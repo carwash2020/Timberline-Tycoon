@@ -80,7 +80,7 @@ function HUD.Toast(message: string)
 	local label = Instance.new("TextLabel")
 	label.Name = "Toast"
 	label.LayoutOrder = toastOrder
-	label.Size = UDim2.new(0, 0, 0, 34)
+	label.Size = UDim2.fromOffset(0, 34)
 	label.AutomaticSize = Enum.AutomaticSize.X
 	label.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
 	label.BackgroundTransparency = 0.25
@@ -118,14 +118,14 @@ function HUD.Start()
 	-- Cash plaque, top-left.
 	local plaque = Instance.new("Frame")
 	plaque.Name = "CashPlaque"
-	plaque.Size = UDim2.new(0, 200, 0, 50)
-	plaque.Position = UDim2.new(0, 12, 0, 8)
+	plaque.Size = UDim2.fromOffset(200, 50)
+	plaque.Position = UDim2.fromOffset(12, 8)
 	plaque.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
 	plaque.BorderSizePixel = 0
 	corner(plaque, 10)
 	local paper = Instance.new("Frame")
 	paper.Size = UDim2.new(1, -8, 1, -8)
-	paper.Position = UDim2.new(0, 4, 0, 4)
+	paper.Position = UDim2.fromOffset(4, 4)
 	paper.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
 	paper.BorderSizePixel = 0
 	corner(paper, 7)
@@ -173,8 +173,8 @@ function HUD.Start()
 	local stack = Instance.new("Frame")
 	stack.Name = "Toasts"
 	stack.AnchorPoint = Vector2.new(0.5, 0)
-	stack.Position = UDim2.new(0.5, 0, 0.18, 0)
-	stack.Size = UDim2.new(0.9, 0, 0, 0)
+	stack.Position = UDim2.fromScale(0.5, 0.18)
+	stack.Size = UDim2.fromScale(0.9, 0)
 	stack.AutomaticSize = Enum.AutomaticSize.Y
 	stack.BackgroundTransparency = 1
 	local list = Instance.new("UIListLayout")
@@ -191,7 +191,7 @@ function HUD.Start()
 	loading.Name = "Loading"
 	loading.AnchorPoint = Vector2.new(0.5, 0.5)
 	loading.Position = UDim2.fromScale(0.5, 0.5)
-	loading.Size = UDim2.new(0, 280, 0, 48)
+	loading.Size = UDim2.fromOffset(280, 48)
 	loading.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
 	loading.Font = Enum.Font.Fantasy
 	loading.TextSize = 24

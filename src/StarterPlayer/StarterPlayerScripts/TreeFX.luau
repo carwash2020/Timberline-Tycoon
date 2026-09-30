@@ -60,7 +60,7 @@ local function wobble(tree: Model, def: WoodDef, home: CFrame)
 	local token = (shakeToken[tree] or 0) + 1
 	shakeToken[tree] = token
 	local base = home.Position - Vector3.new(0, def.trunkHeight / 2, 0)
-	local axis = Vector3.yAxis:Cross(awayFromPlayer(base)) -- tips the top away from you
+	local axis = Vector3.new(0, 1, 0):Cross(awayFromPlayer(base)) -- tips the top away from you
 	task.spawn(function()
 		for _, degrees in ipairs(WOBBLE_DEGREES) do
 			if shakeToken[tree] ~= token or tree.Parent == nil then

@@ -134,7 +134,7 @@ local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
 	swatch.Name = "Swatch"
 	swatch.AnchorPoint = Vector2.new(0, 0.5)
 	swatch.Position = UDim2.new(0, 10, 0.5, 0)
-	swatch.Size = UDim2.new(0, 40, 0, 40)
+	swatch.Size = UDim2.fromOffset(40, 40)
 	swatch.BackgroundColor3 = Color3.fromHex(axe.look.headColor)
 	swatch.BorderSizePixel = 0
 	corner(swatch, 20)
@@ -147,12 +147,12 @@ local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
 	swatch.Parent = frame
 
 	local name = label(frame, axe.displayName, 17, Enum.Font.GothamBold)
-	name.Position = UDim2.new(0, 60, 0, 8)
+	name.Position = UDim2.fromOffset(60, 8)
 	name.Size = UDim2.new(1, -172, 0, 20)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 
 	local detail = label(frame, ShopLogic.DamageText(axe) .. "\n" .. ShopLogic.FellSummary(axe), 14, Enum.Font.Gotham)
-	detail.Position = UDim2.new(0, 60, 0, 30)
+	detail.Position = UDim2.fromOffset(60, 30)
 	detail.Size = UDim2.new(1, -172, 0, 38)
 	detail.TextYAlignment = Enum.TextYAlignment.Top
 	detail.TextWrapped = true
@@ -166,7 +166,7 @@ local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
 	button.Name = "Buy"
 	button.AnchorPoint = Vector2.new(1, 0.5)
 	button.Position = UDim2.new(1, -10, 0.5, 0)
-	button.Size = UDim2.new(0, 100, 0, 38)
+	button.Size = UDim2.fromOffset(100, 38)
 	button.BackgroundColor3 = MUTED
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 15
@@ -245,7 +245,7 @@ local function buildPanel()
 
 	local paper = Instance.new("Frame")
 	paper.Name = "Paper"
-	paper.Position = UDim2.new(0, 5, 0, 5)
+	paper.Position = UDim2.fromOffset(5, 5)
 	paper.Size = UDim2.new(1, -10, 1, -10)
 	paper.BackgroundColor3 = PAPER
 	paper.BorderSizePixel = 0
@@ -253,7 +253,7 @@ local function buildPanel()
 	paper.Parent = p
 
 	local title = label(paper, "TOOL SHED", 26, Enum.Font.Fantasy)
-	title.Position = UDim2.new(0, 14, 0, 8)
+	title.Position = UDim2.fromOffset(14, 8)
 	title.Size = UDim2.new(1, -70, 0, 30)
 
 	local subtitle = label(
@@ -262,7 +262,7 @@ local function buildPanel()
 		13,
 		Enum.Font.Gotham
 	)
-	subtitle.Position = UDim2.new(0, 14, 0, 38)
+	subtitle.Position = UDim2.fromOffset(14, 38)
 	subtitle.Size = UDim2.new(1, -28, 0, 30)
 	subtitle.TextWrapped = true
 	subtitle.TextYAlignment = Enum.TextYAlignment.Top
@@ -271,7 +271,7 @@ local function buildPanel()
 	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, -10, 0, 10)
-	close.Size = UDim2.new(0, 36, 0, 36)
+	close.Size = UDim2.fromOffset(36, 36)
 	close.BackgroundColor3 = BARK
 	close.Font = Enum.Font.GothamBold
 	close.TextSize = 18
@@ -283,7 +283,7 @@ local function buildPanel()
 
 	local list = Instance.new("ScrollingFrame")
 	list.Name = "Axes"
-	list.Position = UDim2.new(0, 10, 0, 74)
+	list.Position = UDim2.fromOffset(10, 74)
 	list.Size = UDim2.new(1, -20, 1, -84)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0

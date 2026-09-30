@@ -52,7 +52,7 @@ function AxeController.Start()
 	b.Name = "DropAxe"
 	b.AnchorPoint = Vector2.new(1, 0.5)
 	b.Position = UDim2.new(1, -12, 0.6, 0) -- right edge, clear of the mobile jump button
-	b.Size = UDim2.new(0, 110, 0, 40)
+	b.Size = UDim2.fromOffset(110, 40)
 	b.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
 	b.BackgroundTransparency = 0.1
 	b.Font = Enum.Font.GothamMedium

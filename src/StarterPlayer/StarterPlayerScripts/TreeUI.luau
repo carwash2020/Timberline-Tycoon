@@ -30,7 +30,7 @@ local function refresh(model: Model)
 	end
 	local frac = math.clamp(hp / maxHp, 0, 1)
 	bar.gui.Enabled = frac > 0 and frac < 1
-	bar.fill.Size = UDim2.new(frac, 0, 1, 0)
+	bar.fill.Size = UDim2.fromScale(frac, 1)
 	if frac > 0.5 then
 		bar.fill.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
 	elseif frac > 0.25 then
@@ -51,7 +51,7 @@ local function attach(model: Model)
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "TreeHP"
-	billboard.Size = UDim2.new(4, 0, 0.5, 0)
+	billboard.Size = UDim2.fromScale(4, 0.5)
 	billboard.StudsOffsetWorldSpace = barOffset(model) -- world up, whatever the trunk's rotation
 	billboard.MaxDistance = BAR_MAX_DISTANCE
 	billboard.AlwaysOnTop = true

@@ -43,7 +43,7 @@ type Dropped = { model: Model, owner: Player, item: AxeItem, temporary: boolean 
 local temporary: { [Player]: { AxeItem } } = {} -- Studio test axes, never saved
 local dropped: { [string]: Dropped } = {} -- [uid]
 local lastCommand: { [Player]: number } = {} -- Studio /giveaxe debounce
-local notify: (Player, string) -> () = function() end
+local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 
 ---------------------------------------------------------------------------
 -- Inventory
