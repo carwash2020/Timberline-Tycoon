@@ -128,6 +128,11 @@ local function onChopTree(player: Player, treeUid: unknown)
 	if newHp == nil then
 		if err == "far" then
 			notify(player, "Too far away. Walk closer to chop.")
+		elseif err == "tooHard" then
+			notify(
+				player,
+				string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName)
+			)
 		end
 		return
 	end

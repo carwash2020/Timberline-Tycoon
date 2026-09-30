@@ -42,17 +42,24 @@ within ~15 minutes. Never more than ~60 seconds of walking with nothing to do.
 
 Tune so each axe roughly halves time-to-fell vs. the previous tier's trees.
 
-### Wood tiers (HP / logs per tree / price per log / where)
-| Wood | Tree HP | Logs | $/log | Biome |
-|---|---|---|---|---|
-| Oak | 30 | 3 | 8 | Starter forest |
-| Birch | 60 | 4 | 15 | Starter forest |
-| Pine | 120 | 5 | 28 | Hills (short drive) |
-| Maple | 220 | 6 | 55 | Hills |
-| Palmwood | 300 | 6 | 85 | Island (boat required) |
-| Frostwood | 400 | 7 | 120 | Snow biome (far) |
-| Emberwood | 700 | 8 | 260 | Volcano biome (far, hazard) |
-| Phantomwood | 1,200 | 9 | 600 | Night-only grove (timed event) |
+### Wood tiers (HP / hardness / logs per tree / price per log / where)
+| Wood | Tree HP | Hardness | Logs | $/log | Biome |
+|---|---|---|---|---|---|
+| Oak | 30 | 0 | 3 | 3 | Starter forest |
+| Birch | 60 | 0 | 4 | 4 | Starter forest |
+| Pine | 100 | 4 | 5 | 7 | Hills (short drive) |
+| Maple | 200 | 10 | 6 | 10 | Hills |
+| Palmwood | 300 | 15 | 6 | 20 | Island (boat required) |
+| Frostwood | 400 | 20 | 7 | 25 | Snow biome (far) |
+| Emberwood | 900 | 50 | 8 | 55 | Volcano biome (far, hazard) |
+| Phantomwood | 1,200 | 70 | 9 | 65 | Night-only grove (timed event) |
+
+**Hardness** is subtracted from every axe hit, so each wood needs a real
+axe upgrade: the Rusty Axe can't cut maple at all, and emberwood needs the
+Gold Axe or better. Price per HP falls up the tiers on purpose: rare wood
+pays per *log* (worth the long drive in a big truck), not per swing. Tuned
+2026-09-30 with `tools/economy.luau` so every §4 target is within 25%; see
+ECONOMY.md.
 
 Rare trees respawn slowly (5–15 min) to create scarcity and trading.
 
@@ -284,7 +291,7 @@ players never compete for them.
 2. **Haul.** "Grab those logs — load your truck." Teaches: pick up, carry
    capacity, the Rustbucket (your run-down starter truck).
 3. **First sale.** Beacon to the Sawmill. "Sell 'em at the mill." Cha-ching —
-   3 oak logs, $24. Target: under 3 minutes from spawn.
+   3 oak logs, $9. Target: under 3 minutes from spawn.
 4. **The goal.** "That Rusty Axe won't cut it in the hills." Quest: chop and
    sell 3 more loads; completion bonus bridges the gap to the $150 Steel Axe.
    Teaches the grind loop with a near-term payoff (~12 min to first upgrade).
@@ -423,8 +430,8 @@ export type Profile = {
 - Session-lock via UpdateAsync so two servers can't double-spend.
 
 ### 14.3 Static data (ReplicatedStorage.Shared) — balance lives HERE
-- `WoodData.luau`: per wood — id, displayName, treeHP, logsPerTree,
-  pricePerLog, biome, respawnSec, silhouette, colorHex.
+- `WoodData.luau`: per wood — id, displayName, treeHP, hardness,
+  logsPerTree, pricePerLog, biome, respawnSec, silhouette, colorHex.
 - `ItemCatalog.luau`: axes, trucks, trailers, boats, gear, blueprints —
   id, displayName, priceCash, stats.
 - `BiomeData.luau`: biome id, effect id + params (slowFactor, damagePerSec).
@@ -480,7 +487,9 @@ export type Profile = {
   "PlotSpot". Biomes: folders in Workspace, art per §13.
 
 ### 14.8 Economy formulas (implement, don't eyeball)
-- `hitsToFell = ceil(treeHP / axeDamage)`; swing cooldown 0.8s.
+- `hitsToFell = ceil(treeHP / max(0, axeDamage - hardness))` (0 damage =
+  can't cut it); swing cooldown 0.8s. `lune run tools/economy` applies these
+  formulas to the data tables and writes ECONOMY.md.
 - `cashPerHour ≈ 3600 / cycleSec × logsPerTree × pricePerLog`
   (cycleSec measured in playtest, not hardcoded).
 - After each phase, check against §4 targets; if off by >25%, tune the
@@ -493,7 +502,7 @@ export type Profile = {
 - [ ] Tree shakes, chips fly, HP bar shows; falls and spawns exactly 3 logs.
 - [ ] Pick up ≤ 2 logs by hand (prompt within 10 studs).
 - [ ] Rustbucket bed holds 6; load/unload at the sawmill.
-- [ ] Sell in SellZone: +$8/log; cash changes ONLY via EconomyService.
+- [ ] Sell in SellZone: +$3/log (oak); cash changes ONLY via EconomyService.
 - [ ] Leave + rejoin: cash and axe persist.
 - [ ] First sale achievable in < 3 min in a solo Play test.
 - [ ] `ChopTree` rejected beyond 20 studs; rate-limited at 4/s.

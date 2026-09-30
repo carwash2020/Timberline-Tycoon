@@ -305,7 +305,11 @@ function TreeService.ApplyChop(player: Player, treeUid: string, axe: ItemCatalog
 	then
 		return nil, "far"
 	end
-	rec.hp = math.max(0, rec.hp - ItemCatalog.AxeDamage(axe, rec.def.biome))
+	local damage = ItemCatalog.AxeDamage(axe, rec.def)
+	if damage <= 0 then
+		return nil, "tooHard"
+	end
+	rec.hp = math.max(0, rec.hp - damage)
 	rec.model:SetAttribute("HP", rec.hp)
 	if rec.hp <= 0 then
 		fellTree(player, treeUid)

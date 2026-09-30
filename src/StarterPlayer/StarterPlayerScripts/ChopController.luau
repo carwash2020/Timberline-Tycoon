@@ -18,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local HUD = require(script.Parent.HUD)
 
 local ChopController = {}
@@ -46,6 +47,12 @@ local function isAlive(tree: Model): boolean
 	return type(hp) == "number" and hp > 0
 end
 
+-- Can this axe cut this tree at all? (Harder wood needs a stronger axe.)
+local function canCut(axe: ItemCatalog.AxeDef, tree: Model): boolean
+	local wood = WoodData.Get(tostring(tree:GetAttribute("WoodId")))
+	return wood ~= nil and ItemCatalog.AxeDamage(axe, wood) > 0
+end
+
 local function flatDistance(tree: Model, from: Vector3): number
 	local home = tree:GetAttribute("HomePivot")
 	local pos = if typeof(home) == "CFrame" then home.Position else tree:GetPivot().Position
@@ -65,9 +72,10 @@ local function pointerRay(camera: Camera): Ray?
 	return camera:ViewportPointToRay(m.X, m.Y)
 end
 
--- Returns (tree, pointedAtFarTree).
-local function pickTarget(hrp: BasePart): (Model?, boolean)
-	local pointedTooFar = false
+-- Returns (tree, problem) where problem explains a miss: "far" if the
+-- pointer is on a tree out of reach, "hard" if it's on one this axe can't cut.
+local function pickTarget(hrp: BasePart, axe: ItemCatalog.AxeDef): (Model?, string?)
+	local problem: string? = nil
 	local camera = workspace.CurrentCamera
 	local ray = if camera then pointerRay(camera) else nil
 	if ray then
@@ -77,24 +85,27 @@ local function pickTarget(hrp: BasePart): (Model?, boolean)
 		local hit = workspace:Raycast(ray.Origin, ray.Direction * 250, params)
 		local tree = if hit then findTreeModel(hit.Instance) else nil
 		if tree and isAlive(tree) then
-			if flatDistance(tree, hrp.Position) <= GameConfig.ChopRange then
-				return tree, false
+			if not canCut(axe, tree) then
+				problem = "hard"
+			elseif flatDistance(tree, hrp.Position) <= GameConfig.ChopRange then
+				return tree, nil
+			else
+				problem = "far"
 			end
-			pointedTooFar = true
 		end
 	end
 	-- Nothing choppable under the pointer: take the nearest tree within reach.
 	local best: Model? = nil
 	local bestDist = GameConfig.AutoTargetRange
 	for _, inst in ipairs(CollectionService:GetTagged("Tree")) do
-		if inst:IsA("Model") and isAlive(inst) then
+		if inst:IsA("Model") and isAlive(inst) and canCut(axe, inst) then
 			local d = flatDistance(inst, hrp.Position)
 			if d <= bestDist then
 				best, bestDist = inst, d
 			end
 		end
 	end
-	return best, pointedTooFar and best == nil
+	return best, if best == nil then problem else nil
 end
 
 -- The default character Animate script plays its built-in tool-slash
@@ -118,13 +129,16 @@ local function trySwing(fromClick: boolean)
 	end
 	local tool = char:FindFirstChildOfClass("Tool")
 	local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not tool or not hrp or not ItemCatalog.GetAxe(tool.Name) then
+	local axe = if tool then ItemCatalog.GetAxe(tool.Name) else nil
+	if not tool or not hrp or not axe then
 		return
 	end
-	local tree, tooFar = pickTarget(hrp)
+	local tree, problem = pickTarget(hrp, axe)
 	if not tree then
-		if tooFar and fromClick then
+		if fromClick and problem == "far" then
 			HUD.Toast("Too far away. Walk closer to chop.")
+		elseif fromClick and problem == "hard" then
+			HUD.Toast(string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName))
 		end
 		return
 	end

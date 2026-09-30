@@ -1,6 +1,12 @@
 -- WoodData: static definitions for every wood tier in Timberline Tycoon.
 -- All balance numbers live here. Tuning = editing this table, never code.
 -- (Phase 1 spawns oak + birch; the rest are defined for later phases.)
+--
+-- hardness is subtracted from every axe hit (ItemCatalog.AxeDamage), so a
+-- weak axe barely dents, or can't cut, higher-tier wood. Together with the
+-- falling "$ per HP" up the tiers, that keeps each axe on its own tier
+-- instead of farming rare wood from minute one. Check any change with
+-- `lune run tools/economy` (writes ECONOMY.md).
 
 local WoodData = {}
 
@@ -8,6 +14,7 @@ export type WoodDef = {
 	id: string,
 	displayName: string,
 	treeHP: number,
+	hardness: number, -- subtracted from each axe hit
 	logsPerTree: number,
 	pricePerLog: number,
 	biome: string,
@@ -32,8 +39,9 @@ local woods: { WoodDef } = {
 		id = "oak",
 		displayName = "Oak",
 		treeHP = 30,
+		hardness = 0,
 		logsPerTree = 3,
-		pricePerLog = 8,
+		pricePerLog = 3,
 		biome = "starter",
 		respawnSec = 45,
 		silhouette = "broadleaf",
@@ -46,8 +54,9 @@ local woods: { WoodDef } = {
 		id = "birch",
 		displayName = "Birch",
 		treeHP = 60,
+		hardness = 0,
 		logsPerTree = 4,
-		pricePerLog = 15,
+		pricePerLog = 4,
 		biome = "starter",
 		respawnSec = 60,
 		silhouette = "broadleaf",
@@ -59,9 +68,10 @@ local woods: { WoodDef } = {
 	{
 		id = "pine",
 		displayName = "Pine",
-		treeHP = 120,
+		treeHP = 100,
+		hardness = 4,
 		logsPerTree = 5,
-		pricePerLog = 28,
+		pricePerLog = 7,
 		biome = "hills",
 		respawnSec = 90,
 		silhouette = "pine",
@@ -73,9 +83,10 @@ local woods: { WoodDef } = {
 	{
 		id = "maple",
 		displayName = "Maple",
-		treeHP = 220,
+		treeHP = 200,
+		hardness = 10,
 		logsPerTree = 6,
-		pricePerLog = 55,
+		pricePerLog = 10,
 		biome = "hills",
 		respawnSec = 120,
 		silhouette = "broadleaf",
@@ -88,8 +99,9 @@ local woods: { WoodDef } = {
 		id = "palmwood",
 		displayName = "Palmwood",
 		treeHP = 300,
+		hardness = 15,
 		logsPerTree = 6,
-		pricePerLog = 85,
+		pricePerLog = 20,
 		biome = "island",
 		respawnSec = 150,
 		silhouette = "palm",
@@ -102,8 +114,9 @@ local woods: { WoodDef } = {
 		id = "frostwood",
 		displayName = "Frostwood",
 		treeHP = 400,
+		hardness = 20,
 		logsPerTree = 7,
-		pricePerLog = 120,
+		pricePerLog = 25,
 		biome = "snow",
 		respawnSec = 180,
 		silhouette = "pine",
@@ -115,9 +128,10 @@ local woods: { WoodDef } = {
 	{
 		id = "emberwood",
 		displayName = "Emberwood",
-		treeHP = 700,
+		treeHP = 900,
+		hardness = 50,
 		logsPerTree = 8,
-		pricePerLog = 260,
+		pricePerLog = 55,
 		biome = "volcano",
 		respawnSec = 240,
 		silhouette = "glowing",
@@ -130,8 +144,9 @@ local woods: { WoodDef } = {
 		id = "phantomwood",
 		displayName = "Phantomwood",
 		treeHP = 1200,
+		hardness = 70,
 		logsPerTree = 9,
-		pricePerLog = 600,
+		pricePerLog = 65,
 		biome = "grove",
 		respawnSec = 300,
 		silhouette = "dead",

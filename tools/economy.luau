@@ -78,8 +78,10 @@ local BOATS = sortedByPrice(ItemCatalog.Boats)
 local GEAR = sortedByPrice(ItemCatalog.Gear)
 local WOODS = WoodData.All()
 
+-- math.huge when the axe can't cut the wood (hardness >= damage).
 local function hitsToFell(axe, wood): number
-	return math.ceil(wood.treeHP / ItemCatalog.AxeDamage(axe, wood.biome))
+	local damage = ItemCatalog.AxeDamage(axe, wood)
+	return if damage > 0 then math.ceil(wood.treeHP / damage) else math.huge
 end
 
 -- One full load: chop enough trees to fill the cargo plus both hands,
@@ -120,7 +122,7 @@ local function bestRate(owned, biomes: { [string]: boolean }?)
 		local allowed = if biomes then biomes[wood.biome] == true else true
 		if allowed and not NIGHT_ONLY[wood.biome] and (gear == nil or owned[gear]) then
 			local axe = best(AXES, owned, function(a)
-				return ItemCatalog.AxeDamage(a, wood.biome)
+				return ItemCatalog.AxeDamage(a, wood)
 			end)
 			local cargo, speed, label = 0, A.driveSpeed, ""
 			if BY_BOAT[wood.biome] then
@@ -142,7 +144,7 @@ local function bestRate(owned, biomes: { [string]: boolean }?)
 					label = truck.displayName .. (if trailer then " + " .. trailer.displayName else "")
 				end
 			end
-			if axe and cargo > 0 then
+			if axe and cargo > 0 and ItemCatalog.AxeDamage(axe, wood) > 0 then
 				local secs, cash = loadCycle(axe, cargo, speed, wood, owned.InsulatedCoat == true)
 				local rate = cash / secs * 3600
 				if rate > topRate then
@@ -376,13 +378,17 @@ do
 				startWood.displayName:lower()
 			)
 		)
+	else
+		line("- **Weak axes stay on their own tier:** the Rusty Axe earns the most in the starter forest.")
 	end
-	line(
-		string.format(
-			"- **Axe upgrades barely move income once you haul far.** On the best wood with the Rustbucket, going from the Rusty Axe to the Inferno Axe raises $/h only %.1f×: the drive dominates each trip, so trucks and trailers matter more than axes.",
-			infernoRate / anyRate
+	if infernoRate / anyRate < 2 then
+		line(
+			string.format(
+				"- **Axe upgrades barely move income once you haul far.** On the best wood with the Rustbucket, going from the Rusty Axe to the Inferno Axe raises $/h only %.1f×: the drive dominates each trip, so trucks and trailers matter more than axes.",
+				infernoRate / anyRate
+			)
 		)
-	)
+	end
 	if inferno and rig then
 		line(
 			string.format(
@@ -478,19 +484,20 @@ line()
 line("## What each wood pays")
 line()
 line(
-	'"$ per 100 HP" is what each 100 HP of chopping earns, whatever the axe. If it climbs much faster than the haul gets longer, rare wood beats upgrading your axe.'
+	'"$ per 100 HP" is what each 100 HP of chopping earns. It falls up the tiers on purpose: rare wood pays per log (worth the long drive with a big truck), not per swing, so weak axes are better off on their own tier. Hardness is subtracted from every hit.'
 )
 line()
-line("| Wood | Biome | HP | Logs | $/log | $/tree | $ per 100 HP | Haul (studs) |")
-line("|---|---|---|---|---|---|---|---|")
+line("| Wood | Biome | HP | Hardness | Logs | $/log | $/tree | $ per 100 HP | Haul (studs) |")
+line("|---|---|---|---|---|---|---|---|---|")
 for _, wood in ipairs(WOODS) do
 	local perTree = wood.logsPerTree * wood.pricePerLog
 	line(
 		string.format(
-			"| %s | %s | %d | %d | %s | %s | %s | %d |",
+			"| %s | %s | %d | %d | %d | %s | %s | %s | %d |",
 			wood.displayName,
 			wood.biome,
 			wood.treeHP,
+			wood.hardness,
 			wood.logsPerTree,
 			money(wood.pricePerLog),
 			money(perTree),
@@ -560,7 +567,7 @@ line()
 local header = "| Axe (damage) |"
 local rule = "|---|"
 for _, wood in ipairs(WOODS) do
-	header ..= string.format(" %s (%d HP) |", wood.displayName, wood.treeHP)
+	header ..= string.format(" %s (%d HP, hardness %d) |", wood.displayName, wood.treeHP, wood.hardness)
 	rule ..= "---|"
 end
 line(header)
@@ -568,12 +575,15 @@ line(rule)
 for _, axe in ipairs(AXES) do
 	local row = string.format("| %s (%d%s) |", axe.displayName, axe.damage, if axe.biomeDamage then "*" else "")
 	for _, wood in ipairs(WOODS) do
-		row ..= string.format(" %d |", hitsToFell(axe, wood))
+		local hits = hitsToFell(axe, wood)
+		row ..= if hits == math.huge then " — |" else string.format(" %d |", hits)
 	end
 	line(row)
 end
 line()
-line("\\* Deals more to some biomes (ItemCatalog `biomeDamage`).")
+line(
+	"— = can't cut it: the wood's hardness is at least the axe's damage. \\* Deals more to some biomes (ItemCatalog `biomeDamage`)."
+)
 line()
 
 -- Assumptions.

@@ -50,7 +50,7 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 4. At your truck's tailgate → **Load logs** (bed holds 6). **Drive** is at
    the seat; jump (Space) to get out.
 5. Drive to the sawmill (north of spawn), stand on the **SELL LOGS HERE**
-   pad → **Sell logs**. Oak is $8 a log. The truck bed only sells if the
+   pad → **Sell logs**. Oak is $3 a log, birch $4. The truck bed only sells if the
    truck is parked by the mill.
 
 ## First playtest: what to check
@@ -60,7 +60,7 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 - [ ] Tree wobbles, chips fly, HP bar shows; falls and leaves exactly 3 logs
 - [ ] Pick up ≤ 2 logs by hand (prompt within 10 studs)
 - [ ] Rustbucket bed holds 6; sell it at the sawmill
-- [ ] Sell on the pad: +$8/log; cash only changes via EconomyService
+- [ ] Sell on the pad: +$3/log (oak); cash only changes via EconomyService
 - [ ] Leave + rejoin: cash and axe persist (needs API access, see README)
 - [ ] First sale in < 3 min in a solo Play test
 - [ ] ChopTree rejected when too far; can't swing faster than every 0.8 s
@@ -93,8 +93,8 @@ Things only a human can judge (report back):
 - Tree placement is random scatter, not art-directed; the full world comes
   with the biome passes.
 
-## Open questions for Connor
-- **Economy pace:** see [ECONOMY.md](ECONOMY.md). The model says earning
-  runs ~5× faster than §4's targets, rare wood pays so well per hit that a
-  Rusty Axe can farm it from minute one, and the whole progression takes
-  under 2 hours. Decide the direction, then tune WoodData / ItemCatalog.
+## Economy status
+- **Economy pace:** tuned on 2026-09-30 to match §4 (see ECONOMY.md):
+  first Steel Axe ~10 min, whole progression ~12 h. The model assumes
+  real players are half as efficient as a perfect one; the playtest's
+  `[Stopwatch]` $/min will tell us the real number.

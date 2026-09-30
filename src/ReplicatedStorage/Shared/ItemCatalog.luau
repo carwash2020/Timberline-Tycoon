@@ -103,10 +103,12 @@ function ItemCatalog.GetAxe(axeId: string): AxeDef?
 	return nil
 end
 
--- Damage this axe deals per hit to a tree from `biome`.
-function ItemCatalog.AxeDamage(axe: AxeDef, biome: string): number
-	local override = if axe.biomeDamage then axe.biomeDamage[biome] else nil
-	return override or axe.damage
+-- Damage this axe deals per hit to a tree of `wood` (a WoodData entry):
+-- the axe's damage (or its biome override), minus the wood's hardness.
+-- 0 means the axe can't cut that wood at all.
+function ItemCatalog.AxeDamage(axe: AxeDef, wood: { biome: string, hardness: number }): number
+	local override = if axe.biomeDamage then axe.biomeDamage[wood.biome] else nil
+	return math.max(0, (override or axe.damage) - wood.hardness)
 end
 
 function ItemCatalog.GetTruck(truckId: string): TruckDef?
