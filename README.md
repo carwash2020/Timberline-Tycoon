@@ -6,32 +6,37 @@ at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 - **What the game is:** [GAME_DESIGN.md](GAME_DESIGN.md)
 - **Where Phase 1 stands:** [PHASE1_NOTES.md](PHASE1_NOTES.md)
 
-## One-time setup (Mac)
+## Set up on any computer (one command)
 
-1. **Install Roblox Studio** and sign in.
-2. **Install Rokit**, which installs the exact tool versions pinned in
-   `rokit.toml` (Rojo, StyLua, Selene, luau-lsp):
-   ```sh
-   curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
-   ```
-   Open a new terminal afterwards so `rokit` is on your PATH.
-3. **Get the code and the tools:**
-   ```sh
-   git clone https://github.com/carwash2020/timberline-tycoon.git
-   cd timberline-tycoon
-   rokit install
-   rojo plugin install   # installs the matching Rojo plugin into Studio
-   ```
-4. **Make a place for it in Studio.** File → New → **Baseplate**, then
-   File → **Publish to Roblox** (name it Timberline Tycoon). The game
-   removes the template's Baseplate and SpawnLocation by itself when you
-   press Play, so you don't have to.
-5. **Turn on saving in Studio:** Home → **Game Settings** → **Security** →
-   enable **Enable Studio Access to API Services** → Save. Without this,
-   everything still works but progress resets between tests.
-6. *(Optional)* VS Code extensions: **Luau Language Server**
-   (JohnnyMorganz), **Selene**, **StyLua**. They give autocomplete for the
-   Roblox API and flag mistakes as you type.
+You need **Roblox Studio** installed and signed in; that part can't live in
+the repo. Everything else is installed by the setup script at the exact
+versions pinned in `rokit.toml`:
+
+**Mac / Linux** (Terminal):
+```sh
+git clone https://github.com/carwash2020/timberline-tycoon.git
+cd timberline-tycoon
+bash setup.sh
+```
+
+**Windows:** clone the repo (or on GitHub: **Code → Download ZIP** and
+unzip it), then double-click **`setup.cmd`**.
+
+The script installs Rokit if it's missing, then Rojo, StyLua, Selene and
+luau-lsp, then the matching Rojo plugin into Studio. It's safe to run
+again any time. If it says GitHub is rate-limiting you (common on school
+or office Wi-Fi), run `rokit authenticate github` and try again.
+
+**First time only, per game (not per computer):** in Studio, File → New →
+**Baseplate**, then File → **Publish to Roblox**, then Home → **Game
+Settings** → **Security** → enable **Enable Studio Access to API
+Services** → Save. Without API access everything works but progress
+resets between tests. On other computers, open the same place with
+File → **Open from Roblox**.
+
+*(Optional)* VS Code extensions: **Luau Language Server** (JohnnyMorganz),
+**Selene**, **StyLua**: autocomplete for the Roblox API, plus mistakes
+flagged as you type.
 
 ## Everyday loop
 
