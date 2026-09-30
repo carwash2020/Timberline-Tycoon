@@ -1,5 +1,6 @@
 --!nocheck
--- Loads game modules outside Roblox, so tests can run with Lune.
+-- Loads game modules outside Roblox, so tests (tests/run.luau) and tools
+-- (tools/economy.luau) can run them with Lune.
 --
 -- Each module is loaded from src/ with a small fake of what Roblox gives it:
 --   * `script.Parent.X` and `game:GetService("ReplicatedStorage").Shared.X`

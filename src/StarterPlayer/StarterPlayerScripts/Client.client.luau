@@ -12,6 +12,7 @@ local AxeController = require(script.Parent.AxeController)
 local ShopUI = require(script.Parent.ShopUI)
 local QuestUI = require(script.Parent.QuestUI)
 local VehicleController = require(script.Parent.VehicleController)
+local DailyUI = require(script.Parent.DailyUI)
 
 HUD.Start() -- first, so toasts work for everything after it
 ChopController.Start()
@@ -22,5 +23,6 @@ AxeController.Start()
 ShopUI.Start()
 QuestUI.Start()
 VehicleController.Start()
+DailyUI.Start()
 
 print("[Client] Timberline Tycoon client started.")

@@ -21,21 +21,21 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 local luau = require("@lune/luau")
-local roblox = require("@lune/roblox")
 
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tools/economy")
 
--- The data modules are plain Luau except WoodData's Color3 colours, so load
--- them with Lune's Color3 standing in for Roblox's.
+-- The game's own data modules, loaded outside Roblox (tools/loader.luau).
+local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
+local modules = Loader.new()
 local function loadModule(name: string)
-	local path = "src/ReplicatedStorage/Shared/" .. name .. ".luau"
-	return luau.load(fs.readFile(path), { debugName = path, environment = { Color3 = roblox.Color3 } })()
+	return modules:shared(name)
 end
 local WoodData = loadModule("WoodData")
 local ItemCatalog = loadModule("ItemCatalog")
 local GameConfig = loadModule("GameConfig")
 local BiomeData = loadModule("BiomeData")
 local TutorialData = loadModule("TutorialData")
+local DailyData = loadModule("DailyData")
 
 ---------------------------------------------------------------------------
 -- Assumptions (edit these, then re-run)
@@ -828,6 +828,19 @@ line(
 		money(TutorialData.TotalReward())
 	)
 )
+do
+	-- Daily goals aren't in the pace above: they're a once-a-day extra.
+	local function dailyMax(tier: number): number
+		return DailyData.GoalsPerDay * DailyData.Tiers[tier].reward + DailyData.Bonus(tier, 5)
+	end
+	line(
+		string.format(
+			"- Daily goals (DailyData) aren't counted above: at most %s a day with the Rusty Axe, up to %s with the Starfall Axe (all goals plus a 5-day streak bonus).",
+			money(dailyMax(1)),
+			money(dailyMax(#DailyData.Tiers))
+		)
+	)
+end
 
 local report = table.concat(out, "\n") .. "\n"
 if process.args[1] == "--check" then

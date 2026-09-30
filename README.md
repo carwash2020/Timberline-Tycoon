@@ -93,19 +93,21 @@ measure the economy model against your real play (saved in
   - `AxeService`: axes as items (hotbar, drop, pick up)
   - `ShopService`: buying at the Tool Shed and Dealership
   - `QuestService`: Murph's tutorial (progress, rewards, skip)
+  - `DailyService`: daily goals and streaks
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
   - `ShopLogic`: what the shop may sell a player (both sides use it)
   - `TutorialData`: Murph's tutorial steps and lines
   - `TruckLayout`, `DriveMath`: how trucks are built and how they drive
+  - `DailyData`: daily goal sizes, rewards and streak bonus
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial
-  tracker, `VehicleController` drives your truck)
+  tracker, `VehicleController` drives your truck, `DailyUI` the daily goals)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
-- `tests/`: unit tests, run with Lune outside Roblox (`tests/loader.luau`
+- `tests/`: unit tests, run with Lune outside Roblox (`tools/loader.luau`
   fakes just enough of Roblox to load game modules)
 - `scripts/check.sh`: formatter, linter, type checks, tests
 - `.github/workflows/checks.yml`: runs `check.sh` on GitHub

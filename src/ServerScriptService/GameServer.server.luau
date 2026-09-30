@@ -14,6 +14,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AxeService = require(script.Parent.AxeService)
+local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -137,6 +138,7 @@ local function onChopTree(player: Player, treeUid: unknown)
 		profile.stats.treesChopped += 1
 		MilestoneService.Mark(player, "First tree felled")
 		QuestService.Event(player, "treeFelled")
+		DailyService.Event(player, "treeFelled", 1)
 	end
 end
 
@@ -242,6 +244,7 @@ local function onLoadToTruck(player: Player)
 	if moved > 0 then
 		MilestoneService.Mark(player, "First log loaded")
 		QuestService.Event(player, "logsLoaded", moved)
+		DailyService.Event(player, "logsLoaded", moved)
 		notify(
 			player,
 			string.format(
@@ -313,13 +316,16 @@ local function onSellLogs(player: Player)
 			)
 		)
 	end
-	QuestService.Event(player, "logsSold", count) -- after the sale's toasts, so Murph's reward reads last
+	-- After the sale's toasts, so rewards read last.
+	QuestService.Event(player, "logsSold", count)
+	DailyService.Event(player, "logsSold", count, byWood, credited)
 end
 
 MilestoneService.Init(notify)
 AxeService.Init(notify)
 ShopService.Init(mapFolder, remote.BuyItem, remote.EquipItem, notify)
 QuestService.Init(remote.SkipTutorial, notify)
+DailyService.Init(notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
@@ -405,6 +411,7 @@ local function onPlayerAdded(player: Player)
 	remote.CashChanged:FireClient(player, profile.cash)
 	MilestoneService.Start(player, profile)
 	QuestService.Start(player, profile)
+	DailyService.Start(player, profile)
 	ShopService.PlayerJoined(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end

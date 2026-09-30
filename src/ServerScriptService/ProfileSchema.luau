@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -23,6 +24,15 @@ export type PlacedItem = {
 export type AxeItem = {
 	uid: string,
 	id: string, -- ItemCatalog.Axes key
+}
+
+-- Today's goals and the streak (DailyService).
+export type DailyState = {
+	day: number, -- DailyData.Day of the goals below
+	goals: { DailyData.Goal },
+	streak: number, -- days in a row with every goal done
+	bestStreak: number,
+	lastCompleteDay: number,
 }
 
 export type Profile = {
@@ -54,6 +64,7 @@ export type Profile = {
 	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
 	tutorialProgress: number, -- count toward the current step
 	seasonId: string,
+	daily: DailyState,
 	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
 }
 
@@ -80,6 +91,7 @@ local TEMPLATE: Profile = {
 	tutorialStep = 1,
 	tutorialProgress = 0,
 	seasonId = "spring",
+	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
 	onboarding = {},
 }
 ProfileSchema.Template = TEMPLATE

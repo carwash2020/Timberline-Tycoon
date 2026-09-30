@@ -491,6 +491,31 @@ systems make the world worth *living in*, not just optimizing.
 - **Day/night + weather.** Full cycle (the Phantom Grove is night-only);
   rain, storms that knock down bonus trees, auroras over the snow biome.
   Cozy, not just cosmetic — weather changes what the world offers.
+- **Daily goals (built).** Three goals a day (UTC), picked per player and
+  sized to their axe tier: fell trees, load logs, sell logs, sell one wood,
+  earn cash. Each pays a small reward; finishing all three pays a bonus
+  that grows with the **streak** (days in a row, up to 2x at 5 days). A
+  missed day breaks it. Rewards are modest on purpose (at most $105 a day
+  on the Rusty Axe, $9,100 on the Starfall Axe; see ECONOMY.md) so dailies
+  bring players back without replacing play. Tuning: `Shared/DailyData`.
+
+### Seasons and festivals: build plan (next)
+The next retention milestone after dailies, in this order:
+1. **Season clock** (`SeasonService`): one server-agnostic calendar from
+   UTC time (no DataStore needed): season = (days since launch // 14) % 4.
+   Expose it as a workspace attribute; the HUD shows "Autumn · day 6".
+2. **World tint per season**: Lighting presets and leaf colours per season
+   (§13), applied by the client from the attribute. No gameplay yet; proves
+   the clock and looks good in screenshots.
+3. **Seasonal content, from data**: a `SeasonData` table (which woods and
+   forage spawn, price multipliers, e.g. frostwood +20% in winter). The
+   economy calculator reads it so seasonal swings stay inside the targets.
+4. **Festivals**: the last 2 days of each season. First one: a timed
+   log-chopping contest at the sawmill (most logs sold in 10 minutes,
+   server-wide leaderboard, cosmetic rewards only). Cosmetics avoid
+   feeding the economy.
+5. **Seasonal dailies**: DailyData gets a per-season goal pool (e.g. "sell
+   6 frostwood logs" in winter) once more woods are in the world.
 
 ## 13. Art direction — cozy low-poly
 
@@ -582,6 +607,8 @@ export type Profile = {
   tutorialStep: number,   -- index into TutorialData.Steps
   tutorialProgress: number,
   seasonId: string,
+  daily: { day: number, goals: { DailyGoal }, streak: number,
+           bestStreak: number, lastCompleteDay: number },  -- DailyService
 }
 ```
 - Autosave every 120s + on PlayerRemoving. Retry with backoff. If load
@@ -653,6 +680,7 @@ export type Profile = {
   recall and switching; later trailer attach and boats.
 - `QuestService.luau` — tutorial beats + quest log.
 - `NPCService.luau` — dialogue, friendship, gifts.
+- `DailyService.luau` — daily goals and streaks (rules in `Shared/DailyData`).
 - `SeasonService.luau` — clock, seasons, festivals, weather, day/night.
 - `TradingService.luau` — phase 7.
 

@@ -8,7 +8,7 @@
 --   t.eq(actual, expected)  equal (deep for tables)
 --   t.ok(value, message?)   truthy
 --   t.fails(fn, pattern?)   fn must error (optionally matching pattern)
---   t.loader(options?)      a fresh module Loader (see tests/loader.luau)
+--   t.loader(options?)      a fresh module Loader (see tools/loader.luau)
 --   t.shared(name), t.server(name)  load a module with a shared Loader
 --   t.roblox                @lune/roblox (Enum, Vector3, ...)
 -- Exits non-zero if anything fails, so CI can gate on it.
@@ -20,7 +20,7 @@ local roblox = require("@lune/roblox")
 
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tests/run")
 
-local Loader = luau.load(fs.readFile("tests/loader.luau"), { debugName = "tests/loader.luau" })()
+local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
 
 local filter = process.args[1]
 

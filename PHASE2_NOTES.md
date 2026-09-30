@@ -132,3 +132,27 @@ test account), progress starts fresh each Play session.
 Numbers to tune after this playtest (all in `GameConfig.luau` /
 `ItemCatalog.luau`): `VehicleAccel` 14, `VehicleBrake` 40, `VehicleCoast` 8,
 each truck's `topSpeed` and `turnRate`.
+
+## Daily goals and streaks (GAME_DESIGN §12)
+
+A **DAILY GOALS 0/3** button sits under your cash. Tap it for today's three
+goals, e.g. "Fell 4 trees", "Sell 12 logs", "Sell 6 birch logs", "Earn
+$60 selling logs", "Load 12 logs into your truck", with progress bars and
+rewards. Each goal pays when done; all three pay a bonus that grows with
+your **streak** (days in a row, up to 2x at 5 days). Goals are sized to
+your best axe, reset at midnight UTC (the panel counts down), and a missed
+day resets the streak.
+
+### Playtest checklist
+- [ ] The button shows under the cash with "0/3"; tapping opens the goals
+- [ ] Felling, loading and selling move the right bars; a finished goal
+      toasts "Daily goal done … +$15" and turns green
+- [ ] Finishing all three: "All daily goals done! +$30. Streak: 1 day."; the
+      button turns green and shows the streak
+- [ ] Rejoin the same day: same goals, same progress
+- [ ] "New goals in …" counts down to midnight UTC
+- [ ] Phone: the button and panel fit under the cash and close with a tap
+
+To test a new day without waiting: temporarily change `SecondsPerDay` in
+`DailyData.luau` to `300` (a "day" every 5 minutes), then set it back to
+`86400`.

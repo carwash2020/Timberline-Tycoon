@@ -120,3 +120,4 @@ The whole world, with a player who always buys whichever upgrade pays for itself
 - Biome rules come from BiomeData: required gear (volcano: Heat Boots; Phantom Grove: Lantern, night only, so left out of the path), boats for the Island, and slowdowns (snow without the Insulated Coat).
 - Each load = cargo + a full armful; logs are sold at WoodData prices.
 - Murph's tutorial pays $25 (TutorialData), counted toward the first purchase.
+- Daily goals (DailyData) aren't counted above: at most $105 a day with the Rusty Axe, up to $9,100 with the Starfall Axe (all goals plus a 5-day streak bonus).

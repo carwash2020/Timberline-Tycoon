@@ -581,9 +581,9 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 		return false, "Hop out first."
 	end
 	local now = os.clock()
-	local wait = GameConfig.TruckRecallCooldown - (now - (lastRecall[player.UserId] or -math.huge))
-	if wait > 0 then
-		return false, string.format("Your truck's on its way. Try again in %d s.", math.ceil(wait))
+	local remaining = GameConfig.TruckRecallCooldown - (now - (lastRecall[player.UserId] or -math.huge))
+	if remaining > 0 then
+		return false, string.format("Your truck's on its way. Try again in %d s.", math.ceil(remaining))
 	end
 	lastRecall[player.UserId] = now
 	VehicleService.SpawnTruck(player, rec.def.id, rec.bed)
