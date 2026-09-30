@@ -7,6 +7,7 @@
 -- GAME_DESIGN §2, §4 and §11. Writes the report to ECONOMY.md.
 --
 -- Run from the repo root:   lune run tools/economy
+-- Check the committed report is current (CI does):   lune run tools/economy --check
 --
 -- It's a model, not a measurement. It assumes trees are always available
 -- and nobody competes for them. EFFICIENCY scales the ideal "perfect player"
@@ -815,5 +816,15 @@ line(
 line("- Each load = cargo + a full armful; logs are sold at WoodData prices.")
 
 local report = table.concat(out, "\n") .. "\n"
-fs.writeFile("ECONOMY.md", report)
-print(report)
+if process.args[1] == "--check" then
+	-- CI: fail if someone changed the balance tables without regenerating.
+	local current = if fs.isFile("ECONOMY.md") then fs.readFile("ECONOMY.md") else ""
+	if string.gsub(current, "\r\n", "\n") ~= report then
+		print("ECONOMY.md is out of date. Run `lune run tools/economy` and commit the result.")
+		process.exit(1)
+	end
+	print("ECONOMY.md is up to date.")
+else
+	fs.writeFile("ECONOMY.md", report)
+	print(report)
+end

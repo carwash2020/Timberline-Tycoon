@@ -1,0 +1,29 @@
+# Runs ./scripts/check.sh (formatting, lint, strict types, unit tests, and
+# the ECONOMY.md check) on every push and pull request, with the tool
+# versions pinned in rokit.toml. A red X on a commit means something here
+# failed: open the run to see which step.
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rokit and the pinned tools
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          export PATH="$HOME/.rokit/bin:$PATH"
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+          # The Actions token avoids GitHub's anonymous download rate limit.
+          rokit authenticate github --token "$GITHUB_TOKEN" --skip-verify
+          rokit install --no-trust-check
+
+      - name: Checks
+        run: ./scripts/check.sh

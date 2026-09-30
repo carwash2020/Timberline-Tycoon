@@ -18,7 +18,7 @@ function Util.guid(): string
 	return HttpService:GenerateGUID(false)
 end
 
--- 1234567 -> "$1,234,567"
+-- 1234567 -> "$1,234,567", -4500 -> "-$4,500"
 function Util.formatCash(n: number): string
 	n = math.floor(n or 0)
 	local negative = n < 0
@@ -30,10 +30,7 @@ function Util.formatCash(n: number): string
 		s = string.sub(s, 1, -4)
 	end
 	out = s .. out
-	if negative then
-		out = "-" .. out
-	end
-	return "$" .. out
+	return (if negative then "-$" else "$") .. out
 end
 
 function Util.deepCopy(t: any): any

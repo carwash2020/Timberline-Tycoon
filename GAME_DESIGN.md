@@ -612,7 +612,8 @@ export type Profile = {
 
 ### 14.5 Server services (ServerScriptService)
 - `GameServer.server.luau` — bootstrap, PlayerAdded/Removing wiring.
-- `ProfileService.luau` — sole DataStore reader/writer.
+- `ProfileService.luau` — sole DataStore reader/writer. The save's types,
+  new-player template and migrations live in `ProfileSchema.luau`.
 - `EconomyService.luau` — SOLE writer of `profile.cash`.
   `addCash(player, n, reason)` / `spendCash(player, n, reason)`; every change
   logs its reason.

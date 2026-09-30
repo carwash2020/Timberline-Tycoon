@@ -7,11 +7,18 @@ architecture). Current phase status: PHASE1_NOTES.md.
 - Connor tests in Roblox Studio on a Mac; Claude can't run Studio. After a
   change, list exactly what to check in Studio.
 - Verify before pushing: `./scripts/check.sh` (StyLua, Selene, luau-lsp
-  strict type check against the Roblox API). Game code is `--!strict`.
+  strict type check against the Roblox API, Lune unit tests, ECONOMY.md
+  current). CI runs the same script. Game code is `--!strict`.
+- Tests live in `tests/*.spec.luau` (`lune run tests/run [filter]`). Put
+  rules in pure modules (e.g. `Shared/ShopLogic`, `ProfileSchema`) so they
+  can be tested; services are tested with `mocks` (see `ShopService.spec`).
+  Add or update a spec with every rule change.
 - The server owns all state; remotes carry intents only and every handler
   validates (range, ownership, rate via RateLimiter).
 - Only EconomyService changes `profile.cash`; only ProfileService touches
-  DataStores (via vendored ProfileStore; never edit `Vendor/`).
+  DataStores (via vendored ProfileStore; never edit `Vendor/`). New save
+  fields go in `ProfileSchema` (type + template, and `Migrate` if old saves
+  need converting).
 - Balance lives in WoodData / ItemCatalog / BiomeData; shared tuning in GameConfig.
   After any balance change, re-run `lune run tools/economy` and commit the
   regenerated ECONOMY.md.

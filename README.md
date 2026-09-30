@@ -1,5 +1,7 @@
 # Timberline Tycoon
 
+[![Checks](https://github.com/carwash2020/timberline-tycoon/actions/workflows/checks.yml/badge.svg)](https://github.com/carwash2020/timberline-tycoon/actions/workflows/checks.yml)
+
 A cozy low-poly lumber tycoon for Roblox: chop trees, haul logs, sell them
 at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 
@@ -49,8 +51,11 @@ flagged as you type.
 4. Press **Play**. Keep **View → Output** open; errors show up there.
 5. Found a problem? Paste the Output text (or a screenshot) to Claude.
 
-`./scripts/check.sh` runs the formatter check, the linter and a strict type
-check against the Roblox API: everything that doesn't need Studio.
+`./scripts/check.sh` runs everything that doesn't need Studio: the
+formatter check, the linter, a strict type check against the Roblox API,
+the unit tests (`lune run tests/run`) and a check that ECONOMY.md is
+current. GitHub runs the same script on every push; a red X next to a
+commit means something failed (click it to see what).
 
 While you play in Studio, lines starting with **`[Stopwatch]`** in the Output
 window time the core loop: first chop, first sale, when you could afford
@@ -82,6 +87,7 @@ measure the economy model against your real play (saved in
   - `GameServer`: startup, player join/leave, every remote handler
   - `ProfileService`: saving (wraps the vendored `Vendor/ProfileStore`)
   - `EconomyService`: the only code allowed to change cash
+  - `ProfileSchema`: the save layout, new-player template and migrations
   - `TreeService`, `VehicleService`, `MapBuilder`, `RateLimiter`
   - `MilestoneService`: the Studio stopwatch + Roblox analytics funnel
   - `AxeService`: axes as items (hotbar, drop, pick up)
@@ -95,7 +101,10 @@ measure the economy model against your real play (saved in
   `ShopUI` is the Tool Shed screen)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
-- `scripts/check.sh`: formatter, linter and type checks
+- `tests/`: unit tests, run with Lune outside Roblox (`tests/loader.luau`
+  fakes just enough of Roblox to load game modules)
+- `scripts/check.sh`: formatter, linter, type checks, tests
+- `.github/workflows/checks.yml`: runs `check.sh` on GitHub
 - `THIRD_PARTY_LICENSES/`: licenses for vendored code
 
 ## Build a place file without Studio sync
