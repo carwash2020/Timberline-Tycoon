@@ -341,8 +341,8 @@ corner from minute one, and its canopy hides floating islands of glowing
   little less than emberwood (the grind); once forged, the Starfall loop is
   the best in the game (~35% above the volcano). Forging takes about 3 hours
   of saving; all of V1 is about 17 hours for a focused player.
-- **Other isle items:** Sky Shards (the one forge material, also sellable)
-  and a sky-themed plot decoration blueprint. No more materials (§15).
+- **Other isle items:** Sky Shards (the forge material, also sellable) and
+  a sky-themed plot decoration blueprint.
 
 Distances are deliberate: better wood means a longer haul, so truck upgrades
 buy *range*, not just stats. No early fast-travel — the drive is part of the
@@ -605,9 +605,10 @@ Playtest in Studio, checklist passes, zero console errors, commit as
   cadence before promising a date.
 - **Scope**: cut phase 6–7 scope before cutting core-loop feel. A tight loop
   with 3 wood tiers beats a sprawling game that feels empty.
-- **Item sprawl**: V1 has exactly one gathered material, Sky Shards (the
-  Starfall forge). Every new material means another thing to find, store,
-  explain and balance; add one only when an existing item can't do the job.
+- **Item sprawl**: gathered materials are welcome (Connor, 2026-09-30), but
+  each needs a job: an input to something players want (a building, an
+  upgrade, a forge), found in a specific place so it pulls players across
+  the map. A material nothing uses is clutter.
 - **Uncalibrated economy**: every pacing number in ECONOMY.md scales with
   EFFICIENCY, a 0.50 guess until a playtest measures it. Calibrate early
   and again whenever the loop changes (the stopwatch prints the command).
