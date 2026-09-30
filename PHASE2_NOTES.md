@@ -64,7 +64,7 @@ axe is next in line, and your cash. You can own at most
 ## Murph's tutorial (GAME_DESIGN §11)
 
 **Murph** (big beard, red flannel, beanie) stands just ahead of the spawn.
-New players get one objective at a time in a tracker at the top right,
+New players get one objective at a time in a tracker on the left,
 with Murph's line under it and an amber arrow over what to do next:
 
 1. Chop down a tree (arrow on the nearest tree)
@@ -79,8 +79,8 @@ Progress is saved, so a rejoin carries on where you left off. Saves from
 before the tutorial that already own a better axe skip it.
 
 Balance note: with the $25, the model has players affording the Steel Axe
-at ~9 min (design target 12–15). The calibration playtest decides whether
-to keep it (`rewardCash` in `TutorialData.luau`).
+at ~9 min (design target 12–15). Connor chose to keep the bonus
+(2026-09-30); ECONOMY.md flags those two early rows, and that's expected.
 
 ### Playtest checklist
 - [ ] New save (or reset: see below): the tracker shows step 1 of 6, Murph's
@@ -91,12 +91,27 @@ to keep it (`rewardCash` in `TutorialData.luau`).
 - [ ] Rejoin mid-tutorial: same step and progress
 - [ ] Skip (tap twice): the tracker goes and doesn't come back after rejoining
 - [ ] **Talk** at Murph repeats his current line
-- [ ] Phone: the tracker and Murph's card fit top right and don't cover the
-      jump button or the cash
+- [ ] The tracker sits on the left, below the chat window; on a phone it
+      stays clear of the thumbstick (Murph's card may dip toward it: tap
+      the card to dismiss)
 - [ ] `[Stopwatch] … Finished the tutorial at …` prints at the end
 
 To see the tutorial again with an old save: with API access off (or a new
 test account), progress starts fresh each Play session.
+
+## Screen layout
+
+- **Cash, top right**, with the Daily Goals button under it.
+- **Tutorial tracker, left**, a third of the way down, under Roblox's chat
+  window.
+- Roblox's own **player list is off** (it opens top right on computers,
+  over the cash) until the game has its own leaderboard. Turn it back on
+  with `ShowRobloxPlayerList = true` in `GameConfig.luau`.
+
+### Playtest checklist
+- [ ] Cash shows top right on a computer and on a phone, clear of Roblox's
+      menu buttons; no Roblox player list covering it
+- [ ] The tutorial tracker is on the left and doesn't cover the chat
 
 ## Trucks: Dealership and physics driving (GAME_DESIGN §8 phase 4)
 
@@ -145,7 +160,8 @@ each truck's `topSpeed` and `turnRate`.
 
 ## Daily goals and streaks (GAME_DESIGN §12)
 
-A **DAILY GOALS 0/3** button sits under your cash. Tap it for today's three
+A **DAILY GOALS 0/3** button sits under your cash, top right. Tap it for
+today's three
 goals, e.g. "Fell 4 trees", "Sell 12 logs", "Sell 6 birch logs", "Earn
 $60 selling logs", "Load 12 logs into your truck", with progress bars and
 rewards. Each goal pays when done; all three pay a bonus that grows with

@@ -1,6 +1,6 @@
 --!strict
 -- QuestUI: Murph's tutorial, client side (steps in Shared/TutorialData).
---   * Tracker, top right: the current objective with progress, and Skip
+--   * Tracker, on the left: the current objective with progress, and Skip
 --     (tap twice).
 --   * Murph's card under it: what he says when a step starts. "Talk" at
 --     Murph (by the spawn) says it again.
@@ -211,8 +211,9 @@ local function build()
 
 	local column = Instance.new("Frame")
 	column.Name = "Column"
-	column.AnchorPoint = Vector2.new(1, 0)
-	column.Position = UDim2.new(1, -12, 0, 8)
+	-- Left edge, a third of the way down: under Roblox's chat window (top
+	-- left) and above a phone's thumbstick.
+	column.Position = UDim2.new(0, 12, 0.3, 0)
 	column.Size = UDim2.fromOffset(280, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1

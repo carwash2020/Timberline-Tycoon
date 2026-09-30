@@ -460,9 +460,9 @@ players never compete for them.
 **Built so far** (Shared/TutorialData, QuestService, QuestUI): beats 1–4,
 then "Buy the Steel Axe" as the last step; 5–7 wait for plots, blueprints
 and the Field Guide. Beat 4 is "sell 18 more logs" (about three Rustbucket
-loads) for a $25 bonus. Tension to settle at calibration: the model
-already has players affording the Steel Axe in ~10 min without a bonus
-(ECONOMY.md), so any bonus pulls it further under the 12–15 min target.
+loads) for a $25 bonus. The model already has players affording the Steel
+Axe in ~10 min without it (ECONOMY.md), so the bonus pulls that to ~9 min,
+under the 12–15 min target; Connor chose to keep it (2026-09-30).
 
 Tutorial ends; the quest log takes over ("Buy the Steel Axe", "Chop 10
 birch", "Sell your first planks"...). Session-2 hooks already planted: a
@@ -548,7 +548,10 @@ blocky look; built for phones (low part counts, no per-tree scripts).
 **UI aesthetic**
 - Wood-grain + kraft paper + stenciled type. Chunky rounded buttons.
 - The Field Guide looks and feels like a worn journal.
-- Quest tracker: small, top-left, never nagging.
+- Screen layout (Connor, 2026-09-30): cash top right with the Daily Goals
+  button under it; the quest tracker small, on the left (under Roblox's
+  chat window), never nagging. Roblox's own player list stays off until our
+  leaderboard exists, since it would cover the cash.
 
 **Lighting & mood**
 - Warm days, cozy sunsets, aurora nights over the snow biome.

@@ -1,6 +1,7 @@
 --!strict
 -- DailyUI: daily goals and the streak (rules in Shared/DailyData).
---   * A "Daily goals 1/3" button under the cash plaque, with the streak.
+--   * A "Daily goals 1/3" button under the cash plaque (top right), with
+--     the streak.
 --   * Tapping it opens the day's goals: progress bars, each goal's reward,
 --     the bonus for finishing them all, and the time until new goals.
 -- The server owns progress: it sets the DailyGoals, DailyStreak and
@@ -135,7 +136,8 @@ local function build()
 
 	local b = Instance.new("TextButton")
 	b.Name = "DailyButton"
-	b.Position = UDim2.fromOffset(12, 64) -- under the cash plaque
+	b.AnchorPoint = Vector2.new(1, 0)
+	b.Position = UDim2.new(1, -12, 0, 64) -- under the cash plaque
 	b.Size = UDim2.fromOffset(200, 30)
 	b.AutomaticSize = Enum.AutomaticSize.X
 	b.BackgroundColor3 = BARK
@@ -153,7 +155,8 @@ local function build()
 
 	local p = Instance.new("Frame")
 	p.Name = "Goals"
-	p.Position = UDim2.fromOffset(12, 100)
+	p.AnchorPoint = Vector2.new(1, 0)
+	p.Position = UDim2.new(1, -12, 0, 100)
 	p.Size = UDim2.fromOffset(280, 0)
 	p.AutomaticSize = Enum.AutomaticSize.Y
 	p.BackgroundColor3 = PAPER

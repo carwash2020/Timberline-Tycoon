@@ -24,7 +24,12 @@ local GameConfig = {
 	MaxDroppedAxes = 10, -- per player, lying in the world at once
 	MaxOwnedAxes = 20, -- the shop stops selling past this (keeps hotbars and saves small)
 
-	-- Shops (Tool Shed, later the Dealership)
+	-- HUD
+	-- Roblox's own player list opens top right on computers, right over the
+	-- cash. Off until our own leaderboard (GAME_DESIGN §8 phase 7).
+	ShowRobloxPlayerList = false,
+
+	-- Shops (Tool Shed, Dealership)
 	ShopPromptRange = 10, -- studs from the counter to open the shop
 	ShopRange = 20, -- the shop screen closes past this; the server allows + RangeTolerance
 

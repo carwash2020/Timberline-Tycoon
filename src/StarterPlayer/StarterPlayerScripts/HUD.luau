@@ -1,6 +1,7 @@
 --!strict
--- HUD: builds the Phase 1 UI from code (wood-grain / kraft-paper theme).
---   * Cash plaque top-left, below Roblox's own top-bar buttons.
+-- HUD: builds the main UI from code (wood-grain / kraft-paper theme).
+--   * Cash plaque top right, below Roblox's own top-bar buttons (Roblox's
+--     player list, which would cover it, is off: GameConfig).
 --   * A one-line control hint, worded for the device being used.
 --   * Toasts: short messages from the server (Notify) or other controllers,
 --     stacked (newest at the bottom, up to MAX_TOASTS) so none gets lost.
@@ -9,6 +10,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -115,11 +117,14 @@ function HUD.Start()
 	gui.IgnoreGuiInset = false -- keep clear of Roblox's menu and chat buttons
 	gui.DisplayOrder = 10 -- above panels like the shop, so toasts stay visible
 
-	-- Cash plaque, top-left.
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
+
+	-- Cash plaque, top right.
 	local plaque = Instance.new("Frame")
 	plaque.Name = "CashPlaque"
+	plaque.AnchorPoint = Vector2.new(1, 0)
 	plaque.Size = UDim2.fromOffset(200, 50)
-	plaque.Position = UDim2.fromOffset(12, 8)
+	plaque.Position = UDim2.new(1, -12, 0, 8)
 	plaque.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
 	plaque.BorderSizePixel = 0
 	corner(plaque, 10)
