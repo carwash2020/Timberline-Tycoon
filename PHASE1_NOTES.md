@@ -88,8 +88,6 @@ Things only a human can judge (report back):
   with the biome passes.
 
 ## Open questions for Connor
-- **Inferno Axe damage:** GAME_DESIGN §3 says 150, ItemCatalog says 200.
-  Which is right?
 - **Economy pace:** a rough estimate puts the $150 Steel Axe at about 3
   minutes, not the ~15 in §2/§11. Time it in the playtest (§14.8), then
   decide whether to slow it down or keep the fast first upgrade.

@@ -123,7 +123,7 @@ local function onChopTree(player: Player, treeUid: unknown)
 	if now < due - GameConfig.SwingTolerance then
 		return
 	end
-	local newHp, err = TreeService.ApplyChop(player, treeUid, axe.damage)
+	local newHp, err = TreeService.ApplyChop(player, treeUid, axe)
 	if newHp == nil then
 		if err == "far" then
 			notify(player, "Too far away. Walk closer to chop.")

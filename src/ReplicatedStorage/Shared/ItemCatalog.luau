@@ -1,5 +1,5 @@
 -- ItemCatalog: every purchasable item in Timberline Tycoon.
--- Data only — no logic. (Shop UI that spends these arrives in Phase 2.)
+-- Data plus small lookups. (Shop UI that spends these arrives in Phase 2.)
 
 local ItemCatalog = {}
 
@@ -7,6 +7,9 @@ export type AxeDef = {
 	id: string,
 	displayName: string,
 	damage: number,
+	-- Optional per-biome damage that replaces `damage` against trees from
+	-- that biome (WoodData.biome), e.g. the Inferno Axe vs. volcano trees.
+	biomeDamage: { [string]: number }?,
 	priceCash: number,
 }
 
@@ -45,7 +48,13 @@ ItemCatalog.Axes = {
 	HardenedAxe = { id = "HardenedAxe", displayName = "Hardened Axe", damage = 25, priceCash = 800 },
 	SilverAxe = { id = "SilverAxe", displayName = "Silver Axe", damage = 45, priceCash = 3500 },
 	GoldAxe = { id = "GoldAxe", displayName = "Gold Axe", damage = 80, priceCash = 12000 },
-	InfernoAxe = { id = "InfernoAxe", displayName = "Inferno Axe", damage = 200, priceCash = 45000 },
+	InfernoAxe = {
+		id = "InfernoAxe",
+		displayName = "Inferno Axe",
+		damage = 150,
+		biomeDamage = { volcano = 200 }, -- burns through fire-biome trees
+		priceCash = 45000,
+	},
 }
 
 ItemCatalog.Trucks = {
@@ -92,6 +101,12 @@ function ItemCatalog.GetAxe(axeId: string): AxeDef?
 		return axe
 	end
 	return nil
+end
+
+-- Damage this axe deals per hit to a tree from `biome`.
+function ItemCatalog.AxeDamage(axe: AxeDef, biome: string): number
+	local override = if axe.biomeDamage then axe.biomeDamage[biome] else nil
+	return override or axe.damage
 end
 
 function ItemCatalog.GetTruck(truckId: string): TruckDef?

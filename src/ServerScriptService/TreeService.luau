@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 
@@ -284,8 +285,9 @@ local function fellTree(player: Player, uid: string)
 	end)
 end
 
--- Validates range server-side, applies damage, returns new HP (nil + reason on reject).
-function TreeService.ApplyChop(player: Player, treeUid: string, damage: number): (number?, string?)
+-- Validates range server-side, applies the axe's damage for this tree's
+-- biome, returns new HP (nil + reason on reject).
+function TreeService.ApplyChop(player: Player, treeUid: string, axe: ItemCatalog.AxeDef): (number?, string?)
 	local rec = trees[treeUid]
 	if not rec or not rec.alive then
 		return nil, "gone"
@@ -303,7 +305,7 @@ function TreeService.ApplyChop(player: Player, treeUid: string, damage: number):
 	then
 		return nil, "far"
 	end
-	rec.hp = math.max(0, rec.hp - damage)
+	rec.hp = math.max(0, rec.hp - ItemCatalog.AxeDamage(axe, rec.def.biome))
 	rec.model:SetAttribute("HP", rec.hp)
 	if rec.hp <= 0 then
 		fellTree(player, treeUid)

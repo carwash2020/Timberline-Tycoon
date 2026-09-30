@@ -38,7 +38,7 @@ within ~15 minutes. Never more than ~60 seconds of walking with nothing to do.
 | Hardened Axe | 25 | 800 |
 | Silver Axe | 45 | 3,500 |
 | Gold Axe | 80 | 12,000 |
-| Inferno Axe | 150 | 45,000 |
+| Inferno Axe | 150 (200 vs. volcano trees) | 45,000 |
 
 Tune so each axe roughly halves time-to-fell vs. the previous tier's trees.
 
