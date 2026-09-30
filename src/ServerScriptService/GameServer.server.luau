@@ -12,6 +12,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EconomyService = require(script.Parent.EconomyService)
+local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local TreeService = require(script.Parent.TreeService)
@@ -131,8 +132,10 @@ local function onChopTree(player: Player, treeUid: unknown)
 		return
 	end
 	nextSwingAt[player.UserId] = math.max(now, due) + GameConfig.SwingCooldown
+	MilestoneService.Mark(player, "First chop")
 	if newHp <= 0 then
 		profile.stats.treesChopped += 1
+		MilestoneService.Mark(player, "First tree felled")
 	end
 end
 
@@ -183,6 +186,7 @@ local function serverPickupLog(player: Player, logUid: unknown)
 	weld.Parent = pp
 	hands[logUid] = true
 	player:SetAttribute("CarriedLogs", already + 1)
+	MilestoneService.Mark(player, "First log picked up")
 end
 
 -- ProximityPrompts on logs call the same validated path.
@@ -230,6 +234,7 @@ local function onLoadToTruck(player: Player)
 	end
 	player:SetAttribute("CarriedLogs", countHands(hands))
 	if moved > 0 then
+		MilestoneService.Mark(player, "First log loaded")
 		notify(
 			player,
 			string.format(
@@ -283,9 +288,13 @@ local function onSellLogs(player: Player)
 		return
 	end
 	profile.stats.logsSold += count
-	EconomyService.AddCash(player, total, string.format("sold %d logs", count))
+	EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
+	MilestoneService.Mark(player, "First sale")
+	MilestoneService.CashEarned(player, total)
 	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
 end
+
+MilestoneService.Init(notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
@@ -402,11 +411,13 @@ local function onPlayerAdded(player: Player)
 
 	player:SetAttribute("ProfileLoaded", true)
 	remote.CashChanged:FireClient(player, profile.cash)
+	MilestoneService.Start(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
 local function onPlayerRemoving(player: Player)
 	dropCarriedLogs(player) -- back into the world for others, before the character goes
+	MilestoneService.Stop(player) -- before the final save, so playtime is included
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

@@ -51,6 +51,7 @@ export type Profile = {
 	},
 	tutorialDone: boolean,
 	seasonId: string,
+	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
 }
 
 -- New players start from this. Fields added here later are filled into
@@ -73,6 +74,7 @@ local TEMPLATE: Profile = {
 	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0 },
 	tutorialDone = false,
 	seasonId = "spring",
+	onboarding = {},
 }
 
 local store = ProfileStore.New(STORE_NAME, TEMPLATE)

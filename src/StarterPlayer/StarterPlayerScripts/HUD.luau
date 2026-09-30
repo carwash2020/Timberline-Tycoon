@@ -2,7 +2,8 @@
 -- HUD: builds the Phase 1 UI from code (wood-grain / kraft-paper theme).
 --   * Cash plaque top-left, below Roblox's own top-bar buttons.
 --   * A one-line control hint, worded for the device being used.
---   * Toasts: short messages from the server (Notify) or other controllers.
+--   * Toasts: short messages from the server (Notify) or other controllers,
+--     stacked (newest at the bottom, up to MAX_TOASTS) so none gets lost.
 --   * "Loading your save..." until the server says the profile is ready.
 -- Built in code so Rojo syncs it cleanly.
 
@@ -21,9 +22,12 @@ local player = Players.LocalPlayer
 local INK = Color3.fromRGB(60, 40, 20)
 local CREAM = Color3.fromRGB(245, 235, 215)
 
+local MAX_TOASTS = 3
+local TOAST_SECONDS = 2.4
+
 local cashLabel: TextLabel? = nil
-local toastLabel: TextLabel? = nil
-local toastToken = 0
+local toastStack: Frame? = nil
+local toastOrder = 0
 
 local function corner(parent: GuiObject, radius: number)
 	local c = Instance.new("UICorner")
@@ -49,29 +53,54 @@ local function setCash(amount: number)
 	end
 end
 
--- Shows a short message in the middle-top of the screen for ~2 seconds.
+-- Shows a short message in the upper middle of the screen for a few seconds.
 function HUD.Toast(message: string)
-	local label = toastLabel
-	if not label then
+	local stack = toastStack
+	if not stack then
 		return
 	end
-	toastToken += 1
-	local token = toastToken
-	label.Text = message
-	label.TextTransparency = 0
+	-- Make room: drop the oldest toasts beyond the limit.
+	local existing: { TextLabel } = {}
+	for _, child in ipairs(stack:GetChildren()) do
+		if child:IsA("TextLabel") then
+			table.insert(existing, child)
+		end
+	end
+	table.sort(existing, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	for i = 1, #existing - MAX_TOASTS + 1 do
+		existing[i]:Destroy()
+	end
+
+	toastOrder += 1
+	local label = Instance.new("TextLabel")
+	label.Name = "Toast"
+	label.LayoutOrder = toastOrder
+	label.Size = UDim2.new(0, 0, 0, 34)
+	label.AutomaticSize = Enum.AutomaticSize.X
+	label.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
 	label.BackgroundTransparency = 0.25
-	label.Visible = true
-	task.delay(2.2, function()
-		if token ~= toastToken then
-			return
+	label.Font = Enum.Font.GothamMedium
+	label.TextSize = 18
+	label.TextColor3 = INK
+	label.Text = message
+	corner(label, 8)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 14)
+	pad.PaddingRight = UDim.new(0, 14)
+	pad.Parent = label
+	label.Parent = stack
+
+	task.delay(TOAST_SECONDS, function()
+		if label.Parent == nil then
+			return -- already pushed out by newer toasts
 		end
 		local fade =
 			TweenService:Create(label, TweenInfo.new(0.35), { TextTransparency = 1, BackgroundTransparency = 1 })
 		fade:Play()
 		fade.Completed:Wait()
-		if token == toastToken then
-			label.Visible = false
-		end
+		label:Destroy()
 	end)
 end
 
@@ -136,26 +165,22 @@ function HUD.Start()
 	hintPad.Parent = hint
 	hint.Parent = gui
 
-	-- Toast, upper-middle.
-	local toast = Instance.new("TextLabel")
-	toast.Name = "Toast"
-	toast.AnchorPoint = Vector2.new(0.5, 0)
-	toast.Position = UDim2.new(0.5, 0, 0.22, 0)
-	toast.Size = UDim2.new(0, 0, 0, 36)
-	toast.AutomaticSize = Enum.AutomaticSize.X
-	toast.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
-	toast.BackgroundTransparency = 0.25
-	toast.Font = Enum.Font.GothamMedium
-	toast.TextSize = 18
-	toast.TextColor3 = INK
-	toast.Visible = false
-	corner(toast, 8)
-	local toastPad = Instance.new("UIPadding")
-	toastPad.PaddingLeft = UDim.new(0, 14)
-	toastPad.PaddingRight = UDim.new(0, 14)
-	toastPad.Parent = toast
-	toast.Parent = gui
-	toastLabel = toast
+	-- Toast stack, upper-middle.
+	local stack = Instance.new("Frame")
+	stack.Name = "Toasts"
+	stack.AnchorPoint = Vector2.new(0.5, 0)
+	stack.Position = UDim2.new(0.5, 0, 0.18, 0)
+	stack.Size = UDim2.new(0.9, 0, 0, 0)
+	stack.AutomaticSize = Enum.AutomaticSize.Y
+	stack.BackgroundTransparency = 1
+	local list = Instance.new("UIListLayout")
+	list.FillDirection = Enum.FillDirection.Vertical
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Padding = UDim.new(0, 6)
+	list.Parent = stack
+	stack.Parent = gui
+	toastStack = stack
 
 	-- "Loading your save..." until the server has the profile.
 	local loading = Instance.new("TextLabel")
