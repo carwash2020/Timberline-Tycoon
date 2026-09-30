@@ -17,6 +17,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	DropAxe = 2,
 	PickUpAxe = 4,
 	BuyItem = 3,
+	SkipTutorial = 1,
 }
 local ABUSE_MULTIPLIER = 5
 local STRIKE_WINDOW = 60

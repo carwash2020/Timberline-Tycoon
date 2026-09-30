@@ -92,13 +92,15 @@ measure the economy model against your real play (saved in
   - `MilestoneService`: the Studio stopwatch + Roblox analytics funnel
   - `AxeService`: axes as items (hotbar, drop, pick up)
   - `ShopService`: buying at the Tool Shed (the BuyItem remote)
+  - `QuestService`: Murph's tutorial (progress, rewards, skip)
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
   - `ShopLogic`: what the shop may sell a player (both sides use it)
+  - `TutorialData`: Murph's tutorial steps and lines
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
-  `ShopUI` is the Tool Shed screen)
+  `ShopUI` is the Tool Shed screen, `QuestUI` the tutorial tracker)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
 - `tests/`: unit tests, run with Lune outside Roblox (`tests/loader.luau`

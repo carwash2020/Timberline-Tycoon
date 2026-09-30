@@ -51,6 +51,8 @@ export type Profile = {
 		playtimeMin: number,
 	},
 	tutorialDone: boolean,
+	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
+	tutorialProgress: number, -- count toward the current step
 	seasonId: string,
 	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
 }
@@ -75,6 +77,8 @@ local TEMPLATE: Profile = {
 	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
 	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0 },
 	tutorialDone = false,
+	tutorialStep = 1,
+	tutorialProgress = 0,
 	seasonId = "spring",
 	onboarding = {},
 }

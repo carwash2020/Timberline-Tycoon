@@ -35,6 +35,7 @@ local WoodData = loadModule("WoodData")
 local ItemCatalog = loadModule("ItemCatalog")
 local GameConfig = loadModule("GameConfig")
 local BiomeData = loadModule("BiomeData")
+local TutorialData = loadModule("TutorialData")
 
 ---------------------------------------------------------------------------
 -- Assumptions (edit these, then re-run)
@@ -223,7 +224,9 @@ end
 ---------------------------------------------------------------------------
 local function simulate(biomes: { [string]: boolean }?)
 	local owned = { RustyAxe = true, Rustbucket = true }
-	local t, cash, earned = firstSaleSeconds() / EFFICIENCY, 0, 0
+	-- Murph's tutorial pays its reward before the first purchase (the
+	-- Steel Axe), so it's counted as cash in hand from the start.
+	local t, cash, earned = firstSaleSeconds() / EFFICIENCY, TutorialData.TotalReward(), 0
 	local steps = {}
 	local earnedAt15, t15done = nil, false
 	local candidates = {}
@@ -814,6 +817,12 @@ line(
 	"- Biome rules come from BiomeData: required gear (volcano: Heat Boots; Phantom Grove: Lantern, night only, so left out of the path), boats for the Island, and slowdowns (snow without the Insulated Coat)."
 )
 line("- Each load = cargo + a full armful; logs are sold at WoodData prices.")
+line(
+	string.format(
+		"- Murph's tutorial pays %s (TutorialData), counted toward the first purchase.",
+		money(TutorialData.TotalReward())
+	)
+)
 
 local report = table.concat(out, "\n") .. "\n"
 if process.args[1] == "--check" then

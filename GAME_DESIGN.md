@@ -451,6 +451,13 @@ players never compete for them.
    question marks. Teaches: the world has tiers, the compendium is the
    long-term chase; gives aspiration before the tutorial ends.
 
+**Built so far** (Shared/TutorialData, QuestService, QuestUI): beats 1–4,
+then "Buy the Steel Axe" as the last step; 5–7 wait for plots, blueprints
+and the Field Guide. Beat 4 is "sell 18 more logs" (about three Rustbucket
+loads) for a $25 bonus. Tension to settle at calibration: the model
+already has players affording the Steel Axe in ~10 min without a bonus
+(ECONOMY.md), so any bonus pulls it further under the 12–15 min target.
+
 Tutorial ends; the quest log takes over ("Buy the Steel Axe", "Chop 10
 birch", "Sell your first planks"...). Session-2 hooks already planted: a
 thirsty sapling, the Steel Axe goal, the hills in sight, a Field Guide full
@@ -566,6 +573,8 @@ export type Profile = {
   npcFriendship: { [string]: number },     -- "Murph" | "Millie" | "Tink"
   stats: { treesChopped: number, logsSold: number, playtimeMin: number },
   tutorialDone: boolean,
+  tutorialStep: number,   -- index into TutorialData.Steps
+  tutorialProgress: number,
   seasonId: string,
 }
 ```
@@ -600,6 +609,7 @@ export type Profile = {
   `GameConfig.MaxOwnedAxes`), then `EconomyService.SpendCash` and
   `AxeService.Grant`. The answer comes back as a toast; the shop screen
   redraws from the Cash / OwnedAxes / BestAxeTier player attributes.
+- `SkipTutorial()` — ends Murph's tutorial early, no rewards.
 - `DropAxe(axeUid)` — owner only; the axe becomes a world item with a
   "Pick up" prompt (owner only unless `GameConfig.AxePickupByOthers`).
 - `PlaceBlueprint(blueprintId, cframe12)` — validates: blueprint owned,

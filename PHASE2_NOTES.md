@@ -50,3 +50,40 @@ axe is next in line, and your cash. You can own at most
 - [ ] Toasts show on top of the shop screen
 - [ ] Phone (device emulator): the screen fits and scrolls; buttons are tappable
 - [ ] `[Stopwatch] … First upgrade bought at …` prints after the first buy
+
+## Murph's tutorial (GAME_DESIGN §11)
+
+**Murph** (big beard, red flannel, beanie) stands just ahead of the spawn.
+New players get one objective at a time in a tracker at the top right,
+with Murph's line under it and an amber arrow over what to do next:
+
+1. Chop down a tree (arrow on the nearest tree)
+2. Pick up a log (nearest log)
+3. Load logs into your truck (your truck)
+4. Sell logs at the sawmill (the sell pad)
+5. Sell 18 more logs: Murph chips in **$25**
+6. Buy the Steel Axe at the Tool Shed (the Tool Shed counter)
+
+**Skip tutorial** (tap twice) ends it; **Talk** at Murph repeats his line.
+Progress is saved, so a rejoin carries on where you left off. Saves from
+before the tutorial that already own a better axe skip it.
+
+Balance note: with the $25, the model has players affording the Steel Axe
+at ~9 min (design target 12–15). The calibration playtest decides whether
+to keep it (`rewardCash` in `TutorialData.luau`).
+
+### Playtest checklist
+- [ ] New save (or reset: see below): the tracker shows step 1 of 6, Murph's
+      line appears, the arrow bounces over a nearby tree
+- [ ] Each step advances the moment you do it; the arrow moves to the next thing
+- [ ] Step 5 counts logs as you sell ("(6/18)"), then "Murph chipped in $25!"
+- [ ] Buying the Steel Axe ends it: the tracker goes, Murph says goodbye
+- [ ] Rejoin mid-tutorial: same step and progress
+- [ ] Skip (tap twice): the tracker goes and doesn't come back after rejoining
+- [ ] **Talk** at Murph repeats his current line
+- [ ] Phone: the tracker and Murph's card fit top right and don't cover the
+      jump button or the cash
+- [ ] `[Stopwatch] … Finished the tutorial at …` prints at the end
+
+To see the tutorial again with an old save: with API access off (or a new
+test account), progress starts fresh each Play session.

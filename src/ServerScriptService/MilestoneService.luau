@@ -43,6 +43,7 @@ local FUNNEL: { string } = {
 	"First sale",
 	"Could afford an upgrade",
 	"First upgrade bought",
+	"Finished the tutorial",
 }
 local STEP_NUMBER: { [string]: number } = {}
 for i, name in ipairs(FUNNEL) do

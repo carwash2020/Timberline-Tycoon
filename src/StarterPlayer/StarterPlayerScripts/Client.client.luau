@@ -10,6 +10,7 @@ local TreeFX = require(script.Parent.TreeFX)
 local CarryController = require(script.Parent.CarryController)
 local AxeController = require(script.Parent.AxeController)
 local ShopUI = require(script.Parent.ShopUI)
+local QuestUI = require(script.Parent.QuestUI)
 
 HUD.Start() -- first, so toasts work for everything after it
 ChopController.Start()
@@ -18,5 +19,6 @@ TreeFX.Start()
 CarryController.Start()
 AxeController.Start()
 ShopUI.Start()
+QuestUI.Start()
 
 print("[Client] Timberline Tycoon client started.")

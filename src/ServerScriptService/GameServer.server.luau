@@ -17,6 +17,7 @@ local AxeService = require(script.Parent.AxeService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
+local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
@@ -135,6 +136,7 @@ local function onChopTree(player: Player, treeUid: unknown)
 	if newHp <= 0 then
 		profile.stats.treesChopped += 1
 		MilestoneService.Mark(player, "First tree felled")
+		QuestService.Event(player, "treeFelled")
 	end
 end
 
@@ -186,6 +188,7 @@ local function serverPickupLog(player: Player, logUid: unknown)
 	hands[logUid] = true
 	player:SetAttribute("CarriedLogs", already + 1)
 	MilestoneService.Mark(player, "First log picked up")
+	QuestService.Event(player, "logPickedUp")
 end
 
 -- ProximityPrompts on logs call the same validated path.
@@ -234,6 +237,7 @@ local function onLoadToTruck(player: Player)
 	player:SetAttribute("CarriedLogs", countHands(hands))
 	if moved > 0 then
 		MilestoneService.Mark(player, "First log loaded")
+		QuestService.Event(player, "logsLoaded", moved)
 		notify(
 			player,
 			string.format(
@@ -305,11 +309,13 @@ local function onSellLogs(player: Player)
 			)
 		)
 	end
+	QuestService.Event(player, "logsSold", count) -- after the sale's toasts, so Murph's reward reads last
 end
 
 MilestoneService.Init(notify)
 AxeService.Init(notify)
 ShopService.Init(mapFolder, remote.BuyItem, notify)
+QuestService.Init(remote.SkipTutorial, notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
@@ -380,6 +386,7 @@ local function onPlayerAdded(player: Player)
 	player:SetAttribute("ProfileLoaded", true)
 	remote.CashChanged:FireClient(player, profile.cash)
 	MilestoneService.Start(player, profile)
+	QuestService.Start(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 

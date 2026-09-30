@@ -14,7 +14,7 @@ return function(t)
 
 	local function setup(options)
 		local profile = { cash = options.cash or 0, totalEarned = 0, bestAxeTier = options.bestTier or 1 }
-		local toasts, granted, equipped = {}, {}, {}
+		local toasts, granted, equipped, quests = {}, {}, {}, {}
 		local humanoid = {
 			EquipTool = function(_, tool)
 				table.insert(equipped, tool)
@@ -55,6 +55,11 @@ return function(t)
 					end,
 				},
 				MilestoneService = { Mark = function() end },
+				QuestService = {
+					Event = function(_, event)
+						table.insert(quests, event)
+					end,
+				},
 			},
 		})
 		local ShopService = loader:server("ShopService")
@@ -76,6 +81,7 @@ return function(t)
 			toasts = toasts,
 			granted = granted,
 			equipped = equipped,
+			quests = quests,
 		}
 	end
 
@@ -86,6 +92,7 @@ return function(t)
 		t.eq(s.granted, { "SteelAxe" })
 		t.eq(s.equipped[1].Name, "SteelAxeTool")
 		t.eq(s.toasts, { "Bought the Steel Axe! It's in your hotbar." })
+		t.eq(s.quests, { "axeBought" }, "the tutorial hears about it")
 	end)
 
 	t.test("too far from the counter: nothing happens but a hint", function()

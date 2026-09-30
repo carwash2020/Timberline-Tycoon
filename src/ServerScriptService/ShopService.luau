@@ -21,6 +21,7 @@ local AxeService = require(script.Parent.AxeService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
+local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
 
 local ShopService = {}
@@ -31,7 +32,7 @@ local SHOP_FOR: { [string]: string } = {
 }
 
 local map: Instance? = nil
-local notify: (Player, string) -> () = function() end
+local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 
 local function shopPoint(category: string): Vector3?
 	local shopName = SHOP_FOR[category]
@@ -85,6 +86,7 @@ local function buyAxe(player: Player, axeId: string)
 	end
 	notify(player, string.format("Bought the %s! It's in your hotbar.", axe.displayName))
 	MilestoneService.Mark(player, "First upgrade bought")
+	QuestService.Event(player, "axeBought")
 end
 
 local function onBuyItem(player: Player, category: unknown, itemId: unknown)

@@ -1,8 +1,8 @@
 --!strict
 -- MapBuilder: constructs the Phase 1 world from code at server start.
--- Everything the vertical slice needs: ground, spawn, starter forest
--- (40 oak + 15 birch), a parking lot, sawmill + sell zone, the Tool Shed
--- (axe shop), and plot markers for later phases. GameServer waits for the
+-- Ground, spawn, starter forest (40 oak + 15 birch), a parking lot,
+-- sawmill + sell zone, the Tool Shed (axe shop), Murph (the tutorial NPC),
+-- and plot markers for later phases. GameServer waits for the
 -- TimberlineMap folder before accepting players.
 
 local CollectionService = game:GetService("CollectionService")
@@ -275,6 +275,70 @@ for i, color in ipairs({ Color3.fromRGB(167, 173, 180), Color3.fromRGB(94, 102, 
 	head.Parent = toolShed
 end
 
+-- Murph, the retired lumberjack who runs the tutorial (GAME_DESIGN §11),
+-- stands just ahead of the spawn, facing it. A blocky figure (no Humanoid:
+-- he doesn't walk yet). Persistent, so QuestUI can always find him and put
+-- its "Talk" prompt on his Torso.
+do
+	local murph = Instance.new("Model")
+	murph.Name = "Murph"
+	murph.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	murph.Parent = map
+	local base = CFrame.lookAt(Vector3.new(-8, 0, 30), Vector3.new(0, 0, 40)) -- facing the spawn
+	local SKIN = Color3.fromRGB(234, 184, 146)
+	local FLANNEL = Color3.fromRGB(170, 40, 35)
+	local JEANS = Color3.fromRGB(55, 70, 110)
+	local BEARD = Color3.fromRGB(110, 72, 40)
+	local function limb(name: string, size: Vector3, offset: Vector3, color: Color3, material: Enum.Material?): Part
+		local p = box(name, size, Vector3.zero, color, material or Enum.Material.SmoothPlastic)
+		p.CFrame = base * CFrame.new(offset)
+		p.CanCollide = name == "Torso" -- one solid part so players don't walk through him
+		p.Parent = murph
+		return p
+	end
+	limb("LeftLeg", Vector3.new(1, 2, 1), Vector3.new(-0.5, 1, 0), JEANS)
+	limb("RightLeg", Vector3.new(1, 2, 1), Vector3.new(0.5, 1, 0), JEANS)
+	local torso = limb("Torso", Vector3.new(2, 2, 1), Vector3.new(0, 3, 0), FLANNEL, Enum.Material.Fabric)
+	limb("LeftArm", Vector3.new(1, 2, 1), Vector3.new(-1.5, 3, 0), FLANNEL, Enum.Material.Fabric)
+	limb("RightArm", Vector3.new(1, 2, 1), Vector3.new(1.5, 3, 0), FLANNEL, Enum.Material.Fabric)
+	local head = limb("Head", Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 4.6, 0), SKIN)
+	limb("Beard", Vector3.new(1.3, 0.9, 0.4), Vector3.new(0, 4.25, -0.55), BEARD, Enum.Material.Fabric)
+	limb(
+		"Beanie",
+		Vector3.new(1.35, 0.55, 1.35),
+		Vector3.new(0, 5.4, 0),
+		Color3.fromRGB(120, 30, 30),
+		Enum.Material.Fabric
+	)
+	murph.PrimaryPart = torso
+
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "NameTag"
+	tag.Size = UDim2.fromOffset(160, 40)
+	tag.StudsOffset = Vector3.new(0, 2.2, 0)
+	tag.MaxDistance = 60
+	tag.Parent = head
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.fromScale(1, 0.6)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Font = Enum.Font.Fantasy
+	nameLabel.TextScaled = true
+	nameLabel.TextColor3 = Color3.fromRGB(245, 235, 215)
+	nameLabel.TextStrokeTransparency = 0.4
+	nameLabel.Text = "Murph"
+	nameLabel.Parent = tag
+	local role = Instance.new("TextLabel")
+	role.Position = UDim2.fromScale(0, 0.6)
+	role.Size = UDim2.fromScale(1, 0.4)
+	role.BackgroundTransparency = 1
+	role.Font = Enum.Font.Gotham
+	role.TextScaled = true
+	role.TextColor3 = Color3.fromRGB(245, 235, 215)
+	role.TextStrokeTransparency = 0.6
+	role.Text = "Retired lumberjack"
+	role.Parent = tag
+end
+
 -- Plot markers for later phases (visual only in Phase 1).
 local plotPositions = {
 	Vector3.new(150, 0.15, 110),
@@ -293,4 +357,4 @@ end
 Lighting.ClockTime = 15.5
 Lighting.Brightness = 2
 
-print("[MapBuilder] World built: spawn, starter forest, parking, sawmill, sell zone, Tool Shed, plot markers.")
+print("[MapBuilder] World built: spawn, starter forest, parking, sawmill, sell zone, Tool Shed, Murph, plot markers.")
