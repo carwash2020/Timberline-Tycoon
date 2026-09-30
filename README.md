@@ -98,6 +98,7 @@ measure the economy model against your real play (saved in
   - `BiomeService`: what each biome does to you (cold, lava, darkness)
   - `WorldClock`: day and night, the same on every server
   - `MonetizationService`: Robux passes and products (receipts granted once)
+  - `FieldGuideService`: the woods each player has found
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
@@ -107,6 +108,7 @@ measure the economy model against your real play (saved in
   - `DailyData`: daily goal sizes, rewards and streak bonus
   - `WorldTime`: the in-game clock
   - `StoreData`: Robux items and their Creator Hub ids
+  - `FieldGuide`: the Field Guide's pages
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial

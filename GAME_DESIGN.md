@@ -472,6 +472,11 @@ loads) for a $25 bonus. The model already has players affording the Steel
 Axe in ~10 min without it (ECONOMY.md), so the bonus pulls that to ~9 min,
 under the 12–15 min target; Connor chose to keep it (2026-09-30).
 
+**Field Guide (built):** Murph hands it over when the tutorial ends (or is
+skipped). Every wood is a "???" with a hint of where it grows until you
+fell one; then its page shows the biome, HP, hardness, logs and price, the
+first axe that cuts it and the first that does so in 30 hits or fewer.
+
 Tutorial ends; the quest log takes over ("Buy the Steel Axe", "Chop 10
 birch", "Sell your first planks"...). Session-2 hooks already planted: a
 thirsty sapling, the Steel Axe goal, the hills in sight, a Field Guide full

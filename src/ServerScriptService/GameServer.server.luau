@@ -17,6 +17,7 @@ local AxeService = require(script.Parent.AxeService)
 local BiomeService = require(script.Parent.BiomeService)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
+local FieldGuideService = require(script.Parent.FieldGuideService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -152,6 +153,9 @@ local function onChopTree(player: Player, treeUid: unknown)
 		MilestoneService.Mark(player, "First tree felled")
 		QuestService.Event(player, "treeFelled")
 		DailyService.Event(player, "treeFelled", 1)
+		if wood then
+			FieldGuideService.Discover(player, wood.id)
+		end
 	end
 end
 
@@ -378,6 +382,7 @@ QuestService.Init(remote.SkipTutorial, notify)
 DailyService.Init(notify)
 BiomeService.Init(notify)
 MonetizationService.Init(remote.BuyRobuxItem, notify)
+FieldGuideService.Init(notify)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
@@ -470,6 +475,7 @@ local function onPlayerAdded(player: Player)
 	DailyService.Start(player, profile)
 	ShopService.PlayerJoined(player, profile)
 	MonetizationService.PlayerJoined(player, profile)
+	FieldGuideService.Refresh(player)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 

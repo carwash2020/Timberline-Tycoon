@@ -61,9 +61,11 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 - ⬜ Materials inventory (Sky Shards) and the Starfall Axe forge
 
 ### 5. The Field Guide (GAME_DESIGN §11 beat 7, §13)
-- ⬜ A journal of every wood: silhouettes until you find it, then its facts
+- 🟡 A journal of every wood: silhouettes until you find it, then its facts
   (where, HP, hardness, price, the axe you need); discovered on first fell
-- ⬜ Murph hands it over at the end of the tutorial
+- 🟡 Murph hands it over at the end of the tutorial
+- ⬜ A worn-journal look (GAME_DESIGN §13) in the art pass; for now it uses
+  the shop panel
 
 ### 6. Plots and the empire (GAME_DESIGN §9, §10; in V1)
 Slices, in order:

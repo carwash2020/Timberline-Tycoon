@@ -78,7 +78,7 @@ TutorialData.Steps = {
 
 -- The line Murph says once the last step is done.
 TutorialData.Farewell =
-	"Now that's an axe! Pine grows in the hills, and every new wood pays better. Come find me if you get stuck."
+	"Now that's an axe! Take my old Field Guide: every new wood you fell goes in it. Pine grows in the hills. And kid, some woods only show at night."
 
 -- Total cash the tutorial pays out (the economy model counts it toward the
 -- first purchase).

@@ -16,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
+local FieldGuideService = require(script.Parent.FieldGuideService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -58,6 +59,7 @@ local function finish(player: Player, profile: Profile, how: "completed" | "skip
 	profile.tutorialDone = true
 	profile.tutorialProgress = 0
 	publish(player, profile)
+	FieldGuideService.Refresh(player) -- Murph hands over the Field Guide
 	if how == "completed" then
 		logFunnelStep(player, profile, #TutorialData.Steps + 1, "Done")
 		MilestoneService.Mark(player, "Finished the tutorial")

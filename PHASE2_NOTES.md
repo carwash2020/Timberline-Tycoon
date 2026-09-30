@@ -17,6 +17,7 @@ On this branch, each with its own checklist below:
 5. **The world**: biomes, roads, day and night, Hearth & Home
 6. **Trailers**
 7. **Robux**: the Store, 2x Cash, cash packs, 2x Wood, Instant Delivery
+8. **The Field Guide**
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -285,3 +286,19 @@ server crash can't lose one or pay it twice.
       pressing it sells the bed anywhere
 - [ ] Buy 2x Cash: sales pay double; the Store says Owned; rejoin: still owned
 - [ ] Leave during a purchase and rejoin: it's granted (once)
+
+## The Field Guide
+
+When the tutorial ends (or is skipped), Murph hands over the **Field
+Guide**: a button on the left. It lists all nine woods. Ones you haven't
+felled are "???" with a hint of where to look ("Grows in Snowfields",
+"Somewhere hidden, and only at night"). Fell one and its page fills in:
+biome, HP, hardness, logs and price, and which axe cuts it ("Rusty Axe: 100
+hits; Steel Axe: 13"). Each new wood toasts "New in your Field Guide".
+
+### Playtest checklist
+- [ ] No Field Guide button during the tutorial; it appears when it ends
+- [ ] Oak and birch show as found if you felled them in the tutorial
+- [ ] Felling a first pine: toast "New in your Field Guide: Pine! (3 of 9)";
+      its page fills in
+- [ ] Undiscovered woods never show their price
