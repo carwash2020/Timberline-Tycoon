@@ -26,6 +26,6 @@ architecture). Current phase status: PHASE1_NOTES.md.
     (seasons, festivals, companies), then more content.
   - Late game, automation may out-earn hand work, inside the rules in
     GAME_DESIGN §9 (runs on what you unlocked, rare content stays manual,
-    Warehouse-capped offline output).
+    online only for now, Warehouse-capped).
   - Wallet cap: `GameConfig.CashCap` = $2,000,000. All cash goes through
     EconomyService.AddCash, which clamps and returns (credited, overflow).

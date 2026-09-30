@@ -290,17 +290,19 @@ runs to a biome you've unlocked → Storefront selling while you're away.
 2. **The best things stay hands-on.** Lumenwood, Phantomwood, festival
    trees and contests, Sky Shards and other rare nodes can't be automated,
    so the wild is always worth going back to.
-3. **Nothing runs away.** The $2,000,000 wallet cap (§4), warehouse
-   capacity on offline output, and sinks that scale with the empire (base
-   tiers, upgrades, cosmetics).
+3. **Nothing runs away.** The $2,000,000 wallet cap (§4), Warehouse
+   capacity, online-only production, and sinks that scale with the empire
+   (base tiers, upgrades, cosmetics).
 4. **The empire asks for decisions, not just waiting.** Contracts and
    storefront orders want specific goods by a deadline, so you plan what
    your lines make.
 
-**Offline:** machines keep working while you're away and fill your
-Warehouse, which caps out after a few hours. "Your warehouse is full" is a
-daily reason to come back (the retention milestone, §8). Saplings stay
-hands-on: they only grow while you tend them.
+**Online only (for now, Connor 2026-09-30):** automation runs only while
+you're in the game, working in the background while you're out in the
+wild. Nothing produces while you're logged off. Output collects in your
+Warehouse, which has a size limit. Saplings stay hands-on: they only grow
+while you tend them. Offline production can be revisited later as a
+retention lever.
 
 **Base tiers.** Your plot grows through named tiers that give the freeform
 building a spine, and each tier is visible from the road (sign, gate,
@@ -651,8 +653,8 @@ export type Profile = {
   data tables, not the code.
 - Automation vs hand work (§9): below the Timber Works tier, automation
   earns less than active play at the same tier; from there it may earn
-  more. Offline output is capped by Warehouse size; all cash by
-  `GameConfig.CashCap` ($2,000,000).
+  more. Automation only runs while the player is online; output is capped
+  by Warehouse size and all cash by `GameConfig.CashCap` ($2,000,000).
 
 ### 14.9 Phase 1 acceptance checklist (no Phase 2 until all pass)
 - [ ] Spawn with Rusty Axe; oak falls in exactly 6 hits (30 HP / 5 dmg).
