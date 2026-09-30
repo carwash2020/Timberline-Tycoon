@@ -1,6 +1,7 @@
 --!strict
 -- ShopService: the BuyItem and EquipItem remotes. The Tool Shed sells
--- axes; the Dealership sells trucks and swaps between the ones you own.
+-- axes; the Dealership sells trucks and swaps between the ones you own;
+-- Hearth & Home sells biome gear (once each, yours for good).
 --
 -- Every purchase is checked here, whatever the client showed:
 --   * the player stands within GameConfig.ShopRange (+ tolerance) of that
@@ -33,6 +34,7 @@ local ShopService = {}
 local SHOP_FOR: { [string]: string } = {
 	Axe = "ToolShed",
 	Truck = "Dealership",
+	Gear = "HearthAndHome",
 }
 
 local map: Instance? = nil
@@ -91,6 +93,47 @@ local function buyAxe(player: Player, axeId: string)
 	notify(player, string.format("Bought the %s! It's in your hotbar.", axe.displayName))
 	MilestoneService.Mark(player, "First upgrade bought")
 	QuestService.Event(player, "axeBought")
+end
+
+local function publishGear(player: Player, profile: ProfileService.Profile)
+	player:SetAttribute("OwnedGear", ShopLogic.EncodeSet(profile.gear))
+end
+
+local function buyGear(player: Player, gearId: string)
+	local profile = ProfileService.GetProfile(player)
+	local gear = ItemCatalog.GetGear(gearId)
+	if not profile or not gear then
+		return
+	end
+	local owned: { [string]: boolean } = {}
+	for _, id in ipairs(profile.gear) do
+		owned[id] = true
+	end
+	local status: ShopLogic.GearStatus = ShopLogic.GearStatusOf(gear, owned)
+	if status == "owned" then
+		notify(player, string.format("You already have the %s.", gear.displayName))
+		return
+	elseif status == "soon" then
+		notify(player, string.format("The %s isn't for sale yet: its biome is coming soon.", gear.displayName))
+		return
+	end
+	if profile.cash < gear.priceCash then
+		notify(
+			player,
+			string.format(
+				"You need %s more for the %s.",
+				Util.formatCash(gear.priceCash - profile.cash),
+				gear.displayName
+			)
+		)
+		return
+	end
+	if not EconomyService.SpendCash(player, gear.priceCash, "bought " .. gear.displayName, gear.id) then
+		return
+	end
+	table.insert(profile.gear, gear.id)
+	publishGear(player, profile)
+	notify(player, string.format("Bought the %s! You're wearing it from now on.", gear.displayName))
 end
 
 local function publishTrucks(player: Player, profile: ProfileService.Profile)
@@ -188,12 +231,15 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 		buyAxe(player, itemId)
 	elseif category == "Truck" then
 		buyTruck(player, itemId)
+	elseif category == "Gear" then
+		buyGear(player, itemId)
 	end
 end
 
 -- Call once the player's save has loaded (after their truck spawned).
 function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profile)
 	publishTrucks(player, profile)
+	publishGear(player, profile)
 end
 
 -- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's notify).

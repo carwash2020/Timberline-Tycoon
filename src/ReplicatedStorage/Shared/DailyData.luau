@@ -10,6 +10,8 @@
 --     bonus that grows with the streak: days in a row with every goal done.
 --   * Missing a day breaks the streak.
 
+local BiomeData = require(script.Parent.BiomeData)
+local ItemCatalog = require(script.Parent.ItemCatalog)
 local Util = require(script.Parent.Util)
 local WoodData = require(script.Parent.WoodData)
 
@@ -49,9 +51,21 @@ DailyData.Tiers = TIERS
 
 local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load" }
 
--- Woods a "sell N <wood> logs" goal can ask for: ones that grow in the
--- world today. Add woods here as their biomes are built.
-DailyData.WoodPool = { "oak", "birch" }
+-- Woods a "sell N <wood> logs" goal can ask for at a tier: ones growing in
+-- the world by day that the tier's axe fells in 30 hits or fewer.
+function DailyData.WoodsFor(tier: number): { string }
+	local ladder = ItemCatalog.AxeLadder()
+	local axe = ladder[math.clamp(math.floor(tier), 1, #ladder)]
+	local out: { string } = {}
+	for _, wood in ipairs(WoodData.All()) do
+		local biome = BiomeData.Get(wood.biome)
+		local damage = ItemCatalog.AxeDamage(axe, wood)
+		if biome and biome.area and not biome.nightOnly and damage > 0 and wood.treeHP / damage <= 30 then
+			table.insert(out, wood.id)
+		end
+	end
+	return out
+end
 
 -- The streak multiplier on the all-done bonus: +25% per day in a row after
 -- the first, up to 2x at 5 days.
@@ -106,7 +120,8 @@ function DailyData.Roll(userId: number, day: number, tier: number): { Goal }
 			goal.target = scale.cash
 		else
 			goal.target = math.ceil(scale.logs / 2)
-			goal.wood = DailyData.WoodPool[math.floor(random() * #DailyData.WoodPool) + 1]
+			local woods = DailyData.WoodsFor(tier)
+			goal.wood = woods[math.floor(random() * #woods) + 1]
 		end
 		table.insert(goals, goal)
 	end

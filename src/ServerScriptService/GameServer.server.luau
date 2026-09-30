@@ -14,6 +14,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AxeService = require(script.Parent.AxeService)
+local BiomeService = require(script.Parent.BiomeService)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
@@ -119,6 +120,17 @@ local function onChopTree(player: Player, treeUid: unknown)
 	local due = nextSwingAt[player.UserId] or 0
 	if now < due - GameConfig.SwingTolerance then
 		return
+	end
+	-- Some woods need gear: Heat Boots on the Volcano, a Lantern in the Grove.
+	local wood = TreeService.GetTreeWood(treeUid)
+	if wood then
+		local ok, why = BiomeService.CanChop(player, wood)
+		if not ok then
+			if why then
+				notify(player, why)
+			end
+			return
+		end
 	end
 	local newHp, err = TreeService.ApplyChop(player, treeUid, axe)
 	if newHp == nil then
@@ -326,6 +338,7 @@ AxeService.Init(notify)
 ShopService.Init(mapFolder, remote.BuyItem, remote.EquipItem, notify)
 QuestService.Init(remote.SkipTutorial, notify)
 DailyService.Init(notify)
+BiomeService.Init(notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)

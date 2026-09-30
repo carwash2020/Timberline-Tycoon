@@ -7,9 +7,11 @@
 --   * Dealership ("Browse trucks"): every truck with its bed size and top
 --     speed. Buy one, or switch to one you own; the new truck waits in your
 --     parking spot.
+--   * Hearth & Home ("Browse gear"): gear for the far biomes, bought once
+--     and worn for good. Gear for a biome that isn't built yet says Soon.
 -- Buying only sends an intent (BuyItem / EquipItem); the server checks
 -- everything and answers with a toast. The player attributes it changes
--- (Cash, OwnedAxes, BestAxeTier, OwnedTrucks, EquippedTruck) redraw the
+-- (Cash, OwnedAxes, BestAxeTier, OwnedTrucks, EquippedTruck, OwnedGear) redraw the
 -- list. Walking away closes the screen, and so do the X and B on a gamepad.
 
 local ContextActionService = game:GetService("ContextActionService")
@@ -28,6 +30,7 @@ local HUD = require(script.Parent.HUD)
 
 type AxeDef = ItemCatalog.AxeDef
 type TruckDef = ItemCatalog.TruckDef
+type GearDef = ItemCatalog.GearDef
 
 local ShopUI = {}
 
@@ -206,7 +209,59 @@ local TRUCKS: Shop = {
 	end,
 }
 
-local SHOPS: { Shop } = { AXES, TRUCKS }
+---------------------------------------------------------------------------
+-- Hearth & Home: gear
+---------------------------------------------------------------------------
+
+local GEAR: Shop = {
+	building = "HearthAndHome",
+	promptText = "Browse gear",
+	title = "HEARTH & HOME",
+	subtitle = "Gear for the far biomes. Buy it once and you wear it for good.",
+	ids = function()
+		local ids = {}
+		for _, gear in ipairs(ItemCatalog.GearList()) do
+			table.insert(ids, gear.id)
+		end
+		return ids
+	end,
+	view = function(id: string): RowView
+		local gear = ItemCatalog.GetGear(id) :: GearDef
+		local cash = (player:GetAttribute("Cash") :: number?) or 0
+		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
+		local status: ShopLogic.GearStatus = ShopLogic.GearStatusOf(gear, owned)
+		local button, buttonColor
+		if status == "buy" then
+			button, buttonColor = priceButton(gear.priceCash, cash)
+		elseif status == "owned" then
+			button, buttonColor = "Owned", MUTED
+		else
+			button, buttonColor = "Soon", SKY
+		end
+		return {
+			name = gear.displayName,
+			detail = ShopLogic.GearDetail(gear),
+			color = Color3.fromHex(gear.color),
+			glow = false,
+			dim = status == "soon",
+			button = button,
+			buttonColor = buttonColor,
+			onClick = function()
+				if status == "owned" then
+					HUD.Toast(string.format("You already have the %s.", gear.displayName))
+				elseif status == "soon" then
+					HUD.Toast(string.format("The %s goes on sale when its biome opens.", gear.displayName))
+				elseif cash < gear.priceCash then
+					needMore(gear.priceCash, cash, gear.displayName)
+				else
+					Net.Remote("BuyItem"):FireServer("Gear", gear.id)
+				end
+			end,
+		}
+	end,
+}
+
+local SHOPS: { Shop } = { AXES, TRUCKS, GEAR }
 
 ---------------------------------------------------------------------------
 -- The panel
@@ -469,7 +524,7 @@ end
 
 function ShopUI.Start()
 	buildPanel()
-	for _, attribute in ipairs({ "Cash", "BestAxeTier", "OwnedAxes", "OwnedTrucks", "EquippedTruck" }) do
+	for _, attribute in ipairs({ "Cash", "BestAxeTier", "OwnedAxes", "OwnedTrucks", "EquippedTruck", "OwnedGear" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	for _, shop in ipairs(SHOPS) do

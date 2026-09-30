@@ -37,6 +37,20 @@ return function(t)
 		end
 	end)
 
+	t.test("wood goals ask for wood the player's axe can fell", function()
+		t.eq(DailyData.WoodsFor(1), { "oak", "birch" })
+		local steel = DailyData.WoodsFor(2)
+		t.ok(table.find(steel, "pine") ~= nil, "the Steel Axe fells pine")
+		for tier = 1, #DailyData.Tiers do
+			local woods = DailyData.WoodsFor(tier)
+			t.ok(#woods > 0, "tier " .. tier .. " has woods")
+			for _, id in ipairs(woods) do
+				t.ok(id ~= "phantomwood", "night-only wood isn't a daily goal")
+				t.ok(id ~= "palmwood" and id ~= "lumenwood", "only woods in the world")
+			end
+		end
+	end)
+
 	t.test("bigger tiers mean bigger goals and rewards", function()
 		for i = 2, #DailyData.Tiers do
 			local a, b = DailyData.Tiers[i - 1], DailyData.Tiers[i]

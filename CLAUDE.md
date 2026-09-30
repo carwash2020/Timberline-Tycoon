@@ -2,7 +2,9 @@
 
 Roblox game, Rojo + Luau. Design spec: GAME_DESIGN.md (§14 is the
 implementation spec; ask Connor before deviating from its data values or
-architecture). Current phase status: PHASE1_NOTES.md.
+architecture). What V1 needs and where it stands: V1_PLAN.md (keep it
+current). Playtest checklists: PHASE1_NOTES.md (main), PHASE2_NOTES.md
+(the branch).
 
 - Connor tests in Roblox Studio on a Mac; Claude can't run Studio. After a
   change, list exactly what to check in Studio.

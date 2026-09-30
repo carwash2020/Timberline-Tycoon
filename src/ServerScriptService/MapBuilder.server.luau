@@ -1,14 +1,24 @@
 --!strict
--- MapBuilder: constructs the Phase 1 world from code at server start.
--- Ground, spawn, starter forest (40 oak + 15 birch), a parking lot,
--- sawmill + sell zone, the Tool Shed (axes), the Dealership (trucks),
--- Murph (the tutorial NPC), and plot markers for later phases. GameServer waits for the
--- TimberlineMap folder before accepting players.
+-- MapBuilder: constructs the world from code at server start (placeholder
+-- art until the Studio-built world, GAME_DESIGN §14.7).
+--   * A 3,000-stud world with every biome that has an area in BiomeData:
+--     ground patch, trees (BiomeData.trees), a few landmarks, a road and
+--     signpost from town. The Phantom Grove is hidden: no road, no sign.
+--   * Town: spawn, parking lot, sawmill + sell zone, the Tool Shed (axes),
+--     the Dealership (trucks), Hearth & Home (gear), Murph (the tutorial
+--     NPC), and plot markers for later phases.
+--   * Starts the day/night clock once the trees are in (WorldClock).
+-- GameServer waits for the TimberlineMap folder before accepting players.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TreeService = require(script.Parent.TreeService)
+local WorldClock = require(script.Parent.WorldClock)
 
 -- A place made from Studio's "Baseplate" template ships its own Baseplate and
 -- SpawnLocation. They would z-fight with our ground and steal spawns, so
@@ -79,8 +89,33 @@ local function signText(part: BasePart, text: string, textSize: number)
 	end
 end
 
--- Ground (Phase 1: starter area only; the full 3000x3000 world comes later).
-box("Ground", Vector3.new(1200, 2, 1200), Vector3.new(0, -1, 0), Color3.fromRGB(91, 155, 72), Enum.Material.Grass)
+-- Ground: the whole world, WORLD_HALF studs each way from the origin, in
+-- four tiles (a part can be at most 2,048 studs long).
+local WORLD_HALF = 1500
+local GRASS = Color3.fromRGB(91, 155, 72)
+for _, sx in ipairs({ -1, 1 }) do
+	for _, sz in ipairs({ -1, 1 }) do
+		box(
+			"Ground",
+			Vector3.new(WORLD_HALF, 2, WORLD_HALF),
+			Vector3.new(sx * WORLD_HALF / 2, -1, sz * WORLD_HALF / 2),
+			GRASS,
+			Enum.Material.Grass
+		)
+	end
+end
+-- Invisible walls at the edge, so nobody drives off the world.
+for _, edge in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+	local ex, ez = edge[1], edge[2]
+	local wall = box(
+		"WorldEdge",
+		Vector3.new(if ex ~= 0 then 2 else WORLD_HALF * 2, 60, if ez ~= 0 then 2 else WORLD_HALF * 2),
+		Vector3.new(ex * WORLD_HALF, 30, ez * WORLD_HALF),
+		GRASS
+	)
+	wall.Transparency = 1
+	wall.CanQuery = false
+end
 
 -- Spawn at the starter-forest edge.
 local spawn = Instance.new("SpawnLocation")
@@ -93,23 +128,27 @@ spawn.Color = Color3.fromRGB(160, 160, 160)
 spawn.Material = Enum.Material.Concrete
 spawn.Parent = map
 
--- Starter forest: oak + birch south of spawn, scattered with spacing.
-local function scatterPositions(
+-- Points at least `minGap` apart inside a ring (inner..outer radius)
+-- around (cx, cz), also clear of every point already in `taken` (which
+-- gains the new ones). Fewer than `count` if the ring is too crowded.
+local function scatterInRing(
 	count: number,
-	xMin: number,
-	xMax: number,
-	zMin: number,
-	zMax: number,
-	minGap: number
+	cx: number,
+	cz: number,
+	inner: number,
+	outer: number,
+	minGap: number,
+	taken: { Vector3 }
 ): { Vector3 }
 	local pts: { Vector3 } = {}
 	local tries = 0
-	while #pts < count and tries < count * 60 do
+	while #pts < count and tries < count * 80 do
 		tries += 1
-		local x = xMin + math.random() * (xMax - xMin)
-		local z = zMin + math.random() * (zMax - zMin)
+		local angle = math.random() * math.pi * 2
+		local r = math.sqrt(inner * inner + math.random() * (outer * outer - inner * inner)) -- even spread
+		local x, z = cx + math.cos(angle) * r, cz + math.sin(angle) * r
 		local clear = true
-		for _, q in ipairs(pts) do
+		for _, q in ipairs(taken) do
 			local dx, dz = x - q.X, z - q.Z
 			if dx * dx + dz * dz < minGap * minGap then
 				clear = false
@@ -117,17 +156,144 @@ local function scatterPositions(
 			end
 		end
 		if clear then
-			table.insert(pts, Vector3.new(x, 0, z))
+			local p = Vector3.new(x, 0, z)
+			table.insert(pts, p)
+			table.insert(taken, p)
 		end
 	end
 	return pts
 end
 
-for _, pos in ipairs(scatterPositions(40, -90, 90, -170, -30, 9)) do
-	TreeService.SpawnTree("oak", CFrame.new(pos))
+local function disc(
+	name: string,
+	x: number,
+	z: number,
+	radius: number,
+	y: number,
+	color: Color3,
+	material: Enum.Material
+): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Shape = Enum.PartType.Cylinder -- axis X, turned upright below
+	p.Size = Vector3.new(0.2, radius * 2, radius * 2)
+	p.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, 0, math.rad(90))
+	p.Color = color
+	p.Material = material
+	p.Anchored = true
+	p.Parent = map
+	return p
 end
-for _, pos in ipairs(scatterPositions(15, -90, 90, -170, -30, 9)) do
-	TreeService.SpawnTree("birch", CFrame.new(pos))
+
+local SAWMILL = Vector3.new(0, 0, 110)
+
+-- Landmarks on the far side of a biome (away from town, so they never
+-- block the road in). Returns the radius to keep clear of trees.
+local function decorate(biome: BiomeData.BiomeDef): number
+	local area = biome.area :: { x: number, z: number, radius: number }
+	local towardTown = math.atan2(SAWMILL.Z - area.z, SAWMILL.X - area.x)
+	local function farSide(i: number, n: number): (number, number)
+		local angle = towardTown + math.pi / 2 + math.pi * (i - 0.5) / n
+		return area.x + math.cos(angle) * (area.radius + 18), area.z + math.sin(angle) * (area.radius + 18)
+	end
+	if biome.id == "hills" or biome.id == "snow" then
+		-- Rolling mounds (or snowdrifts) around the far rim.
+		local color = if biome.id == "hills" then Color3.fromRGB(70, 125, 55) else Color3.fromRGB(235, 242, 248)
+		local material = if biome.id == "hills" then Enum.Material.Grass else Enum.Material.Snow
+		for i = 1, 7 do
+			local x, z = farSide(i, 7)
+			local size = 40 + (i % 3) * 14
+			local mound = Instance.new("Part")
+			mound.Name = "Mound"
+			mound.Shape = Enum.PartType.Ball
+			mound.Size = Vector3.new(size, size, size)
+			mound.Position = Vector3.new(x, -size * 0.3, z) -- mostly buried
+			mound.Color = color
+			mound.Material = material
+			mound.Anchored = true
+			mound.Parent = map
+		end
+		return 0
+	elseif biome.id == "volcano" then
+		-- The cone: stacked rock rings with a lava crater on top.
+		local rock = Color3.fromRGB(45, 38, 35)
+		for i, radius in ipairs({ 55, 44, 33, 22 }) do
+			local ring = disc("VolcanoCone", area.x, area.z, radius, 7.5 + (i - 1) * 15, rock, Enum.Material.Basalt)
+			ring.Size = Vector3.new(15, radius * 2, radius * 2)
+		end
+		local crater = disc("Crater", area.x, area.z, 16, 60.2, Color3.fromRGB(255, 106, 26), Enum.Material.Neon)
+		crater.CanCollide = false
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(255, 120, 40)
+		glow.Range = 60
+		glow.Brightness = 3
+		glow.Parent = crater
+		return 65
+	elseif biome.id == "grove" then
+		-- Glowing mushrooms: the grove's tell at night.
+		for i = 1, 12 do
+			local angle = i / 12 * math.pi * 2
+			local r = area.radius * (0.3 + (i % 4) * 0.18)
+			local cap = Instance.new("Part")
+			cap.Name = "GlowCap"
+			cap.Shape = Enum.PartType.Ball
+			cap.Size = Vector3.new(1.6, 1.6, 1.6)
+			cap.Position = Vector3.new(area.x + math.cos(angle) * r, 0.5, area.z + math.sin(angle) * r)
+			cap.Color = Color3.fromRGB(80, 230, 210)
+			cap.Material = Enum.Material.Neon
+			cap.Anchored = true
+			cap.CanCollide = false
+			cap.Parent = map
+		end
+		return 0
+	end
+	return 0
+end
+
+-- Lava pools on the Volcano (looks only; the ground itself burns).
+local function lavaPools(biome: BiomeData.BiomeDef, taken: { Vector3 })
+	local area = biome.area :: { x: number, z: number, radius: number }
+	for _, pos in ipairs(scatterInRing(6, area.x, area.z, 75, area.radius - 20, 30, taken)) do
+		local pool = disc("LavaPool", pos.X, pos.Z, 6, 0.12, Color3.fromRGB(255, 90, 26), Enum.Material.Neon)
+		ghost(pool, 0)
+	end
+end
+
+-- Every biome with an area: ground patch, landmarks, trees.
+for _, biome in ipairs(BiomeData.All()) do
+	local area = biome.area
+	if area then
+		local ground = biome.ground
+		if ground then
+			local patch = disc(
+				biome.id .. "Ground",
+				area.x,
+				area.z,
+				area.radius,
+				0.05,
+				Color3.fromHex(ground.color),
+				Enum.Material:FromName(ground.material) or Enum.Material.Grass
+			)
+			ghost(patch, 0) -- players and trucks stay on the real ground under it
+		end
+		local clear = decorate(biome)
+		local taken: { Vector3 } = {}
+		if biome.id == "volcano" then
+			lavaPools(biome, taken)
+		end
+		-- Plant woods in a fixed order so every server builds the same mix.
+		local woodIds: { string } = {}
+		for woodId in pairs(biome.trees or {}) do
+			table.insert(woodIds, woodId)
+		end
+		table.sort(woodIds)
+		for _, woodId in ipairs(woodIds) do
+			local count = (biome.trees :: { [string]: number })[woodId]
+			for _, pos in ipairs(scatterInRing(count, area.x, area.z, clear, area.radius - 6, 9, taken)) do
+				TreeService.SpawnTree(woodId, CFrame.new(pos))
+			end
+		end
+	end
 end
 
 -- Parking lot east of spawn: one slot per player, so trucks never spawn
@@ -285,6 +451,113 @@ for i, color in ipairs({ Color3.fromRGB(47, 109, 181), Color3.fromRGB(217, 162, 
 	swatch.Parent = dealership
 end
 
+-- Hearth & Home (biome gear), west of the Tool Shed. A lantern and a coat
+-- hang on the back wall.
+local hearth = shopBuilding("HearthAndHome", Vector3.new(-80, 0, 100), "HEARTH & HOME", Color3.fromRGB(122, 90, 60))
+local lantern = box("LanternProp", Vector3.new(1, 1.4, 1), Vector3.new(-82, 5.5, 104.6), Color3.fromRGB(242, 193, 78))
+lantern.Material = Enum.Material.Neon
+lantern.Parent = hearth
+local lanternLight = Instance.new("PointLight")
+lanternLight.Color = Color3.fromRGB(255, 214, 140)
+lanternLight.Range = 12
+lanternLight.Parent = lantern
+local coat = box("CoatProp", Vector3.new(2.2, 3, 0.4), Vector3.new(-77.5, 5, 104.6), Color3.fromRGB(92, 135, 184))
+coat.Material = Enum.Material.Fabric
+coat.Parent = hearth
+
+---------------------------------------------------------------------------
+-- Roads and signposts out to the biomes
+---------------------------------------------------------------------------
+
+local ROAD_COLOR = Color3.fromRGB(150, 118, 82)
+
+-- A dirt road for looks: trucks drive on the flat ground under it, so
+-- there's no lip to snag on.
+local function road(name: string, x1: number, z1: number, x2: number, z2: number)
+	local from, to = Vector3.new(x1, 0.1, z1), Vector3.new(x2, 0.1, z2)
+	local p = box(name, Vector3.new(10, 0.1, (to - from).Magnitude), (from + to) / 2, ROAD_COLOR, Enum.Material.Ground)
+	p.CFrame = CFrame.lookAt((from + to) / 2, to)
+	ghost(p, 0)
+end
+
+-- A post with a board facing (towardX, towardZ); text scales to fit.
+local function signpost(name: string, x: number, z: number, towardX: number, towardZ: number, text: string)
+	local post = box(name .. "Post", Vector3.new(0.6, 7, 0.6), Vector3.new(x, 3.5, z), WOOD_DARK, Enum.Material.Wood)
+	post.CanCollide = false
+	local board = box(name, Vector3.new(9, 4, 0.4), Vector3.new(x, 7, z), WOOD, Enum.Material.Wood)
+	board.CFrame = CFrame.lookAt(Vector3.new(x, 7, z), Vector3.new(towardX, 7, towardZ))
+	board.CanCollide = false
+	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = face
+		sg.PixelsPerStud = 40
+		sg.Parent = board
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.Fantasy
+		label.TextScaled = true
+		label.TextWrapped = true
+		label.TextColor3 = Color3.fromRGB(245, 235, 215)
+		label.Text = text
+		label.Parent = sg
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0.05, 0)
+		pad.PaddingRight = UDim.new(0.05, 0)
+		pad.PaddingTop = UDim.new(0.05, 0)
+		pad.PaddingBottom = UDim.new(0.05, 0)
+		pad.Parent = label
+	end
+end
+
+-- "THE HILLS\npine · maple" (+ the gear it needs)
+local function biomeSign(biome: BiomeData.BiomeDef): string
+	local woods: { string } = {}
+	for _, wood in ipairs(WoodData.All()) do
+		if (biome.trees or {})[wood.id] then
+			table.insert(woods, string.lower(wood.displayName))
+		end
+	end
+	local text = string.upper(biome.displayName) .. "\n" .. table.concat(woods, " · ")
+	local gearId = biome.requiresGear or (if biome.slowdown then biome.slowdown.removedBy else nil)
+	local gear = if gearId then ItemCatalog.GetGear(gearId) else nil
+	if gear then
+		text ..= "\nBring: " .. gear.displayName
+	end
+	return text
+end
+
+-- Each road runs from town to where it meets the biome's edge, and ends in
+-- a signpost facing back toward town. (The Phantom Grove has none.)
+type Route = { biome: string, from: Vector2 }
+local ROUTES: { Route } = {
+	{ biome = "hills", from = Vector2.new(-20, 20) }, -- west, between the plot markers
+	{ biome = "snow", from = Vector2.new(0, 128) }, -- north, from behind the sawmill
+	{ biome = "volcano", from = Vector2.new(25, 130) }, -- north-east
+}
+local distances: { string } = {}
+for _, route in ipairs(ROUTES) do
+	local biome = BiomeData.Get(route.biome)
+	local area = if biome then biome.area else nil
+	if biome and area then
+		local center = Vector2.new(area.x, area.z)
+		local dir = (center - route.from).Unit
+		local edge = center - dir * (area.radius - 10) -- a little way in
+		road(biome.id .. "Road", route.from.X, route.from.Y, edge.X, edge.Y)
+		signpost(
+			biome.id .. "Sign",
+			edge.X - dir.X * 14 + dir.Y * 9,
+			edge.Y - dir.Y * 14 - dir.X * 9,
+			route.from.X,
+			route.from.Y,
+			biomeSign(biome)
+		)
+		table.insert(distances, string.format("%s  %d", biome.displayName, biome.haulStuds or 0))
+	end
+end
+-- Where the roads start: a signpost by the spawn with every destination.
+signpost("TownSign", -16, 44, 0, 40, "TO THE WOODS\n" .. table.concat(distances, "\n"))
+
 -- Murph, the retired lumberjack who runs the tutorial (GAME_DESIGN §11),
 -- stands just ahead of the spawn, facing it. A blocky figure (no Humanoid:
 -- he doesn't walk yet). Persistent, so QuestUI can always find him and put
@@ -351,10 +624,10 @@ end
 
 -- Plot markers for later phases (visual only in Phase 1).
 local plotPositions = {
-	Vector3.new(150, 0.15, 110),
-	Vector3.new(-150, 0.15, 110),
-	Vector3.new(150, 0.15, -60),
-	Vector3.new(-150, 0.15, -60),
+	Vector3.new(170, 0.15, 110),
+	Vector3.new(-170, 0.15, 110),
+	Vector3.new(170, 0.15, -60),
+	Vector3.new(-170, 0.15, -60),
 }
 for i, pos in ipairs(plotPositions) do
 	local pad =
@@ -363,8 +636,8 @@ for i, pos in ipairs(plotPositions) do
 	CollectionService:AddTag(pad, "PlotSpot")
 end
 
--- Warm afternoon light.
-Lighting.ClockTime = 15.5
+-- Warm light; the time of day comes from WorldClock.
 Lighting.Brightness = 2
+WorldClock.Start()
 
-print("[MapBuilder] World built: spawn, forest, parking, sawmill, sell zone, Tool Shed, Dealership, Murph, plots.")
+print("[MapBuilder] World built: biomes, roads, town (sawmill, Tool Shed, Dealership, Hearth & Home), Murph, plots.")

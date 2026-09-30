@@ -3,12 +3,14 @@
 -- enforces it) and the client (which draws it). Pure: no Roblox services,
 -- so tests can run it outside Studio.
 
+local BiomeData = require(script.Parent.BiomeData)
 local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local WoodData = require(script.Parent.WoodData)
 
 type AxeDef = ItemCatalog.AxeDef
 type TruckDef = ItemCatalog.TruckDef
+type GearDef = ItemCatalog.GearDef
 
 local ShopLogic = {}
 
@@ -150,6 +152,34 @@ function ShopLogic.DecodeSet(text: string): { [string]: boolean }
 		set[id] = true
 	end
 	return set
+end
+
+---------------------------------------------------------------------------
+-- Gear (Hearth & Home)
+---------------------------------------------------------------------------
+
+-- "buy": not owned yet. "owned": yours for good. "soon": its biome isn't in
+-- the world yet, so it isn't sold.
+export type GearStatus = "buy" | "owned" | "soon"
+
+function ShopLogic.GearStatusOf(gear: GearDef, owned: { [string]: boolean }): GearStatus
+	if owned[gear.id] then
+		return "owned"
+	end
+	if not BiomeData.IsOpen(gear.biome) then
+		return "soon"
+	end
+	return "buy"
+end
+
+-- "Walk and chop on the Volcano without burning · for The Volcano"
+function ShopLogic.GearDetail(gear: GearDef): string
+	local biome = BiomeData.Get(gear.biome)
+	local where = if biome then biome.displayName else gear.biome
+	if not BiomeData.IsOpen(gear.biome) then
+		return string.format("%s · %s is coming soon", gear.effect, where)
+	end
+	return string.format("%s · for %s", gear.effect, where)
 end
 
 ---------------------------------------------------------------------------

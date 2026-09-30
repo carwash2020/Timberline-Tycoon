@@ -8,6 +8,7 @@ at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 - **What the game is:** [GAME_DESIGN.md](GAME_DESIGN.md)
 - **Where Phase 1 stands:** [PHASE1_NOTES.md](PHASE1_NOTES.md)
 - **What's being built next, and how to test it:** [PHASE2_NOTES.md](PHASE2_NOTES.md)
+- **Everything V1 needs, and where it stands:** [V1_PLAN.md](V1_PLAN.md)
 - **How fast the economy runs:** [ECONOMY.md](ECONOMY.md) (generated; re-run with `lune run tools/economy`)
 
 ## Set up on any computer (one command)
@@ -94,6 +95,8 @@ measure the economy model against your real play (saved in
   - `ShopService`: buying at the Tool Shed and Dealership
   - `QuestService`: Murph's tutorial (progress, rewards, skip)
   - `DailyService`: daily goals and streaks
+  - `BiomeService`: what each biome does to you (cold, lava, darkness)
+  - `WorldClock`: day and night, the same on every server
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
@@ -101,10 +104,12 @@ measure the economy model against your real play (saved in
   - `TutorialData`: Murph's tutorial steps and lines
   - `TruckLayout`, `DriveMath`: how trucks are built and how they drive
   - `DailyData`: daily goal sizes, rewards and streak bonus
+  - `WorldTime`: the in-game clock
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial
-  tracker, `VehicleController` drives your truck, `DailyUI` the daily goals)
+  tracker, `VehicleController` drives your truck, `DailyUI` the daily goals,
+  `WorldUI` biome names and the clock)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
 - `tests/`: unit tests, run with Lune outside Roblox (`tools/loader.luau`

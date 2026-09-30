@@ -24,6 +24,12 @@ local GameConfig = {
 	MaxDroppedAxes = 10, -- per player, lying in the world at once
 	MaxOwnedAxes = 20, -- the shop stops selling past this (keeps hotbars and saves small)
 
+	-- World (biome areas and rules are in BiomeData)
+	DayCycleMinutes = 20, -- one full day and night, real minutes; the same on every server
+	NightStartsAt = 19, -- in-game hour (ClockTime) the night starts
+	NightEndsAt = 5, -- ... and ends; the Phantom Grove only exists in between
+	LavaDamagePerSecond = 5, -- on the Volcano without Heat Boots (100 health = 20 s)
+
 	-- HUD
 	-- Roblox's own player list opens top right on computers, right over the
 	-- cash. Off until our own leaderboard (GAME_DESIGN §8 phase 7).

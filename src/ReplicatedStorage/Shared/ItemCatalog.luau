@@ -59,11 +59,15 @@ export type BoatDef = {
 	priceCash: number,
 }
 
+-- Worn gear, sold at Hearth & Home; each piece is for one biome (BiomeData
+-- names it in requiresGear or slowdown.removedBy). You own it for good.
 export type GearDef = {
 	id: string,
 	displayName: string,
 	effect: string,
 	priceCash: number,
+	biome: string, -- the biome it's for
+	color: string, -- hex, for the shop swatch
 }
 
 ItemCatalog.Axes = {
@@ -205,19 +209,37 @@ ItemCatalog.Boats = {
 }
 
 ItemCatalog.Gear = {
-	Lantern = { id = "Lantern", displayName = "Lantern", effect = "See in the dark (Phantom Grove)", priceCash = 150 },
+	Lantern = {
+		id = "Lantern",
+		displayName = "Lantern",
+		effect = "Light to chop by in the Phantom Grove",
+		priceCash = 150,
+		biome = "grove",
+		color = "#F2C14E",
+	},
 	InsulatedCoat = {
 		id = "InsulatedCoat",
 		displayName = "Insulated Coat",
-		effect = "Ignore snow cold",
+		effect = "No more slow, cold walking in the Snowfields",
 		priceCash = 500,
+		biome = "snow",
+		color = "#5C87B8",
 	},
-	HeatBoots = { id = "HeatBoots", displayName = "Heat Boots", effect = "Immune to lava burn", priceCash = 800 },
+	HeatBoots = {
+		id = "HeatBoots",
+		displayName = "Heat Boots",
+		effect = "Walk and chop on the Volcano without burning",
+		priceCash = 800,
+		biome = "volcano",
+		color = "#B5472A",
+	},
 	FeatherfallCloak = {
 		id = "FeatherfallCloak",
 		displayName = "Featherfall Cloak",
 		effect = "Glide down instead of falling off the Aether Isles",
 		priceCash = 2500,
+		biome = "sky",
+		color = "#BFD8FF",
 	},
 }
 
@@ -313,6 +335,27 @@ end)
 
 function ItemCatalog.TruckList(): { TruckDef }
 	return truckList
+end
+
+function ItemCatalog.GetGear(gearId: string): GearDef?
+	local gear = ItemCatalog.Gear[gearId]
+	if type(gear) == "table" then
+		return gear
+	end
+	return nil
+end
+
+-- Every piece of gear, cheapest first (Hearth & Home's order).
+local gearList: { GearDef } = {}
+for _, gear in pairs(ItemCatalog.Gear) do
+	table.insert(gearList, gear)
+end
+table.sort(gearList, function(a, b)
+	return a.priceCash < b.priceCash
+end)
+
+function ItemCatalog.GearList(): { GearDef }
+	return gearList
 end
 
 return ItemCatalog

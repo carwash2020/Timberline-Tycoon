@@ -134,7 +134,7 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 	local target = step.beacon
 	if target == "tree" then
 		return nearestTagged("Tree", from, function(model)
-			return ((model:GetAttribute("HP") :: number?) or 0) > 0
+			return ((model:GetAttribute("HP") :: number?) or 0) > 0 and model:GetAttribute("Dormant") ~= true
 		end)
 	elseif target == "log" then
 		-- Logs lying in the world have a "Pick up" prompt; carried ones don't.

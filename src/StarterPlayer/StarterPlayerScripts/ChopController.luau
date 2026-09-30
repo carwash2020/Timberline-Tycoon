@@ -50,7 +50,8 @@ end
 
 local function isAlive(tree: Model): boolean
 	local hp = tree:GetAttribute("HP")
-	return type(hp) == "number" and hp > 0
+	-- Dormant = hidden for now (the Phantom Grove by day).
+	return type(hp) == "number" and hp > 0 and tree:GetAttribute("Dormant") ~= true
 end
 
 -- Can this axe cut this tree at all? (Harder wood needs a stronger axe.)

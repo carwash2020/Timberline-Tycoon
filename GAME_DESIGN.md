@@ -684,6 +684,9 @@ export type Profile = {
 - `QuestService.luau` — tutorial beats + quest log.
 - `NPCService.luau` — dialogue, friendship, gifts.
 - `DailyService.luau` — daily goals and streaks (rules in `Shared/DailyData`).
+- `BiomeService.luau` — biome rules per player (slowdown, lava, gear needed
+  to chop; rules in `BiomeData.Rules`). `WorldClock.luau` — day/night from
+  real time (`Shared/WorldTime`), night-only trees.
 - `SeasonService.luau` — clock, seasons, festivals, weather, day/night.
 - `TradingService.luau` — phase 7.
 

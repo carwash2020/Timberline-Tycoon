@@ -7,6 +7,8 @@
 --   * Felling hinges the tree over at its base in a random direction, then
 --     swaps it for exactly logsPerTree logs laid along the fallen trunk, and
 --     respawns the tree after the wood's respawnSec.
+--   * Night-only woods (the Phantom Grove): SetBiomeDormant hides a biome's
+--     trees by day and brings them back at night (WorldClock).
 --   * Log records: state "world" | "carried". Ownership: PickupGraceSec to
 --     the feller, then free-for-all. Logs left in the world despawn after
 --     LogDespawnSec.
@@ -41,6 +43,8 @@ export type TreeRecord = {
 	pivot: CFrame, -- upright pivot (trunk centre)
 	base: Vector3, -- ground point under the trunk
 	collide: { [BasePart]: boolean }, -- each part's original CanCollide
+	felled: boolean, -- down and waiting to regrow
+	dormant: boolean, -- hidden for now (night-only woods by day)
 }
 
 export type LogRecord = {
@@ -143,6 +147,8 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame): Model
 		pivot = pivot,
 		base = cframe.Position,
 		collide = { [trunk] = trunk.CanCollide, [foliage] = foliage.CanCollide },
+		felled = false,
+		dormant = false,
 	}
 	return model
 end
@@ -240,6 +246,7 @@ local function fellTree(player: Player, uid: string)
 		return
 	end
 	rec.alive = false
+	rec.felled = true
 	local model = rec.model
 	local fellerId = player.UserId
 
@@ -280,9 +287,38 @@ local function fellTree(player: Player, uid: string)
 		model:PivotTo(rec.pivot)
 		rec.hp = rec.def.treeHP
 		model:SetAttribute("HP", rec.hp)
-		setTreeVisible(rec, true)
-		rec.alive = true
+		rec.felled = false
+		if not rec.dormant then
+			setTreeVisible(rec, true)
+			rec.alive = true
+		end
 	end)
+end
+
+-- Hides (or brings back) every tree of a biome, e.g. the Phantom Grove by
+-- day. A tree that's down stays down until it regrows.
+function TreeService.SetBiomeDormant(biomeId: string, dormant: boolean)
+	for _, rec in pairs(trees) do
+		if rec.def.biome == biomeId and rec.dormant ~= dormant then
+			rec.dormant = dormant
+			rec.model:SetAttribute("Dormant", dormant) -- clients don't aim at hidden trees
+			if dormant and rec.alive then
+				rec.alive = false
+				rec.hp = rec.def.treeHP -- a half-chopped tree is whole again tomorrow night
+				rec.model:SetAttribute("HP", rec.hp)
+				setTreeVisible(rec, false)
+			elseif not dormant and not rec.felled then
+				setTreeVisible(rec, true)
+				rec.alive = true
+			end
+		end
+	end
+end
+
+-- The wood of a standing tree, or nil if there's no such tree up right now.
+function TreeService.GetTreeWood(uid: string): WoodDef?
+	local rec = trees[uid]
+	return if rec and rec.alive then rec.def else nil
 end
 
 -- Validates range server-side, applies the axe's damage for this tree's

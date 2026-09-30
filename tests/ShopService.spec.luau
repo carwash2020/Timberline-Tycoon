@@ -18,6 +18,7 @@ return function(t)
 			totalEarned = 0,
 			bestAxeTier = options.bestTier or 1,
 			ownedTrucks = options.trucks or { "Rustbucket" },
+			gear = options.gear or {},
 			equippedTruck = options.equippedTruck or "Rustbucket",
 		}
 		local toasts, granted, equipped, quests, switched = {}, {}, {}, {}, {}
@@ -45,6 +46,7 @@ return function(t)
 		local map = node({
 			ToolShed = node({ Counter = node({ ShopPoint = point }) }),
 			Dealership = node({ Counter = node({ ShopPoint = point }) }), -- same spot: fine for these tests
+			HearthAndHome = node({ Counter = node({ ShopPoint = point }) }),
 		})
 
 		local loader = t.loader({
@@ -211,6 +213,24 @@ return function(t)
 		local far = setup({ trucks = { "Rustbucket", "Pickup" }, at = COUNTER + Vector3.new(0, 0, -40) })
 		far.use("Truck", "Pickup")
 		t.eq(far.switched, {})
+	end)
+
+	t.test("gear: bought once, never twice, and not before its biome opens", function()
+		local s = setup({ cash = 1000 })
+		s.buy("Gear", "InsulatedCoat")
+		t.eq(s.profile.cash, 500)
+		t.eq(s.profile.gear, { "InsulatedCoat" })
+		t.eq(s.toasts, { "Bought the Insulated Coat! You're wearing it from now on." })
+		local again = setup({ cash = 1000, gear = { "InsulatedCoat" } })
+		again.buy("Gear", "InsulatedCoat")
+		t.eq(again.profile.cash, 1000)
+		local early = setup({ cash = 5000 })
+		early.buy("Gear", "FeatherfallCloak")
+		t.eq(early.profile.cash, 5000)
+		t.eq(early.profile.gear, {})
+		local poor = setup({ cash = 100 })
+		poor.buy("Gear", "HeatBoots")
+		t.eq(poor.toasts, { "You need $700 more for the Heat Boots." })
 	end)
 
 	t.test("junk requests are ignored silently", function()

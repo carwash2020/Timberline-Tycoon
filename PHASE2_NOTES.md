@@ -14,6 +14,7 @@ On this branch, each with its own checklist below:
 2. **Murph's tutorial**
 3. **Trucks**: the Dealership, every truck, physics driving, Truck to lot
 4. **Daily goals and streaks**
+5. **The world**: biomes, roads, day and night, Hearth & Home
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -181,3 +182,45 @@ day resets the streak.
 To test a new day without waiting: temporarily change `SecondsPerDay` in
 `DailyData.luau` to `300` (a "day" every 5 minutes), then set it back to
 `86400`.
+
+## The world: biomes, day and night, Hearth & Home (GAME_DESIGN §8 phase 5)
+
+The world is now 3,000 studs across, with every biome on the way to V1.
+Roads and signposts lead out from town (a signpost by the spawn lists
+them all):
+
+| Biome | Where | Woods | Rule |
+|---|---|---|---|
+| Starter Forest | south of spawn | oak, birch | none |
+| The Hills | west, ~400 studs | pine, maple | none |
+| Snowfields | far north, ~1,200 | frostwood | you walk 15% slower without an **Insulated Coat** |
+| The Volcano | far north-east, ~1,600 | emberwood | the ground burns without **Heat Boots**, and you can't chop there |
+| Phantom Grove | hidden south-west, no road | phantomwood | trees only at night; you need a **Lantern** to chop |
+
+- **Hearth & Home** (west of the Tool Shed) sells the gear: Lantern $150,
+  Insulated Coat $500, Heat Boots $800. The Featherfall Cloak says **Soon**
+  until the Aether Isles exist.
+- **Day and night:** a full day is 20 minutes, the same on every server;
+  night runs 19:00 to 05:00 (about 8 minutes). The clock is next to the
+  cash. A Lantern glows on you at night.
+- Everything is placeholder art (coloured ground, simple mounds, a stepped
+  volcano cone) until the Studio art pass.
+
+### Playtest checklist
+- [ ] The signpost by the spawn lists the Hills, Snowfields and Volcano
+- [ ] Follow each road: it ends at its biome, with a sign naming the woods
+      and the gear to bring; entering shows a toast
+- [ ] The Hills: pine and maple trees; the Steel Axe fells pine in 13 hits
+- [ ] Snowfields: noticeably slower walking; buy the Insulated Coat: normal speed
+- [ ] The Volcano: you take damage and "The ground is scorching!"; chopping
+      says you need Heat Boots; with Heat Boots neither happens
+- [ ] Phantom Grove (about 800 studs south-west of the sawmill, no road): by
+      day, no trees and a toast saying so; at night, trees; chopping needs a Lantern
+- [ ] The clock shows Day/Night; the sky darkens at night; the Lantern glows
+- [ ] Hearth & Home: buy each piece once; buying again says you have it
+- [ ] Driving all the way to the Volcano: no falling through the ground, no
+      `[AntiExploit]` warnings; the world edge stops you
+- [ ] The far biomes stream in as you drive (no empty void on arrival)
+
+Quick night test: set `DayCycleMinutes = 2` in `GameConfig.luau` (a day
+every 2 minutes), then set it back to `20`.
