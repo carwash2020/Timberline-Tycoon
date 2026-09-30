@@ -260,12 +260,14 @@ local function onSellLogs(player: Player)
 		return
 	end
 	local total, count = 0, 0
+	local byWood: { [string]: number } = {} -- for the stopwatch's calibration line
 	-- Logs in hands: valued from SERVER records, then destroyed.
 	for uid in pairs(hands) do
 		local log = TreeService.TakeLog(uid)
 		if log then
 			total += log.def.pricePerLog
 			count += 1
+			byWood[log.def.id] = (byWood[log.def.id] or 0) + 1
 			log.model:Destroy()
 		end
 	end
@@ -277,6 +279,7 @@ local function onSellLogs(player: Player)
 		for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
 			total += entry.value
 			count += 1
+			byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
 		end
 	end
 	player:SetAttribute("CarriedLogs", 0)
@@ -288,6 +291,7 @@ local function onSellLogs(player: Player)
 	EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
 	MilestoneService.Mark(player, "First sale")
 	MilestoneService.CashEarned(player, total)
+	MilestoneService.LogsSold(player, byWood)
 	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
 end
 

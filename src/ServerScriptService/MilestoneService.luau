@@ -9,6 +9,9 @@
 --     you don't own yet: that's the pace check from GAME_DESIGN §14.8.
 --   * Once a minute prints cash earned and cash per minute.
 --   * On leaving, prints a one-line session summary.
+--   * Prints a ready-to-paste command that calibrates the economy model
+--     from what you actually did: time from first chop to last sale, and
+--     the logs sold by wood ("lune run tools/economy --calibrate ...").
 --
 -- On live servers:
 --   * Logs the steps as Roblox's onboarding funnel (Creator Hub ->
@@ -47,6 +50,8 @@ end
 
 local IS_STUDIO = RunService:IsStudio()
 local REPORT_EVERY = 60 -- seconds, Studio only
+local CALIBRATE_MIN_LOGS = 10 -- don't suggest calibrating from less than this
+local CALIBRATE_MIN_SECONDS = 120
 
 type Session = {
 	profile: Profile,
@@ -54,6 +59,10 @@ type Session = {
 	earned: number,
 	earnedAtLastReport: number,
 	seen: { [string]: boolean },
+	-- For calibrating the economy model (tools/economy.luau).
+	firstChopAt: number?,
+	lastSaleAt: number?,
+	soldByWood: { [string]: number },
 }
 
 local sessions: { [Player]: Session } = {}
@@ -80,6 +89,34 @@ local function stopwatch(player: Player, session: Session, text: string)
 	local send = notify
 	if send then
 		send(player, "⏱ " .. line)
+	end
+end
+
+-- "lune run tools/economy --calibrate 612 birch=16 oak=24", or nil if the
+-- session doesn't have enough sales yet.
+local function calibrationCommand(session: Session): string?
+	local first, last = session.firstChopAt, session.lastSaleAt
+	if not first or not last then
+		return nil
+	end
+	local seconds = math.floor(last - first)
+	local parts, total = {}, 0
+	for woodId, count in pairs(session.soldByWood) do
+		table.insert(parts, string.format("%s=%d", woodId, count))
+		total += count
+	end
+	if total < CALIBRATE_MIN_LOGS or seconds < CALIBRATE_MIN_SECONDS then
+		return nil
+	end
+	table.sort(parts)
+	return string.format("lune run tools/economy --calibrate %d %s", seconds, table.concat(parts, " "))
+end
+
+local function printCalibration(player: Player, session: Session)
+	local command = calibrationCommand(session)
+	if command then
+		print(string.format("[Stopwatch] %s: to calibrate the economy model, run in the repo folder:", player.Name))
+		print("    " .. command)
 	end
 end
 
@@ -118,6 +155,7 @@ function MilestoneService.Init(notifyFn: (Player, string) -> ())
 							perMinute(lastMinute, REPORT_EVERY)
 						)
 					)
+					printCalibration(player, session)
 				end
 			end
 		end)
@@ -132,6 +170,7 @@ function MilestoneService.Start(player: Player, profile: Profile)
 		earned = 0,
 		earnedAtLastReport = 0,
 		seen = {},
+		soldByWood = {},
 	}
 	sessions[player] = session
 	MilestoneService.Mark(player, "Joined")
@@ -146,6 +185,9 @@ function MilestoneService.Mark(player: Player, name: string)
 		return
 	end
 	session.seen[name] = true
+	if name == "First chop" then
+		session.firstChopAt = os.clock()
+	end
 	if name ~= "Joined" then
 		stopwatch(player, session, name)
 	end
@@ -173,6 +215,18 @@ function MilestoneService.CashEarned(player: Player, amount: number)
 	end
 end
 
+-- Call after a sale with the logs sold, counted by wood id.
+function MilestoneService.LogsSold(player: Player, byWood: { [string]: number })
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	session.lastSaleAt = os.clock()
+	for woodId, count in pairs(byWood) do
+		session.soldByWood[woodId] = (session.soldByWood[woodId] or 0) + count
+	end
+end
+
 -- Call when the player leaves.
 function MilestoneService.Stop(player: Player)
 	local session = sessions[player]
@@ -192,6 +246,7 @@ function MilestoneService.Stop(player: Player)
 				perMinute(session.earned, elapsed)
 			)
 		)
+		printCalibration(player, session)
 	end
 end
 

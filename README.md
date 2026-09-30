@@ -53,7 +53,10 @@ check against the Roblox API: everything that doesn't need Studio.
 
 While you play in Studio, lines starting with **`[Stopwatch]`** in the Output
 window time the core loop: first chop, first sale, when you could afford
-each axe, and cash per minute. After changing any prices or HP, run
+each axe, and cash per minute. After ~10 minutes they also print a
+`lune run tools/economy --calibrate …` line: run it in the repo folder to
+measure the economy model against your real play (saved in
+`tools/calibration.json`). After changing any prices or HP, run
 `lune run tools/economy` to regenerate ECONOMY.md.
 
 ## Rules of the road

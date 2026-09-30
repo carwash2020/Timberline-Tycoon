@@ -82,8 +82,11 @@ Axes as items:
 Numbers to report back (from the `[Stopwatch]` lines in the Output window):
 - [ ] "First sale at …" (target: under 3:00)
 - [ ] "Could afford the Steel Axe at …" (design target: 12–15 min)
-- [ ] The "overall" $/min after ~10 minutes of oak/birch: this calibrates
-      the economy model in ECONOMY.md
+- [ ] **Calibrate the economy model:** play oak/birch with the Rusty Axe and
+      Rustbucket for ~10 minutes, then run the
+      `lune run tools/economy --calibrate …` line the Output prints (in the
+      repo folder), and commit `tools/calibration.json` + ECONOMY.md (or just
+      paste the line to Claude)
 
 Things only a human can judge (report back):
 - [ ] Axe sits right in the hand and the swing animation plays
@@ -109,6 +112,6 @@ Things only a human can judge (report back):
 
 ## Economy status
 - **Economy pace:** tuned on 2026-09-30 to match §4 (see ECONOMY.md):
-  first Steel Axe ~10 min, whole progression ~12 h. The model assumes
-  real players are half as efficient as a perfect one; the playtest's
-  `[Stopwatch]` $/min will tell us the real number.
+  first Steel Axe ~10 min, all of V1 ~17 h. Those numbers rest on
+  EFFICIENCY = 0.50, a guess; the calibration step above replaces it with
+  a measured value.

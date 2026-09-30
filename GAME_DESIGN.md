@@ -198,6 +198,17 @@ forecast against that, not against gross Robux.
 8. **Monetization**: passes, dev products, private servers.
 9. **Polish & launch**: thumbnail, icon, tutorial, analytics, bug bash.
 
+**Milestones (what the phases add up to):**
+1. **The core feels good.** Phases 1–4 pass in playtests, EFFICIENCY in
+   `tools/economy.luau` is calibrated from a real playtest, and chop → haul
+   → sell is fun to repeat. Nothing else matters until this holds.
+2. **Retention: the real next milestone.** V1 is ~17 h for a focused player
+   (ECONOMY.md). What carries players past that is seasons and festivals
+   (§12), companies (§5, §7) and a reason to come back each day. These are
+   doc-only today and come next, ahead of more content.
+3. **Content and empire:** the remaining biomes (5), the Aether Isles
+   finale (5b), plots and flumes (6). Then monetization and launch (8–9).
+
 ## 9. Empire building (blueprint-placed, not buy-buttons)
 
 Your plot is a working lumber empire — but nothing is a buy-pad. Every
@@ -330,8 +341,8 @@ corner from minute one, and its canopy hides floating islands of glowing
   little less than emberwood (the grind); once forged, the Starfall loop is
   the best in the game (~35% above the volcano). Forging takes about 3 hours
   of saving; all of V1 is about 17 hours for a focused player.
-- **Other isle items:** Sky Shards (forge material, sellable), a sky-themed
-  plot decoration blueprint, and Cloud Cotton for foraging (§12).
+- **Other isle items:** Sky Shards (the one forge material, also sellable)
+  and a sky-themed plot decoration blueprint. No more materials (§15).
 
 Distances are deliberate: better wood means a longer haul, so truck upgrades
 buy *range*, not just stats. No early fast-travel — the drive is part of the
@@ -594,3 +605,9 @@ Playtest in Studio, checklist passes, zero console errors, commit as
   cadence before promising a date.
 - **Scope**: cut phase 6–7 scope before cutting core-loop feel. A tight loop
   with 3 wood tiers beats a sprawling game that feels empty.
+- **Item sprawl**: V1 has exactly one gathered material, Sky Shards (the
+  Starfall forge). Every new material means another thing to find, store,
+  explain and balance; add one only when an existing item can't do the job.
+- **Uncalibrated economy**: every pacing number in ECONOMY.md scales with
+  EFFICIENCY, a 0.50 guess until a playtest measures it. Calibrate early
+  and again whenever the loop changes (the stopwatch prints the command).

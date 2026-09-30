@@ -16,3 +16,10 @@ architecture). Current phase status: PHASE1_NOTES.md.
   After any balance change, re-run `lune run tools/economy` and commit the
   regenerated ECONOMY.md.
 - Commit messages: `phase-N: <what changed>`.
+- Scope guardrails (from Connor):
+  - One gathered material in V1 (Sky Shards). Don't add materials.
+  - The economy model's EFFICIENCY is a guess until calibrated. The
+    stopwatch prints `lune run tools/economy --calibrate ...`; running it
+    saves `tools/calibration.json`. Commit that file with ECONOMY.md.
+  - Milestones (GAME_DESIGN §8): the core feels good, then retention
+    (seasons, festivals, companies), then more content.

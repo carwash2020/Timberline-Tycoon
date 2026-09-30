@@ -11,11 +11,14 @@
 -- It's a model, not a measurement. It assumes trees are always available
 -- and nobody competes for them. EFFICIENCY scales the ideal "perfect player"
 -- numbers down to a real one. Calibrate it with a Studio playtest: play the
--- starter loop for ~10 minutes, read the "[Stopwatch] ... overall" $/min,
--- divide by the ideal $/min this report prints, put that in EFFICIENCY and
--- re-run.
+-- starter loop for ~10 minutes and the Output window prints a line like
+--   lune run tools/economy --calibrate 612 birch=16 oak=24
+-- Run it here: it measures you against the ideal model, saves EFFICIENCY
+-- to tools/calibration.json (read by every later run) and rewrites the report.
 
 local fs = require("@lune/fs")
+local process = require("@lune/process")
+local serde = require("@lune/serde")
 local luau = require("@lune/luau")
 local roblox = require("@lune/roblox")
 
@@ -35,7 +38,11 @@ local BiomeData = loadModule("BiomeData")
 ---------------------------------------------------------------------------
 -- Assumptions (edit these, then re-run)
 ---------------------------------------------------------------------------
-local EFFICIENCY = 0.5 -- real player vs the ideal model (calibrate, see top)
+-- Real player vs the ideal model: measured by --calibrate (see top), or a
+-- guess until then.
+local CALIBRATION_FILE = "tools/calibration.json"
+local calibration = if fs.isFile(CALIBRATION_FILE) then serde.decode("json", fs.readFile(CALIBRATION_FILE)) else nil
+local EFFICIENCY = if calibration then calibration.efficiency else 0.5
 
 local A = {
 	walkSpeed = 16, -- studs/s, Roblox default WalkSpeed
@@ -372,6 +379,44 @@ local function setupRate(axeId: string, truckId: string, woodIds: { string }, ex
 	return topRate, topWood or WoodData.Get(woodIds[1])
 end
 
+-- --calibrate <seconds> <wood>=<logs> ...: how long a perfect player would
+-- take to fell, haul and sell those logs with the starter kit, divided by
+-- how long the playtester took (first chop to last sale).
+if process.args[1] == "--calibrate" then
+	local usage = "usage: lune run tools/economy --calibrate <seconds> <wood>=<logs> ..."
+	local seconds = tonumber(process.args[2])
+	assert(seconds and seconds > 0, usage)
+	local owned = { RustyAxe = true, Rustbucket = true }
+	local rusty = ItemCatalog.GetAxe("RustyAxe")
+	local idealSeconds, logs, total = 0, {}, 0
+	for i = 3, #process.args do
+		local woodId, count = string.match(process.args[i], "^(%w+)=(%d+)$")
+		local wood = if woodId then WoodData.Get(woodId) else nil
+		assert(wood, "not a <wood>=<logs> pair: " .. process.args[i] .. "\n" .. usage)
+		local secs, _, perLoad = loadCycle(rusty, wood, owned)
+		assert(secs, "the Rusty Axe can't cut " .. woodId)
+		idealSeconds += tonumber(count) * secs / perLoad
+		logs[woodId] = tonumber(count)
+		total += tonumber(count)
+	end
+	assert(total > 0, usage)
+	local measured = idealSeconds / seconds
+	if measured > 1 then
+		print(
+			string.format(
+				"Warning: you beat the ideal model (%.2f). Its assumptions (walk distances, prompt times) are too slow; review them in tools/economy.luau. Saving 1.0.",
+				measured
+			)
+		)
+		measured = 1
+	end
+	measured = math.floor(measured * 100 + 0.5) / 100
+	print(string.format("EFFICIENCY %.2f -> %.2f (saved to %s)", EFFICIENCY, measured, CALIBRATION_FILE))
+	calibration = { efficiency = measured, seconds = seconds, logs = logs, date = os.date("%Y-%m-%d") }
+	fs.writeFile(CALIBRATION_FILE, serde.encode("json", calibration, true) .. "\n")
+	EFFICIENCY = measured
+end
+
 local STARTER = { starter = true }
 local steps = simulate() -- the whole world
 local starterSteps, earnedAt15 = simulate(STARTER) -- a new player in the starter forest (all Phase 1 has)
@@ -396,8 +441,15 @@ line(
 line()
 line(
 	string.format(
-		'**Model, not measurement.** Numbers assume trees are always available and nobody competes for them. "Real player" = the ideal model × EFFICIENCY (%.2f), a guess until a playtest calibrates it.',
-		EFFICIENCY
+		'**Model, not measurement.** Numbers assume trees are always available and nobody competes for them. "Real player" = the ideal model × EFFICIENCY (%.2f), %s.',
+		EFFICIENCY,
+		if calibration
+			then string.format(
+				"measured %s from a %d-min Studio playtest",
+				calibration.date,
+				math.floor(calibration.seconds / 60 + 0.5)
+			)
+			else "**a guess until a playtest calibrates it** (see below)"
 	)
 )
 line()
@@ -564,12 +616,29 @@ line()
 line("## Calibrating with a playtest")
 line()
 line(
-	string.format(
-		"The ideal model earns **%s/min** with the Rusty Axe and Rustbucket on %s. Play that loop in Studio for ~10 minutes and read the `[Stopwatch] ... overall` $/min in the Output window. Set `EFFICIENCY` in `tools/economy.luau` to your number ÷ %s, and re-run.",
-		money(early / 60),
-		earlyWood.displayName:lower(),
-		money(early / 60)
-	)
+	"1. In Studio, play the starter loop with the Rusty Axe and Rustbucket for about 10 minutes: chop, load the truck, sell at the mill."
+)
+line(
+	"2. The Output window prints a line starting `lune run tools/economy --calibrate` (every minute, and when you stop)."
+)
+line(
+	"3. Run that line in the repo folder. It saves EFFICIENCY to `tools/calibration.json` and rewrites this report with honest numbers."
+)
+line()
+line(
+	if calibration
+		then string.format(
+			"Current: **%.2f**, measured %s over %d min. Re-run after big changes to how the loop plays.",
+			EFFICIENCY,
+			calibration.date,
+			math.floor(calibration.seconds / 60 + 0.5)
+		)
+		else string.format(
+			"Current: **%.2f (a guess)**. For reference, the ideal model earns %s/min on %s with the starter kit.",
+			EFFICIENCY,
+			money(early / 60),
+			earlyWood.displayName:lower()
+		)
 )
 line()
 
