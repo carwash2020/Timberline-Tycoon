@@ -47,7 +47,9 @@ ItemCatalog.Axes = {
 	SteelAxe = { id = "SteelAxe", displayName = "Steel Axe", damage = 12, priceCash = 150 },
 	HardenedAxe = { id = "HardenedAxe", displayName = "Hardened Axe", damage = 25, priceCash = 800 },
 	SilverAxe = { id = "SilverAxe", displayName = "Silver Axe", damage = 45, priceCash = 3500 },
+	CobaltAxe = { id = "CobaltAxe", displayName = "Cobalt Axe", damage = 60, priceCash = 7000 },
 	GoldAxe = { id = "GoldAxe", displayName = "Gold Axe", damage = 80, priceCash = 12000 },
+	ObsidianAxe = { id = "ObsidianAxe", displayName = "Obsidian Axe", damage = 120, priceCash = 20000 },
 	InfernoAxe = {
 		id = "InfernoAxe",
 		displayName = "Inferno Axe",
@@ -99,6 +101,31 @@ function ItemCatalog.GetAxe(axeId: string): AxeDef?
 	local axe = ItemCatalog.Axes[axeId]
 	if type(axe) == "table" then
 		return axe
+	end
+	return nil
+end
+
+-- Axes are sold in order, one tier at a time (GAME_DESIGN §3): the ladder
+-- is the axes sorted by price, and the shop only offers the first one the
+-- player doesn't own yet.
+local axeLadder: { AxeDef } = {}
+for _, axe in pairs(ItemCatalog.Axes) do
+	table.insert(axeLadder, axe)
+end
+table.sort(axeLadder, function(a, b)
+	return a.priceCash < b.priceCash
+end)
+
+function ItemCatalog.AxeLadder(): { AxeDef }
+	return axeLadder
+end
+
+-- The next axe this player can buy, or nil once they own them all.
+function ItemCatalog.NextAxe(ownedAxes: { string }): AxeDef?
+	for _, axe in ipairs(axeLadder) do
+		if not table.find(ownedAxes, axe.id) then
+			return axe
+		end
 	end
 	return nil
 end

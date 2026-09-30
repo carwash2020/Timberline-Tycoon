@@ -71,7 +71,7 @@ local function sortedByPrice(tbl)
 	return list
 end
 
-local AXES = sortedByPrice(ItemCatalog.Axes)
+local AXES = ItemCatalog.AxeLadder() -- sold in order, cheapest first
 local TRUCKS = sortedByPrice(ItemCatalog.Trucks)
 local TRAILERS = sortedByPrice(ItemCatalog.Trailers)
 local BOATS = sortedByPrice(ItemCatalog.Boats)
@@ -201,42 +201,70 @@ local function simulate(biomes: { [string]: boolean }?)
 		if owned.InfernoAxe and owned.LoggingRig then
 			break
 		end
-		local rate, wood = bestRate(owned, biomes)
-		rate *= EFFICIENCY
+		local rate = bestRate(owned, biomes) * EFFICIENCY
 		-- Pick the purchase with the shortest payback (price / extra $ per hour).
-		-- Goals with no payback left (e.g. the Inferno Axe once a better
-		-- wood isn't unlocked) are still bought at the end.
-		local pick, pickScore, pickRate = nil, math.huge, rate
-		for _, item in ipairs(candidates) do
-			if not owned[item.id] and item.priceCash > 0 then
+		-- A purchase can be one item, or an item plus a piece of gear it's only
+		-- worth having with (the Gold Axe + Heat Boots open the volcano), the
+		-- way a real player plans ahead. Goals with no payback left (e.g. the
+		-- Inferno Axe once a better wood isn't unlocked) are bought last.
+		local pick, pickScore = nil, math.huge
+		local function consider(bundle)
+			local price = 0
+			for _, item in ipairs(bundle) do
+				if owned[item.id] or item.priceCash <= 0 then
+					return
+				end
+				price += item.priceCash
+			end
+			for _, item in ipairs(bundle) do
 				owned[item.id] = true
-				local newRate = bestRate(owned, biomes) * EFFICIENCY
+			end
+			local newRate = bestRate(owned, biomes) * EFFICIENCY
+			for _, item in ipairs(bundle) do
 				owned[item.id] = nil
-				local gain = newRate - rate
-				local isGoal = item.id == "InfernoAxe" or item.id == "LoggingRig"
-				local score = if gain > 0
-					then item.priceCash / gain
-					else (if isGoal then 1e12 + item.priceCash else math.huge)
-				if score < pickScore then
-					pick, pickScore, pickRate = item, score, newRate
+			end
+			local gain = newRate - rate
+			local main = bundle[#bundle]
+			local isGoal = main.id == "InfernoAxe" or main.id == "LoggingRig"
+			local score = if gain > 0
+				then price / gain
+				else (if isGoal and #bundle == 1 then 1e12 + price else math.huge)
+			if score < pickScore then
+				pick, pickScore = bundle, score
+			end
+		end
+		for _, item in ipairs(candidates) do
+			-- Axes are sold in order: the shop only offers the next tier.
+			local axeIndex = table.find(AXES, item)
+			if axeIndex and axeIndex > 1 and not owned[AXES[axeIndex - 1].id] then
+				continue
+			end
+			consider({ item })
+			for _, gear in ipairs(GEAR) do
+				if gear ~= item then
+					consider({ gear, item })
 				end
 			end
 		end
 		if not pick or (biomes and pickScore >= 1e12) then
 			break -- nothing left that helps (in a limited world, don't buy goals for nothing)
 		end
-		local wait = math.max(0, pick.priceCash - cash) / rate * 3600
-		advance(wait, rate)
-		cash -= pick.priceCash
-		owned[pick.id] = true
-		table.insert(steps, {
-			item = pick,
-			saving = wait,
-			total = t,
-			before = rate,
-			after = pickRate,
-			wood = wood,
-		})
+		for _, item in ipairs(pick) do
+			local before, nowWood = bestRate(owned, biomes)
+			before *= EFFICIENCY
+			local wait = math.max(0, item.priceCash - cash) / before * 3600
+			advance(wait, before)
+			cash -= item.priceCash
+			owned[item.id] = true
+			table.insert(steps, {
+				item = item,
+				saving = wait,
+				total = t,
+				before = before,
+				after = bestRate(owned, biomes) * EFFICIENCY,
+				wood = nowWood,
+			})
+		end
 	end
 	if not t15done then
 		local rate = bestRate(owned, biomes) * EFFICIENCY
@@ -539,7 +567,7 @@ line()
 line("## Progression path")
 line()
 line(
-	'The whole world, with a player who always buys whichever upgrade pays for itself fastest (real-player rates). "Working" is the wood they farm while saving.'
+	'The whole world, with a player who always buys whichever upgrade pays for itself fastest (real-player rates). Axes are sold in order, one tier at a time. "Working" is the wood they farm while saving.'
 )
 line()
 line("| # | Buy | Price | Saving for it | Total play time | $/h before → after | Working |")

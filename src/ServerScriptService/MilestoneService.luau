@@ -152,8 +152,8 @@ function MilestoneService.Mark(player: Player, name: string)
 	logFunnelStep(player, session, name)
 end
 
--- Call after cash is added. Tracks session earnings and announces each axe
--- the player can newly afford (cheapest unowned first).
+-- Call after cash is added. Tracks session earnings and announces when the
+-- player can first afford their next axe (axes are sold in order).
 function MilestoneService.CashEarned(player: Player, amount: number)
 	local session = sessions[player]
 	if not session then
@@ -161,21 +161,8 @@ function MilestoneService.CashEarned(player: Player, amount: number)
 	end
 	session.earned += amount
 	local profile = session.profile
-	local affordable: { ItemCatalog.AxeDef } = {}
-	for id, axe in pairs(ItemCatalog.Axes) do
-		if
-			not session.seen["afford:" .. id]
-			and not table.find(profile.ownedAxes, id)
-			and axe.priceCash > 0
-			and profile.cash >= axe.priceCash
-		then
-			table.insert(affordable, axe)
-		end
-	end
-	table.sort(affordable, function(a, b)
-		return a.priceCash < b.priceCash
-	end)
-	for _, axe in ipairs(affordable) do
+	local axe = ItemCatalog.NextAxe(profile.ownedAxes)
+	if axe and not session.seen["afford:" .. axe.id] and profile.cash >= axe.priceCash then
 		session.seen["afford:" .. axe.id] = true
 		stopwatch(
 			player,

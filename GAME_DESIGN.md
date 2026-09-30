@@ -37,8 +37,15 @@ within ~15 minutes. Never more than ~60 seconds of walking with nothing to do.
 | Steel Axe | 12 | 150 |
 | Hardened Axe | 25 | 800 |
 | Silver Axe | 45 | 3,500 |
+| Cobalt Axe | 60 | 7,000 |
 | Gold Axe | 80 | 12,000 |
+| Obsidian Axe | 120 | 20,000 |
 | Inferno Axe | 150 (200 vs. volcano trees) | 45,000 |
+
+Axes are **sold in order**: the shop only offers the next tier, so every
+axe is a milestone and nobody skips from Silver straight to a late axe.
+Cobalt and Obsidian (added 2026-09-30) split the two longest waits
+(Silver → Gold and Gold → Inferno); ECONOMY.md shows the resulting path.
 
 Tune so each axe roughly halves time-to-fell vs. the previous tier's trees.
 
@@ -360,7 +367,8 @@ blocky look; built for phones (low part counts, no per-tree scripts).
 
 **Characters & props**
 - Blocky lumberjack archetypes; Murph = big beard, red flannel, beanie.
-- Axes read by silhouette: Rusty (dull, pitted) → Inferno (glowing edge).
+- Axes read by silhouette: Rusty (dull, pitted) → Cobalt (icy blue) →
+  Obsidian (black volcanic glass) → Inferno (glowing edge).
 - Trucks: the Rustbucket is visibly held together by hope (mismatched
   panels, a little smoke); the Logging rig gleams.
 
@@ -444,7 +452,8 @@ export type Profile = {
   (10s grace to the feller).
 - `SellLogs()` — only inside the sawmill SellZone; server values logs from
   server-side records, then calls EconomyService.
-- `BuyItem(category, itemId)` → returns ok/err.
+- `BuyItem(category, itemId)` → returns ok/err. Axes: only
+  `ItemCatalog.NextAxe(ownedAxes)` can be bought (sold in order).
 - `PlaceBlueprint(blueprintId, cframe12)` — validates: blueprint owned,
   plot claimed, inside plot bounds, no overlap, funds. Returns uid.
 - `MoveBlueprint(uid, cframe12)`, `SellPlaced(uid)`.
