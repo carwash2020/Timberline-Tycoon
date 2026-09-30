@@ -40,11 +40,28 @@ return function(t)
 		t.eq(#TruckLayout.For(ItemCatalog.GetTruck("LoggingRig")).wheelZ, 3)
 	end)
 
-	t.test("every truck fits a parking slot (6.5 x 25 studs)", function()
+	t.test("every rig fits a parking slot (6.5 x 37 studs), trailer and all", function()
 		for id, truck in pairs(ItemCatalog.Trucks) do
 			local layout = TruckLayout.For(truck)
-			t.ok(layout.length <= 25, id .. " too long")
 			t.ok(2 * layout.wheelX + 0.8 <= 6.5 + 0.5, id .. " too wide")
+			t.ok(layout.length <= 37, id .. " too long")
+			for trailerId, trailer in pairs(ItemCatalog.Trailers) do
+				local tl = TruckLayout.ForTrailer(trailer, layout)
+				t.ok(layout.length + tl.length <= 37, id .. " + " .. trailerId .. " too long")
+			end
+		end
+	end)
+
+	t.test("trailer beds hold their extra capacity, behind the truck", function()
+		local truck = TruckLayout.For(ItemCatalog.GetTruck("Pickup"))
+		for id, trailer in pairs(ItemCatalog.Trailers) do
+			local tl = TruckLayout.ForTrailer(trailer, truck)
+			t.eq(#tl.logSlots, trailer.extraCapacity, id .. " slots")
+			t.ok(tl.bedCenterZ - tl.bedLength / 2 > truck.length / 2, id .. " overlaps the truck")
+			for _, slot in ipairs(tl.logSlots) do
+				t.ok(math.abs(slot.Z) + TruckLayout.LogDiameter / 2 <= tl.bedLength / 2, id .. " log sticks out")
+			end
+			t.ok(math.abs(tl.wheelZ - tl.bedCenterZ) < tl.bedLength / 2, id .. " axle under the bed")
 		end
 	end)
 

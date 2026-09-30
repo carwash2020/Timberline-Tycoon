@@ -5,8 +5,8 @@
 --     as locked, and the Starfall Axe as forged. Each row says the axe's
 --     damage and the toughest woods it fells.
 --   * Dealership ("Browse trucks"): every truck with its bed size and top
---     speed. Buy one, or switch to one you own; the new truck waits in your
---     parking spot.
+--     speed, then the trailers. Buy a truck, or switch to one you own (it
+--     waits in your parking spot); buy a trailer, hitch it, or unhitch it.
 --   * Hearth & Home ("Browse gear"): gear for the far biomes, bought once
 --     and worn for good. Gear for a biome that isn't built yet says Soon.
 -- Buying only sends an intent (BuyItem / EquipItem); the server checks
@@ -31,6 +31,7 @@ local HUD = require(script.Parent.HUD)
 type AxeDef = ItemCatalog.AxeDef
 type TruckDef = ItemCatalog.TruckDef
 type GearDef = ItemCatalog.GearDef
+type TrailerDef = ItemCatalog.TrailerDef
 
 local ShopUI = {}
 
@@ -160,19 +161,61 @@ local AXES: Shop = {
 -- Dealership: trucks
 ---------------------------------------------------------------------------
 
+local function trailerView(id: string): RowView
+	local trailer = ItemCatalog.GetTrailer(id) :: TrailerDef
+	local cash = (player:GetAttribute("Cash") :: number?) or 0
+	local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrailers") :: string?) or "")
+	local hitched = (player:GetAttribute("HitchedTrailer") :: string?) or ""
+	local status: ShopLogic.TrailerStatus = ShopLogic.TrailerStatusOf(trailer, owned, hitched)
+	local button, buttonColor
+	if status == "buy" then
+		button, buttonColor = priceButton(trailer.priceCash, cash)
+	elseif status == "hitch" then
+		button, buttonColor = "Hitch", BLUE
+	else
+		button, buttonColor = "Unhitch", MUTED
+	end
+	return {
+		name = trailer.displayName .. (if status == "hitched" then "  ·  hitched" else ""),
+		detail = ShopLogic.TrailerDetail(trailer),
+		color = Color3.fromHex(trailer.look.color),
+		glow = false,
+		dim = false,
+		button = button,
+		buttonColor = buttonColor,
+		onClick = function()
+			if status == "buy" and cash < trailer.priceCash then
+				needMore(trailer.priceCash, cash, trailer.displayName)
+			elseif status == "buy" then
+				Net.Remote("BuyItem"):FireServer("Trailer", trailer.id)
+			else
+				Net.Remote("EquipItem"):FireServer("Trailer", trailer.id) -- hitch, or unhitch
+			end
+		end,
+	}
+end
+
 local TRUCKS: Shop = {
 	building = "Dealership",
 	promptText = "Browse trucks",
 	title = "DEALERSHIP",
-	subtitle = "Bigger beds haul more but drive slower. A truck you buy waits in your parking spot.",
+	subtitle = "Bigger beds haul more but drive slower. Trailers add bed space behind any truck with a bed.",
+	-- Trucks first, then trailers ("Trailer:" ids).
 	ids = function()
 		local ids = {}
 		for _, truck in ipairs(ItemCatalog.TruckList()) do
 			table.insert(ids, truck.id)
 		end
+		for _, trailer in ipairs(ItemCatalog.TrailerList()) do
+			table.insert(ids, "Trailer:" .. trailer.id)
+		end
 		return ids
 	end,
 	view = function(id: string): RowView
+		local trailerId = string.match(id, "^Trailer:(.+)$")
+		if trailerId then
+			return trailerView(trailerId)
+		end
 		local truck = ItemCatalog.GetTruck(id) :: TruckDef
 		local cash = (player:GetAttribute("Cash") :: number?) or 0
 		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrucks") :: string?) or "")
@@ -524,7 +567,16 @@ end
 
 function ShopUI.Start()
 	buildPanel()
-	for _, attribute in ipairs({ "Cash", "BestAxeTier", "OwnedAxes", "OwnedTrucks", "EquippedTruck", "OwnedGear" }) do
+	for _, attribute in ipairs({
+		"Cash",
+		"BestAxeTier",
+		"OwnedAxes",
+		"OwnedTrucks",
+		"EquippedTruck",
+		"OwnedTrailers",
+		"HitchedTrailer",
+		"OwnedGear",
+	}) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	for _, shop in ipairs(SHOPS) do

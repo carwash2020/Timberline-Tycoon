@@ -11,6 +11,7 @@ local WoodData = require(script.Parent.WoodData)
 type AxeDef = ItemCatalog.AxeDef
 type TruckDef = ItemCatalog.TruckDef
 type GearDef = ItemCatalog.GearDef
+type TrailerDef = ItemCatalog.TrailerDef
 
 local ShopLogic = {}
 
@@ -136,6 +137,22 @@ function ShopLogic.TruckDetail(truck: TruckDef): string
 		table.insert(parts, truck.note)
 	end
 	return table.concat(parts, " · ")
+end
+
+-- "buy": not owned yet. "hitch": owned, not behind the truck. "hitched":
+-- towing now (a second press unhitches it).
+export type TrailerStatus = "buy" | "hitch" | "hitched"
+
+function ShopLogic.TrailerStatusOf(trailer: TrailerDef, owned: { [string]: boolean }, hitched: string): TrailerStatus
+	if trailer.id == hitched then
+		return "hitched"
+	end
+	return if owned[trailer.id] then "hitch" else "buy"
+end
+
+-- "+12 bed space · tows behind any truck with a bed"
+function ShopLogic.TrailerDetail(trailer: TrailerDef): string
+	return string.format("+%d bed space · tows behind any truck with a bed", trailer.extraCapacity)
 end
 
 -- Sets of ids on player attributes: { Pickup = true, Rustbucket = true }

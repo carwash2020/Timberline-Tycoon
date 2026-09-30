@@ -15,6 +15,7 @@ On this branch, each with its own checklist below:
 3. **Trucks**: the Dealership, every truck, physics driving, Truck to lot
 4. **Daily goals and streaks**
 5. **The world**: biomes, roads, day and night, Hearth & Home
+6. **Trailers**
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -224,3 +225,25 @@ them all):
 
 Quick night test: set `DayCycleMinutes = 2` in `GameConfig.luau` (a day
 every 2 minutes), then set it back to `20`.
+
+## Trailers
+
+The Dealership now lists the three trailers under the trucks: Pony Trailer
+(+6, $600), Ranch Trailer (+12, $3,000), Heavy Hauler (+24, $12,000).
+Buying one hitches it behind your truck; **Hitch** / **Unhitch** swap them.
+The truck bed fills first, then the trailer; the **Load logs** prompt moves
+to the back of the trailer. The Scout ATV can't tow. For V1 the trailer is
+fixed to the truck (the whole rig turns as one), which is simple and hard
+to break; a swinging hitch can come later. Parking slots are now 37 studs
+long (two rows of 12) to fit a Logging Rig with a Heavy Hauler.
+
+### Playtest checklist
+- [ ] Buy the Pony Trailer: it appears behind your truck in your spot
+- [ ] Bed shows 6 + 6 = 12; logs fill the truck bed, then the trailer
+- [ ] **Load logs** shows at the back of the trailer; loading works from there
+- [ ] Driving and turning with a trailer feels OK (tight turns swing the back out)
+- [ ] Sell the whole load (truck + trailer) at the mill
+- [ ] Unhitch with logs in the trailer: refused ("Sell your load first")
+- [ ] Switch trucks at the Dealership: the trailer comes along; on the Scout ATV
+      it doesn't (and hitching says the ATV can't tow)
+- [ ] Parked rigs never overlap their neighbours in the lot

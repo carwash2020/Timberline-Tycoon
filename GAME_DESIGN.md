@@ -98,7 +98,8 @@ sold at the Dealership in town.
 | Logging rig | 48 | 24 | 25,000 |
 
 Bigger beds drive slower (speeds added 2026-09-30, tuned so every §4 rate
-stays within 25%). Any truck can be bought once you can afford it; trucks
+stays within 25%). One trailer at a time hitches behind any truck with a
+bed (not the Scout ATV); in V1 it's a rigid hitch, the rig turning as one. Any truck can be bought once you can afford it; trucks
 you own are swapped at the Dealership, and the one you drive waits in your
 parking spot. Driving is physics-based: trucks collide with trees and
 buildings, and the driver's device simulates their own truck.

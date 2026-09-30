@@ -45,6 +45,7 @@ export type Profile = {
 	ownedTrucks: { string },
 	equippedTruck: string,
 	ownedTrailers: { string },
+	equippedTrailer: string, -- hitched trailer id, "" for none
 	ownedBoats: { string },
 	gear: { string },
 	plot: {
@@ -80,6 +81,7 @@ local TEMPLATE: Profile = {
 	ownedTrucks = { "Rustbucket" },
 	equippedTruck = "Rustbucket",
 	ownedTrailers = {},
+	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
 	plot = { claimed = false, size = 120, placed = {} },

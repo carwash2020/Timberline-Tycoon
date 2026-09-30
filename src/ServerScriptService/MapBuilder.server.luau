@@ -298,20 +298,21 @@ end
 
 -- Parking lot east of spawn: one slot per player, so trucks never spawn
 -- inside each other. VehicleService claims slots by Index. Trucks face the
--- forest (-Z). Slots are sized for the biggest truck (the Logging Rig,
--- about 6 x 24 studs), so no two parked trucks can overlap.
-local SLOT_ROWS, SLOTS_PER_ROW = 3, 8
+-- forest (-Z). Slots are sized for the biggest rig (the Logging Rig towing
+-- the Heavy Hauler, about 6 x 36 studs), so no two parked rigs overlap.
+local SLOT_ROWS, SLOTS_PER_ROW = 2, 12
 local slotIndex = 0
 for row = 0, SLOT_ROWS - 1 do
 	for col = 0, SLOTS_PER_ROW - 1 do
 		slotIndex += 1
 		local slot = box(
 			"ParkingSlot_" .. slotIndex,
-			Vector3.new(6.5, 0.2, 25),
-			Vector3.new(18 + col * 8, 0.1, 56 - row * 28),
+			Vector3.new(6.5, 0.2, 37),
+			Vector3.new(16 + col * 8, 0.1, 45 - row * 40),
 			Color3.fromRGB(150, 140, 125),
 			Enum.Material.Slate
 		)
+		slot.CanCollide = false -- paint on the ground: no lip for a truck to snag on
 		slot:SetAttribute("Index", slotIndex)
 		CollectionService:AddTag(slot, "ParkingSlot")
 	end
@@ -398,6 +399,7 @@ local sellPad = box(
 	Color3.fromRGB(214, 170, 92),
 	Enum.Material.WoodPlanks
 )
+sellPad.CanCollide = false -- paint on the ground, like the parking slots
 sellPad.Parent = sellArea
 topLabel(sellPad, "SELL LOGS HERE")
 

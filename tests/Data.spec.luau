@@ -103,6 +103,11 @@ return function(t)
 			t.ok(truck.look.width >= 3 and truck.look.width <= 6, key .. " width fits a parking slot")
 			t.eq(truck.look.bedLength > 0, truck.bedCapacity > 0, key .. ": a bed exactly when it carries logs")
 		end
+		for key, trailer in pairs(ItemCatalog.Trailers) do
+			t.eq(trailer.id, key)
+			t.ok(isHex(trailer.look.color), key .. " color")
+			t.ok(trailer.extraCapacity > 0 and trailer.look.bedLength > 0, key .. " bed")
+		end
 		local list = ItemCatalog.TruckList()
 		t.eq(list[1].id, "Rustbucket")
 		for i = 2, #list do

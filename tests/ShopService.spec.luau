@@ -19,6 +19,8 @@ return function(t)
 			bestAxeTier = options.bestTier or 1,
 			ownedTrucks = options.trucks or { "Rustbucket" },
 			gear = options.gear or {},
+			ownedTrailers = options.trailers or {},
+			equippedTrailer = options.hitched or "",
 			equippedTruck = options.equippedTruck or "Rustbucket",
 		}
 		local toasts, granted, equipped, quests, switched = {}, {}, {}, {}, {}
@@ -72,11 +74,11 @@ return function(t)
 					end,
 				},
 				VehicleService = {
-					Equip = function(_, truckId)
+					Equip = function(_, truckId, trailerId)
 						if options.equipRefusal then
 							return false, options.equipRefusal
 						end
-						table.insert(switched, truckId)
+						table.insert(switched, truckId .. "+" .. (trailerId or ""))
 						return true, nil
 					end,
 				},
@@ -177,7 +179,7 @@ return function(t)
 		t.eq(s.profile.cash, 300)
 		t.eq(s.profile.ownedTrucks, { "Rustbucket", "Pickup" })
 		t.eq(s.profile.equippedTruck, "Pickup")
-		t.eq(s.switched, { "Pickup" })
+		t.eq(s.switched, { "Pickup+" })
 		t.eq(s.toasts, { "Bought the Pickup! It's waiting in your parking spot." })
 	end)
 
@@ -205,7 +207,7 @@ return function(t)
 		local s = setup({ trucks = { "Rustbucket", "Pickup" }, equippedTruck = "Pickup" })
 		s.use("Truck", "Rustbucket")
 		t.eq(s.profile.equippedTruck, "Rustbucket")
-		t.eq(s.switched, { "Rustbucket" })
+		t.eq(s.switched, { "Rustbucket+" })
 		local thief = setup({})
 		thief.use("Truck", "LoggingRig")
 		t.eq(thief.profile.equippedTruck, "Rustbucket")
@@ -213,6 +215,40 @@ return function(t)
 		local far = setup({ trucks = { "Rustbucket", "Pickup" }, at = COUNTER + Vector3.new(0, 0, -40) })
 		far.use("Truck", "Pickup")
 		t.eq(far.switched, {})
+	end)
+
+	t.test("trailers: buy one and it's hitched; switching trucks keeps it", function()
+		local s = setup({ cash = 1000, trucks = { "Rustbucket", "Pickup" } })
+		s.buy("Trailer", "PonyTrailer")
+		t.eq(s.profile.cash, 400)
+		t.eq(s.profile.ownedTrailers, { "PonyTrailer" })
+		t.eq(s.profile.equippedTrailer, "PonyTrailer")
+		t.eq(s.switched, { "Rustbucket+PonyTrailer" })
+		t.eq(s.toasts, { "Bought the Pony Trailer! It's hitched to your truck." })
+		s.use("Truck", "Pickup")
+		t.eq(s.switched[2], "Pickup+PonyTrailer", "the trailer moves to the new truck")
+	end)
+
+	t.test("trailers: pressing again unhitches; hitching needs ownership", function()
+		local s = setup({ trailers = { "PonyTrailer", "RanchTrailer" }, hitched = "PonyTrailer" })
+		s.use("Trailer", "PonyTrailer")
+		t.eq(s.profile.equippedTrailer, "")
+		t.eq(s.switched, { "Rustbucket+" })
+		local other = setup({ trailers = { "PonyTrailer", "RanchTrailer" }, hitched = "PonyTrailer" })
+		other.use("Trailer", "RanchTrailer")
+		t.eq(other.profile.equippedTrailer, "RanchTrailer")
+		local thief = setup({})
+		thief.use("Trailer", "HeavyHauler")
+		t.eq(thief.profile.equippedTrailer, "")
+		t.eq(thief.switched, {})
+	end)
+
+	t.test("the Scout ATV can't tow", function()
+		local s =
+			setup({ trucks = { "Rustbucket", "ScoutATV" }, equippedTruck = "ScoutATV", trailers = { "PonyTrailer" } })
+		s.use("Trailer", "PonyTrailer")
+		t.eq(s.profile.equippedTrailer, "")
+		t.eq(s.toasts, { "The Scout ATV can't tow a trailer." })
 	end)
 
 	t.test("gear: bought once, never twice, and not before its biome opens", function()

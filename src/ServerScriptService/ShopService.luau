@@ -34,6 +34,7 @@ local ShopService = {}
 local SHOP_FOR: { [string]: string } = {
 	Axe = "ToolShed",
 	Truck = "Dealership",
+	Trailer = "Dealership",
 	Gear = "HearthAndHome",
 }
 
@@ -139,6 +140,65 @@ end
 local function publishTrucks(player: Player, profile: ProfileService.Profile)
 	player:SetAttribute("OwnedTrucks", ShopLogic.EncodeSet(profile.ownedTrucks))
 	player:SetAttribute("EquippedTruck", profile.equippedTruck)
+	player:SetAttribute("OwnedTrailers", ShopLogic.EncodeSet(profile.ownedTrailers))
+	player:SetAttribute("HitchedTrailer", profile.equippedTrailer)
+end
+
+local function toSet(list: { string }): { [string]: boolean }
+	local set: { [string]: boolean } = {}
+	for _, id in ipairs(list) do
+		set[id] = true
+	end
+	return set
+end
+
+-- Rebuilds the rig with `trailerId` hitched ("" = none); says why not.
+local function hitch(player: Player, profile: ProfileService.Profile, trailerId: string): boolean
+	local ok, why = VehicleService.Equip(player, profile.equippedTruck, trailerId)
+	if not ok then
+		if why then
+			notify(player, why)
+		end
+		return false
+	end
+	profile.equippedTrailer = trailerId
+	publishTrucks(player, profile)
+	return true
+end
+
+local function buyTrailer(player: Player, trailerId: string)
+	local profile = ProfileService.GetProfile(player)
+	local trailer = ItemCatalog.GetTrailer(trailerId)
+	if not profile or not trailer then
+		return
+	end
+	local status: ShopLogic.TrailerStatus =
+		ShopLogic.TrailerStatusOf(trailer, toSet(profile.ownedTrailers), profile.equippedTrailer)
+	if status ~= "buy" then
+		notify(player, string.format("You already own the %s.", trailer.displayName))
+		return
+	end
+	if profile.cash < trailer.priceCash then
+		notify(
+			player,
+			string.format(
+				"You need %s more for the %s.",
+				Util.formatCash(trailer.priceCash - profile.cash),
+				trailer.displayName
+			)
+		)
+		return
+	end
+	if not EconomyService.SpendCash(player, trailer.priceCash, "bought " .. trailer.displayName, trailer.id) then
+		return
+	end
+	table.insert(profile.ownedTrailers, trailer.id)
+	publishTrucks(player, profile)
+	if hitch(player, profile, trailer.id) then
+		notify(player, string.format("Bought the %s! It's hitched to your truck.", trailer.displayName))
+	else
+		notify(player, string.format("Bought the %s! Hitch it here when you're ready.", trailer.displayName))
+	end
 end
 
 local function ownedTruckSet(profile: ProfileService.Profile): { [string]: boolean }
@@ -149,9 +209,10 @@ local function ownedTruckSet(profile: ProfileService.Profile): { [string]: boole
 	return set
 end
 
--- Switches to an owned truck; says why not when it can't.
+-- Switches to an owned truck (keeping the hitched trailer); says why not
+-- when it can't.
 local function switchTo(player: Player, profile: ProfileService.Profile, truck: ItemCatalog.TruckDef): boolean
-	local ok, why = VehicleService.Equip(player, truck.id)
+	local ok, why = VehicleService.Equip(player, truck.id, profile.equippedTrailer)
 	if not ok then
 		if why then
 			notify(player, why)
@@ -197,17 +258,50 @@ local function buyTruck(player: Player, truckId: string)
 	end
 end
 
+-- A second press on the hitched trailer unhitches it.
+local function toggleTrailer(player: Player, profile: ProfileService.Profile, trailerId: string)
+	local trailer = ItemCatalog.GetTrailer(trailerId)
+	if not trailer then
+		return
+	end
+	local status: ShopLogic.TrailerStatus =
+		ShopLogic.TrailerStatusOf(trailer, toSet(profile.ownedTrailers), profile.equippedTrailer)
+	local truck = ItemCatalog.GetTruck(profile.equippedTruck)
+	if status == "hitched" then
+		if hitch(player, profile, "") then
+			notify(player, string.format("Unhitched the %s.", trailer.displayName))
+		end
+	elseif status == "hitch" then
+		if truck and truck.bedCapacity <= 0 then
+			notify(player, string.format("The %s can't tow a trailer.", truck.displayName))
+		elseif hitch(player, profile, trailer.id) then
+			notify(player, string.format("The %s is hitched to your truck.", trailer.displayName))
+		end
+	end
+end
+
 local function onEquipItem(player: Player, category: unknown, itemId: unknown)
-	if category ~= "Truck" or type(itemId) ~= "string" or not RateLimiter.Allow(player, "EquipItem") then
+	if
+		(category ~= "Truck" and category ~= "Trailer")
+		or type(itemId) ~= "string"
+		or not RateLimiter.Allow(player, "EquipItem")
+	then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	local truck = ItemCatalog.GetTruck(itemId)
-	if not profile or not truck then
+	if not profile then
 		return
 	end
 	if not inRange(player, "Truck") then
 		notify(player, "Walk up to the Dealership counter to switch trucks.")
+		return
+	end
+	if category == "Trailer" then
+		toggleTrailer(player, profile, itemId)
+		return
+	end
+	local truck = ItemCatalog.GetTruck(itemId)
+	if not truck then
 		return
 	end
 	local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, ownedTruckSet(profile), profile.equippedTruck)
@@ -231,6 +325,8 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 		buyAxe(player, itemId)
 	elseif category == "Truck" then
 		buyTruck(player, itemId)
+	elseif category == "Trailer" then
+		buyTrailer(player, itemId)
 	elseif category == "Gear" then
 		buyGear(player, itemId)
 	end

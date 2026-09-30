@@ -40,9 +40,10 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
   pass (item 6)
 
 ### 3. Hauling upgrades on the path
-- ⬜ Trailers (Pony, Ranch, Heavy Hauler): bought at the Dealership, hitched
+- 🟡 Trailers (Pony, Ranch, Heavy Hauler): bought at the Dealership, hitched
   behind the truck, extra bed space. The model buys all three on the way to
-  V1, so they're not optional.
+  V1, so they're not optional. V1 hitches them rigidly (the rig turns as
+  one piece); a swinging hitch is a later polish.
 
 ### 4. The V1 finale: the Aether Isles (GAME_DESIGN §10, phase 5b)
 - ⬜ The Skyroot and its gondola (ride time + fee from BiomeData)

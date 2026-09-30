@@ -15,7 +15,12 @@
 --         exploiter teleporting it).
 --       - Arcade: the Phase 1 glide, moved by the server; passes through
 --         things.
---   * The bed is a server-side list of logs, drawn as logs welded to it.
+--   * A hitched trailer (ItemCatalog.Trailers) is built onto the truck as
+--     one rigid rig, and adds its bed to the truck's. Rigid, not swinging:
+--     simple and hard to break; a real hitch can come later. A truck
+--     without a bed (the Scout ATV) doesn't tow.
+--   * The bed is a server-side list of logs, drawn as logs welded to it
+--     (the truck bed fills first, then the trailer).
 --   * Recall ("Truck to lot") and switching trucks rebuild the truck in the
 --     player's slot, keeping the load when it fits.
 
@@ -31,6 +36,7 @@ local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 
 type TruckDef = ItemCatalog.TruckDef
+type TrailerDef = ItemCatalog.TrailerDef
 
 local VehicleService = {}
 
@@ -51,6 +57,11 @@ export type BedEntry = { woodId: string, value: number }
 type TruckRecord = {
 	def: TruckDef,
 	layout: TruckLayout.Layout,
+	trailer: TrailerDef?, -- hitched and towing (nil for a truck that can't tow)
+	trailerLayout: TruckLayout.TrailerLayout?,
+	trailerBed: BasePart?,
+	capacity: number, -- truck bed + trailer bed
+	loadPoint: Attachment?,
 	model: Model,
 	chassis: BasePart,
 	seat: VehicleSeat,
@@ -81,6 +92,8 @@ type Built = {
 	chassis: BasePart,
 	seat: VehicleSeat,
 	bedFloor: BasePart?,
+	trailerBed: BasePart?,
+	loadPoint: Attachment?,
 	exhaust: BasePart,
 	drive: LinearVelocity,
 	heading: AlignOrientation,
@@ -88,12 +101,17 @@ type Built = {
 
 -- Builds a truck around the origin, facing -Z, wheels touching y = 0.
 -- Open-top like a farm truck: seat behind the hood, roll bar, then the bed.
-local function buildTruckModel(def: TruckDef, layout: TruckLayout.Layout): Built
+local function buildTruckModel(
+	def: TruckDef,
+	layout: TruckLayout.Layout,
+	trailer: TrailerDef?,
+	trailerLayout: TruckLayout.TrailerLayout?
+): Built
 	local model = Instance.new("Model")
 	model.Name = def.id
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- streams in whole, tailgate included
 
-	local function part(name: string, size: Vector3, pos: Vector3, color: Color3, material: Enum.Material): BasePart
+	local function part(name: string, size: Vector3, pos: Vector3, color: Color3, material: Enum.Material): Part
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Size = size
@@ -200,13 +218,83 @@ local function buildTruckModel(def: TruckDef, layout: TruckLayout.Layout): Built
 				end
 			end
 		end
-		-- Where the client's "Load logs" prompt hangs: just behind the tailgate.
-		local loadPoint = Instance.new("Attachment")
-		loadPoint.Name = "LoadPoint"
-		loadPoint.Position = Vector3.new(0, 1, bedLength / 2 + 0.6)
-		loadPoint.Parent = floor
 	else
 		part("Rack", Vector3.new(W - 0.4, 0.3, 1.2), Vector3.new(0, 2.6, L / 2 - 0.8), trim, Enum.Material.Metal)
+	end
+
+	-- The trailer, behind the truck: tongue, low bed with rails, one axle,
+	-- and its own frictionless skid.
+	local trailerBed: BasePart? = nil
+	if trailer and trailerLayout then
+		local tl = trailerLayout
+		local tPaint = Color3.fromHex(trailer.look.color)
+		part(
+			"Tongue",
+			Vector3.new(0.4, 0.4, TruckLayout.Tongue + 1),
+			Vector3.new(0, 1.4, L / 2 + TruckLayout.Tongue / 2),
+			DARK,
+			Enum.Material.Metal
+		)
+		local tBed = part(
+			"TrailerBed",
+			Vector3.new(W, 0.5, tl.bedLength),
+			Vector3.new(0, 1.75, tl.bedCenterZ),
+			WOOD,
+			Enum.Material.Wood
+		)
+		trailerBed = tBed
+		local back = tl.bedCenterZ + tl.bedLength / 2
+		part(
+			"TrailerRailL",
+			Vector3.new(0.3, 1, tl.bedLength),
+			Vector3.new(-sideX, 2.5, tl.bedCenterZ),
+			tPaint,
+			Enum.Material.Metal
+		)
+		part(
+			"TrailerRailR",
+			Vector3.new(0.3, 1, tl.bedLength),
+			Vector3.new(sideX, 2.5, tl.bedCenterZ),
+			tPaint,
+			Enum.Material.Metal
+		)
+		part("TrailerRailBack", Vector3.new(W, 1, 0.3), Vector3.new(0, 2.5, back - 0.15), tPaint, Enum.Material.Metal)
+		part(
+			"TrailerRailFront",
+			Vector3.new(W, 1, 0.3),
+			Vector3.new(0, 2.5, back - tl.bedLength + 0.15),
+			tPaint,
+			Enum.Material.Metal
+		)
+		local tSkid = part(
+			"TrailerSkid",
+			Vector3.new(W - 0.4, 1, tl.bedLength - 1),
+			Vector3.new(0, 0.5, tl.bedCenterZ),
+			DARK,
+			Enum.Material.Plastic
+		)
+		tSkid.Transparency = 1
+		tSkid.CanQuery = false
+		tSkid.CanTouch = false
+		tSkid.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+		for _, x in ipairs({ -layout.wheelX, layout.wheelX }) do
+			local wheel =
+				part("Wheel", Vector3.new(0.8, 2, 2), Vector3.new(x, 1, tl.wheelZ), DARK, Enum.Material.SmoothPlastic)
+			wheel.Shape = Enum.PartType.Cylinder
+			wheel.CanCollide = false
+		end
+	end
+
+	-- Where the client's "Load logs" prompt hangs: just behind the last bed
+	-- (the trailer's, when there is one).
+	local loadPoint: Attachment? = nil
+	local lastBed = trailerBed or bedFloor
+	if lastBed then
+		local point = Instance.new("Attachment")
+		point.Name = "LoadPoint"
+		point.Position = Vector3.new(0, 1, lastBed.Size.Z / 2 + 0.6)
+		point.Parent = lastBed
+		loadPoint = point
 	end
 
 	-- Exhaust pipe that puffs a little smoke while someone's driving.
@@ -295,6 +383,8 @@ local function buildTruckModel(def: TruckDef, layout: TruckLayout.Layout): Built
 		chassis = chassis,
 		seat = seat,
 		bedFloor = bedFloor,
+		trailerBed = trailerBed,
+		loadPoint = loadPoint,
 		exhaust = exhaust,
 		drive = drive,
 		heading = heading,
@@ -302,8 +392,14 @@ local function buildTruckModel(def: TruckDef, layout: TruckLayout.Layout): Built
 end
 
 local function addBedVisual(rec: TruckRecord, entry: BedEntry, index: number)
-	local floor = rec.bedFloor
-	local slot = rec.layout.logSlots[index]
+	-- The truck bed fills first, then the trailer.
+	local floor: BasePart?, slot: Vector3?
+	local truckSlots = #rec.layout.logSlots
+	if index <= truckSlots then
+		floor, slot = rec.bedFloor, rec.layout.logSlots[index]
+	elseif rec.trailerLayout then
+		floor, slot = rec.trailerBed, rec.trailerLayout.logSlots[index - truckSlots]
+	end
 	if not floor or not slot then
 		return
 	end
@@ -477,10 +573,27 @@ local function destroyTruck(rec: TruckRecord)
 	rec.model:Destroy()
 end
 
+-- The trailer a truck actually tows: none for a truck without a bed.
+local function towedTrailer(def: TruckDef, trailerId: string?): TrailerDef?
+	if def.bedCapacity <= 0 or not trailerId or trailerId == "" then
+		return nil
+	end
+	return ItemCatalog.GetTrailer(trailerId)
+end
+
+local function capacityOf(def: TruckDef, trailer: TrailerDef?): number
+	return def.bedCapacity + (if trailer then trailer.extraCapacity else 0)
+end
+
 -- Builds the player's truck (replacing any they have) in their parking
--- slot. `load` refills the bed (a recall or a switch); returns how many of
--- those logs didn't fit.
-function VehicleService.SpawnTruck(player: Player, truckId: string, load: { BedEntry }?): (Model, number)
+-- slot, with `trailerId` hitched behind if it can tow. `load` refills the
+-- bed (a recall or a switch); returns how many of those logs didn't fit.
+function VehicleService.SpawnTruck(
+	player: Player,
+	truckId: string,
+	load: { BedEntry }?,
+	trailerId: string?
+): (Model, number)
 	local def = ItemCatalog.GetTruck(truckId) or ItemCatalog.GetTruck("Rustbucket")
 	assert(def, "[VehicleService] Rustbucket missing from ItemCatalog")
 
@@ -491,12 +604,17 @@ function VehicleService.SpawnTruck(player: Player, truckId: string, load: { BedE
 	end
 
 	local layout = TruckLayout.For(def)
-	local built = buildTruckModel(def, layout)
+	local trailer = towedTrailer(def, trailerId)
+	local trailerLayout = if trailer then TruckLayout.ForTrailer(trailer, layout) else nil
+	local built = buildTruckModel(def, layout, trailer, trailerLayout)
 	local model = built.model
-	model:PivotTo(slotCFrame(slot))
+	-- Centre the whole rig (truck + trailer) on the parking slot.
+	local rigShift = if trailerLayout then trailerLayout.length / 2 else 0
+	model:PivotTo(slotCFrame(slot) * CFrame.new(0, 0, -rigShift))
 	model:SetAttribute("OwnerId", player.UserId)
 	model:SetAttribute("TruckId", def.id)
-	model:SetAttribute("BedCapacity", def.bedCapacity)
+	model:SetAttribute("TrailerId", if trailer then trailer.id else "")
+	model:SetAttribute("BedCapacity", capacityOf(def, trailer))
 	model:SetAttribute("BedCount", 0)
 	model:SetAttribute("TopSpeed", def.topSpeed) -- read by VehicleController
 	model:SetAttribute("TurnRate", def.turnRate)
@@ -510,6 +628,11 @@ function VehicleService.SpawnTruck(player: Player, truckId: string, load: { BedE
 	local rec: TruckRecord = {
 		def = def,
 		layout = layout,
+		trailer = trailer,
+		trailerLayout = trailerLayout,
+		trailerBed = built.trailerBed,
+		capacity = capacityOf(def, trailer),
+		loadPoint = built.loadPoint,
 		model = model,
 		chassis = built.chassis,
 		seat = built.seat,
@@ -586,13 +709,14 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 		return false, string.format("Your truck's on its way. Try again in %d s.", math.ceil(remaining))
 	end
 	lastRecall[player.UserId] = now
-	VehicleService.SpawnTruck(player, rec.def.id, rec.bed)
+	VehicleService.SpawnTruck(player, rec.def.id, rec.bed, if rec.trailer then rec.trailer.id else nil)
 	return true, nil
 end
 
--- Swaps the player's truck for another they own (the Dealership). Refuses
--- while they drive, or when the load wouldn't fit in the new bed.
-function VehicleService.Equip(player: Player, truckId: string): (boolean, string?)
+-- Swaps the player's rig (the Dealership): truck `truckId` towing
+-- `trailerId` ("" or nil for none). Refuses while they drive, or when the
+-- load wouldn't fit the new bed space.
+function VehicleService.Equip(player: Player, truckId: string, trailerId: string?): (boolean, string?)
 	local def = ItemCatalog.GetTruck(truckId)
 	local rec = trucks[player.UserId]
 	if not def then
@@ -601,10 +725,10 @@ function VehicleService.Equip(player: Player, truckId: string): (boolean, string
 	if rec and isDriving(player, rec) then
 		return false, "Hop out of your truck first."
 	end
-	if rec and #rec.bed > def.bedCapacity then
-		return false, "Sell your load first: it won't fit in the " .. def.displayName .. "."
+	if rec and #rec.bed > capacityOf(def, towedTrailer(def, trailerId)) then
+		return false, "Sell your load first: it won't fit."
 	end
-	VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil)
+	VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil, trailerId)
 	return true, nil
 end
 
@@ -617,14 +741,13 @@ end
 -- without a bed.
 function VehicleService.GetLoadPoint(player: Player): Vector3?
 	local rec = trucks[player.UserId]
-	local floor = if rec then rec.bedFloor else nil
-	local point = if floor then floor:FindFirstChild("LoadPoint") else nil
-	return if point and point:IsA("Attachment") then point.WorldPosition else nil
+	local point = if rec then rec.loadPoint else nil
+	return if point then point.WorldPosition else nil
 end
 
 function VehicleService.GetBedCapacity(player: Player): number
 	local rec = trucks[player.UserId]
-	return if rec then rec.def.bedCapacity else 0
+	return if rec then rec.capacity else 0
 end
 
 function VehicleService.GetBedCount(player: Player): number
@@ -635,7 +758,7 @@ end
 -- Adds a log to the bed (with a log you can see). False if full / no truck.
 function VehicleService.AddBedLog(player: Player, entry: BedEntry): boolean
 	local rec = trucks[player.UserId]
-	if not rec or #rec.bed >= rec.def.bedCapacity then
+	if not rec or #rec.bed >= rec.capacity then
 		return false
 	end
 	table.insert(rec.bed, entry)

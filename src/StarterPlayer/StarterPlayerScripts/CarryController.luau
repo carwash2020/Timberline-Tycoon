@@ -76,9 +76,16 @@ local function bindTruck(truck: Model)
 		return
 	end
 	task.spawn(function()
-		-- The truck may stream in piece by piece; wait for the tailgate.
-		local bedFloor = truck:WaitForChild("BedFloor", 10)
-		local point = if bedFloor then bedFloor:WaitForChild("LoadPoint", 10) else nil
+		-- The LoadPoint sits behind the last bed: the truck's, or the
+		-- trailer's when one is hitched. Wait a moment for it to stream in.
+		local point: Instance? = nil
+		for _ = 1, 20 do
+			point = truck:FindFirstChild("LoadPoint", true)
+			if point then
+				break
+			end
+			task.wait(0.5)
+		end
 		if not point or not point:IsA("Attachment") then
 			return
 		end

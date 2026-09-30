@@ -45,11 +45,15 @@ export type TruckDef = {
 	note: string?,
 }
 
+-- Hitched behind a truck at the Dealership; adds bed space. `look` is its
+-- paint (hex) and bed length in studs (TruckLayout.ForTrailer). A truck
+-- without a bed (the Scout ATV) can't tow.
 export type TrailerDef = {
 	id: string,
 	displayName: string,
 	extraCapacity: number,
 	priceCash: number,
+	look: { color: string, bedLength: number },
 }
 
 export type BoatDef = {
@@ -196,9 +200,27 @@ ItemCatalog.Trucks = {
 }
 
 ItemCatalog.Trailers = {
-	PonyTrailer = { id = "PonyTrailer", displayName = "Pony Trailer", extraCapacity = 6, priceCash = 600 },
-	RanchTrailer = { id = "RanchTrailer", displayName = "Ranch Trailer", extraCapacity = 12, priceCash = 3000 },
-	HeavyHauler = { id = "HeavyHauler", displayName = "Heavy Hauler", extraCapacity = 24, priceCash = 12000 },
+	PonyTrailer = {
+		id = "PonyTrailer",
+		displayName = "Pony Trailer",
+		extraCapacity = 6,
+		priceCash = 600,
+		look = { color = "#7A5A3A", bedLength = 7 },
+	},
+	RanchTrailer = {
+		id = "RanchTrailer",
+		displayName = "Ranch Trailer",
+		extraCapacity = 12,
+		priceCash = 3000,
+		look = { color = "#6E7F46", bedLength = 9 },
+	},
+	HeavyHauler = {
+		id = "HeavyHauler",
+		displayName = "Heavy Hauler",
+		extraCapacity = 24,
+		priceCash = 12000,
+		look = { color = "#4A4F57", bedLength = 10 },
+	},
 }
 
 ItemCatalog.Boats = {
@@ -335,6 +357,27 @@ end)
 
 function ItemCatalog.TruckList(): { TruckDef }
 	return truckList
+end
+
+function ItemCatalog.GetTrailer(trailerId: string): TrailerDef?
+	local trailer = ItemCatalog.Trailers[trailerId]
+	if type(trailer) == "table" then
+		return trailer
+	end
+	return nil
+end
+
+-- Every trailer, cheapest first.
+local trailerList: { TrailerDef } = {}
+for _, trailer in pairs(ItemCatalog.Trailers) do
+	table.insert(trailerList, trailer)
+end
+table.sort(trailerList, function(a, b)
+	return a.priceCash < b.priceCash
+end)
+
+function ItemCatalog.TrailerList(): { TrailerDef }
+	return trailerList
 end
 
 function ItemCatalog.GetGear(gearId: string): GearDef?

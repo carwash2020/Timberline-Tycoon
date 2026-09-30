@@ -10,6 +10,7 @@
 local ItemCatalog = require(script.Parent.ItemCatalog)
 
 type TruckDef = ItemCatalog.TruckDef
+type TrailerDef = ItemCatalog.TrailerDef
 
 local TruckLayout = {}
 
@@ -19,6 +20,7 @@ local TAIL = 0.4 -- chassis behind the bed
 local ATV_REAR = 1.6 -- the Scout ATV's rear rack instead of a bed
 local LOG_SPACING = 1 -- along the bed, centre to centre
 local BED_FLOOR_TOP = 0.25 -- above the bed floor part's centre (it's 0.5 thick)
+TruckLayout.Tongue = 1.5 -- gap between the truck's back and the trailer's bed
 
 export type Layout = {
 	width: number,
@@ -33,6 +35,24 @@ export type Layout = {
 	logSlots: { Vector3 }, -- log centres, relative to the bed floor part's centre
 }
 
+-- Log centres for `count` logs on a bed `bedLength` long, relative to the
+-- bed floor part's centre: across the bed, side by side along it, in layers.
+local function logSlots(bedLength: number, count: number): { Vector3 }
+	local slots: { Vector3 } = {}
+	if bedLength <= 0 then
+		return slots
+	end
+	local perLayer = math.max(1, math.floor((bedLength - 0.4) / LOG_SPACING))
+	for i = 1, count do
+		local layer = (i - 1) // perLayer
+		local col = (i - 1) % perLayer
+		local z = -(perLayer - 1) * LOG_SPACING / 2 + col * LOG_SPACING
+		local y = BED_FLOOR_TOP + TruckLayout.LogDiameter / 2 + layer * TruckLayout.LogDiameter
+		table.insert(slots, Vector3.new(0, y, z))
+	end
+	return slots
+end
+
 function TruckLayout.For(def: TruckDef): Layout
 	local look = def.look
 	local width, bedLength = look.width, look.bedLength
@@ -45,19 +65,6 @@ function TruckLayout.For(def: TruckDef): Layout
 		table.insert(wheelZ, length / 2 - 4.2) -- long beds get a second rear axle
 	end
 
-	-- Logs lie across the bed, side by side along it, in layers.
-	local slots: { Vector3 } = {}
-	if bedLength > 0 then
-		local perLayer = math.max(1, math.floor((bedLength - 0.4) / LOG_SPACING))
-		for i = 1, def.bedCapacity do
-			local layer = (i - 1) // perLayer
-			local col = (i - 1) % perLayer
-			local z = -(perLayer - 1) * LOG_SPACING / 2 + col * LOG_SPACING
-			local y = BED_FLOOR_TOP + TruckLayout.LogDiameter / 2 + layer * TruckLayout.LogDiameter
-			table.insert(slots, Vector3.new(0, y, z))
-		end
-	end
-
 	return {
 		width = width,
 		length = length,
@@ -68,7 +75,31 @@ function TruckLayout.For(def: TruckDef): Layout
 		wheelX = width / 2 + 0.2,
 		wheelZ = wheelZ,
 		logLength = width - 0.8,
-		logSlots = slots,
+		logSlots = logSlots(bedLength, def.bedCapacity),
+	}
+end
+
+export type TrailerLayout = {
+	width: number,
+	bedLength: number,
+	bedCenterZ: number, -- truck-local z of the trailer bed's centre
+	length: number, -- tongue + bed, behind the truck
+	wheelZ: number,
+	logSlots: { Vector3 }, -- relative to the trailer bed floor's centre
+}
+
+-- Where a trailer sits behind `truck` (a Layout): as wide as the truck, its
+-- bed starting a tongue's length behind the truck's back.
+function TruckLayout.ForTrailer(trailer: TrailerDef, truck: Layout): TrailerLayout
+	local bedLength = trailer.look.bedLength
+	local bedStart = truck.length / 2 + TruckLayout.Tongue
+	return {
+		width = truck.width,
+		bedLength = bedLength,
+		bedCenterZ = bedStart + bedLength / 2,
+		length = TruckLayout.Tongue + bedLength,
+		wheelZ = bedStart + bedLength * 0.6,
+		logSlots = logSlots(bedLength, trailer.extraCapacity),
 	}
 end
 

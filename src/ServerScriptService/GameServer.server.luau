@@ -408,9 +408,12 @@ local function onPlayerAdded(player: Player)
 	then
 		profile.equippedTruck = "Rustbucket"
 	end
+	if profile.equippedTrailer ~= "" and not table.find(profile.ownedTrailers, profile.equippedTrailer) then
+		profile.equippedTrailer = ""
+	end
 
 	player:SetAttribute("Cash", profile.cash)
-	VehicleService.SpawnTruck(player, profile.equippedTruck)
+	VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
 
 	player.CharacterAdded:Connect(function(char)
 		onCharacterAdded(player, char)
