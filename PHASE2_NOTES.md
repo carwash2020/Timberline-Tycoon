@@ -161,8 +161,7 @@ each truck's `topSpeed` and `turnRate`.
 ## Daily goals and streaks (GAME_DESIGN §12)
 
 A **DAILY GOALS 0/3** button sits under your cash, top right. Tap it for
-today's three
-goals, e.g. "Fell 4 trees", "Sell 12 logs", "Sell 6 birch logs", "Earn
+today's three goals, e.g. "Fell 4 trees", "Sell 12 logs", "Sell 6 birch logs", "Earn
 $60 selling logs", "Load 12 logs into your truck", with progress bars and
 rewards. Each goal pays when done; all three pay a bonus that grows with
 your **streak** (days in a row, up to 2x at 5 days). Goals are sized to
