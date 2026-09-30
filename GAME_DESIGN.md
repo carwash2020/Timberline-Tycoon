@@ -605,9 +605,12 @@ deviating from data values or architecture.
 export type PlacedItem = {
   uid: string,            -- guid
   blueprintId: string,
-  cframe: { number },     -- 12 components, validated server-side
-  data: { any }?,         -- e.g. sapling: { water: number, stage: number }
+  x: number, z: number,   -- centre in plot-local studs (PlotData.Grid snap)
+  rot: number,            -- 0-3 quarter turns
+  -- data: { any }? comes with saplings, e.g. { water: number, stage: number }
 }
+-- Plot-local, not a world CFrame: your plot slot can differ per server, so
+-- the layout rebuilds wherever you land. PlotLogic.Check validates it.
 export type Profile = {
   cash: number,
   totalEarned: number,    -- lifetime, for leaderboard + rebirth math
@@ -621,7 +624,7 @@ export type Profile = {
   ownedBoats: { string },
   gear: { string },       -- "Lantern" | "InsulatedCoat" | "HeatBoots" | ...
   materials: { [string]: number },  -- Stone, IronOre, Resin, EmberGlass, SkyShard (when built)
-  plot: { claimed: boolean, size: number, placed: { PlacedItem } },
+  plot: { claimed: boolean, tier: number, placed: { PlacedItem } },  -- tier: PlotData.Tiers index
   compendium: { [string]: boolean },       -- wood ids discovered
   furnitureBlueprints: { [string]: boolean },
   npcFriendship: { [string]: number },     -- "Murph" | "Millie" | "Tink"
@@ -674,9 +677,12 @@ export type Profile = {
   load kept; 10 s cooldown, not while driving.
 - `DropAxe(axeUid)` — owner only; the axe becomes a world item with a
   "Pick up" prompt (owner only unless `GameConfig.AxePickupByOthers`).
-- `PlaceBlueprint(blueprintId, cframe12)` — validates: blueprint owned,
-  plot claimed, inside plot bounds, no overlap, funds. Returns uid.
-- `MoveBlueprint(uid, cframe12)`, `SellPlaced(uid)`.
+- `PlaceBlueprint(blueprintId, x, z, rot)` (PlotService) — validates: on
+  your own claimed plot, the blueprint's tier unlocked, inside plot bounds,
+  no overlap (`PlotLogic.Check`), funds. You pay on placing (the ghost
+  preview is free).
+- `MoveBlueprint(uid, x, z, rot)`, `SellPlaced(uid)` (half back, all of it
+  within a minute of placing), `UpgradePlot()` (the next base tier).
 - `WaterSapling(uid)` — distance + ownership check.
 - `GiftNPC(npcId, itemRef)`.
 - Rate-limit everything per player (ChopTree 4/s, PlaceBlueprint 2/s…).
@@ -726,7 +732,8 @@ export type Profile = {
   (CollectionService), attributes: `WoodId` (string), `MaxHP` (number).
 - Logs: server-created Models, tag "Log", attributes `WoodId`, `Value`.
 - SellZone: invisible Part at the sawmill. Plot spots: Parts tagged
-  "PlotSpot". Biomes: folders in Workspace, art per §13.
+  PlotService builds them from `PlotData.Slots` (plot district east of
+  town). Biomes: folders in Workspace, art per §13.
 
 ### 14.8 Economy formulas (implement, don't eyeball)
 - `hitsToFell = ceil(treeHP / max(0, axeDamage - hardness))` (0 damage =

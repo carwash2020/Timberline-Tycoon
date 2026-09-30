@@ -102,6 +102,8 @@ measure the economy model against your real play (saved in
   - `AetherService`, `GondolaService`, `NodeService`: the Aether Isles
     (Cloud Chute, Sky Bin, forge, falling), the gondola, crystal nodes
   - `CarryService`: the logs in each player's hands
+  - `PlotService`: the plot district, claiming, placing, moving, selling
+    back and growing plots
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
@@ -113,11 +115,15 @@ measure the economy model against your real play (saved in
   - `StoreData`: Robux items and their Creator Hub ids
   - `FieldGuide`: the Field Guide's pages
   - `ForgeLogic`: what forging the Starfall Axe takes
+  - `PlotData`, `PlotLogic`, `BlueprintModels`: plot tiers and blueprints
+    (tune here), where a blueprint may go, and how each one is built
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial
   tracker, `VehicleController` drives your truck, `DailyUI` the daily goals,
-  `WorldUI` biome names and the clock, `StoreUI` the Robux Store)
+  `WorldUI` biome names and the clock, `StoreUI` the Robux Store,
+  `PlotUI` build mode and the Blueprint Store, `BlueprintPlacer` the ghost
+  preview)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
 - `tests/`: unit tests, run with Lune outside Roblox (`tools/loader.luau`

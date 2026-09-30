@@ -12,11 +12,14 @@ local Util = require(ReplicatedStorage.Shared.Util)
 
 local ProfileSchema = {}
 
+-- One blueprint on your plot: its centre in plot-local studs and 0-3
+-- quarter turns (PlotLogic checks every placement).
 export type PlacedItem = {
 	uid: string,
 	blueprintId: string,
-	cframe: { number }, -- 12 components, validated server-side
-	data: { [string]: any }?,
+	x: number,
+	z: number,
+	rot: number,
 }
 
 -- One axe the player owns. Axes are items: duplicates are fine, and each
@@ -48,9 +51,11 @@ export type Profile = {
 	equippedTrailer: string, -- hitched trailer id, "" for none
 	ownedBoats: { string },
 	gear: { string },
+	-- Your plot (PlotService). Placed items are plot-local, so the layout
+	-- rebuilds on whichever plot slot you get on each server.
 	plot: {
 		claimed: boolean,
-		size: number,
+		tier: number, -- PlotData.Tiers index (1 = Campsite)
 		placed: { PlacedItem },
 	},
 	compendium: { [string]: boolean },
@@ -91,7 +96,7 @@ local TEMPLATE: Profile = {
 	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
-	plot = { claimed = false, size = 120, placed = {} },
+	plot = { claimed = false, tier = 1, placed = {} },
 	compendium = { oak = true },
 	materials = {},
 	forgeLogs = {},
@@ -129,6 +134,17 @@ function ProfileSchema.Migrate(data: any)
 	for _, item in ipairs(data.axes) do
 		data.bestAxeTier = math.max(data.bestAxeTier, ItemCatalog.AxeTier(item.id) or 1)
 	end
+	-- Saves from before plots were built had a `size` (tiers replaced it) and
+	-- could only hold an empty layout; anything not in plot-local x/z/rot
+	-- form is dropped.
+	data.plot.size = nil
+	local kept = {}
+	for _, item in ipairs(data.plot.placed) do
+		if type(item.x) == "number" and type(item.z) == "number" and type(item.rot) == "number" then
+			table.insert(kept, item)
+		end
+	end
+	data.plot.placed = kept
 end
 
 -- How many granted receipts to remember. Roblox retries an unconfirmed

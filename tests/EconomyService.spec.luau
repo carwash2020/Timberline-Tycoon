@@ -61,6 +61,18 @@ return function(t)
 		t.eq(profile.cash, 0)
 	end)
 
+	t.test("Refund gives spent cash back up to the cap, without counting it as earned", function()
+		local Economy, GameConfig, player, profile = setup(0)
+		t.eq({ Economy.Refund(player, 40, "sold a fence") }, { 40, 0 })
+		t.eq(profile.cash, 40)
+		t.eq(profile.totalEarned, 0)
+		t.eq(player.attrs.Cash, 40)
+		profile.cash = GameConfig.CashCap - 10
+		t.eq({ Economy.Refund(player, 25, "test") }, { 10, 15 })
+		t.eq(profile.cash, GameConfig.CashCap)
+		t.eq({ Economy.Refund(player, -5, "test") }, { 0, 0 })
+	end)
+
 	t.test("no profile, no cash", function()
 		local Economy = setup(0)
 		t.eq({ Economy.AddCash({ Name = "Stranger" }, 10, "test") }, { 0, 0 })

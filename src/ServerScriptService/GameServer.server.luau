@@ -24,6 +24,7 @@ local GondolaService = require(script.Parent.GondolaService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
+local PlotService = require(script.Parent.PlotService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -421,6 +422,12 @@ FieldGuideService.Init(notify)
 NodeService.Init(notify)
 AetherService.Init(notify)
 GondolaService.Init(mapFolder, notify)
+PlotService.Init(mapFolder, {
+	PlaceBlueprint = remote.PlaceBlueprint,
+	MoveBlueprint = remote.MoveBlueprint,
+	SellPlaced = remote.SellPlaced,
+	UpgradePlot = remote.UpgradePlot,
+}, notify)
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
@@ -517,6 +524,7 @@ local function onPlayerAdded(player: Player)
 	FieldGuideService.Refresh(player)
 	NodeService.Publish(player)
 	AetherService.PlayerJoined(player, profile)
+	PlotService.PlayerJoined(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -525,6 +533,7 @@ local function onPlayerRemoving(player: Player)
 	MilestoneService.Stop(player) -- before the final save, so playtime is included
 	AxeService.PlayerRemoving(player) -- dropped axes go back to the save's inventory
 	MonetizationService.PlayerRemoving(player)
+	PlotService.PlayerRemoving(player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

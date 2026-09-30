@@ -94,6 +94,32 @@ function EconomyService.AddCash(
 	return credited, overflow
 end
 
+-- Gives back cash the player spent (a placed item picked up or sold back):
+-- up to the wallet cap, and not counted in totalEarned. Returns (credited,
+-- overflow) like AddCash.
+function EconomyService.Refund(player: Player, amount: number, reason: string, itemSku: string?): (number, number)
+	amount = math.floor(amount)
+	local profile = ProfileService.GetProfile(player)
+	if amount <= 0 or not profile then
+		return 0, 0
+	end
+	local credited = math.clamp(GameConfig.CashCap - profile.cash, 0, amount)
+	if credited > 0 then
+		profile.cash += credited
+		publish(player, profile.cash)
+		logEconomy(
+			player,
+			Enum.AnalyticsEconomyFlowType.Source,
+			credited,
+			profile.cash,
+			Enum.AnalyticsEconomyTransactionType.Shop,
+			itemSku
+		)
+		print(string.format("[Economy] +%d refund to %s (%s)", credited, player.Name, reason))
+	end
+	return credited, amount - credited
+end
+
 -- `itemSku` names what was bought for analytics (e.g. "SteelAxe").
 function EconomyService.SpendCash(player: Player, amount: number, reason: string, itemSku: string?): boolean
 	amount = math.floor(amount)

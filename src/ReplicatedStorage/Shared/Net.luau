@@ -19,6 +19,10 @@ Net.RemoteNames = {
 	"BuyRobuxItem", -- client -> server: ("Pass" | "Product", key) the server shows Roblox's prompt
 	"UseInstantDelivery", -- client -> server: () sell the truck bed from anywhere (a Robux product)
 	"MineNode", -- client -> server: (nodeUid) one swing at a crystal node
+	"PlaceBlueprint", -- client -> server: (blueprintId, x, z, rot) build on your plot (plot-local studs)
+	"MoveBlueprint", -- client -> server: (uid, x, z, rot) move a placed item on your plot
+	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
+	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 }

@@ -23,6 +23,10 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	BuyRobuxItem = 2,
 	MineNode = 4,
 	Gondola = 1,
+	PlaceBlueprint = 2,
+	MoveBlueprint = 2,
+	SellPlaced = 4,
+	UpgradePlot = 1,
 }
 local ABUSE_MULTIPLIER = 5
 local STRIKE_WINDOW = 60

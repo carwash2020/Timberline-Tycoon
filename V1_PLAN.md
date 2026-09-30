@@ -73,13 +73,16 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 
 ### 6. Plots and the empire (GAME_DESIGN §9, §10; in V1)
 Slices, in order:
-- ⬜ Claim a plot in the plot district; base tiers (Campsite → Timber
-  Empire) that grow the plot
-- ⬜ Blueprint Store + placement: ghost preview, rotate, grid snap, bounds
-  and overlap checked on the server; move and sell back; saved with the
-  profile
+- 🟡 Claim a plot in the plot district (12 plots east of the parking lot);
+  base tiers (Campsite → Timber Empire) that grow the plot, cash only
+  until Stone and planks exist (tier prices are a first pass to tune)
+- 🟡 Blueprint Store + placement: ghost preview, rotate, 2-stud grid snap,
+  bounds and overlap checked on the server; move, and sell back for half
+  (all of it within a minute); saved with the profile, plot-local so a
+  layout rebuilds on whichever plot you get
 - ⬜ Buildings and decor: Warehouse (stores logs and materials), Axe Rack,
-  walls, lights
+  walls, lights. Placeable now as looks (with a Cabin, fences, lamps, a
+  flag and more); what they do comes next
 - ⬜ Production: Sawmill Shed (logs → planks), Workshop (planks →
   furniture), flumes linking machines, hand work vs Auto Saw ratios
 - ⬜ Storefront (sell furniture while you're out) and contracts

@@ -142,6 +142,7 @@ function Loader:environment(modulePath: string)
 		Color3 = roblox.Color3,
 		Enum = roblox.Enum,
 		UDim2 = roblox.UDim2,
+		Vector2 = roblox.Vector2,
 		Vector3 = roblox.Vector3,
 		-- Roblox globals
 		warn = function(...)

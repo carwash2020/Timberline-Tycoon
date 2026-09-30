@@ -7,7 +7,7 @@ merged.
 
 **Status:** code complete, **not yet played in Studio.** It passes the same
 checks as Phase 1 (`./scripts/check.sh`, also run by GitHub on every push),
-plus 93 unit tests.
+plus 162 unit tests.
 
 On this branch, each with its own checklist below:
 1. **Axe shop**: the Tool Shed
@@ -19,6 +19,7 @@ On this branch, each with its own checklist below:
 7. **Robux**: the Store, 2x Cash, cash packs, 2x Wood, Instant Delivery
 8. **The Field Guide**
 9. **The Aether Isles**: gondola, Lumenwood, Sky Shards, Cloud Chute, Sky Bin, the forge
+10. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -109,6 +110,8 @@ test account), progress starts fresh each Play session.
 - **Cash, top right**, with the Daily Goals button under it.
 - **Tutorial tracker, left**, a third of the way down, under Roblox's chat
   window.
+- **BUILD** (on your own plot), **Sell load here** and **Truck to lot**
+  stack on the right, above the jump button.
 - Roblox's own **player list is off** (it opens top right on computers,
   over the cash) until the game has its own leaderboard. Turn it back on
   with `ShowRobloxPlayerList = true` in `GameConfig.luau`.
@@ -342,3 +345,60 @@ from everywhere; the isles float above it. How it works:
 - [ ] Performance on a phone while riding the gondola (streaming the map)
 
 Quick test with a Studio test axe: `/giveaxe inferno` or `/giveaxe starfall`.
+
+## Plots (V1_PLAN §6, first slices)
+
+The **plot district** is east of the parking lot: 12 plots (one per player
+on a full server) with a road along the north side and lanes between them.
+A sign at each plot's north edge says whose it is.
+
+- **Claiming:** walk to a free plot's sign, "Claim this plot" (hold). It's
+  free, and you keep it: each time you join, your saved layout is rebuilt
+  on whichever plot is free (the sign says "FREE PLOT" until someone
+  claims it; plots are plot-local, so nothing is lost if you get a
+  different one).
+- **Building:** on your plot a **BUILD** button shows (right side). It opens
+  the **Blueprint Store** and turns on build mode (a bar with BLUEPRINTS
+  and DONE at the bottom). Pick a blueprint and a see-through ghost follows
+  your mouse (the last spot you tapped on a phone; the middle of the screen
+  on a gamepad), green where it fits and red with the reason where it
+  doesn't. Click or PLACE to build it (you pay then); R or ROTATE turns it;
+  Q or CANCEL stops. You keep placing the same thing until you cancel, so
+  fences are quick.
+- **Moving and selling:** in build mode, walk up to anything you placed:
+  **Move** (E) picks it up as a ghost to put somewhere else (free); **Sell**
+  (F, hold) pays back half the price, or all of it within a minute of
+  placing it.
+- **Growing:** the store's top row grows the plot to the next base tier:
+  Homestead (140 × 140, $2,500), Lumber Yard (160, $10,000), Timber Works
+  (180, $30,000), Timber Empire (200, $60,000). The Warehouse and Axe Rack
+  need a Homestead. **These prices are a first pass for you to tune**
+  (`PlotData.luau`); tier-ups will also cost Stone and planks once those
+  exist.
+- **What's there:** Fence, Flower Bed, Bench, Lamp Post (lights up), Log
+  Pile, Flag, Cabin, and (Homestead) the Warehouse and Axe Rack. They're
+  looks for now; the Warehouse storing logs and the Axe Rack showing axes
+  come in the next slice.
+
+### Playtest checklist
+- [ ] The plot district is east of the parking lot, with roads and a
+      "PLOT DISTRICT" sign; the old plot markers by town are gone
+- [ ] Claim a plot: the sign shows your name and "CAMPSITE", a rail marks
+      the edge; claiming a second one says you already have one
+- [ ] BUILD shows only on your plot; walking off ends build mode
+- [ ] Place a fence: the ghost snaps, turns with R, goes red over another
+      fence or past the edge (with the reason), green where it fits;
+      placing takes the price
+- [ ] Place several fences in a row without reopening the store
+- [ ] Move something: it hides, the ghost takes its place, and it lands
+      where you put it (no charge)
+- [ ] Sell something right after placing it (full refund), and again after
+      a minute (half)
+- [ ] Grow to a Homestead: the pad and sign grow, the Warehouse unlocks
+- [ ] Leave and rejoin: the plot and everything on it come back (maybe on a
+      different plot)
+- [ ] Two players: each sees the other's build; nobody gets Move or Sell
+      prompts on someone else's things
+- [ ] On a phone: tap to aim, PLACE / ROTATE / CANCEL work, prompts are
+      reachable
+- [ ] Lamp posts glow at night

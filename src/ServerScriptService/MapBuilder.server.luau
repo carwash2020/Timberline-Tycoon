@@ -6,7 +6,8 @@
 --     signpost from town. The Phantom Grove is hidden: no road, no sign.
 --   * Town: spawn, parking lot, sawmill + sell zone, the Tool Shed (axes),
 --     the Dealership (trucks), Hearth & Home (gear), Murph (the tutorial
---     NPC), and plot markers for later phases.
+--     NPC), and the roads through the plot district (PlotService builds
+--     the plots).
 --   * Starts the day/night clock once the trees are in (WorldClock).
 -- GameServer waits for the TimberlineMap folder before accepting players.
 
@@ -17,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local NodeService = require(script.Parent.NodeService)
 local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
@@ -535,7 +537,7 @@ end
 -- a signpost facing back toward town. (The Phantom Grove has none.)
 type Route = { biome: string, from: Vector2 }
 local ROUTES: { Route } = {
-	{ biome = "hills", from = Vector2.new(-20, 20) }, -- west, between the plot markers
+	{ biome = "hills", from = Vector2.new(-20, 20) }, -- west, past Hearth & Home
 	{ biome = "snow", from = Vector2.new(0, 128) }, -- north, from behind the sawmill
 	{ biome = "volcano", from = Vector2.new(25, 130) }, -- north-east
 }
@@ -862,22 +864,41 @@ local skyBin = box("SkyBin", Vector3.new(4, 4, 4), Vector3.new(-18, 2, MILL_Z - 
 skyBin.Parent = sellArea
 signText(skyBin, "SKY BIN", 40)
 
--- Plot markers for later phases (visual only in Phase 1).
-local plotPositions = {
-	Vector3.new(170, 0.15, 110),
-	Vector3.new(-170, 0.15, 110),
-	Vector3.new(170, 0.15, -60),
-	Vector3.new(-170, 0.15, -60),
-}
-for i, pos in ipairs(plotPositions) do
-	local pad =
-		box("PlotSpot_" .. i, Vector3.new(120, 0.2, 120), pos, Color3.fromRGB(210, 190, 150), Enum.Material.Sand)
-	ghost(pad, 0.85)
-	CollectionService:AddTag(pad, "PlotSpot")
+-- The plot district, east of the parking lot (the plots themselves are
+-- PlotService's, at PlotData.Slots). A road along its north side and lanes
+-- between the plots, all in the gaps left by the biggest tier.
+do
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, slot in ipairs(PlotData.Slots) do
+		minX, maxX = math.min(minX, slot.X), math.max(maxX, slot.X)
+		minZ, maxZ = math.min(minZ, slot.Y), math.max(maxZ, slot.Y)
+	end
+	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+	local northZ = maxZ + half + 10
+	road("PlotRoad", 110, northZ, maxX + half, northZ)
+	local xs, zs = {}, {}
+	for _, slot in ipairs(PlotData.Slots) do
+		xs[slot.X], zs[slot.Y] = true, true
+	end
+	for x in pairs(xs) do
+		if x > minX then -- a lane on each plot column's west side
+			local laneX = x - PlotData.SlotSpacing / 2
+			road("PlotLane", laneX, northZ, laneX, minZ - half)
+		end
+	end
+	for z in pairs(zs) do
+		if z < maxZ then
+			local laneZ = z + PlotData.SlotSpacing / 2
+			road("PlotLane", minX - half, laneZ, maxX + half, laneZ)
+		end
+	end
+	signpost("PlotSign", 124, northZ + 12, 0, 40, "PLOT DISTRICT\nClaim a free plot\nand build on it")
 end
 
 -- Warm light; the time of day comes from WorldClock.
 Lighting.Brightness = 2
 WorldClock.Start()
 
-print("[MapBuilder] World built: biomes, roads, town (sawmill, Tool Shed, Dealership, Hearth & Home), Murph, plots.")
+print(
+	"[MapBuilder] World built: biomes, roads, town (sawmill, Tool Shed, Dealership, Hearth & Home), Murph, the plot district."
+)

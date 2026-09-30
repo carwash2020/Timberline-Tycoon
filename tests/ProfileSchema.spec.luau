@@ -36,6 +36,29 @@ return function(t)
 		t.eq(equipped.id, "SteelAxe")
 	end)
 
+	t.test("a new save has an unclaimed Campsite plot", function()
+		local Schema, data = fresh()
+		Schema.Migrate(data)
+		t.eq(data.plot, { claimed = false, tier = 1, placed = {} })
+	end)
+
+	t.test("saves from before plots lose the old size and any old-format items", function()
+		local Schema, data = fresh()
+		data.plot = {
+			claimed = false,
+			size = 120,
+			tier = 1, -- Reconcile adds the new field
+			placed = {
+				{ uid = "old", blueprintId = "Fence", cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 } },
+				{ uid = "new", blueprintId = "Fence", x = 2, z = 4, rot = 1 },
+			},
+		}
+		Schema.Migrate(data)
+		t.eq(data.plot.size, nil)
+		t.eq(#data.plot.placed, 1)
+		t.eq(data.plot.placed[1].uid, "new")
+	end)
+
 	t.test("migrating twice changes nothing", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)
