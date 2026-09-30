@@ -21,6 +21,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	EquipItem = 2,
 	CallTruck = 1,
 	BuyRobuxItem = 2,
+	MineNode = 4,
+	Gondola = 1,
 }
 local ABUSE_MULTIPLIER = 5
 local STRIKE_WINDOW = 60

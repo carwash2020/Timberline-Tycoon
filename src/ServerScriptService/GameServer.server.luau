@@ -13,13 +13,17 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
+local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
+local GondolaService = require(script.Parent.GondolaService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
+local NodeService = require(script.Parent.NodeService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -30,6 +34,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 
 -- Wait for the code-built world (MapBuilder runs at server start).
 local mapFolder = workspace:WaitForChild("TimberlineMap", 60)
@@ -55,7 +60,6 @@ remotes.Parent = ReplicatedStorage
 EconomyService.Init(remotes)
 
 -- Per-player state ---------------------------------------------------------
-local carriedLogs: { [number]: { [string]: boolean } } = {} -- [userId] -> { [logUid] = true }
 local nextSwingAt: { [number]: number } = {}
 local lastNotice: { [number]: { [string]: number } } = {}
 
@@ -159,12 +163,34 @@ local function onChopTree(player: Player, treeUid: unknown)
 	end
 end
 
+-- One swing at a crystal node (any axe; the same swing cooldown as chopping).
+local function onMineNode(player: Player, nodeUid: unknown)
+	if type(nodeUid) ~= "string" or not RateLimiter.Allow(player, "MineNode") then
+		return
+	end
+	local char = getCharacterParts(player)
+	if not char or not AxeService.GetEquippedAxe(player) then
+		return
+	end
+	local now = os.clock()
+	local due = nextSwingAt[player.UserId] or 0
+	if now < due - GameConfig.SwingTolerance then
+		return
+	end
+	local result = NodeService.Hit(player, nodeUid)
+	if result == "far" then
+		notify(player, "Too far away. Walk closer to mine.")
+	elseif result then
+		nextSwingAt[player.UserId] = math.max(now, due) + GameConfig.SwingCooldown
+	end
+end
+
 local function serverPickupLog(player: Player, logUid: unknown)
 	if type(logUid) ~= "string" or not RateLimiter.Allow(player, "PickupLog") then
 		return
 	end
 	local char, hrp = getCharacterParts(player)
-	local hands = carriedLogs[player.UserId]
+	local hands = CarryService.Hands(player)
 	if not char or not hrp or not hands or not ProfileService.GetProfile(player) then
 		return
 	end
@@ -220,7 +246,7 @@ local function onLoadToTruck(player: Player)
 	end
 	local _char, hrp = getCharacterParts(player)
 	local truck = VehicleService.GetVehicle(player)
-	local hands = carriedLogs[player.UserId]
+	local hands = CarryService.Hands(player)
 	if not hrp or not truck or not hands then
 		return
 	end
@@ -313,7 +339,7 @@ local function onSellLogs(player: Player)
 	end
 	local _char, hrp = getCharacterParts(player)
 	local profile = ProfileService.GetProfile(player)
-	local hands = carriedLogs[player.UserId]
+	local hands = CarryService.Hands(player)
 	if not hrp or not profile or not hands then
 		return
 	end
@@ -342,6 +368,15 @@ local function onSellLogs(player: Player)
 			total += entry.value
 			count += 1
 			byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
+		end
+	end
+	-- The Sky Bin sits by the pad: logs sent down the Cloud Chute.
+	for _, woodId in ipairs(AetherService.TakeSkyBin(player)) do
+		local wood = WoodData.Get(woodId)
+		if wood then
+			total += wood.pricePerLog
+			count += 1
+			byWood[woodId] = (byWood[woodId] or 0) + 1
 		end
 	end
 	player:SetAttribute("CarriedLogs", 0)
@@ -383,6 +418,10 @@ DailyService.Init(notify)
 BiomeService.Init(notify)
 MonetizationService.Init(remote.BuyRobuxItem, notify)
 FieldGuideService.Init(notify)
+NodeService.Init(notify)
+AetherService.Init(notify)
+GondolaService.Init(mapFolder, notify)
+remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
@@ -405,7 +444,7 @@ end)
 -- Player lifecycle --------------------------------------------------------
 
 local function dropCarriedLogs(player: Player)
-	local hands = carriedLogs[player.UserId]
+	local hands = CarryService.Hands(player)
 	if not hands then
 		return
 	end
@@ -435,7 +474,7 @@ end
 local function onPlayerAdded(player: Player)
 	player:SetAttribute("ProfileLoaded", false) -- the HUD shows "Loading your save..."
 	player:SetAttribute("CarriedLogs", 0)
-	carriedLogs[player.UserId] = {}
+	CarryService.Start(player)
 	lastNotice[player.UserId] = {}
 
 	local profile, err = ProfileService.LoadProfile(player)
@@ -476,6 +515,8 @@ local function onPlayerAdded(player: Player)
 	ShopService.PlayerJoined(player, profile)
 	MonetizationService.PlayerJoined(player, profile)
 	FieldGuideService.Refresh(player)
+	NodeService.Publish(player)
+	AetherService.PlayerJoined(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -487,7 +528,7 @@ local function onPlayerRemoving(player: Player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)
-	carriedLogs[player.UserId] = nil
+	CarryService.Stop(player)
 	nextSwingAt[player.UserId] = nil
 	lastNotice[player.UserId] = nil
 	print(string.format("[GameServer] %s left (saving)", player.Name))

@@ -1,5 +1,5 @@
 --!strict
--- TreeUI: floating HP bars over trees.
+-- TreeUI: floating HP bars over trees and crystal nodes.
 -- One BillboardGui per tree, listening to the server's HP attribute.
 -- Bars show only while a tree is damaged: hidden at full HP and once felled.
 
@@ -93,22 +93,25 @@ local function detach(model: Model)
 end
 
 function TreeUI.Start()
-	for _, inst in ipairs(CollectionService:GetTagged("Tree")) do
-		if inst:IsA("Model") then
-			attach(inst)
+	-- Trees, and the crystal nodes on the Aether Isles (same HP attributes).
+	for _, tag in ipairs({ "Tree", "Node" }) do
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			if inst:IsA("Model") then
+				attach(inst)
+			end
 		end
+		CollectionService:GetInstanceAddedSignal(tag):Connect(function(inst)
+			if inst:IsA("Model") then
+				attach(inst)
+			end
+		end)
+		-- Fires when a model streams out of range, too.
+		CollectionService:GetInstanceRemovedSignal(tag):Connect(function(inst)
+			if inst:IsA("Model") then
+				detach(inst)
+			end
+		end)
 	end
-	CollectionService:GetInstanceAddedSignal("Tree"):Connect(function(inst)
-		if inst:IsA("Model") then
-			attach(inst)
-		end
-	end)
-	-- Fires when a tree streams out of range, too.
-	CollectionService:GetInstanceRemovedSignal("Tree"):Connect(function(inst)
-		if inst:IsA("Model") then
-			detach(inst)
-		end
-	end)
 end
 
 return TreeUI

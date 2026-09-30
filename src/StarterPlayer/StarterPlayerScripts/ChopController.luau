@@ -3,9 +3,10 @@
 -- A click, a tap on the screen and the gamepad trigger all fire the Tool's
 -- Activated event, so there's no per-device input code. Hold to keep chopping.
 --
--- Target: the tree under the pointer (mouse, or the last tap), or, if
--- there isn't a choppable one, the nearest tree within AutoTargetRange (for
--- gamepads and slightly-missed taps). The cooldown is mirrored here for
+-- Target: the tree (or crystal node, "Node" tag) under the pointer (mouse,
+-- or the last tap), or, if there isn't one, the nearest within
+-- AutoTargetRange (for gamepads and slightly-missed taps). Nodes take any
+-- axe and go to MineNode instead of ChopTree. The cooldown is mirrored here for
 -- responsiveness; the server re-checks everything, so this isn't security.
 
 local CollectionService = game:GetService("CollectionService")
@@ -36,11 +37,17 @@ local function axeOf(tool: Tool): ItemCatalog.AxeDef?
 	return if type(id) == "string" then ItemCatalog.GetAxe(id) else nil
 end
 
--- Walk up from the hit part to the tagged tree model (or nil).
+local TARGET_TAGS = { "Tree", "Node" }
+
+local function isNode(model: Model): boolean
+	return CollectionService:HasTag(model, "Node")
+end
+
+-- Walk up from the hit part to the tagged tree or node model (or nil).
 local function findTreeModel(inst: Instance): Model?
 	local node: Instance? = inst
 	while node and node ~= workspace do
-		if node:IsA("Model") and CollectionService:HasTag(node, "Tree") then
+		if node:IsA("Model") and (CollectionService:HasTag(node, "Tree") or CollectionService:HasTag(node, "Node")) then
 			return node
 		end
 		node = node.Parent
@@ -56,6 +63,9 @@ end
 
 -- Can this axe cut this tree at all? (Harder wood needs a stronger axe.)
 local function canCut(axe: ItemCatalog.AxeDef, tree: Model): boolean
+	if isNode(tree) then
+		return true -- any axe mines crystals
+	end
 	local wood = WoodData.Get(tostring(tree:GetAttribute("WoodId")))
 	return wood ~= nil and ItemCatalog.AxeDamage(axe, wood) > 0
 end
@@ -104,11 +114,13 @@ local function pickTarget(hrp: BasePart, axe: ItemCatalog.AxeDef): (Model?, stri
 	-- Nothing choppable under the pointer: take the nearest tree within reach.
 	local best: Model? = nil
 	local bestDist = GameConfig.AutoTargetRange
-	for _, inst in ipairs(CollectionService:GetTagged("Tree")) do
-		if inst:IsA("Model") and isAlive(inst) and canCut(axe, inst) then
-			local d = flatDistance(inst, hrp.Position)
-			if d <= bestDist then
-				best, bestDist = inst, d
+	for _, tag in ipairs(TARGET_TAGS) do
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			if inst:IsA("Model") and isAlive(inst) and canCut(axe, inst) then
+				local d = flatDistance(inst, hrp.Position)
+				if d <= bestDist then
+					best, bestDist = inst, d
+				end
 			end
 		end
 	end
@@ -150,7 +162,7 @@ local function trySwing(fromClick: boolean)
 		return
 	end
 	cooldownUntil = now + GameConfig.SwingCooldown
-	Net.Remote("ChopTree"):FireServer(tree:GetAttribute("Uid"))
+	Net.Remote(if isNode(tree) then "MineNode" else "ChopTree"):FireServer(tree:GetAttribute("Uid"))
 	playSlash(tool)
 end
 

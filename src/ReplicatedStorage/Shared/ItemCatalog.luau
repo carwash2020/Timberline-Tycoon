@@ -266,11 +266,14 @@ ItemCatalog.Gear = {
 }
 
 -- Materials: gathered, used in recipes, sellable.
+-- A material's `node` is what you mine it from: `hits` swings of any axe
+-- break one, it gives `yield`, and it comes back after `respawnSec`.
 export type MaterialDef = {
 	id: string,
 	displayName: string,
 	sellPrice: number,
 	source: string,
+	node: { hits: number, yield: number, respawnSec: number, color: string },
 }
 
 ItemCatalog.Materials = {
@@ -279,6 +282,7 @@ ItemCatalog.Materials = {
 		displayName = "Sky Shard",
 		sellPrice = 150,
 		source = "Crystal nodes on the Aether Isles; mine them with an axe",
+		node = { hits = 12, yield = 1, respawnSec = 600, color = "#9FD4FF" },
 	},
 }
 

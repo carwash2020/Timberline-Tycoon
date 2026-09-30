@@ -99,6 +99,9 @@ measure the economy model against your real play (saved in
   - `WorldClock`: day and night, the same on every server
   - `MonetizationService`: Robux passes and products (receipts granted once)
   - `FieldGuideService`: the woods each player has found
+  - `AetherService`, `GondolaService`, `NodeService`: the Aether Isles
+    (Cloud Chute, Sky Bin, forge, falling), the gondola, crystal nodes
+  - `CarryService`: the logs in each player's hands
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
@@ -109,6 +112,7 @@ measure the economy model against your real play (saved in
   - `WorldTime`: the in-game clock
   - `StoreData`: Robux items and their Creator Hub ids
   - `FieldGuide`: the Field Guide's pages
+  - `ForgeLogic`: what forging the Starfall Axe takes
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial

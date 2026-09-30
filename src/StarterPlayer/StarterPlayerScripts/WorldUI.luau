@@ -4,6 +4,7 @@
 --     ("It's cold here: you walk slower without an Insulated Coat").
 --   * A clock next to the cash: "Day 14:05" / "Night 22:10" (night is when
 --     the Phantom Grove's trees come out).
+--   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
 -- The server sets the Biome and OwnedGear attributes; the time of day is
 -- Lighting.ClockTime, set by WorldClock.
 
@@ -85,8 +86,36 @@ local function buildClock()
 	Lighting:GetPropertyChangedSignal("ClockTime"):Connect(refresh)
 end
 
+-- The Sky Bin by the sell pad shows this player's own count.
+local function watchSkyBin()
+	local map = workspace:WaitForChild("TimberlineMap")
+	local area = map:WaitForChild("SellArea") -- Persistent: always streamed in
+	local bin = area:WaitForChild("SkyBin", 30)
+	if not bin then
+		return
+	end
+	local labels: { TextLabel } = {}
+	for _, gui in ipairs(bin:GetChildren()) do
+		local label = if gui:IsA("SurfaceGui") then gui:FindFirstChildOfClass("TextLabel") else nil
+		if label then
+			table.insert(labels, label)
+		end
+	end
+	local sky = BiomeData.Get("sky")
+	local capacity = if sky then sky.skyBinCapacity or 30 else 30
+	local function refresh()
+		local n = (player:GetAttribute("SkyBin") :: number?) or 0
+		for _, label in ipairs(labels) do
+			label.Text = string.format("SKY BIN\n%d/%d", n, capacity)
+		end
+	end
+	player:GetAttributeChangedSignal("SkyBin"):Connect(refresh)
+	refresh()
+end
+
 function WorldUI.Start()
 	buildClock()
+	task.spawn(watchSkyBin)
 	player:GetAttributeChangedSignal("Biome"):Connect(onBiomeChanged)
 end
 

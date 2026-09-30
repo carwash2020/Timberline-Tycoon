@@ -18,6 +18,7 @@ Net.RemoteNames = {
 	"CallTruck", -- client -> server: () send your truck back to your parking slot
 	"BuyRobuxItem", -- client -> server: ("Pass" | "Product", key) the server shows Roblox's prompt
 	"UseInstantDelivery", -- client -> server: () sell the truck bed from anywhere (a Robux product)
+	"MineNode", -- client -> server: (nodeUid) one swing at a crystal node
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 }

@@ -18,6 +18,7 @@ On this branch, each with its own checklist below:
 6. **Trailers**
 7. **Robux**: the Store, 2x Cash, cash packs, 2x Wood, Instant Delivery
 8. **The Field Guide**
+9. **The Aether Isles**: gondola, Lumenwood, Sky Shards, Cloud Chute, Sky Bin, the forge
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -302,3 +303,42 @@ hits; Steel Axe: 13"). Each new wood toasts "New in your Field Guide".
 - [ ] Felling a first pine: toast "New in your Field Guide: Pine! (3 of 9)";
       its page fills in
 - [ ] Undiscovered woods never show their price
+
+## The Aether Isles (the V1 finale)
+
+The **Skyroot**, a colossal tree in the far north-west corner, is visible
+from everywhere; the isles float above it. How it works:
+
+- **Getting up:** the **Skyroot Gondola** leaves from a station behind the
+  Tool Shed (north-west of the sawmill), $250 a ride, about 40 seconds up
+  the cable. There's a second station at the Skyroot's foot. From the top,
+  "Ride down" goes back to town.
+- **Lumenwood:** 12 glowing trees on the three outer isles, joined to the
+  main isle by rope bridges. Only the Inferno Axe dents it (67 hits); the
+  Starfall Axe fells it in 12.
+- **Sky Shards:** blue crystals on the isles. Any axe mines one in 12 swings
+  (+1 Sky Shard); they grow back after 10 minutes.
+- **Cloud Chute:** one on each outer isle. "Send logs down" puts the logs in
+  your hands into your **Sky Bin**, the crate by the sawmill's sell pad
+  (holds 30; it shows your count). Selling on the pad sells the bin too.
+- **Falling off** loses the logs in your hands, unless you wear the
+  **Featherfall Cloak** (Hearth & Home, $2,500): then you glide down.
+- **The Starfall Forge** (main isle): "Add lumenwood" puts carried Lumenwood
+  in (40 needed); "Forge the Starfall Axe" (hold) takes $60,000 and 12 Sky
+  Shards and puts the axe in your hand. It says what's still missing.
+
+### Playtest checklist
+- [ ] The Skyroot is visible from town and from the far biomes
+- [ ] Gondola from town: $250 taken, a ~40 s ride, you land on the main isle
+- [ ] Jump out mid-ride: you fall (no refund); the ride ends cleanly
+- [ ] Lumenwood: the Inferno Axe works (slowly); weaker axes say it's too hard
+- [ ] Mine a Sky Shard: HP bar, +1 toast; it vanishes and comes back later
+- [ ] Cloud Chute: logs leave your hands; back in town the Sky Bin shows the
+      count; selling on the pad pays for them
+- [ ] Fall off without the cloak: logs in hand are lost; with it: a slow glide
+- [ ] Forge: adding lumenwood shows progress; forging with everything takes
+      the cash and shards and hands you the Starfall Axe
+- [ ] Ride down: back at the town station
+- [ ] Performance on a phone while riding the gondola (streaming the map)
+
+Quick test with a Studio test axe: `/giveaxe inferno` or `/giveaxe starfall`.

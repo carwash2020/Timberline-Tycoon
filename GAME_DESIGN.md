@@ -427,6 +427,13 @@ corner from minute one, and its canopy hides floating islands of glowing
   of saving; all of V1 is about 17 hours for a focused player.
 - **Other isle items:** Sky Shards (the forge material, also sellable) and
   a sky-themed plot decoration blueprint.
+- **Built (2026-09-30):** the Skyroot stands in the far north-west corner
+  (x -1050, z 1050), the isles float above it at ~700 studs. The gondola
+  runs from a station by the sawmill (so the Sky Bin is a short walk from
+  where you get off, as the economy model assumes) and from one at the
+  Skyroot's foot, for anyone who fell. The Starfall Forge is on the main
+  isle for V1 (the Timber Empire plot Forge can come with plots). Sky
+  Shards aren't sellable yet; wind and lightning aren't in yet.
 
 Distances are deliberate: better wood means a longer haul, so truck upgrades
 buy *range*, not just stats. No early fast-travel — the drive is part of the

@@ -18,7 +18,7 @@ return function(t)
 	end
 
 	t.test("every biome on the progression path is in the world", function()
-		for _, id in ipairs({ "starter", "hills", "snow", "volcano", "grove" }) do
+		for _, id in ipairs({ "starter", "hills", "snow", "volcano", "grove", "sky" }) do
 			t.ok(BiomeData.IsOpen(id), id .. " should be open")
 		end
 		t.ok(not BiomeData.IsOpen("island"), "the island waits for boats")
@@ -27,13 +27,15 @@ return function(t)
 
 	t.test("open biomes have ground and trees of their own woods", function()
 		for _, biome in ipairs(open()) do
-			t.ok(biome.ground ~= nil, biome.id .. " ground")
-			t.ok(
-				pcall(function()
-					return t.roblox.Enum.Material[biome.ground.material]
-				end),
-				biome.id .. " ground material"
-			)
+			if biome.area.y == nil then -- the floating isles have no ground patch
+				t.ok(biome.ground ~= nil, biome.id .. " ground")
+				t.ok(
+					pcall(function()
+						return t.roblox.Enum.Material[biome.ground.material]
+					end),
+					biome.id .. " ground material"
+				)
+			end
 			t.ok(biome.trees ~= nil and next(biome.trees) ~= nil, biome.id .. " has no trees")
 			for woodId, count in pairs(biome.trees) do
 				local wood = WoodData.Get(woodId)
@@ -46,6 +48,9 @@ return function(t)
 
 	t.test("each biome is about its haul distance from the sawmill", function()
 		for _, biome in ipairs(open()) do
+			if biome.access == "gondola" then
+				continue -- the gondola leaves from town; the ride is what's modelled
+			end
 			local d = math.sqrt((biome.area.x - SAWMILL_X) ^ 2 + (biome.area.z - SAWMILL_Z) ^ 2)
 			t.ok(
 				math.abs(d - biome.haulStuds) <= biome.haulStuds * 0.2,
@@ -72,10 +77,23 @@ return function(t)
 
 	t.test("At finds the biome under a point, nil in between", function()
 		for _, biome in ipairs(open()) do
-			t.eq(BiomeData.At(biome.area.x, biome.area.z).id, biome.id)
-			t.eq(BiomeData.At(biome.area.x + biome.area.radius - 1, biome.area.z).id, biome.id)
+			local y = (biome.area.y or 0) + 10
+			t.eq(BiomeData.At(biome.area.x, biome.area.z, y).id, biome.id)
+			t.eq(BiomeData.At(biome.area.x + biome.area.radius - 1, biome.area.z, y).id, biome.id)
 		end
 		t.eq(BiomeData.At(SAWMILL_X, SAWMILL_Z), nil, "the town is open country")
+		local sky = BiomeData.Get("sky").area
+		t.eq(BiomeData.At(sky.x, sky.z, 3), nil, "the ground under the isles isn't the isles")
+	end)
+
+	t.test("the sky has its gondola, bin and nodes", function()
+		local sky = BiomeData.Get("sky")
+		t.ok(sky.gondola.rideSec > 0 and sky.gondola.fee > 0)
+		t.ok(sky.skyBinCapacity > 0)
+		for materialId, count in pairs(sky.nodes) do
+			t.ok(ItemCatalog.Materials[materialId] ~= nil, "unknown material " .. materialId)
+			t.ok(count > 0)
+		end
 	end)
 
 	t.test("gear named by biomes exists and is for that biome", function()

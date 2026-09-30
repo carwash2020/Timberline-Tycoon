@@ -54,6 +54,9 @@ export type Profile = {
 		placed: { PlacedItem },
 	},
 	compendium: { [string]: boolean },
+	materials: { [string]: number }, -- gathered materials by id (Sky Shards, ...)
+	forgeLogs: { [string]: number }, -- logs put into the Starfall forge, by wood id
+	skyBin: { string }, -- wood ids of the logs waiting in the Sky Bin at the sawmill
 	furnitureBlueprints: { [string]: boolean },
 	npcFriendship: { [string]: number },
 	stats: {
@@ -90,6 +93,9 @@ local TEMPLATE: Profile = {
 	gear = {},
 	plot = { claimed = false, size = 120, placed = {} },
 	compendium = { oak = true },
+	materials = {},
+	forgeLogs = {},
+	skyBin = {},
 	furnitureBlueprints = {},
 	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
 	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0 },

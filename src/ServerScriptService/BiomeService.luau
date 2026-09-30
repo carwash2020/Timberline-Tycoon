@@ -83,7 +83,7 @@ local function update(player: Player)
 		return
 	end
 	local pos = root.Position
-	local biome = BiomeData.At(pos.X, pos.Z)
+	local biome = BiomeData.At(pos.X, pos.Z, pos.Y)
 	local biomeId = if biome then biome.id else ""
 	if player:GetAttribute("Biome") ~= biomeId then
 		player:SetAttribute("Biome", biomeId)

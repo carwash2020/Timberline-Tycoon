@@ -54,11 +54,15 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
   one piece); a swinging hitch is a later polish.
 
 ### 4. The V1 finale: the Aether Isles (GAME_DESIGN §10, phase 5b; in V1)
-- ⬜ The Skyroot and its gondola (ride time + fee from BiomeData)
-- ⬜ The isles: Lumenwood trees, Sky Shard crystal nodes (mined with an axe)
-- ⬜ Cloud Chute + Sky Bin (logs go down to the sawmill) and the Featherfall
-  Cloak
-- ⬜ Materials inventory (Sky Shards) and the Starfall Axe forge
+- 🟡 The Skyroot and its gondola (ride time + fee from BiomeData), leaving
+  from a station by the sawmill (plus one at the Skyroot's foot)
+- 🟡 The isles: Lumenwood trees, Sky Shard crystal nodes (mined with an axe)
+- 🟡 Cloud Chute + Sky Bin (logs go down to the sawmill) and the Featherfall
+  Cloak (glide instead of losing your logs when you fall)
+- 🟡 Materials inventory (Sky Shards) and the Starfall Axe forge (on the
+  main isle for V1)
+- ⬜ Isle hazards: wind gusts and lightning (GAME_DESIGN §10); left out of
+  the first pass
 
 ### 5. The Field Guide (GAME_DESIGN §11 beat 7, §13)
 - 🟡 A journal of every wood: silhouettes until you find it, then its facts

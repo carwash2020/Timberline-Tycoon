@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local NodeService = require(script.Parent.NodeService)
 local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
 
@@ -190,7 +191,7 @@ local SAWMILL = Vector3.new(0, 0, 110)
 -- Landmarks on the far side of a biome (away from town, so they never
 -- block the road in). Returns the radius to keep clear of trees.
 local function decorate(biome: BiomeData.BiomeDef): number
-	local area = biome.area :: { x: number, z: number, radius: number }
+	local area = biome.area :: { x: number, z: number, radius: number, y: number? }
 	local towardTown = math.atan2(SAWMILL.Z - area.z, SAWMILL.X - area.x)
 	local function farSide(i: number, n: number): (number, number)
 		local angle = towardTown + math.pi / 2 + math.pi * (i - 0.5) / n
@@ -252,17 +253,18 @@ end
 
 -- Lava pools on the Volcano (looks only; the ground itself burns).
 local function lavaPools(biome: BiomeData.BiomeDef, taken: { Vector3 })
-	local area = biome.area :: { x: number, z: number, radius: number }
+	local area = biome.area :: { x: number, z: number, radius: number, y: number? }
 	for _, pos in ipairs(scatterInRing(6, area.x, area.z, 75, area.radius - 20, 30, taken)) do
 		local pool = disc("LavaPool", pos.X, pos.Z, 6, 0.12, Color3.fromRGB(255, 90, 26), Enum.Material.Neon)
 		ghost(pool, 0)
 	end
 end
 
--- Every biome with an area: ground patch, landmarks, trees.
+-- Every biome with an area on the ground: ground patch, landmarks, trees.
+-- (The Aether Isles float; they're built further down.)
 for _, biome in ipairs(BiomeData.All()) do
 	local area = biome.area
-	if area then
+	if area and area.y == nil then
 		local ground = biome.ground
 		if ground then
 			local patch = disc(
@@ -623,6 +625,242 @@ do
 	role.Text = "Retired lumberjack"
 	role.Parent = tag
 end
+
+---------------------------------------------------------------------------
+-- The Aether Isles and the Skyroot Gondola (BiomeData "sky", GAME_DESIGN §10)
+---------------------------------------------------------------------------
+
+-- A straight line of cable (or rope) between two points, for looks.
+local function cable(name: string, from: Vector3, to: Vector3, thickness: number, color: Color3)
+	local p =
+		box(name, Vector3.new(thickness, thickness, (to - from).Magnitude), (from + to) / 2, color, Enum.Material.Metal)
+	p.CFrame = CFrame.lookAt((from + to) / 2, to)
+	p.CanCollide = false
+	p.CanQuery = false
+end
+
+-- A gondola station: a platform (what GondolaService rides from) under a roof.
+local function station(name: string, at: Vector3): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	model.Parent = map
+	local platform = box(
+		"Platform",
+		Vector3.new(10, 1, 10),
+		at + Vector3.new(0, 0.5, 0),
+		Color3.fromRGB(150, 140, 125),
+		Enum.Material.Slate
+	)
+	platform.Parent = model
+	for _, corner in ipairs({
+		Vector3.new(4.5, 0, 4.5),
+		Vector3.new(-4.5, 0, 4.5),
+		Vector3.new(4.5, 0, -4.5),
+		Vector3.new(-4.5, 0, -4.5),
+	}) do
+		local post =
+			box("Post", Vector3.new(0.6, 10, 0.6), at + corner + Vector3.new(0, 6, 0), WOOD_DARK, Enum.Material.Wood)
+		post.Parent = model
+	end
+	local roof = box(
+		"Roof",
+		Vector3.new(11, 0.6, 11),
+		at + Vector3.new(0, 11.3, 0),
+		Color3.fromRGB(92, 135, 184),
+		Enum.Material.Wood
+	)
+	roof.Parent = model
+	model.PrimaryPart = platform
+	return model
+end
+
+do
+	local skyBiome = BiomeData.Get("sky")
+	local area = if skyBiome then skyBiome.area else nil
+	if skyBiome and area then
+		local center = Vector3.new(area.x, 0, area.z)
+		local TOP = (area.y or 650) + 50 -- the main isle's surface
+		local toTown = Vector3.new(SAWMILL.X - center.X, 0, SAWMILL.Z - center.Z).Unit
+		local townAngle = math.atan2(toTown.Z, toTown.X)
+
+		-- The Skyroot: a colossal tree under the isles, drawn from anywhere.
+		local skyroot = Instance.new("Model")
+		skyroot.Name = "Skyroot"
+		skyroot.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+		skyroot.Parent = map
+		local trunkHeight = TOP - 12
+		local trunk = disc(
+			"SkyrootTrunk",
+			center.X,
+			center.Z,
+			28,
+			trunkHeight / 2,
+			Color3.fromRGB(107, 74, 46),
+			Enum.Material.Wood
+		)
+		trunk.Size = Vector3.new(trunkHeight, 56, 56)
+		trunk.Parent = skyroot
+		local flare = disc("SkyrootRoots", center.X, center.Z, 42, 4, Color3.fromRGB(95, 66, 40), Enum.Material.Wood)
+		flare.Size = Vector3.new(8, 84, 84)
+		flare.Parent = skyroot
+		for i = 1, 5 do
+			local angle = i / 5 * math.pi * 2
+			local leaf = Instance.new("Part")
+			leaf.Name = "SkyrootCanopy"
+			leaf.Shape = Enum.PartType.Ball
+			leaf.Size = Vector3.new(120, 120, 120)
+			leaf.Position = center + Vector3.new(math.cos(angle) * 70, TOP - 55, math.sin(angle) * 70)
+			leaf.Color = Color3.fromRGB(196, 232, 168)
+			leaf.Material = Enum.Material.Grass
+			leaf.Transparency = 0.25
+			leaf.Anchored = true
+			ghost(leaf, 0.25) -- looks only: falling players drop through it
+			leaf.Parent = skyroot
+		end
+
+		-- An isle: a grassy disc with a rocky underside. `surface` is its top centre.
+		local function isle(name: string, surface: Vector3, radius: number)
+			local grass = disc(
+				name,
+				surface.X,
+				surface.Z,
+				radius,
+				surface.Y - 4,
+				Color3.fromRGB(168, 216, 110),
+				Enum.Material.Grass
+			)
+			grass.Size = Vector3.new(8, radius * 2, radius * 2)
+			for i, shrink in ipairs({ 0.7, 0.4 }) do
+				local rock = disc(
+					name .. "Rock",
+					surface.X,
+					surface.Z,
+					radius * shrink,
+					surface.Y - 8 - i * 9,
+					Color3.fromRGB(201, 195, 184),
+					Enum.Material.Slate
+				)
+				rock.Size = Vector3.new(10, radius * shrink * 2, radius * shrink * 2)
+			end
+		end
+
+		-- A plank bridge with rope rails between two walkable points.
+		local function bridge(from: Vector3, to: Vector3)
+			local mid = (from + to) / 2
+			local plank = box("Bridge", Vector3.new(6, 0.6, (to - from).Magnitude), mid, WOOD, Enum.Material.WoodPlanks)
+			plank.CFrame = CFrame.lookAt(mid, to) * CFrame.new(0, -0.3, 0)
+			local side = plank.CFrame.RightVector * 3
+			cable(
+				"Rope",
+				from + side + Vector3.new(0, 2.5, 0),
+				to + side + Vector3.new(0, 2.5, 0),
+				0.25,
+				Color3.fromRGB(160, 130, 90)
+			)
+			cable(
+				"Rope",
+				from - side + Vector3.new(0, 2.5, 0),
+				to - side + Vector3.new(0, 2.5, 0),
+				0.25,
+				Color3.fromRGB(160, 130, 90)
+			)
+		end
+
+		local mainSurface = center + Vector3.new(0, TOP, 0)
+		isle("MainIsle", mainSurface, 50)
+		local taken: { Vector3 } = {}
+		-- Three outer isles, away from the town side where the gondola lands.
+		for i, turn in ipairs({ 70, 180, 290 }) do
+			local angle = townAngle + math.rad(turn)
+			local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			local height = TOP + ({ 5, -5, 10 })[i]
+			local surface = center + dir * 120 + Vector3.new(0, height, 0)
+			isle("Isle" .. i, surface, 40)
+			bridge(mainSurface + dir * 48, surface - dir * 38)
+			-- Within 20 studs of the middle, so a felled tree's logs (they lie
+			-- up to ~18 studs out) stay on the isle.
+			for _, pos in ipairs(scatterInRing(4, surface.X, surface.Z, 0, 20, 12, taken)) do
+				TreeService.SpawnTree("lumenwood", CFrame.new(pos.X, height, pos.Z))
+			end
+			for _, pos in ipairs(scatterInRing(2, surface.X, surface.Z, 10, 32, 10, taken)) do
+				NodeService.Spawn("SkyShard", Vector3.new(pos.X, height, pos.Z), map)
+			end
+			-- The Cloud Chute at the isle's outer edge, with a flume dropping away.
+			local chutePos = surface + dir * 33
+			local chute = box(
+				"CloudChute",
+				Vector3.new(4, 3, 4),
+				chutePos + Vector3.new(0, 1.5, 0),
+				WOOD,
+				Enum.Material.WoodPlanks
+			)
+			CollectionService:AddTag(chute, "CloudChute")
+			local water = box(
+				"ChuteWater",
+				Vector3.new(3.4, 0.2, 3.4),
+				chutePos + Vector3.new(0, 3.05, 0),
+				Color3.fromRGB(120, 190, 255),
+				Enum.Material.Neon
+			)
+			water.CanCollide = false
+			cable("Flume", chutePos + Vector3.new(0, 1, 0), chutePos + dir * 40 - Vector3.new(0, 60, 0), 2, WOOD_DARK)
+		end
+		-- The main isle: two crystal nodes and the Starfall Forge.
+		for _, pos in ipairs(scatterInRing(2, mainSurface.X, mainSurface.Z, 20, 40, 10, taken)) do
+			NodeService.Spawn("SkyShard", Vector3.new(pos.X, TOP, pos.Z), map)
+		end
+		local side = Vector3.new(-toTown.Z, 0, toTown.X)
+		local forgeAt = mainSurface + side * 16
+		box(
+			"ForgeStone",
+			Vector3.new(6, 2, 4),
+			forgeAt + Vector3.new(0, 1, 0),
+			Color3.fromRGB(120, 115, 110),
+			Enum.Material.Slate
+		)
+		local anvil = box(
+			"StarfallForge",
+			Vector3.new(3, 1.5, 1.6),
+			forgeAt + Vector3.new(0, 2.75, 0),
+			Color3.fromRGB(60, 62, 70),
+			Enum.Material.Metal
+		)
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(191, 216, 255)
+		glow.Range = 16
+		glow.Brightness = 2
+		glow.Parent = anvil
+		CollectionService:AddTag(anvil, "StarfallForge")
+
+		-- The gondola: town (by the sawmill) and the Skyroot's foot ride up
+		-- to the top station on the main isle's town-facing edge.
+		local top = station("GondolaTop", mainSurface + toTown * 44)
+		local base = station("GondolaBase", center + toTown * 62)
+		local town = station("GondolaTown", Vector3.new(-40, 0, 150))
+		local hang = Vector3.new(0, 8.5, 0)
+		local topPoint = (top.PrimaryPart :: BasePart).Position + hang
+		cable("GondolaCable", (town.PrimaryPart :: BasePart).Position + hang, topPoint, 0.4, Color3.fromRGB(70, 70, 75))
+		cable("GondolaCable", (base.PrimaryPart :: BasePart).Position + hang, topPoint, 0.4, Color3.fromRGB(70, 70, 75))
+		signpost(
+			"GondolaSign",
+			-52,
+			140,
+			0,
+			60,
+			string.format(
+				"SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride",
+				(skyBiome.gondola :: { fee: number, rideSec: number }).fee
+			)
+		)
+	end
+end
+
+-- The Sky Bin by the sell pad: logs sent down the Cloud Chute wait here and
+-- sell with everything else on the pad. (Each player sees their own count.)
+local skyBin = box("SkyBin", Vector3.new(4, 4, 4), Vector3.new(-18, 2, MILL_Z - 24), WOOD, Enum.Material.WoodPlanks)
+skyBin.Parent = sellArea
+signText(skyBin, "SKY BIN", 40)
 
 -- Plot markers for later phases (visual only in Phase 1).
 local plotPositions = {

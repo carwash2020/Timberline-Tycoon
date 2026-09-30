@@ -46,7 +46,7 @@ return function(t)
 			t.ok(#woods > 0, "tier " .. tier .. " has woods")
 			for _, id in ipairs(woods) do
 				t.ok(id ~= "phantomwood", "night-only wood isn't a daily goal")
-				t.ok(id ~= "palmwood" and id ~= "lumenwood", "only woods in the world")
+				t.ok(id ~= "palmwood", "only woods in the world")
 			end
 		end
 	end)

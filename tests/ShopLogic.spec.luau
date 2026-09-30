@@ -88,12 +88,13 @@ return function(t)
 
 	t.test("gear: buy once, owned for good; gear for an unbuilt biome is soon", function()
 		local coat = ItemCatalog.GetGear("InsulatedCoat")
-		local cloak = ItemCatalog.GetGear("FeatherfallCloak")
+		local hook = { id = "BoatHook", effect = "Tie up at the dock", biome = "island", priceCash = 100 }
 		t.eq(ShopLogic.GearStatusOf(coat, {}), "buy")
 		t.eq(ShopLogic.GearStatusOf(coat, { InsulatedCoat = true }), "owned")
-		t.eq(ShopLogic.GearStatusOf(cloak, {}), "soon", "the Aether Isles aren't built yet")
+		t.eq(ShopLogic.GearStatusOf(hook, {}), "soon", "the Island isn't built yet")
+		t.eq(ShopLogic.GearStatusOf(ItemCatalog.GetGear("FeatherfallCloak"), {}), "buy", "the Isles are open")
 		t.eq(ShopLogic.GearDetail(coat), "No more slow, cold walking in the Snowfields · for Snowfields")
-		t.ok(string.find(ShopLogic.GearDetail(cloak), "coming soon") ~= nil)
+		t.ok(string.find(ShopLogic.GearDetail(hook), "coming soon") ~= nil)
 	end)
 
 	t.test("id sets survive the attribute round trip", function()

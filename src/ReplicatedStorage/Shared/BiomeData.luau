@@ -30,12 +30,15 @@ export type BiomeDef = {
 	skyBinCapacity: number?,
 	chuteWalkStuds: number?, -- from the trees to the chute
 	hazards: { string }?,
-	-- In the world: a circle around (x, z), radius in studs; nil = not
-	-- built yet. Ground is the patch colour (hex) and Enum.Material name;
-	-- trees = how many of each wood to plant there.
-	area: { x: number, z: number, radius: number }?,
+	-- In the world: a circle around (x, z), radius in studs, and for the
+	-- sky only a floor height `y` (below it you're on the ground under the
+	-- isles); nil = not built yet. Ground is the patch colour (hex) and
+	-- Enum.Material name; trees = how many of each wood to plant there;
+	-- nodes = how many of each gathered material's nodes (ItemCatalog.Materials).
+	area: { x: number, z: number, radius: number, y: number? }?,
 	ground: { color: string, material: string }?,
 	trees: { [string]: number }?,
+	nodes: { [string]: number }?,
 }
 
 -- What a biome does to a player right now (BiomeData.Rules).
@@ -108,6 +111,13 @@ local biomes: { BiomeDef } = {
 		skyBinCapacity = 30,
 		chuteWalkStuds = 30,
 		hazards = { "wind gusts", "lightning" },
+		-- Floating above the Skyroot in the far north-west corner. The
+		-- gondola leaves from a station by the sawmill (the model counts the
+		-- Sky Bin as a short walk from it); a second station at the Skyroot's
+		-- foot is the way back up for anyone who falls.
+		area = { x = -1050, z = 1050, radius = 170, y = 650 },
+		trees = { lumenwood = 12 },
+		nodes = { SkyShard = 8 },
 	},
 }
 
@@ -131,12 +141,14 @@ function BiomeData.IsOpen(biomeId: string): boolean
 end
 
 -- The biome a world position is in, or nil for the open country between.
-function BiomeData.At(x: number, z: number): BiomeDef?
+-- `y` matters only for the sky: under the isles is plain ground.
+function BiomeData.At(x: number, z: number, y: number?): BiomeDef?
 	for _, def in ipairs(biomes) do
 		local area = def.area
 		if area then
 			local dx, dz = x - area.x, z - area.z
-			if dx * dx + dz * dz <= area.radius * area.radius then
+			local high = area.y == nil or (y or 0) >= area.y
+			if high and dx * dx + dz * dz <= area.radius * area.radius then
 				return def
 			end
 		end

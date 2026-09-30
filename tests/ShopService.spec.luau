@@ -115,6 +115,7 @@ return function(t)
 				equipHandler(player, category, itemId)
 			end,
 			switched = switched,
+			ItemCatalog = loader:shared("ItemCatalog"),
 			profile = profile,
 			toasts = toasts,
 			granted = granted,
@@ -261,7 +262,15 @@ return function(t)
 		again.buy("Gear", "InsulatedCoat")
 		t.eq(again.profile.cash, 1000)
 		local early = setup({ cash = 5000 })
-		early.buy("Gear", "FeatherfallCloak")
+		early.ItemCatalog.Gear.BoatHook = {
+			id = "BoatHook",
+			displayName = "Boat Hook",
+			effect = "",
+			biome = "island",
+			priceCash = 100,
+			color = "#000000",
+		}
+		early.buy("Gear", "BoatHook")
 		t.eq(early.profile.cash, 5000)
 		t.eq(early.profile.gear, {})
 		local poor = setup({ cash = 100 })
