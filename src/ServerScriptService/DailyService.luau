@@ -26,6 +26,13 @@ export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold"
 
 local DailyService = {}
 
+-- The goal kind each event counts toward, one per tree or log.
+local COUNTED_BY: { [DailyEvent]: DailyData.GoalKind } = {
+	treeFelled = "fell",
+	logsLoaded = "load",
+	logsSold = "sell",
+}
+
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local clock: () -> number = os.time -- tests replace this
 
@@ -111,11 +118,7 @@ function DailyService.Event(
 	for _, goal in ipairs(profile.daily.goals) do
 		if not goal.done then
 			local add = 0
-			if event == "treeFelled" and goal.kind == "fell" then
-				add = amount
-			elseif event == "logsLoaded" and goal.kind == "load" then
-				add = amount
-			elseif event == "logsSold" and goal.kind == "sell" then
+			if goal.kind == COUNTED_BY[event] then
 				add = amount
 			elseif event == "logsSold" and goal.kind == "earn" then
 				add = cash or 0
