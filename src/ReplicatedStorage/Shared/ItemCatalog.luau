@@ -29,11 +29,19 @@ export type AxeDef = {
 	priceCash: number,
 }
 
+-- How a truck is built (VehicleService, via TruckLayout): paint colour
+-- (hex), body width, bed length in studs (0 = no bed) and whether the bed
+-- has walls or is a flat deck with stake posts.
+export type TruckLook = { color: string, width: number, bedLength: number, bedWalls: boolean }
+
 export type TruckDef = {
 	id: string,
 	displayName: string,
 	bedCapacity: number,
 	priceCash: number,
+	topSpeed: number, -- studs/s flat out (reverse is slower; GameConfig)
+	turnRate: number, -- radians/s at full steer
+	look: TruckLook,
 	note: string?,
 }
 
@@ -131,18 +139,56 @@ ItemCatalog.Axes = {
 	},
 }
 
+-- Sold at the Dealership; any truck can be bought once you can afford it.
+-- Bigger beds are slower: the Logging Rig hauls the most but is the
+-- slowest, and the Scout ATV carries nothing but is the fastest.
 ItemCatalog.Trucks = {
-	Rustbucket = { id = "Rustbucket", displayName = "Rustbucket", bedCapacity = 6, priceCash = 0 },
-	Pickup = { id = "Pickup", displayName = "Pickup", bedCapacity = 12, priceCash = 1200 },
+	Rustbucket = {
+		id = "Rustbucket",
+		displayName = "Rustbucket",
+		bedCapacity = 6,
+		priceCash = 0,
+		topSpeed = 26,
+		turnRate = 1.4,
+		look = { color = "#964830", width = 4, bedLength = 7, bedWalls = true },
+	},
+	Pickup = {
+		id = "Pickup",
+		displayName = "Pickup",
+		bedCapacity = 12,
+		priceCash = 1200,
+		topSpeed = 28,
+		turnRate = 1.4,
+		look = { color = "#2F6DB5", width = 4.4, bedLength = 8, bedWalls = true },
+	},
 	ScoutATV = {
 		id = "ScoutATV",
 		displayName = "Scout ATV",
 		bedCapacity = 0,
 		priceCash = 2500,
+		topSpeed = 40,
+		turnRate = 2,
+		look = { color = "#5E8C31", width = 3.4, bedLength = 0, bedWalls = false },
 		note = "Fast recon, no cargo",
 	},
-	Flatbed = { id = "Flatbed", displayName = "Flatbed", bedCapacity = 24, priceCash = 6000 },
-	LoggingRig = { id = "LoggingRig", displayName = "Logging Rig", bedCapacity = 48, priceCash = 25000 },
+	Flatbed = {
+		id = "Flatbed",
+		displayName = "Flatbed",
+		bedCapacity = 24,
+		priceCash = 6000,
+		topSpeed = 26,
+		turnRate = 1.2,
+		look = { color = "#D9A21B", width = 5, bedLength = 12, bedWalls = false },
+	},
+	LoggingRig = {
+		id = "LoggingRig",
+		displayName = "Logging Rig",
+		bedCapacity = 48,
+		priceCash = 25000,
+		topSpeed = 24,
+		turnRate = 1,
+		look = { color = "#B23A26", width = 5.4, bedLength = 18, bedWalls = false },
+	},
 }
 
 ItemCatalog.Trailers = {
@@ -254,6 +300,19 @@ function ItemCatalog.GetTruck(truckId: string): TruckDef?
 		return truck
 	end
 	return nil
+end
+
+-- Every truck, cheapest first (the Dealership's order).
+local truckList: { TruckDef } = {}
+for _, truck in pairs(ItemCatalog.Trucks) do
+	table.insert(truckList, truck)
+end
+table.sort(truckList, function(a, b)
+	return a.priceCash < b.priceCash
+end)
+
+function ItemCatalog.TruckList(): { TruckDef }
+	return truckList
 end
 
 return ItemCatalog

@@ -89,13 +89,19 @@ Rare trees respawn slowly (5–15 min) to create scarcity and trading.
 Trucks haul on land, trailers add towed capacity, boats cross water. All
 sold at the Dealership in town.
 
-| Truck | Bed capacity | Price (cash) |
-|---|---|---|
-| Rustbucket (starter) | 6 | free |
-| Pickup | 12 | 1,200 |
-| Scout ATV | — (fastest vehicle; marks rare trees on your map) | 2,500 |
-| Flatbed | 24 | 6,000 |
-| Logging rig | 48 | 25,000 |
+| Truck | Bed capacity | Top speed (studs/s) | Price (cash) |
+|---|---|---|---|
+| Rustbucket (starter) | 6 | 26 | free |
+| Pickup | 12 | 28 | 1,200 |
+| Scout ATV | — (fastest vehicle; marks rare trees on your map) | 40 | 2,500 |
+| Flatbed | 24 | 26 | 6,000 |
+| Logging rig | 48 | 24 | 25,000 |
+
+Bigger beds drive slower (speeds added 2026-09-30, tuned so every §4 rate
+stays within 25%). Any truck can be bought once you can afford it; trucks
+you own are swapped at the Dealership, and the one you drive waits in your
+parking spot. Driving is physics-based: trucks collide with trees and
+buildings, and the driver's device simulates their own truck.
 
 | Trailer (towed) | Extra capacity | Price (cash) |
 |---|---|---|
@@ -610,6 +616,10 @@ export type Profile = {
   `AxeService.Grant`. The answer comes back as a toast; the shop screen
   redraws from the Cash / OwnedAxes / BestAxeTier player attributes.
 - `SkipTutorial()` — ends Murph's tutorial early, no rewards.
+- `EquipItem(category, itemId)` — switch to a truck you own; at the
+  Dealership counter, not while driving, only if the load fits.
+- `CallTruck()` — "Truck to lot": your truck back in your parking slot,
+  load kept; 10 s cooldown, not while driving.
 - `DropAxe(axeUid)` — owner only; the axe becomes a world item with a
   "Pick up" prompt (owner only unless `GameConfig.AxePickupByOthers`).
 - `PlaceBlueprint(blueprintId, cframe12)` — validates: blueprint owned,
@@ -637,7 +647,10 @@ export type Profile = {
 - `DropperService.luau` — manual + automatic dropper ticks.
 - `FlumeService.luau` — production lines consume inputs on timers, output
   the next stage.
-- `VehicleService.luau` — trucks, trailer attach, boats.
+- `VehicleService.luau` — trucks built from ItemCatalog (`Shared/TruckLayout`),
+  parking slots, physics driving via network ownership with a server-side
+  speed check (or the arcade fallback, `GameConfig.VehiclePhysics`),
+  recall and switching; later trailer attach and boats.
 - `QuestService.luau` — tutorial beats + quest log.
 - `NPCService.luau` — dialogue, friendship, gifts.
 - `SeasonService.luau` — clock, seasons, festivals, weather, day/night.

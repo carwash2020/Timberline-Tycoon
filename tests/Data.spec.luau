@@ -93,18 +93,28 @@ return function(t)
 		end
 	end)
 
-	t.test("vehicles: the Rustbucket is free and every id matches its key", function()
+	t.test("vehicles: the Rustbucket is free and every truck is buildable", function()
 		t.eq(ItemCatalog.GetTruck("Rustbucket").priceCash, 0)
 		for key, truck in pairs(ItemCatalog.Trucks) do
 			t.eq(truck.id, key)
 			t.ok(truck.bedCapacity >= 0, key)
+			t.ok(truck.topSpeed > 0 and truck.turnRate > 0, key .. " speed")
+			t.ok(isHex(truck.look.color), key .. " color")
+			t.ok(truck.look.width >= 3 and truck.look.width <= 6, key .. " width fits a parking slot")
+			t.eq(truck.look.bedLength > 0, truck.bedCapacity > 0, key .. ": a bed exactly when it carries logs")
+		end
+		local list = ItemCatalog.TruckList()
+		t.eq(list[1].id, "Rustbucket")
+		for i = 2, #list do
+			t.ok(list[i].priceCash >= list[i - 1].priceCash)
 		end
 	end)
 
 	t.test("GameConfig ranges agree with each other", function()
 		t.ok(GameConfig.ShopRange > GameConfig.ShopPromptRange, "the shop must not close where it opens")
 		t.ok(GameConfig.AutoTargetRange <= GameConfig.ChopRange)
-		t.ok(GameConfig.LoadPromptRange <= GameConfig.TruckLoadRange)
+		t.ok(GameConfig.VehicleBrake > GameConfig.VehicleAccel, "braking beats accelerating")
+		t.ok(GameConfig.ReverseFactor > 0 and GameConfig.ReverseFactor <= 1)
 		t.ok(GameConfig.SwingTolerance < GameConfig.SwingCooldown)
 		t.ok(GameConfig.MaxOwnedAxes >= #ItemCatalog.AxeLadder(), "room for one of every axe")
 		t.ok(GameConfig.CashCap >= 1_000_000)

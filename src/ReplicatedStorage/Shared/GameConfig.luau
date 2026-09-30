@@ -29,9 +29,16 @@ local GameConfig = {
 	ShopRange = 20, -- the shop screen closes past this; the server allows + RangeTolerance
 
 	-- Truck + sawmill
-	LoadPromptRange = 8, -- studs from the tailgate
-	TruckLoadRange = 16, -- studs from the truck's centre (server check)
+	LoadPromptRange = 8, -- studs from the tailgate (the server allows + RangeTolerance)
 	SellTruckRange = 35, -- the truck bed only sells if the truck is this close to the sell zone
+
+	-- Driving (each truck's top speed and turn rate are in ItemCatalog)
+	VehiclePhysics = true, -- false = Phase 1 arcade driving (glides through trees and walls)
+	VehicleAccel = 14, -- studs/s², throttle held
+	VehicleBrake = 40, -- studs/s², throttle against the direction of travel
+	VehicleCoast = 8, -- studs/s², no throttle
+	ReverseFactor = 0.5, -- reverse top speed, as a share of forward
+	TruckRecallCooldown = 10, -- seconds between "Truck to lot" presses
 
 	-- Sound asset ids (e.g. "rbxassetid://123"). Pick them from the Creator
 	-- Store; empty = silent.

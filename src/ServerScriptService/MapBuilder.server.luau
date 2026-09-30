@@ -1,8 +1,8 @@
 --!strict
 -- MapBuilder: constructs the Phase 1 world from code at server start.
 -- Ground, spawn, starter forest (40 oak + 15 birch), a parking lot,
--- sawmill + sell zone, the Tool Shed (axe shop), Murph (the tutorial NPC),
--- and plot markers for later phases. GameServer waits for the
+-- sawmill + sell zone, the Tool Shed (axes), the Dealership (trucks),
+-- Murph (the tutorial NPC), and plot markers for later phases. GameServer waits for the
 -- TimberlineMap folder before accepting players.
 
 local CollectionService = game:GetService("CollectionService")
@@ -132,7 +132,8 @@ end
 
 -- Parking lot east of spawn: one slot per player, so trucks never spawn
 -- inside each other. VehicleService claims slots by Index. Trucks face the
--- forest (-Z).
+-- forest (-Z). Slots are sized for the biggest truck (the Logging Rig,
+-- about 6 x 24 studs), so no two parked trucks can overlap.
 local SLOT_ROWS, SLOTS_PER_ROW = 3, 8
 local slotIndex = 0
 for row = 0, SLOT_ROWS - 1 do
@@ -140,8 +141,8 @@ for row = 0, SLOT_ROWS - 1 do
 		slotIndex += 1
 		local slot = box(
 			"ParkingSlot_" .. slotIndex,
-			Vector3.new(5, 0.2, 13),
-			Vector3.new(16 + col * 7, 0.1, 50 - row * 20),
+			Vector3.new(6.5, 0.2, 25),
+			Vector3.new(18 + col * 8, 0.1, 56 - row * 28),
 			Color3.fromRGB(150, 140, 125),
 			Enum.Material.Slate
 		)
@@ -275,6 +276,15 @@ for i, color in ipairs({ Color3.fromRGB(167, 173, 180), Color3.fromRGB(94, 102, 
 	head.Parent = toolShed
 end
 
+-- Dealership (trucks), east of the sawmill, across from the Tool Shed.
+local dealership = shopBuilding("Dealership", Vector3.new(45, 0, 100), "DEALERSHIP", Color3.fromRGB(47, 109, 181))
+for i, color in ipairs({ Color3.fromRGB(47, 109, 181), Color3.fromRGB(217, 162, 27), Color3.fromRGB(178, 58, 38) }) do
+	-- Paint swatches on the back wall: the colours on sale.
+	local swatch = box("PaintSwatch", Vector3.new(2, 2, 0.3), Vector3.new(45 + (i - 2) * 3.5, 5.5, 104.7), color)
+	swatch.Material = Enum.Material.Metal
+	swatch.Parent = dealership
+end
+
 -- Murph, the retired lumberjack who runs the tutorial (GAME_DESIGN §11),
 -- stands just ahead of the spawn, facing it. A blocky figure (no Humanoid:
 -- he doesn't walk yet). Persistent, so QuestUI can always find him and put
@@ -357,4 +367,4 @@ end
 Lighting.ClockTime = 15.5
 Lighting.Brightness = 2
 
-print("[MapBuilder] World built: spawn, starter forest, parking, sawmill, sell zone, Tool Shed, Murph, plot markers.")
+print("[MapBuilder] World built: spawn, forest, parking, sawmill, sell zone, Tool Shed, Dealership, Murph, plots.")

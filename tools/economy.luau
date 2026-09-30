@@ -48,7 +48,6 @@ local EFFICIENCY = if calibration then calibration.efficiency else 0.5
 
 local A = {
 	walkSpeed = 16, -- studs/s, Roblox default WalkSpeed
-	driveSpeed = 26, -- studs/s, VehicleService DRIVE_SPEED (every truck, for now)
 	boatSpeed = 26, -- studs/s, no boats built yet
 	fellTime = 0.75, -- s, fall animation + logs appearing
 	betweenTrees = 15, -- studs walked to the next tree
@@ -136,7 +135,8 @@ local function haulFor(b, owned)
 	end
 	local cargo = truck.bedCapacity + (if trailer then trailer.extraCapacity else 0)
 	local label = truck.displayName .. (if trailer then " + " .. trailer.displayName else "")
-	return cargo, 2 * b.haulStuds / A.driveSpeed + A.driveOverhead, A.treeToTruck, 0, label
+	-- Hauls at the truck's top speed (ItemCatalog); a trailer doesn't slow it (yet).
+	return cargo, 2 * b.haulStuds / truck.topSpeed + A.driveOverhead, A.treeToTruck, 0, label
 end
 
 -- One full load: chop enough trees to fill the cargo plus both hands,
@@ -214,7 +214,8 @@ local function firstSaleSeconds(): number
 	local trips = math.ceil(oak.logsPerTree / GameConfig.HandCapacity)
 	local carry = trips * (2 * A.treeToTruck / A.walkSpeed) + (oak.logsPerTree + trips) * A.promptTime
 	local toTruck = 25 / A.walkSpeed -- spawn pad to the parking lot
-	local drives = 80 / A.driveSpeed + biome("starter").haulStuds / A.driveSpeed + A.driveOverhead
+	local speed = ItemCatalog.GetTruck("Rustbucket").topSpeed
+	local drives = 80 / speed + biome("starter").haulStuds / speed + A.driveOverhead
 	return toTruck + drives + chop + carry + A.sellTime
 end
 
@@ -772,11 +773,15 @@ line(
 		GameConfig.HandCapacity
 	)
 )
+local speeds = {}
+for _, truck in ipairs(TRUCKS) do
+	table.insert(speeds, string.format("%s %d", truck.displayName, truck.topSpeed))
+end
 line(
 	string.format(
-		"- Walk %d studs/s; every truck drives %d studs/s; boats %d studs/s.",
+		"- Walk %d studs/s; trucks drive at their top speed (%s studs/s); boats %d studs/s.",
 		A.walkSpeed,
-		A.driveSpeed,
+		table.concat(speeds, ", "),
 		A.boatSpeed
 	)
 )

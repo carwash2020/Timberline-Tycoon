@@ -13,8 +13,14 @@ return function(t)
 	end
 
 	local function setup(options)
-		local profile = { cash = options.cash or 0, totalEarned = 0, bestAxeTier = options.bestTier or 1 }
-		local toasts, granted, equipped, quests = {}, {}, {}, {}
+		local profile = {
+			cash = options.cash or 0,
+			totalEarned = 0,
+			bestAxeTier = options.bestTier or 1,
+			ownedTrucks = options.trucks or { "Rustbucket" },
+			equippedTruck = options.equippedTruck or "Rustbucket",
+		}
+		local toasts, granted, equipped, quests, switched = {}, {}, {}, {}, {}
 		local humanoid = {
 			EquipTool = function(_, tool)
 				table.insert(equipped, tool)
@@ -36,7 +42,10 @@ return function(t)
 				return class == "Attachment"
 			end,
 		}
-		local map = node({ ToolShed = node({ Counter = node({ ShopPoint = point }) }) })
+		local map = node({
+			ToolShed = node({ Counter = node({ ShopPoint = point }) }),
+			Dealership = node({ Counter = node({ ShopPoint = point }) }), -- same spot: fine for these tests
+		})
 
 		local loader = t.loader({
 			mocks = {
@@ -60,23 +69,48 @@ return function(t)
 						table.insert(quests, event)
 					end,
 				},
+				VehicleService = {
+					Equip = function(_, truckId)
+						if options.equipRefusal then
+							return false, options.equipRefusal
+						end
+						table.insert(switched, truckId)
+						return true, nil
+					end,
+				},
 			},
 		})
 		local ShopService = loader:server("ShopService")
-		local handler
-		ShopService.Init(map, {
-			OnServerEvent = {
-				Connect = function(_, fn)
-					handler = fn
-				end,
-			},
-		}, function(_, message)
-			table.insert(toasts, message)
-		end)
+		local handler, equipHandler
+		local function remote(set)
+			return {
+				OnServerEvent = {
+					Connect = function(_, fn)
+						set(fn)
+					end,
+				},
+			}
+		end
+		ShopService.Init(
+			map,
+			remote(function(fn)
+				handler = fn
+			end),
+			remote(function(fn)
+				equipHandler = fn
+			end),
+			function(_, message)
+				table.insert(toasts, message)
+			end
+		)
 		return {
 			buy = function(category, itemId)
 				handler(player, category, itemId)
 			end,
+			use = function(category, itemId)
+				equipHandler(player, category, itemId)
+			end,
+			switched = switched,
 			profile = profile,
 			toasts = toasts,
 			granted = granted,
@@ -135,13 +169,58 @@ return function(t)
 		t.eq(s.profile.cash, 1000)
 	end)
 
+	t.test("buys a truck: takes the cash, owns it and switches to it", function()
+		local s = setup({ cash = 1500 })
+		s.buy("Truck", "Pickup")
+		t.eq(s.profile.cash, 300)
+		t.eq(s.profile.ownedTrucks, { "Rustbucket", "Pickup" })
+		t.eq(s.profile.equippedTruck, "Pickup")
+		t.eq(s.switched, { "Pickup" })
+		t.eq(s.toasts, { "Bought the Pickup! It's waiting in your parking spot." })
+	end)
+
+	t.test("a bought truck that can't take over yet is still owned", function()
+		local s = setup({ cash = 1500, equipRefusal = "Sell your load first." })
+		s.buy("Truck", "Pickup")
+		t.eq(s.profile.ownedTrucks, { "Rustbucket", "Pickup" })
+		t.eq(s.profile.equippedTruck, "Rustbucket")
+		t.eq(s.toasts, { "Sell your load first.", "Bought the Pickup! Switch to it here when you're ready." })
+	end)
+
+	t.test("trucks you own aren't sold twice; short cash is refused", function()
+		local owner = setup({ cash = 5000, trucks = { "Rustbucket", "Pickup" } })
+		owner.buy("Truck", "Pickup")
+		t.eq(owner.profile.cash, 5000)
+		t.eq(owner.toasts, { "You already own the Pickup." })
+		local poor = setup({ cash = 100 })
+		poor.buy("Truck", "Flatbed")
+		t.eq(poor.profile.cash, 100)
+		t.eq(poor.profile.ownedTrucks, { "Rustbucket" })
+		t.eq(poor.toasts, { "You need $5,900 more for the Flatbed." })
+	end)
+
+	t.test("switching trucks: only ones you own, only at the Dealership", function()
+		local s = setup({ trucks = { "Rustbucket", "Pickup" }, equippedTruck = "Pickup" })
+		s.use("Truck", "Rustbucket")
+		t.eq(s.profile.equippedTruck, "Rustbucket")
+		t.eq(s.switched, { "Rustbucket" })
+		local thief = setup({})
+		thief.use("Truck", "LoggingRig")
+		t.eq(thief.profile.equippedTruck, "Rustbucket")
+		t.eq(thief.switched, {})
+		local far = setup({ trucks = { "Rustbucket", "Pickup" }, at = COUNTER + Vector3.new(0, 0, -40) })
+		far.use("Truck", "Pickup")
+		t.eq(far.switched, {})
+	end)
+
 	t.test("junk requests are ignored silently", function()
 		-- A fresh setup each, so BuyItem's rate limit (3/s) isn't what stops them.
 		for _, args in ipairs({
 			{ 42, "SteelAxe" },
 			{ "Axe", { "SteelAxe" } },
-			{ "Truck", "Pickup" },
+			{ "Boat", "Rowboat" },
 			{ "Axe", "NoSuchAxe" },
+			{ "Truck", "NoSuchTruck" },
 		}) do
 			local s = setup({ cash = 1000 })
 			s.buy(args[1], args[2])

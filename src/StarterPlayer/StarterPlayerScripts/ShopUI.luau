@@ -1,14 +1,16 @@
 --!strict
--- ShopUI: the Tool Shed's axe screen.
--- A "Browse axes" prompt at the Tool Shed counter opens it. It lists the
--- whole axe ladder: the next axe can be bought, owned ones can be bought
--- again (for a collection), later ones show as locked, and the Starfall Axe
--- as forged. Each row says what the axe does: damage and the toughest woods
--- it fells, and how many hits that takes.
--- Buying only sends an intent (BuyItem); the server checks everything and
--- answers with a toast. The Cash / OwnedAxes / BestAxeTier attributes it
--- changes redraw the list. Walking away closes the screen, and so does the
--- close button (or B on a gamepad).
+-- ShopUI: the shop screen, for both shops.
+--   * Tool Shed ("Browse axes"): the whole axe ladder. The next axe can be
+--     bought, owned ones bought again (for a collection), later ones show
+--     as locked, and the Starfall Axe as forged. Each row says the axe's
+--     damage and the toughest woods it fells.
+--   * Dealership ("Browse trucks"): every truck with its bed size and top
+--     speed. Buy one, or switch to one you own; the new truck waits in your
+--     parking spot.
+-- Buying only sends an intent (BuyItem / EquipItem); the server checks
+-- everything and answers with a toast. The player attributes it changes
+-- (Cash, OwnedAxes, BestAxeTier, OwnedTrucks, EquippedTruck) redraw the
+-- list. Walking away closes the screen, and so do the X and B on a gamepad.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -25,6 +27,7 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 
 type AxeDef = ItemCatalog.AxeDef
+type TruckDef = ItemCatalog.TruckDef
 
 local ShopUI = {}
 
@@ -36,20 +39,178 @@ local PAPER = Color3.fromRGB(240, 225, 195)
 local PAPER_DARK = Color3.fromRGB(226, 207, 170)
 local BARK = Color3.fromRGB(88, 58, 34)
 local GREEN = Color3.fromRGB(76, 140, 64)
+local BLUE = Color3.fromRGB(47, 109, 181)
 local MUTED = Color3.fromRGB(160, 145, 120)
 local SKY = Color3.fromRGB(110, 120, 190)
 
+-- One row's look and what its button does right now.
+type RowView = {
+	name: string,
+	detail: string,
+	color: Color3,
+	glow: boolean,
+	dim: boolean,
+	button: string,
+	buttonColor: Color3,
+	onClick: () -> (),
+}
+
+-- A shop: which building, the prompt, the header, and its rows.
+type Shop = {
+	building: string, -- model in TimberlineMap
+	promptText: string,
+	title: string,
+	subtitle: string,
+	ids: () -> { string },
+	view: (id: string) -> RowView,
+}
+
 type Row = {
-	axe: AxeDef,
+	id: string,
+	frame: Frame,
 	name: TextLabel,
+	detail: TextLabel,
 	button: TextButton,
 	swatch: Frame,
+	stroke: UIStroke,
 }
 
 local panel: Frame? = nil
+local titleLabel: TextLabel? = nil
+local subtitleLabel: TextLabel? = nil
+local list: ScrollingFrame? = nil
 local rows: { Row } = {}
-local prompt: ProximityPrompt? = nil
-local isOpen = false
+local prompts: { [Shop]: ProximityPrompt } = {}
+local points: { [Shop]: Attachment } = {}
+local openShop: Shop? = nil
+
+local function needMore(price: number, cash: number, name: string)
+	HUD.Toast(string.format("You need %s more for the %s.", Util.formatCash(price - cash), name))
+end
+
+local function priceButton(price: number, cash: number): (string, Color3)
+	if cash >= price then
+		return "Buy " .. Util.formatCash(price), GREEN
+	end
+	return Util.formatCash(price), MUTED
+end
+
+---------------------------------------------------------------------------
+-- Tool Shed: axes
+---------------------------------------------------------------------------
+
+local function axeState(): (number, number, { [string]: number }, number)
+	local cash = (player:GetAttribute("Cash") :: number?) or 0
+	local bestTier = (player:GetAttribute("BestAxeTier") :: number?) or 1
+	local counts, total = ShopLogic.DecodeOwned((player:GetAttribute("OwnedAxes") :: string?) or "")
+	return cash, bestTier, counts, total
+end
+
+local AXES: Shop = {
+	building = "ToolShed",
+	promptText = "Browse axes",
+	title = "TOOL SHED",
+	subtitle = "Axes are sold in order. Every axe you buy is yours to keep: switch in your hotbar.",
+	ids = function()
+		local ids = {}
+		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
+			table.insert(ids, axe.id)
+		end
+		return ids
+	end,
+	view = function(id: string): RowView
+		local axe = ItemCatalog.GetAxe(id) :: AxeDef
+		local cash, bestTier, counts, total = axeState()
+		local owned = counts[axe.id] or 0
+		local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, bestTier, owned, total)
+		local button, buttonColor
+		if ShopLogic.CanPurchase(status) then
+			button, buttonColor = priceButton(axe.priceCash, cash)
+		elseif status == "forged" then
+			button, buttonColor = "Forged", SKY
+		else
+			button = if status == "starter" then "Starter" elseif status == "full" then "Full" else "Locked"
+			buttonColor = MUTED
+		end
+		return {
+			name = if owned > 0 then string.format("%s  ·  you own %d", axe.displayName, owned) else axe.displayName,
+			detail = ShopLogic.DamageText(axe) .. "\n" .. ShopLogic.FellSummary(axe),
+			color = Color3.fromHex(axe.look.headColor),
+			glow = axe.look.glow == true,
+			dim = status == "locked",
+			button = button,
+			buttonColor = buttonColor,
+			onClick = function()
+				if not ShopLogic.CanPurchase(status) then
+					HUD.Toast(ShopLogic.WhyNot(status, axe, bestTier))
+				elseif cash < axe.priceCash then
+					needMore(axe.priceCash, cash, axe.displayName)
+				else
+					Net.Remote("BuyItem"):FireServer("Axe", axe.id) -- the server re-checks all of it
+				end
+			end,
+		}
+	end,
+}
+
+---------------------------------------------------------------------------
+-- Dealership: trucks
+---------------------------------------------------------------------------
+
+local TRUCKS: Shop = {
+	building = "Dealership",
+	promptText = "Browse trucks",
+	title = "DEALERSHIP",
+	subtitle = "Bigger beds haul more but drive slower. A truck you buy waits in your parking spot.",
+	ids = function()
+		local ids = {}
+		for _, truck in ipairs(ItemCatalog.TruckList()) do
+			table.insert(ids, truck.id)
+		end
+		return ids
+	end,
+	view = function(id: string): RowView
+		local truck = ItemCatalog.GetTruck(id) :: TruckDef
+		local cash = (player:GetAttribute("Cash") :: number?) or 0
+		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrucks") :: string?) or "")
+		local equipped = (player:GetAttribute("EquippedTruck") :: string?) or "Rustbucket"
+		local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, owned, equipped)
+		local button, buttonColor
+		if status == "buy" then
+			button, buttonColor = priceButton(truck.priceCash, cash)
+		elseif status == "use" then
+			button, buttonColor = "Use", BLUE
+		else
+			button, buttonColor = "In use", MUTED
+		end
+		return {
+			name = truck.displayName,
+			detail = ShopLogic.TruckDetail(truck),
+			color = Color3.fromHex(truck.look.color),
+			glow = false,
+			dim = false,
+			button = button,
+			buttonColor = buttonColor,
+			onClick = function()
+				if status == "inUse" then
+					HUD.Toast(string.format("You're already using the %s.", truck.displayName))
+				elseif status == "use" then
+					Net.Remote("EquipItem"):FireServer("Truck", truck.id)
+				elseif cash < truck.priceCash then
+					needMore(truck.priceCash, cash, truck.displayName)
+				else
+					Net.Remote("BuyItem"):FireServer("Truck", truck.id)
+				end
+			end,
+		}
+	end,
+}
+
+local SHOPS: { Shop } = { AXES, TRUCKS }
+
+---------------------------------------------------------------------------
+-- The panel
+---------------------------------------------------------------------------
 
 local function corner(parent: GuiObject, radius: number)
 	local c = Instance.new("UICorner")
@@ -69,60 +230,26 @@ local function label(parent: GuiObject, text: string, size: number, font: Enum.F
 	return l
 end
 
--- What the shop knows about the player, from server-set attributes.
-local function state(): (number, number, { [string]: number }, number)
-	local cash = (player:GetAttribute("Cash") :: number?) or 0
-	local bestTier = (player:GetAttribute("BestAxeTier") :: number?) or 1
-	local owned = (player:GetAttribute("OwnedAxes") :: string?) or ""
-	local counts, total = ShopLogic.DecodeOwned(owned)
-	return cash, bestTier, counts, total
-end
-
 local function refresh()
-	if not isOpen then
+	local shop = openShop
+	if not shop then
 		return
 	end
-	local cash, bestTier, counts, total = state()
 	for _, row in ipairs(rows) do
-		local axe = row.axe
-		local owned = counts[axe.id] or 0
-		local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, bestTier, owned, total)
-		local button = row.button
-		row.name.Text = if owned > 0
-			then string.format("%s  ·  you own %d", axe.displayName, owned)
-			else axe.displayName
-		row.swatch.BackgroundTransparency = if status == "locked" then 0.6 else 0
-		if ShopLogic.CanPurchase(status) then
-			local affordable = cash >= axe.priceCash
-			button.Text = if affordable
-				then "Buy " .. Util.formatCash(axe.priceCash)
-				else Util.formatCash(axe.priceCash)
-			button.BackgroundColor3 = if affordable then GREEN else MUTED
-		elseif status == "forged" then
-			button.Text = "Forged"
-			button.BackgroundColor3 = SKY
-		else
-			button.Text = if status == "starter" then "Starter" elseif status == "full" then "Full" else "Locked"
-			button.BackgroundColor3 = MUTED
-		end
+		local view = shop.view(row.id)
+		row.name.Text = view.name
+		row.detail.Text = view.detail
+		row.swatch.BackgroundColor3 = view.color
+		row.swatch.BackgroundTransparency = if view.dim then 0.6 else 0
+		row.stroke.Enabled = view.glow
+		row.button.Text = view.button
+		row.button.BackgroundColor3 = view.buttonColor
 	end
 end
 
-local function onRowClicked(axe: AxeDef)
-	local cash, bestTier, counts, total = state()
-	local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, bestTier, counts[axe.id] or 0, total)
-	if not ShopLogic.CanPurchase(status) then
-		HUD.Toast(ShopLogic.WhyNot(status, axe, bestTier))
-	elseif cash < axe.priceCash then
-		HUD.Toast(string.format("You need %s more for the %s.", Util.formatCash(axe.priceCash - cash), axe.displayName))
-	else
-		Net.Remote("BuyItem"):FireServer("Axe", axe.id) -- the server re-checks all of it
-	end
-end
-
-local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
+local function buildRow(parent: Instance, shop: Shop, id: string, order: number): Row
 	local frame = Instance.new("Frame")
-	frame.Name = axe.id
+	frame.Name = id
 	frame.LayoutOrder = order
 	frame.Size = UDim2.new(1, 0, 0, 74)
 	frame.BackgroundColor3 = PAPER_DARK
@@ -135,23 +262,21 @@ local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
 	swatch.AnchorPoint = Vector2.new(0, 0.5)
 	swatch.Position = UDim2.new(0, 10, 0.5, 0)
 	swatch.Size = UDim2.fromOffset(40, 40)
-	swatch.BackgroundColor3 = Color3.fromHex(axe.look.headColor)
 	swatch.BorderSizePixel = 0
 	corner(swatch, 20)
-	if axe.look.glow then
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = Color3.fromRGB(255, 240, 180)
-		stroke.Thickness = 2
-		stroke.Parent = swatch
-	end
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(255, 240, 180)
+	stroke.Thickness = 2
+	stroke.Enabled = false
+	stroke.Parent = swatch
 	swatch.Parent = frame
 
-	local name = label(frame, axe.displayName, 17, Enum.Font.GothamBold)
+	local name = label(frame, "", 17, Enum.Font.GothamBold)
 	name.Position = UDim2.fromOffset(60, 8)
 	name.Size = UDim2.new(1, -172, 0, 20)
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 
-	local detail = label(frame, ShopLogic.DamageText(axe) .. "\n" .. ShopLogic.FellSummary(axe), 14, Enum.Font.Gotham)
+	local detail = label(frame, "", 14, Enum.Font.Gotham)
 	detail.Position = UDim2.fromOffset(60, 30)
 	detail.Size = UDim2.new(1, -172, 0, 38)
 	detail.TextYAlignment = Enum.TextYAlignment.Top
@@ -163,7 +288,7 @@ local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
 	fit.Parent = detail
 
 	local button = Instance.new("TextButton")
-	button.Name = "Buy"
+	button.Name = "Action"
 	button.AnchorPoint = Vector2.new(1, 0.5)
 	button.Position = UDim2.new(1, -10, 0.5, 0)
 	button.Size = UDim2.fromOffset(100, 38)
@@ -175,10 +300,11 @@ local function buildRow(parent: Instance, axe: AxeDef, order: number): Row
 	corner(button, 8)
 	button.Parent = frame
 	button.Activated:Connect(function()
-		onRowClicked(axe)
+		-- Worked out fresh on every click, from the latest cash and ownership.
+		shop.view(id).onClick()
 	end)
 
-	return { axe = axe, name = name, button = button, swatch = swatch }
+	return { id = id, frame = frame, name = name, detail = detail, button = button, swatch = swatch, stroke = stroke }
 end
 
 local function onCloseAction(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
@@ -188,13 +314,29 @@ local function onCloseAction(_name: string, inputState: Enum.UserInputState): En
 	return Enum.ContextActionResult.Sink
 end
 
-function ShopUI.Open()
-	local p = panel
-	if not p or isOpen then
+local function open(shop: Shop)
+	local p, scroll = panel, list
+	if not p or not scroll then
 		return
 	end
-	isOpen = true
+	ShopUI.Close()
+	openShop = shop
+	for _, row in ipairs(rows) do
+		row.frame:Destroy()
+	end
+	table.clear(rows)
+	for i, id in ipairs(shop.ids()) do
+		table.insert(rows, buildRow(scroll, shop, id, i))
+	end
+	scroll.CanvasPosition = Vector2.zero
+	if titleLabel then
+		titleLabel.Text = shop.title
+	end
+	if subtitleLabel then
+		subtitleLabel.Text = shop.subtitle
+	end
 	p.Visible = true
+	local prompt = prompts[shop]
 	if prompt then
 		prompt.Enabled = false
 	end
@@ -206,14 +348,16 @@ function ShopUI.Open()
 end
 
 function ShopUI.Close()
-	if not isOpen then
+	local shop = openShop
+	if not shop then
 		return
 	end
-	isOpen = false
+	openShop = nil
 	local p = panel
 	if p then
 		p.Visible = false
 	end
+	local prompt = prompts[shop]
 	if prompt then
 		prompt.Enabled = true
 	end
@@ -252,20 +396,17 @@ local function buildPanel()
 	corner(paper, 9)
 	paper.Parent = p
 
-	local title = label(paper, "TOOL SHED", 26, Enum.Font.Fantasy)
+	local title = label(paper, "", 26, Enum.Font.Fantasy)
 	title.Position = UDim2.fromOffset(14, 8)
 	title.Size = UDim2.new(1, -70, 0, 30)
+	titleLabel = title
 
-	local subtitle = label(
-		paper,
-		"Axes are sold in order. Every axe you buy is yours to keep: switch in your hotbar.",
-		13,
-		Enum.Font.Gotham
-	)
+	local subtitle = label(paper, "", 13, Enum.Font.Gotham)
 	subtitle.Position = UDim2.fromOffset(14, 38)
 	subtitle.Size = UDim2.new(1, -28, 0, 30)
 	subtitle.TextWrapped = true
 	subtitle.TextYAlignment = Enum.TextYAlignment.Top
+	subtitleLabel = subtitle
 
 	local close = Instance.new("TextButton")
 	close.Name = "Close"
@@ -281,72 +422,75 @@ local function buildPanel()
 	close.Parent = paper
 	close.Activated:Connect(ShopUI.Close)
 
-	local list = Instance.new("ScrollingFrame")
-	list.Name = "Axes"
-	list.Position = UDim2.fromOffset(10, 74)
-	list.Size = UDim2.new(1, -20, 1, -84)
-	list.BackgroundTransparency = 1
-	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 6
-	list.ScrollBarImageColor3 = BARK
-	list.CanvasSize = UDim2.new()
-	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	list.ScrollingDirection = Enum.ScrollingDirection.Y
-	list.Parent = paper
+	local scroll = Instance.new("ScrollingFrame")
+	scroll.Name = "Items"
+	scroll.Position = UDim2.fromOffset(10, 74)
+	scroll.Size = UDim2.new(1, -20, 1, -84)
+	scroll.BackgroundTransparency = 1
+	scroll.BorderSizePixel = 0
+	scroll.ScrollBarThickness = 6
+	scroll.ScrollBarImageColor3 = BARK
+	scroll.CanvasSize = UDim2.new()
+	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+	scroll.Parent = paper
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Padding = UDim.new(0, 6)
-	layout.Parent = list
+	layout.Parent = scroll
 	local pad = Instance.new("UIPadding")
 	pad.PaddingRight = UDim.new(0, 8) -- room for the scroll bar
-	pad.Parent = list
-
-	for i, axe in ipairs(ItemCatalog.AxeLadder()) do
-		table.insert(rows, buildRow(list, axe, i))
-	end
+	pad.Parent = scroll
+	list = scroll
 
 	panel = p
 	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
-local function setupPrompt()
+local function setupPrompt(shop: Shop)
 	local map = workspace:WaitForChild("TimberlineMap")
-	local shed = map:WaitForChild("ToolShed") -- a Persistent model: always streamed in
-	local counter = shed:WaitForChild("Counter")
+	local building = map:WaitForChild(shop.building) -- a Persistent model: always streamed in
+	local counter = building:WaitForChild("Counter")
 	local point = counter:WaitForChild("ShopPoint") :: Attachment
+	points[shop] = point
 
 	local pp = Instance.new("ProximityPrompt")
-	pp.ActionText = "Browse axes"
-	pp.ObjectText = "Tool Shed"
+	pp.ActionText = shop.promptText
+	pp.ObjectText = shop.title
 	pp.MaxActivationDistance = GameConfig.ShopPromptRange
 	pp.HoldDuration = 0
 	pp.RequiresLineOfSight = false
 	pp.Parent = point
-	pp.Triggered:Connect(ShopUI.Open)
-	prompt = pp
-
-	-- Walked away (or respawned somewhere else)? Close the screen.
-	local elapsed = 0
-	RunService.Heartbeat:Connect(function(dt: number)
-		elapsed += dt
-		if not isOpen or elapsed < 0.25 then
-			return
-		end
-		elapsed = 0
-		local char = player.Character
-		local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-		if not hrp or (hrp.Position - point.WorldPosition).Magnitude > GameConfig.ShopRange then
-			ShopUI.Close()
-		end
+	pp.Triggered:Connect(function()
+		open(shop)
 	end)
+	prompts[shop] = pp
 end
 
 function ShopUI.Start()
 	buildPanel()
-	for _, attribute in ipairs({ "Cash", "BestAxeTier", "OwnedAxes" }) do
+	for _, attribute in ipairs({ "Cash", "BestAxeTier", "OwnedAxes", "OwnedTrucks", "EquippedTruck" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
-	task.spawn(setupPrompt)
+	for _, shop in ipairs(SHOPS) do
+		task.spawn(setupPrompt, shop)
+	end
+	-- Walked away (or respawned somewhere else)? Close the screen.
+	local elapsed = 0
+	RunService.Heartbeat:Connect(function(dt: number)
+		elapsed += dt
+		local shop = openShop
+		if not shop or elapsed < 0.25 then
+			return
+		end
+		elapsed = 0
+		local point = points[shop]
+		local char = player.Character
+		local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+		if not point or not hrp or (hrp.Position - point.WorldPosition).Magnitude > GameConfig.ShopRange then
+			ShopUI.Close()
+		end
+	end)
 end
 
 return ShopUI

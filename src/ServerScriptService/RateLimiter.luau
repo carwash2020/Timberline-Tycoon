@@ -18,6 +18,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PickUpAxe = 4,
 	BuyItem = 3,
 	SkipTutorial = 1,
+	EquipItem = 2,
+	CallTruck = 1,
 }
 local ABUSE_MULTIPLIER = 5
 local STRIKE_WINDOW = 60

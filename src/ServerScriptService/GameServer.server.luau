@@ -204,8 +204,12 @@ local function onLoadToTruck(player: Player)
 	if not hrp or not truck or not hands then
 		return
 	end
-	local truckPP = truck.PrimaryPart
-	if not truckPP or (hrp.Position - truckPP.Position).Magnitude > GameConfig.TruckLoadRange then
+	local loadPoint = VehicleService.GetLoadPoint(player)
+	if not loadPoint then
+		notify(player, "This truck has no bed. Switch trucks at the Dealership.")
+		return
+	end
+	if (hrp.Position - loadPoint).Magnitude > GameConfig.LoadPromptRange + GameConfig.RangeTolerance then
 		notify(player, "Get closer to your truck's tailgate.")
 		return
 	end
@@ -314,7 +318,7 @@ end
 
 MilestoneService.Init(notify)
 AxeService.Init(notify)
-ShopService.Init(mapFolder, remote.BuyItem, notify)
+ShopService.Init(mapFolder, remote.BuyItem, remote.EquipItem, notify)
 QuestService.Init(remote.SkipTutorial, notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
@@ -322,6 +326,17 @@ remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
 remote.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
 remote.SellLogs.OnServerEvent:Connect(onSellLogs)
 remote.DropAxe.OnServerEvent:Connect(AxeService.Drop)
+remote.CallTruck.OnServerEvent:Connect(function(player: Player)
+	if not RateLimiter.Allow(player, "CallTruck") then
+		return
+	end
+	local ok, why = VehicleService.Recall(player)
+	if ok then
+		notify(player, "Your truck is back in your parking spot.")
+	elseif why then
+		notify(player, why)
+	end
+end)
 
 -- Player lifecycle --------------------------------------------------------
 
@@ -367,8 +382,11 @@ local function onPlayerAdded(player: Player)
 		return -- "left": they're already gone
 	end
 
-	-- A save naming a truck that no longer exists falls back to the starter.
-	if not ItemCatalog.GetTruck(profile.equippedTruck) then
+	-- A save naming a truck that no longer exists (or isn't owned) falls
+	-- back to the starter.
+	if
+		not ItemCatalog.GetTruck(profile.equippedTruck) or not table.find(profile.ownedTrucks, profile.equippedTruck)
+	then
 		profile.equippedTruck = "Rustbucket"
 	end
 
@@ -387,6 +405,7 @@ local function onPlayerAdded(player: Player)
 	remote.CashChanged:FireClient(player, profile.cash)
 	MilestoneService.Start(player, profile)
 	QuestService.Start(player, profile)
+	ShopService.PlayerJoined(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 

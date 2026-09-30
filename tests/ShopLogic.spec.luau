@@ -62,6 +62,28 @@ return function(t)
 		t.eq(ShopLogic.DamageText(axe("StarfallAxe")), "180 damage (300 vs. lumenwood)")
 	end)
 
+	t.test("trucks: buy, use or in use; the Rustbucket is always yours", function()
+		local function truck(id)
+			return ItemCatalog.GetTruck(id)
+		end
+		local owned = { Pickup = true }
+		t.eq(ShopLogic.TruckStatusOf(truck("Pickup"), owned, "Pickup"), "inUse")
+		t.eq(ShopLogic.TruckStatusOf(truck("Rustbucket"), owned, "Pickup"), "use")
+		t.eq(ShopLogic.TruckStatusOf(truck("Rustbucket"), {}, "Pickup"), "use")
+		t.eq(ShopLogic.TruckStatusOf(truck("Flatbed"), owned, "Pickup"), "buy")
+	end)
+
+	t.test("truck details", function()
+		t.eq(ShopLogic.TruckDetail(ItemCatalog.GetTruck("Pickup")), "Bed: 12 logs · top speed 28")
+		t.eq(ShopLogic.TruckDetail(ItemCatalog.GetTruck("ScoutATV")), "No bed · top speed 40 · Fast recon, no cargo")
+	end)
+
+	t.test("id sets survive the attribute round trip", function()
+		t.eq(ShopLogic.EncodeSet({ "Rustbucket", "Pickup" }), "Pickup,Rustbucket")
+		t.eq(ShopLogic.DecodeSet("Pickup,Rustbucket"), { Pickup = true, Rustbucket = true })
+		t.eq(ShopLogic.DecodeSet(""), {})
+	end)
+
 	t.test("owned counts survive the attribute round trip", function()
 		local text = ShopLogic.EncodeOwned({ SteelAxe = 2, RustyAxe = 1, GoldAxe = 0 })
 		t.eq(text, "RustyAxe=1,SteelAxe=2")

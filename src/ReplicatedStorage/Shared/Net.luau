@@ -14,6 +14,8 @@ Net.RemoteNames = {
 	"DropAxe", -- client -> server: (axeUid)
 	"BuyItem", -- client -> server: (category, itemId); the result comes back as a Notify toast
 	"SkipTutorial", -- client -> server: ()
+	"EquipItem", -- client -> server: (category, itemId) switch to something you own (a truck)
+	"CallTruck", -- client -> server: () send your truck back to your parking slot
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 }

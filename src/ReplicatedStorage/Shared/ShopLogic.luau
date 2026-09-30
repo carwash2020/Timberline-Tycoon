@@ -8,6 +8,7 @@ local ItemCatalog = require(script.Parent.ItemCatalog)
 local WoodData = require(script.Parent.WoodData)
 
 type AxeDef = ItemCatalog.AxeDef
+type TruckDef = ItemCatalog.TruckDef
 
 local ShopLogic = {}
 
@@ -104,6 +105,56 @@ function ShopLogic.DamageText(axe: AxeDef): string
 	end
 	return text
 end
+
+---------------------------------------------------------------------------
+-- Trucks (the Dealership)
+---------------------------------------------------------------------------
+
+-- "buy": not owned yet. "use": owned, switch to it. "inUse": the one you
+-- drive now. The Rustbucket is always yours.
+export type TruckStatus = "buy" | "use" | "inUse"
+
+function ShopLogic.TruckStatusOf(truck: TruckDef, owned: { [string]: boolean }, equipped: string): TruckStatus
+	if truck.id == equipped then
+		return "inUse"
+	end
+	if owned[truck.id] or truck.priceCash <= 0 then
+		return "use"
+	end
+	return "buy"
+end
+
+-- "Bed: 12 logs · top speed 30" (plus the catalog note, if any).
+function ShopLogic.TruckDetail(truck: TruckDef): string
+	local parts = {
+		if truck.bedCapacity > 0 then string.format("Bed: %d logs", truck.bedCapacity) else "No bed",
+		string.format("top speed %d", truck.topSpeed),
+	}
+	if truck.note then
+		table.insert(parts, truck.note)
+	end
+	return table.concat(parts, " · ")
+end
+
+-- Sets of ids on player attributes: { Pickup = true, Rustbucket = true }
+-- <-> "Pickup,Rustbucket".
+function ShopLogic.EncodeSet(ids: { string }): string
+	local sorted = table.clone(ids)
+	table.sort(sorted)
+	return table.concat(sorted, ",")
+end
+
+function ShopLogic.DecodeSet(text: string): { [string]: boolean }
+	local set: { [string]: boolean } = {}
+	for id in string.gmatch(text, "%w+") do
+		set[id] = true
+	end
+	return set
+end
+
+---------------------------------------------------------------------------
+-- Attributes
+---------------------------------------------------------------------------
 
 -- The OwnedAxes player attribute (attributes can't hold tables):
 -- { SteelAxe = 2, RustyAxe = 1 } <-> "RustyAxe=1,SteelAxe=2".

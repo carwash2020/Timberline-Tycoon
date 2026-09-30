@@ -87,3 +87,48 @@ to keep it (`rewardCash` in `TutorialData.luau`).
 
 To see the tutorial again with an old save: with API access off (or a new
 test account), progress starts fresh each Play session.
+
+## Trucks: Dealership and physics driving (GAME_DESIGN §8 phase 4)
+
+- **Every truck is real now:** Rustbucket, Pickup, Scout ATV, Flatbed and
+  Logging Rig, each its own size and colour, built from ItemCatalog. Beds
+  fill with visible logs. Bigger beds drive slower (top speeds 24 to 40).
+- **Dealership** east of the sawmill (opposite the Tool Shed): **Browse
+  trucks** lists every truck with its bed and top speed. Buy one and it
+  replaces your truck in your parking spot, load and all if it fits. Trucks
+  you own show **Use** to switch back. The Scout ATV has no bed.
+- **Physics driving:** trucks collide with trees and buildings instead of
+  gliding through them. Your device drives your truck (smooth, no lag);
+  the server checks it never goes faster than it can. Getting out parks it
+  where it is. Set `VehiclePhysics = false` in `GameConfig.luau` to get
+  the Phase 1 arcade driving back if physics misbehaves.
+- **Truck to lot:** a button (right edge) when your truck is far away:
+  it goes back to your parking spot with its load. 10 s cooldown.
+- The parking lot is bigger (slots fit the Logging Rig).
+
+### Playtest checklist
+- [ ] The Rustbucket spawns on its slot with its wheels on the ground, not
+      floating or sunk
+- [ ] Drive with WASD / arrows: it speeds up, turns, reverses, stops when you
+      let go. It bumps into trees and walls instead of passing through
+- [ ] Hop out while rolling: it stops where it is and stays put; nobody can
+      push it around
+- [ ] Load logs at the tailgate; they show in the bed; sell at the mill
+- [ ] Dealership: **Browse trucks** shows 5 trucks; the Rustbucket says
+      **In use**; buying the Pickup ($1,200) takes the cash and the Pickup
+      appears in your spot; the Rustbucket now says **Use**
+- [ ] Switch with logs in the bed: the load moves over (if it fits)
+- [ ] Walk far from your truck: **Truck to lot** appears; press it: the truck
+      is back in your spot with its load; pressing again right away says to wait
+- [ ] Phone (device emulator): drive with the thumbstick; the Truck to lot
+      button doesn't cover the jump button
+- [ ] A second player (Test → 2 players) can drive your truck, and it moves
+      smoothly for both
+- [ ] Output has no `[AntiExploit] … truck moved` warnings during normal driving
+      (if it does, tell Claude: the speed check is too strict)
+- [ ] If physics driving feels bad: set `VehiclePhysics = false` and report
+      what went wrong
+
+Numbers to tune after this playtest (all in `GameConfig.luau` /
+`ItemCatalog.luau`): `VehicleAccel` 14, `VehicleBrake` 40, `VehicleCoast` 8,
+each truck's `topSpeed` and `turnRate`.

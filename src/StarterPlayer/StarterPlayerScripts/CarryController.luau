@@ -66,6 +66,15 @@ local function bindTruck(truck: Model)
 	if truck:GetAttribute("OwnerId") ~= player.UserId then
 		return
 	end
+	if ((truck:GetAttribute("BedCapacity") :: number?) or 0) <= 0 then
+		-- No bed (the Scout ATV): nothing to load.
+		if loadPrompt then
+			loadPrompt:Destroy()
+			loadPrompt = nil
+		end
+		myTruck = truck
+		return
+	end
 	task.spawn(function()
 		-- The truck may stream in piece by piece; wait for the tailgate.
 		local bedFloor = truck:WaitForChild("BedFloor", 10)

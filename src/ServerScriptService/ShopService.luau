@@ -1,15 +1,17 @@
 --!strict
--- ShopService: the BuyItem remote. Phase 2 sells axes at the Tool Shed;
--- trucks at the Dealership come with Phase 4.
+-- ShopService: the BuyItem and EquipItem remotes. The Tool Shed sells
+-- axes; the Dealership sells trucks and swaps between the ones you own.
 --
 -- Every purchase is checked here, whatever the client showed:
---   * the player stands within GameConfig.ShopRange (+ tolerance) of the
+--   * the player stands within GameConfig.ShopRange (+ tolerance) of that
 --     shop's counter,
---   * ShopLogic.StatusOf allows it (axes are sold in order, forged axes
---     never, and at most GameConfig.MaxOwnedAxes),
+--   * ShopLogic allows it (axes: sold in order, forged axes never, at most
+--     GameConfig.MaxOwnedAxes; trucks: not owned yet),
 --   * EconomyService.SpendCash succeeds (it refuses if cash is short).
--- Then AxeService.Grant adds the axe and it goes straight into the
--- player's hand. The result comes back as a toast.
+-- A bought axe goes straight into the player's hand (AxeService.Grant); a
+-- bought truck replaces the current one in their parking slot
+-- (VehicleService.Equip). The result comes back as a toast. The
+-- OwnedTrucks and EquippedTruck player attributes feed the shop screen.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -23,12 +25,14 @@ local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local VehicleService = require(script.Parent.VehicleService)
 
 local ShopService = {}
 
 -- Which shop building (a model in TimberlineMap) sells each category.
 local SHOP_FOR: { [string]: string } = {
 	Axe = "ToolShed",
+	Truck = "Dealership",
 }
 
 local map: Instance? = nil
@@ -89,6 +93,86 @@ local function buyAxe(player: Player, axeId: string)
 	QuestService.Event(player, "axeBought")
 end
 
+local function publishTrucks(player: Player, profile: ProfileService.Profile)
+	player:SetAttribute("OwnedTrucks", ShopLogic.EncodeSet(profile.ownedTrucks))
+	player:SetAttribute("EquippedTruck", profile.equippedTruck)
+end
+
+local function ownedTruckSet(profile: ProfileService.Profile): { [string]: boolean }
+	local set: { [string]: boolean } = {}
+	for _, id in ipairs(profile.ownedTrucks) do
+		set[id] = true
+	end
+	return set
+end
+
+-- Switches to an owned truck; says why not when it can't.
+local function switchTo(player: Player, profile: ProfileService.Profile, truck: ItemCatalog.TruckDef): boolean
+	local ok, why = VehicleService.Equip(player, truck.id)
+	if not ok then
+		if why then
+			notify(player, why)
+		end
+		return false
+	end
+	profile.equippedTruck = truck.id
+	publishTrucks(player, profile)
+	return true
+end
+
+local function buyTruck(player: Player, truckId: string)
+	local profile = ProfileService.GetProfile(player)
+	local truck = ItemCatalog.GetTruck(truckId)
+	if not profile or not truck then
+		return
+	end
+	local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, ownedTruckSet(profile), profile.equippedTruck)
+	if status ~= "buy" then
+		notify(player, string.format("You already own the %s.", truck.displayName))
+		return
+	end
+	if profile.cash < truck.priceCash then
+		notify(
+			player,
+			string.format(
+				"You need %s more for the %s.",
+				Util.formatCash(truck.priceCash - profile.cash),
+				truck.displayName
+			)
+		)
+		return
+	end
+	if not EconomyService.SpendCash(player, truck.priceCash, "bought " .. truck.displayName, truck.id) then
+		return
+	end
+	table.insert(profile.ownedTrucks, truck.id)
+	publishTrucks(player, profile)
+	if switchTo(player, profile, truck) then
+		notify(player, string.format("Bought the %s! It's waiting in your parking spot.", truck.displayName))
+	else
+		notify(player, string.format("Bought the %s! Switch to it here when you're ready.", truck.displayName))
+	end
+end
+
+local function onEquipItem(player: Player, category: unknown, itemId: unknown)
+	if category ~= "Truck" or type(itemId) ~= "string" or not RateLimiter.Allow(player, "EquipItem") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local truck = ItemCatalog.GetTruck(itemId)
+	if not profile or not truck then
+		return
+	end
+	if not inRange(player, "Truck") then
+		notify(player, "Walk up to the Dealership counter to switch trucks.")
+		return
+	end
+	local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, ownedTruckSet(profile), profile.equippedTruck)
+	if status == "use" and switchTo(player, profile, truck) then
+		notify(player, string.format("Your %s is waiting in your parking spot.", truck.displayName))
+	end
+end
+
 local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	if type(category) ~= "string" or type(itemId) ~= "string" or not RateLimiter.Allow(player, "BuyItem") then
 		return
@@ -102,14 +186,27 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	end
 	if category == "Axe" then
 		buyAxe(player, itemId)
+	elseif category == "Truck" then
+		buyTruck(player, itemId)
 	end
 end
 
+-- Call once the player's save has loaded (after their truck spawned).
+function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profile)
+	publishTrucks(player, profile)
+end
+
 -- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's notify).
-function ShopService.Init(mapFolder: Instance, buyRemote: RemoteEvent, notifyFn: (Player, string) -> ())
+function ShopService.Init(
+	mapFolder: Instance,
+	buyRemote: RemoteEvent,
+	equipRemote: RemoteEvent,
+	notifyFn: (Player, string) -> ()
+)
 	map = mapFolder
 	notify = notifyFn
 	buyRemote.OnServerEvent:Connect(onBuyItem)
+	equipRemote.OnServerEvent:Connect(onEquipItem)
 end
 
 return ShopService
