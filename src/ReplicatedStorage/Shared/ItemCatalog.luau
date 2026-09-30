@@ -7,10 +7,20 @@ local ItemCatalog = {}
 -- glance (GAME_DESIGN §13). material is an Enum.Material name.
 export type AxeLook = { headColor: string, material: string, glow: boolean? }
 
+-- What forging an axe takes (GAME_DESIGN §10, Aether Isles): cash, logs by
+-- wood id, and materials by id.
+export type ForgeRecipe = {
+	cash: number,
+	logs: { [string]: number },
+	materials: { [string]: number },
+}
+
 export type AxeDef = {
 	id: string,
 	displayName: string,
 	look: AxeLook,
+	sold: boolean?, -- false = never in the shop (forged instead); default true
+	forge: ForgeRecipe?,
 	damage: number,
 	-- Optional per-biome damage that replaces `damage` against trees from
 	-- that biome (WoodData.biome), e.g. the Inferno Axe vs. volcano trees.
@@ -105,6 +115,19 @@ ItemCatalog.Axes = {
 		biomeDamage = { volcano = 200 }, -- burns through fire-biome trees
 		priceCash = 45000,
 	},
+	-- V1's final axe. Forged at the top of the Skyroot, never sold. Still
+	-- worse than the Inferno Axe on volcano trees (130 vs 150 after
+	-- hardness), so collectors keep both.
+	StarfallAxe = {
+		id = "StarfallAxe",
+		displayName = "Starfall Axe",
+		look = { headColor = "#BFD8FF", material = "Neon", glow = true },
+		sold = false,
+		forge = { cash = 60000, logs = { lumenwood = 40 }, materials = { SkyShard = 12 } },
+		damage = 180,
+		biomeDamage = { sky = 300 },
+		priceCash = 60000, -- the forge's cash part; also its place on the ladder
+	},
 }
 
 ItemCatalog.Trucks = {
@@ -143,6 +166,29 @@ ItemCatalog.Gear = {
 		priceCash = 500,
 	},
 	HeatBoots = { id = "HeatBoots", displayName = "Heat Boots", effect = "Immune to lava burn", priceCash = 800 },
+	FeatherfallCloak = {
+		id = "FeatherfallCloak",
+		displayName = "Featherfall Cloak",
+		effect = "Glide down instead of falling off the Aether Isles",
+		priceCash = 2500,
+	},
+}
+
+-- Materials: gathered, used in recipes, sellable.
+export type MaterialDef = {
+	id: string,
+	displayName: string,
+	sellPrice: number,
+	source: string,
+}
+
+ItemCatalog.Materials = {
+	SkyShard = {
+		id = "SkyShard",
+		displayName = "Sky Shard",
+		sellPrice = 150,
+		source = "Crystal nodes on the Aether Isles; mine them with an axe",
+	},
 }
 
 function ItemCatalog.GetAxe(axeId: string): AxeDef?
@@ -179,15 +225,18 @@ function ItemCatalog.AxeTier(axeId: string): number?
 	return nil
 end
 
--- The next new axe for a player at `bestTier`, or nil at the top.
+-- The next new axe the shop sells a player at `bestTier`, or nil when the
+-- next rung is forged (or they own them all).
 function ItemCatalog.NextAxe(bestTier: number): AxeDef?
-	return axeLadder[bestTier + 1]
+	local nextAxe = axeLadder[bestTier + 1]
+	return if nextAxe and nextAxe.sold ~= false then nextAxe else nil
 end
 
 -- Whether the shop may sell `axeId` to a player at `bestTier`.
 function ItemCatalog.CanBuyAxe(axeId: string, bestTier: number): boolean
 	local tier = ItemCatalog.AxeTier(axeId)
-	return tier ~= nil and tier <= bestTier + 1
+	local axe = ItemCatalog.GetAxe(axeId)
+	return tier ~= nil and axe ~= nil and axe.sold ~= false and tier <= bestTier + 1
 end
 
 -- Damage this axe deals per hit to a tree of `wood` (a WoodData entry):

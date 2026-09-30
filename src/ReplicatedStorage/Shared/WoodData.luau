@@ -155,6 +155,23 @@ local woods: { WoodDef } = {
 		trunkHeight = 15,
 		foliageSize = 10,
 	},
+	{
+		-- V1 finale (Aether Isles). Only the Inferno Axe can dent it, slowly;
+		-- the Starfall Axe, forged from its logs, is what it's really for.
+		id = "lumenwood",
+		displayName = "Lumenwood",
+		treeHP = 2000,
+		hardness = 120,
+		logsPerTree = 10,
+		pricePerLog = 120,
+		biome = "sky",
+		respawnSec = 900, -- rare: few trees, slow regrowth, worth trading
+		silhouette = "glowing",
+		leafColor = hexColor("#FFF4C2"),
+		trunkColor = hexColor("#F2E6C8"),
+		trunkHeight = 16,
+		foliageSize = 11,
+	},
 }
 
 local byId: { [string]: WoodDef } = {}

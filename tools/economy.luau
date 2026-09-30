@@ -1,7 +1,7 @@
 --!nocheck
 -- Economy calculator for Timberline Tycoon.
 --
--- Reads the real balance tables (WoodData, ItemCatalog, GameConfig), models
+-- Reads the real balance tables (WoodData, ItemCatalog, BiomeData, GameConfig), models
 -- how fast a player earns with each gear setup, simulates a player climbing
 -- the whole progression, and checks the results against the targets in
 -- GAME_DESIGN §2, §4 and §11. Writes the report to ECONOMY.md.
@@ -30,6 +30,7 @@ end
 local WoodData = loadModule("WoodData")
 local ItemCatalog = loadModule("ItemCatalog")
 local GameConfig = loadModule("GameConfig")
+local BiomeData = loadModule("BiomeData")
 
 ---------------------------------------------------------------------------
 -- Assumptions (edit these, then re-run)
@@ -46,16 +47,19 @@ local A = {
 	promptTime = 0.5, -- s per Pick up / Load press
 	driveOverhead = 8, -- s per round trip: get in, park, get out
 	sellTime = 2, -- s
-	coldSlowdown = 0.15, -- snow without the Insulated Coat: 15% slower (§10)
+	skyBinWalk = 5, -- s, gondola station to the Sky Bin and selling it
+	shardMinutes = 1, -- min to find and mine one Sky Shard (forging cost)
 	sessionMinutes = 45, -- one "session" for the "2-4 sessions" target (§4)
 }
 
--- One-way haul from each biome to the sawmill, in studs (GAME_DESIGN §10;
--- the starter forest is measured from the Phase 1 MapBuilder layout).
-local HAUL = { starter = 190, hills = 400, snow = 1200, volcano = 1600, island = 900, grove = 800 }
-local NIGHT_ONLY = { grove = true } -- the Phantom Grove only exists at night
-local NEEDS = { volcano = "HeatBoots", grove = "Lantern" } -- gear required to work the biome
-local BY_BOAT = { island = true } -- trucks can't swim; the boat's hull is the cargo
+-- Where to go, how to haul, required gear and slowdowns all come from
+-- BiomeData (src/ReplicatedStorage/Shared/BiomeData.luau).
+local function biome(id: string)
+	return assert(BiomeData.Get(id), "WoodData uses unknown biome " .. id)
+end
+
+-- Players chase these until they own them all (V1's end goals).
+local GOALS = { InfernoAxe = true, LoggingRig = true, StarfallAxe = true }
 
 ---------------------------------------------------------------------------
 -- Model
@@ -84,21 +88,6 @@ local function hitsToFell(axe, wood): number
 	return if damage > 0 then math.ceil(wood.treeHP / damage) else math.huge
 end
 
--- One full load: chop enough trees to fill the cargo plus both hands,
--- carry logs to the vehicle two at a time, drive to the mill, sell.
--- Returns seconds, cash, logs for a perfect player.
-local function loadCycle(axe, cargo: number, speed: number, wood, hasCoat: boolean)
-	local slow = if wood.biome == "snow" and not hasCoat then 1 / (1 - A.coldSlowdown) else 1
-	local hits = hitsToFell(axe, wood)
-	local perTree = ((hits - 1) * GameConfig.SwingCooldown + A.fellTime + A.betweenTrees / A.walkSpeed) * slow
-	local logs = cargo + GameConfig.HandCapacity
-	local chop = (logs / wood.logsPerTree) * perTree
-	local trips = math.ceil(cargo / GameConfig.HandCapacity)
-	local carry = trips * (2 * A.treeToTruck / A.walkSpeed) * slow + (logs + trips) * A.promptTime
-	local haul = 2 * HAUL[wood.biome] / speed + A.driveOverhead
-	return chop + carry + haul + A.sellTime, logs * wood.pricePerLog, logs
-end
-
 local function best(list, owned, score)
 	local top, topScore = nil, -math.huge
 	for _, item in ipairs(list) do
@@ -112,48 +101,98 @@ local function best(list, owned, score)
 	return top
 end
 
+-- What a player owns can carry for a biome: cargo size, travel time per
+-- round trip, walk from tree to vehicle/chute, cost per trip, and a label.
+local function haulFor(b, owned)
+	if b.access == "gondola" then
+		local g = b.gondola
+		return b.skyBinCapacity, 2 * g.rideSec + A.skyBinWalk, b.chuteWalkStuds, 2 * g.fee, "Cloud Chute + Sky Bin"
+	elseif b.access == "boat" then
+		local boat = best(BOATS, owned, function(x)
+			return x.hullCapacity
+		end)
+		if not boat then
+			return 0, 0, 0, 0, ""
+		end
+		return boat.hullCapacity, 2 * b.haulStuds / A.boatSpeed + A.driveOverhead, A.treeToTruck, 0, boat.displayName
+	end
+	local truck = best(TRUCKS, owned, function(x)
+		return x.bedCapacity
+	end)
+	local trailer = best(TRAILERS, owned, function(x)
+		return x.extraCapacity
+	end)
+	if not truck then
+		return 0, 0, 0, 0, ""
+	end
+	local cargo = truck.bedCapacity + (if trailer then trailer.extraCapacity else 0)
+	local label = truck.displayName .. (if trailer then " + " .. trailer.displayName else "")
+	return cargo, 2 * b.haulStuds / A.driveSpeed + A.driveOverhead, A.treeToTruck, 0, label
+end
+
+-- One full load: chop enough trees to fill the cargo plus both hands,
+-- carry logs to the vehicle (or chute) two at a time, haul, sell.
+-- Returns seconds, cash (after trip fees), logs for a perfect player, or
+-- nil if the player can't work this wood yet.
+local function loadCycle(axe, wood, owned)
+	local b = biome(wood.biome)
+	local cargo, haulSecs, carryStuds, fee = haulFor(b, owned)
+	if cargo <= 0 or ItemCatalog.AxeDamage(axe, wood) <= 0 then
+		return nil
+	end
+	local slow = if b.slowdown and not owned[b.slowdown.removedBy] then 1 / (1 - b.slowdown.amount) else 1
+	local hits = hitsToFell(axe, wood)
+	local perTree = ((hits - 1) * GameConfig.SwingCooldown + A.fellTime + A.betweenTrees / A.walkSpeed) * slow
+	local logs = cargo + GameConfig.HandCapacity
+	local chop = (logs / wood.logsPerTree) * perTree
+	local trips = math.ceil(cargo / GameConfig.HandCapacity)
+	local carry = trips * (2 * carryStuds / A.walkSpeed) * slow + (logs + trips) * A.promptTime
+	return chop + carry + haulSecs + A.sellTime, logs * wood.pricePerLog - fee, logs
+end
+
 -- Best cash per hour for a set of owned items (perfect player), optionally
 -- limited to some biomes. Night-only biomes are left out.
--- Returns $/hr, wood, axe, cargo description.
+-- Returns $/hr, wood, axe, haul description.
 local function bestRate(owned, biomes: { [string]: boolean }?)
-	local topRate, topWood, topAxe, topCargo = 0, nil, nil, ""
+	local topRate, topWood, topAxe, topHaul = 0, nil, nil, ""
 	for _, wood in ipairs(WOODS) do
-		local gear = NEEDS[wood.biome]
+		local b = biome(wood.biome)
 		local allowed = if biomes then biomes[wood.biome] == true else true
-		if allowed and not NIGHT_ONLY[wood.biome] and (gear == nil or owned[gear]) then
+		if allowed and not b.nightOnly and (b.requiresGear == nil or owned[b.requiresGear]) then
 			local axe = best(AXES, owned, function(a)
 				return ItemCatalog.AxeDamage(a, wood)
 			end)
-			local cargo, speed, label = 0, A.driveSpeed, ""
-			if BY_BOAT[wood.biome] then
-				local boat = best(BOATS, owned, function(b)
-					return b.hullCapacity
-				end)
-				if boat then
-					cargo, speed, label = boat.hullCapacity, A.boatSpeed, boat.displayName
-				end
-			else
-				local truck = best(TRUCKS, owned, function(t)
-					return t.bedCapacity
-				end)
-				local trailer = best(TRAILERS, owned, function(t)
-					return t.extraCapacity
-				end)
-				if truck then
-					cargo = truck.bedCapacity + (if trailer then trailer.extraCapacity else 0)
-					label = truck.displayName .. (if trailer then " + " .. trailer.displayName else "")
-				end
+			local secs, cash = nil, 0
+			if axe then
+				secs, cash = loadCycle(axe, wood, owned)
 			end
-			if axe and cargo > 0 and ItemCatalog.AxeDamage(axe, wood) > 0 then
-				local secs, cash = loadCycle(axe, cargo, speed, wood, owned.InsulatedCoat == true)
+			if secs then
 				local rate = cash / secs * 3600
 				if rate > topRate then
-					topRate, topWood, topAxe, topCargo = rate, wood, axe, label
+					local _, _, _, _, label = haulFor(b, owned)
+					topRate, topWood, topAxe, topHaul = rate, wood, axe, label
 				end
 			end
 		end
 	end
-	return topRate, topWood, topAxe, topCargo
+	return topRate, topWood, topAxe, topHaul
+end
+
+-- What an item really costs: its price, or for a forged axe the cash plus
+-- the logs and materials given up (at their sell value).
+local function itemPrice(item): number
+	local recipe = item.forge
+	if not recipe then
+		return item.priceCash
+	end
+	local total = recipe.cash
+	for woodId, count in pairs(recipe.logs) do
+		total += count * WoodData.Get(woodId).pricePerLog
+	end
+	for materialId, count in pairs(recipe.materials) do
+		total += count * ItemCatalog.Materials[materialId].sellPrice
+	end
+	return total
 end
 
 -- First sale for a brand-new player: walk to the truck, drive to the
@@ -166,13 +205,13 @@ local function firstSaleSeconds(): number
 	local trips = math.ceil(oak.logsPerTree / GameConfig.HandCapacity)
 	local carry = trips * (2 * A.treeToTruck / A.walkSpeed) + (oak.logsPerTree + trips) * A.promptTime
 	local toTruck = 25 / A.walkSpeed -- spawn pad to the parking lot
-	local drives = 80 / A.driveSpeed + HAUL.starter / A.driveSpeed + A.driveOverhead
+	local drives = 80 / A.driveSpeed + biome("starter").haulStuds / A.driveSpeed + A.driveOverhead
 	return toTruck + drives + chop + carry + A.sellTime
 end
 
 ---------------------------------------------------------------------------
 -- Progression: a player who always buys the upgrade that pays for itself
--- fastest, until they own the Inferno Axe and the Logging Rig.
+-- fastest, until they own every GOALS item (Inferno, Logging Rig, Starfall).
 ---------------------------------------------------------------------------
 local function simulate(biomes: { [string]: boolean }?)
 	local owned = { RustyAxe = true, Rustbucket = true }
@@ -198,7 +237,11 @@ local function simulate(biomes: { [string]: boolean }?)
 	end
 
 	for _ = 1, 40 do
-		if owned.InfernoAxe and owned.LoggingRig then
+		local done = true
+		for id in pairs(GOALS) do
+			done = done and owned[id] == true
+		end
+		if done then
 			break
 		end
 		local rate = bestRate(owned, biomes) * EFFICIENCY
@@ -211,10 +254,10 @@ local function simulate(biomes: { [string]: boolean }?)
 		local function consider(bundle)
 			local price = 0
 			for _, item in ipairs(bundle) do
-				if owned[item.id] or item.priceCash <= 0 then
+				if owned[item.id] or itemPrice(item) <= 0 then
 					return
 				end
-				price += item.priceCash
+				price += itemPrice(item)
 			end
 			for _, item in ipairs(bundle) do
 				owned[item.id] = true
@@ -225,7 +268,7 @@ local function simulate(biomes: { [string]: boolean }?)
 			end
 			local gain = newRate - rate
 			local main = bundle[#bundle]
-			local isGoal = main.id == "InfernoAxe" or main.id == "LoggingRig"
+			local isGoal = GOALS[main.id] == true
 			local score = if gain > 0
 				then price / gain
 				else (if isGoal and #bundle == 1 then 1e12 + price else math.huge)
@@ -252,9 +295,16 @@ local function simulate(biomes: { [string]: boolean }?)
 		for _, item in ipairs(pick) do
 			local before, nowWood = bestRate(owned, biomes)
 			before *= EFFICIENCY
-			local wait = math.max(0, item.priceCash - cash) / before * 3600
+			local price = itemPrice(item)
+			local wait = math.max(0, price - cash) / before * 3600
+			if item.forge then
+				-- Mining the Sky Shards takes time on top of the cash and logs.
+				for _, count in pairs(item.forge.materials) do
+					wait += count * A.shardMinutes * 60
+				end
+			end
 			advance(wait, before)
-			cash -= item.priceCash
+			cash -= price
 			owned[item.id] = true
 			table.insert(steps, {
 				item = item,
@@ -313,19 +363,13 @@ local function setupRate(axeId: string, truckId: string, woodIds: { string }, ex
 	local topRate, topWood = 0, nil
 	for _, woodId in ipairs(woodIds) do
 		local wood = WoodData.Get(woodId)
-		local secs, cash = loadCycle(
-			ItemCatalog.GetAxe(axeId),
-			ItemCatalog.GetTruck(truckId).bedCapacity,
-			A.driveSpeed,
-			wood,
-			owned.InsulatedCoat == true
-		)
-		local rate = cash / secs * 3600
+		local secs, cash = loadCycle(ItemCatalog.GetAxe(axeId), wood, owned)
+		local rate = if secs then cash / secs * 3600 else 0
 		if rate > topRate then
 			topRate, topWood = rate, wood
 		end
 	end
-	return topRate, topWood
+	return topRate, topWood or WoodData.Get(woodIds[1])
 end
 
 local STARTER = { starter = true }
@@ -363,9 +407,12 @@ local firstSale = firstSaleSeconds() / EFFICIENCY
 local early, earlyWood = setupRate("RustyAxe", "Rustbucket", { "oak", "birch" })
 local mid, midWood = setupRate("SteelAxe", "Pickup", { "pine", "maple" })
 local late, lateWood = setupRate("InfernoAxe", "LoggingRig", { "emberwood" }, { "HeatBoots" })
+local finale = setupRate("StarfallAxe", "LoggingRig", { "lumenwood" }) -- V1 finale loop
+local grind = setupRate("InfernoAxe", "LoggingRig", { "lumenwood" }) -- lumenwood before the Starfall
 local steel = starterStepFor.SteelAxe
 local inferno = stepFor.InfernoAxe
 local rig = stepFor.LoggingRig
+local starfall = stepFor.StarfallAxe
 local sessionLo, sessionHi = 2 * A.sessionMinutes * 60, 4 * A.sessionMinutes * 60
 
 -- Key findings, computed so they stay true after re-tuning.
@@ -417,14 +464,25 @@ do
 			)
 		)
 	end
-	if inferno and rig then
-		line(
-			string.format(
-				"- **The whole progression (Inferno Axe + Logging Rig) takes %s of play** for a focused player.",
-				duration(math.max(inferno.total, rig.total))
-			)
+	line(
+		string.format(
+			"- **The forge grind:** before the Starfall Axe, Lumenwood with the Inferno Axe earns %s/h (emberwood: %s/h). With the Starfall Axe it earns %s/h.",
+			money(grind * EFFICIENCY),
+			money(late * EFFICIENCY),
+			money(finale * EFFICIENCY)
 		)
+	)
+	local lastGoal = 0
+	for id in pairs(GOALS) do
+		local s = stepFor[id]
+		lastGoal = math.max(lastGoal, if s then s.total else math.huge)
 	end
+	line(
+		string.format(
+			"- **All of V1 (Inferno Axe, Logging Rig, forged Starfall Axe) takes %s of play** for a focused player.",
+			duration(lastGoal)
+		)
+	)
 	line()
 end
 
@@ -477,7 +535,14 @@ line(
 		verdict(late * EFFICIENCY, 15000, 20000, true)
 	)
 )
-for _, pair in ipairs({ { "Inferno Axe", inferno }, { "Logging Rig", rig } }) do
+line(
+	string.format(
+		"| V1 finale: Starfall Axe on Lumenwood | above end-game (>$20k/h) | %s/h | %s |",
+		money(finale * EFFICIENCY),
+		if finale * EFFICIENCY > 20000 then "✅ on target" else "⚠️ below end-game"
+	)
+)
+for _, pair in ipairs({ { "Inferno Axe", inferno }, { "Logging Rig", rig }, { "Starfall Axe (forging)", starfall } }) do
 	local s = pair[2]
 	line(
 		string.format(
@@ -515,22 +580,24 @@ line(
 	'"$ per 100 HP" is what each 100 HP of chopping earns. It falls up the tiers on purpose: rare wood pays per log (worth the long drive with a big truck), not per swing, so weak axes are better off on their own tier. Hardness is subtracted from every hit.'
 )
 line()
-line("| Wood | Biome | HP | Hardness | Logs | $/log | $/tree | $ per 100 HP | Haul (studs) |")
+line("| Wood | Biome | HP | Hardness | Logs | $/log | $/tree | $ per 100 HP | Haul |")
 line("|---|---|---|---|---|---|---|---|---|")
 for _, wood in ipairs(WOODS) do
 	local perTree = wood.logsPerTree * wood.pricePerLog
 	line(
 		string.format(
-			"| %s | %s | %d | %d | %d | %s | %s | %s | %d |",
+			"| %s | %s | %d | %d | %d | %s | %s | %s | %s |",
 			wood.displayName,
-			wood.biome,
+			biome(wood.biome).displayName,
 			wood.treeHP,
 			wood.hardness,
 			wood.logsPerTree,
 			money(wood.pricePerLog),
 			money(perTree),
 			money(perTree / wood.treeHP * 100),
-			HAUL[wood.biome]
+			if biome(wood.biome).access == "gondola"
+				then "gondola + Cloud Chute"
+				else string.format("%d studs by %s", biome(wood.biome).haulStuds, biome(wood.biome).access)
 		)
 	)
 end
@@ -577,8 +644,8 @@ for i, s in ipairs(steps) do
 		string.format(
 			"| %d | %s | %s | %s | %s | %s → %s | %s |",
 			i,
-			s.item.displayName,
-			money(s.item.priceCash),
+			s.item.displayName .. (if s.item.forge then " (forged)" else ""),
+			money(itemPrice(s.item)),
 			duration(s.saving),
 			duration(s.total),
 			money(s.before),
@@ -633,10 +700,29 @@ line(
 	)
 )
 local hauls = {}
-for _, biome in ipairs({ "starter", "hills", "snow", "volcano", "island", "grove" }) do
-	table.insert(hauls, string.format("%s %d", biome, HAUL[biome]))
+for _, b in ipairs(BiomeData.All()) do
+	if b.haulStuds then
+		table.insert(hauls, string.format("%s %d (%s)", b.displayName, b.haulStuds, b.access))
+	end
 end
-line("- One-way haul to the sawmill (studs): " .. table.concat(hauls, ", ") .. ".")
+line("- One-way haul to the sawmill in studs, from BiomeData: " .. table.concat(hauls, ", ") .. ".")
+local sky = biome("sky")
+line(
+	string.format(
+		"- %s: gondola %d s each way ($%d a ride), logs carried %d studs to the Cloud Chute, Sky Bin holds %d.",
+		sky.displayName,
+		sky.gondola.rideSec,
+		sky.gondola.fee,
+		sky.chuteWalkStuds,
+		sky.skyBinCapacity
+	)
+)
+line(
+	string.format(
+		"- Forged axes cost their cash plus the logs and materials given up (at sell value), plus %d min per Sky Shard to mine.",
+		A.shardMinutes
+	)
+)
 line(
 	string.format(
 		"- %d studs between trees, %d studs from tree to truck, %.1f s per prompt press, %d s to get in/out and park.",
@@ -647,7 +733,7 @@ line(
 	)
 )
 line(
-	"- Volcano needs Heat Boots, the Phantom Grove needs a Lantern and only exists at night (left out of the path), the Island needs a boat, and snow is 15% slower without the Insulated Coat."
+	"- Biome rules come from BiomeData: required gear (volcano: Heat Boots; Phantom Grove: Lantern, night only, so left out of the path), boats for the Island, and slowdowns (snow without the Insulated Coat)."
 )
 line("- Each load = cargo + a full armful; logs are sold at WoodData prices.")
 

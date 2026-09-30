@@ -82,7 +82,7 @@ each axe, and cash per minute. After changing any prices or HP, run
   - `MilestoneService`: the Studio stopwatch + Roblox analytics funnel
   - `AxeService`: axes as items (hotbar, drop, pick up)
 - `src/ReplicatedStorage/Shared`: code and data both sides use
-  - `WoodData`, `ItemCatalog`: balance tables (tune here, not in code)
+  - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects)

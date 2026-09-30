@@ -41,6 +41,7 @@ within ~15 minutes. Never more than ~60 seconds of walking with nothing to do.
 | Gold Axe | 80 | 12,000 |
 | Obsidian Axe | 120 | 20,000 |
 | Inferno Axe | 150 (200 vs. volcano trees) | 45,000 |
+| Starfall Axe (V1 final, **forged**) | 180 (300 vs. sky trees) | forge: 60,000 + 40 Lumenwood + 12 Sky Shards |
 
 Axes are **sold in order**: the shop only offers the next tier, so every
 axe is a milestone and nobody skips from Silver straight to a late axe.
@@ -73,6 +74,7 @@ Tune so each axe roughly halves time-to-fell vs. the previous tier's trees.
 | Frostwood | 400 | 20 | 7 | 25 | Snow biome (far) |
 | Emberwood | 900 | 50 | 8 | 55 | Volcano biome (far, hazard) |
 | Phantomwood | 1,200 | 70 | 9 | 65 | Night-only grove (timed event) |
+| Lumenwood | 2,000 | 120 | 10 | 120 | Aether Isles, high above the map (V1 finale) |
 
 **Hardness** is subtracted from every axe hit, so each wood needs a real
 axe upgrade: the Rusty Axe can't cut maple at all, and emberwood needs the
@@ -113,6 +115,7 @@ sold at the Dealership in town.
 | Lantern | see in the dark (Phantom Grove) | 150 |
 | Insulated Coat | ignore snow cold | 500 |
 | Heat Boots | immune to lava burn | 800 |
+| Featherfall Cloak | glide down instead of falling off the Aether Isles | 2,500 |
 
 ### Plot
 Player-owned plot near the sawmill: store logs, park truck, place decorations.
@@ -186,6 +189,9 @@ forecast against that, not against gross Robux.
 3. **Saving**: DataStore profiles, cash + owned items persist across sessions.
 4. **Trucks**: buy, capacity limits, driving.
 5. **Wood tiers + biomes**: 4+ tiers across 3 areas, respawn timers.
+   5b. **V1 finale, the Aether Isles** (§10): Skyroot gondola, Cloud Chute
+   + Sky Bin, Lumenwood, Sky Shards, Starfall Axe forge. If V1 runs long,
+   this ships as the first big update instead.
 6. **Plot + empire**: claim plot, droppers, flume tracks, sawmill shed,
    processing chain (logs → planks → furniture), warehouse, storefront.
 7. **Social**: trading, companies, leaderboard.
@@ -283,6 +289,8 @@ the game.
 - East: the Beach — dock and boat shop. Offshore: the **Island**
   (palmwood, coconuts) — boat required, trucks can't swim.
 - Phantom Grove: hidden, spawns night-only.
+- Sky: the **Aether Isles**, floating high above the far corner, reached
+  up the trunk of the **Skyroot**, a colossal tree visible from anywhere.
 
 **Biome effects** — every biome pushes back a little:
 - Starter Forest: safe. Learn here.
@@ -294,6 +302,36 @@ the game.
   their own cargo limits.
 - Phantom Grove: pitch dark and whispering — a Lantern keeps you sane and
   spotting trees.
+- Aether Isles: wind gusts shove you toward the edges and lightning strikes
+  marked circles. Falling off loses the logs in your hands (never axes);
+  the Featherfall Cloak lets you glide down instead.
+
+### V1 finale: the Aether Isles
+The end-game the whole map points at: the Skyroot towers over the far
+corner from minute one, and its canopy hides floating islands of glowing
+**Lumenwood**.
+
+- **Getting up:** a gondola climbs the Skyroot's trunk ($250 a ride, a
+  money sink). No vehicles up top: you work on foot across isles joined by
+  rope bridges.
+- **Getting logs down:** the **Cloud Chute**. Drop logs in at the edge and
+  they ride a flume spiralling down the Skyroot, across the map, into your
+  personal **Sky Bin** at the sawmill (30 logs; bigger bins are an upgrade
+  later). Sell from the bin when you come down. It's the flume system's
+  first appearance before plots get their own (§9).
+- **Lumenwood:** 2,000 HP, hardness 120, 10 glowing logs at $120, rare and
+  slow to regrow (15 min), so it's worth trading. Only the Inferno Axe can
+  dent it at first (67 hits a tree).
+- **Starfall Axe:** V1's final axe is **forged, never sold**: $60,000 + 40
+  Lumenwood logs + 12 **Sky Shards** (crystals mined on the isles). It fells
+  Lumenwood in 12 hits. On volcano trees the Inferno Axe is still better
+  (150 vs 130 after hardness), so collectors keep both (axes are items, §3).
+- **Pacing (ECONOMY.md):** gathering forge logs with the Inferno Axe pays a
+  little less than emberwood (the grind); once forged, the Starfall loop is
+  the best in the game (~35% above the volcano). Forging takes about 3 hours
+  of saving; all of V1 is about 17 hours for a focused player.
+- **Other isle items:** Sky Shards (forge material, sellable), a sky-themed
+  plot decoration blueprint, and Cloud Cotton for foraging (§12).
 
 Distances are deliberate: better wood means a longer haul, so truck upgrades
 buy *range*, not just stats. No early fast-travel — the drive is part of the
@@ -371,6 +409,8 @@ blocky look; built for phones (low part counts, no per-tree scripts).
 - Snow: pale blues, white drifts, cool rim light.
 - Volcano: charred dark rock, ember-orange glow, ash in the air.
 - Phantom Grove (night): deep purples, teal glow, fireflies.
+- Aether Isles: white-gold light, soft cloud banks, Lumenwood motes drifting
+  upward, the whole map spread out below.
 
 **Readability rules (gameplay-critical)**
 - Every wood tier has a distinct silhouette + color — identify value at 50
@@ -457,7 +497,12 @@ export type Profile = {
   logsPerTree, pricePerLog, biome, respawnSec, silhouette, colorHex.
 - `ItemCatalog.luau`: axes, trucks, trailers, boats, gear, blueprints —
   id, displayName, priceCash, stats.
-- `BiomeData.luau`: biome id, effect id + params (slowFactor, damagePerSec).
+- `BiomeData.luau`: per biome — access (truck / boat / gondola), haul
+  distance, required gear, slowdowns, night-only, hazards; the sky biome
+  adds gondola ride time + fee, Sky Bin size and chute walk. The economy
+  calculator reads it too.
+- `ItemCatalog.Materials`: gathered materials (Sky Shard) with sell price;
+  forged axes carry a `forge` recipe and `sold = false`.
 - Tuning = editing these tables, never code.
 
 ### 14.4 Remotes (ReplicatedStorage.Remotes) — intents only, never trust
