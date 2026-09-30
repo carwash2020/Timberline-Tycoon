@@ -6,7 +6,17 @@ stays the Phase 1 build until that playtest passes; then this branch is
 merged.
 
 **Status:** code complete, **not yet played in Studio.** It passes the same
-checks as Phase 1 (`./scripts/check.sh`).
+checks as Phase 1 (`./scripts/check.sh`, also run by GitHub on every push),
+plus 93 unit tests.
+
+On this branch, each with its own checklist below:
+1. **Axe shop**: the Tool Shed
+2. **Murph's tutorial**
+3. **Trucks**: the Dealership, every truck, physics driving, Truck to lot
+4. **Daily goals and streaks**
+
+Old saves carry over: new save fields are filled in on load. Play the
+sections in order the first time (a fresh save gets the tutorial).
 
 ## Try this build
 
