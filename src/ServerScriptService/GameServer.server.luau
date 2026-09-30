@@ -1,11 +1,12 @@
 --!strict
--- GameServer: bootstrap + remote handlers for the Phase 1 vertical slice.
+-- GameServer: bootstrap + remote handlers.
 --   * Creates ReplicatedStorage/Remotes (names listed in Shared/Net).
 --   * PlayerAdded: load save -> spawn Rustbucket -> hand over every owned axe
 --     (AxeService; axes are items the player can switch, drop and pick up).
 --   * PlayerRemoving: drop carried logs, final save + release the session.
 --   * Every remote is rate-limited and server-validated. The client only
---     sends intents; TreeService/EconomyService own the truth.
+--     sends intents; TreeService/EconomyService own the truth. BuyItem is
+--     handled by ShopService.
 -- Autosave, shutdown flushing and session locks are ProfileStore's job
 -- (see ProfileService).
 
@@ -17,6 +18,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local VehicleService = require(script.Parent.VehicleService)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -307,6 +309,7 @@ end
 
 MilestoneService.Init(notify)
 AxeService.Init(notify)
+ShopService.Init(mapFolder, remote.BuyItem, notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
@@ -400,4 +403,4 @@ for _, p in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, p)
 end
 
-print("[GameServer] Phase 1 online: chop -> carry -> sell.")
+print("[GameServer] Online: chop -> carry -> sell -> buy a better axe.")

@@ -1,5 +1,6 @@
 -- ItemCatalog: every purchasable item in Timberline Tycoon.
--- Data plus small lookups. (Shop UI that spends these arrives in Phase 2.)
+-- Data plus small lookups. The Tool Shed (ShopService/ShopUI) sells the
+-- axes; the rest are sold as their phases land.
 
 local ItemCatalog = {}
 

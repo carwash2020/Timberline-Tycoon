@@ -22,6 +22,11 @@ local GameConfig = {
 	-- Axes (items: see AxeService)
 	AxePickupByOthers = false, -- true lets anyone pick up a dropped axe (a gift); off until trading exists
 	MaxDroppedAxes = 10, -- per player, lying in the world at once
+	MaxOwnedAxes = 20, -- the shop stops selling past this (keeps hotbars and saves small)
+
+	-- Shops (Tool Shed, later the Dealership)
+	ShopPromptRange = 10, -- studs from the counter to open the shop
+	ShopRange = 20, -- the shop screen closes past this; the server allows + RangeTolerance
 
 	-- Truck + sawmill
 	LoadPromptRange = 8, -- studs from the tailgate

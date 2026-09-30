@@ -1,9 +1,9 @@
 --!strict
 -- MapBuilder: constructs the Phase 1 world from code at server start.
 -- Everything the vertical slice needs: ground, spawn, starter forest
--- (40 oak + 15 birch), a parking lot, sawmill + sell zone, and plot markers
--- for later phases. GameServer waits for the TimberlineMap folder before
--- accepting players.
+-- (40 oak + 15 birch), a parking lot, sawmill + sell zone, the Tool Shed
+-- (axe shop), and plot markers for later phases. GameServer waits for the
+-- TimberlineMap folder before accepting players.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -60,6 +60,23 @@ local function topLabel(part: BasePart, text: string)
 	label.TextColor3 = Color3.fromRGB(70, 45, 22)
 	label.Text = text
 	label.Parent = sg
+end
+
+-- A sign's text on both faces, so it reads from either side.
+local function signText(part: BasePart, text: string, textSize: number)
+	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
+		local sg = Instance.new("SurfaceGui")
+		sg.Face = face
+		sg.Parent = part
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.Fantasy
+		label.TextSize = textSize
+		label.TextColor3 = Color3.fromRGB(245, 235, 215)
+		label.Text = text
+		label.Parent = sg
+	end
 end
 
 -- Ground (Phase 1: starter area only; the full 3000x3000 world comes later).
@@ -186,22 +203,9 @@ for _, offset in ipairs({ Vector3.new(8, 4), Vector3.new(8, -2) }) do
 	end
 end
 
--- Sign (SurfaceGui on both faces so it reads from either side).
 local signBoard =
 	box("MillSign", Vector3.new(14, 3, 0.5), Vector3.new(MILL_X, 10, MILL_Z - 13.2), WOOD, Enum.Material.Wood)
-for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
-	local sg = Instance.new("SurfaceGui")
-	sg.Face = face
-	sg.Parent = signBoard
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.Fantasy
-	label.TextSize = 42
-	label.TextColor3 = Color3.fromRGB(245, 235, 215)
-	label.Text = "TIMBERLINE SAWMILL"
-	label.Parent = sg
-end
+signText(signBoard, "TIMBERLINE SAWMILL", 42)
 
 -- SellZone: stand (or park) inside to sell. The volume itself is invisible;
 -- a painted pad on the ground shows players where it is. Both live in a
@@ -230,6 +234,47 @@ local sellPad = box(
 sellPad.Parent = sellArea
 topLabel(sellPad, "SELL LOGS HERE")
 
+-- Shops: small open-front buildings facing -Z (toward spawn). Each is a
+-- Persistent model, so every client always has it, with a Counter whose
+-- "ShopPoint" attachment is where the client's "Browse" prompt appears and
+-- what the server measures purchase range from (ShopService).
+local function shopBuilding(name: string, center: Vector3, sign: string, roofColor: Color3): Model
+	local model = Instance.new("Model")
+	model.Name = name
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	model.Parent = map
+	local function part(partName: string, size: Vector3, offset: Vector3, color: Color3, material: Enum.Material): Part
+		local p = box(partName, size, center + offset, color, material)
+		p.Parent = model
+		return p
+	end
+	part("Floor", Vector3.new(16, 1, 12), Vector3.new(0, 0.5, 0), WOOD, Enum.Material.WoodPlanks)
+	part("BackWall", Vector3.new(16, 8, 1), Vector3.new(0, 5, 5.5), WOOD_DARK, Enum.Material.Wood)
+	part("WallL", Vector3.new(1, 8, 12), Vector3.new(-7.5, 5, 0), WOOD_DARK, Enum.Material.Wood)
+	part("WallR", Vector3.new(1, 8, 12), Vector3.new(7.5, 5, 0), WOOD_DARK, Enum.Material.Wood)
+	part("Roof", Vector3.new(18, 1, 14), Vector3.new(0, 9.5, 0), roofColor, Enum.Material.Wood)
+	local counter = part("Counter", Vector3.new(10, 3, 2), Vector3.new(0, 2.5, 1), WOOD, Enum.Material.Wood)
+	local point = Instance.new("Attachment")
+	point.Name = "ShopPoint"
+	point.Position = Vector3.new(0, 0, -1.5) -- the customer's side
+	point.Parent = counter
+	local board = part("Sign", Vector3.new(12, 2.5, 0.5), Vector3.new(0, 11.25, -6.5), WOOD, Enum.Material.Wood)
+	signText(board, sign, 36)
+	model.PrimaryPart = counter
+	return model
+end
+
+-- Tool Shed (axe shop), west of the sawmill, with three axes on the back wall.
+local toolShed = shopBuilding("ToolShed", Vector3.new(-45, 0, 100), "TOOL SHED", Color3.fromRGB(150, 62, 44))
+for i, color in ipairs({ Color3.fromRGB(167, 173, 180), Color3.fromRGB(94, 102, 112), Color3.fromRGB(225, 181, 48) }) do
+	local x = -45 + (i - 2) * 4
+	local handle = box("RackHandle", Vector3.new(0.5, 3, 0.5), Vector3.new(x, 5, 104.6), Color3.fromRGB(122, 82, 48))
+	handle.Material = Enum.Material.Wood
+	handle.Parent = toolShed
+	local head = box("RackHead", Vector3.new(2, 1.2, 0.4), Vector3.new(x + 0.6, 6, 104.6), color, Enum.Material.Metal)
+	head.Parent = toolShed
+end
+
 -- Plot markers for later phases (visual only in Phase 1).
 local plotPositions = {
 	Vector3.new(150, 0.15, 110),
@@ -248,4 +293,4 @@ end
 Lighting.ClockTime = 15.5
 Lighting.Brightness = 2
 
-print("[MapBuilder] Phase 1 world built: spawn, starter forest, parking, sawmill, sell zone, plot markers.")
+print("[MapBuilder] World built: spawn, starter forest, parking, sawmill, sell zone, Tool Shed, plot markers.")

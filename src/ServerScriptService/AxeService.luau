@@ -13,8 +13,11 @@
 --     Dying doesn't lose axes either. Axes are never lost.
 --   * GetEquippedAxe() is what ChopTree trusts: only a server-made tool
 --     whose uid is in the player's inventory counts.
+--   * Grant() adds a new axe (the Tool Shed, ShopService). Player
+--     attributes OwnedAxes and BestAxeTier mirror the saved inventory for
+--     the shop screen.
 --   * In Studio, typing "/giveaxe <name>" in chat grants a temporary axe
---     (never saved) so switching can be tested before the shop exists.
+--     (never saved) so any axe can be tried without buying it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +26,7 @@ local TextChatService = game:GetService("TextChatService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -77,6 +81,27 @@ local function allItems(player: Player): { AxeItem }
 	return out
 end
 
+-- Saved axes only (temporary test axes don't count): how many of each id,
+-- and in total.
+local function ownedCounts(player: Player): ({ [string]: number }, number)
+	local counts: { [string]: number } = {}
+	local profile = ProfileService.GetProfile(player)
+	local items = if profile then profile.axes else {}
+	for _, item in ipairs(items) do
+		counts[item.id] = (counts[item.id] or 0) + 1
+	end
+	return counts, #items
+end
+
+-- Mirrors the saved inventory on player attributes for the shop screen.
+local function publishOwned(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if profile then
+		player:SetAttribute("OwnedAxes", ShopLogic.EncodeOwned((ownedCounts(player))))
+		player:SetAttribute("BestAxeTier", profile.bestAxeTier)
+	end
+end
+
 local function removeItem(player: Player, uid: string)
 	local profile = ProfileService.GetProfile(player)
 	local lists = { temporary[player] or {} }
@@ -87,6 +112,7 @@ local function removeItem(player: Player, uid: string)
 		for i, item in ipairs(list) do
 			if item.uid == uid then
 				table.remove(list, i)
+				publishOwned(player)
 				return
 			end
 		end
@@ -104,6 +130,7 @@ local function addItem(player: Player, item: AxeItem, isTemporary: boolean)
 	if profile then
 		table.insert(profile.axes, item)
 		profile.bestAxeTier = math.max(profile.bestAxeTier, ItemCatalog.AxeTier(item.id) or 1)
+		publishOwned(player)
 	end
 end
 
@@ -218,6 +245,7 @@ function AxeService.GiveLoadout(player: Player, character: Model)
 	if not profile or not humanoid then
 		return
 	end
+	publishOwned(player)
 	local toEquip: Tool? = nil
 	for _, item in ipairs(allItems(player)) do
 		local tool = giveTool(player, item)
@@ -237,16 +265,21 @@ function AxeService.GiveLoadout(player: Player, character: Model)
 	end)
 end
 
--- Adds a new axe to the player's inventory and Backpack. For the shop
--- (Phase 2) and the Studio test command.
-function AxeService.Grant(player: Player, axeId: string, isTemporary: boolean?): AxeItem?
+-- Adds a new axe to the player's inventory and Backpack, and returns it
+-- with its Tool (nil while the player has no Backpack, e.g. mid-respawn:
+-- the next spawn hands it over). For the shop and the Studio test command.
+function AxeService.Grant(player: Player, axeId: string, isTemporary: boolean?): (AxeItem?, Tool?)
 	if not ItemCatalog.GetAxe(axeId) then
-		return nil
+		return nil, nil
 	end
 	local item: AxeItem = { uid = Util.guid(), id = axeId }
 	addItem(player, item, isTemporary == true)
-	giveTool(player, item)
-	return item
+	return item, giveTool(player, item)
+end
+
+-- How many saved axes the player owns: per axe id, and in total.
+function AxeService.OwnedCounts(player: Player): ({ [string]: number }, number)
+	return ownedCounts(player)
 end
 
 local function onPickUp(player: Player, uid: string)

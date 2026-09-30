@@ -113,6 +113,7 @@ function HUD.Start()
 	gui.Name = "TimberlineHUD"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false -- keep clear of Roblox's menu and chat buttons
+	gui.DisplayOrder = 10 -- above panels like the shop, so toasts stay visible
 
 	-- Cash plaque, top-left.
 	local plaque = Instance.new("Frame")

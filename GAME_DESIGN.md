@@ -594,9 +594,12 @@ export type Profile = {
   (10s grace to the feller).
 - `SellLogs()` — only inside the sawmill SellZone; server values logs from
   server-side records, then calls EconomyService.
-- `BuyItem(category, itemId)` → returns ok/err. Axes: only if
-  `ItemCatalog.CanBuyAxe(axeId, profile.bestAxeTier)` (sold in order);
-  add it with `AxeService.Grant(player, axeId)`.
+- `BuyItem(category, itemId)` (ShopService) — within `GameConfig.ShopRange`
+  of the shop's counter; axes only if `ShopLogic.StatusOf` allows it (sold
+  in order via `ItemCatalog.CanBuyAxe`, never forged ones, at most
+  `GameConfig.MaxOwnedAxes`), then `EconomyService.SpendCash` and
+  `AxeService.Grant`. The answer comes back as a toast; the shop screen
+  redraws from the Cash / OwnedAxes / BestAxeTier player attributes.
 - `DropAxe(axeUid)` — owner only; the axe becomes a world item with a
   "Pick up" prompt (owner only unless `GameConfig.AxePickupByOthers`).
 - `PlaceBlueprint(blueprintId, cframe12)` — validates: blueprint owned,
@@ -617,6 +620,8 @@ export type Profile = {
   fell → spawns server-owned log Models (attributes: WoodId, Value).
 - `AxeService.luau` — axes as items: one Tool per owned axe (attributes
   AxeId, AxeUid), drop/pick up, and `GetEquippedAxe` for ChopTree checks.
+- `ShopService.luau` — the BuyItem remote: the Tool Shed (axes), later the
+  Dealership (trucks). Shared rules in `Shared/ShopLogic.luau`.
 - `PlotService.luau` — claim, size upgrades, place/move/sell validation.
 - `DropperService.luau` — manual + automatic dropper ticks.
 - `FlumeService.luau` — production lines consume inputs on timers, output

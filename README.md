@@ -5,6 +5,7 @@ at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 
 - **What the game is:** [GAME_DESIGN.md](GAME_DESIGN.md)
 - **Where Phase 1 stands:** [PHASE1_NOTES.md](PHASE1_NOTES.md)
+- **What's being built next, and how to test it:** [PHASE2_NOTES.md](PHASE2_NOTES.md)
 - **How fast the economy runs:** [ECONOMY.md](ECONOMY.md) (generated; re-run with `lune run tools/economy`)
 
 ## Set up on any computer (one command)
@@ -84,11 +85,14 @@ measure the economy model against your real play (saved in
   - `TreeService`, `VehicleService`, `MapBuilder`, `RateLimiter`
   - `MilestoneService`: the Studio stopwatch + Roblox analytics funnel
   - `AxeService`: axes as items (hotbar, drop, pick up)
+  - `ShopService`: buying at the Tool Shed (the BuyItem remote)
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
+  - `ShopLogic`: what the shop may sell a player (both sides use it)
   - `Net`: remote names; `Util`: helpers
-- `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects)
+- `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
+  `ShopUI` is the Tool Shed screen)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
 - `scripts/check.sh`: formatter, linter and type checks

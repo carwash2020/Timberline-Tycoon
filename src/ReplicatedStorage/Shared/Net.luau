@@ -12,6 +12,7 @@ Net.RemoteNames = {
 	"LoadToTruck", -- client -> server: ()
 	"SellLogs", -- client -> server: ()
 	"DropAxe", -- client -> server: (axeUid)
+	"BuyItem", -- client -> server: (category, itemId); the result comes back as a Notify toast
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 }
