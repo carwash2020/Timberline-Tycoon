@@ -1,52 +1,95 @@
 # Phase 1 — Vertical Slice Notes
 
-**Goal:** prove the core loop — chop a tree → carry the logs → sell them at the sawmill.
+**Goal:** prove the core loop: chop a tree → carry the logs → sell them at the sawmill.
 
-## What was built
+**Status:** code complete, **not yet played in Studio.** Every script passes a
+strict type check against the Roblox API (`./scripts/check.sh`), but only a
+Studio playtest proves the loop feels right. See "First playtest" below.
+
+## What's built
 
 ### Shared (`src/ReplicatedStorage/Shared/`)
-- **WoodData.luau** — all 8 woods with HP, logs/tree, price, biome, respawn time, silhouette, and colors. Oak: 30 HP, 3 logs, $8/log, 45s respawn → Phantomwood: 1200 HP, 9 logs, $600/log, 300s respawn.
-- **ItemCatalog.luau** — axes (Rusty 5 dmg → Inferno 200 dmg), trucks (Rustbucket bed 6 → LoggingRig bed 48), trailers, boats, and biome gear. Phase 1 uses Rusty Axe + Rustbucket only.
-- **Util.luau** — `clamp`, `guid`, `formatCash`, `deepCopy`, `pointInPart` (sell-zone check).
+- **WoodData**: all 8 woods (HP, logs/tree, price, biome, respawn, colours).
+  Phase 1 spawns oak and birch.
+- **ItemCatalog**: axes, trucks, trailers, boats, gear. Phase 1 uses the
+  Rusty Axe and the Rustbucket.
+- **GameConfig**: ranges, cooldowns, capacities and sound ids that the
+  client and server must agree on.
+- **Net**: remote names. **Util**: `formatCash`, `pointInPart`, `guid`, …
 
 ### Server (`src/ServerScriptService/`)
-- **ProfileService.luau** — DataStore `PlayerProfiles`, key `profile_<UserId>`, full §14.2 schema. Session lock via `UpdateAsync` (10-min stale TTL); failed loads → session-only mode that **never writes**. Autosave 120s, save-on-leave, flush on shutdown.
-- **EconomyService.luau** — the SOLE writer of `profile.cash`. `AddCash`/`SpendCash` with reason logging; fires `CashChanged`.
-- **TreeService.luau** — builds low-poly trees (cylinder trunk + ball foliage), server-side HP, shake-on-hit, tip-over fell animation, spawns exactly `logsPerTree` logs, respawns per-wood timers. Log records: world/carried/truck, 10s feller grace then free-for-all.
-- **VehicleService.luau** — builds the Rustbucket from parts (body, cab, wheels, VehicleSeat, mismatched bed panels), per-player spawn, ProximityPrompt "Drive", arcade CFrame driving while seated. Bed capacity 6 with 3D mini-log visuals.
-- **MapBuilder.server.luau** — green ground plane, SpawnLocation at the forest edge, ~40 oak + ~15 birch scattered south of spawn, sawmill building (open front, roof, spinning-prop saw blade, log piles, sign), invisible **SellZone** out front, 4 ghosted 120×120 plot markers for later phases.
-- **GameServer.server.luau** — creates `ReplicatedStorage/Remotes` (ChopTree, PickupLog, LoadToTruck, SellLogs, CashChanged). Player join → load profile → spawn truck → give Rusty Axe; leave → save + lock release. All four remote handlers with range/distance validation and per-remote rate limits; 10 violations → kick.
+- **ProfileService** wraps **ProfileStore** (vendored, by loleris): session
+  locking across servers, autosave, retries, shutdown flush.
+  DataStore `PlayerProfiles`, key `profile_<UserId>`, full §14.2 schema.
+- **EconomyService**: the only writer of `profile.cash`, with a logged reason.
+- **TreeService**: trees with server-side HP; felling hinges the tree over
+  at its base, then lays exactly `logsPerTree` logs along the fallen trunk;
+  respawn per wood. Logs: 10 s feller grace, then free-for-all; logs left
+  lying around despawn after 5 min.
+- **VehicleService**: the Rustbucket (open seat, roll bar, bed of 6, a bit
+  of exhaust smoke), one parking slot per player, arcade CFrame driving.
+- **MapBuilder**: ground, spawn, 40 oak + 15 birch, parking lot (24 slots),
+  sawmill with a visible **SELL LOGS HERE** pad, 4 plot markers.
+- **RateLimiter**: drops request spam quietly; only floods earn strikes.
+- **GameServer**: remotes, join/leave, all request handlers.
 
 ### Client (`src/StarterPlayer/StarterPlayerScripts/`)
-- **Client.client.luau** — starts everything.
-- **ChopController.luau** — click/hold on a tree raycasts to the tree model, fires ChopTree. Client cooldown mirrors the server's 0.8s.
-- **TreeUI.luau** — BillboardGui HP bars that appear once a tree is damaged (green → yellow → red), hide on fell.
-- **CarryController.luau** — **E** loads carried logs to your truck, **Q** sells hands + truck bed at the sawmill. Log pickup is via ProximityPrompt on each log.
-- **HUD.luau** — cash plaque top-left (wood-grain/kraft-paper theme) synced from the server, control hint bottom-center. Built from code so Rojo syncs it.
+- **ChopController**: chop with the axe's Activated event (mouse, touch and
+  gamepad), aiming at the tree under the pointer or the nearest one in reach.
+- **TreeFX**: wobble, wood chips and optional sounds on every hit.
+- **TreeUI**: HP bars over damaged trees.
+- **CarryController**: "Load logs" prompt on your tailgate, "Sell logs"
+  prompt on the sell pad, shown only when they apply.
+- **HUD**: cash, device-aware hint, toasts, "Loading your save…".
 
-## How to play it (Studio Play test)
-1. Serve with Rojo, press Play. Spawn at the forest edge with the Rusty Axe in your backpack (equip it).
-2. Click a tree (hold to keep chopping) — HP bar appears, tree shakes, tips over at 0 HP and drops exactly 3 oak / 2 birch logs.
-3. Walk up to a log → "Pick up" prompt. You can carry 2 at a time (stacked in front of you).
-4. Walk to your Rustbucket (parked by spawn, press E near it) → "Drive" prompt in the seat; E loads your carried logs into the bed (6 max).
-5. Drive/park at the sawmill (north of spawn), stand in the SellZone in front of it, press **Q** — logs sell, cash appears top-left. Oak log = $8.
+## How to play
+1. Spawn by the forest with the Rusty Axe in hand.
+2. Click / tap / hold R2 on a tree (hold to keep chopping). It falls after
+   6 hits (oak) and leaves 3 logs.
+3. Walk up to a log → **Pick up** (E, or tap the prompt). You carry 2.
+4. At your truck's tailgate → **Load logs** (bed holds 6). **Drive** is at
+   the seat; jump (Space) to get out.
+5. Drive to the sawmill (north of spawn), stand on the **SELL LOGS HERE**
+   pad → **Sell logs**. Oak is $8 a log. The truck bed only sells if the
+   truck is parked by the mill.
 
-## §14.9 acceptance checklist
-- [ ] New player spawns with $0, Rusty Axe in backpack, Rustbucket nearby
-- [ ] Clicking a tree within 20 studs chops it; >20 studs rejected
-- [ ] Oak falls after 30/5 = 6 swings; drops exactly 3 logs
-- [ ] Logs pickup-able within 12 studs; max 2 carried; 10s feller grace
-- [ ] E near truck loads carried → bed (6 max); Q in SellZone sells hands + bed
-- [ ] Selling values logs from SERVER records, destroys models, credits cash
-- [ ] Tree respawns after 45s (oak) with full HP
-- [ ] Leaving and rejoining restores cash (DataStore round-trip)
-- [ ] Spamming ChopTree doesn't bypass the 0.8s cooldown
+## First playtest: what to check
 
-## Known limitations / next
-- **Never tested in Studio** — this is a careful first draft. Expect Rojo/Luau syntax or API issues on first sync (check the Output window).
-- Driving is arcade CFrame movement; real VehicleConstraint physics comes in Phase 4.
-- Client has no exploit protection beyond server validation; that's by design — server re-checks everything.
-- No shop, blueprints, NPCs, quests, seasons, or trading (Phase 2+).
-- Tree placement is random-scatter, not art-directed; the full 3000-stud world comes with the biome passes.
-- `default.project.json` still names the game `LumberGame` — rename to **Timberline Tycoon** in Studio before publishing.
-- Axe Tool has no swing animation yet; it plays `tool:Activate()` which does nothing until one is added.
+§14.9 acceptance (all must pass before Phase 2):
+- [ ] Spawn with the Rusty Axe; oak falls in exactly 6 hits (30 HP / 5 dmg)
+- [ ] Tree wobbles, chips fly, HP bar shows; falls and leaves exactly 3 logs
+- [ ] Pick up ≤ 2 logs by hand (prompt within 10 studs)
+- [ ] Rustbucket bed holds 6; sell it at the sawmill
+- [ ] Sell on the pad: +$8/log; cash only changes via EconomyService
+- [ ] Leave + rejoin: cash and axe persist (needs API access, see README)
+- [ ] First sale in < 3 min in a solo Play test
+- [ ] ChopTree rejected when too far; can't swing faster than every 0.8 s
+
+Things only a human can judge (report back):
+- [ ] Axe sits right in the hand and the swing animation plays
+- [ ] The fall looks good (direction, speed) and logs land sensibly
+- [ ] Driving feels OK for Phase 1 (it's arcade movement, see limitations)
+- [ ] Prompts show at the right moments (Pick up / Load / Drive / Sell)
+- [ ] Output window shows no red errors
+- [ ] Optional: test on a phone via Studio's device emulator (Test tab)
+
+## Known limitations
+- **Driving is arcade CFrame movement**: the truck passes through trees and
+  walls and may look choppy to the driver. Real vehicle physics is Phase 4.
+- **Anyone can drive anyone's truck** (loading and selling only use your own).
+- **No sounds yet**: set `ChopSoundId` / `FellSoundId` in GameConfig to
+  sound ids from the Creator Store.
+- Range checks give ±3 studs of slack for lag: the client stops aiming past
+  20 studs, and the server rejects past 23.
+- With Studio API access on, test sessions write to the real
+  `PlayerProfiles` store. Fine before launch; wipe test saves before
+  release if you like.
+- Tree placement is random scatter, not art-directed; the full world comes
+  with the biome passes.
+
+## Open questions for Connor
+- **Inferno Axe damage:** GAME_DESIGN §3 says 150, ItemCatalog says 200.
+  Which is right?
+- **Economy pace:** a rough estimate puts the $150 Steel Axe at about 3
+  minutes, not the ~15 in §2/§11. Time it in the playtest (§14.8), then
+  decide whether to slow it down or keep the fast first upgrade.
