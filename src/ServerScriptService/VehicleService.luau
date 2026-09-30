@@ -57,8 +57,8 @@ local function buildTruckModel(): (Model, BasePart, VehicleSeat, BasePart)
 	local DARK = Color3.fromRGB(60, 55, 55)
 
 	-- Chassis (PrimaryPart). Front of truck faces -Z.
-	local chassis = part("Chassis", Vector3.new(4, 1, 12), Vector3.new(0, 1.5, 0),
-		Color3.fromRGB(80, 55, 35), Enum.Material.Wood)
+	local chassis =
+		part("Chassis", Vector3.new(4, 1, 12), Vector3.new(0, 1.5, 0), Color3.fromRGB(80, 55, 35), Enum.Material.Wood)
 	-- Cab
 	part("Cab", Vector3.new(4, 2.5, 3.5), Vector3.new(0, 3.25, -3.75), RUST, Enum.Material.Metal)
 	part("CabRoof", Vector3.new(4.2, 0.4, 3.7), Vector3.new(0, 4.7, -3.75), WOOD2, Enum.Material.Wood)

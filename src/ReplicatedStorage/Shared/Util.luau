@@ -51,9 +51,7 @@ end
 function Util.pointInPart(part: BasePart, point: Vector3): boolean
 	local rel = part.CFrame:PointToObjectSpace(point)
 	local s = part.Size
-	return math.abs(rel.X) <= s.X / 2
-		and math.abs(rel.Y) <= s.Y / 2
-		and math.abs(rel.Z) <= s.Z / 2
+	return math.abs(rel.X) <= s.X / 2 and math.abs(rel.Y) <= s.Y / 2 and math.abs(rel.Z) <= s.Z / 2
 end
 
 return Util

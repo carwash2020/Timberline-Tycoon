@@ -194,11 +194,8 @@ local function fellTree(player: Player, uid: string)
 				model:PivotTo(cf.Value)
 			end
 		end)
-		local tween = TweenService:Create(
-			cf,
-			TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-			{ Value = to }
-		)
+		local tween =
+			TweenService:Create(cf, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Value = to })
 		tween:Play()
 		tween.Completed:Wait()
 		if conn then
@@ -212,11 +209,7 @@ local function fellTree(player: Player, uid: string)
 	local base = rec.pivot.Position
 	for i = 1, rec.def.logsPerTree do
 		local angle = (i / rec.def.logsPerTree) * math.pi * 2 + math.random() * 0.5
-		local pos = Vector3.new(
-			base.X + math.cos(angle) * 4,
-			1.6,
-			base.Z + math.sin(angle) * 4
-		)
+		local pos = Vector3.new(base.X + math.cos(angle) * 4, 1.6, base.Z + math.sin(angle) * 4)
 		TreeService.SpawnLog(rec.def, pos, player.UserId)
 	end
 

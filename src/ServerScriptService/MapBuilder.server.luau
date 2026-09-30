@@ -12,7 +12,14 @@ local map = Instance.new("Folder")
 map.Name = "TimberlineMap"
 map.Parent = workspace
 
-local function box(name: string, size: Vector3, pos: Vector3, color: Color3, material: Enum.Material?, props: { [string]: any }?)
+local function box(
+	name: string,
+	size: Vector3,
+	pos: Vector3,
+	color: Color3,
+	material: Enum.Material?,
+	props: { [string]: any }?
+)
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
@@ -32,8 +39,7 @@ local function box(name: string, size: Vector3, pos: Vector3, color: Color3, mat
 end
 
 -- Ground (Phase 1: starter area only; the full 3000x3000 world comes later).
-box("Ground", Vector3.new(1200, 2, 1200), Vector3.new(0, -1, 0),
-	Color3.fromRGB(91, 155, 72), Enum.Material.Grass)
+box("Ground", Vector3.new(1200, 2, 1200), Vector3.new(0, -1, 0), Color3.fromRGB(91, 155, 72), Enum.Material.Grass)
 
 -- Spawn at the starter-forest edge.
 local spawn = Instance.new("SpawnLocation")
@@ -88,10 +94,22 @@ box("MillWallR", Vector3.new(1, 7, 26), Vector3.new(MILL_X + 16.5, 4.5, MILL_Z),
 box("MillPillarL", Vector3.new(2, 7, 1), Vector3.new(MILL_X - 8, 4.5, MILL_Z - 12.5), WOOD_DARK, Enum.Material.Wood)
 box("MillPillarR", Vector3.new(2, 7, 1), Vector3.new(MILL_X + 8, 4.5, MILL_Z - 12.5), WOOD_DARK, Enum.Material.Wood)
 box("MillHeader", Vector3.new(34, 1.5, 1), Vector3.new(MILL_X, 7.75, MILL_Z - 12.5), WOOD_DARK, Enum.Material.Wood)
-box("MillRoof", Vector3.new(38, 1, 30), Vector3.new(MILL_X, 8.75, MILL_Z), Color3.fromRGB(120, 80, 50), Enum.Material.Wood)
+box(
+	"MillRoof",
+	Vector3.new(38, 1, 30),
+	Vector3.new(MILL_X, 8.75, MILL_Z),
+	Color3.fromRGB(120, 80, 50),
+	Enum.Material.Wood
+)
 
 -- Saw prop: stand + big circular blade.
-box("SawStand", Vector3.new(3, 3, 2), Vector3.new(MILL_X - 8, 2.5, MILL_Z), Color3.fromRGB(90, 60, 40), Enum.Material.Wood)
+box(
+	"SawStand",
+	Vector3.new(3, 3, 2),
+	Vector3.new(MILL_X - 8, 2.5, MILL_Z),
+	Color3.fromRGB(90, 60, 40),
+	Enum.Material.Wood
+)
 local blade = Instance.new("Part")
 blade.Name = "SawBlade"
 blade.Shape = Enum.PartType.Cylinder
@@ -118,7 +136,8 @@ for _, offset in ipairs({ Vector3.new(8, 4), Vector3.new(8, -2) }) do
 end
 
 -- Sign (SurfaceGui on both faces so it reads from either side).
-local signBoard = box("MillSign", Vector3.new(14, 3, 0.5), Vector3.new(MILL_X, 10, MILL_Z - 13.2), WOOD, Enum.Material.Wood)
+local signBoard =
+	box("MillSign", Vector3.new(14, 3, 0.5), Vector3.new(MILL_X, 10, MILL_Z - 13.2), WOOD, Enum.Material.Wood)
 for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 	local sg = Instance.new("SurfaceGui")
 	sg.Face = face
@@ -134,8 +153,14 @@ for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 end
 
 -- SellZone: stand inside to sell. Invisible, non-colliding.
-box("SellZone", Vector3.new(24, 12, 18), Vector3.new(MILL_X, 6, MILL_Z - 24),
-	Color3.fromRGB(255, 255, 255), nil, { Transparency = 1, CanCollide = false })
+box(
+	"SellZone",
+	Vector3.new(24, 12, 18),
+	Vector3.new(MILL_X, 6, MILL_Z - 24),
+	Color3.fromRGB(255, 255, 255),
+	nil,
+	{ Transparency = 1, CanCollide = false }
+)
 
 -- Plot markers for later phases (visual only in Phase 1).
 local plotPositions = {
@@ -145,9 +170,14 @@ local plotPositions = {
 	Vector3.new(-150, 0.5, -60),
 }
 for i, pos in ipairs(plotPositions) do
-	local pad = box("PlotSpot_" .. i, Vector3.new(120, 1, 120), pos,
-		Color3.fromRGB(210, 190, 150), Enum.Material.Sand,
-		{ Transparency = 0.85, CanCollide = false })
+	local pad = box(
+		"PlotSpot_" .. i,
+		Vector3.new(120, 1, 120),
+		pos,
+		Color3.fromRGB(210, 190, 150),
+		Enum.Material.Sand,
+		{ Transparency = 0.85, CanCollide = false }
+	)
 	CollectionService:AddTag(pad, "PlotSpot")
 end
 

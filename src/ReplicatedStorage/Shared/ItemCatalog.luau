@@ -51,7 +51,13 @@ ItemCatalog.Axes = {
 ItemCatalog.Trucks = {
 	Rustbucket = { id = "Rustbucket", displayName = "Rustbucket", bedCapacity = 6, priceCash = 0 },
 	Pickup = { id = "Pickup", displayName = "Pickup", bedCapacity = 12, priceCash = 1200 },
-	ScoutATV = { id = "ScoutATV", displayName = "Scout ATV", bedCapacity = 0, priceCash = 2500, note = "Fast recon, no cargo" },
+	ScoutATV = {
+		id = "ScoutATV",
+		displayName = "Scout ATV",
+		bedCapacity = 0,
+		priceCash = 2500,
+		note = "Fast recon, no cargo",
+	},
 	Flatbed = { id = "Flatbed", displayName = "Flatbed", bedCapacity = 24, priceCash = 6000 },
 	LoggingRig = { id = "LoggingRig", displayName = "Logging Rig", bedCapacity = 48, priceCash = 25000 },
 }
@@ -71,7 +77,12 @@ ItemCatalog.Boats = {
 
 ItemCatalog.Gear = {
 	Lantern = { id = "Lantern", displayName = "Lantern", effect = "See in the dark (Phantom Grove)", priceCash = 150 },
-	InsulatedCoat = { id = "InsulatedCoat", displayName = "Insulated Coat", effect = "Ignore snow cold", priceCash = 500 },
+	InsulatedCoat = {
+		id = "InsulatedCoat",
+		displayName = "Insulated Coat",
+		effect = "Ignore snow cold",
+		priceCash = 500,
+	},
 	HeatBoots = { id = "HeatBoots", displayName = "Heat Boots", effect = "Immune to lava burn", priceCash = 800 },
 }
 
