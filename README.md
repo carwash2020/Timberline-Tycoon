@@ -5,6 +5,7 @@ at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 
 - **What the game is:** [GAME_DESIGN.md](GAME_DESIGN.md)
 - **Where Phase 1 stands:** [PHASE1_NOTES.md](PHASE1_NOTES.md)
+- **How fast the economy runs:** [ECONOMY.md](ECONOMY.md) (generated; re-run with `lune run tools/economy`)
 
 ## Set up on any computer (one command)
 
@@ -22,8 +23,8 @@ bash setup.sh
 **Windows:** clone the repo (or on GitHub: **Code → Download ZIP** and
 unzip it), then double-click **`setup.cmd`**.
 
-The script installs Rokit if it's missing, then Rojo, StyLua, Selene and
-luau-lsp, then the matching Rojo plugin into Studio. It's safe to run
+The script installs Rokit if it's missing, then Rojo, StyLua, Selene,
+luau-lsp and Lune, then the matching Rojo plugin into Studio. It's safe to run
 again any time. If it says GitHub is rate-limiting you (common on school
 or office Wi-Fi), run `rokit authenticate github` and try again.
 
@@ -50,6 +51,11 @@ flagged as you type.
 `./scripts/check.sh` runs the formatter check, the linter and a strict type
 check against the Roblox API: everything that doesn't need Studio.
 
+While you play in Studio, lines starting with **`[Stopwatch]`** in the Output
+window time the core loop: first chop, first sale, when you could afford
+each axe, and cash per minute. After changing any prices or HP, run
+`lune run tools/economy` to regenerate ECONOMY.md.
+
 ## Rules of the road
 
 - **Files are the source of truth.** Rojo syncs files → Studio. Don't
@@ -73,12 +79,15 @@ check against the Roblox API: everything that doesn't need Studio.
   - `ProfileService`: saving (wraps the vendored `Vendor/ProfileStore`)
   - `EconomyService`: the only code allowed to change cash
   - `TreeService`, `VehicleService`, `MapBuilder`, `RateLimiter`
+  - `MilestoneService`: the Studio stopwatch + Roblox analytics funnel
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
+- `tools/economy.luau`: the economy calculator that writes ECONOMY.md
+- `scripts/check.sh`: formatter, linter and type checks
 - `THIRD_PARTY_LICENSES/`: licenses for vendored code
 
 ## Build a place file without Studio sync

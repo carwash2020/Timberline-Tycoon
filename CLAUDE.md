@@ -13,4 +13,6 @@ architecture). Current phase status: PHASE1_NOTES.md.
 - Only EconomyService changes `profile.cash`; only ProfileService touches
   DataStores (via vendored ProfileStore; never edit `Vendor/`).
 - Balance lives in WoodData / ItemCatalog; shared tuning in GameConfig.
+  After any balance change, re-run `lune run tools/economy` and commit the
+  regenerated ECONOMY.md.
 - Commit messages: `phase-N: <what changed>`.

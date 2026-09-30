@@ -65,6 +65,12 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 - [ ] First sale in < 3 min in a solo Play test
 - [ ] ChopTree rejected when too far; can't swing faster than every 0.8 s
 
+Numbers to report back (from the `[Stopwatch]` lines in the Output window):
+- [ ] "First sale at …" (target: under 3:00)
+- [ ] "Could afford the Steel Axe at …" (design target: 12–15 min)
+- [ ] The "overall" $/min after ~10 minutes of oak/birch: this calibrates
+      the economy model in ECONOMY.md
+
 Things only a human can judge (report back):
 - [ ] Axe sits right in the hand and the swing animation plays
 - [ ] The fall looks good (direction, speed) and logs land sensibly
@@ -88,6 +94,7 @@ Things only a human can judge (report back):
   with the biome passes.
 
 ## Open questions for Connor
-- **Economy pace:** a rough estimate puts the $150 Steel Axe at about 3
-  minutes, not the ~15 in §2/§11. Time it in the playtest (§14.8), then
-  decide whether to slow it down or keep the fast first upgrade.
+- **Economy pace:** see [ECONOMY.md](ECONOMY.md). The model says earning
+  runs ~5× faster than §4's targets, rare wood pays so well per hit that a
+  Rusty Axe can farm it from minute one, and the whole progression takes
+  under 2 hours. Decide the direction, then tune WoodData / ItemCatalog.
