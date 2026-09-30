@@ -161,7 +161,7 @@ function MilestoneService.CashEarned(player: Player, amount: number)
 	end
 	session.earned += amount
 	local profile = session.profile
-	local axe = ItemCatalog.NextAxe(profile.ownedAxes)
+	local axe = ItemCatalog.NextAxe(profile.bestAxeTier)
 	if axe and not session.seen["afford:" .. axe.id] and profile.cash >= axe.priceCash then
 		session.seen["afford:" .. axe.id] = true
 		stopwatch(

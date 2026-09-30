@@ -3,9 +3,14 @@
 
 local ItemCatalog = {}
 
+-- How an axe looks, so every axe in a collection is recognisable at a
+-- glance (GAME_DESIGN §13). material is an Enum.Material name.
+export type AxeLook = { headColor: string, material: string, glow: boolean? }
+
 export type AxeDef = {
 	id: string,
 	displayName: string,
+	look: AxeLook,
 	damage: number,
 	-- Optional per-biome damage that replaces `damage` against trees from
 	-- that biome (WoodData.biome), e.g. the Inferno Axe vs. volcano trees.
@@ -43,16 +48,59 @@ export type GearDef = {
 }
 
 ItemCatalog.Axes = {
-	RustyAxe = { id = "RustyAxe", displayName = "Rusty Axe", damage = 5, priceCash = 0 },
-	SteelAxe = { id = "SteelAxe", displayName = "Steel Axe", damage = 12, priceCash = 150 },
-	HardenedAxe = { id = "HardenedAxe", displayName = "Hardened Axe", damage = 25, priceCash = 800 },
-	SilverAxe = { id = "SilverAxe", displayName = "Silver Axe", damage = 45, priceCash = 3500 },
-	CobaltAxe = { id = "CobaltAxe", displayName = "Cobalt Axe", damage = 60, priceCash = 7000 },
-	GoldAxe = { id = "GoldAxe", displayName = "Gold Axe", damage = 80, priceCash = 12000 },
-	ObsidianAxe = { id = "ObsidianAxe", displayName = "Obsidian Axe", damage = 120, priceCash = 20000 },
+	RustyAxe = {
+		id = "RustyAxe",
+		displayName = "Rusty Axe",
+		look = { headColor = "#7D6A5A", material = "CorrodedMetal" },
+		damage = 5,
+		priceCash = 0,
+	},
+	SteelAxe = {
+		id = "SteelAxe",
+		displayName = "Steel Axe",
+		look = { headColor = "#A7ADB4", material = "Metal" },
+		damage = 12,
+		priceCash = 150,
+	},
+	HardenedAxe = {
+		id = "HardenedAxe",
+		displayName = "Hardened Axe",
+		look = { headColor = "#5E6670", material = "DiamondPlate" },
+		damage = 25,
+		priceCash = 800,
+	},
+	SilverAxe = {
+		id = "SilverAxe",
+		displayName = "Silver Axe",
+		look = { headColor = "#DCE1E6", material = "Foil" },
+		damage = 45,
+		priceCash = 3500,
+	},
+	CobaltAxe = {
+		id = "CobaltAxe",
+		displayName = "Cobalt Axe",
+		look = { headColor = "#3A6FD8", material = "Metal" },
+		damage = 60,
+		priceCash = 7000,
+	},
+	GoldAxe = {
+		id = "GoldAxe",
+		displayName = "Gold Axe",
+		look = { headColor = "#E1B530", material = "Foil" },
+		damage = 80,
+		priceCash = 12000,
+	},
+	ObsidianAxe = {
+		id = "ObsidianAxe",
+		displayName = "Obsidian Axe",
+		look = { headColor = "#1D1A24", material = "Glass" },
+		damage = 120,
+		priceCash = 20000,
+	},
 	InfernoAxe = {
 		id = "InfernoAxe",
 		displayName = "Inferno Axe",
+		look = { headColor = "#FF6A1A", material = "Neon", glow = true },
 		damage = 150,
 		biomeDamage = { volcano = 200 }, -- burns through fire-biome trees
 		priceCash = 45000,
@@ -105,9 +153,10 @@ function ItemCatalog.GetAxe(axeId: string): AxeDef?
 	return nil
 end
 
--- Axes are sold in order, one tier at a time (GAME_DESIGN §3): the ladder
--- is the axes sorted by price, and the shop only offers the first one the
--- player doesn't own yet.
+-- Axes are sold in order, one tier at a time (GAME_DESIGN §3). The ladder
+-- is the axes sorted by price; a player's tier is the highest rung they have
+-- ever owned (profile.bestAxeTier, 1 = Rusty Axe). The shop sells any axe up
+-- to one rung above that, so older axes can be re-bought for a collection.
 local axeLadder: { AxeDef } = {}
 for _, axe in pairs(ItemCatalog.Axes) do
 	table.insert(axeLadder, axe)
@@ -120,14 +169,25 @@ function ItemCatalog.AxeLadder(): { AxeDef }
 	return axeLadder
 end
 
--- The next axe this player can buy, or nil once they own them all.
-function ItemCatalog.NextAxe(ownedAxes: { string }): AxeDef?
-	for _, axe in ipairs(axeLadder) do
-		if not table.find(ownedAxes, axe.id) then
-			return axe
+-- 1-based rung of an axe on the ladder, or nil for an unknown id.
+function ItemCatalog.AxeTier(axeId: string): number?
+	for i, axe in ipairs(axeLadder) do
+		if axe.id == axeId then
+			return i
 		end
 	end
 	return nil
+end
+
+-- The next new axe for a player at `bestTier`, or nil at the top.
+function ItemCatalog.NextAxe(bestTier: number): AxeDef?
+	return axeLadder[bestTier + 1]
+end
+
+-- Whether the shop may sell `axeId` to a player at `bestTier`.
+function ItemCatalog.CanBuyAxe(axeId: string, bestTier: number): boolean
+	local tier = ItemCatalog.AxeTier(axeId)
+	return tier ~= nil and tier <= bestTier + 1
 end
 
 -- Damage this axe deals per hit to a tree of `wood` (a WoodData entry):

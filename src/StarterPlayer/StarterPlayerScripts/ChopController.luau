@@ -30,6 +30,12 @@ local cooldownUntil = 0
 local lastTap: Vector2? = nil -- screen position of the last touch on the 3D world
 local bound: { [Tool]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 
+-- The axe definition behind a tool (axe tools carry an "AxeId" attribute).
+local function axeOf(tool: Tool): ItemCatalog.AxeDef?
+	local id = tool:GetAttribute("AxeId")
+	return if type(id) == "string" then ItemCatalog.GetAxe(id) else nil
+end
+
 -- Walk up from the hit part to the tagged tree model (or nil).
 local function findTreeModel(inst: Instance): Model?
 	local node: Instance? = inst
@@ -129,7 +135,7 @@ local function trySwing(fromClick: boolean)
 	end
 	local tool = char:FindFirstChildOfClass("Tool")
 	local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local axe = if tool then ItemCatalog.GetAxe(tool.Name) else nil
+	local axe = if tool then axeOf(tool) else nil
 	if not tool or not hrp or not axe then
 		return
 	end
@@ -148,7 +154,7 @@ local function trySwing(fromClick: boolean)
 end
 
 local function bindTool(tool: Tool)
-	if bound[tool] or not ItemCatalog.GetAxe(tool.Name) then
+	if bound[tool] or not axeOf(tool) then
 		return
 	end
 	bound[tool] = true

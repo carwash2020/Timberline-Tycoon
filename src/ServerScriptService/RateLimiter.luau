@@ -14,6 +14,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PickupLog = 8,
 	LoadToTruck = 4,
 	SellLogs = 4,
+	DropAxe = 2,
+	PickUpAxe = 4,
 }
 local ABUSE_MULTIPLIER = 5
 local STRIKE_WINDOW = 60

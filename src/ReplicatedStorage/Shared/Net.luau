@@ -11,6 +11,7 @@ Net.RemoteNames = {
 	"PickupLog", -- client -> server: (logUid)
 	"LoadToTruck", -- client -> server: ()
 	"SellLogs", -- client -> server: ()
+	"DropAxe", -- client -> server: (axeUid)
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 }

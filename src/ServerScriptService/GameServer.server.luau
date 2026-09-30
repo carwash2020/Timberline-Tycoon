@@ -1,7 +1,8 @@
 --!strict
 -- GameServer: bootstrap + remote handlers for the Phase 1 vertical slice.
 --   * Creates ReplicatedStorage/Remotes (names listed in Shared/Net).
---   * PlayerAdded: load save -> spawn Rustbucket -> hand over the equipped axe.
+--   * PlayerAdded: load save -> spawn Rustbucket -> hand over every owned axe
+--     (AxeService; axes are items the player can switch, drop and pick up).
 --   * PlayerRemoving: drop carried logs, final save + release the session.
 --   * Every remote is rate-limited and server-validated. The client only
 --     sends intents; TreeService/EconomyService own the truth.
@@ -11,6 +12,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AxeService = require(script.Parent.AxeService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -21,8 +23,6 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
-
-type Profile = ProfileService.Profile
 
 -- Wait for the code-built world (MapBuilder runs at server start).
 local mapFolder = workspace:WaitForChild("TimberlineMap", 60)
@@ -81,14 +81,6 @@ local function getCharacterParts(player: Player): (Model?, BasePart?)
 	return char, hrp
 end
 
-local function getEquippedAxe(char: Model, profile: Profile): ItemCatalog.AxeDef?
-	local tool = char:FindFirstChildOfClass("Tool")
-	if not tool or tool.Name ~= profile.equippedAxe then
-		return nil -- no axe out, or one the server didn't grant
-	end
-	return ItemCatalog.GetAxe(tool.Name)
-end
-
 local function countHands(hands: { [string]: boolean }): number
 	local n = 0
 	for _ in pairs(hands) do
@@ -112,7 +104,7 @@ local function onChopTree(player: Player, treeUid: unknown)
 	if not char or not profile then
 		return
 	end
-	local axe = getEquippedAxe(char, profile)
+	local axe = AxeService.GetEquippedAxe(player) -- only a real, owned axe counts
 	if not axe then
 		return
 	end
@@ -300,50 +292,15 @@ local function onSellLogs(player: Player)
 end
 
 MilestoneService.Init(notify)
+AxeService.Init(notify)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
 remote.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
 remote.SellLogs.OnServerEvent:Connect(onSellLogs)
+remote.DropAxe.OnServerEvent:Connect(AxeService.Drop)
 
 -- Player lifecycle --------------------------------------------------------
-
-local function buildAxeTool(axeId: string): Tool
-	local def = ItemCatalog.GetAxe(axeId) or ItemCatalog.GetAxe("RustyAxe")
-	assert(def, "[GameServer] RustyAxe missing from ItemCatalog")
-
-	local tool = Instance.new("Tool")
-	tool.Name = def.id
-	tool.ToolTip = def.displayName
-	tool.RequiresHandle = true
-	tool.CanBeDropped = false
-
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-	handle.Size = Vector3.new(0.5, 3, 0.5)
-	handle.Color = Color3.fromRGB(122, 82, 48)
-	handle.Material = Enum.Material.Wood
-	handle.CanCollide = false -- a colliding tool can trip or fling its holder
-	handle.Massless = true
-	handle.Parent = tool
-
-	local head = Instance.new("Part")
-	head.Name = "Head"
-	head.Size = Vector3.new(0.4, 1.2, 2)
-	head.Position = Vector3.new(0, 1.8, 0)
-	head.Color = Color3.fromRGB(120, 120, 120) -- dull, pitted, rusty
-	head.Material = Enum.Material.Metal
-	head.CanCollide = false
-	head.Massless = true
-	head.Parent = tool
-
-	local w = Instance.new("WeldConstraint")
-	w.Part0 = handle
-	w.Part1 = head
-	w.Parent = handle
-
-	return tool
-end
 
 local function dropCarriedLogs(player: Player)
 	local hands = carriedLogs[player.UserId]
@@ -360,7 +317,7 @@ local function dropCarriedLogs(player: Player)
 	player:SetAttribute("CarriedLogs", 0)
 end
 
-local function onCharacterAdded(player: Player, character: Model, profile: Profile)
+local function onCharacterAdded(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
 		return
@@ -368,17 +325,9 @@ local function onCharacterAdded(player: Player, character: Model, profile: Profi
 	humanoid.Died:Connect(function()
 		dropCarriedLogs(player)
 	end)
-	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10)
-	if not backpack then
-		return
+	if player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10) then
+		AxeService.GiveLoadout(player, character)
 	end
-	local axeId = profile.equippedAxe
-	if backpack:FindFirstChild(axeId) or character:FindFirstChild(axeId) then
-		return -- already handed over for this life
-	end
-	local axe = buildAxeTool(axeId)
-	axe.Parent = backpack
-	humanoid:EquipTool(axe) -- spawn with the axe in hand (GAME_DESIGN §11)
 end
 
 local function onPlayerAdded(player: Player)
@@ -395,10 +344,7 @@ local function onPlayerAdded(player: Player)
 		return -- "left": they're already gone
 	end
 
-	-- A save naming an item that no longer exists falls back to the starter kit.
-	if not ItemCatalog.GetAxe(profile.equippedAxe) then
-		profile.equippedAxe = "RustyAxe"
-	end
+	-- A save naming a truck that no longer exists falls back to the starter.
 	if not ItemCatalog.GetTruck(profile.equippedTruck) then
 		profile.equippedTruck = "Rustbucket"
 	end
@@ -407,11 +353,11 @@ local function onPlayerAdded(player: Player)
 	VehicleService.SpawnTruck(player, profile.equippedTruck)
 
 	player.CharacterAdded:Connect(function(char)
-		onCharacterAdded(player, char, profile)
+		onCharacterAdded(player, char)
 	end)
 	local existing = player.Character
 	if existing then
-		task.spawn(onCharacterAdded, player, existing, profile)
+		task.spawn(onCharacterAdded, player, existing)
 	end
 
 	player:SetAttribute("ProfileLoaded", true)
@@ -423,6 +369,7 @@ end
 local function onPlayerRemoving(player: Player)
 	dropCarriedLogs(player) -- back into the world for others, before the character goes
 	MilestoneService.Stop(player) -- before the final save, so playtime is included
+	AxeService.PlayerRemoving(player) -- dropped axes go back to the save's inventory
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

@@ -17,6 +17,10 @@ local GameConfig = {
 	PickupGraceSec = 10, -- the feller's exclusive pickup window
 	LogDespawnSec = 300, -- logs left lying in the world disappear after this
 
+	-- Axes (items: see AxeService)
+	AxePickupByOthers = false, -- true lets anyone pick up a dropped axe (a gift); off until trading exists
+	MaxDroppedAxes = 10, -- per player, lying in the world at once
+
 	-- Truck + sawmill
 	LoadPromptRange = 8, -- studs from the tailgate
 	TruckLoadRange = 16, -- studs from the truck's centre (server check)

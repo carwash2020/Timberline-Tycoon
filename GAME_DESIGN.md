@@ -46,6 +46,19 @@ Axes are **sold in order**: the shop only offers the next tier, so every
 axe is a milestone and nobody skips from Silver straight to a late axe.
 Cobalt and Obsidian (added 2026-09-30) split the two longest waits
 (Silver → Gold and Gold → Inferno); ECONOMY.md shows the resulting path.
+A player's tier is the best axe they have *ever* owned, so older axes can
+be re-bought for a collection.
+
+**Axes are items.** Every axe you own is its own item, duplicates included,
+and all of them sit in your hotbar. Switch with the number keys or a tap,
+so the Inferno Axe stays useful on volcano trees even after a stronger
+general axe comes out; the game re-equips whichever you held last. Drop an
+axe (Backspace or the Drop button) and it lies on the ground with a "Pick
+up" prompt, ready for plot displays later. Axes are never lost: dying
+doesn't drop them, and one left lying around is back in your inventory
+when you rejoin. Only the owner can pick up a dropped axe for now, which
+blocks "drop it, I'll hold it" scams. Gifting is one switch
+(`GameConfig.AxePickupByOthers`) or, better, the trade window in Phase 7.
 
 Tune so each axe roughly halves time-to-fell vs. the previous tier's trees.
 
@@ -119,7 +132,8 @@ plot for a 10% fee), cosmetic buildings.
 ## 5. Multiplayer / social
 
 - Trading: player-to-player log/item trades with a confirm window (server
-  validated — never trust the client's inventory).
+  validated — never trust the client's inventory). Axes are already items
+  with uids (profile.axes), so they can move between inventories.
 - Visit plots; leaderboard for lifetime earnings (opt-in).
 - Co-op hauling: friends can load each other's trucks.
 - Private servers for friend groups (monetized, see §7).
@@ -416,8 +430,9 @@ export type Profile = {
   cash: number,
   totalEarned: number,    -- lifetime, for leaderboard + rebirth math
   rebirths: number,
-  ownedAxes: { string },
-  equippedAxe: string,    -- default "RustyAxe"
+  axes: { AxeItem },      -- AxeItem = { uid: string, id: string }; duplicates allowed
+  bestAxeTier: number,    -- highest axe rung ever owned (1 = Rusty); gates the shop
+  equippedAxe: string,    -- uid of the axe last held; re-equipped on spawn
   ownedTrucks: { string },
   equippedTruck: string,  -- default "Rustbucket"
   ownedTrailers: { string },
@@ -452,8 +467,11 @@ export type Profile = {
   (10s grace to the feller).
 - `SellLogs()` — only inside the sawmill SellZone; server values logs from
   server-side records, then calls EconomyService.
-- `BuyItem(category, itemId)` → returns ok/err. Axes: only
-  `ItemCatalog.NextAxe(ownedAxes)` can be bought (sold in order).
+- `BuyItem(category, itemId)` → returns ok/err. Axes: only if
+  `ItemCatalog.CanBuyAxe(axeId, profile.bestAxeTier)` (sold in order);
+  add it with `AxeService.Grant(player, axeId)`.
+- `DropAxe(axeUid)` — owner only; the axe becomes a world item with a
+  "Pick up" prompt (owner only unless `GameConfig.AxePickupByOthers`).
 - `PlaceBlueprint(blueprintId, cframe12)` — validates: blueprint owned,
   plot claimed, inside plot bounds, no overlap, funds. Returns uid.
 - `MoveBlueprint(uid, cframe12)`, `SellPlaced(uid)`.
@@ -470,6 +488,8 @@ export type Profile = {
   logs its reason.
 - `TreeService.luau` — spawns trees per biome from WoodData, server-side HP,
   fell → spawns server-owned log Models (attributes: WoodId, Value).
+- `AxeService.luau` — axes as items: one Tool per owned axe (attributes
+  AxeId, AxeUid), drop/pick up, and `GetEquippedAxe` for ChopTree checks.
 - `PlotService.luau` — claim, size upgrades, place/move/sell validation.
 - `DropperService.luau` — manual + automatic dropper ticks.
 - `FlumeService.luau` — production lines consume inputs on timers, output
@@ -483,7 +503,8 @@ export type Profile = {
 ### 14.6 Client (StarterPlayerScripts)
 - `Client.client.luau` — bootstrap.
 - `ChopController.luau` — click/hold input, swing animation, HP bar UI.
-- `CarryController.luau`, `VehicleController.luau`.
+- `CarryController.luau`, `VehicleController.luau`, `AxeController.luau`
+  (Drop button + Backspace).
 - `BlueprintPlacer.luau` — ghost preview (green/red validity), R to rotate,
   2-stud grid snap, click to place.
 - UI modules: `HUD`, `ShopUI`, `FieldGuideUI`, `QuestUI`, `DialogueUI`.

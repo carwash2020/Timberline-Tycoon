@@ -80,6 +80,7 @@ each axe, and cash per minute. After changing any prices or HP, run
   - `EconomyService`: the only code allowed to change cash
   - `TreeService`, `VehicleService`, `MapBuilder`, `RateLimiter`
   - `MilestoneService`: the Studio stopwatch + Roblox analytics funnel
+  - `AxeService`: axes as items (hotbar, drop, pick up)
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids

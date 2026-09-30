@@ -33,6 +33,11 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 - **RateLimiter**: drops request spam quietly; only floods earn strikes.
 - **GameServer**: remotes, join/leave, all request handlers.
 
+- **AxeService**: axes are items. Every owned axe is in the hotbar; drop
+  one and it lies on the ground with a "Pick up" prompt (owner only).
+  Dying or leaving never loses an axe. In Studio, chat `/giveaxe inferno`
+  (any axe name) for a temporary test axe that isn't saved.
+
 ### Client (`src/StarterPlayer/StarterPlayerScripts/`)
 - **ChopController**: chop with the axe's Activated event (mouse, touch and
   gamepad), aiming at the tree under the pointer or the nearest one in reach.
@@ -41,6 +46,7 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 - **CarryController**: "Load logs" prompt on your tailgate, "Sell logs"
   prompt on the sell pad, shown only when they apply.
 - **HUD**: cash, device-aware hint, toasts, "Loading your save…".
+- **AxeController**: "Drop axe" button (and Backspace) while holding an axe.
 
 ## How to play
 1. Spawn by the forest with the Rusty Axe in hand.
@@ -64,6 +70,14 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 - [ ] Leave + rejoin: cash and axe persist (needs API access, see README)
 - [ ] First sale in < 3 min in a solo Play test
 - [ ] ChopTree rejected when too far; can't swing faster than every 0.8 s
+
+Axes as items:
+- [ ] Rusty Axe is in the hotbar and in hand on spawn
+- [ ] Chat `/giveaxe inferno` and `/giveaxe gold`: both appear in the hotbar;
+      switch with number keys or taps; chopping uses the one in hand
+- [ ] Drop (Backspace / button): the axe lies on the ground; "Pick up"
+      brings it back; a second player sees "That's <name>'s axe"
+- [ ] Die, then respawn: every axe is back (except ones lying on the ground)
 
 Numbers to report back (from the `[Stopwatch]` lines in the Output window):
 - [ ] "First sale at …" (target: under 3:00)
