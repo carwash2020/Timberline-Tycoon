@@ -1,30 +1,78 @@
+--!strict
 -- HUD: builds the Phase 1 UI from code (wood-grain / kraft-paper theme).
--- Cash readout top-left (synced from server via CashChanged), a small
--- control hint bottom-center. Built in code so Rojo syncs it cleanly.
+--   * Cash plaque top-left, below Roblox's own top-bar buttons.
+--   * A one-line control hint, worded for the device being used.
+--   * Toasts: short messages from the server (Notify) or other controllers.
+--   * "Loading your save..." until the server says the profile is ready.
+-- Built in code so Rojo syncs it cleanly.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
+local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 local HUD = {}
 
 local player = Players.LocalPlayer
-local remotes: Folder? = nil
+
+local INK = Color3.fromRGB(60, 40, 20)
+local CREAM = Color3.fromRGB(245, 235, 215)
 
 local cashLabel: TextLabel? = nil
+local toastLabel: TextLabel? = nil
+local toastToken = 0
 
-local function getRemotes(): Folder
-	if not remotes then
-		remotes = ReplicatedStorage:WaitForChild("Remotes")
+local function corner(parent: GuiObject, radius: number)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius)
+	c.Parent = parent
+end
+
+local function hintText(): string
+	local verb = "Click"
+	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+		verb = "Tap"
+	elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
+		verb = "Hold R2 on"
 	end
-	return remotes :: Folder
+	return verb
+		.. " trees to chop  •  Pick up the logs  •  Load them at your truck's tailgate  •  Sell on the sawmill pad"
 end
 
 local function setCash(amount: number)
-	if cashLabel then
-		cashLabel.Text = Util.formatCash(amount)
+	local label = cashLabel
+	if label then
+		label.Text = Util.formatCash(amount)
 	end
+end
+
+-- Shows a short message in the middle-top of the screen for ~2 seconds.
+function HUD.Toast(message: string)
+	local label = toastLabel
+	if not label then
+		return
+	end
+	toastToken += 1
+	local token = toastToken
+	label.Text = message
+	label.TextTransparency = 0
+	label.BackgroundTransparency = 0.25
+	label.Visible = true
+	task.delay(2.2, function()
+		if token ~= toastToken then
+			return
+		end
+		local fade =
+			TweenService:Create(label, TweenInfo.new(0.35), { TextTransparency = 1, BackgroundTransparency = 1 })
+		fade:Play()
+		fade.Completed:Wait()
+		if token == toastToken then
+			label.Visible = false
+		end
+	end)
 end
 
 function HUD.Start()
@@ -32,63 +80,115 @@ function HUD.Start()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "TimberlineHUD"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
+	gui.IgnoreGuiInset = false -- keep clear of Roblox's menu and chat buttons
 
 	-- Cash plaque, top-left.
 	local plaque = Instance.new("Frame")
 	plaque.Name = "CashPlaque"
-	plaque.Size = UDim2.new(0, 220, 0, 56)
-	plaque.Position = UDim2.new(0, 16, 0, 16)
+	plaque.Size = UDim2.new(0, 200, 0, 50)
+	plaque.Position = UDim2.new(0, 12, 0, 8)
 	plaque.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
 	plaque.BorderSizePixel = 0
-	local plaqueCorner = Instance.new("UICorner")
-	plaqueCorner.CornerRadius = UDim.new(0, 10)
-	plaqueCorner.Parent = plaque
+	corner(plaque, 10)
 	local paper = Instance.new("Frame")
 	paper.Size = UDim2.new(1, -8, 1, -8)
 	paper.Position = UDim2.new(0, 4, 0, 4)
 	paper.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
 	paper.BorderSizePixel = 0
-	local paperCorner = Instance.new("UICorner")
-	paperCorner.CornerRadius = UDim.new(0, 7)
-	paperCorner.Parent = paper
+	corner(paper, 7)
 	paper.Parent = plaque
 
-	cashLabel = Instance.new("TextLabel")
-	cashLabel.Size = UDim2.new(1, 0, 1, 0)
-	cashLabel.BackgroundTransparency = 1
-	cashLabel.Font = Enum.Font.Fantasy
-	cashLabel.TextSize = 30
-	cashLabel.TextColor3 = Color3.fromRGB(60, 40, 20)
-	cashLabel.Text = "$0"
-	cashLabel.Parent = paper
+	local cash = Instance.new("TextLabel")
+	cash.Size = UDim2.fromScale(1, 1)
+	cash.BackgroundTransparency = 1
+	cash.Font = Enum.Font.Fantasy
+	cash.TextSize = 28
+	cash.TextColor3 = INK
+	cash.Text = "$0"
+	cash.Parent = paper
+	cashLabel = cash
 	plaque.Parent = gui
 
-	-- Control hint, bottom-center.
+	-- Control hint, bottom-centre, narrow enough to clear the mobile
+	-- thumbstick (bottom-left) and jump button (bottom-right).
 	local hint = Instance.new("TextLabel")
 	hint.Name = "Hint"
 	hint.AnchorPoint = Vector2.new(0.5, 1)
-	hint.Size = UDim2.new(0, 640, 0, 40)
-	hint.Position = UDim2.new(0.5, 0, 1, -14)
+	hint.Size = UDim2.new(0.46, 0, 0, 36)
+	hint.Position = UDim2.new(0.5, 0, 1, -12)
 	hint.BackgroundColor3 = Color3.fromRGB(20, 15, 10)
 	hint.BackgroundTransparency = 0.35
 	hint.Font = Enum.Font.Gotham
-	hint.TextSize = 16
-	hint.TextColor3 = Color3.fromRGB(245, 235, 215)
-	hint.Text = "Click a tree to chop it  •  E = load logs to truck  •  Q = sell at sawmill"
-	local hintCorner = Instance.new("UICorner")
-	hintCorner.CornerRadius = UDim.new(0, 8)
-	hintCorner.Parent = hint
+	hint.TextScaled = true
+	hint.TextWrapped = true
+	hint.TextColor3 = CREAM
+	hint.Text = hintText()
+	corner(hint, 8)
+	local hintMax = Instance.new("UISizeConstraint")
+	hintMax.MaxSize = Vector2.new(640, 36)
+	hintMax.Parent = hint
+	local hintTextSize = Instance.new("UITextSizeConstraint")
+	hintTextSize.MaxTextSize = 16
+	hintTextSize.Parent = hint
+	local hintPad = Instance.new("UIPadding")
+	hintPad.PaddingLeft = UDim.new(0, 8)
+	hintPad.PaddingRight = UDim.new(0, 8)
+	hintPad.Parent = hint
 	hint.Parent = gui
+
+	-- Toast, upper-middle.
+	local toast = Instance.new("TextLabel")
+	toast.Name = "Toast"
+	toast.AnchorPoint = Vector2.new(0.5, 0)
+	toast.Position = UDim2.new(0.5, 0, 0.22, 0)
+	toast.Size = UDim2.new(0, 0, 0, 36)
+	toast.AutomaticSize = Enum.AutomaticSize.X
+	toast.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
+	toast.BackgroundTransparency = 0.25
+	toast.Font = Enum.Font.GothamMedium
+	toast.TextSize = 18
+	toast.TextColor3 = INK
+	toast.Visible = false
+	corner(toast, 8)
+	local toastPad = Instance.new("UIPadding")
+	toastPad.PaddingLeft = UDim.new(0, 14)
+	toastPad.PaddingRight = UDim.new(0, 14)
+	toastPad.Parent = toast
+	toast.Parent = gui
+	toastLabel = toast
+
+	-- "Loading your save..." until the server has the profile.
+	local loading = Instance.new("TextLabel")
+	loading.Name = "Loading"
+	loading.AnchorPoint = Vector2.new(0.5, 0.5)
+	loading.Position = UDim2.fromScale(0.5, 0.5)
+	loading.Size = UDim2.new(0, 280, 0, 48)
+	loading.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
+	loading.Font = Enum.Font.Fantasy
+	loading.TextSize = 24
+	loading.TextColor3 = CREAM
+	loading.Text = "Loading your save..."
+	corner(loading, 10)
+	loading.Parent = gui
+	local function refreshLoading()
+		loading.Visible = player:GetAttribute("ProfileLoaded") ~= true
+	end
+	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
+	refreshLoading()
 
 	gui.Parent = playerGui
 
 	-- Server is authoritative: seed from the attribute, then listen.
-	setCash(player:GetAttribute("Cash") :: number? or 0)
+	setCash((player:GetAttribute("Cash") :: number?) or 0)
 	player:GetAttributeChangedSignal("Cash"):Connect(function()
-		setCash(player:GetAttribute("Cash") :: number? or 0)
+		setCash((player:GetAttribute("Cash") :: number?) or 0)
 	end)
-	getRemotes().CashChanged.OnClientEvent:Connect(setCash)
+	Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
+	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown)
+		if type(message) == "string" then
+			HUD.Toast(message)
+		end
+	end)
 end
 
 return HUD

@@ -1,3 +1,4 @@
+--!strict
 -- EconomyService: the SOLE writer of profile.cash.
 -- Every cash change goes through AddCash/SpendCash with a reason string.
 -- Fires CashChanged to the client and mirrors cash on a player attribute.
@@ -14,12 +15,16 @@ function EconomyService.Init(remotes: Folder)
 	cashChangedEvent = ev
 end
 
+local function publish(player: Player, cash: number)
+	player:SetAttribute("Cash", cash)
+	if cashChangedEvent then
+		cashChangedEvent:FireClient(player, cash)
+	end
+end
+
 function EconomyService.GetCash(player: Player): number
 	local profile = ProfileService.GetProfile(player)
-	if not profile then
-		return 0
-	end
-	return profile.cash
+	return if profile then profile.cash else 0
 end
 
 function EconomyService.AddCash(player: Player, amount: number, reason: string): number
@@ -33,10 +38,7 @@ function EconomyService.AddCash(player: Player, amount: number, reason: string):
 	end
 	profile.cash += amount
 	profile.totalEarned += amount
-	player:SetAttribute("Cash", profile.cash)
-	if cashChangedEvent then
-		cashChangedEvent:FireClient(player, profile.cash)
-	end
+	publish(player, profile.cash)
 	print(string.format("[Economy] +%d to %s (%s)", amount, player.Name, reason))
 	return amount
 end
@@ -47,17 +49,11 @@ function EconomyService.SpendCash(player: Player, amount: number, reason: string
 		return false
 	end
 	local profile = ProfileService.GetProfile(player)
-	if not profile then
-		return false
-	end
-	if profile.cash < amount then
+	if not profile or profile.cash < amount then
 		return false
 	end
 	profile.cash -= amount
-	player:SetAttribute("Cash", profile.cash)
-	if cashChangedEvent then
-		cashChangedEvent:FireClient(player, profile.cash)
-	end
+	publish(player, profile.cash)
 	print(string.format("[Economy] -%d from %s (%s)", amount, player.Name, reason))
 	return true
 end

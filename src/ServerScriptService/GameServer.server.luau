@@ -1,116 +1,94 @@
+--!strict
 -- GameServer: bootstrap + remote handlers for the Phase 1 vertical slice.
---   * Creates the ReplicatedStorage/Remotes folder (ChopTree, PickupLog,
---     LoadToTruck, SellLogs, CashChanged).
---   * PlayerAdded: load profile -> spawn Rustbucket -> give Rusty Axe.
---   * PlayerRemoving: save + release lock, clean up.
+--   * Creates ReplicatedStorage/Remotes (names listed in Shared/Net).
+--   * PlayerAdded: load save -> spawn Rustbucket -> hand over the equipped axe.
+--   * PlayerRemoving: drop carried logs, final save + release the session.
 --   * Every remote is rate-limited and server-validated. The client only
 --     sends intents; TreeService/EconomyService own the truth.
+-- Autosave, shutdown flushing and session locks are ProfileStore's job
+-- (see ProfileService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ProfileService = require(script.Parent.ProfileService)
 local EconomyService = require(script.Parent.EconomyService)
+local ProfileService = require(script.Parent.ProfileService)
+local RateLimiter = require(script.Parent.RateLimiter)
 local TreeService = require(script.Parent.TreeService)
 local VehicleService = require(script.Parent.VehicleService)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
+
+type Profile = ProfileService.Profile
 
 -- Wait for the code-built world (MapBuilder runs at server start).
 local mapFolder = workspace:WaitForChild("TimberlineMap", 60)
 assert(mapFolder, "[GameServer] TimberlineMap was not built (MapBuilder failed?)")
-local sellZone = mapFolder:WaitForChild("SellZone", 30)
-assert(sellZone and sellZone:IsA("BasePart"), "[GameServer] SellZone missing")
+local sellArea = mapFolder:WaitForChild("SellArea", 30)
+assert(sellArea, "[GameServer] SellArea missing")
+local sellZoneInst = sellArea:WaitForChild("SellZone", 30)
+assert(sellZoneInst and sellZoneInst:IsA("BasePart"), "[GameServer] SellZone missing")
+local sellZone = sellZoneInst :: BasePart
 
 -- Remotes -----------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
-for _, name in ipairs({ "ChopTree", "PickupLog", "LoadToTruck", "SellLogs", "CashChanged" }) do
+local remote: { [string]: RemoteEvent } = {}
+for _, name in ipairs(Net.RemoteNames) do
 	local re = Instance.new("RemoteEvent")
 	re.Name = name
 	re.Parent = remotes
+	remote[name] = re
 end
 remotes.Parent = ReplicatedStorage
 
 EconomyService.Init(remotes)
 
--- Tuning ------------------------------------------------------------------
-local SWING_COOLDOWN = 0.8
-local PICKUP_RANGE = 12
-local TRUCK_RANGE = 15
-local HAND_CAPACITY = 2
-
 -- Per-player state ---------------------------------------------------------
 local carriedLogs: { [number]: { [string]: boolean } } = {} -- [userId] -> { [logUid] = true }
-local lastSwing: { [number]: number } = {}
-local rateBuckets: { [string]: { count: number, windowStart: number } } = {}
-local violations: { [number]: number } = {}
+local nextSwingAt: { [number]: number } = {}
+local lastNotice: { [number]: { [string]: number } } = {}
 
-local RATE_LIMITS = {
-	ChopTree = { max = 4, per = 1 },
-	PickupLog = { max = 4, per = 1 },
-	LoadToTruck = { max = 2, per = 1 },
-	SellLogs = { max = 2, per = 1 },
-}
-
-local function checkRate(player: Player, remoteName: string): boolean
-	local limits = RATE_LIMITS[remoteName]
-	if not limits then
-		return false
+-- Short on-screen message. The same text at most once a second, so
+-- spam-clicking can't spam toasts.
+local function notify(player: Player, message: string)
+	local seen = lastNotice[player.UserId]
+	if not seen then
+		return
 	end
-	local key = player.UserId .. ":" .. remoteName
 	local now = os.clock()
-	local bucket = rateBuckets[key]
-	if not bucket or now - bucket.windowStart >= limits.per then
-		rateBuckets[key] = { count = 1, windowStart = now }
-		return true
+	local last = seen[message]
+	if last and now - last < 1 then
+		return
 	end
-	bucket.count += 1
-	if bucket.count > limits.max then
-		local v = (violations[player.UserId] or 0) + 1
-		violations[player.UserId] = v
-		warn(string.format("[AntiExploit] %s exceeded %s rate (%d violations)", player.Name, remoteName, v))
-		if v >= 10 then
-			player:Kick("Disconnected: suspicious activity detected.")
-		end
-		return false
-	end
-	return true
+	seen[message] = now
+	remote.Notify:FireClient(player, message)
 end
 
-local function getCharacterParts(player: Player): (Model?, BasePart?, Humanoid?)
+local function getCharacterParts(player: Player): (Model?, BasePart?)
 	local char = player.Character
 	if not char then
-		return nil, nil, nil
+		return nil, nil
 	end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not hrp or not humanoid or humanoid.Health <= 0 then
-		return nil, nil, nil
+		return nil, nil
 	end
-	return char, hrp, humanoid
+	return char, hrp
 end
 
-local function getEquippedAxe(char: Model, profile: any): any
+local function getEquippedAxe(char: Model, profile: Profile): ItemCatalog.AxeDef?
 	local tool = char:FindFirstChildOfClass("Tool")
-	if not tool then
-		return nil
+	if not tool or tool.Name ~= profile.equippedAxe then
+		return nil -- no axe out, or one the server didn't grant
 	end
-	local def = ItemCatalog.GetAxe(tool.Name)
-	if not def then
-		return nil
-	end
-	if tool.Name ~= profile.equippedAxe then
-		return nil -- client equipped something the server didn't grant
-	end
-	return def
+	return ItemCatalog.GetAxe(tool.Name)
 end
 
-local function countHands(userId: number): number
-	local hands = carriedLogs[userId]
-	if not hands then
-		return 0
-	end
+local function countHands(hands: { [string]: boolean }): number
 	local n = 0
 	for _ in pairs(hands) do
 		n += 1
@@ -118,47 +96,53 @@ local function countHands(userId: number): number
 	return n
 end
 
+local function flatDistance(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
+
 -- Remote handlers ----------------------------------------------------------
 
-local function onChopTree(player: Player, treeUid: any)
-	if type(treeUid) ~= "string" then
-		return
-	end
-	if not checkRate(player, "ChopTree") then
+local function onChopTree(player: Player, treeUid: unknown)
+	if type(treeUid) ~= "string" or not RateLimiter.Allow(player, "ChopTree") then
 		return
 	end
 	local char = getCharacterParts(player)
-	if not char then
-		return
-	end
 	local profile = ProfileService.GetProfile(player)
-	if not profile then
+	if not char or not profile then
 		return
 	end
-	local now = os.clock()
-	if now - (lastSwing[player.UserId] or 0) < SWING_COOLDOWN then
-		return
-	end
-	local axe = getEquippedAxe(char :: Model, profile)
+	local axe = getEquippedAxe(char, profile)
 	if not axe then
 		return
 	end
-	lastSwing[player.UserId] = now
-	local newHp, _err = TreeService.ApplyChop(player, treeUid, axe.damage)
-	if newHp ~= nil and newHp <= 0 then
+	-- A swing may arrive up to SwingTolerance early (network jitter), but the
+	-- schedule advances from when it was due, so over time nobody can swing
+	-- faster than once per SwingCooldown.
+	local now = os.clock()
+	local due = nextSwingAt[player.UserId] or 0
+	if now < due - GameConfig.SwingTolerance then
+		return
+	end
+	local newHp, err = TreeService.ApplyChop(player, treeUid, axe.damage)
+	if newHp == nil then
+		if err == "far" then
+			notify(player, "Too far away. Walk closer to chop.")
+		end
+		return
+	end
+	nextSwingAt[player.UserId] = math.max(now, due) + GameConfig.SwingCooldown
+	if newHp <= 0 then
 		profile.stats.treesChopped += 1
 	end
 end
 
-local function serverPickupLog(player: Player, logUid: any)
-	if type(logUid) ~= "string" then
-		return
-	end
-	if not checkRate(player, "PickupLog") then
+local function serverPickupLog(player: Player, logUid: unknown)
+	if type(logUid) ~= "string" or not RateLimiter.Allow(player, "PickupLog") then
 		return
 	end
 	local char, hrp = getCharacterParts(player)
-	if not char or not hrp then
+	local hands = carriedLogs[player.UserId]
+	if not char or not hrp or not hands or not ProfileService.GetProfile(player) then
 		return
 	end
 	local log = TreeService.GetLog(logUid)
@@ -169,63 +153,54 @@ local function serverPickupLog(player: Player, logUid: any)
 	if not pp then
 		return
 	end
-	if (hrp.Position - pp.Position).Magnitude > PICKUP_RANGE then
+	if (hrp.Position - pp.Position).Magnitude > GameConfig.PickupPromptRange + GameConfig.RangeTolerance then
 		return
 	end
-	-- 10s grace to the feller, then free-for-all.
-	if log.ownerId ~= player.UserId and os.time() - log.fellTime < TreeService.GetPickupGraceSec() then
+	-- Grace period: only the feller can grab these for the first few seconds.
+	if log.ownerId ~= player.UserId and os.time() - log.fellTime < GameConfig.PickupGraceSec then
+		notify(player, "Someone else felled this tree. Their logs are up for grabs in a few seconds.")
 		return
 	end
-	local hands = carriedLogs[player.UserId]
-	if not hands then
-		hands = {}
-		carriedLogs[player.UserId] = hands
-	end
-	local alreadyCarrying = countHands(player.UserId)
-	if alreadyCarrying >= HAND_CAPACITY then
+	local already = countHands(hands)
+	if already >= GameConfig.HandCapacity then
+		notify(
+			player,
+			string.format("Hands full (%d/%d). Load them into your truck.", already, GameConfig.HandCapacity)
+		)
 		return
 	end
-	if not TreeService.ClaimLog(logUid) then
-		return
-	end
-	local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
-	if not torso then
-		TreeService.ReturnLogToWorld(logUid)
+	local torso = (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")) :: BasePart?
+	if not torso or not TreeService.ClaimLog(logUid) then
 		return
 	end
 	pp.Anchored = false
 	pp.CanCollide = false
 	pp.Massless = true
-	pp.CFrame = torso.CFrame * CFrame.new(0, 0.4 + alreadyCarrying * 1.1, -1.7)
+	pp.CFrame = torso.CFrame * CFrame.new(0, 0.4 + already * 1.1, -1.7)
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = torso
 	weld.Part1 = pp
 	weld.Parent = pp
 	hands[logUid] = true
-	player:SetAttribute("CarriedLogs", alreadyCarrying + 1)
+	player:SetAttribute("CarriedLogs", already + 1)
 end
 
 -- ProximityPrompts on logs call the same validated path.
 TreeService.PickupCallback = serverPickupLog
 
 local function onLoadToTruck(player: Player)
-	if not checkRate(player, "LoadToTruck") then
+	if not RateLimiter.Allow(player, "LoadToTruck") then
 		return
 	end
 	local _char, hrp = getCharacterParts(player)
-	if not hrp then
-		return
-	end
 	local truck = VehicleService.GetVehicle(player)
-	if not truck then
+	local hands = carriedLogs[player.UserId]
+	if not hrp or not truck or not hands then
 		return
 	end
 	local truckPP = truck.PrimaryPart
-	if not truckPP or (hrp.Position - truckPP.Position).Magnitude > TRUCK_RANGE then
-		return
-	end
-	local hands = carriedLogs[player.UserId]
-	if not hands then
+	if not truckPP or (hrp.Position - truckPP.Position).Magnitude > GameConfig.TruckLoadRange then
+		notify(player, "Get closer to your truck's tailgate.")
 		return
 	end
 	local uids: { string } = {}
@@ -235,85 +210,97 @@ local function onLoadToTruck(player: Player)
 	if #uids == 0 then
 		return
 	end
-	local space = VehicleService.GetBedCapacity(player) - VehicleService.GetBedCount(player)
-	if space <= 0 then
+	local capacity = VehicleService.GetBedCapacity(player)
+	if VehicleService.GetBedCount(player) >= capacity then
+		notify(player, "Truck bed full. Sell at the sawmill.")
 		return
 	end
 	local moved = 0
 	for _, uid in ipairs(uids) do
-		if moved >= space then
-			break
-		end
-		local rec = TreeService.TakeLog(uid)
-		if rec then
-			if rec.model then
-				rec.model:Destroy()
-			end
-			if VehicleService.AddBedLog(player, { woodId = rec.def.id, value = rec.def.pricePerLog }) then
-				hands[uid] = nil
-				moved += 1
-			end
-		else
+		local log = TreeService.GetLog(uid)
+		if not log then
 			hands[uid] = nil -- stale entry; drop it
+		elseif VehicleService.AddBedLog(player, { woodId = log.def.id, value = log.def.pricePerLog }) then
+			-- Only destroy the carried log once it's safely in the bed.
+			TreeService.TakeLog(uid)
+			log.model:Destroy()
+			hands[uid] = nil
+			moved += 1
 		end
 	end
-	player:SetAttribute("CarriedLogs", countHands(player.UserId))
+	player:SetAttribute("CarriedLogs", countHands(hands))
+	if moved > 0 then
+		notify(
+			player,
+			string.format(
+				"Loaded %d log%s. Bed %d/%d.",
+				moved,
+				moved == 1 and "" or "s",
+				VehicleService.GetBedCount(player),
+				capacity
+			)
+		)
+	end
 end
 
 local function onSellLogs(player: Player)
-	if not checkRate(player, "SellLogs") then
+	if not RateLimiter.Allow(player, "SellLogs") then
 		return
 	end
 	local _char, hrp = getCharacterParts(player)
-	if not hrp then
-		return
-	end
-	if not Util.pointInPart(sellZone :: BasePart, hrp.Position) then
-		return
-	end
 	local profile = ProfileService.GetProfile(player)
-	if not profile then
+	local hands = carriedLogs[player.UserId]
+	if not hrp or not profile or not hands then
+		return
+	end
+	if not Util.pointInPart(sellZone, hrp.Position) then
+		notify(player, "Stand on the sawmill's sell pad to sell.")
 		return
 	end
 	local total, count = 0, 0
 	-- Logs in hands: valued from SERVER records, then destroyed.
-	local hands = carriedLogs[player.UserId]
-	if hands then
-		for uid in pairs(hands) do
-			local rec = TreeService.TakeLog(uid)
-			if rec then
-				total += rec.def.pricePerLog
-				count += 1
-				if rec.model then
-					rec.model:Destroy()
-				end
-			end
+	for uid in pairs(hands) do
+		local log = TreeService.TakeLog(uid)
+		if log then
+			total += log.def.pricePerLog
+			count += 1
+			log.model:Destroy()
 		end
-		carriedLogs[player.UserId] = {}
 	end
-	-- Logs in the truck bed.
-	for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
-		total += entry.value
-		count += 1
+	table.clear(hands)
+	-- The truck bed only sells if the truck is actually at the mill.
+	local truck = VehicleService.GetVehicle(player)
+	local truckPP = if truck then truck.PrimaryPart else nil
+	if truckPP and flatDistance(truckPP.Position, sellZone.Position) <= GameConfig.SellTruckRange then
+		for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
+			total += entry.value
+			count += 1
+		end
 	end
+	player:SetAttribute("CarriedLogs", 0)
 	if count == 0 then
+		notify(player, "Nothing to sell. Bring logs, or park your truck by the mill.")
 		return
 	end
 	profile.stats.logsSold += count
-	player:SetAttribute("CarriedLogs", 0)
 	EconomyService.AddCash(player, total, string.format("sold %d logs", count))
+	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
 end
 
-remotes.ChopTree.OnServerEvent:Connect(onChopTree)
-remotes.PickupLog.OnServerEvent:Connect(serverPickupLog)
-remotes.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
-remotes.SellLogs.OnServerEvent:Connect(onSellLogs)
+remote.ChopTree.OnServerEvent:Connect(onChopTree)
+remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
+remote.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
+remote.SellLogs.OnServerEvent:Connect(onSellLogs)
 
 -- Player lifecycle --------------------------------------------------------
 
-local function buildAxeTool(): Tool
+local function buildAxeTool(axeId: string): Tool
+	local def = ItemCatalog.GetAxe(axeId) or ItemCatalog.GetAxe("RustyAxe")
+	assert(def, "[GameServer] RustyAxe missing from ItemCatalog")
+
 	local tool = Instance.new("Tool")
-	tool.Name = "RustyAxe"
+	tool.Name = def.id
+	tool.ToolTip = def.displayName
 	tool.RequiresHandle = true
 	tool.CanBeDropped = false
 
@@ -322,6 +309,8 @@ local function buildAxeTool(): Tool
 	handle.Size = Vector3.new(0.5, 3, 0.5)
 	handle.Color = Color3.fromRGB(122, 82, 48)
 	handle.Material = Enum.Material.Wood
+	handle.CanCollide = false -- a colliding tool can trip or fling its holder
+	handle.Massless = true
 	handle.Parent = tool
 
 	local head = Instance.new("Part")
@@ -330,6 +319,8 @@ local function buildAxeTool(): Tool
 	head.Position = Vector3.new(0, 1.8, 0)
 	head.Color = Color3.fromRGB(120, 120, 120) -- dull, pitted, rusty
 	head.Material = Enum.Material.Metal
+	head.CanCollide = false
+	head.Massless = true
 	head.Parent = tool
 
 	local w = Instance.new("WeldConstraint")
@@ -346,66 +337,83 @@ local function dropCarriedLogs(player: Player)
 		return
 	end
 	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	local dropPos = (hrp and hrp.Position) or Vector3.new(0, 5, 40)
+	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	local dropPos = if hrp then hrp.Position else Vector3.new(0, 3, 40)
 	for uid in pairs(hands) do
-		TreeService.DropLog(uid, dropPos)
+		TreeService.DropLog(uid, dropPos, player)
 	end
-	carriedLogs[player.UserId] = {}
+	table.clear(hands)
 	player:SetAttribute("CarriedLogs", 0)
 end
 
-local function onCharacterAdded(player: Player, character: Model)
-	local backpack = player:WaitForChild("Backpack", 10)
-	if backpack then
-		local axe = buildAxeTool()
-		axe.Parent = backpack
-	end
+local function onCharacterAdded(player: Player, character: Model, profile: Profile)
 	local humanoid = character:WaitForChild("Humanoid", 10)
-	if humanoid and humanoid:IsA("Humanoid") then
-		humanoid.Died:Connect(function()
-			dropCarriedLogs(player)
-		end)
+	if not humanoid or not humanoid:IsA("Humanoid") then
+		return
 	end
+	humanoid.Died:Connect(function()
+		dropCarriedLogs(player)
+	end)
+	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10)
+	if not backpack then
+		return
+	end
+	local axeId = profile.equippedAxe
+	if backpack:FindFirstChild(axeId) or character:FindFirstChild(axeId) then
+		return -- already handed over for this life
+	end
+	local axe = buildAxeTool(axeId)
+	axe.Parent = backpack
+	humanoid:EquipTool(axe) -- spawn with the axe in hand (GAME_DESIGN §11)
 end
 
 local function onPlayerAdded(player: Player)
+	player:SetAttribute("ProfileLoaded", false) -- the HUD shows "Loading your save..."
+	player:SetAttribute("CarriedLogs", 0)
+	carriedLogs[player.UserId] = {}
+	lastNotice[player.UserId] = {}
+
 	local profile, err = ProfileService.LoadProfile(player)
 	if not profile then
-		-- "locked": an active session exists on another server.
-		player:Kick("Timberline Tycoon couldn't load your save (it may be open in another server). Please rejoin.")
-		return
+		if err == "failed" then
+			player:Kick("Timberline Tycoon couldn't load your save right now. Your progress is safe. Please rejoin.")
+		end
+		return -- "left": they're already gone
 	end
-	if err == "sessionOnly" then
-		warn(string.format("[GameServer] %s playing session-only; progress will NOT save", player.Name))
+
+	-- A save naming an item that no longer exists falls back to the starter kit.
+	if not ItemCatalog.GetAxe(profile.equippedAxe) then
+		profile.equippedAxe = "RustyAxe"
+	end
+	if not ItemCatalog.GetTruck(profile.equippedTruck) then
+		profile.equippedTruck = "Rustbucket"
 	end
 
 	player:SetAttribute("Cash", profile.cash)
-	player:SetAttribute("CarriedLogs", 0)
-	carriedLogs[player.UserId] = {}
-
-	-- Spawn their Rustbucket next to spawn.
-	VehicleService.SpawnTruck(player, CFrame.new(12, 1, 55))
+	VehicleService.SpawnTruck(player, profile.equippedTruck)
 
 	player.CharacterAdded:Connect(function(char)
-		onCharacterAdded(player, char)
+		onCharacterAdded(player, char, profile)
 	end)
-	if player.Character then
-		onCharacterAdded(player, player.Character)
+	local existing = player.Character
+	if existing then
+		task.spawn(onCharacterAdded, player, existing, profile)
 	end
 
-	remotes.CashChanged:FireClient(player, profile.cash)
+	player:SetAttribute("ProfileLoaded", true)
+	remote.CashChanged:FireClient(player, profile.cash)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
 local function onPlayerRemoving(player: Player)
-	ProfileService.SaveProfile(player, true)
+	dropCarriedLogs(player) -- back into the world for others, before the character goes
 	ProfileService.ReleaseProfile(player)
-	carriedLogs[player.UserId] = nil
-	lastSwing[player.UserId] = nil
-	violations[player.UserId] = nil
 	VehicleService.DespawnTruck(player)
-	print(string.format("[GameServer] %s left (saved)", player.Name))
+	RateLimiter.Forget(player)
+	carriedLogs[player.UserId] = nil
+	nextSwingAt[player.UserId] = nil
+	lastNotice[player.UserId] = nil
+	print(string.format("[GameServer] %s left (saving)", player.Name))
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
@@ -414,19 +422,5 @@ Players.PlayerRemoving:Connect(onPlayerRemoving)
 for _, p in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, p)
 end
-
--- Autosave every 120s.
-task.spawn(function()
-	while true do
-		task.wait(120)
-		ProfileService.SaveAll(false)
-		print("[GameServer] Autosave complete")
-	end
-end)
-
--- Flush saves on server shutdown (matters in Studio Play tests).
-game:BindToClose(function()
-	ProfileService.SaveAll(true)
-end)
 
 print("[GameServer] Phase 1 online: chop -> carry -> sell.")

@@ -1,26 +1,30 @@
--- ProfileService: the SOLE reader/writer of the PlayerProfiles DataStore.
--- Every other service goes through here for profile data; EconomyService is
--- the only module allowed to change profile.cash.
+--!strict
+-- ProfileService: the SOLE reader/writer of player save data.
+-- A thin wrapper over ProfileStore (loleris, vendored in Vendor/), which does
+-- the hard parts: session locking across servers, waiting out (then taking
+-- over) another server's lock, autosave, retries, and flushing on shutdown.
+-- EconomyService is the only module allowed to change profile.cash.
 --
--- Safety rules:
---   * Session lock via UpdateAsync so two servers can't double-spend.
---   * If a load fails, the player gets a session-only profile and nothing
---     is ever saved for them (never overwrite a good save with a blank one).
---   * Autosave every 120s + on PlayerRemoving + on server shutdown.
+-- DataStore "PlayerProfiles", key "profile_<UserId>" (GAME_DESIGN §14.2).
+-- In Studio without "Enable Studio Access to API Services", ProfileStore
+-- quietly uses an in-memory mock store, so data won't persist between tests.
 
-local DataStoreService = game:GetService("DataStoreService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Util = require(ReplicatedStorage.Shared.Util)
+local ProfileStore = require(script.Parent.Vendor.ProfileStore)
 
 local ProfileService = {}
 
 local STORE_NAME = "PlayerProfiles"
 local KEY_PREFIX = "profile_"
-local LOCK_TTL = 600 -- seconds; a lock older than this is considered stale
-local LOAD_RETRIES = 3
+
+export type PlacedItem = {
+	uid: string,
+	blueprintId: string,
+	cframe: { number }, -- 12 components, validated server-side
+	data: { [string]: any }?,
+}
+
 export type Profile = {
 	cash: number,
 	totalEarned: number,
@@ -35,7 +39,7 @@ export type Profile = {
 	plot: {
 		claimed: boolean,
 		size: number,
-		placed: { any },
+		placed: { PlacedItem },
 	},
 	compendium: { [string]: boolean },
 	furnitureBlueprints: { [string]: boolean },
@@ -49,149 +53,83 @@ export type Profile = {
 	seasonId: string,
 }
 
-local store = DataStoreService:GetDataStore(STORE_NAME)
-local SERVER_ID = HttpService:GenerateGUID(false)
+-- New players start from this. Fields added here later are filled into
+-- existing saves by Reconcile() on load; nothing already saved is dropped.
+local TEMPLATE: Profile = {
+	cash = 0,
+	totalEarned = 0,
+	rebirths = 0,
+	ownedAxes = { "RustyAxe" },
+	equippedAxe = "RustyAxe",
+	ownedTrucks = { "Rustbucket" },
+	equippedTruck = "Rustbucket",
+	ownedTrailers = {},
+	ownedBoats = {},
+	gear = {},
+	plot = { claimed = false, size = 120, placed = {} },
+	compendium = { oak = true },
+	furnitureBlueprints = {},
+	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
+	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0 },
+	tutorialDone = false,
+	seasonId = "spring",
+}
 
-local profiles: { [number]: Profile } = {}
-local sessionOnly: { [number]: boolean } = {}
+local store = ProfileStore.New(STORE_NAME, TEMPLATE)
+local sessions: { [Player]: any } = {}
 
-local function defaultProfile(): Profile
-	return {
-		cash = 0,
-		totalEarned = 0,
-		rebirths = 0,
-		ownedAxes = { "RustyAxe" },
-		equippedAxe = "RustyAxe",
-		ownedTrucks = { "Rustbucket" },
-		equippedTruck = "Rustbucket",
-		ownedTrailers = {},
-		ownedBoats = {},
-		gear = {},
-		plot = { claimed = false, size = 120, placed = {} },
-		compendium = { oak = true },
-		furnitureBlueprints = {},
-		npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
-		stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0 },
-		tutorialDone = false,
-		seasonId = "spring",
-	}
-end
-
--- Merge a loaded table over the defaults so new fields always exist.
--- Arrays are replaced wholesale; dictionaries merge key-by-key.
-local function mergeInto(defaults: any, loaded: any): any
-	if type(defaults) ~= "table" or type(loaded) ~= "table" then
-		return loaded
-	end
-	if #defaults > 0 or #loaded > 0 then
-		return Util.deepCopy(loaded) -- it's an array: take it as-is
-	end
-	local out: { [any]: any } = {}
-	for k, v in pairs(defaults) do
-		if loaded[k] ~= nil then
-			out[k] = mergeInto(v, loaded[k])
-		else
-			out[k] = Util.deepCopy(v)
-		end
-	end
-	return out
-end
-
--- Loads the profile and acquires the session lock.
--- Returns (profile, nil) on success,
---         (nil, "locked") if another server holds a fresh lock,
---         (profile, "sessionOnly") if the load failed (nothing will be saved).
+-- Starts the player's save session. Yields until the save is loaded:
+-- ProfileStore keeps retrying and, if another server still holds the save
+-- (the player just hopped servers), asks it to let go and then takes over.
+-- Returns (profile, nil) on success, or (nil, "left" | "failed").
 function ProfileService.LoadProfile(player: Player): (Profile?, string?)
-	local userId = player.UserId
-	local key = KEY_PREFIX .. userId
-
-	for attempt = 1, LOAD_RETRIES do
-		local ok, result = pcall(function()
-			return store:UpdateAsync(key, function(old: any)
-				old = old or {}
-				local lock = old.lock
-				local now = os.time()
-				if lock and lock.serverId ~= SERVER_ID and (now - (lock.time or 0)) < LOCK_TTL then
-					return old -- session active elsewhere; do not steal it
-				end
-				old.lock = { serverId = SERVER_ID, time = now }
-				return old
-			end)
-		end)
-		if ok and result then
-			local data: any = result
-			if data.lock and data.lock.serverId == SERVER_ID then
-				local profile: Profile = mergeInto(defaultProfile(), data.profile or {})
-				profiles[userId] = profile
-				return profile, nil
-			else
-				return nil, "locked"
-			end
-		end
-		warn(string.format("[ProfileService] Load attempt %d failed for %s", attempt, player.Name))
-		task.wait(2 ^ attempt)
+	local session = store:StartSessionAsync(KEY_PREFIX .. player.UserId, {
+		Cancel = function()
+			return player.Parent ~= Players
+		end,
+	})
+	if session == nil then
+		return nil, if player.Parent ~= Players then "left" else "failed"
 	end
 
-	-- Load failed: play session-only. NEVER write this blank profile.
-	local fallback = defaultProfile()
-	profiles[userId] = fallback
-	sessionOnly[userId] = true
-	player:SetAttribute("ProfileSessionOnly", true)
-	warn(string.format("[ProfileService] %s is SESSION-ONLY (load failed); saving disabled", player.Name))
-	return fallback, "sessionOnly"
+	session:AddUserId(player.UserId) -- GDPR: lets Roblox erase this key on request
+	session:Reconcile()
+
+	-- The player may have left while we were waiting on the DataStore.
+	if player.Parent ~= Players then
+		session:EndSession()
+		return nil, "left"
+	end
+
+	session.OnSessionEnd:Connect(function()
+		if sessions[player] ~= session then
+			return -- we ended it ourselves in ReleaseProfile (player left)
+		end
+		sessions[player] = nil
+		if player.Parent == Players and not ProfileStore.IsClosing then
+			-- Another server took the save over; this copy must stop playing.
+			player:Kick("Your save was opened on another server. Please rejoin.")
+		end
+	end)
+	sessions[player] = session
+	return session.Data :: Profile, nil
 end
 
 function ProfileService.GetProfile(player: Player): Profile?
-	return profiles[player.UserId]
+	local session = sessions[player]
+	if session == nil then
+		return nil
+	end
+	return session.Data :: Profile
 end
 
-function ProfileService.IsSessionOnly(player: Player): boolean
-	return sessionOnly[player.UserId] == true
-end
-
--- Saves the profile. Never overwrites if we lost the session lock or the
--- profile is session-only. releaseLock=true on final save (player leaving).
-function ProfileService.SaveProfile(player: Player, releaseLock: boolean?): boolean
-	local userId = player.UserId
-	if sessionOnly[userId] then
-		return false
-	end
-	local data = profiles[userId]
-	if not data then
-		return false
-	end
-	local key = KEY_PREFIX .. userId
-	local snapshot = Util.deepCopy(data)
-	local ok, err = pcall(function()
-		store:UpdateAsync(key, function(old: any)
-			old = old or {}
-			if old.lock and old.lock.serverId ~= SERVER_ID then
-				return old -- lost the lock; don't clobber the other session
-			end
-			old.profile = snapshot
-			if releaseLock then
-				old.lock = nil
-			else
-				old.lock = { serverId = SERVER_ID, time = os.time() }
-			end
-			return old
-		end)
-	end)
-	if not ok then
-		warn(string.format("[ProfileService] Save failed for %s: %s", player.Name, tostring(err)))
-	end
-	return ok
-end
-
-function ProfileService.SaveAll(releaseLock: boolean?)
-	for _, player in ipairs(Players:GetPlayers()) do
-		ProfileService.SaveProfile(player, releaseLock)
-	end
-end
-
+-- Final save + release of the session lock. Call when the player leaves.
 function ProfileService.ReleaseProfile(player: Player)
-	profiles[player.UserId] = nil
-	sessionOnly[player.UserId] = nil
+	local session = sessions[player]
+	sessions[player] = nil
+	if session ~= nil then
+		session:EndSession()
+	end
 end
 
 return ProfileService

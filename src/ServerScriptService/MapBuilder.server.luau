@@ -1,25 +1,31 @@
+--!strict
 -- MapBuilder: constructs the Phase 1 world from code at server start.
 -- Everything the vertical slice needs: ground, spawn, starter forest
--- (40 oak + 15 birch), sawmill + sell zone, and plot markers for later phases.
--- GameServer waits for the TimberlineMap folder before accepting players.
+-- (40 oak + 15 birch), a parking lot, sawmill + sell zone, and plot markers
+-- for later phases. GameServer waits for the TimberlineMap folder before
+-- accepting players.
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 
 local TreeService = require(script.Parent.TreeService)
 
+-- A place made from Studio's "Baseplate" template ships its own Baseplate and
+-- SpawnLocation. They would z-fight with our ground and steal spawns, so
+-- remove them for this session (changes made while playing never touch the
+-- saved place file).
+for _, child in ipairs(workspace:GetChildren()) do
+	if (child.Name == "Baseplate" and child:IsA("BasePart")) or child:IsA("SpawnLocation") then
+		warn(string.format("[MapBuilder] Removing template %s '%s' for this session", child.ClassName, child.Name))
+		child:Destroy()
+	end
+end
+
 local map = Instance.new("Folder")
 map.Name = "TimberlineMap"
 map.Parent = workspace
 
-local function box(
-	name: string,
-	size: Vector3,
-	pos: Vector3,
-	color: Color3,
-	material: Enum.Material?,
-	props: { [string]: any }?
-)
+local function box(name: string, size: Vector3, pos: Vector3, color: Color3, material: Enum.Material?): Part
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
@@ -29,13 +35,31 @@ local function box(
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
-	if props then
-		for k, v in pairs(props) do
-			p[k] = v
-		end
-	end
 	p.Parent = map
 	return p
+end
+
+-- Invisible helper volume: no collisions, no clicks, no touches.
+local function ghost(p: BasePart, transparency: number)
+	p.Transparency = transparency
+	p.CanCollide = false -- must be false before CanQuery can be
+	p.CanQuery = false
+	p.CanTouch = false
+end
+
+local function topLabel(part: BasePart, text: string)
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Top
+	sg.PixelsPerStud = 20
+	sg.Parent = part
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.Fantasy
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(70, 45, 22)
+	label.Text = text
+	label.Parent = sg
 end
 
 -- Ground (Phase 1: starter area only; the full 3000x3000 world comes later).
@@ -53,7 +77,14 @@ spawn.Material = Enum.Material.Concrete
 spawn.Parent = map
 
 -- Starter forest: oak + birch south of spawn, scattered with spacing.
-local function scatterPositions(count: number, xMin: number, xMax: number, zMin: number, zMax: number, minGap: number)
+local function scatterPositions(
+	count: number,
+	xMin: number,
+	xMax: number,
+	zMin: number,
+	zMax: number,
+	minGap: number
+): { Vector3 }
 	local pts: { Vector3 } = {}
 	local tries = 0
 	while #pts < count and tries < count * 60 do
@@ -80,6 +111,26 @@ for _, pos in ipairs(scatterPositions(40, -90, 90, -170, -30, 9)) do
 end
 for _, pos in ipairs(scatterPositions(15, -90, 90, -170, -30, 9)) do
 	TreeService.SpawnTree("birch", CFrame.new(pos))
+end
+
+-- Parking lot east of spawn: one slot per player, so trucks never spawn
+-- inside each other. VehicleService claims slots by Index. Trucks face the
+-- forest (-Z).
+local SLOT_ROWS, SLOTS_PER_ROW = 3, 8
+local slotIndex = 0
+for row = 0, SLOT_ROWS - 1 do
+	for col = 0, SLOTS_PER_ROW - 1 do
+		slotIndex += 1
+		local slot = box(
+			"ParkingSlot_" .. slotIndex,
+			Vector3.new(5, 0.2, 13),
+			Vector3.new(16 + col * 7, 0.1, 50 - row * 20),
+			Color3.fromRGB(150, 140, 125),
+			Enum.Material.Slate
+		)
+		slot:SetAttribute("Index", slotIndex)
+		CollectionService:AddTag(slot, "ParkingSlot")
+	end
 end
 
 -- Sawmill (north of spawn). Open front faces -Z toward the spawn.
@@ -152,32 +203,44 @@ for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 	label.Parent = sg
 end
 
--- SellZone: stand inside to sell. Invisible, non-colliding.
-box(
-	"SellZone",
-	Vector3.new(24, 12, 18),
-	Vector3.new(MILL_X, 6, MILL_Z - 24),
-	Color3.fromRGB(255, 255, 255),
-	nil,
-	{ Transparency = 1, CanCollide = false }
+-- SellZone: stand (or park) inside to sell. The volume itself is invisible;
+-- a painted pad on the ground shows players where it is. Both live in a
+-- Persistent model so they're always streamed in on every client (the
+-- client-side "Sell logs" prompt hangs off SellZone).
+local sellArea = Instance.new("Model")
+sellArea.Name = "SellArea"
+sellArea.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+sellArea.Parent = map
+
+local sellZone = box("SellZone", Vector3.new(24, 12, 18), Vector3.new(MILL_X, 6, MILL_Z - 24), Color3.new(1, 1, 1))
+ghost(sellZone, 1)
+sellZone.Parent = sellArea
+local sellPoint = Instance.new("Attachment") -- where the client's "Sell logs" prompt appears
+sellPoint.Name = "SellPoint"
+sellPoint.Position = Vector3.new(0, -2.5, 0)
+sellPoint.Parent = sellZone
+
+local sellPad = box(
+	"SellPad",
+	Vector3.new(24, 0.2, 18),
+	Vector3.new(MILL_X, 0.1, MILL_Z - 24),
+	Color3.fromRGB(214, 170, 92),
+	Enum.Material.WoodPlanks
 )
+sellPad.Parent = sellArea
+topLabel(sellPad, "SELL LOGS HERE")
 
 -- Plot markers for later phases (visual only in Phase 1).
 local plotPositions = {
-	Vector3.new(150, 0.5, 110),
-	Vector3.new(-150, 0.5, 110),
-	Vector3.new(150, 0.5, -60),
-	Vector3.new(-150, 0.5, -60),
+	Vector3.new(150, 0.15, 110),
+	Vector3.new(-150, 0.15, 110),
+	Vector3.new(150, 0.15, -60),
+	Vector3.new(-150, 0.15, -60),
 }
 for i, pos in ipairs(plotPositions) do
-	local pad = box(
-		"PlotSpot_" .. i,
-		Vector3.new(120, 1, 120),
-		pos,
-		Color3.fromRGB(210, 190, 150),
-		Enum.Material.Sand,
-		{ Transparency = 0.85, CanCollide = false }
-	)
+	local pad =
+		box("PlotSpot_" .. i, Vector3.new(120, 0.2, 120), pos, Color3.fromRGB(210, 190, 150), Enum.Material.Sand)
+	ghost(pad, 0.85)
 	CollectionService:AddTag(pad, "PlotSpot")
 end
 
@@ -185,4 +248,4 @@ end
 Lighting.ClockTime = 15.5
 Lighting.Brightness = 2
 
-print("[MapBuilder] Phase 1 world built: spawn, starter forest, sawmill, sell zone, plot markers.")
+print("[MapBuilder] Phase 1 world built: spawn, starter forest, parking, sawmill, sell zone, plot markers.")

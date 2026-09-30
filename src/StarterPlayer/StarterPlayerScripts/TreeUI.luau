@@ -1,91 +1,95 @@
+--!strict
 -- TreeUI: floating HP bars over trees.
--- One BillboardGui per living tree, listening to the server's HP attribute.
--- Bars hide on full HP and when the tree is felled.
+-- One BillboardGui per tree, listening to the server's HP attribute.
+-- Bars show only while a tree is damaged: hidden at full HP and once felled.
 
 local CollectionService = game:GetService("CollectionService")
 
 local TreeUI = {}
 
-local guis: { [string]: BillboardGui } = {}
+local BAR_MAX_DISTANCE = 80 -- studs; farther bars aren't drawn
 
-local function buildGui(model: Model): BillboardGui
-	local bg = Instance.new("Frame")
-	bg.Name = "HPBg"
-	bg.Size = UDim2.new(1, 0, 1, 0)
-	bg.BackgroundColor3 = Color3.fromRGB(40, 25, 15)
-	bg.BorderSizePixel = 0
-	bg.Parent = nil
+type Bar = { gui: BillboardGui, fill: Frame, conn: RBXScriptConnection }
 
-	local fill = Instance.new("Frame")
-	fill.Name = "HPFill"
-	fill.Size = UDim2.new(1, 0, 1, 0)
-	fill.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
-	fill.BorderSizePixel = 0
-	fill.Parent = bg
+local bars: { [Model]: Bar } = {}
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "TreeHP"
-	billboard.Size = UDim2.new(4, 0, 0.5, 0)
-	billboard.StudsOffset = Vector3.new(0, (model:GetAttribute("BarOffset") :: number?) or 8, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Enabled = false
-	bg.Parent = billboard
-	return billboard
+local function barOffset(model: Model): Vector3
+	return Vector3.new(0, (model:GetAttribute("BarOffset") :: number?) or 8, 0)
 end
 
 local function refresh(model: Model)
-	local uid = model:GetAttribute("Uid")
-	if uid == nil then
-		return
-	end
-	local gui = guis[uid :: string]
-	if not gui then
+	local bar = bars[model]
+	if not bar then
 		return
 	end
 	local hp = model:GetAttribute("HP") :: number?
 	local maxHp = model:GetAttribute("MaxHP") :: number?
 	if hp == nil or maxHp == nil or maxHp <= 0 then
-		gui.Enabled = false
+		bar.gui.Enabled = false
 		return
 	end
 	local frac = math.clamp(hp / maxHp, 0, 1)
-	gui.Enabled = frac < 1
-	local fill = gui:FindFirstChild("HPBg", true)
-	if fill then
-		local f = fill:FindFirstChild("HPFill")
-		if f and f:IsA("Frame") then
-			f.Size = UDim2.new(frac, 0, 1, 0)
-			if frac > 0.5 then
-				f.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
-			elseif frac > 0.25 then
-				f.BackgroundColor3 = Color3.fromRGB(220, 170, 60)
-			else
-				f.BackgroundColor3 = Color3.fromRGB(200, 70, 50)
-			end
-		end
+	bar.gui.Enabled = frac > 0 and frac < 1
+	bar.fill.Size = UDim2.new(frac, 0, 1, 0)
+	if frac > 0.5 then
+		bar.fill.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
+	elseif frac > 0.25 then
+		bar.fill.BackgroundColor3 = Color3.fromRGB(220, 170, 60)
+	else
+		bar.fill.BackgroundColor3 = Color3.fromRGB(200, 70, 50)
 	end
 end
 
 local function attach(model: Model)
-	local uid = model:GetAttribute("Uid")
-	if uid == nil or guis[uid :: string] then
+	if bars[model] then
 		return
 	end
 	local adornee = model.PrimaryPart or model:FindFirstChild("Trunk")
-	if not adornee then
+	if not adornee or not adornee:IsA("BasePart") then
 		return
 	end
-	local gui = buildGui(model)
-	gui.Adornee = adornee
-	gui.Parent = model
-	guis[uid :: string] = gui
-	model:GetAttributeChangedSignal("HP"):Connect(function()
-		refresh(model)
-	end)
-	model:GetAttributeChangedSignal("BarOffset"):Connect(function()
-		gui.StudsOffset = Vector3.new(0, (model:GetAttribute("BarOffset") :: number?) or 8, 0)
-	end)
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "TreeHP"
+	billboard.Size = UDim2.new(4, 0, 0.5, 0)
+	billboard.StudsOffsetWorldSpace = barOffset(model) -- world up, whatever the trunk's rotation
+	billboard.MaxDistance = BAR_MAX_DISTANCE
+	billboard.AlwaysOnTop = true
+	billboard.Enabled = false
+	billboard.Adornee = adornee
+
+	local bg = Instance.new("Frame")
+	bg.Name = "HPBg"
+	bg.Size = UDim2.fromScale(1, 1)
+	bg.BackgroundColor3 = Color3.fromRGB(40, 25, 15)
+	bg.BorderSizePixel = 0
+	bg.Parent = billboard
+
+	local fill = Instance.new("Frame")
+	fill.Name = "HPFill"
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
+	fill.BorderSizePixel = 0
+	fill.Parent = bg
+
+	billboard.Parent = model
+	bars[model] = {
+		gui = billboard,
+		fill = fill,
+		conn = model:GetAttributeChangedSignal("HP"):Connect(function()
+			refresh(model)
+		end),
+	}
 	refresh(model)
+end
+
+local function detach(model: Model)
+	local bar = bars[model]
+	if bar then
+		bar.conn:Disconnect()
+		bar.gui:Destroy()
+		bars[model] = nil
+	end
 end
 
 function TreeUI.Start()
@@ -99,10 +103,10 @@ function TreeUI.Start()
 			attach(inst)
 		end
 	end)
+	-- Fires when a tree streams out of range, too.
 	CollectionService:GetInstanceRemovedSignal("Tree"):Connect(function(inst)
-		local uid = inst:GetAttribute("Uid")
-		if uid ~= nil then
-			guis[uid :: string] = nil
+		if inst:IsA("Model") then
+			detach(inst)
 		end
 	end)
 end

@@ -1,47 +1,83 @@
+--!strict
 -- TreeService: owns every tree and log in the world.
 --   * Builds low-poly tree Models (cylinder trunk + ball foliage).
 --   * Server-side HP; ApplyChop validates range and applies axe damage.
---   * Felling tips the tree over, hides it, spawns exactly logsPerTree logs,
---     and respawns it after the wood's respawnSec.
---   * Log records: state "world" | "carried" | "truck". Ownership: 10s grace
---     to the feller, then free-for-all.
+--     Hit feedback (shake, chips, sound) is drawn on each client by TreeFX,
+--     so the server never fights the fall animation over the trunk.
+--   * Felling hinges the tree over at its base in a random direction, then
+--     swaps it for exactly logsPerTree logs laid along the fallen trunk, and
+--     respawns the tree after the wood's respawnSec.
+--   * Log records: state "world" | "carried". Ownership: PickupGraceSec to
+--     the feller, then free-for-all. Logs left in the world despawn after
+--     LogDespawnSec.
 -- GameServer assigns TreeService.PickupCallback for ProximityPrompt pickups.
 
 local CollectionService = game:GetService("CollectionService")
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
-local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
+
+type WoodDef = WoodData.WoodDef
 
 local TreeService = {}
 
 local TREE_TAG = "Tree"
 local LOG_TAG = "Log"
-local CHOP_RANGE = 20
-local PICKUP_GRACE_SEC = 10
+local FALL_ANGLE = math.rad(84) -- nearly flat; a full 90 would sink the trunk into the ground
+local FALL_TIME = 0.6
+local LOG_LENGTH = 3
+local LOG_DIAMETER = 1.2
+local LOG_GAP = 0.2
 
-local trees: { [string]: any } = {} -- [uid] -> { model, def, hp, alive, pivot }
-local logs: { [string]: any } = {} -- [uid] -> { model, def, ownerId, fellTime, state }
+export type TreeRecord = {
+	model: Model,
+	def: WoodDef,
+	hp: number,
+	alive: boolean,
+	pivot: CFrame, -- upright pivot (trunk centre)
+	base: Vector3, -- ground point under the trunk
+	collide: { [BasePart]: boolean }, -- each part's original CanCollide
+}
+
+export type LogRecord = {
+	model: Model,
+	def: WoodDef,
+	ownerId: number,
+	fellTime: number,
+	state: "world" | "carried",
+	despawnToken: number,
+}
+
+local trees: { [string]: TreeRecord } = {}
+local logs: { [string]: LogRecord } = {}
 local treeCounters: { [string]: number } = {}
 
-local mapFolder: Folder? = nil
-local function getMapFolder(): Folder
-	if not mapFolder then
-		mapFolder = workspace:WaitForChild("TimberlineMap", 30)
-		assert(mapFolder, "[TreeService] TimberlineMap not found")
+local folders: { [string]: Folder } = {}
+local function getFolder(name: string): Folder
+	local cached = folders[name]
+	if cached then
+		return cached
 	end
-	return mapFolder :: Folder
+	local map = workspace:WaitForChild("TimberlineMap", 30)
+	assert(map, "[TreeService] TimberlineMap not found")
+	local folder = Instance.new("Folder")
+	folder.Name = name
+	folder.Parent = map
+	folders[name] = folder
+	return folder
 end
 
 -- Assigned by GameServer: (player, logUid) -> (). Server-validated pickup.
 TreeService.PickupCallback = nil :: ((Player, string) -> ())?
 
-local function addPickupPrompt(logPart: BasePart, uid: string, def: any)
+local function addPickupPrompt(logPart: BasePart, uid: string, def: WoodDef)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = "Pick up"
 	prompt.ObjectText = def.displayName .. " Log"
-	prompt.MaxActivationDistance = 12
+	prompt.MaxActivationDistance = GameConfig.PickupPromptRange
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = logPart
@@ -62,6 +98,7 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame): Model
 
 	local model = Instance.new("Model")
 	model.Name = string.format("Tree_%s_%d", woodId, treeCounters[woodId])
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- trunk + leaves stream in together
 
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
@@ -87,58 +124,58 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame): Model
 	foliage.Parent = model
 
 	model.PrimaryPart = trunk
+	local pivot = model:GetPivot()
 	model:SetAttribute("WoodId", woodId)
 	model:SetAttribute("MaxHP", def.treeHP)
 	model:SetAttribute("HP", def.treeHP)
 	model:SetAttribute("Uid", uid)
-	model:SetAttribute("BarOffset", def.trunkHeight + def.foliageSize * 0.95)
-	model.Parent = getMapFolder()
+	model:SetAttribute("BarOffset", def.trunkHeight / 2 + def.foliageSize * 0.95)
+	model:SetAttribute("HomePivot", pivot) -- clients shake the tree around this
 	CollectionService:AddTag(model, TREE_TAG)
+	model.Parent = getFolder("Trees")
 
 	trees[uid] = {
 		model = model,
 		def = def,
 		hp = def.treeHP,
 		alive = true,
-		pivot = model:GetPivot(),
+		pivot = pivot,
+		base = cframe.Position,
+		collide = { [trunk] = trunk.CanCollide, [foliage] = foliage.CanCollide },
 	}
 	return model
 end
 
--- Brief wobble so every hit feels like it landed.
-function TreeService.ShakeTree(model: Model)
-	local pp = model.PrimaryPart
-	if not pp then
-		return
+local function setTreeVisible(rec: TreeRecord, visible: boolean)
+	for part, collides in pairs(rec.collide) do
+		part.Transparency = if visible then 0 else 1
+		part.CanTouch = visible
+		if visible then
+			part.CanQuery = true
+			part.CanCollide = collides
+		else
+			-- CanCollide must go false before CanQuery can.
+			part.CanCollide = false
+			part.CanQuery = false -- clicks and raycasts pass through the hidden tree
+		end
 	end
-	task.spawn(function()
-		local base = pp.CFrame
-		for _ = 1, 3 do
-			if pp.Parent == nil then
-				return
-			end
-			pp.CFrame = base * CFrame.Angles(0, 0, math.rad(2.5))
-			task.wait(0.05)
-			if pp.Parent == nil then
-				return
-			end
-			pp.CFrame = base
-			task.wait(0.05)
+end
+
+-- Log despawn: each (re)entry into the world gets a fresh token, so an old
+-- timer can't delete a log that was picked up and dropped again since.
+local function scheduleDespawn(uid: string, rec: LogRecord)
+	rec.despawnToken += 1
+	local token = rec.despawnToken
+	task.delay(GameConfig.LogDespawnSec, function()
+		if logs[uid] == rec and rec.state == "world" and rec.despawnToken == token then
+			logs[uid] = nil
+			rec.model:Destroy()
 		end
 	end)
 end
 
-local function setTreeVisible(rec: any, visible: boolean)
-	for _, d in ipairs(rec.model:GetDescendants()) do
-		if d:IsA("BasePart") then
-			d.Transparency = visible and 0 or 1
-			d.CanCollide = visible
-		end
-	end
-end
-
--- Spawns one pickup-able log. Returns (Model, uid).
-function TreeService.SpawnLog(def: any, position: Vector3, ownerId: number): (Model, string)
+-- Spawns one pickup-able log at `cframe` (cylinder axis = the CFrame's X).
+function TreeService.SpawnLog(def: WoodDef, cframe: CFrame, ownerId: number): (Model, string)
 	local uid = Util.guid()
 
 	local model = Instance.new("Model")
@@ -147,30 +184,53 @@ function TreeService.SpawnLog(def: any, position: Vector3, ownerId: number): (Mo
 	local part = Instance.new("Part")
 	part.Name = "LogPart"
 	part.Shape = Enum.PartType.Cylinder
-	part.Size = Vector3.new(3, 1.2, 1.2)
+	part.Size = Vector3.new(LOG_LENGTH, LOG_DIAMETER, LOG_DIAMETER)
 	part.Color = def.trunkColor
 	part.Material = Enum.Material.Wood
 	part.Anchored = true
 	part.CanCollide = false
-	part.CFrame = CFrame.new(position) * CFrame.Angles(0, math.random() * math.pi, math.rad(90))
+	part.CFrame = cframe
 	part.Parent = model
 
 	model.PrimaryPart = part
 	model:SetAttribute("WoodId", def.id)
 	model:SetAttribute("Value", def.pricePerLog)
 	model:SetAttribute("Uid", uid)
-	model.Parent = getMapFolder()
 	CollectionService:AddTag(model, LOG_TAG)
+	model.Parent = getFolder("Logs")
 
-	logs[uid] = {
+	local rec: LogRecord = {
 		model = model,
 		def = def,
 		ownerId = ownerId,
 		fellTime = os.time(),
 		state = "world",
+		despawnToken = 0,
 	}
+	logs[uid] = rec
 	addPickupPrompt(part, uid, def)
+	scheduleDespawn(uid, rec)
 	return model, uid
+end
+
+-- CFrames for n logs lying end to end along `dir` from the stump, in
+-- side-by-side rows when the trunk is too short to hold them in one line.
+local function logLayout(base: Vector3, dir: Vector3, trunkHeight: number, n: number): { CFrame }
+	local step = LOG_LENGTH + LOG_GAP
+	local perRow = math.max(1, math.floor(trunkHeight / step))
+	local rows = math.ceil(n / perRow)
+	local side = dir:Cross(Vector3.yAxis)
+	local out: { CFrame } = {}
+	for i = 0, n - 1 do
+		local row = i // perRow
+		local col = i % perRow
+		local pos = base
+			+ dir * (1.8 + col * step)
+			+ side * ((row - (rows - 1) / 2) * (LOG_DIAMETER + 0.3))
+			+ Vector3.new(0, LOG_DIAMETER / 2, 0)
+		table.insert(out, CFrame.fromMatrix(pos, dir, Vector3.yAxis))
+	end
+	return out
 end
 
 local function fellTree(player: Player, uid: string)
@@ -180,49 +240,47 @@ local function fellTree(player: Player, uid: string)
 	end
 	rec.alive = false
 	local model = rec.model
+	local fellerId = player.UserId
 
-	-- Tip over, then vanish (respawn timer restores it later).
+	-- Hinge at the base of the trunk, facing a random direction, and tip the
+	-- whole tree over around that hinge's X axis.
+	local hinge = CFrame.new(rec.base) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
+	local offset = hinge:ToObjectSpace(rec.pivot)
+	local fallenUp = (hinge * CFrame.Angles(FALL_ANGLE, 0, 0)).UpVector
+	local fallDir = Vector3.new(fallenUp.X, 0, fallenUp.Z).Unit -- where the treetop lands
+
 	task.spawn(function()
-		local from = model:GetPivot()
-		local yaw = math.random() * math.pi * 2
-		local to = from * CFrame.Angles(0, yaw, 0) * CFrame.new(0, -1.5, 0) * CFrame.Angles(math.rad(75), 0, 0)
-		local cf = Instance.new("CFrameValue")
-		cf.Value = from
-		local conn: RBXScriptConnection? = nil
-		conn = cf:GetPropertyChangedSignal("Value"):Connect(function()
-			if model.Parent then
-				model:PivotTo(cf.Value)
-			end
+		local alpha = Instance.new("NumberValue")
+		local conn = alpha.Changed:Connect(function(a: number)
+			model:PivotTo(hinge * CFrame.Angles(FALL_ANGLE * a, 0, 0) * offset)
 		end)
-		local tween =
-			TweenService:Create(cf, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Value = to })
+		local tween = TweenService:Create(
+			alpha,
+			TweenInfo.new(FALL_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{ Value = 1 }
+		)
 		tween:Play()
 		tween.Completed:Wait()
-		if conn then
-			conn:Disconnect()
-		end
-		cf:Destroy()
+		conn:Disconnect()
+		alpha:Destroy()
+		task.wait(0.15)
+
+		-- Swap the fallen tree for exactly logsPerTree logs where it landed.
 		setTreeVisible(rec, false)
+		for _, cf in ipairs(logLayout(rec.base, fallDir, rec.def.trunkHeight, rec.def.logsPerTree)) do
+			TreeService.SpawnLog(rec.def, cf, fellerId)
+		end
 	end)
 
-	-- Spawn exactly logsPerTree logs around the stump.
-	local base = rec.pivot.Position
-	for i = 1, rec.def.logsPerTree do
-		local angle = (i / rec.def.logsPerTree) * math.pi * 2 + math.random() * 0.5
-		local pos = Vector3.new(base.X + math.cos(angle) * 4, 1.6, base.Z + math.sin(angle) * 4)
-		TreeService.SpawnLog(rec.def, pos, player.UserId)
-	end
-
 	task.delay(rec.def.respawnSec, function()
-		local r = trees[uid]
-		if not r then
+		if trees[uid] ~= rec then
 			return
 		end
-		r.hp = r.def.treeHP
-		r.alive = true
-		r.model:PivotTo(r.pivot)
-		setTreeVisible(r, true)
-		r.model:SetAttribute("HP", r.hp)
+		model:PivotTo(rec.pivot)
+		rec.hp = rec.def.treeHP
+		model:SetAttribute("HP", rec.hp)
+		setTreeVisible(rec, true)
+		rec.alive = true
 	end)
 end
 
@@ -233,29 +291,28 @@ function TreeService.ApplyChop(player: Player, treeUid: string, damage: number):
 		return nil, "gone"
 	end
 	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	local pp = rec.model.PrimaryPart
-	if not hrp or not pp then
+	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not hrp then
 		return nil, "nochar"
 	end
-	if (hrp.Position - pp.Position).Magnitude > CHOP_RANGE then
+	local offset = hrp.Position - rec.base
+	local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
+	if
+		horizontal > GameConfig.ChopRange + GameConfig.RangeTolerance
+		or math.abs(offset.Y) > rec.def.trunkHeight + 10
+	then
 		return nil, "far"
 	end
 	rec.hp = math.max(0, rec.hp - damage)
 	rec.model:SetAttribute("HP", rec.hp)
-	TreeService.ShakeTree(rec.model)
 	if rec.hp <= 0 then
 		fellTree(player, treeUid)
 	end
 	return rec.hp, nil
 end
 
-function TreeService.GetLog(uid: string): any
+function TreeService.GetLog(uid: string): LogRecord?
 	return logs[uid]
-end
-
-function TreeService.GetPickupGraceSec(): number
-	return PICKUP_GRACE_SEC
 end
 
 -- Marks a world log as carried (caller welds the model). False if unavailable.
@@ -265,7 +322,7 @@ function TreeService.ClaimLog(uid: string): boolean
 		return false
 	end
 	rec.state = "carried"
-	local pp = rec.model and rec.model.PrimaryPart
+	local pp = rec.model.PrimaryPart
 	if pp then
 		local prompt = pp:FindFirstChildOfClass("ProximityPrompt")
 		if prompt then
@@ -275,44 +332,46 @@ function TreeService.ClaimLog(uid: string): boolean
 	return true
 end
 
--- Removes the log record entirely (sold / loaded). Returns the record.
-function TreeService.TakeLog(uid: string): any
+-- Removes the log record entirely (sold / loaded). The caller destroys the model.
+function TreeService.TakeLog(uid: string): LogRecord?
 	local rec = logs[uid]
-	if not rec then
-		return nil
-	end
 	logs[uid] = nil
 	return rec
 end
 
-function TreeService.ReturnLogToWorld(uid: string): boolean
-	local rec = logs[uid]
-	if not rec then
-		return false
-	end
-	rec.state = "world"
-	return true
-end
-
--- Drops a carried log back into the world (e.g. player died).
-function TreeService.DropLog(uid: string, nearPos: Vector3)
+-- Drops a carried log back onto the ground near `nearPos` (player died or
+-- left). The dropper gets the pickup grace window again.
+function TreeService.DropLog(uid: string, nearPos: Vector3, dropper: Player)
 	local rec = logs[uid]
 	if not rec or rec.state ~= "carried" then
 		return
 	end
-	local pp = rec.model and rec.model.PrimaryPart
+	local pp = rec.model.PrimaryPart
 	if pp then
-		local weld = pp:FindFirstChildOfClass("WeldConstraint")
-		if weld then
-			weld:Destroy()
+		for _, child in ipairs(pp:GetChildren()) do
+			if child:IsA("WeldConstraint") then
+				child:Destroy()
+			end
 		end
-		pp.Massless = false
+		local spot = nearPos + Vector3.new(math.random(-3, 3), 0, math.random(-3, 3))
+		local params = RaycastParams.new()
+		params.RespectCanCollide = true -- skip invisible zones, foliage, other logs
+		if dropper.Character then
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { dropper.Character }
+		end
+		local hit = workspace:Raycast(spot + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), params)
+		local groundY = if hit then hit.Position.Y else spot.Y - 3
 		pp.Anchored = true
-		pp.CFrame = CFrame.new(nearPos + Vector3.new(math.random(-3, 3), 1.6, math.random(-3, 3)))
-			* CFrame.Angles(0, math.random() * math.pi, math.rad(90))
+		pp.Massless = false
+		pp.CFrame = CFrame.new(spot.X, groundY + LOG_DIAMETER / 2, spot.Z)
+			* CFrame.Angles(0, math.random() * math.pi, 0)
 		addPickupPrompt(pp, uid, rec.def)
 	end
 	rec.state = "world"
+	rec.ownerId = dropper.UserId
+	rec.fellTime = os.time()
+	scheduleDespawn(uid, rec)
 end
 
 return TreeService
