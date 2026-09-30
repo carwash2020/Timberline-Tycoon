@@ -24,3 +24,8 @@ architecture). Current phase status: PHASE1_NOTES.md.
     saves `tools/calibration.json`. Commit that file with ECONOMY.md.
   - Milestones (GAME_DESIGN §8): the core feels good, then retention
     (seasons, festivals, companies), then more content.
+  - Late game, automation may out-earn hand work, inside the rules in
+    GAME_DESIGN §9 (runs on what you unlocked, rare content stays manual,
+    Warehouse-capped offline output).
+  - Wallet cap: `GameConfig.CashCap` = $2,000,000. All cash goes through
+    EconomyService.AddCash, which clamps and returns (credited, overflow).

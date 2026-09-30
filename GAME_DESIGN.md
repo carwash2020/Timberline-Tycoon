@@ -93,7 +93,7 @@ sold at the Dealership in town.
 |---|---|---|
 | Rustbucket (starter) | 6 | free |
 | Pickup | 12 | 1,200 |
-| Scout ATV | — (fast recon, no cargo) | 2,500 |
+| Scout ATV | — (fastest vehicle; marks rare trees on your map) | 2,500 |
 | Flatbed | 24 | 6,000 |
 | Logging rig | 48 | 25,000 |
 
@@ -116,6 +116,33 @@ sold at the Dealership in town.
 | Insulated Coat | ignore snow cold | 500 |
 | Heat Boots | immune to lava burn | 800 |
 | Featherfall Cloak | glide down instead of falling off the Aether Isles | 2,500 |
+| Prospector's Pickaxe | mines stone, ore and crystal nodes (one pick for all) | 300 |
+
+**Vehicle upgrades (the Garage, a building on your base).** Every truck
+also improves along three tracks, paid in cash + Iron Ore, so vehicles
+progress in more than bed size:
+
+| Track | What it does | Why it matters |
+|---|---|---|
+| Engine | faster driving, per level | the haul is most of a trip; speed buys range |
+| Tires & Chains | removes mud (Hills) and snow slowdowns | makes the hard biomes drivable |
+| Log Crane | pulls nearby logs into the bed with one prompt | hand-carrying is ~90 s of every full Logging Rig load; this removes the worst chore |
+
+### Materials
+Gathered from nodes you mine with the Prospector's Pickaxe or from trees
+you tap. Each has a job and a home, so it pulls players across the map.
+They go straight into your inventory (logs keep the hauling).
+
+| Material | Where | Used for |
+|---|---|---|
+| Stone | Hills quarry | base buildings, plot expansions |
+| Iron Ore | Hills cliffs | Garage upgrades, machine parts |
+| Resin | tap pines and maples, come back later | varnish: furniture sells for more |
+| Ember Glass | volcano vents | kilns (dried planks are worth more), heat-proof truck parts |
+| Sky Shards | Aether Isles crystal nodes | the Starfall Axe forge |
+
+Your own planks are a building material too: the empire is built from
+your own lumber.
 
 ### Plot
 Player-owned plot near the sawmill: store logs, park truck, place decorations.
@@ -131,6 +158,12 @@ plot for a 10% fee), cosmetic buildings.
   dedicated player 2–4 sessions each — long enough to aspire to, short enough
   to reach. Add small money sinks (fuel, repairs optional; decorations) so
   cash always has somewhere to go.
+- **Wallet cap: $2,000,000** (`GameConfig.CashCap`). Hardcore players can
+  grind, but nobody runs away with the economy. Sales past the cap tell the
+  player what didn't fit, and the cash display shows MAX. At the best V1
+  loop that's ~67 h of saving, far past the ~17 h progression (ECONOMY.md).
+- **Late game, automation may out-earn hand work** (§9), inside the wallet
+  cap and warehouse limits.
 
 ## 5. Multiplayer / social
 
@@ -169,7 +202,10 @@ Keep it convenience/cosmetics — no pay-to-win axes that trivialize progression
 - Master Builder (plot expansion + exclusive blueprint skins) — 499 R$
 
 **Developer products (repeatable)**
-- Cash packs: 1k cash — 49 R$; 10k cash — 399 R$ (priced below grind value)
+- Cash packs: 1k cash — 49 R$; 10k cash — 399 R$ (priced below grind value).
+  Never offer a pack that would push the wallet past the $2,000,000 cap:
+  check before prompting the purchase, because a granted receipt can't be
+  undone.
 - 2x Wood Weekend (48h) — 199 R$
 - Instant delivery (sell truckload from anywhere, one use) — 29 R$
 
@@ -239,15 +275,47 @@ ladder. Categories: Droppers, Machines, Flumes, Buildings, Decor.
 - Use case: income while you're deep in the wild biomes chasing rare wood.
   The empire keeps moving so you never feel punished for leaving it.
 
-The design leans manual-heavy on purpose: there's always something worth
-doing by hand, and hand work always pays best per unit. Automation is how
-progression *feels* — each upgrade removes a chore (replanting, hand-feeding
-the saw, hauling) without ever out-earning an active player at the same tier.
-Plot space and budget stay limited so your mix is a real decision:
-manual lines for max yield while you're there, automation keeping the empire
-breathing while you're out in the wild.
-Balance rule: passive empire income caps around ~40% of what active
-chopping + manual processing earns at the same tier.
+Early and mid game, hand work pays best per unit, so the core loop matters
+and every upgrade removes a chore (replanting, hand-feeding the saw,
+hauling). **Late game, automation is allowed to take over and out-earn
+hand work** (Connor, 2026-09-30): a built-out empire should feel like one.
+Automation ladder, one chore at a time: self-replanting saplings → Auto
+Saw on a flume → Apprentice Crew felling trees on your plot → crew haul
+runs to a biome you've unlocked → Storefront selling while you're away.
+
+**Keeping the game playable once automation wins:**
+1. **Automation runs on what you unlocked by hand.** Crews only fell woods
+   your best axe can cut and haul from biomes you've reached; machines are
+   built and upgraded with materials you gather out in the world.
+2. **The best things stay hands-on.** Lumenwood, Phantomwood, festival
+   trees and contests, Sky Shards and other rare nodes can't be automated,
+   so the wild is always worth going back to.
+3. **Nothing runs away.** The $2,000,000 wallet cap (§4), warehouse
+   capacity on offline output, and sinks that scale with the empire (base
+   tiers, upgrades, cosmetics).
+4. **The empire asks for decisions, not just waiting.** Contracts and
+   storefront orders want specific goods by a deadline, so you plan what
+   your lines make.
+
+**Offline:** machines keep working while you're away and fill your
+Warehouse, which caps out after a few hours. "Your warehouse is full" is a
+daily reason to come back (the retention milestone, §8). Saplings stay
+hands-on: they only grow while you tend them.
+
+**Base tiers.** Your plot grows through named tiers that give the freeform
+building a spine, and each tier is visible from the road (sign, gate,
+flag):
+
+| Tier | Plot | Unlocks |
+|---|---|---|
+| Campsite (free) | 120×120 | sapling plots, a log pile |
+| Homestead | 140×140 | Warehouse (stores logs + materials), Axe Rack |
+| Lumber Yard | 160×160 | Sawmill Shed (planks), Garage (vehicle upgrades) |
+| Timber Works | 180×180 | Workshop (furniture), Kiln, Apprentice Crew |
+| Timber Empire | 200×200 | Storefront, Forge (the Starfall Axe), crew haul runs |
+
+Tier-ups cost cash + Stone + your own planks. Once you have a Warehouse,
+the Sky Bin (§10) can deliver there instead of the sawmill.
 
 **Tracks — Log Flumes (the signature system)**
 Lumber mills moved logs by water flume — so tracks are flumes, not sci-fi
@@ -488,7 +556,8 @@ export type Profile = {
   equippedTruck: string,  -- default "Rustbucket"
   ownedTrailers: { string },
   ownedBoats: { string },
-  gear: { string },       -- "Lantern" | "InsulatedCoat" | "HeatBoots"
+  gear: { string },       -- "Lantern" | "InsulatedCoat" | "HeatBoots" | ...
+  materials: { [string]: number },  -- Stone, IronOre, Resin, EmberGlass, SkyShard (when built)
   plot: { claimed: boolean, size: number, placed: { PlacedItem } },
   compendium: { [string]: boolean },       -- wood ids discovered
   furnitureBlueprints: { [string]: boolean },
@@ -580,8 +649,10 @@ export type Profile = {
   (cycleSec measured in playtest, not hardcoded).
 - After each phase, check against §4 targets; if off by >25%, tune the
   data tables, not the code.
-- Passive cap: total auto-dropper output ≤ 0.4 × active cashPerHour at the
-  same tier.
+- Automation vs hand work (§9): below the Timber Works tier, automation
+  earns less than active play at the same tier; from there it may earn
+  more. Offline output is capped by Warehouse size; all cash by
+  `GameConfig.CashCap` ($2,000,000).
 
 ### 14.9 Phase 1 acceptance checklist (no Phase 2 until all pass)
 - [ ] Spawn with Rusty Axe; oak falls in exactly 6 hits (30 HP / 5 dmg).

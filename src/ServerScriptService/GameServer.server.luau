@@ -288,11 +288,21 @@ local function onSellLogs(player: Player)
 		return
 	end
 	profile.stats.logsSold += count
-	EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
+	local credited, overflow = EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
 	MilestoneService.Mark(player, "First sale")
-	MilestoneService.CashEarned(player, total)
+	MilestoneService.CashEarned(player, credited)
 	MilestoneService.LogsSold(player, byWood)
 	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
+	if overflow > 0 then
+		notify(
+			player,
+			string.format(
+				"Wallet full at %s: %s didn't fit. Spend some!",
+				Util.formatCash(GameConfig.CashCap),
+				Util.formatCash(overflow)
+			)
+		)
+	end
 end
 
 MilestoneService.Init(notify)

@@ -79,6 +79,11 @@ Axes as items:
       brings it back; a second player sees "That's <name>'s axe"
 - [ ] Die, then respawn: every axe is back (except ones lying on the ground)
 
+Wallet cap (optional):
+- [ ] Set `CashCap = 50` in `GameConfig.luau`, sell logs past $50: the cash
+      shows "MAX" in amber and a toast says what didn't fit. Set it back to
+      `2_000_000` afterwards.
+
 Numbers to report back (from the `[Stopwatch]` lines in the Output window):
 - [ ] "First sale at …" (target: under 3:00)
 - [ ] "Could afford the Steel Axe at …" (design target: 12–15 min)

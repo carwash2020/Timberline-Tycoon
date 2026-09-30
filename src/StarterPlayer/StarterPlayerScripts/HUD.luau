@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -49,7 +50,9 @@ end
 local function setCash(amount: number)
 	local label = cashLabel
 	if label then
-		label.Text = Util.formatCash(amount)
+		local full = amount >= GameConfig.CashCap
+		label.Text = Util.formatCash(amount) .. (if full then " MAX" else "")
+		label.TextColor3 = if full then Color3.fromRGB(176, 96, 18) else INK -- amber when the wallet is full
 	end
 end
 

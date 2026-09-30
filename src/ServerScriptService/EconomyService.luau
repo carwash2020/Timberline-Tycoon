@@ -1,11 +1,14 @@
 --!strict
 -- EconomyService: the SOLE writer of profile.cash.
 -- Every cash change goes through AddCash/SpendCash with a reason string.
+-- A wallet holds at most GameConfig.CashCap; AddCash reports what didn't fit.
 -- Fires CashChanged to the client, mirrors cash on a player attribute, and
 -- logs a Roblox economy analytics event (Creator Hub -> Analytics -> Economy).
 
 local AnalyticsService = game:GetService("AnalyticsService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ProfileService = require(script.Parent.ProfileService)
 
 local EconomyService = {}
@@ -47,29 +50,41 @@ function EconomyService.GetCash(player: Player): number
 	return if profile then profile.cash else 0
 end
 
+-- Adds cash up to the wallet cap. Returns (credited, overflow): overflow is
+-- what didn't fit, so the caller can tell the player.
 -- `itemSku` names what earned the cash for analytics (e.g. "logs").
-function EconomyService.AddCash(player: Player, amount: number, reason: string, itemSku: string?): number
+function EconomyService.AddCash(player: Player, amount: number, reason: string, itemSku: string?): (number, number)
 	amount = math.floor(amount)
 	if amount <= 0 then
-		return 0
+		return 0, 0
 	end
 	local profile = ProfileService.GetProfile(player)
 	if not profile then
-		return 0
+		return 0, 0
 	end
-	profile.cash += amount
-	profile.totalEarned += amount
+	local credited = math.clamp(GameConfig.CashCap - profile.cash, 0, amount)
+	local overflow = amount - credited
+	if overflow > 0 then
+		pcall(function()
+			AnalyticsService:LogCustomEvent(player, "CashOverCap", overflow)
+		end)
+	end
+	if credited <= 0 then
+		return 0, overflow
+	end
+	profile.cash += credited
+	profile.totalEarned += credited
 	publish(player, profile.cash)
 	logEconomy(
 		player,
 		Enum.AnalyticsEconomyFlowType.Source,
-		amount,
+		credited,
 		profile.cash,
 		Enum.AnalyticsEconomyTransactionType.Gameplay,
 		itemSku
 	)
-	print(string.format("[Economy] +%d to %s (%s)", amount, player.Name, reason))
-	return amount
+	print(string.format("[Economy] +%d to %s (%s)", credited, player.Name, reason))
+	return credited, overflow
 end
 
 -- `itemSku` names what was bought for analytics (e.g. "SteelAxe").

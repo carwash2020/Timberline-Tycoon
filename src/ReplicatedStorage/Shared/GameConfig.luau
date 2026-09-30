@@ -4,6 +4,8 @@
 -- still lives in WoodData / ItemCatalog.
 
 local GameConfig = {
+	-- Economy
+	CashCap = 2_000_000, -- most cash a wallet holds; hardcore players can grind, not run away
 	-- Chopping
 	SwingCooldown = 0.8, -- seconds between chops (GAME_DESIGN §14.8)
 	SwingTolerance = 0.15, -- server accepts a swing this early, to absorb network jitter

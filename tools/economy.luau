@@ -535,6 +535,14 @@ do
 			duration(lastGoal)
 		)
 	)
+	line(
+		string.format(
+			"- **The %s wallet cap** (GameConfig.CashCap) takes %s of saving at the best V1 loop (%s/h), far past the whole progression, so it only stops hardcore grinders.",
+			money(GameConfig.CashCap),
+			duration(GameConfig.CashCap / (finale * EFFICIENCY) * 3600),
+			money(finale * EFFICIENCY)
+		)
+	)
 	line()
 end
 
