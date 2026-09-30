@@ -66,6 +66,10 @@ export type Profile = {
 	tutorialProgress: number, -- count toward the current step
 	seasonId: string,
 	daily: DailyState,
+	-- Robux (MonetizationService)
+	purchaseIds: { string }, -- recent developer product receipts already granted
+	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
+	instantDeliveries: number, -- Instant Delivery uses left
 	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
 }
 
@@ -94,6 +98,9 @@ local TEMPLATE: Profile = {
 	tutorialProgress = 0,
 	seasonId = "spring",
 	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
+	purchaseIds = {},
+	doubleWoodUntil = 0,
+	instantDeliveries = 0,
 	onboarding = {},
 }
 ProfileSchema.Template = TEMPLATE
@@ -116,6 +123,24 @@ function ProfileSchema.Migrate(data: any)
 	for _, item in ipairs(data.axes) do
 		data.bestAxeTier = math.max(data.bestAxeTier, ItemCatalog.AxeTier(item.id) or 1)
 	end
+end
+
+-- How many granted receipts to remember. Roblox retries an unconfirmed
+-- receipt for a while; 100 is far more than can be in flight at once.
+ProfileSchema.PurchaseIdCacheSize = 100
+
+-- Records a developer product receipt. True if it's new (grant it); false
+-- if it was already granted (a retry after a crash or a slow save).
+function ProfileSchema.RecordPurchase(data: any, purchaseId: string): boolean
+	local ids = data.purchaseIds
+	if table.find(ids, purchaseId) then
+		return false
+	end
+	table.insert(ids, purchaseId)
+	while #ids > ProfileSchema.PurchaseIdCacheSize do
+		table.remove(ids, 1)
+	end
+	return true
 end
 
 return ProfileSchema

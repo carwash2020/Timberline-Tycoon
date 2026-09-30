@@ -18,6 +18,7 @@ local BiomeService = require(script.Parent.BiomeService)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
+local MonetizationService = require(script.Parent.MonetizationService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -207,6 +208,7 @@ end
 
 -- ProximityPrompts on logs call the same validated path.
 TreeService.PickupCallback = serverPickupLog
+TreeService.LogMultiplier = MonetizationService.LogMultiplier
 
 local function onLoadToTruck(player: Player)
 	if not RateLimiter.Allow(player, "LoadToTruck") then
@@ -270,6 +272,37 @@ local function onLoadToTruck(player: Player)
 	end
 end
 
+-- Pays for `count` logs worth `total` and reports the sale everywhere:
+-- stats, the stopwatch, the tutorial, daily goals. 2x Cash applies here.
+local function completeSale(
+	player: Player,
+	profile: ProfileService.Profile,
+	total: number,
+	count: number,
+	byWood: { [string]: number }
+)
+	total *= MonetizationService.SaleMultiplier(player)
+	profile.stats.logsSold += count
+	local credited, overflow = EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
+	MilestoneService.Mark(player, "First sale")
+	MilestoneService.CashEarned(player, credited)
+	MilestoneService.LogsSold(player, byWood)
+	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
+	if overflow > 0 then
+		notify(
+			player,
+			string.format(
+				"Wallet full at %s: %s didn't fit. Spend some!",
+				Util.formatCash(GameConfig.CashCap),
+				Util.formatCash(overflow)
+			)
+		)
+	end
+	-- After the sale's toasts, so rewards read last.
+	QuestService.Event(player, "logsSold", count)
+	DailyService.Event(player, "logsSold", count, byWood, credited)
+end
+
 local function onSellLogs(player: Player)
 	if not RateLimiter.Allow(player, "SellLogs") then
 		return
@@ -312,25 +345,30 @@ local function onSellLogs(player: Player)
 		notify(player, "Nothing to sell. Bring logs, or park your truck by the mill.")
 		return
 	end
-	profile.stats.logsSold += count
-	local credited, overflow = EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
-	MilestoneService.Mark(player, "First sale")
-	MilestoneService.CashEarned(player, credited)
-	MilestoneService.LogsSold(player, byWood)
-	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
-	if overflow > 0 then
-		notify(
-			player,
-			string.format(
-				"Wallet full at %s: %s didn't fit. Spend some!",
-				Util.formatCash(GameConfig.CashCap),
-				Util.formatCash(overflow)
-			)
-		)
+	completeSale(player, profile, total, count, byWood)
+end
+
+-- Instant Delivery (a Robux product): sells the truck bed from anywhere.
+local function onInstantDelivery(player: Player)
+	if not RateLimiter.Allow(player, "SellLogs") then
+		return
 	end
-	-- After the sale's toasts, so rewards read last.
-	QuestService.Event(player, "logsSold", count)
-	DailyService.Event(player, "logsSold", count, byWood, credited)
+	local profile = ProfileService.GetProfile(player)
+	if not profile or VehicleService.GetBedCount(player) == 0 then
+		return
+	end
+	if not MonetizationService.UseInstantDelivery(player) then
+		notify(player, "You have no Instant Deliveries left.")
+		return
+	end
+	local total, count = 0, 0
+	local byWood: { [string]: number } = {}
+	for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
+		total += entry.value
+		count += 1
+		byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
+	end
+	completeSale(player, profile, total, count, byWood)
 end
 
 MilestoneService.Init(notify)
@@ -339,6 +377,8 @@ ShopService.Init(mapFolder, remote.BuyItem, remote.EquipItem, notify)
 QuestService.Init(remote.SkipTutorial, notify)
 DailyService.Init(notify)
 BiomeService.Init(notify)
+MonetizationService.Init(remote.BuyRobuxItem, notify)
+remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
 remote.ChopTree.OnServerEvent:Connect(onChopTree)
 remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
@@ -429,6 +469,7 @@ local function onPlayerAdded(player: Player)
 	QuestService.Start(player, profile)
 	DailyService.Start(player, profile)
 	ShopService.PlayerJoined(player, profile)
+	MonetizationService.PlayerJoined(player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -436,6 +477,7 @@ local function onPlayerRemoving(player: Player)
 	dropCarriedLogs(player) -- back into the world for others, before the character goes
 	MilestoneService.Stop(player) -- before the final save, so playtime is included
 	AxeService.PlayerRemoving(player) -- dropped axes go back to the save's inventory
+	MonetizationService.PlayerRemoving(player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

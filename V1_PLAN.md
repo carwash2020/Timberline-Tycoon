@@ -5,8 +5,16 @@ current: tick items as they land, and move anything cut to "After V1".
 
 **V1 = a new player can go from the Rusty Axe to the forged Starfall Axe**
 (about 17 hours of focused play, ECONOMY.md), in a world with every biome
-on that path, with saving, shops, the tutorial, daily goals, a few fair
-ways to spend Robux, and launch polish.
+on that path, and build a lumber empire on their own plot, trade with
+other players, run a company with friends, fill in the Field Guide, and
+spend Robux fairly. Scope set by Connor, 2026-09-30.
+
+**Build order** (each lands on the branch with tests and a playtest
+checklist in PHASE2_NOTES.md):
+1. Robux purchase handling (so products can be set up in Creator Hub in
+   parallel) → 2. the Field Guide → 3. the Aether Isles + materials + the
+   forge → 4. plots and the empire, in slices → 5. trading → 6. companies →
+   7. launch polish.
 
 Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 ⬜ not started. Nothing is ✅ yet: Studio playtests are what turn 🟡 into ✅.
@@ -37,7 +45,7 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 - 🟡 Day/night cycle, the same on every server
 - 🟡 Hearth & Home: the gear shop (Lantern, Insulated Coat, Heat Boots)
 - Placeholder art: every biome is code-built parts until the Studio art
-  pass (item 6)
+  pass (item 9)
 
 ### 3. Hauling upgrades on the path
 - 🟡 Trailers (Pony, Ranch, Heavy Hauler): bought at the Dealership, hitched
@@ -45,24 +53,59 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
   V1, so they're not optional. V1 hitches them rigidly (the rig turns as
   one piece); a swinging hitch is a later polish.
 
-### 4. The V1 finale: the Aether Isles (GAME_DESIGN §10, phase 5b)
+### 4. The V1 finale: the Aether Isles (GAME_DESIGN §10, phase 5b; in V1)
 - ⬜ The Skyroot and its gondola (ride time + fee from BiomeData)
 - ⬜ The isles: Lumenwood trees, Sky Shard crystal nodes (mined with an axe)
 - ⬜ Cloud Chute + Sky Bin (logs go down to the sawmill) and the Featherfall
   Cloak
 - ⬜ Materials inventory (Sky Shards) and the Starfall Axe forge
-- The design allows shipping this as the first big update if V1 runs long;
-  without it, V1 ends at the Inferno Axe (~13 h).
 
-### 5. Fair monetization (GAME_DESIGN §7; nothing pay-to-win)
-- ⬜ Purchase handling done right: receipts granted exactly once, saved with
+### 5. The Field Guide (GAME_DESIGN §11 beat 7, §13)
+- ⬜ A journal of every wood: silhouettes until you find it, then its facts
+  (where, HP, hardness, price, the axe you need); discovered on first fell
+- ⬜ Murph hands it over at the end of the tutorial
+
+### 6. Plots and the empire (GAME_DESIGN §9, §10; in V1)
+Slices, in order:
+- ⬜ Claim a plot in the plot district; base tiers (Campsite → Timber
+  Empire) that grow the plot
+- ⬜ Blueprint Store + placement: ghost preview, rotate, grid snap, bounds
+  and overlap checked on the server; move and sell back; saved with the
+  profile
+- ⬜ Buildings and decor: Warehouse (stores logs and materials), Axe Rack,
+  walls, lights
+- ⬜ Production: Sawmill Shed (logs → planks), Workshop (planks →
+  furniture), flumes linking machines, hand work vs Auto Saw ratios
+- ⬜ Storefront (sell furniture while you're out) and contracts
+- ⬜ Automation, online only: Apprentice Crew, self-replanting saplings,
+  Warehouse-capped (§9 rules)
+- ⬜ Sapling plots (tended by hand)
+- ⬜ More gathered materials with a job each: Stone, Iron Ore, Resin, Ember
+  Glass (tier-ups, machines, kilns)
+
+### 7. Trading and companies (GAME_DESIGN §5, phase 7; in V1)
+- ⬜ Trading: a two-player trade window (axes, materials, planks,
+  furniture, cash), both confirm, a short countdown, then one swap on the
+  server
+- ⬜ Companies: create or join a company with friends; a name (filtered by
+  Roblox), a member list, company earnings leaderboard. Needs a design
+  pass with Connor first (what a company shares).
+- ⬜ Lifetime earnings leaderboard (opt-in)
+
+### 8. Fair monetization (GAME_DESIGN §7; nothing pay-to-win; in V1)
+- 🟡 Purchase handling done right: receipts granted exactly once, saved with
   the profile (ProfileStore), never lost on a crash
-- ⬜ Game passes: 2x Cash, VIP axe skin (cosmetic)
-- ⬜ Cash packs that check the $2,000,000 cap before offering
+- 🟡 Game passes: 2x Cash. ⬜ Extra Plot and Master Builder (with plots);
+  ⬜ VIP axe skin and Lumberjack Truck
+- 🟡 Developer products: cash packs (checked against the $2,000,000 cap
+  before the prompt), 2x Wood (48 h), Instant Delivery
+- ⬜ Connor: create the items in Creator Hub and put their ids in
+  `Shared/StoreData.luau` (steps in PHASE2_NOTES.md)
 - ⬜ Private servers (a Roblox setting, no code)
-- Prices are Connor's call; the design has starting points.
+- Prices are Connor's call (the design has starting points), and each item
+  must be created in Creator Hub; its id goes in `Shared/StoreData.luau`.
 
-### 6. Launch polish (phase 9)
+### 9. Launch polish (phase 9)
 - ⬜ Sounds: chop, fell, sell, buy, UI clicks; a music toggle
 - ⬜ Settings menu (music, sound effects)
 - ⬜ Icon and thumbnail (Claude Design prompt, then Studio renders)
@@ -74,15 +117,9 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 - ⬜ Analytics check: funnels and economy events show up in Creator Hub
 - ⬜ Bug bash with friends (a 4-6 player test), then a soft launch
 
-## After V1 (first updates), recommended cuts
-These are big, and the progression doesn't need them. GAME_DESIGN §15:
-"cut phase 6–7 scope before cutting core-loop feel."
+## After V1 (first updates)
 - The Island + boats (palmwood; off the progression path)
-- Plots and the empire: blueprints, droppers, flumes, processing,
-  warehouse, storefront, automation (phase 6)
-- Trading, companies, leaderboards (phase 7)
 - Seasons and festivals (the build plan is in GAME_DESIGN §12)
-- The Field Guide (compendium)
 
 ## What only Connor can do
 - Play each build in Studio and report back (Claude can't run Studio)

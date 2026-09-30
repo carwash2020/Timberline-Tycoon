@@ -48,7 +48,7 @@ local MUTED = Color3.fromRGB(160, 145, 120)
 local SKY = Color3.fromRGB(110, 120, 190)
 
 -- One row's look and what its button does right now.
-type RowView = {
+export type RowView = {
 	name: string,
 	detail: string,
 	color: Color3,
@@ -59,9 +59,10 @@ type RowView = {
 	onClick: () -> (),
 }
 
--- A shop: which building, the prompt, the header, and its rows.
-type Shop = {
-	building: string, -- model in TimberlineMap
+-- A shop: which building (nil for a screen opened from a button, like the
+-- Robux Store), the prompt, the header, and its rows.
+export type Shop = {
+	building: string?, -- model in TimberlineMap
 	promptText: string,
 	title: string,
 	subtitle: string,
@@ -546,8 +547,12 @@ local function buildPanel()
 end
 
 local function setupPrompt(shop: Shop)
+	local buildingName = shop.building
+	if not buildingName then
+		return
+	end
 	local map = workspace:WaitForChild("TimberlineMap")
-	local building = map:WaitForChild(shop.building) -- a Persistent model: always streamed in
+	local building = map:WaitForChild(buildingName) -- a Persistent model: always streamed in
 	local counter = building:WaitForChild("Counter")
 	local point = counter:WaitForChild("ShopPoint") :: Attachment
 	points[shop] = point
@@ -563,6 +568,16 @@ local function setupPrompt(shop: Shop)
 		open(shop)
 	end)
 	prompts[shop] = pp
+end
+
+-- Opens a screen that isn't tied to a building (the Robux Store).
+function ShopUI.OpenCustom(shop: Shop)
+	open(shop)
+end
+
+-- Redraws the open screen (e.g. once prices have loaded).
+function ShopUI.Refresh()
+	refresh()
 end
 
 function ShopUI.Start()
@@ -587,7 +602,7 @@ function ShopUI.Start()
 	RunService.Heartbeat:Connect(function(dt: number)
 		elapsed += dt
 		local shop = openShop
-		if not shop or elapsed < 0.25 then
+		if not shop or not shop.building or elapsed < 0.25 then
 			return
 		end
 		elapsed = 0

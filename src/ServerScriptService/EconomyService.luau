@@ -52,8 +52,15 @@ end
 
 -- Adds cash up to the wallet cap. Returns (credited, overflow): overflow is
 -- what didn't fit, so the caller can tell the player.
--- `itemSku` names what earned the cash for analytics (e.g. "logs").
-function EconomyService.AddCash(player: Player, amount: number, reason: string, itemSku: string?): (number, number)
+-- `itemSku` names what earned the cash for analytics (e.g. "logs");
+-- `transaction` defaults to Gameplay (IAP for Robux cash packs).
+function EconomyService.AddCash(
+	player: Player,
+	amount: number,
+	reason: string,
+	itemSku: string?,
+	transaction: Enum.AnalyticsEconomyTransactionType?
+): (number, number)
 	amount = math.floor(amount)
 	if amount <= 0 then
 		return 0, 0
@@ -80,7 +87,7 @@ function EconomyService.AddCash(player: Player, amount: number, reason: string, 
 		Enum.AnalyticsEconomyFlowType.Source,
 		credited,
 		profile.cash,
-		Enum.AnalyticsEconomyTransactionType.Gameplay,
+		transaction or Enum.AnalyticsEconomyTransactionType.Gameplay,
 		itemSku
 	)
 	print(string.format("[Economy] +%d to %s (%s)", credited, player.Name, reason))

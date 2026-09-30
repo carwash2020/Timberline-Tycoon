@@ -218,6 +218,13 @@ Keep it convenience/cosmetics — no pay-to-win axes that trivialize progression
 
 **Private servers** — 150 R$/month for friend groups.
 
+**Built (2026-09-30):** `MonetizationService` + `Shared/StoreData` (item ids;
+0 = not set up, hidden). Receipts are granted exactly once and saved before
+Roblox is told (ProfileStore's LastSavedData pattern). 2x Cash doubles sale
+income; 2x Wood doubles logs per felled tree for 48 h; Instant Delivery
+sells the truck bed from anywhere. The Store screen shows Roblox's live
+prices.
+
 **Premium Payouts** — passive Robux from Premium subscribers' playtime;
 rewards retention directly, so design for session length (events, dailies).
 
@@ -613,6 +620,8 @@ export type Profile = {
   seasonId: string,
   daily: { day: number, goals: { DailyGoal }, streak: number,
            bestStreak: number, lastCompleteDay: number },  -- DailyService
+  purchaseIds: { string },  -- recent Robux receipts already granted
+  doubleWoodUntil: number, instantDeliveries: number,  -- Robux boosts
 }
 ```
 - Autosave every 120s + on PlayerRemoving. Retry with backoff. If load

@@ -75,6 +75,43 @@ function ProfileService.GetProfile(player: Player): Profile?
 	return session.Data :: Profile
 end
 
+-- Grants a developer product purchase exactly once (Roblox calls
+-- ProcessReceipt again until it hears PurchaseGranted, even across servers
+-- and crashes). `grant` changes the profile; it runs only for a receipt
+-- this save hasn't seen. Yields until the save holding the receipt id has
+-- reached the DataStore, so a crash can never lose a purchase or grant it
+-- twice. Returns the decision for ProcessReceipt.
+function ProfileService.ProcessPurchaseAsync(
+	player: Player,
+	purchaseId: string,
+	grant: (Profile) -> ()
+): Enum.ProductPurchaseDecision
+	-- The receipt can arrive before the save has loaded.
+	while sessions[player] == nil and player.Parent == Players do
+		task.wait()
+	end
+	local session = sessions[player]
+	if session == nil or not session:IsActive() then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	if ProfileSchema.RecordPurchase(session.Data, purchaseId) then
+		grant(session.Data :: Profile)
+		session:Save()
+	end
+	local function saved(data: any): boolean
+		return data ~= nil and data.purchaseIds ~= nil and table.find(data.purchaseIds, purchaseId) ~= nil
+	end
+	if saved(session.LastSavedData) then
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	while session:IsActive() do
+		if saved(session.OnAfterSave:Wait()) then
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		end
+	end
+	return Enum.ProductPurchaseDecision.NotProcessedYet
+end
+
 -- Final save + release of the session lock. Call when the player leaves.
 function ProfileService.ReleaseProfile(player: Player)
 	local session = sessions[player]

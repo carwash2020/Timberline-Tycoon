@@ -16,6 +16,7 @@ On this branch, each with its own checklist below:
 4. **Daily goals and streaks**
 5. **The world**: biomes, roads, day and night, Hearth & Home
 6. **Trailers**
+7. **Robux**: the Store, 2x Cash, cash packs, 2x Wood, Instant Delivery
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -247,3 +248,40 @@ long (two rows of 12) to fit a Logging Rig with a Heavy Hauler.
 - [ ] Switch trucks at the Dealership: the trailer comes along; on the Scout ATV
       it doesn't (and hitching says the ATV can't tow)
 - [ ] Parked rigs never overlap their neighbours in the lot
+
+## Robux: the Store
+
+A **STORE** button (next to the clock) opens the Robux Store once at least
+one item is set up. Items (GAME_DESIGN §7; starting prices there):
+
+| Item | Kind | What it does |
+|---|---|---|
+| 2x Cash | game pass | every log sells for double, forever |
+| $1,000 / $10,000 | developer products | cash, only offered if it fits under the $2,000,000 cap |
+| 2x Wood (48 hours) | developer product | felled trees drop twice the logs; buying again extends it |
+| Instant Delivery | developer product | a "Sell load here" button sells your truck bed from anywhere, once |
+
+Purchases are granted exactly once and saved before Roblox is told, so a
+server crash can't lose one or pay it twice.
+
+### Setting the items up (Connor, in Creator Hub)
+1. Publish the place (File → Publish to Roblox) if it isn't already.
+2. Creator Hub → Creations → Timberline Tycoon → **Monetization → Passes** →
+   Create a Pass: "2x Cash", an icon, then set it on sale at your price.
+   Copy its **ID**.
+3. **Monetization → Developer Products** → Create: "$1,000", "$10,000",
+   "2x Wood (48 hours)", "Instant Delivery", each with a price. Copy each ID.
+4. Paste the IDs into `src/ReplicatedStorage/Shared/StoreData.luau` (the
+   `id = 0` lines), or send them to Claude.
+
+### Playtest checklist (Studio purchases are free test purchases)
+- [ ] With the IDs in, the STORE button shows; the Store lists each item with
+      its Robux price
+- [ ] Buy $1,000: the Roblox prompt, then +$1,000 and a thank-you toast
+- [ ] With over $1,990,000 (set `cash` in Studio or lower `CashCap` for a
+      test), the $10,000 pack says "Wallet full" and never prompts
+- [ ] Buy 2x Wood: felled trees drop double logs; the Store shows the hours left
+- [ ] Buy Instant Delivery with logs in the truck: "Sell load here (1)" appears;
+      pressing it sells the bed anywhere
+- [ ] Buy 2x Cash: sales pay double; the Store says Owned; rejoin: still owned
+- [ ] Leave during a purchase and rejoin: it's granted (once)

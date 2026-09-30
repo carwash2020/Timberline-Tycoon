@@ -44,6 +44,17 @@ return function(t)
 		t.eq(data, before)
 	end)
 
+	t.test("receipts: new ones are recorded once; the cache keeps the latest", function()
+		local Schema, data = fresh()
+		t.ok(Schema.RecordPurchase(data, "a"))
+		t.ok(not Schema.RecordPurchase(data, "a"), "a retry is not new")
+		for i = 1, Schema.PurchaseIdCacheSize + 5 do
+			Schema.RecordPurchase(data, "id" .. i)
+		end
+		t.eq(#data.purchaseIds, Schema.PurchaseIdCacheSize)
+		t.ok(not Schema.RecordPurchase(data, "id" .. (Schema.PurchaseIdCacheSize + 5)), "recent ids are kept")
+	end)
+
 	t.test("bestAxeTier never goes down, and unknown axe ids don't break it", function()
 		local Schema, data = fresh()
 		data.bestAxeTier = 6

@@ -77,6 +77,9 @@ end
 
 -- Assigned by GameServer: (player, logUid) -> (). Server-validated pickup.
 TreeService.PickupCallback = nil :: ((Player, string) -> ())?
+-- Assigned by GameServer: how many times logsPerTree a player's fell drops
+-- (2 during a 2x Wood boost).
+TreeService.LogMultiplier = nil :: ((Player) -> number)?
 
 local function addPickupPrompt(logPart: BasePart, uid: string, def: WoodDef)
 	local prompt = Instance.new("ProximityPrompt")
@@ -275,7 +278,9 @@ local function fellTree(player: Player, uid: string)
 
 		-- Swap the fallen tree for exactly logsPerTree logs where it landed.
 		setTreeVisible(rec, false)
-		for _, cf in ipairs(logLayout(rec.base, fallDir, rec.def.trunkHeight, rec.def.logsPerTree)) do
+		local multiplier = if TreeService.LogMultiplier then TreeService.LogMultiplier(player) else 1
+		local count = rec.def.logsPerTree * multiplier
+		for _, cf in ipairs(logLayout(rec.base, fallDir, rec.def.trunkHeight, count)) do
 			TreeService.SpawnLog(rec.def, cf, fellerId)
 		end
 	end)

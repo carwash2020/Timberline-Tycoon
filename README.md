@@ -97,6 +97,7 @@ measure the economy model against your real play (saved in
   - `DailyService`: daily goals and streaks
   - `BiomeService`: what each biome does to you (cold, lava, darkness)
   - `WorldClock`: day and night, the same on every server
+  - `MonetizationService`: Robux passes and products (receipts granted once)
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
@@ -105,11 +106,12 @@ measure the economy model against your real play (saved in
   - `TruckLayout`, `DriveMath`: how trucks are built and how they drive
   - `DailyData`: daily goal sizes, rewards and streak bonus
   - `WorldTime`: the in-game clock
+  - `StoreData`: Robux items and their Creator Hub ids
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial
   tracker, `VehicleController` drives your truck, `DailyUI` the daily goals,
-  `WorldUI` biome names and the clock)
+  `WorldUI` biome names and the clock, `StoreUI` the Robux Store)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
 - `tests/`: unit tests, run with Lune outside Roblox (`tools/loader.luau`
