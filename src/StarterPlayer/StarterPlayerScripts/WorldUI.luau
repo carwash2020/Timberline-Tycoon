@@ -11,8 +11,10 @@
 --     save loads (HudLayout.ClockLine).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
 -- The server sets the Biome and OwnedGear attributes and the
--- VitalityTier_<biome> workspace attributes (ForestService); the time of
--- day comes from the server clock (WorldTime; LightingController sets Lighting.ClockTime).
+-- VitalityTier_<biome> workspace attributes (ForestService). The clock
+-- reads Lighting.ClockTime, the hour the sky shows: LightingController
+-- sets it every frame from the server's clock (WorldTime), or in Studio
+-- from the ClockOverride attribute.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -29,6 +31,7 @@ local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local WorldUI = {}
@@ -126,12 +129,14 @@ local function buildClock()
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(place) -- IsPhone reads the screen's height
 	end
 
-	-- From the server clock, once a second (LightingController moves
-	-- Lighting.ClockTime every frame; the label doesn't need to).
+	-- The hour the sky shows, once a second (LightingController moves
+	-- Lighting.ClockTime every frame; the label doesn't need to): the
+	-- shared clock, or Studio's ClockOverride, so a tester sees that hour.
 	local function refresh()
-		local clock = WorldTime.ClockTime(workspace:GetServerTimeNow())
-		label.Text =
-			string.format("%s %s", if WorldTime.IsNight(clock) then "Night" else "Day", WorldTime.Format(clock))
+		local text = HudRules.ClockText(Lighting.ClockTime)
+		if label.Text ~= text then
+			label.Text = text
+		end
 	end
 	refresh()
 	task.spawn(function()

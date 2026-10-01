@@ -266,4 +266,33 @@ return function(t)
 			t.eq(string.find(text, "plant them in stumps", 1, true) ~= nil, not keep, "step " .. step)
 		end
 	end)
+
+	t.test("the corner clock: Day or Night and the hour, as it always read", function()
+		local GameConfig = t.shared("GameConfig")
+		t.eq(HudRules.ClockText(14 + 5 / 60), "Day 14:05")
+		t.eq(HudRules.ClockText(22 + 10 / 60), "Night 22:10")
+		t.eq(HudRules.ClockText(0), "Night 00:00")
+		t.eq(
+			HudRules.ClockText(GameConfig.NightStartsAt),
+			"Night " .. string.format("%02d:00", GameConfig.NightStartsAt)
+		)
+		t.eq(HudRules.ClockText(GameConfig.NightEndsAt), "Day " .. string.format("%02d:00", GameConfig.NightEndsAt))
+	end)
+
+	t.test("the corner clock shows Lighting.ClockTime, so Studio's ClockOverride shows on it", function()
+		local ClockOverride = t.shared("ClockOverride")
+		-- A tester sets the override to 23 at noon: the sky goes dark, and so must the label.
+		t.eq(HudRules.ClockText(ClockOverride.Apply(12, 23, true)), "Night 23:00")
+		t.eq(HudRules.ClockText(ClockOverride.Apply(12, 23, false)), "Day 12:00", "a live server ignores it")
+		-- WorldUI reads the hour LightingController sets, not the server clock again.
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/WorldUI.luau")
+		local clock = string.match(source, "local function buildClock%(%).-\nend\n")
+		t.ok(clock, "WorldUI's buildClock moved")
+		t.ok(
+			string.find(clock, "HudRules.ClockText(Lighting.ClockTime)", 1, true),
+			"the label reads Lighting.ClockTime"
+		)
+		t.ok(not string.find(clock, "GetServerTimeNow", 1, true), "and doesn't work the hour out again")
+	end)
 end

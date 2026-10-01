@@ -20,6 +20,7 @@
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
 --   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
 --   * SeedToast() (ForestUI): what Heartseeds landing in your pouch say.
+--   * ClockText() (WorldUI): the corner clock, "Day 14:05" / "Night 22:10".
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +28,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
 local HudRules = {}
 
@@ -235,6 +237,13 @@ function HudRules.SeedToast(
 		end
 	end
 	return text
+end
+
+-- The corner clock (WorldUI) for `clockTime`, an hour from 0 to 24
+-- (Lighting.ClockTime): "Day 14:05", or "Night 22:10" while the Phantom
+-- Grove's trees are out (WorldTime.IsNight).
+function HudRules.ClockText(clockTime: number): string
+	return string.format("%s %s", if WorldTime.IsNight(clockTime) then "Night" else "Day", WorldTime.Format(clockTime))
 end
 
 return HudRules
