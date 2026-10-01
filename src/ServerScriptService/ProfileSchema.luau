@@ -41,6 +41,16 @@ export type DailyState = {
 
 -- One log riding in your truck bed (saved, so a disconnect never loses a
 -- haul; VehicleService rebuilds the load when your truck spawns).
+-- A left-behind log saved where it lay (VehicleService puts it back).
+export type LeftLog = {
+	woodId: string,
+	value: number,
+	figure: string?,
+	x: number,
+	y: number,
+	z: number,
+}
+
 export type BedLog = {
 	woodId: string,
 	value: number,
@@ -104,6 +114,7 @@ export type Profile = {
 	-- z; {} until known): on a rejoin the bed only comes back into the truck
 	-- if that was in town, else it waits there on the ground (VehicleService).
 	truckAt: { x: number?, y: number?, z: number? },
+	leftLoad: { LeftLog }, -- left-behind logs still on the ground when you left (put back on rejoin)
 	settings: { music: boolean, sfx: boolean },
 	pendingCash: number, -- Robux cash that didn't fit under the wallet cap, paid out as room frees up
 }
@@ -144,6 +155,7 @@ local TEMPLATE: Profile = {
 	forest = { planted = 0, harvested = 0, royalties = 0, figures = {}, elders = 0 },
 	truckBed = {},
 	truckAt = {},
+	leftLoad = {},
 	settings = { music = true, sfx = true },
 	pendingCash = 0,
 }

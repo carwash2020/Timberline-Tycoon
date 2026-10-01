@@ -259,6 +259,7 @@ end
 ---------------------------------------------------------------------------
 
 export type BedEntry = { woodId: string, value: number, figure: string? }
+export type LeftLog = { woodId: string, value: number, figure: string?, x: number, y: number, z: number }
 
 -- Plain copies of the bed's entries (nothing shared with the live bed).
 function VehicleLogic.CopyBed(bed: { BedEntry }): { BedEntry }
@@ -313,10 +314,11 @@ end
 ---------------------------------------------------------------------------
 
 -- A load rides along when the truck is rebuilt (Truck to lot, switching
--- trucks) or on a rejoin only from within this many studs (flat) of town:
--- the parking lot or the sell pad. From further out it's left on the
--- ground where the truck stood, so nobody skips the haul home.
-VehicleLogic.TownRadius = 150
+-- trucks) or on a rejoin only from town: inside the town's area (a flat
+-- rectangle, InTown) or within HomeRadius of the player's own parking
+-- spot. From further out it's left on the ground where the truck stood,
+-- so nobody skips the haul home.
+VehicleLogic.HomeRadius = 30
 VehicleLogic.MaxCoord = 100000 -- a saved spot further out than this is junk
 VehicleLogic.SpillPerRow = 3 -- logs left behind lie this many end to end across the truck's line
 
@@ -324,6 +326,17 @@ VehicleLogic.SpillPerRow = 3 -- logs left behind lie this many end to end across
 function VehicleLogic.FlatDistance(a: Vector3, b: Vector3): number
 	local dx, dz = a.X - b.X, a.Z - b.Z
 	return math.sqrt(dx * dx + dz * dz)
+end
+
+export type Rect = { x0: number, x1: number, z0: number, z1: number }
+
+-- True when `at` is in town: inside `rect` (flat), or within HomeRadius of
+-- `home` (an overflow parking spot can sit just outside the rectangle).
+function VehicleLogic.InTown(at: Vector3, rect: Rect, home: Vector3?): boolean
+	if at.X >= rect.x0 and at.X <= rect.x1 and at.Z >= rect.z0 and at.Z <= rect.z1 then
+		return true
+	end
+	return home ~= nil and VehicleLogic.FlatDistance(at, home) <= VehicleLogic.HomeRadius
 end
 
 -- True when `at` is within `radius` (flat) of any of `spots`.
@@ -358,6 +371,30 @@ function VehicleLogic.CleanSpot(saved: unknown): Vector3?
 		return nil
 	end
 	return Vector3.new(raw.x, raw.y, raw.z)
+end
+
+-- A saved left-behind log (profile.leftLoad), checked: a known wood id
+-- (`isWood`), a sane value and spot. Nil for junk.
+function VehicleLogic.CleanLeftLog(saved: unknown, isWood: (string) -> boolean): LeftLog?
+	if type(saved) ~= "table" then
+		return nil
+	end
+	local raw = saved :: { [string]: any }
+	local spot = VehicleLogic.CleanSpot(raw)
+	local value = raw.value
+	if
+		not spot
+		or type(raw.woodId) ~= "string"
+		or not isWood(raw.woodId)
+		or type(value) ~= "number"
+		or value ~= value
+		or value < 0
+		or value > 1e7
+	then
+		return nil
+	end
+	local figure = if type(raw.figure) == "string" then raw.figure else nil
+	return { woodId = raw.woodId, value = math.floor(value), figure = figure, x = spot.X, y = spot.Y, z = spot.Z }
 end
 
 -- Where `count` logs left behind lie, in the truck's flat frame (front is

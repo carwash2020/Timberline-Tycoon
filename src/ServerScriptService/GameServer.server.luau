@@ -312,7 +312,7 @@ local function onLoadToTruck(player: Player)
 		notify(player, "Truck bed full. Sell at the sawmill.")
 		return
 	end
-	local moved = 0
+	local moved, fresh = 0, 0 -- fresh: not a left-behind load being picked up again
 	for _, uid in ipairs(uids) do
 		local log = TreeService.GetLog(uid)
 		if not log then
@@ -325,13 +325,18 @@ local function onLoadToTruck(player: Player)
 			log.model:Destroy()
 			hands[uid] = nil
 			moved += 1
+			if log.tags.leftBehind ~= true then
+				fresh += 1
+			end
 		end
 	end
 	player:SetAttribute("CarriedLogs", countHands(hands))
 	if moved > 0 then
 		MilestoneService.Mark(player, "First log loaded")
-		QuestService.Event(player, "logsLoaded", moved)
-		DailyService.Event(player, "logsLoaded", moved)
+		if fresh > 0 then
+			QuestService.Event(player, "logsLoaded", fresh)
+			DailyService.Event(player, "logsLoaded", fresh)
+		end
 		notify(
 			player,
 			string.format(
@@ -632,6 +637,24 @@ local function onPlayerAdded(player: Player)
 	safely("VehicleService.SpawnTruck", function()
 		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
 	end)
+	-- Logs left behind (Truck to lot from afar) that were still lying out
+	-- when the player last left: back where they lay.
+	if #profile.leftLoad > 0 then
+		safely("VehicleService.RestoreLeftLoad", function()
+			local n = VehicleService.RestoreLeftLoad(player, profile.leftLoad)
+			profile.leftLoad = {}
+			if n > 0 then
+				notify(
+					player,
+					string.format(
+						"Your %d left-behind log%s are still where you left them.",
+						n,
+						if n == 1 then "" else "s"
+					)
+				)
+			end
+		end)
+	end
 
 	player.CharacterAdded:Connect(function(char)
 		onCharacterAdded(player, char)
@@ -663,6 +686,19 @@ local function onPlayerRemoving(player: Player)
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
+	-- Left-behind logs still lying out go into the save (put back on rejoin).
+	safely("save left-behind logs", function()
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			local left = TreeService.TakeLeftBehind(player.UserId)
+			for _, entry in ipairs(left) do
+				if #profile.leftLoad >= GameConfig.MaxLeftLogs then
+					break
+				end
+				table.insert(profile.leftLoad, entry)
+			end
+		end
+	end)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

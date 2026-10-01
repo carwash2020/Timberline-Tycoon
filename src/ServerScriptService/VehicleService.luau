@@ -42,9 +42,11 @@
 --     (the HUD keeps working while the truck is streamed out).
 --   * Recall ("Truck to lot") and switching trucks rebuild the truck in the
 --     player's slot. The load comes along (when it fits) only if the truck
---     was already in town (VehicleLogic.TownRadius); from further out it's
+--     was already in town (VehicleLogic.InTown); from further out it's
 --     left on the ground where the truck stood, as the player's logs, so
---     nobody skips the haul home.
+--     nobody skips the haul home. Left-behind logs still lying out when the
+--     player leaves are saved (profile.leftLoad, GameServer) and put back
+--     where they lay on rejoin (RestoreLeftLoad).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -59,6 +61,7 @@ local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
 local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
+local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ProfileService = require(script.Parent.ProfileService)
 local TreeService = require(script.Parent.TreeService)
@@ -813,24 +816,25 @@ end
 -- Loads left behind
 ---------------------------------------------------------------------------
 
--- Town, for VehicleLogic.TownRadius: every parking slot, the sell pad, and
--- `home` (the player's own spot, which may be an overflow spot).
-local function townSpots(home: Vector3): { Vector3 }
-	local spots = { home }
-	for _, slot in ipairs(sortedSlots()) do
-		table.insert(spots, slot.Position)
+-- Town, for VehicleLogic.InTown: the Town flat zone (the sawmill, shops,
+-- lot and spawn), cut off at the parking lot's south edge so the Starter
+-- Forest just beyond isn't town.
+local TOWN_RECT: VehicleLogic.Rect = (function()
+	for _, zone in ipairs(WorldLayout.FlatZones) do
+		if zone.name == "Town" then
+			return {
+				x0 = zone.x0,
+				x1 = zone.x1,
+				z0 = math.max(zone.z0, WorldLayout.ParkingLot.z0 - 4),
+				z1 = zone.z1,
+			}
+		end
 	end
-	local map = workspace:FindFirstChild("TimberlineMap")
-	local area = if map then map:FindFirstChild("SellArea") else nil
-	local zone = if area then area:FindFirstChild("SellZone") else nil
-	if zone and zone:IsA("BasePart") then
-		table.insert(spots, zone.Position)
-	end
-	return spots
-end
+	return { x0 = -125, x1 = 140, z0 = -22, z1 = 205 }
+end)()
 
 local function inTown(at: Vector3, home: Vector3): boolean
-	return VehicleLogic.NearAny(at, townSpots(home), VehicleLogic.TownRadius)
+	return VehicleLogic.InTown(at, TOWN_RECT, home)
 end
 
 -- True if a rebuild keeps this truck's load: the truck is in town.
@@ -888,6 +892,7 @@ local function spillLoad(player: Player, load: { BedEntry }, at: CFrame)
 		local log = TreeService.GetLog(uid)
 		if log then
 			log.value = entry.value
+			log.tags.leftBehind = true -- saved if its owner leaves before collecting it; not new work to load
 			model:SetAttribute("Value", entry.value)
 			if entry.figure then
 				log.tags.figure = entry.figure
@@ -904,6 +909,40 @@ end
 ---------------------------------------------------------------------------
 -- Public API
 ---------------------------------------------------------------------------
+
+-- Puts left-behind logs saved when the player last left (profile.leftLoad)
+-- back where they lay, theirs again for LeftLoadGraceSec. Returns how many.
+function VehicleService.RestoreLeftLoad(player: Player, saved: { any }): number
+	local restored = 0
+	for _, raw in ipairs(saved) do
+		local entry = VehicleLogic.CleanLeftLog(raw, function(id: string): boolean
+			return WoodData.Get(id) ~= nil
+		end)
+		local def = if entry then WoodData.Get(entry.woodId) else nil
+		if entry and def then
+			local model, uid = TreeService.SpawnLog(def, CFrame.new(entry.x, entry.y, entry.z), player.UserId, {
+				graceSec = GameConfig.LeftLoadGraceSec,
+				despawnSec = GameConfig.LeftLoadDespawnSec,
+			})
+			local log = TreeService.GetLog(uid)
+			if log then
+				log.value = entry.value
+				log.tags.leftBehind = true
+				model:SetAttribute("Value", entry.value)
+				if entry.figure then
+					log.tags.figure = entry.figure
+					model:SetAttribute("Figure", entry.figure)
+					local part = model.PrimaryPart
+					if part then
+						ForestArt.FigureBand(part, entry.figure)
+					end
+				end
+				restored += 1
+			end
+		end
+	end
+	return restored
+end
 
 -- `notifyFn` shows a toast (GameServer's notify). Without it, messages for
 -- players go to Output.

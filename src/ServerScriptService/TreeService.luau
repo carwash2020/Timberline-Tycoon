@@ -714,6 +714,36 @@ function TreeService.ClaimLog(uid: string): boolean
 end
 
 -- Removes the log record entirely (sold / loaded). The caller destroys the model.
+-- A left-behind log, saved where it lay (profile.leftLoad).
+export type LeftLog = { woodId: string, value: number, figure: string?, x: number, y: number, z: number }
+
+-- Takes every log left behind for `ownerId` (a truck load left where the
+-- truck stood, tag leftBehind) that's still lying in the world out of it,
+-- and returns what and where they were (saved when the owner leaves).
+function TreeService.TakeLeftBehind(ownerId: number): { LeftLog }
+	local out: { LeftLog } = {}
+	for uid, rec in pairs(logs) do
+		if rec.ownerId == ownerId and rec.state == "world" and rec.tags.leftBehind == true then
+			local pp = rec.model.PrimaryPart
+			if pp then
+				local p = pp.CFrame.Position
+				local figure = rec.tags.figure
+				table.insert(out, {
+					woodId = rec.def.id,
+					value = rec.value,
+					figure = if type(figure) == "string" then figure else nil,
+					x = p.X,
+					y = p.Y,
+					z = p.Z,
+				})
+			end
+			logs[uid] = nil
+			rec.model:Destroy()
+		end
+	end
+	return out
+end
+
 function TreeService.TakeLog(uid: string): LogRecord?
 	local rec = logs[uid]
 	logs[uid] = nil

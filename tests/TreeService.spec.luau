@@ -352,4 +352,26 @@ return function(t)
 		t.eq(s.pending(GameConfig.LeftLoadDespawnSec), 1, "and the long life")
 		t.ok(GameConfig.LeftLoadGraceSec > GameConfig.PickupGraceSec)
 	end)
+
+	t.test("left-behind logs still lying out are taken for the save; others aren't", function()
+		local s = setup()
+		local oak = t.shared("WoodData").Get("oak")
+		local _, leftUid = s.Trees.SpawnLog(oak, CFrame.new(10, 2, 20), 7)
+		local left = s.Trees.GetLog(leftUid)
+		left.tags.leftBehind = true
+		left.tags.figure = "curly"
+		left.value = 6
+		s.Trees.SpawnLog(oak, CFrame.new(0, 1, 0), 7) -- an ordinary felled log
+		local _, theirsUid = s.Trees.SpawnLog(oak, CFrame.new(5, 1, 5), 8)
+		s.Trees.GetLog(theirsUid).tags.leftBehind = true -- someone else's
+		local taken = s.Trees.TakeLeftBehind(7)
+		t.eq(#taken, 1)
+		t.eq(taken[1].woodId, "oak")
+		t.eq(taken[1].value, 6)
+		t.eq(taken[1].figure, "curly")
+		t.eq({ taken[1].x, taken[1].z }, { 10, 20 })
+		t.eq(s.Trees.GetLog(leftUid), nil, "gone from the world")
+		t.ok(s.Trees.GetLog(theirsUid) ~= nil)
+		t.eq(#s.Trees.TakeLeftBehind(7), 0, "taken once")
+	end)
 end

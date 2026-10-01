@@ -303,17 +303,19 @@ return function(t)
 	end)
 
 	t.test("a load only rides along from town", function()
-		-- Town: two parking slots and the sell pad (WorldPlan's layout).
-		local town = { Vector3.new(16, 0, 45), Vector3.new(104, 0, 5), Vector3.new(0, 6, 86) }
-		local r = VehicleLogic.TownRadius
+		-- Town: the Town flat zone cut at the parking lot's south edge
+		-- (VehicleService builds it from WorldLayout).
+		local town = { x0 = -125, x1 = 140, z0 = -22, z1 = 205 }
 		t.ok(near(VehicleLogic.FlatDistance(Vector3.new(0, 100, 0), Vector3.new(3, -50, 4)), 5), "height ignored")
-		t.ok(VehicleLogic.NearAny(Vector3.new(0, 3, 86), town, r), "on the sell pad")
-		t.ok(VehicleLogic.NearAny(Vector3.new(45, 3, 100), town, r), "at the Dealership")
-		t.ok(VehicleLogic.NearAny(Vector3.new(104, 50, 5 - r + 1), town, r), "just inside, however high")
-		t.ok(not VehicleLogic.NearAny(Vector3.new(104, 3, 5 - r - 1), town, r), "just outside")
-		t.ok(not VehicleLogic.NearAny(Vector3.new(1100, 40, 1180), town, r), "the Volcano")
-		t.ok(not VehicleLogic.NearAny(Vector3.new(-420, 10, 110), town, r), "the Hills")
-		t.ok(not VehicleLogic.NearAny(Vector3.zero, {}, r))
+		t.ok(VehicleLogic.InTown(Vector3.new(0, 3, 86), town), "on the sell pad")
+		t.ok(VehicleLogic.InTown(Vector3.new(45, 3, 100), town), "at the Dealership")
+		t.ok(VehicleLogic.InTown(Vector3.new(104, 50, 5), town), "in the lot, however high")
+		t.ok(not VehicleLogic.InTown(Vector3.new(0, 3, -60), town), "the Starter Forest isn't town")
+		t.ok(not VehicleLogic.InTown(Vector3.new(1100, 40, 1180), town), "the Volcano")
+		t.ok(not VehicleLogic.InTown(Vector3.new(-420, 10, 110), town), "the Hills")
+		local home = Vector3.new(-76, 0, -28) -- an overflow spot past the edge
+		t.ok(VehicleLogic.InTown(Vector3.new(-70, 0, -30), town, home), "beside your own spot")
+		t.ok(not VehicleLogic.InTown(Vector3.new(-70, 0, -70), town, home), "but not far past it")
 	end)
 
 	t.test("a load left behind lies in rows where the truck stood", function()
@@ -375,5 +377,31 @@ return function(t)
 		local cf = VehicleLogic.HeadingCFrame(Vector3.new(0, 0, -1), Vector3.yAxis)
 		local id = CFrame.identity
 		t.ok(nearV(cf.RightVector, id.RightVector) and nearV(cf.LookVector, id.LookVector))
+	end)
+
+	t.test("a saved left-behind log is checked before it's put back", function()
+		local function isWood(id)
+			return id == "oak" or id == "lumenwood"
+		end
+		local good = { woodId = "lumenwood", value = 960.7, figure = "starfall", x = 1, y = 700, z = -3 }
+		t.eq(VehicleLogic.CleanLeftLog(good, isWood), {
+			woodId = "lumenwood",
+			value = 960,
+			figure = "starfall",
+			x = 1,
+			y = 700,
+			z = -3,
+		})
+		t.eq(VehicleLogic.CleanLeftLog({ woodId = "oak", value = 3, x = 0, y = 0, z = 0 }, isWood).figure, nil)
+		for _, junk in ipairs({
+			"oak",
+			{ woodId = "plastic", value = 3, x = 0, y = 0, z = 0 },
+			{ woodId = "oak", value = -1, x = 0, y = 0, z = 0 },
+			{ woodId = "oak", value = 0 / 0, x = 0, y = 0, z = 0 },
+			{ woodId = "oak", value = 3, x = math.huge, y = 0, z = 0 },
+			{ woodId = "oak", value = 3, x = 0, z = 0 },
+		}) do
+			t.eq(VehicleLogic.CleanLeftLog(junk, isWood), nil)
+		end
 	end)
 end
