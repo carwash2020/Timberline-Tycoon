@@ -13,6 +13,11 @@
 --
 -- While an axe is out, whatever you'd chop is outlined: cream when it's in
 -- reach, amber when your axe is too weak for it. Out of reach, no outline.
+--
+-- Each swing first turns you to face its tree (FaceTarget: yaw only, and
+-- only when it's more than 15 degrees off to the side), so the slash lands
+-- on the trunk; holding to chop turns you again on every swing. Not while
+-- you sit or climb.
 
 local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
@@ -26,6 +31,7 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
 
 local ChopController = {}
@@ -88,10 +94,15 @@ local function canCut(axe: ItemCatalog.AxeDef, tree: Model): boolean
 	return wood ~= nil and ItemCatalog.AxeDamage(axe, wood) > 0
 end
 
+-- Where a tree (or node) stands: its HomePivot when it has one, else its pivot.
+local function baseOf(tree: Model): Vector3
+	local home = tree:GetAttribute("HomePivot")
+	return if typeof(home) == "CFrame" then home.Position else tree:GetPivot().Position
+end
+
 -- Horizontal distance from `from` to the tree's bark (to a node's centre).
 local function reachTo(tree: Model, from: Vector3): number
-	local home = tree:GetAttribute("HomePivot")
-	local pos = if typeof(home) == "CFrame" then home.Position else tree:GetPivot().Position
+	local pos = baseOf(tree)
 	local radius = tree:GetAttribute("TrunkRadius")
 	local flat = Vector3.new(pos.X - from.X, 0, pos.Z - from.Z).Magnitude
 	return flat - (if type(radius) == "number" then radius else 0)
@@ -161,6 +172,33 @@ local function pickTarget(hrp: BasePart, axe: ItemCatalog.AxeDef): (Model?, stri
 	return best, if best == nil then problem else nil
 end
 
+-- Turns the character to face `tree` before a swing (see the header).
+-- Skipped while sitting (the root part is welded to the seat, so turning
+-- it would swing the truck), climbing, knocked over (PlatformStand) or
+-- dead. The turn only has to hold for the slash: Humanoid.AutoRotate
+-- leaves a character that stands still facing where it was put, and one
+-- that's walking (or in shift lock / first person, which face the camera)
+-- turns back on its own afterwards, so AutoRotate is left alone.
+local function faceTree(hrp: BasePart, tree: Model)
+	local char = player.Character
+	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+	if
+		not humanoid
+		or humanoid.Sit
+		or humanoid.SeatPart ~= nil
+		or humanoid.PlatformStand
+		or humanoid.Health <= 0
+		or hrp.Anchored
+		or humanoid:GetState() == Enum.HumanoidStateType.Climbing
+	then
+		return
+	end
+	local turned = FaceTarget.Turn(hrp.CFrame, baseOf(tree))
+	if turned then
+		hrp.CFrame = turned
+	end
+end
+
 -- The default character Animate script plays its built-in tool-slash
 -- animation when a StringValue "toolanim" = "Slash" appears in the tool.
 local function playSlash(tool: Tool)
@@ -211,6 +249,7 @@ local function trySwing(fromClick: boolean)
 		return
 	end
 	cooldownUntil = now + GameConfig.SwingCooldown
+	faceTree(hrp, tree)
 	Net.Remote(if isNode(tree) then "MineNode" else "ChopTree"):FireServer(tree:GetAttribute("Uid"))
 	playSlash(tool)
 	SoundData.Play("Swing")
@@ -319,7 +358,8 @@ function ChopController.Start()
 	end)
 	local sinceAim = 0
 	RunService.Heartbeat:Connect(function(dt: number)
-		-- Hold-to-chop: keep swinging every cooldown while the button is down.
+		-- Hold-to-chop: keep swinging every cooldown while the button is down
+		-- (each swing turns you to its tree again).
 		local now = os.clock()
 		if holding and now >= cooldownUntil and now >= retryAt then
 			trySwing(false)
