@@ -1,0 +1,1010 @@
+--!strict
+-- EnvironmentData: how the world looks and feels at every hour, in every
+-- biome and every weather (GAME_DESIGN §12, §13, §16). Pure data and
+-- functions, so the client draws it, the tests check it, and tuning it is
+-- editing this file:
+--
+--   * Lighting: keyframes over the day (dawn, midday, golden hour, dusk,
+--     night), then per-biome and per-weather overrides on top. Blend()
+--     turns (clock, biome, weather, intensity) into one LightingState that
+--     LightingController eases toward.
+--   * Daylight(clock): 0 at night, 1 by day, smooth in between (ambience,
+--     critters, music).
+--   * Decor: what grows around you per biome (AmbientLife scatters it per
+--     64-stud cell), and DecorSpots(), the deterministic scatter itself.
+--   * Critters: who is out and about (CritterPlan), by biome, hour,
+--     weather and the grove's vitality (thriving groves come alive).
+--   * NearestWater(x, z): where the river or lake is (water sounds, fish).
+--
+-- All the numbers are "tune by eye in Studio" starting points.
+
+local BiomeData = require(script.Parent.BiomeData)
+local Kit = require(script.Parent.Art.Kit)
+local TerrainGen = require(script.Parent.World.TerrainGen)
+local WorldLayout = require(script.Parent.World.WorldLayout)
+
+local EnvironmentData = {}
+
+local rgb = Color3.fromRGB
+
+local function smoothstep(t: number): number
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+---------------------------------------------------------------------------
+-- Lighting
+---------------------------------------------------------------------------
+
+-- Everything LightingController sets (besides the clock). Colours are
+-- Color3s, the rest numbers; names say which instance they go to.
+export type LightingState = {
+	-- Lighting
+	brightness: number,
+	exposure: number, -- ExposureCompensation
+	ambient: Color3, -- indoors / out of the sky's reach
+	outdoorAmbient: Color3,
+	colorShiftTop: Color3, -- tint of sunlit faces
+	-- Atmosphere
+	atmosphereDensity: number,
+	atmosphereOffset: number,
+	atmosphereColor: Color3,
+	atmosphereDecay: Color3,
+	atmosphereGlare: number,
+	atmosphereHaze: number,
+	-- ColorCorrection
+	saturation: number,
+	contrast: number,
+	tint: Color3,
+	-- SunRays
+	sunRaysIntensity: number,
+	sunRaysSpread: number,
+	-- Bloom
+	bloomIntensity: number,
+	bloomSize: number,
+	bloomThreshold: number,
+	-- Clouds (under workspace.Terrain)
+	cloudCover: number,
+	cloudDensity: number,
+	cloudColor: Color3,
+	-- DepthOfField far blur (0 = off)
+	dofFar: number,
+}
+
+EnvironmentData.NumberKeys = {
+	"brightness",
+	"exposure",
+	"atmosphereDensity",
+	"atmosphereOffset",
+	"atmosphereGlare",
+	"atmosphereHaze",
+	"saturation",
+	"contrast",
+	"sunRaysIntensity",
+	"sunRaysSpread",
+	"bloomIntensity",
+	"bloomSize",
+	"bloomThreshold",
+	"cloudCover",
+	"cloudDensity",
+	"dofFar",
+}
+
+EnvironmentData.ColorKeys = {
+	"ambient",
+	"outdoorAmbient",
+	"colorShiftTop",
+	"atmosphereColor",
+	"atmosphereDecay",
+	"tint",
+	"cloudColor",
+}
+
+-- The legal range of each number (Roblox's own limits, or what still looks
+-- sane); Blend clamps into these.
+EnvironmentData.Ranges = {
+	brightness = { 0, 10 },
+	exposure = { -3, 3 },
+	atmosphereDensity = { 0, 1 },
+	atmosphereOffset = { 0, 1 },
+	atmosphereGlare = { 0, 10 },
+	atmosphereHaze = { 0, 10 },
+	saturation = { -1, 1 },
+	contrast = { -1, 1 },
+	sunRaysIntensity = { 0, 1 },
+	sunRaysSpread = { 0, 1 },
+	bloomIntensity = { 0, 1.5 },
+	bloomSize = { 0, 56 },
+	bloomThreshold = { 0, 4 },
+	cloudCover = { 0, 1 },
+	cloudDensity = { 0, 1 },
+	dofFar = { 0, 1 },
+} :: { [string]: { number } }
+
+-- A keyframe: the full state at an in-game hour.
+export type Keyframe = { hour: number, name: string, state: LightingState }
+
+local function key(
+	hour: number,
+	name: string,
+	s: {
+		brightness: number,
+		exposure: number,
+		ambient: Color3,
+		outdoor: Color3,
+		shift: Color3,
+		density: number,
+		offset: number,
+		color: Color3,
+		decay: Color3,
+		glare: number,
+		haze: number,
+		saturation: number,
+		tint: Color3,
+		rays: number,
+		spread: number,
+		bloom: number,
+		threshold: number,
+		clouds: Color3,
+	}
+): Keyframe
+	return {
+		hour = hour,
+		name = name,
+		state = {
+			brightness = s.brightness,
+			exposure = s.exposure,
+			ambient = s.ambient,
+			outdoorAmbient = s.outdoor,
+			colorShiftTop = s.shift,
+			atmosphereDensity = s.density,
+			atmosphereOffset = s.offset,
+			atmosphereColor = s.color,
+			atmosphereDecay = s.decay,
+			atmosphereGlare = s.glare,
+			atmosphereHaze = s.haze,
+			saturation = s.saturation,
+			contrast = 0.05,
+			tint = s.tint,
+			sunRaysIntensity = s.rays,
+			sunRaysSpread = s.spread,
+			bloomIntensity = s.bloom,
+			bloomSize = 24,
+			bloomThreshold = s.threshold,
+			cloudCover = 0.5,
+			cloudDensity = 0.25,
+			cloudColor = s.clouds,
+			dofFar = 0,
+		},
+	}
+end
+
+-- Cozy days, golden evenings, nights dark enough that lanterns and lit
+-- windows matter. The night holds from 22:00 to 04:00.
+local NIGHT = {
+	brightness = 0.6,
+	exposure = -0.2,
+	ambient = rgb(26, 28, 46),
+	outdoor = rgb(55, 65, 105),
+	shift = rgb(30, 40, 80),
+	density = 0.36,
+	offset = 0.1,
+	color = rgb(90, 100, 140),
+	decay = rgb(40, 45, 80),
+	glare = 0,
+	haze = 0.5,
+	saturation = -0.05,
+	tint = rgb(210, 220, 255),
+	rays = 0,
+	spread = 0.4,
+	bloom = 0.75,
+	threshold = 1.2,
+	clouds = rgb(120, 130, 165),
+}
+
+EnvironmentData.Keyframes = {
+	key(4, "Night", NIGHT),
+	key(6, "Dawn", {
+		brightness = 1.8,
+		exposure = 0,
+		ambient = rgb(62, 54, 64),
+		outdoor = rgb(150, 125, 140),
+		shift = rgb(150, 110, 90),
+		density = 0.34,
+		offset = 0.15,
+		color = rgb(255, 195, 165),
+		decay = rgb(120, 95, 115),
+		glare = 0.6,
+		haze = 2,
+		saturation = 0.1,
+		tint = rgb(255, 240, 230),
+		rays = 0.1,
+		spread = 0.6,
+		bloom = 0.6,
+		threshold = 1.6,
+		clouds = rgb(255, 228, 218),
+	}),
+	key(13, "Midday", {
+		brightness = 2.6,
+		exposure = 0,
+		ambient = rgb(70, 70, 76),
+		outdoor = rgb(135, 135, 140),
+		shift = rgb(40, 38, 34),
+		density = 0.28,
+		offset = 0.2,
+		color = rgb(200, 212, 222),
+		decay = rgb(106, 122, 142),
+		glare = 0.2,
+		haze = 1,
+		saturation = 0.12,
+		tint = rgb(255, 255, 255),
+		rays = 0.05,
+		spread = 0.5,
+		bloom = 0.6,
+		threshold = 1.6,
+		clouds = rgb(255, 255, 255),
+	}),
+	key(17.5, "Golden", {
+		brightness = 2.2,
+		exposure = 0,
+		ambient = rgb(76, 62, 56),
+		outdoor = rgb(160, 130, 110),
+		shift = rgb(170, 110, 60),
+		density = 0.32,
+		offset = 0.15,
+		color = rgb(255, 200, 150),
+		decay = rgb(150, 100, 90),
+		glare = 1.2,
+		haze = 2.2,
+		saturation = 0.15,
+		tint = rgb(255, 235, 215),
+		rays = 0.12,
+		spread = 0.7,
+		bloom = 0.6,
+		threshold = 1.6,
+		clouds = rgb(255, 214, 180),
+	}),
+	key(19.25, "Dusk", {
+		brightness = 1.1,
+		exposure = -0.1,
+		ambient = rgb(50, 44, 62),
+		outdoor = rgb(112, 96, 130),
+		shift = rgb(90, 60, 90),
+		density = 0.34,
+		offset = 0.12,
+		color = rgb(210, 150, 170),
+		decay = rgb(85, 65, 110),
+		glare = 0.4,
+		haze = 1.6,
+		saturation = 0.06,
+		tint = rgb(240, 225, 250),
+		rays = 0.03,
+		spread = 0.5,
+		bloom = 0.7,
+		threshold = 1.4,
+		clouds = rgb(205, 170, 200),
+	}),
+	key(22, "Night", NIGHT),
+} :: { Keyframe }
+
+-- An override nudges the state: numbers multiplied (mul), added (add) or
+-- pulled toward a value (set); colours multiplied channel by channel
+-- (tint, so a night stays dark) or pulled toward a colour (paint). It is
+-- applied with a weight: 1 for the biome you're in, the weather's
+-- intensity for weather.
+export type Override = {
+	mul: { [string]: number }?,
+	add: { [string]: number }?,
+	set: { [string]: number }?,
+	tint: { [string]: Color3 }?,
+	paint: { [string]: Color3 }?,
+}
+
+local function scale(r: number, g: number, b: number): Color3
+	return Color3.new(r, g, b)
+end
+
+EnvironmentData.BiomeOverrides = {
+	-- Warm greens and honey light.
+	starter = { add = { saturation = 0.03 } },
+	hills = { add = { saturation = 0.02, contrast = 0.02 } },
+	-- Cool and bright: pale blues, white drifts, cool rim light.
+	snow = {
+		mul = { brightness = 1.12 },
+		add = { exposure = 0.1, saturation = -0.05, atmosphereDensity = 0.04, atmosphereHaze = 0.5 },
+		tint = {
+			outdoorAmbient = scale(0.95, 1.0, 1.12),
+			atmosphereColor = scale(0.9, 0.97, 1.08),
+			colorShiftTop = scale(0.8, 0.9, 1.1),
+		},
+		paint = { tint = rgb(235, 245, 255) },
+	},
+	-- Charred rock, ember-orange glow, ash in the air. (The midday tint
+	-- comes out at (255, 215, 190), the decay at (180, 80, 60).)
+	volcano = {
+		add = { atmosphereDensity = 0.08, atmosphereHaze = 1, saturation = 0.02, bloomIntensity = 0.1 },
+		tint = {
+			tint = scale(1, 0.843, 0.745),
+			atmosphereDecay = scale(1.7, 0.66, 0.42),
+			atmosphereColor = scale(1.15, 0.85, 0.7),
+			outdoorAmbient = scale(1.15, 0.9, 0.8),
+			cloudColor = scale(0.75, 0.6, 0.55),
+		},
+	},
+	-- Deep purples and teal glow, darker than anywhere.
+	grove = {
+		mul = { brightness = 0.6 },
+		add = { exposure = -0.15, atmosphereDensity = 0.08, bloomIntensity = 0.2 },
+		tint = {
+			tint = scale(0.745, 0.706, 1),
+			outdoorAmbient = scale(0.75, 0.65, 1),
+			atmosphereColor = scale(0.8, 0.7, 1.1),
+			atmosphereDecay = scale(0.8, 0.6, 1.2),
+		},
+	},
+	-- White-gold light above the clouds, the whole map spread out below.
+	sky = {
+		set = { atmosphereDensity = 0.2, atmosphereOffset = 0.4, dofFar = 0.08 },
+		add = { saturation = 0.2, bloomIntensity = 0.3, brightness = 0.3, atmosphereGlare = 0.5 },
+	},
+} :: { [string]: Override }
+
+EnvironmentData.WeatherOverrides = {
+	Clear = {},
+	Cloudy = {
+		mul = { brightness = 0.85, sunRaysIntensity = 0.4, atmosphereGlare = 0.5 },
+		add = { saturation = -0.03, atmosphereDensity = 0.03 },
+		set = { cloudCover = 0.78, cloudDensity = 0.4 },
+	},
+	Rain = {
+		mul = { brightness = 0.7, sunRaysIntensity = 0, atmosphereGlare = 0.2 },
+		add = { atmosphereDensity = 0.1, saturation = -0.1, atmosphereHaze = 0.8, exposure = -0.05 },
+		set = { cloudCover = 0.88, cloudDensity = 0.55 },
+		tint = {
+			cloudColor = scale(0.72, 0.74, 0.78),
+			atmosphereColor = scale(0.85, 0.88, 0.92),
+			outdoorAmbient = scale(0.88, 0.9, 0.95),
+		},
+	},
+	Storm = {
+		mul = { brightness = 0.5, sunRaysIntensity = 0, atmosphereGlare = 0 },
+		add = { atmosphereDensity = 0.15, saturation = -0.15, atmosphereHaze = 1.2, exposure = -0.1, contrast = 0.05 },
+		set = { cloudCover = 0.96, cloudDensity = 0.8 },
+		tint = {
+			cloudColor = scale(0.5, 0.52, 0.58),
+			atmosphereColor = scale(0.65, 0.68, 0.75),
+			atmosphereDecay = scale(0.6, 0.62, 0.7),
+			outdoorAmbient = scale(0.75, 0.78, 0.86),
+		},
+	},
+	Fog = {
+		mul = { atmosphereGlare = 0.3, sunRaysIntensity = 0.3 },
+		add = { saturation = -0.05 },
+		set = { atmosphereDensity = 0.55, atmosphereOffset = 0.05, atmosphereHaze = 3, cloudCover = 0.6 },
+	},
+	Snow = {
+		mul = { brightness = 0.9, sunRaysIntensity = 0.2 },
+		add = { atmosphereDensity = 0.12, atmosphereHaze = 1, saturation = -0.05 },
+		set = { cloudCover = 0.85, cloudDensity = 0.45 },
+		tint = { atmosphereColor = scale(1.05, 1.05, 1.08) },
+	},
+	Blizzard = {
+		mul = { brightness = 0.65, sunRaysIntensity = 0, atmosphereGlare = 0 },
+		add = { atmosphereDensity = 0.3, saturation = -0.12 },
+		set = { atmosphereOffset = 0.03, atmosphereHaze = 4, cloudCover = 0.95, cloudDensity = 0.7 },
+		tint = { atmosphereColor = scale(1.1, 1.1, 1.15), cloudColor = scale(0.8, 0.82, 0.86) },
+	},
+	Ashfall = {
+		mul = { brightness = 0.55, sunRaysIntensity = 0 },
+		add = { atmosphereDensity = 0.25, atmosphereHaze = 2, saturation = -0.1 },
+		set = { cloudCover = 0.9, cloudDensity = 0.65 },
+		tint = {
+			atmosphereColor = scale(0.75, 0.6, 0.55),
+			atmosphereDecay = scale(0.7, 0.45, 0.4),
+			tint = scale(1, 0.9, 0.85),
+			cloudColor = scale(0.45, 0.38, 0.36),
+		},
+	},
+	Wind = {
+		add = { atmosphereHaze = 0.3 },
+		set = { cloudCover = 0.62, cloudDensity = 0.3 },
+	},
+} :: { [string]: Override }
+
+local NUMBER_SET: { [string]: boolean } = {}
+for _, k in ipairs(EnvironmentData.NumberKeys) do
+	NUMBER_SET[k] = true
+end
+local COLOR_SET: { [string]: boolean } = {}
+for _, k in ipairs(EnvironmentData.ColorKeys) do
+	COLOR_SET[k] = true
+end
+
+-- Every key an override names must exist (a typo would silently do nothing).
+local function checkOverride(name: string, o: Override)
+	local function numbers(part: { [string]: number }?)
+		for k in pairs(part or {}) do
+			assert(NUMBER_SET[k], string.format("[EnvironmentData] %s: unknown number %q", name, k))
+		end
+	end
+	local function colors(part: { [string]: Color3 }?)
+		for k in pairs(part or {}) do
+			assert(COLOR_SET[k], string.format("[EnvironmentData] %s: unknown colour %q", name, k))
+		end
+	end
+	numbers(o.mul)
+	numbers(o.add)
+	numbers(o.set)
+	colors(o.tint)
+	colors(o.paint)
+end
+for name, o in pairs(EnvironmentData.BiomeOverrides) do
+	checkOverride(name, o)
+end
+for name, o in pairs(EnvironmentData.WeatherOverrides) do
+	checkOverride(name, o)
+end
+
+local function copy(s: LightingState): LightingState
+	return table.clone(s)
+end
+
+local function lerpNumber(a: number, b: number, t: number): number
+	return a + (b - a) * t
+end
+
+-- The state between a and b (t = 0 gives a, 1 gives b).
+function EnvironmentData.Lerp(a: LightingState, b: LightingState, t: number): LightingState
+	local out = copy(a) :: any
+	local fa, fb = a :: any, b :: any
+	for _, k in ipairs(EnvironmentData.NumberKeys) do
+		out[k] = lerpNumber(fa[k], fb[k], t)
+	end
+	for _, k in ipairs(EnvironmentData.ColorKeys) do
+		out[k] = (fa[k] :: Color3):Lerp(fb[k], t)
+	end
+	return out :: LightingState
+end
+
+local function clampColor(c: Color3): Color3
+	return Color3.new(math.clamp(c.R, 0, 1), math.clamp(c.G, 0, 1), math.clamp(c.B, 0, 1))
+end
+
+-- Applies an override with weight w (0 = no change) to s, in place.
+function EnvironmentData.Apply(s: LightingState, o: Override, w: number)
+	if w <= 0 then
+		return
+	end
+	w = math.min(w, 1)
+	local f = s :: any
+	local none: { [string]: number } = {}
+	local noColors: { [string]: Color3 } = {}
+	for k, m in pairs(o.mul or none) do
+		f[k] *= 1 + (m - 1) * w
+	end
+	for k, a in pairs(o.add or none) do
+		f[k] += a * w
+	end
+	for k, v in pairs(o.set or none) do
+		f[k] = lerpNumber(f[k], v, w)
+	end
+	local white = Color3.new(1, 1, 1)
+	for k, c in pairs(o.tint or noColors) do
+		local m = white:Lerp(c, w)
+		local base = f[k] :: Color3
+		f[k] = Color3.new(base.R * m.R, base.G * m.G, base.B * m.B)
+	end
+	for k, c in pairs(o.paint or noColors) do
+		f[k] = (f[k] :: Color3):Lerp(c, w)
+	end
+end
+
+-- Keeps every value inside its legal range, in place.
+function EnvironmentData.Clamp(s: LightingState)
+	local f = s :: any
+	for _, k in ipairs(EnvironmentData.NumberKeys) do
+		local r = EnvironmentData.Ranges[k]
+		f[k] = math.clamp(f[k], r[1], r[2])
+	end
+	for _, k in ipairs(EnvironmentData.ColorKeys) do
+		f[k] = clampColor(f[k])
+	end
+end
+
+-- The day's own light at `clockTime` (0..24), before biome and weather.
+function EnvironmentData.TimeOfDay(clockTime: number): LightingState
+	local frames = EnvironmentData.Keyframes
+	local h = clockTime % 24
+	-- Find the keyframes either side, wrapping past midnight.
+	local n = #frames
+	local prev, nextFrame = frames[n], frames[1]
+	local prevHour, nextHour = frames[n].hour - 24, frames[1].hour
+	for i = 1, n do
+		local f = frames[i]
+		if f.hour <= h then
+			prev, prevHour = f, f.hour
+			local following = frames[i + 1]
+			if following then
+				nextFrame, nextHour = following, following.hour
+			else
+				nextFrame, nextHour = frames[1], frames[1].hour + 24
+			end
+		end
+	end
+	local span = nextHour - prevHour
+	local t = if span > 0 then smoothstep((h - prevHour) / span) else 0
+	return EnvironmentData.Lerp(prev.state, nextFrame.state, t)
+end
+
+-- The full picture: the hour's light, then the biome you're in ("" or nil
+-- = open country), then the weather at `intensity` (0..1).
+function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: string?, intensity: number?): LightingState
+	local s = EnvironmentData.TimeOfDay(clockTime)
+	local biome = if biomeId then EnvironmentData.BiomeOverrides[biomeId] else nil
+	if biome then
+		EnvironmentData.Apply(s, biome, 1)
+	end
+	local w = if weather then EnvironmentData.WeatherOverrides[weather] else nil
+	if w then
+		EnvironmentData.Apply(s, w, math.clamp(intensity or 1, 0, 1))
+	end
+	EnvironmentData.Clamp(s)
+	return s
+end
+
+-- 0 at night, 1 by day, easing through dawn (5-7) and dusk (17.5-19.5).
+function EnvironmentData.Daylight(clockTime: number): number
+	local h = clockTime % 24
+	if h < 12 then
+		return smoothstep((h - 5) / 2)
+	end
+	return 1 - smoothstep((h - 17.5) / 2)
+end
+
+---------------------------------------------------------------------------
+-- Grove vitality (GAME_DESIGN §16): what a thriving grove adds
+---------------------------------------------------------------------------
+
+EnvironmentData.DefaultVitality = 60
+
+-- "Thinning" | "Healthy" | "Thriving" | "OldGrowth"
+function EnvironmentData.VitalityTier(v: number): string
+	if v >= 90 then
+		return "OldGrowth"
+	elseif v >= 75 then
+		return "Thriving"
+	elseif v >= 35 then
+		return "Healthy"
+	end
+	return "Thinning"
+end
+
+-- How much more life a grove of this vitality shows (1 = normal).
+EnvironmentData.TierLife = { Thinning = 0.5, Healthy = 1, Thriving = 1.6, OldGrowth = 2 } :: { [string]: number }
+
+function EnvironmentData.LifeFactor(v: number): number
+	return EnvironmentData.TierLife[EnvironmentData.VitalityTier(v)]
+end
+
+---------------------------------------------------------------------------
+-- Ground decoration (AmbientLife scatters it around you)
+---------------------------------------------------------------------------
+
+-- One kind of decoration in a biome. `kind` is a PropArt builder name;
+-- AmbientLife knows how to call each. `lush` (0..1) is how strongly its
+-- numbers follow the grove's vitality (flowers 1, rocks 0). `enabled =
+-- false` marks a slot waiting for its PropArt model (the nature workstream
+-- is adding them); AmbientLife skips those until someone wires them up.
+export type DecorKind = {
+	kind: string,
+	weight: number,
+	lush: number?,
+	variants: number, -- how many looks are built and pooled
+	palette: string?, -- EnvironmentData.DecorPalettes key
+	size: { number }?, -- min, max (Rock, Bush, Crystal)
+	glowing: boolean?, -- Mushroom
+	sink: number?, -- studs pushed into the ground (rocks)
+	enabled: boolean?,
+}
+
+EnvironmentData.DecorPalettes = {
+	meadowFlowers = { rgb(250, 214, 80), rgb(255, 255, 245), rgb(240, 140, 180), rgb(170, 130, 230) },
+	forestFlowers = { rgb(255, 236, 120), rgb(255, 250, 240), rgb(250, 160, 190), rgb(255, 170, 90) },
+	hillFlowers = { rgb(120, 150, 240), rgb(170, 120, 220), rgb(255, 220, 90), rgb(255, 255, 250) },
+	groveFlowers = { rgb(150, 120, 240), rgb(90, 230, 210), rgb(200, 170, 255) },
+	greens = { rgb(84, 140, 60), rgb(104, 160, 70), rgb(70, 120, 52) },
+	hillGreens = { rgb(64, 120, 52), rgb(84, 136, 60), rgb(110, 150, 70) },
+	frostGreens = { rgb(120, 160, 160), rgb(150, 190, 200), rgb(220, 235, 245) },
+	groveGreens = { rgb(70, 50, 110), rgb(90, 64, 140), rgb(52, 90, 110) },
+	stone = { rgb(140, 134, 126), rgb(120, 116, 110), rgb(158, 150, 140) },
+	snowStone = { rgb(232, 238, 245), rgb(200, 208, 218), rgb(150, 150, 156) },
+	darkStone = { rgb(58, 52, 50), rgb(44, 40, 40), rgb(72, 64, 60) },
+	ice = { rgb(170, 222, 245) },
+	ember = { rgb(255, 120, 40) },
+	amethyst = { rgb(170, 120, 255) },
+} :: { [string]: { Color3 } }
+
+type DecorExtra = {
+	lush: number?,
+	variants: number?,
+	palette: string?,
+	size: { number }?,
+	glowing: boolean?,
+	sink: number?,
+	enabled: boolean?,
+}
+
+local function decor(kind: string, weight: number, extra: DecorExtra?): DecorKind
+	local e: DecorExtra = extra or {}
+	return {
+		kind = kind,
+		weight = weight,
+		lush = e.lush,
+		variants = e.variants or 4,
+		palette = e.palette,
+		size = e.size,
+		glowing = e.glowing,
+		sink = e.sink,
+		enabled = e.enabled,
+	}
+end
+
+-- What grows where ("meadow" = the open country between biomes). The
+-- `enabled = false` rows are TODO slots for PropArt models the nature
+-- workstream is adding; wire each into AmbientLife's BUILDERS, then drop
+-- the flag.
+EnvironmentData.Decor = {
+	meadow = {
+		decor("Flowers", 5, { lush = 1, palette = "meadowFlowers" }),
+		decor("Bush", 2, { lush = 0.4, palette = "greens", size = { 2, 3.6 } }),
+		decor("Rock", 1.5, { palette = "stone", size = { 0.9, 2.2 }, sink = 0.25 }),
+		decor("Mushroom", 0.6, { lush = 0.5 }),
+		decor("GrassTuft", 6, { lush = 0.3, enabled = false }), -- TODO PropArt.GrassTuft
+		decor("Pebbles", 2, { enabled = false }), -- TODO PropArt.Pebbles
+		decor("BerryBush", 1, { lush = 1, enabled = false }), -- TODO PropArt.BerryBush
+	},
+	starter = {
+		decor("Flowers", 4, { lush = 1, palette = "forestFlowers" }),
+		decor("Bush", 3, { lush = 0.5, palette = "greens", size = { 2, 4 } }),
+		decor("Mushroom", 1.5, { lush = 0.7 }),
+		decor("Rock", 1, { palette = "stone", size = { 0.8, 2 }, sink = 0.25 }),
+		decor("Fern", 4, { lush = 0.6, enabled = false }), -- TODO PropArt.Fern
+		decor("GrassTuft", 4, { lush = 0.3, enabled = false }), -- TODO PropArt.GrassTuft
+		decor("FallenLog", 0.6, { enabled = false }), -- TODO PropArt.FallenLog
+		decor("Stump", 0.6, { enabled = false }), -- TODO PropArt.Stump
+		decor("BerryBush", 1, { lush = 1, enabled = false }), -- TODO PropArt.BerryBush
+	},
+	hills = {
+		decor("Bush", 3, { lush = 0.4, palette = "hillGreens", size = { 2.2, 4.2 } }),
+		decor("Rock", 2.5, { palette = "stone", size = { 1, 2.8 }, sink = 0.3 }),
+		decor("Flowers", 3, { lush = 1, palette = "hillFlowers" }),
+		decor("Mushroom", 1, { lush = 0.6 }),
+		decor("Fern", 3, { lush = 0.6, enabled = false }), -- TODO PropArt.Fern
+		decor("GrassTuft", 4, { lush = 0.3, enabled = false }), -- TODO PropArt.GrassTuft
+		decor("FallenLog", 0.8, { enabled = false }), -- TODO PropArt.FallenLog
+		decor("Stump", 0.6, { enabled = false }), -- TODO PropArt.Stump
+	},
+	snow = {
+		decor("Rock", 3, { palette = "snowStone", size = { 1, 2.6 }, sink = 0.3 }),
+		decor("Crystal", 1.5, { palette = "ice", size = { 1, 2.2 } }),
+		decor("Bush", 1.5, { lush = 0.5, palette = "frostGreens", size = { 1.8, 3 } }),
+		decor("SnowPile", 4, { enabled = false }), -- TODO PropArt.SnowPile
+		decor("DeadBranch", 1, { enabled = false }), -- TODO PropArt.DeadBranch
+	},
+	volcano = {
+		decor("Rock", 4, { palette = "darkStone", size = { 1, 3 }, sink = 0.3 }),
+		decor("Crystal", 1, { palette = "ember", size = { 0.8, 1.6 } }),
+		decor("LavaRock", 3, { enabled = false }), -- TODO PropArt.LavaRock
+		decor("DeadBranch", 1.5, { enabled = false }), -- TODO PropArt.DeadBranch
+	},
+	grove = {
+		decor("Mushroom", 4, { lush = 0.8, glowing = true }),
+		decor("Flowers", 2, { lush = 1, palette = "groveFlowers" }),
+		decor("Bush", 2, { lush = 0.4, palette = "groveGreens", size = { 2, 3.4 } }),
+		decor("Crystal", 1, { palette = "amethyst", size = { 0.8, 1.8 } }),
+		decor("Fern", 3, { lush = 0.6, enabled = false }), -- TODO PropArt.Fern (violet)
+		decor("DeadBranch", 1, { enabled = false }), -- TODO PropArt.DeadBranch
+	},
+	-- By the water's edge, any biome (reeds, cattails, lily pads). TODO:
+	-- DecorSpots never picks this table yet; once the models exist, give
+	-- spots within a few studs of NearestWater() this table instead.
+	shore = {
+		decor("Reeds", 4, { enabled = false }), -- TODO PropArt.Reeds
+		decor("Cattails", 2, { enabled = false }), -- TODO PropArt.Cattails
+		decor("LilyPad", 2, { enabled = false }), -- TODO PropArt.LilyPad (on the water)
+	},
+} :: { [string]: { DecorKind } }
+
+-- Candidate spots per 64-stud cell, before vitality and the ground rules.
+-- (About half the rows are TODO slots today, so roughly half the
+-- candidates land on one and are skipped; when the new PropArt models are
+-- wired in, the ground fills in without touching these.)
+EnvironmentData.DecorCell = 64
+EnvironmentData.DecorCandidates = { meadow = 18, starter = 26, hills = 22, snow = 14, volcano = 12, grove = 22 } :: {
+	[string]: number,
+}
+EnvironmentData.DecorAcceptance = 0.6 -- share of candidates kept at Healthy vitality
+
+export type DecorSpot = {
+	biome: string, -- the Decor table it came from ("meadow" for open country)
+	index: number, -- row in that table
+	kind: string,
+	variant: number, -- 1..variants: which pooled look
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+}
+
+-- Which Decor table applies at (x, z) ("meadow" between biomes; nil where
+-- nothing grows: the isles' biome only exists high up).
+function EnvironmentData.DecorBiomeAt(x: number, z: number): string
+	local def = BiomeData.At(x, z)
+	local id = if def then def.id else "meadow"
+	if EnvironmentData.Decor[id] == nil then
+		return "meadow"
+	end
+	return id
+end
+
+local SKYROOT_CLEAR = 95 -- the giant trunk, its roots and the gondola station
+local skyArea = (function()
+	local def = BiomeData.Get("sky")
+	return if def then def.area else nil
+end)()
+
+-- True where nothing should be scattered: buildings, roads, water, the
+-- Skyroot's foot, the volcano's cone, high mountains.
+function EnvironmentData.DecorBlocked(x: number, z: number): boolean
+	if WorldLayout.FlatWeight(x, z) > 0 then
+		return true
+	end
+	if TerrainGen.RoadClearance(x, z) < 2.5 then
+		return true
+	end
+	if skyArea then
+		local dx, dz = x - skyArea.x, z - skyArea.z
+		if dx * dx + dz * dz < SKYROOT_CLEAR * SKYROOT_CLEAR then
+			return true
+		end
+	end
+	local cone = WorldLayout.VolcanoCone
+	local cx, cz = x - cone.x, z - cone.z
+	if cx * cx + cz * cz < (cone.radius * 0.55) ^ 2 then
+		return true
+	end
+	if math.abs(x) > WorldLayout.WorldHalf - 20 or math.abs(z) > WorldLayout.WorldHalf - 20 then
+		return true
+	end
+	return TerrainGen.WaterLevelAt(x, z) ~= nil
+end
+
+-- The deterministic decoration of cell (cellX, cellZ): every player sees
+-- the same meadow. `vitalityOf(biomeId)` gives each grove's vitality
+-- (0..100); thriving groves grow more flowers. Trees aren't avoided here
+-- (they come and go); AmbientLife skips spots too close to one.
+function EnvironmentData.DecorSpots(
+	cellX: number,
+	cellZ: number,
+	vitalityOf: (biomeId: string) -> number
+): { DecorSpot }
+	local size = EnvironmentData.DecorCell
+	local out: { DecorSpot } = {}
+	local rng = Kit.rng((cellX + 4096) * 8209 + (cellZ + 4096) + 11)
+	local cx, cz = (cellX + 0.5) * size, (cellZ + 0.5) * size
+	local cellBiome = EnvironmentData.DecorBiomeAt(cx, cz)
+	local candidates = EnvironmentData.DecorCandidates[cellBiome] or 10
+	for _ = 1, candidates do
+		-- Always draw the same numbers per candidate, so the rest of the
+		-- cell doesn't reshuffle when one spot is rejected.
+		local x = cellX * size + rng:next() * size
+		local z = cellZ * size + rng:next() * size
+		local kindRoll = rng:next()
+		local keepRoll = rng:next()
+		local variantRoll = rng:next()
+		local yaw = rng:next() * math.pi * 2
+		local biome = EnvironmentData.DecorBiomeAt(x, z)
+		local list = EnvironmentData.Decor[biome]
+		local total = 0
+		for _, d in ipairs(list) do
+			total += d.weight
+		end
+		local roll = kindRoll * total
+		local pickIndex = #list
+		for i, d in ipairs(list) do
+			roll -= d.weight
+			if roll < 0 then
+				pickIndex = i
+				break
+			end
+		end
+		local pick = list[pickIndex]
+		if pick.enabled == false then
+			continue
+		end
+		local life = if biome == "meadow"
+			then EnvironmentData.LifeFactor(vitalityOf("starter"))
+			else EnvironmentData.LifeFactor(vitalityOf(biome))
+		local lush = pick.lush or 0
+		local keep = EnvironmentData.DecorAcceptance * (1 + (life - 1) * lush)
+		if keepRoll >= keep then
+			continue
+		end
+		if EnvironmentData.DecorBlocked(x, z) then
+			continue
+		end
+		local y = TerrainGen.HeightAt(x, z)
+		if y > 100 then
+			continue -- mountain peaks stay bare
+		end
+		table.insert(out, {
+			biome = biome,
+			index = pickIndex,
+			kind = pick.kind,
+			variant = math.min(pick.variants, 1 + math.floor(variantRoll * pick.variants)),
+			x = x,
+			y = y - (pick.sink or 0.1),
+			z = z,
+			yaw = yaw,
+		})
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- Critters (AmbientLife)
+---------------------------------------------------------------------------
+
+export type CritterKind =
+	"Flock"
+	| "PerchedBird"
+	| "Butterfly"
+	| "Fireflies"
+	| "Rabbit"
+	| "Deer"
+	| "Duck"
+	| "Fish"
+	| "Wisp"
+	| "EmberSprite"
+
+-- How many animated models each critter is (the flock is several birds).
+EnvironmentData.CritterCost = {
+	Flock = 5,
+	PerchedBird = 1,
+	Butterfly = 1,
+	Fireflies = 1,
+	Rabbit = 1,
+	Deer = 1,
+	Duck = 1,
+	Fish = 1,
+	Wisp = 1,
+	EmberSprite = 1,
+} :: { [string]: number }
+
+EnvironmentData.MaxCritters = 16 -- animated models near the player, all kinds together
+
+export type CritterContext = {
+	biomeId: string, -- "" for open country
+	daylight: number, -- EnvironmentData.Daylight
+	weather: string, -- after WeatherSchedule.ForBiome
+	intensity: number,
+	vitality: number, -- the biome's (open country uses the Starter Forest's)
+	nearPond: boolean, -- the starter pond is close
+	nearWater: boolean, -- a river or lake is close
+}
+
+export type CritterWant = { kind: CritterKind, count: number }
+
+local LEAFY: { [string]: boolean } = { [""] = true, starter = true, hills = true }
+
+-- Who is out right now, most special first (AmbientLife fills up to
+-- MaxCritters in this order). Thriving groves bring more butterflies,
+-- deer and fireflies; rain sends the butterflies home; night brings out
+-- fireflies, and the Phantom Grove's wisps.
+function EnvironmentData.CritterPlan(ctx: CritterContext): { CritterWant }
+	local out: { CritterWant } = {}
+	local function want(kind: CritterKind, count: number)
+		local n = math.floor(count + 0.5)
+		if n > 0 then
+			table.insert(out, { kind = kind, count = n })
+		end
+	end
+	local day = ctx.daylight > 0.55
+	local night = ctx.daylight < 0.3
+	local wet = (
+		ctx.weather == "Rain"
+		or ctx.weather == "Storm"
+		or ctx.weather == "Blizzard"
+		or ctx.weather == "Ashfall"
+	) and ctx.intensity > 0.35
+	local stormy = (ctx.weather == "Storm" or ctx.weather == "Blizzard") and ctx.intensity > 0.35
+	local life = EnvironmentData.LifeFactor(ctx.vitality)
+	local biome = ctx.biomeId
+	local leafy = LEAFY[biome] == true
+
+	if ctx.nearPond then
+		want("Duck", if night then 2 else 3)
+	end
+	if ctx.nearWater and not stormy then
+		want("Fish", 1)
+	end
+	if biome == "grove" and night then
+		want("Wisp", 3 + life)
+	end
+	if biome == "volcano" then
+		want("EmberSprite", if ctx.weather == "Ashfall" then 4 else 3)
+	end
+	if leafy and not stormy and ctx.daylight > 0.25 and biome ~= "" then
+		want("Deer", life) -- a deer at Healthy, two Thriving, a little herd in old growth
+	end
+	if (leafy or biome == "snow") and not stormy and not night then
+		want("Rabbit", if biome == "snow" then 1 else 1 + life * 0.6)
+	end
+	if leafy and day and not wet then
+		want("Butterfly", 1 + life * 2)
+	end
+	if (leafy or biome == "snow") and day and not wet then
+		want("PerchedBird", if biome == "snow" then 1 else 1 + life * 0.5)
+	end
+	if leafy and day and not stormy then
+		want("Flock", 1)
+	end
+	if leafy and night and not wet then
+		want("Fireflies", if life >= 1.6 then 3 elseif life >= 1 then 2 else 1)
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- Water (sounds by the river and lake, jumping fish)
+---------------------------------------------------------------------------
+
+local function nearestOnLine(points: { Vector2 }, x: number, z: number): (number, number, number)
+	local best, bx, bz = math.huge, x, z
+	for i = 1, #points - 1 do
+		local a, b = points[i], points[i + 1]
+		local abx, abz = b.X - a.X, b.Y - a.Y
+		local len2 = abx * abx + abz * abz
+		local t = if len2 > 1e-6 then math.clamp(((x - a.X) * abx + (z - a.Y) * abz) / len2, 0, 1) else 0
+		local px, pz = a.X + abx * t, a.Y + abz * t
+		local d = math.sqrt((x - px) ^ 2 + (z - pz) ^ 2)
+		if d < best then
+			best, bx, bz = d, px, pz
+		end
+	end
+	return best, bx, bz
+end
+
+-- The nearest point of open water (river, lake outflow, Mirror Lake, the
+-- pond) to (x, z) at the water's surface, how far it is from the bank
+-- there, and which water it is.
+function EnvironmentData.NearestWater(x: number, z: number): (Vector3, number, string)
+	local level = WorldLayout.LakeLevel
+	local bestD, bestX, bestZ, bestKind = math.huge, x, z, "river"
+	local function consider(d: number, px: number, pz: number, kind: string)
+		if d < bestD then
+			bestD, bestX, bestZ, bestKind = d, px, pz, kind
+		end
+	end
+	local river = WorldLayout.River
+	local d, px, pz = nearestOnLine(river.points, x, z)
+	consider(math.max(0, d - river.width / 2), px, pz, "river")
+	local outflow = WorldLayout.LakeOutflow
+	d, px, pz = nearestOnLine(outflow.points, x, z)
+	consider(math.max(0, d - outflow.width / 2), px, pz, "river")
+	for _, pool in ipairs({ { p = WorldLayout.Lake, kind = "lake" }, { p = WorldLayout.Pond, kind = "pond" } }) do
+		local p = pool.p
+		local dx, dz = x - p.x, z - p.z
+		local dist = math.sqrt(dx * dx + dz * dz)
+		local edge = math.max(0, dist - p.radius)
+		if dist > 1e-3 then
+			local r = math.min(dist, p.radius * 0.85)
+			consider(edge, p.x + dx / dist * r, p.z + dz / dist * r, pool.kind)
+		else
+			consider(0, p.x, p.z, pool.kind)
+		end
+	end
+	return Vector3.new(bestX, level, bestZ), bestD, bestKind
+end
+
+return EnvironmentData
