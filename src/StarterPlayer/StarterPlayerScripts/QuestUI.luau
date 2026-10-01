@@ -8,7 +8,8 @@
 --     touches through and just fades after a while.
 --   * A beacon: a bouncing arrow over what to do next (the nearest tree or
 --     log, your truck, the sell pad, a stump to plant in or else a tree to
---     fell for one, the Tool Shed), with its distance.
+--     fell for one, the Tool Shed), with its distance. It never picks an
+--     Elder (QuestUI.TutorialTree).
 -- The server owns progress: it sets the TutorialStep (0 = done) and
 -- TutorialProgress attributes, and this redraws from them.
 -- Looks per the UI spec (03, 04): a kraft card with the step and Skip (tap
@@ -211,6 +212,20 @@ local function standing(model: Model): boolean
 	return type(hp) == "number" and hp > 0 and model:GetAttribute("Dormant") ~= true
 end
 
+-- A tree the tutorial may point you at: standing, and not an Elder. An
+-- Elder is a co-op giant that's gone for good once felled, so it leaves
+-- no stump to plant in (the plant step), and it's no first tree for a new
+-- player. Elders carry the Elder attribute; `elderUid` (the workspace's
+-- ElderUid, "" when none is awake) names the one awake too, in case that
+-- attribute hasn't reached this client yet.
+function QuestUI.TutorialTree(model: Model, elderUid: unknown): boolean
+	if not standing(model) or model:GetAttribute("Elder") == true then
+		return false
+	end
+	local uid = model:GetAttribute("Uid")
+	return not (type(elderUid) == "string" and elderUid ~= "" and uid == elderUid)
+end
+
 -- How many Heartseeds of this tree's or stump's wood you hold.
 local function seedsFor(model: Model): number
 	local wood = model:GetAttribute("WoodId")
@@ -221,8 +236,12 @@ end
 -- The part the beacon should hang over for this step, if it's around.
 local function beaconTarget(step: Step, from: Vector3): BasePart?
 	local target = step.beacon
+	local elderUid = workspace:GetAttribute("ElderUid")
+	local function choppable(model: Model): boolean
+		return QuestUI.TutorialTree(model, elderUid)
+	end
 	if target == "tree" then
-		return nearestTagged("Tree", from, standing)
+		return nearestTagged("Tree", from, choppable)
 	elseif target == "log" then
 		-- Logs lying in the world have a "Pick up" prompt; carried ones don't.
 		return nearestTagged("Log", from, function(_model, pp)
@@ -243,10 +262,11 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		end
 		-- None around (it grew back, or it's out of view): a tree to fell for
 		-- a fresh stump, one of a wood you hold seeds for if there is one,
-		-- else any (felling it drops its own seed).
+		-- else any (felling it drops its own seed). Never the Elder: it
+		-- leaves no stump to plant in.
 		return nearestTagged("Tree", from, function(model)
-			return standing(model) and seedsFor(model) > 0
-		end) or nearestTagged("Tree", from, standing)
+			return choppable(model) and seedsFor(model) > 0
+		end) or nearestTagged("Tree", from, choppable)
 	elseif target then
 		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)
 	end
