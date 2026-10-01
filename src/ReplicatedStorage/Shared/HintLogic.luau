@@ -5,9 +5,13 @@
 --   * Pick(device, context): the hint line. Every line fits MaxLength
 --     characters (the hint is one line, truncated past ~40).
 --   * ContextFor(state): which context wins when several apply: driving,
---     then standing on the sell pad, then carrying logs, else chopping. A
---     mode a controller sets ("build" while placing a blueprint:
---     HUD.SetHintContext) wins over all of them.
+--     then standing on the sell pad with something to sell there, then
+--     carrying logs, else chopping. A mode a controller sets ("build"
+--     while placing a blueprint: HUD.SetHintContext) wins over all of
+--     them.
+--   * SellCount(...): how many logs the pad would sell, as
+--     CarryController's Sell prompt counts them (the hint says "Press E to
+--     sell" only when that prompt is up).
 --   * Expand(line, device): {click} (or {tap}) becomes the main action on
 --     this device: "click", "tap", or "press RT" on a gamepad (the Tool's
 --     Activated trigger). Capitalised ({Click}, {Tap}) at a sentence start.
@@ -24,6 +28,7 @@ export type State = {
 	driving: boolean, -- in a vehicle's driver seat (Humanoid.Seated)
 	inSellZone: boolean, -- standing in the sawmill's sell zone
 	carrying: boolean, -- logs in hand (the CarriedLogs attribute)
+	sellable: number, -- logs the pad would sell from there (SellCount)
 }
 
 HintLogic.MaxLength = 40
@@ -72,10 +77,35 @@ function HintLogic.Pick(device: Device, context: Context): string
 	return lines[device] or lines.desktop
 end
 
+-- How many logs selling on the pad would take right now, from what the
+-- client knows (the Player attributes as read, any type; nil while the
+-- save loads): the logs in your hands (CarriedLogs), your truck's bed
+-- (BedCount) only if the truck stands within `sellRange` studs
+-- (GameConfig.SellTruckRange) of the sell zone, measured flat
+-- (`truckFromZone`; nil with no truck or one that isn't streamed in), and
+-- your Sky Bin (SkyBin: logs sent down the Cloud Chute). The same sum
+-- CarryController's Sell prompt shows (and the server sells).
+function HintLogic.SellCount(
+	carried: unknown,
+	bedCount: unknown,
+	truckFromZone: number?,
+	skyBin: unknown,
+	sellRange: number
+): number
+	local function count(value: unknown): number
+		if type(value) ~= "number" or value ~= value or value <= 0 then
+			return 0 -- not a number, NaN, or none
+		end
+		return math.floor(math.min(value, 999))
+	end
+	local truckHere = truckFromZone ~= nil and truckFromZone <= sellRange
+	return count(carried) + (if truckHere then count(bedCount) else 0) + count(skyBin)
+end
+
 function HintLogic.ContextFor(state: State): Context
 	if state.driving then
 		return "driving"
-	elseif state.inSellZone then
+	elseif state.inSellZone and state.sellable > 0 then
 		return "sellPad"
 	elseif state.carrying then
 		return "carrying"

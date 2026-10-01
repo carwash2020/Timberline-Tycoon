@@ -19,8 +19,10 @@
 --     worded for the device in use and for what you're doing
 --     (Shared/HintLogic): chopping, carrying logs (the CarriedLogs
 --     attribute), driving (Humanoid.Seated in a VehicleSeat), standing in
---     the sell zone, or a mode a controller sets (HUD.SetHintContext:
---     placing a blueprint). It hides while a panel is open (HUD.SetModal).
+--     the sell zone with something to sell there (as the Sell prompt
+--     counts it: HintLogic.SellCount), or a mode a controller sets
+--     (HUD.SetHintContext: placing a blueprint). It hides while a panel is
+--     open (HUD.SetModal).
 --   * The load chip on the same line, left of the hint: a log, "Hands 1/2"
 --     and, with a truck, "Bed 4/6" (amber and "Bed full" once it's full),
 --     from the CarriedLogs, BedCount and BedCapacity attributes
@@ -54,6 +56,7 @@
 --     the HUD's layer, over the shop; the rest is in a layer under it. On a
 --     phone the clock is in the second line (or hidden: WorldUI).
 
+local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -145,7 +148,7 @@ local rowQueued = false
 local chip: Chip? = nil
 local chipText: string? = nil -- what the chip said last time it showed (a change bumps it)
 local hintForced: HintLogic.Context? = nil -- a controller's mode (HUD.SetHintContext)
-local hintState: HintLogic.State = { driving = false, inSellZone = false, carrying = false }
+local hintState: HintLogic.State = { driving = false, inSellZone = false, carrying = false, sellable = 0 }
 local sideGui: ScreenGui? = nil
 local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
 local sides: { Side } = {}
@@ -615,10 +618,72 @@ local function queueRow()
 	end
 end
 
+-- Your truck's flat distance from the sell zone, as CarryController
+-- measures it (its PrimaryPart); nil with no truck, or while it isn't
+-- streamed in.
+local function truckFrom(zone: BasePart): number?
+	for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
+		if inst:IsA("Model") and inst:GetAttribute("OwnerId") == player.UserId then
+			local pp = inst.PrimaryPart
+			if pp then
+				local d = pp.Position - zone.Position
+				return Vector3.new(d.X, 0, d.Z).Magnitude
+			end
+		end
+	end
+	return nil
+end
+
+-- Your bed's count: the Player's mirror, or the truck's own while that
+-- isn't set (as CarryController reads it).
+local function bedCount(): unknown
+	local n = player:GetAttribute("BedCount")
+	if n ~= nil then
+		return n
+	end
+	for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
+		if inst:GetAttribute("OwnerId") == player.UserId then
+			return inst:GetAttribute("BedCount")
+		end
+	end
+	return nil
+end
+
+-- Whether you stand in the sell zone, and what the pad would sell from
+-- there (HintLogic.SellCount); the hint changes if either did. The sell
+-- area is Persistent, but found by name each time in case it isn't there
+-- yet.
+local function refreshSellState()
+	local map = workspace:FindFirstChild("TimberlineMap")
+	local area = if map then map:FindFirstChild("SellArea") else nil
+	local found = if area then area:FindFirstChild("SellZone") else nil
+	local zone = if found and found:IsA("BasePart") then found else nil
+	local body = player.Character
+	local root = if body then body:FindFirstChild("HumanoidRootPart") else nil
+	local hrp = if root and root:IsA("BasePart") then root else nil
+	local inZone = false
+	local sellable = 0
+	if zone and hrp and Util.pointInPart(zone, hrp.Position) then
+		inZone = true
+		sellable = HintLogic.SellCount(
+			player:GetAttribute("CarriedLogs"),
+			bedCount(),
+			truckFrom(zone),
+			player:GetAttribute("SkyBin"),
+			GameConfig.SellTruckRange
+		)
+	end
+	if inZone ~= hintState.inSellZone or sellable ~= hintState.sellable then
+		hintState.inSellZone = inZone
+		hintState.sellable = sellable
+		refreshHint()
+	end
+end
+
 -- The hint's sources: sitting in a driver's seat (re-hooked on every
 -- character, R6 or R15: both have a Humanoid), logs in hand, and standing
--- in the sell zone (polled; the sell area is Persistent, but found by name
--- each time in case it isn't there yet).
+-- in the sell zone with something to sell (polled, and again whenever
+-- what you'd sell changes).
 local function watchHintSources()
 	local seatedConn: RBXScriptConnection? = nil
 	local function onCharacter(char: Model)
@@ -650,27 +715,17 @@ local function watchHintSources()
 	local function onCarried()
 		local n = player:GetAttribute("CarriedLogs")
 		hintState.carrying = type(n) == "number" and n > 0
+		refreshSellState() -- what the pad would sell changed too
 		refreshHint()
 	end
 	player:GetAttributeChangedSignal("CarriedLogs"):Connect(onCarried)
+	player:GetAttributeChangedSignal("BedCount"):Connect(refreshSellState)
+	player:GetAttributeChangedSignal("SkyBin"):Connect(refreshSellState)
 	onCarried()
 
 	while true do
 		task.wait(HINT_POLL)
-		local map = workspace:FindFirstChild("TimberlineMap")
-		local area = if map then map:FindFirstChild("SellArea") else nil
-		local zone = if area then area:FindFirstChild("SellZone") else nil
-		local body = player.Character
-		local hrp = if body then body:FindFirstChild("HumanoidRootPart") else nil
-		local inZone = zone ~= nil
-			and zone:IsA("BasePart")
-			and hrp ~= nil
-			and hrp:IsA("BasePart")
-			and Util.pointInPart(zone, hrp.Position)
-		if inZone ~= hintState.inSellZone then
-			hintState.inSellZone = inZone
-			refreshHint()
-		end
+		refreshSellState()
 	end
 end
 
