@@ -3,7 +3,9 @@
 -- from the server's attributes, so everyone nearby sees it smoothly.
 -- One animator per tree, so a wobble, a fall and a regrow never fight:
 --   * Hit (HP drops): the tree wobbles around its base, wood chips fly and
---     a thunk plays (Shared/SoundData).
+--     a thunk plays (Shared/SoundData). Chips use no physics: each one arcs
+--     along a TreeLogic flight to the ground under it (one raycast), rests
+--     about a second and fades. They're pooled and capped.
 --   * Fall (Felled = true): the tree leans away from the chopper, slowly
 --     at first, then thumps down along FallDir (Shared/TreeLogic timing),
 --     with a dust and leaf burst, a creak and a crash, and a small camera
@@ -32,6 +34,10 @@ local FX_RANGE = 120 -- studs from the camera; farther trees aren't animated
 local WOBBLE_DEGREES = { 2.6, -1.4, 0.6, 0 }
 local WOBBLE_STEP = 0.05
 local CHIP_COUNT = 6
+local CHIP_CAP = 36 -- chips on screen at once; the oldest is reused past this
+local CHIP_SPREAD = math.rad(70) -- either side of straight out of the cut
+local GROUND_PROBE_UP = 6 -- the ground ray starts this far over the trunk's foot ...
+local GROUND_PROBE_DOWN = 14 -- ... and reaches this far down
 local REGROW_TIME = 2.2
 
 type State = {
@@ -42,6 +48,162 @@ type State = {
 }
 
 local states: { [Model]: State } = {}
+
+-- A chip (or leaf) in flight or lying on the ground.
+type Piece = {
+	part: BasePart,
+	flight: TreeLogic.Flight,
+	born: number, -- os.clock() when it spawned
+	life: number, -- seconds until it has faded out
+	rest: CFrame, -- its turn once it lies on the ground
+	spinAxis: Vector3, -- it tumbles about this in the air ...
+	spin: number, -- ... at this many radians a second, unwinding to `rest` as it lands
+}
+
+-- Pieces of one kind: the parts waiting to be reused, the ones out now
+-- (oldest first) and how many may be out at once.
+type Batch = { idle: { BasePart }, out: { Piece }, cap: number, make: () -> BasePart }
+
+local pieceFolder: Folder? = nil
+local pieceConn: RBXScriptConnection? = nil
+local batches: { Batch } = {}
+
+local function newChipPart(): BasePart
+	local chip = Instance.new("Part")
+	chip.Name = "WoodChip"
+	chip.Material = Enum.Material.Wood
+	chip.Anchored = true
+	chip.CanCollide = false
+	chip.CanQuery = false
+	chip.CanTouch = false
+	chip.CastShadow = false
+	return chip
+end
+
+local chipBatch: Batch = { idle = {}, out = {}, cap = CHIP_CAP, make = newChipPart }
+table.insert(batches, chipBatch)
+
+local function folder(): Folder
+	local f = pieceFolder
+	if f and f.Parent then
+		return f
+	end
+	local made = Instance.new("Folder")
+	made.Name = "TreeFXPieces" -- client-only: nothing here replicates or streams
+	made.Parent = workspace
+	pieceFolder = made
+	return made
+end
+
+local function release(batch: Batch, piece: Piece)
+	piece.part.Parent = nil
+	table.insert(batch.idle, piece.part)
+end
+
+-- Moves every piece along its flight; stops when none are left.
+local function stepPieces()
+	local now = os.clock()
+	local any = false
+	for _, batch in ipairs(batches) do
+		local i = 1
+		while i <= #batch.out do
+			local piece = batch.out[i]
+			local t = now - piece.born
+			if piece.part.Parent == nil then
+				table.remove(batch.out, i) -- destroyed under us: never reuse it
+				continue
+			elseif t >= piece.life then
+				table.remove(batch.out, i)
+				release(batch, piece)
+				continue
+			end
+			local f = piece.flight
+			local turn = if t < f.landT
+				then piece.rest * CFrame.fromAxisAngle(piece.spinAxis, piece.spin * (f.landT - t))
+				else piece.rest
+			piece.part.CFrame = CFrame.new(TreeLogic.FlightAt(f, t)) * turn
+			piece.part.Transparency = TreeLogic.FlightFade(f, t)
+			any = true
+			i += 1
+		end
+	end
+	if not any then
+		local conn = pieceConn
+		if conn then
+			conn:Disconnect()
+			pieceConn = nil
+		end
+	end
+end
+
+-- A part for a new piece: an idle one, a new one, or (at the cap) the
+-- oldest one out.
+local function takePart(batch: Batch): BasePart
+	if #batch.out >= batch.cap then
+		local oldest = table.remove(batch.out, 1) :: Piece
+		if oldest.part.Parent ~= nil then
+			return oldest.part
+		end
+	end
+	local idle = table.remove(batch.idle)
+	return idle or batch.make()
+end
+
+local function launchPiece(batch: Batch, part: BasePart, flight: TreeLogic.Flight, rest: CFrame, spin: number)
+	local axis = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5)
+	local piece: Piece = {
+		part = part,
+		flight = flight,
+		born = os.clock(),
+		life = TreeLogic.FlightLife(flight),
+		rest = rest,
+		spinAxis = if axis.Magnitude > 0.01 then axis.Unit else Vector3.xAxis,
+		spin = spin,
+	}
+	part.Transparency = 0
+	part.CFrame = CFrame.new(flight.origin) * rest
+	part.Parent = folder()
+	table.insert(batch.out, piece)
+	if not pieceConn then
+		pieceConn = RunService.Heartbeat:Connect(stepPieces)
+	end
+end
+
+-- What the ground rays skip: the tree itself, people and trucks (only
+-- colliding parts count, so leaves, logs and decoration are skipped too).
+local function groundParams(tree: Model): RaycastParams
+	local skip: { Instance } = { tree }
+	for _, player in ipairs(Players:GetPlayers()) do
+		local char = player.Character
+		if char then
+			table.insert(skip, char)
+		end
+	end
+	for _, tag in ipairs({ "Truck", "NPC" }) do
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			table.insert(skip, inst)
+		end
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = skip
+	params.RespectCanCollide = true
+	return params
+end
+
+-- The ground's height and normal under `at`, looking down from `fromY`
+-- (or `fallbackY` and straight up if nothing is there yet).
+local function groundAt(at: Vector3, fromY: number, fallbackY: number, params: RaycastParams): (number, Vector3)
+	local hit = workspace:Raycast(
+		Vector3.new(at.X, fromY + GROUND_PROBE_UP, at.Z),
+		Vector3.new(0, -(GROUND_PROBE_UP + GROUND_PROBE_DOWN), 0),
+		params
+	)
+	if hit then
+		return hit.Position.Y, hit.Normal
+	end
+	return fallbackY, Vector3.yAxis
+end
 
 local function homeOf(tree: Model): CFrame?
 	local home = tree:GetAttribute("HomePivot")
@@ -91,6 +253,8 @@ local function wobble(tree: Model, state: State, home: CFrame)
 	end)
 end
 
+-- Chips fly out of the cut toward whoever swung, land around the trunk's
+-- foot and lie there a moment.
 local function chips(tree: Model, def: WoodDef, home: CFrame)
 	local _, base = trunkInfo(tree, home)
 	local trunk = tree.PrimaryPart
@@ -98,23 +262,19 @@ local function chips(tree: Model, def: WoodDef, home: CFrame)
 	local toward = -awayFromPlayer(base)
 	local origin = base + Vector3.new(0, 2.6, 0) + toward * (radius + 0.15)
 	local inner = TreeArt.HeartColor(def)
+	local params = groundParams(tree)
 	for i = 1, CHIP_COUNT do
-		local chip = Instance.new("Part")
-		chip.Name = "WoodChip"
+		local kind = TreeLogic.Chip
+		-- Aim at the trunk's foot, then land on the ground where it comes down.
+		local aim =
+			TreeLogic.Launch(kind, origin, toward, CHIP_SPREAD, base.Y, math.random(), math.random(), math.random())
+		local groundY, normal = groundAt(TreeLogic.FlightAt(aim, aim.landT), base.Y, base.Y, params)
+		local flight = TreeLogic.Flight(kind, origin, aim.velocity, groundY)
+		local chip = takePart(chipBatch)
 		chip.Size = Vector3.new(0.25 + math.random() * 0.25, 0.14, 0.35 + math.random() * 0.3)
 		chip.Color = if i % 3 == 0 then def.trunkColor else inner
-		chip.Material = Enum.Material.Wood
-		chip.CanCollide = false
-		chip.CanQuery = false
-		chip.CanTouch = false
-		chip.Massless = true
-		chip.CastShadow = false
-		chip.CFrame = CFrame.new(origin) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6)
-		chip.Parent = workspace
-		local side = toward:Cross(Vector3.yAxis) * ((math.random() - 0.5) * 12)
-		chip.AssemblyLinearVelocity = toward * (6 + math.random() * 4) + side + Vector3.new(0, 9 + math.random() * 7, 0)
-		chip.AssemblyAngularVelocity = Vector3.new(math.random() * 20, math.random() * 20, math.random() * 20)
-		Debris:AddItem(chip, 1.4)
+		local rest = TreeLogic.Upright(normal) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
+		launchPiece(chipBatch, chip, flight, rest, 10 + math.random() * 10)
 	end
 end
 
