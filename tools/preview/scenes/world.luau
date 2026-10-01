@@ -57,9 +57,14 @@ return {
 		for _, cf in ipairs(town.lamps) do
 			place(BuildingArt.LampPost(), cf)
 		end
+		for _, fence in ipairs(town.fences) do
+			place(BuildingArt.Fence(fence.length), fence.cframe)
+		end
 		for _, prop in ipairs(town.props) do
 			place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
 		end
+		place(BuildingArt.SkyBin(), town.skyBin * CF.new(0, -2, 0))
+		place(BuildingArt.Signpost("SKYROOT GONDOLA\nto the Aether Isles\n$250 a ride"), town.gondolaSign)
 		for _, sign in ipairs(town.signs) do
 			place(BuildingArt.Signpost(sign.text), sign.cframe)
 		end
@@ -97,6 +102,18 @@ return {
 			end
 			for _, cf in ipairs(sky.chutes) do
 				place(BuildingArt.CloudChute(), cf)
+				local from = (cf * CF.new(0, -2.6, 13.6)).Position
+				local to = from + cf.LookVector * -36 - V3.new(0, 60, 0)
+				Kit.beam(
+					root,
+					"Flume",
+					from,
+					to,
+					2.4,
+					1.2,
+					roblox.Color3.fromRGB(90, 62, 38),
+					roblox.Enum.Material.WoodPlanks
+				)
 			end
 			place(BuildingArt.StarfallForge(), sky.forge)
 			place(BuildingArt.GondolaStation(), sky.gondolaTop)

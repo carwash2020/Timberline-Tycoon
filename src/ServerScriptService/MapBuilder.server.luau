@@ -195,6 +195,9 @@ for _, cf in ipairs(town.lamps) do
 	CollectionService:AddTag(lamp, "StreetLamp") -- clients light them at night
 	place(atomic(lamp), cf)
 end
+for _, fence in ipairs(town.fences) do
+	place(atomic(BuildingArt.Fence(fence.length)), fence.cframe)
+end
 for _, prop in ipairs(town.props) do
 	place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe)
 end
@@ -204,10 +207,9 @@ end
 do
 	local skyBiome = BiomeData.Get("sky")
 	local fee = if skyBiome and skyBiome.gondola then skyBiome.gondola.fee else 250
-	local at = town.gondola.Position + Vector3.new(-9, 0, -9)
 	place(
 		atomic(BuildingArt.Signpost(string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee))),
-		CFrame.lookAt(at, Vector3.new(0, 0, 60))
+		town.gondolaSign
 	)
 end
 

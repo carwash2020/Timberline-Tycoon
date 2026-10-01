@@ -19,6 +19,7 @@ local WorldPlan = {}
 export type TreeSpot = { woodId: string, position: Vector3, biome: string }
 export type Placement = { name: string, cframe: CFrame, seed: number }
 export type Sign = { text: string, cframe: CFrame }
+export type Fence = { length: number, cframe: CFrame }
 
 local function hashString(s: string): number
 	local h = 7
@@ -210,8 +211,11 @@ export type Town = {
 	shops: { ShopSpot },
 	gondola: CFrame,
 	campsite: CFrame,
+	murph: CFrame, -- where Murph stands, facing the spawn
+	gondolaSign: CFrame, -- the "SKYROOT GONDOLA" signpost
 	parkingSlots: { CFrame }, -- in claim order (Index 1, 2, ...)
 	lamps: { CFrame },
+	fences: { Fence },
 	props: { Placement },
 	signs: { Sign },
 }
@@ -232,48 +236,74 @@ end
 
 function WorldPlan.Town(): Town
 	local mill = WorldLayout.Sawmill
-	local lamps: { CFrame } = {}
-	-- Main street: spawn north to the sell pad, lamps both sides.
-	for z = 48, 74, 13 do
-		table.insert(lamps, CFrame.new(-11, 0, z))
-		table.insert(lamps, CFrame.new(11, 0, z))
+	-- At (x, z), turned by `yaw`.
+	local function at(x: number, z: number, yaw: number?): CFrame
+		return CFrame.new(x, 0, z) * CFrame.Angles(0, yaw or 0, 0)
 	end
-	-- Around the plaza and the shop row.
-	for _, p in ipairs({
-		{ -28, 84 },
-		{ 28, 84 },
-		{ -62, 90 },
-		{ 62, 90 },
-		{ -98, 92 },
-		{ -40, 135 },
-		{ 0, 30 },
-		{ 120, 52 },
-		{ 120, 0 },
-	}) do
-		table.insert(lamps, CFrame.new(p[1], 0, p[2]))
+	-- At (x, z) with the front (-Z) toward (tx, tz).
+	local function facing(x: number, z: number, tx: number, tz: number): CFrame
+		return at(x, z, math.atan2(x - tx, z - tz))
 	end
 
-	local props: { Placement } = {
-		{ name = "LogPile", cframe = CFrame.new(24, 0, 112) * CFrame.Angles(0, math.pi / 2, 0), seed = 1 },
-		{ name = "LogPile", cframe = CFrame.new(-25, 0, 118) * CFrame.Angles(0, math.pi / 2, 0), seed = 2 },
-		{ name = "SawdustPile", cframe = CFrame.new(-21, 0, 96), seed = 3 },
-		{ name = "WaterTower", cframe = CFrame.new(30, 0, 140), seed = 4 },
-		{ name = "Well", cframe = CFrame.new(-24, 0, 70), seed = 5 },
-		{ name = "Bench", cframe = CFrame.new(-6, 0, 52) * CFrame.Angles(0, math.pi / 2, 0), seed = 6 },
-		{ name = "Bench", cframe = CFrame.new(6, 0, 62) * CFrame.Angles(0, -math.pi / 2, 0), seed = 7 },
-		{ name = "Crate", cframe = CFrame.new(-55, 0, 93), seed = 8 },
-		{ name = "Barrel", cframe = CFrame.new(-36, 0, 93), seed = 9 },
-		{ name = "Barrel", cframe = CFrame.new(-35, 0, 95), seed = 10 },
-		{ name = "Cart", cframe = CFrame.new(57, 0, 92) * CFrame.Angles(0, 0.4, 0), seed = 11 },
-		{ name = "FlowerBox", cframe = CFrame.new(-86, 0, 92), seed = 12 },
-		{ name = "FlowerBox", cframe = CFrame.new(-74, 0, 92), seed = 13 },
-		{ name = "Mailbox", cframe = CFrame.new(-14, 0, 40) * CFrame.Angles(0, math.pi / 2, 0), seed = 14 },
-		{ name = "Haybale", cframe = CFrame.new(-92, 0, 110), seed = 15 },
-		{ name = "Wheelbarrow", cframe = CFrame.new(18, 0, 92) * CFrame.Angles(0, 2.2, 0), seed = 16 },
-		{ name = "ToolRack", cframe = CFrame.new(-55, 0, 104) * CFrame.Angles(0, math.pi, 0), seed = 17 },
-		{ name = "Planter", cframe = CFrame.new(10, 0, 30), seed = 18 },
-		{ name = "Planter", cframe = CFrame.new(-10, 0, 30), seed = 19 },
+	-- Lamps (the layout from tools/preview/scenes/town.luau): along the
+	-- main street (z 70 to 84) with their arms over it, at the head of the
+	-- spawn walk, by the gondola path and the mill yard, and by the lot.
+	-- None stand where trucks pull out of the parking slots (x 16 to 104).
+	local lamps: { CFrame } = {}
+	for _, x in ipairs({ -92, -64, -30, -14 }) do
+		table.insert(lamps, at(x, 68.5, math.pi)) -- south side, arm north over the street
+	end
+	for _, x in ipairs({ 22, 58 }) do
+		table.insert(lamps, at(x, 86, 0)) -- north side, arm south over the street
+	end
+	table.insert(lamps, at(-8, 60, -math.pi / 2))
+	table.insert(lamps, at(8, 60, math.pi / 2))
+	table.insert(lamps, at(-23, 132, math.pi / 2))
+	table.insert(lamps, at(26, 122, 0))
+	table.insert(lamps, at(120, 52, math.pi / 2))
+	table.insert(lamps, at(120, 0, math.pi / 2))
+
+	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east edge.
+	local fences: { Fence } = {
+		{ length = 26, cframe = at(-88, 136) },
+		{ length = 26, cframe = at(-88, 114) },
+		{ length = 22, cframe = at(-101, 125, math.pi / 2) },
+		{ length = 36, cframe = at(111, 25, math.pi / 2) },
 	}
+
+	local propSpots: { { any } } = { -- { name, x, z, yaw? }
+		{ "Haybale", -93, 128, 0.3 },
+		{ "Haybale", -85, 121, -0.5 },
+		{ "Haybale", -80, 130, 1.2 },
+		{ "Cart", -71, 124, -0.4 },
+		{ "WaterTower", -58, 126 },
+		{ "ToolRack", -33, 97, -math.pi / 2 },
+		{ "Well", -38, 77 },
+		{ "Bench", -58, 66, math.pi },
+		{ "Bench", -40, 66, math.pi },
+		{ "Barrel", -32.5, 92 },
+		{ "Crate", -57, 92, 0.3 },
+		{ "Barrel", 32, 93 },
+		{ "Crate", 57, 93, -0.2 },
+		{ "Crate", 57.5, 89.5, 0.5 },
+		{ "Planter", -66, 92 },
+		{ "Planter", -94, 92 },
+		{ "Mailbox", -91, 87, 0 },
+		{ "FlowerBox", -86, 90.5, 0 },
+		{ "LogPile", 28, 108, 0 },
+		{ "LogPile", 28, 98, 0.1 },
+		{ "Wheelbarrow", 20, 93, -0.6 },
+		{ "SawdustPile", 24, 118 },
+		{ "SawdustPile", -21, 99 },
+		{ "Lantern", -28, 30 },
+		{ "Barrel", -24, 120 },
+		{ "Barrel", -26, 117.5 },
+	}
+	local props: { Placement } = {}
+	for i, p in ipairs(propSpots) do
+		local name: string, x: number, z: number, yaw: number? = p[1], p[2], p[3], p[4]
+		table.insert(props, { name = name, cframe = at(x, z, yaw), seed = i * 13 })
+	end
 
 	-- Parking: two rows of 12 slots facing the forest (-Z), sized for the
 	-- longest rig (VehicleService claims them by Index).
@@ -293,9 +323,13 @@ function WorldPlan.Town(): Town
 		end
 	end
 	local signs: { Sign } = {
-		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = standing(-18, 44, 0, 40) },
+		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 62, 0, 40) },
 	}
+
+	-- Murph's camp by the spawn: the campfire at its origin, the tent behind
+	-- (+Z), facing the spawn; Murph stands at camp-local (0, 0, -3).
+	local campsite = facing(-21, 24, 0, 40)
 
 	return {
 		spawn = Vector3.new(0, 0.5, 40),
@@ -324,9 +358,12 @@ function WorldPlan.Town(): Town
 			},
 		},
 		gondola = townGondola(),
-		campsite = CFrame.new(-17, 0, 25) * CFrame.Angles(0, math.rad(35), 0),
+		campsite = campsite,
+		murph = campsite * CFrame.new(0, 0, -3),
+		gondolaSign = facing(-36, 128, 0, 80),
 		parkingSlots = slots,
 		lamps = lamps,
+		fences = fences,
 		props = props,
 		signs = signs,
 	}

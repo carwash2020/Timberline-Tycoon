@@ -40,6 +40,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
+local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
@@ -205,10 +206,13 @@ local function addBedVisual(rec: TruckRecord, entry: BedEntry, index: number)
 	end
 	local log = TruckArt.BedLog(floor, slot, wood, rec.layout.logLength, index)
 	log:SetAttribute("WoodId", entry.woodId)
-	if entry.figure then
-		log:SetAttribute("Figure", entry.figure) -- the Living Forest may mark figured logs
-	end
 	local logPart = log.PrimaryPart
+	if entry.figure then
+		log:SetAttribute("Figure", entry.figure)
+		if logPart then
+			ForestArt.FigureBand(logPart, entry.figure) -- the same band it wore in the world
+		end
+	end
 	for _, d in ipairs(log:GetDescendants()) do
 		if d:IsA("BasePart") then
 			d.Anchored = false

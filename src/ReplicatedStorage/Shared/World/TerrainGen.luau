@@ -360,10 +360,15 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 
 	local _, onRoad = roadWeight(x, z)
 	local flat = WorldLayout.FlatWeight(x, z)
-	-- Town: a cobbled square around the sawmill and dirt elsewhere on roads.
-	local dxm, dzm = x - WorldLayout.Sawmill.X, z - (WorldLayout.Sawmill.Z - 10)
-	if dxm * dxm + dzm * dzm < 46 * 46 + noise(x / 8, z / 8, 1.1) * 300 then
-		return "Cobblestone"
+	-- Town: the plaza, street and paths (WorldLayout.TownPaint), then dirt
+	-- on every road.
+	if flat > 0.5 then
+		local wobble = noise(x / 6, z / 6, 1.1) * 1.5
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			if x > paint.x0 - wobble and x < paint.x1 + wobble and z > paint.z0 - wobble and z < paint.z1 + wobble then
+				return paint.material
+			end
+		end
 	end
 	if onRoad > 0 then
 		return "Ground"
