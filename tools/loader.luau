@@ -15,6 +15,8 @@
 --     real Models here (tests, tools/preview).
 --   * `mocks` replaces whole modules by name, e.g. { ProfileService = fake }.
 --   * `globals` overrides globals, e.g. { os = { clock = fakeClock } }.
+--   * `loader:run(path)` runs a Script (Name.server.luau) the same way, e.g.
+--     MapBuilder with its heavy modules mocked (tests/MapBuilder.spec.luau).
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -208,6 +210,7 @@ local CFrameShim = setmetatable({
 
 function Loader:environment(modulePath: string)
 	local dir, name = string.match(modulePath, "^(.*)/([^/]+)%.luau$")
+	name = string.match(name, "^([^%.]+)") -- a Script's Name drops .server / .client
 	local services = self.services
 	local env = {
 		-- Luau standard library
@@ -234,6 +237,7 @@ function Loader:environment(modulePath: string)
 		bit32 = bit32,
 		buffer = buffer,
 		coroutine = coroutine,
+		debug = debug,
 		math = math,
 		os = os,
 		string = string,
@@ -307,6 +311,19 @@ end
 -- Loads a module by its path under src/, e.g. "ReplicatedStorage/Shared/Util".
 function Loader:load(path: string)
 	return self:require(SRC .. "/" .. path .. ".luau")
+end
+
+-- Runs a Script by its path under src/, e.g. "ServerScriptService/MapBuilder.server".
+-- Scripts return nothing; their effects land on the fakes passed in
+-- (services, globals, mocks). Each call runs the script again.
+function Loader:run(path: string)
+	local scriptPath = SRC .. "/" .. path .. ".luau"
+	local chunk = luau.load(fs.readFile(scriptPath), {
+		debugName = scriptPath,
+		environment = self:environment(scriptPath),
+		injectGlobals = false,
+	})
+	chunk()
 end
 
 -- Shorthand for a module in ReplicatedStorage/Shared.

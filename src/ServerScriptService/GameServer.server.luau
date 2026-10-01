@@ -17,6 +17,7 @@ local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
 local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
+local BootReport = require(script.Parent.BootReport)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
@@ -26,6 +27,7 @@ local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
+local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
@@ -38,6 +40,30 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
+
+-- Runs one service's Init, join or leave hook on its own: an error in one
+-- is logged with a traceback and doesn't stop the others (a broken Init
+-- must never keep players out). tostring first: debug.traceback itself
+-- errors on a non-string error.
+local function safely(name: string, fn: (...any) -> ...any, ...: any)
+	local args = table.pack(...)
+	local ok, err = xpcall(function(): any
+		fn(table.unpack(args, 1, args.n))
+		return nil
+	end, function(e: any): string
+		return debug.traceback(tostring(e), 2)
+	end)
+	if not ok then
+		warn(string.format("[GameServer] %s failed:\n%s", name, tostring(err)))
+	end
+end
+
+-- Does the live place match default.project.json (and, in Studio, can it
+-- save)? A warning names each fix; "[PlaceCheck] OK" when all match. Its
+-- own thread: in Studio it waits a moment for ProfileStore's access probe.
+task.spawn(function()
+	safely("PlaceCheck.Run", PlaceCheck.Run)
+end)
 
 -- Wait for the code-built world. MapBuilder writes the terrain first (a few
 -- seconds to a minute) and adds the SellArea last, once everything exists.
@@ -61,7 +87,7 @@ for _, name in ipairs(Net.RemoteNames) do
 end
 remotes.Parent = ReplicatedStorage
 
-EconomyService.Init(remotes)
+safely("EconomyService.Init", EconomyService.Init, remotes)
 
 -- Per-player state ---------------------------------------------------------
 local nextSwingAt: { [number]: number } = {}
@@ -503,27 +529,29 @@ local function onInstantDelivery(player: Player)
 	completeSale(player, profile, total, count, byWood, figures)
 end
 
-MilestoneService.Init(notify)
-AxeService.Init(notify)
-ShopService.Init(mapFolder, remote.BuyItem, remote.EquipItem, notify)
-VehicleService.Init(notify)
-QuestService.Init(remote.SkipTutorial, notify)
-DailyService.Init(notify)
-BiomeService.Init(notify)
-MonetizationService.Init(remote.BuyRobuxItem, notify)
-FieldGuideService.Init(notify)
-NodeService.Init(notify)
-AetherService.Init(notify)
-GondolaService.Init(mapFolder, notify)
-PlotService.Init(mapFolder, {
+-- Each Init on its own (safely): one failing leaves that service broken
+-- but the server, the other services and spawning carry on.
+safely("MilestoneService.Init", MilestoneService.Init, notify)
+safely("AxeService.Init", AxeService.Init, notify)
+safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify)
+safely("VehicleService.Init", VehicleService.Init, notify)
+safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify)
+safely("DailyService.Init", DailyService.Init, notify)
+safely("BiomeService.Init", BiomeService.Init, notify)
+safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
+safely("FieldGuideService.Init", FieldGuideService.Init, notify)
+safely("NodeService.Init", NodeService.Init, notify)
+safely("AetherService.Init", AetherService.Init, notify)
+safely("GondolaService.Init", GondolaService.Init, mapFolder, notify)
+safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlaceBlueprint = remote.PlaceBlueprint,
 	MoveBlueprint = remote.MoveBlueprint,
 	SellPlaced = remote.SellPlaced,
 	UpgradePlot = remote.UpgradePlot,
 }, notify)
-ForestService.Init({ PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
-WeatherService.Init(remote.WorldFX)
-NPCService.Init(mapFolder)
+safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
+safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
+safely("NPCService.Init", NPCService.Init, mapFolder)
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
@@ -586,19 +614,6 @@ local function onCharacterAdded(player: Player, character: Model)
 	end)
 	if player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10) then
 		AxeService.GiveLoadout(player, character)
-	end
-end
-
--- Runs one service's join or leave hook on its own: an error in one is
--- logged with a traceback and doesn't stop the player's other systems.
-local function safely(name: string, fn: (...any) -> ...any, ...: any)
-	local args = table.pack(...)
-	local ok, err = xpcall(function(): any
-		fn(table.unpack(args, 1, args.n))
-		return nil
-	end, debug.traceback)
-	if not ok then
-		warn(string.format("[GameServer] %s failed:\n%s", name, tostring(err)))
 	end
 end
 
@@ -715,4 +730,5 @@ for _, p in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, p)
 end
 
-print("[GameServer] Online: chop -> carry -> sell -> buy a better axe.")
+-- The boot report (PLAY-01): how long the world took, trees, players.
+print(BootReport.Line(workspace, #Players:GetPlayers()))
