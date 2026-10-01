@@ -30,6 +30,7 @@ local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local CameraShake = require(script.Parent.CameraShake)
 local LightingController = require(script.Parent.LightingController)
+local Quality = require(script.Parent.Quality)
 
 local WeatherController = {}
 
@@ -256,13 +257,14 @@ end
 local function updateRates(env: LightingController.Environment, dt: number)
 	local want = targets(env)
 	local alpha = 1 - math.exp(-dt / RATE_EASE)
+	local scale = Quality.Budget().WeatherRate -- half the particles on low quality (the rain loop follows `current`)
 	for name, ch in pairs(channels) do
 		ch.target = (want[name] or 0) * ch.maxRate
 		ch.current += (ch.target - ch.current) * alpha
 		if ch.target == 0 and ch.current < 0.5 then
 			ch.current = 0
 		end
-		local rate = math.floor(ch.current + 0.5)
+		local rate = math.floor(ch.current * scale + 0.5)
 		if math.abs(rate - ch.shown) >= math.max(1, ch.shown * 0.05) or (rate == 0 and ch.shown ~= 0) then
 			ch.shown = rate
 			ch.emitter.Rate = rate
