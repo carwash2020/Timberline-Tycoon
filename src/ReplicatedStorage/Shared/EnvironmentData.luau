@@ -346,9 +346,11 @@ EnvironmentData.BiomeOverrides = {
 		},
 	},
 	-- White-gold light above the clouds, the whole map spread out below.
+	-- Bloom only +0.1 (WLD-17; it was +0.3, which melted the Lumenwood's
+	-- glowing crowns into white blobs).
 	sky = {
 		set = { atmosphereDensity = 0.2, atmosphereOffset = 0.4, dofFar = 0.08 },
-		add = { saturation = 0.2, bloomIntensity = 0.3, brightness = 0.3, atmosphereGlare = 0.5 },
+		add = { saturation = 0.2, bloomIntensity = 0.1, brightness = 0.3, atmosphereGlare = 0.5 },
 	},
 } :: { [string]: Override }
 
