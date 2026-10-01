@@ -8,7 +8,9 @@
 --     sets the truck's Drive (LinearVelocity) and Heading (AlignOrientation).
 --     Heading follows the ground: four rays at the chassis corners give the
 --     slope (Shared/VehicleLogic.GroundUp), never more than 30 degrees, so
---     the truck rides hills and bumps instead of nosing into them.
+--     the truck rides hills and bumps instead of nosing into them. Long
+--     trucks turn wider circles: DriveMath.MinTurnRadius of the truck's
+--     wheelbase (TruckLayout.Wheelbase).
 --   * "Send truck home" side button (Y on a gamepad): sends your truck back
 --     to your parking slot when it's far away (left somewhere, or stuck).
 --     It shows only while you're on foot, away from the truck, and the
@@ -25,7 +27,9 @@ local RunService = game:GetService("RunService")
 
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local HUD = require(script.Parent.HUD)
 local HudRules = require(script.Parent.HudRules)
@@ -48,6 +52,7 @@ type Session = {
 	heading: AlignOrientation,
 	topSpeed: number,
 	turnRate: number,
+	minRadius: number?, -- tightest turning circle (DriveMath.MinTurnRadius)
 	speed: number,
 	facing: Vector3, -- flat unit vector the truck is steering toward
 	up: Vector3, -- the ground's up under the truck, smoothed
@@ -75,6 +80,11 @@ local function startDriving(seat: VehicleSeat)
 	then
 		return
 	end
+	-- Long trucks turn wider circles (from the wheelbase; a trailer doesn't
+	-- change it). Unknown truck: no limit beyond turnRate.
+	local truckId = truck:GetAttribute("TruckId")
+	local def = if type(truckId) == "string" then ItemCatalog.GetTruck(truckId) else nil
+	local minRadius = if def then DriveMath.MinTurnRadius(TruckLayout.Wheelbase(TruckLayout.For(def))) else nil
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { truck, player.Character :: Instance }
@@ -87,6 +97,7 @@ local function startDriving(seat: VehicleSeat)
 		heading = heading,
 		topSpeed = (truck:GetAttribute("TopSpeed") :: number?) or 26,
 		turnRate = (truck:GetAttribute("TurnRate") :: number?) or 1.4,
+		minRadius = minRadius,
 		speed = 0,
 		facing = VehicleLogic.FlatFacing(chassis.CFrame.LookVector),
 		up = chassis.CFrame.UpVector,
@@ -123,7 +134,7 @@ local function step(dt: number)
 	local velocity = s.chassis.AssemblyLinearVelocity
 	local actual = Vector3.new(velocity.X, 0, velocity.Z):Dot(s.facing)
 	s.speed = DriveMath.Speed(s.speed, s.seat.ThrottleFloat, s.topSpeed, dt, actual)
-	local turn = DriveMath.Turn(s.speed, s.seat.SteerFloat, s.turnRate, dt)
+	local turn = DriveMath.Turn(s.speed, s.seat.SteerFloat, s.turnRate, dt, s.minRadius)
 	s.facing = VehicleLogic.FlatFacing(CFrame.Angles(0, turn, 0):VectorToWorldSpace(s.facing))
 
 	-- Lean with the ground, smoothly (slopes, bumps, later biomes).

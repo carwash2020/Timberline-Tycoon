@@ -145,6 +145,21 @@ return function(t)
 		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 9.25) < 1e-9, "the Logging Rig's tandem middle")
 	end)
 
+	t.test("wheelbase: front axle to the axle it turns about", function()
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			local wb = TruckLayout.Wheelbase(layout)
+			t.ok(math.abs(wb - (TruckLayout.DriveAxleZ(layout) - layout.wheelZ[1])) < 1e-9, id)
+			t.ok(wb > 0 and wb < layout.length, id .. " inside the truck")
+		end
+		t.eq(TruckLayout.Wheelbase({ wheelZ = { -2 } }), 0, "one axle: no wheelbase")
+		t.ok(
+			TruckLayout.Wheelbase(TruckLayout.For(ItemCatalog.Trucks.LoggingRig))
+				> TruckLayout.Wheelbase(TruckLayout.For(ItemCatalog.Trucks.Rustbucket)),
+			"the rig is the long one"
+		)
+	end)
+
 	t.test("the axle pick on odd layouts", function()
 		t.eq(TruckLayout.DriveAxleZ({ wheelZ = { -3, 4 } }), 4)
 		t.eq(TruckLayout.DriveAxleZ({ wheelZ = { -5, 8, 5 } }), 6.5)
@@ -171,10 +186,15 @@ return function(t)
 		local VehicleLogic = t.shared("VehicleLogic")
 		local Vector3 = t.roblox.Vector3
 		for id, truck in pairs(ItemCatalog.Trucks) do
-			local d = TruckLayout.DriveAxleZ(TruckLayout.For(truck)) -- centre ahead of the pivot
-			for step = 1, 20 do
-				local v = truck.topSpeed * step / 20
-				local omega = math.abs(DriveMath.Turn(v, 1, truck.turnRate, 1)) -- rad/s at full steer
+			local layout = TruckLayout.For(truck)
+			local d = TruckLayout.DriveAxleZ(layout) -- centre ahead of the pivot
+			-- With and without the wheelbase's turning circle (a wider circle
+			-- only slows the turn).
+			local circles = { false, DriveMath.MinTurnRadius(TruckLayout.Wheelbase(layout)) }
+			for step = 1, 40 do
+				local v = truck.topSpeed * ((step - 1) % 20 + 1) / 20
+				local minRadius = circles[(step - 1) // 20 + 1] or nil
+				local omega = math.abs(DriveMath.Turn(v, 1, truck.turnRate, 1, minRadius)) -- rad/s at full steer
 				local centreSpeed = math.sqrt(v * v + (omega * d) ^ 2)
 				t.ok(centreSpeed <= truck.topSpeed * 1.25, string.format("%s at %.1f: %.2f", id, v, centreSpeed))
 				-- Where the centre gets to along its circle in a judging window.
