@@ -62,12 +62,63 @@ Anything red becomes a P0 and jumps the queue.
 | 5 | Step 4: drive to the sawmill and sell | Sitting in the truck switches the hint to "WASD to drive · Space to hop out". The rear wheels follow the front in a tight turn (no tail slide). Under 4 min from spawn to sale. Say if a truck stops dead at a road edge (ACT-05) |
 | 6 | Step 5: plant | No Plant prompt on any stump before step 5 (the toast says "keep it for now"). At step 5 your first stump is still there (held up to 4 min) or the beacon points at a tree to fell. The sapling grows in 8 s with your name |
 | 7 | Walk the thickest part of the Starter Forest | You can always see your character; leaves in the way fade (Build #2) |
-| 8 | Ride the gondola up and down | Say if it steps or stutters (WLD-07) |
+| 8 | Ride the gondola up and down | Smooth, about 40 s, no stepping (Build #3) |
 | 9 | Stop, then Play again | Cash, axe, truck bed and settings are all kept |
 | 10 | **Test > Clients and Servers**, 2 players | Each sees the other's truck move smoothly; your logs stay yours for 45 s |
 | 11 | **File > Studio Settings > Network > Incoming Replication Lag** 0.2, drive 60 s | No rubber-banding, no put-back |
 | 12 | **Device Emulator**: iPhone SE, then iPhone 14 Pro (landscape) | Toasts stack under the tracker and never cover the cash, ♪ or tracker. During the tutorial: no Daily Goals button and no clock. Note anything that overlaps |
 | 13 | Phone emulation + **View > MicroProfiler**. Night: in the **Server** command bar run `workspace:SetAttribute("ClockOverride", 23)` (`nil` clears it). Town at night, the Starter Forest, the Snowfields, the isles | 30+ fps (frame under 33 ms). Note the top script costs |
+
+### Build #3 (phones, frame rate, driving, the gondola, trees)
+
+- **WLD-07 gondola (check this first)** Ride up from town and back down,
+  with View > Output open. Good: the cabin eases out, glides with no
+  stepping, eases in at about 40 s, you stand on the platform, $250 is
+  charged once, no gondola errors. With 2 clients the watcher sees a
+  smooth glide; two riders pass through each other. Jump out 10 s in:
+  you fall, the cabin vanishes, no refund. Watch the first 30 studs out
+  of the town station for any snag (riders now collide with the world).
+  With Studio Settings > Physics > Are Owners Shown, the cabin shows the
+  rider's colour.
+- **ACT-05** Full throttle from the lot onto terrain, over road edges and
+  kerbs, up the Starter Forest hill: no dead stops, at most a small bump.
+  A 0.5-stud part head-on and at 45 degrees: the truck climbs over.
+  Getting out still parks it upright. With a trailer too.
+- **ACT-03 fix** The Logging Rig turns a visibly wider circle at low speed
+  (about 30 studs across); the Rustbucket and Pickup feel as before. Pull
+  the Rig out of a slot between two parked trucks: it clears them (a west
+  slot may need a three-point turn, as before).
+- **ACT-04** Sit in the Pickup, Flatbed and Logging Rig with a tall hat:
+  the head and hat stay under the roof. On the Scout ATV the legs pass
+  under the bars. Check R6 too (Roblox may seat it a little higher).
+- **UI-07 / UI-09** iPhone SE and iPhone 14 Pro (both landscapes): every
+  button is easy to tap, text is readable, the side buttons and the shop
+  panel stay clear of the notch and the top bar. Desktop looks as before.
+- **UI-04 fix** The load chip appears with your first log, not before.
+- **UI-14 / UI-16** Toasts stay up long enough to read (the truck recall
+  confirm 6 s) and say "an oak". Every button clicks once; silent with
+  SOUND FX off.
+- **Small fixes** The sell hint shows only with something to sell; the
+  tutorial beacon never points at an Elder; the first Heartseeds say
+  "keep them for now"; the phone clock doesn't flash while loading; the
+  corner clock follows ClockOverride; Skip says Tap/Click/Press.
+- **PLAY-04 / PLAY-05 / NAT-09** Output prints `[Quality] high (...)` on
+  desktop and `[Quality] low (Automatic, touch only)` in the phone
+  emulator. MicroProfiler in a Snowfields frostwood stand: WindSway under
+  1 ms (high) / 0.5 ms (low). Trees beyond the nearest 32 (16 on low)
+  don't sway. A tree you fell, then leave and come back to, sways normally.
+- **WLD-06 / WLD-17** ClockOverride 23: night is lighter (trunks read at
+  30 studs in the Starter Forest and Hills); the Phantom Grove is darkest
+  but not black. On the isles at midday the Lumenwood crowns keep their
+  shape (bloom 0.7).
+- **NAT-17 / NAT-07** Pines are 5-sided tiers; frostwood is deep blue with
+  a white tip and collar and a dark slate trunk, and stands out from the
+  snow (its foot ice shards are gone, on purpose: part budget). The world
+  is about 2,200 parts lighter.
+- **NAT-04 / NAT-12** A planted sprout sits on its stump (no soil in the
+  air) and grows to the tree; the Heartseed orb is bigger with a trail.
+- **NAT-13 / NAT-19** Decor fallen logs and old stumps look old (grey,
+  mossy, mushrooms); the rabbit's eyes sit in its head.
 
 ### Build #2 (Phase 2: chop, carry, drive feel right; first town fixes)
 
