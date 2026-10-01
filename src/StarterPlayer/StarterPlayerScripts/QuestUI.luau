@@ -276,6 +276,7 @@ local function buildBeacon(playerGui: Instance)
 	-- pill. Drawn the same size at any distance; bobs 8 px.
 	local b = Instance.new("BillboardGui")
 	b.Name = "TutorialBeacon"
+	b.ResetOnSpawn = false -- it lives in PlayerGui: a respawn would destroy it for good
 	b.Size = UDim2.fromOffset(64, 80)
 	b.AlwaysOnTop = true
 	b.LightInfluence = 0

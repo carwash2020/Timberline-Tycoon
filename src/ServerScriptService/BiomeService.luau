@@ -96,7 +96,9 @@ local function update(player: Player)
 	if math.abs(humanoid.WalkSpeed - speed) > 0.01 then
 		humanoid.WalkSpeed = speed
 	end
-	if rules.burning then
+	-- Only feet on the ground burn: riding in a truck or jumping is safe.
+	local grounded = humanoid.SeatPart == nil and humanoid.FloorMaterial ~= Enum.Material.Air
+	if rules.burning and grounded then
 		humanoid:TakeDamage(GameConfig.LavaDamagePerSecond * TICK)
 		if not burningWarned[player] then
 			burningWarned[player] = true

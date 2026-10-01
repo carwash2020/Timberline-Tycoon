@@ -2,7 +2,7 @@
 -- Cash only moves through EconomyService, and the wallet cap holds.
 return function(t)
 	local function setup(cash)
-		local profile = { cash = cash, totalEarned = 0 }
+		local profile = { cash = cash, totalEarned = 0, pendingCash = 0 }
 		local player = {
 			Name = "Tester",
 			attrs = {},
@@ -77,5 +77,32 @@ return function(t)
 		local Economy = setup(0)
 		t.eq({ Economy.AddCash({ Name = "Stranger" }, 10, "test") }, { 0, 0 })
 		t.ok(not Economy.SpendCash({ Name = "Stranger" }, 1, "test"))
+	end)
+
+	t.test("AddPaidCash banks what doesn't fit and pays it out as you spend", function()
+		local Economy, GameConfig, player, profile = setup(0)
+		local cap = GameConfig.CashCap
+		profile.cash = cap - 100
+		t.eq({ Economy.AddPaidCash(player, 250, "robux: test") }, { 100, 150 })
+		t.eq(profile.cash, cap)
+		t.eq(profile.pendingCash, 150)
+		t.eq(player.attrs.PendingCash, 150)
+		t.ok(Economy.SpendCash(player, 60, "test"))
+		t.eq(profile.cash, cap, "the spend's room is refilled from the bank")
+		t.eq(profile.pendingCash, 90)
+		t.ok(Economy.SpendCash(player, 200, "test"))
+		t.eq(profile.cash, cap - 110)
+		t.eq(profile.pendingCash, 0)
+		t.eq(player.attrs.PendingCash, 0)
+	end)
+
+	t.test("PayPending fills the wallet from the bank when a save loads", function()
+		local Economy, GameConfig, player, profile = setup(0)
+		profile.cash = GameConfig.CashCap - 30
+		profile.pendingCash = 50
+		Economy.PayPending(player)
+		t.eq(profile.cash, GameConfig.CashCap)
+		t.eq(profile.pendingCash, 20)
+		Economy.PayPending({ Name = "Stranger" })
 	end)
 end

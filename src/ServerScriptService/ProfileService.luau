@@ -10,13 +10,16 @@
 -- quietly uses an in-memory mock store, so data won't persist between tests.
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileStore = require(script.Parent.Vendor.ProfileStore)
 
 local ProfileService = {}
 
-local STORE_NAME = "PlayerProfiles"
+-- Studio playtests (with API access on) get their own store, so testing can
+-- never overwrite a real player's save.
+local STORE_NAME = if RunService:IsStudio() then "PlayerProfiles_Studio" else "PlayerProfiles"
 local KEY_PREFIX = "profile_"
 
 export type PlacedItem = ProfileSchema.PlacedItem
@@ -95,7 +98,22 @@ function ProfileService.ProcessPurchaseAsync(
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	if ProfileSchema.RecordPurchase(session.Data, purchaseId) then
-		grant(session.Data :: Profile)
+		local data = session.Data :: Profile
+		local ok, err = pcall(function(): any
+			grant(data)
+			return nil
+		end)
+		if not ok then
+			-- Forget the receipt so Roblox retries it: never take Robux for
+			-- nothing.
+			local ids = data.purchaseIds
+			local at = table.find(ids, purchaseId)
+			if at then
+				table.remove(ids, at)
+			end
+			warn(string.format("[ProfileService] Granting %s failed: %s", purchaseId, tostring(err)))
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
 		session:Save()
 	end
 	local function saved(data: any): boolean

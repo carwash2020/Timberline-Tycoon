@@ -658,7 +658,7 @@ export type Profile = {
 - Tuning = editing these tables, never code.
 
 ### 14.4 Remotes (ReplicatedStorage.Remotes) — intents only, never trust
-- `ChopTree(treeUid)` — server checks: distance < 20 studs, axe equipped,
+- `ChopTree(treeUid)` — server checks: within 12 studs of the bark (ChopRange + trunk radius), axe equipped,
   per-player 0.8s cooldown. Applies damage to server-side HP.
 - `PickupLog(logUid)` — distance check; logs are free-for-all after fell
   (10s grace to the feller).
@@ -756,7 +756,7 @@ export type Profile = {
 - [ ] Sell in SellZone: +$3/log (oak); cash changes ONLY via EconomyService.
 - [ ] Leave + rejoin: cash and axe persist.
 - [ ] First sale achievable in < 3 min in a solo Play test.
-- [ ] `ChopTree` rejected beyond 20 studs; rate-limited at 4/s.
+- [ ] `ChopTree` rejected beyond 12 studs from the bark; rate-limited at 4/s.
 
 ### 14.10 Definition of done, per phase
 Playtest in Studio, checklist passes, zero console errors, commit as

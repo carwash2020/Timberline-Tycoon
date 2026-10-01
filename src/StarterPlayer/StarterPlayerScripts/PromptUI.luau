@@ -120,9 +120,11 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	words.Parent = card.face
 	local action = UITheme.label(words, prompt.ActionText, F.Black, 16, C.Cream)
 	action.LayoutOrder = 1
+	action.Size = UDim2.new()
 	action.AutomaticSize = Enum.AutomaticSize.XY
 	local object = UITheme.label(words, string.upper(prompt.ObjectText), F.Black, 12, C.Amber)
 	object.LayoutOrder = 2
+	object.Size = UDim2.new()
 	object.AutomaticSize = Enum.AutomaticSize.XY
 	object.Visible = prompt.ObjectText ~= ""
 

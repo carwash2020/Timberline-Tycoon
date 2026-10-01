@@ -60,6 +60,9 @@ type State = {
 local state: State? = nil
 local bar: Frame? = nil
 local barLabel: TextLabel? = nil
+-- The mouse is over the build bar: don't drag the ghost under the buttons
+-- (pressing PLACE would build right there).
+local overBar = false
 
 function BlueprintPlacer.Active(): boolean
 	return state ~= nil
@@ -118,6 +121,9 @@ local function aimPoint(s: State): Vector3?
 		local size = camera.ViewportSize
 		return onGround(camera:ViewportPointToRay(size.X / 2, size.Y / 2))
 	else
+		if overBar then
+			return nil -- keep the ghost where it was aimed
+		end
 		local mouse = UserInputService:GetMouseLocation()
 		return onGround(camera:ViewportPointToRay(mouse.X, mouse.Y))
 	end
@@ -343,6 +349,12 @@ function BlueprintPlacer.Start()
 	add("PLACE", "buy", 2, BlueprintPlacer.Place)
 	add("CANCEL", "skip", 3, BlueprintPlacer.Stop)
 	bar = b.outer
+	b.outer.MouseEnter:Connect(function()
+		overBar = true
+	end)
+	b.outer.MouseLeave:Connect(function()
+		overBar = false
+	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 	player.CharacterRemoving:Connect(BlueprintPlacer.Stop)
 end

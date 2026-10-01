@@ -300,6 +300,10 @@ function UITheme.Card(fill: Color3, edgeColor: Color3, edge: number, radius: num
 	face.BorderSizePixel = 0
 	UITheme.corner(face, radius)
 	if auto then
+		-- AutomaticSize treats Size as a minimum: start from zero so the
+		-- card is exactly as big as what's in it.
+		outer.Size = UDim2.new()
+		face.Size = UDim2.new()
 		outer.AutomaticSize = Enum.AutomaticSize.XY
 		face.AutomaticSize = Enum.AutomaticSize.XY
 		UITheme.padding(outer, 0, 0, edge, 0)

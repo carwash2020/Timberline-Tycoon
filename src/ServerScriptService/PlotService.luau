@@ -48,7 +48,7 @@ type Slot = {
 	board: Part,
 	border: Folder,
 	items: Folder,
-	signLabel: TextLabel,
+	signLabels: { TextLabel }, -- both faces of the sign
 	claim: ProximityPrompt,
 	owner: Player?,
 }
@@ -118,13 +118,15 @@ end
 
 local function refreshSign(slot: Slot)
 	local owner = slot.owner
+	local text = "FREE PLOT\nClaim it here"
 	if owner then
 		local profile = ProfileService.GetProfile(owner)
 		local tier = if profile then PlotData.Tier(profile.plot.tier) else nil
-		slot.signLabel.Text =
+		text =
 			string.format("%s'S\n%s", string.upper(owner.DisplayName), string.upper(if tier then tier.name else "PLOT"))
-	else
-		slot.signLabel.Text = "FREE PLOT\nClaim it here"
+	end
+	for _, label in ipairs(slot.signLabels) do
+		label.Text = text
 	end
 	slot.claim.Enabled = owner == nil
 end
@@ -159,7 +161,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	post.CanCollide = false
 	local board = part("Sign", Vector3.new(8, 3.5, 0.4), cframe, Color3.fromRGB(101, 67, 33), Enum.Material.Wood, model)
 	board.CanCollide = false
-	local label: TextLabel? = nil
+	local labels: { TextLabel } = {}
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face
@@ -171,8 +173,9 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		l.Font = Enum.Font.Fantasy
 		l.TextScaled = true
 		l.TextColor3 = Color3.fromRGB(245, 235, 215)
+		l.Text = ""
 		l.Parent = sg
-		label = l
+		table.insert(labels, l)
 	end
 	local claim = Instance.new("ProximityPrompt")
 	claim.ActionText = "Claim this plot"
@@ -191,7 +194,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		board = board,
 		border = border,
 		items = items,
-		signLabel = label :: TextLabel,
+		signLabels = labels,
 		claim = claim,
 		owner = nil,
 	}
@@ -494,7 +497,10 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 	end
 	local slot = freeSlot()
 	if not slot then
+		-- More players than plots (the place's Max Players should be at most
+		-- #PlotData.Slots): tell them, rather than failing silently.
 		warn("[PlotService] No free plot for " .. player.Name .. "; add slots in PlotData")
+		notify(player, "This server's plot district is full, so your plot isn't out today. Try another server!")
 		return
 	end
 	assign(player, slot, profile)

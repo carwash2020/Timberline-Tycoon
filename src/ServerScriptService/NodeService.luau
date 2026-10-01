@@ -12,6 +12,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
@@ -23,6 +25,7 @@ local NODE_TAG = "Node"
 type NodeRecord = {
 	model: Model,
 	part: BasePart,
+	look: Model, -- the crystals you see (PropArt), out of the world while mined
 	materialId: string,
 	hp: number,
 	alive: boolean,
@@ -39,9 +42,9 @@ local function publish(player: Player)
 end
 
 local function setVisible(rec: NodeRecord, visible: boolean)
-	rec.part.Transparency = if visible then 0.1 else 1
 	rec.part.CanCollide = visible
 	rec.part.CanQuery = visible
+	rec.look.Parent = if visible then rec.model else nil
 end
 
 -- A crystal cluster standing on the ground at `position`, parented to `parent`.
@@ -52,20 +55,25 @@ function NodeService.Spawn(materialId: string, position: Vector3, parent: Instan
 	local model = Instance.new("Model")
 	model.Name = "Node_" .. materialId
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	-- An invisible hit box you aim at and bump into; the look is PropArt's.
+	local color = Color3.fromHex(material.node.color)
 	local part = Instance.new("Part")
 	part.Name = "Crystal"
-	part.Size = Vector3.new(2.2, 4, 2.2)
-	part.CFrame = CFrame.new(position + Vector3.new(0, 2, 0)) * CFrame.Angles(0, math.random() * math.pi, math.rad(12))
-	part.Color = Color3.fromHex(material.node.color)
-	part.Material = Enum.Material.Glass
-	part.Transparency = 0.1
+	part.Size = Vector3.new(3, 4.5, 3)
+	part.CFrame = CFrame.new(position + Vector3.new(0, 2.25, 0))
+	part.Transparency = 1
 	part.Anchored = true
 	part.Parent = model
+	local seed = Kit.seedAt(position.X, position.Z)
+	local look = PropArt.Crystal(seed, color, 4)
+	look.Name = "Look"
+	Kit.placeAt(look, CFrame.new(position) * CFrame.Angles(0, Kit.rng(seed):range(0, math.pi * 2), 0))
 	local glow = Instance.new("PointLight")
-	glow.Color = part.Color
-	glow.Range = 10
-	glow.Brightness = 1.5
-	glow.Parent = part
+	glow.Color = color
+	glow.Range = 12
+	glow.Brightness = 1.2
+	glow.Parent = look.PrimaryPart or look:FindFirstChildWhichIsA("BasePart", true)
+	look.Parent = model
 	model.PrimaryPart = part
 	model:SetAttribute("Material", materialId)
 	model:SetAttribute("MaxHP", material.node.hits)
@@ -74,7 +82,8 @@ function NodeService.Spawn(materialId: string, position: Vector3, parent: Instan
 	model:SetAttribute("BarOffset", 3.5) -- TreeUI's HP bar height
 	CollectionService:AddTag(model, NODE_TAG)
 	model.Parent = parent
-	nodes[uid] = { model = model, part = part, materialId = materialId, hp = material.node.hits, alive = true }
+	nodes[uid] =
+		{ model = model, part = part, look = look, materialId = materialId, hp = material.node.hits, alive = true }
 	return model
 end
 

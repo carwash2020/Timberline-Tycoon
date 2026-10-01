@@ -9,8 +9,8 @@ local GameConfig = {
 	-- Chopping
 	SwingCooldown = 0.8, -- seconds between chops (GAME_DESIGN §14.8)
 	SwingTolerance = 0.15, -- server accepts a swing this early, to absorb network jitter
-	ChopRange = 20, -- studs, horizontal, character to trunk (§14.4)
-	AutoTargetRange = 10, -- nothing under the pointer? chop the nearest tree this close
+	ChopRange = 12, -- studs, horizontal, character to the bark (trunk radius added per tree, §14.4)
+	AutoTargetRange = 6, -- nothing under the pointer? chop the nearest tree this close to its bark
 
 	-- Logs
 	PickupPromptRange = 10, -- studs (§14.9)

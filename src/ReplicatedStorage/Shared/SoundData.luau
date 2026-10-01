@@ -30,6 +30,7 @@ SoundData.Sounds = {
 	-- Chopping and felling
 	Chop = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.6, speed = { 1.45, 1.7 }, rolloff = 90 },
 	ChopFinal = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.8, speed = { 1.05, 1.15 }, rolloff = 100 },
+	Swing = { id = "rbxasset://sounds/swordslash.wav", volume = 0.25, speed = { 0.75, 0.9 } },
 	ChopTooHard = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.5, speed = { 2.4, 2.6 }, rolloff = 60 },
 	TreeCreak = { id = "", volume = 0.6, rolloff = 120 },
 	TreeFall = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.35, speed = { 0.5, 0.6 }, rolloff = 160 },

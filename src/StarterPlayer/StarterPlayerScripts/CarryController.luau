@@ -135,7 +135,9 @@ local function setupSellPrompt()
 			local d = truckPart.Position - zone.Position
 			truckHere = Vector3.new(d.X, 0, d.Z).Magnitude <= GameConfig.SellTruckRange
 		end
-		local n = carried() + (if truckHere then bedCount() else 0)
+		-- Logs waiting in the Sky Bin (sent down the Cloud Chute) sell here too.
+		local skyBin = (player:GetAttribute("SkyBin") :: number?) or 0
+		local n = carried() + (if truckHere then bedCount() else 0) + skyBin
 		prompt.Enabled = inZone and n > 0
 		prompt.ActionText = if n == 1 then "Sell 1 log" else string.format("Sell %d logs", n)
 	end)

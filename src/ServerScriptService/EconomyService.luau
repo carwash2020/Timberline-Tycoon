@@ -120,6 +120,43 @@ function EconomyService.Refund(player: Player, amount: number, reason: string, i
 	return credited, amount - credited
 end
 
+-- Adds cash the player paid real money for (a Robux cash pack). What
+-- doesn't fit under the wallet cap is banked (profile.pendingCash) and paid
+-- out as spending frees up room, because a granted receipt can't be undone.
+-- Returns (credited now, banked).
+function EconomyService.AddPaidCash(player: Player, amount: number, reason: string, itemSku: string?): (number, number)
+	local credited, overflow =
+		EconomyService.AddCash(player, amount, reason, itemSku, Enum.AnalyticsEconomyTransactionType.IAP)
+	local profile = ProfileService.GetProfile(player)
+	if overflow > 0 and profile then
+		profile.pendingCash += overflow
+		player:SetAttribute("PendingCash", profile.pendingCash)
+	end
+	return credited, overflow
+end
+
+-- Moves banked cash (AddPaidCash) into the wallet while there's room.
+-- SpendCash calls it; GameServer calls it when a save loads.
+function EconomyService.PayPending(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if profile == nil then
+		return
+	end
+	local pending = profile.pendingCash or 0
+	if pending <= 0 then
+		return
+	end
+	local room = GameConfig.CashCap - profile.cash
+	local move = math.min(room, pending)
+	if move > 0 then
+		profile.pendingCash = pending - move
+		profile.cash += move
+		publish(player, profile.cash)
+		player:SetAttribute("PendingCash", profile.pendingCash)
+		print(string.format("[Economy] +%d banked cash to %s", move, player.Name))
+	end
+end
+
 -- `itemSku` names what was bought for analytics (e.g. "SteelAxe").
 function EconomyService.SpendCash(player: Player, amount: number, reason: string, itemSku: string?): boolean
 	amount = math.floor(amount)
@@ -141,6 +178,7 @@ function EconomyService.SpendCash(player: Player, amount: number, reason: string
 		itemSku
 	)
 	print(string.format("[Economy] -%d from %s (%s)", amount, player.Name, reason))
+	EconomyService.PayPending(player)
 	return true
 end
 

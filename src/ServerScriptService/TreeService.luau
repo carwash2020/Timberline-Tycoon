@@ -59,6 +59,7 @@ export type TreeRecord = {
 	alive: boolean,
 	pivot: CFrame, -- upright pivot (trunk centre)
 	base: Vector3, -- ground point under the trunk
+	radius: number, -- the trunk's radius: chop range is measured from the bark
 	parts: { [BasePart]: PartState },
 	effects: { [Instance]: boolean }, -- lights and particles, with Enabled
 	felled: boolean, -- down and waiting to regrow
@@ -169,6 +170,8 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 	Kit.placeAt(model, CFrame.new(pos) * CFrame.Angles(0, yaw, 0))
 
 	local pivot = model:GetPivot()
+	local trunkPart = model.PrimaryPart
+	local radius = if trunkPart then trunkPart.Size.Y / 2 else 1 -- the trunk cylinder's axis is its X
 	local maxHp = TreeLogic.MaxHP(def.treeHP, size)
 	model:SetAttribute("WoodId", woodId)
 	model:SetAttribute("MaxHP", maxHp)
@@ -177,6 +180,7 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 	model:SetAttribute("Size", size.name)
 	model:SetAttribute("BarOffset", TreeArt.BarHeight(def, size.scale))
 	model:SetAttribute("HomePivot", pivot) -- clients shake and fell the tree around this
+	model:SetAttribute("TrunkRadius", radius) -- ChopController measures reach from the bark
 	model:SetAttribute("Felled", false)
 	if opts.planterId then
 		model:SetAttribute("PlanterId", opts.planterId)
@@ -195,6 +199,7 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 		alive = true,
 		pivot = pivot,
 		base = pos,
+		radius = radius,
 		parts = parts,
 		effects = effects,
 		felled = false,
@@ -537,7 +542,7 @@ function TreeService.ApplyChop(player: Player, treeUid: string, axe: ItemCatalog
 	local offset = hrp.Position - rec.base
 	local horizontal = Vector3.new(offset.X, 0, offset.Z).Magnitude
 	if
-		horizontal > GameConfig.ChopRange + GameConfig.RangeTolerance
+		horizontal - rec.radius > GameConfig.ChopRange + GameConfig.RangeTolerance
 		or math.abs(offset.Y) > rec.def.trunkHeight * rec.size.scale + 10
 	then
 		return nil, "far"

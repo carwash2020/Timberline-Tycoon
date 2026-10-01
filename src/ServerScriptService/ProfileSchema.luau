@@ -100,6 +100,7 @@ export type Profile = {
 	forest: ForestState,
 	truckBed: { BedLog }, -- what's in your truck bed (VehicleService)
 	settings: { music: boolean, sfx: boolean },
+	pendingCash: number, -- Robux cash that didn't fit under the wallet cap, paid out as room frees up
 }
 
 -- New players start from this. Fields added here later are filled into
@@ -138,6 +139,7 @@ local TEMPLATE: Profile = {
 	forest = { planted = 0, harvested = 0, royalties = 0, figures = {}, elders = 0 },
 	truckBed = {},
 	settings = { music = true, sfx = true },
+	pendingCash = 0,
 }
 ProfileSchema.Template = TEMPLATE
 

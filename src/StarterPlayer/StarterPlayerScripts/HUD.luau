@@ -53,6 +53,10 @@ local cashInner: Frame? = nil
 local cashLabel: TextLabel? = nil
 local cashOuter: Frame? = nil
 local cashGlow: UIStroke? = nil
+local cashScale: UIScale? = nil
+local cashGui: ScreenGui? = nil
+local cashShown: NumberValue? = nil -- what the plaque shows; tweens toward the real amount
+local cashTarget: number? = nil -- the real amount (nil until the first update)
 local toastStack: Frame? = nil
 local toasts: { Toast } = {}
 local toastOrder = 0
@@ -65,17 +69,78 @@ local shownPrompts: { [ProximityPrompt]: boolean } = {}
 -- Cash
 ---------------------------------------------------------------------------
 
-local function setCash(amount: number)
-	local label, face, inner, outer, glow = cashLabel, cashFace, cashInner, cashOuter, cashGlow
-	if not label or not face or not inner or not outer or not glow then
+local function showCash(amount: number)
+	local label = cashLabel
+	if not label then
 		return
 	end
 	local full = amount >= GameConfig.CashCap
-	label.Text = if full then "MAX" else Util.formatCash(amount)
+	label.Text = if full then "MAX" else Util.formatCash(math.floor(amount + 0.5))
 	label.TextXAlignment = if full then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
+end
+
+-- "+$1,250" floats up under the plaque and fades (red for spending).
+local function popDelta(delta: number)
+	local gui, outer = cashGui, cashOuter
+	if not gui or not outer then
+		return
+	end
+	local gain = delta > 0
+	local text = (if gain then "+" else "-") .. Util.formatCash(math.abs(delta))
+	local pop = UITheme.label(gui, text, F.Heading, if gain then 24 else 20, if gain then C.Money else C.Ink)
+	pop.Name = "CashPop"
+	pop.AnchorPoint = Vector2.new(1, 0)
+	pop.AutomaticSize = Enum.AutomaticSize.XY
+	pop.Size = UDim2.fromOffset(0, 0)
+	pop.TextXAlignment = Enum.TextXAlignment.Right
+	local start = UDim2.new(1, -UITheme.Margin() - 12, 0, outer.AbsoluteSize.Y + 14)
+	pop.Position = start
+	local stroke = UITheme.stroke(pop, C.Cream, 2)
+	pop.Parent = gui
+	local rise = TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(pop, rise, { Position = start + UDim2.fromOffset(0, if gain then -10 else 18) }):Play()
+	local fade = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.In, 0, false, 0.75)
+	TweenService:Create(pop, fade, { TextTransparency = 1 }):Play()
+	TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
+	task.delay(1.4, function()
+		pop:Destroy()
+	end)
+	-- A little bounce on the plaque for money coming in.
+	local scale = cashScale
+	if gain and scale then
+		scale.Scale = 1.1
+		TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+			:Play()
+	end
+end
+
+local function setCash(amount: number)
+	local face, inner, glow, shown = cashFace, cashInner, cashGlow, cashShown
+	if not face or not inner or not glow or not shown then
+		return
+	end
+	local full = amount >= GameConfig.CashCap
 	face.BackgroundColor3 = if full then C.AmberDeep else C.Bark
 	inner.BackgroundColor3 = if full then C.Amber else C.Paper
 	glow.Enabled = full
+	local before = cashTarget
+	cashTarget = amount
+	if before == nil then
+		-- The first value is the save loading in: no fanfare.
+		shown.Value = amount
+		showCash(amount)
+		return
+	end
+	local delta = amount - before
+	if delta == 0 then
+		return -- the attribute and the remote both report every change
+	end
+	popDelta(delta)
+	-- Count up (or down) to the new amount.
+	local seconds = math.clamp(math.abs(delta) / 4000, 0.25, 0.9)
+	TweenService:Create(shown, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Value = amount,
+	}):Play()
 end
 
 ---------------------------------------------------------------------------
@@ -133,6 +198,7 @@ function HUD.Toast(message: string)
 	local stroke = UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 7, 14, 7, 14)
 	local label = UITheme.label(card.face, "", F.Bold, 13, C.Ink)
+	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.TextWrapped = true
 	label.RichText = true
@@ -306,8 +372,18 @@ local function buildCash(gui: ScreenGui)
 	labelMin.MinSize = Vector2.new(114, 0)
 	labelMin.Parent = label
 
+	local scale = Instance.new("UIScale")
+	scale.Parent = card.outer
+	local shown = Instance.new("NumberValue")
+	shown.Name = "CashShown"
+	shown.Changed:Connect(function(value: number)
+		showCash(value)
+	end)
+	shown.Parent = card.outer
+
 	card.outer.Parent = gui
 	cashOuter, cashFace, cashInner, cashLabel, cashGlow = card.outer, card.face, inner, label, glow
+	cashScale, cashGui, cashShown = scale, gui, shown
 end
 
 local function buildHint(gui: ScreenGui)
@@ -357,6 +433,7 @@ local function buildLoading(gui: ScreenGui)
 	card.outer.Position = UDim2.fromScale(0.5, 0.5)
 	UITheme.padding(card.face, 12, 22, 12, 22)
 	local label = UITheme.label(card.face, "Loading your save...", F.Heading, 24, C.Cream)
+	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	card.outer.Parent = gui
 	local function refreshLoading()
@@ -401,8 +478,14 @@ function HUD.Start()
 		end)
 	end)
 
-	-- Server is authoritative: seed from the attribute, then listen.
-	setCash((player:GetAttribute("Cash") :: number?) or 0)
+	-- Server is authoritative: seed from the attribute (once the save has
+	-- set it), then listen.
+	local initial = player:GetAttribute("Cash")
+	if type(initial) == "number" then
+		setCash(initial)
+	else
+		showCash(0)
+	end
 	player:GetAttributeChangedSignal("Cash"):Connect(function()
 		setCash((player:GetAttribute("Cash") :: number?) or 0)
 	end)

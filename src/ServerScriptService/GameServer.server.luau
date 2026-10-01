@@ -239,7 +239,22 @@ local function serverPickupLog(player: Player, logUid: unknown)
 	pp.Anchored = false
 	pp.CanCollide = false
 	pp.Massless = true
-	pp.CFrame = torso.CFrame * CFrame.new(0, 0.4 + already * 1.1, -1.7)
+	-- The lowest free spot in the stack, so a log never lands inside another
+	-- after one was sold or loaded out of the middle.
+	local used: { [number]: boolean } = {}
+	for uid in pairs(hands) do
+		local held = TreeService.GetLog(uid)
+		local slot = if held and held.model.PrimaryPart then held.model.PrimaryPart:GetAttribute("CarrySlot") else nil
+		if type(slot) == "number" then
+			used[slot] = true
+		end
+	end
+	local slot = 0
+	while used[slot] do
+		slot += 1
+	end
+	pp:SetAttribute("CarrySlot", slot)
+	pp.CFrame = torso.CFrame * CFrame.new(0, 0.4 + slot * 1.3, -1.7)
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = torso
 	weld.Part1 = pp
@@ -559,6 +574,10 @@ local function onPlayerAdded(player: Player)
 	end
 
 	player:SetAttribute("Cash", profile.cash)
+	if profile.pendingCash > 0 then
+		player:SetAttribute("PendingCash", profile.pendingCash)
+		EconomyService.PayPending(player)
+	end
 	safely("VehicleService.SpawnTruck", function()
 		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
 	end)

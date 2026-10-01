@@ -73,14 +73,19 @@ end
 
 local function grantProduct(player: Player, profile: Profile, product: StoreData.Product)
 	if product.cash then
-		EconomyService.AddCash(
-			player,
-			product.cash,
-			"robux: " .. product.key,
-			product.key,
-			Enum.AnalyticsEconomyTransactionType.IAP
-		)
-		notify(player, string.format("Thanks! +%s", Util.formatCash(product.cash)))
+		local credited, banked = EconomyService.AddPaidCash(player, product.cash, "robux: " .. product.key, product.key)
+		if banked > 0 then
+			notify(
+				player,
+				string.format(
+					"Thanks! +%s now; %s more is saved for you and arrives as you spend.",
+					Util.formatCash(credited),
+					Util.formatCash(banked)
+				)
+			)
+		else
+			notify(player, string.format("Thanks! +%s", Util.formatCash(product.cash)))
+		end
 	elseif product.boostHours then
 		profile.doubleWoodUntil = math.max(clock(), profile.doubleWoodUntil) + product.boostHours * 3600
 		notify(player, string.format("Thanks! %s is on: trees drop twice the logs.", product.name))
