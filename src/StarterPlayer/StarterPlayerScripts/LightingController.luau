@@ -33,6 +33,7 @@ local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
+local Quality = require(script.Parent.Quality)
 
 type LightingState = EnvironmentData.LightingState
 
@@ -266,10 +267,17 @@ local function apply(owned: Owned, s: LightingState, flash: number)
 	owned.grade.Contrast = s.contrast
 	owned.grade.TintColor = s.tint
 
-	owned.sunRays.Intensity = s.sunRaysIntensity
+	-- Low quality (Quality.Budget(), Shared/QualityBudgets): no sun rays,
+	-- no far blur, softer bloom. High multiplies by 1: today's look.
+	local budget = Quality.Budget()
+	local rays = budget.SunRays > 0
+	if owned.sunRays.Enabled ~= rays then
+		owned.sunRays.Enabled = rays
+	end
+	owned.sunRays.Intensity = s.sunRaysIntensity * budget.SunRays
 	owned.sunRays.Spread = s.sunRaysSpread
 
-	owned.bloom.Intensity = s.bloomIntensity
+	owned.bloom.Intensity = s.bloomIntensity * budget.Bloom
 	owned.bloom.Size = s.bloomSize
 	owned.bloom.Threshold = s.bloomThreshold
 
@@ -277,12 +285,13 @@ local function apply(owned: Owned, s: LightingState, flash: number)
 	owned.clouds.Density = s.cloudDensity
 	owned.clouds.Color = s.cloudColor
 
-	local blur = s.dofFar > 0.005
+	local far = s.dofFar * budget.DepthOfField
+	local blur = far > 0.005
 	if owned.dof.Enabled ~= blur then
 		owned.dof.Enabled = blur
 	end
 	if blur then
-		owned.dof.FarIntensity = s.dofFar
+		owned.dof.FarIntensity = far
 	end
 end
 

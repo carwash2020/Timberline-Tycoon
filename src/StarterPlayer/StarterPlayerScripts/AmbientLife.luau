@@ -36,6 +36,7 @@ local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local LightingController = require(script.Parent.LightingController)
+local Quality = require(script.Parent.Quality)
 
 type Environment = LightingController.Environment
 type DecorKind = EnvironmentData.DecorKind
@@ -84,9 +85,10 @@ end
 ---------------------------------------------------------------------------
 
 local CELL = EnvironmentData.DecorCell
-local LOAD_RADIUS = 200
+-- Cells load within Quality.Budget().DecorLoadRadius (200 studs, 140 on low
+-- quality), and at most Quality.Budget().MaxDecor live decoration models
+-- (420, 160 on low), all cells together. Shared/QualityBudgets.
 local UNLOAD_RADIUS = 260
-local MAX_DECOR = 420 -- live decoration models, all cells together
 local TREE_CLEARANCE = 4
 local CELLS_PER_FRAME = 2
 local SCAN_EVERY = 0.4
@@ -302,7 +304,7 @@ local function loadCell(cx: number, cz: number, key: string)
 	local cell: Cell = { key = key, cx = cx, cz = cz, items = {}, biomes = consulted }
 	local parent = root()
 	for _, spot in ipairs(spots) do
-		if liveDecor >= MAX_DECOR then
+		if liveDecor >= Quality.Budget().MaxDecor then
 			break
 		end
 		if not nearTree(spot.x, spot.z) then
@@ -325,7 +327,8 @@ end
 local function scanCells(focus: Vector3)
 	table.clear(loadQueue)
 	local fx, fz = focus.X, focus.Z
-	local reach = math.ceil(LOAD_RADIUS / CELL) + 1
+	local loadRadius = Quality.Budget().DecorLoadRadius
+	local reach = math.ceil(loadRadius / CELL) + 1
 	local ccx, ccz = fx // CELL, fz // CELL
 	local wanted: { { cx: number, cz: number, key: string, d: number } } = {}
 	for dx = -reach, reach do
@@ -333,7 +336,7 @@ local function scanCells(focus: Vector3)
 			local cx, cz = ccx + dx, ccz + dz
 			local mx, mz = (cx + 0.5) * CELL, (cz + 0.5) * CELL
 			local d = math.sqrt((mx - fx) ^ 2 + (mz - fz) ^ 2)
-			if d <= LOAD_RADIUS then
+			if d <= loadRadius then
 				local key = cellKey(cx, cz)
 				-- Up on the isles the ground is ~650 studs below: skip it.
 				if math.abs(focus.Y - cellGround(cx, cz, key)) < 160 then
@@ -1391,7 +1394,7 @@ local function plan(ctx: Ctx)
 	for _, w in ipairs(wants) do
 		local cost = EnvironmentData.CritterCost[w.kind] or 1
 		while (have[w.kind] or 0) < w.count and spawned < SPAWNS_PER_PLAN do
-			if spent + cost > EnvironmentData.MaxCritters then
+			if spent + cost > Quality.Budget().MaxCritters then
 				return
 			end
 			local spawner = SPAWNERS[w.kind]
@@ -1524,7 +1527,7 @@ function AmbientLife.Start()
 		end
 		for _ = 1, CELLS_PER_FRAME do
 			local queued = table.remove(loadQueue, 1)
-			if not queued or liveDecor >= MAX_DECOR then
+			if not queued or liveDecor >= Quality.Budget().MaxDecor then
 				break
 			end
 			if not cells[queued.key] then

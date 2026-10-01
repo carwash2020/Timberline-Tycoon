@@ -11,6 +11,7 @@
 local HUD = require(script.Parent.HUD)
 
 local controllers: { { name: string, module: { Start: () -> () } } } = {
+	{ name = "Quality", module = require(script.Parent.Quality) },
 	{ name = "LightingController", module = require(script.Parent.LightingController) },
 	{ name = "ChopController", module = require(script.Parent.ChopController) },
 	{ name = "TreeUI", module = require(script.Parent.TreeUI) },

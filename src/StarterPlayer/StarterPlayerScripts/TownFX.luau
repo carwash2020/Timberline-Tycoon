@@ -10,10 +10,13 @@
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
+local Quality = require(script.Parent.Quality)
+
 local TownFX = {}
 
 local BLADE_SPEED = 7 -- radians per second
-local NEAR = 260 -- studs from the camera
+-- Only within Quality.Budget().TownFxNear studs of the camera (260, 120 on
+-- low quality; Shared/QualityBudgets).
 
 type Flame = { part: BasePart, size: Vector3, phase: number }
 
@@ -57,13 +60,14 @@ function TownFX.Start()
 			return
 		end
 		local eye = camera.CFrame.Position
+		local near = Quality.Budget().TownFxNear
 		for blade in pairs(blades) do
-			if blade.Parent and (blade.Position - eye).Magnitude < NEAR then
+			if blade.Parent and (blade.Position - eye).Magnitude < near then
 				blade.CFrame *= CFrame.Angles(BLADE_SPEED * dt, 0, 0)
 			end
 		end
 		for part, flame in pairs(flames) do
-			if part.Parent and (part.Position - eye).Magnitude < NEAR then
+			if part.Parent and (part.Position - eye).Magnitude < near then
 				local breathe = 1 + 0.14 * math.sin(t * 9 + flame.phase) + 0.06 * math.sin(t * 23 + flame.phase * 2)
 				part.Size = flame.size * breathe
 				part.Transparency = 0.08 + 0.12 * (0.5 + 0.5 * math.sin(t * 13 + flame.phase))

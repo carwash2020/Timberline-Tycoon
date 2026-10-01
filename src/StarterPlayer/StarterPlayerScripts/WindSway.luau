@@ -2,15 +2,16 @@
 -- WindSway: the wind in the trees, and the wind itself (REDESIGN.md "one
 -- animator per tree": sway leaves busy trees alone).
 --   * Canopies near the camera (the nearest 32 "Tree"-tagged trees within
---     120 studs) lean and rock gently about the top of their trunk: the
---     "Leaves" and "Frond" parts, every part of a pine's "Tier" models and
---     a frostwood's snow caps. Positions are absolute CFrames worked out
---     from rest offsets relative to the tree's HomePivot and the time
---     (never accumulated, so a tree that sits out a few frames picks up
---     exactly where it would have been), written with one
---     workspace:BulkMoveTo a frame.
---   * A frame moves at most PART_BUDGET canopy parts (PLAY-04): it walks
---     the trees round-robin from where the last frame stopped
+--     120 studs, or 16 within 80 on low quality) lean and rock gently
+--     about the top of their trunk: the "Leaves" and "Frond" parts, every
+--     part of a pine's "Tier" models and a frostwood's snow caps.
+--     Positions are absolute CFrames worked out from rest offsets
+--     relative to the tree's HomePivot and the time (never accumulated,
+--     so a tree that sits out a few frames picks up exactly where it would
+--     have been), written with one workspace:BulkMoveTo a frame.
+--   * A frame moves at most 900 canopy parts, 400 on low quality
+--     (PLAY-04; the tiers are Quality.Budget(), PLAY-05): it walks the
+--     trees round-robin from where the last frame stopped
 --     (WindSway.PlanFrame), so in a dense frostwood stand (96 parts a
 --     tree) each tree updates every few frames, and in the Starter Forest
 --     (11-21 parts) every tree updates every frame.
@@ -33,13 +34,13 @@ local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
 local LightingController = require(script.Parent.LightingController)
+local Quality = require(script.Parent.Quality)
 local TreeFX = require(script.Parent.TreeFX)
 
 local WindSway = {}
 
-local RANGE = 120
-local MAX_TREES = 32
-local PART_BUDGET = 900 -- canopy parts moved per frame, all trees together
+-- How far, how many trees and how many parts a frame: Quality.Budget()'s
+-- SwayRange, SwayTrees and SwayParts (Shared/QualityBudgets).
 local SCAN_EVERY = 0.4
 local WIND_EVERY = 0.1
 local BASE_WIND = Vector3.new(6, 0, 3)
@@ -195,17 +196,18 @@ local function removeTree(inst: Instance)
 	end
 end
 
--- Picks the trees to sway: the nearest MAX_TREES within RANGE.
+-- Picks the trees to sway: the nearest SwayTrees within SwayRange.
 local function scan()
 	local camera = workspace.CurrentCamera
 	if not camera then
 		return
 	end
+	local budget = Quality.Budget()
 	local eye = camera.CFrame.Position
 	local near: { { tree: Model, d: number } } = {}
 	for tree, p in pairs(known) do
 		local d = (p - eye).Magnitude
-		if d <= RANGE then
+		if d <= budget.SwayRange then
 			table.insert(near, { tree = tree, d = d })
 		end
 	end
@@ -214,7 +216,7 @@ local function scan()
 	end)
 	local keep: { [Model]: boolean } = {}
 	table.clear(order)
-	for i = 1, math.min(#near, MAX_TREES) do
+	for i = 1, math.min(#near, budget.SwayTrees) do
 		local tree = near[i].tree
 		keep[tree] = true
 		local s: Sway? = sways[tree]
@@ -340,7 +342,7 @@ local function swayAll(now: number)
 	frameAmplitude = 0.008 + windStrength * 0.04
 	table.clear(moveParts)
 	table.clear(moveFrames)
-	cursor = WindSway.PlanFrame(#order, cursor, PART_BUDGET, costOf, swayOne)
+	cursor = WindSway.PlanFrame(#order, cursor, Quality.Budget().SwayParts, costOf, swayOne)
 	if #moveParts > 0 then
 		workspace:BulkMoveTo(moveParts, moveFrames, Enum.BulkMoveMode.FireCFrameChanged)
 	end

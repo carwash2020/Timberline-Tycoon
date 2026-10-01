@@ -6,7 +6,9 @@
 --     budget, and walks the trees round-robin so every swaying tree gets
 --     its turn within a few frames. In a frostwood stand (96 canopy parts a
 --     tree, the worst wood) the real module moves at most 900 parts a frame
---     and every one of the nearest 32 trees at least every 4 frames.
+--     and every one of the nearest 32 trees at least every 4 frames; on
+--     low quality (PLAY-05) at most 400 parts, the nearest 16 within 80
+--     studs, and the switch takes effect while playing.
 --   * The pose is a function of the time alone: a tree that sat out a few
 --     frames lands exactly where a tree that never skipped one is.
 --   * NAT-09: each canopy part's rest offset is read once per tree
@@ -25,6 +27,7 @@ return function(t)
 	local WindSway = t.loader({
 		mocks = {
 			LightingController = {},
+			Quality = {},
 			TreeFX = {},
 		},
 		services = { RunService = {}, CollectionService = {} },
@@ -161,6 +164,8 @@ return function(t)
 
 	-- A fake world: a camera at the origin looking down -Z, a Heartbeat to
 	-- step, and a BulkMoveTo that records each call.
+	local QualityBudgets = t.shared("QualityBudgets")
+
 	local function world()
 		local w = {
 			clock = 100,
@@ -171,6 +176,7 @@ return function(t)
 			removed = {},
 			busy = {},
 			wind = 0.4,
+			tier = "high", -- Quality's tier
 			owner = {}, -- canopy part -> its tree
 		}
 		local folder = Instance.new("Folder")
@@ -221,6 +227,11 @@ return function(t)
 				TreeFX = {
 					IsBusy = function(tree)
 						return w.busy[tree] == true
+					end,
+				},
+				Quality = {
+					Budget = function()
+						return QualityBudgets.For(w.tier)
 					end,
 				},
 			},
@@ -318,6 +329,74 @@ return function(t)
 				t.ok(longestGap(when[tree]) <= 4, string.format("tree %d waited %d frames", i, longestGap(when[tree])))
 			else
 				t.eq(when[tree], nil, "only the nearest 32 sway")
+			end
+		end
+	end)
+
+	-- Runs `frames` frames; returns the most parts a frame moved and, per
+	-- tree, the frames it moved on.
+	local function watch(w, frames)
+		local most, when = 0, {}
+		for f = 1, frames do
+			local parts, moved = w.frame()
+			most = math.max(most, parts)
+			for tree in pairs(moved) do
+				when[tree] = when[tree] or {}
+				table.insert(when[tree], f)
+			end
+		end
+		return most, when
+	end
+
+	t.test("on low quality: at most 400 parts a frame, the nearest 16 within 80 studs, each every 4 frames", function()
+		local w = world()
+		w.tier = "low"
+		local trees = frostStand(w)
+		w.WindSway.Start()
+		local most, when = watch(w, 120)
+		t.ok(most <= 400, string.format("a frame moved %d parts", most))
+		local eye = w.camera.CFrame.Position
+		local swaying = 0
+		for i, tree in ipairs(trees) do
+			if i <= 16 then
+				t.ok((tree:GetPivot().Position - eye).Magnitude <= 80, "the nearest 16 are inside 80 studs")
+				t.ok(
+					when[tree] ~= nil and longestGap(when[tree]) <= 4,
+					string.format("tree %d sways every 4 frames", i)
+				)
+				swaying += 1
+			else
+				t.eq(when[tree], nil, "nothing past the nearest 16")
+			end
+		end
+		t.eq(swaying, 16)
+	end)
+
+	t.test("lowering the quality while playing takes effect, and the trees let go are put back at rest", function()
+		local w = world()
+		local trees = frostStand(w)
+		local rest = {}
+		for _, tree in ipairs(trees) do
+			for _, d in ipairs(tree:GetDescendants()) do
+				if d:IsA("BasePart") then
+					rest[d] = d.CFrame
+				end
+			end
+		end
+		w.WindSway.Start()
+		local most = watch(w, 60)
+		t.ok(most > 400 and most <= 900, "high: up to 900 parts")
+		w.tier = "low"
+		watch(w, 30) -- the next scan picks 16 trees
+		local after, when = watch(w, 60)
+		t.ok(after <= 400, string.format("low: %d parts a frame", after))
+		for i = 17, #trees do
+			local tree = trees[i]
+			t.eq(when[tree], nil, "only 16 sway now")
+			for _, d in ipairs(tree:GetDescendants()) do
+				if d:IsA("BasePart") then
+					t.ok((d.CFrame.Position - rest[d].Position).Magnitude < 1e-5, "and the rest stand at rest")
+				end
 			end
 		end
 	end)
