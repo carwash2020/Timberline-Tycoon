@@ -6,6 +6,7 @@
 --   * Grove Vitality: changes, the drift back to rest, tiers.
 --   * The Hidden Grain: the figure chance, the roll, value multipliers,
 --     and the average a figure adds (the economy model's factor).
+--   * Who a felling counts for (the most chopping, not the last swing).
 --   * Elders: their size class, who counts as a helper, the helper's
 --     bonus, which grove wakes one.
 --   * The planter's share and the Skyroot Bloom.
@@ -329,6 +330,28 @@ end
 -- value: no figure), whole dollars, at least $1.
 function ForestLogic.Royalty(pricePerLog: number, logCount: number): number
 	return math.max(1, math.floor(pricePerLog * logCount * ForestData.PlanterShare + 0.5))
+end
+
+---------------------------------------------------------------------------
+-- Who fells a tree
+---------------------------------------------------------------------------
+
+-- The user id a felling counts for (its logs, seeds, stats): whoever
+-- chopped the most of it among those `isHere`, so the last swing can't take
+-- someone else's tree. A tie with the swinger goes to the swinger, other
+-- ties to the lowest id.
+function ForestLogic.Feller(damageBy: { [number]: number }, swingerId: number, isHere: (number) -> boolean): number
+	local best, bestDealt = swingerId, damageBy[swingerId] or 0
+	for userId, dealt in pairs(damageBy) do
+		if userId ~= swingerId and isHere(userId) then
+			local more = dealt > bestDealt + 1e-9
+			local tie = math.abs(dealt - bestDealt) <= 1e-9 and best ~= swingerId and userId < best
+			if more or tie then
+				best, bestDealt = userId, dealt
+			end
+		end
+	end
+	return best
 end
 
 ---------------------------------------------------------------------------

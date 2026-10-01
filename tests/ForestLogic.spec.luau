@@ -86,6 +86,24 @@ return function(t)
 		t.ok(ForestLogic.IsLarge(ForestLogic.ElderSize(WoodData.Get("oak"))), "Elders count as large")
 	end)
 
+	t.test("a felling counts for whoever chopped the most of it, not the last swing", function()
+		local function here()
+			return true
+		end
+		t.eq(ForestLogic.Feller({ [1] = 29, [2] = 1 }, 2, here), 1, "1 HP from the end doesn't take it")
+		t.eq(ForestLogic.Feller({ [1] = 10, [2] = 20 }, 2, here), 2)
+		t.eq(ForestLogic.Feller({ [1] = 15, [2] = 15 }, 2, here), 2, "a tie goes to the swinger")
+		t.eq(ForestLogic.Feller({ [1] = 12, [3] = 12, [2] = 6 }, 2, here), 1, "other ties to the lowest id")
+		t.eq(
+			ForestLogic.Feller({ [1] = 29, [2] = 1 }, 2, function(id)
+				return id ~= 1
+			end),
+			2,
+			"someone who left doesn't count"
+		)
+		t.eq(ForestLogic.Feller({}, 5, here), 5)
+	end)
+
 	t.test("the pouch holds 50 of a wood and 200 in all", function()
 		local seeds = {}
 		t.eq(ForestLogic.AddSeeds(seeds, "oak", 3), 3)
