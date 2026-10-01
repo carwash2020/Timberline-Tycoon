@@ -7,6 +7,8 @@
 --   * Button(): a chunky button with named styles (buy, cant, starter,
 --     locked, forged, full, use, inuse, bark, blue, amber, skip). Pressed,
 --     it drops onto its edge; on a computer it brightens under the mouse.
+--     Every press clicks (Click(): SoundData's UIClick, silent with SOUND
+--     FX off), as do HitPads and the buttons Clicks() is given.
 --   * Screen(): a ScreenGui with a UIScale for the device: 1x on phones,
 --     the screen height / 864 on computers (1.25x at 1080p), / 720 on
 --     consoles (1.5x on a TV), never below 1x; under the top bar, or
@@ -29,6 +31,7 @@
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -558,6 +561,31 @@ function UITheme.Card(fill: Color3, edgeColor: Color3, edge: number, radius: num
 end
 
 ---------------------------------------------------------------------------
+-- The click
+---------------------------------------------------------------------------
+
+-- Plays the button click (SoundData's UIClick; SoundData.Play stays
+-- silent while sound effects are off in Settings). Deferred until the
+-- press's handlers have run, so pressing SOUND FX itself is judged by
+-- the new setting: off is silent, on clicks. SoundData is required on
+-- the first press, so loading this module (the specs do) needs no
+-- SoundService.
+function UITheme.Click()
+	task.defer(function()
+		local SoundData = require(ReplicatedStorage.Shared.SoundData)
+		SoundData.Play("UIClick")
+	end)
+end
+
+-- Makes `button` click when it's pressed (Activated: a click, a tap, the
+-- gamepad's A on it). For buttons built by hand (the corner's pills); a
+-- Button and a HitPad already do. Give a button one source of clicks:
+-- one that plays its own sound shouldn't also get this.
+function UITheme.Clicks(button: GuiButton)
+	button.Activated:Connect(UITheme.Click)
+end
+
+---------------------------------------------------------------------------
 -- Chunky buttons
 ---------------------------------------------------------------------------
 
@@ -691,6 +719,7 @@ function UITheme.Button(opts: ButtonOptions): Button
 		pressed = false
 		paint()
 	end)
+	UITheme.Clicks(face)
 	paint()
 	return button
 end
@@ -708,7 +737,9 @@ end
 -- wider). Give such a pill a `holder`: a frame it sits in at the left,
 -- the same height; the pad goes in that, beside it (the Daily Goals pill).
 -- Wherever the pad goes mustn't have a UIListLayout (the pad would join
--- the list), and its padding must be the same either side.
+-- the list), and its padding must be the same either side. A press on
+-- the pad clicks, as one on a Button's face does (only one of them gets
+-- any one press: the face is drawn over the pad).
 function UITheme.HitPad(visual: GuiObject, height: number, holder: GuiObject?): TextButton
 	local pad = Instance.new("TextButton")
 	pad.Name = "HitPad"
@@ -731,6 +762,7 @@ function UITheme.HitPad(visual: GuiObject, height: number, holder: GuiObject?): 
 	end
 	visual:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 	fit()
+	UITheme.Clicks(pad)
 	pad.Parent = holder or visual
 	return pad
 end

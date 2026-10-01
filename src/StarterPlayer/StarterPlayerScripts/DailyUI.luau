@@ -253,6 +253,7 @@ local function build()
 		refresh()
 	end
 	b.Activated:Connect(toggle)
+	UITheme.Clicks(b) -- a plain button: it clicks like the Buttons (its HitPad does too)
 	local slot = buttonSlot
 	if spec.hit and slot then
 		UITheme.HitPad(b, spec.hit, slot).Activated:Connect(toggle)

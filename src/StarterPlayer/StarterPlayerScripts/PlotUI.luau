@@ -108,9 +108,9 @@ local function plotRow(): ShopUI.RowView
 			if cash() < nextTier.priceCash then
 				HUD.Toast(
 					string.format(
-						"You need %s more for a %s.",
+						"You need %s more for %s.",
 						Util.formatCash(nextTier.priceCash - cash()),
-						nextTier.name
+						Util.article(nextTier.name)
 					)
 				)
 				return
@@ -126,7 +126,7 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local affordable = cash() >= bp.priceCash
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
-		detail ..= " · needs a " .. needed.name .. " plot"
+		detail ..= " · needs " .. Util.article(needed.name) .. " plot"
 	elseif bp.note then
 		detail ..= " · " .. bp.note
 	end
@@ -147,7 +147,12 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 		state = state,
 		onClick = function()
 			if bp.tier > tier() then
-				HUD.Toast(string.format("Grow your plot to a %s first.", if needed then needed.name else "bigger plot"))
+				HUD.Toast(
+					string.format(
+						"Grow your plot to %s first.",
+						Util.article(if needed then needed.name else "bigger plot")
+					)
+				)
 			elseif cash() < bp.priceCash then
 				HUD.Toast(
 					string.format(

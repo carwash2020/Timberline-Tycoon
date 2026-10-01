@@ -7,12 +7,14 @@
 --     changes tier, a toast says so.
 --   * A clock next to the cash: "Day 14:05" / "Night 22:10" (night is when
 --     the Phantom Grove's trees come out). On a phone it's in the corner's
---     second line instead, and hidden during the tutorial
---     (HudLayout.ClockLine).
+--     second line instead, and hidden during the tutorial and while the
+--     save loads (HudLayout.ClockLine).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
 -- The server sets the Biome and OwnedGear attributes and the
--- VitalityTier_<biome> workspace attributes (ForestService); the time of
--- day comes from the server clock (WorldTime; LightingController sets Lighting.ClockTime).
+-- VitalityTier_<biome> workspace attributes (ForestService). The clock
+-- reads Lighting.ClockTime, the hour the sky shows: LightingController
+-- sets it every frame from the server's clock (WorldTime), or in Studio
+-- from the ClockOverride attribute.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -24,10 +26,12 @@ local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local WorldUI = {}
@@ -70,10 +74,17 @@ local function onBiomeChanged()
 	local gear = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
 	local rules = BiomeData.Rules(biome, gear)
 	if rules.speedFactor < 1 and biome.slowdown then
-		HUD.Toast(string.format("It's cold here: you walk slower without an %s.", gearName(biome.slowdown.removedBy)))
+		HUD.Toast(
+			string.format(
+				"It's cold here: you walk slower without %s.",
+				Util.article(gearName(biome.slowdown.removedBy))
+			)
+		)
 	end
 	if rules.needs and not rules.burning then
-		HUD.Toast(string.format("Too dark to chop here without a %s (Hearth & Home).", gearName(rules.needs)))
+		HUD.Toast(
+			string.format("Too dark to chop here without %s (Hearth & Home).", Util.article(gearName(rules.needs)))
+		)
 	end
 	if biome.nightOnly and not WorldTime.IsNight(Lighting.ClockTime) then
 		HUD.Toast("Nothing grows here by day. Come back at night.")
@@ -100,8 +111,8 @@ local function buildClock()
 
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()
-		local step = player:GetAttribute("TutorialStep")
-		local spot = HudLayout.ClockLine(UITheme.IsPhone(), if type(step) == "number" then step else 0)
+		-- (nil while the save loads: hidden on a phone until it's in)
+		local spot = HudLayout.ClockLine(UITheme.IsPhone(), player:GetAttribute("TutorialStep"))
 		local under = HUD.UnderCash()
 		local target = if spot == "under" and under then under else line
 		if label.Parent ~= target then
@@ -118,12 +129,14 @@ local function buildClock()
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(place) -- IsPhone reads the screen's height
 	end
 
-	-- From the server clock, once a second (LightingController moves
-	-- Lighting.ClockTime every frame; the label doesn't need to).
+	-- The hour the sky shows, once a second (LightingController moves
+	-- Lighting.ClockTime every frame; the label doesn't need to): the
+	-- shared clock, or Studio's ClockOverride, so a tester sees that hour.
 	local function refresh()
-		local clock = WorldTime.ClockTime(workspace:GetServerTimeNow())
-		label.Text =
-			string.format("%s %s", if WorldTime.IsNight(clock) then "Night" else "Day", WorldTime.Format(clock))
+		local text = HudRules.ClockText(Lighting.ClockTime)
+		if label.Text ~= text then
+			label.Text = text
+		end
 	end
 	refresh()
 	task.spawn(function()

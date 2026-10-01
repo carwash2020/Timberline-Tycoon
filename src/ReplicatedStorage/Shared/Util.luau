@@ -33,6 +33,38 @@ function Util.formatCash(n: number): string
 	return (if negative then "-$" else "$") .. out
 end
 
+-- Words that start with a vowel letter but a consonant sound ("a
+-- unicorn", "a one-off"), and with a silent h ("an hour"), lower case.
+local A_BEFORE = { "uni", "use", "usu", "uti", "ure", "eu", "one", "once" }
+local AN_BEFORE = { "hour", "honest", "honor", "honour", "heir" }
+
+local function startsWithAny(word: string, prefixes: { string }): boolean
+	for _, prefix in ipairs(prefixes) do
+		if string.sub(word, 1, #prefix) == prefix then
+			return true
+		end
+	end
+	return false
+end
+
+-- `word` with "a" or "an" before it, its own case kept: "an oak", "a
+-- birch", "an Elder", "an Insulated Coat", "a unicorn", "an hour". For
+-- messages that name a thing ("Lightning struck %s nearby!"); "" stays "".
+function Util.article(word: string): string
+	local lower = string.lower(word)
+	local first = string.sub(lower, 1, 1)
+	if first == "" then
+		return word
+	end
+	local an = string.find(first, "[aeiou]") ~= nil
+	if an and startsWithAny(lower, A_BEFORE) then
+		an = false
+	elseif not an and startsWithAny(lower, AN_BEFORE) then
+		an = true
+	end
+	return (if an then "an " else "a ") .. word
+end
+
 function Util.deepCopy(t: any): any
 	if type(t) ~= "table" then
 		return t

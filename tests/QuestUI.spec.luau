@@ -78,6 +78,58 @@ return function(t)
 		t.eq(part.Parent.Name, "ToolShed")
 	end)
 
+	-- PLAY-03: the plant step's fallback (and the first step's tree) never
+	-- point at an Elder: it leaves no stump to plant in.
+	t.test("the tutorial's trees: standing ones, never an Elder", function()
+		local function tree(attrs)
+			local model = Instance.new("Model")
+			for key, value in pairs(attrs) do
+				model:SetAttribute(key, value)
+			end
+			return model
+		end
+		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), ""), true, "a standing oak")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), nil), true, "no Elder awake (attribute unset)")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 0, Uid = "a" }), ""), false, "felled")
+		t.eq(QuestUI.TutorialTree(tree({ Uid = "a" }), ""), false, "no HP yet")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Dormant = true }), ""), false, "the Phantom Grove by day")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 4000, Elder = true, Uid = "e" }), ""), false, "an Elder")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 4000, Uid = "e" }), "e"), false, "the Elder before its attribute lands")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), "e"), true, "any other tree while one is awake")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Elder = false, Uid = "a" }), ""), true)
+	end)
+
+	t.test("every tree the beacon looks for goes through TutorialTree", function()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		local searches = 0
+		local at = 1
+		while true do
+			local _, stop = string.find(source, 'nearestTagged("Tree", from, ', at, true)
+			if not stop then
+				break
+			end
+			searches += 1
+			-- Its filter: the name, or an inline function's first line.
+			local filter = string.match(string.sub(source, stop + 1), "^function%([^)]*%)%s*\n%s*([^\n]*)")
+				or string.match(string.sub(source, stop + 1), "^([^\n]*)")
+			t.ok(string.find(filter, "choppable", 1, true), "a tree search without the Elder check: " .. filter)
+			at = stop + 1
+		end
+		t.ok(searches >= 3, "the tree step and the plant step's two fallbacks")
+	end)
+
+	t.test("Skip asks again in the device's word", function()
+		local HintLogic = loader:shared("HintLogic")
+		t.eq(HintLogic.Expand(QuestUI.SkipArmed, "phone"), "Tap again to skip")
+		t.eq(HintLogic.Expand(QuestUI.SkipArmed, "desktop"), "Click again to skip")
+		t.eq(HintLogic.Expand(QuestUI.SkipArmed, "console"), "Press again to skip")
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(not string.find(source, 'SetText("Tap again to skip")', 1, true), "no fixed Tap left")
+		t.ok(string.find(source, "HintLogic.Expand(QuestUI.SkipArmed, UITheme.Device())", 1, true), "worded per device")
+	end)
+
 	t.test("nothing to find: no map yet, or a beacon that moves", function()
 		t.eq(QuestUI.FindBeaconPart(nil, "sellPad"), nil)
 		t.eq(QuestUI.FindBeaconPart(townMap(), "tree"), nil)

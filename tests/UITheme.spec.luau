@@ -259,4 +259,81 @@ return function(t)
 			{ 0, 12, 0, 270 }
 		)
 	end)
+
+	-- UI-16: every button press clicks.
+	t.test("a press clicks once, with SoundData's UIClick, after the press's own handlers", function()
+		local played, queued = {}, {}
+		local loader = t.loader({
+			services = { GuiService = {}, Players = { LocalPlayer = {} }, TextChatService = {}, UserInputService = {} },
+			globals = {
+				task = {
+					defer = function(fn)
+						table.insert(queued, fn)
+					end,
+				},
+			},
+			mocks = {
+				SoundData = {
+					Play = function(name)
+						table.insert(played, name)
+					end,
+				},
+			},
+		})
+		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		UITheme.Click()
+		t.eq(played, {}, "not yet: Settings' SOUND FX toggle may be flipping it")
+		t.eq(#queued, 1)
+		queued[1]()
+		t.eq(played, { "UIClick" })
+	end)
+
+	t.test("UIClick is a built-in sound, and SoundData.Play makes nothing with SOUND FX off", function()
+		local made = 0
+		local loader = t.loader({
+			services = { SoundService = Instance.new("Folder"), Debris = { AddItem = function() end } },
+			globals = {
+				Instance = {
+					new = function(className)
+						made += 1
+						return Instance.new(className)
+					end,
+				},
+			},
+		})
+		local SoundData = loader:shared("SoundData")
+		local def = SoundData.Sounds.UIClick
+		t.ok(def and string.match(def.id, "^rbxasset://"), "UIClick ships with every client")
+		SoundData.SfxEnabled = false
+		SoundData.Play("UIClick")
+		t.eq(made, 0, "SOUND FX off: silent")
+		SoundData.SfxEnabled = true
+		pcall(SoundData.Play, "UIClick") -- (Lune's Sound can't :Play(); it's made first)
+		t.eq(made, 1, "SOUND FX on: the click is made")
+	end)
+
+	t.test("the click has one source (UITheme.Click), which Button, HitPad and the prompt card use", function()
+		local fs = require("@lune/fs")
+		local dir = "src/StarterPlayer/StarterPlayerScripts/"
+		local theme = fs.readFile(dir .. "UITheme.luau")
+		local button = string.match(theme, "function UITheme%.Button%(.-\nend\n")
+		local pad = string.match(theme, "function UITheme%.HitPad%(.-\nend\n")
+		t.ok(button and string.find(button, "UITheme.Clicks(face)", 1, true), "Button clicks on its face")
+		t.ok(pad and string.find(pad, "UITheme.Clicks(pad)", 1, true), "HitPad clicks")
+		t.ok(string.find(fs.readFile(dir .. "PromptUI.luau"), "UITheme.Click()", 1, true), "the prompt card clicks")
+		-- Nothing else plays UIClick, so no press clicks twice.
+		local function scan(path)
+			for _, entry in ipairs(fs.readDir(path)) do
+				local file = path .. "/" .. entry
+				if fs.isDir(file) then
+					scan(file)
+				elseif string.match(entry, "%.luau$") and entry ~= "SoundData.luau" then
+					local source = fs.readFile(file)
+					local uses = select(2, string.gsub(source, '"UIClick"', ""))
+					t.eq(uses, if entry == "UITheme.luau" then 1 else 0, file)
+				end
+			end
+		end
+		scan("src")
+	end)
 end

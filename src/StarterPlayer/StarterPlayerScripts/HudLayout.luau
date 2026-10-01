@@ -315,13 +315,18 @@ export type ClockLine = "beside" | "under" | "none"
 -- Which corner line the clock goes in. On a computer or a TV: beside the
 -- cash (the first line). On a phone it moves to the second (with the
 -- pouch and Daily Goals), leaving the first to the cash row and the Store;
--- and while the tutorial runs (`tutorialStep` > 0) it's hidden, because on
--- a small phone that line would then reach the tracker.
-function HudLayout.ClockLine(phone: boolean, tutorialStep: number): ClockLine
+-- and while the tutorial runs it's hidden, because on a small phone that
+-- line would then reach the tracker. `tutorialStep` is the TutorialStep
+-- attribute as read (any type): 0 once the tutorial's done or skipped;
+-- above 0, or not a number yet (nil while the save loads), it's running
+-- (as HudRules.TutorialRunning has it), so the clock doesn't flash into
+-- line 2 before the save arrives.
+function HudLayout.ClockLine(phone: boolean, tutorialStep: unknown): ClockLine
 	if not phone then
 		return "beside"
 	end
-	return if tutorialStep > 0 then "none" else "under"
+	local running = type(tutorialStep) ~= "number" or tutorialStep > 0
+	return if running then "none" else "under"
 end
 
 return HudLayout

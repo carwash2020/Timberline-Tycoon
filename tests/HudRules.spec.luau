@@ -63,6 +63,15 @@ return function(t)
 		t.eq(HudRules.Pouch(nil, 4), false, "loading")
 	end)
 
+	t.test("the pouch waits for TutorialData.PlantStep, the step the server lets you plant from", function()
+		t.eq(TutorialData.PlantStep, stepIndex("plant"))
+		t.eq(HudRules.Pouch(TutorialData.PlantStep - 1, 4), false)
+		t.eq(HudRules.Pouch(TutorialData.PlantStep, 4), TutorialData.CanPlant(TutorialData.PlantStep))
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HudRules.luau")
+		t.ok(not string.find(source, "PLANT_STEP", 1, true), "no copy of the plant step of its own")
+	end)
+
 	t.test("Send truck home: on foot, away from the truck, and the truck away from its spot", function()
 		t.eq(HudRules.SendHome(true, 50, 300), true, "in the forest, walked 50 studs off")
 		t.eq(HudRules.SendHome(true, nil, 300), true, "not streamed in: far from you")
@@ -171,5 +180,128 @@ return function(t)
 		t.eq(HudRules.LoadingText(true, true), nil, "the save is in: the card goes")
 		t.eq(HudRules.LoadingText(false, true), nil, "a loaded save always takes it down")
 		t.eq(HudRules.LoadingText(true, "true"), "Loading your save...", "only the boolean counts")
+	end)
+
+	-- A toast's seconds, near enough (the formula's floats).
+	local function near(actual, expected, what)
+		t.ok(math.abs(actual - expected) < 1e-9, string.format("%s: %s s, not %s s", what, actual, expected))
+	end
+
+	t.test("a toast stays 1.6 s plus 0.045 s a character, from 2.5 to 6 s", function()
+		near(HudRules.ToastSeconds(""), 2.5, "empty")
+		near(HudRules.ToastSeconds("Hop out first."), 2.5, "short: the least")
+		near(HudRules.ToastSeconds(string.rep("x", 20)), 2.5, "20 characters: the least")
+		near(HudRules.ToastSeconds(string.rep("x", 40)), 1.6 + 0.045 * 40, "40 characters")
+		near(HudRules.ToastSeconds(string.rep("x", 60)), 1.6 + 0.045 * 60, "60 characters")
+		near(HudRules.ToastSeconds(string.rep("x", 98)), 6, "98 characters: the most")
+		near(HudRules.ToastSeconds(string.rep("x", 400)), 6, "a long one: still the most")
+		-- Longer never means shorter.
+		local last = 0
+		for n = 0, 140 do
+			local s = HudRules.ToastSeconds(string.rep("x", n))
+			t.ok(s >= last and s >= 2.5 and s <= 6, n .. " characters")
+			last = s
+		end
+		-- A real one: the lightning toast, 72 characters (4.84 s).
+		local struck = "Lightning struck an oak nearby! Fell it within 2 minutes for Stormgrain."
+		near(HudRules.ToastSeconds(struck), 1.6 + 0.045 * #struck, "the lightning toast")
+	end)
+
+	t.test("a toast's length is its plain text: rich-text tags out, an entity or a · one character", function()
+		local plain = "Sold 4 logs for $120"
+		local rich = '<font color="#3F7A34" weight="heavy">Sold 4 logs</font> for <b>$120</b>'
+		local long = string.rep("word ", 12) -- 60 characters
+		local richLong = "<i>" .. long .. "</i>"
+		t.eq(HudRules.ToastSeconds(rich), HudRules.ToastSeconds(plain))
+		t.eq(HudRules.ToastSeconds(richLong), HudRules.ToastSeconds(long))
+		near(HudRules.ToastSeconds(string.rep("&amp;", 60)), 1.6 + 0.045 * 60, "60 entities")
+		near(HudRules.ToastSeconds(string.rep("·", 60)), 1.6 + 0.045 * 60, "60 middle dots (two bytes each)")
+	end)
+
+	t.test("a confirm toast (press again to go ahead) stays the full 6 s; a caller's seconds win", function()
+		t.eq(HudRules.ConfirmToastSeconds, 6)
+		-- VehicleService's recall confirm (it waits 6 s for the second press).
+		t.eq(
+			HudRules.ToastSeconds(
+				"Your 1 log will be left where your truck stands. Press Send truck home again to go ahead."
+			),
+			6
+		)
+		t.eq(HudRules.ToastSeconds("Tap again to skip"), 6)
+		t.ok(HudRules.ToastSeconds("Your truck's on its way. Try again in 4 s.") < 6, "a cooldown isn't a confirm")
+		t.ok(HudRules.ToastSeconds("Northern Hills is healthy again.") < 6)
+		t.eq(HudRules.ToastSeconds("Hi", 6), 6, "the caller's seconds")
+		t.eq(HudRules.ToastSeconds(string.rep("x", 200), 3), 3, "even for a long one")
+		t.eq(HudRules.ToastSeconds("Hi", 0), 1, "never under 1 s")
+		t.eq(HudRules.ToastSeconds("Hi", 1e9), 15, "nor over 15 s")
+		t.eq(HudRules.ToastSeconds("Hi", 0 / 0), 2.5, "NaN: by its length")
+	end)
+
+	-- PLAY-03: the first seeds say to keep them during the tutorial, even
+	-- when they come with an extra.
+	t.test("Heartseed toasts: none for a plain drop, extras in brackets", function()
+		t.eq(HudRules.SeedToast(1, "Oak", {}, false, true), nil, "the flying seed and the pouch say it")
+		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, false, true), "+2 Oak Heartseeds (lucky)")
+		t.eq(
+			HudRules.SeedToast(3, "Pine", { "big tree", "lucky" }, false, false),
+			"+3 Pine Heartseeds (big tree, lucky)",
+			"not the first: no instructions, in the tutorial or not"
+		)
+	end)
+
+	t.test("the first Heartseeds say what to do: keep them in the tutorial, extras or not", function()
+		t.eq(HudRules.SeedToast(1, "Oak", {}, true, false), "+1 Oak Heartseed: keep it for now")
+		t.eq(HudRules.SeedToast(2, "Oak", {}, true, false), "+2 Oak Heartseeds: keep them for now")
+		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, true, false), "+2 Oak Heartseeds (lucky): keep them for now")
+		t.eq(
+			HudRules.SeedToast(3, "Birch", { "big tree" }, true, false),
+			"+3 Birch Heartseeds (big tree): keep them for now"
+		)
+		t.eq(
+			HudRules.SeedToast(4, "Birch", { "big tree", "lucky" }, true, false),
+			"+4 Birch Heartseeds (big tree, lucky): keep them for now"
+		)
+		-- Once planting's allowed (the plant step, or no tutorial).
+		t.eq(HudRules.SeedToast(1, "Oak", {}, true, true), "+1 Oak Heartseed: plant it in a stump")
+		t.eq(HudRules.SeedToast(2, "Oak", {}, true, true), "+2 Oak Heartseeds: plant them in stumps")
+		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, true, true), "+2 Oak Heartseeds (lucky): plant them in stumps")
+	end)
+
+	t.test("the seed toast's planting word follows TutorialData.CanPlant through the steps", function()
+		for step = 1, #TutorialData.Steps do
+			local text = HudRules.SeedToast(2, "Oak", { "lucky" }, true, TutorialData.CanPlant(step))
+			local keep = step < stepIndex("plant")
+			t.eq(string.find(text, "keep them for now", 1, true) ~= nil, keep, "step " .. step)
+			t.eq(string.find(text, "plant them in stumps", 1, true) ~= nil, not keep, "step " .. step)
+		end
+	end)
+
+	t.test("the corner clock: Day or Night and the hour, as it always read", function()
+		local GameConfig = t.shared("GameConfig")
+		t.eq(HudRules.ClockText(14 + 5 / 60), "Day 14:05")
+		t.eq(HudRules.ClockText(22 + 10 / 60), "Night 22:10")
+		t.eq(HudRules.ClockText(0), "Night 00:00")
+		t.eq(
+			HudRules.ClockText(GameConfig.NightStartsAt),
+			"Night " .. string.format("%02d:00", GameConfig.NightStartsAt)
+		)
+		t.eq(HudRules.ClockText(GameConfig.NightEndsAt), "Day " .. string.format("%02d:00", GameConfig.NightEndsAt))
+	end)
+
+	t.test("the corner clock shows Lighting.ClockTime, so Studio's ClockOverride shows on it", function()
+		local ClockOverride = t.shared("ClockOverride")
+		-- A tester sets the override to 23 at noon: the sky goes dark, and so must the label.
+		t.eq(HudRules.ClockText(ClockOverride.Apply(12, 23, true)), "Night 23:00")
+		t.eq(HudRules.ClockText(ClockOverride.Apply(12, 23, false)), "Day 12:00", "a live server ignores it")
+		-- WorldUI reads the hour LightingController sets, not the server clock again.
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/WorldUI.luau")
+		local clock = string.match(source, "local function buildClock%(%).-\nend\n")
+		t.ok(clock, "WorldUI's buildClock moved")
+		t.ok(
+			string.find(clock, "HudRules.ClockText(Lighting.ClockTime)", 1, true),
+			"the label reads Lighting.ClockTime"
+		)
+		t.ok(not string.find(clock, "GetServerTimeNow", 1, true), "and doesn't work the hour out again")
 	end)
 end

@@ -110,6 +110,7 @@ function SettingsUI.Start()
 		card.outer.Visible = not card.outer.Visible
 	end
 	open.Activated:Connect(toggle)
+	UITheme.Clicks(open) -- a plain button: it clicks like the Buttons (its HitPad does too)
 	if roundSpec.hit then
 		UITheme.HitPad(open, roundSpec.hit).Activated:Connect(toggle)
 	end

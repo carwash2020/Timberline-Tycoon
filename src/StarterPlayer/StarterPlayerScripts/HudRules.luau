@@ -18,6 +18,9 @@
 --   * LoadChip() (HUD): the logs in your hands and in your truck's bed,
 --     beside the hint.
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
+--   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
+--   * SeedToast() (ForestUI): what Heartseeds landing in your pouch say.
+--   * ClockText() (WorldUI): the corner clock, "Day 14:05" / "Night 22:10".
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,23 +28,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
 local HudRules = {}
 
 HudRules.SendHomeNear = 40 -- studs: closer to your truck than this, you'd drive it rather than send it
 HudRules.DropConfirmSeconds = 3 -- the second press must come this soon after the first...
 HudRules.DropConfirmGap = 0.3 -- ...but not sooner than this (a double tap or a mashed button isn't a yes)
-
--- The tutorial step the pouch waits for (step ids never change: they're
--- save keys). Without it, the pouch shows from the start.
-local PLANT_STEP = (function(): number
-	for i, step in ipairs(TutorialData.Steps) do
-		if step.id == "plant" then
-			return i
-		end
-	end
-	return 1
-end)()
+HudRules.ToastMinSeconds = 2.5 -- the shortest toast...
+HudRules.ToastMaxSeconds = 6 -- ...and the longest one, by its length
+HudRules.ConfirmToastSeconds = 6 -- a toast that asks for a second press (the server waits 6 s for it)
 
 -- `step` is the TutorialStep attribute as read (any type).
 function HudRules.TutorialRunning(step: unknown): boolean
@@ -69,9 +65,9 @@ function HudRules.DailyLabel(done: number, total: number, streak: number, phone:
 end
 
 -- The Heartseed pouch: you hold `seeds`, and the tutorial has reached its
--- plant step (or is over).
+-- plant step (TutorialData.PlantStep, found by its id) or is over.
 function HudRules.Pouch(step: unknown, seeds: number): boolean
-	return seeds > 0 and type(step) == "number" and (step == 0 or step >= PLANT_STEP)
+	return seeds > 0 and type(step) == "number" and (step == 0 or step >= TutorialData.PlantStep)
 end
 
 -- "Send truck home": `onFoot` (you have a character and aren't driving),
@@ -168,6 +164,75 @@ function HudRules.LoadingText(remotes: boolean, profileLoaded: unknown): string?
 		return nil
 	end
 	return if remotes then "Loading your save..." else "Building the world..."
+end
+
+-- `text` as it reads: rich-text tags dropped and each entity (&amp;) one
+-- character.
+local function plainText(text: string): string
+	local noTags = string.gsub(text, "<[^<>]*>", "")
+	local plain = string.gsub(noTags, "&#?%w+;", "x")
+	return plain
+end
+
+-- How many seconds a toast saying `message` stays up (HUD.Toast):
+--   * long enough to read it: 1.6 s plus 0.045 s a character of its plain
+--     text (rich-text tags stripped), from 2.5 s (20 characters or fewer)
+--     to 6 s (98 or more);
+--   * a confirm, one that asks for a second press ("... Press Send truck
+--     home again to go ahead."), the full 6 s, as long as the server waits
+--     for that press (VehicleService's recall);
+--   * `seconds`, when the caller gives a number, instead (kept between
+--     1 and 15 s).
+function HudRules.ToastSeconds(message: string, seconds: number?): number
+	if type(seconds) == "number" and seconds == seconds then -- not NaN
+		return math.clamp(seconds, 1, 15)
+	end
+	local plain = plainText(message)
+	if string.find(string.lower(plain), "again to ", 1, true) then
+		return HudRules.ConfirmToastSeconds
+	end
+	local length = utf8.len(plain) or #plain -- characters ("·" is one), or bytes if it isn't UTF-8
+	return math.clamp(1.6 + 0.045 * length, HudRules.ToastMinSeconds, HudRules.ToastMaxSeconds)
+end
+
+-- The toast for `seeds` Heartseeds of `wood` (its name) landing in your
+-- pouch (ForestUI), or nil for none. `reasons` are the server's words for
+-- any extras ("lucky", "big tree", "Elder", "storm-struck", "steward's
+-- bonus"): they go in brackets. A plain drop gets no toast (the flying
+-- seed and the pouch say it), except your very first seeds
+-- (`firstSeeds`), which also say what to do with them, extras or not:
+-- keep them for now while the tutorial hasn't reached its plant step
+-- (`mayPlant` false: TutorialData.CanPlant), else plant them in a stump.
+function HudRules.SeedToast(
+	seeds: number,
+	wood: string,
+	reasons: { string },
+	firstSeeds: boolean,
+	mayPlant: boolean
+): string?
+	if #reasons == 0 and not firstSeeds then
+		return nil
+	end
+	local one = seeds == 1
+	local text = string.format("+%d %s Heartseed%s", seeds, wood, if one then "" else "s")
+	if #reasons > 0 then
+		text ..= " (" .. table.concat(reasons, ", ") .. ")"
+	end
+	if firstSeeds then
+		if mayPlant then
+			text ..= if one then ": plant it in a stump" else ": plant them in stumps"
+		else
+			text ..= if one then ": keep it for now" else ": keep them for now"
+		end
+	end
+	return text
+end
+
+-- The corner clock (WorldUI) for `clockTime`, an hour from 0 to 24
+-- (Lighting.ClockTime): "Day 14:05", or "Night 22:10" while the Phantom
+-- Grove's trees are out (WorldTime.IsNight).
+function HudRules.ClockText(clockTime: number): string
+	return string.format("%s %s", if WorldTime.IsNight(clockTime) then "Night" else "Day", WorldTime.Format(clockTime))
 end
 
 return HudRules
