@@ -2,39 +2,50 @@
 -- Client: entry point for the Timberline Tycoon client.
 -- Just starts each controller. All game state lives on the server;
 -- these controllers only render UI and effects, and send intents.
+-- Each one starts in its own protected thread: one that errors (or waits
+-- forever on something that never streams in) can't stop the others, and
+-- its error goes to Output with a traceback.
 
 local HUD = require(script.Parent.HUD)
-local ChopController = require(script.Parent.ChopController)
-local TreeUI = require(script.Parent.TreeUI)
-local TreeFX = require(script.Parent.TreeFX)
-local CarryController = require(script.Parent.CarryController)
-local AxeController = require(script.Parent.AxeController)
-local ShopUI = require(script.Parent.ShopUI)
-local QuestUI = require(script.Parent.QuestUI)
-local VehicleController = require(script.Parent.VehicleController)
-local DailyUI = require(script.Parent.DailyUI)
-local WorldUI = require(script.Parent.WorldUI)
-local StoreUI = require(script.Parent.StoreUI)
-local FieldGuideUI = require(script.Parent.FieldGuideUI)
-local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
-local PlotUI = require(script.Parent.PlotUI)
-local PromptUI = require(script.Parent.PromptUI)
+
+local controllers: { { name: string, module: { Start: () -> () } } } = {
+	{ name = "LightingController", module = require(script.Parent.LightingController) },
+	{ name = "ChopController", module = require(script.Parent.ChopController) },
+	{ name = "TreeUI", module = require(script.Parent.TreeUI) },
+	{ name = "TreeFX", module = require(script.Parent.TreeFX) },
+	{ name = "CarryController", module = require(script.Parent.CarryController) },
+	{ name = "AxeController", module = require(script.Parent.AxeController) },
+	{ name = "ShopUI", module = require(script.Parent.ShopUI) },
+	{ name = "QuestUI", module = require(script.Parent.QuestUI) },
+	{ name = "VehicleController", module = require(script.Parent.VehicleController) },
+	{ name = "VehicleFX", module = require(script.Parent.VehicleFX) },
+	{ name = "DailyUI", module = require(script.Parent.DailyUI) },
+	{ name = "WorldUI", module = require(script.Parent.WorldUI) },
+	{ name = "StoreUI", module = require(script.Parent.StoreUI) },
+	{ name = "FieldGuideUI", module = require(script.Parent.FieldGuideUI) },
+	{ name = "BlueprintPlacer", module = require(script.Parent.BlueprintPlacer) },
+	{ name = "PlotUI", module = require(script.Parent.PlotUI) },
+	{ name = "ForestUI", module = require(script.Parent.ForestUI) },
+	{ name = "WeatherController", module = require(script.Parent.WeatherController) },
+	{ name = "AmbientLife", module = require(script.Parent.AmbientLife) },
+	{ name = "WindSway", module = require(script.Parent.WindSway) },
+	{ name = "AmbientSound", module = require(script.Parent.AmbientSound) },
+	{ name = "NPCController", module = require(script.Parent.NPCController) },
+	{ name = "PromptUI", module = require(script.Parent.PromptUI) },
+}
 
 HUD.Start() -- first (it starts UITheme), so toasts and side buttons work for everything after it
-ChopController.Start()
-TreeUI.Start()
-TreeFX.Start()
-CarryController.Start()
-AxeController.Start()
-ShopUI.Start()
-QuestUI.Start()
-VehicleController.Start()
-DailyUI.Start()
-WorldUI.Start()
-StoreUI.Start()
-FieldGuideUI.Start()
-BlueprintPlacer.Start()
-PlotUI.Start()
-PromptUI.Start()
+
+for _, c in ipairs(controllers) do
+	task.spawn(function()
+		local ok, err = xpcall(function(): any
+			c.module.Start()
+			return nil
+		end, debug.traceback)
+		if not ok then
+			warn(string.format("[Client] %s failed to start:\n%s", c.name, tostring(err)))
+		end
+	end)
+end
 
 print("[Client] Timberline Tycoon client started.")

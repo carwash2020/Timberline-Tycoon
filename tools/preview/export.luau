@@ -4,7 +4,7 @@
 --   lune run tools/preview/export trees      write preview/trees.html
 --   lune run tools/preview/export all        every scene
 --
--- Builds a scene (tools/preview/scenes.luau) with the game's own art modules
+-- Builds a scene (tools/preview/scenes/<scene>.luau) with the game's own art modules
 -- (src/ReplicatedStorage/Shared/Art) through tools/loader.luau, then writes a
 -- self-contained HTML viewer (tools/preview/viewer.html + the scene's parts,
 -- lights, sign text and terrain) to preview/<scene>.html. Open it in any
@@ -23,7 +23,14 @@ local serde = require("@lune/serde")
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tools/preview/export <scene>")
 
 local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
-local scenes = luau.load(fs.readFile("tools/preview/scenes.luau"), { debugName = "tools/preview/scenes.luau" })()
+-- One scene per file in tools/preview/scenes (files starting with _ are helpers).
+local scenes = {}
+for _, file in ipairs(fs.readDir("tools/preview/scenes")) do
+	local name = string.match(file, "^([^_][%w_%-]*)%.luau$")
+	if name then
+		scenes[name] = require("./scenes/" .. name)
+	end
+end
 
 local Vector3, CFrame = roblox.Vector3, roblox.CFrame
 

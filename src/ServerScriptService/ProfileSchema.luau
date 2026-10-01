@@ -38,6 +38,23 @@ export type DailyState = {
 	lastCompleteDay: number,
 }
 
+-- One log riding in your truck bed (saved, so a disconnect never loses a
+-- haul; VehicleService rebuilds the load when your truck spawns).
+export type BedLog = {
+	woodId: string,
+	value: number,
+	figure: string?,
+}
+
+-- The Living Forest (ForestService): your Heartseeds and steward record.
+export type ForestState = {
+	planted: number, -- Heartseeds you've planted in the wild
+	harvested: number, -- your planted trees others have felled
+	royalties: number, -- cash earned from those (the planter's share)
+	figures: { [string]: number }, -- figured logs you've revealed, by figure id
+	elders: number, -- Elder trees you helped fell
+}
+
 export type Profile = {
 	cash: number,
 	totalEarned: number,
@@ -79,6 +96,10 @@ export type Profile = {
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
 	instantDeliveries: number, -- Instant Delivery uses left
 	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
+	heartseeds: { [string]: number }, -- Heartseeds by wood id (ForestService)
+	forest: ForestState,
+	truckBed: { BedLog }, -- what's in your truck bed (VehicleService)
+	settings: { music: boolean, sfx: boolean },
 }
 
 -- New players start from this. Fields added here later are filled into
@@ -113,6 +134,10 @@ local TEMPLATE: Profile = {
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
 	onboarding = {},
+	heartseeds = {},
+	forest = { planted = 0, harvested = 0, royalties = 0, figures = {}, elders = 0 },
+	truckBed = {},
+	settings = { music = true, sfx = true },
 }
 ProfileSchema.Template = TEMPLATE
 

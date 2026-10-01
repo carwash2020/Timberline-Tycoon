@@ -27,8 +27,12 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	MoveBlueprint = 2,
 	SellPlaced = 4,
 	UpgradePlot = 1,
+	PlantSeed = 3,
 }
 local ABUSE_MULTIPLIER = 5
+-- Never strike for fewer than this many presses in a second: frantic
+-- tapping on a 1-per-second button ("Truck to lot") is still human.
+local ABUSE_FLOOR = 15
 local STRIKE_WINDOW = 60
 local STRIKES_TO_KICK = 5
 
@@ -77,7 +81,7 @@ function RateLimiter.Allow(player: Player, remoteName: string): boolean
 	if bucket.count <= limit then
 		return true
 	end
-	if not bucket.struck and bucket.count > limit * ABUSE_MULTIPLIER then
+	if not bucket.struck and bucket.count > math.max(limit * ABUSE_MULTIPLIER, ABUSE_FLOOR) then
 		bucket.struck = true -- at most one strike per remote per second
 		addStrike(player, remoteName)
 	end

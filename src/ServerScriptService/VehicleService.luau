@@ -52,7 +52,7 @@ local WOOD = Color3.fromRGB(101, 67, 33)
 local WOOD2 = Color3.fromRGB(130, 90, 50)
 local DARK = Color3.fromRGB(60, 55, 55)
 
-export type BedEntry = { woodId: string, value: number }
+export type BedEntry = { woodId: string, value: number, figure: string? }
 
 type TruckRecord = {
 	def: TruckDef,

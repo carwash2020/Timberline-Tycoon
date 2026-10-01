@@ -23,8 +23,10 @@ Net.RemoteNames = {
 	"MoveBlueprint", -- client -> server: (uid, x, z, rot) move a placed item on your plot
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
+	"PlantSeed", -- client -> server: (treeUid) plant a Heartseed in a felled tree's stump (ForestService)
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
+	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...
 }
 
 local folder: Folder? = nil

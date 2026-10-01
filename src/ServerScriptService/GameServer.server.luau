@@ -20,10 +20,12 @@ local BiomeService = require(script.Parent.BiomeService)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
+local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
+local NPCService = require(script.Parent.NPCService)
 local PlotService = require(script.Parent.PlotService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
@@ -31,6 +33,7 @@ local RateLimiter = require(script.Parent.RateLimiter)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local VehicleService = require(script.Parent.VehicleService)
+local WeatherService = require(script.Parent.WeatherService)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -77,6 +80,15 @@ local function notify(player: Player, message: string)
 		return
 	end
 	seen[message] = now
+	-- Most messages are one-offs (cash amounts, counts): forget old ones so
+	-- the table doesn't grow for as long as the player stays.
+	if math.random() < 0.05 then
+		for text, at in pairs(seen) do
+			if now - at > 2 then
+				seen[text] = nil
+			end
+		end
+	end
 	remote.Notify:FireClient(player, message)
 end
 
@@ -277,7 +289,9 @@ local function onLoadToTruck(player: Player)
 		local log = TreeService.GetLog(uid)
 		if not log then
 			hands[uid] = nil -- stale entry; drop it
-		elseif VehicleService.AddBedLog(player, { woodId = log.def.id, value = log.def.pricePerLog }) then
+		elseif
+			VehicleService.AddBedLog(player, { woodId = log.def.id, value = log.value, figure = log.tags.figure })
+		then
 			-- Only destroy the carried log once it's safely in the bed.
 			TreeService.TakeLog(uid)
 			log.model:Destroy()
@@ -304,13 +318,15 @@ local function onLoadToTruck(player: Player)
 end
 
 -- Pays for `count` logs worth `total` and reports the sale everywhere:
--- stats, the stopwatch, the tutorial, daily goals. 2x Cash applies here.
+-- stats, the stopwatch, the tutorial, daily goals, the Living Forest's
+-- figure reveals. 2x Cash applies here.
 local function completeSale(
 	player: Player,
 	profile: ProfileService.Profile,
 	total: number,
 	count: number,
-	byWood: { [string]: number }
+	byWood: { [string]: number },
+	figures: { [string]: number }
 )
 	total *= MonetizationService.SaleMultiplier(player)
 	profile.stats.logsSold += count
@@ -318,7 +334,17 @@ local function completeSale(
 	MilestoneService.Mark(player, "First sale")
 	MilestoneService.CashEarned(player, credited)
 	MilestoneService.LogsSold(player, byWood)
-	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(total)))
+	-- Report what was actually paid (the wallet cap may have taken some).
+	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(credited)))
+	if next(figures) then
+		local ok, err = pcall(function(): any
+			ForestService.OnSale(player, figures)
+			return nil
+		end)
+		if not ok then
+			warn("[GameServer] ForestService.OnSale failed: " .. tostring(err))
+		end
+	end
 	if overflow > 0 then
 		notify(
 			player,
@@ -350,13 +376,18 @@ local function onSellLogs(player: Player)
 	end
 	local total, count = 0, 0
 	local byWood: { [string]: number } = {} -- for the stopwatch's calibration line
+	local figures: { [string]: number } = {} -- figured logs, for the reveal
 	-- Logs in hands: valued from SERVER records, then destroyed.
 	for uid in pairs(hands) do
 		local log = TreeService.TakeLog(uid)
 		if log then
-			total += log.def.pricePerLog
+			total += log.value
 			count += 1
 			byWood[log.def.id] = (byWood[log.def.id] or 0) + 1
+			local figure = log.tags.figure
+			if type(figure) == "string" then
+				figures[figure] = (figures[figure] or 0) + 1
+			end
 			log.model:Destroy()
 		end
 	end
@@ -369,6 +400,9 @@ local function onSellLogs(player: Player)
 			total += entry.value
 			count += 1
 			byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
+			if entry.figure then
+				figures[entry.figure] = (figures[entry.figure] or 0) + 1
+			end
 		end
 	end
 	-- The Sky Bin sits by the pad: logs sent down the Cloud Chute.
@@ -385,7 +419,7 @@ local function onSellLogs(player: Player)
 		notify(player, "Nothing to sell. Bring logs, or park your truck by the mill.")
 		return
 	end
-	completeSale(player, profile, total, count, byWood)
+	completeSale(player, profile, total, count, byWood, figures)
 end
 
 -- Instant Delivery (a Robux product): sells the truck bed from anywhere.
@@ -403,12 +437,16 @@ local function onInstantDelivery(player: Player)
 	end
 	local total, count = 0, 0
 	local byWood: { [string]: number } = {}
+	local figures: { [string]: number } = {}
 	for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
 		total += entry.value
 		count += 1
 		byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
+		if entry.figure then
+			figures[entry.figure] = (figures[entry.figure] or 0) + 1
+		end
 	end
-	completeSale(player, profile, total, count, byWood)
+	completeSale(player, profile, total, count, byWood, figures)
 end
 
 MilestoneService.Init(notify)
@@ -428,6 +466,9 @@ PlotService.Init(mapFolder, {
 	SellPlaced = remote.SellPlaced,
 	UpgradePlot = remote.UpgradePlot,
 }, notify)
+ForestService.Init({ PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
+WeatherService.Init(remote.WorldFX)
+NPCService.Init(mapFolder)
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
@@ -478,6 +519,19 @@ local function onCharacterAdded(player: Player, character: Model)
 	end
 end
 
+-- Runs one service's join or leave hook on its own: an error in one is
+-- logged with a traceback and doesn't stop the player's other systems.
+local function safely(name: string, fn: (...any) -> ...any, ...: any)
+	local args = table.pack(...)
+	local ok, err = xpcall(function(): any
+		fn(table.unpack(args, 1, args.n))
+		return nil
+	end, debug.traceback)
+	if not ok then
+		warn(string.format("[GameServer] %s failed:\n%s", name, tostring(err)))
+	end
+end
+
 local function onPlayerAdded(player: Player)
 	player:SetAttribute("ProfileLoaded", false) -- the HUD shows "Loading your save..."
 	player:SetAttribute("CarriedLogs", 0)
@@ -504,7 +558,9 @@ local function onPlayerAdded(player: Player)
 	end
 
 	player:SetAttribute("Cash", profile.cash)
-	VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
+	safely("VehicleService.SpawnTruck", function()
+		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
+	end)
 
 	player.CharacterAdded:Connect(function(char)
 		onCharacterAdded(player, char)
@@ -516,24 +572,26 @@ local function onPlayerAdded(player: Player)
 
 	player:SetAttribute("ProfileLoaded", true)
 	remote.CashChanged:FireClient(player, profile.cash)
-	MilestoneService.Start(player, profile)
-	QuestService.Start(player, profile)
-	DailyService.Start(player, profile)
-	ShopService.PlayerJoined(player, profile)
-	MonetizationService.PlayerJoined(player, profile)
-	FieldGuideService.Refresh(player)
-	NodeService.Publish(player)
-	AetherService.PlayerJoined(player, profile)
-	PlotService.PlayerJoined(player, profile)
+	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
+	safely("QuestService.Start", QuestService.Start, player, profile)
+	safely("DailyService.Start", DailyService.Start, player, profile)
+	safely("ShopService.PlayerJoined", ShopService.PlayerJoined, player, profile)
+	safely("MonetizationService.PlayerJoined", MonetizationService.PlayerJoined, player, profile)
+	safely("FieldGuideService.Refresh", FieldGuideService.Refresh, player)
+	safely("NodeService.Publish", NodeService.Publish, player)
+	safely("AetherService.PlayerJoined", AetherService.PlayerJoined, player, profile)
+	safely("PlotService.PlayerJoined", PlotService.PlayerJoined, player, profile)
+	safely("ForestService.PlayerJoined", ForestService.PlayerJoined, player, profile)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
 local function onPlayerRemoving(player: Player)
-	dropCarriedLogs(player) -- back into the world for others, before the character goes
-	MilestoneService.Stop(player) -- before the final save, so playtime is included
-	AxeService.PlayerRemoving(player) -- dropped axes go back to the save's inventory
-	MonetizationService.PlayerRemoving(player)
-	PlotService.PlayerRemoving(player)
+	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
+	safely("MilestoneService.Stop", MilestoneService.Stop, player) -- before the final save, so playtime is included
+	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- dropped axes go back to the save
+	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
+	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
+	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)
