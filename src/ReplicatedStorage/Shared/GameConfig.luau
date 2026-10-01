@@ -20,7 +20,10 @@ local GameConfig = {
 	LogDespawnSec = 300, -- logs left lying in the world disappear after this
 	LeftLoadGraceSec = 600, -- a truck load left behind (Truck to lot, rejoin) stays yours this long
 	LeftLoadDespawnSec = 1200, -- and lies there this long, so there's time to drive back for it
-	MaxLeftLogs = 150, -- left-behind logs saved when you leave (profile.leftLoad), put back when you rejoin
+	-- Left-behind logs saved when you leave (profile.leftLoad) and put back
+	-- when you rejoin: the biggest load there is (Logging Rig 48 + Heavy
+	-- Hauler 24), so nobody loses a full truck (PLAY-14).
+	MaxLeftLogs = 72,
 
 	-- Axes (items: see AxeService)
 	AxePickupByOthers = false, -- true lets anyone pick up a dropped axe (a gift); off until trading exists

@@ -23,6 +23,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
 local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
+local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
@@ -647,10 +648,22 @@ local function onPlayerAdded(player: Player)
 		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
 	end)
 	-- Logs left behind (Truck to lot from afar) that were still lying out
-	-- when the player last left: back where they lay.
+	-- when the player last left: back where they lay, at most MaxLeftLogs
+	-- of them (saves made under the old cap can hold 150).
 	if #profile.leftLoad > 0 then
 		safely("VehicleService.RestoreLeftLoad", function()
-			local n = VehicleService.RestoreLeftLoad(player, profile.leftLoad)
+			local saved = LeftLoad.ToRestore(profile.leftLoad)
+			if #saved < #profile.leftLoad then
+				warn(
+					string.format(
+						"[GameServer] %s: %d saved left-behind log(s) over MaxLeftLogs (%d) not restored",
+						player.Name,
+						#profile.leftLoad - #saved,
+						GameConfig.MaxLeftLogs
+					)
+				)
+			end
+			local n = VehicleService.RestoreLeftLoad(player, saved)
 			profile.leftLoad = {}
 			if n > 0 then
 				notify(
