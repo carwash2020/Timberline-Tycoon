@@ -3,7 +3,8 @@
 -- first minute has one objective, so Daily Goals and the pouch wait for
 -- the tutorial, "Send truck home" waits until the truck is away, and
 -- "Drop axe" waits until you have an axe to spare and takes two presses;
--- the load chip says what's in your hands and your truck's bed.
+-- the load chip says what's in your hands and your truck's bed; the
+-- HUD's loading card says what the wait is for.
 return function(t)
 	local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
 	local TutorialData = t.shared("TutorialData")
@@ -139,5 +140,13 @@ return function(t)
 		t.eq(HudRules.LoadChip(1.7, 2.2, 6.9, HANDS, false).hands, "Hands 1/2", "whole numbers")
 		t.eq(HudRules.LoadChip(1.7, 2.2, 6.9, HANDS, false).bed, "Bed 2/6")
 		t.eq(HudRules.LoadChip(math.huge, 0, 0, HANDS, false).hands, "Hands 999/2", "never a format error")
+	end)
+	t.test("the HUD's loading card: building the world, then loading your save, then gone", function()
+		t.eq(HudRules.LoadingText(false, nil), "Building the world...", "no Remotes yet: the map is still building")
+		t.eq(HudRules.LoadingText(true, nil), "Loading your save...", "Remotes are in")
+		t.eq(HudRules.LoadingText(true, false), "Loading your save...")
+		t.eq(HudRules.LoadingText(true, true), nil, "the save is in: the card goes")
+		t.eq(HudRules.LoadingText(false, true), nil, "a loaded save always takes it down")
+		t.eq(HudRules.LoadingText(true, "true"), "Loading your save...", "only the boolean counts")
 	end)
 end

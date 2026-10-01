@@ -16,6 +16,7 @@
 --     button or Backspace), the second 0.3 to 3 s after the first.
 --   * LoadChip() (HUD): the logs in your hands and in your truck's bed,
 --     beside the hint.
+--   * LoadingText() (HUD): what the HUD's loading card says while you wait.
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -137,6 +138,19 @@ function HudRules.LoadChip(
 		bed = bed,
 		full = full,
 	}
+end
+
+-- The HUD's loading card (under the ReplicatedFirst one, and showing once
+-- that gives up): "Building the world..." until the server has made its
+-- remotes (`remotes`: ReplicatedStorage has the Remotes folder, which
+-- GameServer adds once MapBuilder is done), then "Loading your save..."
+-- until the ProfileLoaded attribute (as read, any type) is true; then nil:
+-- the card goes.
+function HudRules.LoadingText(remotes: boolean, profileLoaded: unknown): string?
+	if profileLoaded == true then
+		return nil
+	end
+	return if remotes then "Loading your save..." else "Building the world..."
 end
 
 return HudRules

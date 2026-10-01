@@ -31,7 +31,13 @@
 --     line (the Daily Goals button); what doesn't fit there starts another
 --     column to its left. On a gamepad each shows its button glyph, and
 --     that button presses it (unless a world prompt is using the same one).
---   * "Loading your save..." until the server says the profile is ready.
+--   * A loading card, under the ReplicatedFirst one (LoadingScreen, which
+--     gives up after 30 s) so it shows if the wait runs longer: "Building
+--     the world..." until the server's Remotes folder exists (GameServer
+--     makes it once the map is built), then "Loading your save..." until
+--     the server says the profile is ready (HudRules.LoadingText). HUD.Start
+--     puts it up before anything that waits, and waits for the Remotes in
+--     short tries, so a slow build never prints an infinite-yield warning.
 --   * Money in or out pops beside the plaque ("+$1,250") and the plaque
 --     counts up to the new amount.
 --   * The top-right corner, laid out by size (UIListLayouts), so nothing
@@ -83,6 +89,7 @@ local ROW_GAP = 8 -- between them, and short of a phone's jump button
 local CHIP_POP = 1.4 -- the chip's log grows to this when the load changes, and eases back
 local BAR_HALF_WIDTH = 176 -- UITheme.Bar's card (340 wide plus its edge) at the bottom centre
 local BAR_HEIGHT = 84 -- and its height (label, a row of buttons, padding)
+local REMOTES_WAIT = 5 -- seconds per try for the server's Remotes folder (a timeout: no infinite-yield warning)
 
 type Toast = {
 	outer: Frame,
@@ -143,6 +150,8 @@ local shelf: Frame? = nil -- the corner's two lines
 local besideCash: Frame? = nil
 local underCash: Frame? = nil
 local popups: { GuiObject } = {}
+local loadingCard: Frame? = nil
+local loadingLabel: TextLabel? = nil
 local shownPrompts: { [ProximityPrompt]: boolean } = {}
 
 ---------------------------------------------------------------------------
@@ -1107,26 +1116,53 @@ local function buildSideColumn(playerGui: Instance)
 	queueArrange()
 end
 
+-- What the loading card says (HudRules.LoadingText), or hidden once the
+-- save is in.
+local function refreshLoading()
+	local card, label = loadingCard, loadingLabel
+	if not card or not label then
+		return
+	end
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes") ~= nil
+	local text = HudRules.LoadingText(remotes, player:GetAttribute("ProfileLoaded"))
+	card.Visible = text ~= nil
+	if text and label.Text ~= text then
+		label.Text = text
+	end
+end
+
 local function buildLoading(gui: ScreenGui)
 	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
 	card.outer.Name = "Loading"
 	card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.outer.Position = UDim2.fromScale(0.5, 0.5)
 	UITheme.padding(card.face, 12, 22, 12, 22)
-	local label = UITheme.label(card.face, "Loading your save...", F.Heading, 24, C.Cream)
+	local label = UITheme.label(card.face, "", F.Heading, 24, C.Cream)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	card.outer.Parent = gui
-	local function refreshLoading()
-		card.outer.Visible = player:GetAttribute("ProfileLoaded") ~= true
-	end
+	loadingCard, loadingLabel = card.outer, label
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
 	refreshLoading()
 end
 
+-- The server's remotes: GameServer makes the Remotes folder once the world
+-- is built, which on a new server takes a while. Waited for in short tries
+-- (a bare WaitForChild warns of an infinite yield after 5 s), then the
+-- loading card moves on to the save. After this, Net.Remote finds each
+-- remote at once (GameServer fills the folder before it parents it).
+local function waitForRemotes()
+	while not ReplicatedStorage:FindFirstChild("Remotes") do
+		ReplicatedStorage:WaitForChild("Remotes", REMOTES_WAIT)
+	end
+	refreshLoading()
+end
+
+-- Nothing in here waits before the loading card is up (PlayerGui aside,
+-- which UITheme waits for in short tries); the remotes are waited for last.
 function HUD.Start()
 	UITheme.Start()
-	local playerGui = player:WaitForChild("PlayerGui")
+	local playerGui = UITheme.PlayerGui()
 	-- Above panels like the shop, so the cash and toasts stay visible.
 	local gui = UITheme.Screen("TimberlineHUD", 10)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
@@ -1186,6 +1222,10 @@ function HUD.Start()
 	player:GetAttributeChangedSignal("Cash"):Connect(function()
 		setCash((player:GetAttribute("Cash") :: number?) or 0)
 	end)
+	-- Last, as it can take the whole world build: the card says so meanwhile.
+	-- (Client.client starts the other controllers once this returns, so
+	-- theirs are there too by then.)
+	waitForRemotes()
 	Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
 	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown)
 		if type(message) == "string" then
