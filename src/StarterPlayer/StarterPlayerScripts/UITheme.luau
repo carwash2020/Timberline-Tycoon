@@ -146,18 +146,32 @@ local scales: { UIScale } = {}
 local currentScale = 1
 local leftColumn: Frame? = nil
 
+local CHAT_CONFIGS = { "ChatWindowConfiguration", "ChatInputBarConfiguration" }
+
+-- The bottom of one chat config's box in screen pixels, 0 if it isn't
+-- showing. Read in a pcall (0 if it errors): a chat property that can't be
+-- read must not stop the HUD or the left column from starting.
+local function configBottom(config: Instance): number
+	local ok, bottom = pcall(function(): number
+		local c = config :: any
+		if not c.Enabled then
+			return 0
+		end
+		local pos = c.AbsolutePosition :: Vector2
+		local size = c.AbsoluteSize :: Vector2
+		return if size.Y > 0 then pos.Y + size.Y else 0
+	end)
+	return if ok and type(bottom) == "number" then bottom else 0
+end
+
 -- The bottom of Roblox's chat window (and its input bar), in screen
 -- pixels; 0 if there's no chat window showing.
 local function chatBottom(): number
 	local bottom = 0
-	for _, className in ipairs({ "ChatWindowConfiguration", "ChatInputBarConfiguration" }) do
+	for _, className in ipairs(CHAT_CONFIGS) do
 		local config = TextChatService:FindFirstChildOfClass(className)
-		if config and (config :: any).Enabled then
-			local pos = (config :: any).AbsolutePosition :: Vector2
-			local size = (config :: any).AbsoluteSize :: Vector2
-			if size.Y > 0 then
-				bottom = math.max(bottom, pos.Y + size.Y)
-			end
+		if config then
+			bottom = math.max(bottom, configBottom(config))
 		end
 	end
 	return bottom
@@ -587,13 +601,16 @@ function UITheme.Start()
 	end
 	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
 	watchCamera()
-	-- Follow the chat window as it appears, moves or resizes.
+	-- Follow the chat window as it appears, moves or resizes (each signal
+	-- in a pcall, like the reads: one that's missing is skipped).
 	task.spawn(function()
-		for _, className in ipairs({ "ChatWindowConfiguration", "ChatInputBarConfiguration" }) do
+		for _, className in ipairs(CHAT_CONFIGS) do
 			local config = TextChatService:WaitForChild(className, 10)
 			if config then
 				for _, prop in ipairs({ "AbsolutePosition", "AbsoluteSize", "Enabled" }) do
-					config:GetPropertyChangedSignal(prop):Connect(placeLeft)
+					pcall(function()
+						config:GetPropertyChangedSignal(prop):Connect(placeLeft)
+					end)
 				end
 			end
 		end

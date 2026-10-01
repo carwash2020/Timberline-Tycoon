@@ -4,7 +4,9 @@
 -- these controllers only render UI and effects, and send intents.
 -- Each one starts in its own protected thread: one that errors (or waits
 -- forever on something that never streams in) can't stop the others, and
--- its error goes to Output with a traceback.
+-- its error goes to Output with a traceback. The HUD starts first, also
+-- protected: if it fails, the others still start (without the HUD's corner
+-- and side buttons, which they skip with a warning).
 
 local HUD = require(script.Parent.HUD)
 
@@ -36,18 +38,22 @@ local controllers: { { name: string, module: { Start: () -> () } } } = {
 	{ name = "TownFX", module = require(script.Parent.TownFX) },
 }
 
-HUD.Start() -- first (it starts UITheme), so toasts and side buttons work for everything after it
+local function start(name: string, module: { Start: () -> () })
+	local ok, err = xpcall(function(): any
+		module.Start()
+		return nil
+	end, debug.traceback)
+	if not ok then
+		warn(string.format("[Client] %s failed to start:\n%s", name, tostring(err)))
+	end
+end
+
+-- First, and waited for (it starts UITheme), so toasts and side buttons
+-- work for everything after it.
+start("HUD", HUD)
 
 for _, c in ipairs(controllers) do
-	task.spawn(function()
-		local ok, err = xpcall(function(): any
-			c.module.Start()
-			return nil
-		end, debug.traceback)
-		if not ok then
-			warn(string.format("[Client] %s failed to start:\n%s", c.name, tostring(err)))
-		end
-	end)
+	task.spawn(start, c.name, c.module)
 end
 
 print("[Client] Timberline Tycoon client started.")

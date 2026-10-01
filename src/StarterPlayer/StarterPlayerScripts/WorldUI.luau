@@ -78,7 +78,10 @@ end
 
 local function buildClock()
 	local line = HUD.BesideCash()
-	assert(line, "[WorldUI] clock before HUD.Start")
+	if not line then
+		warn("[WorldUI] no HUD corner (HUD.Start didn't finish): skipping the clock")
+		return
+	end
 	local label = UITheme.label(line, "", UITheme.Fonts.Black, 13, UITheme.Colors.Cream)
 	label.Name = "Clock"
 	label.LayoutOrder = 20 -- left of HUD's top row (♪ + cash), right of the Store button

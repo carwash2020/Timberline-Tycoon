@@ -441,9 +441,10 @@ export type SideOptions = {
 
 -- Adds a button to the right-hand column (hidden until you show it:
 -- set `.root.Visible`). Pressing it, or its gamepad button, calls onPress.
+-- Without the column (HUD.Start failed or hasn't run) it warns and hands
+-- back a button that's never on screen, so the caller still starts.
 function HUD.SideButton(opts: SideOptions): UITheme.Button
 	local column = sideColumn
-	assert(column, "[HUD] SideButton before HUD.Start")
 	local button = UITheme.Button({
 		name = opts.name,
 		text = opts.text,
@@ -455,6 +456,10 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	button.root.LayoutOrder = opts.order
 	button.root.AnchorPoint = Vector2.new(1, 1) -- placed by arrangeSide
 	button.root.Visible = false
+	if not column then
+		warn(string.format("[HUD] no side column (HUD.Start didn't finish): skipping the %s button", opts.name))
+		return button
+	end
 	local glyph: GuiObject? = nil
 	if opts.key then
 		local g = UITheme.Glyph(opts.key, 22)
