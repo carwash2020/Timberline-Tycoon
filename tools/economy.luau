@@ -36,6 +36,8 @@ local GameConfig = loadModule("GameConfig")
 local BiomeData = loadModule("BiomeData")
 local TutorialData = loadModule("TutorialData")
 local DailyData = loadModule("DailyData")
+local ForestData = loadModule("ForestData")
+local ForestLogic = loadModule("ForestLogic")
 
 ---------------------------------------------------------------------------
 -- Assumptions (edit these, then re-run)
@@ -58,6 +60,7 @@ local A = {
 	skyBinWalk = 5, -- s, gondola station to the Sky Bin and selling it
 	shardMinutes = 1, -- min to find and mine one Sky Shard (forging cost)
 	sessionMinutes = 45, -- one "session" for the "2-4 sessions" target (§4)
+	groveTier = "Healthy", -- the grove's vitality tier for the figure average (ForestData)
 }
 
 -- Where to go, how to haul, required gear and slowdowns all come from
@@ -139,6 +142,14 @@ local function haulFor(b, owned)
 	return cargo, 2 * b.haulStuds / truck.topSpeed + A.driveOverhead, A.treeToTruck, 0, label
 end
 
+-- The Living Forest's Hidden Grain: some trees hide a figure that sells
+-- for more (GAME_DESIGN §16). On average, at a Healthy grove, that adds
+-- ForestLogic.FigureBonus to every log (about 6%); storms, Elders, planted
+-- trees and blooms are events on top, left out.
+local function figureFactor(wood): number
+	return 1 + ForestLogic.FigureBonus(wood.id, A.groveTier, false, false)
+end
+
 -- One full load: chop enough trees to fill the cargo plus both hands,
 -- carry logs to the vehicle (or chute) two at a time, haul, sell.
 -- Returns seconds, cash (after trip fees), logs for a perfect player, or
@@ -156,7 +167,7 @@ local function loadCycle(axe, wood, owned)
 	local chop = (logs / wood.logsPerTree) * perTree
 	local trips = math.ceil(cargo / GameConfig.HandCapacity)
 	local carry = trips * (2 * carryStuds / A.walkSpeed) * slow + (logs + trips) * A.promptTime
-	return chop + carry + haulSecs + A.sellTime, logs * wood.pricePerLog - fee, logs
+	return chop + carry + haulSecs + A.sellTime, logs * wood.pricePerLog * figureFactor(wood) - fee, logs
 end
 
 -- Best cash per hour for a set of owned items (perfect player), optionally
@@ -492,15 +503,22 @@ do
 	if median > 1.25 then
 		line(
 			string.format(
-				"- **Earning runs about %.0f× faster than the design's targets** (median of the early, mid and end-game checks below).",
+				"- **Earning runs about %.1f× faster than the design's targets** (median of the early, mid and end-game checks below).",
 				median
 			)
 		)
 	elseif median < 0.75 then
-		line(string.format("- **Earning runs about %.0f× slower than the design's targets.**", 1 / median))
+		line(string.format("- **Earning runs about %.1f× slower than the design's targets.**", 1 / median))
 	else
 		line("- **Earning rates are within 25% of the design's targets.**")
 	end
+	line(
+		string.format(
+			"- **The Living Forest's figured wood adds %.1f%% to every wood** (the Hidden Grain's average at a Healthy grove, counted in every rate here; %.1f%% on Lumenwood). See \"The Living Forest\" below.",
+			ForestLogic.FigureBonus("oak", A.groveTier, false, false) * 100,
+			ForestLogic.FigureBonus("lumenwood", A.groveTier, false, false) * 100
+		)
+	)
 	if anyWood and startWood and anyWood.biome ~= "starter" then
 		line(
 			string.format(
@@ -763,6 +781,101 @@ line(
 )
 line()
 
+-- The Living Forest (GAME_DESIGN §16): figured wood, the planter's share,
+-- Elders. Computed from ForestData through ForestLogic.
+do
+	line("## The Living Forest")
+	line()
+	line(
+		string.format(
+			"Some trees hide a figure that sells for more (ForestData): %d in 100 at a Healthy grove, a figured tree's logs worth %.2f× on average (%.2f× on Lumenwood, where %d in 10 burls are Starfall Burls). Every rate above includes that average at a %s grove. Storm strikes, Elders, Skyroot Blooms and the planted-tree bonus are events on top and aren't counted.",
+			math.floor(ForestData.FigureChance.base * 100 + 0.5),
+			ForestLogic.FiguredAverage("oak"),
+			ForestLogic.FiguredAverage("lumenwood"),
+			math.floor(ForestData.StarfallShare * 10 + 0.5),
+			A.groveTier
+		)
+	)
+	line()
+	line("What figures add to wood income, by the grove's vitality tier:")
+	line()
+	line("| Grove | Figure chance (wild / planted) | Adds (wild) | Adds (planted) | In a Skyroot Bloom (wild) |")
+	line("|---|---|---|---|---|")
+	for _, tier in ipairs(ForestData.Tiers) do
+		line(
+			string.format(
+				"| %s (%d+) | %.0f%% / %.0f%% | +%.1f%% | +%.1f%% | +%.1f%% |",
+				tier.displayName,
+				tier.min,
+				ForestLogic.FigureChance(tier.id, false, false) * 100,
+				ForestLogic.FigureChance(tier.id, true, false) * 100,
+				ForestLogic.FigureBonus("oak", tier.id, false, false) * 100,
+				ForestLogic.FigureBonus("oak", tier.id, true, false) * 100,
+				ForestLogic.FigureBonus("oak", tier.id, false, true) * 100
+			)
+		)
+	end
+	line()
+	local v = ForestData.Vitality
+	line(
+		string.format(
+			"A grove drifts back toward %d by %d a minute, loses %.1f per wild tree felled (%.1f per planted one) and gains %d per Heartseed planted: it holds steady while it loses under %.2f wild trees a minute, and a player who replants every stump raises it %.1f per tree.",
+			v.rest,
+			v.driftPerMinute,
+			-v.fellWild,
+			-v.fellPlanted,
+			v.plant,
+			v.driftPerMinute / -v.fellWild,
+			v.plant + v.fellPlanted
+		)
+	)
+	line()
+	local seeds = ForestData.Seeds
+	line(
+		string.format(
+			"Per tree: %.2f Heartseeds on average (1, +1 for a large tree, +1 on a %d%% roll). The planter's share is %d%% of a tree's base log value when someone else fells it; an Elder (%.1f× size, %d× HP, %d× logs, always Quilted or Burl) pays each helper %d%% of its logs' value and %d Heartseeds.",
+			seeds.perTree + 0.25 * seeds.largeBonus + seeds.rollChance * seeds.rollBonus,
+			math.floor(seeds.rollChance * 100 + 0.5),
+			math.floor(ForestData.PlanterShare * 100 + 0.5),
+			ForestData.Elder.scale,
+			ForestData.Elder.hpMul,
+			ForestData.Elder.logMul,
+			math.floor(ForestData.Elder.helperShare * 100 + 0.5),
+			ForestData.Elder.helperSeeds
+		)
+	)
+	line()
+	-- An Elder's figure: Quilted or Burl by their weights.
+	local elderMul, elderWeight = 0, 0
+	for _, id in ipairs(ForestData.Elder.figures) do
+		local f = ForestLogic.Figure(id)
+		elderMul += f.weight * f.multiplier
+		elderWeight += f.weight
+	end
+	elderMul /= elderWeight
+	line("| Wood | Planter's share per tree | Elder HP | Elder logs | Elder value (avg) | Each helper's bonus |")
+	line("|---|---|---|---|---|---|")
+	for _, wood in ipairs(WOODS) do
+		local b = biome(wood.biome)
+		if b.area and b.area.y == nil then -- Elders wake in the ground groves
+			local logs = ForestData.Elder.logMul * wood.logsPerTree
+			local value = logs * wood.pricePerLog * elderMul
+			line(
+				string.format(
+					"| %s | %s | %d | %d | %s | %s |",
+					wood.displayName,
+					money(ForestLogic.Royalty(wood.pricePerLog, wood.logsPerTree)),
+					ForestData.Elder.hpMul * wood.treeHP,
+					logs,
+					money(value),
+					money(ForestLogic.HelperBonus(value))
+				)
+			)
+		end
+	end
+	line()
+end
+
 -- Assumptions.
 line("## Assumptions")
 line()
@@ -821,7 +934,12 @@ line(
 line(
 	"- Biome rules come from BiomeData: required gear (volcano: Heat Boots; Phantom Grove: Lantern, night only, so left out of the path), boats for the Island, and slowdowns (snow without the Insulated Coat)."
 )
-line("- Each load = cargo + a full armful; logs are sold at WoodData prices.")
+line(
+	string.format(
+		"- Each load = cargo + a full armful; logs are sold at WoodData prices × the figure average at a %s grove (ForestData).",
+		A.groveTier
+	)
+)
 line(
 	string.format(
 		"- Murph's tutorial pays %s (TutorialData), counted toward the first purchase.",

@@ -5,15 +5,21 @@
 --
 -- Beats 5–7 of §11 (plot, first blueprint, Field Guide) join when plots
 -- and the compendium exist. The last step here hands over to the Steel
--- Axe goal instead.
+-- Axe goal instead. Right after the first sale Murph teaches the Living
+-- Forest's habit (GAME_DESIGN §16): plant a Heartseed in a stump.
+--
+-- Inserting a step shifts the ones after it: QuestService moves saves
+-- made before the insert to the step they were really on (by the funnel
+-- steps they've reached), so keep step ids stable.
 
 local TutorialData = {}
 
 -- Game events QuestService listens for (the server reports them).
-export type TutorialEvent = "treeFelled" | "logPickedUp" | "logsLoaded" | "logsSold" | "axeBought"
+export type TutorialEvent = "treeFelled" | "logPickedUp" | "logsLoaded" | "logsSold" | "seedPlanted" | "axeBought"
 
--- What the beacon points at (QuestUI finds it in the world).
-export type BeaconTarget = "tree" | "log" | "truck" | "sellPad" | "toolShed"
+-- What the beacon points at (QuestUI finds it in the world; "stump" is a
+-- stump you hold a Heartseed for, which ForestUI also marks).
+export type BeaconTarget = "tree" | "log" | "truck" | "sellPad" | "stump" | "toolShed"
 
 export type Step = {
 	id: string,
@@ -59,9 +65,17 @@ TutorialData.Steps = {
 		beacon = "sellPad",
 	},
 	{
+		id = "plant",
+		objective = "Plant a Heartseed in a stump",
+		murph = "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.",
+		event = "seedPlanted",
+		count = 1,
+		beacon = "stump",
+	},
+	{
 		id = "loads",
 		objective = "Sell %d more logs",
-		murph = "Cha-ching! That Rusty Axe won't cut it in the hills, though. Sell a few more loads and I'll chip in for a Steel Axe.",
+		murph = "See it grow? That tree's yours now. That Rusty Axe won't cut it in the hills, though. Sell a few more loads and I'll chip in for a Steel Axe.",
 		event = "logsSold",
 		count = 18,
 		rewardCash = 25,

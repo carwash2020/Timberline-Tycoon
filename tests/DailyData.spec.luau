@@ -56,7 +56,31 @@ return function(t)
 			local a, b = DailyData.Tiers[i - 1], DailyData.Tiers[i]
 			t.ok(b.reward > a.reward, "reward tier " .. i)
 			t.ok(b.cash >= a.cash and b.logs >= a.logs and b.trees >= a.trees, "size tier " .. i)
+			t.ok(b.seeds >= a.seeds and b.figured >= a.figured, "forest goals tier " .. i)
 		end
+	end)
+
+	t.test("the Living Forest's goals: plant Heartseeds, sell figured logs", function()
+		local seen = {}
+		for day = 1, 200 do
+			for _, goal in ipairs(DailyData.Roll(4242, day, 2)) do
+				seen[goal.kind] = true
+				if goal.kind == "plant" then
+					t.eq(goal.target, DailyData.Tiers[2].seeds)
+				elseif goal.kind == "sellFigured" then
+					t.eq(goal.target, DailyData.Tiers[2].figured)
+				end
+			end
+		end
+		t.ok(seen.plant and seen.sellFigured, "both come up")
+		-- About one figured tree's logs of the tier's wood; never more seeds
+		-- than a few trees' worth.
+		for _, tier in ipairs(DailyData.Tiers) do
+			t.ok(tier.figured >= 3 and tier.figured <= 10, "figured target")
+			t.ok(tier.seeds >= 1 and tier.seeds <= tier.trees, "seeds target")
+		end
+		local goals = { { kind = "plant", target = 3, progress = 1, reward = 30, done = false } }
+		t.eq(DailyData.Decode(DailyData.Encode(goals)), goals, "the new kinds survive the attribute")
 	end)
 
 	t.test("streak bonus grows to 2x at 5 days, then stays", function()
@@ -90,5 +114,8 @@ return function(t)
 		t.eq(DailyData.GoalText({ kind = "fell", target = 4 }), "Fell 4 trees")
 		t.eq(DailyData.GoalText({ kind = "earn", target = 1500 }), "Earn $1,500 selling logs")
 		t.eq(DailyData.GoalText({ kind = "sellWood", target = 9, wood = "birch" }), "Sell 9 birch logs")
+		t.eq(DailyData.GoalText({ kind = "plant", target = 3 }), "Plant 3 Heartseeds in stumps")
+		t.eq(DailyData.GoalText({ kind = "plant", target = 1 }), "Plant a Heartseed in a stump")
+		t.eq(DailyData.GoalText({ kind = "sellFigured", target = 4 }), "Sell 4 figured logs (read the bark!)")
 	end)
 end

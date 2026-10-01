@@ -11,6 +11,10 @@
 --     Shared/ForgeLogic).
 --   * Falling off: the logs in your hands are lost to the clouds, unless you
 --     wear the Featherfall Cloak, which lets you glide down.
+--   * Figured logs (the Hidden Grain, a Starfall Burl) carry their figure on
+--     the log, and the Sky Bin only keeps wood ids, so they stay in your
+--     hands: you ride them down on the gondola and sell them at the mill.
+--     The forge doesn't take them either (they're worth more sold).
 -- Mirrored on the SkyBin (log count) and ForgeLogs attributes.
 
 local AnalyticsService = game:GetService("AnalyticsService")
@@ -29,6 +33,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local NodeService = require(script.Parent.NodeService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local TreeService = require(script.Parent.TreeService)
 
 type Profile = ProfileService.Profile
 
@@ -63,6 +68,33 @@ local function recipe(): ItemCatalog.ForgeRecipe
 	return axe.forge :: ItemCatalog.ForgeRecipe
 end
 
+-- Runs `take` with the player's figured logs set aside, so it can't take
+-- them (CarryService.TakeWhere only sees each log's wood). Returns what
+-- `take` returned and how many figured logs stayed in hand.
+local function withoutFigured(player: Player, take: () -> { string }): ({ string }, number)
+	local hands = CarryService.Hands(player)
+	local aside: { string } = {}
+	if hands then
+		for uid in pairs(hands) do
+			local log = TreeService.GetLog(uid)
+			if log and log.tags.figure ~= nil then
+				table.insert(aside, uid)
+			end
+		end
+		for _, uid in ipairs(aside) do
+			hands[uid] = nil
+		end
+	end
+	local taken = take()
+	if hands then
+		for _, uid in ipairs(aside) do
+			hands[uid] = true
+		end
+		CarryService.Publish(player)
+	end
+	return taken, #aside
+end
+
 -- Sends the logs in the player's hands down the Cloud Chute.
 function AetherService.SendDown(player: Player)
 	if not RateLimiter.Allow(player, "LoadToTruck") then
@@ -77,11 +109,21 @@ function AetherService.SendDown(player: Player)
 		notify(player, string.format("Your Sky Bin is full (%d). Sell it at the sawmill.", binCapacity()))
 		return
 	end
-	local sent = CarryService.TakeWhere(player, function()
-		return true
-	end, space)
+	local sent, kept = withoutFigured(player, function()
+		return CarryService.TakeWhere(player, function()
+			return true
+		end, space)
+	end)
+	if kept > 0 then
+		notify(
+			player,
+			"Figured wood is too precious for the chute: carry it down on the gondola and sell it at the mill."
+		)
+	end
 	if #sent == 0 then
-		notify(player, "Bring logs to send them down the Cloud Chute.")
+		if kept == 0 then
+			notify(player, "Bring logs to send them down the Cloud Chute.")
+		end
 		return
 	end
 	for _, woodId in ipairs(sent) do
@@ -122,16 +164,22 @@ function AetherService.AddToForge(player: Player)
 		return
 	end
 	local r = recipe()
-	local added = 0
+	local added, figured = 0, 0
 	for woodId in pairs(r.logs) do
 		local want = ForgeLogic.LogsWanted(r, stockOf(profile), woodId)
 		if want > 0 then
-			local taken = CarryService.TakeWhere(player, function(wood)
-				return wood.id == woodId
-			end, want)
+			local taken, kept = withoutFigured(player, function()
+				return CarryService.TakeWhere(player, function(wood)
+					return wood.id == woodId
+				end, want)
+			end)
 			profile.forgeLogs[woodId] = (profile.forgeLogs[woodId] or 0) + #taken
 			added += #taken
+			figured = math.max(figured, kept)
 		end
+	end
+	if figured > 0 then
+		notify(player, "Figured logs are worth more sold than forged: take them to the sawmill.")
 	end
 	publish(player, profile)
 	if added == 0 then

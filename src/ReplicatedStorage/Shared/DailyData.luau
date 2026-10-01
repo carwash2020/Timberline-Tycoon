@@ -9,6 +9,8 @@
 --   * Each goal pays its reward when done. Finishing all of them pays a
 --     bonus that grows with the streak: days in a row with every goal done.
 --   * Missing a day breaks the streak.
+--   * Two goals come from the Living Forest (GAME_DESIGN §16): plant
+--     Heartseeds, and sell figured logs (read the bark to find them).
 
 local BiomeData = require(script.Parent.BiomeData)
 local ItemCatalog = require(script.Parent.ItemCatalog)
@@ -20,7 +22,7 @@ local DailyData = {}
 DailyData.GoalsPerDay = 3
 DailyData.SecondsPerDay = 86400
 
-export type GoalKind = "fell" | "sell" | "earn" | "sellWood" | "load"
+export type GoalKind = "fell" | "sell" | "earn" | "sellWood" | "load" | "plant" | "sellFigured"
 
 export type Goal = {
 	kind: GoalKind,
@@ -34,22 +36,23 @@ export type Goal = {
 -- Sizes by axe tier (profile.bestAxeTier; 1 = Rusty Axe ... 9 = Starfall).
 -- `reward` is one goal's cash, roughly a minute or three of play at that
 -- tier (ECONOMY.md); the all-done bonus is 2 rewards, times the streak
--- multiplier.
-type TierScale = { trees: number, logs: number, cash: number, reward: number }
+-- multiplier. `seeds` is a "plant N Heartseeds" goal; `figured` a "sell N
+-- figured logs" goal, about one figured tree of that tier's wood.
+type TierScale = { trees: number, logs: number, cash: number, reward: number, seeds: number, figured: number }
 local TIERS: { TierScale } = {
-	{ trees = 4, logs = 12, cash = 60, reward = 15 }, -- Rusty
-	{ trees = 6, logs = 18, cash = 150, reward = 30 }, -- Steel
-	{ trees = 6, logs = 24, cash = 400, reward = 75 }, -- Hardened
-	{ trees = 8, logs = 30, cash = 900, reward = 150 }, -- Silver
-	{ trees = 8, logs = 36, cash = 1500, reward = 250 }, -- Cobalt
-	{ trees = 10, logs = 42, cash = 2500, reward = 400 }, -- Gold
-	{ trees = 10, logs = 48, cash = 4000, reward = 600 }, -- Obsidian
-	{ trees = 12, logs = 60, cash = 6000, reward = 900 }, -- Inferno
-	{ trees = 12, logs = 60, cash = 9000, reward = 1300 }, -- Starfall
+	{ trees = 4, logs = 12, cash = 60, reward = 15, seeds = 2, figured = 3 }, -- Rusty
+	{ trees = 6, logs = 18, cash = 150, reward = 30, seeds = 3, figured = 4 }, -- Steel
+	{ trees = 6, logs = 24, cash = 400, reward = 75, seeds = 3, figured = 5 }, -- Hardened
+	{ trees = 8, logs = 30, cash = 900, reward = 150, seeds = 4, figured = 6 }, -- Silver
+	{ trees = 8, logs = 36, cash = 1500, reward = 250, seeds = 4, figured = 6 }, -- Cobalt
+	{ trees = 10, logs = 42, cash = 2500, reward = 400, seeds = 5, figured = 7 }, -- Gold
+	{ trees = 10, logs = 48, cash = 4000, reward = 600, seeds = 5, figured = 7 }, -- Obsidian
+	{ trees = 12, logs = 60, cash = 6000, reward = 900, seeds = 6, figured = 8 }, -- Inferno
+	{ trees = 12, logs = 60, cash = 9000, reward = 1300, seeds = 6, figured = 8 }, -- Starfall
 }
 DailyData.Tiers = TIERS
 
-local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load" }
+local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load", "plant", "sellFigured" }
 
 -- Woods a "sell N <wood> logs" goal can ask for at a tier: ones growing in
 -- the world by day that the tier's axe fells in 30 hits or fewer.
@@ -118,6 +121,10 @@ function DailyData.Roll(userId: number, day: number, tier: number): { Goal }
 			goal.target = scale.logs
 		elseif kind == "earn" then
 			goal.target = scale.cash
+		elseif kind == "plant" then
+			goal.target = scale.seeds
+		elseif kind == "sellFigured" then
+			goal.target = scale.figured
 		else
 			goal.target = math.ceil(scale.logs / 2)
 			local woods = DailyData.WoodsFor(tier)
@@ -138,6 +145,12 @@ function DailyData.GoalText(goal: Goal): string
 		return string.format("Load %d logs into your truck", goal.target)
 	elseif goal.kind == "earn" then
 		return string.format("Earn %s selling logs", Util.formatCash(goal.target))
+	elseif goal.kind == "plant" then
+		return if goal.target == 1
+			then "Plant a Heartseed in a stump"
+			else string.format("Plant %d Heartseeds in stumps", goal.target)
+	elseif goal.kind == "sellFigured" then
+		return string.format("Sell %d figured logs (read the bark!)", goal.target)
 	end
 	local wood = if goal.wood then WoodData.Get(goal.wood) else nil
 	return string.format("Sell %d %s logs", goal.target, if wood then string.lower(wood.displayName) else "")
