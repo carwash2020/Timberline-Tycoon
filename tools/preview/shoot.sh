@@ -4,7 +4,9 @@
 #   bash tools/preview/shoot.sh town 3        just view 3 of the town
 #   bash tools/preview/shoot.sh trees         every view of the trees
 # Writes preview/<scene>-<view>.png (gitignored). Re-exports
-# preview/<scene>.html first when it's missing or older than the code.
+# preview/<scene>.html first when it's missing or older than the code it
+# comes from (.luau under src/ and tools/preview/, tools/loader.luau and
+# tools/preview/viewer.html).
 # Heavy scenes (world, terrain) take up to ~3 minutes a view on 4 cores:
 # shoot one view at a time, and one scene at a time.
 #
@@ -20,7 +22,7 @@ shift
 HTML="preview/$SCENE.html"
 RENDER_HOME=${RENDER_HOME:-$HOME/.cache/timberline-render}
 
-if [ ! -f "$HTML" ] || [ -n "$(find src tools/preview -newer "$HTML" -name '*.luau' -print -quit)" ]; then
+if [ ! -f "$HTML" ] || [ -n "$(find src tools/preview tools/loader.luau -newer "$HTML" \( -name '*.luau' -o -path tools/preview/viewer.html \) -print -quit)" ]; then
 	echo "== Exporting $SCENE"
 	lune run tools/preview/export "$SCENE"
 fi

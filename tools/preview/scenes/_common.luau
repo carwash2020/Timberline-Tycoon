@@ -1,5 +1,8 @@
 --!nocheck
 -- Shared helpers for preview scenes (tools/preview/scenes/*.luau).
+-- A scene's cameras are { pos, target, label, fov?, night? }: `night = true`
+-- shows that view with the viewer's night preset (windows, lamps and
+-- lanterns lit). export.luau's header has the whole format.
 
 local Common = {}
 
