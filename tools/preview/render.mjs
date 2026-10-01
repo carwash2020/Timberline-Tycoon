@@ -41,7 +41,7 @@ for (const v of views) {
   await page.evaluate((i) => window.setView(i), v - 1);
   await page.waitForTimeout(400);
   const out = `${base}-${v}.png`;
-  await page.screenshot({ path: out });
+  await page.screenshot({ path: out, timeout: 180000 }); // software rendering is slow on big scenes
   console.log(out);
 }
 await browser.close();
