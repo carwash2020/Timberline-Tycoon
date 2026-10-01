@@ -227,4 +227,43 @@ return function(t)
 		t.eq(HudRules.ToastSeconds("Hi", 1e9), 15, "nor over 15 s")
 		t.eq(HudRules.ToastSeconds("Hi", 0 / 0), 2.5, "NaN: by its length")
 	end)
+
+	-- PLAY-03: the first seeds say to keep them during the tutorial, even
+	-- when they come with an extra.
+	t.test("Heartseed toasts: none for a plain drop, extras in brackets", function()
+		t.eq(HudRules.SeedToast(1, "Oak", {}, false, true), nil, "the flying seed and the pouch say it")
+		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, false, true), "+2 Oak Heartseeds (lucky)")
+		t.eq(
+			HudRules.SeedToast(3, "Pine", { "big tree", "lucky" }, false, false),
+			"+3 Pine Heartseeds (big tree, lucky)",
+			"not the first: no instructions, in the tutorial or not"
+		)
+	end)
+
+	t.test("the first Heartseeds say what to do: keep them in the tutorial, extras or not", function()
+		t.eq(HudRules.SeedToast(1, "Oak", {}, true, false), "+1 Oak Heartseed: keep it for now")
+		t.eq(HudRules.SeedToast(2, "Oak", {}, true, false), "+2 Oak Heartseeds: keep them for now")
+		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, true, false), "+2 Oak Heartseeds (lucky): keep them for now")
+		t.eq(
+			HudRules.SeedToast(3, "Birch", { "big tree" }, true, false),
+			"+3 Birch Heartseeds (big tree): keep them for now"
+		)
+		t.eq(
+			HudRules.SeedToast(4, "Birch", { "big tree", "lucky" }, true, false),
+			"+4 Birch Heartseeds (big tree, lucky): keep them for now"
+		)
+		-- Once planting's allowed (the plant step, or no tutorial).
+		t.eq(HudRules.SeedToast(1, "Oak", {}, true, true), "+1 Oak Heartseed: plant it in a stump")
+		t.eq(HudRules.SeedToast(2, "Oak", {}, true, true), "+2 Oak Heartseeds: plant them in stumps")
+		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, true, true), "+2 Oak Heartseeds (lucky): plant them in stumps")
+	end)
+
+	t.test("the seed toast's planting word follows TutorialData.CanPlant through the steps", function()
+		for step = 1, #TutorialData.Steps do
+			local text = HudRules.SeedToast(2, "Oak", { "lucky" }, true, TutorialData.CanPlant(step))
+			local keep = step < stepIndex("plant")
+			t.eq(string.find(text, "keep them for now", 1, true) ~= nil, keep, "step " .. step)
+			t.eq(string.find(text, "plant them in stumps", 1, true) ~= nil, not keep, "step " .. step)
+		end
+	end)
 end

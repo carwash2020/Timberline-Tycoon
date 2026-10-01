@@ -570,19 +570,14 @@ local function onSeedPop(payload: { [string]: any })
 			end
 		end
 		-- The flying seed and the pouch say it for a plain drop; toast the
-		-- extras, and the very first seeds (so new players learn what they are).
+		-- extras, and the very first seeds (so new players learn what they
+		-- are: in the tutorial, keep them until Murph shows where, even
+		-- with a lucky or big-tree extra).
 		local firstSeeds = lastTotal <= count
-		if #words == 0 and not firstSeeds then
-			return
+		local text = HudRules.SeedToast(count, woodName(woodId), words, firstSeeds, tutorialAllowsPlanting())
+		if text then
+			HUD.Toast(text)
 		end
-		local why = if #words > 0 then " (" .. table.concat(words, ", ") .. ")" else ""
-		if firstSeeds and #words == 0 then
-			-- In the tutorial, Murph shows where at its plant step.
-			why = if not tutorialAllowsPlanting()
-				then (if count == 1 then ": keep it for now" else ": keep them for now")
-				else ": plant them in stumps"
-		end
-		HUD.Toast(string.format("+%d %s Heartseed%s%s", count, woodName(woodId), if count == 1 then "" else "s", why))
 	end
 end
 

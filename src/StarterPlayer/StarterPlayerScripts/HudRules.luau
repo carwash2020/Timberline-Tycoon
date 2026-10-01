@@ -19,6 +19,7 @@
 --     beside the hint.
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
 --   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
+--   * SeedToast() (ForestUI): what Heartseeds landing in your pouch say.
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -201,6 +202,39 @@ function HudRules.ToastSeconds(message: string, seconds: number?): number
 	end
 	local length = utf8.len(plain) or #plain -- characters ("·" is one), or bytes if it isn't UTF-8
 	return math.clamp(1.6 + 0.045 * length, HudRules.ToastMinSeconds, HudRules.ToastMaxSeconds)
+end
+
+-- The toast for `seeds` Heartseeds of `wood` (its name) landing in your
+-- pouch (ForestUI), or nil for none. `reasons` are the server's words for
+-- any extras ("lucky", "big tree", "Elder", "storm-struck", "steward's
+-- bonus"): they go in brackets. A plain drop gets no toast (the flying
+-- seed and the pouch say it), except your very first seeds
+-- (`firstSeeds`), which also say what to do with them, extras or not:
+-- keep them for now while the tutorial hasn't reached its plant step
+-- (`mayPlant` false: TutorialData.CanPlant), else plant them in a stump.
+function HudRules.SeedToast(
+	seeds: number,
+	wood: string,
+	reasons: { string },
+	firstSeeds: boolean,
+	mayPlant: boolean
+): string?
+	if #reasons == 0 and not firstSeeds then
+		return nil
+	end
+	local one = seeds == 1
+	local text = string.format("+%d %s Heartseed%s", seeds, wood, if one then "" else "s")
+	if #reasons > 0 then
+		text ..= " (" .. table.concat(reasons, ", ") .. ")"
+	end
+	if firstSeeds then
+		if mayPlant then
+			text ..= if one then ": plant it in a stump" else ": plant them in stumps"
+		else
+			text ..= if one then ": keep it for now" else ": keep them for now"
+		end
+	end
+	return text
 end
 
 return HudRules
