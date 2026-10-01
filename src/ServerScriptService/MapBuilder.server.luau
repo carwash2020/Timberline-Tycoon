@@ -407,17 +407,9 @@ if sky then
 		local platform = model.PrimaryPart :: BasePart
 		local to = (top.PrimaryPart :: BasePart).Position
 		local path = WorldPlan.GondolaPath(sky, platform.Position, platform.CFrame.ZVector, to)
-		local up = Vector3.new(0, 8.5, 0)
-		for i = 1, #path - 1 do
-			local cable = Kit.rod(
-				map,
-				"GondolaCable",
-				path[i] + up,
-				path[i + 1] + up,
-				0.4,
-				Color3.fromRGB(70, 70, 75),
-				Enum.Material.Metal
-			)
+		for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
+			local cable =
+				Kit.rod(map, "GondolaCable", piece[1], piece[2], 0.4, Color3.fromRGB(70, 70, 75), Enum.Material.Metal)
 			Kit.decor(cable, false)
 		end
 	end

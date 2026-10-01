@@ -123,6 +123,8 @@ local trucks: { [number]: TruckRecord } = {} -- [userId]
 local slotOwner: { [BasePart]: number } = {}
 local overflowUsed: { [number]: boolean } = {}
 local lastRecall: { [number]: number } = {}
+local LEAVE_CONFIRM_SECONDS = 6
+local leaveAsked: { [number]: number } = {} -- [userId] = when Recall warned about leaving the load
 
 local notify: ((Player, string) -> ())? = nil
 
@@ -738,8 +740,26 @@ local function trucksInBox(box: CFrame, size: Vector3, skip: TruckRecord?): { Tr
 	return found
 end
 
+-- Whether any player's character has a part in the box.
+local function peopleInBox(box: CFrame, size: Vector3): boolean
+	local chars: { Instance } = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Character then
+			table.insert(chars, p.Character)
+		end
+	end
+	if #chars == 0 then
+		return false
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = chars
+	return #workspace:GetPartBoundsInBox(box, size, params) > 0
+end
+
 -- Moves a parked, empty truck that's in someone else's way back onto its
--- owner's own spot, when that's clear. True if it moved.
+-- owner's own spot, when that's clear of trucks and people. True if it
+-- moved.
 local function sendHome(other: TruckRecord): boolean
 	if other.seat.Occupant ~= nil or not other.chassis.Anchored or not other.model.Parent then
 		return false
@@ -747,6 +767,14 @@ local function sendHome(other: TruckRecord): boolean
 	local home = slotCFrame(other.slot, other.overflowIndex) * CFrame.new(0, 0, -rigShiftOf(other.trailerLayout))
 	local rel, size = footprint(other.model)
 	if #trucksInBox(home * rel, size, other) > 0 then
+		return false
+	end
+	-- Nobody standing in its home spot, or on the truck itself (loading at
+	-- the tailgate): the move would drop it on them or carry them off.
+	if
+		peopleInBox(home * rel, size + Vector3.new(0, 4, 0))
+		or peopleInBox(other.model:GetPivot() * rel, size + Vector3.new(2, 6, 2))
+	then
 		return false
 	end
 	other.model:PivotTo(home)
@@ -1152,6 +1180,7 @@ function VehicleService.DespawnTruck(player: Player)
 		return
 	end
 	destroyTruck(rec)
+	leaveAsked[player.UserId] = nil
 	if rec.slot then
 		slotOwner[rec.slot] = nil
 	end
@@ -1186,6 +1215,22 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 	if remaining > 0 then
 		return false, string.format("Your truck's on its way. Try again in %d s.", math.ceil(remaining))
 	end
+	-- A load out of town stays where the truck stands: say so, and only go
+	-- ahead on a second press within a few seconds (a stray tap mustn't
+	-- strand a full bed in the Volcano).
+	if #rec.bed > 0 and not keepsLoad(rec) then
+		local asked = leaveAsked[player.UserId]
+		if not asked or now - asked > LEAVE_CONFIRM_SECONDS then
+			leaveAsked[player.UserId] = now
+			return false,
+				string.format(
+					"Your %d log%s will be left where your truck stands. Press Truck to lot again to go ahead.",
+					#rec.bed,
+					if #rec.bed == 1 then "" else "s"
+				)
+		end
+	end
+	leaveAsked[player.UserId] = nil
 	lastRecall[player.UserId] = now
 	VehicleService.SpawnTruck(player, rec.def.id, rec.bed, if rec.trailer then rec.trailer.id else nil)
 	return true, nil

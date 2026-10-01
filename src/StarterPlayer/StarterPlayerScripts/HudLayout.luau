@@ -33,6 +33,53 @@ function HudLayout.Stack(sizes: { Vector2 }, room: number, gap: number): { Vecto
 	return spots
 end
 
+-- Lifts whole columns of Stack()'s `spots` (boxes `sizes`, the stack's
+-- bottom-right corner at `corner` in screen offsets) that would overlap
+-- `band` so they sit `gap` above it, if the column's top stays below
+-- `top`; columns that don't overlap, or can't fit above it, stay put.
+function HudLayout.LiftClear(
+	spots: { Vector2 },
+	sizes: { Vector2 },
+	corner: Vector2,
+	band: Rect,
+	top: number,
+	gap: number
+): { Vector2 }
+	local out: { Vector2 } = table.clone(spots)
+	-- Group by column (same x offset).
+	local columns: { [number]: { number } } = {}
+	for i, spot in ipairs(spots) do
+		columns[spot.X] = columns[spot.X] or {}
+		table.insert(columns[spot.X], i)
+	end
+	for x, members in pairs(columns) do
+		local lift = 0
+		local highest = math.huge -- the column's top edge
+		for _, i in ipairs(members) do
+			local size = sizes[i]
+			local right = corner.X - x
+			local left = right - size.X
+			local bottom = corner.Y - spots[i].Y
+			local boxTop = bottom - size.Y
+			highest = math.min(highest, boxTop)
+			if
+				left < band.right + gap
+				and right > band.left - gap
+				and bottom > band.top - gap
+				and boxTop < band.bottom
+			then
+				lift = math.max(lift, bottom - (band.top - gap))
+			end
+		end
+		if lift > 0 and highest - lift >= top then
+			for _, i in ipairs(members) do
+				out[i] = Vector2.new(spots[i].X, spots[i].Y + lift)
+			end
+		end
+	end
+	return out
+end
+
 -- The panel a size-capped panel centred in `area` takes.
 function HudLayout.Centred(area: Rect, max: Vector2): Rect
 	local w = math.min(max.X, area.right - area.left)

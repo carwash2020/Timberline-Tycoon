@@ -546,9 +546,12 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	local refell = steward and not ForestLogic.StewardEarned(sprouted, clock())
 	changeVitality(def.biome, ForestLogic.FellDelta(planterId ~= nil, refell))
 
-	local roll = random()
+	-- A quick solo refell gives back the seed that was planted and no more
+	-- (no big-tree, lucky or steward's extras), so plant-and-refell alone
+	-- never grows the pouch.
+	local roll = if refell then 1 else random()
 	local facts: ForestLogic.DropFacts = {
-		large = ForestLogic.IsLarge(rec.size),
+		large = ForestLogic.IsLarge(rec.size) and not refell,
 		storm = wasStruck,
 		steward = steward and not refell,
 		roll = roll,

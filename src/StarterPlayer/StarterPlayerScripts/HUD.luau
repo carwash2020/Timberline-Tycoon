@@ -53,6 +53,8 @@ local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
 local SIDE_GAP = 8 -- between side buttons, and under the corner
 local JUMP_CLEARANCE = 24 -- the side buttons end this far above a phone's jump button
 local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
+local BAR_HALF_WIDTH = 176 -- UITheme.Bar's card (340 wide plus its edge) at the bottom centre
+local BAR_HEIGHT = 84 -- and its height (label, a row of buttons, padding)
 
 type Toast = { outer: Frame, face: ImageLabel, label: TextLabel, stroke: UIStroke }
 
@@ -238,6 +240,10 @@ end
 function HUD.Popup(card: GuiObject)
 	table.insert(popups, card)
 	card.AnchorPoint = Vector2.new(1, 0)
+	-- It takes the taps on its empty parts too, and while it's open the
+	-- side buttons it drops over are put away (so nothing hidden under it
+	-- can be pressed, by touch or by the pad).
+	card.Active = true
 	card:GetPropertyChangedSignal("Visible"):Connect(function()
 		if card.Visible then
 			for _, other in ipairs(popups) do
@@ -245,6 +251,14 @@ function HUD.Popup(card: GuiObject)
 					other.Visible = false
 				end
 			end
+		end
+		local open = false
+		for _, p in ipairs(popups) do
+			open = open or p.Visible
+		end
+		local gui = sideGui
+		if gui then
+			gui.Enabled = not open
 		end
 	end)
 	placePopups()
@@ -379,6 +393,18 @@ local function arrangeSide()
 		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset)
 	end
 	local spots = HudLayout.Stack(sizes, bottom - top, SIDE_GAP)
+	-- Columns that spill left mustn't reach the bars at the bottom centre
+	-- (build mode, placing): lift such a column above them if there's room.
+	local width = gui.AbsoluteSize.X / scale
+	local height = gui.AbsoluteSize.Y / scale
+	local band: HudLayout.Rect = {
+		left = width / 2 - BAR_HALF_WIDTH,
+		right = width / 2 + BAR_HALF_WIDTH,
+		top = height - (UITheme.Bottom() + 38) - BAR_HEIGHT,
+		bottom = height,
+	}
+	local cornerX = width - UITheme.Margin()
+	spots = HudLayout.LiftClear(spots, sizes, Vector2.new(cornerX, bottom), band, top, SIDE_GAP)
 	for i, root in ipairs(shown) do
 		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y)
 	end
@@ -453,7 +479,8 @@ local function onGamepad(input: InputObject, processed: boolean)
 		return -- a menu has the pad
 	end
 	for _, side in ipairs(sides) do
-		if side.key == input.KeyCode and side.button.root.Visible and not promptOn(input.KeyCode) then
+		local shown = side.button.root.Visible and (sideGui == nil or (sideGui :: ScreenGui).Enabled)
+		if side.key == input.KeyCode and shown and not promptOn(input.KeyCode) then
 			side.onPress()
 			return
 		end

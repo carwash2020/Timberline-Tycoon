@@ -61,6 +61,25 @@ return function(t)
 		return { left = w - margin - 226, top = inset + 8, right = w - margin, bottom = inset + 57 }
 	end
 
+	t.test("a spilled column is lifted clear of the bottom-centre bar when there's room", function()
+		-- 844 x 390: corner at (832, 276), the bar band x 246..598 from y 210.
+		local band = { left = 246, right = 598, top = 210, bottom = 390 }
+		local sizes = buttons(3, PHONE_BUTTON)
+		local spots = HudLayout.Stack(sizes, 100, GAP) -- two to a column
+		t.eq(spots[1], v(108, 0), "the first button spills left")
+		local lifted = HudLayout.LiftClear(spots, sizes, v(832, 276), band, 100, GAP)
+		-- That column's right edge is 724, clear of the band: it stays.
+		t.eq(lifted, spots)
+		-- A narrower screen, where it does reach the band, with room above.
+		local narrow = { left = 163, right = 503, top = 181, bottom = 375 }
+		local lifted2 = HudLayout.LiftClear(spots, sizes, v(655, 285), narrow, 60, GAP)
+		local bottom = 285 - lifted2[1].Y
+		t.ok(bottom <= narrow.top - GAP, "lifted above the bar")
+		t.eq(lifted2[2], spots[2], "the corner column doesn't move")
+		-- No room above it: it stays (the bar's screen draws over it).
+		t.eq(HudLayout.LiftClear(spots, sizes, v(655, 285), narrow, 160, GAP), spots)
+	end)
+
 	t.test("on a phone the shop panel moves left of the cash row", function()
 		for _, screen in ipairs({ v(844, 390), v(667, 375) }) do
 			for _, inset in ipairs({ 36, 58 }) do

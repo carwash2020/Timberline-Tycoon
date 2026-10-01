@@ -668,9 +668,9 @@ end
 -- both follow it, each at its own height above it, so neither cuts through
 -- a station's roof or the isle. (The cabin is 5.4 across; a station's roof,
 -- its barge boards, reaches 5.2 behind its middle; the isle's grassy rim
--- 1.1 past its radius.)
+-- 1.1 past its radius, and its rim stones' corners about 3.4 past it.)
 local GONDOLA_OUT = 9
-local GONDOLA_RIM = 6
+local GONDOLA_RIM = 7
 
 function WorldPlan.GondolaPath(sky: Sky, from: Vector3, back: Vector3, to: Vector3): { Vector3 }
 	local c = sky.main.center
@@ -681,6 +681,53 @@ end
 
 -- The point `alpha` (0 to 1) of the way along `path`, by length (so a
 -- cabin moving along it keeps an even speed round the bends).
+-- The drawn cable for a gondola route (GondolaPath): CABLE_UP above it,
+-- except on a near-vertical stretch (the climb beside the Skyroot). A cable
+-- straight above that would run down through the cabin itself, and any
+-- piece crossing the column the cabin climbs through would cut it on the
+-- way up. So the cable leaves the route CABLE_CLEAR before the climb,
+-- steps CABLE_SIDE aside (across `back`, the station's back), runs up
+-- beside the climb and comes back over at the top, above the highest
+-- cabin. Pairs of points, one rod each.
+local CABLE_UP = 8.5
+local CABLE_SIDE = 4.5 -- the cabin reaches 2.7 from its middle (plus the rod)
+local CABLE_CLEAR = 4
+function WorldPlan.GondolaCable(path: { Vector3 }, back: Vector3): { { Vector3 } }
+	local up = Vector3.new(0, CABLE_UP, 0)
+	local flatBack = Vector3.new(back.X, 0, back.Z)
+	local side = if flatBack.Magnitude > 1e-6
+		then flatBack.Unit:Cross(Vector3.new(0, 1, 0)) * CABLE_SIDE
+		else Vector3.new(CABLE_SIDE, 0, 0)
+	local function steep(i: number): boolean
+		local d = path[i + 1] - path[i]
+		return math.abs(d.Y) > Vector3.new(d.X, 0, d.Z).Magnitude
+	end
+	local out: { { Vector3 } } = {}
+	local start = path[1] + up -- where the next piece starts
+	for i = 1, #path - 1 do
+		local a, b = path[i] + up, path[i + 1] + up
+		if steep(i) then
+			table.insert(out, { start, start + side })
+			table.insert(out, { start + side, a + side })
+			table.insert(out, { a + side, b + side })
+			table.insert(out, { b + side, b })
+			start = b
+		else
+			local finish = b
+			if i + 1 <= #path - 1 and steep(i + 1) then
+				-- Stop short of the climb: the next pieces step aside from here.
+				local d = b - a
+				finish = if d.Magnitude > CABLE_CLEAR then b - d.Unit * CABLE_CLEAR else a
+			end
+			if (finish - start).Magnitude > 1e-6 then
+				table.insert(out, { start, finish })
+			end
+			start = finish
+		end
+	end
+	return out
+end
+
 function WorldPlan.AlongPath(path: { Vector3 }, alpha: number): Vector3
 	local total = 0
 	for i = 1, #path - 1 do

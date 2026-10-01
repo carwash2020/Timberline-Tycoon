@@ -750,6 +750,29 @@ return function(t)
 		end
 	)
 
+	t.test("a quick solo refell of a big tree on a lucky roll still gives back just the planted seed", function()
+		local s = setup()
+		local TreeLogic = t.shared("TreeLogic")
+		local large
+		for _, size in ipairs(TreeLogic.Sizes) do
+			if size.name == "large" then
+				large = size
+			end
+		end
+		local rec = s.tree("oak", nil, { seed = 7, size = large })
+		s.start()
+		local a = s.player(1, "Ada")
+		s.fell(a, rec)
+		local before = s.profiles[a].heartseeds.oak
+		s.plant(a, rec.uid)
+		s.runDelays()
+		s.rolls = { 0.01, 0.01, 0.01 } -- every roll lucky
+		s.fxAll = {}
+		s.fell(a, rec)
+		t.eq(s.profiles[a].heartseeds.oak, before, "planted one, got one back")
+		t.eq(s.fxAll[1].payload.reasons, {}, "no big-tree, lucky or steward's extras")
+	end)
+
 	t.test("woods outside the groves keep their slow regrowth: half of it to sprout, never past their own", function()
 		local s = setup()
 		local lumen = s.tree("lumenwood")

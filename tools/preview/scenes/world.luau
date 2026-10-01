@@ -160,13 +160,13 @@ return {
 				local platform = station.PrimaryPart
 				local to = top.PrimaryPart.CFrame.Position
 				local path = WorldPlan.GondolaPath(sky, platform.CFrame.Position, platform.CFrame.ZVector, to)
-				for i = 1, #path - 1 do
+				for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
 					Kit.decor(
 						Kit.rod(
 							root,
 							"GondolaCable",
-							path[i] + V3.new(0, 8.5, 0),
-							path[i + 1] + V3.new(0, 8.5, 0),
+							piece[1],
+							piece[2],
 							0.4,
 							roblox.Color3.fromRGB(70, 70, 75),
 							roblox.Enum.Material.Metal

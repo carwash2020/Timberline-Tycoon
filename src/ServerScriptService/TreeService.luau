@@ -106,6 +106,7 @@ local trees: { [string]: TreeRecord } = {}
 local logs: { [string]: LogRecord } = {}
 local treeCounters: { [string]: number } = {}
 local makeSolid: (rec: TreeRecord) -> () -- below: solid, or a ghost while something's in the way
+local stumpSolidWhenClear: (rec: TreeRecord) -> () -- below: the same for a stump
 
 local folders: { [string]: Folder } = {}
 local function getFolder(name: string): Folder
@@ -341,6 +342,9 @@ local function setStumpVisible(rec: TreeRecord, visible: boolean)
 	local parts = rec.stumpParts
 	if rec.stump and parts then
 		showParts(parts, visible)
+		if visible then
+			stumpSolidWhenClear(rec)
+		end
 	end
 end
 
@@ -366,11 +370,13 @@ local function placeStump(rec: TreeRecord)
 		setStumpVisible(rec, false) -- it landed after dawn: hidden with the rest of its grove
 	end
 	stump.Parent = getFolder("Stumps")
+	stumpSolidWhenClear(rec) -- a ghost tree's stump lands where something stood
 end
 
--- True when a truck or someone's character is in the way of a tree's solid
--- parts (its trunk), so making it solid now would trap or fling them.
-local function blocked(rec: TreeRecord): boolean
+-- True when a truck or someone's character is in the way of any of these
+-- solid parts (a trunk, a stump), so making them solid now would trap or
+-- fling them.
+local function blockedParts(parts: { [BasePart]: PartState }): boolean
 	local include: { Instance } = {}
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player.Character then
@@ -388,7 +394,7 @@ local function blocked(rec: TreeRecord): boolean
 	params.FilterDescendantsInstances = include
 	params.RespectCanCollide = true
 	params.MaxParts = 1
-	for part, state in pairs(rec.parts) do
+	for part, state in pairs(parts) do
 		if state.collide and part.Parent ~= nil then
 			if #workspace:GetPartBoundsInBox(part.CFrame, part.Size + Vector3.one, params) > 0 then
 				return true
@@ -396,6 +402,39 @@ local function blocked(rec: TreeRecord): boolean
 		end
 	end
 	return false
+end
+
+local function blocked(rec: TreeRecord): boolean
+	return blockedParts(rec.parts)
+end
+
+-- A stump that appears (a tree landed, a grove woke) where a truck or a
+-- player is stays walk-through until the spot is clear, like a ghost tree.
+stumpSolidWhenClear = function(rec: TreeRecord)
+	local stump, parts = rec.stump, rec.stumpParts
+	if not stump or not parts or rec.dormant or not blockedParts(parts) then
+		return
+	end
+	for part in pairs(parts) do
+		if part.Parent ~= nil then
+			part.CanCollide = false
+		end
+	end
+	local function retry()
+		if rec.stump ~= stump or rec.dormant then
+			return -- gone, replaced or hidden: they look after its collisions
+		end
+		if blockedParts(parts) then
+			task.delay(GHOST_RETRY, retry)
+			return
+		end
+		for part, state in pairs(parts) do
+			if part.Parent ~= nil then
+				part.CanCollide = state.collide
+			end
+		end
+	end
+	task.delay(GHOST_RETRY, retry)
 end
 
 -- Makes a standing tree solid, or, while something is in the way, a ghost

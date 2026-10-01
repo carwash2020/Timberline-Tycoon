@@ -215,6 +215,55 @@ return function(t)
 		end
 	end)
 
+	t.test("the gondola cable never runs through a cabin, on either route", function()
+		-- The cabin hangs with its pivot 1 above the route, turned toward
+		-- the route's far end (GondolaService): inside is |x|,|z| < 2.7,
+		-- y -0.2 .. 5.6 in its own frame (plus the cable's 0.2 radius).
+		local routes = {}
+		for _, name in ipairs({ "town", "base" }) do
+			routes[name] = routeFrom(name)
+		end
+		for cableName, cablePath in pairs(routes) do
+			local back = stations[cableName].PrimaryPart.CFrame.ZVector
+			local pieces = WorldPlan.GondolaCable(cablePath, back)
+			t.ok(#pieces >= #cablePath - 1, cableName .. ": a rod per stretch at least")
+			for cabinName, path in pairs(routes) do
+				local from, to = path[1], path[#path]
+				local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
+				local facing = CFrame.lookAt(Vector3.zero, flat).Rotation
+				local length = 0
+				for i = 1, #path - 1 do
+					length += (path[i + 1] - path[i]).Magnitude
+				end
+				local samples = math.ceil(length / 1)
+				for k = 0, samples do
+					local cabin = CFrame.new(WorldPlan.AlongPath(path, k / samples) + Vector3.new(0, 1, 0)) * facing
+					for _, piece in ipairs(pieces) do
+						local a, b = piece[1], piece[2]
+						-- Skip rods nowhere near this cabin spot.
+						local mid = (a + b) / 2
+						if (mid - cabin.Position).Magnitude <= (b - a).Magnitude / 2 + 8 then
+							local steps = math.max(1, math.ceil((b - a).Magnitude / 0.5))
+							for j = 0, steps do
+								local p = cabin:PointToObjectSpace(a:Lerp(b, j / steps))
+								if math.abs(p.X) < 2.9 and math.abs(p.Z) < 2.9 and p.Y > -0.4 and p.Y < 5.8 then
+									error(
+										string.format(
+											"the %s cable runs through a %s cabin at %s",
+											cableName,
+											cabinName,
+											tostring(cabin.Position)
+										)
+									)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end)
+
 	t.test("the gondola cabin never passes through a station, the main isle or the Skyroot", function()
 		local isle = placed(
 			IsleArt.Isle(sky.main.radius, 1, { clear = WorldPlan.IsleClearPoints(sky, sky.main.center) }),

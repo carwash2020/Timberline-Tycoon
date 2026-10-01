@@ -298,7 +298,7 @@ end
 ---------------------------------------------------------------------------
 
 function PlotUI.Start()
-	local gui = UITheme.Screen("PlotUI")
+	local gui = UITheme.Screen("PlotUI", 2) -- its bar draws over any side button spilling that far
 
 	buildButton = HUD.SideButton({
 		name = "Build",
