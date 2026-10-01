@@ -35,6 +35,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const scene = JSON.parse(document.getElementById("scene").textContent);
 // Lua's empty tables arrive as {} rather than [].
@@ -42,8 +43,10 @@ for (const k of ["parts", "lights", "texts", "cameras"]) if (!Array.isArray(scen
 const L = Object.assign({
   sunDir: [-0.45, 0.7, -0.35], sunColor: "#ffe2b0", sunIntensity: 2.6,
   skyTop: "#8dbbe8", skyBottom: "#f4dcae", ground: "#8a7a5c", hemiIntensity: 1.5, ambient: 0.55,
-  fog: "#dfe6e6", fogNear: 250, fogFar: 1400, exposure: 1.0, bloom: 0.55,
+  fog: "#dfe6e6", fogNear: 250, fogFar: 1400, exposure: 1.0, bloom: 0.3,
 }, scene.lighting || {});
+// bloom 0.3 (was 0.55): Neon glows without melting its part into a white
+// blob, so the Starfall axe keeps its shape (ACT-15). A scene may set its own.
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
@@ -56,6 +59,15 @@ document.body.appendChild(renderer.domElement);
 
 const world = new THREE.Scene();
 world.fog = new THREE.Fog(L.fog, L.fogNear, L.fogFar);
+// A soft studio room for metals to reflect (see METALS below).
+const ENV = (() => {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const room = new RoomEnvironment();
+  const texture = pmrem.fromScene(room, 0.04).texture;
+  room.dispose();
+  pmrem.dispose();
+  return texture;
+})();
 
 // Sky: a big gradient dome.
 {
@@ -109,9 +121,15 @@ const GEOM = {
   Sphere: new THREE.SphereGeometry(0.5, 20, 14), // SpecialMesh sphere (an ellipsoid)
 };
 
-// Roblox materials, roughly: [roughness, metalness]
+// Roblox materials, roughly: [roughness, metalness]. A three.js metal keeps
+// little of its own colour and shows what it reflects, so with nothing to
+// reflect Silver read grey and Gold brown (ACT-15). Metals stay at 0.5
+// metalness or under and reflect ENV; nothing else gets ENV, so wood,
+// plastic, glass and terrain look as they always did.
+const METALS = new Set(["Metal", "DiamondPlate", "CorrodedMetal", "Foil"]);
+const ENV_INTENSITY = 0.6;
 const MAT = {
-  Metal: [0.45, 0.7], DiamondPlate: [0.4, 0.7], CorrodedMetal: [0.8, 0.4], Foil: [0.3, 0.8],
+  Metal: [0.45, 0.5], DiamondPlate: [0.4, 0.5], CorrodedMetal: [0.8, 0.4], Foil: [0.3, 0.5],
   Glass: [0.05, 0.1], Ice: [0.15, 0.0], Glacier: [0.2, 0.0], Marble: [0.35, 0.0], SmoothPlastic: [0.6, 0.0], Plastic: [0.65, 0.0],
 };
 
@@ -142,6 +160,7 @@ for (const g of groups.values()) {
     // Boxes and wedges already have one normal per face; flatShading would
     // flip double-sided faces wound the other way.
     mat = new THREE.MeshStandardMaterial({ roughness: rough, metalness: metal });
+    if (METALS.has(g.material)) { mat.envMap = ENV; mat.envMapIntensity = ENV_INTENSITY; }
   }
   if (g.transparency > 0 || g.material === "Glass") {
     mat.transparent = true;
