@@ -1,11 +1,14 @@
 --!strict
 -- VehicleController: driving, on the driver's device.
---   * Physics driving (GameConfig.VehiclePhysics): while you sit in a
---     truck's driver seat, the server hands you its physics. Every frame
---     this turns the seat's throttle and steer (WASD / arrow keys, the
---     touch thumbstick, a gamepad's stick) into a speed and heading
---     (Shared/DriveMath), then sets the truck's Drive (LinearVelocity) and
---     Heading (AlignOrientation, tilted to match the ground).
+--   * Physics driving (GameConfig.VehiclePhysics): while you sit in your
+--     truck's driver seat, the server hands you its physics. Every physics
+--     step (RunService.PreSimulation, before the solver runs) this turns the
+--     seat's throttle and steer (WASD / arrow keys, the touch thumbstick, a
+--     gamepad's stick) into a speed and heading (Shared/DriveMath), then
+--     sets the truck's Drive (LinearVelocity) and Heading (AlignOrientation).
+--     Heading follows the ground: four rays at the chassis corners give the
+--     slope (Shared/VehicleLogic.GroundUp), never more than 30 degrees, so
+--     the truck rides hills and bumps instead of nosing into them.
 --   * "Truck to lot" side button (Y on a gamepad): sends your truck back to
 --     your parking slot, load and all, when it's far away (left somewhere,
 --     or stuck).
@@ -18,6 +21,7 @@ local RunService = game:GetService("RunService")
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
+local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
 
@@ -26,6 +30,10 @@ local VehicleController = {}
 local player = Players.LocalPlayer
 
 local CALL_BUTTON_DISTANCE = 40 -- studs: show "Truck to lot" when your truck is this far away
+local MAX_TILT = math.rad(30) -- the steepest the truck leans to follow the ground
+local RAY_UP = 2.5 -- corner rays start this far above the chassis...
+local RAY_DOWN = 9 -- ...and look this far down
+local UP_SMOOTHING = 12 -- how fast the truck's lean follows the ground (per second)
 
 type Session = {
 	truck: Model,
@@ -37,16 +45,13 @@ type Session = {
 	turnRate: number,
 	speed: number,
 	facing: Vector3, -- flat unit vector the truck is steering toward
+	up: Vector3, -- the ground's up under the truck, smoothed
+	corners: { Vector3 }, -- chassis-local ray starts (VehicleLogic.CornerOffsets)
 	rayParams: RaycastParams,
 }
 
 local session: Session? = nil
 local callButton: UITheme.Button? = nil
-
-local function flat(v: Vector3): Vector3
-	local f = Vector3.new(v.X, 0, v.Z)
-	return if f.Magnitude > 1e-3 then f.Unit else Vector3.new(0, 0, -1)
-end
 
 local function startDriving(seat: VehicleSeat)
 	local truck = seat.Parent
@@ -78,9 +83,27 @@ local function startDriving(seat: VehicleSeat)
 		topSpeed = (truck:GetAttribute("TopSpeed") :: number?) or 26,
 		turnRate = (truck:GetAttribute("TurnRate") :: number?) or 1.4,
 		speed = 0,
-		facing = flat(chassis.CFrame.LookVector),
+		facing = VehicleLogic.FlatFacing(chassis.CFrame.LookVector),
+		up = chassis.CFrame.UpVector,
+		corners = VehicleLogic.CornerOffsets(chassis.Size.X, chassis.Size.Z),
 		rayParams = params,
 	}
+end
+
+-- The ground's up under the truck, from a ray down at each corner.
+local function groundUp(s: Session): Vector3
+	local cf = s.chassis.CFrame
+	local points: { Vector3? } = {}
+	local normals: { Vector3? } = {}
+	for i, offset in ipairs(s.corners) do
+		local origin = cf:PointToWorldSpace(offset) + Vector3.new(0, RAY_UP, 0)
+		local hit = workspace:Raycast(origin, Vector3.new(0, -(RAY_UP + RAY_DOWN), 0), s.rayParams)
+		if hit then
+			points[i] = hit.Position
+			normals[i] = hit.Normal
+		end
+	end
+	return VehicleLogic.GroundUp(points, normals, MAX_TILT)
 end
 
 local function step(dt: number)
@@ -88,7 +111,7 @@ local function step(dt: number)
 	if not s then
 		return
 	end
-	if not s.truck.Parent then
+	if not s.truck.Parent or not s.chassis.Parent then
 		session = nil -- the truck was rebuilt or removed
 		return
 	end
@@ -96,13 +119,13 @@ local function step(dt: number)
 	local actual = Vector3.new(velocity.X, 0, velocity.Z):Dot(s.facing)
 	s.speed = DriveMath.Speed(s.speed, s.seat.ThrottleFloat, s.topSpeed, dt, actual)
 	local turn = DriveMath.Turn(s.speed, s.seat.SteerFloat, s.turnRate, dt)
-	s.facing = flat(CFrame.Angles(0, turn, 0):VectorToWorldSpace(s.facing))
+	s.facing = VehicleLogic.FlatFacing(CFrame.Angles(0, turn, 0):VectorToWorldSpace(s.facing))
 
-	-- Sit level with the ground under the truck (slopes, later biomes).
-	local hit = workspace:Raycast(s.chassis.Position + Vector3.new(0, 2, 0), Vector3.new(0, -12, 0), s.rayParams)
-	local up = if hit then hit.Normal else Vector3.yAxis
-	local look = (s.facing - up * s.facing:Dot(up)).Unit
-	s.heading.CFrame = CFrame.lookAt(Vector3.zero, look, up)
+	-- Lean with the ground, smoothly (slopes, bumps, later biomes).
+	local target = groundUp(s)
+	local alpha = 1 - math.exp(-UP_SMOOTHING * dt)
+	s.up = VehicleLogic.ClampTilt(s.up:Lerp(target, alpha), MAX_TILT)
+	s.heading.CFrame = VehicleLogic.HeadingCFrame(s.facing, s.up)
 	local move = s.facing * s.speed
 	s.drive.PlaneVelocity = Vector2.new(move.X, move.Z)
 end
@@ -161,13 +184,28 @@ local function watchCharacter(char: Model)
 	end)
 end
 
+-- Runs `fn(dt)` every physics step, before the solver: PreSimulation where
+-- the engine has it, else Stepped.
+local function everyPhysicsStep(fn: (number) -> ())
+	local ok, signal = pcall(function(): RBXScriptSignal<number>
+		return RunService.PreSimulation
+	end)
+	if ok and signal then
+		signal:Connect(fn)
+	else
+		RunService.Stepped:Connect(function(_time: number, dt: number)
+			fn(dt)
+		end)
+	end
+end
+
 function VehicleController.Start()
 	buildButton()
 	player.CharacterAdded:Connect(watchCharacter)
 	if player.Character then
 		task.spawn(watchCharacter, player.Character)
 	end
-	RunService.Heartbeat:Connect(step)
+	everyPhysicsStep(step)
 	local sinceRefresh = 0
 	RunService.Heartbeat:Connect(function(dt: number)
 		sinceRefresh += dt
