@@ -111,6 +111,28 @@ local function processReceipt(receipt: { [string]: any }): Enum.ProductPurchaseD
 	end)
 end
 
+-- Whether the player owns a game pass, asking Roblox up to 3 times (with
+-- 2 s, then 4 s, between tries) if the service errors. False if it keeps
+-- failing or the player leaves.
+local function ownsPass(player: Player, passId: number): boolean
+	for attempt = 1, 3 do
+		local ok, has = pcall(function(): any
+			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, passId)
+		end)
+		if ok then
+			return has == true
+		end
+		warn(string.format("[Monetization] Couldn't check game pass %d (try %d): %s", passId, attempt, tostring(has)))
+		if attempt < 3 then
+			task.wait(2 ^ attempt)
+		end
+		if player.Parent ~= Players then
+			return false
+		end
+	end
+	return false
+end
+
 local function onBuy(player: Player, kind: unknown, key: unknown)
 	if type(kind) ~= "string" or type(key) ~= "string" or not RateLimiter.Allow(player, "BuyRobuxItem") then
 		return
@@ -122,6 +144,13 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 		end
 		if MonetizationService.HasPass(player, pass.key) then
 			notify(player, string.format("You already have %s.", pass.name))
+			return
+		end
+		-- The check on join may have failed (Roblox's service hiccupped):
+		-- ask again before prompting, so an owner isn't asked to buy it twice.
+		if ownsPass(player, pass.id) then
+			setPass(player, pass.key)
+			notify(player, string.format("You already own %s; it's active now.", pass.name))
 			return
 		end
 		MarketplaceService:PromptGamePassPurchase(player, pass.id)
@@ -148,13 +177,8 @@ function MonetizationService.PlayerJoined(player: Player, profile: Profile)
 	for _, pass in ipairs(StoreData.Passes) do
 		if pass.id ~= 0 then
 			task.spawn(function()
-				local ok, has = pcall(function()
-					return MarketplaceService:UserOwnsGamePassAsync(player.UserId, pass.id)
-				end)
-				if ok and has then
+				if ownsPass(player, pass.id) then
 					setPass(player, pass.key)
-				elseif not ok then
-					warn("[Monetization] Couldn't check game pass " .. pass.key .. ": " .. tostring(has))
 				end
 			end)
 		end

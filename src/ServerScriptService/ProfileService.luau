@@ -28,6 +28,8 @@ export type Profile = ProfileSchema.Profile
 
 -- Fields added to the template later are filled into existing saves by
 -- Reconcile() on load; nothing already saved is dropped.
+-- Autosave every 2 minutes (GAME_DESIGN §14.2; ProfileStore's default is 5).
+ProfileStore.SetConstant("AUTO_SAVE_PERIOD", 120)
 local store = ProfileStore.New(STORE_NAME, ProfileSchema.Template)
 
 local sessions: { [Player]: any } = {}

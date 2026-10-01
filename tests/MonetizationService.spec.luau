@@ -28,6 +28,10 @@ return function(t)
 				table.insert(prompts, "product " .. id)
 			end,
 			UserOwnsGamePassAsync = function(_, _, id)
+				if (options.passErrors or 0) > 0 then
+					options.passErrors -= 1
+					error("HTTP 500 (the service hiccupped)")
+				end
 				return options.ownsPass == id
 			end,
 			PromptGamePassPurchaseFinished = {
@@ -36,6 +40,12 @@ return function(t)
 				end,
 			},
 		}
+		local players = {
+			GetPlayerByUserId = function(_, id)
+				return if id == player.UserId then player else nil
+			end,
+		}
+		player.Parent = players
 		loader = t.loader({
 			mocks = {
 				ProfileService = {
@@ -53,17 +63,16 @@ return function(t)
 			},
 			services = {
 				MarketplaceService = market,
-				Players = {
-					GetPlayerByUserId = function(_, id)
-						return if id == player.UserId then player else nil
+				Players = players,
+			},
+			globals = {
+				task = {
+					spawn = function(fn, ...)
+						fn(...)
 					end,
+					wait = function() end,
 				},
 			},
-			globals = { task = {
-				spawn = function(fn, ...)
-					fn(...)
-				end,
-			} },
 		})
 		local StoreData = loader:shared("StoreData")
 		for i, item in ipairs(StoreData.Passes) do
@@ -186,5 +195,16 @@ return function(t)
 		s.buy("Product", "Nope")
 		s.buy(1, 2)
 		t.eq(s.prompts, {})
+	end)
+
+	t.test("a pass check that errors is retried; buying an owned pass turns it on instead of prompting", function()
+		local first = setup({ ownsPass = 101, passErrors = 2 })
+		local key = first.StoreData.Passes[1].key
+		t.ok(first.M.HasPass(first.player, key), "the third try worked")
+		local s = setup({ ownsPass = 101, passErrors = 3 })
+		t.ok(not s.M.HasPass(s.player, key), "three failures on join: not known yet")
+		s.buy("Pass", key)
+		t.ok(s.M.HasPass(s.player, key), "the Buy press asked again")
+		t.eq(#s.prompts, 0, "no purchase prompt for a pass they own")
 	end)
 end
