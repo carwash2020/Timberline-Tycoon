@@ -12,6 +12,7 @@ return function(t)
 	local loader = t.loader()
 	local BuildingArt = loader:load("ReplicatedStorage/Shared/Art/BuildingArt")
 	local Kit = loader:load("ReplicatedStorage/Shared/Art/Kit")
+	local IsleArt = loader:load("ReplicatedStorage/Shared/Art/IsleArt")
 	local controller = fs.readFile("src/StarterPlayer/StarterPlayerScripts/LightingController.luau")
 
 	local function find(model, name)
@@ -45,12 +46,33 @@ return function(t)
 		local lamp = BuildingArt.LampPost()
 		local glow = find(lamp, "LampGlow")
 		t.ok(glow and glow.Material == roblox.Enum.Material.Neon, "LampPost has a Neon LampGlow")
+		-- Kit.lantern builds this glow in the lantern colour itself, so this
+		-- line can't tell "keeps its colour" from "takes the lantern colour";
+		-- the isle lantern test below can.
 		t.eq(Night.GlowColor(glow), glow.Color:ToHex())
 		local light = glow:FindFirstChildWhichIsA("PointLight")
 		t.ok(light, "LampGlow holds the lamp's light")
 		t.ok(Night.IsNightLight(light), "the lamp's light is a night light")
 		t.eq(Night.GlowColor(find(lamp, "Post")), nil)
 		t.eq(Night.GlowColor(find(lamp, "LanternCap")), nil)
+	end)
+
+	t.test("a Neon glow part in its own colour keeps it, not the lantern colour", function()
+		-- IsleArt.LanternPost recolours its Kit.lantern glow to #FFE2A0; the
+		-- Hearth & Home shop lanterns (#F2C14E) rely on the same rule.
+		local post = IsleArt.LanternPost(1)
+		local glow = find(post, "LanternGlow")
+		t.ok(glow and glow.Material == roblox.Enum.Material.Neon, "LanternPost has a Neon LanternGlow")
+		t.eq(glow.Color:ToHex(), "FFE2A0")
+		t.ok(glow.Color:ToHex() ~= Night.LanternColor, "the sample glow isn't already the lantern colour")
+		t.eq(Night.GlowColor(glow), "FFE2A0")
+
+		local part = roblox.Instance.new("Part")
+		part.Name = "LampGlow"
+		part.Material = roblox.Enum.Material.Neon
+		part.Color = C3.fromRGB(120, 200, 255)
+		t.eq(Night.GlowColor(part), part.Color:ToHex())
+		t.ok(Night.GlowColor(part) ~= Night.LanternColor, "a blue Neon lamp keeps its blue")
 	end)
 
 	t.test("windows glow the warm window colour, lit or not", function()
