@@ -3,6 +3,9 @@
   "servePort": 34872,
   "tree": {
     "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$path": "src/ReplicatedFirst"
+    },
     "ReplicatedStorage": {
       "$path": "src/ReplicatedStorage"
     },

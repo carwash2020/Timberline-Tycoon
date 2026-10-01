@@ -8,14 +8,22 @@
 -- clock out from workspace:GetServerTimeNow() each frame
 -- (LightingController) with the same WorldTime maths, so everyone sees the
 -- same sky.
+--
+-- In Studio only, the workspace attribute "ClockOverride" (an hour, 0-24)
+-- stands in for the clock (Shared/ClockOverride, WLD-06): set it from the
+-- server command bar to test night, clear it to go back.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local TreeService = require(script.Parent.TreeService)
 
 local WorldClock = {}
+
+local IS_STUDIO = RunService:IsStudio()
 
 local night: boolean? = nil
 
@@ -38,7 +46,11 @@ end
 
 -- The in-game hour right now (0 to 24), the same number the clients show.
 function WorldClock.ClockTime(): number
-	return WorldTime.ClockTime(workspace:GetServerTimeNow())
+	local clock = WorldTime.ClockTime(workspace:GetServerTimeNow())
+	if IS_STUDIO then
+		return ClockOverride.Apply(clock, workspace:GetAttribute(ClockOverride.Attribute), true)
+	end
+	return clock
 end
 
 -- Call after the world's trees are planted (MapBuilder).
