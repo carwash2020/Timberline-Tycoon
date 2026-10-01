@@ -6,8 +6,11 @@
 -- Axe on volcano trees), and pick which to use from the hotbar.
 --   * On spawn, every owned axe that isn't lying in the world goes into the
 --     Backpack, and the one the player last held is equipped.
---   * Drop() lays an axe on the ground with a "Pick up" prompt. It stays
---     owned: only its owner can pick it up (unless
+--   * Drop() lays an axe on the ground with a "Pick up" prompt, unless it's
+--     the last one the player has to hand (every other owned axe is lying
+--     somewhere): "You need an axe to chop!". Judged from the save and the
+--     server's own list of dropped axes, never from what the client says.
+--     A dropped axe stays owned: only its owner can pick it up (unless
 --     GameConfig.AxePickupByOthers is on, which makes a dropped axe a gift),
 --     and if the owner leaves it's simply back in their inventory next time.
 --     Dying doesn't lose axes either. Axes are never lost.
@@ -100,6 +103,17 @@ local function publishOwned(player: Player)
 		player:SetAttribute("OwnedAxes", ShopLogic.EncodeOwned((ownedCounts(player))))
 		player:SetAttribute("BestAxeTier", profile.bestAxeTier)
 	end
+end
+
+-- Whether the player has an axe to chop with besides `uid`: one they own
+-- (saved, or a Studio test axe) that isn't lying in the world.
+local function keepsAnAxe(player: Player, uid: string): boolean
+	for _, item in ipairs(allItems(player)) do
+		if item.uid ~= uid and not dropped[item.uid] and ItemCatalog.GetAxe(item.id) then
+			return true
+		end
+	end
+	return false
 end
 
 local function removeItem(player: Player, uid: string)
@@ -303,6 +317,10 @@ function AxeService.Drop(player: Player, uid: unknown)
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 	local def = if item then ItemCatalog.GetAxe(item.id) else nil
 	if not item or not def or not tool or not char or not hrp or dropped[uid] then
+		return
+	end
+	if not keepsAnAxe(player, uid) then
+		notify(player, "You need an axe to chop!")
 		return
 	end
 	local mine = 0

@@ -9,6 +9,10 @@
 --   * A finished goal pays its reward; finishing all of them pays the
 --     streak bonus and extends the streak. A missed day breaks it.
 --   * New goals roll at midnight UTC, including for players online then.
+--   * While Murph's tutorial runs (profile.tutorialDone is false, so the
+--     TutorialStep attribute is above 0), goals still count and pay, but
+--     their toasts are held back: the first minute has one objective, and
+--     DailyUI hides its button until then too.
 -- All rewards go through EconomyService.AddCash, so the wallet cap holds.
 
 local AnalyticsService = game:GetService("AnalyticsService")
@@ -39,6 +43,13 @@ local COUNTED_BY: { [DailyEvent]: DailyData.GoalKind } = {
 
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local clock: () -> number = os.time -- tests replace this
+
+-- A toast about the daily goals, unless the tutorial is still running.
+local function toast(player: Player, profile: Profile, message: string)
+	if profile.tutorialDone then
+		notify(player, message)
+	end
+end
 
 local function analytics(player: Player, name: string, value: number)
 	local ok, err = pcall(function()
@@ -91,8 +102,9 @@ local function finishDay(player: Player, profile: Profile)
 	daily.bestStreak = math.max(daily.bestStreak, daily.streak)
 	local bonus = DailyData.Bonus(profile.bestAxeTier, daily.streak)
 	EconomyService.AddCash(player, bonus, string.format("daily bonus, %d-day streak", daily.streak), "daily")
-	notify(
+	toast(
 		player,
+		profile,
 		string.format(
 			"All daily goals done! +%s. Streak: %d day%s.",
 			Util.formatCash(bonus),
@@ -135,8 +147,9 @@ function DailyService.Event(
 				if goal.progress >= goal.target then
 					goal.done = true
 					EconomyService.AddCash(player, goal.reward, "daily goal: " .. goal.kind, "daily")
-					notify(
+					toast(
 						player,
+						profile,
 						string.format(
 							"Daily goal done: %s. +%s",
 							DailyData.GoalText(goal),
@@ -170,7 +183,7 @@ local function midnightLoop()
 			local profile = ProfileService.GetProfile(player)
 			if profile and rollIfNewDay(player, profile) then
 				publish(player, profile)
-				notify(player, "New daily goals are in!")
+				toast(player, profile, "New daily goals are in!")
 			end
 		end
 	end
