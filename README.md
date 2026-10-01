@@ -86,6 +86,10 @@ measure the economy model against your real play (saved in
 - **See models without Studio:** `lune run tools/preview/export trees`
   (or town, trucks, world, ... ; run it with no name to list them) writes
   `preview/<scene>.html`; open it in a browser and drag to look around.
+  `bash tools/preview/shoot.sh trees 2` saves a screenshot of view 2 as
+  `preview/trees-2.png` instead (needs Node and Playwright).
+- **On Linux without Rokit** (e.g. a cloud session): `bash scripts/cloud-setup.sh`
+  installs the same tool versions.
 
 ## Layout
 

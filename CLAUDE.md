@@ -3,14 +3,18 @@
 Roblox game, Rojo + Luau. Design spec: GAME_DESIGN.md (§14 is the
 implementation spec; ask Connor before deviating from its data values or
 architecture). What V1 needs and where it stands: V1_PLAN.md (keep it
-current). Playtest checklists: PHASE1_NOTES.md (main), PHASE2_NOTES.md
-(the branch).
+current). Playtest checklists: PHASE1_NOTES.md (phase 1), PHASE2_NOTES.md
+(everything since; all on main). Tonight's cleanup plan: HANDOFF.md.
 
 - Connor tests in Roblox Studio on a Mac; Claude can't run Studio. After a
   change, list exactly what to check in Studio.
 - Verify before pushing: `./scripts/check.sh` (StyLua, Selene, luau-lsp
   strict type check against the Roblox API, Lune unit tests, ECONOMY.md
   current). CI runs the same script. Game code is `--!strict`.
+- See an art or world change without Studio: `bash tools/preview/shoot.sh
+  <scene> [view]` (scenes in `tools/preview/scenes`) writes
+  `preview/<scene>-<view>.png`; compare renders before and after. On Linux
+  without Rokit, `bash scripts/cloud-setup.sh` installs the toolchain.
 - Tests live in `tests/*.spec.luau` (`lune run tests/run [filter]`). Put
   rules in pure modules (e.g. `Shared/ShopLogic`, `ProfileSchema`) so they
   can be tested; services are tested with `mocks` (see `ShopService.spec`).
