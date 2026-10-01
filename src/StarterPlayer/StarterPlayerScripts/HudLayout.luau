@@ -5,6 +5,9 @@
 --     columns no taller than the room there.
 --   * ClearOf(): a centred panel's area, shrunk or lowered so the panel
 --     stays clear of something drawn over it (the cash row over the shop).
+--   * ToastLane(): where the toasts stack, clear of the top-right corner
+--     and the left column (the tutorial tracker).
+--   * ClockLine(): which corner line the clock goes in.
 -- Everything is in a screen's offsets (UIScale units), y down.
 
 local HudLayout = {}
@@ -107,6 +110,94 @@ function HudLayout.ClearOf(area: Rect, max: Vector2, avoid: Rect, gap: number, m
 		return { left = area.left, top = area.top, right = right, bottom = area.bottom }
 	end
 	return { left = area.left, top = math.max(area.top, avoid.bottom + gap), right = area.right, bottom = area.bottom }
+end
+
+-- Where the toasts stack (newest on top): a strip of screen from `top`
+-- down to `bottom`, `right - left` wide (the widest a toast may be), that
+-- holds `max` toasts at once; `under` when it's under the left column
+-- (toasts left-aligned there) rather than centred at the top.
+export type Lane = { left: number, top: number, right: number, bottom: number, max: number, under: boolean }
+
+local LANE_GAP = 8 -- between the lane and what it keeps clear of
+local LANE_TOASTS = 3 -- toasts at once in a lane at the top
+local UNDER_TOASTS = 2 -- and under the left column (a phone)
+local TOAST_ROW = 48 -- the room a toast takes in a lane: a two-line toast and the gap under it
+
+-- The toast lane on a `screen`-sized screen with the top-right `corner`
+-- (both its lines: the cash row and what's beside and under it) and the
+-- left `column` (the Field Guide button, the tutorial tracker, Murph's
+-- card, and off a phone Roblox's chat window above them; nil if there's
+-- none yet), all in the same screen's offsets.
+--   * Where the band between the column and the corner is at least `minW`
+--     wide (a computer, a TV): the lane is centred in it, at the corner's
+--     top, at most `maxW` wide, and takes three toasts.
+--   * Narrower (a phone): directly under the column, at its width (at
+--     least `minW`, at most `maxW`), and takes two. If the column is so
+--     short that the lane would reach the corner, it ends left of the
+--     corner, or (if that leaves less than `minW`) starts under the
+--     corner. Where there's no room for two above `floor` (the lowest a
+--     toast may reach; the screen's bottom if nil), it takes one.
+-- The lane never overlaps the corner or the column, at any height.
+function HudLayout.ToastLane(
+	screen: Vector2,
+	corner: Rect,
+	column: Rect?,
+	maxW: number,
+	minW: number,
+	floor: number?
+): Lane
+	local margin = screen.X - corner.right -- the corner sits at the right margin, the column at the left one
+	local bottom = floor or screen.Y
+	local bandLeft = if column then column.right + LANE_GAP else margin
+	local bandRight = corner.left - LANE_GAP
+	if bandRight - bandLeft >= minW then
+		local width = math.min(maxW, bandRight - bandLeft)
+		local left = bandLeft + (bandRight - bandLeft - width) / 2
+		return {
+			left = left,
+			top = corner.top,
+			right = left + width,
+			bottom = bottom,
+			max = LANE_TOASTS,
+			under = false,
+		}
+	end
+	-- Under the column (or, with none yet, from the top-left margin).
+	local left = if column then column.left else margin
+	local top = if column then column.bottom + LANE_GAP else corner.top
+	local columnWidth = if column then column.right - column.left else 0
+	local width = math.min(maxW, math.max(columnWidth, minW), screen.X - margin - left)
+	if top < corner.bottom + LANE_GAP and left + width > corner.left - LANE_GAP then
+		local room = corner.left - LANE_GAP - left
+		if room >= minW then
+			width = room
+		else
+			top = corner.bottom + LANE_GAP
+		end
+	end
+	local fits = math.floor((bottom - top + LANE_GAP) / TOAST_ROW)
+	return {
+		left = left,
+		top = top,
+		right = left + math.max(0, width),
+		bottom = bottom,
+		max = math.clamp(fits, 1, UNDER_TOASTS),
+		under = true,
+	}
+end
+
+export type ClockLine = "beside" | "under" | "none"
+
+-- Which corner line the clock goes in. On a computer or a TV: beside the
+-- cash (the first line). On a phone it moves to the second (with the
+-- pouch and Daily Goals), leaving the first to the cash row and the Store;
+-- and while the tutorial runs (`tutorialStep` > 0) it's hidden, because on
+-- a small phone that line would then reach the tracker.
+function HudLayout.ClockLine(phone: boolean, tutorialStep: number): ClockLine
+	if not phone then
+		return "beside"
+	end
+	return if tutorialStep > 0 then "none" else "under"
 end
 
 return HudLayout

@@ -1,7 +1,8 @@
 --!nocheck
 -- UITheme (StarterPlayerScripts/UITheme): the left column follows Roblox's
--- chat window, and a chat property that can't be read never stops it; the
--- colours other code relies on.
+-- chat window, and a chat property that can't be read never stops it;
+-- WatchLeftColumn (the toasts keep clear of the column); the colours other
+-- code relies on.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector2 = roblox.Instance, roblox.Vector2
@@ -32,7 +33,14 @@ return function(t)
 				},
 				UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
 			},
-			globals = { workspace = { CurrentCamera = nil } },
+			globals = {
+				workspace = { CurrentCamera = nil },
+				task = {
+					spawn = function(fn, ...)
+						fn(...)
+					end,
+				},
+			},
 		})
 		return loader:load("StarterPlayer/StarterPlayerScripts/UITheme"), playerGui
 	end
@@ -72,6 +80,25 @@ return function(t)
 	t.test("no chat, or chat turned off: 30% down the screen", function()
 		t.eq(columnAt({}), { 0, 12, 0.3, 0 })
 		t.eq(columnAt({ ChatWindowConfiguration = unreadable(false) }), { 0, 12, 0.3, 0 })
+	end)
+
+	t.test("WatchLeftColumn hands over the column once it exists, or straight away", function()
+		local UITheme, playerGui = theme({})
+		local seen = {}
+		UITheme.WatchLeftColumn(function(column)
+			table.insert(seen, column)
+		end)
+		t.eq(#seen, 0, "no column yet")
+		UITheme.LeftColumn(Instance.new("Frame"), 1)
+		UITheme.LeftColumn(Instance.new("Frame"), 2)
+		local column = playerGui:FindFirstChild("LeftColumn"):FindFirstChild("Column")
+		t.eq(#seen, 1, "once, when it's made")
+		t.ok(seen[1] == column)
+		UITheme.WatchLeftColumn(function(c)
+			table.insert(seen, c)
+		end)
+		t.eq(#seen, 2, "a late watcher gets it at once")
+		t.ok(seen[2] == column)
 	end)
 
 	t.test("the theme's danger colour is #C0503A", function()

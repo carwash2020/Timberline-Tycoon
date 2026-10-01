@@ -6,7 +6,9 @@
 --     walk slower without an Insulated Coat"). If the grove you're in
 --     changes tier, a toast says so.
 --   * A clock next to the cash: "Day 14:05" / "Night 22:10" (night is when
---     the Phantom Grove's trees come out).
+--     the Phantom Grove's trees come out). On a phone it's in the corner's
+--     second line instead, and hidden during the tutorial
+--     (HudLayout.ClockLine).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
 -- The server sets the Biome and OwnedGear attributes and the
 -- VitalityTier_<biome> workspace attributes (ForestService); the time of
@@ -15,6 +17,7 @@
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
@@ -24,6 +27,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
+local HudLayout = require(script.Parent.HudLayout)
 local UITheme = require(script.Parent.UITheme)
 
 local WorldUI = {}
@@ -91,6 +95,26 @@ local function buildClock()
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	UITheme.corner(label, 15)
 	UITheme.stroke(label, UITheme.Colors.Ink, 2)
+
+	-- Which line it's in (or none) for the device and the tutorial.
+	local function place()
+		local step = player:GetAttribute("TutorialStep")
+		local spot = HudLayout.ClockLine(UITheme.IsPhone(), if type(step) == "number" then step else 0)
+		local under = HUD.UnderCash()
+		local target = if spot == "under" and under then under else line
+		if label.Parent ~= target then
+			label.Parent = target
+			label.LayoutOrder = if target == line then 20 else 1 -- left of the pouch and Daily Goals
+		end
+		label.Visible = spot ~= "none"
+	end
+	place()
+	player:GetAttributeChangedSignal("TutorialStep"):Connect(place)
+	UserInputService.LastInputTypeChanged:Connect(place)
+	local camera = workspace.CurrentCamera
+	if camera then
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(place) -- IsPhone reads the screen's height
+	end
 
 	-- From the server clock, once a second (LightingController moves
 	-- Lighting.ClockTime every frame; the label doesn't need to).

@@ -1,7 +1,8 @@
 --!nocheck
 -- The HUD's geometry (StarterPlayerScripts/HudLayout): the side buttons'
--- columns and the shop panel kept clear of the cash row, at the screen
--- sizes the layout has to work on.
+-- columns, the shop panel kept clear of the cash row, and the toast lane
+-- kept clear of the corner and the tutorial tracker, at the screen sizes
+-- the layout has to work on.
 return function(t)
 	local Vector2 = t.roblox.Vector2
 	local HudLayout = t.load("StarterPlayer/StarterPlayerScripts/HudLayout")
@@ -110,5 +111,182 @@ return function(t)
 		local area = HudLayout.ClearOf(areaOn(568, 320), PANEL, row, 8, 400)
 		t.eq(area.top, row.bottom + 8)
 		t.eq(area.right, 568 - 12)
+	end)
+
+	-- The toast lane. Sizes as the HUD builds them, in the HUD screen's
+	-- offsets (which mind the top bar and a phone's safe-area insets).
+	local TOAST_W, LANE_MIN = 280, 240 -- HUD's widest toast, and the narrowest band for a lane at the top
+	local CASH, STORE, CLOCK, POUCH, DAILY, DAILY_STREAK = 226, 90, 100, 84, 200, 300
+	local TRACKER, SPEECH, GUIDE = 92, 6 + 80, 37 -- the tracker, Murph's card under it, the Field Guide button
+	local function widths(...)
+		local sum, n = 0, 0
+		for _, w in ipairs({ ... }) do
+			sum += w
+			n += 1
+		end
+		return sum + 8 * math.max(0, n - 1)
+	end
+	-- The corner: line 1 (the cash row, 49 tall, and what's beside it) at
+	-- y 8, line 2 (30 tall) 7 under it, right-aligned at the margin.
+	local function cornerOf(screenW, line1, line2, margin)
+		margin = margin or 12
+		return {
+			left = screenW - margin - math.max(line1, line2),
+			top = 8,
+			right = screenW - margin,
+			bottom = if line2 > 0 then 8 + 49 + 7 + 30 else 8 + 49,
+		}
+	end
+	-- The left column: 280 wide (QuestUI's tutorial frame), from `top`.
+	local function columnOf(top, height, margin)
+		margin = margin or 12
+		return { left = margin, top = top, right = margin + 280, bottom = top + height }
+	end
+	local function clear(a, b, gap)
+		return a.right + gap <= b.left or b.right + gap <= a.left or a.bottom + gap <= b.top or b.bottom + gap <= a.top
+	end
+	local function checkLane(name, screen, corner, column, lane)
+		t.ok(clear(lane, corner, 8), name .. ": the lane is clear of the corner")
+		if column then
+			t.ok(clear(lane, column, 8), name .. ": the lane is clear of the tracker")
+		end
+		t.ok(lane.left >= 0 and lane.right <= screen.X, name .. ": on screen")
+		t.ok(lane.right - lane.left >= LANE_MIN, name .. ": wide enough for a toast")
+		t.ok(lane.top >= 0 and lane.top < lane.bottom, name .. ": room to stack down")
+	end
+
+	t.test("on a 667 x 375 phone today's top-centre lane covers the clock; the lane goes under the tracker", function()
+		local screen = v(667, 375 - 58)
+		-- Before: the clock beside the cash, toasts centred at the top.
+		local clock = { left = 667 - 12 - widths(CLOCK, CASH), top = 8, right = 667 - 12 - CASH - 8, bottom = 38 }
+		local today = { left = 667 / 2 - 140, top = 8, right = 667 / 2 + 140, bottom = 8 + 3 * 40 }
+		t.ok(not clear(today, clock, 0), "the evidence: today's lane (x 193-473) covers the clock")
+		-- Even with the clock still there, the lane now misses it.
+		local withClock = cornerOf(667, widths(CLOCK, CASH), widths(POUCH, DAILY))
+		local tracker = columnOf(60, TRACKER)
+		local lane = HudLayout.ToastLane(screen, withClock, tracker, TOAST_W, LANE_MIN, screen.Y - 12)
+		checkLane("667 clock on line 1", screen, withClock, tracker, lane)
+		t.ok(clear(lane, clock, 8), "clear of the clock")
+		t.eq(lane.under, true)
+	end)
+
+	t.test("667 x 375 (iPhone SE): under the tracker at its width, two toasts, one when Murph's card is up", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(667, 375 - inset)
+			-- In the tutorial the clock is off the corner (ClockLine).
+			local corner = cornerOf(667, CASH, widths(POUCH, DAILY))
+			local tracker = columnOf(60, TRACKER)
+			local lane = HudLayout.ToastLane(screen, corner, tracker, TOAST_W, LANE_MIN, screen.Y - 12)
+			checkLane("SE " .. inset, screen, corner, tracker, lane)
+			t.eq(lane.under, true)
+			t.eq(lane.left, tracker.left, "lined up with the tracker")
+			t.eq(lane.right - lane.left, 280, "at its width")
+			t.eq(lane.top, tracker.bottom + 8)
+			t.eq(lane.max, 2)
+			local talking = columnOf(60, TRACKER + SPEECH)
+			local low = HudLayout.ToastLane(screen, corner, talking, TOAST_W, LANE_MIN, screen.Y - 12)
+			checkLane("SE " .. inset .. " with Murph", screen, corner, talking, low)
+			t.eq(low.max, 1, "no room for two above the bottom edge")
+		end
+		-- After the tutorial: the clock on line 2, the Field Guide button up top.
+		local screen = v(667, 375 - 58)
+		local corner = cornerOf(667, CASH, widths(CLOCK, POUCH, DAILY_STREAK))
+		local column = columnOf(60, GUIDE + 6)
+		local lane = HudLayout.ToastLane(screen, corner, column, TOAST_W, LANE_MIN, screen.Y - 12)
+		checkLane("SE after the tutorial", screen, corner, column, lane)
+		t.eq(lane.max, 2)
+	end)
+
+	t.test("844 x 390 with 47/47/21 insets (iPhone 14 Pro): under the tracker", function()
+		local screen = v(844 - 47 - 47, 390 - 58 - 21)
+		local cases = {
+			{ "tutorial", cornerOf(screen.X, CASH, widths(POUCH, DAILY)), columnOf(60, TRACKER) },
+			{ "tutorial, Murph", cornerOf(screen.X, CASH, widths(POUCH, DAILY)), columnOf(60, TRACKER + SPEECH) },
+			{
+				"after",
+				cornerOf(screen.X, widths(STORE, CASH), widths(CLOCK, POUCH, DAILY_STREAK)),
+				columnOf(60, GUIDE + 6),
+			},
+		}
+		for _, case in ipairs(cases) do
+			local name, corner, column = case[1], case[2], case[3]
+			local lane = HudLayout.ToastLane(screen, corner, column, TOAST_W, LANE_MIN, screen.Y - 12)
+			checkLane("14 Pro " .. name, screen, corner, column, lane)
+			t.eq(lane.under, true, name)
+			t.ok(lane.max >= 1 and lane.max <= 2, name .. ": at most two")
+		end
+	end)
+
+	t.test("computers and TVs: centred between the column and the corner, at most 280 wide, three toasts", function()
+		local lines1 = widths(STORE, CLOCK, CASH)
+		local cases = {
+			-- name, screen (offsets), line 2, column top (under the chat), margin
+			{ "1024 x 768 with STORE", v(1024, 768 - 58), widths(POUCH, DAILY_STREAK), 250, 12 },
+			{ "1366 x 768", v(1366, 768 - 58), widths(POUCH, DAILY), 250, 12 },
+			{ "1920 x 1080 (1.25x)", v(1536, (1080 - 58) / 1.25), widths(POUCH, DAILY), 0.3 * 817, 12 },
+			{ "a TV (1.5x)", v(1280, (1080 - 58) / 1.5), widths(POUCH, DAILY), 0.3 * 681, 64 },
+		}
+		for _, case in ipairs(cases) do
+			local name, screen, line2, columnTop, margin = case[1], case[2], case[3], case[4], case[5]
+			local corner = cornerOf(screen.X, lines1, line2, margin)
+			for _, column in ipairs({ columnOf(columnTop, TRACKER, margin), columnOf(8, TRACKER + SPEECH, margin) }) do
+				local lane = HudLayout.ToastLane(screen, corner, column, TOAST_W, LANE_MIN, screen.Y - 12)
+				checkLane(name, screen, corner, column, lane)
+				t.eq(lane.under, false, name)
+				t.eq(lane.top, 8, name .. ": at the top")
+				t.eq(lane.max, 3, name)
+				t.ok(lane.right - lane.left <= 280, name .. ": at most 280")
+				-- Centred in the band between them.
+				local leftGap, rightGap = lane.left - column.right, corner.left - lane.right
+				t.ok(math.abs(leftGap - rightGap) < 1e-6, name .. ": centred")
+			end
+		end
+		-- 1024 with STORE: the band is 272 wide, and the lane fills it.
+		local corner = cornerOf(1024, lines1, widths(POUCH, DAILY))
+		local lane = HudLayout.ToastLane(v(1024, 710), corner, columnOf(250, TRACKER), TOAST_W, LANE_MIN)
+		t.eq({ lane.left, lane.right }, { 300, 572 })
+		-- HUD passes the column with Roblox's chat window above it: a chat
+		-- 400 wide leaves too narrow a band, so the toasts go under the column.
+		local withChat = { left = 8, top = 0, right = 408, bottom = 250 + TRACKER }
+		local under = HudLayout.ToastLane(v(1024, 710), corner, withChat, TOAST_W, LANE_MIN, 698)
+		checkLane("1024 with a wide chat", v(1024, 710), corner, withChat, under)
+		t.eq(under.under, true)
+	end)
+
+	t.test("no column yet, and a column too short to clear the corner", function()
+		-- Desktop with no column: centred between the left margin and the corner.
+		local desk = cornerOf(1366, widths(STORE, CLOCK, CASH), 0)
+		local lane = HudLayout.ToastLane(v(1366, 710), desk, nil, TOAST_W, LANE_MIN)
+		checkLane("desktop, no column", v(1366, 710), desk, nil, lane)
+		t.eq(lane.under, false)
+		-- A phone with no column: the band from the left margin may be wide enough...
+		local phone = cornerOf(667, CASH, widths(POUCH, DAILY))
+		local top = HudLayout.ToastLane(v(667, 317), phone, nil, TOAST_W, LANE_MIN)
+		checkLane("phone, no column", v(667, 317), phone, nil, top)
+		t.eq(top.under, false)
+		-- ... and where it isn't, the lane starts under the corner at the margin.
+		local wide = cornerOf(667, CASH, widths(CLOCK, POUCH, DAILY_STREAK))
+		local low = HudLayout.ToastLane(v(667, 317), wide, nil, TOAST_W, LANE_MIN)
+		checkLane("phone, no column, wide corner", v(667, 317), wide, nil, low)
+		t.eq({ low.left, low.top }, { 12, wide.bottom + 8 })
+		-- An empty column beside a corner that leaves less than 240: under the corner.
+		local empty = columnOf(60, 0)
+		local under = HudLayout.ToastLane(v(667, 317), wide, empty, TOAST_W, LANE_MIN)
+		checkLane("phone, empty column", v(667, 317), wide, empty, under)
+		t.eq(under.top, wide.bottom + 8)
+		-- ... or, with room for 240, ends left of it.
+		local mid = cornerOf(667, CASH, widths(POUCH, DAILY, 60))
+		local beside = HudLayout.ToastLane(v(667, 317), mid, empty, TOAST_W, LANE_MIN)
+		checkLane("phone, empty column, mid corner", v(667, 317), mid, empty, beside)
+		t.eq(beside.top, 68)
+		t.eq(beside.right, mid.left - 8)
+	end)
+
+	t.test("the clock: beside the cash on a computer, line 2 on a phone, hidden there in the tutorial", function()
+		t.eq(HudLayout.ClockLine(false, 0), "beside")
+		t.eq(HudLayout.ClockLine(false, 3), "beside")
+		t.eq(HudLayout.ClockLine(true, 0), "under")
+		t.eq(HudLayout.ClockLine(true, 1), "none")
+		t.eq(HudLayout.ClockLine(true, 7), "none")
 	end)
 end

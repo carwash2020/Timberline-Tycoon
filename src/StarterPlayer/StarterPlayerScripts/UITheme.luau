@@ -16,7 +16,8 @@
 --     Roblox's tool hotbar, which the spec didn't allow for.
 --   * LeftColumn(): one list down the left (the Field Guide button, the
 --     tutorial), just under Roblox's chat window, wherever and however big
---     it is; what's in it stacks instead of overlapping.
+--     it is; what's in it stacks instead of overlapping. WatchLeftColumn()
+--     hands its frame to whoever needs to keep clear of it (the toasts).
 --   * Textures: the spec's wood grain and kraft fibre are tiled images;
 --     until they're uploaded (set the ids below) surfaces are flat colour.
 
@@ -146,36 +147,57 @@ end
 local scales: { UIScale } = {}
 local currentScale = 1
 local leftColumn: Frame? = nil
+local columnWatchers: { (Frame) -> () } = {} -- waiting for the left column to exist
+local chatWatchers: { () -> () } = {} -- told when the chat window moves
 
 local CHAT_CONFIGS = { "ChatWindowConfiguration", "ChatInputBarConfiguration" }
 
--- The bottom of one chat config's box in screen pixels, 0 if it isn't
--- showing. Read in a pcall (0 if it errors): a chat property that can't be
--- read must not stop the HUD or the left column from starting.
-local function configBottom(config: Instance): number
-	local ok, bottom = pcall(function(): number
+-- One chat config's box in screen pixels (its top-left corner and size),
+-- or nil if it isn't showing. Read in a pcall (nil if it errors): a chat
+-- property that can't be read must not stop the HUD or the left column.
+local function configBox(config: Instance): (Vector2?, Vector2?)
+	local ok, pos, size = pcall(function(): (Vector2?, Vector2?)
 		local c = config :: any
 		if not c.Enabled then
-			return 0
+			return nil, nil
 		end
-		local pos = c.AbsolutePosition :: Vector2
-		local size = c.AbsoluteSize :: Vector2
-		return if size.Y > 0 then pos.Y + size.Y else 0
+		local p = c.AbsolutePosition :: Vector2
+		local s = c.AbsoluteSize :: Vector2
+		if s.Y <= 0 then
+			return nil, nil
+		end
+		return p, s
 	end)
-	return if ok and type(bottom) == "number" then bottom else 0
+	if ok and typeof(pos) == "Vector2" and typeof(size) == "Vector2" then
+		return pos, size
+	end
+	return nil, nil
+end
+
+-- Roblox's chat window and its input bar, as one box in screen pixels
+-- (top-left and bottom-right corners), or nil if neither is showing.
+function UITheme.ChatBox(): (Vector2?, Vector2?)
+	local low: Vector2?, high: Vector2? = nil, nil
+	for _, className in ipairs(CHAT_CONFIGS) do
+		local config = TextChatService:FindFirstChildOfClass(className)
+		local pos, size = nil, nil
+		if config then
+			pos, size = configBox(config)
+		end
+		if pos and size then
+			local far = pos + size
+			low = if low then low:Min(pos) else pos
+			high = if high then high:Max(far) else far
+		end
+	end
+	return low, high
 end
 
 -- The bottom of Roblox's chat window (and its input bar), in screen
 -- pixels; 0 if there's no chat window showing.
 local function chatBottom(): number
-	local bottom = 0
-	for _, className in ipairs(CHAT_CONFIGS) do
-		local config = TextChatService:FindFirstChildOfClass(className)
-		if config then
-			bottom = math.max(bottom, configBottom(config))
-		end
-	end
-	return bottom
+	local _, high = UITheme.ChatBox()
+	return if high then high.Y else 0
 end
 
 local function placeLeft()
@@ -208,6 +230,7 @@ end
 -- bottom), and keeps it there.
 function UITheme.LeftColumn(obj: GuiObject, order: number)
 	local column = leftColumn
+	local made: Frame? = nil
 	if not column then
 		local gui = UITheme.Screen("LeftColumn")
 		local frame = Instance.new("Frame")
@@ -220,10 +243,35 @@ function UITheme.LeftColumn(obj: GuiObject, order: number)
 		gui.Parent = player:WaitForChild("PlayerGui")
 		leftColumn = frame
 		column = frame
+		made = frame
 	end
 	obj.LayoutOrder = order
 	obj.Parent = column
 	placeLeft()
+	if made then
+		local watchers = columnWatchers
+		columnWatchers = {}
+		for _, fn in ipairs(watchers) do
+			task.spawn(fn, made)
+		end
+	end
+end
+
+-- Calls `fn` whenever Roblox's chat window moves, resizes, shows or hides
+-- (from UITheme.Start on).
+function UITheme.WatchChat(fn: () -> ())
+	table.insert(chatWatchers, fn)
+end
+
+-- Calls `fn` with the left column's frame: now if it's there, or once
+-- something is first put in it (the HUD keeps its toasts clear of it).
+function UITheme.WatchLeftColumn(fn: (Frame) -> ())
+	local column = leftColumn
+	if column then
+		task.spawn(fn, column)
+	else
+		table.insert(columnWatchers, fn)
+	end
 end
 
 -- A ScreenGui for one of the game's screens, scaled for the device.
@@ -604,18 +652,24 @@ function UITheme.Start()
 	watchCamera()
 	-- Follow the chat window as it appears, moves or resizes (each signal
 	-- in a pcall, like the reads: one that's missing is skipped).
+	local function chatMoved()
+		placeLeft()
+		for _, fn in ipairs(chatWatchers) do
+			task.spawn(fn)
+		end
+	end
 	task.spawn(function()
 		for _, className in ipairs(CHAT_CONFIGS) do
 			local config = TextChatService:WaitForChild(className, 10)
 			if config then
 				for _, prop in ipairs({ "AbsolutePosition", "AbsoluteSize", "Enabled" }) do
 					pcall(function()
-						config:GetPropertyChangedSignal(prop):Connect(placeLeft)
+						config:GetPropertyChangedSignal(prop):Connect(chatMoved)
 					end)
 				end
 			end
 		end
-		placeLeft()
+		chatMoved()
 	end)
 end
 

@@ -4,8 +4,11 @@
 --     which would cover it, is off: GameConfig). At the wallet cap it turns
 --     amber and reads MAX.
 --   * Toasts: short messages from the server (Notify) or other controllers,
---     top centre, newest on top, up to three (older ones fade back).
---     Amounts of money show in green.
+--     newest on top (older ones fade back), in a lane that keeps clear of
+--     the top-right corner and the left column (HudLayout.ToastLane):
+--     centred at the top between them on a computer or a TV, up to three;
+--     on a phone, where there's no room between them, under the tutorial
+--     tracker at its width, up to two. Amounts of money show in green.
 --   * A one-line control hint at the bottom (above Roblox's tool hotbar),
 --     worded for the device in use.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
@@ -23,7 +26,8 @@
 --                  [pouch][DAILY GOALS 1/3]      HUD.UnderCash
 --                       [one popup at a time]    HUD.Popup
 --     The cash row (HUD.TopRow, which SettingsUI adds its button to) is in
---     the HUD's layer, over the shop; the rest is in a layer under it.
+--     the HUD's layer, over the shop; the rest is in a layer under it. On a
+--     phone the clock is in the second line (or hidden: WorldUI).
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -46,7 +50,10 @@ local F = UITheme.Fonts
 
 local player = Players.LocalPlayer
 
-local MAX_TOASTS = 3
+local MAX_TOASTS = 3 -- until the lane is placed (HudLayout.ToastLane says how many it holds)
+local TOAST_WIDTH = 280 -- a toast's widest
+local TOAST_TEXT_INSET = 28 -- its padding either side of the text
+local TOAST_LANE_MIN = 240 -- a band narrower than this between the left column and the corner: toasts go under the column
 local TOAST_SECONDS = 3
 local TOAST_FADE = 0.25
 local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
@@ -56,7 +63,14 @@ local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
 local BAR_HALF_WIDTH = 176 -- UITheme.Bar's card (340 wide plus its edge) at the bottom centre
 local BAR_HEIGHT = 84 -- and its height (label, a row of buttons, padding)
 
-type Toast = { outer: Frame, face: ImageLabel, label: TextLabel, stroke: UIStroke }
+type Toast = {
+	outer: Frame,
+	face: ImageLabel,
+	label: TextLabel,
+	stroke: UIStroke,
+	limit: UISizeConstraint, -- the card's width, at most the lane's
+	labelLimit: UISizeConstraint, -- and its text's
+}
 
 type Side = {
 	button: UITheme.Button,
@@ -74,8 +88,14 @@ local cashPops: Frame? = nil -- a zero-size spot at the row's left end the pops 
 local cashShown: NumberValue? = nil -- what the plaque shows; tweens toward the real amount
 local cashTarget: number? = nil -- the real amount (nil until the first update)
 local toastStack: Frame? = nil
+local toastList: UIListLayout? = nil
 local toasts: { Toast } = {}
 local toastOrder = 0
+local toastWidth = TOAST_WIDTH -- the lane's width
+local maxToasts = MAX_TOASTS -- how many the lane holds
+local laneQueued = false
+local hudGui: ScreenGui? = nil
+local leftColumn: Frame? = nil -- UITheme's left column (the tracker), once it exists
 local hintLabel: TextLabel? = nil
 local sideGui: ScreenGui? = nil
 local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
@@ -200,6 +220,84 @@ local function removeToast(toast: Toast)
 	restack()
 end
 
+local function fitToast(toast: Toast)
+	toast.limit.MaxSize = Vector2.new(toastWidth, math.huge)
+	toast.labelLimit.MaxSize = Vector2.new(math.max(0, toastWidth - TOAST_TEXT_INSET), math.huge)
+end
+
+-- A box in screen pixels (top-left, bottom-right) in `gui`'s offsets.
+-- The corner's and the left column's screens mind the top bar inset as
+-- the HUD's does; measure from its corner anyway, as the shop does.
+local function boxIn(gui: ScreenGui, low: Vector2, high: Vector2): HudLayout.Rect
+	local scale = UITheme.Scale()
+	local a = (low - gui.AbsolutePosition) / scale
+	local b = (high - gui.AbsolutePosition) / scale
+	return { left = a.X, top = a.Y, right = b.X, bottom = b.Y }
+end
+
+local function rectIn(gui: ScreenGui, obj: GuiObject): HudLayout.Rect
+	return boxIn(gui, obj.AbsolutePosition, obj.AbsolutePosition + obj.AbsoluteSize)
+end
+
+-- Puts the toasts' lane clear of the corner and the left column, for
+-- their sizes right now (HudLayout.ToastLane).
+local function placeToasts()
+	laneQueued = false
+	local gui, stack, list, corner = hudGui, toastStack, toastList, shelf
+	if not gui or not stack or not list or not corner then
+		return
+	end
+	local screen = gui.AbsoluteSize / UITheme.Scale()
+	if screen.X <= 0 or screen.Y <= 0 then
+		return -- not laid out yet
+	end
+	local column = leftColumn
+	local columnRect = if column and column.Parent then rectIn(gui, column) else nil
+	-- Off a phone the column hangs under Roblox's chat window: keep the
+	-- toasts clear of that too. (On a phone the chat is a button whose
+	-- window opens over everything, and the column ignores it.)
+	local chatLow, chatHigh = UITheme.ChatBox()
+	if chatLow and chatHigh and not UITheme.IsPhone() then
+		local chat = boxIn(gui, chatLow, chatHigh)
+		columnRect = if columnRect
+			then {
+				left = math.min(columnRect.left, chat.left),
+				top = math.min(columnRect.top, chat.top),
+				right = math.max(columnRect.right, chat.right),
+				bottom = math.max(columnRect.bottom, chat.bottom),
+			}
+			else chat
+	end
+	local _, bottomMargin = UITheme.Margin()
+	local lane = HudLayout.ToastLane(
+		screen,
+		rectIn(gui, corner),
+		columnRect,
+		TOAST_WIDTH,
+		TOAST_LANE_MIN,
+		screen.Y - bottomMargin
+	)
+	toastWidth = lane.right - lane.left
+	maxToasts = lane.max
+	stack.Position = UDim2.fromOffset(lane.left, lane.top)
+	stack.Size = UDim2.fromOffset(toastWidth, 0)
+	list.HorizontalAlignment = if lane.under then Enum.HorizontalAlignment.Left else Enum.HorizontalAlignment.Center
+	while #toasts > maxToasts do
+		removeToast(toasts[#toasts])
+	end
+	for _, toast in ipairs(toasts) do
+		fitToast(toast)
+	end
+end
+
+-- Once per frame at most, however many things moved.
+local function queueToasts()
+	if not laneQueued then
+		laneQueued = true
+		task.defer(placeToasts)
+	end
+end
+
 -- The top-right row holding the cash plaque (LayoutOrder 10). Other
 -- controllers add small buttons to its left with lower LayoutOrders. It's
 -- drawn over the shop panel, which keeps clear of it.
@@ -270,7 +368,7 @@ function HUD.Toast(message: string)
 	if not stack then
 		return
 	end
-	while #toasts >= MAX_TOASTS do
+	while #toasts >= maxToasts do
 		removeToast(toasts[#toasts])
 	end
 	toastOrder += 1
@@ -278,7 +376,6 @@ function HUD.Toast(message: string)
 	card.outer.Name = "Toast"
 	card.outer.LayoutOrder = -toastOrder -- newest on top
 	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(280, math.huge)
 	limit.MinSize = Vector2.new(0, 34)
 	limit.Parent = card.outer
 	local stroke = UITheme.stroke(card.face, C.Bark, 2)
@@ -290,11 +387,17 @@ function HUD.Toast(message: string)
 	label.RichText = true
 	label.Text = richToast(message)
 	local labelLimit = Instance.new("UISizeConstraint")
-	labelLimit.MaxSize = Vector2.new(252, math.huge)
 	labelLimit.Parent = label
+	local toast: Toast = {
+		outer = card.outer,
+		face = card.face,
+		label = label,
+		stroke = stroke,
+		limit = limit,
+		labelLimit = labelLimit,
+	}
+	fitToast(toast)
 	card.outer.Parent = stack
-
-	local toast: Toast = { outer = card.outer, face = card.face, label = label, stroke = stroke }
 	table.insert(toasts, 1, toast)
 	restack()
 
@@ -428,6 +531,7 @@ local function refreshDevice()
 		layoutSide(side, device)
 	end
 	queueArrange()
+	queueToasts()
 end
 
 export type SideOptions = {
@@ -628,6 +732,7 @@ local function buildCorner(playerGui: Instance)
 	local function moved()
 		placePopups()
 		queueArrange()
+		queueToasts()
 	end
 	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(moved)
 	frame:GetPropertyChangedSignal("AbsolutePosition"):Connect(moved)
@@ -692,22 +797,33 @@ function HUD.Start()
 	buildCash(gui)
 	buildHint(gui)
 
+	-- The toasts' lane: top centre (the spec's y 44, under the top bar)
+	-- until placeToasts moves it clear of the corner and the left column.
 	local stack = Instance.new("Frame")
 	stack.Name = "Toasts"
-	stack.AnchorPoint = Vector2.new(0.5, 0)
-	stack.Position = UDim2.new(0.5, 0, 0, 8) -- the spec's y 44, under the top bar
-	stack.Size = UDim2.fromOffset(0, 0)
-	stack.AutomaticSize = Enum.AutomaticSize.XY
+	stack.Position = UDim2.new(0.5, -TOAST_WIDTH / 2, 0, 8)
+	stack.Size = UDim2.fromOffset(TOAST_WIDTH, 0)
+	stack.AutomaticSize = Enum.AutomaticSize.Y
 	stack.BackgroundTransparency = 1
 	local list = UITheme.list(stack, 6)
 	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	stack.Parent = gui
-	toastStack = stack
+	toastStack, toastList, hudGui = stack, list, gui
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueToasts)
 
 	buildLoading(gui)
 	gui.Parent = playerGui
 	buildCorner(playerGui)
 	buildSideColumn(playerGui)
+	-- The left column (the tracker) is made by the first controller that
+	-- puts something in it: keep the toasts clear of it from then on.
+	UITheme.WatchLeftColumn(function(column: Frame)
+		leftColumn = column
+		column:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueToasts)
+		column:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueToasts)
+		queueToasts()
+	end)
+	UITheme.WatchChat(queueToasts)
 	refreshDevice()
 	UserInputService.LastInputTypeChanged:Connect(refreshDevice)
 	UserInputService.InputBegan:Connect(onGamepad)
