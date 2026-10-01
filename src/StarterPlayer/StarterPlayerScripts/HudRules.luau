@@ -39,17 +39,6 @@ HudRules.ToastMinSeconds = 2.5 -- the shortest toast...
 HudRules.ToastMaxSeconds = 6 -- ...and the longest one, by its length
 HudRules.ConfirmToastSeconds = 6 -- a toast that asks for a second press (the server waits 6 s for it)
 
--- The tutorial step the pouch waits for (step ids never change: they're
--- save keys). Without it, the pouch shows from the start.
-local PLANT_STEP = (function(): number
-	for i, step in ipairs(TutorialData.Steps) do
-		if step.id == "plant" then
-			return i
-		end
-	end
-	return 1
-end)()
-
 -- `step` is the TutorialStep attribute as read (any type).
 function HudRules.TutorialRunning(step: unknown): boolean
 	return type(step) ~= "number" or step > 0
@@ -76,9 +65,9 @@ function HudRules.DailyLabel(done: number, total: number, streak: number, phone:
 end
 
 -- The Heartseed pouch: you hold `seeds`, and the tutorial has reached its
--- plant step (or is over).
+-- plant step (TutorialData.PlantStep, found by its id) or is over.
 function HudRules.Pouch(step: unknown, seeds: number): boolean
-	return seeds > 0 and type(step) == "number" and (step == 0 or step >= PLANT_STEP)
+	return seeds > 0 and type(step) == "number" and (step == 0 or step >= TutorialData.PlantStep)
 end
 
 -- "Send truck home": `onFoot` (you have a character and aren't driving),
