@@ -1,65 +1,96 @@
 --!strict
--- NPCService: the townsfolk (Murph, Millie at the sawmill, the shopkeepers,
--- the gondola operator): their models, where they stand and walk, and what
--- they say.
--- (First pass: just Murph, the blocky figure QuestUI needs. The characters
--- workstream replaces this with real rigs and more townsfolk.)
+-- NPCService: the townsfolk (Shared/NPCData; models from Art/CharacterArt).
+-- Init(mapFolder) runs once the whole world is built, so it can find the
+-- shop Counters, the sell zone and the gondola station to stand beside.
 --
--- Contract: a Persistent Model "Murph" under TimberlineMap with parts Head,
--- Beard, Beanie, Torso (PrimaryPart; QuestUI's Talk prompt goes on it),
--- LeftArm, RightArm (QuestUI's portrait clones them).
+--   * Murph: a Persistent Model "Murph" directly under TimberlineMap
+--     (QuestUI clones his Head, Beard, Beanie, Torso, LeftArm, RightArm
+--     for its portrait and puts its Talk prompt on his Torso).
+--   * Everyone else: Atomic models in a Folder "Townsfolk" under
+--     TimberlineMap (each streams in whole, so a client never sees half a
+--     person).
+--   * Every NPC model is tagged "NPC" with attributes NPCId (and, from
+--     CharacterArt, RootHeight). NPCController animates them on each
+--     client (breathing, blinking, looking at you, waving, speech bubbles).
+--   * Walkers: the server never moves them. They start at their route's
+--     first waypoint; attributes Route (NPCData.EncodeRoute), Speed and
+--     RouteOffset let every client place them from the shared server clock
+--     (NPCData.RouteState), so all players see the same stroll for free.
+--     Walkers don't collide (they'd shove players about); the others
+--     block like a person would.
+
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local CharacterArt = require(ReplicatedStorage.Shared.Art.CharacterArt)
+local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local NPCData = require(ReplicatedStorage.Shared.NPCData)
 
 local NPCService = {}
 
--- Where Murph stands: by his camp at the spawn, facing it.
-NPCService.MurphSpot = CFrame.lookAt(Vector3.new(-8, 0, 30), Vector3.new(0, 0, 40))
-
-local function buildMurph(map: Instance)
-	local murph = Instance.new("Model")
-	murph.Name = "Murph"
-	murph.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-	local base = NPCService.MurphSpot
-	local function limb(name: string, size: Vector3, offset: Vector3, color: Color3, material: Enum.Material?): Part
-		local p = Instance.new("Part")
-		p.Name = name
-		p.Size = size
-		p.CFrame = base * CFrame.new(offset)
-		p.Color = color
-		p.Material = material or Enum.Material.SmoothPlastic
-		p.Anchored = true
-		p.CanCollide = name == "Torso"
-		p.TopSurface = Enum.SurfaceType.Smooth
-		p.BottomSurface = Enum.SurfaceType.Smooth
-		p.Parent = murph
-		return p
+-- A part's CFrame and Size, looked up by model name (anywhere under the
+-- map) and part name (a direct child of that model).
+local function finder(map: Instance): (string, string) -> (CFrame?, Vector3?)
+	return function(modelName: string, partName: string): (CFrame?, Vector3?)
+		local model = map:FindFirstChild(modelName) or map:FindFirstChild(modelName, true)
+		local part = if model then model:FindFirstChild(partName) else nil
+		if part and part:IsA("BasePart") then
+			return part.CFrame, part.Size
+		end
+		return nil, nil
 	end
-	local skin, flannel, jeans = Color3.fromRGB(234, 184, 146), Color3.fromRGB(170, 40, 35), Color3.fromRGB(55, 70, 110)
-	limb("LeftLeg", Vector3.new(1, 2, 1), Vector3.new(-0.5, 1, 0), jeans)
-	limb("RightLeg", Vector3.new(1, 2, 1), Vector3.new(0.5, 1, 0), jeans)
-	local torso = limb("Torso", Vector3.new(2, 2, 1), Vector3.new(0, 3, 0), flannel, Enum.Material.Fabric)
-	limb("LeftArm", Vector3.new(1, 2, 1), Vector3.new(-1.5, 3, 0), flannel, Enum.Material.Fabric)
-	limb("RightArm", Vector3.new(1, 2, 1), Vector3.new(1.5, 3, 0), flannel, Enum.Material.Fabric)
-	limb("Head", Vector3.new(1.2, 1.2, 1.2), Vector3.new(0, 4.6, 0), skin)
-	limb(
-		"Beard",
-		Vector3.new(1.3, 0.9, 0.4),
-		Vector3.new(0, 4.25, -0.55),
-		Color3.fromRGB(110, 72, 40),
-		Enum.Material.Fabric
-	)
-	limb(
-		"Beanie",
-		Vector3.new(1.35, 0.55, 1.35),
-		Vector3.new(0, 5.4, 0),
-		Color3.fromRGB(120, 30, 30),
-		Enum.Material.Fabric
-	)
-	murph.PrimaryPart = torso
-	murph.Parent = map
+end
+
+local function build(npc: NPCData.NPC, find: (string, string) -> (CFrame?, Vector3?)): Model
+	local model = CharacterArt.Build(npc.look)
+	model.Name = npc.id
+	model:SetAttribute("NPCId", npc.id)
+	local spot = npc.spot
+	if spot.kind == "counter" or spot.kind == "beside" then
+		local partName = if spot.kind == "counter" then "Counter" else spot.part or ""
+		if not find(spot.model or "", partName) then
+			warn(
+				string.format(
+					"[NPCService] %s: no %s.%s, standing at the fallback spot",
+					npc.id,
+					spot.model or "?",
+					partName
+				)
+			)
+		end
+	end
+	Kit.placeAt(model, NPCData.SpotFor(npc, find))
+	local root = model.PrimaryPart
+	if npc.route and root then
+		model:SetAttribute("Route", NPCData.EncodeRoute(npc.route))
+		model:SetAttribute("Speed", npc.speed or 4)
+		model:SetAttribute("RouteOffset", NPCData.RouteOffset(npc.id))
+		root.CanCollide = false
+	end
+	CollectionService:AddTag(model, "NPC")
+	return model
 end
 
 function NPCService.Init(mapFolder: Instance)
-	buildMurph(mapFolder)
+	local find = finder(mapFolder)
+	local folder = Instance.new("Folder")
+	folder.Name = "Townsfolk"
+	folder.Parent = mapFolder
+	for _, npc in ipairs(NPCData.All()) do
+		local ok, err = pcall(function()
+			local model = build(npc, find)
+			if npc.id == "Murph" then
+				model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+				model.Parent = mapFolder
+			else
+				model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+				model.Parent = folder
+			end
+		end)
+		if not ok then
+			warn(string.format("[NPCService] couldn't build %s: %s", npc.id, tostring(err)))
+		end
+	end
 end
 
 return NPCService

@@ -24,8 +24,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
+local AxeArt = require(ReplicatedStorage.Shared.Art.AxeArt)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
@@ -35,8 +37,6 @@ type AxeItem = ProfileService.AxeItem
 type AxeDef = ItemCatalog.AxeDef
 
 local AxeService = {}
-
-local HANDLE_COLOR = Color3.fromRGB(122, 82, 48)
 
 type Dropped = { model: Model, owner: Player, item: AxeItem, temporary: boolean }
 
@@ -138,31 +138,9 @@ end
 -- Building axes (tool in hand, or lying in the world)
 ---------------------------------------------------------------------------
 
-local function buildParts(def: AxeDef): (Part, Part)
-	local handle = Instance.new("Part")
-	handle.Name = "Handle"
-	handle.Size = Vector3.new(0.5, 3, 0.5)
-	handle.Color = HANDLE_COLOR
-	handle.Material = Enum.Material.Wood
-	handle.CanCollide = false -- a colliding tool can trip or fling its holder
-	handle.Massless = true
-
-	local head = Instance.new("Part")
-	head.Name = "Head"
-	head.Size = Vector3.new(0.4, 1.2, 2)
-	head.Color = Color3.fromHex(def.look.headColor)
-	head.Material = Enum.Material:FromName(def.look.material) or Enum.Material.Metal
-	head.CanCollide = false
-	head.Massless = true
-	if def.look.glow then
-		local light = Instance.new("PointLight")
-		light.Color = head.Color
-		light.Brightness = 1.5
-		light.Range = 8
-		light.Parent = head
-	end
-	return handle, head
-end
+-- The models come from Shared/Art/AxeArt: a "Handle" (the haft) with the
+-- head and its details welded to it. In hand everything is massless and
+-- non-colliding (a colliding tool can trip or fling its holder).
 
 local function findTool(player: Player, uid: string): Tool?
 	local containers: { Instance } = {}
@@ -201,14 +179,13 @@ local function giveTool(player: Player, item: AxeItem): Tool?
 	tool.CanBeDropped = false -- dropping goes through Drop(), not Roblox's built-in drop
 	tool:SetAttribute("AxeId", def.id)
 	tool:SetAttribute("AxeUid", item.uid)
-	local handle, head = buildParts(def)
-	handle.Parent = tool
-	head.Position = Vector3.new(0, 1.8, 0)
-	head.Parent = tool
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = handle
-	weld.Part1 = head
-	weld.Parent = handle
+	-- The hand holds near the foot of the haft, the blade facing forward.
+	tool.Grip = AxeArt.Grip(def)
+	local art = AxeArt.Held(def)
+	for _, child in ipairs(art:GetChildren()) do
+		child.Parent = tool -- each part carries its own weld to the Handle
+	end
+	art:Destroy()
 	tool.Parent = backpack
 	return tool
 end
@@ -349,20 +326,12 @@ function AxeService.Drop(player: Player, uid: unknown)
 	local hit = workspace:Raycast(spot + Vector3.new(0, 4, 0), Vector3.new(0, -80, 0), params)
 	local groundY = if hit then hit.Position.Y else spot.Y - 3
 
-	-- Lying flat: the handle along the ground, the head beside it.
-	local model = Instance.new("Model")
+	-- Lying on its side on the ground, turned any which way. Its
+	-- PrimaryPart is the Handle (the prompt goes there).
+	local model = AxeArt.Dropped(def)
 	model.Name = "DroppedAxe"
-	local handle, head = buildParts(def)
-	handle.Anchored = true
-	head.Anchored = true
-	local base = CFrame.new(spot.X, groundY + 0.25, spot.Z)
-		* CFrame.Angles(0, math.random() * math.pi * 2, 0)
-		* CFrame.Angles(0, 0, math.rad(90))
-	handle.CFrame = base
-	head.CFrame = base * CFrame.new(0, 1.8, 0)
-	handle.Parent = model
-	head.Parent = model
-	model.PrimaryPart = handle
+	Kit.placeAt(model, CFrame.new(spot.X, groundY, spot.Z) * CFrame.Angles(0, math.random() * math.pi * 2, 0))
+	local handle = model.PrimaryPart :: BasePart
 	model:SetAttribute("AxeUid", uid)
 	model:SetAttribute("OwnerId", player.UserId)
 
