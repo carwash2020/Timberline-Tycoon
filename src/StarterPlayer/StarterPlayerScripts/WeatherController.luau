@@ -12,7 +12,9 @@
 --     crackles on the spot, then a jagged bolt from the sky, a flash of the
 --     whole scene, and thunder after a delay that grows with distance.
 --   * Clear nights over the Snowfields: an aurora (GAME_DESIGN §12).
---   * A rainbow when a shower has just passed by day.
+--   * A rainbow when a shower has just passed by day. (To see one in
+--     Studio without waiting for rain: on the server, by day, in clear
+--     weather, workspace:SetAttribute("RainbowTest", true).)
 -- Every emitter is toggled by Enabled and its Rate changed only a few
 -- times a second; nothing here allocates per frame.
 
@@ -657,6 +659,9 @@ local function rainbowLevel(env: LightingController.Environment): number
 	end
 	if env.weather ~= "Clear" and env.weather ~= "Cloudy" then
 		return 0
+	end
+	if workspace:GetAttribute("RainbowTest") == true then
+		return 1 -- a tester asked for one (see the header)
 	end
 	local slot = math.floor(env.serverTime / WeatherSchedule.SlotSeconds)
 	local before = WeatherSchedule.SlotKind(slot - 1)
