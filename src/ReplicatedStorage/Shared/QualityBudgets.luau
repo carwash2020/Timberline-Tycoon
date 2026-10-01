@@ -21,6 +21,7 @@ export type Budget = {
 	-- AmbientLife: ground decoration and critters
 	MaxDecor: number, -- live decoration models, all cells together (see Low)
 	DecorLoadRadius: number, -- studs: decoration cells load within this
+	DecorUnloadRadius: number, -- studs: and unload past this (see Low)
 	MaxCritters: number, -- animated critter models near the player
 	-- WindSway (PLAY-04)
 	SwayParts: number, -- canopy parts moved per frame, all trees together
@@ -40,6 +41,7 @@ QualityBudgets.High = table.freeze({
 	Tier = "high" :: Tier,
 	MaxDecor = 420,
 	DecorLoadRadius = 200,
+	DecorUnloadRadius = 260,
 	MaxCritters = 16,
 	SwayParts = 900,
 	SwayTrees = 32,
@@ -57,10 +59,22 @@ QualityBudgets.High = table.freeze({
 -- cloud), the Skyroot's 2 mote clouds (always there) and up to 2 fish
 -- splashes (each lives 1.2 s; a leap takes 0.95 s). So low's decoration
 -- gets 160 - 8 - 2 - 2 = 148. tests/QualityBudgets.spec.luau checks the sum.
+-- AmbientLife never evicts a loaded cell for a nearer one: a cell stays
+-- until it is DecorUnloadRadius away, and once MaxDecor is reached nothing
+-- new loads. So the cells inside DecorUnloadRadius must roughly fit
+-- MaxDecor, or the cap fills with cells behind you while the ground beside
+-- you stays bare. The Hills and the Phantom Grove hold about 12 models a
+-- 64-stud cell, so 148 roughly covers the 13 cells within 130 studs, but
+-- not the 52 within 260 (high's unload radius) or the 15 within 140 (the
+-- load radius PLAY-05 first asked for). Cells load within 110, and the 20
+-- studs between that and 130 keep an edge cell from loading and unloading
+-- as you sway while chopping. tests/QualityBudgets.spec.luau walks the
+-- Hills, the Grove, the Snowfields and the Starter Forest on both tiers.
 QualityBudgets.Low = table.freeze({
 	Tier = "low" :: Tier,
 	MaxDecor = 148,
-	DecorLoadRadius = 140,
+	DecorLoadRadius = 110,
+	DecorUnloadRadius = 130,
 	MaxCritters = 8,
 	SwayParts = 400,
 	SwayTrees = 16,

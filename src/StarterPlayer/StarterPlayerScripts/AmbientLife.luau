@@ -85,10 +85,10 @@ end
 ---------------------------------------------------------------------------
 
 local CELL = EnvironmentData.DecorCell
--- Cells load within Quality.Budget().DecorLoadRadius (200 studs, 140 on low
--- quality), and at most Quality.Budget().MaxDecor live decoration models
--- (420, 148 on low), all cells together. Shared/QualityBudgets.
-local UNLOAD_RADIUS = 260
+-- Cells load within Quality.Budget().DecorLoadRadius (200 studs, 110 on low
+-- quality) and unload past DecorUnloadRadius (260, 130 on low), with at
+-- most Quality.Budget().MaxDecor live decoration models (420, 148 on low),
+-- all cells together. Shared/QualityBudgets.
 local TREE_CLEARANCE = 4
 local CELLS_PER_FRAME = 2
 local SCAN_EVERY = 0.4
@@ -359,10 +359,11 @@ local function scanCells(focus: Vector3)
 		table.insert(loadQueue, { cx = w.cx, cz = w.cz, key = w.key })
 	end
 	-- Far cells (or the ground far below the isles) go back to the pools.
+	local unloadRadius = Quality.Budget().DecorUnloadRadius
 	for key, cell in pairs(cells) do
 		local mx, mz = (cell.cx + 0.5) * CELL, (cell.cz + 0.5) * CELL
 		local d = math.sqrt((mx - fx) ^ 2 + (mz - fz) ^ 2)
-		if d > UNLOAD_RADIUS or math.abs(focus.Y - cellGround(cell.cx, cell.cz, key)) > 200 then
+		if d > unloadRadius or math.abs(focus.Y - cellGround(cell.cx, cell.cz, key)) > 200 then
 			unloadCell(cell)
 		end
 	end
