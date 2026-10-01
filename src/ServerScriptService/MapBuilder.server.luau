@@ -143,7 +143,7 @@ step("4. The town", function()
 		local spawn = Instance.new("SpawnLocation")
 		spawn.Name = "SpawnLocation"
 		spawn.Size = Vector3.new(6, 1, 6)
-		spawn.CFrame = CFrame.new(town.spawn)
+		spawn.CFrame = town.spawnFacing -- players spawn facing the sawmill
 		spawn.Anchored = true
 		spawn.Neutral = true
 		spawn.Duration = 0 -- no force field bubble

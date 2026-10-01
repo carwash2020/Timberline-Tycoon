@@ -307,6 +307,7 @@ export type ShopSpot = { kind: string, title: string, accent: Color3, cframe: CF
 
 export type Town = {
 	spawn: Vector3,
+	spawnFacing: CFrame, -- the SpawnLocation's CFrame: at `spawn`, its front toward the sawmill
 	sawmill: CFrame,
 	sellZone: CFrame, -- centre of the 24 x 12 x 18 sell volume
 	sellPad: CFrame,
@@ -441,8 +442,16 @@ function WorldPlan.Town(): Town
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
 	}
 
+	-- A character spawns facing its SpawnLocation's front (LookVector), so
+	-- turn the pad's front (-Z) half a turn to +Z: the sawmill is due north
+	-- of the spawn, framed by the walk's two lamps. (Angles, not
+	-- CFrame.lookAt: Lune gets lookAt wrong, and Shared code runs there.)
+	local spawn = Vector3.new(0, 0.5, 40)
+	local spawnFacing = CFrame.new(spawn) * CFrame.Angles(0, math.pi, 0)
+
 	return {
-		spawn = Vector3.new(0, 0.5, 40),
+		spawn = spawn,
+		spawnFacing = spawnFacing,
 		sawmill = CFrame.new(mill) * FACING_SOUTH,
 		sellZone = CFrame.new(mill.X, 6, mill.Z - 24),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),

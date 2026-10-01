@@ -134,6 +134,22 @@ return function(t)
 		t.ok(spawn >= ROAD_MARGIN, string.format("the spawn is %.2f studs off a road", spawn))
 	end)
 
+	t.test("the spawn faces the sawmill (TWN-03)", function()
+		local cf = town.spawnFacing
+		t.ok((cf.Position - town.spawn).Magnitude < 1e-4, "spawnFacing stands at town.spawn")
+		t.ok(cf.UpVector.Y > 0.99999, "the spawn pad lies flat")
+		-- A character spawns facing the pad's LookVector.
+		local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z).Unit
+		local mill = town.sawmill.Position
+		local toMill = Vector3.new(mill.X - town.spawn.X, 0, mill.Z - town.spawn.Z).Unit
+		local degrees = math.deg(math.acos(math.clamp(look:Dot(toMill), -1, 1)))
+		t.ok(degrees <= 15, string.format("the spawn looks %.1f degrees off the sawmill", degrees))
+		-- And the sell pad, between the walk's two lamps, is straight ahead.
+		local pad = town.sellPad.Position
+		local toPad = Vector3.new(pad.X - town.spawn.X, 0, pad.Z - town.spawn.Z).Unit
+		t.ok(look:Dot(toPad) > math.cos(math.rad(15)), "the sell pad is ahead of the spawn")
+	end)
+
 	t.test("Murph stands in front of his camp, where NPCData puts him", function()
 		local spot = NPCData.Get("Murph").spot
 		local front = (town.campsite * CFrame.new(0, 0, -3)).Position

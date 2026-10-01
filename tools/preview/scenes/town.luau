@@ -43,7 +43,7 @@ return {
 			root,
 			"SpawnLocation",
 			V3.new(6, 1, 6),
-			CF.new(town.spawn),
+			town.spawnFacing,
 			C3.fromRGB(168, 152, 128),
 			Enum.Material.Cobblestone
 		)

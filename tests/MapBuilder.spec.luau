@@ -151,6 +151,15 @@ return function(t)
 		t.ok(s.treeBeforeSellArea, "every tree spawns before SellArea goes in")
 		t.ok(s.baseplate.Parent == nil and s.templateSpawn.Parent == nil, "the template's Baseplate and spawn go")
 		t.ok(s.map:FindFirstChild("SpawnLocation"), "our spawn is built")
+		-- TWN-03: the pad is turned to WorldPlan's spawnFacing (toward the
+		-- sawmill), keeping its size, place and Neutral.
+		local spawn = s.map:FindFirstChild("SpawnLocation")
+		local facing = t.load("ReplicatedStorage/Shared/World/WorldPlan").Town().spawnFacing
+		t.ok((spawn.CFrame.Position - facing.Position).Magnitude < 1e-4, "the spawn pad stays at town.spawn")
+		t.ok(spawn.CFrame.LookVector:Dot(facing.LookVector) > 0.99999, "the spawn pad faces spawnFacing's way")
+		t.ok(spawn.CFrame.UpVector.Y > 0.99999, "the spawn pad lies flat")
+		t.ok(spawn.Size == roblox.Vector3.new(6, 1, 6), "the spawn pad stays 6 x 1 x 6")
+		t.eq(spawn.Neutral, true)
 	end)
 
 	t.test("the build line has the shape WLD-03 and the checklist read, and the stats are published", function()
