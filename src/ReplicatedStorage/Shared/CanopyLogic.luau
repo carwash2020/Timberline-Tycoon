@@ -16,8 +16,9 @@
 --     it's been out of the way for Hold seconds it eases back to 0 over
 --     FadeOutTime.
 --   * Who owns a part's LocalTransparencyModifier (Owns): CanopyFade only
---     writes a part that is still where it left it, or at 0. Anything else
---     (TreeFX's felled fade to 1) belongs to someone else.
+--     writes a part that is still where it left it, or at 0 (not while it
+--     lets a felled or falling tree go). Anything else (TreeFX's felled
+--     fade to 1) belongs to someone else.
 
 local CanopyLogic = {}
 
@@ -110,9 +111,14 @@ end
 
 -- Whether CanopyFade may write a part whose LocalTransparencyModifier is
 -- `current`, having last written `written` to it: only if it's still
--- there, or at 0 (nobody has faded it).
-function CanopyLogic.Owns(current: number, written: number): boolean
-	return math.abs(current - written) <= CanopyLogic.Slack or math.abs(current) <= CanopyLogic.Slack
+-- there, or at 0 (nobody has faded it). `letting` (a tree easing back as
+-- TreeFX takes it over, felled or falling) drops the "at 0" case:
+-- TreeFX's own fade starts from 0, and is never written over.
+function CanopyLogic.Owns(current: number, written: number, letting: boolean?): boolean
+	if math.abs(current - written) <= CanopyLogic.Slack then
+		return true
+	end
+	return not letting and math.abs(current) <= CanopyLogic.Slack
 end
 
 return CanopyLogic

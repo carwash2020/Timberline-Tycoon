@@ -11,7 +11,9 @@
 --   * The ray loop finds each tree once, keeps only canopy hits, and stops
 --     when the way is clear or after six rays.
 --   * The fade: in the way it reaches 0.7 in 0.1 s; 0.3 s after its last
---     hit it eases back to 0; and a part someone else set is never owned.
+--     hit it eases back to 0; and a part someone else set is never owned
+--     (letting a felled tree go, not even one at 0: TreeFX's fade starts
+--     there), with the ease back done before TreeFX's fade begins.
 return function(t)
 	local roblox = t.roblox
 	local Vector3, Instance = roblox.Vector3, roblox.Instance
@@ -228,5 +230,24 @@ return function(t)
 		t.eq(CanopyLogic.Owns(1, 0.7), false) -- TreeFX's felled fade
 		t.eq(CanopyLogic.Owns(1, 0), false)
 		t.eq(CanopyLogic.Owns(0.4, 0.7), false)
+	end)
+
+	t.test("letting a felled tree go, a part at 0 is TreeFX's (its fade starts there)", function()
+		t.eq(CanopyLogic.Owns(0.3, 0.3, true), true, "still where it was left: still ours to ease back")
+		t.eq(CanopyLogic.Owns(0.29999998, 0.3, true), true)
+		t.eq(CanopyLogic.Owns(0.0004, 0.3, true), false, "TreeFX's first fade frame")
+		t.eq(CanopyLogic.Owns(0, 0.3, true), false)
+		t.eq(CanopyLogic.Owns(0.06, 0.3, true), false)
+		t.eq(CanopyLogic.Owns(0, 0, true), true, "nothing faded, nothing taken")
+		t.eq(CanopyLogic.Owns(0, 0.3, false), true, "otherwise 0 is free, as before")
+	end)
+
+	t.test("easing back takes at most FadeOutTime, well before TreeFX's felled fade", function()
+		-- CanopyFade lets a felled tree's canopy ease back from Fade over
+		-- FadeOutTime; TreeFX starts fading the fallen tree at FellFadeStart.
+		t.ok(
+			CanopyLogic.FadeOutTime + CanopyLogic.Every < TreeLogic.FellFadeStart,
+			"the ease is done before TreeFX's fade begins"
+		)
 	end)
 end
