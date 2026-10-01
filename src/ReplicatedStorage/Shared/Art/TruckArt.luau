@@ -884,9 +884,10 @@ builders.flatbed = function(c: Ctx)
 		deco(m, "Mirror", V3(0.15, 0.8, 0.45), CF(side * (W / 2 + 0.2), 3.9, f + 3.7), BLACK, M.Metal)
 	end
 
-	-- Cab (its roof 4 studs over the seat: room for a driver in a hat) and
-	-- roof beacon; the stack stands clear of the roof.
-	local cabTop = 6.2
+	-- Cab (its roof 4.4 studs over the seat: room for a driver in a hat,
+	-- and a clear step up from the Pickup's roof, ACT-07) and roof beacon;
+	-- the stack stands clear of the roof.
+	local cabTop = 6.6
 	boxCab(m, W, f + 4.6, 2.3, 1.65, 3.25, cabTop, paint, BLACK, hex("#EEEBE3"))
 	deco(m, "Beacon", V3(0.8, 0.32, 0.4), CF(0, cabTop + 0.48, f + 4.4), AMBER, M.Neon)
 	driverSeat(m, V3(2.4, 0.5, 1.3), CF(0, 1.95, f + 4.65), hex("#4A4440"), M.Fabric)
@@ -945,6 +946,7 @@ builders.flatbed = function(c: Ctx)
 		{ rim = rimColor, hub = BLACK, steer = true, rear = false },
 		{ rim = rimColor, steer = false, rear = true }
 	)
+	gloss(m, paint, 0.03) -- fresh enamel, a step under the Rig's shine
 end
 
 -- The Logging Rig: chrome everywhere, built to haul a forest.
@@ -998,8 +1000,8 @@ builders.rig = function(c: Ctx)
 		exhaust(
 			m,
 			V3(side * (W / 2 + 0.25), 2.1, f + 6.75),
-			V3(side * (W / 2 + 0.25), 8.0, f + 6.75),
-			0.42,
+			V3(side * (W / 2 + 0.25), 9.4, f + 6.75), -- tall chrome stacks, well over the roof
+			0.46,
 			CHROME_HI,
 			M.Foil,
 			0.2,
@@ -1008,9 +1010,10 @@ builders.rig = function(c: Ctx)
 		deco(m, "Mirror", V3(0.15, 0.95, 0.45), CF(side * (W / 2 + 0.22), 4.9, f + 4.75), CHROME_HI, M.Foil)
 	end
 
-	-- A tall day cab (its roof 4 studs over the seat: room for a driver in
-	-- a hat): roof markers, sun visor.
-	local cabTop = 7.0
+	-- A tall day cab (its roof 4.4 studs over the seat: room for a driver
+	-- in a hat, and the tallest roof on the lot, ACT-07): roof markers, sun
+	-- visor.
+	local cabTop = 7.4
 	boxCab(m, W, f + 5.8, 2.4, 1.9, 4.0, cabTop, paint, paint, paint)
 	deco(
 		m,

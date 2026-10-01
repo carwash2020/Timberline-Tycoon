@@ -186,7 +186,7 @@ ItemCatalog.Trucks = {
 		priceCash = 6000,
 		topSpeed = 26,
 		turnRate = 1.2,
-		look = { color = "#D9A21B", width = 5, bedLength = 12, bedWalls = false },
+		look = { color = "#E3AE2A", width = 5, bedLength = 12, bedWalls = false },
 	},
 	LoggingRig = {
 		id = "LoggingRig",

@@ -80,12 +80,15 @@ local STYLES: { [Style]: StyleSpec } = {
 	},
 	rig = {
 		cabLength = 7,
-		wheelRadius = 1.2,
+		wheelRadius = 1.4, -- the biggest wheels: the top of the ladder (ACT-07)
 		tyreWidth = 0.9,
 		frontAxle = 2.2,
-		rearAxle = 2.1,
-		tandemGap = 2.7,
-		bedFloorY = 2.75, -- a raised deck, clear of the big wheels
+		-- Wide enough apart for the big tyres, and the tandem's middle (the
+		-- axle it turns about, DriveAxleZ) where it was: 2.0 + 2.9 / 2 =
+		-- 2.1 + 2.7 / 2, so the wheelbase and turning circle don't change.
+		rearAxle = 2,
+		tandemGap = 2.9,
+		bedFloorY = 3.05, -- a raised deck, its underside clear of the big wheels' tops
 	},
 }
 

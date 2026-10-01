@@ -548,6 +548,68 @@ return function(t)
 		end
 	end)
 
+	-- ACT-07: side by side the trucks climb: each roof (the Rustbucket has
+	-- none: its windshield top) over the last; the Rig's chrome stacks stand
+	-- well over its roof; the Flatbed's paint shines (a little less than
+	-- the Rig's) and the Rustbucket's is matte on purpose.
+	t.test("the ladder: Rustbucket < Pickup < Flatbed < Rig; the Flatbed shines, the Rustbucket doesn't", function()
+		local function top(model, name)
+			local y = -math.huge
+			for _, p in ipairs(named(model, name)) do
+				local _, hi = box(p)
+				y = math.max(y, hi.Y)
+			end
+			return y
+		end
+		local models = {}
+		for _, id in ipairs({ "Rustbucket", "Pickup", "Flatbed", "LoggingRig" }) do
+			models[id] = build({ def = ItemCatalog.GetTruck(id) })
+		end
+		local heights = {
+			top(models.Rustbucket, "WindshieldTop"),
+			top(models.Pickup, "Roof"),
+			top(models.Flatbed, "Roof"),
+			top(models.LoggingRig, "Roof"),
+		}
+		for i = 2, #heights do
+			t.ok(
+				heights[i] >= heights[i - 1] + 0.4,
+				string.format(
+					"roof %d (%.2f) is a clear step over roof %d (%.2f)",
+					i,
+					heights[i],
+					i - 1,
+					heights[i - 1]
+				)
+			)
+		end
+		t.ok(top(models.LoggingRig, "Exhaust") >= heights[4] + 1, "the Rig's stacks stand well over its roof")
+
+		local function shine(id)
+			local def = ItemCatalog.GetTruck(id)
+			local paint = t.roblox.Color3.fromHex(def.look.color)
+			local n, lo, hi = 0, math.huge, -math.huge
+			for _, p in ipairs(parts(models[id])) do
+				if p.Color == paint then
+					n += 1
+					lo = math.min(lo, p.Reflectance)
+					hi = math.max(hi, p.Reflectance)
+					if p.Reflectance > 0 then
+						t.eq(p.Material.Name, "SmoothPlastic", id .. " " .. p.Name .. " glossy paint is SmoothPlastic")
+					end
+				end
+			end
+			t.ok(n >= 4, id .. " has painted parts")
+			return lo, hi
+		end
+		local flatLo, flatHi = shine("Flatbed")
+		local rigLo = shine("LoggingRig")
+		local _, rustHi = shine("Rustbucket")
+		t.ok(flatLo > 0, "every painted Flatbed part shines")
+		t.ok(flatHi < rigLo, "the Rig gleams more than the Flatbed")
+		t.eq(rustHi, 0, "the Rustbucket stays matte")
+	end)
+
 	t.test("Rig makes one rigid body: chassis anchored, wheels on Motor6Ds", function()
 		for _, rig in ipairs(rigs()) do
 			local model = build(rig)
