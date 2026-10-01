@@ -100,6 +100,10 @@ export type Profile = {
 	heartseeds: { [string]: number }, -- Heartseeds by wood id (ForestService)
 	forest: ForestState,
 	truckBed: { BedLog }, -- what's in your truck bed (VehicleService)
+	-- Where your truck was when its bed last changed or it last moved (x, y,
+	-- z; {} until known): on a rejoin the bed only comes back into the truck
+	-- if that was in town, else it waits there on the ground (VehicleService).
+	truckAt: { x: number?, y: number?, z: number? },
 	settings: { music: boolean, sfx: boolean },
 	pendingCash: number, -- Robux cash that didn't fit under the wallet cap, paid out as room frees up
 }
@@ -139,6 +143,7 @@ local TEMPLATE: Profile = {
 	heartseeds = {},
 	forest = { planted = 0, harvested = 0, royalties = 0, figures = {}, elders = 0 },
 	truckBed = {},
+	truckAt = {},
 	settings = { music = true, sfx = true },
 	pendingCash = 0,
 }

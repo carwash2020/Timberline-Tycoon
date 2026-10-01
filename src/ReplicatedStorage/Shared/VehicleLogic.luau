@@ -1,14 +1,19 @@
 --!strict
 -- VehicleLogic: the rules behind trucks that don't need Roblox running, so
 -- they can be tested (tests/VehicleLogic.spec.luau):
---   * the anti-exploit speed check (VehicleService), tolerant of network
---     stalls: a move is judged against the time since the last ACCEPTED
---     position, and a truck that hasn't moved keeps that clock running;
+--   * the anti-exploit speed check (VehicleService), tolerant of short
+--     network stalls: a move is judged against the time since the last
+--     ACCEPTED position, and a truck that hasn't moved keeps that clock
+--     running (for at most MaxJudgeSeconds);
 --   * which way is up under a truck, from four corner ground rays, never
 --     tilted past a limit (VehicleController, and parking on exit);
---   * the truck's target orientation (Heading), NaN-proof;
+--   * the truck's target orientation (Heading), NaN-proof, and where a
+--     tipped or airborne truck is set down (on the ground, nothing sunk in);
 --   * overflow parking spots that stay put across rebuilds;
---   * a saved truck bed, cleaned and copied (profile.truckBed);
+--   * a saved truck bed, cleaned and copied (profile.truckBed), where the
+--     truck was (profile.truckAt), whether that was in town (a load only
+--     rides along on a rebuild or a rejoin from there), and how a load left
+--     behind is laid on the ground;
 --   * wheel spin, steering, brake lights and dust (VehicleFX).
 -- Uses only datatypes (no services). CFrames are built with fromMatrix,
 -- never lookAt, so Roblox and the Lune tests agree.
@@ -21,7 +26,12 @@ local VehicleLogic = {}
 
 VehicleLogic.SpeedSlack = 1.5 -- a truck may cover this many times its top speed (bumps, physics)
 VehicleLogic.SlackStuds = 8 -- plus this much
-VehicleLogic.MaxJudgeSeconds = 8 -- longer gaps count as this long (a parked truck doesn't bank distance)
+-- Longer gaps count as this long, so a truck that sat still (parked with
+-- its driver in it, or a stalled connection) never banks more than about
+-- 86 studs of allowance at 26 studs/s. A stall longer than this puts the
+-- truck back where it was last accepted: an honest driver loses a couple
+-- of seconds of driving, an exploiter can't hop across the map.
+VehicleLogic.MaxJudgeSeconds = 2
 VehicleLogic.StillStuds = 0.05 -- closer than this counts as not moved at all
 VehicleLogic.ClimbShare = 0.75 -- the steepest climb, as a share of top speed
 VehicleLogic.Gravity = 196.2 -- studs/s², Roblox's default
@@ -170,6 +180,61 @@ function VehicleLogic.ParkedCFrame(
 	return VehicleLogic.HeadingCFrame(facing, up) + (ground + up * clearance)
 end
 
+-- Ground-ray points under a whole rig, truck-local (front is -Z): the four
+-- corners of the box `width` wide from z = `front` to z = `rear` (the
+-- trailer's back when one is hitched), just inside, in CornerOffsets
+-- order; then both sides halfway along.
+function VehicleLogic.RigCorners(width: number, front: number, rear: number): { Vector3 }
+	local mid = (front + rear) / 2
+	local out: { Vector3 } = {}
+	for _, c in ipairs(VehicleLogic.CornerOffsets(width, rear - front)) do
+		table.insert(out, c + Vector3.new(0, 0, mid))
+	end
+	local x = out[2].X
+	table.insert(out, Vector3.new(-x, 0, mid))
+	table.insert(out, Vector3.new(x, 0, mid))
+	return out
+end
+
+-- Where a tipped or airborne truck is set down: facing `facing`, tilted to
+-- `up` (at most `maxTilt`), its pivot over `at` (X and Z) with the chassis
+-- `clearance` above the ground, then lifted until no point of `corners`
+-- (truck-local, chassis level, as RigCorners) is below the ground hit
+-- under it (`hits`, in the same order; nil where a ray missed). So it
+-- rests on the highest ground under it and nothing sinks into a slope.
+-- Nil when no ray hit anything.
+function VehicleLogic.RestingCFrame(
+	at: Vector3,
+	up: Vector3,
+	facing: Vector3,
+	clearance: number,
+	maxTilt: number,
+	corners: { Vector3 },
+	hits: { Vector3? }
+): CFrame?
+	local lowest = math.huge
+	for i = 1, #corners do
+		local hit = hits[i]
+		if hit and finite(hit) then
+			lowest = math.min(lowest, hit.Y)
+		end
+	end
+	if lowest == math.huge then
+		return nil
+	end
+	local u = VehicleLogic.ClampTilt(up, maxTilt)
+	local cf = VehicleLogic.HeadingCFrame(facing, u) + (Vector3.new(at.X, lowest, at.Z) + u * clearance)
+	local lift = 0
+	for i, c in ipairs(corners) do
+		local hit = hits[i]
+		if hit and finite(hit) then
+			local wheel = cf * (c - Vector3.new(0, clearance, 0)) -- the corner at ground level
+			lift = math.max(lift, hit.Y - wheel.Y)
+		end
+	end
+	return cf + Vector3.new(0, lift, 0)
+end
+
 ---------------------------------------------------------------------------
 -- Overflow parking
 ---------------------------------------------------------------------------
@@ -232,6 +297,83 @@ function VehicleLogic.CleanBed(saved: unknown, isWood: (string) -> boolean, capa
 		end
 	end
 	return out, dropped
+end
+
+-- What a bed's logs are worth together (before any sale multiplier).
+function VehicleLogic.BedValue(bed: { BedEntry }): number
+	local total = 0
+	for _, e in ipairs(bed) do
+		total += e.value
+	end
+	return total
+end
+
+---------------------------------------------------------------------------
+-- Where the truck is (profile.truckAt), and loads left behind
+---------------------------------------------------------------------------
+
+-- A load rides along when the truck is rebuilt (Truck to lot, switching
+-- trucks) or on a rejoin only from within this many studs (flat) of town:
+-- the parking lot or the sell pad. From further out it's left on the
+-- ground where the truck stood, so nobody skips the haul home.
+VehicleLogic.TownRadius = 150
+VehicleLogic.MaxCoord = 100000 -- a saved spot further out than this is junk
+VehicleLogic.SpillPerRow = 3 -- logs left behind lie this many end to end across the truck's line
+
+-- Distance between two points, ignoring height.
+function VehicleLogic.FlatDistance(a: Vector3, b: Vector3): number
+	local dx, dz = a.X - b.X, a.Z - b.Z
+	return math.sqrt(dx * dx + dz * dz)
+end
+
+-- True when `at` is within `radius` (flat) of any of `spots`.
+function VehicleLogic.NearAny(at: Vector3, spots: { Vector3 }, radius: number): boolean
+	for _, spot in ipairs(spots) do
+		if VehicleLogic.FlatDistance(at, spot) <= radius then
+			return true
+		end
+	end
+	return false
+end
+
+-- A truck position as profile.truckAt saves it ({} = not known yet).
+export type SavedSpot = { x: number?, y: number?, z: number? }
+
+function VehicleLogic.SaveSpot(at: Vector3): SavedSpot
+	return { x = at.X, y = at.Y, z = at.Z }
+end
+
+local function sane(n: unknown): boolean
+	return type(n) == "number" and n == n and math.abs(n) <= VehicleLogic.MaxCoord
+end
+
+-- A saved truck position made safe to use: a finite point inside the map,
+-- or nil (never saved, or junk).
+function VehicleLogic.CleanSpot(saved: unknown): Vector3?
+	if type(saved) ~= "table" then
+		return nil
+	end
+	local raw = saved :: { [string]: any }
+	if not (sane(raw.x) and sane(raw.y) and sane(raw.z)) then
+		return nil
+	end
+	return Vector3.new(raw.x, raw.y, raw.z)
+end
+
+-- Where `count` logs left behind lie, in the truck's flat frame (front is
+-- -Z, the pile centred where it stood): rows of SpillPerRow logs lying
+-- across its line (a log's axis is its X), end to end with a gap, the
+-- rows side by side down its length.
+function VehicleLogic.SpillSpots(count: number, logLength: number, logDiameter: number): { Vector3 }
+	local per = VehicleLogic.SpillPerRow
+	local rows = math.ceil(count / per)
+	local across, along = logLength + 0.5, logDiameter + 0.3
+	local out: { Vector3 } = table.create(count)
+	for i = 1, count do
+		local row, col = (i - 1) // per, (i - 1) % per
+		out[i] = Vector3.new((col - (per - 1) / 2) * across, 0, (row - (rows - 1) / 2) * along)
+	end
+	return out
 end
 
 ---------------------------------------------------------------------------

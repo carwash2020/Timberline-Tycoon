@@ -411,10 +411,11 @@ local function onSellLogs(player: Player)
 		end
 	end
 	table.clear(hands)
-	-- The truck bed only sells if the truck is actually at the mill.
-	local truck = VehicleService.GetVehicle(player)
-	local truckPP = if truck then truck.PrimaryPart else nil
-	if truckPP and flatDistance(truckPP.Position, sellZone.Position) <= GameConfig.SellTruckRange then
+	-- The truck bed only sells if the truck is actually at the mill: where
+	-- the server vouches it is, judged right now (its driver's device moves
+	-- it, and could have teleported it onto the pad a moment ago).
+	local truckAt = VehicleService.TrustedTruckPosition(player)
+	if truckAt and flatDistance(truckAt, sellZone.Position) <= GameConfig.SellTruckRange then
 		for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
 			total += entry.value
 			count += 1
@@ -448,6 +449,26 @@ local function onInstantDelivery(player: Player)
 	end
 	local profile = ProfileService.GetProfile(player)
 	if not profile or VehicleService.GetBedCount(player) == 0 then
+		return
+	end
+	-- A load the wallet cap would eat (some or all of it) isn't worth a
+	-- paid use: say so before one is spent.
+	local worth = math.floor(VehicleService.GetBedValue(player) * MonetizationService.SaleMultiplier(player))
+	local room = GameConfig.CashCap - profile.cash
+	if worth > room then
+		notify(
+			player,
+			if room <= 0
+				then string.format(
+					"Your wallet is full (%s). Spend some before using Instant Delivery.",
+					Util.formatCash(GameConfig.CashCap)
+				)
+				else string.format(
+					"This load is worth %s but your wallet only has room for %s. Spend some before using Instant Delivery.",
+					Util.formatCash(worth),
+					Util.formatCash(room)
+				)
+		)
 		return
 	end
 	if not MonetizationService.UseInstantDelivery(player) then

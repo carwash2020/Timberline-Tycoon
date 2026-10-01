@@ -1,7 +1,8 @@
 --!nocheck
 -- Truck rules: the stall-tolerant speed check, ground tilt from four
--- corner rays, NaN-proof headings, parking, overflow spots, the saved bed,
--- and the looks VehicleFX drives (spin, steer, brake lights, dust).
+-- corner rays, NaN-proof headings, parking (and setting a tipped truck
+-- down), overflow spots, the saved bed and truck spot, loads left out of
+-- town, and the looks VehicleFX drives (spin, steer, brake lights, dust).
 return function(t)
 	local VehicleLogic = t.shared("VehicleLogic")
 	local Vector3, CFrame = t.roblox.Vector3, t.roblox.CFrame
@@ -24,9 +25,9 @@ return function(t)
 		t.eq(VehicleLogic.JudgeMove(from, Vector3.new(0 / 0, 3, 0), 0.5, 26), "tooFar", "NaN")
 	end)
 
-	t.test("speed check: a network stall doesn't rubber-band the truck", function()
-		-- The driver's packets stop for 3 s (the server sees the truck stand
-		-- still), then it arrives where it really drove: 26 studs/s x 3.5 s.
+	t.test("speed check: a short network stall doesn't rubber-band the truck", function()
+		-- The driver's packets stop for 1.5 s (the server sees the truck
+		-- stand still), then it arrives where it really drove: 26 studs/s x 2 s.
 		local accepted, acceptedAt = Vector3.new(0, 3, 0), 0
 		local now = 0
 		local function check(pos)
@@ -37,18 +38,35 @@ return function(t)
 			end
 			return verdict
 		end
-		for _ = 1, 6 do
+		for _ = 1, 3 do
 			t.eq(check(accepted), "still") -- stalled: the clock keeps running
 		end
-		t.eq(check(Vector3.new(0, 3, -26 * 3.5)), "ok")
+		t.eq(check(Vector3.new(0, 3, -26 * 2)), "ok")
 		-- The old rule (time since the last check, 0.5 s) would have refused it:
-		t.ok(26 * 3.5 > 26 * 0.5 * VehicleLogic.SpeedSlack + VehicleLogic.SlackStuds)
+		t.ok(26 * 2 > 26 * 0.5 * VehicleLogic.SpeedSlack + VehicleLogic.SlackStuds)
 	end)
 
 	t.test("speed check: a long-parked truck doesn't bank distance", function()
 		local from = Vector3.new(0, 3, 0)
 		t.eq(VehicleLogic.JudgeMove(from, from + Vector3.new(500, 0, 0), 60, 26), "tooFar")
 		t.eq(VehicleLogic.JudgeMove(from, from + Vector3.new(5, 0, 0), 60, 26), "ok")
+	end)
+
+	t.test("speed check: sitting still in the truck banks at most MaxJudgeSeconds", function()
+		-- An exploiter parks with the driver in the seat, waits, then hops the
+		-- truck onto the sell pad. The allowance stops growing after
+		-- MaxJudgeSeconds, so a hop across the map is refused.
+		local from = Vector3.new(0, 3, 0)
+		local max = VehicleLogic.MaxJudgeSeconds
+		t.ok(max <= 2, "about two seconds")
+		local allowance = 26 * max * VehicleLogic.SpeedSlack + VehicleLogic.SlackStuds
+		t.eq(VehicleLogic.JudgeMove(from, from + Vector3.new(0, 0, -(allowance - 1)), 8, 26), "ok")
+		t.eq(VehicleLogic.JudgeMove(from, from + Vector3.new(0, 0, -(allowance + 1)), 8, 26), "tooFar")
+		t.eq(
+			VehicleLogic.JudgeMove(from, from + Vector3.new(0, 0, -300), 8, 26),
+			"tooFar",
+			"the old 8 s window let this by"
+		)
 	end)
 
 	t.test("speed check: vertical moves are bounded too", function()
@@ -137,6 +155,73 @@ return function(t)
 		t.ok(near((steep.Position - ground).Magnitude, 1.5, 1e-4))
 	end)
 
+	t.test("rig corners span the truck and its trailer", function()
+		local corners = VehicleLogic.RigCorners(4, -6, 14)
+		t.eq(#corners, 6)
+		local four = VehicleLogic.CornerOffsets(4, 20)
+		for i = 1, 4 do
+			t.ok(nearV(corners[i], four[i] + Vector3.new(0, 0, 4)), "corner " .. i .. " in CornerOffsets order")
+		end
+		t.ok(corners[1].Z < -5 and corners[3].Z > 13, "front of the truck to the back of the trailer")
+		t.ok(near(corners[5].Z, 4) and near(corners[6].Z, 4), "both sides halfway along")
+		t.ok(corners[5].X < 0 and corners[6].X > 0)
+	end)
+
+	t.test("a tipped truck is set down on the ground, nothing sunk in", function()
+		local corners = VehicleLogic.RigCorners(4, -6, 6)
+		local max = math.rad(30)
+		local function hitsOn(height)
+			local hits = {}
+			for i, c in ipairs(corners) do
+				hits[i] = Vector3.new(c.X, height(c), c.Z)
+			end
+			return hits
+		end
+		local function wheelsAbove(cf, hits)
+			for i, c in ipairs(corners) do
+				local wheel = cf * (c - Vector3.new(0, 1.5, 0))
+				if wheel.Y < hits[i].Y - 1e-4 then
+					return false
+				end
+			end
+			return true
+		end
+		-- Flat ground at y = 4: the chassis sits clearance above it.
+		local flat = hitsOn(function()
+			return 4
+		end)
+		local cf = VehicleLogic.RestingCFrame(
+			Vector3.new(0, 30, 0),
+			Vector3.yAxis,
+			Vector3.new(0, 0, -1),
+			1.5,
+			max,
+			corners,
+			flat
+		)
+		t.ok(nearV(cf.Position, Vector3.new(0, 5.5, 0)), "on the ground, not where it was in the air")
+		t.ok(nearV(cf.UpVector, Vector3.yAxis))
+		-- Flat in front, rising behind (a dip): posed level, it's lifted so
+		-- the back isn't buried in the slope.
+		local dip = hitsOn(function(c)
+			return if c.Z > 0 then c.Z * 0.3 else 0
+		end)
+		local level =
+			VehicleLogic.RestingCFrame(Vector3.zero, Vector3.yAxis, Vector3.new(0, 0, -1), 1.5, max, corners, dip)
+		t.ok(wheelsAbove(level, dip), "no corner below the ground")
+		t.ok(near(level.Position.Y, 1.5 + (6 - 0.5) * 0.3, 1e-4), "resting on the highest ground under it")
+		-- Tilted to the ground's up, still nothing below it.
+		local up = VehicleLogic.GroundUp(dip, {}, max)
+		local tilted = VehicleLogic.RestingCFrame(Vector3.zero, up, Vector3.new(0, 0, -1), 1.5, max, corners, dip)
+		t.ok(wheelsAbove(tilted, dip))
+		-- Rays that missed are skipped; none hit: nothing to stand on.
+		local partial = { nil, nil, Vector3.new(1.7, 2, 5.5) }
+		local some =
+			VehicleLogic.RestingCFrame(Vector3.zero, Vector3.yAxis, Vector3.new(0, 0, -1), 1.5, max, corners, partial)
+		t.ok(some and near(some.Position.Y, 3.5, 1e-4))
+		t.eq(VehicleLogic.RestingCFrame(Vector3.zero, Vector3.yAxis, Vector3.new(0, 0, -1), 1.5, max, corners, {}), nil)
+	end)
+
 	t.test("overflow parking spots stay put across rebuilds", function()
 		local used = {}
 		local a = VehicleLogic.NextFreeIndex(used)
@@ -188,6 +273,76 @@ return function(t)
 		local none, zero = VehicleLogic.CleanBed(nil, isWood, 6)
 		t.eq(none, {})
 		t.eq(zero, 0)
+	end)
+
+	t.test("the bed's worth", function()
+		t.eq(VehicleLogic.BedValue({}), 0)
+		t.eq(
+			VehicleLogic.BedValue({
+				{ woodId = "oak", value = 12 },
+				{ woodId = "pine", value = 20.5, figure = "curly" },
+			}),
+			32.5
+		)
+	end)
+
+	t.test("the truck's saved spot round-trips and junk is refused", function()
+		local at = Vector3.new(120.5, 3, -1180)
+		t.ok(nearV(VehicleLogic.CleanSpot(VehicleLogic.SaveSpot(at)), at))
+		t.eq(VehicleLogic.CleanSpot({}), nil, "never saved")
+		t.eq(VehicleLogic.CleanSpot(nil), nil)
+		t.eq(VehicleLogic.CleanSpot("far"), nil)
+		t.eq(VehicleLogic.CleanSpot({ x = 1, y = 2 }), nil, "missing z")
+		t.eq(VehicleLogic.CleanSpot({ x = 0 / 0, y = 2, z = 3 }), nil, "NaN")
+		t.eq(VehicleLogic.CleanSpot({ x = math.huge, y = 2, z = 3 }), nil, "inf")
+		t.eq(VehicleLogic.CleanSpot({ x = "1", y = 2, z = 3 }), nil)
+		t.eq(VehicleLogic.CleanSpot({ x = 1, y = 2, z = VehicleLogic.MaxCoord * 2 }), nil, "off the map")
+		-- A new save doesn't know yet, so an old save's bed comes back as before.
+		local Schema = t.loader():server("ProfileSchema")
+		t.eq(VehicleLogic.CleanSpot(Schema.Template.truckAt), nil)
+	end)
+
+	t.test("a load only rides along from town", function()
+		-- Town: two parking slots and the sell pad (WorldPlan's layout).
+		local town = { Vector3.new(16, 0, 45), Vector3.new(104, 0, 5), Vector3.new(0, 6, 86) }
+		local r = VehicleLogic.TownRadius
+		t.ok(near(VehicleLogic.FlatDistance(Vector3.new(0, 100, 0), Vector3.new(3, -50, 4)), 5), "height ignored")
+		t.ok(VehicleLogic.NearAny(Vector3.new(0, 3, 86), town, r), "on the sell pad")
+		t.ok(VehicleLogic.NearAny(Vector3.new(45, 3, 100), town, r), "at the Dealership")
+		t.ok(VehicleLogic.NearAny(Vector3.new(104, 50, 5 - r + 1), town, r), "just inside, however high")
+		t.ok(not VehicleLogic.NearAny(Vector3.new(104, 3, 5 - r - 1), town, r), "just outside")
+		t.ok(not VehicleLogic.NearAny(Vector3.new(1100, 40, 1180), town, r), "the Volcano")
+		t.ok(not VehicleLogic.NearAny(Vector3.new(-420, 10, 110), town, r), "the Hills")
+		t.ok(not VehicleLogic.NearAny(Vector3.zero, {}, r))
+	end)
+
+	t.test("a load left behind lies in rows where the truck stood", function()
+		local length, diameter = 3, 1.2
+		t.eq(VehicleLogic.SpillSpots(0, length, diameter), {})
+		for _, count in ipairs({ 1, 4, 74 }) do
+			local spots = VehicleLogic.SpillSpots(count, length, diameter)
+			t.eq(#spots, count)
+			local sum = Vector3.zero
+			for i, a in ipairs(spots) do
+				sum += a
+				t.eq(a.Y, 0)
+				for j = i + 1, #spots do
+					local b = spots[j]
+					-- Logs lie along X: apart end to end, or side by side.
+					local clear = math.abs(a.X - b.X) >= length or math.abs(a.Z - b.Z) >= diameter
+					t.ok(clear, string.format("logs %d and %d don't overlap", i, j))
+				end
+			end
+			if count % VehicleLogic.SpillPerRow == 0 then
+				t.ok(nearV(sum / count, Vector3.zero), "centred on the truck")
+			end
+		end
+		local big = VehicleLogic.SpillSpots(74, length, diameter)
+		local deepest = 0
+		for _, s in ipairs(big) do
+			deepest = math.max(deepest, math.abs(s.Z))
+		end
+		t.ok(deepest < 20, "a full Logging Rig + Heavy Hauler load stays about rig-sized")
 	end)
 
 	t.test("wheels spin with speed, steer toward the stick", function()
