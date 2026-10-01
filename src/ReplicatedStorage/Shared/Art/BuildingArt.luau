@@ -15,10 +15,14 @@
 -- Only what players stand on or bump into collides (floors, walls, posts,
 -- roofs, counters, big props); everything else is Kit.decor, and small
 -- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
--- them): Sawmill 400, each Shop 220, GondolaStation 140, Campsite 110.
+-- them): Sawmill 400, each Shop 220, GondolaStation 140, Campsite 110,
+-- a TownTree 70.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
+local PropArt = require(script.Parent.PropArt)
+local TreeArt = require(script.Parent.TreeArt)
 
 type Rng = Kit.Rng
 
@@ -2099,6 +2103,95 @@ function BuildingArt.PropNames(): { string }
 	end
 	table.sort(names)
 	return names
+end
+
+---------------------------------------------------------------------------
+-- The town's greenery
+---------------------------------------------------------------------------
+
+-- A ring of chunky stones round a bed of soil, `radius` studs to the
+-- stones' middle (looks only).
+local function stoneRing(parent: Instance, radius: number, rng: Rng)
+	dCyl(parent, "RingSoil", 0.2, radius * 2, CF(0, 0.05, 0) * ANG(0, 0, PI / 2), SOIL, MAT.Ground)
+	local count = math.clamp(math.floor(radius * 2 * PI / 1.6), 7, 12)
+	local start = rng:range(0, PI * 2)
+	for i = 1, count do
+		local a = start + (i - 1) / count * PI * 2 + rng:range(-0.05, 0.05)
+		local w = radius * 2 * PI / count * rng:range(0.8, 0.92)
+		local h = rng:range(0.45, 0.65)
+		-- Its long side along the ring (tangent at angle a).
+		dBox(
+			parent,
+			"RingStone",
+			V3(w, h, rng:range(0.6, 0.8)),
+			CF(math.cos(a) * radius, h / 2 - 0.05, math.sin(a) * radius)
+				* ANG(rng:range(-0.06, 0.06), -a - PI / 2, rng:range(-0.06, 0.06)),
+			Kit.vary(rng:pick(STONE), rng, 0.05),
+			MAT.Slate
+		)
+	end
+end
+
+-- How far a town tree's stone ring sits from its middle (to the stones'
+-- middle): just outside the root flares, which reach at most 1.15 trunk
+-- diameters from it (TreeArt: 0.45-0.65 diameters past the bark).
+function BuildingArt.TreeRingRadius(trunkDiameter: number): number
+	return trunkDiameter * 1.15 + 0.6
+end
+
+-- An ornamental tree for the town: TreeArt's `woodId` tree at `scale`,
+-- seated in a stone ring. Only its Trunk collides (and can be clicked);
+-- everything else is decoration. It carries no tag or attribute, so
+-- nothing can chop it (ChopController targets models tagged Tree), and it
+-- must stay out of TimberlineMap.Trees (WindSway, CanopyFade, TreeService).
+-- An unknown wood grows a birch.
+function BuildingArt.TownTree(woodId: string, seed: number, scale: number): Model
+	local def = WoodData.Get(woodId) or WoodData.Get("birch")
+	assert(def, "[BuildingArt] no birch in WoodData")
+	local model = TreeArt.Build(def, seed, scale)
+	model.Name = "TownTree"
+	Kit.decorAll(model, { Trunk = true })
+	local trunk = model.PrimaryPart
+	local diameter = if trunk then math.min(trunk.Size.Y, trunk.Size.Z) else 1.5
+	stoneRing(model, BuildingArt.TreeRingRadius(diameter), Kit.rng(seed + 31))
+	return model
+end
+
+-- A flower bed `size` studs across: a mound of soil with two or three
+-- patches of PropArt.Flowers on it (looks only).
+local function flowerBed(size: number, seed: number): Model
+	local model = Kit.model("FlowerBed")
+	local rng = Kit.rng(seed)
+	dCyl(model, "BedSoil", 0.3, size, CF(0, 0.08, 0) * ANG(0, 0, PI / 2), SOIL, MAT.Ground)
+	local patches = if size >= 2.4 then 3 else 2
+	local start = rng:range(0, PI * 2)
+	for i = 1, patches do
+		local a = start + (i - 1) / patches * PI * 2
+		local r = size * 0.22
+		local patch = PropArt.Flowers(seed * 7 + i, FLOWERS)
+		Kit.placeAt(patch, CF(math.cos(a) * r, 0.2, math.sin(a) * r) * ANG(0, rng:range(0, PI * 2), 0))
+		patch.Parent = model
+	end
+	return model
+end
+
+-- A piece of the town's greenery (WorldPlan.Town().greenery) by kind:
+-- "tree" (TownTree: `woodId` at scale `size`), "bush" (PropArt.Bush `size`
+-- studs across, in the planters' greens), "flowers" (a bed `size` studs
+-- across) or "rock" (PropArt.Rock `size` studs across, as decoration). All
+-- of it is looks only (no collisions, clicks or touches) but a tree's
+-- Trunk. An unknown kind builds a bush. On the ground at the origin.
+function BuildingArt.Greenery(kind: string, size: number, seed: number, woodId: string?): Model
+	if kind == "tree" then
+		return BuildingArt.TownTree(woodId or "birch", seed, size)
+	elseif kind == "flowers" then
+		return flowerBed(size, seed)
+	elseif kind == "rock" then
+		local rock = PropArt.Rock(size, seed, STONE)
+		Kit.decorAll(rock)
+		return rock
+	end
+	return PropArt.Bush(size, seed, LEAF)
 end
 
 -- The Sky Bin by the sell pad, where logs sent down the Cloud Chute land

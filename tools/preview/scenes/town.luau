@@ -3,12 +3,12 @@
 -- WorldPlan.Town(): the sawmill at (0, 110) with the sell pad and Sky Bin in
 -- front, the Tool Shed, the Dealership and Hearth & Home along the street,
 -- the gondola station behind them, Murph's camp by the spawn, the spawn pad,
--- the parking lot's slots, lamps, fences, props and signs, on the real
--- terrain (TerrainGen paints the cobbled plaza, the street and the paths),
--- at golden hour. Nothing here that MapBuilder doesn't build: no trees or
--- greenery (TWN-01 adds the town's own), and no people or trucks (NPCService
--- and VehicleService add those at runtime). world.luau builds the same town
--- the same way.
+-- the parking lot's slots, lamps, fences, props, signs and the town's
+-- greenery (its ornamental trees, bushes, flower beds and rocks), on the
+-- real terrain (TerrainGen paints the cobbled plaza, the street and the
+-- paths), at golden hour. Nothing here that MapBuilder doesn't build: no
+-- people or trucks (NPCService and VehicleService add those at runtime).
+-- world.luau builds the same town the same way.
 
 local Common = require("./_common")
 
@@ -82,6 +82,9 @@ return {
 			BuildingArt.Signpost(string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee)),
 			town.gondolaSign
 		)
+		for _, g in ipairs(town.greenery) do
+			place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
+		end
 
 		return {
 			root = root,

@@ -162,6 +162,53 @@ return function(t)
 		t.eq(spawn.Neutral, true)
 	end)
 
+	t.test(
+		"the town's greenery: Atomic, in its own folder, never a Tree and never in the Trees folder (TWN-01)",
+		function()
+			local s = build()
+			t.eq(s.warnings, {})
+			local town = t.load("ReplicatedStorage/Shared/World/WorldPlan").Town()
+			local folder = s.map:FindFirstChild("TownGreenery")
+			t.ok(folder and folder:IsA("Folder"), "a TownGreenery folder in TimberlineMap")
+			t.eq(#folder:GetChildren(), #town.greenery, "one model per piece")
+			local trees = 0
+			for i, model in ipairs(folder:GetChildren()) do
+				local g = town.greenery[i]
+				t.ok(model:IsA("Model"), model.Name .. " is a Model")
+				t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, model.Name .. " streams Atomic")
+				-- No attributes (no HP, no WoodId) but the loader's own pivot note.
+				for name in pairs(model:GetAttributes()) do
+					t.eq(name, "__pivot", model.Name .. " has an attribute")
+				end
+				if g.kind == "tree" then
+					trees += 1
+					t.eq(model.Name, "TownTree")
+					local trunk = model.PrimaryPart
+					t.ok(trunk and trunk.Name == "Trunk", "a town tree's PrimaryPart is its Trunk")
+					-- Where WorldPlan says, its trunk standing on the spot.
+					local base = trunk.CFrame.Position - roblox.Vector3.new(0, trunk.Size.X / 2, 0)
+					t.ok((base - g.cframe.Position).Magnitude < 1e-3, "a town tree stands on its spot")
+				end
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") and d.CanCollide then
+						t.eq(d.Name, "Trunk", model.Name .. "'s " .. d.Name .. " collides")
+					end
+				end
+			end
+			t.ok(trees >= 20, "the town's trees are built")
+			-- Nothing in the map is tagged Tree (TreeService, mocked here, tags
+			-- the wild ones), and the greenery never goes in a Trees folder.
+			for _, d in ipairs(s.map:GetDescendants()) do
+				t.ok(not d:HasTag("Tree"), d:GetFullName() .. " is tagged Tree")
+			end
+			t.ok(
+				folder:FindFirstAncestor("Trees") == nil and folder.Parent == s.map,
+				"TownGreenery sits in TimberlineMap"
+			)
+			t.ok(s.map:FindFirstChild("Trees") == nil or #s.map.Trees:GetChildren() == 0, "no town tree in Trees")
+		end
+	)
+
 	t.test("the build line has the shape WLD-03 and the checklist read, and the stats are published", function()
 		local s = build()
 		local line = builtLine(s)

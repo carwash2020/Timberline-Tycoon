@@ -305,6 +305,12 @@ end
 
 export type ShopSpot = { kind: string, title: string, accent: Color3, cframe: CFrame }
 
+-- A piece of the town's greenery (BuildingArt.Greenery builds it): kind
+-- "tree" (`woodId` at scale `size`, in a stone ring), "bush" or "rock"
+-- (`size` studs across) or "flowers" (a bed `size` studs across), standing
+-- at `cframe` (on the ground, turned).
+export type Greenery = { kind: string, woodId: string?, cframe: CFrame, size: number, seed: number }
+
 export type Town = {
 	spawn: Vector3,
 	spawnFacing: CFrame, -- the SpawnLocation's CFrame: at `spawn`, its front toward the sawmill
@@ -322,6 +328,7 @@ export type Town = {
 	fences: { Fence },
 	props: { Placement },
 	signs: { Sign },
+	greenery: { Greenery }, -- ornamental: never choppable
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
@@ -442,6 +449,90 @@ function WorldPlan.Town(): Town
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
 	}
 
+	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the
+	-- town (birch and maple round the edges, a pine band behind the mill
+	-- and the gondola), bushes along the shops' and the station's sides,
+	-- flower beds by the plaza, the spawn walk and the shop paths' mouths,
+	-- and a few rocks. Looks only, but for the trees' trunks, which collide
+	-- (MapBuilder never tags them Tree or puts them in the Trees folder, so
+	-- nobody can chop them). No oaks, so Murph's "find an oak" always means
+	-- a tree you can chop. All of it stays off the paint, the lot, the
+	-- sell pad and the parking pull-outs, 2 studs off the roads, 4 studs
+	-- from the colliding props, off the townsfolk's walks and out of the
+	-- gondola's way (WorldPlan.spec). No trunk stands east of the mill at x
+	-- 22 to 42 or between there and the Snow Road's start at (0, 205): room
+	-- for the lane north (TWN-05). Seeds come from the spot.
+	local greenery: { Greenery } = {}
+	local greenSpots: { { any } } = { -- { kind, x, z, size, woodId? }
+		-- The pine band behind the mill and the gondola (z 140 to 200).
+		{ "tree", -12, 146, 1.22, "pine" },
+		{ "tree", 4, 153, 1, "pine" },
+		{ "tree", -2, 169, 1.22, "pine" },
+		{ "tree", 9, 180, 1, "pine" },
+		{ "tree", -20, 164, 1, "pine" },
+		{ "tree", -30, 184, 1.22, "pine" },
+		{ "tree", -44, 177, 1, "pine" },
+		{ "tree", -58, 196, 1.22, "pine" },
+		{ "tree", -62, 147, 1, "pine" },
+		{ "tree", -80, 163, 1.22, "pine" },
+		{ "tree", -94, 150, 1, "pine" },
+		{ "tree", -106, 174, 1.22, "pine" },
+		-- Birch and maple round the edges.
+		{ "tree", -106, 56, 1.22, "maple" },
+		{ "tree", -116, 86, 1, "birch" },
+		{ "tree", -112, 110, 1.22, "birch" },
+		{ "tree", -118, 138, 1, "maple" },
+		{ "tree", -80, 50, 1, "maple" },
+		{ "tree", -62, 6, 1, "birch" },
+		{ "tree", -98, 14, 1.22, "birch" },
+		{ "tree", -46, 118, 1, "birch" },
+		{ "tree", 50, 122, 1, "maple" },
+		{ "tree", 78, 114, 1.22, "birch" },
+		{ "tree", 104, 128, 1.22, "maple" },
+		{ "tree", 130, 98, 1, "birch" },
+		{ "tree", 124, 150, 1, "maple" },
+		{ "tree", 96, 162, 1.22, "birch" },
+		{ "tree", 68, 168, 1.22, "maple" },
+		{ "tree", 128, 24, 1, "birch" },
+		{ "tree", 132, -14, 1.22, "maple" },
+		-- Bushes along the shops' sides, the mill's back and the station.
+		{ "bush", -66, 100, 2.8 },
+		{ "bush", -66.5, 105.5, 2.4 },
+		{ "bush", -57, 100, 2.6 },
+		{ "bush", -57.5, 106, 3 },
+		{ "bush", 58, 101, 2.8 },
+		{ "bush", 58.5, 106.5, 2.4 },
+		{ "bush", -8, 129, 2.6 },
+		{ "bush", 8, 129, 2.8 },
+		{ "bush", -51.5, 146, 2.8 },
+		{ "bush", -28, 148, 2.6 },
+		{ "bush", -28.5, 154, 2.4 },
+		-- Flower beds: off the plaza's south-west corner, by the spawn walk,
+		-- at the mouths of the Hearth & Home path, by the well. (None where
+		-- the townsfolk walk: NPCData's routes pass 3 studs or more away.)
+		{ "flowers", -30, 54.5, 2.4 },
+		{ "flowers", -8.4, 53.6, 2 },
+		{ "flowers", -72.5, 87.2, 2.2 },
+		{ "flowers", -87.5, 86, 1.8 },
+		{ "flowers", -57.5, 57, 2.4 },
+		-- Rocks.
+		{ "rock", -55, 150, 1.8 },
+		{ "rock", 66, 110, 2 },
+		{ "rock", -101, 100, 1.6 },
+		{ "rock", 116, 72, 1.8 },
+	}
+	for _, g in ipairs(greenSpots) do
+		local kind: string, x: number, z: number, size: number, woodId: string? = g[1], g[2], g[3], g[4], g[5]
+		local seed = Kit.seedAt(x, z)
+		table.insert(greenery, {
+			kind = kind,
+			woodId = woodId,
+			cframe = CFrame.new(x, TerrainGen.HeightAt(x, z), z) * CFrame.Angles(0, (seed % 628) / 100, 0),
+			size = size,
+			seed = seed,
+		})
+	end
+
 	-- A character spawns facing its SpawnLocation's front (LookVector), so
 	-- turn the pad's front (-Z) half a turn to +Z: the sawmill is due north
 	-- of the spawn, framed by the walk's two lamps. (Angles, not
@@ -485,6 +576,7 @@ function WorldPlan.Town(): Town
 		fences = fences,
 		props = props,
 		signs = signs,
+		greenery = greenery,
 	}
 end
 
