@@ -182,6 +182,11 @@ local function nearestTagged(tag: string, from: Vector3, accept: (Model, BasePar
 	return best
 end
 
+-- What Skip says after the first press, in the device's word
+-- (HintLogic.Expand): "Tap again to skip", "Click again to skip", or
+-- "Press again to skip" on a gamepad.
+QuestUI.SkipArmed = "{Press} again to skip"
+
 -- The beacons that hang over a fixed part: its path from TimberlineMap,
 -- one direct child at a time. Both start in a Persistent model, so they're
 -- always streamed in. The sell pad's beacon hangs over the sell zone, the
@@ -476,7 +481,7 @@ local function build()
 		end
 		armed += 1
 		local token = armed
-		skip:SetText("Tap again to skip")
+		skip:SetText(HintLogic.Expand(QuestUI.SkipArmed, UITheme.Device())) -- "Tap" / "Click" / "Press again to skip"
 		skip:SetStyle("amber")
 		task.delay(3, function()
 			if armed == token then

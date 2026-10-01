@@ -14,7 +14,9 @@
 --     sell" only when that prompt is up).
 --   * Expand(line, device): {click} (or {tap}) becomes the main action on
 --     this device: "click", "tap", or "press RT" on a gamepad (the Tool's
---     Activated trigger). Capitalised ({Click}, {Tap}) at a sentence start.
+--     Activated trigger). {press} is pressing a button on the screen:
+--     "tap", "click", or "press" on a gamepad (A, on the selected button).
+--     Capitalised ({Click}, {Tap}, {Press}) at a sentence start.
 
 local HintLogic = {}
 
@@ -70,6 +72,14 @@ local ACTION: { [string]: string } = { -- [Device]
 	console = "press RT",
 }
 
+-- Pressing a button on the screen, per device ({press}: "Tap again to
+-- skip"). A gamepad presses the selected button with A, not RT.
+local PRESS: { [string]: string } = { -- [Device]
+	phone = "tap",
+	desktop = "click",
+	console = "press",
+}
+
 -- The hint line for `context` on `device` (the chopping one for anything
 -- unknown).
 function HintLogic.Pick(device: Device, context: Context): string
@@ -113,13 +123,17 @@ function HintLogic.ContextFor(state: State): Context
 	return "chop"
 end
 
--- `line` with its {click} / {tap} tokens worded for `device`. Other
--- {words} are left as they are.
+-- `line` with its {click} / {tap} / {press} tokens worded for `device`.
+-- Other {words} are left as they are.
 function HintLogic.Expand(line: string, device: Device): string
-	local action = ACTION[device] or ACTION.desktop
 	local expanded = string.gsub(line, "{(%a+)}", function(token: string): string
 		local lower = string.lower(token)
-		if lower ~= "click" and lower ~= "tap" then
+		local action: string
+		if lower == "click" or lower == "tap" then
+			action = ACTION[device] or ACTION.desktop
+		elseif lower == "press" then
+			action = PRESS[device] or PRESS.desktop
+		else
 			return "{" .. token .. "}"
 		end
 		if string.sub(token, 1, 1) ~= string.sub(lower, 1, 1) then

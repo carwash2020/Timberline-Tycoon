@@ -112,4 +112,13 @@ return function(t)
 		t.eq(HintLogic.Expand("{nope} stays", "phone"), "{nope} stays", "unknown words are left alone")
 		t.ok(HintLogic.HasToken("{nope} stays"))
 	end)
+
+	t.test("{press} is pressing a button on the screen: a gamepad presses it with A, not RT", function()
+		t.eq(HintLogic.Expand("{Press} again to skip", "phone"), "Tap again to skip")
+		t.eq(HintLogic.Expand("{Press} again to skip", "desktop"), "Click again to skip")
+		t.eq(HintLogic.Expand("{Press} again to skip", "console"), "Press again to skip")
+		t.eq(HintLogic.Expand("Then {press} it.", "console"), "Then press it.")
+		t.eq(HintLogic.Expand("{Press} or {click}", "console"), "Press or press RT", "two tokens, two meanings")
+		t.ok(not HintLogic.HasToken(HintLogic.Expand("{Press} again", "phone")))
+	end)
 end
