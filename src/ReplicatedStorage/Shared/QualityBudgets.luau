@@ -19,7 +19,7 @@ export type Tier = "low" | "high"
 export type Budget = {
 	Tier: Tier,
 	-- AmbientLife: ground decoration and critters
-	MaxDecor: number, -- live decoration models, all cells together
+	MaxDecor: number, -- live decoration models, all cells together (see Low)
 	DecorLoadRadius: number, -- studs: decoration cells load within this
 	MaxCritters: number, -- animated critter models near the player
 	-- WindSway (PLAY-04)
@@ -51,9 +51,15 @@ QualityBudgets.High = table.freeze({
 	TownFxNear = 260,
 }) :: Budget
 
+-- PLAY-05's acceptance: on low, the workspace.AmbientLife folder holds 160
+-- models or fewer. Decoration shares that folder with the critters (one
+-- model per MaxCritters point: a Flock is 5 birds, a firefly swarm 1
+-- cloud), the Skyroot's 2 mote clouds (always there) and up to 2 fish
+-- splashes (each lives 1.2 s; a leap takes 0.95 s). So low's decoration
+-- gets 160 - 8 - 2 - 2 = 148. tests/QualityBudgets.spec.luau checks the sum.
 QualityBudgets.Low = table.freeze({
 	Tier = "low" :: Tier,
-	MaxDecor = 160,
+	MaxDecor = 148,
 	DecorLoadRadius = 140,
 	MaxCritters = 8,
 	SwayParts = 400,

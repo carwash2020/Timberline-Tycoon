@@ -9,6 +9,7 @@ local fs = require("@lune/fs")
 return function(t)
 	local QualityBudgets = t.shared("QualityBudgets")
 	local EnvironmentData = t.shared("EnvironmentData")
+	local BiomeData = t.shared("BiomeData")
 
 	local KEYS = {
 		"Tier",
@@ -46,7 +47,7 @@ return function(t)
 	t.test("low is the phone budget", function()
 		t.eq(QualityBudgets.Low, {
 			Tier = "low",
-			MaxDecor = 160,
+			MaxDecor = 148, -- the whole AmbientLife folder holds 160 (next test)
 			DecorLoadRadius = 140,
 			MaxCritters = 8,
 			SwayParts = 400,
@@ -58,6 +59,81 @@ return function(t)
 			Bloom = 0.5,
 			TownFxNear = 120,
 		})
+	end)
+
+	-- PLAY-05's acceptance counts the whole workspace.AmbientLife folder on
+	-- low ("160 models or fewer"), not only the decoration. AmbientLife puts
+	-- exactly these into it: decoration (at most MaxDecor), critter bodies
+	-- and firefly clouds (one model per MaxCritters point), the Skyroot's 2
+	-- mote clouds (made once, always there) and fish splashes (each lives
+	-- 1.2 s and a leap takes 0.95 s, with at most one fish wanted, so at most
+	-- 2 at once). This pins the sum and what it assumes about AmbientLife:
+	-- if AmbientLife starts putting something new in its folder, recount.
+	t.test("low: the whole AmbientLife folder holds 160 models or fewer", function()
+		local Low = QualityBudgets.Low
+		local MOTES, SPLASHES = 2, 2
+		t.ok(
+			Low.MaxDecor + Low.MaxCritters + MOTES + SPLASHES <= 160,
+			"decoration " .. Low.MaxDecor .. " + critters " .. Low.MaxCritters .. " + motes + splashes"
+		)
+
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/AmbientLife.luau")
+		local code = string.gsub(source, "%-%-[^\n]*", "")
+		local function count(pattern: string): number
+			local n = 0
+			for _ in string.gmatch(code, pattern) do
+				n += 1
+			end
+			return n
+		end
+		-- Everything AmbientLife parents to its folder: decoration in loadCell;
+		-- acquireBody (every critter body), the firefly cloud, the splash, a
+		-- leaping fish (a body acquireBody already counted) and the 2 motes.
+		t.eq(count("%.Parent = parent%f[%W]"), 1, "decoration is parented in one place")
+		t.eq(count("%.Parent = root%(%)"), 6, "a new kind of model in the AmbientLife folder: recount Low.MaxDecor")
+		t.eq(count("CritterArt%.Motes%("), MOTES, "the Skyroot's mote clouds")
+		-- One model per cost point: a Flock's cost is its bird count.
+		t.eq(tonumber(string.match(code, "local FLOCK_SIZE = (%d+)")), EnvironmentData.CritterCost.Flock)
+		for kind, cost in pairs(EnvironmentData.CritterCost) do
+			t.ok(cost >= 1, kind .. " costs at least its one model")
+		end
+		-- Splashes: two per leap (in and out), each living 1.2 s, and a fish
+		-- waits at least 4 s after landing before it leaps again, so one
+		-- leap's splashes are gone before the next leap's.
+		t.eq(count("splash%("), 3, "the splash function and a fish leap's two calls")
+		t.ok(string.find(code, "task.delay(1.2, function()", 1, true) ~= nil, "a splash lives 1.2 s")
+		t.ok(string.find(code, "d.nextJump = t + 4 + ", 1, true) ~= nil, "4 s or more between leaps")
+		local biomeIds = { "" }
+		for _, biome in ipairs(BiomeData.All()) do
+			table.insert(biomeIds, biome.id)
+		end
+		local fishPlans = 0
+		for _, weather in ipairs({ "Clear", "Cloudy", "Rain", "Storm", "Fog", "Blizzard", "Ashfall" }) do
+			for _, biomeId in ipairs(biomeIds) do
+				for _, daylight in ipairs({ 0, 0.5, 1 }) do
+					for _, intensity in ipairs({ 0.2, 1 }) do
+						for _, vitality in ipairs({ 0, 50, 100 }) do
+							local wants = EnvironmentData.CritterPlan({
+								biomeId = biomeId,
+								daylight = daylight,
+								weather = weather,
+								intensity = intensity,
+								vitality = vitality,
+								nearPond = true,
+								nearWater = true,
+							})
+							for _, w in ipairs(wants) do
+								if w.kind == "Fish" then
+									t.ok(w.count <= 1, "one fish at a time")
+									fishPlans += 1
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		t.ok(fishPlans > 0, "the sweep reached the fish")
 	end)
 
 	t.test("both tiers have every key, low never asks for more than high, and neither can be changed", function()

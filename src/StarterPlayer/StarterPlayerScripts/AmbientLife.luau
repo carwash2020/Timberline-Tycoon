@@ -87,7 +87,7 @@ end
 local CELL = EnvironmentData.DecorCell
 -- Cells load within Quality.Budget().DecorLoadRadius (200 studs, 140 on low
 -- quality), and at most Quality.Budget().MaxDecor live decoration models
--- (420, 160 on low), all cells together. Shared/QualityBudgets.
+-- (420, 148 on low), all cells together. Shared/QualityBudgets.
 local UNLOAD_RADIUS = 260
 local TREE_CLEARANCE = 4
 local CELLS_PER_FRAME = 2
