@@ -1,10 +1,16 @@
 --!strict
 -- AxeController: dropping axes.
 -- Every axe you own is in your hotbar; switch with the number keys or by
--- tapping it. While you hold one, a "Drop axe" side button shows
--- (Backspace on a keyboard, X on a gamepad when no prompt is showing). The
--- server lays it on the ground, where a "Pick up" prompt brings it back.
--- Dropped axes stay yours (AxeService).
+-- tapping it. A "Drop axe" side button shows while you hold an axe and
+-- either carry another one or hold one better than the starter
+-- (HudRules.DropAxe), so a new player with just the Rusty Axe never sees
+-- it. Dropping takes two presses (HudRules.DropPress): the first turns the
+-- button amber, "Confirm drop", for 3 seconds, and a second press in that
+-- time drops the axe. The same goes for every way to press it: a tap, a
+-- click, D-pad down on a gamepad (when no prompt is using it) and
+-- Backspace on a keyboard. The server lays it on the ground, where a "Pick
+-- up" prompt brings it back, and refuses to drop your last axe. Dropped
+-- axes stay yours (AxeService).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,13 +18,22 @@ local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local HUD = require(script.Parent.HUD)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local AxeController = {}
 
 local player = Players.LocalPlayer
 
+local LABEL = "Drop axe"
+local CONFIRM_LABEL = "Confirm drop"
+local STYLE = "bark"
+local CONFIRM_STYLE = "amber"
+
 local button: UITheme.Button? = nil
+local armedAt: number? = nil -- when the press waiting for a second one was made
+local armedUid: string? = nil -- and for which axe
+local armToken = 0 -- bumped whenever the wait starts or ends
 
 local function heldAxe(): Tool?
 	local char = player.Character
@@ -26,44 +41,115 @@ local function heldAxe(): Tool?
 	return if tool and type(tool:GetAttribute("AxeUid")) == "string" then tool else nil
 end
 
-local function dropHeld()
+local function axesIn(container: Instance?): number
+	local n = 0
+	if container then
+		for _, child in ipairs(container:GetChildren()) do
+			if child:IsA("Tool") and type(child:GetAttribute("AxeUid")) == "string" then
+				n += 1
+			end
+		end
+	end
+	return n
+end
+
+-- Whether "Drop axe" applies right now (HudRules.DropAxe): the axe in hand,
+-- counted with the others in the Backpack.
+local function canDrop(tool: Tool?): boolean
+	local id = if tool then tool:GetAttribute("AxeId") else nil
+	local carried = axesIn(player.Character) + axesIn(player:FindFirstChildOfClass("Backpack"))
+	return HudRules.DropAxe(carried, if type(id) == "string" then id else nil)
+end
+
+local function disarm()
+	armedAt, armedUid = nil, nil
+	armToken += 1
+	local b = button
+	if b then
+		b:SetText(LABEL)
+		b:SetStyle(STYLE)
+	end
+end
+
+-- One press, from any input: the first one waits for a second, which drops.
+local function press()
 	local tool = heldAxe()
-	if tool then
-		Net.Remote("DropAxe"):FireServer(tool:GetAttribute("AxeUid"))
+	local uid = if tool then tool:GetAttribute("AxeUid") else nil
+	if not tool or type(uid) ~= "string" or not canDrop(tool) then
+		disarm()
+		return
+	end
+	local waiting = if armedUid == uid then armedAt else nil
+	local drop, at = HudRules.DropPress(waiting, os.clock())
+	if drop then
+		disarm()
+		Net.Remote("DropAxe"):FireServer(uid)
+	elseif at ~= waiting then
+		-- A new wait: say so on the button, and give up after a while.
+		armedAt, armedUid = at, uid
+		armToken += 1
+		local token = armToken
+		local b = button
+		if b then
+			b:SetText(CONFIRM_LABEL)
+			b:SetStyle(CONFIRM_STYLE)
+		end
+		task.delay(HudRules.DropConfirmSeconds, function()
+			if armToken == token then
+				disarm()
+			end
+		end)
 	end
 end
 
 local function refresh()
+	local tool = heldAxe()
+	local shown = canDrop(tool)
 	local b = button
 	if b then
-		b.root.Visible = heldAxe() ~= nil
+		b.root.Visible = shown
+	end
+	-- Switching axes (or putting it away) ends a wait for the old one.
+	if armedUid ~= nil and (not shown or not tool or tool:GetAttribute("AxeUid") ~= armedUid) then
+		disarm()
 	end
 end
 
-local function watchCharacter(char: Model)
-	char.ChildAdded:Connect(refresh)
-	char.ChildRemoved:Connect(refresh)
+local function watchContainer(container: Instance)
+	container.ChildAdded:Connect(refresh)
+	container.ChildRemoved:Connect(refresh)
 	refresh()
 end
 
 function AxeController.Start()
 	button = HUD.SideButton({
 		name = "DropAxe",
-		text = "Drop axe",
-		style = "bark",
+		text = LABEL,
+		style = STYLE,
 		order = 3,
-		key = Enum.KeyCode.ButtonX,
-		onPress = dropHeld,
+		key = Enum.KeyCode.DPadDown, -- not X: that's the pad's interact button
+		onPress = press,
 	})
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
 		if not gameProcessed and input.KeyCode == Enum.KeyCode.Backspace then
-			dropHeld()
+			press()
 		end
 	end)
-	player.CharacterAdded:Connect(watchCharacter)
+	-- The axe in hand (the character) and the others (the Backpack, a new
+	-- one each spawn).
+	player.CharacterAdded:Connect(watchContainer)
 	if player.Character then
-		watchCharacter(player.Character)
+		watchContainer(player.Character)
+	end
+	player.ChildAdded:Connect(function(child: Instance)
+		if child:IsA("Backpack") then
+			watchContainer(child)
+		end
+	end)
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if backpack then
+		watchContainer(backpack)
 	end
 end
 

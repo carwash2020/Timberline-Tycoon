@@ -10,16 +10,23 @@
 --     plant step on, and after it, once you hold a seed.
 --   * SendHome() (VehicleController): "Send truck home" only while you're
 --     on foot, away from your truck, and it's away from its parking spot.
+--   * DropAxe() (AxeController): "Drop axe" only while you hold an axe and
+--     either carry another or hold one better than the starter.
+--   * DropPress(): dropping takes two presses (a tap, a click, the pad's
+--     button or Backspace), the second 0.3 to 3 s after the first.
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 
 local HudRules = {}
 
 HudRules.SendHomeNear = 40 -- studs: closer to your truck than this, you'd drive it rather than send it
+HudRules.DropConfirmSeconds = 3 -- the second press must come this soon after the first...
+HudRules.DropConfirmGap = 0.3 -- ...but not sooner than this (a double tap or a mashed button isn't a yes)
 
 -- The tutorial step the pouch waits for (step ids never change: they're
 -- save keys). Without it, the pouch shows from the start.
@@ -53,6 +60,35 @@ end
 -- in, which means it's far), and the server's TruckSlotDistance.
 function HudRules.SendHome(onFoot: boolean, fromYou: number?, slotDistance: unknown): boolean
 	return onFoot and (fromYou == nil or fromYou > HudRules.SendHomeNear) and TruckHome.Far(slotDistance)
+end
+
+-- "Drop axe": you hold an axe (`heldId`, nil if you don't) and carry
+-- `carried` axes in all (in hand and in the Backpack, so not counting any
+-- lying on the ground): two or more, or the one in hand isn't the starter
+-- (the ladder's first rung). A new player with just the Rusty Axe never
+-- sees it. The server refuses to drop your last axe either way.
+function HudRules.DropAxe(carried: number, heldId: string?): boolean
+	if heldId == nil then
+		return false
+	end
+	return carried >= 2 or (ItemCatalog.AxeTier(heldId) or 1) > 1
+end
+
+-- A press of "Drop axe" when the first press was at `armedAt` (nil: none
+-- waiting) and it's `now` (os.clock). Returns whether to drop, and when
+-- the press waiting for a second one was made (nil once it's dropped):
+--   * no press waiting, or it's too old: this one waits ("Confirm drop");
+--   * the waiting one is less than DropConfirmGap old: nothing (it still
+--     waits, from the first press);
+--   * else: drop.
+function HudRules.DropPress(armedAt: number?, now: number): (boolean, number?)
+	if armedAt == nil or now - armedAt > HudRules.DropConfirmSeconds then
+		return false, now
+	end
+	if now - armedAt < HudRules.DropConfirmGap then
+		return false, armedAt
+	end
+	return true, nil
 end
 
 return HudRules

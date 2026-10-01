@@ -1,7 +1,8 @@
 --!nocheck
 -- When the HUD's optional pieces show (StarterPlayerScripts/HudRules): the
 -- first minute has one objective, so Daily Goals and the pouch wait for
--- the tutorial, and "Send truck home" waits until the truck is away.
+-- the tutorial, "Send truck home" waits until the truck is away, and
+-- "Drop axe" waits until you have an axe to spare and takes two presses.
 return function(t)
 	local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
 	local TutorialData = t.shared("TutorialData")
@@ -56,5 +57,50 @@ return function(t)
 		t.eq(HudRules.SendHome(true, 30, 300), false, "standing by it: drive it instead")
 		t.eq(HudRules.SendHome(false, 50, 300), false, "driving, or no character")
 		t.eq(HudRules.SendHome(true, 41, 21), true, "just past both lines")
+	end)
+
+	t.test("Drop axe: never for a new player's lone Rusty Axe", function()
+		local ItemCatalog = t.shared("ItemCatalog")
+		local starter = ItemCatalog.AxeLadder()[1].id
+		t.eq(starter, "RustyAxe")
+		t.eq(HudRules.DropAxe(1, starter), false, "a fresh profile")
+		t.eq(HudRules.DropAxe(2, starter), true, "a second axe in the Backpack")
+		t.eq(HudRules.DropAxe(1, "SteelAxe"), true, "holding a better one")
+		t.eq(HudRules.DropAxe(3, nil), false, "nothing in hand")
+		t.eq(HudRules.DropAxe(0, nil), false)
+		t.eq(HudRules.DropAxe(1, "NoSuchAxe"), false, "an unknown axe counts as the starter")
+	end)
+
+	t.test("Drop axe takes two presses, 0.3 to 3 s apart", function()
+		-- One press only waits.
+		local drop, at = HudRules.DropPress(nil, 10)
+		t.eq(drop, false, "one tap doesn't drop it")
+		t.eq(at, 10)
+		-- A second one in the window drops.
+		drop, at = HudRules.DropPress(10, 11)
+		t.eq(drop, true)
+		t.eq(at, nil)
+		t.eq((HudRules.DropPress(10, 10.3)), true, "right at the gap")
+		t.eq((HudRules.DropPress(10, 13)), true, "right at the end")
+	end)
+
+	t.test("a double tap, a bounce or mashing doesn't confirm; a late press starts again", function()
+		local drop, at = HudRules.DropPress(10, 10.1)
+		t.eq(drop, false)
+		t.eq(at, 10, "still waiting, from the first press")
+		-- Three presses 0.1 s apart (mashing) never drop.
+		local armed = nil
+		local dropped = false
+		for i = 0, 2 do
+			local d, a = HudRules.DropPress(armed, 20 + i * 0.1)
+			dropped = dropped or d
+			armed = a
+		end
+		t.eq(dropped, false)
+		t.eq(armed, 20)
+		-- Too late: that press is a new first press.
+		drop, at = HudRules.DropPress(10, 13.5)
+		t.eq(drop, false)
+		t.eq(at, 13.5)
 	end)
 end
