@@ -584,6 +584,51 @@ return function(t)
 		end
 	)
 
+	t.test("SELL LOGS HERE stands upright by the pad, facing the street, clear of the props (TWN-04)", function()
+		local found = {}
+		for _, sign in ipairs(town.signs) do
+			if sign.text == "SELL LOGS HERE" then
+				table.insert(found, sign)
+			end
+		end
+		t.eq(#found, 1, "one SELL LOGS HERE signpost in town.signs")
+		local cf = found[1].cframe
+		t.ok(cf.UpVector.Y > 0.99999, "upright")
+		t.ok(math.abs(cf.Y - TerrainGen.HeightAt(cf.X, cf.Z)) < 1e-6, "on the ground")
+		-- Its front (-Z, where the board's text reads) faces the street, south.
+		t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "facing the street")
+		t.ok(cf.Z > 84 and cf.Z < 97, "on the street's north side, beside the plaza")
+		local pad = town.sellPad.Position
+		local fromPad = Vector3.new(cf.X - pad.X, 0, cf.Z - pad.Z).Magnitude
+		t.ok(fromPad < 40, string.format("by the pad: %.1f studs from its middle", fromPad))
+		-- The spawn sees its front: read from the spawn walk, not edge-on.
+		local toSpawn = Vector3.new(town.spawn.X - cf.X, 0, town.spawn.Z - cf.Z).Unit
+		t.ok(cf.LookVector:Dot(toSpawn) > 0.5, "its board faces the spawn walk")
+		-- Nothing it stands in or on: the whole signpost (decoration too) keeps
+		-- out of every prop, and its posts (what collides) 2 studs from them.
+		local sign = placed(BuildingArt.Signpost(found[1].text), cf)
+		for _, prop in ipairs(town.props) do
+			local model = placed(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
+			for _, p in ipairs(parts(model)) do
+				local lo, hi = boxOf(p)
+				for _, s in ipairs(parts(sign)) do
+					local gap = if s.CanCollide and p.CanCollide then 2 else 0
+					local area = { x0 = lo.X - gap, x1 = hi.X + gap, z0 = lo.Z - gap, z1 = hi.Z + gap }
+					t.ok(
+						reachInto(s.CFrame, s.Size, area) <= 1e-3,
+						string.format(
+							"the signpost's %s runs into the %s at (%g, %g)",
+							s.Name,
+							prop.name,
+							prop.cframe.X,
+							prop.cframe.Z
+						)
+					)
+				end
+			end
+		end
+	end)
+
 	t.test("the spawn faces the sawmill (TWN-03)", function()
 		local cf = town.spawnFacing
 		t.ok((cf.Position - town.spawn).Magnitude < 1e-4, "spawnFacing stands at town.spawn")

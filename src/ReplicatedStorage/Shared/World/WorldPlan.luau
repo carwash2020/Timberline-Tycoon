@@ -436,7 +436,8 @@ function WorldPlan.Town(): Town
 		end
 	end
 
-	-- Signs: one by the spawn with every destination, the gondola, plots.
+	-- Signs: one by the spawn with every destination, the plots, and SELL
+	-- LOGS HERE by the pad (the gondola's is gondolaSign).
 	local distances: { string } = {}
 	for _, id in ipairs({ "starter", "hills", "snow", "volcano" }) do
 		local def = BiomeData.Get(id)
@@ -444,9 +445,15 @@ function WorldPlan.Town(): Town
 			table.insert(distances, string.format("%s  %d", def.displayName, def.haulStuds or 0))
 		end
 	end
+	-- SELL LOGS HERE (TWN-04) stands upright just off the plaza's north-west
+	-- corner, facing the street: its posts clear of the plaza, the street
+	-- and the Tool Shed's path (WorldPlan.spec), out of the trucks' way onto
+	-- the pad. (Not the east side: the lamp at (30, 86) would stand in front
+	-- of its board, and the posts would be in the lane north, TWN-05.)
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
+		{ text = "SELL LOGS HERE", cframe = at(-32.5, 87) * FACING_SOUTH },
 	}
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the

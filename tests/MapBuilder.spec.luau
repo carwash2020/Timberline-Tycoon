@@ -209,6 +209,39 @@ return function(t)
 		end
 	)
 
+	t.test("every town marker's part is in the built map, where TownMarkers looks (TWN-04)", function()
+		local s = build()
+		local client = t.loader({
+			services = {
+				CollectionService = {},
+				Players = { LocalPlayer = {} },
+				GuiService = {},
+				TextChatService = {},
+				TweenService = {},
+				UserInputService = {},
+			},
+		})
+		local TownMarkers = client:load("StarterPlayer/StarterPlayerScripts/TownMarkers")
+		t.eq(#TownMarkers.Markers, 5)
+		for _, marker in ipairs(TownMarkers.Markers) do
+			local at = s.map
+			for _, name in ipairs(marker.path) do
+				at = at and at:FindFirstChild(name)
+			end
+			t.ok(
+				at and at:IsA("BasePart"),
+				marker.name .. ": TimberlineMap." .. table.concat(marker.path, ".") .. " is a part"
+			)
+			-- Its model is Persistent: always streamed in on every client.
+			local model = s.map:FindFirstChild(marker.path[1])
+			t.eq(
+				model.ModelStreamingMode,
+				roblox.Enum.ModelStreamingMode.Persistent,
+				marker.path[1] .. " is Persistent"
+			)
+		end
+	end)
+
 	t.test("the build line has the shape WLD-03 and the checklist read, and the stats are published", function()
 		local s = build()
 		local line = builtLine(s)

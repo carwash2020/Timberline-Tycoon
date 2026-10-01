@@ -40,6 +40,7 @@ local controllers: { { name: string, module: { Start: () -> () } } } = {
 	{ name = "PromptUI", module = require(script.Parent.PromptUI) },
 	{ name = "SettingsUI", module = require(script.Parent.SettingsUI) },
 	{ name = "TownFX", module = require(script.Parent.TownFX) },
+	{ name = "TownMarkers", module = require(script.Parent.TownMarkers) },
 }
 
 local function start(name: string, module: { Start: () -> () })
