@@ -1,316 +1,2315 @@
 --!strict
--- BuildingArt: the town's buildings and set dressing (GAME_DESIGN §13):
--- stone-footed timber buildings with shingle roofs, warm windows that glow
--- at night, chimney smoke. Pure (see Kit), so tools/preview draws them too.
+-- BuildingArt: the town's buildings and set dressing (GAME_DESIGN §10, §13)
+-- in the cozy low-poly look of concept-art/sawmill-vista: chunky stone
+-- footings, honey plank walls where every board is its own tone, shingled
+-- roofs with deep overhangs, dark timber frames, warm glowing windows,
+-- lanterns, sawdust and stacked lumber. Pure (see Kit), so tools/preview
+-- draws exactly what the game builds (scenes "buildings" and "town").
 --
 -- Every builder returns a Model built around the origin: ground at y = 0,
--- the front (door, counter, open side) facing -Z. MapBuilder places and
--- turns them, and adds the gameplay bits (attachments, tags, zones).
--- Parts other systems look up by name are listed per builder: keep them.
+-- the front (door, counter, open side) facing -Z. Only GondolaStation has a
+-- PrimaryPart, so place the others with Kit.placeAt right after building.
+-- MapBuilder adds the gameplay bits (attachments, tags, zones). Parts other
+-- systems look up by name are listed per builder: keep them.
 --
--- (First pass: simple shapes. The buildings workstream replaces the
--- insides of these functions; keep the signatures and named parts.)
+-- Only what players stand on or bump into collides (floors, walls, posts,
+-- roofs, counters, big props); everything else is Kit.decor, and small
+-- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
+-- them): Sawmill 400, each Shop 220, GondolaStation 140, Campsite 110.
 
+local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
+
+type Rng = Kit.Rng
 
 local BuildingArt = {}
 
-local WOOD = Color3.fromRGB(101, 67, 33)
-local WOOD_DARK = Color3.fromRGB(70, 45, 22)
-local STONE = Color3.fromRGB(140, 134, 128)
-local ROOF = Color3.fromRGB(120, 64, 50)
+local V3 = Vector3.new
+local CF = CFrame.new
+local ANG = CFrame.Angles
+local PI = math.pi
+local MAT = Enum.Material
 
-local function shell(model: Model, w: number, d: number, h: number, roofColor: Color3, openFront: boolean)
-	local rng = Kit.rng(w * 7 + d)
-	Kit.part(model, "Floor", Vector3.new(w, 1, d), CFrame.new(0, 0.5, 0), STONE, Enum.Material.Slate)
-	Kit.plankWall(model, "BackWall", CFrame.new(0, 1 + h / 2, d / 2 - 0.4), w, h, 0.8, 7, rng, { WOOD_DARK })
-	Kit.plankWall(
-		model,
-		"WallL",
-		CFrame.new(-w / 2 + 0.4, 1 + h / 2, 0) * CFrame.Angles(0, math.pi / 2, 0),
-		d,
-		h,
-		0.8,
-		7,
-		rng,
-		{ WOOD_DARK }
-	)
-	Kit.plankWall(
-		model,
-		"WallR",
-		CFrame.new(w / 2 - 0.4, 1 + h / 2, 0) * CFrame.Angles(0, math.pi / 2, 0),
-		d,
-		h,
-		0.8,
-		7,
-		rng,
-		{ WOOD_DARK }
-	)
-	if not openFront then
-		Kit.plankWall(model, "FrontWall", CFrame.new(0, 1 + h / 2, -d / 2 + 0.4), w, h, 0.8, 7, rng, { WOOD_DARK })
+local function hex(h: string): Color3
+	return Color3.fromHex(h)
+end
+
+---------------------------------------------------------------------------
+-- Palette (warm, toy-like; see concept-art/sawmill-vista)
+---------------------------------------------------------------------------
+
+local PLANK = { hex("#A4693E"), hex("#B07548"), hex("#985F37"), hex("#BC804D") }
+local PLANK_DARK = { hex("#7E502E"), hex("#885731"), hex("#724828") }
+local CABIN = { hex("#9A5733"), hex("#A6623A"), hex("#8C4F2E"), hex("#B06B40") }
+local TIMBER = hex("#5B3920")
+local TIMBER_LIGHT = hex("#7A4C2B")
+local STONE = { hex("#9C968D"), hex("#ABA498"), hex("#89837B"), hex("#B4AB9D") }
+local MORTAR = hex("#6F6A63")
+local SHINGLE = { hex("#8B4831"), hex("#9A5338"), hex("#7E402C"), hex("#A65E3D") }
+local BARN_ROOF = { hex("#5E4B45"), hex("#6A5650"), hex("#54433E"), hex("#715C55") }
+local SLATE_ROOF = { hex("#5D6B7C"), hex("#687889"), hex("#53606F"), hex("#72839A") }
+local TIN_ROOF = { hex("#8D99A3"), hex("#97A3AD"), hex("#83909A") }
+local ROOF_DECK = hex("#4E3220")
+local TRIM = hex("#F2E7CF")
+local IRON = hex("#3B3634")
+local STEEL = hex("#C9CED3")
+local STEEL_DARK = hex("#8E959C")
+local BRICK = hex("#A8553D")
+local BRICK_DARK = hex("#8A4532")
+local SOOT = hex("#3F3633")
+local BARK = hex("#76492A")
+local HEART = hex("#E4BD83")
+local LUMBER = hex("#D9AE72")
+local SAWDUST = { hex("#EAC686"), hex("#DFB670"), hex("#F3D79D") }
+local CANVAS = hex("#E8D9B8")
+local CANVAS_DARK = hex("#CDBB97")
+local SOIL = hex("#5C3F2E")
+local LEAF = { hex("#5DA24A"), hex("#6FB352"), hex("#4C8F3E") }
+local FLOWERS = { hex("#F2728C"), hex("#FFD256"), hex("#8FB8F2"), hex("#FFF3E6"), hex("#E85A4F"), hex("#C58BF2") }
+local GLOW = hex("#FFC872")
+local EMBER = hex("#FF7A2E")
+local FLAME = { hex("#FFD35A"), hex("#FF8A2A"), hex("#FF6A1A") }
+local SIGN_BOARD = hex("#4A2D1A")
+local SIGN_INK = hex("#F8E7C5")
+local DOOR = hex("#6E4426")
+local SHUTTER = hex("#4E7A4C")
+local HANDLE = hex("#A0703F")
+local ROPE = hex("#B89A6A")
+local BRASS = hex("#C9A24A")
+local PAPER = hex("#F4ECD8")
+local CONCRETE = hex("#B3ABA0")
+local TYRE = hex("#2E2B2B")
+local HAY = hex("#DDB65C")
+local WATER = hex("#7CC4F2")
+local STAR = hex("#B5D3FF")
+local ANVIL = hex("#3C3F48")
+local AWNING = { hex("#C9473C"), hex("#F4E7CC") }
+local TERRACOTTA = hex("#B8603E")
+local PAD = hex("#D9AE63")
+local PAD_INK = hex("#5A3820")
+
+---------------------------------------------------------------------------
+-- Small helpers
+---------------------------------------------------------------------------
+
+-- Looks only (Kit.decor); small parts cast no shadow.
+local function dec(p: BasePart)
+	local s = p.Size
+	Kit.decor(p, if math.max(s.X, s.Y, s.Z) < 3 or s.X * s.Y * s.Z < 4 then false else nil)
+end
+
+local function dBox(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material?): Part
+	local p = Kit.part(parent, name, size, cf, color, mat or MAT.Wood)
+	dec(p)
+	return p
+end
+
+local function dWedge(
+	parent: Instance,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	mat: Enum.Material?
+): WedgePart
+	local p = Kit.wedge(parent, name, size, cf, color, mat or MAT.Wood)
+	dec(p)
+	return p
+end
+
+-- A looks-only cylinder `length` long along cf's X.
+local function dCyl(
+	parent: Instance,
+	name: string,
+	length: number,
+	dia: number,
+	cf: CFrame,
+	color: Color3,
+	mat: Enum.Material?
+): Part
+	local p = Kit.cylinder(parent, name, length, dia, cf, color, mat or MAT.Wood)
+	dec(p)
+	return p
+end
+
+local function dBall(parent: Instance, name: string, dia: number, cf: CFrame, color: Color3, mat: Enum.Material?): Part
+	local p = Kit.ball(parent, name, dia, cf, color, mat or MAT.SmoothPlastic)
+	dec(p)
+	return p
+end
+
+-- CFrame.lookAt built from its axes. Same result as Roblox's, but Lune's
+-- CFrame.lookAt (0.10) disagrees with Roblox, so the preview needs this.
+local function lookAt(pos: Vector3, target: Vector3, up: Vector3?): CFrame
+	local look = (target - pos).Unit
+	local u = up or Vector3.yAxis
+	if math.abs(look:Dot(u)) > 0.99 then
+		u = if math.abs(look.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis
 	end
-	Kit.gableRoof(
-		model,
-		"Roof",
-		CFrame.new(0, 1 + h, 0) * CFrame.Angles(0, math.pi / 2, 0),
-		d + 2,
-		w + 2,
-		h * 0.5,
-		roofColor,
-		Enum.Material.WoodPlanks
+	local right = look:Cross(u).Unit
+	return CFrame.fromMatrix(pos, right, right:Cross(look), -look)
+end
+
+-- A frame halfway from a to b with its -Z pointing at b.
+local function between(a: Vector3, b: Vector3): CFrame
+	return lookAt((a + b) / 2, b, if math.abs((b - a).Unit.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis)
+end
+
+-- A solid box from a to b (`w` x `h` cross-section).
+local function beam(
+	parent: Instance,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	w: number,
+	h: number,
+	color: Color3,
+	mat: Enum.Material?
+): Part
+	return Kit.part(parent, name, V3(w, h, (b - a).Magnitude), between(a, b), color, mat or MAT.Wood)
+end
+
+local function dRod(
+	parent: Instance,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	dia: number,
+	color: Color3,
+	mat: Enum.Material?
+)
+	local cf = between(a, b) * ANG(0, PI / 2, 0) -- the cylinder runs along X
+	dec(Kit.cylinder(parent, name, (b - a).Magnitude, dia, cf, color, mat or MAT.Wood))
+end
+
+local function dBeam(
+	parent: Instance,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	w: number,
+	h: number,
+	color: Color3,
+	mat: Enum.Material?
+)
+	dec(beam(parent, name, a, b, w, h, color, mat))
+end
+
+local function dEllipsoid(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material?)
+	dec(Kit.ellipsoid(parent, name, size, cf, color, mat or MAT.SmoothPlastic))
+end
+
+local function light(part: BasePart, range: number, brightness: number, color: Color3?)
+	local l = Instance.new("PointLight")
+	l.Color = color or Color3.fromRGB(255, 190, 120)
+	l.Range = range
+	l.Brightness = brightness
+	l.Shadows = false
+	l.Parent = part
+end
+
+local function material(name: string, fallback: Enum.Material): Enum.Material
+	local ok, m = pcall(function(): Enum.Material
+		return (Enum.Material :: any)[name]
+	end)
+	return if ok and m then m else fallback
+end
+
+---------------------------------------------------------------------------
+-- Building pieces
+---------------------------------------------------------------------------
+
+-- A course of chunky stones along cf's X; `cf` is the middle of the
+-- course's base line. Stones never stand taller than `height`.
+local function stones(
+	parent: Instance,
+	cf: CFrame,
+	length: number,
+	height: number,
+	depth: number,
+	rng: Rng,
+	minW: number,
+	maxW: number
+)
+	local x = -length / 2
+	while x < length / 2 - 0.25 do
+		local w = math.min(rng:range(minW, maxW), length / 2 - x)
+		local h = height * rng:range(0.78, 0.98)
+		dBox(
+			parent,
+			"Stone",
+			V3(math.max(0.3, w - 0.14), h, depth * rng:range(0.9, 1.1)),
+			cf * CF(x + w / 2, h / 2, 0) * ANG(0, rng:range(-0.04, 0.04), rng:range(-0.03, 0.03)),
+			Kit.vary(rng:pick(STONE), rng, 0.05),
+			MAT.Slate
+		)
+		x += w
+	end
+end
+
+type Faces = { front: boolean?, back: boolean?, left: boolean?, right: boolean? }
+
+-- A solid footing under a building (its top is the floor) with chunky
+-- stones on the listed faces. `cf` is the middle of its base.
+local function plinth(
+	parent: Instance,
+	cf: CFrame,
+	w: number,
+	d: number,
+	h: number,
+	rng: Rng,
+	faces: Faces,
+	stoneW: number
+)
+	Kit.part(parent, "Footing", V3(w, h, d), cf * CF(0, h / 2, 0), MORTAR, MAT.Slate)
+	local function course(face: CFrame, length: number)
+		stones(parent, face, length + 0.4, h, 0.7, rng, stoneW * 0.65, stoneW * 1.25)
+	end
+	if faces.front then
+		course(cf * CF(0, 0, -d / 2), w)
+	end
+	if faces.back then
+		course(cf * CF(0, 0, d / 2) * ANG(0, PI, 0), w)
+	end
+	if faces.left then
+		course(cf * CF(-w / 2, 0, 0) * ANG(0, PI / 2, 0), d)
+	end
+	if faces.right then
+		course(cf * CF(w / 2, 0, 0) * ANG(0, -PI / 2, 0), d)
+	end
+end
+
+-- A plank wall section (solid) in a wall's own frame: `wall` is the wall's
+-- base line (y = 0 at the ground) facing -Z; x0..x1 by y0..y1 is filled.
+local function panel(
+	parent: Instance,
+	wall: CFrame,
+	x0: number,
+	x1: number,
+	y0: number,
+	y1: number,
+	thick: number,
+	rng: Rng,
+	colors: { Color3 },
+	boardH: number
+)
+	local h = y1 - y0
+	local boards = math.max(1, math.floor(h / boardH + 0.5))
+	Kit.plankWall(parent, "Wall", wall * CF((x0 + x1) / 2, (y0 + y1) / 2, 0), x1 - x0, h, thick, boards, rng, colors)
+end
+
+-- A triangular gable (two solid wedges) in a wall frame: base `span` wide
+-- along the frame's X at y = 0, apex `rise` above the middle.
+local function gable(
+	parent: Instance,
+	wall: CFrame,
+	span: number,
+	rise: number,
+	thick: number,
+	color: Color3,
+	mat: Enum.Material?
+)
+	local size = V3(thick, rise, span / 2)
+	Kit.wedge(
+		parent,
+		"Gable",
+		size,
+		wall * CF(-span / 4, rise / 2, 0) * ANG(0, PI / 2, 0),
+		color,
+		mat or MAT.WoodPlanks
+	)
+	Kit.wedge(
+		parent,
+		"Gable",
+		size,
+		wall * CF(span / 4, rise / 2, 0) * ANG(0, -PI / 2, 0),
+		color,
+		mat or MAT.WoodPlanks
 	)
 end
 
--- The sawmill: about 40 x 30 studs, open front (-Z). Named parts:
--- "SawBlade" (a cylinder clients spin), "Smokestack" (has a Smoke).
+-- Vertical battens over a gable's face (board-and-batten texture).
+local function battens(
+	parent: Instance,
+	wall: CFrame,
+	span: number,
+	rise: number,
+	thick: number,
+	gap: number,
+	color: Color3
+)
+	local n = math.floor(span / gap)
+	for i = 1, n - 1 do
+		local x = -span / 2 + i * span / n
+		local h = rise * (1 - math.abs(x) / (span / 2)) - 0.35
+		if h > 0.8 then
+			dBox(parent, "Batten", V3(0.3, h, 0.16), wall * CF(x, h / 2 + 0.05, -thick / 2 - 0.06), color)
+		end
+	end
+end
+
+type RoofStyle = {
+	colors: { Color3 }, -- shingle tones
+	deck: Color3, -- the roof boards seen from below
+	trim: Color3, -- ridge cap and barge boards
+	rowLen: number, -- shingle row depth down the slope
+	pieceLen: number, -- shingle length along a row
+}
+
+-- One roof plane: a solid slab whose top surface runs from the edge
+-- through `top` (centred on it) down `down` for `slopeLen`, `length` wide
+-- along `along`, with overlapping rows of shingles on it. `barge` puts
+-- boards on the sloping ends: nil = both, 0 = none, +1/-1 = the end at
+-- +along / -along only.
+local function roofPlane(
+	parent: Instance,
+	top: Vector3,
+	along: Vector3,
+	down: Vector3,
+	length: number,
+	slopeLen: number,
+	rng: Rng,
+	style: RoofStyle,
+	barge: number?
+)
+	local normal = along:Cross(down).Unit
+	if normal.Y < 0 then
+		normal = -normal
+	end
+	local x = along
+	if x:Cross(normal):Dot(down) > 0 then
+		x = -x
+	end
+	-- local -Z runs down the slope, +Y out of the roof
+	local frame = CFrame.fromMatrix(top, x, normal, x:Cross(normal))
+	Kit.part(parent, "Roof", V3(length, 0.4, slopeLen), frame * CF(0, -0.2, -slopeLen / 2), style.deck, MAT.WoodPlanks)
+	local rows = math.max(2, math.floor(slopeLen / style.rowLen + 0.5))
+	local rl = slopeLen / rows
+	local pieces = math.max(1, math.floor(length / style.pieceLen + 0.5))
+	local pl = length / pieces
+	for r = 1, rows do
+		local z = -(r - 0.5) * rl
+		local edge = -length / 2
+		local first = true
+		while edge < length / 2 - 0.05 do
+			local w = if first
+				then pl * (if r % 2 == 0 then rng:range(0.45, 0.7) else rng:range(0.85, 1.05))
+				else pl * rng:range(0.85, 1.15)
+			if length / 2 - edge - w < pl * 0.35 then
+				w = length / 2 - edge -- no slivers at the far end
+			end
+			first = false
+			dBox(
+				parent,
+				"Shingle",
+				V3(w - 0.08, 0.26, rl * 1.22),
+				frame
+					* CF(edge + w / 2, 0.15 + r * 0.004, z)
+					* ANG(0.1 + rng:range(-0.025, 0.025), rng:range(-0.012, 0.012), 0),
+				Kit.vary(rng:pick(style.colors), rng, 0.05),
+				MAT.WoodPlanks
+			)
+			edge += w
+		end
+	end
+	for _, e in ipairs({ -1, 1 }) do
+		if barge == nil or barge == e then
+			local a = top + along * (e * (length / 2 + 0.13)) - normal * 0.2
+			dBeam(parent, "Barge", a, a + down * slopeLen, 0.3, 0.85, style.trim)
+		end
+	end
+end
+
+-- A gable roof: `cf` = the middle of the wall tops, ridge along cf's X;
+-- `length` along the ridge (gable overhangs included); `wallSpan` = outside
+-- face to outside face across it; `rise` = wall top to ridge; `overhang` =
+-- how far the eaves reach past the walls (they drop below the wall top).
+-- gable(wall, wallSpan, rise) fits underneath it exactly.
+local function gableRoof(
+	parent: Instance,
+	cf: CFrame,
+	length: number,
+	wallSpan: number,
+	rise: number,
+	overhang: number,
+	rng: Rng,
+	style: RoofStyle,
+	barge: number?
+)
+	local w2 = wallSpan / 2
+	local drop = rise * overhang / w2
+	local ridge = (cf * CF(0, rise, 0)).Position
+	for _, side in ipairs({ -1, 1 }) do
+		local eave = (cf * CF(0, -drop, side * (w2 + overhang))).Position
+		roofPlane(parent, ridge, cf.XVector, (eave - ridge).Unit, length, (eave - ridge).Magnitude, rng, style, barge)
+	end
+	dBox(parent, "RidgeCap", V3(length + 0.3, 0.75, 0.75), cf * CF(0, rise + 0.12, 0) * ANG(PI / 4, 0, 0), style.trim)
+end
+
+-- A lantern on an iron bracket out of a wall face (`cf` on the face,
+-- facing -Z, at the lantern's height). Returns the glowing part.
+local function wallLantern(parent: Instance, cf: CFrame, s: number): Part
+	dBox(parent, "Bracket", V3(0.2, 0.2, 1.4) * s, cf * CF(0, 0.95 * s, -0.65 * s), IRON, MAT.Metal)
+	dBox(parent, "Bracket", V3(0.3, 1.1, 0.16) * s, cf * CF(0, 0.6 * s, -0.04 * s), IRON, MAT.Metal)
+	return Kit.lantern(parent, cf * CF(0, 0, -1.25 * s), s)
+end
+
+-- A lantern hanging on a chain from a beam's underside at `top`.
+local function hangingLantern(parent: Instance, top: Vector3, chain: number, s: number): Part
+	dBox(parent, "Chain", V3(0.12, chain, 0.12), CF(top - V3(0, chain / 2, 0)), IRON, MAT.Metal)
+	return Kit.lantern(parent, CF(top - V3(0, chain + 0.82 * s, 0)), s)
+end
+
+-- A painted box of flowers; `cf` = the middle of the box.
+local function flowerBox(parent: Instance, cf: CFrame, w: number, rng: Rng)
+	dBox(parent, "FlowerBox", V3(w, 0.8, 0.9), cf, PLANK_DARK[1])
+	dEllipsoid(parent, "Leaves", V3(w - 0.2, 0.75, 0.8), cf * CF(0, 0.45, 0), rng:pick(LEAF))
+	local n = math.max(3, math.floor(w / 0.75))
+	for i = 1, n do
+		local x = -w / 2 + (i - 0.5) * w / n + rng:range(-0.12, 0.12)
+		dBall(
+			parent,
+			"Flower",
+			rng:range(0.4, 0.55),
+			cf * CF(x, rng:range(0.75, 0.95), rng:range(-0.2, 0.15)),
+			rng:pick(FLOWERS)
+		)
+	end
+end
+
+-- A glowing window on a wall face (`cf` = its middle on the face, facing
+-- -Z) with optional shutters and a flower box under it.
+local function window(
+	parent: Instance,
+	cf: CFrame,
+	w: number,
+	h: number,
+	frame: Color3,
+	shutters: Color3?,
+	flowers: Rng?
+)
+	Kit.window(parent, cf * CF(0, 0, -0.08), w, h, frame, true)
+	if shutters then
+		for _, s in ipairs({ -1, 1 }) do
+			dBox(parent, "Shutter", V3(w * 0.42, h + 0.2, 0.16), cf * CF(s * (w * 0.71 + 0.3), 0, -0.1), shutters)
+		end
+	end
+	if flowers then
+		flowerBox(parent, cf * CF(0, -h / 2 - 0.7, -0.6), w + 0.5, flowers)
+	end
+end
+
+-- A plank door with a frame and a brass knob; `cf` = the middle of its
+-- bottom edge on the wall face.
+local function door(parent: Instance, cf: CFrame, w: number, h: number, color: Color3, frame: Color3)
+	dBox(parent, "Door", V3(w, h, 0.25), cf * CF(0, h / 2, -0.1), color, MAT.WoodPlanks)
+	dBox(parent, "DoorFrame", V3(w + 0.7, 0.35, 0.4), cf * CF(0, h + 0.15, -0.15), frame)
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(parent, "DoorFrame", V3(0.35, h, 0.4), cf * CF(s * (w / 2 + 0.15), h / 2, -0.15), frame)
+	end
+	dBox(parent, "DoorBrace", V3(w - 0.3, 0.3, 0.1), cf * CF(0, h * 0.3, -0.27), Kit.shade(color, -0.12))
+	dBox(parent, "DoorBrace", V3(w - 0.3, 0.3, 0.1), cf * CF(0, h * 0.75, -0.27), Kit.shade(color, -0.12))
+	dBox(parent, "DoorKnob", V3(0.25, 0.25, 0.25), cf * CF(w / 2 - 0.45, h * 0.5, -0.33), BRASS, MAT.Metal)
+end
+
+-- A painted sign board with a frame; `cf` = its middle, facing -Z. The
+-- board is named `name` and carries the text (front, or both faces).
+local function signBoard(
+	parent: Instance,
+	name: string,
+	cf: CFrame,
+	w: number,
+	h: number,
+	text: string,
+	board: Color3,
+	frame: Color3,
+	ink: Color3,
+	bothSides: boolean
+): Part
+	local b = dBox(parent, name, V3(w, h, 0.4), cf, board)
+	Kit.signText(b, text, ink, if bothSides then nil else { Enum.NormalId.Front })
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(parent, "SignFrame", V3(w + 0.6, 0.3, 0.55), cf * CF(0, s * (h / 2 + 0.15), 0), frame)
+		dBox(parent, "SignFrame", V3(0.3, h, 0.55), cf * CF(s * (w / 2 + 0.15), 0, 0), frame)
+	end
+	return b
+end
+
+-- A gooseneck lamp shining down on a sign; `cf` = where the arm leaves
+-- the sign's top edge, facing -Z.
+local function gooseneck(parent: Instance, cf: CFrame)
+	dRod(parent, "LampArm", (cf * CF(0, -0.1, 0.1)).Position, (cf * CF(0, 0.9, -1.0)).Position, 0.18, IRON, MAT.Metal)
+	dBox(parent, "LampShade", V3(0.9, 0.35, 0.7), cf * CF(0, 0.95, -1.25) * ANG(-0.45, 0, 0), IRON, MAT.Metal)
+	light(dBall(parent, "LampBulb", 0.42, cf * CF(0, 0.72, -1.32), GLOW, MAT.Neon), 10, 1.2)
+end
+
+-- A log along cf's X with pale end caps (`caps` 0, 1 = the +X end, 2).
+local function log(
+	parent: Instance,
+	cf: CFrame,
+	length: number,
+	dia: number,
+	rng: Rng,
+	caps: number,
+	solid: boolean?
+): Part
+	local p = Kit.cylinder(parent, "Log", length, dia, cf, Kit.vary(BARK, rng, 0.06), MAT.Wood)
+	if not solid then
+		dec(p)
+	end
+	for i, side in ipairs({ 1, -1 }) do
+		if i <= caps then
+			dCyl(
+				parent,
+				"LogEnd",
+				0.08,
+				dia * 0.8,
+				cf * CF(side * (length / 2 + 0.03), 0, 0),
+				Kit.vary(HEART, rng, 0.04)
+			)
+		end
+	end
+	return p
+end
+
+-- A stack of sawn boards on spacer sticks; `cf` = the middle of its base,
+-- boards along its X, `boards` side by side in each layer.
+local function lumberStack(
+	parent: Instance,
+	cf: CFrame,
+	length: number,
+	width: number,
+	layers: number,
+	boards: number,
+	rng: Rng
+)
+	local y = 0
+	for _ = 1, layers do
+		for _, x in ipairs({ -length * 0.34, length * 0.34 }) do
+			dBox(parent, "Sticker", V3(0.4, 0.25, width + 0.3), cf * CF(x, y + 0.125, 0), PLANK_DARK[2])
+		end
+		y += 0.25
+		local bw = width / boards
+		for b = 1, boards do
+			local p = Kit.part(
+				parent,
+				"Lumber",
+				V3(length * rng:range(0.94, 1), 0.5, bw - 0.06),
+				cf * CF(rng:range(-0.2, 0.2), y + 0.25, -width / 2 + (b - 0.5) * bw),
+				Kit.vary(LUMBER, rng, 0.05),
+				MAT.WoodPlanks
+			)
+			p.CastShadow = true
+		end
+		y += 0.5
+	end
+end
+
+-- A mound of sawdust (half buried ellipsoids) with a few chips around it.
+local function sawdust(parent: Instance, cf: CFrame, size: number, rng: Rng)
+	dEllipsoid(parent, "Sawdust", V3(size * 1.7, size * 0.95, size * 1.4), cf, rng:pick(SAWDUST), MAT.Sand)
+	dEllipsoid(
+		parent,
+		"Sawdust",
+		V3(size * 1.0, size * 0.7, size * 0.9),
+		cf * CF(size * rng:range(-0.5, 0.5), 0, size * rng:range(0.25, 0.5)),
+		rng:pick(SAWDUST),
+		MAT.Sand
+	)
+	for _ = 1, 1 do
+		local a = rng:range(0, PI * 2)
+		dBox(
+			parent,
+			"Chip",
+			V3(0.5, 0.12, 0.3),
+			cf * CF(math.cos(a) * size * 1.05, 0.06, math.sin(a) * size * 0.9) * ANG(0, a, 0),
+			Kit.vary(LUMBER, rng, 0.06)
+		)
+	end
+end
+
+-- A barrel (body + iron hoops + lid); `cf` = the middle of its base.
+local function barrel(parent: Instance, cf: CFrame, rng: Rng, solid: boolean, color: Color3?)
+	local base = cf.Position
+	local body =
+		Kit.post(parent, "Barrel", base, 2.5, 2.0, color or Kit.vary(hex("#8E5A33"), rng, 0.06), MAT.WoodPlanks)
+	if not solid then
+		dec(body)
+	end
+	for _, y in ipairs({ 0.45, 2.05 }) do
+		dec(Kit.post(parent, "Hoop", base + V3(0, y - 0.1, 0), 0.2, 2.1, IRON, MAT.Metal))
+	end
+	dec(Kit.post(parent, "Lid", base + V3(0, 2.5, 0), 0.06, 1.7, PLANK_DARK[1], MAT.Wood))
+end
+
+-- A wooden crate with banded edges and a brace; `cf` = the middle of its
+-- base, `s` its size.
+local function crate(parent: Instance, cf: CFrame, s: number, rng: Rng, solid: boolean)
+	local body = Kit.part(
+		parent,
+		"Crate",
+		V3(s, s, s),
+		cf * CF(0, s / 2, 0),
+		Kit.vary(hex("#C08A55"), rng, 0.05),
+		MAT.WoodPlanks
+	)
+	if not solid then
+		dec(body)
+	end
+	local band = Kit.vary(hex("#7E5230"), rng, 0.04)
+	for _, y in ipairs({ 0.18, s - 0.18 }) do
+		dBox(parent, "CrateBand", V3(s + 0.1, 0.3, s + 0.1), cf * CF(0, y, 0), band)
+	end
+	dBox(parent, "CrateBrace", V3(0.3, s * 1.2, 0.1), cf * CF(0, s / 2, -s / 2 - 0.05) * ANG(0, 0, PI / 4), band)
+end
+
+-- An axe hanging head-up: handle up from `cf`, the bit toward cf's -X.
+local function rackAxe(parent: Instance, cf: CFrame, len: number, color: Color3, mat: Enum.Material)
+	dBox(parent, "AxeHandle", V3(0.26, len, 0.26), cf * CF(0, len / 2, 0), HANDLE)
+	local head = dBox(parent, "AxeHead", V3(0.95, 0.85, 0.3), cf * CF(-0.4, len - 0.45, 0), color, mat)
+	if mat == MAT.Neon then
+		light(head, 6, 0.8, color)
+	end
+end
+
+-- A brass cash register; `cf` = the middle of its base on a counter.
+local function register(parent: Instance, cf: CFrame)
+	dBox(parent, "Register", V3(1.6, 0.85, 1.2), cf * CF(0, 0.42, 0), BRASS, MAT.Metal)
+	dBox(
+		parent,
+		"Register",
+		V3(1.4, 0.55, 0.6),
+		cf * CF(0, 1.0, 0.25) * ANG(-0.45, 0, 0),
+		Kit.shade(BRASS, -0.15),
+		MAT.Metal
+	)
+	dBox(parent, "RegisterTag", V3(0.8, 0.4, 0.08), cf * CF(0, 1.5, 0.42), PAPER, MAT.SmoothPlastic)
+end
+
+-- An open ledger book; `cf` = its middle on a counter.
+local function ledger(parent: Instance, cf: CFrame)
+	dBox(parent, "LedgerCover", V3(2.0, 0.08, 1.35), cf * CF(0, 0.04, 0), hex("#3F5E3A"))
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(
+			parent,
+			"LedgerPage",
+			V3(0.92, 0.1, 1.2),
+			cf * CF(s * 0.47, 0.12, 0) * ANG(0, 0, -s * 0.07),
+			PAPER,
+			MAT.SmoothPlastic
+		)
+	end
+end
+
+-- A grindstone: a stone wheel turning in a trough on splayed legs.
+local function grindstone(parent: Instance, cf: CFrame)
+	dBox(parent, "GrindTrough", V3(2.6, 0.7, 1.3), cf * CF(0, 1.9, 0), TIMBER_LIGHT)
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			dBeam(
+				parent,
+				"GrindLeg",
+				(cf * V3(sx * 1.25, 0, sz * 0.7)),
+				(cf * V3(sx * 0.95, 1.7, sz * 0.45)),
+				0.3,
+				0.3,
+				TIMBER
+			)
+		end
+	end
+	dCyl(parent, "Grindstone", 0.55, 2.6, cf * CF(0, 2.9, 0), hex("#B9AE98"), MAT.Sandstone)
+	dCyl(parent, "Axle", 2.9, 0.25, cf * CF(0, 2.9, 0), IRON, MAT.Metal)
+	dBox(parent, "Crank", V3(0.2, 0.9, 0.2), cf * CF(1.5, 2.55, 0), IRON, MAT.Metal)
+	dCyl(parent, "CrankHandle", 0.7, 0.25, cf * CF(1.8, 2.15, 0), HANDLE)
+end
+
+-- A chopping block (a solid stump) with an axe sunk in its top.
+local function choppingBlock(parent: Instance, cf: CFrame, rng: Rng)
+	local base = cf.Position
+	Kit.post(parent, "ChoppingBlock", base, 1.5, 2.0, Kit.vary(BARK, rng, 0.05), MAT.Wood)
+	dec(Kit.post(parent, "StumpTop", base + V3(0, 1.5, 0), 0.06, 1.7, HEART, MAT.Wood))
+	dRod(parent, "AxeHandle", (cf * V3(0.15, 1.55, 0)), (cf * V3(1.6, 3.0, -0.2)), 0.26, HANDLE)
+	dBox(parent, "AxeHead", V3(0.3, 0.75, 1.0), cf * CF(0.05, 1.55, 0.05) * ANG(0, 0, 0.78), hex("#A7ADB4"), MAT.Metal)
+	for i = 1, 2 do
+		local a = rng:range(0, PI * 2)
+		dWedge(
+			parent,
+			"Split",
+			V3(0.6, 0.6, 1.4),
+			cf * CF(math.cos(a) * 1.7, 0.3, math.sin(a) * 1.7) * ANG(0, a + i, 0),
+			Kit.vary(HEART, rng, 0.05)
+		)
+	end
+end
+
+-- A potted shrub in a half barrel; `cf` = the middle of its base.
+local function planter(parent: Instance, cf: CFrame, rng: Rng)
+	local base = cf.Position
+	Kit.post(parent, "Planter", base, 1.3, 2.0, Kit.vary(PLANK_DARK[1], rng, 0.05), MAT.WoodPlanks)
+	dec(Kit.post(parent, "Hoop", base + V3(0, 0.9, 0), 0.18, 2.08, IRON, MAT.Metal))
+	dec(Kit.post(parent, "Soil", base + V3(0, 1.3, 0), 0.08, 1.8, SOIL, MAT.Ground))
+	Kit.blob(parent, "Shrub", cf * CF(0, 2.05, 0), V3(2.0, 1.7, 2.0), 3, rng, LEAF)
+	for _ = 1, 2 do
+		local a = rng:range(0, PI * 2)
+		dBall(
+			parent,
+			"Flower",
+			0.45,
+			cf * CF(math.cos(a) * 0.75, rng:range(2.1, 2.7), math.sin(a) * 0.75),
+			rng:pick(FLOWERS)
+		)
+	end
+end
+
+---------------------------------------------------------------------------
+-- The sawmill
+---------------------------------------------------------------------------
+
+-- The sawmill: about 40 x 30 studs (x -20..21, z -13..15), the mill shed's
+-- open front (-Z) on the sell side. Nothing within |x| < 12 reaches past
+-- z = -13, so the sell pad can start 13 studs in front of the centre.
+--   * the mill shed (x -11..11): plank deck at y = 1 up a front ramp, the
+--     headrig inside (log carriage on rails, the saw, a steam engine and
+--     boiler), a "TIMBERLINE SAWMILL" crest sign above the roof ridge;
+--   * the office cabin on the west side, the log slip and log deck under a
+--     lean-to on the east, lumber stacks, sawdust, barrels, lanterns.
+-- Named parts:
+--   "SawBlade": a cylinder (9 across) whose axis is its own X axis,
+--     pointing along world Z (the blade faces the sell pad). Spin it on
+--     clients with blade.CFrame *= CFrame.Angles(step, 0, 0). Its teeth,
+--     hub and rivets are welded to it (unanchored, massless), so they turn
+--     with it. Not collidable.
+--   "Smokestack": the top of the brick stack (y 25.7..27.9), holding the
+--     Smoke.
 function BuildingArt.Sawmill(): Model
 	local model = Kit.model("Sawmill")
-	shell(model, 34, 26, 8, ROOF, true)
-	local blade = Kit.cylinder(
+	local rng = Kit.rng(1907)
+	local roofStyle: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2.3, pieceLen = 9 }
+
+	-- The mill shed: x -11..11, z -11.5..13, deck at y = 1, walls to 13.
+	local X0, X1, Z0, Z1 = -11, 11, -11.5, 13
+	local FLOOR, TOP, RISE = 1, 13, 7
+	local zMid, depth = (Z0 + Z1) / 2, Z1 - Z0
+	plinth(model, CF(0, 0, zMid), 22, depth, FLOOR - 0.2, rng, { front = true, right = true, back = true }, 3.4)
+	for i = 0, 3 do
+		Kit.part(
+			model,
+			"Deck",
+			V3(5.44, 0.2, depth),
+			CF(X0 + 2.75 + i * 5.5, FLOOR - 0.1, zMid),
+			Kit.vary(PLANK[1], rng, 0.05),
+			MAT.WoodPlanks
+		)
+	end
+	Kit.wedge(model, "Ramp", V3(18, FLOOR, 1.5), CF(0, FLOOR / 2, Z0 - 0.75), PLANK[2], MAT.WoodPlanks)
+	for _, x in ipairs({ X0, X1 }) do
+		for _, z in ipairs({ Z0, 0.75, Z1 }) do
+			Kit.part(model, "Post", V3(1.4, TOP - FLOOR, 1.4), CF(x, (TOP + FLOOR) / 2, z), TIMBER, MAT.Wood)
+		end
+	end
+	panel(model, CF(0, 0, Z1) * ANG(0, PI, 0), X0, X1, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	panel(model, CF(X0, 0, 0) * ANG(0, PI / 2, 0), -Z1, -Z0, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	local east = CF(X1, 0, 0) * ANG(0, -PI / 2, 0) -- local x = world z
+	panel(model, east, Z0, -3.6, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	panel(model, east, 2.4, Z1, FLOOR, TOP, 0.6, rng, PLANK, 1.75)
+	panel(model, east, -3.6, 2.4, 7.4, TOP, 0.6, rng, PLANK, 1.75)
+	local front = CF(0, TOP, Z0)
+	gable(model, front, 22, RISE, 0.6, PLANK[3])
+	battens(model, front, 22, RISE, 0.6, 2.6, PLANK_DARK[1])
+	gable(model, CF(0, TOP, Z1) * ANG(0, PI, 0), 22, RISE, 0.6, PLANK[3])
+	Kit.part(model, "Header", V3(23.4, 1.4, 1.5), CF(0, TOP - 0.7, Z0), TIMBER, MAT.Wood)
+	for _, s in ipairs({ -1, 1 }) do
+		dBeam(model, "Brace", V3(s * 10.4, 8.6, Z0), V3(s * 7.2, TOP - 1.3, Z0), 0.7, 0.7, TIMBER)
+	end
+	dBox(model, "TieBeam", V3(21.4, 1, 1), CF(0, TOP - 0.5, -2.6), TIMBER)
+	-- A log-slice medallion on the front gable.
+	local slice = front * CF(0, 2.6, -0.42) * ANG(0, PI / 2, 0)
+	dCyl(model, "Medallion", 0.3, 3.4, slice, BARK)
+	dCyl(model, "Medallion", 0.36, 2.9, slice, HEART)
+	dCyl(model, "Medallion", 0.42, 1.7, slice, Kit.shade(HEART, -0.1))
+	dCyl(model, "Medallion", 0.48, 0.6, slice, Kit.shade(HEART, -0.25))
+	gableRoof(model, CF(0, TOP, zMid) * ANG(0, PI / 2, 0), depth + 2.4, 23.4, RISE, 1.4, rng, roofStyle)
+
+	-- The crest sign above the ridge, on two posts standing on the roof.
+	local signY, signZ = TOP + RISE + 2.4, Z0 - 0.3
+	signBoard(
 		model,
-		"SawBlade",
-		0.4,
-		6,
-		CFrame.new(-8, 5.5, 0) * CFrame.Angles(0, math.pi / 2, 0),
-		Color3.fromRGB(170, 170, 175),
-		Enum.Material.Metal
+		"Sign",
+		CF(0, signY, signZ),
+		17,
+		3.4,
+		"TIMBERLINE SAWMILL",
+		SIGN_BOARD,
+		TIMBER_LIGHT,
+		SIGN_INK,
+		true
 	)
-	Kit.decor(blade)
-	local stack = Kit.post(model, "Smokestack", Vector3.new(12, 1, 8), 16, 2, STONE, Enum.Material.Slate)
+	for _, s in ipairs({ -1, 1 }) do
+		local roofY = TOP + RISE * (1 - 5.5 / 11.7)
+		local h = signY - 1.7 - roofY + 0.6
+		Kit.part(model, "SignPost", V3(0.7, h, 0.7), CF(s * 5.5, roofY - 0.6 + h / 2, signZ + 0.65), TIMBER, MAT.Wood)
+		gooseneck(model, CF(s * 4.6, signY + 1.85, signZ - 0.2))
+	end
+
+	-- The office cabin (west): x -20..-11.3, z -7..9.
+	local CX0, CX1, CZ0, CZ1, CTOP = -20, -11.3, -7, 9, 9
+	local cw, cd = CX1 - CX0, CZ1 - CZ0
+	local ccx, ccz = (CX0 + CX1) / 2, (CZ0 + CZ1) / 2
+	local cabinRoof: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2.1, pieceLen = 6.5 }
+	plinth(model, CF(ccx, 0, ccz), cw, cd, FLOOR, rng, { front = true, left = true, back = true }, 2.9)
+	panel(model, CF(0, 0, CZ0), CX0, CX1, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	panel(model, CF(CX0, 0, 0) * ANG(0, PI / 2, 0), -CZ1, -CZ0, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	panel(model, CF(0, 0, CZ1) * ANG(0, PI, 0), -CX1, -CX0, FLOOR, CTOP, 0.6, rng, CABIN, 1.9)
+	for _, c in ipairs({ { CX0, CZ0 }, { CX0, CZ1 }, { CX1, CZ0 } }) do
+		Kit.part(model, "Post", V3(1, CTOP - FLOOR, 1), CF(c[1], (CTOP + FLOOR) / 2, c[2]), TIMBER, MAT.Wood)
+	end
+	gable(model, CF(CX0, CTOP, ccz) * ANG(0, PI / 2, 0), cd, 4.6, 0.6, CABIN[3])
+	gableRoof(model, CF(ccx - 0.5, CTOP, ccz), cw + 1, cd + 0.6, 4.6, 1.2, rng, cabinRoof, -1)
+	door(model, CF(-14.1, FLOOR, CZ0 - 0.3), 2.8, 6, DOOR, TIMBER_LIGHT)
+	window(model, CF(-17.6, 5.4, CZ0 - 0.3), 2.5, 2.4, TIMBER_LIGHT, nil, rng)
+	window(model, CF(CX0 - 0.3, 5.4, 1) * ANG(0, PI / 2, 0), 2.6, 2.4, TIMBER_LIGHT, SHUTTER, nil)
+	wallLantern(model, CF(CX1, 6.6, CZ0 - 0.5), 0.9)
+
+	-- The smokestack behind the cabin, fed by the boiler's flue.
+	local sx, sz = -15.4, 12.4
+	Kit.part(model, "StackBase", V3(4.4, 3, 4.4), CF(sx, 1.5, sz), STONE[2], MAT.Slate)
+	dBox(model, "StackBase", V3(4.9, 0.5, 4.9), CF(sx, 3.1, sz), STONE[1], MAT.Slate)
+	Kit.part(model, "StackShaft", V3(3, 22.4, 3), CF(sx, 14.5, sz), BRICK, MAT.Brick)
+	for _, y in ipairs({ 10, 18 }) do
+		dBox(model, "StackBand", V3(3.35, 0.5, 3.35), CF(sx, y, sz), BRICK_DARK, MAT.Brick)
+	end
+	dBox(model, "StackBand", V3(3.7, 0.8, 3.7), CF(sx, 25.4, sz), BRICK_DARK, MAT.Brick)
+	local stack = Kit.part(model, "Smokestack", V3(3.2, 2.2, 3.2), CF(sx, 26.8, sz), SOOT, MAT.Brick)
+	dBox(model, "StackRim", V3(3.6, 0.4, 3.6), CF(sx, 28, sz), IRON, MAT.Metal)
 	local smoke = Instance.new("Smoke")
-	smoke.Opacity = 0.15
-	smoke.RiseVelocity = 4
-	smoke.Size = 3
+	smoke.Color = Color3.fromRGB(226, 220, 212)
+	smoke.Opacity = 0.18
+	smoke.RiseVelocity = 5
+	smoke.Size = 4
 	smoke.Parent = stack
+
+	-- The lean-to over the log slip and the log deck (east).
+	for _, z in ipairs({ -10.2, -0.6, 10.2 }) do
+		Kit.part(model, "Post", V3(1, 7, 1), CF(19.6, 3.5, z), TIMBER, MAT.Wood)
+	end
+	dBox(model, "Plate", V3(1.1, 0.8, 21.4), CF(19.6, 7.2, 0), TIMBER)
+	local hi, lo = V3(11.5, 10.6, 0), V3(20.9, 7.25, 0)
+	roofPlane(model, hi, Vector3.zAxis, (lo - hi).Unit, 22, (lo - hi).Magnitude, rng, roofStyle)
+	dBox(model, "Fascia", V3(0.35, 0.8, 22.3), CF(21.05, 6.9, 0), TIMBER)
+	-- The log slip: logs ride up it onto the carriage.
+	local slipZ = -0.6
+	local slipA, slipB = V3(21.6, 0.3, slipZ), V3(11.6, 2.1, slipZ)
+	for _, dz in ipairs({ -1, 1 }) do
+		dBeam(model, "SlipRail", slipA + V3(0, 0, dz), slipB + V3(0, 0, dz), 0.45, 0.6, TIMBER)
+		Kit.part(model, "SlipLeg", V3(0.5, 1.7, 0.5), CF(12.8, 0.85, slipZ + dz), TIMBER, MAT.Wood)
+	end
+	dBeam(model, "SlipChain", slipA + V3(0, 0.25, 0), slipB + V3(0, 0.25, 0), 0.35, 0.25, IRON, MAT.Metal)
+	local slipDir = (slipB - slipA).Unit
+	local onSlip = slipA:Lerp(slipB, 0.45) + V3(0, 1.45, 0)
+	log(model, lookAt(onSlip, onSlip + slipDir) * ANG(0, PI / 2, 0), 6.5, 2.2, rng, 2)
+	-- The log deck: a pyramid of logs, cut ends to the front.
+	for row = 0, 2 do
+		for i = 0, 2 - row do
+			local x = 16.3 + (i - (2 - row) / 2) * 2.1
+			log(model, CF(x, 1.0 + row * 1.75, -6.6) * ANG(0, PI / 2, 0), 6.4, 2.0, rng, 1, row == 0)
+		end
+	end
+
+	-- The headrig: carriage on rails, the log, the saw, its drive.
+	for _, z in ipairs({ -1.6, 0.4 }) do
+		dBox(model, "Rail", V3(21.6, 0.25, 0.3), CF(0, FLOOR + 0.125, z), STEEL_DARK, MAT.Metal)
+	end
+	local carX = 3.4
+	Kit.part(model, "Carriage", V3(6.6, 0.55, 2.9), CF(carX, FLOOR + 0.78, -0.6), TIMBER, MAT.Wood)
+	for _, dx in ipairs({ -2.5, 2.5 }) do
+		for _, z in ipairs({ -1.6, 0.4 }) do
+			dCyl(model, "Wheel", 0.4, 0.9, CF(carX + dx, FLOOR + 0.7, z) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+		end
+		dBox(model, "Knee", V3(0.7, 2.2, 0.6), CF(carX + dx * 0.76, FLOOR + 2.15, -1.75), TIMBER_LIGHT)
+	end
+	log(model, CF(carX, FLOOR + 2.35, -0.1), 6.2, 2.6, rng, 2)
+
+	local bladeCf = CF(-3.2, 6, 1.35) * ANG(0, PI / 2, 0)
+	local blade = Kit.cylinder(model, "SawBlade", 0.3, 9, bladeCf, hex("#DDE2E6"), MAT.Metal)
+	Kit.decor(blade)
+	local function onBlade(p: BasePart)
+		dec(p)
+		p.Anchored = false
+		p.Massless = true
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = blade
+		weld.Part1 = p
+		weld.Parent = p
+	end
+	local hub = bladeCf.Position
+	for i = 0, 15 do
+		local a = i / 16 * PI * 2
+		local radial = V3(math.cos(a), math.sin(a), 0)
+		onBlade(
+			Kit.wedge(
+				model,
+				"SawTooth",
+				V3(0.26, 0.6, 0.9),
+				CFrame.fromMatrix(hub + radial * 4.7, Vector3.zAxis, radial, V3(-radial.Y, radial.X, 0)),
+				STEEL_DARK,
+				MAT.Metal
+			)
+		)
+	end
+	onBlade(Kit.cylinder(model, "BladeHub", 0.5, 1.8, bladeCf, IRON, MAT.Metal))
+	for i = 0, 2 do
+		local a = i / 3 * PI * 2 + 0.5
+		onBlade(
+			Kit.cylinder(
+				model,
+				"BladeRivet",
+				0.34,
+				0.6,
+				CF(hub + V3(math.cos(a), math.sin(a), 0) * 2.6) * ANG(0, PI / 2, 0),
+				IRON,
+				MAT.Metal
+			)
+		)
+	end
+	dCyl(model, "Arbor", 3.4, 0.55, CF(-3.2, 6, 3) * ANG(0, PI / 2, 0), STEEL_DARK, MAT.Metal)
+	Kit.part(model, "SawFrame", V3(1.6, 4.6, 1.4), CF(-3.2, FLOOR + 2.3, 3.4), TIMBER, MAT.Wood)
+	dBox(model, "Bearing", V3(1.9, 0.9, 1.6), CF(-3.2, 6, 3.4), IRON, MAT.Metal)
+	dCyl(model, "Pulley", 0.6, 2.2, CF(-3.2, 6, 4.5) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+	dCyl(model, "Flywheel", 0.5, 3, CF(-3.2, FLOOR + 1.6, 4.5) * ANG(0, PI / 2, 0), hex("#8E3426"), MAT.Metal)
+	for _, s in ipairs({ -1, 1 }) do
+		dBeam(
+			model,
+			"Belt",
+			V3(-3.2 + s * 1.12, 6, 4.5),
+			V3(-3.2 + s * 1.5, FLOOR + 1.6, 4.5),
+			0.5,
+			0.14,
+			hex("#4A2F22")
+		)
+	end
+	Kit.part(model, "Engine", V3(3, 1.2, 1.8), CF(-7, FLOOR + 0.6, 4.5), IRON, MAT.Metal)
+	dCyl(model, "SteamCylinder", 2.4, 1.5, CF(-7.2, FLOOR + 1.95, 4.5), hex("#8E3426"), MAT.Metal)
+	dRod(model, "PistonRod", V3(-6, FLOOR + 1.95, 4.5), V3(-3.7, FLOOR + 2.3, 4.1), 0.25, STEEL, MAT.Metal)
+	Kit.post(model, "Boiler", V3(-8, FLOOR, 9.8), 5.6, 3.2, hex("#3E3936"), MAT.Metal)
+	dEllipsoid(model, "BoilerDome", V3(3.2, 1.4, 3.2), CF(-8, FLOOR + 5.6, 9.8), hex("#4A4542"), MAT.Metal)
+	local firebox = dBox(model, "Firebox", V3(1.3, 1.0, 0.25), CF(-8, FLOOR + 1.0, 8.15), EMBER, MAT.Neon)
+	light(firebox, 9, 1.4, Color3.fromRGB(255, 140, 70))
+	dRod(model, "Flue", V3(-8, FLOOR + 6, 9.8), V3(-8, 9.6, 9.8), 0.9, IRON, MAT.Metal)
+	dRod(model, "Flue", V3(-8, 9.6, 9.8), V3(-13.9, 9.6, 12.4), 0.9, IRON, MAT.Metal)
+	dRod(model, "SteamPipe", V3(-7.6, FLOOR + 4.2, 8.3), V3(-7.2, FLOOR + 2.6, 5.4), 0.35, STEEL_DARK, MAT.Metal)
+
+	-- Inside: cut lumber, sawdust, barrels, lanterns from the tie beam.
+	lumberStack(model, CF(-7.4, FLOOR, -8.4), 5.6, 2.4, 3, 2, rng)
+	sawdust(model, CF(-5.8, FLOOR, -3.5), 2, rng)
+	barrel(model, CF(8.4, FLOOR, -9.3), rng, true)
+	barrel(model, CF(9.1, FLOOR, -7.1), rng, true)
+	for _, x in ipairs({ -5, 5 }) do
+		hangingLantern(model, V3(x, TOP - 1, -2.6), 1.2, 0.9)
+	end
+
+	-- Outside: lanterns on the front posts, sawdust, the office's yard.
+	for _, s in ipairs({ -1, 1 }) do
+		wallLantern(model, CF(s * 11, 9.4, Z0 - 0.7), 1)
+	end
+	sawdust(model, CF(15.4, 0, -11), 2.8, rng)
+	lumberStack(model, CF(-16.4, 0, -10.5), 5.4, 2.2, 3, 2, rng)
+	barrel(model, CF(-12.6, 0, -8.6), rng, true)
+	crate(model, CF(-19, 0, -8.4) * ANG(0, 0.2, 0), 1.8, rng, true)
+	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, false)
 	return model
 end
 
--- A shop: about 18 x 14 studs, open front (-Z). `kind` is "ToolShed",
--- "Dealership" or "HearthAndHome"; `title` goes on the sign. Named parts:
--- "Counter" (a direct child; MapBuilder puts the ShopPoint on its -Z side).
+---------------------------------------------------------------------------
+-- The shops
+---------------------------------------------------------------------------
+
+-- The Tool Shed: a red barn workshop with a gambrel roof, its barn doors
+-- slid open on the counter, the axe ladder on the back wall (every axe the
+-- shop sells, from ItemCatalog), a grindstone and a chopping block out
+-- front, logs stacked by the east wall.
+local function toolShed(model: Model, title: string, accent: Color3)
+	local rng = Kit.rng(311)
+	local red = { accent, Kit.shade(accent, 0.07), Kit.shade(accent, -0.07), Kit.vary(accent, rng, 0.05) }
+	local doorRed = Kit.shade(accent, -0.2)
+	local roofStyle: RoofStyle = { colors = BARN_ROOF, deck = ROOF_DECK, trim = TRIM, rowLen = 2.4, pieceLen = 8 }
+	local HX, HZ, FLOOR, TOP = 9, 7, 0.5, 9
+
+	plinth(model, CF(0, 0, 0), 2 * HX, 2 * HZ, FLOOR, rng, { left = true, right = true, back = true }, 3.2)
+	for _, s in ipairs({ -1, 1 }) do
+		stones(model, CF(s * 7, 0, -HZ), 4, FLOOR, 0.7, rng, 1.3, 2.3)
+	end
+	Kit.wedge(model, "Ramp", V3(10, FLOOR, 1.2), CF(0, FLOOR / 2, -HZ - 0.6), PLANK_DARK[1], MAT.WoodPlanks)
+
+	-- Walls: red boards; the front opens on a 10-wide barn door.
+	panel(model, CF(-HX, 0, 0) * ANG(0, PI / 2, 0), -HZ, HZ, FLOOR, TOP, 0.6, rng, red, 1.7)
+	panel(model, CF(HX, 0, 0) * ANG(0, -PI / 2, 0), -HZ, HZ, FLOOR, TOP, 0.6, rng, red, 1.7)
+	panel(model, CF(0, 0, HZ) * ANG(0, PI, 0), -HX, HX, FLOOR, TOP, 0.6, rng, red, 1.7)
+	local front = CF(0, 0, -HZ)
+	panel(model, front, -HX, -5, FLOOR, TOP, 0.6, rng, red, 1.7)
+	panel(model, front, 5, HX, FLOOR, TOP, 0.6, rng, red, 1.7)
+	panel(model, front, -5, 5, 7.6, TOP, 0.6, rng, red, 1.7)
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			dBox(
+				model,
+				"Trim",
+				V3(0.5, TOP - FLOOR, 0.5),
+				CF(sx * (HX + 0.1), (TOP + FLOOR) / 2, sz * (HZ + 0.1)),
+				TRIM
+			)
+		end
+	end
+
+	-- The gambrel roof: steep lower slopes, shallow upper ones.
+	local KX, KY, RY = 5.6, 13, 14.8
+	local length = 2 * HZ + 2
+	local ridge = V3(0, RY, 0)
+	for _, s in ipairs({ -1, 1 }) do
+		local knee = V3(s * KX, KY, 0)
+		local eave = V3(s * (HX + 0.3), TOP, 0)
+		roofPlane(model, knee, Vector3.zAxis, (eave - knee).Unit, length, (eave - knee).Magnitude + 0.9, rng, roofStyle)
+		roofPlane(
+			model,
+			ridge,
+			Vector3.zAxis,
+			(knee - ridge).Unit,
+			length,
+			(knee - ridge).Magnitude + 0.35,
+			rng,
+			roofStyle
+		)
+	end
+	dBox(model, "RidgeCap", V3(0.75, 0.75, length + 0.3), CF(0, RY + 0.12, 0) * ANG(0, 0, PI / 4), TRIM)
+	for _, z in ipairs({ -HZ, HZ }) do
+		local wall = CF(0, 0, z) * (if z > 0 then ANG(0, PI, 0) else CFrame.identity)
+		panel(model, wall, -KX, KX, TOP, KY, 0.6, rng, red, 1.7)
+		for _, s in ipairs({ -1, 1 }) do
+			Kit.wedge(
+				model,
+				"Gable",
+				V3(0.6, KY - TOP, HX - KX),
+				wall * CF(s * (KX + (HX - KX) / 2), (TOP + KY) / 2, 0) * ANG(0, -s * PI / 2, 0),
+				red[2],
+				MAT.WoodPlanks
+			)
+		end
+		gable(model, wall * CF(0, KY, 0), 2 * KX, RY - KY, 0.6, red[1])
+	end
+
+	-- Barn doors slid open (white trim, X braces) on a track.
+	dBox(model, "DoorTrack", V3(2 * HX + 0.6, 0.3, 0.3), CF(0, 7.9, -HZ - 0.5), IRON, MAT.Metal)
+	local diag, tilt = math.sqrt(3.6 ^ 2 + 6.4 ^ 2), math.atan2(3.6, 6.4)
+	for _, s in ipairs({ -1, 1 }) do
+		local d = CF(s * 7, FLOOR, -HZ - 0.5)
+		dBox(model, "BarnDoor", V3(4.4, 7.2, 0.3), d * CF(0, 3.6, 0), doorRed, MAT.WoodPlanks)
+		for _, bar in ipairs({ { 0, 0.2, 4.4, 0.4 }, { 0, 7.0, 4.4, 0.4 }, { -2, 3.6, 0.4, 7.2 }, { 2, 3.6, 0.4, 7.2 } }) do
+			dBox(model, "DoorTrim", V3(bar[3], bar[4], 0.15), d * CF(bar[1], bar[2], -0.2), TRIM)
+		end
+		for _, k in ipairs({ -1, 1 }) do
+			dBox(model, "DoorTrim", V3(0.4, diag, 0.15), d * CF(0, 3.6, -0.2) * ANG(0, 0, k * tilt), TRIM)
+		end
+	end
+
+	-- The sign on the gable, a hay hoist above it, windows, lanterns.
+	signBoard(model, "Sign", CF(0, 10.6, -HZ - 0.45), 9.6, 2.3, title, TRIM, TIMBER, doorRed, false)
+	dBox(model, "HoistBeam", V3(0.7, 0.7, 2.8), CF(0, 13.45, -HZ - 1.1), TIMBER)
+	dCyl(model, "Pulley", 0.3, 0.8, CF(0, 12.85, -HZ - 2.2), IRON, MAT.Metal)
+	dBox(model, "Rope", V3(0.12, 0.7, 0.12), CF(0, 12.2, -HZ - 2.55), ROPE, MAT.Fabric)
+	dBox(model, "Hook", V3(0.35, 0.35, 0.35), CF(0, 11.75, -HZ - 2.55), IRON, MAT.Metal)
+	for _, s in ipairs({ -1, 1 }) do
+		window(model, CF(s * (HX + 0.3), 5.2, 0) * ANG(0, -s * PI / 2, 0), 2.6, 2.6, TRIM, nil, nil)
+		hangingLantern(model, V3(s * 3.8, 7.6, -HZ + 0.1), 0.6, 0.85)
+	end
+	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
+	hangingLantern(model, V3(0, TOP - 0.8, 3.6), 0.9, 0.9)
+
+	-- Inside: the counter, the axe rack, a workbench, a barrel of handles.
+	Kit.part(model, "Counter", V3(9, 3, 2), CF(0, FLOOR + 1.5, 1.4), PLANK_DARK[1], MAT.WoodPlanks)
+	dBox(model, "CounterTop", V3(9.6, 0.3, 2.6), CF(0, FLOOR + 3.15, 1.4), PLANK[4])
+	for _, x in ipairs({ -3, 0, 3 }) do
+		dBox(model, "CounterTrim", V3(0.3, 2.7, 0.14), CF(x, FLOOR + 1.45, 0.33), PLANK_DARK[3])
+	end
+	register(model, CF(2.7, FLOOR + 3.3, 1.6))
+	ledger(model, CF(-2.5, FLOOR + 3.3, 1.2))
+	dBox(model, "AxeRack", V3(11.6, 4.2, 0.3), CF(0, 5.5, HZ - 0.45), PLANK_DARK[2])
+	dBox(model, "AxeRackRail", V3(11.8, 0.35, 0.45), CF(0, 4.1, HZ - 0.75), TIMBER)
+	local axes = {}
+	for _, axe in ipairs(ItemCatalog.AxeLadder()) do
+		if axe.sold ~= false then
+			table.insert(axes, axe)
+		end
+	end
+	for i, axe in ipairs(axes) do
+		local x = (i - (#axes + 1) / 2) * 1.35
+		rackAxe(
+			model,
+			CF(x + 0.2, 3.7, HZ - 0.85),
+			3.7,
+			hex(axe.look.headColor),
+			material(axe.look.material, MAT.Metal)
+		)
+	end
+	dBox(model, "Workbench", V3(1.9, 0.35, 5.6), CF(-HX + 1.4, FLOOR + 2.9, 2.6), PLANK[2])
+	for _, z in ipairs({ 0.4, 4.8 }) do
+		dBox(model, "BenchLeg", V3(1.6, 2.7, 0.35), CF(-HX + 1.4, FLOOR + 1.35, z), TIMBER)
+	end
+	dBox(model, "Vise", V3(0.8, 0.7, 0.6), CF(-HX + 2.1, FLOOR + 3.4, 1.0), IRON, MAT.Metal)
+	dBox(model, "Saw", V3(0.1, 1.0, 3.2), CF(-HX + 0.45, 6.1, 2.6), STEEL, MAT.Metal)
+	barrel(model, CF(-6.3, FLOOR, -4.4), rng, true)
+	for i = 1, 3 do
+		dBox(
+			model,
+			"Handle",
+			V3(0.25, 3, 0.25),
+			CF(-6.3 + (i - 2) * 0.45, FLOOR + 3.2, -4.4 + (i % 2) * 0.3) * ANG(rng:range(-0.2, 0.2), 0, (i - 2) * 0.18),
+			HANDLE
+		)
+	end
+
+	-- Out front: the grindstone and the chopping block; logs by the wall.
+	grindstone(model, CF(-6.9, 0, -9.3))
+	choppingBlock(model, CF(6.8, 0, -9.4), rng)
+	for row = 0, 1 do
+		for i = 0, 1 - row do
+			local z = -2 + (i - (1 - row) / 2) * 1.55
+			log(model, CF(HX + 1.25, 0.75 + row * 1.32, z), 2, 1.5, rng, 1, row == 0)
+		end
+	end
+end
+
+-- The Dealership: a garage with a western false front, the roll-up door
+-- rolled up over the counter, the paint swatches on the back wall (every
+-- truck colour on sale), a tyre stack and a gas pump on the apron, the
+-- office on the east side.
+local function dealership(model: Model, title: string, accent: Color3)
+	local rng = Kit.rng(512)
+	local cream = { hex("#EEDFC3"), hex("#E6D5B5"), hex("#F3E6CD"), hex("#E9DABD") }
+	local paint = { accent, Kit.shade(accent, 0.08), Kit.shade(accent, -0.06) }
+	local dark = Kit.shade(accent, -0.35)
+	local roofStyle: RoofStyle = { colors = TIN_ROOF, deck = ROOF_DECK, trim = dark, rowLen = 1.7, pieceLen = 7.5 }
+	local FLOOR, TOP = 0.3, 10
+	local GX0, GX1, Z0, Z1 = -9, 3.6, -7, 7
+	local gx = (GX0 + GX1) / 2
+
+	Kit.part(model, "Slab", V3(19, FLOOR, 16.4), CF(0.2, FLOOR / 2, -1.2), CONCRETE, MAT.Concrete)
+	stones(model, CF(GX0, FLOOR, 0) * ANG(0, PI / 2, 0), 2 * Z1, 1.3, 0.7, rng, 1.6, 2.8)
+	stones(model, CF(gx, FLOOR, Z1) * ANG(0, PI, 0), GX1 - GX0, 1.3, 0.7, rng, 1.6, 2.8)
+	panel(model, CF(GX0, 0, 0) * ANG(0, PI / 2, 0), -Z1, -Z0, FLOOR, TOP, 0.6, rng, cream, 1.3)
+	panel(model, CF(0, 0, Z1) * ANG(0, PI, 0), -GX1, -GX0, FLOOR, TOP, 0.6, rng, cream, 1.3)
+	panel(model, CF(GX1, 0, 0) * ANG(0, -PI / 2, 0), Z0, Z1, FLOOR, TOP, 0.6, rng, cream, 1.3)
+	gable(model, CF(gx, TOP, Z1) * ANG(0, PI, 0), GX1 - GX0, 2.6, 0.6, cream[2])
+	gableRoof(model, CF(gx, TOP, 0.4) * ANG(0, PI / 2, 0), 14.8, GX1 - GX0 + 0.6, 2.6, 0.8, rng, roofStyle, -1)
+
+	-- The false front: open on a 9.6-wide roll-up door, stepped on top.
+	local front = CF(0, 0, Z0)
+	local DX0, DX1, DH = -7.7, 1.9, 8.6
+	panel(model, front, GX0, DX0, FLOOR, TOP, 0.6, rng, cream, 1.3)
+	panel(model, front, DX1, GX1, FLOOR, TOP, 0.6, rng, cream, 1.3)
+	panel(model, front, DX0, DX1, DH, TOP, 0.6, rng, cream, 1.3)
+	panel(model, front, GX0, GX1, TOP, 13, 0.6, rng, cream, 1.5)
+	panel(model, front, gx - 2.9, gx + 2.9, 13, 14.5, 0.6, rng, cream, 1.5)
+	dBox(model, "Cornice", V3(3.9, 0.5, 1.0), CF(GX0 + 1.65, 13.15, Z0 - 0.1), dark)
+	dBox(model, "Cornice", V3(3.9, 0.5, 1.0), CF(GX1 - 1.65, 13.15, Z0 - 0.1), dark)
+	dBox(model, "Cornice", V3(6.6, 0.5, 1.0), CF(gx, 14.65, Z0 - 0.1), dark)
+	dBox(model, "Stripe", V3(GX1 - GX0 + 0.2, 0.35, 0.2), CF(gx, TOP - 0.2, Z0 - 0.38), paint[1])
+	dCyl(model, "Badge", 0.3, 1.3, CF(gx, 13.75, Z0 - 0.42) * ANG(0, PI / 2, 0), TYRE, MAT.Rubber)
+	dCyl(model, "Badge", 0.36, 0.6, CF(gx, 13.75, Z0 - 0.42) * ANG(0, PI / 2, 0), paint[1], MAT.Metal)
+	signBoard(model, "Sign", CF(gx, 11.55, Z0 - 0.42), 11.2, 2.3, title, paint[3], dark, TRIM, false)
+	for _, x in ipairs({ gx - 3.8, gx + 3.8 }) do
+		gooseneck(model, CF(x, 12.85, Z0 - 0.5))
+	end
+	for _, x in ipairs({ DX0, DX1 }) do
+		Kit.part(model, "DoorJamb", V3(0.8, DH - FLOOR, 0.9), CF(x, (DH + FLOOR) / 2, Z0 - 0.15), dark, MAT.Metal)
+	end
+	dBox(model, "DoorHeader", V3(DX1 - DX0 + 1.2, 0.9, 1.0), CF((DX0 + DX1) / 2, DH + 0.35, Z0 - 0.2), dark, MAT.Metal)
+	dBox(model, "DoorDrum", V3(DX1 - DX0, 1.3, 1.3), CF((DX0 + DX1) / 2, DH - 0.1, Z0 + 0.95), paint[3], MAT.Metal)
+	for i = 0, 1 do
+		dBox(
+			model,
+			"DoorSlat",
+			V3(DX1 - DX0 - 0.5, 0.5, 0.18),
+			CF((DX0 + DX1) / 2, DH - 0.3 - i * 0.55, Z0 + 0.15),
+			Kit.shade(STEEL_DARK, i * 0.08),
+			MAT.Metal
+		)
+	end
+	window(model, CF(GX0 - 0.3, 6.2, 0) * ANG(0, PI / 2, 0), 3, 2.2, TRIM, nil, nil)
+
+	-- The office (east), painted in the accent colour, under a lean-to.
+	local OX0, OX1, OZ0, OZ1, OTOP, OHI = GX1, 9.4, -4.6, 7, 7.6, 9.4
+	panel(model, CF(0, 0, OZ0), OX0, OX1, FLOOR, OTOP, 0.6, rng, paint, 1.3)
+	panel(model, CF(OX1, 0, 0) * ANG(0, -PI / 2, 0), OZ0, OZ1, FLOOR, OTOP, 0.6, rng, paint, 1.3)
+	panel(model, CF(0, 0, OZ1) * ANG(0, PI, 0), -OX1, -OX0, FLOOR, OTOP, 0.6, rng, paint, 1.3)
+	for _, z in ipairs({ OZ0, OZ1 }) do
+		Kit.wedge(
+			model,
+			"Gable",
+			V3(0.6, OHI - OTOP, OX1 - OX0),
+			CF((OX0 + OX1) / 2, (OTOP + OHI) / 2, z) * ANG(0, -PI / 2, 0),
+			paint[2],
+			MAT.WoodPlanks
+		)
+	end
+	local ohi, olo = V3(OX0 + 0.3, OHI, (OZ0 + OZ1) / 2), V3(OX1 + 0.9, OTOP - 0.3, (OZ0 + OZ1) / 2)
+	roofPlane(model, ohi, Vector3.zAxis, (olo - ohi).Unit, OZ1 - OZ0 + 1.4, (olo - ohi).Magnitude, rng, roofStyle)
+	door(model, CF(5.1, FLOOR, OZ0 - 0.3), 2.2, 6, paint[3], TRIM)
+	window(model, CF(7.9, 4.4, OZ0 - 0.3), 1.7, 2.2, TRIM, nil, nil)
+	signBoard(model, "OfficeSign", CF(6.5, 7.05, OZ0 - 0.45), 5.2, 0.75, "TRUCKS & TRAILERS", TRIM, dark, dark, false)
+
+	-- Inside: the counter, paint swatches, a tool chest, oil drums.
+	Kit.part(model, "Counter", V3(7, 3, 1.8), CF(gx, FLOOR + 1.5, 2.4), paint[3], MAT.WoodPlanks)
+	dBox(model, "CounterTop", V3(7.6, 0.3, 2.3), CF(gx, FLOOR + 3.15, 2.4), PLANK[4])
+	register(model, CF(gx + 2.0, FLOOR + 3.3, 2.6))
+	ledger(model, CF(gx - 2.0, FLOOR + 3.3, 2.3))
+	dBox(model, "SwatchBoard", V3(7, 2.6, 0.2), CF(gx, 6.4, Z1 - 0.4), SIGN_BOARD)
+	local trucks = ItemCatalog.TruckList()
+	for i, truck in ipairs(trucks) do
+		local x = gx + (i - (#trucks + 1) / 2) * 1.3
+		dBox(model, "PaintSwatch", V3(1, 1.4, 0.14), CF(x, 6.4, Z1 - 0.55), hex(truck.look.color), MAT.SmoothPlastic)
+	end
+	Kit.part(model, "ToolChest", V3(2.4, 2.6, 1.3), CF(1.6, FLOOR + 1.3, 5.6), hex("#C8402F"), MAT.Metal)
+	for i = 1, 3 do
+		dBox(model, "Drawer", V3(2.2, 0.12, 0.1), CF(1.6, FLOOR + 0.6 * i, 4.92), IRON, MAT.Metal)
+	end
+	barrel(model, CF(-7.6, FLOOR, 5.4), rng, true, paint[1])
+	barrel(model, CF(-7.4, FLOOR, 3.2), rng, true, hex("#C8402F"))
+
+	-- The apron: a tyre stack and the gas pump on its island.
+	for i = 1, 4 do
+		local t = Kit.post(
+			model,
+			"Tyre",
+			V3(-8.3 + rng:range(-0.1, 0.1), FLOOR + (i - 1) * 0.78, -8.1),
+			0.76,
+			2.3,
+			TYRE,
+			MAT.Rubber
+		)
+		if i > 1 then
+			dec(t)
+		end
+	end
+	dec(Kit.post(model, "TyreHole", V3(-8.3, FLOOR + 3.1, -8.1), 0.04, 1.1, hex("#1E1C1C"), MAT.Rubber))
+	Kit.part(model, "PumpIsland", V3(4.2, 0.35, 2.4), CF(6.8, FLOOR + 0.175, -6.6), CONCRETE, MAT.Concrete)
+	local pump = CF(6.4, FLOOR + 0.35, -6.6)
+	Kit.part(model, "GasPump", V3(1.3, 4.2, 1), pump * CF(0, 2.5, 0), hex("#C8402F"), MAT.Metal)
+	dBox(model, "PumpBase", V3(1.6, 0.4, 1.2), pump * CF(0, 0.2, 0), IRON, MAT.Metal)
+	dBox(model, "PumpTop", V3(1.45, 0.35, 1.1), pump * CF(0, 4.75, 0), STEEL, MAT.Metal)
+	dBox(model, "PumpDial", V3(0.9, 0.9, 0.1), pump * CF(0, 3.5, -0.55), TRIM, MAT.SmoothPlastic)
+	dBox(model, "PumpNeck", V3(0.4, 0.35, 0.4), pump * CF(0, 5.1, 0), STEEL, MAT.Metal)
+	light(dBall(model, "PumpGlobe", 1.1, pump * CF(0, 5.75, 0), hex("#FFF1D6"), MAT.Neon), 9, 0.9)
+	dRod(model, "Hose", (pump * V3(0.68, 3.2, 0)), (pump * V3(1.15, 1.2, -0.1)), 0.2, IRON, MAT.Rubber)
+	dRod(model, "Hose", (pump * V3(1.15, 1.2, -0.1)), (pump * V3(0.8, 2.4, -0.4)), 0.2, IRON, MAT.Rubber)
+	dBox(model, "Nozzle", V3(0.25, 0.7, 0.3), pump * CF(0.75, 2.65, -0.42) * ANG(0.3, 0, 0), STEEL, MAT.Metal)
+end
+
+-- Hearth & Home: a timber-framed cottage store with a slate roof, a
+-- cross gable over the entrance, a striped awning with the sign above it,
+-- a bay window, flower boxes, hanging lanterns and a chimney. The gear it
+-- sells (ItemCatalog) is on display inside the door: the coat and cloak on
+-- a stand, the boots and lanterns on a step shelf.
+local function hearthAndHome(model: Model, title: string, accent: Color3)
+	local rng = Kit.rng(733)
+	local plaster = { hex("#F0E2C6"), hex("#EBDBBB"), hex("#F3E7CF") }
+	local wood = Kit.shade(accent, -0.32)
+	local roofStyle: RoofStyle = { colors = SLATE_ROOF, deck = ROOF_DECK, trim = wood, rowLen = 2.8, pieceLen = 9 }
+	local HX, HZ, FLOOR, TOP, RISE = 9, 7, 0.6, 8.6, 5.8
+	local function gearColor(id: string, fallback: string): Color3
+		local gear = ItemCatalog.GetGear(id)
+		return hex(if gear then gear.color else fallback)
+	end
+
+	plinth(model, CF(0, 0, 0), 2 * HX, 2 * HZ, FLOOR, rng, { left = true, right = true }, 3)
+	for _, s in ipairs({ -1, 1 }) do
+		stones(model, CF(s * 6.4, 0, -HZ), 5.2, FLOOR, 0.7, rng, 2, 3)
+	end
+	Kit.wedge(model, "Ramp", V3(7.6, FLOOR, 1.2), CF(0, FLOOR / 2, -HZ - 0.6), STONE[2], MAT.Slate)
+
+	-- Plaster walls; the front opens on a 7.6-wide entrance.
+	local mid, h = (FLOOR + TOP) / 2, TOP - FLOOR
+	local function wall(cf: CFrame, w: number, height: number)
+		Kit.part(model, "Wall", V3(w, height, 0.6), cf, rng:pick(plaster), MAT.Plaster)
+	end
+	wall(CF(-HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, h)
+	wall(CF(HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, h)
+	wall(CF(0, mid, HZ), 2 * HX, h)
+	wall(CF(-6.4, mid, -HZ), 5.2, h)
+	wall(CF(6.4, mid, -HZ), 5.2, h)
+	wall(CF(0, (7.2 + TOP) / 2, -HZ), 7.6, TOP - 7.2)
+
+	-- The dark timber frame on the plaster.
+	local fz = -HZ - 0.33
+	local function timber(a: Vector3, b: Vector3)
+		dBeam(model, "Timber", a, b, 0.5, 0.45, wood)
+	end
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			dBox(model, "Timber", V3(0.65, h, 0.65), CF(sx * (HX + 0.05), mid, sz * (HZ + 0.05)), wood)
+		end
+		dBox(model, "Timber", V3(0.5, 6.6, 0.45), CF(sx * 3.95, FLOOR + 3.3, fz), wood)
+		timber(V3(sx * HX, 6.7, fz), V3(sx * 3.95, 6.7, fz))
+		timber(V3(sx * (HX - 0.4), 6.9, fz), V3(sx * (HX - 1.9), TOP - 0.3, fz))
+		timber(V3(sx * HX, FLOOR + 0.25, fz), V3(sx * 3.95, FLOOR + 0.25, fz))
+		local sideX = sx * (HX + 0.33)
+		timber(V3(sideX, TOP - 0.25, -HZ), V3(sideX, TOP - 0.25, HZ))
+		for _, z in ipairs({ -3.6, 3.6 }) do
+			timber(V3(sideX, FLOOR + 0.4, z), V3(sideX, TOP - 0.4, z))
+		end
+	end
+	timber(V3(-HX, TOP - 0.25, fz), V3(HX, TOP - 0.25, fz))
+
+	-- Slate roof (ridge along X), plaster gables with a king post, and a
+	-- cross gable over the entrance with a little window.
+	gableRoof(model, CF(-0.4, TOP, 0), 2 * HX + 1.6, 2 * HZ + 0.6, RISE, 1.3, rng, roofStyle)
+	for _, s in ipairs({ -1, 1 }) do
+		local g = CF(s * HX, TOP, 0) * ANG(0, -s * PI / 2, 0)
+		gable(model, g, 2 * HZ, RISE, 0.6, plaster[1], MAT.Plaster)
+		dBox(model, "Timber", V3(0.45, RISE - 0.6, 0.4), g * CF(0, (RISE - 0.6) / 2, -0.38), wood)
+		dBox(model, "Timber", V3(7.4, 0.4, 0.4), g * CF(0, RISE * 0.42, -0.38), wood)
+	end
+	gable(model, CF(0, TOP, -HZ), 9, 4.2, 0.6, plaster[2], MAT.Plaster)
+	gableRoof(model, CF(0, TOP, -4.6) * ANG(0, PI / 2, 0), 7.4, 9.6, 4.2, 0.7, rng, roofStyle, 1)
+	window(model, CF(0, TOP + 1.45, -HZ - 0.3), 1.6, 1.3, wood, nil, nil)
+
+	-- The chimney on the east gable end.
+	Kit.part(model, "ChimneyBase", V3(2.6, 8.6, 2.4), CF(HX + 1.6, 4.3, 1.6), STONE[2], MAT.Slate)
+	Kit.part(model, "ChimneyStack", V3(1.9, 8.4, 1.7), CF(HX + 1.75, 12.8, 1.6), STONE[1], MAT.Slate)
+	dBox(model, "ChimneyCap", V3(2.4, 0.4, 2.2), CF(HX + 1.75, 17.2, 1.6), STONE[3], MAT.Slate)
+	local pot = Kit.part(model, "Chimney", V3(1, 1, 1), CF(HX + 1.75, 17.9, 1.6), TERRACOTTA, MAT.Brick)
+	local smoke = Instance.new("Smoke")
+	smoke.Color = Color3.fromRGB(232, 228, 222)
+	smoke.Opacity = 0.12
+	smoke.RiseVelocity = 3
+	smoke.Size = 2
+	smoke.Parent = pot
+
+	-- The striped awning over the entrance on two posts, the sign on top.
+	local stripes = 6
+	for i = 0, stripes - 1 do
+		local x = -4.5 + (i + 0.5) * 9 / stripes
+		local color = AWNING[i % 2 + 1]
+		dBeam(model, "Awning", V3(x, 7.5, -HZ - 0.35), V3(x, 6.7, -9.9), 9 / stripes, 0.18, color, MAT.Fabric)
+		dBox(model, "Valance", V3(9 / stripes - 0.06, 0.55, 0.12), CF(x, 6.4, -9.95), color, MAT.Fabric)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "AwningPost", V3(0.5, 9, 0.5), CF(s * 4.35, 4.5, -9.75), wood, MAT.Wood)
+		hangingLantern(model, V3(s * 2.6, 6.6, -9.75), 0.35, 0.8)
+		planter(model, CF(s * 5.7, 0, -9.3), rng)
+	end
+	dBox(model, "AwningBeam", V3(9.2, 0.35, 0.4), CF(0, 6.65, -9.75), wood)
+	signBoard(model, "Sign", CF(0, 7.95, -9.75), 8, 1.9, title, hex("#3E5E3A"), wood, TRIM, true)
+
+	-- The bay window (west) and a shuttered window (east), with flowers.
+	local bay = CF(-6.4, 0, -HZ - 0.3)
+	dBox(model, "BayBase", V3(4.2, 2.2, 1.3), bay * CF(0, FLOOR + 1.1, -0.65), STONE[1], MAT.Slate)
+	Kit.window(model, bay * CF(0, 4, -1.3), 3.2, 2.6, wood, true)
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "BayGlass", V3(0.2, 2.6, 1.0), bay * CF(s * 1.95, 4, -0.65), GLOW, MAT.Neon)
+	end
+	dWedge(model, "BayRoof", V3(4.6, 0.9, 1.7), bay * CF(0, 5.75, -0.8), SLATE_ROOF[1], MAT.Slate)
+	flowerBox(model, bay * CF(0, 2.35, -1.75), 4, rng)
+	window(model, CF(6.4, 4.4, -HZ - 0.3), 2.2, 2.6, wood, SHUTTER, rng)
+	window(model, CF(-HX - 0.3, 4.6, 0) * ANG(0, PI / 2, 0), 2.4, 2.4, wood, nil, nil)
+
+	-- Inside the door: the gear on display, the counter, shelves.
+	local stand = CF(-2.7, FLOOR, -5.2)
+	local coat = gearColor("InsulatedCoat", "#5C87B8")
+	dBox(model, "StandPost", V3(0.3, 5.4, 0.3), stand * CF(0, 2.7, 0), wood)
+	dBox(model, "StandFoot", V3(1.8, 0.25, 0.3), stand * CF(0, 0.12, 0), wood)
+	dBox(model, "StandFoot", V3(0.3, 0.25, 1.8), stand * CF(0, 0.12, 0), wood)
+	dBox(model, "StandHook", V3(1.6, 0.18, 0.18), stand * CF(0, 5.1, 0), IRON, MAT.Metal)
+	dBox(model, "Coat", V3(1.6, 2.6, 0.8), stand * CF(0, 3.6, -0.45), coat, MAT.Fabric)
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(
+			model,
+			"CoatSleeve",
+			V3(0.5, 2.2, 0.6),
+			stand * CF(s * 0.98, 3.7, -0.45) * ANG(0, 0, -s * 0.12),
+			Kit.shade(coat, -0.1),
+			MAT.Fabric
+		)
+	end
+	dBox(model, "CoatCollar", V3(1.5, 0.45, 0.95), stand * CF(0, 4.95, -0.45), TRIM, MAT.Fabric)
+	dWedge(
+		model,
+		"Cloak",
+		V3(1.7, 3.2, 0.7),
+		stand * CF(0, 3.4, 0.45) * ANG(0, PI, 0),
+		gearColor("FeatherfallCloak", "#BFD8FF"),
+		MAT.Fabric
+	)
+	local shelf = CF(2.8, FLOOR, -5.2)
+	dBox(model, "Shelf", V3(2.6, 0.9, 1.6), shelf * CF(0, 0.45, 0), wood)
+	dBox(model, "Shelf", V3(2.6, 0.9, 0.8), shelf * CF(0, 1.35, 0.4), wood)
+	local boots = gearColor("HeatBoots", "#B5472A")
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "Boot", V3(0.5, 0.9, 0.55), shelf * CF(s * 0.35 - 0.6, 1.35, -0.45), boots, MAT.Leather)
+		dBox(model, "Boot", V3(0.5, 0.35, 0.5), shelf * CF(s * 0.35 - 0.6, 1.08, -0.85), boots, MAT.Leather)
+	end
+	local lanternColor = gearColor("Lantern", "#F2C14E")
+	for i, s in ipairs({ 0.55, 0.7 }) do
+		local at = shelf * CF(-0.5 + i * 0.75, (if i == 1 then 0.9 else 1.8) + 0.6 * s, if i == 1 then -0.45 else 0.4)
+		dBox(model, "LanternCap", V3(0.9, 0.25, 0.9) * s, at * CF(0, 0.7 * s, 0), IRON, MAT.Metal)
+		local g = dBox(model, "LanternGlow", V3(0.6, 1, 0.6) * s, at, lanternColor, MAT.Neon)
+		if i == 2 then
+			light(g, 10, 1)
+		end
+	end
+	Kit.part(model, "Counter", V3(7, 3, 1.8), CF(0, FLOOR + 1.5, 1.6), Kit.shade(accent, -0.1), MAT.WoodPlanks)
+	dBox(model, "CounterTop", V3(7.6, 0.3, 2.3), CF(0, FLOOR + 3.15, 1.6), PLANK[4])
+	register(model, CF(2, FLOOR + 3.3, 1.8))
+	ledger(model, CF(-2, FLOOR + 3.3, 1.5))
+	for _, y in ipairs({ 4.2, 6.4 }) do
+		dBox(model, "Shelf", V3(10, 0.3, 1.2), CF(0, y, HZ - 0.9), wood)
+	end
+	for i = 1, 3 do
+		dBox(
+			model,
+			"Blanket",
+			V3(1.5, 0.7, 0.95),
+			CF(-4.6 + i * 2.3, (if i % 2 == 0 then 6.4 else 4.2) + 0.5, HZ - 0.9),
+			rng:pick({ hex("#B5472A"), hex("#5C87B8"), hex("#6E8F4E"), hex("#E2B04A"), TRIM }),
+			MAT.Fabric
+		)
+	end
+end
+
+-- A shop: about 18 x 14 studs, its front (-Z) open on the counter. `kind`
+-- is "ToolShed", "Dealership" or "HearthAndHome" (anything else builds a
+-- Hearth & Home style store); `title` goes on the sign; `accent` is the
+-- shop's colour (the Tool Shed's walls, the Dealership's paint, Hearth &
+-- Home's timbers). Named parts:
+--   "Counter": a direct child, axis-aligned with the model, collides; its
+--     -Z face is the customer side (MapBuilder puts the ShopPoint there,
+--     and the floor in front of it is clear to the open front).
 function BuildingArt.Shop(kind: string, title: string, accent: Color3): Model
 	local model = Kit.model(kind)
-	shell(model, 16, 12, 8, accent, true)
-	Kit.part(model, "Counter", Vector3.new(10, 3, 2), CFrame.new(0, 2.5, 1), WOOD, Enum.Material.Wood)
-	local sign =
-		Kit.part(model, "Sign", Vector3.new(12, 2.5, 0.5), CFrame.new(0, 11.25, -6.5), WOOD, Enum.Material.Wood)
-	Kit.signText(sign, title, Color3.fromRGB(245, 235, 215))
+	if kind == "ToolShed" then
+		toolShed(model, title, accent)
+	elseif kind == "Dealership" then
+		dealership(model, title, accent)
+	else
+		hearthAndHome(model, title, accent)
+	end
 	return model
 end
 
--- A gondola station: PrimaryPart "Platform" (10 x 1 x 10, its top at y = 1).
+---------------------------------------------------------------------------
+-- The gondola station
+---------------------------------------------------------------------------
+
+-- A gondola station: a stone platform under a timber A-frame with a
+-- shingled roof and the cable's bullwheel overhead. The cabin hangs at the
+-- platform's middle and leaves through the open back gable (+Z): turn the
+-- model so +Z points along the cable. Steps up on the front (-Z).
+-- Named parts: "Platform" (the PrimaryPart: 10 x 1 x 10, its top at
+-- y = 1, collides).
 function BuildingArt.GondolaStation(): Model
 	local model = Kit.model("GondolaStation")
-	local platform =
-		Kit.part(model, "Platform", Vector3.new(10, 1, 10), CFrame.new(0, 0.5, 0), STONE, Enum.Material.Slate)
-	for _, c in ipairs({ { 4.5, 4.5 }, { -4.5, 4.5 }, { 4.5, -4.5 }, { -4.5, -4.5 } }) do
-		Kit.post(model, "Post", Vector3.new(c[1], 1, c[2]), 10, 0.6, WOOD_DARK, Enum.Material.Wood)
-	end
-	Kit.part(
-		model,
-		"Roof",
-		Vector3.new(11, 0.6, 11),
-		CFrame.new(0, 11.3, 0),
-		Color3.fromRGB(92, 135, 184),
-		Enum.Material.Wood
-	)
+	local rng = Kit.rng(2207)
+	local roofStyle: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2, pieceLen = 4.6 }
+	local platform = Kit.part(model, "Platform", V3(10, 1, 10), CF(0, 0.5, 0), hex("#A39C92"), MAT.Slate)
 	model.PrimaryPart = platform
+	for _, f in ipairs({
+		CF(0, 0, 5) * ANG(0, PI, 0),
+		CF(-5, 0, 0) * ANG(0, PI / 2, 0),
+		CF(5, 0, 0) * ANG(0, -PI / 2, 0),
+	}) do
+		stones(model, f, 10.4, 0.95, 0.6, rng, 1.8, 2.8)
+	end
+	Kit.wedge(model, "Steps", V3(6, 1, 1.8), CF(0, 0.5, -5.9), STONE[2], MAT.Slate)
+
+	local PX, PZ, TOP, RISE = 5.6, 4.4, 10.5, 3.6
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			Kit.part(model, "Post", V3(0.9, TOP, 0.9), CF(sx * PX, TOP / 2, sz * PZ), TIMBER, MAT.Wood)
+			dBox(model, "Footing", V3(1.6, 0.8, 1.6), CF(sx * PX, 0.4, sz * PZ), STONE[1], MAT.Slate)
+			dBeam(
+				model,
+				"Brace",
+				V3(sx * PX, TOP - 3, sz * (PZ - 0.1)),
+				V3(sx * PX, TOP - 0.7, sz * (PZ - 2.3)),
+				0.5,
+				0.5,
+				TIMBER
+			)
+		end
+		dBox(model, "Plate", V3(1, 0.9, 2 * PZ + 1), CF(sx * PX, TOP - 0.45, 0), TIMBER)
+		-- a railing along the platform's side
+		for _, z in ipairs({ -3.6, 0, 3.6 }) do
+			dBox(model, "RailPost", V3(0.35, 3, 0.35), CF(sx * 4.6, 2.5, z), TIMBER_LIGHT)
+		end
+		Kit.part(model, "Rail", V3(0.3, 0.3, 7.6), CF(sx * 4.6, 3.85, 0), TIMBER_LIGHT, MAT.Wood)
+		dBox(model, "Rail", V3(0.25, 0.25, 7.6), CF(sx * 4.6, 2.5, 0), TIMBER_LIGHT)
+		wallLantern(model, CF(sx * PX, 7.6, -PZ - 0.45), 0.9)
+	end
+	dBox(model, "TieBeam", V3(2 * PX + 1, 0.9, 1), CF(0, TOP - 0.45, -PZ), TIMBER)
+	gable(model, CF(0, TOP, -PZ), 2 * PX, RISE, 0.5, PLANK[2])
+	battens(model, CF(0, TOP, -PZ), 2 * PX, RISE, 0.5, 1.6, PLANK_DARK[1])
+	gableRoof(model, CF(0, TOP, -0.55) * ANG(0, PI / 2, 0), 2 * PZ + 2.1, 2 * PX + 0.9, RISE, 1.2, rng, roofStyle)
+
+	-- The bullwheel: a ring in front of the cabin's hanging point, on a
+	-- shaft from a bearer beam.
+	local wheelY, wheelZ, r = 8.9, -3.4, 3.4
+	for i = 0, 7 do
+		local a0, a1 = i / 8 * PI * 2, (i + 1) / 8 * PI * 2
+		dBeam(
+			model,
+			"Bullwheel",
+			V3(math.cos(a0) * r, wheelY, wheelZ + math.sin(a0) * r),
+			V3(math.cos(a1) * r, wheelY, wheelZ + math.sin(a1) * r),
+			0.7,
+			0.8,
+			hex("#8E3426"),
+			MAT.Metal
+		)
+	end
+	for _, a in ipairs({ 0, PI / 2 }) do
+		local d = V3(math.cos(a), 0, math.sin(a)) * r
+		dBeam(model, "Spoke", V3(0, wheelY, wheelZ) - d, V3(0, wheelY, wheelZ) + d, 0.3, 0.3, STEEL_DARK, MAT.Metal)
+	end
+	dec(Kit.post(model, "Hub", V3(0, wheelY - 0.45, wheelZ), 0.9, 1.2, IRON, MAT.Metal))
+	dBox(model, "Shaft", V3(0.45, TOP - wheelY, 0.45), CF(0, (TOP + wheelY) / 2, wheelZ), STEEL_DARK, MAT.Metal)
+	dBox(model, "Bearer", V3(2 * PX, 0.8, 0.8), CF(0, TOP - 0.4, wheelZ), TIMBER)
+
+	-- The crest sign and a ticket lectern with a bell.
+	signBoard(
+		model,
+		"Sign",
+		CF(0, TOP + RISE + 1.4, -PZ - 1.3),
+		6.4,
+		1.5,
+		"GONDOLA",
+		SIGN_BOARD,
+		TIMBER_LIGHT,
+		SIGN_INK,
+		true
+	)
+	dBox(model, "Lectern", V3(1.2, 2.6, 0.9), CF(3.2, 2.3, -3.6), TIMBER_LIGHT)
+	dBox(model, "Lectern", V3(1.5, 0.2, 1.1), CF(3.2, 3.7, -3.6) * ANG(-0.3, 0, 0), PLANK[4])
+	dBall(model, "Bell", 0.55, CF(3.5, 4.0, -3.5), BRASS, MAT.Metal)
 	return model
 end
 
--- A signpost: a post at the origin with a board facing -Z (text both sides).
+---------------------------------------------------------------------------
+-- Street furniture
+---------------------------------------------------------------------------
+
+-- A signpost: two posts with a framed board between them facing -Z (text
+-- on both faces) under a little shingled cap. Named parts: "Board" (the
+-- 9 x 4.4 text board, its middle 7 studs up).
 function BuildingArt.Signpost(text: string): Model
 	local model = Kit.model("Signpost")
-	Kit.decor(Kit.post(model, "Post", Vector3.zero, 7, 0.6, WOOD_DARK, Enum.Material.Wood))
-	local board = Kit.part(model, "Board", Vector3.new(9, 4, 0.4), CFrame.new(0, 7, 0), WOOD, Enum.Material.Wood)
-	Kit.decor(board)
-	Kit.signText(board, text, Color3.fromRGB(245, 235, 215))
+	local rng = Kit.rng(#text * 13 + 5)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "Post", V3(0.7, 9.8, 0.7), CF(s * 4.95, 4.9, 0), TIMBER, MAT.Wood)
+		dBox(model, "PostCap", V3(0.95, 0.3, 0.95), CF(s * 4.95, 9.9, 0), TIMBER_LIGHT)
+	end
+	signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+	for _, s in ipairs({ -1, 1 }) do
+		dWedge(
+			model,
+			"Cap",
+			V3(10.6, 0.7, 0.75),
+			CF(0, 9.75, s * 0.37) * ANG(0, if s > 0 then PI else 0, 0),
+			SHINGLE[1]
+		)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.rock(model, CF(s * 5.6, 0, rng:range(-0.4, 0.4)), rng:range(0.9, 1.3), rng, STONE)
+	end
 	return model
 end
 
--- A street lamp (lit; clients may switch the glow by time of day).
--- Named parts: "LampGlow".
+-- A street lamp: a stone footing, a timber post, an iron arm reaching out
+-- toward -Z with a lantern hanging from it (lit; clients may switch the
+-- glow by time of day). The post collides. Named parts: "LampGlow" (the
+-- lantern's neon glass, with the PointLight), 8.4 up and 2.3 out (-Z).
 function BuildingArt.LampPost(): Model
 	local model = Kit.model("LampPost")
-	Kit.decor(Kit.post(model, "Post", Vector3.zero, 9, 0.5, Color3.fromRGB(45, 40, 38), Enum.Material.Metal))
-	local glow = Kit.lantern(model, CFrame.new(0, 9.2, 0), 1.2)
+	Kit.part(model, "Footing", V3(1.6, 0.7, 1.6), CF(0, 0.35, 0), STONE[1], MAT.Slate)
+	dBox(model, "Footing", V3(1.9, 0.25, 1.9), CF(0, 0.15, 0), STONE[3], MAT.Slate)
+	Kit.part(model, "Post", V3(0.7, 9.6, 0.7), CF(0, 5.5, 0), TIMBER, MAT.Wood)
+	dBox(model, "PostCap", V3(1, 0.35, 1), CF(0, 10.45, 0), TIMBER_LIGHT)
+	dBox(model, "Arm", V3(0.35, 0.35, 2.7), CF(0, 9.8, -1.25), IRON, MAT.Metal)
+	dBeam(model, "Brace", V3(0, 8.3, -0.35), V3(0, 9.7, -1.7), 0.22, 0.22, IRON, MAT.Metal)
+	dBox(model, "Chain", V3(0.12, 0.4, 0.12), CF(0, 9.43, -2.3), IRON, MAT.Metal)
+	local glow = Kit.lantern(model, CF(0, 8.4, -2.3), 1.1)
 	glow.Name = "LampGlow"
 	return model
 end
 
--- A rail fence `length` studs long along X.
+-- A split-rail fence `length` studs long along X (posts and rails
+-- collide).
 function BuildingArt.Fence(length: number): Model
 	local model = Kit.model("Fence")
+	local rng = Kit.rng(math.floor(length * 10) + 3)
 	local posts = math.max(2, math.floor(length / 6) + 1)
+	local step = length / (posts - 1)
 	for i = 0, posts - 1 do
-		local x = -length / 2 + length * i / (posts - 1)
-		Kit.decor(
-			Kit.part(model, "Post", Vector3.new(0.5, 3, 0.5), CFrame.new(x, 1.5, 0), WOOD_DARK, Enum.Material.Wood)
+		local x = -length / 2 + i * step
+		local h = 3.3 + rng:range(-0.15, 0.15)
+		Kit.part(
+			model,
+			"Post",
+			V3(0.55, h, 0.55),
+			CF(x, h / 2, 0) * ANG(0, rng:range(-0.15, 0.15), rng:range(-0.03, 0.03)),
+			Kit.vary(TIMBER_LIGHT, rng, 0.05),
+			MAT.Wood
 		)
 	end
-	for _, y in ipairs({ 1.2, 2.3 }) do
-		Kit.decor(
-			Kit.part(model, "Rail", Vector3.new(length, 0.35, 0.25), CFrame.new(0, y, 0), WOOD, Enum.Material.Wood)
-		)
+	for i = 0, posts - 2 do
+		local x0 = -length / 2 + i * step
+		for _, y in ipairs({ 1.15, 2.4 }) do
+			local rail = beam(
+				model,
+				"Rail",
+				V3(x0 - 0.15, y + rng:range(-0.1, 0.1), -0.32),
+				V3(x0 + step + 0.15, y + rng:range(-0.1, 0.1), -0.32),
+				0.24,
+				0.34,
+				Kit.vary(PLANK[3], rng, 0.05),
+				MAT.Wood
+			)
+			rail.CastShadow = true
+		end
 	end
 	return model
 end
 
--- The painted sell pad (w x d), CanCollide off. Named parts: "SellPad".
+-- The painted sell pad (w x d) with a timber border and drive-in chevrons;
+-- nothing on it collides or stands taller than 0.25. Named parts:
+-- "SellPad" (w x 0.2 x d, CanCollide off) with "SELL LOGS HERE" on its
+-- top face. The pad is turned half a turn so the text reads upright from
+-- the -Z side (the spawn).
 function BuildingArt.SellPad(w: number, d: number): Model
 	local model = Kit.model("SellPadArt")
-	local pad = Kit.part(
-		model,
-		"SellPad",
-		Vector3.new(w, 0.2, d),
-		CFrame.new(0, 0.1, 0),
-		Color3.fromRGB(214, 170, 92),
-		Enum.Material.WoodPlanks
-	)
+	local pad = Kit.part(model, "SellPad", V3(w, 0.2, d), CF(0, 0.1, 0) * ANG(0, PI, 0), PAD, MAT.WoodPlanks)
 	pad.CanCollide = false
-	Kit.signText(pad, "SELL LOGS HERE", Color3.fromRGB(70, 45, 22), { Enum.NormalId.Top })
+	Kit.signText(pad, "SELL LOGS HERE", PAD_INK, { Enum.NormalId.Top })
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "PadBorder", V3(w + 1.6, 0.24, 0.8), CF(0, 0.12, s * (d / 2 + 0.4)), PLANK_DARK[1])
+		dBox(model, "PadBorder", V3(0.8, 0.24, d), CF(s * (w / 2 + 0.4), 0.12, 0), PLANK_DARK[2])
+		for _, t in ipairs({ -1, 1 }) do
+			dBox(
+				model,
+				"PadCorner",
+				V3(1.3, 0.26, 1.3),
+				CF(s * (w / 2 + 0.4), 0.13, t * (d / 2 + 0.4)),
+				IRON,
+				MAT.Metal
+			)
+		end
+	end
+	for i = 0, 2 do
+		local x = (i - 1) * (w / 3.4)
+		for _, s in ipairs({ -1, 1 }) do
+			dBox(
+				model,
+				"Chevron",
+				V3(2.2, 0.22, 0.45),
+				CF(x + s * 0.75, 0.11, -d / 2 + 1.5) * ANG(0, s * 0.6, 0),
+				SIGN_INK,
+				MAT.SmoothPlastic
+			)
+		end
+	end
 	return model
 end
 
--- Murph's camp by the spawn: a tent, a campfire, a log bench.
-function BuildingArt.Campsite(): Model
-	local model = Kit.model("MurphsCamp")
-	Kit.gableRoof(model, "Tent", CFrame.new(0, 0, 4), 6, 5, 3.5, Color3.fromRGB(176, 72, 52), Enum.Material.Fabric)
-	local fire = BuildingArt.Campfire()
-	fire.Parent = model
-	return model
-end
+---------------------------------------------------------------------------
+-- Murph's camp
+---------------------------------------------------------------------------
 
--- A campfire with flames and warm light. Named parts: "Embers" (has Fire).
+-- A campfire: a ring of stones, crossed logs, glowing embers and three
+-- low-poly flame shapes (neon "Flame" parts; clients may flicker them).
+-- Named parts: "Embers" (with the Fire and a warm PointLight).
 function BuildingArt.Campfire(): Model
 	local model = Kit.model("Campfire")
 	local rng = Kit.rng(5)
 	for i = 1, 8 do
-		local a = i / 8 * math.pi * 2
-		Kit.decor(
-			Kit.part(
-				model,
-				"FireStone",
-				Vector3.new(0.9, 0.6, 0.7),
-				CFrame.new(math.cos(a) * 1.6, 0.3, math.sin(a) * 1.6) * CFrame.Angles(0, -a, 0),
-				Kit.vary(STONE, rng, 0.08),
-				Enum.Material.Slate
-			),
-			false
+		local a = i / 8 * PI * 2 + rng:range(-0.1, 0.1)
+		dBox(
+			model,
+			"FireStone",
+			V3(0.85, 0.55, 0.7) * rng:range(0.85, 1.1),
+			CF(math.cos(a) * 1.7, 0.24, math.sin(a) * 1.75) * ANG(rng:range(-0.1, 0.1), -a, rng:range(-0.1, 0.1)),
+			Kit.vary(rng:pick(STONE), rng, 0.06),
+			MAT.Slate
 		)
 	end
-	local embers = Kit.part(
-		model,
-		"Embers",
-		Vector3.new(1.6, 0.3, 1.6),
-		CFrame.new(0, 0.15, 0),
-		Color3.fromRGB(255, 120, 40),
-		Enum.Material.Neon
-	)
+	dec(Kit.post(model, "Ash", V3(0, 0, 0), 0.1, 2.8, hex("#4A4440"), MAT.Slate))
+	for i = 1, 4 do
+		local a = i / 4 * PI * 2 + 0.4
+		dRod(
+			model,
+			"FireLog",
+			V3(math.cos(a) * 1.3, 0.2, math.sin(a) * 1.3),
+			V3(math.cos(a) * 0.15, 1.35, math.sin(a) * 0.15),
+			0.45,
+			Kit.vary(BARK, rng, 0.06)
+		)
+	end
+	local embers = Kit.part(model, "Embers", V3(1.6, 0.3, 1.6), CF(0, 0.2, 0), EMBER, MAT.Neon)
 	Kit.decor(embers, false)
+	local corner = ANG(math.rad(35.26), math.rad(45), 0) -- a cube on its corner: a faceted flame
+	for i, f in ipairs({ { 0, 0.95, 0, 1 }, { 0, 1.4, 0, 0.6 }, { 0.38, 0.75, 0.2, 0.55 }, { -0.3, 0.72, -0.3, 0.5 } }) do
+		local p = Kit.part(
+			model,
+			"Flame",
+			V3(f[4], f[4], f[4]),
+			CF(f[1], f[2], f[3]) * ANG(0, i * 0.6, 0) * corner,
+			FLAME[if i == 2 then 1 else i % 2 + 2],
+			MAT.Neon
+		)
+		Kit.decor(p, false)
+	end
 	local fire = Instance.new("Fire")
 	fire.Size = 3
 	fire.Heat = 6
 	fire.Parent = embers
-	local light = Instance.new("PointLight")
-	light.Color = Color3.fromRGB(255, 160, 80)
-	light.Range = 18
-	light.Brightness = 1.6
-	light.Parent = embers
+	light(embers, 18, 1.6, Color3.fromRGB(255, 160, 80))
 	return model
 end
 
--- Town dressing, by name: "LogPile", "Crate", "Barrel", "Bench", "Well",
--- "Cart", "SawdustPile", "WaterTower", "Mailbox", "FlowerBox".
-function BuildingArt.Prop(name: string, seed: number): Model
-	local model = Kit.model(name)
-	local rng = Kit.rng(seed)
-	if name == "LogPile" then
-		for row = 0, 2 do
-			for i = 0, 3 - row do
-				Kit.decor(
-					Kit.cylinder(
-						model,
-						"PileLog",
-						6,
-						1.3,
-						CFrame.new(0, 0.65 + row * 1.1, (i - (3 - row) / 2) * 1.35),
-						Kit.vary(Color3.fromRGB(122, 82, 48), rng, 0.05),
-						Enum.Material.Wood
-					)
-				)
+-- Murph's camp by the spawn: the campfire at the origin, a canvas tent
+-- behind it (+Z, its door toward the fire), log seats either side
+-- (x = +-3.4), an axe in a chopping stump, a lantern on a hook, a kettle
+-- on a tripod over the fire, his pack, firewood and a little sign. Leave
+-- (0, 0, -3) clear for Murph himself. Named parts: "Embers" (see Campfire).
+function BuildingArt.Campsite(): Model
+	local model = Kit.model("MurphsCamp")
+	local rng = Kit.rng(1931)
+	BuildingArt.Campfire().Parent = model
+
+	-- The tent: two canvas sheets over a ridge pole, closed at the back.
+	local tent = CF(0, 0, 5.4)
+	local TW, TH, TL = 2.8, 4.2, 6
+	local tilt = math.atan2(TW, TH)
+	local sheet = math.sqrt(TW * TW + TH * TH)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(
+			model,
+			"Canvas",
+			V3(0.18, sheet + 0.3, TL),
+			tent * CF(s * TW / 2, TH / 2, 0) * ANG(0, 0, s * tilt),
+			if s < 0 then CANVAS else Kit.shade(CANVAS, -0.04),
+			MAT.Fabric
+		)
+		dWedge(
+			model,
+			"Flap",
+			V3(0.12, TH * 0.85, 1.6),
+			tent * CF(s * (TW - 0.2), TH * 0.42, -TL / 2 - 0.55) * ANG(0, s * 0.9 + (if s > 0 then PI else 0), 0),
+			CANVAS_DARK,
+			MAT.Fabric
+		)
+	end
+	gable(model, tent * CF(0, 0, TL / 2 - 0.1) * ANG(0, PI, 0), 2 * TW - 0.3, TH - 0.2, 0.15, CANVAS_DARK, MAT.Fabric)
+	dCyl(model, "RidgePole", TL + 0.8, 0.25, tent * CF(0, TH + 0.08, 0) * ANG(0, PI / 2, 0), TIMBER)
+	for _, s in ipairs({ -1, 1 }) do
+		local z = s * (TL / 2 + 0.25)
+		dBox(model, "TentPole", V3(0.22, TH + 0.3, 0.22), tent * CF(0, (TH + 0.3) / 2, z), TIMBER)
+		dRod(model, "GuyRope", (tent * V3(0, TH + 0.2, z)), (tent * V3(0, 0.15, z + s * 2.4)), 0.1, ROPE, MAT.Fabric)
+		dBox(model, "Peg", V3(0.2, 0.5, 0.2), tent * CF(0, 0.2, z + s * 2.45), TIMBER_LIGHT)
+	end
+	dCyl(model, "Bedroll", 2.4, 0.9, tent * CF(-0.6, 0.45, 1.2), hex("#A63A30"), MAT.Fabric)
+
+	-- Log seats round the fire and Murph's pack against one.
+	for _, s in ipairs({ -1, 1 }) do
+		log(model, CF(s * 3.4, 0.65, -0.4) * ANG(0, PI / 2, 0), 3.6, 1.3, rng, 2, true)
+	end
+	dBox(model, "Pack", V3(1.1, 1.4, 0.7), CF(4.3, 0.7, 1.6) * ANG(0, -0.4, -0.12), hex("#6E7F46"), MAT.Fabric)
+	dBox(model, "PackFlap", V3(1.15, 0.5, 0.75), CF(4.32, 1.3, 1.6) * ANG(0, -0.4, -0.12), hex("#5A6A38"), MAT.Fabric)
+	dCyl(model, "PackRoll", 1.3, 0.55, CF(4.4, 1.65, 1.6) * ANG(0, -0.4, -0.12), hex("#A63A30"), MAT.Fabric)
+
+	-- A kettle on a tripod over the fire.
+	for i = 0, 2 do
+		local a = i / 3 * PI * 2 + 0.3
+		dRod(model, "Tripod", V3(math.cos(a) * 2.1, 0, math.sin(a) * 2.1), V3(0, 3.7, 0), 0.18, TIMBER_LIGHT)
+	end
+	dBox(model, "Chain", V3(0.1, 1.0, 0.1), CF(0, 3.15, 0), IRON, MAT.Metal)
+	dEllipsoid(model, "Kettle", V3(1.1, 0.9, 1.1), CF(0, 2.25, 0), hex("#4A4F57"), MAT.Metal)
+	dCyl(model, "KettleLid", 0.2, 0.6, CF(0, 2.7, 0) * ANG(0, 0, PI / 2), hex("#5B616A"), MAT.Metal)
+	dRod(model, "Spout", V3(0.4, 2.2, 0), V3(0.85, 2.55, 0), 0.18, hex("#4A4F57"), MAT.Metal)
+
+	-- The chopping stump, the lantern hook, firewood, rocks, the sign.
+	choppingBlock(model, CF(4.6, 0, 4.2), rng)
+	local hook = CF(-4, 0, 3.4)
+	dBox(model, "HookPost", V3(0.25, 5.2, 0.25), hook * CF(0, 2.6, 0), IRON, MAT.Metal)
+	dBox(model, "Hook", V3(0.2, 0.2, 1.2), hook * CF(0, 5.1, -0.5), IRON, MAT.Metal)
+	hangingLantern(model, (hook * V3(0, 5, -1.0)), 0.35, 0.8)
+	for row = 0, 1 do
+		for i = 0, 2 - row do
+			log(model, CF(-4.3 + (i - (2 - row) / 2) * 0.85, 0.4 + row * 0.72, 7.2) * ANG(0, PI / 2, 0), 2, 0.8, rng, 1)
+		end
+	end
+	Kit.rock(model, CF(-5.6, 0, -1.4), 1.6, rng, STONE)
+	Kit.rock(model, CF(6, 0, -0.8), 1.2, rng, STONE)
+	dBox(model, "SignStake", V3(0.3, 2, 0.3), CF(-5.6, 1.0, -1.6), TIMBER)
+	signBoard(
+		model,
+		"CampSign",
+		CF(-5.6, 1.9, -1.8) * ANG(0, 0.6, 0.04),
+		2.6,
+		0.8,
+		"MURPH'S CAMP",
+		PLANK[2],
+		TIMBER,
+		SIGN_INK,
+		true
+	)
+	return model
+end
+
+---------------------------------------------------------------------------
+-- Props
+---------------------------------------------------------------------------
+
+type PropBuilder = (model: Model, rng: Rng) -> ()
+
+local PROPS: { [string]: PropBuilder } = {}
+
+-- A log pile, cut ends to the front (-Z); the bottom row collides.
+PROPS.LogPile = function(model, rng)
+	local dia, len = rng:range(1.2, 1.5), rng:range(5, 6.5)
+	for row = 0, 2 do
+		for i = 0, 2 - row do
+			local x = (i - (2 - row) / 2) * (dia + 0.06)
+			local cf = CF(x, dia / 2 + row * dia * 0.86, rng:range(-0.25, 0.25)) * ANG(0, PI / 2, 0)
+			log(model, cf, len * rng:range(0.92, 1.04), dia * rng:range(0.92, 1.05), rng, 2, row == 0)
+		end
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		dWedge(model, "Chock", V3(0.5, 0.7, 0.8), CF(s * (1.5 * dia + 0.3), 0.35, 0) * ANG(0, -s * PI / 2, 0), TIMBER)
+	end
+end
+
+PROPS.Crate = function(model, rng)
+	crate(model, CF(0, 0, 0) * ANG(0, rng:range(-0.25, 0.25), 0), rng:range(1.9, 2.4), rng, true)
+	if rng:next() < 0.5 then
+		crate(
+			model,
+			CF(rng:range(-0.2, 0.2), 1.9, rng:range(-0.2, 0.2)) * ANG(0, rng:range(-0.6, 0.6), 0),
+			1.4,
+			rng,
+			true
+		)
+	end
+end
+
+PROPS.Barrel = function(model, rng)
+	barrel(model, CFrame.identity, rng, true)
+end
+
+-- A bench you'd sit on facing -Z (the seat collides).
+PROPS.Bench = function(model, rng)
+	for i, z in ipairs({ -0.35, 0.35 }) do
+		Kit.part(model, "Seat", V3(5, 0.25, 0.65), CF(0, 1.55, z), Kit.vary(PLANK[i], rng, 0.04), MAT.WoodPlanks)
+	end
+	for _, x in ipairs({ -2, 2 }) do
+		dBox(model, "BenchLeg", V3(0.35, 1.45, 1.4), CF(x, 0.72, 0), TIMBER)
+		dBox(model, "BenchLeg", V3(0.3, 2, 0.25), CF(x, 2.4, 0.8) * ANG(-0.15, 0, 0), TIMBER)
+	end
+	for _, y in ipairs({ 2.35, 3.05 }) do
+		dBox(model, "BenchBack", V3(5, 0.45, 0.2), CF(0, y, 0.9) * ANG(-0.15, 0, 0), Kit.vary(PLANK[3], rng, 0.04))
+	end
+end
+
+-- A stone well with a little shingled roof, a windlass and a bucket (the
+-- ring and the posts collide).
+PROPS.Well = function(model, rng)
+	for i = 0, 7 do
+		local a = i / 8 * PI * 2
+		Kit.part(
+			model,
+			"WellStone",
+			V3(1.65, 2.2, 0.8),
+			CF(math.cos(a) * 2, 1.1, math.sin(a) * 2) * ANG(0, PI / 2 - a, 0),
+			Kit.vary(rng:pick(STONE), rng, 0.05),
+			MAT.Slate
+		)
+	end
+	dec(Kit.post(model, "WellWater", V3(0, 0, 0), 1.6, 3.4, hex("#3F7FA8"), MAT.Glass))
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "WellPost", V3(0.5, 5.4, 0.5), CF(s * 2.25, 2.7, 0), TIMBER, MAT.Wood)
+	end
+	dCyl(model, "Windlass", 4.6, 0.5, CF(0, 4.1, 0), TIMBER_LIGHT)
+	dBox(model, "Crank", V3(0.2, 0.9, 0.2), CF(2.65, 3.75, 0), IRON, MAT.Metal)
+	dBox(model, "Rope", V3(0.1, 1.2, 0.1), CF(0.3, 3.4, 0), ROPE, MAT.Fabric)
+	dec(Kit.post(model, "Bucket", V3(0.3, 2.3, 0), 0.6, 0.75, PLANK_DARK[2], MAT.WoodPlanks))
+	local style: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 1.2, pieceLen = 6 }
+	gableRoof(model, CF(0, 5.4, 0), 5.8, 3.2, 1.5, 0.4, rng, style)
+end
+
+-- A hand cart loaded with logs (the bed collides).
+PROPS.Cart = function(model, rng)
+	Kit.part(model, "CartBed", V3(3.4, 0.3, 5), CF(0, 1.95, 0), PLANK[1], MAT.WoodPlanks)
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "CartSide", V3(0.25, 0.9, 5), CF(s * 1.6, 2.5, 0), PLANK[3])
+		dBox(model, "CartSide", V3(3.4, 0.9, 0.25), CF(0, 2.5, s * 2.45), PLANK[2])
+		local wheel = CF(s * 2, 1.6, 0.4)
+		dCyl(model, "Wheel", 0.3, 3.2, wheel, TIMBER_LIGHT)
+		for _, a in ipairs({ PI / 4, -PI / 4 }) do
+			dBox(model, "Spoke", V3(0.36, 2.9, 0.3), wheel * ANG(a, 0, 0), TIMBER)
+		end
+		dCyl(model, "Hub", 0.5, 0.8, wheel, IRON, MAT.Metal)
+		dRod(model, "Shaft", V3(s * 1.2, 1.9, -2.4), V3(s * 1, 0.3, -5.4), 0.3, TIMBER_LIGHT)
+	end
+	dCyl(model, "Axle", 4.4, 0.3, CF(0, 1.6, 0.4), IRON, MAT.Metal)
+	for i = -1, 1 do
+		log(model, CF(i * 0.95, 2.6 + (if i == 0 then 0.6 else 0), 0) * ANG(0, PI / 2, 0), 4.6, 0.95, rng, 2)
+	end
+end
+
+PROPS.SawdustPile = function(model, rng)
+	sawdust(model, CFrame.identity, rng:range(2, 3), rng)
+end
+
+-- A wooden water tank on a trestle with a ladder (the legs and tank
+-- collide).
+PROPS.WaterTower = function(model, rng)
+	local H = 9
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			beam(model, "Leg", V3(sx * 2.7, 0, sz * 2.7), V3(sx * 2, H, sz * 2), 0.7, 0.7, TIMBER, MAT.Wood)
+		end
+	end
+	for i, f in ipairs({ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }) do
+		local fx, fz = f[1], f[2]
+		local function at(t: number, y: number): Vector3
+			local w = 2.7 - 0.7 * y / H
+			return if fx ~= 0 then V3(fx * w, y, t * w) else V3(t * w, y, fz * w)
+		end
+		dBeam(model, "Brace", at(-1, 0.8), at(1, H - 0.8), 0.3, 0.3, TIMBER_LIGHT)
+		dBeam(model, "Girt", at(-1, 4.6), at(1, 4.6), 0.3, 0.35, TIMBER_LIGHT)
+		if i == 3 then
+			for _, t in ipairs({ -0.25, 0.25 }) do
+				dBeam(model, "Ladder", at(t, 0) + V3(0, 0, -0.4), at(t, H) + V3(0, 0, -0.4), 0.18, 0.18, TIMBER)
+			end
+			for y = 1.2, H - 0.5, 1.5 do
+				dBox(model, "Rung", V3(1.3, 0.15, 0.15), CF(0, y, -(2.7 - 0.7 * y / H) - 0.4), TIMBER)
 			end
 		end
-	else
-		Kit.decor(Kit.part(model, name, Vector3.new(2, 2, 2), CFrame.new(0, 1, 0), WOOD, Enum.Material.WoodPlanks))
+	end
+	Kit.post(model, "TankFloor", V3(0, H, 0), 0.5, 5.8, TIMBER, MAT.WoodPlanks)
+	Kit.post(model, "Tank", V3(0, H + 0.5, 0), 5, 5, PLANK[2], MAT.WoodPlanks)
+	for _, y in ipairs({ 1.4, 3, 4.6 }) do
+		dec(Kit.post(model, "Hoop", V3(0, H + 0.5 + y - 0.1, 0), 0.2, 5.12, IRON, MAT.Metal))
+	end
+	Kit.cone(model, CF(0, H + 5.5, 0), 3, 2.3, 8, function(i: number): Color3
+		return Kit.vary(SHINGLE[(i - 1) % #SHINGLE + 1], rng, 0.04)
+	end, MAT.WoodPlanks, 0.15)
+	dBall(model, "Finial", 0.5, CF(0, H + 7.9, 0), IRON, MAT.Metal)
+	dRod(model, "Spout", V3(2.4, H + 1.2, 0), V3(3.6, H + 0.4, 0), 0.45, IRON, MAT.Metal)
+	dRod(model, "Spout", V3(3.6, H + 0.4, 0), V3(3.6, H - 1.4, 0), 0.45, IRON, MAT.Metal)
+end
+
+PROPS.Mailbox = function(model, rng)
+	local green = Kit.vary(hex("#4E7A4C"), rng, 0.05)
+	dBox(model, "Post", V3(0.4, 3.4, 0.4), CF(0, 1.7, 0), TIMBER)
+	dBox(model, "Mailbox", V3(1.05, 0.6, 1.7), CF(0, 3.7, 0), green, MAT.Metal)
+	dCyl(model, "Mailbox", 1.7, 1.05, CF(0, 4, 0) * ANG(0, PI / 2, 0), green, MAT.Metal)
+	dBox(model, "MailDoor", V3(0.9, 0.85, 0.08), CF(0, 3.85, -0.88), Kit.shade(green, -0.15), MAT.Metal)
+	dBox(model, "Flag", V3(0.1, 1, 0.12), CF(0.6, 4.1, 0.3), hex("#C8402F"), MAT.Metal)
+	dBox(model, "Flag", V3(0.1, 0.35, 0.55), CF(0.6, 4.45, 0.05), hex("#C8402F"), MAT.Metal)
+end
+
+PROPS.FlowerBox = function(model, rng)
+	flowerBox(model, CF(0, 0.4, 0), rng:range(2.6, 3.4), rng)
+end
+
+-- A straw bale (sometimes two); collides.
+PROPS.Haybale = function(model, rng)
+	local count = if rng:next() < 0.4 then 2 else 1
+	for i = 1, count do
+		local cf = CF(0, 0.7 + (i - 1) * 1.4, 0) * ANG(0, rng:range(-0.3, 0.3) + (i - 1) * PI / 2, 0)
+		Kit.part(model, "Haybale", V3(2.6, 1.4, 1.6), cf, Kit.vary(HAY, rng, 0.04), MAT.Grass)
+		for _, x in ipairs({ -0.7, 0.7 }) do
+			dBox(model, "Twine", V3(0.15, 1.45, 1.65), cf * CF(x, 0, 0), hex("#A8843C"), MAT.Fabric)
+		end
+	end
+end
+
+PROPS.Wheelbarrow = function(model, rng)
+	local tray = CF(0, 1.45, 0.2)
+	dBox(model, "Tray", V3(1.9, 0.9, 1.6), tray, hex("#7E8A72"), MAT.Metal)
+	dWedge(model, "Tray", V3(1.9, 0.9, 1.0), tray * CF(0, 0, -1.3) * ANG(0, PI, 0), hex("#7E8A72"), MAT.Metal)
+	dBox(model, "Load", V3(1.7, 0.2, 1.5), tray * CF(0, 0.4, 0), rng:pick(SAWDUST), MAT.Sand)
+	dCyl(model, "Wheel", 0.35, 1.2, CF(0, 0.6, -1.9), TYRE, MAT.Rubber)
+	dCyl(model, "Hub", 0.45, 0.4, CF(0, 0.6, -1.9), IRON, MAT.Metal)
+	for _, s in ipairs({ -1, 1 }) do
+		dRod(model, "Handle", V3(s * 0.5, 0.6, -1.9), V3(s * 0.85, 1.25, 2.6), 0.22, TIMBER_LIGHT)
+		dBox(model, "Leg", V3(0.2, 1.0, 0.2), CF(s * 0.65, 0.5, 1.1), TIMBER_LIGHT)
+	end
+end
+
+-- A tool rack: two posts and rails with an axe, a shovel, a rake and a
+-- crosscut saw hung on it.
+PROPS.ToolRack = function(model, rng)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "Post", V3(0.4, 4.6, 0.4), CF(s * 2.2, 2.3, 0), TIMBER, MAT.Wood)
+	end
+	for _, y in ipairs({ 1.2, 4 }) do
+		dBox(model, "Rail", V3(4.8, 0.3, 0.3), CF(0, y, -0.1), PLANK[3])
+	end
+	rackAxe(model, CF(-1.5, 0.6, -0.4), 3.4, hex("#A7ADB4"), MAT.Metal)
+	dBox(model, "ShovelHandle", V3(0.22, 3.6, 0.22), CF(-0.4, 2.4, -0.4), HANDLE)
+	dBox(model, "ShovelBlade", V3(0.9, 1.1, 0.12), CF(-0.4, 0.75, -0.45), STEEL_DARK, MAT.Metal)
+	dBox(model, "RakeHandle", V3(0.22, 3.8, 0.22), CF(0.6, 2.2, -0.4), HANDLE)
+	dBox(model, "RakeHead", V3(1.4, 0.3, 0.3), CF(0.6, 4.2, -0.45), IRON, MAT.Metal)
+	dBox(model, "SawBlade", V3(2.2, 0.7, 0.08), CF(1.4, 3.1, -0.3) * ANG(0, 0, -0.2), STEEL, MAT.Metal)
+	dBox(model, "SawHandle", V3(0.4, 0.6, 0.18), CF(2.5, 3.3, -0.3), HANDLE)
+	if rng:next() < 0.5 then
+		dBox(model, "Coil", V3(0.9, 0.9, 0.3), CF(1.6, 1.6, -0.3), ROPE, MAT.Fabric)
+	end
+end
+
+-- A lantern on a shepherd's hook (lit).
+PROPS.Lantern = function(model, rng)
+	local h = rng:range(4.8, 5.4)
+	dBox(model, "Base", V3(1, 0.25, 1), CF(0, 0.12, 0), IRON, MAT.Metal)
+	dBox(model, "Post", V3(0.25, h, 0.25), CF(0, h / 2, 0), IRON, MAT.Metal)
+	dBox(model, "Hook", V3(0.2, 0.2, 1.2), CF(0, h - 0.1, -0.5), IRON, MAT.Metal)
+	hangingLantern(model, V3(0, h - 0.2, -1.0), 0.35, 0.8)
+end
+
+PROPS.Planter = function(model, rng)
+	planter(model, CFrame.identity, rng)
+end
+
+-- Town dressing, by name: "LogPile", "Crate", "Barrel", "Bench", "Well",
+-- "Cart", "SawdustPile", "WaterTower", "Mailbox", "FlowerBox", "Haybale",
+-- "Wheelbarrow", "ToolRack", "Lantern", "Planter". An unknown name builds a
+-- crate. Each is built on the ground at the origin; `seed` varies it.
+function BuildingArt.Prop(name: string, seed: number): Model
+	local model = Kit.model(name)
+	local build = PROPS[name] or PROPS.Crate
+	build(model, Kit.rng(seed))
+	return model
+end
+
+-- Every name Prop knows (for tests and the preview).
+function BuildingArt.PropNames(): { string }
+	local names = {}
+	for name in pairs(PROPS) do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	return names
+end
+
+---------------------------------------------------------------------------
+-- The Aether Isles
+---------------------------------------------------------------------------
+
+-- The Cloud Chute on an isle's edge: a banded wooden hopper full of water,
+-- a step up to it on the -Z side, and a flume on trestles running off the
+-- +Z side and down over the edge into a puff of cloud (place it with +Z
+-- pointing off the isle; the flume's end is at (0, -2.6, 13.6)). Named
+-- parts: "CloudChute" (the hopper box, 4 x 3 x 4 centred at y = 1.5,
+-- collides; MapBuilder tags it).
+function BuildingArt.CloudChute(): Model
+	local model = Kit.model("CloudChuteArt")
+	local rng = Kit.rng(41)
+	local hopper = Kit.part(model, "CloudChute", V3(4, 3, 4), CF(0, 1.5, 0), PLANK[2], MAT.WoodPlanks)
+	Kit.signText(hopper, "CLOUD CHUTE", SIGN_INK, { Enum.NormalId.Front })
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			dBox(model, "ChutePost", V3(0.55, 3.7, 0.55), CF(sx * 2.05, 1.85, sz * 2.05), TIMBER)
+		end
+		dBox(model, "ChuteRim", V3(4.5, 0.35, 0.35), CF(0, 3.15, sx * 2.1), TIMBER_LIGHT)
+		dBox(model, "ChuteRim", V3(0.35, 0.35, 4.5), CF(sx * 2.1, 3.15, 0), TIMBER_LIGHT)
+	end
+	dBox(model, "ChuteBand", V3(4.15, 0.3, 4.15), CF(0, 0.8, 0), IRON, MAT.Metal)
+	local water = dBox(model, "ChuteWater", V3(3.4, 0.2, 3.4), CF(0, 3.05, 0), WATER, MAT.Neon)
+	water.Transparency = 0.15
+	Kit.part(model, "ChuteStep", V3(3, 1.2, 1.4), CF(0, 0.6, -2.8), PLANK_DARK[1], MAT.WoodPlanks)
+
+	-- The flume: two trough runs, the second tipping over the edge.
+	local function trough(a: Vector3, b: Vector3)
+		dBeam(model, "Flume", a, b, 2.1, 0.3, PLANK_DARK[1])
+		for _, s in ipairs({ -1, 1 }) do
+			dBeam(model, "Flume", a + V3(s * 1.0, 0.6, 0), b + V3(s * 1.0, 0.6, 0), 0.22, 1.2, PLANK[3])
+		end
+		local w = beam(model, "FlumeWater", a + V3(0, 0.3, 0), b + V3(0, 0.3, 0), 1.6, 0.14, WATER, MAT.Neon)
+		dec(w)
+		w.Transparency = 0.15
+	end
+	trough(V3(0, 2.5, 1.8), V3(0, 1.5, 9))
+	trough(V3(0, 1.5, 9), V3(0, -2.6, 13.6))
+	for _, z in ipairs({ 5.2, 9 }) do
+		local y = if z < 6 then 2.0 else 1.35
+		for _, s in ipairs({ -1, 1 }) do
+			Kit.part(model, "Trestle", V3(0.4, y, 0.4), CF(s * 1.05, y / 2, z), TIMBER, MAT.Wood)
+		end
+		dBox(model, "Trestle", V3(2.6, 0.3, 0.35), CF(0, y - 0.1, z), TIMBER_LIGHT)
+	end
+	for i = 1, 4 do
+		local a = i / 4 * PI * 2 + rng:range(-0.3, 0.3)
+		dEllipsoid(
+			model,
+			"Cloud",
+			V3(3.2, 2.0, 3.0) * rng:range(0.75, 1.15),
+			CF(math.cos(a) * 1.6, -3.8 + rng:range(-0.4, 0.4), 14.2 + math.sin(a) * 1.6),
+			Color3.fromRGB(250, 250, 255)
+		)
+	end
+	local spray = Instance.new("ParticleEmitter")
+	spray.Name = "Spray"
+	spray.Color = ColorSequence.new(Color3.fromRGB(235, 248, 255))
+	spray.LightEmission = 0.5
+	spray.Rate = 14
+	spray.Lifetime = NumberRange.new(0.8, 1.6)
+	spray.Speed = NumberRange.new(4, 7)
+	spray.SpreadAngle = Vector2.new(25, 25)
+	spray.Acceleration = Vector3.new(0, -20, 0)
+	spray.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0.9) })
+	spray.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	spray.Parent = water
+	return model
+end
+
+-- The Starfall Forge: a stone hearth with star-white coals under a hood
+-- and chimney, bellows, a quench trough and a basket of Sky Shards, and in
+-- front of it the anvil on a stump with a glowing star-metal ingot and
+-- drifting sparkles. Named parts: "StarfallForge" (the anvil's top, 3 x
+-- 0.8 x 1.4 at y = 2.9, with the light and sparkles; MapBuilder tags it).
+function BuildingArt.StarfallForge(): Model
+	local model = Kit.model("StarfallForgeArt")
+	local rng = Kit.rng(88)
+	Kit.post(model, "AnvilStump", V3(0, 0, 0), 1.3, 2.2, BARK, MAT.Wood)
+	dec(Kit.post(model, "StumpTop", V3(0, 1.3, 0), 0.05, 1.9, HEART, MAT.Wood))
+	dBox(model, "AnvilFoot", V3(2.4, 0.5, 1.5), CF(0, 1.55, 0), ANVIL, MAT.Metal)
+	dBox(model, "AnvilWaist", V3(1.3, 0.75, 0.9), CF(0, 2.15, 0), ANVIL, MAT.Metal)
+	local anvil = Kit.part(model, "StarfallForge", V3(3, 0.8, 1.4), CF(0, 2.9, 0), ANVIL, MAT.Metal)
+	dWedge(model, "AnvilHorn", V3(1.2, 0.8, 1.4), CF(-2.2, 2.9, 0) * ANG(0, PI / 2, 0), ANVIL, MAT.Metal)
+	dBox(model, "StarIngot", V3(1.3, 0.35, 0.6), CF(0.4, 3.48, 0.1), STAR, MAT.Neon)
+	dBox(model, "HammerHead", V3(0.9, 0.5, 0.5), CF(-0.9, 3.55, -0.2), IRON, MAT.Metal)
+	dBox(model, "HammerHandle", V3(0.2, 0.2, 1.8), CF(-0.9, 3.55, -1.2) * ANG(0, 0.2, 0), HANDLE)
+	light(anvil, 16, 2, Color3.fromRGB(191, 216, 255))
+	local sparkles = Instance.new("ParticleEmitter")
+	sparkles.Name = "Sparkles"
+	sparkles.Color = ColorSequence.new(Color3.fromRGB(220, 235, 255), Color3.fromRGB(255, 230, 160))
+	sparkles.LightEmission = 1
+	sparkles.LightInfluence = 0
+	sparkles.Rate = 8
+	sparkles.Lifetime = NumberRange.new(1.2, 2.4)
+	sparkles.Speed = NumberRange.new(1, 3)
+	sparkles.SpreadAngle = Vector2.new(60, 60)
+	sparkles.Acceleration = Vector3.new(0, 1.5, 0)
+	sparkles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.2, 0.25),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkles.Parent = anvil
+
+	-- The hearth behind (+Z): a stone table with a bed of star-white coals,
+	-- a back wall, a sloping iron hood and a chimney.
+	Kit.part(model, "ForgeHearth", V3(5.6, 2.8, 3.6), CF(0, 1.4, 4.4), STONE[3], MAT.Slate)
+	stones(model, CF(0, 0, 2.6), 5.9, 1.4, 0.6, rng, 1.2, 2)
+	stones(model, CF(0, 1.4, 2.6), 5.9, 1.4, 0.6, rng, 1.2, 2)
+	dBox(model, "HearthRim", V3(6, 0.4, 3.9), CF(0, 2.95, 4.4), STONE[1], MAT.Slate)
+	Kit.part(model, "ForgeWall", V3(5.6, 4.4, 1), CF(0, 5.3, 5.7), STONE[2], MAT.Slate)
+	dWedge(model, "Hood", V3(5, 2, 2.3), CF(0, 5.8, 4.15), hex("#B8733F"), MAT.Metal)
+	dBox(model, "HoodBand", V3(5.6, 0.35, 0.35), CF(0, 4.85, 2.55), BRASS, MAT.Metal)
+	Kit.part(model, "ForgeChimney", V3(1.7, 5, 1.7), CF(0, 9.3, 5.4), STONE[3], MAT.Slate)
+	dBox(model, "ChimneyCap", V3(2.5, 0.4, 2.5), CF(0, 11.95, 5.4), STONE[2], MAT.Slate)
+	local coals = dBox(model, "ForgeCoals", V3(3.4, 0.3, 2.2), CF(0, 3.2, 4.2), STAR, MAT.Neon)
+	local fire = Instance.new("Fire")
+	fire.Color = Color3.fromRGB(150, 200, 255)
+	fire.SecondaryColor = Color3.fromRGB(255, 255, 255)
+	fire.Size = 3
+	fire.Heat = 5
+	fire.Parent = coals
+	light(coals, 14, 1.5, Color3.fromRGB(200, 225, 255))
+
+	-- Bellows (east), quench trough (west), a basket of Sky Shards.
+	dWedge(model, "Bellows", V3(1.4, 1.1, 2.4), CF(3.7, 2.2, 4.2) * ANG(0, PI, 0), hex("#7A4A2E"), MAT.Leather)
+	dBox(model, "BellowsBoard", V3(1.5, 0.15, 2.5), CF(3.7, 1.6, 4.2), TIMBER)
+	dRod(model, "BellowsHandle", V3(3.7, 2.7, 3), V3(3.7, 3.2, 1.6), 0.2, HANDLE)
+	Kit.part(model, "Trough", V3(1.6, 1.4, 3), CF(-3.9, 0.7, 3.8), PLANK_DARK[2], MAT.WoodPlanks)
+	dBox(model, "TroughWater", V3(1.3, 0.1, 2.7), CF(-3.9, 1.42, 3.8), WATER, MAT.Glass)
+	barrel(model, CF(3.4, 0, -1.6), rng, true, PLANK_DARK[1])
+	for i = 1, 4 do
+		local a = i / 4 * PI * 2
+		dBox(
+			model,
+			"SkyShard",
+			V3(0.5, rng:range(1, 1.6), 0.5),
+			CF(3.4 + math.cos(a) * 0.4, 2.9, -1.6 + math.sin(a) * 0.4)
+				* ANG(rng:range(-0.4, 0.4), a, rng:range(-0.4, 0.4)),
+			hex("#9FD4FF"),
+			MAT.Neon
+		)
 	end
 	return model
 end
 
--- The Cloud Chute on an isle's edge. Named parts: "CloudChute" (4 x 3 x 4,
--- centred at y = 1.5; MapBuilder tags it).
-function BuildingArt.CloudChute(): Model
-	local model = Kit.model("CloudChuteArt")
-	Kit.part(model, "CloudChute", Vector3.new(4, 3, 4), CFrame.new(0, 1.5, 0), WOOD, Enum.Material.WoodPlanks)
-	local water = Kit.part(
-		model,
-		"ChuteWater",
-		Vector3.new(3.4, 0.2, 3.4),
-		CFrame.new(0, 3.05, 0),
-		Color3.fromRGB(120, 190, 255),
-		Enum.Material.Neon
-	)
-	Kit.decor(water)
-	return model
-end
-
--- The Starfall Forge. Named parts: "StarfallForge" (the anvil; MapBuilder
--- tags it).
-function BuildingArt.StarfallForge(): Model
-	local model = Kit.model("StarfallForgeArt")
-	Kit.part(model, "ForgeStone", Vector3.new(6, 2, 4), CFrame.new(0, 1, 0), STONE, Enum.Material.Slate)
-	local anvil = Kit.part(
-		model,
-		"StarfallForge",
-		Vector3.new(3, 1.5, 1.6),
-		CFrame.new(0, 2.75, 0),
-		Color3.fromRGB(60, 62, 70),
-		Enum.Material.Metal
-	)
-	local glow = Instance.new("PointLight")
-	glow.Color = Color3.fromRGB(191, 216, 255)
-	glow.Range = 16
-	glow.Brightness = 2
-	glow.Parent = anvil
-	return model
-end
-
--- A plank bridge with rope rails from `a` to `b` (world points; the deck's
--- top passes through both). Built in world space.
+-- A rope bridge from `a` to `b` (world points; the planks' tops run
+-- through both), `width` wide: planks on two stringers, a post at each
+-- corner, sagging rope rails with hangers down to the deck. Built in world
+-- space. Named parts: "Deck" (the stringers; it and the planks collide).
 function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 	local model = Kit.model("Bridge")
-	local mid = (a + b) / 2
-	local deck = Kit.part(
-		model,
-		"Deck",
-		Vector3.new(width, 0.6, (b - a).Magnitude),
-		CFrame.lookAt(mid, b) * CFrame.new(0, -0.3, 0),
-		WOOD,
-		Enum.Material.WoodPlanks
-	)
-	local side = deck.CFrame.RightVector * (width / 2)
-	for _, s in ipairs({ 1, -1 }) do
-		Kit.decor(
-			Kit.rod(
-				model,
-				"Rope",
-				a + side * s + Vector3.new(0, 2.5, 0),
-				b + side * s + Vector3.new(0, 2.5, 0),
-				0.25,
-				Color3.fromRGB(160, 130, 90),
-				Enum.Material.Fabric
-			)
+	local span = (b - a).Magnitude
+	if span < 0.5 then
+		return model
+	end
+	local rng = Kit.rng(Kit.seedAt(a.X + b.X, a.Z + b.Z))
+	local frame = lookAt((a + b) / 2, b) -- -Z toward b, X across
+	Kit.part(model, "Deck", V3(width - 0.8, 0.5, span), frame * CF(0, -0.5, 0), TIMBER, MAT.Wood)
+	local n = math.max(2, math.floor(span / 1.15))
+	for i = 0, n - 1 do
+		local z = -span / 2 + (i + 0.5) * span / n
+		Kit.part(
+			model,
+			"Plank",
+			V3(width + rng:range(-0.25, 0.25), 0.25, span / n - 0.14),
+			frame * CF(rng:range(-0.12, 0.12), -0.125, z) * ANG(0, rng:range(-0.04, 0.04), 0),
+			Kit.vary(rng:pick(PLANK), rng, 0.05),
+			MAT.WoodPlanks
 		)
+	end
+	local right = frame.RightVector
+	local flat = V3(b.X - a.X, 0, b.Z - a.Z)
+	local look = if flat.Magnitude > 0.01 then flat.Unit else Vector3.zAxis
+	local sag = math.clamp(span * 0.05, 0.3, 1.6)
+	local segments = math.clamp(math.floor(span / 6), 2, 8)
+	for _, s in ipairs({ -1, 1 }) do
+		local side = right * (s * (width / 2 + 0.25))
+		local ends = { a + side, b + side }
+		for _, e in ipairs(ends) do
+			local base = e - V3(0, 0.6, 0)
+			Kit.part(
+				model,
+				"Post",
+				V3(0.6, 4.2, 0.6),
+				lookAt(base + V3(0, 2.1, 0), base + V3(0, 2.1, 0) + look),
+				TIMBER,
+				MAT.Wood
+			)
+			dBox(
+				model,
+				"PostCap",
+				V3(0.8, 0.3, 0.8),
+				lookAt(base + V3(0, 4.3, 0), base + V3(0, 4.3, 0) + look),
+				TIMBER_LIGHT
+			)
+		end
+		local function rail(t: number): Vector3
+			return ends[1]:Lerp(ends[2], t) + V3(0, 3.2 - sag * 4 * t * (1 - t), 0)
+		end
+		for i = 0, segments - 1 do
+			dRod(model, "Rope", rail(i / segments), rail((i + 1) / segments), 0.22, ROPE, MAT.Fabric)
+		end
+		local hangers = math.max(1, math.floor(span / 3))
+		for i = 1, hangers - 1 do
+			local t = i / hangers
+			local top = rail(t)
+			dRod(model, "Hanger", top, ends[1]:Lerp(ends[2], t) + V3(0, -0.1, 0), 0.1, ROPE, MAT.Fabric)
+		end
 	end
 	return model
 end
