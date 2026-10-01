@@ -1,26 +1,36 @@
 --!strict
 -- VehicleService: builds and owns player trucks.
---   * Every truck is built from its ItemCatalog entry (Shared/TruckLayout
---     says where each piece goes) in the player's own ParkingSlot, so
---     trucks never spawn inside each other.
+--   * Every truck is drawn by Shared/Art/TruckArt from its ItemCatalog entry
+--     (Shared/TruckLayout says where each piece goes) in the player's own
+--     ParkingSlot, so trucks never spawn inside each other. TruckArt.Rig
+--     makes it one rigid body: the invisible chassis is its only massive
+--     part, every other part is massless and welded to it, and each wheel
+--     hangs on a Motor6D that VehicleFX spins and steers on every client.
 --   * Driving, set by GameConfig.VehiclePhysics:
 --       - Physics (default): a parked truck is anchored (parking brake).
---         When someone sits in the driver seat, the server unanchors it and
---         hands its physics to that player's device (network ownership),
---         where VehicleController steers it through two constraints: Drive
---         (a LinearVelocity: speed and grip) and Heading (an
---         AlignOrientation: direction, and staying upright). It collides
---         with trees and buildings. Getting out parks it again. A speed
---         check puts back a truck that moves faster than it can go (an
---         exploiter teleporting it).
+--         When its owner sits in the driver seat, the server unanchors it
+--         and hands its physics to their device (network ownership), where
+--         VehicleController steers it through two constraints: Drive (a
+--         LinearVelocity: speed and grip) and Heading (an AlignOrientation:
+--         direction, and staying upright). It collides with trees and
+--         buildings. Getting out brakes it and lets it settle, then parks it
+--         upright on the ground. A speed check puts back a truck that moves
+--         further than it can drive (an exploiter teleporting it), judged
+--         against the last position it accepted, so a network stall doesn't
+--         rubber-band an honest driver (Shared/VehicleLogic).
 --       - Arcade: the Phase 1 glide, moved by the server; passes through
 --         things.
+--   * Only the owner drives. The Drive prompt refuses anyone else, and
+--     anyone who ends up in the seat some other way is put out beside it.
 --   * A hitched trailer (ItemCatalog.Trailers) is built onto the truck as
---     one rigid rig, and adds its bed to the truck's. Rigid, not swinging:
---     simple and hard to break; a real hitch can come later. A truck
---     without a bed (the Scout ATV) doesn't tow.
---   * The bed is a server-side list of logs, drawn as logs welded to it
---     (the truck bed fills first, then the trailer).
+--     one rigid rig, and adds its bed to the truck's. A truck without a bed
+--     (the Scout ATV) doesn't tow.
+--   * The bed is a server-side list of logs, drawn as TreeArt logs welded to
+--     it (the truck bed fills first, then the trailer). It's saved in
+--     profile.truckBed on every change, so leaving the game never loses a
+--     load: the first truck a player gets on joining is loaded from it.
+--   * BedCount / BedCapacity are attributes on the truck AND on the player
+--     (the HUD keeps working while the truck is streamed out).
 --   * Recall ("Truck to lot") and switching trucks rebuild the truck in the
 --     player's slot, keeping the load when it fits.
 
@@ -32,8 +42,11 @@ local RunService = game:GetService("RunService")
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
 local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
+local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local ProfileService = require(script.Parent.ProfileService)
 
 type TruckDef = ItemCatalog.TruckDef
 type TrailerDef = ItemCatalog.TrailerDef
@@ -42,19 +55,17 @@ local VehicleService = {}
 
 local TRUCK_TAG = "Truck"
 local SLOT_TAG = "ParkingSlot"
-local WHEEL_CLEARANCE = 1.5 -- chassis pivot height above the ground; puts the wheels on it
+local WHEEL_CLEARANCE = TruckLayout.ChassisY -- chassis pivot height above the ground; puts the wheels on it
 local SPEED_CHECK_EVERY = 0.5 -- seconds
-local SPEED_SLACK = 1.5 -- a truck may cover this many times its top speed (bumps, lag)
-local SPEED_SLACK_STUDS = 8
+local SETTLE_MAX = 1.5 -- seconds a truck may roll after its driver gets out
+local SETTLE_SPEED = 1.5 -- studs/s: slower than this counts as stopped
+local PARK_TILT = math.rad(30) -- the steepest slope a truck parks on
+local EXIT_GAP = 2 -- studs beside the truck where the driver steps out
 
-local CHASSIS_COLOR = Color3.fromRGB(80, 55, 35)
-local WOOD = Color3.fromRGB(101, 67, 33)
-local WOOD2 = Color3.fromRGB(130, 90, 50)
-local DARK = Color3.fromRGB(60, 55, 55)
-
-export type BedEntry = { woodId: string, value: number, figure: string? }
+export type BedEntry = VehicleLogic.BedEntry
 
 type TruckRecord = {
+	owner: Player,
 	def: TruckDef,
 	layout: TruckLayout.Layout,
 	trailer: TrailerDef?, -- hitched and towing (nil for a truck that can't tow)
@@ -65,23 +76,40 @@ type TruckRecord = {
 	model: Model,
 	chassis: BasePart,
 	seat: VehicleSeat,
+	prompt: ProximityPrompt,
 	bedFloor: BasePart?,
 	drive: LinearVelocity,
 	heading: AlignOrientation,
 	bed: { BedEntry },
 	bedFolder: Folder,
 	slot: BasePart?,
+	overflowIndex: number?, -- an overflow spot, when every ParkingSlot is taken
 	conns: { RBXScriptConnection },
 	arcadeSpeed: number,
+	driver: Humanoid?, -- the owner, while they sit in the driver seat
+	settleToken: number, -- bumped to cancel a settle in progress
 	-- Speed check (physics driving)
-	lastGood: CFrame,
+	lastGood: CFrame, -- the last position it accepted
+	lastGoodAt: number, -- when (os.clock)
 	lastCheck: number,
 }
 
 local trucks: { [number]: TruckRecord } = {} -- [userId]
 local slotOwner: { [BasePart]: number } = {}
+local overflowUsed: { [number]: boolean } = {}
 local lastRecall: { [number]: number } = {}
-local overflowCount = 0
+
+local notify: ((Player, string) -> ())? = nil
+
+-- A toast for `player` (GameServer's notify once Init has run).
+local function tell(player: Player, message: string)
+	local fn = notify
+	if fn then
+		fn(player, message)
+	else
+		warn(string.format("[VehicleService] (to %s) %s", player.Name, message))
+	end
+end
 
 ---------------------------------------------------------------------------
 -- Building
@@ -94,264 +122,36 @@ type Built = {
 	bedFloor: BasePart?,
 	trailerBed: BasePart?,
 	loadPoint: Attachment?,
-	exhaust: BasePart,
 	drive: LinearVelocity,
 	heading: AlignOrientation,
 }
 
--- Builds a truck around the origin, facing -Z, wheels touching y = 0.
--- Open-top like a farm truck: seat behind the hood, roll bar, then the bed.
+local function partNamed(model: Model, name: string): BasePart?
+	local inst = model:FindFirstChild(name)
+	return if inst and inst:IsA("BasePart") then inst else nil
+end
+
+-- Builds a truck (and trailer) around the origin, facing -Z, wheels on
+-- y = 0: TruckArt's model, rigged, with the driving constraints.
 local function buildTruckModel(
 	def: TruckDef,
 	layout: TruckLayout.Layout,
 	trailer: TrailerDef?,
 	trailerLayout: TruckLayout.TrailerLayout?
 ): Built
-	local model = Instance.new("Model")
-	model.Name = def.id
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- streams in whole, tailgate included
+	local model = TruckArt.Build(def, layout, trailer, trailerLayout)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- streams in whole, trailer included
+	TruckArt.Rig(model)
 
-	local function part(name: string, size: Vector3, pos: Vector3, color: Color3, material: Enum.Material): Part
-		local p = Instance.new("Part")
-		p.Name = name
-		p.Size = size
-		p.Position = pos
-		p.Color = color
-		p.Material = material
-		p.CanCollide = true
-		p.TopSurface = Enum.SurfaceType.Smooth
-		p.BottomSurface = Enum.SurfaceType.Smooth
-		p.Parent = model
-		return p
-	end
+	local chassis = model.PrimaryPart
+	local seatInst = model:FindFirstChild("DriverSeat")
+	assert(chassis, "[VehicleService] TruckArt built no Chassis")
+	assert(seatInst and seatInst:IsA("VehicleSeat"), "[VehicleService] TruckArt built no DriverSeat")
+	local seat: VehicleSeat = seatInst
+	seat.HeadsUpDisplay = false -- our HUD shows the speed, not Roblox's
 
-	local W, L, front = layout.width, layout.length, layout.front
-	local paint = Color3.fromHex(def.look.color)
-	local trim = paint:Lerp(Color3.new(0, 0, 0), 0.3)
-	local sideX = W / 2 - 0.15
-
-	-- Chassis (PrimaryPart), top at y = 2.
-	local chassis = part("Chassis", Vector3.new(W, 1, L), Vector3.new(0, 1.5, 0), CHASSIS_COLOR, Enum.Material.Wood)
-	-- An invisible, frictionless skid under the chassis is what touches the
-	-- ground (the wheels are only for looks); Drive supplies the grip.
-	local skid = part("Skid", Vector3.new(W - 0.4, 1, L - 1), Vector3.new(0, 0.5, 0), DARK, Enum.Material.Plastic)
-	skid.Transparency = 1
-	skid.CanQuery = false
-	skid.CanTouch = false
-	skid.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
-
-	-- Cab: hood and dash in front of an open seat, roll bar behind it.
-	part("Hood", Vector3.new(W, 1.3, 2.6), Vector3.new(0, 2.65, front + 1.3), paint, Enum.Material.Metal)
-	part("Dash", Vector3.new(W, 0.9, 0.4), Vector3.new(0, 3.75, front + 2.8), trim, Enum.Material.Metal)
-	for _, x in ipairs({ -(W / 2 - 0.7), W / 2 - 0.7 }) do
-		local lamp = part(
-			"Headlight",
-			Vector3.new(0.7, 0.45, 0.2),
-			Vector3.new(x, 2.75, front - 0.05),
-			Color3.fromRGB(255, 226, 150),
-			Enum.Material.Neon
-		)
-		lamp.CanCollide = false
-	end
-	local rollZ = front + TruckLayout.CabLength - 0.35
-	for _, x in ipairs({ -sideX, sideX }) do
-		part("RollBarPost", Vector3.new(0.3, 3, 0.3), Vector3.new(x, 3.5, rollZ), trim, Enum.Material.Metal)
-	end
-	part("RollBarTop", Vector3.new(W, 0.3, 0.3), Vector3.new(0, 5.1, rollZ), trim, Enum.Material.Metal)
-
-	-- Bed, or the ATV's little rear rack.
-	local bedFloor: BasePart? = nil
-	local bedLength = layout.bedLength
-	if bedLength > 0 then
-		local floor = part(
-			"BedFloor",
-			Vector3.new(W, 0.5, bedLength),
-			Vector3.new(0, 2.25, layout.bedCenterZ),
-			WOOD,
-			Enum.Material.Wood
-		)
-		bedFloor = floor
-		local bedEnd = layout.bedStart + bedLength
-		if def.look.bedWalls then
-			part(
-				"BedWallL",
-				Vector3.new(0.3, 1.5, bedLength),
-				Vector3.new(-sideX, 3.25, layout.bedCenterZ),
-				WOOD2,
-				Enum.Material.Wood
-			)
-			part(
-				"BedWallR",
-				Vector3.new(0.3, 1.5, bedLength),
-				Vector3.new(sideX, 3.25, layout.bedCenterZ),
-				WOOD,
-				Enum.Material.Wood
-			)
-			part(
-				"BedWallBack",
-				Vector3.new(W, 1.5, 0.3),
-				Vector3.new(0, 3.25, bedEnd - 0.15),
-				WOOD2,
-				Enum.Material.Wood
-			)
-			part(
-				"BedWallFront",
-				Vector3.new(W, 1.5, 0.3),
-				Vector3.new(0, 3.25, layout.bedStart + 0.15),
-				paint,
-				Enum.Material.Metal
-			)
-		else
-			-- A flat deck: a headboard and stake posts down both sides.
-			part(
-				"Headboard",
-				Vector3.new(W, 2, 0.3),
-				Vector3.new(0, 3.5, layout.bedStart + 0.15),
-				paint,
-				Enum.Material.Metal
-			)
-			local posts = math.max(2, math.floor(bedLength / 3) + 1)
-			for i = 0, posts - 1 do
-				local z = layout.bedStart + 0.3 + (bedLength - 0.6) * i / (posts - 1)
-				for _, x in ipairs({ -sideX, sideX }) do
-					part("Stake", Vector3.new(0.3, 2, 0.3), Vector3.new(x, 3.5, z), trim, Enum.Material.Metal)
-				end
-			end
-		end
-	else
-		part("Rack", Vector3.new(W - 0.4, 0.3, 1.2), Vector3.new(0, 2.6, L / 2 - 0.8), trim, Enum.Material.Metal)
-	end
-
-	-- The trailer, behind the truck: tongue, low bed with rails, one axle,
-	-- and its own frictionless skid.
-	local trailerBed: BasePart? = nil
-	if trailer and trailerLayout then
-		local tl = trailerLayout
-		local tPaint = Color3.fromHex(trailer.look.color)
-		part(
-			"Tongue",
-			Vector3.new(0.4, 0.4, TruckLayout.Tongue + 1),
-			Vector3.new(0, 1.4, L / 2 + TruckLayout.Tongue / 2),
-			DARK,
-			Enum.Material.Metal
-		)
-		local tBed = part(
-			"TrailerBed",
-			Vector3.new(W, 0.5, tl.bedLength),
-			Vector3.new(0, 1.75, tl.bedCenterZ),
-			WOOD,
-			Enum.Material.Wood
-		)
-		trailerBed = tBed
-		local back = tl.bedCenterZ + tl.bedLength / 2
-		part(
-			"TrailerRailL",
-			Vector3.new(0.3, 1, tl.bedLength),
-			Vector3.new(-sideX, 2.5, tl.bedCenterZ),
-			tPaint,
-			Enum.Material.Metal
-		)
-		part(
-			"TrailerRailR",
-			Vector3.new(0.3, 1, tl.bedLength),
-			Vector3.new(sideX, 2.5, tl.bedCenterZ),
-			tPaint,
-			Enum.Material.Metal
-		)
-		part("TrailerRailBack", Vector3.new(W, 1, 0.3), Vector3.new(0, 2.5, back - 0.15), tPaint, Enum.Material.Metal)
-		part(
-			"TrailerRailFront",
-			Vector3.new(W, 1, 0.3),
-			Vector3.new(0, 2.5, back - tl.bedLength + 0.15),
-			tPaint,
-			Enum.Material.Metal
-		)
-		local tSkid = part(
-			"TrailerSkid",
-			Vector3.new(W - 0.4, 1, tl.bedLength - 1),
-			Vector3.new(0, 0.5, tl.bedCenterZ),
-			DARK,
-			Enum.Material.Plastic
-		)
-		tSkid.Transparency = 1
-		tSkid.CanQuery = false
-		tSkid.CanTouch = false
-		tSkid.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
-		for _, x in ipairs({ -layout.wheelX, layout.wheelX }) do
-			local wheel =
-				part("Wheel", Vector3.new(0.8, 2, 2), Vector3.new(x, 1, tl.wheelZ), DARK, Enum.Material.SmoothPlastic)
-			wheel.Shape = Enum.PartType.Cylinder
-			wheel.CanCollide = false
-		end
-	end
-
-	-- Where the client's "Load logs" prompt hangs: just behind the last bed
-	-- (the trailer's, when there is one).
-	local loadPoint: Attachment? = nil
-	local lastBed = trailerBed or bedFloor
-	if lastBed then
-		local point = Instance.new("Attachment")
-		point.Name = "LoadPoint"
-		point.Position = Vector3.new(0, 1, lastBed.Size.Z / 2 + 0.6)
-		point.Parent = lastBed
-		loadPoint = point
-	end
-
-	-- Exhaust pipe that puffs a little smoke while someone's driving.
-	local exhaust = part(
-		"Exhaust",
-		Vector3.new(0.4, 0.4, 0.8),
-		Vector3.new(W / 2 - 0.5, 1.2, L / 2 + 0.2),
-		DARK,
-		Enum.Material.Metal
-	)
-	exhaust.CanCollide = false
-	local smoke = Instance.new("Smoke")
-	smoke.Color = Color3.fromRGB(120, 115, 110)
-	smoke.Opacity = 0.12
-	smoke.Size = 0.6
-	smoke.RiseVelocity = 2
-	smoke.Enabled = false
-	smoke.Parent = exhaust
-
-	-- Wheels (for looks: the skid carries the truck).
-	for _, z in ipairs(layout.wheelZ) do
-		for _, x in ipairs({ -layout.wheelX, layout.wheelX }) do
-			local wheel = Instance.new("Part")
-			wheel.Name = "Wheel"
-			wheel.Shape = Enum.PartType.Cylinder
-			wheel.Size = Vector3.new(0.8, 2, 2)
-			wheel.Position = Vector3.new(x, 1, z)
-			wheel.Color = DARK
-			wheel.Material = Enum.Material.SmoothPlastic
-			wheel.CanCollide = false
-			wheel.Parent = model
-		end
-	end
-
-	-- Driver seat, open to the sky so the driver sits in it, not inside a box.
-	local seat = Instance.new("VehicleSeat")
-	seat.Name = "DriverSeat"
-	seat.Size = Vector3.new(2, 1, 2)
-	seat.Position = Vector3.new(0, 2.5, front + 3.9)
-	seat.Color = Color3.fromRGB(90, 60, 40)
-	seat.Material = Enum.Material.Fabric
-	seat.CanCollide = false
-	seat.Parent = model
-
-	-- One rigid body: everything welded to the chassis, and only the chassis
-	-- has mass. Parked = the chassis is anchored.
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") and d ~= chassis then
-			d.Anchored = false
-			d.Massless = true
-			local w = Instance.new("WeldConstraint")
-			w.Part0 = chassis
-			w.Part1 = d
-			w.Parent = chassis
-		end
-	end
-	chassis.Anchored = true
+	local point = model:FindFirstChild("LoadPoint", true)
+	local loadPoint = if point and point:IsA("Attachment") then point else nil
 
 	-- Physics driving: the driver's VehicleController sets these each frame.
 	local attachment = Instance.new("Attachment")
@@ -377,22 +177,21 @@ local function buildTruckModel(
 	heading.Enabled = false
 	heading.Parent = chassis
 
-	model.PrimaryPart = chassis
 	return {
 		model = model,
 		chassis = chassis,
 		seat = seat,
-		bedFloor = bedFloor,
-		trailerBed = trailerBed,
+		bedFloor = partNamed(model, "BedFloor"),
+		trailerBed = partNamed(model, "TrailerBed"),
 		loadPoint = loadPoint,
-		exhaust = exhaust,
 		drive = drive,
 		heading = heading,
 	}
 end
 
+-- Draws bed log `index` (the truck bed fills first, then the trailer): a
+-- TreeArt log with its end caps, welded to the bed, massless, out of the way.
 local function addBedVisual(rec: TruckRecord, entry: BedEntry, index: number)
-	-- The truck bed fills first, then the trailer.
 	local floor: BasePart?, slot: Vector3?
 	local truckSlots = #rec.layout.logSlots
 	if index <= truckSlots then
@@ -400,96 +199,253 @@ local function addBedVisual(rec: TruckRecord, entry: BedEntry, index: number)
 	elseif rec.trailerLayout then
 		floor, slot = rec.trailerBed, rec.trailerLayout.logSlots[index - truckSlots]
 	end
-	if not floor or not slot then
+	local wood = WoodData.Get(entry.woodId) or WoodData.Get("oak")
+	if not floor or not slot or not wood then
 		return
 	end
-	local wood = WoodData.Get(entry.woodId)
-	local visual = Instance.new("Part")
-	visual.Name = "BedLog"
-	visual.Shape = Enum.PartType.Cylinder
-	visual.Size = Vector3.new(rec.layout.logLength, TruckLayout.LogDiameter, TruckLayout.LogDiameter)
-	visual.Color = if wood then wood.trunkColor else Color3.fromRGB(122, 82, 48)
-	visual.Material = Enum.Material.Wood
-	visual.CanCollide = false
-	visual.CanQuery = false
-	visual.CanTouch = false
-	visual.Massless = true
-	visual.CFrame = floor.CFrame * CFrame.new(slot)
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = floor
-	weld.Part1 = visual
-	weld.Parent = visual
-	visual.Parent = rec.bedFolder
-end
-
----------------------------------------------------------------------------
--- Driving
----------------------------------------------------------------------------
-
-local function flatDistance(a: Vector3, b: Vector3): number
-	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
-end
-
-local function onOccupantChanged(rec: TruckRecord, prompt: ProximityPrompt, smoke: Smoke?)
-	local occupant = rec.seat.Occupant
-	prompt.Enabled = occupant == nil -- no "Drive" prompt hovering over the driver
-	if smoke then
-		smoke.Enabled = occupant ~= nil
+	local log = TruckArt.BedLog(floor, slot, wood, rec.layout.logLength, index)
+	log:SetAttribute("WoodId", entry.woodId)
+	if entry.figure then
+		log:SetAttribute("Figure", entry.figure) -- the Living Forest may mark figured logs
 	end
-	rec.arcadeSpeed = 0
-	if not GameConfig.VehiclePhysics then
-		return
-	end
-	if occupant then
-		local driver = Players:GetPlayerFromCharacter(occupant.Parent)
-		rec.chassis.Anchored = false
-		if driver then
-			rec.chassis:SetNetworkOwner(driver) -- the driver's device simulates it: smooth, no lag
+	local logPart = log.PrimaryPart
+	for _, d in ipairs(log:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = false
+			d.Massless = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
 		end
-		rec.lastGood = rec.model:GetPivot()
-		rec.lastCheck = os.clock()
-		-- Size the forces to the truck plus its driver once the seat weld is in.
-		task.defer(function()
-			local mass = rec.chassis.AssemblyMass
-			rec.drive.MaxForce = mass * 120
-			rec.heading.MaxTorque = mass * 5000
-			rec.heading.CFrame = rec.chassis.CFrame.Rotation
-			rec.drive.PlaneVelocity = Vector2.zero
-			rec.drive.Enabled = true
-			rec.heading.Enabled = true
-		end)
-	else
-		rec.drive.Enabled = false
-		rec.heading.Enabled = false
-		rec.drive.PlaneVelocity = Vector2.zero
-		rec.chassis.Anchored = true -- parked; physics goes back to the server
 	end
+	if logPart then
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = floor
+		weld.Part1 = logPart
+		weld.Parent = logPart
+	end
+	log.Parent = rec.bedFolder
+end
+
+-- The bed's numbers, on the truck and on its owner.
+local function publishBed(rec: TruckRecord)
+	rec.model:SetAttribute("BedCount", #rec.bed)
+	rec.owner:SetAttribute("BedCount", #rec.bed)
+	rec.owner:SetAttribute("BedCapacity", rec.capacity)
+end
+
+-- Saves the bed into the owner's profile (ProfileStore writes it out).
+local function saveBed(rec: TruckRecord)
+	local profile = ProfileService.GetProfile(rec.owner)
+	if profile then
+		profile.truckBed = VehicleLogic.CopyBed(rec.bed)
+	end
+end
+
+---------------------------------------------------------------------------
+-- Getting in and out
+---------------------------------------------------------------------------
+
+-- Ray params that see the world but not this truck or any character.
+local function worldParams(rec: TruckRecord, extra: Instance?): RaycastParams
+	local skip: { Instance } = { rec.model }
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p.Character then
+			table.insert(skip, p.Character)
+		end
+	end
+	if extra then
+		table.insert(skip, extra)
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = skip
+	params.RespectCanCollide = true -- skip leaves, zones, decoration
+	return params
+end
+
+-- Puts someone who just left the seat on the ground beside the driver's
+-- door (the left), when that spot is clear; else leaves them where the
+-- seat's jump put them.
+local function stepOut(rec: TruckRecord, humanoid: Humanoid)
+	local char = humanoid.Parent
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not char or not char:IsA("Model") or not root or not root:IsA("BasePart") then
+		return
+	end
+	if humanoid.Health <= 0 or humanoid.Sit or not rec.model.Parent then
+		return
+	end
+	local seatCF = rec.seat.CFrame
+	local door = seatCF * CFrame.new(-(rec.layout.width / 2 + EXIT_GAP), 0, 0)
+	local params = worldParams(rec)
+	local across = door.Position - seatCF.Position
+	if workspace:Raycast(seatCF.Position, across, params) then
+		return -- a wall or a tree on that side
+	end
+	local ground = workspace:Raycast(door.Position + Vector3.new(0, 4, 0), Vector3.new(0, -14, 0), params)
+	if not ground then
+		return
+	end
+	local height = if humanoid.RigType == Enum.HumanoidRigType.R15 then humanoid.HipHeight + root.Size.Y / 2 else 3
+	local facing = VehicleLogic.FlatFacing(seatCF.LookVector)
+	local at = ground.Position + Vector3.new(0, height + 0.1, 0)
+	char:PivotTo(CFrame.lookAt(at, at + facing))
+end
+
+-- Throws a stranger out of someone else's truck.
+local function ejectStranger(rec: TruckRecord, humanoid: Humanoid, stranger: Player?)
+	local weld = rec.seat:FindFirstChild("SeatWeld")
+	if weld then
+		weld:Destroy()
+	end
+	humanoid.Sit = false
+	if stranger then
+		tell(
+			stranger,
+			string.format("That's %s's %s. Yours waits in the parking lot.", rec.owner.DisplayName, rec.def.displayName)
+		)
+	end
+	task.defer(stepOut, rec, humanoid)
+end
+
+-- True when the truck rests on something solid.
+local function grounded(rec: TruckRecord): boolean
+	local origin = rec.chassis.Position
+	local hit = workspace:Raycast(origin, -rec.chassis.CFrame.UpVector * (WHEEL_CLEARANCE + 1), worldParams(rec))
+	return hit ~= nil
+end
+
+-- Parks the truck where it is: upright on the ground under it, anchored.
+local function park(rec: TruckRecord)
+	rec.drive.Enabled = false
+	rec.heading.Enabled = false
+	rec.drive.PlaneVelocity = Vector2.zero
+	local pivot = rec.chassis.CFrame
+	local hit = workspace:Raycast(pivot.Position + Vector3.new(0, 3, 0), Vector3.new(0, -40, 0), worldParams(rec))
+	local target = if hit
+		then VehicleLogic.ParkedCFrame(hit.Position, hit.Normal, pivot.LookVector, WHEEL_CLEARANCE, PARK_TILT)
+		else VehicleLogic.HeadingCFrame(pivot.LookVector, Vector3.yAxis) + pivot.Position
+	rec.chassis.AssemblyLinearVelocity = Vector3.zero
+	rec.chassis.AssemblyAngularVelocity = Vector3.zero
+	rec.model:PivotTo(target)
+	rec.chassis.Anchored = true -- parked; physics goes back to the server
+end
+
+-- Holds the truck's current direction, upright (the driver's device aimed
+-- Heading every frame, but those changes never reached the server, so the
+-- server's copy still points wherever the truck faced when they got in).
+local function holdHeading(rec: TruckRecord)
+	local cf = rec.chassis.CFrame
+	rec.heading.CFrame = VehicleLogic.HeadingCFrame(cf.LookVector, VehicleLogic.ClampTilt(cf.UpVector, PARK_TILT))
+end
+
+-- After the driver gets out: brake to a stop (Drive holds zero speed,
+-- Heading keeps it upright, the server simulates it), wait until it's
+-- slow and on the ground (at most SETTLE_MAX), then park it. A new driver
+-- or a rebuild cancels it.
+local function settle(rec: TruckRecord)
+	rec.settleToken += 1
+	local token = rec.settleToken
+	rec.drive.PlaneVelocity = Vector2.zero
+	holdHeading(rec)
+	pcall(function()
+		rec.chassis:SetNetworkOwner(nil)
+	end)
+	local started = os.clock()
+	while os.clock() - started < SETTLE_MAX do
+		task.wait(0.1)
+		if rec.settleToken ~= token or not rec.model.Parent or rec.chassis.Anchored then
+			return
+		end
+		holdHeading(rec)
+		if rec.chassis.AssemblyLinearVelocity.Magnitude < SETTLE_SPEED and grounded(rec) then
+			break
+		end
+	end
+	if rec.settleToken ~= token or not rec.model.Parent then
+		return
+	end
+	park(rec)
+end
+
+-- The owner sat down: physics goes to their device, sized to the truck.
+local function startDriving(rec: TruckRecord, driver: Player)
+	rec.settleToken += 1 -- a settle in progress stops here
+	rec.chassis.Anchored = false
+	rec.chassis:SetNetworkOwner(driver) -- the driver's device simulates it: smooth, no lag
+	rec.lastGood = rec.model:GetPivot()
+	rec.lastGoodAt = os.clock()
+	rec.lastCheck = os.clock()
+	-- Size the forces to the truck plus its driver once the seat weld is in.
+	task.defer(function()
+		if rec.driver == nil or not rec.model.Parent then
+			return
+		end
+		local mass = rec.chassis.AssemblyMass
+		rec.drive.MaxForce = mass * 120
+		rec.heading.MaxTorque = mass * 5000
+		rec.heading.CFrame = rec.chassis.CFrame.Rotation
+		rec.drive.PlaneVelocity = Vector2.zero
+		rec.drive.Enabled = true
+		rec.heading.Enabled = true
+	end)
+end
+
+local function onOccupantChanged(rec: TruckRecord)
+	local occupant = rec.seat.Occupant
+	rec.prompt.Enabled = occupant == nil -- no "Drive" prompt hovering over the driver
+	rec.arcadeSpeed = 0
+	if occupant then
+		local player = Players:GetPlayerFromCharacter(occupant.Parent)
+		if player ~= rec.owner then
+			ejectStranger(rec, occupant, player)
+			return
+		end
+		rec.driver = occupant
+		if GameConfig.VehiclePhysics and player then
+			startDriving(rec, player)
+		end
+		return
+	end
+	local driver = rec.driver
+	rec.driver = nil
+	if not driver then
+		return -- a stranger was put out
+	end
+	if GameConfig.VehiclePhysics then
+		task.spawn(settle, rec)
+	end
+	task.defer(stepOut, rec, driver)
 end
 
 -- Physics driving: puts back a truck that moved further than it can drive.
-local function speedCheck(rec: TruckRecord, ownerName: string)
+local function speedCheck(rec: TruckRecord)
 	local now = os.clock()
-	local elapsed = now - rec.lastCheck
-	if elapsed < SPEED_CHECK_EVERY then
+	if now - rec.lastCheck < SPEED_CHECK_EVERY then
 		return
 	end
 	rec.lastCheck = now
 	local pivot = rec.model:GetPivot()
-	local moved = flatDistance(pivot.Position, rec.lastGood.Position)
-	if moved > rec.def.topSpeed * elapsed * SPEED_SLACK + SPEED_SLACK_STUDS then
+	local verdict =
+		VehicleLogic.JudgeMove(rec.lastGood.Position, pivot.Position, now - rec.lastGoodAt, rec.def.topSpeed)
+	if verdict == "ok" then
+		rec.lastGood = pivot
+		rec.lastGoodAt = now
+	elseif verdict == "tooFar" then
 		warn(
 			string.format(
 				"[AntiExploit] %s's truck moved %d studs in %.1fs; putting it back",
-				ownerName,
-				moved,
-				elapsed
+				rec.owner.Name,
+				math.floor((pivot.Position - rec.lastGood.Position).Magnitude),
+				now - rec.lastGoodAt
 			)
 		)
 		rec.model:PivotTo(rec.lastGood)
 		rec.chassis.AssemblyLinearVelocity = Vector3.zero
-	else
-		rec.lastGood = pivot
+		rec.lastGoodAt = now
 	end
+	-- "still": nothing new arrived (or it's parked); keep the clock running.
 end
 
 -- Arcade driving: the server glides the (anchored) truck.
@@ -503,29 +459,33 @@ local function arcadeStep(rec: TruckRecord, dt: number)
 	rec.model:PivotTo(rec.model:GetPivot() * CFrame.Angles(0, turn, 0) * CFrame.new(0, 0, -rec.arcadeSpeed * dt))
 end
 
-local function addDrivePrompt(rec: TruckRecord, ownerName: string, exhaust: BasePart)
-	local seat = rec.seat
+local function makeDrivePrompt(seat: VehicleSeat, owner: Player, def: TruckDef): ProximityPrompt
 	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "DrivePrompt"
 	prompt.ActionText = "Drive"
-	prompt.ObjectText = string.format("%s's %s", ownerName, rec.def.displayName)
+	prompt.ObjectText = string.format("%s's %s", owner.DisplayName, def.displayName)
 	prompt.MaxActivationDistance = 7
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("OwnerId", owner.UserId) -- VehicleFX hides it from everyone else
 	prompt.Parent = seat
-	prompt.Triggered:Connect(function(player: Player)
-		local char = player.Character
-		local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
-		if humanoid and seat.Occupant == nil then
-			seat:Sit(humanoid)
-		end
-	end)
-	local smoke = exhaust:FindFirstChildOfClass("Smoke")
-	table.insert(
-		rec.conns,
-		seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-			onOccupantChanged(rec, prompt, smoke)
-		end)
-	)
+	return prompt
+end
+
+-- Only the owner gets in; anyone else hears whose truck it is.
+local function onDrivePrompt(rec: TruckRecord, player: Player)
+	if player ~= rec.owner then
+		tell(
+			player,
+			string.format("That's %s's %s. Yours waits in the parking lot.", rec.owner.DisplayName, rec.def.displayName)
+		)
+		return
+	end
+	local char = player.Character
+	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+	if humanoid and humanoid.Health > 0 and rec.seat.Occupant == nil then
+		rec.seat:Sit(humanoid)
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -551,22 +511,36 @@ local function claimSlot(userId: number): BasePart?
 	return nil
 end
 
-local function slotCFrame(slot: BasePart?): CFrame
+-- More players than parking slots: a spot in the overflow rows, held
+-- until the player leaves (so rebuilding never walks it along).
+local function claimOverflow(): number
+	local index = VehicleLogic.NextFreeIndex(overflowUsed)
+	overflowUsed[index] = true
+	warn("[VehicleService] Out of parking slots; add more in MapBuilder")
+	return index
+end
+
+local function slotCFrame(slot: BasePart?, overflowIndex: number?): CFrame
 	if slot then
 		local ground = slot.Position - Vector3.new(0, slot.Size.Y / 2, 0)
 		return CFrame.new(ground + Vector3.new(0, WHEEL_CLEARANCE, 0)) * slot.CFrame.Rotation
 	end
-	-- More players than parking slots: line the extras up west of spawn.
-	overflowCount += 1
-	warn("[VehicleService] Out of parking slots; add more in MapBuilder")
-	return CFrame.new(-20 - (overflowCount % 8) * 8, WHEEL_CLEARANCE, 56 - (overflowCount // 8) * 28)
+	local spot = VehicleLogic.OverflowSpot(overflowIndex or 0)
+	return CFrame.new(spot.X, WHEEL_CLEARANCE, spot.Z)
 end
 
 ---------------------------------------------------------------------------
 -- Public API
 ---------------------------------------------------------------------------
 
+-- `notifyFn` shows a toast (GameServer's notify). Without it, messages for
+-- players go to Output.
+function VehicleService.Init(notifyFn: (Player, string) -> ())
+	notify = notifyFn
+end
+
 local function destroyTruck(rec: TruckRecord)
+	rec.settleToken += 1
 	for _, conn in ipairs(rec.conns) do
 		conn:Disconnect()
 	end
@@ -585,9 +559,21 @@ local function capacityOf(def: TruckDef, trailer: TrailerDef?): number
 	return def.bedCapacity + (if trailer then trailer.extraCapacity else 0)
 end
 
+-- What was in this player's bed when they last played (profile.truckBed).
+local function savedBed(player: Player, capacity: number): ({ BedEntry }, number)
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return {}, 0
+	end
+	return VehicleLogic.CleanBed(profile.truckBed, function(woodId: string): boolean
+		return WoodData.Get(woodId) ~= nil
+	end, capacity)
+end
+
 -- Builds the player's truck (replacing any they have) in their parking
 -- slot, with `trailerId` hitched behind if it can tow. `load` refills the
--- bed (a recall or a switch); returns how many of those logs didn't fit.
+-- bed (a recall or a switch); with no `load`, the bed comes back from the
+-- player's save. Returns the model and how many logs didn't fit.
 function VehicleService.SpawnTruck(
 	player: Player,
 	truckId: string,
@@ -599,6 +585,10 @@ function VehicleService.SpawnTruck(
 
 	local old = trucks[player.UserId]
 	local slot = if old then old.slot else claimSlot(player.UserId)
+	local overflowIndex = if old then old.overflowIndex else nil
+	if not slot and overflowIndex == nil then
+		overflowIndex = claimOverflow()
+	end
 	if old then
 		destroyTruck(old)
 	end
@@ -606,15 +596,25 @@ function VehicleService.SpawnTruck(
 	local layout = TruckLayout.For(def)
 	local trailer = towedTrailer(def, trailerId)
 	local trailerLayout = if trailer then TruckLayout.ForTrailer(trailer, layout) else nil
+	local capacity = capacityOf(def, trailer)
+	local dropped = 0
+	if load == nil then
+		local restored, lost = savedBed(player, capacity)
+		load, dropped = restored, lost
+		if lost > 0 then
+			warn(string.format("[VehicleService] %s: %d saved bed log(s) couldn't be restored", player.Name, lost))
+		end
+	end
+
 	local built = buildTruckModel(def, layout, trailer, trailerLayout)
 	local model = built.model
 	-- Centre the whole rig (truck + trailer) on the parking slot.
 	local rigShift = if trailerLayout then trailerLayout.length / 2 else 0
-	model:PivotTo(slotCFrame(slot) * CFrame.new(0, 0, -rigShift))
+	model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -rigShift))
 	model:SetAttribute("OwnerId", player.UserId)
 	model:SetAttribute("TruckId", def.id)
 	model:SetAttribute("TrailerId", if trailer then trailer.id else "")
-	model:SetAttribute("BedCapacity", capacityOf(def, trailer))
+	model:SetAttribute("BedCapacity", capacity)
 	model:SetAttribute("BedCount", 0)
 	model:SetAttribute("TopSpeed", def.topSpeed) -- read by VehicleController
 	model:SetAttribute("TurnRate", def.turnRate)
@@ -623,53 +623,73 @@ function VehicleService.SpawnTruck(
 	local bedFolder = Instance.new("Folder")
 	bedFolder.Name = "BedVisuals"
 	bedFolder.Parent = model
+	-- Everything clients look for is in place before the truck replicates.
+	local prompt = makeDrivePrompt(built.seat, player, def)
 	model.Parent = workspace
 
+	local now = os.clock()
 	local rec: TruckRecord = {
+		owner = player,
 		def = def,
 		layout = layout,
 		trailer = trailer,
 		trailerLayout = trailerLayout,
 		trailerBed = built.trailerBed,
-		capacity = capacityOf(def, trailer),
+		capacity = capacity,
 		loadPoint = built.loadPoint,
 		model = model,
 		chassis = built.chassis,
 		seat = built.seat,
+		prompt = prompt,
 		bedFloor = built.bedFloor,
 		drive = built.drive,
 		heading = built.heading,
 		bed = {},
 		bedFolder = bedFolder,
 		slot = slot,
+		overflowIndex = overflowIndex,
 		conns = {},
 		arcadeSpeed = 0,
+		driver = nil,
+		settleToken = 0,
 		lastGood = model:GetPivot(),
-		lastCheck = os.clock(),
+		lastGoodAt = now,
+		lastCheck = now,
 	}
 	trucks[player.UserId] = rec
-	addDrivePrompt(rec, player.DisplayName, built.exhaust)
+	table.insert(
+		rec.conns,
+		rec.prompt.Triggered:Connect(function(who: Player)
+			onDrivePrompt(rec, who)
+		end)
+	)
+	table.insert(
+		rec.conns,
+		rec.seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+			onOccupantChanged(rec)
+		end)
+	)
 	table.insert(
 		rec.conns,
 		RunService.Heartbeat:Connect(function(dt: number)
-			local occupant = rec.seat.Occupant
-			if not occupant or not occupant.Parent then
+			if not rec.driver or not rec.driver.Parent then
 				return
 			end
 			if GameConfig.VehiclePhysics then
-				speedCheck(rec, player.Name)
+				speedCheck(rec)
 			else
 				arcadeStep(rec, dt)
 			end
 		end)
 	)
 
-	local dropped = 0
 	for _, entry in ipairs(load or {}) do
 		if not VehicleService.AddBedLog(player, entry) then
 			dropped += 1
 		end
 	end
+	publishBed(rec)
+	saveBed(rec) -- the save matches what's really in the bed now
 	player:SetAttribute("EquippedTruck", def.id)
 	return model, dropped
 end
@@ -683,8 +703,13 @@ function VehicleService.DespawnTruck(player: Player)
 	if rec.slot then
 		slotOwner[rec.slot] = nil
 	end
+	if rec.overflowIndex then
+		overflowUsed[rec.overflowIndex] = nil
+	end
 	trucks[player.UserId] = nil
 	lastRecall[player.UserId] = nil
+	player:SetAttribute("BedCount", 0)
+	player:SetAttribute("BedCapacity", 0)
 end
 
 -- True if this player is sitting in their own truck's driver seat.
@@ -761,9 +786,11 @@ function VehicleService.AddBedLog(player: Player, entry: BedEntry): boolean
 	if not rec or #rec.bed >= rec.capacity then
 		return false
 	end
-	table.insert(rec.bed, entry)
-	rec.model:SetAttribute("BedCount", #rec.bed)
-	addBedVisual(rec, entry, #rec.bed)
+	local clean: BedEntry = { woodId = entry.woodId, value = entry.value, figure = entry.figure }
+	table.insert(rec.bed, clean)
+	addBedVisual(rec, clean, #rec.bed)
+	publishBed(rec)
+	saveBed(rec)
 	return true
 end
 
@@ -775,8 +802,9 @@ function VehicleService.TakeBedLogs(player: Player): { BedEntry }
 	end
 	local out = rec.bed
 	rec.bed = {}
-	rec.model:SetAttribute("BedCount", 0)
 	rec.bedFolder:ClearAllChildren()
+	publishBed(rec)
+	saveBed(rec)
 	return out
 end
 

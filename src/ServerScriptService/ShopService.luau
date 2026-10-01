@@ -194,7 +194,18 @@ local function buyTrailer(player: Player, trailerId: string)
 	end
 	table.insert(profile.ownedTrailers, trailer.id)
 	publishTrucks(player, profile)
-	if hitch(player, profile, trailer.id) then
+	-- A truck without a bed (the Scout ATV) can't tow: keep it unhitched.
+	local truck = ItemCatalog.GetTruck(profile.equippedTruck)
+	if truck and truck.bedCapacity <= 0 then
+		notify(
+			player,
+			string.format(
+				"Bought the %s! The %s can't tow, so hitch it here once you drive a truck with a bed.",
+				trailer.displayName,
+				truck.displayName
+			)
+		)
+	elseif hitch(player, profile, trailer.id) then
 		notify(player, string.format("Bought the %s! It's hitched to your truck.", trailer.displayName))
 	else
 		notify(player, string.format("Bought the %s! Hitch it here when you're ready.", trailer.displayName))
