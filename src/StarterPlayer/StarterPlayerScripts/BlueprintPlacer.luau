@@ -24,15 +24,13 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local BlueprintPlacer = {}
 
 local player = Players.LocalPlayer
 
-local CREAM = Color3.fromRGB(245, 235, 215)
-local BARK = Color3.fromRGB(88, 58, 34)
-local GREEN = Color3.fromRGB(76, 140, 64)
-local RED = Color3.fromRGB(190, 60, 45)
+local CREAM = UITheme.Colors.Cream
 local VALID = Color3.fromRGB(90, 220, 110)
 local INVALID = Color3.fromRGB(235, 70, 60)
 
@@ -132,7 +130,7 @@ local function setBarText(text: string, ok: boolean)
 	local l = barLabel
 	if l then
 		l.Text = text
-		l.TextColor3 = if ok then CREAM else Color3.fromRGB(255, 190, 170)
+		l.TextColor3 = if ok then CREAM else UITheme.Colors.Amber
 	end
 end
 
@@ -331,72 +329,20 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	update(s)
 end
 
-local function button(parent: Instance, text: string, color: Color3, order: number, onClick: () -> ()): TextButton
-	local b = Instance.new("TextButton")
-	b.Name = text
-	b.LayoutOrder = order
-	b.Size = UDim2.fromOffset(96, 36)
-	b.BackgroundColor3 = color
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 14
-	b.TextColor3 = CREAM
-	b.Text = text
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 8)
-	c.Parent = b
-	b.Parent = parent
-	b.Activated:Connect(onClick)
-	return b
-end
-
 function BlueprintPlacer.Start()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "BlueprintPlacer"
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 6
-
-	local frame = Instance.new("Frame")
-	frame.Name = "Bar"
-	frame.AnchorPoint = Vector2.new(0.5, 1)
-	frame.Position = UDim2.new(0.5, 0, 1, -44) -- above the control hint
-	frame.Size = UDim2.fromOffset(340, 84)
-	frame.BackgroundColor3 = BARK
-	frame.BackgroundTransparency = 0.1
-	frame.Visible = false
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 10)
-	c.Parent = frame
-	frame.Parent = gui
-
-	local l = Instance.new("TextLabel")
-	l.Name = "What"
-	l.Position = UDim2.fromOffset(10, 6)
-	l.Size = UDim2.new(1, -20, 0, 24)
-	l.BackgroundTransparency = 1
-	l.Font = Enum.Font.GothamMedium
-	l.TextSize = 15
-	l.TextColor3 = CREAM
-	l.TextTruncate = Enum.TextTruncate.AtEnd
-	l.Parent = frame
-	barLabel = l
-
-	local row = Instance.new("Frame")
-	row.Name = "Buttons"
-	row.Position = UDim2.fromOffset(0, 38)
-	row.Size = UDim2.new(1, 0, 0, 36)
-	row.BackgroundTransparency = 1
-	row.Parent = frame
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 8)
-	layout.Parent = row
-	button(row, "ROTATE", BARK:Lerp(Color3.new(0, 0, 0), 0.25), 1, BlueprintPlacer.Rotate)
-	button(row, "PLACE", GREEN, 2, BlueprintPlacer.Place)
-	button(row, "CANCEL", RED, 3, BlueprintPlacer.Stop)
-
-	bar = frame
+	local gui = UITheme.Screen("BlueprintPlacer", 6)
+	local b = UITheme.Bar(gui, "Placing")
+	barLabel = b.label
+	local function add(text: string, style: string, order: number, onClick: () -> ())
+		local button = UITheme.Button({ text = text, size = Vector2.new(96, 36), style = style })
+		button.root.LayoutOrder = order
+		button.root.Parent = b.row
+		button.face.Activated:Connect(onClick)
+	end
+	add("ROTATE", "bark", 1, BlueprintPlacer.Rotate)
+	add("PLACE", "buy", 2, BlueprintPlacer.Place)
+	add("CANCEL", "skip", 3, BlueprintPlacer.Stop)
+	bar = b.outer
 	gui.Parent = player:WaitForChild("PlayerGui")
 	player.CharacterRemoving:Connect(BlueprintPlacer.Stop)
 end

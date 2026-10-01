@@ -117,7 +117,11 @@ Slices, in order:
 ### 9. Launch polish (phase 9)
 - ⬜ Sounds: chop, fell, sell, buy, UI clicks; a music toggle
 - ⬜ Settings menu (music, sound effects)
-- ⬜ Icon and thumbnail (Claude Design prompt, then Studio renders)
+- 🟡 UI pass from the Claude Design spec: HUD, side buttons, shop panel,
+  tutorial and Murph cards, beacon, custom prompts, console and phone
+  sizes (UITheme). Still to do: upload the wood-grain and kraft textures
+- ⬜ Icon and thumbnail: layouts are in the UI spec (6a/6b, 7a/7b); they
+  need Studio renders of a big pine, an axe and a loaded Logging Rig
 - ⬜ Art pass on the code-built placeholders: trees, buildings, trucks
   (GAME_DESIGN §13, §14.7), at least the starter area and sawmill
 - ⬜ Phone pass: every screen on a small phone, performance with many trees

@@ -20,6 +20,7 @@ On this branch, each with its own checklist below:
 8. **The Field Guide**
 9. **The Aether Isles**: gondola, Lumenwood, Sky Shards, Cloud Chute, Sky Bin, the forge
 10. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
+11. **The new look**: every screen restyled from the Claude Design UI spec
 
 Old saves carry over: new save fields are filled in on load. Play the
 sections in order the first time (a fresh save gets the tutorial).
@@ -107,11 +108,14 @@ test account), progress starts fresh each Play session.
 
 ## Screen layout
 
-- **Cash, top right**, with the Daily Goals button under it.
-- **Tutorial tracker, left**, a third of the way down, under Roblox's chat
-  window.
-- **BUILD** (on your own plot), **Sell load here** and **Truck to lot**
-  stack on the right, above the jump button.
+- **Cash, top right**, with the Daily Goals button under it, the clock and
+  STORE to its left.
+- **Tutorial tracker, left**: high up on a phone (its chat is a button), a
+  third of the way down on a computer, under Roblox's chat window.
+- **Side buttons, right**: BUILD (on your own plot), Sell here (Instant
+  Delivery), Drop axe, Truck to lot, stacked so the bottom one always ends
+  above a phone's jump button.
+- **Toasts, top centre**, newest on top. **Control hint, bottom centre.**
 - Roblox's own **player list is off** (it opens top right on computers,
   over the cash) until the game has its own leaderboard. Turn it back on
   with `ShowRobloxPlayerList = true` in `GameConfig.luau`.
@@ -402,3 +406,82 @@ A sign at each plot's north edge says whose it is.
 - [ ] On a phone: tap to aim, PLACE / ROTATE / CANCEL work, prompts are
       reachable
 - [ ] Lamp posts glow at night
+
+## The new look (Claude Design UI spec)
+
+Every screen is rebuilt from the UI spec you made in Claude Design
+(colours, sizes and states are in `UITheme.luau`; each screen builds from
+it):
+
+- **Cash plaque:** kraft paper in a bark frame with an ink edge; at the
+  $2,000,000 cap it turns amber and reads **MAX**.
+- **Toasts:** paper pills at the top, newest on top, older ones fading
+  back; money shows in green.
+- **Control hint:** one short line for the device in use ("Tap a tree to
+  swing your axe", "Click a tree to swing · E to interact", "RT to swing ·
+  X to interact"); it switches when you pick up a gamepad.
+- **Side buttons:** chunky buttons that press down onto their edge. On a
+  gamepad each shows its glyph: X drops your axe, Y calls your truck (only
+  when no world prompt is using that button, so X near a shop still opens
+  the shop).
+- **Shops** (Tool Shed, Dealership, Hearth & Home, Field Guide, Blueprint
+  Store, Robux Store): the screen dims behind a wood-framed paper panel;
+  tapping outside it closes it, and you can't walk while it's open. Rows
+  have a round swatch (the Inferno and Starfall axes glow), the name with
+  "· you own 2", two lines of detail, and a button in one of the spec's
+  states (Buy, can't afford, Starter, Locked, Forged, Full, Use, In use).
+  On a gamepad the first Buy button is selected, with an amber ring.
+- **Tutorial:** the kraft tracker card with an amber "Tap again to skip"
+  confirm; Murph's wood card has his portrait (a live view of the Murph by
+  the spawn) and fades away when tapped.
+- **Beacon:** an amber arrow with an ink rim and a distance pill, bobbing
+  over the target; it hides once you're there.
+- **World prompts:** the spec's wood cards with a key cap that fills amber
+  while you hold, TAP on a phone, the pad's glyph on a gamepad. If any
+  prompt misbehaves, `CustomPrompts = false` in `GameConfig.luau` brings
+  back Roblox's default ones.
+- **Scaling:** 1x on phones, about 1.25x on a 1080p monitor, 1.5x on a TV,
+  with the TV-safe margin on consoles.
+
+Where it differs from the spec, and why:
+- The cash stays **top right** (you asked for that); the spec drew it top
+  left.
+- On a computer the tracker sits lower than the spec's y 96, to clear
+  Roblox's chat window.
+- **No wood grain or paper fibre yet:** those are tiled images. Upload them
+  and put the ids in `UITheme.Textures` (Wood, Kraft) and every surface
+  picks them up; until then the surfaces are flat colour.
+- Drop shadows are drawn as solid edges, and the beacon's triangle is a
+  text arrow (no image needed).
+- The icon and thumbnail layouts (6a/6b, 7a/7b) need Studio renders; they
+  aren't in the game itself.
+
+### Playtest checklist
+- [ ] Phone (Studio's device emulator, e.g. iPhone 14 landscape): cash,
+      tracker and side buttons clear of the thumbstick, the jump button
+      and Roblox's top bar; nothing overlaps
+- [ ] Computer at 1080p: everything a little bigger (1.25x), still in the
+      right places; at a small window size, still 1x
+- [ ] Toasts: three at once, the newest on top; "$18" shows in green;
+      they fade after 3 seconds
+- [ ] Wallet at the cap (quick test: set `CashCap = 100` in
+      `GameConfig.luau` for one Play, then sell a load): the plaque turns
+      amber and says MAX
+- [ ] Buttons press down when held, and brighten under the mouse
+- [ ] A shop: the screen dims, the panel fits on a phone (the list
+      scrolls), tapping the dim area closes it, WASD doesn't walk while
+      it's open, B on a gamepad closes it
+- [ ] Gamepad in a shop: the first Buy button has the amber ring; the
+      D-pad moves between buttons; A buys
+- [ ] Tool Shed rows: Starter (outlined), Full, Buy, the grey price you
+      can't afford yet, Locked; the Inferno and Starfall swatches glow
+- [ ] Tutorial: Skip turns amber and says "Tap again to skip", then goes
+      back after 3 seconds; Murph's portrait shows his face; tapping his
+      card fades it
+- [ ] Beacon: bobs over the tree / log / truck / sell pad with the
+      distance; disappears when you're next to it
+- [ ] World prompts: key cap with E; holding fills it amber; on a phone the
+      card says TAP and tapping it works (Pick up, Load, Drive); on a plot
+      in build mode, Move and Sell stack instead of overlapping
+- [ ] Gamepad: X drops the axe away from prompts, but next to a shop X
+      opens the shop instead; Y calls the truck

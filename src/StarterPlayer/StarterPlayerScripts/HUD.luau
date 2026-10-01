@@ -1,14 +1,21 @@
 --!strict
--- HUD: builds the main UI from code (wood-grain / kraft-paper theme).
---   * Cash plaque top right, below Roblox's own top-bar buttons (Roblox's
---     player list, which would cover it, is off: GameConfig).
---   * A one-line control hint, worded for the device being used.
+-- HUD: the always-on screen (UI spec 01, look from UITheme).
+--   * Cash plaque top right, below Roblox's top bar (Roblox's player list,
+--     which would cover it, is off: GameConfig). At the wallet cap it turns
+--     amber and reads MAX.
 --   * Toasts: short messages from the server (Notify) or other controllers,
---     stacked (newest at the bottom, up to MAX_TOASTS) so none gets lost.
+--     top centre, newest on top, up to three (older ones fade back).
+--     Amounts of money show in green.
+--   * A one-line control hint at the bottom, worded for the device in use.
+--   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
+--     that other controllers add to with HUD.SideButton. It ends above a
+--     phone's jump button. On a gamepad each shows its button glyph, and
+--     that button presses it (unless a world prompt is using the same one).
 --   * "Loading your save..." until the server says the profile is ready.
--- Built in code so Rojo syncs it cleanly.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
@@ -17,200 +24,382 @@ local UserInputService = game:GetService("UserInputService")
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
+local UITheme = require(script.Parent.UITheme)
 
 local HUD = {}
 
+local C = UITheme.Colors
+local F = UITheme.Fonts
+
 local player = Players.LocalPlayer
 
-local INK = Color3.fromRGB(60, 40, 20)
-local CREAM = Color3.fromRGB(245, 235, 215)
-
 local MAX_TOASTS = 3
-local TOAST_SECONDS = 2.4
+local TOAST_SECONDS = 3
+local TOAST_FADE = 0.25
+local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
 
+type Toast = { outer: Frame, face: ImageLabel, label: TextLabel, stroke: UIStroke }
+
+type Side = {
+	button: UITheme.Button,
+	key: Enum.KeyCode?,
+	glyph: GuiObject?,
+	onPress: () -> (),
+}
+
+local cashFace: ImageLabel? = nil
+local cashInner: Frame? = nil
 local cashLabel: TextLabel? = nil
+local cashOuter: Frame? = nil
+local cashGlow: UIStroke? = nil
 local toastStack: Frame? = nil
+local toasts: { Toast } = {}
 local toastOrder = 0
+local hintLabel: TextLabel? = nil
+local sideColumn: Frame? = nil
+local sides: { Side } = {}
+local shownPrompts: { [ProximityPrompt]: boolean } = {}
 
-local function corner(parent: GuiObject, radius: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, radius)
-	c.Parent = parent
-end
-
-local function hintText(): string
-	local verb = "Click"
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		verb = "Tap"
-	elseif UserInputService.GamepadEnabled and not UserInputService.KeyboardEnabled then
-		verb = "Hold R2 on"
-	end
-	return verb
-		.. " trees to chop  •  Pick up the logs  •  Load them at your truck's tailgate  •  Sell on the sawmill pad"
-end
+---------------------------------------------------------------------------
+-- Cash
+---------------------------------------------------------------------------
 
 local function setCash(amount: number)
-	local label = cashLabel
-	if label then
-		local full = amount >= GameConfig.CashCap
-		label.Text = Util.formatCash(amount) .. (if full then " MAX" else "")
-		label.TextColor3 = if full then Color3.fromRGB(176, 96, 18) else INK -- amber when the wallet is full
+	local label, face, inner, outer, glow = cashLabel, cashFace, cashInner, cashOuter, cashGlow
+	if not label or not face or not inner or not outer or not glow then
+		return
+	end
+	local full = amount >= GameConfig.CashCap
+	label.Text = if full then "MAX" else Util.formatCash(amount)
+	label.TextXAlignment = if full then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
+	face.BackgroundColor3 = if full then C.AmberDeep else C.Bark
+	inner.BackgroundColor3 = if full then C.Amber else C.Paper
+	glow.Enabled = full
+end
+
+---------------------------------------------------------------------------
+-- Toasts
+---------------------------------------------------------------------------
+
+-- Money in a message ("$1,250") shows in green.
+local function richToast(message: string): string
+	return (
+		string.gsub(UITheme.escape(message), "%$[%d,]+", function(money: string)
+			return string.format('<font color="#3F7A34" weight="heavy">%s</font>', money)
+		end)
+	)
+end
+
+local function setToastAlpha(toast: Toast, alpha: number)
+	toast.outer.BackgroundTransparency = alpha
+	toast.face.BackgroundTransparency = alpha
+	toast.label.TextTransparency = alpha
+	toast.stroke.Transparency = alpha
+end
+
+local function restack()
+	for i, toast in ipairs(toasts) do
+		setToastAlpha(toast, TOAST_ALPHA[i] or 1)
 	end
 end
 
--- Shows a short message in the upper middle of the screen for a few seconds.
+local function removeToast(toast: Toast)
+	local i = table.find(toasts, toast)
+	if i then
+		table.remove(toasts, i)
+	end
+	toast.outer:Destroy()
+	restack()
+end
+
+-- Shows a short message at the top of the screen for a few seconds.
 function HUD.Toast(message: string)
 	local stack = toastStack
 	if not stack then
 		return
 	end
-	-- Make room: drop the oldest toasts beyond the limit.
-	local existing: { TextLabel } = {}
-	for _, child in ipairs(stack:GetChildren()) do
-		if child:IsA("TextLabel") then
-			table.insert(existing, child)
-		end
+	while #toasts >= MAX_TOASTS do
+		removeToast(toasts[#toasts])
 	end
-	table.sort(existing, function(a, b)
-		return a.LayoutOrder < b.LayoutOrder
-	end)
-	for i = 1, #existing - MAX_TOASTS + 1 do
-		existing[i]:Destroy()
-	end
-
 	toastOrder += 1
-	local label = Instance.new("TextLabel")
-	label.Name = "Toast"
-	label.LayoutOrder = toastOrder
-	label.Size = UDim2.fromOffset(0, 34)
-	label.AutomaticSize = Enum.AutomaticSize.X
-	label.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
-	label.BackgroundTransparency = 0.25
-	label.Font = Enum.Font.GothamMedium
-	label.TextSize = 18
-	label.TextColor3 = INK
-	label.Text = message
-	corner(label, 8)
-	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 14)
-	pad.PaddingRight = UDim.new(0, 14)
-	pad.Parent = label
-	label.Parent = stack
+	local card = UITheme.Card(C.Paper, C.Ink, 2, 16, true)
+	card.outer.Name = "Toast"
+	card.outer.LayoutOrder = -toastOrder -- newest on top
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(280, math.huge)
+	limit.MinSize = Vector2.new(0, 34)
+	limit.Parent = card.outer
+	local stroke = UITheme.stroke(card.face, C.Bark, 2)
+	UITheme.padding(card.face, 7, 14, 7, 14)
+	local label = UITheme.label(card.face, "", F.Bold, 13, C.Ink)
+	label.AutomaticSize = Enum.AutomaticSize.XY
+	label.TextWrapped = true
+	label.RichText = true
+	label.Text = richToast(message)
+	local labelLimit = Instance.new("UISizeConstraint")
+	labelLimit.MaxSize = Vector2.new(252, math.huge)
+	labelLimit.Parent = label
+	card.outer.Parent = stack
+
+	local toast: Toast = { outer = card.outer, face = card.face, label = label, stroke = stroke }
+	table.insert(toasts, 1, toast)
+	restack()
 
 	task.delay(TOAST_SECONDS, function()
-		if label.Parent == nil then
+		if not table.find(toasts, toast) then
 			return -- already pushed out by newer toasts
 		end
-		local fade =
-			TweenService:Create(label, TweenInfo.new(0.35), { TextTransparency = 1, BackgroundTransparency = 1 })
+		local info = TweenInfo.new(TOAST_FADE)
+		TweenService:Create(card.outer, info, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(card.face, info, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(stroke, info, { Transparency = 1 }):Play()
+		local fade = TweenService:Create(label, info, { TextTransparency = 1 })
 		fade:Play()
 		fade.Completed:Wait()
-		label:Destroy()
+		if table.find(toasts, toast) then
+			removeToast(toast)
+		end
 	end)
 end
 
-function HUD.Start()
-	local playerGui = player:WaitForChild("PlayerGui")
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "TimberlineHUD"
-	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = false -- keep clear of Roblox's menu and chat buttons
-	gui.DisplayOrder = 10 -- above panels like the shop, so toasts stay visible
+---------------------------------------------------------------------------
+-- Hint and side buttons, by device
+---------------------------------------------------------------------------
 
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
+local HINTS: { [UITheme.Device]: string } = {
+	phone = "Tap a tree to swing your axe",
+	desktop = "Click a tree to swing · E to interact",
+	console = "RT to swing · X to interact",
+}
 
-	-- Cash plaque, top right.
-	local plaque = Instance.new("Frame")
-	plaque.Name = "CashPlaque"
-	plaque.AnchorPoint = Vector2.new(1, 0)
-	plaque.Size = UDim2.fromOffset(200, 50)
-	plaque.Position = UDim2.new(1, -12, 0, 8)
-	plaque.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
-	plaque.BorderSizePixel = 0
-	corner(plaque, 10)
-	local paper = Instance.new("Frame")
-	paper.Size = UDim2.new(1, -8, 1, -8)
-	paper.Position = UDim2.fromOffset(4, 4)
-	paper.BackgroundColor3 = Color3.fromRGB(240, 225, 195)
-	paper.BorderSizePixel = 0
-	corner(paper, 7)
-	paper.Parent = plaque
+-- Whether a world prompt that uses `key` is showing (it gets the press).
+local function promptOn(key: Enum.KeyCode): boolean
+	for prompt in pairs(shownPrompts) do
+		if prompt.Enabled and prompt.GamepadKeyCode == key then
+			return true
+		end
+	end
+	return false
+end
 
-	local cash = Instance.new("TextLabel")
-	cash.Size = UDim2.fromScale(1, 1)
-	cash.BackgroundTransparency = 1
-	cash.Font = Enum.Font.Fantasy
-	cash.TextSize = 28
-	cash.TextColor3 = INK
-	cash.Text = "$0"
-	cash.Parent = paper
-	cashLabel = cash
-	plaque.Parent = gui
+local function layoutSide(side: Side, device: UITheme.Device)
+	local phone = UITheme.IsPhone()
+	local console = device == "console" and side.key ~= nil
+	local width = if console then 150 elseif phone then 100 else 110
+	local height = if phone then 36 else 40
+	side.button.root.Size = UDim2.fromOffset(width, height + 3)
+	side.button.face.TextSize = if phone then 12 else 13
+	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
+	if fit then
+		fit.MaxTextSize = if phone then 12 else 13
+	end
+	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
+	if pad then
+		pad.PaddingLeft = UDim.new(0, if console then 36 else 6)
+	end
+	if side.glyph then
+		side.glyph.Visible = console
+	end
+end
 
-	-- Control hint, bottom-centre, narrow enough to clear the mobile
-	-- thumbstick (bottom-left) and jump button (bottom-right).
-	local hint = Instance.new("TextLabel")
+local function refreshDevice()
+	local device: UITheme.Device = UITheme.Device()
+	local hint = hintLabel
+	if hint then
+		hint.Text = HINTS[device]
+	end
+	for _, side in ipairs(sides) do
+		layoutSide(side, device)
+	end
+end
+
+export type SideOptions = {
+	name: string,
+	text: string,
+	style: string,
+	order: number, -- top to bottom
+	key: Enum.KeyCode?, -- the gamepad button that presses it
+	onPress: () -> (),
+}
+
+-- Adds a button to the right-hand column (hidden until you show it:
+-- set `.root.Visible`). Pressing it, or its gamepad button, calls onPress.
+function HUD.SideButton(opts: SideOptions): UITheme.Button
+	local column = sideColumn
+	assert(column, "[HUD] SideButton before HUD.Start")
+	local button = UITheme.Button({
+		name = opts.name,
+		text = opts.text,
+		size = Vector2.new(110, 40),
+		style = opts.style,
+		textSize = 13,
+		radius = 12,
+	})
+	button.root.LayoutOrder = opts.order
+	button.root.Visible = false
+	local glyph: GuiObject? = nil
+	if opts.key then
+		local g = UITheme.Glyph(opts.key, 22)
+		g.AnchorPoint = Vector2.new(0, 0.5)
+		g.Position = UDim2.new(0, -26, 0.5, 0) -- in the face's left padding
+		g.Parent = button.face
+		glyph = g
+	end
+	button.root.Parent = column
+	button.face.Activated:Connect(opts.onPress)
+	local side: Side = { button = button, key = opts.key, glyph = glyph, onPress = opts.onPress }
+	table.insert(sides, side)
+	local device: UITheme.Device = UITheme.Device()
+	layoutSide(side, device)
+	return button
+end
+
+local function onGamepad(input: InputObject, processed: boolean)
+	if processed or GuiService.SelectedObject ~= nil then
+		return -- a menu has the pad
+	end
+	for _, side in ipairs(sides) do
+		if side.key == input.KeyCode and side.button.root.Visible and not promptOn(input.KeyCode) then
+			side.onPress()
+			return
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Building it
+---------------------------------------------------------------------------
+
+local function buildCash(gui: ScreenGui)
+	local side = UITheme.Margin()
+	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
+	card.outer.Name = "CashPlaque"
+	card.outer.AnchorPoint = Vector2.new(1, 0)
+	card.outer.Position = UDim2.new(1, -side, 0, 8)
+	local min = Instance.new("UISizeConstraint")
+	min.MinSize = Vector2.new(150, 49)
+	min.Parent = card.outer
+	local glow = UITheme.stroke(card.outer, C.Amber, 4)
+	glow.Transparency = 0.45
+	glow.Enabled = false
+	UITheme.padding(card.face, 4, 4, 4, 4)
+	UITheme.texture(card.face, "Wood", 14)
+
+	local inner = Instance.new("Frame")
+	inner.Name = "Paper"
+	inner.AutomaticSize = Enum.AutomaticSize.X
+	inner.Size = UDim2.fromOffset(0, 38)
+	inner.BackgroundColor3 = C.Paper
+	inner.BorderSizePixel = 0
+	UITheme.corner(inner, 10)
+	UITheme.padding(inner, 0, 14, 0, 14)
+	inner.Parent = card.face
+	local innerMin = Instance.new("UISizeConstraint")
+	innerMin.MinSize = Vector2.new(142, 38)
+	innerMin.Parent = inner
+
+	local label = UITheme.label(inner, "$0", F.Heading, 26, C.Ink)
+	label.AutomaticSize = Enum.AutomaticSize.X
+	label.Size = UDim2.fromScale(0, 1)
+	local labelMin = Instance.new("UISizeConstraint")
+	labelMin.MinSize = Vector2.new(114, 0)
+	labelMin.Parent = label
+
+	card.outer.Parent = gui
+	cashOuter, cashFace, cashInner, cashLabel, cashGlow = card.outer, card.face, inner, label, glow
+end
+
+local function buildHint(gui: ScreenGui)
+	local _, bottom = UITheme.Margin()
+	local hint = UITheme.label(gui, "", F.Body, 13, C.Cream)
 	hint.Name = "Hint"
 	hint.AnchorPoint = Vector2.new(0.5, 1)
-	hint.Size = UDim2.new(0.46, 0, 0, 36)
-	hint.Position = UDim2.new(0.5, 0, 1, -12)
-	hint.BackgroundColor3 = Color3.fromRGB(20, 15, 10)
-	hint.BackgroundTransparency = 0.35
-	hint.Font = Enum.Font.Gotham
-	hint.TextScaled = true
-	hint.TextWrapped = true
-	hint.TextColor3 = CREAM
-	hint.Text = hintText()
-	corner(hint, 8)
-	local hintMax = Instance.new("UISizeConstraint")
-	hintMax.MaxSize = Vector2.new(640, 36)
-	hintMax.Parent = hint
-	local hintTextSize = Instance.new("UITextSizeConstraint")
-	hintTextSize.MaxTextSize = 16
-	hintTextSize.Parent = hint
-	local hintPad = Instance.new("UIPadding")
-	hintPad.PaddingLeft = UDim.new(0, 8)
-	hintPad.PaddingRight = UDim.new(0, 8)
-	hintPad.Parent = hint
-	hint.Parent = gui
+	hint.Position = UDim2.new(0.5, 0, 1, -bottom)
+	hint.AutomaticSize = Enum.AutomaticSize.X
+	hint.Size = UDim2.fromOffset(0, 30)
+	hint.BackgroundColor3 = C.Ink
+	hint.BackgroundTransparency = 0.2
+	hint.TextXAlignment = Enum.TextXAlignment.Center
+	hint.TextTruncate = Enum.TextTruncate.AtEnd
+	UITheme.corner(hint, 15)
+	UITheme.padding(hint, 0, 14, 0, 14)
+	local max = Instance.new("UISizeConstraint")
+	max.MaxSize = Vector2.new(320, 30)
+	max.Parent = hint
+	hintLabel = hint
+end
 
-	-- Toast stack, upper-middle.
-	local stack = Instance.new("Frame")
-	stack.Name = "Toasts"
-	stack.AnchorPoint = Vector2.new(0.5, 0)
-	stack.Position = UDim2.fromScale(0.5, 0.18)
-	stack.Size = UDim2.fromScale(0.9, 0)
-	stack.AutomaticSize = Enum.AutomaticSize.Y
-	stack.BackgroundTransparency = 1
-	local list = Instance.new("UIListLayout")
-	list.FillDirection = Enum.FillDirection.Vertical
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Padding = UDim.new(0, 6)
-	list.Parent = stack
-	stack.Parent = gui
-	toastStack = stack
+local function buildSideColumn()
+	-- Its own screen, under the shop panel's scrim (which blocks HUD taps),
+	-- and measured from the true screen centre.
+	local gui = UITheme.Screen("SideButtons", 1, true)
+	local side = UITheme.Margin()
+	local column = Instance.new("Frame")
+	column.Name = "Column"
+	column.AnchorPoint = Vector2.new(1, 1)
+	-- The bottom stays 44 below the centre (y 239 on a 390-tall phone), so
+	-- however many buttons show, they never reach the jump button.
+	column.Position = UDim2.new(1, -side, 0.5, 44)
+	column.AutomaticSize = Enum.AutomaticSize.XY
+	column.BackgroundTransparency = 1
+	local list = UITheme.list(column, 8)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	list.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	column.Parent = gui
+	gui.Parent = player:WaitForChild("PlayerGui")
+	sideColumn = column
+end
 
-	-- "Loading your save..." until the server has the profile.
-	local loading = Instance.new("TextLabel")
-	loading.Name = "Loading"
-	loading.AnchorPoint = Vector2.new(0.5, 0.5)
-	loading.Position = UDim2.fromScale(0.5, 0.5)
-	loading.Size = UDim2.fromOffset(280, 48)
-	loading.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
-	loading.Font = Enum.Font.Fantasy
-	loading.TextSize = 24
-	loading.TextColor3 = CREAM
-	loading.Text = "Loading your save..."
-	corner(loading, 10)
-	loading.Parent = gui
+local function buildLoading(gui: ScreenGui)
+	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
+	card.outer.Name = "Loading"
+	card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.outer.Position = UDim2.fromScale(0.5, 0.5)
+	UITheme.padding(card.face, 12, 22, 12, 22)
+	local label = UITheme.label(card.face, "Loading your save...", F.Heading, 24, C.Cream)
+	label.AutomaticSize = Enum.AutomaticSize.XY
+	card.outer.Parent = gui
 	local function refreshLoading()
-		loading.Visible = player:GetAttribute("ProfileLoaded") ~= true
+		card.outer.Visible = player:GetAttribute("ProfileLoaded") ~= true
 	end
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
 	refreshLoading()
+end
 
+function HUD.Start()
+	UITheme.Start()
+	local playerGui = player:WaitForChild("PlayerGui")
+	-- Above panels like the shop, so the cash and toasts stay visible.
+	local gui = UITheme.Screen("TimberlineHUD", 10)
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
+
+	buildCash(gui)
+	buildHint(gui)
+
+	local stack = Instance.new("Frame")
+	stack.Name = "Toasts"
+	stack.AnchorPoint = Vector2.new(0.5, 0)
+	stack.Position = UDim2.new(0.5, 0, 0, 8) -- the spec's y 44, under the top bar
+	stack.Size = UDim2.fromOffset(0, 0)
+	stack.AutomaticSize = Enum.AutomaticSize.XY
+	stack.BackgroundTransparency = 1
+	local list = UITheme.list(stack, 6)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	stack.Parent = gui
+	toastStack = stack
+
+	buildLoading(gui)
 	gui.Parent = playerGui
+	buildSideColumn()
+	refreshDevice()
+	UserInputService.LastInputTypeChanged:Connect(refreshDevice)
+	UserInputService.InputBegan:Connect(onGamepad)
+	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
+		shownPrompts[prompt] = true
+		prompt.PromptHidden:Once(function()
+			shownPrompts[prompt] = nil
+		end)
+	end)
 
 	-- Server is authoritative: seed from the attribute, then listen.
 	setCash((player:GetAttribute("Cash") :: number?) or 0)

@@ -12,18 +12,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local Util = require(ReplicatedStorage.Shared.Util)
+local UITheme = require(script.Parent.UITheme)
 
 local DailyUI = {}
 
 local player = Players.LocalPlayer
 
-local INK = Color3.fromRGB(60, 40, 20)
-local CREAM = Color3.fromRGB(245, 235, 215)
-local PAPER = Color3.fromRGB(240, 225, 195)
-local PAPER_DARK = Color3.fromRGB(226, 207, 170)
-local BARK = Color3.fromRGB(88, 58, 34)
-local GREEN = Color3.fromRGB(76, 140, 64)
-local AMBER = Color3.fromRGB(255, 184, 64)
+local INK = UITheme.Colors.Ink
+local CREAM = UITheme.Colors.Cream
+local PAPER = UITheme.Colors.Paper
+local PAPER_DARK = UITheme.Colors.PaperDark
+local BARK = UITheme.Colors.Bark
+local GREEN = UITheme.Colors.Money
+local AMBER = UITheme.Colors.Amber
 
 type GoalRow = { frame: Frame, text: TextLabel, reward: TextLabel, fill: Frame }
 
@@ -130,22 +131,22 @@ local function refresh()
 end
 
 local function build()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "DailyUI"
-	gui.ResetOnSpawn = false
+	local gui = UITheme.Screen("DailyUI")
 
 	local b = Instance.new("TextButton")
 	b.Name = "DailyButton"
 	b.AnchorPoint = Vector2.new(1, 0)
-	b.Position = UDim2.new(1, -12, 0, 64) -- under the cash plaque
+	b.Position = UDim2.new(1, -UITheme.Margin(), 0, 64) -- under the cash plaque
 	b.Size = UDim2.fromOffset(200, 30)
 	b.AutomaticSize = Enum.AutomaticSize.X
 	b.BackgroundColor3 = BARK
-	b.Font = Enum.Font.GothamBold
+	b.Font = UITheme.Fonts.Black
 	b.TextSize = 13
 	b.TextColor3 = CREAM
+	b.AutoButtonColor = true
 	b.Visible = false
-	corner(b, 8)
+	corner(b, 15)
+	UITheme.stroke(b, INK, 2)
 	local pad = Instance.new("UIPadding")
 	pad.PaddingLeft = UDim.new(0, 10)
 	pad.PaddingRight = UDim.new(0, 10)
@@ -156,16 +157,13 @@ local function build()
 	local p = Instance.new("Frame")
 	p.Name = "Goals"
 	p.AnchorPoint = Vector2.new(1, 0)
-	p.Position = UDim2.new(1, -12, 0, 100)
+	p.Position = UDim2.new(1, -UITheme.Margin(), 0, 100)
 	p.Size = UDim2.fromOffset(280, 0)
 	p.AutomaticSize = Enum.AutomaticSize.Y
 	p.BackgroundColor3 = PAPER
 	p.Visible = false
-	corner(p, 10)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = BARK
-	stroke.Thickness = 2
-	stroke.Parent = p
+	corner(p, 12)
+	UITheme.stroke(p, BARK, 3)
 	local inner = Instance.new("UIPadding")
 	inner.PaddingLeft = UDim.new(0, 10)
 	inner.PaddingRight = UDim.new(0, 10)
@@ -179,7 +177,7 @@ local function build()
 	p.Parent = gui
 	panel = p
 
-	text(p, "TODAY'S GOALS", 14, Enum.Font.GothamBold, 1)
+	text(p, "TODAY'S GOALS", 13, UITheme.Fonts.Black, 1).TextColor3 = BARK
 	for i = 1, DailyData.GoalsPerDay do
 		local row = Instance.new("Frame")
 		row.LayoutOrder = 1 + i

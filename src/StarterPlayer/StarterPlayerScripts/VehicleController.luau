@@ -6,8 +6,9 @@
 --     touch thumbstick, a gamepad's stick) into a speed and heading
 --     (Shared/DriveMath), then sets the truck's Drive (LinearVelocity) and
 --     Heading (AlignOrientation, tilted to match the ground).
---   * "Truck to lot" button: sends your truck back to your parking slot,
---     load and all, when it's far away (left somewhere, or stuck).
+--   * "Truck to lot" side button (Y on a gamepad): sends your truck back to
+--     your parking slot, load and all, when it's far away (left somewhere,
+--     or stuck).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -17,6 +18,8 @@ local RunService = game:GetService("RunService")
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
+local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local VehicleController = {}
 
@@ -38,7 +41,7 @@ type Session = {
 }
 
 local session: Session? = nil
-local callButton: TextButton? = nil
+local callButton: UITheme.Button? = nil
 
 local function flat(v: Vector3): Vector3
 	local f = Vector3.new(v.X, 0, v.Z)
@@ -125,34 +128,20 @@ local function refreshCallButton()
 	local truckPart = if truck then truck.PrimaryPart else nil
 	local far = truckPart == nil
 		or (hrp ~= nil and (hrp.Position - truckPart.Position).Magnitude > CALL_BUTTON_DISTANCE)
-	button.Visible = hrp ~= nil and session == nil and far
+	button.root.Visible = hrp ~= nil and session == nil and far
 end
 
 local function buildButton()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "TruckControls"
-	gui.ResetOnSpawn = false
-	local b = Instance.new("TextButton")
-	b.Name = "CallTruck"
-	b.AnchorPoint = Vector2.new(1, 0.5)
-	b.Position = UDim2.new(1, -12, 0.6, -50) -- above the Drop axe button, clear of the jump button
-	b.Size = UDim2.fromOffset(110, 40)
-	b.BackgroundColor3 = Color3.fromRGB(47, 109, 181)
-	b.BackgroundTransparency = 0.1
-	b.Font = Enum.Font.GothamMedium
-	b.TextSize = 16
-	b.TextColor3 = Color3.fromRGB(245, 235, 215)
-	b.Text = "Truck to lot"
-	b.Visible = false
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 8)
-	c.Parent = b
-	b.Parent = gui
-	b.Activated:Connect(function()
-		Net.Remote("CallTruck"):FireServer()
-	end)
-	callButton = b
-	gui.Parent = player:WaitForChild("PlayerGui")
+	callButton = HUD.SideButton({
+		name = "CallTruck",
+		text = "Truck to lot",
+		style = "blue",
+		order = 4,
+		key = Enum.KeyCode.ButtonY,
+		onPress = function()
+			Net.Remote("CallTruck"):FireServer()
+		end,
+	})
 end
 
 local function watchCharacter(char: Model)

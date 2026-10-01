@@ -18,8 +18,9 @@ local StoreUI = require(script.Parent.StoreUI)
 local FieldGuideUI = require(script.Parent.FieldGuideUI)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local PlotUI = require(script.Parent.PlotUI)
+local PromptUI = require(script.Parent.PromptUI)
 
-HUD.Start() -- first, so toasts work for everything after it
+HUD.Start() -- first (it starts UITheme), so toasts and side buttons work for everything after it
 ChopController.Start()
 TreeUI.Start()
 TreeFX.Start()
@@ -34,5 +35,6 @@ StoreUI.Start()
 FieldGuideUI.Start()
 BlueprintPlacer.Start()
 PlotUI.Start()
+PromptUI.Start()
 
 print("[Client] Timberline Tycoon client started.")

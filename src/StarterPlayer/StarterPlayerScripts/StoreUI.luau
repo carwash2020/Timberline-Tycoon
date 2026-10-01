@@ -19,17 +19,16 @@ local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local ShopUI = require(script.Parent.ShopUI)
+local UITheme = require(script.Parent.UITheme)
 
 local StoreUI = {}
 
 local player = Players.LocalPlayer
 
-local GREEN = Color3.fromRGB(76, 140, 64)
-local MUTED = Color3.fromRGB(160, 145, 120)
-local CREAM = Color3.fromRGB(245, 235, 215)
+local ROBUX_GREEN = Color3.fromRGB(0, 176, 111)
 
 local prices: { [string]: number } = {} -- "Pass:DoubleCash" -> Robux
-local deliveryButton: TextButton? = nil
+local deliveryButton: UITheme.Button? = nil
 
 local function robux(price: number?): string
 	return if price then "R$ " .. tostring(price) else "R$ …"
@@ -67,7 +66,7 @@ end
 local STORE: ShopUI.Shop = {
 	building = nil,
 	promptText = "",
-	title = "STORE",
+	title = "Store",
 	subtitle = "Robux extras: nothing here makes you win, it just saves time.",
 	ids = function()
 		local ids = {}
@@ -91,11 +90,11 @@ local STORE: ShopUI.Shop = {
 			return {
 				name = pass.name,
 				detail = pass.description,
-				color = Color3.fromRGB(0, 176, 111),
-				glow = true,
+				color = ROBUX_GREEN,
+				ring = UITheme.Colors.Amber,
 				dim = false,
 				button = if has then "Owned" else robux(prices[id]),
-				buttonColor = if has then MUTED else GREEN,
+				state = if has then "inuse" else "buy",
 				onClick = function()
 					if has then
 						HUD.Toast(string.format("You already have %s.", pass.name))
@@ -123,11 +122,10 @@ local STORE: ShopUI.Shop = {
 		return {
 			name = name,
 			detail = product.description,
-			color = Color3.fromRGB(0, 176, 111),
-			glow = false,
+			color = ROBUX_GREEN,
 			dim = not fits,
 			button = if fits then robux(prices[id]) else "Wallet full",
-			buttonColor = if fits then GREEN else MUTED,
+			state = if fits then "buy" else "inuse",
 			onClick = function()
 				if not fits then
 					HUD.Toast(
@@ -159,52 +157,36 @@ local function refreshDelivery()
 		return
 	end
 	local n = (player:GetAttribute("InstantDeliveries") :: number?) or 0
-	b.Visible = n > 0 and myBedCount() > 0
-	b.Text = string.format("Sell load here (%d)", n)
+	b.root.Visible = n > 0 and myBedCount() > 0
+	b:SetText(string.format("Sell here (%d)", n))
 end
 
 local function buildButtons()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "StoreButtons"
-	gui.ResetOnSpawn = false
-
-	local store = Instance.new("TextButton")
-	store.Name = "Store"
-	store.AnchorPoint = Vector2.new(1, 0)
-	store.Position = UDim2.new(1, -330, 0, 18) -- left of the clock
-	store.Size = UDim2.fromOffset(90, 30)
-	store.BackgroundColor3 = GREEN
-	store.Font = Enum.Font.GothamBold
-	store.TextSize = 14
-	store.TextColor3 = CREAM
-	store.Text = "STORE"
-	store.Visible = #STORE.ids() > 0 -- hidden until something's set up in StoreData
-	local c1 = Instance.new("UICorner")
-	c1.CornerRadius = UDim.new(0, 8)
-	c1.Parent = store
-	store.Parent = gui
-	store.Activated:Connect(function()
+	local gui = UITheme.Screen("StoreButtons")
+	local store = UITheme.Button({
+		name = "Store",
+		text = "STORE",
+		size = Vector2.new(90, 30),
+		style = "buy",
+		textSize = 14,
+	})
+	store.root.AnchorPoint = Vector2.new(1, 0)
+	store.root.Position = UDim2.new(1, -(UITheme.Margin() + 318), 0, 15) -- left of the clock
+	store.root.Visible = #STORE.ids() > 0 -- hidden until something's set up in StoreData
+	store.root.Parent = gui
+	store.face.Activated:Connect(function()
 		ShopUI.OpenCustom(STORE)
 	end)
 
-	local delivery = Instance.new("TextButton")
-	delivery.Name = "InstantDelivery"
-	delivery.AnchorPoint = Vector2.new(1, 0.5)
-	delivery.Position = UDim2.new(1, -12, 0.6, -100) -- above Truck to lot
-	delivery.Size = UDim2.fromOffset(150, 40)
-	delivery.BackgroundColor3 = GREEN
-	delivery.Font = Enum.Font.GothamMedium
-	delivery.TextSize = 15
-	delivery.TextColor3 = CREAM
-	delivery.Visible = false
-	local c2 = Instance.new("UICorner")
-	c2.CornerRadius = UDim.new(0, 8)
-	c2.Parent = delivery
-	delivery.Parent = gui
-	delivery.Activated:Connect(function()
-		Net.Remote("UseInstantDelivery"):FireServer()
-	end)
-	deliveryButton = delivery
+	deliveryButton = HUD.SideButton({
+		name = "InstantDelivery",
+		text = "Sell here",
+		style = "buy",
+		order = 2,
+		onPress = function()
+			Net.Remote("UseInstantDelivery"):FireServer()
+		end,
+	})
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 end

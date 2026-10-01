@@ -34,6 +34,9 @@ local GameConfig = {
 	-- Roblox's own player list opens top right on computers, right over the
 	-- cash. Off until our own leaderboard (GAME_DESIGN §8 phase 7).
 	ShowRobloxPlayerList = false,
+	-- World prompts ("Browse axes", "Pick up", ...) in the game's own wood
+	-- look (UI spec 05, PromptUI). false = Roblox's default prompts.
+	CustomPrompts = true,
 
 	-- Shops (Tool Shed, Dealership)
 	ShopPromptRange = 10, -- studs from the counter to open the shop

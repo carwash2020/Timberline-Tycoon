@@ -12,7 +12,10 @@
 -- Buying only sends an intent (BuyItem / EquipItem); the server checks
 -- everything and answers with a toast. The player attributes it changes
 -- (Cash, OwnedAxes, BestAxeTier, OwnedTrucks, EquippedTruck, OwnedGear) redraw the
--- list. Walking away closes the screen, and so do the X and B on a gamepad.
+-- list. Walking away closes the screen, and so do the X, tapping outside the
+-- panel, and B on a gamepad. Looks per the UI spec (02, UITheme): a dimmed
+-- screen behind a wood-framed paper panel; while it's open you can't walk.
+-- On a gamepad the first Buy button is selected when it opens.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -27,6 +30,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 type AxeDef = ItemCatalog.AxeDef
 type TruckDef = ItemCatalog.TruckDef
@@ -37,25 +41,19 @@ local ShopUI = {}
 
 local player = Players.LocalPlayer
 
-local INK = Color3.fromRGB(60, 40, 20)
-local CREAM = Color3.fromRGB(245, 235, 215)
-local PAPER = Color3.fromRGB(240, 225, 195)
-local PAPER_DARK = Color3.fromRGB(226, 207, 170)
-local BARK = Color3.fromRGB(88, 58, 34)
-local GREEN = Color3.fromRGB(76, 140, 64)
-local BLUE = Color3.fromRGB(47, 109, 181)
-local MUTED = Color3.fromRGB(160, 145, 120)
-local SKY = Color3.fromRGB(110, 120, 190)
+local C = UITheme.Colors
+local F = UITheme.Fonts
 
 -- One row's look and what its button does right now.
 export type RowView = {
 	name: string,
-	detail: string,
-	color: Color3,
-	glow: boolean,
-	dim: boolean,
+	own: string?, -- small text after the name ("· you own 2")
+	detail: string, -- up to two lines
+	color: Color3, -- the swatch
+	ring: Color3?, -- a glowing ring round the swatch (the Inferno and Starfall axes)
+	dim: boolean, -- a faded swatch (locked)
 	button: string,
-	buttonColor: Color3,
+	state: string, -- the button's UITheme style: buy, cant, starter, locked, forged, full, use, inuse
 	onClick: () -> (),
 }
 
@@ -74,12 +72,14 @@ type Row = {
 	id: string,
 	frame: Frame,
 	name: TextLabel,
+	own: TextLabel,
 	detail: TextLabel,
-	button: TextButton,
+	button: UITheme.Button,
 	swatch: Frame,
-	stroke: UIStroke,
+	ring: UIStroke,
 }
 
+local gui: ScreenGui? = nil
 local panel: Frame? = nil
 local titleLabel: TextLabel? = nil
 local subtitleLabel: TextLabel? = nil
@@ -93,11 +93,11 @@ local function needMore(price: number, cash: number, name: string)
 	HUD.Toast(string.format("You need %s more for the %s.", Util.formatCash(price - cash), name))
 end
 
-local function priceButton(price: number, cash: number): (string, Color3)
+local function priceButton(price: number, cash: number): (string, string)
 	if cash >= price then
-		return "Buy " .. Util.formatCash(price), GREEN
+		return "Buy " .. Util.formatCash(price), "buy"
 	end
-	return Util.formatCash(price), MUTED
+	return Util.formatCash(price), "cant"
 end
 
 ---------------------------------------------------------------------------
@@ -114,8 +114,8 @@ end
 local AXES: Shop = {
 	building = "ToolShed",
 	promptText = "Browse axes",
-	title = "TOOL SHED",
-	subtitle = "Axes are sold in order. Every axe you buy is yours to keep: switch in your hotbar.",
+	title = "Tool Shed",
+	subtitle = "Sharper axes fell trees in fewer swings. Every axe is yours to keep.",
 	ids = function()
 		local ids = {}
 		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
@@ -128,23 +128,31 @@ local AXES: Shop = {
 		local cash, bestTier, counts, total = axeState()
 		local owned = counts[axe.id] or 0
 		local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, bestTier, owned, total)
-		local button, buttonColor
+		local button, state
 		if ShopLogic.CanPurchase(status) then
-			button, buttonColor = priceButton(axe.priceCash, cash)
+			button, state = priceButton(axe.priceCash, cash)
 		elseif status == "forged" then
-			button, buttonColor = "Forged", SKY
+			button, state = "Forged", "forged"
+		elseif status == "starter" then
+			button, state = "Starter", "starter"
+		elseif status == "full" then
+			button, state = "Full", "full"
 		else
-			button = if status == "starter" then "Starter" elseif status == "full" then "Full" else "Locked"
-			buttonColor = MUTED
+			button, state = "Locked", "locked"
+		end
+		local ring: Color3? = nil
+		if axe.look.glow then
+			ring = if axe.forge then C.Ice else C.Amber
 		end
 		return {
-			name = if owned > 0 then string.format("%s  ·  you own %d", axe.displayName, owned) else axe.displayName,
+			name = axe.displayName,
+			own = if owned > 0 then string.format("· you own %d", owned) else nil,
 			detail = ShopLogic.DamageText(axe) .. "\n" .. ShopLogic.FellSummary(axe),
 			color = Color3.fromHex(axe.look.headColor),
-			glow = axe.look.glow == true,
+			ring = ring,
 			dim = status == "locked",
 			button = button,
-			buttonColor = buttonColor,
+			state = state,
 			onClick = function()
 				if not ShopLogic.CanPurchase(status) then
 					HUD.Toast(ShopLogic.WhyNot(status, axe, bestTier))
@@ -168,22 +176,22 @@ local function trailerView(id: string): RowView
 	local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrailers") :: string?) or "")
 	local hitched = (player:GetAttribute("HitchedTrailer") :: string?) or ""
 	local status: ShopLogic.TrailerStatus = ShopLogic.TrailerStatusOf(trailer, owned, hitched)
-	local button, buttonColor
+	local button, state
 	if status == "buy" then
-		button, buttonColor = priceButton(trailer.priceCash, cash)
+		button, state = priceButton(trailer.priceCash, cash)
 	elseif status == "hitch" then
-		button, buttonColor = "Hitch", BLUE
+		button, state = "Hitch", "use"
 	else
-		button, buttonColor = "Unhitch", MUTED
+		button, state = "Unhitch", "full"
 	end
 	return {
-		name = trailer.displayName .. (if status == "hitched" then "  ·  hitched" else ""),
+		name = trailer.displayName,
+		own = if status == "hitched" then "· hitched" elseif status == "hitch" then "· owned" else nil,
 		detail = ShopLogic.TrailerDetail(trailer),
 		color = Color3.fromHex(trailer.look.color),
-		glow = false,
 		dim = false,
 		button = button,
-		buttonColor = buttonColor,
+		state = state,
 		onClick = function()
 			if status == "buy" and cash < trailer.priceCash then
 				needMore(trailer.priceCash, cash, trailer.displayName)
@@ -199,8 +207,8 @@ end
 local TRUCKS: Shop = {
 	building = "Dealership",
 	promptText = "Browse trucks",
-	title = "DEALERSHIP",
-	subtitle = "Bigger beds haul more but drive slower. Trailers add bed space behind any truck with a bed.",
+	title = "Dealership",
+	subtitle = "Bigger beds haul more logs per trip. Trailers add more.",
 	-- Trucks first, then trailers ("Trailer:" ids).
 	ids = function()
 		local ids = {}
@@ -222,22 +230,22 @@ local TRUCKS: Shop = {
 		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrucks") :: string?) or "")
 		local equipped = (player:GetAttribute("EquippedTruck") :: string?) or "Rustbucket"
 		local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, owned, equipped)
-		local button, buttonColor
+		local button, state
 		if status == "buy" then
-			button, buttonColor = priceButton(truck.priceCash, cash)
+			button, state = priceButton(truck.priceCash, cash)
 		elseif status == "use" then
-			button, buttonColor = "Use", BLUE
+			button, state = "Use", "use"
 		else
-			button, buttonColor = "In use", MUTED
+			button, state = "In use", "inuse"
 		end
 		return {
 			name = truck.displayName,
+			own = if status ~= "buy" then "· owned" else nil,
 			detail = ShopLogic.TruckDetail(truck),
 			color = Color3.fromHex(truck.look.color),
-			glow = false,
 			dim = false,
 			button = button,
-			buttonColor = buttonColor,
+			state = state,
 			onClick = function()
 				if status == "inUse" then
 					HUD.Toast(string.format("You're already using the %s.", truck.displayName))
@@ -260,8 +268,8 @@ local TRUCKS: Shop = {
 local GEAR: Shop = {
 	building = "HearthAndHome",
 	promptText = "Browse gear",
-	title = "HEARTH & HOME",
-	subtitle = "Gear for the far biomes. Buy it once and you wear it for good.",
+	title = "Hearth & Home",
+	subtitle = "Gear for the far biomes: buy it once, wear it for good.",
 	ids = function()
 		local ids = {}
 		for _, gear in ipairs(ItemCatalog.GearList()) do
@@ -274,22 +282,21 @@ local GEAR: Shop = {
 		local cash = (player:GetAttribute("Cash") :: number?) or 0
 		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
 		local status: ShopLogic.GearStatus = ShopLogic.GearStatusOf(gear, owned)
-		local button, buttonColor
+		local button, state
 		if status == "buy" then
-			button, buttonColor = priceButton(gear.priceCash, cash)
+			button, state = priceButton(gear.priceCash, cash)
 		elseif status == "owned" then
-			button, buttonColor = "Owned", MUTED
+			button, state = "Owned", "inuse"
 		else
-			button, buttonColor = "Soon", SKY
+			button, state = "Soon", "locked"
 		end
 		return {
 			name = gear.displayName,
 			detail = ShopLogic.GearDetail(gear),
 			color = Color3.fromHex(gear.color),
-			glow = false,
 			dim = status == "soon",
 			button = button,
-			buttonColor = buttonColor,
+			state = state,
 			onClick = function()
 				if status == "owned" then
 					HUD.Toast(string.format("You already have the %s.", gear.displayName))
@@ -311,24 +318,6 @@ local SHOPS: { Shop } = { AXES, TRUCKS, GEAR }
 -- The panel
 ---------------------------------------------------------------------------
 
-local function corner(parent: GuiObject, radius: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, radius)
-	c.Parent = parent
-end
-
-local function label(parent: GuiObject, text: string, size: number, font: Enum.Font): TextLabel
-	local l = Instance.new("TextLabel")
-	l.BackgroundTransparency = 1
-	l.Font = font
-	l.TextSize = size
-	l.TextColor3 = INK
-	l.TextXAlignment = Enum.TextXAlignment.Left
-	l.Text = text
-	l.Parent = parent
-	return l
-end
-
 local function refresh()
 	local shop = openShop
 	if not shop then
@@ -337,73 +326,124 @@ local function refresh()
 	for _, row in ipairs(rows) do
 		local view = shop.view(row.id)
 		row.name.Text = view.name
+		row.own.Text = view.own or ""
+		row.own.Visible = view.own ~= nil
 		row.detail.Text = view.detail
 		row.swatch.BackgroundColor3 = view.color
-		row.swatch.BackgroundTransparency = if view.dim then 0.6 else 0
-		row.stroke.Enabled = view.glow
-		row.button.Text = view.button
-		row.button.BackgroundColor3 = view.buttonColor
+		row.swatch.BackgroundTransparency = if view.dim then 0.65 else 0
+		row.ring.Enabled = view.ring ~= nil
+		row.ring.Color = view.ring or C.Amber
+		row.button:SetText(view.button)
+		row.button:SetStyle(view.state)
 	end
 end
 
 local function buildRow(parent: Instance, shop: Shop, id: string, order: number): Row
+	local phone = UITheme.IsPhone()
 	local frame = Instance.new("Frame")
 	frame.Name = id
 	frame.LayoutOrder = order
-	frame.Size = UDim2.new(1, 0, 0, 74)
-	frame.BackgroundColor3 = PAPER_DARK
+	frame.Size = UDim2.fromScale(1, 0)
+	frame.AutomaticSize = Enum.AutomaticSize.Y
+	frame.BackgroundColor3 = C.PaperDark
 	frame.BorderSizePixel = 0
-	corner(frame, 8)
+	UITheme.corner(frame, 12)
+	UITheme.padding(frame, 10, 12, 10, 12)
+	local minHeight = Instance.new("UISizeConstraint")
+	minHeight.MinSize = Vector2.new(0, 72)
+	minHeight.Parent = frame
 	frame.Parent = parent
 
+	-- Swatch: a 44 circle with an ink rim and a shaded bottom.
 	local swatch = Instance.new("Frame")
 	swatch.Name = "Swatch"
-	swatch.AnchorPoint = Vector2.new(0, 0.5)
-	swatch.Position = UDim2.new(0, 10, 0.5, 0)
-	swatch.Size = UDim2.fromOffset(40, 40)
+	-- Offsets, not scale, inside the auto-sized row: centred in its 52 px
+	-- minimum content height.
+	swatch.Position = UDim2.fromOffset(0, 4)
+	swatch.Size = UDim2.fromOffset(44, 44)
 	swatch.BorderSizePixel = 0
-	corner(swatch, 20)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(255, 240, 180)
-	stroke.Thickness = 2
-	stroke.Enabled = false
-	stroke.Parent = swatch
+	UITheme.corner(swatch, 22)
+	UITheme.stroke(swatch, C.Ink, 3)
+	local shade = Instance.new("UIGradient")
+	shade.Rotation = 90
+	shade.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(0.85, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, Color3.new(0.82, 0.82, 0.82)),
+	})
+	shade.Parent = swatch
 	swatch.Parent = frame
+	-- The glow ring sits just outside the rim.
+	local halo = Instance.new("Frame")
+	halo.Name = "Halo"
+	halo.AnchorPoint = Vector2.new(0.5, 0.5)
+	halo.Position = UDim2.fromScale(0.5, 0.5)
+	halo.Size = UDim2.new(1, 6, 1, 6)
+	halo.BackgroundTransparency = 1
+	UITheme.corner(halo, 26)
+	local ring = UITheme.stroke(halo, C.Amber, 3)
+	ring.Enabled = false
+	halo.Parent = swatch
 
-	local name = label(frame, "", 17, Enum.Font.GothamBold)
-	name.Position = UDim2.fromOffset(60, 8)
-	name.Size = UDim2.new(1, -172, 0, 20)
-	name.TextTruncate = Enum.TextTruncate.AtEnd
+	local buttonWidth, buttonHeight = if phone then 90 else 100, if phone then 34 else 38
+	local text = Instance.new("Frame")
+	text.Name = "Text"
+	text.Position = UDim2.fromOffset(56, 0)
+	text.Size = UDim2.new(1, -(56 + buttonWidth + 12), 0, 0)
+	text.AutomaticSize = Enum.AutomaticSize.Y
+	text.BackgroundTransparency = 1
+	UITheme.list(text, 2)
+	text.Parent = frame
 
-	local detail = label(frame, "", 14, Enum.Font.Gotham)
-	detail.Position = UDim2.fromOffset(60, 30)
-	detail.Size = UDim2.new(1, -172, 0, 38)
-	detail.TextYAlignment = Enum.TextYAlignment.Top
+	local nameRow = Instance.new("Frame")
+	nameRow.Name = "NameRow"
+	nameRow.LayoutOrder = 1
+	nameRow.Size = UDim2.new(1, 0, 0, 20)
+	nameRow.BackgroundTransparency = 1
+	local nameList = UITheme.list(nameRow, 6, true)
+	nameList.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	nameRow.Parent = text
+	local name = UITheme.label(nameRow, "", F.Heading, 18, C.Ink)
+	name.LayoutOrder = 1
+	name.AutomaticSize = Enum.AutomaticSize.X
+	name.Size = UDim2.fromOffset(0, 20)
+	local own = UITheme.label(nameRow, "", F.Bold, 12, C.Bark)
+	own.LayoutOrder = 2
+	own.AutomaticSize = Enum.AutomaticSize.X
+	own.Size = UDim2.fromOffset(0, 16)
+
+	local detail = UITheme.label(text, "", F.Body, 12, C.Bark)
+	detail.LayoutOrder = 2
+	detail.Size = UDim2.fromScale(1, 0)
+	detail.AutomaticSize = Enum.AutomaticSize.Y
 	detail.TextWrapped = true
-	detail.TextScaled = true
-	local fit = Instance.new("UITextSizeConstraint")
-	fit.MaxTextSize = 14
-	fit.MinTextSize = 9
-	fit.Parent = detail
+	detail.LineHeight = 1.1
 
-	local button = Instance.new("TextButton")
-	button.Name = "Action"
-	button.AnchorPoint = Vector2.new(1, 0.5)
-	button.Position = UDim2.new(1, -10, 0.5, 0)
-	button.Size = UDim2.fromOffset(100, 38)
-	button.BackgroundColor3 = MUTED
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 15
-	button.TextColor3 = CREAM
-	button.Text = ""
-	corner(button, 8)
-	button.Parent = frame
-	button.Activated:Connect(function()
+	local button = UITheme.Button({
+		name = "Action",
+		text = "",
+		size = Vector2.new(buttonWidth, buttonHeight),
+		style = "cant",
+		textSize = if phone then 13 else 14,
+	})
+	button.root.AnchorPoint = Vector2.new(1, 0)
+	button.root.Position = UDim2.new(1, 0, 0, math.floor((52 - (buttonHeight + 3)) / 2))
+	button.root.Parent = frame
+	button.face.Activated:Connect(function()
 		-- Worked out fresh on every click, from the latest cash and ownership.
 		shop.view(id).onClick()
 	end)
 
-	return { id = id, frame = frame, name = name, detail = detail, button = button, swatch = swatch, stroke = stroke }
+	return {
+		id = id,
+		frame = frame,
+		name = name,
+		own = own,
+		detail = detail,
+		button = button,
+		swatch = swatch,
+		ring = ring,
+	}
 end
 
 local function onCloseAction(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
@@ -413,9 +453,13 @@ local function onCloseAction(_name: string, inputState: Enum.UserInputState): En
 	return Enum.ContextActionResult.Sink
 end
 
+local function holdStill(): Enum.ContextActionResult
+	return Enum.ContextActionResult.Sink -- no walking or jumping while a shop is open
+end
+
 local function open(shop: Shop)
-	local p, scroll = panel, list
-	if not p or not scroll then
+	local g, p, scroll = gui, panel, list
+	if not g or not p or not scroll then
 		return
 	end
 	ShopUI.Close()
@@ -434,15 +478,34 @@ local function open(shop: Shop)
 	if subtitleLabel then
 		subtitleLabel.Text = shop.subtitle
 	end
-	p.Visible = true
+	g.Enabled = true
 	local prompt = prompts[shop]
 	if prompt then
 		prompt.Enabled = false
 	end
 	refresh()
 	ContextActionService:BindAction("CloseShop", onCloseAction, false, Enum.KeyCode.ButtonB)
+	ContextActionService:BindActionAtPriority(
+		"ShopHoldStill",
+		holdStill,
+		false,
+		Enum.ContextActionPriority.High.Value,
+		Enum.PlayerActions.CharacterForward,
+		Enum.PlayerActions.CharacterBackward,
+		Enum.PlayerActions.CharacterLeft,
+		Enum.PlayerActions.CharacterRight,
+		Enum.PlayerActions.CharacterJump
+	)
 	if UserInputService.GamepadEnabled and rows[1] then
-		GuiService.SelectedObject = rows[1].button
+		-- The first thing you can buy, else the first row.
+		local pick = rows[1].button.face
+		for _, row in ipairs(rows) do
+			if row.button.style == "buy" then
+				pick = row.button.face
+				break
+			end
+		end
+		GuiService.SelectedObject = pick
 	end
 end
 
@@ -452,98 +515,140 @@ function ShopUI.Close()
 		return
 	end
 	openShop = nil
-	local p = panel
-	if p then
-		p.Visible = false
+	local g, p = gui, panel
+	if g then
+		g.Enabled = false
 	end
 	local prompt = prompts[shop]
 	if prompt then
 		prompt.Enabled = true
 	end
 	ContextActionService:UnbindAction("CloseShop")
+	ContextActionService:UnbindAction("ShopHoldStill")
 	if GuiService.SelectedObject and p and GuiService.SelectedObject:IsDescendantOf(p) then
 		GuiService.SelectedObject = nil
 	end
 end
 
 local function buildPanel()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "ShopUI"
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 5 -- under the HUD (10), so toasts show on top of the panel
+	-- Over everything but the HUD (10), so the cash and toasts show on top.
+	local g = UITheme.Screen("ShopUI", 5, true)
+	g.Enabled = false
 
-	local p = Instance.new("Frame")
+	-- The scrim: dims the game, blocks taps on it, and closes on a tap.
+	local scrim = Instance.new("TextButton")
+	scrim.Name = "Scrim"
+	scrim.Size = UDim2.fromScale(1, 1)
+	scrim.BackgroundColor3 = C.Ink
+	scrim.BackgroundTransparency = 0.55
+	scrim.AutoButtonColor = false
+	scrim.Text = ""
+	scrim.Selectable = false
+	scrim.Modal = true -- frees the mouse in first person
+	scrim.Parent = g
+	scrim.Activated:Connect(ShopUI.Close)
+
+	-- The panel fits the area below the top bar: top 44, bottom 8, sides
+	-- 12, at most 560 x 540 (on a phone, 560 x 338).
+	local area = Instance.new("Frame")
+	area.Name = "Area"
+	area.BackgroundTransparency = 1
+	area.Position = UDim2.fromOffset(12, 44)
+	area.Size = UDim2.new(1, -24, 1, -52)
+	area.Parent = g
+
+	local frame = UITheme.Card(C.Bark, C.Ink, 6, 20)
+	local p = frame.outer
 	p.Name = "Panel"
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
-	p.Position = UDim2.fromScale(0.5, 0.52)
-	p.Size = UDim2.fromScale(0.92, 0.72)
-	p.BackgroundColor3 = BARK
-	p.BorderSizePixel = 0
-	p.Visible = false
-	corner(p, 12)
+	p.Position = UDim2.fromScale(0.5, 0.5)
+	p.Size = UDim2.fromScale(1, 1)
 	local maxSize = Instance.new("UISizeConstraint")
 	maxSize.MaxSize = Vector2.new(560, 540)
 	maxSize.Parent = p
-	p.Parent = gui
+	p.Parent = area
+	UITheme.texture(frame.face, "Wood", 20)
 
 	local paper = Instance.new("Frame")
 	paper.Name = "Paper"
-	paper.Position = UDim2.fromOffset(5, 5)
-	paper.Size = UDim2.new(1, -10, 1, -10)
-	paper.BackgroundColor3 = PAPER
+	paper.Position = UDim2.fromOffset(8, 8)
+	paper.Size = UDim2.new(1, -16, 1, -16)
+	paper.BackgroundColor3 = C.Paper
 	paper.BorderSizePixel = 0
-	corner(paper, 9)
-	paper.Parent = p
+	paper.ClipsDescendants = true
+	UITheme.corner(paper, 14)
+	paper.Parent = frame.face
+	UITheme.texture(paper, "Kraft", 14)
 
-	local title = label(paper, "", 26, Enum.Font.Fantasy)
-	title.Position = UDim2.fromOffset(14, 8)
-	title.Size = UDim2.new(1, -70, 0, 30)
+	local closeSize = if UITheme.IsPhone() then 40 else 44
+	local headerHeight = 14 + 30 + 2 + 16 + 10
+	local header = Instance.new("Frame")
+	header.Name = "Header"
+	header.Size = UDim2.new(1, 0, 0, headerHeight)
+	header.BackgroundTransparency = 1
+	header.Parent = paper
+	local rule = Instance.new("Frame")
+	rule.Name = "Rule"
+	rule.AnchorPoint = Vector2.new(0, 1)
+	rule.Position = UDim2.fromScale(0, 1)
+	rule.Size = UDim2.new(1, 0, 0, 2)
+	rule.BackgroundColor3 = C.PaperDark
+	rule.BorderSizePixel = 0
+	rule.Parent = header
+
+	local title = UITheme.label(header, "", F.Heading, 28, C.Ink)
+	title.Position = UDim2.fromOffset(18, 14)
+	title.Size = UDim2.new(1, -(18 + closeSize + 26), 0, 30)
+	title.TextTruncate = Enum.TextTruncate.AtEnd
 	titleLabel = title
 
-	local subtitle = label(paper, "", 13, Enum.Font.Gotham)
-	subtitle.Position = UDim2.fromOffset(14, 38)
-	subtitle.Size = UDim2.new(1, -28, 0, 30)
-	subtitle.TextWrapped = true
-	subtitle.TextYAlignment = Enum.TextYAlignment.Top
+	local subtitle = UITheme.label(header, "", F.Body, 13, C.Bark)
+	subtitle.Position = UDim2.fromOffset(18, 46)
+	subtitle.Size = UDim2.new(1, -(18 + closeSize + 26), 0, 16)
+	subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 	subtitleLabel = subtitle
 
-	local close = Instance.new("TextButton")
-	close.Name = "Close"
-	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -10, 0, 10)
-	close.Size = UDim2.fromOffset(36, 36)
-	close.BackgroundColor3 = BARK
-	close.Font = Enum.Font.GothamBold
-	close.TextSize = 18
-	close.TextColor3 = CREAM
-	close.Text = "X"
-	corner(close, 18)
-	close.Parent = paper
-	close.Activated:Connect(ShopUI.Close)
+	local close = UITheme.Button({
+		name = "Close",
+		text = "X",
+		size = Vector2.new(closeSize, closeSize),
+		style = "bark",
+		textSize = 20,
+		radius = 12,
+	})
+	close.root.AnchorPoint = Vector2.new(1, 0)
+	close.root.Position = UDim2.new(1, -14, 0, 12)
+	close.root.Parent = header
+	close.face.Activated:Connect(ShopUI.Close)
+	-- On a gamepad, B closes: show its glyph on the corner of the X.
+	local glyph = UITheme.Glyph(Enum.KeyCode.ButtonB, 22)
+	glyph.AnchorPoint = Vector2.new(0.5, 0.5)
+	glyph.Position = UDim2.new(1, -2, 1, -2)
+	glyph.ZIndex = 3
+	glyph.Visible = UITheme.Device() == "console"
+	glyph.Parent = close.face
+	UserInputService.LastInputTypeChanged:Connect(function()
+		glyph.Visible = UITheme.Device() == "console"
+	end)
 
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Items"
-	scroll.Position = UDim2.fromOffset(10, 74)
-	scroll.Size = UDim2.new(1, -20, 1, -84)
+	scroll.Position = UDim2.fromOffset(0, headerHeight)
+	scroll.Size = UDim2.new(1, 0, 1, -headerHeight)
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
 	scroll.ScrollBarThickness = 6
-	scroll.ScrollBarImageColor3 = BARK
+	scroll.ScrollBarImageColor3 = C.Bark
 	scroll.CanvasSize = UDim2.new()
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.ScrollingDirection = Enum.ScrollingDirection.Y
 	scroll.Parent = paper
-	local layout = Instance.new("UIListLayout")
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 6)
-	layout.Parent = scroll
-	local pad = Instance.new("UIPadding")
-	pad.PaddingRight = UDim.new(0, 8) -- room for the scroll bar
-	pad.Parent = scroll
+	UITheme.list(scroll, 8)
+	UITheme.padding(scroll, 10, 12 + 8, 12, 12) -- room for the scroll bar
 	list = scroll
 
-	panel = p
-	gui.Parent = player:WaitForChild("PlayerGui")
+	gui, panel = g, p
+	g.Parent = player:WaitForChild("PlayerGui")
 end
 
 local function setupPrompt(shop: Shop)

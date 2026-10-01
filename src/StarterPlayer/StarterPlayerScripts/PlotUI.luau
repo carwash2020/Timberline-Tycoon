@@ -21,22 +21,19 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
 local ShopUI = require(script.Parent.ShopUI)
+local UITheme = require(script.Parent.UITheme)
 
 local PlotUI = {}
 
 local player = Players.LocalPlayer
 
-local CREAM = Color3.fromRGB(245, 235, 215)
-local BARK = Color3.fromRGB(88, 58, 34)
-local GREEN = Color3.fromRGB(76, 140, 64)
-local BLUE = Color3.fromRGB(47, 109, 181)
-local MUTED = Color3.fromRGB(160, 145, 120)
+local C = UITheme.Colors
 
 local REACH = 40 -- studs past your plot's edge that still count as on it (PlotService's BUILD_REACH)
 local PLOT_ROW = "_plot"
 
 local building = false
-local buildButton: TextButton? = nil
+local buildButton: UITheme.Button? = nil
 local modeBar: Frame? = nil
 local itemPrompts: { [Instance]: { ProximityPrompt } } = {}
 
@@ -82,11 +79,11 @@ local function plotRow(): ShopUI.RowView
 		return {
 			name = now.name,
 			detail = string.format("%d × %d studs: your plot is as big as it gets.", now.size, now.size),
-			color = GREEN,
-			glow = true,
+			color = C.Green,
+			ring = C.Amber,
 			dim = false,
 			button = "Max",
-			buttonColor = MUTED,
+			state = "inuse",
 			onClick = function() end,
 		}
 	end
@@ -101,13 +98,12 @@ local function plotRow(): ShopUI.RowView
 			now.size,
 			unlocksAt(tier() + 1)
 		),
-		color = BLUE,
-		glow = false,
+		color = C.Blue,
 		dim = false,
 		button = if affordable
 			then "Grow " .. Util.formatCash(nextTier.priceCash)
 			else Util.formatCash(nextTier.priceCash),
-		buttonColor = if affordable then GREEN else MUTED,
+		state = if affordable then "buy" else "cant",
 		onClick = function()
 			if cash() < nextTier.priceCash then
 				HUD.Toast(
@@ -134,22 +130,21 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	elseif bp.note then
 		detail ..= " · " .. bp.note
 	end
-	local button, color
+	local button, state
 	if locked then
-		button, color = if needed then needed.name else "Locked", MUTED
+		button, state = if needed then needed.name else "Locked", "locked"
 	elseif affordable then
-		button, color = "Build " .. Util.formatCash(bp.priceCash), GREEN
+		button, state = "Build " .. Util.formatCash(bp.priceCash), "buy"
 	else
-		button, color = Util.formatCash(bp.priceCash), MUTED
+		button, state = Util.formatCash(bp.priceCash), "cant"
 	end
 	return {
 		name = bp.displayName,
 		detail = detail,
 		color = Color3.fromHex(bp.boxes[1].color),
-		glow = false,
 		dim = locked,
 		button = button,
-		buttonColor = color,
+		state = state,
 		onClick = function()
 			if bp.tier > tier() then
 				HUD.Toast(string.format("Grow your plot to a %s first.", if needed then needed.name else "bigger plot"))
@@ -173,9 +168,8 @@ end
 local STORE: ShopUI.Shop = {
 	building = nil,
 	promptText = "",
-	title = "BLUEPRINT STORE",
-	subtitle = "Pick something to build, then place it on your plot. You pay when you place it. "
-		.. "Sold back: half the price (all of it within a minute of placing).",
+	title = "Blueprint Store",
+	subtitle = "You pay when you place it. Sold back: half (all of it within a minute).",
 	ids = function()
 		local ids = { PLOT_ROW }
 		local sorted = table.clone(PlotData.Blueprints)
@@ -223,7 +217,13 @@ local function addPrompts(model: Instance)
 		return
 	end
 	local reach = math.max(10, math.max(bp.footprint.X, bp.footprint.Y) / 2 + 6)
-	local function prompt(action: string, key: Enum.KeyCode, pad: Enum.KeyCode, hold: number): ProximityPrompt
+	local function prompt(
+		action: string,
+		key: Enum.KeyCode,
+		pad: Enum.KeyCode,
+		hold: number,
+		dy: number
+	): ProximityPrompt
 		local p = Instance.new("ProximityPrompt")
 		p.ActionText = action
 		p.ObjectText = bp.displayName
@@ -232,18 +232,23 @@ local function addPrompts(model: Instance)
 		p.HoldDuration = hold
 		p.MaxActivationDistance = reach
 		p.RequiresLineOfSight = false
-		p.UIOffset = Vector2.new(0, 40)
+		p.UIOffset = Vector2.new(0, dy) -- the two stack, Move over Sell
 		p.Parent = root
 		return p
 	end
-	local move = prompt("Move", Enum.KeyCode.E, Enum.KeyCode.ButtonX, 0)
+	local move = prompt("Move", Enum.KeyCode.E, Enum.KeyCode.ButtonX, 0, -36)
 	move.Triggered:Connect(function()
 		ShopUI.Close()
 		BlueprintPlacer.Begin(bp, { moveUid = uid, onStop = PlotUI.Refresh })
 		PlotUI.Refresh()
 	end)
-	local sell =
-		prompt("Sell (+" .. Util.formatCash(PlotLogic.SellValue(bp)) .. ")", Enum.KeyCode.F, Enum.KeyCode.ButtonY, 0.6)
+	local sell = prompt(
+		"Sell (+" .. Util.formatCash(PlotLogic.SellValue(bp)) .. ")",
+		Enum.KeyCode.F,
+		Enum.KeyCode.ButtonY,
+		0.6,
+		36
+	)
 	sell.Triggered:Connect(function()
 		Net.Remote("SellPlaced"):FireServer(uid)
 	end)
@@ -275,7 +280,7 @@ function PlotUI.Refresh()
 	local placing = BlueprintPlacer.Active()
 	local b = buildButton
 	if b then
-		b.Visible = not building and onMyPlot()
+		b.root.Visible = not building and onMyPlot()
 	end
 	local bar = modeBar
 	if bar then
@@ -292,71 +297,34 @@ end
 -- Screen
 ---------------------------------------------------------------------------
 
-local function textButton(parent: Instance, name: string, text: string, color: Color3): TextButton
-	local b = Instance.new("TextButton")
-	b.Name = name
-	b.BackgroundColor3 = color
-	b.Font = Enum.Font.GothamBold
-	b.TextSize = 15
-	b.TextColor3 = CREAM
-	b.Text = text
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 8)
-	c.Parent = b
-	b.Parent = parent
-	return b
-end
-
 function PlotUI.Start()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "PlotUI"
-	gui.ResetOnSpawn = false
+	local gui = UITheme.Screen("PlotUI")
 
-	local build = textButton(gui, "Build", "BUILD", GREEN)
-	build.AnchorPoint = Vector2.new(1, 0.5)
-	build.Position = UDim2.new(1, -12, 0.6, -150) -- above Sell load here / Truck to lot
-	build.Size = UDim2.fromOffset(150, 40)
-	build.Visible = false
-	build.Activated:Connect(function()
-		setBuilding(true)
-	end)
-	buildButton = build
+	buildButton = HUD.SideButton({
+		name = "Build",
+		text = "BUILD",
+		style = "buy",
+		order = 1,
+		onPress = function()
+			setBuilding(true)
+		end,
+	})
 
-	local bar = Instance.new("Frame")
-	bar.Name = "BuildMode"
-	bar.AnchorPoint = Vector2.new(0.5, 1)
-	bar.Position = UDim2.new(0.5, 0, 1, -44) -- where BlueprintPlacer's bar goes
-	bar.Size = UDim2.fromOffset(340, 84)
-	bar.BackgroundColor3 = BARK
-	bar.BackgroundTransparency = 0.1
-	bar.Visible = false
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 10)
-	c.Parent = bar
-	bar.Parent = gui
-	local l = Instance.new("TextLabel")
-	l.Position = UDim2.fromOffset(10, 6)
-	l.Size = UDim2.new(1, -20, 0, 24)
-	l.BackgroundTransparency = 1
-	l.Font = Enum.Font.GothamMedium
-	l.TextSize = 14
-	l.TextColor3 = CREAM
-	l.Text = "BUILD MODE · walk up to something to move or sell it"
-	l.TextTruncate = Enum.TextTruncate.AtEnd
-	l.Parent = bar
-	local blueprints = textButton(bar, "Blueprints", "BLUEPRINTS", GREEN)
-	blueprints.Position = UDim2.new(0.5, -128, 0, 38)
-	blueprints.Size = UDim2.fromOffset(150, 36)
-	blueprints.Activated:Connect(function()
+	local bar = UITheme.Bar(gui, "BuildMode") -- where BlueprintPlacer's bar goes
+	bar.label.Text = "BUILD MODE · walk up to something to move or sell it"
+	local blueprints = UITheme.Button({ text = "BLUEPRINTS", size = Vector2.new(150, 36), style = "buy" })
+	blueprints.root.LayoutOrder = 1
+	blueprints.root.Parent = bar.row
+	blueprints.face.Activated:Connect(function()
 		ShopUI.OpenCustom(STORE)
 	end)
-	local done = textButton(bar, "Done", "DONE", BARK:Lerp(Color3.new(0, 0, 0), 0.25))
-	done.Position = UDim2.new(0.5, 30, 0, 38)
-	done.Size = UDim2.fromOffset(98, 36)
-	done.Activated:Connect(function()
+	local done = UITheme.Button({ text = "DONE", size = Vector2.new(98, 36), style = "skip" })
+	done.root.LayoutOrder = 2
+	done.root.Parent = bar.row
+	done.face.Activated:Connect(function()
 		setBuilding(false)
 	end)
-	modeBar = bar
+	modeBar = bar.outer
 	gui.Parent = player:WaitForChild("PlayerGui")
 
 	CollectionService:GetInstanceAddedSignal("PlacedItem"):Connect(function(model: Instance)

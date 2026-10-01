@@ -18,6 +18,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local WorldUI = {}
 
@@ -58,23 +59,17 @@ local function onBiomeChanged()
 end
 
 local function buildClock()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "WorldClock"
-	gui.ResetOnSpawn = false
-	local label = Instance.new("TextLabel")
+	local gui = UITheme.Screen("WorldClock")
+	local label = UITheme.label(gui, "", UITheme.Fonts.Black, 13, UITheme.Colors.Cream)
 	label.Name = "Clock"
 	label.AnchorPoint = Vector2.new(1, 0)
-	label.Position = UDim2.new(1, -222, 0, 18) -- left of the cash plaque
+	label.Position = UDim2.new(1, -(UITheme.Margin() + 210), 0, 15) -- left of the cash plaque
 	label.Size = UDim2.fromOffset(100, 30)
-	label.BackgroundColor3 = Color3.fromRGB(88, 58, 34)
-	label.BackgroundTransparency = 0.15
-	label.Font = Enum.Font.GothamBold
-	label.TextSize = 14
-	label.TextColor3 = Color3.fromRGB(245, 235, 215)
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = label
-	label.Parent = gui
+	label.BackgroundColor3 = UITheme.Colors.Bark
+	label.BackgroundTransparency = 0
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	UITheme.corner(label, 15)
+	UITheme.stroke(label, UITheme.Colors.Ink, 2)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
 	local function refresh()
