@@ -31,8 +31,8 @@ local BlueprintPlacer = {}
 local player = Players.LocalPlayer
 
 local CREAM = UITheme.Colors.Cream
-local VALID = Color3.fromRGB(90, 220, 110)
-local INVALID = Color3.fromRGB(235, 70, 60)
+local VALID = UITheme.Colors.Green
+local INVALID = UITheme.Colors.Danger
 
 local LEAVE_REACH = 40 -- studs past the plot's edge before placing stops (PlotService's BUILD_REACH)
 local ACTIONS = { "PlacerRotate", "PlacerPlace", "PlacerCancel" }
