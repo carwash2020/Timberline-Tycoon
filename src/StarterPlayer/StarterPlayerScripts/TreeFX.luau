@@ -3,12 +3,18 @@
 -- from the server's attributes, so everyone nearby sees it smoothly.
 -- One animator per tree, so a wobble, a fall and a regrow never fight:
 --   * Hit (HP drops): the tree wobbles around its base, wood chips fly and
---     a thunk plays (Shared/SoundData).
+--     a thunk plays (Shared/SoundData). Chips use no physics: each one arcs
+--     along a TreeLogic flight to the ground under it (one raycast), rests
+--     about a second and fades. They're pooled and capped.
 --   * Fall (Felled = true): the tree leans away from the chopper, slowly
 --     at first, then thumps down along FallDir (Shared/TreeLogic timing),
---     with a dust and leaf burst, a creak and a crash, and a small camera
---     shake for anyone close. The server hides it once it has landed.
---   * Regrow (Felled = false): the tree springs back up from sapling size.
+--     with a puff of dust in its biome's colour, leaves shaken out of its
+--     canopy (pooled wedges in its palette that flutter down), a creak and
+--     a crash, and a small camera shake for anyone close. Once down it
+--     fades out (LocalTransparencyModifier) into the logs the server lays,
+--     and the server hides it.
+--   * Regrow (Felled = false): the fade is undone and the tree springs
+--     back up from sapling size.
 -- The server never moves a tree, so everything here starts and ends on the
 -- HomePivot attribute.
 
@@ -32,6 +38,16 @@ local FX_RANGE = 120 -- studs from the camera; farther trees aren't animated
 local WOBBLE_DEGREES = { 2.6, -1.4, 0.6, 0 }
 local WOBBLE_STEP = 0.05
 local CHIP_COUNT = 6
+local CHIP_CAP = 36 -- chips on screen at once; the oldest is reused past this
+local CHIP_SPREAD = math.rad(70) -- either side of straight out of the cut
+local GROUND_PROBE_UP = 6 -- a ground ray starts this far over the trunk's foot (or a leaf) ...
+local GROUND_PROBE_DOWN = 14 -- ... and reaches this far down
+local LEAF_COUNT = 10 -- leaves a landing tree shakes loose
+local LEAF_CAP = 40
+local LEAF_ROCK = math.rad(40) -- a falling leaf rocks this far either way ...
+local LEAF_FLUTTER = 8 -- ... this fast (radians a second)
+local LEAF_FLAT = CFrame.Angles(0, 0, math.pi / 2) -- a leaf wedge's thin X axis up: lying flat
+local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local REGROW_TIME = 2.2
 
 type State = {
@@ -42,6 +58,195 @@ type State = {
 }
 
 local states: { [Model]: State } = {}
+
+-- Trees this client faded out after a fall, to bring back when they regrow
+-- or stream in again (weak keys: a destroyed tree just drops out).
+local faded: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+-- A chip (or leaf) in flight or lying on the ground.
+type Piece = {
+	part: BasePart,
+	flight: TreeLogic.Flight,
+	born: number, -- os.clock() when it spawned
+	life: number, -- seconds until it has faded out
+	rest: CFrame, -- its turn once it lies on the ground
+	spinAxis: Vector3, -- it tumbles about this in the air ...
+	spin: number, -- ... at this many radians a second, unwinding to `rest` as it lands
+	rock: number, -- leaves: how far it rocks either way as it drifts down (0: chips)
+}
+
+-- Pieces of one kind: the parts waiting to be reused, the ones out now
+-- (oldest first) and how many may be out at once.
+type Batch = { idle: { BasePart }, out: { Piece }, cap: number, make: () -> BasePart }
+
+local pieceFolder: Folder? = nil
+local pieceConn: RBXScriptConnection? = nil
+local batches: { Batch } = {}
+
+local function newChipPart(): BasePart
+	local chip = Instance.new("Part")
+	chip.Name = "WoodChip"
+	chip.Material = Enum.Material.Wood
+	chip.Anchored = true
+	chip.CanCollide = false
+	chip.CanQuery = false
+	chip.CanTouch = false
+	chip.CastShadow = false
+	return chip
+end
+
+local function newLeafPart(): BasePart
+	local leaf = Instance.new("WedgePart")
+	leaf.Name = "FallingLeaf"
+	leaf.Material = Enum.Material.SmoothPlastic
+	leaf.Anchored = true
+	leaf.CanCollide = false
+	leaf.CanQuery = false
+	leaf.CanTouch = false
+	leaf.CastShadow = false
+	return leaf
+end
+
+local chipBatch: Batch = { idle = {}, out = {}, cap = CHIP_CAP, make = newChipPart }
+local leafBatch: Batch = { idle = {}, out = {}, cap = LEAF_CAP, make = newLeafPart }
+table.insert(batches, chipBatch)
+table.insert(batches, leafBatch)
+
+local function folder(): Folder
+	local f = pieceFolder
+	if f and f.Parent then
+		return f
+	end
+	local made = Instance.new("Folder")
+	made.Name = "TreeFXPieces" -- client-only: nothing here replicates or streams
+	made.Parent = workspace
+	pieceFolder = made
+	return made
+end
+
+local function release(batch: Batch, piece: Piece)
+	piece.part.Parent = nil
+	table.insert(batch.idle, piece.part)
+end
+
+-- Moves every piece along its flight; stops when none are left.
+local function stepPieces()
+	local now = os.clock()
+	local any = false
+	for _, batch in ipairs(batches) do
+		local i = 1
+		while i <= #batch.out do
+			local piece = batch.out[i]
+			local t = now - piece.born
+			if piece.part.Parent == nil then
+				table.remove(batch.out, i) -- destroyed under us: never reuse it
+				continue
+			elseif t >= piece.life then
+				table.remove(batch.out, i)
+				release(batch, piece)
+				continue
+			end
+			local f = piece.flight
+			local turn = piece.rest
+			if t < f.landT then
+				local left = f.landT - t
+				turn = piece.rest * CFrame.fromAxisAngle(piece.spinAxis, piece.spin * left)
+				if piece.rock > 0 then
+					-- Rocks as it drifts, settling flat as it lands.
+					turn *= CFrame.Angles(0, 0, piece.rock * math.sin(t * LEAF_FLUTTER) * math.min(1, left / 0.4))
+				end
+			end
+			piece.part.CFrame = CFrame.new(TreeLogic.FlightAt(f, t)) * turn
+			piece.part.Transparency = TreeLogic.FlightFade(f, t)
+			any = true
+			i += 1
+		end
+	end
+	if not any then
+		local conn = pieceConn
+		if conn then
+			conn:Disconnect()
+			pieceConn = nil
+		end
+	end
+end
+
+-- A part for a new piece: an idle one, a new one, or (at the cap) the
+-- oldest one out.
+local function takePart(batch: Batch): BasePart
+	if #batch.out >= batch.cap then
+		local oldest = table.remove(batch.out, 1) :: Piece
+		if oldest.part.Parent ~= nil then
+			return oldest.part
+		end
+	end
+	local idle = table.remove(batch.idle)
+	return idle or batch.make()
+end
+
+local function launchPiece(
+	batch: Batch,
+	part: BasePart,
+	flight: TreeLogic.Flight,
+	rest: CFrame,
+	spinAxis: Vector3,
+	spin: number,
+	rock: number
+)
+	local piece: Piece = {
+		part = part,
+		flight = flight,
+		born = os.clock(),
+		life = TreeLogic.FlightLife(flight),
+		rest = rest,
+		spinAxis = spinAxis,
+		spin = spin,
+		rock = rock,
+	}
+	part.Transparency = 0
+	part.CFrame = CFrame.new(flight.origin) * rest
+	part.Parent = folder()
+	table.insert(batch.out, piece)
+	if not pieceConn then
+		pieceConn = RunService.Heartbeat:Connect(stepPieces)
+	end
+end
+
+-- What the ground rays skip: the tree itself, people and trucks (only
+-- colliding parts count, so leaves, logs and decoration are skipped too).
+local function groundParams(tree: Model): RaycastParams
+	local skip: { Instance } = { tree }
+	for _, player in ipairs(Players:GetPlayers()) do
+		local char = player.Character
+		if char then
+			table.insert(skip, char)
+		end
+	end
+	for _, tag in ipairs({ "Truck", "NPC" }) do
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			table.insert(skip, inst)
+		end
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = skip
+	params.RespectCanCollide = true
+	return params
+end
+
+-- The ground's height and normal under `at`, looking down from `fromY`
+-- (or `fallbackY` and straight up if nothing is there yet).
+local function groundAt(at: Vector3, fromY: number, fallbackY: number, params: RaycastParams): (number, Vector3)
+	local hit = workspace:Raycast(
+		Vector3.new(at.X, fromY + GROUND_PROBE_UP, at.Z),
+		Vector3.new(0, -(GROUND_PROBE_UP + GROUND_PROBE_DOWN), 0),
+		params
+	)
+	if hit then
+		return hit.Position.Y, hit.Normal
+	end
+	return fallbackY, Vector3.yAxis
+end
 
 local function homeOf(tree: Model): CFrame?
 	local home = tree:GetAttribute("HomePivot")
@@ -91,6 +296,8 @@ local function wobble(tree: Model, state: State, home: CFrame)
 	end)
 end
 
+-- Chips fly out of the cut toward whoever swung, land around the trunk's
+-- foot and lie there a moment.
 local function chips(tree: Model, def: WoodDef, home: CFrame)
 	local _, base = trunkInfo(tree, home)
 	local trunk = tree.PrimaryPart
@@ -98,28 +305,77 @@ local function chips(tree: Model, def: WoodDef, home: CFrame)
 	local toward = -awayFromPlayer(base)
 	local origin = base + Vector3.new(0, 2.6, 0) + toward * (radius + 0.15)
 	local inner = TreeArt.HeartColor(def)
+	local params = groundParams(tree)
 	for i = 1, CHIP_COUNT do
-		local chip = Instance.new("Part")
-		chip.Name = "WoodChip"
+		local kind = TreeLogic.Chip
+		-- Aim at the trunk's foot, then land on the ground where it comes down.
+		local aim =
+			TreeLogic.Launch(kind, origin, toward, CHIP_SPREAD, base.Y, math.random(), math.random(), math.random())
+		local groundY, normal = groundAt(TreeLogic.FlightAt(aim, aim.landT), base.Y, base.Y, params)
+		local flight = TreeLogic.Flight(kind, origin, aim.velocity, groundY)
+		local chip = takePart(chipBatch)
 		chip.Size = Vector3.new(0.25 + math.random() * 0.25, 0.14, 0.35 + math.random() * 0.3)
 		chip.Color = if i % 3 == 0 then def.trunkColor else inner
-		chip.Material = Enum.Material.Wood
-		chip.CanCollide = false
-		chip.CanQuery = false
-		chip.CanTouch = false
-		chip.Massless = true
-		chip.CastShadow = false
-		chip.CFrame = CFrame.new(origin) * CFrame.Angles(math.random() * 6, math.random() * 6, math.random() * 6)
-		chip.Parent = workspace
-		local side = toward:Cross(Vector3.yAxis) * ((math.random() - 0.5) * 12)
-		chip.AssemblyLinearVelocity = toward * (6 + math.random() * 4) + side + Vector3.new(0, 9 + math.random() * 7, 0)
-		chip.AssemblyAngularVelocity = Vector3.new(math.random() * 20, math.random() * 20, math.random() * 20)
-		Debris:AddItem(chip, 1.4)
+		local rest = TreeLogic.Upright(normal) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
+		local axis = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5)
+		local spinAxis = if axis.Magnitude > 0.01 then axis.Unit else Vector3.xAxis
+		launchPiece(chipBatch, chip, flight, rest, spinAxis, 10 + math.random() * 10, 0)
 	end
 end
 
--- A burst of dust (and leaves, for leafy trees) where the tree lands.
-local function landingBurst(def: WoodDef, at: Vector3)
+-- Where a tree's canopy is right now (its leaf parts' centres): Leaves and
+-- Frond parts and a pine's Tier models, as WindSway finds them.
+local function canopySpots(tree: Model): { Vector3 }
+	local spots: { Vector3 } = {}
+	for _, d in ipairs(tree:GetDescendants()) do
+		if d:IsA("BasePart") and d.Transparency < 1 then
+			local parent = d.Parent
+			local inTier = parent ~= nil and parent ~= tree and parent:IsA("Model") and parent.Name == "Tier"
+			if d.Name == "Leaves" or d.Name == "Frond" or inTier then
+				table.insert(spots, d.CFrame.Position)
+			end
+		end
+	end
+	return spots
+end
+
+-- Leaves shaken out of a landing tree's canopy: they burst up and flutter
+-- down around it, in its palette.
+local function shakeLeaves(tree: Model, def: WoodDef, groundY: number)
+	local spots = canopySpots(tree)
+	if #spots == 0 then
+		return
+	end
+	local colors = TreeArt.Palette(def).leaves
+	local params = groundParams(tree)
+	for i = 1, LEAF_COUNT do
+		local jitter = Vector3.new(math.random() - 0.5, math.random() * 0.5, math.random() - 0.5)
+		local origin = spots[math.random(1, #spots)] + jitter
+		local a = math.random() * math.pi * 2
+		local kind = TreeLogic.Leaf
+		local aim = TreeLogic.Launch(
+			kind,
+			origin,
+			Vector3.new(math.cos(a), 0, math.sin(a)),
+			0,
+			groundY,
+			math.random(),
+			math.random(),
+			0.5
+		)
+		local y, normal = groundAt(TreeLogic.FlightAt(aim, aim.landT), origin.Y, groundY, params)
+		local flight = TreeLogic.Flight(kind, origin, aim.velocity, y)
+		local leaf = takePart(leafBatch)
+		leaf.Size = Vector3.new(0.08, 0.4 + math.random() * 0.2, 0.55 + math.random() * 0.25)
+		leaf.Color = colors[(i - 1) % #colors + 1]
+		local rest = TreeLogic.Upright(normal) * CFrame.Angles(0, math.random() * math.pi * 2, 0) * LEAF_FLAT
+		-- Its thin X axis points up once it lies flat, so a turn about X spins it flat.
+		launchPiece(leafBatch, leaf, flight, rest, Vector3.xAxis, (math.random() - 0.5) * 8, LEAF_ROCK)
+	end
+end
+
+-- A burst of dust where the tree lands (and leaves, for leafy trees).
+local function landingBurst(tree: Model, def: WoodDef, at: Vector3)
 	local anchor = Instance.new("Part")
 	anchor.Name = "FellBurst"
 	anchor.Transparency = 1
@@ -130,35 +386,50 @@ local function landingBurst(def: WoodDef, at: Vector3)
 	anchor.Size = Vector3.new(6, 1, 6)
 	anchor.CFrame = CFrame.new(at)
 	anchor.Parent = workspace
+	-- Soft smoke puffs (the default texture is a sparkle) in the colour of
+	-- the ground it fell on.
 	local dust = Instance.new("ParticleEmitter")
-	dust.Color = ColorSequence.new(Color3.fromRGB(196, 174, 140))
+	dust.Texture = DUST_TEXTURE
+	dust.Color = ColorSequence.new(TreeArt.DustColor(def))
 	dust.LightInfluence = 1
-	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.5), NumberSequenceKeypoint.new(1, 5) })
-	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 6) })
+	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
 	dust.Lifetime = NumberRange.new(0.8, 1.6)
 	dust.Speed = NumberRange.new(4, 10)
 	dust.SpreadAngle = Vector2.new(80, 80)
+	dust.Rotation = NumberRange.new(0, 360)
+	dust.RotSpeed = NumberRange.new(-40, 40)
 	dust.Acceleration = Vector3.new(0, 2, 0)
 	dust.Drag = 3
 	dust.Rate = 0
 	dust.Parent = anchor
-	dust:Emit(26)
-	if def.silhouette ~= "dead" then
-		local leaves = Instance.new("ParticleEmitter")
-		leaves.Color = ColorSequence.new(TreeArt.Palette(def).leaves[1])
-		leaves.LightInfluence = 1
-		leaves.Size = NumberSequence.new(0.35)
-		leaves.Lifetime = NumberRange.new(1.4, 2.6)
-		leaves.Speed = NumberRange.new(6, 14)
-		leaves.SpreadAngle = Vector2.new(70, 70)
-		leaves.Acceleration = Vector3.new(0, -6, 0)
-		leaves.Drag = 1.5
-		leaves.RotSpeed = NumberRange.new(-180, 180)
-		leaves.Rate = 0
-		leaves.Parent = anchor
-		leaves:Emit(30)
-	end
+	dust:Emit(20)
 	Debris:AddItem(anchor, 3)
+	if def.silhouette ~= "dead" then
+		shakeLeaves(tree, def, at.Y)
+	end
+end
+
+local function partsOf(tree: Model, visibleOnly: boolean): { BasePart }
+	local out: { BasePart } = {}
+	for _, d in ipairs(tree:GetDescendants()) do
+		if d:IsA("BasePart") and (not visibleOnly or d.Transparency < 1) then
+			table.insert(out, d)
+		end
+	end
+	return out
+end
+
+local function setFade(parts: { BasePart }, alpha: number)
+	for _, p in ipairs(parts) do
+		p.LocalTransparencyModifier = alpha
+	end
+end
+
+-- Undoes a fade, so a regrown tree (or one streamed back in) is solid.
+local function unfade(tree: Model)
+	faded[tree] = nil
+	setFade(partsOf(tree, false), 0)
 end
 
 local function fall(tree: Model, def: WoodDef, state: State)
@@ -183,8 +454,10 @@ local function fall(tree: Model, def: WoodDef, state: State)
 	SoundData.PlayAt("TreeCreak", base + Vector3.new(0, length / 2, 0))
 	task.spawn(function()
 		local landed = false
+		local fading: { BasePart }? = nil
 		local t = math.max(0, started)
-		while t <= TreeLogic.FallTime + 0.05 do
+		local stop = math.max(TreeLogic.FallTime + 0.05, TreeLogic.FellFadeStart + TreeLogic.FellFadeTime)
+		while true do
 			if state.token ~= token or tree.Parent == nil then
 				return
 			end
@@ -193,11 +466,21 @@ local function fall(tree: Model, def: WoodDef, state: State)
 			if not landed and t >= TreeLogic.FallTime * 0.86 then
 				landed = true
 				local tip = base + dir * (length * 0.85)
-				landingBurst(def, tip)
+				landingBurst(tree, def, tip)
 				SoundData.PlayAt("TreeFall", tip)
 				if nearCamera(tip, 45) then
 					CameraShake.Shake(0.45, 0.35)
 				end
+			end
+			if t >= TreeLogic.FellFadeStart then
+				-- Down: fade out into the logs the server is about to lay.
+				local parts = fading or partsOf(tree, true)
+				fading = parts
+				faded[tree] = true
+				setFade(parts, TreeLogic.FellFade(t))
+			end
+			if t >= stop then
+				break
 			end
 			t += RunService.Heartbeat:Wait()
 		end
@@ -205,6 +488,7 @@ local function fall(tree: Model, def: WoodDef, state: State)
 end
 
 local function regrow(tree: Model, state: State)
+	unfade(tree) -- first, whatever happens next: a regrown tree is never left see-through
 	local home = homeOf(tree)
 	if not home then
 		return
@@ -254,6 +538,9 @@ local function attach(tree: Model)
 		busy = false,
 	}
 	states[tree] = state
+	if faded[tree] then
+		unfade(tree) -- faded out before it streamed away (it may have regrown since)
+	end
 	table.insert(
 		state.conns,
 		tree:GetAttributeChangedSignal("HP"):Connect(function()
@@ -270,7 +557,7 @@ local function attach(tree: Model)
 			chips(tree, woodDef, home)
 			local trunk = tree.PrimaryPart
 			if trunk then
-				SoundData.PlayAt(if hp > 0 then "Chop" else "ChopFinal", trunk.Position)
+				SoundData.PlayAt(if hp > 0 then "Chop" else "ChopFinal", trunk.CFrame.Position)
 			end
 			if hp > 0 and not state.busy then
 				wobble(tree, state, home)

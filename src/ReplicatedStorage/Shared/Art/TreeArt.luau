@@ -7,8 +7,9 @@
 -- Contract with TreeService / TreeFX / TreeUI / ChopController:
 --   * Build returns a Model whose PrimaryPart is "Trunk": an upright
 --     cylinder from the ground (y = 0 at the model's origin) to
---     trunkHeight * scale, so its centre is the tree's pivot and
---     pivot - trunkHeight/2 is the ground point under it.
+--     trunkHeight * scale (a palm's straight lower trunk is shorter: the
+--     curved rods above it are decoration), so its centre is the tree's
+--     pivot and pivot - Trunk.Size.X/2 is the ground point under it.
 --   * The trunk and canopy can be clicked (CanQuery) but only the trunk
 --     collides; everything else is decoration.
 --   * Log returns a Model whose PrimaryPart is "LogPart" (a cylinder along
@@ -22,6 +23,10 @@ type WoodDef = WoodData.WoodDef
 type Rng = Kit.Rng
 
 local TreeArt = {}
+
+-- How much of a palm's height its straight Trunk part takes; the curved,
+-- ringed rods above it are decoration.
+local PALM_TRUNK = 0.35
 
 -- Extra colours per wood beyond WoodData's leaf and trunk colours: the
 -- hand-painted variety that makes a canopy read as many leaves, the pale
@@ -97,6 +102,24 @@ end
 -- The pale cut-wood colour of this wood (log ends, stumps, chips).
 function TreeArt.HeartColor(def: WoodDef): Color3
 	return TreeArt.Palette(def).heart
+end
+
+-- The dust a felled tree throws up, by the ground of its home biome
+-- (TreeFX): earth in the forests, sand on the coast, powder snow, volcanic
+-- ash, the Phantom Grove's violet loam, pale isle soil.
+local EARTH_DUST = Color3.fromRGB(196, 174, 140)
+local DUST: { [string]: Color3 } = {
+	starter = EARTH_DUST,
+	hills = Color3.fromRGB(198, 168, 128),
+	island = Color3.fromRGB(228, 210, 164),
+	snow = Color3.fromRGB(242, 246, 250),
+	volcano = Color3.fromRGB(118, 112, 108),
+	grove = Color3.fromRGB(150, 138, 168),
+	sky = Color3.fromRGB(236, 228, 198),
+}
+
+function TreeArt.DustColor(def: WoodDef): Color3
+	return DUST[def.biome] or EARTH_DUST
 end
 
 ---------------------------------------------------------------------------
@@ -390,10 +413,10 @@ end
 -- Palm: a curved, ringed trunk and drooping fronds.
 builders.palmwood = function(model, def, pal, H, F, rng)
 	local D = 0.11 * H
-	trunk(model, def, H * 0.35, D * 1.15)
+	trunk(model, def, H * PALM_TRUNK, D * 1.15)
 	local lean = rng:range(0.12, 0.22)
 	local dir = rng:range(0, math.pi * 2)
-	local pos = Vector3.new(0, H * 0.35, 0)
+	local pos = Vector3.new(0, H * PALM_TRUNK, 0)
 	local segments = 5
 	for i = 1, segments do
 		local t = i / segments
@@ -633,10 +656,18 @@ function TreeArt.Build(def: WoodDef, seed: number, scale: number?): Model
 	return model
 end
 
--- Where the HP bar floats above a tree of this size (TreeUI).
+-- How high the HP bar floats above the ground: just over a player's head
+-- (an avatar is about 5.3 studs), so it stays on screen while you chop.
+TreeArt.BarAboveGround = 7
+
+-- Where the HP bar floats on a tree of this size (TreeService's BarOffset
+-- attribute): TreeUI adds it to the Trunk part's centre, half the trunk's
+-- length above the ground, so every wood and size class (an Elder too)
+-- gets its bar BarAboveGround studs up.
 function TreeArt.BarHeight(def: WoodDef, scale: number?): number
-	local s = scale or 1
-	return def.trunkHeight * s * 0.5 + def.foliageSize * s * 1.05
+	local H = def.trunkHeight * (scale or 1)
+	local trunkLength = if def.id == "palmwood" then H * PALM_TRUNK else H
+	return TreeArt.BarAboveGround - trunkLength / 2
 end
 
 -- The stump left behind until the tree regrows.
