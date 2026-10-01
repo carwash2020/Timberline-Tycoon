@@ -278,4 +278,34 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("frostwood is deep blue with a darker trunk, under narrower caps (NAT-07)", function()
+		local def = WoodData.Get("frostwood")
+		local want = { "3F7FA6", "4F90B5", "2F6E96", "5B9CC0" }
+		local got = {}
+		for _, c in ipairs(TreeArt.Palette(def).leaves) do
+			table.insert(got, string.upper(c:ToHex()))
+		end
+		t.eq(got, want)
+		local _, _, value = def.trunkColor:ToHSV()
+		t.ok(value < 0.4, "the trunk is darker than the old #5A6A7A")
+		t.eq(TreeArt.SnowCapRadius, 0.45)
+		-- Blue shows under every cap: no cap facet reaches below the
+		-- lowest 40% of the tier it sits on, and the top one still clears
+		-- the tree's tip.
+		local tree = TreeArt.Build(def, 3, 1)
+		local H = def.trunkHeight
+		local lowest, highest = math.huge, -math.huge
+		for _, p in ipairs(tree:GetChildren()) do
+			if p:IsA("BasePart") and p.Name == "Facet" then
+				local top, bottom = topOf(p)
+				lowest = math.min(lowest, bottom)
+				highest = math.max(highest, top)
+			end
+		end
+		-- The third tier runs from 0.92 H, 0.5 H x 0.84 tall.
+		t.ok(lowest > 0.92 * H + 0.4 * 0.5 * H * 0.84, "a cap starts too low to show blue under it")
+		local tipTier = 0.32 * H + 3 * 0.3 * H + 0.5 * H * (1 - 3 * 0.08)
+		t.ok(highest > tipTier, "the top cap covers the tree's tip")
+	end)
 end

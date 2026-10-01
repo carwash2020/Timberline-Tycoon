@@ -66,7 +66,8 @@ local PALETTES: { [string]: Palette } = {
 		accent = hex("#7A5A36"),
 	},
 	frostwood = {
-		leaves = { hex("#7FB8D8"), hex("#6AA8CC"), hex("#93C7E2"), hex("#5E9DC4") },
+		-- Deep blue so a frostwood reads against the snowfield (NAT-07).
+		leaves = { hex("#3F7FA6"), hex("#4F90B5"), hex("#2F6E96"), hex("#5B9CC0") },
 		heart = hex("#E4F2FA"),
 		accent = hex("#FFFFFF"),
 		glow = hex("#B9F1FF"),
@@ -359,6 +360,9 @@ TreeArt.ConiferTiers = 4
 TreeArt.ConiferSides = 5
 TreeArt.SnowCapSides = 4
 TreeArt.SnowCappedTiers = 2
+-- A cap's base radius, as a fraction of its tier's: narrow enough that the
+-- blue shows under it (NAT-07; it was 0.56).
+TreeArt.SnowCapRadius = 0.45
 
 local function conifer(model: Model, def: WoodDef, pal: Palette, H: number, F: number, rng: Rng, snow: boolean)
 	local D = 0.12 * H
@@ -372,12 +376,24 @@ local function conifer(model: Model, def: WoodDef, pal: Palette, H: number, F: n
 		local base = CFrame.new(0, y, 0) * CFrame.Angles(0, rng:range(0, math.pi), 0)
 		tier(model, base, r, tierH * (1 - i * 0.08), TreeArt.ConiferSides, rng, pal.leaves)
 		if snow and i >= tiers - TreeArt.SnowCappedTiers then
-			-- A white cap over the top of the tier, a hair outside it.
-			local capH = tierH * (1 - i * 0.08) * 0.5
-			local capBase = base * CFrame.new(0, tierH * (1 - i * 0.08) - capH + 0.08, 0)
-			Kit.cone(model, capBase, r * 0.56, capH + 0.14, TreeArt.SnowCapSides, function(): Color3
-				return Kit.vary(pal.accent or Color3.new(1, 1, 1), rng, 0.02)
-			end, Enum.Material.Snow, 0.1)
+			-- A white cap over the top of the tier. It starts where the tier
+			-- has narrowed to the cap's width (its corners a hair outside),
+			-- so blue shows under it and its tip clears the tier's by 0.22.
+			local h = tierH * (1 - i * 0.08)
+			local capFrom = h * (1 - TreeArt.SnowCapRadius * 0.72)
+			local capBase = base * CFrame.new(0, capFrom, 0)
+			Kit.cone(
+				model,
+				capBase,
+				r * TreeArt.SnowCapRadius,
+				h - capFrom + 0.22,
+				TreeArt.SnowCapSides,
+				function(): Color3
+					return Kit.vary(pal.accent or Color3.new(1, 1, 1), rng, 0.02)
+				end,
+				Enum.Material.Snow,
+				0.1
+			)
 		end
 	end
 end
