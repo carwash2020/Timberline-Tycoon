@@ -1,39 +1,307 @@
 # Phase 2+ build notes
 
-Everything after the Phase 1 vertical slice, built on the branch
-`claude/sleepy-ptolemy-p7e4pm` while Phase 1 is being playtested. `main`
-stays the Phase 1 build until that playtest passes; then this branch is
-merged.
+Everything after the Phase 1 vertical slice. It's all on `main` now
+(merged October 2026, with the redesign below).
 
-**Status:** code complete, **not yet played in Studio.** It passes the same
-checks as Phase 1 (`./scripts/check.sh`, also run by GitHub on every push),
-plus 162 unit tests.
+**Status:** code complete, **not yet played in Studio.** `./scripts/check.sh`
+passes (formatter, linter, strict types against the Roblox API, 351 unit
+tests, ECONOMY.md current); GitHub runs it on every push.
 
-On this branch, each with its own checklist below:
-1. **Axe shop**: the Tool Shed
-2. **Murph's tutorial**
-3. **Trucks**: the Dealership, every truck, physics driving, Truck to lot
-4. **Daily goals and streaks**
-5. **The world**: biomes, roads, day and night, Hearth & Home
-6. **Trailers**
-7. **Robux**: the Store, 2x Cash, cash packs, 2x Wood, Instant Delivery
-8. **The Field Guide**
-9. **The Aether Isles**: gondola, Lumenwood, Sky Shards, Cloud Chute, Sky Bin, the forge
-10. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
-11. **The new look**: every screen restyled from the Claude Design UI spec
+What's here, each with its own checklist below:
+1. **The redesign (October 2026):** every model rebuilt, the world on
+   terrain, a living environment, the Living Forest twist, feel and fixes
+2. **Axe shop**: the Tool Shed
+3. **Murph's tutorial**
+4. **Trucks**: the Dealership, every truck, physics driving, Truck to lot
+5. **Daily goals and streaks**
+6. **The world**: biomes, roads, day and night, Hearth & Home
+7. **Trailers**
+8. **Robux**: the Store, 2x Cash, cash packs, 2x Wood, Instant Delivery
+9. **The Field Guide**
+10. **The Aether Isles**: gondola, Lumenwood, Sky Shards, Cloud Chute, Sky Bin, the forge
+11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
+12. **The new look**: every screen restyled from the Claude Design UI spec
 
-Old saves carry over: new save fields are filled in on load. Play the
-sections in order the first time (a fresh save gets the tutorial).
+Where the redesign changed something an older section describes (the
+world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
+section wins.
+
+Old saves carry over: new save fields are filled in on load and old ones
+migrated. Play the sections in order the first time (a fresh save gets the
+tutorial).
 
 ## Try this build
 
 ```sh
-git fetch
-git checkout claude/sleepy-ptolemy-p7e4pm
-rojo serve
+git checkout main
+git pull
+rojo build -o build.rbxlx   # once: open this file in Studio (see below)
+rojo serve                  # then connect from Studio as usual
 ```
-Then connect from Studio as usual. `git checkout main` goes back to the
-Phase 1 build.
+
+**Open the built place once.** `rojo serve` syncs scripts, but some of the
+place settings in `default.project.json` only arrive in a built place:
+StreamingEnabled and its radii, Lighting's style and quality, terrain
+decoration (grass), GlobalWind. Open `build.rbxlx`, then File > **Publish
+to Roblox** over your existing place (or set those properties by hand in
+the Explorer to match the project file). After that, `rojo serve` as
+usual.
+
+Also in Studio, once:
+- **Game Settings > Places > Max Players: 12 or fewer** (there are 12
+  plots).
+- Game Settings > Security > **Enable Studio Access to API Services**, so
+  saves persist between tests. Studio playtests save to their own
+  DataStore (`PlayerProfiles_Studio`), so testing can never touch a real
+  player's save.
+
+## The redesign (October 2026): models, a living world, the Living Forest
+
+REDESIGN.md has the engineering side (rules, contracts, who owns what);
+GAME_DESIGN §16 has the twist and §17 the art and world. In short:
+
+- **The world is terrain**, generated from code (`Shared/World`): rolling
+  hills, a river from the Skyroot's waterfall down to a lake, the coast and
+  an island, the Snowfields plateau, the Volcano's cone with its lava
+  crater, the Phantom Grove's hollow, mountains round the edge, dirt roads
+  between them. The server writes it when it starts (nearest the town
+  first; nobody spawns until the ground exists).
+- **Every model is new** and built from code in `Shared/Art` (so the
+  preview tool draws exactly what the game builds): 9 woods' trees with
+  stumps, logs and saplings; the sawmill with its spinning blade, the Tool
+  Shed barn, the Dealership garage, Hearth & Home; the gondola stations,
+  Murph's camp, lamps, fences and props; the Skyroot (a colossal tree whose
+  limbs hold the isles), the isles, rope bridges, the waterfall and cloud
+  banks; 5 trucks and 3 trailers; 9 axes; Murph and 8 townsfolk; rocks,
+  bushes, flowers, ferns, reeds, lily pads and more; birds, butterflies,
+  rabbits, deer, ducks, fish, fireflies, wisps and ember sprites.
+- **A living environment:** a smooth 20-minute day (dawn, midday, golden
+  hour, dusk, night) with lamps and windows that light up one by one;
+  weather from the server clock (clear, cloudy, rain, storms with real
+  lightning, fog at night; snow and blizzards on the Snowfields, ashfall at
+  the Volcano, wind on the isles); trees that sway; decoration and
+  wildlife around you; ambient sound and day/night music.
+- **The Living Forest** (the twist): felled trees drop **Heartseeds** you
+  plant in stumps (the tree regrows at once with your name on a stake);
+  you earn a **planter's share** when anyone fells a tree you planted;
+  each grove has a **vitality** that replanting raises (thriving groves get
+  more flowers, wildlife and figured wood, old-growth ones wake a giant
+  **Elder tree** the whole server fells together); some trees hide
+  **figured wood** (curly, birdseye, quilted, burl, stormgrain, starfall)
+  you learn to spot from **bark clues**, revealed with a stamp when you
+  sell; **storms strike real trees**, which glow and give Stormgrain; when
+  every grove thrives, the **Skyroot blooms**.
+- **Feel and fixes:** chopping outlines the tree you'd hit and measures
+  reach from the bark; the cash counts up with a "+$" pop; a ♪ Settings
+  button (music and sound effects, saved); trucks are owner-only, park
+  themselves on exit and keep their load across sessions; the Featherfall
+  Cloak glides properly; Robux cash over the wallet cap is banked, not
+  lost; a dozen smaller fixes.
+
+### Handy test commands
+
+In Studio's command bar while playing (server side, the "Server" view):
+- `workspace:SetAttribute("WeatherOverride", "Storm")` (or `"Rain"`,
+  `"Fog"`, `"Cloudy"`, `"Clear"`); `nil` hands the weather back to the
+  schedule. `WeatherOverrideIntensity` (0 to 1) sets how strong.
+- `workspace:SetAttribute("RainbowTest", true)`: a rainbow, by day.
+- `require(game.ServerScriptService.ForestService).WakeElder("starter")`:
+  an Elder oak now.
+- `require(game.ServerScriptService.ForestService).Strike(Vector3.new(0, 0, -110))`:
+  lightning hits the nearest tree to that point.
+- `workspace:SetAttribute("Vitality_starter", 85)` on the client view
+  re-scatters the Starter Forest's decoration as a thriving grove (the
+  server's own vitality is unchanged).
+- In chat (Studio only): `/giveaxe inferno` (any part of an axe's name)
+  gives a temporary axe.
+
+### Sounds to pick
+
+Some new sounds have no id yet and stay silent until you pick one (Toolbox
+> Audio, Creator = Roblox, right-click > Copy Asset ID, paste as
+`"rbxassetid://<id>"` in `Shared/SoundData.luau`): **BirdsDay,
+CricketsNight, WindHowl, LavaRumble, Wings, Quack, StormCrackle, Engine**.
+An id that fails to load is just silent (a warning in Output).
+
+### Playtest checklist
+
+**Start-up and the world**
+- [ ] Output: `[MapBuilder] Terrain n/n` lines, then `World built in ...s`,
+      with no errors from MapBuilder, TerrainBuilder, NPCService,
+      ForestService or any controller (`[Client] X failed to start` means a
+      controller died; paste it)
+- [ ] You spawn on the cobbled pad at the town, standing on solid ground
+      (nobody spawns into the void while the terrain is still building)
+- [ ] Fly around (or drive): hills, the river from the Skyroot's
+      waterfall to the lake, the beach and the island, the Snowfields up
+      north, the Volcano north-east, the Phantom Grove's hollow south-west,
+      mountains round the edge; roads reach each biome with a signpost
+- [ ] Nothing floats or is buried: trees, boulders, signposts, the
+      Skyroot's roots, buildings (the town is flat at y 0)
+- [ ] The invisible walls at the world's edge stop you
+
+**The town**
+- [ ] From the spawn: the sawmill straight ahead with "SELL LOGS HERE" on
+      the pad reading upright (if it's upside down: remove the
+      `* ANG(0, PI, 0)` in `BuildingArt.SellPad`), the Tool Shed barn to
+      the left, the Dealership to the right, Hearth & Home past the Tool
+      Shed, the gondola station behind, Murph's camp by the spawn
+- [ ] The sawmill's big blade spins; smoke rises from its smokestack and
+      Hearth & Home's chimney; the campfire flickers
+- [ ] Each shop: walk in through the front; **Browse** appears before the
+      counter; the keeper (Tink, Dale, Hazel) stands behind the counter,
+      not inside a wall
+- [ ] Drive a truck from your parking slot onto the sell pad, and out to
+      the Starter Forest and the Hills road: no lamp post, fence, bench or
+      crate in the way (they collide on purpose)
+- [ ] The Sky Bin (blue, with a cloud and a flume behind it) shows your
+      own count, e.g. "SKY BIN 0/30"
+- [ ] At night: lamps come on one by one from about 18:40, windows glow,
+      some go dark after midnight; by day windows are blue glass
+
+**Trees and chopping**
+- [ ] Hold an axe and point at a tree: a cream outline on the one you'd
+      chop (amber if your axe is too weak); out of reach (about 12 studs
+      from the bark), no outline
+- [ ] Each swing: a whoosh at once, then the thunk, wood chips and a
+      wobble; the last hit: a creak, the tree falls away from you, the
+      ground shakes a little, logs lie along where it fell, a stump stays
+- [ ] Felled trees regrow after their wood's time (the stump goes, the
+      tree grows up from it); a planted one regrows at once (below)
+- [ ] Trees sway in the wind (harder in storms); a tree you're chopping
+      doesn't
+
+**Trucks** (Vehicles)
+- [ ] Your Rustbucket is in your slot, wheels on the ground; **Drive**
+      (E) seats you
+- [ ] Two players: player 2 has no Drive prompt on your truck; if they
+      sit in it anyway, they're put out with a toast
+- [ ] Drive with WASD, a gamepad and a phone thumbstick: smooth, no
+      rubber-banding (also with Studio's network latency turned up); the
+      truck leans with the ground, up to about 30°
+- [ ] Wheels roll and the front ones steer; dust behind on dirt, sand
+      and snow (not grass); exhaust puffs with throttle (the Rustbucket
+      smokes and coughs); headlights at night; taillights brighten when
+      braking
+- [ ] Get out at speed and on a slope: it brakes, parks upright on the
+      ground within about 1.5 s, and you land beside the driver's door
+- [ ] Load logs: they appear in the bed with pale ends (figured ones keep
+      their coloured band); leave and rejoin: the same logs are back, and
+      the bed count is right even when the truck is far away
+- [ ] Every truck and trailer from the Dealership looks right and fits its
+      slot; buying a trailer on the Scout ATV says it can't tow
+
+**Townsfolk and axes**
+- [ ] Murph stands in front of his campfire facing the spawn; his name
+      tag shows; he breathes, blinks, turns his head to follow you and
+      waves when you come close (if nobody ever moves, tell me: the
+      animation needs a Studio check); his **Talk** prompt works
+- [ ] After the tutorial, townsfolk greet you and say a line in a bubble
+      now and then (with a soft click)
+- [ ] Millie by the sell pad, Gus by the gondola, and the walkers (Rosa
+      west of the plaza, Pip east, Old Bram by the street) don't block
+      prompts or bump you; two clients see the walkers in about the same
+      place
+- [ ] `/giveaxe` each axe: each looks different, held near the foot of the
+      haft, blade forward; the Inferno and Starfall axes glow and sparkle;
+      a dropped axe lies flat and **Pick up** works
+
+**Light, weather and wildlife** (Environment)
+- [ ] Two clients show the same time of day; the sun moves smoothly
+- [ ] A full day looks right: pink-gold dawn, clear midday, warm golden
+      hour, purple dusk, dark-blue night where lamps stand out (tune
+      `EnvironmentData.Keyframes` by eye)
+- [ ] Walk into the Volcano (red haze) and the Phantom Grove at night
+      (very dark violet): the light crossfades over about 3 s; on the
+      isles: bright, low haze, a slight far blur
+- [ ] Force `Rain`: rain streaks (if they look like blobs, see the env
+      notes in `WeatherController`), the rain sound, a darker sky; `nil`
+      fades it out
+- [ ] Force `Storm` in the Starter Forest: a bolt every 20 to 50 s, never
+      in town: a crackle ring first, then the bolt, a flash, thunder late
+      with distance; a struck tree glows blue with sparks and a toast
+- [ ] Storm on the Snowfields: blizzard; at the Volcano: ash and embers;
+      on the isles: golden motes and wind; `Fog` at night: ground mist
+- [ ] Clear night on the Snowfields: an aurora to the north
+- [ ] Decoration round you: grass, flowers, ferns, bushes, rocks, berry
+      bushes, fallen logs, snow piles at the Snowfields, lava rocks at the
+      Volcano, glowing mushrooms in the grove, reeds and cattails by the
+      water, lily pads on the lake and the pond; none on roads, in town or
+      inside trunks; driving fast, it loads in without hitches
+- [ ] Wildlife: a flock overhead that scatters when you walk under it,
+      songbirds that fly off when you come close, butterflies, rabbits and
+      deer that bound away, ducks on the pond (78, -182), fish leaping;
+      at night fireflies, wisps in the grove, ember sprites at the Volcano
+- [ ] Sound: music crossfades at dusk and dawn; the river follows the
+      nearest water; the waterfall roars near the Skyroot
+- [ ] ♪ (left of the cash) > Music OFF fades the music out, SOUND FX OFF
+      silences effects; both stay that way after rejoining
+
+**The Living Forest**
+- [ ] Workspace attributes on start: `Vitality_starter` = 60 and
+      `VitalityTier_starter` = "Healthy" (also hills, snow, volcano, grove)
+- [ ] About 1 tree in 16 wears a bark clue (wavy pale strips = curly, dark
+      eyes = birdseye, scaly plates = quilted, a knobbly lump at the foot =
+      burl); clicking the clue still chops the tree
+- [ ] Fell a tree: a glowing Heartseed arcs into you with a pop and the
+      pouch chip under the clock counts it (first time: a toast)
+- [ ] Tutorial: after your first sale Murph asks you to plant a Heartseed;
+      the beacon points at the nearest stump you have a seed for;
+      **Plant Heartseed (1)** (F / Y) grows a sapling for 8 s, then the
+      tree springs up with your name on a stake
+- [ ] Can't plant without a seed of that wood, twice on a sprouting stump,
+      from far away, or in an Elder's stump
+- [ ] Two players: A plants, B fells it: A gets "Your oak was harvested by
+      B: +$..." ; A felling their own planted tree gets an extra seed
+- [ ] Figured logs carry a coloured band (in hand, on the ground and in the
+      truck bed); selling them shows a stamp ("BURL x4!") and pays more;
+      the Field Guide's Hidden Grain page counts them
+- [ ] `WakeElder("starter")`: a giant oak on open ground with a glowing
+      ring and a light pillar, a server-wide toast and a marker from town;
+      felled by two players: both get paid and 2 seeds, its logs are free
+      to grab; left alone it fades after 15 min
+- [ ] Replant until a grove reaches Thriving (75+): entering it says "a
+      thriving grove: more figured wood"; more flowers and wildlife there
+- [ ] Every grove at 80+: the Skyroot blooms with golden motes and a toast
+- [ ] Daily goals can include "Plant N Heartseeds" and "Sell N figured logs"
+
+**The Skyroot and the isles**
+- [ ] From town the Skyroot reads as a giant tree with the isles in its
+      crown and the waterfall pouring off one; at night its canopy and
+      vines glow
+- [ ] Ride the gondola from town and from the Skyroot's foot: the cabin
+      never clips a root, limb, leaf or station roof
+- [ ] On the isles: tops are flat and solid to the rim; bridges walkable
+      with lanterns at each end; the Cloud Chute's flume runs off the edge;
+      figured logs go down the chute too and sell at their worth from the
+      Sky Bin
+- [ ] Featherfall Cloak: step off an isle: it opens about 15 studs down,
+      you drift down at a steady speed and can steer, and it closes when
+      you land; without it, the logs in your hands are lost to the clouds
+- [ ] Reset (respawn) while on the isles: no "You fell!" toast in town
+- [ ] The Starfall Forge refuses with "You own 20 axes" when you're at the
+      axe limit, before taking anything
+
+**Feel, UI and money**
+- [ ] Sell a load: the cash counts up, "+$..." floats left of the plaque,
+      the paper flashes green; buying shows "-$..." in ink
+- [ ] Top right on a phone and at 1080p: Store, clock, ♪ and the cash
+      plaque in a row with no overlaps, even at $1,999,999; the Heartseed
+      pouch and the Daily Goals button below don't overlap
+- [ ] Two logs in hand: drop one by selling the other, pick up again: the
+      new log never sits inside the old one
+- [ ] Lava doesn't burn you inside a truck or mid-jump
+- [ ] A Robux cash pack near the wallet cap (test purchase): the part
+      that fits arrives now, the rest says it's saved and arrives as you
+      spend
+- [ ] Mined Sky Shard crystals vanish with their glow and grow back
+
+**Performance** (Studio's device emulator, phone size, MicroProfiler)
+- [ ] Town at night with every lamp lit, the lot full of trucks: smooth
+- [ ] AmbientLife + WindSway under about 1 ms a frame; NPCController well
+      under 0.5 ms (if decoration is heavy: lower `MAX_DECOR` in
+      AmbientLife or `EnvironmentData.DecorCandidates`)
+- [ ] The Skyroot, isles and cloud banks in view: still smooth
 
 ## Axe shop (GAME_DESIGN §8 phase 2)
 
@@ -159,8 +427,8 @@ test account), progress starts fresh each Play session.
       is back in your spot with its load; pressing again right away says to wait
 - [ ] Phone (device emulator): drive with the thumbstick; the Truck to lot
       button doesn't cover the jump button
-- [ ] A second player (Test → 2 players) can drive your truck, and it moves
-      smoothly for both
+- [ ] A second player (Test → 2 players) sees your truck move smoothly, but
+      can't drive it: trucks are owner-only since the redesign
 - [ ] Output has no `[AntiExploit] … truck moved` warnings during normal driving
       (if it does, tell Claude: the speed check is too strict)
 - [ ] If physics driving feels bad: set `VehiclePhysics = false` and report

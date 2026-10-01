@@ -780,6 +780,11 @@ Playtest in Studio, checklist passes, zero console errors, commit as
 
 ## 16. The Living Forest (the twist; added October 2026)
 
+**Built (October 2026):** everything in this section except "Next" is in
+the game (ForestData holds every number below; ForestLogic the rules;
+ForestService, ForestUI and ForestArt the rest). The numbers are a first
+pass for playtesting.
+
 Research (REDESIGN.md) found that weather mutations with multipliers are
 saturated, including in our own genre (*Chop Your Tree*). What no lumber
 game does is make the forest **respond to you**. Timberline's twist: you
@@ -871,3 +876,43 @@ goes.
   Plots stay hands-on (tended while online), per §9.
 - **Skyroot Rising:** cross-server weekly goals (offer wood and seeds at the
   roots) that grow new branch isles, once there are players to drive it.
+
+## 17. Art and world, v2 (October 2026)
+
+The redesign replaced every placeholder with art built in code
+(`Shared/Art`, previewed with `tools/preview` without Studio) and put the
+world on generated terrain. REDESIGN.md has the rules and contracts.
+
+**Style.** Cozy low-poly, as §13: chunky faceted shapes, warm saturated
+colour, each wood with its own silhouette and canopy palette (oak's broad
+crown, birch's pale trunk, pine's tiers, maple's autumn fire, frostwood's
+snow caps, emberwood's glowing cracks, phantomwood's violet glow,
+lumenwood's light), readable at 50 studs. Buildings stand on stone
+plinths with board-by-board plank walls, shingled roofs and warm windows.
+Trucks tell their story: the Rustbucket is held together by hope (a
+primer-green door, a dented fender, a rope-tied tailgate, heavy smoke),
+the Logging Rig gleams. Decoration never collides; what you bump into
+does.
+
+**The world** (about 3,000 studs square, `Shared/World`):
+- The **town** sits flat at the centre: the sawmill at (0, 110) with the
+  sell pad and Sky Bin in front, the Tool Shed, Dealership and Hearth &
+  Home along a dirt main street, the gondola station behind, Murph's camp
+  by the spawn at (0, 40), the parking lot to the east and the plot
+  district beyond it.
+- **Biomes** ring it, each reached by a dirt road with a signpost: the
+  Starter Forest just south, the Hills west, the Snowfields plateau far
+  north, the Volcano's cone in the north-east corner, the Phantom Grove
+  hidden in a hollow south-west (no road), the coast and an island to the
+  east, a lake south-west, mountains round the edge.
+- The **Skyroot** rises in the north-west: a colossal tree whose limbs
+  hold the four Aether Isles; its waterfall feeds the river that winds
+  past the town to the lake.
+
+**A living place.** A 20-minute day with keyframed light per biome and
+weather; weather from a shared schedule (storms strike real trees, §16);
+town lamps and windows that light up at dusk; wind that sways the trees;
+client-side decoration and wildlife that thicken as groves thrive; nine
+townsfolk with routines (Murph, three shopkeepers, Millie at the mill, Gus
+at the gondola, three walkers); ambient sound and music by time of day.
+

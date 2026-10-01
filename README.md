@@ -5,9 +5,10 @@
 A cozy low-poly lumber tycoon for Roblox: chop trees, haul logs, sell them
 at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 
-- **What the game is:** [GAME_DESIGN.md](GAME_DESIGN.md)
+- **What the game is:** [GAME_DESIGN.md](GAME_DESIGN.md) (the Living Forest twist: §16; art and world: §17)
+- **The October 2026 redesign (rules, contracts, status):** [REDESIGN.md](REDESIGN.md)
 - **Where Phase 1 stands:** [PHASE1_NOTES.md](PHASE1_NOTES.md)
-- **What's being built next, and how to test it:** [PHASE2_NOTES.md](PHASE2_NOTES.md)
+- **How to test everything in Studio:** [PHASE2_NOTES.md](PHASE2_NOTES.md)
 - **Everything V1 needs, and where it stands:** [V1_PLAN.md](V1_PLAN.md)
 - **How fast the economy runs:** [ECONOMY.md](ECONOMY.md) (generated; re-run with `lune run tools/economy`)
 
@@ -79,8 +80,12 @@ measure the economy model against your real play (saved in
   starts with `--!strict` so type mistakes are caught before Studio.
 - **The server owns the truth** (cash, logs, tree HP). Clients only send
   requests ("chop this tree"), and the server checks every one.
-- The Phase 1 world is built from code (`MapBuilder`). The art-directed
-  world will be built in Studio later (see GAME_DESIGN §14.7).
+- The whole world is built from code when the server starts: terrain from
+  `Shared/World`, every model from `Shared/Art` (pure modules, so
+  `tools/preview` can draw them without Studio). See REDESIGN.md.
+- **See models without Studio:** `lune run tools/preview/export trees`
+  (or town, trucks, world, ... ; run it with no name to list them) writes
+  `preview/<scene>.html`; open it in a browser and drag to look around.
 
 ## Layout
 
@@ -104,6 +109,11 @@ measure the economy model against your real play (saved in
   - `CarryService`: the logs in each player's hands
   - `PlotService`: the plot district, claiming, placing, moving, selling
     back and growing plots
+  - `MapBuilder` + `TerrainBuilder`: build the world at start-up (terrain,
+    town, trees, the Skyroot and isles)
+  - `ForestService`: the Living Forest (Heartseeds, planting, the planter's
+    share, grove vitality, figured wood, storm strikes, Elders, the Bloom)
+  - `WeatherService`: the weather and lightning; `NPCService`: the townsfolk
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)
   - `GameConfig`: ranges, cooldowns, capacities, sound ids
@@ -117,15 +127,33 @@ measure the economy model against your real play (saved in
   - `ForgeLogic`: what forging the Starfall Axe takes
   - `PlotData`, `PlotLogic`, `BlueprintModels`: plot tiers and blueprints
     (tune here), where a blueprint may go, and how each one is built
+  - `Art/`: every model, built in code (`Kit` helpers; `TreeArt`,
+    `BuildingArt`, `TruckArt`, `IsleArt`, `PropArt`, `CharacterArt`,
+    `AxeArt`, `ForestArt`, `CritterArt`)
+  - `World/`: the world's shape (`WorldLayout` zones and roads,
+    `TerrainGen` heights and materials, `WorldPlan` where everything goes)
+  - `TreeLogic`: tree sizes, how trees fall, where logs land
+  - `ForestData`, `ForestLogic`: the Living Forest's numbers and rules
+  - `EnvironmentData`, `WeatherSchedule`: light per hour/biome/weather,
+    decoration and wildlife rules, the weather schedule
+  - `NPCData`: the townsfolk (looks, spots, routes, lines)
+  - `VehicleLogic`: truck rules (speed check, tilt, parking, wheels)
+  - `SoundData`: every sound, by name
   - `Net`: remote names; `Util`: helpers
 - `src/StarterPlayer/StarterPlayerScripts`: client (UI, input, effects;
   `ShopUI` is the Tool Shed and Dealership screen, `QuestUI` the tutorial
-  tracker, `VehicleController` drives your truck, `DailyUI` the daily goals,
-  `WorldUI` biome names and the clock, `StoreUI` the Robux Store,
-  `PlotUI` build mode and the Blueprint Store, `BlueprintPlacer` the ghost
-  preview)
+  tracker, `VehicleController` drives your truck and `VehicleFX` animates
+  every truck, `DailyUI` the daily goals, `WorldUI` biome names and the
+  clock, `StoreUI` the Robux Store, `PlotUI` build mode and the Blueprint
+  Store, `BlueprintPlacer` the ghost preview, `ForestUI` the Living
+  Forest, `SettingsUI` music and sound settings, `ChopController` and
+  `TreeFX` chopping and falling trees, `LightingController`,
+  `WeatherController`, `AmbientLife`, `WindSway`, `AmbientSound` and
+  `TownFX` the living world, `NPCController` the townsfolk)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
+- `tools/preview/`: the model preview (Lune export + a three.js viewer;
+  one scene per file in `tools/preview/scenes`)
 - `tests/`: unit tests, run with Lune outside Roblox (`tools/loader.luau`
   fakes just enough of Roblox to load game modules)
 - `scripts/check.sh`: formatter, linter, type checks, tests

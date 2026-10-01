@@ -22,12 +22,13 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 ## Must have for V1
 
 ### 0. Prove the core (blocks everything else feeling right)
-- 🟡 Phase 1 core loop on `main` (PHASE1_NOTES.md checklist)
-- 🟡 Phase 2+ branch (PHASE2_NOTES.md checklists), then merge to `main`
+- 🟡 Phase 1 core loop (PHASE1_NOTES.md checklist)
+- 🟡 Phase 2+ and the October 2026 redesign, all on `main` now
+  (PHASE2_NOTES.md checklists, "The redesign" first)
 - ⬜ Calibrate EFFICIENCY from a real 10-minute session (stopwatch line →
   `lune run tools/economy --calibrate …`), then re-check ECONOMY.md
 
-### 1. Core systems (🟡 on the branch)
+### 1. Core systems (🟡 on `main`)
 - 🟡 Saving (ProfileStore), wallet cap, anti-exploit rate limits
 - 🟡 Axes as items + the Tool Shed
 - 🟡 Trucks, the Dealership, physics driving, Truck to lot
@@ -44,8 +45,13 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
   night
 - 🟡 Day/night cycle, the same on every server
 - 🟡 Hearth & Home: the gear shop (Lantern, Insulated Coat, Heat Boots)
-- Placeholder art: every biome is code-built parts until the Studio art
-  pass (item 9)
+- 🟡 The world on generated terrain (hills, river, lake, coast, the
+  Snowfields plateau, the Volcano's cone, the grove's hollow, mountains)
+  with real art for every tree, building and prop (REDESIGN.md)
+- 🟡 A living environment: keyframed light per hour, biome and weather;
+  the weather schedule with storms and lightning; decoration, wildlife,
+  wind and ambient sound (REDESIGN.md)
+- 🟡 The townsfolk: Murph and eight others with routines (NPCData)
 
 ### 3. Hauling upgrades on the path
 - 🟡 Trailers (Pony, Ranch, Heavy Hauler): bought at the Dealership, hitched
@@ -61,8 +67,10 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
   Cloak (glide instead of losing your logs when you fall)
 - 🟡 Materials inventory (Sky Shards) and the Starfall Axe forge (on the
   main isle for V1)
-- ⬜ Isle hazards: wind gusts and lightning (GAME_DESIGN §10); left out of
-  the first pass
+- 🟡 The Skyroot as a colossal tree holding the isles, the waterfall,
+  cloud banks, rope bridges
+- 🟡 Isle weather: wind and golden motes; lightning strikes there are
+  marked but harmless for now (a design call, REDESIGN.md)
 
 ### 5. The Field Guide (GAME_DESIGN §11 beat 7, §13)
 - 🟡 A journal of every wood: silhouettes until you find it, then its facts
@@ -70,6 +78,13 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 - 🟡 Murph hands it over at the end of the tutorial
 - ⬜ A worn-journal look (GAME_DESIGN §13) in the art pass; for now it uses
   the shop panel
+
+### 5b. The Living Forest (GAME_DESIGN §16; the twist, in V1)
+- 🟡 Heartseeds, planting in stumps, the planter's share
+- 🟡 Grove vitality and tiers, Elder trees, the Skyroot Bloom
+- 🟡 The Hidden Grain (figured wood, bark clues, the sawmill's reveal,
+  the Field Guide's page), storm-struck trees and Stormgrain
+- ⬜ Genes and breeding on Sapling Plots, then Skyroot Rising (§16 "Next")
 
 ### 6. Plots and the empire (GAME_DESIGN §9, §10; in V1)
 Slices, in order:
@@ -115,15 +130,18 @@ Slices, in order:
   must be created in Creator Hub; its id goes in `Shared/StoreData.luau`.
 
 ### 9. Launch polish (phase 9)
-- ⬜ Sounds: chop, fell, sell, buy, UI clicks; a music toggle
-- ⬜ Settings menu (music, sound effects)
+- 🟡 Sounds: chop, fell, sell, buy, UI clicks, ambience and music
+  (SoundData). ⬜ Pick ids for the silent ones (REDESIGN.md, Status)
+- 🟡 Settings menu (music, sound effects), saved with the profile
+- 🟡 Feel: the chop target outline, the cash count-up and "+$" pops,
+  camera shake when a tree lands
 - 🟡 UI pass from the Claude Design spec: HUD, side buttons, shop panel,
   tutorial and Murph cards, beacon, custom prompts, console and phone
   sizes (UITheme). Still to do: upload the wood-grain and kraft textures
 - ⬜ Icon and thumbnail: layouts are in the UI spec (6a/6b, 7a/7b); they
   need Studio renders of a big pine, an axe and a loaded Logging Rig
-- ⬜ Art pass on the code-built placeholders: trees, buildings, trucks
-  (GAME_DESIGN §13, §14.7), at least the starter area and sawmill
+- 🟡 Art pass: every tree, building, truck, axe, person, prop and isle
+  rebuilt in code (GAME_DESIGN §17); ⬜ tune by eye in Studio
 - ⬜ Phone pass: every screen on a small phone, performance with many trees
 - ⬜ Roblox settings: maturity questionnaire, devices, StreamingEnabled
   checked, API access, a fresh DataStore name for launch (wipe test saves)
