@@ -7,6 +7,8 @@
 --     stays clear of something drawn over it (the cash row over the shop).
 --   * ToastLane(): where the toasts stack, clear of the top-right corner
 --     and the left column (the tutorial tracker).
+--   * ModalLane(): where they stack while a panel (the shop) is open over
+--     the game: inside its bottom edge, clear of its title and buttons.
 --   * ClockLine(): which corner line the clock goes in.
 -- Everything is in a screen's offsets (UIScale units), y down.
 
@@ -115,8 +117,18 @@ end
 -- Where the toasts stack (newest on top): a strip of screen from `top`
 -- down to `bottom`, `right - left` wide (the widest a toast may be), that
 -- holds `max` toasts at once; `under` when it's under the left column
--- (toasts left-aligned there) rather than centred at the top.
-export type Lane = { left: number, top: number, right: number, bottom: number, max: number, under: boolean }
+-- (toasts left-aligned there) rather than centred at the top; `modal`
+-- when it's inside an open panel (ModalLane: left-aligned, and the stack
+-- grows up from `bottom` instead of down from `top`).
+export type Lane = {
+	left: number,
+	top: number,
+	right: number,
+	bottom: number,
+	max: number,
+	under: boolean,
+	modal: boolean,
+}
 
 local LANE_GAP = 8 -- between the lane and what it keeps clear of
 local LANE_TOASTS = 3 -- toasts at once in a lane at the top
@@ -160,6 +172,7 @@ function HudLayout.ToastLane(
 			bottom = bottom,
 			max = LANE_TOASTS,
 			under = false,
+			modal = false,
 		}
 	end
 	-- Under the column (or, with none yet, from the top-left margin).
@@ -183,6 +196,41 @@ function HudLayout.ToastLane(
 		bottom = bottom,
 		max = math.clamp(fits, 1, UNDER_TOASTS),
 		under = true,
+		modal = false,
+	}
+end
+
+local MODAL_INSET = 20 -- a panel's frame (8) and its rows' padding (12): the lane lines up with the rows
+local MODAL_BUTTONS = 140 -- the strip down a panel's right side with the rows' buttons (ShopUI: 100 wide, 90 on a phone, and 40 of padding and frame)
+local MODAL_PHONE_TOASTS = 1 -- toasts at once in a panel on a phone
+
+-- The toast lane while a panel (the shop, HUD.SetModal) is open over the
+-- game, `panel` in the same screen's offsets: inside the panel, LANE_GAP
+-- above its bottom edge, the stack growing upward from there (`modal`).
+-- It lines up with the panel's rows on the left and ends left of their
+-- buttons, `maxW` wide at most; a panel too narrow for `minW` there gets
+-- `minW` (over the buttons if it must). One toast on a phone; elsewhere up
+-- to three, and never above the panel's middle, so its title and subtitle
+-- stay clear.
+function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boolean): Lane
+	local left = panel.left + MODAL_INSET
+	local right = math.min(left + maxW, panel.right - MODAL_BUTTONS - LANE_GAP)
+	if right - left < minW then
+		right = math.max(left, math.min(left + minW, panel.right - MODAL_INSET))
+	end
+	local bottom = panel.bottom - LANE_GAP
+	local middle = (panel.top + panel.bottom) / 2
+	local max = if phone
+		then MODAL_PHONE_TOASTS
+		else math.clamp(math.floor((bottom - middle + LANE_GAP) / TOAST_ROW), 1, LANE_TOASTS)
+	return {
+		left = left,
+		top = bottom - max * TOAST_ROW,
+		right = right,
+		bottom = bottom,
+		max = max,
+		under = false,
+		modal = true,
 	}
 end
 

@@ -9,12 +9,16 @@
 --     centred at the top between them on a computer or a TV, up to three;
 --     on a phone, where there's no room between them, under the tutorial
 --     tracker at its width, up to two. Amounts of money show in green.
+--     While a panel is open over the game (the shop: HUD.SetModal), they
+--     move inside its bottom edge instead, stacking upward, clear of its
+--     title and its Buy buttons; one at a time on a phone
+--     (HudLayout.ModalLane).
 --   * A one-line control hint at the bottom (above Roblox's tool hotbar),
 --     worded for the device in use and for what you're doing
 --     (Shared/HintLogic): chopping, carrying logs (the CarriedLogs
 --     attribute), driving (Humanoid.Seated in a VehicleSeat), standing in
 --     the sell zone, or a mode a controller sets (HUD.SetHintContext:
---     placing a blueprint).
+--     placing a blueprint). It hides while a panel is open (HUD.SetModal).
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
@@ -100,6 +104,7 @@ local toastOrder = 0
 local toastWidth = TOAST_WIDTH -- the lane's width
 local maxToasts = MAX_TOASTS -- how many the lane holds
 local laneQueued = false
+local modalRect: HudLayout.Rect? = nil -- an open panel (HUD.SetModal), in screen pixels
 local hudGui: ScreenGui? = nil
 local leftColumn: Frame? = nil -- UITheme's left column (the tracker), once it exists
 local hintLabel: TextLabel? = nil
@@ -247,18 +252,9 @@ local function rectIn(gui: ScreenGui, obj: GuiObject): HudLayout.Rect
 	return boxIn(gui, obj.AbsolutePosition, obj.AbsolutePosition + obj.AbsoluteSize)
 end
 
--- Puts the toasts' lane clear of the corner and the left column, for
--- their sizes right now (HudLayout.ToastLane).
-local function placeToasts()
-	laneQueued = false
-	local gui, stack, list, corner = hudGui, toastStack, toastList, shelf
-	if not gui or not stack or not list or not corner then
-		return
-	end
-	local screen = gui.AbsoluteSize / UITheme.Scale()
-	if screen.X <= 0 or screen.Y <= 0 then
-		return -- not laid out yet
-	end
+-- The toasts' lane at the top, clear of the corner and the left column,
+-- for their sizes right now (HudLayout.ToastLane).
+local function laneAtTop(gui: ScreenGui, corner: Frame, screen: Vector2): HudLayout.Lane
 	local column = leftColumn
 	local columnRect = if column and column.Parent then rectIn(gui, column) else nil
 	-- Off a phone the column hangs under Roblox's chat window: keep the
@@ -277,7 +273,7 @@ local function placeToasts()
 			else chat
 	end
 	local _, bottomMargin = UITheme.Margin()
-	local lane = HudLayout.ToastLane(
+	return HudLayout.ToastLane(
 		screen,
 		rectIn(gui, corner),
 		columnRect,
@@ -285,11 +281,39 @@ local function placeToasts()
 		TOAST_LANE_MIN,
 		screen.Y - bottomMargin
 	)
+end
+
+-- Puts the toasts' lane at the top (laneAtTop), or while a panel is open
+-- inside its bottom edge (HudLayout.ModalLane), growing upward there.
+local function placeToasts()
+	laneQueued = false
+	local gui, stack, list, corner = hudGui, toastStack, toastList, shelf
+	if not gui or not stack or not list or not corner then
+		return
+	end
+	local screen = gui.AbsoluteSize / UITheme.Scale()
+	if screen.X <= 0 or screen.Y <= 0 then
+		return -- not laid out yet
+	end
+	local modal = modalRect
+	local lane = if modal
+		then HudLayout.ModalLane(
+			boxIn(gui, Vector2.new(modal.left, modal.top), Vector2.new(modal.right, modal.bottom)),
+			TOAST_WIDTH,
+			TOAST_LANE_MIN,
+			UITheme.IsPhone()
+		)
+		else laneAtTop(gui, corner, screen)
 	toastWidth = lane.right - lane.left
 	maxToasts = lane.max
-	stack.Position = UDim2.fromOffset(lane.left, lane.top)
+	-- A modal lane's stack hangs from its bottom edge, so newer toasts
+	-- (on top) push it up and the older ones stay put.
+	stack.AnchorPoint = if lane.modal then Vector2.new(0, 1) else Vector2.zero
+	stack.Position = UDim2.fromOffset(lane.left, if lane.modal then lane.bottom else lane.top)
 	stack.Size = UDim2.fromOffset(toastWidth, 0)
-	list.HorizontalAlignment = if lane.under then Enum.HorizontalAlignment.Left else Enum.HorizontalAlignment.Center
+	list.HorizontalAlignment = if lane.under or lane.modal
+		then Enum.HorizontalAlignment.Left
+		else Enum.HorizontalAlignment.Center
 	while #toasts > maxToasts do
 		removeToast(toasts[#toasts])
 	end
@@ -447,6 +471,26 @@ end
 function HUD.SetHintContext(context: HintLogic.Context?)
 	hintForced = context
 	refreshHint()
+end
+
+-- The hint shows unless a panel is open over the game.
+local function refreshModal()
+	local hint = hintLabel
+	if hint then
+		hint.Visible = modalRect == nil
+	end
+end
+
+-- A panel open over the game (ShopUI: the shops, the Store, the Field
+-- Guide), as its box in screen pixels (AbsolutePosition and
+-- AbsolutePosition + AbsoluteSize), or nil once it's closed. While one is
+-- open the hint hides and the toasts move inside the panel's bottom edge
+-- (HudLayout.ModalLane), so they never cover its title or its buttons.
+-- Safe to call before HUD.Start: it applies once the HUD is built.
+function HUD.SetModal(rect: HudLayout.Rect?)
+	modalRect = if rect then table.clone(rect) else nil
+	refreshModal()
+	queueToasts()
 end
 
 -- The hint's sources: sitting in a driver's seat (re-hooked on every
@@ -758,6 +802,7 @@ local function buildHint(gui: ScreenGui)
 	max.MaxSize = Vector2.new(320, 30)
 	max.Parent = hint
 	hintLabel = hint
+	refreshModal() -- a panel may already be open (HUD.SetModal before HUD.Start)
 end
 
 local function buildCorner(playerGui: Instance)

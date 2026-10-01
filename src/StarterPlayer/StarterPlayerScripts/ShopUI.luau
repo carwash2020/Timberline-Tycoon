@@ -16,8 +16,11 @@
 -- panel, and B on a gamepad. Looks per the UI spec (02, UITheme): a dimmed
 -- screen behind a wood-framed paper panel; while it's open you can't walk.
 -- The panel keeps clear of the HUD's cash row, which is drawn over it (on
--- a phone it moves left of the row). On a gamepad the first Buy button is
--- selected when it opens.
+-- a phone it moves left of the row). While it's open the HUD knows where
+-- it is (HUD.SetModal), so its hint hides and its toasts sit inside the
+-- panel's bottom edge, off the title and the Buy buttons; every way of
+-- closing goes through ShopUI.Close, which tells the HUD it's gone. On a
+-- gamepad the first Buy button is selected when it opens.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -489,6 +492,18 @@ local function fitArea()
 	a.Size = UDim2.fromOffset(fit.right - fit.left, fit.bottom - fit.top)
 end
 
+-- Tells the HUD where the open panel is on screen (HUD.SetModal): on
+-- opening, and whenever it moves or resizes while open (fitArea, a turned
+-- phone), so the HUD's toasts follow it.
+local function reportModal()
+	local p = panel
+	if not openShop or not p then
+		return
+	end
+	local at, size = p.AbsolutePosition, p.AbsoluteSize
+	HUD.SetModal({ left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y })
+end
+
 local function open(shop: Shop)
 	local g, p, scroll = gui, panel, list
 	if not g or not p or not scroll then
@@ -512,6 +527,7 @@ local function open(shop: Shop)
 	end
 	g.Enabled = true
 	fitArea()
+	reportModal()
 	local prompt = prompts[shop]
 	if prompt then
 		prompt.Enabled = false
@@ -548,6 +564,7 @@ function ShopUI.Close()
 		return
 	end
 	openShop = nil
+	HUD.SetModal(nil) -- the hint comes back and the toasts go back up top
 	local g, p = gui, panel
 	if g then
 		g.Enabled = false
@@ -687,6 +704,9 @@ local function buildPanel()
 			fitArea()
 		end
 	end)
+	-- Wherever the panel ends up once laid out, the HUD hears of it.
+	p:GetPropertyChangedSignal("AbsoluteSize"):Connect(reportModal)
+	p:GetPropertyChangedSignal("AbsolutePosition"):Connect(reportModal)
 	g.Parent = player:WaitForChild("PlayerGui")
 end
 

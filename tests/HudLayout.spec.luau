@@ -282,6 +282,87 @@ return function(t)
 		t.eq(beside.right, mid.left - 8)
 	end)
 
+	-- A shop open over the game (UI-03). The panel as ShopUI places it (in
+	-- its screen's offsets, which ignore the top bar), moved into the HUD
+	-- screen's offsets (under the top bar), where the HUD works out the lane.
+	local PAPER, HEADER = 8, 14 + 30 + 2 + 16 + 10 -- ShopUI: the wood frame, the title and subtitle block
+	local function shopPanel(w, h, inset)
+		local area = HudLayout.ClearOf(areaOn(w, h), PANEL, cashRow(w, inset, 12), 8, 400)
+		local p = HudLayout.Centred(area, PANEL)
+		return { left = p.left, top = p.top - inset, right = p.right, bottom = p.bottom - inset }
+	end
+	-- The strip down the panel's right side with the rows' buttons: the
+	-- button (90 wide on a phone, 100 on a computer) inside the row's 12
+	-- padding, the list's 12 + 8 (the scroll bar) and the frame.
+	local function buttonsOf(panel, phone)
+		local right = panel.right - PAPER - 20 - 12
+		return {
+			left = right - (if phone then 90 else 100),
+			top = panel.top + PAPER + HEADER,
+			right = right,
+			bottom = panel.bottom,
+		}
+	end
+	local function checkModal(name, panel, lane, phone)
+		t.eq(lane.modal, true, name)
+		t.eq(lane.bottom, panel.bottom - 8, name .. ": 8 above the panel's bottom edge")
+		t.ok(lane.left >= panel.left and lane.right <= panel.right, name .. ": inside the panel")
+		t.ok(lane.top >= panel.top + PAPER + HEADER, name .. ": below the title and subtitle")
+		t.ok(clear(lane, buttonsOf(panel, phone), 8), name .. ": clear of the Buy buttons")
+		t.ok(lane.right - lane.left >= LANE_MIN, name .. ": wide enough for a toast")
+		t.ok(lane.bottom - lane.top >= lane.max * 34, name .. ": room for its toasts (34 each at least)")
+	end
+
+	t.test("a shop open on a 667 x 375 phone: one toast, inside the panel's bottom edge", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(667, 375 - inset)
+			local panel = shopPanel(667, 375, inset)
+			t.ok(panel.right - panel.left >= 400, "the panel as ShopUI fits it, left of the cash row")
+			-- The evidence: the lane under the tracker sits on the panel.
+			local corner = cornerOf(667, CASH, widths(POUCH, DAILY))
+			local under = HudLayout.ToastLane(screen, corner, columnOf(60, TRACKER), TOAST_W, LANE_MIN, screen.Y - 12)
+			t.ok(not clear(under, panel, 0), "today's lane is over the panel")
+			local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true)
+			checkModal("SE " .. inset, panel, lane, true)
+			t.eq(lane.max, 1, "one toast on a phone")
+			t.eq(lane.left, panel.left + PAPER + 12, "lined up with the rows")
+		end
+	end)
+
+	t.test("a shop open in a 1366 x 768 window: up to three, growing up from its bottom edge", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(1366, 768 - inset)
+			local panel = shopPanel(1366, 768, inset)
+			t.eq(panel.right - panel.left, 560, "the full-size panel")
+			-- The evidence: the lane at the top covers the panel's title.
+			local corner = cornerOf(1366, widths(STORE, CLOCK, CASH), widths(POUCH, DAILY))
+			local top = HudLayout.ToastLane(screen, corner, columnOf(250, TRACKER), TOAST_W, LANE_MIN, screen.Y - 12)
+			local title = {
+				left = panel.left + PAPER,
+				top = panel.top + PAPER,
+				right = panel.right - PAPER,
+				bottom = panel.top + PAPER + HEADER,
+			}
+			local reach = { left = top.left, top = top.top, right = top.right, bottom = top.top + top.max * 48 }
+			t.ok(not clear(reach, title, 0), "three toasts at the top reach the title")
+			local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, false)
+			checkModal("1366 " .. inset, panel, lane, false)
+			t.eq(lane.max, 3)
+			t.ok(lane.top >= (panel.top + panel.bottom) / 2, "in the panel's lower half")
+			t.eq(lane.right - lane.left, TOAST_W, "a full-width toast")
+		end
+	end)
+
+	t.test("a panel too narrow to keep clear of its buttons: the narrowest lane, still inside it", function()
+		local panel = { left = 100, top = 40, right = 400, bottom = 340 } -- 300 wide
+		local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true)
+		t.eq({ lane.left, lane.right }, { 120, 360 })
+		t.eq(lane.bottom, 332)
+		local tiny = HudLayout.ModalLane({ left = 0, top = 0, right = 100, bottom = 80 }, TOAST_W, LANE_MIN, false)
+		t.ok(tiny.right >= tiny.left and tiny.right <= 100, "never wider than the panel")
+		t.eq(tiny.max, 1, "a short panel takes one")
+	end)
+
 	t.test("the clock: beside the cash on a computer, line 2 on a phone, hidden there in the tutorial", function()
 		t.eq(HudLayout.ClockLine(false, 0), "beside")
 		t.eq(HudLayout.ClockLine(false, 3), "beside")
