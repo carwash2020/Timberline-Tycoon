@@ -167,6 +167,23 @@ return function(t)
 		end
 	end)
 
+	t.test("BiomeSignText: each road sign's name, woods and gear, as MapBuilder always wrote them", function()
+		t.eq(WorldPlan.BiomeSignText("hills"), "THE HILLS\npine · maple")
+		t.eq(WorldPlan.BiomeSignText("snow"), "SNOWFIELDS\nfrostwood\nBring: Insulated Coat") -- its slowdown's gear
+		t.eq(WorldPlan.BiomeSignText("volcano"), "THE VOLCANO\nemberwood\nBring: Heat Boots") -- the gear it needs
+		t.eq(WorldPlan.BiomeSignText("sky"), "AETHER ISLES\nlumenwood\nGondola to the Aether Isles")
+		t.eq(WorldPlan.BiomeSignText("starter"), "STARTER FOREST\noak · birch")
+		t.eq(WorldPlan.BiomeSignText("nowhere"), "nowhere", "an unknown biome reads as its id")
+		-- What each road's sign says (MapBuilder and the world preview pass it).
+		local texts = {}
+		for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+			texts[sign.text] = true
+		end
+		for _, id in ipairs({ "hills", "snow", "volcano", "sky" }) do
+			t.ok(texts[WorldPlan.BiomeSignText(id)], id .. " has its sign")
+		end
+	end)
+
 	t.test("boulders sit on gentle ground, sunk a little into it", function()
 		local boulders = WorldPlan.Boulders()
 		t.eq(#boulders, 90)
@@ -184,6 +201,40 @@ return function(t)
 		t.ok((WorldPlan.AlongPath(path, 0.5) - Vector3.new(10, 10, 0)).Magnitude < 1e-6, "halfway: up the second")
 		t.ok((WorldPlan.AlongPath(path, 1) - path[3]).Magnitude < 1e-6, "ends at the end")
 		t.ok((WorldPlan.AlongPath(path, 2) - path[3]).Magnitude < 1e-6, "past the end stays there")
+	end)
+
+	t.test("each Cloud Chute's flume leaves its trough's lip and runs out off its isle, down", function()
+		t.eq(#sky.chutes, #sky.isles)
+		for i, cf in ipairs(sky.chutes) do
+			local isle = sky.isles[i]
+			local from, to = WorldPlan.ChuteFlume(cf)
+			-- It starts at the far end of the chute's own trough (its Flume parts).
+			local atAnEnd, farthest = false, -math.huge
+			for _, p in ipairs(parts(placed(BuildingArt.CloudChute(), cf))) do
+				if p.Name == "Flume" then
+					for _, z in ipairs({ -p.Size.Z / 2, p.Size.Z / 2 }) do
+						local e = p.CFrame * Vector3.new(0, 0, z)
+						atAnEnd = atAnEnd or (e - from).Magnitude < 1e-3
+						farthest = math.max(farthest, cf:PointToObjectSpace(e).Z)
+					end
+				end
+			end
+			t.ok(atAnEnd, "isle " .. i .. ": the flume starts at a trough end")
+			t.ok(math.abs(cf:PointToObjectSpace(from).Z - farthest) < 1e-3, "isle " .. i .. ": the farthest-out one")
+			-- Outward: along the chute's +Z, which is the isle's own way out.
+			local d = to - from
+			t.ok(
+				(d - (cf.LookVector * -36 - Vector3.new(0, 60, 0))).Magnitude < 1e-3,
+				"isle " .. i .. ": 36 out, 60 down"
+			)
+			t.ok(Vector3.new(d.X, 0, d.Z).Unit:Dot(isle.dir) > 0.999, "isle " .. i .. ": out the isle's way")
+			local function fromMiddle(p)
+				return Vector3.new(p.X - isle.center.X, 0, p.Z - isle.center.Z).Magnitude
+			end
+			t.ok(fromMiddle(from) > isle.radius, "isle " .. i .. ": its lip hangs past the rim")
+			t.ok(fromMiddle(to) > fromMiddle(from) + 30, "isle " .. i .. ": it runs away from the isle")
+			t.ok(to.Y < from.Y - 50, "isle " .. i .. ": down into the clouds")
+		end
 	end)
 
 	-- The gondola: the stations as MapBuilder places them, the main isle and
