@@ -55,6 +55,18 @@ SoundData.Sounds = {
 	-- Ambience (loops)
 	Rain = { id = "rbxassetid://1516791621", volume = 0.35, looped = true },
 	River = { id = "rbxassetid://6564308795", volume = 0.4, rolloff = 70, looped = true },
+	-- The living world (AmbientSound, AmbientLife, WeatherController). Empty
+	-- ids are slots waiting for a sound picked in Studio (Toolbox -> Audio,
+	-- Creator = Roblox): until then they stay silent and nothing breaks.
+	BirdsDay = { id = "", volume = 0.3, looped = true }, -- birdsong bed, by day in leafy places
+	CricketsNight = { id = "", volume = 0.25, looped = true }, -- crickets and frogs, at night
+	WindHowl = { id = "", volume = 0.35, looped = true }, -- the Snowfields, the isles, storms
+	LavaRumble = { id = "", volume = 0.4, looped = true }, -- a low rumble at the Volcano
+	WaterfallRoar = { id = "rbxassetid://6564308795", volume = 0.7, rolloff = 260, looped = true },
+	FishSplash = { id = "rbxasset://sounds/impact_water.mp3", volume = 0.22, speed = { 1.5, 1.8 }, rolloff = 60 },
+	Wings = { id = "", volume = 0.4, rolloff = 60 }, -- a flock taking off
+	Quack = { id = "", volume = 0.35, rolloff = 50 },
+	StormCrackle = { id = "", volume = 0.5, rolloff = 200 }, -- the air crackles before a bolt
 	-- Music (loops; the Settings toggle turns it off)
 	MusicDay = { id = "rbxassetid://1841461968", volume = 0.18, looped = true },
 	MusicNight = { id = "rbxassetid://1848183670", volume = 0.14, looped = true },

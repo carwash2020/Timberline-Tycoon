@@ -1,9 +1,14 @@
 --!strict
--- WorldClock: runs day and night (Shared/WorldTime). Sets Lighting's clock,
--- mirrors it on the workspace "IsNight" attribute, and wakes the night-only
--- biomes' trees (the Phantom Grove) at dusk and hides them at dawn.
+-- WorldClock: runs day and night (Shared/WorldTime). Mirrors the clock on
+-- the workspace "IsNight" attribute, and wakes the night-only biomes' trees
+-- (the Phantom Grove) at dusk and hides them at dawn.
+--
+-- It does NOT set Lighting.ClockTime: that property doesn't replicate, and
+-- the sun would only step once a second if it did. Every client works the
+-- clock out from workspace:GetServerTimeNow() each frame
+-- (LightingController) with the same WorldTime maths, so everyone sees the
+-- same sky.
 
-local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
@@ -31,12 +36,15 @@ function WorldClock.IsNight(): boolean
 	return night == true
 end
 
+-- The in-game hour right now (0 to 24), the same number the clients show.
+function WorldClock.ClockTime(): number
+	return WorldTime.ClockTime(workspace:GetServerTimeNow())
+end
+
 -- Call after the world's trees are planted (MapBuilder).
 function WorldClock.Start()
 	local function tick()
-		local clock = WorldTime.ClockTime(os.time())
-		Lighting.ClockTime = clock
-		setNight(WorldTime.IsNight(clock))
+		setNight(WorldTime.IsNight(WorldClock.ClockTime()))
 	end
 	tick()
 	task.spawn(function()
