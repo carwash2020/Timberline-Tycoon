@@ -314,9 +314,11 @@ These checks cover the ones that change what you see or do:
 
 **Hauling**
 - [ ] Fill the bed in the Hills, walk 40+ studs away, **Truck to lot**:
-      the truck is back in your slot empty, the logs lie where it stood
-      (figured ones keep their band and value), with a toast; they stay
-      yours for 10 minutes
+      the first press warns that the load will be left; press again within
+      6 s: the truck is back in your slot empty, the logs lie where it
+      stood (figured ones keep their band and value), with a toast; they
+      stay yours for 10 minutes, and if you leave before collecting them
+      they're saved and back where they lay when you rejoin
 - [ ] Loaded at the sell pad or the Dealership: Truck to lot or switching
       trucks keeps the load
 - [ ] Leave with a loaded truck in a far biome and rejoin: truck empty in
@@ -380,6 +382,12 @@ These checks cover the ones that change what you see or do:
       Instant Deliveries) fit above the jump button in two columns
 - [ ] Phone, Tool Shed: the panel sits left of the cash; its X shows and
       closes it
+- [ ] Open the daily goals (or Settings, or the Heartseed pouch) with side
+      buttons showing: the side buttons go away while it's open and come
+      back when it closes; tapping the open panel never presses anything
+      under it
+- [ ] Build mode on a small phone with three side buttons: none covers the
+      BUILD MODE bar's buttons
 - [ ] Lightning and a nearby tree falling: the rumble plays out in full
 - [ ] Shift-lock or first person near a falling tree: after the shake the
       view points where it did
