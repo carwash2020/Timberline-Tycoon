@@ -57,7 +57,12 @@ return function(t)
 		t.ok(math.abs(EnvironmentData.TimeOfDay(13).brightness - 2.6) < 1e-6)
 		t.ok(math.abs(EnvironmentData.TimeOfDay(6).brightness - 1.8) < 1e-6)
 		t.ok(math.abs(EnvironmentData.TimeOfDay(17.5).brightness - 2.2) < 1e-6)
-		t.ok(math.abs(EnvironmentData.TimeOfDay(0).brightness - 0.6) < 1e-6)
+		-- The night WLD-06 settled on (HANDOFF 6b), lifted from brightness 0.6,
+		-- ambient 26,28,46 and outdoor 55,65,105 so a trunk reads at 30 studs.
+		local night = EnvironmentData.TimeOfDay(0)
+		t.ok(math.abs(night.brightness - 0.8) < 1e-6, "night brightness")
+		t.ok(colorDiff(night.ambient, Color3.fromRGB(34, 36, 58)) < 1e-6, "night ambient")
+		t.ok(colorDiff(night.outdoorAmbient, Color3.fromRGB(72, 82, 125)) < 1e-6, "night outdoor ambient")
 	end)
 
 	t.test("continuous through the whole day, midnight included", function()
@@ -100,11 +105,28 @@ return function(t)
 		local function lum(c)
 			return (c.R + c.G + c.B) / 3
 		end
-		t.ok(lum(night.outdoorAmbient) < lum(noon.outdoorAmbient) * 0.6)
+		-- 0.68 of noon's since WLD-06 lifted the night's fill (it was 0.55).
+		t.ok(lum(night.outdoorAmbient) < lum(noon.outdoorAmbient) * 0.7)
 		t.ok(night.exposure < 0)
 		t.ok(EnvironmentData.Daylight(1) == 0 and EnvironmentData.Daylight(13) == 1)
 		t.ok(EnvironmentData.Daylight(6) > 0 and EnvironmentData.Daylight(6) < 1)
 		t.ok(EnvironmentData.Daylight(18.5) > 0 and EnvironmentData.Daylight(18.5) < 1)
+	end)
+
+	t.test("at night the Phantom Grove is the darkest place, but never black", function()
+		local function lum(c)
+			return (c.R + c.G + c.B) / 3
+		end
+		local grove = EnvironmentData.Blend(23, "grove", "Clear", 0)
+		for _, biome in ipairs({ "", "starter", "hills", "snow", "volcano", "sky" }) do
+			local other = EnvironmentData.Blend(23, biome, "Clear", 0)
+			t.ok(grove.brightness < other.brightness, "darker than '" .. biome .. "'")
+			t.ok(lum(grove.outdoorAmbient) < lum(other.outdoorAmbient), "dimmer fill than '" .. biome .. "'")
+		end
+		-- Never black: its fill (outdoor + ambient) and brightness stay above
+		-- where they were before WLD-06 (0.38 and 0.36).
+		t.ok(lum(grove.outdoorAmbient) + lum(grove.ambient) >= 0.4, "the grove's night fill")
+		t.ok(grove.brightness >= 0.45, "the grove's night brightness")
 	end)
 
 	t.test("weather overrides apply with their intensity", function()
@@ -139,7 +161,8 @@ return function(t)
 		t.ok(math.abs(sky.atmosphereDensity - 0.2) < 1e-6)
 		t.ok(math.abs(sky.atmosphereOffset - 0.4) < 1e-6)
 		t.ok(math.abs(sky.saturation - (base.saturation + 0.2)) < 1e-6)
-		t.ok(math.abs(sky.bloomIntensity - 0.9) < 1e-6)
+		t.ok(math.abs(sky.bloomIntensity - (base.bloomIntensity + 0.1)) < 1e-6, "isles bloom +0.1 (WLD-17)")
+		t.ok(math.abs(sky.bloomIntensity - 0.7) < 1e-6)
 		t.ok(math.abs(sky.brightness - (base.brightness + 0.3)) < 1e-6)
 		local snow = EnvironmentData.Blend(13, "snow", "Clear", 0)
 		t.ok(snow.brightness > base.brightness, "snow is bright")

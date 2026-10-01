@@ -180,12 +180,15 @@ local function key(
 end
 
 -- Cozy days, golden evenings, nights dark enough that lanterns and lit
--- windows matter. The night holds from 22:00 to 04:00.
+-- windows matter. The night holds from 22:00 to 04:00. WLD-06 lifted it
+-- (from brightness 0.6, ambient 26,28,46, outdoor 55,65,105) so a trunk
+-- still reads at 30 studs without a lantern, in the Hills too; the Phantom
+-- Grove's override keeps it the darkest place, and never black.
 local NIGHT = {
-	brightness = 0.6,
+	brightness = 0.8,
 	exposure = -0.2,
-	ambient = rgb(26, 28, 46),
-	outdoor = rgb(55, 65, 105),
+	ambient = rgb(34, 36, 58),
+	outdoor = rgb(72, 82, 125),
 	shift = rgb(30, 40, 80),
 	density = 0.36,
 	offset = 0.1,
@@ -343,9 +346,11 @@ EnvironmentData.BiomeOverrides = {
 		},
 	},
 	-- White-gold light above the clouds, the whole map spread out below.
+	-- Bloom only +0.1 (WLD-17; it was +0.3, which melted the Lumenwood's
+	-- glowing crowns into white blobs).
 	sky = {
 		set = { atmosphereDensity = 0.2, atmosphereOffset = 0.4, dofFar = 0.08 },
-		add = { saturation = 0.2, bloomIntensity = 0.3, brightness = 0.3, atmosphereGlare = 0.5 },
+		add = { saturation = 0.2, bloomIntensity = 0.1, brightness = 0.3, atmosphereGlare = 0.5 },
 	},
 } :: { [string]: Override }
 

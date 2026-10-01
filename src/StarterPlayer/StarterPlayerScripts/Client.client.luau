@@ -23,6 +23,7 @@ local controllers: { { name: string, module: { Start: () -> () } } } = {
 	{ name = "QuestUI", module = require(script.Parent.QuestUI) },
 	{ name = "VehicleController", module = require(script.Parent.VehicleController) },
 	{ name = "VehicleFX", module = require(script.Parent.VehicleFX) },
+	{ name = "GondolaController", module = require(script.Parent.GondolaController) },
 	{ name = "DailyUI", module = require(script.Parent.DailyUI) },
 	{ name = "WorldUI", module = require(script.Parent.WorldUI) },
 	{ name = "StoreUI", module = require(script.Parent.StoreUI) },
