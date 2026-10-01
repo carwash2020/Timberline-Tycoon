@@ -9,6 +9,8 @@
 --     and the left column (the tutorial tracker).
 --   * ModalLane(): where they stack while a panel (the shop) is open over
 --     the game: inside its bottom edge, clear of its title and buttons.
+--   * BottomRow(): the load chip and the hint, side by side above the
+--     hotbar, clear of a phone's jump button.
 --   * ClockLine(): which corner line the clock goes in.
 -- Everything is in a screen's offsets (UIScale units), y down.
 
@@ -232,6 +234,30 @@ function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boo
 		under = false,
 		modal = true,
 	}
+end
+
+-- The bottom row (HUD): the load chip, then the hint, `gap` apart, on one
+-- line above the hotbar, centred on a `screenW`-wide screen but kept
+-- between `low` and `high` (x: the left margin, and a phone's jump button
+-- or the right margin). `chipW` is 0 while the chip is hidden; `hintW` is
+-- how wide the hint is now. Returns the widest the hint may be (at most
+-- `hintCap`: it truncates past that) so the row fits between them, and
+-- where the row's centre goes: the screen's, or as far left of it as the
+-- row needs to end before `high`.
+function HudLayout.BottomRow(
+	screenW: number,
+	chipW: number,
+	hintW: number,
+	gap: number,
+	low: number,
+	high: number,
+	hintCap: number
+): (number, number)
+	local chip = if chipW > 0 then chipW + gap else 0
+	local hintMax = math.max(0, math.min(hintCap, high - low - chip))
+	local width = chip + math.min(hintW, hintMax)
+	local centre = math.min(screenW / 2, high - width / 2)
+	return hintMax, math.max(centre, low + width / 2)
 end
 
 export type ClockLine = "beside" | "under" | "none"

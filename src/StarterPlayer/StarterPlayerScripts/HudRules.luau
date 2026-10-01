@@ -14,6 +14,8 @@
 --     either carry another or hold one better than the starter.
 --   * DropPress(): dropping takes two presses (a tap, a click, the pad's
 --     button or Backspace), the second 0.3 to 3 s after the first.
+--   * LoadChip() (HUD): the logs in your hands and in your truck's bed,
+--     beside the hint.
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -89,6 +91,52 @@ function HudRules.DropPress(armedAt: number?, now: number): (boolean, number?)
 		return false, armedAt
 	end
 	return true, nil
+end
+
+-- A count from a Player attribute as read (any type; nil while the save
+-- loads): a whole number from 0, else 0.
+local function count(value: unknown): number
+	if type(value) ~= "number" or value ~= value then
+		return 0 -- not a number, or NaN
+	end
+	return math.clamp(math.floor(value), 0, 999)
+end
+
+export type LoadChip = {
+	shown: boolean,
+	hands: string, -- "Hands 1/2"
+	bed: string?, -- "Bed 4/6", "Bed full"; nil with no truck bed
+	full: boolean, -- the bed is full: the chip turns amber
+}
+
+-- The load chip (HUD), from the Player attributes CarriedLogs, BedCount and
+-- BedCapacity as read (any type), `handCapacity` (GameConfig.HandCapacity)
+-- and whether a panel is open over the game (`modal`, HUD.SetModal):
+--   * "Hands 1/2", then "Bed 4/6" while you have a truck with a bed
+--     (BedCapacity above 0; the Scout ATV has none), "Bed full" and amber
+--     once it's full;
+--   * hidden when there's nothing in your hands or your bed and no truck
+--     bed (before the save loads, say), and while a panel is open, as the
+--     hint is.
+function HudRules.LoadChip(
+	carried: unknown,
+	bedCount: unknown,
+	bedCapacity: unknown,
+	handCapacity: number,
+	modal: boolean
+): LoadChip
+	local hands, inBed, room = count(carried), count(bedCount), count(bedCapacity)
+	local full = room > 0 and inBed >= room
+	local bed: string? = nil
+	if room > 0 then
+		bed = if full then "Bed full" else string.format("Bed %d/%d", inBed, room)
+	end
+	return {
+		shown = not modal and (hands > 0 or inBed > 0 or room > 0),
+		hands = string.format("Hands %d/%d", hands, count(handCapacity)),
+		bed = bed,
+		full = full,
+	}
 end
 
 return HudRules

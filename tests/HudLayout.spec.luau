@@ -363,6 +363,79 @@ return function(t)
 		t.eq(tiny.max, 1, "a short panel takes one")
 	end)
 
+	-- The bottom line (UI-04): the load chip, then the hint, on the hint's
+	-- line above the hotbar (UITheme.Bottom(): 70 up on a phone).
+	local HINT_CAP, ROW_GAP, PHONE_BOTTOM = 320, 8, 70
+	local HintLogic = t.shared("HintLogic")
+	-- GothamMedium 13 runs under 7 px a character; the pill's padding is 14 + 14.
+	local function hintWidth(line)
+		return #line * 7 + 28
+	end
+	local CHIPS = { 150, 200 } -- "Hands 1/2", up to "Hands 2/2 · Bed 12/12" with the log and padding
+	-- Roblox's touch jump button on a small screen: 70 px, 95 in from the
+	-- right and 90 up from the bottom (full-screen pixels), here in the HUD
+	-- screen's offsets (under the top bar).
+	local function jumpOn(w, h, inset)
+		return { left = w - 95, top = h - 90 - inset, right = w - 25, bottom = h - 20 - inset }
+	end
+	-- The chip's and the hint's boxes as the row lays them out.
+	local function rowOn(screen, chipW, hintW, high)
+		local hintMax, centre = HudLayout.BottomRow(screen.X, chipW, hintW, ROW_GAP, 12, high, HINT_CAP)
+		local shown = math.min(hintW, hintMax)
+		local width = (if chipW > 0 then chipW + ROW_GAP else 0) + shown
+		local left = centre - width / 2
+		local bottom = screen.Y - PHONE_BOTTOM
+		local chip = if chipW > 0
+			then { left = left, top = bottom - 30, right = left + chipW, bottom = bottom }
+			else nil
+		local hintLeft = if chipW > 0 then left + chipW + ROW_GAP else left
+		return chip, { left = hintLeft, top = bottom - 30, right = hintLeft + shown, bottom = bottom }, hintMax
+	end
+
+	t.test("667 x 375: the load chip and the hint share a line, apart, clear of the jump button, uncut", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(667, 375 - inset)
+			local jump = jumpOn(667, 375, inset)
+			for _, context in ipairs(HintLogic.Contexts) do
+				local line = HintLogic.Pick("phone", context)
+				for _, chipW in ipairs(CHIPS) do
+					local name = string.format("SE %d, %q, chip %d", inset, line, chipW)
+					local chip, hint, hintMax = rowOn(screen, chipW, hintWidth(line), jump.left - ROW_GAP)
+					t.ok(hint.bottom > jump.top, name .. ": level with the jump button")
+					t.ok(clear(chip, hint, ROW_GAP - 0.01), name .. ": the chip and the hint don't overlap")
+					t.ok(
+						clear(chip, jump, ROW_GAP - 0.01) and clear(hint, jump, ROW_GAP - 0.01),
+						name .. ": clear of jump"
+					)
+					t.ok(chip.left >= 12 and hint.right <= 667 - 12, name .. ": on screen")
+					t.ok(hintMax >= hintWidth(line), name .. ": the hint isn't cut short")
+					t.eq(hint.bottom, screen.Y - PHONE_BOTTOM, name .. ": on the hint's line, above the hotbar")
+				end
+			end
+		end
+	end)
+
+	t.test("568 x 320: the row moves left, then the hint truncates, before it reaches the jump button", function()
+		local screen = v(568, 320 - 36)
+		local jump = jumpOn(568, 320, 36)
+		local line = HintLogic.Pick("phone", "carrying")
+		local chip, hint, hintMax = rowOn(screen, 200, hintWidth(line), jump.left - ROW_GAP)
+		t.ok(hintMax < hintWidth(line), "no room for all of it")
+		t.ok(clear(chip, hint, ROW_GAP - 0.01))
+		t.ok(clear(hint, jump, ROW_GAP - 0.01), "clear of jump")
+		t.ok(chip.left >= 12 - 1e-6, "on screen")
+	end)
+
+	t.test("a computer: the row centred, the hint up to 320; with no chip the hint is where it always was", function()
+		local screen = v(1366, 768 - 58)
+		local hintMax, centre = HudLayout.BottomRow(1366, 180, 266, ROW_GAP, 12, 1366 - 12, HINT_CAP)
+		t.eq(hintMax, HINT_CAP)
+		t.eq(centre, 683)
+		local chip, hint = rowOn(screen, 0, 266, 1366 - 12)
+		t.eq(chip, nil)
+		t.eq((hint.left + hint.right) / 2, 683, "centred, as before the chip")
+	end)
+
 	t.test("the clock: beside the cash on a computer, line 2 on a phone, hidden there in the tutorial", function()
 		t.eq(HudLayout.ClockLine(false, 0), "beside")
 		t.eq(HudLayout.ClockLine(false, 3), "beside")
