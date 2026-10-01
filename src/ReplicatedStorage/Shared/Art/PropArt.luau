@@ -1,101 +1,1142 @@
 --!strict
 -- PropArt: nature's small things, so the world never looks empty: rocks,
--- bushes, flowers, mushrooms, grass tufts, fallen logs, crystals, reeds,
--- lily pads, snow piles, lava rocks. Pure (see Kit). Clients scatter most
--- of these around the player (AmbientLife); MapBuilder places landmarks.
+-- bushes, flowers, ferns, grass tufts, reeds and cattails, lily pads,
+-- fallen logs and old stumps, pebbles, pinecones, berry bushes, snow
+-- piles, lava rocks, crystals. Pure (see Kit). Clients scatter most of
+-- these around the player (AmbientLife, via PropArt.Scatter); MapBuilder
+-- places the landmarks (boulders, the grove's mushrooms).
 --
--- Every builder returns a Model on the ground at the origin, decoration
--- only (no collisions, clicks or touches) unless noted.
---
--- (First pass: simple shapes. The nature workstream replaces the insides;
--- keep the signatures.)
+-- Every builder returns a Model on the ground at the origin (y = 0; a
+-- LilyPad's origin is the water's surface), decoration only (no
+-- collisions, clicks or touches; small parts cast no shadow) unless noted.
+-- Only Rock collides. They're cheap: Rock and most others are under 10
+-- parts, so hundreds can stand round a player. Colours come in as
+-- parameters so each biome can tint them (PropArt.Tints has a palette per
+-- biome).
 
 local Kit = require(script.Parent.Kit)
 
+type Rng = Kit.Rng
+
 local PropArt = {}
 
+local function hex(h: string): Color3
+	return Color3.fromHex(h)
+end
+
 local STONE = { Color3.fromRGB(140, 134, 126), Color3.fromRGB(120, 116, 110), Color3.fromRGB(158, 150, 140) }
+local MOSS = hex("#7FA650")
+local STEM = hex("#5E9442")
+local LEAF = hex("#6FAE4E")
+local BARK = hex("#6E5038")
+local HEART = hex("#D9B98A")
+local WHITE = Color3.new(1, 1, 1)
 
--- A faceted boulder about `size` studs across. Collides (you can climb it).
-function PropArt.Rock(size: number, seed: number, colors: { Color3 }?): Model
-	local model = Kit.model("Rock")
-	local parts = Kit.rock(model, CFrame.identity, size, Kit.rng(seed), colors or STONE)
-	for _, p in ipairs(parts) do
-		p.CanCollide = true
-	end
-	return model
+---------------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------------
+
+-- A looks-only part (no shadow unless asked).
+local function bit(
+	model: Model,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	material: Enum.Material?,
+	shadow: boolean?
+): Part
+	local p = Kit.part(model, name, size, cf, color, material)
+	Kit.decor(p, shadow == true)
+	return p
 end
 
--- A leafy bush about `size` studs across in the given greens.
-function PropArt.Bush(size: number, seed: number, colors: { Color3 }): Model
-	local model = Kit.model("Bush")
-	Kit.blob(
+local function wedgeBit(
+	model: Model,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	material: Enum.Material?
+): WedgePart
+	local p = Kit.wedge(model, name, size, cf, color, material)
+	Kit.decor(p, false)
+	return p
+end
+
+-- CFrame.lookAt from fromMatrix (the same frame in Roblox; also right in
+-- the preview, where Lune 0.10's lookAt isn't).
+local function lookAt(at: Vector3, target: Vector3): CFrame
+	local look = (target - at).Unit
+	local ref = if math.abs(look.Y) > 0.999 then Vector3.zAxis else Vector3.yAxis
+	local right = look:Cross(ref).Unit
+	return CFrame.fromMatrix(at, right, right:Cross(look), -look)
+end
+
+-- A looks-only cylinder from a to b.
+local function rod(
+	model: Model,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	d: number,
+	color: Color3,
+	material: Enum.Material?
+): Part
+	local p = Kit.cylinder(
 		model,
-		"Bush",
-		CFrame.new(0, size * 0.35, 0),
-		Vector3.new(size, size * 0.7, size),
-		4,
-		Kit.rng(seed),
-		colors
+		name,
+		(b - a).Magnitude,
+		d,
+		lookAt((a + b) / 2, b) * CFrame.Angles(0, math.pi / 2, 0),
+		color,
+		material
 	)
-	return model
+	Kit.decor(p, false)
+	return p
 end
 
--- A small patch of flowers (petal colours from the list).
-function PropArt.Flowers(seed: number, colors: { Color3 }): Model
-	local model = Kit.model("Flowers")
-	local rng = Kit.rng(seed)
-	for _ = 1, 5 do
-		local x, z = rng:range(-1.5, 1.5), rng:range(-1.5, 1.5)
-		Kit.decor(
-			Kit.part(model, "Stem", Vector3.new(0.1, 0.8, 0.1), CFrame.new(x, 0.4, z), Color3.fromRGB(80, 140, 60)),
-			false
-		)
-		Kit.decor(Kit.ball(model, "Petals", 0.45, CFrame.new(x, 0.85, z), rng:pick(colors)), false)
-	end
-	return model
-end
-
--- A mushroom (glowing ones for the Phantom Grove).
-function PropArt.Mushroom(seed: number, glowing: boolean): Model
-	local model = Kit.model("Mushroom")
-	local rng = Kit.rng(seed)
-	local h = rng:range(0.8, 1.6)
-	Kit.decor(
-		Kit.post(model, "Stalk", Vector3.zero, h, 0.35, Color3.fromRGB(235, 228, 210), Enum.Material.SmoothPlastic),
+-- An upright looks-only cylinder (axis vertical) centred at `at`.
+local function disc(
+	model: Model,
+	name: string,
+	at: Vector3,
+	thickness: number,
+	d: number,
+	color: Color3,
+	material: Enum.Material?
+): Part
+	return Kit.decor(
+		Kit.cylinder(model, name, thickness, d, CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2), color, material),
 		false
 	)
-	local cap = Kit.ellipsoid(
+end
+
+-- The frame of a cube standing on a corner at `at` (the round, faceted
+-- look of leaves and boulders).
+local function cornerUp(at: Vector3, yaw: number): CFrame
+	return CFrame.new(at) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(math.rad(35.26), math.rad(45), 0)
+end
+
+-- A small flower: a stem, a four-petal head (a square turned 45 degrees)
+-- and, if `center` is given, a heart. Returns how many parts it made.
+local function flower(model: Model, at: Vector3, h: number, petal: Color3, center: Color3?, yaw: number): number
+	bit(model, "Stem", Vector3.new(0.1, h, 0.1), CFrame.new(at + Vector3.new(0, h / 2, 0)), STEM)
+	bit(
 		model,
-		"Cap",
-		Vector3.new(1.4, 0.7, 1.4) * (h / 1.2),
-		CFrame.new(0, h, 0),
-		if glowing then Color3.fromRGB(80, 230, 210) else Color3.fromRGB(196, 72, 56),
-		if glowing then Enum.Material.Neon else Enum.Material.SmoothPlastic
+		"Petals",
+		Vector3.new(0.55, 0.12, 0.55),
+		CFrame.new(at + Vector3.new(0, h, 0)) * CFrame.Angles(0, yaw + math.pi / 4, 0) * CFrame.Angles(0.15, 0, 0),
+		petal
 	)
-	Kit.decor(cap, false)
+	if center then
+		bit(model, "FlowerHeart", Vector3.new(0.2, 0.14, 0.2), CFrame.new(at + Vector3.new(0, h + 0.07, 0)), center)
+		return 3
+	end
+	return 2
+end
+
+---------------------------------------------------------------------------
+-- Stones
+---------------------------------------------------------------------------
+
+-- A faceted boulder about `size` studs across, sunk a little into the
+-- ground so it sits on slopes. Its three big stones collide (you can climb
+-- it); the pebbles and moss are decoration. With the default stone colours
+-- one in three wears a cap of moss; pass `moss` to give any rock one.
+function PropArt.Rock(size: number, seed: number, colors: { Color3 }?, moss: Color3?): Model
+	local model = Kit.model("Rock")
+	local rng = Kit.rng(seed)
+	local palette = colors or STONE
+	local s = size
+	local yaw = rng:range(0, math.pi * 2)
+	local turn = CFrame.Angles(0, yaw, 0)
+	local function stone(name: string, dims: Vector3, offset: Vector3, tilt: CFrame, color: Color3): Part
+		return Kit.part(
+			model,
+			name,
+			dims,
+			CFrame.new(turn:VectorToWorldSpace(offset)) * turn * tilt,
+			Kit.vary(color, rng, 0.04),
+			Enum.Material.Slate
+		)
+	end
+	-- The body (tipped so its top is a slanting facet), a corner-up cap and
+	-- a shoulder leaning on it: they collide.
+	stone(
+		"Rock",
+		Vector3.new(s * 0.92, s * 0.62, s * 0.78),
+		Vector3.new(0, s * 0.14, 0),
+		CFrame.Angles(rng:range(0.22, 0.34) * rng:sign(), 0, rng:range(0.15, 0.26) * rng:sign()),
+		palette[1]
+	)
+	local cap = stone(
+		"Rock",
+		Vector3.new(s * 0.62, s * 0.5, s * 0.58),
+		Vector3.new(s * 0.08, s * 0.4, -s * 0.04),
+		CFrame.Angles(math.rad(35.26), math.rad(45), rng:range(-0.2, 0.2)),
+		palette[3] or palette[1]
+	)
+	stone(
+		"Rock",
+		Vector3.new(s * 0.52, s * 0.44, s * 0.48),
+		Vector3.new(-s * 0.4, s * 0.1, s * 0.18),
+		CFrame.Angles(rng:range(0.35, 0.55), rng:range(0.4, 0.9), rng:range(0.3, 0.5)),
+		palette[2] or palette[1]
+	)
+	-- Pebbles at its foot (looks only).
+	for i = 1, 2 do
+		local a = yaw + i * 2.4 + rng:range(-0.3, 0.3)
+		local p = s * rng:range(0.14, 0.22)
+		bit(
+			model,
+			"RockPebble",
+			Vector3.new(p, p * 0.6, p * 0.85),
+			CFrame.new(math.cos(a) * s * 0.62, p * 0.15, math.sin(a) * s * 0.55)
+				* CFrame.Angles(rng:range(-0.5, 0.5), rng:range(0, 3), rng:range(-0.5, 0.5)),
+			Kit.vary(palette[(i % #palette) + 1], rng, 0.05),
+			Enum.Material.Slate
+		)
+	end
+	local mossColor = moss or (if palette == STONE and seed % 3 == 0 then MOSS else nil)
+	if mossColor then
+		local m = Kit.part(
+			model,
+			"Moss",
+			Vector3.new(s * 0.6, s * 0.12, s * 0.5),
+			cap.CFrame * CFrame.new(0, s * 0.2, 0),
+			Kit.vary(mossColor, rng, 0.04),
+			Enum.Material.Grass
+		)
+		Kit.decor(m, false)
+	end
 	return model
 end
 
--- A crystal cluster (Sky Shard look, ice in the snow, embers by lava).
+-- A scatter of 4-6 small flat stones.
+function PropArt.Pebbles(seed: number, colors: { Color3 }?): Model
+	local model = Kit.model("Pebbles")
+	local rng = Kit.rng(seed)
+	local palette = colors or STONE
+	for i = 1, rng:int(4, 6) do
+		local a, r = rng:range(0, math.pi * 2), rng:range(0.2, 1.6)
+		local p = rng:range(0.25, 0.6)
+		bit(
+			model,
+			"Pebble",
+			Vector3.new(p, p * 0.45, p * 0.8),
+			CFrame.new(math.cos(a) * r, p * 0.15, math.sin(a) * r)
+				* CFrame.Angles(rng:range(-0.45, 0.45), rng:range(0, 3), rng:range(-0.45, 0.45)),
+			Kit.vary(palette[(i - 1) % #palette + 1], rng, 0.06),
+			Enum.Material.Slate
+		)
+	end
+	return model
+end
+
+-- Dark volcanic rock split by glowing cracks, an ember glow at its foot.
+function PropArt.LavaRock(seed: number, size: number): Model
+	local model = Kit.model("LavaRock")
+	local rng = Kit.rng(seed)
+	local s = size
+	local DARK = { hex("#3A3330"), hex("#2E2826"), hex("#4A403B") }
+	local GLOW = hex("#FF7A1A")
+	local yaw = rng:range(0, math.pi * 2)
+	local body = bit(
+		model,
+		"LavaRock",
+		Vector3.new(s, s * 0.62, s * 0.84),
+		CFrame.new(0, s * 0.2, 0) * CFrame.Angles(rng:range(-0.1, 0.1), yaw, rng:range(-0.1, 0.1)),
+		Kit.vary(DARK[1], rng, 0.03),
+		Enum.Material.Basalt,
+		true
+	)
+	local cap = bit(
+		model,
+		"LavaRock",
+		Vector3.new(s * 0.6, s * 0.5, s * 0.55),
+		cornerUp(Vector3.new(math.cos(yaw) * s * 0.1, s * 0.45, math.sin(yaw) * s * 0.1), yaw),
+		Kit.vary(DARK[2], rng, 0.03),
+		Enum.Material.Basalt,
+		true
+	)
+	bit(
+		model,
+		"LavaRock",
+		Vector3.new(s * 0.45, s * 0.36, s * 0.4),
+		CFrame.new(math.cos(yaw + 2) * s * 0.42, s * 0.12, math.sin(yaw + 2) * s * 0.4)
+			* CFrame.Angles(rng:range(-0.3, 0.3), rng:range(0, 3), rng:range(-0.3, 0.3)),
+		Kit.vary(DARK[3], rng, 0.03),
+		Enum.Material.Basalt
+	)
+	-- Cracks: glowing seams across the top and down a side.
+	local sz = body.Size
+	for i = 1, 2 do
+		bit(
+			model,
+			"LavaCrack",
+			Vector3.new(s * 0.07, 0.06, sz.Z * rng:range(0.5, 0.8)),
+			body.CFrame
+				* CFrame.new(rng:range(-0.25, 0.25) * sz.X, sz.Y / 2 + 0.01, 0)
+				* CFrame.Angles(0, rng:range(-0.6, 0.6) + i, 0),
+			GLOW,
+			Enum.Material.Neon
+		)
+	end
+	bit(
+		model,
+		"LavaCrack",
+		Vector3.new(0.06, sz.Y * 0.8, s * 0.07),
+		body.CFrame
+			* CFrame.new(sz.X / 2 + 0.01, 0, rng:range(-0.2, 0.2) * sz.Z)
+			* CFrame.Angles(rng:range(-0.4, 0.4), 0, 0),
+		GLOW,
+		Enum.Material.Neon
+	)
+	bit(
+		model,
+		"LavaCrack",
+		Vector3.new(s * 0.06, 0.06, s * 0.3),
+		cap.CFrame * CFrame.new(0, cap.Size.Y / 2 + 0.01, 0),
+		GLOW,
+		Enum.Material.Neon
+	)
+	-- Embers glowing in the ground at its foot.
+	disc(model, "Embers", Vector3.new(0, 0.02, 0), 0.05, s * 1.3, hex("#C2400E"), Enum.Material.Neon).Transparency =
+		0.35
+	return model
+end
+
+-- A crystal cluster: pointed shards round a glowing one, on a stone base
+-- (Sky Shard look, ice in the snow, embers by the lava).
 function PropArt.Crystal(seed: number, color: Color3, size: number): Model
 	local model = Kit.model("Crystal")
 	local rng = Kit.rng(seed)
-	for _ = 1, 4 do
-		local h = rng:range(0.6, 1.2) * size
-		Kit.decor(
-			Kit.part(
+	local s = size
+	bit(
+		model,
+		"CrystalBase",
+		Vector3.new(s * 0.8, s * 0.3, s * 0.7),
+		CFrame.new(0, s * 0.08, 0) * CFrame.Angles(0, rng:range(0, 3), rng:range(-0.1, 0.1)),
+		Kit.shade(color, -0.55),
+		Enum.Material.Slate
+	)
+	local shards = {
+		{ h = 1.15, w = 0.26, r = 0, glow = true },
+		{ h = 0.8, w = 0.22, r = 0.28, glow = false },
+		{ h = 0.6, w = 0.18, r = 0.3, glow = false },
+		{ h = 0.45, w = 0.16, r = 0.32, glow = false },
+	}
+	local yaw = rng:range(0, math.pi * 2)
+	for i, sh in ipairs(shards) do
+		local a = yaw + i * 2.1
+		local h, w = sh.h * s * rng:range(0.85, 1.1), sh.w * s
+		local lean = if i == 1 then rng:range(-0.12, 0.12) else 0.35 + rng:range(-0.1, 0.15)
+		local cf = CFrame.new(math.cos(a) * sh.r * s, s * 0.1, math.sin(a) * sh.r * s)
+			* CFrame.Angles(0, -a, 0)
+			* CFrame.Angles(0, 0, -lean)
+			* CFrame.Angles(0, math.pi / 4, 0)
+		local body = bit(
+			model,
+			"Shard",
+			Vector3.new(w, h, w),
+			cf * CFrame.new(0, h / 2, 0),
+			if sh.glow then color else Kit.shade(color, 0.25),
+			if sh.glow then Enum.Material.Neon else Enum.Material.Glass
+		)
+		if not sh.glow then
+			body.Transparency = 0.15
+		end
+		if i <= 2 then
+			local tip = wedgeBit(
 				model,
-				"Shard",
-				Vector3.new(size * 0.25, h, size * 0.25),
-				CFrame.new(rng:range(-0.3, 0.3) * size, h / 2, rng:range(-0.3, 0.3) * size)
-					* CFrame.Angles(rng:range(-0.4, 0.4), rng:range(0, 3), rng:range(-0.4, 0.4)),
-				color,
-				Enum.Material.Glass
+				"ShardTip",
+				Vector3.new(w, w * 1.2, w),
+				cf * CFrame.new(0, h + w * 0.6, 0),
+				body.Color,
+				body.Material
+			)
+			tip.Transparency = body.Transparency
+		end
+	end
+	return model
+end
+
+---------------------------------------------------------------------------
+-- Green things
+---------------------------------------------------------------------------
+
+-- A leafy bush about `size` studs across: a corner-up core and three
+-- smaller cubes round its foot, in the given greens.
+function PropArt.Bush(size: number, seed: number, colors: { Color3 }): Model
+	local model = Kit.model("Bush")
+	local rng = Kit.rng(seed)
+	local s = size
+	local yaw = rng:range(0, math.pi * 2)
+	local shadow = s >= 3
+	bit(
+		model,
+		"Bush",
+		Vector3.new(s * 0.62, s * 0.55, s * 0.62),
+		cornerUp(Vector3.new(0, s * 0.42, 0), yaw),
+		Kit.vary(colors[1], rng, 0.04),
+		Enum.Material.SmoothPlastic,
+		shadow
+	)
+	for i = 1, 3 do
+		local a = yaw + i * 2.1 + rng:range(-0.3, 0.3)
+		local e = s * rng:range(0.4, 0.48)
+		bit(
+			model,
+			"Bush",
+			Vector3.new(e, e * 0.85, e),
+			cornerUp(Vector3.new(math.cos(a) * s * 0.3, e * 0.42, math.sin(a) * s * 0.3), a),
+			Kit.vary(colors[(i % #colors) + 1], rng, 0.05),
+			Enum.Material.SmoothPlastic,
+			shadow
+		)
+	end
+	return model
+end
+
+-- A bush hung with berries: a forage hint (red, or blue by seed).
+function PropArt.BerryBush(seed: number, colors: { Color3 }?): Model
+	local model = Kit.model("BerryBush")
+	local rng = Kit.rng(seed)
+	local greens = colors or { hex("#3F7F38"), hex("#4C8F3E"), hex("#5A9A45") }
+	local berry = if seed % 2 == 0 then hex("#D8404A") else hex("#5468C8")
+	local s = rng:range(2.2, 3)
+	local yaw = rng:range(0, math.pi * 2)
+	local centers: { { at: Vector3, e: number } } = {}
+	for i = 1, 3 do
+		local a = yaw + i * 2.1
+		local r = if i == 1 then 0 else s * 0.28
+		local e = if i == 1 then s * 0.62 else s * 0.46
+		local at = Vector3.new(math.cos(a) * r, e * 0.48, math.sin(a) * r)
+		table.insert(centers, { at = at, e = e })
+		bit(model, "Bush", Vector3.new(e, e * 0.85, e), cornerUp(at, a), Kit.vary(greens[i], rng, 0.04))
+	end
+	for i = 1, 5 do
+		local c = centers[(i - 1) % #centers + 1]
+		local a = rng:range(0, math.pi * 2)
+		local up = rng:range(-0.1, 0.5)
+		local dir = Vector3.new(math.cos(a), up, math.sin(a)).Unit
+		Kit.decor(
+			Kit.ball(model, "Berry", 0.45, CFrame.new(c.at + dir * c.e * 0.74), Kit.vary(berry, rng, 0.04)),
+			false
+		)
+	end
+	return model
+end
+
+-- The same as BerryBush (the name the forage code may look for).
+PropArt.Berries = PropArt.BerryBush
+
+-- A small patch of flowers (petal colours from the list) and a leaf.
+function PropArt.Flowers(seed: number, colors: { Color3 }): Model
+	local model = Kit.model("Flowers")
+	local rng = Kit.rng(seed)
+	local heart = hex("#FFD84D")
+	for i = 1, 3 do
+		local a = i * 2.1 + rng:range(-0.4, 0.4)
+		local r = if i == 1 then 0.1 else rng:range(0.45, 0.8)
+		local petal = rng:pick(colors)
+		flower(
+			model,
+			Vector3.new(math.cos(a) * r, 0, math.sin(a) * r),
+			rng:range(0.6, 1.1),
+			petal,
+			if petal == heart then WHITE else heart,
+			rng:range(0, 3)
+		)
+	end
+	wedgeBit(
+		model,
+		"Leaf",
+		Vector3.new(0.08, 0.35, 0.7),
+		CFrame.Angles(0, rng:range(0, 6), 0) * CFrame.new(0, 0.12, -0.35) * CFrame.Angles(0.3, 0, math.pi / 2),
+		Kit.vary(LEAF, rng, 0.05),
+		Enum.Material.SmoothPlastic
+	)
+	return model
+end
+
+-- A tuft of 2-4 thin, pointed grass blades.
+function PropArt.GrassTuft(seed: number, color: Color3): Model
+	local model = Kit.model("GrassTuft")
+	local rng = Kit.rng(seed)
+	local yaw = rng:range(0, math.pi * 2)
+	for i = 1, rng:int(2, 4) do
+		local h = rng:range(0.8, 1.6)
+		local a = yaw + i * 2.3
+		wedgeBit(
+			model,
+			"Blade",
+			Vector3.new(0.12, h, rng:range(0.35, 0.55)),
+			CFrame.new(math.cos(a) * 0.15, h / 2 - 0.05, math.sin(a) * 0.15)
+				* CFrame.Angles(0, a, 0)
+				* CFrame.Angles(rng:range(-0.35, -0.05), 0, rng:range(-0.2, 0.2)),
+			Kit.vary(color, rng, 0.06),
+			Enum.Material.SmoothPlastic
+		)
+	end
+	return model
+end
+
+-- A fern: five or six tapering fronds arching out from a curled heart.
+function PropArt.Fern(seed: number, color: Color3): Model
+	local model = Kit.model("Fern")
+	local rng = Kit.rng(seed)
+	local yaw = rng:range(0, math.pi * 2)
+	local n = rng:int(5, 6)
+	for i = 1, n do
+		local a = yaw + i / n * math.pi * 2 + rng:range(-0.2, 0.2)
+		local L = rng:range(1.6, 2.4)
+		local pitch = math.rad(rng:range(28, 42))
+		-- A wedge lying flat: wide at the heart, pointed at the tip.
+		wedgeBit(
+			model,
+			"Frond",
+			Vector3.new(0.07, rng:range(0.5, 0.65), L),
+			CFrame.new(0, 0.06, 0)
+				* CFrame.Angles(0, a, 0)
+				* CFrame.Angles(pitch, 0, 0)
+				* CFrame.new(0, 0, -L / 2)
+				* CFrame.Angles(0, 0, math.pi / 2),
+			Kit.vary(color, rng, 0.05),
+			Enum.Material.SmoothPlastic
+		)
+	end
+	Kit.decor(Kit.ball(model, "Fiddlehead", 0.3, CFrame.new(0, 0.3, 0), Kit.shade(color, -0.1)), false)
+	return model
+end
+
+-- Riverbank reeds: a clump of tall, thin, leaning blades.
+function PropArt.Reeds(seed: number): Model
+	local model = Kit.model("Reeds")
+	local rng = Kit.rng(seed)
+	local greens = { hex("#7A9A4A"), hex("#8EA858"), hex("#6A8A40"), hex("#A8A868") }
+	for i = 1, rng:int(5, 7) do
+		local a, r = rng:range(0, math.pi * 2), rng:range(0, 0.7)
+		local h = rng:range(2.6, 4.4)
+		wedgeBit(
+			model,
+			"Reed",
+			Vector3.new(0.12, h, rng:range(0.3, 0.42)),
+			CFrame.new(math.cos(a) * r, h / 2 - 0.1, math.sin(a) * r)
+				* CFrame.Angles(0, rng:range(0, 6), 0)
+				* CFrame.Angles(rng:range(-0.2, 0.05), 0, rng:range(-0.12, 0.12)),
+			Kit.vary(greens[(i - 1) % #greens + 1], rng, 0.04),
+			Enum.Material.SmoothPlastic
+		)
+	end
+	return model
+end
+
+-- Cattails: tall stems with brown velvet heads, and a couple of blades.
+function PropArt.Cattails(seed: number): Model
+	local model = Kit.model("Cattails")
+	local rng = Kit.rng(seed)
+	for i = 1, rng:int(3, 4) do
+		local a, r = i * 2.2 + rng:range(-0.3, 0.3), rng:range(0.15, 0.6)
+		local base = Vector3.new(math.cos(a) * r, -0.1, math.sin(a) * r)
+		local h = rng:range(3, 4.2)
+		local top = base + Vector3.new(rng:range(-0.25, 0.25), h, rng:range(-0.25, 0.25))
+		rod(model, "CattailStem", base, top, 0.1, hex("#7A9248"), Enum.Material.SmoothPlastic)
+		local dir = (top - base).Unit
+		rod(
+			model,
+			"CattailHead",
+			top - dir * 1.1,
+			top - dir * 0.2,
+			0.3,
+			Kit.vary(hex("#6B4428"), rng, 0.05),
+			Enum.Material.Fabric
+		)
+	end
+	for b = 1, 2 do
+		local h = rng:range(2, 2.8)
+		wedgeBit(
+			model,
+			"Blade",
+			Vector3.new(0.1, h, 0.35),
+			CFrame.new(0, h / 2 - 0.1, 0) * CFrame.Angles(0, b * 2.5, 0) * CFrame.Angles(-0.25, 0, 0),
+			hex("#7FA050"),
+			Enum.Material.SmoothPlastic
+		)
+	end
+	return model
+end
+
+-- A lily pad or two floating on the water (origin: the surface), and, one
+-- time in two, a pink water lily.
+function PropArt.LilyPad(seed: number): Model
+	local model = Kit.model("LilyPad")
+	local rng = Kit.rng(seed)
+	local pad = hex("#4F9A48")
+	local d = rng:range(1.8, 2.8)
+	disc(model, "Pad", Vector3.new(0, 0.05, 0), 0.1, d, Kit.vary(pad, rng, 0.05), Enum.Material.SmoothPlastic)
+	-- The notch: a sliver of the pad's darker underside, like a cut.
+	bit(
+		model,
+		"PadVein",
+		Vector3.new(0.06, 0.04, d * 0.48),
+		CFrame.Angles(0, rng:range(0, 6), 0) * CFrame.new(0, 0.11, -d * 0.24),
+		Kit.shade(pad, -0.25)
+	)
+	local a = rng:range(0, math.pi * 2)
+	local d2 = d * rng:range(0.55, 0.75)
+	disc(
+		model,
+		"Pad",
+		Vector3.new(math.cos(a) * (d + d2) * 0.48, 0.04, math.sin(a) * (d + d2) * 0.48),
+		0.1,
+		d2,
+		Kit.vary(pad, rng, 0.07),
+		Enum.Material.SmoothPlastic
+	)
+	if seed % 2 == 0 then
+		local at = Vector3.new(rng:range(-0.3, 0.3), 0.16, rng:range(-0.3, 0.3))
+		local yaw = rng:range(0, 3)
+		for k = 0, 1 do
+			bit(
+				model,
+				"Lily",
+				Vector3.new(0.75 - k * 0.25, 0.22, 0.75 - k * 0.25),
+				CFrame.new(at + Vector3.new(0, k * 0.16, 0)) * CFrame.Angles(0, yaw + k * math.pi / 4, 0),
+				if k == 0 then hex("#F4A7C8") else hex("#FBD3E4")
+			)
+		end
+		bit(model, "LilyHeart", Vector3.new(0.2, 0.12, 0.2), CFrame.new(at + Vector3.new(0, 0.34, 0)), hex("#FFD84D"))
+	end
+	return model
+end
+
+-- A mushroom with a stepped, faceted cap (and a little one beside it).
+-- Glowing ones (the Phantom Grove's) are Neon teal or violet with a soft
+-- light; the rest are red with white spots.
+function PropArt.Mushroom(seed: number, glowing: boolean): Model
+	local model = Kit.model("Mushroom")
+	local rng = Kit.rng(seed)
+	local capColor = if glowing then (if seed % 2 == 0 then hex("#55F2E0") else hex("#B58CFF")) else hex("#C4483A")
+	local capMat = if glowing then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	local function shroom(at: Vector3, h: number, w: number, main: boolean): Part
+		bit(
+			model,
+			"Stalk",
+			Vector3.new(w * 0.28, h, w * 0.28),
+			CFrame.new(at + Vector3.new(0, h / 2, 0)),
+			hex("#EDE4CC")
+		)
+		local yaw = rng:range(0, 3)
+		local brim = bit(
+			model,
+			"Cap",
+			Vector3.new(w, w * 0.26, w),
+			CFrame.new(at + Vector3.new(0, h, 0)) * CFrame.Angles(0, yaw + math.pi / 4, 0),
+			capColor,
+			capMat
+		)
+		if main then
+			bit(
+				model,
+				"Cap",
+				Vector3.new(w * 0.62, w * 0.26, w * 0.62),
+				CFrame.new(at + Vector3.new(0, h + w * 0.2, 0)) * CFrame.Angles(0, yaw, 0),
+				Kit.shade(capColor, 0.06),
+				capMat
+			)
+		end
+		return brim
+	end
+	local h = rng:range(0.8, 1.4)
+	local w = rng:range(1.0, 1.5)
+	local cap = shroom(Vector3.zero, h, w, true)
+	local a = rng:range(0, math.pi * 2)
+	shroom(Vector3.new(math.cos(a) * w * 0.7, 0, math.sin(a) * w * 0.7), h * 0.55, w * 0.55, false)
+	if glowing then
+		local l = Instance.new("PointLight")
+		l.Color = capColor
+		l.Range = 8
+		l.Brightness = 0.8
+		l.Shadows = false
+		l.Parent = cap
+	else
+		for i = 1, 2 do
+			local sa = rng:range(0, math.pi * 2)
+			bit(
+				model,
+				"Spot",
+				Vector3.new(w * 0.14, 0.06, w * 0.14),
+				CFrame.new(math.cos(sa) * w * 0.22 * i, h + w * 0.14 + (2 - i) * w * 0.2, math.sin(sa) * w * 0.22 * i),
+				WHITE
+			)
+		end
+	end
+	return model
+end
+
+-- Pinecones under the pines: two to four little faceted cones.
+function PropArt.Pinecones(seed: number): Model
+	local model = Kit.model("Pinecones")
+	local rng = Kit.rng(seed)
+	for _ = 1, rng:int(2, 4) do
+		local a, r = rng:range(0, math.pi * 2), rng:range(0, 1.2)
+		local at = Vector3.new(math.cos(a) * r, 0.2, math.sin(a) * r)
+		local lie = CFrame.new(at) * CFrame.Angles(0, rng:range(0, 6), 0) * CFrame.Angles(math.pi / 2 - 0.15, 0, 0)
+		bit(
+			model,
+			"Pinecone",
+			Vector3.new(0.38, 0.62, 0.38),
+			lie * CFrame.Angles(0, math.pi / 4, 0),
+			Kit.vary(hex("#7A5232"), rng, 0.05)
+		)
+		bit(
+			model,
+			"Pinecone",
+			Vector3.new(0.26, 0.3, 0.26),
+			lie * CFrame.new(0, 0.42, 0),
+			Kit.vary(hex("#8C6240"), rng, 0.05)
+		)
+	end
+	return model
+end
+
+-- A snow drift about `size` studs across: soft mounds.
+function PropArt.SnowPile(seed: number, size: number): Model
+	local model = Kit.model("SnowPile")
+	local rng = Kit.rng(seed)
+	local s = size
+	local SNOW = { hex("#F4F8FC"), hex("#E8F0F7"), hex("#FFFFFF") }
+	local yaw = rng:range(0, math.pi * 2)
+	for i = 1, 3 do
+		local a = yaw + i * 2.1
+		local r = if i == 1 then 0 else s * 0.32
+		local w = if i == 1 then s else s * rng:range(0.5, 0.65)
+		local m = Kit.ellipsoid(
+			model,
+			"Snow",
+			Vector3.new(w, w * 0.42, w * 0.78),
+			CFrame.new(math.cos(a) * r, w * 0.08, math.sin(a) * r) * CFrame.Angles(0, a, 0),
+			Kit.vary(SNOW[i], rng, 0.02),
+			Enum.Material.Snow
+		)
+		Kit.decor(m, s >= 4)
+	end
+	return model
+end
+
+---------------------------------------------------------------------------
+-- Wood on the forest floor
+---------------------------------------------------------------------------
+
+-- A fallen, mossy log: one end sawn (pale, with rings), the other broken,
+-- a branch stub and a bracket fungus.
+function PropArt.FallenLog(seed: number, barkColor: Color3?, moss: Color3?): Model
+	local model = Kit.model("FallenLog")
+	local rng = Kit.rng(seed)
+	local bark = barkColor or BARK
+	local L = rng:range(6, 10)
+	local d = rng:range(1.4, 2.2)
+	local yaw = rng:range(0, math.pi * 2)
+	local base = CFrame.new(0, d / 2 - 0.15, 0) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, 0, rng:range(-0.04, 0.04))
+	Kit.decor(Kit.cylinder(model, "Log", L, d, base, Kit.vary(bark, rng, 0.03), Enum.Material.Wood))
+	-- The sawn end: pale heartwood and a ring.
+	local endCF = base * CFrame.new(L / 2 + 0.02, 0, 0)
+	Kit.decor(Kit.cylinder(model, "LogEnd", 0.06, d * 0.86, endCF, HEART, Enum.Material.Wood), false)
+	Kit.decor(
+		Kit.cylinder(
+			model,
+			"LogRing",
+			0.08,
+			d * 0.48,
+			endCF * CFrame.new(0.01, 0, 0),
+			Kit.shade(HEART, -0.14),
+			Enum.Material.Wood
+		),
+		false
+	)
+	-- The broken end: a few splinters.
+	wedgeBit(
+		model,
+		"Splinter",
+		Vector3.new(d * 0.3, d * 0.5, d * 0.5),
+		base * CFrame.new(-L / 2 - d * 0.1, d * 0.12, 0) * CFrame.Angles(0, math.pi / 2, 0),
+		Kit.shade(bark, 0.1),
+		Enum.Material.Wood
+	)
+	-- Moss along the top.
+	for i = 1, 2 do
+		local x = (i - 1.5) * L * 0.4 + rng:range(-0.5, 0.5)
+		Kit.decor(
+			Kit.ellipsoid(
+				model,
+				"Moss",
+				Vector3.new(L * rng:range(0.22, 0.32), d * 0.22, d * 0.7),
+				base * CFrame.new(x, d * 0.42, rng:range(-0.1, 0.1)),
+				Kit.vary(moss or MOSS, rng, 0.05),
+				Enum.Material.Grass
 			),
 			false
 		)
 	end
+	-- A branch stub and a bracket fungus.
+	local stubAt = (base * CFrame.new(rng:range(-0.2, 0.2) * L, 0, d * 0.4)).Position
+	rod(
+		model,
+		"Stub",
+		stubAt,
+		stubAt + base:VectorToWorldSpace(Vector3.new(0.3, 0.9, 1.0)),
+		d * 0.3,
+		bark,
+		Enum.Material.Wood
+	)
+	disc(
+		model,
+		"Fungus",
+		(base * CFrame.new(rng:range(-0.3, 0.1) * L, 0, -d * 0.5)).Position,
+		0.12,
+		d * 0.5,
+		hex("#E9C892"),
+		Enum.Material.SmoothPlastic
+	)
+	return model
+end
+
+-- An old weathered stump: grey-gold top, jagged splinters, moss, roots and
+-- a tiny mushroom.
+function PropArt.Stump(seed: number, barkColor: Color3?, moss: Color3?): Model
+	local model = Kit.model("OldStump")
+	local rng = Kit.rng(seed)
+	local bark = barkColor or BARK
+	local d = rng:range(1.6, 2.4)
+	local h = rng:range(0.9, 1.5)
+	Kit.decor(
+		Kit.cylinder(
+			model,
+			"StumpBody",
+			h + 0.2,
+			d,
+			CFrame.new(0, h / 2 - 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			Kit.vary(bark, rng, 0.03),
+			Enum.Material.Wood
+		)
+	)
+	disc(model, "StumpTop", Vector3.new(0, h + 0.02, 0), 0.06, d * 0.84, hex("#B8A68A"), Enum.Material.Wood)
+	-- Splinters standing up round the rim where it broke.
+	local yaw = rng:range(0, math.pi * 2)
+	for i = 1, 2 do
+		local a = yaw + i * 2.4
+		local sh = rng:range(0.5, 0.9)
+		wedgeBit(
+			model,
+			"Splinter",
+			Vector3.new(0.18, sh, d * 0.3),
+			CFrame.new(math.cos(a) * d * 0.36, h + sh / 2, math.sin(a) * d * 0.36)
+				* CFrame.Angles(0, -a + math.pi / 2, 0),
+			Kit.shade(bark, 0.08),
+			Enum.Material.Wood
+		)
+	end
+	-- Moss over part of the top.
+	Kit.decor(
+		Kit.ellipsoid(
+			model,
+			"Moss",
+			Vector3.new(d * 0.6, 0.2, d * 0.45),
+			CFrame.new(math.cos(yaw + 1) * d * 0.15, h + 0.05, math.sin(yaw + 1) * d * 0.15),
+			Kit.vary(moss or MOSS, rng, 0.05),
+			Enum.Material.Grass
+		),
+		false
+	)
+	-- Roots.
+	for i = 1, 3 do
+		local a = yaw + 0.6 + i * 2.1 + rng:range(-0.2, 0.2)
+		local rh, rl = h * rng:range(0.45, 0.7), d * rng:range(0.45, 0.6)
+		wedgeBit(
+			model,
+			"Root",
+			Vector3.new(d * 0.24, rh, rl),
+			CFrame.Angles(0, -a - math.pi / 2, 0) * CFrame.new(0, rh / 2 - 0.08, -(d / 2 + rl / 2 - 0.15)),
+			Kit.shade(bark, -0.06),
+			Enum.Material.Wood
+		)
+	end
+	-- A little mushroom at its foot.
+	local ma = yaw + 3.6
+	local mAt = Vector3.new(math.cos(ma) * d * 0.62, 0, math.sin(ma) * d * 0.62)
+	bit(model, "Mushroom", Vector3.new(0.12, 0.4, 0.12), CFrame.new(mAt + Vector3.new(0, 0.2, 0)), hex("#EDE4CC"))
+	bit(
+		model,
+		"Mushroom",
+		Vector3.new(0.4, 0.12, 0.4),
+		CFrame.new(mAt + Vector3.new(0, 0.42, 0)) * CFrame.Angles(0, math.pi / 4, 0),
+		hex("#C4483A")
+	)
+	return model
+end
+
+-- A dead branch lying on the ground, with two twigs.
+function PropArt.DeadBranch(seed: number): Model
+	local model = Kit.model("DeadBranch")
+	local rng = Kit.rng(seed)
+	local color = Kit.vary(hex("#7A6A58"), rng, 0.05)
+	local L = rng:range(3, 5)
+	local d = rng:range(0.3, 0.45)
+	local yaw = rng:range(0, math.pi * 2)
+	local dir = Vector3.new(math.cos(yaw), 0, math.sin(yaw))
+	local a = -dir * (L / 2) + Vector3.new(0, d * 0.4, 0)
+	local b = dir * (L / 2) + Vector3.new(0, d * 0.35, 0)
+	rod(model, "Branch", a, b, d, color, Enum.Material.Wood)
+	local side = Vector3.new(-dir.Z, 0, dir.X)
+	for i, t in ipairs({ 0.25, 0.6 }) do
+		local from = a:Lerp(b, t)
+		local s = if i == 1 then 1 else -1
+		local to = from
+			+ dir * rng:range(0.5, 0.9)
+			+ side * s * rng:range(0.6, 1.1)
+			+ Vector3.new(0, rng:range(0.05, 0.4), 0)
+		rod(model, "Twig", from, to, d * 0.45, color, Enum.Material.Wood)
+	end
+	return model
+end
+
+---------------------------------------------------------------------------
+-- Biome tints and scattering
+---------------------------------------------------------------------------
+
+export type Tints = {
+	grass: Color3, -- tufts, ferns
+	leaves: { Color3 }, -- bushes
+	flowers: { Color3 },
+	stone: { Color3 },
+	bark: Color3, -- fallen logs, stumps
+	moss: Color3,
+}
+
+local TINTS: { [string]: Tints } = {
+	starter = {
+		grass = hex("#7CB850"),
+		leaves = { hex("#5DA24A"), hex("#6FB352"), hex("#86BF57") },
+		flowers = { hex("#FFD84D"), hex("#FFFFFF"), hex("#F28AB0"), hex("#A98BE0") },
+		stone = STONE,
+		bark = hex("#6E5038"),
+		moss = hex("#7FA650"),
+	},
+	hills = {
+		grass = hex("#5E9A44"),
+		leaves = { hex("#4C8F3E"), hex("#5A9A45"), hex("#3F7F38") },
+		flowers = { hex("#E5A33B"), hex("#FFFFFF"), hex("#D86A3A"), hex("#F2C14E") },
+		stone = STONE,
+		bark = hex("#5E4632"),
+		moss = hex("#6E9A48"),
+	},
+	snow = {
+		grass = hex("#9DB8A8"),
+		leaves = { hex("#6F9A8C"), hex("#7FA898"), hex("#5E8A7C") },
+		flowers = { hex("#BFE6FF"), hex("#FFFFFF"), hex("#D8E8FF") },
+		stone = { hex("#E8EEF5"), hex("#C8D0DA"), hex("#969AA0") },
+		bark = hex("#5A4A40"),
+		moss = hex("#9CB8A0"),
+	},
+	volcano = {
+		grass = hex("#7A6A44"),
+		leaves = { hex("#4A4A36"), hex("#5B5238"), hex("#3E3A2C") },
+		flowers = { hex("#FF8A2A"), hex("#FFB050"), hex("#FF6A2A") },
+		stone = { hex("#3A3330"), hex("#2E2826"), hex("#4A403B") },
+		bark = hex("#3A2E28"),
+		moss = hex("#6B6A3A"),
+	},
+	grove = {
+		grass = hex("#5A4A7A"),
+		leaves = { hex("#5A3F8C"), hex("#6A4FA0"), hex("#47336F") },
+		flowers = { hex("#55F2E0"), hex("#B58CFF"), hex("#E0C8FF") },
+		stone = { hex("#4A4258"), hex("#3C3648"), hex("#5A5068") },
+		bark = hex("#3E3248"),
+		moss = hex("#4FA89A"),
+	},
+	sky = {
+		grass = hex("#A8CC62"),
+		leaves = { hex("#CFE08E"), hex("#BCD27A"), hex("#A9C76C") },
+		flowers = { hex("#FFF3B0"), hex("#FFFFFF"), hex("#CDB8F0"), hex("#A8D8F0") },
+		stone = { hex("#DCCCB0"), hex("#C2B19C"), hex("#E5D7BE") },
+		bark = hex("#C8B48E"),
+		moss = hex("#B8D47A"),
+	},
+	island = {
+		grass = hex("#8CC45A"),
+		leaves = { hex("#3FAE5A"), hex("#52BF66"), hex("#33964B") },
+		flowers = { hex("#FF6F91"), hex("#FFD84D"), hex("#FFFFFF") },
+		stone = { hex("#E2CD96"), hex("#CDB98A"), hex("#EBDDB0") },
+		bark = hex("#7A5A36"),
+		moss = hex("#7FB04C"),
+	},
+}
+TINTS.beach = TINTS.island
+
+-- The palette props use in a biome (BiomeData ids, plus "beach"); the
+-- Starter Forest's for anything unknown.
+function PropArt.Tints(biomeId: string?): Tints
+	return TINTS[biomeId or ""] or TINTS.starter
+end
+
+-- What grows where, and how often: (prop, weight). "shore" and "water"
+-- are the riverbanks and the water itself, in any biome.
+local MIX: { [string]: { { name: string, weight: number } } } = {
+	starter = {
+		{ name = "GrassTuft", weight = 30 },
+		{ name = "Flowers", weight = 18 },
+		{ name = "Fern", weight = 8 },
+		{ name = "Bush", weight = 10 },
+		{ name = "Pebbles", weight = 7 },
+		{ name = "Mushroom", weight = 4 },
+		{ name = "BerryBush", weight = 3 },
+		{ name = "DeadBranch", weight = 4 },
+		{ name = "FallenLog", weight = 2 },
+		{ name = "Stump", weight = 2 },
+		{ name = "Rock", weight = 3 },
+	},
+	hills = {
+		{ name = "GrassTuft", weight = 28 },
+		{ name = "Fern", weight = 14 },
+		{ name = "Flowers", weight = 10 },
+		{ name = "Pinecones", weight = 10 },
+		{ name = "Bush", weight = 8 },
+		{ name = "Pebbles", weight = 8 },
+		{ name = "BerryBush", weight = 3 },
+		{ name = "DeadBranch", weight = 5 },
+		{ name = "FallenLog", weight = 3 },
+		{ name = "Stump", weight = 3 },
+		{ name = "Rock", weight = 5 },
+	},
+	snow = {
+		{ name = "SnowPile", weight = 30 },
+		{ name = "Pinecones", weight = 10 },
+		{ name = "Pebbles", weight = 10 },
+		{ name = "GrassTuft", weight = 8 },
+		{ name = "Crystal", weight = 4 },
+		{ name = "DeadBranch", weight = 5 },
+		{ name = "Rock", weight = 6 },
+	},
+	volcano = {
+		{ name = "LavaRock", weight = 20 },
+		{ name = "Pebbles", weight = 20 },
+		{ name = "DeadBranch", weight = 8 },
+		{ name = "GrassTuft", weight = 6 },
+		{ name = "Crystal", weight = 3 },
+		{ name = "Rock", weight = 8 },
+	},
+	grove = {
+		{ name = "Mushroom", weight = 20 },
+		{ name = "Fern", weight = 16 },
+		{ name = "GrassTuft", weight = 14 },
+		{ name = "Flowers", weight = 8 },
+		{ name = "Stump", weight = 5 },
+		{ name = "FallenLog", weight = 4 },
+		{ name = "Pebbles", weight = 6 },
+	},
+	sky = {
+		{ name = "GrassTuft", weight = 26 },
+		{ name = "Flowers", weight = 24 },
+		{ name = "Bush", weight = 8 },
+		{ name = "Pebbles", weight = 6 },
+		{ name = "Crystal", weight = 3 },
+	},
+	island = {
+		{ name = "GrassTuft", weight = 22 },
+		{ name = "Fern", weight = 14 },
+		{ name = "Flowers", weight = 12 },
+		{ name = "Bush", weight = 8 },
+		{ name = "Pebbles", weight = 10 },
+	},
+	shore = {
+		{ name = "Reeds", weight = 30 },
+		{ name = "Cattails", weight = 18 },
+		{ name = "GrassTuft", weight = 18 },
+		{ name = "Pebbles", weight = 14 },
+	},
+	water = {
+		{ name = "LilyPad", weight = 1 },
+	},
+}
+MIX.beach = MIX.island
+
+-- Builds one prop by name, tinted for the biome (nil for an unknown name).
+function PropArt.Build(name: string, seed: number, biomeId: string?): Model?
+	local t = PropArt.Tints(biomeId)
+	local rng = Kit.rng(seed + 77)
+	local glow = biomeId == "grove"
+	local crystal = if biomeId == "snow"
+		then hex("#BFEFFF")
+		elseif biomeId == "volcano" then hex("#FF8A2A")
+		else hex("#9FE6FF")
+	if name == "Rock" then
+		return PropArt.Rock(rng:range(1.6, 3.2), seed, t.stone)
+	elseif name == "Bush" then
+		return PropArt.Bush(rng:range(2, 4), seed, t.leaves)
+	elseif name == "Flowers" then
+		return PropArt.Flowers(seed, t.flowers)
+	elseif name == "Mushroom" then
+		return PropArt.Mushroom(seed, glow)
+	elseif name == "Crystal" then
+		return PropArt.Crystal(seed, crystal, rng:range(1.2, 2.2))
+	elseif name == "GrassTuft" then
+		return PropArt.GrassTuft(seed, t.grass)
+	elseif name == "Fern" then
+		return PropArt.Fern(seed, t.leaves[1])
+	elseif name == "Reeds" then
+		return PropArt.Reeds(seed)
+	elseif name == "LilyPad" then
+		return PropArt.LilyPad(seed)
+	elseif name == "FallenLog" then
+		return PropArt.FallenLog(seed, t.bark, t.moss)
+	elseif name == "Pebbles" then
+		return PropArt.Pebbles(seed, t.stone)
+	elseif name == "SnowPile" then
+		return PropArt.SnowPile(seed, rng:range(2.5, 5))
+	elseif name == "LavaRock" then
+		return PropArt.LavaRock(seed, rng:range(1.5, 3))
+	elseif name == "Pinecones" then
+		return PropArt.Pinecones(seed)
+	elseif name == "BerryBush" then
+		return PropArt.BerryBush(seed, t.leaves)
+	elseif name == "Stump" then
+		return PropArt.Stump(seed, t.bark, t.moss)
+	elseif name == "Cattails" then
+		return PropArt.Cattails(seed)
+	elseif name == "DeadBranch" then
+		return PropArt.DeadBranch(seed)
+	end
+	return nil
+end
+
+-- The prop names a biome's mix can pick (for tests and tools).
+function PropArt.Mix(biomeId: string): { { name: string, weight: number } }
+	return MIX[biomeId] or MIX.starter
+end
+
+-- One scattered prop for a spot: picked by weight from the biome's mix
+-- (or the "shore"/"water" mix when `spot` says so), tinted for the biome,
+-- the same on every client for the same seed. Everything it returns is
+-- decoration, Rock included (a client-only rock mustn't stop a truck).
+function PropArt.Scatter(biomeId: string?, seed: number, spot: string?): Model
+	local mix = PropArt.Mix(spot or biomeId or "starter")
+	local total = 0
+	for _, entry in ipairs(mix) do
+		total += entry.weight
+	end
+	local roll = Kit.rng(seed):next() * total
+	local name = mix[#mix].name
+	for _, entry in ipairs(mix) do
+		roll -= entry.weight
+		if roll < 0 then
+			name = entry.name
+			break
+		end
+	end
+	local model = PropArt.Build(name, seed, biomeId) or PropArt.GrassTuft(seed, PropArt.Tints(biomeId).grass)
+	Kit.decorAll(model)
 	return model
 end
 
