@@ -236,9 +236,16 @@ return function(t)
 				checked += 1
 			end
 		end
-		t.eq(checked, 5, "every project setting PLAY-02 names")
-		t.eq(PlaceCheck.Expected[6].property, "MaxPlayers")
-		t.eq(PlaceCheck.Expected[6].value, 12)
+		t.ok(checked >= 5, "every project setting PLAY-02 names (more may follow: PLAY-08)")
+		local maxPlayers
+		for _, e in ipairs(PlaceCheck.Expected) do
+			if e.service == "Players" and e.property == "MaxPlayers" then
+				maxPlayers = e
+			end
+		end
+		t.ok(maxPlayers, "Max Players is checked")
+		t.eq(maxPlayers.value, 12)
+		t.eq(maxPlayers.atMost, true, "12 or fewer")
 	end)
 
 	t.test("the expected table is data: one more line is one more check", function()
