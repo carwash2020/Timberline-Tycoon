@@ -393,7 +393,7 @@ function WorldPlan.Town(): Town
 		{ "Cart", -71, 124, -0.4 },
 		{ "WaterTower", -58, 126 },
 		{ "ToolRack", -33, 97, -math.pi / 2 },
-		{ "Well", -38, 77 },
+		{ "Well", -49, 60 }, -- on the green south of the street, between the benches
 		{ "Bench", -58, 66, math.pi },
 		{ "Bench", -40, 66, math.pi },
 		{ "Barrel", -32.5, 92 },
@@ -406,13 +406,13 @@ function WorldPlan.Town(): Town
 		{ "Mailbox", -91, 87, 0 },
 		{ "FlowerBox", -86, 90.5, 0 },
 		{ "LogPile", 28, 108, 0 },
-		{ "LogPile", 28, 98, 0.1 },
+		{ "LogPile", 29, 98, 0.1 }, -- clear of the plaza's corner
 		{ "Wheelbarrow", 20, 93, -0.6 },
-		{ "SawdustPile", 24, 118 },
+		{ "SawdustPile", 22, 114 }, -- by the lean-to, clear of the yard lamp
 		{ "SawdustPile", -21, 99 },
 		{ "Lantern", lantern.X, lantern.Z, campYaw },
-		{ "Barrel", -24, 120 },
-		{ "Barrel", -26, 117.5 },
+		{ "Barrel", -22, 116 }, -- against the mill's side shed, off the gondola path
+		{ "Barrel", -22, 113.5 },
 	}
 	local props: { Placement } = {}
 	for i, p in ipairs(propSpots) do

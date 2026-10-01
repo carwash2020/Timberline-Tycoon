@@ -119,18 +119,21 @@ WorldLayout.ParkingLot = { x0 = 8, x1 = 112, z0 = -18, z1 = 68 }
 
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
 -- pad, packed dirt for the main street, the shop paths, the spawn walk, the
--- mill yard and the gondola path. Edges get a little noise.
-export type Paint = { x0: number, x1: number, z0: number, z1: number, material: string }
+-- mill yard and the gondola path. Edges get a little noise. The first
+-- that covers a spot paints it (the plaza's cobbles run across the
+-- street). `name` is for the specs: nothing that collides stands on the
+-- street, plaza, paths or walk (WorldPlan.spec).
+export type Paint = { name: string, x0: number, x1: number, z0: number, z1: number, material: string }
 WorldLayout.TownPaint = {
-	{ x0 = -26, x1 = 26, z0 = 64, z1 = 97, material = "Cobblestone" },
-	{ x0 = -96, x1 = 64, z0 = 70, z1 = 84, material = "Ground" },
-	{ x0 = -86, x1 = -74, z0 = 84, z1 = 93, material = "Ground" },
-	{ x0 = -51, x1 = -39, z0 = 84, z1 = 93, material = "Ground" },
-	{ x0 = 39, x1 = 51, z0 = 84, z1 = 93, material = "Ground" },
-	{ x0 = -6, x1 = 6, z0 = 34, z1 = 64, material = "Ground" },
-	{ x0 = -22, x1 = 24, z0 = 97, z1 = 126, material = "Ground" },
-	{ x0 = -31, x1 = -25, z0 = 97, z1 = 142, material = "Ground" },
-	{ x0 = -46, x1 = -25, z0 = 136, z1 = 142, material = "Ground" },
+	{ name = "Plaza", x0 = -26, x1 = 26, z0 = 64, z1 = 97, material = "Cobblestone" },
+	{ name = "MainStreet", x0 = -96, x1 = 64, z0 = 70, z1 = 84, material = "Ground" },
+	{ name = "HearthAndHomePath", x0 = -86, x1 = -74, z0 = 84, z1 = 93, material = "Ground" },
+	{ name = "ToolShedPath", x0 = -51, x1 = -39, z0 = 84, z1 = 93, material = "Ground" },
+	{ name = "DealershipPath", x0 = 39, x1 = 51, z0 = 84, z1 = 93, material = "Ground" },
+	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 64, material = "Ground" },
+	{ name = "MillYard", x0 = -22, x1 = 24, z0 = 97, z1 = 126, material = "Ground" },
+	{ name = "GondolaPath", x0 = -31, x1 = -25, z0 = 97, z1 = 142, material = "Ground" },
+	{ name = "GondolaPath", x0 = -46, x1 = -25, z0 = 136, z1 = 142, material = "Ground" },
 } :: { Paint }
 
 -- The river runs from the pool under the Aether Isles' waterfall, south

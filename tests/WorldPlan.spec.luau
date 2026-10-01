@@ -1,8 +1,10 @@
 --!nocheck
 -- WorldPlan: nothing in town that collides stands on (or within 2 studs
--- of) a road, Murph stands at his camp; the biome road signs stand on the
--- ground beside their roads, the boulders on gentle ground; the gondola's
--- routes clear the stations' roofs, the main isle and the Skyroot.
+-- of) a road, or on the town's street, plaza, paths, walk or sell pad
+-- (TWN-08); the spawn faces the sawmill; Murph stands at his camp; the
+-- biome road signs stand on the ground beside their roads, the boulders
+-- on gentle ground; the gondola's routes clear the stations' roofs, the
+-- main isle and the Skyroot.
 
 return function(t)
 	local roblox = t.roblox
@@ -79,33 +81,46 @@ return function(t)
 		return best
 	end
 
-	t.test("nothing in town that collides stands within 2 studs of a road", function()
+	-- Everything MapBuilder builds in town that a player or a truck could
+	-- bump into, placed where it stands: { label, kind, shop?, model }.
+	local builtThings
+	local function townThings()
+		if builtThings then
+			return builtThings
+		end
 		local things = {}
-		local function add(label, model, cf)
-			table.insert(things, { label = label, model = placed(model, cf) })
+		local function add(label, kind, model, cf, shop)
+			table.insert(things, { label = label, kind = kind, shop = shop, model = placed(model, cf) })
 		end
 		for i, cf in ipairs(town.lamps) do
-			add("lamp " .. i, BuildingArt.LampPost(), cf)
+			add(string.format("lamp %d at (%g, %g)", i, cf.X, cf.Z), "lamp", BuildingArt.LampPost(), cf)
 		end
 		for i, fence in ipairs(town.fences) do
-			add("fence " .. i, BuildingArt.Fence(fence.length), fence.cframe)
+			add("fence " .. i, "fence", BuildingArt.Fence(fence.length), fence.cframe)
 		end
 		for _, prop in ipairs(town.props) do
-			add(prop.name, BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
+			local label = string.format("%s at (%g, %g)", prop.name, prop.cframe.X, prop.cframe.Z)
+			add(label, "prop", BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
 		end
 		for _, sign in ipairs(town.signs) do
-			add(string.match(sign.text, "^[^\n]+") .. " sign", BuildingArt.Signpost(sign.text), sign.cframe)
+			add(string.match(sign.text, "^[^\n]+") .. " sign", "sign", BuildingArt.Signpost(sign.text), sign.cframe)
 		end
 		local fee = BiomeData.Get("sky").gondola.fee
 		local gondolaText = string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee)
-		add("gondola sign", BuildingArt.Signpost(gondolaText), town.gondolaSign)
-		add("Murph's camp", BuildingArt.Campsite(), town.campsite)
-		add("gondola station", BuildingArt.GondolaStation(), town.gondola)
-		add("sawmill", BuildingArt.Sawmill(), town.sawmill)
-		add("Sky Bin", BuildingArt.SkyBin(), town.skyBin * CFrame.new(0, -2, 0))
+		add("gondola sign", "sign", BuildingArt.Signpost(gondolaText), town.gondolaSign)
+		add("Murph's camp", "camp", BuildingArt.Campsite(), town.campsite)
+		add("gondola station", "station", BuildingArt.GondolaStation(), town.gondola)
+		add("sawmill", "sawmill", BuildingArt.Sawmill(), town.sawmill)
+		add("Sky Bin", "skyBin", BuildingArt.SkyBin(), town.skyBin * CFrame.new(0, -2, 0))
 		for _, spot in ipairs(town.shops) do
-			add(spot.kind, BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
+			add(spot.kind, "shop", BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end
+		builtThings = things
+		return things
+	end
+
+	t.test("nothing in town that collides stands within 2 studs of a road", function()
+		local things = townThings()
 		local checked = 0
 		for _, thing in ipairs(things) do
 			for _, p in ipairs(parts(thing.model)) do
@@ -132,6 +147,143 @@ return function(t)
 		t.ok(murph >= ROAD_MARGIN, string.format("Murph is %.2f studs off a road", murph))
 		local spawn = roadClearance(CFrame.new(town.spawn), Vector3.new(6, 1, 6))
 		t.ok(spawn >= ROAD_MARGIN, string.format("the spawn is %.2f studs off a road", spawn))
+	end)
+
+	-- How far a part's footprint (its box seen from above) reaches into an
+	-- axis-aligned rectangle, in studs; 0 or less means it's clear. Exact
+	-- for any rotation: the footprint is convex and its edges run along the
+	-- part's own axes seen from above, so those and the rectangle's two are
+	-- the only axes that can separate them.
+	local function reachInto(cf, size, r)
+		local pts = {}
+		for _, c in ipairs(corners(size)) do
+			local p = cf * c
+			table.insert(pts, { p.X, p.Z })
+		end
+		local axes = { { 1, 0 }, { 0, 1 } }
+		for _, v in ipairs({ cf.RightVector, cf.UpVector, cf.LookVector }) do
+			local len = math.sqrt(v.X * v.X + v.Z * v.Z)
+			if len > 1e-6 then
+				table.insert(axes, { -v.Z / len, v.X / len })
+			end
+		end
+		local rect = { { r.x0, r.z0 }, { r.x1, r.z0 }, { r.x0, r.z1 }, { r.x1, r.z1 } }
+		local depth = math.huge
+		for _, a in ipairs(axes) do
+			local lo, hi, rlo, rhi = math.huge, -math.huge, math.huge, -math.huge
+			for _, p in ipairs(pts) do
+				local d = p[1] * a[1] + p[2] * a[2]
+				lo, hi = math.min(lo, d), math.max(hi, d)
+			end
+			for _, p in ipairs(rect) do
+				local d = p[1] * a[1] + p[2] * a[2]
+				rlo, rhi = math.min(rlo, d), math.max(rhi, d)
+			end
+			depth = math.min(depth, math.min(hi, rhi) - math.max(lo, rlo))
+		end
+		return depth
+	end
+
+	t.test("nothing that collides stands on the street, the plaza, the paths or the walk (TWN-08)", function()
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		-- The ground you walk and drive (the mill yard is the sawmill's own
+		-- floor), and the sell pad trucks back onto (BuildingArt.SellPad(24,
+		-- 18) with its 0.8-stud border, as MapBuilder builds it). What may
+		-- stand on which, by design: a shop meets the end of its own path
+		-- (porch, ramp, front wall), the gondola path runs into the station,
+		-- and the Sky Bin and the lamps by the sell pad (the corner lamps) may
+		-- stand on the plaza, but never on the street through it or the pad.
+		local CHECKED = {
+			Plaza = true,
+			MainStreet = true,
+			HearthAndHomePath = true,
+			ToolShedPath = true,
+			DealershipPath = true,
+			SpawnWalk = true,
+			GondolaPath = true,
+		}
+		local function allowed(thing, area)
+			if thing.kind == "shop" then
+				return area.name == thing.shop .. "Path"
+			elseif thing.kind == "station" then
+				return area.name == "GondolaPath"
+			elseif thing.kind == "skyBin" or thing.kind == "lamp" then
+				return area.name == "Plaza"
+			end
+			return false
+		end
+		local areas, names = {}, {}
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			if CHECKED[paint.name] then
+				table.insert(areas, paint)
+				names[paint.name] = true
+			end
+		end
+		for name in pairs(CHECKED) do
+			t.ok(names[name], "TownPaint has a " .. name)
+		end
+		t.ok(#areas >= 8, string.format("only %d paint rectangles checked", #areas))
+		local pad = town.sellPad.Position
+		local sellPad = { name = "SellPad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 }
+		table.insert(areas, sellPad)
+		local function intrusions(thing, model)
+			local out = {}
+			for _, p in ipairs(parts(model)) do
+				if p.CanCollide then
+					for _, area in ipairs(areas) do
+						if not allowed(thing, area) then
+							local reach = reachInto(p.CFrame, p.Size, area)
+							if reach > 1e-3 then
+								table.insert(out, { part = p, area = area, reach = reach })
+							end
+						end
+					end
+				end
+			end
+			return out
+		end
+		local checked = 0
+		for _, thing in ipairs(townThings()) do
+			for _, p in ipairs(parts(thing.model)) do
+				if p.CanCollide then
+					checked += 1
+				end
+			end
+			for _, hit in ipairs(intrusions(thing, thing.model)) do
+				t.ok(
+					false,
+					string.format(
+						"%s's %s at (%.1f, %.1f) stands %.2f studs into the %s",
+						thing.label,
+						hit.part.Name,
+						hit.part.CFrame.X,
+						hit.part.CFrame.Z,
+						hit.reach,
+						hit.area.name
+					)
+				)
+			end
+		end
+		t.ok(checked > 300, string.format("only %d colliding parts in town", checked))
+		-- The check itself: where the well, a barrel and a log pile stood
+		-- before TWN-08 (mid-street, on the gondola path, on the plaza's
+		-- corner), and a corner lamp moved onto the pad, are all caught.
+		local old = {
+			{ "Well", -38, 77, "prop", "MainStreet" },
+			{ "Barrel", -26, 117.5, "prop", "GondolaPath" },
+			{ "LogPile", 28, 98, "prop", "Plaza" },
+			{ "LampPost", -12, 80, "lamp", "SellPad" },
+		}
+		for _, spot in ipairs(old) do
+			local name, x, z, kind, where = spot[1], spot[2], spot[3], spot[4], spot[5]
+			local model = if kind == "lamp" then BuildingArt.LampPost() else BuildingArt.Prop(name, 7)
+			placed(model, CFrame.new(x, 0, z))
+			local caught = false
+			for _, hit in ipairs(intrusions({ kind = kind }, model)) do
+				caught = caught or hit.area.name == where
+			end
+			t.ok(caught, string.format("a %s at (%g, %g) is caught on the %s", name, x, z, where))
+		end
 	end)
 
 	t.test("the spawn faces the sawmill (TWN-03)", function()
