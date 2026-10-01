@@ -64,7 +64,9 @@ NPCData.List = {
 		id = "Murph",
 		name = "Murph",
 		role = "Retired lumberjack",
-		spot = { kind = "fixed", position = Vector3.new(-10.8, 0, 24.3), lookAt = Vector3.new(0, 0, 40) },
+		-- In front of his campfire, facing the spawn (WorldPlan.Town().murph:
+		-- the camp at (-21, 24) turned toward the spawn, 3 studs out).
+		spot = { kind = "fixed", position = Vector3.new(-18.6, 0, 25.8), lookAt = Vector3.new(0, 0, 40) },
 		idle = "sip",
 		tutorialQuiet = true,
 		look = {
@@ -301,7 +303,9 @@ NPCData.List = {
 			{ x = -78, z = 84, pause = 4, face = 180 }, -- window-shopping at Hearth & Home
 			{ x = -60, z = 82 },
 			{ x = -45, z = 84, pause = 3, face = 180 }, -- and at the Tool Shed
-			{ x = -34, z = 76 },
+			{ x = -38, z = 85 }, -- round the well
+			{ x = -24, z = 76 },
+			{ x = -22, z = 64 }, -- between the street lamps
 		},
 		idle = "lookAround",
 		look = {
@@ -339,7 +343,7 @@ NPCData.List = {
 			{ x = 20, z = 70 },
 			{ x = 36, z = 76 },
 			{ x = 45, z = 85, pause = 3, face = 180 }, -- staring at the trucks
-			{ x = 24, z = 92 },
+			{ x = 38, z = 80 }, -- back along the street
 			{ x = 20, z = 82, pause = 2.5, face = 110 }, -- watching the saw
 		},
 		idle = "lookAround",
@@ -377,7 +381,7 @@ NPCData.List = {
 		speed = 2.6,
 		route = {
 			{ x = -17, z = 50 },
-			{ x = -18, z = 66, pause = 5, face = 104 }, -- admiring the well
+			{ x = -18, z = 66, pause = 5, face = 104 }, -- watching the saw
 			{ x = -15.5, z = 64 },
 			{ x = -15, z = 52, pause = 4, face = 270 }, -- watching the street
 		},

@@ -253,7 +253,7 @@ function WorldPlan.Town(): Town
 	for _, x in ipairs({ -92, -64, -30, -14 }) do
 		table.insert(lamps, at(x, 68.5, math.pi)) -- south side, arm north over the street
 	end
-	for _, x in ipairs({ 22, 58 }) do
+	for _, x in ipairs({ 30, 58 }) do
 		table.insert(lamps, at(x, 86, 0)) -- north side, arm south over the street
 	end
 	table.insert(lamps, at(-8, 60, -math.pi / 2))
@@ -401,13 +401,13 @@ export type Sky = {
 	main: Isle,
 	isles: { Isle },
 	bridges: { { a: Vector3, b: Vector3 } },
-	chutes: { CFrame }, -- each on an outer isle's edge, facing outward
+	chutes: { CFrame }, -- each on an outer isle's edge, its +Z (the flume) outward
 	forge: CFrame,
 	gondolaTop: CFrame,
 	gondolaBase: CFrame,
 	lumenwood: { Vector3 },
 	shards: { Vector3 },
-	waterfall: { top: Vector3, bottom: Vector3 },
+	waterfall: { top: Vector3, bottom: Vector3, dir: Vector3, isle: number },
 }
 
 function WorldPlan.Sky(): Sky?
@@ -473,17 +473,18 @@ function WorldPlan.Sky(): Sky?
 	)
 	-- The waterfall pours off the outer isle nearest the river's spring.
 	local spring = WorldLayout.River.points[1]
-	local nearest = isles[1]
-	for _, isle in ipairs(isles) do
+	local nearest, nearestIndex = isles[1], 1
+	for i, isle in ipairs(isles) do
 		local d = Vector2.new(isle.center.X - spring.X, isle.center.Z - spring.Y).Magnitude
 		local best = Vector2.new(nearest.center.X - spring.X, nearest.center.Z - spring.Y).Magnitude
 		if d < best then
-			nearest = isle
+			nearest, nearestIndex = isle, i
 		end
 	end
 	local toSpring = Vector3.new(spring.X - nearest.center.X, 0, spring.Y - nearest.center.Z)
 	local fallDir = if toSpring.Magnitude > 1 then toSpring.Unit else nearest.dir
-	local fallTop = nearest.center + fallDir * (nearest.radius - 3) - Vector3.new(0, 2, 0)
+	-- The lip, just past the isle's rim (IsleArt.Isle's spout runs to it).
+	local fallTop = nearest.center + fallDir * (nearest.radius + 1) - Vector3.new(0, 0.4, 0)
 	return {
 		root = Vector3.new(area.x, rootY, area.z),
 		trunkHeight = top - 12 - rootY,
@@ -499,8 +500,40 @@ function WorldPlan.Sky(): Sky?
 		gondolaBase = facingZ(base, main.center + toTown * 44),
 		lumenwood = lumen,
 		shards = shards,
-		waterfall = { top = fallTop, bottom = Vector3.new(fallTop.X, WorldLayout.LakeLevel, fallTop.Z) },
+		waterfall = {
+			top = fallTop,
+			bottom = Vector3.new(fallTop.X, WorldLayout.LakeLevel, fallTop.Z),
+			dir = fallDir, -- flat, away from the isle
+			isle = nearestIndex, -- which of `isles` it pours off
+		},
 	}
+end
+
+-- Points on an isle's top (relative to its centre `center`) that its
+-- decoration keeps clear of: bridge ends, Cloud Chutes, the forge and the
+-- top gondola station (IsleArt.Isle's `clear` option).
+function WorldPlan.IsleClearPoints(sky: Sky, center: Vector3): { Vector3 }
+	local out: { Vector3 } = {}
+	for _, b in ipairs(sky.bridges) do
+		table.insert(out, b.a - center)
+		table.insert(out, b.b - center)
+	end
+	for _, cf in ipairs(sky.chutes) do
+		table.insert(out, cf.Position - center)
+	end
+	table.insert(out, sky.forge.Position - center)
+	table.insert(out, sky.gondolaTop.Position - center)
+	return out
+end
+
+-- Every isle's centre relative to the Skyroot's foot, main isle first
+-- (IsleArt.Skyroot reaches a limb up into each).
+function WorldPlan.IslesFromRoot(sky: Sky): { Vector3 }
+	local out = { sky.main.center - sky.root }
+	for _, isle in ipairs(sky.isles) do
+		table.insert(out, isle.center - sky.root)
+	end
+	return out
 end
 
 return WorldPlan

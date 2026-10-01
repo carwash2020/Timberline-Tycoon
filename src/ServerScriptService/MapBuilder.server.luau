@@ -329,20 +329,48 @@ end
 
 local sky = WorldPlan.Sky()
 if sky then
-	-- The Skyroot: seen from anywhere, so Persistent.
-	place(persistent(IsleArt.Skyroot(sky.trunkHeight)), CFrame.new(sky.root))
+	-- The Skyroot: seen from anywhere, so Persistent. Its limbs reach up
+	-- into each isle, its hollow faces the gondola, it parts round the fall.
+	local fall = sky.waterfall
+	local fromRoot = WorldPlan.IslesFromRoot(sky)
+	place(
+		persistent(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root)),
+		CFrame.new(sky.root)
+	)
 
 	local islesFolder = Instance.new("Folder")
 	islesFolder.Name = "AetherIsles"
 	islesFolder.Parent = map
-	place(persistent(IsleArt.Isle(sky.main.radius, 1)), CFrame.new(sky.main.center), islesFolder).Name = "MainIsle"
+	local mainIsle = IsleArt.Isle(sky.main.radius, 1, { clear = WorldPlan.IsleClearPoints(sky, sky.main.center) })
+	mainIsle.Name = "MainIsle"
+	place(persistent(mainIsle), CFrame.new(sky.main.center), islesFolder)
 	for i, isle in ipairs(sky.isles) do
-		place(persistent(IsleArt.Isle(isle.radius, i + 1)), CFrame.new(isle.center), islesFolder).Name = "Isle" .. i
+		local options: IsleArt.IsleOptions = {
+			clear = WorldPlan.IsleClearPoints(sky, isle.center),
+			spout = if i == fall.isle then fall.dir else nil, -- the spring that feeds the waterfall
+		}
+		local model = IsleArt.Isle(isle.radius, i + 1, options)
+		model.Name = "Isle" .. i
+		place(persistent(model), CFrame.new(isle.center), islesFolder)
 	end
 	for _, bridge in ipairs(sky.bridges) do
 		local model = BuildingArt.Bridge(bridge.a, bridge.b, 6)
 		model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 		model.Parent = islesFolder
+		-- A lantern at each bridge head.
+		for k, at in ipairs({ bridge.a, bridge.b }) do
+			local along = (bridge.b - bridge.a).Unit * (if k == 1 then 1 else -1)
+			local side = Vector3.new(-along.Z, 0, along.X)
+			place(atomic(IsleArt.LanternPost(k)), CFrame.lookAt(at - along * 2 + side * 4.2, at + along), islesFolder)
+		end
+	end
+
+	-- Cloud banks drifting round the Skyroot's crown.
+	local clouds = Instance.new("Folder")
+	clouds.Name = "CloudBanks"
+	clouds.Parent = map
+	for i, spot in ipairs(IsleArt.CloudSpots(fromRoot, sky.trunkHeight, 99, sky.main.dir)) do
+		place(persistent(IsleArt.CloudBank(spot.size, i)), CFrame.new(sky.root) * spot.cframe, clouds)
 	end
 	for _, pos in ipairs(sky.lumenwood) do
 		TreeService.SpawnTree("lumenwood", CFrame.new(pos))
@@ -384,32 +412,10 @@ if sky then
 	cableFrom(base)
 
 	-- The waterfall pouring off an outer isle into the river's spring.
-	local fall = sky.waterfall
-	local height = fall.top.Y - fall.bottom.Y
-	for i, width in ipairs({ 7, 4.5 }) do
-		local sheet = Kit.part(
-			map,
-			"Waterfall",
-			Vector3.new(width, height, width * 0.5),
-			CFrame.new((fall.top + fall.bottom) / 2 + Vector3.new(0, 0, i * 0.3)),
-			if i == 1 then Color3.fromRGB(150, 205, 235) else Color3.fromRGB(225, 245, 255),
-			Enum.Material.Glass
-		)
-		Kit.decor(sheet, false)
-		sheet.Transparency = if i == 1 then 0.35 else 0.55
-	end
-	local mist = Kit.part(map, "WaterfallMist", Vector3.new(10, 1, 10), CFrame.new(fall.bottom), Color3.new(1, 1, 1))
-	ghost(mist, 1)
-	local spray = Instance.new("ParticleEmitter")
-	spray.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	spray.Color = ColorSequence.new(Color3.fromRGB(235, 245, 255))
-	spray.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(1, 14) })
-	spray.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
-	spray.Lifetime = NumberRange.new(2, 4)
-	spray.Rate = 10
-	spray.Speed = NumberRange.new(6, 12)
-	spray.SpreadAngle = Vector2.new(70, 70)
-	spray.Parent = mist
+	place(
+		persistent(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10)),
+		CFrame.lookAt(fall.top, fall.top + fall.dir) -- its -Z away from the isle
+	)
 end
 
 ---------------------------------------------------------------------------

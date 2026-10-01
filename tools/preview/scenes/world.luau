@@ -89,14 +89,32 @@ return {
 		-- The Skyroot and the isles.
 		local sky = WorldPlan.Sky()
 		if sky then
-			place(IsleArt.Skyroot(sky.trunkHeight), CF.new(sky.root))
-			place(IsleArt.Isle(sky.main.radius, 1), CF.new(sky.main.center))
+			local fall = sky.waterfall
+			local fromRoot = WorldPlan.IslesFromRoot(sky)
+			place(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root), CF.new(sky.root))
+			place(
+				IsleArt.Isle(sky.main.radius, 1, { clear = WorldPlan.IsleClearPoints(sky, sky.main.center) }),
+				CF.new(sky.main.center)
+			)
 			for i, isle in ipairs(sky.isles) do
-				place(IsleArt.Isle(isle.radius, i + 1), CF.new(isle.center))
+				local options = {
+					clear = WorldPlan.IsleClearPoints(sky, isle.center),
+					spout = if i == fall.isle then fall.dir else nil,
+				}
+				place(IsleArt.Isle(isle.radius, i + 1, options), CF.new(isle.center))
 			end
 			for _, bridge in ipairs(sky.bridges) do
 				BuildingArt.Bridge(bridge.a, bridge.b, 6).Parent = root
+				for k, at in ipairs({ bridge.a, bridge.b }) do
+					local along = (bridge.b - bridge.a).Unit * (if k == 1 then 1 else -1)
+					local side = V3.new(-along.Z, 0, along.X)
+					place(IsleArt.LanternPost(k), CF.lookAt(at - along * 2 + side * 4.2, at + along))
+				end
 			end
+			for i, spot in ipairs(IsleArt.CloudSpots(fromRoot, sky.trunkHeight, 99, sky.main.dir)) do
+				place(IsleArt.CloudBank(spot.size, i), CF.new(sky.root) * spot.cframe)
+			end
+			place(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10), CF.lookAt(fall.top, fall.top + fall.dir))
 			for i, pos in ipairs(sky.lumenwood) do
 				place(TreeArt.Build(WoodData.Get("lumenwood"), i, 1), CF.new(pos))
 			end
@@ -118,16 +136,6 @@ return {
 			place(BuildingArt.StarfallForge(), sky.forge)
 			place(BuildingArt.GondolaStation(), sky.gondolaTop)
 			place(BuildingArt.GondolaStation(), sky.gondolaBase)
-			local fall = sky.waterfall
-			Kit.part(
-				root,
-				"Waterfall",
-				V3.new(7, fall.top.Y - fall.bottom.Y, 3.5),
-				CF.new((fall.top + fall.bottom) / 2),
-				roblox.Color3.fromRGB(150, 205, 235),
-				roblox.Enum.Material.Glass
-			).Transparency =
-				0.35
 		end
 
 		return {

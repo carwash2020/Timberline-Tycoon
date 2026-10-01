@@ -204,9 +204,13 @@ return function(t)
 				t.eq(s.variant, b[i].variant)
 				t.ok(s.x >= c[1] * 64 and s.x < (c[1] + 1) * 64, "inside its cell")
 				t.ok(TerrainGen.RoadClearance(s.x, s.z) >= 2.5, "off the road")
-				t.ok(TerrainGen.WaterLevelAt(s.x, s.z) == nil, "on dry land")
+				if s.kind == "LilyPad" then
+					t.eq(s.y, TerrainGen.WaterLevelAt(s.x, s.z), "lily pads float on the water")
+				else
+					t.ok(TerrainGen.WaterLevelAt(s.x, s.z) == nil, "on dry land")
+					t.ok(math.abs(s.y - TerrainGen.HeightAt(s.x, s.z)) < 1, "on the ground")
+				end
 				t.ok(WorldLayout.FlatWeight(s.x, s.z) <= 0, "not in town or the plots")
-				t.ok(math.abs(s.y - TerrainGen.HeightAt(s.x, s.z)) < 1, "on the ground")
 				local row = EnvironmentData.Decor[s.biome][s.index]
 				t.eq(row.kind, s.kind)
 				t.ok(row.enabled ~= false, "only kinds that can be built")
@@ -215,6 +219,33 @@ return function(t)
 			end
 		end
 		t.ok(total > 60, "the meadows aren't empty: " .. total)
+	end)
+
+	t.test("the water's edge: reeds on the bank, lily pads on still water, nothing on the river", function()
+		local kinds = {}
+		local function scan(cx0, cx1, cz0, cz1)
+			for cx = cx0, cx1 do
+				for cz = cz0, cz1 do
+					for _, s in ipairs(EnvironmentData.DecorSpots(cx, cz, vitality(60))) do
+						kinds[s.kind] = (kinds[s.kind] or 0) + 1
+						local water = TerrainGen.WaterLevelAt(s.x, s.z)
+						local _, distance, kind = EnvironmentData.NearestWater(s.x, s.z)
+						if s.kind == "LilyPad" then
+							t.ok(water ~= nil and kind ~= "river", "lily pads only on the lake and the pond")
+						elseif s.kind == "Reeds" or s.kind == "Cattails" then
+							t.ok(water == nil and distance < 6, "reeds and cattails on the bank")
+						else
+							t.ok(water == nil, s.kind .. " stays out of the water")
+						end
+					end
+				end
+			end
+		end
+		-- The lake (centre (-830, -190), radius 135) and the pond (78, -182).
+		scan(-16, -10, -6, 0)
+		scan(0, 2, -4, -2)
+		t.ok((kinds.LilyPad or 0) > 0, "some lily pads")
+		t.ok((kinds.Reeds or 0) + (kinds.Cattails or 0) > 0, "some reeds")
 	end)
 
 	t.test("thriving groves grow more flowers; rocks don't care", function()

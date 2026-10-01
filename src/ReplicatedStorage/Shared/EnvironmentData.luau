@@ -601,7 +601,7 @@ export type DecorKind = {
 	lush: number?,
 	variants: number, -- how many looks are built and pooled
 	palette: string?, -- EnvironmentData.DecorPalettes key
-	size: { number }?, -- min, max (Rock, Bush, Crystal)
+	size: { number }?, -- min, max (Rock, Bush, Crystal, SnowPile, LavaRock)
 	glowing: boolean?, -- Mushroom
 	sink: number?, -- studs pushed into the ground (rocks)
 	enabled: boolean?,
@@ -649,76 +649,71 @@ local function decor(kind: string, weight: number, extra: DecorExtra?): DecorKin
 	}
 end
 
--- What grows where ("meadow" = the open country between biomes). The
--- `enabled = false` rows are TODO slots for PropArt models the nature
--- workstream is adding; wire each into AmbientLife's BUILDERS, then drop
--- the flag.
+-- What grows where ("meadow" = the open country between biomes, "shore"
+-- = the water's edge anywhere). Each kind has a builder in AmbientLife; a
+-- row with `enabled = false` is skipped.
 EnvironmentData.Decor = {
 	meadow = {
 		decor("Flowers", 5, { lush = 1, palette = "meadowFlowers" }),
 		decor("Bush", 2, { lush = 0.4, palette = "greens", size = { 2, 3.6 } }),
 		decor("Rock", 1.5, { palette = "stone", size = { 0.9, 2.2 }, sink = 0.25 }),
 		decor("Mushroom", 0.6, { lush = 0.5 }),
-		decor("GrassTuft", 6, { lush = 0.3, enabled = false }), -- TODO PropArt.GrassTuft
-		decor("Pebbles", 2, { enabled = false }), -- TODO PropArt.Pebbles
-		decor("BerryBush", 1, { lush = 1, enabled = false }), -- TODO PropArt.BerryBush
+		decor("GrassTuft", 6, { lush = 0.3 }),
+		decor("Pebbles", 2),
+		decor("BerryBush", 1, { lush = 1 }),
 	},
 	starter = {
 		decor("Flowers", 4, { lush = 1, palette = "forestFlowers" }),
 		decor("Bush", 3, { lush = 0.5, palette = "greens", size = { 2, 4 } }),
 		decor("Mushroom", 1.5, { lush = 0.7 }),
 		decor("Rock", 1, { palette = "stone", size = { 0.8, 2 }, sink = 0.25 }),
-		decor("Fern", 4, { lush = 0.6, enabled = false }), -- TODO PropArt.Fern
-		decor("GrassTuft", 4, { lush = 0.3, enabled = false }), -- TODO PropArt.GrassTuft
-		decor("FallenLog", 0.6, { enabled = false }), -- TODO PropArt.FallenLog
-		decor("Stump", 0.6, { enabled = false }), -- TODO PropArt.Stump
-		decor("BerryBush", 1, { lush = 1, enabled = false }), -- TODO PropArt.BerryBush
+		decor("Fern", 4, { lush = 0.6 }),
+		decor("GrassTuft", 4, { lush = 0.3 }),
+		decor("FallenLog", 0.6),
+		decor("Stump", 0.6),
+		decor("BerryBush", 1, { lush = 1 }),
 	},
 	hills = {
 		decor("Bush", 3, { lush = 0.4, palette = "hillGreens", size = { 2.2, 4.2 } }),
 		decor("Rock", 2.5, { palette = "stone", size = { 1, 2.8 }, sink = 0.3 }),
 		decor("Flowers", 3, { lush = 1, palette = "hillFlowers" }),
 		decor("Mushroom", 1, { lush = 0.6 }),
-		decor("Fern", 3, { lush = 0.6, enabled = false }), -- TODO PropArt.Fern
-		decor("GrassTuft", 4, { lush = 0.3, enabled = false }), -- TODO PropArt.GrassTuft
-		decor("FallenLog", 0.8, { enabled = false }), -- TODO PropArt.FallenLog
-		decor("Stump", 0.6, { enabled = false }), -- TODO PropArt.Stump
+		decor("Fern", 3, { lush = 0.6 }),
+		decor("GrassTuft", 4, { lush = 0.3 }),
+		decor("FallenLog", 0.8),
+		decor("Stump", 0.6),
 	},
 	snow = {
 		decor("Rock", 3, { palette = "snowStone", size = { 1, 2.6 }, sink = 0.3 }),
 		decor("Crystal", 1.5, { palette = "ice", size = { 1, 2.2 } }),
 		decor("Bush", 1.5, { lush = 0.5, palette = "frostGreens", size = { 1.8, 3 } }),
-		decor("SnowPile", 4, { enabled = false }), -- TODO PropArt.SnowPile
-		decor("DeadBranch", 1, { enabled = false }), -- TODO PropArt.DeadBranch
+		decor("SnowPile", 4, { size = { 1.4, 3 } }),
+		decor("DeadBranch", 1),
 	},
 	volcano = {
 		decor("Rock", 4, { palette = "darkStone", size = { 1, 3 }, sink = 0.3 }),
 		decor("Crystal", 1, { palette = "ember", size = { 0.8, 1.6 } }),
-		decor("LavaRock", 3, { enabled = false }), -- TODO PropArt.LavaRock
-		decor("DeadBranch", 1.5, { enabled = false }), -- TODO PropArt.DeadBranch
+		decor("LavaRock", 3, { size = { 0.9, 2 } }),
+		decor("DeadBranch", 1.5),
 	},
 	grove = {
 		decor("Mushroom", 4, { lush = 0.8, glowing = true }),
 		decor("Flowers", 2, { lush = 1, palette = "groveFlowers" }),
 		decor("Bush", 2, { lush = 0.4, palette = "groveGreens", size = { 2, 3.4 } }),
 		decor("Crystal", 1, { palette = "amethyst", size = { 0.8, 1.8 } }),
-		decor("Fern", 3, { lush = 0.6, enabled = false }), -- TODO PropArt.Fern (violet)
-		decor("DeadBranch", 1, { enabled = false }), -- TODO PropArt.DeadBranch
+		decor("Fern", 3, { lush = 0.6 }),
+		decor("DeadBranch", 1),
 	},
-	-- By the water's edge, any biome (reeds, cattails, lily pads). TODO:
-	-- DecorSpots never picks this table yet; once the models exist, give
-	-- spots within a few studs of NearestWater() this table instead.
+	-- By the water's edge, any biome: reeds and cattails on the bank, lily
+	-- pads on still water (DecorSpots picks this table near the water).
 	shore = {
-		decor("Reeds", 4, { enabled = false }), -- TODO PropArt.Reeds
-		decor("Cattails", 2, { enabled = false }), -- TODO PropArt.Cattails
-		decor("LilyPad", 2, { enabled = false }), -- TODO PropArt.LilyPad (on the water)
+		decor("Reeds", 4),
+		decor("Cattails", 2),
+		decor("LilyPad", 2),
 	},
 } :: { [string]: { DecorKind } }
 
 -- Candidate spots per 64-stud cell, before vitality and the ground rules.
--- (About half the rows are TODO slots today, so roughly half the
--- candidates land on one and are skipped; when the new PropArt models are
--- wired in, the ground fills in without touching these.)
 EnvironmentData.DecorCell = 64
 EnvironmentData.DecorCandidates = { meadow = 18, starter = 26, hills = 22, snow = 14, volcano = 12, grove = 22 } :: {
 	[string]: number,
@@ -779,6 +774,17 @@ function EnvironmentData.DecorBlocked(x: number, z: number): boolean
 	return TerrainGen.WaterLevelAt(x, z) ~= nil
 end
 
+local SHORE_STUDS = 6 -- this close to the water counts as the bank
+
+-- Whether a "shore" row suits the spot: lily pads only on the water,
+-- everything else only on land. (Rows of other tables always fit.)
+local function shoreFits(kind: string, shoreKind: string?): boolean
+	if shoreKind == nil then
+		return true
+	end
+	return (kind == "LilyPad") == (shoreKind == "water")
+end
+
 -- The deterministic decoration of cell (cellX, cellZ): every player sees
 -- the same meadow. `vitalityOf(biomeId)` gives each grove's vitality
 -- (0..100); thriving groves grow more flowers. Trees aren't avoided here
@@ -804,25 +810,45 @@ function EnvironmentData.DecorSpots(
 		local variantRoll = rng:next()
 		local yaw = rng:next() * math.pi * 2
 		local biome = EnvironmentData.DecorBiomeAt(x, z)
+		-- The water's edge: reeds and cattails on the bank, lily pads on
+		-- still water (the lake and the pond, not the river).
+		local water = TerrainGen.WaterLevelAt(x, z)
+		local shoreKind: string? = nil
+		local _, distance, waterKind = EnvironmentData.NearestWater(x, z)
+		if water ~= nil then
+			if waterKind == "river" or WorldLayout.FlatWeight(x, z) > 0 then
+				continue -- open river water, or a pond in town
+			end
+			shoreKind = "water"
+		elseif distance < SHORE_STUDS then
+			shoreKind = "bank"
+		end
+		if shoreKind then
+			biome = "shore"
+		end
 		local list = EnvironmentData.Decor[biome]
 		local total = 0
 		for _, d in ipairs(list) do
-			total += d.weight
+			if shoreFits(d.kind, shoreKind) then
+				total += d.weight
+			end
 		end
 		local roll = kindRoll * total
 		local pickIndex = #list
 		for i, d in ipairs(list) do
-			roll -= d.weight
-			if roll < 0 then
-				pickIndex = i
-				break
+			if shoreFits(d.kind, shoreKind) then
+				roll -= d.weight
+				if roll < 0 then
+					pickIndex = i
+					break
+				end
 			end
 		end
 		local pick = list[pickIndex]
-		if pick.enabled == false then
+		if pick.enabled == false or not shoreFits(pick.kind, shoreKind) then
 			continue
 		end
-		local life = if biome == "meadow"
+		local life = if biome == "meadow" or biome == "shore"
 			then EnvironmentData.LifeFactor(vitalityOf("starter"))
 			else EnvironmentData.LifeFactor(vitalityOf(biome))
 		local lush = pick.lush or 0
@@ -830,12 +856,17 @@ function EnvironmentData.DecorSpots(
 		if keepRoll >= keep then
 			continue
 		end
-		if EnvironmentData.DecorBlocked(x, z) then
-			continue
-		end
-		local y = TerrainGen.HeightAt(x, z)
-		if y > 100 then
-			continue -- mountain peaks stay bare
+		local y
+		if shoreKind == "water" then
+			y = water :: number -- floating on the surface
+		else
+			if EnvironmentData.DecorBlocked(x, z) then
+				continue
+			end
+			y = TerrainGen.HeightAt(x, z)
+			if y > 100 then
+				continue -- mountain peaks stay bare
+			end
 		end
 		table.insert(out, {
 			biome = biome,
@@ -843,7 +874,7 @@ function EnvironmentData.DecorSpots(
 			kind = pick.kind,
 			variant = math.min(pick.variants, 1 + math.floor(variantRoll * pick.variants)),
 			x = x,
-			y = y - (pick.sink or 0.1),
+			y = if shoreKind == "water" then y else y - (pick.sink or 0.1),
 			z = z,
 			yaw = yaw,
 		})

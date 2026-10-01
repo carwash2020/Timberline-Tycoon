@@ -271,8 +271,9 @@ local function portrait(parent: Instance): ViewportFrame
 		end
 		local camera = Instance.new("Camera")
 		camera.FieldOfView = 30
-		local eye = (head.CFrame * CFrame.new(0, 0.15, -4.2)).Position
-		camera.CFrame = CFrame.lookAt(eye, head.Position - Vector3.new(0, 0.25, 0))
+		-- Far enough back for the whole beanie and its pompom.
+		local eye = (head.CFrame * CFrame.new(0, 0.35, -5.2)).Position
+		camera.CFrame = CFrame.lookAt(eye, head.Position + Vector3.new(0, 0.05, 0))
 		camera.Parent = view
 		view.CurrentCamera = camera
 	end)

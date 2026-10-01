@@ -118,12 +118,13 @@ local function sizeOf(row: DecorKind, variant: number): number
 	return size[1] + (size[2] - size[1]) * t
 end
 
--- How to build each decoration kind from PropArt. TODO (nature
--- workstream): wire in GrassTuft, Fern, Reeds, LilyPad, FallenLog,
--- Pebbles, SnowPile, LavaRock, Stump, Cattails, BerryBush and DeadBranch
--- here once PropArt has them, then drop `enabled = false` on their rows
--- in EnvironmentData.Decor.
-type Builder = (row: DecorKind, variant: number, seed: number) -> Model
+-- How to build each decoration kind from PropArt. `biome` is the Decor
+-- table the spot came from ("meadow" and "shore" take the Starter Forest's
+-- tints); PropArt.Tints gives each biome its grass, leaf, bark and moss.
+type Builder = (row: DecorKind, variant: number, seed: number, biome: string) -> Model
+local function tints(biome: string): PropArt.Tints
+	return PropArt.Tints(if biome == "meadow" or biome == "shore" then "starter" else biome)
+end
 local BUILDERS: { [string]: Builder } = {
 	Flowers = function(row, _variant, seed)
 		return PropArt.Flowers(seed, paletteOf(row))
@@ -139,6 +140,44 @@ local BUILDERS: { [string]: Builder } = {
 	end,
 	Crystal = function(row, variant, seed)
 		return PropArt.Crystal(seed, paletteOf(row)[1], sizeOf(row, variant))
+	end,
+	GrassTuft = function(_row, _variant, seed, biome)
+		return PropArt.GrassTuft(seed, tints(biome).grass)
+	end,
+	Fern = function(_row, _variant, seed, biome)
+		return PropArt.Fern(seed, tints(biome).grass)
+	end,
+	Pebbles = function(_row, _variant, seed, biome)
+		return PropArt.Pebbles(seed, tints(biome).stone)
+	end,
+	BerryBush = function(_row, _variant, seed)
+		return PropArt.BerryBush(seed)
+	end,
+	FallenLog = function(_row, _variant, seed, biome)
+		local t = tints(biome)
+		return PropArt.FallenLog(seed, t.bark, t.moss)
+	end,
+	Stump = function(_row, _variant, seed, biome)
+		local t = tints(biome)
+		return PropArt.Stump(seed, t.bark, t.moss)
+	end,
+	DeadBranch = function(_row, _variant, seed)
+		return PropArt.DeadBranch(seed)
+	end,
+	SnowPile = function(row, variant, seed)
+		return PropArt.SnowPile(seed, sizeOf(row, variant))
+	end,
+	LavaRock = function(row, variant, seed)
+		return PropArt.LavaRock(seed, sizeOf(row, variant))
+	end,
+	Reeds = function(_row, _variant, seed)
+		return PropArt.Reeds(seed)
+	end,
+	Cattails = function(_row, _variant, seed)
+		return PropArt.Cattails(seed)
+	end,
+	LilyPad = function(_row, _variant, seed)
+		return PropArt.LilyPad(seed)
 	end,
 }
 
@@ -160,7 +199,7 @@ local function buildDecor(spot: DecorSpot, key: string): Decor?
 	if not row or not builder then
 		return nil
 	end
-	local model = builder(row, spot.variant, seedOf(spot.biome, spot.index, spot.variant))
+	local model = builder(row, spot.variant, seedOf(spot.biome, spot.index, spot.variant), spot.biome)
 	local parts: { BasePart } = {}
 	local locals: { CFrame } = {}
 	for _, d in ipairs(model:GetDescendants()) do
