@@ -42,6 +42,7 @@ local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
@@ -673,7 +674,7 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	local def = rec.def
 	if not ForestLogic.TakeSeed(profile.heartseeds, def.id) then
 		local wood = string.lower(def.displayName)
-		notify(player, string.format("You have no %s Heartseeds. Fell a %s tree to find some.", wood, wood))
+		notify(player, string.format("You have no %s Heartseeds. Fell %s tree to find some.", wood, Util.article(wood)))
 		return
 	end
 	publishSeeds(player, profile)
