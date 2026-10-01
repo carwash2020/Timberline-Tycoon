@@ -3,7 +3,8 @@
 -- (ForestService) owns everything; this draws it.
 --   * The Heartseed pouch: a small chip left of the Daily Goals button
 --     (HUD.UnderCash) with your seed count; tap it for the count of each
---     wood (one of the corner's popups). It bumps when seeds arrive.
+--     wood (one of the corner's popups). It bumps when seeds arrive. It
+--     shows from the tutorial's plant step on (HudRules.Pouch).
 --   * "Plant Heartseed (n)" on every stump you hold that wood's seed for
 --     (tag "Stump", attributes WoodId / TreeUid; F or Y), and a little
 --     glowing seed over the nearest plantable stumps so you can find them.
@@ -35,6 +36,7 @@ local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local CameraShake = require(script.Parent.CameraShake)
 local HUD = require(script.Parent.HUD)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 type FigureDef = ForestData.FigureDef
@@ -160,7 +162,7 @@ local function refreshPouch()
 	end
 	local total = player:GetAttribute("Heartseeds")
 	local n = if type(total) == "number" then total else 0
-	slot.Visible = n > 0
+	slot.Visible = HudRules.Pouch(player:GetAttribute("TutorialStep"), n)
 	label.Text = tostring(n)
 	local bump = pouchBump
 	if bump and n > lastTotal then
@@ -248,6 +250,7 @@ local function buildPouch()
 
 	pouchSlot, pouchLabel, pouchBump, pouchPopup, pouchPopupText = slot, label, bump, card.outer, text
 	player:GetAttributeChangedSignal("Heartseeds"):Connect(refreshPouch)
+	player:GetAttributeChangedSignal("TutorialStep"):Connect(refreshPouch)
 	local total = player:GetAttribute("Heartseeds")
 	lastTotal = if type(total) == "number" then total else 0
 	refreshPouch()

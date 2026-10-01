@@ -1,7 +1,9 @@
 --!strict
 -- DailyUI: daily goals and the streak (rules in Shared/DailyData).
 --   * A "Daily goals 1/3" button under the cash plaque (top right, in
---     HUD.UnderCash), with the streak.
+--     HUD.UnderCash), with the streak. It waits until Murph's tutorial is
+--     done (HudRules.DailyButton), so the first minute has one objective;
+--     the goals still count meanwhile, quietly (DailyService).
 --   * Tapping it opens the day's goals (one of the corner's popups, under
 --     it): progress bars, each goal's reward, the bonus for finishing them
 --     all, and the time until new goals.
@@ -14,6 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local DailyUI = {}
@@ -90,7 +93,11 @@ local function refresh()
 	end
 	local b = button
 	if b then
-		b.Visible = #list > 0
+		b.Visible = HudRules.DailyButton(player:GetAttribute("TutorialStep"), #list)
+		local p = panel
+		if p and not b.Visible then
+			p.Visible = false
+		end
 		local s = streak()
 		b.Text = string.format(
 			"DAILY GOALS  %d/%d%s",
@@ -233,7 +240,7 @@ end
 
 function DailyUI.Start()
 	build()
-	for _, attribute in ipairs({ "DailyGoals", "DailyStreak", "DailyResetAt", "BestAxeTier" }) do
+	for _, attribute in ipairs({ "DailyGoals", "DailyStreak", "DailyResetAt", "BestAxeTier", "TutorialStep" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	refresh()

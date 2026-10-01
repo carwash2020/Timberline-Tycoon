@@ -9,10 +9,14 @@
 --     Heading follows the ground: four rays at the chassis corners give the
 --     slope (Shared/VehicleLogic.GroundUp), never more than 30 degrees, so
 --     the truck rides hills and bumps instead of nosing into them.
---   * "Truck to lot" side button (Y on a gamepad): sends your truck back to
---     your parking slot when it's far away (left somewhere, or stuck). The
---     load comes along only from town; otherwise the server leaves it on
---     the ground where the truck stood (VehicleService).
+--   * "Send truck home" side button (Y on a gamepad): sends your truck back
+--     to your parking slot when it's far away (left somewhere, or stuck).
+--     It shows only while you're on foot, away from the truck, and the
+--     truck is more than 20 studs from its own spot (the server's
+--     TruckSlotDistance attribute; HudRules.SendHome), so it isn't on
+--     screen while the truck sits in the lot. The load comes along only
+--     from town; otherwise the server leaves it on the ground where the
+--     truck stood (VehicleService).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -24,13 +28,13 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local HUD = require(script.Parent.HUD)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local VehicleController = {}
 
 local player = Players.LocalPlayer
 
-local CALL_BUTTON_DISTANCE = 40 -- studs: show "Truck to lot" when your truck is this far away
 local MAX_TILT = math.rad(30) -- the steepest the truck leans to follow the ground
 local RAY_UP = 2.5 -- corner rays start this far above the chassis...
 local RAY_DOWN = 9 -- ...and look this far down
@@ -150,15 +154,15 @@ local function refreshCallButton()
 	local truck = myTruck()
 	-- A truck far away may not be streamed in at all: that counts as far.
 	local truckPart = if truck then truck.PrimaryPart else nil
-	local far = truckPart == nil
-		or (hrp ~= nil and (hrp.Position - truckPart.Position).Magnitude > CALL_BUTTON_DISTANCE)
-	button.root.Visible = hrp ~= nil and session == nil and far
+	local fromYou = if hrp and truckPart then (hrp.Position - truckPart.Position).Magnitude else nil
+	button.root.Visible =
+		HudRules.SendHome(hrp ~= nil and session == nil, fromYou, player:GetAttribute("TruckSlotDistance"))
 end
 
 local function buildButton()
 	callButton = HUD.SideButton({
 		name = "CallTruck",
-		text = "Truck to lot",
+		text = "Send truck home",
 		style = "blue",
 		order = 4,
 		key = Enum.KeyCode.ButtonY,
@@ -166,6 +170,7 @@ local function buildButton()
 			Net.Remote("CallTruck"):FireServer()
 		end,
 	})
+	player:GetAttributeChangedSignal("TruckSlotDistance"):Connect(refreshCallButton)
 end
 
 local function watchCharacter(char: Model)

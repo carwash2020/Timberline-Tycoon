@@ -40,13 +40,17 @@
 --     in town, or waits on the ground where the truck was.
 --   * BedCount / BedCapacity are attributes on the truck AND on the player
 --     (the HUD keeps working while the truck is streamed out).
---   * Recall ("Truck to lot") and switching trucks rebuild the truck in the
+--   * Recall ("Send truck home") and switching trucks rebuild the truck in the
 --     player's slot. The load comes along (when it fits) only if the truck
 --     was already in town (VehicleLogic.InTown); from further out it's
 --     left on the ground where the truck stood, as the player's logs, so
 --     nobody skips the haul home. Left-behind logs still lying out when the
 --     player leaves are saved (profile.leftLoad, GameServer) and put back
 --     where they lay on rejoin (RestoreLeftLoad).
+--   * TruckSlotDistance on the player: how far their truck is from its own
+--     parking spot, in whole studs (Shared/TruckHome), checked twice a
+--     second and sent only when it moves a couple of studs; nil with no
+--     truck. VehicleController shows "Send truck home" from it.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -58,6 +62,7 @@ local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
+local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
 local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
@@ -125,6 +130,8 @@ local overflowUsed: { [number]: boolean } = {}
 local lastRecall: { [number]: number } = {}
 local LEAVE_CONFIRM_SECONDS = 6
 local leaveAsked: { [number]: number } = {} -- [userId] = when Recall warned about leaving the load
+local slotShown: { [number]: number } = {} -- [userId] = the TruckSlotDistance last sent
+local slotWarned = false
 
 local notify: ((Player, string) -> ())? = nil
 
@@ -972,10 +979,39 @@ function VehicleService.RestoreLeftLoad(player: Player, saved: { any }): number
 	return restored
 end
 
+-- Mirrors how far this truck is from its own parking spot (where the
+-- rig's pivot sits when parked there) on its owner's TruckSlotDistance.
+local function publishSlotDistance(rec: TruckRecord)
+	local home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -rigShiftOf(rec.trailerLayout))
+	local distance = TruckHome.Distance(trustedCFrame(rec).Position, home.Position)
+	local userId = rec.owner.UserId
+	if TruckHome.ShouldPublish(slotShown[userId], distance) then
+		slotShown[userId] = distance
+		rec.owner:SetAttribute("TruckSlotDistance", distance)
+	end
+end
+
+local function slotDistanceLoop()
+	while true do
+		task.wait(TruckHome.Every)
+		for _, rec in pairs(trucks) do
+			local ok, err = pcall(function(): any
+				publishSlotDistance(rec)
+				return nil
+			end)
+			if not ok and not slotWarned then
+				slotWarned = true -- once: this runs twice a second
+				warn("[VehicleService] TruckSlotDistance failed: " .. tostring(err))
+			end
+		end
+	end
+end
+
 -- `notifyFn` shows a toast (GameServer's notify). Without it, messages for
 -- players go to Output.
 function VehicleService.Init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
+	task.spawn(slotDistanceLoop)
 end
 
 local function destroyTruck(rec: TruckRecord)
@@ -1189,8 +1225,10 @@ function VehicleService.DespawnTruck(player: Player)
 	end
 	trucks[player.UserId] = nil
 	lastRecall[player.UserId] = nil
+	slotShown[player.UserId] = nil
 	player:SetAttribute("BedCount", 0)
 	player:SetAttribute("BedCapacity", 0)
+	player:SetAttribute("TruckSlotDistance", nil)
 end
 
 -- True if this player is sitting in their own truck's driver seat.
@@ -1199,7 +1237,7 @@ local function isDriving(player: Player, rec: TruckRecord): boolean
 	return occupant ~= nil and player.Character ~= nil and occupant.Parent == player.Character
 end
 
--- "Truck to lot": rebuilds the player's truck in their parking slot. The
+-- "Send truck home": rebuilds the player's truck in their parking slot. The
 -- load comes along from town only; from further out it's left where the
 -- truck stood (SpawnTruck). Returns false and why not when it can't.
 function VehicleService.Recall(player: Player): (boolean, string?)
@@ -1224,7 +1262,7 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 			leaveAsked[player.UserId] = now
 			return false,
 				string.format(
-					"Your %d log%s will be left where your truck stands. Press Truck to lot again to go ahead.",
+					"Your %d log%s will be left where your truck stands. Press Send truck home again to go ahead.",
 					#rec.bed,
 					if #rec.bed == 1 then "" else "s"
 				)
