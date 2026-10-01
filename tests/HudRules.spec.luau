@@ -136,11 +136,21 @@ return function(t)
 		t.eq(chip(2, 0, 0), { shown = true, hands = "Hands 2/2", full = false })
 	end)
 
-	t.test("the load chip hides with nothing in hand or bed and no truck, and while a panel is open", function()
+	t.test("the load chip hides with nothing in hand or bed, and while a panel is open", function()
 		t.eq(HudRules.LoadChip(nil, nil, nil, HANDS, false).shown, false, "the save still loading")
 		t.eq(HudRules.LoadChip(0, 0, 0, HANDS, false).shown, false, "no truck, nothing carried")
 		t.eq(HudRules.LoadChip(0, 0, nil, HANDS, false).shown, false, "BedCapacity not set yet")
-		t.eq(HudRules.LoadChip(0, 0, 6, HANDS, false).shown, true, "an empty truck still shows its bed")
+		-- UI-FU-1: everyone has a truck from the moment they join; an empty
+		-- one doesn't put "Hands 0/2 · Bed 0/6" on screen from minute one.
+		t.eq(
+			HudRules.LoadChip(0, 0, 6, HANDS, false),
+			{ shown = false, hands = "Hands 0/2", bed = "Bed 0/6", full = false },
+			"a new player's empty truck: hidden"
+		)
+		t.eq(HudRules.LoadChip(0, 0, 12, HANDS, false).shown, false, "a bigger empty truck too")
+		t.eq(HudRules.LoadChip(1, 0, 6, HANDS, false).shown, true, "the first log picked up shows it")
+		t.eq(HudRules.LoadChip(0, 1, 6, HANDS, false).shown, true, "and it stays while the log's in the bed")
+		t.eq(HudRules.LoadChip(0, 0, 6, HANDS, false).shown, false, "sold: the bed's empty again, it goes")
 		for _, case in ipairs({ { 1, 0, 0 }, { 0, 3, 6 }, { 2, 6, 6 }, { 0, 0, 6 } }) do
 			local view = HudRules.LoadChip(case[1], case[2], case[3], HANDS, true)
 			t.eq(view.shown, false, "hidden with the hint while the shop is open")

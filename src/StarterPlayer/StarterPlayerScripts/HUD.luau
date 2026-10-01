@@ -22,9 +22,10 @@
 --   * The load chip on the same line, left of the hint: a log, "Hands 1/2"
 --     and, with a truck, "Bed 4/6" (amber and "Bed full" once it's full),
 --     from the CarriedLogs, BedCount and BedCapacity attributes
---     (HudRules.LoadChip); the log bumps when they change. The line stays
---     clear of a phone's jump button (HudLayout.BottomRow), and hides with
---     the hint.
+--     (HudRules.LoadChip); the log bumps when they change. It shows only
+--     while there are logs in your hands or your bed. The line stays clear
+--     of a phone's jump button (HudLayout.BottomRow), and hides with the
+--     hint.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second

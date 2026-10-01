@@ -132,9 +132,10 @@ export type LoadChip = {
 --   * "Hands 1/2", then "Bed 4/6" while you have a truck with a bed
 --     (BedCapacity above 0; the Scout ATV has none), "Bed full" and amber
 --     once it's full;
---   * hidden when there's nothing in your hands or your bed and no truck
---     bed (before the save loads, say), and while a panel is open, as the
---     hint is.
+--   * hidden while there's nothing in your hands or your bed: everyone
+--     has an empty truck from the moment they join, and "Hands 0/2 · Bed
+--     0/6" from minute one is noise (it shows once you pick up a log);
+--     and while a panel is open, as the hint is.
 function HudRules.LoadChip(
 	carried: unknown,
 	bedCount: unknown,
@@ -149,7 +150,7 @@ function HudRules.LoadChip(
 		bed = if full then "Bed full" else string.format("Bed %d/%d", inBed, room)
 	end
 	return {
-		shown = not modal and (hands > 0 or inBed > 0 or room > 0),
+		shown = not modal and (hands > 0 or inBed > 0),
 		hands = string.format("Hands %d/%d", hands, count(handCapacity)),
 		bed = bed,
 		full = full,
