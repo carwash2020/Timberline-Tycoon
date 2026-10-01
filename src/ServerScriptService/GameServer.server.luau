@@ -287,7 +287,7 @@ local function serverPickupLog(player: Player, logUid: unknown)
 		slot += 1
 	end
 	pp:SetAttribute("CarrySlot", slot)
-	pp.CFrame = torso.CFrame * CFrame.new(0, 0.4 + slot * 1.3, -1.7)
+	pp.CFrame = torso.CFrame * CFrame.new(0, 0.35 - slot * 1.25, -1.35) -- = CarryLayout.LogOffset(slot)
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = torso
 	weld.Part1 = pp
