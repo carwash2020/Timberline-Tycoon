@@ -102,7 +102,7 @@ return {
 				cam(width / 2, 7, -12, width / 2, 0, -4.5, "dropped on the ground"),
 				cam(width / 2 + 6, 3, 14, width / 2, 2, 0, "from behind (blades)"),
 				cam(width + 3, 6, -10, width + 8.5, 3.5, 0, "held: the grip"),
-				cam(width + 16, 5, -3, width + 8.5, 4, 0, "held, from the side"),
+				cam(width + 19, 5.5, 9.5, width + 8.5, 4, 0, "held, from the side and behind"),
 				cam(at(9), 2.8, -4.2, at(9), 2.8, 0, "Starfall up close"),
 				cam(at(7) - 1.5, 3.4, -4.4, at(7), 2.8, 0, "Obsidian up close"),
 				cam(at(1) + 1.2, 2.8, -4, at(1), 2.4, 0, "Rusty up close"),
