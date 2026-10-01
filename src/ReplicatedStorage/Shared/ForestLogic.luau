@@ -2,7 +2,8 @@
 -- ForestLogic: the Living Forest's rules (GAME_DESIGN §16), pure so tests
 -- and tools can check them. Numbers come from ForestData; randomness comes
 -- in as rolls in [0, 1), so every rule is deterministic here.
---   * Heartseeds: how many a felled tree drops, and the pouch's caps.
+--   * Heartseeds: how many a felled tree drops, the pouch's caps, and how
+--     long a planted sapling takes.
 --   * Grove Vitality: changes, the drift back to rest, tiers.
 --   * The Hidden Grain: the figure chance, the roll, value multipliers,
 --     and the average a figure adds (the economy model's factor).
@@ -59,6 +60,27 @@ function ForestLogic.SeedDrop(facts: DropFacts): number
 		n += s.stewardBonus
 	end
 	return n
+end
+
+-- True when the steward's bonus is earned: the tree has stood
+-- Seeds.stewardAfter since it sprouted (`sproutedAt` nil = long ago).
+function ForestLogic.StewardEarned(sproutedAt: number?, now: number): boolean
+	return sproutedAt == nil or now - sproutedAt >= ForestData.Seeds.stewardAfter
+end
+
+-- Seconds a planted sapling of `def` takes to stand: SproutSeconds in the
+-- ground groves; woods from outside them keep their slowness
+-- (SlowSproutShare of respawnSec). Never past `regrowsIn` (when the stump
+-- grows back anyway), but never under SproutSeconds either.
+function ForestLogic.SproutSeconds(def: WoodData.WoodDef, regrowsIn: number?): number
+	local seconds = ForestData.SproutSeconds
+	if not ForestLogic.IsGrove(def.biome) then
+		seconds = math.max(seconds, def.respawnSec * ForestData.SlowSproutShare)
+	end
+	if regrowsIn then
+		seconds = math.min(seconds, math.max(ForestData.SproutSeconds, regrowsIn))
+	end
+	return seconds
 end
 
 -- True for the size classes that drop the large tree's extra seed.
@@ -152,9 +174,14 @@ function ForestLogic.Drift(v: number, seconds: number): number
 end
 
 -- The change felling a tree makes (planted trees cost the grove less).
-function ForestLogic.FellDelta(planted: boolean): number
+-- `refell`: its planter felled it before earning the steward's bonus, so
+-- its planting's vitality goes back too.
+function ForestLogic.FellDelta(planted: boolean, refell: boolean?): number
 	local d = ForestData.Vitality
-	return if planted then d.fellPlanted else d.fellWild
+	if not planted then
+		return d.fellWild
+	end
+	return if refell then d.fellPlanted - d.plant else d.fellPlanted
 end
 
 function ForestLogic.TierFor(v: number): Tier

@@ -17,7 +17,10 @@ ForestData.Seeds = {
 	rollChance = 0.15, -- +1 on this roll
 	rollBonus = 1,
 	stormBonus = 1, -- +1 for a storm-struck tree felled in time
-	stewardBonus = 1, -- felling a tree you planted yourself: +1 instead of a share
+	stewardBonus = 1, -- felling a tree you planted yourself: +1 instead of a share ...
+	-- ... once it has stood this long since it sprouted (seconds). Sooner, no bonus, and its
+	-- planting's vitality goes back: replanting and refelling one tree alone gains nothing.
+	stewardAfter = 10 * 60,
 	maxPerWood = 50, -- the pouch holds at most this many of one wood
 	maxTotal = 200, -- ... and this many in all
 }
@@ -26,6 +29,10 @@ ForestData.Seeds = {
 ForestData.PlantRange = 12
 -- Seconds from planting to the tree standing again (a sapling sprouts).
 ForestData.SproutSeconds = 8
+-- Woods that grow outside the ground groves (Lumenwood on the isles,
+-- palmwood on the island) keep their slow regrowth: planted, they sprout
+-- for this share of their respawnSec (never past when they'd grow back).
+ForestData.SlowSproutShare = 0.5
 
 -- The planter's share: when someone else fells a tree you planted, you get
 -- this much of its logs' base value (paid by the game), if you're online.
@@ -218,7 +225,8 @@ ForestData.Elder = {
 	helperMinShare = 0.1, -- chopped at least this much of its HP to count
 	helperSeeds = 2, -- each helper gets these Heartseeds ...
 	helperShare = 0.1, -- ... and this much of its logs' value
-	fadeSeconds = 15 * 60, -- unfelled, it fades back into the forest
+	fadeSeconds = 15 * 60, -- unfelled, it fades back into the forest (a night-only one at dawn)
+	nightLeftSeconds = 5 * 60, -- a night-only grove wakes one only with this much of the night left
 	minGap = 16, -- studs to the nearest other tree where it wakes
 }
 
