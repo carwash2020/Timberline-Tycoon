@@ -20,6 +20,8 @@
 --   * Lightning flashes (Flash) for WeatherController.
 --   * Environment(): the hour, daylight, biome, weather and wind as one
 --     reading, shared by the other environment controllers.
+--   * In Studio only, the workspace attribute "ClockOverride" (an hour,
+--     0-24) stands in for the clock (Shared/ClockOverride, WLD-06).
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
@@ -27,6 +29,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
@@ -39,6 +42,17 @@ local EASE_SECONDS = 1 -- time constant: a change is ~95% done after 3 s
 local TARGET_EVERY = 0.1 -- seconds between recomputing the target look
 local GLOW_EVERY = 0.5 -- seconds between night-light checks
 local OWN_PREFIX = "Timberline"
+local IS_STUDIO = RunService:IsStudio()
+
+-- The hour to show at `serverTime`: the shared clock, or Studio's
+-- ClockOverride when it is set.
+local function clockAt(serverTime: number): number
+	local clock = WorldTime.ClockTime(serverTime)
+	if IS_STUDIO then
+		return ClockOverride.Apply(clock, workspace:GetAttribute(ClockOverride.Attribute), true)
+	end
+	return clock
+end
 
 ---------------------------------------------------------------------------
 -- The environment reading other controllers share
@@ -92,7 +106,7 @@ function LightingController.Environment(): Environment
 		return env
 	end
 	local serverTime = workspace:GetServerTimeNow()
-	local clock = WorldTime.ClockTime(serverTime)
+	local clock = clockAt(serverTime)
 	local biomeId = biomeOfLocalPlayer()
 	local global = publishedWeather(serverTime)
 	local here = WeatherSchedule.ForBiome(global, biomeId)
@@ -499,7 +513,7 @@ function LightingController.Start()
 
 	RunService.RenderStepped:Connect(function(dt: number)
 		-- The sun every frame, straight from the server's clock.
-		Lighting.ClockTime = WorldTime.ClockTime(workspace:GetServerTimeNow())
+		Lighting.ClockTime = clockAt(workspace:GetServerTimeNow())
 		sinceTarget += dt
 		if sinceTarget >= TARGET_EVERY then
 			sinceTarget = 0
