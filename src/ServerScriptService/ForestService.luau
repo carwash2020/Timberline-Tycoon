@@ -10,7 +10,8 @@
 --     "SeedPop"); the pouch is profile.heartseeds, mirrored on the
 --     Seeds_<woodId> and Heartseeds player attributes.
 --   * PlantSeed(treeUid): validated (rate, a felled non-temporary tree with
---     its stump, in range, a seed of that wood); a sapling sprouts
+--     its stump, past the tutorial's plant step or no tutorial, in range, a
+--     seed of that wood); a sapling sprouts
 --     (ForestLogic.SproutSeconds: 8 s in the groves, longer for the slow
 --     woods outside them), then TreeService.Regrow marks the tree as yours
 --     and a name stake goes up at its foot.
@@ -40,6 +41,7 @@ local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
+local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
@@ -642,6 +644,12 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	end
 	if not rec.felled or not rec.stump or rec.temporary then
 		return -- nothing to plant in (still standing, mid-fall, an Elder's)
+	end
+	-- Murph's tutorial saves the first seed for its plant step (from the
+	-- save, not the client: ForestUI just hides the prompt till then).
+	if not TutorialData.CanPlant(if profile.tutorialDone then 0 else profile.tutorialStep) then
+		notify(player, "Hang onto it: Murph will show you where.")
+		return
 	end
 	if rec.dormant then
 		notify(player, "This grove sleeps by day. Plant here after dark.")

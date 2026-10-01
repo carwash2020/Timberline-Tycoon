@@ -11,7 +11,10 @@
 --   * Each step reached is logged once as a "Tutorial" analytics funnel
 --     (which also lets saves made before a new step was inserted find
 --     their place again).
---   * ForestService reports "seedPlanted" for the Heartseed beat.
+--   * ForestService reports "seedPlanted" for the Heartseed beat. Until
+--     then a player keeps their seeds (ForestService refuses planting,
+--     TutorialData.CanPlant), and the stumps they fell wait for them
+--     (TreeService.StumpHold, TutorialData.StumpHold).
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +26,7 @@ local FieldGuideService = require(script.Parent.FieldGuideService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local TreeService = require(script.Parent.TreeService)
 
 type Profile = ProfileService.Profile
 type TutorialEvent = TutorialData.TutorialEvent
@@ -152,6 +156,17 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 	enterStep(player, profile, profile.tutorialStep + 1)
 end
 
+-- How long a stump this player has just felled keeps before its tree grows
+-- back on its own (TreeService.StumpHold): up to the plant step, long
+-- enough to come back and plant in it; 0 otherwise (or skipped, or done).
+function QuestService.StumpHoldFor(player: Player): number
+	local profile = ProfileService.GetProfile(player)
+	if not profile or profile.tutorialDone then
+		return 0
+	end
+	return TutorialData.StumpHold(profile.tutorialStep)
+end
+
 local function onSkip(player: Player)
 	if not RateLimiter.Allow(player, "SkipTutorial") then
 		return
@@ -167,6 +182,7 @@ end
 function QuestService.Init(skipRemote: RemoteEvent, notifyFn: (Player, string) -> ())
 	notify = notifyFn
 	skipRemote.OnServerEvent:Connect(onSkip)
+	TreeService.StumpHold = QuestService.StumpHoldFor
 end
 
 return QuestService

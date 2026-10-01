@@ -270,6 +270,104 @@ return function(t)
 		t.eq(s.pending(2), 0)
 	end)
 
+	t.test("a held stump (Murph's plant step) outlasts the wood's regrowth, then the tree comes back", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local a = s.player(1)
+		local asked
+		s.Trees.StumpHold = function(p)
+			asked = p
+			return 240
+		end
+		s.chop(a, rec, 20)
+		t.eq(asked, a, "asked about the feller")
+		s.run(s.TreeLogic.FallTime + 1) -- landed
+		t.ok(rec.stump ~= nil)
+		t.eq(s.Trees.RegrowsIn(rec.uid), 240)
+		s.clock += rec.def.respawnSec
+		s.run(rec.def.respawnSec) -- the oak's own 45 s are up
+		t.ok(rec.felled and rec.stump ~= nil, "still a stump")
+		t.eq(s.pending(240 - rec.def.respawnSec), 1, "it waits out the rest of the hold")
+		s.clock += 120 - rec.def.respawnSec
+		t.ok(rec.felled and rec.stump ~= nil and rec.stump.Parent ~= nil, "two minutes on, the stump is still there")
+		t.eq(s.Trees.RegrowsIn(rec.uid), 120)
+		s.clock += 120
+		s.run()
+		t.ok(rec.alive and not rec.felled, "the hold over, it regrows on its own")
+		t.eq(rec.stump, nil)
+		t.eq(s.Trees.RegrowsIn(rec.uid), nil)
+		t.eq(#s.delays, 0)
+	end)
+
+	t.test("no hold, or a hook that fails: the usual regrowth", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local a = s.player(1)
+		s.Trees.StumpHold = function()
+			return 0
+		end
+		s.chop(a, rec, 20)
+		s.run(s.TreeLogic.FallTime + 1)
+		t.eq(s.Trees.RegrowsIn(rec.uid), rec.def.respawnSec)
+		s.run(rec.def.respawnSec)
+		t.ok(rec.alive and not rec.felled, "back after 45 s")
+		s.Trees.StumpHold = function()
+			error("no profile")
+		end
+		s.chop(a, rec, 20)
+		t.eq(s.Trees.RegrowsIn(rec.uid), rec.def.respawnSec)
+		s.run()
+		t.ok(rec.alive and not rec.felled)
+	end)
+
+	t.test("HoldRegrow: at most 4 minutes from now, never sooner, not for standing trees or Elders", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local a = s.player(1)
+		s.Trees.HoldRegrow(rec.uid, 100) -- standing: nothing to hold
+		s.chop(a, rec, 20)
+		t.eq(s.Trees.RegrowsIn(rec.uid), 45)
+		s.Trees.HoldRegrow(rec.uid, 10)
+		t.eq(s.Trees.RegrowsIn(rec.uid), 45, "a short hold never brings it back sooner")
+		s.Trees.HoldRegrow(rec.uid, 10000)
+		t.eq(s.Trees.RegrowsIn(rec.uid), 240, "capped")
+		s.Trees.HoldRegrow(rec.uid, 0 / 0)
+		t.eq(s.Trees.RegrowsIn(rec.uid), 240)
+		s.Trees.HoldRegrow("no-such-tree", 60)
+		local elder = s.Trees.GetTree(s.Trees
+			.SpawnTree("oak", CFrame.new(40, 0, 0), {
+				seed = 3,
+				size = s.TreeLogic.Sizes[2],
+				temporary = true,
+			})
+			:GetAttribute("Uid"))
+		a.root.Position = Vector3.new(44, 0, 0)
+		s.chop(a, elder, 40)
+		t.ok(elder.felled, "the Elder is down")
+		s.Trees.HoldRegrow(elder.uid, 100)
+		t.eq(s.Trees.RegrowsIn(elder.uid), nil, "an Elder's stump goes as usual")
+	end)
+
+	t.test("a held stump planted early stands at once; the hold's timer leaves the new tree alone", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local a = s.player(1)
+		s.Trees.StumpHold = function()
+			return 240
+		end
+		s.chop(a, rec, 20)
+		s.run(s.TreeLogic.FallTime + 1)
+		s.clock += 120
+		s.Trees.Regrow(rec.uid, 1) -- a Heartseed sprouted
+		t.ok(rec.alive and not rec.felled)
+		t.eq(rec.planterId, 1)
+		s.clock += 200
+		s.run()
+		t.ok(rec.alive and not rec.felled, "still standing")
+		t.eq(rec.planterId, 1, "and still the planter's")
+		t.eq(#s.delays, 0)
+	end)
+
 	t.test("felling a ghost ends its wait; with nothing around, no query at all", function()
 		local s = setup()
 		local rec = s.tree("oak")

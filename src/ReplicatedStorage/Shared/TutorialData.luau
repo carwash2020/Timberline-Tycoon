@@ -66,7 +66,7 @@ TutorialData.Steps = {
 	},
 	{
 		id = "plant",
-		objective = "Plant a Heartseed in a stump",
+		objective = "Fell a tree, then plant its Heartseed in the stump",
 		murph = "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.",
 		event = "seedPlanted",
 		count = 1,
@@ -111,6 +111,37 @@ function TutorialData.ObjectiveText(step: Step, progress: number): string
 		text ..= string.format(" (%d/%d)", math.min(progress, step.count), step.count)
 	end
 	return text
+end
+
+-- The Heartseed beat's place in the steps (found by id, so it follows the
+-- step wherever it sits).
+local function indexOf(id: string): number
+	for i, step in ipairs(TutorialData.Steps) do
+		if step.id == id then
+			return i
+		end
+	end
+	error("[TutorialData] no step " .. id)
+end
+TutorialData.PlantStep = indexOf("plant")
+
+-- How long a stump felled on the way to the plant step waits before its
+-- tree grows back on its own (TreeService.HoldRegrow): long enough to haul
+-- and sell a load and come back to plant in it.
+TutorialData.StumpHoldSeconds = 240
+
+-- Whether a player on tutorial step `step` (the TutorialStep attribute: 0
+-- once it's finished or skipped) may plant a Heartseed. Before the plant
+-- step they keep their seed: Murph shows them where.
+function TutorialData.CanPlant(step: number): boolean
+	return step <= 0 or step >= TutorialData.PlantStep
+end
+
+-- Seconds a tree felled by a player on step `step` keeps its stump (0 =
+-- the usual regrowth): anyone still on the way to the plant step, so the
+-- stump is there when Murph asks for it.
+function TutorialData.StumpHold(step: number): number
+	return if step > 0 and step <= TutorialData.PlantStep then TutorialData.StumpHoldSeconds else 0
 end
 
 -- Whether a player who's already past this step (from their save) should

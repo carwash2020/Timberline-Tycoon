@@ -53,6 +53,8 @@ local LOG_LENGTH = 3
 local LOG_DIAMETER = 1.2
 local LOG_GAP = 0.25
 local GHOST_RETRY = 2 -- seconds between checks while something stands where a tree came back
+local MAX_HOLD = 240 -- seconds: HoldRegrow never keeps a stump longer than this from now
+local HOLD_SLACK = 0.1 -- seconds: a timer waking this close to the due time regrows now
 TreeService.LogDiameter = LOG_DIAMETER
 
 -- What a part looked like before the tree was hidden.
@@ -77,6 +79,7 @@ export type TreeRecord = {
 	stumpParts: { [BasePart]: PartState }?, -- how the stump looked before it was hidden
 	ghost: boolean, -- standing but not solid yet: a truck or someone was where it came back
 	regrowAt: number?, -- os.clock() its natural regrowth is due, while it's down
+	heldUntil: number?, -- os.clock() a hold on its stump ends (HoldRegrow), while it's down
 	seed: number,
 	planterId: number?, -- who planted it (the Living Forest), if anyone
 	damageBy: { [number]: number }, -- HP each player has chopped off this growth (co-op credit)
@@ -133,6 +136,10 @@ TreeService.LogMultiplier = nil :: ((Player) -> number)?
 TreeService.OnFelled = nil :: ((player: Player, rec: TreeRecord, logUids: { string }, fallDir: Vector3) -> ())?
 -- Assigned by the forest systems: called when a tree regrows.
 TreeService.OnRegrown = nil :: ((rec: TreeRecord) -> ())?
+-- Assigned by QuestService: how many seconds a stump this player has just
+-- felled should wait before its tree grows back on its own (0 = the wood's
+-- usual respawnSec). Murph's tutorial keeps the stump for its plant step.
+TreeService.StumpHold = nil :: ((feller: Player) -> number)?
 
 local function addPickupPrompt(logPart: BasePart, uid: string, def: WoodDef)
 	local prompt = Instance.new("ProximityPrompt")
@@ -230,6 +237,7 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 		stumpParts = nil,
 		ghost = false,
 		regrowAt = nil,
+		heldUntil = nil,
 		seed = seed,
 		planterId = opts.planterId,
 		damageBy = {},
@@ -603,7 +611,8 @@ local function fellTree(swinger: Player, uid: string): Player?
 
 	local downFor = if rec.temporary then TreeLogic.FallTime + 8 else rec.def.respawnSec
 	rec.regrowAt = if rec.temporary then nil else os.clock() + downFor
-	task.delay(downFor, function()
+	rec.heldUntil = nil
+	local function due()
 		-- Planted back early and felled again since? That felling has its
 		-- own timer.
 		if trees[uid] ~= rec or rec.growth ~= growth then
@@ -611,11 +620,43 @@ local function fellTree(swinger: Player, uid: string): Player?
 		end
 		if rec.temporary then
 			TreeService.Remove(uid)
-		else
-			TreeService.Regrow(uid)
+			return
 		end
-	end)
+		-- Held (HoldRegrow): wait out the rest of the hold, then regrow.
+		local held = rec.heldUntil
+		local left = if rec.felled and held then held - os.clock() else 0
+		if left > HOLD_SLACK then
+			task.delay(left, due)
+			return
+		end
+		TreeService.Regrow(uid)
+	end
+	task.delay(downFor, due)
+	local hold = TreeService.StumpHold
+	if hold and not rec.temporary then
+		local ok, seconds = pcall(hold, feller)
+		if ok and type(seconds) == "number" and seconds > 0 then
+			TreeService.HoldRegrow(uid, seconds)
+		elseif not ok then
+			warn("[TreeService] StumpHold failed: " .. tostring(seconds))
+		end
+	end
 	return feller
+end
+
+-- Keeps a felled tree's stump for at least `seconds` more (at most
+-- MAX_HOLD) before the tree grows back on its own; never brings it back
+-- sooner. Planting a Heartseed in it still regrows it early. Nothing for a
+-- standing tree or an Elder's stump.
+function TreeService.HoldRegrow(uid: string, seconds: number)
+	local rec = trees[uid]
+	local at = if rec and rec.felled and not rec.temporary then rec.regrowAt else nil
+	if not rec or not at or seconds ~= seconds then
+		return
+	end
+	local untilAt = math.max(rec.heldUntil or 0, os.clock() + math.clamp(seconds, 0, MAX_HOLD))
+	rec.heldUntil = untilAt
+	rec.regrowAt = math.max(at, untilAt)
 end
 
 -- Brings a felled tree back: whole HP, stump gone, standing again (clients
@@ -634,6 +675,7 @@ function TreeService.Regrow(uid: string, planterId: number?)
 	rec.model:SetAttribute("HP", rec.hp)
 	rec.felled = false
 	rec.regrowAt = nil
+	rec.heldUntil = nil
 	rec.model:SetAttribute("Felled", false)
 	if not rec.dormant then
 		setTreeVisible(rec, true)

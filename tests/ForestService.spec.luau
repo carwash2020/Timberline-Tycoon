@@ -207,6 +207,9 @@ return function(t)
 			end
 			p.root = root
 			s.profiles[p] = Util.deepCopy(Schema.Template)
+			-- Past Murph's tutorial, which keeps seeds until its plant step
+			-- (tested on its own below).
+			s.profiles[p].tutorialDone = true
 			s.byId[userId] = p
 			return p
 		end
@@ -433,6 +436,56 @@ return function(t)
 		t.eq(stake:GetAttribute("PlanterId"), 1)
 		local board = find(stake, "Board")
 		t.ok(board ~= nil and find(board, "TextLabel").Text == "Ada", "it says who planted it")
+	end)
+
+	t.test("Murph's tutorial: no planting before its plant step, and the seed is kept", function()
+		local s = setup()
+		local rec = s.tree("oak", Vector3.new(10, 0, 10))
+		s.start()
+		local TutorialData = t.shared("TutorialData")
+		local a = s.player(1, "Ada", Vector3.new(12, 0, 10))
+		local profile = s.profiles[a]
+		profile.tutorialDone = false
+		s.fell(a, rec)
+		t.eq(profile.heartseeds.oak, 1)
+		s.fxAll = {}
+		for step = 1, TutorialData.PlantStep - 1 do
+			profile.tutorialStep = step
+			a.attrs.TutorialStep = TutorialData.PlantStep -- the client's word counts for nothing
+			s.plant(a, rec.uid)
+			t.eq(s.lastToast(a), "Hang onto it: Murph will show you where.", "step " .. step)
+			t.eq(profile.heartseeds.oak, 1, "the seed is kept")
+			t.eq(profile.forest.planted, 0)
+			t.eq(s.fxKinds(), {}, "nothing sprouts")
+			t.eq(s.quest, {})
+			t.ok(rec.felled and rec.stump ~= nil, "the stump waits")
+		end
+		profile.tutorialStep = TutorialData.PlantStep
+		s.plant(a, rec.uid)
+		t.eq(profile.heartseeds.oak, nil, "at the plant step it goes in")
+		t.eq(s.fxKinds(), { "Sprout" })
+		t.eq(s.quest, { { a, "seedPlanted" } })
+	end)
+
+	t.test("players who skipped the tutorial (or are past its plant step) plant as before", function()
+		local s = setup()
+		local one = s.tree("oak", Vector3.new(10, 0, 10))
+		local two = s.tree("oak", Vector3.new(-10, 0, -10))
+		s.start()
+		local skipped = s.player(1, "Ada", Vector3.new(12, 0, 10))
+		s.profiles[skipped].tutorialStep = 2 -- skipped on step 2
+		s.profiles[skipped].tutorialDone = true
+		local later = s.player(2, "Bo", Vector3.new(-12, 0, -10))
+		s.profiles[later].tutorialDone = false
+		s.profiles[later].tutorialStep = 6 -- selling loads, after planting
+		s.fell(skipped, one)
+		s.fell(later, two)
+		s.fxAll = {}
+		s.plant(skipped, one.uid)
+		s.plant(later, two.uid)
+		t.eq(s.profiles[skipped].heartseeds.oak, nil, "planted")
+		t.eq(s.profiles[later].heartseeds.oak, nil, "planted")
+		t.eq(s.fxKinds(), { "Sprout", "Sprout" })
 	end)
 
 	t.test("a tree that grew back on its own while sprouting is still yours, from then on", function()

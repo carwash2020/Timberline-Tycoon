@@ -7,7 +7,8 @@
 --     touch controls: there it sits in the thumbstick's corner, so it lets
 --     touches through and just fades after a while.
 --   * A beacon: a bouncing arrow over what to do next (the nearest tree or
---     log, your truck, the sell pad, the Tool Shed), with its distance.
+--     log, your truck, the sell pad, a stump to plant in or else a tree to
+--     fell for one, the Tool Shed), with its distance.
 -- The server owns progress: it sets the TutorialStep (0 = done) and
 -- TutorialProgress attributes, and this redraws from them.
 -- Looks per the UI spec (03, 04): a kraft card with the step and Skip (tap
@@ -193,13 +194,24 @@ function QuestUI.FindBeaconPart(map: Instance?, target: string): BasePart?
 	return if node and node:IsA("BasePart") then node else nil
 end
 
+-- A tree standing (not felled, not hidden by day) that you could chop.
+local function standing(model: Model): boolean
+	local hp = model:GetAttribute("HP")
+	return type(hp) == "number" and hp > 0 and model:GetAttribute("Dormant") ~= true
+end
+
+-- How many Heartseeds of this tree's or stump's wood you hold.
+local function seedsFor(model: Model): number
+	local wood = model:GetAttribute("WoodId")
+	local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
+	return if type(seeds) == "number" then seeds else 0
+end
+
 -- The part the beacon should hang over for this step, if it's around.
 local function beaconTarget(step: Step, from: Vector3): BasePart?
 	local target = step.beacon
 	if target == "tree" then
-		return nearestTagged("Tree", from, function(model)
-			return ((model:GetAttribute("HP") :: number?) or 0) > 0 and model:GetAttribute("Dormant") ~= true
-		end)
+		return nearestTagged("Tree", from, standing)
 	elseif target == "log" then
 		-- Logs lying in the world have a "Pick up" prompt; carried ones don't.
 		return nearestTagged("Log", from, function(_model, pp)
@@ -212,14 +224,18 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 	elseif target == "stump" then
 		-- The nearest stump you hold a Heartseed for (hidden Phantom Grove
 		-- stumps and ones already sprouting don't count).
-		return nearestTagged("Stump", from, function(model, pp)
-			local wood = model:GetAttribute("WoodId")
-			local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
-			return type(seeds) == "number"
-				and seeds > 0
-				and pp.Transparency < 1
-				and model:GetAttribute("Sprouting") ~= true
+		local stump = nearestTagged("Stump", from, function(model, pp)
+			return seedsFor(model) > 0 and pp.Transparency < 1 and model:GetAttribute("Sprouting") ~= true
 		end)
+		if stump then
+			return stump
+		end
+		-- None around (it grew back, or it's out of view): a tree to fell for
+		-- a fresh stump, one of a wood you hold seeds for if there is one,
+		-- else any (felling it drops its own seed).
+		return nearestTagged("Tree", from, function(model)
+			return standing(model) and seedsFor(model) > 0
+		end) or nearestTagged("Tree", from, standing)
 	elseif target then
 		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)
 	end

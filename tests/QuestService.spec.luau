@@ -16,7 +16,9 @@ return function(t)
 			end,
 		}
 		local toasts, marks = {}, {}
+		local trees = {} -- TreeService: QuestService sets its StumpHold hook
 		local mocks = {
+			TreeService = trees,
 			ProfileService = {
 				GetProfile = function(p)
 					return if p == player then profile else nil
@@ -47,6 +49,7 @@ return function(t)
 			player = player,
 			toasts = toasts,
 			marks = marks,
+			trees = trees,
 			skip = function()
 				skipHandler(player)
 			end,
@@ -189,6 +192,33 @@ return function(t)
 		e.Quest.Start(e.player, e.profile)
 		e.event("logsSold", 3)
 		t.eq(e.Steps[e.profile.tutorialStep].id, "plant")
+	end)
+
+	t.test("stumps a player fells wait for the plant step, and only until then", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		t.eq(s.trees.StumpHold, s.Quest.StumpHoldFor, "Init hands TreeService the hook")
+		local held = {}
+		for _, step in ipairs(s.Steps) do
+			held[step.id] = s.trees.StumpHold(s.player)
+			s.event(step.event, step.count)
+		end
+		for _, id in ipairs({ "fell", "pickup", "load", "sell", "plant" }) do
+			t.eq(held[id], 240, id .. ": up to the plant step the stump waits 4 minutes")
+		end
+		t.eq(held.loads, 0, "planted: trees regrow as usual")
+		t.eq(held.steel, 0)
+		t.ok(s.profile.tutorialDone)
+		t.eq(s.trees.StumpHold(s.player), 0, "finished")
+		t.eq(s.trees.StumpHold({}), 0, "no profile (left)")
+	end)
+
+	t.test("a skipped tutorial holds no stumps", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		t.eq(s.Quest.StumpHoldFor(s.player), 240)
+		s.skip()
+		t.eq(s.Quest.StumpHoldFor(s.player), 0)
 	end)
 
 	t.test("a broken step index restarts cleanly", function()

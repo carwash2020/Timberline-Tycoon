@@ -23,8 +23,20 @@ return function(t)
 		local plant = TutorialData.Steps[ids.plant]
 		t.eq(plant.event, "seedPlanted")
 		t.eq(plant.count, 1)
-		t.eq(plant.objective, "Plant a Heartseed in a stump")
+		t.eq(plant.objective, "Fell a tree, then plant its Heartseed in the stump")
 		t.eq(plant.murph, "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.")
+	end)
+
+	t.test("seeds wait for the plant step; stumps felled until then are held", function()
+		local plant = TutorialData.PlantStep
+		t.eq(TutorialData.Steps[plant].id, "plant")
+		for i = 1, #TutorialData.Steps do
+			t.eq(TutorialData.CanPlant(i), i >= plant, "step " .. i)
+			t.eq(TutorialData.StumpHold(i), if i <= plant then 240 else 0, "hold at step " .. i)
+		end
+		t.ok(TutorialData.CanPlant(0), "finished or skipped: plant any time")
+		t.eq(TutorialData.StumpHold(0), 0, "and no held stumps")
+		t.eq(TutorialData.StumpHoldSeconds, 240)
 	end)
 
 	t.test("every step is well formed", function()

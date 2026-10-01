@@ -29,6 +29,7 @@ local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
+local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
@@ -265,9 +266,17 @@ type StumpEntry = { model: Model, part: BasePart, prompt: ProximityPrompt, woodI
 local stumps: { [Model]: StumpEntry } = {}
 local sproutingUntil: { [string]: number } = {} -- tree uid -> os.clock() its sprout ends
 
+-- Murph's tutorial: no planting before its plant step (the server refuses
+-- it too). TutorialStep is 0 (or not set yet) without a tutorial.
+local function tutorialAllowsPlanting(): boolean
+	local step = player:GetAttribute("TutorialStep")
+	return TutorialData.CanPlant(if type(step) == "number" then step else 0)
+end
+
 local function plantable(entry: StumpEntry): boolean
 	local busy = sproutingUntil[entry.uid]
 	return seedsOf(entry.woodId) > 0
+		and tutorialAllowsPlanting()
 		and entry.part.Parent ~= nil
 		and entry.part.Transparency < 1 -- hidden stumps (the Phantom Grove by day)
 		and entry.model:GetAttribute("Sprouting") ~= true -- planted before you came by (slow woods take minutes)
@@ -536,7 +545,10 @@ local function onSeedPop(payload: { [string]: any })
 		end
 		local why = if #words > 0 then " (" .. table.concat(words, ", ") .. ")" else ""
 		if firstSeeds and #words == 0 then
-			why = ": plant them in stumps"
+			-- In the tutorial, Murph shows where at its plant step.
+			why = if not tutorialAllowsPlanting()
+				then (if count == 1 then ": keep it for now" else ": keep them for now")
+				else ": plant them in stumps"
 		end
 		HUD.Toast(string.format("+%d %s Heartseed%s%s", count, woodName(woodId), if count == 1 then "" else "s", why))
 	end
