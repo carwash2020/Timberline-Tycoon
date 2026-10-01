@@ -46,7 +46,7 @@
       "$ignoreUnknownInstances": true,
       "$properties": {
         "LightingStyle": "Realistic",
-        "PrioritizeLightingQuality": true,
+        "PrioritizeLightingQuality": false,
         "ShadowSoftness": 0.35,
         "EnvironmentDiffuseScale": 0.6,
         "EnvironmentSpecularScale": 0.35,

@@ -26,7 +26,7 @@ return function(t)
 				StreamingIntegrityMode = Enum.StreamingIntegrityMode.PauseOutsideLoadedArea,
 			},
 			Terrain = { Decoration = true },
-			Lighting = { LightingStyle = Enum.LightingStyle.Realistic },
+			Lighting = { LightingStyle = Enum.LightingStyle.Realistic, PrioritizeLightingQuality = false },
 			Players = { MaxPlayers = 12 },
 		}
 	end
@@ -137,15 +137,28 @@ return function(t)
 		place.Workspace.StreamingTargetRadius = 512
 		place.Workspace.StreamingIntegrityMode = Enum.StreamingIntegrityMode.Default
 		place.Lighting.LightingStyle = Enum.LightingStyle.Soft
+		place.Lighting.PrioritizeLightingQuality = true
 		place.Terrain.Decoration = false
 		local s = run({ place = place })
-		t.eq(#s.warnings, 4)
+		t.eq(#s.warnings, 5)
 		t.ok(has(s.warnings, "Workspace.StreamingTargetRadius is 512, expected 1024."))
 		t.ok(has(s.warnings, "Workspace.StreamingIntegrityMode is Default, expected PauseOutsideLoadedArea."))
 		t.ok(has(s.warnings, "Lighting.LightingStyle is Soft, expected Realistic."))
+		t.ok(has(s.warnings, "Lighting.PrioritizeLightingQuality is true, expected false."))
 		t.ok(has(s.warnings, "Workspace.Terrain.Decoration is false, expected true."))
 		t.ok(has(s.warnings, "set Workspace.Terrain.Decoration = false") == false, "the fix names the wanted value")
 		t.ok(has(s.warnings, "set Workspace.Terrain.Decoration = true"))
+	end)
+
+	t.test("PrioritizeLightingQuality left on warns once, with the Properties fix (PLAY-08)", function()
+		local place = goodPlace()
+		place.Lighting.PrioritizeLightingQuality = true
+		local s = run({ place = place })
+		t.eq(#s.warnings, 1)
+		t.ok(has(s.warnings, "[PlaceCheck] Lighting.PrioritizeLightingQuality is true, expected false."), s.warnings[1])
+		t.ok(has(s.warnings, "Fix: set Lighting.PrioritizeLightingQuality = false in Studio's Properties panel"))
+		t.ok(not has(s.prints, "[PlaceCheck] OK"))
+		t.ok(not s.ok)
 	end)
 
 	t.test("a property a script can't read says so, never errors, and doesn't block OK", function()
@@ -236,13 +249,22 @@ return function(t)
 				checked += 1
 			end
 		end
-		t.ok(checked >= 5, "every project setting PLAY-02 names (more may follow: PLAY-08)")
-		local maxPlayers
+		t.ok(checked >= 6, "every project setting PLAY-02 and PLAY-08 name")
+		local maxPlayers, lightingQuality, lightingStyle
 		for _, e in ipairs(PlaceCheck.Expected) do
 			if e.service == "Players" and e.property == "MaxPlayers" then
 				maxPlayers = e
+			elseif e.service == "Lighting" and e.property == "PrioritizeLightingQuality" then
+				lightingQuality = e
+			elseif e.service == "Lighting" and e.property == "LightingStyle" then
+				lightingStyle = e
 			end
 		end
+		t.ok(lightingQuality, "PrioritizeLightingQuality is checked (PLAY-08)")
+		t.eq(lightingQuality.value, false, "off: phone frame rate over lighting quality")
+		t.eq(fromProject.Lighting.PrioritizeLightingQuality, false)
+		t.ok(lightingStyle, "LightingStyle is checked")
+		t.eq(lightingStyle.value, Enum.LightingStyle.Realistic, "still Realistic")
 		t.ok(maxPlayers, "Max Players is checked")
 		t.eq(maxPlayers.value, 12)
 		t.eq(maxPlayers.atMost, true, "12 or fewer")
@@ -251,16 +273,18 @@ return function(t)
 	t.test("the expected table is data: one more line is one more check", function()
 		local PlaceCheck = module()
 		local expected = table.clone(PlaceCheck.Expected)
-		table.insert(expected, { service = "Lighting", property = "PrioritizeLightingQuality", value = false })
+		-- (PrioritizeLightingQuality was the example here; PLAY-08 made it a
+		-- real check, so the extra line is one the table doesn't have.)
+		table.insert(expected, { service = "Lighting", property = "GlobalShadows", value = true })
 		local place = goodPlace()
-		place.Lighting.PrioritizeLightingQuality = true
+		place.Lighting.GlobalShadows = false
 		local results = PlaceCheck.Compare(place, expected)
 		t.eq(#results, #PlaceCheck.Expected + 1)
 		local last = results[#results]
-		t.eq(last.setting, "Lighting.PrioritizeLightingQuality")
+		t.eq(last.setting, "Lighting.GlobalShadows")
 		t.eq(last.status, "mismatch")
 		local report = PlaceCheck.Report(results, nil)
 		t.eq(#report.warnings, 1)
-		t.ok(has(report.warnings, "Lighting.PrioritizeLightingQuality is true, expected false."))
+		t.ok(has(report.warnings, "Lighting.GlobalShadows is false, expected true."))
 	end)
 end

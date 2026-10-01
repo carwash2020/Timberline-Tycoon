@@ -52,6 +52,8 @@ PlaceCheck.Expected = {
 		value = Enum.StreamingIntegrityMode.PauseOutsideLoadedArea,
 	},
 	{ service = "Lighting", property = "LightingStyle", value = Enum.LightingStyle.Realistic },
+	-- Off, so phones keep their frame rate in town at night (PLAY-08).
+	{ service = "Lighting", property = "PrioritizeLightingQuality", value = false },
 	{ service = "Terrain", property = "Decoration", value = true },
 	{
 		service = "Players",
