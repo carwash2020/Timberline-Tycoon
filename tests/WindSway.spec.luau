@@ -9,6 +9,11 @@
 --     and every one of the nearest 32 trees at least every 4 frames.
 --   * The pose is a function of the time alone: a tree that sat out a few
 --     frames lands exactly where a tree that never skipped one is.
+--   * NAT-09: each canopy part's rest offset is read once per tree
+--     instance, before WindSway ever moves it. A tree felled (or wobbling)
+--     as you walk away is put back at rest once it's idle again, and a
+--     canopy left leaning is never read back as its rest pose. Felled and
+--     busy trees are never moved.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
@@ -354,5 +359,123 @@ return function(t)
 			end
 		end
 		t.ok(compared > 10 and skipped > 10, "it both moved and sat out frames")
+	end)
+
+	---------------------------------------------------------------------------
+	-- NAT-09: rest offsets for the tree instance's lifetime
+	---------------------------------------------------------------------------
+
+	-- A tree's canopy parts, by WindSway's rule.
+	local CANOPY = { Leaves = true, Frond = true }
+	local function canopyOf(tree)
+		local out = {}
+		for _, d in ipairs(tree:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local parent = d.Parent
+				local inTier = parent ~= tree and parent:IsA("Model") and parent.Name == "Tier"
+				if CANOPY[d.Name] or inTier or (d.Name == "Facet" and parent == tree) then
+					table.insert(out, d)
+				end
+			end
+		end
+		return out
+	end
+	local function snapshot(parts)
+		local out = {}
+		for _, p in ipairs(parts) do
+			out[p] = p.CFrame
+		end
+		return out
+	end
+	-- How far the furthest part is from where `from` had it (position, plus
+	-- its axes' drift so a pure turn counts too).
+	local function drift(parts, from)
+		local worst = 0
+		for _, p in ipairs(parts) do
+			local a, b = p.CFrame, from[p]
+			worst = math.max(
+				worst,
+				(a.Position - b.Position).Magnitude,
+				(a.LookVector - b.LookVector).Magnitude,
+				(a.UpVector - b.UpVector).Magnitude
+			)
+		end
+		return worst
+	end
+	local function run(w, frames)
+		local movedEver = {}
+		for _ = 1, frames do
+			local _, moved = w.frame()
+			for tree in pairs(moved) do
+				movedEver[tree] = true
+			end
+		end
+		return movedEver
+	end
+	local NEAR = CFrame.new(0, 6, 0)
+	local FAR = CFrame.new(0, 6, 400) -- well past RANGE
+
+	t.test("NAT-09: a tree felled as you walk away is put back at rest once it regrows", function()
+		local w = world()
+		local tree = w.tree("oak", 0, -20)
+		local parts = canopyOf(tree)
+		local server = snapshot(parts) -- as it streamed in
+		w.WindSway.Start()
+		run(w, 30)
+		t.ok(drift(parts, server) > 1e-3, "it sways")
+		tree:SetAttribute("Felled", true) -- TreeFX fells it; WindSway lets go
+		local atFell = snapshot(parts)
+		w.camera.CFrame = FAR
+		run(w, 30)
+		t.eq(drift(parts, atFell), 0, "WindSway leaves a felled tree alone, even to restore it")
+		tree:SetAttribute("Felled", false) -- regrown while you were away
+		run(w, 30)
+		t.ok(drift(parts, server) < 1e-5, string.format("back at rest (off by %.6f)", drift(parts, server)))
+	end)
+
+	t.test("NAT-09: a canopy left leaning is never read back as its rest pose", function()
+		for _, woodId in ipairs({ "oak", "pine", "frostwood" }) do
+			local w = world()
+			local tree = w.tree(woodId, 0, -20)
+			local parts = canopyOf(tree)
+			local server = snapshot(parts)
+			w.WindSway.Start()
+			run(w, 30)
+			tree:SetAttribute("Felled", true)
+			w.camera.CFrame = FAR
+			run(w, 30) -- dropped while felled: still leaning
+			w.camera.CFrame = NEAR
+			run(w, 30) -- back in range, still down
+			t.ok(drift(parts, server) > 1e-3, woodId .. ": still leaning when it regrows")
+			tree:SetAttribute("Felled", false) -- regrows next to you
+			local moved = run(w, 60)
+			t.ok(moved[tree], woodId .. ": sways again")
+			w.camera.CFrame = FAR
+			run(w, 30)
+			t.ok(
+				drift(parts, server) < 1e-5,
+				string.format("%s: back at the server's pose, not the lean (off by %.6f)", woodId, drift(parts, server))
+			)
+		end
+	end)
+
+	t.test("WindSway never moves a felled tree or one TreeFX is animating", function()
+		local w = world()
+		local tree = w.tree("oak", 0, -20)
+		local parts = canopyOf(tree)
+		w.WindSway.Start()
+		t.ok(run(w, 10)[tree], "a standing tree sways")
+		tree:SetAttribute("Felled", true)
+		local before = snapshot(parts)
+		t.eq(run(w, 30)[tree], nil, "not while felled")
+		t.eq(drift(parts, before), 0)
+		tree:SetAttribute("Felled", false)
+		t.ok(run(w, 30)[tree], "again once it stands")
+		w.busy[tree] = true -- TreeFX.IsBusy: a regrow spring, say
+		before = snapshot(parts)
+		t.eq(run(w, 30)[tree], nil, "not while TreeFX is busy with it")
+		t.eq(drift(parts, before), 0)
+		w.busy[tree] = nil
+		t.ok(run(w, 30)[tree], "and again after")
 	end)
 end

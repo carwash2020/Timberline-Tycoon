@@ -17,7 +17,13 @@
 --   * A tree is left alone while TreeFX animates it (a fall, a regrow),
 --     while it's felled, dormant or at 0 HP, and while its pivot is off
 --     HomePivot (a hit wobble is playing). Trees leaving range are put
---     back exactly at rest.
+--     back exactly at rest; one that is busy as it leaves is put back as
+--     soon as it's idle again.
+--   * NAT-09: each canopy part's rest offset from HomePivot is recorded
+--     once, the first time WindSway sees the part (before it ever moves
+--     it), and kept until the tree streams out. A canopy WindSway left
+--     leaning (felled or wobbling as you walked away) is never re-read as
+--     the rest pose, so it can't be baked in.
 --   * The wind (workspace.GlobalWind, set locally) gusts around the base
 --     breeze (6, 0, 3) and blows harder in storms, blizzards and up on
 --     the isles; grass, clouds and the weather's particles all follow it,
@@ -49,8 +55,13 @@ type Sway = {
 }
 
 local known: { [Model]: Vector3 } = {} -- every tree streamed in -> its home position
+-- Each canopy part's offset from HomePivot (its server pose), for as long
+-- as the tree instance lives: written the first time WindSway sees the
+-- part and cleared only in removeTree (NAT-09).
+local restOf: { [Model]: { [BasePart]: CFrame } } = {}
 local sways: { [Model]: Sway } = {}
 local order: { Sway } = {} -- the active ones, nearest first
+local unrestored: { [Model]: Sway } = {} -- left range while busy: put back once idle
 local cursor = 1 -- where in `order` the next frame's walk starts
 
 local moveParts: { BasePart } = {}
@@ -109,11 +120,21 @@ local function capture(tree: Model): Sway?
 	if #parts == 0 then
 		return nil
 	end
+	local offsets = restOf[tree]
+	if not offsets then
+		offsets = {}
+		restOf[tree] = offsets
+	end
 	local rest: { CFrame } = {}
 	for i, p in ipairs(parts) do
-		-- The offset from HomePivot, then back to world space: the canopy's
-		-- exact rest pose for as long as the tree stands here.
-		rest[i] = home * home:ToObjectSpace(p.CFrame)
+		local offset = offsets[p]
+		if not offset then
+			-- First sight of this part, before WindSway ever moved it: its
+			-- offset from HomePivot is the server's.
+			offset = home:ToObjectSpace(p.CFrame)
+			offsets[p] = offset
+		end
+		rest[i] = home * offset -- the canopy's exact rest pose, in world space
 	end
 	local trunk = tree.PrimaryPart
 	local length = if trunk then trunk.Size.X else 8
@@ -131,10 +152,18 @@ local function capture(tree: Model): Sway?
 	}
 end
 
-local function restore(s: Sway)
+-- Puts a tree's canopy back at rest. False while it's busy (TreeFX owns
+-- it now): try again later.
+local function restore(s: Sway): boolean
+	if s.tree.Parent == nil then
+		return true -- streamed out: its parts are gone with it
+	end
 	local home = homeOf(s.tree)
-	if s.tree.Parent == nil or not home or not idle(s.tree, home) then
-		return -- busy or gone: TreeFX (or streaming) owns it now
+	if not home then
+		return true -- no HomePivot to judge it by: nothing we can do
+	end
+	if not idle(s.tree, home) then
+		return false
 	end
 	local parts: { BasePart } = {}
 	local frames: { CFrame } = {}
@@ -147,6 +176,7 @@ local function restore(s: Sway)
 	if #parts > 0 then
 		workspace:BulkMoveTo(parts, frames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
+	return true
 end
 
 local function addTree(inst: Instance)
@@ -160,6 +190,8 @@ local function removeTree(inst: Instance)
 	if inst:IsA("Model") then
 		known[inst] = nil
 		sways[inst] = nil -- streamed out: its parts are gone with it
+		unrestored[inst] = nil
+		restOf[inst] = nil
 	end
 end
 
@@ -206,8 +238,15 @@ local function scan()
 	end
 	for tree, s in pairs(sways) do
 		if not keep[tree] then
-			restore(s)
 			sways[tree] = nil
+			if not restore(s) then
+				unrestored[tree] = s -- falling, regrowing or wobbling
+			end
+		end
+	end
+	for tree, s in pairs(unrestored) do
+		if sways[tree] or restore(s) then
+			unrestored[tree] = nil -- swaying again, or back at rest
 		end
 	end
 end
