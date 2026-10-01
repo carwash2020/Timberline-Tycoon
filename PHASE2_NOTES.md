@@ -30,6 +30,125 @@ Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
 
+## Tonight (phase 10): smoke test and what each build changed
+
+Players arrive at 9:00 pm Mountain time (03:00 UTC). Everything lands on
+`main` in small green merges; the freeze is at 8:00 pm, and after it only
+what Connor reports from Studio gets fixed. HANDOFF.md has the plan and
+the backlog ids used below.
+
+### Once per build
+
+1. `git checkout main && git pull`, then `rojo build -o build.rbxlx`. Open
+   it in Studio and **File > Publish to Roblox** over your private test
+   place (this is how place settings arrive; `rojo serve` doesn't sync
+   them). Then `rojo serve` and **Plugins > Rojo > Connect**.
+   - Rojo now owns **ReplicatedFirst** (the loading card). Anything you put
+     there by hand is deleted on Connect; it should be empty.
+2. **Game Settings > Places > Max Players: 12** and **Game Settings >
+   Security > Enable Studio Access to API Services: on**.
+
+### Tonight's smoke test (run it on Build #1, then again on the last build)
+
+Paste the Output and screenshots of anything wrong into the session.
+Anything red becomes a P0 and jumps the queue.
+
+| # | Do this | Good looks like |
+|---|---|---|
+| 1 | Press **Play** with **View > Output** open | Roblox's loader, then a brown **Timberline Tycoon** card with a rotating tip, then a fade into the spawn. No grey frames. Output: a white `[PlaceCheck] can't check ...` line, `[PlaceCheck] OK`, `[MapBuilder] World built in Xs (terrain Ys)`, `[GameServer] Online: world built in Xs (terrain Ys), 334 trees, 1 player`, `[Client] Timberline Tycoon client started.` No red lines. Note X |
+| 2 | Look around at the spawn | Mountains, snow and the volcano on the horizon (say if the horizon is empty: WLD-02). Build #1 still faces the parking lot; the town fixes come in Build #3 |
+| 3 | Tutorial step 1: fell the oak Murph points at | Murph says the woods are south of town and says **Click** (Tap on a phone, Press RT on a pad). The swing turns you to face the tree |
+| 4 | Steps 2-3: pick up logs, load the truck | The hint changes to "Take logs to your truck's tailgate" while you carry |
+| 5 | Step 4: drive to the sawmill and sell | Sitting in the truck switches the hint to "WASD to drive · Space to hop out". The rear wheels follow the front in a tight turn (no tail slide). Under 4 min from spawn to sale. Say if a truck stops dead at a road edge (ACT-05) |
+| 6 | Step 5: plant | No Plant prompt on any stump before step 5 (the toast says "keep it for now"). At step 5 your first stump is still there (held up to 4 min) or the beacon points at a tree to fell. The sapling grows in 8 s with your name |
+| 7 | Walk the thickest part of the Starter Forest | Say if leaves hide your character (NAT-02 comes in Build #2) |
+| 8 | Ride the gondola up and down | Say if it steps or stutters (WLD-07) |
+| 9 | Stop, then Play again | Cash, axe, truck bed and settings are all kept |
+| 10 | **Test > Clients and Servers**, 2 players | Each sees the other's truck move smoothly; your logs stay yours for 45 s |
+| 11 | **File > Studio Settings > Network > Incoming Replication Lag** 0.2, drive 60 s | No rubber-banding, no put-back |
+| 12 | **Device Emulator**: iPhone SE, then iPhone 14 Pro (landscape) | Toasts stack under the tracker and never cover the cash, ♪ or tracker. During the tutorial: no Daily Goals button and no clock. Note anything that overlaps |
+| 13 | Phone emulation + **View > MicroProfiler**. Night: in the **Server** command bar run `workspace:SetAttribute("ClockOverride", 23)` (`nil` clears it). Town at night, the Starter Forest, the Snowfields, the isles | 30+ fps (frame under 33 ms). Note the top script costs |
+
+### Build #1 (Phase 1: a first session that can't break)
+
+- **PLAY-07** One broken builder no longer stops anyone spawning. To see
+  it: put `error("x")` as the first line of `BuildingArt.Sawmill()`, Play:
+  you still spawn, the sawmill is missing, one yellow `[MapBuilder] 4. The
+  sawmill failed, the rest of the world still builds:` warning, and the
+  Online line ends `, 1 build step failed`. Remove the line again. In
+  Play, Workspace's attributes show MapBuildSeconds, MapTerrainSeconds,
+  MapTrees = 334 and MapBuildFailures = 0.
+- **PLAY-02** `[PlaceCheck]` compares the live place with
+  `default.project.json`. Untick Workspace.StreamingEnabled (don't save),
+  Play: one yellow `[PlaceCheck] Workspace.StreamingEnabled is false,
+  expected true. Fix: ...`, no OK. Set Max Players to 20: a warning naming
+  Max Players (if it doesn't warn, run `print(game.Players.MaxPlayers)` in
+  Play and tell Claude the number). Turn API access off: a warning that
+  saves won't persist. Put each back. Three settings can't be read by
+  scripts (StreamingTargetRadius, StreamingIntegrityMode,
+  Terrain.Decoration); check those by eye in Properties.
+- **PLAY-01** The Online line reports build seconds, terrain seconds,
+  trees and players.
+- **WLD-03** (loading card) Shows from the first frame; fades once your
+  character and save are in, 30 s at most, never stuck. On an iPhone SE
+  the title and tip fit with margin.
+- **WLD-06** (step 1) `ClockOverride` (Studio only, set from the
+  **Server** command bar): 23 gives night within a second (sun, lamps,
+  windows, headlights, the Phantom Grove wakes), 12 gives day, `nil`
+  returns to the shared clock. The HUD clock label keeps the real hour.
+  A live server ignores it.
+- **UI-18** With TextChatService > ChatWindowConfiguration.Enabled
+  unticked, Play still prints `[Client] Timberline Tycoon client started.`
+  and no `failed to start` line.
+- **NAT-01 (ui part)** Placing a blueprint: the ghost is theme green when
+  it fits, brick red (#C0503A) when it doesn't.
+- **UI-01** Toasts keep to a lane: on desktop between the tracker column
+  and the corner; on phones under the tracker, 2 at most. On phones the
+  clock sits on corner line 2 and is hidden during the tutorial.
+- **PLAY-03** See smoke-test step 6. Also: plant before step 5 (if you
+  can find a way) is refused with "Hang onto it: Murph will show you
+  where." and the seed is kept.
+- **UI-05** The hint follows what you do: chop / carrying / driving /
+  the sell pad / placing a blueprint, worded per device. Known: on the
+  sell pad with nothing to sell it still says "Press E to sell your logs".
+- **UI-08** During the tutorial: no Daily Goals button, no daily toasts
+  (progress still counts), the Heartseed pouch only from step 5. "Truck to
+  lot" is now **Send truck home** and only shows when your truck is more
+  than 20 studs from its slot and you're 40+ studs from it.
+- **UI-06** Drop axe shows only with a spare or better axe, needs two
+  presses ("Confirm drop" in amber), and sits on D-pad down (not X). The
+  server keeps your last axe ("You need an axe to chop!"). On a gamepad:
+  check D-pad down doesn't open a Roblox menu.
+- **ACT-02** (early, from Phase 2) A swing turns you to the tree when it's
+  off to the side. Not while seated.
+- **ACT-03** (early, from Phase 2) Trucks turn about the rear axle. Hold
+  full lock at walking pace in the Rustbucket: a tight circle about the
+  rear wheels, no jitter. In the Logging Rig, drive up and down the
+  steepest Hills slope braking hard: no nose-dive or wheelie. Say if the
+  long rig's nose now clips town lamps or corners.
+- **PLAY-08** Lighting.PrioritizeLightingQuality is off (better phone
+  frame rate). A fresh `build.rbxlx` shows it unticked; if your published
+  place still has it on, `[PlaceCheck]` warns. A/B it if you have time:
+  during Play, Esc > Settings > Graphics Mode Manual, quality 1-3, town at
+  night (ClockOverride 23), read fps from the **View > Stats** panels (not
+  Shift+F5, which stops the test) with it on and off. Studio's emulator
+  still uses the Mac's GPU, so a real phone on the published place is the
+  deciding number.
+- **PLAY-15** Logs you fell are yours for 45 s (was 10). With 2 players,
+  the other one is refused with "Their logs are up for grabs in N
+  seconds." counting down.
+- **PLAY-14** At most 72 left-behind logs are saved and restored (a full
+  Logging Rig + Heavy Hauler).
+- **NAT-01** The tree HP bar sits just over your head (7 studs up) for
+  every tree, and is a pill: green, amber at half, red at a quarter. On a
+  phone, tapping the trunk where the bar overlaps still swings.
+- **NAT-05** Chips arc out, land around the trunk, rest about a second and
+  fade. None below the ground.
+- **NAT-06** The fall dust is soft smoke (no sparkles) in the biome's
+  colour, about ten leaves flutter down, and the trunk fades out as the
+  logs appear. Say if there is a blink of empty ground before the logs
+  (it gets shifted in Build #2). A regrown tree is fully solid.
+
 ## Try this build
 
 ```sh
