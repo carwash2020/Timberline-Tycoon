@@ -4,13 +4,23 @@
 --
 -- The logs: GameServer welds each carried log to the torso (UpperTorso on
 -- R15, Torso on R6) at LogOffset(slot), its length across the chest. Slot
--- 0, the first log, rides at the forearms with its ends in the hands. Slot
+-- 0, the first log, sits at chest height with its ends in the hands. Slot
 -- 1 tucks in under it, not on top: an avatar's head sits right above its
 -- shoulders, so a log stacked on the first would hide the face. Either way
--- the top of the logs stays below the eyes and clear of the head on both
--- default rigs (tests/CarryLayout.spec works it out).
+-- the top of the logs stays below the mouth and clear of the head on both
+-- default rigs. CarryService restacks after a take, so one log in hand is
+-- always slot 0.
 --
--- The arms: CarryPose (client) sets each arm joint's Motor6D.Transform to
+-- The arms: on R15 the upper arms swing forward ShoulderRaise and the
+-- elbows bend so the forearms cross the stack where the two logs meet:
+-- the first log rests on them (its lower part in the hands) and the
+-- second hangs from them (its upper part in the hands). R6's arms have no
+-- elbow and can't reach that low in front of the chest, so they rise
+-- R6ShoulderRaise to hold the first log end to end; the second tucks in
+-- just under them. tests/CarryLayout.spec works all of this out against
+-- the default rigs.
+--
+-- The joints: CarryPose (client) sets each arm joint's Motor6D.Transform to
 -- JointTransform(joint.C0, turn). A Motor6D puts Part1 at
 --   Part0.CFrame * C0 * Transform * C1:Inverse()
 -- so Transform turns Part1 about the joint in the joint's own axes (C0's).
@@ -24,8 +34,9 @@
 
 local CarryLayout = {}
 
-CarryLayout.ShoulderRaise = math.rad(80) -- both arms forward, just under level
-CarryLayout.ElbowBend = math.rad(15) -- R15 forearms tip up a little to cradle the logs
+CarryLayout.ShoulderRaise = math.rad(52) -- R15 upper arms forward, below level
+CarryLayout.ElbowBend = math.rad(18) -- R15 forearms tip up past them, to run between the logs
+CarryLayout.R6ShoulderRaise = math.rad(80) -- R6 straight arms forward, just under level
 CarryLayout.Range = 150 -- studs from you: players further off aren't posed
 
 -- The carried log weld, relative to the torso. GameServer's pickup writes
@@ -59,6 +70,7 @@ export type ArmJoint = {
 
 local raise = CFrame.Angles(CarryLayout.ShoulderRaise, 0, 0)
 local bend = CFrame.Angles(CarryLayout.ElbowBend, 0, 0)
+local raiseR6 = CFrame.Angles(CarryLayout.R6ShoulderRaise, 0, 0)
 
 CarryLayout.R15 = {
 	{ part = "RightUpperArm", joint = "RightShoulder", turn = raise },
@@ -68,8 +80,8 @@ CarryLayout.R15 = {
 } :: { ArmJoint }
 
 CarryLayout.R6 = {
-	{ part = "Torso", joint = "Right Shoulder", turn = raise },
-	{ part = "Torso", joint = "Left Shoulder", turn = raise },
+	{ part = "Torso", joint = "Right Shoulder", turn = raiseR6 },
+	{ part = "Torso", joint = "Left Shoulder", turn = raiseR6 },
 } :: { ArmJoint }
 
 -- Whether a player's arms hold the carry pose: logs in hand (`carried` is

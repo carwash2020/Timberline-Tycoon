@@ -183,8 +183,8 @@ return function(t)
 			and near(c.joints.LeftElbow.Transform, BEND)
 	end
 	local function posedR6(c)
-		return near(c.joints["Right Shoulder"].Transform, CFrame.Angles(0, 0, CarryLayout.ShoulderRaise))
-			and near(c.joints["Left Shoulder"].Transform, CFrame.Angles(0, 0, -CarryLayout.ShoulderRaise))
+		return near(c.joints["Right Shoulder"].Transform, CFrame.Angles(0, 0, CarryLayout.R6ShoulderRaise))
+			and near(c.joints["Left Shoulder"].Transform, CFrame.Angles(0, 0, -CarryLayout.R6ShoulderRaise))
 	end
 	local function all(c, cf)
 		for _, j in pairs(c.joints) do

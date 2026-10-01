@@ -3,8 +3,9 @@
 -- signs on R15 and R6 (whose shoulder joints turn about different axes),
 -- and where GameServer welds the logs, checked against Roblox's default
 -- blocky rigs: the arms rise forward, the first log sits at the forearms
--- with its ends in the hands, two logs clear each other, and nothing
--- touches the head or rises past the mouth.
+-- with its ends in the hands, on R15 the forearms hold the second log too,
+-- two logs clear each other, and nothing touches the head or rises past
+-- the mouth.
 return function(t)
 	local roblox = t.roblox
 	local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
@@ -14,6 +15,7 @@ return function(t)
 
 	local RAISE = CarryLayout.ShoulderRaise
 	local BEND = CarryLayout.ElbowBend
+	local RAISE6 = CarryLayout.R6ShoulderRaise
 
 	local function near(a, b, eps)
 		return (a - b).Magnitude < (eps or 1e-4)
@@ -165,9 +167,12 @@ return function(t)
 		t.ok(CarryLayout.JointTransform(CFrame.new(5, 6, 7), turn).Position.Magnitude < 1e-9)
 	end)
 
-	t.test("about 80 degrees forward, a slight elbow bend", function()
-		t.ok(math.abs(math.deg(RAISE) - 80) <= 5)
-		t.ok(math.deg(BEND) > 0 and math.deg(BEND) <= 25)
+	t.test("R15: upper arms about 50 degrees forward, a slight elbow bend; R6: about 80", function()
+		t.ok(math.abs(math.deg(RAISE) - 50) <= 5, "R15 shoulders")
+		t.ok(math.deg(BEND) > 0 and math.deg(BEND) <= 25, "R15 elbows")
+		-- The R15 forearms point forward, below level (they run between two logs).
+		t.ok(math.deg(RAISE + BEND) >= 60 and math.deg(RAISE + BEND) < 90, "R15 forearms")
+		t.ok(math.abs(math.deg(RAISE6) - 80) <= 5, "R6 shoulders")
 	end)
 
 	t.test("every rig's arms hang straight down at rest (the fixtures are right)", function()
@@ -196,9 +201,9 @@ return function(t)
 			t.ok(near(-lower.UpVector, swung(RAISE + BEND)), "R15 " .. side .. " forearm tips up past the upper arm")
 
 			local r6 = forearm(R6, side)[1].cf
-			t.ok(near(-r6.UpVector, swung(RAISE)), "R6 " .. side .. " arm")
+			t.ok(near(-r6.UpVector, swung(RAISE6)), "R6 " .. side .. " arm")
 			t.ok(
-				near(r6.LookVector, Vector3.new(0, math.sin(RAISE), -math.cos(RAISE))),
+				near(r6.LookVector, Vector3.new(0, math.sin(RAISE6), -math.cos(RAISE6))),
 				"R6 " .. side .. " not twisted"
 			)
 			t.ok(math.abs(math.abs(r6.Position.X) - 1.5) < 1e-3, "R6 " .. side .. " stays beside the torso")
@@ -290,6 +295,44 @@ return function(t)
 		t.ok(math.abs(second.Z - first.Z) < 1e-9 and math.abs(second.X - first.X) < 1e-9)
 		local gap = (first.Y - R) - (second.Y + R)
 		t.ok(gap > 0 and gap <= 0.1, string.format("against the first (gap %.2f)", gap))
+	end)
+
+	-- The heights a side's forearm covers where a log's centre is (nil if it
+	-- doesn't get there).
+	local function forearmSpan(rig, side, log)
+		local lo, hi = math.huge, -math.huge
+		for _, box in ipairs(forearm(rig, side)) do
+			local a, b = spanAt(box, log.Z)
+			if a then
+				lo, hi = math.min(lo, a), math.max(hi, b)
+			end
+		end
+		return if lo < hi then lo else nil, if lo < hi then hi else nil
+	end
+
+	t.test("R15: the forearms run between two logs and hold both; R6: the second tucks in under the arms", function()
+		local logs = slots()
+		local first, second = logs[1], logs[2]
+		local meet = ((first.Y - R) + (second.Y + R)) / 2 -- where the two logs touch
+		for _, side in ipairs({ "Right", "Left" }) do
+			local lo, hi = forearmSpan(R15, side, second)
+			t.ok(lo, "R15 " .. side .. " forearm reaches the second log")
+			t.ok(lo < meet and hi > meet, string.format("R15 %s forearm %.2f..%.2f crosses %.2f", side, lo, hi, meet))
+			for slot, log in ipairs(logs) do
+				local overlap = math.min(hi, log.Y + R) - math.max(lo, log.Y - R)
+				t.ok(
+					overlap >= 0.35,
+					string.format("R15 %s forearm holds slot %d (%.2f of it)", side, slot - 1, overlap)
+				)
+				t.ok(reach(forearm(R15, side)) <= log.Z, "R15 " .. side .. " hands reach under it")
+			end
+			-- R6: the arm holds the first log (the test above); the second sits
+			-- right under the arm, not far below it.
+			local lo6 = forearmSpan(R6, side, second)
+			t.ok(lo6, "R6 " .. side .. " arm reaches the logs")
+			local gap = lo6 - (second.Y + R)
+			t.ok(gap <= 0.1, string.format("R6 %s second log %.2f under the arm", side, gap))
+		end
 	end)
 
 	t.test("GameServer welds carried logs at LogOffset", function()
