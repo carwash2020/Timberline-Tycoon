@@ -1,0 +1,313 @@
+--!nocheck
+-- PropArt: every prop builds, stays cheap (clients scatter hundreds), is
+-- decoration only (Rock's stones aside), sits on the ground, is placed
+-- with CFrame only and comes out the same for the same seed; the biome
+-- mixes only name props that exist.
+
+return function(t)
+	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
+	local BiomeData = t.shared("BiomeData")
+	local Color3 = t.roblox.Color3
+
+	local tints = PropArt.Tints("starter")
+	local ICE = Color3.fromRGB(159, 230, 255)
+
+	-- name -> (builder(seed), part budget)
+	local PROPS = {
+		{
+			"Rock",
+			function(s)
+				return PropArt.Rock(3, s)
+			end,
+			6,
+		},
+		{
+			"Pebbles",
+			function(s)
+				return PropArt.Pebbles(s)
+			end,
+			6,
+		},
+		{
+			"LavaRock",
+			function(s)
+				return PropArt.LavaRock(s, 2.5)
+			end,
+			8,
+		},
+		{
+			"Crystal",
+			function(s)
+				return PropArt.Crystal(s, ICE, 2)
+			end,
+			8,
+		},
+		{
+			"Bush",
+			function(s)
+				return PropArt.Bush(3, s, tints.leaves)
+			end,
+			6,
+		},
+		{
+			"BerryBush",
+			function(s)
+				return PropArt.BerryBush(s)
+			end,
+			10,
+		},
+		{
+			"Flowers",
+			function(s)
+				return PropArt.Flowers(s, tints.flowers)
+			end,
+			10,
+		},
+		{
+			"GrassTuft",
+			function(s)
+				return PropArt.GrassTuft(s, tints.grass)
+			end,
+			4,
+		},
+		{
+			"Fern",
+			function(s)
+				return PropArt.Fern(s, tints.grass)
+			end,
+			8,
+		},
+		{
+			"Reeds",
+			function(s)
+				return PropArt.Reeds(s)
+			end,
+			8,
+		},
+		{
+			"Cattails",
+			function(s)
+				return PropArt.Cattails(s)
+			end,
+			10,
+		},
+		{
+			"LilyPad",
+			function(s)
+				return PropArt.LilyPad(s)
+			end,
+			7,
+		},
+		{
+			"Mushroom",
+			function(s)
+				return PropArt.Mushroom(s, false)
+			end,
+			8,
+		},
+		{
+			"Mushroom (glowing)",
+			function(s)
+				return PropArt.Mushroom(s, true)
+			end,
+			8,
+		},
+		{
+			"Pinecones",
+			function(s)
+				return PropArt.Pinecones(s)
+			end,
+			8,
+		},
+		{
+			"SnowPile",
+			function(s)
+				return PropArt.SnowPile(s, 4)
+			end,
+			4,
+		},
+		{
+			"FallenLog",
+			function(s)
+				return PropArt.FallenLog(s, tints.bark, tints.moss)
+			end,
+			10,
+		},
+		{
+			"Stump",
+			function(s)
+				return PropArt.Stump(s, tints.bark, tints.moss)
+			end,
+			10,
+		},
+		{
+			"DeadBranch",
+			function(s)
+				return PropArt.DeadBranch(s)
+			end,
+			4,
+		},
+	}
+
+	local function parts(model)
+		local out = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				table.insert(out, d)
+			end
+		end
+		return out
+	end
+
+	-- Half the part's extent along world Y (exact for blocks).
+	local function halfHeight(p)
+		local cf, s = p.CFrame, p.Size
+		return 0.5 * (math.abs(cf.XVector.Y) * s.X + math.abs(cf.YVector.Y) * s.Y + math.abs(cf.ZVector.Y) * s.Z)
+	end
+
+	t.test("every prop builds within its part budget", function()
+		for _, prop in ipairs(PROPS) do
+			for seed = 1, 30 do
+				local model = prop[2](seed)
+				t.ok(model:IsA("Model"), prop[1] .. " returns a Model")
+				local n = #parts(model)
+				t.ok(n > 0, prop[1] .. " has parts")
+				t.ok(n <= prop[3], string.format("%s seed %d: %d parts (budget %d)", prop[1], seed, n, prop[3]))
+			end
+		end
+	end)
+
+	t.test("props are decoration; only Rock's stones collide", function()
+		for _, prop in ipairs(PROPS) do
+			for seed = 1, 8 do
+				for _, p in ipairs(parts(prop[2](seed))) do
+					t.ok(p.Anchored, prop[1] .. " parts are anchored")
+					if prop[1] == "Rock" and p.Name == "Rock" then
+						t.ok(p.CanCollide, "a boulder's stones collide")
+					else
+						t.ok(
+							not p.CanCollide and not p.CanQuery and not p.CanTouch,
+							prop[1] .. ": " .. p.Name .. " is decoration"
+						)
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("a boulder has three stones you can climb", function()
+		local stones = 0
+		for _, p in ipairs(parts(PropArt.Rock(5, 7))) do
+			if p.Name == "Rock" then
+				stones += 1
+			end
+		end
+		t.eq(stones, 3)
+	end)
+
+	t.test("props sit on the ground: nothing floats, nothing is buried", function()
+		for _, prop in ipairs(PROPS) do
+			for seed = 1, 20 do
+				local low, high = math.huge, -math.huge
+				for _, p in ipairs(parts(prop[2](seed))) do
+					low = math.min(low, p.CFrame.Y - halfHeight(p))
+					high = math.max(high, p.CFrame.Y + halfHeight(p))
+				end
+				t.ok(low <= 0.1, string.format("%s seed %d floats (lowest %.2f)", prop[1], seed, low))
+				t.ok(high > 0.08, string.format("%s seed %d is buried (highest %.2f)", prop[1], seed, high))
+			end
+		end
+	end)
+
+	t.test("lily pads lie flat on the water", function()
+		for seed = 1, 20 do
+			for _, p in ipairs(parts(PropArt.LilyPad(seed))) do
+				t.ok(p.CFrame.Y - halfHeight(p) > -0.1, "nothing sinks below the surface")
+				t.ok(p.CFrame.Y + halfHeight(p) < 0.8, "nothing stands tall on a lily pad")
+			end
+		end
+	end)
+
+	t.test("parts are placed with CFrame, never Position", function()
+		for _, prop in ipairs(PROPS) do
+			for _, p in ipairs(parts(prop[2](3))) do
+				local setPosition = pcall(function()
+					return p.Position
+				end)
+				t.ok(not setPosition, prop[1] .. ": " .. p.Name .. " was placed with .Position")
+			end
+		end
+	end)
+
+	t.test("the same seed builds the same prop", function()
+		for _, prop in ipairs(PROPS) do
+			local a, b = parts(prop[2](11)), parts(prop[2](11))
+			t.eq(#a, #b, prop[1] .. " part count")
+			for i = 1, #a do
+				t.ok((a[i].CFrame.Position - b[i].CFrame.Position).Magnitude < 1e-6, prop[1] .. " is deterministic")
+				t.eq(a[i].Color, b[i].Color)
+			end
+		end
+	end)
+
+	t.test("glowing mushrooms glow; the others wear spots", function()
+		local glow, plain = PropArt.Mushroom(4, true), PropArt.Mushroom(4, false)
+		t.ok(glow:FindFirstChildWhichIsA("PointLight", true) ~= nil, "a glowing mushroom has a light")
+		t.ok(glow:FindFirstChild("Spot") == nil, "no spots on a glowing cap")
+		t.ok(plain:FindFirstChild("Spot") ~= nil, "a red cap has spots")
+		t.ok(plain:FindFirstChildWhichIsA("PointLight", true) == nil, "plain mushrooms cast no light")
+	end)
+
+	t.test("every biome has tints, and its mix names only props that exist", function()
+		for _, biome in ipairs(BiomeData.All()) do
+			local tint = PropArt.Tints(biome.id)
+			t.ok(
+				tint.grass and tint.bark and tint.moss and #tint.leaves > 0 and #tint.flowers > 0 and #tint.stone > 0,
+				biome.id
+			)
+		end
+		for _, id in ipairs({
+			"starter",
+			"hills",
+			"snow",
+			"volcano",
+			"grove",
+			"sky",
+			"island",
+			"beach",
+			"shore",
+			"water",
+		}) do
+			local mix = PropArt.Mix(id)
+			t.ok(#mix > 0, id .. " has a mix")
+			for _, entry in ipairs(mix) do
+				t.ok(entry.weight > 0, id .. ": " .. entry.name .. " has a weight")
+				t.ok(PropArt.Build(entry.name, 5, id) ~= nil, id .. ": " .. entry.name .. " builds")
+			end
+		end
+		t.eq(PropArt.Build("Nope", 1, "starter"), nil)
+	end)
+
+	t.test("Scatter is decoration only, varied and deterministic", function()
+		for _, id in ipairs({ "starter", "hills", "snow", "volcano", "grove", "sky", "island" }) do
+			local seen = {}
+			for seed = 1, 60 do
+				local model = PropArt.Scatter(id, seed)
+				seen[model.Name] = true
+				for _, p in ipairs(parts(model)) do
+					t.ok(
+						not p.CanCollide and not p.CanQuery and not p.CanTouch,
+						id .. ": scattered " .. model.Name .. " is decoration"
+					)
+				end
+			end
+			local kinds = 0
+			for _ in pairs(seen) do
+				kinds += 1
+			end
+			t.ok(kinds >= 4, id .. " scatters at least four kinds of prop")
+			t.eq(PropArt.Scatter(id, 42).Name, PropArt.Scatter(id, 42).Name)
+		end
+		t.eq(PropArt.Scatter("starter", 3, "water").Name, "LilyPad")
+	end)
+end
