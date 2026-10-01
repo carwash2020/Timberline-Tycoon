@@ -1,7 +1,8 @@
 --!nocheck
 -- The Living Forest (GAME_DESIGN §16): a tree wearing each bark clue, a
 -- planted tree with its name stake, an Elder in its aura, a storm-struck
--- tree, a Heartseed sprouting, and a figured log of each figure.
+-- tree, Heartseeds sprouting on a birch, a pine and a small oak's stump,
+-- and a figured log of each figure.
 local Common = require("./_common")
 
 return {
@@ -13,6 +14,7 @@ return {
 		local ForestArt = ctx.art("ForestArt")
 		local ForestData = ctx.shared("ForestData")
 		local ForestLogic = ctx.shared("ForestLogic")
+		local TreeLogic = ctx.shared("TreeLogic")
 		local WoodData = ctx.shared("WoodData")
 		local root = roblox.Instance.new("Model")
 		Common.ground(ctx, root, 260, C3.fromRGB(110, 160, 80), V3.new(40, -0.5, 30))
@@ -81,13 +83,21 @@ return {
 		ForestArt.StormGlow(struck, struck.PrimaryPart, pine, 4)
 		label("Storm-struck pine", V3.new(92, 1.5, 38))
 
-		local birch = WoodData.Get("birch")
-		local stump = TreeArt.Stump(birch, 5, 1)
-		Kit.placeAt(stump, CF.new(122, 0, 50))
-		stump.Parent = root
-		local sprout = ForestArt.Sprout(birch, 5)
-		Kit.placeAt(sprout, CF.new(122, stump.PrimaryPart.Size.X, 50))
-		sprout.Parent = root
+		-- Sprouts at full size on a birch, a pine and a small oak's stump
+		-- (the smallest cuts): the mound and halo stay on the stump.
+		local function sprouting(woodId, seed, scale, x, z)
+			local def = WoodData.Get(woodId)
+			local stump = TreeArt.Stump(def, seed, scale)
+			Kit.placeAt(stump, CF.new(x, 0, z))
+			stump.Parent = root
+			local part = stump.PrimaryPart
+			local sprout = ForestArt.Sprout(def, seed, part.Size.Y)
+			Kit.placeAt(sprout, CF.new(x, part.Size.X, z))
+			sprout.Parent = root
+		end
+		sprouting("birch", 5, 1, 122, 50)
+		sprouting("pine", 6, 1, 117, 51)
+		sprouting("oak", 7, TreeLogic.Sizes[1].scale, 112, 52)
 		local orb = ForestArt.SeedOrb()
 		orb.CFrame = CF.new(126, 4, 47)
 		orb.Parent = root

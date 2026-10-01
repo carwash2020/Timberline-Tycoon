@@ -577,9 +577,11 @@ local function onSprout(payload: { [string]: any })
 		return
 	end
 	local seed = if type(payload.seed) == "number" then payload.seed else 1
-	local sprout = ForestArt.Sprout(def, seed)
+	-- The stump's diameter (a server without it: the old fixed-size mound).
+	local diameter = payload.diameter
+	local sprout = ForestArt.Sprout(def, seed, if type(diameter) == "number" then diameter else nil)
 	Kit.placeAt(sprout, CFrame.new(pos))
-	sprout:ScaleTo(0.25) -- a seedling first
+	sprout:ScaleTo(ForestArt.SproutScale(0)) -- a seedling first
 	sprout.Parent = fx()
 	SoundData.PlayAt("Plant", pos)
 	local heart = sprout:FindFirstChild("Heartseed")
@@ -598,12 +600,12 @@ local function onSprout(payload: { [string]: any })
 		burst.Parent = heart
 		burst:Emit(24)
 	end
-	-- Grows from a seedling to a sapling, then the tree itself takes over.
+	-- Grows from a seedling to a sapling (full size, 1, fits the stump),
+	-- then the tree itself takes over.
 	task.spawn(function()
 		local t = 0
 		while t < seconds and sprout.Parent do
-			local u = t / seconds
-			sprout:ScaleTo(0.25 + 0.95 * (1 - (1 - u) ^ 2))
+			sprout:ScaleTo(ForestArt.SproutScale(t / seconds))
 			t += task.wait(0.05)
 		end
 		sprout:Destroy()

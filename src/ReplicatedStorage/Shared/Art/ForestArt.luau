@@ -16,8 +16,9 @@
 --   * ElderAura(radius, color?): an Elder's ring of glowing stones, rising
 --     motes and a pillar of light (ground at y = 0); PrimaryPart "AuraCore"
 --     (holds the light and the "ElderMotes" emitter).
---   * Sprout(def, seed): a Heartseed sprouting in a mound (ground at y = 0);
---     PrimaryPart "Mound".
+--   * Sprout(def, seed, stumpDiameter?): a Heartseed sprouting in a mound
+--     (ground at y = 0), sized to the stump it's on; PrimaryPart "Mound".
+--     SproutScale(u) is how big it's drawn as it grows (at most 1).
 --   * SeedOrb(): the glowing Heartseed that pops out and flies to you.
 --   * FigureBand(logPart, figure): the coloured band round a figured log,
 --     welded to it like the log's caps (unanchored, massless).
@@ -488,32 +489,45 @@ end
 ---------------------------------------------------------------------------
 
 -- A Heartseed sprouting: a mound of fresh soil, the glowing seed and a
--- sapling of the wood. Ground at y = 0.
-function ForestArt.Sprout(def: WoodDef, seed: number): Model
+-- sapling of the wood. Ground at y = 0 (the stump's cut). Given the
+-- stump's diameter, the mound (0.8 of it) and a thin glowing ring round
+-- the cut (0.95 of it) stay on the stump, so nothing hangs in mid-air
+-- past a small one, even at full size; without it, the old fixed-size
+-- mound and halo. The pivot (the Mound) sits 0.1 up, so a ScaleTo grows
+-- it from the cut.
+function ForestArt.Sprout(def: WoodDef, seed: number, stumpDiameter: number?): Model
+	local d: number? = if stumpDiameter and stumpDiameter > 0 and stumpDiameter < math.huge then stumpDiameter else nil
 	local model = Kit.model("Sprout")
 	local mound = Kit.ellipsoid(
 		model,
 		"Mound",
-		Vector3.new(2.6, 0.7, 2.6),
+		if d then Vector3.new(d * 0.8, 0.35, d * 0.8) else Vector3.new(2.6, 0.7, 2.6),
 		CFrame.new(0, 0.1, 0),
 		Color3.fromRGB(92, 64, 42),
 		Enum.Material.Ground
 	)
 	Kit.decor(mound, false)
 	model.PrimaryPart = mound
+	-- On a stump the halo is a collar round the mound's foot, just over the
+	-- cut's rings (0.07-0.1 up), so only a thin ring of it shows.
 	local halo = Kit.cylinder(
 		model,
 		"Halo",
-		0.05,
-		3.6,
-		CFrame.new(0, 0.08, 0) * CFrame.Angles(0, 0, math.pi / 2),
+		if d then 0.04 else 0.05,
+		if d then d * 0.95 else 3.6,
+		CFrame.new(0, if d then 0.12 else 0.08, 0) * CFrame.Angles(0, 0, math.pi / 2),
 		ForestArt.HeartseedColor,
 		Enum.Material.Neon
 	)
 	halo.Transparency = 0.6
 	Kit.decor(halo, false)
-	local heart =
-		Kit.ball(model, "Heartseed", 0.55, CFrame.new(0.5, 0.42, -0.3), ForestArt.HeartseedColor, Enum.Material.Neon)
+	-- The seed rests on the mound beside the stem (on a stump, a fifth of
+	-- the way out, sized to it).
+	local heartSize = if d then math.clamp(d * 0.3, 0.32, 0.55) else 0.55
+	local heartAt = if d
+		then CFrame.new(d * 0.2 * 0.857, 0.25 + heartSize * 0.2, -d * 0.2 * 0.514)
+		else CFrame.new(0.5, 0.42, -0.3)
+	local heart = Kit.ball(model, "Heartseed", heartSize, heartAt, ForestArt.HeartseedColor, Enum.Material.Neon)
 	Kit.decor(heart, false)
 	local light = Instance.new("PointLight")
 	light.Color = ForestArt.HeartseedColor
@@ -523,13 +537,21 @@ function ForestArt.Sprout(def: WoodDef, seed: number): Model
 	light.Parent = heart
 	local sapling = TreeArt.Sapling(def, seed)
 	Kit.placeAt(sapling, CFrame.new(0, 0.2, 0))
-	for _, d in ipairs(sapling:GetDescendants()) do
-		if d:IsA("BasePart") then
-			Kit.decor(d, false)
+	for _, part in ipairs(sapling:GetDescendants()) do
+		if part:IsA("BasePart") then
+			Kit.decor(part, false)
 		end
 	end
 	sapling.Parent = model
 	return model
+end
+
+-- How big a sprout is drawn `u` (0-1) of the way through its growth: a
+-- seedling at 0.25, easing out to full size (1, which fits the stump it's
+-- on) and never past it.
+function ForestArt.SproutScale(u: number): number
+	local x = math.clamp(u, 0, 1)
+	return 0.25 + 0.75 * (1 - (1 - x) ^ 2)
 end
 
 -- The glowing seed that pops out of a felled tree and flies to you.

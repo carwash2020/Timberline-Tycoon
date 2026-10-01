@@ -854,6 +854,36 @@ return function(t)
 		t.eq(s.attr("Vitality_island"), nil, "the island has no meter")
 	end)
 
+	t.test("a sprout is sized to its stump: the payload and a slow wood's SproutMark carry its diameter", function()
+		local s = setup()
+		local birch = s.tree("birch", Vector3.new(0, 0, 0), { size = s.TreeLogic.Sizes[1] }) -- the smallest cut
+		local lumen = s.tree("lumenwood", Vector3.new(30, 0, 0))
+		s.start()
+		local a = s.player(1, "Ada")
+		s.fell(a, birch)
+		s.fell(a, lumen)
+		s.fxAll = {}
+		s.plant(a, birch.uid)
+		-- TreeArt.Stump is an upright cylinder: Size.X its height, Size.Y its diameter.
+		local cut = birch.stump.PrimaryPart
+		t.ok(cut.Size.Y < cut.Size.Z + 1e-6 and cut.Size.Y > cut.Size.Z - 1e-6, "Y and Z are the round axes")
+		t.eq(s.fxAll[1].kind, "Sprout")
+		t.eq(s.fxAll[1].payload.diameter, cut.Size.Y)
+		t.ok(math.abs(s.fxAll[1].payload.pos.Y - (cut.CFrame.Position.Y + cut.Size.X / 2)) < 1e-4, "on the cut")
+		t.eq(birch.stump:FindFirstChild("SproutMark"), nil, "a grove wood's sprout is the client's (ForestUI)")
+
+		a.root.Position = Vector3.new(30, 0, 0)
+		s.plant(a, lumen.uid)
+		local lumenCut = lumen.stump.PrimaryPart
+		t.eq(s.fxAll[2].payload.diameter, lumenCut.Size.Y)
+		local mark = lumen.stump:FindFirstChild("SproutMark")
+		t.ok(mark ~= nil, "a slow wood's sapling sits on the stump for everyone")
+		local mound = mark:FindFirstChild("Mound")
+		t.ok(math.abs(mound.Size.X - lumenCut.Size.Y * 0.8) < 1e-4, "the mound is 0.8 of the cut")
+		local halo = mark:FindFirstChild("Halo")
+		t.ok(math.abs(halo.Size.Y - lumenCut.Size.Y * 0.95) < 1e-4, "the halo rings the cut")
+	end)
+
 	t.test("a dormant grove's stump: planting says why it can't", function()
 		local s = setup()
 		local rec = s.tree("phantomwood")
