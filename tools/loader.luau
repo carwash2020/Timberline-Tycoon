@@ -177,6 +177,35 @@ function Loader.new(options: Options?)
 	return self
 end
 
+-- Lune 0.10.5 builds CFrame.lookAt and CFrame.new(pos, lookAt) wrong (the
+-- look direction comes out flipped, diagonal targets lose their pitch), so
+-- modules get a CFrame with Roblox's behaviour for those two.
+local function lookAt(at, target, up)
+	local look = target - at
+	if look.Magnitude < 1e-9 then
+		return roblox.CFrame.new(at)
+	end
+	look = look.Unit
+	up = up or roblox.Vector3.new(0, 1, 0)
+	local right = look:Cross(up)
+	if right.Magnitude < 1e-6 then
+		right = look:Cross(roblox.Vector3.new(0, 0, 1)) -- looking straight up or down
+	end
+	right = right.Unit
+	return roblox.CFrame.fromMatrix(at, right, right:Cross(look), -look)
+end
+
+local CFrameShim = setmetatable({
+	lookAt = lookAt,
+	new = function(...)
+		local a, b = ...
+		if select("#", ...) == 2 and typeof(a) == "Vector3" and typeof(b) == "Vector3" then
+			return lookAt(a, b)
+		end
+		return roblox.CFrame.new(...)
+	end,
+}, { __index = roblox.CFrame })
+
 function Loader:environment(modulePath: string)
 	local dir, name = string.match(modulePath, "^(.*)/([^/]+)%.luau$")
 	local services = self.services
@@ -212,7 +241,7 @@ function Loader:environment(modulePath: string)
 		utf8 = utf8,
 		-- Roblox datatypes
 		BrickColor = roblox.BrickColor,
-		CFrame = roblox.CFrame,
+		CFrame = CFrameShim,
 		Color3 = roblox.Color3,
 		ColorSequence = roblox.ColorSequence,
 		ColorSequenceKeypoint = roblox.ColorSequenceKeypoint,

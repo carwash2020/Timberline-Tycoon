@@ -40,11 +40,19 @@ function CarryService.Publish(player: Player)
 	player:SetAttribute("CarriedLogs", CarryService.Count(player))
 end
 
--- Takes up to `max` carried logs whose wood passes `accept` out of the
--- player's hands, destroys their models, and returns their wood ids.
-function CarryService.TakeWhere(player: Player, accept: (WoodData.WoodDef) -> boolean, max: number?): { string }
+-- A log taken out of someone's hands: its wood, what it sells for and its
+-- figure (the Hidden Grain), the same shape as a truck bed entry.
+export type HeldLog = { woodId: string, value: number, figure: string? }
+
+-- Takes up to `max` carried logs that `accept(wood, figure)` allows out of
+-- the player's hands, destroys their models, and returns what they were.
+function CarryService.TakeLogs(
+	player: Player,
+	accept: (WoodData.WoodDef, string?) -> boolean,
+	max: number?
+): { HeldLog }
 	local set = hands[player.UserId]
-	local out: { string } = {}
+	local out: { HeldLog } = {}
 	if not set then
 		return out
 	end
@@ -55,15 +63,32 @@ function CarryService.TakeWhere(player: Player, accept: (WoodData.WoodDef) -> bo
 		local log = TreeService.GetLog(uid)
 		if not log then
 			set[uid] = nil -- stale
-		elseif accept(log.def) then
-			TreeService.TakeLog(uid)
-			log.model:Destroy()
-			set[uid] = nil
-			table.insert(out, log.def.id)
+		else
+			local figure = log.tags.figure
+			local figureId: string? = if type(figure) == "string" then figure else nil
+			if accept(log.def, figureId) then
+				TreeService.TakeLog(uid)
+				log.model:Destroy()
+				set[uid] = nil
+				table.insert(out, { woodId = log.def.id, value = log.value, figure = figureId })
+			end
 		end
 	end
 	CarryService.Publish(player)
 	return out
+end
+
+-- Like TakeLogs, returning just the wood ids.
+function CarryService.TakeWhere(player: Player, accept: (WoodData.WoodDef) -> boolean, max: number?): { string }
+	local ids: { string } = {}
+	for _, log in
+		ipairs(CarryService.TakeLogs(player, function(wood)
+			return accept(wood)
+		end, max))
+	do
+		table.insert(ids, log.woodId)
+	end
+	return ids
 end
 
 return CarryService

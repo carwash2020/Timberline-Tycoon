@@ -69,6 +69,7 @@ export type TreeRecord = {
 	planterId: number?, -- who planted it (the Living Forest), if anyone
 	damageBy: { [number]: number }, -- HP each player has chopped off this growth (co-op credit)
 	temporary: boolean, -- removed after it's felled instead of regrowing (Elder trees)
+	growth: number, -- counts fellings: a timer from an earlier felling checks it and gives up
 }
 
 export type LogRecord = {
@@ -209,6 +210,7 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 		planterId = opts.planterId,
 		damageBy = {},
 		temporary = opts.temporary == true,
+		growth = 0,
 	}
 	return model
 end
@@ -406,6 +408,8 @@ local function fellTree(player: Player, uid: string)
 	end
 	rec.alive = false
 	rec.felled = true
+	rec.growth += 1
+	local growth = rec.growth
 	local model = rec.model
 	local fellerId = player.UserId
 
@@ -419,7 +423,7 @@ local function fellTree(player: Player, uid: string)
 	model:SetAttribute("Felled", true)
 
 	task.delay(TreeLogic.FallTime + 0.35, function()
-		if trees[uid] ~= rec or not rec.felled then
+		if trees[uid] ~= rec or not rec.felled or rec.growth ~= growth then
 			return
 		end
 		-- Landed: hide the tree, leave a stump, lay its logs along the fall.
@@ -446,7 +450,9 @@ local function fellTree(player: Player, uid: string)
 	end)
 
 	task.delay(if rec.temporary then TreeLogic.FallTime + 8 else rec.def.respawnSec, function()
-		if trees[uid] ~= rec then
+		-- Planted back early and felled again since? That felling has its
+		-- own timer.
+		if trees[uid] ~= rec or rec.growth ~= growth then
 			return
 		end
 		if rec.temporary then

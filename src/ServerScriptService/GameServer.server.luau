@@ -38,7 +38,6 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
-local WoodData = require(ReplicatedStorage.Shared.WoodData)
 
 -- Wait for the code-built world. MapBuilder writes the terrain first (a few
 -- seconds to a minute) and adds the SellArea last, once everything exists.
@@ -422,12 +421,12 @@ local function onSellLogs(player: Player)
 		end
 	end
 	-- The Sky Bin sits by the pad: logs sent down the Cloud Chute.
-	for _, woodId in ipairs(AetherService.TakeSkyBin(player)) do
-		local wood = WoodData.Get(woodId)
-		if wood then
-			total += wood.pricePerLog
-			count += 1
-			byWood[woodId] = (byWood[woodId] or 0) + 1
+	for _, entry in ipairs(AetherService.TakeSkyBin(player)) do
+		total += entry.value
+		count += 1
+		byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
+		if entry.figure then
+			figures[entry.figure] = (figures[entry.figure] or 0) + 1
 		end
 	end
 	player:SetAttribute("CarriedLogs", 0)

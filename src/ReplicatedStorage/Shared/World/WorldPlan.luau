@@ -38,16 +38,17 @@ end
 -- Trees
 ---------------------------------------------------------------------------
 
--- A spot trees may grow on: dry, not on a road, not too steep, not in a
--- building zone or the volcano's crater.
-local function goodGround(x: number, z: number): boolean
+-- Ground a tree may grow on: dry, `roadClearance` (6) studs off the roads,
+-- flatter than `maxSlope` (0.75), not in town or the volcano's crater.
+-- ForestService asks a little more of it for a giant Elder.
+function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxSlope: number?): boolean
 	if WorldLayout.FlatWeight(x, z) > 0.9 then
 		return false
 	end
 	if TerrainGen.WaterLevelAt(x, z) ~= nil then
 		return false
 	end
-	if TerrainGen.RoadClearance(x, z) < 6 then
+	if TerrainGen.RoadClearance(x, z) < (roadClearance or 6) then
 		return false
 	end
 	local cone = WorldLayout.VolcanoCone
@@ -55,8 +56,9 @@ local function goodGround(x: number, z: number): boolean
 	if dx * dx + dz * dz < (cone.radius * 0.55) ^ 2 then
 		return false
 	end
-	return TerrainGen.SlopeAt(x, z) < 0.75
+	return TerrainGen.SlopeAt(x, z) < (maxSlope or 0.75)
 end
+local goodGround = WorldPlan.GoodGround
 
 local cachedTrees: { TreeSpot }? = nil
 

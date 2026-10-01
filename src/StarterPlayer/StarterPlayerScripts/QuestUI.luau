@@ -177,6 +177,14 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		return nearestTagged("Truck", from, function(model)
 			return model:GetAttribute("OwnerId") == player.UserId
 		end)
+	elseif target == "stump" then
+		-- The nearest stump you hold a Heartseed for (hidden Phantom Grove
+		-- stumps don't count).
+		return nearestTagged("Stump", from, function(model, pp)
+			local wood = model:GetAttribute("WoodId")
+			local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
+			return type(seeds) == "number" and seeds > 0 and pp.Transparency < 1
+		end)
 	elseif target == "sellPad" then
 		return findPart({ "SellArea", "SellPad" })
 	elseif target == "toolShed" then

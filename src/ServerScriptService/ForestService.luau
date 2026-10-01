@@ -42,7 +42,7 @@ local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
-local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
+local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
@@ -322,25 +322,10 @@ local function clearElder()
 	setElderAttributes(nil, nil)
 end
 
--- A spot trees may grow on (the test WorldPlan plants the world with, a
--- little stricter for a giant): dry, off the roads, not steep, not in town
--- or the volcano's crater.
+-- A spot an Elder may grow on: WorldPlan's test for trees, a little
+-- stricter for a giant (further from roads, flatter).
 local function goodGround(x: number, z: number): boolean
-	if WorldLayout.FlatWeight(x, z) > 0.9 then
-		return false
-	end
-	if TerrainGen.WaterLevelAt(x, z) ~= nil then
-		return false
-	end
-	if TerrainGen.RoadClearance(x, z) < 9 then
-		return false
-	end
-	local cone = WorldLayout.VolcanoCone
-	local dx, dz = x - cone.x, z - cone.z
-	if dx * dx + dz * dz < (cone.radius * 0.55) ^ 2 then
-		return false
-	end
-	return TerrainGen.SlopeAt(x, z) < 0.6
+	return WorldPlan.GoodGround(x, z, 9, 0.6)
 end
 
 -- One of a grove's woods, weighted by how many of each it grows.

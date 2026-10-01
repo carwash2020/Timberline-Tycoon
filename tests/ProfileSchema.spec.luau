@@ -85,4 +85,16 @@ return function(t)
 		Schema.Migrate(data)
 		t.eq(data.bestAxeTier, 6)
 	end)
+
+	t.test("Migrate turns old Sky Bin wood ids into priced entries", function()
+		local Schema = t.loader():server("ProfileSchema")
+		local WoodData = t.loader():shared("WoodData")
+		local data = t.loader():shared("Util").deepCopy(Schema.Template)
+		data.skyBin = { "lumenwood", { woodId = "oak", value = 7 } }
+		Schema.Migrate(data)
+		t.eq(data.skyBin, {
+			{ woodId = "lumenwood", value = WoodData.Get("lumenwood").pricePerLog },
+			{ woodId = "oak", value = 7 },
+		})
+	end)
 end

@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 local ProfileSchema = {}
@@ -78,7 +79,7 @@ export type Profile = {
 	compendium: { [string]: boolean },
 	materials: { [string]: number }, -- gathered materials by id (Sky Shards, ...)
 	forgeLogs: { [string]: number }, -- logs put into the Starfall forge, by wood id
-	skyBin: { string }, -- wood ids of the logs waiting in the Sky Bin at the sawmill
+	skyBin: { BedLog }, -- the logs waiting in the Sky Bin at the sawmill (wood, value, figure)
 	furnitureBlueprints: { [string]: boolean },
 	npcFriendship: { [string]: number },
 	stats: {
@@ -172,6 +173,13 @@ function ProfileSchema.Migrate(data: any)
 		end
 	end
 	data.plot.placed = kept
+	-- Saves from before the Hidden Grain kept only wood ids in the Sky Bin.
+	for i, entry in ipairs(data.skyBin) do
+		if type(entry) == "string" then
+			local wood = WoodData.Get(entry)
+			data.skyBin[i] = { woodId = entry, value = if wood then wood.pricePerLog else 0 }
+		end
+	end
 end
 
 -- How many granted receipts to remember. Roblox retries an unconfirmed
