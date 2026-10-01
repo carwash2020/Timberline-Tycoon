@@ -1,6 +1,8 @@
 --!nocheck
 -- Every truck in a row, each towing a trailer (the Scout ATV can't tow),
--- beds partly loaded, plus a lone Rustbucket up front for close-ups.
+-- beds partly loaded (one Burl log in the Pickup's bed, banded the way
+-- VehicleService bands a figured log), plus a lone Rustbucket up front for
+-- close-ups.
 -- A driver sits in every truck: a CharacterArt figure seated the way
 -- Roblox seats an R15 (hips on the seat's top, at its middle), its legs
 -- straight out in front (R6's worst case) and a 0.6-stud hat on, to check
@@ -15,6 +17,7 @@ return {
 		local Kit = ctx.art("Kit")
 		local TruckArt = ctx.art("TruckArt")
 		local CharacterArt = ctx.art("CharacterArt")
+		local ForestArt = ctx.art("ForestArt")
 		local ItemCatalog = ctx.shared("ItemCatalog")
 		local TruckLayout = ctx.shared("TruckLayout")
 		local WoodData = ctx.shared("WoodData")
@@ -32,7 +35,8 @@ return {
 		)
 
 		local woods = { "oak", "birch", "pine", "maple", "oak", "pine", "birch", "emberwood", "oak", "maple" }
-		local function load(model, layout, floorName, slots, count, offset)
+		-- `figures`: { [slot] = figure id } for figured logs.
+		local function load(model, layout, floorName, slots, count, offset, figures)
 			local floor = model:FindFirstChild(floorName)
 			if not floor then
 				return
@@ -40,6 +44,11 @@ return {
 			for i = 1, math.min(count, #slots) do
 				local wood = WoodData.Get(woods[(i + offset) % #woods + 1])
 				local log = TruckArt.BedLog(floor, slots[i], wood, layout.logLength, i)
+				local figure = figures and figures[i]
+				if figure then
+					log:SetAttribute("Figure", figure)
+					ForestArt.FigureBand(log.PrimaryPart, figure)
+				end
 				log.Parent = root
 			end
 		end
@@ -92,7 +101,7 @@ return {
 
 		local rigs = {
 			{ "Rustbucket", "PonyTrailer", 5, 4 },
-			{ "Pickup", "RanchTrailer", 9, 7 },
+			{ "Pickup", "RanchTrailer", 9, 7, { [8] = "burl" } }, -- the Burl on top, by the cab
 			{ "ScoutATV", nil, 0, 0 },
 			{ "Flatbed", "RanchTrailer", 16, 0 },
 			{ "LoggingRig", "HeavyHauler", 40, 20 },
@@ -107,7 +116,7 @@ return {
 			Kit.placeAt(model, CF.new((i - 1) * spacing, 0, 0))
 			model.Parent = root
 			seatDriver(model, C3.fromHex(shirts[i]))
-			load(model, layout, "BedFloor", layout.logSlots, entry[3], i)
+			load(model, layout, "BedFloor", layout.logSlots, entry[3], i, entry[5])
 			if tl then
 				load(model, layout, "TrailerBed", tl.logSlots, entry[4], i + 3)
 			end
@@ -139,6 +148,9 @@ return {
 				{ pos = { at(4) - 10, 9, -20 }, target = { at(4), 3, -4 }, label = "Flatbed" },
 				{ pos = { at(5) - 12, 9, -24 }, target = { at(5), 3.5, -8 }, label = "Logging Rig" },
 				{ pos = { at(5) + 18, 10, 18 }, target = { at(5), 3, 10 }, label = "Logging Rig + Heavy Hauler" },
+				-- From the Pickup's passenger side: the seated driver's head and hat
+				-- under the roof, the Burl on the load behind the cab.
+				{ pos = { at(2) + 7.5, 5.4, -3.6 }, target = { at(2), 4.5, -1.6 }, label = "Pickup, seated driver" },
 			},
 		}
 	end,

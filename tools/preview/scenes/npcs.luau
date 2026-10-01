@@ -28,10 +28,14 @@ return {
 			C3.fromRGB(112, 162, 82),
 			Enum.Material.Grass
 		)
+		local murph
 		for i, npc in ipairs(npcs) do
 			local m = CharacterArt.Build(npc.look)
 			Kit.placeAt(m, CF.new(LX + (i - 1) * GAP, 0, LZ))
 			m.Parent = root
+			if npc.id == "Murph" then
+				murph = m
+			end
 		end
 
 		-- 1b. Poses: the Motor6D Transforms NPCController uses, applied the way
@@ -187,6 +191,11 @@ return {
 			return { pos = { x, y, z }, target = { tx, ty, tz }, label = label }
 		end
 		local mid = LX + width / 2
+		local head = murph:FindFirstChild("Head")
+		local eye = (head.CFrame * CF.new(0, 0.35, -5.2)).Position
+		local look = head.CFrame.Position + V3.new(0, 0.05, 0)
+		local portrait = cam(eye.X, eye.Y, eye.Z, look.X, look.Y, look.Z, "QuestUI's portrait framing (centre square)")
+		portrait.fov = 30
 		local function at(i)
 			return LX + (i - 1) * GAP
 		end
@@ -203,7 +212,10 @@ return {
 				cam(mid + 8, 7, LZ + 24, mid, 3, LZ, "from behind"),
 				cam(at(1) - 9, 5, LZ - 7, at(3), 3, LZ, "three-quarter"),
 				cam(-8, 150, 40, -8, 0, 74, "the town from above, walkers' loops"),
-				cam(-1, 6, 38, -10.8, 3.2, 24.3, "Murph at his camp, from the spawn"),
+				-- West to Murph by his campfire, from 12 studs south of the spawn
+				-- pad: from the pad itself, (-2, 6, 40), the TO THE WOODS sign at
+				-- (-16, 44) hides his head and chest.
+				cam(-4, 6, 28, -25, 3.5, 41.8, "Murph at his camp, from by the spawn"),
 				cam(-45, 7, 84, -45, 3.5, 102, "Tink behind the Tool Shed counter"),
 				cam(4, 9, 66, 12, 3, 90, "Millie by the sell pad"),
 				cam(-24, 9, 128, -36, 3, 148, "Gus by the gondola"),
@@ -214,8 +226,10 @@ return {
 				cam(at(6) - 4, 5, LZ - 6, at(6), 3.6, LZ, "Gus, three-quarter (vest, scarf)"),
 				cam(at(5) + 4, 5, LZ - 6, at(5), 3.6, LZ, "Hazel, three-quarter (scarf, lantern)"),
 				cam(at(8) - 3, 3.5, LZ - 5, at(8), 2.6, LZ, "Pip up close"),
-				-- QuestUI's portrait: FOV 30 from 4.2 studs, i.e. this view's FOV 40 from 3.09.
-				cam(LX, 4.625 + 0.15, LZ - 3.09, LX, 4.625 - 0.25, LZ, "QuestUI's portrait framing (centre square)"),
+				-- QuestUI's portrait, exactly: a FOV 30 camera at Murph's head *
+				-- (0, 0.35, -5.2), looking at the head's centre + 0.05 up (its
+				-- viewport is square, so read the centre square).
+				portrait,
 			},
 		}
 	end,
