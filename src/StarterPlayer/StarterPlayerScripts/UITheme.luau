@@ -14,8 +14,9 @@
 --     a console (64 at the sides, 36 at the bottom).
 --   * Bottom(): where bottom-centre things (the hint, bars) start: above
 --     Roblox's tool hotbar, which the spec didn't allow for.
---   * LeftColumn(): keeps the left column (tutorial, Field Guide button)
---     just under Roblox's chat window, wherever and however big it is.
+--   * LeftColumn(): one list down the left (the Field Guide button, the
+--     tutorial), just under Roblox's chat window, wherever and however big
+--     it is; what's in it stacks instead of overlapping.
 --   * Textures: the spec's wood grain and kraft fibre are tiled images;
 --     until they're uploaded (set the ids below) surfaces are flat colour.
 
@@ -143,7 +144,7 @@ end
 
 local scales: { UIScale } = {}
 local currentScale = 1
-local leftColumn: { GuiObject } = {}
+local leftColumn: Frame? = nil
 
 -- The bottom of Roblox's chat window (and its input bar), in screen
 -- pixels; 0 if there's no chat window showing.
@@ -176,14 +177,37 @@ local function placeLeft()
 			position = UDim2.new(0, side, 0.3, 0)
 		end
 	end
-	for _, obj in ipairs(leftColumn) do
-		obj.Position = position
+	local column = leftColumn
+	if column then
+		column.Position = position
 	end
 end
 
--- Puts `obj` in the left column, under the chat, and keeps it there.
-function UITheme.LeftColumn(obj: GuiObject)
-	table.insert(leftColumn, obj)
+-- The UIScale every screen has now: offsets times this are screen pixels
+-- (so an AbsoluteSize divided by it is in offsets again).
+function UITheme.Scale(): number
+	return currentScale
+end
+
+-- Puts `obj` in the left column, under the chat, at `order` (top to
+-- bottom), and keeps it there.
+function UITheme.LeftColumn(obj: GuiObject, order: number)
+	local column = leftColumn
+	if not column then
+		local gui = UITheme.Screen("LeftColumn")
+		local frame = Instance.new("Frame")
+		frame.Name = "Column"
+		frame.Size = UDim2.new()
+		frame.AutomaticSize = Enum.AutomaticSize.XY
+		frame.BackgroundTransparency = 1
+		UITheme.list(frame, 6)
+		frame.Parent = gui
+		gui.Parent = player:WaitForChild("PlayerGui")
+		leftColumn = frame
+		column = frame
+	end
+	obj.LayoutOrder = order
+	obj.Parent = column
 	placeLeft()
 end
 

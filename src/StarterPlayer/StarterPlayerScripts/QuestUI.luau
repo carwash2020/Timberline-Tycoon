@@ -3,7 +3,9 @@
 --   * Tracker, on the left: the current objective with progress, and Skip
 --     (tap twice).
 --   * Murph's card under it: what he says when a step starts. "Talk" at
---     Murph (by the spawn) says it again.
+--     Murph (by the spawn) says it again. A tap dismisses it, except with
+--     touch controls: there it sits in the thumbstick's corner, so it lets
+--     touches through and just fades after a while.
 --   * A beacon: a bouncing arrow over what to do next (the nearest tree or
 --     log, your truck, the sell pad, the Tool Shed), with its distance.
 -- The server owns progress: it sets the TutorialStep (0 = done) and
@@ -18,6 +20,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
@@ -42,6 +45,7 @@ local stepLabel: TextLabel? = nil
 local speech: Frame? = nil -- the holder in the column
 local speechCard: Frame? = nil -- slides and fades inside it
 local speechLabel: TextLabel? = nil
+local speechTap: TextButton? = nil -- covers the card: a tap dismisses it
 local beacon: BillboardGui? = nil
 local distanceLabel: TextLabel? = nil
 local speechToken = 0
@@ -109,12 +113,24 @@ local function hideSpeech(animated: boolean)
 	end)
 end
 
+-- With touch controls the card sits where the dynamic thumbstick starts
+-- (the left of the screen, below the top third): a button over it would
+-- take the touch, so the stick wouldn't move. There it lets touches
+-- through and goes on its own.
+local function refreshTap()
+	local tap = speechTap
+	if tap then
+		tap.Visible = UITheme.Device() ~= "phone"
+	end
+end
+
 -- Shows one of Murph's lines for a while.
 local function say(line: string)
 	local holder, card, label = speech, speechCard, speechLabel
 	if not holder or not card or not label then
 		return
 	end
+	refreshTap()
 	label.Text = line
 	card.Position = UDim2.fromOffset(0, 0)
 	fadeCard(card, 0, 0)
@@ -153,8 +169,24 @@ local function nearestTagged(tag: string, from: Vector3, accept: (Model, BasePar
 	return best
 end
 
-local function findPart(path: { string }): BasePart?
-	local node: Instance? = workspace:FindFirstChild("TimberlineMap")
+-- The beacons that hang over a fixed part: its path from TimberlineMap,
+-- one direct child at a time. Both start in a Persistent model, so they're
+-- always streamed in. The sell pad's beacon hangs over the sell zone, the
+-- volume over the pad that the server sells from (the pad itself is art,
+-- nested inside its model).
+QuestUI.BeaconPaths = {
+	sellPad = { "SellArea", "SellZone" },
+	toolShed = { "ToolShed", "Counter" },
+} :: { [string]: { string } }
+
+-- The fixed part for the beacon `target` under `map` (TimberlineMap), if
+-- it's there.
+function QuestUI.FindBeaconPart(map: Instance?, target: string): BasePart?
+	local path = QuestUI.BeaconPaths[target]
+	if not path then
+		return nil
+	end
+	local node = map
 	for _, name in ipairs(path) do
 		node = if node then node:FindFirstChild(name) else nil
 	end
@@ -185,10 +217,8 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 			local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
 			return type(seeds) == "number" and seeds > 0 and pp.Transparency < 1
 		end)
-	elseif target == "sellPad" then
-		return findPart({ "SellArea", "SellPad" })
-	elseif target == "toolShed" then
-		return findPart({ "ToolShed", "Counter" })
+	elseif target then
+		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)
 	end
 	return nil
 end
@@ -336,15 +366,12 @@ end
 
 local function build()
 	local playerGui = player:WaitForChild("PlayerGui")
-	local gui = UITheme.Screen("QuestUI")
 
 	local column = Instance.new("Frame")
-	column.Name = "Column"
-	UITheme.LeftColumn(column) -- under Roblox's chat window
+	column.Name = "Tutorial"
 	column.Size = UDim2.fromOffset(280, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1
-	column.Parent = gui
 	UITheme.list(column, 6)
 
 	-- The tracker: kraft paper, a bark rim, an ink edge.
@@ -413,7 +440,8 @@ local function build()
 	objective.TextWrapped = true
 	objectiveLabel = objective
 
-	-- Murph's card: one big button (a tap dismisses it).
+	-- Murph's card: one big button (a tap dismisses it; not with touch
+	-- controls, see refreshTap).
 	local holder = Instance.new("Frame")
 	holder.Name = "Speech"
 	holder.LayoutOrder = 2
@@ -458,12 +486,17 @@ local function build()
 	tap.Text = ""
 	tap.ZIndex = 5
 	tap.Parent = bubble.outer
-	speech, speechCard, speechLabel = holder, bubble.outer, line
+	speech, speechCard, speechLabel, speechTap = holder, bubble.outer, line, tap
 	tap.Activated:Connect(function()
 		hideSpeech(true)
 	end)
+	UserInputService.LastInputTypeChanged:Connect(refreshTap)
+	refreshTap()
 
-	gui.Parent = playerGui
+	-- In the left column (under Roblox's chat window), under the Field
+	-- Guide button: that shows up as Murph's farewell starts, and stacks
+	-- above his card instead of under it.
+	UITheme.LeftColumn(column, 2)
 	buildBeacon(playerGui)
 
 	-- Re-aim the beacon a couple of times a second.
