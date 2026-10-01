@@ -116,4 +116,76 @@ return function(t)
 		t.eq(layout.bedLength, 0)
 		t.eq(#layout.logSlots, 0)
 	end)
+
+	-- ACT-03: VehicleService's DriveAttachment (where Drive holds the
+	-- truck's velocity) goes on the rear axle, so trucks turn about their
+	-- rear wheels instead of their middle.
+	t.test("every truck turns about its rear axle (the middle of a tandem pair)", function()
+		local axles = {}
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			local z = layout.wheelZ
+			local pivot = TruckLayout.DriveAxleZ(layout)
+			axles[id] = #z
+			if #z == 2 then
+				t.eq(pivot, z[2], id .. " two axles: the rear one")
+			else
+				t.eq(#z, 3, id .. " has two or three axles")
+				t.eq(pivot, (z[2] + z[3]) / 2, id .. " three axles: between the tandem pair")
+				t.ok(pivot ~= z[#z], id .. " not the tandem's front axle")
+				t.ok(pivot < z[2] and pivot > z[3], id .. " between the rear two axles")
+			end
+			t.ok(pivot > 0, id .. " behind the middle")
+			t.ok(pivot > z[1], id .. " behind the steering axle")
+			t.ok(pivot < layout.length / 2, id .. " under the truck")
+		end
+		-- The long beds (12+ studs) are the tandem ones.
+		t.eq(axles, { Rustbucket = 2, Pickup = 2, ScoutATV = 2, Flatbed = 3, LoggingRig = 3 })
+		local rig = TruckLayout.For(ItemCatalog.GetTruck("LoggingRig"))
+		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 9.25) < 1e-9, "the Logging Rig's tandem middle")
+	end)
+
+	t.test("the axle pick on odd layouts", function()
+		t.eq(TruckLayout.DriveAxleZ({ wheelZ = { -3, 4 } }), 4)
+		t.eq(TruckLayout.DriveAxleZ({ wheelZ = { -5, 8, 5 } }), 6.5)
+		t.eq(TruckLayout.DriveAxleZ({ wheelZ = { -3 } }), 0, "front axle only: its middle")
+		t.eq(TruckLayout.DriveAxleZ({ wheelZ = {} }), 0)
+		-- A new catalogue truck (style guessed from its look) still gets one.
+		local mystery = TruckLayout.For({
+			id = "Mystery",
+			bedCapacity = 30,
+			topSpeed = 20,
+			turnRate = 1,
+			look = { color = "#888888", width = 5, bedLength = 16, bedWalls = false },
+		})
+		t.eq(TruckLayout.DriveAxleZ(mystery), (mystery.wheelZ[2] + mystery.wheelZ[3]) / 2)
+	end)
+
+	-- Turning about the rear axle, the chassis centre (the model's pivot,
+	-- which the speed check judges) swings round a slightly wider circle
+	-- than the rear wheels, so it moves a little faster than the driven
+	-- speed. Its forward speed (what DriveMath sees) and the straight-line
+	-- top speed don't change. It must stay well inside the speed check.
+	t.test("the chassis centre on a full-lock turn stays inside the speed check", function()
+		local DriveMath = t.shared("DriveMath")
+		local VehicleLogic = t.shared("VehicleLogic")
+		local Vector3 = t.roblox.Vector3
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local d = TruckLayout.DriveAxleZ(TruckLayout.For(truck)) -- centre ahead of the pivot
+			for step = 1, 20 do
+				local v = truck.topSpeed * step / 20
+				local omega = math.abs(DriveMath.Turn(v, 1, truck.turnRate, 1)) -- rad/s at full steer
+				local centreSpeed = math.sqrt(v * v + (omega * d) ^ 2)
+				t.ok(centreSpeed <= truck.topSpeed * 1.25, string.format("%s at %.1f: %.2f", id, v, centreSpeed))
+				-- Where the centre gets to along its circle in a judging window.
+				local radius = centreSpeed / omega
+				for _, seconds in ipairs({ VehicleLogic.MaxJudgeSeconds / 4, VehicleLogic.MaxJudgeSeconds }) do
+					local chord = 2 * radius * math.sin(omega * seconds / 2)
+					local verdict =
+						VehicleLogic.JudgeMove(Vector3.zero, Vector3.new(chord, 0, 0), seconds, truck.topSpeed)
+					t.ok(verdict == "ok", string.format("%s at %.1f over %.1fs: %s", id, v, seconds, verdict))
+				end
+			end
+		end
+	end)
 end

@@ -13,7 +13,8 @@
 --         When its owner sits in the driver seat, the server unanchors it
 --         and hands its physics to their device (network ownership), where
 --         VehicleController steers it through two constraints: Drive (a
---         LinearVelocity: speed and grip) and Heading (an AlignOrientation:
+--         LinearVelocity on the rear axle: speed and grip, so the truck
+--         turns about its rear wheels) and Heading (an AlignOrientation:
 --         direction, and staying upright). It collides with trees and
 --         buildings. Getting out brakes it and lets it settle, then parks it
 --         where it comes to rest (set upright on the ground under its
@@ -188,8 +189,15 @@ local function buildTruckModel(
 	local loadPoint = if point and point:IsA("Attachment") then point else nil
 
 	-- Physics driving: the driver's VehicleController sets these each frame.
+	-- DriveAttachment sits on the rear axle (TruckLayout.DriveAxleZ; the
+	-- chassis is centred on the truck, so truck-local z is chassis-local z),
+	-- at the chassis's own height and unrotated. Drive holds that point's
+	-- velocity along the heading, so the truck turns about its rear wheels
+	-- and the tail follows instead of sliding out. Heading only uses the
+	-- attachment's axes, which are the chassis's.
 	local attachment = Instance.new("Attachment")
 	attachment.Name = "DriveAttachment"
+	attachment.CFrame = CFrame.new(0, 0, TruckLayout.DriveAxleZ(layout))
 	attachment.Parent = chassis
 	local drive = Instance.new("LinearVelocity")
 	drive.Name = "Drive"
