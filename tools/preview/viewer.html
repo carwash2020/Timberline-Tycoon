@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timberline Preview</title>
+<!--
+  Timberline Tycoon model preview. Written by `lune run tools/preview/export <scene>`,
+  which builds the scene with the game's own art modules (outside Roblox) and
+  embeds it below. Open the file in any browser: drag to orbit, right-drag to
+  pan, scroll to zoom, number keys 1-9 jump to the scene's camera presets.
+  It approximates Roblox's look (flat colours, sun + sky light, fog, neon glow);
+  materials' textures and Roblox's exact lighting are only in Studio.
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #9cc7e8; overflow: hidden; font-family: system-ui, sans-serif; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 12px; bottom: 10px; color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000a; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="application/json" id="scene">/*SCENE_JSON*/</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const scene = JSON.parse(document.getElementById("scene").textContent);
+// Lua's empty tables arrive as {} rather than [].
+for (const k of ["parts", "lights", "texts", "cameras"]) if (!Array.isArray(scene[k])) scene[k] = [];
+const L = Object.assign({
+  sunDir: [-0.45, 0.7, -0.35], sunColor: "#ffe2b0", sunIntensity: 2.6,
+  skyTop: "#8dbbe8", skyBottom: "#f4dcae", ground: "#8a7a5c", hemiIntensity: 1.5, ambient: 0.55,
+  fog: "#dfe6e6", fogNear: 250, fogFar: 1400, exposure: 1.0, bloom: 0.55,
+}, scene.lighting || {});
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = L.exposure;
+document.body.appendChild(renderer.domElement);
+
+const world = new THREE.Scene();
+world.fog = new THREE.Fog(L.fog, L.fogNear, L.fogFar);
+
+// Sky: a big gradient dome.
+{
+  const g = new THREE.SphereGeometry(6000, 32, 16);
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color(L.skyTop) }, bottom: { value: new THREE.Color(L.skyBottom) } },
+    vertexShader: "varying vec3 p; void main(){ p = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+    fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying vec3 p; void main(){ float t = clamp(p.y*1.6+0.15,0.0,1.0); gl_FragColor = vec4(mix(bottom, top, t),1.0); }",
+  });
+  world.add(new THREE.Mesh(g, m));
+}
+
+// Roblox's OutdoorAmbient keeps shadows readable; a hemisphere light plus a
+// little flat ambient is the closest cheap match.
+const hemi = new THREE.HemisphereLight(L.skyTop, L.ground, L.hemiIntensity);
+world.add(hemi, new THREE.AmbientLight("#ffffff", L.ambient));
+const sun = new THREE.DirectionalLight(L.sunColor, L.sunIntensity);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.6;
+world.add(sun, sun.target);
+
+// ---- Geometry for each Roblox shape (unit size, centred) -------------------
+function wedgeGeometry() {
+  // Roblox WedgePart: full bottom and back (+Z) faces, slope from the top of
+  // the back edge down to the bottom of the front (-Z) edge.
+  const a = [-.5,-.5,-.5], b = [.5,-.5,-.5], c = [.5,-.5,.5], d = [-.5,-.5,.5], e = [-.5,.5,.5], f = [.5,.5,.5];
+  const tris = [a,c,b, a,d,c, d,f,c, d,e,f, a,b,f, a,f,e, a,e,d, b,c,f];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris.flat(), 3));
+  g.computeVertexNormals();
+  return g;
+}
+function cornerWedgeGeometry() {
+  // Approximation (peak over the +X, -Z top corner); avoid in art code.
+  const a = [-.5,-.5,-.5], b = [.5,-.5,-.5], c = [.5,-.5,.5], d = [-.5,-.5,.5], p = [.5,.5,-.5];
+  const tris = [a,c,b, a,d,c, a,b,p, b,c,p, c,d,p, d,a,p];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(tris.flat(), 3));
+  g.computeVertexNormals();
+  return g;
+}
+const GEOM = {
+  Block: new THREE.BoxGeometry(1, 1, 1),
+  Wedge: wedgeGeometry(),
+  CornerWedge: cornerWedgeGeometry(),
+  Cylinder: new THREE.CylinderGeometry(0.5, 0.5, 1, 20).rotateZ(Math.PI / 2), // Roblox cylinders run along X
+  Ball: new THREE.SphereGeometry(0.5, 20, 14),
+  Sphere: new THREE.SphereGeometry(0.5, 20, 14), // SpecialMesh sphere (an ellipsoid)
+};
+
+// Roblox materials, roughly: [roughness, metalness]
+const MAT = {
+  Metal: [0.45, 0.7], DiamondPlate: [0.4, 0.7], CorrodedMetal: [0.8, 0.4], Foil: [0.3, 0.8],
+  Glass: [0.05, 0.1], Ice: [0.15, 0.0], Glacier: [0.2, 0.0], Marble: [0.35, 0.0], SmoothPlastic: [0.6, 0.0], Plastic: [0.65, 0.0],
+};
+
+// Group parts into InstancedMeshes by shape + material class + transparency.
+const groups = new Map();
+const m4 = new THREE.Matrix4(), s4 = new THREE.Matrix4(), col = new THREE.Color();
+const bounds = new THREE.Box3();
+const SHAPES = scene.shapes;
+const MATS = scene.materials;
+for (const p of scene.parts) {
+  // [shape, sx,sy,sz, x,y,z, r00..r22, color, material, transparency]
+  const shape = SHAPES[p[0]];
+  const material = MATS[p[17]];
+  const transparency = p[18];
+  if (transparency >= 0.98) continue;
+  const neon = material === "Neon";
+  const key = shape + "|" + (neon ? "neon" : (MAT[material] ? material : "default")) + "|" + transparency.toFixed(2);
+  let g = groups.get(key);
+  if (!g) { g = { shape, material: neon ? "Neon" : material, transparency, items: [] }; groups.set(key, g); }
+  g.items.push(p);
+}
+for (const g of groups.values()) {
+  const [rough, metal] = MAT[g.material] || [0.85, 0.0];
+  let mat;
+  if (g.material === "Neon") {
+    mat = new THREE.MeshBasicMaterial({ toneMapped: false });
+  } else {
+    // Boxes and wedges already have one normal per face; flatShading would
+    // flip double-sided faces wound the other way.
+    mat = new THREE.MeshStandardMaterial({ roughness: rough, metalness: metal });
+  }
+  if (g.transparency > 0 || g.material === "Glass") {
+    mat.transparent = true;
+    mat.opacity = Math.max(0.15, 1 - g.transparency - (g.material === "Glass" ? 0.35 : 0));
+    mat.depthWrite = g.transparency < 0.5;
+  }
+  mat.side = THREE.DoubleSide;
+  const mesh = new THREE.InstancedMesh(GEOM[g.shape] || GEOM.Block, mat, g.items.length);
+  g.items.forEach((p, i) => {
+    let sx = p[1], sy = p[2], sz = p[3];
+    if (g.shape === "Ball") { const d = Math.min(sx, sy, sz); sx = sy = sz = d; }
+    if (g.shape === "Cylinder") { const d = Math.min(sy, sz); sy = sz = d; }
+    m4.set(p[7], p[8], p[9], p[4], p[10], p[11], p[12], p[5], p[13], p[14], p[15], p[6], 0, 0, 0, 1);
+    s4.makeScale(Math.max(sx, 0.01), Math.max(sy, 0.01), Math.max(sz, 0.01));
+    m4.multiply(s4);
+    mesh.setMatrixAt(i, m4);
+    col.set("#" + p[16]);
+    if (g.material === "Neon") col.multiplyScalar(1.6);
+    mesh.setColorAt(i, col);
+    bounds.expandByPoint(new THREE.Vector3(p[4], p[5], p[6]));
+  });
+  mesh.castShadow = g.material !== "Neon" && g.transparency < 0.5;
+  mesh.receiveShadow = true;
+  world.add(mesh);
+}
+
+// Point lights (the brightest few: forward rendering can't afford hundreds).
+for (const l of (scene.lights || []).slice(0, 24)) {
+  const pl = new THREE.PointLight("#" + l[3], l[5] * 6, l[4] * 1.4, 1.6);
+  pl.position.set(l[0], l[1], l[2]);
+  world.add(pl);
+}
+
+// Text on SurfaceGuis (signs) and BillboardGuis (name tags).
+function textTexture(text, color, bg) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+  const x = c.getContext("2d");
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 512, 256); }
+  x.fillStyle = color; x.textAlign = "center"; x.textBaseline = "middle";
+  const lines = String(text).split("\n");
+  const size = Math.min(110, 230 / lines.length);
+  x.font = `bold ${size}px system-ui, sans-serif`;
+  lines.forEach((ln, i) => x.fillText(ln, 256, 128 + (i - (lines.length - 1) / 2) * size * 1.05, 490));
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+for (const t of (scene.texts || [])) {
+  // [kind, w, h, x,y,z, r00..r22, text, color]
+  const geom = new THREE.PlaneGeometry(t[1], t[2]);
+  const mat = new THREE.MeshBasicMaterial({ map: textTexture(t[15], "#" + t[16]), transparent: true, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geom, mat);
+  m4.set(t[6], t[7], t[8], t[3], t[9], t[10], t[11], t[4], t[12], t[13], t[14], t[5], 0, 0, 0, 1);
+  mesh.applyMatrix4(m4);
+  if (t[0] === "billboard") mesh.userData.billboard = true;
+  world.add(mesh);
+}
+
+// Terrain heightfield (+ water) when the scene has one.
+if (scene.terrain) {
+  const T = scene.terrain;
+  const g = new THREE.PlaneGeometry((T.nx - 1) * T.step, (T.nz - 1) * T.step, T.nx - 1, T.nz - 1);
+  g.rotateX(-Math.PI / 2);
+  const pos = g.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  for (let iz = 0; iz < T.nz; iz++) for (let ix = 0; ix < T.nx; ix++) {
+    const i = iz * T.nx + ix;
+    pos.setXYZ(i, T.x0 + ix * T.step, T.h[i], T.z0 + iz * T.step);
+    col.set("#" + T.palette[T.m[i]]);
+    colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }));
+  mesh.receiveShadow = true;
+  world.add(mesh);
+  bounds.expandByPoint(new THREE.Vector3(T.x0, 0, T.z0));
+  bounds.expandByPoint(new THREE.Vector3(T.x0 + (T.nx - 1) * T.step, 0, T.z0 + (T.nz - 1) * T.step));
+  if (T.wet) {
+    // Water only over the columns that have it: one quad per wet cell.
+    const verts = [];
+    for (let iz = 0; iz < T.nz - 1; iz++) for (let ix = 0; ix < T.nx - 1; ix++) {
+      const i = iz * T.nx + ix;
+      const w = Math.max(T.wet[i], T.wet[i + 1], T.wet[i + T.nx], T.wet[i + T.nx + 1]);
+      if (w < -9000) continue;
+      const x0 = T.x0 + ix * T.step, z0 = T.z0 + iz * T.step, x1 = x0 + T.step, z1 = z0 + T.step;
+      verts.push(x0, w, z0, x1, w, z0, x1, w, z1, x0, w, z0, x1, w, z1, x0, w, z1);
+    }
+    if (verts.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+      g.computeVertexNormals();
+      world.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: T.waterColor || "#3d8fb8", transparent: true, opacity: 0.85, roughness: 0.12, metalness: 0.1, side: THREE.DoubleSide })));
+    }
+  }
+}
+
+// Fit the shadow camera to the scene.
+const size = bounds.getSize(new THREE.Vector3());
+const center = bounds.getCenter(new THREE.Vector3());
+const radius = Math.max(20, size.length() / 2);
+const sd = new THREE.Vector3(...L.sunDir).normalize();
+const shadowRadius = Math.min(radius, scene.shadowRadius || 400);
+sun.target.position.copy(center);
+sun.position.copy(center).addScaledVector(sd, shadowRadius * 2);
+Object.assign(sun.shadow.camera, { left: -shadowRadius, right: shadowRadius, top: shadowRadius, bottom: -shadowRadius, near: 1, far: shadowRadius * 5 });
+sun.shadow.camera.updateProjectionMatrix();
+
+// Camera + controls.
+const camera = new THREE.PerspectiveCamera(scene.fov || 55, innerWidth / innerHeight, 0.5, 12000);
+const controls = new OrbitControls(camera, renderer.domElement);
+const views = scene.cameras && scene.cameras.length ? scene.cameras : [{ pos: [center.x + radius, center.y + radius * 0.6, center.z + radius], target: [center.x, center.y, center.z] }];
+function setView(i) {
+  const v = views[Math.max(0, Math.min(views.length - 1, i))];
+  camera.position.set(...v.pos);
+  controls.target.set(...v.target);
+  camera.fov = v.fov || scene.fov || 55;
+  camera.updateProjectionMatrix();
+  controls.update();
+  document.getElementById("hud").textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""} · ${scene.parts.length} parts`;
+}
+window.setView = setView;
+window.viewCount = views.length;
+addEventListener("keydown", (e) => { const n = parseInt(e.key, 10); if (n >= 1 && n <= 9) setView(n - 1); });
+setView(0);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(world, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), L.bloom, 0.6, 0.85));
+composer.addPass(new OutputPass());
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+function frame() {
+  world.traverse((o) => { if (o.userData.billboard) o.quaternion.copy(camera.quaternion); });
+  controls.update();
+  composer.render();
+  requestAnimationFrame(frame);
+}
+frame();
+window.__ready = true;
+</script>
+</body>
+</html>

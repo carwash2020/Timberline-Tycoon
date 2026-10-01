@@ -47,8 +47,8 @@ local woods: { WoodDef } = {
 		silhouette = "broadleaf",
 		leafColor = hexColor("#5DA24A"),
 		trunkColor = hexColor("#7A5230"),
-		trunkHeight = 8,
-		foliageSize = 7,
+		trunkHeight = 9,
+		foliageSize = 12,
 	},
 	{
 		id = "birch",
@@ -62,8 +62,8 @@ local woods: { WoodDef } = {
 		silhouette = "broadleaf",
 		leafColor = hexColor("#6FBF5F"),
 		trunkColor = hexColor("#D8D2C4"),
-		trunkHeight = 9,
-		foliageSize = 7,
+		trunkHeight = 10,
+		foliageSize = 8,
 	},
 	{
 		id = "pine",
@@ -77,8 +77,8 @@ local woods: { WoodDef } = {
 		silhouette = "pine",
 		leafColor = hexColor("#2F7A3D"),
 		trunkColor = hexColor("#6B4A2F"),
-		trunkHeight = 12,
-		foliageSize = 8,
+		trunkHeight = 14,
+		foliageSize = 10,
 	},
 	{
 		id = "maple",
@@ -92,8 +92,8 @@ local woods: { WoodDef } = {
 		silhouette = "broadleaf",
 		leafColor = hexColor("#D88F2C"),
 		trunkColor = hexColor("#7A5230"),
-		trunkHeight = 11,
-		foliageSize = 9,
+		trunkHeight = 10,
+		foliageSize = 13,
 	},
 	{
 		id = "palmwood",
@@ -107,8 +107,8 @@ local woods: { WoodDef } = {
 		silhouette = "palm",
 		leafColor = hexColor("#3FAE5A"),
 		trunkColor = hexColor("#8A6A45"),
-		trunkHeight = 13,
-		foliageSize = 8,
+		trunkHeight = 14,
+		foliageSize = 10,
 	},
 	{
 		id = "frostwood",
@@ -122,8 +122,8 @@ local woods: { WoodDef } = {
 		silhouette = "pine",
 		leafColor = hexColor("#BFE3F2"),
 		trunkColor = hexColor("#5A6A7A"),
-		trunkHeight = 13,
-		foliageSize = 9,
+		trunkHeight = 15,
+		foliageSize = 10,
 	},
 	{
 		id = "emberwood",
@@ -137,8 +137,8 @@ local woods: { WoodDef } = {
 		silhouette = "glowing",
 		leafColor = hexColor("#FF7A1A"),
 		trunkColor = hexColor("#3A2A24"),
-		trunkHeight = 14,
-		foliageSize = 10,
+		trunkHeight = 13,
+		foliageSize = 14,
 	},
 	{
 		id = "phantomwood",
@@ -152,8 +152,8 @@ local woods: { WoodDef } = {
 		silhouette = "dead",
 		leafColor = hexColor("#7A4FD0"),
 		trunkColor = hexColor("#2A2138"),
-		trunkHeight = 15,
-		foliageSize = 10,
+		trunkHeight = 14,
+		foliageSize = 13,
 	},
 	{
 		-- V1 finale (Aether Isles). Only the Inferno Axe can dent it, slowly;
@@ -169,8 +169,8 @@ local woods: { WoodDef } = {
 		silhouette = "glowing",
 		leafColor = hexColor("#FFF4C2"),
 		trunkColor = hexColor("#F2E6C8"),
-		trunkHeight = 16,
-		foliageSize = 11,
+		trunkHeight = 18,
+		foliageSize = 15,
 	},
 }
 
