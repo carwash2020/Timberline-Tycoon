@@ -905,6 +905,9 @@ does.
   north, the Volcano's cone in the north-east corner, the Phantom Grove
   hidden in a hollow south-west (no road), the coast and an island to the
   east, a lake south-west, mountains round the edge.
+- **Wild groves** (22 small stands of oak, birch, pine and maple) dot the
+  open country between the biomes, all at least 300 studs from the
+  sawmill so they never shorten the first haul.
 - The **Skyroot** rises in the north-west: a colossal tree whose limbs
   hold the four Aether Isles; its waterfall feeds the river that winds
   past the town to the lake.

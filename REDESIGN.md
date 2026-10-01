@@ -205,8 +205,7 @@ Built and passing every check; not yet played in Studio. Open items:
   its own figure if that's worth more than Stormgrain; royalties and Elder
   bonuses ignore the 2x Wood boost; isle lightning does no damage; trucks
   are owner-only.
-- **Ideas not built:** wild groves in the meadows between biomes; showroom
-  trucks at the Dealership (TruckArt.Build); real axes in the Tool Shed's
+- **Ideas not built:** showroom trucks at the Dealership (TruckArt.Build); real axes in the Tool Shed's
   rows (AxeArt in a ViewportFrame); a "Storm in 4 min" forecast badge
   (WeatherSchedule.Forecast); genes and breeding, then Skyroot Rising
   (§16).

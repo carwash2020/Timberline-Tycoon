@@ -16,7 +16,7 @@ local WorldLayout = require(script.Parent.WorldLayout)
 
 local WorldPlan = {}
 
-export type TreeSpot = { woodId: string, position: Vector3, biome: string }
+export type TreeSpot = { woodId: string, position: Vector3, biome: string } -- biome "wild": a meadow grove
 export type Placement = { name: string, cframe: CFrame, seed: number }
 export type Sign = { text: string, cframe: CFrame }
 export type Fence = { length: number, cframe: CFrame }
@@ -69,7 +69,34 @@ local goodGround = WorldPlan.GoodGround
 
 local cachedTrees: { TreeSpot }? = nil
 
--- Every wild tree on the ground (the sky's Lumenwood is in WorldPlan.Sky).
+local WILD_GROVES = 22 -- stands of trees in the open country
+local WILD_NEAREST = 300 -- studs from the sawmill (the Starter Forest is 190)
+
+-- The woods of a wild grove at `c`, by the nearest biome: pine and maple
+-- toward the Hills, pine and birch toward the Snowfields and the Volcano,
+-- oak and birch everywhere else. (Repeats weight the pick.)
+local function wildWoodsNear(c: Vector2): { string }
+	local nearest, best = "starter", math.huge
+	for _, id in ipairs({ "starter", "hills", "snow", "volcano" }) do
+		local def = BiomeData.Get(id)
+		local area = if def then def.area else nil
+		if area then
+			local d = Vector2.new(c.X - area.x, c.Y - area.z).Magnitude - area.radius
+			if d < best then
+				nearest, best = id, d
+			end
+		end
+	end
+	if nearest == "hills" then
+		return { "pine", "pine", "maple", "oak" }
+	elseif nearest == "snow" or nearest == "volcano" then
+		return { "pine", "pine", "birch" }
+	end
+	return { "oak", "oak", "birch" }
+end
+
+-- Every tree on the ground: each biome's trees (BiomeData counts), then the
+-- wild groves between them (the sky's Lumenwood is in WorldPlan.Sky).
 function WorldPlan.Trees(): { TreeSpot }
 	if cachedTrees then
 		return cachedTrees
@@ -111,6 +138,75 @@ function WorldPlan.Trees(): { TreeSpot }
 						placed += 1
 					end
 				end
+			end
+		end
+	end
+	-- Wild groves: small stands of the common woods out in the open country
+	-- between the biomes, so the land between them is never bare. Never
+	-- nearer the sawmill than WILD_NEAREST (past the Starter Forest, so they
+	-- don't shorten the first haul), clear of every biome, the town and the
+	-- plots, the roads, the beach and the mountains. Their woods follow the
+	-- nearest biome; each counts toward its wood's grove like any tree.
+	local wildRng = Kit.rng(hashString("wild groves"))
+	local mill = WorldLayout.Sawmill
+	local half = WorldLayout.WorldHalf - 120
+	local coast = WorldLayout.Coast
+	local centers: { Vector2 } = {}
+	local tries = 0
+	while #centers < WILD_GROVES and tries < 6000 do
+		tries += 1
+		local x, z = wildRng:range(-half, half), wildRng:range(-half, half)
+		local ok = Vector2.new(x - mill.X, z - mill.Z).Magnitude > WILD_NEAREST
+			and WorldLayout.FlatWeight(x, z) <= 0
+			and not (z < coast.northZ and x > coast.shoreX - coast.beachWidth - 40)
+			and goodGround(x, z, 12, 0.55)
+			and TerrainGen.HeightAt(x, z) < 70
+		if ok then
+			for _, biome in ipairs(BiomeData.All()) do
+				local area = biome.area
+				if area and Vector2.new(x - area.x, z - area.z).Magnitude < area.radius + 60 then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok then
+			for _, c in ipairs(centers) do
+				if (c - Vector2.new(x, z)).Magnitude < 170 then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok then
+			table.insert(centers, Vector2.new(x, z))
+		end
+	end
+	for _, c in ipairs(centers) do
+		local woods = wildWoodsNear(c)
+		local want = wildRng:int(4, 8)
+		local placed, attempts = 0, 0
+		while placed < want and attempts < want * 30 do
+			attempts += 1
+			local angle = wildRng:range(0, math.pi * 2)
+			local r = math.sqrt(wildRng:next()) * 26
+			local x, z = c.X + math.cos(angle) * r, c.Y + math.sin(angle) * r
+			local ok = goodGround(x, z, 10, 0.6)
+			if ok then
+				for _, q in ipairs(taken) do
+					local ddx, ddz = x - q.X, z - q.Z
+					if ddx * ddx + ddz * ddz < 10 * 10 then
+						ok = false
+						break
+					end
+				end
+			end
+			if ok then
+				local woodId = wildRng:pick(woods)
+				local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+				table.insert(taken, p)
+				table.insert(out, { woodId = woodId, position = p, biome = "wild" })
+				placed += 1
 			end
 		end
 	end
