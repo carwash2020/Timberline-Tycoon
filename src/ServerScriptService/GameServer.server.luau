@@ -222,10 +222,19 @@ local function serverPickupLog(player: Player, logUid: unknown)
 	if (hrp.Position - pp.Position).Magnitude > GameConfig.PickupPromptRange + GameConfig.RangeTolerance then
 		return
 	end
-	-- Grace period: only the feller can grab these for the first few seconds.
-	if log.ownerId ~= player.UserId and os.time() - log.fellTime < GameConfig.PickupGraceSec then
-		notify(player, "Someone else felled this tree. Their logs are up for grabs in a few seconds.")
-		return
+	-- Grace period: only the feller can grab these for the first few seconds
+	-- (a load left behind by a truck stays its owner's for longer).
+	if log.ownerId ~= player.UserId then
+		local graceEnds = log.graceUntil or (log.fellTime + GameConfig.PickupGraceSec)
+		if os.time() < graceEnds then
+			notify(
+				player,
+				if log.graceUntil
+					then "Someone left this load here. It's theirs for a while yet."
+					else "Someone else felled this tree. Their logs are up for grabs in a few seconds."
+			)
+			return
+		end
 	end
 	local already = countHands(hands)
 	if already >= GameConfig.HandCapacity then

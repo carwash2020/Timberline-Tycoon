@@ -244,7 +244,8 @@ An id that fails to load is just silent (a warning in Output).
       eyes = birdseye, scaly plates = quilted, a knobbly lump at the foot =
       burl); clicking the clue still chops the tree
 - [ ] Fell a tree: a glowing Heartseed arcs into you with a pop and the
-      pouch chip under the clock counts it (first time: a toast)
+      pouch chip left of the Daily Goals button counts it (first time: a
+      toast)
 - [ ] Tutorial: after your first sale Murph asks you to plant a Heartseed;
       the beacon points at the nearest stump you have a seed for;
       **Plant Heartseed (1)** (F / Y) grows a sapling for 8 s, then the
@@ -286,8 +287,11 @@ An id that fails to load is just silent (a warning in Output).
 - [ ] Sell a load: the cash counts up, "+$..." floats left of the plaque,
       the paper flashes green; buying shows "-$..." in ink
 - [ ] Top right on a phone and at 1080p: Store, clock, ♪ and the cash
-      plaque in a row with no overlaps, even at $1,999,999; the Heartseed
-      pouch and the Daily Goals button below don't overlap
+      plaque in a row with no overlaps, even at $1,999,999; the Daily Goals
+      button and the Heartseed pouch in the row below don't overlap; the
+      Settings card, the goals panel and the pouch list open one at a time
+      under that row; side buttons spill into a second column instead of
+      climbing over the Daily button; a shop's X is clear of the cash
 - [ ] Two logs in hand: drop one by selling the other, pick up again: the
       new log never sits inside the old one
 - [ ] Lava doesn't burn you inside a truck or mid-jump
@@ -302,6 +306,84 @@ An id that fails to load is just silent (a warning in Output).
       under 0.5 ms (if decoration is heavy: lower `MAX_DECOR` in
       AmbientLife or `EnvironmentData.DecorCandidates`)
 - [ ] The Skyroot, isles and cloud banks in view: still smooth
+
+### After the review (October 2026): fixes to check
+
+A review of the merged redesign found about 30 problems; all are fixed.
+These checks cover the ones that change what you see or do:
+
+**Hauling**
+- [ ] Fill the bed in the Hills, walk 40+ studs away, **Truck to lot**:
+      the truck is back in your slot empty, the logs lie where it stood
+      (figured ones keep their band and value), with a toast; they stay
+      yours for 10 minutes
+- [ ] Loaded at the sell pad or the Dealership: Truck to lot or switching
+      trucks keeps the load
+- [ ] Leave with a loaded truck in a far biome and rejoin: truck empty in
+      the lot, the logs waiting at the old spot (once, not twice); leave
+      loaded in the lot and rejoin: the load is back in the bed
+- [ ] Two players: park in the other's slot, they press Truck to lot: your
+      truck goes back to your own slot (with a toast), theirs isn't built
+      inside it
+- [ ] Hop out across a dip or a slope (Flatbed + trailer): it stays where
+      it rests, nothing sunk in; hop out mid-air off a ledge: it lands first
+- [ ] Out of the truck on the sell pad with logs: the prompt says **Sell**,
+      not Drive; Drive comes back after selling or off the pad
+- [ ] Instant Delivery with cash near $2,000,000: refused with a toast,
+      and no use is spent
+- [ ] Normal driving: no rubber-banding (a network stall over 2 s puts the
+      truck back to its last good spot: tell me if that happens in normal
+      play); selling from the truck at the pad works
+
+**Trees and the Living Forest**
+- [ ] Two players on one oak: A chops it to 1 HP, B lands the last hit: A
+      gets the logs' window, the Heartseed and the tutorial/daily credit
+- [ ] Plant your own oak and refell it at once: a seed back but no
+      steward's bonus, and the grove's vitality drops back; after 10 minutes
+      standing, the bonus returns
+- [ ] Plant a Lumenwood stump: the toast says about 8 minutes and a sapling
+      stands on the stump the whole time, for anyone who comes by; no plant
+      prompt on it meanwhile
+- [ ] A tree that grows back (or a Phantom tree at dusk) where a truck is
+      parked: it appears, the truck isn't flung, you can drive off, and the
+      trunk turns solid within about 2 s
+- [ ] By day in the Phantom Grove: no invisible stumps to bump into; a
+      phantomwood felled seconds before dawn leaves no visible stump
+- [ ] `WakeElder("grove")` at night, then let dawn come: the Elder, its
+      aura and marker fade together and another grove can wake one
+- [ ] Fell a tree uphill on a steep slope: its logs lie on the surface
+- [ ] Fell a storm-struck tree in the glow's last second: still Stormgrain
+
+**The world**
+- [ ] Drive west from the lot along the Hills road and east along the Plot
+      road: nothing in the lane (Murph's camp now sits beside the TO THE
+      WOODS sign, Murph facing the spawn; his Talk prompt works)
+- [ ] Sign text (sawmill crest, shop titles, signposts, SKY BIN, plot
+      signs) reads unstretched
+- [ ] Wade into the lake, the river and the pond: no air pockets under the
+      water; water reaches the shallow edges (a place saved with
+      `Workspace.Terrain` attribute `Prebuilt = true` keeps its old terrain:
+      clear it to rebuild)
+- [ ] From the volcano's rim: a level glowing pool fills the crater floor
+- [ ] The four biome road signs: both posts on the ground, clear of the
+      road; no boulders floating on mountainsides
+- [ ] Gondola up from town and from the Skyroot's foot, and back down: the
+      cabin leaves through the station's open back and comes in level over
+      the isle's rim, no clipping; still about 40 s a ride
+
+**Screens**
+- [ ] Tutorial "Sell logs at the sawmill": the arrow sits over the sell pad
+- [ ] Finishing the tutorial: FIELD GUIDE at the top left with Murph's
+      farewell card under it (not covering it)
+- [ ] Phone (iPhone 14 landscape and SE): Murph's card lets a thumb move
+      you; all four side buttons (on your plot, axe out, truck far away,
+      Instant Deliveries) fit above the jump button in two columns
+- [ ] Phone, Tool Shed: the panel sits left of the cash; its X shows and
+      closes it
+- [ ] Lightning and a nearby tree falling: the rumble plays out in full
+- [ ] Shift-lock or first person near a falling tree: after the shake the
+      view points where it did
+- [ ] Aether Isles: the next isle sharp, the ground far below a little soft
 
 ## Axe shop (GAME_DESIGN §8 phase 2)
 
@@ -400,7 +482,8 @@ test account), progress starts fresh each Play session.
   fill with visible logs. Bigger beds drive slower (top speeds 24 to 40).
 - **Dealership** east of the sawmill (opposite the Tool Shed): **Browse
   trucks** lists every truck with its bed and top speed. Buy one and it
-  replaces your truck in your parking spot, load and all if it fits. Trucks
+  replaces your truck in your parking spot, load and all if it fits (and
+  if the truck is in town: see the redesign's "Truck to lot"). Trucks
   you own show **Use** to switch back. The Scout ATV has no bed.
 - **Physics driving:** trucks collide with trees and buildings instead of
   gliding through them. Your device drives your truck (smooth, no lag);
@@ -408,7 +491,10 @@ test account), progress starts fresh each Play session.
   where it is. Set `VehiclePhysics = false` in `GameConfig.luau` to get
   the Phase 1 arcade driving back if physics misbehaves.
 - **Truck to lot:** a button (right edge) when your truck is far away:
-  it goes back to your parking spot with its load. 10 s cooldown.
+  it goes back to your parking spot. 10 s cooldown. Since the redesign
+  the load comes along only from within 150 studs of town; from farther
+  out it's left on the ground where the truck stood (yours for 10
+  minutes), so the drive home can't be skipped.
 - The parking lot is bigger (slots fit the Logging Rig).
 
 ### Playtest checklist
@@ -422,9 +508,11 @@ test account), progress starts fresh each Play session.
 - [ ] Dealership: **Browse trucks** shows 5 trucks; the Rustbucket says
       **In use**; buying the Pickup ($1,200) takes the cash and the Pickup
       appears in your spot; the Rustbucket now says **Use**
-- [ ] Switch with logs in the bed: the load moves over (if it fits)
+- [ ] Switch with logs in the bed (truck parked in town): the load moves
+      over (if it fits)
 - [ ] Walk far from your truck: **Truck to lot** appears; press it: the truck
-      is back in your spot with its load; pressing again right away says to wait
+      is back in your spot (its load stays where it stood if that was out of
+      town); pressing again right away says to wait
 - [ ] Phone (device emulator): drive with the thumbstick; the Truck to lot
       button doesn't cover the jump button
 - [ ] A second player (Test → 2 players) sees your truck move smoothly, but

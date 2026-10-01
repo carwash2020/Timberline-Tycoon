@@ -18,6 +18,8 @@ local GameConfig = {
 	HandCapacity = 2,
 	PickupGraceSec = 10, -- the feller's exclusive pickup window
 	LogDespawnSec = 300, -- logs left lying in the world disappear after this
+	LeftLoadGraceSec = 600, -- a truck load left behind (Truck to lot, rejoin) stays yours this long
+	LeftLoadDespawnSec = 1200, -- and lies there this long, so there's time to drive back for it
 
 	-- Axes (items: see AxeService)
 	AxePickupByOthers = false, -- true lets anyone pick up a dropped axe (a gift); off until trading exists

@@ -10,8 +10,9 @@
 --     slope (Shared/VehicleLogic.GroundUp), never more than 30 degrees, so
 --     the truck rides hills and bumps instead of nosing into them.
 --   * "Truck to lot" side button (Y on a gamepad): sends your truck back to
---     your parking slot, load and all, when it's far away (left somewhere,
---     or stuck).
+--     your parking slot when it's far away (left somewhere, or stuck). The
+--     load comes along only from town; otherwise the server leaves it on
+--     the ground where the truck stood (VehicleService).
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")

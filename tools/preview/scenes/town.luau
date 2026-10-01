@@ -92,7 +92,7 @@ return {
 		put(BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", C3.fromRGB(122, 90, 60)), -80, 100)
 		-- The gondola station, its back (+Z) toward the Skyroot (-1050, 1050).
 		put(BuildingArt.GondolaStation(), -40, 150, math.atan2(-1050 + 40, 1050 - 150))
-		put(BuildingArt.Campsite(), -21, 24, facing(-21, 24, 0, 40))
+		put(BuildingArt.Campsite(), -28, 42, facing(-28, 42, 0, 40)) -- as WorldPlan.Town
 		put(BuildingArt.Signpost("TO THE WOODS\nHills 400 · Snow 1200"), -16, 44, facing(-16, 44, 0, 40))
 		put(
 			BuildingArt.Signpost("SKYROOT GONDOLA\nto the Aether Isles\n$250 a ride"),
@@ -115,7 +115,7 @@ return {
 		put(BuildingArt.Fence(26), -88, 136)
 		put(BuildingArt.Fence(26), -88, 114)
 		put(BuildingArt.Fence(22), -101, 125, math.pi / 2)
-		put(BuildingArt.Fence(36), 111, 25, math.pi / 2)
+		put(BuildingArt.Fence(36), 111, 24, math.pi / 2)
 
 		-- Props.
 		local seed = 0
@@ -266,7 +266,7 @@ return {
 				{ pos = { 36, 7.5, 74 }, target = { 45, 6, 100 }, label = "Dealership" },
 				{ pos = { -71, 7.5, 76 }, target = { -80, 6, 100 }, label = "Hearth & Home" },
 				{ pos = { -18, 12, 126 }, target = { -40, 6, 150 }, label = "gondola station" },
-				{ pos = { -6, 6, 10 }, target = { -21, 2, 26 }, label = "Murph's camp" },
+				{ pos = { -10, 6, 30 }, target = { -28, 2, 42 }, label = "Murph's camp" },
 				{ pos = { 14, 5.5, 62 }, target = { 0, 7, 104 }, label = "sell pad + mill" },
 				{ pos = { 80, 14, 24 }, target = { 0, 9, 100 }, label = "from the lot" },
 			},

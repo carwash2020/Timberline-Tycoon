@@ -678,6 +678,14 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	end
 	local stumpPart = if stump then stump.PrimaryPart else nil
 	local top = if stumpPart then stumpPart.CFrame.Position.Y + stumpPart.Size.X / 2 else rec.base.Y + 1
+	if stump and seconds > ForestData.ShownSproutSeconds then
+		-- A slow wood: a sapling on the stump for everyone, the whole time
+		-- (it goes with the stump when the tree stands).
+		local sapling = ForestArt.Sprout(def, rec.seed)
+		sapling.Name = "SproutMark"
+		Kit.placeAt(sapling, CFrame.new(rec.base.X, top, rec.base.Z))
+		sapling.Parent = stump
+	end
 	fireAll("Sprout", {
 		uid = treeUid,
 		pos = Vector3.new(rec.base.X, top, rec.base.Z),

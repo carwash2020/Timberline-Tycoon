@@ -149,7 +149,9 @@ measure the economy model against your real play (saved in
   Forest, `SettingsUI` music and sound settings, `ChopController` and
   `TreeFX` chopping and falling trees, `LightingController`,
   `WeatherController`, `AmbientLife`, `WindSway`, `AmbientSound` and
-  `TownFX` the living world, `NPCController` the townsfolk)
+  `TownFX` the living world, `NPCController` the townsfolk; `HudLayout`
+  is the pure geometry the HUD corner, side buttons and shop panel are laid
+  out with)
 - `src/StarterGui`: reserved for UI built in Studio (empty for now)
 - `tools/economy.luau`: the economy calculator that writes ECONOMY.md
 - `tools/preview/`: the model preview (Lune export + a three.js viewer;

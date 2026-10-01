@@ -819,7 +819,7 @@ do
 	local v = ForestData.Vitality
 	line(
 		string.format(
-			"A grove drifts back toward %d by %d a minute, loses %.1f per wild tree felled (%.1f per planted one) and gains %d per Heartseed planted: it holds steady while it loses under %.2f wild trees a minute, and a player who replants every stump raises it %.1f per tree.",
+			"A grove drifts back toward %d by %d a minute, loses %.1f per wild tree felled (%.1f per planted one) and gains %d per Heartseed planted: it holds steady while it loses under %.2f wild trees a minute, and replanting raises it %.1f per tree (when someone else fells the planted tree, or its planter waits 10 minutes; a quick solo refell takes the planting back).",
 			v.rest,
 			v.driftPerMinute,
 			-v.fellWild,

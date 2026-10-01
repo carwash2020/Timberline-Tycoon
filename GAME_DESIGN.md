@@ -673,8 +673,11 @@ export type Profile = {
 - `SkipTutorial()` — ends Murph's tutorial early, no rewards.
 - `EquipItem(category, itemId)` — switch to a truck you own; at the
   Dealership counter, not while driving, only if the load fits.
-- `CallTruck()` — "Truck to lot": your truck back in your parking slot,
-  load kept; 10 s cooldown, not while driving.
+- `CallTruck()` — "Truck to lot": your truck back in your parking slot;
+  10 s cooldown, not while driving. The load comes along only from within
+  150 studs of town; from farther out it's left on the ground where the
+  truck stood (yours for 10 minutes), so the haul home can't be skipped.
+  Rejoining works the same way (the save remembers where the truck was).
 - `DropAxe(axeUid)` — owner only; the axe becomes a world item with a
   "Pick up" prompt (owner only unless `GameConfig.AxePickupByOthers`).
 - `PlaceBlueprint(blueprintId, x, z, rot)` (PlotService) — validates: on
@@ -806,12 +809,19 @@ goes.
 - **Planting:** stand at a stump (within 12 studs) holding a seed of that
   wood and press "Plant Heartseed". A sapling sprouts on the stump and the
   tree is standing again **8 seconds** later, long before its natural
-  regrowth. It's marked as yours (a little name stake at its foot).
+  regrowth (woods outside the ground groves keep their rarity: a planted
+  Lumenwood sprouts for half its regrowth, about 7.5 minutes; palmwood
+  75 s). It's marked as yours (a little name stake at its foot).
 - **The planter's share:** when anyone else fells a tree you planted, you
   earn **15% of its logs' base value**, paid by the game (the feller loses
   nothing), if you're on the server. Felling your own planted tree gives
-  +1 Heartseed instead (the steward's bonus). Either way the tree grows
-  back wild unless someone replants it.
+  +1 Heartseed instead (the steward's bonus) once it has stood 10 minutes;
+  felling it sooner gives no bonus and takes back the vitality its planting
+  gave, so nobody can pump a grove alone by planting and refelling one
+  tree. Either way the tree grows back wild unless someone replants it.
+- **Who felled it:** a felling (its logs' pickup window, its Heartseeds,
+  the tutorial and daily credit) counts for whoever chopped the most of
+  it, not whoever landed the last swing.
 
 ### Grove Vitality
 - Each ground biome has a vitality meter, 0–100, shared by the server
@@ -860,7 +870,11 @@ goes.
 - **Co-op:** everyone who chopped at least 10% of it counts: they all get
   2 Heartseeds and a helper's bonus of 10% of its logs' value, and its
   logs are free to grab at once. An Elder nobody fells fades after 15
-  minutes. Elders never regrow (the grove has to earn the next one).
+  minutes (a Phantom Grove Elder fades at dawn, and only wakes with at
+  least 5 minutes of night left). Elders never regrow (the grove has to
+  earn the next one).
+- A tree that grows back, wakes or appears where a truck or a player
+  stands comes up as a ghost (no collisions) until the spot is clear.
 
 ### The Skyroot Bloom
 - When the five ground groves average 75 vitality or more, the Skyroot

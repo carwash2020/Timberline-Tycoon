@@ -334,4 +334,22 @@ return function(t)
 		t.eq(rec.hp, rec.maxHp)
 		t.eq(rec.damageBy, {})
 	end)
+
+	t.test("a load left behind stays its owner's longer and lies longer", function()
+		local s = setup()
+		local GameConfig = t.shared("GameConfig")
+		local oak = t.shared("WoodData").Get("oak")
+		local _, plainUid = s.Trees.SpawnLog(oak, CFrame.new(0, 1, 0), 7)
+		local plain = s.Trees.GetLog(plainUid)
+		t.eq(plain.graceUntil, nil, "a felled log keeps the short grace")
+		t.eq(s.pending(GameConfig.LogDespawnSec), 1)
+		local _, leftUid = s.Trees.SpawnLog(oak, CFrame.new(0, 1, 6), 7, {
+			graceSec = GameConfig.LeftLoadGraceSec,
+			despawnSec = GameConfig.LeftLoadDespawnSec,
+		})
+		local left = s.Trees.GetLog(leftUid)
+		t.ok(left.graceUntil and left.graceUntil >= os.time() + GameConfig.LeftLoadGraceSec - 1, "the long window")
+		t.eq(s.pending(GameConfig.LeftLoadDespawnSec), 1, "and the long life")
+		t.ok(GameConfig.LeftLoadGraceSec > GameConfig.PickupGraceSec)
+	end)
 end

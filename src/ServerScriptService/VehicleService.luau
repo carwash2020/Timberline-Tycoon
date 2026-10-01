@@ -881,7 +881,10 @@ local function spillLoad(player: Player, load: { BedEntry }, at: CFrame)
 		local hit = workspace:Raycast(spot + Vector3.new(0, 10, 0), Vector3.new(0, -SPILL_RAY, 0), params)
 		local y = if hit then hit.Position.Y else TerrainGen.HeightAt(spot.X, spot.Z)
 		local model, uid =
-			TreeService.SpawnLog(def, frame.Rotation + Vector3.new(spot.X, y + radius, spot.Z), player.UserId)
+			TreeService.SpawnLog(def, frame.Rotation + Vector3.new(spot.X, y + radius, spot.Z), player.UserId, {
+				graceSec = GameConfig.LeftLoadGraceSec, -- time to drive back for it
+				despawnSec = GameConfig.LeftLoadDespawnSec,
+			})
 		local log = TreeService.GetLog(uid)
 		if log then
 			log.value = entry.value

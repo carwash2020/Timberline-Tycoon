@@ -93,6 +93,13 @@ export type LogRecord = {
 	despawnToken: number,
 	value: number, -- what this log sells for (figure and other bonuses included)
 	tags: { [string]: any }, -- facts other systems attach (figure, planter, ...)
+	graceUntil: number?, -- os.time() until which only the owner may pick it up (default: fellTime + PickupGraceSec)
+	despawnSec: number?, -- how long it lies in the world (default: GameConfig.LogDespawnSec)
+}
+
+export type LogOptions = {
+	graceSec: number?, -- the owner's exclusive pickup window (default PickupGraceSec)
+	despawnSec: number?, -- how long it lies before it disappears (default LogDespawnSec)
 }
 
 local trees: { [string]: TreeRecord } = {}
@@ -424,7 +431,7 @@ end
 local function scheduleDespawn(uid: string, rec: LogRecord)
 	rec.despawnToken += 1
 	local token = rec.despawnToken
-	task.delay(GameConfig.LogDespawnSec, function()
+	task.delay(rec.despawnSec or GameConfig.LogDespawnSec, function()
 		if logs[uid] == rec and rec.state == "world" and rec.despawnToken == token then
 			logs[uid] = nil
 			rec.model:Destroy()
@@ -433,7 +440,9 @@ local function scheduleDespawn(uid: string, rec: LogRecord)
 end
 
 -- Spawns one pickup-able log at `cframe` (cylinder axis = the CFrame's X).
-function TreeService.SpawnLog(def: WoodDef, cframe: CFrame, ownerId: number): (Model, string)
+-- `options` lengthens the owner's pickup window and the log's life (a truck
+-- load left where the truck stood).
+function TreeService.SpawnLog(def: WoodDef, cframe: CFrame, ownerId: number, options: LogOptions?): (Model, string)
 	local uid = Util.guid()
 	local model = TreeArt.Log(def, LOG_LENGTH, LOG_DIAMETER)
 	-- Built at the origin: move every part (the caps are welded to LogPart).
@@ -457,6 +466,8 @@ function TreeService.SpawnLog(def: WoodDef, cframe: CFrame, ownerId: number): (M
 		despawnToken = 0,
 		value = def.pricePerLog,
 		tags = {},
+		graceUntil = if options and options.graceSec then os.time() + options.graceSec else nil,
+		despawnSec = if options then options.despawnSec else nil,
 	}
 	logs[uid] = rec
 	addPickupPrompt(model.PrimaryPart :: BasePart, uid, def)
@@ -738,6 +749,8 @@ function TreeService.DropLog(uid: string, nearPos: Vector3, dropper: Player)
 	rec.state = "world"
 	rec.ownerId = dropper.UserId
 	rec.fellTime = os.time()
+	rec.graceUntil = nil -- dropped again: the usual rules
+	rec.despawnSec = nil
 	scheduleDespawn(uid, rec)
 end
 

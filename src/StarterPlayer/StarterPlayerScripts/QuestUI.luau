@@ -211,11 +211,14 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		end)
 	elseif target == "stump" then
 		-- The nearest stump you hold a Heartseed for (hidden Phantom Grove
-		-- stumps don't count).
+		-- stumps and ones already sprouting don't count).
 		return nearestTagged("Stump", from, function(model, pp)
 			local wood = model:GetAttribute("WoodId")
 			local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
-			return type(seeds) == "number" and seeds > 0 and pp.Transparency < 1
+			return type(seeds) == "number"
+				and seeds > 0
+				and pp.Transparency < 1
+				and model:GetAttribute("Sprouting") ~= true
 		end)
 	elseif target then
 		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)

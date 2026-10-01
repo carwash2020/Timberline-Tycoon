@@ -33,6 +33,9 @@ ForestData.SproutSeconds = 8
 -- palmwood on the island) keep their slow regrowth: planted, they sprout
 -- for this share of their respawnSec (never past when they'd grow back).
 ForestData.SlowSproutShare = 0.5
+-- A sprout longer than this is a sapling the server puts on the stump, so
+-- everyone who comes by sees it (shorter ones the clients animate).
+ForestData.ShownSproutSeconds = 30
 
 -- The planter's share: when someone else fells a tree you planted, you get
 -- this much of its logs' base value (paid by the game), if you're online.

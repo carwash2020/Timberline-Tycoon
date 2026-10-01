@@ -123,7 +123,7 @@ What figures add to wood income, by the grove's vitality tier:
 | Thriving (75+) | 9% / 13% | +9.2% | +13.3% | +18.4% |
 | Old Growth (90+) | 12% / 16% | +12.2% | +16.3% | +24.5% |
 
-A grove drifts back toward 60 by 1 a minute, loses 1.5 per wild tree felled (0.5 per planted one) and gains 4 per Heartseed planted: it holds steady while it loses under 0.67 wild trees a minute, and a player who replants every stump raises it 3.5 per tree.
+A grove drifts back toward 60 by 1 a minute, loses 1.5 per wild tree felled (0.5 per planted one) and gains 4 per Heartseed planted: it holds steady while it loses under 0.67 wild trees a minute, and replanting raises it 3.5 per tree (when someone else fells the planted tree, or its planter waits 10 minutes; a quick solo refell takes the planting back).
 
 Per tree: 1.40 Heartseeds on average (1, +1 for a large tree, +1 on a 15% roll). The planter's share is 15% of a tree's base log value when someone else fells it; an Elder (1.7× size, 6× HP, 3× logs, always Quilted or Burl) pays each helper 10% of its logs' value and 2 Heartseeds.
 

@@ -557,6 +557,10 @@ local function onSprout(payload: { [string]: any })
 	if not def or not nearCamera(pos, FX_RANGE) then
 		return
 	end
+	if seconds > ForestData.ShownSproutSeconds then
+		SoundData.PlayAt("Plant", pos) -- the server puts the sapling on the stump
+		return
+	end
 	local seed = if type(payload.seed) == "number" then payload.seed else 1
 	local sprout = ForestArt.Sprout(def, seed)
 	Kit.placeAt(sprout, CFrame.new(pos))
