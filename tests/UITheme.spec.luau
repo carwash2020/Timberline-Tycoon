@@ -1,6 +1,7 @@
 --!nocheck
 -- UITheme (StarterPlayerScripts/UITheme): the left column follows Roblox's
--- chat window, and a chat property that can't be read never stops it.
+-- chat window, and a chat property that can't be read never stops it; the
+-- colours other code relies on.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector2 = roblox.Instance, roblox.Vector2
@@ -71,6 +72,15 @@ return function(t)
 	t.test("no chat, or chat turned off: 30% down the screen", function()
 		t.eq(columnAt({}), { 0, 12, 0.3, 0 })
 		t.eq(columnAt({ ChatWindowConfiguration = unreadable(false) }), { 0, 12, 0.3, 0 })
+	end)
+
+	t.test("the theme's danger colour is #C0503A", function()
+		local UITheme = theme({})
+		local danger = UITheme.Colors.Danger
+		t.eq(
+			{ math.floor(danger.R * 255 + 0.5), math.floor(danger.G * 255 + 0.5), math.floor(danger.B * 255 + 0.5) },
+			{ 192, 80, 58 }
+		)
 	end)
 
 	t.test("a chat box that can't be read counts as 0 instead of erroring", function()

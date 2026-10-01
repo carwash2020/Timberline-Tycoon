@@ -50,6 +50,7 @@ UITheme.Colors = {
 	Locked = Color3.fromHex("#CDBA93"),
 	LockedEdge = Color3.fromHex("#A89670"),
 	Money = Color3.fromHex("#3F7A34"),
+	Danger = Color3.fromHex("#C0503A"), -- can't (a blueprint that won't fit, a tree's last HP)
 }
 local C = UITheme.Colors
 
