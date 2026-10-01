@@ -15,7 +15,9 @@
 -- list. Walking away closes the screen, and so do the X, tapping outside the
 -- panel, and B on a gamepad. Looks per the UI spec (02, UITheme): a dimmed
 -- screen behind a wood-framed paper panel; while it's open you can't walk.
--- On a gamepad the first Buy button is selected when it opens.
+-- The panel keeps clear of the HUD's cash row, which is drawn over it (on
+-- a phone it moves left of the row). On a gamepad the first Buy button is
+-- selected when it opens.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -30,6 +32,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local HudLayout = require(script.Parent.HudLayout)
 local UITheme = require(script.Parent.UITheme)
 
 type AxeDef = ItemCatalog.AxeDef
@@ -79,7 +82,11 @@ type Row = {
 	ring: UIStroke,
 }
 
+local PANEL_MAX = Vector2.new(560, 540)
+local PANEL_MIN_WIDTH = 400 -- narrower than this beside the cash row, it goes under the row instead
+
 local gui: ScreenGui? = nil
+local area: Frame? = nil -- what the panel is centred in
 local panel: Frame? = nil
 local titleLabel: TextLabel? = nil
 local subtitleLabel: TextLabel? = nil
@@ -457,6 +464,31 @@ local function holdStill(): Enum.ContextActionResult
 	return Enum.ContextActionResult.Sink -- no walking or jumping while a shop is open
 end
 
+-- The panel's area: below the top bar (top 44, bottom 8, sides 12), but
+-- clear of the HUD's cash row (the plaque and the ♪ button), which draws
+-- over the shop. On a phone the centred panel's top-right corner, with its
+-- X, would sit under them: there the area ends left of the row, or if that
+-- leaves too narrow a panel, starts under it.
+local function fitArea()
+	local g, a, row = gui, area, HUD.TopRow()
+	if not g or not a then
+		return
+	end
+	local scale = UITheme.Scale()
+	local screen = g.AbsoluteSize / scale
+	local fit: HudLayout.Rect = { left = 12, top = 44, right = screen.X - 12, bottom = screen.Y - 8 }
+	if row then
+		-- The row's screen minds the top bar inset and this one doesn't:
+		-- measure it from this one's corner.
+		local at = (row.AbsolutePosition - g.AbsolutePosition) / scale
+		local size = row.AbsoluteSize / scale
+		local avoid = { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
+		fit = HudLayout.ClearOf(fit, PANEL_MAX, avoid, 8, PANEL_MIN_WIDTH)
+	end
+	a.Position = UDim2.fromOffset(fit.left, fit.top)
+	a.Size = UDim2.fromOffset(fit.right - fit.left, fit.bottom - fit.top)
+end
+
 local function open(shop: Shop)
 	local g, p, scroll = gui, panel, list
 	if not g or not p or not scroll then
@@ -479,6 +511,7 @@ local function open(shop: Shop)
 		subtitleLabel.Text = shop.subtitle
 	end
 	g.Enabled = true
+	fitArea()
 	local prompt = prompts[shop]
 	if prompt then
 		prompt.Enabled = false
@@ -548,14 +581,14 @@ local function buildPanel()
 	scrim.Parent = g
 	scrim.Activated:Connect(ShopUI.Close)
 
-	-- The panel fits the area below the top bar: top 44, bottom 8, sides
-	-- 12, at most 560 x 540 (on a phone, 560 x 338).
-	local area = Instance.new("Frame")
-	area.Name = "Area"
-	area.BackgroundTransparency = 1
-	area.Position = UDim2.fromOffset(12, 44)
-	area.Size = UDim2.new(1, -24, 1, -52)
-	area.Parent = g
+	-- The panel fits the area below the top bar (fitArea), at most
+	-- 560 x 540 (on an 844 x 390 phone, 560 x 338, left of the cash).
+	local a = Instance.new("Frame")
+	a.Name = "Area"
+	a.BackgroundTransparency = 1
+	a.Position = UDim2.fromOffset(12, 44)
+	a.Size = UDim2.new(1, -24, 1, -52)
+	a.Parent = g
 
 	local frame = UITheme.Card(C.Bark, C.Ink, 6, 20)
 	local p = frame.outer
@@ -564,9 +597,9 @@ local function buildPanel()
 	p.Position = UDim2.fromScale(0.5, 0.5)
 	p.Size = UDim2.fromScale(1, 1)
 	local maxSize = Instance.new("UISizeConstraint")
-	maxSize.MaxSize = Vector2.new(560, 540)
+	maxSize.MaxSize = PANEL_MAX
 	maxSize.Parent = p
-	p.Parent = area
+	p.Parent = a
 	UITheme.texture(frame.face, "Wood", 20)
 
 	local paper = Instance.new("Frame")
@@ -647,7 +680,13 @@ local function buildPanel()
 	UITheme.padding(scroll, 10, 12 + 8, 12, 12) -- room for the scroll bar
 	list = scroll
 
-	gui, panel = g, p
+	gui, area, panel = g, a, p
+	-- A phone turning round, or a window resized, while a shop is open.
+	g:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		if openShop then
+			fitArea()
+		end
+	end)
 	g.Parent = player:WaitForChild("PlayerGui")
 end
 

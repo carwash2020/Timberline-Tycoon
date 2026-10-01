@@ -77,18 +77,17 @@ local function onBiomeChanged()
 end
 
 local function buildClock()
-	local gui = UITheme.Screen("WorldClock")
-	local label = UITheme.label(gui, "", UITheme.Fonts.Black, 13, UITheme.Colors.Cream)
+	local line = HUD.BesideCash()
+	assert(line, "[WorldUI] clock before HUD.Start")
+	local label = UITheme.label(line, "", UITheme.Fonts.Black, 13, UITheme.Colors.Cream)
 	label.Name = "Clock"
-	label.AnchorPoint = Vector2.new(1, 0)
-	label.Position = UDim2.new(1, -(UITheme.Margin() + 226), 0, 15) -- left of HUD's top row (cash + settings)
+	label.LayoutOrder = 20 -- left of HUD's top row (♪ + cash), right of the Store button
 	label.Size = UDim2.fromOffset(100, 30)
 	label.BackgroundColor3 = UITheme.Colors.Bark
 	label.BackgroundTransparency = 0
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	UITheme.corner(label, 15)
 	UITheme.stroke(label, UITheme.Colors.Ink, 2)
-	gui.Parent = player:WaitForChild("PlayerGui")
 
 	-- From the server clock, once a second (LightingController moves
 	-- Lighting.ClockTime every frame; the label doesn't need to).

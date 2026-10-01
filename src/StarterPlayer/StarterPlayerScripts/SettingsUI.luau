@@ -1,10 +1,11 @@
 --!strict
 -- SettingsUI: a round button left of the cash plaque (HUD.TopRow) opens a
--- small card with two toggles, Music and Sound effects. They apply at once
--- (SoundData.MusicEnabled / SfxEnabled, which AmbientSound and every sound
--- helper read) and are saved with your profile (SaveSetting); the server
--- mirrors them on the SettingMusic / SettingSfx attributes, so they come
--- back when you rejoin.
+-- small card (one of the corner's popups, HUD.Popup: under the Daily Goals
+-- button, never over it) with two toggles, Music and Sound effects. They
+-- apply at once (SoundData.MusicEnabled / SfxEnabled, which AmbientSound
+-- and every sound helper read) and are saved with your profile
+-- (SaveSetting); the server mirrors them on the SettingMusic / SettingSfx
+-- attributes, so they come back when you rejoin.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -62,7 +63,6 @@ function SettingsUI.Start()
 
 	local card = UITheme.Card(C.Paper, C.Bark, 3, 12, true)
 	card.outer.Name = "Settings"
-	card.outer.AnchorPoint = Vector2.new(1, 0)
 	card.outer.Visible = false
 	UITheme.padding(card.face, 10, 10, 10, 10)
 	UITheme.list(card.face, 8)
@@ -106,8 +106,9 @@ function SettingsUI.Start()
 		card.outer.Visible = not card.outer.Visible
 	end)
 
-	-- The card drops down under the top row, at the right edge.
-	card.outer.Position = UDim2.new(1, -UITheme.Margin(), 0, 64)
+	-- The card drops down under the corner, at the right edge (its screen
+	-- stays over the shop, like the button).
+	HUD.Popup(card.outer)
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 end

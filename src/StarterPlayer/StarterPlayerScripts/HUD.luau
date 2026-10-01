@@ -10,15 +10,20 @@
 --     worded for the device in use.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
---     phone's jump button. On a gamepad each shows its button glyph, and
+--     phone's jump button and grows up to just under the corner's second
+--     line (the Daily Goals button); what doesn't fit there starts another
+--     column to its left. On a gamepad each shows its button glyph, and
 --     that button presses it (unless a world prompt is using the same one).
 --   * "Loading your save..." until the server says the profile is ready.
 --   * Money in or out pops beside the plaque ("+$1,250") and the plaque
---     counts up to the new amount. The plaque sits in a top-right row
---     (HUD.TopRow) that SettingsUI adds its button to; the plaque is wide
---     enough for any amount, so the row is a fixed 226 studs + the margin
---     wide and the clock (WorldUI), Store button and Heartseed pouch sit
---     left of that.
+--     counts up to the new amount.
+--   * The top-right corner, laid out by size (UIListLayouts), so nothing
+--     in it overlaps on a phone, a monitor or a TV:
+--       [STORE][clock]        [♪][cash plaque]   HUD.BesideCash | HUD.TopRow
+--                  [pouch][DAILY GOALS 1/3]      HUD.UnderCash
+--                       [one popup at a time]    HUD.Popup
+--     The cash row (HUD.TopRow, which SettingsUI adds its button to) is in
+--     the HUD's layer, over the shop; the rest is in a layer under it.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -31,6 +36,7 @@ local UserInputService = game:GetService("UserInputService")
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
+local HudLayout = require(script.Parent.HudLayout)
 local UITheme = require(script.Parent.UITheme)
 
 local HUD = {}
@@ -44,6 +50,9 @@ local MAX_TOASTS = 3
 local TOAST_SECONDS = 3
 local TOAST_FADE = 0.25
 local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
+local SIDE_GAP = 8 -- between side buttons, and under the corner
+local JUMP_CLEARANCE = 24 -- the side buttons end this far above a phone's jump button
+local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
 
 type Toast = { outer: Frame, face: ImageLabel, label: TextLabel, stroke: UIStroke }
 
@@ -66,8 +75,15 @@ local toastStack: Frame? = nil
 local toasts: { Toast } = {}
 local toastOrder = 0
 local hintLabel: TextLabel? = nil
-local sideColumn: Frame? = nil
+local sideGui: ScreenGui? = nil
+local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
 local sides: { Side } = {}
+local arrangeQueued = false
+local jumpButton: GuiObject? = nil -- a phone's jump button (Roblox's touch controls), once there is one
+local shelf: Frame? = nil -- the corner's two lines
+local besideCash: Frame? = nil
+local underCash: Frame? = nil
+local popups: { GuiObject } = {}
 local shownPrompts: { [ProximityPrompt]: boolean } = {}
 
 ---------------------------------------------------------------------------
@@ -183,10 +199,55 @@ local function removeToast(toast: Toast)
 end
 
 -- The top-right row holding the cash plaque (LayoutOrder 10). Other
--- controllers add small buttons to its left with lower LayoutOrders.
+-- controllers add small buttons to its left with lower LayoutOrders. It's
+-- drawn over the shop panel, which keeps clear of it.
 -- Nil before HUD.Start.
 function HUD.TopRow(): Frame?
 	return if cashOuter then cashOuter.Parent :: Frame? else nil
+end
+
+-- The line left of the cash row (the clock, the Store button), and the
+-- line under it (the Daily Goals button, the Heartseed pouch): both
+-- right-aligned, by LayoutOrder (higher = further right), and under the
+-- shop panel. Nil before HUD.Start.
+function HUD.BesideCash(): Frame?
+	return besideCash
+end
+
+function HUD.UnderCash(): Frame?
+	return underCash
+end
+
+-- Popups drop down at the right margin under both lines of the corner,
+-- however tall the lines are right now.
+local function placePopups()
+	local f = shelf
+	if not f then
+		return
+	end
+	local y = f.Position.Y.Offset + f.AbsoluteSize.Y / UITheme.Scale() + POPUP_GAP
+	for _, card in ipairs(popups) do
+		card.Position = UDim2.new(1, -UITheme.Margin(), 0, y)
+	end
+end
+
+-- Makes `card` one of the corner's popups (Settings, the goals, the pouch
+-- list): HUD places it under the corner, and showing it hides the others,
+-- so they never stack up. Its screen must mind the top bar inset (the
+-- UITheme.Screen default), as the corner's does.
+function HUD.Popup(card: GuiObject)
+	table.insert(popups, card)
+	card.AnchorPoint = Vector2.new(1, 0)
+	card:GetPropertyChangedSignal("Visible"):Connect(function()
+		if card.Visible then
+			for _, other in ipairs(popups) do
+				if other ~= card then
+					other.Visible = false
+				end
+			end
+		end
+	end)
+	placePopups()
 end
 
 -- Shows a short message at the top of the screen for a few seconds.
@@ -280,6 +341,57 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 end
 
+-- Lays out the side buttons that are showing (HudLayout.Stack), up from
+-- 44 below the screen centre, or with touch controls from just above the
+-- jump button, to just under the corner's second line.
+local function arrangeSide()
+	arrangeQueued = false
+	local gui, column, corner = sideGui, sideColumn, shelf
+	if not gui or not column or not corner then
+		return
+	end
+	local scale = UITheme.Scale()
+	-- Screen pixels to this screen's offsets. It ignores the top bar inset
+	-- and the corner's screen doesn't, so measure both from this one's top.
+	local origin = gui.AbsolutePosition.Y
+	local function y(pixels: number): number
+		return (pixels - origin) / scale
+	end
+	local top = y(corner.AbsolutePosition.Y + corner.AbsoluteSize.Y) + SIDE_GAP
+	local bottom = gui.AbsoluteSize.Y / scale / 2 + 44
+	local jump = jumpButton
+	if jump and jump.Parent and jump.AbsoluteSize.Y > 0 then
+		bottom = y(jump.AbsolutePosition.Y) - JUMP_CLEARANCE
+	end
+	column.Position = UDim2.new(1, -UITheme.Margin(), 0, bottom)
+
+	local shown: { Frame } = {}
+	for _, side in ipairs(sides) do
+		if side.button.root.Visible then
+			table.insert(shown, side.button.root)
+		end
+	end
+	table.sort(shown, function(a: Frame, b: Frame): boolean
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	local sizes: { Vector2 } = {}
+	for i, root in ipairs(shown) do
+		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset)
+	end
+	local spots = HudLayout.Stack(sizes, bottom - top, SIDE_GAP)
+	for i, root in ipairs(shown) do
+		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y)
+	end
+end
+
+-- Once per frame at most, however many things changed.
+local function queueArrange()
+	if not arrangeQueued then
+		arrangeQueued = true
+		task.defer(arrangeSide)
+	end
+end
+
 local function refreshDevice()
 	local device: UITheme.Device = UITheme.Device()
 	local hint = hintLabel
@@ -289,6 +401,7 @@ local function refreshDevice()
 	for _, side in ipairs(sides) do
 		layoutSide(side, device)
 	end
+	queueArrange()
 end
 
 export type SideOptions = {
@@ -314,6 +427,7 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 		radius = 12,
 	})
 	button.root.LayoutOrder = opts.order
+	button.root.AnchorPoint = Vector2.new(1, 1) -- placed by arrangeSide
 	button.root.Visible = false
 	local glyph: GuiObject? = nil
 	if opts.key then
@@ -329,6 +443,8 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	table.insert(sides, side)
 	local device: UITheme.Device = UITheme.Device()
 	layoutSide(side, device)
+	button.root:GetPropertyChangedSignal("Visible"):Connect(queueArrange)
+	queueArrange()
 	return button
 end
 
@@ -431,25 +547,90 @@ local function buildHint(gui: ScreenGui)
 	hintLabel = hint
 end
 
-local function buildSideColumn()
-	-- Its own screen, under the shop panel's scrim (which blocks HUD taps),
-	-- and measured from the true screen centre.
+local function buildCorner(playerGui: Instance)
+	-- The corner under and left of the cash row, in a layer of its own:
+	-- under the shop panel's scrim, over the side buttons. Two right-aligned
+	-- lines, stacked by a list, so each sits by the real size of the other.
+	local gui = UITheme.Screen("Corner", 2)
+	local frame = Instance.new("Frame")
+	frame.Name = "Shelf"
+	frame.AnchorPoint = Vector2.new(1, 0)
+	frame.Position = UDim2.new(1, -UITheme.Margin(), 0, 8) -- the cash row's spot
+	frame.Size = UDim2.new()
+	frame.AutomaticSize = Enum.AutomaticSize.XY
+	frame.BackgroundTransparency = 1
+	UITheme.list(frame, 7).HorizontalAlignment = Enum.HorizontalAlignment.Right
+	frame.Parent = gui
+	local function line(name: string, order: number): Frame
+		local l = Instance.new("Frame")
+		l.Name = name
+		l.LayoutOrder = order
+		l.Size = UDim2.new()
+		l.AutomaticSize = Enum.AutomaticSize.XY
+		l.BackgroundTransparency = 1
+		local list = UITheme.list(l, 8, true)
+		list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		list.VerticalAlignment = Enum.VerticalAlignment.Center
+		l.Parent = frame
+		return l
+	end
+	local beside = line("BesideCash", 1)
+	-- A space the size of the cash row (drawn in the HUD's layer) ends the
+	-- first line: the line's buttons sit left of the row, the second line
+	-- under it.
+	local space = Instance.new("Frame")
+	space.Name = "CashRow"
+	space.LayoutOrder = 1000
+	space.BackgroundTransparency = 1
+	space.Parent = beside
+	local row = HUD.TopRow()
+	if row then
+		local function fit()
+			local scale = UITheme.Scale()
+			space.Size = UDim2.fromOffset(row.AbsoluteSize.X / scale, row.AbsoluteSize.Y / scale)
+		end
+		row:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+		fit()
+	end
+	besideCash, underCash, shelf = beside, line("UnderCash", 2), frame
+	local function moved()
+		placePopups()
+		queueArrange()
+	end
+	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(moved)
+	frame:GetPropertyChangedSignal("AbsolutePosition"):Connect(moved)
+	gui.Parent = playerGui
+end
+
+-- Roblox's touch controls make a jump button once touch is used; the side
+-- buttons end just above it.
+local function watchJump(playerGui: Instance)
+	local touch = playerGui:WaitForChild("TouchGui", math.huge)
+	local controls = if touch then touch:WaitForChild("TouchControlFrame", math.huge) else nil
+	local jump = if controls then controls:WaitForChild("JumpButton", math.huge) else nil
+	if jump and jump:IsA("GuiObject") then
+		jumpButton = jump
+		jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueArrange)
+		jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
+		queueArrange()
+	end
+end
+
+local function buildSideColumn(playerGui: Instance)
+	-- Its own screen, under the shop panel's scrim (which blocks HUD taps)
+	-- and the corner's popups, and measured from the true screen centre.
 	local gui = UITheme.Screen("SideButtons", 1, true)
-	local side = UITheme.Margin()
 	local column = Instance.new("Frame")
 	column.Name = "Column"
 	column.AnchorPoint = Vector2.new(1, 1)
-	-- The bottom stays 44 below the centre (y 239 on a 390-tall phone), so
-	-- however many buttons show, they never reach the jump button.
-	column.Position = UDim2.new(1, -side, 0.5, 44)
-	column.AutomaticSize = Enum.AutomaticSize.XY
+	column.Size = UDim2.new() -- arrangeSide moves it and stacks the buttons up and left of it
 	column.BackgroundTransparency = 1
-	local list = UITheme.list(column, 8)
-	list.HorizontalAlignment = Enum.HorizontalAlignment.Right
-	list.VerticalAlignment = Enum.VerticalAlignment.Bottom
 	column.Parent = gui
-	gui.Parent = player:WaitForChild("PlayerGui")
-	sideColumn = column
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
+	gui.Parent = playerGui
+	sideGui, sideColumn = gui, column
+	task.spawn(watchJump, playerGui)
+	queueArrange()
 end
 
 local function buildLoading(gui: ScreenGui)
@@ -493,7 +674,8 @@ function HUD.Start()
 
 	buildLoading(gui)
 	gui.Parent = playerGui
-	buildSideColumn()
+	buildCorner(playerGui)
+	buildSideColumn(playerGui)
 	refreshDevice()
 	UserInputService.LastInputTypeChanged:Connect(refreshDevice)
 	UserInputService.InputBegan:Connect(onGamepad)

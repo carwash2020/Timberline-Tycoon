@@ -1,9 +1,10 @@
 --!strict
 -- DailyUI: daily goals and the streak (rules in Shared/DailyData).
---   * A "Daily goals 1/3" button under the cash plaque (top right), with
---     the streak.
---   * Tapping it opens the day's goals: progress bars, each goal's reward,
---     the bonus for finishing them all, and the time until new goals.
+--   * A "Daily goals 1/3" button under the cash plaque (top right, in
+--     HUD.UnderCash), with the streak.
+--   * Tapping it opens the day's goals (one of the corner's popups, under
+--     it): progress bars, each goal's reward, the bonus for finishing them
+--     all, and the time until new goals.
 -- The server owns progress: it sets the DailyGoals, DailyStreak and
 -- DailyResetAt attributes, and this redraws from them.
 
@@ -12,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local Util = require(ReplicatedStorage.Shared.Util)
+local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
 
 local DailyUI = {}
@@ -131,12 +133,13 @@ local function refresh()
 end
 
 local function build()
-	local gui = UITheme.Screen("DailyUI")
+	-- The goals panel's screen: over the side buttons (it can drop over
+	-- them), under the shop.
+	local gui = UITheme.Screen("DailyUI", 3)
 
 	local b = Instance.new("TextButton")
 	b.Name = "DailyButton"
-	b.AnchorPoint = Vector2.new(1, 0)
-	b.Position = UDim2.new(1, -UITheme.Margin(), 0, 64) -- under the cash plaque
+	b.LayoutOrder = 10 -- at the right margin, under the cash plaque
 	b.Size = UDim2.fromOffset(200, 30)
 	b.AutomaticSize = Enum.AutomaticSize.X
 	b.BackgroundColor3 = BARK
@@ -151,13 +154,11 @@ local function build()
 	pad.PaddingLeft = UDim.new(0, 10)
 	pad.PaddingRight = UDim.new(0, 10)
 	pad.Parent = b
-	b.Parent = gui
+	b.Parent = HUD.UnderCash() or gui
 	button = b
 
 	local p = Instance.new("Frame")
 	p.Name = "Goals"
-	p.AnchorPoint = Vector2.new(1, 0)
-	p.Position = UDim2.new(1, -UITheme.Margin(), 0, 100)
 	p.Size = UDim2.fromOffset(280, 0)
 	p.AutomaticSize = Enum.AutomaticSize.Y
 	p.BackgroundColor3 = PAPER
@@ -175,6 +176,7 @@ local function build()
 	layout.Padding = UDim.new(0, 6)
 	layout.Parent = p
 	p.Parent = gui
+	HUD.Popup(p)
 	panel = p
 
 	text(p, "TODAY'S GOALS", 13, UITheme.Fonts.Black, 1).TextColor3 = BARK
