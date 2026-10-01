@@ -214,8 +214,11 @@ local function makeOwned(): Owned
 	dof.Name = OWN_PREFIX .. "FarBlur"
 	dof.Enabled = false
 	dof.NearIntensity = 0
-	dof.FocusDistance = 120
-	dof.InFocusRadius = 200
+	-- Both at Roblox's caps (FocusDistance 0-200, InFocusRadius 0-50; more
+	-- is clamped): sharp out to 250 studs, so only the ground far below
+	-- the isles blurs, not the next isle over.
+	dof.FocusDistance = 200
+	dof.InFocusRadius = 50
 	dof.Parent = Lighting
 	silenceOthers("DepthOfFieldEffect", dof)
 
