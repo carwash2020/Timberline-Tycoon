@@ -237,16 +237,16 @@ for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
 	place(atomic(PropArt.Mushroom(i, true)), cf)
 end
 
--- The volcano's crater: glowing lava, smoke rising, a light the whole
--- valley sees at night.
+-- The volcano's crater: glowing lava filling the level pool on its floor,
+-- smoke rising, a light the whole valley sees at night.
 do
-	local crater, radius = WorldPlan.Crater()
+	local pool, radius = WorldPlan.Crater()
 	local lava = Kit.cylinder(
 		map,
 		"CraterLava",
 		1,
-		radius * 1.7,
-		CFrame.new(crater + Vector3.new(0, 1.5, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+		radius * 2,
+		CFrame.new(pool + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.pi / 2),
 		Color3.fromRGB(255, 106, 26),
 		Enum.Material.Neon
 	)
@@ -399,14 +399,27 @@ if sky then
 	end
 
 	-- The gondola: from town and from the Skyroot's foot up to the top
-	-- station on the main isle's town-facing edge.
+	-- station on the main isle's town-facing edge. The cable runs 8.5 studs
+	-- above the cabins' route (WorldPlan.GondolaPath), one rod per stretch.
 	local top = station("GondolaTop", sky.gondolaTop)
 	local base = station("GondolaBase", sky.gondolaBase)
 	local function cableFrom(model: Model)
-		local a = (model.PrimaryPart :: BasePart).Position + Vector3.new(0, 8.5, 0)
-		local b = (top.PrimaryPart :: BasePart).Position + Vector3.new(0, 8.5, 0)
-		local cable = Kit.rod(map, "GondolaCable", a, b, 0.4, Color3.fromRGB(70, 70, 75), Enum.Material.Metal)
-		Kit.decor(cable, false)
+		local platform = model.PrimaryPart :: BasePart
+		local to = (top.PrimaryPart :: BasePart).Position
+		local path = WorldPlan.GondolaPath(sky, platform.Position, platform.CFrame.ZVector, to)
+		local up = Vector3.new(0, 8.5, 0)
+		for i = 1, #path - 1 do
+			local cable = Kit.rod(
+				map,
+				"GondolaCable",
+				path[i] + up,
+				path[i + 1] + up,
+				0.4,
+				Color3.fromRGB(70, 70, 75),
+				Enum.Material.Metal
+			)
+			Kit.decor(cable, false)
+		end
 	end
 	cableFrom(townStation)
 	cableFrom(base)

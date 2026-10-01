@@ -65,8 +65,8 @@ NPCData.List = {
 		name = "Murph",
 		role = "Retired lumberjack",
 		-- In front of his campfire, facing the spawn (WorldPlan.Town().murph:
-		-- the camp at (-21, 24) turned toward the spawn, 3 studs out).
-		spot = { kind = "fixed", position = Vector3.new(-18.6, 0, 25.8), lookAt = Vector3.new(0, 0, 40) },
+		-- the camp at (-28, 42) turned toward the spawn, 3 studs out).
+		spot = { kind = "fixed", position = Vector3.new(-25, 0, 41.8), lookAt = Vector3.new(0, 0, 40) },
 		idle = "sip",
 		tutorialQuiet = true,
 		look = {

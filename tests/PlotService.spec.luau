@@ -214,6 +214,11 @@ return function(t)
 		for i = 1, #s.PlotData.Slots do
 			local sign = s.plot(i):FindFirstChild("Sign")
 			t.ok(sign:FindFirstChild("ProximityPrompt").Enabled, "plot " .. i .. " can be claimed")
+			for _, gui in ipairs(sign:GetChildren()) do
+				if gui.ClassName == "SurfaceGui" then -- sized to the board, so its text isn't stretched
+					t.eq(gui.SizingMode, t.roblox.Enum.SurfaceGuiSizingMode.PixelsPerStud)
+				end
+			end
 		end
 		t.ok(s.remotes.PlaceBlueprint.OnServerEvent.fn ~= nil)
 		t.ok(s.remotes.MoveBlueprint.OnServerEvent.fn ~= nil)

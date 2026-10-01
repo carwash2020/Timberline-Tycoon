@@ -6,8 +6,9 @@
 --   * Only a crust: each chunk is filled from a few voxels under its lowest
 --     ground up to its highest ground or water. Below that nobody looks.
 --   * Fractional occupancy on the surface voxel (TerrainGen.Voxel) gives
---     smooth hills; the top two voxels take the surface material, deeper
---     ones what lies beneath (TerrainGen.SubMaterial).
+--     smooth hills (under water the bed rounds to whole voxels, so water
+--     always meets it); the top two voxels take the surface material,
+--     deeper ones what lies beneath (TerrainGen.SubMaterial).
 --   * Yields between chunks, so the server keeps ticking.
 -- A place that already has the terrain saved can skip all this: set the
 -- attribute Prebuilt = true on Workspace.Terrain in Studio.

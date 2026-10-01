@@ -165,6 +165,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face
+		sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud -- the canvas takes the board's shape
 		sg.PixelsPerStud = 40
 		sg.Parent = board
 		local l = Instance.new("TextLabel")

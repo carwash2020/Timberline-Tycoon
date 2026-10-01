@@ -44,6 +44,25 @@ return {
 		for i, pos in ipairs(WorldPlan.IslandPalms()) do
 			place(TreeArt.Build(palm, 3000 + i, 0.9 + (i % 3) * 0.1), CF.new(pos))
 		end
+		-- The lava filling the volcano crater's pool, with its glow.
+		local pool, poolRadius = WorldPlan.Crater()
+		local lava = Kit.decor(
+			Kit.cylinder(
+				root,
+				"CraterLava",
+				1,
+				poolRadius * 2,
+				CF.new(pool + V3.new(0, 0.5, 0)) * CF.Angles(0, 0, math.pi / 2),
+				roblox.Color3.fromRGB(255, 106, 26),
+				roblox.Enum.Material.Neon
+			),
+			false
+		)
+		local glow = roblox.Instance.new("PointLight")
+		glow.Color = roblox.Color3.fromRGB(255, 120, 40)
+		glow.Range = 60
+		glow.Brightness = 4
+		glow.Parent = lava
 
 		-- The town.
 		local town = WorldPlan.Town()
@@ -52,7 +71,7 @@ return {
 		for _, spot in ipairs(town.shops) do
 			place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
 		end
-		place(BuildingArt.GondolaStation(), town.gondola)
+		local townStation = place(BuildingArt.GondolaStation(), town.gondola)
 		place(BuildingArt.Campsite(), town.campsite)
 		for _, cf in ipairs(town.lamps) do
 			place(BuildingArt.LampPost(), cf)
@@ -134,8 +153,28 @@ return {
 				)
 			end
 			place(BuildingArt.StarfallForge(), sky.forge)
-			place(BuildingArt.GondolaStation(), sky.gondolaTop)
-			place(BuildingArt.GondolaStation(), sky.gondolaBase)
+			local top = place(BuildingArt.GondolaStation(), sky.gondolaTop)
+			local base = place(BuildingArt.GondolaStation(), sky.gondolaBase)
+			-- The cables, along the cabins' route as MapBuilder draws them.
+			for _, station in ipairs({ townStation, base }) do
+				local platform = station.PrimaryPart
+				local to = top.PrimaryPart.CFrame.Position
+				local path = WorldPlan.GondolaPath(sky, platform.CFrame.Position, platform.CFrame.ZVector, to)
+				for i = 1, #path - 1 do
+					Kit.decor(
+						Kit.rod(
+							root,
+							"GondolaCable",
+							path[i] + V3.new(0, 8.5, 0),
+							path[i + 1] + V3.new(0, 8.5, 0),
+							0.4,
+							roblox.Color3.fromRGB(70, 70, 75),
+							roblox.Enum.Material.Metal
+						),
+						false
+					)
+				end
+			end
 		end
 
 		return {

@@ -649,7 +649,9 @@ function Kit.lantern(parent: Instance, cf: CFrame, scale: number?): Part
 	return glow
 end
 
--- Text on one or both faces of a board (signs). Returns the labels.
+-- Text on one or both faces of a board (signs), laid out at 40 pixels a
+-- stud so the canvas takes the face's shape (a new SurfaceGui's default
+-- fixed 800 x 600 canvas would stretch the text to fit). Returns the labels.
 function Kit.signText(
 	part: BasePart,
 	text: string,
@@ -661,6 +663,7 @@ function Kit.signText(
 	for _, face in ipairs(faces or { Enum.NormalId.Front, Enum.NormalId.Back }) do
 		local sg = Instance.new("SurfaceGui")
 		sg.Face = face
+		sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 		sg.PixelsPerStud = 40
 		sg.LightInfluence = 0.6
 		sg.Parent = part

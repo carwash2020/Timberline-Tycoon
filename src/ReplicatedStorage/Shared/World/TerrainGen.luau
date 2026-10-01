@@ -14,8 +14,9 @@
 --   * flat building zones (town, plot district) at exactly y = 0;
 --   * roads smoothed to an easy grade with the bumps taken out;
 --   * per biome: gentle Starter Forest, rolling Hills, the raised
---     Snowfields plateau, the Volcano's basalt shelf and cone, the Phantom
---     Grove's hidden hollow behind a ring of ridges;
+--     Snowfields plateau, the Volcano's basalt shelf and cone (a level lava
+--     pool in its crater), the Phantom Grove's hidden hollow behind a ring
+--     of ridges;
 --   * the river, Mirror Lake, the pond and the east coast cut below water;
 --   * mountains framing the north, west and south edges.
 
@@ -141,6 +142,31 @@ local function detailHeight(x: number, z: number): number
 	return h
 end
 
+-- How much the mountains framing the north, west and south edges lift
+-- (x, z).
+local function mountainLift(x: number, z: number): number
+	local north = (z - MOUNT.start) / (HALF - MOUNT.start)
+	local west = (-x - MOUNT.start) / (HALF - MOUNT.start)
+	local south = (-z - MOUNT.start) / (HALF - MOUNT.start)
+	local east = if z > COAST.northZ + 150 then (x - MOUNT.start) / (HALF - MOUNT.start) else -1
+	local m = math.max(north, west, south, east)
+	if m <= 0 then
+		return 0
+	end
+	local rough = 0.62 + 0.38 * fbm(x, z, 1 / 160, 3, 61)
+	-- Lower behind the volcano, so its cone stands out against the sky.
+	local dcx, dcz = x - CONE.x, z - CONE.z
+	local nearCone = 1 - smoothstep((sqrt(dcx * dcx + dcz * dcz) - CONE.radius) / 260)
+	return smoothstep(m) * MOUNT.peak * rough * (1 - nearCone * 0.65)
+end
+
+-- The crater's lava pool: level, at the height the bowl's lowest point
+-- (its centre) had, mountains and all.
+local POOL_Y = 12
+	+ CONE.height * ((1 - CONE.crater / CONE.radius) ^ 1.6)
+	- CONE.crater * 1.1
+	+ mountainLift(CONE.x, CONE.z)
+
 -- Features that override everything: the volcano cone, the grove hollow,
 -- mountains, coast, island.
 local function landmarks(x: number, z: number, h: number): number
@@ -170,17 +196,16 @@ local function landmarks(x: number, z: number, h: number): number
 	end
 
 	-- Mountains framing the north, west and south edges.
-	local north = (z - MOUNT.start) / (HALF - MOUNT.start)
-	local west = (-x - MOUNT.start) / (HALF - MOUNT.start)
-	local south = (-z - MOUNT.start) / (HALF - MOUNT.start)
-	local east = if z > COAST.northZ + 150 then (x - MOUNT.start) / (HALF - MOUNT.start) else -1
-	local m = math.max(north, west, south, east)
-	if m > 0 then
-		local rough = 0.62 + 0.38 * fbm(x, z, 1 / 160, 3, 61)
-		-- Lower behind the volcano, so its cone stands out against the sky.
-		local dcx, dcz = x - CONE.x, z - CONE.z
-		local nearCone = 1 - smoothstep((sqrt(dcx * dcx + dcz * dcz) - CONE.radius) / 260)
-		h += smoothstep(m) * MOUNT.peak * rough * (1 - nearCone * 0.65)
+	h += mountainLift(x, z)
+
+	-- The crater's floor: the level lava pool (MapBuilder's CraterLava
+	-- fills it), then a wall climbing to meet the rim, however much the
+	-- mountains behind tipped the bowl.
+	dx, dz = x - CONE.x, z - CONE.z
+	d = sqrt(dx * dx + dz * dz)
+	if d < CONE.crater then
+		local t = math.max(0, d - CONE.pool) / (CONE.crater - CONE.pool)
+		h = POOL_Y + (h - POOL_Y) * t
 	end
 
 	-- East coast: beach sloping into the ocean (south of the volcano).
@@ -443,14 +468,22 @@ end
 -- What one 4-stud voxel of a column holds: solid ground (with how much of
 -- it is filled, which is what makes smooth terrain smooth), water, or air.
 -- `bottom` is the voxel's lowest y; the column's ground is at `h` and its
--- water surface (if any) at `surface`.
+-- water surface (if any) at `surface`. A voxel holds one material, so a
+-- partly filled bed voxel would leave air between the bed and the water:
+-- under water the bed rounds to the voxel grid instead (at least half
+-- ground is all ground, less is all water).
 function TerrainGen.Voxel(h: number, surface: number?, bottom: number): (string, number)
 	local solid = math.clamp((h - bottom) / 4, 0, 1)
+	if surface and h < surface then
+		if solid >= 0.5 then
+			return "solid", 1
+		elseif bottom < surface then
+			return "water", math.clamp((surface - bottom) / 4, 0, 1)
+		end
+		return "air", 0
+	end
 	if solid > 0.02 then
 		return "solid", solid
-	end
-	if surface and bottom < surface then
-		return "water", math.clamp((surface - bottom) / 4, 0, 1)
 	end
 	return "air", 0
 end

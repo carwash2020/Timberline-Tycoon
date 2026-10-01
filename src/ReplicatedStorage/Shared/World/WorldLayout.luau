@@ -162,8 +162,11 @@ WorldLayout.Coast = { shoreX = 1190, beachWidth = 70, northZ = 820 }
 -- An island offshore (the palmwood teaser; boats come after V1).
 WorldLayout.Island = { x = 1395, z = -760, radius = 70, height = 9 }
 
--- The Volcano's cone sits on the far side of its biome, away from town.
-WorldLayout.VolcanoCone = { x = volcano.X + 105, z = volcano.Y + 115, radius = 150, height = 175, crater = 30 }
+-- The Volcano's cone sits on the far side of its biome, away from town. Its
+-- crater (radius `crater`) has a level lava pool (radius `pool`) in the
+-- middle of its floor.
+WorldLayout.VolcanoCone =
+	{ x = volcano.X + 105, z = volcano.Y + 115, radius = 150, height = 175, crater = 30, pool = 14 }
 
 -- The Phantom Grove sits in a hollow ringed by ridges (no road in).
 WorldLayout.GroveRidge = { inner = 132, outer = 205, height = 34, gapAngle = math.rad(35) }
