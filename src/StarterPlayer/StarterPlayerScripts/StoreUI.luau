@@ -143,6 +143,10 @@ local STORE: ShopUI.Shop = {
 }
 
 local function myBedCount(): number
+	local mirrored = player:GetAttribute("BedCount") -- set by the server even when the truck streams out
+	if type(mirrored) == "number" then
+		return mirrored
+	end
 	for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
 		if inst:GetAttribute("OwnerId") == player.UserId then
 			return (inst:GetAttribute("BedCount") :: number?) or 0
@@ -171,7 +175,7 @@ local function buildButtons()
 		textSize = 14,
 	})
 	store.root.AnchorPoint = Vector2.new(1, 0)
-	store.root.Position = UDim2.new(1, -(UITheme.Margin() + 318), 0, 15) -- left of the clock
+	store.root.Position = UDim2.new(1, -(UITheme.Margin() + 334), 0, 15) -- left of the clock
 	store.root.Visible = #STORE.ids() > 0 -- hidden until something's set up in StoreData
 	store.root.Parent = gui
 	store.face.Activated:Connect(function()

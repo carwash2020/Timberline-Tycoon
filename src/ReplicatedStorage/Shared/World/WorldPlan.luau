@@ -34,6 +34,12 @@ local function standing(x: number, z: number, tx: number, tz: number): CFrame
 	return CFrame.lookAt(Vector3.new(x, y, z), Vector3.new(tx, y, tz))
 end
 
+-- Standing at `at` with the model's +Z pointing toward `toward` (flat).
+local function facingZ(at: Vector3, toward: Vector3): CFrame
+	local dx, dz = toward.X - at.X, toward.Z - at.Z
+	return CFrame.new(at) * CFrame.Angles(0, math.atan2(dx, dz), 0)
+end
+
 ---------------------------------------------------------------------------
 -- Trees
 ---------------------------------------------------------------------------
@@ -212,6 +218,18 @@ export type Town = {
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
 
+-- The town's gondola station; it turns its open back (+Z) toward the top
+-- station on the isles, along the cable.
+WorldPlan.TownGondolaSpot = Vector3.new(-40, 0, 150)
+local function townGondola(): CFrame
+	local def = BiomeData.Get("sky")
+	local area = if def then def.area else nil
+	if not area then
+		return CFrame.new(WorldPlan.TownGondolaSpot)
+	end
+	return facingZ(WorldPlan.TownGondolaSpot, Vector3.new(area.x, 0, area.z))
+end
+
 function WorldPlan.Town(): Town
 	local mill = WorldLayout.Sawmill
 	local lamps: { CFrame } = {}
@@ -305,7 +323,7 @@ function WorldPlan.Town(): Town
 				cframe = CFrame.new(-80, 0, 100),
 			},
 		},
-		gondola = CFrame.new(-40, 0, 150),
+		gondola = townGondola(),
 		campsite = CFrame.new(-17, 0, 25) * CFrame.Angles(0, math.rad(35), 0),
 		parkingSlots = slots,
 		lamps = lamps,
@@ -401,8 +419,9 @@ function WorldPlan.Sky(): Sky?
 				table.insert(shards, isle.center + Vector3.new(math.cos(a) * 27, 0, math.sin(a) * 27))
 			end
 		end
+		-- BuildingArt.CloudChute's flume runs out along its +Z: off the isle.
 		local chutePos = isle.center + dir * 33
-		table.insert(chutes, CFrame.lookAt(chutePos, chutePos + dir))
+		table.insert(chutes, facingZ(chutePos, chutePos + dir))
 	end
 	-- The main isle: the forge to one side, two nodes on the other.
 	local side = Vector3.new(-toTown.Z, 0, toTown.X)
@@ -410,6 +429,11 @@ function WorldPlan.Sky(): Sky?
 		table.insert(shards, main.center - side * (14 + k * 8) - toTown * 10)
 	end
 	local forgeAt = main.center + side * 16
+	local base = Vector3.new(
+		center.X + toTown.X * 62,
+		TerrainGen.HeightAt(center.X + toTown.X * 62, center.Z + toTown.Z * 62),
+		center.Z + toTown.Z * 62
+	)
 	-- The waterfall pours off the outer isle nearest the river's spring.
 	local spring = WorldLayout.River.points[1]
 	local nearest = isles[1]
@@ -432,12 +456,10 @@ function WorldPlan.Sky(): Sky?
 		bridges = bridges,
 		chutes = chutes,
 		forge = CFrame.lookAt(forgeAt, forgeAt - side),
-		gondolaTop = CFrame.new(main.center + toTown * 44),
-		gondolaBase = CFrame.new(
-			center.X + toTown.X * 62,
-			TerrainGen.HeightAt(center.X + toTown.X * 62, center.Z + toTown.Z * 62),
-			center.Z + toTown.Z * 62
-		),
+		-- Stations turn their open back (+Z) along the cable: the top one
+		-- toward town, the foot one up toward the top.
+		gondolaTop = facingZ(main.center + toTown * 44, WorldPlan.TownGondolaSpot),
+		gondolaBase = facingZ(base, main.center + toTown * 44),
 		lumenwood = lumen,
 		shards = shards,
 		waterfall = { top = fallTop, bottom = Vector3.new(fallTop.X, WorldLayout.LakeLevel, fallTop.Z) },

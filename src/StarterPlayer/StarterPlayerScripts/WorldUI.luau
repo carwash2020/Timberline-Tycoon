@@ -10,7 +10,7 @@
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
 -- The server sets the Biome and OwnedGear attributes and the
 -- VitalityTier_<biome> workspace attributes (ForestService); the time of
--- day is Lighting.ClockTime, set by WorldClock.
+-- day comes from the server clock (WorldTime; LightingController sets Lighting.ClockTime).
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -81,7 +81,7 @@ local function buildClock()
 	local label = UITheme.label(gui, "", UITheme.Fonts.Black, 13, UITheme.Colors.Cream)
 	label.Name = "Clock"
 	label.AnchorPoint = Vector2.new(1, 0)
-	label.Position = UDim2.new(1, -(UITheme.Margin() + 210), 0, 15) -- left of the cash plaque
+	label.Position = UDim2.new(1, -(UITheme.Margin() + 226), 0, 15) -- left of HUD's top row (cash + settings)
 	label.Size = UDim2.fromOffset(100, 30)
 	label.BackgroundColor3 = UITheme.Colors.Bark
 	label.BackgroundTransparency = 0
@@ -90,13 +90,20 @@ local function buildClock()
 	UITheme.stroke(label, UITheme.Colors.Ink, 2)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
+	-- From the server clock, once a second (LightingController moves
+	-- Lighting.ClockTime every frame; the label doesn't need to).
 	local function refresh()
-		local clock = Lighting.ClockTime
+		local clock = WorldTime.ClockTime(workspace:GetServerTimeNow())
 		label.Text =
 			string.format("%s %s", if WorldTime.IsNight(clock) then "Night" else "Day", WorldTime.Format(clock))
 	end
 	refresh()
-	Lighting:GetPropertyChangedSignal("ClockTime"):Connect(refresh)
+	task.spawn(function()
+		while label.Parent do
+			task.wait(1)
+			refresh()
+		end
+	end)
 end
 
 -- The Sky Bin by the sell pad shows this player's own count.

@@ -31,12 +31,22 @@ local function carried(): number
 	return (player:GetAttribute("CarriedLogs") :: number?) or 0
 end
 
+-- The server mirrors the bed on the Player too, so these hold while the
+-- truck itself has streamed out.
 local function bedCount(): number
+	local n = player:GetAttribute("BedCount")
+	if type(n) == "number" then
+		return n
+	end
 	local truck = myTruck
 	return if truck then (truck:GetAttribute("BedCount") :: number?) or 0 else 0
 end
 
 local function bedCapacity(): number
+	local n = player:GetAttribute("BedCapacity")
+	if type(n) == "number" then
+		return n
+	end
 	local truck = myTruck
 	return if truck then (truck:GetAttribute("BedCapacity") :: number?) or 0 else 0
 end
@@ -101,7 +111,7 @@ local function bindTruck(truck: Model)
 			Net.Remote("LoadToTruck"):FireServer()
 		end)
 		loadPrompt = prompt
-		truckConn = truck:GetAttributeChangedSignal("BedCount"):Connect(refreshLoadPrompt)
+		truckConn = player:GetAttributeChangedSignal("BedCount"):Connect(refreshLoadPrompt)
 		refreshLoadPrompt()
 	end)
 end

@@ -106,7 +106,11 @@ spawn.Parent = map
 
 -- The sawmill, and the sell area in front of it. SellArea is Persistent so
 -- every client always has the sell zone (CarryController's prompt).
-place(atomic(BuildingArt.Sawmill()), town.sawmill)
+local sawmill = place(atomic(BuildingArt.Sawmill()), town.sawmill)
+local blade = sawmill:FindFirstChild("SawBlade", true)
+if blade then
+	CollectionService:AddTag(blade, "SawBlade") -- TownFX spins it
+end
 
 -- (Parented last of all: GameServer starts once it appears, so the whole
 -- world must exist by then.)
@@ -125,21 +129,16 @@ local padArt = BuildingArt.SellPad(24, 18)
 place(padArt, town.sellPad, sellArea)
 
 -- The Sky Bin: logs sent down the Cloud Chute wait here (WorldUI rewrites
--- its labels with each player's own count).
-local skyBin = Kit.part(
-	sellArea,
-	"SkyBin",
-	Vector3.new(4, 4, 4),
-	town.skyBin,
-	Color3.fromRGB(130, 96, 60),
-	Enum.Material.WoodPlanks
-)
-Kit.signText(skyBin, "SKY BIN", Color3.fromRGB(245, 235, 215), {
-	Enum.NormalId.Front,
-	Enum.NormalId.Back,
-	Enum.NormalId.Left,
-	Enum.NormalId.Right,
-})
+-- its labels with each player's own count). The bin part itself goes into
+-- SellArea (the contract); the flume and cloud behind it stay in the map.
+do
+	local binArt = BuildingArt.SkyBin()
+	place(atomic(binArt), town.skyBin * CFrame.new(0, -2, 0)) -- town.skyBin is the bin's centre
+	local bin = binArt:FindFirstChild("SkyBin")
+	if bin then
+		bin.Parent = sellArea
+	end
+end
 
 -- Shops: Persistent, with a Counter whose ShopPoint is where the client's
 -- "Browse" prompt appears and what ShopService measures range from.
@@ -165,7 +164,12 @@ end
 local townStation = station("GondolaTown", town.gondola)
 
 -- Murph's camp by the spawn (Murph himself is NPCService's).
-place(atomic(BuildingArt.Campsite()), town.campsite)
+local camp = place(atomic(BuildingArt.Campsite()), town.campsite)
+for _, part in ipairs(camp:GetDescendants()) do
+	if part.Name == "Flame" and part:IsA("BasePart") then
+		CollectionService:AddTag(part, "Flame") -- TownFX flickers them
+	end
+end
 
 -- Parking lot: one slot per player, so trucks never spawn inside each other.
 -- VehicleService claims slots by Index. Paint on the ground: no lip for a
@@ -351,9 +355,10 @@ if sky then
 		if box then
 			CollectionService:AddTag(box, "CloudChute")
 		end
-		-- The flume dropping away into the clouds.
-		local from = cf.Position + Vector3.new(0, 1, 0)
-		local to = cf.Position + cf.LookVector * 40 - Vector3.new(0, 60, 0)
+		-- The flume carries on from the chute's lip (its +Z end) and drops
+		-- away into the clouds.
+		local from = (cf * CFrame.new(0, -2.6, 13.6)).Position
+		local to = from + cf.LookVector * -36 - Vector3.new(0, 60, 0)
 		Kit.decor(Kit.beam(map, "Flume", from, to, 2.4, 1.2, Color3.fromRGB(90, 62, 38), Enum.Material.WoodPlanks))
 	end
 	local forge = BuildingArt.StarfallForge()

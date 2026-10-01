@@ -467,6 +467,7 @@ end
 MilestoneService.Init(notify)
 AxeService.Init(notify)
 ShopService.Init(mapFolder, remote.BuyItem, remote.EquipItem, notify)
+VehicleService.Init(notify)
 QuestService.Init(remote.SkipTutorial, notify)
 DailyService.Init(notify)
 BiomeService.Init(notify)

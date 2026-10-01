@@ -187,7 +187,7 @@ local function buildPouch()
 	local chip = Instance.new("TextButton")
 	chip.Name = "Pouch"
 	chip.AnchorPoint = Vector2.new(1, 0)
-	chip.Position = UDim2.new(1, -(side + 214), 0, 50)
+	chip.Position = UDim2.new(1, -(side + 230), 0, 50)
 	chip.Size = UDim2.fromOffset(84, 26)
 	chip.BackgroundColor3 = C.Bark
 	chip.AutoButtonColor = true
@@ -224,7 +224,7 @@ local function buildPouch()
 	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true)
 	card.outer.Name = "PouchList"
 	card.outer.AnchorPoint = Vector2.new(1, 0)
-	card.outer.Position = UDim2.new(1, -(side + 214), 0, 80)
+	card.outer.Position = UDim2.new(1, -(side + 230), 0, 80)
 	card.outer.Visible = false
 	UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 6, 10, 6, 10)

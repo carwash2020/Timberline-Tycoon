@@ -15,7 +15,10 @@
 --   * "Loading your save..." until the server says the profile is ready.
 --   * Money in or out pops beside the plaque ("+$1,250") and the plaque
 --     counts up to the new amount. The plaque sits in a top-right row
---     (HUD.TopRow) that SettingsUI adds its button to.
+--     (HUD.TopRow) that SettingsUI adds its button to; the plaque is wide
+--     enough for any amount, so the row is a fixed 226 studs + the margin
+--     wide and the clock (WorldUI), Store button and Heartseed pouch sit
+--     left of that.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -368,7 +371,7 @@ local function buildCash(gui: ScreenGui)
 	pops.LayoutOrder = -100
 	pops.Parent = row
 	local min = Instance.new("UISizeConstraint")
-	min.MinSize = Vector2.new(150, 49)
+	min.MinSize = Vector2.new(172, 49) -- fits $1,999,999 without growing into the row
 	min.Parent = card.outer
 	local glow = UITheme.stroke(card.outer, C.Amber, 4)
 	glow.Transparency = 0.45
@@ -386,14 +389,14 @@ local function buildCash(gui: ScreenGui)
 	UITheme.padding(inner, 0, 14, 0, 14)
 	inner.Parent = card.face
 	local innerMin = Instance.new("UISizeConstraint")
-	innerMin.MinSize = Vector2.new(142, 38)
+	innerMin.MinSize = Vector2.new(164, 38)
 	innerMin.Parent = inner
 
 	local label = UITheme.label(inner, "$0", F.Heading, 26, C.Ink)
 	label.AutomaticSize = Enum.AutomaticSize.X
 	label.Size = UDim2.fromScale(0, 1)
 	local labelMin = Instance.new("UISizeConstraint")
-	labelMin.MinSize = Vector2.new(114, 0)
+	labelMin.MinSize = Vector2.new(136, 0)
 	labelMin.Parent = label
 
 	local shown = Instance.new("NumberValue")
