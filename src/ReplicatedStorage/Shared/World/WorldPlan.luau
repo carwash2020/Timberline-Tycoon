@@ -307,6 +307,7 @@ export type ShopSpot = { kind: string, title: string, accent: Color3, cframe: CF
 
 export type Town = {
 	spawn: Vector3,
+	spawnFacing: CFrame, -- the SpawnLocation's CFrame: at `spawn`, its front toward the sawmill
 	sawmill: CFrame,
 	sellZone: CFrame, -- centre of the 24 x 12 x 18 sell volume
 	sellPad: CFrame,
@@ -392,7 +393,7 @@ function WorldPlan.Town(): Town
 		{ "Cart", -71, 124, -0.4 },
 		{ "WaterTower", -58, 126 },
 		{ "ToolRack", -33, 97, -math.pi / 2 },
-		{ "Well", -38, 77 },
+		{ "Well", -49, 60 }, -- on the green south of the street, between the benches
 		{ "Bench", -58, 66, math.pi },
 		{ "Bench", -40, 66, math.pi },
 		{ "Barrel", -32.5, 92 },
@@ -405,13 +406,13 @@ function WorldPlan.Town(): Town
 		{ "Mailbox", -91, 87, 0 },
 		{ "FlowerBox", -86, 90.5, 0 },
 		{ "LogPile", 28, 108, 0 },
-		{ "LogPile", 28, 98, 0.1 },
+		{ "LogPile", 29, 98, 0.1 }, -- clear of the plaza's corner
 		{ "Wheelbarrow", 20, 93, -0.6 },
-		{ "SawdustPile", 24, 118 },
+		{ "SawdustPile", 22, 114 }, -- by the lean-to, clear of the yard lamp
 		{ "SawdustPile", -21, 99 },
 		{ "Lantern", lantern.X, lantern.Z, campYaw },
-		{ "Barrel", -24, 120 },
-		{ "Barrel", -26, 117.5 },
+		{ "Barrel", -22, 116 }, -- against the mill's side shed, off the gondola path
+		{ "Barrel", -22, 113.5 },
 	}
 	local props: { Placement } = {}
 	for i, p in ipairs(propSpots) do
@@ -441,8 +442,16 @@ function WorldPlan.Town(): Town
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
 	}
 
+	-- A character spawns facing its SpawnLocation's front (LookVector), so
+	-- turn the pad's front (-Z) half a turn to +Z: the sawmill is due north
+	-- of the spawn, framed by the walk's two lamps. (Angles, not
+	-- CFrame.lookAt: Lune gets lookAt wrong, and Shared code runs there.)
+	local spawn = Vector3.new(0, 0.5, 40)
+	local spawnFacing = CFrame.new(spawn) * CFrame.Angles(0, math.pi, 0)
+
 	return {
-		spawn = Vector3.new(0, 0.5, 40),
+		spawn = spawn,
+		spawnFacing = spawnFacing,
 		sawmill = CFrame.new(mill) * FACING_SOUTH,
 		sellZone = CFrame.new(mill.X, 6, mill.Z - 24),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
