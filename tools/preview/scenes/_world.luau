@@ -91,6 +91,9 @@ function World.build(ctx)
 	for _, sign in ipairs(town.signs) do
 		place(BuildingArt.Signpost(sign.text), sign.cframe)
 	end
+	for _, g in ipairs(town.greenery) do
+		place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
+	end
 	for _, cf in ipairs(town.parkingSlots) do
 		Kit.part(
 			root,

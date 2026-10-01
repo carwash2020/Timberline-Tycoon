@@ -7,7 +7,8 @@
 --   2. Characters wait until there's ground to stand on.
 --   3. Terrain (TerrainBuilder): hills, rivers, the lake, the coast, roads.
 --   4. The town: sawmill and sell area, the three shops, the gondola
---      station, Murph's camp, the parking lot, lamps, signs, props.
+--      station, Murph's camp, the parking lot, lamps, signs, props, and
+--      its greenery (ornamental trees no one can chop, bushes, flowers).
 --   5. The biomes: every wild tree (BiomeData counts) on the terrain,
 --      boulders, the volcano's crater, the grove's glowing mushrooms, the
 --      palm island offshore, signposts where the roads arrive.
@@ -260,6 +261,20 @@ step("4. The town", function()
 				atomic(BuildingArt.Signpost(string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee))),
 				town.gondolaSign
 			)
+		end
+	end)
+
+	-- The town's greenery: ornamental trees in stone rings, bushes, flower
+	-- beds and rocks, each Atomic, in their own folder. Decoration but for
+	-- the trees' trunks (BuildingArt.Greenery). Never tagged Tree and never
+	-- in the Trees folder, so nobody can chop them, and WindSway and
+	-- CanopyFade leave them be.
+	step("4. Greenery", function()
+		local folder = Instance.new("Folder")
+		folder.Name = "TownGreenery"
+		folder.Parent = map
+		for _, g in ipairs(town.greenery) do
+			place(atomic(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId)), g.cframe, folder)
 		end
 	end)
 end)

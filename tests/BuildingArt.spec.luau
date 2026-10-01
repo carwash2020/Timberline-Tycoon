@@ -244,6 +244,92 @@ return function(t)
 		t.ok(find(BuildingArt.Prop("Lantern", 1), "LanternGlow"), "the Lantern prop glows")
 	end)
 
+	t.test("town trees: only the Trunk collides, seated in a stone ring outside the roots, under budget", function()
+		for _, woodId in ipairs({ "birch", "maple", "pine" }) do
+			for _, scale in ipairs({ 0.82, 1, 1.22 }) do
+				for seed = 1, 4 do
+					local label = string.format("%s %.2f seed %d", woodId, scale, seed)
+					local tree = BuildingArt.TownTree(woodId, seed, scale)
+					t.eq(tree.Name, "TownTree")
+					local trunk = tree.PrimaryPart
+					t.ok(trunk and trunk.Name == "Trunk", label .. ": PrimaryPart Trunk")
+					t.ok(trunk.CanCollide and trunk.CanQuery, label .. ": the trunk collides")
+					t.eq(#tree:GetTags(), 0, label .. " is tagged")
+					local reach, stones = 0, 0
+					local inner = math.huge
+					for _, p in ipairs(parts(tree)) do
+						if p ~= trunk then
+							t.ok(
+								not p.CanCollide and not p.CanQuery and not p.CanTouch,
+								label .. ": " .. p.Name .. " is decoration"
+							)
+						end
+						t.eq(#p:GetTags(), 0, label .. ": " .. p.Name .. " is tagged")
+						if p.Name == "Root" or p.Name == "RingStone" then
+							-- The nearest and farthest its footprint comes to the trunk's axis.
+							local h = p.Size / 2
+							local near, far = math.huge, 0
+							for _, x in ipairs({ -1, 1 }) do
+								for _, z in ipairs({ -1, 1 }) do
+									for _, y in ipairs({ -1, 1 }) do
+										local c = p.CFrame * V3.new(h.X * x, h.Y * y, h.Z * z)
+										local r = math.sqrt(c.X * c.X + c.Z * c.Z)
+										near, far = math.min(near, r), math.max(far, r)
+									end
+								end
+							end
+							if p.Name == "Root" then
+								reach = math.max(reach, far)
+							else
+								stones += 1
+								-- A stone's middle-of-inner-face, nearer than its corners.
+								local mid = p.CFrame.Position
+								inner = math.min(inner, math.sqrt(mid.X * mid.X + mid.Z * mid.Z) - h.Z)
+							end
+						end
+					end
+					t.ok(stones >= 7, label .. ": a ring of stones")
+					t.ok(
+						inner > reach,
+						string.format("%s: the ring (%.2f) sits outside the roots (%.2f)", label, inner, reach)
+					)
+					t.ok(find(tree, "RingSoil"), label .. ": soil in the ring")
+					t.ok(#parts(tree) <= 70, label .. " parts: " .. #parts(tree))
+				end
+			end
+		end
+		-- An unknown wood grows a birch.
+		t.eq(#parts(BuildingArt.TownTree("teak", 1, 1)), #parts(BuildingArt.TownTree("birch", 1, 1)))
+	end)
+
+	t.test("town greenery: bushes, flower beds and rocks are looks only, deterministic", function()
+		for _, kind in ipairs({ "bush", "flowers", "rock", "mystery" }) do
+			for _, size in ipairs({ 1.6, 2.4, 3 }) do
+				local model = BuildingArt.Greenery(kind, size, 11, nil)
+				local all = parts(model)
+				t.ok(#all > 0 and #all <= 40, kind .. " parts: " .. #all)
+				for _, p in ipairs(all) do
+					t.ok(
+						not p.CanCollide and not p.CanQuery and not p.CanTouch,
+						kind .. ": " .. p.Name .. " is decoration"
+					)
+					local lo, hi = bounds(p)
+					t.ok(lo.Y > -0.4 * size and hi.Y < size + 1.5, kind .. ": " .. p.Name .. " sits on the ground")
+				end
+				local again = parts(BuildingArt.Greenery(kind, size, 11, nil))
+				t.eq(#again, #all)
+				for i = 1, #all do
+					t.ok(
+						all[i].CFrame == again[i].CFrame and all[i].Color == again[i].Color,
+						kind .. ": the same every time"
+					)
+				end
+			end
+		end
+		t.eq(BuildingArt.Greenery("mystery", 2, 1).Name, "Bush", "an unknown kind is a bush")
+		t.eq(BuildingArt.Greenery("tree", 1, 1, "pine").Name, "TownTree")
+	end)
+
 	t.test("the Sky Bin: a 4 x 4 x 4 SkyBin at y = 2 with its text on SurfaceGuis", function()
 		local art = BuildingArt.SkyBin()
 		local bin = art:FindFirstChild("SkyBin")

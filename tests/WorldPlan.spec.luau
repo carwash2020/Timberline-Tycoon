@@ -1,10 +1,12 @@
 --!nocheck
 -- WorldPlan: nothing in town that collides stands on (or within 2 studs
 -- of) a road, or on the town's street, plaza, paths, walk or sell pad
--- (TWN-08); the spawn faces the sawmill; Murph stands at his camp; the
--- biome road signs stand on the ground beside their roads, the boulders
--- on gentle ground; the gondola's routes clear the stations' roofs, the
--- main isle and the Skyroot.
+-- (TWN-08); the town's greenery (TWN-01) keeps off the paint, the lot, the
+-- pad, the pull-outs, the roads, the props, the buildings, the walkers and
+-- the gondola, and has 20-30 trees, none of them oaks; the spawn faces the
+-- sawmill; Murph stands at his camp; the biome road signs stand on the
+-- ground beside their roads, the boulders on gentle ground; the gondola's
+-- routes clear the stations' roofs, the main isle and the Skyroot.
 
 return function(t)
 	local roblox = t.roblox
@@ -115,8 +117,40 @@ return function(t)
 		for _, spot in ipairs(town.shops) do
 			add(spot.kind, "shop", BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end
+		-- The greenery (TWN-01): a tree's trunk collides, the rest is looks.
+		for _, g in ipairs(town.greenery) do
+			local label = string.format(
+				"%s%s at (%g, %g)",
+				if g.woodId then g.woodId .. " " else "",
+				g.kind,
+				g.cframe.X,
+				g.cframe.Z
+			)
+			add(label, "greenery", BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
+		end
 		builtThings = things
 		return things
+	end
+
+	local function greenery()
+		local out = {}
+		for _, thing in ipairs(townThings()) do
+			if thing.kind == "greenery" then
+				table.insert(out, thing)
+			end
+		end
+		return out
+	end
+
+	-- A part's world bounding box.
+	local function boxOf(p)
+		local lo, hi
+		for _, c in ipairs(corners(p.Size)) do
+			local w = p.CFrame * c
+			lo = if lo then lo:Min(w) else w
+			hi = if hi then hi:Max(w) else w
+		end
+		return lo, hi
 	end
 
 	t.test("nothing in town that collides stands within 2 studs of a road", function()
@@ -191,7 +225,8 @@ return function(t)
 		-- 18) with its 0.8-stud border, as MapBuilder builds it). What may
 		-- stand on which, by design: a shop meets the end of its own path
 		-- (porch, ramp, front wall), the gondola path runs into the station,
-		-- and the Sky Bin and the lamps by the sell pad (the corner lamps) may
+		-- and the Sky Bin, the lamps by the sell pad (the corner lamps) and
+		-- the SELL LOGS HERE signpost at the pad's east edge (TWN-04) may
 		-- stand on the plaza, but never on the street through it or the pad.
 		local CHECKED = {
 			Plaza = true,
@@ -208,6 +243,8 @@ return function(t)
 			elseif thing.kind == "station" then
 				return area.name == "GondolaPath"
 			elseif thing.kind == "skyBin" or thing.kind == "lamp" then
+				return area.name == "Plaza"
+			elseif thing.kind == "sign" and thing.label == "SELL LOGS HERE sign" then
 				return area.name == "Plaza"
 			end
 			return false
@@ -283,6 +320,385 @@ return function(t)
 				caught = caught or hit.area.name == where
 			end
 			t.ok(caught, string.format("a %s at (%g, %g) is caught on the %s", name, x, z, where))
+		end
+	end)
+
+	-- Every problem a check found, a line each (the first 25).
+	local function report(problems)
+		local lines = {}
+		for i = 1, math.min(#problems, 25) do
+			table.insert(lines, problems[i])
+		end
+		if #problems > 25 then
+			table.insert(lines, string.format("... and %d more", #problems - 25))
+		end
+		return string.format("%d problems:\n", #problems) .. table.concat(lines, "\n")
+	end
+
+	-- The town's greenery (TWN-01).
+	t.test("the town's greenery stays off the paint, the lot, the pad, the pull-outs and the roads (TWN-01)", function()
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local areas = {}
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			table.insert(areas, paint)
+		end
+		local lot = WorldLayout.ParkingLot
+		table.insert(areas, { name = "parking lot", x0 = lot.x0, x1 = lot.x1, z0 = lot.z0, z1 = lot.z1 })
+		local pad = town.sellPad.Position
+		table.insert(
+			areas,
+			{ name = "sell pad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 }
+		)
+		-- Each slot's pull-out: its own lane (a stud wider each side), 25 studs
+		-- on past either end (a truck leaves forward or backs out).
+		for i, cf in ipairs(town.parkingSlots) do
+			t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.9999, "slot " .. i .. " faces the forest (-Z)")
+			table.insert(areas, {
+				name = "pull-out of slot " .. i,
+				x0 = cf.X - 4.25,
+				x1 = cf.X + 4.25,
+				z0 = cf.Z - 18.5 - 25,
+				z1 = cf.Z + 18.5 + 25,
+			})
+		end
+		local things = greenery()
+		t.ok(#things >= 40, string.format("only %d pieces of greenery", #things))
+		local problems = {}
+		local checked = 0
+		for _, thing in ipairs(things) do
+			for _, p in ipairs(parts(thing.model)) do
+				checked += 1
+				for _, area in ipairs(areas) do
+					local reach = reachInto(p.CFrame, p.Size, area)
+					if reach > 1e-3 then
+						table.insert(
+							problems,
+							string.format(
+								"%s's %s reaches %.2f studs into the %s",
+								thing.label,
+								p.Name,
+								reach,
+								area.name
+							)
+						)
+					end
+				end
+				local c = roadClearance(p.CFrame, p.Size)
+				if c < ROAD_MARGIN then
+					table.insert(problems, string.format("%s's %s is %.2f studs off a road", thing.label, p.Name, c))
+				end
+			end
+		end
+		t.ok(#problems == 0, report(problems))
+		t.ok(checked > 1000, string.format("only %d greenery parts", checked))
+		-- The check itself: a bush on the street, a tree in the lot, one by
+		-- the Hills Road and a flower bed in a pull-out are all caught.
+		local function caught(kind, x, z, where)
+			local model =
+				placed(BuildingArt.Greenery(kind, 2.4, 5, if kind == "tree" then "birch" else nil), CFrame.new(x, 0, z))
+			for _, p in ipairs(parts(model)) do
+				if where == "road" then
+					if roadClearance(p.CFrame, p.Size) < ROAD_MARGIN then
+						return true
+					end
+				else
+					for _, area in ipairs(areas) do
+						if area.name == where and reachInto(p.CFrame, p.Size, area) > 1e-3 then
+							return true
+						end
+					end
+				end
+			end
+			return false
+		end
+		t.ok(caught("bush", -40, 77, "MainStreet"), "a bush on the street is caught")
+		t.ok(caught("tree", 60, 30, "parking lot"), "a tree in the lot is caught")
+		t.ok(caught("tree", -60, 17, "road"), "a tree by the Hills Road is caught")
+		t.ok(caught("flowers", 40, -30, "pull-out of slot 16"), "a flower bed in a pull-out is caught")
+	end)
+
+	t.test("the town's greenery keeps 4 studs from the props and out of the buildings (TWN-01)", function()
+		local GAP = 4
+		local PROPS = { lamp = true, fence = true, prop = true, sign = true, camp = true, skyBin = true }
+		-- Ground level: what you'd walk or drive into (a canopy is higher).
+		local GROUND = 3
+		local obstacles = {}
+		for _, thing in ipairs(townThings()) do
+			if thing.kind ~= "greenery" then
+				for _, p in ipairs(parts(thing.model)) do
+					if p.CanCollide then
+						local lo, hi = boxOf(p)
+						table.insert(obstacles, { thing = thing, part = p, lo = lo, hi = hi, prop = PROPS[thing.kind] })
+					end
+				end
+			end
+		end
+		-- What a piece of greenery bumps into, a line each.
+		local function clashes(label, isTree, model, problems)
+			for _, p in ipairs(parts(model)) do
+				local plo, phi = boxOf(p)
+				for _, o in ipairs(obstacles) do
+					if plo.Y < GROUND then
+						-- Props: 4 studs clear. Buildings: a tree keeps 4 studs off
+						-- (room to walk round it), the rest only stays out.
+						if o.lo.Y < GROUND then
+							local gap = if o.prop or isTree then GAP else 0
+							local area = { x0 = o.lo.X - gap, x1 = o.hi.X + gap, z0 = o.lo.Z - gap, z1 = o.hi.Z + gap }
+							local reach = reachInto(p.CFrame, p.Size, area)
+							if reach > 1e-3 then
+								table.insert(
+									problems,
+									string.format(
+										"%s's %s is within %d studs of %s's %s (%.2f in)",
+										label,
+										p.Name,
+										gap,
+										o.thing.label,
+										o.part.Name,
+										reach
+									)
+								)
+							end
+						end
+					elseif not o.prop then
+						-- A canopy never runs through a roof.
+						local apart = phi.X <= o.lo.X
+							or plo.X >= o.hi.X
+							or phi.Y <= o.lo.Y
+							or plo.Y >= o.hi.Y
+							or phi.Z <= o.lo.Z
+							or plo.Z >= o.hi.Z
+						if not apart then
+							table.insert(
+								problems,
+								string.format("%s's %s runs into %s's %s", label, p.Name, o.thing.label, o.part.Name)
+							)
+						end
+					end
+				end
+			end
+			return problems
+		end
+		local problems = {}
+		for _, g in ipairs(greenery()) do
+			clashes(g.label, string.find(g.label, "tree", 1, true) ~= nil, g.model, problems)
+		end
+		t.ok(#problems == 0, report(problems))
+		-- The check itself: a bush hugging the barrel by the Tool Shed, a
+		-- birch 3 studs from a lamp, and a maple whose crown would run into
+		-- the Dealership's roof are all caught.
+		local function caught(kind, woodId, x, z)
+			local model = placed(BuildingArt.Greenery(kind, if woodId then 1 else 2.4, 9, woodId), CFrame.new(x, 0, z))
+			return #clashes(kind, kind == "tree", model, {}) > 0
+		end
+		t.ok(caught("bush", nil, -32.5, 89), "a bush by the barrel is caught")
+		t.ok(caught("tree", "birch", -61, 66), "a birch between a lamp and a bench is caught")
+		t.ok(caught("tree", "maple", 45, 113), "a maple against the Dealership's back wall is caught")
+	end)
+
+	t.test("the townsfolk never walk through the town's greenery (TWN-01)", function()
+		-- Every walker's loop, a point each half stud (as NPCData.spec walks
+		-- it), and where each standing NPC stands.
+		local points = {}
+		for _, npc in ipairs(NPCData.All()) do
+			local route = npc.route
+			if route then
+				for i, w in ipairs(route) do
+					local nxt = route[i % #route + 1]
+					local a, b = Vector3.new(w.x, 0, w.z), Vector3.new(nxt.x, 0, nxt.z)
+					local n = math.max(1, math.ceil((b - a).Magnitude / 0.5))
+					for k = 0, n - 1 do
+						table.insert(points, { id = npc.id, p = a:Lerp(b, k / n) })
+					end
+				end
+			end
+			local spot = npc.spot.position or npc.spot.fallback
+			if spot then
+				table.insert(points, { id = npc.id, p = Vector3.new(spot.X, 0, spot.Z) })
+			end
+		end
+		t.ok(#points > 100, "the walkers' loops")
+		local CLEAR = 2 -- studs between a walker's middle and the greenery's ground parts
+		local problems = {}
+		for _, g in ipairs(greenery()) do
+			for _, p in ipairs(parts(g.model)) do
+				local lo, hi = boxOf(p)
+				if lo.Y < 3 then
+					for _, w in ipairs(points) do
+						local dx = math.max(lo.X - w.p.X, 0, w.p.X - hi.X)
+						local dz = math.max(lo.Z - w.p.Z, 0, w.p.Z - hi.Z)
+						if dx * dx + dz * dz < CLEAR * CLEAR then
+							table.insert(
+								problems,
+								string.format("%s walks through %s at (%.1f, %.1f)", w.id, g.label, w.p.X, w.p.Z)
+							)
+							break
+						end
+					end
+				end
+			end
+		end
+		t.ok(#problems == 0, report(problems))
+	end)
+
+	t.test(
+		"the town's trees: 20 to 30 birch, maple and pine (no oaks), trunks the only thing that collides (TWN-01)",
+		function()
+			local trees, woods = 0, {}
+			for _, g in ipairs(town.greenery) do
+				t.ok(
+					g.kind == "tree" or g.kind == "bush" or g.kind == "flowers" or g.kind == "rock",
+					"an unknown greenery kind " .. tostring(g.kind)
+				)
+				if g.kind == "tree" then
+					trees += 1
+					t.ok(
+						g.woodId == "birch" or g.woodId == "maple" or g.woodId == "pine",
+						"a town " .. tostring(g.woodId)
+					)
+					woods[g.woodId] = (woods[g.woodId] or 0) + 1
+					t.ok(g.size >= 0.8 and g.size <= 1.25, "a tree's size is its scale")
+				else
+					t.eq(g.woodId, nil)
+				end
+				t.ok(math.abs(g.cframe.Y - TerrainGen.HeightAt(g.cframe.X, g.cframe.Z)) < 1e-6, "on the ground")
+				t.ok(g.cframe.UpVector.Y > 0.99999, "standing upright")
+			end
+			t.ok(trees >= 20 and trees <= 30, string.format("%d town trees", trees))
+			t.ok((woods.pine or 0) >= 8, "a pine band")
+			t.ok((woods.birch or 0) >= 4 and (woods.maple or 0) >= 4, "birch and maple round the edges")
+			-- The pine band: behind the mill and the gondola, z 140 to 200.
+			for _, g in ipairs(town.greenery) do
+				if g.woodId == "pine" then
+					t.ok(
+						g.cframe.Z >= 140 and g.cframe.Z <= 200,
+						string.format("a pine out of the band at z %g", g.cframe.Z)
+					)
+				end
+			end
+			for _, g in ipairs(greenery()) do
+				for _, p in ipairs(parts(g.model)) do
+					if p.CanCollide then
+						t.eq(p.Name, "Trunk", g.label .. "'s " .. p.Name .. " collides")
+					end
+					t.ok(p.CanQuery == (p.Name == "Trunk"), g.label .. "'s " .. p.Name .. " can be clicked")
+				end
+			end
+		end
+	)
+
+	t.test("SELL LOGS HERE stands upright by the pad, facing the street, clear of the props (TWN-04)", function()
+		local found = {}
+		for _, sign in ipairs(town.signs) do
+			if sign.text == "SELL LOGS HERE" then
+				table.insert(found, sign)
+			end
+		end
+		t.eq(#found, 1, "one SELL LOGS HERE signpost in town.signs")
+		local cf = found[1].cframe
+		t.ok(cf.UpVector.Y > 0.99999, "upright")
+		t.ok(math.abs(cf.Y - TerrainGen.HeightAt(cf.X, cf.Z)) < 1e-6, "on the ground")
+		-- Its front (-Z, where the board's text reads) faces the street, south.
+		t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "facing the street")
+		-- At the pad's east edge (the row's "about (17, 92)"), not by any other
+		-- building: every problem with a spot, or none.
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local plaza, street
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			if paint.name == "Plaza" then
+				plaza = paint
+			elseif paint.name == "MainStreet" then
+				street = paint
+			end
+		end
+		local pad = town.sellPad.Position
+		local padEast, padNorth = pad.X + 12.8, pad.Z + 9.8 -- the pad's edges, its border included
+		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
+			if model == "SellArea" and part == "SellZone" then
+				return town.sellZone, Vector3.new(24, 12, 18)
+			end
+			return nil, nil
+		end).Position
+		local function byThePad(spot)
+			local problems = {}
+			local post = placed(BuildingArt.Signpost("SELL LOGS HERE"), spot)
+			local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+			for _, p in ipairs(parts(post)) do
+				local lo, hi = boxOf(p)
+				if p.CanCollide then
+					x0, x1 = math.min(x0, lo.X), math.max(x1, hi.X)
+					z0, z1 = math.min(z0, lo.Z), math.max(z1, hi.Z)
+					-- Millie stands beside the pad: the posts keep 2.5 studs from her.
+					local dx = math.max(lo.X - millie.X, 0, millie.X - hi.X)
+					local dz = math.max(lo.Z - millie.Z, 0, millie.Z - hi.Z)
+					if math.sqrt(dx * dx + dz * dz) < 2.5 then
+						table.insert(problems, "a post within 2.5 studs of Millie")
+					end
+				end
+				-- Not over her head: she isn't under any of it.
+				if millie.X > lo.X - 1 and millie.X < hi.X + 1 and millie.Z > lo.Z - 1 and millie.Z < hi.Z + 1 then
+					table.insert(problems, "its " .. p.Name .. " over Millie")
+				end
+			end
+			-- East of the pad, out of the trucks' lane in (1.5 studs off its
+			-- edge), its near post within 4 studs of the edge.
+			if x0 < padEast + 1.5 or x0 > padEast + 4 then
+				table.insert(problems, string.format("near post %.1f studs off the pad's east edge", x0 - padEast))
+			end
+			-- Alongside the pad, north of the street (4 studs clear), and inside
+			-- the plaza's east edge (the lane north, TWN-05, starts there).
+			if z0 < street.z1 + 4 or z1 > padNorth then
+				table.insert(problems, string.format("posts at z %.1f to %.1f, not alongside the pad", z0, z1))
+			end
+			if x1 > plaza.x1 then
+				table.insert(problems, string.format("east post at x %.1f, past the plaza", x1))
+			end
+			return problems
+		end
+		local problems = byThePad(cf)
+		t.ok(#problems == 0, "by the pad: " .. table.concat(problems, "; "))
+		-- The check itself: the spot by the Tool Shed's door, one with its west
+		-- post on the pad, one on Millie, one in the lane north and one by
+		-- the street are each caught, for the right reason.
+		local bads = {
+			{ -32.5, 87, "near post" },
+			{ 17, 92, "near post" },
+			{ 20.5, 92, "Millie" },
+			{ 28, 90, "past the plaza" },
+			{ 20.5, 87, "alongside" },
+		}
+		for _, bad in ipairs(bads) do
+			local caught = false
+			for _, why in ipairs(byThePad(CFrame.new(bad[1], 0, bad[2]))) do
+				caught = caught or string.find(why, bad[3], 1, true) ~= nil
+			end
+			t.ok(caught, string.format("a SELL LOGS HERE at (%g, %g) is caught (%s)", bad[1], bad[2], bad[3]))
+		end
+		-- The spawn sees its front: read from the spawn walk, not edge-on.
+		local toSpawn = Vector3.new(town.spawn.X - cf.X, 0, town.spawn.Z - cf.Z).Unit
+		t.ok(cf.LookVector:Dot(toSpawn) > 0.5, "its board faces the spawn walk")
+		-- Nothing it stands in or on: the whole signpost (decoration too) keeps
+		-- out of every prop, and its posts (what collides) 2 studs from them.
+		local sign = placed(BuildingArt.Signpost(found[1].text), cf)
+		for _, prop in ipairs(town.props) do
+			local model = placed(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
+			for _, p in ipairs(parts(model)) do
+				local lo, hi = boxOf(p)
+				for _, s in ipairs(parts(sign)) do
+					local gap = if s.CanCollide and p.CanCollide then 2 else 0
+					local area = { x0 = lo.X - gap, x1 = hi.X + gap, z0 = lo.Z - gap, z1 = hi.Z + gap }
+					t.ok(
+						reachInto(s.CFrame, s.Size, area) <= 1e-3,
+						string.format(
+							"the signpost's %s runs into the %s at (%g, %g)",
+							s.Name,
+							prop.name,
+							prop.cframe.X,
+							prop.cframe.Z
+						)
+					)
+				end
+			end
 		end
 	end)
 
@@ -611,5 +1027,61 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test("the town's greenery keeps out of the gondola's way (TWN-01)", function()
+		-- The cabin rides 1 above the route, 5.4 across (up to 3.9 from its
+		-- middle, turned), its floor 0.2 under that and its roof 5.6 over;
+		-- the cable runs 8.5 above the route. The first 150 studs out of
+		-- town, a stud at a time.
+		local path = routeFrom("town")
+		local length = 0
+		for i = 1, #path - 1 do
+			length += (path[i + 1] - path[i]).Magnitude
+		end
+		local boxes = {}
+		for _, g in ipairs(greenery()) do
+			for _, p in ipairs(parts(g.model)) do
+				local lo, hi = boxOf(p)
+				table.insert(boxes, { label = g.label, part = p, lo = lo, hi = hi })
+			end
+		end
+		local problems = {}
+		for k = 0, 150 do
+			local at = WorldPlan.AlongPath(path, k / length)
+			local lo = at + Vector3.new(-4, 0.6, -4)
+			local hi = at + Vector3.new(4, 9.2, 4)
+			for _, b in ipairs(boxes) do
+				local apart = b.hi.X <= lo.X
+					or b.lo.X >= hi.X
+					or b.hi.Y <= lo.Y
+					or b.lo.Y >= hi.Y
+					or b.hi.Z <= lo.Z
+					or b.lo.Z >= hi.Z
+				if not apart then
+					table.insert(
+						problems,
+						string.format(
+							"%s's %s is in the gondola's way at (%.0f, %.0f, %.0f)",
+							b.label,
+							b.part.Name,
+							at.X,
+							at.Y,
+							at.Z
+						)
+					)
+				end
+			end
+		end
+		t.ok(#problems == 0, report(problems))
+		-- The check itself: a pine on the route, 30 studs out, is caught.
+		local out = WorldPlan.AlongPath(path, 30 / length)
+		local pine = placed(BuildingArt.Greenery("tree", 1, 3, "pine"), CFrame.new(out.X, 0, out.Z))
+		local hit = false
+		for _, p in ipairs(parts(pine)) do
+			local plo, phi = boxOf(p)
+			hit = hit or (phi.Y > out.Y + 0.6 and plo.Y < out.Y + 9.2)
+		end
+		t.ok(hit, "a pine 30 studs out would reach the cabin")
 	end)
 end
