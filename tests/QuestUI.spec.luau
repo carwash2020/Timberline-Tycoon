@@ -130,6 +130,19 @@ return function(t)
 		t.ok(string.find(source, "HintLogic.Expand(QuestUI.SkipArmed, UITheme.Device())", 1, true), "worded per device")
 	end)
 
+	-- UI-19: Skip isn't on screen from a new player's first second.
+	t.test("Skip shows from the second step on, and the tracker starts with it hidden", function()
+		t.eq(QuestUI.ShowSkip(0), false, "done or skipped (the tracker is hidden anyway)")
+		t.eq(QuestUI.ShowSkip(1), false, "the first step: no Skip")
+		for index = 2, #TutorialData.Steps do
+			t.eq(QuestUI.ShowSkip(index), true, "step " .. index)
+		end
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(string.find(source, "skip.root.Visible = false", 1, true), "built hidden")
+		t.ok(string.find(source, "skipRoot.Visible = showSkip", 1, true), "refresh shows it")
+	end)
+
 	t.test("nothing to find: no map yet, or a beacon that moves", function()
 		t.eq(QuestUI.FindBeaconPart(nil, "sellPad"), nil)
 		t.eq(QuestUI.FindBeaconPart(townMap(), "tree"), nil)

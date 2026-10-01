@@ -4,7 +4,8 @@
 --   * SideColumn(): where the side buttons' column stands (clear of the
 --     corner and a phone's jump button), and Stack(): the buttons, stacked
 --     up from its bottom-right corner in columns no taller than the room.
---   * ShopArea(): what the shop panel is centred in, under the top bar.
+--   * ShopArea(): what the shop panel is centred in, under the top bar;
+--     ShopHeader(): how tall its title and subtitle block is.
 --   * ClearOf(): a centred panel's area, shrunk or lowered so the panel
 --     stays clear of something drawn over it (the cash row over the shop).
 --   * ToastLane(): where the toasts stack, clear of the top-right corner
@@ -113,6 +114,16 @@ function HudLayout.LiftClear(
 		end
 	end
 	return out
+end
+
+-- The shop panel's header (ShopUI): 14 above the title, the title (30),
+-- 2, the subtitle, and 10 under it. The subtitle takes one 16 px line on a
+-- computer or a TV, and two (32) on a phone, where its narrower panel
+-- wraps it (UI-19).
+HudLayout.SubtitleLine = 16
+function HudLayout.ShopHeader(phone: boolean): number
+	local lines = if phone then 2 else 1
+	return 14 + 30 + 2 + lines * HudLayout.SubtitleLine + 10
 end
 
 local SHOP_SIDE = 12 -- the shop's area: in from the sides,

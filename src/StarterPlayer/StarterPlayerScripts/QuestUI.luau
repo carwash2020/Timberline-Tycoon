@@ -1,7 +1,7 @@
 --!strict
 -- QuestUI: Murph's tutorial, client side (steps in Shared/TutorialData).
 --   * Tracker, on the left: the current objective with progress, and Skip
---     (tap twice).
+--     (tap twice; from step 2 on, QuestUI.ShowSkip).
 --   * Murph's card under it: what he says when a step starts. "Talk" at
 --     Murph (by the spawn) says it again. A tap dismisses it, except with
 --     touch controls: there it sits in the thumbstick's corner, so it lets
@@ -45,6 +45,8 @@ local BEACON_HIDE_WITHIN = 8 -- studs: you're there
 local tracker: Frame? = nil
 local objectiveLabel: TextLabel? = nil
 local stepLabel: TextLabel? = nil
+local skipRoot: Frame? = nil -- the Skip button (QuestUI.ShowSkip says when it shows)
+local skipWidth = 0 -- its width and gap: the step label ends left of it while it shows
 local speech: Frame? = nil -- the holder in the column
 local speechCard: Frame? = nil -- slides and fades inside it
 local speechLabel: TextLabel? = nil
@@ -182,6 +184,13 @@ local function nearestTagged(tag: string, from: Vector3, accept: (Model, BasePar
 	return best
 end
 
+-- Whether Skip shows on step `index` (the TutorialStep attribute): from
+-- the second step on, so a new player's first second on the screen isn't
+-- an invitation to skip (UI-19). It still takes two taps.
+function QuestUI.ShowSkip(index: number): boolean
+	return index >= 2
+end
+
 -- What Skip says after the first press, in the device's word
 -- (HintLogic.Expand): "Tap again to skip", "Click again to skip", or
 -- "Press again to skip" on a gamepad.
@@ -313,8 +322,13 @@ local function refresh()
 		if objectiveLabel then
 			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress)
 		end
+		local showSkip = QuestUI.ShowSkip(index)
+		if skipRoot then
+			skipRoot.Visible = showSkip
+		end
 		if stepLabel then
 			stepLabel.Text = string.format("TUTORIAL · %d/%d", index, #TutorialData.Steps)
+			stepLabel.Size = UDim2.new(1, if showSkip then -skipWidth else 0, 0, 28)
 		end
 	end
 	-- A new step: Murph says his line. (Also on join, as a reminder.)
@@ -471,7 +485,9 @@ local function build()
 	})
 	skip.root.AnchorPoint = Vector2.new(1, 0)
 	skip.root.Position = UDim2.fromScale(1, 0)
+	skip.root.Visible = false -- until step 2 (refresh)
 	skip.root.Parent = header
+	skipRoot, skipWidth = skip.root, skipSize.X + 8
 	local armed = 0
 	local function onSkip()
 		if armed > 0 then
