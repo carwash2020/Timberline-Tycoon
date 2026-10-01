@@ -56,18 +56,59 @@ Anything red becomes a P0 and jumps the queue.
 | # | Do this | Good looks like |
 |---|---|---|
 | 1 | Press **Play** with **View > Output** open | Roblox's loader, then a brown **Timberline Tycoon** card with a rotating tip, then a fade into the spawn. No grey frames. Output: a white `[PlaceCheck] can't check ...` line, `[PlaceCheck] OK`, `[MapBuilder] World built in Xs (terrain Ys)`, `[GameServer] Online: world built in Xs (terrain Ys), 334 trees, 1 player`, `[Client] Timberline Tycoon client started.` No red lines. Note X |
-| 2 | Look around at the spawn | Mountains, snow and the volcano on the horizon (say if the horizon is empty: WLD-02). Build #1 still faces the parking lot; the town fixes come in Build #3 |
+| 2 | Look around at the spawn | You face the sawmill with SELL LOGS HERE between the two lamps (from Build #2). Mountains, snow and the volcano on the horizon (say if the horizon is empty: WLD-02) |
 | 3 | Tutorial step 1: fell the oak Murph points at | Murph says the woods are south of town and says **Click** (Tap on a phone, Press RT on a pad). The swing turns you to face the tree |
-| 4 | Steps 2-3: pick up logs, load the truck | The hint changes to "Take logs to your truck's tailgate" while you carry |
+| 4 | Steps 2-3: pick up logs, load the truck | Your arms come up under the logs (Build #2) and the hint changes to "Take logs to your truck's tailgate" |
 | 5 | Step 4: drive to the sawmill and sell | Sitting in the truck switches the hint to "WASD to drive · Space to hop out". The rear wheels follow the front in a tight turn (no tail slide). Under 4 min from spawn to sale. Say if a truck stops dead at a road edge (ACT-05) |
 | 6 | Step 5: plant | No Plant prompt on any stump before step 5 (the toast says "keep it for now"). At step 5 your first stump is still there (held up to 4 min) or the beacon points at a tree to fell. The sapling grows in 8 s with your name |
-| 7 | Walk the thickest part of the Starter Forest | Say if leaves hide your character (NAT-02 comes in Build #2) |
+| 7 | Walk the thickest part of the Starter Forest | You can always see your character; leaves in the way fade (Build #2) |
 | 8 | Ride the gondola up and down | Say if it steps or stutters (WLD-07) |
 | 9 | Stop, then Play again | Cash, axe, truck bed and settings are all kept |
 | 10 | **Test > Clients and Servers**, 2 players | Each sees the other's truck move smoothly; your logs stay yours for 45 s |
 | 11 | **File > Studio Settings > Network > Incoming Replication Lag** 0.2, drive 60 s | No rubber-banding, no put-back |
 | 12 | **Device Emulator**: iPhone SE, then iPhone 14 Pro (landscape) | Toasts stack under the tracker and never cover the cash, ♪ or tracker. During the tutorial: no Daily Goals button and no clock. Note anything that overlaps |
 | 13 | Phone emulation + **View > MicroProfiler**. Night: in the **Server** command bar run `workspace:SetAttribute("ClockOverride", 23)` (`nil` clears it). Town at night, the Starter Forest, the Snowfields, the isles | 30+ fps (frame under 33 ms). Note the top script costs |
+
+### Build #2 (Phase 2: chop, carry, drive feel right; first town fixes)
+
+- **ACT-01** Carrying logs raises your arms (R15: about halfway up with
+  the elbows bent; R6: straight out). One log rests in the forearms, a
+  second hangs just under it, and nothing covers your eyes or mouth.
+  Loading, selling, dropping, sitting or dying lowers the arms at once.
+  Load 1 of 2 logs into a bed with room for one: the log left in hand
+  moves up to the top spot. With 2 players, each sees the other's pose.
+  Check an R6 avatar too (Game Settings > Avatar).
+- **UI-04** A load chip left of the hint: "Hands 1/2 · Bed 0/6", amber
+  "Bed full" at capacity. (Build #2 still shows it from the first second
+  as "Hands 0/2 · Bed 0/6"; it hides until you carry something in the
+  next build.)
+- **UI-03** Open the Tool Shed with $0 and press Buy on Steel: the toast
+  sits inside the panel's bottom-left, the hint pill is hidden, and the
+  title and Buy buttons stay readable (iPhone SE and a 1366x768 window).
+- **WLD-03** (HUD part) Under the loading card the HUD's own card says
+  "Building the world...", then "Loading your save...". No "Infinite
+  yield possible" lines in Output.
+- **NAT-02** Walk the densest Starter Forest patch and stand under a Hills
+  pine with the default camera: leaves between the camera and you fade
+  to see-through and come back after you pass. Trunks never fade.
+- **NAT-03** Every stump's highest point is the pale cut ring; the root
+  flares stay low around its foot.
+- **NAT-06 fix** A felled tree fades out as the logs appear (no blink of
+  empty ground).
+- **TWN-03** (early, from Phase 3) The first frame after the loading card
+  looks north at the sawmill with SELL LOGS HERE between the two lamps,
+  the Dealership on the left and the Tool Shed on the right. Same after
+  a reset, on R6 and R15, and for 2 players.
+- **TWN-08** (early) No well in the street: it stands on the green between
+  the benches south of the street. No barrels on the gondola path. Drive
+  the whole main street and back onto the sell pad without bumping
+  anything.
+- Previews only (no game change): the town preview is rebuilt from the
+  real layout (TWN-02); a world-eye scene with eye-level and night views
+  (WLD-19); the shared flume and road-sign helpers build exactly what
+  they did before (check the four road signs still read THE HILLS /
+  SNOWFIELDS / THE VOLCANO / AETHER ISLES and the Cloud Chute flumes go
+  out and down from the isles).
 
 ### Build #1 (Phase 1: a first session that can't break)
 
