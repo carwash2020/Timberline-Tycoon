@@ -8,7 +8,8 @@
 --   * "Plant Heartseed (n)" on every stump you hold that wood's seed for
 --     (tag "Stump", attributes WoodId / TreeUid; F or Y), and a little
 --     glowing seed over the nearest plantable stumps so you can find them.
---   * Seeds popping out of a felled tree and flying to whoever felled it,
+--   * Seeds popping out of a felled tree in a burst of sparkles and flying
+--     to whoever felled it on a short trail, with a pop as they reach you,
 --     a sapling sprouting where someone planted, the sawmill's figure
 --     reveal (a big colour-coded stamp per figure, rarer ones stay longer).
 --   * Toasts: your planted tree harvested (the planter's share), lightning
@@ -433,10 +434,11 @@ type Orb = {
 	from: Vector3,
 	mid: Vector3,
 	target: Player?,
-	t: number,
+	t: number, -- seconds since it set off (under 0: waiting its turn)
 	duration: number,
 	last: boolean,
 	mine: boolean,
+	landed: boolean, -- reached you: popping
 }
 
 local orbPool: { Part } = {}
@@ -454,19 +456,32 @@ local function stepOrbs(dt: number)
 	for i = #orbs, 1, -1 do
 		local o = orbs[i]
 		o.t += dt
-		local u = math.clamp(o.t / o.duration, 0, 1)
 		local to = targetOf(o.target) or o.mid
-		local e = u * u * (3 - 2 * u) -- ease in and out
-		local a = o.from:Lerp(o.mid, e)
-		local b = o.mid:Lerp(to, e)
-		o.part.CFrame = CFrame.new(a:Lerp(b, e))
-		if u >= 1 then
-			o.part.Parent = nil
-			table.insert(orbPool, o.part)
-			table.remove(orbs, i)
+		if o.t < o.duration then
+			local u = math.clamp(o.t / o.duration, 0, 1)
+			local e = u * u * (3 - 2 * u) -- ease in and out
+			local a = o.from:Lerp(o.mid, e)
+			local b = o.mid:Lerp(to, e)
+			o.part.CFrame = CFrame.new(a:Lerp(b, e))
+			continue
+		end
+		-- Arrived: a quick pop on you (it swells and fades), then back to the pool.
+		if not o.landed then
+			o.landed = true
 			if o.mine and o.last then
 				SoundData.Play("SeedPop")
 			end
+		end
+		local u = (o.t - o.duration) / ForestArt.SeedPopSeconds
+		local scale, fade = ForestArt.SeedOrbPop(u)
+		o.part.CFrame = CFrame.new(to)
+		o.part.Size = Vector3.one * (ForestArt.SeedOrbSize * scale)
+		o.part.Transparency = fade
+		if u >= 1 then
+			ForestArt.RestSeedOrb(o.part)
+			o.part.Parent = nil
+			table.insert(orbPool, o.part)
+			table.remove(orbs, i)
 		end
 	end
 	local conn = orbConn
@@ -498,8 +513,17 @@ local function popSeeds(from: Vector3, target: Player?, count: number, mine: boo
 		local angle = math.random() * math.pi * 2
 		local spread = 2 + math.random() * 2
 		local start = from + Vector3.new(0, 1.5, 0)
-		part.CFrame = CFrame.new(start)
 		part.Parent = fx()
+		-- In the world first, then reset there: a pooled orb's trail starts
+		-- afresh, not from where its last flight ended.
+		ForestArt.LaunchSeedOrb(part, CFrame.new(start))
+		if i == 1 then
+			-- One burst of sparkles as the seeds pop out of the tree.
+			local sparkle = part:FindFirstChild("SeedSparkle")
+			if sparkle and sparkle:IsA("ParticleEmitter") then
+				sparkle:Emit(ForestArt.SeedSparkles)
+			end
+		end
 		table.insert(orbs, {
 			part = part,
 			from = start,
@@ -509,6 +533,7 @@ local function popSeeds(from: Vector3, target: Player?, count: number, mine: boo
 			duration = ORB_SECONDS,
 			last = i == n,
 			mine = mine,
+			landed = false,
 		})
 	end
 	if #orbs > 0 and not orbConn then

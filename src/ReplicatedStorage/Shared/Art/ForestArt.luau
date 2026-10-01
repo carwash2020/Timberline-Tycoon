@@ -19,7 +19,9 @@
 --   * Sprout(def, seed, stumpDiameter?): a Heartseed sprouting in a mound
 --     (ground at y = 0), sized to the stump it's on; PrimaryPart "Mound".
 --     SproutScale(u) is how big it's drawn as it grows (at most 1).
---   * SeedOrb(): the glowing Heartseed that pops out and flies to you.
+--   * SeedOrb(): the glowing Heartseed that pops out and flies to you,
+--     with a trail and a sparkle burst; LaunchSeedOrb / SeedOrbPop /
+--     RestSeedOrb are its flight's start, landing and rest in a pool.
 --   * FigureBand(logPart, figure): the coloured band round a figured log,
 --     welded to it like the log's caps (unanchored, massless).
 -- Everything here is decoration (Kit.decor): no collisions, no clicks.
@@ -554,12 +556,22 @@ function ForestArt.SproutScale(u: number): number
 	return 0.25 + 0.75 * (1 - (1 - x) ^ 2)
 end
 
--- The glowing seed that pops out of a felled tree and flies to you.
+-- The glowing seed that pops out of a felled tree and flies to you: a
+-- 0.9 neon ball with a light, a short ribbon of a trail ("SeedTrail",
+-- between two Attachments, off until it flies) and a sparkle emitter
+-- ("SeedSparkle", bursts only). ForestUI pools them: LaunchSeedOrb before
+-- each flight, SeedOrbPop as it lands, RestSeedOrb into the pool.
+ForestArt.SeedOrbSize = 0.9
+ForestArt.SeedSparkles = 12 -- particles in the burst as the seeds pop out
+-- A soft round puff (the built-in smoke), glowing: Roblox's default
+-- sparkle texture is a hard four-pointed star.
+ForestArt.SeedSparkleTexture = "rbxasset://textures/particles/smoke_main.dds"
+
 function ForestArt.SeedOrb(): Part
 	local orb = Instance.new("Part")
 	orb.Name = "HeartseedOrb"
 	orb.Shape = Enum.PartType.Ball
-	orb.Size = Vector3.new(0.7, 0.7, 0.7)
+	orb.Size = Vector3.one * ForestArt.SeedOrbSize
 	orb.Color = ForestArt.HeartseedColor
 	orb.Material = Enum.Material.Neon
 	orb.Anchored = true
@@ -572,7 +584,88 @@ function ForestArt.SeedOrb(): Part
 	light.Brightness = 1.6
 	light.Shadows = false
 	light.Parent = orb
+	-- The trail: a ribbon between a point over the centre and one under
+	-- it, turned to face the camera, lime gold fading to nothing.
+	local top = Instance.new("Attachment")
+	top.Name = "TrailTop"
+	top.CFrame = CFrame.new(0, 0.3, 0)
+	top.Parent = orb
+	local bottom = Instance.new("Attachment")
+	bottom.Name = "TrailBottom"
+	bottom.CFrame = CFrame.new(0, -0.3, 0)
+	bottom.Parent = orb
+	local trail = Instance.new("Trail")
+	trail.Name = "SeedTrail"
+	trail.Attachment0 = top
+	trail.Attachment1 = bottom
+	trail.Lifetime = 0.35
+	trail.Color = ColorSequence.new(ForestArt.HeartseedColor)
+	trail.Transparency = NumberSequence.new(0.1, 1)
+	trail.WidthScale = NumberSequence.new(1, 0.3)
+	trail.LightEmission = 1
+	trail.LightInfluence = 0
+	trail.FaceCamera = true
+	trail.Enabled = false -- LaunchSeedOrb turns it on once the orb is in place
+	trail.Parent = orb
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Name = "SeedSparkle"
+	sparkle.Texture = ForestArt.SeedSparkleTexture
+	sparkle.Color = ColorSequence.new(Color3.fromRGB(246, 255, 214), ForestArt.HeartseedColor)
+	sparkle.LightEmission = 1
+	sparkle.LightInfluence = 0
+	sparkle.Rate = 0 -- bursts only (Emit)
+	sparkle.Lifetime = NumberRange.new(0.35, 0.7)
+	sparkle.Speed = NumberRange.new(4, 8)
+	sparkle.Drag = 4
+	sparkle.SpreadAngle = Vector2.new(180, 180)
+	sparkle.Acceleration = Vector3.new(0, -3, 0)
+	sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	sparkle.Parent = orb
 	return orb
+end
+
+local function seedTrail(orb: BasePart): Trail?
+	local trail = orb:FindFirstChild("SeedTrail")
+	return if trail and trail:IsA("Trail") then trail else nil
+end
+
+-- Readies a SeedOrb, new or from a pool, to fly from `at`: full size,
+-- solid, there, and its trail starting afresh from there (a pooled orb's
+-- old trail never streaks over from where its last flight ended). Call it
+-- once the orb is in the world: a Trail only draws there.
+function ForestArt.LaunchSeedOrb(orb: BasePart, at: CFrame)
+	local trail = seedTrail(orb)
+	if trail then
+		trail.Enabled = false -- nothing drawn across the jump
+	end
+	orb.Size = Vector3.one * ForestArt.SeedOrbSize
+	orb.Transparency = 0
+	orb.CFrame = at
+	if trail then
+		trail:Clear()
+		trail.Enabled = true
+	end
+end
+
+-- Puts a SeedOrb back the way SeedOrb() made it, its trail off and wiped,
+-- to wait in a pool.
+function ForestArt.RestSeedOrb(orb: BasePart)
+	local trail = seedTrail(orb)
+	if trail then
+		trail.Enabled = false
+		trail:Clear()
+	end
+	orb.Size = Vector3.one * ForestArt.SeedOrbSize
+	orb.Transparency = 0
+end
+
+-- The pop as a seed reaches you, `u` (0-1) of the way through it: how
+-- big the orb is (times its size), swelling quickly to 1.8, and how
+-- see-through, fading out.
+ForestArt.SeedPopSeconds = 0.18
+function ForestArt.SeedOrbPop(u: number): (number, number)
+	local x = math.clamp(u, 0, 1)
+	return 1 + 0.8 * (1 - (1 - x) ^ 2), x
 end
 
 ---------------------------------------------------------------------------

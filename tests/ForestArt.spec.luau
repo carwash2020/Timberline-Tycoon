@@ -5,7 +5,26 @@
 -- every size (even an Elder's); without a diameter it keeps the old
 -- fixed-size look. And it grows from a seedling to full size, never past
 -- it (SproutScale, which ForestUI scales the sprout by).
+-- And the Heartseed orb (NAT-12): 0.9 across, a lime-gold trail fading to
+-- nothing (two Attachments, 0.35 s), a burst-only sparkle emitter with a
+-- soft texture, a quick pop as it lands, and a pooled orb's trail wiped
+-- before it flies again, so it never streaks across the map.
 return function(t)
+	local roblox = t.roblox
+	local Vector3, CFrame = roblox.Vector3, roblox.CFrame
+
+	-- @lune/roblox has no Trail:Clear; this one notes what the orb was
+	-- like when its trail was wiped.
+	local clears = {}
+	roblox.implementMethod("Trail", "Clear", function(trail)
+		local orb = trail.Parent
+		table.insert(clears, {
+			trail = trail,
+			enabled = trail.Enabled,
+			at = if orb then orb.CFrame.Position else nil,
+		})
+	end)
+
 	local ForestArt = t.load("ReplicatedStorage/Shared/Art/ForestArt")
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
 	local WoodData = t.shared("WoodData")
@@ -107,5 +126,89 @@ return function(t)
 			prev = scale
 		end
 		t.ok(ForestArt.SproutScale(0.5) > 0.7, "eases out: most of the growth comes early")
+	end)
+
+	local function near3(a, b)
+		return (a - b).Magnitude < 1e-4
+	end
+
+	t.test("the Heartseed orb: 0.9 across, a light, a trail and a sparkle emitter, all looks", function()
+		local orb = ForestArt.SeedOrb()
+		t.eq(orb.Name, "HeartseedOrb")
+		t.ok(near3(orb.Size, Vector3.new(0.9, 0.9, 0.9)), "0.9, up from 0.7")
+		t.eq(orb.Shape, roblox.Enum.PartType.Ball)
+		t.eq(orb.Material, roblox.Enum.Material.Neon)
+		t.eq(orb.Color, ForestArt.HeartseedColor)
+		t.eq({ orb.Anchored, orb.CanCollide, orb.CanQuery, orb.CanTouch }, { true, false, false, false })
+		t.ok(orb:FindFirstChildOfClass("PointLight") ~= nil, "it glows")
+		local trail = orb:FindFirstChild("SeedTrail")
+		t.ok(trail and trail:IsA("Trail"), "a Trail")
+		local a0, a1 = trail.Attachment0, trail.Attachment1
+		t.ok(a0 and a1 and a0 ~= a1, "between two Attachments")
+		t.ok(a0:IsA("Attachment") and a0.Parent == orb and a1.Parent == orb, "both on the orb")
+		t.ok(near3(a0.CFrame.Position - a1.CFrame.Position, Vector3.new(0, 0.6, 0)), "a ribbon 0.6 wide")
+		t.ok(math.abs(trail.Lifetime - 0.35) < 1e-4, "0.35 s long")
+		local color = trail.Color.Keypoints
+		t.eq(color[1].Value, ForestArt.HeartseedColor)
+		t.eq(color[#color].Value, ForestArt.HeartseedColor)
+		local fade = trail.Transparency.Keypoints
+		t.ok(fade[1].Value < 0.5, "bright at the orb")
+		t.eq(fade[#fade].Value, 1, "fading to nothing")
+		t.eq(trail.LightEmission, 1)
+		t.eq(trail.FaceCamera, true)
+		t.eq(trail.Enabled, false, "off until it flies (LaunchSeedOrb)")
+		local sparkle = orb:FindFirstChild("SeedSparkle")
+		t.ok(sparkle and sparkle:IsA("ParticleEmitter"), "a sparkle emitter")
+		t.eq(sparkle.Rate, 0, "bursts only")
+		t.eq(ForestArt.SeedSparkles, 12)
+		t.eq(sparkle.Texture, ForestArt.SeedSparkleTexture)
+		t.ok(
+			sparkle.Texture ~= "" and sparkle.Texture ~= "rbxasset://textures/particles/sparkles_main.dds",
+			"a soft texture, not the default star"
+		)
+		t.eq(sparkle.LightEmission, 1)
+	end)
+
+	t.test("a pooled orb flies again with its trail wiped first, never across the map", function()
+		local orb = ForestArt.SeedOrb()
+		-- Its last flight ended far away, mid-pop, its trail still on.
+		ForestArt.LaunchSeedOrb(orb, CFrame.new(500, 20, -300))
+		orb.Size = Vector3.new(1.6, 1.6, 1.6)
+		orb.Transparency = 0.7
+		local trail = orb:FindFirstChild("SeedTrail")
+		t.eq(trail.Enabled, true, "on in flight")
+		-- Back to the pool.
+		table.clear(clears)
+		ForestArt.RestSeedOrb(orb)
+		t.eq(trail.Enabled, false, "off in the pool")
+		t.eq(#clears, 1, "and wiped")
+		t.ok(near3(orb.Size, Vector3.new(0.9, 0.9, 0.9)) and orb.Transparency == 0, "back to how it was made")
+		-- It flies again from somewhere else.
+		table.clear(clears)
+		trail.Enabled = true -- (even if something left it on)
+		ForestArt.LaunchSeedOrb(orb, CFrame.new(10, 3, 12))
+		t.eq(#clears, 1, "the old trail is wiped")
+		t.eq(clears[1].enabled, false, "with the trail off while it moved")
+		t.ok(near3(clears[1].at, Vector3.new(10, 3, 12)), "once it's at its new start")
+		t.eq(trail.Enabled, true, "then on again, from there")
+		t.ok(near3(orb.CFrame.Position, Vector3.new(10, 3, 12)))
+		t.ok(near3(orb.Size, Vector3.new(0.9, 0.9, 0.9)) and orb.Transparency == 0, "full size and solid")
+	end)
+
+	t.test("as it lands it pops: a quick swell, fading out", function()
+		local s0, f0 = ForestArt.SeedOrbPop(0)
+		t.eq({ s0, f0 }, { 1, 0 }, "it starts as it flew")
+		local s1, f1 = ForestArt.SeedOrbPop(1)
+		t.ok(s1 > 1.5, "swells: " .. s1)
+		t.eq(f1, 1, "and is gone")
+		local _, fLate = ForestArt.SeedOrbPop(1.4)
+		t.eq(fLate, 1, "a late frame stays gone")
+		local prevS, prevF = 0, -1
+		for i = 0, 20 do
+			local s, f = ForestArt.SeedOrbPop(i / 20)
+			t.ok(s >= prevS and f >= prevF, "only swells and fades")
+			prevS, prevF = s, f
+		end
+		t.ok(ForestArt.SeedPopSeconds > 0 and ForestArt.SeedPopSeconds <= 0.25, "quick")
 	end)
 end
