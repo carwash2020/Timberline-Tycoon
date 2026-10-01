@@ -11,10 +11,12 @@
 --     with a puff of dust in its biome's colour, leaves shaken out of its
 --     canopy (pooled wedges in its palette that flutter down), a creak and
 --     a crash, and a small camera shake for anyone close. Once down it
---     fades out (LocalTransparencyModifier) into the logs the server lays,
---     and the server hides it.
+--     fades out (LocalTransparencyModifier, TreeLogic.FellFade: from
+--     FallTime + 0.1 to + 0.4) into the logs the server lays, and the
+--     server hides it.
 --   * Regrow (Felled = false): the fade is undone and the tree springs
---     back up from sapling size.
+--     back up from sapling size. A standing tree that streams in is made
+--     solid too, whatever this client last did to it.
 -- The server never moves a tree, so everything here starts and ends on the
 -- HomePivot attribute.
 
@@ -60,7 +62,8 @@ type State = {
 local states: { [Model]: State } = {}
 
 -- Trees this client faded out after a fall, to bring back when they regrow
--- or stream in again (weak keys: a destroyed tree just drops out).
+-- (weak keys: a destroyed tree just drops out, so attach doesn't rely on
+-- this to make a tree that streams back in solid).
 local faded: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 
 -- A chip (or leaf) in flight or lying on the ground.
@@ -538,8 +541,11 @@ local function attach(tree: Model)
 		busy = false,
 	}
 	states[tree] = state
-	if faded[tree] then
-		unfade(tree) -- faded out before it streamed away (it may have regrown since)
+	if tree:GetAttribute("Felled") ~= true then
+		-- Standing (so not mid-fall either): solid, always. It may have
+		-- faded out before it streamed away and regrown since, and the weak
+		-- `faded` set can have forgotten it by then.
+		unfade(tree)
 	end
 	table.insert(
 		state.conns,

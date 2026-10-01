@@ -4,8 +4,9 @@
 -- sideways 4-8), lands around the trunk's foot, never goes below the
 -- ground, rests about a second and fades over 0.4 s (about 1.6 s in all);
 -- leaves burst up and drift down slower; pieces lie flat on a slope. A
--- felled tree fades out over 0.3 s once it's down (FallTime * 0.95), done
--- before the server hides it and lays its logs (FallTime + 0.35).
+-- felled tree fades out over 0.3 s once it's down (from FallTime + 0.1),
+-- gone at FallTime + 0.4: about when its logs, laid by the server at
+-- FallTime + 0.35, reach a client.
 return function(t)
 	local roblox = t.roblox
 	local Vector3 = roblox.Vector3
@@ -134,17 +135,23 @@ return function(t)
 		end
 	end)
 
-	t.test("a felled tree fades out once it's down, before its logs appear", function()
+	t.test("a felled tree fades out once it's down, as its logs appear", function()
 		local fall = TreeLogic.FallTime
-		t.eq(TreeLogic.FellFadeStart, fall * 0.95)
+		t.eq(TreeLogic.FellFadeStart, fall + 0.1)
 		t.eq(TreeLogic.FellFadeTime, 0.3)
 		t.eq(TreeLogic.FellFade(0), 0)
 		t.eq(TreeLogic.FellFade(fall * 0.9), 0) -- still falling: solid
-		t.eq(TreeLogic.FellFade(fall * 0.95), 0)
-		t.ok(math.abs(TreeLogic.FellFade(fall * 0.95 + 0.15) - 0.5) < 1e-9, "half gone halfway")
-		t.eq(TreeLogic.FellFade(fall * 0.95 + 0.3), 1)
-		-- TreeService hides the tree and lays its logs at FallTime + 0.35.
-		t.eq(TreeLogic.FellFade(fall + 0.35), 1)
+		t.eq(TreeLogic.FellFade(fall), 0) -- landed: still solid
+		t.eq(TreeLogic.FellFade(fall + 0.1), 0)
+		t.ok(math.abs(TreeLogic.FellFade(fall + 0.25) - 0.5) < 1e-9, "half gone halfway")
+		-- TreeService lays the logs at FallTime + 0.35; they reach a client
+		-- a little later, by when the tree is nearly gone ...
+		t.ok(TreeLogic.FellFade(fall + 0.35) > 0.8, "nearly gone when the logs are laid")
+		t.ok(TreeLogic.FellFade(fall + 0.35) < 1, "but not before")
+		-- ... and it's gone at FallTime + 0.4.
+		t.ok(math.abs(TreeLogic.FellFadeStart + TreeLogic.FellFadeTime - (fall + 0.4)) < 1e-9)
+		t.eq(TreeLogic.FellFade(fall + 0.4 + 1e-9), 1)
+		t.eq(TreeLogic.FellFade(fall + 2), 1)
 		local last = 0
 		for i = 0, 200 do
 			local a = TreeLogic.FellFade(i / 100)

@@ -116,8 +116,10 @@ end
 
 -- Once it's down, a felled tree fades out on every client (TreeFX sets its
 -- parts' LocalTransparencyModifier to this, t seconds into the fall), into
--- the logs the server lays when it hides the tree (FallTime + 0.35).
-TreeLogic.FellFadeStart = TreeLogic.FallTime * 0.95
+-- the logs the server lays when it hides the tree (FallTime + 0.35, and
+-- they reach a client a little later): it starts 0.1 s after the landing
+-- and is gone at FallTime + 0.4, about when the logs show up.
+TreeLogic.FellFadeStart = TreeLogic.FallTime + 0.1
 TreeLogic.FellFadeTime = 0.3
 
 function TreeLogic.FellFade(t: number): number

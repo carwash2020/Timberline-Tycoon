@@ -8,8 +8,10 @@
 --   * a landing tree throws smoke-textured dust in its biome's colour and
 --     about ten leaf wedges in its palette that flutter down and fade;
 --   * once down, the felled tree fades out (LocalTransparencyModifier 0 to
---     1), and regrowing undoes it, also for a tree that streamed out while
---     faded and came back.
+--     1, from FallTime + 0.1 to FallTime + 0.4, as its logs appear), and
+--     regrowing undoes it, also for a tree that streamed out while faded
+--     and came back; a standing tree that streams in is always made solid
+--     (the weak `faded` set may have forgotten it), a felled one is left.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
@@ -444,11 +446,20 @@ return function(t)
 		end
 		w.TreeFX.Start()
 		fell(w, tree)
-		w.run(w.TreeLogic.FallTime * 0.9)
+		local fall = w.TreeLogic.FallTime
+		w.run(fall * 0.9)
 		for _, p in ipairs(visible) do
 			t.eq(ltm(p), 0) -- still falling: solid
 		end
-		w.run(0.5)
+		w.run(fall * 0.1 + 0.05)
+		for _, p in ipairs(visible) do
+			t.eq(ltm(p), 0) -- landed a moment ago: still solid
+		end
+		w.run(0.2) -- FallTime + 0.25: halfway
+		for _, p in ipairs(visible) do
+			t.ok(ltm(p) > 0.3 and ltm(p) < 0.7, "fading: " .. ltm(p))
+		end
+		w.run(0.17) -- FallTime + 0.42: gone, as the logs reach this client
 		for _, p in ipairs(visible) do
 			t.eq(ltm(p), 1)
 		end
@@ -473,6 +484,60 @@ return function(t)
 			for _, p in ipairs(parts(tree)) do
 				t.eq(ltm(p), 0)
 			end
+		end
+	end)
+
+	t.test("a standing tree that streams in is solid, even one this client forgot it faded", function()
+		local w = world()
+		local tree = w.tree("oak")
+		w.TreeFX.Start()
+		-- See-through from before it streamed away, and not in `faded` any
+		-- more (a weak key: the record can be gone).
+		for _, p in ipairs(parts(tree)) do
+			p.LocalTransparencyModifier = 1
+		end
+		for _, fn in ipairs(w.removed.Tree) do
+			fn(tree)
+		end
+		for _, fn in ipairs(w.added.Tree) do
+			fn(tree)
+		end
+		for _, p in ipairs(parts(tree)) do
+			t.eq(ltm(p), 0)
+		end
+		-- The same for one that's there when TreeFX starts.
+		local w2 = world()
+		local tree2 = w2.tree("pine")
+		for _, p in ipairs(parts(tree2)) do
+			p.LocalTransparencyModifier = 0.7
+		end
+		w2.TreeFX.Start()
+		for _, p in ipairs(parts(tree2)) do
+			t.eq(ltm(p), 0)
+		end
+	end)
+
+	t.test("a felled tree that streams in is left as it is until it regrows", function()
+		local w = world()
+		local tree = w.tree("birch")
+		w.TreeFX.Start()
+		fell(w, tree)
+		w.run(2)
+		for _, fn in ipairs(w.removed.Tree) do
+			fn(tree)
+		end
+		for _, fn in ipairs(w.added.Tree) do
+			fn(tree) -- still felled (the server hides it)
+		end
+		for _, p in ipairs(parts(tree)) do
+			if p.Transparency < 1 then
+				t.eq(ltm(p), 1)
+			end
+		end
+		w.set(tree, "HP", 10)
+		w.set(tree, "Felled", false)
+		for _, p in ipairs(parts(tree)) do
+			t.eq(ltm(p), 0)
 		end
 	end)
 
