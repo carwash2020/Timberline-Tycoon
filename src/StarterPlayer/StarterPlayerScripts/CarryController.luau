@@ -7,8 +7,11 @@
 --   * "Sell logs" at the sawmill, while you stand on the sell pad with logs.
 -- Prompts work with keyboard (E), touch (tap) and gamepad out of the box,
 -- and Roblox only shows the nearest prompt per button, so Pick up / Load /
--- Drive / Sell never fight over the same key. The server re-validates
--- range, capacity and the sell zone on every request.
+-- Drive / Sell never fight over the same key. On the sell pad Sell wins:
+-- hopping out of your truck there leaves its seat nearer than the sell
+-- point, so your Drive prompt is hidden (on this device) while Sell is up.
+-- The server re-validates range, capacity and the sell zone on every
+-- request.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -26,6 +29,8 @@ local player = Players.LocalPlayer
 local myTruck: Model? = nil
 local loadPrompt: ProximityPrompt? = nil
 local truckConn: RBXScriptConnection? = nil
+local hiddenDrive: ProximityPrompt? = nil -- your truck's Drive prompt, while Sell is up
+local hiddenConn: RBXScriptConnection? = nil
 
 local function carried(): number
 	return (player:GetAttribute("CarriedLogs") :: number?) or 0
@@ -116,6 +121,42 @@ local function bindTruck(truck: Model)
 	end)
 end
 
+-- Your truck's Drive prompt (it shares E with Sell).
+local function drivePrompt(): ProximityPrompt?
+	local truck = myTruck
+	local seat = if truck then truck:FindFirstChild("DriverSeat") else nil
+	local prompt = if seat then seat:FindFirstChild("DrivePrompt") else nil
+	return if prompt and prompt:IsA("ProximityPrompt") then prompt else nil
+end
+
+-- Hides your Drive prompt while `hide`, and keeps it hidden when the
+-- server turns it back on (it does when you get out). Shown again, it
+-- follows the server's rule: on whenever the seat is empty.
+local function hideDrive(hide: boolean)
+	local current = if hide then drivePrompt() else nil
+	if current == hiddenDrive then
+		return
+	end
+	if hiddenConn then
+		hiddenConn:Disconnect()
+		hiddenConn = nil
+	end
+	local old = hiddenDrive
+	if old then
+		local seat = old.Parent
+		old.Enabled = seat ~= nil and seat:IsA("VehicleSeat") and seat.Occupant == nil
+	end
+	hiddenDrive = current
+	if current then
+		current.Enabled = false
+		hiddenConn = current:GetPropertyChangedSignal("Enabled"):Connect(function()
+			if current.Enabled then
+				current.Enabled = false
+			end
+		end)
+	end
+end
+
 local function setupSellPrompt()
 	local map = workspace:WaitForChild("TimberlineMap")
 	local area = map:WaitForChild("SellArea") -- a Persistent model: always streamed in
@@ -150,6 +191,7 @@ local function setupSellPrompt()
 		local n = carried() + (if truckHere then bedCount() else 0) + skyBin
 		prompt.Enabled = inZone and n > 0
 		prompt.ActionText = if n == 1 then "Sell 1 log" else string.format("Sell %d logs", n)
+		hideDrive(prompt.Enabled)
 	end)
 end
 
