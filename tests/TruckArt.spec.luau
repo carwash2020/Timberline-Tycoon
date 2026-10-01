@@ -293,6 +293,162 @@ return function(t)
 		end
 	end)
 
+	-- A seated driver, the way Roblox seats an avatar: the hips (an R15's
+	-- hip joints) on the seat's top at its middle, facing the front. Head
+	-- and hat stack up from there (an R15's head top sits about 3.2 over the
+	-- seat, CharacterArt's 3.25; then a 0.6 hat), the face and nose reach
+	-- 0.75 ahead of the hips. The legs are R6's (the worst case): straight
+	-- out in front, 2 long, 1 thick about the seat's top, 2 wide.
+	local HEADROOM = 4.0
+	local function driver(seat)
+		local s = seat.CFrame
+		local top = s.Y + seat.Size.Y / 2
+		local function zone(halfX, y0, y1, z0, z1)
+			return {
+				lo = Vector3.new(s.X - halfX, top + y0, s.Z + z0),
+				hi = Vector3.new(s.X + halfX, top + y1, s.Z + z1),
+			}
+		end
+		return {
+			top = top,
+			head = zone(0.7, 2.0, 3.25, -0.75, 0.6),
+			hat = zone(0.72, 3.25, 3.85, -0.65, 0.65),
+			legs = zone(1.0, -0.5, 0.5, -2.0, 0),
+		}
+	end
+
+	-- `point` inside `part`'s (oriented) box, give or take `eps`.
+	local function inside(point, part, eps)
+		local p = part.CFrame:Inverse() * point
+		local h = part.Size / 2 + Vector3.new(eps, eps, eps)
+		return math.abs(p.X) <= h.X and math.abs(p.Y) <= h.Y and math.abs(p.Z) <= h.Z
+	end
+
+	local function corners(zone)
+		local out = {}
+		for _, x in ipairs({ zone.lo.X, zone.hi.X }) do
+			for _, y in ipairs({ zone.lo.Y, zone.hi.Y }) do
+				for _, z in ipairs({ zone.lo.Z, zone.hi.Z }) do
+					table.insert(out, Vector3.new(x, y, z))
+				end
+			end
+		end
+		return out
+	end
+
+	local function opaque(p, seat)
+		return p ~= seat and p.Transparency < 1 and p.Material.Name ~= "Glass"
+	end
+
+	-- Seat tops before the cabs were raised (ACT-04): the headroom comes
+	-- from the roofs, not from sinking the seats.
+	local SEAT_TOP = { Rustbucket = 2.35, Pickup = 2.025, ScoutATV = 2.75, Flatbed = 2.2, LoggingRig = 3.0 }
+	local ROOFED = { pickup = true, flatbed = true, rig = true }
+
+	t.test("seats stay put; a roofed cab has 4 studs over the seat", function()
+		for id, def in pairs(ItemCatalog.Trucks) do
+			local model, layout = build({ def = def })
+			local seat = model:FindFirstChild("DriverSeat")
+			local d = driver(seat)
+			if SEAT_TOP[id] then
+				t.ok(math.abs(d.top - SEAT_TOP[id]) < 1e-3, string.format("%s seat top %.3f moved", id, d.top))
+			end
+			local roofs = 0
+			for _, p in ipairs(named(model, "Roof")) do
+				local lo, hi = box(p)
+				local s = seat.CFrame
+				if lo.X < s.X and s.X < hi.X and lo.Z < s.Z and s.Z < hi.Z then
+					roofs += 1
+					local headroom = lo.Y - d.top
+					t.ok(
+						headroom >= HEADROOM - 1e-3,
+						string.format("%s headroom %.3f under %.1f", id, headroom, HEADROOM)
+					)
+					-- The roof covers the driver's head and hat.
+					for _, zone in ipairs({ d.head, d.hat }) do
+						t.ok(lo.X <= zone.lo.X and zone.hi.X <= hi.X, id .. " roof covers the head and hat across")
+						t.ok(
+							lo.Z <= zone.lo.Z and zone.hi.Z <= hi.Z,
+							id .. " roof covers the head and hat front to back"
+						)
+					end
+				end
+			end
+			t.eq(roofs > 0, ROOFED[layout.style] == true, id .. " roof over the seat")
+		end
+	end)
+
+	t.test("a seated driver's head and hat fit: nothing solid there, behind the windshield", function()
+		for id, def in pairs(ItemCatalog.Trucks) do
+			local model = build({ def = def })
+			local seat = model:FindFirstChild("DriverSeat")
+			local d = driver(seat)
+			for _, p in ipairs(parts(model)) do
+				if opaque(p, seat) then
+					local a, b = box(p)
+					for name, zone in pairs({ head = d.head, hat = d.hat }) do
+						t.ok(
+							not overlaps(a, b, zone.lo, zone.hi),
+							string.format("%s: %s goes through the driver's %s", id, p.Name, name)
+						)
+					end
+				end
+			end
+			-- Every point of the face and hat is behind each windshield pane
+			-- (its +Z side faces the cab) wherever the pane is beside it.
+			for _, pane in ipairs(named(model, "Windshield")) do
+				for _, zone in ipairs({ d.head, d.hat }) do
+					for _, c in ipairs(corners(zone)) do
+						local p = pane.CFrame:Inverse() * c
+						local h = pane.Size / 2
+						if math.abs(p.X) <= h.X and math.abs(p.Y) <= h.Y then
+							t.ok(
+								p.Z > h.Z,
+								string.format("%s: the driver's face or hat pokes through the windshield", id)
+							)
+						end
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("a seated driver's legs end inside the hood; the Scout's clear its racks and bars", function()
+		local CLEAR = { Rack = true, Nose = true, Handlebar = true, Grip = true, Guard = true, SupplyBox = true }
+		for id, def in pairs(ItemCatalog.Trucks) do
+			local model, layout = build({ def = def })
+			local seat = model:FindFirstChild("DriverSeat")
+			local legs = driver(seat).legs
+			if layout.style == "atv" then
+				-- Open: the feet stick out ahead, over the nose, under the bars.
+				for _, p in ipairs(parts(model)) do
+					if CLEAR[p.Name] then
+						local a, b = box(p)
+						t.ok(
+							not overlaps(a, b, legs.lo, legs.hi, 0.05),
+							id .. ": the rider's legs go through the " .. p.Name
+						)
+					end
+				end
+			else
+				-- Every corner of the feet is inside the bodywork (hood, nose,
+				-- frame), so no foot shows through it.
+				for _, c in ipairs(corners(legs)) do
+					if c.Z < seat.CFrame.Z - 1 then
+						local hidden = false
+						for _, p in ipairs(parts(model)) do
+							if opaque(p, seat) and p.Name ~= "Wheel" and inside(c, p, 0.02) then
+								hidden = true
+								break
+							end
+						end
+						t.ok(hidden, string.format("%s: a foot pokes out at (%.2f, %.2f, %.2f)", id, c.X, c.Y, c.Z))
+					end
+				end
+			end
+		end
+	end)
+
 	t.test("Rig makes one rigid body: chassis anchored, wheels on Motor6Ds", function()
 		for _, rig in ipairs(rigs()) do
 			local model = build(rig)

@@ -1,6 +1,10 @@
 --!nocheck
 -- Every truck in a row, each towing a trailer (the Scout ATV can't tow),
 -- beds partly loaded, plus a lone Rustbucket up front for close-ups.
+-- A driver sits in every truck: a CharacterArt figure seated the way
+-- Roblox seats an R15 (hips on the seat's top, at its middle), its legs
+-- straight out in front (R6's worst case) and a 0.6-stud hat on, to check
+-- heads and hats clear the roofs and legs stay inside the hoods.
 local Common = require("./_common")
 
 return {
@@ -10,6 +14,7 @@ return {
 		local Enum = roblox.Enum
 		local Kit = ctx.art("Kit")
 		local TruckArt = ctx.art("TruckArt")
+		local CharacterArt = ctx.art("CharacterArt")
 		local ItemCatalog = ctx.shared("ItemCatalog")
 		local TruckLayout = ctx.shared("TruckLayout")
 		local WoodData = ctx.shared("WoodData")
@@ -39,6 +44,52 @@ return {
 			end
 		end
 
+		-- The driver: Motor6D Transforms applied the way Roblox does (Part1 =
+		-- Part0 * C0 * Transform * C1:Inverse(), then the welded details
+		-- follow), hips turned a quarter so the legs point forward.
+		local HAT = 0.6
+		local function seatDriver(truck, shirt)
+			local seat = truck:FindFirstChild("DriverSeat")
+			if not seat then
+				return
+			end
+			local fig = CharacterArt.Build({
+				name = "Driver",
+				skin = C3.fromHex("#E8B994"),
+				shirt = shirt,
+				pants = C3.fromHex("#3D4F6E"),
+				hairStyle = "bald",
+				hat = "none",
+				tag = false,
+			})
+			local hip = fig.Torso:FindFirstChild("LeftHip")
+			local hipY = (hip.Part0.CFrame * hip.C0).Y
+			for _, name in ipairs({ "LeftHip", "RightHip" }) do
+				local motor = fig.Torso:FindFirstChild(name)
+				motor.Part1.CFrame = motor.Part0.CFrame * motor.C0 * CF.Angles(math.pi / 2, 0, 0) * motor.C1:Inverse()
+			end
+			for _, d in ipairs(fig:GetDescendants()) do
+				local w = d:IsA("BasePart") and d:FindFirstChild("Weld")
+				if w then
+					d.CFrame = w.Part0.CFrame * w.C0
+				end
+			end
+			local head = fig.Head
+			Kit.part(
+				fig,
+				"Hat",
+				V3.new(1.44, HAT, 1.3),
+				head.CFrame * CF.new(0, head.Size.Y / 2 + HAT / 2, 0),
+				C3.fromHex("#7A3FA0"),
+				Enum.Material.Fabric
+			)
+			-- The hip joints on the seat's top, over its middle.
+			local rootY = fig:GetPivot().Y
+			fig:PivotTo(seat.CFrame * CF.new(0, seat.Size.Y / 2 + rootY - hipY, 0))
+			fig.Parent = root
+		end
+		local shirts = { "#C8553D", "#E9C46A", "#2A9D8F", "#F4F1DE", "#264653" }
+
 		local rigs = {
 			{ "Rustbucket", "PonyTrailer", 5, 4 },
 			{ "Pickup", "RanchTrailer", 9, 7 },
@@ -55,6 +106,7 @@ return {
 			local model = TruckArt.Build(def, layout, trailer, tl)
 			Kit.placeAt(model, CF.new((i - 1) * spacing, 0, 0))
 			model.Parent = root
+			seatDriver(model, C3.fromHex(shirts[i]))
 			load(model, layout, "BedFloor", layout.logSlots, entry[3], i)
 			if tl then
 				load(model, layout, "TrailerBed", tl.logSlots, entry[4], i + 3)
@@ -67,6 +119,7 @@ return {
 		local lone = TruckArt.Build(rust, rustLayout)
 		Kit.placeAt(lone, CF.new(-16, 0, -22) * CF.Angles(0, math.rad(35), 0))
 		lone.Parent = root
+		seatDriver(lone, C3.fromHex("#4C7A3E"))
 		load(lone, rustLayout, "BedFloor", rustLayout.logSlots, 6, 2)
 
 		local function at(i)
