@@ -404,4 +404,60 @@ return function(t)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees() + #WorldPlan.Sky().lumenwood)
 	end)
+
+	t.test(
+		"the backdrop: one Persistent model of decor parts, as WorldPlan.Backdrop() lays them out (WLD-02)",
+		function()
+			local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+			local s = build()
+			t.eq(s.warnings, {})
+			lastStepsRan(s)
+			local backdrop = s.map:FindFirstChild("Backdrop")
+			t.ok(backdrop and backdrop:IsA("Model"), "a Backdrop model in the map")
+			t.eq(backdrop.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Persistent)
+			local pieces = WorldPlan.Backdrop()
+			local parts = backdrop:GetChildren()
+			t.eq(#parts, #pieces)
+			for i, piece in ipairs(pieces) do
+				local part = parts[i]
+				local class = if piece.kind == "Wedge" then "WedgePart" else "Part"
+				t.eq(part.ClassName, class)
+				if piece.kind == "Cylinder" then
+					t.eq(part.Shape, roblox.Enum.PartType.Cylinder)
+				elseif class == "Part" then
+					t.eq(part.Shape, roblox.Enum.PartType.Block)
+				end
+				t.eq(part.Name, piece.name)
+				t.ok((part.CFrame.Position - piece.cframe.Position).Magnitude < 1e-4, piece.name .. " placed")
+				t.ok(part.CFrame.LookVector:Dot(piece.cframe.LookVector) > 0.99999, piece.name .. " turned")
+				t.ok(part.CFrame.UpVector:Dot(piece.cframe.UpVector) > 0.99999, piece.name .. " turned")
+				t.ok((part.Size - piece.size).Magnitude < 1e-4, piece.name .. " sized")
+				t.eq(part.Color, piece.color)
+				t.eq(part.Material, piece.material)
+				t.ok(math.abs(part.Transparency - piece.transparency) < 1e-6, piece.name .. " transparency")
+				-- Looks only: never collides, clicked, touched or shadowed.
+				t.eq(part.Anchored, true)
+				t.eq(part.CanCollide, false)
+				t.eq(part.CanQuery, false)
+				t.eq(part.CanTouch, false)
+				t.eq(part.CastShadow, false)
+			end
+		end
+	)
+
+	t.test("an erroring backdrop fails its step alone: the rest of the world, SellArea, spawning", function()
+		local s = build({
+			worldPlan = {
+				Backdrop = function()
+					error("x")
+				end,
+			},
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 7. The backdrop failed", 1, true), s.warnings[1])
+		lastStepsRan(s)
+		t.ok(s.map:FindFirstChild("Backdrop") == nil, "no half-built backdrop")
+		t.ok(s.map:FindFirstChild("WorldEdge"), "the walls still built")
+		t.ok(s.clockStarted, "the clock still started")
+	end)
 end

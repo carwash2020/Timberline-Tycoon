@@ -10,7 +10,7 @@
 
 return function(t)
 	local roblox = t.roblox
-	local Vector3, CFrame = roblox.Vector3, roblox.CFrame
+	local Vector2, Vector3, CFrame = roblox.Vector2, roblox.Vector3, roblox.CFrame
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
 	local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
@@ -1084,4 +1084,444 @@ return function(t)
 		end
 		t.ok(hit, "a pine 30 studs out would reach the cabin")
 	end)
+
+	---------------------------------------------------------------------------
+	-- The backdrop beyond the world's edge (WLD-02, WLD-09)
+	---------------------------------------------------------------------------
+
+	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+	local HALF = WorldLayout.WorldHalf
+	local backdrop = WorldPlan.Backdrop()
+	-- How far under the terrain's surface anything of the backdrop inside the
+	-- walls keeps (its smooth voxels round the surface a little).
+	local UNDER = 2
+
+	local function pieceCorners(p)
+		local out = {}
+		for _, c in ipairs(corners(p.size)) do
+			table.insert(out, p.cframe * c)
+		end
+		return out
+	end
+
+	-- The rule: a piece is wholly beyond a wall when all eight corners of its
+	-- box are on the far side of one wall's plane (a box lies within a half
+	-- space exactly when its corners do, and the shape within its box).
+	local function beyondAWall(p)
+		local c = pieceCorners(p)
+		for _, side in ipairs({ { "X", -1 }, { "X", 1 }, { "Z", -1 }, { "Z", 1 } }) do
+			local axis, sign = side[1], side[2]
+			local all = true
+			for _, v in ipairs(c) do
+				if v[axis] * sign < HALF - 1e-3 then
+					all = false
+					break
+				end
+			end
+			if all then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- Points through a piece's solid at most `step` apart along each of its
+	-- axes (faces, edges and corners included), kept to its shape: under a
+	-- wedge's slope (and on it), inside a cylinder's round (and its rim).
+	local function solidPoints(p, step)
+		local s = p.size
+		local nx, ny, nz =
+			math.max(1, math.ceil(s.X / step)), math.max(1, math.ceil(s.Y / step)), math.max(1, math.ceil(s.Z / step))
+		local out = {}
+		local function add(x, y, z)
+			table.insert(out, p.cframe * Vector3.new(x, y, z))
+		end
+		for i = 0, nx do
+			for j = 0, ny do
+				for k = 0, nz do
+					local x, y, z = -s.X / 2 + s.X * i / nx, -s.Y / 2 + s.Y * j / ny, -s.Z / 2 + s.Z * k / nz
+					if p.kind == "Wedge" then
+						-- Kit.wedge: the slope runs from the top of the back (+Z)
+						-- down to the bottom of the front.
+						local slope = -s.Y / 2 + s.Y * (z + s.Z / 2) / s.Z
+						if y <= slope + 1e-6 then
+							add(x, y, z)
+						end
+						if j == ny then
+							add(x, slope, z)
+						end
+					elseif p.kind == "Cylinder" then
+						if y * y + z * z <= (s.Y / 2) ^ 2 + 1e-6 then
+							add(x, y, z)
+						end
+					else
+						add(x, y, z)
+					end
+				end
+			end
+		end
+		if p.kind == "Cylinder" then
+			local r = s.Y / 2
+			local m = math.max(16, math.ceil(2 * math.pi * r / step))
+			for i = 0, m - 1 do
+				local a = i / m * math.pi * 2
+				add(-s.X / 2, math.cos(a) * r, math.sin(a) * r)
+				add(s.X / 2, math.cos(a) * r, math.sin(a) * r)
+			end
+		end
+		return out
+	end
+
+	-- Part names the clients look for (WindSway, CanopyFade, the night
+	-- lights, AmbientSound): never the backdrop's.
+	local CLIENT_NAMES = {
+		Leaves = true,
+		Frond = true,
+		Tier = true,
+		Facet = true,
+		WindowGlass = true,
+		LampGlow = true,
+		LanternGlow = true,
+		Waterfall = true,
+	}
+
+	local function named(name)
+		local out = {}
+		for _, p in ipairs(backdrop) do
+			if p.name == name then
+				table.insert(out, p)
+			end
+		end
+		return out
+	end
+
+	local function topOf(p)
+		local top = -math.huge
+		for _, c in ipairs(pieceCorners(p)) do
+			top = math.max(top, c.Y)
+		end
+		return top
+	end
+
+	t.test(
+		"the backdrop: every piece is wholly beyond a wall, or under dry ground wherever it is inside them",
+		function()
+			local inside = 0
+			for _, p in ipairs(backdrop) do
+				if not beyondAWall(p) then
+					inside += 1
+					t.ok(
+						p.name == "VolcanoImpostor" or p.name == "BackdropFooting",
+						p.name .. " reaches inside the walls at " .. tostring(p.cframe.Position)
+					)
+					for _, v in ipairs(solidPoints(p, 4)) do
+						if math.abs(v.X) < HALF and math.abs(v.Z) < HALF then
+							local ground = TerrainGen.HeightAt(v.X, v.Z)
+							if v.Y > ground - UNDER then
+								error(
+									string.format(
+										"%s pokes out of the ground at (%.1f, %.1f, %.1f), ground %.1f",
+										p.name,
+										v.X,
+										v.Y,
+										v.Z,
+										ground
+									)
+								)
+							end
+							if TerrainGen.WaterLevelAt(v.X, v.Z) then
+								error(string.format("%s lies under water at (%.1f, %.1f)", p.name, v.X, v.Z))
+							end
+						end
+					end
+				end
+			end
+			-- The impostor's facets and floor, and the footing.
+			t.eq(inside, #named("VolcanoImpostor") + #named("BackdropFooting"))
+			t.ok(
+				#named("VolcanoImpostor") > 0 and #named("BackdropFooting") == 1,
+				"the impostor and the footing are built"
+			)
+		end
+	)
+
+	t.test("the backdrop keeps clear of the gondola's routes, the Skyroot, its isles and their clouds", function()
+		local function insideBy(v, margin)
+			return math.abs(v.X) <= HALF - margin and math.abs(v.Z) <= HALF - margin
+		end
+		-- The Skyroot, the isles, the stations and the cloud banks stand well
+		-- inside the walls, so nothing beyond them can touch them.
+		local fall = sky.waterfall
+		local skyroot = placed(
+			IsleArt.Skyroot(sky.trunkHeight, WorldPlan.IslesFromRoot(sky), sky.main.dir, fall.top - sky.root),
+			CFrame.new(sky.root)
+		)
+		for _, model in ipairs({ skyroot, stations.town, stations.top, stations.base }) do
+			for _, part in ipairs(parts(model)) do
+				for _, c in ipairs(corners(part.Size)) do
+					t.ok(insideBy(part.CFrame * c, 100), model.Name .. " reaches near a wall")
+				end
+			end
+		end
+		for _, isle in ipairs({ sky.main, table.unpack(sky.isles) }) do
+			t.ok(insideBy(isle.center, isle.radius + 100), "an isle near a wall")
+		end
+		for _, spot in ipairs(IsleArt.CloudSpots(WorldPlan.IslesFromRoot(sky), sky.trunkHeight, 99, sky.main.dir)) do
+			t.ok(insideBy((CFrame.new(sky.root) * spot.cframe).Position, spot.size + 100), "a cloud bank near a wall")
+		end
+		-- The pieces inside the walls are under the ground (above); the rides
+		-- pass over them with room to spare.
+		local under = {}
+		for _, p in ipairs(backdrop) do
+			if not beyondAWall(p) then
+				local lo, hi
+				for _, c in ipairs(pieceCorners(p)) do
+					lo = if lo then lo:Min(c) else c
+					hi = if hi then hi:Max(c) else c
+				end
+				table.insert(under, { piece = p, lo = lo, hi = hi })
+			end
+		end
+		for _, name in ipairs({ "town", "base" }) do
+			local path = routeFrom(name)
+			for i = 1, #path - 1 do
+				local a, b = path[i], path[i + 1]
+				local steps = math.max(1, math.ceil((b - a).Magnitude / 2))
+				for k = 0, steps do
+					local v = a:Lerp(b, k / steps)
+					t.ok(insideBy(v, 100), name .. ": the ride stays well inside the walls")
+					for _, u in ipairs(under) do
+						if v.X > u.lo.X - 4 and v.X < u.hi.X + 4 and v.Z > u.lo.Z - 4 and v.Z < u.hi.Z + 4 then
+							t.ok(
+								v.Y > u.hi.Y + 3,
+								string.format("the ride from %s passes %s at %s", name, u.piece.name, tostring(v))
+							)
+						end
+					end
+				end
+			end
+		end
+		-- The footing lies under the Skyroot's foot and the foot station.
+		local footing = named("BackdropFooting")[1]
+		local footingTop = topOf(footing)
+		t.ok(footingTop < sky.root.Y - UNDER, "the footing is under the Skyroot's foot")
+		t.ok(footingTop < sky.gondolaBase.Position.Y - UNDER, "and under the foot station")
+		local flat = Vector3.new(footing.cframe.Position.X - sky.root.X, 0, footing.cframe.Position.Z - sky.root.Z)
+		t.ok(flat.Magnitude < 1e-6, "centred on the Skyroot")
+	end)
+
+	t.test(
+		"the backdrop holds 150 to 300 parts (Persistent: every client keeps them all), none over 2,048 a side",
+		function()
+			t.ok(#backdrop >= 150 and #backdrop <= 300, "the backdrop has " .. #backdrop .. " parts")
+			for _, p in ipairs(backdrop) do
+				t.ok(
+					p.size.X <= 2048 and p.size.Y <= 2048 and p.size.Z <= 2048,
+					p.name .. " is " .. tostring(p.size) .. " (Roblox clamps parts at 2,048)"
+				)
+				t.ok(p.size.X > 0 and p.size.Y > 0 and p.size.Z > 0, p.name .. " has no size")
+				t.ok(p.kind == "Block" or p.kind == "Wedge" or p.kind == "Cylinder", "kind " .. tostring(p.kind))
+				if p.kind == "Cylinder" then
+					t.ok(math.abs(p.size.Y - p.size.Z) < 1e-6, "a cylinder is round")
+				end
+				t.ok(not CLIENT_NAMES[p.name], p.name .. " is a name the clients look for")
+			end
+			-- The same every time (MapBuilder and the previews build the same).
+			local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan").Backdrop()
+			t.eq(#again, #backdrop)
+			for i, p in ipairs(backdrop) do
+				t.ok((again[i].cframe.Position - p.cframe.Position).Magnitude < 1e-6, "piece " .. i .. " moved")
+				t.ok((again[i].size - p.size).Magnitude < 1e-6, "piece " .. i .. " resized")
+			end
+		end
+	)
+
+	t.test("the backdrop's sea: its top at -3.2 (under the terrain's), out to x 3000 and z -3000 to 3000", function()
+		local seas = named("BackdropSea")
+		t.ok(#seas >= 3, "the sea is tiled")
+		t.ok(WorldPlan.BackdropSeaTop == -3.2, "the sea's top")
+		t.ok(WorldPlan.BackdropSeaTop < WorldLayout.SeaLevel, "under the terrain's own sea")
+		for _, sea in ipairs(seas) do
+			t.ok(math.abs(topOf(sea) - -3.2) < 1e-6, "a sea tile's top at " .. topOf(sea))
+			t.ok(sea.cframe.RightVector:Dot(Vector3.xAxis) > 0.99999, "level and square")
+			t.eq(sea.transparency, 0.3)
+			t.eq(sea.material, roblox.Enum.Material.SmoothPlastic)
+			t.ok(sea.color == roblox.Color3.fromRGB(62, 140, 150), "water's colour")
+		end
+		local function covered(x, z)
+			for _, sea in ipairs(seas) do
+				local c, h = sea.cframe.Position, sea.size / 2
+				if math.abs(x - c.X) <= h.X + 1e-6 and math.abs(z - c.Z) <= h.Z + 1e-6 then
+					return true
+				end
+			end
+			return false
+		end
+		for x = HALF, WorldPlan.BackdropReach, 50 do
+			for z = -WorldPlan.BackdropReach, WorldPlan.BackdropReach, 50 do
+				t.ok(covered(x, z), string.format("no sea at (%d, %d)", x, z))
+			end
+		end
+		-- And south of the south wall, from where the coast cuts it.
+		for x = 1250, HALF, 50 do
+			for z = -WorldPlan.BackdropReach, -HALF, 50 do
+				t.ok(covered(x, z), string.format("no sea at (%d, %d)", x, z))
+			end
+		end
+	end)
+
+	t.test(
+		"the backdrop's skirt never stands up above the terrain at the wall (no cliff at the world's edge)",
+		function()
+			local walls = 0
+			-- The banks' boxes reach the wall (their slopes are lower still).
+			local skirt = named("BackdropSkirt")
+			for _, p in ipairs(named("BackdropBank")) do
+				table.insert(skirt, p)
+			end
+			for _, p in ipairs(skirt) do
+				local c, h = p.cframe.Position, p.size / 2
+				local top = c.Y + h.Y
+				for _, side in ipairs({ { "X", -1 }, { "X", 1 }, { "Z", -1 }, { "Z", 1 } }) do
+					local axis, sign = side[1], side[2]
+					local other = if axis == "X" then "Z" else "X"
+					if math.abs(c[axis] - h[axis] * sign - sign * HALF) < 1e-3 then
+						-- Its inner face is on this wall: along its span inside the world.
+						walls += 1
+						local a, b = math.max(c[other] - h[other], -HALF), math.min(c[other] + h[other], HALF)
+						for u = a, b, 1 do
+							local x = if axis == "X" then sign * (HALF - 2) else u
+							local z = if axis == "X" then u else sign * (HALF - 2)
+							t.ok(
+								top <= TerrainGen.HeightAt(x, z) - UNDER,
+								string.format("the skirt stands up over the rim at (%.0f, %.0f)", x, z)
+							)
+						end
+					end
+				end
+			end
+			t.ok(walls >= 12, "the skirt runs along the north, west and south walls")
+		end
+	)
+
+	t.test(
+		"the volcano's impostor stands inside the real cone's footprint and under it, tall enough to read",
+		function()
+			local cone = WorldLayout.VolcanoCone
+			local impostor = named("VolcanoImpostor")
+			t.ok(#impostor >= 16, "a faceted cone")
+			local highest = -math.huge
+			for _, p in ipairs(impostor) do
+				for _, c in ipairs(pieceCorners(p)) do
+					local flat = Vector2.new(c.X - cone.x, c.Z - cone.z).Magnitude
+					t.ok(flat < cone.radius, string.format("the impostor reaches %.0f from the cone's middle", flat))
+					highest = math.max(highest, c.Y)
+				end
+				-- Under the cone's surface, more finely than the rule above.
+				for _, v in ipairs(solidPoints(p, 2)) do
+					local ground = TerrainGen.HeightAt(v.X, v.Z)
+					if v.Y > ground - UNDER then
+						error(
+							string.format(
+								"the impostor pokes out at (%.1f, %.1f, %.1f), the cone %.1f",
+								v.X,
+								v.Y,
+								v.Z,
+								ground
+							)
+						)
+					end
+				end
+			end
+			-- Its top is most of the real rim's height (the rim's lowest point is
+			-- about 140; the crater's lava pool is under it).
+			local pool = WorldPlan.Crater()
+			t.ok(highest >= 100, "the impostor's top at " .. highest)
+			t.ok(highest < pool.Y - UNDER, "under the crater's floor")
+		end
+	)
+
+	t.test(
+		"from the town square the ring stands over the terrain all round the north, west and south, low behind the volcano",
+		function()
+			local eye = WorldPlan.BackdropEye
+			local gap = WorldPlan.BackdropVolcanoGap
+			local function azimuth(v)
+				return math.deg(math.atan2(v.Z - eye.Z, v.X - eye.X)) % 360
+			end
+			local function elevation(v)
+				local d = Vector2.new(v.X - eye.X, v.Z - eye.Z).Magnitude
+				return math.deg(math.atan2(v.Y - eye.Y, d))
+			end
+			-- The backdrop's skyline: the highest point in each degree of azimuth.
+			local skyline, impostorTop = {}, -math.huge
+			for _, p in ipairs(backdrop) do
+				if p.name == "VolcanoImpostor" then
+					for _, c in ipairs(pieceCorners(p)) do
+						impostorTop = math.max(impostorTop, elevation(c))
+					end
+				elseif p.name ~= "BackdropFooting" then
+					-- Its top: a wedge's slope (whose edges are its end faces'
+					-- tops), a block's top face.
+					local h = p.size / 2
+					for i = 0, 24 do
+						for k = 0, 24 do
+							local x, z = -h.X + p.size.X * i / 24, -h.Z + p.size.Z * k / 24
+							local y = if p.kind == "Wedge" then -h.Y + p.size.Y * (z + h.Z) / p.size.Z else h.Y
+							local v = p.cframe * Vector3.new(x, y, z)
+							local bin = math.floor(azimuth(v))
+							skyline[bin] = math.max(skyline[bin] or -90, elevation(v))
+						end
+					end
+				end
+			end
+			-- The terrain's skyline along the middle of each degree, out to the walls.
+			local function terrainAt(deg)
+				local a = math.rad(deg + 0.5)
+				local dx, dz = math.cos(a), math.sin(a)
+				local best = -90
+				for d = 60, 3000, 10 do
+					local x, z = eye.X + dx * d, eye.Z + dz * d
+					if math.abs(x) > HALF or math.abs(z) > HALF then
+						break
+					end
+					best = math.max(best, elevation(Vector3.new(x, TerrainGen.HeightAt(x, z), z)))
+				end
+				return best
+			end
+			local gapAz, gapHalf = math.deg(gap.azimuth) % 360, math.deg(gap.half)
+			-- All round, from just past the volcano's gap to where the south ring
+			-- meets the coast: in every 5 degrees the ring rises at least 1.5
+			-- degrees over the terrain's own skyline (its edge mountains, all of
+			-- them streamed in, as in the preview), and its saddles never sink
+			-- more than 1.5 under it.
+			local from, to = math.ceil(gapAz + gapHalf + 4), 296
+			local over = {}
+			for deg = from, to do
+				over[deg] = (skyline[deg] or -90) - terrainAt(deg)
+				t.ok(
+					over[deg] >= -1.5,
+					string.format("at %d degrees the ring sinks %.1f under the terrain", deg, -over[deg])
+				)
+			end
+			for deg = from, to - 4 do
+				local best = -math.huge
+				for k = 0, 4 do
+					best = math.max(best, over[deg + k])
+				end
+				t.ok(
+					best >= 1.5,
+					string.format("from %d degrees the ring stands only %.1f over the terrain", deg, best)
+				)
+			end
+			-- Behind the volcano: nothing as tall as the impostor's top.
+			for deg = math.floor(gapAz - gapHalf), math.ceil(gapAz + gapHalf) - 1 do
+				t.ok(
+					(skyline[deg] or -90) < impostorTop - 1,
+					string.format("at %d degrees the backdrop stands over the volcano's impostor", deg)
+				)
+			end
+			t.ok(impostorTop > 3, "the impostor reads from town: " .. impostorTop .. " degrees")
+		end
+	)
 end
