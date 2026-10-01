@@ -67,6 +67,7 @@ export type TreeRecord = {
 	seed: number,
 	planterId: number?, -- who planted it (the Living Forest), if anyone
 	damageBy: { [number]: number }, -- HP each player has chopped off this growth (co-op credit)
+	temporary: boolean, -- removed after it's felled instead of regrowing (Elder trees)
 }
 
 export type LogRecord = {
@@ -144,7 +145,12 @@ end
 -- Builds a tree on the ground at `cframe` (its position is the ground point
 -- under the trunk). options.seed fixes its look, options.size its size
 -- class, options.planterId who planted it. Returns the Model.
-export type SpawnOptions = { seed: number?, size: TreeLogic.SizeClass?, planterId: number? }
+export type SpawnOptions = {
+	seed: number?,
+	size: TreeLogic.SizeClass?,
+	planterId: number?,
+	temporary: boolean?, -- gone for good once felled (Elder trees)
+}
 function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOptions?): Model
 	local def = WoodData.Get(woodId)
 	assert(def, "[TreeService] Unknown wood: " .. tostring(woodId))
@@ -197,8 +203,24 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 		seed = seed,
 		planterId = opts.planterId,
 		damageBy = {},
+		temporary = opts.temporary == true,
 	}
 	return model
+end
+
+-- Removes a tree (and its stump) for good, e.g. an Elder that was felled
+-- or that nobody felled in time. Its logs stay where they lie.
+function TreeService.Remove(uid: string)
+	local rec = trees[uid]
+	if not rec then
+		return
+	end
+	trees[uid] = nil
+	if rec.stump then
+		rec.stump:Destroy()
+		rec.stump = nil
+	end
+	rec.model:Destroy()
 end
 
 -- Adds parts to a standing tree (bark clues, a storm's glow, an Elder's
@@ -418,20 +440,28 @@ local function fellTree(player: Player, uid: string)
 		end
 	end)
 
-	task.delay(rec.def.respawnSec, function()
-		if trees[uid] == rec then
+	task.delay(if rec.temporary then TreeLogic.FallTime + 8 else rec.def.respawnSec, function()
+		if trees[uid] ~= rec then
+			return
+		end
+		if rec.temporary then
+			TreeService.Remove(uid)
+		else
 			TreeService.Regrow(uid)
 		end
 	end)
 end
 
 -- Brings a felled tree back: whole HP, stump gone, standing again (clients
--- play it growing). Also used to regrow a tree early (a planted Heartseed).
-function TreeService.Regrow(uid: string)
+-- play it growing). Also used to regrow a tree early (a planted Heartseed):
+-- `planterId` marks who planted it (nil = it grew back wild).
+function TreeService.Regrow(uid: string, planterId: number?)
 	local rec = trees[uid]
 	if not rec or not rec.felled then
 		return
 	end
+	rec.planterId = planterId
+	rec.model:SetAttribute("PlanterId", planterId)
 	removeStump(rec)
 	rec.hp = rec.maxHp
 	rec.damageBy = {}

@@ -16,6 +16,39 @@
       "StarterPlayerScripts": {
         "$path": "src/StarterPlayer/StarterPlayerScripts"
       }
+    },
+    "Workspace": {
+      "$ignoreUnknownInstances": true,
+      "$properties": {
+        "StreamingEnabled": true,
+        "ModelStreamingBehavior": "Improved",
+        "StreamingIntegrityMode": "PauseOutsideLoadedArea",
+        "StreamingMinRadius": 96,
+        "StreamingTargetRadius": 1024,
+        "GlobalWind": [
+          6,
+          0,
+          3
+        ]
+      },
+      "Terrain": {
+        "$ignoreUnknownInstances": true,
+        "$properties": {
+          "Decoration": true,
+          "GrassLength": 0.7
+        }
+      }
+    },
+    "Lighting": {
+      "$ignoreUnknownInstances": true,
+      "$properties": {
+        "LightingStyle": "Realistic",
+        "PrioritizeLightingQuality": true,
+        "ShadowSoftness": 0.35,
+        "EnvironmentDiffuseScale": 0.6,
+        "EnvironmentSpecularScale": 0.35,
+        "GeographicLatitude": 35
+      }
     }
   }
 }

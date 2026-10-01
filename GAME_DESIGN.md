@@ -777,3 +777,97 @@ Playtest in Studio, checklist passes, zero console errors, commit as
 - **Uncalibrated economy**: every pacing number in ECONOMY.md scales with
   EFFICIENCY, a 0.50 guess until a playtest measures it. Calibrate early
   and again whenever the loop changes (the stopwatch prints the command).
+
+## 16. The Living Forest (the twist; added October 2026)
+
+Research (REDESIGN.md) found that weather mutations with multipliers are
+saturated, including in our own genre (*Chop Your Tree*). What no lumber
+game does is make the forest **respond to you**. Timberline's twist: you
+don't just harvest the forest, you tend it, and it remembers.
+
+**The loop it adds:** fell a tree → Heartseeds pop out → plant one in a
+stump (the tree grows back early, wearing your name) → anyone who later
+fells it pays you the planter's share → replanted groves thrive → thriving
+groves grow more figured wood and wake Elder giants. Every felled tree is
+now three decisions: which tree (read the bark), when, and where its seed
+goes.
+
+### Heartseeds
+- Every felled tree drops **1** Heartseed of its wood (+1 for a large tree,
+  +1 on a 15% roll, +1 for a storm-struck tree). Elders drop more (below).
+  Seeds fly to the feller (a glowing pop and a counter tick).
+- Seeds are saved per wood (`profile.heartseeds`), at most 50 of a wood and
+  200 in all.
+- **Planting:** stand at a stump (within 12 studs) holding a seed of that
+  wood and press "Plant Heartseed". A sapling sprouts on the stump and the
+  tree is standing again **8 seconds** later, long before its natural
+  regrowth. It's marked as yours (a little name stake at its foot).
+- **The planter's share:** when anyone else fells a tree you planted, you
+  earn **15% of its logs' base value**, paid by the game (the feller loses
+  nothing), if you're on the server. Felling your own planted tree gives
+  +1 Heartseed instead (the steward's bonus). Either way the tree grows
+  back wild unless someone replants it.
+
+### Grove Vitality
+- Each ground biome has a vitality meter, 0–100, shared by the server
+  (workspace attribute `Vitality_<biome>`). It starts at 60 and drifts back
+  toward 60 by 1 point a minute.
+- Felling a wild tree −1.5; felling a planted tree −0.5; planting +4.
+- Tiers: **Thinning** under 35, **Healthy** 35–74, **Thriving** 75–89,
+  **Old Growth** 90+. The biome banner shows the tier.
+- Thriving and Old Growth groves come alive (more flowers, butterflies,
+  birdsong, deer, fireflies at night), grow more figured wood (below) and
+  can wake an Elder. Clear-cutting never punishes anyone's own progress:
+  a thinning grove just has fewer surprises in it.
+
+### The Hidden Grain (figured wood)
+- When a tree grows (spawns or regrows), it may hide a **figure**. Chance:
+  6%, ×0.5 / ×1 / ×1.5 / ×2 by the grove's tier, +4% if planted, ×2 during
+  a Skyroot Bloom.
+- Figures, with their weights and what each log sells for:
+  | Figure | Weight | Value | Bark clue |
+  |---|---|---|---|
+  | Curly | 45 | ×1.5 | wavy diagonal bark strips |
+  | Birdseye | 30 | ×2 | small dark "eyes" dotted over the trunk |
+  | Quilted | 17 | ×2.5 | scalloped bark plates |
+  | Burl | 8 | ×4 | a big knobbly swelling near the base |
+  | Starfall Burl | (30% of Lumenwood burls) | ×8 | a burl speckled with stars |
+  | Stormgrain | lightning only | ×3 | glowing blue cracks, sparks |
+- The clue is always on the bark: reading the forest is the skill (the
+  Field Guide's Hidden Grain page teaches every clue). Every log of a
+  figured tree carries the figure (a coloured band on the log); the
+  **sawmill reveals it** when you sell ("BIRDSEYE MAPLE ×2!").
+- Economy: the figure average adds about 6% to wood income at Healthy
+  (tools/economy.luau models it).
+
+### Storms strike trees
+- In a storm (WeatherService), lightning strikes now and then. A strike
+  near a tree marks it **storm-struck** for 2 minutes: glowing cracks,
+  sparks, a toast for everyone nearby. Fell it in time and its logs are
+  Stormgrain (+1 Heartseed). Weather is an input to the forest, never a
+  flat multiplier.
+
+### Elder trees
+- At most one Elder on a server at a time. Every 8–15 minutes a Thriving or
+  Old Growth grove may wake one (more likely the higher its vitality): a
+  giant of that grove's wood (1.7× size, 6× HP, 3× logs, always figured:
+  Quilted or Burl), glowing, announced server-wide.
+- **Co-op:** everyone who chopped at least 10% of it counts: they all get
+  2 Heartseeds and a helper's bonus of 10% of its logs' value, and its
+  logs are free to grab at once. An Elder nobody fells fades after 15
+  minutes. Elders never regrow (the grove has to earn the next one).
+
+### The Skyroot Bloom
+- When the five ground groves average 75 vitality or more, the Skyroot
+  blooms for 8 minutes (workspace attribute `SkyrootBloom`): golden motes
+  pour off it, figure chances double everywhere. Then it rests for 30
+  minutes. Servers that replant together see it more.
+
+### Next (designed, not built)
+- **Genes and breeding** on plot Sapling Plots: a Heartseed carries a small
+  genome (girth, height, hue, density, figure, vigor); neighbouring plot
+  trees cross-pollinate at dawn; the first player to grow a new cultivar
+  names it in the Field Guide registry (generated names only). Sapling
+  Plots stay hands-on (tended while online), per §9.
+- **Skyroot Rising:** cross-server weekly goals (offer wood and seeds at the
+  roots) that grow new branch isles, once there are players to drive it.
