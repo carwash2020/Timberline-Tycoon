@@ -1,11 +1,13 @@
 --!nocheck
 -- The Skyroot and the Aether Isles at their real places (WorldPlan.Sky),
 -- dressed the way MapBuilder dresses them: isles, bridges, Lumenwood, the
--- Cloud Chutes and their flumes, the Starfall Forge, the gondola stations
--- and cables, the waterfall, cloud banks, lantern posts. Terrain around
--- the Skyroot's foot.
+-- Cloud Chutes and their flumes (WorldPlan.ChuteFlume), the Starfall Forge,
+-- the gondola stations and cables (WorldPlan.GondolaCable), the waterfall,
+-- cloud banks, lantern posts. Terrain around the Skyroot's foot.
 
 local Common = require("./_common")
+
+local REACH = 700 -- the terrain runs this far round the Skyroot's foot
 
 return {
 	build = function(ctx)
@@ -94,38 +96,57 @@ return {
 		for i, pos in ipairs(sky.shards) do
 			place(PropArt.Crystal(i, C3.fromRGB(159, 230, 255), 2.2), CF.new(pos))
 		end
-		-- (Kit.rod / Kit.beam lean on CFrame.lookAt, which Lune gets wrong; these
-		-- build the same parts MapBuilder's calls make in Roblox.)
-		local function rod(name, a, b, d, color, material)
-			local cf = lookAt((a + b) / 2, b) * CF.Angles(0, math.pi / 2, 0)
-			return Kit.cylinder(root, name, (b - a).Magnitude, d, cf, color, material)
-		end
-		local function beam(name, a, b, w, h, color, material)
-			return Kit.part(root, name, V3.new(w, h, (b - a).Magnitude), lookAt((a + b) / 2, b), color, material)
-		end
+		-- (Kit comes through tools/loader.luau, whose CFrame.lookAt behaves like
+		-- Roblox's, so Kit.beam and Kit.rod build here what they build in the game.)
 		for _, cf in ipairs(sky.chutes) do
 			place(BuildingArt.CloudChute(), cf)
-			local from = cf.Position + V3.new(0, 1, 0)
-			local to = cf.Position + cf.LookVector * 40 - V3.new(0, 60, 0)
-			Kit.decor(beam("Flume", from, to, 2.4, 1.2, C3.fromRGB(90, 62, 38), roblox.Enum.Material.WoodPlanks))
+			local from, to = WorldPlan.ChuteFlume(cf) -- out off the isle, as MapBuilder draws it
+			Kit.decor(
+				Kit.beam(root, "Flume", from, to, 2.4, 1.2, C3.fromRGB(90, 62, 38), roblox.Enum.Material.WoodPlanks)
+			)
 		end
 		place(BuildingArt.StarfallForge(), sky.forge)
 		local top = place(BuildingArt.GondolaStation(), sky.gondolaTop)
 		local base = place(BuildingArt.GondolaStation(), sky.gondolaBase)
-		rod(
-			"GondolaCable",
-			base.PrimaryPart.CFrame.Position + V3.new(0, 8.5, 0),
-			top.PrimaryPart.CFrame.Position + V3.new(0, 8.5, 0),
-			0.4,
-			C3.fromRGB(70, 70, 75),
-			roblox.Enum.Material.Metal
-		)
-		-- The cable from town, as far as this scene reaches.
-		do
-			local town = ctx.load("ReplicatedStorage/Shared/World/WorldPlan").Town().gondola.Position
-			local a = top.PrimaryPart.CFrame.Position + V3.new(0, 8.5, 0)
-			local b = town + V3.new(0, 9.5, 0)
-			rod("GondolaCable", a, a:Lerp(b, 0.45), 0.4, C3.fromRGB(70, 70, 75), roblox.Enum.Material.Metal)
+		-- The cables along the cabins' routes, as MapBuilder draws them
+		-- (WorldPlan.GondolaPath and GondolaCable): from the foot, and from
+		-- town as far as this scene's terrain reaches. The town station isn't
+		-- in the scene; it's built only to find its platform.
+		local townStation = BuildingArt.GondolaStation()
+		Kit.placeAt(townStation, WorldPlan.Town().gondola)
+		-- The part of a-b over the scene's terrain (REACH round the Skyroot), or nil.
+		local function overScene(a, b)
+			local t0, t1 = 0, 1
+			for _, axis in ipairs({ "X", "Z" }) do
+				local lo, hi = sky.root[axis] - REACH, sky.root[axis] + REACH
+				local d = b[axis] - a[axis]
+				if math.abs(d) < 1e-9 then
+					if a[axis] < lo or a[axis] > hi then
+						return nil
+					end
+				else
+					local u0, u1 = (lo - a[axis]) / d, (hi - a[axis]) / d
+					t0, t1 = math.max(t0, math.min(u0, u1)), math.min(t1, math.max(u0, u1))
+				end
+			end
+			if t0 >= t1 then
+				return nil
+			end
+			return a:Lerp(b, t0), a:Lerp(b, t1)
+		end
+		for _, station in ipairs({ townStation, base }) do
+			local platform = station.PrimaryPart
+			local to = top.PrimaryPart.CFrame.Position
+			local path = WorldPlan.GondolaPath(sky, platform.CFrame.Position, platform.CFrame.ZVector, to)
+			for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
+				local a, b = overScene(piece[1], piece[2])
+				if a then
+					Kit.decor(
+						Kit.rod(root, "GondolaCable", a, b, 0.4, C3.fromRGB(70, 70, 75), roblox.Enum.Material.Metal),
+						false
+					)
+				end
+			end
 		end
 
 		-- The waterfall, from the isle's rim down to the river's spring.
@@ -157,7 +178,7 @@ return {
 		end
 		return {
 			root = root,
-			terrain = Common.terrain(ctx, r.X - 700, r.Z - 700, r.X + 700, r.Z + 700, 10),
+			terrain = Common.terrain(ctx, r.X - REACH, r.Z - REACH, r.X + REACH, r.Z + REACH, 10),
 			shadowRadius = 900,
 			lighting = {
 				sunDir = { 0.35, 0.75, -0.55 },

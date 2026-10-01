@@ -10,8 +10,10 @@
 -- from the sawmill.
 
 local BiomeData = require(script.Parent.Parent.BiomeData)
+local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local TerrainGen = require(script.Parent.TerrainGen)
+local WoodData = require(script.Parent.Parent.WoodData)
 local WorldLayout = require(script.Parent.WorldLayout)
 
 local WorldPlan = {}
@@ -491,6 +493,34 @@ end
 local SIGN_POST = 4.95 + 0.35
 local SIGN_CLEAR = 2
 
+-- What a biome's road sign says (MapBuilder's road signs and the world
+-- preview both use it): the biome's name, its woods (in WoodData's order),
+-- the gear it asks for (the gear it needs, or the gear that takes its
+-- slowdown away) and, for the sky, the gondola. An unknown id is shown as
+-- it is.
+function WorldPlan.BiomeSignText(biomeId: string): string
+	local biome = BiomeData.Get(biomeId)
+	if not biome then
+		return biomeId
+	end
+	local woods: { string } = {}
+	for _, wood in ipairs(WoodData.All()) do
+		if (biome.trees or {})[wood.id] then
+			table.insert(woods, string.lower(wood.displayName))
+		end
+	end
+	local text = string.upper(biome.displayName) .. "\n" .. table.concat(woods, " · ")
+	local gearId = biome.requiresGear or (if biome.slowdown then biome.slowdown.removedBy else nil)
+	local gear = if gearId then ItemCatalog.GetGear(gearId) else nil
+	if gear then
+		text ..= "\nBring: " .. gear.displayName
+	end
+	if biome.gondola then
+		text ..= "\nGondola to the Aether Isles"
+	end
+	return text
+end
+
 function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 	local out: { Sign } = {}
 	local roadFor = { HillsRoad = "hills", SnowRoad = "snow", VolcanoRoad = "volcano", SkyrootRoad = "sky" }
@@ -657,6 +687,20 @@ function WorldPlan.Sky(): Sky?
 			isle = nearestIndex, -- which of `isles` it pours off
 		},
 	}
+end
+
+-- The flume under a Cloud Chute at `cf` (one of Sky().chutes), as the two
+-- ends of the beam MapBuilder and the previews draw: from the lip of
+-- BuildingArt.CloudChute's own trough (FLUME_LIP, at its +Z end), out
+-- along the chute's +Z (cf.LookVector * -FLUME_OUT: off the isle) and
+-- FLUME_DROP down into the clouds.
+local FLUME_LIP = Vector3.new(0, -2.6, 13.6)
+local FLUME_OUT = 36
+local FLUME_DROP = 60
+
+function WorldPlan.ChuteFlume(cf: CFrame): (Vector3, Vector3)
+	local from = cf * FLUME_LIP
+	return from, from + cf.LookVector * -FLUME_OUT - Vector3.new(0, FLUME_DROP, 0)
 end
 
 -- The gondola's route from a station's Platform (its centre `from`, its

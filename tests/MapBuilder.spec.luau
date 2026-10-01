@@ -245,6 +245,50 @@ return function(t)
 		lastStepsRan(s)
 	end)
 
+	t.test("road signs and Cloud Chute flumes come from WorldPlan, the way the previews draw them", function()
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local signText = nil
+		local s = build({
+			sky = true,
+			worldPlan = {
+				RoadSigns = function(text)
+					signText = text
+					return WorldPlan.RoadSigns(text)
+				end,
+			},
+		})
+		lastStepsRan(s)
+		t.ok(signText, "the road signs are built")
+		for _, id in ipairs({ "hills", "snow", "volcano", "sky" }) do
+			t.eq(signText(id), WorldPlan.BiomeSignText(id), id .. "'s sign")
+		end
+		-- One flume per chute, along WorldPlan.ChuteFlume (out off the isle).
+		local flumes = {}
+		for _, child in ipairs(s.map:GetChildren()) do
+			if child.Name == "Flume" then
+				table.insert(flumes, child)
+			end
+		end
+		local chutes = WorldPlan.Sky().chutes
+		t.eq(#flumes, #chutes)
+		for i, cf in ipairs(chutes) do
+			local from, to = WorldPlan.ChuteFlume(cf)
+			local found = false
+			for _, flume in ipairs(flumes) do
+				local at = flume.CFrame
+				if (at.Position - (from + to) / 2).Magnitude < 1e-3 then
+					found = true
+					t.ok(
+						at.LookVector:Dot((to - from).Unit) > 0.9999,
+						"chute " .. i .. ": the flume runs from its lip out"
+					)
+					t.ok(math.abs(flume.Size.Z - (to - from).Magnitude) < 1e-3, "chute " .. i .. ": the flume's length")
+				end
+			end
+			t.ok(found, "chute " .. i .. " has its flume")
+		end
+	end)
+
 	t.test("the full world with the sky: an erroring sky builder is contained too", function()
 		local s = build({
 			sky = true,

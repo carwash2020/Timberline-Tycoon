@@ -26,7 +26,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
-local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
@@ -359,31 +358,10 @@ step("5. The palm island", function()
 	end
 end)
 
--- Signposts where the roads arrive: the biome, its woods, the gear it needs.
-local function biomeSignText(biomeId: string): string
-	local biome = BiomeData.Get(biomeId)
-	if not biome then
-		return biomeId
-	end
-	local woods: { string } = {}
-	for _, wood in ipairs(WoodData.All()) do
-		if (biome.trees or {})[wood.id] then
-			table.insert(woods, string.lower(wood.displayName))
-		end
-	end
-	local text = string.upper(biome.displayName) .. "\n" .. table.concat(woods, " · ")
-	local gearId = biome.requiresGear or (if biome.slowdown then biome.slowdown.removedBy else nil)
-	local gear = if gearId then ItemCatalog.GetGear(gearId) else nil
-	if gear then
-		text ..= "\nBring: " .. gear.displayName
-	end
-	if biome.gondola then
-		text ..= "\nGondola to the Aether Isles"
-	end
-	return text
-end
+-- Signposts where the roads arrive: the biome, its woods, the gear it needs
+-- (WorldPlan.BiomeSignText, which the world preview shows too).
 step("5. The road signs", function()
-	for _, sign in ipairs(WorldPlan.RoadSigns(biomeSignText)) do
+	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
 		place(atomic(BuildingArt.Signpost(sign.text)), sign.cframe)
 	end
 end)
@@ -472,10 +450,10 @@ step("6. The Skyroot and the Aether Isles", function()
 			if box then
 				CollectionService:AddTag(box, "CloudChute")
 			end
-			-- The flume carries on from the chute's lip (its +Z end) and drops
-			-- away into the clouds.
-			local from = (cf * CFrame.new(0, -2.6, 13.6)).Position
-			local to = from + cf.LookVector * -36 - Vector3.new(0, 60, 0)
+			-- The flume carries on from the chute's lip (its +Z end), out off
+			-- the isle and down into the clouds (WorldPlan.ChuteFlume, which
+			-- the previews draw too).
+			local from, to = WorldPlan.ChuteFlume(cf)
 			Kit.decor(Kit.beam(map, "Flume", from, to, 2.4, 1.2, Color3.fromRGB(90, 62, 38), Enum.Material.WoodPlanks))
 		end
 	end)
