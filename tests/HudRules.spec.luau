@@ -35,6 +35,19 @@ return function(t)
 		t.eq(HudRules.DailyButton(0, 0), false, "no goals yet")
 	end)
 
+	t.test("the Daily Goals label: the streak after the count; a phone drops GOALS when there's one", function()
+		t.eq(HudRules.DailyLabel(1, 3, 0, false), "DAILY GOALS  1/3")
+		t.eq(HudRules.DailyLabel(1, 3, 5, false), "DAILY GOALS  1/3  ·  5-day streak", "a computer, as before")
+		t.eq(HudRules.DailyLabel(1, 3, 0, true), "DAILY GOALS  1/3", "a phone with no streak")
+		t.eq(HudRules.DailyLabel(3, 3, 12, true), "DAILY 3/3  ·  12-day streak")
+		t.ok(#HudRules.DailyLabel(1, 3, 99, true) < #HudRules.DailyLabel(1, 3, 99, false), "shorter on a phone")
+		-- An odd streak attribute never breaks the button.
+		t.eq(HudRules.DailyLabel(0, 3, 0 / 0, true), "DAILY GOALS  0/3", "NaN: no streak")
+		t.eq(HudRules.DailyLabel(0, 3, -2, false), "DAILY GOALS  0/3")
+		t.eq(HudRules.DailyLabel(0, 3, math.huge, false), "DAILY GOALS  0/3")
+		t.eq(HudRules.DailyLabel(0, 3, 4.7, false), "DAILY GOALS  0/3  ·  4-day streak", "whole days")
+	end)
+
 	t.test("the pouch: from the plant step on, once you hold a seed", function()
 		local plant = stepIndex("plant")
 		t.ok(plant > 1, "the plant step comes after the first")
@@ -123,11 +136,21 @@ return function(t)
 		t.eq(chip(2, 0, 0), { shown = true, hands = "Hands 2/2", full = false })
 	end)
 
-	t.test("the load chip hides with nothing in hand or bed and no truck, and while a panel is open", function()
+	t.test("the load chip hides with nothing in hand or bed, and while a panel is open", function()
 		t.eq(HudRules.LoadChip(nil, nil, nil, HANDS, false).shown, false, "the save still loading")
 		t.eq(HudRules.LoadChip(0, 0, 0, HANDS, false).shown, false, "no truck, nothing carried")
 		t.eq(HudRules.LoadChip(0, 0, nil, HANDS, false).shown, false, "BedCapacity not set yet")
-		t.eq(HudRules.LoadChip(0, 0, 6, HANDS, false).shown, true, "an empty truck still shows its bed")
+		-- UI-FU-1: everyone has a truck from the moment they join; an empty
+		-- one doesn't put "Hands 0/2 · Bed 0/6" on screen from minute one.
+		t.eq(
+			HudRules.LoadChip(0, 0, 6, HANDS, false),
+			{ shown = false, hands = "Hands 0/2", bed = "Bed 0/6", full = false },
+			"a new player's empty truck: hidden"
+		)
+		t.eq(HudRules.LoadChip(0, 0, 12, HANDS, false).shown, false, "a bigger empty truck too")
+		t.eq(HudRules.LoadChip(1, 0, 6, HANDS, false).shown, true, "the first log picked up shows it")
+		t.eq(HudRules.LoadChip(0, 1, 6, HANDS, false).shown, true, "and it stays while the log's in the bed")
+		t.eq(HudRules.LoadChip(0, 0, 6, HANDS, false).shown, false, "sold: the bed's empty again, it goes")
 		for _, case in ipairs({ { 1, 0, 0 }, { 0, 3, 6 }, { 2, 6, 6 }, { 0, 0, 6 } }) do
 			local view = HudRules.LoadChip(case[1], case[2], case[3], HANDS, true)
 			t.eq(view.shown, false, "hidden with the hint while the shop is open")

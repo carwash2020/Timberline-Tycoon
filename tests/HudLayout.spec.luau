@@ -6,9 +6,16 @@
 return function(t)
 	local Vector2 = t.roblox.Vector2
 	local HudLayout = t.load("StarterPlayer/StarterPlayerScripts/HudLayout")
+	-- The sizes the screens build with (UITheme.Sizes), phone and desktop.
+	local UITheme = t.loader({
+		services = { GuiService = {}, Players = { LocalPlayer = {} }, TextChatService = {}, UserInputService = {} },
+	}):load("StarterPlayer/StarterPlayerScripts/UITheme")
+	local PHONE, DESK = UITheme.Sizes.phone, UITheme.Sizes.desktop
 
 	local GAP = 8
-	local PHONE_BUTTON = Vector2.new(100, 39) -- HUD.layoutSide on a phone (36 + the 3 px edge)
+	local EDGE = 3 -- a UITheme.Button's drop edge, under its face
+	-- HUD.layoutSide on a phone: 116 x 44, and the edge.
+	local PHONE_BUTTON = Vector2.new(PHONE.SideButton.size.X, PHONE.SideButton.size.Y + EDGE)
 	local function buttons(n, size)
 		local out = {}
 		for i = 1, n do
@@ -28,15 +35,17 @@ return function(t)
 
 	t.test("what doesn't fit starts a column to the left, bottom first", function()
 		-- 844 x 390 phone with the 58 px top bar: under the Daily Goals
-		-- button (y 152) + 8, down to 24 above the jump button (y 300).
-		local room = (300 - 24) - (152 + 8)
+		-- button (58 + 8 + 49 + 7 + its 36 = y 158) + 8, down to 24 above the
+		-- jump button (y 300).
+		local room = (300 - 24) - (158 + 8)
+		t.eq(PHONE_BUTTON, v(116, 47), "a phone's side button and its edge")
 		local spots = HudLayout.Stack(buttons(4, PHONE_BUTTON), room, GAP)
-		t.eq(spots, { v(108, 47), v(108, 0), v(0, 47), v(0, 0) })
+		t.eq(spots, { v(124, 55), v(124, 0), v(0, 55), v(0, 0) })
 		for _, spot in ipairs(spots) do
 			t.ok(spot.Y + PHONE_BUTTON.Y <= room, "every button ends under the corner")
 		end
 		-- Three: the first one alone on the left.
-		t.eq(HudLayout.Stack(buttons(3, PHONE_BUTTON), room, GAP), { v(108, 0), v(0, 47), v(0, 0) })
+		t.eq(HudLayout.Stack(buttons(3, PHONE_BUTTON), room, GAP), { v(124, 0), v(0, 55), v(0, 0) })
 	end)
 
 	t.test("a column is as wide as its widest button", function()
@@ -47,14 +56,15 @@ return function(t)
 	end)
 
 	t.test("a column always takes one button, even with no room", function()
-		t.eq(HudLayout.Stack(buttons(2, PHONE_BUTTON), 10, GAP), { v(108, 0), v(0, 0) })
+		t.eq(HudLayout.Stack(buttons(2, PHONE_BUTTON), 10, GAP), { v(124, 0), v(0, 0) })
 		t.eq(HudLayout.Stack({}, 100, GAP), {})
 	end)
 
 	local PANEL = v(560, 540)
-	-- The shop's area on a screen (offsets): top 44, bottom 8, sides 12.
-	local function areaOn(w, h)
-		return { left = 12, top = 44, right = w - 12, bottom = h - 8 }
+	-- The shop's area on a `w` x `h` screen whose top bar ends `topBar`
+	-- down (offsets): 8 under the bar, 8 above the bottom, 12 in.
+	local function areaOn(w, h, topBar)
+		return HudLayout.ShopArea(v(w, h), topBar)
 	end
 	-- HUD's cash row ([pops][♪][plaque], 226 wide, 49 tall) at the right
 	-- margin, 8 under the top bar, in the shop screen's offsets.
@@ -63,14 +73,20 @@ return function(t)
 	end
 
 	t.test("a spilled column is lifted clear of the bottom-centre bar when there's room", function()
-		-- 844 x 390: corner at (832, 276), the bar band x 246..598 from y 210.
-		local band = { left = 246, right = 598, top = 210, bottom = 390 }
+		-- 926 x 428: corner at (914, 314), the bar band x 287..639 from y 248.
+		local wideBand = { left = 287, right = 639, top = 248, bottom = 428 }
 		local sizes = buttons(3, PHONE_BUTTON)
-		local spots = HudLayout.Stack(sizes, 100, GAP) -- two to a column
-		t.eq(spots[1], v(108, 0), "the first button spills left")
-		local lifted = HudLayout.LiftClear(spots, sizes, v(832, 276), band, 100, GAP)
-		-- That column's right edge is 724, clear of the band: it stays.
+		local spots = HudLayout.Stack(sizes, 110, GAP) -- two to a column
+		t.eq(spots[1], v(124, 0), "the first button spills left")
+		local lifted = HudLayout.LiftClear(spots, sizes, v(914, 314), wideBand, 100, GAP)
+		-- That column's left edge is 674, clear of the band: it stays.
 		t.eq(lifted, spots)
+		-- 844 x 390: corner at (832, 276), the band x 246..598 from y 210.
+		-- The spilled column (x 592..708) reaches it, and there's room above.
+		local band = { left = 246, right = 598, top = 210, bottom = 390 }
+		local up = HudLayout.LiftClear(spots, sizes, v(832, 276), band, 100, GAP)
+		t.ok(276 - up[1].Y <= band.top - GAP, "844: lifted above the bar")
+		t.eq(up[2], spots[2], "844: the corner column doesn't move")
 		-- A narrower screen, where it does reach the band, with room above.
 		local narrow = { left = 163, right = 503, top = 181, bottom = 375 }
 		local lifted2 = HudLayout.LiftClear(spots, sizes, v(655, 285), narrow, 60, GAP)
@@ -85,30 +101,31 @@ return function(t)
 		for _, screen in ipairs({ v(844, 390), v(667, 375) }) do
 			for _, inset in ipairs({ 36, 58 }) do
 				local row = cashRow(screen.X, inset, 12)
-				local area = HudLayout.ClearOf(areaOn(screen.X, screen.Y), PANEL, row, 8, 400)
+				local area = HudLayout.ClearOf(areaOn(screen.X, screen.Y, inset), PANEL, row, 8, 400)
 				local panel = HudLayout.Centred(area, PANEL)
 				t.ok(panel.right <= row.left - 8, "clear of the row")
 				t.ok(panel.right - panel.left >= 400, "still wide enough")
-				t.eq(panel.top, 44, "keeps its height")
+				t.eq(panel.top, inset + 8, "keeps its height, 8 under the top bar")
 			end
 		end
 		-- 844 wide: the full 560, just shifted.
-		local area = HudLayout.ClearOf(areaOn(844, 390), PANEL, cashRow(844, 58, 12), 8, 400)
+		local area = HudLayout.ClearOf(areaOn(844, 390, 58), PANEL, cashRow(844, 58, 12), 8, 400)
 		local panel = HudLayout.Centred(area, PANEL)
 		t.eq(panel.right - panel.left, 560)
 	end)
 
 	t.test("on a monitor or a TV the centred panel already misses the row", function()
 		-- 1920 x 1080 at 1.25x and a TV at 1.5x, in offsets.
-		local desktop = areaOn(1536, 864)
+		-- Roblox's 58 px top bar is 46.4 and 38.7 offsets there.
+		local desktop = areaOn(1536, 864, 46.4)
 		t.eq(HudLayout.ClearOf(desktop, PANEL, cashRow(1536, 46.4, 12), 8, 400), desktop)
-		local tv = areaOn(1280, 720)
+		local tv = areaOn(1280, 720, 38.7)
 		t.eq(HudLayout.ClearOf(tv, PANEL, cashRow(1280, 38.7, 64), 8, 400), tv)
 	end)
 
 	t.test("too narrow beside the row: the panel starts under it instead", function()
 		local row = cashRow(568, 58, 12)
-		local area = HudLayout.ClearOf(areaOn(568, 320), PANEL, row, 8, 400)
+		local area = HudLayout.ClearOf(areaOn(568, 320, 58), PANEL, row, 8, 400)
 		t.eq(area.top, row.bottom + 8)
 		t.eq(area.right, 568 - 12)
 	end)
@@ -117,7 +134,10 @@ return function(t)
 	-- offsets (which mind the top bar and a phone's safe-area insets).
 	local TOAST_W, LANE_MIN = 280, 240 -- HUD's widest toast, and the narrowest band for a lane at the top
 	local CASH, STORE, CLOCK, POUCH, DAILY, DAILY_STREAK = 226, 90, 100, 84, 200, 300
-	local TRACKER, SPEECH, GUIDE = 92, 6 + 80, 37 -- the tracker, Murph's card under it, the Field Guide button
+	-- The tracker, Murph's card under it (a line or so taller at a phone's
+	-- 14 px), the Field Guide button (a fingertip tall on a phone).
+	local TRACKER, SPEECH, GUIDE = 92, 6 + 100, PHONE.FieldGuide.size.Y + EDGE
+	local LINE2, PHONE_LINE2 = DESK.DailyButton.size.Y, PHONE.DailyButton.size.Y -- the corner's second line: its pills
 	local function widths(...)
 		local sum, n = 0, 0
 		for _, w in ipairs({ ... }) do
@@ -127,15 +147,19 @@ return function(t)
 		return sum + 8 * math.max(0, n - 1)
 	end
 	-- The corner: line 1 (the cash row, 49 tall, and what's beside it) at
-	-- y 8, line 2 (30 tall) 7 under it, right-aligned at the margin.
-	local function cornerOf(screenW, line1, line2, margin)
+	-- y 8, line 2 (30 tall, 36 on a phone: `line2H`) 7 under it,
+	-- right-aligned at the margin.
+	local function cornerOf(screenW, line1, line2, margin, line2H)
 		margin = margin or 12
 		return {
 			left = screenW - margin - math.max(line1, line2),
 			top = 8,
 			right = screenW - margin,
-			bottom = if line2 > 0 then 8 + 49 + 7 + 30 else 8 + 49,
+			bottom = if line2 > 0 then 8 + 49 + 7 + (line2H or LINE2) else 8 + 49,
 		}
+	end
+	local function phoneCorner(screenW, line1, line2)
+		return cornerOf(screenW, line1, line2, 12, PHONE_LINE2)
 	end
 	-- The left column: 280 wide (QuestUI's tutorial frame), from `top`.
 	local function columnOf(top, height, margin)
@@ -162,7 +186,7 @@ return function(t)
 		local today = { left = 667 / 2 - 140, top = 8, right = 667 / 2 + 140, bottom = 8 + 3 * 40 }
 		t.ok(not clear(today, clock, 0), "the evidence: today's lane (x 193-473) covers the clock")
 		-- Even with the clock still there, the lane now misses it.
-		local withClock = cornerOf(667, widths(CLOCK, CASH), widths(POUCH, DAILY))
+		local withClock = phoneCorner(667, widths(CLOCK, CASH), widths(POUCH, DAILY))
 		local tracker = columnOf(60, TRACKER)
 		local lane = HudLayout.ToastLane(screen, withClock, tracker, TOAST_W, LANE_MIN, screen.Y - 12)
 		checkLane("667 clock on line 1", screen, withClock, tracker, lane)
@@ -174,7 +198,7 @@ return function(t)
 		for _, inset in ipairs({ 36, 58 }) do
 			local screen = v(667, 375 - inset)
 			-- In the tutorial the clock is off the corner (ClockLine).
-			local corner = cornerOf(667, CASH, widths(POUCH, DAILY))
+			local corner = phoneCorner(667, CASH, widths(POUCH, DAILY))
 			local tracker = columnOf(60, TRACKER)
 			local lane = HudLayout.ToastLane(screen, corner, tracker, TOAST_W, LANE_MIN, screen.Y - 12)
 			checkLane("SE " .. inset, screen, corner, tracker, lane)
@@ -190,7 +214,7 @@ return function(t)
 		end
 		-- After the tutorial: the clock on line 2, the Field Guide button up top.
 		local screen = v(667, 375 - 58)
-		local corner = cornerOf(667, CASH, widths(CLOCK, POUCH, DAILY_STREAK))
+		local corner = phoneCorner(667, CASH, widths(CLOCK, POUCH, DAILY_STREAK))
 		local column = columnOf(60, GUIDE + 6)
 		local lane = HudLayout.ToastLane(screen, corner, column, TOAST_W, LANE_MIN, screen.Y - 12)
 		checkLane("SE after the tutorial", screen, corner, column, lane)
@@ -200,11 +224,11 @@ return function(t)
 	t.test("844 x 390 with 47/47/21 insets (iPhone 14 Pro): under the tracker", function()
 		local screen = v(844 - 47 - 47, 390 - 58 - 21)
 		local cases = {
-			{ "tutorial", cornerOf(screen.X, CASH, widths(POUCH, DAILY)), columnOf(60, TRACKER) },
-			{ "tutorial, Murph", cornerOf(screen.X, CASH, widths(POUCH, DAILY)), columnOf(60, TRACKER + SPEECH) },
+			{ "tutorial", phoneCorner(screen.X, CASH, widths(POUCH, DAILY)), columnOf(60, TRACKER) },
+			{ "tutorial, Murph", phoneCorner(screen.X, CASH, widths(POUCH, DAILY)), columnOf(60, TRACKER + SPEECH) },
 			{
 				"after",
-				cornerOf(screen.X, widths(STORE, CASH), widths(CLOCK, POUCH, DAILY_STREAK)),
+				phoneCorner(screen.X, widths(STORE, CASH), widths(CLOCK, POUCH, DAILY_STREAK)),
 				columnOf(60, GUIDE + 6),
 			},
 		}
@@ -260,12 +284,12 @@ return function(t)
 		checkLane("desktop, no column", v(1366, 710), desk, nil, lane)
 		t.eq(lane.under, false)
 		-- A phone with no column: the band from the left margin may be wide enough...
-		local phone = cornerOf(667, CASH, widths(POUCH, DAILY))
+		local phone = phoneCorner(667, CASH, widths(POUCH, DAILY))
 		local top = HudLayout.ToastLane(v(667, 317), phone, nil, TOAST_W, LANE_MIN)
 		checkLane("phone, no column", v(667, 317), phone, nil, top)
 		t.eq(top.under, false)
 		-- ... and where it isn't, the lane starts under the corner at the margin.
-		local wide = cornerOf(667, CASH, widths(CLOCK, POUCH, DAILY_STREAK))
+		local wide = phoneCorner(667, CASH, widths(CLOCK, POUCH, DAILY_STREAK))
 		local low = HudLayout.ToastLane(v(667, 317), wide, nil, TOAST_W, LANE_MIN)
 		checkLane("phone, no column, wide corner", v(667, 317), wide, nil, low)
 		t.eq({ low.left, low.top }, { 12, wide.bottom + 8 })
@@ -275,7 +299,7 @@ return function(t)
 		checkLane("phone, empty column", v(667, 317), wide, empty, under)
 		t.eq(under.top, wide.bottom + 8)
 		-- ... or, with room for 240, ends left of it.
-		local mid = cornerOf(667, CASH, widths(POUCH, DAILY, 60))
+		local mid = phoneCorner(667, CASH, widths(POUCH, DAILY, 60))
 		local beside = HudLayout.ToastLane(v(667, 317), mid, empty, TOAST_W, LANE_MIN)
 		checkLane("phone, empty column, mid corner", v(667, 317), mid, empty, beside)
 		t.eq(beside.top, 68)
@@ -283,29 +307,36 @@ return function(t)
 	end)
 
 	-- A shop open over the game (UI-03). The panel as ShopUI places it (in
-	-- its screen's offsets, which ignore the top bar), moved into the HUD
-	-- screen's offsets (under the top bar), where the HUD works out the lane.
+	-- its screen's offsets, which start above the top bar), moved into the
+	-- HUD screen's offsets (under the top bar), where the HUD works out the
+	-- lane.
 	local PAPER, HEADER = 8, 14 + 30 + 2 + 16 + 10 -- ShopUI: the wood frame, the title and subtitle block
 	local function shopPanel(w, h, inset)
-		local area = HudLayout.ClearOf(areaOn(w, h), PANEL, cashRow(w, inset, 12), 8, 400)
+		local area = HudLayout.ClearOf(areaOn(w, h, inset), PANEL, cashRow(w, inset, 12), 8, 400)
 		local p = HudLayout.Centred(area, PANEL)
 		return { left = p.left, top = p.top - inset, right = p.right, bottom = p.bottom - inset }
 	end
 	-- The strip down the panel's right side with the rows' buttons: the
-	-- button (90 wide on a phone, 100 on a computer) inside the row's 12
-	-- padding, the list's 12 + 8 (the scroll bar) and the frame.
+	-- button (ShopUI's, from UITheme.Sizes: 96 wide on a phone, 100 on a
+	-- computer) inside the row's 12 padding, the list's 12 + 8 (the scroll
+	-- bar) and the frame.
 	local function buttonsOf(panel, phone)
 		local right = panel.right - PAPER - 20 - 12
 		return {
-			left = right - (if phone then 90 else 100),
+			left = right - (if phone then PHONE else DESK).ShopBuy.size.X,
 			top = panel.top + PAPER + HEADER,
 			right = right,
 			bottom = panel.bottom,
 		}
 	end
-	local function checkModal(name, panel, lane, phone)
+	-- `hotbar`: the top of Roblox's tool hotbar band, on a phone.
+	local function checkModal(name, panel, lane, phone, hotbar)
 		t.eq(lane.modal, true, name)
-		t.eq(lane.bottom, panel.bottom - 8, name .. ": 8 above the panel's bottom edge")
+		if hotbar then
+			t.ok(lane.bottom <= hotbar, name .. ": above the tool hotbar")
+		else
+			t.eq(lane.bottom, panel.bottom - 8, name .. ": 8 above the panel's bottom edge")
+		end
 		t.ok(lane.left >= panel.left and lane.right <= panel.right, name .. ": inside the panel")
 		t.ok(lane.top >= panel.top + PAPER + HEADER, name .. ": below the title and subtitle")
 		t.ok(clear(lane, buttonsOf(panel, phone), 8), name .. ": clear of the Buy buttons")
@@ -313,20 +344,40 @@ return function(t)
 		t.ok(lane.bottom - lane.top >= lane.max * 34, name .. ": room for its toasts (34 each at least)")
 	end
 
-	t.test("a shop open on a 667 x 375 phone: one toast, inside the panel's bottom edge", function()
+	-- Roblox's tool hotbar on a phone: the bottom 70 of the HUD screen
+	-- (UITheme.Bottom(): the 12 margin and 58), drawn over everything.
+	local PHONE_HOTBAR = 12 + 58
+
+	t.test("a shop open on a 667 x 375 phone: one toast, inside the panel, above the tool hotbar", function()
 		for _, inset in ipairs({ 36, 58 }) do
 			local screen = v(667, 375 - inset)
 			local panel = shopPanel(667, 375, inset)
 			t.ok(panel.right - panel.left >= 400, "the panel as ShopUI fits it, left of the cash row")
 			-- The evidence: the lane under the tracker sits on the panel.
-			local corner = cornerOf(667, CASH, widths(POUCH, DAILY))
+			local corner = phoneCorner(667, CASH, widths(POUCH, DAILY))
 			local under = HudLayout.ToastLane(screen, corner, columnOf(60, TRACKER), TOAST_W, LANE_MIN, screen.Y - 12)
 			t.ok(not clear(under, panel, 0), "today's lane is over the panel")
-			local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true)
-			checkModal("SE " .. inset, panel, lane, true)
+			-- And the panel reaches down over the hotbar: a toast at its
+			-- bottom edge would be half under it.
+			local hotbar = screen.Y - PHONE_HOTBAR
+			t.ok(panel.bottom - 8 > hotbar, "the panel's bottom edge is in the hotbar's band")
+			local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true, hotbar)
+			checkModal("SE " .. inset, panel, lane, true, hotbar)
 			t.eq(lane.max, 1, "one toast on a phone")
 			t.eq(lane.left, panel.left + PAPER + 12, "lined up with the rows")
+			t.eq(lane.bottom, hotbar, "just above the hotbar")
 		end
+	end)
+
+	t.test("over the hotbar: the lane never climbs above one toast under the panel's middle", function()
+		local panel = { left = 100, top = 40, right = 500, bottom = 340 } -- middle 190
+		local high = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true, 150)
+		t.eq(high.bottom, 190 + 48, "one toast's room under the middle")
+		t.ok(high.top >= 190, "in the panel's lower half")
+		-- A hotbar below the panel changes nothing.
+		local low = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true, 400)
+		t.eq(low, HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true))
+		t.eq(low.bottom, 332)
 	end)
 
 	t.test("a shop open in a 1366 x 768 window: up to three, growing up from its bottom edge", function()
@@ -367,11 +418,15 @@ return function(t)
 	-- line above the hotbar (UITheme.Bottom(): 70 up on a phone).
 	local HINT_CAP, ROW_GAP, PHONE_BOTTOM = 320, 8, 70
 	local HintLogic = t.shared("HintLogic")
-	-- GothamMedium 13 runs under 7 px a character; the pill's padding is 14 + 14.
+	t.eq(PHONE.Hint.text, 14, "the phone's hint is 14 px")
+	-- GothamMedium 14 (a phone's hint) runs under 7.6 px a character; the
+	-- pill's padding is 14 + 14.
 	local function hintWidth(line)
-		return #line * 7 + 28
+		return #line * 7.6 + 28
 	end
-	local CHIPS = { 150, 200 } -- "Hands 1/2", up to "Hands 2/2 · Bed 12/12" with the log and padding
+	-- "Hands 1/2", up to "Hands 2/2 · Bed 12/12" in GothamBold 14 (under 8 px
+	-- a character), with the log, the gaps and the padding.
+	local CHIPS = { 150, 216 }
 	-- Roblox's touch jump button on a small screen: 70 px, 95 in from the
 	-- right and 90 up from the bottom (full-screen pixels), here in the HUD
 	-- screen's offsets (under the top bar).
@@ -419,7 +474,7 @@ return function(t)
 		local screen = v(568, 320 - 36)
 		local jump = jumpOn(568, 320, 36)
 		local line = HintLogic.Pick("phone", "carrying")
-		local chip, hint, hintMax = rowOn(screen, 200, hintWidth(line), jump.left - ROW_GAP)
+		local chip, hint, hintMax = rowOn(screen, 216, hintWidth(line), jump.left - ROW_GAP)
 		t.ok(hintMax < hintWidth(line), "no room for all of it")
 		t.ok(clear(chip, hint, ROW_GAP - 0.01))
 		t.ok(clear(hint, jump, ROW_GAP - 0.01), "clear of jump")
@@ -434,6 +489,177 @@ return function(t)
 		local chip, hint = rowOn(screen, 0, 266, 1366 - 12)
 		t.eq(chip, nil)
 		t.eq((hint.left + hint.right) / 2, 683, "centred, as before the chip")
+	end)
+
+	-- UI-09: phones by their safe-area insets, in full-screen pixels (a
+	-- phone's UIScale is 1). In landscape nothing cuts in at the top; iOS
+	-- reports a 14 Pro's 47 px either side and 21 for the home bar in both
+	-- landscapes, and a cutout on one side only proves the sums don't lean
+	-- on that.
+	local function device(w, h, topBar, left, right, bottom)
+		return {
+			size = v(w, h),
+			topBar = topBar,
+			-- The "device" screens (UITheme.Screen): the side buttons, the shop.
+			safe = { left = left, top = 0, right = w - right, bottom = h - bottom },
+			-- Roblox's default screens (the corner, the HUD): under the top bar too.
+			hud = { left = left, top = topBar, right = w - right, bottom = h - bottom },
+		}
+	end
+	local PHONES = {
+		{ "iPhone SE", device(667, 375, 58, 0, 0, 0) },
+		{ "iPhone SE, the old 36 px top bar", device(667, 375, 36, 0, 0, 0) },
+		{ "iPhone 14 Pro, notch on the left", device(844, 390, 58, 47, 47, 21) },
+		{ "iPhone 14 Pro, notch on the right", device(844, 390, 58, 47, 47, 21) },
+		{ "a cutout on the left only", device(844, 390, 58, 47, 0, 21) },
+		{ "a cutout on the right only", device(844, 390, 58, 0, 47, 21) },
+	}
+	local function shift(r, dx, dy)
+		return { left = r.left + dx, top = r.top + dy, right = r.right + dx, bottom = r.bottom + dy }
+	end
+	local function inside(r, area)
+		return r.left >= area.left and r.top >= area.top and r.right <= area.right and r.bottom <= area.bottom
+	end
+	-- Roblox's jump button (70 px, 95 in from the right and 90 up from the
+	-- bottom of its screen) on touch controls that fill the screen, or that
+	-- keep to the safe area.
+	local function jumpsOn(d)
+		local w, h = d.size.X, d.size.Y
+		return {
+			{ "full-screen touch controls", { left = w - 95, top = h - 90, right = w - 25, bottom = h - 20 } },
+			{
+				"safe-area touch controls",
+				{
+					left = d.hud.right - 95,
+					top = d.hud.bottom - 90,
+					right = d.hud.right - 25,
+					bottom = d.hud.bottom - 20,
+				},
+			},
+		}
+	end
+
+	t.test("UI-09: side buttons sit in the safe area, no further right than jump, under the corner", function()
+		for _, case in ipairs(PHONES) do
+			local name, d = case[1], case[2]
+			local safe = d.safe
+			-- The side screen's offsets start at the safe area's corner.
+			local screen = v(safe.right - safe.left, safe.bottom - safe.top)
+			-- The corner's second line ends 100 down the HUD screen.
+			local cornerBottom = d.hud.top + 8 + 49 + 7 + PHONE_LINE2
+			for _, j in ipairs(jumpsOn(d)) do
+				local label, jump = name .. ", " .. j[1], j[2]
+				local spot, room = HudLayout.SideColumn(
+					screen,
+					cornerBottom - safe.top,
+					shift(jump, -safe.left, -safe.top),
+					12,
+					GAP,
+					24,
+					44
+				)
+				for n = 1, 4 do
+					local sizes = buttons(n, PHONE_BUTTON)
+					for i, at in ipairs(HudLayout.Stack(sizes, room, GAP)) do
+						-- The button's box, in full-screen pixels.
+						local right, bottom = safe.left + spot.X - at.X, safe.top + spot.Y - at.Y
+						local box =
+							{ left = right - sizes[i].X, top = bottom - sizes[i].Y, right = right, bottom = bottom }
+						local what = string.format("%s, %d buttons, #%d", label, n, i)
+						t.ok(inside(box, safe), what .. ": inside the safe area")
+						t.ok(box.right <= jump.right, what .. ": no further right than jump")
+						t.ok(box.bottom <= jump.top - 24, what .. ": above jump")
+						t.ok(box.top >= cornerBottom + GAP, what .. ": under the corner")
+					end
+				end
+				-- At the safe area's margin, where the corner ends too, unless
+				-- jump's right edge is further left (an SE: 25 in, not 12).
+				t.eq(safe.left + spot.X, math.min(d.hud.right - 12, jump.right), label .. ": its right edge")
+			end
+		end
+		-- The evidence: a side screen over the whole screen puts its 12 px
+		-- margin inside a 14 Pro's 47 px notch strip, right of jump.
+		local pro = PHONES[3][2]
+		t.ok(844 - 12 > pro.safe.right, "a full-screen margin is in the notch's strip")
+		-- Without touch controls (a computer): 44 under the middle, at the margin.
+		local spot, room = HudLayout.SideColumn(v(1536, 864), 120, nil, 12, GAP, 24, 44)
+		t.eq(spot, v(1524, 476))
+		t.eq(room, 476 - 128)
+	end)
+
+	t.test("UI-09: the shop panel clears the top bar and the notch", function()
+		for _, case in ipairs(PHONES) do
+			local name, d = case[1], case[2]
+			local safe = d.safe
+			-- The shop's screen is the safe area; the cash row is in the
+			-- HUD's, at its right margin, 8 under the top bar.
+			local screen = v(safe.right - safe.left, safe.bottom - safe.top)
+			local row = {
+				left = d.hud.right - 12 - CASH,
+				top = d.hud.top + 8,
+				right = d.hud.right - 12,
+				bottom = d.hud.top + 57,
+			}
+			local area = HudLayout.ClearOf(
+				HudLayout.ShopArea(screen, d.topBar - safe.top),
+				PANEL,
+				shift(row, -safe.left, -safe.top),
+				8,
+				400
+			)
+			local panel = shift(HudLayout.Centred(area, PANEL), safe.left, safe.top)
+			t.ok(panel.top >= d.topBar + 8, name .. ": 8 under the top bar")
+			t.ok(panel.left >= safe.left + 12 and panel.right <= safe.right - 12, name .. ": 12 clear of a notch")
+			t.ok(panel.bottom <= safe.bottom - 8, name .. ": above the home bar")
+			t.ok(clear(panel, row, 8), name .. ": clear of the cash row")
+			t.ok(panel.right - panel.left >= 400, name .. ": still wide enough")
+		end
+		-- The evidence: the old area's top (44, for a 36 px bar) is under
+		-- today's 58 px top bar.
+		t.ok(44 < 58, "44 is under the top bar")
+		t.eq(HudLayout.ShopArea(v(667, 375), 58).top, 66, "now 8 under it")
+		t.eq(HudLayout.ShopArea(v(667, 375), 0).top, 8, "no top bar: 8 from the top")
+	end)
+
+	-- GothamBlack's width at `size` px, from above: capitals under 0.75 em,
+	-- digits 0.68, lower case 0.62, a space 0.28, anything else 0.45.
+	local function blackWidth(text, size)
+		local em = 0
+		for _, code in utf8.codes(text) do
+			local c = utf8.char(code)
+			em += if string.match(c, "^%u$")
+				then 0.75
+				elseif string.match(c, "^%d$") then 0.68
+				elseif string.match(c, "^%l$") then 0.62
+				elseif c == " " then 0.28
+				else 0.45
+		end
+		return em * size
+	end
+
+	t.test("640 x 360 after the tutorial: the corner's second line stays clear of the Field Guide button", function()
+		local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
+		local daily, clock, pouch = PHONE.DailyButton, PHONE.Clock, PHONE.Pouch
+		-- The clock's longest text fits its pill.
+		t.ok(blackWidth("Night 23:45", clock.text) <= clock.size.X, "the clock fits")
+		-- Line 2: [clock][pouch][Daily Goals], right-aligned at the margin, 7
+		-- under the cash row; the Field Guide button tops the left column at
+		-- y 60 (UITheme's phone column), in the same screen's offsets.
+		local function line2(label)
+			local dailyW = math.max(daily.size.X, blackWidth(label, daily.text) + 20) -- its padding: 10 + 10
+			local w = widths(clock.size.X, pouch.size.X, dailyW)
+			return { left = 640 - 12 - w, top = 8 + 49 + 7, right = 640 - 12, bottom = 8 + 49 + 7 + daily.size.Y }
+		end
+		local guide = { left = 12, top = 60, right = 12 + PHONE.FieldGuide.size.X, bottom = 60 + GUIDE }
+		for _, streak in ipairs({ 0, 1, 9, 10, 99, 100, 999 }) do
+			local label = HudRules.DailyLabel(1, 3, streak, true)
+			t.ok(clear(line2(label), guide, 8), string.format("%q: clear of the Field Guide", label))
+		end
+		-- The evidence: the computer's label, at a phone's 14 px, comes within
+		-- 8 px of the button from a 10-day streak.
+		t.ok(not clear(line2(HudRules.DailyLabel(1, 3, 10, false)), guide, 8), "the long label reaches it")
+		-- Line 1 (the Store and the cash row) ends above the column.
+		t.ok(8 + 49 <= guide.top, "line 1 is above the Field Guide")
 	end)
 
 	t.test("the clock: beside the cash on a computer, line 2 on a phone, hidden there in the tutorial", function()

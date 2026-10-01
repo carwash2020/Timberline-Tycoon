@@ -11,8 +11,8 @@
 --     tracker at its width, up to two. Amounts of money show in green.
 --     While a panel is open over the game (the shop: HUD.SetModal), they
 --     move inside its bottom edge instead, stacking upward, clear of its
---     title and its Buy buttons; one at a time on a phone
---     (HudLayout.ModalLane).
+--     title and its Buy buttons; one at a time on a phone, and there
+--     above Roblox's tool hotbar (HudLayout.ModalLane).
 --   * A one-line control hint at the bottom (above Roblox's tool hotbar),
 --     worded for the device in use and for what you're doing
 --     (Shared/HintLogic): chopping, carrying logs (the CarriedLogs
@@ -22,15 +22,18 @@
 --   * The load chip on the same line, left of the hint: a log, "Hands 1/2"
 --     and, with a truck, "Bed 4/6" (amber and "Bed full" once it's full),
 --     from the CarriedLogs, BedCount and BedCapacity attributes
---     (HudRules.LoadChip); the log bumps when they change. The line stays
---     clear of a phone's jump button (HudLayout.BottomRow), and hides with
---     the hint.
+--     (HudRules.LoadChip); the log bumps when they change. It shows only
+--     while there are logs in your hands or your bed. The line stays clear
+--     of a phone's jump button (HudLayout.BottomRow), and hides with the
+--     hint.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
 --     line (the Daily Goals button); what doesn't fit there starts another
---     column to its left. On a gamepad each shows its button glyph, and
---     that button presses it (unless a world prompt is using the same one).
+--     column to its left. On a phone they're a fingertip tall (UITheme's
+--     phone sizes, as the hint, the chip and the toasts' 14 px text are).
+--     On a gamepad each shows its button glyph, and that button presses it
+--     (unless a world prompt is using the same one).
 --   * A loading card, under the ReplicatedFirst one (LoadingScreen, which
 --     gives up after 30 s) so it shows if the wait runs longer: "Building
 --     the world..." until the server's Remotes folder exists (GameServer
@@ -82,6 +85,7 @@ local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
 local HINT_POLL = 0.25 -- seconds between sell-zone checks for the hint
 local SIDE_GAP = 8 -- between side buttons, and under the corner
 local JUMP_CLEARANCE = 24 -- the side buttons end this far above a phone's jump button
+local SIDE_BELOW_CENTRE = 44 -- without touch controls, they end this far under the screen's middle
 local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
 local HINT_MAX = 320 -- the hint's widest (it truncates past this)
 local ROW_HEIGHT = 30 -- the hint and the load chip
@@ -329,12 +333,15 @@ local function placeToasts()
 		return -- not laid out yet
 	end
 	local modal = modalRect
+	local phone = UITheme.IsPhone()
 	local lane = if modal
 		then HudLayout.ModalLane(
 			boxIn(gui, Vector2.new(modal.left, modal.top), Vector2.new(modal.right, modal.bottom)),
 			TOAST_WIDTH,
 			TOAST_LANE_MIN,
-			UITheme.IsPhone()
+			phone,
+			-- On a phone, above the tool hotbar (which draws over the panel).
+			if phone then screen.Y - UITheme.Bottom() else nil
 		)
 		else laneAtTop(gui, corner, screen)
 	toastWidth = lane.right - lane.left
@@ -445,7 +452,7 @@ function HUD.Toast(message: string)
 	limit.Parent = card.outer
 	local stroke = UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 7, 14, 7, 14)
-	local label = UITheme.label(card.face, "", F.Bold, 13, C.Ink)
+	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Ink)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.TextWrapped = true
@@ -674,16 +681,21 @@ local function promptOn(key: Enum.KeyCode): boolean
 	return false
 end
 
+-- A side button's size for the device (UITheme.Sized: on a phone 116 x 44,
+-- a fingertip tall, its label 15 and never under 12; on a gamepad wider,
+-- for the glyph).
 local function layoutSide(side: Side, device: UITheme.Device)
 	local phone = UITheme.IsPhone()
+	local spec = UITheme.Sized("SideButton")
+	local face = spec.size or Vector2.new(110, 40)
 	local console = device == "console" and side.key ~= nil
-	local width = if console then 150 elseif phone then 100 else 110
-	local height = if phone then 36 else 40
-	side.button.root.Size = UDim2.fromOffset(width, height + 3)
-	side.button.face.TextSize = if phone then 12 else 13
+	local width = if console then 150 else face.X
+	side.button.root.Size = UDim2.fromOffset(width, face.Y + 3)
+	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
-		fit.MaxTextSize = if phone then 12 else 13
+		fit.MaxTextSize = spec.text
+		fit.MinTextSize = if phone then UITheme.Size.ButtonMinText else 8
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
@@ -694,9 +706,11 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 end
 
--- Lays out the side buttons that are showing (HudLayout.Stack), up from
--- 44 below the screen centre, or with touch controls from just above the
--- jump button, to just under the corner's second line.
+-- Lays out the side buttons that are showing (HudLayout.SideColumn, then
+-- Stack), up from SIDE_BELOW_CENTRE under the screen centre, or with touch
+-- controls from just above the jump button, to just under the corner's
+-- second line; at the right margin of the device's safe area, and no
+-- further right than the jump button.
 local function arrangeSide()
 	arrangeQueued = false
 	local gui, column, corner = sideGui, sideColumn, shelf
@@ -704,19 +718,34 @@ local function arrangeSide()
 		return
 	end
 	local scale = UITheme.Scale()
-	-- Screen pixels to this screen's offsets. It ignores the top bar inset
-	-- and the corner's screen doesn't, so measure both from this one's top.
-	local origin = gui.AbsolutePosition.Y
-	local function y(pixels: number): number
+	-- Screen pixels to this screen's offsets. It's the device's safe area
+	-- with the top bar's strip in it (UITheme.Screen "device"); the
+	-- corner's screen starts under the top bar, and the touch controls'
+	-- may not mind the safe area at all: measure both from this one's
+	-- corner.
+	local origin = gui.AbsolutePosition
+	local function at(pixels: Vector2): Vector2
 		return (pixels - origin) / scale
 	end
-	local top = y(corner.AbsolutePosition.Y + corner.AbsoluteSize.Y) + SIDE_GAP
-	local bottom = gui.AbsoluteSize.Y / scale / 2 + 44
+	local screen = gui.AbsoluteSize / scale
+	local cornerBottom = at(corner.AbsolutePosition + corner.AbsoluteSize).Y
+	local jumpRect: HudLayout.Rect? = nil
 	local jump = jumpButton
 	if jump and jump.Parent and jump.AbsoluteSize.Y > 0 then
-		bottom = y(jump.AbsolutePosition.Y) - JUMP_CLEARANCE
+		local low, high = at(jump.AbsolutePosition), at(jump.AbsolutePosition + jump.AbsoluteSize)
+		jumpRect = { left = low.X, top = low.Y, right = high.X, bottom = high.Y }
 	end
-	column.Position = UDim2.new(1, -UITheme.Margin(), 0, bottom)
+	local spot, room = HudLayout.SideColumn(
+		screen,
+		cornerBottom,
+		jumpRect,
+		UITheme.Margin(),
+		SIDE_GAP,
+		JUMP_CLEARANCE,
+		SIDE_BELOW_CENTRE
+	)
+	-- From the right edge, so it stays put if the screen resizes first.
+	column.Position = UDim2.new(1, spot.X - screen.X, 0, spot.Y)
 
 	local shown: { Frame } = {}
 	for _, side in ipairs(sides) do
@@ -731,19 +760,17 @@ local function arrangeSide()
 	for i, root in ipairs(shown) do
 		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset)
 	end
-	local spots = HudLayout.Stack(sizes, bottom - top, SIDE_GAP)
+	local spots = HudLayout.Stack(sizes, room, SIDE_GAP)
 	-- Columns that spill left mustn't reach the bars at the bottom centre
 	-- (build mode, placing): lift such a column above them if there's room.
-	local width = gui.AbsoluteSize.X / scale
-	local height = gui.AbsoluteSize.Y / scale
+	-- The bars' screens share this one's safe area left, right and below.
 	local band: HudLayout.Rect = {
-		left = width / 2 - BAR_HALF_WIDTH,
-		right = width / 2 + BAR_HALF_WIDTH,
-		top = height - (UITheme.Bottom() + 38) - BAR_HEIGHT,
-		bottom = height,
+		left = screen.X / 2 - BAR_HALF_WIDTH,
+		right = screen.X / 2 + BAR_HALF_WIDTH,
+		top = screen.Y - (UITheme.Bottom() + 38) - BAR_HEIGHT,
+		bottom = screen.Y,
 	}
-	local cornerX = width - UITheme.Margin()
-	spots = HudLayout.LiftClear(spots, sizes, Vector2.new(cornerX, bottom), band, top, SIDE_GAP)
+	spots = HudLayout.LiftClear(spots, sizes, spot, band, spot.Y - room, SIDE_GAP)
 	for i, root in ipairs(shown) do
 		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y)
 	end
@@ -757,9 +784,24 @@ local function queueArrange()
 	end
 end
 
+-- The hint's and the load chip's text, for the device (UITheme.Sized).
+local function sizeRow()
+	local hint, c = hintLabel, chip
+	if hint then
+		hint.TextSize = UITheme.Sized("Hint").text
+	end
+	if c then
+		local size = UITheme.Sized("LoadChip").text
+		c.hands.TextSize = size
+		c.dot.TextSize = size
+		c.bed.TextSize = size
+	end
+end
+
 local function refreshDevice()
 	local device: UITheme.Device = UITheme.Device()
 	refreshHint()
+	sizeRow()
 	for _, side in ipairs(sides) do
 		layoutSide(side, device)
 	end
@@ -783,12 +825,13 @@ export type SideOptions = {
 -- back a button that's never on screen, so the caller still starts.
 function HUD.SideButton(opts: SideOptions): UITheme.Button
 	local column = sideColumn
+	local spec = UITheme.Sized("SideButton") -- layoutSide keeps it right for the device
 	local button = UITheme.Button({
 		name = opts.name,
 		text = opts.text,
-		size = Vector2.new(110, 40),
+		size = spec.size or Vector2.new(110, 40),
 		style = opts.style,
-		textSize = 13,
+		textSize = spec.text,
 		radius = 12,
 	})
 	button.root.LayoutOrder = opts.order
@@ -965,7 +1008,7 @@ local function buildChip(row: Frame)
 	heart.Parent = cut
 
 	local function words(name: string, order: number, text: string): TextLabel
-		local label = UITheme.label(frame, text, F.Bold, 13, C.Cream)
+		local label = UITheme.label(frame, text, F.Bold, UITheme.Sized("LoadChip").text, C.Cream)
 		label.Name = name
 		label.LayoutOrder = order
 		label.Size = UDim2.fromOffset(0, ROW_HEIGHT)
@@ -985,7 +1028,7 @@ local function buildChip(row: Frame)
 end
 
 local function buildHint(row: Frame)
-	local hint = UITheme.label(row, "", F.Body, 13, C.Cream)
+	local hint = UITheme.label(row, "", F.Body, UITheme.Sized("Hint").text, C.Cream)
 	hint.Name = "Hint"
 	hint.LayoutOrder = 2
 	hint.AutomaticSize = Enum.AutomaticSize.X
@@ -1101,8 +1144,10 @@ end
 
 local function buildSideColumn(playerGui: Instance)
 	-- Its own screen, under the shop panel's scrim (which blocks HUD taps)
-	-- and the corner's popups, and measured from the true screen centre.
-	local gui = UITheme.Screen("SideButtons", 1, true)
+	-- and the corner's popups, and measured from the true screen centre:
+	-- the device's safe area, the top bar's strip included (clear of a
+	-- notch and the home bar).
+	local gui = UITheme.Screen("SideButtons", 1, "device")
 	local column = Instance.new("Frame")
 	column.Name = "Column"
 	column.AnchorPoint = Vector2.new(1, 1)
@@ -1110,6 +1155,7 @@ local function buildSideColumn(playerGui: Instance)
 	column.BackgroundTransparency = 1
 	column.Parent = gui
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
+	gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueArrange) -- the safe area's insets arriving
 	gui.Parent = playerGui
 	sideGui, sideColumn = gui, column
 	task.spawn(watchJump, playerGui)

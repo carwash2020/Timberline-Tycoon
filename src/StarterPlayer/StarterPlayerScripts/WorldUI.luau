@@ -86,14 +86,16 @@ local function buildClock()
 		warn("[WorldUI] no HUD corner (HUD.Start didn't finish): skipping the clock")
 		return
 	end
-	local label = UITheme.label(line, "", UITheme.Fonts.Black, 13, UITheme.Colors.Cream)
+	local spec = UITheme.Sized("Clock") -- a corner pill: 36 tall on a phone
+	local size = spec.size or Vector2.new(100, 30)
+	local label = UITheme.label(line, "", UITheme.Fonts.Black, spec.text, UITheme.Colors.Cream)
 	label.Name = "Clock"
 	label.LayoutOrder = 20 -- left of HUD's top row (♪ + cash), right of the Store button
-	label.Size = UDim2.fromOffset(100, 30)
+	label.Size = UDim2.fromOffset(size.X, size.Y)
 	label.BackgroundColor3 = UITheme.Colors.Bark
 	label.BackgroundTransparency = 0
 	label.TextXAlignment = Enum.TextXAlignment.Center
-	UITheme.corner(label, 15)
+	UITheme.corner(label, size.Y / 2)
 	UITheme.stroke(label, UITheme.Colors.Ink, 2)
 
 	-- Which line it's in (or none) for the device and the tutorial.

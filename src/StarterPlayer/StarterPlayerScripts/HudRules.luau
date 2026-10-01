@@ -5,7 +5,8 @@
 --   * TutorialRunning(): Murph's tutorial is on. TutorialStep is 0 once
 --     it's done or skipped; nil while the save loads counts as on (as
 --     NPCController has it).
---   * DailyButton() (DailyUI): Daily Goals waits until the tutorial's done.
+--   * DailyButton() (DailyUI): Daily Goals waits until the tutorial's done;
+--     DailyLabel() is what its button says.
 --   * Pouch() (ForestUI): the Heartseed pouch shows from the tutorial's
 --     plant step on, and after it, once you hold a seed.
 --   * SendHome() (VehicleController): "Send truck home" only while you're
@@ -50,6 +51,21 @@ end
 -- The Daily Goals button: once there are goals and the tutorial's over.
 function HudRules.DailyButton(step: unknown, goals: number): boolean
 	return goals > 0 and not HudRules.TutorialRunning(step)
+end
+
+-- What the Daily Goals button says: `done` of `total` goals and the
+-- `streak` (days in a row with every goal done; not shown at 0):
+-- "DAILY GOALS  1/3  ·  5-day streak". On a phone, where the corner's
+-- second line (the clock, the pouch and this) would reach the Field Guide
+-- button on a small screen, a streak drops the GOALS: "DAILY 1/3  ·  5-day
+-- streak".
+function HudRules.DailyLabel(done: number, total: number, streak: number, phone: boolean): string
+	local days = math.floor(streak)
+	if not (days > 0) or days == math.huge then -- no streak (or not a count: NaN, infinity)
+		return string.format("DAILY GOALS  %d/%d", done, total)
+	end
+	local name = if phone then "DAILY " else "DAILY GOALS  "
+	return string.format("%s%d/%d  ·  %d-day streak", name, done, total, days)
 end
 
 -- The Heartseed pouch: you hold `seeds`, and the tutorial has reached its
@@ -116,9 +132,10 @@ export type LoadChip = {
 --   * "Hands 1/2", then "Bed 4/6" while you have a truck with a bed
 --     (BedCapacity above 0; the Scout ATV has none), "Bed full" and amber
 --     once it's full;
---   * hidden when there's nothing in your hands or your bed and no truck
---     bed (before the save loads, say), and while a panel is open, as the
---     hint is.
+--   * hidden while there's nothing in your hands or your bed: everyone
+--     has an empty truck from the moment they join, and "Hands 0/2 · Bed
+--     0/6" from minute one is noise (it shows once you pick up a log);
+--     and while a panel is open, as the hint is.
 function HudRules.LoadChip(
 	carried: unknown,
 	bedCount: unknown,
@@ -133,7 +150,7 @@ function HudRules.LoadChip(
 		bed = if full then "Bed full" else string.format("Bed %d/%d", inBed, room)
 	end
 	return {
-		shown = not modal and (hands > 0 or inBed > 0 or room > 0),
+		shown = not modal and (hands > 0 or inBed > 0),
 		hands = string.format("Hands %d/%d", hands, count(handCapacity)),
 		bed = bed,
 		full = full,

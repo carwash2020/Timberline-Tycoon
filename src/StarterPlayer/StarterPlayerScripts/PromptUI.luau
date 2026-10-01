@@ -122,7 +122,8 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	action.LayoutOrder = 1
 	action.Size = UDim2.new()
 	action.AutomaticSize = Enum.AutomaticSize.XY
-	local object = UITheme.label(words, string.upper(prompt.ObjectText), F.Black, 12, C.Amber)
+	local object =
+		UITheme.label(words, string.upper(prompt.ObjectText), F.Black, UITheme.Sized("PromptObject").text, C.Amber)
 	object.LayoutOrder = 2
 	object.Size = UDim2.new()
 	object.AutomaticSize = Enum.AutomaticSize.XY

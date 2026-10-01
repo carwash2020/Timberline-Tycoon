@@ -1,8 +1,10 @@
 --!strict
 -- HudLayout: the screen geometry the HUD works out from real sizes, as
 -- plain maths (no Instances), so tests can check it.
---   * Stack(): the side buttons, stacked up from a bottom-right corner in
---     columns no taller than the room there.
+--   * SideColumn(): where the side buttons' column stands (clear of the
+--     corner and a phone's jump button), and Stack(): the buttons, stacked
+--     up from its bottom-right corner in columns no taller than the room.
+--   * ShopArea(): what the shop panel is centred in, under the top bar.
 --   * ClearOf(): a centred panel's area, shrunk or lowered so the panel
 --     stays clear of something drawn over it (the cash row over the shop).
 --   * ToastLane(): where the toasts stack, clear of the top-right corner
@@ -17,6 +19,32 @@
 local HudLayout = {}
 
 export type Rect = { left: number, top: number, right: number, bottom: number }
+
+-- The side buttons' column on their screen (HUD's SideButtons: the device's
+-- safe area, the top bar's strip included), `screen` big, all in its
+-- offsets. Its bottom-right corner sits at the right `margin`, but never
+-- further right than a phone's `jump` button (nil without touch
+-- controls), `clearance` above that button, or without one `belowCentre`
+-- under the screen's middle. The buttons may stack up to `gap` under
+-- `cornerBottom` (the bottom of the corner's second line). Returns that
+-- corner and the room above it (Stack's `room`).
+function HudLayout.SideColumn(
+	screen: Vector2,
+	cornerBottom: number,
+	jump: Rect?,
+	margin: number,
+	gap: number,
+	clearance: number,
+	belowCentre: number
+): (Vector2, number)
+	local right = screen.X - margin
+	local bottom = screen.Y / 2 + belowCentre
+	if jump then
+		right = math.min(right, jump.right)
+		bottom = jump.top - clearance
+	end
+	return Vector2.new(right, bottom), bottom - (cornerBottom + gap)
+end
 
 -- Stacks boxes up from a bottom-right corner: the last box sits in the
 -- corner and the ones before it above it, in a column at most `room`
@@ -85,6 +113,22 @@ function HudLayout.LiftClear(
 		end
 	end
 	return out
+end
+
+local SHOP_SIDE = 12 -- the shop's area: in from the sides,
+local SHOP_GAP = 8 -- and from the top bar and the bottom
+
+-- What the shop panel is centred in, on a `screen`-sized screen whose top
+-- bar ends `topBar` down (both in its offsets): `SHOP_GAP` under the bar
+-- and above the bottom, 12 in from the sides (before ClearOf keeps it clear
+-- of the cash row).
+function HudLayout.ShopArea(screen: Vector2, topBar: number): Rect
+	return {
+		left = SHOP_SIDE,
+		top = math.max(0, topBar) + SHOP_GAP,
+		right = screen.X - SHOP_SIDE,
+		bottom = screen.Y - SHOP_GAP,
+	}
 end
 
 -- The panel a size-capped panel centred in `area` takes.
@@ -203,7 +247,7 @@ function HudLayout.ToastLane(
 end
 
 local MODAL_INSET = 20 -- a panel's frame (8) and its rows' padding (12): the lane lines up with the rows
-local MODAL_BUTTONS = 140 -- the strip down a panel's right side with the rows' buttons (ShopUI: 100 wide, 90 on a phone, and 40 of padding and frame)
+local MODAL_BUTTONS = 140 -- the strip down a panel's right side with the rows' buttons (ShopUI: 100 wide, 96 on a phone, and 40 of padding and frame)
 local MODAL_PHONE_TOASTS = 1 -- toasts at once in a panel on a phone
 
 -- The toast lane while a panel (the shop, HUD.SetModal) is open over the
@@ -213,8 +257,11 @@ local MODAL_PHONE_TOASTS = 1 -- toasts at once in a panel on a phone
 -- buttons, `maxW` wide at most; a panel too narrow for `minW` there gets
 -- `minW` (over the buttons if it must). One toast on a phone; elsewhere up
 -- to three, and never above the panel's middle, so its title and subtitle
--- stay clear.
-function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boolean): Lane
+-- stay clear. With `hotbar` (on a phone: the top of the band along the
+-- bottom where Roblox's tool hotbar draws over everything), a panel that
+-- reaches down into it gets its lane ending above it instead, but no
+-- higher than one toast under the panel's middle.
+function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boolean, hotbar: number?): Lane
 	local left = panel.left + MODAL_INSET
 	local right = math.min(left + maxW, panel.right - MODAL_BUTTONS - LANE_GAP)
 	if right - left < minW then
@@ -222,6 +269,9 @@ function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boo
 	end
 	local bottom = panel.bottom - LANE_GAP
 	local middle = (panel.top + panel.bottom) / 2
+	if hotbar and hotbar < bottom then
+		bottom = math.max(hotbar, math.min(bottom, middle + TOAST_ROW))
+	end
 	local max = if phone
 		then MODAL_PHONE_TOASTS
 		else math.clamp(math.floor((bottom - middle + LANE_GAP) / TOAST_ROW), 1, LANE_TOASTS)
