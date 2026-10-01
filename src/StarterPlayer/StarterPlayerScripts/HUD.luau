@@ -10,7 +10,11 @@
 --     on a phone, where there's no room between them, under the tutorial
 --     tracker at its width, up to two. Amounts of money show in green.
 --   * A one-line control hint at the bottom (above Roblox's tool hotbar),
---     worded for the device in use.
+--     worded for the device in use and for what you're doing
+--     (Shared/HintLogic): chopping, carrying logs (the CarriedLogs
+--     attribute), driving (Humanoid.Seated in a VehicleSeat), standing in
+--     the sell zone, or a mode a controller sets (HUD.SetHintContext:
+--     placing a blueprint).
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
@@ -38,6 +42,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HudLayout = require(script.Parent.HudLayout)
@@ -57,6 +62,7 @@ local TOAST_LANE_MIN = 240 -- a band narrower than this between the left column 
 local TOAST_SECONDS = 3
 local TOAST_FADE = 0.25
 local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
+local HINT_POLL = 0.25 -- seconds between sell-zone checks for the hint
 local SIDE_GAP = 8 -- between side buttons, and under the corner
 local JUMP_CLEARANCE = 24 -- the side buttons end this far above a phone's jump button
 local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
@@ -97,6 +103,8 @@ local laneQueued = false
 local hudGui: ScreenGui? = nil
 local leftColumn: Frame? = nil -- UITheme's left column (the tracker), once it exists
 local hintLabel: TextLabel? = nil
+local hintForced: HintLogic.Context? = nil -- a controller's mode (HUD.SetHintContext)
+local hintState: HintLogic.State = { driving = false, inSellZone = false, carrying = false }
 local sideGui: ScreenGui? = nil
 local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
 local sides: { Side } = {}
@@ -422,11 +430,83 @@ end
 -- Hint and side buttons, by device
 ---------------------------------------------------------------------------
 
-local HINTS: { [UITheme.Device]: string } = {
-	phone = "Tap a tree to swing your axe",
-	desktop = "Click a tree to swing · E to interact",
-	console = "RT to swing · X to interact",
-}
+-- The hint for this device and what you're doing.
+local function refreshHint()
+	local hint = hintLabel
+	if not hint then
+		return
+	end
+	local text = HintLogic.Pick(UITheme.Device(), hintForced or HintLogic.ContextFor(hintState))
+	if hint.Text ~= text then
+		hint.Text = text
+	end
+end
+
+-- A mode a controller is in that the hint should explain ("build" while
+-- placing a blueprint), or nil when it's over: back to what you're doing.
+function HUD.SetHintContext(context: HintLogic.Context?)
+	hintForced = context
+	refreshHint()
+end
+
+-- The hint's sources: sitting in a driver's seat (re-hooked on every
+-- character, R6 or R15: both have a Humanoid), logs in hand, and standing
+-- in the sell zone (polled; the sell area is Persistent, but found by name
+-- each time in case it isn't there yet).
+local function watchHintSources()
+	local seatedConn: RBXScriptConnection? = nil
+	local function onCharacter(char: Model)
+		local old = seatedConn
+		if old then
+			old:Disconnect()
+			seatedConn = nil
+		end
+		hintState.driving = false
+		refreshHint()
+		local humanoid = char:WaitForChild("Humanoid", 10)
+		if not humanoid or not humanoid:IsA("Humanoid") or char ~= player.Character then
+			return
+		end
+		seatedConn = humanoid.Seated:Connect(function(active: boolean, seatPart: BasePart?)
+			hintState.driving = active and seatPart ~= nil and seatPart:IsA("VehicleSeat")
+			refreshHint()
+		end)
+		local seat = humanoid.SeatPart
+		hintState.driving = seat ~= nil and seat:IsA("VehicleSeat")
+		refreshHint()
+	end
+	player.CharacterAdded:Connect(onCharacter)
+	local char = player.Character
+	if char then
+		task.spawn(onCharacter, char)
+	end
+
+	local function onCarried()
+		local n = player:GetAttribute("CarriedLogs")
+		hintState.carrying = type(n) == "number" and n > 0
+		refreshHint()
+	end
+	player:GetAttributeChangedSignal("CarriedLogs"):Connect(onCarried)
+	onCarried()
+
+	while true do
+		task.wait(HINT_POLL)
+		local map = workspace:FindFirstChild("TimberlineMap")
+		local area = if map then map:FindFirstChild("SellArea") else nil
+		local zone = if area then area:FindFirstChild("SellZone") else nil
+		local body = player.Character
+		local hrp = if body then body:FindFirstChild("HumanoidRootPart") else nil
+		local inZone = zone ~= nil
+			and zone:IsA("BasePart")
+			and hrp ~= nil
+			and hrp:IsA("BasePart")
+			and Util.pointInPart(zone, hrp.Position)
+		if inZone ~= hintState.inSellZone then
+			hintState.inSellZone = inZone
+			refreshHint()
+		end
+	end
+end
 
 -- Whether a world prompt that uses `key` is showing (it gets the press).
 local function promptOn(key: Enum.KeyCode): boolean
@@ -523,10 +603,7 @@ end
 
 local function refreshDevice()
 	local device: UITheme.Device = UITheme.Device()
-	local hint = hintLabel
-	if hint then
-		hint.Text = HINTS[device]
-	end
+	refreshHint()
 	for _, side in ipairs(sides) do
 		layoutSide(side, device)
 	end
@@ -826,6 +903,7 @@ function HUD.Start()
 	UITheme.WatchChat(queueToasts)
 	refreshDevice()
 	UserInputService.LastInputTypeChanged:Connect(refreshDevice)
+	task.spawn(watchHintSources)
 	UserInputService.InputBegan:Connect(onGamepad)
 	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 		shownPrompts[prompt] = true

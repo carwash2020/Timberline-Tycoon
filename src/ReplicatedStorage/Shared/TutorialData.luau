@@ -24,7 +24,7 @@ export type BeaconTarget = "tree" | "log" | "truck" | "sellPad" | "stump" | "too
 export type Step = {
 	id: string,
 	objective: string, -- the tracker line; "%d" is replaced by the goal count
-	murph: string, -- what Murph says when the step starts
+	murph: string, -- what Murph says when the step starts ({click} / {Click}: the device's word, HintLogic.Expand)
 	event: TutorialEvent,
 	count: number, -- how many of `event` (logs, for the log events)
 	beacon: BeaconTarget?,
@@ -35,7 +35,7 @@ TutorialData.Steps = {
 	{
 		id = "fell",
 		objective = "Chop down a tree",
-		murph = "Mornin'! I'm Murph. See that oak? Give it a whack. Click, or hold, to keep swingin'.",
+		murph = "Mornin'! I'm Murph. See the woods south of town, past the parking lot? Find an oak and give it a whack. {Click}, or hold, to keep swingin'.",
 		event = "treeFelled",
 		count = 1,
 		beacon = "tree",

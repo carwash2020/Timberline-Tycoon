@@ -23,6 +23,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local UITheme = require(script.Parent.UITheme)
@@ -50,6 +51,7 @@ local speechTap: TextButton? = nil -- covers the card: a tap dismisses it
 local beacon: BillboardGui? = nil
 local distanceLabel: TextLabel? = nil
 local speechToken = 0
+local speechLine = "" -- the line on the card, before its device words (HintLogic.Expand)
 local lastStep = -1
 local skipped = false -- this player pressed Skip: no farewell speech
 
@@ -117,11 +119,20 @@ end
 -- With touch controls the card sits where the dynamic thumbstick starts
 -- (the left of the screen, below the top third): a button over it would
 -- take the touch, so the stick wouldn't move. There it lets touches
--- through and goes on its own.
+-- through and goes on its own. Murph's words follow the device too
+-- ("Tap" on a touch screen, "Click" with a mouse, "Press RT" on a gamepad).
 local function refreshTap()
+	local device: UITheme.Device = UITheme.Device()
 	local tap = speechTap
 	if tap then
-		tap.Visible = UITheme.Device() ~= "phone"
+		tap.Visible = device ~= "phone"
+	end
+	local label = speechLabel
+	if label then
+		local text = HintLogic.Expand(speechLine, device)
+		if label.Text ~= text then
+			label.Text = text
+		end
 	end
 end
 
@@ -131,8 +142,8 @@ local function say(line: string)
 	if not holder or not card or not label then
 		return
 	end
-	refreshTap()
-	label.Text = line
+	speechLine = line
+	refreshTap() -- shows the line, worded for this device
 	card.Position = UDim2.fromOffset(0, 0)
 	fadeCard(card, 0, 0)
 	holder.Visible = true

@@ -53,6 +53,36 @@ return function(t)
 		t.eq(TutorialData.Steps[#TutorialData.Steps].event, "axeBought", "it ends by buying the Steel Axe")
 	end)
 
+	t.test("Murph's device words ({click}) expand on every device; the tracker lines have none", function()
+		local HintLogic = t.shared("HintLogic")
+		local lines = { TutorialData.Farewell }
+		for _, step in ipairs(TutorialData.Steps) do
+			table.insert(lines, step.murph)
+			t.ok(not HintLogic.HasToken(step.objective), step.id .. ": the tracker shows its objective as is")
+		end
+		local tokens = 0
+		for _, line in ipairs(lines) do
+			if HintLogic.HasToken(line) then
+				tokens += 1
+				for _, device in ipairs(HintLogic.Devices) do
+					local said = HintLogic.Expand(line, device)
+					t.ok(not HintLogic.HasToken(said), device .. ": " .. said)
+					t.ok(not string.find(said, "[{}]"), device .. ": a brace left in " .. said)
+				end
+			end
+			-- Device words only through a token: no bare "click" or "tap".
+			local bare = string.gsub(line, "{%a+}", "")
+			t.ok(not string.find(string.lower(bare), "%f[%a]click%f[%A]"), "a bare click in: " .. line)
+			t.ok(not string.find(string.lower(bare), "%f[%a]tap%f[%A]"), "a bare tap in: " .. line)
+		end
+		t.ok(tokens >= 1, "Murph's first line uses one")
+		local first = TutorialData.Steps[1].murph
+		t.ok(string.find(HintLogic.Expand(first, "phone"), "Tap, or hold", 1, true), "Tap on a phone")
+		t.ok(string.find(HintLogic.Expand(first, "desktop"), "Click, or hold", 1, true), "Click with a mouse")
+		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
+		t.ok(string.find(first, "south of town, past the parking lot", 1, true), "it points the way to the woods")
+	end)
+
 	t.test("rewards help toward the Steel Axe but don't buy it outright", function()
 		local reward = TutorialData.TotalReward()
 		t.ok(reward > 0)
