@@ -64,11 +64,20 @@ return {
 			place(BuildingArt.Signpost(sign.text), sign.cframe)
 		end
 		for _, cf in ipairs(town.parkingSlots) do
-			Kit.part(root, "Slot", V3.new(6.5, 0.2, 37), cf, roblox.Color3.fromRGB(186, 168, 140), roblox.Enum.Material.Slate)
+			Kit.part(
+				root,
+				"Slot",
+				V3.new(6.5, 0.2, 37),
+				cf,
+				roblox.Color3.fromRGB(186, 168, 140),
+				roblox.Enum.Material.Slate
+			)
 		end
-		for _, sign in ipairs(WorldPlan.RoadSigns(function(id)
-			return string.upper(id)
-		end)) do
+		for _, sign in
+			ipairs(WorldPlan.RoadSigns(function(id)
+				return string.upper(id)
+			end))
+		do
 			place(BuildingArt.Signpost(sign.text), sign.cframe)
 		end
 
@@ -100,7 +109,8 @@ return {
 				CF.new((fall.top + fall.bottom) / 2),
 				roblox.Color3.fromRGB(150, 205, 235),
 				roblox.Enum.Material.Glass
-			).Transparency = 0.35
+			).Transparency =
+				0.35
 		end
 
 		return {
