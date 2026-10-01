@@ -220,6 +220,9 @@ end
 
 export type Boulder = { position: Vector3, size: number, seed: number, snowy: boolean, dark: boolean }
 
+-- Boulders out in the country: dry, off the roads, below the high peaks,
+-- and on ground gentle enough (slope under 0.6) that sinking them 0.6
+-- leaves no gap under their downhill side.
 function WorldPlan.Boulders(): { Boulder }
 	local out: { Boulder } = {}
 	local rng = Kit.rng(4242)
@@ -232,6 +235,7 @@ function WorldPlan.Boulders(): { Boulder }
 			and TerrainGen.WaterLevelAt(x, z) == nil
 			and TerrainGen.RoadClearance(x, z) > 10
 			and TerrainGen.HeightAt(x, z) < 90
+			and TerrainGen.SlopeAt(x, z) < 0.6
 		if ok then
 			for _, t in ipairs(trees) do
 				local dx, dz = x - t.position.X, z - t.position.Z
@@ -286,10 +290,11 @@ function WorldPlan.IslandPalms(): { Vector3 }
 	return out
 end
 
--- The volcano's crater: where the lava glows and the smoke rises.
+-- The volcano's crater: where the lava glows and the smoke rises. Returns
+-- the centre of the level lava pool on its floor and the pool's radius.
 function WorldPlan.Crater(): (Vector3, number)
 	local cone = WorldLayout.VolcanoCone
-	return Vector3.new(cone.x, TerrainGen.HeightAt(cone.x, cone.z), cone.z), cone.crater
+	return Vector3.new(cone.x, TerrainGen.HeightAt(cone.x, cone.z), cone.z), cone.pool
 end
 
 ---------------------------------------------------------------------------
@@ -344,7 +349,9 @@ function WorldPlan.Town(): Town
 	-- Lamps (the layout from tools/preview/scenes/town.luau): along the
 	-- main street (z 70 to 84) with their arms over it, at the head of the
 	-- spawn walk, by the gondola path and the mill yard, and by the lot.
-	-- None stand where trucks pull out of the parking slots (x 16 to 104).
+	-- None stand where trucks pull out of the parking slots (x 16 to 104),
+	-- and none on a road (like every colliding thing in town: WorldPlan.spec).
+	-- The lot's lamp stands south of the Plot Road's mouth, its arm over it.
 	local lamps: { CFrame } = {}
 	for _, x in ipairs({ -92, -64, -30, -14 }) do
 		table.insert(lamps, at(x, 68.5, math.pi)) -- south side, arm north over the street
@@ -356,16 +363,25 @@ function WorldPlan.Town(): Town
 	table.insert(lamps, at(8, 60, math.pi / 2))
 	table.insert(lamps, at(-23, 132, math.pi / 2))
 	table.insert(lamps, at(26, 122, 0))
-	table.insert(lamps, at(120, 52, math.pi / 2))
+	table.insert(lamps, at(118, 40, math.pi))
 	table.insert(lamps, at(120, 0, math.pi / 2))
 
-	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east edge.
+	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east
+	-- edge (z 6 to 42, ending short of the Plot Road).
 	local fences: { Fence } = {
 		{ length = 26, cframe = at(-88, 136) },
 		{ length = 26, cframe = at(-88, 114) },
 		{ length = 22, cframe = at(-101, 125, math.pi / 2) },
-		{ length = 36, cframe = at(111, 25, math.pi / 2) },
+		{ length = 36, cframe = at(111, 24, math.pi / 2) },
 	}
+
+	-- Murph's camp west of the spawn, behind the TO THE WOODS sign and clear
+	-- of the Hills Road: the campfire at its origin, the tent behind (+Z),
+	-- facing the spawn; Murph stands at camp-local (0, 0, -3), his lantern
+	-- on its hook beside the camp, turned with it.
+	local campsite = facing(-28, 42, 0, 40)
+	local _, campYaw = campsite:ToEulerAnglesYXZ()
+	local lantern = campsite * Vector3.new(9, 0, 2)
 
 	local propSpots: { { any } } = { -- { name, x, z, yaw? }
 		{ "Haybale", -93, 128, 0.3 },
@@ -391,7 +407,7 @@ function WorldPlan.Town(): Town
 		{ "Wheelbarrow", 20, 93, -0.6 },
 		{ "SawdustPile", 24, 118 },
 		{ "SawdustPile", -21, 99 },
-		{ "Lantern", -28, 30 },
+		{ "Lantern", lantern.X, lantern.Z, campYaw },
 		{ "Barrel", -24, 120 },
 		{ "Barrel", -26, 117.5 },
 	}
@@ -420,12 +436,8 @@ function WorldPlan.Town(): Town
 	end
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
-		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 62, 0, 40) },
+		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
 	}
-
-	-- Murph's camp by the spawn: the campfire at its origin, the tent behind
-	-- (+Z), facing the spawn; Murph stands at camp-local (0, 0, -3).
-	local campsite = facing(-21, 24, 0, 40)
 
 	return {
 		spawn = Vector3.new(0, 0.5, 40),
@@ -467,9 +479,32 @@ end
 
 -- Signposts where the roads reach each biome: facing back down the road,
 -- listing the woods and the gear you need. (The Phantom Grove has none.)
+-- Each stands beside the road's last stretch, its near post a little over
+-- SIGN_CLEAR studs off the road, where the ground under both posts is
+-- level within a stud: from 6 studs before the road's end, stepping back
+-- down the road and trying both sides until it is. Where the road is cut
+-- into a hillside and nowhere is, it stands along the road instead, close
+-- in, where the road's grading keeps the ground level. Either way it's set
+-- on the lower post's ground, so neither post floats.
+-- (BuildingArt.Signpost's posts' outer faces are SIGN_POST either side of
+-- its middle.)
+local SIGN_POST = 4.95 + 0.35
+local SIGN_CLEAR = 2
+
 function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 	local out: { Sign } = {}
 	local roadFor = { HillsRoad = "hills", SnowRoad = "snow", VolcanoRoad = "volcano", SkyrootRoad = "sky" }
+	-- `flat` (at y = 0) set down on the lower post's ground, and whether the
+	-- ground under its posts and middle is level within a stud.
+	local function setDown(flat: CFrame): (CFrame, boolean)
+		local a, b, m = flat * Vector3.new(-SIGN_POST, 0, 0), flat * Vector3.new(SIGN_POST, 0, 0), flat.Position
+		local ha, hb, hm = TerrainGen.HeightAt(a.X, a.Z), TerrainGen.HeightAt(b.X, b.Z), TerrainGen.HeightAt(m.X, m.Z)
+		local level = math.max(ha, hb, hm) - math.min(ha, hb, hm) < 1
+			and TerrainGen.RoadClearance(a.X, a.Z) >= SIGN_CLEAR
+			and TerrainGen.RoadClearance(b.X, b.Z) >= SIGN_CLEAR
+			and TerrainGen.WaterLevelAt(m.X, m.Z) == nil
+		return flat + Vector3.new(0, math.min(ha, hb), 0), level
+	end
 	for _, road in ipairs(WorldLayout.Roads) do
 		local biomeId = roadFor[road.name]
 		if biomeId then
@@ -477,8 +512,27 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 			local last, prev = pts[#pts], pts[#pts - 1]
 			local dir = (last - prev).Unit
 			local side = Vector2.new(-dir.Y, dir.X)
-			local at = last - dir * 6 + side * (road.width / 2 + 4)
-			table.insert(out, { text = text(biomeId), cframe = standing(at.X, at.Y, prev.X, prev.Y) })
+			local toward = Vector3.new(prev.X, 0, prev.Y)
+			local spot: CFrame? = nil
+			for back = 6, math.min(66, (last - prev).Magnitude - 6), 4 do
+				for _, s in ipairs({ 1, -1 }) do
+					local at = last - dir * back + side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 0.5))
+					local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), toward))
+					if level then
+						spot = cf
+						break
+					end
+				end
+				if spot then
+					break
+				end
+			end
+			if not spot then
+				local at = last - dir * 6 + side * (road.width / 2 + 0.35 + SIGN_CLEAR + 0.5)
+				local roadSide = Vector3.new(at.X - side.X, 0, at.Y - side.Y) -- its face toward the road
+				spot = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), roadSide))
+			end
+			table.insert(out, { text = text(biomeId), cframe = spot :: CFrame })
 		end
 	end
 	return out
@@ -603,6 +657,44 @@ function WorldPlan.Sky(): Sky?
 			isle = nearestIndex, -- which of `isles` it pours off
 		},
 	}
+end
+
+-- The gondola's route from a station's Platform (its centre `from`, its
+-- open back `back` facing along the cable) up to the top station's
+-- Platform (`to`, its open back facing out over the main isle's rim):
+-- level out of the station's back until the cabin is clear of its roof,
+-- then up to a point level with the top platform just past the rim, then
+-- level in under the top station's roof. The rides and the drawn cable
+-- both follow it, each at its own height above it, so neither cuts through
+-- a station's roof or the isle. (The cabin is 5.4 across; a station's roof,
+-- its barge boards, reaches 5.2 behind its middle; the isle's grassy rim
+-- 1.1 past its radius.)
+local GONDOLA_OUT = 9
+local GONDOLA_RIM = 6
+
+function WorldPlan.GondolaPath(sky: Sky, from: Vector3, back: Vector3, to: Vector3): { Vector3 }
+	local c = sky.main.center
+	local out = Vector3.new(to.X - c.X, 0, to.Z - c.Z).Unit
+	local rim = Vector3.new(c.X, to.Y, c.Z) + out * (sky.main.radius + GONDOLA_RIM)
+	return { from, from + Vector3.new(back.X, 0, back.Z).Unit * GONDOLA_OUT, rim, to }
+end
+
+-- The point `alpha` (0 to 1) of the way along `path`, by length (so a
+-- cabin moving along it keeps an even speed round the bends).
+function WorldPlan.AlongPath(path: { Vector3 }, alpha: number): Vector3
+	local total = 0
+	for i = 1, #path - 1 do
+		total += (path[i + 1] - path[i]).Magnitude
+	end
+	local left = math.clamp(alpha, 0, 1) * total
+	for i = 1, #path - 1 do
+		local len = (path[i + 1] - path[i]).Magnitude
+		if left <= len and len > 0 then
+			return path[i]:Lerp(path[i + 1], left / len)
+		end
+		left -= len
+	end
+	return path[#path]
 end
 
 -- Points on an isle's top (relative to its centre `center`) that its

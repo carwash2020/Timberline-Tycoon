@@ -4,8 +4,10 @@
 -- the sawmill and GondolaBase at the Skyroot's foot ride up; GondolaTop on
 -- the isles rides down to town. Each ride costs the fee (a money sink) and
 -- takes rideSec: the player sits in a cabin that the server glides along
--- the cable. Jumping out ends the ride early (and you fall). The Riding
--- attribute is set for the whole ride, so the isles don't count it as a fall.
+-- the cable (WorldPlan.GondolaPath: out of the station, up past the main
+-- isle's rim, in under the top station's roof). Jumping out ends the ride
+-- early (and you fall). The Riding attribute is set for the whole ride, so
+-- the isles don't count it as a fall.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +15,7 @@ local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local EconomyService = require(script.Parent.EconomyService)
 local RateLimiter = require(script.Parent.RateLimiter)
 
@@ -78,8 +81,9 @@ local function endRide(player: Player)
 	end
 end
 
--- Rides `player` from `from` to `to` (cable points) and sets them down at `landing`.
-local function ride(player: Player, from: Vector3, to: Vector3, landing: CFrame)
+-- Rides `player` along `path` (where the cabin goes, start to end) and sets
+-- them down at `landing`.
+local function ride(player: Player, path: { Vector3 }, landing: CFrame)
 	if rides[player] or not RateLimiter.Allow(player, "Gondola") then
 		return
 	end
@@ -97,6 +101,7 @@ local function ride(player: Player, from: Vector3, to: Vector3, landing: CFrame)
 		return
 	end
 	local cabin, seat = buildCabin()
+	local from, to = path[1], path[#path]
 	local flatDir = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
 	local facing = if flatDir.Magnitude > 1 then CFrame.lookAt(Vector3.zero, flatDir) else CFrame.identity
 	cabin:PivotTo(CFrame.new(from) * facing.Rotation)
@@ -113,7 +118,7 @@ local function ride(player: Player, from: Vector3, to: Vector3, landing: CFrame)
 			return
 		end
 		local alpha = math.clamp((os.clock() - started) / gondola.rideSec, 0, 1)
-		cabin:PivotTo(CFrame.new(from:Lerp(to, alpha)) * facing.Rotation)
+		cabin:PivotTo(CFrame.new(WorldPlan.AlongPath(path, alpha)) * facing.Rotation)
 		if alpha >= 1 then
 			humanoid.Sit = false
 			local seatWeld = seat:FindFirstChild("SeatWeld")
@@ -147,9 +152,21 @@ function GondolaService._setup(map: Instance)
 		return platform
 	end
 	local town, base, top = station("GondolaTown"), station("GondolaBase"), station("GondolaTop")
-	-- The cabin hangs from the cable 8 studs above each platform.
-	local function cablePoint(platform: BasePart): Vector3
-		return platform.Position + Vector3.new(0, 1, 0)
+	local plan = WorldPlan.Sky()
+	assert(plan, "[GondolaService] No sky biome")
+	-- The cabin rides 1 stud above the platforms' centres, hanging from the
+	-- cable 7.5 above that (MapBuilder draws it along the same route).
+	local function upFrom(platform: BasePart): { Vector3 }
+		local path = WorldPlan.GondolaPath(plan, platform.Position, platform.CFrame.ZVector, top.Position)
+		for i, p in ipairs(path) do
+			path[i] = p + Vector3.new(0, 1, 0)
+		end
+		return path
+	end
+	local townUp, baseUp = upFrom(town), upFrom(base)
+	local townDown: { Vector3 } = {}
+	for i = #townUp, 1, -1 do
+		table.insert(townDown, townUp[i])
 	end
 	local function landingOn(platform: BasePart): CFrame
 		return CFrame.new(platform.Position + Vector3.new(0, 4, 0))
@@ -166,13 +183,13 @@ function GondolaService._setup(map: Instance)
 		prompt.Triggered:Connect(go)
 	end
 	addPrompt(town, "Ride up", function(player)
-		ride(player, cablePoint(town), cablePoint(top), landingOn(top))
+		ride(player, townUp, landingOn(top))
 	end)
 	addPrompt(base, "Ride up", function(player)
-		ride(player, cablePoint(base), cablePoint(top), landingOn(top))
+		ride(player, baseUp, landingOn(top))
 	end)
 	addPrompt(top, "Ride down", function(player)
-		ride(player, cablePoint(top), cablePoint(town), landingOn(town))
+		ride(player, townDown, landingOn(town))
 	end)
 end
 
