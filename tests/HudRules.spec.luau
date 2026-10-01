@@ -172,4 +172,59 @@ return function(t)
 		t.eq(HudRules.LoadingText(false, true), nil, "a loaded save always takes it down")
 		t.eq(HudRules.LoadingText(true, "true"), "Loading your save...", "only the boolean counts")
 	end)
+
+	-- A toast's seconds, near enough (the formula's floats).
+	local function near(actual, expected, what)
+		t.ok(math.abs(actual - expected) < 1e-9, string.format("%s: %s s, not %s s", what, actual, expected))
+	end
+
+	t.test("a toast stays 1.6 s plus 0.045 s a character, from 2.5 to 6 s", function()
+		near(HudRules.ToastSeconds(""), 2.5, "empty")
+		near(HudRules.ToastSeconds("Hop out first."), 2.5, "short: the least")
+		near(HudRules.ToastSeconds(string.rep("x", 20)), 2.5, "20 characters: the least")
+		near(HudRules.ToastSeconds(string.rep("x", 40)), 1.6 + 0.045 * 40, "40 characters")
+		near(HudRules.ToastSeconds(string.rep("x", 60)), 1.6 + 0.045 * 60, "60 characters")
+		near(HudRules.ToastSeconds(string.rep("x", 98)), 6, "98 characters: the most")
+		near(HudRules.ToastSeconds(string.rep("x", 400)), 6, "a long one: still the most")
+		-- Longer never means shorter.
+		local last = 0
+		for n = 0, 140 do
+			local s = HudRules.ToastSeconds(string.rep("x", n))
+			t.ok(s >= last and s >= 2.5 and s <= 6, n .. " characters")
+			last = s
+		end
+		-- A real one: the lightning toast, 72 characters (4.84 s).
+		local struck = "Lightning struck an oak nearby! Fell it within 2 minutes for Stormgrain."
+		near(HudRules.ToastSeconds(struck), 1.6 + 0.045 * #struck, "the lightning toast")
+	end)
+
+	t.test("a toast's length is its plain text: rich-text tags out, an entity or a · one character", function()
+		local plain = "Sold 4 logs for $120"
+		local rich = '<font color="#3F7A34" weight="heavy">Sold 4 logs</font> for <b>$120</b>'
+		local long = string.rep("word ", 12) -- 60 characters
+		local richLong = "<i>" .. long .. "</i>"
+		t.eq(HudRules.ToastSeconds(rich), HudRules.ToastSeconds(plain))
+		t.eq(HudRules.ToastSeconds(richLong), HudRules.ToastSeconds(long))
+		near(HudRules.ToastSeconds(string.rep("&amp;", 60)), 1.6 + 0.045 * 60, "60 entities")
+		near(HudRules.ToastSeconds(string.rep("·", 60)), 1.6 + 0.045 * 60, "60 middle dots (two bytes each)")
+	end)
+
+	t.test("a confirm toast (press again to go ahead) stays the full 6 s; a caller's seconds win", function()
+		t.eq(HudRules.ConfirmToastSeconds, 6)
+		-- VehicleService's recall confirm (it waits 6 s for the second press).
+		t.eq(
+			HudRules.ToastSeconds(
+				"Your 1 log will be left where your truck stands. Press Send truck home again to go ahead."
+			),
+			6
+		)
+		t.eq(HudRules.ToastSeconds("Tap again to skip"), 6)
+		t.ok(HudRules.ToastSeconds("Your truck's on its way. Try again in 4 s.") < 6, "a cooldown isn't a confirm")
+		t.ok(HudRules.ToastSeconds("Northern Hills is healthy again.") < 6)
+		t.eq(HudRules.ToastSeconds("Hi", 6), 6, "the caller's seconds")
+		t.eq(HudRules.ToastSeconds(string.rep("x", 200), 3), 3, "even for a long one")
+		t.eq(HudRules.ToastSeconds("Hi", 0), 1, "never under 1 s")
+		t.eq(HudRules.ToastSeconds("Hi", 1e9), 15, "nor over 15 s")
+		t.eq(HudRules.ToastSeconds("Hi", 0 / 0), 2.5, "NaN: by its length")
+	end)
 end

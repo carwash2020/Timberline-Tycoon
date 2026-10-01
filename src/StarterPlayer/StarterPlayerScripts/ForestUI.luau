@@ -794,8 +794,8 @@ local function onStruck(payload: { [string]: any })
 		local minutes = if type(seconds) == "number" then math.max(1, math.floor(seconds / 60 + 0.5)) else 2
 		HUD.Toast(
 			string.format(
-				"Lightning struck a %s nearby! Fell it within %d minute%s for Stormgrain.",
-				string.lower(woodName(woodId)),
+				"Lightning struck %s nearby! Fell it within %d minute%s for Stormgrain.",
+				Util.article(string.lower(woodName(woodId))),
 				minutes,
 				if minutes == 1 then "" else "s"
 			)

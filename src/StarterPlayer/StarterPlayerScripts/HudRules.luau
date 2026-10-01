@@ -18,6 +18,7 @@
 --   * LoadChip() (HUD): the logs in your hands and in your truck's bed,
 --     beside the hint.
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
+--   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,6 +32,9 @@ local HudRules = {}
 HudRules.SendHomeNear = 40 -- studs: closer to your truck than this, you'd drive it rather than send it
 HudRules.DropConfirmSeconds = 3 -- the second press must come this soon after the first...
 HudRules.DropConfirmGap = 0.3 -- ...but not sooner than this (a double tap or a mashed button isn't a yes)
+HudRules.ToastMinSeconds = 2.5 -- the shortest toast...
+HudRules.ToastMaxSeconds = 6 -- ...and the longest one, by its length
+HudRules.ConfirmToastSeconds = 6 -- a toast that asks for a second press (the server waits 6 s for it)
 
 -- The tutorial step the pouch waits for (step ids never change: they're
 -- save keys). Without it, the pouch shows from the start.
@@ -168,6 +172,35 @@ function HudRules.LoadingText(remotes: boolean, profileLoaded: unknown): string?
 		return nil
 	end
 	return if remotes then "Loading your save..." else "Building the world..."
+end
+
+-- `text` as it reads: rich-text tags dropped and each entity (&amp;) one
+-- character.
+local function plainText(text: string): string
+	local noTags = string.gsub(text, "<[^<>]*>", "")
+	local plain = string.gsub(noTags, "&#?%w+;", "x")
+	return plain
+end
+
+-- How many seconds a toast saying `message` stays up (HUD.Toast):
+--   * long enough to read it: 1.6 s plus 0.045 s a character of its plain
+--     text (rich-text tags stripped), from 2.5 s (20 characters or fewer)
+--     to 6 s (98 or more);
+--   * a confirm, one that asks for a second press ("... Press Send truck
+--     home again to go ahead."), the full 6 s, as long as the server waits
+--     for that press (VehicleService's recall);
+--   * `seconds`, when the caller gives a number, instead (kept between
+--     1 and 15 s).
+function HudRules.ToastSeconds(message: string, seconds: number?): number
+	if type(seconds) == "number" and seconds == seconds then -- not NaN
+		return math.clamp(seconds, 1, 15)
+	end
+	local plain = plainText(message)
+	if string.find(string.lower(plain), "again to ", 1, true) then
+		return HudRules.ConfirmToastSeconds
+	end
+	local length = utf8.len(plain) or #plain -- characters ("·" is one), or bytes if it isn't UTF-8
+	return math.clamp(1.6 + 0.045 * length, HudRules.ToastMinSeconds, HudRules.ToastMaxSeconds)
 end
 
 return HudRules

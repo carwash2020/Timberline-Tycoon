@@ -26,6 +26,52 @@ return function(t)
 		t.eq(original.a.b, 1)
 	end)
 
+	t.test("article: an before a vowel sound, a before a consonant, the word's case kept", function()
+		t.eq(Util.article("oak"), "an oak")
+		t.eq(Util.article("birch"), "a birch")
+		t.eq(Util.article("Elder"), "an Elder")
+		t.eq(Util.article("Oak"), "an Oak")
+		t.eq(Util.article("emberwood"), "an emberwood")
+		t.eq(Util.article("Insulated Coat"), "an Insulated Coat")
+		t.eq(Util.article("Lantern"), "a Lantern")
+		t.eq(Util.article("Homestead"), "a Homestead", "a sounded h")
+		t.eq(Util.article("hour"), "an hour", "a silent h")
+		t.eq(Util.article("unicorn"), "a unicorn", "a u that sounds like you")
+		t.eq(Util.article("umbrella"), "an umbrella")
+		t.eq(Util.article(""), "", "nothing to name")
+	end)
+
+	t.test("article names every wood, gear and plot tier the toasts can name", function()
+		local WoodData = t.shared("WoodData")
+		local ItemCatalog = t.shared("ItemCatalog")
+		local PlotData = t.shared("PlotData")
+		local expect = {
+			oak = "an oak",
+			birch = "a birch",
+			pine = "a pine",
+			maple = "a maple",
+			palmwood = "a palmwood",
+			frostwood = "a frostwood",
+			emberwood = "an emberwood",
+			phantomwood = "a phantomwood",
+			lumenwood = "a lumenwood",
+		}
+		local checked = 0
+		for _, wood in ipairs(WoodData.All()) do
+			local name = string.lower(wood.displayName)
+			if expect[name] then
+				t.eq(Util.article(name), expect[name])
+				checked += 1
+			end
+		end
+		t.ok(checked >= 9, "the nine woods are still there")
+		t.eq(Util.article(ItemCatalog.GetGear("InsulatedCoat").displayName), "an Insulated Coat")
+		t.eq(Util.article(ItemCatalog.GetGear("Lantern").displayName), "a Lantern")
+		for _, tier in ipairs(PlotData.Tiers) do
+			t.eq(Util.article(tier.name), "a " .. tier.name)
+		end
+	end)
+
 	t.test("guid gives a fresh id each time", function()
 		t.ok(Util.guid() ~= Util.guid())
 	end)

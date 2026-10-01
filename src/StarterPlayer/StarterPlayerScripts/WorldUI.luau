@@ -24,6 +24,7 @@ local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
@@ -70,10 +71,17 @@ local function onBiomeChanged()
 	local gear = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
 	local rules = BiomeData.Rules(biome, gear)
 	if rules.speedFactor < 1 and biome.slowdown then
-		HUD.Toast(string.format("It's cold here: you walk slower without an %s.", gearName(biome.slowdown.removedBy)))
+		HUD.Toast(
+			string.format(
+				"It's cold here: you walk slower without %s.",
+				Util.article(gearName(biome.slowdown.removedBy))
+			)
+		)
 	end
 	if rules.needs and not rules.burning then
-		HUD.Toast(string.format("Too dark to chop here without a %s (Hearth & Home).", gearName(rules.needs)))
+		HUD.Toast(
+			string.format("Too dark to chop here without %s (Hearth & Home).", Util.article(gearName(rules.needs)))
+		)
 	end
 	if biome.nightOnly and not WorldTime.IsNight(Lighting.ClockTime) then
 		HUD.Toast("Nothing grows here by day. Come back at night.")

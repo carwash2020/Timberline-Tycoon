@@ -4,8 +4,10 @@
 --     which would cover it, is off: GameConfig). At the wallet cap it turns
 --     amber and reads MAX.
 --   * Toasts: short messages from the server (Notify) or other controllers,
---     newest on top (older ones fade back), in a lane that keeps clear of
---     the top-right corner and the left column (HudLayout.ToastLane):
+--     up for as long as they take to read (2.5 to 6 s; a confirm 6 s:
+--     HudRules.ToastSeconds), newest on top (older ones fade back), in a
+--     lane that keeps clear of the top-right corner and the left column
+--     (HudLayout.ToastLane):
 --     centred at the top between them on a computer or a TV, up to three;
 --     on a phone, where there's no room between them, under the tutorial
 --     tracker at its width, up to two. Amounts of money show in green.
@@ -79,7 +81,6 @@ local MAX_TOASTS = 3 -- until the lane is placed (HudLayout.ToastLane says how m
 local TOAST_WIDTH = 280 -- a toast's widest
 local TOAST_TEXT_INSET = 28 -- its padding either side of the text
 local TOAST_LANE_MIN = 240 -- a band narrower than this between the left column and the corner: toasts go under the column
-local TOAST_SECONDS = 3
 local TOAST_FADE = 0.25
 local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
 local HINT_POLL = 0.25 -- seconds between sell-zone checks for the hint
@@ -434,8 +435,10 @@ function HUD.Popup(card: GuiObject)
 	placePopups()
 end
 
--- Shows a short message at the top of the screen for a few seconds.
-function HUD.Toast(message: string)
+-- Shows a short message at the top of the screen for a few seconds: long
+-- enough to read it, or `seconds` when given (HudRules.ToastSeconds; a
+-- confirm, which asks for a second press, stays 6 s).
+function HUD.Toast(message: string, seconds: number?)
 	local stack = toastStack
 	if not stack then
 		return
@@ -473,7 +476,7 @@ function HUD.Toast(message: string)
 	table.insert(toasts, 1, toast)
 	restack()
 
-	task.delay(TOAST_SECONDS, function()
+	task.delay(HudRules.ToastSeconds(message, seconds), function()
 		if not table.find(toasts, toast) then
 			return -- already pushed out by newer toasts
 		end
@@ -1273,9 +1276,9 @@ function HUD.Start()
 	-- theirs are there too by then.)
 	waitForRemotes()
 	Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
-	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown)
+	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown, seconds: unknown)
 		if type(message) == "string" then
-			HUD.Toast(message)
+			HUD.Toast(message, if type(seconds) == "number" then seconds else nil)
 		end
 	end)
 end
