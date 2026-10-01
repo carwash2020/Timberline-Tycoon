@@ -29,7 +29,6 @@ local MOSS = hex("#7FA650")
 local STEM = hex("#5E9442")
 local LEAF = hex("#6FAE4E")
 local BARK = hex("#6E5038")
-local HEART = hex("#D9B98A")
 local WHITE = Color3.new(1, 1, 1)
 
 ---------------------------------------------------------------------------
@@ -730,30 +729,51 @@ end
 -- Wood on the forest floor
 ---------------------------------------------------------------------------
 
--- A fallen, mossy log: one end sawn (pale, with rings), the other broken,
--- a branch stub and a bracket fungus.
+-- Decor logs and stumps have lain here for years, so they must never pass
+-- for a fresh one you can chop or haul (NAT-13): bark weathered 35% toward
+-- grey-olive, rotten or mossy wood where a fresh cut would be pale, sunk
+-- 0.2 studs into the ground, mushrooms.
+local WEATHERED = hex("#6E6A58")
+local WEATHERING = 0.35
+local SINK = 0.2
+local ROT = hex("#5B4A36") -- soft, dark old wood
+local HOLLOW = hex("#33281D")
+
+local function weathered(bark: Color3): Color3
+	return bark:Lerp(WEATHERED, WEATHERING)
+end
+
+-- A small brown mushroom: a pale stalk and a squat cap. Two parts.
+local function toadstool(model: Model, at: Vector3, h: number, w: number, color: Color3)
+	bit(model, "Mushroom", Vector3.new(w * 0.3, h, w * 0.3), CFrame.new(at + Vector3.new(0, h / 2, 0)), hex("#EDE4CC"))
+	bit(
+		model,
+		"Mushroom",
+		Vector3.new(w, w * 0.3, w),
+		CFrame.new(at + Vector3.new(0, h + w * 0.08, 0)) * CFrame.Angles(0, math.pi / 4, 0),
+		color
+	)
+end
+
+-- A long-fallen log, sunk into the ground: weathered bark, one end rotted
+-- hollow, the other broken, moss along the top, a branch stub, a bracket
+-- fungus and a mushroom.
 function PropArt.FallenLog(seed: number, barkColor: Color3?, moss: Color3?): Model
 	local model = Kit.model("FallenLog")
 	local rng = Kit.rng(seed)
-	local bark = barkColor or BARK
+	local bark = weathered(barkColor or BARK)
 	local L = rng:range(6, 10)
 	local d = rng:range(1.4, 2.2)
 	local yaw = rng:range(0, math.pi * 2)
-	local base = CFrame.new(0, d / 2 - 0.15, 0) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, 0, rng:range(-0.04, 0.04))
+	local base = CFrame.new(0, d / 2 - 0.15 - SINK, 0)
+		* CFrame.Angles(0, yaw, 0)
+		* CFrame.Angles(0, 0, rng:range(-0.04, 0.04))
 	Kit.decor(Kit.cylinder(model, "Log", L, d, base, Kit.vary(bark, rng, 0.03), Enum.Material.Wood))
-	-- The sawn end: pale heartwood and a ring.
+	-- The old cut end: soft, dark rotten wood round a hollow core.
 	local endCF = base * CFrame.new(L / 2 + 0.02, 0, 0)
-	Kit.decor(Kit.cylinder(model, "LogEnd", 0.06, d * 0.86, endCF, HEART, Enum.Material.Wood), false)
+	Kit.decor(Kit.cylinder(model, "LogEnd", 0.06, d * 0.86, endCF, ROT, Enum.Material.Wood), false)
 	Kit.decor(
-		Kit.cylinder(
-			model,
-			"LogRing",
-			0.08,
-			d * 0.48,
-			endCF * CFrame.new(0.01, 0, 0),
-			Kit.shade(HEART, -0.14),
-			Enum.Material.Wood
-		),
+		Kit.cylinder(model, "LogHollow", 0.08, d * 0.5, endCF * CFrame.new(0.01, 0, 0), HOLLOW, Enum.Material.Wood),
 		false
 	)
 	-- The broken end: a few splinters.
@@ -800,29 +820,33 @@ function PropArt.FallenLog(seed: number, barkColor: Color3?, moss: Color3?): Mod
 		hex("#E9C892"),
 		Enum.Material.SmoothPlastic
 	)
+	-- A mushroom on the ground against the log's flank.
+	local mAt = (base * CFrame.new(rng:range(0.05, 0.35) * L, 0, -d * 0.62)).Position
+	toadstool(model, Vector3.new(mAt.X, 0, mAt.Z), rng:range(0.35, 0.5), rng:range(0.4, 0.55), hex("#A8683E"))
 	return model
 end
 
--- An old weathered stump: grey-gold top, jagged splinters, moss, roots and
--- a tiny mushroom.
+-- An old stump, sunk into the ground: weathered bark, a rotten top half
+-- grown over with moss, jagged splinters, roots and a little mushroom.
 function PropArt.Stump(seed: number, barkColor: Color3?, moss: Color3?): Model
 	local model = Kit.model("OldStump")
 	local rng = Kit.rng(seed)
-	local bark = barkColor or BARK
+	local bark = weathered(barkColor or BARK)
 	local d = rng:range(1.6, 2.4)
 	local h = rng:range(0.9, 1.5)
+	local top = h - SINK
 	Kit.decor(
 		Kit.cylinder(
 			model,
 			"StumpBody",
 			h + 0.2,
 			d,
-			CFrame.new(0, h / 2 - 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			CFrame.new(0, h / 2 - 0.1 - SINK, 0) * CFrame.Angles(0, 0, math.pi / 2),
 			Kit.vary(bark, rng, 0.03),
 			Enum.Material.Wood
 		)
 	)
-	disc(model, "StumpTop", Vector3.new(0, h + 0.02, 0), 0.06, d * 0.84, hex("#B8A68A"), Enum.Material.Wood)
+	disc(model, "StumpTop", Vector3.new(0, top + 0.02, 0), 0.06, d * 0.84, ROT, Enum.Material.Wood)
 	-- Splinters standing up round the rim where it broke.
 	local yaw = rng:range(0, math.pi * 2)
 	for i = 1, 2 do
@@ -832,19 +856,19 @@ function PropArt.Stump(seed: number, barkColor: Color3?, moss: Color3?): Model
 			model,
 			"Splinter",
 			Vector3.new(0.18, sh, d * 0.3),
-			CFrame.new(math.cos(a) * d * 0.36, h + sh / 2, math.sin(a) * d * 0.36)
+			CFrame.new(math.cos(a) * d * 0.36, top + sh / 2, math.sin(a) * d * 0.36)
 				* CFrame.Angles(0, -a + math.pi / 2, 0),
 			Kit.shade(bark, 0.08),
 			Enum.Material.Wood
 		)
 	end
-	-- Moss over part of the top.
+	-- Moss over most of the top.
 	Kit.decor(
 		Kit.ellipsoid(
 			model,
 			"Moss",
-			Vector3.new(d * 0.6, 0.2, d * 0.45),
-			CFrame.new(math.cos(yaw + 1) * d * 0.15, h + 0.05, math.sin(yaw + 1) * d * 0.15),
+			Vector3.new(d * 0.72, 0.22, d * 0.6),
+			CFrame.new(math.cos(yaw + 1) * d * 0.1, top + 0.05, math.sin(yaw + 1) * d * 0.1),
 			Kit.vary(moss or MOSS, rng, 0.05),
 			Enum.Material.Grass
 		),
@@ -858,7 +882,7 @@ function PropArt.Stump(seed: number, barkColor: Color3?, moss: Color3?): Model
 			model,
 			"Root",
 			Vector3.new(d * 0.24, rh, rl),
-			CFrame.Angles(0, -a - math.pi / 2, 0) * CFrame.new(0, rh / 2 - 0.08, -(d / 2 + rl / 2 - 0.15)),
+			CFrame.Angles(0, -a - math.pi / 2, 0) * CFrame.new(0, rh / 2 - 0.08 - SINK, -(d / 2 + rl / 2 - 0.15)),
 			Kit.shade(bark, -0.06),
 			Enum.Material.Wood
 		)

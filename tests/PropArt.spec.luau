@@ -310,4 +310,41 @@ return function(t)
 		end
 		t.eq(PropArt.Scatter("starter", 3, "water").Name, "LilyPad")
 	end)
+
+	-- NAT-13: decor logs and stumps read as old, never as a fresh one.
+	t.test("decor logs and stumps are weathered, rotten-topped, sunk and sprout mushrooms", function()
+		local BARK = Color3.fromHex("#6E5038")
+		local aged = BARK:Lerp(Color3.fromHex("#6E6A58"), 0.35)
+		local function near(a, b, tol)
+			return math.abs(a.R - b.R) <= tol and math.abs(a.G - b.G) <= tol and math.abs(a.B - b.B) <= tol
+		end
+		local function named(model, name)
+			local out = {}
+			for _, p in ipairs(parts(model)) do
+				if p.Name == name then
+					table.insert(out, p)
+				end
+			end
+			return out
+		end
+		local fresh = Color3.fromHex("#D9B98A") -- the pale heartwood they used to show
+		for seed = 1, 20 do
+			for _, case in ipairs({
+				{ PropArt.FallenLog(seed), "Log", "LogEnd" },
+				{ PropArt.Stump(seed), "StumpBody", "StumpTop" },
+			}) do
+				local model, bodyName, cutName = case[1], case[2], case[3]
+				local body = named(model, bodyName)[1]
+				t.ok(body, bodyName .. " exists")
+				t.ok(near(body.Color, aged, 0.05), bodyName .. ": bark weathered 35% toward #6E6A58")
+				local cut = named(model, cutName)[1]
+				local _, _, value = cut.Color:ToHSV()
+				t.ok(value < 0.5 and not near(cut.Color, fresh, 0.15), cutName .. " is rotten, not pale heartwood")
+				t.ok(#named(model, "Mushroom") >= 2, model.Name .. " has a mushroom (stalk and cap)")
+				-- Sunk 0.2 deeper than before: the body's bottom is 0.2 lower.
+				local bottom = body.CFrame.Y - halfHeight(body)
+				t.ok(bottom < -0.3, string.format("%s seed %d: sunk to %.2f", bodyName, seed, bottom))
+			end
+		end
+	end)
 end

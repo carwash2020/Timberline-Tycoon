@@ -66,7 +66,8 @@ local PALETTES: { [string]: Palette } = {
 		accent = hex("#7A5A36"),
 	},
 	frostwood = {
-		leaves = { hex("#7FB8D8"), hex("#6AA8CC"), hex("#93C7E2"), hex("#5E9DC4") },
+		-- Deep blue so a frostwood reads against the snowfield (NAT-07).
+		leaves = { hex("#3F7FA6"), hex("#4F90B5"), hex("#2F6E96"), hex("#5B9CC0") },
 		heart = hex("#E4F2FA"),
 		accent = hex("#FFFFFF"),
 		glow = hex("#B9F1FF"),
@@ -350,25 +351,49 @@ builders.birch = function(model, def, pal, H, F, rng)
 	canopy(model, CFrame.new(0, H * 1.5, 0), Vector3.new(F * 0.6, F * 0.6, F * 0.6), 3, rng, pal.leaves)
 end
 
--- Pine: a straight trunk under stacked faceted cones.
+-- Pine: a straight trunk under stacked faceted cones. Every face is two
+-- wedges, so the side counts set the part budget (NAT-17, TreeArt.spec):
+-- a pine is a trunk, 3 root flares and 4 five-sided tiers (44 parts); a
+-- frostwood adds four-sided snow caps on its top two tiers only (60). The
+-- lower tiers' tops sit inside the tier above, so caps there barely showed.
+TreeArt.ConiferTiers = 4
+TreeArt.ConiferSides = 5
+TreeArt.SnowCapSides = 4
+TreeArt.SnowCappedTiers = 2
+-- A cap's base radius, as a fraction of its tier's: narrow enough that the
+-- blue shows under it (NAT-07; it was 0.56).
+TreeArt.SnowCapRadius = 0.45
+
 local function conifer(model: Model, def: WoodDef, pal: Palette, H: number, F: number, rng: Rng, snow: boolean)
 	local D = 0.12 * H
 	trunk(model, def, H, D)
 	rootFlares(model, def.trunkColor, D, 3, rng)
-	local tiers = 4
+	local tiers = TreeArt.ConiferTiers
 	local tierH = H * 0.5
 	for i = 0, tiers - 1 do
 		local y = H * 0.32 + i * H * 0.3
 		local r = F / 2 * (1 - i * 0.2)
 		local base = CFrame.new(0, y, 0) * CFrame.Angles(0, rng:range(0, math.pi), 0)
-		tier(model, base, r, tierH * (1 - i * 0.08), 6, rng, pal.leaves)
-		if snow then
-			-- A white cap over the top of each tier, a hair outside it.
-			local capH = tierH * (1 - i * 0.08) * 0.5
-			local capBase = base * CFrame.new(0, tierH * (1 - i * 0.08) - capH + 0.08, 0)
-			Kit.cone(model, capBase, r * 0.56, capH + 0.14, 6, function(): Color3
-				return Kit.vary(pal.accent or Color3.new(1, 1, 1), rng, 0.02)
-			end, Enum.Material.Snow, 0.1)
+		tier(model, base, r, tierH * (1 - i * 0.08), TreeArt.ConiferSides, rng, pal.leaves)
+		if snow and i >= tiers - TreeArt.SnowCappedTiers then
+			-- A white cap over the top of the tier. It starts where the tier
+			-- has narrowed to the cap's width (its corners a hair outside),
+			-- so blue shows under it and its tip clears the tier's by 0.22.
+			local h = tierH * (1 - i * 0.08)
+			local capFrom = h * (1 - TreeArt.SnowCapRadius * 0.72)
+			local capBase = base * CFrame.new(0, capFrom, 0)
+			Kit.cone(
+				model,
+				capBase,
+				r * TreeArt.SnowCapRadius,
+				h - capFrom + 0.22,
+				TreeArt.SnowCapSides,
+				function(): Color3
+					return Kit.vary(pal.accent or Color3.new(1, 1, 1), rng, 0.02)
+				end,
+				Enum.Material.Snow,
+				0.1
+			)
 		end
 	end
 end
@@ -377,27 +402,11 @@ builders.pine = function(model, def, pal, H, F, rng)
 	conifer(model, def, pal, H, F, rng, false)
 end
 
+-- Frostwood: a snow-capped conifer. Its four glass ice shards at the foot
+-- went for the 60-part budget (NAT-17): the caps say "snow" from the road,
+-- the shards only up close.
 builders.frostwood = function(model, def, pal, H, F, rng)
 	conifer(model, def, pal, H, F, rng, true)
-	-- Ice crystals at the foot, catching the light.
-	for _ = 1, 4 do
-		local a = rng:range(0, math.pi * 2)
-		local r = rng:range(1.4, 2.6)
-		local h = rng:range(1.2, 2.4)
-		Kit.decor(
-			Kit.part(
-				model,
-				"IceShard",
-				Vector3.new(0.5, h, 0.5),
-				CFrame.new(math.cos(a) * r, h / 2 - 0.2, math.sin(a) * r)
-					* CFrame.Angles(rng:range(-0.4, 0.4), rng:range(0, 3), rng:range(-0.4, 0.4)),
-				pal.glow or Color3.fromRGB(185, 241, 255),
-				Enum.Material.Glass
-			),
-			false
-		).Transparency =
-			0.25
-	end
 end
 
 -- Maple: a forked trunk under a wide, flaming autumn crown.

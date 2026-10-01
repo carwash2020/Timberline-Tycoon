@@ -121,7 +121,7 @@ local woods: { WoodDef } = {
 		respawnSec = 180,
 		silhouette = "pine",
 		leafColor = hexColor("#BFE3F2"),
-		trunkColor = hexColor("#5A6A7A"),
+		trunkColor = hexColor("#485462"),
 		trunkHeight = 15,
 		foliageSize = 10,
 	},

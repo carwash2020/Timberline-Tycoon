@@ -9,6 +9,9 @@
 -- And stumps (NAT-03): no root flare sticks up past the cut, for every
 -- wood at every size and as an Elder; a stump's flares are shorter
 -- (0.35-0.5 diameters) and a standing tree's are as they were.
+-- And part budgets (NAT-17): trees are most of the world's parts, so a
+-- pine stays at or under 44 and a frostwood at or under 60, in every size
+-- class and for any seed, with their tiers and snow caps still there.
 return function(t)
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
 	local WoodData = t.shared("WoodData")
@@ -193,5 +196,116 @@ return function(t)
 				t.ok(barY < 8, def.id .. " " .. size.name .. ": the bar is too high")
 			end
 		end
+	end)
+
+	local function partCount(model)
+		local n = 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				n += 1
+			end
+		end
+		return n
+	end
+
+	local BUDGET = { pine = 44, frostwood = 60 }
+	local SEEDS = { 1, 2, 3, 11, 42, 777, 9001 }
+
+	t.test("pines and frostwoods stay inside their part budgets", function()
+		local line = {}
+		for _, def in ipairs(WoodData.All()) do
+			local most = 0
+			for _, size in ipairs(scales(def)) do
+				for _, seed in ipairs(SEEDS) do
+					local n = partCount(TreeArt.Build(def, seed, size.scale))
+					most = math.max(most, n)
+					local cap = BUDGET[def.id]
+					if cap then
+						t.ok(
+							n <= cap,
+							string.format(
+								"%s %s seed %d: %d parts, over its budget of %d",
+								def.id,
+								size.name,
+								seed,
+								n,
+								cap
+							)
+						)
+					end
+				end
+			end
+			table.insert(line, def.id .. " " .. most)
+		end
+		print("    tree parts (most per wood): " .. table.concat(line, ", "))
+	end)
+
+	t.test("a conifer keeps four five-sided tiers, and a frostwood's caps top only the upper two", function()
+		for _, id in ipairs({ "pine", "frostwood" }) do
+			local def = WoodData.Get(id)
+			for _, scale in ipairs({ 0.82, 1, 1.22 }) do
+				for _, seed in ipairs({ 1, 42, 777 }) do
+					local tree = TreeArt.Build(def, seed, scale)
+					local tiers = {}
+					local caps = {}
+					for _, child in ipairs(tree:GetChildren()) do
+						if child:IsA("Model") and child.Name == "Tier" then
+							table.insert(tiers, child)
+						elseif child:IsA("BasePart") and child.Name == "Facet" then
+							table.insert(caps, child)
+						end
+					end
+					t.eq(#tiers, TreeArt.ConiferTiers, id .. ": four Tier models")
+					for _, tier in ipairs(tiers) do
+						-- Two wedges a face (Kit.triangle), every one a clickable Facet.
+						t.eq(partCount(tier), TreeArt.ConiferSides * 2, id .. ": a five-sided tier")
+						for _, p in ipairs(tier:GetChildren()) do
+							t.ok(p.Name == "Facet" and p.CanQuery, id .. ": tier parts are clickable Facets")
+						end
+					end
+					if id == "frostwood" then
+						t.eq(#caps, TreeArt.SnowCappedTiers * TreeArt.SnowCapSides * 2, "two four-sided caps")
+						-- The third tier from the bottom starts 0.92 trunk heights up.
+						local thirdTier = 0.92 * def.trunkHeight * scale
+						for _, cap in ipairs(caps) do
+							t.ok(cap.Material == t.roblox.Enum.Material.Snow, "a cap is snow")
+							t.ok(cap.CFrame.Position.Y > thirdTier, "a snow cap sits on one of the top two tiers")
+						end
+					else
+						t.eq(#caps, 0, "a pine has no snow")
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("frostwood is deep blue with a darker trunk, under narrower caps (NAT-07)", function()
+		local def = WoodData.Get("frostwood")
+		local want = { "3F7FA6", "4F90B5", "2F6E96", "5B9CC0" }
+		local got = {}
+		for _, c in ipairs(TreeArt.Palette(def).leaves) do
+			table.insert(got, string.upper(c:ToHex()))
+		end
+		t.eq(got, want)
+		local _, _, value = def.trunkColor:ToHSV()
+		t.ok(value < 0.4, "the trunk is darker than the old #5A6A7A")
+		t.eq(TreeArt.SnowCapRadius, 0.45)
+		-- Blue shows under every cap: no cap facet reaches below the
+		-- lowest 40% of the tier it sits on, and the top one still clears
+		-- the tree's tip.
+		local tree = TreeArt.Build(def, 3, 1)
+		local H = def.trunkHeight
+		local lowest, highest = math.huge, -math.huge
+		for _, p in ipairs(tree:GetChildren()) do
+			if p:IsA("BasePart") and p.Name == "Facet" then
+				local top, bottom = topOf(p)
+				lowest = math.min(lowest, bottom)
+				highest = math.max(highest, top)
+			end
+		end
+		-- The third tier runs from 0.92 H, 0.5 H x 0.84 tall.
+		t.ok(lowest > 0.92 * H + 0.4 * 0.5 * H * 0.84, "a cap starts too low to show blue under it")
+		local tipTier = 0.32 * H + 3 * 0.3 * H + 0.5 * H * (1 - 3 * 0.08)
+		t.ok(highest > tipTier, "the top cap covers the tree's tip")
 	end)
 end
