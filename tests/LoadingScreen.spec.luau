@@ -16,7 +16,22 @@ return function(t)
 		Amber = Color3.fromHex("#FFB840"),
 	}
 
-	-- What the card looks like right now, read from its Instances.
+	-- A UIGradient multiplies its parent's colour (it doesn't replace it),
+	-- so what shows on screen is base x keypoint, channel by channel.
+	local function times(a, b)
+		return Color3.new(a.R * b.R, a.G * b.G, a.B * b.B)
+	end
+	local function same(a, b)
+		return a ~= nil and b ~= nil and a:ToHex() == b:ToHex()
+	end
+	local function gradientOf(frame)
+		local g = frame:FindFirstChildOfClass("UIGradient")
+		return if g and g.Enabled then g else nil
+	end
+
+	-- What the card looks like right now, read from its Instances. Colours
+	-- are the ones that render: a Frame with a UIGradient shows its
+	-- BackgroundColor3 times each keypoint, never the raw values alone.
 	local function snapshot(gui)
 		local snap = {
 			name = gui.Name,
@@ -38,14 +53,17 @@ return function(t)
 				table.insert(snap.colors, d.TextColor3)
 			elseif d:IsA("Frame") then
 				if d.BackgroundTransparency < 1 then
-					table.insert(snap.colors, d.BackgroundColor3)
+					local g = gradientOf(d)
+					if g then
+						for _, k in ipairs(g.Color.Keypoints) do
+							table.insert(snap.colors, times(d.BackgroundColor3, k.Value))
+						end
+					else
+						table.insert(snap.colors, d.BackgroundColor3)
+					end
 				end
 			elseif d:IsA("UIStroke") then
 				table.insert(snap.colors, d.Color)
-			elseif d:IsA("UIGradient") then
-				for _, k in ipairs(d.Color.Keypoints) do
-					table.insert(snap.colors, k.Value)
-				end
 			elseif d:IsA("UIScale") then
 				snap.scale = d.Scale
 			elseif d:IsA("UISizeConstraint") then
@@ -53,7 +71,21 @@ return function(t)
 			end
 		end
 		local backdrop = gui:FindFirstChild("Backdrop")
-		snap.backdrop = backdrop and backdrop.BackgroundColor3
+		if backdrop then
+			-- The rendered top and bottom edges (Rotation 90 runs the
+			-- gradient's first keypoint along the top).
+			local g = gradientOf(backdrop)
+			local base = backdrop.BackgroundColor3
+			if g then
+				local keys = g.Color.Keypoints
+				snap.backdropRotation = g.Rotation
+				snap.backdropTop = times(base, keys[1].Value)
+				snap.backdropBottom = times(base, keys[#keys].Value)
+			else
+				snap.backdropTop = base
+				snap.backdropBottom = base
+			end
+		end
 		snap.backdropTransparency = backdrop and backdrop.BackgroundTransparency
 		local content = backdrop and backdrop:FindFirstChild("Content")
 		snap.contentWidth = content and content.Size.X
@@ -228,15 +260,18 @@ return function(t)
 		t.eq(snap.labels.Title.font, Enum.Font.FredokaOne)
 	end)
 
-	t.test("uses only the inlined palette: Cream title on Bark", function()
+	t.test("renders only the inlined palette: Cream title on a Bark-to-Ink backdrop", function()
 		local snap = run({ character = 1, profile = 1 }).removedDefault.card
-		t.ok(snap.labels.Title.color == PALETTE.Cream, "title is Cream")
-		t.ok(snap.backdrop == PALETTE.Bark, "backdrop is Bark")
+		t.ok(same(snap.labels.Title.color, PALETTE.Cream), "title is Cream")
+		-- As it shows on screen (base x gradient), not the raw properties.
+		t.eq(snap.backdropRotation, 90, "the gradient runs top to bottom")
+		t.ok(same(snap.backdropTop, PALETTE.Bark), "backdrop shows Bark along the top")
+		t.ok(same(snap.backdropBottom, PALETTE.Ink), "and Ink along the bottom")
 		t.ok(#snap.colors >= 5)
 		for _, c in ipairs(snap.colors) do
 			local named = false
 			for _, p in pairs(PALETTE) do
-				if c == p then
+				if same(c, p) then
 					named = true
 				end
 			end

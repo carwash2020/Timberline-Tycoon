@@ -106,7 +106,11 @@ local function build(): Card
 	local backdrop = Instance.new("Frame")
 	backdrop.Name = "Backdrop"
 	backdrop.Size = UDim2.fromScale(1, 1)
-	backdrop.BackgroundColor3 = BARK
+	-- White, because a UIGradient multiplies its parent's colour rather
+	-- than replacing it (UITheme's button shine relies on that too): white
+	-- x Bark..Ink shows Bark..Ink. A Bark base would show Bark x Bark,
+	-- close to black.
+	backdrop.BackgroundColor3 = Color3.new(1, 1, 1)
 	backdrop.BorderSizePixel = 0
 	local gradient = Instance.new("UIGradient")
 	gradient.Color = ColorSequence.new(BARK, INK)
