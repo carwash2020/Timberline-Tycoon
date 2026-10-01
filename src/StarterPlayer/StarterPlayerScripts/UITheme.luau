@@ -366,14 +366,15 @@ function UITheme.Button(opts: ButtonOptions): Button
 
 	face.InputBegan:Connect(function(input: InputObject)
 		local t = input.UserInputType
-		if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+		if
+			t == Enum.UserInputType.MouseButton1
+			or t == Enum.UserInputType.Touch
+			or input.KeyCode == Enum.KeyCode.ButtonA
+		then
 			pressed = true
 			paint()
 		elseif t == Enum.UserInputType.MouseMovement then
 			hovered = true
-			paint()
-		elseif input.KeyCode == Enum.KeyCode.ButtonA then
-			pressed = true
 			paint()
 		end
 	end)
