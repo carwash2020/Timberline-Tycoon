@@ -17,6 +17,7 @@ local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
 local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
+local BootReport = require(script.Parent.BootReport)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
@@ -729,4 +730,5 @@ for _, p in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, p)
 end
 
-print("[GameServer] Online: chop -> carry -> sell -> buy a better axe.")
+-- The boot report (PLAY-01): how long the world took, trees, players.
+print(BootReport.Line(workspace, #Players:GetPlayers()))
