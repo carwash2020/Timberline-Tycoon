@@ -248,7 +248,7 @@ function CritterArt.Rabbit(seed: number, snowy: boolean?): Model
 			hinge
 		)
 		anim(
-			bead(model, if side < 0 then "EyeL" else "EyeR", 0.1, Vector3.new(side * 0.24, 0.98, -0.66), BLACK),
+			bead(model, if side < 0 then "EyeL" else "EyeR", 0.09, Vector3.new(side * 0.26, 1.0, -0.58), BLACK),
 			"Head",
 			hinge
 		)
