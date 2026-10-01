@@ -7,8 +7,8 @@
 --     changes tier, a toast says so.
 --   * A clock next to the cash: "Day 14:05" / "Night 22:10" (night is when
 --     the Phantom Grove's trees come out). On a phone it's in the corner's
---     second line instead, and hidden during the tutorial
---     (HudLayout.ClockLine).
+--     second line instead, and hidden during the tutorial and while the
+--     save loads (HudLayout.ClockLine).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
 -- The server sets the Biome and OwnedGear attributes and the
 -- VitalityTier_<biome> workspace attributes (ForestService); the time of
@@ -108,8 +108,8 @@ local function buildClock()
 
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()
-		local step = player:GetAttribute("TutorialStep")
-		local spot = HudLayout.ClockLine(UITheme.IsPhone(), if type(step) == "number" then step else 0)
+		-- (nil while the save loads: hidden on a phone until it's in)
+		local spot = HudLayout.ClockLine(UITheme.IsPhone(), player:GetAttribute("TutorialStep"))
 		local under = HUD.UnderCash()
 		local target = if spot == "under" and under then under else line
 		if label.Parent ~= target then

@@ -669,4 +669,18 @@ return function(t)
 		t.eq(HudLayout.ClockLine(true, 1), "none")
 		t.eq(HudLayout.ClockLine(true, 7), "none")
 	end)
+
+	t.test("the clock: while the save loads (no TutorialStep yet) it waits off a phone's corner", function()
+		t.eq(HudLayout.ClockLine(true, nil), "none", "nil is the tutorial running, not done")
+		t.eq(HudLayout.ClockLine(true, "0"), "none", "only a number counts")
+		t.eq(HudLayout.ClockLine(false, nil), "beside", "a computer shows it from the start")
+		-- The same rule as the rest of the HUD (HudRules.TutorialRunning).
+		local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
+		local steps = table.pack(nil, 0, 1, 5, 7, "0", true)
+		for i = 1, steps.n do
+			local step = steps[i]
+			local hidden = HudLayout.ClockLine(true, step) == "none"
+			t.eq(hidden, HudRules.TutorialRunning(step), "step " .. tostring(step))
+		end
+	end)
 end
