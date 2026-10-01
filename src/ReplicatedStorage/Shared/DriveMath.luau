@@ -2,8 +2,9 @@
 -- DriveMath: how a truck's speed and heading respond to the seat's throttle
 -- and steer. Used by the physics driver (VehicleController, on the
 -- driver's device) and by the arcade fallback (VehicleService), so both
--- feel the same. Rates live in GameConfig; top speed and turning per truck
--- in ItemCatalog.
+-- feel the same (the arcade fallback passes no turning circle, so it keeps
+-- the plain turnRate rule). Rates live in GameConfig; top speed and turning
+-- per truck in ItemCatalog; the turning circle from TruckLayout.
 
 local GameConfig = require(script.Parent.GameConfig)
 
@@ -38,13 +39,37 @@ function DriveMath.Speed(speed: number, throttle: number, topSpeed: number, dt: 
 	return nextSpeed
 end
 
+DriveMath.GripSpeed = 10 -- studs/s: below this a truck turns in proportion to its speed
+
+-- A truck's tightest turning circle (studs, the radius its rear axle
+-- follows at full steer) is at least this many times its wheelbase
+-- (TruckLayout.Wheelbase: front axle to the axle it turns about), so a
+-- long rig sweeps a wider circle than a short truck, as a real one does
+-- (wheelbase / tan(max steer), here about 53 degrees of lock). The
+-- Logging Rig's 19.75-stud wheelbase gives 14.8; the Rustbucket's 9.2
+-- gives 6.9, under its own 10 / turnRate = 7.1, so short trucks keep the
+-- circle they had.
+DriveMath.TurnRadiusPerWheelbase = 0.75
+
+function DriveMath.MinTurnRadius(wheelbase: number): number
+	return DriveMath.TurnRadiusPerWheelbase * math.max(wheelbase, 0)
+end
+
 -- How far (radians, around +Y) the truck turns in `dt` seconds of `steer`
 -- (-1..1, positive = right). Standing still it can't turn; reversing
--- flips the direction, like a real car.
-function DriveMath.Turn(speed: number, steer: number, turnRate: number, dt: number): number
-	local grip = math.clamp(math.abs(speed) / 10, 0, 1)
+-- flips the direction, like a real car. Below GripSpeed it turns in
+-- proportion to its speed, on a circle GripSpeed / turnRate studs in
+-- radius; `minRadius` (DriveMath.MinTurnRadius), when given, keeps the
+-- circle at least that wide at any speed. Top speed and turnRate at speed
+-- are untouched: the cap only bites while |speed| < turnRate * minRadius.
+function DriveMath.Turn(speed: number, steer: number, turnRate: number, dt: number, minRadius: number?): number
+	local grip = math.clamp(math.abs(speed) / DriveMath.GripSpeed, 0, 1)
+	local rate = turnRate * grip
+	if minRadius and minRadius > 0 then
+		rate = math.min(rate, math.abs(speed) / minRadius)
+	end
 	local direction = if speed < 0 then -1 else 1
-	return -steer * turnRate * dt * grip * direction
+	return -steer * rate * dt * direction
 end
 
 return DriveMath

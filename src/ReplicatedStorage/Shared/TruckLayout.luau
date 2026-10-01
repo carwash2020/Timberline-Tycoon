@@ -201,6 +201,16 @@ function TruckLayout.DriveAxleZ(layout: Layout): number
 	return 0
 end
 
+-- Front axle to the axle the truck turns about (DriveAxleZ), in studs:
+-- what sets its tightest turning circle (DriveMath.MinTurnRadius). 0 with
+-- a single axle.
+function TruckLayout.Wheelbase(layout: Layout): number
+	if #layout.wheelZ < 2 then
+		return 0
+	end
+	return TruckLayout.DriveAxleZ(layout) - layout.wheelZ[1]
+end
+
 export type TrailerLayout = {
 	style: TrailerStyle,
 	width: number,
