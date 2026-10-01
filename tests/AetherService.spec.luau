@@ -42,6 +42,9 @@ return function(t)
 					end,
 				},
 				AxeService = {
+					OwnedCounts = function()
+						return {}, options.ownedAxes or 0
+					end,
 					Grant = function(_, axeId)
 						table.insert(granted, axeId)
 						return { uid = "u", id = axeId }, nil
@@ -55,6 +58,7 @@ return function(t)
 						return {}
 					end,
 					PlayerRemoving = signal,
+					PlayerAdded = signal,
 				},
 				RunService = { Heartbeat = signal },
 				CollectionService = {
@@ -121,5 +125,18 @@ return function(t)
 		t.eq(ready.profile.cash, 10000)
 		t.eq(ready.profile.forgeLogs.lumenwood, 5)
 		t.eq(ready.profile.materials.SkyShard, 0)
+	end)
+
+	t.test("forging is refused when you already own the most axes", function()
+		local s = setup({
+			cash = 70000,
+			forgeLogs = { lumenwood = 45 },
+			materials = { SkyShard = 12 },
+			ownedAxes = 20,
+		})
+		s.A.Forge(s.player)
+		t.eq(s.granted, {})
+		t.eq(s.profile.cash, 70000, "nothing is taken")
+		t.eq(s.profile.forgeLogs.lumenwood, 45)
 	end)
 end

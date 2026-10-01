@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ForgeLogic = require(ReplicatedStorage.Shared.ForgeLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
@@ -35,8 +36,11 @@ type Profile = ProfileService.Profile
 local AetherService = {}
 
 local FORGED_AXE = "StarfallAxe"
-local GLIDE_LIFT = 0.85 -- the cloak cancels this share of gravity
-local FALL_BELOW = 40 -- studs under the isles' floor that count as falling off
+local GLIDE_SPEED = 14 -- studs/s: the cloak holds your fall to this
+local DECK_ABOVE_AREA = 40 -- the isles' walking surfaces sit about 50 above the sky area's y (WorldPlan.Sky)
+local GLIDE_BELOW = 15 -- studs under the deck where the cloak opens
+local FALL_BELOW = 40 -- studs under the deck that count as falling off
+local NEAR = 250 -- further than this from the isles (sideways) isn't a fall: a respawn or teleport
 
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local onIsles: { [Player]: boolean } = {}
@@ -150,6 +154,11 @@ function AetherService.Forge(player: Player)
 	if not profile then
 		return
 	end
+	local _counts, ownedTotal = AxeService.OwnedCounts(player)
+	if ownedTotal >= GameConfig.MaxOwnedAxes then
+		notify(player, string.format("You own %d axes, the most you can carry. Drop one first.", ownedTotal))
+		return
+	end
 	local r = recipe()
 	local missing = ForgeLogic.Missing(r, stockOf(profile))
 	if #missing > 0 then
@@ -180,24 +189,43 @@ function AetherService.Forge(player: Player)
 	end)
 end
 
--- Falling off the isles: glide with the cloak, or lose the logs in hand.
-local function onFell(player: Player, root: BasePart)
+local function hasCloak(player: Player): boolean
 	local profile = ProfileService.GetProfile(player)
-	if profile and table.find(profile.gear, "FeatherfallCloak") then
-		if not root:FindFirstChild("Featherfall") then
-			local attachment = Instance.new("Attachment")
-			attachment.Name = "FeatherfallAttachment"
-			attachment.Parent = root
-			local lift = Instance.new("VectorForce")
-			lift.Name = "Featherfall"
-			lift.Attachment0 = attachment
-			lift.RelativeTo = Enum.ActuatorRelativeTo.World
-			lift.Force = Vector3.new(0, root.AssemblyMass * workspace.Gravity * GLIDE_LIFT, 0)
-			lift.Parent = root
-		end
-		notify(player, "Your Featherfall Cloak catches the wind.")
+	return profile ~= nil and table.find(profile.gear, "FeatherfallCloak") ~= nil
+end
+
+-- The cloak opens: a vertical-only velocity limit, so you drift down at
+-- GLIDE_SPEED and still steer sideways. It closes when you land.
+local function startGlide(player: Player, root: BasePart)
+	if root:FindFirstChild("Featherfall") then
 		return
 	end
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "FeatherfallAttachment"
+	attachment.Parent = root
+	local glide = Instance.new("LinearVelocity")
+	glide.Name = "Featherfall"
+	glide.Attachment0 = attachment
+	glide.RelativeTo = Enum.ActuatorRelativeTo.World
+	glide.VelocityConstraintMode = Enum.VelocityConstraintMode.Line
+	glide.LineDirection = Vector3.new(0, 1, 0)
+	glide.LineVelocity = -GLIDE_SPEED
+	glide.MaxForce = root.AssemblyMass * workspace.Gravity * 4
+	glide.Parent = root
+	notify(player, "Your Featherfall Cloak catches the wind.")
+end
+
+local function stopGlide(root: BasePart)
+	for _, name in ipairs({ "Featherfall", "FeatherfallAttachment" }) do
+		local inst = root:FindFirstChild(name)
+		if inst then
+			inst:Destroy()
+		end
+	end
+end
+
+-- Fell off without a cloak: the logs in your hands are lost to the clouds.
+local function loseLogs(player: Player)
 	local lost = CarryService.TakeWhere(player, function()
 		return true
 	end)
@@ -211,31 +239,41 @@ local function tick()
 	if not area then
 		return
 	end
+	local deck = (area.y or 0) + DECK_ABOVE_AREA
 	for _, player in ipairs(Players:GetPlayers()) do
 		local char = player.Character
 		local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 		local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
 		if root and humanoid then
 			local pos = root.Position
-			local floor = area.y or 0
 			local dx, dz = pos.X - area.x, pos.Z - area.z
-			local within = dx * dx + dz * dz <= (area.radius + 30) ^ 2
+			local flat2 = dx * dx + dz * dz
 			if player:GetAttribute("Riding") == true then
 				onIsles[player] = false
-			elseif within and pos.Y >= floor - 5 then
+			elseif flat2 <= (area.radius + 30) ^ 2 and pos.Y >= deck - 5 then
 				onIsles[player] = true
-			elseif onIsles[player] and pos.Y < floor - FALL_BELOW then
-				onIsles[player] = false
-				onFell(player, root)
-			end
-			-- The glide ends on landing.
-			local lift = root:FindFirstChild("Featherfall")
-			if lift and humanoid.FloorMaterial ~= Enum.Material.Air then
-				lift:Destroy()
-				local attachment = root:FindFirstChild("FeatherfallAttachment")
-				if attachment then
-					attachment:Destroy()
+			elseif onIsles[player] then
+				if flat2 > (area.radius + NEAR) ^ 2 then
+					onIsles[player] = false -- gone some other way
+				elseif hasCloak(player) then
+					if pos.Y < deck - GLIDE_BELOW and root.AssemblyLinearVelocity.Y < -8 then
+						onIsles[player] = false
+						startGlide(player, root)
+					end
+				elseif pos.Y < deck - FALL_BELOW then
+					onIsles[player] = false
+					loseLogs(player)
 				end
+			end
+			-- The glide ends on landing (or in the water).
+			if
+				root:FindFirstChild("Featherfall")
+				and (
+					humanoid.FloorMaterial ~= Enum.Material.Air
+					or humanoid:GetState() == Enum.HumanoidStateType.Swimming
+				)
+			then
+				stopGlide(root)
 			end
 		end
 	end
@@ -291,6 +329,17 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 	Players.PlayerRemoving:Connect(function(player: Player)
 		onIsles[player] = nil
 	end)
+	-- A new character starts wherever it spawns, not on the isles.
+	Players.PlayerAdded:Connect(function(player: Player)
+		player.CharacterAdded:Connect(function()
+			onIsles[player] = nil
+		end)
+	end)
+	for _, player in ipairs(Players:GetPlayers()) do
+		player.CharacterAdded:Connect(function()
+			onIsles[player] = nil
+		end)
+	end
 end
 
 return AetherService
