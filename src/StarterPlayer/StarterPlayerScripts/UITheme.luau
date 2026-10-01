@@ -9,7 +9,9 @@
 --     it drops onto its edge; on a computer it brightens under the mouse.
 --   * Screen(): a ScreenGui with a UIScale for the device: 1x on phones,
 --     the screen height / 864 on computers (1.25x at 1080p), / 720 on
---     consoles (1.5x on a TV), never below 1x.
+--     consoles (1.5x on a TV), never below 1x; under the top bar, or
+--     ("device") over it but inside the notch's safe area. TopBar(): where
+--     the top bar ends.
 --   * Margin(): the gap to the screen edge: 12, or the 5% TV-safe area on
 --     a console (64 at the sides, 36 at the bottom).
 --   * Bottom(): where bottom-centre things (the hint, bars) start: above
@@ -222,6 +224,26 @@ function UITheme.Sized(name: string): SizeSpec
 	return spec
 end
 
+-- The bottom of Roblox's top bar, in screen pixels down from the top of
+-- the screen: GuiService.TopbarInset, which can read zero-size until the
+-- bar is laid out, and meanwhile GetGuiInset's top (the same edge). A
+-- "device" screen (Screen) starts at the top of the screen in landscape, so
+-- there this divided by Scale() is in its offsets. WatchTopBar() hears of
+-- it changing.
+function UITheme.TopBar(): number
+	local bar = GuiService.TopbarInset.Max.Y
+	if bar > 0 then
+		return bar
+	end
+	local inset = GuiService:GetGuiInset()
+	return math.max(0, inset.Y)
+end
+
+-- Calls `fn` whenever the top bar moves or resizes (or first gets a size).
+function UITheme.WatchTopBar(fn: () -> ())
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(fn)
+end
+
 function UITheme.Margin(): (number, number) -- (side, bottom)
 	if GuiService:IsTenFootInterface() then
 		return 64, 36
@@ -392,14 +414,30 @@ function UITheme.WatchLeftColumn(fn: (Frame) -> ())
 	end
 end
 
+-- Which part of the screen a ScreenGui lays out in:
+--   * nil (Roblox's default): under the top bar, and inside the device's
+--     safe area (clear of a notch, a camera cutout, the home bar);
+--   * "device": the device's safe area, the top bar's strip included, for
+--     screens that keep clear of the bar themselves (TopBar()) or are
+--     measured from the true screen centre: the side buttons, the shop,
+--     the figure reveal.
+export type Insets = "device"
+
 -- A ScreenGui for one of the game's screens, scaled for the device.
-function UITheme.Screen(name: string, displayOrder: number?, ignoreInset: boolean?): ScreenGui
+function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): ScreenGui
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = displayOrder or 0
-	gui.IgnoreGuiInset = ignoreInset == true
+	-- The default screens keep Roblox's default ScreenInsets.
+	gui.IgnoreGuiInset = insets == "device"
+	if insets == "device" then
+		-- Over the top bar's strip, but not into a notch. After
+		-- IgnoreGuiInset, as ScreenInsets is the newer of the two and has
+		-- the last word.
+		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	end
 	local scale = Instance.new("UIScale")
 	scale.Scale = scaleFor()
 	scale.Parent = gui

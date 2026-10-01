@@ -61,9 +61,10 @@ return function(t)
 	end)
 
 	local PANEL = v(560, 540)
-	-- The shop's area on a screen (offsets): top 44, bottom 8, sides 12.
-	local function areaOn(w, h)
-		return { left = 12, top = 44, right = w - 12, bottom = h - 8 }
+	-- The shop's area on a `w` x `h` screen whose top bar ends `topBar`
+	-- down (offsets): 8 under the bar, 8 above the bottom, 12 in.
+	local function areaOn(w, h, topBar)
+		return HudLayout.ShopArea(v(w, h), topBar)
 	end
 	-- HUD's cash row ([pops][♪][plaque], 226 wide, 49 tall) at the right
 	-- margin, 8 under the top bar, in the shop screen's offsets.
@@ -100,30 +101,31 @@ return function(t)
 		for _, screen in ipairs({ v(844, 390), v(667, 375) }) do
 			for _, inset in ipairs({ 36, 58 }) do
 				local row = cashRow(screen.X, inset, 12)
-				local area = HudLayout.ClearOf(areaOn(screen.X, screen.Y), PANEL, row, 8, 400)
+				local area = HudLayout.ClearOf(areaOn(screen.X, screen.Y, inset), PANEL, row, 8, 400)
 				local panel = HudLayout.Centred(area, PANEL)
 				t.ok(panel.right <= row.left - 8, "clear of the row")
 				t.ok(panel.right - panel.left >= 400, "still wide enough")
-				t.eq(panel.top, 44, "keeps its height")
+				t.eq(panel.top, inset + 8, "keeps its height, 8 under the top bar")
 			end
 		end
 		-- 844 wide: the full 560, just shifted.
-		local area = HudLayout.ClearOf(areaOn(844, 390), PANEL, cashRow(844, 58, 12), 8, 400)
+		local area = HudLayout.ClearOf(areaOn(844, 390, 58), PANEL, cashRow(844, 58, 12), 8, 400)
 		local panel = HudLayout.Centred(area, PANEL)
 		t.eq(panel.right - panel.left, 560)
 	end)
 
 	t.test("on a monitor or a TV the centred panel already misses the row", function()
 		-- 1920 x 1080 at 1.25x and a TV at 1.5x, in offsets.
-		local desktop = areaOn(1536, 864)
+		-- Roblox's 58 px top bar is 46.4 and 38.7 offsets there.
+		local desktop = areaOn(1536, 864, 46.4)
 		t.eq(HudLayout.ClearOf(desktop, PANEL, cashRow(1536, 46.4, 12), 8, 400), desktop)
-		local tv = areaOn(1280, 720)
+		local tv = areaOn(1280, 720, 38.7)
 		t.eq(HudLayout.ClearOf(tv, PANEL, cashRow(1280, 38.7, 64), 8, 400), tv)
 	end)
 
 	t.test("too narrow beside the row: the panel starts under it instead", function()
 		local row = cashRow(568, 58, 12)
-		local area = HudLayout.ClearOf(areaOn(568, 320), PANEL, row, 8, 400)
+		local area = HudLayout.ClearOf(areaOn(568, 320, 58), PANEL, row, 8, 400)
 		t.eq(area.top, row.bottom + 8)
 		t.eq(area.right, 568 - 12)
 	end)
@@ -305,11 +307,12 @@ return function(t)
 	end)
 
 	-- A shop open over the game (UI-03). The panel as ShopUI places it (in
-	-- its screen's offsets, which ignore the top bar), moved into the HUD
-	-- screen's offsets (under the top bar), where the HUD works out the lane.
+	-- its screen's offsets, which start above the top bar), moved into the
+	-- HUD screen's offsets (under the top bar), where the HUD works out the
+	-- lane.
 	local PAPER, HEADER = 8, 14 + 30 + 2 + 16 + 10 -- ShopUI: the wood frame, the title and subtitle block
 	local function shopPanel(w, h, inset)
-		local area = HudLayout.ClearOf(areaOn(w, h), PANEL, cashRow(w, inset, 12), 8, 400)
+		local area = HudLayout.ClearOf(areaOn(w, h, inset), PANEL, cashRow(w, inset, 12), 8, 400)
 		local p = HudLayout.Centred(area, PANEL)
 		return { left = p.left, top = p.top - inset, right = p.right, bottom = p.bottom - inset }
 	end
@@ -486,6 +489,136 @@ return function(t)
 		local chip, hint = rowOn(screen, 0, 266, 1366 - 12)
 		t.eq(chip, nil)
 		t.eq((hint.left + hint.right) / 2, 683, "centred, as before the chip")
+	end)
+
+	-- UI-09: phones by their safe-area insets, in full-screen pixels (a
+	-- phone's UIScale is 1). In landscape nothing cuts in at the top; iOS
+	-- reports a 14 Pro's 47 px either side and 21 for the home bar in both
+	-- landscapes, and a cutout on one side only proves the sums don't lean
+	-- on that.
+	local function device(w, h, topBar, left, right, bottom)
+		return {
+			size = v(w, h),
+			topBar = topBar,
+			-- The "device" screens (UITheme.Screen): the side buttons, the shop.
+			safe = { left = left, top = 0, right = w - right, bottom = h - bottom },
+			-- Roblox's default screens (the corner, the HUD): under the top bar too.
+			hud = { left = left, top = topBar, right = w - right, bottom = h - bottom },
+		}
+	end
+	local PHONES = {
+		{ "iPhone SE", device(667, 375, 58, 0, 0, 0) },
+		{ "iPhone SE, the old 36 px top bar", device(667, 375, 36, 0, 0, 0) },
+		{ "iPhone 14 Pro, notch on the left", device(844, 390, 58, 47, 47, 21) },
+		{ "iPhone 14 Pro, notch on the right", device(844, 390, 58, 47, 47, 21) },
+		{ "a cutout on the left only", device(844, 390, 58, 47, 0, 21) },
+		{ "a cutout on the right only", device(844, 390, 58, 0, 47, 21) },
+	}
+	local function shift(r, dx, dy)
+		return { left = r.left + dx, top = r.top + dy, right = r.right + dx, bottom = r.bottom + dy }
+	end
+	local function inside(r, area)
+		return r.left >= area.left and r.top >= area.top and r.right <= area.right and r.bottom <= area.bottom
+	end
+	-- Roblox's jump button (70 px, 95 in from the right and 90 up from the
+	-- bottom of its screen) on touch controls that fill the screen, or that
+	-- keep to the safe area.
+	local function jumpsOn(d)
+		local w, h = d.size.X, d.size.Y
+		return {
+			{ "full-screen touch controls", { left = w - 95, top = h - 90, right = w - 25, bottom = h - 20 } },
+			{
+				"safe-area touch controls",
+				{
+					left = d.hud.right - 95,
+					top = d.hud.bottom - 90,
+					right = d.hud.right - 25,
+					bottom = d.hud.bottom - 20,
+				},
+			},
+		}
+	end
+
+	t.test("UI-09: side buttons sit in the safe area, no further right than jump, under the corner", function()
+		for _, case in ipairs(PHONES) do
+			local name, d = case[1], case[2]
+			local safe = d.safe
+			-- The side screen's offsets start at the safe area's corner.
+			local screen = v(safe.right - safe.left, safe.bottom - safe.top)
+			-- The corner's second line ends 100 down the HUD screen.
+			local cornerBottom = d.hud.top + 8 + 49 + 7 + PHONE_LINE2
+			for _, j in ipairs(jumpsOn(d)) do
+				local label, jump = name .. ", " .. j[1], j[2]
+				local spot, room = HudLayout.SideColumn(
+					screen,
+					cornerBottom - safe.top,
+					shift(jump, -safe.left, -safe.top),
+					12,
+					GAP,
+					24,
+					44
+				)
+				for n = 1, 4 do
+					local sizes = buttons(n, PHONE_BUTTON)
+					for i, at in ipairs(HudLayout.Stack(sizes, room, GAP)) do
+						-- The button's box, in full-screen pixels.
+						local right, bottom = safe.left + spot.X - at.X, safe.top + spot.Y - at.Y
+						local box =
+							{ left = right - sizes[i].X, top = bottom - sizes[i].Y, right = right, bottom = bottom }
+						local what = string.format("%s, %d buttons, #%d", label, n, i)
+						t.ok(inside(box, safe), what .. ": inside the safe area")
+						t.ok(box.right <= jump.right, what .. ": no further right than jump")
+						t.ok(box.bottom <= jump.top - 24, what .. ": above jump")
+						t.ok(box.top >= cornerBottom + GAP, what .. ": under the corner")
+					end
+				end
+				-- At the safe area's margin, where the corner ends too, unless
+				-- jump's right edge is further left (an SE: 25 in, not 12).
+				t.eq(safe.left + spot.X, math.min(d.hud.right - 12, jump.right), label .. ": its right edge")
+			end
+		end
+		-- The evidence: a side screen over the whole screen puts its 12 px
+		-- margin inside a 14 Pro's 47 px notch strip, right of jump.
+		local pro = PHONES[3][2]
+		t.ok(844 - 12 > pro.safe.right, "a full-screen margin is in the notch's strip")
+		-- Without touch controls (a computer): 44 under the middle, at the margin.
+		local spot, room = HudLayout.SideColumn(v(1536, 864), 120, nil, 12, GAP, 24, 44)
+		t.eq(spot, v(1524, 476))
+		t.eq(room, 476 - 128)
+	end)
+
+	t.test("UI-09: the shop panel clears the top bar and the notch", function()
+		for _, case in ipairs(PHONES) do
+			local name, d = case[1], case[2]
+			local safe = d.safe
+			-- The shop's screen is the safe area; the cash row is in the
+			-- HUD's, at its right margin, 8 under the top bar.
+			local screen = v(safe.right - safe.left, safe.bottom - safe.top)
+			local row = {
+				left = d.hud.right - 12 - CASH,
+				top = d.hud.top + 8,
+				right = d.hud.right - 12,
+				bottom = d.hud.top + 57,
+			}
+			local area = HudLayout.ClearOf(
+				HudLayout.ShopArea(screen, d.topBar - safe.top),
+				PANEL,
+				shift(row, -safe.left, -safe.top),
+				8,
+				400
+			)
+			local panel = shift(HudLayout.Centred(area, PANEL), safe.left, safe.top)
+			t.ok(panel.top >= d.topBar + 8, name .. ": 8 under the top bar")
+			t.ok(panel.left >= safe.left + 12 and panel.right <= safe.right - 12, name .. ": 12 clear of a notch")
+			t.ok(panel.bottom <= safe.bottom - 8, name .. ": above the home bar")
+			t.ok(clear(panel, row, 8), name .. ": clear of the cash row")
+			t.ok(panel.right - panel.left >= 400, name .. ": still wide enough")
+		end
+		-- The evidence: the old area's top (44, for a 36 px bar) is under
+		-- today's 58 px top bar.
+		t.ok(44 < 58, "44 is under the top bar")
+		t.eq(HudLayout.ShopArea(v(667, 375), 58).top, 66, "now 8 under it")
+		t.eq(HudLayout.ShopArea(v(667, 375), 0).top, 8, "no top bar: 8 from the top")
 	end)
 
 	-- GothamBlack's width at `size` px, from above: capitals under 0.75 em,

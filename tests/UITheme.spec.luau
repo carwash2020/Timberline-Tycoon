@@ -10,7 +10,8 @@ return function(t)
 
 	-- A UITheme on a desktop (no touch, a keyboard, no camera yet: 1x),
 	-- with these TextChatService configs ([className] = config); or on
-	-- `device` ({ touch, keyboard, viewport }).
+	-- `device` ({ touch, keyboard, viewport, topbar (GuiService.TopbarInset),
+	-- guiInset (GetGuiInset's top left) }).
 	local function theme(configs, device)
 		device = device or { touch = false, keyboard = true }
 		local playerGui = Instance.new("Folder")
@@ -20,6 +21,10 @@ return function(t)
 				GuiService = {
 					IsTenFootInterface = function()
 						return false
+					end,
+					TopbarInset = device.topbar or roblox.Rect.new(0, 0, 0, 0),
+					GetGuiInset = function()
+						return device.guiInset or Vector2.new(0, 58), Vector2.zero
 					end,
 				},
 				Players = {
@@ -218,6 +223,31 @@ return function(t)
 		t.fails(function()
 			theme({}).Sized("NoSuchPiece")
 		end, "no size for NoSuchPiece")
+	end)
+
+	-- UI-09: the screens that keep clear of the top bar themselves.
+	t.test("Screen: under the top bar by default; 'device' screens over it, inside the safe area", function()
+		local UITheme = theme({})
+		local plain = UITheme.Screen("Corner", 2)
+		t.eq({ plain.Name, plain.DisplayOrder, plain.IgnoreGuiInset }, { "Corner", 2, false })
+		local device = UITheme.Screen("SideButtons", 1, "device")
+		t.eq(device.IgnoreGuiInset, true, "over the top bar's strip")
+		t.eq(device.ScreenInsets, roblox.Enum.ScreenInsets.DeviceSafeInsets, "but clear of a notch and the home bar")
+		t.ok(device:FindFirstChildOfClass("UIScale"), "scaled for the device like the rest")
+	end)
+
+	t.test("TopBar: the top bar's real bottom edge, even before it has a size", function()
+		local Rect = roblox.Rect
+		-- Roblox's top bar today (58), the old one (36), and a phone's.
+		t.eq(theme({}, { touch = false, keyboard = true, topbar = Rect.new(124, 0, 1800, 58) }).TopBar(), 58)
+		t.eq(theme({}, { touch = false, keyboard = true, topbar = Rect.new(104, 0, 1800, 36) }).TopBar(), 36)
+		t.eq(theme({}, { touch = true, keyboard = false, topbar = Rect.new(150, 0, 760, 58) }).TopBar(), 58)
+		-- The first frame: TopbarInset is still zero-size, GetGuiInset knows.
+		local first = { touch = false, keyboard = true, topbar = Rect.new(0, 0, 0, 0), guiInset = Vector2.new(0, 58) }
+		t.eq(theme({}, first).TopBar(), 58)
+		-- No top bar at all.
+		local none = { touch = false, keyboard = true, topbar = Rect.new(0, 0, 0, 0), guiInset = Vector2.zero }
+		t.eq(theme({}, none).TopBar(), 0)
 	end)
 
 	t.test("a chat box that can't be read counts as 0 instead of erroring", function()

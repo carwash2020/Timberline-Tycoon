@@ -15,12 +15,14 @@
 -- list. Walking away closes the screen, and so do the X, tapping outside the
 -- panel, and B on a gamepad. Looks per the UI spec (02, UITheme): a dimmed
 -- screen behind a wood-framed paper panel; while it's open you can't walk.
--- The panel keeps clear of the HUD's cash row, which is drawn over it (on
--- a phone it moves left of the row). While it's open the HUD knows where
--- it is (HUD.SetModal), so its hint hides and its toasts sit inside the
--- panel's bottom edge, off the title and the Buy buttons; every way of
--- closing goes through ShopUI.Close, which tells the HUD it's gone. On a
--- gamepad the first Buy button is selected when it opens.
+-- The panel keeps clear of Roblox's top bar (its real height), a phone's
+-- notch (the screen is the device's safe area) and the HUD's cash row,
+-- which is drawn over it (on a phone it moves left of the row). While it's
+-- open the HUD knows where it is (HUD.SetModal), so its hint hides and its
+-- toasts sit inside the panel's bottom edge, off the title and the Buy
+-- buttons; every way of closing goes through ShopUI.Close, which tells the
+-- HUD it's gone. On a gamepad the first Buy button is selected when it
+-- opens.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -469,11 +471,13 @@ local function holdStill(): Enum.ContextActionResult
 	return Enum.ContextActionResult.Sink -- no walking or jumping while a shop is open
 end
 
--- The panel's area: below the top bar (top 44, bottom 8, sides 12), but
--- clear of the HUD's cash row (the plaque and the ♪ button), which draws
--- over the shop. On a phone the centred panel's top-right corner, with its
--- X, would sit under them: there the area ends left of the row, or if that
--- leaves too narrow a panel, starts under it.
+-- The panel's area (HudLayout.ShopArea): 8 under Roblox's top bar
+-- (UITheme.TopBar: its real height, not a guess), 8 above the bottom and
+-- 12 in from the sides of the device's safe area (this screen is it: no
+-- notch), but clear of the HUD's cash row (the plaque and the ♪ button),
+-- which draws over the shop. On a phone the centred panel's top-right
+-- corner, with its X, would sit under them: there the area ends left of
+-- the row, or if that leaves too narrow a panel, starts under it.
 local function fitArea()
 	local g, a, row = gui, area, HUD.TopRow()
 	if not g or not a then
@@ -481,9 +485,11 @@ local function fitArea()
 	end
 	local scale = UITheme.Scale()
 	local screen = g.AbsoluteSize / scale
-	local fit: HudLayout.Rect = { left = 12, top = 44, right = screen.X - 12, bottom = screen.Y - 8 }
+	-- This screen starts at the top of the screen (in landscape), where the
+	-- top bar's height is measured from.
+	local fit = HudLayout.ShopArea(screen, UITheme.TopBar() / scale)
 	if row then
-		-- The row's screen minds the top bar inset and this one doesn't:
+		-- The row's screen starts under the top bar and this one doesn't:
 		-- measure it from this one's corner.
 		local at = (row.AbsolutePosition - g.AbsolutePosition) / scale
 		local size = row.AbsoluteSize / scale
@@ -584,7 +590,9 @@ end
 
 local function buildPanel()
 	-- Over everything but the HUD (10), so the cash and toasts show on top.
-	local g = UITheme.Screen("ShopUI", 5, true)
+	-- The device's safe area with the top bar's strip in it: the scrim dims
+	-- it, and the panel keeps clear of the bar itself (fitArea).
+	local g = UITheme.Screen("ShopUI", 5, "device")
 	g.Enabled = false
 
 	-- The scrim: dims the game, blocks taps on it, and closes on a tap.
@@ -600,13 +608,14 @@ local function buildPanel()
 	scrim.Parent = g
 	scrim.Activated:Connect(ShopUI.Close)
 
-	-- The panel fits the area below the top bar (fitArea), at most
-	-- 560 x 540 (on an 844 x 390 phone, 560 x 338, left of the cash).
+	-- The panel fits the area below the top bar (fitArea, on opening), at
+	-- most 560 x 540 (on an 844 x 390 phone about 300 tall, left of the
+	-- cash).
 	local a = Instance.new("Frame")
 	a.Name = "Area"
 	a.BackgroundTransparency = 1
-	a.Position = UDim2.fromOffset(12, 44)
-	a.Size = UDim2.new(1, -24, 1, -52)
+	a.Position = UDim2.fromOffset(12, 66)
+	a.Size = UDim2.new(1, -24, 1, -74)
 	a.Parent = g
 
 	local frame = UITheme.Card(C.Bark, C.Ink, 6, 20)
@@ -701,12 +710,15 @@ local function buildPanel()
 	list = scroll
 
 	gui, area, panel = g, a, p
-	-- A phone turning round, or a window resized, while a shop is open.
-	g:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	-- A phone turning round, or a window resized, while a shop is open; or
+	-- the top bar getting its real size after the first frame.
+	local function refit()
 		if openShop then
 			fitArea()
 		end
-	end)
+	end
+	g:GetPropertyChangedSignal("AbsoluteSize"):Connect(refit)
+	UITheme.WatchTopBar(refit)
 	-- Wherever the panel ends up once laid out, the HUD hears of it.
 	p:GetPropertyChangedSignal("AbsoluteSize"):Connect(reportModal)
 	p:GetPropertyChangedSignal("AbsolutePosition"):Connect(reportModal)

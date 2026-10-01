@@ -1039,7 +1039,7 @@ local handlers: { [string]: ({ [string]: any }) -> () } = {
 function ForestUI.Start()
 	local playerGui = player:WaitForChild("PlayerGui")
 	buildPouch()
-	local reveal = UITheme.Screen("FigureReveal", 12, true)
+	local reveal = UITheme.Screen("FigureReveal", 12, "device") -- centred in the safe area, clear of a notch
 	reveal.Parent = playerGui
 	revealGui = reveal
 	buildMarkers()

@@ -84,6 +84,7 @@ local TOAST_ALPHA = { 0, 0.15, 0.3 } -- newest, then older ones at 85% and 70%
 local HINT_POLL = 0.25 -- seconds between sell-zone checks for the hint
 local SIDE_GAP = 8 -- between side buttons, and under the corner
 local JUMP_CLEARANCE = 24 -- the side buttons end this far above a phone's jump button
+local SIDE_BELOW_CENTRE = 44 -- without touch controls, they end this far under the screen's middle
 local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
 local HINT_MAX = 320 -- the hint's widest (it truncates past this)
 local ROW_HEIGHT = 30 -- the hint and the load chip
@@ -704,9 +705,11 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 end
 
--- Lays out the side buttons that are showing (HudLayout.Stack), up from
--- 44 below the screen centre, or with touch controls from just above the
--- jump button, to just under the corner's second line.
+-- Lays out the side buttons that are showing (HudLayout.SideColumn, then
+-- Stack), up from SIDE_BELOW_CENTRE under the screen centre, or with touch
+-- controls from just above the jump button, to just under the corner's
+-- second line; at the right margin of the device's safe area, and no
+-- further right than the jump button.
 local function arrangeSide()
 	arrangeQueued = false
 	local gui, column, corner = sideGui, sideColumn, shelf
@@ -714,19 +717,34 @@ local function arrangeSide()
 		return
 	end
 	local scale = UITheme.Scale()
-	-- Screen pixels to this screen's offsets. It ignores the top bar inset
-	-- and the corner's screen doesn't, so measure both from this one's top.
-	local origin = gui.AbsolutePosition.Y
-	local function y(pixels: number): number
+	-- Screen pixels to this screen's offsets. It's the device's safe area
+	-- with the top bar's strip in it (UITheme.Screen "device"); the
+	-- corner's screen starts under the top bar, and the touch controls'
+	-- may not mind the safe area at all: measure both from this one's
+	-- corner.
+	local origin = gui.AbsolutePosition
+	local function at(pixels: Vector2): Vector2
 		return (pixels - origin) / scale
 	end
-	local top = y(corner.AbsolutePosition.Y + corner.AbsoluteSize.Y) + SIDE_GAP
-	local bottom = gui.AbsoluteSize.Y / scale / 2 + 44
+	local screen = gui.AbsoluteSize / scale
+	local cornerBottom = at(corner.AbsolutePosition + corner.AbsoluteSize).Y
+	local jumpRect: HudLayout.Rect? = nil
 	local jump = jumpButton
 	if jump and jump.Parent and jump.AbsoluteSize.Y > 0 then
-		bottom = y(jump.AbsolutePosition.Y) - JUMP_CLEARANCE
+		local low, high = at(jump.AbsolutePosition), at(jump.AbsolutePosition + jump.AbsoluteSize)
+		jumpRect = { left = low.X, top = low.Y, right = high.X, bottom = high.Y }
 	end
-	column.Position = UDim2.new(1, -UITheme.Margin(), 0, bottom)
+	local spot, room = HudLayout.SideColumn(
+		screen,
+		cornerBottom,
+		jumpRect,
+		UITheme.Margin(),
+		SIDE_GAP,
+		JUMP_CLEARANCE,
+		SIDE_BELOW_CENTRE
+	)
+	-- From the right edge, so it stays put if the screen resizes first.
+	column.Position = UDim2.new(1, spot.X - screen.X, 0, spot.Y)
 
 	local shown: { Frame } = {}
 	for _, side in ipairs(sides) do
@@ -741,19 +759,17 @@ local function arrangeSide()
 	for i, root in ipairs(shown) do
 		sizes[i] = Vector2.new(root.Size.X.Offset, root.Size.Y.Offset)
 	end
-	local spots = HudLayout.Stack(sizes, bottom - top, SIDE_GAP)
+	local spots = HudLayout.Stack(sizes, room, SIDE_GAP)
 	-- Columns that spill left mustn't reach the bars at the bottom centre
 	-- (build mode, placing): lift such a column above them if there's room.
-	local width = gui.AbsoluteSize.X / scale
-	local height = gui.AbsoluteSize.Y / scale
+	-- The bars' screens share this one's safe area left, right and below.
 	local band: HudLayout.Rect = {
-		left = width / 2 - BAR_HALF_WIDTH,
-		right = width / 2 + BAR_HALF_WIDTH,
-		top = height - (UITheme.Bottom() + 38) - BAR_HEIGHT,
-		bottom = height,
+		left = screen.X / 2 - BAR_HALF_WIDTH,
+		right = screen.X / 2 + BAR_HALF_WIDTH,
+		top = screen.Y - (UITheme.Bottom() + 38) - BAR_HEIGHT,
+		bottom = screen.Y,
 	}
-	local cornerX = width - UITheme.Margin()
-	spots = HudLayout.LiftClear(spots, sizes, Vector2.new(cornerX, bottom), band, top, SIDE_GAP)
+	spots = HudLayout.LiftClear(spots, sizes, spot, band, spot.Y - room, SIDE_GAP)
 	for i, root in ipairs(shown) do
 		root.Position = UDim2.fromOffset(-spots[i].X, -spots[i].Y)
 	end
@@ -1127,8 +1143,10 @@ end
 
 local function buildSideColumn(playerGui: Instance)
 	-- Its own screen, under the shop panel's scrim (which blocks HUD taps)
-	-- and the corner's popups, and measured from the true screen centre.
-	local gui = UITheme.Screen("SideButtons", 1, true)
+	-- and the corner's popups, and measured from the true screen centre:
+	-- the device's safe area, the top bar's strip included (clear of a
+	-- notch and the home bar).
+	local gui = UITheme.Screen("SideButtons", 1, "device")
 	local column = Instance.new("Frame")
 	column.Name = "Column"
 	column.AnchorPoint = Vector2.new(1, 1)
@@ -1136,6 +1154,7 @@ local function buildSideColumn(playerGui: Instance)
 	column.BackgroundTransparency = 1
 	column.Parent = gui
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
+	gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueArrange) -- the safe area's insets arriving
 	gui.Parent = playerGui
 	sideGui, sideColumn = gui, column
 	task.spawn(watchJump, playerGui)
