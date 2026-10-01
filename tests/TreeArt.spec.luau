@@ -6,6 +6,9 @@
 -- stands on: just over a player's head, on screen while they chop.
 -- And the fall dust's colour (TreeFX): one per home biome, white on the
 -- snow, ash grey on the volcano.
+-- And stumps (NAT-03): no root flare sticks up past the cut, for every
+-- wood at every size and as an Elder; a stump's flares are shorter
+-- (0.35-0.5 diameters) and a standing tree's are as they were.
 return function(t)
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
 	local WoodData = t.shared("WoodData")
@@ -79,6 +82,106 @@ return function(t)
 		t.ok(hi - lo < 0.06 and hi < 0.6, "volcano dust is ash grey")
 		-- An unknown biome falls back to the forest's earth.
 		t.eq(TreeArt.DustColor({ id = "x", biome = "nowhere" }), earth)
+	end)
+
+	-- The highest and lowest world Y of a part's box (in Lune, read
+	-- part.CFrame, never part.Position).
+	local function topOf(part)
+		local cf, size = part.CFrame, part.Size
+		local half = (
+			math.abs(cf.XVector.Y) * size.X
+			+ math.abs(cf.YVector.Y) * size.Y
+			+ math.abs(cf.ZVector.Y) * size.Z
+		) / 2
+		return cf.Position.Y + half, cf.Position.Y - half
+	end
+
+	local function named(model, name)
+		local out = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == name then
+				table.insert(out, d)
+			end
+		end
+		return out
+	end
+
+	t.test("no stump's root flare sticks up past its cut, at any size", function()
+		for _, def in ipairs(WoodData.All()) do
+			for _, scale in ipairs({ 0.82, 1, 1.22, ForestLogic.ElderSize(def).scale }) do
+				for _, seed in ipairs({ 1, 2, 3, 42, 777, 9001 }) do
+					local stump = TreeArt.Stump(def, seed, scale)
+					local body = named(stump, "Stump")[1]
+					t.ok(body and stump.PrimaryPart == body, def.id .. ": the stump's PrimaryPart is Stump")
+					local cut = topOf(body)
+					local roots = named(stump, "Root")
+					t.eq(#roots, 3, def.id .. ": three root flares")
+					for _, root in ipairs(roots) do
+						local top = topOf(root)
+						t.ok(
+							top < cut,
+							string.format(
+								"%s x%.2f seed %d: a root flare tops out at %.2f, over the cut at %.2f",
+								def.id,
+								scale,
+								seed,
+								top,
+								cut
+							)
+						)
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("the scales checked are the size classes and the Elder", function()
+		t.eq(ForestLogic.ElderSize(WoodData.Get("oak")).scale, 1.7)
+	end)
+
+	t.test("a stump's flares reach 0.35-0.5 diameters out and still show", function()
+		for _, def in ipairs(WoodData.All()) do
+			for _, scale in ipairs({ 0.82, 1, 1.7 }) do
+				for _, seed in ipairs({ 1, 5, 42, 777 }) do
+					local stump = TreeArt.Stump(def, seed, scale)
+					local body = named(stump, "Stump")[1]
+					local D = body.Size.Y -- the cylinder's axis is its X
+					local _, ground = topOf(body)
+					for _, root in ipairs(named(stump, "Root")) do
+						-- 0.77 x a standing tree's 0.45-0.65: 0.35-0.50 to two places.
+						local out = root.Size.Z / D
+						t.ok(
+							out >= 0.3465 - 1e-4 and out <= 0.5005 + 1e-4,
+							def.id .. ": a flare " .. out .. " diameters long"
+						)
+						local top, bottom = topOf(root)
+						t.ok(top > ground + 0.1, def.id .. ": a flare shows above the ground")
+						t.ok(math.abs(bottom - (ground - 0.05)) < 1e-3, def.id .. ": a flare sits on the ground")
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("a standing tree's root flares are as they were", function()
+		for _, def in ipairs(WoodData.All()) do
+			for _, seed in ipairs({ 1, 777 }) do
+				local tree = TreeArt.Build(def, seed, 1)
+				local roots = named(tree, "Root")
+				if def.id ~= "palmwood" then -- a palm has none
+					t.ok(#roots >= 3, def.id .. " has root flares")
+				end
+				local D = tree.PrimaryPart.Size.Y
+				for _, root in ipairs(roots) do
+					local tall, out = root.Size.Y / D, root.Size.Z / D
+					t.ok(
+						tall >= 0.55 - 1e-3 and tall <= 0.8 + 1e-3,
+						def.id .. ": a flare " .. tall .. " diameters tall"
+					)
+					t.ok(out >= 0.45 - 1e-3 and out <= 0.65 + 1e-3, def.id .. ": a flare " .. out .. " diameters long")
+				end
+			end
+		end
 	end)
 
 	t.test("the bar is no longer up in the canopy", function()

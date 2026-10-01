@@ -142,13 +142,26 @@ local function trunk(model: Model, def: WoodDef, height: number, diameter: numbe
 	return p
 end
 
--- Wedges flaring out from the trunk's foot.
-local function rootFlares(model: Model, color: Color3, diameter: number, count: number, rng: Rng)
+-- Wedges flaring out from the trunk's foot, 0.55-0.8 diameters tall and
+-- 0.45-0.65 out. A stump passes `maxHeight` (no flare tops its cut) and a
+-- `lengthFactor` for shorter ones; the rng draws are the same either way.
+local function rootFlares(
+	model: Model,
+	color: Color3,
+	diameter: number,
+	count: number,
+	rng: Rng,
+	maxHeight: number?,
+	lengthFactor: number?
+)
 	local start = rng:range(0, math.pi * 2)
 	for i = 1, count do
 		local a = start + (i - 1) / count * math.pi * 2 + rng:range(-0.2, 0.2)
 		local h = diameter * rng:range(0.55, 0.8)
-		local len = diameter * rng:range(0.45, 0.65)
+		if maxHeight then
+			h = math.min(h, maxHeight)
+		end
+		local len = diameter * rng:range(0.45, 0.65) * (lengthFactor or 1)
 		Kit.decor(
 			Kit.wedge(
 				model,
@@ -670,6 +683,10 @@ function TreeArt.BarHeight(def: WoodDef, scale: number?): number
 	return TreeArt.BarAboveGround - trunkLength / 2
 end
 
+-- A stump's root flares reach 0.77 as far as a standing tree's (0.35-0.5
+-- diameters instead of 0.45-0.65).
+local STUMP_FLARE_LENGTH = 0.77
+
 -- The stump left behind until the tree regrows.
 function TreeArt.Stump(def: WoodDef, seed: number, scale: number?): Model
 	local s = scale or 1
@@ -725,7 +742,9 @@ function TreeArt.Stump(def: WoodDef, seed: number, scale: number?): Model
 		),
 		false
 	)
-	rootFlares(model, def.trunkColor, D, 3, rng)
+	-- Below the cut (its tops at most 0.8 of the stump's height, less the
+	-- 0.05 they sink), and 0.35-0.5 diameters out.
+	rootFlares(model, def.trunkColor, D, 3, rng, h * 0.8, STUMP_FLARE_LENGTH)
 	model.PrimaryPart = stump
 	return model
 end
