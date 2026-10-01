@@ -222,6 +222,7 @@ function BlueprintPlacer.Stop()
 	if b then
 		b.Visible = false
 	end
+	HUD.SetHintContext(nil)
 	if s.options.onStop then
 		s.options.onStop()
 	end
@@ -332,6 +333,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	if b then
 		b.Visible = true
 	end
+	HUD.SetHintContext("build") -- the hint says how to place, turn and stop
 	update(s)
 end
 

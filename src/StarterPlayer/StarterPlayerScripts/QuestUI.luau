@@ -7,7 +7,8 @@
 --     touch controls: there it sits in the thumbstick's corner, so it lets
 --     touches through and just fades after a while.
 --   * A beacon: a bouncing arrow over what to do next (the nearest tree or
---     log, your truck, the sell pad, the Tool Shed), with its distance.
+--     log, your truck, the sell pad, a stump to plant in or else a tree to
+--     fell for one, the Tool Shed), with its distance.
 -- The server owns progress: it sets the TutorialStep (0 = done) and
 -- TutorialProgress attributes, and this redraws from them.
 -- Looks per the UI spec (03, 04): a kraft card with the step and Skip (tap
@@ -22,6 +23,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local UITheme = require(script.Parent.UITheme)
@@ -49,6 +51,7 @@ local speechTap: TextButton? = nil -- covers the card: a tap dismisses it
 local beacon: BillboardGui? = nil
 local distanceLabel: TextLabel? = nil
 local speechToken = 0
+local speechLine = "" -- the line on the card, before its device words (HintLogic.Expand)
 local lastStep = -1
 local skipped = false -- this player pressed Skip: no farewell speech
 
@@ -116,11 +119,20 @@ end
 -- With touch controls the card sits where the dynamic thumbstick starts
 -- (the left of the screen, below the top third): a button over it would
 -- take the touch, so the stick wouldn't move. There it lets touches
--- through and goes on its own.
+-- through and goes on its own. Murph's words follow the device too
+-- ("Tap" on a touch screen, "Click" with a mouse, "Press RT" on a gamepad).
 local function refreshTap()
+	local device: UITheme.Device = UITheme.Device()
 	local tap = speechTap
 	if tap then
-		tap.Visible = UITheme.Device() ~= "phone"
+		tap.Visible = device ~= "phone"
+	end
+	local label = speechLabel
+	if label then
+		local text = HintLogic.Expand(speechLine, device)
+		if label.Text ~= text then
+			label.Text = text
+		end
 	end
 end
 
@@ -130,8 +142,8 @@ local function say(line: string)
 	if not holder or not card or not label then
 		return
 	end
-	refreshTap()
-	label.Text = line
+	speechLine = line
+	refreshTap() -- shows the line, worded for this device
 	card.Position = UDim2.fromOffset(0, 0)
 	fadeCard(card, 0, 0)
 	holder.Visible = true
@@ -193,13 +205,24 @@ function QuestUI.FindBeaconPart(map: Instance?, target: string): BasePart?
 	return if node and node:IsA("BasePart") then node else nil
 end
 
+-- A tree standing (not felled, not hidden by day) that you could chop.
+local function standing(model: Model): boolean
+	local hp = model:GetAttribute("HP")
+	return type(hp) == "number" and hp > 0 and model:GetAttribute("Dormant") ~= true
+end
+
+-- How many Heartseeds of this tree's or stump's wood you hold.
+local function seedsFor(model: Model): number
+	local wood = model:GetAttribute("WoodId")
+	local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
+	return if type(seeds) == "number" then seeds else 0
+end
+
 -- The part the beacon should hang over for this step, if it's around.
 local function beaconTarget(step: Step, from: Vector3): BasePart?
 	local target = step.beacon
 	if target == "tree" then
-		return nearestTagged("Tree", from, function(model)
-			return ((model:GetAttribute("HP") :: number?) or 0) > 0 and model:GetAttribute("Dormant") ~= true
-		end)
+		return nearestTagged("Tree", from, standing)
 	elseif target == "log" then
 		-- Logs lying in the world have a "Pick up" prompt; carried ones don't.
 		return nearestTagged("Log", from, function(_model, pp)
@@ -212,14 +235,18 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 	elseif target == "stump" then
 		-- The nearest stump you hold a Heartseed for (hidden Phantom Grove
 		-- stumps and ones already sprouting don't count).
-		return nearestTagged("Stump", from, function(model, pp)
-			local wood = model:GetAttribute("WoodId")
-			local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
-			return type(seeds) == "number"
-				and seeds > 0
-				and pp.Transparency < 1
-				and model:GetAttribute("Sprouting") ~= true
+		local stump = nearestTagged("Stump", from, function(model, pp)
+			return seedsFor(model) > 0 and pp.Transparency < 1 and model:GetAttribute("Sprouting") ~= true
 		end)
+		if stump then
+			return stump
+		end
+		-- None around (it grew back, or it's out of view): a tree to fell for
+		-- a fresh stump, one of a wood you hold seeds for if there is one,
+		-- else any (felling it drops its own seed).
+		return nearestTagged("Tree", from, function(model)
+			return standing(model) and seedsFor(model) > 0
+		end) or nearestTagged("Tree", from, standing)
 	elseif target then
 		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)
 	end
