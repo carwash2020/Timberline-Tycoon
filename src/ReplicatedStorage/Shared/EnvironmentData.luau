@@ -567,6 +567,60 @@ function EnvironmentData.Daylight(clockTime: number): number
 end
 
 ---------------------------------------------------------------------------
+-- Write throttle (WLD-18): how often LightingController touches Lighting
+---------------------------------------------------------------------------
+
+-- LightingController eases and writes the look 10 times a second (the
+-- frames between add their dt up), and writes a property only when its
+-- value has moved past one of these since the last write. The lightning
+-- flash is the one per-frame write (ExposureCompensation only).
+EnvironmentData.WriteEvery = 0.1 -- seconds between eased writes
+EnvironmentData.NumberEpsilon = 1e-3
+EnvironmentData.ColorEpsilon = 1 / 255 -- one 8-bit step in any channel
+EnvironmentData.ClockEpsilon = 0.005 -- in-game hours (0.25 real s; 0.075 degrees of sun)
+
+-- Adds a frame's `dt` to the time `pending` since the last write. Returns
+-- whether to write now, the time to ease by (all of it, so the ease is
+-- the same at any frame rate), and what is left pending.
+function EnvironmentData.WriteTick(pending: number, dt: number): (boolean, number, number)
+	local total = pending + math.max(dt, 0)
+	if total >= EnvironmentData.WriteEvery then
+		return true, total, 0
+	end
+	return false, 0, total
+end
+
+-- Whether a number property should be rewritten: never written yet, or
+-- moved more than NumberEpsilon (or `epsilon`) from what was last written.
+function EnvironmentData.NumberMoved(last: number?, value: number, epsilon: number?): boolean
+	if last == nil then
+		return true
+	end
+	return math.abs(value - last) > (epsilon or EnvironmentData.NumberEpsilon)
+end
+
+-- Whether a Color3 property should be rewritten: never written yet, or a
+-- channel moved by at least one 8-bit step (ColorEpsilon).
+function EnvironmentData.ColorMoved(last: Color3?, value: Color3): boolean
+	if last == nil then
+		return true
+	end
+	-- A hair under one step, so a full 1/255 step (with float error) counts.
+	local eps = EnvironmentData.ColorEpsilon - 1e-6
+	return math.abs(value.R - last.R) >= eps or math.abs(value.G - last.G) >= eps or math.abs(value.B - last.B) >= eps
+end
+
+-- Whether Lighting.ClockTime should be rewritten: moved more than
+-- ClockEpsilon around the 24-hour dial (23.999 to 0.001 is 0.002 h).
+function EnvironmentData.ClockMoved(last: number?, value: number): boolean
+	if last == nil then
+		return true
+	end
+	local d = math.abs(value - last) % 24
+	return math.min(d, 24 - d) > EnvironmentData.ClockEpsilon
+end
+
+---------------------------------------------------------------------------
 -- Grove vitality (GAME_DESIGN §16): what a thriving grove adds
 ---------------------------------------------------------------------------
 
