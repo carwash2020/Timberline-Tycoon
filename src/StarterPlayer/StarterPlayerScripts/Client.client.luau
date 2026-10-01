@@ -31,6 +31,7 @@ local controllers: { { name: string, module: { Start: () -> () } } } = {
 	{ name = "WeatherController", module = require(script.Parent.WeatherController) },
 	{ name = "AmbientLife", module = require(script.Parent.AmbientLife) },
 	{ name = "WindSway", module = require(script.Parent.WindSway) },
+	{ name = "CanopyFade", module = require(script.Parent.CanopyFade) },
 	{ name = "AmbientSound", module = require(script.Parent.AmbientSound) },
 	{ name = "NPCController", module = require(script.Parent.NPCController) },
 	{ name = "PromptUI", module = require(script.Parent.PromptUI) },
