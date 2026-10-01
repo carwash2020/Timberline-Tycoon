@@ -1,10 +1,14 @@
 --!strict
 -- FieldGuide: the wood compendium (GAME_DESIGN §11 beat 7). Every wood is a
--- silhouette with a hint until you fell one; then its page fills in. Pure,
--- shared by FieldGuideService (server), FieldGuideUI (client) and tests.
--- Discoveries live in profile.compendium.
+-- silhouette with a hint until you fell one; then its page fills in. A
+-- second page, the Hidden Grain (§16), teaches every figure's bark clue
+-- and counts the ones you've revealed. Pure, shared by FieldGuideService
+-- (server), FieldGuideUI (client) and tests. Discoveries live in
+-- profile.compendium and profile.forest.figures.
 
 local BiomeData = require(script.Parent.BiomeData)
+local ForestData = require(script.Parent.ForestData)
+local ForestLogic = require(script.Parent.ForestLogic)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local Util = require(script.Parent.Util)
 local WoodData = require(script.Parent.WoodData)
@@ -89,6 +93,73 @@ function FieldGuide.Count(found: { [string]: boolean }): (number, number)
 		end
 	end
 	return n, #woods
+end
+
+-- The woods page's header, worked out fresh each time it's drawn.
+function FieldGuide.WoodsSubtitle(found: { [string]: boolean }): string
+	local n, total = FieldGuide.Count(found)
+	return string.format("%d of %d woods found. Fell one of each to fill in its page.", n, total)
+end
+
+---------------------------------------------------------------------------
+-- The Hidden Grain: every figure, its bark clue, its value and how many
+-- you've revealed. The clues are never secret: reading the bark is the
+-- skill this page teaches.
+---------------------------------------------------------------------------
+
+-- The figures in the order the page lists them (rarest last).
+function FieldGuide.Figures(): { ForestData.FigureDef }
+	return ForestData.Figures
+end
+
+-- How many figures a player has revealed at least once (counts by id).
+function FieldGuide.FigureCount(revealed: { [string]: number }): (number, number)
+	local n = 0
+	for _, f in ipairs(ForestData.Figures) do
+		if (revealed[f.id] or 0) > 0 then
+			n += 1
+		end
+	end
+	return n, #ForestData.Figures
+end
+
+function FieldGuide.GrainSubtitle(revealed: { [string]: number }): string
+	local n, total = FieldGuide.FigureCount(revealed)
+	return string.format("%d of %d figures revealed. Read the bark; the sawmill shows what's inside.", n, total)
+end
+
+-- Its odds in words ("45 in 100 figured trees"), or how it comes about.
+local function oddsLine(f: ForestData.FigureDef): string
+	if f.source then
+		return f.source
+	end
+	local total = 0
+	for _, g in ipairs(ForestData.Figures) do
+		total += g.weight
+	end
+	return string.format("%d in 100 figured trees", math.floor(f.weight / total * 100 + 0.5))
+end
+
+-- A figure's page: 'Clue: small dark "eyes" dotted over the trunk · logs
+-- sell for x2 · 30 in 100 figured trees · revealed 4'.
+function FieldGuide.FigureFacts(f: ForestData.FigureDef, revealed: number): string
+	return string.format(
+		"Clue: %s · logs sell for %s · %s · revealed %d",
+		f.clue,
+		ForestLogic.MultiplierText(f.multiplier),
+		oddsLine(f),
+		revealed
+	)
+end
+
+-- The page's opening line: how figures come about.
+function FieldGuide.GrainIntro(): string
+	local c = ForestData.FigureChance
+	return string.format(
+		"About %d in 100 trees hide a figure: more in thriving groves, +%d in trees someone planted, twice as many while the Skyroot blooms. Every log of a figured tree carries it.",
+		math.floor(c.base * 100 + 0.5),
+		math.floor(c.plantedBonus * 100 + 0.5)
+	)
 end
 
 return FieldGuide

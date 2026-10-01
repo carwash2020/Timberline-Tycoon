@@ -3,8 +3,29 @@ return function(t)
 	local ItemCatalog = t.shared("ItemCatalog")
 	local TutorialData = t.shared("TutorialData")
 
-	local EVENTS = { treeFelled = true, logPickedUp = true, logsLoaded = true, logsSold = true, axeBought = true }
-	local BEACONS = { tree = true, log = true, truck = true, sellPad = true, toolShed = true }
+	local EVENTS = {
+		treeFelled = true,
+		logPickedUp = true,
+		logsLoaded = true,
+		logsSold = true,
+		seedPlanted = true,
+		axeBought = true,
+	}
+	local BEACONS = { tree = true, log = true, truck = true, sellPad = true, stump = true, toolShed = true }
+
+	t.test("right after the first sale, Murph teaches planting a Heartseed", function()
+		local ids = {}
+		for i, step in ipairs(TutorialData.Steps) do
+			ids[step.id] = i
+		end
+		t.ok(ids.plant ~= nil, "there's a planting beat")
+		t.eq(ids.plant, ids.sell + 1, "it comes right after the first sale")
+		local plant = TutorialData.Steps[ids.plant]
+		t.eq(plant.event, "seedPlanted")
+		t.eq(plant.count, 1)
+		t.eq(plant.objective, "Plant a Heartseed in a stump")
+		t.eq(plant.murph, "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.")
+	end)
 
 	t.test("every step is well formed", function()
 		local ids = {}

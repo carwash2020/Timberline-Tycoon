@@ -4,7 +4,8 @@
 --     the DailyGoals, DailyStreak and DailyResetAt player attributes for
 --     DailyUI.
 --   * Game code reports what happened with DailyService.Event (the same
---     moments as the tutorial: trees felled, logs loaded, logs sold).
+--     moments as the tutorial: trees felled, logs loaded, logs sold, and
+--     from the Living Forest: Heartseeds planted, figured logs sold).
 --   * A finished goal pays its reward; finishing all of them pays the
 --     streak bonus and extends the streak. A missed day breaks it.
 --   * New goals roll at midnight UTC, including for players online then.
@@ -22,15 +23,18 @@ local ProfileService = require(script.Parent.ProfileService)
 type Profile = ProfileService.Profile
 type Goal = DailyData.Goal
 
-export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold"
+export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold" | "seedPlanted" | "figuredSold"
 
 local DailyService = {}
 
--- The goal kind each event counts toward, one per tree or log.
+-- The goal kind each event counts toward, one per tree, log or seed.
+-- ForestService reports seedPlanted and figuredSold (figured logs sold).
 local COUNTED_BY: { [DailyEvent]: DailyData.GoalKind } = {
 	treeFelled = "fell",
 	logsLoaded = "load",
 	logsSold = "sell",
+	seedPlanted = "plant",
+	figuredSold = "sellFigured",
 }
 
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end

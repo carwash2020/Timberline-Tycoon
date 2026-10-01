@@ -63,11 +63,40 @@ return function(t)
 				s.Daily.Event(s.player, "logsSold", goal.target, {}, 0)
 			elseif goal.kind == "earn" then
 				s.Daily.Event(s.player, "logsSold", 1, {}, goal.target)
+			elseif goal.kind == "plant" then
+				s.Daily.Event(s.player, "seedPlanted", goal.target)
+			elseif goal.kind == "sellFigured" then
+				s.Daily.Event(s.player, "figuredSold", goal.target)
 			else
 				s.Daily.Event(s.player, "logsSold", goal.target, { [goal.wood] = goal.target }, 0)
 			end
 		end
 	end
+
+	t.test("the Living Forest's goals: planting Heartseeds and selling figured logs", function()
+		local planters, figured = 0, 0
+		for userId = 1, 80 do
+			local s = setup({ userId = userId })
+			for _, goal in ipairs(s.profile.daily.goals) do
+				if goal.kind == "plant" then
+					planters += 1
+					s.Daily.Event(s.player, "logsSold", 5, {}, 0)
+					t.eq(goal.progress, 0, "selling doesn't count as planting")
+					s.Daily.Event(s.player, "seedPlanted", 1)
+					t.eq(goal.progress, 1)
+					t.eq(goal.target, s.DailyData.Tiers[1].seeds)
+				elseif goal.kind == "sellFigured" then
+					figured += 1
+					s.Daily.Event(s.player, "logsSold", 5, {}, 0)
+					t.eq(goal.progress, 0, "plain logs don't count")
+					s.Daily.Event(s.player, "figuredSold", 2)
+					t.eq(goal.progress, 2)
+					t.eq(goal.target, s.DailyData.Tiers[1].figured)
+				end
+			end
+		end
+		t.ok(planters > 0 and figured > 0, "both kinds come up across 80 players")
+	end)
 
 	t.test("joining rolls today's goals and publishes them", function()
 		local s = setup()

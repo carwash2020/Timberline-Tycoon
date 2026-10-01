@@ -1,18 +1,24 @@
 --!strict
 -- WorldUI: the world, client side.
---   * Entering a biome names it and its woods, and warns about missing gear
---     ("It's cold here: you walk slower without an Insulated Coat").
+--   * Entering a biome names it and its woods, says how its grove is doing
+--     (Grove Vitality, GAME_DESIGN §16: "Starter Forest · oak, birch · a
+--     thriving grove"), and warns about missing gear ("It's cold here: you
+--     walk slower without an Insulated Coat"). If the grove you're in
+--     changes tier, a toast says so.
 --   * A clock next to the cash: "Day 14:05" / "Night 22:10" (night is when
 --     the Phantom Grove's trees come out).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
--- The server sets the Biome and OwnedGear attributes; the time of day is
--- Lighting.ClockTime, set by WorldClock.
+-- The server sets the Biome and OwnedGear attributes and the
+-- VitalityTier_<biome> workspace attributes (ForestService); the time of
+-- day is Lighting.ClockTime, set by WorldClock.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local ForestData = require(ReplicatedStorage.Shared.ForestData)
+local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -23,6 +29,17 @@ local UITheme = require(script.Parent.UITheme)
 local WorldUI = {}
 
 local player = Players.LocalPlayer
+
+local TIER_TOAST_COOLDOWN = 45 -- seconds between tier toasts for one grove (no flicker at a boundary)
+
+-- The grove's tier right now, if this biome has a vitality meter.
+local function groveTier(biome: BiomeData.BiomeDef): ForestData.Tier?
+	if not ForestLogic.IsGrove(biome.id) then
+		return nil
+	end
+	local id = workspace:GetAttribute("VitalityTier_" .. biome.id)
+	return if type(id) == "string" then ForestLogic.Tier(id) else nil
+end
 
 local function woodsOf(biome: BiomeData.BiomeDef): string
 	local names: { string } = {}
@@ -44,7 +61,8 @@ local function onBiomeChanged()
 	if not biome then
 		return
 	end
-	HUD.Toast(string.format("%s · %s", biome.displayName, woodsOf(biome)))
+	local tier = groveTier(biome)
+	HUD.Toast(string.format("%s · %s%s", biome.displayName, woodsOf(biome), if tier then " · " .. tier.blurb else ""))
 	local gear = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
 	local rules = BiomeData.Rules(biome, gear)
 	if rules.speedFactor < 1 and biome.slowdown then
@@ -108,9 +126,30 @@ local function watchSkyBin()
 	refresh()
 end
 
+-- A toast when the grove you're standing in changes tier.
+local function watchGroves()
+	local lastToast: { [string]: number } = {}
+	for _, id in ipairs(ForestData.Groves) do
+		workspace:GetAttributeChangedSignal("VitalityTier_" .. id):Connect(function()
+			if player:GetAttribute("Biome") ~= id then
+				return
+			end
+			local biome = BiomeData.Get(id)
+			local tier = if biome then groveTier(biome) else nil
+			local now = os.clock()
+			if not biome or not tier or now - (lastToast[id] or -math.huge) < TIER_TOAST_COOLDOWN then
+				return
+			end
+			lastToast[id] = now
+			HUD.Toast(string.format(tier.became, biome.displayName))
+		end)
+	end
+end
+
 function WorldUI.Start()
 	buildClock()
 	task.spawn(watchSkyBin)
+	watchGroves()
 	player:GetAttributeChangedSignal("Biome"):Connect(onBiomeChanged)
 end
 

@@ -8,7 +8,10 @@
 --   * A finished step pays its rewardCash through EconomyService.
 --   * The SkipTutorial remote ends it early, without rewards. Saves from
 --     before the tutorial that already own a better axe skip it.
---   * Each step reached is logged once as a "Tutorial" analytics funnel.
+--   * Each step reached is logged once as a "Tutorial" analytics funnel
+--     (which also lets saves made before a new step was inserted find
+--     their place again).
+--   * ForestService reports "seedPlanted" for the Heartseed beat.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -87,12 +90,30 @@ local function enterStep(player: Player, profile: Profile, index: number)
 	publish(player, profile)
 end
 
+-- A save from before a step was inserted (the Heartseed beat after the
+-- first sale) points at whatever step now sits at its old index. The
+-- funnel remembers every step a player has reached (profile.onboarding,
+-- by step id), and steps are reached in order, so the latest one reached
+-- is the one they're really on. Progress toward it is kept.
+local function realign(profile: Profile)
+	local latest = 0
+	for i, step in ipairs(TutorialData.Steps) do
+		if profile.onboarding["Tutorial:" .. step.id] then
+			latest = i
+		end
+	end
+	if latest > profile.tutorialStep then
+		profile.tutorialStep = latest
+	end
+end
+
 -- Call once the player's save has loaded.
 function QuestService.Start(player: Player, profile: Profile)
 	if profile.tutorialDone then
 		publish(player, profile)
 		return
 	end
+	realign(profile)
 	if profile.bestAxeTier >= 2 and profile.tutorialStep == 1 and profile.tutorialProgress == 0 then
 		finish(player, profile, "bypassed") -- a save from before the tutorial existed
 		return

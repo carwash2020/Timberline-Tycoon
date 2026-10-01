@@ -149,6 +149,48 @@ return function(t)
 		t.eq(again.player.attrs.TutorialStep, 0)
 	end)
 
+	t.test("the Heartseed beat: planting a seed in a stump moves it on", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		playUntil(s, "plant")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plant")
+		t.eq(s.Steps[s.profile.tutorialStep - 1].id, "sell", "right after the first sale")
+		s.event("logsSold", 5)
+		s.event("treeFelled")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plant", "only planting counts")
+		s.event("seedPlanted")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads")
+		t.eq(s.player.attrs.TutorialProgress, 0)
+	end)
+
+	t.test("saves from before the Heartseed beat keep their place", function()
+		-- Steps those saves reached, logged by the funnel.
+		local reached = {}
+		for _, id in ipairs({ "fell", "pickup", "load", "sell", "loads" }) do
+			reached["Tutorial:" .. id] = true
+		end
+		-- On "loads" (then step 5, now 6), 7 logs in.
+		local mid = setup({ tutorialStep = 5, tutorialProgress = 7, onboarding = table.clone(reached) })
+		mid.Quest.Start(mid.player, mid.profile)
+		t.eq(mid.Steps[mid.profile.tutorialStep].id, "loads")
+		t.eq(mid.player.attrs.TutorialProgress, 7, "progress kept")
+		-- On "steel" (then 6, now 7).
+		local late = table.clone(reached)
+		late["Tutorial:steel"] = true
+		local s = setup({ tutorialStep = 6, tutorialProgress = 0, onboarding = late })
+		s.Quest.Start(s.player, s.profile)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "steel")
+		-- Just sold for the first time: planting is next, as for everyone.
+		local early = {}
+		for _, id in ipairs({ "fell", "pickup", "load", "sell" }) do
+			early["Tutorial:" .. id] = true
+		end
+		local e = setup({ tutorialStep = 4, tutorialProgress = 0, onboarding = early })
+		e.Quest.Start(e.player, e.profile)
+		e.event("logsSold", 3)
+		t.eq(e.Steps[e.profile.tutorialStep].id, "plant")
+	end)
+
 	t.test("a broken step index restarts cleanly", function()
 		local s = setup({ tutorialStep = 99 })
 		s.Quest.Start(s.player, s.profile)
