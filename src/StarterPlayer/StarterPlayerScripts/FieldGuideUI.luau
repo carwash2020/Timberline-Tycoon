@@ -66,7 +66,7 @@ function FieldGuideUI.Start()
 		style = "bark",
 		textSize = 14,
 	})
-	b.root.Position = UITheme.LeftColumnPosition() -- where the tutorial tracker was
+	UITheme.LeftColumn(b.root) -- where the tutorial tracker was
 	b.root.Visible = false
 	b.root.Parent = gui
 	b.face.Activated:Connect(function()

@@ -12,11 +12,16 @@
 --     consoles (1.5x on a TV), never below 1x.
 --   * Margin(): the gap to the screen edge: 12, or the 5% TV-safe area on
 --     a console (64 at the sides, 36 at the bottom).
+--   * Bottom(): where bottom-centre things (the hint, bars) start: above
+--     Roblox's tool hotbar, which the spec didn't allow for.
+--   * LeftColumn(): keeps the left column (tutorial, Field Guide button)
+--     just under Roblox's chat window, wherever and however big it is.
 --   * Textures: the spec's wood grain and kraft fibre are tiled images;
 --     until they're uploaded (set the ids below) surfaces are flat colour.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
 
 local UITheme = {}
@@ -115,15 +120,13 @@ function UITheme.Margin(): (number, number) -- (side, bottom)
 	return 12, 12
 end
 
--- Where the left column (the tutorial tracker, then the Field Guide button)
--- starts: high up on a phone (its chat is a button), a third of the way
--- down elsewhere, under Roblox's chat window.
-function UITheme.LeftColumnPosition(): UDim2
-	local side = UITheme.Margin()
-	if UITheme.IsPhone() then
-		return UDim2.fromOffset(side, 60) -- the spec's y 96, under the top bar
-	end
-	return UDim2.new(0, side, 0.3, 0)
+-- Room for Roblox's tool hotbar (your axes), centred along the bottom.
+local HOTBAR = 70
+
+-- How far above the bottom edge the bottom-centre things start.
+function UITheme.Bottom(): number
+	local _, bottom = UITheme.Margin()
+	return bottom + (if UITheme.IsPhone() then 58 else HOTBAR)
 end
 
 local function scaleFor(): number
@@ -139,6 +142,50 @@ local function scaleFor(): number
 end
 
 local scales: { UIScale } = {}
+local currentScale = 1
+local leftColumn: { GuiObject } = {}
+
+-- The bottom of Roblox's chat window (and its input bar), in screen
+-- pixels; 0 if there's no chat window showing.
+local function chatBottom(): number
+	local bottom = 0
+	for _, className in ipairs({ "ChatWindowConfiguration", "ChatInputBarConfiguration" }) do
+		local config = TextChatService:FindFirstChildOfClass(className)
+		if config and (config :: any).Enabled then
+			local pos = (config :: any).AbsolutePosition :: Vector2
+			local size = (config :: any).AbsoluteSize :: Vector2
+			if size.Y > 0 then
+				bottom = math.max(bottom, pos.Y + size.Y)
+			end
+		end
+	end
+	return bottom
+end
+
+local function placeLeft()
+	local side = UITheme.Margin()
+	local position: UDim2
+	if UITheme.IsPhone() then
+		position = UDim2.fromOffset(side, 60) -- the spec's y 96, under the top bar (chat is a button)
+	else
+		local bottom = chatBottom()
+		if bottom > 0 then
+			-- Our offsets are scaled by the UIScale, the chat's aren't.
+			position = UDim2.fromOffset(side, (bottom + 10) / currentScale)
+		else
+			position = UDim2.new(0, side, 0.3, 0)
+		end
+	end
+	for _, obj in ipairs(leftColumn) do
+		obj.Position = position
+	end
+end
+
+-- Puts `obj` in the left column, under the chat, and keeps it there.
+function UITheme.LeftColumn(obj: GuiObject)
+	table.insert(leftColumn, obj)
+	placeLeft()
+end
 
 -- A ScreenGui for one of the game's screens, scaled for the device.
 function UITheme.Screen(name: string, displayOrder: number?, ignoreInset: boolean?): ScreenGui
@@ -406,11 +453,10 @@ export type Bar = { outer: Frame, label: TextLabel, row: Frame }
 -- A bark bar at the bottom centre, just above the control hint: a line of
 -- text and a row of buttons (build mode, placing a blueprint).
 function UITheme.Bar(parent: Instance, name: string): Bar
-	local _, bottom = UITheme.Margin()
 	local card = UITheme.Card(C.Bark, C.Ink, 3, 12, true)
 	card.outer.Name = name
 	card.outer.AnchorPoint = Vector2.new(0.5, 1)
-	card.outer.Position = UDim2.new(0.5, 0, 1, -(bottom + 30 + 8))
+	card.outer.Position = UDim2.new(0.5, 0, 1, -(UITheme.Bottom() + 30 + 8))
 	card.outer.Visible = false
 	UITheme.stroke(card.face, C.Ink, 2)
 	UITheme.padding(card.face, 8, 10, 10, 10)
@@ -498,10 +544,11 @@ function UITheme.Start()
 	playerGui.SelectionImageObject = selectionRing()
 	-- Rescale when the window changes size (or a phone rotates).
 	local function rescale()
-		local s = scaleFor()
+		currentScale = scaleFor()
 		for _, scale in ipairs(scales) do
-			scale.Scale = s
+			scale.Scale = currentScale
 		end
+		placeLeft()
 	end
 	local function watchCamera()
 		local camera = workspace.CurrentCamera
@@ -512,6 +559,18 @@ function UITheme.Start()
 	end
 	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
 	watchCamera()
+	-- Follow the chat window as it appears, moves or resizes.
+	task.spawn(function()
+		for _, className in ipairs({ "ChatWindowConfiguration", "ChatInputBarConfiguration" }) do
+			local config = TextChatService:WaitForChild(className, 10)
+			if config then
+				for _, prop in ipairs({ "AbsolutePosition", "AbsoluteSize", "Enabled" }) do
+					config:GetPropertyChangedSignal(prop):Connect(placeLeft)
+				end
+			end
+		end
+		placeLeft()
+	end)
 end
 
 return UITheme

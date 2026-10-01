@@ -221,7 +221,7 @@ local function refresh()
 			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress)
 		end
 		if stepLabel then
-			stepLabel.Text = string.format("MURPH'S TUTORIAL · %d/%d", index, #TutorialData.Steps)
+			stepLabel.Text = string.format("TUTORIAL · %d/%d", index, #TutorialData.Steps)
 		end
 	end
 	-- A new step: Murph says his line. (Also on join, as a reminder.)
@@ -330,7 +330,7 @@ local function build()
 
 	local column = Instance.new("Frame")
 	column.Name = "Column"
-	column.Position = UITheme.LeftColumnPosition()
+	UITheme.LeftColumn(column) -- under Roblox's chat window
 	column.Size = UDim2.fromOffset(280, 0)
 	column.AutomaticSize = Enum.AutomaticSize.Y
 	column.BackgroundTransparency = 1
@@ -362,11 +362,7 @@ local function build()
 	header.Parent = card.face
 	local step = UITheme.label(header, "", F.Black, 13, C.Bark)
 	step.Size = UDim2.new(1, -120, 0, 28)
-	step.TextScaled = true
-	local stepFit = Instance.new("UITextSizeConstraint")
-	stepFit.MaxTextSize = 13
-	stepFit.MinTextSize = 9
-	stepFit.Parent = step
+	step.TextTruncate = Enum.TextTruncate.AtEnd -- one line, never wrapped
 	stepLabel = step
 
 	local skip = UITheme.Button({

@@ -6,7 +6,8 @@
 --   * Toasts: short messages from the server (Notify) or other controllers,
 --     top centre, newest on top, up to three (older ones fade back).
 --     Amounts of money show in green.
---   * A one-line control hint at the bottom, worded for the device in use.
+--   * A one-line control hint at the bottom (above Roblox's tool hotbar),
+--     worded for the device in use.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button. On a gamepad each shows its button glyph, and
@@ -310,11 +311,10 @@ local function buildCash(gui: ScreenGui)
 end
 
 local function buildHint(gui: ScreenGui)
-	local _, bottom = UITheme.Margin()
 	local hint = UITheme.label(gui, "", F.Body, 13, C.Cream)
 	hint.Name = "Hint"
 	hint.AnchorPoint = Vector2.new(0.5, 1)
-	hint.Position = UDim2.new(0.5, 0, 1, -bottom)
+	hint.Position = UDim2.new(0.5, 0, 1, -UITheme.Bottom()) -- above the tool hotbar
 	hint.AutomaticSize = Enum.AutomaticSize.X
 	hint.Size = UDim2.fromOffset(0, 30)
 	hint.BackgroundColor3 = C.Ink
