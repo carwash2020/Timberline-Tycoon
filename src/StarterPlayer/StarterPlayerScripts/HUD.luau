@@ -9,19 +9,35 @@
 --     centred at the top between them on a computer or a TV, up to three;
 --     on a phone, where there's no room between them, under the tutorial
 --     tracker at its width, up to two. Amounts of money show in green.
+--     While a panel is open over the game (the shop: HUD.SetModal), they
+--     move inside its bottom edge instead, stacking upward, clear of its
+--     title and its Buy buttons; one at a time on a phone
+--     (HudLayout.ModalLane).
 --   * A one-line control hint at the bottom (above Roblox's tool hotbar),
 --     worded for the device in use and for what you're doing
 --     (Shared/HintLogic): chopping, carrying logs (the CarriedLogs
 --     attribute), driving (Humanoid.Seated in a VehicleSeat), standing in
 --     the sell zone, or a mode a controller sets (HUD.SetHintContext:
---     placing a blueprint).
+--     placing a blueprint). It hides while a panel is open (HUD.SetModal).
+--   * The load chip on the same line, left of the hint: a log, "Hands 1/2"
+--     and, with a truck, "Bed 4/6" (amber and "Bed full" once it's full),
+--     from the CarriedLogs, BedCount and BedCapacity attributes
+--     (HudRules.LoadChip); the log bumps when they change. The line stays
+--     clear of a phone's jump button (HudLayout.BottomRow), and hides with
+--     the hint.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
 --     line (the Daily Goals button); what doesn't fit there starts another
 --     column to its left. On a gamepad each shows its button glyph, and
 --     that button presses it (unless a world prompt is using the same one).
---   * "Loading your save..." until the server says the profile is ready.
+--   * A loading card, under the ReplicatedFirst one (LoadingScreen, which
+--     gives up after 30 s) so it shows if the wait runs longer: "Building
+--     the world..." until the server's Remotes folder exists (GameServer
+--     makes it once the map is built), then "Loading your save..." until
+--     the server says the profile is ready (HudRules.LoadingText). HUD.Start
+--     puts it up before anything that waits, and waits for the Remotes in
+--     short tries, so a slow build never prints an infinite-yield warning.
 --   * Money in or out pops beside the plaque ("+$1,250") and the plaque
 --     counts up to the new amount.
 --   * The top-right corner, laid out by size (UIListLayouts), so nothing
@@ -46,6 +62,7 @@ local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HudLayout = require(script.Parent.HudLayout)
+local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local HUD = {}
@@ -66,8 +83,13 @@ local HINT_POLL = 0.25 -- seconds between sell-zone checks for the hint
 local SIDE_GAP = 8 -- between side buttons, and under the corner
 local JUMP_CLEARANCE = 24 -- the side buttons end this far above a phone's jump button
 local POPUP_GAP = 6 -- the corner's popups drop this far under its second line
+local HINT_MAX = 320 -- the hint's widest (it truncates past this)
+local ROW_HEIGHT = 30 -- the hint and the load chip
+local ROW_GAP = 8 -- between them, and short of a phone's jump button
+local CHIP_POP = 1.4 -- the chip's log grows to this when the load changes, and eases back
 local BAR_HALF_WIDTH = 176 -- UITheme.Bar's card (340 wide plus its edge) at the bottom centre
 local BAR_HEIGHT = 84 -- and its height (label, a row of buttons, padding)
+local REMOTES_WAIT = 5 -- seconds per try for the server's Remotes folder (a timeout: no infinite-yield warning)
 
 type Toast = {
 	outer: Frame,
@@ -76,6 +98,14 @@ type Toast = {
 	stroke: UIStroke,
 	limit: UISizeConstraint, -- the card's width, at most the lane's
 	labelLimit: UISizeConstraint, -- and its text's
+}
+
+type Chip = {
+	frame: Frame,
+	hands: TextLabel,
+	dot: TextLabel,
+	bed: TextLabel,
+	pop: UIScale, -- on the log, for the bump
 }
 
 type Side = {
@@ -100,9 +130,15 @@ local toastOrder = 0
 local toastWidth = TOAST_WIDTH -- the lane's width
 local maxToasts = MAX_TOASTS -- how many the lane holds
 local laneQueued = false
+local modalRect: HudLayout.Rect? = nil -- an open panel (HUD.SetModal), in screen pixels
 local hudGui: ScreenGui? = nil
 local leftColumn: Frame? = nil -- UITheme's left column (the tracker), once it exists
 local hintLabel: TextLabel? = nil
+local hintLimit: UISizeConstraint? = nil -- the hint's widest right now (placeRow)
+local bottomRow: Frame? = nil -- the load chip and the hint, side by side
+local rowQueued = false
+local chip: Chip? = nil
+local chipText: string? = nil -- what the chip said last time it showed (a change bumps it)
 local hintForced: HintLogic.Context? = nil -- a controller's mode (HUD.SetHintContext)
 local hintState: HintLogic.State = { driving = false, inSellZone = false, carrying = false }
 local sideGui: ScreenGui? = nil
@@ -114,6 +150,8 @@ local shelf: Frame? = nil -- the corner's two lines
 local besideCash: Frame? = nil
 local underCash: Frame? = nil
 local popups: { GuiObject } = {}
+local loadingCard: Frame? = nil
+local loadingLabel: TextLabel? = nil
 local shownPrompts: { [ProximityPrompt]: boolean } = {}
 
 ---------------------------------------------------------------------------
@@ -247,18 +285,9 @@ local function rectIn(gui: ScreenGui, obj: GuiObject): HudLayout.Rect
 	return boxIn(gui, obj.AbsolutePosition, obj.AbsolutePosition + obj.AbsoluteSize)
 end
 
--- Puts the toasts' lane clear of the corner and the left column, for
--- their sizes right now (HudLayout.ToastLane).
-local function placeToasts()
-	laneQueued = false
-	local gui, stack, list, corner = hudGui, toastStack, toastList, shelf
-	if not gui or not stack or not list or not corner then
-		return
-	end
-	local screen = gui.AbsoluteSize / UITheme.Scale()
-	if screen.X <= 0 or screen.Y <= 0 then
-		return -- not laid out yet
-	end
+-- The toasts' lane at the top, clear of the corner and the left column,
+-- for their sizes right now (HudLayout.ToastLane).
+local function laneAtTop(gui: ScreenGui, corner: Frame, screen: Vector2): HudLayout.Lane
 	local column = leftColumn
 	local columnRect = if column and column.Parent then rectIn(gui, column) else nil
 	-- Off a phone the column hangs under Roblox's chat window: keep the
@@ -277,7 +306,7 @@ local function placeToasts()
 			else chat
 	end
 	local _, bottomMargin = UITheme.Margin()
-	local lane = HudLayout.ToastLane(
+	return HudLayout.ToastLane(
 		screen,
 		rectIn(gui, corner),
 		columnRect,
@@ -285,11 +314,39 @@ local function placeToasts()
 		TOAST_LANE_MIN,
 		screen.Y - bottomMargin
 	)
+end
+
+-- Puts the toasts' lane at the top (laneAtTop), or while a panel is open
+-- inside its bottom edge (HudLayout.ModalLane), growing upward there.
+local function placeToasts()
+	laneQueued = false
+	local gui, stack, list, corner = hudGui, toastStack, toastList, shelf
+	if not gui or not stack or not list or not corner then
+		return
+	end
+	local screen = gui.AbsoluteSize / UITheme.Scale()
+	if screen.X <= 0 or screen.Y <= 0 then
+		return -- not laid out yet
+	end
+	local modal = modalRect
+	local lane = if modal
+		then HudLayout.ModalLane(
+			boxIn(gui, Vector2.new(modal.left, modal.top), Vector2.new(modal.right, modal.bottom)),
+			TOAST_WIDTH,
+			TOAST_LANE_MIN,
+			UITheme.IsPhone()
+		)
+		else laneAtTop(gui, corner, screen)
 	toastWidth = lane.right - lane.left
 	maxToasts = lane.max
-	stack.Position = UDim2.fromOffset(lane.left, lane.top)
+	-- A modal lane's stack hangs from its bottom edge, so newer toasts
+	-- (on top) push it up and the older ones stay put.
+	stack.AnchorPoint = if lane.modal then Vector2.new(0, 1) else Vector2.zero
+	stack.Position = UDim2.fromOffset(lane.left, if lane.modal then lane.bottom else lane.top)
 	stack.Size = UDim2.fromOffset(toastWidth, 0)
-	list.HorizontalAlignment = if lane.under then Enum.HorizontalAlignment.Left else Enum.HorizontalAlignment.Center
+	list.HorizontalAlignment = if lane.under or lane.modal
+		then Enum.HorizontalAlignment.Left
+		else Enum.HorizontalAlignment.Center
 	while #toasts > maxToasts do
 		removeToast(toasts[#toasts])
 	end
@@ -447,6 +504,105 @@ end
 function HUD.SetHintContext(context: HintLogic.Context?)
 	hintForced = context
 	refreshHint()
+end
+
+-- The load chip, from the attributes the server keeps (HudRules.LoadChip).
+-- A change in what it says, while it shows, bumps its log.
+local function refreshChip()
+	local c = chip
+	if not c then
+		return
+	end
+	local view = HudRules.LoadChip(
+		player:GetAttribute("CarriedLogs"),
+		player:GetAttribute("BedCount"),
+		player:GetAttribute("BedCapacity"),
+		GameConfig.HandCapacity,
+		modalRect ~= nil
+	)
+	local bed = view.bed
+	c.frame.Visible = view.shown
+	c.hands.Text = view.hands
+	c.bed.Text = bed or ""
+	c.bed.Visible = bed ~= nil
+	c.dot.Visible = bed ~= nil
+	c.frame.BackgroundColor3 = if view.full then C.Amber else C.Ink
+	c.frame.BackgroundTransparency = if view.full then 0 else 0.2
+	local ink = if view.full then C.Ink else C.Cream
+	c.hands.TextColor3 = ink
+	c.dot.TextColor3 = ink
+	c.bed.TextColor3 = ink
+	if not view.shown then
+		return
+	end
+	local text = view.hands .. " " .. (bed or "")
+	if chipText ~= nil and chipText ~= text then
+		c.pop.Scale = CHIP_POP
+		TweenService:Create(c.pop, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Scale = 1,
+		}):Play()
+	end
+	chipText = text
+end
+
+-- The hint and the load chip show unless a panel is open over the game.
+local function refreshModal()
+	local hint = hintLabel
+	if hint then
+		hint.Visible = modalRect == nil
+	end
+	refreshChip()
+end
+
+-- A panel open over the game (ShopUI: the shops, the Store, the Field
+-- Guide), as its box in screen pixels (AbsolutePosition and
+-- AbsolutePosition + AbsoluteSize), or nil once it's closed. While one is
+-- open the hint hides and the toasts move inside the panel's bottom edge
+-- (HudLayout.ModalLane), so they never cover its title or its buttons.
+-- Safe to call before HUD.Start: it applies once the HUD is built.
+function HUD.SetModal(rect: HudLayout.Rect?)
+	modalRect = if rect then table.clone(rect) else nil
+	refreshModal()
+	queueToasts()
+end
+
+-- Fits the bottom row between the left margin and a phone's jump button
+-- (or the right margin) for the chip's and the hint's sizes right now
+-- (HudLayout.BottomRow): it moves left, then the hint truncates sooner.
+local function placeRow()
+	rowQueued = false
+	local gui, row, hint, limit = hudGui, bottomRow, hintLabel, hintLimit
+	if not gui or not row or not hint or not limit then
+		return
+	end
+	local scale = UITheme.Scale()
+	local screenW = gui.AbsoluteSize.X / scale
+	if screenW <= 0 then
+		return -- not laid out yet
+	end
+	local side = UITheme.Margin()
+	local high = screenW - side
+	local jump = jumpButton
+	local touch = if jump then jump:FindFirstAncestorOfClass("ScreenGui") else nil
+	if jump and touch and touch.Enabled and jump.Visible and jump.AbsoluteSize.X > 0 then
+		high = math.min(high, (jump.AbsolutePosition.X - gui.AbsolutePosition.X) / scale - ROW_GAP)
+	end
+	local c = chip
+	local chipW = if c and c.frame.Visible then c.frame.AbsoluteSize.X / scale else 0
+	local hintW = if hint.Visible then hint.AbsoluteSize.X / scale else 0
+	local hintMax, centre = HudLayout.BottomRow(screenW, chipW, hintW, ROW_GAP, side, high, HINT_MAX)
+	if limit.MaxSize.X ~= hintMax then
+		limit.MaxSize = Vector2.new(hintMax, ROW_HEIGHT)
+	end
+	row.Position = UDim2.new(0, centre, 1, -UITheme.Bottom()) -- above the tool hotbar
+end
+
+-- Once per frame at most, however many things changed.
+local function queueRow()
+	if not rowQueued then
+		rowQueued = true
+		task.defer(placeRow)
+	end
 end
 
 -- The hint's sources: sitting in a driver's seat (re-hooked on every
@@ -609,6 +765,7 @@ local function refreshDevice()
 	end
 	queueArrange()
 	queueToasts()
+	queueRow()
 end
 
 export type SideOptions = {
@@ -741,23 +898,131 @@ local function buildCash(gui: ScreenGui)
 	cashPops, cashShown = pops, shown
 end
 
-local function buildHint(gui: ScreenGui)
-	local hint = UITheme.label(gui, "", F.Body, 13, C.Cream)
+-- The load chip: a log drawn from frames (no image to upload), then
+-- "Hands 1/2 · Bed 4/6". Ink like the hint; amber once the bed is full.
+local function buildChip(row: Frame)
+	local frame = Instance.new("Frame")
+	frame.Name = "LoadChip"
+	frame.LayoutOrder = 1
+	frame.Size = UDim2.fromOffset(0, ROW_HEIGHT)
+	frame.AutomaticSize = Enum.AutomaticSize.X
+	frame.BackgroundColor3 = C.Ink
+	frame.BackgroundTransparency = 0.2
+	frame.BorderSizePixel = 0
+	frame.Visible = false
+	UITheme.corner(frame, ROW_HEIGHT / 2)
+	UITheme.padding(frame, 0, 12, 0, 8)
+	local list = UITheme.list(frame, 6, true)
+	list.VerticalAlignment = Enum.VerticalAlignment.Center
+
+	-- The log, side on: a golden length with its pale cut end (a bark ring
+	-- round a heart) at the right. Its holder keeps a fixed size, so the
+	-- bump doesn't push the text about.
+	local holder = Instance.new("Frame")
+	holder.Name = "Log"
+	holder.LayoutOrder = 1
+	holder.Size = UDim2.fromOffset(26, 16)
+	holder.BackgroundTransparency = 1
+	holder.Parent = frame
+	local icon = Instance.new("Frame")
+	icon.Name = "Icon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.Size = UDim2.fromScale(1, 1)
+	icon.BackgroundTransparency = 1
+	icon.Parent = holder
+	local pop = Instance.new("UIScale")
+	pop.Parent = icon
+	local body = Instance.new("Frame")
+	body.Name = "Length"
+	body.AnchorPoint = Vector2.new(0, 0.5)
+	body.Position = UDim2.fromScale(0, 0.5)
+	body.Size = UDim2.fromOffset(20, 12)
+	body.BackgroundColor3 = C.AmberEdge
+	body.BorderSizePixel = 0
+	UITheme.corner(body, 4)
+	UITheme.stroke(body, C.Ink, 1) -- shows on the amber chip
+	body.Parent = icon
+	local cut = Instance.new("Frame")
+	cut.Name = "Cut"
+	cut.AnchorPoint = Vector2.new(1, 0.5)
+	cut.Position = UDim2.new(1, -1, 0.5, 0)
+	cut.Size = UDim2.fromOffset(13, 13)
+	cut.ZIndex = 2 -- over the length's end
+	cut.BackgroundColor3 = C.Paper
+	cut.BorderSizePixel = 0
+	UITheme.corner(cut, 7)
+	UITheme.stroke(cut, C.Bark, 2)
+	cut.Parent = icon
+	local heart = Instance.new("Frame")
+	heart.Name = "Heart"
+	heart.AnchorPoint = Vector2.new(0.5, 0.5)
+	heart.Position = UDim2.fromScale(0.5, 0.5)
+	heart.Size = UDim2.fromOffset(4, 4)
+	heart.BackgroundColor3 = C.AmberEdge
+	heart.BorderSizePixel = 0
+	UITheme.corner(heart, 2)
+	heart.Parent = cut
+
+	local function words(name: string, order: number, text: string): TextLabel
+		local label = UITheme.label(frame, text, F.Bold, 13, C.Cream)
+		label.Name = name
+		label.LayoutOrder = order
+		label.Size = UDim2.fromOffset(0, ROW_HEIGHT)
+		label.AutomaticSize = Enum.AutomaticSize.X
+		return label
+	end
+	chip = {
+		frame = frame,
+		hands = words("Hands", 2, ""),
+		dot = words("Dot", 3, "·"),
+		bed = words("Bed", 4, ""),
+		pop = pop,
+	}
+	frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueRow)
+	frame:GetPropertyChangedSignal("Visible"):Connect(queueRow)
+	frame.Parent = row
+end
+
+local function buildHint(row: Frame)
+	local hint = UITheme.label(row, "", F.Body, 13, C.Cream)
 	hint.Name = "Hint"
-	hint.AnchorPoint = Vector2.new(0.5, 1)
-	hint.Position = UDim2.new(0.5, 0, 1, -UITheme.Bottom()) -- above the tool hotbar
+	hint.LayoutOrder = 2
 	hint.AutomaticSize = Enum.AutomaticSize.X
-	hint.Size = UDim2.fromOffset(0, 30)
+	hint.Size = UDim2.fromOffset(0, ROW_HEIGHT)
 	hint.BackgroundColor3 = C.Ink
 	hint.BackgroundTransparency = 0.2
 	hint.TextXAlignment = Enum.TextXAlignment.Center
 	hint.TextTruncate = Enum.TextTruncate.AtEnd
-	UITheme.corner(hint, 15)
+	UITheme.corner(hint, ROW_HEIGHT / 2)
 	UITheme.padding(hint, 0, 14, 0, 14)
 	local max = Instance.new("UISizeConstraint")
-	max.MaxSize = Vector2.new(320, 30)
+	max.MaxSize = Vector2.new(HINT_MAX, ROW_HEIGHT)
 	max.Parent = hint
-	hintLabel = hint
+	hint:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueRow)
+	hint:GetPropertyChangedSignal("Visible"):Connect(queueRow)
+	hintLabel, hintLimit = hint, max
+end
+
+-- The bottom line: the load chip, then the hint, centred above the tool
+-- hotbar (placeRow fits it).
+local function buildBottomRow(gui: ScreenGui)
+	local row = Instance.new("Frame")
+	row.Name = "BottomRow"
+	row.AnchorPoint = Vector2.new(0.5, 1)
+	row.Position = UDim2.new(0.5, 0, 1, -UITheme.Bottom()) -- above the tool hotbar
+	row.Size = UDim2.new()
+	row.AutomaticSize = Enum.AutomaticSize.XY
+	row.BackgroundTransparency = 1
+	local list = UITheme.list(row, ROW_GAP, true)
+	list.VerticalAlignment = Enum.VerticalAlignment.Center
+	buildChip(row)
+	buildHint(row)
+	row.Parent = gui
+	bottomRow = row
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueRow)
+	refreshModal() -- a panel may already be open (HUD.SetModal before HUD.Start); fills the chip
+	queueRow()
 end
 
 local function buildCorner(playerGui: Instance)
@@ -826,7 +1091,11 @@ local function watchJump(playerGui: Instance)
 		jumpButton = jump
 		jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueArrange)
 		jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueArrange)
+		jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(queueRow)
+		jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueRow)
+		jump:GetPropertyChangedSignal("Visible"):Connect(queueRow)
 		queueArrange()
+		queueRow()
 	end
 end
 
@@ -847,32 +1116,59 @@ local function buildSideColumn(playerGui: Instance)
 	queueArrange()
 end
 
+-- What the loading card says (HudRules.LoadingText), or hidden once the
+-- save is in.
+local function refreshLoading()
+	local card, label = loadingCard, loadingLabel
+	if not card or not label then
+		return
+	end
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes") ~= nil
+	local text = HudRules.LoadingText(remotes, player:GetAttribute("ProfileLoaded"))
+	card.Visible = text ~= nil
+	if text and label.Text ~= text then
+		label.Text = text
+	end
+end
+
 local function buildLoading(gui: ScreenGui)
 	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
 	card.outer.Name = "Loading"
 	card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.outer.Position = UDim2.fromScale(0.5, 0.5)
 	UITheme.padding(card.face, 12, 22, 12, 22)
-	local label = UITheme.label(card.face, "Loading your save...", F.Heading, 24, C.Cream)
+	local label = UITheme.label(card.face, "", F.Heading, 24, C.Cream)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	card.outer.Parent = gui
-	local function refreshLoading()
-		card.outer.Visible = player:GetAttribute("ProfileLoaded") ~= true
-	end
+	loadingCard, loadingLabel = card.outer, label
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
 	refreshLoading()
 end
 
+-- The server's remotes: GameServer makes the Remotes folder once the world
+-- is built, which on a new server takes a while. Waited for in short tries
+-- (a bare WaitForChild warns of an infinite yield after 5 s), then the
+-- loading card moves on to the save. After this, Net.Remote finds each
+-- remote at once (GameServer fills the folder before it parents it).
+local function waitForRemotes()
+	while not ReplicatedStorage:FindFirstChild("Remotes") do
+		ReplicatedStorage:WaitForChild("Remotes", REMOTES_WAIT)
+	end
+	refreshLoading()
+end
+
+-- Nothing in here waits before the loading card is up (PlayerGui aside,
+-- which UITheme waits for in short tries); the remotes are waited for last.
 function HUD.Start()
 	UITheme.Start()
-	local playerGui = player:WaitForChild("PlayerGui")
+	local playerGui = UITheme.PlayerGui()
 	-- Above panels like the shop, so the cash and toasts stay visible.
 	local gui = UITheme.Screen("TimberlineHUD", 10)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
 
 	buildCash(gui)
-	buildHint(gui)
+	buildBottomRow(gui)
 
 	-- The toasts' lane: top centre (the spec's y 44, under the top bar)
 	-- until placeToasts moves it clear of the corner and the left column.
@@ -903,6 +1199,9 @@ function HUD.Start()
 	UITheme.WatchChat(queueToasts)
 	refreshDevice()
 	UserInputService.LastInputTypeChanged:Connect(refreshDevice)
+	for _, name in ipairs({ "CarriedLogs", "BedCount", "BedCapacity" }) do
+		player:GetAttributeChangedSignal(name):Connect(refreshChip)
+	end
 	task.spawn(watchHintSources)
 	UserInputService.InputBegan:Connect(onGamepad)
 	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
@@ -923,6 +1222,10 @@ function HUD.Start()
 	player:GetAttributeChangedSignal("Cash"):Connect(function()
 		setCash((player:GetAttribute("Cash") :: number?) or 0)
 	end)
+	-- Last, as it can take the whole world build: the card says so meanwhile.
+	-- (Client.client starts the other controllers once this returns, so
+	-- theirs are there too by then.)
+	waitForRemotes()
 	Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
 	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown)
 		if type(message) == "string" then

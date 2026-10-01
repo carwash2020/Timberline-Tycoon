@@ -2,7 +2,9 @@
 -- When the HUD's optional pieces show (StarterPlayerScripts/HudRules): the
 -- first minute has one objective, so Daily Goals and the pouch wait for
 -- the tutorial, "Send truck home" waits until the truck is away, and
--- "Drop axe" waits until you have an axe to spare and takes two presses.
+-- "Drop axe" waits until you have an axe to spare and takes two presses;
+-- the load chip says what's in your hands and your truck's bed; the
+-- HUD's loading card says what the wait is for.
 return function(t)
 	local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
 	local TutorialData = t.shared("TutorialData")
@@ -102,5 +104,49 @@ return function(t)
 		drop, at = HudRules.DropPress(10, 13.5)
 		t.eq(drop, false)
 		t.eq(at, 13.5)
+	end)
+	local HANDS = t.shared("GameConfig").HandCapacity
+
+	t.test("the load chip: Hands, then Bed with a truck; Bed full and amber at capacity", function()
+		t.eq(HANDS, 2, "you carry two")
+		local function chip(carried, bed, room)
+			return HudRules.LoadChip(carried, bed, room, HANDS, false)
+		end
+		t.eq(chip(1, 0, 0), { shown = true, hands = "Hands 1/2", full = false }, "a log in hand, no truck bed")
+		t.eq(chip(1, 0, 6), { shown = true, hands = "Hands 1/2", bed = "Bed 0/6", full = false }, "picked one up")
+		t.eq(chip(0, 1, 6), { shown = true, hands = "Hands 0/2", bed = "Bed 1/6", full = false }, "loaded it")
+		t.eq(chip(2, 4, 6), { shown = true, hands = "Hands 2/2", bed = "Bed 4/6", full = false })
+		t.eq(chip(0, 6, 6), { shown = true, hands = "Hands 0/2", bed = "Bed full", full = true }, "a full bed")
+		t.eq(chip(0, 7, 6).full, true, "more than full still reads full")
+		t.eq(chip(2, 12, 12).bed, "Bed full")
+		-- The Scout ATV has no bed: the chip is just your hands.
+		t.eq(chip(2, 0, 0), { shown = true, hands = "Hands 2/2", full = false })
+	end)
+
+	t.test("the load chip hides with nothing in hand or bed and no truck, and while a panel is open", function()
+		t.eq(HudRules.LoadChip(nil, nil, nil, HANDS, false).shown, false, "the save still loading")
+		t.eq(HudRules.LoadChip(0, 0, 0, HANDS, false).shown, false, "no truck, nothing carried")
+		t.eq(HudRules.LoadChip(0, 0, nil, HANDS, false).shown, false, "BedCapacity not set yet")
+		t.eq(HudRules.LoadChip(0, 0, 6, HANDS, false).shown, true, "an empty truck still shows its bed")
+		for _, case in ipairs({ { 1, 0, 0 }, { 0, 3, 6 }, { 2, 6, 6 }, { 0, 0, 6 } }) do
+			local view = HudRules.LoadChip(case[1], case[2], case[3], HANDS, true)
+			t.eq(view.shown, false, "hidden with the hint while the shop is open")
+		end
+	end)
+
+	t.test("the load chip reads odd attribute values as 0", function()
+		local odd = HudRules.LoadChip("2", 0 / 0, -3, HANDS, false)
+		t.eq(odd, { shown = false, hands = "Hands 0/2", full = false })
+		t.eq(HudRules.LoadChip(1.7, 2.2, 6.9, HANDS, false).hands, "Hands 1/2", "whole numbers")
+		t.eq(HudRules.LoadChip(1.7, 2.2, 6.9, HANDS, false).bed, "Bed 2/6")
+		t.eq(HudRules.LoadChip(math.huge, 0, 0, HANDS, false).hands, "Hands 999/2", "never a format error")
+	end)
+	t.test("the HUD's loading card: building the world, then loading your save, then gone", function()
+		t.eq(HudRules.LoadingText(false, nil), "Building the world...", "no Remotes yet: the map is still building")
+		t.eq(HudRules.LoadingText(true, nil), "Loading your save...", "Remotes are in")
+		t.eq(HudRules.LoadingText(true, false), "Loading your save...")
+		t.eq(HudRules.LoadingText(true, true), nil, "the save is in: the card goes")
+		t.eq(HudRules.LoadingText(false, true), nil, "a loaded save always takes it down")
+		t.eq(HudRules.LoadingText(true, "true"), "Loading your save...", "only the boolean counts")
 	end)
 end

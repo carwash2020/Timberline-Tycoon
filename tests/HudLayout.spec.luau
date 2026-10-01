@@ -282,6 +282,160 @@ return function(t)
 		t.eq(beside.right, mid.left - 8)
 	end)
 
+	-- A shop open over the game (UI-03). The panel as ShopUI places it (in
+	-- its screen's offsets, which ignore the top bar), moved into the HUD
+	-- screen's offsets (under the top bar), where the HUD works out the lane.
+	local PAPER, HEADER = 8, 14 + 30 + 2 + 16 + 10 -- ShopUI: the wood frame, the title and subtitle block
+	local function shopPanel(w, h, inset)
+		local area = HudLayout.ClearOf(areaOn(w, h), PANEL, cashRow(w, inset, 12), 8, 400)
+		local p = HudLayout.Centred(area, PANEL)
+		return { left = p.left, top = p.top - inset, right = p.right, bottom = p.bottom - inset }
+	end
+	-- The strip down the panel's right side with the rows' buttons: the
+	-- button (90 wide on a phone, 100 on a computer) inside the row's 12
+	-- padding, the list's 12 + 8 (the scroll bar) and the frame.
+	local function buttonsOf(panel, phone)
+		local right = panel.right - PAPER - 20 - 12
+		return {
+			left = right - (if phone then 90 else 100),
+			top = panel.top + PAPER + HEADER,
+			right = right,
+			bottom = panel.bottom,
+		}
+	end
+	local function checkModal(name, panel, lane, phone)
+		t.eq(lane.modal, true, name)
+		t.eq(lane.bottom, panel.bottom - 8, name .. ": 8 above the panel's bottom edge")
+		t.ok(lane.left >= panel.left and lane.right <= panel.right, name .. ": inside the panel")
+		t.ok(lane.top >= panel.top + PAPER + HEADER, name .. ": below the title and subtitle")
+		t.ok(clear(lane, buttonsOf(panel, phone), 8), name .. ": clear of the Buy buttons")
+		t.ok(lane.right - lane.left >= LANE_MIN, name .. ": wide enough for a toast")
+		t.ok(lane.bottom - lane.top >= lane.max * 34, name .. ": room for its toasts (34 each at least)")
+	end
+
+	t.test("a shop open on a 667 x 375 phone: one toast, inside the panel's bottom edge", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(667, 375 - inset)
+			local panel = shopPanel(667, 375, inset)
+			t.ok(panel.right - panel.left >= 400, "the panel as ShopUI fits it, left of the cash row")
+			-- The evidence: the lane under the tracker sits on the panel.
+			local corner = cornerOf(667, CASH, widths(POUCH, DAILY))
+			local under = HudLayout.ToastLane(screen, corner, columnOf(60, TRACKER), TOAST_W, LANE_MIN, screen.Y - 12)
+			t.ok(not clear(under, panel, 0), "today's lane is over the panel")
+			local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true)
+			checkModal("SE " .. inset, panel, lane, true)
+			t.eq(lane.max, 1, "one toast on a phone")
+			t.eq(lane.left, panel.left + PAPER + 12, "lined up with the rows")
+		end
+	end)
+
+	t.test("a shop open in a 1366 x 768 window: up to three, growing up from its bottom edge", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(1366, 768 - inset)
+			local panel = shopPanel(1366, 768, inset)
+			t.eq(panel.right - panel.left, 560, "the full-size panel")
+			-- The evidence: the lane at the top covers the panel's title.
+			local corner = cornerOf(1366, widths(STORE, CLOCK, CASH), widths(POUCH, DAILY))
+			local top = HudLayout.ToastLane(screen, corner, columnOf(250, TRACKER), TOAST_W, LANE_MIN, screen.Y - 12)
+			local title = {
+				left = panel.left + PAPER,
+				top = panel.top + PAPER,
+				right = panel.right - PAPER,
+				bottom = panel.top + PAPER + HEADER,
+			}
+			local reach = { left = top.left, top = top.top, right = top.right, bottom = top.top + top.max * 48 }
+			t.ok(not clear(reach, title, 0), "three toasts at the top reach the title")
+			local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, false)
+			checkModal("1366 " .. inset, panel, lane, false)
+			t.eq(lane.max, 3)
+			t.ok(lane.top >= (panel.top + panel.bottom) / 2, "in the panel's lower half")
+			t.eq(lane.right - lane.left, TOAST_W, "a full-width toast")
+		end
+	end)
+
+	t.test("a panel too narrow to keep clear of its buttons: the narrowest lane, still inside it", function()
+		local panel = { left = 100, top = 40, right = 400, bottom = 340 } -- 300 wide
+		local lane = HudLayout.ModalLane(panel, TOAST_W, LANE_MIN, true)
+		t.eq({ lane.left, lane.right }, { 120, 360 })
+		t.eq(lane.bottom, 332)
+		local tiny = HudLayout.ModalLane({ left = 0, top = 0, right = 100, bottom = 80 }, TOAST_W, LANE_MIN, false)
+		t.ok(tiny.right >= tiny.left and tiny.right <= 100, "never wider than the panel")
+		t.eq(tiny.max, 1, "a short panel takes one")
+	end)
+
+	-- The bottom line (UI-04): the load chip, then the hint, on the hint's
+	-- line above the hotbar (UITheme.Bottom(): 70 up on a phone).
+	local HINT_CAP, ROW_GAP, PHONE_BOTTOM = 320, 8, 70
+	local HintLogic = t.shared("HintLogic")
+	-- GothamMedium 13 runs under 7 px a character; the pill's padding is 14 + 14.
+	local function hintWidth(line)
+		return #line * 7 + 28
+	end
+	local CHIPS = { 150, 200 } -- "Hands 1/2", up to "Hands 2/2 · Bed 12/12" with the log and padding
+	-- Roblox's touch jump button on a small screen: 70 px, 95 in from the
+	-- right and 90 up from the bottom (full-screen pixels), here in the HUD
+	-- screen's offsets (under the top bar).
+	local function jumpOn(w, h, inset)
+		return { left = w - 95, top = h - 90 - inset, right = w - 25, bottom = h - 20 - inset }
+	end
+	-- The chip's and the hint's boxes as the row lays them out.
+	local function rowOn(screen, chipW, hintW, high)
+		local hintMax, centre = HudLayout.BottomRow(screen.X, chipW, hintW, ROW_GAP, 12, high, HINT_CAP)
+		local shown = math.min(hintW, hintMax)
+		local width = (if chipW > 0 then chipW + ROW_GAP else 0) + shown
+		local left = centre - width / 2
+		local bottom = screen.Y - PHONE_BOTTOM
+		local chip = if chipW > 0
+			then { left = left, top = bottom - 30, right = left + chipW, bottom = bottom }
+			else nil
+		local hintLeft = if chipW > 0 then left + chipW + ROW_GAP else left
+		return chip, { left = hintLeft, top = bottom - 30, right = hintLeft + shown, bottom = bottom }, hintMax
+	end
+
+	t.test("667 x 375: the load chip and the hint share a line, apart, clear of the jump button, uncut", function()
+		for _, inset in ipairs({ 36, 58 }) do
+			local screen = v(667, 375 - inset)
+			local jump = jumpOn(667, 375, inset)
+			for _, context in ipairs(HintLogic.Contexts) do
+				local line = HintLogic.Pick("phone", context)
+				for _, chipW in ipairs(CHIPS) do
+					local name = string.format("SE %d, %q, chip %d", inset, line, chipW)
+					local chip, hint, hintMax = rowOn(screen, chipW, hintWidth(line), jump.left - ROW_GAP)
+					t.ok(hint.bottom > jump.top, name .. ": level with the jump button")
+					t.ok(clear(chip, hint, ROW_GAP - 0.01), name .. ": the chip and the hint don't overlap")
+					t.ok(
+						clear(chip, jump, ROW_GAP - 0.01) and clear(hint, jump, ROW_GAP - 0.01),
+						name .. ": clear of jump"
+					)
+					t.ok(chip.left >= 12 and hint.right <= 667 - 12, name .. ": on screen")
+					t.ok(hintMax >= hintWidth(line), name .. ": the hint isn't cut short")
+					t.eq(hint.bottom, screen.Y - PHONE_BOTTOM, name .. ": on the hint's line, above the hotbar")
+				end
+			end
+		end
+	end)
+
+	t.test("568 x 320: the row moves left, then the hint truncates, before it reaches the jump button", function()
+		local screen = v(568, 320 - 36)
+		local jump = jumpOn(568, 320, 36)
+		local line = HintLogic.Pick("phone", "carrying")
+		local chip, hint, hintMax = rowOn(screen, 200, hintWidth(line), jump.left - ROW_GAP)
+		t.ok(hintMax < hintWidth(line), "no room for all of it")
+		t.ok(clear(chip, hint, ROW_GAP - 0.01))
+		t.ok(clear(hint, jump, ROW_GAP - 0.01), "clear of jump")
+		t.ok(chip.left >= 12 - 1e-6, "on screen")
+	end)
+
+	t.test("a computer: the row centred, the hint up to 320; with no chip the hint is where it always was", function()
+		local screen = v(1366, 768 - 58)
+		local hintMax, centre = HudLayout.BottomRow(1366, 180, 266, ROW_GAP, 12, 1366 - 12, HINT_CAP)
+		t.eq(hintMax, HINT_CAP)
+		t.eq(centre, 683)
+		local chip, hint = rowOn(screen, 0, 266, 1366 - 12)
+		t.eq(chip, nil)
+		t.eq((hint.left + hint.right) / 2, 683, "centred, as before the chip")
+	end)
+
 	t.test("the clock: beside the cash on a computer, line 2 on a phone, hidden there in the tutorial", function()
 		t.eq(HudLayout.ClockLine(false, 0), "beside")
 		t.eq(HudLayout.ClockLine(false, 3), "beside")

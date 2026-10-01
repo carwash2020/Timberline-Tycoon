@@ -220,6 +220,18 @@ local function placeLeft()
 	end
 end
 
+-- The LocalPlayer's PlayerGui, waited for in short tries: a bare
+-- WaitForChild prints an infinite-yield warning if it's slow to come, and
+-- the HUD's loading card waits on it.
+function UITheme.PlayerGui(): PlayerGui
+	local found = player:FindFirstChildOfClass("PlayerGui")
+	while not found do
+		player:WaitForChild("PlayerGui", 5)
+		found = player:FindFirstChildOfClass("PlayerGui")
+	end
+	return found
+end
+
 -- The UIScale every screen has now: offsets times this are screen pixels
 -- (so an AbsoluteSize divided by it is in offsets again).
 function UITheme.Scale(): number
@@ -631,7 +643,7 @@ local function selectionRing(): Frame
 end
 
 function UITheme.Start()
-	local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
+	local playerGui = UITheme.PlayerGui()
 	playerGui.SelectionImageObject = selectionRing()
 	-- Rescale when the window changes size (or a phone rotates).
 	local function rescale()
