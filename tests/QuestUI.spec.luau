@@ -143,6 +143,40 @@ return function(t)
 		t.ok(string.find(source, "skipRoot.Visible = showSkip", 1, true), "refresh shows it")
 	end)
 
+	-- UI-12: the arrow is shapes, not stacked glyphs, so it's centred.
+	t.test("the beacon arrow is a clipped 45-degree square, centred over the distance pill", function()
+		local arrow = QuestUI.BeaconArrow()
+		local square = arrow:FindFirstChild("Square")
+		local rim = arrow:FindFirstChild("Rim")
+		t.eq(arrow.ClipsDescendants, true, "the clip cuts the square's top half off")
+		t.eq(arrow.AnchorPoint, roblox.Vector2.new(0.5, 0))
+		t.eq({ arrow.Position.X.Scale, arrow.Position.X.Offset }, { 0.5, 0 }, "centred across the beacon")
+		t.eq(square.Rotation, 45)
+		t.eq(square.AnchorPoint, roblox.Vector2.new(0.5, 0.5))
+		t.eq({ square.Position.X.Scale, square.Position.X.Offset }, { 0.5, 0 }, "centred in the clip")
+		t.eq({ square.Position.Y.Scale, square.Position.Y.Offset }, { 0, 0 }, "on its top edge")
+		t.eq(square.Size.X.Offset, square.Size.Y.Offset, "a square")
+		t.eq(square.BackgroundColor3, Color3.fromHex("#FFB840"), "Amber")
+		local stroke = square:FindFirstChildOfClass("UIStroke")
+		t.ok(stroke and stroke.Color == Color3.fromHex("#3C2814"), "an Ink rim")
+		t.eq(rim.BackgroundColor3, Color3.fromHex("#3C2814"), "the top edge's rim")
+		t.eq(rim.Size.Y.Offset, QuestUI.ArrowRim)
+		-- The whole triangle, rim and all, is inside the clip, and an even
+		-- width either side of its tip.
+		local half = square.Size.X.Offset * math.sqrt(2) / 2
+		local reach = QuestUI.ArrowRim * math.sqrt(2)
+		t.ok(arrow.Size.X.Offset >= 2 * (half + reach) - 1, "as wide as the triangle and its rim")
+		t.ok(arrow.Size.Y.Offset >= half + reach - 1, "as tall")
+		t.ok(arrow.Size.Y.Offset <= half + reach + 1, "and no taller")
+		-- Above the pill (20 tall, 8 off the 80 px beacon's bottom), at
+		-- any distance: the beacon is drawn the same size in pixels.
+		t.ok(arrow.Position.Y.Offset + arrow.Size.Y.Offset <= 80 - 8 - 20 - 4, "clear of the pill")
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(not string.find(source, "▼", 1, true), "no glyph arrows left")
+		t.ok(string.find(source, "b.Size = UDim2.fromOffset(64, 80)", 1, true), "a fixed-pixel beacon")
+	end)
+
 	t.test("nothing to find: no map yet, or a beacon that moves", function()
 		t.eq(QuestUI.FindBeaconPart(nil, "sellPad"), nil)
 		t.eq(QuestUI.FindBeaconPart(townMap(), "tree"), nil)

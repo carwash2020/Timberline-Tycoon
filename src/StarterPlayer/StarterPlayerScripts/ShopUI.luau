@@ -669,6 +669,8 @@ local function buildPanel()
 	title.Position = UDim2.fromOffset(18, 14)
 	title.Size = UDim2.new(1, -(18 + closeSize + 26), 0, 30)
 	title.TextTruncate = Enum.TextTruncate.AtEnd
+	-- FredokaOne is a wide face: a long title shrinks rather than truncates.
+	UITheme.fit(title, 28, 20)
 	titleLabel = title
 
 	local subtitle = UITheme.label(header, "", F.Body, UITheme.Sized("ShopSubtitle").text, C.Bark)

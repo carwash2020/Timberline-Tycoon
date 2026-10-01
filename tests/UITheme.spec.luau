@@ -336,4 +336,66 @@ return function(t)
 		end
 		scan("src")
 	end)
+	-- UI-12: one display face, the world signs' (Kit.signText), and a
+	-- speaker drawn from frames instead of the ♪ glyph.
+	t.test("headings use FredokaOne, the signs' face; Gotham stays for body text", function()
+		local UITheme = theme({})
+		t.eq(UITheme.Fonts.Heading, roblox.Enum.Font.FredokaOne)
+		t.eq(UITheme.Fonts.Black, roblox.Enum.Font.GothamBlack)
+		t.eq(UITheme.Fonts.Bold, roblox.Enum.Font.GothamBold)
+		local fs = require("@lune/fs")
+		local kit = fs.readFile("src/ReplicatedStorage/Shared/Art/Kit.luau")
+		t.ok(string.find(kit, "label.Font = font or Enum.Font.FredokaOne", 1, true), "the signs' default face")
+		-- No HUD screen asks for the old face by name.
+		for _, entry in ipairs(fs.readDir("src/StarterPlayer/StarterPlayerScripts")) do
+			local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/" .. entry)
+			t.ok(not string.find(source, "Enum.Font.Fantasy", 1, true), entry .. ": Fantasy")
+		end
+	end)
+
+	t.test("fit lets a heading shrink to its box, between two sizes", function()
+		local UITheme = theme({})
+		local label = Instance.new("TextLabel")
+		local fit = UITheme.fit(label, 28, 20)
+		t.eq(label.TextScaled, true)
+		t.eq(label.TextSize, 28)
+		t.eq({ fit.MaxTextSize, fit.MinTextSize }, { 28, 20 })
+		t.eq(fit.Parent, label)
+	end)
+
+	t.test("the speaker is frames only, centred, and fits the round Settings button", function()
+		local UITheme = theme({})
+		local cream = UITheme.Colors.Cream
+		local icon = UITheme.Speaker(cream)
+		t.eq(icon.AnchorPoint, Vector2.new(0.5, 0.5))
+		t.eq({ icon.Position.X.Scale, icon.Position.Y.Scale }, { 0.5, 0.5 })
+		for _, device in ipairs({ "phone", "desktop" }) do
+			local button = UITheme.Sizes[device].Settings.size
+			t.ok(
+				icon.Size.X.Offset <= button.X - 12 and icon.Size.Y.Offset <= button.Y - 12,
+				device .. ": inside the rim"
+			)
+		end
+		for _, part in ipairs(icon:GetDescendants()) do
+			t.ok(not part:IsA("TextLabel") and not part:IsA("GuiButton") and not part:IsA("ImageLabel"), part.Name)
+			if part:IsA("Frame") then
+				t.eq(part.Active, false, part.Name .. ": the press goes to the button")
+			end
+		end
+		local coneClip = icon:FindFirstChild("Cone")
+		local cone = coneClip:FindFirstChild("Square")
+		t.eq(coneClip.ClipsDescendants, true)
+		t.eq(cone.Rotation, 45)
+		t.eq(cone.BackgroundColor3, cream)
+		-- The cone starts as tall as the body, where the clip cuts it.
+		local half = cone.Size.X.Offset * math.sqrt(2) / 2
+		local body = icon:FindFirstChild("Body")
+		local leftHeight = 2 * (half - coneClip.Size.X.Offset)
+		t.ok(math.abs(leftHeight - body.Size.Y.Offset) <= 1, "the cone meets the body: " .. leftHeight)
+		t.eq(icon:FindFirstChild("Wave").ClipsDescendants, true)
+		local fs = require("@lune/fs")
+		local settings = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SettingsUI.luau")
+		t.ok(not string.find(settings, "♪", 1, true), "no glyph left")
+		t.ok(string.find(settings, "UITheme.Speaker(C.Cream).Parent = open", 1, true), "the button draws it")
+	end)
 end
