@@ -40,10 +40,11 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 
--- Wait for the code-built world (MapBuilder runs at server start).
+-- Wait for the code-built world. MapBuilder writes the terrain first (a few
+-- seconds to a minute) and adds the SellArea last, once everything exists.
 local mapFolder = workspace:WaitForChild("TimberlineMap", 60)
 assert(mapFolder, "[GameServer] TimberlineMap was not built (MapBuilder failed?)")
-local sellArea = mapFolder:WaitForChild("SellArea", 30)
+local sellArea = mapFolder:WaitForChild("SellArea", 600)
 assert(sellArea, "[GameServer] SellArea missing")
 local sellZoneInst = sellArea:WaitForChild("SellZone", 30)
 assert(sellZoneInst and sellZoneInst:IsA("BasePart"), "[GameServer] SellZone missing")

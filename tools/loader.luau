@@ -223,6 +223,7 @@ function Loader:environment(modulePath: string)
 		NumberSequence = roblox.NumberSequence,
 		NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
 		PhysicalProperties = roblox.PhysicalProperties,
+		Region3 = roblox.Region3,
 		UDim = roblox.UDim,
 		UDim2 = roblox.UDim2,
 		Vector2 = roblox.Vector2,

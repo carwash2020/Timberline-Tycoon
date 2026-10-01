@@ -10,6 +10,7 @@
 --   t.fails(fn, pattern?)   fn must error (optionally matching pattern)
 --   t.loader(options?)      a fresh module Loader (see tools/loader.luau)
 --   t.shared(name), t.server(name)  load a module with a shared Loader
+--   t.load(path)            any module by its path under src/ (e.g. "ReplicatedStorage/Shared/World/TerrainGen")
 --   t.roblox                @lune/roblox (Enum, Vector3, ...)
 -- Exits non-zero if anything fails, so CI can gate on it.
 
@@ -117,6 +118,9 @@ for _, file in ipairs(specs) do
 	end
 	function t.server(name: string)
 		return shared:server(name)
+	end
+	function t.load(path: string)
+		return shared:load(path)
 	end
 
 	local path = "tests/" .. file

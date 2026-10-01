@@ -1,4 +1,5 @@
 --!strict
+--!native
 -- TerrainGen: the shape and surface of the world, as pure functions of
 -- (x, z). Deterministic (math.noise, fixed seeds), so the server's
 -- TerrainBuilder, every client (ambient life finds the ground without
@@ -274,6 +275,29 @@ local function roadWeight(x: number, z: number): (number, number)
 	return best, onRoad
 end
 
+-- How far (x, z) is from the edge of the nearest road (negative = on it).
+function TerrainGen.RoadClearance(x: number, z: number): number
+	local best = math.huge
+	for _, road in ipairs(ROADS) do
+		local d = WorldLayout.FastDistance(road.line, x, z, road.half + 60) - road.half
+		if d < best then
+			best = d
+		end
+	end
+	return best
+end
+
+-- Rise over run at (x, z), from the heights 3 studs either side.
+function TerrainGen.SlopeAt(x: number, z: number): number
+	local h = TerrainGen.HeightAt(x, z)
+	return math.max(
+		math.abs(TerrainGen.HeightAt(x + 3, z) - h),
+		math.abs(TerrainGen.HeightAt(x, z + 3) - h),
+		math.abs(TerrainGen.HeightAt(x - 3, z) - h),
+		math.abs(TerrainGen.HeightAt(x, z - 3) - h)
+	) / 3
+end
+
 -- Ground height at (x, z), in studs.
 function TerrainGen.HeightAt(x: number, z: number): number
 	local low = lowHeight(x, z)
@@ -344,6 +368,10 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	if onRoad > 0 then
 		return "Ground"
 	end
+	local lot = WorldLayout.ParkingLot
+	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then
+		return "Ground"
+	end
 
 	-- The volcano's cone: dark rock, a lava-filled crater (checked before
 	-- the mountains, so its peak never gets a snow cap).
@@ -405,6 +433,21 @@ function TerrainGen.Sample(x: number, z: number): (number, string, number?)
 	local hz = TerrainGen.HeightAt(x, z + 3)
 	local slope = math.max(math.abs(hx - h), math.abs(hz - h)) / 3
 	return h, TerrainGen.SurfaceMaterial(x, z, h, slope), TerrainGen.WaterLevelAt(x, z)
+end
+
+-- What one 4-stud voxel of a column holds: solid ground (with how much of
+-- it is filled, which is what makes smooth terrain smooth), water, or air.
+-- `bottom` is the voxel's lowest y; the column's ground is at `h` and its
+-- water surface (if any) at `surface`.
+function TerrainGen.Voxel(h: number, surface: number?, bottom: number): (string, number)
+	local solid = math.clamp((h - bottom) / 4, 0, 1)
+	if solid > 0.02 then
+		return "solid", solid
+	end
+	if surface and bottom < surface then
+		return "water", math.clamp((surface - bottom) / 4, 0, 1)
+	end
+	return "air", 0
 end
 
 -- Colours for each terrain material in the cozy palette (GAME_DESIGN §13).

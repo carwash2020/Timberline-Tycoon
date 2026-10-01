@@ -85,6 +85,38 @@ WorldLayout.Roads = {
 	{ name = "PlotRoad", points = { Vector2.new(110, pz1 + 10), Vector2.new(px1, pz1 + 10) }, width = 10 },
 } :: { Road }
 
+-- Lanes between the plots (in the gaps the biggest tier leaves).
+do
+	local xs, zs = {}, {}
+	for _, slot in ipairs(PlotData.Slots) do
+		xs[slot.X], zs[slot.Y] = true, true
+	end
+	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+	local minX = px0 + half
+	for x in pairs(xs) do
+		if x > minX then
+			local laneX = x - PlotData.SlotSpacing / 2
+			table.insert(
+				WorldLayout.Roads,
+				{ name = "PlotLane", points = { Vector2.new(laneX, pz1 + 10), Vector2.new(laneX, pz0) }, width = 8 }
+			)
+		end
+	end
+	for z in pairs(zs) do
+		if z < pz1 - half then
+			local laneZ = z + PlotData.SlotSpacing / 2
+			table.insert(
+				WorldLayout.Roads,
+				{ name = "PlotLane", points = { Vector2.new(px0, laneZ), Vector2.new(px1, laneZ) }, width = 8 }
+			)
+		end
+	end
+end
+
+-- The parking lot east of the spawn (a gravel lot; MapBuilder paints the
+-- slots on it).
+WorldLayout.ParkingLot = { x0 = 8, x1 = 112, z0 = -18, z1 = 68 }
+
 -- The river runs from the pool under the Aether Isles' waterfall, south
 -- past the Hills' west side, into Mirror Lake, then out to the west edge.
 WorldLayout.River = {
