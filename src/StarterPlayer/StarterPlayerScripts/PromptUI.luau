@@ -6,7 +6,8 @@
 --     on ("TOOL SHED") in amber;
 --   * a paper key cap with the key (E, F); on a gamepad, the pad's glyph;
 --     on a touch screen an amber TAP, and the whole card is the button;
---   * holding fills the key cap amber from the bottom over HoldDuration.
+--   * holding fills the key cap amber from the bottom over HoldDuration;
+--   * a tap or a click on the card clicks (UITheme.Click) as it goes down.
 -- The engine still decides when a prompt shows and handles keys and
 -- buttons; touch and clicks go through InputHoldBegin / InputHoldEnd.
 
@@ -177,6 +178,9 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	end)
 
 	-- Touch (and clicks, if the prompt allows them): the card is the button.
+	-- It clicks as the press goes down, not on Activated (the release): a
+	-- prompt it triggers (Pick up, Sell) is often hidden before the finger
+	-- lifts, and that takes the card, and its Activated, with it.
 	if touch or prompt.ClickablePrompt then
 		local button = Instance.new("TextButton")
 		button.Name = "Press"
@@ -188,6 +192,7 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 		on(button.InputBegan, function(input: InputObject)
 			local t = input.UserInputType
 			if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+				UITheme.Click()
 				prompt:InputHoldBegin()
 			end
 		end)

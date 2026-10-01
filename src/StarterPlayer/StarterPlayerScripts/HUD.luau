@@ -870,6 +870,7 @@ local function onGamepad(input: InputObject, processed: boolean)
 	for _, side in ipairs(sides) do
 		local shown = side.button.root.Visible and (sideGui == nil or (sideGui :: ScreenGui).Enabled)
 		if side.key == input.KeyCode and shown and not promptOn(input.KeyCode) then
+			UITheme.Click() -- as a press on the button itself does (UITheme.Button)
 			side.onPress()
 			return
 		end
