@@ -13,6 +13,7 @@ return function(t)
 	local HULL = {
 		Chassis = true,
 		Skid = true,
+		Ramp = true, -- a skid's end, its child
 		BedFloor = true,
 		BedBoard = true,
 		BedWall = true,
@@ -225,8 +226,106 @@ return function(t)
 			t.ok(math.max(-lo.X, hi.X) <= 3.8, label .. " fits between neighbours (8 studs apart)")
 			t.ok(hi.Z - lo.Z <= 37.5, label .. " fits a 37-stud slot")
 			t.ok(lo.Z >= layout.front - 0.6, label .. " nothing far in front of the bumper")
-			local budget = 70 + (if rig.trailer then 34 else 0)
+			-- 72: 70 plus the two invisible skid ramps (ACT-05); a trailer's
+			-- skid brings its own two inside its 34.
+			local budget = 72 + (if rig.trailer then 34 else 0)
 			t.ok(count <= budget, string.format("%s has %d parts (budget %d)", label, count, budget))
+		end
+	end)
+
+	-- A WedgePart's corners in the world: its full bottom, and the top edge
+	-- of its full back (+Z) face.
+	local function wedgeCorners(p)
+		local s = p.Size / 2
+		local out = {}
+		for _, x in ipairs({ -1, 1 }) do
+			for _, c in ipairs({ { -1, -1 }, { -1, 1 }, { 1, 1 } }) do
+				table.insert(out, p.CFrame * Vector3.new(s.X * x, s.Y * c[1], s.Z * c[2]))
+			end
+		end
+		return out
+	end
+
+	t.test("skids ramp up at both ends: ledges ride under them (ACT-05)", function()
+		local MAX_SLOPE = math.rad(27) -- Drive's push (mass * 120) over gravity (196.2) is tan 31.4
+		local eps = 1e-3
+		for _, rig in ipairs(rigs()) do
+			local model, layout, tl = build(rig)
+			local skids = { { name = "Skid", front = layout.front + 0.5, back = -layout.front - 0.5 } }
+			if tl then
+				local trailerSkid =
+					{ name = "TrailerSkid", front = tl.bedStart + 0.5, back = tl.bedStart + tl.bedLength - 0.5 }
+				table.insert(skids, trailerSkid)
+			end
+			for _, want in ipairs(skids) do
+				local label = rig.label .. " " .. want.name
+				local skid = model:FindFirstChild(want.name)
+				t.ok(skid and skid:IsA("BasePart"), label)
+				local top = skid.CFrame.Y + skid.Size.Y / 2
+				t.ok(math.abs(skid.CFrame.Y - skid.Size.Y / 2) < eps, label .. " bottom at y 0")
+				t.ok(skid.Size.Z >= 1 - eps, label .. " keeps a flat bottom")
+				local faces = { front = skid.CFrame.Z - skid.Size.Z / 2, back = skid.CFrame.Z + skid.Size.Z / 2 }
+				local seen = {}
+				local ramps = named(skid, "Ramp")
+				t.eq(#ramps, 2, label .. " has two ramps")
+				for _, ramp in ipairs(ramps) do
+					t.ok(ramp:IsA("WedgePart") and ramp.Parent == skid, label .. " ramp is a WedgePart on the skid")
+					t.eq(ramp.CanCollide, true, label .. " ramp collides")
+					t.eq(ramp.CanTouch, false, label .. " ramp fires no touches")
+					t.eq(ramp.CanQuery, false, label .. " ramp can't be clicked or hit by rays")
+					t.eq(ramp.Transparency, 1, label .. " ramp is invisible")
+					t.eq(ramp.CastShadow, false, label .. " ramp casts no shadow")
+					t.eq(ramp.Massless, true, label .. " ramp is massless")
+					local props, skidProps = ramp.CustomPhysicalProperties, skid.CustomPhysicalProperties
+					t.ok(props, label .. " ramp has custom physics")
+					t.eq(props.Friction, 0, label .. " ramp is frictionless")
+					t.eq(props.FrictionWeight, skidProps.FrictionWeight, label .. " ramp friction weight")
+					t.eq(props.Elasticity, 0, label .. " ramp doesn't bounce")
+					t.ok(math.abs(ramp.Size.X - skid.Size.X) < eps, label .. " ramp as wide as the skid")
+					t.ok(math.abs(ramp.CFrame.X - skid.CFrame.X) < eps, label .. " ramp centred across")
+
+					-- Which end: the side of the skid it's on.
+					local corners = wedgeCorners(ramp)
+					local isFront = ramp.CFrame.Z < skid.CFrame.Z
+					local endName = if isFront then "front" else "back"
+					t.ok(not seen[endName], label .. " one ramp at the " .. endName)
+					seen[endName] = true
+					local face = faces[endName]
+					local tip = if isFront then want.front else want.back
+					local atFace, atTip = {}, {}
+					for _, c in ipairs(corners) do
+						t.ok(c.Y > -eps and c.Y < top + eps, label .. " ramp between y 0 and the skid top")
+						local outward = if isFront then face - c.Z else c.Z - face
+						t.ok(outward > -eps, label .. " ramp lies past the skid's " .. endName)
+						if math.abs(c.Z - face) < eps then
+							table.insert(atFace, c.Y)
+						elseif math.abs(c.Z - tip) < eps then
+							table.insert(atTip, c.Y)
+						else
+							t.ok(
+								false,
+								string.format("%s ramp corner at z %.3f, off the skid face and tip", label, c.Z)
+							)
+						end
+					end
+					-- The full face against the skid's end, from y 0 to its top;
+					-- the outer end is an edge at the top: the slope is underneath.
+					table.sort(atFace)
+					t.eq(#atFace, 4, label .. " ramp's full face against the skid")
+					t.ok(math.abs(atFace[1]) < eps and math.abs(atFace[2]) < eps, label .. " ramp's foot on the ground")
+					t.ok(math.abs(atFace[4] - top) < eps, label .. " ramp's back reaches the skid top")
+					t.eq(#atTip, 2, label .. " ramp's outer end is an edge")
+					for _, y in ipairs(atTip) do
+						t.ok(math.abs(y - top) < eps, label .. " ramp rises to the skid top at its outer end")
+					end
+					local slope = math.atan(top / math.abs(tip - face))
+					t.ok(
+						slope <= MAX_SLOPE + 1e-6,
+						string.format("%s %s ramp is %.1f degrees steep", label, endName, math.deg(slope))
+					)
+				end
+				t.ok(seen.front and seen.back, label .. " ramps at both ends")
+			end
 		end
 	end)
 

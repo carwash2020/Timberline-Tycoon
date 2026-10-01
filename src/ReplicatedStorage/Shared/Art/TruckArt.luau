@@ -22,11 +22,13 @@
 --   * Build returns a Model named def.id around the origin: ground y = 0,
 --     front -Z. PrimaryPart "Chassis" (invisible, W x 1 x L, centre at
 --     TruckLayout.ChassisY); "Skid" (invisible, frictionless) under it,
---     its bottom flush with the wheel bottoms (y = 0).
+--     its bottom flush with the wheel bottoms (y = 0), with a "Ramp"
+--     wedge (its child, same rules) at each end so ledges ride under it.
 --   * "DriverSeat": a VehicleSeat, a direct child of the model.
 --   * "BedFloor" (0.5 thick, centred at layout.bedFloorY) when the truck has
 --     a bed; layout.logSlots are relative to it. A towed trailer adds
---     "TrailerBed" (same rule, TrailerLayout) and "TrailerSkid".
+--     "TrailerBed" (same rule, TrailerLayout) and "TrailerSkid" (ramped
+--     the same way).
 --   * Exactly one Attachment "LoadPoint", on the last bed part.
 --   * "Headlight" and "Taillight" parts (Neon), "Exhaust" parts each with an
 --     Attachment "ExhaustOut" (its +Y points out of the pipe) and a "Smoke"
@@ -362,14 +364,54 @@ local function bedFloor(model: Model, name: string, width: number, length: numbe
 	return hull(model, name, V3(width, TruckLayout.BedFloorThickness, length), CF(0, y, z), color, M.WoodPlanks)
 end
 
-local function frictionlessSkid(model: Model, name: string, size: Vector3, cf: CFrame)
-	local skid = Kit.part(model, name, size, cf, FRAME, M.SmoothPlastic)
-	skid.Transparency = 1
-	skid.CanQuery = false
-	skid.CanTouch = false
-	skid.CastShadow = false
+-- Skids: what a truck rests and slides on. Each is a flat box with a
+-- wedge ("Ramp", its child) at either end, so the outline seen from the
+-- side is a sled runner: the bottom on the ground between the ramps, each
+-- ramp's underside rising from y 0 to the skid's top (the chassis's
+-- underside) at the skid's end. A kerb, a road edge, a terrain step or a
+-- rock up to SKID_HEIGHT tall meets a slope, not a wall, and the truck
+-- rides up onto it. Why this slope: everything is frictionless and Drive
+-- pushes with at most mass * 120 (VehicleService) against gravity's
+-- 196.2, so a truck lifting itself up a ramp from a standstill needs
+-- tan(slope) < 120 / 196.2 = 0.61 (31 degrees), and the truck's own lean
+-- onto the step (VehicleController's ground rays) adds a few degrees.
+-- 1 over 2 studs is 26.6 degrees. Steeper ramps (or balls at the wheels,
+-- whose contact with a 0.5 step is nearly a wall) climb only at speed.
+local SKID_HEIGHT = 1
+TruckArt.SkidRampRun = 2 -- studs along the truck that each ramp rises over
+local SKID_MIN_FLAT = 1 -- a short skid keeps at least this much flat bottom
+
+local function slippery(p: BasePart)
+	p.Transparency = 1
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
 	-- Slides over the ground; the Drive constraint supplies the grip.
-	skid.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+	p.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+end
+
+-- A skid `width` wide spanning `length` along the truck (ramp tip to ramp
+-- tip), centred at truck-local `z`, bottom at y 0. Returns the flat part.
+local function frictionlessSkid(model: Model, name: string, width: number, length: number, z: number): Part
+	local run = math.min(TruckArt.SkidRampRun, (length - SKID_MIN_FLAT) / 2)
+	local flat = length - 2 * run
+	local y = SKID_HEIGHT / 2
+	local skid = Kit.part(model, name, V3(width, SKID_HEIGHT, flat), CF(0, y, z), FRAME, M.SmoothPlastic)
+	slippery(skid)
+	-- Kit.wedge's slope faces up and to -Z, its full back face at +Z.
+	-- Turned over about Z it faces down and to the front (the leading
+	-- ramp); turned over about X, down and to the back (the trailing one).
+	-- Either way the full face is against the skid's end.
+	local size = V3(width, SKID_HEIGHT, run)
+	local ends = {
+		CF(0, y, z - flat / 2 - run / 2) * CFrame.Angles(0, 0, math.pi),
+		CF(0, y, z + flat / 2 + run / 2) * CFrame.Angles(math.pi, 0, 0),
+	}
+	for _, cf in ipairs(ends) do
+		local ramp = Kit.wedge(skid, "Ramp", size, cf, FRAME, M.SmoothPlastic)
+		slippery(ramp)
+		ramp.Massless = true
+	end
 	return skid
 end
 
@@ -1044,7 +1086,7 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 
 	local deckColor = if tl.style == "heavy" then hex("#5B4A3C") else wood
 	bedFloor(model, "TrailerBed", W, tl.bedLength, y, bc, deckColor)
-	frictionlessSkid(model, "TrailerSkid", V3(W - 0.4, 1, tl.bedLength - 1), CF(0, 0.5, bc))
+	frictionlessSkid(model, "TrailerSkid", W - 0.4, tl.bedLength - 1, bc)
 	deco(model, "TrailerFrame", V3(W - 1.2, 0.35, tl.bedLength), CF(0, y - 0.42, bc), FRAME, M.Metal)
 
 	-- A-frame tongue to a coupler at the truck's back.
@@ -1204,7 +1246,7 @@ function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, tr
 	chassis.CanTouch = false
 	chassis.CastShadow = false
 	model.PrimaryPart = chassis
-	frictionlessSkid(model, "Skid", V3(lay.width - 0.4, 1, lay.length - 1), CF(0, 0.5, 0))
+	frictionlessSkid(model, "Skid", lay.width - 0.4, lay.length - 1, 0)
 
 	local build = builders[lay.style] or builders.flatbed
 	build({
