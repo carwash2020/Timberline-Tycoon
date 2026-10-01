@@ -28,6 +28,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SellPlaced = 4,
 	UpgradePlot = 1,
 	PlantSeed = 3,
+	SaveSetting = 4,
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

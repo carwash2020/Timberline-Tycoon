@@ -13,6 +13,9 @@
 --     phone's jump button. On a gamepad each shows its button glyph, and
 --     that button presses it (unless a world prompt is using the same one).
 --   * "Loading your save..." until the server says the profile is ready.
+--   * Money in or out pops beside the plaque ("+$1,250") and the plaque
+--     counts up to the new amount. The plaque sits in a top-right row
+--     (HUD.TopRow) that SettingsUI adds its button to.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -53,8 +56,7 @@ local cashInner: Frame? = nil
 local cashLabel: TextLabel? = nil
 local cashOuter: Frame? = nil
 local cashGlow: UIStroke? = nil
-local cashScale: UIScale? = nil
-local cashGui: ScreenGui? = nil
+local cashPops: Frame? = nil -- a zero-size spot at the row's left end the pops float from
 local cashShown: NumberValue? = nil -- what the plaque shows; tweens toward the real amount
 local cashTarget: number? = nil -- the real amount (nil until the first update)
 local toastStack: Frame? = nil
@@ -79,38 +81,37 @@ local function showCash(amount: number)
 	label.TextXAlignment = if full then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
 end
 
--- "+$1,250" floats up under the plaque and fades (red for spending).
+-- "+$1,250" floats up beside the plaque and fades (dark for spending).
 local function popDelta(delta: number)
-	local gui, outer = cashGui, cashOuter
-	if not gui or not outer then
+	local spot = cashPops
+	if not spot then
 		return
 	end
 	local gain = delta > 0
 	local text = (if gain then "+" else "-") .. Util.formatCash(math.abs(delta))
-	local pop = UITheme.label(gui, text, F.Heading, if gain then 24 else 20, if gain then C.Money else C.Ink)
+	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Money else C.Ink)
 	pop.Name = "CashPop"
-	pop.AnchorPoint = Vector2.new(1, 0)
+	pop.AnchorPoint = Vector2.new(1, 0.5)
 	pop.AutomaticSize = Enum.AutomaticSize.XY
 	pop.Size = UDim2.fromOffset(0, 0)
 	pop.TextXAlignment = Enum.TextXAlignment.Right
-	local start = UDim2.new(1, -UITheme.Margin() - 12, 0, outer.AbsoluteSize.Y + 14)
+	local start = UDim2.fromOffset(-4, 0)
 	pop.Position = start
 	local stroke = UITheme.stroke(pop, C.Cream, 2)
-	pop.Parent = gui
 	local rise = TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(pop, rise, { Position = start + UDim2.fromOffset(0, if gain then -10 else 18) }):Play()
+	TweenService:Create(pop, rise, { Position = start + UDim2.fromOffset(0, if gain then -16 else 16) }):Play()
 	local fade = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.In, 0, false, 0.75)
 	TweenService:Create(pop, fade, { TextTransparency = 1 }):Play()
 	TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
 	task.delay(1.4, function()
 		pop:Destroy()
 	end)
-	-- A little bounce on the plaque for money coming in.
-	local scale = cashScale
-	if gain and scale then
-		scale.Scale = 1.1
-		TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-			:Play()
+	-- The paper flashes green for money coming in (no size change, so the
+	-- row doesn't jiggle).
+	local inner = cashInner
+	if gain and inner and (cashTarget or 0) < GameConfig.CashCap then
+		inner.BackgroundColor3 = Color3.fromHex("#CFE8B8")
+		TweenService:Create(inner, TweenInfo.new(0.6, Enum.EasingStyle.Quad), { BackgroundColor3 = C.Paper }):Play()
 	end
 end
 
@@ -176,6 +177,13 @@ local function removeToast(toast: Toast)
 	end
 	toast.outer:Destroy()
 	restack()
+end
+
+-- The top-right row holding the cash plaque (LayoutOrder 10). Other
+-- controllers add small buttons to its left with lower LayoutOrders.
+-- Nil before HUD.Start.
+function HUD.TopRow(): Frame?
+	return if cashOuter then cashOuter.Parent :: Frame? else nil
 end
 
 -- Shows a short message at the top of the screen for a few seconds.
@@ -341,8 +349,24 @@ local function buildCash(gui: ScreenGui)
 	local side = UITheme.Margin()
 	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
 	card.outer.Name = "CashPlaque"
-	card.outer.AnchorPoint = Vector2.new(1, 0)
-	card.outer.Position = UDim2.new(1, -side, 0, 8)
+	card.outer.LayoutOrder = 10
+	-- The top-right row (HUD.TopRow): [pops][other buttons][plaque].
+	local row = Instance.new("Frame")
+	row.Name = "TopRow"
+	row.AnchorPoint = Vector2.new(1, 0)
+	row.Position = UDim2.new(1, -side, 0, 8)
+	row.Size = UDim2.new()
+	row.AutomaticSize = Enum.AutomaticSize.XY
+	row.BackgroundTransparency = 1
+	local list = UITheme.list(row, 8, true)
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Right
+	list.VerticalAlignment = Enum.VerticalAlignment.Center
+	local pops = Instance.new("Frame")
+	pops.Name = "Pops"
+	pops.Size = UDim2.new()
+	pops.BackgroundTransparency = 1
+	pops.LayoutOrder = -100
+	pops.Parent = row
 	local min = Instance.new("UISizeConstraint")
 	min.MinSize = Vector2.new(150, 49)
 	min.Parent = card.outer
@@ -372,8 +396,6 @@ local function buildCash(gui: ScreenGui)
 	labelMin.MinSize = Vector2.new(114, 0)
 	labelMin.Parent = label
 
-	local scale = Instance.new("UIScale")
-	scale.Parent = card.outer
 	local shown = Instance.new("NumberValue")
 	shown.Name = "CashShown"
 	shown.Changed:Connect(function(value: number)
@@ -381,9 +403,10 @@ local function buildCash(gui: ScreenGui)
 	end)
 	shown.Parent = card.outer
 
-	card.outer.Parent = gui
+	card.outer.Parent = row
+	row.Parent = gui
 	cashOuter, cashFace, cashInner, cashLabel, cashGlow = card.outer, card.face, inner, label, glow
-	cashScale, cashGui, cashShown = scale, gui, shown
+	cashPops, cashShown = pops, shown
 end
 
 local function buildHint(gui: ScreenGui)

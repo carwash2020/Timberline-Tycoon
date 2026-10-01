@@ -505,6 +505,21 @@ remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	end
 end)
 
+-- Settings toggles (music, sound effects), mirrored on SettingMusic /
+-- SettingSfx attributes so the client applies them when the save loads.
+local SETTING_ATTRIBUTES = { music = "SettingMusic", sfx = "SettingSfx" }
+remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, on: unknown)
+	if not RateLimiter.Allow(player, "SaveSetting") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or type(key) ~= "string" or type(on) ~= "boolean" or not SETTING_ATTRIBUTES[key] then
+		return
+	end
+	(profile.settings :: any)[key] = on
+	player:SetAttribute(SETTING_ATTRIBUTES[key], on)
+end)
+
 -- Player lifecycle --------------------------------------------------------
 
 local function dropCarriedLogs(player: Player)
@@ -574,6 +589,8 @@ local function onPlayerAdded(player: Player)
 	end
 
 	player:SetAttribute("Cash", profile.cash)
+	player:SetAttribute("SettingMusic", profile.settings.music ~= false)
+	player:SetAttribute("SettingSfx", profile.settings.sfx ~= false)
 	if profile.pendingCash > 0 then
 		player:SetAttribute("PendingCash", profile.pendingCash)
 		EconomyService.PayPending(player)

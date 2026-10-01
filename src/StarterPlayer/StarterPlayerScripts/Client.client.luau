@@ -32,6 +32,7 @@ local controllers: { { name: string, module: { Start: () -> () } } } = {
 	{ name = "AmbientSound", module = require(script.Parent.AmbientSound) },
 	{ name = "NPCController", module = require(script.Parent.NPCController) },
 	{ name = "PromptUI", module = require(script.Parent.PromptUI) },
+	{ name = "SettingsUI", module = require(script.Parent.SettingsUI) },
 }
 
 HUD.Start() -- first (it starts UITheme), so toasts and side buttons work for everything after it
