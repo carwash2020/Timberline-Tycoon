@@ -188,11 +188,14 @@ local function buildPouch()
 	-- under the shop.
 	local gui = UITheme.Screen("HeartseedPouch", 3)
 	-- In the corner's second line, left of the Daily Goals button. The
-	-- slot keeps the line still while the chip bumps inside it.
+	-- slot keeps the line still while the chip bumps inside it. A corner
+	-- pill: on a phone 36 tall, with a fingertip-tall hit area round it.
+	local spec = UITheme.Sized("Pouch")
+	local size = spec.size or Vector2.new(84, 26)
 	local slot = Instance.new("Frame")
 	slot.Name = "Pouch"
 	slot.LayoutOrder = 5
-	slot.Size = UDim2.fromOffset(84, 26)
+	slot.Size = UDim2.fromOffset(size.X, size.Y)
 	slot.BackgroundTransparency = 1
 	slot.Visible = false
 	local chip = Instance.new("TextButton")
@@ -204,7 +207,7 @@ local function buildPouch()
 	chip.AutoButtonColor = true
 	chip.Text = ""
 	chip.Parent = slot
-	UITheme.corner(chip, 13)
+	UITheme.corner(chip, size.Y / 2)
 	UITheme.stroke(chip, C.Ink, 2)
 	local bump = Instance.new("UIScale")
 	bump.Parent = chip
@@ -227,7 +230,7 @@ local function buildPouch()
 	UITheme.corner(leaf, 3)
 	leaf.Parent = seed
 
-	local label = UITheme.label(chip, "0", F.Black, 14, C.Cream)
+	local label = UITheme.label(chip, "0", F.Black, spec.text, C.Cream)
 	label.Position = UDim2.fromOffset(28, 0)
 	label.Size = UDim2.new(1, -34, 1, 0)
 	label.TextXAlignment = Enum.TextXAlignment.Left
@@ -237,7 +240,7 @@ local function buildPouch()
 	card.outer.Visible = false
 	UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 6, 10, 6, 10)
-	local text = UITheme.label(card.face, "", F.Bold, 13, C.Ink)
+	local text = UITheme.label(card.face, "", F.Bold, UITheme.Sized("PouchList").text, C.Ink)
 	text.RichText = true
 	text.AutomaticSize = Enum.AutomaticSize.XY
 	text.LineHeight = 1.15
@@ -245,9 +248,13 @@ local function buildPouch()
 	HUD.Popup(card.outer)
 
 	slot.Parent = HUD.UnderCash() or gui
-	chip.Activated:Connect(function()
+	local function toggle()
 		showPouchPopup(not card.outer.Visible)
-	end)
+	end
+	chip.Activated:Connect(toggle)
+	if spec.hit then
+		UITheme.HitPad(slot, spec.hit).Activated:Connect(toggle) -- under the chip: it still bumps and darkens
+	end
 	gui.Parent = player:WaitForChild("PlayerGui")
 
 	pouchSlot, pouchLabel, pouchBump, pouchPopup, pouchPopupText = slot, label, bump, card.outer, text

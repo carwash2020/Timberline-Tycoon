@@ -46,18 +46,21 @@ end
 function SettingsUI.Start()
 	local gui = UITheme.Screen("SettingsUI", 10)
 
-	-- The round button, left of the cash plaque in HUD's top row.
+	-- The round button, left of the cash plaque in HUD's top row; on a
+	-- phone with a fingertip-tall hit area round it (UITheme.HitPad).
+	local roundSpec = UITheme.Sized("Settings")
+	local size = roundSpec.size or Vector2.new(38, 38)
 	local open = Instance.new("TextButton")
 	open.Name = "SettingsButton"
 	open.LayoutOrder = 5
-	open.Size = UDim2.fromOffset(38, 38)
+	open.Size = UDim2.fromOffset(size.X, size.Y)
 	open.BackgroundColor3 = C.Bark
 	open.Font = F.Black
 	open.Text = "♪"
-	open.TextSize = 20
+	open.TextSize = roundSpec.text
 	open.TextColor3 = C.Cream
 	open.AutoButtonColor = true
-	UITheme.corner(open, 19)
+	UITheme.corner(open, size.Y / 2)
 	UITheme.stroke(open, C.Ink, 3)
 	open.Parent = HUD.TopRow() or gui
 
@@ -71,6 +74,7 @@ function SettingsUI.Start()
 	title.LayoutOrder = 0
 	card.outer.Parent = gui
 
+	local toggleSpec = UITheme.Sized("SettingsToggle") -- 44 tall on a phone
 	for i, spec in ipairs({
 		{ key = "music", attribute = "SettingMusic", title = "MUSIC" },
 		{ key = "sfx", attribute = "SettingSfx", title = "SOUND FX" },
@@ -78,9 +82,9 @@ function SettingsUI.Start()
 		local button = UITheme.Button({
 			name = spec.key,
 			text = spec.title,
-			size = Vector2.new(170, 36),
+			size = toggleSpec.size or Vector2.new(170, 36),
 			style = "buy",
-			textSize = 14,
+			textSize = toggleSpec.text,
 		})
 		button.root.LayoutOrder = i
 		button.root.Parent = card.face
@@ -102,9 +106,13 @@ function SettingsUI.Start()
 		apply(spec.key, isOn(spec.key))
 	end
 
-	open.Activated:Connect(function()
+	local function toggle()
 		card.outer.Visible = not card.outer.Visible
-	end)
+	end
+	open.Activated:Connect(toggle)
+	if roundSpec.hit then
+		UITheme.HitPad(open, roundSpec.hit).Activated:Connect(toggle)
+	end
 
 	-- The card drops down under the corner, at the right edge (its screen
 	-- stays over the shop, like the button).

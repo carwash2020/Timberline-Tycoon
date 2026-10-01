@@ -378,7 +378,7 @@ local function buildBeacon(playerGui: Instance)
 	pill.Size = UDim2.fromOffset(0, 20)
 	pill.BackgroundColor3 = C.Ink
 	pill.Font = F.Black
-	pill.TextSize = 12
+	pill.TextSize = UITheme.Sized("Beacon").text
 	pill.TextColor3 = C.Cream
 	UITheme.corner(pill, 10)
 	UITheme.stroke(pill, C.Amber, 2)
@@ -427,24 +427,28 @@ local function build()
 	header.Size = UDim2.new(1, 0, 0, 31)
 	header.BackgroundTransparency = 1
 	header.Parent = card.face
-	local step = UITheme.label(header, "", F.Black, 13, C.Bark)
-	step.Size = UDim2.new(1, -120, 0, 28)
+	-- Skip: on a phone its face keeps the header's height, and a hit area
+	-- round it (UITheme.HitPad) takes a whole fingertip.
+	local skipSpec = UITheme.Sized("Skip")
+	local skipSize = skipSpec.size or Vector2.new(112, 28)
+	local step = UITheme.label(header, "", F.Black, UITheme.Sized("TrackerStep").text, C.Bark)
+	step.Size = UDim2.new(1, -(skipSize.X + 8), 0, 28)
 	step.TextTruncate = Enum.TextTruncate.AtEnd -- one line, never wrapped
 	stepLabel = step
 
 	local skip = UITheme.Button({
 		name = "Skip",
 		text = "Skip tutorial",
-		size = Vector2.new(112, 28),
+		size = skipSize,
 		style = "skip",
-		textSize = 11,
+		textSize = skipSpec.text,
 		radius = 8,
 	})
 	skip.root.AnchorPoint = Vector2.new(1, 0)
 	skip.root.Position = UDim2.fromScale(1, 0)
 	skip.root.Parent = header
 	local armed = 0
-	skip.face.Activated:Connect(function()
+	local function onSkip()
 		if armed > 0 then
 			skipped = true
 			Net.Remote("SkipTutorial"):FireServer()
@@ -461,7 +465,11 @@ local function build()
 				skip:SetStyle("skip")
 			end
 		end)
-	end)
+	end
+	skip.face.Activated:Connect(onSkip)
+	if skipSpec.hit then
+		UITheme.HitPad(skip.root, skipSpec.hit).Activated:Connect(onSkip)
+	end
 
 	local objective = UITheme.label(card.face, "", F.Black, 15, C.Ink)
 	objective.LayoutOrder = 2
@@ -500,10 +508,11 @@ local function build()
 	words.BackgroundTransparency = 1
 	UITheme.list(words, 3)
 	words.Parent = bubble.face
-	local who = UITheme.label(words, "MURPH", F.Black, 12, C.Amber)
+	local nameSize = UITheme.Sized("MurphName").text
+	local who = UITheme.label(words, "MURPH", F.Black, nameSize, C.Amber)
 	who.LayoutOrder = 1
-	who.Size = UDim2.new(1, 0, 0, 12)
-	local line = UITheme.label(words, "", F.Bold, 13, C.Cream)
+	who.Size = UDim2.new(1, 0, 0, nameSize)
+	local line = UITheme.label(words, "", F.Bold, UITheme.Sized("MurphLine").text, C.Cream)
 	line.LayoutOrder = 2
 	line.Size = UDim2.fromScale(1, 0)
 	line.AutomaticSize = Enum.AutomaticSize.Y

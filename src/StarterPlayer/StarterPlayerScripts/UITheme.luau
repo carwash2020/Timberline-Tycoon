@@ -20,6 +20,10 @@
 --     hands its frame to whoever needs to keep clear of it (the toasts).
 --   * Textures: the spec's wood grain and kraft fibre are tiled images;
 --     until they're uploaded (set the ids below) surfaces are flat colour.
+--   * Size and Sized(): what a phone needs (a fingertip is 44 px, text at
+--     least 14), and each piece's size on a phone and elsewhere, in one
+--     table per device, so a test can check every phone size at once.
+--     HitPad() gives a small thing (a corner pill) a fingertip-tall hit area.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -114,6 +118,108 @@ function UITheme.IsPhone(): boolean
 	return UserInputService.TouchEnabled
 		and not UserInputService.KeyboardEnabled
 		and (camera == nil or camera.ViewportSize.Y < 600)
+end
+
+---------------------------------------------------------------------------
+-- Sizes
+---------------------------------------------------------------------------
+
+-- What a phone needs to be usable at arm's length: a fingertip (Apple and
+-- Google both ask for 44) and text you can read.
+UITheme.Size = {
+	Tap = 44, -- the least anything you tap is tall on a phone: its face, or its hit area (HitPad)
+	TextMin = 14, -- the smallest text on a phone
+	TextBody = 15, -- a phone's body text
+	TextButton = 15, -- a phone's button labels (they shrink to fit, down to ButtonMinText)
+	ButtonMinText = 12, -- the least a button's label shrinks to on a phone
+}
+local S = UITheme.Size
+
+-- One piece's size on a device.
+export type SizeSpec = {
+	text: number, -- its text size (a button's largest: its label shrinks to fit)
+	size: Vector2?, -- its box; for a Button, the face without its edge
+	hit: number?, -- how tall its transparent hit area is, round a smaller face (HitPad)
+	tap: boolean?, -- something you tap or click
+}
+
+-- Each piece's size on a phone (UITheme.IsPhone) and everywhere else (a
+-- computer, a tablet, a TV: the HUD scales those up with the screen).
+-- Both have the same names; the screens read theirs with Sized(name).
+UITheme.Sizes = {
+	phone = {
+		-- HUD
+		SideButton = { size = Vector2.new(116, S.Tap), text = S.TextButton, tap = true },
+		Hint = { text = S.TextMin },
+		LoadChip = { text = S.TextMin },
+		Toast = { text = S.TextMin },
+		-- The corner (HUD.TopRow, BesideCash, UnderCash): pills 36 tall, each
+		-- with a fingertip-tall hit area (the Daily Goals pill grows with
+		-- its text from 200).
+		Settings = { size = Vector2.new(38, 38), hit = S.Tap, text = 20, tap = true },
+		Store = { size = Vector2.new(90, 36), hit = S.Tap, text = S.TextMin, tap = true },
+		Clock = { size = Vector2.new(100, 36), text = S.TextMin },
+		Pouch = { size = Vector2.new(84, 36), hit = S.Tap, text = S.TextMin, tap = true },
+		DailyButton = { size = Vector2.new(200, 36), hit = S.Tap, text = S.TextMin, tap = true },
+		-- The corner's popups
+		DailyHeading = { text = S.TextMin },
+		DailyFooter = { text = S.TextMin },
+		DailyCountdown = { text = S.TextMin },
+		PouchList = { text = S.TextMin },
+		SettingsToggle = { size = Vector2.new(170, S.Tap), text = S.TextButton, tap = true },
+		-- The shop panel (ShopUI)
+		ShopBuy = { size = Vector2.new(96, S.Tap), text = S.TextButton, tap = true },
+		ShopClose = { size = Vector2.new(48, 48), text = 20, tap = true },
+		ShopSubtitle = { text = S.TextMin },
+		ShopOwn = { text = S.TextMin },
+		ShopDetail = { text = S.TextMin },
+		-- The left column: the Field Guide button, the tutorial (QuestUI)
+		FieldGuide = { size = Vector2.new(130, S.Tap), text = S.TextButton, tap = true },
+		TrackerStep = { text = S.TextMin },
+		Skip = { size = Vector2.new(120, 28), hit = S.Tap, text = S.TextMin, tap = true },
+		MurphName = { text = S.TextMin },
+		MurphLine = { text = S.TextMin },
+		Beacon = { text = S.TextMin }, -- the distance under the arrow
+		-- World prompts (PromptUI): on a touch screen the whole card is the button
+		PromptObject = { text = S.TextMin },
+	} :: { [string]: SizeSpec },
+	-- As they always were.
+	desktop = {
+		SideButton = { size = Vector2.new(110, 40), text = 13, tap = true },
+		Hint = { text = 13 },
+		LoadChip = { text = 13 },
+		Toast = { text = 13 },
+		Settings = { size = Vector2.new(38, 38), text = 20, tap = true },
+		Store = { size = Vector2.new(90, 30), text = 14, tap = true },
+		Clock = { size = Vector2.new(100, 30), text = 13 },
+		Pouch = { size = Vector2.new(84, 26), text = 14, tap = true },
+		DailyButton = { size = Vector2.new(200, 30), text = 13, tap = true },
+		DailyHeading = { text = 13 },
+		DailyFooter = { text = 13 },
+		DailyCountdown = { text = 12 },
+		PouchList = { text = 13 },
+		SettingsToggle = { size = Vector2.new(170, 36), text = 14, tap = true },
+		ShopBuy = { size = Vector2.new(100, 38), text = 14, tap = true },
+		ShopClose = { size = Vector2.new(44, 44), text = 20, tap = true },
+		ShopSubtitle = { text = 13 },
+		ShopOwn = { text = 12 },
+		ShopDetail = { text = 12 },
+		FieldGuide = { size = Vector2.new(130, 34), text = 14, tap = true },
+		TrackerStep = { text = 13 },
+		Skip = { size = Vector2.new(112, 28), text = 11, tap = true },
+		MurphName = { text = 12 },
+		MurphLine = { text = 13 },
+		Beacon = { text = 12 },
+		PromptObject = { text = 12 },
+	} :: { [string]: SizeSpec },
+}
+
+-- `name`'s size on this device (a phone's, or everyone else's).
+function UITheme.Sized(name: string): SizeSpec
+	local sizes = if UITheme.IsPhone() then UITheme.Sizes.phone else UITheme.Sizes.desktop
+	local spec = sizes[name]
+	assert(spec, "[UITheme] no size for " .. name)
+	return spec
 end
 
 function UITheme.Margin(): (number, number) -- (side, bottom)
@@ -462,7 +568,7 @@ function UITheme.Button(opts: ButtonOptions): Button
 	UITheme.corner(face, radius)
 	local fit = Instance.new("UITextSizeConstraint")
 	fit.MaxTextSize = opts.textSize or 14
-	fit.MinTextSize = 8
+	fit.MinTextSize = if UITheme.IsPhone() then S.ButtonMinText else 8
 	fit.Parent = face
 	UITheme.padding(face, 0, 6, 0, 6)
 	-- The spec's top highlight: a touch lighter along the top edge.
@@ -549,6 +655,37 @@ function UITheme.Button(opts: ButtonOptions): Button
 	end)
 	paint()
 	return button
+end
+
+-- A transparent button round `visual` (a corner pill, the tutorial's
+-- Skip), `height` tall and as wide as it, so a small face still takes a
+-- whole fingertip on a phone. It's drawn under `visual`'s own children:
+--   * put in a plain button (the Daily Goals pill), it takes every tap on
+--     it, so connect its Activated to what the button does;
+--   * put in a Button's root, or a frame round a button (the pouch's
+--     slot), the face still takes the taps on itself (and looks pressed),
+--     and the pad the ones just around it: connect both.
+-- It follows `visual`'s size. `visual` mustn't have a UIListLayout (the
+-- pad would join the list), and its padding must be the same either side.
+function UITheme.HitPad(visual: GuiObject, height: number): TextButton
+	local pad = Instance.new("TextButton")
+	pad.Name = "HitPad"
+	pad.AnchorPoint = Vector2.new(0.5, 0.5)
+	pad.Position = UDim2.fromScale(0.5, 0.5)
+	pad.BackgroundTransparency = 1
+	pad.BorderSizePixel = 0
+	pad.Text = ""
+	pad.AutoButtonColor = false
+	pad.Selectable = false -- the gamepad selects the button itself
+	pad.ZIndex = 0 -- under its siblings (a Button's face)
+	local function fit()
+		local size = visual.AbsoluteSize / currentScale
+		pad.Size = UDim2.fromOffset(size.X, math.max(height, size.Y))
+	end
+	visual:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+	fit()
+	pad.Parent = visual
+	return pad
 end
 
 export type Bar = { outer: Frame, label: TextLabel, row: Frame }

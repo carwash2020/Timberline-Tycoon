@@ -11,8 +11,8 @@
 --     tracker at its width, up to two. Amounts of money show in green.
 --     While a panel is open over the game (the shop: HUD.SetModal), they
 --     move inside its bottom edge instead, stacking upward, clear of its
---     title and its Buy buttons; one at a time on a phone
---     (HudLayout.ModalLane).
+--     title and its Buy buttons; one at a time on a phone, and there
+--     above Roblox's tool hotbar (HudLayout.ModalLane).
 --   * A one-line control hint at the bottom (above Roblox's tool hotbar),
 --     worded for the device in use and for what you're doing
 --     (Shared/HintLogic): chopping, carrying logs (the CarriedLogs
@@ -29,8 +29,10 @@
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
 --     line (the Daily Goals button); what doesn't fit there starts another
---     column to its left. On a gamepad each shows its button glyph, and
---     that button presses it (unless a world prompt is using the same one).
+--     column to its left. On a phone they're a fingertip tall (UITheme's
+--     phone sizes, as the hint, the chip and the toasts' 14 px text are).
+--     On a gamepad each shows its button glyph, and that button presses it
+--     (unless a world prompt is using the same one).
 --   * A loading card, under the ReplicatedFirst one (LoadingScreen, which
 --     gives up after 30 s) so it shows if the wait runs longer: "Building
 --     the world..." until the server's Remotes folder exists (GameServer
@@ -329,12 +331,15 @@ local function placeToasts()
 		return -- not laid out yet
 	end
 	local modal = modalRect
+	local phone = UITheme.IsPhone()
 	local lane = if modal
 		then HudLayout.ModalLane(
 			boxIn(gui, Vector2.new(modal.left, modal.top), Vector2.new(modal.right, modal.bottom)),
 			TOAST_WIDTH,
 			TOAST_LANE_MIN,
-			UITheme.IsPhone()
+			phone,
+			-- On a phone, above the tool hotbar (which draws over the panel).
+			if phone then screen.Y - UITheme.Bottom() else nil
 		)
 		else laneAtTop(gui, corner, screen)
 	toastWidth = lane.right - lane.left
@@ -445,7 +450,7 @@ function HUD.Toast(message: string)
 	limit.Parent = card.outer
 	local stroke = UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 7, 14, 7, 14)
-	local label = UITheme.label(card.face, "", F.Bold, 13, C.Ink)
+	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Ink)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.TextWrapped = true
@@ -674,16 +679,21 @@ local function promptOn(key: Enum.KeyCode): boolean
 	return false
 end
 
+-- A side button's size for the device (UITheme.Sized: on a phone 116 x 44,
+-- a fingertip tall, its label 15 and never under 12; on a gamepad wider,
+-- for the glyph).
 local function layoutSide(side: Side, device: UITheme.Device)
 	local phone = UITheme.IsPhone()
+	local spec = UITheme.Sized("SideButton")
+	local face = spec.size or Vector2.new(110, 40)
 	local console = device == "console" and side.key ~= nil
-	local width = if console then 150 elseif phone then 100 else 110
-	local height = if phone then 36 else 40
-	side.button.root.Size = UDim2.fromOffset(width, height + 3)
-	side.button.face.TextSize = if phone then 12 else 13
+	local width = if console then 150 else face.X
+	side.button.root.Size = UDim2.fromOffset(width, face.Y + 3)
+	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
-		fit.MaxTextSize = if phone then 12 else 13
+		fit.MaxTextSize = spec.text
+		fit.MinTextSize = if phone then UITheme.Size.ButtonMinText else 8
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
@@ -757,9 +767,24 @@ local function queueArrange()
 	end
 end
 
+-- The hint's and the load chip's text, for the device (UITheme.Sized).
+local function sizeRow()
+	local hint, c = hintLabel, chip
+	if hint then
+		hint.TextSize = UITheme.Sized("Hint").text
+	end
+	if c then
+		local size = UITheme.Sized("LoadChip").text
+		c.hands.TextSize = size
+		c.dot.TextSize = size
+		c.bed.TextSize = size
+	end
+end
+
 local function refreshDevice()
 	local device: UITheme.Device = UITheme.Device()
 	refreshHint()
+	sizeRow()
 	for _, side in ipairs(sides) do
 		layoutSide(side, device)
 	end
@@ -783,12 +808,13 @@ export type SideOptions = {
 -- back a button that's never on screen, so the caller still starts.
 function HUD.SideButton(opts: SideOptions): UITheme.Button
 	local column = sideColumn
+	local spec = UITheme.Sized("SideButton") -- layoutSide keeps it right for the device
 	local button = UITheme.Button({
 		name = opts.name,
 		text = opts.text,
-		size = Vector2.new(110, 40),
+		size = spec.size or Vector2.new(110, 40),
 		style = opts.style,
-		textSize = 13,
+		textSize = spec.text,
 		radius = 12,
 	})
 	button.root.LayoutOrder = opts.order
@@ -965,7 +991,7 @@ local function buildChip(row: Frame)
 	heart.Parent = cut
 
 	local function words(name: string, order: number, text: string): TextLabel
-		local label = UITheme.label(frame, text, F.Bold, 13, C.Cream)
+		local label = UITheme.label(frame, text, F.Bold, UITheme.Sized("LoadChip").text, C.Cream)
 		label.Name = name
 		label.LayoutOrder = order
 		label.Size = UDim2.fromOffset(0, ROW_HEIGHT)
@@ -985,7 +1011,7 @@ local function buildChip(row: Frame)
 end
 
 local function buildHint(row: Frame)
-	local hint = UITheme.label(row, "", F.Body, 13, C.Cream)
+	local hint = UITheme.label(row, "", F.Body, UITheme.Sized("Hint").text, C.Cream)
 	hint.Name = "Hint"
 	hint.LayoutOrder = 2
 	hint.AutomaticSize = Enum.AutomaticSize.X

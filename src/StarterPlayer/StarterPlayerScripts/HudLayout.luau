@@ -203,7 +203,7 @@ function HudLayout.ToastLane(
 end
 
 local MODAL_INSET = 20 -- a panel's frame (8) and its rows' padding (12): the lane lines up with the rows
-local MODAL_BUTTONS = 140 -- the strip down a panel's right side with the rows' buttons (ShopUI: 100 wide, 90 on a phone, and 40 of padding and frame)
+local MODAL_BUTTONS = 140 -- the strip down a panel's right side with the rows' buttons (ShopUI: 100 wide, 96 on a phone, and 40 of padding and frame)
 local MODAL_PHONE_TOASTS = 1 -- toasts at once in a panel on a phone
 
 -- The toast lane while a panel (the shop, HUD.SetModal) is open over the
@@ -213,8 +213,11 @@ local MODAL_PHONE_TOASTS = 1 -- toasts at once in a panel on a phone
 -- buttons, `maxW` wide at most; a panel too narrow for `minW` there gets
 -- `minW` (over the buttons if it must). One toast on a phone; elsewhere up
 -- to three, and never above the panel's middle, so its title and subtitle
--- stay clear.
-function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boolean): Lane
+-- stay clear. With `hotbar` (on a phone: the top of the band along the
+-- bottom where Roblox's tool hotbar draws over everything), a panel that
+-- reaches down into it gets its lane ending above it instead, but no
+-- higher than one toast under the panel's middle.
+function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boolean, hotbar: number?): Lane
 	local left = panel.left + MODAL_INSET
 	local right = math.min(left + maxW, panel.right - MODAL_BUTTONS - LANE_GAP)
 	if right - left < minW then
@@ -222,6 +225,9 @@ function HudLayout.ModalLane(panel: Rect, maxW: number, minW: number, phone: boo
 	end
 	local bottom = panel.bottom - LANE_GAP
 	local middle = (panel.top + panel.bottom) / 2
+	if hotbar and hotbar < bottom then
+		bottom = math.max(hotbar, math.min(bottom, middle + TOAST_ROW))
+	end
 	local max = if phone
 		then MODAL_PHONE_TOASTS
 		else math.clamp(math.floor((bottom - middle + LANE_GAP) / TOAST_ROW), 1, LANE_TOASTS)

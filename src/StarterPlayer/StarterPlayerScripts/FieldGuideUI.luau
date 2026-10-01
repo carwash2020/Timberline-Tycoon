@@ -183,12 +183,13 @@ open = function(which: Page)
 end
 
 function FieldGuideUI.Start()
+	local spec = UITheme.Sized("FieldGuide") -- a fingertip tall on a phone
 	local b = UITheme.Button({
 		name = "FieldGuide",
 		text = "FIELD GUIDE",
-		size = Vector2.new(130, 34),
+		size = spec.size or Vector2.new(130, 34),
 		style = "bark",
-		textSize = 14,
+		textSize = spec.text,
 	})
 	b.root.Visible = false
 	-- Top of the left column, where the tutorial tracker was: above

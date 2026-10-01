@@ -349,7 +349,6 @@ local function refresh()
 end
 
 local function buildRow(parent: Instance, shop: Shop, id: string, order: number): Row
-	local phone = UITheme.IsPhone()
 	local frame = Instance.new("Frame")
 	frame.Name = id
 	frame.LayoutOrder = order
@@ -395,7 +394,10 @@ local function buildRow(parent: Instance, shop: Shop, id: string, order: number)
 	ring.Enabled = false
 	halo.Parent = swatch
 
-	local buttonWidth, buttonHeight = if phone then 90 else 100, if phone then 34 else 38
+	-- The row's button: 96 x 44 on a phone, a fingertip tall (UITheme.Sized).
+	local buy = UITheme.Sized("ShopBuy")
+	local buttonSize = buy.size or Vector2.new(100, 38)
+	local buttonWidth, buttonHeight = buttonSize.X, buttonSize.Y
 	local text = Instance.new("Frame")
 	text.Name = "Text"
 	text.Position = UDim2.fromOffset(56, 0)
@@ -417,12 +419,12 @@ local function buildRow(parent: Instance, shop: Shop, id: string, order: number)
 	name.LayoutOrder = 1
 	name.AutomaticSize = Enum.AutomaticSize.X
 	name.Size = UDim2.fromOffset(0, 20)
-	local own = UITheme.label(nameRow, "", F.Bold, 12, C.Bark)
+	local own = UITheme.label(nameRow, "", F.Bold, UITheme.Sized("ShopOwn").text, C.Bark)
 	own.LayoutOrder = 2
 	own.AutomaticSize = Enum.AutomaticSize.X
 	own.Size = UDim2.fromOffset(0, 16)
 
-	local detail = UITheme.label(text, "", F.Body, 12, C.Bark)
+	local detail = UITheme.label(text, "", F.Body, UITheme.Sized("ShopDetail").text, C.Bark)
 	detail.LayoutOrder = 2
 	detail.Size = UDim2.fromScale(1, 0)
 	detail.AutomaticSize = Enum.AutomaticSize.Y
@@ -434,7 +436,7 @@ local function buildRow(parent: Instance, shop: Shop, id: string, order: number)
 		text = "",
 		size = Vector2.new(buttonWidth, buttonHeight),
 		style = "cant",
-		textSize = if phone then 13 else 14,
+		textSize = buy.text,
 	})
 	button.root.AnchorPoint = Vector2.new(1, 0)
 	button.root.Position = UDim2.new(1, 0, 0, math.floor((52 - (buttonHeight + 3)) / 2))
@@ -630,7 +632,8 @@ local function buildPanel()
 	paper.Parent = frame.face
 	UITheme.texture(paper, "Kraft", 14)
 
-	local closeSize = if UITheme.IsPhone() then 40 else 44
+	local closeSpec = UITheme.Sized("ShopClose") -- 48 on a phone
+	local closeSize = (closeSpec.size or Vector2.new(44, 44)).X
 	local headerHeight = 14 + 30 + 2 + 16 + 10
 	local header = Instance.new("Frame")
 	header.Name = "Header"
@@ -652,7 +655,7 @@ local function buildPanel()
 	title.TextTruncate = Enum.TextTruncate.AtEnd
 	titleLabel = title
 
-	local subtitle = UITheme.label(header, "", F.Body, 13, C.Bark)
+	local subtitle = UITheme.label(header, "", F.Body, UITheme.Sized("ShopSubtitle").text, C.Bark)
 	subtitle.Position = UDim2.fromOffset(18, 46)
 	subtitle.Size = UDim2.new(1, -(18 + closeSize + 26), 0, 16)
 	subtitle.TextTruncate = Enum.TextTruncate.AtEnd
@@ -663,7 +666,7 @@ local function buildPanel()
 		text = "X",
 		size = Vector2.new(closeSize, closeSize),
 		style = "bark",
-		textSize = 20,
+		textSize = closeSpec.text,
 		radius = 12,
 	})
 	close.root.AnchorPoint = Vector2.new(1, 0)

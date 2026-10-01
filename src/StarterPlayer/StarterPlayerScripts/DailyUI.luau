@@ -98,13 +98,7 @@ local function refresh()
 		if p and not b.Visible then
 			p.Visible = false
 		end
-		local s = streak()
-		b.Text = string.format(
-			"DAILY GOALS  %d/%d%s",
-			done,
-			#list,
-			if s > 0 then string.format("  ·  %d-day streak", s) else ""
-		)
+		b.Text = HudRules.DailyLabel(done, #list, streak(), UITheme.IsPhone())
 		b.BackgroundColor3 = if done == #list and #list > 0 then GREEN else BARK
 	end
 	for i, row in ipairs(goalRows) do
@@ -144,18 +138,22 @@ local function build()
 	-- them), under the shop.
 	local gui = UITheme.Screen("DailyUI", 3)
 
+	-- A corner pill: on a phone 36 tall, with a fingertip-tall hit area
+	-- round it (UITheme.HitPad).
+	local spec = UITheme.Sized("DailyButton")
+	local size = spec.size or Vector2.new(200, 30)
 	local b = Instance.new("TextButton")
 	b.Name = "DailyButton"
 	b.LayoutOrder = 10 -- at the right margin, under the cash plaque
-	b.Size = UDim2.fromOffset(200, 30)
+	b.Size = UDim2.fromOffset(size.X, size.Y) -- at least this wide: it grows with its text
 	b.AutomaticSize = Enum.AutomaticSize.X
 	b.BackgroundColor3 = BARK
 	b.Font = UITheme.Fonts.Black
-	b.TextSize = 13
+	b.TextSize = spec.text
 	b.TextColor3 = CREAM
 	b.AutoButtonColor = true
 	b.Visible = false
-	corner(b, 15)
+	corner(b, size.Y / 2)
 	UITheme.stroke(b, INK, 2)
 	local pad = Instance.new("UIPadding")
 	pad.PaddingLeft = UDim.new(0, 10)
@@ -186,7 +184,7 @@ local function build()
 	HUD.Popup(p)
 	panel = p
 
-	text(p, "TODAY'S GOALS", 13, UITheme.Fonts.Black, 1).TextColor3 = BARK
+	text(p, "TODAY'S GOALS", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 1).TextColor3 = BARK
 	for i = 1, DailyData.GoalsPerDay do
 		local row = Instance.new("Frame")
 		row.LayoutOrder = 1 + i
@@ -225,15 +223,19 @@ local function build()
 		fill.Parent = bar
 		table.insert(goalRows, { frame = row, text = label, reward = reward, fill = fill })
 	end
-	footer = text(p, "", 13, Enum.Font.GothamMedium, 10)
-	local c = text(p, "", 12, Enum.Font.Gotham, 11)
+	footer = text(p, "", UITheme.Sized("DailyFooter").text, Enum.Font.GothamMedium, 10)
+	local c = text(p, "", UITheme.Sized("DailyCountdown").text, Enum.Font.Gotham, 11)
 	c.TextColor3 = BARK
 	countdown = c
 
-	b.Activated:Connect(function()
+	local function toggle()
 		p.Visible = not p.Visible
 		refresh()
-	end)
+	end
+	b.Activated:Connect(toggle)
+	if spec.hit then
+		UITheme.HitPad(b, spec.hit).Activated:Connect(toggle)
+	end
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 end

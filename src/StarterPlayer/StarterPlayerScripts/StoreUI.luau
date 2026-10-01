@@ -166,19 +166,26 @@ local function refreshDelivery()
 end
 
 local function buildButtons()
+	-- A corner pill: on a phone 36 tall, with a fingertip-tall hit area
+	-- round it (UITheme.HitPad).
+	local spec = UITheme.Sized("Store")
 	local store = UITheme.Button({
 		name = "Store",
 		text = "STORE",
-		size = Vector2.new(90, 30),
+		size = spec.size or Vector2.new(90, 30),
 		style = "buy",
-		textSize = 14,
+		textSize = spec.text,
 	})
 	store.root.LayoutOrder = 10 -- left of the clock (HUD's corner, beside the cash)
 	store.root.Visible = #STORE.ids() > 0 -- hidden until something's set up in StoreData
 	store.root.Parent = HUD.BesideCash()
-	store.face.Activated:Connect(function()
+	local function openStore()
 		ShopUI.OpenCustom(STORE)
-	end)
+	end
+	store.face.Activated:Connect(openStore)
+	if spec.hit then
+		UITheme.HitPad(store.root, spec.hit).Activated:Connect(openStore) -- under the face: it still looks pressed
+	end
 
 	deliveryButton = HUD.SideButton({
 		name = "InstantDelivery",

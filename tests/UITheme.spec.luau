@@ -2,14 +2,17 @@
 -- UITheme (StarterPlayerScripts/UITheme): the left column follows Roblox's
 -- chat window, and a chat property that can't be read never stops it;
 -- WatchLeftColumn (the toasts keep clear of the column); the colours other
--- code relies on.
+-- code relies on; the phone sizes (UI-07: fingertip-tall taps, text at
+-- least 14) and that everyone else keeps today's.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector2 = roblox.Instance, roblox.Vector2
 
 	-- A UITheme on a desktop (no touch, a keyboard, no camera yet: 1x),
-	-- with these TextChatService configs ([className] = config).
-	local function theme(configs)
+	-- with these TextChatService configs ([className] = config); or on
+	-- `device` ({ touch, keyboard, viewport }).
+	local function theme(configs, device)
+		device = device or { touch = false, keyboard = true }
 		local playerGui = Instance.new("Folder")
 		playerGui.Name = "PlayerGui"
 		local loader = t.loader({
@@ -31,10 +34,10 @@ return function(t)
 						return configs[className]
 					end,
 				},
-				UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
+				UserInputService = { TouchEnabled = device.touch, KeyboardEnabled = device.keyboard },
 			},
 			globals = {
-				workspace = { CurrentCamera = nil },
+				workspace = { CurrentCamera = if device.viewport then { ViewportSize = device.viewport } else nil },
 				task = {
 					spawn = function(fn, ...)
 						fn(...)
@@ -108,6 +111,113 @@ return function(t)
 			{ math.floor(danger.R * 255 + 0.5), math.floor(danger.G * 255 + 0.5), math.floor(danger.B * 255 + 0.5) },
 			{ 192, 80, 58 }
 		)
+	end)
+
+	-- UI-07: the phone sizes (UITheme.Sizes.phone), what Sized() reads on a phone.
+	t.test("on a phone every tappable is at least 44 tall and every text at least 14", function()
+		local UITheme = theme({})
+		local S = UITheme.Size
+		t.eq({ S.Tap, S.TextMin, S.TextBody, S.TextButton, S.ButtonMinText }, { 44, 14, 15, 15, 12 })
+		local n = 0
+		for name, spec in pairs(UITheme.Sizes.phone) do
+			n += 1
+			t.ok(spec.text >= S.TextMin, name .. ": text " .. spec.text .. " is under 14")
+			if spec.tap then
+				local face = if spec.size then spec.size.Y else 0
+				t.ok(math.max(face, spec.hit or 0) >= S.Tap, name .. ": a tap target under 44 tall")
+			end
+			if spec.hit then
+				t.ok(spec.size and spec.hit >= spec.size.Y, name .. ": a hit area round its face, not inside it")
+			end
+		end
+		t.ok(n >= 20, "the phone table covers the HUD, the corner, the shop, the tutorial and prompts")
+		-- The pieces the backlog row names, at its sizes.
+		local P = UITheme.Sizes.phone
+		t.eq({ P.SideButton.size.X, P.SideButton.size.Y }, { 116, 44 }, "side buttons 116 x 44")
+		t.eq({ P.ShopBuy.size.X, P.ShopBuy.size.Y }, { 96, 44 }, "a shop row's Buy 96 x 44")
+		t.eq(P.ShopClose.size.Y, 48, "the shop's X 48")
+		t.eq(P.Skip.hit, 44, "Skip: a 44 px hit area round a smaller face")
+		for _, pill in ipairs({ "Store", "Clock", "Pouch", "DailyButton" }) do
+			t.eq(P[pill].size.Y, 36, pill .. ": corner pills 36 tall")
+		end
+		for _, pill in ipairs({ "Settings", "Store", "Pouch", "DailyButton" }) do
+			t.eq(P[pill].hit, 44, pill .. ": with a 44 px hit area")
+		end
+	end)
+
+	t.test("phones and everyone else size the same pieces; off a phone they're as they always were", function()
+		local UITheme = theme({})
+		for name in pairs(UITheme.Sizes.phone) do
+			t.ok(UITheme.Sizes.desktop[name], name .. " has no size off a phone")
+		end
+		for name in pairs(UITheme.Sizes.desktop) do
+			t.ok(UITheme.Sizes.phone[name], name .. " has no size on a phone")
+		end
+		-- Desktop must look the same as before UI-07: these are the sizes
+		-- the screens had built in.
+		local function flat(sizes)
+			local out = {}
+			for name, spec in pairs(sizes) do
+				out[name] = {
+					text = spec.text,
+					w = if spec.size then spec.size.X else nil,
+					h = if spec.size then spec.size.Y else nil,
+					hit = spec.hit,
+				}
+			end
+			return out
+		end
+		t.eq(flat(UITheme.Sizes.desktop), {
+			SideButton = { w = 110, h = 40, text = 13 },
+			Hint = { text = 13 },
+			LoadChip = { text = 13 },
+			Toast = { text = 13 },
+			Settings = { w = 38, h = 38, text = 20 },
+			Store = { w = 90, h = 30, text = 14 },
+			Clock = { w = 100, h = 30, text = 13 },
+			Pouch = { w = 84, h = 26, text = 14 },
+			DailyButton = { w = 200, h = 30, text = 13 },
+			DailyHeading = { text = 13 },
+			DailyFooter = { text = 13 },
+			DailyCountdown = { text = 12 },
+			PouchList = { text = 13 },
+			SettingsToggle = { w = 170, h = 36, text = 14 },
+			ShopBuy = { w = 100, h = 38, text = 14 },
+			ShopClose = { w = 44, h = 44, text = 20 },
+			ShopSubtitle = { text = 13 },
+			ShopOwn = { text = 12 },
+			ShopDetail = { text = 12 },
+			FieldGuide = { w = 130, h = 34, text = 14 },
+			TrackerStep = { text = 13 },
+			Skip = { w = 112, h = 28, text = 11 },
+			MurphName = { text = 12 },
+			MurphLine = { text = 13 },
+			Beacon = { text = 12 },
+			PromptObject = { text = 12 },
+		})
+	end)
+
+	t.test("Sized() reads the phone table only with touch, no keyboard and a screen under 600 tall", function()
+		local cases = {
+			-- name, device, a phone?
+			{ "iPhone SE (667 x 375)", { touch = true, keyboard = false, viewport = Vector2.new(667, 375) }, true },
+			{ "iPhone 14 Pro (844 x 390)", { touch = true, keyboard = false, viewport = Vector2.new(844, 390) }, true },
+			{ "a phone before the camera exists", { touch = true, keyboard = false }, true },
+			{ "an iPad (1180 x 820)", { touch = true, keyboard = false, viewport = Vector2.new(1180, 820) }, false },
+			{ "a touch laptop", { touch = true, keyboard = true, viewport = Vector2.new(1366, 500) }, false },
+			{ "a desktop", { touch = false, keyboard = true, viewport = Vector2.new(1920, 1080) }, false },
+		}
+		for _, case in ipairs(cases) do
+			local name, device, phone = case[1], case[2], case[3]
+			local UITheme = theme({}, device)
+			t.eq(UITheme.IsPhone(), phone, name)
+			local side = UITheme.Sized("SideButton")
+			t.eq(side.size.Y, if phone then 44 else 40, name .. ": side button height")
+			t.ok(side == (if phone then UITheme.Sizes.phone else UITheme.Sizes.desktop).SideButton, name)
+		end
+		t.fails(function()
+			theme({}).Sized("NoSuchPiece")
+		end, "no size for NoSuchPiece")
 	end)
 
 	t.test("a chat box that can't be read counts as 0 instead of erroring", function()
