@@ -1,9 +1,9 @@
 --!strict
 -- ForestUI: the Living Forest on screen (GAME_DESIGN §16). The server
 -- (ForestService) owns everything; this draws it.
---   * The Heartseed pouch: a small chip under the clock (never over the
---     cash) with your seed count; tap it for the count of each wood. It
---     bumps when seeds arrive.
+--   * The Heartseed pouch: a small chip left of the Daily Goals button
+--     (HUD.UnderCash) with your seed count; tap it for the count of each
+--     wood (one of the corner's popups). It bumps when seeds arrive.
 --   * "Plant Heartseed (n)" on every stump you hold that wood's seed for
 --     (tag "Stump", attributes WoodId / TreeUid; F or Y), and a little
 --     glowing seed over the nearest plantable stumps so you can find them.
@@ -55,7 +55,7 @@ local MARKER_RANGE = 70
 local LOOP_SECONDS = 0.4
 
 local fxFolder: Folder? = nil
-local pouchChip: TextButton? = nil
+local pouchSlot: Frame? = nil -- the chip's place in the corner's line (the chip bumps inside it)
 local pouchLabel: TextLabel? = nil
 local pouchBump: UIScale? = nil
 local pouchPopup: Frame? = nil
@@ -154,13 +154,13 @@ end
 
 local lastTotal = 0
 local function refreshPouch()
-	local chip, label = pouchChip, pouchLabel
-	if not chip or not label then
+	local slot, label = pouchSlot, pouchLabel
+	if not slot or not label then
 		return
 	end
 	local total = player:GetAttribute("Heartseeds")
 	local n = if type(total) == "number" then total else 0
-	chip.Visible = n > 0
+	slot.Visible = n > 0
 	label.Text = tostring(n)
 	local bump = pouchBump
 	if bump and n > lastTotal then
@@ -180,19 +180,26 @@ local function refreshPouch()
 end
 
 local function buildPouch()
-	local gui = UITheme.Screen("HeartseedPouch", 9)
-	local side = UITheme.Margin()
-	-- Under the clock (which sits left of the cash plaque), clear of the
-	-- Daily Goals button under the cash.
+	-- The list's screen: over the side buttons (it can drop over them),
+	-- under the shop.
+	local gui = UITheme.Screen("HeartseedPouch", 3)
+	-- In the corner's second line, left of the Daily Goals button. The
+	-- slot keeps the line still while the chip bumps inside it.
+	local slot = Instance.new("Frame")
+	slot.Name = "Pouch"
+	slot.LayoutOrder = 5
+	slot.Size = UDim2.fromOffset(84, 26)
+	slot.BackgroundTransparency = 1
+	slot.Visible = false
 	local chip = Instance.new("TextButton")
-	chip.Name = "Pouch"
-	chip.AnchorPoint = Vector2.new(1, 0)
-	chip.Position = UDim2.new(1, -(side + 230), 0, 50)
-	chip.Size = UDim2.fromOffset(84, 26)
+	chip.Name = "Chip"
+	chip.AnchorPoint = Vector2.new(0.5, 0.5) -- bumps from its centre
+	chip.Position = UDim2.fromScale(0.5, 0.5)
+	chip.Size = UDim2.fromScale(1, 1)
 	chip.BackgroundColor3 = C.Bark
 	chip.AutoButtonColor = true
 	chip.Text = ""
-	chip.Visible = false
+	chip.Parent = slot
 	UITheme.corner(chip, 13)
 	UITheme.stroke(chip, C.Ink, 2)
 	local bump = Instance.new("UIScale")
@@ -223,8 +230,6 @@ local function buildPouch()
 
 	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true)
 	card.outer.Name = "PouchList"
-	card.outer.AnchorPoint = Vector2.new(1, 0)
-	card.outer.Position = UDim2.new(1, -(side + 230), 0, 80)
 	card.outer.Visible = false
 	UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 6, 10, 6, 10)
@@ -233,14 +238,15 @@ local function buildPouch()
 	text.AutomaticSize = Enum.AutomaticSize.XY
 	text.LineHeight = 1.15
 	card.outer.Parent = gui
+	HUD.Popup(card.outer)
 
-	chip.Parent = gui
+	slot.Parent = HUD.UnderCash() or gui
 	chip.Activated:Connect(function()
 		showPouchPopup(not card.outer.Visible)
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	pouchChip, pouchLabel, pouchBump, pouchPopup, pouchPopupText = chip, label, bump, card.outer, text
+	pouchSlot, pouchLabel, pouchBump, pouchPopup, pouchPopupText = slot, label, bump, card.outer, text
 	player:GetAttributeChangedSignal("Heartseeds"):Connect(refreshPouch)
 	local total = player:GetAttribute("Heartseeds")
 	lastTotal = if type(total) == "number" then total else 0

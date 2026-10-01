@@ -183,7 +183,6 @@ open = function(which: Page)
 end
 
 function FieldGuideUI.Start()
-	local gui = UITheme.Screen("FieldGuideButton")
 	local b = UITheme.Button({
 		name = "FieldGuide",
 		text = "FIELD GUIDE",
@@ -191,13 +190,13 @@ function FieldGuideUI.Start()
 		style = "bark",
 		textSize = 14,
 	})
-	UITheme.LeftColumn(b.root) -- where the tutorial tracker was
 	b.root.Visible = false
-	b.root.Parent = gui
+	-- Top of the left column, where the tutorial tracker was: above
+	-- Murph's farewell card (QuestUI, next in the column), not under it.
+	UITheme.LeftColumn(b.root, 1)
 	b.face.Activated:Connect(function()
 		open(page)
 	end)
-	gui.Parent = player:WaitForChild("PlayerGui")
 
 	local function refresh()
 		b.root.Visible = player:GetAttribute("HasFieldGuide") == true

@@ -1,8 +1,10 @@
 --!strict
 -- CameraShake: a short, decaying shake added on top of whatever the camera
 -- is doing (a tree landing nearby, lightning close by). Applied as an
--- offset after Roblox's camera update each frame, so it never fights the
--- camera scripts. Phones get a light haptic buzz too.
+-- offset after Roblox's camera update each frame and taken back out just
+-- before the next one: Roblox's camera builds each frame from where the
+-- camera points now, so an offset left in would add up and leave the view
+-- turned. Phones get a light haptic buzz too.
 
 local HapticService = game:GetService("HapticService")
 local RunService = game:GetService("RunService")
@@ -13,6 +15,21 @@ local amplitude = 0 -- degrees
 local decay = 1 -- per second
 local bound = false
 local t = 0
+-- The camera as Roblox's camera left it, and as the shake left it, last
+-- frame (nil when no offset is in).
+local unshaken: CFrame? = nil
+local shaken: CFrame? = nil
+
+-- Before the camera update: back to the unshaken view, unless something
+-- else has moved the camera since (then there's no offset left in it).
+local function undo()
+	local camera = workspace.CurrentCamera
+	local base, left = unshaken, shaken
+	unshaken, shaken = nil, nil
+	if camera and base and camera.CFrame == left then
+		camera.CFrame = base
+	end
+end
 
 local function step(dt: number)
 	if amplitude <= 0.01 then
@@ -23,11 +40,10 @@ local function step(dt: number)
 	local camera = workspace.CurrentCamera
 	if camera then
 		local a = math.rad(amplitude)
-		camera.CFrame *= CFrame.Angles(
-			math.noise(t * 22, 1.3) * a,
-			math.noise(t * 22, 7.1) * a,
-			math.noise(t * 22, 3.7) * a * 0.5
-		)
+		local base = camera.CFrame
+		camera.CFrame = base
+			* CFrame.Angles(math.noise(t * 22, 1.3) * a, math.noise(t * 22, 7.1) * a, math.noise(t * 22, 3.7) * a * 0.5)
+		unshaken, shaken = base, camera.CFrame
 	end
 	amplitude = math.max(0, amplitude - decay * dt)
 end
@@ -37,6 +53,9 @@ end
 function CameraShake.Shake(strength: number, duration: number)
 	if not bound then
 		bound = true
+		-- The undo runs every frame from now on, so the last frame's offset
+		-- comes out too.
+		RunService:BindToRenderStep("TimberlineShakeUndo", Enum.RenderPriority.Camera.Value - 1, undo)
 		RunService:BindToRenderStep("TimberlineShake", Enum.RenderPriority.Camera.Value + 1, step)
 	end
 	local degrees = strength * 2.2

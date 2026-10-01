@@ -119,6 +119,19 @@ function SoundData.Make(name: string): Sound?
 	return s
 end
 
+-- Destroys a one-shot sound's `holder` (the sound or what it's in) once
+-- it has played. A new Sound's TimeLength is 0 until its asset loads,
+-- which is usually after Play, so this waits for Ended (slowed-down thunder
+-- and tree falls run several seconds), with a fallback for one that never
+-- loads or never ends.
+local function removeWhenDone(s: Sound, holder: Instance)
+	s.Ended:Once(function()
+		holder:Destroy()
+	end)
+	local length = s.TimeLength / math.max(0.1, s.PlaybackSpeed)
+	Debris:AddItem(holder, if s.IsLoaded and length > 0 then length + 1 else 20)
+end
+
 -- Plays a one-shot sound at a point in the world.
 function SoundData.PlayAt(name: string, position: Vector3)
 	if not SoundData.SfxEnabled then
@@ -134,7 +147,7 @@ function SoundData.PlayAt(name: string, position: Vector3)
 	holder.Parent = workspace.Terrain
 	s.Parent = holder
 	s:Play()
-	Debris:AddItem(holder, math.max(2, s.TimeLength / math.max(0.1, s.PlaybackSpeed) + 1))
+	removeWhenDone(s, holder)
 end
 
 -- Plays a one-shot sound in the player's ears (UI, rewards).
@@ -148,7 +161,7 @@ function SoundData.Play(name: string)
 	end
 	s.Parent = SoundService
 	s:Play()
-	Debris:AddItem(s, 6)
+	removeWhenDone(s, s)
 end
 
 return SoundData

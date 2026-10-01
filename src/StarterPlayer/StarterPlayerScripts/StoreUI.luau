@@ -166,7 +166,6 @@ local function refreshDelivery()
 end
 
 local function buildButtons()
-	local gui = UITheme.Screen("StoreButtons")
 	local store = UITheme.Button({
 		name = "Store",
 		text = "STORE",
@@ -174,10 +173,9 @@ local function buildButtons()
 		style = "buy",
 		textSize = 14,
 	})
-	store.root.AnchorPoint = Vector2.new(1, 0)
-	store.root.Position = UDim2.new(1, -(UITheme.Margin() + 334), 0, 15) -- left of the clock
+	store.root.LayoutOrder = 10 -- left of the clock (HUD's corner, beside the cash)
 	store.root.Visible = #STORE.ids() > 0 -- hidden until something's set up in StoreData
-	store.root.Parent = gui
+	store.root.Parent = HUD.BesideCash()
 	store.face.Activated:Connect(function()
 		ShopUI.OpenCustom(STORE)
 	end)
@@ -191,8 +189,6 @@ local function buildButtons()
 			Net.Remote("UseInstantDelivery"):FireServer()
 		end,
 	})
-
-	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
 function StoreUI.Start()
