@@ -261,6 +261,7 @@ local function plantable(entry: StumpEntry): boolean
 	return seedsOf(entry.woodId) > 0
 		and entry.part.Parent ~= nil
 		and entry.part.Transparency < 1 -- hidden stumps (the Phantom Grove by day)
+		and entry.model:GetAttribute("Sprouting") ~= true -- planted before you came by (slow woods take minutes)
 		and not (busy and os.clock() < busy)
 end
 

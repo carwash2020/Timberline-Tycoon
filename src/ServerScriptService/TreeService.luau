@@ -5,14 +5,20 @@
 --     more chopping and drop an extra log).
 --   * Server-side HP; ApplyChop validates range and applies axe damage.
 --     Hit feedback (shake, chips, sound) is drawn on each client by TreeFX.
---   * Felling: the tree tips away from whoever felled it. The server never
---     moves the tree: it sets Felled / FallDir / FellAt and every client
---     animates the fall smoothly (TreeFX). When it has landed, the server
---     hides it, leaves a stump, and lays exactly the tree's logs along the
---     fall line. After the wood's respawnSec the stump goes and the tree
---     is back (clients play it growing from a sapling).
+--   * Felling: the tree tips away from whoever swung last. The felling
+--     (its logs, OnFelled) counts for whoever chopped the most of it
+--     (ForestLogic.Feller), so a last swing can't take someone's tree. The
+--     server never moves the tree: it sets Felled / FallDir / FellAt and
+--     every client animates the fall smoothly (TreeFX). When it has
+--     landed, the server hides it, leaves a stump, and lays exactly the
+--     tree's logs along the fall line. After the wood's respawnSec the
+--     stump goes and the tree is back (clients play it growing from a
+--     sapling).
+--   * A tree only comes back solid (regrown, woken at night, or new) when
+--     no truck or player is where it stands; until then it's a ghost (no
+--     collisions), checked again every couple of seconds.
 --   * Night-only woods (the Phantom Grove): SetBiomeDormant hides a biome's
---     trees by day and brings them back at night (WorldClock).
+--     trees and stumps by day and brings them back at night (WorldClock).
 --   * Log records: state "world" | "carried". Ownership: PickupGraceSec to
 --     the feller, then free-for-all. Logs left in the world despawn after
 --     LogDespawnSec.
@@ -27,6 +33,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
@@ -34,6 +41,7 @@ local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 
 type WoodDef = WoodData.WoodDef
 
@@ -44,6 +52,7 @@ local LOG_TAG = "Log"
 local LOG_LENGTH = 3
 local LOG_DIAMETER = 1.2
 local LOG_GAP = 0.25
+local GHOST_RETRY = 2 -- seconds between checks while something stands where a tree came back
 TreeService.LogDiameter = LOG_DIAMETER
 
 -- What a part looked like before the tree was hidden.
@@ -65,6 +74,9 @@ export type TreeRecord = {
 	felled: boolean, -- down and waiting to regrow
 	dormant: boolean, -- hidden for now (night-only woods by day)
 	stump: Model?,
+	stumpParts: { [BasePart]: PartState }?, -- how the stump looked before it was hidden
+	ghost: boolean, -- standing but not solid yet: a truck or someone was where it came back
+	regrowAt: number?, -- os.clock() its natural regrowth is due, while it's down
 	seed: number,
 	planterId: number?, -- who planted it (the Living Forest), if anyone
 	damageBy: { [number]: number }, -- HP each player has chopped off this growth (co-op credit)
@@ -86,6 +98,7 @@ export type LogRecord = {
 local trees: { [string]: TreeRecord } = {}
 local logs: { [string]: LogRecord } = {}
 local treeCounters: { [string]: number } = {}
+local makeSolid: (rec: TreeRecord) -> () -- below: solid, or a ghost while something's in the way
 
 local folders: { [string]: Folder } = {}
 local function getFolder(name: string): Folder
@@ -206,12 +219,16 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 		felled = false,
 		dormant = false,
 		stump = nil,
+		stumpParts = nil,
+		ghost = false,
+		regrowAt = nil,
 		seed = seed,
 		planterId = opts.planterId,
 		damageBy = {},
 		temporary = opts.temporary == true,
 		growth = 0,
 	}
+	makeSolid(trees[uid]) -- an Elder may wake where a truck is parked
 	return model
 end
 
@@ -276,8 +293,8 @@ function TreeService.Forget(uid: string, inst: Instance)
 	rec.effects[inst] = nil
 end
 
-local function setTreeVisible(rec: TreeRecord, visible: boolean)
-	for part, state in pairs(rec.parts) do
+local function showParts(parts: { [BasePart]: PartState }, visible: boolean)
+	for part, state in pairs(parts) do
 		if part.Parent == nil then
 			continue
 		end
@@ -292,6 +309,10 @@ local function setTreeVisible(rec: TreeRecord, visible: boolean)
 			part.CanQuery = false -- clicks and raycasts pass through the hidden tree
 		end
 	end
+end
+
+local function setTreeVisible(rec: TreeRecord, visible: boolean)
+	showParts(rec.parts, visible)
 	for effect, enabled in pairs(rec.effects) do
 		if effect:IsA("Light") or effect:IsA("ParticleEmitter") then
 			(effect :: any).Enabled = visible and enabled
@@ -308,11 +329,20 @@ local function setTreeSolid(rec: TreeRecord, solid: boolean)
 	end
 end
 
+-- Hidden stumps (the Phantom Grove by day) are no invisible obstacle either.
+local function setStumpVisible(rec: TreeRecord, visible: boolean)
+	local parts = rec.stumpParts
+	if rec.stump and parts then
+		showParts(parts, visible)
+	end
+end
+
 local function removeStump(rec: TreeRecord)
 	if rec.stump then
 		rec.stump:Destroy()
 		rec.stump = nil
 	end
+	rec.stumpParts = nil
 end
 
 local function placeStump(rec: TreeRecord)
@@ -323,8 +353,70 @@ local function placeStump(rec: TreeRecord)
 	stump:SetAttribute("WoodId", rec.def.id)
 	stump:SetAttribute("TreeUid", rec.uid)
 	CollectionService:AddTag(stump, "Stump")
-	stump.Parent = getFolder("Stumps")
 	rec.stump = stump
+	rec.stumpParts = (snapshot(stump))
+	if rec.dormant then
+		setStumpVisible(rec, false) -- it landed after dawn: hidden with the rest of its grove
+	end
+	stump.Parent = getFolder("Stumps")
+end
+
+-- True when a truck or someone's character is in the way of a tree's solid
+-- parts (its trunk), so making it solid now would trap or fling them.
+local function blocked(rec: TreeRecord): boolean
+	local include: { Instance } = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character then
+			table.insert(include, player.Character)
+		end
+	end
+	for _, truck in ipairs(CollectionService:GetTagged("Truck")) do
+		table.insert(include, truck)
+	end
+	if #include == 0 then
+		return false
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = include
+	params.RespectCanCollide = true
+	params.MaxParts = 1
+	for part, state in pairs(rec.parts) do
+		if state.collide and part.Parent ~= nil then
+			if #workspace:GetPartBoundsInBox(part.CFrame, part.Size + Vector3.one, params) > 0 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Makes a standing tree solid, or, while something is in the way, a ghost
+-- (seen and choppable, no collisions) that tries again every GHOST_RETRY
+-- seconds. Felling or hiding the tree ends the wait.
+makeSolid = function(rec: TreeRecord)
+	if not blocked(rec) then
+		rec.ghost = false
+		setTreeSolid(rec, true)
+		return
+	end
+	setTreeSolid(rec, false)
+	if rec.ghost then
+		return -- already waiting
+	end
+	rec.ghost = true
+	local function retry()
+		if trees[rec.uid] ~= rec or not rec.ghost then
+			return
+		end
+		if blocked(rec) then
+			task.delay(GHOST_RETRY, retry)
+			return
+		end
+		rec.ghost = false
+		setTreeSolid(rec, true)
+	end
+	task.delay(GHOST_RETRY, retry)
 end
 
 -- Log despawn: each (re)entry into the world gets a fresh token, so an old
@@ -395,26 +487,36 @@ local function groundParams(extra: { Instance }?): RaycastParams
 end
 
 -- The ground height under (x, z), searching down from just above `fromY`
--- (trees on the Aether Isles stand far above the terrain).
+-- (trees on the Aether Isles stand far above the terrain), or from above
+-- the terrain there if that's higher (a log laid uphill of its stump).
 local function groundY(params: RaycastParams, x: number, z: number, fromY: number, fallback: number): number
-	local hit = workspace:Raycast(Vector3.new(x, fromY + 10, z), Vector3.new(0, -40, 0), params)
+	local top = math.max(fromY, TerrainGen.HeightAt(x, z)) + 10
+	local hit = workspace:Raycast(Vector3.new(x, top, z), Vector3.new(0, fromY - 30 - top, 0), params)
 	return if hit then hit.Position.Y else fallback
 end
 
-local function fellTree(player: Player, uid: string)
+-- Fells a tree `swinger` just finished; returns the player the felling
+-- counts for (nil if there was no tree to fell).
+local function fellTree(swinger: Player, uid: string): Player?
 	local rec = trees[uid]
 	if not rec or not rec.alive then
-		return
+		return nil
 	end
 	rec.alive = false
 	rec.felled = true
+	rec.ghost = false
 	rec.growth += 1
 	local growth = rec.growth
 	local model = rec.model
-	local fellerId = player.UserId
+	-- It counts for whoever (still here) chopped the most of it.
+	local most = ForestLogic.Feller(rec.damageBy, swinger.UserId, function(userId: number): boolean
+		return Players:GetPlayerByUserId(userId) ~= nil
+	end)
+	local feller = Players:GetPlayerByUserId(most) or swinger
+	local fellerId = feller.UserId
 
-	-- Fall away from the feller, a little randomly.
-	local char = player.Character
+	-- Fall away from the swinger, a little randomly.
+	local char = swinger.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 	local fallDir = TreeLogic.FallDirection(rec.base, if hrp then hrp.Position else nil, (math.random() - 0.5) * 0.7)
 	setTreeSolid(rec, false)
@@ -429,7 +531,7 @@ local function fellTree(player: Player, uid: string)
 		-- Landed: hide the tree, leave a stump, lay its logs along the fall.
 		setTreeVisible(rec, false)
 		placeStump(rec)
-		local multiplier = if TreeService.LogMultiplier then TreeService.LogMultiplier(player) else 1
+		local multiplier = if TreeService.LogMultiplier then TreeService.LogMultiplier(feller) else 1
 		local count = TreeLogic.LogCount(rec.def.logsPerTree, rec.size, multiplier)
 		local trunkLength = (rec.def.trunkHeight + rec.def.foliageSize * 0.5) * rec.size.scale
 		local skip: { Instance } = { getFolder("Stumps") }
@@ -445,11 +547,13 @@ local function fellTree(player: Player, uid: string)
 		end
 		local onFelled = TreeService.OnFelled
 		if onFelled then
-			task.spawn(onFelled, player, rec, uids, fallDir)
+			task.spawn(onFelled, feller, rec, uids, fallDir)
 		end
 	end)
 
-	task.delay(if rec.temporary then TreeLogic.FallTime + 8 else rec.def.respawnSec, function()
+	local downFor = if rec.temporary then TreeLogic.FallTime + 8 else rec.def.respawnSec
+	rec.regrowAt = if rec.temporary then nil else os.clock() + downFor
+	task.delay(downFor, function()
 		-- Planted back early and felled again since? That felling has its
 		-- own timer.
 		if trees[uid] ~= rec or rec.growth ~= growth then
@@ -461,6 +565,7 @@ local function fellTree(player: Player, uid: string)
 			TreeService.Regrow(uid)
 		end
 	end)
+	return feller
 end
 
 -- Brings a felled tree back: whole HP, stump gone, standing again (clients
@@ -478,9 +583,11 @@ function TreeService.Regrow(uid: string, planterId: number?)
 	rec.damageBy = {}
 	rec.model:SetAttribute("HP", rec.hp)
 	rec.felled = false
+	rec.regrowAt = nil
 	rec.model:SetAttribute("Felled", false)
 	if not rec.dormant then
 		setTreeVisible(rec, true)
+		makeSolid(rec)
 		rec.alive = true
 	end
 	local onRegrown = TreeService.OnRegrown
@@ -496,21 +603,17 @@ function TreeService.SetBiomeDormant(biomeId: string, dormant: boolean)
 		if rec.def.biome == biomeId and rec.dormant ~= dormant then
 			rec.dormant = dormant
 			rec.model:SetAttribute("Dormant", dormant) -- clients don't aim at hidden trees
-			local stump = rec.stump
-			if stump then
-				for _, d in ipairs(stump:GetDescendants()) do
-					if d:IsA("BasePart") then
-						d.Transparency = if dormant then 1 else 0
-					end
-				end
-			end
+			setStumpVisible(rec, not dormant)
 			if dormant and rec.alive then
 				rec.alive = false
+				rec.ghost = false
 				rec.hp = rec.maxHp -- a half-chopped tree is whole again tomorrow night
+				rec.damageBy = {}
 				rec.model:SetAttribute("HP", rec.hp)
 				setTreeVisible(rec, false)
 			elseif not dormant and not rec.felled then
 				setTreeVisible(rec, true)
+				makeSolid(rec) -- a truck may have parked on its spot by day
 				rec.alive = true
 			end
 		end
@@ -533,9 +636,18 @@ function TreeService.AllTrees(): { [string]: TreeRecord }
 	return trees
 end
 
+-- Seconds until a felled tree grows back on its own (nil if it isn't down,
+-- or never will: an Elder).
+function TreeService.RegrowsIn(uid: string): number?
+	local rec = trees[uid]
+	local at = if rec and rec.felled then rec.regrowAt else nil
+	return if at then math.max(0, at - os.clock()) else nil
+end
+
 -- Validates range server-side, applies the axe's damage for this tree's
--- biome, returns new HP (nil + reason on reject).
-function TreeService.ApplyChop(player: Player, treeUid: string, axe: ItemCatalog.AxeDef): (number?, string?)
+-- biome, returns new HP (nil + reason on reject) and, if this swing felled
+-- it, the player the felling counts for (the one who chopped the most).
+function TreeService.ApplyChop(player: Player, treeUid: string, axe: ItemCatalog.AxeDef): (number?, string?, Player?)
 	local rec = trees[treeUid]
 	if not rec or not rec.alive then
 		return nil, "gone"
@@ -562,9 +674,9 @@ function TreeService.ApplyChop(player: Player, treeUid: string, axe: ItemCatalog
 	rec.damageBy[player.UserId] = (rec.damageBy[player.UserId] or 0) + dealt
 	rec.model:SetAttribute("HP", rec.hp)
 	if rec.hp <= 0 then
-		fellTree(player, treeUid)
+		return rec.hp, nil, fellTree(player, treeUid)
 	end
-	return rec.hp, nil
+	return rec.hp, nil, nil
 end
 
 function TreeService.GetLog(uid: string): LogRecord?

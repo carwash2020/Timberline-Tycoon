@@ -26,6 +26,7 @@ return function(t)
 			paid = {},
 			delays = {},
 			now = 1000,
+			serverNow = 0, -- the day and night clock
 			rolls = {}, -- queued dice; 0.5 once they run out (no figure, no lucky seed)
 			allow = true,
 		}
@@ -61,6 +62,10 @@ return function(t)
 		function TreeService.Forget() end
 		function TreeService.Remove(uid)
 			trees[uid] = nil
+		end
+		function TreeService.RegrowsIn(uid)
+			local rec = trees[uid]
+			return if rec and rec.felled then rec.regrowsIn else nil
 		end
 		function TreeService.Regrow(uid, planterId)
 			local rec = trees[uid]
@@ -102,6 +107,7 @@ return function(t)
 				planterId = opts.planterId,
 				damageBy = {},
 				temporary = opts.temporary == true,
+				growth = 0,
 			}
 			return model
 		end
@@ -176,6 +182,7 @@ return function(t)
 		s.ForestData = loader:shared("ForestData")
 		s.ForestLogic = loader:shared("ForestLogic")
 		s.GameConfig = loader:shared("GameConfig")
+		s.WorldTime = loader:shared("WorldTime")
 		s.WoodData = WoodData
 		s.TreeLogic = TreeLogic
 
@@ -214,6 +221,7 @@ return function(t)
 		local logCounter = 0
 		function s.fell(p, rec)
 			rec.alive, rec.felled = false, true
+			rec.growth += 1
 			local stump = TreeArt.Stump(rec.def, rec.seed, rec.size.scale)
 			Kit.placeAt(stump, CFrame.new(rec.base))
 			rec.stump = stump
@@ -259,6 +267,9 @@ return function(t)
 			end, {
 				clock = function()
 					return s.now
+				end,
+				serverTime = function()
+					return s.serverNow
 				end,
 				random = function()
 					return if #s.rolls > 0 then table.remove(s.rolls, 1) else 0.5
@@ -424,19 +435,49 @@ return function(t)
 		t.ok(board ~= nil and find(board, "TextLabel").Text == "Ada", "it says who planted it")
 	end)
 
-	t.test("a tree that grew back on its own while sprouting is still yours", function()
+	t.test("a tree that grew back on its own while sprouting is still yours, from then on", function()
 		local s = setup()
 		local rec = s.tree("oak")
 		s.start()
 		local a = s.player(1, "Ada")
+		local b = s.player(2, "Bo")
 		s.fell(a, rec)
 		s.plant(a, rec.uid)
 		s.TreeService.Regrow(rec.uid) -- its natural regrowth came first
-		t.eq(rec.planterId, nil)
-		s.runDelays()
-		t.eq(rec.planterId, 1)
+		t.eq(rec.planterId, 1, "the sapling took")
 		t.eq(rec.model:GetAttribute("PlanterId"), 1)
 		t.ok(s.map.ForestMarks:FindFirstChild("NameStake") ~= nil)
+		-- Felled again before the sprout's timer: the planter's share, and the
+		-- old timer doesn't pop it back up.
+		s.fell(b, rec)
+		t.eq(#s.paid, 1, "Ada's share")
+		s.runDelays()
+		t.ok(rec.felled, "still down: that sapling was used up")
+	end)
+
+	t.test("a sprout never pops up a tree felled again since (not even mid-fall)", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		s.start()
+		local a = s.player(1, "Ada")
+		local b = s.player(2, "Bo")
+		s.fell(a, rec)
+		s.plant(a, rec.uid)
+		-- It stood up again unseen by the hooks and was felled again: still
+		-- falling (no stump yet) when the sapling's timer runs.
+		rec.felled, rec.alive, rec.stump = false, true, nil
+		rec.alive, rec.felled = false, true
+		rec.growth += 1
+		s.runDelays()
+		t.ok(rec.felled, "it stays down and lands as felled")
+		t.eq(rec.planterId, nil)
+		-- Its new stump takes a seed again.
+		s.fell(b, rec)
+		s.plant(b, rec.uid)
+		t.eq(s.profiles[b].heartseeds.oak, nil, "Bo planted the seed it gave")
+		s.runDelays()
+		t.ok(not rec.felled)
+		t.eq(rec.planterId, 2)
 	end)
 
 	t.test("the planter's share: someone else fells your tree, you earn 15% of its base value", function()
@@ -596,11 +637,14 @@ return function(t)
 		end
 		s.start()
 		local a = s.player(1, "Ada")
-		-- Fell, replant, regrow, again: each round nets the grove +2.5 or +3.5.
-		for _ = 1, 5 do
+		local b = s.player(2, "Bo")
+		-- Two players fell each other's trees and replant: each round nets
+		-- the grove +2.5 (a wild tree) or +3.5 (one the other planted).
+		for round = 1, 5 do
+			local p = if round % 2 == 1 then a else b
 			for _, rec in pairs(recs) do
-				s.fell(a, rec)
-				s.plant(a, rec.uid)
+				s.fell(p, rec)
+				s.plant(p, rec.uid)
 			end
 			s.runDelays()
 		end
@@ -667,5 +711,155 @@ return function(t)
 		local clue = rec.model:FindFirstChild("BarkClue")
 		t.ok(clue ~= nil, "planted: a figure at 8%")
 		t.eq(clue:GetAttribute("Figure"), "birdseye")
+	end)
+
+	t.test(
+		"refelling your own tree straight after it sprouts: no steward's seed, the planting's vitality goes back",
+		function()
+			local s = setup()
+			local rec = s.tree("oak")
+			s.start()
+			local a = s.player(1, "Ada")
+			local b = s.player(2, "Bo")
+			s.fell(a, rec)
+			s.plant(a, rec.uid)
+			s.runDelays()
+			t.eq(rec.planterId, 1)
+			t.eq(s.attr("Vitality_starter"), 62.5, "-1.5 for the wild tree, +4 for the planting")
+			s.fxAll = {}
+			s.fell(a, rec)
+			t.eq(s.profiles[a].heartseeds.oak, 1, "the seed planted, one back: no gain")
+			t.eq(s.fxAll[1].payload.reasons, {}, "no steward's bonus")
+			t.eq(s.attr("Vitality_starter"), 58, "-0.5 for the felling and the planting's 4 back")
+			-- Left standing ten minutes, it's a steward's tree.
+			s.plant(a, rec.uid)
+			s.runDelays()
+			s.now += 10 * 60
+			s.fxAll = {}
+			s.fell(a, rec)
+			t.eq(s.profiles[a].heartseeds.oak, 2, "1 + the steward's bonus")
+			t.eq(s.fxAll[1].payload.reasons, { "steward's bonus" })
+			t.eq(s.attr("Vitality_starter"), 61.5, "+4 planted, -0.5 felled")
+			-- Someone else felling a fresh one still pays the planter.
+			s.plant(a, rec.uid)
+			s.runDelays()
+			s.fell(b, rec)
+			t.eq(#s.paid, 1)
+			t.eq(s.paid[1].player, a)
+			t.eq(s.attr("Vitality_starter"), 65, "+4 planted, -0.5 felled: Bo's felling keeps it")
+		end
+	)
+
+	t.test("woods outside the groves keep their slow regrowth: half of it to sprout, never past their own", function()
+		local s = setup()
+		local lumen = s.tree("lumenwood")
+		local palm = s.tree("palmwood", Vector3.new(30, 0, 0))
+		local oak = s.tree("oak", Vector3.new(-30, 0, 0))
+		s.start()
+		local a = s.player(1, "Ada")
+		s.fell(a, lumen)
+		s.fell(a, palm)
+		s.fell(a, oak)
+		s.fxAll = {}
+		s.plant(a, lumen.uid)
+		t.eq(s.fxAll[1].payload.seconds, 450, "half of Lumenwood's 15 minutes")
+		t.eq(s.delays[1].seconds, 450)
+		t.ok(string.find(s.lastToast(a), "in about 8 minutes") ~= nil)
+		t.eq(lumen.stump:GetAttribute("Sprouting"), true, "the stump says so to everyone (ForestUI)")
+		a.root.Position = Vector3.new(30, 0, 0)
+		palm.regrowsIn = 40 -- its own regrowth comes sooner
+		s.plant(a, palm.uid)
+		t.eq(s.fxAll[2].payload.seconds, 40)
+		a.root.Position = Vector3.new(-30, 0, 0)
+		oak.regrowsIn = 3
+		s.plant(a, oak.uid)
+		t.eq(s.fxAll[3].payload.seconds, 8, "never under the 8 seconds")
+		t.ok(string.find(s.lastToast(a), "in a moment") ~= nil)
+		t.eq(s.attr("Vitality_island"), nil, "the island has no meter")
+	end)
+
+	t.test("a dormant grove's stump: planting says why it can't", function()
+		local s = setup()
+		local rec = s.tree("phantomwood")
+		s.start()
+		local a = s.player(1, "Ada")
+		s.fell(a, rec)
+		rec.dormant = true
+		s.plant(a, rec.uid)
+		t.ok(string.find(s.lastToast(a), "sleeps by day") ~= nil)
+		t.eq(s.profiles[a].heartseeds.phantomwood, 1, "the seed is kept")
+		t.eq(#s.delays, 0)
+	end)
+
+	t.test("a storm-struck tree felled in time stays Stormgrain even if the glow runs out while it falls", function()
+		local s = setup()
+		local rec = s.tree("oak", Vector3.new(10, 0, 0))
+		s.start()
+		t.eq(s.Forest.Strike(Vector3.new(0, 0, 0)), rec.uid)
+		rec.alive, rec.felled = false, true -- the last swing: falling
+		s.now += 121
+		s.Forest.Tick(1)
+		t.ok(rec.model:FindFirstChild("StormGlow") ~= nil, "still struck while it falls")
+		local a = s.player(1, "Ada")
+		local uids = s.fell(a, rec) -- it lands
+		t.eq(s.logs[uids[1]].tags.figure, "stormgrain")
+		t.eq(s.profiles[a].heartseeds.oak, 2, "+1 for the storm")
+		t.eq(rec.model:FindFirstChild("StormGlow"), nil)
+	end)
+
+	local function golden(s)
+		for i = 1, 400 do
+			table.insert(s.rolls, (i * 0.6180339887) % 1)
+		end
+	end
+
+	t.test("a Phantom Grove Elder fades at dawn with its grove", function()
+		local s = setup()
+		s.start()
+		golden(s)
+		local uid = s.Forest.WakeElder("grove")
+		s.rolls = {}
+		t.ok(uid ~= nil, "found a spot in the grove")
+		t.eq(s.attr("ElderBiome"), "grove")
+		s.trees[uid].dormant = true -- dawn (TreeService.SetBiomeDormant)
+		s.Forest.Tick(0)
+		t.eq(s.trees[uid], nil, "gone with the night")
+		t.eq(s.attr("ElderUid"), "")
+		t.eq(s.map.ForestMarks:FindFirstChild("ElderAura"), nil, "its aura too")
+		local kinds = s.fxKinds()
+		t.eq(kinds[#kinds], "ElderFaded")
+		t.eq(s.Forest.ElderUid(), nil, "another grove may wake one")
+	end)
+
+	t.test("the Phantom Grove only wakes an Elder with five minutes of the night left", function()
+		local s = setup()
+		local rec = s.tree("phantomwood")
+		s.start()
+		local a = s.player(1, "Ada")
+		local b = s.player(2, "Bo")
+		for round = 1, 5 do
+			local p = if round % 2 == 1 then a else b
+			s.fell(p, rec)
+			s.plant(p, rec.uid)
+			s.runDelays()
+		end
+		t.ok(s.attr("Vitality_grove") >= 75, "thriving")
+		s.workspace:SetAttribute("IsNight", true)
+		-- Night is 19:00 to 05:00: 500 real seconds from 950 into each 1200 s day.
+		local WorldTime = s.WorldTime
+		s.serverNow = 1200 -- midnight: 250 s of night left
+		t.ok(math.abs(WorldTime.SecondsUntilChange(s.serverNow) - 250) < 1e-6)
+		s.now += 20 * 60
+		s.rolls = { 0.5, 0, 0 } -- the next check's interval, then the grove pick and wake rolls
+		s.Forest.Tick(0)
+		t.eq(s.Forest.ElderUid(), nil, "too close to dawn")
+		s.serverNow = 950 -- dusk: the whole night ahead
+		t.ok(math.abs(WorldTime.SecondsUntilChange(s.serverNow) - 500) < 1e-6)
+		s.now += 20 * 60
+		s.rolls = { 0.5, 0, 0 }
+		golden(s)
+		s.Forest.Tick(0)
+		t.ok(s.Forest.ElderUid() ~= nil, "an Elder wakes at dusk")
+		t.eq(s.attr("ElderBiome"), "grove")
 	end)
 end

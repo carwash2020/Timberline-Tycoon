@@ -10,12 +10,14 @@
 --     "SeedPop"); the pouch is profile.heartseeds, mirrored on the
 --     Seeds_<woodId> and Heartseeds player attributes.
 --   * PlantSeed(treeUid): validated (rate, a felled non-temporary tree with
---     its stump, in range, a seed of that wood); a sapling sprouts for
---     ForestData.SproutSeconds, then TreeService.Regrow marks the tree as
---     yours and a name stake goes up at its foot.
+--     its stump, in range, a seed of that wood); a sapling sprouts
+--     (ForestLogic.SproutSeconds: 8 s in the groves, longer for the slow
+--     woods outside them), then TreeService.Regrow marks the tree as yours
+--     and a name stake goes up at its foot.
 --   * The planter's share: someone else fells your tree, you get a share of
 --     its logs' base value (EconomyService), if you're online. Felling your
---     own gives the steward's extra seed instead.
+--     own gives the steward's extra seed instead, once it has stood a while
+--     (Seeds.stewardAfter); sooner, its planting's vitality goes back too.
 --   * Grove Vitality per ground grove: workspace attributes
 --     Vitality_<biome> (0-100, one decimal) and VitalityTier_<biome>
 --     ("Thinning" | "Healthy" | "Thriving" | "OldGrowth").
@@ -39,6 +41,7 @@ local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
@@ -58,19 +61,24 @@ local ForestService = {}
 
 export type Remotes = { PlantSeed: RemoteEvent, WorldFX: RemoteEvent }
 
--- Tests pass their own clock and dice, and tick by hand.
+-- Tests pass their own clocks and dice, and tick by hand.
 export type Options = {
 	clock: (() -> number)?,
+	serverTime: (() -> number)?, -- the day and night clock (workspace:GetServerTimeNow())
 	random: (() -> number)?,
 	manual: boolean?, -- no background loop: call ForestService.Tick(dt)
 }
 
 type Struck = { untilAt: number, glow: Instance }
+type Sprout = { userId: number, growth: number } -- a sapling, into the stump of that felling
 type Elder = { uid: string, woodId: string, biome: string, wokeAt: number, aura: Model? }
 
 local remotes: Remotes? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local clock: () -> number = os.clock
+local serverTime: () -> number = function(): number
+	return workspace:GetServerTimeNow()
+end
 local random: () -> number = math.random
 
 local figureOf: { [string]: string } = {} -- the figure each standing tree hides
@@ -78,7 +86,8 @@ local clueOf: { [string]: Instance } = {} -- its bark clue
 local stakeOf: { [string]: Model } = {} -- planted trees' name stakes (in ForestMarks)
 local planterName: { [string]: string } = {} -- who planted each tree, for its stake
 local struck: { [string]: Struck } = {}
-local sprouting: { [string]: boolean } = {}
+local sprouting: { [string]: Sprout } = {}
+local sproutedAt: { [string]: number } = {} -- clock time each planted tree came up (the steward's wait)
 local vitality: { [string]: number } = {}
 local shownVitality: { [string]: number } = {}
 local shownTier: { [string]: string } = {}
@@ -415,6 +424,15 @@ local function elderInterval(): number
 	return e.checkMinSeconds + (e.checkMaxSeconds - e.checkMinSeconds) * random()
 end
 
+-- Seconds of the night left (0 by day, or while WorldClock still says day).
+local function nightLeft(): number
+	local now = serverTime()
+	if workspace:GetAttribute("IsNight") ~= true or not WorldTime.IsNight(WorldTime.ClockTime(now)) then
+		return 0
+	end
+	return WorldTime.SecondsUntilChange(now)
+end
+
 local function checkElder()
 	if elder ~= nil then
 		return
@@ -422,8 +440,9 @@ local function checkElder()
 	local groves: { ForestLogic.GroveState } = {}
 	for _, id in ipairs(ForestData.Groves) do
 		local biome = BiomeData.Get(id)
-		-- Night-only groves (the Phantom Grove) only wake one at night.
-		local awake = biome ~= nil and (not biome.nightOnly or workspace:GetAttribute("IsNight") == true)
+		-- Night-only groves (the Phantom Grove) only wake one at night, with
+		-- enough of it left to fell it (it fades at dawn).
+		local awake = biome ~= nil and (not biome.nightOnly or nightLeft() >= ForestData.Elder.nightLeftSeconds)
 		if biome and biome.area and biome.trees and awake then
 			table.insert(groves, { biome = id, vitality = vitality[id] or ForestData.Vitality.rest })
 		end
@@ -519,14 +538,19 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	end
 
 	local planterId = rec.planterId
-	changeVitality(def.biome, ForestLogic.FellDelta(planterId ~= nil))
-
 	local steward = planterId == player.UserId
+	local sprouted = sproutedAt[uid]
+	sproutedAt[uid] = nil
+	-- Its planter felling it soon after it sprouted: no steward's seed, and
+	-- the planting's vitality goes back (others felling it still pay the share).
+	local refell = steward and not ForestLogic.StewardEarned(sprouted, clock())
+	changeVitality(def.biome, ForestLogic.FellDelta(planterId ~= nil, refell))
+
 	local roll = random()
 	local facts: ForestLogic.DropFacts = {
 		large = ForestLogic.IsLarge(rec.size),
 		storm = wasStruck,
-		steward = steward,
+		steward = steward and not refell,
 		roll = roll,
 	}
 	local reasons: { string } = {}
@@ -539,7 +563,7 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	if wasStruck then
 		table.insert(reasons, "storm-struck")
 	end
-	if steward then
+	if facts.steward then
 		table.insert(reasons, "steward's bonus")
 	end
 	giveSeeds(player, def.id, ForestLogic.SeedDrop(facts), rec.base, reasons)
@@ -556,6 +580,19 @@ local function onRegrown(rec: TreeRecord)
 	if rec.temporary then
 		return
 	end
+	local sprout = sprouting[rec.uid]
+	if sprout and rec.planterId == nil then
+		-- It grew back on its own while a sapling sprouted: the sapling took,
+		-- so it's the planter's tree from now.
+		sprouting[rec.uid] = nil
+		rec.planterId = sprout.userId
+		rec.model:SetAttribute("PlanterId", sprout.userId)
+	end
+	if rec.planterId then
+		sproutedAt[rec.uid] = clock()
+	else
+		sproutedAt[rec.uid] = nil
+	end
 	grow(rec)
 	if rec.planterId then
 		addStake(rec)
@@ -569,20 +606,26 @@ end
 -- Planting
 ---------------------------------------------------------------------------
 
-local function finishSprout(uid: string, userId: number)
+local function finishSprout(uid: string, sprout: Sprout)
+	if sprouting[uid] ~= sprout then
+		return -- it grew back on its own first, and the sapling took then (onRegrown)
+	end
 	sprouting[uid] = nil
 	local rec = TreeService.GetTree(uid)
-	if not rec then
-		return
+	-- Only into the stump it was planted in: never a later felling, nor a
+	-- tree that's still falling.
+	if rec and rec.felled and rec.stump and rec.growth == sprout.growth then
+		TreeService.Regrow(uid, sprout.userId) -- OnRegrown rolls its figure and puts up the stake
 	end
-	if rec.felled then
-		TreeService.Regrow(uid, userId) -- OnRegrown rolls its figure and puts up the stake
-	elseif rec.planterId == nil then
-		-- It grew back on its own while the sapling sprouted: still yours.
-		rec.planterId = userId
-		rec.model:SetAttribute("PlanterId", userId)
-		addStake(rec)
+end
+
+-- "in a moment", "in about 7 minutes"
+local function standsAgainIn(seconds: number): string
+	if seconds < 45 then
+		return "in a moment"
 	end
+	local minutes = math.max(1, math.floor(seconds / 60 + 0.5))
+	return if minutes == 1 then "in about a minute" else string.format("in about %d minutes", minutes)
 end
 
 local function onPlantSeed(player: Player, treeUid: unknown)
@@ -594,8 +637,12 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	if not profile or not rec then
 		return
 	end
-	if not rec.felled or not rec.stump or rec.temporary or rec.dormant then
-		return -- nothing to plant in (still standing, mid-fall, an Elder's, hidden by day)
+	if not rec.felled or not rec.stump or rec.temporary then
+		return -- nothing to plant in (still standing, mid-fall, an Elder's)
+	end
+	if rec.dormant then
+		notify(player, "This grove sleeps by day. Plant here after dark.")
+		return
 	end
 	if sprouting[treeUid] then
 		notify(player, "Something's already sprouting there.")
@@ -621,9 +668,14 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	publishSeeds(player, profile)
 	profile.forest.planted += 1
 	changeVitality(def.biome, ForestData.Vitality.plant)
-	sprouting[treeUid] = true
+	local seconds = ForestLogic.SproutSeconds(def, TreeService.RegrowsIn(treeUid))
+	local sprout: Sprout = { userId = player.UserId, growth = rec.growth }
+	sprouting[treeUid] = sprout
 	planterName[treeUid] = player.DisplayName
 	local stump = rec.stump
+	if stump then
+		stump:SetAttribute("Sprouting", true) -- ForestUI: no planting prompt (it goes with the stump)
+	end
 	local stumpPart = if stump then stump.PrimaryPart else nil
 	local top = if stumpPart then stumpPart.CFrame.Position.Y + stumpPart.Size.X / 2 else rec.base.Y + 1
 	fireAll("Sprout", {
@@ -631,15 +683,18 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 		pos = Vector3.new(rec.base.X, top, rec.base.Z),
 		woodId = def.id,
 		seed = rec.seed,
-		seconds = ForestData.SproutSeconds,
+		seconds = seconds,
 		planter = player.DisplayName,
 		userId = player.UserId,
 	})
-	notify(player, string.format("Planted! Your %s will stand again in a moment.", string.lower(def.displayName)))
+	notify(
+		player,
+		string.format("Planted! Your %s will stand again %s.", string.lower(def.displayName), standsAgainIn(seconds))
+	)
 	QuestService.Event(player, "seedPlanted")
 	DailyService.Event(player, "seedPlanted", 1)
 	analytics(player, "HeartseedPlanted", profile.forest.planted)
-	task.delay(ForestData.SproutSeconds, finishSprout, treeUid, player.UserId)
+	task.delay(seconds, finishSprout, treeUid, sprout)
 end
 
 ---------------------------------------------------------------------------
@@ -654,7 +709,9 @@ function ForestService.Tick(dt: number)
 	publishVitality()
 
 	for uid, s in pairs(struck) do
-		if now >= s.untilAt then
+		-- Felled in time: it keeps the strike while it falls (onFelled clears it).
+		local rec = TreeService.GetTree(uid)
+		if now >= s.untilAt and not (rec and rec.felled) then
 			clearStruck(uid)
 		end
 	end
@@ -677,7 +734,8 @@ function ForestService.Tick(dt: number)
 		local rec = TreeService.GetTree(e.uid)
 		if not rec then
 			clearElder()
-		elseif not rec.felled and now - e.wokeAt >= ForestData.Elder.fadeSeconds then
+		elseif not rec.felled and (rec.dormant or now - e.wokeAt >= ForestData.Elder.fadeSeconds) then
+			-- Unfelled in time, or a night-only one at dawn.
 			figureOf[e.uid] = nil
 			clueOf[e.uid] = nil
 			TreeService.Remove(e.uid)
@@ -712,6 +770,7 @@ function ForestService.Init(r: Remotes, notifyFn: (Player, string) -> (), option
 	remotes = r
 	notify = notifyFn
 	clock = opts.clock or os.clock
+	serverTime = opts.serverTime or serverTime
 	random = opts.random or math.random
 	for _, id in ipairs(ForestData.Groves) do
 		vitality[id] = ForestData.Vitality.start

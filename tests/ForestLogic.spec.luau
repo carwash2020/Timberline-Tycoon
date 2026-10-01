@@ -18,8 +18,10 @@ return function(t)
 		local s = ForestData.Seeds
 		t.eq({ s.perTree, s.largeBonus, s.rollChance, s.stormBonus, s.stewardBonus }, { 1, 1, 0.15, 1, 1 })
 		t.eq({ s.maxPerWood, s.maxTotal }, { 50, 200 })
+		t.eq(s.stewardAfter, 600)
 		t.eq(ForestData.PlantRange, 12)
 		t.eq(ForestData.SproutSeconds, 8)
+		t.eq(ForestData.SlowSproutShare, 0.5)
 		t.eq(ForestData.PlanterShare, 0.15)
 		local v = ForestData.Vitality
 		t.eq({ v.start, v.rest, v.driftPerMinute, v.fellWild, v.fellPlanted, v.plant }, { 60, 60, 1, -1.5, -0.5, 4 })
@@ -29,6 +31,7 @@ return function(t)
 		t.eq({ e.maxActive, e.checkMinSeconds, e.checkMaxSeconds }, { 1, 480, 900 })
 		t.eq({ e.scale, e.hpMul, e.logMul, e.helperMinShare, e.helperSeeds, e.helperShare }, { 1.7, 6, 3, 0.1, 2, 0.1 })
 		t.eq(e.fadeSeconds, 900)
+		t.eq(e.nightLeftSeconds, 300)
 		t.eq(ForestData.Bloom, { threshold = 75, seconds = 480, restSeconds = 1800 })
 	end)
 
@@ -86,6 +89,51 @@ return function(t)
 		t.ok(ForestLogic.IsLarge(ForestLogic.ElderSize(WoodData.Get("oak"))), "Elders count as large")
 	end)
 
+	t.test("the steward's bonus waits until the tree has stood 10 minutes", function()
+		t.ok(ForestLogic.StewardEarned(nil, 0), "planted long ago (or before a restart)")
+		t.ok(not ForestLogic.StewardEarned(1000, 1000))
+		t.ok(not ForestLogic.StewardEarned(1000, 1599.9))
+		t.ok(ForestLogic.StewardEarned(1000, 1600))
+	end)
+
+	t.test("a sapling stands in 8 s in the groves; slow woods outside them take half their regrowth", function()
+		for _, wood in ipairs(WoodData.All()) do
+			local seconds = ForestLogic.SproutSeconds(wood)
+			if ForestLogic.IsGrove(wood.biome) then
+				t.eq(seconds, 8, wood.id)
+			else
+				t.eq(seconds, wood.respawnSec / 2, wood.id)
+				t.ok(seconds > 8, wood.id .. " stays slow")
+			end
+		end
+		local lumen = WoodData.Get("lumenwood")
+		t.eq(ForestLogic.SproutSeconds(lumen), 450)
+		t.eq(ForestLogic.SproutSeconds(WoodData.Get("palmwood")), 75)
+		t.eq(ForestLogic.SproutSeconds(lumen, 600), 450)
+		t.eq(ForestLogic.SproutSeconds(lumen, 120), 120, "never past its own regrowth")
+		t.eq(ForestLogic.SproutSeconds(lumen, 2), 8, "never under 8 s")
+		t.eq(ForestLogic.SproutSeconds(WoodData.Get("oak"), 3), 8)
+		t.eq(ForestLogic.SproutSeconds(WoodData.Get("oak"), 30), 8)
+	end)
+
+	t.test("a felling counts for whoever chopped the most of it, not the last swing", function()
+		local function here()
+			return true
+		end
+		t.eq(ForestLogic.Feller({ [1] = 29, [2] = 1 }, 2, here), 1, "1 HP from the end doesn't take it")
+		t.eq(ForestLogic.Feller({ [1] = 10, [2] = 20 }, 2, here), 2)
+		t.eq(ForestLogic.Feller({ [1] = 15, [2] = 15 }, 2, here), 2, "a tie goes to the swinger")
+		t.eq(ForestLogic.Feller({ [1] = 12, [3] = 12, [2] = 6 }, 2, here), 1, "other ties to the lowest id")
+		t.eq(
+			ForestLogic.Feller({ [1] = 29, [2] = 1 }, 2, function(id)
+				return id ~= 1
+			end),
+			2,
+			"someone who left doesn't count"
+		)
+		t.eq(ForestLogic.Feller({}, 5, here), 5)
+	end)
+
 	t.test("the pouch holds 50 of a wood and 200 in all", function()
 		local seeds = {}
 		t.eq(ForestLogic.AddSeeds(seeds, "oak", 3), 3)
@@ -122,6 +170,8 @@ return function(t)
 	t.test("vitality: fells and plants, clamped to 0-100, drifting back to 60 by 1 a minute", function()
 		t.eq(ForestLogic.FellDelta(false), -1.5)
 		t.eq(ForestLogic.FellDelta(true), -0.5)
+		t.eq(ForestLogic.FellDelta(true, true), -4.5, "its planter refelling it: the planting's 4 back too")
+		t.eq(ForestLogic.FellDelta(false, true), -1.5)
 		t.eq(ForestLogic.ApplyVitality(60, ForestData.Vitality.plant), 64)
 		t.eq(ForestLogic.ApplyVitality(99, 4), 100)
 		t.eq(ForestLogic.ApplyVitality(1, -1.5), 0)

@@ -2,10 +2,12 @@
 -- ForestLogic: the Living Forest's rules (GAME_DESIGN §16), pure so tests
 -- and tools can check them. Numbers come from ForestData; randomness comes
 -- in as rolls in [0, 1), so every rule is deterministic here.
---   * Heartseeds: how many a felled tree drops, and the pouch's caps.
+--   * Heartseeds: how many a felled tree drops, the pouch's caps, and how
+--     long a planted sapling takes.
 --   * Grove Vitality: changes, the drift back to rest, tiers.
 --   * The Hidden Grain: the figure chance, the roll, value multipliers,
 --     and the average a figure adds (the economy model's factor).
+--   * Who a felling counts for (the most chopping, not the last swing).
 --   * Elders: their size class, who counts as a helper, the helper's
 --     bonus, which grove wakes one.
 --   * The planter's share and the Skyroot Bloom.
@@ -58,6 +60,27 @@ function ForestLogic.SeedDrop(facts: DropFacts): number
 		n += s.stewardBonus
 	end
 	return n
+end
+
+-- True when the steward's bonus is earned: the tree has stood
+-- Seeds.stewardAfter since it sprouted (`sproutedAt` nil = long ago).
+function ForestLogic.StewardEarned(sproutedAt: number?, now: number): boolean
+	return sproutedAt == nil or now - sproutedAt >= ForestData.Seeds.stewardAfter
+end
+
+-- Seconds a planted sapling of `def` takes to stand: SproutSeconds in the
+-- ground groves; woods from outside them keep their slowness
+-- (SlowSproutShare of respawnSec). Never past `regrowsIn` (when the stump
+-- grows back anyway), but never under SproutSeconds either.
+function ForestLogic.SproutSeconds(def: WoodData.WoodDef, regrowsIn: number?): number
+	local seconds = ForestData.SproutSeconds
+	if not ForestLogic.IsGrove(def.biome) then
+		seconds = math.max(seconds, def.respawnSec * ForestData.SlowSproutShare)
+	end
+	if regrowsIn then
+		seconds = math.min(seconds, math.max(ForestData.SproutSeconds, regrowsIn))
+	end
+	return seconds
 end
 
 -- True for the size classes that drop the large tree's extra seed.
@@ -151,9 +174,14 @@ function ForestLogic.Drift(v: number, seconds: number): number
 end
 
 -- The change felling a tree makes (planted trees cost the grove less).
-function ForestLogic.FellDelta(planted: boolean): number
+-- `refell`: its planter felled it before earning the steward's bonus, so
+-- its planting's vitality goes back too.
+function ForestLogic.FellDelta(planted: boolean, refell: boolean?): number
 	local d = ForestData.Vitality
-	return if planted then d.fellPlanted else d.fellWild
+	if not planted then
+		return d.fellWild
+	end
+	return if refell then d.fellPlanted - d.plant else d.fellPlanted
 end
 
 function ForestLogic.TierFor(v: number): Tier
@@ -329,6 +357,28 @@ end
 -- value: no figure), whole dollars, at least $1.
 function ForestLogic.Royalty(pricePerLog: number, logCount: number): number
 	return math.max(1, math.floor(pricePerLog * logCount * ForestData.PlanterShare + 0.5))
+end
+
+---------------------------------------------------------------------------
+-- Who fells a tree
+---------------------------------------------------------------------------
+
+-- The user id a felling counts for (its logs, seeds, stats): whoever
+-- chopped the most of it among those `isHere`, so the last swing can't take
+-- someone else's tree. A tie with the swinger goes to the swinger, other
+-- ties to the lowest id.
+function ForestLogic.Feller(damageBy: { [number]: number }, swingerId: number, isHere: (number) -> boolean): number
+	local best, bestDealt = swingerId, damageBy[swingerId] or 0
+	for userId, dealt in pairs(damageBy) do
+		if userId ~= swingerId and isHere(userId) then
+			local more = dealt > bestDealt + 1e-9
+			local tie = math.abs(dealt - bestDealt) <= 1e-9 and best ~= swingerId and userId < best
+			if more or tie then
+				best, bestDealt = userId, dealt
+			end
+		end
+	end
+	return best
 end
 
 ---------------------------------------------------------------------------

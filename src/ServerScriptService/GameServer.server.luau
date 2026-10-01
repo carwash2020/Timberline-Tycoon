@@ -151,7 +151,7 @@ local function onChopTree(player: Player, treeUid: unknown)
 			return
 		end
 	end
-	local newHp, err = TreeService.ApplyChop(player, treeUid, axe)
+	local newHp, err, feller = TreeService.ApplyChop(player, treeUid, axe)
 	if newHp == nil then
 		if err == "far" then
 			notify(player, "Too far away. Walk closer to chop.")
@@ -165,13 +165,17 @@ local function onChopTree(player: Player, treeUid: unknown)
 	end
 	nextSwingAt[player.UserId] = math.max(now, due) + GameConfig.SwingCooldown
 	MilestoneService.Mark(player, "First chop")
-	if newHp <= 0 then
-		profile.stats.treesChopped += 1
-		MilestoneService.Mark(player, "First tree felled")
-		QuestService.Event(player, "treeFelled")
-		DailyService.Event(player, "treeFelled", 1)
+	-- The felling counts for whoever chopped the most of the tree (its logs
+	-- are theirs too), not just whoever landed the last swing.
+	local credited = if newHp <= 0 then feller or player else nil
+	local creditedProfile = if credited then ProfileService.GetProfile(credited) else nil
+	if credited and creditedProfile then
+		creditedProfile.stats.treesChopped += 1
+		MilestoneService.Mark(credited, "First tree felled")
+		QuestService.Event(credited, "treeFelled")
+		DailyService.Event(credited, "treeFelled", 1)
 		if wood then
-			FieldGuideService.Discover(player, wood.id)
+			FieldGuideService.Discover(credited, wood.id)
 		end
 	end
 end
