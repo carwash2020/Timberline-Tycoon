@@ -4,9 +4,9 @@
 -- Dealership and Hearth & Home along the street, the gondola station behind
 -- them, Murph's camp by the spawn, the parking lot east of it, lamp posts,
 -- props, greenery and trees, on the real terrain, at golden hour.
--- Things MapBuilder builds itself (parking slots, Sky Bin, spawn pad) are
--- stood in for with plain parts; the dirt paths are a suggestion for the
--- terrain paint.
+-- Things MapBuilder builds itself (parking slots, spawn pad) are stood in
+-- for with plain parts; the dirt paths are a suggestion for the terrain
+-- paint.
 local Common = require("./_common")
 
 return {
@@ -56,8 +56,8 @@ return {
 		flat("GondolaPath", -31, -25, 97, 142, DIRT, Enum.Material.Ground)
 		flat("GondolaPath", -46, -25, 136, 142, DIRT, Enum.Material.Ground)
 
-		-- Stand-ins for what MapBuilder builds: the spawn, the parking slots
-		-- and the Sky Bin.
+		-- Stand-ins for what MapBuilder builds: the spawn and the parking
+		-- slots.
 		local spawn = Kit.cylinder(
 			root,
 			"Spawn",
@@ -83,19 +83,10 @@ return {
 				)
 			end
 		end
-		local bin = Kit.part(
-			root,
-			"SkyBin",
-			V3.new(4, 4, 4),
-			CF.new(-18, 2, 86),
-			C3.fromRGB(150, 110, 70),
-			Enum.Material.WoodPlanks
-		)
-		Kit.signText(bin, "SKY BIN", C3.fromRGB(245, 235, 215))
-
 		-- The buildings.
 		put(BuildingArt.Sawmill(), 0, 110)
 		put(BuildingArt.SellPad(24, 18), 0, 86)
+		put(BuildingArt.SkyBin(), -18, 86)
 		put(BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44)), -45, 100)
 		put(BuildingArt.Shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181)), 45, 100)
 		put(BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", C3.fromRGB(122, 90, 60)), -80, 100)
