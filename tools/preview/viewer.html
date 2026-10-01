@@ -10,7 +10,8 @@
   embeds it below. Open the file in any browser: drag to orbit, right-drag to
   pan, scroll to zoom, number keys 1-9 jump to the scene's camera presets.
   It approximates Roblox's look (flat colours, sun + sky light, fog, neon glow);
-  materials' textures and Roblox's exact lighting are only in Studio.
+  materials' textures and Roblox's exact lighting are only in Studio. A camera
+  preset marked `night` shows the scene after dark (see NIGHT below).
 -->
 <style>
   :root { color-scheme: dark; }
@@ -48,6 +49,18 @@ const L = Object.assign({
 // bloom 0.3 (was 0.55): Neon glows without melting its part into a white
 // blob, so the Starfall axe keeps its shape (ACT-15). A scene may set its own.
 
+// The night preset (WLD-19). A camera with `night: true` renders with these
+// over the scene's lighting; the other keys (sunDir, ground, fog distances,
+// exposure, bloom) stay the scene's. At night the parts the game lights after
+// dark (WindowGlass, LampGlow, LanternGlow: export.luau tags them) glow Neon,
+// and the point lights drawn are the 24 nearest the camera (see useLights).
+// Cameras without the flag render exactly as before.
+const NIGHT = Object.assign({}, L, {
+  sunColor: "#7f8fc8", sunIntensity: 0.35, skyTop: "#0a1030", skyBottom: "#273256",
+  ambient: 0.18, hemiIntensity: 0.45, fog: "#1b2140",
+});
+const NIGHT_ENV = 0.25; // metals reflect a quarter as much of the room at night
+
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
 renderer.setSize(innerWidth, innerHeight);
@@ -70,21 +83,19 @@ const ENV = (() => {
 })();
 
 // Sky: a big gradient dome.
-{
-  const g = new THREE.SphereGeometry(6000, 32, 16);
-  const m = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: new THREE.Color(L.skyTop) }, bottom: { value: new THREE.Color(L.skyBottom) } },
-    vertexShader: "varying vec3 p; void main(){ p = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
-    fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying vec3 p; void main(){ float t = clamp(p.y*1.6+0.15,0.0,1.0); gl_FragColor = vec4(mix(bottom, top, t),1.0); }",
-  });
-  world.add(new THREE.Mesh(g, m));
-}
+const sky = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { top: { value: new THREE.Color(L.skyTop) }, bottom: { value: new THREE.Color(L.skyBottom) } },
+  vertexShader: "varying vec3 p; void main(){ p = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+  fragmentShader: "uniform vec3 top; uniform vec3 bottom; varying vec3 p; void main(){ float t = clamp(p.y*1.6+0.15,0.0,1.0); gl_FragColor = vec4(mix(bottom, top, t),1.0); }",
+});
+world.add(new THREE.Mesh(new THREE.SphereGeometry(6000, 32, 16), sky));
 
 // Roblox's OutdoorAmbient keeps shadows readable; a hemisphere light plus a
 // little flat ambient is the closest cheap match.
 const hemi = new THREE.HemisphereLight(L.skyTop, L.ground, L.hemiIntensity);
-world.add(hemi, new THREE.AmbientLight("#ffffff", L.ambient));
+const ambient = new THREE.AmbientLight("#ffffff", L.ambient);
+world.add(hemi, ambient);
 const sun = new THREE.DirectionalLight(L.sunColor, L.sunIntensity);
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
@@ -134,24 +145,33 @@ const MAT = {
 };
 
 // Group parts into InstancedMeshes by shape + material class + transparency.
-const groups = new Map();
+// A part the game lights at night (it carries a night colour, p[19]) also
+// goes into a Neon night group, and its day look into a group of its own, so
+// a night camera can swap the two (setView).
+const groups = new Map(), nightGroups = new Map();
 const m4 = new THREE.Matrix4(), s4 = new THREE.Matrix4(), col = new THREE.Color();
 const bounds = new THREE.Box3();
 const SHAPES = scene.shapes;
 const MATS = scene.materials;
+function addTo(map, key, make, p) {
+  let g = map.get(key);
+  if (!g) { g = Object.assign(make(), { items: [] }); map.set(key, g); }
+  g.items.push(p);
+}
 for (const p of scene.parts) {
-  // [shape, sx,sy,sz, x,y,z, r00..r22, color, material, transparency]
+  // [shape, sx,sy,sz, x,y,z, r00..r22, color, material, transparency, nightColor?]
   const shape = SHAPES[p[0]];
   const material = MATS[p[17]];
   const transparency = p[18];
   if (transparency >= 0.98) continue;
   const neon = material === "Neon";
-  const key = shape + "|" + (neon ? "neon" : (MAT[material] ? material : "default")) + "|" + transparency.toFixed(2);
-  let g = groups.get(key);
-  if (!g) { g = { shape, material: neon ? "Neon" : material, transparency, items: [] }; groups.set(key, g); }
-  g.items.push(p);
+  const glow = typeof p[19] === "string";
+  const key = shape + "|" + (neon ? "neon" : (MAT[material] ? material : "default")) + "|" + transparency.toFixed(2) + (glow ? "|glow" : "");
+  addTo(groups, key, () => ({ shape, material: neon ? "Neon" : material, transparency, glow }), p);
+  if (glow) addTo(nightGroups, shape + "|" + transparency.toFixed(2), () => ({ shape, material: "Neon", transparency, night: true }), p);
 }
-for (const g of groups.values()) {
+const metalMaterials = [], dayGlowMeshes = [], nightGlowMeshes = [];
+function buildMesh(g) {
   const [rough, metal] = MAT[g.material] || [0.85, 0.0];
   let mat;
   if (g.material === "Neon") {
@@ -160,7 +180,7 @@ for (const g of groups.values()) {
     // Boxes and wedges already have one normal per face; flatShading would
     // flip double-sided faces wound the other way.
     mat = new THREE.MeshStandardMaterial({ roughness: rough, metalness: metal });
-    if (METALS.has(g.material)) { mat.envMap = ENV; mat.envMapIntensity = ENV_INTENSITY; }
+    if (METALS.has(g.material)) { mat.envMap = ENV; mat.envMapIntensity = ENV_INTENSITY; metalMaterials.push(mat); }
   }
   if (g.transparency > 0 || g.material === "Glass") {
     mat.transparent = true;
@@ -177,7 +197,7 @@ for (const g of groups.values()) {
     s4.makeScale(Math.max(sx, 0.01), Math.max(sy, 0.01), Math.max(sz, 0.01));
     m4.multiply(s4);
     mesh.setMatrixAt(i, m4);
-    col.set("#" + p[16]);
+    col.set("#" + (g.night ? p[19] : p[16]));
     if (g.material === "Neon") col.multiplyScalar(1.6);
     mesh.setColorAt(i, col);
     bounds.expandByPoint(new THREE.Vector3(p[4], p[5], p[6]));
@@ -185,13 +205,45 @@ for (const g of groups.values()) {
   mesh.castShadow = g.material !== "Neon" && g.transparency < 0.5;
   mesh.receiveShadow = true;
   world.add(mesh);
+  return mesh;
+}
+for (const g of groups.values()) {
+  const mesh = buildMesh(g);
+  if (g.glow) dayGlowMeshes.push(mesh);
+}
+for (const g of nightGroups.values()) {
+  const mesh = buildMesh(g);
+  mesh.visible = false;
+  nightGlowMeshes.push(mesh);
 }
 
 // Point lights (the brightest few: forward rendering can't afford hundreds).
-for (const l of (scene.lights || []).slice(0, 24)) {
-  const pl = new THREE.PointLight("#" + l[3], l[5] * 6, l[4] * 1.4, 1.6);
-  pl.position.set(l[0], l[1], l[2]);
+// [x, y, z, color, range, brightness, nightOnly?]. A day camera draws the
+// first 24 in export order, leaving out the night-only ones (a light in a
+// night part that was built switched off). A night camera has every light on,
+// as the game does after dark, and draws the 24 nearest the camera preset's
+// position (orbiting away from it doesn't pick again; press its key).
+const MAX_LIGHTS = 24;
+const pointLights = [];
+for (let i = 0; i < Math.min(MAX_LIGHTS, scene.lights.length); i++) {
+  const pl = new THREE.PointLight("#ffffff", 0, 0, 1.6);
   world.add(pl);
+  pointLights.push(pl);
+}
+function useLights(night, at) {
+  let list = scene.lights.filter((l) => night || !l[6]);
+  if (night) {
+    const d2 = (l) => (l[0] - at.x) ** 2 + (l[1] - at.y) ** 2 + (l[2] - at.z) ** 2;
+    list = list.map((l) => [d2(l), l]).sort((a, b) => a[0] - b[0]).map((e) => e[1]);
+  }
+  pointLights.forEach((pl, i) => {
+    const l = list[i];
+    if (!l) { pl.intensity = 0; return; }
+    pl.color.set("#" + l[3]);
+    pl.intensity = l[5] * 6;
+    pl.distance = l[4] * 1.4;
+    pl.position.set(l[0], l[1], l[2]);
+  });
 }
 
 // Text on SurfaceGuis (signs) and BillboardGuis (name tags).
@@ -270,25 +322,49 @@ sun.shadow.camera.updateProjectionMatrix();
 // Camera + controls.
 const camera = new THREE.PerspectiveCamera(scene.fov || 55, innerWidth / innerHeight, 0.5, 12000);
 const controls = new OrbitControls(camera, renderer.domElement);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(world, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), L.bloom, 0.6, 0.85);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// The scene's own lighting, or the night preset (NIGHT, at the top).
+function useLighting(night) {
+  const X = night ? NIGHT : L;
+  sky.uniforms.top.value.set(X.skyTop);
+  sky.uniforms.bottom.value.set(X.skyBottom);
+  hemi.color.set(X.skyTop);
+  hemi.groundColor.set(X.ground);
+  hemi.intensity = X.hemiIntensity;
+  ambient.intensity = X.ambient;
+  sun.color.set(X.sunColor);
+  sun.intensity = X.sunIntensity;
+  world.fog.color.set(X.fog);
+  bloom.strength = X.bloom;
+  for (const m of metalMaterials) m.envMapIntensity = ENV_INTENSITY * (night ? NIGHT_ENV : 1);
+  for (const m of dayGlowMeshes) m.visible = !night;
+  for (const m of nightGlowMeshes) m.visible = night;
+}
+
+// Camera presets: { pos, target, label?, fov?, night? } (export.luau has the
+// format). `night: true` renders that view with the night preset.
 const views = scene.cameras && scene.cameras.length ? scene.cameras : [{ pos: [center.x + radius, center.y + radius * 0.6, center.z + radius], target: [center.x, center.y, center.z] }];
 function setView(i) {
   const v = views[Math.max(0, Math.min(views.length - 1, i))];
+  const night = v.night === true;
   camera.position.set(...v.pos);
   controls.target.set(...v.target);
   camera.fov = v.fov || scene.fov || 55;
   camera.updateProjectionMatrix();
   controls.update();
-  document.getElementById("hud").textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""} · ${scene.parts.length} parts`;
+  useLighting(night);
+  useLights(night, camera.position);
+  document.getElementById("hud").textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""} · ${scene.parts.length} parts`;
 }
 window.setView = setView;
 window.viewCount = views.length;
 addEventListener("keydown", (e) => { const n = parseInt(e.key, 10); if (n >= 1 && n <= 9) setView(n - 1); });
 setView(0);
-
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(world, camera));
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), L.bloom, 0.6, 0.85));
-composer.addPass(new OutputPass());
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();

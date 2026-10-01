@@ -13,6 +13,16 @@
 -- It also lints the art: parts placed with .Position instead of .CFrame
 -- (the preview can't tell which was set last, so art code uses CFrame only),
 -- and part counts per scene, so the phone budget stays visible.
+--
+-- A scene's build(ctx) returns { root, cameras?, lighting?, fov?,
+-- shadowRadius?, terrain? }. Each camera is
+--   { pos = { x, y, z }, target = { x, y, z }, label = "...", fov = 50?, night = true? }
+-- and number key 1-9 in the viewer jumps to it. `night = true` renders that
+-- view with the viewer's night preset (viewer.html NIGHT): dark blue light,
+-- and the parts the game lights after dark (WindowGlass, LampGlow,
+-- LanternGlow; see night.luau) glow with their lights on. The viewer draws
+-- at most 24 point lights: in export order on a day camera, the 24 nearest
+-- the camera at night. Cameras without the flag render as they always have.
 
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
@@ -23,6 +33,7 @@ local serde = require("@lune/serde")
 assert(fs.isFile("rokit.toml"), "Run this from the repo root: lune run tools/preview/export <scene>")
 
 local Loader = luau.load(fs.readFile("tools/loader.luau"), { debugName = "tools/loader.luau" })()
+local Night = require("./night")
 -- One scene per file in tools/preview/scenes (files starting with _ are helpers).
 local scenes = {}
 for _, file in ipairs(fs.readDir("tools/preview/scenes")) do
@@ -159,7 +170,7 @@ local function export(name: string, def)
 			local shape, size = shapeOf(inst)
 			if shape then
 				local c = cframeList(inst.CFrame)
-				table.insert(parts, {
+				local entry = {
 					SHAPE_INDEX[shape],
 					round(size.X, 3),
 					round(size.Y, 3),
@@ -179,11 +190,16 @@ local function export(name: string, def)
 					hex(inst.Color),
 					matIdx(inst.Material.Name),
 					round(inst.Transparency, 2),
-				})
+				}
+				-- [20]: the colour it glows on a night camera (night.luau).
+				entry[20] = Night.GlowColor(inst)
+				table.insert(parts, entry)
 			end
 		elseif inst:IsA("Light") then
 			local parent = inst.Parent
-			if parent and parent:IsA("BasePart") and inst.Enabled then
+			-- A night light built switched off still comes on at night.
+			local nightOnly = not inst.Enabled and Night.IsNightLight(inst)
+			if parent and parent:IsA("BasePart") and (inst.Enabled or nightOnly) then
 				local p = parent.CFrame.Position
 				table.insert(lights, {
 					round(p.X, 2),
@@ -192,6 +208,7 @@ local function export(name: string, def)
 					hex(inst.Color),
 					inst.Range,
 					inst.Brightness,
+					if nightOnly then 1 else nil, -- [7]: drawn only on a night camera
 				})
 			end
 		elseif inst:IsA("SurfaceGui") or inst:IsA("BillboardGui") then
