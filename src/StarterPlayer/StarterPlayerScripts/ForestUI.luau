@@ -207,6 +207,7 @@ local function buildPouch()
 	chip.AutoButtonColor = true
 	chip.Text = ""
 	chip.Parent = slot
+	UITheme.Clicks(chip)
 	UITheme.corner(chip, size.Y / 2)
 	UITheme.stroke(chip, C.Ink, 2)
 	local bump = Instance.new("UIScale")
