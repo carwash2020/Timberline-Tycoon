@@ -104,6 +104,24 @@ function TreeArt.HeartColor(def: WoodDef): Color3
 	return TreeArt.Palette(def).heart
 end
 
+-- The dust a felled tree throws up, by the ground of its home biome
+-- (TreeFX): earth in the forests, sand on the coast, powder snow, volcanic
+-- ash, the Phantom Grove's violet loam, pale isle soil.
+local EARTH_DUST = Color3.fromRGB(196, 174, 140)
+local DUST: { [string]: Color3 } = {
+	starter = EARTH_DUST,
+	hills = Color3.fromRGB(198, 168, 128),
+	island = Color3.fromRGB(228, 210, 164),
+	snow = Color3.fromRGB(242, 246, 250),
+	volcano = Color3.fromRGB(118, 112, 108),
+	grove = Color3.fromRGB(150, 138, 168),
+	sky = Color3.fromRGB(236, 228, 198),
+}
+
+function TreeArt.DustColor(def: WoodDef): Color3
+	return DUST[def.biome] or EARTH_DUST
+end
+
 ---------------------------------------------------------------------------
 -- Shared pieces
 ---------------------------------------------------------------------------

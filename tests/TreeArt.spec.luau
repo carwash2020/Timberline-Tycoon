@@ -4,6 +4,8 @@
 -- part's centre, so for every wood, in every size class and as an Elder,
 -- the bar must land BarAboveGround (7) studs over the ground the tree
 -- stands on: just over a player's head, on screen while they chop.
+-- And the fall dust's colour (TreeFX): one per home biome, white on the
+-- snow, ash grey on the volcano.
 return function(t)
 	local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
 	local WoodData = t.shared("WoodData")
@@ -56,6 +58,27 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test("every wood's fall dust has its biome's colour", function()
+		local earth = TreeArt.DustColor(WoodData.Get("oak"))
+		local seen = {}
+		for _, def in ipairs(WoodData.All()) do
+			local c = TreeArt.DustColor(def)
+			t.ok(typeof(c) == "Color3", def.id .. " has a dust colour")
+			if def.biome ~= "starter" then
+				t.ok(c ~= earth, def.id .. " (" .. def.biome .. ") has its own dust, not the forest's")
+			end
+			seen[def.biome] = c
+		end
+		local snow = seen.snow
+		t.ok(snow and snow.R > 0.9 and snow.G > 0.9 and snow.B > 0.9, "snow dust is white")
+		local ash = seen.volcano
+		t.ok(ash, "the volcano has a wood")
+		local hi, lo = math.max(ash.R, ash.G, ash.B), math.min(ash.R, ash.G, ash.B)
+		t.ok(hi - lo < 0.06 and hi < 0.6, "volcano dust is ash grey")
+		-- An unknown biome falls back to the forest's earth.
+		t.eq(TreeArt.DustColor({ id = "x", biome = "nowhere" }), earth)
 	end)
 
 	t.test("the bar is no longer up in the canopy", function()

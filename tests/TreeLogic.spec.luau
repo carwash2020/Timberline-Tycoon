@@ -3,7 +3,9 @@
 -- a chip knocked off the bark arcs out at the lead's speeds (up 12-20,
 -- sideways 4-8), lands around the trunk's foot, never goes below the
 -- ground, rests about a second and fades over 0.4 s (about 1.6 s in all);
--- leaves burst up and drift down slower; pieces lie flat on a slope.
+-- leaves burst up and drift down slower; pieces lie flat on a slope. A
+-- felled tree fades out over 0.3 s once it's down (FallTime * 0.95), done
+-- before the server hides it and lays its logs (FallTime + 0.35).
 return function(t)
 	local roblox = t.roblox
 	local Vector3 = roblox.Vector3
@@ -129,6 +131,25 @@ return function(t)
 			local out = flat(TreeLogic.FlightAt(f, f.landT) - top).Magnitude
 			t.ok(out <= Leaf.side[2] / Leaf.drag + 1e-6, "it lands close by")
 			t.ok(TreeLogic.FlightLife(f) < 4.5, "it is gone in a few seconds")
+		end
+	end)
+
+	t.test("a felled tree fades out once it's down, before its logs appear", function()
+		local fall = TreeLogic.FallTime
+		t.eq(TreeLogic.FellFadeStart, fall * 0.95)
+		t.eq(TreeLogic.FellFadeTime, 0.3)
+		t.eq(TreeLogic.FellFade(0), 0)
+		t.eq(TreeLogic.FellFade(fall * 0.9), 0) -- still falling: solid
+		t.eq(TreeLogic.FellFade(fall * 0.95), 0)
+		t.ok(math.abs(TreeLogic.FellFade(fall * 0.95 + 0.15) - 0.5) < 1e-9, "half gone halfway")
+		t.eq(TreeLogic.FellFade(fall * 0.95 + 0.3), 1)
+		-- TreeService hides the tree and lays its logs at FallTime + 0.35.
+		t.eq(TreeLogic.FellFade(fall + 0.35), 1)
+		local last = 0
+		for i = 0, 200 do
+			local a = TreeLogic.FellFade(i / 100)
+			t.ok(a >= last, "it only fades out")
+			last = a
 		end
 	end)
 

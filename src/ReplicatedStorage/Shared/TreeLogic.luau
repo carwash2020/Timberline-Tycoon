@@ -114,6 +114,16 @@ function TreeLogic.FallProgress(t: number): number
 	return 1 - math.sin(u * math.pi) * 0.035 -- the thump and settle
 end
 
+-- Once it's down, a felled tree fades out on every client (TreeFX sets its
+-- parts' LocalTransparencyModifier to this, t seconds into the fall), into
+-- the logs the server lays when it hides the tree (FallTime + 0.35).
+TreeLogic.FellFadeStart = TreeLogic.FallTime * 0.95
+TreeLogic.FellFadeTime = 0.3
+
+function TreeLogic.FellFade(t: number): number
+	return math.clamp((t - TreeLogic.FellFadeStart) / TreeLogic.FellFadeTime, 0, 1)
+end
+
 ---------------------------------------------------------------------------
 -- Chips and leaves (TreeFX)
 ---------------------------------------------------------------------------
