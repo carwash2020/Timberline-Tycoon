@@ -185,6 +185,22 @@ function TruckLayout.For(def: TruckDef): Layout
 	}
 end
 
+-- Truck-local z of the rear axle, the point a truck turns about (where
+-- VehicleService hangs its DriveAttachment): the second axle, or the
+-- middle of the tandem pair on a long bed. wheelZ is { front, rear } plus
+-- `rear - tandemGap` for the tandem's front axle, so the last entry is not
+-- the rear axle on a three-axle truck. A layout with only a front axle
+-- turns about its middle.
+function TruckLayout.DriveAxleZ(layout: Layout): number
+	local z = layout.wheelZ
+	if #z >= 3 then
+		return (z[2] + z[3]) / 2
+	elseif #z == 2 then
+		return z[2]
+	end
+	return 0
+end
+
 export type TrailerLayout = {
 	style: TrailerStyle,
 	width: number,
