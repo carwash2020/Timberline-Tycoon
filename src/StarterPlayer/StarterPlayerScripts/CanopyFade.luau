@@ -14,9 +14,11 @@
 --     CanQuery (Poppercam, trucks and clicking the leaves rely on them).
 --   * TreeFX owns a tree while it falls, lies felled or regrows (and the
 --     server hides dormant ones): those are skipped, a fading tree that
---     starts to fall is handed back at once, and a part someone else has
---     set (TreeFX's felled fade to 1) is never written. Restoring only puts
---     back to 0 the parts this module faded.
+--     starts to fall eases back to solid over FadeOutTime (0.4 s, long
+--     before TreeFX's own fade starts at FallTime + 0.1) instead of
+--     snapping, and a part someone else has set (TreeFX's felled fade to
+--     1) is never written. Restoring only puts back to 0 the parts this
+--     module faded.
 --   * The Trees folder and the trees in it stream in late and out again:
 --     everything is looked up fresh each time (no waiting), and a tree that
 --     has left the world is dropped on the next frame, its faded parts put
@@ -102,12 +104,13 @@ local function mark(tree: Model, now: number)
 end
 
 -- Writes `alpha` to every part the fade still owns; a part someone else
--- has set since is left alone for good.
-local function write(fade: Fade, alpha: number)
+-- has set since is left alone for good. `letting`: the tree is TreeFX's
+-- now (see CanopyLogic.Owns).
+local function write(fade: Fade, alpha: number, letting: boolean?)
 	local parts = fade.parts
 	for i = #parts, 1, -1 do
 		local part = parts[i]
-		if CanopyLogic.Owns(part.LocalTransparencyModifier, fade.written) then
+		if CanopyLogic.Owns(part.LocalTransparencyModifier, fade.written, letting) then
 			part.LocalTransparencyModifier = alpha
 		else
 			table.remove(parts, i)
@@ -189,17 +192,22 @@ end
 -- Every frame: fades move toward where they should be.
 local function step(now: number, dt: number)
 	for tree, fade in pairs(fades) do
-		if tree.Parent == nil or blocked(tree) then
-			-- Streamed out or gone (leave nothing see-through behind, in case
-			-- it comes back), or TreeFX owns it now: put back to 0 only what
-			-- this faded, and let go.
+		if tree.Parent == nil then
+			-- Streamed out or gone: leave nothing see-through behind (in case
+			-- it comes back), putting back to 0 only what this faded, and let go.
 			write(fade, 0)
 			fades[tree] = nil
 		else
-			local alpha = CanopyLogic.Step(fade.alpha, now - fade.lastHit, dt)
+			-- Felled, dormant, or TreeFX animating it: it can't be in the way
+			-- any more, so it eases straight back over FadeOutTime (0.4 s,
+			-- done well before TreeFX's own fade starts at FallTime + 0.1);
+			-- write() lets go of any part TreeFX has set meanwhile, even to 0.
+			local letting = blocked(tree)
+			local sinceHit = if letting then math.huge else now - fade.lastHit
+			local alpha = CanopyLogic.Step(fade.alpha, sinceHit, dt)
 			fade.alpha = alpha
 			if alpha ~= fade.written then
-				write(fade, alpha)
+				write(fade, alpha, letting)
 			end
 			if alpha <= 0 then
 				fades[tree] = nil

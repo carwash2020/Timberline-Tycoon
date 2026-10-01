@@ -687,12 +687,15 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	if stump then
 		stump:SetAttribute("Sprouting", true) -- ForestUI: no planting prompt (it goes with the stump)
 	end
+	-- The stump is an upright cylinder (TreeArt.Stump): its length, Size.X,
+	-- is its height and Size.Y its diameter. The sprout is sized to it.
 	local stumpPart = if stump then stump.PrimaryPart else nil
 	local top = if stumpPart then stumpPart.CFrame.Position.Y + stumpPart.Size.X / 2 else rec.base.Y + 1
+	local diameter = if stumpPart then stumpPart.Size.Y else nil
 	if stump and seconds > ForestData.ShownSproutSeconds then
 		-- A slow wood: a sapling on the stump for everyone, the whole time
 		-- (it goes with the stump when the tree stands).
-		local sapling = ForestArt.Sprout(def, rec.seed)
+		local sapling = ForestArt.Sprout(def, rec.seed, diameter)
 		sapling.Name = "SproutMark"
 		Kit.placeAt(sapling, CFrame.new(rec.base.X, top, rec.base.Z))
 		sapling.Parent = stump
@@ -703,6 +706,7 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 		woodId = def.id,
 		seed = rec.seed,
 		seconds = seconds,
+		diameter = diameter, -- the stump's (nil without one: the old fixed-size sprout)
 		planter = player.DisplayName,
 		userId = player.UserId,
 	})

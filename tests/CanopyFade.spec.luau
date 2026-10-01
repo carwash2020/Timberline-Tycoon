@@ -11,8 +11,11 @@
 --     next ray, at most six rays per target per look, ten looks a second;
 --   * a canopy around the camera itself fades too;
 --   * felled, dormant and falling or regrowing trees are left to TreeFX: a
---     fading tree that starts to fall is handed back at once, and a part
---     someone else set (TreeFX's fade to 1) is never written;
+--     fading tree that starts to fall eases back over 0.4 s (no snap), done
+--     before TreeFX's own fade starts, and a part someone else set
+--     (TreeFX's fade to 1, or its first frame near 0) is never written;
+--   * the ray to the HumanoidRootPart counts on its own: leaves only in
+--     that line (the head's clear) still fade;
 --   * a tree that streams out mid-fade is dropped with nothing left
 --     see-through, the Trees folder may stream in late, and no character
 --     or first person does nothing.
@@ -191,6 +194,7 @@ return function(t)
 		})
 		w.CanopyFade = loader:load("StarterPlayer/StarterPlayerScripts/CanopyFade")
 		w.CanopyLogic = loader:shared("CanopyLogic")
+		w.TreeLogic = loader:shared("TreeLogic")
 		w.TreeArt = loader:shared("Art/TreeArt")
 		w.WoodData = loader:shared("WoodData")
 
@@ -427,7 +431,7 @@ return function(t)
 		t.eq(w.CanopyFade.Tracked(), 0)
 	end)
 
-	t.test("a fading tree that starts to fall is handed back, never undoing TreeFX's fade", function()
+	t.test("a fading tree that starts to fall eases back over 0.4 s, never undoing TreeFX's fade", function()
 		local w = world()
 		local tree = w.tree(w.along(0.5))
 		-- A second leaf cube that someone else (TreeFX) has set meanwhile.
@@ -442,24 +446,92 @@ return function(t)
 		other.LocalTransparencyModifier = 1 -- not CanopyFade's any more
 		w.run(0.3)
 		t.eq(ltm(other), 1, "a part someone else set is left alone")
-		-- It's felled: TreeFX owns it now.
+		-- It's felled: TreeFX owns it now, and CanopyFade lets it go gently.
 		tree:SetAttribute("Felled", true)
+		local perFrame = (1 / 60) * w.CanopyLogic.Fade / w.CanopyLogic.FadeOutTime
 		w.frame(1 / 60)
-		t.eq(ltm(leaves), 0, "what CanopyFade faded is put back at once")
+		t.ok(math.abs(ltm(leaves) - (0.7 - perFrame)) < 1e-3, "it eases back, no snap: " .. ltm(leaves))
 		t.eq(ltm(other), 1, "TreeFX's fade is never undone")
-		t.eq(w.CanopyFade.Tracked(), 0)
+		w.run(0.2)
+		t.ok(ltm(leaves) > 0.2 and ltm(leaves) < 0.45, "still easing back: " .. ltm(leaves))
+		t.eq(w.CanopyFade.Tracked(), 1)
+		w.run(0.2 + 1 / 60) -- 0.4 s and a frame since it was felled
+		t.eq(ltm(leaves), 0, "solid again within FadeOutTime")
+		t.eq(w.CanopyFade.Tracked(), 0, "and let go")
+		t.ok(0.4 + 1 / 60 < w.TreeLogic.FellFadeStart, "before TreeFX's own fade starts")
 		w.run(1)
 		t.eq(ltm(leaves), 0, "and it stays out of the way of the fall")
-		-- The same once TreeFX starts animating it (a regrow, say).
+		t.eq(ltm(other), 1, "TreeFX's fade is never undone")
+		-- The same once TreeFX starts animating it (a fall seen before the
+		-- Felled attribute, say).
 		local w2 = world()
 		local tree2 = w2.tree(w2.along(0.5))
+		local leaves2 = partNamed(tree2, "Leaves")
 		w2.CanopyFade.Start()
 		w2.run(0.3)
-		t.ok(faded(partNamed(tree2, "Leaves")))
+		t.ok(faded(leaves2))
 		w2.busy[tree2] = true
 		w2.frame(1 / 60)
-		t.eq(ltm(partNamed(tree2, "Leaves")), 0)
+		t.ok(ltm(leaves2) > 0.6 and ltm(leaves2) < 0.7, "eases, no snap: " .. ltm(leaves2))
+		w2.run(0.45)
+		t.eq(ltm(leaves2), 0)
 		t.eq(w2.CanopyFade.Tracked(), 0)
+	end)
+
+	t.test("TreeFX's fade starting while a felled canopy eases back is never written over", function()
+		local w = world()
+		local tree = w.tree(w.along(0.5))
+		local leaves = partNamed(tree, "Leaves")
+		w.CanopyFade.Start()
+		w.run(0.3)
+		t.ok(faded(leaves))
+		tree:SetAttribute("Felled", true)
+		w.run(0.1)
+		t.ok(ltm(leaves) > 0.3, "easing back")
+		-- A late fall: TreeFX's fade begins mid-ease, its first frame near 0.
+		leaves.LocalTransparencyModifier = 0.0004
+		w.frame(1 / 60)
+		t.ok(math.abs(ltm(leaves) - 0.0004) < 1e-6, "TreeFX's value stays: " .. ltm(leaves))
+		leaves.LocalTransparencyModifier = 0.25
+		w.run(0.5)
+		t.ok(math.abs(ltm(leaves) - 0.25) < 1e-6, "and every value after it: " .. ltm(leaves))
+		t.eq(w.CanopyFade.Tracked(), 0)
+	end)
+
+	t.test("only the line to your HumanoidRootPart is blocked: the second ray still finds it", function()
+		local w = world()
+		-- A small leaf block across the line to your root, under the line
+		-- to your head (camera (0, 20, 20), root (0, 3, 0), head (0, 4.5, 0)).
+		local eye = w.camera.CFrame.Position
+		local root = w.root.CFrame.Position
+		local tree = w.tree(eye + (root - eye) * 0.85)
+		local leaves = partNamed(tree, "Leaves")
+		leaves.Size = Vector3.new(2, 0.8, 0.8)
+		w.CanopyFade.Start()
+		w.frame(1 / 60) -- the first look
+		local head = w.head.CFrame.Position
+		local toHead, toRoot, rootHits = 0, 0, 0
+		for _, ray in ipairs(w.rays) do
+			local stop = ray.origin + ray.direction
+			local part = w.hit(ray.origin, ray.direction, ray.include)
+			if (stop - head).Magnitude < 1e-3 then
+				toHead += 1
+				t.eq(part, nil, "the way to your head is clear")
+			elseif (stop - root).Magnitude < 1e-3 then
+				toRoot += 1
+				if part == leaves then
+					rootHits += 1
+				end
+			end
+		end
+		t.ok(toHead >= 1, "it looked at your head")
+		t.ok(toRoot >= 1, "and at your root")
+		t.eq(rootHits, 1, "the ray to your root hit the leaves")
+		-- Nor is it the camera's own canopy.
+		t.ok((leaves.CFrame.Position - eye).Magnitude > w.CanopyLogic.EyeRadius + 2)
+		w.run(0.2)
+		t.ok(faded(leaves), "so they fade: " .. ltm(leaves))
+		t.eq(ltm(tree.PrimaryPart), 0, "the trunk doesn't")
 	end)
 
 	t.test("a tree that streams out mid-fade is dropped, with nothing left see-through", function()
