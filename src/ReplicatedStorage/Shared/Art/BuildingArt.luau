@@ -229,7 +229,8 @@ local function stones(
 	depth: number,
 	rng: Rng,
 	minW: number,
-	maxW: number
+	maxW: number,
+	colors: { Color3 }?
 )
 	local x = -length / 2
 	while x < length / 2 - 0.25 do
@@ -240,7 +241,7 @@ local function stones(
 			"Stone",
 			V3(math.max(0.3, w - 0.14), h, depth * rng:range(0.9, 1.1)),
 			cf * CF(x + w / 2, h / 2, 0) * ANG(0, rng:range(-0.04, 0.04), rng:range(-0.03, 0.03)),
-			Kit.vary(rng:pick(STONE), rng, 0.05),
+			Kit.vary(rng:pick(colors or STONE), rng, 0.05),
 			MAT.Slate
 		)
 		x += w
@@ -766,8 +767,9 @@ end
 ---------------------------------------------------------------------------
 
 -- The sawmill: about 40 x 30 studs (x -20..21, z -13..15), the mill shed's
--- open front (-Z) on the sell side. Nothing within |x| < 12 reaches past
--- z = -13, so the sell pad can start 13 studs in front of the centre.
+-- open front (-Z) on the sell side. Below 8 studs up, nothing within
+-- |x| < 12 reaches past z = -13, so the sell pad can start 13 studs in
+-- front of the centre (the Sky Bin spot, (-18, -24), is clear too).
 --   * the mill shed (x -11..11): plank deck at y = 1 up a front ramp, the
 --     headrig inside (log carriage on rails, the saw, a steam engine and
 --     boiler), a "TIMBERLINE SAWMILL" crest sign above the roof ridge;
@@ -1846,11 +1848,11 @@ function BuildingArt.Campsite(): Model
 	end
 	Kit.rock(model, CF(-5.6, 0, -1.4), 1.6, rng, STONE)
 	Kit.rock(model, CF(6, 0, -0.8), 1.2, rng, STONE)
-	dBox(model, "SignStake", V3(0.3, 2, 0.3), CF(-5.6, 1.0, -1.6), TIMBER)
+	dBox(model, "SignStake", V3(0.3, 2, 0.3), CF(5.9, 1.0, -2.4), TIMBER)
 	signBoard(
 		model,
 		"CampSign",
-		CF(-5.6, 1.9, -1.8) * ANG(0, 0.6, 0.04),
+		CF(5.9, 1.9, -2.6) * ANG(0, -0.6, -0.04),
 		2.6,
 		0.8,
 		"MURPH'S CAMP",
@@ -2099,6 +2101,46 @@ function BuildingArt.PropNames(): { string }
 	return names
 end
 
+-- The Sky Bin by the sell pad, where logs sent down the Cloud Chute land
+-- (each player sees their own count): a sky-blue banded bin under the end
+-- of a flume that drops out of a puff of cloud behind it (+Z). Optional:
+-- MapBuilder can build this instead of its plain box. Named parts:
+-- "SkyBin" (4 x 4 x 4 centred at y = 2, collides; "SKY BIN" on SurfaceGuis
+-- on its front and back, each with a TextLabel clients may rewrite).
+function BuildingArt.SkyBin(): Model
+	local model = Kit.model("SkyBinArt")
+	local rng = Kit.rng(61)
+	dBox(model, "BinBase", V3(4.8, 0.3, 4.8), CF(0, 0.15, 0), STONE[2], MAT.Slate)
+	local bin = Kit.part(model, "SkyBin", V3(4, 4, 4), CF(0, 2, 0), hex("#5D86B8"), MAT.WoodPlanks)
+	Kit.signText(bin, "SKY BIN", TRIM)
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			dBox(model, "BinStrap", V3(0.35, 4.1, 0.35), CF(sx * 2, 2.05, sz * 2), IRON, MAT.Metal)
+		end
+		dBox(model, "BinRim", V3(4.5, 0.35, 0.4), CF(0, 4.1, sx * 2.05), TRIM)
+		dBox(model, "BinRim", V3(0.4, 0.35, 4.5), CF(sx * 2.05, 4.1, 0), TRIM)
+	end
+	Kit.part(model, "FlumePost", V3(0.6, 8.6, 0.6), CF(0, 4.3, 3.6), TIMBER, MAT.Wood)
+	local a, b = V3(0, 8.4, 3.4), V3(0, 4.9, 0.6)
+	dBeam(model, "Flume", a, b, 1.8, 0.25, PLANK_DARK[1])
+	for _, s in ipairs({ -1, 1 }) do
+		dBeam(model, "Flume", a + V3(s * 0.9, 0.4, 0), b + V3(s * 0.9, 0.4, 0), 0.2, 0.8, PLANK[3])
+	end
+	local water = beam(model, "FlumeWater", a + V3(0, 0.25, 0), b + V3(0, 0.25, 0), 1.3, 0.12, WATER, MAT.Neon)
+	dec(water)
+	water.Transparency = 0.2
+	for _ = 1, 3 do
+		dEllipsoid(
+			model,
+			"Cloud",
+			V3(2.6, 1.6, 2.2) * rng:range(0.8, 1.15),
+			CF(rng:range(-0.9, 0.9), 9 + rng:range(-0.2, 0.4), 3.6 + rng:range(-0.6, 0.6)),
+			Color3.fromRGB(250, 250, 255)
+		)
+	end
+	return model
+end
+
 ---------------------------------------------------------------------------
 -- The Aether Isles
 ---------------------------------------------------------------------------
@@ -2130,7 +2172,7 @@ function BuildingArt.CloudChute(): Model
 	local function trough(a: Vector3, b: Vector3)
 		dBeam(model, "Flume", a, b, 2.1, 0.3, PLANK_DARK[1])
 		for _, s in ipairs({ -1, 1 }) do
-			dBeam(model, "Flume", a + V3(s * 1.0, 0.6, 0), b + V3(s * 1.0, 0.6, 0), 0.22, 1.2, PLANK[3])
+			dBeam(model, "Flume", a + V3(s * 1.0, 0.6, 0), b + V3(s * 1.0, 0.6, 0), 0.24, 1.2, TIMBER_LIGHT)
 		end
 		local w = beam(model, "FlumeWater", a + V3(0, 0.3, 0), b + V3(0, 0.3, 0), 1.6, 0.14, WATER, MAT.Neon)
 		dec(w)
@@ -2207,15 +2249,16 @@ function BuildingArt.StarfallForge(): Model
 
 	-- The hearth behind (+Z): a stone table with a bed of star-white coals,
 	-- a back wall, a sloping iron hood and a chimney.
-	Kit.part(model, "ForgeHearth", V3(5.6, 2.8, 3.6), CF(0, 1.4, 4.4), STONE[3], MAT.Slate)
-	stones(model, CF(0, 0, 2.6), 5.9, 1.4, 0.6, rng, 1.2, 2)
-	stones(model, CF(0, 1.4, 2.6), 5.9, 1.4, 0.6, rng, 1.2, 2)
-	dBox(model, "HearthRim", V3(6, 0.4, 3.9), CF(0, 2.95, 4.4), STONE[1], MAT.Slate)
-	Kit.part(model, "ForgeWall", V3(5.6, 4.4, 1), CF(0, 5.3, 5.7), STONE[2], MAT.Slate)
+	local dark = { hex("#6F6A65"), hex("#7C766F"), hex("#625E5A"), hex("#857E75") }
+	Kit.part(model, "ForgeHearth", V3(5.6, 2.8, 3.6), CF(0, 1.4, 4.4), MORTAR, MAT.Slate)
+	stones(model, CF(0, 0, 2.6), 5.9, 1.4, 0.6, rng, 1.2, 2, dark)
+	stones(model, CF(0, 1.4, 2.6), 5.9, 1.4, 0.6, rng, 1.2, 2, dark)
+	dBox(model, "HearthRim", V3(6, 0.4, 3.9), CF(0, 2.95, 4.4), dark[4], MAT.Slate)
+	Kit.part(model, "ForgeWall", V3(5.6, 4.4, 1), CF(0, 5.3, 5.7), dark[2], MAT.Slate)
 	dWedge(model, "Hood", V3(5, 2, 2.3), CF(0, 5.8, 4.15), hex("#B8733F"), MAT.Metal)
 	dBox(model, "HoodBand", V3(5.6, 0.35, 0.35), CF(0, 4.85, 2.55), BRASS, MAT.Metal)
-	Kit.part(model, "ForgeChimney", V3(1.7, 5, 1.7), CF(0, 9.3, 5.4), STONE[3], MAT.Slate)
-	dBox(model, "ChimneyCap", V3(2.5, 0.4, 2.5), CF(0, 11.95, 5.4), STONE[2], MAT.Slate)
+	Kit.part(model, "ForgeChimney", V3(1.7, 5, 1.7), CF(0, 9.3, 5.4), BRICK, MAT.Brick)
+	dBox(model, "ChimneyCap", V3(2.3, 0.4, 2.3), CF(0, 11.95, 5.4), BRICK_DARK, MAT.Brick)
 	local coals = dBox(model, "ForgeCoals", V3(3.4, 0.3, 2.2), CF(0, 3.2, 4.2), STAR, MAT.Neon)
 	local fire = Instance.new("Fire")
 	fire.Color = Color3.fromRGB(150, 200, 255)
@@ -2240,7 +2283,7 @@ function BuildingArt.StarfallForge(): Model
 			V3(0.5, rng:range(1, 1.6), 0.5),
 			CF(3.4 + math.cos(a) * 0.4, 2.9, -1.6 + math.sin(a) * 0.4)
 				* ANG(rng:range(-0.4, 0.4), a, rng:range(-0.4, 0.4)),
-			hex("#9FD4FF"),
+			hex("#7FB6FF"),
 			MAT.Neon
 		)
 	end

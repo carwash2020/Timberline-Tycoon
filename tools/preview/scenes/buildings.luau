@@ -66,6 +66,7 @@ return {
 		place(BuildingArt.LampPost(), 114, 60, "LampPost", -4, { -6, 7, -9, 6 })
 		place(BuildingArt.Fence(18), 132, 60, "Fence", -4, { -6, 5, -12, 2 })
 		place(BuildingArt.Campfire(), 155, 60, "Campfire", -4, { -3, 4, -5, 1 })
+		place(BuildingArt.SkyBin(), 170, 60, "SkyBin", -5, { -7, 7, -10, 4 })
 
 		-- Row 3: the sell pad, every prop, a bridge between two rocks.
 		place(BuildingArt.SellPad(24, 18), 0, 110, "SellPad", -12, { 0, 16, -20, 0 })

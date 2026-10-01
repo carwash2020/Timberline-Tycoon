@@ -244,6 +244,21 @@ return function(t)
 		t.ok(find(BuildingArt.Prop("Lantern", 1), "LanternGlow"), "the Lantern prop glows")
 	end)
 
+	t.test("the Sky Bin: a 4 x 4 x 4 SkyBin at y = 2 with its text on SurfaceGuis", function()
+		local art = BuildingArt.SkyBin()
+		local bin = art:FindFirstChild("SkyBin")
+		t.ok(bin and bin.CanCollide, "SkyBin collides")
+		t.ok(near(bin.Size, V3.new(4, 4, 4)), "SkyBin is 4 x 4 x 4")
+		t.ok(math.abs(bin.CFrame.Position.Y - 2) < 1e-4, "centred at y = 2")
+		local labels = 0
+		for _, gui in ipairs(bin:GetChildren()) do
+			if gui:IsA("SurfaceGui") and gui:FindFirstChildWhichIsA("TextLabel", true) then
+				labels += 1
+			end
+		end
+		t.eq(labels, 2)
+	end)
+
 	t.test("the isle pieces keep CloudChute and StarfallForge", function()
 		local chute = find(BuildingArt.CloudChute(), "CloudChute")
 		t.ok(chute and chute.CanCollide, "CloudChute collides")
