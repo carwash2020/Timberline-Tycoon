@@ -27,6 +27,7 @@ local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
+local PickupGrace = require(script.Parent.PickupGrace)
 local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -248,19 +249,12 @@ local function serverPickupLog(player: Player, logUid: unknown)
 	if (hrp.Position - pp.Position).Magnitude > GameConfig.PickupPromptRange + GameConfig.RangeTolerance then
 		return
 	end
-	-- Grace period: only the feller can grab these for the first few seconds
-	-- (a load left behind by a truck stays its owner's for longer).
-	if log.ownerId ~= player.UserId then
-		local graceEnds = log.graceUntil or (log.fellTime + GameConfig.PickupGraceSec)
-		if os.time() < graceEnds then
-			notify(
-				player,
-				if log.graceUntil
-					then "Someone left this load here. It's theirs for a while yet."
-					else "Someone else felled this tree. Their logs are up for grabs in a few seconds."
-			)
-			return
-		end
+	-- Grace period: only the feller can grab these for PickupGraceSec (a
+	-- load left behind by a truck stays its owner's for longer).
+	local graceLeft = PickupGrace.WaitFor(log, player.UserId, os.time())
+	if graceLeft > 0 then
+		notify(player, PickupGrace.Message(log, graceLeft))
+		return
 	end
 	local already = countHands(hands)
 	if already >= GameConfig.HandCapacity then
