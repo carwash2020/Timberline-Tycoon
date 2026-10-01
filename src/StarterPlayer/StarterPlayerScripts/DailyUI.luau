@@ -34,6 +34,7 @@ local AMBER = UITheme.Colors.Amber
 type GoalRow = { frame: Frame, text: TextLabel, reward: TextLabel, fill: Frame }
 
 local button: TextButton? = nil
+local buttonSlot: Frame? = nil -- on a phone, what holds the button and its hit area in the corner
 local panel: Frame? = nil
 local goalRows: { GoalRow } = {}
 local footer: TextLabel? = nil
@@ -94,6 +95,10 @@ local function refresh()
 	local b = button
 	if b then
 		b.Visible = HudRules.DailyButton(player:GetAttribute("TutorialStep"), #list)
+		local slot = buttonSlot
+		if slot then
+			slot.Visible = b.Visible
+		end
 		local p = panel
 		if p and not b.Visible then
 			p.Visible = false
@@ -139,7 +144,8 @@ local function build()
 	local gui = UITheme.Screen("DailyUI", 3)
 
 	-- A corner pill: on a phone 36 tall, with a fingertip-tall hit area
-	-- round it (UITheme.HitPad).
+	-- round it (UITheme.HitPad). It grows with its text, so there the pad
+	-- goes beside it, in a slot that holds both in the corner's line.
 	local spec = UITheme.Sized("DailyButton")
 	local size = spec.size or Vector2.new(200, 30)
 	local b = Instance.new("TextButton")
@@ -159,7 +165,21 @@ local function build()
 	pad.PaddingLeft = UDim.new(0, 10)
 	pad.PaddingRight = UDim.new(0, 10)
 	pad.Parent = b
-	b.Parent = HUD.UnderCash() or gui
+	local line = HUD.UnderCash() or gui
+	if spec.hit then
+		local slot = Instance.new("Frame")
+		slot.Name = "DailySlot"
+		slot.LayoutOrder = b.LayoutOrder
+		slot.Size = UDim2.fromOffset(0, size.Y)
+		slot.AutomaticSize = Enum.AutomaticSize.X -- as wide as the button
+		slot.BackgroundTransparency = 1
+		slot.Visible = false
+		slot.Parent = line
+		b.Parent = slot
+		buttonSlot = slot
+	else
+		b.Parent = line
+	end
 	button = b
 
 	local p = Instance.new("Frame")
@@ -233,8 +253,9 @@ local function build()
 		refresh()
 	end
 	b.Activated:Connect(toggle)
-	if spec.hit then
-		UITheme.HitPad(b, spec.hit).Activated:Connect(toggle)
+	local slot = buttonSlot
+	if spec.hit and slot then
+		UITheme.HitPad(b, spec.hit, slot).Activated:Connect(toggle)
 	end
 
 	gui.Parent = player:WaitForChild("PlayerGui")

@@ -697,32 +697,41 @@ end
 
 -- A transparent button round `visual` (a corner pill, the tutorial's
 -- Skip), `height` tall and as wide as it, so a small face still takes a
--- whole fingertip on a phone. It's drawn under `visual`'s own children:
---   * put in a plain button (the Daily Goals pill), it takes every tap on
---     it, so connect its Activated to what the button does;
+-- whole fingertip on a phone. It's drawn under its siblings:
+--   * put in a plain button (the sound button), it takes every tap on it,
+--     so connect its Activated to what the button does;
 --   * put in a Button's root, or a frame round a button (the pouch's
 --     slot), the face still takes the taps on itself (and looks pressed),
 --     and the pad the ones just around it: connect both.
--- It follows `visual`'s size. `visual` mustn't have a UIListLayout (the
--- pad would join the list), and its padding must be the same either side.
-function UITheme.HitPad(visual: GuiObject, height: number): TextButton
+-- It follows `visual`'s size, so it mustn't go in a `visual` that sizes
+-- itself to what's in it (AutomaticSize: the pad would push it wider, and
+-- wider). Give such a pill a `holder`: a frame it sits in at the left,
+-- the same height; the pad goes in that, beside it (the Daily Goals pill).
+-- Wherever the pad goes mustn't have a UIListLayout (the pad would join
+-- the list), and its padding must be the same either side.
+function UITheme.HitPad(visual: GuiObject, height: number, holder: GuiObject?): TextButton
 	local pad = Instance.new("TextButton")
 	pad.Name = "HitPad"
-	pad.AnchorPoint = Vector2.new(0.5, 0.5)
-	pad.Position = UDim2.fromScale(0.5, 0.5)
+	if holder then
+		pad.AnchorPoint = Vector2.new(0, 0.5) -- over `visual`, at the holder's left
+		pad.Position = UDim2.fromScale(0, 0.5)
+	else
+		pad.AnchorPoint = Vector2.new(0.5, 0.5)
+		pad.Position = UDim2.fromScale(0.5, 0.5)
+	end
 	pad.BackgroundTransparency = 1
 	pad.BorderSizePixel = 0
 	pad.Text = ""
 	pad.AutoButtonColor = false
 	pad.Selectable = false -- the gamepad selects the button itself
-	pad.ZIndex = 0 -- under its siblings (a Button's face)
+	pad.ZIndex = 0 -- under its siblings (a Button's face, the pill)
 	local function fit()
 		local size = visual.AbsoluteSize / currentScale
 		pad.Size = UDim2.fromOffset(size.X, math.max(height, size.Y))
 	end
 	visual:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
 	fit()
-	pad.Parent = visual
+	pad.Parent = holder or visual
 	return pad
 end
 
