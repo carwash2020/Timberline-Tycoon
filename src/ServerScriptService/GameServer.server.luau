@@ -26,6 +26,7 @@ local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
+local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
@@ -55,6 +56,13 @@ local function safely(name: string, fn: (...any) -> ...any, ...: any)
 		warn(string.format("[GameServer] %s failed:\n%s", name, tostring(err)))
 	end
 end
+
+-- Does the live place match default.project.json (and, in Studio, can it
+-- save)? A warning names each fix; "[PlaceCheck] OK" when all match. Its
+-- own thread: in Studio it waits a moment for ProfileStore's access probe.
+task.spawn(function()
+	safely("PlaceCheck.Run", PlaceCheck.Run)
+end)
 
 -- Wait for the code-built world. MapBuilder writes the terrain first (a few
 -- seconds to a minute) and adds the SellArea last, once everything exists.
