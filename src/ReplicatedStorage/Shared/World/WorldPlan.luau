@@ -445,15 +445,19 @@ function WorldPlan.Town(): Town
 			table.insert(distances, string.format("%s  %d", def.displayName, def.haulStuds or 0))
 		end
 	end
-	-- SELL LOGS HERE (TWN-04) stands upright just off the plaza's north-west
-	-- corner, facing the street: its posts clear of the plaza, the street
-	-- and the Tool Shed's path (WorldPlan.spec), out of the trucks' way onto
-	-- the pad. (Not the east side: the lamp at (30, 86) would stand in front
-	-- of its board, and the posts would be in the lane north, TWN-05.)
+	-- SELL LOGS HERE (TWN-04) stands upright at the pad's east edge, facing
+	-- the street, beside Millie (who stands at (14.6, 92.5), just off the
+	-- pad's edge): its west post 2.4 studs east of the pad, out of the
+	-- trucks' lane in from the street, 5 studs north of the street, 2.5
+	-- studs or more from Millie and south of her, so from the spawn she
+	-- shows just left of its board; its east post inside the plaza (x < 26),
+	-- out of the lane north (TWN-05) and clear of the lamp at (30, 86).
+	-- Like the corner lamps, it may stand on the plaza, never on the
+	-- street, the pad or a path (WorldPlan.spec).
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
-		{ text = "SELL LOGS HERE", cframe = at(-32.5, 87) * FACING_SOUTH },
+		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH },
 	}
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the

@@ -225,7 +225,8 @@ return function(t)
 		-- 18) with its 0.8-stud border, as MapBuilder builds it). What may
 		-- stand on which, by design: a shop meets the end of its own path
 		-- (porch, ramp, front wall), the gondola path runs into the station,
-		-- and the Sky Bin and the lamps by the sell pad (the corner lamps) may
+		-- and the Sky Bin, the lamps by the sell pad (the corner lamps) and
+		-- the SELL LOGS HERE signpost at the pad's east edge (TWN-04) may
 		-- stand on the plaza, but never on the street through it or the pad.
 		local CHECKED = {
 			Plaza = true,
@@ -242,6 +243,8 @@ return function(t)
 			elseif thing.kind == "station" then
 				return area.name == "GondolaPath"
 			elseif thing.kind == "skyBin" or thing.kind == "lamp" then
+				return area.name == "Plaza"
+			elseif thing.kind == "sign" and thing.label == "SELL LOGS HERE sign" then
 				return area.name == "Plaza"
 			end
 			return false
@@ -597,10 +600,80 @@ return function(t)
 		t.ok(math.abs(cf.Y - TerrainGen.HeightAt(cf.X, cf.Z)) < 1e-6, "on the ground")
 		-- Its front (-Z, where the board's text reads) faces the street, south.
 		t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "facing the street")
-		t.ok(cf.Z > 84 and cf.Z < 97, "on the street's north side, beside the plaza")
+		-- At the pad's east edge (the row's "about (17, 92)"), not by any other
+		-- building: every problem with a spot, or none.
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local plaza, street
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			if paint.name == "Plaza" then
+				plaza = paint
+			elseif paint.name == "MainStreet" then
+				street = paint
+			end
+		end
 		local pad = town.sellPad.Position
-		local fromPad = Vector3.new(cf.X - pad.X, 0, cf.Z - pad.Z).Magnitude
-		t.ok(fromPad < 40, string.format("by the pad: %.1f studs from its middle", fromPad))
+		local padEast, padNorth = pad.X + 12.8, pad.Z + 9.8 -- the pad's edges, its border included
+		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
+			if model == "SellArea" and part == "SellZone" then
+				return town.sellZone, Vector3.new(24, 12, 18)
+			end
+			return nil, nil
+		end).Position
+		local function byThePad(spot)
+			local problems = {}
+			local post = placed(BuildingArt.Signpost("SELL LOGS HERE"), spot)
+			local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+			for _, p in ipairs(parts(post)) do
+				local lo, hi = boxOf(p)
+				if p.CanCollide then
+					x0, x1 = math.min(x0, lo.X), math.max(x1, hi.X)
+					z0, z1 = math.min(z0, lo.Z), math.max(z1, hi.Z)
+					-- Millie stands beside the pad: the posts keep 2.5 studs from her.
+					local dx = math.max(lo.X - millie.X, 0, millie.X - hi.X)
+					local dz = math.max(lo.Z - millie.Z, 0, millie.Z - hi.Z)
+					if math.sqrt(dx * dx + dz * dz) < 2.5 then
+						table.insert(problems, "a post within 2.5 studs of Millie")
+					end
+				end
+				-- Not over her head: she isn't under any of it.
+				if millie.X > lo.X - 1 and millie.X < hi.X + 1 and millie.Z > lo.Z - 1 and millie.Z < hi.Z + 1 then
+					table.insert(problems, "its " .. p.Name .. " over Millie")
+				end
+			end
+			-- East of the pad, out of the trucks' lane in (1.5 studs off its
+			-- edge), its near post within 4 studs of the edge.
+			if x0 < padEast + 1.5 or x0 > padEast + 4 then
+				table.insert(problems, string.format("near post %.1f studs off the pad's east edge", x0 - padEast))
+			end
+			-- Alongside the pad, north of the street (4 studs clear), and inside
+			-- the plaza's east edge (the lane north, TWN-05, starts there).
+			if z0 < street.z1 + 4 or z1 > padNorth then
+				table.insert(problems, string.format("posts at z %.1f to %.1f, not alongside the pad", z0, z1))
+			end
+			if x1 > plaza.x1 then
+				table.insert(problems, string.format("east post at x %.1f, past the plaza", x1))
+			end
+			return problems
+		end
+		local problems = byThePad(cf)
+		t.ok(#problems == 0, "by the pad: " .. table.concat(problems, "; "))
+		-- The check itself: the spot by the Tool Shed's door, one with its west
+		-- post on the pad, one on Millie, one in the lane north and one by
+		-- the street are each caught, for the right reason.
+		local bads = {
+			{ -32.5, 87, "near post" },
+			{ 17, 92, "near post" },
+			{ 20.5, 92, "Millie" },
+			{ 28, 90, "past the plaza" },
+			{ 20.5, 87, "alongside" },
+		}
+		for _, bad in ipairs(bads) do
+			local caught = false
+			for _, why in ipairs(byThePad(CFrame.new(bad[1], 0, bad[2]))) do
+				caught = caught or string.find(why, bad[3], 1, true) ~= nil
+			end
+			t.ok(caught, string.format("a SELL LOGS HERE at (%g, %g) is caught (%s)", bad[1], bad[2], bad[3]))
+		end
 		-- The spawn sees its front: read from the spawn walk, not edge-on.
 		local toSpawn = Vector3.new(town.spawn.X - cf.X, 0, town.spawn.Z - cf.Z).Unit
 		t.ok(cf.LookVector:Dot(toSpawn) > 0.5, "its board faces the spawn walk")
