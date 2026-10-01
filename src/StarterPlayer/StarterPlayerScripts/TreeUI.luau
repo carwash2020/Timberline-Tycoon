@@ -2,19 +2,76 @@
 -- TreeUI: floating HP bars over trees and crystal nodes.
 -- One BillboardGui per tree, listening to the server's HP attribute.
 -- Bars show only while a tree is damaged: hidden at full HP and once felled.
+-- The bar is a UITheme pill (Paper track, Ink stroke, a Green fill that
+-- turns Amber at half HP and Danger at a quarter), a fixed size on screen,
+-- unlit, and drawn on top: it floats inside the trunk you're chopping
+-- (TreeArt.BarHeight puts it just over your head), which would hide it.
 
 local CollectionService = game:GetService("CollectionService")
 
+local UITheme = require(script.Parent.UITheme)
+
+local C = UITheme.Colors
+
 local TreeUI = {}
 
-local BAR_MAX_DISTANCE = 80 -- studs; farther bars aren't drawn
+TreeUI.MaxDistance = 60 -- studs; farther bars aren't drawn
+TreeUI.Width = 110 -- the pill, in pixels
+TreeUI.Height = 12
+TreeUI.Stroke = 2
 
 type Bar = { gui: BillboardGui, fill: Frame, conn: RBXScriptConnection }
 
 local bars: { [Model]: Bar } = {}
 
 local function barOffset(model: Model): Vector3
-	return Vector3.new(0, (model:GetAttribute("BarOffset") :: number?) or 8, 0)
+	local offset = model:GetAttribute("BarOffset")
+	return Vector3.new(0, if type(offset) == "number" then offset else 8, 0)
+end
+
+-- The fill's colour at this fraction of HP left.
+function TreeUI.FillColor(frac: number): Color3
+	if frac <= 0.25 then
+		return C.Danger
+	elseif frac <= 0.5 then
+		return C.Amber
+	end
+	return C.Green
+end
+
+-- A hidden bar `offset` studs (world space) from its adornee's centre:
+-- the BillboardGui and its fill.
+function TreeUI.MakeBar(offset: Vector3): (BillboardGui, Frame)
+	local w, h, stroke = TreeUI.Width, TreeUI.Height, TreeUI.Stroke
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "TreeHP"
+	-- Room for the stroke, which is drawn outside the track.
+	billboard.Size = UDim2.fromOffset(w + stroke * 2, h + stroke * 2)
+	billboard.StudsOffsetWorldSpace = offset -- world up, whatever the trunk's rotation
+	billboard.MaxDistance = TreeUI.MaxDistance
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0 -- the same colours by night as by day
+	billboard.Enabled = false
+
+	local track = Instance.new("Frame")
+	track.Name = "HPBg"
+	track.AnchorPoint = Vector2.new(0.5, 0.5)
+	track.Position = UDim2.fromScale(0.5, 0.5)
+	track.Size = UDim2.fromOffset(w, h)
+	track.BackgroundColor3 = C.Paper
+	track.BorderSizePixel = 0
+	UITheme.corner(track, h / 2)
+	UITheme.stroke(track, C.Ink, stroke)
+	track.Parent = billboard
+
+	local fill = Instance.new("Frame")
+	fill.Name = "HPFill"
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = C.Green
+	fill.BorderSizePixel = 0
+	UITheme.corner(fill, h / 2)
+	fill.Parent = track
+	return billboard, fill
 end
 
 local function refresh(model: Model)
@@ -22,22 +79,16 @@ local function refresh(model: Model)
 	if not bar then
 		return
 	end
-	local hp = model:GetAttribute("HP") :: number?
-	local maxHp = model:GetAttribute("MaxHP") :: number?
-	if hp == nil or maxHp == nil or maxHp <= 0 then
+	local hp = model:GetAttribute("HP")
+	local maxHp = model:GetAttribute("MaxHP")
+	if type(hp) ~= "number" or type(maxHp) ~= "number" or maxHp <= 0 then
 		bar.gui.Enabled = false
 		return
 	end
 	local frac = math.clamp(hp / maxHp, 0, 1)
 	bar.gui.Enabled = frac > 0 and frac < 1
 	bar.fill.Size = UDim2.fromScale(frac, 1)
-	if frac > 0.5 then
-		bar.fill.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
-	elseif frac > 0.25 then
-		bar.fill.BackgroundColor3 = Color3.fromRGB(220, 170, 60)
-	else
-		bar.fill.BackgroundColor3 = Color3.fromRGB(200, 70, 50)
-	end
+	bar.fill.BackgroundColor3 = TreeUI.FillColor(frac)
 end
 
 local function attach(model: Model)
@@ -49,29 +100,8 @@ local function attach(model: Model)
 		return
 	end
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "TreeHP"
-	billboard.Size = UDim2.fromScale(4, 0.5)
-	billboard.StudsOffsetWorldSpace = barOffset(model) -- world up, whatever the trunk's rotation
-	billboard.MaxDistance = BAR_MAX_DISTANCE
-	billboard.AlwaysOnTop = true
-	billboard.Enabled = false
+	local billboard, fill = TreeUI.MakeBar(barOffset(model))
 	billboard.Adornee = adornee
-
-	local bg = Instance.new("Frame")
-	bg.Name = "HPBg"
-	bg.Size = UDim2.fromScale(1, 1)
-	bg.BackgroundColor3 = Color3.fromRGB(40, 25, 15)
-	bg.BorderSizePixel = 0
-	bg.Parent = billboard
-
-	local fill = Instance.new("Frame")
-	fill.Name = "HPFill"
-	fill.Size = UDim2.fromScale(1, 1)
-	fill.BackgroundColor3 = Color3.fromRGB(115, 185, 80)
-	fill.BorderSizePixel = 0
-	fill.Parent = bg
-
 	billboard.Parent = model
 	bars[model] = {
 		gui = billboard,
