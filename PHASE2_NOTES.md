@@ -97,6 +97,31 @@ Anything red becomes a P0 and jumps the queue.
   wheels, tallest cab, tall chrome stacks). The Rig still parks in its
   slot, loads from the tailgate, and turns as in Build #3.
 
+- **WLD-18** MicroProfiler or View > Script Profiler (Client), phone
+  emulation, 10 s in the Starter Forest at midday: LightingController
+  well under 0.1 ms a frame. Watch a dusk (HUD clock about Day 16:50, 2
+  real minutes): long shadows lengthen smoothly, sky colours glide, lamps
+  come on one by one. Walk into the Phantom Grove and back: a smooth
+  ~3 s fade. Storm (`workspace:SetAttribute("WeatherOverride", "Storm")`):
+  each bolt flashes and the scene returns to its stormy brightness.
+- **UI-19** iPhone SE, every shop, the Store, the Blueprint Store and the
+  Field Guide: each subtitle reads in full; row names end before the Buy
+  button (check "Featherfall Cloak · owned" and "The Hidden Grain").
+  Skip tutorial shows from step 2, not step 1.
+- **UI-12** HUD headings in the same rounded face as the signs; the
+  beacon is an amber triangle with an even dark rim at 10, 40 and 100
+  studs; the sound button is a drawn speaker and still opens Settings
+  once per tap.
+
+**Not done tonight** (backlog ids for tomorrow, none started on main):
+WLD-05 waterfall motion (a partial patch exists only in this session's
+container), WLD-08 isle tops, TWN-06 lot lines and lights, TWN-07 night
+signs, TWN-05 road links, UI-15 gamepad shortcuts, ACT-09 round hubs,
+ACT-08 Starfall axe, WLD-01 open country, NAT-14 stands, WLD-10 snow
+contrast, WLD-12/13/14/15, NAT-08/10/11/16/18, ACT-06/10/11/12/14,
+UI-11/17, PLAY-06 sounds (needs your ids), PLAY-12, PLAY-16, TWN-09/10/
+11/12.
+
 ### Build #3 (phones, frame rate, driving, the gondola, trees)
 
 - **WLD-07 gondola (check this first)** Ride up from town and back down,
