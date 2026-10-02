@@ -3237,8 +3237,11 @@ local SCENERY_TALL: { [string]: number } = {
 }
 
 -- A player's eye on the spawn pad (MapBuilder's is a stud tall).
+local cachedSpawnEye: Vector3? = nil
 function WorldPlan.SpawnEye(): Vector3
-	return WorldPlan.Town().spawn + Vector3.new(0, 0.5 + 5.5, 0)
+	local eye = cachedSpawnEye or WorldPlan.Town().spawn + Vector3.new(0, 0.5 + 5.5, 0)
+	cachedSpawnEye = eye
+	return eye
 end
 
 -- Whether the line from a player's eye on the spawn pad to `lamp` clears
@@ -3246,21 +3249,15 @@ end
 -- near it: the
 -- town's signs, lamps, props, greenery, fences and buildings, the trees,
 -- the scenery and the boulder clusters (each a disc this wide and tall).
-local function inSightOfSpawn(lamp: Vector3, overLand: boolean): boolean
+type Blocker = { at: Vector3, r: number, tall: number }
+local cachedTownBlockers: { Blocker }? = nil
+-- What stands in town that could hide something from the spawn (worked out once).
+local function townBlockers(): { Blocker }
+	if cachedTownBlockers then
+		return cachedTownBlockers
+	end
 	local town = WorldPlan.Town()
-	local eye = WorldPlan.SpawnEye()
-	local a, b = Vector2.new(eye.X, eye.Z), Vector2.new(lamp.X, lamp.Z)
-	local function hides(at: Vector3, r: number, tall: number): boolean
-		local d, s = WorldLayout.SegmentDistance(Vector2.new(at.X, at.Z), a, b)
-		return d < r and eye.Y + (lamp.Y - eye.Y) * s < at.Y + tall
-	end
-	for k = 1, if overLand then 199 else 0 do
-		local q = eye:Lerp(lamp, k / 200)
-		if q.Y - TerrainGen.HeightAt(q.X, q.Z) < 2 then
-			return false
-		end
-	end
-	local discs: { { at: Vector3, r: number, tall: number } } = {
+	local discs: { Blocker } = {
 		{ at = town.sawmill.Position, r = 45, tall = 45 },
 		{ at = town.gondola.Position, r = 16, tall = 25 },
 		{ at = town.campsite.Position, r = 12, tall = 9 },
@@ -3287,7 +3284,24 @@ local function inSightOfSpawn(lamp: Vector3, overLand: boolean): boolean
 			{ at = g.cframe.Position, r = if tree then 10 else g.size / 2 + 2, tall = if tree then 30 else 5 }
 		)
 	end
-	for _, d in ipairs(discs) do
+	cachedTownBlockers = discs
+	return discs
+end
+
+local function inSightOfSpawn(lamp: Vector3, overLand: boolean): boolean
+	local eye = WorldPlan.SpawnEye()
+	local a, b = Vector2.new(eye.X, eye.Z), Vector2.new(lamp.X, lamp.Z)
+	local function hides(at: Vector3, r: number, tall: number): boolean
+		local d, s = WorldLayout.SegmentDistance(Vector2.new(at.X, at.Z), a, b)
+		return d < r and eye.Y + (lamp.Y - eye.Y) * s < at.Y + tall
+	end
+	for k = 1, if overLand then 199 else 0 do
+		local q = eye:Lerp(lamp, k / 200)
+		if q.Y - TerrainGen.HeightAt(q.X, q.Z) < 2 then
+			return false
+		end
+	end
+	for _, d in ipairs(townBlockers()) do
 		if hides(d.at, d.r, d.tall) then
 			return false
 		end
