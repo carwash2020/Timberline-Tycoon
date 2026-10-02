@@ -249,9 +249,13 @@ function VehicleLogic.NextFreeIndex(used: { [number]: boolean }): number
 end
 
 -- Ground position (x, 0, z) of overflow spot `index`: rows of eight west
--- of spawn, for when every ParkingSlot is taken.
+-- of spawn, for when every ParkingSlot is taken. Side by side they're as
+-- far apart as the parking slots (OverflowApart), so the bigger trucks
+-- (M1.5) never overlap their neighbours; a long rig can reach the next
+-- row, and VehicleService skips any spot a truck is in.
+VehicleLogic.OverflowApart = 11
 function VehicleLogic.OverflowSpot(index: number): Vector3
-	return Vector3.new(-20 - (index % 8) * 8, 0, 56 - (index // 8) * 28)
+	return Vector3.new(-20 - (index % 8) * VehicleLogic.OverflowApart, 0, 56 - (index // 8) * 28)
 end
 
 ---------------------------------------------------------------------------
@@ -317,8 +321,9 @@ end
 -- trucks) or on a rejoin only from town: inside the town's area (a flat
 -- rectangle, InTown) or within HomeRadius of the player's own parking
 -- spot. From further out it's left on the ground where the truck stood,
--- so nobody skips the haul home.
-VehicleLogic.HomeRadius = 30
+-- so nobody skips the haul home. 40 studs (30 before the trucks and their
+-- 60-stud slots grew, M1.5): a big rig anywhere round its own spot counts.
+VehicleLogic.HomeRadius = 40
 VehicleLogic.MaxCoord = 100000 -- a saved spot further out than this is junk
 VehicleLogic.SpillPerRow = 3 -- logs left behind lie this many end to end across the truck's line
 

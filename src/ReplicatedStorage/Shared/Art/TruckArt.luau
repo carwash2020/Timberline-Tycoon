@@ -43,6 +43,11 @@
 --   * Build leaves every part anchored (previews, tests); Rig makes it one
 --     rigid body: the chassis anchored, the rest unanchored, massless and
 --     welded (WeldConstraint) or motored to it.
+--
+-- Sizes (M1.5, V2_PLAN §4c): each body is drawn round its layout (width,
+-- cab, bed, wheels, the walls' height), and each cab round a seated driver
+-- who stays avatar-sized: the seat (SEAT_TOP) and the roof (HEADROOM over
+-- it) are set per truck, so a hat clears every roof (TruckArt.spec).
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
@@ -379,10 +384,12 @@ end
 -- 196.2, so a truck lifting itself up a ramp from a standstill needs
 -- tan(slope) < 120 / 196.2 = 0.61 (31 degrees), and the truck's own lean
 -- onto the step (VehicleController's ground rays) adds a few degrees.
--- 1 over 2 studs is 26.6 degrees. Steeper ramps (or balls at the wheels,
--- whose contact with a 0.5 step is nearly a wall) climb only at speed.
-local SKID_HEIGHT = 1
-TruckArt.SkidRampRun = 2 -- studs along the truck that each ramp rises over
+-- 1.3 over 2.6 studs is 26.6 degrees (it was 1 over 2 before the chassis
+-- rose with the bigger wheels, M1.5). Steeper ramps (or balls at the
+-- wheels, whose contact with a 0.5 step is nearly a wall) climb only at
+-- speed.
+local SKID_HEIGHT = TruckLayout.ChassisY - 0.5 -- up to the chassis's underside (it's 1 tall)
+TruckArt.SkidRampRun = 2.6 -- studs along the truck that each ramp rises over
 local SKID_MIN_FLAT = 1 -- a short skid keeps at least this much flat bottom
 
 local function slippery(p: BasePart)
@@ -433,6 +440,13 @@ type Ctx = {
 
 local builders: { [string]: (Ctx) -> () } = {}
 
+-- Each style's driver seat (its top, over the ground) and, under a roof, the
+-- roof's underside over that. A seated avatar's head tops out about 3.25
+-- over the seat and a hat adds more, so the roofs stand 4.6 or more over
+-- it, the bigger the truck the more (V2_PLAN §4c, TruckArt.spec).
+local SEAT_TOP = { farm = 2.85, pickup = 2.6, atv = 3.5, flatbed = 2.8, rig = 3.7 }
+local HEADROOM = { pickup = 4.65, flatbed = 4.9, rig = 5.05 }
+
 -- The Rustbucket: held together by hope.
 builders.farm = function(c: Ctx)
 	local m, lay, paint, rng = c.model, c.lay, c.paint, c.rng
@@ -440,39 +454,42 @@ builders.farm = function(c: Ctx)
 	local r, tw, wx = lay.wheelRadius, lay.tyreWidth, lay.wheelX
 	local zF, zR = lay.wheelZ[1], lay.wheelZ[2]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
+	local floorTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local wall = (W - lay.bedWidth) / 2
+	local seatTop, seatZ = SEAT_TOP.farm, f + 5.8
 	local primer = hex("#7F8E6E") -- the replacement door, never painted
 	local cream = hex("#D8C6A0")
 	local oldMetal = hex("#6E5D50")
 	local wood = hex("#7C5A3A")
 	local hoodW = W * 0.5
 
-	deco(m, "Frame", V3(W - 1.2, 0.8, lay.length - 0.8), CF(0, 1.4, 0), FRAME, M.Metal)
+	deco(m, "Frame", V3(W - 1.6, 0.9, lay.length - 1.0), CF(0, 1.95, 0), FRAME, M.Metal)
 
 	-- Front: a narrow hood between big separate fenders, a cream grille
 	-- shell and a bumper that has met a few stumps.
 	deco(
 		m,
 		"Bumper",
-		V3(W + 0.5, 0.42, 0.45),
-		CF(0, 1.25, f + 0.2) * CFrame.Angles(0, 0.04, 0.05),
+		V3(W + 0.6, 0.55, 0.55),
+		CF(0, 1.65, f + 0.25) * CFrame.Angles(0, 0.04, 0.05),
 		oldMetal,
 		M.CorrodedMetal
 	)
-	deco(m, "Hood", V3(hoodW, 1.2, 2.5), CF(0, 2.4, f + 1.8), paint, M.Metal)
-	deco(m, "HoodCrown", V3(hoodW - 0.5, 0.22, 2.5), CF(0, 3.11, f + 1.8), Kit.shade(paint, 0.04), M.Metal)
-	deco(m, "Grille", V3(hoodW + 0.12, 1.55, 0.3), CF(0, 2.35, f + 0.45), cream, M.Metal)
-	deco(m, "GrilleSlats", V3(hoodW - 0.35, 1.15, 0.08), CF(0, 2.3, f + 0.27), hex("#2B2420"), M.Metal)
-	deco(m, "EngineBay", V3(W - 0.7, 0.5, 2.4), CF(0, 1.95, f + 1.8), hex("#2B2420"), M.Metal)
-	local fenderTop = 2 * r + 0.5
+	deco(m, "Hood", V3(hoodW, 1.6, 3.4), CF(0, 3.1, f + 2.45), paint, M.Metal)
+	deco(m, "HoodCrown", V3(hoodW - 0.6, 0.28, 3.4), CF(0, 4.04, f + 2.45), Kit.shade(paint, 0.04), M.Metal)
+	deco(m, "Grille", V3(hoodW + 0.15, 2.0, 0.35), CF(0, 3.05, f + 0.6), cream, M.Metal)
+	deco(m, "GrilleSlats", V3(hoodW - 0.45, 1.5, 0.1), CF(0, 3.0, f + 0.4), hex("#2B2420"), M.Metal)
+	deco(m, "EngineBay", V3(W - 0.9, 0.6, 3.2), CF(0, 2.5, f + 2.45), hex("#2B2420"), M.Metal)
+	local fenderTop = 2 * r + 0.6
 	for _, side in ipairs({ -1, 1 }) do
 		local dented = side < 0
 		fender(m, side * wx, zF, zF, {
 			r = r,
-			width = tw + 0.35,
+			width = tw + 0.45,
 			top = fenderTop,
-			thick = 0.42,
-			front = { 0.85, 1.35 },
-			back = { 0.75, 1.5 },
+			thick = 0.5,
+			front = { 1.1, 1.75 },
+			back = { 1.0, 1.95 },
 			color = if dented then Kit.shade(paint, -0.14) else paint,
 			material = M.Metal,
 			tilt = if dented then CFrame.Angles(0.07, 0, -0.06) else nil,
@@ -484,9 +501,9 @@ builders.farm = function(c: Ctx)
 		roundLamp(
 			m,
 			"Headlight",
-			CF(side * (wx - 0.45), fenderTop + 0.36, zF - 0.25) * tilt,
-			0.7,
-			0.4,
+			CF(side * (wx - 0.55), fenderTop + 0.45, zF - 0.3) * tilt,
+			0.9,
+			0.5,
 			oldMetal,
 			HEADLIGHT,
 			-1
@@ -494,48 +511,52 @@ builders.farm = function(c: Ctx)
 	end
 
 	-- Open cab: cowl, a raked windshield frame, doors (one of them from a
-	-- different truck), a bench seat and the canvas top, rolled up for good.
-	deco(m, "Cowl", V3(W - 0.2, 1.25, 0.5), CF(0, 2.6, f + 3.3), paint, M.Metal)
+	-- different truck), a bench seat and the canvas top, rolled up for good
+	-- behind the seat (nothing over the driver's head).
+	deco(m, "Cowl", V3(W - 0.3, 1.6, 0.7), CF(0, 3.3, f + 4.5), paint, M.Metal)
 	local rake = CFrame.Angles(0.12, 0, 0)
+	local screen = CF(0, 4.95, f + 4.75) * rake
 	for _, side in ipairs({ -1, 1 }) do
-		deco(
-			m,
-			"WindshieldPost",
-			V3(0.16, 1.5, 0.16),
-			CF(side * (W / 2 - 0.25), 3.95, f + 3.42) * rake,
-			oldMetal,
-			M.Metal
-		)
+		deco(m, "WindshieldPost", V3(0.2, 1.9, 0.2), CF(side * (W / 2 - 0.3), 0, 0) * screen, oldMetal, M.Metal)
 	end
-	deco(m, "WindshieldTop", V3(W - 0.34, 0.16, 0.16), CF(0, 3.95, f + 3.42) * rake * CF(0, 0.75, 0), oldMetal, M.Metal)
-	glass(m, "Windshield", V3(W - 0.66, 1.3, 0.06), CF(0, 3.95, f + 3.42) * rake, 0.5)
-	deco(m, "Mirror", V3(0.14, 0.38, 0.5), CF(-(W / 2 - 0.05), 4.1, f + 3.5), oldMetal, M.Metal)
+	deco(m, "WindshieldTop", V3(W - 0.4, 0.2, 0.2), screen * CF(0, 0.95, 0), oldMetal, M.Metal)
+	glass(m, "Windshield", V3(W - 0.8, 1.65, 0.07), screen, 0.5)
+	deco(m, "Mirror", V3(0.16, 0.5, 0.6), CF(-(W / 2 - 0.05), 5.1, f + 4.9), oldMetal, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
 			m,
 			"Door",
-			V3(0.2, 1.25, 1.75),
-			CF(side * (W / 2 - 0.1), 2.6, f + 4.4),
+			V3(0.22, 1.7, 2.2),
+			CF(side * (W / 2 - 0.11), 3.35, f + 5.9),
 			if side < 0 then primer else paint,
 			M.Metal
 		)
 	end
-	driverSeat(m, V3(2.6, 0.5, 1.35), CF(0, 2.1, f + 4.45), hex("#6E4A33"), M.Leather)
-	deco(m, "SeatBack", V3(2.7, 1.3, 0.3), CF(0, 2.95, f + 5.15) * CFrame.Angles(0.12, 0, 0), hex("#6E4A33"), M.Leather)
-	steeringWheel(m, V3(0, 3.15, f + 3.75), 0.9)
-	deco(m, "CabBack", V3(W, 1.5, 0.3), CF(0, 2.75, bedStart + 0.15), paint, M.Metal)
-	deco(m, "CanvasTop", V3(W - 0.4, 0.38, 0.62), CF(0, 3.69, bedStart + 0.15), hex("#7D7A52"), M.Fabric)
+	driverSeat(m, V3(2.8, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#6E4A33"), M.Leather)
+	deco(
+		m,
+		"SeatBack",
+		V3(2.9, 1.4, 0.3),
+		CF(0, seatTop + 0.7, seatZ + 0.85) * CFrame.Angles(0.12, 0, 0),
+		hex("#6E4A33"),
+		M.Leather
+	)
+	steeringWheel(m, V3(0, seatTop + 0.85, seatZ - 0.75), 1.0)
+	deco(m, "CabBack", V3(W, 2.0, 0.3), CF(0, 3.5, bedStart + 0.15), paint, M.Metal)
+	deco(m, "CanvasTop", V3(W - 0.4, 0.5, 0.8), CF(0, 4.75, bedStart + 0.15), hex("#7D7A52"), M.Fabric)
 
 	-- Bed: weathered side boards with gaps, rusty corner posts, and a
 	-- tailgate that hangs open on two bits of rope.
 	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, wood)
+	local boardH = (lay.wallHeight - 0.2) / 2 -- two boards a side, a gap between
+	local postH = lay.wallHeight + 0.15
 	for _, side in ipairs({ -1, 1 }) do
-		for _, y in ipairs({ 2.75, 3.45 }) do
+		for i = 0, 1 do
 			hull(
 				m,
 				"BedBoard",
-				V3(0.22, 0.5, lay.bedLength - 0.3),
-				CF(side * (W / 2 - 0.11), y, lay.bedCenterZ + 0.15),
+				V3(wall, boardH, lay.bedLength - 0.3),
+				CF(side * (W / 2 - wall / 2), floorTop + boardH / 2 + i * (boardH + 0.2), lay.bedCenterZ + 0.15),
 				Kit.vary(wood, rng, 0.06),
 				M.WoodPlanks
 			)
@@ -543,21 +564,22 @@ builders.farm = function(c: Ctx)
 		deco(
 			m,
 			"BedPost",
-			V3(0.28, 1.45, 0.28),
-			CF(side * (W / 2 - 0.14), 3.22, bedEnd - 0.14),
+			V3(0.34, postH, 0.34),
+			CF(side * (W / 2 - 0.17), floorTop + postH / 2, bedEnd - 0.17),
 			oldMetal,
 			M.CorrodedMetal
 		)
 	end
-	local hinge = CF(0, 2.5, bedEnd - 0.1) * CFrame.Angles(0.22, 0, 0)
-	hull(m, "Tailgate", V3(W - 0.62, 1.1, 0.2), hinge * CF(0, 0.55, 0), Kit.vary(wood, rng, 0.05), M.WoodPlanks)
+	local hinge = CF(0, floorTop, bedEnd - 0.12) * CFrame.Angles(0.22, 0, 0)
+	local gateW, gateH = W - 0.7, lay.wallHeight - 0.05
+	hull(m, "Tailgate", V3(gateW, gateH, 0.24), hinge * CF(0, gateH / 2, 0), Kit.vary(wood, rng, 0.05), M.WoodPlanks)
 	for _, side in ipairs({ -1, 1 }) do
 		decoRod(
 			m,
 			"Rope",
-			(hinge * CF(side * ((W - 0.62) / 2 - 0.12), 1.05, 0)).Position,
-			V3(side * (W / 2 - 0.14), 3.85, bedEnd - 0.14),
-			0.09,
+			(hinge * CF(side * (gateW / 2 - 0.15), gateH - 0.05, 0)).Position,
+			V3(side * (W / 2 - 0.17), floorTop + postH - 0.1, bedEnd - 0.17),
+			0.11,
 			ROPE,
 			M.Fabric
 		)
@@ -565,43 +587,43 @@ builders.farm = function(c: Ctx)
 	for _, side in ipairs({ -1, 1 }) do
 		fender(m, side * wx, zR, zR, {
 			r = r,
-			width = tw + 0.35,
-			top = 2 * r + 0.45,
-			thick = 0.38,
-			front = { 0.7, 1.5 },
-			back = { 0.6, 1.6 },
+			width = tw + 0.45,
+			top = 2 * r + 0.4,
+			thick = 0.42,
+			front = { 0.9, 1.95 },
+			back = { 0.8, 2.1 },
 			color = Kit.vary(paint, rng, 0.05),
 			material = M.Metal,
 		})
-		local z0, z1 = zF + 0.66 * r + 0.75, zR - 0.66 * r - 0.7
+		local z0, z1 = zF + 0.66 * r + 1.0, zR - 0.66 * r - 0.9
 		deco(
 			m,
 			"RunningBoard",
-			V3(1.0, 0.16, z1 - z0),
-			CF(side * (wx - 0.05), 1.42, (z0 + z1) / 2),
+			V3(1.2, 0.2, z1 - z0),
+			CF(side * (wx - 0.05), 1.9, (z0 + z1) / 2),
 			Kit.vary(wood, rng, 0.05),
 			M.WoodPlanks
 		)
 	end
 
 	-- Rust, and lights that don't match.
-	deco(m, "Rust", V3(0.05, 0.5, 0.75), CF(-(hoodW / 2 + 0.02), 2.45, f + 2.2), RUST, M.CorrodedMetal)
-	deco(m, "Rust", V3(0.7, 0.45, 0.05), hinge * CF(0.75, 0.45, 0.12), RUST, M.CorrodedMetal)
+	deco(m, "Rust", V3(0.06, 0.65, 1.0), CF(-(hoodW / 2 + 0.02), 3.2, f + 2.9), RUST, M.CorrodedMetal)
+	deco(m, "Rust", V3(0.9, 0.55, 0.06), hinge * CF(0.95, 0.55, 0.14), RUST, M.CorrodedMetal)
 	decoCyl(
 		m,
 		"Taillight",
-		0.1,
-		0.34,
-		CF(-(W / 2 - 0.14), 3.3, bedEnd + 0.02) * CFrame.Angles(0, math.pi / 2, 0),
+		0.12,
+		0.44,
+		CF(-(W / 2 - 0.17), floorTop + 0.75, bedEnd + 0.03) * CFrame.Angles(0, math.pi / 2, 0),
 		TAILLIGHT,
 		M.Neon
 	)
-	deco(m, "Taillight", V3(0.3, 0.24, 0.08), CF(W / 2 - 0.14, 3.3, bedEnd + 0.02), TAILLIGHT, M.Neon)
+	deco(m, "Taillight", V3(0.38, 0.3, 0.1), CF(W / 2 - 0.17, floorTop + 0.75, bedEnd + 0.03), TAILLIGHT, M.Neon)
 	exhaust(
 		m,
-		V3(-1.2, 1.15, bedEnd - 1.2),
-		V3(-1.3, 1.02, lay.length / 2 + 0.45),
-		0.3,
+		V3(-1.6, 1.5, bedEnd - 1.6),
+		V3(-1.7, 1.35, lay.length / 2 + 0.5),
+		0.38,
 		oldMetal,
 		M.CorrodedMetal,
 		1,
@@ -633,92 +655,131 @@ builders.pickup = function(c: Ctx)
 	local wx = lay.wheelX
 	local zF, zR = lay.wheelZ[1], lay.wheelZ[2]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
+	local floorTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local wall = (W - lay.bedWidth) / 2
+	local wallY = floorTop + lay.wallHeight / 2
+	local seatTop, seatZ = SEAT_TOP.pickup, f + 6.1
 	local cream = hex("#EFE6D2")
 
-	deco(m, "Frame", V3(W - 1.4, 0.8, L - 1.0), CF(0, 1.4, 0), FRAME, M.Metal)
-	deco(m, "Bumper", V3(W + 0.35, 0.45, 0.45), CF(0, 1.35, f + 0.22), CHROME, M.Metal)
-	deco(m, "Nose", V3(W - 0.8, 1.2, 3.0), CF(0, 2.2, f + 1.9), paint, M.Metal)
-	deco(m, "Hood", V3(W - 1.7, 0.5, 2.6), CF(0, 3.05, f + 2.1), paint, M.Metal)
-	decoWedge(m, "HoodNose", V3(W - 1.7, 0.5, 0.4), CF(0, 3.05, f + 0.6), paint, M.Metal)
-	deco(m, "Grille", V3(W - 1.9, 1.0, 0.14), CF(0, 2.15, f + 0.35), CHROME_HI, M.Metal)
-	deco(m, "GrilleBars", V3(W - 2.3, 0.65, 0.06), CF(0, 2.15, f + 0.27), hex("#2A2D33"), M.Metal)
+	deco(m, "Frame", V3(W - 1.8, 0.9, L - 1.2), CF(0, 1.95, 0), FRAME, M.Metal)
+	deco(m, "Bumper", V3(W + 0.45, 0.6, 0.55), CF(0, 1.75, f + 0.27), CHROME, M.Metal)
+	deco(m, "Nose", V3(W - 1.0, 1.6, 4.0), CF(0, 2.85, f + 2.5), paint, M.Metal)
+	deco(m, "Hood", V3(W - 2.2, 0.65, 3.5), CF(0, 3.975, f + 2.75), paint, M.Metal)
+	decoWedge(m, "HoodNose", V3(W - 2.2, 0.65, 0.5), CF(0, 3.975, f + 0.75), paint, M.Metal)
+	deco(m, "Grille", V3(W - 2.4, 1.3, 0.16), CF(0, 2.85, f + 0.45), CHROME_HI, M.Metal)
+	deco(m, "GrilleBars", V3(W - 2.9, 0.85, 0.08), CF(0, 2.85, f + 0.36), hex("#2A2D33"), M.Metal)
 
 	-- Pontoon front fenders with the headlights in their noses.
-	local fz0, fz1 = f + 0.55, zF + 0.95
+	local fz0, fz1 = f + 0.7, zF + 1.25
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * (wx + 0.05)
-		deco(m, "Fender", V3(1.3, 0.6, fz1 - fz0), CF(x, 2.5, (fz0 + fz1) / 2), paint, M.Metal)
-		decoWedge(m, "Fender", V3(1.3, 0.6, 0.9), CF(x, 2.5, fz1 + 0.45) * CFrame.Angles(0, math.pi, 0), paint, M.Metal)
-		roundLamp(m, "Headlight", CF(x, 2.5, fz0), 0.55, 0.24, CHROME, HEADLIGHT, -1)
+		deco(m, "Fender", V3(1.6, 0.8, fz1 - fz0), CF(x, 3.2, (fz0 + fz1) / 2), paint, M.Metal)
+		decoWedge(m, "Fender", V3(1.6, 0.8, 1.2), CF(x, 3.2, fz1 + 0.6) * CFrame.Angles(0, math.pi, 0), paint, M.Metal)
+		roundLamp(m, "Headlight", CF(x, 3.2, fz0), 0.7, 0.3, CHROME, HEADLIGHT, -1)
 	end
 
 	-- Cab: glass all round under a cream roof, from the body's top (`belt`)
-	-- to the roof's underside: 4 studs over the seat, room for a seated
+	-- to the roof's underside, HEADROOM over the seat: room for a seated
 	-- avatar in a hat (TruckArt.spec). The windshield leans back from the
-	-- body's front edge to just under the roof.
-	local belt, roofY = 3.3, 6.05
-	deco(m, "Cab", V3(W, 1.65, 2.2), CF(0, 2.475, f + 4.5), paint, M.Metal)
-	glass(m, "CabGlass", V3(W - 0.3, roofY - belt, 1.7), CF(0, (belt + roofY) / 2, f + 4.7), 0.45)
-	local screenLo, screenHi = V3(0, belt, f + 3.42), V3(0, roofY - 0.05, f + 3.8)
+	-- body's front edge to just under the roof's front edge.
+	local belt, roofY = seatTop + 1.3, seatTop + HEADROOM.pickup
+	local cabZ0 = f + 4.45
+	deco(m, "Cab", V3(W, belt - 1.9, bedStart - cabZ0), CF(0, (belt + 1.9) / 2, (cabZ0 + bedStart) / 2), paint, M.Metal)
+	local screenLo, screenHi = V3(0, belt, cabZ0), V3(0, roofY - 0.05, cabZ0 + 0.65)
 	local rise = screenHi - screenLo
 	local screen = CF((screenLo + screenHi) / 2) * CFrame.Angles(math.atan2(rise.Z, rise.Y), 0, 0)
-	glass(m, "Windshield", V3(W - 0.5, rise.Magnitude, 0.06), screen, 0.4)
+	local glassZ0, glassZ1 = screenHi.Z + 0.05, bedStart - 0.1
+	glass(
+		m,
+		"CabGlass",
+		V3(W - 0.4, roofY - belt, glassZ1 - glassZ0),
+		CF(0, (belt + roofY) / 2, (glassZ0 + glassZ1) / 2),
+		0.45
+	)
+	glass(m, "Windshield", V3(W - 0.6, rise.Magnitude, 0.07), screen, 0.4)
 	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "Pillar", V3(0.2, rise.Magnitude + 0.05, 0.2), CF(side * (W / 2 - 0.2), 0, 0) * screen, cream, M.Metal)
 		deco(
 			m,
 			"Pillar",
-			V3(0.25, roofY - belt, 0.3),
-			CF(side * (W / 2 - 0.17), (belt + roofY) / 2, f + 5.45),
+			V3(0.24, rise.Magnitude + 0.05, 0.24),
+			CF(side * (W / 2 - 0.24), 0, 0) * screen,
 			cream,
 			M.Metal
 		)
-		deco(m, "Mirror", V3(0.14, 0.36, 0.5), CF(side * (W / 2 + 0.12), 3.6, f + 3.62), CHROME_HI, M.Metal)
+		deco(
+			m,
+			"Pillar",
+			V3(0.3, roofY - belt, 0.36),
+			CF(side * (W / 2 - 0.2), (belt + roofY) / 2, bedStart - 0.25),
+			cream,
+			M.Metal
+		)
+		deco(m, "Mirror", V3(0.18, 0.5, 0.65), CF(side * (W / 2 + 0.15), belt + 0.6, cabZ0 + 0.3), CHROME_HI, M.Metal)
 	end
-	deco(m, "Roof", V3(W - 0.15, 0.32, 2.15), CF(0, roofY + 0.16, f + 4.62), cream, M.Metal)
-	driverSeat(m, V3(2.4, 0.45, 1.25), CF(0, 1.8, f + 4.55), hex("#8C6A4A"), M.Leather)
-	deco(m, "SeatBack", V3(2.5, 1.3, 0.28), CF(0, 2.65, f + 5.3) * CFrame.Angles(0.1, 0, 0), hex("#8C6A4A"), M.Leather)
-	steeringWheel(m, V3(0, 3.1, f + 3.95), 0.85)
+	deco(
+		m,
+		"Roof",
+		V3(W - 0.2, 0.34, bedStart - screenHi.Z + 0.05),
+		CF(0, roofY + 0.17, (screenHi.Z + bedStart + 0.05) / 2),
+		cream,
+		M.Metal
+	)
+	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#8C6A4A"), M.Leather)
+	deco(
+		m,
+		"SeatBack",
+		V3(2.7, 1.4, 0.3),
+		CF(0, seatTop + 0.7, seatZ + 0.85) * CFrame.Angles(0.1, 0, 0),
+		hex("#8C6A4A"),
+		M.Leather
+	)
+	steeringWheel(m, V3(0, seatTop + 1.05, seatZ - 0.75), 0.95)
 
 	-- Chrome spear down each side, black running boards.
-	local trimZ0 = f + 3.4
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
 			m,
 			"Trim",
-			V3(0.06, 0.12, bedEnd - trimZ0),
-			CF(side * (W / 2 + 0.03), 2.95, (trimZ0 + bedEnd) / 2),
+			V3(0.07, 0.15, bedEnd - cabZ0),
+			CF(side * (W / 2 + 0.035), belt - 0.3, (cabZ0 + bedEnd) / 2),
 			CHROME_HI,
 			M.Metal
 		)
-		local z0, z1 = fz1 + 0.9, zR - 1.45
-		deco(m, "RunningBoard", V3(0.9, 0.14, z1 - z0), CF(side * (W / 2 + 0.25), 1.45, (z0 + z1) / 2), BLACK, M.Rubber)
+		local z0, z1 = fz1 + 1.3, zR - 2.5
+		deco(m, "RunningBoard", V3(1.1, 0.18, z1 - z0), CF(side * (W / 2 + 0.3), 1.95, (z0 + z1) / 2), BLACK, M.Rubber)
 	end
 
 	-- Bed: smooth painted walls with chrome caps; a flared rear fender over
 	-- each wheel.
 	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#5E4632"))
 	for _, side in ipairs({ -1, 1 }) do
-		local x = side * (W / 2 - 0.125)
-		hull(m, "BedWall", V3(0.25, 1.3, lay.bedLength), CF(x, 3.15, lay.bedCenterZ), paint, M.Metal)
-		deco(m, "BedCap", V3(0.36, 0.1, lay.bedLength), CF(x, 3.85, lay.bedCenterZ), CHROME_HI, M.Metal)
-		local fx = side * (W / 2 + 0.32)
-		deco(m, "Fender", V3(0.75, 0.55, 2.3), CF(fx, 2.45, zR), paint, M.Metal)
-		decoWedge(m, "Fender", V3(0.75, 0.55, 0.7), CF(fx, 2.45, zR - 1.5), paint, M.Metal)
+		local x = side * (W / 2 - wall / 2)
+		hull(m, "BedWall", V3(wall, lay.wallHeight, lay.bedLength), CF(x, wallY, lay.bedCenterZ), paint, M.Metal)
+		deco(
+			m,
+			"BedCap",
+			V3(wall + 0.12, 0.12, lay.bedLength),
+			CF(x, floorTop + lay.wallHeight + 0.06, lay.bedCenterZ),
+			CHROME_HI,
+			M.Metal
+		)
+		local fx = side * (W / 2 + 0.4)
+		deco(m, "Fender", V3(0.95, 0.7, 3.0), CF(fx, 3.15, zR), paint, M.Metal)
+		decoWedge(m, "Fender", V3(0.95, 0.7, 0.9), CF(fx, 3.15, zR - 1.95), paint, M.Metal)
 		decoWedge(
 			m,
 			"Fender",
-			V3(0.75, 0.55, 0.7),
-			CF(fx, 2.45, zR + 1.5) * CFrame.Angles(0, math.pi, 0),
+			V3(0.95, 0.7, 0.9),
+			CF(fx, 3.15, zR + 1.95) * CFrame.Angles(0, math.pi, 0),
 			paint,
 			M.Metal
 		)
-		deco(m, "Taillight", V3(0.26, 0.6, 0.08), CF(x, 3.3, bedEnd + 0.02), TAILLIGHT, M.Neon)
+		deco(m, "Taillight", V3(0.32, 0.8, 0.1), CF(x, floorTop + 1.0, bedEnd + 0.03), TAILLIGHT, M.Neon)
 	end
-	deco(m, "BedFront", V3(W - 0.5, 1.3, 0.25), CF(0, 3.15, bedStart + 0.125), paint, M.Metal)
-	hull(m, "Tailgate", V3(W - 0.5, 1.3, 0.25), CF(0, 3.15, bedEnd - 0.125), paint, M.Metal)
-	deco(m, "RearBumper", V3(W + 0.2, 0.42, 0.4), CF(0, 1.5, L / 2 - 0.15), CHROME, M.Metal)
-	exhaust(m, V3(1.3, 1.25, bedEnd - 0.6), V3(1.35, 1.2, L / 2 + 0.25), 0.24, CHROME, M.Metal, 0.3, hex("#8A8580"))
+	deco(m, "BedFront", V3(W - 2 * wall, lay.wallHeight, 0.3), CF(0, wallY, bedStart + 0.15), paint, M.Metal)
+	hull(m, "Tailgate", V3(W - 2 * wall, lay.wallHeight, 0.3), CF(0, wallY, bedEnd - 0.15), paint, M.Metal)
+	deco(m, "RearBumper", V3(W + 0.25, 0.55, 0.5), CF(0, 1.95, L / 2 - 0.2), CHROME, M.Metal)
+	exhaust(m, V3(1.7, 1.6, bedEnd - 0.8), V3(1.75, 1.55, L / 2 + 0.3), 0.3, CHROME, M.Metal, 0.3, hex("#8A8580"))
 
 	local front = { rim = cream, rimScale = 0.64, hub = CHROME_HI, steer = true, rear = false }
 	local back = { rim = cream, rimScale = 0.64, hub = CHROME_HI, steer = false, rear = true }
@@ -735,73 +796,73 @@ builders.atv = function(c: Ctx)
 	local plastic = hex("#34372F")
 	local rack = hex("#45484A")
 
-	deco(m, "Frame", V3(1.5, 0.8, 3.6), CF(0, 1.35, 0), FRAME, M.Metal)
-	decoCyl(m, "Engine", 1.8, 0.85, CF(0, 1.45, 0.2), hex("#7E8287"), M.Metal)
+	deco(m, "Frame", V3(2.0, 1.0, 4.7), CF(0, 1.85, 0), FRAME, M.Metal)
+	decoCyl(m, "Engine", 2.35, 1.1, CF(0, 1.95, 0.25), hex("#7E8287"), M.Metal)
 
 	-- Plastic fenders over all four wheels; racks on top front and back.
 	for _, side in ipairs({ -1, 1 }) do
-		local x = side * (wx - 0.08)
+		local x = side * (wx - 0.1)
 		local style: FenderStyle = {
 			r = r,
-			width = tw + 0.2,
-			top = 2 * r + 0.32,
-			thick = 0.26,
-			front = { 0.55, 1.55 },
-			back = { 0.45, 1.75 },
+			width = tw + 0.26,
+			top = 2 * r + 0.42,
+			thick = 0.34,
+			front = { 0.72, 2.0 },
+			back = { 0.6, 2.3 },
 			color = paint,
 			material = M.SmoothPlastic,
 		}
 		fender(m, x, zF, zF, style)
-		style.front, style.back = { 0.45, 1.75 }, { 0.55, 1.55 }
+		style.front, style.back = { 0.6, 2.3 }, { 0.72, 2.0 }
 		fender(m, x, zR, zR, style)
-		deco(m, "Footrest", V3(0.85, 0.12, 1.8), CF(side * 1.25, 1.62, 0), plastic, M.DiamondPlate)
-		deco(m, "Headlight", V3(0.5, 0.26, 0.1), CF(side * 0.55, 2.05, f + 0.22), HEADLIGHT, M.Neon)
-		deco(m, "Taillight", V3(0.32, 0.18, 0.06), CF(side * 0.5, 2.05, b - 0.12), TAILLIGHT, M.Neon)
+		deco(m, "Footrest", V3(1.1, 0.16, 2.3), CF(side * 1.65, 2.1, 0.1), plastic, M.DiamondPlate)
+		deco(m, "Headlight", V3(0.65, 0.34, 0.12), CF(side * 0.72, 2.65, f + 0.27), HEADLIGHT, M.Neon)
+		deco(m, "Taillight", V3(0.42, 0.24, 0.08), CF(side * 0.65, 2.65, b - 0.15), TAILLIGHT, M.Neon)
 	end
-	deco(m, "Nose", V3(2.2, 0.55, 1.6), CF(0, 2.0, f + 1.05), paint, M.SmoothPlastic)
-	deco(m, "RearFascia", V3(1.7, 0.5, 0.3), CF(0, 2.0, b - 0.3), plastic, M.SmoothPlastic)
+	deco(m, "Nose", V3(2.9, 0.7, 2.1), CF(0, 2.6, f + 1.35), paint, M.SmoothPlastic)
+	deco(m, "RearFascia", V3(2.2, 0.65, 0.4), CF(0, 2.6, b - 0.4), plastic, M.SmoothPlastic)
 
 	-- Brush guard and racks (tube). The front rack stops short of a seated
 	-- rider's feet (straight legs reach 2 studs ahead of the seat's middle).
-	local rackY = 2.55
-	local seatZ = 0.45
-	decoRod(m, "Guard", V3(-1.05, 1.55, f + 0.05), V3(1.05, 1.55, f + 0.05), 0.16, BLACK, M.Metal)
+	local rackY = 3.3
+	local seatTop, seatZ = SEAT_TOP.atv, 0.6
+	decoRod(m, "Guard", V3(-1.37, 2.0, f + 0.07), V3(1.37, 2.0, f + 0.07), 0.2, BLACK, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
-		decoRod(m, "Guard", V3(side * 0.9, 1.55, f + 0.05), V3(side * 0.95, rackY, f + 0.35), 0.14, BLACK, M.Metal)
+		decoRod(m, "Guard", V3(side * 1.17, 2.0, f + 0.07), V3(side * 1.24, rackY, f + 0.45), 0.18, BLACK, M.Metal)
 	end
 	local function rackFrame(z0: number, z1: number, y: number)
 		for _, side in ipairs({ -1, 1 }) do
-			decoRod(m, "Rack", V3(side * 1.45, y, z0), V3(side * 1.45, y, z1), 0.12, rack, M.Metal)
+			decoRod(m, "Rack", V3(side * 1.9, y, z0), V3(side * 1.9, y, z1), 0.15, rack, M.Metal)
 		end
-		decoRod(m, "Rack", V3(-1.45, y, z0), V3(1.45, y, z0), 0.12, rack, M.Metal)
-		decoRod(m, "Rack", V3(-1.45, y, z1), V3(1.45, y, z1), 0.12, rack, M.Metal)
+		decoRod(m, "Rack", V3(-1.9, y, z0), V3(1.9, y, z0), 0.15, rack, M.Metal)
+		decoRod(m, "Rack", V3(-1.9, y, z1), V3(1.9, y, z1), 0.15, rack, M.Metal)
 	end
-	rackFrame(f + 0.35, seatZ - 2.2, rackY)
-	rackFrame(zR - 0.75, b - 0.05, rackY + 0.05)
-	deco(m, "SupplyBox", V3(1.3, 0.6, 0.95), CF(0, 2.93, zR + 0.15), hex("#9B6B3E"), M.WoodPlanks)
+	rackFrame(f + 0.45, seatZ - 2.25, rackY)
+	rackFrame(zR - 1.0, b - 0.07, rackY + 0.07)
+	deco(m, "SupplyBox", V3(1.7, 0.8, 1.25), CF(0, rackY + 0.52, zR + 0.2), hex("#9B6B3E"), M.WoodPlanks)
 
 	-- Tank, bars and the saddle. The bars ride just over a seated rider's
 	-- straight legs (the seat's top + 0.5).
-	local barY = 3.4
-	deco(m, "Tank", V3(1.25, 0.55, 0.95), CF(0, 2.45, -1.0), paint, M.SmoothPlastic)
-	decoCyl(m, "TankCap", 0.12, 0.3, CF(0, 2.78, -1.05) * CFrame.Angles(0, 0, math.pi / 2), CHROME, M.Metal)
-	decoRod(m, "SteeringColumn", V3(0, 2.3, -1.55), V3(0, barY - 0.05, -1.15), 0.14, BLACK, M.Metal)
-	decoRod(m, "Handlebar", V3(-1.0, barY, -1.1), V3(1.0, barY, -1.1), 0.13, rack, M.Metal)
+	local barY = seatTop + 0.7
+	deco(m, "Tank", V3(1.6, 0.7, 1.25), CF(0, 3.2, -1.3), paint, M.SmoothPlastic)
+	decoCyl(m, "TankCap", 0.16, 0.4, CF(0, 3.6, -1.35) * CFrame.Angles(0, 0, math.pi / 2), CHROME, M.Metal)
+	decoRod(m, "SteeringColumn", V3(0, 3.0, -2.0), V3(0, barY - 0.06, -1.5), 0.18, BLACK, M.Metal)
+	decoRod(m, "Handlebar", V3(-1.3, barY, -1.45), V3(1.3, barY, -1.45), 0.17, rack, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
-		decoRod(m, "Grip", V3(side * 0.8, barY, -1.1), V3(side * 1.15, barY, -1.1), 0.22, BLACK, M.Rubber)
+		decoRod(m, "Grip", V3(side * 1.05, barY, -1.45), V3(side * 1.5, barY, -1.45), 0.28, BLACK, M.Rubber)
 	end
-	deco(m, "SeatBase", V3(1.35, 0.5, 2.1), CF(0, 2.05, 0.45), plastic, M.SmoothPlastic)
-	driverSeat(m, V3(1.15, 0.45, 1.9), CF(0, 2.525, seatZ), hex("#6B4A33"), M.Leather)
+	deco(m, "SeatBase", V3(1.75, 0.65, 2.75), CF(0, seatTop - 0.875, seatZ), plastic, M.SmoothPlastic)
+	driverSeat(m, V3(1.5, 0.55, 2.4), CF(0, seatTop - 0.275, seatZ), hex("#6B4A33"), M.Leather)
 
-	exhaust(m, V3(0.85, 1.75, 1.5), V3(0.95, 1.95, b + 0.1), 0.24, hex("#55595C"), M.Metal, 0.35, hex("#9A958F"))
+	exhaust(m, V3(1.1, 2.3, 1.95), V3(1.25, 2.55, b + 0.13), 0.3, hex("#55595C"), M.Metal, 0.35, hex("#9A958F"))
 	-- The scout's flag: seen over the brush from far away.
-	local poleTop = V3(-1.5, 6.2, b - 0.15)
-	decoRod(m, "FlagPole", V3(-1.45, rackY, b - 0.2), poleTop, 0.1, BLACK, M.Metal)
+	local poleTop = V3(-1.95, 8.0, b - 0.2)
+	decoRod(m, "FlagPole", V3(-1.9, rackY + 0.07, b - 0.26), poleTop, 0.13, BLACK, M.Metal)
 	decoWedge(
 		m,
 		"Flag",
-		V3(0.05, 0.7, 1.1),
-		CF(poleTop.X, poleTop.Y - 0.4, poleTop.Z + 0.55) * CFrame.Angles(0, math.pi, 0),
+		V3(0.06, 0.9, 1.4),
+		CF(poleTop.X, poleTop.Y - 0.5, poleTop.Z + 0.7) * CFrame.Angles(0, math.pi, 0),
 		hex("#F08A24"),
 		M.Fabric
 	)
@@ -815,7 +876,8 @@ builders.atv = function(c: Ctx)
 	)
 end
 
--- A boxy cab with glass all round: lower body, glass, pillars, roof.
+-- A boxy cab with glass all round: lower body, glass, pillars, roof. Its
+-- roof's underside is at y2.
 local function boxCab(
 	m: Model,
 	W: number,
@@ -835,8 +897,8 @@ local function boxCab(
 			deco(
 				m,
 				"Pillar",
-				V3(0.24, y2 - y1, 0.24),
-				CF(side * (W / 2 - 0.32), (y1 + y2) / 2, z + end_ * (length / 2 - 0.25)),
+				V3(0.3, y2 - y1, 0.3),
+				CF(side * (W / 2 - 0.35), (y1 + y2) / 2, z + end_ * (length / 2 - 0.3)),
 				pillar,
 				M.Metal
 			)
@@ -853,54 +915,57 @@ builders.flatbed = function(c: Ctx)
 	local zF = lay.wheelZ[1]
 	local zRear, zTandem = lay.wheelZ[2], lay.wheelZ[3] or lay.wheelZ[2]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
-	local deckTop = lay.bedFloorY + 0.25
+	local deckTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local wall = (W - lay.bedWidth) / 2
+	local seatTop, seatZ = SEAT_TOP.flatbed, f + 6.3
 	local steel = hex("#6A6E72")
 	local stake = hex("#A0703F")
 
-	deco(m, "Frame", V3(W - 1.8, 0.8, L - 1.2), CF(0, 1.4, 0), FRAME, M.Metal)
-	deco(m, "Bumper", V3(W + 0.5, 0.55, 0.5), CF(0, 1.4, f + 0.22), BLACK, M.Metal)
-	deco(m, "Hood", V3(W - 0.5, 1.4, 3.0), CF(0, 2.35, f + 1.95), paint, M.Metal)
-	deco(m, "Grille", V3(W - 2.2, 0.95, 0.1), CF(0, 2.3, f + 0.42), BLACK, M.Metal)
-	deco(m, "GrilleBar", V3(W - 2.4, 0.12, 0.06), CF(0, 2.35, f + 0.36), CHROME, M.Metal)
+	deco(m, "Frame", V3(W - 2.4, 0.9, L - 1.4), CF(0, 1.95, 0), FRAME, M.Metal)
+	deco(m, "Bumper", V3(W + 0.6, 0.7, 0.6), CF(0, 1.85, f + 0.28), BLACK, M.Metal)
+	deco(m, "Hood", V3(W - 0.6, 1.9, 4.05), CF(0, 3.1, f + 2.525), paint, M.Metal)
+	deco(m, "Grille", V3(W - 3.4, 1.3, 0.12), CF(0, 3.05, f + 0.46), BLACK, M.Metal)
+	deco(m, "GrilleBar", V3(W - 3.7, 0.16, 0.08), CF(0, 3.1, f + 0.39), CHROME, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "Headlight", V3(0.6, 0.42, 0.1), CF(side * 1.85, 2.35, f + 0.42), HEADLIGHT, M.Neon)
+		deco(m, "Headlight", V3(0.8, 0.56, 0.12), CF(side * 2.5, 3.1, f + 0.46), HEADLIGHT, M.Neon)
 		-- Squared-off fenders, front and over the tandem.
 		fender(m, side * wx, zF, zF, {
 			r = r,
-			width = tw + 0.45,
-			top = 2 * r + 0.5,
-			thick = 0.45,
-			front = { 0.5, 1.75 },
-			back = { 0.5, 1.85 },
+			width = tw + 0.55,
+			top = 2 * r + 0.65,
+			thick = 0.55,
+			front = { 0.65, 2.3 },
+			back = { 0.65, 2.4 },
 			color = paint,
 			material = M.Metal,
 		})
 		fender(m, side * wx, zTandem, zRear, {
 			r = r,
-			width = tw + 0.45,
-			top = 2 * r + 0.32,
-			thick = 0.3,
-			front = { 0.45, 1.85 },
-			back = { 0.45, 1.85 },
+			width = tw + 0.55,
+			top = 2 * r + 0.4,
+			thick = 0.38,
+			front = { 0.6, 2.4 },
+			back = { 0.6, 2.4 },
 			color = BLACK,
 			material = M.Metal,
 		})
-		deco(m, "Mirror", V3(0.15, 0.8, 0.45), CF(side * (W / 2 + 0.2), 3.9, f + 3.7), BLACK, M.Metal)
+		deco(m, "Mirror", V3(0.18, 1.0, 0.55), CF(side * (W / 2 + 0.25), 5.0, f + 4.7), BLACK, M.Metal)
 	end
 
-	-- Cab (its roof 4.4 studs over the seat: room for a driver in a hat,
+	-- Cab (its roof HEADROOM over the seat: room for a driver in a hat,
 	-- and a clear step up from the Pickup's roof, ACT-07) and roof beacon;
 	-- the stack stands clear of the roof.
-	local cabTop = 6.6
-	boxCab(m, W, f + 4.6, 2.3, 1.65, 3.25, cabTop, paint, BLACK, hex("#EEEBE3"))
-	deco(m, "Beacon", V3(0.8, 0.32, 0.4), CF(0, cabTop + 0.48, f + 4.4), AMBER, M.Neon)
-	driverSeat(m, V3(2.4, 0.5, 1.3), CF(0, 1.95, f + 4.65), hex("#4A4440"), M.Fabric)
-	steeringWheel(m, V3(0, 3.2, f + 3.95), 0.9)
+	local cabZ0 = f + 4.55
+	local roofY = seatTop + HEADROOM.flatbed
+	boxCab(m, W, (cabZ0 + bedStart) / 2, bedStart - cabZ0, 2.15, seatTop + 1.1, roofY, paint, BLACK, hex("#EEEBE3"))
+	deco(m, "Beacon", V3(1.0, 0.4, 0.5), CF(0, roofY + 0.52, f + 5.4), AMBER, M.Neon)
+	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#4A4440"), M.Fabric)
+	steeringWheel(m, V3(0, seatTop + 1.05, seatZ - 0.75), 1.0)
 	exhaust(
 		m,
-		V3(W / 2 + 0.2, 1.8, f + 5.55),
-		V3(W / 2 + 0.2, cabTop + 0.8, f + 5.55),
-		0.3,
+		V3(W / 2 + 0.25, 2.3, bedStart - 0.4),
+		V3(W / 2 + 0.25, roofY + 1.1, bedStart - 0.4),
+		0.38,
 		steel,
 		M.Metal,
 		0.45,
@@ -908,26 +973,33 @@ builders.flatbed = function(c: Ctx)
 	)
 
 	-- Headache rack behind the cab.
-	local rackZ = bedStart + 0.2
+	local rackZ = bedStart + 0.25
 	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "HeadacheRack", V3(0.3, 2.8, 0.3), CF(side * (W / 2 - 0.25), deckTop + 1.4, rackZ), steel, M.Metal)
+		deco(m, "HeadacheRack", V3(0.36, 3.6, 0.36), CF(side * (W / 2 - 0.3), deckTop + 1.8, rackZ), steel, M.Metal)
 	end
-	deco(m, "HeadacheRack", V3(W - 0.2, 0.3, 0.3), CF(0, deckTop + 2.8, rackZ), steel, M.Metal)
-	deco(m, "HeadacheRack", V3(W - 0.5, 0.2, 0.2), CF(0, deckTop + 1.6, rackZ), steel, M.Metal)
+	deco(m, "HeadacheRack", V3(W - 0.25, 0.36, 0.36), CF(0, deckTop + 3.6, rackZ), steel, M.Metal)
+	deco(m, "HeadacheRack", V3(W - 0.6, 0.24, 0.24), CF(0, deckTop + 2.1, rackZ), steel, M.Metal)
 
 	-- Deck and stake sides (open at the back).
 	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#8A6038"))
 	for _, side in ipairs({ -1, 1 }) do
-		local x = side * (W / 2 - 0.13)
-		for _, z in ipairs({ bedStart + 0.7, lay.bedCenterZ, bedEnd - 0.4 }) do
-			hull(m, "Stake", V3(0.26, 2.3, 0.3), CF(x, deckTop + 1.15, z), Kit.vary(stake, rng, 0.05), M.Wood)
+		local x = side * (W / 2 - wall / 2)
+		for _, z in ipairs({ bedStart + 0.9, lay.bedCenterZ, bedEnd - 0.5 }) do
+			hull(
+				m,
+				"Stake",
+				V3(wall, lay.wallHeight, 0.36),
+				CF(x, deckTop + lay.wallHeight / 2, z),
+				Kit.vary(stake, rng, 0.05),
+				M.Wood
+			)
 		end
-		for _, y in ipairs({ deckTop + 0.75, deckTop + 1.7 }) do
+		for _, y in ipairs({ deckTop + 0.85, deckTop + 1.95 }) do
 			hull(
 				m,
 				"StakeRail",
-				V3(0.2, 0.42, lay.bedLength - 0.5),
-				CF(x, y, lay.bedCenterZ + 0.15),
+				V3(wall - 0.04, 0.5, lay.bedLength - 0.6),
+				CF(x, y, lay.bedCenterZ + 0.2),
 				Kit.vary(stake, rng, 0.06),
 				M.WoodPlanks
 			)
@@ -935,13 +1007,13 @@ builders.flatbed = function(c: Ctx)
 		deco(
 			m,
 			"Taillight",
-			V3(0.4, 0.3, 0.08),
-			CF(side * (W / 2 - 0.35), lay.bedFloorY, bedEnd + 0.02),
+			V3(0.5, 0.38, 0.1),
+			CF(side * (W / 2 - 0.45), lay.bedFloorY, bedEnd + 0.03),
 			TAILLIGHT,
 			M.Neon
 		)
 	end
-	deco(m, "RearBumper", V3(W + 0.2, 0.45, 0.45), CF(0, 1.55, b - 0.2), BLACK, M.Metal)
+	deco(m, "RearBumper", V3(W + 0.25, 0.6, 0.55), CF(0, 2.0, b - 0.25), BLACK, M.Metal)
 
 	local rimColor = hex("#E2E0D8")
 	wheels(
@@ -960,111 +1032,122 @@ builders.rig = function(c: Ctx)
 	local r, tw, wx = lay.wheelRadius, lay.tyreWidth, lay.wheelX
 	local zF = lay.wheelZ[1]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
-	local deckTop = lay.bedFloorY + 0.25
+	local deckTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local wall = (W - lay.bedWidth) / 2
+	local seatTop, seatZ = SEAT_TOP.rig, f + 7.9
 	local steel = hex("#3D4045")
 	local post = hex("#A2A8AE")
 	local crane = hex("#E3A72F")
 
-	deco(m, "Frame", V3(W - 2.0, 0.9, L - 1.0), CF(0, 1.45, 0), BLACK, M.Metal)
-	deco(m, "DeckBeam", V3(W - 1.4, 0.5, lay.bedLength), CF(0, lay.bedFloorY - 0.5, lay.bedCenterZ), steel, M.Metal)
+	deco(m, "Frame", V3(W - 2.6, 1.0, L - 1.2), CF(0, 1.95, 0), BLACK, M.Metal)
+	deco(m, "DeckBeam", V3(W - 1.8, 0.6, lay.bedLength), CF(0, lay.bedFloorY - 0.55, lay.bedCenterZ), steel, M.Metal)
 
 	-- Long nose: chrome bumper and grille, a crowned hood.
-	deco(m, "Bumper", V3(W + 0.5, 0.65, 0.6), CF(0, 1.4, f + 0.3), CHROME_HI, M.Foil)
-	deco(m, "Hood", V3(3.8, 1.3, 4.0), CF(0, 2.55, f + 2.6), paint, M.Metal)
-	deco(m, "HoodTop", V3(3.4, 0.35, 3.2), CF(0, 3.375, f + 3.0), paint, M.Metal)
-	decoWedge(m, "HoodNose", V3(3.4, 0.35, 0.8), CF(0, 3.375, f + 1.0), paint, M.Metal)
+	deco(m, "Bumper", V3(W + 0.6, 0.85, 0.75), CF(0, 1.9, f + 0.38), CHROME_HI, M.Foil)
+	deco(m, "Hood", V3(5.0, 1.8, 5.4), CF(0, 3.4, f + 3.4), paint, M.Metal)
+	deco(m, "HoodTop", V3(4.5, 0.45, 4.4), CF(0, 4.525, f + 3.9), paint, M.Metal)
+	decoWedge(m, "HoodNose", V3(4.5, 0.45, 1.0), CF(0, 4.525, f + 1.2), paint, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "Pinstripe", V3(0.04, 0.2, 3.9), CF(side * 1.91, 2.85, f + 2.62), hex("#F1E6CC"), M.SmoothPlastic)
+		deco(m, "Pinstripe", V3(0.05, 0.26, 5.3), CF(side * 2.52, 3.75, f + 3.42), hex("#F1E6CC"), M.SmoothPlastic)
 	end
-	deco(m, "Grille", V3(2.8, 2.0, 0.25), CF(0, 2.6, f + 0.55), CHROME_HI, M.Foil)
-	deco(m, "GrilleBars", V3(2.4, 1.6, 0.06), CF(0, 2.6, f + 0.41), BLACK, M.Metal)
+	deco(m, "Grille", V3(3.7, 2.6, 0.32), CF(0, 3.4, f + 0.66), CHROME_HI, M.Foil)
+	deco(m, "GrilleBars", V3(3.2, 2.1, 0.08), CF(0, 3.4, f + 0.48), BLACK, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
-		fender(m, side * wx, zF, zF, {
+		-- Set in a little, so the rig, fenders and all, fits its parking slot.
+		fender(m, side * (wx - 0.1), zF, zF, {
 			r = r,
-			width = tw + 0.5,
-			top = 2 * r + 0.55,
-			thick = 0.45,
-			front = { 0.9, 1.55 },
-			back = { 0.8, 1.8 },
+			width = tw + 0.4,
+			top = 2 * r + 0.7,
+			thick = 0.55,
+			front = { 1.15, 2.0 },
+			back = { 1.0, 2.35 },
 			color = paint,
 			material = M.Metal,
 		})
-		deco(m, "Headlight", V3(0.75, 0.38, 0.12), CF(side * 2.2, 1.92, f + 0.38), HEADLIGHT, M.Neon)
+		deco(m, "Headlight", V3(0.9, 0.5, 0.12), CF(side * 2.3, 2.55, f + 0.47), HEADLIGHT, M.Neon)
 		-- Polished fuel tanks under the doors, twin stacks at the cab's back
 		-- corners, west-coast mirrors.
 		decoCyl(
 			m,
 			"FuelTank",
-			2.0,
-			0.95,
-			CF(side * 2.25, 1.55, f + 5.8) * CFrame.Angles(0, math.pi / 2, 0),
+			2.6,
+			1.25,
+			CF(side * 3.0, 2.15, f + 7.75) * CFrame.Angles(0, math.pi / 2, 0),
 			CHROME_HI,
 			M.Foil
 		)
 		exhaust(
 			m,
-			V3(side * (W / 2 + 0.25), 2.1, f + 6.75),
-			V3(side * (W / 2 + 0.25), 9.4, f + 6.75), -- tall chrome stacks, well over the roof
-			0.46,
+			V3(side * (W / 2 + 0.3), 2.8, bedStart - 0.3),
+			V3(side * (W / 2 + 0.3), 11.3, bedStart - 0.3), -- tall chrome stacks, well over the roof
+			0.58,
 			CHROME_HI,
 			M.Foil,
 			0.2,
 			hex("#A8A39D")
 		)
-		deco(m, "Mirror", V3(0.15, 0.95, 0.45), CF(side * (W / 2 + 0.22), 4.9, f + 4.75), CHROME_HI, M.Foil)
+		deco(m, "Mirror", V3(0.19, 1.25, 0.58), CF(side * (W / 2 + 0.28), 6.3, f + 6.3), CHROME_HI, M.Foil)
 	end
 
-	-- A tall day cab (its roof 4.4 studs over the seat: room for a driver
-	-- in a hat, and the tallest roof on the lot, ACT-07): roof markers, sun
+	-- A tall day cab (its roof HEADROOM over the seat: room for a driver in
+	-- a hat, and the tallest roof on the lot, ACT-07): roof markers, sun
 	-- visor.
-	local cabTop = 7.4
-	boxCab(m, W, f + 5.8, 2.4, 1.9, 4.0, cabTop, paint, paint, paint)
+	local cabZ0 = f + 6.1
+	local roofY = seatTop + HEADROOM.rig
+	boxCab(m, W, (cabZ0 + bedStart) / 2, bedStart - cabZ0, 2.5, seatTop + 1.1, roofY, paint, paint, paint)
 	deco(
 		m,
 		"Visor",
-		V3(W - 0.2, 0.14, 0.55),
-		CF(0, cabTop - 0.02, f + 4.45) * CFrame.Angles(0.15, 0, 0),
+		V3(W - 0.25, 0.18, 0.7),
+		CF(0, roofY - 0.02, cabZ0 - 0.1) * CFrame.Angles(0.15, 0, 0),
 		BLACK,
 		M.Metal
 	)
-	for _, x in ipairs({ -1.2, 0, 1.2 }) do
-		deco(m, "Marker", V3(0.32, 0.16, 0.2), CF(x, cabTop + 0.4, f + 4.75), AMBER, M.Neon)
+	for _, x in ipairs({ -1.6, 0, 1.6 }) do
+		deco(m, "Marker", V3(0.42, 0.2, 0.26), CF(x, roofY + 0.42, cabZ0 + 0.35), AMBER, M.Neon)
 	end
-	driverSeat(m, V3(2.4, 0.5, 1.3), CF(0, 2.75, f + 5.95), hex("#3B2F2A"), M.Leather)
-	steeringWheel(m, V3(0, 4.3, f + 5.15), 1.0)
+	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#3B2F2A"), M.Leather)
+	steeringWheel(m, V3(0, seatTop + 1.05, seatZ - 0.75), 1.05)
 
 	-- Bulkhead, as tall as the cab, with a stub knuckle crane parked on top
 	-- (its turret clear of the cab's glass): turret, mast, a boom reaching
 	-- back over the load and a grapple hanging off its end.
-	local bulkTop = cabTop
-	local cz = bedStart + 0.15
+	local bulkTop = roofY
+	local cz = bedStart + 0.2
 	local bulkH = bulkTop - deckTop
-	deco(m, "Bulkhead", V3(W, bulkH, 0.3), CF(0, deckTop + bulkH / 2, cz), hex("#5C6166"), M.DiamondPlate)
-	Kit.decor(Kit.post(m, "Crane", V3(0.9, bulkTop, cz), 0.5, 1.15, crane, M.Metal), false)
-	Kit.decor(Kit.post(m, "Crane", V3(0.9, bulkTop + 0.5, cz), 1.5, 0.5, crane, M.Metal), false)
-	local tip = V3(0.9, bulkTop + 2.4, cz + 4.6)
-	plank(m, "Crane", V3(0.9, bulkTop + 1.8, cz - 0.3), tip, 0.5, 0.5, crane, M.Metal)
-	plank(m, "Crane", tip, tip - V3(0, 1.3, 0), 0.32, 0.32, Kit.shade(crane, -0.15), M.Metal)
-	deco(m, "Grapple", V3(0.75, 0.45, 0.6), CF(tip - V3(0, 1.5, 0)), BLACK, M.Metal)
+	deco(m, "Bulkhead", V3(W, bulkH, 0.4), CF(0, deckTop + bulkH / 2, cz), hex("#5C6166"), M.DiamondPlate)
+	Kit.decor(Kit.post(m, "Crane", V3(1.2, bulkTop, cz), 0.65, 1.5, crane, M.Metal), false)
+	Kit.decor(Kit.post(m, "Crane", V3(1.2, bulkTop + 0.65, cz), 1.95, 0.65, crane, M.Metal), false)
+	local tip = V3(1.2, bulkTop + 3.1, cz + 6.0)
+	plank(m, "Crane", V3(1.2, bulkTop + 2.35, cz - 0.4), tip, 0.65, 0.65, crane, M.Metal)
+	plank(m, "Crane", tip, tip - V3(0, 1.7, 0), 0.42, 0.42, Kit.shade(crane, -0.15), M.Metal)
+	deco(m, "Grapple", V3(1.0, 0.6, 0.8), CF(tip - V3(0, 1.95, 0)), BLACK, M.Metal)
 
-	-- Deck with steel stanchions.
+	-- Deck with steel bunk stakes, a pair at each third and at the back.
 	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#5E4636"))
-	for _, z in ipairs({ bedStart + 6.0, bedStart + 12.0, bedEnd - 0.25 }) do
+	for _, z in ipairs({ bedStart + lay.bedLength / 3, bedStart + lay.bedLength * 2 / 3, bedEnd - 0.3 }) do
 		for _, side in ipairs({ -1, 1 }) do
-			hull(m, "Stanchion", V3(0.28, 3.1, 0.28), CF(side * (W / 2 - 0.14), deckTop + 1.55, z), post, M.Metal)
+			hull(
+				m,
+				"Stanchion",
+				V3(wall, lay.wallHeight, wall),
+				CF(side * (W / 2 - wall / 2), deckTop + lay.wallHeight / 2, z),
+				post,
+				M.Metal
+			)
 		end
 	end
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
 			m,
 			"Taillight",
-			V3(0.45, 0.32, 0.08),
-			CF(side * (W / 2 - 0.4), lay.bedFloorY, bedEnd + 0.02),
+			V3(0.58, 0.42, 0.1),
+			CF(side * (W / 2 - 0.5), lay.bedFloorY, bedEnd + 0.03),
 			TAILLIGHT,
 			M.Neon
 		)
 	end
-	deco(m, "RearBumper", V3(W, 0.45, 0.45), CF(0, 1.6, b - 0.25), BLACK, M.Metal)
+	deco(m, "RearBumper", V3(W, 0.6, 0.6), CF(0, 2.05, b - 0.3), BLACK, M.Metal)
 
 	wheels(
 		m,
@@ -1088,34 +1171,36 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 	local r, tw = tl.wheelRadius, tl.tyreWidth
 	local paint = hex(trailer.look.color)
 	local rng = Kit.rng(#trailer.id * 97 + tl.bedLength)
-	local deckTop = y + 0.25
+	local deckTop = y + TruckLayout.BedFloorThickness / 2
+	local wall = (W - tl.bedWidth) / 2
+	local wallH = tl.wallHeight
 	local wood = hex("#8A6038")
 
 	local deckColor = if tl.style == "heavy" then hex("#5B4A3C") else wood
 	bedFloor(model, "TrailerBed", W, tl.bedLength, y, bc, deckColor)
 	frictionlessSkid(model, "TrailerSkid", W - 0.4, tl.bedLength - 1, bc)
-	deco(model, "TrailerFrame", V3(W - 1.2, 0.35, tl.bedLength), CF(0, y - 0.42, bc), FRAME, M.Metal)
+	deco(model, "TrailerFrame", V3(W - 1.5, 0.45, tl.bedLength), CF(0, y - 0.5, bc), FRAME, M.Metal)
 
 	-- A-frame tongue to a coupler at the truck's back.
-	local hitchZ = tl.hitchZ
+	local hitchZ, hitchY = tl.hitchZ, 1.75
 	for _, side in ipairs({ -1, 1 }) do
 		decoRod(
 			model,
 			"Tongue",
-			V3(side * (W / 2 - 0.7), 1.35, bs + 0.2),
-			V3(side * 0.15, 1.35, hitchZ + 0.5),
-			0.22,
+			V3(side * (W / 2 - 0.9), hitchY, bs + 0.25),
+			V3(side * 0.2, hitchY, hitchZ + 0.6),
+			0.28,
 			FRAME,
 			M.Metal
 		)
 	end
-	deco(model, "Coupler", V3(0.45, 0.35, 0.7), CF(0, 1.35, hitchZ + 0.3), BLACK, M.Metal)
+	deco(model, "Coupler", V3(0.6, 0.45, 0.9), CF(0, hitchY, hitchZ + 0.4), BLACK, M.Metal)
 
 	-- Axles, wheels and flat-topped fenders just outside the deck.
 	local heavy = tl.style == "heavy"
 	local rim = if heavy then hex("#C9CDD1") else hex("#D8C6A0")
 	for _, z in ipairs(tl.axleZ) do
-		decoRod(model, "Axle", V3(-tl.wheelX, r, z), V3(tl.wheelX, r, z), 0.2, FRAME, M.Metal)
+		decoRod(model, "Axle", V3(-tl.wheelX, r, z), V3(tl.wheelX, r, z), 0.26, FRAME, M.Metal)
 		for _, side in ipairs({ -1, 1 }) do
 			wheel(model, V3(side * tl.wheelX, r, z), r, tw, {
 				rim = rim,
@@ -1127,30 +1212,32 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 	end
 	local z0, z1 = tl.axleZ[1], tl.axleZ[#tl.axleZ]
 	local fenderColor = if heavy then hex("#8E949A") else paint
+	local fenderW = tw + 0.24
 	for _, side in ipairs({ -1, 1 }) do
-		local x = side * (W / 2 + (tw + 0.3) / 2 - 0.05)
+		local x = side * (W / 2 + fenderW / 2 - 0.1)
 		fender(model, x, z0, z1, {
 			r = r,
-			width = tw + 0.3,
-			top = 2 * r + 0.24,
-			thick = 0.2,
-			front = { 0.45, 1.5 },
-			back = { 0.4, 1.55 },
+			width = fenderW,
+			top = 2 * r + 0.3,
+			thick = 0.25,
+			front = { 0.55, 1.9 },
+			back = { 0.5, 1.95 },
 			color = fenderColor,
 			material = if heavy then M.DiamondPlate else M.Metal,
 		})
-		deco(model, "Taillight", V3(0.4, 0.28, 0.08), CF(side * (W / 2 - 0.35), y, be + 0.02), TAILLIGHT, M.Neon)
+		deco(model, "Taillight", V3(0.5, 0.36, 0.1), CF(side * (W / 2 - 0.45), y, be + 0.03), TAILLIGHT, M.Neon)
 	end
 
 	if tl.style == "pony" then
 		-- A little wooden farm trailer: plank sides, a drop-down back.
+		local boardH = (wallH - 0.16) / 2 -- two boards a side, a gap between
 		for _, side in ipairs({ -1, 1 }) do
-			for _, by in ipairs({ deckTop + 0.21, deckTop + 0.76 }) do
+			for i = 0, 1 do
 				hull(
 					model,
 					"TrailerBoard",
-					V3(0.22, 0.42, tl.bedLength),
-					CF(side * (W / 2 - 0.11), by, bc),
+					V3(wall, boardH, tl.bedLength),
+					CF(side * (W / 2 - wall / 2), deckTop + boardH / 2 + i * (boardH + 0.16), bc),
 					Kit.vary(paint, rng, 0.06),
 					M.WoodPlanks
 				)
@@ -1158,8 +1245,8 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 			deco(
 				model,
 				"TrailerPost",
-				V3(0.28, 1.15, 0.28),
-				CF(side * (W / 2 - 0.14), deckTop + 0.575, be - 0.14),
+				V3(0.32, wallH + 0.05, 0.32),
+				CF(side * (W / 2 - 0.16), deckTop + (wallH + 0.05) / 2, be - 0.16),
 				FRAME,
 				M.Metal
 			)
@@ -1167,16 +1254,16 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 		hull(
 			model,
 			"TrailerFront",
-			V3(W, 0.97, 0.22),
-			CF(0, deckTop + 0.485, bs + 0.11),
+			V3(W, wallH, 0.25),
+			CF(0, deckTop + wallH / 2, bs + 0.125),
 			Kit.vary(paint, rng, 0.05),
 			M.WoodPlanks
 		)
 		hull(
 			model,
 			"TrailerGate",
-			V3(W - 0.56, 0.97, 0.22),
-			CF(0, deckTop + 0.485, be - 0.11),
+			V3(W - 2 * wall - 0.14, wallH, 0.25),
+			CF(0, deckTop + wallH / 2, be - 0.125),
 			Kit.vary(paint, rng, 0.05),
 			M.WoodPlanks
 		)
@@ -1184,39 +1271,39 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 		-- Painted stake posts with two wooden rails, a tall headboard.
 		local rail = hex("#A77B4C")
 		for _, side in ipairs({ -1, 1 }) do
-			local x = side * (W / 2 - 0.12)
-			for _, z in ipairs({ bs + 0.3, bc, be - 0.3 }) do
-				hull(model, "TrailerStake", V3(0.24, 1.8, 0.24), CF(x, deckTop + 0.9, z), paint, M.Metal)
+			local x = side * (W / 2 - wall / 2)
+			for _, z in ipairs({ bs + 0.35, bc, be - 0.35 }) do
+				hull(model, "TrailerStake", V3(wall, wallH, wall), CF(x, deckTop + wallH / 2, z), paint, M.Metal)
 			end
-			for _, ry in ipairs({ deckTop + 0.75, deckTop + 1.5 }) do
+			for _, ry in ipairs({ deckTop + 0.85, deckTop + 1.7 }) do
 				hull(
 					model,
 					"TrailerRail",
-					V3(0.18, 0.35, tl.bedLength - 0.2),
+					V3(wall - 0.06, 0.42, tl.bedLength - 0.25),
 					CF(x, ry, bc),
 					Kit.vary(rail, rng, 0.06),
 					M.WoodPlanks
 				)
 			end
 		end
-		hull(model, "TrailerFront", V3(W, 1.8, 0.2), CF(0, deckTop + 0.9, bs + 0.1), paint, M.Metal)
+		hull(model, "TrailerFront", V3(W, wallH, 0.25), CF(0, deckTop + wallH / 2, bs + 0.125), paint, M.Metal)
 	else
 		-- Heavy Hauler: a steel headboard, tall stanchions, amber markers.
 		local steel = hex("#9AA1A8")
 		for _, side in ipairs({ -1, 1 }) do
-			for _, z in ipairs({ bs + 0.35, bc + 0.6, be - 0.3 }) do
+			for _, z in ipairs({ bs + 0.4, bc + 0.8, be - 0.35 }) do
 				hull(
 					model,
 					"TrailerStanchion",
-					V3(0.3, 2.6, 0.3),
-					CF(side * (W / 2 - 0.15), deckTop + 1.3, z),
+					V3(wall, wallH, wall),
+					CF(side * (W / 2 - wall / 2), deckTop + wallH / 2, z),
 					steel,
 					M.Metal
 				)
 			end
-			deco(model, "Marker", V3(0.08, 0.2, 0.35), CF(side * (W / 2 + 0.01), y, bc), AMBER, M.Neon)
+			deco(model, "Marker", V3(0.1, 0.26, 0.45), CF(side * (W / 2 + 0.02), y, bc), AMBER, M.Neon)
 		end
-		hull(model, "TrailerFront", V3(W, 2.0, 0.25), CF(0, deckTop + 1.0, bs + 0.125), paint, M.Metal)
+		hull(model, "TrailerFront", V3(W, wallH, 0.3), CF(0, deckTop + wallH / 2, bs + 0.15), paint, M.Metal)
 	end
 end
 

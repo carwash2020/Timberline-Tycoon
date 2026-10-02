@@ -80,7 +80,10 @@ return function(t)
 		t.eq(HudRules.SendHome(true, 50, nil), false, "no truck yet")
 		t.eq(HudRules.SendHome(true, 30, 300), false, "standing by it: drive it instead")
 		t.eq(HudRules.SendHome(false, 50, 300), false, "driving, or no character")
-		t.eq(HudRules.SendHome(true, 41, 21), true, "just past both lines")
+		-- TruckHome's line is half a parking slot (M1.5: 30 for the 60-stud
+		-- slots), so a truck at the far end of its own bay isn't offered.
+		t.eq(HudRules.SendHome(true, 50, 30), false, "parked at the end of its own bay")
+		t.eq(HudRules.SendHome(true, 41, 31), true, "just past both lines")
 	end)
 
 	t.test("Drop axe: never for a new player's lone Rusty Axe", function()

@@ -183,12 +183,16 @@ step("4. The town", function()
 		end
 	end)
 
+	-- The zone reaches south of the pad over the street (M1.5), so a big
+	-- truck backed in has its whole bed in it; the prompt stays over the
+	-- pad's middle.
 	step("4. The sell area", function()
-		local sellZone = Kit.part(sellArea, "SellZone", Vector3.new(24, 12, 18), town.sellZone, Color3.new(1, 1, 1))
+		local sellZone = Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, Color3.new(1, 1, 1))
 		ghost(sellZone, 1)
 		local sellPoint = Instance.new("Attachment") -- where the client's "Sell logs" prompt appears
 		sellPoint.Name = "SellPoint"
-		sellPoint.Position = Vector3.new(0, -2.5, 0)
+		local padMiddle = town.sellZone:ToObjectSpace(town.sellPad).Position
+		sellPoint.Position = Vector3.new(padMiddle.X, -2.5, padMiddle.Z)
 		sellPoint.Parent = sellZone
 
 		local padArt = BuildingArt.SellPad(24, 18)
@@ -241,14 +245,15 @@ step("4. The town", function()
 
 	-- Parking lot: one slot per player, so trucks never spawn inside each other.
 	-- VehicleService claims slots by Index. Paint on the ground: no lip for a
-	-- truck to snag on.
+	-- truck to snag on. Each slot is WorldPlan.ParkingSlotSize (M1.5: 10 x 60,
+	-- room for the biggest rig).
 	local slots: { BasePart } = {}
 	step("4. The parking lot", function()
 		for index, cf in ipairs(town.parkingSlots) do
 			local slot = Kit.part(
 				map,
 				"ParkingSlot_" .. index,
-				Vector3.new(6.5, 0.2, 37),
+				WorldPlan.ParkingSlotSize,
 				cf,
 				Color3.fromRGB(186, 168, 140),
 				Enum.Material.Slate

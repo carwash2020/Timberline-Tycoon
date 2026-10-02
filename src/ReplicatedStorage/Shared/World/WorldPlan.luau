@@ -943,7 +943,7 @@ export type Town = {
 	spawn: Vector3,
 	spawnFacing: CFrame, -- the SpawnLocation's CFrame: at `spawn`, its front toward the sawmill
 	sawmill: CFrame,
-	sellZone: CFrame, -- centre of the 24 x 12 x 18 sell volume
+	sellZone: CFrame, -- centre of the sell volume (WorldPlan.SellZoneSize)
 	sellPad: CFrame,
 	skyBin: CFrame,
 	shops: { ShopSpot },
@@ -960,6 +960,20 @@ export type Town = {
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
+
+-- The sell volume over the pad (MapBuilder's SellZone): the pad's width and
+-- 26 deep, from the pad's north edge (z 95) out over the street to z 69,
+-- so a truck backed in from the street has its whole bed in it, the
+-- Logging Rig's 26-stud deck too (M1.5; it was 18 deep, the pad's own).
+WorldPlan.SellZoneSize = Vector3.new(24, 12, 26)
+
+-- A parking slot (MapBuilder builds a ParkingSlot part this size at each
+-- of town.parkingSlots): as wide as the widest rig with room to open a
+-- door, as long as the longest (the Logging Rig with a Heavy Hauler, 57.9).
+-- Each keeps ParkingPullOut studs clear past both ends, so a truck can
+-- drive out forward or back out (WorldPlan.spec).
+WorldPlan.ParkingSlotSize = Vector3.new(10, 0.2, 60)
+WorldPlan.ParkingPullOut = 35
 
 -- The town's gondola station; it turns its open back (+Z) toward the top
 -- station on the isles, along the cable.
@@ -987,9 +1001,11 @@ function WorldPlan.Town(): Town
 	-- Lamps (the layout from tools/preview/scenes/town.luau): along the
 	-- main street (z 70 to 84) with their arms over it, at the head of the
 	-- spawn walk, by the gondola path and the mill yard, and by the lot.
-	-- None stand where trucks pull out of the parking slots (x 16 to 104),
+	-- None stand where trucks pull out of the parking slots (x 9 to 142),
 	-- and none on a road (like every colliding thing in town: WorldPlan.spec).
-	-- The lot's lamp stands south of the Plot Road's mouth, its arm over it.
+	-- The lot's two lamps stand past its east rail (M1.5: the lot grew east),
+	-- one south of the Plot Road's mouth, its arm toward it, one with its
+	-- arm over the lot.
 	local lamps: { CFrame } = {}
 	for _, x in ipairs({ -92, -64, -30, -14 }) do
 		table.insert(lamps, at(x, 68.5, math.pi)) -- south side, arm north over the street
@@ -1001,8 +1017,8 @@ function WorldPlan.Town(): Town
 	table.insert(lamps, at(8, 60, math.pi / 2))
 	table.insert(lamps, at(-41, 134, -math.pi / 2)) -- west of the gondola path, arm east over it
 	table.insert(lamps, at(36, 124, 0)) -- east of the mill's lean-to
-	table.insert(lamps, at(118, 40, math.pi))
-	table.insert(lamps, at(120, 0, math.pi / 2))
+	table.insert(lamps, at(147.5, 40, math.pi))
+	table.insert(lamps, at(147.5, 0, math.pi / 2))
 
 	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east
 	-- edge (z 6 to 42, ending short of the Plot Road).
@@ -1010,7 +1026,7 @@ function WorldPlan.Town(): Town
 		{ length = 26, cframe = at(-92, 140) },
 		{ length = 26, cframe = at(-92, 124) },
 		{ length = 16, cframe = at(-105, 132, math.pi / 2) },
-		{ length = 36, cframe = at(111, 24, math.pi / 2) },
+		{ length = 36, cframe = at(145, 24, math.pi / 2) },
 	}
 
 	-- Murph's camp west of the spawn, behind the TO THE WOODS sign and clear
@@ -1055,13 +1071,15 @@ function WorldPlan.Town(): Town
 		table.insert(props, { name = name, cframe = at(x, z, yaw), seed = i * 13 })
 	end
 
-	-- Parking: two rows of 12 slots facing the forest (-Z), sized for the
-	-- longest rig (VehicleService claims them by Index).
+	-- Parking (M1.5): one row of 12 slots (a server holds 12 players), 11
+	-- apart, facing the forest (-Z), each ParkingSlotSize: room for the
+	-- longest rig (VehicleService claims them by Index, slot 1 nearest the
+	-- spawn). The row spans z -9 to 51: its pull-outs run on to z -44 south,
+	-- short of the Starter Forest's first trunks, and north to the street;
+	-- the Plot Road comes in along the north ends of the last few.
 	local slots: { CFrame } = {}
-	for row = 0, 1 do
-		for col = 0, 11 do
-			table.insert(slots, CFrame.new(16 + col * 8, 0.1, 45 - row * 40))
-		end
+	for col = 0, 11 do
+		table.insert(slots, CFrame.new(15 + col * 11, WorldPlan.ParkingSlotSize.Y / 2, 21))
 	end
 
 	-- Signs: one by the spawn with every destination, the plots, and SELL
@@ -1084,7 +1102,13 @@ function WorldPlan.Town(): Town
 	-- street, the pad or a path (WorldPlan.spec).
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
-		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
+		-- North of the Plot Road's mouth, past the lot's east rail (M1.5: it
+		-- stood at (124, 64), now in a pull-out). From the spawn it hides
+		-- the same stretch of the coast as before, so the lighthouse (which
+		-- stands where the spawn sees it, inSightOfSpawn) stays where it was:
+		-- (1194, 188). Only a sliver of spots here does that (WorldPlan.spec
+		-- pins the lighthouse).
+		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 67, 0, 40) },
 		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
 	}
 
@@ -1132,8 +1156,11 @@ function WorldPlan.Town(): Town
 		{ "tree", 124, 150, 1, "maple" },
 		{ "tree", 96, 162, 1.22, "birch" },
 		{ "tree", 68, 168, 1.22, "maple" },
-		{ "tree", 128, 24, 1, "birch" },
-		{ "tree", 132, -14, 1.22, "maple" },
+		-- By the lot (M1.5: off it and its pull-outs since it grew east): one
+		-- north of the Plot Road's mouth (and of the lighthouse's line from
+		-- the spawn), one past the south pull-outs.
+		{ "tree", 160, 84, 1, "birch" },
+		{ "tree", 132, -54, 1.22, "maple" },
 		-- Bushes along the shops' sides, the mill's back and the station.
 		{ "bush", -112, 100, 2.8 },
 		{ "bush", -112.5, 105.5, 2.4 },
@@ -1158,7 +1185,7 @@ function WorldPlan.Town(): Town
 		{ "rock", -55, 150, 1.8 },
 		{ "rock", 73, 112, 2 },
 		{ "rock", -114, 95, 1.6 },
-		{ "rock", 116, 72, 1.8 },
+		{ "rock", 146, 88, 1.8 },
 	}
 	for _, g in ipairs(greenSpots) do
 		local kind: string, x: number, z: number, size: number, woodId: string? = g[1], g[2], g[3], g[4], g[5]
@@ -1188,7 +1215,9 @@ function WorldPlan.Town(): Town
 		-- spawn walk; the shops' on their paths. They grew back and sideways
 		-- (the Tool Shed and Hearth & Home west, the Dealership east).
 		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
-		sellZone = CFrame.new(mill.X, 6, mill.Z - 24),
+		-- Its north edge on the pad's (z 95), reaching south over the street
+		-- (WorldPlan.SellZoneSize); its centre (z 82) still on the pad.
+		sellZone = CFrame.new(mill.X, 6, mill.Z + 9 - 24 - WorldPlan.SellZoneSize.Z / 2),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
 		skyBin = CFrame.new(mill.X - 18, 2, mill.Z - 24),
 		shops = {

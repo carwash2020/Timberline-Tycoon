@@ -250,7 +250,14 @@ return function(t)
 		end
 	end)
 
+	-- The parking lot's slots (M1.5: 10 x 60, side by side, 11 apart).
+	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+	local SLOT = WorldPlan.ParkingSlotSize
+	local townSlots = WorldPlan.Town().parkingSlots
+	local SLOT_APART = math.abs(townSlots[2].X - townSlots[1].X)
+
 	t.test("fits its parking slot, sits on the ground, budget kept", function()
+		t.ok(SLOT.X <= SLOT_APART, "slots side by side, none overlapping")
 		for _, rig in ipairs(rigs()) do
 			local model, layout = build(rig)
 			local label = rig.label
@@ -266,8 +273,14 @@ return function(t)
 				end), label .. " " .. p.Name .. " placed with .Position")
 			end
 			t.ok(lo.Y > -0.02, label .. " nothing below the ground")
-			t.ok(math.max(-lo.X, hi.X) <= 3.8, label .. " fits between neighbours (8 studs apart)")
-			t.ok(hi.Z - lo.Z <= 37.5, label .. " fits a 37-stud slot")
+			t.ok(
+				math.max(-lo.X, hi.X) <= SLOT.X / 2,
+				string.format("%s is %.2f wide: fits its %g-wide slot", label, 2 * math.max(-lo.X, hi.X), SLOT.X)
+			)
+			t.ok(
+				hi.Z - lo.Z <= SLOT.Z,
+				string.format("%s is %.2f long: fits a %g-stud slot", label, hi.Z - lo.Z, SLOT.Z)
+			)
 			t.ok(lo.Z >= layout.front - 0.6, label .. " nothing far in front of the bumper")
 			-- 74: 70 plus the two invisible skid ramps (ACT-05) plus two for
 			-- the hub bolts (ACT-09: one a hubbed wheel, up to four, so the
@@ -292,7 +305,10 @@ return function(t)
 	end
 
 	t.test("skids ramp up at both ends: ledges ride under them (ACT-05)", function()
-		local MAX_SLOPE = math.rad(27) -- Drive's push (mass * 120) over gravity (196.2) is tan 31.4
+		-- Drive's push (mass * 120) over gravity (196.2) is tan 31.4; the
+		-- ramps keep to 26.6 (1 in 2), as before the skids grew (M1.5).
+		local MAX_SLOPE = math.rad(26.6)
+		t.ok(TruckArt.SkidRampRun >= 2 * (TruckLayout.ChassisY - 0.5) - 1e-9, "a ramp runs twice the skid's height")
 		local eps = 1e-3
 		for _, rig in ipairs(rigs()) do
 			local model, layout, tl = build(rig)
@@ -440,10 +456,10 @@ return function(t)
 	-- A seated driver, the way Roblox seats an avatar: the hips (an R15's
 	-- hip joints) on the seat's top at its middle, facing the front. Head
 	-- and hat stack up from there (an R15's head top sits about 3.2 over the
-	-- seat, CharacterArt's 3.25; then a 0.6 hat), the face and nose reach
-	-- 0.75 ahead of the hips. The legs are R6's (the worst case): straight
-	-- out in front, 2 long, 1 thick about the seat's top, 2 wide.
-	local HEADROOM = 4.0
+	-- seat, CharacterArt's 3.25; then a 0.6 hat, or a tall one of 1.2), the
+	-- face and nose reach 0.75 ahead of the hips. The legs are R6's (the
+	-- worst case): straight out in front, 2 long, 1 thick about the seat's
+	-- top, 2 wide.
 	local function driver(seat)
 		local s = seat.CFrame
 		local top = s.Y + seat.Size.Y / 2
@@ -457,6 +473,7 @@ return function(t)
 			top = top,
 			head = zone(0.7, 2.0, 3.25, -0.75, 0.6),
 			hat = zone(0.72, 3.25, 3.85, -0.65, 0.65),
+			tallHat = zone(0.72, 3.25, 4.45, -0.65, 0.65),
 			legs = zone(1.0, -0.5, 0.5, -2.0, 0),
 		}
 	end
@@ -484,12 +501,16 @@ return function(t)
 		return p ~= seat and p.Transparency < 1 and p.Material.Name ~= "Glass"
 	end
 
-	-- Seat tops before the cabs were raised (ACT-04): the headroom comes
-	-- from the roofs, not from sinking the seats.
-	local SEAT_TOP = { Rustbucket = 2.35, Pickup = 2.025, ScoutATV = 2.75, Flatbed = 2.2, LoggingRig = 3.0 }
+	-- Seat tops: each seat rose with its bigger body in M1.5 (V2_PLAN §4c)
+	-- and stays put there; the headroom comes from the roofs, not from
+	-- sinking the seats (ACT-04). Each roof's underside stands at least
+	-- HEADROOM over its seat (the plan's table: a hat clears, the bigger the
+	-- truck the more room). The Rustbucket and the Scout are open.
+	local SEAT_TOP = { Rustbucket = 2.85, Pickup = 2.6, ScoutATV = 3.5, Flatbed = 2.8, LoggingRig = 3.7 }
+	local HEADROOM = { Pickup = 4.6, Flatbed = 4.8, LoggingRig = 5.0 }
 	local ROOFED = { pickup = true, flatbed = true, rig = true }
 
-	t.test("seats stay put; a roofed cab has 4 studs over the seat", function()
+	t.test("seats stay put; a roofed cab has 4.6 to 5 studs over the seat", function()
 		for id, def in pairs(ItemCatalog.Trucks) do
 			local model, layout = build({ def = def })
 			local seat = model:FindFirstChild("DriverSeat")
@@ -497,6 +518,7 @@ return function(t)
 			if SEAT_TOP[id] then
 				t.ok(math.abs(d.top - SEAT_TOP[id]) < 1e-3, string.format("%s seat top %.3f moved", id, d.top))
 			end
+			t.eq(HEADROOM[id] ~= nil, ROOFED[layout.style] == true, id .. " has a headroom rule exactly when roofed")
 			local roofs = 0
 			for _, p in ipairs(named(model, "Roof")) do
 				local lo, hi = box(p)
@@ -505,11 +527,12 @@ return function(t)
 					roofs += 1
 					local headroom = lo.Y - d.top
 					t.ok(
-						headroom >= HEADROOM - 1e-3,
-						string.format("%s headroom %.3f under %.1f", id, headroom, HEADROOM)
+						headroom >= (HEADROOM[id] or math.huge) - 1e-3,
+						string.format("%s headroom %.3f under %.1f", id, headroom, HEADROOM[id] or 0)
 					)
+					t.ok(lo.Y >= d.tallHat.hi.Y, id .. ": a tall hat clears the roof")
 					-- The roof covers the driver's head and hat.
-					for _, zone in ipairs({ d.head, d.hat }) do
+					for _, zone in ipairs({ d.head, d.hat, d.tallHat }) do
 						t.ok(lo.X <= zone.lo.X and zone.hi.X <= hi.X, id .. " roof covers the head and hat across")
 						t.ok(
 							lo.Z <= zone.lo.Z and zone.hi.Z <= hi.Z,
@@ -530,7 +553,7 @@ return function(t)
 			for _, p in ipairs(parts(model)) do
 				if opaque(p, seat) then
 					local a, b = box(p)
-					for name, zone in pairs({ head = d.head, hat = d.hat }) do
+					for name, zone in pairs({ head = d.head, hat = d.hat, ["tall hat"] = d.tallHat }) do
 						t.ok(
 							not overlaps(a, b, zone.lo, zone.hi),
 							string.format("%s: %s goes through the driver's %s", id, p.Name, name)
@@ -541,7 +564,7 @@ return function(t)
 			-- Every point of the face and hat is behind each windshield pane
 			-- (its +Z side faces the cab) wherever the pane is beside it.
 			for _, pane in ipairs(named(model, "Windshield")) do
-				for _, zone in ipairs({ d.head, d.hat }) do
+				for _, zone in ipairs({ d.head, d.hat, d.tallHat }) do
 					for _, c in ipairs(corners(zone)) do
 						local p = pane.CFrame:Inverse() * c
 						local h = pane.Size / 2

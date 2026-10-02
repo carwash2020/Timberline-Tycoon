@@ -43,7 +43,7 @@ return function(t)
 		station.Parent = map
 		local sell = Instance.new("Model")
 		sell.Name = "SellArea"
-		part(sell, "SellZone", Vector3.new(24, 12, 18), CFrame.new(0, 6, 86))
+		part(sell, "SellZone", Vector3.new(24, 12, 26), CFrame.new(0, 6, 82)) -- as MapBuilder builds it (M1.5)
 		sell.Parent = map
 		return map, counters
 	end

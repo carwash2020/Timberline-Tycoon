@@ -9,7 +9,10 @@
 
 local TruckHome = {}
 
-TruckHome.ShowBeyond = 20 -- studs from its spot: further than this, the button can show
+-- Studs from its spot: further than this, the button can show. Half a
+-- parking slot (M1.5: 60 long; it was 20 for the 37-stud slots), so a
+-- truck parked anywhere in its own bay never offers it.
+TruckHome.ShowBeyond = 30
 TruckHome.Step = 2 -- studs the distance moves before it's sent again
 TruckHome.Every = 0.5 -- seconds between the server's checks
 TruckHome.Max = 99999 -- the most it reads (and what a broken position reads)

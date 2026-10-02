@@ -149,6 +149,19 @@ return function(t)
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "SellZone")
 		t.ok(s.sellArea:FindFirstChild("SellZone"):FindFirstChild("SellPoint"), "SellPoint")
+		-- M1.5: the zone runs from the pad's north edge (z 95) out over the
+		-- street to z 69, the pad's width; the prompt stays over the pad's
+		-- middle (z 86), where it always was.
+		do
+			local zone = s.sellArea:FindFirstChild("SellZone")
+			local c, size = zone.CFrame.Position, zone.Size
+			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 26) < 1e-4, "the sell zone is 24 x 26")
+			t.ok(math.abs(c.Z + size.Z / 2 - 95) < 1e-4 and math.abs(c.Z - size.Z / 2 - 69) < 1e-4, "z 69 to 95")
+			t.ok(math.abs(c.X) < 1e-4, "centred on the spawn walk")
+			local point = zone.CFrame * zone:FindFirstChild("SellPoint").Position
+			t.ok(math.abs(point.X) < 1e-4 and math.abs(point.Z - 86) < 1e-4, "the prompt over the pad's middle")
+			t.ok(zone.CanCollide == false and zone.CanQuery == false and zone.Transparency == 1, "a ghost")
+		end
 		t.ok(s.clockStarted, "the clock started")
 		t.ok(s.clockBeforeSellArea, "the clock (the last build step) starts before SellArea goes in")
 		t.ok(s.treeBeforeSellArea, "every tree spawns before SellArea goes in")
@@ -252,7 +265,7 @@ return function(t)
 		t.eq(#s.warnings, 0, table.concat(s.warnings, "\n"))
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local plan = WorldPlan.Town().parkingSlots
-		t.ok(#plan >= 24, "24 slots planned")
+		t.eq(#plan, 12, "12 slots planned: one for each player a server holds")
 		for index, cf in ipairs(plan) do
 			local slot = s.map:FindFirstChild("ParkingSlot_" .. index)
 			t.ok(slot and slot:IsA("BasePart"), "ParkingSlot_" .. index .. " is built")
@@ -263,7 +276,15 @@ return function(t)
 					and slot.CFrame.LookVector:Dot(cf.LookVector) > 0.9999,
 				"slot " .. index .. " sits where WorldPlan puts it"
 			)
-			t.ok(math.abs(slot.Size.Y - 0.2) < 1e-4 and math.abs(slot.Size.Z - 37) < 1e-4, "slot " .. index .. " size")
+			-- 10 x 60 (M1.5): the biggest rig fits; Size.Y is what VehicleService
+			-- reads to find the ground under it.
+			t.ok(
+				math.abs(slot.Size.X - 10) < 1e-4
+					and math.abs(slot.Size.Y - 0.2) < 1e-4
+					and math.abs(slot.Size.Z - 60) < 1e-4,
+				"slot " .. index .. " size"
+			)
+			t.ok(math.abs(slot.CFrame.Y - slot.Size.Y / 2) < 1e-4, "slot " .. index .. " lies on the ground")
 			t.eq(slot.Transparency, 1)
 			local glows = 0
 			for _, d in ipairs(slot:GetDescendants()) do

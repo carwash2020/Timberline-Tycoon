@@ -127,7 +127,33 @@ return function(t)
 		t.ok(seen.Flatbed > was("Flatbed") and seen.Flatbed < seen.LoggingRig, "the Flatbed in between")
 	end)
 
-	-- Pulling out of a parking slot (WorldPlan's lot: 6.5 x 37 slots, side by
+	-- M1.5 (V2_PLAN §4c): the trucks grew (longer wheelbases), and
+	-- TurnRadiusPerWheelbase went from 0.75 to 0.62, so each one's tightest
+	-- circle (at a crawl, full lock) is within 10% of what it was before, and
+	-- never tighter: driving feels the same.
+	t.test("the bigger trucks turn within 10% of their old circles", function()
+		t.ok(math.abs(DriveMath.TurnRadiusPerWheelbase - 0.62) < 1e-9, "0.62 a stud of wheelbase")
+		-- Each truck's circle before M1.5: the turnRate rule (GripSpeed /
+		-- turnRate) or 0.75 x its old wheelbase (9.2, 10.2, 4, 13.05, 19.75).
+		local old = {
+			Rustbucket = math.max(10 / 1.4, 0.75 * 9.2),
+			Pickup = math.max(10 / 1.4, 0.75 * 10.2),
+			ScoutATV = math.max(10 / 2, 0.75 * 4),
+			Flatbed = math.max(10 / 1.2, 0.75 * 13.05),
+			LoggingRig = math.max(10 / 1, 0.75 * 19.75),
+		}
+		for id, def in pairs(ItemCatalog.Trucks) do
+			t.ok(old[id], id .. " has its old circle listed")
+			for _, speed in ipairs({ 1, 3, 6 }) do
+				local now = circle(speed, def.turnRate, radiusOf(def))
+				local was = math.max(old[id], circle(speed, def.turnRate, nil))
+				t.ok(now >= was - 1e-9, string.format("%s at %g: %.2f is no tighter than %.2f", id, speed, now, was))
+				t.ok(now <= was * 1.1 + 1e-9, string.format("%s at %g: %.2f within 10%% of %.2f", id, speed, now, was))
+			end
+		end
+	end)
+
+	-- Pulling out of a parking slot (WorldPlan's lot: 10 x 60 slots, side by
 	-- side) with both neighbouring slots taken, the way a driver does it:
 	-- straight out (forward, or reversing) for `straight` studs, then full
 	-- lock at a crawl until the rig is at right angles to its row. A 2D
@@ -135,7 +161,7 @@ return function(t)
 	-- its rear axle, as VehicleController drives it. Returns how far past
 	-- the end of its row the rig reached, or nil if it went into a
 	-- neighbour's slot.
-	local SLOT_W, SLOT_L = 6.5, 37
+	local SLOT_W, SLOT_L = WorldPlan.ParkingSlotSize.X, WorldPlan.ParkingSlotSize.Z
 	local slots = WorldPlan.Town().parkingSlots
 	local spacing = math.abs(slots[2].Position.X - slots[1].Position.X)
 

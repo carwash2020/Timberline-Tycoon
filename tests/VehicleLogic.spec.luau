@@ -243,6 +243,64 @@ return function(t)
 		end
 	end)
 
+	-- M1.5: the trucks grew (the widest rig, wheels and fenders, is under
+	-- 10 studs), so side-by-side overflow spots are 11 apart, like the
+	-- parking slots.
+	t.test("overflow spots side by side are 11 studs apart or more", function()
+		t.ok(VehicleLogic.OverflowApart >= 11)
+		for i = 0, 31 do
+			local a = VehicleLogic.OverflowSpot(i)
+			for k = i + 1, 31 do
+				local b = VehicleLogic.OverflowSpot(k)
+				if math.abs(a.Z - b.Z) < 1e-6 then
+					t.ok(math.abs(a.X - b.X) >= 11 - 1e-6, string.format("spots %d and %d side by side", i, k))
+				end
+			end
+		end
+		-- Every one stays in town, west of the spawn.
+		local first, last = VehicleLogic.OverflowSpot(0), VehicleLogic.OverflowSpot(31)
+		t.ok(first.X < 0 and last.X > -125, "between the spawn and the town's west edge")
+	end)
+
+	t.test("a big rig round its own spot counts as home: 40 studs (M1.5)", function()
+		t.eq(VehicleLogic.HomeRadius, 40)
+		local town = { x0 = 0, x1 = 1, z0 = 0, z1 = 1 }
+		local home = Vector3.new(-200, 0, -200)
+		t.ok(VehicleLogic.InTown(home + Vector3.new(0, 0, 39.9), town, home), "the far end of a rig on its spot")
+		t.ok(not VehicleLogic.InTown(home + Vector3.new(0, 0, 40.1), town, home))
+	end)
+
+	-- RigCorners and RestingCFrame with the biggest rig M1.5 builds: the
+	-- Logging Rig (7.8 wide, 35.9 long) with a Heavy Hauler (22 more).
+	t.test("the biggest rig's corners span it, and it's set down on them", function()
+		local TruckLayout = t.shared("TruckLayout")
+		local ItemCatalog = t.shared("ItemCatalog")
+		local lay = TruckLayout.For(ItemCatalog.GetTruck("LoggingRig"))
+		local tl = TruckLayout.ForTrailer(ItemCatalog.GetTrailer("HeavyHauler"), lay)
+		local rear = lay.length / 2 + tl.length
+		local corners = VehicleLogic.RigCorners(lay.width, lay.front, rear)
+		t.eq(#corners, 6)
+		t.ok(corners[1].Z < lay.front + 1 and corners[3].Z > rear - 1, "bumper to the trailer's back")
+		t.ok(math.abs(corners[2].X) > lay.width / 2 - 0.5, "out at the sides")
+		local clearance = TruckLayout.ChassisY
+		local hits = {}
+		for i, c in ipairs(corners) do
+			hits[i] = Vector3.new(c.X, if c.Z > 0 then c.Z * 0.1 else 0, c.Z) -- rising behind
+		end
+		local cf = VehicleLogic.RestingCFrame(
+			Vector3.new(0, 50, 0),
+			Vector3.yAxis,
+			Vector3.new(0, 0, -1),
+			clearance,
+			math.rad(30),
+			corners,
+			hits
+		)
+		for i, c in ipairs(corners) do
+			t.ok((cf * (c - Vector3.new(0, clearance, 0))).Y >= hits[i].Y - 1e-4, "corner " .. i .. " not buried")
+		end
+	end)
+
 	t.test("the saved bed is copied and cleaned", function()
 		local bed = { { woodId = "oak", value = 12 }, { woodId = "pine", value = 20, figure = "curly" } }
 		local copy = VehicleLogic.CopyBed(bed)
@@ -313,9 +371,10 @@ return function(t)
 		t.ok(not VehicleLogic.InTown(Vector3.new(0, 3, -60), town), "the Starter Forest isn't town")
 		t.ok(not VehicleLogic.InTown(Vector3.new(1100, 40, 1180), town), "the Volcano")
 		t.ok(not VehicleLogic.InTown(Vector3.new(-420, 10, 110), town), "the Hills")
-		local home = Vector3.new(-76, 0, -28) -- an overflow spot past the edge
-		t.ok(VehicleLogic.InTown(Vector3.new(-70, 0, -30), town, home), "beside your own spot")
-		t.ok(not VehicleLogic.InTown(Vector3.new(-70, 0, -70), town, home), "but not far past it")
+		local home = VehicleLogic.OverflowSpot(31) -- an overflow spot past the edge
+		t.ok(home.Z < town.z0, "the last overflow row is south of the town's edge")
+		t.ok(VehicleLogic.InTown(home + Vector3.new(6, 0, -2), town, home), "beside your own spot")
+		t.ok(not VehicleLogic.InTown(home + Vector3.new(6, 0, -45), town, home), "but not far past it")
 	end)
 
 	t.test("a load left behind lies in rows where the truck stood", function()
