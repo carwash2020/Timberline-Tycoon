@@ -372,13 +372,14 @@ step("5. The volcano's crater", function()
 end)
 
 -- The palm island offshore: you can see it from the beach, but there are no
--- boats yet (palmwood comes after V1). Looks only.
+-- boats yet (palmwood comes after V1). Looks only but for each palm's
+-- trunk, which collides (COL-01), like a town tree's. Never tagged Tree.
 step("5. The palm island", function()
 	local palm = WoodData.Get("palmwood")
 	if palm then
 		for i, pos in ipairs(WorldPlan.IslandPalms()) do
 			local tree = TreeArt.Build(palm, 3000 + i, 0.9 + (i % 3) * 0.1)
-			Kit.decorAll(tree)
+			Kit.decorAll(tree, { Trunk = true })
 			place(atomic(tree), CFrame.new(pos) * CFrame.Angles(0, i * 1.3, 0))
 		end
 	end
@@ -395,8 +396,10 @@ end)
 -- Open-country scenery (WLD-01): outcrops, log piles, fence and hay lines,
 -- ruined cabins, windmills and lookout towers between the biomes and along
 -- the haul roads (WorldPlan.Scenery). Each piece is its own Atomic model
--- under TimberlineMap.Scenery. Looks only: nothing in it collides, is
--- clicked or touched, and parts under a stud cast no shadow.
+-- under TimberlineMap.Scenery. What its builder made solid collides (COL-01:
+-- the stones, walls, posts, towers, fence posts and rails, bales and logs,
+-- all of it 4+ studs off the roads); the rest is looks only. Nothing in it
+-- is touched, and parts under a stud cast no shadow.
 step("5. The scenery", function()
 	local folder = Instance.new("Folder")
 	folder.Name = "Scenery"
@@ -420,7 +423,13 @@ step("5. The scenery", function()
 		for _, d in ipairs(piece:GetDescendants()) do
 			if d:IsA("BasePart") then
 				local size = d.Size
-				Kit.decor(d, if math.max(size.X, size.Y, size.Z) < 1 then false else nil)
+				if math.max(size.X, size.Y, size.Z) < 1 then
+					d.CastShadow = false
+				end
+				d.CanTouch = false -- nothing listens for a set piece's touches
+				if not d.CanCollide then
+					Kit.decor(d) -- looks only: no clicks either
+				end
 			end
 		end
 		atomic(piece).Parent = folder

@@ -189,9 +189,11 @@ return function(t)
 					local base = trunk.CFrame.Position - roblox.Vector3.new(0, trunk.Size.X / 2, 0)
 					t.ok((base - g.cframe.Position).Magnitude < 1e-3, "a town tree stands on its spot")
 				end
+				-- Only a tree's Trunk and a rock's stones (COL-01) collide.
+				local solidName = if g.kind == "tree" then "Trunk" elseif g.kind == "rock" then "Rock" else nil
 				for _, d in ipairs(model:GetDescendants()) do
 					if d:IsA("BasePart") and d.CanCollide then
-						t.eq(d.Name, "Trunk", model.Name .. "'s " .. d.Name .. " collides")
+						t.eq(d.Name, solidName, model.Name .. "'s " .. d.Name .. " collides")
 					end
 				end
 			end
@@ -511,7 +513,7 @@ return function(t)
 	end)
 
 	t.test(
-		"the scenery: an Atomic model per WorldPlan.Scenery piece in a Scenery folder, all decor (WLD-01)",
+		"the scenery: an Atomic model per WorldPlan.Scenery piece in a Scenery folder; what looks solid collides (WLD-01, COL-01)",
 		function()
 			local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 			local s = build()
@@ -522,30 +524,64 @@ return function(t)
 			local spots = WorldPlan.Scenery()
 			local models = folder:GetChildren()
 			t.eq(#models, #spots)
-			local total = 0
+			-- What collides in each kind of piece (its builders' big bodies), and
+			-- one thing each kind always has that stops you.
+			local SOLID = {
+				Outcrop = { Rock = true },
+				RuinedCabin = {
+					Footing = true,
+					Floor = true,
+					WallLog = true,
+					CornerPost = true,
+					Chimney = true,
+					FallenRoof = true,
+				},
+				Windmill = { MillBase = true, Tower = true },
+				LookoutTower = { Leg = true, Deck = true, Rail = true, Ladder = true },
+				LogPile = { Log = true },
+				FenceLine = { Post = true, Rail = true, Haybale = true },
+				HayLine = { Haybale = true },
+			}
+			local MUST = {
+				Outcrop = "Rock",
+				RuinedCabin = "WallLog",
+				Windmill = "Tower",
+				LookoutTower = "Leg",
+				LogPile = "Log",
+				FenceLine = "Post",
+				HayLine = "Haybale",
+			}
+			local total, solidTotal = 0, 0
 			for i, model in ipairs(models) do
 				t.ok(model:IsA("Model"), "a Model")
 				t.eq(model.Name, spots[i].kind)
 				t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, model.Name .. " streams Atomic")
-				local n = 0
+				local n, solid = 0, {}
 				for _, d in ipairs(model:GetDescendants()) do
 					if d:IsA("BasePart") then
 						n += 1
 						t.eq(d.Anchored, true)
-						t.ok(
-							not d.CanCollide and not d.CanQuery and not d.CanTouch,
-							model.Name .. ": " .. d.Name .. " is decor"
-						)
+						t.ok(not d.CanTouch, model.Name .. ": " .. d.Name .. " can be touched")
+						if d.CanCollide then
+							solid[d.Name] = true
+							solidTotal += 1
+							t.ok(SOLID[model.Name][d.Name], model.Name .. ": " .. d.Name .. " collides")
+							t.ok(d.CanQuery, model.Name .. ": a solid " .. d.Name .. " can't be clicked")
+						else
+							t.ok(not d.CanQuery, model.Name .. ": " .. d.Name .. " is decor but can be clicked")
+						end
 						local size = d.Size
 						if math.max(size.X, size.Y, size.Z) < 1 then
 							t.eq(d.CastShadow, false, model.Name .. ": a small " .. d.Name .. " casts a shadow")
 						end
 					end
 				end
+				t.ok(solid[MUST[model.Name]], model.Name .. " has a solid " .. MUST[model.Name])
 				t.ok(n >= 1 and n <= 25, model.Name .. ": " .. n .. " parts")
 				total += n
 			end
 			t.ok(total >= 3000 and total <= 5000, total .. " scenery parts")
+			t.ok(solidTotal >= 1000 and solidTotal < total, solidTotal .. " of them solid")
 		end
 	)
 

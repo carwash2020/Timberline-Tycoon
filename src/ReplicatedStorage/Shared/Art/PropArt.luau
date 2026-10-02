@@ -9,7 +9,9 @@
 -- Every builder returns a Model on the ground at the origin (y = 0; a
 -- LilyPad's origin is the water's surface), decoration only (no
 -- collisions, clicks or touches; small parts cast no shadow) unless noted.
--- Only Rock collides. They're cheap: Rock and most others are under 10
+-- Only Rock and the open-country set pieces' big bodies (stones, walls,
+-- towers: see below) collide; Scatter's are all decoration, Rock
+-- included. They're cheap: Rock and most others are under 10
 -- parts, so hundreds can stand round a player. Colours come in as
 -- parameters so each biome can tint them (PropArt.Tints has a palette per
 -- biome).
@@ -1166,9 +1168,13 @@ end
 
 ---------------------------------------------------------------------------
 -- Open-country set pieces (WLD-01): WorldPlan.Scenery places them out
--- between the biomes and along the haul roads. Looks only (nothing
--- collides, is clicked or touched; parts under a stud cast no shadow), 25
--- parts at most each, on the ground at the origin, front to -Z.
+-- between the biomes and along the haul roads, 25 parts at most each, on
+-- the ground at the origin, front to -Z. What looks solid collides and
+-- can be clicked (COL-01: an outcrop's stones, a ruined cabin's footing,
+-- floor, wall logs, corner posts, chimney and fallen roof, a windmill's
+-- base and tower, a lookout tower's legs, deck, rails and ladder); the
+-- trim (sails, braces, rungs, boards, the ridge beam) is looks only, and
+-- parts under a stud cast no shadow.
 ---------------------------------------------------------------------------
 
 local SET_PLANK = { hex("#A4693E"), hex("#B07548"), hex("#985F37") }
@@ -1208,8 +1214,19 @@ local function block(
 	return p
 end
 
+-- Makes a set piece's parts named in `names` solid again (Kit.solid): its
+-- big bodies, built by the looks-only helpers above.
+local function solidParts(model: Model, names: { [string]: boolean })
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and names[d.Name] then
+			Kit.solid(d)
+		end
+	end
+end
+
 -- An outcrop: three or four big rocks (6 to 14 studs) huddled together.
--- Unlike a lone boulder, nothing in it collides.
+-- Like a lone boulder, each rock's three stones collide; the pebbles and
+-- moss are looks only.
 function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
 	local model = Kit.model("Outcrop")
 	local rng = Kit.rng(seed)
@@ -1223,12 +1240,16 @@ function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
 		Kit.placeAt(rock, CFrame.new(math.cos(a) * r, 0, math.sin(a) * r))
 		rock.Parent = model
 	end
-	Kit.decorAll(model)
+	Kit.decorAll(model, { Rock = true })
 	return model
 end
 
 -- A ruined log cabin (about 12 x 10): a stone footing, broken log walls,
--- a stone chimney still standing, the roof fallen in.
+-- a stone chimney still standing, the roof fallen in. The footing, the
+-- floor, the wall logs, the corner posts, the chimney and the fallen roof
+-- collide.
+local CABIN_SOLID: { [string]: boolean } =
+	{ Footing = true, Floor = true, WallLog = true, CornerPost = true, Chimney = true, FallenRoof = true }
 function PropArt.RuinedCabin(seed: number): Model
 	local model = Kit.model("RuinedCabin")
 	local rng = Kit.rng(seed)
@@ -1332,18 +1353,20 @@ function PropArt.RuinedCabin(seed: number): Model
 			Enum.Material.WoodPlanks
 		)
 	end
+	solidParts(model, CABIN_SOLID)
 	return model
 end
 
 -- An old windmill (about 15 tall, 7 across): a stone base, a boarded
--- tower, a little roof, and four sails on a hub facing -Z.
+-- tower, a little roof, and four sails on a hub facing -Z. The base and
+-- the tower collide; the rest is looks only.
 function PropArt.Windmill(seed: number): Model
 	local model = Kit.model("Windmill")
 	local rng = Kit.rng(seed)
-	local base = Kit.decor(Kit.post(model, "Base", Vector3.new(0, -0.5, 0), 4.5, 8, SET_STONE[1], Enum.Material.Slate))
+	local base = Kit.post(model, "Base", Vector3.new(0, -0.5, 0), 4.5, 8, SET_STONE[1], Enum.Material.Slate)
 	base.Name = "MillBase"
-	Kit.decor(Kit.post(model, "Tower", Vector3.new(0, 4, 0), 6.5, 6.6, rng:pick(SET_PLANK), Enum.Material.WoodPlanks))
-	Kit.decor(Kit.post(model, "Tower", Vector3.new(0, 10.5, 0), 3, 5.6, rng:pick(SET_PLANK), Enum.Material.WoodPlanks))
+	Kit.post(model, "Tower", Vector3.new(0, 4, 0), 6.5, 6.6, rng:pick(SET_PLANK), Enum.Material.WoodPlanks)
+	Kit.post(model, "Tower", Vector3.new(0, 10.5, 0), 3, 5.6, rng:pick(SET_PLANK), Enum.Material.WoodPlanks)
 	block(model, "Door", Vector3.new(2, 3.2, 0.3), CFrame.new(0, 1.6 + 0.1, -3.95), SET_TIMBER, Enum.Material.Wood)
 	block(model, "Window", Vector3.new(1.2, 1.4, 0.3), CFrame.new(0, 7.2, -3.35), SET_TIMBER, Enum.Material.Wood)
 	-- The cap: a ridge roof over the top.
@@ -1384,7 +1407,9 @@ function PropArt.Windmill(seed: number): Model
 end
 
 -- A timber lookout tower (about 17 tall): four splayed legs, cross braces,
--- a railed deck, a little roof and a ladder up the front (-Z).
+-- a railed deck, a little roof and a ladder up the front (-Z). The legs,
+-- the deck, its rails and the ladder's sides collide.
+local LOOKOUT_SOLID: { [string]: boolean } = { Leg = true, Deck = true, Rail = true, Ladder = true }
 function PropArt.LookoutTower(seed: number): Model
 	local model = Kit.model("LookoutTower")
 	local rng = Kit.rng(seed)
@@ -1448,6 +1473,7 @@ function PropArt.LookoutTower(seed: number): Model
 		local z = -3.6 + 0.7 * (y / DECK)
 		block(model, "Rung", Vector3.new(1.3, 0.2, 0.2), CFrame.new(0, y, z), SET_TIMBER, Enum.Material.Wood)
 	end
+	solidParts(model, LOOKOUT_SOLID)
 	return model
 end
 

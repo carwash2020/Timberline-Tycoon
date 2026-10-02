@@ -452,20 +452,28 @@ return function(t)
 		t.eq(#parts(BuildingArt.TownTree("teak", 1, 1)), #parts(BuildingArt.TownTree("birch", 1, 1)))
 	end)
 
-	t.test("town greenery: bushes, flower beds and rocks are looks only, deterministic", function()
+	t.test("town greenery: bushes and flower beds are looks only, a rock's stones collide, deterministic", function()
 		for _, kind in ipairs({ "bush", "flowers", "rock", "mystery" }) do
 			for _, size in ipairs({ 1.6, 2.4, 3 }) do
 				local model = BuildingArt.Greenery(kind, size, 11, nil)
 				local all = parts(model)
 				t.ok(#all > 0 and #all <= 40, kind .. " parts: " .. #all)
+				local stones = 0
 				for _, p in ipairs(all) do
-					t.ok(
-						not p.CanCollide and not p.CanQuery and not p.CanTouch,
-						kind .. ": " .. p.Name .. " is decoration"
-					)
+					if kind == "rock" and p.Name == "Rock" then
+						-- COL-01: a rock you'd walk into stops you, like a boulder.
+						stones += 1
+						t.ok(p.CanCollide and p.CanQuery, "a rock's " .. p.Name .. " collides")
+					else
+						t.ok(
+							not p.CanCollide and not p.CanQuery and not p.CanTouch,
+							kind .. ": " .. p.Name .. " is decoration"
+						)
+					end
 					local lo, hi = bounds(p)
 					t.ok(lo.Y > -0.4 * size and hi.Y < size + 1.5, kind .. ": " .. p.Name .. " sits on the ground")
 				end
+				t.eq(stones, if kind == "rock" then 3 else 0, kind .. "'s solid stones")
 				local again = parts(BuildingArt.Greenery(kind, size, 11, nil))
 				t.eq(#again, #all)
 				for i = 1, #all do
@@ -521,6 +529,167 @@ return function(t)
 			end
 		end
 		t.eq(#parts(BuildingArt.Bridge(a, a, 6)), 0)
+	end)
+
+	t.test("bridges (COL-01): an invisible guard under each rope, deck to rail height, end to end", function()
+		local a, b, width = V3.new(10, 50, 0), V3.new(10, 52, 30), 6
+		local bridge = BuildingArt.Bridge(a, b, width)
+		local span, dir = (b - a).Magnitude, (b - a).Unit
+		local across = V3.new(-dir.Z, 0, dir.X).Unit -- level, square to the bridge
+		local h = BuildingArt.BridgeGuardHeight
+		t.ok(math.abs(h - 3.2) < 1e-6, "guards reach the rope rails' height at the posts")
+		local guards, sides = {}, {}
+		for _, p in ipairs(parts(bridge)) do
+			if p.Name == "BridgeGuard" then
+				table.insert(guards, p)
+				t.ok(p.CanCollide, "a guard collides")
+				t.eq(p.Transparency, 1)
+				t.ok(not p.CanTouch and not p.CastShadow, "a guard is never touched and casts no shadow")
+				t.ok(p.Anchored, "anchored")
+				t.ok(math.abs(p.Size.Z - span) < 1e-3, "a guard runs the bridge's whole length")
+				t.ok(p.CFrame.LookVector:Dot(dir) > 0.9999 or p.CFrame.LookVector:Dot(dir) < -0.9999, "along it")
+				-- Its middle under a rope: width / 2 + 0.25 to the side of the a-b line.
+				local mid = p.CFrame.Position - (a + b) / 2
+				local side = mid:Dot(across)
+				t.ok(math.abs(math.abs(side) - (width / 2 + 0.25)) < 1e-3, "under the rope: " .. side)
+				table.insert(sides, if side > 0 then 1 else -1)
+				-- Its inner face at the deck's edge, so the walkway stays `width` wide.
+				t.ok(math.abs(side) - p.Size.X / 2 >= width / 2 - 1e-3, "the walkway stays clear")
+				-- From under the planks' tops (the a-b line) up to h over it.
+				local top = p.CFrame * V3.new(0, p.Size.Y / 2, 0)
+				local bottom = p.CFrame * V3.new(0, -p.Size.Y / 2, 0)
+				local function overLine(v)
+					local onLine = a + dir * (v - a):Dot(dir)
+					return (v - onLine):Dot(p.CFrame.UpVector)
+				end
+				t.ok(math.abs(overLine(top) - h) < 0.05, "its top at rail height")
+				t.ok(overLine(bottom) < -0.2, "its bottom under the planks' tops")
+			end
+		end
+		t.eq(#guards, 2, "one guard each side")
+		t.ok(sides[1] ~= sides[2], "on both sides")
+	end)
+
+	t.test("COL-01: the town's solid-looking props and fittings collide", function()
+		-- Every part called `name` in `model` (at least one) collides and can be
+		-- clicked; `count` of them if given.
+		local function solid(model, name, label, count)
+			local n, all = 0, 0
+			for _, p in ipairs(parts(model)) do
+				if p.Name == name then
+					all += 1
+					if p.CanCollide and p.CanQuery then
+						n += 1
+					end
+				end
+			end
+			t.ok(all > 0 and n == all, string.format("%s: %d of %d %ss collide", label, n, all, name))
+			if count then
+				t.eq(all, count, label .. ": " .. name .. "s")
+			end
+		end
+		local function decor(model, name, label)
+			local all = 0
+			for _, p in ipairs(parts(model)) do
+				if p.Name == name then
+					all += 1
+					t.ok(not p.CanCollide and not p.CanQuery, label .. ": " .. p.Name .. " is looks only")
+				end
+			end
+			t.ok(all > 0, label .. " has a " .. name)
+		end
+		for seed = 1, 6 do
+			solid(BuildingArt.Prop("LogPile", seed), "Log", "a log pile", 6) -- every row, not just the bottom
+			solid(BuildingArt.Prop("Bench", seed), "BenchBack", "a bench", 2)
+			solid(BuildingArt.Prop("Bench", seed), "Seat", "a bench", 2)
+			local cart = BuildingArt.Prop("Cart", seed)
+			solid(cart, "CartSide", "a hand cart", 4)
+			solid(cart, "Wheel", "a hand cart", 2)
+			solid(cart, "Log", "a hand cart's load", 3)
+			solid(BuildingArt.Prop("ToolRack", seed), "Rail", "a tool rack", 2)
+			solid(BuildingArt.Prop("ToolRack", seed), "Post", "a tool rack", 2)
+			-- The mailbox: its box (over the post all round, at chest height)
+			-- collides; the thin post and the round lid are looks only.
+			local mailbox = BuildingArt.Prop("Mailbox", seed)
+			local boxes = 0
+			for _, p in ipairs(parts(mailbox)) do
+				if p.Name == "Mailbox" and p.Shape == roblox.Enum.PartType.Block then
+					boxes += 1
+					t.ok(p.CanCollide and p.CanQuery, "the mailbox's box collides")
+					local lo, hi = bounds(p)
+					t.ok(lo.Y < 4 and hi.Y > 3.4, "at chest height")
+					t.ok(hi.X - lo.X > 1 and hi.Z - lo.Z > 1.6, "wider than its post")
+				end
+			end
+			t.eq(boxes, 1)
+			decor(mailbox, "Post", "the mailbox")
+			-- The wheelbarrow stands on the plaza by the sell pad: looks only.
+			for _, p in ipairs(parts(BuildingArt.Prop("Wheelbarrow", seed))) do
+				t.ok(not p.CanCollide, "the wheelbarrow's " .. p.Name .. " is looks only")
+			end
+		end
+		local mill = BuildingArt.Sawmill()
+		solid(mill, "Log", "the sawmill (slip, log deck, carriage)", 8)
+		solid(mill, "Crate", "the sawmill", 2)
+		solid(mill, "Carriage", "the sawmill")
+		local shed = BuildingArt.Shop(SHOPS[1].kind, SHOPS[1].title, SHOPS[1].accent)
+		solid(shed, "GrindTrough", "the Tool Shed's grindstone", 1)
+		solid(shed, "Grindstone", "the Tool Shed's grindstone", 1)
+		solid(shed, "Workbench", "the Tool Shed's workbench", 1)
+		solid(shed, "BenchLeg", "the Tool Shed's workbench", 2)
+		solid(shed, "Log", "the Tool Shed's firewood", 3)
+		solid(shed, "ChoppingBlock", "the Tool Shed's chopping block", 1)
+		local garage = BuildingArt.Shop(SHOPS[2].kind, SHOPS[2].title, SHOPS[2].accent)
+		solid(garage, "Tyre", "the Dealership's tyre stack", 4)
+		local store = BuildingArt.Shop(SHOPS[3].kind, SHOPS[3].title, SHOPS[3].accent)
+		for _, name in ipairs({ "StandPost", "Coat", "Cloak", "BayBase" }) do
+			solid(store, name, "Hearth & Home", 1)
+		end
+		-- Its boots' step shelf (the two low "Shelf" blocks) collides; the wall
+		-- shelves behind the counter stay looks only.
+		local low, high = 0, 0
+		for _, p in ipairs(parts(store)) do
+			if p.Name == "Shelf" then
+				local lo = bounds(p)
+				if lo.Y < 4 then
+					low += 1
+					t.ok(p.CanCollide and p.CanQuery, "the step shelf collides")
+				else
+					high += 1
+				end
+			end
+		end
+		t.eq(low, 2, "the step shelf's two steps")
+		t.ok(high >= 1, "the wall shelves")
+		-- The gondola station's lectern stand (not its sloped top).
+		local stands = 0
+		for _, p in ipairs(parts(BuildingArt.GondolaStation())) do
+			if p.Name == "Lectern" and p.CanCollide then
+				stands += 1
+				t.ok(near(p.Size, V3.new(1.2, 2.6, 0.9)), "the lectern's stand")
+			end
+		end
+		t.eq(stands, 1)
+		-- Murph's camp: the log seats, the firewood behind the tent, its rocks.
+		local camp = BuildingArt.Campsite()
+		solid(camp, "Log", "Murph's camp", 7)
+		solid(camp, "Rock", "Murph's camp", 6)
+		-- Signposts: the posts collide; the board only when asked (the biome
+		-- road signs); the rocks at their feet never.
+		local WorldPlan = loader:load("ReplicatedStorage/Shared/World/WorldPlan")
+		for _, sign in ipairs(WorldPlan.Town().signs) do
+			-- As MapBuilder builds the town's: people walk under TO THE WOODS's
+			-- board (the spawn to Murph), a Logging Rig drives under SELL LOGS
+			-- HERE's.
+			local post = BuildingArt.Signpost(sign.text, sign.lit)
+			solid(post, "Post", sign.text, 2)
+			decor(post, "Board", sign.text)
+			decor(post, "Rock", sign.text)
+		end
+		local road = BuildingArt.Signpost("THE HILLS\npine · maple", nil, true)
+		solid(road, "Board", "a road sign", 1)
+		decor(road, "Rock", "a road sign")
+		decor(BuildingArt.Signpost("SELL LOGS HERE", true), "Board", "the lit signpost")
 	end)
 
 	t.test("art rules: CFrame only, deterministic, decoration can't be clicked", function()
