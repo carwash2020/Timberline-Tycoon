@@ -641,6 +641,13 @@ local function buildPanel()
 	paper.BackgroundColor3 = C.Paper
 	paper.BorderSizePixel = 0
 	paper.ClipsDescendants = true
+	-- A gamepad's selection stays in the panel (B closes it), not on the
+	-- HUD's buttons over it.
+	paper.SelectionGroup = true
+	paper.SelectionBehaviorUp = Enum.SelectionBehavior.Stop
+	paper.SelectionBehaviorDown = Enum.SelectionBehavior.Stop
+	paper.SelectionBehaviorLeft = Enum.SelectionBehavior.Stop
+	paper.SelectionBehaviorRight = Enum.SelectionBehavior.Stop
 	UITheme.corner(paper, 14)
 	paper.Parent = frame.face
 	UITheme.texture(paper, "Kraft", 14)

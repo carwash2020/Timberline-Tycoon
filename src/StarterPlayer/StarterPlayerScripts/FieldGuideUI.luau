@@ -9,6 +9,9 @@
 -- The first row of each page switches to the other. The header's counts
 -- ("3 of 9 woods found") stay current while the guide is open: ShopUI only
 -- draws a header when a screen opens, so a change reopens the page.
+-- On a gamepad (UI-15) DPadLeft opens it once you have it (HUD.PadShortcut),
+-- with a glyph chip right of the button; ShopUI selects its first row and
+-- B closes it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -198,6 +201,16 @@ function FieldGuideUI.Start()
 	b.face.Activated:Connect(function()
 		open(page)
 	end)
+	-- The pad's shortcut, and its glyph just right of the button (UI-15).
+	HUD.PadShortcut(Enum.KeyCode.DPadLeft, function() -- HudRules.PadKeys.guide
+		return b.root.Visible
+	end, function()
+		open(page)
+	end)
+	local glyph = HUD.PadGlyph(Enum.KeyCode.DPadLeft, b.root)
+	glyph.AnchorPoint = Vector2.new(0, 0.5)
+	glyph.Position = UDim2.new(1, 6, 0.5, 0)
+	glyph.Parent = b.root
 
 	local function refresh()
 		b.root.Visible = player:GetAttribute("HasFieldGuide") == true

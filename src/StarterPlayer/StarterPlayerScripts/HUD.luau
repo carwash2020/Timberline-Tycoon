@@ -57,6 +57,7 @@
 --     phone the clock is in the second line (or hidden: WorldUI).
 
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -158,6 +159,16 @@ local shelf: Frame? = nil -- the corner's two lines
 local besideCash: Frame? = nil
 local underCash: Frame? = nil
 local popups: { GuiObject } = {}
+local popupFirst: { [GuiObject]: GuiObject } = {} -- a popup's first button, which a gamepad selects on opening it
+local popupCloseBound = false -- B closes the open popup (HUD.Popup)
+type PadBinding = {
+	name: string,
+	key: Enum.KeyCode,
+	handle: (string, Enum.UserInputState, InputObject) -> Enum.ContextActionResult,
+}
+local padBindings: { PadBinding } = {} -- the D-pad's shortcuts (HUD.PadShortcut)
+local padBound = false -- whether they're bound right now (not while a menu has the selection)
+
 local loadingCard: Frame? = nil
 local loadingLabel: TextLabel? = nil
 local shownPrompts: { [ProximityPrompt]: boolean } = {}
@@ -407,12 +418,31 @@ local function placePopups()
 	end
 end
 
+local POPUP_CLOSE = "HudPopupClose"
+
+-- B on a gamepad, while a popup's open: closes it (over the placer's and a
+-- shop's B, which get the next press).
+local function onPopupClose(_name: string, state: Enum.UserInputState): Enum.ContextActionResult
+	if state ~= Enum.UserInputState.Begin then
+		return Enum.ContextActionResult.Pass
+	end
+	for _, p in ipairs(popups) do
+		p.Visible = false
+	end
+	return Enum.ContextActionResult.Sink
+end
+
 -- Makes `card` one of the corner's popups (Settings, the goals, the pouch
 -- list): HUD places it under the corner, and showing it hides the others,
 -- so they never stack up. Its screen must mind the top bar inset (the
--- UITheme.Screen default), as the corner's does.
-function HUD.Popup(card: GuiObject)
+-- UITheme.Screen default), as the corner's does. On a gamepad (UI-15)
+-- opening it selects `first` (its first button, if it has one) so A
+-- presses it at once, and B closes it and lets go of the selection.
+function HUD.Popup(card: GuiObject, first: GuiObject?)
 	table.insert(popups, card)
+	if first then
+		popupFirst[card] = first
+	end
 	card.AnchorPoint = Vector2.new(1, 0)
 	-- It takes the taps on its empty parts too, and while it's open the
 	-- side buttons it drops over are put away (so nothing hidden under it
@@ -434,8 +464,45 @@ function HUD.Popup(card: GuiObject)
 		if gui then
 			gui.Enabled = not open
 		end
+		local selected = GuiService.SelectedObject
+		if card.Visible then
+			local pick = popupFirst[card]
+			if pick and HudRules.PadSelects(UITheme.Device()) then
+				GuiService.SelectedObject = pick
+			end
+		elseif selected and selected:IsDescendantOf(card) then
+			GuiService.SelectedObject = nil -- back to walking
+		end
+		if open and not popupCloseBound then
+			popupCloseBound = true
+			ContextActionService:BindActionAtPriority(
+				POPUP_CLOSE,
+				onPopupClose,
+				false,
+				Enum.ContextActionPriority.High.Value,
+				Enum.KeyCode.ButtonB
+			)
+		elseif not open and popupCloseBound then
+			popupCloseBound = false
+			ContextActionService:UnbindAction(POPUP_CLOSE)
+		end
 	end)
 	placePopups()
+end
+
+-- A glyph chip for `key` (UITheme.Glyph), shown while `beside` is and
+-- you're on a gamepad or a TV (HudRules.PadGlyphs), so you can see which
+-- button opens it. The caller places and parents it.
+function HUD.PadGlyph(key: Enum.KeyCode, beside: GuiObject, size: number?): GuiObject
+	local glyph = UITheme.Glyph(key, size or 24)
+	glyph.Name = "PadGlyph"
+	local function refresh()
+		glyph.Visible = beside.Visible and HudRules.PadGlyphs(UITheme.Device())
+	end
+	beside:GetPropertyChangedSignal("Visible"):Connect(refresh)
+	UserInputService.LastInputTypeChanged:Connect(refresh)
+	refresh()
+	return glyph
 end
 
 -- Shows a short message at the top of the screen for a few seconds: long
@@ -918,6 +985,82 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	return button
 end
 
+-- Whether you're sitting in a seat (driving your truck).
+local function seated(): boolean
+	local character = player.Character
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	return humanoid ~= nil and humanoid.SeatPart ~= nil
+end
+
+-- A D-pad shortcut (UI-15, HudRules.PadKeys): `key` calls `onPress` while
+-- `available()` says what it opens is there, and nothing else has the pad
+-- (HudRules.PadShortcut: no menu selection, no shop open, not typing, not
+-- seated in a truck, no world prompt on that button). It's a
+-- ContextActionService action over the default ones (Roblox's camera has
+-- bound the D-pad in some versions), and it lets the press through to them,
+-- and to the menus' own D-pad moves, whenever it doesn't take it. While a
+-- menu has the selection they're unbound altogether (syncPad), so they can
+-- never get in the way of its D-pad moves.
+local function bindPad(binding: PadBinding)
+	ContextActionService:BindActionAtPriority(
+		binding.name,
+		binding.handle,
+		false,
+		Enum.ContextActionPriority.High.Value,
+		binding.key
+	)
+end
+
+local function syncPad()
+	local want = GuiService.SelectedObject == nil
+	if want == padBound then
+		return
+	end
+	padBound = want
+	for _, binding in ipairs(padBindings) do
+		if want then
+			bindPad(binding)
+		else
+			ContextActionService:UnbindAction(binding.name)
+		end
+	end
+end
+
+function HUD.PadShortcut(key: Enum.KeyCode, available: () -> boolean, onPress: () -> ())
+	local took = false -- this press's Begin was ours: so is its End
+	local function handle(_name: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+		if state ~= Enum.UserInputState.Begin then
+			if took and state ~= Enum.UserInputState.Change then
+				took = false
+				return Enum.ContextActionResult.Sink
+			end
+			return if took then Enum.ContextActionResult.Sink else Enum.ContextActionResult.Pass
+		end
+		took = false
+		local allowed = HudRules.PadShortcut({
+			available = available(),
+			typing = UserInputService:GetFocusedTextBox() ~= nil,
+			selecting = GuiService.SelectedObject ~= nil,
+			modal = modalRect ~= nil,
+			seated = seated(),
+			prompt = promptOn(input.KeyCode),
+		})
+		if not allowed then
+			return Enum.ContextActionResult.Pass
+		end
+		took = true
+		UITheme.Click() -- as a press on the button itself does
+		onPress()
+		return Enum.ContextActionResult.Sink
+	end
+	local binding: PadBinding = { name = "HudPad" .. key.Name, key = key, handle = handle }
+	table.insert(padBindings, binding)
+	if padBound then
+		bindPad(binding)
+	end
+	syncPad()
+end
+
 local function onGamepad(input: InputObject, processed: boolean)
 	if processed or GuiService.SelectedObject ~= nil then
 		return -- a menu has the pad
@@ -1309,6 +1452,8 @@ function HUD.Start()
 	end
 	task.spawn(watchHintSources)
 	UserInputService.InputBegan:Connect(onGamepad)
+	GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(syncPad)
+	syncPad()
 	ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 		shownPrompts[prompt] = true
 		prompt.PromptHidden:Once(function()

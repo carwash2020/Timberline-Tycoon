@@ -304,4 +304,91 @@ return function(t)
 		)
 		t.ok(not string.find(clock, "GetServerTimeNow", 1, true), "and doesn't work the hour out again")
 	end)
+	-- UI-15: the gamepad's D-pad shortcuts.
+	local PAD_OWNERS = {
+		daily = { key = "DPadUp", file = "DailyUI" },
+		guide = { key = "DPadLeft", file = "FieldGuideUI" },
+		settings = { key = "DPadRight", file = "SettingsUI" },
+		dropAxe = { key = "DPadDown", file = "AxeController" },
+	}
+
+	t.test("the D-pad: Up Daily Goals, Left the Field Guide, Right Settings, Down Drop axe", function()
+		local seen = {}
+		local count = 0
+		for name, key in pairs(HudRules.PadKeys) do
+			count += 1
+			t.ok(PAD_OWNERS[name], "an unexpected pad shortcut " .. name)
+			t.eq(key, PAD_OWNERS[name].key, name)
+			t.ok(not seen[key], key .. " used twice")
+			seen[key] = true
+		end
+		t.eq(count, 4)
+	end)
+
+	t.test("each D-pad direction is bound by its own controller and by nothing else on the client", function()
+		local fs = require("@lune/fs")
+		local dir = "src/StarterPlayer/StarterPlayerScripts"
+		local users = {} -- key -> { file }
+		for _, entry in ipairs(fs.readDir(dir)) do
+			if string.match(entry, "%.luau$") then
+				local source = fs.readFile(dir .. "/" .. entry)
+				for key in string.gmatch(source, "Enum%.KeyCode%.(DPad%a+)") do
+					users[key] = users[key] or {}
+					users[key][string.gsub(entry, "%.luau$", "")] = true
+				end
+			end
+		end
+		for name, owner in pairs(PAD_OWNERS) do
+			local files = users[owner.key] or {}
+			t.ok(files[owner.file], string.format("%s (%s) isn't bound in %s", name, owner.key, owner.file))
+			for file in pairs(files) do
+				t.eq(file, owner.file, owner.key .. " is also bound in " .. file)
+			end
+		end
+		for _, name in ipairs({ "daily", "guide", "settings" }) do
+			local owner = PAD_OWNERS[name]
+			local source = fs.readFile(dir .. "/" .. owner.file .. ".luau")
+			t.ok(
+				string.find(source, "HUD.PadShortcut(Enum.KeyCode." .. owner.key, 1, true),
+				owner.file .. " registers its shortcut with HUD.PadShortcut"
+			)
+			t.ok(
+				string.find(source, "HUD.PadGlyph(Enum.KeyCode." .. owner.key, 1, true),
+				owner.file .. " shows its glyph chip"
+			)
+		end
+	end)
+
+	t.test("a D-pad shortcut works only when nothing else holds the pad", function()
+		local function state(over)
+			local s = {
+				available = true,
+				typing = false,
+				selecting = false,
+				modal = false,
+				seated = false,
+				prompt = false,
+			}
+			for k, v in pairs(over or {}) do
+				s[k] = v
+			end
+			return s
+		end
+		t.eq(HudRules.PadShortcut(state()), true, "on foot, nothing open: it opens")
+		t.eq(HudRules.PadShortcut(state({ available = false })), false, "Daily during the tutorial, no Field Guide yet")
+		t.eq(HudRules.PadShortcut(state({ typing = true })), false, "typing in chat")
+		t.eq(HudRules.PadShortcut(state({ selecting = true })), false, "a menu has the selection (the D-pad moves it)")
+		t.eq(HudRules.PadShortcut(state({ modal = true })), false, "a shop, the Store or the Field Guide is open")
+		t.eq(HudRules.PadShortcut(state({ seated = true })), false, "driving a truck")
+		t.eq(HudRules.PadShortcut(state({ prompt = true })), false, "a world prompt uses that button")
+	end)
+
+	t.test("glyph chips and popup selection: on a gamepad or a TV only, never for a mouse or a finger", function()
+		t.eq(HudRules.PadGlyphs("console"), true)
+		t.eq(HudRules.PadGlyphs("desktop"), false)
+		t.eq(HudRules.PadGlyphs("phone"), false)
+		t.eq(HudRules.PadSelects("console"), true)
+		t.eq(HudRules.PadSelects("desktop"), false)
+		t.eq(HudRules.PadSelects("phone"), false)
+	end)
 end

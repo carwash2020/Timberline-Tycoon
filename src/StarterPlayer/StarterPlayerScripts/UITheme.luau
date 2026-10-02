@@ -798,8 +798,22 @@ function UITheme.Bar(parent: Instance, name: string): Bar
 	return { outer = card.outer, label = label, row = row }
 end
 
+local GLYPH_TEXT: { [string]: string } = {
+	DPadUp = "▲",
+	DPadDown = "▼",
+	DPadLeft = "◀",
+	DPadRight = "▶",
+}
+
+-- A glyph chip's text for the KeyCode named `keyName`, when Roblox has no
+-- image for it: an arrow for the D-pad, else the name without "Button"
+-- (ButtonB -> "B").
+function UITheme.GlyphText(keyName: string): string
+	return GLYPH_TEXT[keyName] or (string.gsub(keyName, "^Button", ""))
+end
+
 -- A round gamepad glyph for `key`: Roblox's own image for the pad in use,
--- or a cream chip with the letter.
+-- or a cream chip with the letter (or the D-pad's arrow).
 function UITheme.Glyph(key: Enum.KeyCode, size: number): GuiObject
 	local ok, image = pcall(function()
 		return UserInputService:GetImageForKeyCode(key)
@@ -819,7 +833,7 @@ function UITheme.Glyph(key: Enum.KeyCode, size: number): GuiObject
 	chip.Font = UITheme.Fonts.Black
 	chip.TextSize = math.floor(size * 0.55)
 	chip.TextColor3 = C.Ink
-	chip.Text = string.gsub(key.Name, "^Button", "")
+	chip.Text = UITheme.GlyphText(key.Name)
 	UITheme.corner(chip, size)
 	UITheme.stroke(chip, C.Ink, 2)
 	return chip

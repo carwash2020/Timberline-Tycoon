@@ -6,6 +6,9 @@
 -- and every sound helper read) and are saved with your profile
 -- (SaveSetting); the server mirrors them on the SettingMusic / SettingSfx
 -- attributes, so they come back when you rejoin.
+-- On a gamepad (UI-15) DPadRight opens and closes it (HUD.PadShortcut), a
+-- glyph chip left of the button says so, opening it selects MUSIC so A
+-- toggles it at once, the pad can't wander out of the card, and B closes it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -67,6 +70,12 @@ function SettingsUI.Start()
 	card.outer.Visible = false
 	UITheme.padding(card.face, 10, 10, 10, 10)
 	UITheme.list(card.face, 8)
+	-- The pad's selection stays in the card (B closes it).
+	card.face.SelectionGroup = true
+	card.face.SelectionBehaviorUp = Enum.SelectionBehavior.Stop
+	card.face.SelectionBehaviorDown = Enum.SelectionBehavior.Stop
+	card.face.SelectionBehaviorLeft = Enum.SelectionBehavior.Stop
+	card.face.SelectionBehaviorRight = Enum.SelectionBehavior.Stop
 	local title = UITheme.label(card.face, "SETTINGS", F.Black, 14, C.Bark)
 	title.Size = UDim2.fromOffset(170, 18)
 	title.LayoutOrder = 0
@@ -113,9 +122,19 @@ function SettingsUI.Start()
 		UITheme.HitPad(open, roundSpec.hit).Activated:Connect(toggle)
 	end
 
+	-- The pad's shortcut, and its glyph just left of the button (UI-15).
+	HUD.PadShortcut(Enum.KeyCode.DPadRight, function() -- HudRules.PadKeys.settings
+		return open.Visible
+	end, toggle)
+	local glyph = HUD.PadGlyph(Enum.KeyCode.DPadRight, open)
+	glyph.LayoutOrder = open.LayoutOrder - 1
+	glyph.Parent = open.Parent
+
 	-- The card drops down under the corner, at the right edge (its screen
-	-- stays over the shop, like the button).
-	HUD.Popup(card.outer)
+	-- stays over the shop, like the button). On a gamepad, opening it
+	-- selects the first toggle.
+	local first = toggles[1]
+	HUD.Popup(card.outer, if first then first.button.face else nil)
 
 	gui.Parent = player:WaitForChild("PlayerGui")
 end
