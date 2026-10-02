@@ -126,8 +126,6 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 - `liftU3` = 31.7383
 - `murphAfter` = 60
 - `murphReward` = 25
-- `packing` = 0.4
-- `pileOver` = 2
 - `plotPrice` = 900100
 - `seeds` = 50
 - `sellSec` = 4

@@ -51,8 +51,6 @@ local A = {
 	heavyFactor = 2, -- a piece too heavy to lift drags this much slower
 	liftU3 = 130 / (1.6 ^ 3), -- §2f: about 130 studs³ lifts (density 0.15, ~20 mass)
 	aimSec = 1.5, -- s to walk to and line up each cut after the first
-	packing = 0.4, -- of the bed's volume filled with wood (§17)
-	pileOver = 2, -- studs of wood piled above the bed's walls
 	tripOverhead = 8, -- s per round trip: get in, park, get out (§17)
 	sellSec = 4, -- s at the pad (§17)
 	murphReward = 25, -- the tutorial's `loads` reward (§13), after $60 sold
@@ -227,7 +225,7 @@ local function bedU3(id: string?): number
 	if not b or b[1] <= 0 then
 		return 0
 	end
-	return b[1] * b[2] * (b[3] + A.pileOver) * A.packing / (U * U * U)
+	return TruckLayout.BedRoomU3(b[1], b[2], b[3], U)
 end
 
 local function bedLength(id: string): number
@@ -689,8 +687,8 @@ line()
 line(
 	string.format(
 		"u³ a trip = length × width × (walls + %d studs piled) × %.1f packing / u³ (§17).",
-		A.pileOver,
-		A.packing
+		TruckLayout.BedPileOver,
+		TruckLayout.BedPacking
 	)
 )
 line()
