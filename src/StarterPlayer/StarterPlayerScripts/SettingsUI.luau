@@ -55,13 +55,11 @@ function SettingsUI.Start()
 	open.LayoutOrder = 5
 	open.Size = UDim2.fromOffset(size.X, size.Y)
 	open.BackgroundColor3 = C.Bark
-	open.Font = F.Black
-	open.Text = "♪"
-	open.TextSize = roundSpec.text
-	open.TextColor3 = C.Cream
+	open.Text = "" -- a speaker drawn from frames, not a glyph (UI-12)
 	open.AutoButtonColor = true
 	UITheme.corner(open, size.Y / 2)
 	UITheme.stroke(open, C.Ink, 3)
+	UITheme.Speaker(C.Cream).Parent = open
 	open.Parent = HUD.TopRow() or gui
 
 	local card = UITheme.Card(C.Paper, C.Bark, 3, 12, true)

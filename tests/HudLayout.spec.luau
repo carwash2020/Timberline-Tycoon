@@ -310,7 +310,12 @@ return function(t)
 	-- its screen's offsets, which start above the top bar), moved into the
 	-- HUD screen's offsets (under the top bar), where the HUD works out the
 	-- lane.
-	local PAPER, HEADER = 8, 14 + 30 + 2 + 16 + 10 -- ShopUI: the wood frame, the title and subtitle block
+	-- ShopUI: the wood frame, and the title and subtitle block (two
+	-- subtitle lines on a phone, UI-19).
+	local PAPER = 8
+	local function headerOf(phone)
+		return HudLayout.ShopHeader(phone == true)
+	end
 	local function shopPanel(w, h, inset)
 		local area = HudLayout.ClearOf(areaOn(w, h, inset), PANEL, cashRow(w, inset, 12), 8, 400)
 		local p = HudLayout.Centred(area, PANEL)
@@ -324,7 +329,7 @@ return function(t)
 		local right = panel.right - PAPER - 20 - 12
 		return {
 			left = right - (if phone then PHONE else DESK).ShopBuy.size.X,
-			top = panel.top + PAPER + HEADER,
+			top = panel.top + PAPER + headerOf(phone),
 			right = right,
 			bottom = panel.bottom,
 		}
@@ -338,11 +343,19 @@ return function(t)
 			t.eq(lane.bottom, panel.bottom - 8, name .. ": 8 above the panel's bottom edge")
 		end
 		t.ok(lane.left >= panel.left and lane.right <= panel.right, name .. ": inside the panel")
-		t.ok(lane.top >= panel.top + PAPER + HEADER, name .. ": below the title and subtitle")
+		t.ok(lane.top >= panel.top + PAPER + headerOf(phone), name .. ": below the title and subtitle")
 		t.ok(clear(lane, buttonsOf(panel, phone), 8), name .. ": clear of the Buy buttons")
 		t.ok(lane.right - lane.left >= LANE_MIN, name .. ": wide enough for a toast")
 		t.ok(lane.bottom - lane.top >= lane.max * 34, name .. ": room for its toasts (34 each at least)")
 	end
+
+	t.test("the shop's header has room for a two-line subtitle on a phone (UI-19)", function()
+		t.eq(HudLayout.ShopHeader(false), 14 + 30 + 2 + 16 + 10, "a computer: as it always was")
+		t.eq(HudLayout.ShopHeader(true), HudLayout.ShopHeader(false) + 16, "a phone: one more line")
+		-- Two lines of the phone's subtitle text fit the subtitle's box.
+		t.ok(2 * PHONE.ShopSubtitle.text <= 2 * HudLayout.SubtitleLine, "two 14 px lines in 32")
+		t.ok(DESK.ShopSubtitle.text <= HudLayout.SubtitleLine, "one line on a computer")
+	end)
 
 	-- Roblox's tool hotbar on a phone: the bottom 70 of the HUD screen
 	-- (UITheme.Bottom(): the 12 margin and 58), drawn over everything.
@@ -392,7 +405,7 @@ return function(t)
 				left = panel.left + PAPER,
 				top = panel.top + PAPER,
 				right = panel.right - PAPER,
-				bottom = panel.top + PAPER + HEADER,
+				bottom = panel.top + PAPER + headerOf(false),
 			}
 			local reach = { left = top.left, top = top.top, right = top.right, bottom = top.top + top.max * 48 }
 			t.ok(not clear(reach, title, 0), "three toasts at the top reach the title")

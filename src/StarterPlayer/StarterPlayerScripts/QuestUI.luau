@@ -1,7 +1,7 @@
 --!strict
 -- QuestUI: Murph's tutorial, client side (steps in Shared/TutorialData).
 --   * Tracker, on the left: the current objective with progress, and Skip
---     (tap twice).
+--     (tap twice; from step 2 on, QuestUI.ShowSkip).
 --   * Murph's card under it: what he says when a step starts. "Talk" at
 --     Murph (by the spawn) says it again. A tap dismisses it, except with
 --     touch controls: there it sits in the thumbstick's corner, so it lets
@@ -45,6 +45,8 @@ local BEACON_HIDE_WITHIN = 8 -- studs: you're there
 local tracker: Frame? = nil
 local objectiveLabel: TextLabel? = nil
 local stepLabel: TextLabel? = nil
+local skipRoot: Frame? = nil -- the Skip button (QuestUI.ShowSkip says when it shows)
+local skipWidth = 0 -- its width and gap: the step label ends left of it while it shows
 local speech: Frame? = nil -- the holder in the column
 local speechCard: Frame? = nil -- slides and fades inside it
 local speechLabel: TextLabel? = nil
@@ -182,6 +184,13 @@ local function nearestTagged(tag: string, from: Vector3, accept: (Model, BasePar
 	return best
 end
 
+-- Whether Skip shows on step `index` (the TutorialStep attribute): from
+-- the second step on, so a new player's first second on the screen isn't
+-- an invitation to skip (UI-19). It still takes two taps.
+function QuestUI.ShowSkip(index: number): boolean
+	return index >= 2
+end
+
 -- What Skip says after the first press, in the device's word
 -- (HintLogic.Expand): "Tap again to skip", "Click again to skip", or
 -- "Press again to skip" on a gamepad.
@@ -313,8 +322,13 @@ local function refresh()
 		if objectiveLabel then
 			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress)
 		end
+		local showSkip = QuestUI.ShowSkip(index)
+		if skipRoot then
+			skipRoot.Visible = showSkip
+		end
 		if stepLabel then
 			stepLabel.Text = string.format("TUTORIAL · %d/%d", index, #TutorialData.Steps)
+			stepLabel.Size = UDim2.new(1, if showSkip then -skipWidth else 0, 0, 28)
 		end
 	end
 	-- A new step: Murph says his line. (Also on join, as a reminder.)
@@ -365,9 +379,53 @@ local function portrait(parent: Instance): ViewportFrame
 	return view
 end
 
+-- The beacon's arrow, drawn from shapes so it's centred at any distance
+-- (a glyph sits wherever its font puts it): an amber square turned 45
+-- degrees with an ink rim, centred on the top edge of a frame that clips
+-- off its upper half, leaving a downward triangle; an ink bar along that
+-- edge closes the rim. 45 wide and 23 tall, centred along the top of the
+-- beacon, 8 down.
+QuestUI.ArrowHalf = 18 -- the square's half-diagonal: the triangle's height
+QuestUI.ArrowRim = 3
+function QuestUI.BeaconArrow(): Frame
+	local rim = QuestUI.ArrowRim
+	local side = math.floor(QuestUI.ArrowHalf * math.sqrt(2) + 0.5) -- whole pixels
+	local half = side / math.sqrt(2) -- its real half-diagonal
+	local reach = rim * math.sqrt(2) -- how far the rim stands out past a corner
+	local clip = Instance.new("Frame")
+	clip.Name = "Arrow"
+	clip.AnchorPoint = Vector2.new(0.5, 0)
+	clip.Position = UDim2.new(0.5, 0, 0, 8)
+	clip.Size = UDim2.fromOffset(math.ceil(2 * (half + reach)), math.ceil(half + reach))
+	clip.BackgroundTransparency = 1
+	clip.ClipsDescendants = true
+	local square = Instance.new("Frame")
+	square.Name = "Square"
+	square.AnchorPoint = Vector2.new(0.5, 0.5)
+	square.Position = UDim2.fromScale(0.5, 0) -- centred on the clip's top edge
+	square.Size = UDim2.fromOffset(side, side)
+	square.Rotation = 45
+	square.BackgroundColor3 = C.Amber
+	square.BorderSizePixel = 0
+	UITheme.corner(square, 2)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = C.Ink
+	stroke.Thickness = rim
+	stroke.Parent = square
+	square.Parent = clip
+	local top = Instance.new("Frame")
+	top.Name = "Rim"
+	top.Size = UDim2.new(1, 0, 0, rim)
+	top.BackgroundColor3 = C.Ink
+	top.BorderSizePixel = 0
+	top.ZIndex = 2
+	top.Parent = clip
+	return clip
+end
+
 local function buildBeacon(playerGui: Instance)
-	-- The spec's arrow: an amber triangle with an ink rim, over a distance
-	-- pill. Drawn the same size at any distance; bobs 8 px.
+	-- The spec's arrow: an amber triangle with an ink rim (BeaconArrow),
+	-- over a distance pill. Drawn the same size at any distance; bobs 8 px.
 	local b = Instance.new("BillboardGui")
 	b.Name = "TutorialBeacon"
 	b.ResetOnSpawn = false -- it lives in PlayerGui: a respawn would destroy it for good
@@ -380,21 +438,7 @@ local function buildBeacon(playerGui: Instance)
 	bob.Size = UDim2.fromScale(1, 1)
 	bob.BackgroundTransparency = 1
 	bob.Parent = b
-	local function arrow(color: Color3, size: number, y: number, z: number)
-		local a = Instance.new("TextLabel")
-		a.AnchorPoint = Vector2.new(0.5, 0)
-		a.Position = UDim2.new(0.5, 0, 0, y)
-		a.Size = UDim2.fromOffset(64, 40)
-		a.BackgroundTransparency = 1
-		a.Font = F.Black
-		a.TextSize = size
-		a.TextColor3 = color
-		a.Text = "▼"
-		a.ZIndex = z
-		a.Parent = bob
-	end
-	arrow(C.Ink, 50, 6, 1)
-	arrow(C.Amber, 36, 4, 2)
+	QuestUI.BeaconArrow().Parent = bob
 	local pill = Instance.new("TextLabel")
 	pill.Name = "Distance"
 	pill.AnchorPoint = Vector2.new(0.5, 1)
@@ -471,7 +515,9 @@ local function build()
 	})
 	skip.root.AnchorPoint = Vector2.new(1, 0)
 	skip.root.Position = UDim2.fromScale(1, 0)
+	skip.root.Visible = false -- until step 2 (refresh)
 	skip.root.Parent = header
+	skipRoot, skipWidth = skip.root, skipSize.X + 8
 	local armed = 0
 	local function onSkip()
 		if armed > 0 then

@@ -67,7 +67,7 @@ local STORE: ShopUI.Shop = {
 	building = nil,
 	promptText = "",
 	title = "Store",
-	subtitle = "Robux extras: nothing here makes you win, it just saves time.",
+	subtitle = "Robux time-savers. Nothing pay-to-win.",
 	ids = function()
 		local ids = {}
 		for _, pass in ipairs(StoreData.Passes) do

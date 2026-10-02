@@ -71,7 +71,7 @@ export type Shop = {
 	building: string?, -- model in TimberlineMap
 	promptText: string,
 	title: string,
-	subtitle: string,
+	subtitle: string, -- 40 characters at most (ShopUI.SubtitleMax): two lines on a phone
 	ids: () -> { string },
 	view: (id: string) -> RowView,
 }
@@ -86,6 +86,10 @@ type Row = {
 	swatch: Frame,
 	ring: UIStroke,
 }
+
+-- The longest a shop's subtitle may be: two lines on a phone's narrowest
+-- panel (UI-19).
+ShopUI.SubtitleMax = 40
 
 local PANEL_MAX = Vector2.new(560, 540)
 local PANEL_MIN_WIDTH = 400 -- narrower than this beside the cash row, it goes under the row instead
@@ -127,7 +131,7 @@ local AXES: Shop = {
 	building = "ToolShed",
 	promptText = "Browse axes",
 	title = "Tool Shed",
-	subtitle = "Sharper axes fell trees in fewer swings. Every axe is yours to keep.",
+	subtitle = "Sharper axes, fewer swings.",
 	ids = function()
 		local ids = {}
 		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
@@ -220,7 +224,7 @@ local TRUCKS: Shop = {
 	building = "Dealership",
 	promptText = "Browse trucks",
 	title = "Dealership",
-	subtitle = "Bigger beds haul more logs per trip. Trailers add more.",
+	subtitle = "Bigger beds haul more logs per trip.",
 	-- Trucks first, then trailers ("Trailer:" ids).
 	ids = function()
 		local ids = {}
@@ -281,7 +285,7 @@ local GEAR: Shop = {
 	building = "HearthAndHome",
 	promptText = "Browse gear",
 	title = "Hearth & Home",
-	subtitle = "Gear for the far biomes: buy it once, wear it for good.",
+	subtitle = "Gear for far biomes. Buy once, keep it.",
 	ids = function()
 		local ids = {}
 		for _, gear in ipairs(ItemCatalog.GearList()) do
@@ -643,7 +647,10 @@ local function buildPanel()
 
 	local closeSpec = UITheme.Sized("ShopClose") -- 48 on a phone
 	local closeSize = (closeSpec.size or Vector2.new(44, 44)).X
-	local headerHeight = 14 + 30 + 2 + 16 + 10
+	-- On a phone the subtitle may wrap onto a second line (HudLayout.ShopHeader).
+	local phone = UITheme.IsPhone()
+	local subtitleHeight = (if phone then 2 else 1) * HudLayout.SubtitleLine
+	local headerHeight = HudLayout.ShopHeader(phone)
 	local header = Instance.new("Frame")
 	header.Name = "Header"
 	header.Size = UDim2.new(1, 0, 0, headerHeight)
@@ -662,11 +669,15 @@ local function buildPanel()
 	title.Position = UDim2.fromOffset(18, 14)
 	title.Size = UDim2.new(1, -(18 + closeSize + 26), 0, 30)
 	title.TextTruncate = Enum.TextTruncate.AtEnd
+	-- FredokaOne is a wide face: a long title shrinks rather than truncates.
+	UITheme.fit(title, 28, 20)
 	titleLabel = title
 
 	local subtitle = UITheme.label(header, "", F.Body, UITheme.Sized("ShopSubtitle").text, C.Bark)
 	subtitle.Position = UDim2.fromOffset(18, 46)
-	subtitle.Size = UDim2.new(1, -(18 + closeSize + 26), 0, 16)
+	subtitle.Size = UDim2.new(1, -(18 + closeSize + 26), 0, subtitleHeight)
+	subtitle.TextYAlignment = Enum.TextYAlignment.Top
+	subtitle.TextWrapped = phone
 	subtitle.TextTruncate = Enum.TextTruncate.AtEnd
 	subtitleLabel = subtitle
 

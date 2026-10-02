@@ -1,7 +1,8 @@
 --!strict
 -- UITheme: the game's look, from the UI spec ("Timberline Tycoon UI",
 -- Claude Design). Every screen builds from these parts so they match.
---   * Colours and fonts (Fantasy headings, Gotham body).
+--   * Colours and fonts (FredokaOne headings, the world signs' face;
+--     Gotham body).
 --   * Card(): a frame with a drop edge (a darker strip under it) instead of
 --     a shadow, the spec's "chunky" look.
 --   * Button(): a chunky button with named styles (buy, cant, starter,
@@ -65,7 +66,7 @@ UITheme.Colors = {
 local C = UITheme.Colors
 
 UITheme.Fonts = {
-	Heading = Enum.Font.Fantasy, -- titles, names, cash
+	Heading = Enum.Font.FredokaOne, -- titles, names, cash: the signs' face (Kit.signText)
 	Black = Enum.Font.GothamBlack, -- buttons, objectives, stencil-style tags
 	Bold = Enum.Font.GothamBold,
 	Body = Enum.Font.GothamMedium, -- details and hints (the spec's SemiBold)
@@ -822,6 +823,80 @@ function UITheme.Glyph(key: Enum.KeyCode, size: number): GuiObject
 	UITheme.corner(chip, size)
 	UITheme.stroke(chip, C.Ink, 2)
 	return chip
+end
+
+-- Lets `label` shrink its text to fit its (fixed-size) box, from `max`
+-- down to `min`: for headings in a box that a wider face or a longer name
+-- could overflow.
+function UITheme.fit(label: TextLabel, max: number, min: number): UITextSizeConstraint
+	label.TextSize = max
+	label.TextScaled = true
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = max
+	fit.MinTextSize = min
+	fit.Parent = label
+	return fit
+end
+
+-- A small speaker drawn from frames (no glyph, no image to upload), about
+-- 20 x 16, `color` on a transparent box; centre it in a round button
+-- (Settings). A box (the body), a cone (a 45-degree square, its left
+-- corner clipped off) and one sound wave (a ring, clipped to its right
+-- half). None of it takes input: a press goes to the button under it.
+function UITheme.Speaker(color: Color3): Frame
+	local icon = Instance.new("Frame")
+	icon.Name = "Speaker"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.Size = UDim2.fromOffset(20, 16)
+	icon.BackgroundTransparency = 1
+	local body = Instance.new("Frame")
+	body.Name = "Body"
+	body.Position = UDim2.fromOffset(1, 5)
+	body.Size = UDim2.fromOffset(5, 6)
+	body.BackgroundColor3 = color
+	body.BorderSizePixel = 0
+	UITheme.corner(body, 1)
+	body.Parent = icon
+	-- The cone: x 5 to 11, widening from the body's 6 to the box's 16.
+	local coneClip = Instance.new("Frame")
+	coneClip.Name = "Cone"
+	coneClip.Position = UDim2.fromOffset(5, 0)
+	coneClip.Size = UDim2.fromOffset(6, 16)
+	coneClip.BackgroundTransparency = 1
+	coneClip.ClipsDescendants = true
+	coneClip.Parent = icon
+	local cone = Instance.new("Frame")
+	cone.Name = "Square"
+	cone.AnchorPoint = Vector2.new(0.5, 0.5)
+	cone.Position = UDim2.fromScale(1, 0.5) -- centred on the clip's right edge
+	-- A diagonal of 2 x 9: 6 tall at the clip's left edge, 18 at its right.
+	cone.Size = UDim2.fromOffset(13, 13)
+	cone.Rotation = 45
+	cone.BackgroundColor3 = color
+	cone.BorderSizePixel = 0
+	cone.Parent = coneClip
+	-- The wave: a ring centred left of its clip, so a ")" shows.
+	local waveClip = Instance.new("Frame")
+	waveClip.Name = "Wave"
+	waveClip.Position = UDim2.fromOffset(12, 0)
+	waveClip.Size = UDim2.fromOffset(8, 16)
+	waveClip.BackgroundTransparency = 1
+	waveClip.ClipsDescendants = true
+	waveClip.Parent = icon
+	local ring = Instance.new("Frame")
+	ring.Name = "Ring"
+	ring.AnchorPoint = Vector2.new(0.5, 0.5)
+	ring.Position = UDim2.new(0, -2, 0.5, 0)
+	ring.Size = UDim2.fromOffset(12, 12)
+	ring.BackgroundTransparency = 1
+	UITheme.corner(ring, 6)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = color
+	stroke.Thickness = 2
+	stroke.Parent = ring
+	ring.Parent = waveClip
+	return icon
 end
 
 -- Escapes text for a RichText label.
