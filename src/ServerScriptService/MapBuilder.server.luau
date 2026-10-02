@@ -11,8 +11,9 @@
 --      its greenery (ornamental trees no one can chop, bushes, flowers).
 --   5. The biomes: every wild tree (BiomeData counts) on the terrain,
 --      boulders, the volcano's crater, the grove's glowing mushrooms, the
---      palm island offshore, signposts where the roads arrive, and the
---      open country's scenery (decor set pieces).
+--      palm island offshore, signposts where the roads arrive, the
+--      open country's scenery (decor set pieces), and the landscape's
+--      landmarks (phase 10, STY: brown boulder clusters).
 --   6. The Skyroot and the Aether Isles: isles, bridges, Lumenwood, Sky
 --      Shard nodes, Cloud Chutes, the Starfall Forge, the waterfall.
 --   7. The backdrop beyond the world's edge (mountains, sea, the volcano's
@@ -30,6 +31,7 @@ local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -425,6 +427,27 @@ step("5. The scenery", function()
 		end
 		atomic(piece).Parent = folder
 	end
+end)
+
+-- The landscape, a little toward Lumber Tycoon 2 (phase 10, STY-03): brown
+-- boulder clusters over the open grass (WorldPlan.BoulderClusters), each
+-- its own Atomic model under TimberlineMap.BoulderClusters. Their rocks
+-- collide, as the lone boulders do. Each part of this step runs on its own.
+step("5. The landmarks", function()
+	step("5. The boulder clusters", function()
+		local folder = Instance.new("Folder")
+		folder.Name = "BoulderClusters"
+		folder.Parent = map
+		for _, spot in ipairs(WorldPlan.BoulderClusters()) do
+			local cluster = Kit.model("BoulderCluster")
+			for _, r in ipairs(spot.rocks) do
+				local rock = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
+				Kit.placeAt(rock, CFrame.new(r.position) * CFrame.Angles(0, r.yaw, 0))
+				rock.Parent = cluster
+			end
+			atomic(cluster).Parent = folder
+		end
+	end)
 end)
 
 ---------------------------------------------------------------------------

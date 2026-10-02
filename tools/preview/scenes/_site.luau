@@ -1,13 +1,14 @@
 --!nocheck
 -- One corner of the world, close up (phase 10, STY-*): the terrain over a
 -- rectangle sampled finely (the world scene's 8-stud grid blurs a 14-stud
--- road), with what MapBuilder builds there: the trees, boulders, scenery
--- and road signs whose spot is inside it. A helper (files starting with _
+-- road), with what MapBuilder builds there: the trees, boulders, scenery,
+-- road signs and landmarks whose spot is inside it. A helper (files starting with _
 -- aren't scenes): Site.build(ctx, x0, z0, x1, z1, step) returns everything
 -- a scene returns but the cameras; Site.eye(ctx, x, z) is a player's eye
 -- (5.5 studs over the ground) at (x, z).
 
 local Common = require("./_common")
+local World = require("./_world")
 
 local Site = {}
 
@@ -77,6 +78,8 @@ function Site.build(ctx, x0, z0, x1, z1, step)
 			end
 		end
 	end
+
+	World.landmarks(ctx, root, inside)
 
 	return {
 		root = root,

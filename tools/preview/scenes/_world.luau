@@ -30,6 +30,25 @@ function World.backdrop(ctx, root)
 	end
 end
 
+-- What MapBuilder's "5. The landmarks" step builds (phase 10, STY-*) into
+-- `root`: the boulder clusters, the ones `inside(position)` keeps (all of
+-- them when it's nil).
+function World.landmarks(ctx, root, inside)
+	local CF = ctx.roblox.CFrame
+	local Kit = ctx.art("Kit")
+	local LandmarkArt = ctx.art("LandmarkArt")
+	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
+	for _, spot in ipairs(WorldPlan.BoulderClusters()) do
+		if inside == nil or inside(spot.center) then
+			for _, r in ipairs(spot.rocks) do
+				local rock = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
+				Kit.placeAt(rock, CF.new(r.position) * CF.Angles(0, r.yaw, 0))
+				rock.Parent = root
+			end
+		end
+	end
+end
+
 function World.build(ctx)
 	local roblox = ctx.roblox
 	local CF, V3 = roblox.CFrame, roblox.Vector3
@@ -59,7 +78,7 @@ function World.build(ctx)
 		place(tree, CF.new(p) * CF.Angles(0, Kit.rng(seed + 202):range(0, math.pi * 2), 0))
 	end
 	for _, b in ipairs(WorldPlan.Boulders()) do
-		place(PropArt.Rock(b.size, b.seed), CF.new(b.position))
+		place(PropArt.Rock(b.size, b.seed), CF.new(b.position) * CF.Angles(0, b.seed % 6, 0)) -- turned as MapBuilder turns them
 	end
 	for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
 		place(PropArt.Mushroom(i, true), cf)
@@ -145,6 +164,9 @@ function World.build(ctx)
 			end
 		end
 	end
+
+	-- The landscape's landmarks (STY-*), as MapBuilder's "5. The landmarks" builds them.
+	World.landmarks(ctx, root)
 
 	-- The Skyroot and the isles.
 	local sky = WorldPlan.Sky()

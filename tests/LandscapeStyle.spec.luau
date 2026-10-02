@@ -2,6 +2,9 @@
 -- The landscape's look, nudged toward Lumber Tycoon 2 (phase 10, STY-*),
 -- keeping the cozy low-poly palette:
 --   STY-01 a deeper meadow green and brown rock (TerrainGen.MaterialColors).
+--   STY-02 the haul roads' pale gravel crown between dirt verges.
+--   STY-03 brown boulders (LandmarkArt.BrownRock; WorldPlan.spec and
+--          MapBuilder.spec check where the clusters go and how they build).
 return function(t)
 	local Color3 = t.roblox.Color3
 	local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
@@ -231,6 +234,42 @@ return function(t)
 						end
 					end
 				end
+			end
+		end
+	end)
+
+	---------------------------------------------------------------------------
+	-- STY-03: brown boulders (WorldPlan.spec checks where the clusters go)
+	---------------------------------------------------------------------------
+
+	t.test("STY-03: a brown rock is PropArt.Rock in a brown tone, its blocks colliding, moss when asked", function()
+		local LandmarkArt = t.load("ReplicatedStorage/Shared/Art/LandmarkArt")
+		for _, tone in ipairs({ 1, 2 }) do
+			for _, palette in ipairs({ LandmarkArt.ROCK_TONES[tone] }) do
+				for _, c in ipairs(palette) do
+					t.ok(c.R > c.G and c.G > c.B and c.R - c.B >= 20 / 255, "a brown in tone " .. tone)
+				end
+			end
+			for seed = 1, 12 do
+				local mossy = seed % 2 == 0
+				local model = LandmarkArt.BrownRock(6, seed * 31, tone, mossy)
+				local hard, moss = 0, 0
+				for _, p in ipairs(model:GetDescendants()) do
+					if p:IsA("BasePart") then
+						t.ok(p.Anchored, "anchored")
+						if p.CanCollide then
+							hard += 1
+							local r, g, b = rgb(p.Color)
+							t.ok(r > b + 10 and r >= g, string.format("a block %d,%d,%d reads brown", r, g, b))
+						end
+						if p.Name == "Moss" then
+							moss += 1
+							t.eq(p.CanCollide, false, "moss is looks only")
+						end
+					end
+				end
+				t.eq(hard, 3)
+				t.eq(moss, if mossy then 1 else 0)
 			end
 		end
 	end)

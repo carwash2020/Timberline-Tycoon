@@ -563,4 +563,62 @@ return function(t)
 		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
 		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
 	end)
+
+	-- Phase 10, STY: the landscape's landmarks (one new step, "5. The landmarks").
+	t.test("the boulder clusters: an Atomic model per cluster in a BoulderClusters folder, rocks colliding", function()
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local s = build()
+		t.eq(s.warnings, {})
+		lastStepsRan(s)
+		local folder = s.map:FindFirstChild("BoulderClusters")
+		t.ok(folder and folder:IsA("Folder"), "a BoulderClusters folder in TimberlineMap")
+		local spots = WorldPlan.BoulderClusters()
+		local models = folder:GetChildren()
+		t.eq(#models, #spots)
+		for i, model in ipairs(models) do
+			t.ok(model:IsA("Model"), "a Model")
+			t.eq(model.Name, "BoulderCluster")
+			t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, "streams Atomic")
+			local rocks = model:GetChildren()
+			t.eq(#rocks, #spots[i].rocks, "one rock model per rock")
+			for k, rock in ipairs(rocks) do
+				local hard = 0
+				for _, d in ipairs(rock:GetDescendants()) do
+					if d:IsA("BasePart") then
+						t.eq(d.Anchored, true)
+						if d.CanCollide then
+							hard += 1
+						end
+					end
+				end
+				t.eq(hard, 3, "a rock's three blocks collide, as a lone boulder's do")
+				-- Where WorldPlan says: every part round the rock's spot.
+				local spot = spots[i].rocks[k]
+				for _, d in ipairs(rock:GetDescendants()) do
+					if d:IsA("BasePart") then
+						local at = d.CFrame.Position
+						local off = roblox.Vector3.new(at.X - spot.position.X, 0, at.Z - spot.position.Z).Magnitude
+						t.ok(off <= spot.size * WorldPlan.ClusterReach, "the rock stands on its spot")
+						t.ok(math.abs(at.Y - spot.position.Y) <= spot.size, "the rock stands on its spot's ground")
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("an erroring cluster plan fails its own step alone: the rest of the world, SellArea, spawning", function()
+		local s = build({
+			worldPlan = {
+				BoulderClusters = function()
+					error("x")
+				end,
+			},
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The boulder clusters failed", 1, true), s.warnings[1])
+		lastStepsRan(s)
+		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
+		t.ok(s.map:FindFirstChild("Scenery"), "the scenery still built")
+		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
+	end)
 end

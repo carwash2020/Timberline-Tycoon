@@ -1901,4 +1901,240 @@ return function(t)
 			t.ok((again[i].position - spot.position).Magnitude < 1e-6, "tree " .. i .. " in the same place")
 		end
 	end)
+
+	---------------------------------------------------------------------------
+	-- Boulder clusters (phase 10, STY-03: LT2's brown rocks over the grass)
+	---------------------------------------------------------------------------
+
+	local LandmarkArt = t.load("ReplicatedStorage/Shared/Art/LandmarkArt")
+	local clusters = WorldPlan.BoulderClusters()
+
+	-- Each cluster's rocks, built and placed the way MapBuilder's "5. The
+	-- boulder clusters" builds them: { rock, model } per rock.
+	local builtClusters
+	local function clusterRocks()
+		if builtClusters then
+			return builtClusters
+		end
+		local out = {}
+		for _, spot in ipairs(clusters) do
+			for _, r in ipairs(spot.rocks) do
+				local model = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
+				placed(model, CFrame.new(r.position) * CFrame.Angles(0, r.yaw, 0))
+				table.insert(out, { rock = r, cluster = spot, model = model })
+			end
+		end
+		builtClusters = out
+		return out
+	end
+
+	t.test("boulder clusters: 25-40 clusters of 3-5 rocks, 150 rocks at most, about 5 parts a rock", function()
+		t.ok(#clusters >= 25 and #clusters <= WorldPlan.ClusterMost, #clusters .. " clusters")
+		local total, rocks, colliding = 0, 0, 0
+		for _, spot in ipairs(clusters) do
+			t.ok(#spot.rocks >= 3 and #spot.rocks <= 5, #spot.rocks .. " rocks in a cluster")
+			t.ok(spot.tone == 1 or spot.tone == 2, "a known tone")
+			rocks += #spot.rocks
+		end
+		t.ok(rocks <= WorldPlan.ClusterRocks, rocks .. " rocks")
+		for _, entry in ipairs(clusterRocks()) do
+			local n, hard = 0, 0
+			for _, p in ipairs(parts(entry.model)) do
+				n += 1
+				if p.CanCollide then
+					hard += 1
+					t.eq(p.Name, "Rock", "only the rock's own blocks collide")
+					t.ok(p.Anchored, "anchored")
+				else
+					t.eq(p.CanQuery, false, p.Name .. " is looks only")
+				end
+			end
+			t.ok(n >= 5 and n <= 6, n .. " parts in a rock")
+			t.eq(hard, 3, "a rock's three blocks collide (PropArt.Rock, as the lone boulders)")
+			colliding += hard
+			total += n
+		end
+		t.ok(total <= 900, total .. " parts in all the clusters")
+	end)
+
+	t.test("boulder clusters: each rock on gentle open grass, half-buried, no gap under its side", function()
+		for _, entry in ipairs(clusterRocks()) do
+			local r = entry.rock
+			local p = r.position
+			local here = string.format("a rock at (%.0f, %.0f)", p.X, p.Z)
+			local h = TerrainGen.HeightAt(p.X, p.Z)
+			t.ok(math.abs(p.Y - (h - WorldPlan.ClusterSink(r.size))) < 1e-3, here .. " sinks ClusterSink")
+			t.ok(WorldPlan.ClusterSink(r.size) > 0.6, "deeper than a lone boulder's 0.6")
+			t.ok(TerrainGen.SlopeAt(p.X, p.Z) < WorldPlan.ClusterSlope, here .. " is on a steep slope")
+			local _, material = TerrainGen.Sample(p.X, p.Z)
+			t.ok(material == "Grass" or material == "LeafyGrass", here .. " stands on " .. material)
+			t.ok(h < WorldPlan.ClusterLow, here .. " is up in the mountains")
+			t.ok(
+				math.abs(p.X) <= WorldPlan.ClusterEdge and math.abs(p.Z) <= WorldPlan.ClusterEdge,
+				here .. " is at the edge"
+			)
+			for _, q in ipairs(WorldPlan.ClusterFootprint(p.X, p.Z, r.size)) do
+				local drop = h - TerrainGen.HeightAt(q.X, q.Y)
+				t.ok(
+					drop <= WorldPlan.ClusterDrop(r.size) + 1e-6,
+					string.format("%s: the ground falls %.2f", here, drop)
+				)
+			end
+			-- Its buried edge: the body's lowest corners are under the ground.
+			local lowest = math.huge
+			for _, part in ipairs(parts(entry.model)) do
+				if part.CanCollide then
+					for _, c in ipairs(corners(part.Size)) do
+						lowest = math.min(lowest, (part.CFrame * c).Y)
+					end
+				end
+			end
+			t.ok(lowest < h - 0.3, here .. " is sunk into the ground")
+			-- Mixed sizes: the cluster's first rock is its big one.
+			local first = entry.cluster.rocks[1]
+			t.ok(first.size >= WorldPlan.ClusterBig[1] and first.size <= WorldPlan.ClusterBig[2], "a big rock first")
+			if r ~= first then
+				t.ok(
+					r.size >= WorldPlan.ClusterSmall[1] and r.size <= WorldPlan.ClusterSmall[2],
+					"smaller ones round it"
+				)
+				local d = Vector2.new(p.X - first.position.X, p.Z - first.position.Z).Magnitude
+				t.ok(d <= (first.size + r.size) * 0.65, string.format("%s huddles by its big rock (%.1f off)", here, d))
+			end
+		end
+	end)
+
+	t.test(
+		"boulder clusters keep off roads (+4), water, town, plots, biomes, trees, rocks, scenery, signs, gondola",
+		function()
+			local boulders = WorldPlan.Boulders()
+			local signs = WorldPlan.RoadSigns(WorldPlan.BiomeSignText)
+			local trees = WorldPlan.Trees()
+			local routes = {}
+			local top = sky.gondolaTop.Position
+			for _, from in ipairs({ town.gondola.Position, sky.gondolaBase.Position }) do
+				table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+			end
+			local problems = {}
+			local function check(ok, what)
+				if not ok then
+					table.insert(problems, what)
+				end
+			end
+			for _, entry in ipairs(clusterRocks()) do
+				local r = entry.rock
+				local p = r.position
+				local here = string.format("a rock at (%.0f, %.0f)", p.X, p.Z)
+				local reach = r.size * WorldPlan.ClusterReach
+				-- Its parts: within its reach, 4+ studs off every road, out of town.
+				for _, part in ipairs(parts(entry.model)) do
+					for _, q in ipairs(edgePoints(part.CFrame, part.Size)) do
+						local d = Vector2.new(q.X - p.X, q.Z - p.Z).Magnitude
+						check(
+							d <= reach + 1e-3,
+							string.format("%s: its %s reaches %.1f (reach %.1f)", here, part.Name, d, reach)
+						)
+						check(WorldLayout.FlatWeight(q.X, q.Z) == 0, here .. " is in town or the plots")
+					end
+					if part.CanCollide then
+						local c = roadClearance(part.CFrame, part.Size)
+						check(c >= WorldPlan.ClusterRoad, string.format("%s is %.2f studs off a road", here, c))
+					end
+				end
+				for k = 0, 15 do
+					local a = k * math.pi / 8
+					local d = reach + WorldPlan.ClusterWater - 0.5
+					check(
+						TerrainGen.WaterLevelAt(p.X + math.cos(a) * d, p.Z + math.sin(a) * d) == nil,
+						here .. " by the water"
+					)
+				end
+				for _, tree in ipairs(trees) do
+					local d = Vector2.new(p.X - tree.position.X, p.Z - tree.position.Z).Magnitude
+					check(d >= reach + WorldPlan.ClusterGap, string.format("%s is %.1f from a tree", here, d))
+				end
+				for _, b in ipairs(boulders) do
+					local d = Vector2.new(p.X - b.position.X, p.Z - b.position.Z).Magnitude
+					check(d >= reach + b.size / 2 + WorldPlan.ClusterGap, here .. " runs into a boulder")
+				end
+				for _, spot in ipairs(scenery) do
+					local d = Vector2.new(p.X - spot.center.X, p.Z - spot.center.Z).Magnitude
+					check(d >= reach + spot.radius + WorldPlan.ClusterGap, here .. " stands in a " .. spot.kind)
+				end
+				for _, sign in ipairs(signs) do
+					local s = sign.cframe.Position
+					check(
+						Vector2.new(p.X - s.X, p.Z - s.Z).Magnitude >= reach + 5.3 + WorldPlan.ClusterGap,
+						here .. " by a sign"
+					)
+				end
+				for _, biome in ipairs(BiomeData.All()) do
+					local a = biome.area
+					if a and a.y == nil then
+						local margin = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else a.radius + 20
+						check(
+							Vector2.new(p.X - a.x, p.Z - a.z).Magnitude >= margin + reach,
+							here .. " is in " .. biome.id
+						)
+					end
+				end
+				for _, route in ipairs(routes) do
+					local d = WorldLayout.SegmentDistance(Vector2.new(p.X, p.Z), route[1], route[2])
+					check(d >= reach + WorldPlan.ClusterGondola, here .. " is under the gondola")
+				end
+			end
+			t.ok(#problems == 0, report(problems))
+		end
+	)
+
+	t.test(
+		"boulder clusters spread over the country players cross: round the Starter Forest, the Hills, far meadows",
+		function()
+			local function near(id, within)
+				local a = BiomeData.Get(id).area
+				local n = 0
+				for _, spot in ipairs(clusters) do
+					if Vector2.new(spot.center.X - a.x, spot.center.Z - a.z).Magnitude < a.radius + within then
+						n += 1
+					end
+				end
+				return n
+			end
+			t.ok(near("starter", 350) >= 3, near("starter", 350) .. " clusters round the Starter Forest")
+			t.ok(near("hills", 350) >= 3, near("hills", 350) .. " clusters on the Hills' grassland")
+			local far = 0
+			for _, spot in ipairs(clusters) do
+				if Vector2.new(spot.center.X, spot.center.Z - 110).Magnitude > 700 then
+					far += 1
+				end
+			end
+			t.ok(far >= 6, far .. " clusters out in the far meadows")
+			for i, a in ipairs(clusters) do
+				for j = i + 1, #clusters do
+					local b = clusters[j]
+					t.ok(
+						Vector2.new(a.center.X - b.center.X, a.center.Z - b.center.Z).Magnitude >= 120,
+						"two clusters apart"
+					)
+				end
+			end
+		end
+	)
+
+	t.test("boulder clusters are the same on every server", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan").BoulderClusters()
+		t.eq(#again, #clusters)
+		for i, spot in ipairs(clusters) do
+			t.eq(#again[i].rocks, #spot.rocks)
+			t.eq(again[i].tone, spot.tone)
+			for k, r in ipairs(spot.rocks) do
+				local o = again[i].rocks[k]
+				t.ok((o.position - r.position).Magnitude < 1e-6, "same rock spot")
+				t.eq(o.size, r.size)
+				t.eq(o.seed, r.seed)
+				t.eq(o.yaw, r.yaw)
+				t.eq(o.mossy, r.mossy)
+			end
+		end
+	end)
 end
