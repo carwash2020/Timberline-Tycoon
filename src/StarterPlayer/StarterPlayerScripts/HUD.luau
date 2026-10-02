@@ -30,6 +30,14 @@
 --     while there are logs in your hands or your bed. The line stays clear
 --     of a phone's jump button (HudLayout.BottomRow), and hides with the
 --     hint.
+--   * Under the v2 core loop (CoreLoop.V2()) there are no hands to count
+--     (HudRules.ShowsHands): the chip shows the piece you're dragging (a
+--     Wood model whose HeldBy is you: "Oak log · 26 u³ · $39"), else your
+--     bed's load once TruckLoad publishes the BedVolume and BedValue
+--     attributes (HudRules.LoadChipV2). The hint follows
+--     HintLogic.ContextForV2 for what's known so far: driving (backing up
+--     to the pad once the bed has a volume), dragging, an axe in hand
+--     (an AxeId tool in the character), else how to drag.
 --   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
@@ -66,6 +74,7 @@ local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -150,6 +159,12 @@ local chip: Chip? = nil
 local chipText: string? = nil -- what the chip said last time it showed (a change bumps it)
 local hintForced: HintLogic.Context? = nil -- a controller's mode (HUD.SetHintContext)
 local hintState: HintLogic.State = { driving = false, inSellZone = false, carrying = false, sellable = 0 }
+-- The v2 loop's sources (watchV2: only under CoreLoop.V2()).
+local v2Watching = false
+local heldPiece: Model? = nil -- the Wood model whose HeldBy is you
+local woodConns: { [Model]: RBXScriptConnection } = {}
+local axeOut = false -- an axe tool in the character
+local nearPad = false -- your truck by the sell pad (HintLogic.NearPad)
 local sideGui: ScreenGui? = nil
 local sideColumn: Frame? = nil -- a zero-size corner the side buttons stack up and left from
 local sides: { Side } = {}
@@ -567,13 +582,41 @@ end
 -- Hint and side buttons, by device
 ---------------------------------------------------------------------------
 
+-- A number attribute of the player as read, else 0.
+local function attrAmount(name: string): number
+	local n = player:GetAttribute(name)
+	return if type(n) == "number" and n == n then n else 0
+end
+
+-- What the v2 hint knows (HintLogic.StateV2). Pointing at wood, a piece
+-- too hard or too long for the bed aren't known here yet: CutController
+-- (M1.3) and TruckLoad (M1.6) will say.
+local function hintStateV2(): HintLogic.StateV2
+	return {
+		driving = hintState.driving,
+		axeOut = axeOut,
+		holding = heldPiece ~= nil,
+		onWood = false,
+		tooHard = false,
+		tooLong = false,
+		bedVolume = attrAmount("BedVolume"),
+		nearPad = nearPad,
+	}
+end
+
 -- The hint for this device and what you're doing.
 local function refreshHint()
 	local hint = hintLabel
 	if not hint then
 		return
 	end
-	local text = HintLogic.Pick(UITheme.Device(), hintForced or HintLogic.ContextFor(hintState))
+	local text
+	if CoreLoop.V2() then
+		local forced = hintForced :: any -- "build": a context both loops have
+		text = HintLogic.PickV2(UITheme.Device(), forced or HintLogic.ContextForV2(hintStateV2()))
+	else
+		text = HintLogic.Pick(UITheme.Device(), hintForced or HintLogic.ContextFor(hintState))
+	end
 	if hint.Text ~= text then
 		hint.Text = text
 	end
@@ -586,11 +629,59 @@ function HUD.SetHintContext(context: HintLogic.Context?)
 	refreshHint()
 end
 
+-- The piece you're dragging, as its attributes read, or nil.
+local function heldFacts(): HudRules.Held?
+	local model = heldPiece
+	if not model or model.Parent == nil or model:GetAttribute("HeldBy") ~= player.UserId then
+		return nil
+	end
+	return {
+		woodId = model:GetAttribute("WoodId"),
+		kind = model:GetAttribute("Kind"),
+		volume = model:GetAttribute("Volume"),
+		value = model:GetAttribute("Value"),
+	}
+end
+
+-- The v2 chip (HudRules.LoadChipV2): what you hold, else your bed's load.
+-- The bed's room has no attribute yet (nil: "Bed 41 u³ · $61").
+local function refreshChipV2(c: Chip)
+	local view = HudRules.LoadChipV2(
+		heldFacts(),
+		player:GetAttribute("BedVolume"),
+		nil,
+		player:GetAttribute("BedValue"),
+		modalRect ~= nil,
+		UITheme.IsPhone()
+	)
+	c.frame.Visible = view.shown
+	c.hands.Text = view.text
+	c.bed.Visible = false
+	c.dot.Visible = false
+	c.frame.BackgroundColor3 = if view.full then C.Amber else C.Ink
+	c.frame.BackgroundTransparency = if view.full then 0 else 0.2
+	c.hands.TextColor3 = if view.full then C.Ink else C.Cream
+	if not view.shown then
+		return
+	end
+	if chipText ~= nil and chipText ~= view.text then
+		c.pop.Scale = CHIP_POP
+		TweenService:Create(c.pop, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Scale = 1,
+		}):Play()
+	end
+	chipText = view.text
+end
+
 -- The load chip, from the attributes the server keeps (HudRules.LoadChip).
 -- A change in what it says, while it shows, bumps its log.
 local function refreshChip()
 	local c = chip
 	if not c then
+		return
+	end
+	if not HudRules.ShowsHands(CoreLoop.Active()) then
+		refreshChipV2(c) -- the v2 loop: no hands to count
 		return
 	end
 	local view = HudRules.LoadChip(
@@ -747,6 +838,101 @@ local function refreshSellState()
 	end
 end
 
+-- The v2 hint's polled sources (with the v1 ones, every HINT_POLL): an
+-- axe in hand (a Tool with an AxeId in the character) and your truck by
+-- the pad. The chip redraws too, in case the held piece's numbers moved.
+local function refreshV2State()
+	local char = player.Character
+	local axe = false
+	if char then
+		for _, child in ipairs(char:GetChildren()) do
+			if child:IsA("Tool") and type(child:GetAttribute("AxeId")) == "string" then
+				axe = true
+				break
+			end
+		end
+	end
+	local map = workspace:FindFirstChild("TimberlineMap")
+	local area = if map then map:FindFirstChild("SellArea") else nil
+	local found = if area then area:FindFirstChild("SellZone") else nil
+	local near = found ~= nil and found:IsA("BasePart") and HintLogic.NearPad(truckFrom(found))
+	if axe ~= axeOut or near ~= nearPad then
+		axeOut, nearPad = axe, near
+		refreshHint()
+	end
+	refreshChip()
+end
+
+-- Whose hands a piece is in changed: it's the one you hold now, or no
+-- longer.
+local function onHeldBy(model: Model)
+	if model:GetAttribute("HeldBy") == player.UserId then
+		heldPiece = model
+	elseif heldPiece == model then
+		heldPiece = nil
+	end
+	refreshChip()
+	refreshHint()
+end
+
+local function watchWood(inst: Instance)
+	if not inst:IsA("Model") then
+		return
+	end
+	local model = inst :: Model
+	if woodConns[model] then
+		return
+	end
+	woodConns[model] = model:GetAttributeChangedSignal("HeldBy"):Connect(function()
+		onHeldBy(model)
+	end)
+	if model:GetAttribute("HeldBy") == player.UserId then
+		onHeldBy(model)
+	end
+end
+
+-- Gone (sold, cut, despawned or streamed out): forget it.
+local function unwatchWood(inst: Instance)
+	if not inst:IsA("Model") then
+		return
+	end
+	local model = inst :: Model
+	local conn = woodConns[model]
+	if conn then
+		conn:Disconnect()
+		woodConns[model] = nil
+	end
+	if heldPiece == model then
+		heldPiece = nil
+		refreshChip()
+		refreshHint()
+	end
+end
+
+-- The v2 loop's sources, once the loop is known to be v2: loose wood's
+-- HeldBy (tag Wood, as DragController watches it), the bed's volume and
+-- worth (TruckLoad's BedVolume and BedValue, M1.6), and the polled ones
+-- (refreshV2State).
+local function watchV2()
+	if v2Watching or not CoreLoop.V2() then
+		return
+	end
+	v2Watching = true
+	for _, inst in ipairs(CollectionService:GetTagged("Wood")) do
+		watchWood(inst)
+	end
+	CollectionService:GetInstanceAddedSignal("Wood"):Connect(watchWood)
+	CollectionService:GetInstanceRemovedSignal("Wood"):Connect(unwatchWood)
+	for _, name in ipairs({ "BedVolume", "BedValue" }) do
+		player:GetAttributeChangedSignal(name):Connect(function()
+			refreshChip()
+			refreshHint()
+		end)
+	end
+	refreshV2State()
+	refreshHint()
+end
+
 -- The hint's sources: sitting in a driver's seat (re-hooked on every
 -- character, R6 or R15: both have a Humanoid), logs in hand, and standing
 -- in the sell zone with something to sell (polled, and again whenever
@@ -793,6 +979,9 @@ local function watchHintSources()
 	while true do
 		task.wait(HINT_POLL)
 		refreshSellState()
+		if v2Watching then
+			refreshV2State()
+		end
 	end
 end
 
@@ -1476,6 +1665,11 @@ function HUD.Start()
 	-- (Client.client starts the other controllers once this returns, so
 	-- theirs are there too by then.)
 	waitForRemotes()
+	-- MapBuilder published the core loop before the server made its
+	-- remotes: the v2 loop's chip and hint sources start now, if it's v2
+	-- (or whenever the attribute lands, should it come late).
+	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(watchV2)
+	watchV2()
 	Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
 	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown, seconds: unknown)
 		if type(message) == "string" then

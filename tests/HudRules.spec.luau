@@ -495,4 +495,80 @@ return function(t)
 		end
 		t.eq(HudRules.BedChip(41, 96, 4500, false).text, "Bed 41 / 96 u³", "a big worth drops out before it overflows")
 	end)
+
+	-- M1.8b: what the HUD's chip shows under v2.
+	local function held(woodId, kind, volume, value)
+		return { woodId = woodId, kind = kind, volume = volume, value = value }
+	end
+
+	t.test("v2: the chip shows what you hold; else the bed once TruckLoad publishes it; else nothing", function()
+		local oak = held("oak", "log", 26.3, 39)
+		t.eq(
+			HudRules.LoadChipV2(oak, nil, nil, nil, false, false),
+			{ shown = true, text = "Oak log · 26 u³ · $39", full = false }
+		)
+		t.eq(
+			HudRules.LoadChipV2(oak, 41.2, 96, 61.2, false, false).text,
+			"Oak log · 26 u³ · $39",
+			"holding wins over the bed"
+		)
+		t.eq(HudRules.LoadChipV2(oak, nil, nil, nil, true, false).shown, false, "hidden while a panel is open")
+		t.eq(
+			HudRules.LoadChipV2(nil, 41.2, 96, 61.2, false, false),
+			HudRules.BedChip(41.2, 96, 61.2, false),
+			"empty hands: the bed chip"
+		)
+		t.eq(HudRules.LoadChipV2(nil, 41.2, nil, 61.2, false, true).text, "Bed 41 u³ · $61")
+		t.eq(
+			HudRules.LoadChipV2(nil, nil, nil, nil, false, false).shown,
+			false,
+			"no BedVolume yet (TruckLoad, M1.6): no chip, no Hands"
+		)
+		t.eq(
+			HudRules.LoadChipV2(held("nope", "log", 1, 1), 5, nil, 8, false, false).text,
+			"Bed 5 u³ · $8",
+			"not known wood: the bed instead"
+		)
+		t.eq(HudRules.LoadChipV2(held(nil, nil, nil, nil), nil, nil, nil, false, false).shown, false)
+	end)
+
+	t.test("v2: the HUD wires these rules, and only under the v2 loop", function()
+		local fs = require("@lune/fs")
+		local hud = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HUD.luau")
+		local function has(text, why)
+			t.ok(string.find(hud, text, 1, true) ~= nil, why .. " (" .. text .. ")")
+		end
+		has("if not HudRules.ShowsHands(CoreLoop.Active()) then", "no Hands chip under v2")
+		has("HudRules.LoadChipV2(", "the v2 chip: what you hold, else the bed")
+		has('model:GetAttribute("HeldBy") ~= player.UserId', "the held piece is the one whose HeldBy is you")
+		has('CollectionService:GetTagged("Wood")', "loose wood, by its tag")
+		has("HintLogic.ContextForV2(hintStateV2())", "the v2 hint's context")
+		has("if v2Watching or not CoreLoop.V2() then", "the v2 sources start only under v2")
+		has("HintLogic.Pick(UITheme.Device(), hintForced or HintLogic.ContextFor(hintState))", "v1's hint as it was")
+	end)
+
+	t.test("v2: on a phone the held tooltip fits the chip's longest, dropping the kind, then the u³", function()
+		t.eq(HudRules.ChipTooltip(held("oak", "log", 26.3, 39), true), "Oak log · 26 u³ · $39", "fits as it is")
+		t.eq(HudRules.ChipTooltip(held("birch", "log", 7.5, 17), true), "Birch · 7.5 u³ · $17")
+		t.eq(HudRules.ChipTooltip(held("frostwood", "plank", 4.4, 470), true), "Frostwood · $470")
+		t.eq(
+			HudRules.ChipTooltip(held("frostwood", "plank", 4.4, 470), false),
+			"Frostwood plank · 4.4 u³ · $470",
+			"a computer or a TV: all of it"
+		)
+		for _, wood in ipairs(WoodData.All()) do
+			for _, kind in ipairs({ "log", "plank" }) do
+				for _, volume in ipairs({ 0.2, 4.4, 26, 140 }) do
+					for _, value in ipairs({ 0.3, 39, 470, 4500 }) do
+						local text = HudRules.ChipTooltip(held(wood.id, kind, volume, value), true)
+						t.ok(
+							utf8.len(text) <= HudRules.BedChipMaxChars,
+							string.format("%q is longer than the chip's room", text)
+						)
+						t.ok(string.find(text, wood.displayName, 1, true) == 1, "it names the wood: " .. text)
+					end
+				end
+			end
+		end
+	end)
 end

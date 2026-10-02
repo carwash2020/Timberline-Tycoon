@@ -105,7 +105,8 @@ return function(t)
 			end),
 			function(_, message)
 				table.insert(toasts, message)
-			end
+			end,
+			options.loop
 		)
 		return {
 			buy = function(category, itemId)
@@ -301,5 +302,75 @@ return function(t)
 			s.buy("Axe", "SteelAxe")
 		end
 		t.eq(#s.granted, 3)
+	end)
+
+	---------------------------------------------------------------------------
+	-- The v2 loop: Init with loop 2 (GameServer passes CoreLoop.Active())
+	-- charges ShopLogic.Price: the v2 prices for axes, trucks and trailers.
+	---------------------------------------------------------------------------
+
+	t.test("v2: the Steel Axe costs its v2 price; under v1 its v1 price", function()
+		local ItemCatalog = t.shared("ItemCatalog")
+		local steel = ItemCatalog.GetAxe("SteelAxe")
+		t.ok(steel.v2.price ~= steel.priceCash, "the two loops' prices differ")
+		local v2 = setup({ cash = 200, loop = 2 })
+		v2.buy("Axe", "SteelAxe")
+		t.eq(v2.profile.cash, 200 - steel.v2.price)
+		t.eq(v2.granted, { "SteelAxe" })
+		t.eq(v2.quests, { "axeBought" })
+		local v1 = setup({ cash = 200, loop = 1 })
+		v1.buy("Axe", "SteelAxe")
+		t.eq(v1.profile.cash, 200 - steel.priceCash)
+	end)
+
+	t.test("v2: short of the v2 price, the toast says how much more by the v2 price", function()
+		local steel = t.shared("ItemCatalog").GetAxe("SteelAxe")
+		local s = setup({ cash = steel.v2.price - 10, loop = 2 })
+		s.buy("Axe", "SteelAxe")
+		t.eq(s.profile.cash, steel.v2.price - 10)
+		t.eq(s.granted, {})
+		t.eq(s.toasts, { "You need $10 more for the Steel Axe." })
+		-- Enough under v2 is still short under v1 (the Steel Axe got cheaper).
+		local v1 = setup({ cash = steel.v2.price })
+		v1.buy("Axe", "SteelAxe")
+		t.eq(v1.granted, {})
+		t.eq(v1.profile.cash, steel.v2.price)
+	end)
+
+	t.test("v2: trucks and trailers cost their v2 prices", function()
+		local ItemCatalog = t.shared("ItemCatalog")
+		local pickup = ItemCatalog.GetTruck("Pickup")
+		local pony = ItemCatalog.GetTrailer("PonyTrailer")
+		local truck = setup({ cash = 1000, loop = 2 })
+		truck.buy("Truck", "Pickup")
+		t.eq(truck.profile.cash, 1000 - pickup.v2.price)
+		t.eq(truck.profile.ownedTrucks, { "Rustbucket", "Pickup" })
+		local trailer = setup({ cash = 2000, loop = 2 })
+		trailer.buy("Trailer", "PonyTrailer")
+		t.eq(trailer.profile.cash, 2000 - pony.v2.price)
+		t.eq(trailer.profile.ownedTrailers, { "PonyTrailer" })
+		-- The Pony Trailer costs more under v2: v1's price doesn't buy it.
+		t.ok(pony.v2.price > pony.priceCash)
+		local short = setup({ cash = pony.priceCash, loop = 2 })
+		short.buy("Trailer", "PonyTrailer")
+		t.eq(short.profile.ownedTrailers, {})
+		t.eq(short.profile.cash, pony.priceCash)
+		local v1 = setup({ cash = pony.priceCash })
+		v1.buy("Trailer", "PonyTrailer")
+		t.eq(v1.profile.ownedTrailers, { "PonyTrailer" }, "v1 as before")
+		t.eq(v1.profile.cash, 0)
+	end)
+
+	t.test("v2: gear keeps its one price; the ladder and the range rules hold", function()
+		local s = setup({ cash = 1000, loop = 2 })
+		s.buy("Gear", "InsulatedCoat")
+		t.eq(s.profile.cash, 500, "its priceCash, as under v1")
+		t.eq(s.profile.gear, { "InsulatedCoat" })
+		local locked = setup({ cash = 99999, loop = 2 })
+		locked.buy("Axe", "SilverAxe")
+		t.eq(locked.granted, {}, "axes are still sold in order")
+		local far = setup({ cash = 99999, loop = 2, at = COUNTER + Vector3.new(0, 0, -40) })
+		far.buy("Axe", "SteelAxe")
+		t.eq(far.profile.cash, 99999)
 	end)
 end

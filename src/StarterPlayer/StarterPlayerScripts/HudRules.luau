@@ -28,7 +28,8 @@
 -- The v2 core loop (V2_PLAN.md §4, Shared/CoreLoop) has no hands to
 -- count (ShowsHands): what you hold or point at gets a tooltip instead
 -- (WoodTooltip, "Oak log · 26 u³ · $39"), and the bed chip reads in u³
--- (BedChip, "Bed 41 / 96 u³ · $61"). VolumeText, PriceText and CashText
+-- (BedChip, "Bed 41 / 96 u³ · $61"); LoadChipV2 picks which the HUD's
+-- chip shows (ChipTooltip fits a phone). VolumeText, PriceText and CashText
 -- are how u³ and dollars read everywhere (FieldGuide's, so the server's
 -- toasts and the shop agree).
 -- The server stays in charge of what any of them do.
@@ -306,6 +307,29 @@ function HudRules.ShowsHands(loop: number): boolean
 	return loop ~= 2
 end
 
+-- A piece's tooltip, with or without its kind ("Oak log" or "Oak") and
+-- its volume.
+local function tooltipText(
+	wood: WoodData.WoodDef,
+	kind: unknown,
+	volume: unknown,
+	value: unknown,
+	withKind: boolean,
+	withVolume: boolean
+): string
+	local name = if withKind
+		then string.format("%s %s", wood.displayName, if kind == "plank" then "plank" else "log")
+		else wood.displayName
+	local parts = { name }
+	if withVolume and type(volume) == "number" and volume == volume then
+		table.insert(parts, FieldGuide.VolumeText(volume))
+	end
+	if type(value) == "number" and value == value then
+		table.insert(parts, FieldGuide.CashText(value))
+	end
+	return table.concat(parts, " · ")
+end
+
 -- The tooltip for a piece of wood you hold or point at, from its
 -- attributes as read (any type): WoodId, Kind ("log" or "plank"), Volume
 -- (u³) and Value ($): "Oak log · 26 u³ · $39". A part that isn't known
@@ -315,14 +339,7 @@ function HudRules.WoodTooltip(woodId: unknown, kind: unknown, volume: unknown, v
 	if not wood then
 		return nil
 	end
-	local parts = { string.format("%s %s", wood.displayName, if kind == "plank" then "plank" else "log") }
-	if type(volume) == "number" and volume == volume then
-		table.insert(parts, FieldGuide.VolumeText(volume))
-	end
-	if type(value) == "number" and value == value then
-		table.insert(parts, FieldGuide.CashText(value))
-	end
-	return table.concat(parts, " · ")
+	return tooltipText(wood, kind, volume, value, true, true)
 end
 
 export type BedChip = {
@@ -364,6 +381,50 @@ function HudRules.BedChip(volume: unknown, room: unknown, value: unknown, modal:
 		text = text,
 		full = space > 0 and inBed >= space,
 	}
+end
+
+-- A piece you hold, as its attributes read (any type; HUD finds it by
+-- its HeldBy attribute being you).
+export type Held = { woodId: unknown, kind: unknown, volume: unknown, value: unknown }
+
+-- The held piece's tooltip in the load chip: WoodTooltip, and on a phone
+-- no longer than BedChipMaxChars (where HudLayout.spec fits the chip
+-- beside the hint): first without its kind ("Frostwood · 4.4 u³ · $40"),
+-- then without its volume too ("Frostwood · $40"). nil when it isn't
+-- known wood.
+function HudRules.ChipTooltip(held: Held, phone: boolean): string?
+	local full = HudRules.WoodTooltip(held.woodId, held.kind, held.volume, held.value)
+	if not full or not phone or (utf8.len(full) or #full) <= HudRules.BedChipMaxChars then
+		return full
+	end
+	local wood = WoodData.Get(held.woodId :: string) :: WoodData.WoodDef -- known: it has a tooltip
+	local shorter = tooltipText(wood, held.kind, held.volume, held.value, false, true)
+	if (utf8.len(shorter) or #shorter) <= HudRules.BedChipMaxChars then
+		return shorter
+	end
+	return tooltipText(wood, held.kind, held.volume, held.value, false, false)
+end
+
+-- The v2 load chip (HUD), where v1's reads "Hands 1/2 · Bed 4/6":
+--   * while you hold a piece (`held`), its tooltip (ChipTooltip);
+--   * else the bed chip (BedChip) from the BedVolume, the bed's room and
+--     BedValue as read: it shows once TruckLoad (M1.6) publishes a
+--     volume above 0, so until then nothing does;
+--   * hidden while a panel is open, as the hint is.
+-- `full` (amber) only for a bed at its room.
+function HudRules.LoadChipV2(
+	held: Held?,
+	bedVolume: unknown,
+	bedRoom: unknown,
+	bedValue: unknown,
+	modal: boolean,
+	phone: boolean
+): BedChip
+	local tooltip = if held then HudRules.ChipTooltip(held, phone) else nil
+	if tooltip then
+		return { shown = not modal, text = tooltip, full = false }
+	end
+	return HudRules.BedChip(bedVolume, bedRoom, bedValue, modal)
 end
 
 return HudRules
