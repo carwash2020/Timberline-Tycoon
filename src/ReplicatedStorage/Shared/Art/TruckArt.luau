@@ -28,7 +28,9 @@
 --   * "BedFloor" (0.5 thick, centred at layout.bedFloorY) when the truck has
 --     a bed; layout.logSlots are relative to it. A towed trailer adds
 --     "TrailerBed" (same rule, TrailerLayout) and "TrailerSkid" (ramped
---     the same way).
+--     the same way). Each bed part has one child "BedZone" (AddBedZone):
+--     invisible, never colliding or queried, the box the v2 loop's loose
+--     wood rides in (TruckLoad). ApplyBedFriction (v2 only) grips the beds.
 --   * Exactly one Attachment "LoadPoint", on the last bed part.
 --   * "Headlight" and "Taillight" parts (Neon), "Exhaust" parts each with an
 --     Attachment "ExhaustOut" (its +Y points out of the pipe) and a "Smoke"
@@ -49,6 +51,7 @@
 -- who stays avatar-sized: the seat (SEAT_TOP) and the roof (HEADROOM over
 -- it) are set per truck, so a hat clears every roof (TruckArt.spec).
 
+local GameConfig = require(script.Parent.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -1351,8 +1354,17 @@ function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, tr
 		rng = Kit.rng(seedOf(def.id)),
 	})
 
+	local bed = model:FindFirstChild("BedFloor")
+	if bed and bed:IsA("BasePart") then
+		TruckArt.AddBedZone(bed, lay.bedWidth, lay.bedLength, lay.wallHeight)
+	end
 	if trailer then
-		TruckArt.AddTrailer(model, trailer, trailerLayout or TruckLayout.ForTrailer(trailer, lay))
+		local tl = trailerLayout or TruckLayout.ForTrailer(trailer, lay)
+		TruckArt.AddTrailer(model, trailer, tl)
+		local trailerBed = model:FindFirstChild("TrailerBed")
+		if trailerBed and trailerBed:IsA("BasePart") then
+			TruckArt.AddBedZone(trailerBed, tl.bedWidth, tl.bedLength, tl.wallHeight)
+		end
 	end
 
 	-- Where the "Load logs" prompt hangs: just behind the last bed.
@@ -1396,6 +1408,76 @@ function TruckArt.Rig(model: Model)
 		end
 	end
 	chassis.Anchored = true
+end
+
+---------------------------------------------------------------------------
+-- The v2 loop: loose wood rides on the beds (V2_PLAN §4b, M1.6)
+---------------------------------------------------------------------------
+
+-- The parts a load lies on or leans against: bed floors, walls, boards,
+-- tailgates and stakes (the hull, but for the chassis and the skids).
+TruckArt.BedParts = {
+	BedFloor = true,
+	BedBoard = true,
+	BedWall = true,
+	Tailgate = true,
+	Stake = true,
+	StakeRail = true,
+	Stanchion = true,
+	TrailerBed = true,
+	TrailerBoard = true,
+	TrailerFront = true,
+	TrailerGate = true,
+	TrailerStake = true,
+	TrailerRail = true,
+	TrailerStanchion = true,
+} :: { [string]: boolean }
+
+-- Adds a bed's BedZone: an invisible box over `bed` (a bed floor part),
+-- `width` (inside its walls or stakes) x TruckLayout.BedZoneHeight x
+-- `length`, its bottom on the floor's top. A piece of wood whose centre is
+-- inside it rides on that bed (TruckLoad). It never collides, can't be
+-- hit by rays or clicked, fires no touches and casts no shadow, so it
+-- changes nothing about how the truck looks or drives; Rig welds it to
+-- its bed. Attributes: Room (the u³ the bed carries a trip,
+-- TruckLayout.BedRoomU3) and Length (the bed's, in studs). Returns it.
+function TruckArt.AddBedZone(bed: BasePart, width: number, length: number, wallHeight: number): Part
+	local offset, size = TruckLayout.BedZone(width, length)
+	local zone = Kit.part(bed, "BedZone", size, bed.CFrame * offset, Color3.new(1, 1, 1), M.SmoothPlastic)
+	Kit.decor(zone, false)
+	zone.Transparency = 1
+	zone:SetAttribute("Room", TruckLayout.BedRoomU3(length, width, wallHeight, GameConfig.WoodUnit))
+	zone:SetAttribute("Length", length)
+	return zone
+end
+
+-- Every BedZone on a built truck, each with the bed part it sits on.
+function TruckArt.BedZones(model: Model): { { zone: BasePart, bed: BasePart } }
+	local out: { { zone: BasePart, bed: BasePart } } = {}
+	for _, name in ipairs({ "BedFloor", "TrailerBed" }) do
+		local bed = model:FindFirstChild(name)
+		local zone = if bed then bed:FindFirstChild("BedZone") else nil
+		if bed and bed:IsA("BasePart") and zone and zone:IsA("BasePart") then
+			table.insert(out, { zone = zone, bed = bed })
+		end
+	end
+	return out
+end
+
+-- Gives every bed part (TruckArt.BedParts) of a built truck the grip of
+-- `friction`: CustomPhysicalProperties with a heavy friction weight, so
+-- wood resting on it feels `friction` itself, and no bounce. The v2 loop
+-- does this to each player's truck (TruckLoad, BedFriction); the v1 loop
+-- never does, so its trucks keep their materials' own physics. The beds
+-- are massless once rigged, so the density changes nothing.
+TruckArt.BedFrictionWeight = 100
+function TruckArt.ApplyBedFriction(model: Model, friction: number)
+	local props = PhysicalProperties.new(0.7, friction, 0, TruckArt.BedFrictionWeight, TruckArt.BedFrictionWeight)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and TruckArt.BedParts[d.Name] then
+			d.CustomPhysicalProperties = props
+		end
+	end
 end
 
 -- A log lying across a bed at `slot` (relative to `floor`, a bed floor

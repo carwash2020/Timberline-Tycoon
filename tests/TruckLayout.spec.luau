@@ -319,4 +319,30 @@ return function(t)
 			end
 		end
 	end)
+
+	-- M1.6: the v2 loop's BedZone and the bed's room (the HUD's "Bed 41 /
+	-- 96 u³"), the same estimate as tools/economy2's "u³ a trip".
+	t.test("BedZone: the inside of the bed, BedZoneHeight tall, its bottom on the floor's top", function()
+		local cf, size = TruckLayout.BedZone(7.2, 26)
+		t.eq(size, t.roblox.Vector3.new(7.2, TruckLayout.BedZoneHeight, 26))
+		t.ok(math.abs(cf.Position.Y - size.Y / 2 - TruckLayout.BedFloorThickness / 2) < 1e-9, "bottom on the floor")
+		t.ok(math.abs(cf.Position.X) < 1e-9 and math.abs(cf.Position.Z) < 1e-9, "centred")
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			t.ok(layout.wallHeight <= TruckLayout.BedZoneHeight, id .. " walls stand inside the zone")
+		end
+	end)
+
+	t.test("BedRoomU3 matches ECONOMY_V2's u³ a trip for every truck", function()
+		local U = t.shared("GameConfig").WoodUnit
+		-- ECONOMY_V2.md "Beds": length x width x (walls + 2) x 0.4 / u³.
+		local trip = { Rustbucket = 18.6, Pickup = 25.3, Flatbed = 53.8, LoggingRig = 95.1, ScoutATV = 0 }
+		for id, want in pairs(trip) do
+			local layout = TruckLayout.For(ItemCatalog.GetTruck(id))
+			local room = TruckLayout.BedRoomU3(layout.bedLength, layout.bedWidth, layout.wallHeight, U)
+			t.ok(math.abs(room - want) < 0.05, string.format("%s room %.2f (want %.1f)", id, room, want))
+		end
+		t.eq(TruckLayout.BedRoomU3(10, 5, 1, 0), 0, "no unit, no room")
+		t.eq(TruckLayout.BedRoomU3(-1, 5, 1, U), 0)
+	end)
 end
