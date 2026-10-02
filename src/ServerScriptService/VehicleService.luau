@@ -1366,6 +1366,8 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 	return true, nil
 end
 
+VehicleService.UnloadFirstText = "Unload the wood on your truck first (sell it, or drag it off)."
+
 -- Swaps the player's rig (the Dealership): truck `truckId` towing
 -- `trailerId` ("" or nil for none). Refuses while they drive, or when the
 -- load would come along (the truck is in town) and wouldn't fit the new
@@ -1381,6 +1383,18 @@ function VehicleService.Equip(player: Player, truckId: string, trailerId: string
 	end
 	if rec and #rec.bed > capacityOf(def, towedTrailer(def, trailerId)) and keepsLoad(rec) then
 		return false, "Sell your load first: it won't fit."
+	end
+	-- The v2 loop's loose wood (Hooks.loadCount) would be squeezed onto the
+	-- new beds and could be flung: unload first.
+	local countLoose = VehicleService.Hooks.loadCount
+	if rec and countLoose and keepsLoad(rec) then
+		local loose = 0
+		guarded("loadCount", function()
+			loose = countLoose(rec.model)
+		end)
+		if loose > 0 then
+			return false, VehicleService.UnloadFirstText
+		end
 	end
 	VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil, trailerId)
 	return true, nil

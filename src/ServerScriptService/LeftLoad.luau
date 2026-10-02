@@ -62,7 +62,7 @@ export type Piece = {
 }
 
 LeftLoad.Beds = { BedFloor = true, TrailerBed = true } :: { [string]: boolean }
-LeftLoad.MaxOffset = 80 -- studs: a saved place further than this from its bed (or root) is junk
+LeftLoad.MaxOffset = 150 -- studs (an Elder pine is about 90 long): a saved place further than this from its bed (or root) is junk
 LeftLoad.MaxSize = 80 -- studs: a section bigger than this is junk
 LeftLoad.MinSize = 0.05
 LeftLoad.MaxBoost = 4

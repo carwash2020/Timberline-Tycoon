@@ -93,7 +93,7 @@ return function(t)
 		}
 		t.eq(GrowLogic.TakeDue(due, 10, 3), { "a", "b", "d" })
 		t.eq(GrowLogic.TakeDue(due, 10, 12), { "a", "b", "d", "c" }, "nothing not yet due")
-		t.eq(GameConfig.TreesPerGrowTick, 12)
+		t.eq(GameConfig.TreesPerGrowTick, 20) -- headroom over the forest's ~2.9 changes a second (pre-flip review)
 	end)
 
 	t.test("BootTree: the site's look, its mature skeleton, lifespan, age and stage together", function()

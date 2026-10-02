@@ -751,7 +751,7 @@ end
 -- day. A tree that's down stays down; a half-cut one is whole again.
 function SectionTrees.SetBiomeDormant(biomeId: string, dormant: boolean)
 	for _, rec in pairs(trees) do
-		if rec.def.biome == biomeId and rec.dormant ~= dormant then
+		if rec.def.biome == biomeId and rec.dormant ~= dormant and rec.model.Parent ~= nil then
 			rec.dormant = dormant
 			rec.model:SetAttribute("Dormant", dormant)
 			if dormant then
@@ -1150,6 +1150,13 @@ function SectionTrees.Chop(
 	local p = piece
 	if p then
 		local held = GrabService.HeldBy(p.model)
+		-- Wood on someone's truck bed is theirs to cut, as it is to grab (TruckLoad).
+		local bedHook = GrabService.Hooks.bedOwner
+		local bedOwner: Player? = nil
+		if bedHook then
+			local found, who = pcall(bedHook, p :: any)
+			bedOwner = if found then who else nil
+		end
 		local facts: GrabLogic.Facts = {
 			userId = player.UserId,
 			ownerId = p.ownerId,
@@ -1160,10 +1167,11 @@ function SectionTrees.Chop(
 			selling = p.selling,
 			elder = p.elder,
 			shopItem = p.shopItem,
+			bedOwnerId = if bedOwner then bedOwner.UserId else nil,
 		}
 		local ok, reason = GrabLogic.CanGrab(facts)
 		if not ok then
-			notify(player, GrabLogic.Message(reason, facts))
+			notify(player, GrabLogic.Message(reason, facts, if bedOwner then bedOwner.DisplayName else nil))
 			return false, reason, nil
 		end
 	end

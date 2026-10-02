@@ -314,14 +314,33 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		end
 		return nearestTagged("Tree", from, choppable)
 	elseif target == "wood" then
-		-- Your own nearest loose piece, else the nearest anyone may take.
+		-- Your own nearest loose piece, else the nearest anyone may take,
+		-- else a tree to fell for some (a save that came into the v2 loop
+		-- mid-tutorial had its logs bought back).
 		local userId = player.UserId
 		return nearestTagged("Wood", from, function(model)
 			return QuestUI.WoodRank(model, userId) == 1
 		end) or nearestTagged("Wood", from, function(model)
 			return QuestUI.WoodRank(model, userId) == 2
-		end)
+		end) or nearestTagged("Tree", from, choppable)
 	elseif target == "truckBed" then
+		-- Nothing of yours to load (none lying about, none on the bed): a
+		-- tree to fell first.
+		local bedVolume = player:GetAttribute("BedVolume")
+		local onBed = type(bedVolume) == "number" and bedVolume > 0
+		local userId = player.UserId
+		if
+			not onBed
+			and nearestTagged("Wood", from, function(model)
+					return QuestUI.WoodRank(model, userId) == 1
+				end)
+				== nil
+		then
+			local tree = nearestTagged("Tree", from, choppable)
+			if tree then
+				return tree
+			end
+		end
 		for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
 			if inst:IsA("Model") and inst:GetAttribute("OwnerId") == player.UserId then
 				return QuestUI.BedPart(inst)
@@ -353,6 +372,23 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		return nearestTagged("Tree", from, function(model)
 			return choppable(model) and seedsFor(model) > 0
 		end) or nearestTagged("Tree", from, choppable)
+	elseif target == "sellPad" and CoreLoop.V2() then
+		-- The v2 loop with nothing of yours to sell (none on the bed, none
+		-- lying about): a tree to fell first, as for the bed.
+		local bedVolume = player:GetAttribute("BedVolume")
+		local userId = player.UserId
+		local hasWood = (type(bedVolume) == "number" and bedVolume > 0)
+			or nearestTagged("Wood", from, function(model)
+					return QuestUI.WoodRank(model, userId) == 1
+				end)
+				~= nil
+		if not hasWood then
+			local tree = nearestTagged("Tree", from, choppable)
+			if tree then
+				return tree
+			end
+		end
+		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)
 	elseif target then
 		return QuestUI.FindBeaconPart(workspace:FindFirstChild("TimberlineMap"), target)
 	end

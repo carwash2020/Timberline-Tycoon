@@ -73,7 +73,14 @@ function WorldClock.Start()
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			tick()
+			-- One bad tick (a tree's model gone mid-change) mustn't stop day and night.
+			local ok, err = pcall(function(): any
+				tick()
+				return nil
+			end)
+			if not ok then
+				warn("[WorldClock] tick failed: " .. tostring(err))
+			end
 		end
 	end)
 end

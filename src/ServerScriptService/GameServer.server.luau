@@ -927,7 +927,7 @@ local function onPlayerAdded(player: Player)
 	-- Logs left behind (Truck to lot from afar) that were still lying out
 	-- when the player last left: back where they lay, at most MaxLeftLogs
 	-- of them (saves made under the old cap can hold 150).
-	if #profile.leftLoad > 0 then
+	if #profile.leftLoad > 0 and not CoreLoop.V2() then
 		safely("VehicleService.RestoreLeftLoad", function()
 			local saved = LeftLoad.ToRestore(profile.leftLoad)
 			if #saved < #profile.leftLoad then

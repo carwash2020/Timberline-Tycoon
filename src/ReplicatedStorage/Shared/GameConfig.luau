@@ -112,7 +112,7 @@ local GameConfig = {
 	-- growth
 	GrowTickSec = 5,
 	GrowStages = 4,
-	TreesPerGrowTick = 12,
+	TreesPerGrowTick = 20, -- the forest asks about 2.9 changes a second at steady state; 4 a second leaves room
 	PreDeadAt = 0.9, -- of a tree's lifespan: its leaves go
 	DeadSinkSec = 4,
 	-- later phases (M2-M6)

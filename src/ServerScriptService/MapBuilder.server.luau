@@ -338,8 +338,21 @@ step("5. The trees", function()
 		SectionTrees.RegisterGroups() -- Wood, WoodFalling, WoodHeld, Leaves, Players
 	end
 	local before = os.clock()
+	-- One tree that fails to build (a bad seed) mustn't take the rest of
+	-- the forest with it: each on its own, one warning for all of them.
+	local failed, firstErr = 0, nil
 	for _, spot in ipairs(WorldPlan.Trees()) do
-		spawnTree(spot.woodId, spot.position)
+		local ok, err = pcall(function(): any
+			spawnTree(spot.woodId, spot.position)
+			return nil
+		end)
+		if not ok then
+			failed += 1
+			firstErr = firstErr or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
+		end
+	end
+	if failed > 0 then
+		warn(string.format("[MapBuilder] %d tree(s) failed to build; the first: %s", failed, tostring(firstErr)))
 	end
 	if V2 then
 		print(string.format("[MapBuilder] %d section trees in %.1fs", treesSpawned, os.clock() - before))

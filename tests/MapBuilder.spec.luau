@@ -95,6 +95,9 @@ return function(t)
 				-- The v2 loop's section trees (M1.3).
 				SectionTrees = {
 					SpawnTree = function(woodId, _cf, opts)
+						if options.failWood == woodId then
+							error("a bad seed")
+						end
 						s.sectionSpawned = (s.sectionSpawned or 0) + 1
 						s.sectionBoot = (s.sectionBoot ~= false) and opts ~= nil and opts.boot == true
 						s.groupsFirst = (s.groupsFirst ~= false) and s.groups == true
@@ -383,6 +386,26 @@ return function(t)
 		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 2)
 		t.eq(s.spawned or 0, 0, "no TreeService trees")
 		t.ok((s.sectionSpawned or 0) > 0, "section trees")
+	end)
+
+	t.test("a tree that fails to build doesn't stop the rest: one warning for all of them", function()
+		local s = build({ failWood = "birch" })
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local birches = 0
+		for _, spot in ipairs(WorldPlan.Trees()) do
+			if spot.woodId == "birch" then
+				birches += 1
+			end
+		end
+		t.ok(birches > 0, "the plan has birches")
+		t.eq(s.sectionSpawned, #WorldPlan.Trees() - birches, "every other tree")
+		local found = 0
+		for _, line in ipairs(s.allWarnings) do
+			if string.find(tostring(line), "tree(s) failed to build", 1, true) then
+				found += 1
+			end
+		end
+		t.eq(found, 1)
 	end)
 
 	t.test("v1 loop (a rollback, or Studio's CoreLoop = 1): TreeService's trees, SectionTrees untouched", function()

@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CollectionService = game:GetService("CollectionService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
@@ -143,6 +144,11 @@ local STORE: ShopUI.Shop = {
 }
 
 local function myBedCount(): number
+	-- The v2 loop: the loose wood riding on your beds (TruckLoad's BedVolume, u³).
+	if CoreLoop.V2() then
+		local volume = player:GetAttribute("BedVolume")
+		return if type(volume) == "number" and volume > 0 then volume else 0
+	end
 	local mirrored = player:GetAttribute("BedCount") -- set by the server even when the truck streams out
 	if type(mirrored) == "number" then
 		return mirrored

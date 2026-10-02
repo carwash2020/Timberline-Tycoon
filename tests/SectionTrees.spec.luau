@@ -336,6 +336,28 @@ return function(t)
 		end
 	)
 
+	t.test("wood resting on someone's truck bed is theirs to cut, as it is to grab", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local owner = s.player(1)
+		local _, _, _, result = s.cutThrough(owner, rec.sections[1])
+		local piece = result.freed[1]
+		local other = s.player(2)
+		s.now += 600 -- long past the pickup grace
+		local onBed = true
+		s.Grab.Hooks.bedOwner = function(p)
+			return if onBed and p == piece then owner else nil
+		end
+		local part = piece.model.PrimaryPart
+		local ok, why = s.swing(other, part)
+		t.eq(ok, false)
+		t.eq(why, "bed")
+		onBed = false
+		local ok2 = s.swing(other, part)
+		t.ok(ok2, "off the bed, anyone may cut it once the grace is over")
+		s.Grab.Hooks.bedOwner = nil
+	end)
+
 	t.test("the swing schedule: too soon is refused (cooldown), on time is taken", function()
 		local s = setup()
 		local rec = s.tree("oak")

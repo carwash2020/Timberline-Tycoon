@@ -211,6 +211,26 @@ return function(t)
 		t.ok(VehicleService.Recall(w.player), "the second press goes ahead")
 	end)
 
+	t.test("the Dealership won't swap a truck with loose wood riding on it in town", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		local riding = 2
+		VehicleService.Hooks.loadCount = function()
+			return riding
+		end
+		local truck = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		local ok, why = VehicleService.Equip(w.player, "Pickup", "")
+		t.eq(ok, false)
+		t.eq(why, VehicleService.UnloadFirstText)
+		t.eq(VehicleService.GetVehicle(w.player), truck, "the same truck")
+		riding = 0
+		t.ok(VehicleService.Equip(w.player, "Pickup", ""), "an empty bed swaps")
+		-- Out of town the load stays where it is, so the swap goes ahead.
+		riding = 2
+		VehicleService.GetVehicle(w.player):PivotTo(CFrame.new(900, 40, -700))
+		t.ok(VehicleService.Equip(w.player, "Rustbucket", ""), "out of town: swapped, the load stays")
+	end)
+
 	t.test("without hooks, Recall's warning still counts the v1 bed's logs", function()
 		local w = setup()
 		local VehicleService = w.VehicleService

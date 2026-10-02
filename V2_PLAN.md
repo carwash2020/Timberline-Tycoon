@@ -32,6 +32,12 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 - The v2 forge: 60 u³ of plain lumenwood, 12 Sky Shards and $20,000 (`StarfallAxe.v2.forgeCash`, §2c).
 - Boot: section trees take about 7.5 s in Lune (v1's took 1.4 s); MapBuilder prints `[MapBuilder] N section trees in X s` so a live boot can be measured. If it's over budget, speed up TreeGen and FromSkeleton before anything else.
 
+**Follow-ups after the flip (from the pre-flip review, 2 Oct 2026):**
+- Wood a rejoin or "Send truck home" leaves on the ground out of town is lost if the player leaves again before collecting it (only bed wood is saved; v1 saved such logs as `leftLoad`). Fix: TruckLoad tracks each owner's left-behind pieces and saves them on leave.
+- The HUD's v2 hints `tooLong`, `tooHard` and `onWood` are still always false.
+- Calibrate EFFICIENCY from a real session, then tune the pacing (the model has first $1k, Cobalt and a full plot about 1.5x slower than §17).
+- Fixed before the flip: the Instant Delivery button reads BedVolume under v2; the Dealership won't swap a truck with loose wood on it in town; wood on someone's bed can't be cut by others; TreesPerGrowTick 20; WorldClock's tick and each boot tree are guarded; the v1 left-behind restore is v1-only; the tutorial's wood, bed and pad beacons point at a tree when you have no wood (saves migrated mid-tutorial).
+
 ---
 
 ## 0. Decisions and ground rules
