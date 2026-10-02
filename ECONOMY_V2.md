@@ -23,7 +23,7 @@ u³ = (1.6 studs)³. Sizes roll small / normal / large at 25 / 50 / 25%.
 | Wood | Small u³ | Normal u³ | Large u³ | Mean u³ | Trunk share | Elder u³ | Height (normal) | Sections | Main limbs |
 |---|---|---|---|---|---|---|---|---|---|
 | Oak | 12.7 | 20.2 | 30.2 | 20.8 | 41% | 99.5 | 26.1 | 11.0 | 2.5 |
-| Birch | 6.5 | 10.3 | 15.2 | 10.6 | 76% | 49.0 | 28.1 | 5.8 | 1.4 |
+| Birch | 6.4 | 10.1 | 15.0 | 10.4 | 76% | 48.3 | 28.1 | 5.8 | 1.4 |
 | Pine | 26.4 | 41.7 | 62.1 | 43.0 | 98% | 205.0 | 52.6 | 7.0 | 1.0 |
 | Maple | 25.0 | 39.8 | 59.1 | 40.9 | 35% | 194.0 | 28.1 | 12.9 | 2.4 |
 | Palmwood | 10.8 | 17.4 | 26.3 | 18.0 | 100% | 85.6 | 31.1 | 7.0 | 0.0 |
@@ -39,7 +39,7 @@ Mean volume × the v2 price per u³ (the figured-wood bonus left out). The plan'
 | Wood | Log $/u³ | Plank $/u³ | $ / tree as logs | $ / tree as planks | Plan's estimate |
 |---|---|---|---|---|---|
 | Oak | 1.5 | 10 | $31 | $208 | $39 / $260 |
-| Birch | 2.25 | 15 | $24 | $159 | $28 / $187 |
+| Birch | 2.25 | 15 | $23 | $156 | $28 / $187 |
 | Pine | 3.2 | 18 | $138 | $774 | $128 / $720 |
 | Maple | 2.8 | 26.4 | $115 | $1,080 | $88 / $830 |
 | Palmwood | 2.9 | 32 | $52 | $574 | $52 / $570 |
@@ -107,7 +107,7 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 | Biome | Wood | Trees | Regrow | Trees an hour | Real players fed (starter kit) | $/h cap a player (shared by 4) |
 |---|---|---|---|---|---|---|
 | Starter Forest | Oak | 40 | 4.8 min | 505 | 15 | $4,181 |
-| Starter Forest | Birch | 15 | 17.0 min | 53 | 2 | $334 |
+| Starter Forest | Birch | 15 | 17.0 min | 53 | 2 | $330 |
 | The Hills | Maple | 25 | 21.0 min | 71 | 9 | $2,171 |
 | The Hills | Pine | 40 | 11.5 min | 209 | 31 | $7,616 |
 | Snowfields | Frostwood | 35 | 9.0 min | 233 | 51 | $14,339 |
