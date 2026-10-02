@@ -282,4 +282,239 @@ function WorldLayout.FlatWeight(x: number, z: number): number
 	return weight
 end
 
+---------------------------------------------------------------------------
+-- The forest (phase 10, FOR-01): "a forest with the main area open and
+-- then the wild landscapes" (Connor). Three bands, as data:
+--   * the hub: open lawn round the town (spawn, sawmill, shops, parking)
+--     and the plot district, `hub` studs past each side of their flat
+--     zones, its edge wandering `hubNoise` either way. The town's own
+--     ornamental trees stand in it; nothing else grows there.
+--   * the forest ring: canopy from the lawn's edge out to `ring` (give or
+--     take `ringNoise`) past it, thickening over `edge` studs at every
+--     edge. Noise opens clearings in it (`clearing`), roads cut through it
+--     as clear corridors (WorldPlan keeps its trees off them), and the
+--     Starter Forest is its front step south of the spawn.
+--   * the wild landscapes beyond, and the biomes the ring wraps round:
+--     each biome keeps its own ground `wild[id]` studs past its edge (the
+--     Phantom Grove past its ridge), so the Hills stay rolling stands, the
+--     Snowfields, the Volcano, the grove's hollow and the Skyroot's foot
+--     stay themselves; out here only small copses (`copse`) grow. The
+--     forest also stops short of the water (`water`), the beach
+--     (`coast`) and the mountains (`mountains`), and leaves `lanes` open:
+--     the view from the spawn to the lighthouse, and a trail out of the
+--     grove's ridge gap toward town.
+-- WorldLayout.ForestCover reads it (TerrainGen paints the forest floor,
+-- WorldPlan grows the trees). tests/Forest.spec.luau.
+---------------------------------------------------------------------------
+
+export type HubPad = { zone: string, west: number, east: number, south: number, north: number }
+export type Lane = { name: string, a: Vector2, b: Vector2, half: number }
+export type ForestPlan = {
+	hub: { HubPad },
+	hubNoise: number,
+	edge: number,
+	ring: number,
+	ringNoise: number,
+	clearing: { scale: number, fine: number, from: number, soft: number, keep: number },
+	wild: { [string]: number },
+	water: number,
+	coast: number,
+	mountains: number,
+	lanes: { Lane },
+	copse: { scale: number, from: number, soft: number },
+}
+
+local grove = center("grove")
+-- The grove's ridge opens toward the sawmill (TerrainGen's GROVE_GAP).
+local toTown = (Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z) - grove).Unit
+local gapFoot = grove + toTown * (WorldLayout.GroveRidge.inner - 10)
+
+WorldLayout.Forest = {
+	hub = {
+		-- North of the town the lawn runs past the pine band to about z 315;
+		-- west to the Hills' edge; south a strip past the town's edge (the
+		-- Starter Forest starts there); east it meets the plot district.
+		-- Every pad is at least hubNoise, so the wander never eats a zone.
+		{ zone = "Town", west = 80, east = 30, south = 30, north = 110 },
+		-- The plot district's lawn: a strip round it, out to the beach east.
+		{ zone = "Plots", west = 40, east = 130, south = 50, north = 45 },
+	},
+	hubNoise = 30,
+	edge = 50,
+	ring = 520,
+	ringNoise = 90,
+	-- Noise above `from` opens a clearing (fully open `soft` above it), but
+	-- not within `keep` studs of the hub's lawn: the edge facing the town
+	-- and the plots stays a wall of trees.
+	clearing = { scale = 160, fine = 55, from = 0.02, soft = 0.16, keep = 70 },
+	-- Studs past each biome's area the forest keeps off (the grove's from its
+	-- ridge's outer foot). The Starter Forest's own trees are its edge.
+	wild = { starter = 8, hills = 40, snow = 170, volcano = 140, grove = 25, sky = 90 },
+	water = 16, -- studs off the river, its outflow, the lake and the pond
+	coast = 130, -- studs inland of the shore line (its wander and the beach inside it)
+	mountains = 1170, -- the forest fades out by here (|x| or |z|; the mountains rise at 1180)
+	lanes = {
+		-- From the spawn to the lighthouse on the coast's headland
+		-- (WorldPlan.Lighthouse): its lamp stays in sight (Forest.spec).
+		{ name = "LighthouseVista", a = Vector2.new(0, 40), b = Vector2.new(1194, 188), half = 45 },
+		-- A trail out of the Phantom Grove's ridge gap toward town, so the
+		-- curious still find it.
+		{ name = "GroveTrail", a = gapFoot, b = gapFoot + toTown * 300, half = 18 },
+	},
+	-- Out in the wild landscapes: small copses where this noise is high.
+	copse = { scale = 95, from = 0.22, soft = 0.08 },
+} :: ForestPlan
+
+local FOREST = WorldLayout.Forest
+local noise = math.noise
+
+local function smooth(t: number): number
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+-- The hub's padded rectangles, flattened (x0, x1, z0, z1 each).
+local HUB_RECTS: { { number } } = {}
+for _, pad in ipairs(FOREST.hub) do
+	for _, zone in ipairs(WorldLayout.FlatZones) do
+		if zone.name == pad.zone then
+			table.insert(
+				HUB_RECTS,
+				{ zone.x0 - pad.west, zone.x1 + pad.east, zone.z0 - pad.south, zone.z1 + pad.north }
+			)
+		end
+	end
+end
+
+-- Each wild biome's disc (x, z, the radius the forest keeps out of).
+local WILD_DISCS: { { number } } = {}
+for id, margin in pairs(FOREST.wild) do
+	local def = BiomeData.Get(id)
+	local a = if def then def.area else nil
+	if a then -- (the sky's is the Skyroot's foot, under its isles)
+		local r = if id == "grove" then WorldLayout.GroveRidge.outer + margin else a.radius + margin
+		table.insert(WILD_DISCS, { a.x, a.z, r })
+	end
+end
+table.sort(WILD_DISCS, function(p: { number }, q: { number }): boolean
+	return p[1] * 7 + p[2] < q[1] * 7 + q[2] -- a fixed order (pairs isn't)
+end)
+
+local WATER_LINES = {
+	{ line = WorldLayout.FastLine(WorldLayout.River.points), half = WorldLayout.River.width / 2 + 4 },
+	{ line = WorldLayout.FastLine(WorldLayout.LakeOutflow.points), half = WorldLayout.LakeOutflow.width / 2 + 4 },
+}
+local WATER_POOLS = { WorldLayout.Lake, WorldLayout.Pond }
+local LANE_LINES: { { number } } = {}
+for _, lane in ipairs(FOREST.lanes) do
+	table.insert(LANE_LINES, { lane.a.X, lane.a.Y, lane.b.X, lane.b.Y, lane.half })
+end
+
+-- How far (x, z) is outside the hub's lawn (negative inside), before its
+-- edge's wander.
+function WorldLayout.HubDistance(x: number, z: number): number
+	local best = math.huge
+	for _, r in ipairs(HUB_RECTS) do
+		local dx = math.max(r[1] - x, 0, x - r[2])
+		local dz = math.max(r[3] - z, 0, z - r[4])
+		local d
+		if dx > 0 or dz > 0 then
+			d = math.sqrt(dx * dx + dz * dz)
+		else
+			d = -math.min(x - r[1], r[2] - x, z - r[3], r[4] - z)
+		end
+		if d < best then
+			best = d
+		end
+	end
+	return best
+end
+
+-- Distance from (x, z) to segment (ax, az)-(bx, bz), as plain numbers.
+local function segment(x: number, z: number, ax: number, az: number, bx: number, bz: number): number
+	local abx, abz = bx - ax, bz - az
+	local len2 = abx * abx + abz * abz
+	local t = if len2 > 1e-6 then math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1) else 0
+	local dx, dz = x - (ax + abx * t), z - (az + abz * t)
+	return math.sqrt(dx * dx + dz * dz)
+end
+
+-- The forest's canopy over (x, z), 0 (open) to 1 (deep forest); 0.5 is a
+-- forest edge. Also how much (x, z) belongs to the forest ring, clearings
+-- and all (0 out in the wild landscapes and in the hub; there `cover`
+-- comes from the copses alone). Pure and cheap: TerrainGen asks once per
+-- terrain column that reaches the meadow. Roads aren't in it (WorldPlan
+-- keeps the trees off them; TerrainGen paints them first).
+function WorldLayout.ForestCover(x: number, z: number): (number, number)
+	local edge = FOREST.edge
+	local wander = noise(x / 130, z / 130, 31.7) * FOREST.hubNoise * 2
+	-- The world's edge and the beach first: cheap and often enough final.
+	local far = math.max(math.abs(x), math.abs(z))
+	local w = smooth((FOREST.mountains - far) / edge)
+	if w <= 0 then
+		return 0, 0
+	end
+	local coast = WorldLayout.Coast
+	if z < coast.northZ + 150 then
+		w = math.min(w, smooth((coast.shoreX - FOREST.coast - x + wander) / edge))
+		if w <= 0 then
+			return 0, 0
+		end
+	end
+	-- The hub's lawn, then the ring's outer edge.
+	local hub = WorldLayout.HubDistance(x, z) + wander
+	if hub <= 0 then
+		return 0, 0
+	end
+	local ringEdge = FOREST.ring + noise(x / 320, z / 320, 7.3) * FOREST.ringNoise * 2
+	local ring = math.min(smooth(hub / edge), smooth((ringEdge - hub) / edge))
+	-- The wild biomes, the water and the lanes stay open.
+	local open = w
+	for _, d in ipairs(WILD_DISCS) do
+		local dx, dz = x - d[1], z - d[2]
+		local reach = d[3] + edge
+		if dx * dx + dz * dz < reach * reach then
+			open = math.min(open, smooth((math.sqrt(dx * dx + dz * dz) - d[3] + wander) / edge))
+			if open <= 0 then
+				return 0, 0
+			end
+		end
+	end
+	local margin = FOREST.water
+	for _, water in ipairs(WATER_LINES) do
+		local cap = water.half + margin + 20
+		local d = WorldLayout.FastDistance(water.line, x, z, cap)
+		if d < cap then
+			open = math.min(open, smooth((d - water.half - margin) / 20))
+		end
+	end
+	for _, pool in ipairs(WATER_POOLS) do
+		local dx, dz = x - pool.x, z - pool.z
+		local r = pool.radius * 1.15 + margin
+		if dx * dx + dz * dz < (r + 20) ^ 2 then
+			open = math.min(open, smooth((math.sqrt(dx * dx + dz * dz) - r) / 20))
+		end
+	end
+	for _, lane in ipairs(LANE_LINES) do
+		local d = segment(x, z, lane[1], lane[2], lane[3], lane[4])
+		if d < lane[5] + 30 then
+			open = math.min(open, smooth((d - lane[5]) / 30))
+		end
+	end
+	if open <= 0 then
+		return 0, 0
+	end
+	ring = math.min(ring, open)
+	if ring > 0 then
+		local c = FOREST.clearing
+		local n = noise(x / c.scale, z / c.scale, 3.9) + noise(x / c.fine, z / c.fine, 9.1) * 0.35
+		local wall = smooth((hub - c.keep) / c.keep)
+		return ring * (1 - smooth((n - c.from) / c.soft) * wall), ring
+	end
+	-- Out in the wild landscapes: a copse here and there.
+	local k = FOREST.copse
+	local n = noise(x / k.scale, z / k.scale, 17.3) + noise(x / 31, z / 31, 2.1) * 0.25
+	return open * smooth((n - k.from) / k.soft), 0
+end
+
 return WorldLayout
