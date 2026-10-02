@@ -502,18 +502,36 @@ function WorldPlan.CountryStands(): { Stand }
 	return stands
 end
 
--- Every tree on the ground, in spawn order: the first 322 (each biome's
--- trees, then the wild groves), then the country stands' (the sky's
--- Lumenwood is in WorldPlan.Sky).
-function WorldPlan.Trees(): { TreeSpot }
-	if cachedTrees then
-		return cachedTrees
+-- The first 322 and the country stands' trees, in spawn order: every tree
+-- there was before the forest's (FOR-03). The boulder clusters, the
+-- landmarks and the lighthouse's line of sight were placed round these
+-- and keep using them, so the forest's trees move none of them (they keep
+-- off all of it instead).
+local cachedBase: { TreeSpot }? = nil
+local function baseTrees(): { TreeSpot }
+	if cachedBase then
+		return cachedBase
 	end
 	local out = table.clone(firstTrees())
 	for _, stand in ipairs(WorldPlan.CountryStands()) do
 		for _, spot in ipairs(stand.trees) do
 			table.insert(out, spot)
 		end
+	end
+	cachedBase = out
+	return out
+end
+
+-- Every tree on the ground, in spawn order: the first 322 (each biome's
+-- trees, then the wild groves), then the country stands', then the
+-- forest's (WorldPlan.ForestTrees; the sky's Lumenwood is in WorldPlan.Sky).
+function WorldPlan.Trees(): { TreeSpot }
+	if cachedTrees then
+		return cachedTrees
+	end
+	local out = table.clone(baseTrees())
+	for _, spot in ipairs(WorldPlan.ForestTrees()) do
+		table.insert(out, spot)
 	end
 	cachedTrees = out
 	return out
@@ -2526,7 +2544,8 @@ end
 ---------------------------------------------------------------------------
 
 -- What everything here keeps clear of, binned by 64-stud squares so a
--- check looks at its neighbours only: every tree on the ground, the
+-- check looks at its neighbours only: every tree on the ground but the
+-- forest's (baseTrees: those came after and keep off all this), the
 -- boulders, the scenery and the road signs (each a disc: its middle and
 -- how far it reaches), and the gondola's two routes seen from above.
 type Disc = { x: number, z: number, r: number }
@@ -2557,7 +2576,7 @@ local function clutter(): Clutter
 			end
 		end
 	end
-	for _, tree in ipairs(WorldPlan.Trees()) do
+	for _, tree in ipairs(baseTrees()) do -- (not the forest's: they keep off all this)
 		add(tree.position.X, tree.position.Z, 0)
 	end
 	for _, b in ipairs(WorldPlan.Boulders()) do
@@ -3306,7 +3325,7 @@ local function inSightOfSpawn(lamp: Vector3, overLand: boolean): boolean
 			return false
 		end
 	end
-	for _, tree in ipairs(WorldPlan.Trees()) do
+	for _, tree in ipairs(baseTrees()) do -- (the forest's keep out of its lane)
 		if hides(tree.position, 10, 40) then
 			return false
 		end
@@ -3376,6 +3395,318 @@ function WorldPlan.Lighthouse(): Lighthouse?
 	end
 	cachedLighthouse, lighthouseSearched = found, true
 	return found
+end
+
+---------------------------------------------------------------------------
+-- Trees to chop where the forest is (phase 10, FOR-03)
+---------------------------------------------------------------------------
+-- More choppable trees where players walk and drive past the forest ring
+-- (Connor asked for more trees; their count isn't frozen for this), in
+-- three kinds of place, each its own share of ForestMost:
+--   * the verges of the haul roads through the ring: about every
+--     ForestVergeStep along each, one each side, ForestVerge studs off
+--     the road's edge (the filler's wall stands behind them);
+--   * the forest's edges, on their open side (ForestCover 0.18 to 0.42
+--     with canopy close by), ForestEdgeApart apart: facing the plot
+--     district, the lanes, the Hills' and the grove's rooms;
+--   * the ring's clearings: a group of three to five round a middle deep
+--     in one, Starter Forest spacing.
+-- They come after the first 322 and the country stands and draw their own
+-- rng, so none of those move. Each is on good ground (dry, lowland, no
+-- steeper than 0.6, reachable on foot), WILD_NEAREST from the sawmill
+-- (pine and maple STAND_FAR), out of town, the plots, the beach and every
+-- biome's own ground, ForestSpacing off every other tree, and clear of
+-- the gondola's routes, the boulders, the road signs, the scenery, the
+-- boulder clusters, the footbridge, the docks and the lanes (the spawn's
+-- view of the lighthouse). Their woods follow the nearest biome, as the
+-- country stands' do. Like every tree they are built by the server
+-- (TreeService, through MapBuilder's "5. The trees").
+
+WorldPlan.ForestVergeStep = 30
+WorldPlan.ForestVerge = { 11, 16 } -- studs off a road's edge (the trunk's middle)
+WorldPlan.ForestEdgeApart = 30
+WorldPlan.ForestSpacing = 14
+WorldPlan.ForestMost = { verge = 100, edge = 140, clearing = 80 } -- 320 at most
+local FOREST_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
+local FOREST_CLEAR = 10 -- studs a forest tree keeps off a scenery piece, cluster or landmark
+
+local cachedForestTrees: { TreeSpot }? = nil
+
+function WorldPlan.ForestTrees(): { TreeSpot }
+	if cachedForestTrees then
+		return cachedForestTrees
+	end
+	local out: { TreeSpot } = {}
+	local rng = Kit.rng(hashString("forest trees"))
+	local mill = Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z)
+	local coast = WorldLayout.Coast
+	local beachX = coast.shoreX - coast.beachWidth - 40
+
+	-- What they keep clear of, as discs (x, z, reach).
+	local discs: { { number } } = {}
+	for _, b in ipairs(WorldPlan.Boulders()) do
+		table.insert(discs, { b.position.X, b.position.Z, b.size / 2 + STAND_ROCK })
+	end
+	for _, sign in
+		ipairs(WorldPlan.RoadSigns(function(): string
+			return ""
+		end))
+	do
+		local p = sign.cframe.Position
+		table.insert(discs, { p.X, p.Z, STAND_SIGN })
+	end
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		table.insert(discs, { spot.center.X, spot.center.Z, spot.radius + FOREST_CLEAR })
+	end
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		table.insert(discs, { c.center.X, c.center.Z, c.radius + FOREST_CLEAR })
+	end
+	local bridge = WorldPlan.Footbridge()
+	if bridge then
+		local a, along = bridge.cframe.Position, bridge.cframe.LookVector
+		for s = -10, bridge.span + 10, 4 do
+			local p = a + along * s
+			table.insert(discs, { p.X, p.Z, bridge.width / 2 + FOREST_CLEAR })
+		end
+		local sign = bridge.sign
+		if sign then
+			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
+		end
+	end
+	for _, dock in ipairs(WorldPlan.Docks()) do
+		local a, along = dock.cframe.Position, dock.cframe.LookVector
+		for s = -8, dock.length + 4, 4 do
+			local p = a + along * s
+			table.insert(discs, { p.X, p.Z, dock.width / 2 + FOREST_CLEAR })
+		end
+		local sign = dock.sign
+		if sign then
+			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
+		end
+	end
+	local biomes: { { number } } = {}
+	for _, biome in ipairs(BiomeData.All()) do
+		local area = biome.area
+		if area then
+			local r = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else area.radius + 30
+			table.insert(biomes, { area.x, area.z, r })
+		end
+	end
+	local routes: { { Vector2 } } = {}
+	local sky = WorldPlan.Sky()
+	if sky then
+		local top = sky.gondolaTop.Position
+		local town = WorldPlan.TownGondolaSpot
+		local base = sky.gondolaBase.Position
+		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
+		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+
+	-- Every tree so far, binned by 32-stud squares for the spacing checks.
+	local bins: { [number]: { Vector3 } } = {}
+	local function addTree(p: Vector3)
+		local key = binKey(p.X // 32, p.Z // 32)
+		local bin = bins[key]
+		if not bin then
+			bin = {}
+			bins[key] = bin
+		end
+		table.insert(bin, p)
+	end
+	local function crowded(x: number, z: number, d: number): boolean
+		local reach = math.ceil(d / 32)
+		for bx = x // 32 - reach, x // 32 + reach do
+			for bz = z // 32 - reach, z // 32 + reach do
+				for _, p in ipairs(bins[binKey(bx, bz)] or {}) do
+					local dx, dz = x - p.X, z - p.Z
+					if dx * dx + dz * dz < d * d then
+						return true
+					end
+				end
+			end
+		end
+		return false
+	end
+	for _, spot in ipairs(baseTrees()) do
+		addTree(spot.position)
+	end
+
+	-- Whether a forest tree could grow at (x, z), `setBack` off the roads.
+	local function ground(x: number, z: number, setBack: number): boolean
+		if math.abs(x) > STAND_EDGE or math.abs(z) > STAND_EDGE or (z < coast.northZ and x > beachX) then
+			return false
+		end
+		local p = Vector2.new(x, z)
+		if (p - mill).Magnitude <= WILD_NEAREST or WorldLayout.FlatWeight(x, z) > 0 then
+			return false
+		end
+		for _, d in ipairs(biomes) do
+			local dx, dz = x - d[1], z - d[2]
+			if dx * dx + dz * dz < d[3] * d[3] then
+				return false
+			end
+		end
+		for _, d in ipairs(discs) do
+			local dx, dz = x - d[1], z - d[2]
+			if dx * dx + dz * dz < d[3] * d[3] then
+				return false
+			end
+		end
+		for _, route in ipairs(routes) do
+			if WorldLayout.SegmentDistance(p, route[1], route[2]) < STAND_GONDOLA then
+				return false
+			end
+		end
+		for _, lane in ipairs(WorldLayout.Forest.lanes) do
+			if WorldLayout.SegmentDistance(p, lane.a, lane.b) < lane.half + 10 then
+				return false
+			end
+		end
+		return TerrainGen.HeightAt(x, z) < STAND_LOW and goodGround(x, z, setBack, 0.6)
+	end
+
+	local function plant(x: number, z: number, spacing: number): boolean
+		local flat = Vector3.new(x, 0, z) -- rounded as a Vector3 stores it: what's checked is what's spawned
+		x, z = flat.X, flat.Z
+		if crowded(x, z, spacing) then
+			return false
+		end
+		local c = Vector2.new(x, z)
+		local woods = wildWoodsNear(c)
+		if (c - mill).Magnitude < STAND_FAR then
+			woods = { "oak", "oak", "birch" }
+		end
+		local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+		table.insert(out, { woodId = rng:pick(woods), position = p, biome = "wild" })
+		addTree(p)
+		return true
+	end
+	local most = WorldPlan.ForestMost
+
+	-- 1. The verges of the haul roads where they run through the ring.
+	local verge = 0
+	for _, name in ipairs(FOREST_ROADS) do
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == name then
+				local pts = road.points
+				local walked, nextAt = 0, rng:range(0, WorldPlan.ForestVergeStep)
+				for i = 1, #pts - 1 do
+					local a, b = pts[i], pts[i + 1]
+					local len = (b - a).Magnitude
+					local dir = (b - a).Unit
+					local normal = Vector2.new(-dir.Y, dir.X)
+					while nextAt <= walked + len do
+						local along = a + dir * (nextAt - walked)
+						for _, s in ipairs({ 1, -1 }) do
+							-- The same draws each side, planted or not.
+							local off = road.width / 2 + rng:range(WorldPlan.ForestVerge[1], WorldPlan.ForestVerge[2])
+							local at = along + dir * rng:range(-8, 8) + normal * (s * off)
+							if verge < most.verge then
+								local _, ring = WorldLayout.ForestCover(at.X, at.Y)
+								if
+									ring > 0.5
+									and TerrainGen.RoadClearance(at.X, at.Y) >= WorldPlan.ForestVerge[1] - 0.5
+									and ground(at.X, at.Y, WorldPlan.ForestVerge[1] - 1)
+									and plant(at.X, at.Y, WorldPlan.ForestSpacing)
+								then
+									verge += 1
+								end
+							end
+						end
+						nextAt += WorldPlan.ForestVergeStep
+					end
+					walked += len
+				end
+			end
+		end
+	end
+
+	-- Candidates on a grid over the ring, in a shuffled order (so the caps
+	-- don't leave one side bare): forest edges and clearings' middles.
+	local edges: { Vector2 } = {}
+	local middles: { Vector2 } = {}
+	local steps = (STAND_EDGE * 2) // 12
+	for ix = 0, steps do
+		for iz = 0, steps do
+			local x, z = -STAND_EDGE + ix * 12, -STAND_EDGE + iz * 12
+			local c, ring = WorldLayout.ForestCover(x, z)
+			if c > 0.18 and c < 0.42 then
+				local near = 0
+				for _, o in ipairs({ { 18, 0 }, { -18, 0 }, { 0, 18 }, { 0, -18 } }) do
+					near = math.max(near, (WorldLayout.ForestCover(x + o[1], z + o[2])))
+				end
+				if near > 0.65 then
+					table.insert(edges, Vector2.new(x, z))
+				end
+			elseif ring > 0.6 and c < 0.08 and ix % 3 == 0 and iz % 3 == 0 then
+				table.insert(middles, Vector2.new(x, z))
+			end
+		end
+	end
+	for _, list in ipairs({ edges, middles }) do
+		for i = #list, 2, -1 do
+			local j = rng:int(1, i)
+			list[i], list[j] = list[j], list[i]
+		end
+	end
+
+	-- 2. The forest's edges, on their open side.
+	local edge = 0
+	local edgeAt: { Vector2 } = {}
+	for _, p in ipairs(edges) do
+		if edge >= most.edge then
+			break
+		end
+		local x, z = p.X + rng:range(-4, 4), p.Y + rng:range(-4, 4)
+		local apart = true
+		for _, q in ipairs(edgeAt) do
+			if (q - Vector2.new(x, z)).Magnitude < WorldPlan.ForestEdgeApart then
+				apart = false
+				break
+			end
+		end
+		if apart and ground(x, z, STAND_SET_BACK) and plant(x, z, WorldPlan.ForestSpacing) then
+			table.insert(edgeAt, Vector2.new(x, z))
+			edge += 1
+		end
+	end
+
+	-- 3. A group of three to five deep in a clearing, 150 studs apart at least.
+	local clearing = 0
+	local groupAt: { Vector2 } = {}
+	for _, m in ipairs(middles) do
+		if clearing > most.clearing - 3 then
+			break
+		end
+		local apart = true
+		for _, q in ipairs(groupAt) do
+			if (q - m).Magnitude < 150 then
+				apart = false
+				break
+			end
+		end
+		if apart and ground(m.X, m.Y, STAND_SET_BACK) then
+			local want = math.min(rng:int(3, 5), most.clearing - clearing)
+			local planted = 0
+			for _ = 1, want * 12 do
+				if planted >= want then
+					break
+				end
+				local a, r = rng:range(0, math.pi * 2), math.sqrt(rng:next()) * 22
+				local x, z = m.X + math.cos(a) * r, m.Y + math.sin(a) * r
+				if ground(x, z, STAND_SET_BACK) and plant(x, z, STAND_SPACING) then
+					planted += 1
+				end
+			end
+			if planted > 0 then
+				table.insert(groupAt, m)
+				clearing += planted
+			end
+		end
+	end
+
+	cachedForestTrees = out
+	return out
 end
 
 ---------------------------------------------------------------------------
@@ -3588,6 +3919,9 @@ WorldPlan.FillerSteps = {
 	WorldPlan.Scenery,
 	WorldPlan.CountryStands,
 	WorldPlan.BoulderClusters,
+	WorldPlan.Footbridge,
+	WorldPlan.Docks,
+	WorldPlan.ForestTrees,
 	WorldPlan.Trees,
 	function(): any
 		return fillerClutter()

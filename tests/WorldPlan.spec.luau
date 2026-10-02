@@ -1689,8 +1689,9 @@ return function(t)
 		t.ok(total >= 3000 and total <= 5000, total .. " scenery parts")
 		-- The 322 trees the economy was tuned on, then the country stands
 		-- (phase 10, Connor asked for many more trees; the economy model
-		-- doesn't read WorldPlan, so ECONOMY.md stays as it was).
-		t.eq(#WorldPlan.Trees(), 500)
+		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
+		-- forest's (FOR-03, tests/Forest.spec.luau).
+		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 500)
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -1899,10 +1900,29 @@ return function(t)
 				t.eq(spot.biome, "wild")
 			end
 		end
-		t.eq(#trees, i)
-		local added = #trees - FIRST
+		-- Then the forest's (FOR-03), last of all.
+		t.eq(#trees, i + #WorldPlan.ForestTrees())
+		local added = i - FIRST
 		t.ok(added >= 150 and added <= 200, added .. " new trees")
 		t.ok(#stands >= 20, #stands .. " stands")
+	end)
+
+	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
+		local trees = WorldPlan.Trees()
+		-- A fingerprint of trees 323 to 500 (index, wood, biome, x, z), worked
+		-- out from the code before the forest's trees were added (FOR-03).
+		local h = 7
+		for i = FIRST + 1, 500 do
+			local tree = trees[i]
+			local s = string.format("%d %s %s %.2f %.2f;", i, tree.woodId, tree.biome, tree.position.X, tree.position.Z)
+			for k = 1, #s do
+				h = (h * 31 + string.byte(s, k)) % 1000000007
+			end
+		end
+		t.eq(h, 198314729, "the country stands moved, changed wood or changed order")
+		t.eq(trees[FIRST + 1].woodId, "pine")
+		t.ok((trees[FIRST + 1].position - Vector3.new(66.223, -2.2638, 543.319)).Magnitude < 0.01, "tree 323")
+		t.ok((trees[500].position - Vector3.new(986.4496, 1.4604, -714.5976)).Magnitude < 0.01, "tree 500")
 	end)
 
 	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()

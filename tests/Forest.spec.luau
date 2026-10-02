@@ -714,4 +714,152 @@ return function(t)
 		t.ok(WorldPlan.FillerTrunkNear(entry.tree.x + 1, entry.tree.z, 2.5), "a trunk is found")
 		t.ok(WorldPlan.FillerReady(), "the plan is ready once worked out")
 	end)
+
+	---------------------------------------------------------------------------
+	-- FOR-03: more trees to chop where the forest is
+	---------------------------------------------------------------------------
+
+	local BASE = 500 -- the first 322 and the country stands (WorldPlan.spec pins both)
+	local forestTrees = WorldPlan.ForestTrees()
+
+	-- Which kind of place a forest tree stands in.
+	local function placeOf(spot)
+		local p = spot.position
+		if TerrainGen.RoadClearance(p.X, p.Z) <= WorldPlan.ForestVerge[2] + 2 then
+			return "verge"
+		end
+		local c = cover(p.X, p.Z)
+		return if c > 0.12 then "edge" else "clearing"
+	end
+
+	t.test("FOR-03: 200-350 new trees to chop after the country stands: verges, edges and clearings", function()
+		local trees = WorldPlan.Trees()
+		t.eq(#trees, BASE + #forestTrees)
+		for i, spot in ipairs(forestTrees) do
+			t.eq(trees[BASE + i], spot, "the forest's trees come last, in order")
+			t.eq(spot.biome, "wild")
+		end
+		t.ok(#forestTrees >= 200 and #forestTrees <= 350, #forestTrees .. " new trees")
+		local count = { verge = 0, edge = 0, clearing = 0 }
+		for _, spot in ipairs(forestTrees) do
+			local kind = placeOf(spot)
+			count[kind] += 1
+		end
+		for kind, n in pairs(count) do
+			t.ok(n >= 40, string.format("%d trees on the %ss", n, kind))
+		end
+		local most = WorldPlan.ForestMost
+		t.ok(#forestTrees <= most.verge + most.edge + most.clearing, "within ForestMost")
+	end)
+
+	t.test("FOR-03: forest trees on good ground, reachable, off everything players and trucks use", function()
+		local trees = WorldPlan.Trees()
+		local mill = Vector2.new(0, 110)
+		local coast = WorldLayout.Coast
+		local discs = {}
+		for _, b in ipairs(WorldPlan.Boulders()) do
+			table.insert(discs, { b.position.X, b.position.Z, b.size / 2 + 6, "a boulder" })
+		end
+		for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+			local p = sign.cframe.Position
+			table.insert(discs, { p.X, p.Z, 12, "a road sign" })
+		end
+		for _, spot in ipairs(WorldPlan.Scenery()) do
+			table.insert(discs, { spot.center.X, spot.center.Z, spot.radius + 8, "a " .. spot.kind })
+		end
+		for _, c in ipairs(WorldPlan.BoulderClusters()) do
+			table.insert(discs, { c.center.X, c.center.Z, c.radius + 6, "a boulder cluster" })
+		end
+		local lighthouse = WorldPlan.Lighthouse()
+		table.insert(discs, { lighthouse.cframe.X, lighthouse.cframe.Z, 14, "the lighthouse" })
+		local sky = WorldPlan.Sky()
+		local top = sky.gondolaTop.Position
+		local routes = {}
+		for _, from in ipairs({ WorldPlan.TownGondolaSpot, sky.gondolaBase.Position }) do
+			table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+		end
+		local problems = {}
+		local function check(ok, what)
+			if not ok then
+				table.insert(problems, what)
+			end
+		end
+		for i, spot in ipairs(forestTrees) do
+			local p = spot.position
+			local x, z = p.X, p.Z
+			local here = string.format("%s at (%.0f, %.0f)", spot.woodId, x, z)
+			check(WorldPlan.GoodGround(x, z, WorldPlan.ForestVerge[1] - 1, 0.6), here .. ": bad ground or on a road")
+			check(TerrainGen.RoadClearance(x, z) >= WorldPlan.ForestVerge[1] - 1, here .. " is on a road's verge")
+			check(math.abs(p.Y - (TerrainGen.HeightAt(x, z) - 0.3)) < 1e-3, here .. " stands on the ground")
+			check(TerrainGen.HeightAt(x, z) < 70, here .. " is up in the mountains")
+			check(WorldLayout.FlatWeight(x, z) == 0, here .. " is in town or the plots")
+			check(not (z < coast.northZ and x > coast.shoreX - coast.beachWidth - 40), here .. " is on the beach")
+			for k = 0, 7 do -- dry all round: you walk up to it
+				local a = k * math.pi / 4
+				check(
+					TerrainGen.WaterLevelAt(x + math.cos(a) * 4, z + math.sin(a) * 4) == nil,
+					here .. " is by the water"
+				)
+			end
+			local fromMill = (Vector2.new(x, z) - mill).Magnitude
+			check(fromMill > 300, string.format("%s is %.0f from the sawmill", here, fromMill))
+			if spot.woodId == "pine" or spot.woodId == "maple" then
+				check(fromMill >= 400, string.format("%s is %.0f from the sawmill", here, fromMill))
+			end
+			for _, biome in ipairs(BiomeData.All()) do
+				local a = biome.area
+				if a then
+					local margin = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else a.radius + 30
+					check(Vector2.new(x - a.x, z - a.z).Magnitude >= margin, here .. " is in " .. biome.id)
+				end
+			end
+			for _, route in ipairs(routes) do
+				check(WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) >= 30, here .. ": gondola")
+			end
+			for _, disc in ipairs(discs) do
+				check(Vector2.new(x - disc[1], z - disc[2]).Magnitude >= disc[3], here .. " is in " .. disc[4])
+			end
+			for _, lane in ipairs(Forest.lanes) do
+				check(
+					WorldLayout.SegmentDistance(Vector2.new(x, z), lane.a, lane.b) >= lane.half + 10,
+					here .. " stands in the " .. lane.name
+				)
+			end
+			for j = 1, BASE + i - 1 do
+				local q = trees[j].position
+				local d = Vector2.new(x - q.X, z - q.Z).Magnitude
+				check(d >= 12, string.format("%s is %.1f from tree %d", here, d, j))
+			end
+		end
+		t.ok(#problems == 0, report(problems))
+	end)
+
+	t.test("FOR-03: the forest's trees are the same on every server", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan").ForestTrees()
+		t.eq(#again, #forestTrees)
+		for i, spot in ipairs(forestTrees) do
+			t.eq(again[i].woodId, spot.woodId)
+			t.ok((again[i].position - spot.position).Magnitude < 1e-6, "tree " .. i .. " in the same place")
+		end
+	end)
+
+	t.test("FOR-03: the server's trees: about 33 parts each, under 27,500 in all (FOR-03 raised it)", function()
+		local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
+		local WoodData = t.shared("WoodData")
+		local TreeLogic = t.shared("TreeLogic")
+		local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
+		local total, forest = 0, 0
+		for i, spot in ipairs(WorldPlan.Trees()) do
+			local p = spot.position
+			local seed = Kit.seedAt(p.X, p.Z)
+			local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
+			local n = #parts(TreeArt.Build(WoodData.Get(spot.woodId), seed, size.scale))
+			total += n
+			if i > BASE then
+				forest += n
+			end
+		end
+		t.ok(forest / #forestTrees <= 36, string.format("%.1f parts a forest tree", forest / #forestTrees))
+		t.ok(total < 27500, total .. " parts in the ground's trees")
+	end)
 end
