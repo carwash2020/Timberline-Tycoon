@@ -263,9 +263,19 @@ return function(t)
 		s.run(2) -- still there
 		t.eq(s.trunk(rec).CanCollide, false)
 		t.eq(s.pending(2), 1)
+		-- A bark clue added while it's a ghost waits with the rest.
+		s.Trees.Decorate(rec.uid, function(model)
+			local lump = roblox.Instance.new("Part")
+			lump.Name = "Burl"
+			lump.CanCollide = true
+			lump.Parent = model
+		end)
+		local lump = rec.model:FindFirstChild("Burl")
+		t.eq(lump.CanCollide, false, "a new part on a ghost doesn't collide yet")
 		s.blocked = false
 		s.run(2)
 		t.eq(s.trunk(rec).CanCollide, true, "solid once the truck has gone")
+		t.eq(lump.CanCollide, true, "and so is the clue")
 		t.ok(not rec.ghost)
 		t.eq(s.pending(2), 0)
 	end)

@@ -281,6 +281,11 @@ function TreeService.Decorate(uid: string, build: (Model, TreeRecord) -> ())
 				d.Transparency = 1
 				d.CanCollide = false
 				d.CanQuery = false
+			elseif rec.ghost then
+				-- A ghost (something stands where it regrew): a new solid
+				-- part waits with the rest, so it never closes round a
+				-- player or a truck. makeSolid restores it.
+				d.CanCollide = false
 			end
 		elseif (d:IsA("Light") or d:IsA("ParticleEmitter")) and rec.effects[d] == nil then
 			rec.effects[d] = (d :: any).Enabled
