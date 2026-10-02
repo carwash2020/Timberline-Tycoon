@@ -71,6 +71,24 @@ return {
 			label(entry[1], V3.new(x, 0.7, -6))
 		end
 
+		-- Ground cover (AmbientLife's second layer on high), on a row in
+		-- front of the line-up.
+		local EnvironmentData = ctx.load("ReplicatedStorage/Shared/EnvironmentData")
+		local pal = EnvironmentData.DecorPalettes
+		local cover = {
+			{ "GroundCover", PropArt.GroundCover(3, t.grass, pal.meadowFlowers) },
+			{ "Wildflowers", PropArt.Wildflowers(4, pal.meadowFlowers) },
+			{ "LowBush", PropArt.LowBush(5, pal.greens) },
+			{ "FernClump", PropArt.FernClump(6, t.grass) },
+			{ "MushroomCluster", PropArt.MushroomCluster(7) },
+		}
+		ground(V3.new(width / 2, 0, -16), V3.new(width + 20, 1, 12), C3.fromRGB(116, 170, 74), Enum.Material.Grass)
+		for i, entry in ipairs(cover) do
+			local x = width / 2 + (3 - i) * 12
+			place(entry[2], CF.new(x, 0, -15))
+			label(entry[1], V3.new(x, 0.7, -21))
+		end
+
 		-- One strip per biome, scattered like the clients do.
 		local biomes = {
 			{ "starter", "Starter Forest", "Grass" },
@@ -144,6 +162,7 @@ return {
 				{ pos = { 45, 40, 30 }, target = { 45, 0, 84 }, label = "snow and volcano strips" },
 				{ pos = { 45, 40, 90 }, target = { 45, 0, 150 }, label = "grove, sky, island, the pond" },
 				{ pos = { 30, 4, 22 }, target = { 50, 0.5, 26 }, label = "ground level in the forest" },
+				{ pos = { width / 2, 12, -46 }, target = { width / 2, 0.6, -15 }, label = "ground cover" },
 			},
 		}
 	end,

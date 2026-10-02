@@ -30,7 +30,7 @@ return function(t)
 	t.test("high is today's look", function()
 		t.eq(QualityBudgets.High, {
 			Tier = "high",
-			MaxDecor = 420, -- AmbientLife MAX_DECOR
+			MaxDecor = 560, -- AmbientLife MAX_DECOR was 420; +140 for the ground cover (DecorCover.spec)
 			DecorLoadRadius = 200, -- AmbientLife LOAD_RADIUS
 			DecorUnloadRadius = 260, -- AmbientLife UNLOAD_RADIUS
 			MaxCritters = 16, -- EnvironmentData.MaxCritters

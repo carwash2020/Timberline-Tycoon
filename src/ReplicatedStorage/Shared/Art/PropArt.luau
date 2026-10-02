@@ -1466,4 +1466,166 @@ function PropArt.SetPiece(name: string, seed: number): Model?
 	return nil
 end
 
+---------------------------------------------------------------------------
+-- Ground cover (AmbientLife's second layer, EnvironmentData.DecorCoverSpots)
+---------------------------------------------------------------------------
+-- Small clusters that texture the ground between the bigger props: each
+-- spreads over a few studs, so one pooled model covers more ground than a
+-- single tuft. Decoration only, no shadows, 16 parts or fewer.
+
+-- 2-3 of `colors`, chosen by the seed (a drift reads as a few kinds, not
+-- confetti).
+local function someOf(rng: Rng, colors: { Color3 }): { Color3 }
+	local out: { Color3 } = {}
+	local start = rng:int(1, #colors)
+	for i = 0, math.min(#colors, rng:int(2, 3)) - 1 do
+		table.insert(out, colors[(start + i - 1) % #colors + 1])
+	end
+	return out
+end
+
+-- One grass blade, leaning out from `at`.
+local function blade(model: Model, rng: Rng, at: Vector3, h: number, a: number, color: Color3)
+	wedgeBit(
+		model,
+		"Blade",
+		Vector3.new(0.12, h, rng:range(0.3, 0.5)),
+		CFrame.new(at + Vector3.new(0, h / 2 - 0.05, 0))
+			* CFrame.Angles(0, a, 0)
+			* CFrame.Angles(rng:range(-0.4, -0.05), 0, rng:range(-0.2, 0.2)),
+		Kit.vary(color, rng, 0.07),
+		Enum.Material.SmoothPlastic
+	)
+end
+
+-- A patch of meadow about 6 studs across: three or four tufts of grass,
+-- a couple of tiny flowers and maybe a pebble.
+function PropArt.GroundCover(seed: number, grass: Color3, petals: { Color3 }): Model
+	local model = Kit.model("GroundCover")
+	local rng = Kit.rng(seed)
+	local colors = someOf(rng, petals)
+	for i = 1, rng:int(3, 4) do
+		local a, r = i * 1.9 + rng:range(-0.5, 0.5), rng:range(0.6, 2.8)
+		local at = Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
+		local shade = Kit.shade(grass, rng:range(-0.06, 0.05))
+		for j = 1, 2 do
+			blade(model, rng, at, rng:range(0.6, 1.2), a + j * 2.4, shade)
+		end
+	end
+	for i = 1, rng:int(1, 2) do
+		local a, r = rng:range(0, math.pi * 2), rng:range(0.4, 2.4)
+		flower(model, Vector3.new(math.cos(a) * r, 0, math.sin(a) * r), rng:range(0.35, 0.6), colors[i], nil, a)
+	end
+	if rng:next() < 0.5 then
+		local a, r = rng:range(0, math.pi * 2), rng:range(0.8, 2.6)
+		local p = rng:range(0.3, 0.55)
+		bit(
+			model,
+			"Pebble",
+			Vector3.new(p, p * 0.45, p * 0.8),
+			CFrame.new(math.cos(a) * r, p * 0.15, math.sin(a) * r) * CFrame.Angles(0, a, 0.2),
+			Kit.vary(STONE[rng:int(1, #STONE)], rng, 0.05),
+			Enum.Material.Slate
+		)
+	end
+	return model
+end
+
+-- A drift of five to seven small flowers in two or three of `colors`,
+-- with a blade or two of grass among them.
+function PropArt.Wildflowers(seed: number, colors: { Color3 }): Model
+	local model = Kit.model("Wildflowers")
+	local rng = Kit.rng(seed)
+	local picked = someOf(rng, colors)
+	local yaw = rng:range(0, math.pi * 2)
+	for i = 1, rng:int(5, 7) do
+		local a, r = yaw + i * 2.4, rng:range(0.2, 1.9)
+		flower(
+			model,
+			Vector3.new(math.cos(a) * r, 0, math.sin(a) * r),
+			rng:range(0.45, 0.85),
+			picked[(i - 1) % #picked + 1],
+			nil,
+			a
+		)
+	end
+	blade(model, rng, Vector3.new(math.cos(yaw) * 0.6, 0, math.sin(yaw) * 0.6), rng:range(0.6, 0.9), yaw, LEAF)
+	return model
+end
+
+-- A low, spreading shrub, knee high: three or four squashed leaf clumps.
+function PropArt.LowBush(seed: number, colors: { Color3 }): Model
+	local model = Kit.model("LowBush")
+	local rng = Kit.rng(seed)
+	local yaw = rng:range(0, math.pi * 2)
+	local w = rng:range(1.3, 1.8)
+	for i = 1, rng:int(3, 4) do
+		local a = yaw + i * 2.2 + rng:range(-0.3, 0.3)
+		local r = if i == 1 then 0 else w * rng:range(0.45, 0.65)
+		local e = w * (if i == 1 then 1 else rng:range(0.65, 0.8))
+		bit(
+			model,
+			"Bush",
+			Vector3.new(e, e * 0.5, e),
+			CFrame.new(math.cos(a) * r, e * 0.22, math.sin(a) * r)
+				* CFrame.Angles(0, a, 0)
+				* CFrame.Angles(0, math.pi / 4, 0),
+			Kit.vary(colors[(i - 1) % #colors + 1], rng, 0.05),
+			Enum.Material.SmoothPlastic
+		)
+	end
+	return model
+end
+
+-- Two or three young ferns together, the kind that crowds a tree's feet.
+function PropArt.FernClump(seed: number, color: Color3): Model
+	local model = Kit.model("FernClump")
+	local rng = Kit.rng(seed)
+	local yaw = rng:range(0, math.pi * 2)
+	for f = 1, rng:int(2, 3) do
+		local fa = yaw + f * 2.1
+		local fr = if f == 1 then 0 else rng:range(1, 1.6)
+		local at = Vector3.new(math.cos(fa) * fr, 0.05, math.sin(fa) * fr)
+		local c = Kit.vary(color, rng, 0.06)
+		for i = 1, 4 do
+			local a = fa + i / 4 * math.pi * 2 + rng:range(-0.25, 0.25)
+			local L = rng:range(1, 1.6)
+			wedgeBit(
+				model,
+				"Frond",
+				Vector3.new(0.07, rng:range(0.4, 0.55), L),
+				CFrame.new(at)
+					* CFrame.Angles(0, a, 0)
+					* CFrame.Angles(math.rad(rng:range(28, 45)), 0, 0)
+					* CFrame.new(0, 0, -L / 2)
+					* CFrame.Angles(0, 0, math.pi / 2),
+				c,
+				Enum.Material.SmoothPlastic
+			)
+		end
+	end
+	return model
+end
+
+-- A little ring of three to five brown or red toadstools.
+function PropArt.MushroomCluster(seed: number): Model
+	local model = Kit.model("MushroomCluster")
+	local rng = Kit.rng(seed)
+	local caps = { hex("#9A6A44"), hex("#B98A58"), hex("#C4483A"), hex("#7E5A3C") }
+	local color = caps[seed % #caps + 1]
+	local yaw = rng:range(0, math.pi * 2)
+	for i = 1, rng:int(3, 5) do
+		local a, r = yaw + i * 1.7, if i == 1 then 0 else rng:range(0.35, 0.9)
+		local w = rng:range(0.3, 0.6)
+		toadstool(
+			model,
+			Vector3.new(math.cos(a) * r, 0, math.sin(a) * r),
+			w * rng:range(0.8, 1.3),
+			w,
+			Kit.vary(color, rng, 0.05)
+		)
+	end
+	return model
+end
+
 return PropArt

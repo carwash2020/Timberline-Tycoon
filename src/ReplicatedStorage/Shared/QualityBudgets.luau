@@ -39,7 +39,7 @@ export type Budget = {
 
 QualityBudgets.High = table.freeze({
 	Tier = "high" :: Tier,
-	MaxDecor = 420,
+	MaxDecor = 560, -- 420 before the ground-cover layer (tests/DecorCover.spec.luau)
 	DecorLoadRadius = 200,
 	DecorUnloadRadius = 260,
 	MaxCritters = 16,
