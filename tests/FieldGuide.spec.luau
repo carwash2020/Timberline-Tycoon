@@ -300,7 +300,12 @@ return function(t)
 		t.eq(P(1200), "$1,200/u³")
 		t.eq(P(-1), "$0/u³")
 		local C = FieldGuide.CashText
-		t.eq(C(39.9), "$39", "rounded down, as the wallet credits")
+		-- As the sell pad pays a sale: the nearest whole dollar, never $0 for
+		-- wood worth something (M1.7's SellLogic.Payout).
+		t.eq(C(39.4), "$39")
+		t.eq(C(39.5), "$40", "half up")
+		t.eq(C(39.9), "$40")
+		t.eq(C(0.3), "$1", "a sliver still pays a dollar")
 		t.eq(C(1234), "$1,234")
 		for _, junk in ipairs({ -1, 0 / 0, "5" }) do
 			t.eq(C(junk), "$0", tostring(junk))

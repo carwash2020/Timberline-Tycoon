@@ -238,13 +238,14 @@ function FieldGuide.PriceText(price: number): string
 	return string.format("%s.%02d/u³", Util.formatCash(cents // 100), cents % 100)
 end
 
--- Cash as it lands in the wallet: whole dollars, rounded down
--- (EconomyService.AddCash credits math.floor of the amount). "$39".
+-- Cash as a v2 sale pays it: whole dollars, rounded to the nearest, and
+-- never $0 for something worth more than nothing (the sell pad's payout
+-- rule, so a piece's tooltip reads what selling it pays). "$39".
 function FieldGuide.CashText(cash: unknown): string
 	if not finite(cash) or (cash :: number) <= 0 then
 		return "$0"
 	end
-	return Util.formatCash(cash :: number)
+	return Util.formatCash(math.max(1, math.floor((cash :: number) + 0.5)))
 end
 
 -- A typical mature tree of a wood (the size roll's middle, scale 1):

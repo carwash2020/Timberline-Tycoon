@@ -247,7 +247,7 @@ return function(t)
 			)
 		end
 		t.eq(TutorialData.ObjectiveText(loads, 23), expect(23))
-		t.eq(TutorialData.ObjectiveText(loads, 23.7), expect(23), "whole dollars")
+		t.eq(TutorialData.ObjectiveText(loads, 23.7), expect(24), "whole dollars, rounded as the pad pays")
 		t.eq(TutorialData.ObjectiveText(loads, loads.count + 40), expect(loads.count), "never past the goal")
 		t.eq(TutorialData.ObjectiveText(V2[1], 0), "Chop down a tree", "a one-off step shows no count")
 	end)

@@ -293,7 +293,7 @@ end
 
 -- How u³ and dollars read on the HUD (the rounding rules live in
 -- FieldGuide, shared with the server's toasts): "26 u³" / "4.4 u³",
--- "$1.50/u³", "$39" (whole dollars, rounded down as the wallet credits).
+-- "$1.50/u³", "$39" (whole dollars, rounded as the sell pad pays them).
 HudRules.VolumeText = FieldGuide.VolumeText
 HudRules.VolumeNumber = FieldGuide.VolumeNumber
 HudRules.PriceText = FieldGuide.PriceText
@@ -340,8 +340,8 @@ HudRules.BedChipMaxChars = 21
 -- (u³; nil or 0 when there's no figure for it) and BedValue ($), as read
 -- (any type), and whether a panel is open (`modal`):
 --   * "Bed 41 / 96 u³" with a room, "Bed 41 u³" without, then " · $61"
---     once the load is worth a dollar, unless that would make it longer
---     than BedChipMaxChars;
+--     once the load is worth anything (CashText: what the pad would pay),
+--     unless that would make it longer than BedChipMaxChars;
 --   * amber (`full`) once the load reaches the room;
 --   * hidden while the bed is empty (no noise from minute one, as the v1
 --     chip) and while a panel is open.
@@ -353,7 +353,7 @@ function HudRules.BedChip(volume: unknown, room: unknown, value: unknown, modal:
 	local text = if space > 0
 		then string.format("Bed %s / %s", FieldGuide.VolumeNumber(inBed), FieldGuide.VolumeText(space))
 		else "Bed " .. FieldGuide.VolumeText(inBed)
-	if worth >= 1 then
+	if worth > 0 then
 		local withValue = text .. " · " .. FieldGuide.CashText(worth)
 		if (utf8.len(withValue) or #withValue) <= HudRules.BedChipMaxChars then
 			text = withValue
