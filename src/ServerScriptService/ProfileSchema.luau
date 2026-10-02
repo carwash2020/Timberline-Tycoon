@@ -70,6 +70,23 @@ export type SkyWood = {
 	b: number?,
 }
 
+-- One loose piece of wood saved off your truck's beds (the v2 loop,
+-- TruckLoad; V2_PLAN.md §4d). Compact, since every one goes into the
+-- DataStore; LeftLoad has the format, cleans it and caps the list at
+-- GameConfig.MaxSavedPieces pieces and MaxSavedSections sections:
+--   w wood id, k "log" | "plank", f figure id?, x boost? (2 = 2x Wood),
+--   bed "BedFloor" | "TrailerBed", at its place on that bed (x, y, z,
+--   rx, ry, rz), s its sections (size, place on the root, cut faces).
+export type TruckPiece = {
+	w: string,
+	k: string,
+	f: string?,
+	x: number?,
+	bed: string,
+	at: { number },
+	s: { { number } },
+}
+
 -- The Living Forest (ForestService): your Heartseeds and steward record.
 export type ForestState = {
 	planted: number, -- Heartseeds you've planted in the wild
@@ -139,6 +156,10 @@ export type Profile = {
 	-- if that was in town, else it waits there on the ground (VehicleService).
 	truckAt: { x: number?, y: number?, z: number? },
 	leftLoad: { LeftLog }, -- left-behind logs still on the ground when you left (put back on rejoin)
+	-- The v2 loop's loose wood on your truck's beds (TruckLoad), saved as it
+	-- rides and when you leave; rebuilt on the bed when you rejoin (on the
+	-- ground where the truck stood if that wasn't in town). Unused by v1.
+	truckLoad: { TruckPiece },
 	settings: { music: boolean, sfx: boolean },
 	pendingCash: number, -- Robux cash that didn't fit under the wallet cap, paid out as room frees up
 }
@@ -184,6 +205,7 @@ local TEMPLATE: Profile = {
 	truckBed = {},
 	truckAt = {},
 	leftLoad = {},
+	truckLoad = {},
 	settings = { music = true, sfx = true },
 	pendingCash = 0,
 }

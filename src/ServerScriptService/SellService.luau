@@ -16,6 +16,14 @@
 --     pieces · 41 u³ · $96", the dollars that reached the wallet: the cap
 --     may take some) and the onSold hook (GameServer: the tutorial, the
 --     daily goals, the stopwatch, figure reveals), with the sale's totals.
+--   * Wood riding on a truck backed onto the pad sells the same way: the
+--     query only looks in the Wood folder, so the truck itself (its beds,
+--     its BedZones) never does.
+--   * SellBed(player, spend?): Instant Delivery. Sells the pieces riding on
+--     the player's truck beds (deps.bedPieces: TruckLoad.PiecesOn) from
+--     anywhere, after the same wallet check as the v1 bed: a load the
+--     wallet cap would eat isn't worth a paid use. `spend` uses one up
+--     (MonetizationService.UseInstantDelivery) once that check passes.
 -- Runs only in the v2 loop (GameServer wires it under CoreLoop.V2()).
 
 local Players = game:GetService("Players")
@@ -23,6 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
+local Util = require(ReplicatedStorage.Shared.Util)
 
 local SellService = {}
 
@@ -63,6 +72,10 @@ export type Deps = {
 	release: (Model) -> (), -- lets go of a held piece before it goes
 	forget: (Model) -> (), -- drops it from the registries
 	onSold: ((Sale) -> ())?,
+	-- Instant Delivery (SellBed): the pieces on a player's truck beds, and
+	-- the room left in their wallet ($ under GameConfig.CashCap).
+	bedPieces: ((Player) -> { Model })?,
+	walletRoom: ((Player) -> number)?,
 	-- Seams for the specs: what's in the zone, the clock, who's online.
 	partsInZone: ((BasePart, Instance) -> { BasePart })?,
 	now: (() -> number)?,
@@ -108,6 +121,117 @@ local function attrString(model: Model, name: string): string?
 	return if type(v) == "string" and v ~= "" then v else nil
 end
 
+-- A piece that can sell, priced (before 2x Cash).
+type Priced = {
+	model: Model,
+	piece: Piece,
+	woodId: string,
+	volume: number,
+	value: number,
+	figure: string?,
+}
+
+-- `model` priced, or nil when it can't sell: no record, already selling,
+-- dead, a shop's display item, or no wood or volume.
+local function price(d: Deps, model: Model): Priced?
+	local piece = d.resolve(model)
+	if not piece or piece.selling or piece.dead or piece.shopItem then
+		return nil
+	end
+	local woodId = attrString(model, "WoodId")
+	local volume = attrNumber(model, "Volume")
+	if not woodId or not volume or volume <= 0 then
+		return nil
+	end
+	local kind: SellLogic.Kind = if model:GetAttribute("Kind") == "plank" then "plank" else "log"
+	local figure = attrString(model, "Figure")
+	local boost = attrNumber(model, "Boost") or 1
+	return {
+		model = model,
+		piece = piece,
+		woodId = woodId,
+		volume = volume,
+		value = SellLogic.PieceValue(woodId, kind, volume, figure, boost),
+		figure = figure,
+	}
+end
+
+local function onlineCheck(d: Deps): ((number) -> Player?, (number) -> boolean)
+	local findPlayer: (number) -> Player? = d.player or playerById
+	return findPlayer, function(userId: number): boolean
+		return findPlayer(userId) ~= nil
+	end
+end
+
+-- Sells `list`: each piece marked selling, let go of, forgotten and
+-- destroyed; then per payee one AddCash (2x Cash once, on the total), one
+-- toast and the onSold hook. Returns the sales.
+local function sell(d: Deps, list: { Priced }): { Sale }
+	local findPlayer, online = onlineCheck(d)
+	local byPayee: { [Player]: Sale } = {}
+	local order: { Sale } = {}
+	for _, p in ipairs(list) do
+		local model, piece = p.model, p.piece
+		piece.selling = true
+		firstSeen[model] = nil
+		local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, online)
+		d.release(model)
+		d.forget(model)
+		model:Destroy()
+		local payee = if payeeId then findPlayer(payeeId) else nil
+		if payee then
+			local sale: Sale = byPayee[payee]
+				or {
+					payee = payee,
+					pieces = 0,
+					volume = 0,
+					value = 0,
+					paid = 0,
+					credited = 0,
+					figures = {},
+					woods = {},
+					pieceVolumes = {},
+					figured = 0,
+				}
+			if byPayee[payee] == nil then
+				byPayee[payee] = sale
+				table.insert(order, sale)
+			end
+			sale.pieces += 1
+			sale.volume += p.volume
+			sale.value += p.value
+			sale.woods[p.woodId] = (sale.woods[p.woodId] or 0) + p.volume
+			table.insert(sale.pieceVolumes, p.volume)
+			if p.figure then
+				table.insert(sale.figures, p.figure)
+				sale.figured += p.volume
+			end
+		end
+	end
+	for _, sale in ipairs(order) do
+		sale.paid = SellLogic.Payout(sale.value, d.saleMultiplier(sale.payee))
+		if sale.paid > 0 then
+			local credited = d.addCash(sale.payee, sale.paid, "sold wood", "wood")
+			sale.credited = if type(credited) == "number" and credited == credited
+				then math.clamp(credited, 0, sale.paid)
+				else sale.paid
+		end
+		d.notify(sale.payee, SellLogic.SaleText(sale.pieces, sale.volume, sale.credited))
+		local onSold = d.onSold
+		if onSold then
+			-- On its own: a broken listener mustn't stop the next payee's pay.
+			local ok, err = pcall(function(): any
+				onSold(sale)
+				return nil
+			end)
+			if not ok then
+				warn("[SellService] onSold failed: " .. tostring(err))
+			end
+		end
+	end
+	return order
+end
+
 -- One pass: sells every piece that has rested in the zone long enough.
 -- Returns the sales made (for the specs).
 function SellService.Tick(): { Sale }
@@ -134,88 +258,75 @@ function SellService.Tick(): { Sale }
 			firstSeen[model] = nil -- it left the zone
 		end
 	end
-
-	local findPlayer: (number) -> Player? = d.player or playerById
-	local function online(userId: number): boolean
-		return findPlayer(userId) ~= nil
-	end
-	local byPayee: { [Player]: Sale } = {}
-	local order: { Sale } = {}
+	local ready: { Priced } = {}
 	for model, since in pairs(firstSeen) do
-		if now - since < SellService.Settle then
-			continue
-		end
-		local piece = d.resolve(model)
-		if not piece or piece.selling or piece.dead or piece.shopItem then
-			continue
-		end
-		local woodId = attrString(model, "WoodId")
-		local volume = attrNumber(model, "Volume")
-		if not woodId or not volume or volume <= 0 then
-			continue
-		end
-		local kind: SellLogic.Kind = if model:GetAttribute("Kind") == "plank" then "plank" else "log"
-		local figure = attrString(model, "Figure")
-		local boost = attrNumber(model, "Boost") or 1
-		piece.selling = true
-		firstSeen[model] = nil
-		local value = SellLogic.PieceValue(woodId, kind, volume, figure, boost)
-		local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, online)
-		d.release(model)
-		d.forget(model)
-		model:Destroy()
-		local payee = if payeeId then findPlayer(payeeId) else nil
-		if payee then
-			local sale: Sale = byPayee[payee]
-				or {
-					payee = payee,
-					pieces = 0,
-					volume = 0,
-					value = 0,
-					paid = 0,
-					credited = 0,
-					figures = {},
-					woods = {},
-					pieceVolumes = {},
-					figured = 0,
-				}
-			if byPayee[payee] == nil then
-				byPayee[payee] = sale
-				table.insert(order, sale)
-			end
-			sale.pieces += 1
-			sale.volume += volume
-			sale.value += value
-			sale.woods[woodId] = (sale.woods[woodId] or 0) + volume
-			table.insert(sale.pieceVolumes, volume)
-			if figure then
-				table.insert(sale.figures, figure)
-				sale.figured += volume
+		if now - since >= SellService.Settle then
+			local p = price(d, model)
+			if p then
+				table.insert(ready, p)
 			end
 		end
 	end
-	for _, sale in ipairs(order) do
-		sale.paid = SellLogic.Payout(sale.value, d.saleMultiplier(sale.payee))
-		if sale.paid > 0 then
-			local credited = d.addCash(sale.payee, sale.paid, "sold wood", "wood")
-			sale.credited = if type(credited) == "number" and credited == credited
-				then math.clamp(credited, 0, sale.paid)
-				else sale.paid
-		end
-		d.notify(sale.payee, SellLogic.SaleText(sale.pieces, sale.volume, sale.credited))
-		local onSold = d.onSold
-		if onSold then
-			-- On its own: a broken listener mustn't stop the next payee's pay.
-			local ok, err = pcall(function(): any
-				onSold(sale)
-				return nil
-			end)
-			if not ok then
-				warn("[SellService] onSold failed: " .. tostring(err))
+	return sell(d, ready)
+end
+
+SellService.BedEmptyText = "Nothing on your truck's bed to deliver."
+SellService.NoDeliveriesText = "You have no Instant Deliveries left."
+
+-- The wallet check's toast: the same words as the v1 bed's.
+function SellService.WalletText(worth: number, room: number): string
+	if room <= 0 then
+		return string.format(
+			"Your wallet is full (%s). Spend some before using Instant Delivery.",
+			Util.formatCash(GameConfig.CashCap)
+		)
+	end
+	return string.format(
+		"This load is worth %s but your wallet only has room for %s. Spend some before using Instant Delivery.",
+		Util.formatCash(worth),
+		Util.formatCash(room)
+	)
+end
+
+-- Instant Delivery in the v2 loop: sells the pieces riding on `player`'s
+-- truck beds, wherever the truck is (see the header). A piece whose
+-- payee isn't online stays on the bed. Returns the sales, or nothing and
+-- why not ("off", "empty", "wallet", "spent").
+function SellService.SellBed(player: Player, spend: (() -> boolean)?): ({ Sale }, string?)
+	local d = deps
+	if not d or not d.bedPieces then
+		return {}, "off"
+	end
+	local _, online = onlineCheck(d)
+	local list: { Priced } = {}
+	local mine = 0
+	for _, model in ipairs(d.bedPieces(player)) do
+		local p = if model.Parent then price(d, model) else nil
+		local payee = if p then SellLogic.Payee(p.piece.ownerId, p.piece.lastHolderId, online) else nil
+		if p and payee then
+			table.insert(list, p)
+			if payee == player.UserId then
+				mine += p.value
 			end
 		end
 	end
-	return order
+	if #list == 0 then
+		d.notify(player, SellService.BedEmptyText)
+		return {}, "empty"
+	end
+	-- A load the wallet cap would eat (some or all of it) isn't worth a
+	-- paid use: say so before one is spent.
+	local worth = if mine > 0 then SellLogic.Payout(mine, d.saleMultiplier(player)) else 0
+	local room = if d.walletRoom then d.walletRoom(player) else math.huge
+	if worth > room then
+		d.notify(player, SellService.WalletText(worth, room))
+		return {}, "wallet"
+	end
+	if spend and not spend() then
+		d.notify(player, SellService.NoDeliveriesText)
+		return {}, "spent"
+	end
+	return sell(d, list), nil
 end
 
 local running = false

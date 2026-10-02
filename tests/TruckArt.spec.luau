@@ -285,8 +285,9 @@ return function(t)
 			-- 74: 70 plus the two invisible skid ramps (ACT-05) plus two for
 			-- the hub bolts (ACT-09: one a hubbed wheel, up to four, so the
 			-- Rustbucket and the Rig hold 73). A trailer's 36: its skid's own
-			-- two ramps and the bolts on the Pony's and Ranch's two hubs.
-			local budget = 74 + (if rig.trailer then 36 else 0)
+			-- two ramps and the bolts on the Pony's and Ranch's two hubs. Plus
+			-- one invisible BedZone per bed (M1.6), raised on purpose.
+			local budget = 75 + (if rig.trailer then 37 else 0)
 			t.ok(count <= budget, string.format("%s has %d parts (budget %d)", label, count, budget))
 		end
 	end)
@@ -708,6 +709,141 @@ return function(t)
 					end
 				end
 			end
+		end
+	end)
+
+	-- M1.6 (V2_PLAN §4b): the v2 loop's loose wood rides in a BedZone over
+	-- each bed. It is invisible and inert, so v1 trucks look and drive the
+	-- same; only the v2 loop grips the beds (ApplyBedFriction).
+	t.test("one BedZone per bed: inert, invisible, covering the inside of the bed", function()
+		local GameConfig = t.shared("GameConfig")
+		for _, rig in ipairs(rigs()) do
+			local model, layout, tl = build(rig)
+			local label = rig.label
+			local beds = {}
+			if layout.bedLength > 0 then
+				table.insert(
+					beds,
+					{ name = "BedFloor", width = layout.bedWidth, length = layout.bedLength, wall = layout.wallHeight }
+				)
+			end
+			if tl then
+				table.insert(
+					beds,
+					{ name = "TrailerBed", width = tl.bedWidth, length = tl.bedLength, wall = tl.wallHeight }
+				)
+			end
+			t.eq(#named(model, "BedZone"), #beds, label .. " one BedZone per bed")
+			local listed = TruckArt.BedZones(model)
+			t.eq(#listed, #beds, label .. " BedZones lists each")
+			for i, want in ipairs(beds) do
+				local bed = model:FindFirstChild(want.name)
+				local zone = bed:FindFirstChild("BedZone")
+				t.ok(zone and zone:IsA("BasePart"), label .. " " .. want.name .. " has a BedZone child")
+				t.eq(listed[i].bed, bed, label .. " listed with its bed")
+				t.eq(listed[i].zone, zone, label .. " listed")
+				t.eq(zone.CanCollide, false, label .. " BedZone never collides")
+				t.eq(zone.CanQuery, false, label .. " BedZone can't be hit or clicked")
+				t.eq(zone.CanTouch, false, label .. " BedZone fires no touches")
+				t.eq(zone.CastShadow, false, label .. " BedZone casts no shadow")
+				t.eq(zone.Transparency, 1, label .. " BedZone is invisible")
+				-- Covers the bed: the inside width, the whole length, from the
+				-- floor's top up BedZoneHeight, square to the bed.
+				local eps = 1e-3
+				local rel = bed.CFrame:ToObjectSpace(zone.CFrame)
+				t.ok(math.abs(zone.Size.X - want.width) < eps, label .. " as wide as the inside of the bed")
+				t.ok(math.abs(zone.Size.Z - want.length) < eps, label .. " as long as the bed")
+				t.ok(math.abs(zone.Size.Z - bed.Size.Z) < eps, label .. " as long as the bed floor")
+				t.ok(math.abs(zone.Size.Y - TruckLayout.BedZoneHeight) < eps, label .. " BedZoneHeight tall")
+				t.ok(
+					math.abs(rel.Position.X) < eps and math.abs(rel.Position.Z) < eps,
+					label .. " centred over the bed"
+				)
+				t.ok(rel.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.9999, label .. " square to the bed")
+				local bottom = rel.Position.Y - zone.Size.Y / 2
+				t.ok(math.abs(bottom - bed.Size.Y / 2) < eps, label .. " its bottom on the floor's top")
+				t.ok(want.wall <= TruckLayout.BedZoneHeight, label .. " the walls or stakes stand inside it")
+				-- The HUD's numbers.
+				local room = TruckLayout.BedRoomU3(want.length, want.width, want.wall, GameConfig.WoodUnit)
+				t.ok(math.abs(zone:GetAttribute("Room") - room) < eps, label .. " Room is the bed's u³ a trip")
+				t.eq(zone:GetAttribute("Length"), want.length, label .. " Length")
+			end
+			TruckArt.Rig(model)
+			for _, zone in ipairs(named(model, "BedZone")) do
+				t.eq(zone.Massless, true, label .. " rigged BedZone is massless")
+				local weld = zone:FindFirstChildOfClass("WeldConstraint")
+				t.ok(weld and weld.Part0 == zone.Parent and weld.Part1 == zone, label .. " welded to its bed")
+			end
+		end
+	end)
+
+	t.test("bed friction: none on a v1 truck; ApplyBedFriction grips only the bed parts", function()
+		for _, rig in ipairs(rigs()) do
+			local model = build(rig)
+			local label = rig.label
+			TruckArt.Rig(model)
+			for _, p in ipairs(parts(model)) do
+				if TruckArt.BedParts[p.Name] then
+					t.eq(p.CustomPhysicalProperties, nil, label .. " v1 " .. p.Name .. " keeps its material's physics")
+				end
+			end
+			TruckArt.ApplyBedFriction(model, 1.0)
+			local gripped = 0
+			for _, p in ipairs(parts(model)) do
+				local props = p.CustomPhysicalProperties
+				if TruckArt.BedParts[p.Name] then
+					gripped += 1
+					t.ok(p.CanCollide, label .. " " .. p.Name .. " is hull")
+					t.eq(props.Friction, 1, label .. " " .. p.Name .. " grips")
+					t.eq(props.FrictionWeight, TruckArt.BedFrictionWeight, label .. " the bed's grip wins")
+					t.eq(props.Elasticity, 0, label .. " " .. p.Name .. " doesn't bounce")
+				elseif p.Name == "Skid" or p.Name == "Ramp" or p.Name == "TrailerSkid" then
+					t.eq(props.Friction, 0, label .. " " .. p.Name .. " stays frictionless")
+				elseif p.Name == "Chassis" or p.Name == "BedZone" then
+					t.eq(props, nil, label .. " " .. p.Name .. " untouched")
+				end
+			end
+			if rig.def.bedCapacity > 0 then
+				t.ok(gripped >= 3, label .. " a floor and its sides grip")
+				TruckArt.ApplyBedFriction(model, 0.4) -- Tune_BedFriction in Studio
+				t.ok(
+					math.abs(model:FindFirstChild("BedFloor").CustomPhysicalProperties.Friction - 0.4) < 1e-6,
+					label .. " retuned"
+				)
+			else
+				t.eq(gripped, 0, label .. " has no bed to grip")
+			end
+		end
+	end)
+
+	t.test("stakes: the Flatbed, the Rig and the stake trailers hold a load in", function()
+		local function stakes(model, names, deckTop, height)
+			local n = 0
+			for _, p in ipairs(parts(model)) do
+				if names[p.Name] and p.CanCollide then
+					local _, hi = box(p)
+					if hi.Y >= deckTop + height - 1e-3 then
+						n += 1
+					end
+				end
+			end
+			return n
+		end
+		for _, id in ipairs({ "Flatbed", "LoggingRig" }) do
+			local model, layout = build({ def = ItemCatalog.GetTruck(id) })
+			local deckTop = layout.bedFloorY + TruckLayout.BedFloorThickness / 2
+			local n = stakes(model, { Stake = true, Stanchion = true }, deckTop, layout.wallHeight)
+			t.ok(n >= 6, string.format("%s has %d full-height collidable stakes", id, n))
+		end
+		for _, id in ipairs({ "RanchTrailer", "HeavyHauler" }) do
+			local def = ItemCatalog.GetTruck("Flatbed")
+			local layout = TruckLayout.For(def)
+			local trailer = ItemCatalog.GetTrailer(id)
+			local tl = TruckLayout.ForTrailer(trailer, layout)
+			local model = TruckArt.Build(def, layout, trailer, tl)
+			local deckTop = tl.bedFloorY + TruckLayout.BedFloorThickness / 2
+			local n = stakes(model, { TrailerStake = true, TrailerStanchion = true }, deckTop, tl.wallHeight)
+			t.ok(n >= 6, string.format("%s has %d full-height collidable stakes", id, n))
 		end
 	end)
 end

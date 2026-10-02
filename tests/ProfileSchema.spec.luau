@@ -282,4 +282,26 @@ return function(t)
 		t.eq(Schema.CreditText(20, 0), "Murph chipped in $20 to get you started.")
 		t.eq(Schema.CreditText(0, 0), nil)
 	end)
+
+	-- M1.6: the v2 loop's loose wood on the bed (TruckLoad, LeftLoad).
+	t.test("truckLoad: a new save has an empty one; Migrate leaves it (and the v1 bed) alone", function()
+		local Schema, data = fresh()
+		t.eq(data.truckLoad, {})
+		Schema.Migrate(data)
+		t.eq(data.truckLoad, {})
+		-- An older save gets it from Reconcile (a new top-level field); v1's
+		-- own bed fields are untouched by it.
+		local piece = {
+			w = "oak",
+			k = "log",
+			bed = "BedFloor",
+			at = { 0, 1.25, 0, 0, 0, 0 },
+			s = { { 2, 9, 2, 0, 0, 0, 0, 0, 0, 3 } },
+		}
+		data.truckLoad = { piece }
+		data.truckBed = { { woodId = "oak", value = 5 } }
+		Schema.Migrate(data)
+		t.eq(data.truckLoad, { piece })
+		t.eq(data.truckBed, { { woodId = "oak", value = 5 } })
+	end)
 end

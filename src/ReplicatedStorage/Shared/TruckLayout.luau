@@ -221,6 +221,36 @@ function TruckLayout.For(def: TruckDef): Layout
 	}
 end
 
+---------------------------------------------------------------------------
+-- The v2 loop: loose wood rides on the beds (V2_PLAN §4b, M1.6)
+---------------------------------------------------------------------------
+
+-- How tall a bed's BedZone stands over the bed floor's top: a piece whose
+-- centre is inside it rides on that bed (TruckLoad).
+TruckLayout.BedZoneHeight = 4
+
+-- A bed's BedZone, relative to its bed floor part (0.5 thick): `width`
+-- (the inside of the walls or stakes) x BedZoneHeight x `length` (the
+-- bed's), its bottom on the floor's top. Returns its offset and size.
+function TruckLayout.BedZone(width: number, length: number): (CFrame, Vector3)
+	local h = TruckLayout.BedZoneHeight
+	return CFrame.new(0, BED_FLOOR_TOP + h / 2, 0), Vector3.new(width, h, length)
+end
+
+-- The wood a bed carries a trip, in u³ (`unit` studs a side): its length x
+-- its inside width x (its walls + BedPileOver studs piled over them) x
+-- BedPacking (how much of that a load of logs fills). The same estimate as
+-- tools/economy2's "u³ a trip"; the HUD's bed chip shows it as the bed's
+-- room (TruckLoad publishes it as BedRoom).
+TruckLayout.BedPileOver = 2
+TruckLayout.BedPacking = 0.4
+function TruckLayout.BedRoomU3(length: number, width: number, wallHeight: number, unit: number): number
+	if length <= 0 or width <= 0 or unit <= 0 then
+		return 0
+	end
+	return length * width * (wallHeight + TruckLayout.BedPileOver) * TruckLayout.BedPacking / (unit * unit * unit)
+end
+
 -- Truck-local z of the rear axle, the point a truck turns about (where
 -- VehicleService hangs its DriveAttachment): the second axle, or the
 -- middle of the tandem pair on a long bed. wheelZ is { front, rear } plus

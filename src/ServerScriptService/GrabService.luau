@@ -74,10 +74,14 @@ export type Piece = {
 
 -- Hooks for later slices. bedOwner: the player whose truck bed the piece
 -- rests on (TruckLoad, M1.6); permission: false when plot permissions
--- forbid this player (M3); onGrab / onRelease: tutorial and quest events.
+-- forbid this player (M3); beforeHold: a grab that passed every check,
+-- just before the piece's physics goes to the holder (TruckLoad lets go
+-- of a piece it welded to a bed); onGrab / onRelease: tutorial and quest
+-- events.
 export type Hooks = {
 	bedOwner: ((Piece) -> Player?)?,
 	permission: ((Player, Piece) -> boolean?)?,
+	beforeHold: ((Player, Piece) -> ())?,
 	onGrab: ((Player, Piece) -> ())?,
 	onRelease: ((Player, Piece, string) -> ())?,
 }
@@ -423,6 +427,10 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 	end
 	if mine then
 		finish(mine, "switch", "keep")
+	end
+	local beforeHold = hooks.beforeHold
+	if beforeHold then
+		beforeHold(player, piece)
 	end
 	if root.Anchored or not GrabService.Physics.SetOwner(root, player) then
 		return false, "stuck"

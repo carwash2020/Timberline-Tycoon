@@ -269,6 +269,30 @@ return function(t)
 		t.eq(record.lastHolderId, 2)
 	end)
 
+	t.test("beforeHold runs once a grab has passed every check, before the physics is handed over (M1.6)", function()
+		local w = setup()
+		local record, section = w.piece(nil, { ownerId = 1, createdAt = 100 - 10 })
+		local order = {}
+		local setOwner = w.GrabService.Physics.SetOwner
+		w.GrabService.Physics.SetOwner = function(part, player)
+			table.insert(order, "owner")
+			return setOwner(part, player)
+		end
+		w.GrabService.Hooks.beforeHold = function(player, piece)
+			table.insert(order, { player = player, piece = piece })
+		end
+		local other = w.player(2)
+		t.eq({ w.GrabService.Grab(other, section, HIT) }, { false, "grace" })
+		t.eq(#order, 0, "a refused grab never reaches it")
+		local owner = w.player(1)
+		t.ok(w.GrabService.Grab(owner, section, HIT))
+		t.eq(#order, 2)
+		t.eq(order[1].player, owner)
+		t.eq(order[1].piece, record)
+		t.eq(order[2], "owner", "then the physics goes to the holder")
+		w.GrabService.Hooks.beforeHold = nil
+	end)
+
 	t.test("an Elder's piece is anyone's at once; a truck bed is its owner's", function()
 		local w = setup()
 		local _, elderSection = w.piece(nil, { ownerId = 1, createdAt = 100, elder = true })
