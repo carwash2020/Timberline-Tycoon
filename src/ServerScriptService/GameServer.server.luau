@@ -23,6 +23,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
 local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
+local GrabService = require(script.Parent.GrabService)
 local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
@@ -38,6 +39,7 @@ local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local VehicleService = require(script.Parent.VehicleService)
 local WeatherService = require(script.Parent.WeatherService)
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -547,6 +549,11 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("NPCService.Init", NPCService.Init, mapFolder)
+-- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
+-- and drag loose wood.
+if CoreLoop.V2() then
+	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
+end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 

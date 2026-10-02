@@ -29,6 +29,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	UpgradePlot = 1,
 	PlantSeed = 3,
 	SaveSetting = 4,
+	Grab = 6, -- v2 loop (V2_PLAN.md §12)
+	Release = 6,
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic
