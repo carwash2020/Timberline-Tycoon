@@ -125,8 +125,21 @@ end
 -- out as spending frees up room, because a granted receipt can't be undone.
 -- Returns (credited now, banked).
 function EconomyService.AddPaidCash(player: Player, amount: number, reason: string, itemSku: string?): (number, number)
-	local credited, overflow =
-		EconomyService.AddCash(player, amount, reason, itemSku, Enum.AnalyticsEconomyTransactionType.IAP)
+	return EconomyService.AddOwedCash(player, amount, reason, itemSku, Enum.AnalyticsEconomyTransactionType.IAP)
+end
+
+-- Adds cash the game owes the player and mustn't lose to the wallet cap
+-- (the v2 buy-back of logs they had on hand, AddPaidCash's Robux cash):
+-- what doesn't fit is banked like AddPaidCash's. Returns (credited now,
+-- banked).
+function EconomyService.AddOwedCash(
+	player: Player,
+	amount: number,
+	reason: string,
+	itemSku: string?,
+	transaction: Enum.AnalyticsEconomyTransactionType?
+): (number, number)
+	local credited, overflow = EconomyService.AddCash(player, amount, reason, itemSku, transaction)
 	local profile = ProfileService.GetProfile(player)
 	if overflow > 0 and profile then
 		profile.pendingCash += overflow

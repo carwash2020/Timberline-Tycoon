@@ -34,6 +34,7 @@ local NPCService = require(script.Parent.NPCService)
 local PickupGrace = require(script.Parent.PickupGrace)
 local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
+local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -734,12 +735,45 @@ local function onPlayerAdded(player: Player)
 		profile.equippedTrailer = ""
 	end
 
+	-- The v2 loop: v1 logs still on hand are bought back (and a first join
+	-- topped up to StartingCash) into v2Credit, before the truck spawns or
+	-- left-behind logs come back (V2_PLAN.md §14).
+	local boughtBack = 0
+	if CoreLoop.V2() then
+		safely("ProfileSchema.MigrateV2", function()
+			local moved = ProfileSchema.MigrateV2(profile)
+			boughtBack = moved.boughtBack
+			if moved.migrated then
+				print(
+					string.format(
+						"[GameServer] %s's save is now on the v2 loop (bought back $%d, topped up $%d)",
+						player.Name,
+						moved.boughtBack,
+						moved.toppedUp
+					)
+				)
+			end
+		end)
+	end
+
 	player:SetAttribute("Cash", profile.cash)
 	player:SetAttribute("SettingMusic", profile.settings.music ~= false)
 	player:SetAttribute("SettingSfx", profile.settings.sfx ~= false)
 	if profile.pendingCash > 0 then
 		player:SetAttribute("PendingCash", profile.pendingCash)
 		EconomyService.PayPending(player)
+	end
+	-- What MigrateV2 left owed, through the wallet (overflow banked).
+	if CoreLoop.V2() and profile.v2Credit > 0 then
+		safely("pay v2Credit", function()
+			local owed = math.floor(profile.v2Credit)
+			profile.v2Credit = 0
+			local credited, banked = EconomyService.AddOwedCash(player, owed, "v2 buy-back", "v2BuyBack")
+			local text = ProfileSchema.CreditText(credited + banked, boughtBack)
+			if text then
+				notify(player, text)
+			end
+		end)
 	end
 	safely("VehicleService.SpawnTruck", function()
 		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)

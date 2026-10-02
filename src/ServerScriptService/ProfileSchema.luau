@@ -7,7 +7,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -57,6 +59,15 @@ export type BedLog = {
 	figure: string?,
 }
 
+-- Wood waiting in the Sky Bin under the v2 loop (V2_PLAN.md §5): its wood
+-- id, volume in u³, figure, and whether it was a plank.
+export type SkyWood = {
+	w: string,
+	v: number,
+	f: string?,
+	p: boolean?,
+}
+
 -- The Living Forest (ForestService): your Heartseeds and steward record.
 export type ForestState = {
 	planted: number, -- Heartseeds you've planted in the wild
@@ -67,6 +78,13 @@ export type ForestState = {
 }
 
 export type Profile = {
+	-- Which core loop the save has been brought into (V2_PLAN.md §14): 0 =
+	-- never migrated, 2 = the v2 loop (MigrateV2), 3 = plot squares, 4 =
+	-- vehicle pads.
+	schema: number,
+	-- Cash owed for the v1 logs bought back when the save came into the v2
+	-- loop (and the top-up to StartingCash); GameServer pays it on join.
+	v2Credit: number,
 	cash: number,
 	totalEarned: number,
 	rebirths: number,
@@ -90,12 +108,16 @@ export type Profile = {
 	materials: { [string]: number }, -- gathered materials by id (Sky Shards, ...)
 	forgeLogs: { [string]: number }, -- logs put into the Starfall forge, by wood id
 	skyBin: { BedLog }, -- the logs waiting in the Sky Bin at the sawmill (wood, value, figure)
+	forgeWood: { [string]: number }, -- v2: u³ of wood put into the Starfall forge, by wood id
+	skyWood: { SkyWood }, -- v2: the wood waiting in the Sky Bin
 	furnitureBlueprints: { [string]: boolean },
 	npcFriendship: { [string]: number },
 	stats: {
 		treesChopped: number,
 		logsSold: number,
 		playtimeMin: number,
+		volumeSold: number, -- v2: u³ of wood sold
+		cuts: number, -- v2: cuts made through trunks and logs
 	},
 	tutorialDone: boolean,
 	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
@@ -122,6 +144,8 @@ export type Profile = {
 -- New players start from this. Fields added here later are filled into
 -- existing saves by Reconcile() on load; nothing already saved is dropped.
 local TEMPLATE: Profile = {
+	schema = 0,
+	v2Credit = 0,
 	cash = 0,
 	totalEarned = 0,
 	rebirths = 0,
@@ -139,9 +163,11 @@ local TEMPLATE: Profile = {
 	materials = {},
 	forgeLogs = {},
 	skyBin = {},
+	forgeWood = {},
+	skyWood = {},
 	furnitureBlueprints = {},
 	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
-	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0 },
+	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0, volumeSold = 0, cuts = 0 },
 	tutorialDone = false,
 	tutorialStep = 1,
 	tutorialProgress = 0,
@@ -197,6 +223,149 @@ function ProfileSchema.Migrate(data: any)
 			data.skyBin[i] = { woodId = entry, value = if wood then wood.pricePerLog else 0 }
 		end
 	end
+end
+
+-- The v2 loop (V2_PLAN.md §14) ---------------------------------------------
+
+ProfileSchema.SchemaV2 = 2
+-- u³ of forge wood each v1 log in the Starfall forge becomes (40 lumenwood
+-- logs to 60 u³), never more than the recipe takes.
+ProfileSchema.ForgeU3PerLog = 1.5
+
+export type MigrateV2Result = {
+	boughtBack: number, -- $ of v1 logs (truck bed, left-behind, Sky Bin) added to v2Credit by this call
+	toppedUp: number, -- $ added to v2Credit so cash + credit reaches StartingCash
+	migrated: boolean, -- this call brought the save into the v2 loop (schema 2)
+}
+
+-- What the saved v1 logs in `list` are worth (their saved per-log values,
+-- figures included); malformed entries count for nothing.
+local function logsValue(list: any): number
+	if type(list) ~= "table" then
+		return 0
+	end
+	local total = 0
+	for _, entry in ipairs(list) do
+		local v: any = nil
+		if type(entry) == "table" then
+			v = entry.value
+		elseif type(entry) == "string" then
+			local wood = WoodData.Get(entry)
+			v = if wood then wood.pricePerLog else nil
+		end
+		if type(v) == "number" and v == v and v > 0 and v < math.huge then
+			total += v
+		end
+	end
+	return total
+end
+
+local function count(list: any): number
+	return if type(list) == "table" then #list else 0
+end
+
+-- The most of each wood any forge recipe takes, in v1 logs.
+local function forgeLogCaps(): { [string]: number }
+	local caps: { [string]: number } = {}
+	for _, axe in pairs(ItemCatalog.Axes) do
+		local recipe = axe.forge
+		if recipe then
+			for woodId, n in pairs(recipe.logs) do
+				caps[woodId] = math.max(caps[woodId] or 0, n)
+			end
+		end
+	end
+	return caps
+end
+
+-- Brings a save into the v2 core loop. Call on every join under the v2
+-- loop, after Migrate. Never writes cash: what it owes goes in v2Credit,
+-- which GameServer pays through EconomyService.
+--   * Every call: v1 logs still on hand (truck bed, left-behind logs, Sky
+--     Bin) are bought back at their saved values into v2Credit and the
+--     lists emptied (an old v1 server may have refilled them).
+--   * Once (schema below 2): cash + credit is topped up to StartingCash,
+--     the forge's v1 logs become forge wood (forgeLogs is kept, so a
+--     rollback to v1 loses nothing), tutorial progress restarts on a step
+--     whose unit changed (TutorialData.KeepsProgressV2), daily goals rolled
+--     from the v1 pool are rerolled (the streak is kept), and schema = 2.
+-- Idempotent: a second call finds nothing to buy back and changes nothing.
+function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Result
+	if type(data.schema) ~= "number" or data.schema ~= data.schema then
+		data.schema = 0
+	end
+	if type(data.v2Credit) ~= "number" or data.v2Credit ~= data.v2Credit or data.v2Credit < 0 then
+		data.v2Credit = 0
+	end
+	if type(data.forgeWood) ~= "table" then
+		data.forgeWood = {}
+	end
+	if type(data.skyWood) ~= "table" then
+		data.skyWood = {}
+	end
+	if type(data.stats) ~= "table" then
+		data.stats = {}
+	end
+	data.stats.volumeSold = tonumber(data.stats.volumeSold) or 0
+	data.stats.cuts = tonumber(data.stats.cuts) or 0
+
+	local result: MigrateV2Result = { boughtBack = 0, toppedUp = 0, migrated = false }
+	local bedHadLogs = count(data.truckBed) > 0
+	if bedHadLogs or count(data.leftLoad) > 0 or count(data.skyBin) > 0 then
+		local value = logsValue(data.truckBed) + logsValue(data.leftLoad) + logsValue(data.skyBin)
+		result.boughtBack = math.floor(value + 0.5)
+		data.v2Credit += result.boughtBack
+		data.truckBed = {}
+		data.leftLoad = {}
+		data.skyBin = {}
+		if bedHadLogs then
+			data.truckAt = {}
+		end
+	end
+	if data.schema >= ProfileSchema.SchemaV2 then
+		return result
+	end
+
+	data.truckAt = {}
+	local start = startingCash or GameConfig.StartingCash
+	local cash = if type(data.cash) == "number" and data.cash == data.cash then data.cash else 0
+	local short = math.floor(start - (cash + data.v2Credit))
+	if short > 0 then
+		data.v2Credit += short
+		result.toppedUp = short
+	end
+	if type(data.forgeLogs) == "table" then
+		for woodId, cap in pairs(forgeLogCaps()) do
+			local logs = data.forgeLogs[woodId]
+			if type(logs) == "number" and logs > 0 then
+				local u3 = math.min(cap, logs) * ProfileSchema.ForgeU3PerLog
+				data.forgeWood[woodId] = math.max(tonumber(data.forgeWood[woodId]) or 0, u3)
+			end
+		end
+	end
+	local step = tonumber(data.tutorialStep) or 1
+	if not data.tutorialDone and not TutorialData.KeepsProgressV2(step) then
+		data.tutorialProgress = 0
+	end
+	local daily = data.daily
+	if type(daily) == "table" and type(daily.goals) == "table" and DailyData.NeedsReroll(daily.goals, 2) then
+		daily.day = 0
+	end
+	data.schema = ProfileSchema.SchemaV2
+	result.migrated = true
+	return result
+end
+
+-- The toast for cash MigrateV2 left owed, or nil for none: the buy-back
+-- of logs on hand, else a starter's top-up.
+function ProfileSchema.CreditText(paid: number, boughtBack: number): string?
+	if paid <= 0 then
+		return nil
+	end
+	if boughtBack > 0 then
+		return string.format("Murph bought back the logs you had on hand: +%s", Util.formatCash(paid))
+	end
+	return string.format("Murph chipped in %s to get you started.", Util.formatCash(paid))
 end
 
 -- How many granted receipts to remember. Roblox retries an unconfirmed
