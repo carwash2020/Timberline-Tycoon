@@ -702,6 +702,38 @@ return function(t)
 		end
 	end)
 
+	t.test("no grass grows under a building: dirt or cobbles under every wall and floor (TER-02)", function()
+		local buildings = { { "Sawmill", placed(BuildingArt.Sawmill(), town.sawmill) } }
+		for _, spot in ipairs(town.shops) do
+			table.insert(
+				buildings,
+				{ spot.kind, placed(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe) }
+			)
+		end
+		table.insert(buildings, { "GondolaStation", placed(BuildingArt.GondolaStation(), town.gondola) })
+		for _, b in ipairs(buildings) do
+			local name, model = b[1], b[2]
+			local bad = {}
+			for _, p in ipairs(parts(model)) do
+				-- Anything solid that reaches the ground.
+				local bottom = p.CFrame.Position.Y - p.Size.Y / 2
+				if p.CanCollide and bottom < 1.5 then
+					local half = p.Size / 2
+					for _, sx in ipairs({ -1, 0, 1 }) do
+						for _, sz in ipairs({ -1, 0, 1 }) do
+							local q = p.CFrame * Vector3.new(half.X * sx, 0, half.Z * sz)
+							local _, m = TerrainGen.Sample(q.X, q.Z)
+							if m == "Grass" or m == "LeafyGrass" then
+								table.insert(bad, string.format("%s at (%.1f, %.1f)", p.Name, q.X, q.Z))
+							end
+						end
+					end
+				end
+			end
+			t.ok(#bad == 0, name .. ": grass under " .. table.concat(bad, ", ", 1, math.min(#bad, 6)))
+		end
+	end)
+
 	t.test("the spawn faces the sawmill (TWN-03)", function()
 		local cf = town.spawnFacing
 		t.ok((cf.Position - town.spawn).Magnitude < 1e-4, "spawnFacing stands at town.spawn")

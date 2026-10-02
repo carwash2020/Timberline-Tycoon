@@ -38,7 +38,7 @@
         "$ignoreUnknownInstances": true,
         "$properties": {
           "Decoration": true,
-          "GrassLength": 0.7
+          "GrassLength": 0.45
         }
       }
     },

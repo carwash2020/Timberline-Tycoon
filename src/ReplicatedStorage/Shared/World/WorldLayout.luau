@@ -122,19 +122,32 @@ WorldLayout.ParkingLot = { x0 = 8, x1 = 112, z0 = -18, z1 = 68 }
 -- mill yard and the gondola path. Edges get a little noise. The first
 -- that covers a spot paints it (the plaza's cobbles run across the
 -- street). `name` is for the specs: nothing that collides stands on the
--- street, plaza, paths or walk (WorldPlan.spec).
+-- street, plaza, paths or walk (WorldPlan.spec). Patches that meet overlap
+-- by a stud or two: edge noise can pull both back, and a seam would grow
+-- a strip of grass between them.
 export type Paint = { name: string, x0: number, x1: number, z0: number, z1: number, material: string }
 WorldLayout.TownPaint = {
 	{ name = "Plaza", x0 = -26, x1 = 26, z0 = 64, z1 = 97, material = "Cobblestone" },
 	{ name = "MainStreet", x0 = -104, x1 = 64, z0 = 70, z1 = 84, material = "Ground" },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
-	{ name = "HearthAndHomePath", x0 = -99.5, x1 = -87.5, z0 = 84, z1 = 93, material = "Ground" },
-	{ name = "ToolShedPath", x0 = -63, x1 = -51, z0 = 84, z1 = 93, material = "Ground" },
-	{ name = "DealershipPath", x0 = 42, x1 = 54, z0 = 84, z1 = 93, material = "Ground" },
-	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 64, material = "Ground" },
-	{ name = "MillYard", x0 = -32, x1 = 33, z0 = 97, z1 = 140, material = "Ground" },
-	{ name = "GondolaPath", x0 = -39, x1 = -33, z0 = 84, z1 = 142, material = "Ground" },
+	{ name = "HearthAndHomePath", x0 = -99.5, x1 = -87.5, z0 = 82, z1 = 93, material = "Ground" },
+	{ name = "ToolShedPath", x0 = -63, x1 = -51, z0 = 82, z1 = 93, material = "Ground" },
+	{ name = "DealershipPath", x0 = 42, x1 = 54, z0 = 82, z1 = 93, material = "Ground" },
+	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 66, material = "Ground" },
+	{ name = "MillYard", x0 = -32, x1 = 33, z0 = 95, z1 = 140, material = "Ground" },
+	{ name = "GondolaPath", x0 = -39, x1 = -33, z0 = 82, z1 = 142, material = "Ground" },
 	{ name = "GondolaPath", x0 = -46, x1 = -33, z0 = 136, z1 = 142, material = "Ground" },
+} :: { Paint }
+
+-- Packed dirt under each building, a stud or two past its walls, so the
+-- engine's grass (Terrain.Decoration grows on Grass) never pokes up through
+-- a shop floor or hides its front (TER-02). The sawmill stands on the
+-- MillYard. TerrainGen paints these after TownPaint.
+WorldLayout.TownFloors = {
+	{ name = "ToolShedFloor", x0 = -73.5, x1 = -38.5, z0 = 88.5, z1 = 119.5, material = "Ground" },
+	{ name = "HearthAndHomeFloor", x0 = -110.5, x1 = -74, z0 = 88.5, z1 = 120.5, material = "Ground" },
+	{ name = "DealershipFloor", x0 = 35, x1 = 69.5, z0 = 89, z1 = 118, material = "Ground" },
+	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
 } :: { Paint }
 
 -- The river runs from the pool under the Aether Isles' waterfall, south

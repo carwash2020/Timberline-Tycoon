@@ -463,6 +463,11 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 				return paint.material
 			end
 		end
+		for _, floor in ipairs(WorldLayout.TownFloors) do
+			if x > floor.x0 - wobble and x < floor.x1 + wobble and z > floor.z0 - wobble and z < floor.z1 + wobble then
+				return floor.material
+			end
+		end
 	end
 	if onRoad > 0 then
 		return "Ground"
