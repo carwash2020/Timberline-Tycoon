@@ -42,7 +42,7 @@ return function(t)
 			table.insert(toasts, message)
 		end, function()
 			return clock.now
-		end)
+		end, options.loop)
 		Daily.Start(player, profile)
 		return {
 			Daily = Daily,
@@ -265,5 +265,175 @@ return function(t)
 			t.eq(#profile.daily.goals, 3, "new goals either way")
 			t.eq(toasts, if done then { "New daily goals are in!" } else {}, "tutorial done: " .. tostring(done))
 		end
+	end)
+
+	---------------------------------------------------------------------------
+	-- The v2 loop: Init with loop 2 (GameServer passes CoreLoop.Active())
+	---------------------------------------------------------------------------
+
+	-- Does whatever finishes each of today's v2 goals: the chop path and
+	-- ForestService through Event, sales through WoodSold.
+	local function finishAllV2(s)
+		local MIN = s.DailyData.MinPieceVolumeV2
+		for _, goal in ipairs(s.profile.daily.goals) do
+			if goal.kind == "fellTrees" then
+				s.Daily.Event(s.player, "treeFelled", goal.target)
+			elseif goal.kind == "plantSeeds" then
+				s.Daily.Event(s.player, "seedPlanted", goal.target)
+			elseif goal.kind == "sellVolume" then
+				s.Daily.WoodSold(s.player, { volume = goal.target })
+			elseif goal.kind == "earnCash" then
+				s.Daily.WoodSold(s.player, { cash = goal.target })
+			elseif goal.kind == "sellWoodVolume" then
+				s.Daily.WoodSold(s.player, { byWood = { [goal.wood] = goal.target } })
+			elseif goal.kind == "sellPieces" then
+				local pieces = {}
+				for i = 1, goal.target do
+					pieces[i] = MIN
+				end
+				s.Daily.WoodSold(s.player, { pieces = pieces })
+			elseif goal.kind == "sellFiguredVolume" then
+				s.Daily.WoodSold(s.player, { figured = goal.target })
+			else
+				error("not a v2 goal: " .. goal.kind)
+			end
+		end
+	end
+
+	t.test("v2: joining rolls today's goals from the v2 pool, sized by the v2 tiers", function()
+		local s = setup({ loop = 2, tier = 3 })
+		t.eq(#s.profile.daily.goals, 3)
+		for _, goal in ipairs(s.profile.daily.goals) do
+			t.ok(table.find(s.DailyData.KindsV2, goal.kind) ~= nil, goal.kind)
+			t.eq(goal.reward, s.DailyData.TiersV2[3].reward)
+		end
+		t.eq(s.profile.daily.goals, s.DailyData.Roll(42, 20000, 3, 2), "the v2 roll")
+		t.eq(s.DailyData.Decode(s.player.attrs.DailyGoals), s.profile.daily.goals)
+		local v1 = setup({ tier = 3 })
+		t.eq(v1.profile.daily.goals, v1.DailyData.Roll(42, 20000, 3), "without a loop: v1's, as before")
+	end)
+
+	t.test("v2: today's v1 goals roll again on join, and the streak holds", function()
+		local DailyData = t.shared("DailyData")
+		local v1Goals = DailyData.Roll(42, 20000, 1)
+		v1Goals[1].progress = 2
+		local daily = { day = 20000, goals = v1Goals, streak = 4, bestStreak = 6, lastCompleteDay = 19999 }
+		local s = setup({ loop = 2, daily = daily })
+		t.eq(s.profile.daily.day, 20000)
+		t.eq(s.profile.daily.goals, DailyData.Roll(42, 20000, 1, 2), "rolled from the v2 pool")
+		t.eq(s.profile.daily.streak, 4, "yesterday's streak holds")
+		t.eq(s.profile.daily.bestStreak, 6)
+		-- A v2 day on a v2 server stays as it is.
+		s.profile.daily.goals[1].progress = 1
+		local again = setup({ loop = 2, daily = s.profile.daily })
+		t.eq(again.profile.daily.goals[1].progress, 1, "progress kept")
+		-- And a rollback: a v2 day on a v1 server rolls v1 goals.
+		local back = setup({ daily = s.profile.daily })
+		t.eq(back.profile.daily.goals, DailyData.Roll(42, 20000, 1))
+		t.eq(back.profile.daily.streak, 4)
+	end)
+
+	t.test("v2: every goal finishes on the v2 events; each pays, then the v2 bonus", function()
+		local kinds = {}
+		for userId = 1, 40 do
+			local s = setup({ loop = 2, userId = userId })
+			for _, goal in ipairs(s.profile.daily.goals) do
+				kinds[goal.kind] = true
+			end
+			finishAllV2(s)
+			for _, goal in ipairs(s.profile.daily.goals) do
+				t.ok(goal.done, goal.kind)
+				t.eq(goal.progress, goal.target)
+			end
+			local rewards = 3 * s.DailyData.TiersV2[1].reward
+			t.eq(s.profile.cash, rewards + s.DailyData.Bonus(1, 1, 2), "v2 rewards and bonus")
+			t.eq(s.profile.daily.streak, 1)
+			t.ok(string.find(s.toasts[#s.toasts], "All daily goals done") ~= nil)
+		end
+		for _, kind in ipairs(t.shared("DailyData").KindsV2) do
+			t.ok(kinds[kind], kind .. " comes up across 40 players")
+		end
+	end)
+
+	t.test("v2: a sale counts toward each goal by what it measures", function()
+		local found = 0
+		for userId = 1, 60 do
+			local s = setup({ loop = 2, userId = userId })
+			local before = {}
+			for i, goal in ipairs(s.profile.daily.goals) do
+				before[i] = goal.progress
+			end
+			local wood = nil
+			for _, goal in ipairs(s.profile.daily.goals) do
+				wood = wood or goal.wood
+			end
+			local other = if wood == "oak" then "birch" else "oak"
+			s.Daily.WoodSold(s.player, {
+				volume = 3.5,
+				cash = 7,
+				byWood = { [other] = 3.5 },
+				pieces = { 0.4, 1, 2.1 },
+				figured = 0,
+			})
+			for i, goal in ipairs(s.profile.daily.goals) do
+				local gained = goal.progress - before[i]
+				if goal.kind == "sellVolume" then
+					t.eq(gained, 3.5, "u³, kept unrounded in the save")
+				elseif goal.kind == "earnCash" then
+					t.eq(gained, 7)
+				elseif goal.kind == "sellPieces" then
+					t.eq(gained, 2, "pieces of 1 u³ or more")
+				else
+					t.eq(gained, 0, goal.kind .. ": not this sale's wood, no figure, not a sale")
+				end
+				found += 1
+			end
+		end
+		t.ok(found > 0)
+	end)
+
+	t.test("v2: v1 events count for nothing under v2, and v2 sales nothing under v1", function()
+		for userId = 1, 30 do
+			local s = setup({ loop = 2, userId = userId })
+			s.Daily.Event(s.player, "logsSold", 9, { oak = 9, birch = 9, pine = 9 }, 500)
+			s.Daily.Event(s.player, "logsLoaded", 9)
+			s.Daily.Event(s.player, "figuredSold", 9)
+			for _, goal in ipairs(s.profile.daily.goals) do
+				t.eq(goal.progress, 0, goal.kind)
+			end
+			local v1 = setup({ userId = userId })
+			v1.Daily.WoodSold(v1.player, { volume = 99, cash = 999, pieces = { 5, 5, 5 }, figured = 9 })
+			for _, goal in ipairs(v1.profile.daily.goals) do
+				t.eq(goal.progress, 0, "v1 " .. goal.kind)
+			end
+		end
+	end)
+
+	t.test("v2: the attribute shows whole units; the save keeps the fraction", function()
+		for userId = 1, 60 do
+			local s = setup({ loop = 2, userId = userId })
+			for _, goal in ipairs(s.profile.daily.goals) do
+				if goal.kind == "sellVolume" then
+					s.Daily.WoodSold(s.player, { volume = 2.6 })
+					s.Daily.WoodSold(s.player, { volume = 2.6 })
+					t.eq(goal.progress, 5.2)
+					local shown = s.DailyData.Decode(s.player.attrs.DailyGoals)
+					for _, g in ipairs(shown) do
+						if g.kind == "sellVolume" then
+							t.eq(g.progress, 5)
+						end
+					end
+					return
+				end
+			end
+		end
+		error("no sellVolume goal in 60 players")
+	end)
+
+	t.test("v2: quiet during the tutorial, as v1", function()
+		local s = setup({ loop = 2, tutorialDone = false })
+		finishAllV2(s)
+		t.eq(s.toasts, {})
+		t.eq(s.profile.daily.streak, 1)
 	end)
 end

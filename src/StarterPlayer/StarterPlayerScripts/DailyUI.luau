@@ -12,10 +12,14 @@
 --     It has no buttons, so nothing is selected: you can still walk.
 -- The server owns progress: it sets the DailyGoals, DailyStreak and
 -- DailyResetAt attributes, and this redraws from them.
+-- Under the v2 core loop (CoreLoop.Active()) a goal's progress reads in
+-- its units (DailyData.ProgressText: "(12/40 u³)", "($23/$60)") and the
+-- bonus is the v2 one (DailyData.Bonus with the loop).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
@@ -109,13 +113,15 @@ local function refresh()
 		b.Text = HudRules.DailyLabel(done, #list, streak(), UITheme.IsPhone())
 		b.BackgroundColor3 = if done == #list and #list > 0 then GREEN else BARK
 	end
+	local loop = CoreLoop.Active()
 	for i, row in ipairs(goalRows) do
 		local goal = list[i]
 		row.frame.Visible = goal ~= nil
 		if goal then
-			row.text.Text = (if goal.done then "✓ " else "")
-				.. DailyData.GoalText(goal)
-				.. string.format("  (%d/%d)", goal.progress, goal.target)
+			local progress = if loop == 2
+				then "  " .. DailyData.ProgressText(goal)
+				else string.format("  (%d/%d)", goal.progress, goal.target)
+			row.text.Text = (if goal.done then "✓ " else "") .. DailyData.GoalText(goal) .. progress
 			row.reward.Text = "+" .. Util.formatCash(goal.reward)
 			row.fill.Size = UDim2.fromScale(math.clamp(goal.progress / math.max(1, goal.target), 0, 1), 1)
 			row.fill.BackgroundColor3 = if goal.done then GREEN else AMBER
@@ -131,7 +137,7 @@ local function refresh()
 			else string.format(
 				"Finish all %d for a bonus of %s (%d-day streak).",
 				#list,
-				Util.formatCash(DailyData.Bonus(bestAxeTier(), nextStreak)),
+				Util.formatCash(DailyData.Bonus(bestAxeTier(), nextStreak, if loop == 2 then 2 else nil)),
 				nextStreak
 			)
 	end
