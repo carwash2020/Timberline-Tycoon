@@ -19,7 +19,10 @@
 --   * the hoppers' boxes fit BuildingArt's chute and forge;
 --   * the Starfall Forge takes plain lumenwood's u³ up to the recipe (60)
 --     and refuses other woods, figured wood and wood past the recipe;
---     "Forge" spends forgeWood and never touches forgeLogs.
+--     "Forge" spends forgeWood and never touches forgeLogs;
+--   * wood that falls off the isles is lost to the clouds (one toast to its
+--     owner); wood that never was on them isn't; a cloak wearer dragging a
+--     piece glides down with it.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
@@ -52,6 +55,7 @@ return function(t)
 			profiles = {},
 			players = {},
 			online = { [1] = true, [2] = true },
+			held = {},
 		}
 		local FakeInstance = setmetatable({
 			new = function(className, ...)
@@ -247,6 +251,9 @@ return function(t)
 		Aether.InitV2({
 			woodFolder = folder,
 			skyBin = if options.noBin then nil else bin,
+			heldBy = function(model)
+				return s.held[model]
+			end,
 			resolve = function(model)
 				return s.records[model]
 			end,
@@ -586,5 +593,78 @@ return function(t)
 		t.eq(toastsFor(s, 1), {
 			"Lay plain Lumenwood on the forge to feed it. Lumenwood 18/60 u³ · Sky Shards 5/12 · $60,000",
 		})
+	end)
+
+	-- The isles (BiomeData sky.area): x -1050, z 1050, y 650; the deck is 40
+	-- over that (690), and falling off is 40 under the deck (650).
+	local ISLE = Vector3.new(-1050, 700, 1050)
+
+	t.test("wood that falls off the isles is lost to the clouds, with one toast to its owner", function()
+		local s = setup()
+		local m, part = s.piece("a", 1, "lumenwood", 12, nil, ISLE)
+		s.A.FallTick()
+		t.ok(not s.gone(m), "on the isle")
+		part.CFrame = CFrame.new(ISLE - Vector3.new(0, 30, 0)) -- falling, not yet gone
+		s.A.FallTick()
+		t.ok(not s.gone(m))
+		part.CFrame = CFrame.new(ISLE - Vector3.new(0, 55, 0))
+		s.A.FallTick()
+		t.ok(s.gone(m), "lost to the clouds")
+		t.eq(s.released, { m })
+		t.eq(s.forgotten, { m })
+		t.eq(toastsFor(s, 1), { "Your Lumenwood log fell off the isles: lost to the clouds." })
+		-- Two at once: one toast.
+		local a, pa = s.piece("b", 2, "lumenwood", 3, nil, ISLE + Vector3.new(60, 0, 0))
+		local b, pb = s.piece("c", 2, "maple", 3, { Kind = "plank" }, ISLE + Vector3.new(-60, 0, 0))
+		s.A.FallTick()
+		pa.CFrame = CFrame.new(ISLE + Vector3.new(80, -300, 0))
+		pb.CFrame = CFrame.new(ISLE + Vector3.new(-80, -300, 0))
+		s.A.FallTick()
+		t.ok(s.gone(a) and s.gone(b))
+		t.eq(toastsFor(s, 2), { "2 pieces of your wood fell off the isles: lost to the clouds." })
+	end)
+
+	t.test("wood that never was on the isles, or left them some other way, isn't lost", function()
+		local s = setup()
+		local below = s.piece("a", 1, "oak", 4, nil, Vector3.new(-1050, 20, 1050)) -- the ground under the isles
+		s.A.FallTick()
+		s.A.FallTick()
+		t.ok(not s.gone(below))
+		local m, part = s.piece("b", 1, "lumenwood", 4, nil, ISLE)
+		s.A.FallTick()
+		part.CFrame = CFrame.new(0, 3, 40) -- teleported to town (a respawn's /spawnwood, say)
+		s.A.FallTick()
+		part.CFrame = CFrame.new(-1050, 20, 1050)
+		s.A.FallTick()
+		t.ok(not s.gone(m), "not watched once it left sideways")
+		local unknown = s.piece("c", 1, "lumenwood", 4, nil, ISLE)
+		s.A.FallTick()
+		s.records[unknown] = nil
+		unknown.PrimaryPart.CFrame = CFrame.new(ISLE - Vector3.new(0, 80, 0))
+		s.A.FallTick()
+		t.ok(not s.gone(unknown), "only pieces with a record")
+		t.eq(#s.toasts, 0)
+	end)
+
+	t.test("a piece dragged by a cloak wearer glides down with them; without the cloak it's lost", function()
+		local s = setup()
+		local p1 = s.player(1)
+		table.insert(s.profiles[1].gear, "FeatherfallCloak")
+		local m, part = s.piece("a", 1, "lumenwood", 4, nil, ISLE)
+		s.held[m] = p1
+		s.A.FallTick()
+		part.CFrame = CFrame.new(ISLE - Vector3.new(0, 30, 0)) -- 20 under the deck: past GLIDE_BELOW (15), not yet FALL_BELOW (40)
+		s.A.FallTick()
+		part.CFrame = CFrame.new(-1050, 20, 1050) -- landed
+		s.held[m] = nil
+		s.A.FallTick()
+		t.ok(not s.gone(m), "glided down")
+		local p2 = s.player(2)
+		local n, pn = s.piece("b", 2, "lumenwood", 4, nil, ISLE)
+		s.held[n] = p2 -- no cloak
+		s.A.FallTick()
+		pn.CFrame = CFrame.new(ISLE - Vector3.new(0, 60, 0))
+		s.A.FallTick()
+		t.ok(s.gone(n), "lost")
 	end)
 end

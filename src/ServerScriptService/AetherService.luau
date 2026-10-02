@@ -39,6 +39,11 @@
 --     spends forgeWood; forgeLogs is never touched under v2 (a rollback to
 --     v1 keeps it). Its "Add lumenwood" prompt says how far along it is.
 --     Mirrored on the ForgeWood attribute (whole u³ by wood id).
+--   * Falling off: nobody has logs in hand; instead a Wood piece that was
+--     on the isles and drops FALL_BELOW under the deck near them is lost to
+--     the clouds (let go of, forgotten, destroyed; one toast to its owner),
+--     unless someone wearing the Featherfall Cloak is dragging it: it
+--     glides down with them. The cloak's glide for players is as in v1.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local CollectionService = game:GetService("CollectionService")
@@ -52,6 +57,7 @@ local ForgeLogic = require(ReplicatedStorage.Shared.ForgeLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local AxeService = require(script.Parent.AxeService)
 local CarryService = require(script.Parent.CarryService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -72,6 +78,7 @@ export type V2Deps = {
 	release: (Model) -> (), -- lets go of a held piece before it goes
 	forget: (Model) -> (), -- drops it from the registries
 	skyBin: BasePart?, -- SellArea's SkyBin by the pad: its "Sell Sky Bin" prompt
+	heldBy: ((Model) -> Player?)?, -- who's dragging a piece (a cloak wearer glides down with it)
 	-- Seams for the specs: what's in a box, the clock, who's online.
 	partsInBox: ((CFrame, Vector3, Instance) -> { BasePart })?,
 	now: (() -> number)?,
@@ -107,6 +114,7 @@ local v2: V2Deps? = nil -- set by InitV2: the v2 loop runs
 local hoppers: { Hopper } = {}
 local relabel: { PromptText } = {} -- prompts whose text differs under v2
 local refusedAt: { [Player]: { [string]: number } } = {}
+local woodOnIsles: { [Model]: boolean } = {} -- pieces seen on the isles (FallTick)
 
 local function sky(): BiomeData.BiomeDef
 	return BiomeData.Get("sky") :: BiomeData.BiomeDef
@@ -770,6 +778,81 @@ local function tick()
 	end
 end
 
+-- What a lost piece is called in its owner's toast: "Lumenwood log".
+local function pieceName(model: Model): string
+	local wood = WoodData.Get(attrString(model, "WoodId") or "")
+	local kind = if model:GetAttribute("Kind") == "plank" then "plank" else "log"
+	return (if wood then wood.displayName else "wood") .. " " .. kind
+end
+
+-- One look at the loose wood under v2 (with the hoppers, every 0.25 s): a
+-- piece seen on the isles that then drops FALL_BELOW under the deck while
+-- still near them is lost to the clouds. Gone further sideways first (a
+-- teleport), or dragged by a cloak wearer once under GLIDE_BELOW, it's
+-- not watched any more. Wood never on the isles (the ground under them)
+-- is never touched.
+function AetherService.FallTick()
+	local d = v2
+	local area = sky().area
+	if not d or not area then
+		return
+	end
+	local deck = (area.y or 0) + DECK_ABOVE_AREA
+	local find: (number) -> Player? = d.player or playerById
+	local lost: { [Player]: { string } } = {}
+	local order: { Player } = {}
+	for _, child in ipairs(d.woodFolder:GetChildren()) do
+		local root = if child:IsA("Model") and child:HasTag(SellService.Tag) then child.PrimaryPart else nil
+		if not root then
+			continue
+		end
+		local model = child :: Model
+		local pos = root.CFrame.Position
+		local dx, dz = pos.X - area.x, pos.Z - area.z
+		local flat2 = dx * dx + dz * dz
+		if flat2 <= (area.radius + 30) ^ 2 and pos.Y >= deck - 5 then
+			woodOnIsles[model] = true
+		elseif woodOnIsles[model] then
+			local holder = if d.heldBy then d.heldBy(model) else nil
+			local gliding = holder ~= nil and pos.Y < deck - GLIDE_BELOW and hasCloak(holder)
+			if flat2 > (area.radius + NEAR) ^ 2 or gliding then
+				woodOnIsles[model] = nil -- gone some other way, or down with a cloak wearer
+			elseif pos.Y < deck - FALL_BELOW then
+				woodOnIsles[model] = nil
+				local piece = d.resolve(model)
+				if piece and not piece.selling and not piece.dead and not piece.shopItem then
+					local owner = if piece.ownerId ~= 0 then find(piece.ownerId) else nil
+					if owner then
+						if lost[owner] == nil then
+							lost[owner] = {}
+							table.insert(order, owner)
+						end
+						table.insert(lost[owner], pieceName(model))
+					end
+					piece.selling = true
+					d.release(model)
+					d.forget(model)
+					model:Destroy()
+				end
+			end
+		end
+	end
+	for model in pairs(woodOnIsles) do
+		if model.Parent == nil then
+			woodOnIsles[model] = nil
+		end
+	end
+	for _, owner in ipairs(order) do
+		local names = lost[owner]
+		notify(
+			owner,
+			if #names == 1
+				then string.format("Your %s fell off the isles: lost to the clouds.", names[1])
+				else string.format("%d pieces of your wood fell off the isles: lost to the clouds.", #names)
+		)
+	end
+end
+
 -- Call once the save has loaded.
 function AetherService.PlayerJoined(player: Player, profile: Profile)
 	publish(player, profile)
@@ -860,10 +943,11 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 			if v2 then
 				local ok, err = pcall(function(): any
 					AetherService.HopperTick()
+					AetherService.FallTick()
 					return nil
 				end)
 				if not ok then
-					warn("[AetherService] hopper tick failed: " .. tostring(err))
+					warn("[AetherService] v2 tick failed: " .. tostring(err))
 				end
 			end
 		end
