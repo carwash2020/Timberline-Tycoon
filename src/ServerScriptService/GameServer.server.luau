@@ -25,6 +25,7 @@ local FieldGuideService = require(script.Parent.FieldGuideService)
 local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
+local SellService = require(script.Parent.SellService)
 local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
@@ -555,6 +556,32 @@ safely("NPCService.Init", NPCService.Init, mapFolder)
 if CoreLoop.V2() then
 	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
 	safely("DevCommands.Init", DevCommands.Init, notify)
+	-- The sell pad sells loose wood by volume (M1.7).
+	local woodFolder = mapFolder:FindFirstChild("Wood")
+	if not woodFolder then
+		local made = Instance.new("Folder")
+		made.Name = "Wood"
+		made.Parent = mapFolder
+		woodFolder = made
+	end
+	safely("SellService.Init", SellService.Init, {
+		zone = sellZone,
+		woodFolder = woodFolder :: Instance,
+		resolve = function(model: Model): SellService.Piece?
+			local root = model.PrimaryPart
+			local piece = if root then GrabService.PieceOf(root) else nil
+			return piece :: any
+		end,
+		addCash = function(player: Player, amount: number, reason: string, sku: string)
+			EconomyService.AddCash(player, amount, reason, sku)
+		end,
+		saleMultiplier = MonetizationService.SaleMultiplier,
+		notify = notify,
+		release = function(model: Model)
+			GrabService.ReleasePiece(model, "sold")
+		end,
+		forget = GrabService.Unregister,
+	})
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)

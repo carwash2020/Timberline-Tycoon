@@ -161,6 +161,12 @@ function GrabService.SetResolver(fn: ((BasePart) -> Piece?)?)
 	resolve = fn or registered
 end
 
+-- The piece `part` belongs to, through the current resolver (SellService
+-- and TruckLoad find pieces this way), or nil.
+function GrabService.PieceOf(part: BasePart): Piece?
+	return resolve(part)
+end
+
 -- A piece GrabService knows without WoodService (Studio's /spawnwood).
 function GrabService.Register(piece: Piece)
 	registry[piece.model] = piece
