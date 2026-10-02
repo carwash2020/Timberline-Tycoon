@@ -34,8 +34,8 @@
 --     Attachment "ExhaustOut" (its +Y points out of the pipe) and a "Smoke"
 --     attribute (how smoky: 1 = the Rustbucket).
 --   * Wheels: a part "Wheel" per wheel (a cylinder along X, the tyre) with
---     attributes Radius, Steer (front wheels) and Rear; its rim and hub are
---     its children. Rig joins each Wheel to the chassis with a Motor6D
+--     attributes Radius, Steer (front wheels) and Rear; its rim, hub cap and
+--     bolt are its children. Rig joins each Wheel to the chassis with a Motor6D
 --     "Axle" (so clients can spin and steer it through Transform).
 --   * Only the chassis, skids, bed floors and bed walls collide (CanTouch
 --     off); everything else is decoration (Kit.decor). Nothing near the
@@ -260,9 +260,13 @@ local function fender(parent: Instance, x: number, z0: number, z1: number, s: Fe
 	)
 end
 
--- A wheel: the tyre (named "Wheel", the part Rig motors) with its rim and a
--- square hub as children, so the whole wheel spins as one. The hub's
--- corners make the spin readable.
+-- A wheel: the tyre (named "Wheel", the part Rig motors) with its rim and,
+-- when the style has a hub colour, a round hub cap and one bolt off its
+-- centre as children, so the whole wheel spins as one. The dark bolt on the
+-- pale rim makes the spin readable.
+local HUB_CAP = 0.42 -- the cap's diameter, times the tyre's radius
+local HUB_BOLT = 0.14 -- the bolt's diameter, times the radius
+local HUB_BOLT_AT = 0.36 -- the bolt's centre out from the axle, times the radius
 type WheelStyle = {
 	rim: Color3,
 	rimMaterial: Enum.Material?,
@@ -281,8 +285,8 @@ local function wheel(parent: Instance, center: Vector3, r: number, w: number, s:
 	tyre:SetAttribute("Rear", s.rear)
 	decoCyl(tyre, "Rim", w + 0.06, r * 2 * (s.rimScale or 0.6), cf, s.rim, s.rimMaterial or M.Metal)
 	if s.hub then
-		local h = r * 0.5
-		deco(tyre, "Hub", V3(w + 0.16, h, h), cf * CFrame.Angles(math.rad(45), 0, 0), s.hub, M.Metal)
+		decoCyl(tyre, "Hub", w + 0.12, r * HUB_CAP, cf, s.hub, M.Metal)
+		decoCyl(tyre, "HubBolt", w + 0.16, r * HUB_BOLT, cf * CF(0, r * HUB_BOLT_AT, 0), BLACK, M.Metal)
 	end
 	return tyre
 end
