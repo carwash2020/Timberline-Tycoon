@@ -300,6 +300,36 @@ local function roadWeight(x: number, z: number): (number, number)
 	return best, onRoad
 end
 
+-- The haul roads' gravel (STY-02): out in the country each haul road is a
+-- pale gravel crown (TerrainGen.GravelMaterial, a terrain material nothing
+-- else uses) between dirt verges GRAVEL_VERGE studs wide; in town and the
+-- plot district every road stays dirt. Material only: no height reads it.
+TerrainGen.HaulRoads = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
+TerrainGen.GravelMaterial = "Pavement"
+local GRAVEL_VERGE = 3 -- studs of dirt each side of the gravel
+local GRAVEL_LEAST = 3.5 -- the narrowest the gravel's half gets (the 12-wide Skyroot Road)
+TerrainGen.GravelVerge = GRAVEL_VERGE
+TerrainGen.GravelLeast = GRAVEL_LEAST
+local HAUL: { FastRoad } = {}
+for _, road in ipairs(WorldLayout.Roads) do
+	if table.find(TerrainGen.HaulRoads, road.name) then
+		table.insert(HAUL, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
+	end
+end
+
+-- Whether (x, z) is on a haul road's gravel crown (its edge frayed a
+-- little, as the dirt's is).
+local function onGravel(x: number, z: number): boolean
+	for _, road in ipairs(HAUL) do
+		local half = math.max(road.half - GRAVEL_VERGE, GRAVEL_LEAST)
+		local d = WorldLayout.FastDistance(road.line, x, z, half + 1)
+		if d < half + noise(x / 7, z / 7, 8.2) * 0.8 then
+			return true
+		end
+	end
+	return false
+end
+
 -- How far (x, z) is from the edge of the nearest road (negative = on it).
 function TerrainGen.RoadClearance(x: number, z: number): number
 	local best = math.huge
@@ -470,6 +500,11 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		end
 	end
 	if onRoad > 0 then
+		-- Out in the country a haul road's crown is gravel (STY-02), fraying
+		-- into dirt where the town's flat ground begins.
+		if flat < 0.35 + 0.2 * dither(x, z) and onGravel(x, z) then
+			return TerrainGen.GravelMaterial
+		end
 		return "Ground"
 	end
 	local lot = WorldLayout.ParkingLot
@@ -597,6 +632,7 @@ TerrainGen.MaterialColors = {
 	Slate = Color3.fromRGB(74, 66, 62),
 	CrackedLava = Color3.fromRGB(255, 108, 30),
 	Cobblestone = Color3.fromRGB(170, 160, 146),
+	Pavement = Color3.fromRGB(182, 174, 158), -- the haul roads' pale gravel (GravelMaterial, STY-02)
 } :: { [string]: Color3 }
 
 -- What lies under a surface material (cliff faces, the voxels below).
