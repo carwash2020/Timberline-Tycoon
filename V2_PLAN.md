@@ -14,7 +14,7 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | M1.7a SellLogic, M1.7 SellService (sells /spawnwood pieces) | on main, dormant | 5aee212, ccc882a |
 | M1.8a v2 tutorial, hints, HUD rules, dailies, guide, shop data | on main, dormant | 2da706e |
 | M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | on main, dormant | e444b1b |
-| M1.5 bigger trucks, lot, pad zone (lands live) | in progress | |
+| M1.5 bigger trucks, lot, pad zone (LIVE) | on main | 0077061 |
 | M1.8b wiring the tutorial, dailies, shop, guide, HUD | in progress | |
 | M1.3 cut anywhere (SectionTrees, WoodService, CutController, WoodFX) | in progress | |
 | M1.6 trucks by friction, M1.9 flip, M1.10 cleanup | next | |
@@ -667,6 +667,8 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 - `MapBuilder.spec`, `PreviewCameras.spec`.
 
 **Renders:** trucks 1, 3, 6, 8, 9, 10, plus a new view with a seated R15 dummy (hats) in each cab and sections view 7 (logs on beds); town 1, 2, 9; buildings 4 (Dealership display truck).
+
+**As built (M1.5):** Flatbed and Rig wheels are 1.4 and 1.75 (the plan's 1.45/1.8 cut into the open decks); the roads were NOT widened (widening moves the pinned first-322 trees and 472 of 775 trees; two rigs pass with outer wheels on the verges); TruckHome.ShowBeyond 20 -> 30; the lot is one row of 12 bays of 10 x 60 east of the spawn; SellZone 24 x 12 x 26 (z 69-95); BedZone comes with M1.6.
 
 ### 4d. What happens to CarryService, LeftLoad and the truck save
 

@@ -454,11 +454,11 @@ A split id (WLD-03, WLD-06, WLD-10, WLD-19) shows up as done once its first part
   - QuestUI.BeaconPaths (SellArea/SellZone, ToolShed/Counter).
 - SawBlade teeth stay welded and unanchored. Never re-anchor them.
 - The SellPad stays non-colliding and at most 0.25 tall. Its `ANG(0, PI, 0)` is what makes the text read upright.
-- ParkingSlot parts: VehicleService reads their CFrame, Size.Y, tag and Index. Restyle them, but don't remove or resize them.
+- ParkingSlot parts: VehicleService reads their CFrame, Size.Y, tag and Index. They are 10 x 60 (WorldPlan.ParkingSlotSize, M1.5), one row of 12. Restyle them, but keep that contract.
 - Leaves stay CanCollide false (Poppercam and trucks), and canopies stay CanQuery true (clicking leaves targets the tree).
 - Isle tops stay flat, colliding discs. New isle decor is non-colliding and honours `opts.clear`.
 - Gondola cable constants (GONDOLA_OUT, GONDOLA_RIM, CABLE_UP, CABLE_SIDE, CABLE_CLEAR) were just fixed and are covered by specs.
-- TruckArt: the Chassis is the only massive part besides the skids. The skids are frictionless with bottoms at y 0. DriverSeat is a direct child with CanCollide off. Only beds, walls and skids collide. Every truck fits a 6.5x37 slot.
+- TruckArt: the Chassis is the only massive part besides the skids. The skids are frictionless with bottoms at y 0. DriverSeat is a direct child with CanCollide off. Only beds, walls and skids collide. Every rig (truck + trailer) fits a 10 x 60 slot (M1.5; was 6.5 x 37).
 - AxeArt: Handle is the PrimaryPart, everything else is welded to it, and `AxeArt.Grip` is verified.
 - EnvironmentData's local `checkOverride` asserts that every override key exists. A typo errors at require time and kills the client's lighting.
 - DecorSpots must draw the same rng numbers per candidate, or every decor cell reshuffles.
