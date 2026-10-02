@@ -1627,6 +1627,47 @@ function BuildingArt.Signpost(text: string): Model
 	return model
 end
 
+-- The paint and lights on one parking bay (TWN-06). `slot` is MapBuilder's
+-- ParkingSlot part: VehicleService reads its tag, Index, CFrame and Size.Y,
+-- so it keeps all of those and only goes invisible here; the bay is drawn
+-- by looks-only children of it (no collide, query, touch or shadow), flat
+-- on the ground in the slot's own height band: a cream bay line down each
+-- side, a stop bar across the head (the -Z end, where the truck's nose
+-- points; it runs 1.5 past the slot's width, so a row of slots 8 apart
+-- reads as one bar), the bay's number painted just behind it (read from
+-- the driver's seat), and a lamp: a flat "LanternGlow" plate at the head
+-- that glows after dark (LightingController), with a second, invisible
+-- LanternGlow 3 studs over it holding the dim PointLight (built switched
+-- off), so the light falls on the ground instead of grazing along it.
+local BAY_PAINT = Color3.fromRGB(230, 222, 200)
+local BAY_LAMP_DAY = Color3.fromRGB(247, 217, 165) -- LightingController's daytime LanternGlow
+local BAY_LINE = 0.35
+function BuildingArt.ParkingBay(slot: BasePart, index: number)
+	slot.Transparency = 1
+	local cf, size = slot.CFrame, slot.Size
+	local hx, hz = size.X / 2, size.Z / 2
+	local function paint(name: string, partSize: Vector3, at: CFrame, color: Color3): Part
+		return Kit.decor(Kit.part(slot, name, partSize, cf * at, color, MAT.SmoothPlastic), false)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		paint("BayLine", V3(BAY_LINE, size.Y, size.Z), CF(s * (hx - BAY_LINE / 2), 0, 0), BAY_PAINT)
+	end
+	paint("StopBar", V3(size.X + 1.5, size.Y, 0.5), CF(0, 0, -hz + 0.25), BAY_PAINT)
+	local number = paint("BayNumber", V3(2.4, size.Y, 2), CF(0, 0, -hz + 3.6), BAY_PAINT)
+	number.Transparency = 1 -- only its painted digits show
+	Kit.signText(number, tostring(index), BAY_PAINT, { Enum.NormalId.Top })
+	paint("LanternGlow", V3(2.6, size.Y + 0.02, 0.7), CF(0, 0.01, -hz + 1.2), BAY_LAMP_DAY)
+	local holder = paint("LanternGlow", V3(0.2, 0.2, 0.2), CF(0, 3, -hz + 1.2), BAY_LAMP_DAY)
+	holder.Transparency = 1
+	local l = Instance.new("PointLight")
+	l.Color = Color3.fromRGB(255, 190, 120)
+	l.Range = 16
+	l.Brightness = 0.8
+	l.Shadows = false
+	l.Enabled = false -- LightingController switches it on at dusk
+	l.Parent = holder
+end
+
 -- A street lamp: a stone footing, a timber post, an iron arm reaching out
 -- toward -Z with a lantern hanging from it (lit; clients may switch the
 -- glow by time of day). The post collides. Named parts: "LampGlow" (the

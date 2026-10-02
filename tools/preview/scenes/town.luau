@@ -66,6 +66,7 @@ return {
 			)
 			slot.CanCollide = false
 			slot.CastShadow = false
+			BuildingArt.ParkingBay(slot, index)
 		end
 		for _, fence in ipairs(town.fences) do
 			place(BuildingArt.Fence(fence.length), fence.cframe)
@@ -119,6 +120,7 @@ return {
 				{ pos = { 80, 14, 24 }, target = { 0, 9, 100 }, label = "from the lot" },
 				{ pos = { 0, 260, 90 }, target = { 0, 0, 91 }, label = "top down" },
 				{ pos = { 2, 6.5, 32 }, target = { 0, 9, 110 }, label = "the spawn walk at night", night = true },
+				{ pos = { 80, 14, 24 }, target = { 40, 0, 30 }, label = "the lot at night", night = true },
 			},
 		}
 	end,

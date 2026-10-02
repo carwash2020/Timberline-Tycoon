@@ -185,6 +185,67 @@ return function(t)
 		end
 	end)
 
+	t.test("a parking bay (TWN-06): the slot keeps its contract; lines, a stop bar, its number, a dim lamp", function()
+		local Kit = loader:load("ReplicatedStorage/Shared/Art/Kit")
+		local Enum = roblox.Enum
+		local cf = roblox.CFrame.new(40, 0.1, 45)
+		local size = V3.new(6.5, 0.2, 37)
+		local slot = Kit.part(roblox.Instance.new("Folder"), "ParkingSlot_7", size, cf, C3.fromRGB(186, 168, 140))
+		slot.CanCollide = false
+		BuildingArt.ParkingBay(slot, 7)
+		-- What VehicleService reads is untouched; only the look changes.
+		t.ok(
+			near(slot.CFrame.Position, cf.Position) and slot.CFrame.LookVector:Dot(cf.LookVector) > 0.9999,
+			"the slot keeps its CFrame"
+		)
+		t.ok(near(slot.Size, size), "the slot keeps its size")
+		t.eq(slot.Transparency, 1)
+		t.ok(not slot.CanCollide, "the slot still doesn't collide")
+		local named, lights = {}, {}
+		for _, d in ipairs(slot:GetDescendants()) do
+			if d:IsA("BasePart") then
+				named[d.Name] = (named[d.Name] or 0) + 1
+				t.ok(
+					not d.CanCollide and not d.CanQuery and not d.CanTouch and not d.CastShadow,
+					d.Name .. " is looks-only"
+				)
+				-- Inside the bay (the stop bar runs 0.75 past each side), not
+				-- under the ground, and flat but for the lamp's light holder.
+				local local_ = cf:PointToObjectSpace(d.CFrame.Position)
+				local lo, hi = bounds(d)
+				t.ok(math.abs(local_.X) <= 4 + 1e-3 and math.abs(local_.Z) <= 18.5, d.Name .. " is in the bay")
+				t.ok(lo.Y >= -1e-3, d.Name .. " is above the ground")
+				if d.Transparency < 1 then
+					t.ok(hi.Y <= 0.25, d.Name .. " is flat paint")
+				end
+			elseif d:IsA("PointLight") then
+				table.insert(lights, d)
+			end
+		end
+		t.eq(named.BayLine, 2)
+		t.eq(named.StopBar, 1)
+		t.eq(named.BayNumber, 1)
+		t.eq(named.LanternGlow, 2) -- the glowing plate and the light's holder
+		for _, d in ipairs(slot:GetChildren()) do
+			if d.Name == "BayLine" then
+				t.ok(math.abs(d.Size.X - 0.35) < 1e-4, "bay lines are 0.35 wide")
+				t.eq(d.Color:ToHex(), C3.fromRGB(230, 222, 200):ToHex())
+				t.eq(d.Material, Enum.Material.SmoothPlastic)
+			elseif d.Name == "StopBar" then
+				t.ok(cf:PointToObjectSpace(d.CFrame.Position).Z < -17, "the stop bar is at the head (-Z)")
+			end
+		end
+		t.ok(texts(slot)["7"], "the bay's number is painted on")
+		-- One dim light, switched off until LightingController's dusk, in a
+		-- LanternGlow (the name that lights it at night).
+		t.eq(#lights, 1)
+		local l = lights[1]
+		t.eq(l.Parent.Name, "LanternGlow")
+		t.eq(l.Range, 16)
+		t.ok(math.abs(l.Brightness - 0.8) < 1e-4, "brightness 0.8")
+		t.ok(not l.Shadows and not l.Enabled, "no shadows, off by day")
+	end)
+
 	t.test("the sell pad: SellPad doesn't collide, nothing on it does or stands tall", function()
 		local art = BuildingArt.SellPad(24, 18)
 		local pad = find(art, "SellPad")

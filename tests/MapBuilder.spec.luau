@@ -242,6 +242,55 @@ return function(t)
 		end
 	end)
 
+	t.test("the parking lot: every ParkingSlot as VehicleService reads it, painted and lit (TWN-06)", function()
+		local s = build()
+		t.eq(#s.warnings, 0, table.concat(s.warnings, "\n"))
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local plan = WorldPlan.Town().parkingSlots
+		t.ok(#plan >= 24, "24 slots planned")
+		for index, cf in ipairs(plan) do
+			local slot = s.map:FindFirstChild("ParkingSlot_" .. index)
+			t.ok(slot and slot:IsA("BasePart"), "ParkingSlot_" .. index .. " is built")
+			t.ok(slot:HasTag("ParkingSlot"), "slot " .. index .. " is tagged")
+			t.eq(slot:GetAttribute("Index"), index)
+			t.ok(
+				(slot.CFrame.Position - cf.Position).Magnitude < 1e-3
+					and slot.CFrame.LookVector:Dot(cf.LookVector) > 0.9999,
+				"slot " .. index .. " sits where WorldPlan puts it"
+			)
+			t.ok(math.abs(slot.Size.Y - 0.2) < 1e-4 and math.abs(slot.Size.Z - 37) < 1e-4, "slot " .. index .. " size")
+			t.eq(slot.Transparency, 1)
+			local glows = 0
+			for _, d in ipairs(slot:GetDescendants()) do
+				if d:IsA("BasePart") then
+					t.ok(not d.CanCollide and not d.CanQuery, "slot " .. index .. "'s " .. d.Name .. " is looks-only")
+					if d.Name == "LanternGlow" then
+						glows += 1
+					end
+				end
+			end
+			t.ok(glows > 0, "slot " .. index .. " has its lamp")
+		end
+	end)
+
+	t.test("a broken parking-bay builder costs no slot: every ParkingSlot is still built and tagged", function()
+		local s = build({
+			buildingArt = {
+				ParkingBay = function()
+					error("x")
+				end,
+			},
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "4. The parking lot's lines and lamps", 1, true), s.warnings[1])
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		for index in ipairs(WorldPlan.Town().parkingSlots) do
+			local slot = s.map:FindFirstChild("ParkingSlot_" .. index)
+			t.ok(slot and slot:HasTag("ParkingSlot"), "ParkingSlot_" .. index)
+		end
+		lastStepsRan(s)
+	end)
+
 	t.test("the build line has the shape WLD-03 and the checklist read, and the stats are published", function()
 		local s = build()
 		local line = builtLine(s)
