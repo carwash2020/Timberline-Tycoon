@@ -363,4 +363,69 @@ function SellService._use(newDeps: Deps)
 	table.clear(firstSeen)
 end
 
+-- The Sky Bin's sale (M1.7b, AetherService's "Sell Sky Bin" prompt): pays
+-- `player` for the wood the Cloud Chutes sent down (SellLogic entries) as
+-- the pad pays for pieces: each entry by volume, wood, kind, figure and
+-- boost (SellLogic.EntryValue), 2x Cash once on the total, one AddCash,
+-- the same toast and the same onSold hook (the tutorial, the dailies and
+-- figure reveals count it as a pad sale). Entries that don't count
+-- (SellLogic.ValidEntry) are worth nothing. Returns the sale (0 pieces,
+-- nothing paid or said, when none counts), or nil before Init: the
+-- caller keeps its entries.
+function SellService.PayEntries(player: Player, entries: { SellLogic.Entry }): Sale?
+	local d = deps
+	if not d then
+		return nil
+	end
+	local sale: Sale = {
+		payee = player,
+		pieces = 0,
+		volume = 0,
+		value = 0,
+		paid = 0,
+		credited = 0,
+		figures = {},
+		woods = {},
+		pieceVolumes = {},
+		figured = 0,
+	}
+	for _, entry in ipairs(entries) do
+		if not SellLogic.ValidEntry(entry) then
+			continue
+		end
+		local figure = if type(entry.f) == "string" then entry.f else nil
+		sale.pieces += 1
+		sale.volume += entry.v
+		sale.value += SellLogic.EntryValue(entry)
+		sale.woods[entry.w] = (sale.woods[entry.w] or 0) + entry.v
+		table.insert(sale.pieceVolumes, entry.v)
+		if figure then
+			table.insert(sale.figures, figure)
+			sale.figured += entry.v
+		end
+	end
+	if sale.pieces == 0 then
+		return sale
+	end
+	sale.paid = SellLogic.Payout(sale.value, d.saleMultiplier(player))
+	if sale.paid > 0 then
+		local credited = d.addCash(player, sale.paid, "sold wood", "wood")
+		sale.credited = if type(credited) == "number" and credited == credited
+			then math.clamp(credited, 0, sale.paid)
+			else sale.paid
+	end
+	d.notify(player, SellLogic.SaleText(sale.pieces, sale.volume, sale.credited))
+	local onSold = d.onSold
+	if onSold then
+		local ok, err = pcall(function(): any
+			onSold(sale)
+			return nil
+		end)
+		if not ok then
+			warn("[SellService] onSold failed: " .. tostring(err))
+		end
+	end
+	return sale
+end
+
 return SellService

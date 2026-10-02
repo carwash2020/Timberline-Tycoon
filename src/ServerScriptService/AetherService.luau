@@ -15,6 +15,35 @@
 --     Starfall Burl), so figured logs can go down the chute too. The forge
 --     doesn't take them (they're worth more sold).
 -- Mirrored on the SkyBin (log count) and ForgeLogs attributes.
+--
+-- The v2 loop (V2_PLAN.md §5, M1.7b; GameServer calls InitV2 only under
+-- CoreLoop.V2()): nobody carries logs, so the chutes are hoppers. Wood
+-- that rests a moment (SellService.Settle) with its middle in a chute's
+-- hopper box (HopperZone: one box query over the Wood folder per chute
+-- every 0.25 s, as the sell pad does) goes down into its payee's Sky Bin
+-- (SellLogic.Payee: the owner, else the last holder, online) as a
+-- profile.skyWood entry (SellLogic.Entry: wood, u³, figure, plank, boost),
+-- up to the sky's skyBinVolume u³. A piece that won't fit is left where
+-- it is, with a toast now and then. The chute's prompt only says how it
+-- works and how full the bin is. Taking a piece is the pad's: the record
+-- marked selling, let go of, forgotten, destroyed. Mirrored on the
+-- SkyBinVolume attribute (u³ in the bin).
+--   * The Sky Bin by the sell pad gets a "Sell Sky Bin" prompt (from
+--     beside it, RateLimiter "SellSkyBin"): SellService.PayEntries pays the
+--     entries as the pad pays pieces, and the bin empties.
+--   * The Starfall Forge is a hopper too (the anvil and the hearth behind
+--     it): plain lumenwood laid there adds its u³ to its payee's
+--     profile.forgeWood, up to the recipe (ItemCatalog StarfallAxe
+--     v2.forgeWood, ForgeLogic.RecipeV2); other woods, figured wood and
+--     wood past the recipe are refused (ForgeLogic.RefusalV2). "Forge"
+--     spends forgeWood; forgeLogs is never touched under v2 (a rollback to
+--     v1 keeps it). Its "Add lumenwood" prompt says how far along it is.
+--     Mirrored on the ForgeWood attribute (whole u³ by wood id).
+--   * Falling off: nobody has logs in hand; instead a Wood piece that was
+--     on the isles and drops FALL_BELOW under the deck near them is lost to
+--     the clouds (let go of, forgotten, destroyed; one toast to its owner),
+--     unless someone wearing the Featherfall Cloak is dragging it: it
+--     glides down with them. The cloak's glide for players is as in v1.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local CollectionService = game:GetService("CollectionService")
@@ -26,7 +55,9 @@ local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ForgeLogic = require(ReplicatedStorage.Shared.ForgeLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local AxeService = require(script.Parent.AxeService)
 local CarryService = require(script.Parent.CarryService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -34,9 +65,25 @@ local NodeService = require(script.Parent.NodeService)
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local SellService = require(script.Parent.SellService)
 local TreeService = require(script.Parent.TreeService)
 
 type Profile = ProfileService.Profile
+type Piece = SellService.Piece
+
+-- What the v2 loop's hoppers need (GameServer, under CoreLoop.V2()).
+export type V2Deps = {
+	woodFolder: Instance, -- TimberlineMap/Wood: the loose pieces
+	resolve: (Model) -> Piece?, -- a piece's record (as SellService's resolve)
+	release: (Model) -> (), -- lets go of a held piece before it goes
+	forget: (Model) -> (), -- drops it from the registries
+	skyBin: BasePart?, -- SellArea's SkyBin by the pad: its "Sell Sky Bin" prompt
+	heldBy: ((Model) -> Player?)?, -- who's dragging a piece (a cloak wearer glides down with it)
+	-- Seams for the specs: what's in a box, the clock, who's online.
+	partsInBox: ((CFrame, Vector3, Instance) -> { BasePart })?,
+	now: (() -> number)?,
+	player: ((number) -> Player?)?,
+}
 
 local AetherService = {}
 
@@ -47,8 +94,27 @@ local GLIDE_BELOW = 15 -- studs under the deck where the cloak opens
 local FALL_BELOW = 40 -- studs under the deck that count as falling off
 local NEAR = 250 -- further than this from the isles (sideways) isn't a fall: a respawn or teleport
 
+local CHUTE_ZONE_HEIGHT = 6 -- studs above a chute's hopper box that count as in it
+-- The forge's hopper, in the anvil's space (BuildingArt.StarfallForge: the
+-- anvil's top part, 3 x 0.8 x 1.4; the hearth's 5.6 x 3.6 top 0.1 under
+-- the anvil's middle, 2.6-6.2 behind it): both tops, up 5 studs.
+local FORGE_ZONE_OFFSET = CFrame.new(0, 2.2, 2.3)
+local FORGE_ZONE_SIZE = Vector3.new(6.4, 5, 7.8)
+local PROMPT_RANGE = 10 -- every prompt here (ProximityPrompt.MaxActivationDistance)
+AetherService.RefuseToastSec = 4 -- at most one "won't fit" toast per player this often
+
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local onIsles: { [Player]: boolean } = {}
+
+type HopperKind = "chute" | "forge"
+type Hopper = { part: BasePart, kind: HopperKind, firstSeen: { [Model]: number } }
+type PromptText = { prompt: ProximityPrompt, v1: string, v2: string }
+
+local v2: V2Deps? = nil -- set by InitV2: the v2 loop runs
+local hoppers: { Hopper } = {}
+local relabel: { PromptText } = {} -- prompts whose text differs under v2
+local refusedAt: { [Player]: { [string]: number } } = {}
+local woodOnIsles: { [Model]: boolean } = {} -- pieces seen on the isles (FallTick)
 
 local function sky(): BiomeData.BiomeDef
 	return BiomeData.Get("sky") :: BiomeData.BiomeDef
@@ -58,9 +124,35 @@ local function binCapacity(): number
 	return sky().skyBinCapacity or 30
 end
 
+-- u³ the v2 Sky Bin holds at most.
+local function binVolume(): number
+	return sky().skyBinVolume or 120
+end
+
+-- u³ in the player's v2 Sky Bin.
+local function binUsed(profile: Profile): number
+	local _value, volume = SellLogic.EntriesValue(profile.skyWood)
+	return volume
+end
+
+local function round2(n: number): number
+	return math.floor(n * 100 + 0.5) / 100
+end
+
 local function publish(player: Player, profile: Profile)
 	player:SetAttribute("SkyBin", #profile.skyBin)
 	player:SetAttribute("ForgeLogs", ShopLogic.EncodeOwned(profile.forgeLogs))
+	if v2 then
+		player:SetAttribute("SkyBinVolume", round2(binUsed(profile)))
+		-- Whole u³ (EncodeOwned writes whole numbers), rounded down.
+		local whole: { [string]: number } = {}
+		for woodId, u3 in pairs(profile.forgeWood) do
+			if type(u3) == "number" and u3 == u3 and u3 < math.huge then
+				whole[woodId] = math.floor(u3)
+			end
+		end
+		player:SetAttribute("ForgeWood", ShopLogic.EncodeOwned(whole))
+	end
 end
 
 local function stockOf(profile: Profile): ForgeLogic.Stock
@@ -70,6 +162,15 @@ end
 local function recipe(): ItemCatalog.ForgeRecipe
 	local axe = ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef
 	return axe.forge :: ItemCatalog.ForgeRecipe
+end
+
+-- The v2 recipe: wood in u³ (ForgeLogic.RecipeV2).
+local function recipeV2(): ForgeLogic.RecipeV2?
+	return ForgeLogic.RecipeV2(ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef)
+end
+
+local function stockV2(profile: Profile): ForgeLogic.StockV2
+	return { cash = profile.cash, wood = profile.forgeWood, materials = profile.materials }
 end
 
 -- How many figured logs of these woods the player is holding.
@@ -134,6 +235,364 @@ function AetherService.TakeSkyBin(player: Player): { ProfileSchema.BedLog }
 	return out
 end
 
+---------------------------------------------------------------------------
+-- The v2 loop: hoppers (V2_PLAN.md §5)
+---------------------------------------------------------------------------
+
+local function playerById(userId: number): Player?
+	return Players:GetPlayerByUserId(userId)
+end
+
+local function defaultPartsInBox(cf: CFrame, size: Vector3, folder: Instance): { BasePart }
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { folder }
+	return workspace:GetPartBoundsInBox(cf, size, params)
+end
+
+-- The tagged Wood model a part belongs to (a few levels up at most).
+local function pieceModel(part: BasePart): Model?
+	local node: Instance? = part.Parent
+	for _ = 1, 4 do
+		if node == nil then
+			return nil
+		end
+		if node:IsA("Model") and node:HasTag(SellService.Tag) then
+			return node
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+local function attrNumber(model: Model, name: string): number?
+	local v = model:GetAttribute(name)
+	return if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then v else nil
+end
+
+local function attrString(model: Model, name: string): string?
+	local v = model:GetAttribute(name)
+	return if type(v) == "string" and v ~= "" then v else nil
+end
+
+local function inBox(cf: CFrame, size: Vector3, point: Vector3): boolean
+	local p = cf:PointToObjectSpace(point)
+	return math.abs(p.X) <= size.X / 2 and math.abs(p.Y) <= size.Y / 2 and math.abs(p.Z) <= size.Z / 2
+end
+
+-- The box a hopper takes wood from, around its tagged part. A chute: its
+-- hopper box's footprint (half a stud more each side) from just under the
+-- rim up CHUTE_ZONE_HEIGHT studs. The forge: its anvil and hearth tops.
+-- Wood laid on them is in; wood lying on the ground beside isn't.
+function AetherService.HopperZone(part: BasePart, kind: HopperKind): (CFrame, Vector3)
+	if kind == "forge" then
+		return part.CFrame * FORGE_ZONE_OFFSET, FORGE_ZONE_SIZE
+	end
+	local size = part.Size
+	local h = CHUTE_ZONE_HEIGHT
+	return part.CFrame * CFrame.new(0, size.Y / 2 - 0.25 + h / 2, 0), Vector3.new(size.X + 1, h, size.Z + 1)
+end
+
+-- The pieces that have rested SellService.Settle seconds with their
+-- middle (the PrimaryPart's centre) in hopper `h`'s box, oldest first. A
+-- piece that left starts its wait again.
+local function settled(h: Hopper, d: V2Deps, now: number): { Model }
+	local cf, size = AetherService.HopperZone(h.part, h.kind)
+	local query: (CFrame, Vector3, Instance) -> { BasePart } = d.partsInBox or defaultPartsInBox
+	local checked: { [Model]: boolean } = {}
+	local seen: { [Model]: boolean } = {}
+	for _, part in ipairs(query(cf, size, d.woodFolder)) do
+		local model = pieceModel(part)
+		if model and not checked[model] then
+			checked[model] = true
+			local root = model.PrimaryPart
+			if root and inBox(cf, size, root.CFrame.Position) then
+				seen[model] = true
+				if h.firstSeen[model] == nil then
+					h.firstSeen[model] = now
+				end
+			end
+		end
+	end
+	local ready: { Model } = {}
+	for model, since in pairs(h.firstSeen) do
+		if not seen[model] then
+			h.firstSeen[model] = nil
+		elseif now - since >= SellService.Settle then
+			table.insert(ready, model)
+		end
+	end
+	table.sort(ready, function(a: Model, b: Model): boolean
+		local ta, tb = h.firstSeen[a], h.firstSeen[b]
+		if ta ~= tb then
+			return ta < tb
+		end
+		return a.Name < b.Name
+	end)
+	return ready
+end
+
+-- What a hopper needs to know of a piece: its record, and what the
+-- attributes only the server writes say (as SellService reads them).
+type Facts = {
+	piece: Piece,
+	woodId: string,
+	kind: SellLogic.Kind,
+	volume: number,
+	figure: string?,
+	boost: number,
+	payee: Player,
+	profile: Profile,
+}
+
+-- A piece's facts, or nil to leave it alone: unknown, already going,
+-- dead, a shop's, without a wood or a volume, or nobody online to take it
+-- (SellLogic.Payee: its owner, else its last holder).
+local function factsOf(d: V2Deps, model: Model): Facts?
+	local piece = d.resolve(model)
+	if not piece or piece.selling or piece.dead or piece.shopItem then
+		return nil
+	end
+	local woodId = attrString(model, "WoodId")
+	local volume = attrNumber(model, "Volume")
+	if not woodId or not volume or volume <= 0 then
+		return nil
+	end
+	local find: (number) -> Player? = d.player or playerById
+	local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, function(userId: number): boolean
+		return find(userId) ~= nil
+	end)
+	local payee = if payeeId then find(payeeId) else nil
+	local profile = if payee then ProfileService.GetProfile(payee) else nil
+	if not payee or not profile then
+		return nil
+	end
+	local kind: SellLogic.Kind = if model:GetAttribute("Kind") == "plank" then "plank" else "log"
+	return {
+		piece = piece,
+		woodId = woodId,
+		kind = kind,
+		volume = volume,
+		figure = attrString(model, "Figure"),
+		boost = attrNumber(model, "Boost") or 1,
+		payee = payee,
+		profile = profile,
+	}
+end
+
+-- Takes a piece out of the world, as the sell pad does: marked going (no
+-- second hopper or pad takes it), let go of, forgotten, destroyed.
+local function take(d: V2Deps, h: Hopper, model: Model, piece: Piece)
+	piece.selling = true
+	h.firstSeen[model] = nil
+	d.release(model)
+	d.forget(model)
+	model:Destroy()
+end
+
+-- A "won't take it" toast, at most once per RefuseToastSec per player and
+-- text: a refused piece stays in the hopper and is asked about each poll.
+local function refuse(player: Player, text: string, now: number)
+	local seen = refusedAt[player] or {}
+	refusedAt[player] = seen
+	local last = seen[text]
+	if last and now - last < AetherService.RefuseToastSec then
+		return
+	end
+	seen[text] = now
+	notify(player, text)
+end
+
+-- One poll of a chute: each settled piece that fits goes down into its
+-- payee's Sky Bin; one toast per payee for what went.
+local function chuteTick(h: Hopper, d: V2Deps, now: number)
+	local cap = binVolume()
+	local sent: { [Player]: number } = {}
+	local order: { Player } = {}
+	for _, model in ipairs(settled(h, d, now)) do
+		local f = factsOf(d, model)
+		if not f then
+			continue
+		end
+		if not SellLogic.Fits(binUsed(f.profile), f.volume, cap) then
+			local text = if f.volume > cap
+				then string.format(
+					"That piece is too big for the Sky Bin (%s). Cut it smaller.",
+					SellLogic.VolumeText(cap)
+				)
+				else string.format("Your Sky Bin is full (%s). Sell it at the sawmill.", SellLogic.VolumeText(cap))
+			refuse(f.payee, text, now)
+			continue
+		end
+		take(d, h, model, f.piece)
+		table.insert(f.profile.skyWood, SellLogic.Entry(f.woodId, f.kind, f.volume, f.figure, f.boost))
+		if sent[f.payee] == nil then
+			sent[f.payee] = 0
+			table.insert(order, f.payee)
+		end
+		sent[f.payee] += 1
+	end
+	for _, player in ipairs(order) do
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			publish(player, profile)
+			local n = sent[player]
+			notify(
+				player,
+				string.format(
+					"Sent %d piece%s down the Cloud Chute. Sky Bin %s.",
+					n,
+					if n == 1 then "" else "s",
+					SellLogic.BinText(binUsed(profile), cap)
+				)
+			)
+		end
+	end
+end
+
+-- One poll of the forge: each settled piece it takes (ForgeLogic.RefusalV2:
+-- plain wood of the recipe's, while it still wants some) adds its u³ to
+-- its payee's forgeWood, up to the recipe; a piece bigger than what's
+-- left is used up whole. The rest stay, with a toast now and then.
+local function forgeTick(h: Hopper, d: V2Deps, now: number)
+	local r = recipeV2()
+	if not r then
+		return
+	end
+	local added: { [Player]: number } = {}
+	local topped: { [Player]: boolean } = {}
+	local order: { Player } = {}
+	for _, model in ipairs(settled(h, d, now)) do
+		local f = factsOf(d, model)
+		if not f then
+			continue
+		end
+		local stock = stockV2(f.profile)
+		local why = ForgeLogic.RefusalV2(r, stock, f.woodId, f.figure)
+		if why then
+			refuse(f.payee, why, now)
+			continue
+		end
+		local want = ForgeLogic.WoodWanted(r, stock, f.woodId)
+		local u3 = math.min(f.volume, want)
+		take(d, h, model, f.piece)
+		f.profile.forgeWood[f.woodId] = round2((f.profile.forgeWood[f.woodId] or 0) + u3)
+		if added[f.payee] == nil then
+			added[f.payee] = 0
+			table.insert(order, f.payee)
+		end
+		added[f.payee] += u3
+		if f.volume > want then
+			topped[f.payee] = true
+		end
+	end
+	for _, player in ipairs(order) do
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			publish(player, profile)
+			notify(
+				player,
+				string.format(
+					"Into the forge: %s%s. %s",
+					SellLogic.VolumeText(added[player]),
+					if topped[player] then " (all it needed)" else "",
+					ForgeLogic.ProgressV2(r, stockV2(profile))
+				)
+			)
+		end
+	end
+end
+
+-- One poll of every hopper (the Heartbeat runs it every 0.25 s under v2).
+function AetherService.HopperTick()
+	local d = v2
+	if not d then
+		return
+	end
+	local clock: () -> number = d.now or os.clock
+	local now = clock()
+	for _, h in ipairs(hoppers) do
+		if h.part.Parent == nil then
+			continue
+		elseif h.kind == "forge" then
+			forgeTick(h, d, now)
+		else
+			chuteTick(h, d, now)
+		end
+	end
+end
+
+-- The chute's prompt under v2: how it works, and how full your bin is.
+function AetherService.ChuteInfo(player: Player)
+	if not RateLimiter.Allow(player, "LoadToTruck") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	notify(
+		player,
+		string.format(
+			"Lay wood in the Cloud Chute and it goes down to your Sky Bin by the sawmill. Sky Bin %s.",
+			SellLogic.BinText(binUsed(profile), binVolume())
+		)
+	)
+end
+
+-- The forge's "Add lumenwood" prompt under v2: what it takes, and how
+-- far along it is.
+function AetherService.ForgeInfo(player: Player)
+	if not RateLimiter.Allow(player, "LoadToTruck") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local r = recipeV2()
+	if not profile or not r then
+		return
+	end
+	notify(
+		player,
+		string.format(
+			"Lay plain %s on the forge to feed it. %s",
+			ForgeLogic.WoodNames(r),
+			ForgeLogic.ProgressV2(r, stockV2(profile))
+		)
+	)
+end
+
+-- The Sky Bin's prompt by the sell pad (v2): sells what the chutes sent
+-- down through SellService.PayEntries (paid, toasted and counted as a pad
+-- sale), from beside the bin. The entries leave the save before the sale
+-- and come back only if the pad isn't selling yet.
+function AetherService.SellSkyBin(player: Player)
+	local d = v2
+	if not d or not RateLimiter.Allow(player, "SellSkyBin") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local bin = d.skyBin
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not profile or not bin or not root or not root:IsA("BasePart") then
+		return
+	end
+	local reach = PROMPT_RANGE + GameConfig.RangeTolerance
+	if (root.CFrame.Position - bin.CFrame.Position).Magnitude > reach then
+		return
+	end
+	if #profile.skyWood == 0 then
+		notify(player, "Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it.")
+		return
+	end
+	local entries = profile.skyWood
+	profile.skyWood = {}
+	if not SellService.PayEntries(player, entries) then
+		profile.skyWood = entries
+	end
+	publish(player, profile)
+end
+
 -- Puts the lumenwood in the player's hands into the forge (up to the recipe).
 function AetherService.AddToForge(player: Player)
 	if not RateLimiter.Allow(player, "LoadToTruck") then
@@ -168,6 +627,8 @@ function AetherService.AddToForge(player: Player)
 end
 
 -- Forges a Starfall Axe if everything's there; otherwise says what's missing.
+-- Under v2 the wood is u³ in forgeWood (ForgeLogic.RecipeV2); forgeLogs
+-- is left as it is.
 function AetherService.Forge(player: Player)
 	if not RateLimiter.Allow(player, "BuyItem") then
 		return
@@ -182,19 +643,30 @@ function AetherService.Forge(player: Player)
 		return
 	end
 	local r = recipe()
-	local missing = ForgeLogic.Missing(r, stockOf(profile))
+	local rV2 = if v2 then recipeV2() else nil
+	if v2 and not rV2 then
+		return
+	end
+	local missing = if rV2 then ForgeLogic.MissingV2(rV2, stockV2(profile)) else ForgeLogic.Missing(r, stockOf(profile))
 	if #missing > 0 then
 		notify(player, "The forge needs " .. table.concat(missing, ", ") .. ".")
 		return
 	end
+	local cash = if rV2 then rV2.cash else r.cash
 	-- Nothing below yields, so the check above still holds.
-	if not EconomyService.SpendCash(player, r.cash, "forged Starfall Axe", FORGED_AXE) then
+	if not EconomyService.SpendCash(player, cash, "forged Starfall Axe", FORGED_AXE) then
 		return
 	end
-	for woodId, n in pairs(r.logs) do
-		profile.forgeLogs[woodId] -= n
+	if rV2 then
+		for woodId, u3 in pairs(rV2.wood) do
+			profile.forgeWood[woodId] = round2(math.max(0, (profile.forgeWood[woodId] or 0) - u3))
+		end
+	else
+		for woodId, n in pairs(r.logs) do
+			profile.forgeLogs[woodId] -= n
+		end
 	end
-	for materialId, n in pairs(r.materials) do
+	for materialId, n in pairs(if rV2 then rV2.materials else r.materials) do
 		profile.materials[materialId] -= n
 	end
 	local _item, tool = AxeService.Grant(player, FORGED_AXE)
@@ -205,7 +677,12 @@ function AetherService.Forge(player: Player)
 	end
 	publish(player, profile)
 	NodeService.Publish(player)
-	notify(player, "The Starfall Axe is yours! It fells Lumenwood in 12 hits.")
+	notify(
+		player,
+		if rV2
+			then ForgeLogic.ForgedTextV2(ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef, rV2)
+			else "The Starfall Axe is yours! It fells Lumenwood in 12 hits."
+	)
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "StarfallForged")
 	end)
@@ -301,20 +778,123 @@ local function tick()
 	end
 end
 
+-- What a lost piece is called in its owner's toast: "Lumenwood log".
+local function pieceName(model: Model): string
+	local wood = WoodData.Get(attrString(model, "WoodId") or "")
+	local kind = if model:GetAttribute("Kind") == "plank" then "plank" else "log"
+	return (if wood then wood.displayName else "wood") .. " " .. kind
+end
+
+-- One look at the loose wood under v2 (with the hoppers, every 0.25 s): a
+-- piece seen on the isles that then drops FALL_BELOW under the deck while
+-- still near them is lost to the clouds. Gone further sideways first (a
+-- teleport), or dragged by a cloak wearer once under GLIDE_BELOW, it's
+-- not watched any more. Wood never on the isles (the ground under them)
+-- is never touched.
+function AetherService.FallTick()
+	local d = v2
+	local area = sky().area
+	if not d or not area then
+		return
+	end
+	local deck = (area.y or 0) + DECK_ABOVE_AREA
+	local find: (number) -> Player? = d.player or playerById
+	local lost: { [Player]: { string } } = {}
+	local order: { Player } = {}
+	for _, child in ipairs(d.woodFolder:GetChildren()) do
+		local root = if child:IsA("Model") and child:HasTag(SellService.Tag) then child.PrimaryPart else nil
+		if not root then
+			continue
+		end
+		local model = child :: Model
+		local pos = root.CFrame.Position
+		local dx, dz = pos.X - area.x, pos.Z - area.z
+		local flat2 = dx * dx + dz * dz
+		if flat2 <= (area.radius + 30) ^ 2 and pos.Y >= deck - 5 then
+			woodOnIsles[model] = true
+		elseif woodOnIsles[model] then
+			local holder = if d.heldBy then d.heldBy(model) else nil
+			local gliding = holder ~= nil and pos.Y < deck - GLIDE_BELOW and hasCloak(holder)
+			if flat2 > (area.radius + NEAR) ^ 2 or gliding then
+				woodOnIsles[model] = nil -- gone some other way, or down with a cloak wearer
+			elseif pos.Y < deck - FALL_BELOW then
+				woodOnIsles[model] = nil
+				local piece = d.resolve(model)
+				if piece and not piece.selling and not piece.dead and not piece.shopItem then
+					local owner = if piece.ownerId ~= 0 then find(piece.ownerId) else nil
+					if owner then
+						if lost[owner] == nil then
+							lost[owner] = {}
+							table.insert(order, owner)
+						end
+						table.insert(lost[owner], pieceName(model))
+					end
+					piece.selling = true
+					d.release(model)
+					d.forget(model)
+					model:Destroy()
+				end
+			end
+		end
+	end
+	for model in pairs(woodOnIsles) do
+		if model.Parent == nil then
+			woodOnIsles[model] = nil
+		end
+	end
+	for _, owner in ipairs(order) do
+		local names = lost[owner]
+		notify(
+			owner,
+			if #names == 1
+				then string.format("Your %s fell off the isles: lost to the clouds.", names[1])
+				else string.format("%d pieces of your wood fell off the isles: lost to the clouds.", #names)
+		)
+	end
+end
+
 -- Call once the save has loaded.
 function AetherService.PlayerJoined(player: Player, profile: Profile)
 	publish(player, profile)
 end
 
-local function addPrompt(part: Instance, action: string, object: string, hold: number, fn: (Player) -> ())
+local function addPrompt(
+	part: Instance,
+	action: string,
+	object: string,
+	hold: number,
+	fn: (Player) -> ()
+): ProximityPrompt
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = action
 	prompt.ObjectText = object
-	prompt.MaxActivationDistance = 10
+	prompt.MaxActivationDistance = PROMPT_RANGE
 	prompt.HoldDuration = hold
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = part
 	prompt.Triggered:Connect(fn)
+	return prompt
+end
+
+-- A prompt whose action reads `v1Text` or, under the v2 loop, `v2Text`
+-- (InitV2 relabels the ones made before it).
+local function loopPrompt(part: Instance, v1Text: string, v2Text: string, object: string, fn: (Player) -> ())
+	local prompt = addPrompt(part, if v2 then v2Text else v1Text, object, 0, fn)
+	table.insert(relabel, { prompt = prompt, v1 = v1Text, v2 = v2Text })
+end
+
+-- A tagged part the v2 loop polls as a hopper (once, however often its tag
+-- signal fires).
+local function addHopper(part: Instance, kind: HopperKind)
+	if not part:IsA("BasePart") then
+		return
+	end
+	for _, h in ipairs(hoppers) do
+		if h.part == part then
+			return
+		end
+	end
+	table.insert(hoppers, { part = part, kind = kind, firstSeen = {} })
 end
 
 -- MapBuilder tags the chutes "CloudChute" and the forge's anvil
@@ -330,10 +910,24 @@ end
 function AetherService.Init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
 	onTagged("CloudChute", function(part)
-		addPrompt(part, "Send logs down", "Cloud Chute", 0, AetherService.SendDown)
+		loopPrompt(part, "Send logs down", "Check Sky Bin", "Cloud Chute", function(player: Player)
+			if v2 then
+				AetherService.ChuteInfo(player)
+			else
+				AetherService.SendDown(player)
+			end
+		end)
+		addHopper(part, "chute")
 	end)
 	onTagged("StarfallForge", function(part)
-		addPrompt(part, "Add lumenwood", "Starfall Forge", 0, AetherService.AddToForge)
+		loopPrompt(part, "Add lumenwood", "Check the forge", "Starfall Forge", function(player: Player)
+			if v2 then
+				AetherService.ForgeInfo(player)
+			else
+				AetherService.AddToForge(player)
+			end
+		end)
+		addHopper(part, "forge")
 		local forge = Instance.new("Attachment") -- a second prompt needs its own spot
 		forge.Name = "ForgePoint"
 		forge.Position = Vector3.new(0, 1.5, 0)
@@ -346,10 +940,21 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 		if elapsed >= 0.25 then
 			elapsed = 0
 			tick()
+			if v2 then
+				local ok, err = pcall(function(): any
+					AetherService.HopperTick()
+					AetherService.FallTick()
+					return nil
+				end)
+				if not ok then
+					warn("[AetherService] v2 tick failed: " .. tostring(err))
+				end
+			end
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
 		onIsles[player] = nil
+		refusedAt[player] = nil
 	end)
 	-- A new character starts wherever it spawns, not on the isles.
 	Players.PlayerAdded:Connect(function(player: Player)
@@ -361,6 +966,29 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 		player.CharacterAdded:Connect(function()
 			onIsles[player] = nil
 		end)
+	end
+end
+
+-- The v2 loop's hoppers (GameServer, under CoreLoop.V2(), after Init).
+-- The chutes' and forge's prompts turn informational; the Sky Bin gets
+-- its prompt.
+function AetherService.InitV2(deps: V2Deps)
+	v2 = deps
+	for _, entry in ipairs(relabel) do
+		entry.prompt.ActionText = entry.v2
+	end
+	local bin = deps.skyBin
+	if bin then
+		local prompt = addPrompt(bin, "Sell Sky Bin", "Sky Bin", 0, AetherService.SellSkyBin)
+		prompt.Name = "SellSkyBin" -- WorldUI shows it only while your bin has wood in it
+	else
+		warn("[AetherService] No Sky Bin by the sell pad: it can't be sold")
+	end
+	for _, player in ipairs(Players:GetPlayers()) do
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			publish(player, profile)
+		end
 	end
 end
 

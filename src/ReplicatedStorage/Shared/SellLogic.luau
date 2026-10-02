@@ -88,4 +88,72 @@ function SellLogic.SaleText(pieces: number, u3: number, dollars: number): string
 	)
 end
 
+-- The Sky Bin (V2_PLAN.md §5) ---------------------------------------------
+-- Wood a Cloud Chute sent down waits in the bin as entries (the save's
+-- ProfileSchema.SkyWood): its wood id, volume in u³, figure, true for a
+-- plank, and its boost (nil = 1). Short keys: a save holds a list of them.
+
+export type Entry = { w: string, v: number, f: string?, p: boolean?, b: number? }
+
+local function finite(n: unknown): boolean
+	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
+end
+
+-- The bin entry for a piece, from what SellService reads off it.
+function SellLogic.Entry(woodId: string, kind: Kind, volumeU3: number, figure: string?, boost: number?): Entry
+	return {
+		w = woodId,
+		v = volumeU3,
+		f = figure,
+		p = if kind == "plank" then true else nil,
+		b = if finite(boost) and (boost :: number) > 1 then boost else nil,
+	}
+end
+
+-- Whether an entry counts: a wood id and a finite volume above 0. A save
+-- is data, so anything else is worth nothing and is dropped when paid.
+function SellLogic.ValidEntry(entry: unknown): boolean
+	if type(entry) ~= "table" then
+		return false
+	end
+	local e = entry :: { [string]: unknown }
+	return type(e.w) == "string" and finite(e.v) and (e.v :: number) > 0
+end
+
+-- One entry's worth, as the pad values the piece it was
+-- (SellLogic.PieceValue: volume x log or plank price x figure x boost);
+-- 0 for an entry that doesn't count.
+function SellLogic.EntryValue(entry: Entry): number
+	if not SellLogic.ValidEntry(entry) then
+		return 0
+	end
+	local figure = if type(entry.f) == "string" then entry.f else nil
+	local boost = if finite(entry.b) then entry.b else nil
+	return SellLogic.PieceValue(entry.w, if entry.p == true then "plank" else "log", entry.v, figure, boost)
+end
+
+-- What `entries` add up to: their worth ($, before 2x Cash), their
+-- volume (u³) and how many count.
+function SellLogic.EntriesValue(entries: { Entry }): (number, number, number)
+	local value, volume, count = 0, 0, 0
+	for _, entry in ipairs(entries) do
+		if SellLogic.ValidEntry(entry) then
+			value += SellLogic.EntryValue(entry)
+			volume += entry.v
+			count += 1
+		end
+	end
+	return value, volume, count
+end
+
+-- Whether `volume` u³ more fits in a bin holding `used` of `capacity`.
+function SellLogic.Fits(used: number, volume: number, capacity: number): boolean
+	return used + volume <= capacity + 1e-6
+end
+
+-- The bin's fill, "14/120 u³", for its label and the chute's toasts.
+function SellLogic.BinText(used: number, capacity: number): string
+	return FieldGuide.VolumeNumber(used) .. "/" .. FieldGuide.VolumeText(capacity)
+end
+
 return SellLogic

@@ -765,6 +765,31 @@ if CoreLoop.V2() then
 	remote.Chop.OnServerEvent:Connect(function(player: Player, part: unknown, hitPos: unknown, normal: unknown)
 		SectionTrees.Chop(player, part, hitPos, normal)
 	end)
+	-- The isles take loose wood (M1.7b): the Cloud Chutes and the Starfall
+	-- Forge are hoppers found the way the pad finds pieces, the Sky Bin by
+	-- the pad sells through SellService.PayEntries, and wood that falls off
+	-- the isles is lost.
+	local skyBinPart = sellArea:FindFirstChild("SkyBin")
+	safely("AetherService.InitV2", AetherService.InitV2, {
+		woodFolder = woodFolder :: Instance,
+		resolve = function(model: Model): SellService.Piece?
+			-- As the pad: only wood WoodWatch last found where it should be.
+			local piece = WoodService.FromModel(model)
+			if piece and not WoodService.VerdictOk(piece) then
+				return nil
+			end
+			return piece :: any
+		end,
+		release = function(model: Model)
+			GrabService.ReleasePiece(model, "taken")
+		end,
+		forget = function(model: Model)
+			WoodService.Forget(model)
+			GrabService.Unregister(model)
+		end,
+		skyBin = if skyBinPart and skyBinPart:IsA("BasePart") then skyBinPart else nil,
+		heldBy = GrabService.HeldBy,
+	})
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)

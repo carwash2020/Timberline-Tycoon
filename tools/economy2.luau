@@ -57,7 +57,6 @@ local A = {
 	murphAfter = 60,
 	groveTier = "Healthy", -- figured-wood average, as tools/economy
 	plotPrice = 900100, -- a full plot (§2f: $100 + 3000 x (1 + ... + 24))
-	skyBinU3 = 120, -- §5: the v2 Sky Bin holds u³ (BiomeData's skyBinCapacity counts v1 logs)
 	sharing = 4, -- players sharing a biome's regrowth (a rare wood's cap on $/h)
 }
 
@@ -271,7 +270,7 @@ end
 local function haulFor(b, owned)
 	if b.access == "gondola" then
 		local g = b.gondola
-		return A.skyBinU3, 2 * g.rideSec + 5, 2 * g.fee, "Cloud Chute + Sky Bin", 12
+		return BiomeData.Get("sky").skyBinVolume, 2 * g.rideSec + 5, 2 * g.fee, "Cloud Chute + Sky Bin", 12
 	elseif b.access == "boat" then
 		return 0, 0, 0, "", 0 -- the Island comes with the ferry (M6)
 	end

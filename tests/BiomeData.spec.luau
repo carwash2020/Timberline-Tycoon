@@ -90,6 +90,7 @@ return function(t)
 		local sky = BiomeData.Get("sky")
 		t.ok(sky.gondola.rideSec > 0 and sky.gondola.fee > 0)
 		t.ok(sky.skyBinCapacity > 0)
+		t.eq(sky.skyBinVolume, 120, "the v2 bin holds u³ (V2_PLAN §5)")
 		for materialId, count in pairs(sky.nodes) do
 			t.ok(ItemCatalog.Materials[materialId] ~= nil, "unknown material " .. materialId)
 			t.ok(count > 0)

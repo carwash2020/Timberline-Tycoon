@@ -130,6 +130,5 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 - `seeds` = 50
 - `sellSec` = 4
 - `sharing` = 4
-- `skyBinU3` = 120
 - `tripOverhead` = 8
 - `walkSpeed` = 16

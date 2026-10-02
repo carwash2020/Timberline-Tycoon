@@ -9,7 +9,10 @@
 --     the Gloam Hollow's trees come out). On a phone it's in the corner's
 --     second line instead, and hidden during the tutorial and while the
 --     save loads (HudLayout.ClockLine).
---   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").
+--   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30"),
+--     or under the v2 loop the u³ in it ("SKY BIN 14/120 u³", from the
+--     SkyBinVolume attribute); its "Sell Sky Bin" prompt (the server's)
+--     shows only while there's wood in it.
 -- The server sets the Biome and OwnedGear attributes and the
 -- VitalityTier_<biome> workspace attributes (ForestService). The clock
 -- reads Lighting.ClockTime, the hour the sky shows: LightingController
@@ -22,9 +25,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -164,14 +169,37 @@ local function watchSkyBin()
 	end
 	local sky = BiomeData.Get("sky")
 	local capacity = if sky then sky.skyBinCapacity or 30 else 30
+	local volumeCap = if sky then sky.skyBinVolume or 120 else 120
+	local sellPrompt: ProximityPrompt? = nil
 	local function refresh()
-		local n = (player:GetAttribute("SkyBin") :: number?) or 0
+		local text: string
+		if CoreLoop.V2() then
+			local used = player:GetAttribute("SkyBinVolume")
+			text = "SKY BIN\n" .. SellLogic.BinText(if type(used) == "number" then used else 0, volumeCap)
+		else
+			local n = (player:GetAttribute("SkyBin") :: number?) or 0
+			text = string.format("SKY BIN\n%d/%d", n, capacity)
+		end
 		for _, label in ipairs(labels) do
-			label.Text = string.format("SKY BIN\n%d/%d", n, capacity)
+			label.Text = text
+		end
+		local prompt = sellPrompt
+		if prompt then
+			local used = player:GetAttribute("SkyBinVolume")
+			prompt.Enabled = type(used) == "number" and used > 0
 		end
 	end
 	player:GetAttributeChangedSignal("SkyBin"):Connect(refresh)
+	player:GetAttributeChangedSignal("SkyBinVolume"):Connect(refresh)
+	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(refresh)
 	refresh()
+	if CoreLoop.V2() then
+		local found = bin:WaitForChild("SellSkyBin", 30)
+		if found and found:IsA("ProximityPrompt") then
+			sellPrompt = found
+			refresh()
+		end
+	end
 end
 
 -- A toast when the grove you're standing in changes tier.
