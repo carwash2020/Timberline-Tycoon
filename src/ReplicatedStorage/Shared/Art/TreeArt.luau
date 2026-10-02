@@ -15,12 +15,18 @@
 --   * Log returns a Model whose PrimaryPart is "LogPart" (a cylinder along
 --     X); its end caps are welded to it, unanchored and massless, so the
 --     whole log moves when LogPart is welded to a player or a truck.
+-- The v2 section trees (FromSkeleton, CutFace, Notch, the grown-up
+-- Sapling) are at the bottom, with their own contract; Build, Stump and
+-- Log stay as they are for the v1 loop until the flip.
 
+local TreeGen = require(script.Parent.Parent.TreeGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 
 type WoodDef = WoodData.WoodDef
 type Rng = Kit.Rng
+type Skeleton = TreeGen.Skeleton
+type Dress = TreeGen.Dress
 
 local TreeArt = {}
 
@@ -796,7 +802,12 @@ function TreeArt.AddLogCaps(log: BasePart, def: WoodDef)
 end
 
 -- A sapling (the first moment of a regrowing tree, and Sapling Plots).
-function TreeArt.Sapling(def: WoodDef, seed: number): Model
+-- Given `growth` (0-1, the v2 loop), the grown-up sapling instead: see
+-- the section trees below.
+function TreeArt.Sapling(def: WoodDef, seed: number, growth: number?): Model
+	if growth ~= nil then
+		return TreeArt.GrowingSapling(def, seed, growth)
+	end
 	local rng = Kit.rng(seed + 13)
 	local pal = TreeArt.Palette(def)
 	local model = Instance.new("Model")
@@ -811,6 +822,582 @@ function TreeArt.Sapling(def: WoodDef, seed: number): Model
 		Kit.blob(model, "Leaves", CFrame.new(0, 2.4, 0), Vector3.new(1.6, 1.3, 1.6), 3, rng, pal.leaves)
 	end
 	model.PrimaryPart = stem
+	return model
+end
+
+---------------------------------------------------------------------------
+-- v2: section trees (V2_PLAN.md §3c, §3e), built from a TreeGen skeleton
+---------------------------------------------------------------------------
+-- Contract with SectionTrees / WoodService / WoodFX / CutController (M1.3):
+--   * FromSkeleton returns a Model tagged "Tree" (ModelStreamingMode
+--     Atomic) whose PrimaryPart is section 1. Each section is a Block named
+--     "Section" (tag "WoodSection", attribute Section = its id), its length
+--     up the part's Y axis, bark-coloured Wood, anchored, colliding,
+--     queryable, untouchable, in collision group "Wood".
+--   * Everything else is dress: parts named Leaves, Frond or Facet (inside
+--     "Tier" models too: WindSway and CanopyFade find those names), Root,
+--     BarkMark, Crack, Vein, PalmRing, Coconut, Pod, PodStem. Every dress
+--     part has attribute Section (the section it rides on), never collides
+--     or fires touches, can be queried (pointing at leaves finds the tree),
+--     and sits in collision group "Leaves" so chop rays skip it.
+--   * Model attributes: WoodId, Seed, Stage, Scale, Elder, Felled, Dormant,
+--     PlanterId, and Uid when given; the service adds HomePivot once the
+--     tree is placed.
+--   * The wood's core (WoodData v2.core and coreMaterial) shows only on cut
+--     faces (CutFace) and in notches (Notch).
+
+TreeArt.WoodGroup = "Wood"
+TreeArt.LeavesGroup = "Leaves"
+TreeArt.CutFaceThickness = 0.06
+TreeArt.CutFaceInset = 0.86 -- of the section's width
+TreeArt.NotchHeight = 0.35
+TreeArt.NotchMaxDepth = 0.95 -- of the section's width
+TreeArt.NotchShade = -0.25
+
+-- The wood's core colour and material (cut faces, notches, planks).
+function TreeArt.Core(def: WoodDef): (Color3, Enum.Material)
+	local v2 = def.v2
+	if not v2 then
+		return TreeArt.HeartColor(def), Enum.Material.Wood
+	end
+	local material = Enum.Material.Wood
+	local ok, found = pcall(function(): any
+		return (Enum.Material :: any)[v2.coreMaterial]
+	end)
+	if ok and typeof(found) == "EnumItem" then
+		material = found :: any
+	end
+	return Color3.fromHex(v2.core), material
+end
+
+local function hexList(list: { string }): { Color3 }
+	local out: { Color3 } = {}
+	for i, h in ipairs(list) do
+		out[i] = Color3.fromHex(h)
+	end
+	return out
+end
+
+-- What a section tree is painted with: WoodData v2.shape's colours (today's
+-- palettes), the palette's glow and accent where the shape has none.
+type Paint = {
+	bark: Color3,
+	leaves: { Color3 },
+	accent: Color3,
+	glow: Color3?,
+}
+
+local function paintOf(def: WoodDef): Paint
+	local pal = TreeArt.Palette(def)
+	local v2 = def.v2
+	local shape = v2 and v2.shape
+	if not shape then
+		return {
+			bark = def.trunkColor,
+			leaves = pal.leaves,
+			accent = pal.accent or Kit.shade(def.trunkColor, -0.3),
+			glow = pal.glow,
+		}
+	end
+	return {
+		bark = Color3.fromHex(shape.bark),
+		leaves = hexList(shape.leafColors),
+		accent = if shape.accent then Color3.fromHex(shape.accent) else pal.accent or Kit.shade(def.trunkColor, -0.3),
+		glow = if shape.glow then Color3.fromHex(shape.glow) else pal.glow,
+	}
+end
+
+-- Dress never collides or fires touches, can be queried, rides its section.
+local function asDress(p: BasePart, section: number): BasePart
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = true
+	p.CollisionGroup = TreeArt.LeavesGroup
+	p:SetAttribute("Section", section)
+	local s = p.Size
+	if math.max(s.X, s.Y, s.Z) < 1 then
+		p.CastShadow = false
+	end
+	return p
+end
+
+-- The half-size, along the axes of `frame`, of a box `size` turned `rot`.
+local function extents(rot: CFrame, size: Vector3): Vector3
+	local x, y, z = rot.XVector, rot.YVector, rot.ZVector
+	return Vector3.new(
+		math.abs(x.X) * size.X + math.abs(y.X) * size.Y + math.abs(z.X) * size.Z,
+		math.abs(x.Y) * size.X + math.abs(y.Y) * size.Y + math.abs(z.Y) * size.Z,
+		math.abs(x.Z) * size.X + math.abs(y.Z) * size.Y + math.abs(z.Z) * size.Z
+	) / 2
+end
+
+-- A chunky leaf cluster: `d.parts` tilted blocks, every one inside the
+-- dress box (so TreeGen's height and width hold), one big core block and
+-- the rest pushed out to the box's round surface, one of them to its top.
+local function leafCluster(
+	model: Instance,
+	name: string,
+	d: Dress,
+	colors: { Color3 },
+	transparency: number?
+): { BasePart }
+	local rng = Kit.rng(d.seed)
+	local half = d.size / 2
+	local out: { BasePart } = {}
+	local start = rng:range(0, math.pi * 2)
+	-- Two neighbouring tones of the palette per mass: a coherent clump, and
+	-- the crown as a whole still mixed.
+	local first = rng:int(1, #colors)
+	local main, alt = colors[first], colors[first % #colors + 1]
+	-- Near-cubes (a flat cluster's are only as flat as its box makes them).
+	local side = (d.size.X + d.size.Z) / 2
+	local tall = not d.flat and d.size.Y >= side * 0.38
+	for i = 1, d.parts do
+		local frac = if i == 1 then math.clamp(0.68 - 0.025 * d.parts, 0.48, 0.6) else rng:range(0.4, 0.52)
+		local c = math.min(side * frac, d.grain or math.huge)
+		local dims = Vector3.new(
+			c * rng:range(0.92, 1.08),
+			math.min(c * rng:range(0.86, 1), d.size.Y * 0.92),
+			c * rng:range(0.92, 1.08)
+		)
+		local rot: CFrame
+		if i == 1 then
+			rot = CFrame.Angles(rng:range(-0.12, 0.12), rng:range(0, math.pi / 2), rng:range(-0.12, 0.12))
+		elseif tall and i % 3 ~= 0 then
+			-- A corner up reads rounder.
+			rot = CFrame.Angles(0, rng:range(0, math.pi * 2), 0) * CFrame.Angles(math.rad(35.26), math.rad(45), 0)
+		elseif tall then
+			rot = CFrame.Angles(rng:range(-0.45, 0.45), rng:range(0, math.pi * 2), rng:range(-0.45, 0.45))
+		else
+			rot = CFrame.Angles(rng:range(-0.18, 0.18), rng:range(0, math.pi * 2), rng:range(-0.18, 0.18))
+		end
+		local e = extents(rot, dims)
+		local fit = math.min(1, half.X / e.X, half.Y / e.Y, half.Z / e.Z)
+		dims *= fit
+		e *= fit
+		local dir: Vector3
+		if i == 1 then
+			dir = Vector3.new(0, -0.15, 0)
+		elseif i == 2 then
+			dir = Vector3.new(rng:range(-0.2, 0.2), 1, rng:range(-0.2, 0.2))
+		else
+			local theta = start + i * 2.399
+			local y = rng:range(-0.5, 0.45)
+			local r = math.sqrt(1 - y * y)
+			dir = Vector3.new(math.cos(theta) * r, y, math.sin(theta) * r)
+		end
+		local room = half - e
+		local reach = if i == 2 then 1 else rng:range(0.82, 1)
+		local offset = Vector3.new(dir.X * room.X, dir.Y * room.Y, dir.Z * room.Z) * reach
+		local color = Kit.vary(if i % 3 == 0 then alt else main, rng, 0.05)
+		local p = Kit.part(model, name, dims, d.cf * CFrame.new(offset) * rot, color, Enum.Material.SmoothPlastic)
+		if transparency then
+			p.Transparency = transparency
+		end
+		asDress(p, d.section)
+		table.insert(out, p)
+	end
+	return out
+end
+
+-- A cone tier (or a snow cap): Kit.cone's clickable Facets.
+local function coneDress(parent: Instance, d: Dress, colors: { Color3 }, material: Enum.Material): { BasePart }
+	local rng = Kit.rng(d.seed)
+	local sides = d.sides or 5
+	local jit: { number } = {}
+	for i = 1, sides do
+		jit[i] = rng:range(0.9, 1.06)
+	end
+	local before: { [Instance]: boolean } = {}
+	for _, c in ipairs(parent:GetChildren()) do
+		before[c] = true
+	end
+	Kit.cone(
+		parent,
+		d.cf,
+		d.size.X / 2,
+		d.size.Y,
+		sides,
+		function(i: number): Color3
+			return Kit.vary(colors[(i - 1) % #colors + 1], rng, 0.04)
+		end,
+		material,
+		0.12,
+		function(i: number): number
+			return jit[i]
+		end
+	)
+	local made: { BasePart } = {}
+	for _, c in ipairs(parent:GetChildren()) do
+		if not before[c] and c:IsA("BasePart") then
+			asDress(c, d.section)
+			table.insert(made, c)
+		end
+	end
+	return made
+end
+
+local function addLight(part: BasePart, color: Color3, range: number, brightness: number)
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = range
+	light.Brightness = brightness
+	light.Shadows = false
+	light.Parent = part
+end
+
+-- One dress entry's parts. Returns them (the first is where a light goes).
+local function buildDress(model: Model, def: WoodDef, paint: Paint, d: Dress): { BasePart }
+	local kind = d.kind
+	local glow = paint.glow or paint.accent
+	if kind == "leaves" then
+		local parts = leafCluster(model, "Leaves", d, paint.leaves)
+		if d.glow and parts[1] then
+			-- The core block glows through the gaps (never a whole crown).
+			parts[1].Material = Enum.Material.Neon
+			parts[1].Color = glow
+		end
+		return parts
+	elseif kind == "wisp" then
+		return leafCluster(model, "Leaves", d, paint.leaves, 0.3)
+	elseif kind == "tier" then
+		local tierModel = Instance.new("Model")
+		tierModel.Name = "Tier"
+		tierModel:SetAttribute("Section", d.section)
+		tierModel.Parent = model
+		return coneDress(tierModel, d, paint.leaves, Enum.Material.SmoothPlastic)
+	elseif kind == "cap" then
+		return coneDress(model, d, { paint.accent }, Enum.Material.Snow)
+	elseif kind == "frond" then
+		local pts = d.points or { d.cf.Position, d.cf.Position + Vector3.yAxis }
+		local rng = Kit.rng(d.seed)
+		local out: { BasePart } = {}
+		for i = 1, #pts - 1 do
+			local leaf = Kit.beam(
+				model,
+				"Frond",
+				pts[i],
+				pts[i + 1],
+				d.size.X * (if i == 1 then 1 else 0.82),
+				d.size.Y,
+				Kit.vary(rng:pick(paint.leaves), rng, 0.05),
+				Enum.Material.SmoothPlastic
+			)
+			table.insert(out, asDress(leaf, d.section))
+		end
+		return out
+	elseif kind == "coconut" then
+		return { asDress(Kit.ball(model, "Coconut", d.size.X, d.cf, hex("#6B4A2B")), d.section) }
+	elseif kind == "ring" then
+		return { asDress(Kit.part(model, "PalmRing", d.size, d.cf, paint.accent, Enum.Material.Wood), d.section) }
+	elseif kind == "pod" then
+		local ball = d.size.X
+		local stemTop = d.cf.Position + Vector3.new(0, d.size.Y - ball / 2, 0)
+		local pod = Kit.ball(model, "Pod", ball, d.cf, glow, Enum.Material.Neon)
+		local stem = Kit.rod(
+			model,
+			"PodStem",
+			stemTop,
+			d.cf.Position + Vector3.new(0, ball * 0.4, 0),
+			0.1,
+			paint.bark,
+			Enum.Material.Wood
+		)
+		return { asDress(pod, d.section), asDress(stem, d.section) }
+	elseif kind == "flare" then
+		local rng = Kit.rng(d.seed)
+		local p = Kit.wedge(
+			model,
+			"Root",
+			d.size,
+			d.cf,
+			Kit.vary(Kit.shade(paint.bark, -0.08), rng, 0.03),
+			Enum.Material.Wood
+		)
+		return { asDress(p, d.section) }
+	elseif kind == "mark" then
+		return {
+			asDress(Kit.part(model, "BarkMark", d.size, d.cf, paint.accent, Enum.Material.SmoothPlastic), d.section),
+		}
+	elseif kind == "crack" then
+		return { asDress(Kit.part(model, "Crack", d.size, d.cf, glow, Enum.Material.Neon), d.section) }
+	elseif kind == "vein" then
+		local vein = paint.accent
+		if def.id == "lumenwood" then
+			vein = TreeArt.Palette(def).accent or vein
+		end
+		return { asDress(Kit.part(model, "Vein", d.size, d.cf, vein, Enum.Material.Neon), d.section) }
+	end
+	return {}
+end
+
+export type SkeletonOptions = {
+	uid: string?,
+	planterId: number?,
+	only: { [number]: boolean }?, -- build just these sections (a piece) and their dress
+}
+
+-- A section tree (see the contract above), built around the origin with
+-- the ground at y = 0.
+function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOptions?): Model
+	local o: SkeletonOptions = opts or {}
+	local only = o.only
+	local paint = paintOf(def)
+	local rng = Kit.rng(skel.seed + 61)
+	local model = Instance.new("Model")
+	model.Name = "Tree_" .. def.id
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model:AddTag("Tree")
+	model:SetAttribute("WoodId", def.id)
+	model:SetAttribute("Seed", skel.seed)
+	model:SetAttribute("Stage", skel.stage)
+	model:SetAttribute("Scale", skel.scale)
+	model:SetAttribute("Elder", skel.elder)
+	model:SetAttribute("Felled", false)
+	model:SetAttribute("Dormant", false)
+	model:SetAttribute("PlanterId", o.planterId or 0)
+	if o.uid then
+		model:SetAttribute("Uid", o.uid)
+	end
+	local first: BasePart? = nil
+	local lit: { BasePart } = {}
+	for _, sec in ipairs(skel.sections) do
+		if only and not only[sec.id] then
+			continue
+		end
+		local p = Kit.part(
+			model,
+			"Section",
+			Vector3.new(sec.thickness, sec.length, sec.thickness),
+			sec.cf * CFrame.new(0, sec.length / 2, 0),
+			Kit.vary(paint.bark, rng, 0.04),
+			Enum.Material.Wood
+		)
+		p.CanCollide = true
+		p.CanQuery = true
+		p.CanTouch = false
+		p.CollisionGroup = TreeArt.WoodGroup
+		p:SetAttribute("Section", sec.id)
+		p:AddTag("WoodSection")
+		first = first or p
+		for _, d in ipairs(sec.dress) do
+			local parts = buildDress(model, def, paint, d)
+			if d.glow and parts[2] then
+				table.insert(lit, parts[2])
+			end
+		end
+	end
+	model.PrimaryPart = first
+	-- Lights and drifting motes, where today's trees have them (no shadows).
+	local glow = paint.glow
+	if glow and first then
+		if def.id == "emberwood" then
+			if lit[1] then
+				addLight(lit[1], glow, 18, 1.6)
+				particles(lit[#lit], hex("#FFB050"), 3, 1.5, 2.5, 0.25)
+			end
+		elseif def.id == "phantomwood" then
+			addLight(first, TreeArt.Palette(def).accent or hex("#B58CFF"), 16, 0.8)
+			particles(first, glow, 2, 1, 0.6, 0.3)
+		elseif def.id == "lumenwood" then
+			if lit[1] then
+				addLight(lit[1], glow, 22, 1.8)
+				particles(lit[#lit], glow, 4, 0.8, 1.2, 0.35)
+			end
+		end
+	end
+	return model
+end
+
+-- A section part's thickness (the square's side).
+local function widthOf(section: BasePart): number
+	return math.min(section.Size.X, section.Size.Z)
+end
+
+-- Anchored on a standing section, welded and massless on a loose one.
+local function ride(p: BasePart, section: BasePart)
+	p.Massless = true
+	if section.Anchored then
+		p.Anchored = true
+		return
+	end
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = section
+	weld.Part1 = p
+	weld.Parent = p
+	p.Anchored = false
+end
+
+-- The fresh face on one end of a cut section (`top` = its +Y end): a thin
+-- plate of the wood's core, 0.86 of the section's width, just proud of the
+-- end. Parented beside the section; never collides, can't be queried.
+function TreeArt.CutFace(def: WoodDef, section: BasePart, top: boolean): Part
+	local color, material = TreeArt.Core(def)
+	local t = widthOf(section) * TreeArt.CutFaceInset
+	local th = TreeArt.CutFaceThickness
+	local y = (section.Size.Y / 2 + th / 2 - 0.01) * (if top then 1 else -1)
+	local p = Kit.part(
+		section.Parent or section,
+		"CutFace",
+		Vector3.new(t, th, t),
+		section.CFrame * CFrame.new(0, y, 0),
+		color,
+		material
+	)
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p:SetAttribute("Section", section:GetAttribute("Section"))
+	ride(p, section)
+	return p
+end
+
+-- How deep a notch is cut into a section `width` wide, with `damage` of
+-- the `required` dealt.
+function TreeArt.NotchDepth(width: number, damage: number, required: number): number
+	if required <= 0 then
+		return width * TreeArt.NotchMaxDepth
+	end
+	return width * math.clamp(damage / required, 0, TreeArt.NotchMaxDepth)
+end
+
+-- A notch: a strip of shaded core across the face of `section` nearest
+-- `normal` (world space), `height` studs up from its bottom, cut in as
+-- deep as the damage so far. Its ends show on the side faces too, so you
+-- can see the cut grow. Attributes Section, Height, Damage, Required for
+-- the progress ring.
+function TreeArt.Notch(
+	def: WoodDef,
+	section: BasePart,
+	height: number,
+	normal: Vector3,
+	damage: number,
+	required: number
+): Part
+	local color, material = TreeArt.Core(def)
+	local cf = section.CFrame
+	local lx, lz = cf.XVector:Dot(normal), cf.ZVector:Dot(normal)
+	local t = widthOf(section)
+	local depth = TreeArt.NotchDepth(t, damage, required)
+	local y = math.clamp(height, 0, section.Size.Y) - section.Size.Y / 2
+	local size: Vector3
+	local at: Vector3
+	if math.abs(lx) >= math.abs(lz) then
+		local side = if lx >= 0 then 1 else -1
+		size = Vector3.new(depth + 0.02, TreeArt.NotchHeight, t + 0.04)
+		at = Vector3.new(side * (t / 2 - depth / 2 + 0.01), y, 0)
+	else
+		local side = if lz >= 0 then 1 else -1
+		size = Vector3.new(t + 0.04, TreeArt.NotchHeight, depth + 0.02)
+		at = Vector3.new(0, y, side * (t / 2 - depth / 2 + 0.01))
+	end
+	local p = Kit.part(
+		section.Parent or section,
+		"Notch",
+		size,
+		cf * CFrame.new(at),
+		Kit.shade(color, TreeArt.NotchShade),
+		material
+	)
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p:SetAttribute("Section", section:GetAttribute("Section"))
+	p:SetAttribute("Height", height)
+	p:SetAttribute("Damage", damage)
+	p:SetAttribute("Required", required)
+	ride(p, section)
+	return p
+end
+
+-- A v2 sapling, `growth` (0-1) of the way from a sprout to the size of its
+-- tree's first growth stage (TreeGen.Stages[1]). Not cuttable: every part
+-- is decoration. Ground at y = 0; PrimaryPart "Stem".
+function TreeArt.GrowingSapling(def: WoodDef, seed: number, growth: number): Model
+	local u = math.clamp(growth, 0, 1)
+	local rng = Kit.rng(seed + 13)
+	local paint = paintOf(def)
+	local model = Instance.new("Model")
+	model.Name = "Sapling_" .. def.id
+	local v2 = def.v2
+	local shape = v2 and v2.shape
+	local h = 1.6 + u * 2.6
+	local w = 0.22 + u * 0.18
+	local stem = Kit.part(
+		model,
+		"Stem",
+		Vector3.new(w, h, w),
+		CFrame.new(0, h / 2, 0) * CFrame.Angles(0, rng:range(0, math.pi / 2), 0),
+		paint.bark,
+		Enum.Material.Wood
+	)
+	Kit.decor(stem, false)
+	model.PrimaryPart = stem
+	local coneShaped = shape ~= nil and (shape.canopy == "tiers" or shape.canopy == "snowtiers")
+	if coneShaped then
+		local tiers = if u < 0.5 then 1 else 2
+		for i = 1, tiers do
+			local r = (0.9 + u * 1.3) * (1 - (i - 1) * 0.35)
+			local th = 1.8 + u * 1.6
+			local base = h * (0.35 + (i - 1) * 0.3)
+			Kit.cone(
+				model,
+				CFrame.new(0, base, 0) * CFrame.Angles(0, rng:range(0, math.pi), 0),
+				r,
+				th,
+				5,
+				function(k: number): Color3
+					return Kit.vary(paint.leaves[(k - 1) % #paint.leaves + 1], rng, 0.04)
+				end,
+				Enum.Material.SmoothPlastic,
+				0.08
+			)
+		end
+	elseif shape and shape.canopy == "fronds" then
+		for i = 1, 4 do
+			local a = i / 4 * math.pi * 2 + rng:range(-0.2, 0.2)
+			local top = Vector3.new(0, h, 0)
+			local tipAt = top
+				+ Vector3.new(math.cos(a), 0, math.sin(a)) * (1.2 + u * 1.6)
+				- Vector3.new(0, 0.5 + u * 0.4, 0)
+			Kit.decor(Kit.beam(model, "Frond", top, tipAt, 0.6 + u * 0.4, 0.1, rng:pick(paint.leaves)), false)
+		end
+	elseif shape and shape.canopy == "wisps" then
+		for i = 1, 2 do
+			local a = i * math.pi + rng:range(-0.3, 0.3)
+			local tipAt = Vector3.new(math.cos(a) * (0.5 + u * 0.6), h + 0.4 + u * 0.4, math.sin(a) * (0.5 + u * 0.6))
+			Kit.decor(
+				Kit.rod(model, "Twig", Vector3.new(0, h * 0.8, 0), tipAt, 0.14, paint.bark, Enum.Material.Wood),
+				false
+			)
+			Kit.decor(
+				Kit.ball(model, "Pod", 0.32, CFrame.new(tipAt), paint.glow or paint.accent, Enum.Material.Neon),
+				false
+			)
+		end
+	else
+		local size = 1.5 + u * 1.9
+		local blob = Kit.blob(
+			model,
+			"Leaves",
+			CFrame.new(0, h + size * 0.15, 0),
+			Vector3.new(size, size * 0.85, size),
+			3,
+			rng,
+			paint.leaves
+		)
+		if paint.glow and def.id ~= "frostwood" and blob[1] then
+			blob[1].Material = Enum.Material.Neon
+			blob[1].Color = paint.glow
+		end
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			Kit.decor(d, false)
+		end
+	end
 	return model
 end
 

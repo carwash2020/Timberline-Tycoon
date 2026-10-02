@@ -11,6 +11,11 @@
 --     TreeService.Decorate so they hide, fall and regrow with the tree.
 --   * StormGlow(parent, trunk, def, seed): a storm-struck tree's cracks,
 --     sparks and blue light (ParticleEmitter "StormSparks", PointLight).
+--   * SectionClue(parent, section, def, figure, seed) and ClueSection(tree):
+--     the same clues on a v2 section tree's square trunk section (lying flat
+--     on its four sides; every part carries the section's Section attribute
+--     so it rides with it), and which section a clue goes on (the second
+--     trunk section, so a cut at the foot fells it with the tree).
 --   * NameStake(name, seed): the planter's little stake (ground at y = 0,
 --     the sign facing -Z); PrimaryPart "Post".
 --   * ElderAura(radius, color?): an Elder's ring of glowing stones, rising
@@ -57,10 +62,23 @@ ForestArt.FigureColor = figureColor
 ---------------------------------------------------------------------------
 
 -- A trunk's shape: its upright frame (Y up the trunk, origin at its centre),
--- height, radius, and the band of bark you can see under the canopy.
-type Trunk = { frame: CFrame, height: number, radius: number, low: number, high: number }
+-- height, radius, and the band of bark you can see under the canopy. A
+-- section tree's trunk (a square "Section" block, V2_PLAN §3c) is `square`:
+-- its clues lie flat on its four sides.
+type Trunk = { frame: CFrame, height: number, radius: number, low: number, high: number, square: boolean }
 
 local function trunkOf(trunk: BasePart, def: WoodDef): Trunk
+	if trunk.Name == "Section" then
+		local height = trunk.Size.Y
+		return {
+			frame = trunk.CFrame,
+			height = height,
+			radius = math.min(trunk.Size.X, trunk.Size.Z) / 2,
+			low = height * 0.08,
+			high = height * 0.92,
+			square = true,
+		}
+	end
 	local height, diameter = trunk.Size.X, trunk.Size.Y
 	-- Pines and frostwood hide their trunks under the cone tiers from about
 	-- a third of the way up; the broadleaf woods show most of theirs.
@@ -71,12 +89,25 @@ local function trunkOf(trunk: BasePart, def: WoodDef): Trunk
 		radius = diameter / 2,
 		low = height * 0.06,
 		high = height * top,
+		square = false,
 	}
 end
 
 -- On the bark: `y` studs up from the trunk's foot, `angle` round it, `out`
--- studs past the bark. The CFrame's LookVector points straight out.
+-- studs past the bark. The CFrame's LookVector points straight out (on a
+-- square trunk: out of the side `angle` faces, at the point it points to).
 local function onBark(t: Trunk, y: number, angle: number, out: number): CFrame
+	if t.square then
+		local quarter = math.pi / 2
+		local face = math.floor(angle / quarter + 0.5) * quarter
+		-- Where the ray out at `angle` meets that side (its local X runs the
+		-- other way round from the angle).
+		local slide = -math.clamp(math.tan(angle - face), -0.9, 0.9) * t.radius
+		return t.frame
+			* CFrame.new(0, y - t.height / 2, 0)
+			* CFrame.Angles(0, face, 0)
+			* CFrame.new(slide, 0, -(t.radius + out))
+	end
 	return t.frame
 		* CFrame.new(0, y - t.height / 2, 0)
 		* CFrame.Angles(0, angle, 0)
@@ -350,6 +381,40 @@ function ForestArt.StormGlow(parent: Instance, trunk: BasePart, def: WoodDef, se
 	local model = holder(parent, "StormGlow")
 	storm(model, trunkOf(trunk, def), Kit.rng(seed + 977))
 	return model
+end
+
+-- The v2 section trees (V2_PLAN §3i): the bark clue on one trunk section
+-- (a TreeArt.FromSkeleton "Section" part), lying flat on its four sides.
+-- The Model and every part carry the section's Section attribute, so the
+-- clue rides with that section when it's cut free. Returns the Model.
+function ForestArt.SectionClue(parent: Instance, section: BasePart, def: WoodDef, figureId: string, seed: number): Model
+	local model = ForestArt.BarkClue(parent, section, def, figureId, seed)
+	local id = section:GetAttribute("Section")
+	model:SetAttribute("Section", id)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d:SetAttribute("Section", id)
+		end
+	end
+	return model
+end
+
+-- The trunk section a section tree's clue goes on: its second (so a cut at
+-- the foot fells the clue with the tree and the stub keeps none), or its
+-- first when the trunk is one section. Nil if `tree` has no sections.
+function ForestArt.ClueSection(tree: Model): BasePart?
+	local first: BasePart? = nil
+	for _, d in ipairs(tree:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "Section" then
+			local id = d:GetAttribute("Section")
+			if id == 2 then
+				return d
+			elseif id == 1 then
+				first = d
+			end
+		end
+	end
+	return first
 end
 
 ---------------------------------------------------------------------------
