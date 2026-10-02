@@ -300,6 +300,311 @@ function WorldPlan.Crater(): (Vector3, number)
 end
 
 ---------------------------------------------------------------------------
+-- Open-country scenery (WLD-01)
+---------------------------------------------------------------------------
+
+-- One thing a set piece is made of. `builder` is a PropArt set piece
+-- ("Outcrop", "RuinedCabin", "Windmill", "LookoutTower", from `seed`), a
+-- BuildingArt prop ("LogPile", "Haybale", from `seed`) or a BuildingArt
+-- fence ("Fence", `size` studs long). Its origin goes on `cframe`.
+export type SceneryItem = { builder: string, cframe: CFrame, seed: number, size: number }
+-- A set piece: MapBuilder builds each as one Atomic model named `kind`
+-- under TimberlineMap.Scenery. `center` is its base on the ground,
+-- `radius` its footprint (everything in it stands inside).
+export type ScenerySpot = { kind: string, center: Vector3, radius: number, items: { SceneryItem } }
+
+WorldPlan.SceneryGrade = 0.22 -- the steepest ground a piece stands on (rise over run across it)
+WorldPlan.ScenerySink = 2.5 -- the most its uphill side sits in the ground
+WorldPlan.SceneryRadius = {
+	Outcrop = 15,
+	LogPile = 7,
+	FenceLine = 13,
+	HayLine = 9,
+	RuinedCabin = 11,
+	Windmill = 10,
+	LookoutTower = 5,
+} :: { [string]: number }
+local SCENERY_CELL = 250 -- one group of pieces per cell of open country
+local SCENERY_ROAD_STEP = 150 -- and one every this far along the haul roads
+local SCENERY_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
+local SCENERY_EDGE = 1150 -- clear of the mountains at the world's edge
+local SCENERY_LOW = 75 -- lowland only
+-- Along a road, in turn (a random start per road), and what stands with each.
+local SCENERY_CYCLE =
+	{ "Outcrop", "FenceLine", "RuinedCabin", "LogPile", "Windmill", "Outcrop", "HayLine", "LookoutTower" }
+local SCENERY_COMPANIONS: { [string]: { string } } = {
+	Outcrop = { "Outcrop" },
+	LogPile = { "Outcrop" },
+	FenceLine = { "HayLine" },
+	HayLine = { "FenceLine" },
+	RuinedCabin = { "LogPile", "FenceLine" },
+	Windmill = { "HayLine", "FenceLine" },
+	LookoutTower = { "Outcrop", "LogPile" },
+}
+
+-- The items of a `kind` piece with its base at `base` (turned already).
+local function sceneryItems(kind: string, base: CFrame, rng: Kit.Rng): { SceneryItem }
+	local items: { SceneryItem } = {}
+	local function add(builder: string, offset: CFrame, size: number?)
+		table.insert(items, { builder = builder, cframe = base * offset, seed = rng:int(1, 99999), size = size or 0 })
+	end
+	if kind == "LogPile" then
+		add("LogPile", CFrame.Angles(0, rng:range(-0.2, 0.2), 0)) -- about 20 parts on its own
+	elseif kind == "FenceLine" then
+		local length = rng:range(16, 22)
+		add("Fence", CFrame.Angles(0, rng:range(-0.1, 0.1), 0), length)
+		for _ = 1, rng:int(1, 2) do
+			add(
+				"Haybale",
+				CFrame.new(rng:range(-length / 3, length / 3), 0, -rng:range(2.4, 3.4))
+					* CFrame.Angles(0, rng:range(-0.4, 0.4), 0)
+			)
+		end
+	elseif kind == "HayLine" then
+		local count = rng:int(3, 4)
+		for i = 1, count do
+			add(
+				"Haybale",
+				CFrame.new((i - (count + 1) / 2) * 3.4, 0, rng:range(-0.5, 0.5))
+					* CFrame.Angles(0, rng:range(-0.25, 0.25), 0)
+			)
+		end
+	else
+		add(kind, CFrame.identity)
+	end
+	return items
+end
+
+local cachedScenery: { ScenerySpot }? = nil
+
+-- Decor-only set pieces out in the open country (WLD-01): outcrops, log
+-- piles, fence and hay lines, ruined cabins, windmills, lookout towers.
+-- About one group per SCENERY_CELL square of open country, and one every
+-- SCENERY_ROAD_STEP along the haul roads, 18-60 studs off the road's edge,
+-- sides alternating. Each stands on dry lowland no steeper than
+-- SceneryGrade, its base at the lowest ground under its footprint (so
+-- nothing floats, and its uphill side sinks at most ScenerySink), 4+ studs
+-- off the roads, 8+ off any tree, clear of the boulders, the signs, the
+-- gondola's route, the town, the plots and every biome. Looks only:
+-- nothing there is chopped, collides or changes the balance.
+function WorldPlan.Scenery(): { ScenerySpot }
+	if cachedScenery then
+		return cachedScenery
+	end
+	local out: { ScenerySpot } = {}
+	local rng = Kit.rng(hashString("open-country scenery"))
+	local trees = WorldPlan.Trees()
+	local boulders = WorldPlan.Boulders()
+	local signs = WorldPlan.RoadSigns(function(): string
+		return ""
+	end)
+	local coast = WorldLayout.Coast
+	local beachX = coast.shoreX - coast.beachWidth - 40
+	-- The gondola's route (from town and from the Skyroot's foot to the top station).
+	local routes: { { Vector2 } } = {}
+	local sky = WorldPlan.Sky()
+	if sky then
+		local top = sky.gondolaTop.Position
+		local town = WorldPlan.Town().gondola.Position
+		local base = sky.gondolaBase.Position
+		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
+		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+	local discs: { { x: number, z: number, r: number } } = {}
+	for _, biome in ipairs(BiomeData.All()) do
+		local area = biome.area
+		if area then
+			local margin = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 - area.radius else 20
+			table.insert(discs, { x = area.x, z = area.z, r = area.radius + margin })
+		end
+	end
+
+	-- Where a piece of footprint `r` could stand at (x, z): its base height,
+	-- or nil.
+	local function fits(x: number, z: number, r: number): number?
+		if math.abs(x) > SCENERY_EDGE or math.abs(z) > SCENERY_EDGE or x > beachX then
+			return nil
+		end
+		for _, d in ipairs(discs) do
+			local dx, dz = x - d.x, z - d.z
+			if dx * dx + dz * dz < (d.r + r) ^ 2 then
+				return nil
+			end
+		end
+		if TerrainGen.RoadClearance(x, z) < r + 4 then
+			return nil
+		end
+		for _, route in ipairs(routes) do
+			if WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) < r + 30 then
+				return nil
+			end
+		end
+		for _, t in ipairs(trees) do
+			local dx, dz = x - t.position.X, z - t.position.Z
+			if dx * dx + dz * dz < (r + 8) ^ 2 then
+				return nil
+			end
+		end
+		for _, b in ipairs(boulders) do
+			local dx, dz = x - b.position.X, z - b.position.Z
+			if dx * dx + dz * dz < (r + b.size / 2 + 4) ^ 2 then
+				return nil
+			end
+		end
+		for _, sign in ipairs(signs) do
+			local p = sign.cframe.Position
+			if (Vector2.new(x - p.X, z - p.Z)).Magnitude < r + 12 then
+				return nil
+			end
+		end
+		for _, q in ipairs(out) do
+			local dx, dz = x - q.center.X, z - q.center.Z
+			if dx * dx + dz * dz < (r + q.radius + 4) ^ 2 then
+				return nil
+			end
+		end
+		local lo, hi = math.huge, -math.huge
+		for _, sample in ipairs(WorldPlan.SceneryFootprint(x, z, r)) do
+			local sx, sz = sample.X, sample.Y
+			if TerrainGen.WaterLevelAt(sx, sz) ~= nil or WorldLayout.FlatWeight(sx, sz) > 0 then
+				return nil
+			end
+			local h = TerrainGen.HeightAt(sx, sz)
+			lo, hi = math.min(lo, h), math.max(hi, h)
+		end
+		if hi > SCENERY_LOW or hi - lo > math.min(WorldPlan.SceneryGrade * 2 * r, WorldPlan.ScenerySink) then
+			return nil
+		end
+		return lo - 0.1
+	end
+
+	-- Puts a `kind` piece at (x, z) facing `yaw` if it fits there.
+	local function try(kind: string, x: number, z: number, yaw: number): ScenerySpot?
+		local r = WorldPlan.SceneryRadius[kind]
+		local y = fits(x, z, r)
+		if not y then
+			return nil
+		end
+		local center = Vector3.new(x, y, z)
+		local spot = {
+			kind = kind,
+			center = center,
+			radius = r,
+			items = sceneryItems(kind, CFrame.new(center) * CFrame.Angles(0, yaw, 0), rng),
+		}
+		table.insert(out, spot)
+		return spot
+	end
+
+	-- A few companions round a piece (a homestead, a pair of outcrops).
+	local function companions(main: ScenerySpot)
+		for _, kind in ipairs(SCENERY_COMPANIONS[main.kind] or {}) do
+			local r = WorldPlan.SceneryRadius[kind]
+			local start = rng:range(0, math.pi * 2)
+			for k = 0, 7 do
+				local a = start + k * math.pi / 4
+				local d = main.radius + r + rng:range(6, 18)
+				local x, z = main.center.X + math.cos(a) * d, main.center.Z + math.sin(a) * d
+				if try(kind, x, z, a + math.pi / 2 + rng:range(-0.4, 0.4)) then
+					break
+				end
+			end
+		end
+	end
+
+	-- Along the haul roads, every SCENERY_ROAD_STEP, sides alternating.
+	local mains: { Vector3 } = {}
+	for _, name in ipairs(SCENERY_ROADS) do
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == name then
+				local pts = road.points
+				local turn = rng:int(1, #SCENERY_CYCLE)
+				local side = if rng:next() < 0.5 then 1 else -1
+				local walked, nextAt = 0, SCENERY_ROAD_STEP / 2
+				for i = 1, #pts - 1 do
+					local a, b = pts[i], pts[i + 1]
+					local len = (b - a).Magnitude
+					local dir = (b - a).Unit
+					local normal = Vector2.new(-dir.Y, dir.X)
+					while nextAt <= walked + len do
+						local along = a + dir * (nextAt - walked)
+						local kind = SCENERY_CYCLE[(turn - 1) % #SCENERY_CYCLE + 1]
+						local placed: ScenerySpot? = nil
+						for _, s in ipairs({ side, -side }) do
+							for _, shift in ipairs({ 0, 25, -25, 50, -50 }) do
+								for _, off in ipairs({ 18, 26, 36, 48, 60 }) do
+									local at = along + dir * shift + normal * (s * (road.width / 2 + off))
+									-- Its front (-Z) toward the road.
+									local yaw = math.atan2(normal.X * s, normal.Y * s)
+									placed = try(kind, at.X, at.Y, yaw)
+									if placed then
+										break
+									end
+								end
+								if placed then
+									break
+								end
+							end
+							if placed then
+								break
+							end
+						end
+						if placed then
+							table.insert(mains, placed.center)
+							companions(placed)
+						end
+						turn += 1
+						side = -side
+						nextAt += SCENERY_ROAD_STEP
+					end
+					walked += len
+				end
+			end
+		end
+	end
+
+	-- Then one group per cell of open country that has none yet.
+	local kinds = { "Outcrop", "Outcrop", "LogPile", "FenceLine", "HayLine", "RuinedCabin", "Windmill", "LookoutTower" }
+	for cx = -SCENERY_EDGE, SCENERY_EDGE - 1, SCENERY_CELL do
+		for cz = -SCENERY_EDGE, SCENERY_EDGE - 1, SCENERY_CELL do
+			local taken = false
+			for _, m in ipairs(mains) do
+				if m.X >= cx and m.X < cx + SCENERY_CELL and m.Z >= cz and m.Z < cz + SCENERY_CELL then
+					taken = true
+					break
+				end
+			end
+			if not taken then
+				local kind = rng:pick(kinds)
+				for _ = 1, 24 do
+					local x, z = rng:range(cx + 20, cx + SCENERY_CELL - 20), rng:range(cz + 20, cz + SCENERY_CELL - 20)
+					local placed = try(kind, x, z, rng:range(0, math.pi * 2))
+					if placed then
+						table.insert(mains, placed.center)
+						companions(placed)
+						break
+					end
+				end
+			end
+		end
+	end
+	cachedScenery = out
+	return out
+end
+
+-- The ground samples a piece of footprint `r` at (x, z) stands on: its
+-- middle and rings at r / 2 and r (x, z in a Vector2's X, Y).
+function WorldPlan.SceneryFootprint(x: number, z: number, r: number): { Vector2 }
+	local out = { Vector2.new(x, z) }
+	for k = 0, 7 do
+		local a = k * math.pi / 4
+		table.insert(out, Vector2.new(x + math.cos(a) * r, z + math.sin(a) * r))
+		table.insert(out, Vector2.new(x + math.cos(a + math.pi / 8) * r / 2, z + math.sin(a + math.pi / 8) * r / 2))
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
 -- The town
 ---------------------------------------------------------------------------
 

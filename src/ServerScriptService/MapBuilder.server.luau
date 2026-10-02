@@ -11,7 +11,8 @@
 --      its greenery (ornamental trees no one can chop, bushes, flowers).
 --   5. The biomes: every wild tree (BiomeData counts) on the terrain,
 --      boulders, the volcano's crater, the grove's glowing mushrooms, the
---      palm island offshore, signposts where the roads arrive.
+--      palm island offshore, signposts where the roads arrive, and the
+--      open country's scenery (decor set pieces).
 --   6. The Skyroot and the Aether Isles: isles, bridges, Lumenwood, Sky
 --      Shard nodes, Cloud Chutes, the Starfall Forge, the waterfall.
 --   7. The backdrop beyond the world's edge (mountains, sea, the volcano's
@@ -379,6 +380,41 @@ end)
 step("5. The road signs", function()
 	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
 		place(atomic(BuildingArt.Signpost(sign.text)), sign.cframe)
+	end
+end)
+
+-- Open-country scenery (WLD-01): outcrops, log piles, fence and hay lines,
+-- ruined cabins, windmills and lookout towers between the biomes and along
+-- the haul roads (WorldPlan.Scenery). Each piece is its own Atomic model
+-- under TimberlineMap.Scenery. Looks only: nothing in it collides, is
+-- clicked or touched, and parts under a stud cast no shadow.
+step("5. The scenery", function()
+	local folder = Instance.new("Folder")
+	folder.Name = "Scenery"
+	folder.Parent = map
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		local piece = Kit.model(spot.kind)
+		for _, item in ipairs(spot.items) do
+			local model: Model?
+			if item.builder == "Fence" then
+				model = BuildingArt.Fence(item.size)
+			elseif item.builder == "LogPile" or item.builder == "Haybale" then
+				model = BuildingArt.Prop(item.builder, item.seed)
+			else
+				model = PropArt.SetPiece(item.builder, item.seed)
+			end
+			if model then
+				Kit.placeAt(model, item.cframe)
+				model.Parent = piece
+			end
+		end
+		for _, d in ipairs(piece:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local size = d.Size
+				Kit.decor(d, if math.max(size.X, size.Y, size.Z) < 1 then false else nil)
+			end
+		end
+		atomic(piece).Parent = folder
 	end
 end)
 

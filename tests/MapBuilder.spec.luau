@@ -460,4 +460,58 @@ return function(t)
 		t.ok(s.map:FindFirstChild("WorldEdge"), "the walls still built")
 		t.ok(s.clockStarted, "the clock still started")
 	end)
+
+	t.test(
+		"the scenery: an Atomic model per WorldPlan.Scenery piece in a Scenery folder, all decor (WLD-01)",
+		function()
+			local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+			local s = build()
+			t.eq(s.warnings, {})
+			lastStepsRan(s)
+			local folder = s.map:FindFirstChild("Scenery")
+			t.ok(folder and folder:IsA("Folder"), "a Scenery folder in TimberlineMap")
+			local spots = WorldPlan.Scenery()
+			local models = folder:GetChildren()
+			t.eq(#models, #spots)
+			local total = 0
+			for i, model in ipairs(models) do
+				t.ok(model:IsA("Model"), "a Model")
+				t.eq(model.Name, spots[i].kind)
+				t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, model.Name .. " streams Atomic")
+				local n = 0
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") then
+						n += 1
+						t.eq(d.Anchored, true)
+						t.ok(
+							not d.CanCollide and not d.CanQuery and not d.CanTouch,
+							model.Name .. ": " .. d.Name .. " is decor"
+						)
+						local size = d.Size
+						if math.max(size.X, size.Y, size.Z) < 1 then
+							t.eq(d.CastShadow, false, model.Name .. ": a small " .. d.Name .. " casts a shadow")
+						end
+					end
+				end
+				t.ok(n >= 1 and n <= 25, model.Name .. ": " .. n .. " parts")
+				total += n
+			end
+			t.ok(total >= 3000 and total <= 5000, total .. " scenery parts")
+		end
+	)
+
+	t.test("an erroring scenery fails its step alone: the rest of the world, SellArea, spawning", function()
+		local s = build({
+			worldPlan = {
+				Scenery = function()
+					error("x")
+				end,
+			},
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The scenery failed", 1, true), s.warnings[1])
+		lastStepsRan(s)
+		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
+		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
+	end)
 end
