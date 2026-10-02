@@ -540,7 +540,12 @@ The next retention milestone after dailies, in this order:
 ## 13. Art direction — cozy low-poly
 
 Soft shapes, warm light, readable at a glance. Distinct from LT2's classic
-blocky look; built for phones (low part counts, no per-tree scripts).
+blocky look; built for phones (low part counts, no per-tree scripts). After
+the first live session Connor asked for "a little more" LT2 styling in the
+landscape (October 2026): a deeper meadow green, brown rock and boulders,
+pale gravel haul roads, and landmarks (a footbridge, docks, a lighthouse).
+The cozy palette stays; the land borrows LT2's wide open spaces and
+brown-on-green read.
 
 **Biome palettes**
 - Starter Forest: warm greens, honey-brown oak, golden light.

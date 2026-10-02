@@ -30,6 +30,65 @@ Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
 
+## Glitch wave 1 (after the first live session, 2 October 2026)
+
+Connor played the live game and sent screenshots: NPCs standing chest-deep
+in the cobbles, a Rustbucket buried to its fenders in the lot, the parking
+paint missing, players spawning under the ground, tall grass inside the
+shops, lots of things you could walk through, and a landscape that still
+looked bare. What this wave changed, and how to check it.
+
+### How to update the live game
+
+In PowerShell, in the game folder:
+
+```powershell
+Get-Process rojo -ErrorAction SilentlyContinue | Stop-Process
+git fetch origin
+git checkout main
+git reset --hard origin/main
+git log --oneline -1
+rojo build -o build.rbxlx
+Invoke-Item build.rbxlx
+```
+
+In Studio: Play once with **View > Output** open (checks below), Stop,
+then **File > Publish to Roblox**. On create.roblox.com open the game and
+use **Restart servers for updates** (or **Shut down all servers**).
+
+On the live game, the same Output lines are in the in-game console: press
+**F9** (or type `/console` in chat) and pick **Server**.
+
+### What to check
+
+| # | Do this | Good looks like |
+|---|---|---|
+| 1 | Play with Output open | A line `[TerrainBuilder] Calibration: ground ...; water ...` and then `[TerrainBuilder] Town ground at y = 0.0x (6 probes): good`. **Paste both lines to Claude** whatever they say: they are the first real measurement of where Roblox draws our terrain. A yellow `Town ground is at y = ...` warning means the ground is still off |
+| 2 | Look at the townsfolk: Millie by the sell pad, the three shopkeepers, Murph, the walkers (Rosa, Pip, ...) | Feet on the ground, whole legs visible. Nobody waist-deep |
+| 3 | Walk to the parking lot | Your truck sits on its wheels; every slot shows its pale lines, number and lamp |
+| 4 | Respawn a few times (reset your character) | You appear standing on the spawn pad, never inside the ground |
+| 5 | Walk into each shop and the gondola station | Packed dirt round the walls and no grass poking up through the floor or hiding the fronts; grass elsewhere is shorter |
+| 6 | Look around the town and a forest | Trees, stumps, boulders, signposts and flowers stand on the ground: nothing sunk, nothing floating |
+| 7 | Walk into the solid-looking things (COL-01): in town the log piles east of the mill, the mailbox at the west end of the street, the benches' backs, the tool rack, the hand cart, the sawmill's log deck and carriage log, the Tool Shed's grindstone (out front) and workbench, Hearth & Home's coat stand and boot shelf, the Dealership's tyre stack, the gondola lectern, Murph's rocks and firewood, the town rocks | You stop at each one (you can stand on the logs and rocks) |
+| 8 | Out in the country: an outcrop (up the Snow Road), a fence or hay line, a lookout tower, a ruined cabin, a windmill, the island palms' trunks, a biome road sign's board | You stop and can climb the rocks; sails, braces and ladder rungs are still walk-through. Driving along the roads touches none of them |
+| 9 | Drive a Logging Rig from the street onto the sell pad, back out, and between the SELL LOGS HERE posts; walk from the spawn to Murph under TO THE WOODS | Nothing in the way (those boards stay walk-through on purpose) |
+| 10 | Cross each rope bridge on the isles and walk sideways into the rope | An invisible wall stops you; getting on and off at the ends is smooth |
+| 11 | Frame rate in the open country (about 1,650 more solid parts) | Same as before |
+| 12 | A little more Lumber Tycoon 2 (STY-01..05): stand on the spawn, then drive the Snow Road north out of town and look at the hills and mountains | A deeper green meadow, brown cliffs and ridges under white snow, and the haul roads with a pale gravel crown between dirt verges (the town's street stays dirt). If the gravel looks like tiles, tell Claude (it's one setting) |
+| 13 | West of the Starter Forest, about (-124, -177) and (-261, -189), and the Hills' grassland | Groups of 3-5 half-buried brown boulders; every lone boulder and outcrop is brown too. They block you, and none sit on a road or in water |
+| 14 | The timber footbridge over the river at about (-877, 575); the plank docks on Mirror Lake (-716, -111) and on the east coast (1194, -760) | You walk on and off the bridge without a hop, the rails stop you, TIMBER BRIDGE and MIRROR LAKE signs read. Each dock has a ladder, a lantern (lit at dusk) and a rowboat you can walk through |
+| 15 | On the spawn pad, look east | A small red-and-white lighthouse on the horizon just left of the PLOT DISTRICT sign. At night its lamp glows (Server command bar: `workspace:SetAttribute("ClockOverride", 22)`, `nil` to clear) |
+| 16 | `ClockOverride` 1, then 8, then 12 (and 12 on a phone emulator) | A little hazier at night, thinning through the morning, exactly today's look by day |
+
+Left walk-through on purpose: town signpost boards (TO THE WOODS hangs
+over the spawn walk; SELL LOGS HERE over the rig's lane), rocks at
+signpost feet (too close to the roads), the mailbox post (the box still
+stops you), the wheelbarrow on the plaza, sawdust piles, bushes, flowers,
+leaves and branches, felled logs, plot rails, and everything the client
+scatters on its own (rocks, stumps and logs in the forests: a collider
+only one player has would fight the truck physics), and bark-clue burls
+(a round lump would collide as a box).
+
 ## Tonight (phase 10): smoke test and what each build changed
 
 Players arrive at 9:00 pm Mountain time (03:00 UTC). Everything lands on

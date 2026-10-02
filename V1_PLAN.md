@@ -22,6 +22,11 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 ## Must have for V1
 
 ### 0. Prove the core (blocks everything else feeling right)
+- 🟡 Live on Roblox since 1 October 2026 (Connor played it on PC and Xbox).
+  Glitch wave 1 (PHASE2_NOTES.md) fixed what the first session showed:
+  sunk NPCs, trucks and spawns (terrain calibration), grass through shop
+  floors, walk-through props, and a plain landscape (a little more LT2).
+  Next: Connor's checks on it, then wave 2 from what players hit.
 - 🟡 Phase 1 core loop (PHASE1_NOTES.md checklist)
 - 🟡 Phase 2+ and the October 2026 redesign, all on `main` now
   (PHASE2_NOTES.md checklists, "The redesign" first)

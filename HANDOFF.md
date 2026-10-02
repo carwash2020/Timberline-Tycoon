@@ -159,8 +159,9 @@ No scene shows the player's eye level or night yet (WLD-19 adds them). Until the
 
 | Thing | Values (today → target) | Lives in |
 |---|---|---|
-| Meadow | Grass 116,170,74, mixed by noise with LeafyGrass 86,140,62 (target) | `TerrainGen.MaterialColors` |
-| Roads, paths / plaza | Ground 150,116,78 / Cobblestone 170,160,146 | same |
+| Meadow | Grass 100,152,64, mixed by noise with LeafyGrass 76,126,54 (STY-01, toward LT2; was 116,170,74 and 86,140,62) | `TerrainGen.MaterialColors` |
+| Roads, paths / plaza | Ground 150,116,78 / Cobblestone 170,160,146. Haul roads out of town: a Pavement 182,174,158 gravel crown between Ground verges (STY-02) | same |
+| Rock | Rock 122,98,78 (brown, STY-01). Boulders, outcrops and clusters: `PropArt.BrownTones` (two tones); snowy and volcanic boulders keep theirs | `TerrainGen`, `PropArt` |
 | Sand, water | Sand 226,205,150; water 62,140,150 at transparency 0.55, reflectance 0.45 | `TerrainGen`, `TerrainBuilder.setLook` |
 | Snow | Snow 238,244,250 → 222,230,240; Glacier 172,214,236 → 150,196,224; dark Rock/Slate outcrops | `TerrainGen` |
 | Volcano | Basalt 52,46,44, Slate 74,66,62; CrackedLava only in thin veins at 220,90,35 (today: 255,108,30 patches) | `TerrainGen` |
@@ -466,6 +467,9 @@ A split id (WLD-03, WLD-06, WLD-10, WLD-19) shows up as done once its first part
 - Screen DisplayOrders are a set: FigureReveal 12, TimberlineHUD 10, SettingsUI 10, BlueprintPlacer 6, ShopUI 5, DailyUI 3, HeartseedPouch 3, Corner 2, PlotUI 2, SideButtons 1, LeftColumn 0. Change them together. SideButtons, ShopUI and FigureReveal are IgnoreGuiInset on purpose, so SideButtons' offset conversions and the HudLayout tests move together.
 - `UITheme.IsPhone()` needs touch, no keyboard and a viewport under 600 tall, so an iPad gets desktop sizes. Test both paths.
 - `Kit.signText` (PixelsPerStud 40, LightInfluence, font) changes every sign in the game, the isles included.
+
+**The engine draws terrain where it likes (learned on the live game, October 2026).** The first live session showed the town's ground drawn 2-3 studs above the height TerrainBuilder wrote: NPCs waist-deep, parked trucks buried, the lot paint gone, spawns underground. TerrainBuilder now calibrates first (TER-01: flat test pads far below the map, a ray onto each, `Shared/World/TerrainFit`) and writes every height and water level so it is drawn at `TerrainGen.HeightAt`; Output prints `[TerrainBuilder] Calibration: ...` and `Town ground at y = ...`, and Workspace gets TerrainOffset, WaterOffset and TownGroundY. `TerrainBuilder.LiftOnto` is the second guard for NPCs, parked trucks and the spawn. Keep placing things at HeightAt. Grass decoration grows through thin parts on Grass terrain: put a non-grass TownFloors patch under any new building (TER-02).
+- **Collisions (COL-01).** `Kit.solid` undoes `Kit.decor`; `Kit.rock` collides; scenery keeps its builders' collision; `BuildingArt.Signpost(text, lit?, solidBoard?)`; sky bridges have invisible `BridgeGuard` parts (Roblox ignores CanQuery = false while CanCollide is true, so rays can hit them). Client-only decor (AmbientLife) must never collide: a collider only one client has fights the driver-simulated truck physics.
 
 **Prebuilt terrain.** If the published place has the `Workspace.Terrain` attribute `Prebuilt = true`, TerrainBuilder skips the build. Any later TerrainGen, WorldLayout or BiomeData change then leaves trees and signs floating or buried until the terrain is rebuilt. Prebake last. Publishing a fresh `build.rbxlx` over the place afterwards throws the baked terrain away (and its attribute), which is safe but brings back the slow start.
 
