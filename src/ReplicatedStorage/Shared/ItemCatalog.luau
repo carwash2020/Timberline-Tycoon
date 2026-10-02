@@ -28,8 +28,10 @@ export type AxeV2 = {
 	cooldown: number,
 	vs: { [string]: AxeStatsV2 }?, -- by WoodData id
 	-- A forged axe under v2: u³ of each wood (by WoodData id) the forge
-	-- takes in place of its recipe's logs (the cash and materials stay).
+	-- takes in place of its recipe's logs, and the forge's cash (V2_PLAN
+	-- §2c; the recipe's own when nil). The materials stay.
 	forgeWood: { [string]: number }?,
+	forgeCash: number?,
 }
 
 export type AxeDef = {
@@ -330,6 +332,7 @@ local AXES_V2: { [string]: AxeV2 } = {
 		cooldown = 0.4,
 		vs = { emberwood = { damage = 2.5 }, lumenwood = { damage = 3.9 } },
 		forgeWood = { lumenwood = 60 }, -- the v1 recipe's 40 logs at ProfileSchema.ForgeU3PerLog (1.5)
+		forgeCash = 20000, -- V2_PLAN §2c
 	},
 }
 local VEHICLES_V2: { [string]: number } = {

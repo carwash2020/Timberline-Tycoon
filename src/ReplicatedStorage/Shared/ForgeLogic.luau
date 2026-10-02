@@ -105,7 +105,8 @@ function ForgeLogic.RecipeV2(axe: ItemCatalog.AxeDef): RecipeV2?
 	if not forge or not wood then
 		return nil
 	end
-	return { cash = forge.cash, wood = wood, materials = forge.materials }
+	local cash = if axe.v2 and axe.v2.forgeCash then axe.v2.forgeCash else forge.cash
+	return { cash = cash, wood = wood, materials = forge.materials }
 end
 
 local function woodName(id: string): string
@@ -165,7 +166,7 @@ function ForgeLogic.MissingV2(recipe: RecipeV2, stock: StockV2): { string }
 	return out
 end
 
--- "Lumenwood 18/60 u³ · Sky Shards 5/12 · $60,000" for the forge.
+-- "Lumenwood 18/60 u³ · Sky Shards 5/12 · $20,000" for the forge.
 function ForgeLogic.ProgressV2(recipe: RecipeV2, stock: StockV2): string
 	local parts: { string } = {}
 	for id, need in pairs(recipe.wood) do

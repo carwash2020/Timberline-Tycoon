@@ -45,8 +45,8 @@ return function(t)
 		return { cash = cash, wood = { lumenwood = lumenwood }, materials = { SkyShard = shards } }
 	end
 
-	t.test("v2: the recipe is 60 u³ of lumenwood (40 logs x 1.5), the forge's cash and shards", function()
-		t.eq(v2, { cash = 60000, wood = { lumenwood = 60 }, materials = { SkyShard = 12 } })
+	t.test("v2: the recipe is 60 u³ of lumenwood (40 logs x 1.5), $20,000 (V2_PLAN §2c) and the shards", function()
+		t.eq(v2, { cash = 20000, wood = { lumenwood = 60 }, materials = { SkyShard = 12 } })
 		t.eq(ForgeLogic.RecipeV2(ItemCatalog.GetAxe("SteelAxe")), nil, "not forged")
 		local Schema = t.loader():server("ProfileSchema")
 		t.eq(v2.wood.lumenwood, recipe.logs.lumenwood * Schema.ForgeU3PerLog, "the conversion MigrateV2 uses")
@@ -55,7 +55,7 @@ return function(t)
 	t.test("v2: what's missing, in u³", function()
 		t.eq(
 			ForgeLogic.MissingV2(v2, stockV2(0, 0, 0)),
-			{ "$60,000 more", "60 more u³ of Lumenwood", "12 more Sky Shards" }
+			{ "$20,000 more", "60 more u³ of Lumenwood", "12 more Sky Shards" }
 		)
 		t.eq(ForgeLogic.MissingV2(v2, stockV2(70000, 47.5, 12)), { "12.5 more u³ of Lumenwood" })
 		t.eq(
@@ -63,8 +63,8 @@ return function(t)
 			{ "0.1 more u³ of Lumenwood" },
 			"never 0 while short"
 		)
-		t.eq(ForgeLogic.MissingV2(v2, stockV2(60000, 60, 12)), {})
-		t.eq(ForgeLogic.MissingV2(v2, stockV2(60000, 59.9999999, 12)), {}, "float noise isn't short")
+		t.eq(ForgeLogic.MissingV2(v2, stockV2(20000, 60, 12)), {})
+		t.eq(ForgeLogic.MissingV2(v2, stockV2(20000, 59.9999999, 12)), {}, "float noise isn't short")
 		t.eq(ForgeLogic.MissingV2(v2, { cash = 0, wood = {}, materials = {} })[2], "60 more u³ of Lumenwood")
 	end)
 
@@ -76,11 +76,11 @@ return function(t)
 	end)
 
 	t.test("v2: the progress line", function()
-		t.eq(ForgeLogic.ProgressV2(v2, stockV2(0, 18, 5)), "Lumenwood 18/60 u³ · Sky Shards 5/12 · $60,000")
-		t.eq(ForgeLogic.ProgressV2(v2, stockV2(0, 59.96, 5)), "Lumenwood 59.9/60 u³ · Sky Shards 5/12 · $60,000")
+		t.eq(ForgeLogic.ProgressV2(v2, stockV2(0, 18, 5)), "Lumenwood 18/60 u³ · Sky Shards 5/12 · $20,000")
+		t.eq(ForgeLogic.ProgressV2(v2, stockV2(0, 59.96, 5)), "Lumenwood 59.9/60 u³ · Sky Shards 5/12 · $20,000")
 		t.eq(
 			ForgeLogic.ProgressV2(v2, { cash = 0, wood = {}, materials = {} }),
-			"Lumenwood 0/60 u³ · Sky Shards 0/12 · $60,000"
+			"Lumenwood 0/60 u³ · Sky Shards 0/12 · $20,000"
 		)
 	end)
 

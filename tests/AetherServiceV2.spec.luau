@@ -518,14 +518,14 @@ return function(t)
 		t.ok(s.gone(a), "into the forge")
 		t.eq(profile.forgeWood.lumenwood, 54)
 		t.eq(s.players[1].attrs.ForgeWood, "lumenwood=54")
-		t.eq(toastsFor(s, 1), { "Into the forge: 4 u³. Lumenwood 54/60 u³ · Sky Shards 0/12 · $60,000" })
+		t.eq(toastsFor(s, 1), { "Into the forge: 4 u³. Lumenwood 54/60 u³ · Sky Shards 0/12 · $20,000" })
 		local b = s.piece("b", 1, "lumenwood", 10, nil, s.onHearth)
 		s.settle()
 		t.ok(s.gone(b), "a piece bigger than what's left is used up")
 		t.eq(profile.forgeWood.lumenwood, 60, "never past the recipe")
 		t.eq(
 			toastsFor(s, 1)[2],
-			"Into the forge: 6 u³ (all it needed). Lumenwood 60/60 u³ · Sky Shards 0/12 · $60,000"
+			"Into the forge: 6 u³ (all it needed). Lumenwood 60/60 u³ · Sky Shards 0/12 · $20,000"
 		)
 		local c = s.piece("c", 1, "lumenwood", 3, nil, s.onHearth)
 		s.settle()
@@ -571,7 +571,7 @@ return function(t)
 		profile.forgeWood.lumenwood = 60
 		forgePrompt.fire(s.player(1))
 		t.eq(s.granted, { "StarfallAxe" })
-		t.eq(profile.cash, 10000)
+		t.eq(profile.cash, 50000, "the v2 forge's $20,000 (V2_PLAN §2c)")
 		t.eq(profile.forgeWood.lumenwood, 0)
 		t.eq(profile.forgeLogs.lumenwood, 40, "forgeLogs untouched (a rollback to v1 keeps it)")
 		t.eq(profile.materials.SkyShard, 0)
@@ -591,7 +591,7 @@ return function(t)
 		s.profiles[1].materials = { SkyShard = 5 }
 		feed.fire(s.player(1))
 		t.eq(toastsFor(s, 1), {
-			"Lay plain Lumenwood on the forge to feed it. Lumenwood 18/60 u³ · Sky Shards 5/12 · $60,000",
+			"Lay plain Lumenwood on the forge to feed it. Lumenwood 18/60 u³ · Sky Shards 5/12 · $20,000",
 		})
 	end)
 
