@@ -416,6 +416,34 @@ EnvironmentData.WeatherOverrides = {
 	},
 } :: { [string]: Override }
 
+-- The night mist (STY-05), Lumber Tycoon 2's way: the air thickens late
+-- in the evening (from 22:00, full by 23:00), holds through the night and
+-- lifts through the morning (from 06:30, clear by 09:30). MistWeight(clock)
+-- is how much of Mist.override Blend applies at that hour: after the
+-- hour's own light, before the biome and the weather (so the Fog weather
+-- and the isles' own air still set theirs). Never on the isles (above the
+-- clouds), and never by day: 09:30 to 22:00 looks exactly as it did, so a
+-- phone's horizon stays clear.
+EnvironmentData.Mist = {
+	thickFrom = 22,
+	thick = 23,
+	liftFrom = 6.5,
+	clear = 9.5,
+	override = { add = { atmosphereDensity = 0.07, atmosphereHaze = 0.6 } } :: Override,
+}
+
+-- 0..1: how thick the night mist is at `clockTime` (0..24).
+function EnvironmentData.MistWeight(clockTime: number): number
+	local h = clockTime % 24
+	local m = EnvironmentData.Mist
+	if h >= m.thickFrom then
+		return smoothstep((h - m.thickFrom) / (m.thick - m.thickFrom))
+	elseif h < m.liftFrom then
+		return 1
+	end
+	return 1 - smoothstep((h - m.liftFrom) / (m.clear - m.liftFrom))
+end
+
 local NUMBER_SET: { [string]: boolean } = {}
 for _, k in ipairs(EnvironmentData.NumberKeys) do
 	NUMBER_SET[k] = true
@@ -449,6 +477,7 @@ end
 for name, o in pairs(EnvironmentData.WeatherOverrides) do
 	checkOverride(name, o)
 end
+checkOverride("Mist", EnvironmentData.Mist.override)
 
 local function copy(s: LightingState): LightingState
 	return table.clone(s)
@@ -541,10 +570,14 @@ function EnvironmentData.TimeOfDay(clockTime: number): LightingState
 	return EnvironmentData.Lerp(prev.state, nextFrame.state, t)
 end
 
--- The full picture: the hour's light, then the biome you're in ("" or nil
--- = open country), then the weather at `intensity` (0..1).
+-- The full picture: the hour's light and its night mist, then the biome
+-- you're in ("" or nil = open country), then the weather at `intensity`
+-- (0..1).
 function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: string?, intensity: number?): LightingState
 	local s = EnvironmentData.TimeOfDay(clockTime)
+	if biomeId ~= "sky" then
+		EnvironmentData.Apply(s, EnvironmentData.Mist.override, EnvironmentData.MistWeight(clockTime))
+	end
 	local biome = if biomeId then EnvironmentData.BiomeOverrides[biomeId] else nil
 	if biome then
 		EnvironmentData.Apply(s, biome, 1)

@@ -629,4 +629,139 @@ return function(t)
 		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
 		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
 	end)
+
+	-- Phase 10, STY: the landscape's landmarks (one new step, "5. The landmarks").
+	t.test("the boulder clusters: an Atomic model per cluster in a BoulderClusters folder, rocks colliding", function()
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local s = build()
+		t.eq(s.warnings, {})
+		lastStepsRan(s)
+		local folder = s.map:FindFirstChild("BoulderClusters")
+		t.ok(folder and folder:IsA("Folder"), "a BoulderClusters folder in TimberlineMap")
+		local spots = WorldPlan.BoulderClusters()
+		local models = folder:GetChildren()
+		t.eq(#models, #spots)
+		for i, model in ipairs(models) do
+			t.ok(model:IsA("Model"), "a Model")
+			t.eq(model.Name, "BoulderCluster")
+			t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, "streams Atomic")
+			local rocks = model:GetChildren()
+			t.eq(#rocks, #spots[i].rocks, "one rock model per rock")
+			for k, rock in ipairs(rocks) do
+				local hard = 0
+				for _, d in ipairs(rock:GetDescendants()) do
+					if d:IsA("BasePart") then
+						t.eq(d.Anchored, true)
+						if d.CanCollide then
+							hard += 1
+						end
+					end
+				end
+				t.eq(hard, 3, "a rock's three blocks collide, as a lone boulder's do")
+				-- Where WorldPlan says: every part round the rock's spot.
+				local spot = spots[i].rocks[k]
+				for _, d in ipairs(rock:GetDescendants()) do
+					if d:IsA("BasePart") then
+						local at = d.CFrame.Position
+						local off = roblox.Vector3.new(at.X - spot.position.X, 0, at.Z - spot.position.Z).Magnitude
+						t.ok(off <= spot.size * WorldPlan.ClusterReach, "the rock stands on its spot")
+						t.ok(math.abs(at.Y - spot.position.Y) <= spot.size, "the rock stands on its spot's ground")
+					end
+				end
+			end
+		end
+	end)
+
+	t.test(
+		"the landmarks: footbridge, docks and rowboats Atomic, the lighthouse Persistent, in a Landmarks folder",
+		function()
+			local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+			local s = build()
+			t.eq(s.warnings, {})
+			lastStepsRan(s)
+			local folder = s.map:FindFirstChild("Landmarks")
+			t.ok(folder and folder:IsA("Folder"), "a Landmarks folder in TimberlineMap")
+			local Atomic, Persistent = roblox.Enum.ModelStreamingMode.Atomic, roblox.Enum.ModelStreamingMode.Persistent
+			local count = {}
+			for _, model in ipairs(folder:GetChildren()) do
+				t.ok(model:IsA("Model"), model.Name .. " is a Model")
+				count[model.Name] = (count[model.Name] or 0) + 1
+				local mode = if model.Name == "Lighthouse" then Persistent else Atomic
+				t.eq(model.ModelStreamingMode, mode, model.Name .. "'s streaming")
+				local solid = 0
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") then
+						t.eq(d.Anchored, true, model.Name .. ": " .. d.Name .. " is anchored")
+						if d.CanCollide then
+							solid += 1
+						end
+					end
+				end
+				if model.Name == "Rowboat" then
+					t.eq(solid, 0, "the rowboats are looks only")
+				else
+					t.ok(solid > 0, model.Name .. " has something to stand on or bump into")
+				end
+			end
+			local docks = WorldPlan.Docks()
+			t.eq(count.Footbridge, 1)
+			t.eq(count.Dock, #docks)
+			t.eq(count.Rowboat, #docks)
+			t.eq(count.Lighthouse, 1)
+			t.eq(count.Signpost, 2, "the TIMBER BRIDGE and MIRROR LAKE signs")
+			-- The lamp LightingController lights at dusk, where WorldPlan says.
+			local lighthouse = folder:FindFirstChild("Lighthouse")
+			local lamp = lighthouse:FindFirstChild("LampGlow", true)
+			t.ok(lamp and lamp.Material == roblox.Enum.Material.Neon, "a Neon LampGlow")
+			t.ok(
+				(lamp.CFrame.Position - WorldPlan.Lighthouse().lamp).Magnitude < 1e-3,
+				"the lamp where WorldPlan puts it"
+			)
+			-- The signs say what they're for.
+			local texts = {}
+			for _, model in ipairs(folder:GetChildren()) do
+				if model.Name == "Signpost" then
+					for _, d in ipairs(model:GetDescendants()) do
+						if d:IsA("TextLabel") then
+							texts[d.Text] = true
+						end
+					end
+				end
+			end
+			t.ok(texts["TIMBER BRIDGE"] and texts["MIRROR LAKE"], "the signs' text")
+		end
+	)
+
+	t.test("an erroring landmark plan fails its own step alone: the other landmarks, SellArea, spawning", function()
+		local s = build({
+			worldPlan = {
+				Lighthouse = function()
+					error("x")
+				end,
+			},
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The lighthouse failed", 1, true), s.warnings[1])
+		lastStepsRan(s)
+		local folder = s.map:FindFirstChild("Landmarks")
+		t.ok(folder:FindFirstChild("Footbridge") and folder:FindFirstChild("Dock"), "the other landmarks still built")
+		t.ok(folder:FindFirstChild("Lighthouse") == nil, "no half-built lighthouse")
+		t.ok(s.map:FindFirstChild("BoulderClusters"), "the clusters still built")
+	end)
+
+	t.test("an erroring cluster plan fails its own step alone: the rest of the world, SellArea, spawning", function()
+		local s = build({
+			worldPlan = {
+				BoulderClusters = function()
+					error("x")
+				end,
+			},
+		})
+		t.eq(#s.warnings, 1)
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The boulder clusters failed", 1, true), s.warnings[1])
+		lastStepsRan(s)
+		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
+		t.ok(s.map:FindFirstChild("Scenery"), "the scenery still built")
+		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
+	end)
 end

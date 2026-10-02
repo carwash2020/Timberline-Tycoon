@@ -11,8 +11,10 @@
 --      its greenery (ornamental trees no one can chop, bushes, flowers).
 --   5. The biomes: every wild tree (BiomeData counts) on the terrain,
 --      boulders, the volcano's crater, the grove's glowing mushrooms, the
---      palm island offshore, signposts where the roads arrive, and the
---      open country's scenery (decor set pieces).
+--      palm island offshore, signposts where the roads arrive, the
+--      open country's scenery (decor set pieces), and the landscape's
+--      landmarks (phase 10, STY: brown boulder clusters, a footbridge
+--      over the river, two docks, a lighthouse on the coast).
 --   6. The Skyroot and the Aether Isles: isles, bridges, Lumenwood, Sky
 --      Shard nodes, Cloud Chutes, the Starfall Forge, the waterfall.
 --   7. The backdrop beyond the world's edge (mountains, sea, the volcano's
@@ -30,6 +32,7 @@ local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -439,6 +442,62 @@ step("5. The scenery", function()
 		end
 		atomic(piece).Parent = folder
 	end
+end)
+
+-- The landscape, a little toward Lumber Tycoon 2 (phase 10, STY-03,
+-- STY-04): brown boulder clusters over the open grass
+-- (WorldPlan.BoulderClusters), each its own Atomic model under
+-- TimberlineMap.BoulderClusters; then, under TimberlineMap.Landmarks, a
+-- timber footbridge over the river with its TIMBER BRIDGE sign, plank
+-- docks on Mirror Lake and the east coast with a moored rowboat each, and
+-- the lighthouse on the coast's headland (Persistent: the town sees it on
+-- the horizon; its "LampGlow" lights at dusk). Rocks, decks, posts, rails
+-- and the tower collide; the rowboats are looks only. Each part of this
+-- step runs on its own.
+step("5. The landmarks", function()
+	step("5. The boulder clusters", function()
+		local folder = Instance.new("Folder")
+		folder.Name = "BoulderClusters"
+		folder.Parent = map
+		for _, spot in ipairs(WorldPlan.BoulderClusters()) do
+			local cluster = Kit.model("BoulderCluster")
+			for _, r in ipairs(spot.rocks) do
+				local rock = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
+				Kit.placeAt(rock, CFrame.new(r.position) * CFrame.Angles(0, r.yaw, 0))
+				rock.Parent = cluster
+			end
+			atomic(cluster).Parent = folder
+		end
+	end)
+	local landmarks = Instance.new("Folder")
+	landmarks.Name = "Landmarks"
+	landmarks.Parent = map
+	step("5. The footbridge", function()
+		local bridge = WorldPlan.Footbridge()
+		if bridge then
+			local model = LandmarkArt.Footbridge(bridge.span, bridge.drop, bridge.width, bridge.rise, bridge.beds)
+			place(atomic(model), bridge.cframe, landmarks)
+			if bridge.sign then
+				place(atomic(BuildingArt.Signpost(WorldPlan.BridgeText)), bridge.sign, landmarks)
+			end
+		end
+	end)
+	step("5. The docks", function()
+		for i, dock in ipairs(WorldPlan.Docks()) do
+			local model = LandmarkArt.Dock(dock.length, dock.width, dock.deck, dock.water, dock.beds)
+			place(atomic(model), dock.cframe, landmarks)
+			place(atomic(LandmarkArt.Rowboat(i * 17)), dock.boat, landmarks)
+			if dock.sign then
+				place(atomic(BuildingArt.Signpost(WorldPlan.LakeDockText)), dock.sign, landmarks)
+			end
+		end
+	end)
+	step("5. The lighthouse", function()
+		local lighthouse = WorldPlan.Lighthouse()
+		if lighthouse then
+			place(persistent(LandmarkArt.Lighthouse()), lighthouse.cframe, landmarks)
+		end
+	end)
 end)
 
 ---------------------------------------------------------------------------

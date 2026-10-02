@@ -53,7 +53,7 @@ return {
 		}
 		local spacing = 8
 		local width = (#lineup - 1) * spacing
-		ground(V3.new(width / 2, 0, 0), V3.new(width + 20, 1, 16), C3.fromRGB(116, 170, 74), Enum.Material.Grass)
+		ground(V3.new(width / 2, 0, 0), V3.new(width + 20, 1, 16), TerrainGen.MaterialColors.Grass, Enum.Material.Grass)
 		for i, entry in ipairs(lineup) do
 			local x = width - (i - 1) * spacing
 			if entry[1] == "LilyPad" then
@@ -82,7 +82,12 @@ return {
 			{ "FernClump", PropArt.FernClump(6, t.grass) },
 			{ "MushroomCluster", PropArt.MushroomCluster(7) },
 		}
-		ground(V3.new(width / 2, 0, -16), V3.new(width + 20, 1, 12), C3.fromRGB(116, 170, 74), Enum.Material.Grass)
+		ground(
+			V3.new(width / 2, 0, -16),
+			V3.new(width + 20, 1, 12),
+			TerrainGen.MaterialColors.Grass,
+			Enum.Material.Grass
+		)
 		for i, entry in ipairs(cover) do
 			local x = width / 2 + (3 - i) * 12
 			place(entry[2], CF.new(x, 0, -15))
@@ -119,7 +124,12 @@ return {
 		end
 		-- A pond with its shore.
 		local pz = 24 + #biomes * (stripD + 4) + 6
-		ground(V3.new(stripW / 2, 0, pz), V3.new(stripW + 4, 1, 26), C3.fromRGB(116, 170, 74), Enum.Material.Grass)
+		ground(
+			V3.new(stripW / 2, 0, pz),
+			V3.new(stripW + 4, 1, 26),
+			TerrainGen.MaterialColors.Grass,
+			Enum.Material.Grass
+		)
 		Kit.part(
 			root,
 			"Water",

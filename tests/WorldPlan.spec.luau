@@ -2021,4 +2021,631 @@ return function(t)
 			t.ok((again[i].position - spot.position).Magnitude < 1e-6, "tree " .. i .. " in the same place")
 		end
 	end)
+
+	---------------------------------------------------------------------------
+	-- Boulder clusters (phase 10, STY-03: LT2's brown rocks over the grass)
+	---------------------------------------------------------------------------
+
+	local LandmarkArt = t.load("ReplicatedStorage/Shared/Art/LandmarkArt")
+	local clusters = WorldPlan.BoulderClusters()
+
+	-- Each cluster's rocks, built and placed the way MapBuilder's "5. The
+	-- boulder clusters" builds them: { rock, model } per rock.
+	local builtClusters
+	local function clusterRocks()
+		if builtClusters then
+			return builtClusters
+		end
+		local out = {}
+		for _, spot in ipairs(clusters) do
+			for _, r in ipairs(spot.rocks) do
+				local model = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
+				placed(model, CFrame.new(r.position) * CFrame.Angles(0, r.yaw, 0))
+				table.insert(out, { rock = r, cluster = spot, model = model })
+			end
+		end
+		builtClusters = out
+		return out
+	end
+
+	t.test("boulder clusters: 25-40 clusters of 3-5 rocks, 150 rocks at most, about 5 parts a rock", function()
+		t.ok(#clusters >= 25 and #clusters <= WorldPlan.ClusterMost, #clusters .. " clusters")
+		local total, rocks, colliding = 0, 0, 0
+		for _, spot in ipairs(clusters) do
+			t.ok(#spot.rocks >= 3 and #spot.rocks <= 5, #spot.rocks .. " rocks in a cluster")
+			t.ok(spot.tone == 1 or spot.tone == 2, "a known tone")
+			rocks += #spot.rocks
+		end
+		t.ok(rocks <= WorldPlan.ClusterRocks, rocks .. " rocks")
+		for _, entry in ipairs(clusterRocks()) do
+			local n, hard = 0, 0
+			for _, p in ipairs(parts(entry.model)) do
+				n += 1
+				if p.CanCollide then
+					hard += 1
+					t.eq(p.Name, "Rock", "only the rock's own blocks collide")
+					t.ok(p.Anchored, "anchored")
+				else
+					t.eq(p.CanQuery, false, p.Name .. " is looks only")
+				end
+			end
+			t.ok(n >= 5 and n <= 6, n .. " parts in a rock")
+			t.eq(hard, 3, "a rock's three blocks collide (PropArt.Rock, as the lone boulders)")
+			colliding += hard
+			total += n
+		end
+		t.ok(total <= 900, total .. " parts in all the clusters")
+	end)
+
+	t.test("boulder clusters: each rock on gentle open grass, half-buried, no gap under its side", function()
+		for _, entry in ipairs(clusterRocks()) do
+			local r = entry.rock
+			local p = r.position
+			local here = string.format("a rock at (%.0f, %.0f)", p.X, p.Z)
+			local h = TerrainGen.HeightAt(p.X, p.Z)
+			t.ok(math.abs(p.Y - (h - WorldPlan.ClusterSink(r.size))) < 1e-3, here .. " sinks ClusterSink")
+			t.ok(WorldPlan.ClusterSink(r.size) > 0.6, "deeper than a lone boulder's 0.6")
+			t.ok(TerrainGen.SlopeAt(p.X, p.Z) < WorldPlan.ClusterSlope, here .. " is on a steep slope")
+			local _, material = TerrainGen.Sample(p.X, p.Z)
+			t.ok(material == "Grass" or material == "LeafyGrass", here .. " stands on " .. material)
+			t.ok(h < WorldPlan.ClusterLow, here .. " is up in the mountains")
+			t.ok(
+				math.abs(p.X) <= WorldPlan.ClusterEdge and math.abs(p.Z) <= WorldPlan.ClusterEdge,
+				here .. " is at the edge"
+			)
+			for _, q in ipairs(WorldPlan.ClusterFootprint(p.X, p.Z, r.size)) do
+				local drop = h - TerrainGen.HeightAt(q.X, q.Y)
+				t.ok(
+					drop <= WorldPlan.ClusterDrop(r.size) + 1e-6,
+					string.format("%s: the ground falls %.2f", here, drop)
+				)
+			end
+			-- Its buried edge: the body's lowest corners are under the ground.
+			local lowest = math.huge
+			for _, part in ipairs(parts(entry.model)) do
+				if part.CanCollide then
+					for _, c in ipairs(corners(part.Size)) do
+						lowest = math.min(lowest, (part.CFrame * c).Y)
+					end
+				end
+			end
+			t.ok(lowest < h - 0.3, here .. " is sunk into the ground")
+			-- Mixed sizes: the cluster's first rock is its big one.
+			local first = entry.cluster.rocks[1]
+			t.ok(first.size >= WorldPlan.ClusterBig[1] and first.size <= WorldPlan.ClusterBig[2], "a big rock first")
+			if r ~= first then
+				t.ok(
+					r.size >= WorldPlan.ClusterSmall[1] and r.size <= WorldPlan.ClusterSmall[2],
+					"smaller ones round it"
+				)
+				local d = Vector2.new(p.X - first.position.X, p.Z - first.position.Z).Magnitude
+				t.ok(d <= (first.size + r.size) * 0.65, string.format("%s huddles by its big rock (%.1f off)", here, d))
+			end
+		end
+	end)
+
+	t.test(
+		"boulder clusters keep off roads (+4), water, town, plots, biomes, trees, rocks, scenery, signs, gondola",
+		function()
+			local boulders = WorldPlan.Boulders()
+			local signs = WorldPlan.RoadSigns(WorldPlan.BiomeSignText)
+			local trees = WorldPlan.Trees()
+			local routes = {}
+			local top = sky.gondolaTop.Position
+			for _, from in ipairs({ town.gondola.Position, sky.gondolaBase.Position }) do
+				table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+			end
+			local problems = {}
+			local function check(ok, what)
+				if not ok then
+					table.insert(problems, what)
+				end
+			end
+			for _, entry in ipairs(clusterRocks()) do
+				local r = entry.rock
+				local p = r.position
+				local here = string.format("a rock at (%.0f, %.0f)", p.X, p.Z)
+				local reach = r.size * WorldPlan.ClusterReach
+				-- Its parts: within its reach, 4+ studs off every road, out of town.
+				for _, part in ipairs(parts(entry.model)) do
+					for _, q in ipairs(edgePoints(part.CFrame, part.Size)) do
+						local d = Vector2.new(q.X - p.X, q.Z - p.Z).Magnitude
+						check(
+							d <= reach + 1e-3,
+							string.format("%s: its %s reaches %.1f (reach %.1f)", here, part.Name, d, reach)
+						)
+						check(WorldLayout.FlatWeight(q.X, q.Z) == 0, here .. " is in town or the plots")
+					end
+					if part.CanCollide then
+						local c = roadClearance(part.CFrame, part.Size)
+						check(c >= WorldPlan.ClusterRoad, string.format("%s is %.2f studs off a road", here, c))
+					end
+				end
+				for k = 0, 15 do
+					local a = k * math.pi / 8
+					local d = reach + WorldPlan.ClusterWater - 0.5
+					check(
+						TerrainGen.WaterLevelAt(p.X + math.cos(a) * d, p.Z + math.sin(a) * d) == nil,
+						here .. " by the water"
+					)
+				end
+				for _, tree in ipairs(trees) do
+					local d = Vector2.new(p.X - tree.position.X, p.Z - tree.position.Z).Magnitude
+					check(d >= reach + WorldPlan.ClusterGap, string.format("%s is %.1f from a tree", here, d))
+				end
+				for _, b in ipairs(boulders) do
+					local d = Vector2.new(p.X - b.position.X, p.Z - b.position.Z).Magnitude
+					check(d >= reach + b.size / 2 + WorldPlan.ClusterGap, here .. " runs into a boulder")
+				end
+				for _, spot in ipairs(scenery) do
+					local d = Vector2.new(p.X - spot.center.X, p.Z - spot.center.Z).Magnitude
+					check(d >= reach + spot.radius + WorldPlan.ClusterGap, here .. " stands in a " .. spot.kind)
+				end
+				for _, sign in ipairs(signs) do
+					local s = sign.cframe.Position
+					check(
+						Vector2.new(p.X - s.X, p.Z - s.Z).Magnitude >= reach + 5.3 + WorldPlan.ClusterGap,
+						here .. " by a sign"
+					)
+				end
+				for _, biome in ipairs(BiomeData.All()) do
+					local a = biome.area
+					if a then -- the Skyroot's foot (the sky's disc) too
+						local margin = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else a.radius + 20
+						check(
+							Vector2.new(p.X - a.x, p.Z - a.z).Magnitude >= margin + reach,
+							here .. " is in " .. biome.id
+						)
+					end
+				end
+				for _, route in ipairs(routes) do
+					local d = WorldLayout.SegmentDistance(Vector2.new(p.X, p.Z), route[1], route[2])
+					check(d >= reach + WorldPlan.ClusterGondola, here .. " is under the gondola")
+				end
+			end
+			t.ok(#problems == 0, report(problems))
+		end
+	)
+
+	t.test(
+		"boulder clusters spread over the country players cross: round the Starter Forest, the Hills, far meadows",
+		function()
+			local function near(id, within)
+				local a = BiomeData.Get(id).area
+				local n = 0
+				for _, spot in ipairs(clusters) do
+					if Vector2.new(spot.center.X - a.x, spot.center.Z - a.z).Magnitude < a.radius + within then
+						n += 1
+					end
+				end
+				return n
+			end
+			t.ok(near("starter", 350) >= 3, near("starter", 350) .. " clusters round the Starter Forest")
+			t.ok(near("hills", 350) >= 3, near("hills", 350) .. " clusters on the Hills' grassland")
+			local far = 0
+			for _, spot in ipairs(clusters) do
+				if Vector2.new(spot.center.X, spot.center.Z - 110).Magnitude > 700 then
+					far += 1
+				end
+			end
+			t.ok(far >= 6, far .. " clusters out in the far meadows")
+			for i, a in ipairs(clusters) do
+				for j = i + 1, #clusters do
+					local b = clusters[j]
+					t.ok(
+						Vector2.new(a.center.X - b.center.X, a.center.Z - b.center.Z).Magnitude >= 120,
+						"two clusters apart"
+					)
+				end
+			end
+		end
+	)
+
+	t.test("boulder clusters are the same on every server", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan").BoulderClusters()
+		t.eq(#again, #clusters)
+		for i, spot in ipairs(clusters) do
+			t.eq(#again[i].rocks, #spot.rocks)
+			t.eq(again[i].tone, spot.tone)
+			for k, r in ipairs(spot.rocks) do
+				local o = again[i].rocks[k]
+				t.ok((o.position - r.position).Magnitude < 1e-6, "same rock spot")
+				t.eq(o.size, r.size)
+				t.eq(o.seed, r.seed)
+				t.eq(o.yaw, r.yaw)
+				t.eq(o.mossy, r.mossy)
+			end
+		end
+	end)
+
+	---------------------------------------------------------------------------
+	-- Landmarks (phase 10, STY-04): the footbridge, the docks, the lighthouse
+	---------------------------------------------------------------------------
+
+	local bridge = WorldPlan.Footbridge()
+	local docks = WorldPlan.Docks()
+	local lighthouse = WorldPlan.Lighthouse()
+
+	-- Everything the landmarks step builds, placed as MapBuilder places it:
+	-- { label, model }.
+	local builtLandmarks
+	local function landmarkThings()
+		if builtLandmarks then
+			return builtLandmarks
+		end
+		local out = {}
+		local function add(label, model, cf)
+			table.insert(out, { label = label, model = placed(model, cf) })
+		end
+		if bridge then
+			add(
+				"the footbridge",
+				LandmarkArt.Footbridge(bridge.span, bridge.drop, bridge.width, bridge.rise, bridge.beds),
+				bridge.cframe
+			)
+			if bridge.sign then
+				add("the TIMBER BRIDGE sign", BuildingArt.Signpost(WorldPlan.BridgeText), bridge.sign)
+			end
+		end
+		for i, dock in ipairs(docks) do
+			add(
+				"the " .. dock.kind .. " dock",
+				LandmarkArt.Dock(dock.length, dock.width, dock.deck, dock.water, dock.beds),
+				dock.cframe
+			)
+			add("the " .. dock.kind .. " rowboat", LandmarkArt.Rowboat(i * 17), dock.boat)
+			if dock.sign then
+				add("the " .. dock.kind .. " dock's sign", BuildingArt.Signpost(WorldPlan.LakeDockText), dock.sign)
+			end
+		end
+		if lighthouse then
+			add("the lighthouse", LandmarkArt.Lighthouse(), lighthouse.cframe)
+		end
+		builtLandmarks = out
+		return out
+	end
+	local function thing(label)
+		for _, entry in ipairs(landmarkThings()) do
+			if entry.label == label then
+				return entry.model
+			end
+		end
+		return nil
+	end
+	-- How far the flat segment a-b passes from (x, z), and how far along (0..1).
+	local function offLine(a, b, x, z)
+		return WorldLayout.SegmentDistance(Vector2.new(x, z), Vector2.new(a.X, a.Z), Vector2.new(b.X, b.Z))
+	end
+
+	t.test("no road crosses the river, so its footbridge is for players, far from any road", function()
+		for _, road in ipairs(WorldLayout.Roads) do
+			for i = 1, #road.points - 1 do
+				local a, b = road.points[i], road.points[i + 1]
+				for s = 0, 1, 1 / 200 do
+					local p = a:Lerp(b, s)
+					t.eq(TerrainGen.WaterLevelAt(p.X, p.Y), nil, road.name .. " runs through water")
+				end
+			end
+		end
+		t.ok(bridge ~= nil, "a footbridge over the river")
+		local model = thing("the footbridge")
+		for _, p in ipairs(parts(model)) do
+			local c = roadClearance(p.CFrame, p.Size)
+			t.ok(c >= WorldPlan.LandmarkRoad, string.format("the footbridge's %s is %.1f off a road", p.Name, c))
+		end
+	end)
+
+	t.test("the footbridge spans the river bank to bank: dry ends, its deck over the water and the banks", function()
+		local a = bridge.cframe.Position
+		local b = a + bridge.cframe.LookVector * bridge.span + Vector3.new(0, bridge.drop, 0)
+		t.ok(bridge.cframe.UpVector.Y > 0.99999, "it stands level across")
+		for _, e in ipairs({ a, b }) do
+			t.eq(TerrainGen.WaterLevelAt(e.X, e.Z), nil, "an end on dry land")
+			t.ok(math.abs(TerrainGen.HeightAt(e.X, e.Z) - e.Y) < 1e-3, "an end on its bank's ground")
+		end
+		local mid = a:Lerp(b, 0.5)
+		t.ok(TerrainGen.WaterLevelAt(mid.X, mid.Z) ~= nil, "its middle over the river")
+		t.ok(bridge.span <= WorldPlan.BridgeLongest, bridge.span .. " studs")
+		local wet = 0
+		for _, plank in ipairs(parts(thing("the footbridge"))) do
+			if plank.Name == "Plank" then
+				local top = plank.CFrame.Position.Y + plank.Size.Y / 2
+				for _, c in ipairs(corners(plank.Size)) do
+					local w = plank.CFrame * c
+					local ground = TerrainGen.HeightAt(w.X, w.Z)
+					t.ok(ground <= top - 0.05, string.format("the bank pokes through the deck by %.2f", ground - top))
+					local water = TerrainGen.WaterLevelAt(w.X, w.Z)
+					if water then
+						wet += 1
+						t.ok(top >= water + 1, "the deck stands a stud over the water")
+					else
+						-- No engine grass (it grows on Grass and LeafyGrass) up through the planks.
+						local _, m = TerrainGen.Sample(w.X, w.Z)
+						t.ok(m ~= "Grass" and m ~= "LeafyGrass", "grass under the footbridge's deck")
+					end
+				end
+			elseif plank.Name == "Post" then
+				local foot = (plank.CFrame * Vector3.new(0, -plank.Size.Y / 2, 0))
+				t.ok(foot.Y <= TerrainGen.HeightAt(foot.X, foot.Z) + 0.05, "a post floats over the bed")
+			end
+		end
+		t.ok(wet > 40, "planks over the water")
+		-- Its sign stands on the ground by its head, the posts not floating.
+		local sign = thing("the TIMBER BRIDGE sign")
+		t.ok(sign ~= nil, "the TIMBER BRIDGE sign is built")
+		for _, p in ipairs(parts(sign)) do
+			if p.Name == "Post" then
+				local foot = p.CFrame * Vector3.new(0, -p.Size.Y / 2, 0)
+				local ground = TerrainGen.HeightAt(foot.X, foot.Z)
+				t.ok(foot.Y <= ground + 0.05 and ground - foot.Y <= 1, "a sign post on the ground")
+				t.eq(TerrainGen.WaterLevelAt(foot.X, foot.Z), nil, "a sign post in the river")
+			end
+		end
+		t.eq(WorldPlan.BridgeText, "TIMBER BRIDGE")
+	end)
+
+	t.test("the docks: one out over Mirror Lake from its shore, one out to sea toward the Island", function()
+		local kinds = {}
+		for _, dock in ipairs(docks) do
+			kinds[dock.kind] = dock
+			local land = dock.cframe.Position
+			local out = dock.cframe.LookVector
+			local far = land + out * dock.length
+			local here = "the " .. dock.kind .. " dock"
+			t.eq(TerrainGen.WaterLevelAt(land.X, land.Z), nil, here .. "'s land end is dry")
+			t.ok(math.abs(TerrainGen.HeightAt(land.X, land.Z) - land.Y) < 1e-3, here .. " starts on the ground")
+			local level = TerrainGen.WaterLevelAt(far.X, far.Z)
+			t.ok(level ~= nil, here .. "'s far end stands in water")
+			t.ok(level - TerrainGen.HeightAt(far.X, far.Z) >= 2.5, here .. ": deep enough at its ladder")
+			t.ok(math.abs(land.Y + dock.water - level) < 1e-3, here .. ": its water is the water's surface")
+			t.ok(dock.deck >= 0.3 and dock.deck <= 1.0, here .. ": a step of a stud at most onto it")
+			t.ok(land.Y + dock.deck >= level + 1.2 - 1e-3, here .. ": its deck over the water")
+			for _, p in ipairs(parts(thing(here))) do
+				if p.Name == "Plank" then
+					local top = p.CFrame.Position.Y + p.Size.Y / 2
+					for _, c in ipairs(corners(p.Size)) do
+						local w = p.CFrame * c
+						t.ok(TerrainGen.HeightAt(w.X, w.Z) <= top - 0.05, here .. ": the ground pokes through its deck")
+						if TerrainGen.WaterLevelAt(w.X, w.Z) == nil then
+							local _, m = TerrainGen.Sample(w.X, w.Z)
+							t.ok(m ~= "Grass" and m ~= "LeafyGrass", here .. ": grass under its deck")
+						end
+					end
+				elseif p.Name == "Post" then
+					local foot = p.CFrame * Vector3.new(0, -p.Size.Y / 2, 0)
+					t.ok(foot.Y <= TerrainGen.HeightAt(foot.X, foot.Z) + 0.05, here .. ": a post floats over the bed")
+				end
+			end
+			-- The rowboat floats on deep enough water beside it.
+			local boat = dock.boat.Position
+			t.ok(math.abs(boat.Y - level) < 1e-3, here .. ": the rowboat at the water's surface")
+			for _, p in ipairs(parts(thing("the " .. dock.kind .. " rowboat"))) do
+				local at = p.CFrame.Position
+				t.ok(TerrainGen.WaterLevelAt(at.X, at.Z) ~= nil, here .. ": the rowboat is on the water")
+				t.ok(TerrainGen.HeightAt(at.X, at.Z) < level - 1, here .. ": the rowboat runs aground")
+			end
+		end
+		local lake = kinds.lake
+		t.ok(lake ~= nil, "a dock on Mirror Lake")
+		local L = WorldLayout.Lake
+		local land = lake.cframe.Position
+		t.ok(Vector2.new(land.X - L.x, land.Z - L.z).Magnitude < L.radius * 1.3, "on Mirror Lake's shore")
+		local towardMiddle = Vector2.new(L.x - land.X, L.z - land.Z).Unit
+		local out = lake.cframe.LookVector
+		t.ok(Vector2.new(out.X, out.Z):Dot(towardMiddle) > 0.95, "pointing out across the lake")
+		t.ok(lake.sign ~= nil, "the MIRROR LAKE sign")
+		local coast = kinds.coast
+		t.ok(coast ~= nil, "a dock on the east coast")
+		local I = WorldLayout.Island
+		local cland = coast.cframe.Position
+		local toIsland = Vector2.new(I.x - cland.X, I.z - cland.Z).Unit
+		local cout = coast.cframe.LookVector
+		t.ok(Vector2.new(cout.X, cout.Z):Dot(toIsland) > 0.95, "pointing out to sea toward the Island")
+	end)
+
+	t.test(
+		"the lighthouse: on the coast's headland, dry, its door toward town, its lamp in sight from the spawn",
+		function()
+			t.ok(lighthouse ~= nil, "a lighthouse")
+			local base = lighthouse.cframe.Position
+			t.ok(lighthouse.cframe.UpVector.Y > 0.99999, "it stands upright")
+			t.ok(base.X > WorldLayout.Coast.shoreX - WorldLayout.Coast.beachWidth, "on the east coast's beach")
+			local _, material = TerrainGen.Sample(base.X, base.Z)
+			t.eq(material, "Sand", "on the sand")
+			for _, q in ipairs(WorldPlan.SceneryFootprint(base.X, base.Z, LandmarkArt.LIGHTHOUSE_RADIUS)) do
+				t.eq(TerrainGen.WaterLevelAt(q.X, q.Y), nil, "its footprint is dry")
+				local h = TerrainGen.HeightAt(q.X, q.Y)
+				t.ok(base.Y <= h, "it doesn't float")
+				t.ok(h - base.Y <= 1.7, "its plinth isn't buried")
+			end
+			-- The headland: no water's edge further east along this stretch of coast.
+			local function edgeAt(z)
+				for x = 1050, 1400 do
+					if TerrainGen.WaterLevelAt(x, z) ~= nil then
+						return x
+					end
+				end
+				return math.huge
+			end
+			-- (Or near it: the furthest-east stretch the spawn can see it from.)
+			local tip, furthest = edgeAt(base.Z), -math.huge
+			for z = 120, 460, 4 do
+				furthest = math.max(furthest, edgeAt(z))
+			end
+			t.ok(tip >= furthest - 12, string.format("on a headland: its shore %d, the furthest %d", tip, furthest))
+			t.ok(base.X >= tip - 30, "set back from the water's edge on the sand")
+			local toTown = Vector2.new(WorldLayout.Sawmill.X - base.X, WorldLayout.Sawmill.Z - base.Z).Unit
+			local look = lighthouse.cframe.LookVector
+			t.ok(Vector2.new(look.X, look.Z):Dot(toTown) > 0.99, "its door faces town")
+			t.ok(math.abs(lighthouse.lamp.Y - (base.Y + LandmarkArt.LIGHTHOUSE_LAMP)) < 1e-3, "the lamp's height")
+			-- In sight from the spawn on the horizon: the line from a player's
+			-- eye on the spawn pad to the lamp clears the land by 2+ studs, and
+			-- no tree, scenery piece or cluster stands near it below 40 studs.
+			local eye = town.spawn + Vector3.new(0, 0.5 + 5.5, 0)
+			local lamp = lighthouse.lamp
+			for k = 1, 399 do
+				local q = eye:Lerp(lamp, k / 400)
+				t.ok(
+					q.Y - TerrainGen.HeightAt(q.X, q.Z) >= 2,
+					string.format("the land hides the lamp at (%d, %d)", q.X, q.Z)
+				)
+			end
+			local function lineY(s)
+				return eye.Y + (lamp.Y - eye.Y) * s
+			end
+			for _, tree in ipairs(WorldPlan.Trees()) do
+				local d, s = offLine(eye, lamp, tree.position.X, tree.position.Z)
+				t.ok(d >= 10 or lineY(s) - tree.position.Y > 40, "a tree hides the lamp")
+				-- (The tower's line runs beside the lamp's, a little lower.)
+				local towerTop = base + WorldPlan.LighthouseSeen
+				local dt, st = offLine(eye, towerTop, tree.position.X, tree.position.Z)
+				local towerY = eye.Y + (towerTop.Y - eye.Y) * st
+				t.ok(dt >= 10 or towerY - tree.position.Y > 40, "a tree hides the lighthouse's tower")
+			end
+			for _, spot in ipairs(scenery) do
+				local d, s = offLine(eye, lamp, spot.center.X, spot.center.Z)
+				t.ok(d >= spot.radius + 4 or lineY(s) - spot.center.Y > 30, "a " .. spot.kind .. " hides the lamp")
+			end
+			for _, spot in ipairs(clusters) do
+				local d, s = offLine(eye, lamp, spot.center.X, spot.center.Z)
+				t.ok(d >= spot.radius + 2 or lineY(s) - spot.center.Y > 12, "a boulder cluster hides the lamp")
+			end
+			t.ok((WorldPlan.SpawnEye() - eye).Magnitude < 1e-6, "WorldPlan's spawn eye")
+			-- Nothing in town stands in the way: the line through every part's box.
+			local function through(p, target)
+				local inv = p.CFrame:Inverse()
+				local p0, p1 = inv * eye, inv * target
+				local h = p.Size / 2
+				local lo, hi = 0, 1
+				for _, axis in ipairs({ "X", "Y", "Z" }) do
+					local s0, d, half = p0[axis], p1[axis] - p0[axis], h[axis]
+					if math.abs(d) < 1e-9 then
+						if math.abs(s0) > half then
+							return false
+						end
+					else
+						local u0, u1 = (-half - s0) / d, (half - s0) / d
+						if u0 > u1 then
+							u0, u1 = u1, u0
+						end
+						lo, hi = math.max(lo, u0), math.min(hi, u1)
+						if lo > hi then
+							return false
+						end
+					end
+				end
+				return true
+			end
+			-- Its lamp and the top of its tower (LighthouseSeen up), not just the lamp.
+			local tower = base + WorldPlan.LighthouseSeen
+			t.ok(WorldPlan.LighthouseSeen.Y <= 30, "the spawn sees the top half of the tower")
+			for _, entry in ipairs(townThings()) do
+				for _, p in ipairs(parts(entry.model)) do
+					if p.Transparency < 0.9 then
+						for _, target in ipairs({ lamp, tower }) do
+							t.ok(
+								not through(p, target),
+								string.format("%s's %s hides the lighthouse from the spawn", entry.label, p.Name)
+							)
+						end
+					end
+				end
+			end
+			for _, spot in ipairs(scenery) do -- the tower's line runs lower: only the tall pieces matter
+				for _, model in ipairs(sceneryModels(spot)) do
+					for _, p in ipairs(parts(model)) do
+						t.ok(not through(p, tower), "a " .. spot.kind .. " hides the lighthouse's tower")
+					end
+				end
+			end
+			local far = Vector2.new(lamp.X - eye.X, lamp.Z - eye.Z).Magnitude
+			t.ok(far > 1000, string.format("%.0f studs off: past StreamingTargetRadius, so it must be Persistent", far))
+		end
+	)
+
+	t.test(
+		"the landmarks keep off roads, water's edge, town, plots, trees, rocks, scenery, signs, clusters, gondola",
+		function()
+			local boulders = WorldPlan.Boulders()
+			local signs = WorldPlan.RoadSigns(WorldPlan.BiomeSignText)
+			local trees = WorldPlan.Trees()
+			local routes = {}
+			local top = sky.gondolaTop.Position
+			for _, from in ipairs({ town.gondola.Position, sky.gondolaBase.Position }) do
+				table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+			end
+			local problems = {}
+			local function check(ok, what)
+				if not ok then
+					table.insert(problems, what)
+				end
+			end
+			local gap = WorldPlan.LandmarkGap
+			for _, entry in ipairs(landmarkThings()) do
+				for _, p in ipairs(parts(entry.model)) do
+					local here = string.format("%s's %s", entry.label, p.Name)
+					local c = roadClearance(p.CFrame, p.Size)
+					check(c >= WorldPlan.LandmarkRoad - 2, string.format("%s is %.1f off a road", here, c))
+					for _, q in ipairs(edgePoints(p.CFrame, p.Size)) do
+						check(WorldLayout.FlatWeight(q.X, q.Z) == 0, here .. " is in town or the plots")
+					end
+					local at = p.CFrame.Position
+					local r = math.max(p.Size.X, p.Size.Z) / 2
+					for _, tree in ipairs(trees) do
+						local d = Vector2.new(at.X - tree.position.X, at.Z - tree.position.Z).Magnitude
+						check(d >= gap - 1, string.format("%s is %.1f from a tree", here, d))
+					end
+					for _, b in ipairs(boulders) do
+						local d = Vector2.new(at.X - b.position.X, at.Z - b.position.Z).Magnitude
+						check(d >= b.size / 2 + gap - r, here .. " runs into a boulder")
+					end
+					for _, spot in ipairs(scenery) do
+						local d = Vector2.new(at.X - spot.center.X, at.Z - spot.center.Z).Magnitude
+						check(d >= spot.radius + gap - r, here .. " stands in a " .. spot.kind)
+					end
+					for _, spot in ipairs(clusters) do
+						local d = Vector2.new(at.X - spot.center.X, at.Z - spot.center.Z).Magnitude
+						check(d >= spot.radius + gap - r, here .. " stands in a boulder cluster")
+					end
+					for _, sign in ipairs(signs) do
+						local s = sign.cframe.Position
+						check(Vector2.new(at.X - s.X, at.Z - s.Z).Magnitude >= 5.3 + gap - r, here .. " by a road sign")
+					end
+					for _, route in ipairs(routes) do
+						local d = WorldLayout.SegmentDistance(Vector2.new(at.X, at.Z), route[1], route[2])
+						check(d >= gap * 5 - r, here .. " is under the gondola")
+					end
+					for _, biome in ipairs(BiomeData.All()) do
+						local a = biome.area
+						if a then
+							local margin = if biome.id == "grove"
+								then WorldLayout.GroveRidge.outer + 15
+								else a.radius + 20
+							check(
+								Vector2.new(at.X - a.x, at.Z - a.z).Magnitude >= margin - r,
+								here .. " is in " .. biome.id
+							)
+						end
+					end
+				end
+			end
+			t.ok(#problems == 0, report(problems))
+		end
+	)
+
+	t.test("the landmarks are the same on every server", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan")
+		local b = again.Footbridge()
+		t.ok((b.cframe.Position - bridge.cframe.Position).Magnitude < 1e-6, "the footbridge in the same place")
+		t.eq(b.span, bridge.span)
+		t.eq(b.beds, bridge.beds)
+		local d = again.Docks()
+		t.eq(#d, #docks)
+		for i, dock in ipairs(docks) do
+			t.ok((d[i].cframe.Position - dock.cframe.Position).Magnitude < 1e-6, "a dock in the same place")
+			t.eq(d[i].beds, dock.beds)
+		end
+		local l = again.Lighthouse()
+		t.ok((l.cframe.Position - lighthouse.cframe.Position).Magnitude < 1e-6, "the lighthouse in the same place")
+	end)
 end
