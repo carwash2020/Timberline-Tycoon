@@ -14,8 +14,55 @@ local WoodData = {}
 -- unit (GameConfig.WoodUnit studs a side), hardness per u² of cut, how
 -- long a sapling takes to grow up, the core (heartwood and plank) colour
 -- and material. Used only when the v2 loop runs (Shared/CoreLoop); the v1
--- economy model ignores it. `shape` (the section-tree look) lands with the
--- tree generator.
+-- economy model ignores it. `shape` is the section tree's look, read by
+-- Shared/TreeGen (V2_PLAN.md §3a; studs unless noted, angles in degrees).
+export type TreeShape = {
+	height: { number }, -- mature height band (small to large), studs
+	trunkThickness: number, -- the trunk's base, studs a side (square)
+	trunkLength: number, -- the trunk up to its first split (or its spire)
+	trunkSegments: number, -- sections the trunk is cut into
+	taper: number, -- thickness multiplier per trunk segment
+	leader: boolean?, -- a straight leader carries on through every split
+	lean: number?, -- palms bend this much (horizontal per vertical, at the top)
+	spire: number?, -- conifers: the thin top section's length
+	maxDepth: number, -- branch levels after the trunk
+	splitChance: { number }?, -- the chance to split, per branch level
+	minSplits: number?,
+	maxSplits: number?,
+	branchAngle: number?, -- a side branch's angle off its parent
+	angleJitter: number?,
+	elbow: number?, -- crooked woods: extra bend where a branch carries on
+	twistiness: number?, -- bend noise per section (half of it on the trunk)
+	firstBranchLength: number?,
+	lengthDecay: { number }?, -- a child's length over its parent's: min, max
+	thicknessDecay: number?, -- a side branch's thickness over its parent's
+	minThickness: number?, -- thinner than this stops and leafs out
+	canopy: string, -- clusters | tiers | snowtiers | fronds | embers | wisps | glowtiers
+	leafSize: number?, -- a leaf cluster's size
+	clusterParts: { number }?, -- parts per leaf cluster: min, max
+	barkMarks: number?,
+	flares: number?, -- root flares on the first section
+	maxSections: number,
+	tiers: number?,
+	tierSides: number?,
+	firstTierAt: number?,
+	tierRadius: { number }?, -- bottom tier, top tier
+	tierHeight: number?,
+	snowCaps: number?, -- the top tiers that get a snow cap
+	fronds: number?,
+	frondLength: number?,
+	coconuts: number?,
+	rings: number?,
+	cracks: number?,
+	wisps: number?,
+	pods: number?,
+	veins: number?,
+	leafColors: { string },
+	bark: string,
+	accent: string?,
+	glow: string?,
+}
+
 export type WoodV2 = {
 	logPrice: number, -- $ per u³ of log
 	plankPrice: number, -- $ per u³ of plank
@@ -24,7 +71,7 @@ export type WoodV2 = {
 	lifespan: { number }, -- min, max multiples of growSec
 	core: string, -- hex: the cut face and the planks
 	coreMaterial: string, -- Enum.Material name
-	shape: { [string]: any }?,
+	shape: TreeShape?,
 }
 
 export type WoodDef = {
@@ -277,9 +324,237 @@ local V2: { [string]: WoodV2 } = {
 	},
 }
 
+-- The section-tree look (V2_PLAN.md §3a). Sizes are for a scale-1 tree;
+-- Shared/TreeGen scales them by the size roll and fits the height band.
+local SHAPES: { [string]: TreeShape } = {
+	-- A broad round dome, crown about 20 wide.
+	oak = {
+		height = { 22, 30 },
+		trunkThickness = 2.0,
+		trunkLength = 9,
+		trunkSegments = 2,
+		taper = 0.9,
+		maxDepth = 3,
+		splitChance = { 1.0, 0.75, 0.45 },
+		minSplits = 2,
+		maxSplits = 3,
+		branchAngle = 38,
+		angleJitter = 10,
+		twistiness = 8,
+		firstBranchLength = 7,
+		lengthDecay = { 0.62, 0.82 },
+		thicknessDecay = 0.68,
+		minThickness = 0.6,
+		canopy = "clusters",
+		leafSize = 7.5,
+		clusterParts = { 3, 5 },
+		flares = 5,
+		maxSections = 18,
+		leafColors = { "#5DA24A", "#6FB352", "#4C8F3E", "#86BF57" },
+		bark = "#7A5230",
+	},
+	-- A tall airy column.
+	birch = {
+		height = { 24, 32 },
+		trunkThickness = 1.6,
+		trunkLength = 15,
+		trunkSegments = 3,
+		taper = 0.88,
+		leader = true,
+		maxDepth = 2,
+		splitChance = { 0.7, 0.5 },
+		minSplits = 1,
+		maxSplits = 2,
+		branchAngle = 25,
+		twistiness = 5,
+		firstBranchLength = 5,
+		lengthDecay = { 0.5, 0.7 },
+		thicknessDecay = 0.55,
+		minThickness = 0.5,
+		canopy = "clusters",
+		leafSize = 5.5,
+		clusterParts = { 3, 4 },
+		barkMarks = 6,
+		flares = 3,
+		maxSections = 14,
+		leafColors = { "#A6CE5C", "#BCD96B", "#8EBF4E", "#D2DF7A" },
+		bark = "#D8D2C4",
+		accent = "#2E2A28",
+	},
+	-- A clear trunk to 12, then a tall dark cone.
+	pine = {
+		height = { 45, 60 },
+		trunkThickness = 2.6,
+		trunkLength = 46,
+		trunkSegments = 6,
+		taper = 0.86,
+		spire = 6,
+		maxDepth = 0,
+		canopy = "tiers",
+		tiers = 5,
+		tierSides = 5,
+		firstTierAt = 12,
+		tierRadius = { 9.5, 3 },
+		tierHeight = 9,
+		flares = 3,
+		maxSections = 8,
+		leafColors = { "#2F7A3D", "#3A8A47", "#276B36", "#45975A" },
+		bark = "#6B4A2F",
+	},
+	-- Forked, under a wide flat-topped fire crown about 26 wide.
+	maple = {
+		height = { 24, 32 },
+		trunkThickness = 2.4,
+		trunkLength = 8,
+		trunkSegments = 2,
+		taper = 0.92,
+		maxDepth = 3,
+		splitChance = { 1.0, 0.8, 0.5 },
+		minSplits = 2,
+		maxSplits = 3,
+		branchAngle = 42,
+		twistiness = 12,
+		firstBranchLength = 7,
+		lengthDecay = { 0.6, 0.8 },
+		thicknessDecay = 0.7,
+		minThickness = 0.6,
+		canopy = "clusters",
+		leafSize = 8,
+		clusterParts = { 4, 5 },
+		flares = 5,
+		maxSections = 22,
+		leafColors = { "#D88F2C", "#C8642A", "#E5A33B", "#B84A24", "#EDBB4C" },
+		bark = "#7A5230",
+	},
+	-- A curved trunk under a drooping tuft.
+	palmwood = {
+		height = { 26, 36 },
+		trunkThickness = 1.8,
+		trunkLength = 28,
+		trunkSegments = 7,
+		taper = 0.94,
+		lean = 0.2,
+		maxDepth = 0,
+		canopy = "fronds",
+		fronds = 8,
+		frondLength = 11,
+		coconuts = 3,
+		rings = 4,
+		maxSections = 8,
+		leafColors = { "#3FAE5A", "#52BF66", "#33964B" },
+		bark = "#8A6A45",
+		accent = "#7A5A36",
+	},
+	-- A blue cone with white caps.
+	frostwood = {
+		height = { 40, 52 },
+		trunkThickness = 2.2,
+		trunkLength = 38,
+		trunkSegments = 6,
+		taper = 0.85,
+		spire = 5,
+		maxDepth = 0,
+		canopy = "snowtiers",
+		tiers = 4,
+		tierSides = 5,
+		firstTierAt = 10,
+		tierRadius = { 8, 2.5 },
+		snowCaps = 2,
+		flares = 3,
+		maxSections = 8,
+		leafColors = { "#3F7FA6", "#4F90B5", "#2F6E96", "#5B9CC0" },
+		bark = "#485462",
+		accent = "#FFFFFF",
+	},
+	-- Crooked and smouldering.
+	emberwood = {
+		height = { 24, 32 },
+		trunkThickness = 2.4,
+		trunkLength = 10,
+		trunkSegments = 2,
+		taper = 0.9,
+		maxDepth = 2,
+		splitChance = { 1.0, 0.6 },
+		minSplits = 3,
+		maxSplits = 3,
+		branchAngle = 34,
+		elbow = 20,
+		twistiness = 15,
+		firstBranchLength = 6,
+		lengthDecay = { 0.65, 0.85 },
+		thicknessDecay = 0.62,
+		minThickness = 0.6,
+		canopy = "embers",
+		leafSize = 6.5,
+		clusterParts = { 4, 5 },
+		cracks = 5,
+		flares = 5,
+		maxSections = 14,
+		leafColors = { "#FF7A1A", "#F2601A", "#FF9A33", "#E04A12" },
+		bark = "#3A2A24",
+		glow = "#FF8A2A",
+	},
+	-- Bare and twisted.
+	phantomwood = {
+		height = { 22, 30 },
+		trunkThickness = 2.0,
+		trunkLength = 8,
+		trunkSegments = 2,
+		taper = 0.85,
+		maxDepth = 3,
+		splitChance = { 1.0, 0.7, 0.4 },
+		minSplits = 2,
+		maxSplits = 3,
+		branchAngle = 48,
+		twistiness = 28,
+		firstBranchLength = 6,
+		lengthDecay = { 0.6, 0.85 },
+		thicknessDecay = 0.6,
+		minThickness = 0.5,
+		canopy = "wisps",
+		wisps = 5,
+		pods = 3,
+		flares = 5,
+		maxSections = 22,
+		leafColors = { "#7A4FD0", "#6A3FC0", "#9468E0", "#5A34A8" },
+		bark = "#2A2138",
+		glow = "#55F2E0",
+	},
+	-- Tall, pale, layered light.
+	lumenwood = {
+		height = { 34, 44 },
+		trunkThickness = 2.6,
+		trunkLength = 20,
+		trunkSegments = 3,
+		taper = 0.9,
+		maxDepth = 3,
+		splitChance = { 0.9, 0.5, 0.3 },
+		minSplits = 2,
+		maxSplits = 3,
+		branchAngle = 30,
+		twistiness = 6,
+		firstBranchLength = 7,
+		lengthDecay = { 0.55, 0.75 },
+		thicknessDecay = 0.65,
+		minThickness = 0.6,
+		canopy = "glowtiers",
+		leafSize = 7,
+		veins = 6,
+		flares = 5,
+		maxSections = 18,
+		leafColors = { "#FFF4C2", "#FFE89A", "#FFF9DC", "#F7D97A" },
+		bark = "#F2E6C8",
+		glow = "#FFE7A0",
+	},
+}
+
 local byId: { [string]: WoodDef } = {}
 for _, def in ipairs(woods) do
-	def.v2 = V2[def.id]
+	local v2 = V2[def.id]
+	if v2 then
+		v2.shape = SHAPES[def.id]
+	end
+	def.v2 = v2
 	byId[def.id] = def
 end
 
