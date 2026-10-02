@@ -11,10 +11,10 @@
 --   * On leaving, prints a one-line session summary.
 --   * Prints a ready-to-paste command that calibrates the economy model
 --     from what you actually did: time from first chop to last sale, and
---     the logs sold by wood ("lune run tools/economy --calibrate ...").
+--     the logs sold by wood ("lune run tools/economy1 --calibrate ...").
 --     Under the v2 core loop (GameServer passes CoreLoop.Active() to Init)
---     it's the v2 model's command, with the u³ sold by wood (WoodSold):
---     "lune run tools/economy2 --calibrate 612 birch=16 oak=24", and
+--     it's the live model's command, with the u³ sold by wood (WoodSold):
+--     "lune run tools/economy --calibrate 612 birch=16 oak=24", and
 --     "could afford" uses the v2 prices (ShopLogic.Price).
 --
 -- On live servers:
@@ -71,7 +71,7 @@ type Session = {
 	firstChopAt: number?,
 	lastSaleAt: number?,
 	soldByWood: { [string]: number },
-	-- The same for the v2 model (tools/economy2): u³ by wood, pieces sold.
+	-- The same for the v2 model (tools/economy): u³ by wood, pieces sold.
 	volumeByWood: { [string]: number },
 	piecesSold: number,
 }
@@ -108,8 +108,8 @@ end
 -- what was sold by wood (`byWood`: logs under v1, u³ under v2, rounded to
 -- whole numbers), or nil from too little (`count`: logs under v1, pieces
 -- under v2; or too short a session):
--- "lune run tools/economy --calibrate 612 birch=16 oak=24" (v1),
--- "lune run tools/economy2 --calibrate 612 birch=16 oak=24" (v2, u³).
+-- "lune run tools/economy1 --calibrate 612 birch=16 oak=24" (v1),
+-- "lune run tools/economy --calibrate 612 birch=16 oak=24" (v2, u³).
 function MilestoneService.CalibrateLine(
 	seconds: number,
 	byWood: { [string]: number },
@@ -132,7 +132,7 @@ function MilestoneService.CalibrateLine(
 	table.sort(parts)
 	return string.format(
 		"lune run tools/%s --calibrate %d %s",
-		if v2 then "economy2" else "economy",
+		if v2 then "economy" else "economy1",
 		math.floor(seconds),
 		table.concat(parts, " ")
 	)

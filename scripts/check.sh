@@ -30,6 +30,6 @@ lune run tests/run
 
 echo "== ECONOMY.md is current"
 lune run tools/economy --check
-lune run tools/economy2 --check
+lune run tools/economy1 --check
 
 echo "All checks passed."

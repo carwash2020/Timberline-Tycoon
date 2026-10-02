@@ -27,11 +27,18 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
   sunk NPCs, trucks and spawns (terrain calibration), grass through shop
   floors, walk-through props, and a plain landscape (a little more LT2).
   Next: Connor's checks on it, then wave 2 from what players hit.
+- 🟡 The v2 core loop (V2_PLAN.md M1): section trees cut anywhere, wood
+  dragged and carried loose on the beds, sold by volume, the spec's
+  numbers. Flipped on (`CoreLoop = 2`) on 2 October 2026 without a Studio
+  pass, at Connor's go-ahead; PHASE2_NOTES.md "The v2 loop goes live" has
+  the checks. Old saves are bought back and topped up (MigrateV2).
 - 🟡 Phase 1 core loop (PHASE1_NOTES.md checklist)
 - 🟡 Phase 2+ and the October 2026 redesign, all on `main` now
   (PHASE2_NOTES.md checklists, "The redesign" first)
 - ⬜ Calibrate EFFICIENCY from a real 10-minute session (stopwatch line →
-  `lune run tools/economy --calibrate …`), then re-check ECONOMY.md
+  `lune run tools/economy --calibrate …`, the v2 model), then re-check
+  ECONOMY.md (the model says first $1k, Cobalt and a full plot are about
+  1.5x slower than V2_PLAN §17's targets: tune after calibrating)
 
 ### 1. Core systems (🟡 on `main`)
 - 🟡 Saving (ProfileStore), wallet cap, anti-exploit rate limits

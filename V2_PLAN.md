@@ -9,17 +9,28 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | Slice | State | Commit |
 |---|---|---|
 | Plan | on main | b13fa65 |
-| M1.0 flag, Tune, v2 data, Gloamwood | on main, dormant | 1260925 |
-| M1.4 grab and drag (+ /spawnwood in Studio) | on main, dormant | 8f4cc09 |
-| M1.7a SellLogic, M1.7 SellService (sells /spawnwood pieces) | on main, dormant | 5aee212, ccc882a |
-| M1.8a v2 tutorial, hints, HUD rules, dailies, guide, shop data | on main, dormant | 2da706e |
-| M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | on main, dormant | e444b1b |
-| M1.5 bigger trucks, lot, pad zone (LIVE) | on main | 0077061 |
-| M1.8b wiring the tutorial, dailies, shop, guide, HUD | on main, dormant (felling/loading events wait for M1.3/M1.6) | see log |
-| M1.3 cut anywhere (SectionTrees, WoodService, CutController, WoodFX) | in progress | |
-| M1.6 trucks by friction (TruckLoad, BedZones, saved loads) | in progress | |
-| M1.9 migration and the flip | next: Connor said go ahead without a Studio pass (2 Oct 2026) | |
+| M1.0 flag, Tune, v2 data, Gloamwood | live | 1260925 |
+| M1.4 grab and drag (+ /spawnwood in Studio) | live | 8f4cc09 |
+| M1.7a SellLogic, M1.7 SellService | live | 5aee212, ccc882a |
+| M1.8a v2 tutorial, hints, HUD rules, dailies, guide, shop data | live | 2da706e |
+| M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | live | e444b1b |
+| M1.5 bigger trucks, lot, pad zone | live | 0077061 |
+| M1.8b wiring the tutorial, dailies, shop, guide, HUD | live | 9597e0d |
+| M1.6 trucks by friction (TruckLoad, BedZones, saved loads, Instant Delivery v2) | live | da28498 |
+| M1.3 cut anywhere (SectionTrees, WoodService, GrowLogic, CutController, WoodFX) | live | 146a7ce |
+| M1.7b Cloud Chute and forge hoppers, Sky Bin by u³, falls off the isles | live | f8b529a |
+| M1.9 migration (MigrateV2, v2Credit) and the flip (`CoreLoop = 2`; economy2 is now tools/economy, v1's is tools/economy1) | live once Connor publishes; flipped without a Studio pass, at Connor's go-ahead (2 Oct 2026) | see log |
 | M1.10 cleanup | after about a week live | |
+
+**As built, where it differs from the plan (lead's notes, 2 Oct 2026):**
+- Dead trees stay anchored and non-colliding while clients sink them (unanchored, they'd collapse and fight the sink).
+- A felled trunk tips 4° over the cut's far edge with a spin before its physics passes to the cutter (a server impulse doesn't carry to a client-owned assembly).
+- The planter's 15% share is summed over the pieces others freed and paid once, when the tree is felled (at least $1).
+- Time per growth stage is growSec / 4, at boot and live.
+- Falls off the isles: AetherService loses wood 40 studs under the deck (not "the sky floor - 50").
+- A saved bed load has no section graph: WoodService.LinkByContact rebuilds one from which sections touch.
+- The v2 forge: 60 u³ of plain lumenwood, 12 Sky Shards and $20,000 (`StarfallAxe.v2.forgeCash`, §2c).
+- Boot: section trees take about 7.5 s in Lune (v1's took 1.4 s); MapBuilder prints `[MapBuilder] N section trees in X s` so a live boot can be measured. If it's over budget, speed up TreeGen and FromSkeleton before anything else.
 
 ---
 

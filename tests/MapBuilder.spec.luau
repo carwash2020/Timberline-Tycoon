@@ -346,7 +346,7 @@ return function(t)
 	end)
 
 	t.test("the build line has the shape WLD-03 and the checklist read, and the stats are published", function()
-		local s = build()
+		local s = build({ loop = 1 }) -- TreeService's stub counts the spawns
 		local line = builtLine(s)
 		t.ok(line, "a World built line")
 		t.ok(
@@ -378,8 +378,15 @@ return function(t)
 		t.eq(s.sectionWoods.lumenwood >= #sky.lumenwood, true)
 	end)
 
-	t.test("v1 loop: TreeService's trees, SectionTrees untouched", function()
+	t.test("a live server (no Studio override) builds the v2 loop's section trees", function()
 		local s = build()
+		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 2)
+		t.eq(s.spawned or 0, 0, "no TreeService trees")
+		t.ok((s.sectionSpawned or 0) > 0, "section trees")
+	end)
+
+	t.test("v1 loop (a rollback, or Studio's CoreLoop = 1): TreeService's trees, SectionTrees untouched", function()
+		local s = build({ loop = 1 })
 		t.eq(s.sectionSpawned, nil)
 		t.eq(s.groups, nil, "no v2 collision groups on a v1 server")
 		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 1)

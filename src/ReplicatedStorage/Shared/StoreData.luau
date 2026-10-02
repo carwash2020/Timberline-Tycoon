@@ -33,7 +33,7 @@ StoreData.Passes = {
 		key = "DoubleCash",
 		id = 0,
 		name = "2x Cash",
-		description = "Every log you sell pays double, forever.",
+		description = "All the wood you sell pays double, forever.",
 	},
 } :: { Pass }
 
@@ -56,7 +56,7 @@ StoreData.Products = {
 		key = "DoubleWood",
 		id = 0,
 		name = "2x Wood (48 hours)",
-		description = "Every tree you fell drops twice the logs for 48 hours.",
+		description = "Wood you cut in the next 48 hours is worth double.",
 		boostHours = 48,
 	},
 	{

@@ -1,7 +1,7 @@
 --!strict
 -- TreeGen: the skeleton of a section tree (V2_PLAN.md §3a, §3b). Pure and
 -- deterministic: the same wood, seed and scale give the same tree on every
--- server, in the specs, in tools/economy2 and in tools/preview, and
+-- server, in the specs, in tools/economy and in tools/preview, and
 -- TreeArt.FromSkeleton turns it into parts.
 --
 --   * A tree is sections (square blocks, length up their Y axis) joined

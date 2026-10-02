@@ -30,6 +30,57 @@ Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
 
+## The v2 loop goes live (M1.9, 2 October 2026)
+
+Connor's call (V2_PLAN.md): the game now plays like the spec he sent.
+`GameConfig.CoreLoop = 2`. Trees are section trees you can cut anywhere:
+a notch grows where you keep hitting, the tree tips and falls, and you cut
+the trunk and limbs into pieces. You put the axe away and drag the wood
+(heavy pieces drag slowly; cut them shorter). Loose wood rides on the
+truck's bed by friction, and wood resting on the green sell pad by the
+sawmill sells by volume: u³ x the wood's price per u³. A new player starts
+with $20 and a Rusty Axe. Prices and axe numbers are the spec's (ECONOMY.md
+is the v2 model now; ECONOMY_V1.md keeps the old one).
+
+**Old saves.** The first time a player joins, the logs they had on hand
+(truck bed, left-behind logs, Sky Bin) are bought back at their saved
+value: "Murph bought back the logs you had on hand: +$X". Anyone under $20
+is topped up to it ("Murph chipped in $X to get you started."). Lumenwood
+in the forge becomes forge wood (40 logs = 60 u³). Axes, trucks, plots,
+Heartseeds, the Field Guide, streaks and Robux purchases are all kept;
+tutorial progress restarts only on the steps whose unit changed.
+
+**Rollback** if something is badly wrong: set `CoreLoop = 1` in
+GameConfig, rebuild and republish. Migrated saves load fine under v1.
+
+### How to update the live game
+
+As in Glitch wave 1 below: fetch `main`, `rojo build -o build.rbxlx`, open
+it, run the checks, **File > Publish to Roblox**. Then on create.roblox.com
+open the game and use **Restart servers for updates** (Migrate to Latest
+Update), so no server keeps running the old loop.
+
+### What to check (in Studio, before publishing)
+
+| # | Do this | Good looks like |
+|---|---|---|
+| 1 | Play with Output open | `[CoreLoop] 2`, `[MapBuilder] N section trees in X s` (**paste this line to Claude**: it's the boot-time risk), `[SectionTrees] N trees on N sites`, `[GameServer] <you>'s save is now on the v2 loop (bought back $X, topped up $Y)` the first time, and a toast with the buy-back or Murph's $20. No red |
+| 2 | Walk into the Starter Forest | Big, varied trees, some young |
+| 3 | Tutorial step 1: hit an oak's trunk at knee height with the Rusty Axe | A notch grows on the face you hit and a ring fills; on about hit 16 the tree tips away from you, its leaves drop about 1.5 s later, and a stub with a pale cut face stays |
+| 4 | Step 2: press 1 to put the axe away, then click and hold a log | It drags. A whole trunk is heavy: cut it in half (about 16 hits) and drag the halves. Cutting a limb where it joins frees it |
+| 5 | Step 3: drag the wood onto the Rustbucket's bed | It rests there; the HUD shows the bed's u³ and $ |
+| 6 | Step 4: drive to the mill at full speed and back onto the green pad | Nothing falls off on the straights (a hard turn may slide a log). On the pad: "Sold N pieces · X u³ · $Y". The truck stays. Spawn to first sale under 4 minutes |
+| 7 | Steps 5-7: plant the Heartseed in your stump, sell $60 more, buy the Steel Axe | The sapling grows with your name; Murph pays $25; the Steel Axe costs $90 |
+| 8 | Stop and Play again with wood on the bed, parked in town | The load is back on the bed where it lay. Leave it out in the forest instead: "Your last load is waiting where you left your truck." |
+| 9 | **Test > Clients and Servers**, 2 players | Player 2 can't grab wood on your bed ("That's on <you>'s truck."); a log of theirs you sell pays them; no jitter on either screen |
+| 10 | If logs jitter on the bed: Server command bar `workspace:SetAttribute("Tune_BedAutoWeld", 1)` | Resting logs weld within a second; grabbing one unwelds it. Tell Claude if you needed it |
+| 11 | The isles: lay a Lumenwood piece on a Cloud Chute's hopper; at the mill press **Sell Sky Bin**; lay plain Lumenwood on the forge | "Sent 1 piece down the Cloud Chute. Sky Bin X/120 u³"; the bin sells with the usual toast; "Into the forge: X u³. Lumenwood X/60 u³ · Sky Shards ... · $20,000" |
+| 12 | Phone emulator + **View > MicroProfiler** during a felling in the Starter Forest | 30+ fps, no long spike when the tree lands |
+| 13 | Rollback check: in edit mode `workspace:SetAttribute("CoreLoop", 1)`, Play | Today's game as before (logs in hands, Load and Sell prompts). Clear the attribute afterwards (`nil`): PlaceCheck warns if it's left set |
+
+The stopwatch prints `lune run tools/economy --calibrate ...` once you've
+sold enough: paste it to Claude (it calibrates ECONOMY.md).
+
 ## Glitch wave 1 (after the first live session, 2 October 2026)
 
 Connor played the live game and sent screenshots: NPCs standing chest-deep

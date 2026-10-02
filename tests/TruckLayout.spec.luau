@@ -321,7 +321,7 @@ return function(t)
 	end)
 
 	-- M1.6: the v2 loop's BedZone and the bed's room (the HUD's "Bed 41 /
-	-- 96 u³"), the same estimate as tools/economy2's "u³ a trip".
+	-- 96 u³"), the same estimate as tools/economy's "u³ a trip".
 	t.test("BedZone: the inside of the bed, BedZoneHeight tall, its bottom on the floor's top", function()
 		local cf, size = TruckLayout.BedZone(7.2, 26)
 		t.eq(size, t.roblox.Vector3.new(7.2, TruckLayout.BedZoneHeight, 26))
@@ -333,9 +333,9 @@ return function(t)
 		end
 	end)
 
-	t.test("BedRoomU3 matches ECONOMY_V2's u³ a trip for every truck", function()
+	t.test("BedRoomU3 matches ECONOMY.md's u³ a trip for every truck", function()
 		local U = t.shared("GameConfig").WoodUnit
-		-- ECONOMY_V2.md "Beds": length x width x (walls + 2) x 0.4 / u³.
+		-- ECONOMY.md "Beds": length x width x (walls + 2) x 0.4 / u³.
 		local trip = { Rustbucket = 18.6, Pickup = 25.3, Flatbed = 53.8, LoggingRig = 95.1, ScoutATV = 0 }
 		for id, want in pairs(trip) do
 			local layout = TruckLayout.For(ItemCatalog.GetTruck(id))

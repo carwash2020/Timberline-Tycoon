@@ -23,7 +23,7 @@ return function(t)
 		local Milestone = setup()
 		t.eq(
 			Milestone.CalibrateLine(612, { oak = 24, birch = 16 }, 0, 1),
-			"lune run tools/economy --calibrate 612 birch=16 oak=24"
+			"lune run tools/economy1 --calibrate 612 birch=16 oak=24"
 		)
 		t.eq(Milestone.CalibrateLine(612, { oak = 9 }, 0, 1), nil, "fewer than 10 logs")
 		t.eq(Milestone.CalibrateLine(119, { oak = 24 }, 0, 1), nil, "under 2 minutes")
@@ -33,7 +33,7 @@ return function(t)
 		local Milestone = setup(2)
 		t.eq(
 			Milestone.CalibrateLine(612, { oak = 26.4, birch = 15.6, pine = 0.2 }, 12, 2),
-			"lune run tools/economy2 --calibrate 612 birch=16 oak=26",
+			"lune run tools/economy --calibrate 612 birch=16 oak=26",
 			"rounded, and a wood under half a u³ left out"
 		)
 		t.eq(Milestone.CalibrateLine(612, { oak = 260 }, 9, 2), nil, "fewer than 10 pieces")
@@ -66,12 +66,12 @@ return function(t)
 		Milestone.LogsSold(player, { oak = 99 }) -- a v1 sale on the same server (v1 trees until M1.3)
 		clock.now += 12
 		Milestone.WoodSold(player, 4, { oak = 5, maple = 3.4 })
-		t.eq(Milestone.CalibrationFor(player), "lune run tools/economy2 --calibrate 312 maple=3 oak=15")
+		t.eq(Milestone.CalibrationFor(player), "lune run tools/economy --calibrate 312 maple=3 oak=15")
 		local v1, v1Player = setup()
 		v1.Mark(v1Player, "First chop")
 		clock.now += 200
 		v1.LogsSold(v1Player, { oak = 12 })
 		v1.WoodSold(v1Player, 10, { oak = 500 })
-		t.eq(v1.CalibrationFor(v1Player), "lune run tools/economy --calibrate 200 oak=12", "v1 as before")
+		t.eq(v1.CalibrationFor(v1Player), "lune run tools/economy1 --calibrate 200 oak=12", "v1 as before")
 	end)
 end

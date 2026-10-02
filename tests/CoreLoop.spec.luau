@@ -9,9 +9,9 @@ return function(t)
 	local WoodData = t.shared("WoodData")
 	local ItemCatalog = t.shared("ItemCatalog")
 
-	t.test("the live game runs the v1 loop until the flip", function()
-		t.eq(GameConfig.CoreLoop, 1)
-		t.eq(CoreLoop.Resolve(GameConfig.CoreLoop, nil, false), 1)
+	t.test("the live game runs the v2 loop since the M1.9 flip", function()
+		t.eq(GameConfig.CoreLoop, 2)
+		t.eq(CoreLoop.Resolve(GameConfig.CoreLoop, nil, false), 2)
 	end)
 
 	t.test("Studio may override the loop with the CoreLoop attribute; a live server never", function()

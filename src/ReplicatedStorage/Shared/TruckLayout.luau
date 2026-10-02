@@ -240,7 +240,7 @@ end
 -- The wood a bed carries a trip, in u³ (`unit` studs a side): its length x
 -- its inside width x (its walls + BedPileOver studs piled over them) x
 -- BedPacking (how much of that a load of logs fills). The same estimate as
--- tools/economy2's "u³ a trip"; the HUD's bed chip shows it as the bed's
+-- tools/economy's "u³ a trip"; the HUD's bed chip shows it as the bed's
 -- room (TruckLoad publishes it as BedRoom).
 TruckLayout.BedPileOver = 2
 TruckLayout.BedPacking = 0.4

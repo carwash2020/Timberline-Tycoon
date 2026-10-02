@@ -39,11 +39,12 @@ local BARK = Color3.fromHex("#583A22")
 local AMBER = Color3.fromHex("#FFB840")
 
 local TITLE = "Timberline Tycoon"
--- Inlined like the colours: "two at a time" is GameConfig.HandCapacity.
+-- Inlined like the colours (ReplicatedFirst runs before Shared arrives).
+-- The v2 loop's (GameConfig.CoreLoop 2): cut anywhere, drag, carry loose.
 local TIPS = {
-	"Swing at a tree until it falls, then grab the logs. You can carry two at a time.",
-	"Load logs at your truck's tailgate, then drive them to the sawmill.",
-	"Park by the sawmill and stand on the pad to sell your whole load.",
+	"Swing low on a trunk and keep hitting the same spot. Watch the notch grow until it falls.",
+	"Put your axe away, then click and hold a log to drag it onto your truck's bed.",
+	"Back your truck onto the green pad by the sawmill: the wood sells itself, by volume.",
 	"Felled trees drop Heartseeds. Plant one in a stump to grow a tree with your name on it.",
 	"When someone else fells a tree you planted, you earn a planter's share.",
 	"Odd-looking bark can hide figured wood. The sawmill pays extra for it.",

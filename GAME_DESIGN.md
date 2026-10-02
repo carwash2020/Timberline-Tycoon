@@ -18,6 +18,15 @@ players, hunt rare wood types in dangerous biomes, and build up your plot.
 
 ## 2. Core loop
 
+> **Since 2 October 2026 the live loop is v2** (V2_PLAN.md, `GameConfig.CoreLoop = 2`):
+> 1. Swing at a trunk anywhere: hits in one spot grow a notch until the cut goes through; a cut trunk tips and falls (section trees, Shared/TreeGen).
+> 2. Cut the fallen trunk and limbs into pieces wherever you like. Put the axe away and drag them (heavy pieces drag slowly: cut them shorter).
+> 3. Drag the wood onto your truck's bed; it rides loose, by friction.
+> 4. Wood resting on the green sell pad sells by volume: u³ (1.6-stud cubes) x the wood's $ per u³, times its figure and boosts.
+> 5. Spend, then push into farther biomes, as below.
+>
+> The steps below are the v1 loop, kept for a rollback (`CoreLoop = 1`) until M1.10.
+
 1. Swing axe at a tree (hold/click). Tree has HP; axe has damage per hit.
 2. Tree falls → becomes carryable logs (log count scales with tree size).
 3. Carry logs to your truck (capacity limit) or straight to the sawmill.
@@ -29,6 +38,8 @@ Target feel: first sale within ~3 minutes of spawning. First axe upgrade
 within ~15 minutes. Never more than ~60 seconds of walking with nothing to do.
 
 ## 3. Progression systems
+
+> **v2:** axe stats (damage, cooldown, range, per-wood bonuses), prices and truck beds are V2_PLAN §2's, in `ItemCatalog.*.v2` and `WoodData[*].v2`; ECONOMY.md shows them. The tables below are v1's.
 
 ### Axes (damage per hit / swing speed / price)
 | Axe | Damage | Price (cash) |
@@ -157,6 +168,8 @@ Upgrades: extra storage slots, second truck slot, sawmill shortcut (sell from
 plot for a 10% fee), cosmetic buildings.
 
 ## 4. Economy targets
+
+> **v2:** the targets are V2_PLAN §17's (first sale under 3 min, Steel Axe in 5-8 min, first $1k in 15-20 min, Cobalt in about 1 h, a full plot in 20-40 h). `lune run tools/economy` checks them in ECONOMY.md; the v1 model is `tools/economy1` (ECONOMY_V1.md). The wallet cap and the automation rule below are unchanged.
 
 - New player earns ~$150–200 in the first 15 minutes (oak/birch, Rusty Axe).
 - Mid-game (Steel Axe + Pickup, pine/maple): ~$1,500/hour of active play.
@@ -441,6 +454,8 @@ game.
 
 ## 11. New player experience (first 10 minutes)
 
+> **v2:** Murph's seven steps keep their ids and order with v2 objectives (V2_PLAN §13, `TutorialData.StepsV2`): fell a tree, drag a log, drag it onto your bed, sell on the pad, plant a Heartseed, sell $60 more ($25 from Murph), buy the Steel Axe ($90). A new player starts with $20.
+
 A mentor NPC — **Murph**, a retired lumberjack — teaches by doing, not by
 dialogue walls. One objective at a time in a quest tracker, beacon guidance,
 everything skippable for alt accounts. Tutorial trees are plentiful so new
@@ -606,6 +621,8 @@ deviating from data values or architecture.
 - PascalCase for modules/services, camelCase for locals.
 
 ### 14.2 Profile schema (DataStore "PlayerProfiles", key "profile_<UserId>")
+
+> **v2 fields** (ProfileSchema, V2_PLAN §14): `schema` (2 once migrated), `v2Credit` (the buy-back owed, paid on join), `truckLoad` (loose wood saved off the beds), `forgeWood` and `skyWood` (u³), `stats.volumeSold`, `stats.cuts`. `ProfileSchema.MigrateV2` runs on every v2 join; the v1 fields stay so a rollback loses nothing.
 ```lua
 export type PlacedItem = {
   uid: string,            -- guid
@@ -744,6 +761,8 @@ export type Profile = {
   town). Biomes: folders in Workspace, art per §13.
 
 ### 14.8 Economy formulas (implement, don't eyeball)
+
+> **v2** (V2_PLAN §2c, SectionLogic, SellLogic): hits to cut a section `ceil(hardness x (thickness / 1.6)² / damage)`; a piece's value is its u³ x the wood's log (or plank) $/u³ x its figure's multiplier x its boost, and 2x Cash once on the sale. The v1 formulas below are kept for a rollback.
 - `hitsToFell = ceil(treeHP / max(0, axeDamage - hardness))` (0 damage =
   can't cut it); swing cooldown 0.8s. `lune run tools/economy` applies these
   formulas to the data tables and writes ECONOMY.md.
@@ -787,6 +806,8 @@ Playtest in Studio, checklist passes, zero console errors, commit as
   and again whenever the loop changes (the stopwatch prints the command).
 
 ## 16. The Living Forest (the twist; added October 2026)
+
+> **v2:** the same rules on section trees (ForestService.UseV2): every piece freed from a figured tree carries its figure, seeds drop by tree size, a Heartseed planted in a stub grows back mature, and the planter's 15% share is paid once when the tree is felled.
 
 **Built (October 2026):** everything in this section except "Next" is in
 the game (ForestData holds every number below; ForestLogic the rules;
@@ -897,6 +918,8 @@ goes.
   roots) that grow new branch isles, once there are players to drive it.
 
 ## 17. Art and world, v2 (October 2026)
+
+> **v2 loop:** trees are TreeGen section trees built by TreeArt.FromSkeleton (775 sites), which grow in four stages, age and die; cut pieces are loose WoodService models.
 
 The redesign replaced every placeholder with art built in code
 (`Shared/Art`, previewed with `tools/preview` without Studio) and put the

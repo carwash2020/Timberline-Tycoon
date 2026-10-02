@@ -78,7 +78,7 @@ local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load", "plant
 DailyData.Kinds = KINDS
 
 -- The v2 loop's sizes by axe tier, set against V2_PLAN.md §17 and the v2
--- axe prices (ItemCatalog `v2.price`) until tools/economy2 can size them:
+-- axe prices (ItemCatalog `v2.price`) until tools/economy can size them:
 -- `reward` is one goal's cash; a day's goals plus the one-day bonus come
 -- to well under the next axe on the ladder, so goals help along the
 -- cheap first rungs (Steel $90, Hardened $190) without skipping them.
