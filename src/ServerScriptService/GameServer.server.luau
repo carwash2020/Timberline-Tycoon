@@ -25,6 +25,7 @@ local FieldGuideService = require(script.Parent.FieldGuideService)
 local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
+local SectionTrees = require(script.Parent.SectionTrees)
 local SellService = require(script.Parent.SellService)
 local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
@@ -41,10 +42,12 @@ local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local VehicleService = require(script.Parent.VehicleService)
 local WeatherService = require(script.Parent.WeatherService)
+local WoodService = require(script.Parent.WoodService)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 -- Runs one service's Init, join or leave hook on its own: an error in one
@@ -554,8 +557,6 @@ safely("NPCService.Init", NPCService.Init, mapFolder)
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
 if CoreLoop.V2() then
-	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
-	safely("DevCommands.Init", DevCommands.Init, notify)
 	-- The sell pad sells loose wood by volume (M1.7).
 	local woodFolder = mapFolder:FindFirstChild("Wood")
 	if not woodFolder then
@@ -564,12 +565,38 @@ if CoreLoop.V2() then
 		made.Parent = mapFolder
 		woodFolder = made
 	end
+	-- Loose wood (M1.3): every piece a cut frees, its despawn and caps, and
+	-- WoodWatch (which judges held wood too, so GrabService doesn't).
+	safely("WoodService.Init", WoodService.Init, { worldFx = remote.WorldFX, folder = woodFolder })
+	GrabService.SetResolver(function(part: BasePart): GrabService.Piece?
+		return WoodService.FromPart(part) :: any
+	end)
+	GrabService.JudgeMoves = false
+	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
+	safely("DevCommands.Init", DevCommands.Init, notify)
+	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
+	local function saleFx(model: Model)
+		local piece = WoodService.FromModel(model)
+		if not piece then
+			return
+		end
+		local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, function(userId: number): boolean
+			return Players:GetPlayerByUserId(userId) ~= nil
+		end)
+		local payee = if payeeId then Players:GetPlayerByUserId(payeeId) else nil
+		if payee then
+			WoodService.SaleFx(model, SellLogic.Payout(piece.value, MonetizationService.SaleMultiplier(payee)))
+		end
+	end
 	safely("SellService.Init", SellService.Init, {
 		zone = sellZone,
 		woodFolder = woodFolder :: Instance,
 		resolve = function(model: Model): SellService.Piece?
-			local root = model.PrimaryPart
-			local piece = if root then GrabService.PieceOf(root) else nil
+			-- Only wood WoodWatch last found where it should be (no teleports to the pad).
+			local piece = WoodService.FromModel(model)
+			if piece and not WoodService.VerdictOk(piece) then
+				return nil
+			end
 			return piece :: any
 		end,
 		addCash = function(player: Player, amount: number, reason: string, sku: string)
@@ -580,8 +607,48 @@ if CoreLoop.V2() then
 		release = function(model: Model)
 			GrabService.ReleasePiece(model, "sold")
 		end,
-		forget = GrabService.Unregister,
+		forget = function(model: Model)
+			saleFx(model)
+			WoodService.Forget(model)
+			GrabService.Unregister(model)
+		end,
 	})
+	-- The section trees (M1.3): the Living Forest moves onto them, and the
+	-- Chop remote cuts them (and loose pieces) wherever you swing.
+	SectionTrees.StumpHold = QuestService.StumpHoldFor
+	SectionTrees.LogMultiplier = MonetizationService.LogMultiplier
+	safely("ForestService.UseV2", ForestService.UseV2, SectionTrees, WoodService.SetFigure)
+	-- A felling counts for whoever cut the most of the tree (stats, the
+	-- tutorial's treeFelled, dailies, the Field Guide), as in v1.
+	SectionTrees.Hooks.onFelled = function(feller: Player, rec: SectionTrees.TreeRecord)
+		local profile = ProfileService.GetProfile(feller)
+		if not profile then
+			return
+		end
+		profile.stats.treesChopped += 1
+		MilestoneService.Mark(feller, "First tree felled")
+		QuestService.Event(feller, "treeFelled")
+		DailyService.Event(feller, "treeFelled", 1)
+		FieldGuideService.Discover(feller, rec.def.id)
+	end
+	SectionTrees.Hooks.onSwing = function(player: Player)
+		MilestoneService.Mark(player, "First chop")
+	end
+	safely("SectionTrees.Init", SectionTrees.Init, {
+		notify = notify,
+		worldFx = remote.WorldFX,
+		getAxe = AxeService.GetEquippedAxe,
+		canChop = BiomeService.CanChop,
+		swingDue = function(player: Player): number
+			return nextSwingAt[player.UserId] or 0
+		end,
+		setSwingDue = function(player: Player, at: number)
+			nextSwingAt[player.UserId] = at
+		end,
+	})
+	remote.Chop.OnServerEvent:Connect(function(player: Player, part: unknown, hitPos: unknown, normal: unknown)
+		SectionTrees.Chop(player, part, hitPos, normal)
+	end)
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)

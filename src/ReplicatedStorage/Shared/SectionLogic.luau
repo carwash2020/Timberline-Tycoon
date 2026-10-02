@@ -276,4 +276,116 @@ function SectionLogic.Owner(cut: Cut, swingerId: number, isHere: ((number) -> bo
 	end)
 end
 
+---------------------------------------------------------------------------
+-- Aiming a swing (M1.3: CutController aims, SectionTrees checks)
+---------------------------------------------------------------------------
+
+-- A swing at a standing trunk goes in between the knee and the chest,
+-- measured from the HumanoidRootPart (about 3 studs above the feet on R15
+-- and R6), so you never have to aim at your own feet.
+SectionLogic.KneeAbove = -1.6
+SectionLogic.ChestAbove = 1.2
+-- A section whose axis is this close to straight up (its UpVector's Y) is
+-- a trunk you swing at sideways; anything flatter (a limb, a log on the
+-- ground) is cut where you point.
+SectionLogic.Upright = 0.7
+-- The server takes a hit point this far outside the section's box (the
+-- piece may have moved a little since the client aimed).
+SectionLogic.BoxMargin = 0.6
+
+-- The height (world Y) a swing at a standing trunk goes in at: the
+-- pointer's height (or the root part's, without one) kept between the
+-- knee and the chest.
+function SectionLogic.SwingHeight(rootY: number, pointerY: number?): number
+	local y = pointerY or rootY
+	return math.clamp(y, rootY + SectionLogic.KneeAbove, rootY + SectionLogic.ChestAbove)
+end
+
+-- The face of a section (`cf` its centre) that `dir` (world) points out
+-- of most, among its four sides: the outward normal, in world space.
+function SectionLogic.SideFacing(cf: CFrame, dir: Vector3): Vector3
+	local x, z = cf.XVector:Dot(dir), cf.ZVector:Dot(dir)
+	if math.abs(x) >= math.abs(z) then
+		return if x >= 0 then cf.XVector else -cf.XVector
+	end
+	return if z >= 0 then cf.ZVector else -cf.ZVector
+end
+
+-- Where a swing from `from` (the root part) at a section (`cf` its
+-- centre, `size` its size, its length along Y) lands, and the face it
+-- cuts into: (hit point, outward normal), both world space.
+--   * A standing trunk (SectionLogic.Upright): at SwingHeight on its axis
+--     (kept CutEdge inside its ends), on the side facing `from` (or the
+--     side `pointerNormal` names, when it's a side face).
+--   * Anything flatter: where the pointer hit it (`pointer`), else the
+--     point on its axis nearest `from`; the face toward `from`, unless the
+--     pointer named one.
+function SectionLogic.AimAt(
+	cf: CFrame,
+	size: Vector3,
+	from: Vector3,
+	pointer: Vector3?,
+	pointerNormal: Vector3?
+): (Vector3, Vector3)
+	local axis = cf.UpVector
+	local half = size.Y / 2
+	local edge = math.min(GameConfig.CutEdge, half)
+	local centre = cf.Position
+	local side = math.min(size.X, size.Z) / 2
+	if math.abs(axis.Y) >= SectionLogic.Upright then
+		local y = SectionLogic.SwingHeight(from.Y, if pointer then pointer.Y else nil)
+		local t = math.clamp((y - centre.Y) / axis.Y, -half + edge, half - edge)
+		local onAxis = centre + axis * t
+		local normal: Vector3
+		if pointerNormal and math.abs(pointerNormal:Dot(axis)) < 0.5 then
+			normal = SectionLogic.SideFacing(cf, pointerNormal)
+		else
+			normal = SectionLogic.SideFacing(cf, from - onAxis)
+		end
+		return onAxis + normal * side, normal
+	end
+	local along: number
+	if pointer then
+		along = (pointer - centre):Dot(axis)
+	else
+		along = (from - centre):Dot(axis)
+	end
+	along = math.clamp(along, -half + edge, half - edge)
+	local onAxis = centre + axis * along
+	if pointer and pointerNormal and math.abs(pointerNormal:Dot(axis)) < 0.5 then
+		return pointer, SectionLogic.SideFacing(cf, pointerNormal)
+	end
+	local normal = SectionLogic.SideFacing(cf, from - onAxis)
+	return onAxis + normal * side, normal
+end
+
+-- Whether `point` lies inside a section's box (`cf` its centre, `size`
+-- its size) grown by `margin` studs every way.
+function SectionLogic.InBox(cf: CFrame, size: Vector3, point: Vector3, margin: number?): boolean
+	local m = margin or SectionLogic.BoxMargin
+	local p = cf:PointToObjectSpace(point)
+	local h = size / 2
+	return math.abs(p.X) <= h.X + m and math.abs(p.Y) <= h.Y + m and math.abs(p.Z) <= h.Z + m
+end
+
+-- How far up a section (from its bottom) a world point is, along its axis.
+function SectionLogic.HeightOn(cf: CFrame, size: Vector3, point: Vector3): number
+	return cf:PointToObjectSpace(point).Y + size.Y / 2
+end
+
+-- The toast for a refused swing, or nil for none (a swing too soon is
+-- just ignored; the client mirrors the cooldown).
+function SectionLogic.Message(reason: string?): string?
+	if reason == "far" then
+		return "Too far away. Walk closer to cut."
+	elseif reason == "noLOS" then
+		return "Something's in the way."
+	elseif reason == "tooHard" then
+		return "This wood needs a special axe."
+	elseif reason == "noAxe" then
+		return "Take out an axe to cut."
+	end
+	return nil
+end
+
 return SectionLogic

@@ -23,6 +23,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
@@ -145,17 +146,28 @@ local function candidates(): { Vector3 }
 	return out
 end
 
+-- The struck tree's model and base: TreeService's, or SectionTrees' under
+-- the v2 loop (the same records; required only then).
+local function struckTree(uid: string): (Model?, Vector3?)
+	if CoreLoop.V2() then
+		local rec = require(script.Parent.SectionTrees).GetTree(uid)
+		return if rec then rec.model else nil, if rec then rec.base else nil
+	end
+	local rec = TreeService.GetTree(uid)
+	return if rec then rec.model else nil, if rec then rec.base else nil
+end
+
 -- Where the bolt should land: the struck tree's crown, or the point itself.
 local function boltTarget(point: Vector3, struckUid: string?): Vector3
 	if not struckUid then
 		return point
 	end
-	local rec = TreeService.GetTree(struckUid)
-	if not rec or not rec.model.Parent then
+	local model, base = struckTree(struckUid)
+	if not model or not base or not model.Parent then
 		return point
 	end
-	local cf, size = rec.model:GetBoundingBox()
-	return Vector3.new(rec.base.X, cf.Position.Y + size.Y / 2, rec.base.Z)
+	local cf, size = model:GetBoundingBox()
+	return Vector3.new(base.X, cf.Position.Y + size.Y / 2, base.Z)
 end
 
 local function strike(point: Vector3)

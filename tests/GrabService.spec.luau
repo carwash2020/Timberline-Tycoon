@@ -482,6 +482,28 @@ return function(t)
 		t.eq(w.autos, { section }, "then automatic again")
 	end)
 
+	t.test(
+		"JudgeMoves off (WoodService's WoodWatch judges instead): no put-back here, the hold's checks stay",
+		function()
+			local w = setup()
+			w.GrabService.JudgeMoves = false
+			local record, section = w.piece()
+			local home = section.CFrame
+			local player = w.player(1)
+			t.ok(w.GrabService.Grab(player, section, HIT))
+			w.wait(0.5)
+			w.watch()
+			section.CFrame = home + Vector3.new(0, 0, 400)
+			w.wait(0.5)
+			w.watch()
+			w.GrabService.JudgeMoves = true
+			t.eq(#w.loader.warnings, 0, "not judged twice")
+			t.eq(w.GrabService.Holding(player), nil, "but 400 studs from its holder it still lets go")
+			t.eq(w.released[#w.released].reason, "far")
+			t.eq(record.model:GetAttribute("HeldBy"), 0)
+		end
+	)
+
 	t.test("a piece teleported in the dropper's keep window is put back too", function()
 		local w = setup()
 		local _, section = w.piece()

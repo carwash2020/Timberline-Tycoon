@@ -88,6 +88,13 @@ function ForestLogic.IsLarge(size: TreeLogic.SizeClass): boolean
 	return size.name == "large" or size.name == "elder"
 end
 
+-- The v2 loop's rule (V2_PLAN.md §3i): a tree drawn at this scale or more
+-- (TreeGen's large size roll, an Elder) drops the large tree's seed.
+ForestLogic.LargeScale = 1.1
+function ForestLogic.IsLargeScale(scale: number): boolean
+	return scale >= ForestLogic.LargeScale - 1e-9
+end
+
 function ForestLogic.TotalSeeds(seeds: { [string]: number }): number
 	local total = 0
 	for _, n in pairs(seeds) do
@@ -357,6 +364,16 @@ end
 -- value: no figure), whole dollars, at least $1.
 function ForestLogic.Royalty(pricePerLog: number, logCount: number): number
 	return math.max(1, math.floor(pricePerLog * logCount * ForestData.PlanterShare + 0.5))
+end
+
+-- The v2 loop's share (V2_PLAN.md §3i): the planter's cut of wood worth
+-- `baseValue` (its volume at the log price, no figure) that someone else
+-- freed from their tree, whole dollars, at least $1 (nothing for nothing).
+function ForestLogic.RoyaltyByValue(baseValue: number): number
+	if not (baseValue > 0) then
+		return 0
+	end
+	return math.max(1, math.floor(baseValue * ForestData.PlanterShare + 0.5))
 end
 
 ---------------------------------------------------------------------------

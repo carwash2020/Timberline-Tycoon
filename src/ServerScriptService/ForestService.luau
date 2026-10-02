@@ -31,6 +31,24 @@
 --     bloom (workspace SkyrootBloom), doubling figure chances.
 -- WorldFX kinds sent to clients (payload tables): SeedPop, Sprout, Struck,
 -- Elder, ElderFallen, ElderFaded, ElderShare, Royalty, Reveal.
+--
+-- The v2 loop (CoreLoop 2, V2_PLAN.md §3i): the same rules on section
+-- trees. Under it GameServer passes Init SectionTrees (the same API and
+-- records as TreeService) and WoodService's SetFigure, and wires the
+-- hooks V2Hooks returns into SectionTrees:
+--   * Every piece a cut frees from a standing tree (OnPieceFreed: limbs
+--     and the felled trunk) gets the tree's figure (Stormgrain while it's
+--     struck); a planter's share is 15% of the base value of every piece
+--     someone else freed from their tree (ForestLogic.RoyaltyByValue),
+--     paid when it's felled; an Elder's helpers (10% of the damage) share
+--     10% of the value freed from it.
+--   * Bark clues go on the trunk section (ForestArt.SectionClue on
+--     ForestArt.ClueSection) of a tree that has sections, again on every
+--     new model as it grows (OnRebuilt); a storm's glow fades if it grows.
+--   * Felled = the first cut through a trunk (OnFelled with the piece):
+--     the seeds (the large tree's extra by scale: ForestLogic.IsLargeScale)
+--     and vitality as before. Planting in a stub brings the tree back
+--     mature (SectionTrees.Regrow with stage 1) after SproutSeconds.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
@@ -62,15 +80,28 @@ type TreeRecord = TreeService.TreeRecord
 
 local ForestService = {}
 
+-- The trees: TreeService, or under the v2 loop SectionTrees (the same API
+-- and record shape), which Init is given.
+local Trees = TreeService
+local v2 = false
+local sectionTrees: any = nil -- v2: SectionTrees, for its own calls (Regrow with a stage)
+local setFigure: (piece: any, figure: string?) -> () = function(_piece: any, _figure: string?) end
+
 export type Remotes = { PlantSeed: RemoteEvent, WorldFX: RemoteEvent }
 
--- Tests pass their own clocks and dice, and tick by hand.
+-- Tests pass their own clocks and dice, and tick by hand. Under the v2
+-- loop GameServer passes SectionTrees and WoodService.SetFigure.
 export type Options = {
 	clock: (() -> number)?,
 	serverTime: (() -> number)?, -- the day and night clock (workspace:GetServerTimeNow())
 	random: (() -> number)?,
 	manual: boolean?, -- no background loop: call ForestService.Tick(dt)
+	sectionTrees: any?, -- v2: SectionTrees (TreeService's API and record shape)
+	setFigure: ((piece: any, figure: string?) -> ())?, -- v2: WoodService.SetFigure
 }
+
+-- What onPieceFreed reads of a WoodService piece.
+type FreedPiece = { volume: number, value: number }
 
 type Struck = { untilAt: number, glow: Instance }
 type Sprout = { userId: number, growth: number } -- a sapling, into the stump of that felling
@@ -99,6 +130,11 @@ local nextElderCheck = 0
 local bloomUntil = 0 -- clock time the bloom ends; 0 = not blooming
 local bloomRestUntil = 0
 local marks: Folder? = nil
+-- v2: what each standing tree has freed so far (base value someone other
+-- than its planter freed, for the planter's share; all value, for an
+-- Elder's helpers).
+local owedOf: { [string]: number } = {}
+local freedOf: { [string]: number } = {}
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -143,9 +179,21 @@ local function trunkOf(model: Model): BasePart?
 	return if trunk and trunk:IsA("BasePart") then trunk else nil
 end
 
+-- A trunk's thickness: a v1 Trunk is a cylinder along X (Size.Y is its
+-- diameter), a v2 section a square block along Y (Size.X).
+local function trunkWidth(trunk: BasePart): number
+	return if v2 then trunk.Size.X else trunk.Size.Y
+end
+
+-- The top of a trunk part (v1: its X axis runs up it; v2: its Y axis).
+local function trunkTop(trunk: BasePart): Vector3
+	local up = if v2 then trunk.Size.Y else trunk.Size.X
+	return trunk.CFrame.Position + Vector3.new(0, up / 2, 0)
+end
+
 local function forgetDecoration(uid: string, inst: Instance?)
 	if inst then
-		TreeService.Forget(uid, inst)
+		Trees.Forget(uid, inst)
 		inst:Destroy()
 	end
 end
@@ -249,7 +297,15 @@ end
 
 local function addClue(uid: string, figure: string)
 	removeClue(uid)
-	TreeService.Decorate(uid, function(model: Model, rec: TreeRecord)
+	Trees.Decorate(uid, function(model: Model, rec: TreeRecord)
+		if v2 then
+			-- On the trunk section (none yet on a sapling: it comes as it grows).
+			local section = ForestArt.ClueSection(model)
+			if section then
+				clueOf[uid] = ForestArt.SectionClue(model, section, rec.def, figure, rec.seed)
+			end
+			return
+		end
 		local trunk = trunkOf(model)
 		if trunk then
 			clueOf[uid] = ForestArt.BarkClue(model, trunk, rec.def, figure, rec.seed)
@@ -268,7 +324,7 @@ end
 local function addStake(rec: TreeRecord)
 	removeStake(rec.uid)
 	local trunk = trunkOf(rec.model)
-	local radius = if trunk then trunk.Size.Y / 2 else 1
+	local radius = if trunk then trunkWidth(trunk) / 2 else 1
 	local name = planterName[rec.uid]
 	local planterId = rec.planterId
 	if not name and planterId then
@@ -384,7 +440,7 @@ local function wakeElder(biomeId: string): string?
 		if not goodGround(px, pz) then
 			return false
 		end
-		for _, rec in pairs(TreeService.AllTrees()) do
+		for _, rec in pairs(Trees.AllTrees()) do
 			local dx, dz = rec.base.X - px, rec.base.Z - pz
 			if dx * dx + dz * dz < gap * gap then
 				return false
@@ -396,7 +452,7 @@ local function wakeElder(biomeId: string): string?
 		return nil
 	end
 	local base = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
-	local model = TreeService.SpawnTree(woodId, CFrame.new(base), {
+	local model = Trees.SpawnTree(woodId, CFrame.new(base), {
 		size = ForestLogic.ElderSize(def),
 		seed = math.floor(random() * 99999) + 1,
 		temporary = true,
@@ -410,7 +466,7 @@ local function wakeElder(biomeId: string): string?
 	figureOf[uid] = figure
 	addClue(uid, figure)
 	local trunk = trunkOf(model)
-	local aura = ForestArt.ElderAura((if trunk then trunk.Size.Y else 3) * 1.6 + 2)
+	local aura = ForestArt.ElderAura((if trunk then trunkWidth(trunk) else 3) * 1.6 + 2)
 	aura.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	Kit.placeAt(aura, CFrame.new(base))
 	aura:SetAttribute("TreeUid", uid)
@@ -460,9 +516,21 @@ end
 local function elderFallen(feller: Player, rec: TreeRecord, figure: string?)
 	local e = ForestData.Elder
 	local def = rec.def
-	local logCount = TreeLogic.LogCount(def.logsPerTree, rec.size, 1)
-	local bonus = ForestLogic.HelperBonus(logCount * ForestLogic.LogValue(def.pricePerLog, figure))
-	local helpers = ForestLogic.Helpers(rec.damageBy, rec.maxHp)
+	local bonus: number
+	local helpers: { number }
+	if v2 then
+		-- 10% of the value freed from it, to everyone who did 10% of the damage.
+		bonus = ForestLogic.HelperBonus(freedOf[rec.uid] or 0)
+		local total = 0
+		for _, dealt in pairs(rec.damageBy) do
+			total += dealt
+		end
+		helpers = ForestLogic.Helpers(rec.damageBy, total)
+	else
+		local logCount = TreeLogic.LogCount(def.logsPerTree, rec.size, 1)
+		bonus = ForestLogic.HelperBonus(logCount * ForestLogic.LogValue(def.pricePerLog, figure))
+		helpers = ForestLogic.Helpers(rec.damageBy, rec.maxHp)
+	end
 	local paid = 0
 	for _, userId in ipairs(helpers) do
 		local helper = Players:GetPlayerByUserId(userId)
@@ -497,7 +565,12 @@ local function payPlanter(planterId: number, feller: Player, rec: TreeRecord)
 		return -- the share is for planters who are here to see it
 	end
 	local def = rec.def
-	local amount = ForestLogic.Royalty(def.pricePerLog, TreeLogic.LogCount(def.logsPerTree, rec.size, 1))
+	local amount = if v2
+		then ForestLogic.RoyaltyByValue(owedOf[rec.uid] or 0)
+		else ForestLogic.Royalty(def.pricePerLog, TreeLogic.LogCount(def.logsPerTree, rec.size, 1))
+	if amount <= 0 then
+		return
+	end
 	local credited = EconomyService.AddCash(planter, amount, "planter's share: " .. def.id, "royalty")
 	profile.forest.harvested += 1
 	profile.forest.royalties += credited
@@ -520,7 +593,8 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	local current = elder
 	local isElder = current ~= nil and current.uid == uid
 
-	for _, logUid in ipairs(logUids) do
+	-- v2: the pieces already carry the figure (onPieceFreed).
+	for _, logUid in ipairs(if v2 then {} else logUids) do
 		local log = TreeService.GetLog(logUid)
 		if log then
 			if figure then
@@ -553,8 +627,9 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	-- (no big-tree, lucky or steward's extras), so plant-and-refell alone
 	-- never grows the pouch.
 	local roll = if refell then 1 else random()
+	local large = if v2 then ForestLogic.IsLargeScale(rec.size.scale) else ForestLogic.IsLarge(rec.size)
 	local facts: ForestLogic.DropFacts = {
-		large = ForestLogic.IsLarge(rec.size) and not refell,
+		large = large and not refell,
 		storm = wasStruck,
 		steward = steward and not refell,
 		roll = roll,
@@ -574,11 +649,45 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	end
 	giveSeeds(player, def.id, ForestLogic.SeedDrop(facts), rec.base, reasons)
 
-	if planterId and not steward then
+	if v2 then
+		if planterId then
+			payPlanter(planterId, player, rec) -- for what others freed from it
+		end
+	elseif planterId and not steward then
 		payPlanter(planterId, player, rec)
 	end
 	if isElder then
 		elderFallen(player, rec, figure)
+	end
+	owedOf[uid] = nil
+	freedOf[uid] = nil
+end
+
+-- v2: a cut has freed `piece` from standing tree `rec` (a limb, or the
+-- felled trunk): it gets the tree's figure (Stormgrain while struck), and
+-- its value counts toward the planter's share and an Elder's helpers.
+local function onPieceFreed(cutter: Player, rec: TreeRecord, piece: FreedPiece)
+	local uid = rec.uid
+	local hidden = figureOf[uid]
+	local figure = if struck[uid] then ForestLogic.StruckFigure(hidden) else hidden
+	if figure then
+		setFigure(piece, figure)
+	end
+	local base = piece.volume * (if rec.def.v2 then rec.def.v2.logPrice else 0)
+	if rec.planterId and rec.planterId ~= cutter.UserId then
+		owedOf[uid] = (owedOf[uid] or 0) + base
+	end
+	freedOf[uid] = (freedOf[uid] or 0) + piece.value
+end
+
+-- v2: a tree has a new model (it grew a stage, or came back): its clue
+-- goes back on, and a storm's glow (on the old model) is over.
+local function onRebuilt(rec: TreeRecord)
+	clearStruck(rec.uid)
+	clueOf[rec.uid] = nil -- it went with the old model
+	local figure = figureOf[rec.uid]
+	if figure then
+		addClue(rec.uid, figure)
 	end
 end
 
@@ -617,11 +726,16 @@ local function finishSprout(uid: string, sprout: Sprout)
 		return -- it grew back on its own first, and the sapling took then (onRegrown)
 	end
 	sprouting[uid] = nil
-	local rec = TreeService.GetTree(uid)
+	local rec = Trees.GetTree(uid)
 	-- Only into the stump it was planted in: never a later felling, nor a
 	-- tree that's still falling.
 	if rec and rec.felled and rec.stump and rec.growth == sprout.growth then
-		TreeService.Regrow(uid, sprout.userId) -- OnRegrown rolls its figure and puts up the stake
+		if v2 then
+			-- Back mature at once: planting beats waiting out growSec.
+			sectionTrees.Regrow(uid, sprout.userId, { stage = 1 })
+		else
+			TreeService.Regrow(uid, sprout.userId) -- OnRegrown rolls its figure and puts up the stake
+		end
 	end
 end
 
@@ -639,7 +753,7 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	local rec = TreeService.GetTree(treeUid)
+	local rec = Trees.GetTree(treeUid)
 	if not profile or not rec then
 		return
 	end
@@ -680,7 +794,7 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	publishSeeds(player, profile)
 	profile.forest.planted += 1
 	changeVitality(def.biome, ForestData.Vitality.plant)
-	local seconds = ForestLogic.SproutSeconds(def, TreeService.RegrowsIn(treeUid))
+	local seconds = ForestLogic.SproutSeconds(def, Trees.RegrowsIn(treeUid))
 	local sprout: Sprout = { userId = player.UserId, growth = rec.growth }
 	sprouting[treeUid] = sprout
 	planterName[treeUid] = player.DisplayName
@@ -693,6 +807,21 @@ local function onPlantSeed(player: Player, treeUid: unknown)
 	local stumpPart = if stump then stump.PrimaryPart else nil
 	local top = if stumpPart then stumpPart.CFrame.Position.Y + stumpPart.Size.X / 2 else rec.base.Y + 1
 	local diameter = if stumpPart then stumpPart.Size.Y else nil
+	if v2 and stump then
+		-- A v2 stub: its sections (blocks along Y); the sprout sits on the top one.
+		local best: BasePart? = nil
+		local bestY = -math.huge
+		for _, d in ipairs(stump:GetChildren()) do
+			if d:IsA("BasePart") and d.Name == "Section" then
+				local y = (d.CFrame * CFrame.new(0, d.Size.Y / 2, 0)).Position.Y
+				if y > bestY then
+					best, bestY = d, y
+				end
+			end
+		end
+		top = if best then bestY else rec.base.Y + 1
+		diameter = if best then best.Size.X else nil
+	end
 	if stump and seconds > ForestData.ShownSproutSeconds then
 		-- A slow wood: a sapling on the stump for everyone, the whole time
 		-- (it goes with the stump when the tree stands).
@@ -734,7 +863,7 @@ function ForestService.Tick(dt: number)
 
 	for uid, s in pairs(struck) do
 		-- Felled in time: it keeps the strike while it falls (onFelled clears it).
-		local rec = TreeService.GetTree(uid)
+		local rec = Trees.GetTree(uid)
 		if now >= s.untilAt and not (rec and rec.felled) then
 			clearStruck(uid)
 		end
@@ -742,7 +871,7 @@ function ForestService.Tick(dt: number)
 
 	-- Stakes hide with their trees (the Gloam Hollow by day).
 	for uid, stake in pairs(stakeOf) do
-		local rec = TreeService.GetTree(uid)
+		local rec = Trees.GetTree(uid)
 		if not rec then
 			removeStake(uid)
 		else
@@ -755,14 +884,14 @@ function ForestService.Tick(dt: number)
 
 	local e = elder
 	if e then
-		local rec = TreeService.GetTree(e.uid)
+		local rec = Trees.GetTree(e.uid)
 		if not rec then
 			clearElder()
 		elseif not rec.felled and (rec.dormant or now - e.wokeAt >= ForestData.Elder.fadeSeconds) then
 			-- Unfelled in time, or a night-only one at dawn.
 			figureOf[e.uid] = nil
 			clueOf[e.uid] = nil
-			TreeService.Remove(e.uid)
+			Trees.Remove(e.uid)
 			fireAll("ElderFaded", { woodId = e.woodId, biome = e.biome, pos = rec.base })
 			clearElder()
 		end
@@ -803,12 +932,17 @@ function ForestService.Init(r: Remotes, notifyFn: (Player, string) -> (), option
 	workspace:SetAttribute("SkyrootBloom", false)
 	setElderAttributes(nil, nil)
 
+	Trees = TreeService
 	TreeService.OnFelled = onFelled
 	TreeService.OnRegrown = onRegrown
-	-- The trees already standing get their hidden figures now.
-	for _, rec in pairs(TreeService.AllTrees()) do
-		if not rec.felled and not rec.temporary then
-			grow(rec)
+	if opts.sectionTrees then
+		ForestService.UseV2(opts.sectionTrees, opts.setFigure)
+	else
+		-- The trees already standing get their hidden figures now.
+		for _, rec in pairs(Trees.AllTrees()) do
+			if not rec.felled and not rec.temporary then
+				grow(rec)
+			end
 		end
 	end
 
@@ -831,6 +965,26 @@ function ForestService.Init(r: Remotes, notifyFn: (Player, string) -> (), option
 				last = now
 			end
 		end)
+	end
+end
+
+-- The v2 loop (GameServer, after Init): the Living Forest on section trees
+-- from now on. `trees` is SectionTrees (its hooks are set here),
+-- `figureFn` WoodService.SetFigure. The trees standing get their hidden
+-- figures now.
+function ForestService.UseV2(trees: any, figureFn: ((piece: any, figure: string?) -> ())?)
+	v2 = true
+	sectionTrees = trees
+	Trees = trees :: any
+	setFigure = figureFn or setFigure
+	trees.OnFelled = onFelled
+	trees.OnRegrown = onRegrown
+	trees.OnPieceFreed = onPieceFreed
+	trees.OnRebuilt = onRebuilt
+	for _, rec in pairs(Trees.AllTrees()) do
+		if not rec.felled and not rec.temporary then
+			grow(rec)
+		end
 	end
 end
 
@@ -876,7 +1030,7 @@ end
 function ForestService.Strike(position: Vector3): string?
 	local best: TreeRecord? = nil
 	local bestDistance = ForestData.Storm.strikeRadius
-	for uid, rec in pairs(TreeService.AllTrees()) do
+	for uid, rec in pairs(Trees.AllTrees()) do
 		if rec.alive and not rec.felled and not rec.dormant and not struck[uid] then
 			local dx, dz = rec.base.X - position.X, rec.base.Z - position.Z
 			local d = math.sqrt(dx * dx + dz * dz)
@@ -891,7 +1045,7 @@ function ForestService.Strike(position: Vector3): string?
 	end
 	local uid = rec.uid
 	local glow: Instance? = nil
-	TreeService.Decorate(uid, function(model: Model, r: TreeRecord)
+	Trees.Decorate(uid, function(model: Model, r: TreeRecord)
 		local trunk = trunkOf(model)
 		if trunk then
 			glow = ForestArt.StormGlow(model, trunk, r.def, r.seed + math.floor(random() * 1000))
@@ -906,7 +1060,7 @@ function ForestService.Strike(position: Vector3): string?
 	fireAll("Struck", {
 		uid = uid,
 		pos = rec.base,
-		top = if trunk then trunk.CFrame.Position + Vector3.new(0, trunk.Size.X / 2, 0) else rec.base,
+		top = if trunk then trunkTop(trunk) else rec.base,
 		woodId = rec.def.id,
 		seconds = ForestData.Storm.glowSeconds,
 	})
