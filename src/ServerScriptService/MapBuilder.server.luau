@@ -223,6 +223,7 @@ step("4. The town", function()
 	-- Parking lot: one slot per player, so trucks never spawn inside each other.
 	-- VehicleService claims slots by Index. Paint on the ground: no lip for a
 	-- truck to snag on.
+	local slots: { BasePart } = {}
 	step("4. The parking lot", function()
 		for index, cf in ipairs(town.parkingSlots) do
 			local slot = Kit.part(
@@ -237,6 +238,14 @@ step("4. The town", function()
 			slot.CastShadow = false
 			slot:SetAttribute("Index", index)
 			CollectionService:AddTag(slot, "ParkingSlot")
+			table.insert(slots, slot)
+		end
+	end)
+	-- Its paint and lights (TWN-06), a step of their own so a failure here
+	-- never costs a slot (the slab then just stays visible).
+	step("4. The parking lot's lines and lamps", function()
+		for index, slot in ipairs(slots) do
+			BuildingArt.ParkingBay(slot, index)
 		end
 	end)
 
@@ -254,7 +263,7 @@ step("4. The town", function()
 			place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe)
 		end
 		for _, sign in ipairs(town.signs) do
-			place(atomic(BuildingArt.Signpost(sign.text)), sign.cframe)
+			place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe)
 		end
 		do
 			local skyBiome = BiomeData.Get("sky")

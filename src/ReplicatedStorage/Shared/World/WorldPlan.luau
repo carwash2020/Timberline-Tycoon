@@ -20,7 +20,7 @@ local WorldPlan = {}
 
 export type TreeSpot = { woodId: string, position: Vector3, biome: string } -- biome "wild": a meadow grove
 export type Placement = { name: string, cframe: CFrame, seed: number }
-export type Sign = { text: string, cframe: CFrame }
+export type Sign = { text: string, cframe: CFrame, lit: boolean? } -- lit: gooseneck lamps (TWN-07)
 export type Fence = { length: number, cframe: CFrame }
 
 local function hashString(s: string): number
@@ -762,7 +762,7 @@ function WorldPlan.Town(): Town
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(124, 64, 0, 40) },
-		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH },
+		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
 	}
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the

@@ -137,7 +137,9 @@ return function(t)
 			local x = cf.Position.X
 			local hit = blockers(model, V3.new(x - 1.5, 0.7, -8), V3.new(x + 1.5, 6, front - 0.05), counter)
 			t.eq(hit, {}, shop.kind .. " path to the counter")
-			t.ok(#parts(model) <= 220, shop.kind .. " parts: " .. #parts(model))
+			-- 226: 220 plus the two sign goosenecks (3 parts each) the Tool
+			-- Shed and Hearth & Home got in TWN-07, on purpose.
+			t.ok(#parts(model) <= 226, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)
@@ -166,6 +168,37 @@ return function(t)
 		t.ok(#parts(station) <= 140, "station parts: " .. #parts(station))
 	end)
 
+	t.test("sign lamps (TWN-07): every shop sign and the lit signpost have gooseneck LampBulbs", function()
+		local function bulbs(model)
+			local out = {}
+			for _, p in ipairs(parts(model)) do
+				if p.Name == "LampBulb" then
+					table.insert(out, p)
+					local l = p:FindFirstChildOfClass("PointLight")
+					t.ok(l and not l.Shadows, model.Name .. " bulb has a shadowless light")
+					t.ok(not p.CanCollide and not p.CanQuery, model.Name .. " bulb is looks-only")
+				end
+			end
+			return out
+		end
+		for _, shop in ipairs(SHOPS) do
+			t.eq(#bulbs(BuildingArt.Shop(shop.kind, shop.title, shop.accent)), 2, shop.kind .. " sign lamps")
+		end
+		t.eq(#bulbs(BuildingArt.Signpost("SELL LOGS HERE", true)), 2, "a lit signpost has two lamps")
+		t.eq(#bulbs(BuildingArt.Signpost("TO THE WOODS")), 0, "a plain signpost has none")
+		-- The bulbs only glow at night: LightingController switches parts by
+		-- name, so the name must be one of its GLOW_NAMES.
+		local fs = require("@lune/fs")
+		local controller = fs.readFile("src/StarterPlayer/StarterPlayerScripts/LightingController.luau")
+		local list = string.match(controller, "local GLOW_NAMES[^=]*= {([^}]*)}")
+		t.ok(list and string.find(list, "LampBulb = true", 1, true), "LampBulb is a night light")
+		-- The town's SELL LOGS HERE sign is the lit one.
+		local WorldPlan = loader:load("ReplicatedStorage/Shared/World/WorldPlan")
+		for _, sign in ipairs(WorldPlan.Town().signs) do
+			t.eq(sign.lit == true, sign.text == "SELL LOGS HERE", sign.text .. " lit")
+		end
+	end)
+
 	t.test("street furniture keeps its named parts", function()
 		local sign = BuildingArt.Signpost("TO THE WOODS")
 		t.ok(find(sign, "Board") and texts(sign)["TO THE WOODS"], "Signpost board and text")
@@ -183,6 +216,67 @@ return function(t)
 			end
 			t.ok(math.abs((hi.X - lo.X) - length) < 1.2, "fence " .. length .. " spans its length")
 		end
+	end)
+
+	t.test("a parking bay (TWN-06): the slot keeps its contract; lines, a stop bar, its number, a dim lamp", function()
+		local Kit = loader:load("ReplicatedStorage/Shared/Art/Kit")
+		local Enum = roblox.Enum
+		local cf = roblox.CFrame.new(40, 0.1, 45)
+		local size = V3.new(6.5, 0.2, 37)
+		local slot = Kit.part(roblox.Instance.new("Folder"), "ParkingSlot_7", size, cf, C3.fromRGB(186, 168, 140))
+		slot.CanCollide = false
+		BuildingArt.ParkingBay(slot, 7)
+		-- What VehicleService reads is untouched; only the look changes.
+		t.ok(
+			near(slot.CFrame.Position, cf.Position) and slot.CFrame.LookVector:Dot(cf.LookVector) > 0.9999,
+			"the slot keeps its CFrame"
+		)
+		t.ok(near(slot.Size, size), "the slot keeps its size")
+		t.eq(slot.Transparency, 1)
+		t.ok(not slot.CanCollide, "the slot still doesn't collide")
+		local named, lights = {}, {}
+		for _, d in ipairs(slot:GetDescendants()) do
+			if d:IsA("BasePart") then
+				named[d.Name] = (named[d.Name] or 0) + 1
+				t.ok(
+					not d.CanCollide and not d.CanQuery and not d.CanTouch and not d.CastShadow,
+					d.Name .. " is looks-only"
+				)
+				-- Inside the bay (the stop bar runs 0.75 past each side), not
+				-- under the ground, and flat but for the lamp's light holder.
+				local local_ = cf:PointToObjectSpace(d.CFrame.Position)
+				local lo, hi = bounds(d)
+				t.ok(math.abs(local_.X) <= 4 + 1e-3 and math.abs(local_.Z) <= 18.5, d.Name .. " is in the bay")
+				t.ok(lo.Y >= -1e-3, d.Name .. " is above the ground")
+				if d.Transparency < 1 then
+					t.ok(hi.Y <= 0.25, d.Name .. " is flat paint")
+				end
+			elseif d:IsA("PointLight") then
+				table.insert(lights, d)
+			end
+		end
+		t.eq(named.BayLine, 2)
+		t.eq(named.StopBar, 1)
+		t.eq(named.BayNumber, 1)
+		t.eq(named.LanternGlow, 2) -- the glowing plate and the light's holder
+		for _, d in ipairs(slot:GetChildren()) do
+			if d.Name == "BayLine" then
+				t.ok(math.abs(d.Size.X - 0.35) < 1e-4, "bay lines are 0.35 wide")
+				t.eq(d.Color:ToHex(), C3.fromRGB(230, 222, 200):ToHex())
+				t.eq(d.Material, Enum.Material.SmoothPlastic)
+			elseif d.Name == "StopBar" then
+				t.ok(cf:PointToObjectSpace(d.CFrame.Position).Z < -17, "the stop bar is at the head (-Z)")
+			end
+		end
+		t.ok(texts(slot)["7"], "the bay's number is painted on")
+		-- One dim light, switched off until LightingController's dusk, in a
+		-- LanternGlow (the name that lights it at night).
+		t.eq(#lights, 1)
+		local l = lights[1]
+		t.eq(l.Parent.Name, "LanternGlow")
+		t.eq(l.Range, 16)
+		t.ok(math.abs(l.Brightness - 0.8) < 1e-4, "brightness 0.8")
+		t.ok(not l.Shadows and not l.Enabled, "no shadows, off by day")
 	end)
 
 	t.test("the sell pad: SellPad doesn't collide, nothing on it does or stands tall", function()
