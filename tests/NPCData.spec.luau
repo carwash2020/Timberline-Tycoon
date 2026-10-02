@@ -261,4 +261,35 @@ return function(t)
 		local offA, offB = NPCData.RouteOffset("Rosa"), NPCData.RouteOffset("Pip")
 		t.ok(offA ~= offB and offA >= 0 and offA < 60, "walkers are out of step")
 	end)
+	t.test("standing NPCs turn their whole body to face you up close, the short way, then back", function()
+		local NPCData = t.shared("NPCData")
+		local V3 = t.roblox.Vector3
+		local home = math.rad(90)
+		local pos = V3.new(0, 0, 0)
+		-- Nobody near: home.
+		t.eq(NPCData.FaceYaw(home, pos, nil, NPCData.FaceRange), home)
+		t.eq(NPCData.FaceYaw(home, pos, V3.new(40, 0, 0), NPCData.FaceRange), home)
+		-- Close: toward you (YawOf's convention: CFrame.Angles(0, yaw, 0) looks at you).
+		local yaw = NPCData.FaceYaw(home, pos, V3.new(0, 3, -8), NPCData.FaceRange)
+		local look = (CFrame.Angles(0, yaw, 0)).LookVector
+		t.ok(look.Z < -0.99, "faces -Z toward the player: " .. tostring(look))
+		yaw = NPCData.FaceYaw(home, pos, V3.new(6, 0, 6), NPCData.FaceRange)
+		look = (CFrame.Angles(0, yaw, 0)).LookVector
+		t.ok(look.X > 0.7 and look.Z > 0.7, "faces +X+Z: " .. tostring(look))
+		-- Standing on top of them: no spin.
+		t.eq(NPCData.FaceYaw(home, pos, V3.new(0.2, 0, 0.1), NPCData.FaceRange), home)
+		-- TurnToward: capped steps, the short way across +-pi, lands exactly.
+		t.eq(NPCData.TurnToward(0, 1, 0.25), 0.25)
+		t.eq(NPCData.TurnToward(0, -1, 0.25), -0.25)
+		local a = NPCData.TurnToward(math.rad(170), math.rad(-170), 0.05)
+		t.ok(a > math.rad(170), "the short way round: " .. math.deg(a))
+		t.eq(NPCData.TurnToward(0.5, 0.6, 0.25), 0.6)
+		-- A full turn takes about a second at TurnRate.
+		local cur, steps = 0, 0
+		while cur ~= math.pi and steps < 200 do
+			cur = NPCData.TurnToward(cur, math.pi, NPCData.TurnRate / 60)
+			steps += 1
+		end
+		t.ok(steps > 30 and steps < 90, steps .. " frames to turn round")
+	end)
 end

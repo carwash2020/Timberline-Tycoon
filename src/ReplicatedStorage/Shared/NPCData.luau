@@ -536,6 +536,35 @@ function NPCData.YawOf(dx: number, dz: number): number
 	return math.atan2(-dx, -dz)
 end
 
+-- Turning to face you: within FaceRange studs a standing NPC (and a
+-- walker stopped at a waypoint) turns its whole body toward you, at most
+-- TurnRate radians a second, and back to where it was facing once you go.
+NPCData.FaceRange = 16
+NPCData.TurnRate = 3.5
+
+-- `current` turned toward `target` (radians) by at most `maxStep`, the
+-- short way round.
+function NPCData.TurnToward(current: number, target: number, maxStep: number): number
+	local d = (target - current + math.pi) % (math.pi * 2) - math.pi
+	if math.abs(d) <= maxStep then
+		return target
+	end
+	return current + (if d > 0 then maxStep else -maxStep)
+end
+
+-- Which way an NPC at `pos` wants to face: toward `player` (a position, or
+-- nil) when it is within `range` (flat distance), else `home`.
+function NPCData.FaceYaw(home: number, pos: Vector3, player: Vector3?, range: number): number
+	if player then
+		local dx, dz = player.X - pos.X, player.Z - pos.Z
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d < range and d > 0.5 then
+			return NPCData.YawOf(dx, dz)
+		end
+	end
+	return home
+end
+
 local function lerpAngle(a: number, b: number, t: number): number
 	local d = (b - a + math.pi) % (math.pi * 2) - math.pi
 	return a + d * t

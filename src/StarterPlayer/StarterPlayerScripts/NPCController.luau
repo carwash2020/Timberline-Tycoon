@@ -68,6 +68,8 @@ type Rig = {
 	offset: number,
 	rootHeight: number,
 	groundY: number,
+	homeYaw: number, -- the way it faces when nobody's near (its spot's)
+	bodyYaw: number, -- the way it faces now
 	scale: number,
 	topOffset: number,
 	seed: number,
@@ -340,6 +342,8 @@ local function bind(model: Instance, tries: number?)
 		offset = if type(offset) == "number" then offset else 0,
 		rootHeight = rh,
 		groundY = root.Position.Y - rh,
+		homeYaw = NPCData.YawOf(root.CFrame.LookVector.X, root.CFrame.LookVector.Z),
+		bodyYaw = NPCData.YawOf(root.CFrame.LookVector.X, root.CFrame.LookVector.Z),
 		scale = if type(scaleAttr) == "number" then scaleAttr else 1,
 		topOffset = if type(topAttr) == "number" then topAttr else 1,
 		seed = seed,
@@ -375,6 +379,10 @@ local function rest(rig: Rig)
 	end
 	rig.yaw, rig.pitch, rig.walkBlend = 0, 0, 0
 	rig.flourish = nil
+	if not rig.route and rig.bodyYaw ~= rig.homeYaw then
+		rig.bodyYaw = rig.homeYaw
+		rig.root.CFrame = CFrame.new(rig.root.Position) * CFrame.Angles(0, rig.homeYaw, 0)
+	end
 	closeBubble(rig, true)
 end
 
@@ -404,13 +412,29 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	local npc = rig.npc
 
 	-- Walking: the route from the shared clock.
+	-- (and turning to face you when you're close and they're standing).
 	local moving, walked = false, 0
 	local route = rig.route
 	if route then
 		local x, z, heading, isMoving, dist =
 			NPCData.RouteState(route, rig.speed, workspace:GetServerTimeNow() + rig.offset)
-		rig.root.CFrame = CFrame.new(x, rig.groundY + rig.rootHeight, z) * CFrame.Angles(0, heading, 0)
+		local at = Vector3.new(x, rig.groundY + rig.rootHeight, z)
+		if isMoving then
+			-- Back onto the path quickly (a turn, not a snap) if they were facing you.
+			rig.bodyYaw = NPCData.TurnToward(rig.bodyYaw, heading, NPCData.TurnRate * 4 * dt)
+		else
+			local want = NPCData.FaceYaw(heading, at, focus, NPCData.FaceRange)
+			rig.bodyYaw = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
+		end
+		rig.root.CFrame = CFrame.new(at) * CFrame.Angles(0, rig.bodyYaw, 0)
 		moving, walked = isMoving, dist
+	else
+		local want = NPCData.FaceYaw(rig.homeYaw, rig.root.Position, focus, NPCData.FaceRange)
+		local turned = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
+		if turned ~= rig.bodyYaw then
+			rig.bodyYaw = turned
+			rig.root.CFrame = CFrame.new(rig.root.Position) * CFrame.Angles(0, turned, 0)
+		end
 	end
 	rig.walkBlend = approach(rig.walkBlend, if moving then 1 else 0, 8, dt)
 	local w = rig.walkBlend
