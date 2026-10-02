@@ -186,6 +186,85 @@ return function(t)
 		t.ok(EnvironmentData.TimeOfDay(13).brightness == s.brightness, "keyframes untouched")
 	end)
 
+	t.test("write throttle: 10 Hz with the frames' dt added up", function()
+		t.eq(EnvironmentData.WriteEvery, 0.1)
+		-- 60 fps: five frames wait, the sixth writes with all six frames' dt
+		-- (exactly 100 writes in 10 s: 0.0999... counts).
+		local pending, writes, eased = 0, 0, 0
+		for _ = 1, 600 do
+			local write, by, left = EnvironmentData.WriteTick(pending, 1 / 60)
+			pending = left
+			if write then
+				writes += 1
+				eased += by
+				t.ok(by >= 0.1 - 1e-9 and by < 0.1 + 1 / 60, "eases by the accumulated dt")
+				t.eq(left, 0)
+			else
+				t.eq(by, 0)
+			end
+		end
+		t.eq(writes, 100)
+		t.ok(math.abs(eased + pending - 10) < 1e-6, "no time lost: " .. (eased + pending))
+		-- 5 fps: every frame writes, easing by its own (long) dt.
+		local write, by = EnvironmentData.WriteTick(0, 0.2)
+		t.ok(write and math.abs(by - 0.2) < 1e-9)
+		-- A negative dt never runs the clock backwards.
+		local w2, _, left2 = EnvironmentData.WriteTick(0.05, -1)
+		t.ok(not w2 and left2 == 0.05)
+	end)
+
+	t.test("write throttle: a property is rewritten only when it moves past its epsilon", function()
+		local moved = EnvironmentData.NumberMoved
+		t.ok(moved(nil, 1), "never written: write")
+		t.ok(not moved(1, 1), "unchanged: skip")
+		t.ok(not moved(1, 1.0009), "under 1e-3: skip")
+		t.ok(moved(1, 1.0011), "over 1e-3: write")
+		t.ok(moved(1, 0.9989), "either way")
+		t.ok(not moved(1, 1.04, 0.05) and moved(1, 1.06, 0.05), "an explicit epsilon")
+		local color = EnvironmentData.ColorMoved
+		local c = Color3.fromRGB(100, 120, 140)
+		t.ok(color(nil, c), "never written: write")
+		t.ok(not color(c, Color3.fromRGB(100, 120, 140)), "unchanged: skip")
+		t.ok(not color(c, Color3.new(c.R + 0.5 / 255, c.G - 0.5 / 255, c.B)), "under one step: skip")
+		t.ok(color(c, Color3.fromRGB(101, 120, 140)), "one step in red: write")
+		t.ok(color(c, Color3.fromRGB(100, 120, 139)), "one step in blue: write")
+		local clock = EnvironmentData.ClockMoved
+		t.ok(clock(nil, 12), "never written: write")
+		t.ok(not clock(12, 12.00005), "under the epsilon (a still clock): skip")
+		t.ok(clock(12, 12 + 1 / 3000), "one 60 fps frame of a 20-minute day: write")
+		t.ok(not clock(23.99995, 0.00004), "across midnight it's 0.00009 h: skip")
+		t.ok(clock(23.9999, 0.0002), "across midnight it's 0.0003 h: write")
+		t.ok(clock(12, 23), "a ClockOverride jump: write")
+		-- Easing toward a still target settles: after a while nothing moves
+		-- past an epsilon, so idle frames write nothing.
+		local current = EnvironmentData.Blend(13, "", "Clear", 0)
+		local target = EnvironmentData.Blend(17.5, "volcano", "Storm", 1)
+		local last = EnvironmentData.Lerp(current, current, 0)
+		local quietWrites = 0
+		for step = 1, 600 do -- 60 s of 10 Hz writes
+			current = EnvironmentData.Lerp(current, target, 1 - math.exp(-0.1 / 1))
+			for _, k in ipairs(EnvironmentData.NumberKeys) do
+				if moved(last[k], current[k]) then
+					last[k] = current[k]
+					if step > 300 then
+						quietWrites += 1
+					end
+				end
+			end
+			for _, k in ipairs(EnvironmentData.ColorKeys) do
+				if color(last[k], current[k]) then
+					last[k] = current[k]
+					if step > 300 then
+						quietWrites += 1
+					end
+				end
+			end
+		end
+		t.eq(quietWrites, 0, "no writes once settled")
+		local d = maxDiff(last, target)
+		t.ok(d < 0.01, "what was written ends near the target: " .. d)
+	end)
+
 	t.test("vitality tiers", function()
 		t.eq(EnvironmentData.VitalityTier(10), "Thinning")
 		t.eq(EnvironmentData.VitalityTier(60), "Healthy")

@@ -1,9 +1,15 @@
 --!strict
 -- LightingController: the sky and the light, drawn on each client
 -- (GAME_DESIGN §13 "Lighting & mood"; REDESIGN.md "an active environment").
---   * The clock: Lighting.ClockTime doesn't replicate, so every frame it is
---     worked out here from the server's clock (Shared/WorldTime: a 20-minute
---     day), so the sun glides and every player sees the same hour.
+--   * The clock: Lighting.ClockTime doesn't replicate, so it is worked out
+--     here from the server's clock (Shared/WorldTime: a 20-minute day), so
+--     the sun glides and every player sees the same hour.
+--   * WLD-18: the look is eased and written 10 times a second (the frames
+--     between add their dt up), and each property only when it has moved
+--     past its epsilon since the last write (EnvironmentData.WriteTick,
+--     NumberMoved, ColorMoved): idle frames write nothing. Per frame: the
+--     sun (ClockTime, so shadows glide) and the lightning flash
+--     (ExposureCompensation), each only when it moves.
 --   * The look: Shared/EnvironmentData.Blend for the hour, the biome you're
 --     in (your "Biome" attribute, set by BiomeService) and the weather
 --     (workspace "Weather" / "WeatherIntensity", read for your biome),
@@ -40,7 +46,6 @@ type LightingState = EnvironmentData.LightingState
 local LightingController = {}
 
 local EASE_SECONDS = 1 -- time constant: a change is ~95% done after 3 s
-local TARGET_EVERY = 0.1 -- seconds between recomputing the target look
 local GLOW_EVERY = 0.5 -- seconds between night-light checks
 local OWN_PREFIX = "Timberline"
 local IS_STUDIO = RunService:IsStudio()
@@ -248,50 +253,136 @@ local function makeOwned(): Owned
 	}
 end
 
-local function apply(owned: Owned, s: LightingState, flash: number)
-	Lighting.Brightness = s.brightness
-	Lighting.ExposureCompensation = math.clamp(s.exposure + flash, -3, 3)
-	Lighting.Ambient = s.ambient
-	Lighting.OutdoorAmbient = s.outdoorAmbient
-	Lighting.ColorShift_Top = s.colorShiftTop
+-- WLD-18: the values last written to each property, so a property is
+-- written only when it moves past its epsilon (EnvironmentData.NumberMoved
+-- / ColorMoved). Keyed by "<instance>.<property>".
+local written: { [string]: any } = {}
+
+local function numberMoved(key: string, value: number): boolean
+	if EnvironmentData.NumberMoved(written[key], value) then
+		written[key] = value
+		return true
+	end
+	return false
+end
+
+local function colorMoved(key: string, value: Color3): boolean
+	if EnvironmentData.ColorMoved(written[key], value) then
+		written[key] = value
+		return true
+	end
+	return false
+end
+
+-- ExposureCompensation: the eased exposure plus any lightning flash.
+-- Written every frame it moves, like ClockTime.
+local function applyExposure(s: LightingState, flash: number)
+	local exposure = math.clamp(s.exposure + flash, -3, 3)
+	if numberMoved("Lighting.ExposureCompensation", exposure) then
+		Lighting.ExposureCompensation = exposure
+	end
+end
+
+-- Everything else, 10 times a second (EnvironmentData.WriteEvery).
+local function apply(owned: Owned, s: LightingState)
+	if numberMoved("Lighting.Brightness", s.brightness) then
+		Lighting.Brightness = s.brightness
+	end
+	if colorMoved("Lighting.Ambient", s.ambient) then
+		Lighting.Ambient = s.ambient
+	end
+	if colorMoved("Lighting.OutdoorAmbient", s.outdoorAmbient) then
+		Lighting.OutdoorAmbient = s.outdoorAmbient
+	end
+	if colorMoved("Lighting.ColorShift_Top", s.colorShiftTop) then
+		Lighting.ColorShift_Top = s.colorShiftTop
+	end
 
 	local a = owned.atmosphere
-	a.Density = s.atmosphereDensity
-	a.Offset = s.atmosphereOffset
-	a.Color = s.atmosphereColor
-	a.Decay = s.atmosphereDecay
-	a.Glare = s.atmosphereGlare
-	a.Haze = s.atmosphereHaze
+	if numberMoved("Atmosphere.Density", s.atmosphereDensity) then
+		a.Density = s.atmosphereDensity
+	end
+	if numberMoved("Atmosphere.Offset", s.atmosphereOffset) then
+		a.Offset = s.atmosphereOffset
+	end
+	if colorMoved("Atmosphere.Color", s.atmosphereColor) then
+		a.Color = s.atmosphereColor
+	end
+	if colorMoved("Atmosphere.Decay", s.atmosphereDecay) then
+		a.Decay = s.atmosphereDecay
+	end
+	if numberMoved("Atmosphere.Glare", s.atmosphereGlare) then
+		a.Glare = s.atmosphereGlare
+	end
+	if numberMoved("Atmosphere.Haze", s.atmosphereHaze) then
+		a.Haze = s.atmosphereHaze
+	end
 
-	owned.grade.Saturation = s.saturation
-	owned.grade.Contrast = s.contrast
-	owned.grade.TintColor = s.tint
+	local grade = owned.grade
+	if numberMoved("Grade.Saturation", s.saturation) then
+		grade.Saturation = s.saturation
+	end
+	if numberMoved("Grade.Contrast", s.contrast) then
+		grade.Contrast = s.contrast
+	end
+	if colorMoved("Grade.TintColor", s.tint) then
+		grade.TintColor = s.tint
+	end
 
 	-- Low quality (Quality.Budget(), Shared/QualityBudgets): no sun rays,
-	-- no far blur, softer bloom. High multiplies by 1: today's look.
+	-- no far blur, softer bloom. High multiplies by 1: today's look. Read
+	-- on every write, so the tier follows the graphics slider.
 	local budget = Quality.Budget()
 	local rays = budget.SunRays > 0
 	if owned.sunRays.Enabled ~= rays then
 		owned.sunRays.Enabled = rays
 	end
-	owned.sunRays.Intensity = s.sunRaysIntensity * budget.SunRays
-	owned.sunRays.Spread = s.sunRaysSpread
+	local raysIntensity = s.sunRaysIntensity * budget.SunRays
+	if numberMoved("SunRays.Intensity", raysIntensity) then
+		owned.sunRays.Intensity = raysIntensity
+	end
+	if numberMoved("SunRays.Spread", s.sunRaysSpread) then
+		owned.sunRays.Spread = s.sunRaysSpread
+	end
 
-	owned.bloom.Intensity = s.bloomIntensity * budget.Bloom
-	owned.bloom.Size = s.bloomSize
-	owned.bloom.Threshold = s.bloomThreshold
+	local bloomIntensity = s.bloomIntensity * budget.Bloom
+	if numberMoved("Bloom.Intensity", bloomIntensity) then
+		owned.bloom.Intensity = bloomIntensity
+	end
+	if numberMoved("Bloom.Size", s.bloomSize) then
+		owned.bloom.Size = s.bloomSize
+	end
+	if numberMoved("Bloom.Threshold", s.bloomThreshold) then
+		owned.bloom.Threshold = s.bloomThreshold
+	end
 
-	owned.clouds.Cover = s.cloudCover
-	owned.clouds.Density = s.cloudDensity
-	owned.clouds.Color = s.cloudColor
+	if numberMoved("Clouds.Cover", s.cloudCover) then
+		owned.clouds.Cover = s.cloudCover
+	end
+	if numberMoved("Clouds.Density", s.cloudDensity) then
+		owned.clouds.Density = s.cloudDensity
+	end
+	if colorMoved("Clouds.Color", s.cloudColor) then
+		owned.clouds.Color = s.cloudColor
+	end
 
 	local far = s.dofFar * budget.DepthOfField
 	local blur = far > 0.005
 	if owned.dof.Enabled ~= blur then
 		owned.dof.Enabled = blur
 	end
-	if blur then
+	if blur and numberMoved("FarBlur.FarIntensity", far) then
 		owned.dof.FarIntensity = far
+	end
+end
+
+-- The sun: Lighting.ClockTime, every frame it has moved more than
+-- EnvironmentData.ClockEpsilon since the last write (so long shadows glide
+-- at dusk). WorldUI's clock label reads it back.
+local function applyClock(clock: number)
+	if EnvironmentData.ClockMoved(written["Lighting.ClockTime"], clock) then
+		written["Lighting.ClockTime"] = clock
+		Lighting.ClockTime = clock
 	end
 end
 
@@ -515,21 +606,26 @@ function LightingController.Start()
 	local owned = makeOwned()
 	local env = LightingController.Environment()
 	local current = targetLook(env)
-	local target = current
-	local sinceTarget = 0
-	Lighting.ClockTime = env.clock
-	apply(owned, current, 0)
+	local pending = 0 -- seconds since the last eased write (WLD-18)
+	applyClock(env.clock)
+	apply(owned, current)
+	applyExposure(current, 0)
 
 	RunService.RenderStepped:Connect(function(dt: number)
-		-- The sun every frame, straight from the server's clock.
-		Lighting.ClockTime = clockAt(workspace:GetServerTimeNow())
-		sinceTarget += dt
-		if sinceTarget >= TARGET_EVERY then
-			sinceTarget = 0
-			target = targetLook(LightingController.Environment())
+		-- WLD-18: ease and write 10 times a second, by all the time since the
+		-- last write, so the ease is the same at any frame rate.
+		local write, easeBy, left = EnvironmentData.WriteTick(pending, dt)
+		pending = left
+		-- The sun, every frame, from the server's clock (or Studio's
+		-- ClockOverride): one property, and shadows must not step.
+		applyClock(clockAt(workspace:GetServerTimeNow()))
+		if write then
+			local target = targetLook(LightingController.Environment())
+			easeToward(current, target, 1 - math.exp(-easeBy / EASE_SECONDS))
+			apply(owned, current)
 		end
-		easeToward(current, target, 1 - math.exp(-dt / EASE_SECONDS))
-		apply(owned, current, flashNow())
+		-- The lightning flash is per frame, on ExposureCompensation only.
+		applyExposure(current, flashNow())
 	end)
 
 	watchGlows()
