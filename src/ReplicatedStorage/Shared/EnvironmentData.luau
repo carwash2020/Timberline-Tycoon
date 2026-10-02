@@ -668,6 +668,10 @@ export type DecorKind = {
 	glowing: boolean?, -- Mushroom
 	sink: number?, -- studs pushed into the ground (rocks)
 	enabled: boolean?,
+	-- Ground cover: this row belongs to the cover layer (DecorCoverSpots, a
+	-- second scatter with its own rng), never to DecorSpots. Cover rows come
+	-- last in their table, so the first layer's rows keep their indices.
+	cover: boolean?,
 }
 
 EnvironmentData.DecorPalettes = {
@@ -695,6 +699,7 @@ type DecorExtra = {
 	glowing: boolean?,
 	sink: number?,
 	enabled: boolean?,
+	cover: boolean?,
 }
 
 local function decor(kind: string, weight: number, extra: DecorExtra?): DecorKind
@@ -709,7 +714,15 @@ local function decor(kind: string, weight: number, extra: DecorExtra?): DecorKin
 		glowing = e.glowing,
 		sink = e.sink,
 		enabled = e.enabled,
+		cover = e.cover,
 	}
+end
+
+-- A ground-cover row (see DecorKind.cover).
+local function cover(kind: string, weight: number, extra: DecorExtra?): DecorKind
+	local row = decor(kind, weight, extra)
+	row.cover = true
+	return row
 end
 
 -- What grows where ("meadow" = the open country between biomes, "shore"
@@ -724,6 +737,12 @@ EnvironmentData.Decor = {
 		decor("GrassTuft", 6, { lush = 0.3 }),
 		decor("Pebbles", 2),
 		decor("BerryBush", 1, { lush = 1 }),
+		-- Ground cover (DecorCoverSpots): the open country was the barest
+		-- ground on the map, so it gets the most.
+		cover("GroundCover", 5, { lush = 0.3, palette = "meadowFlowers" }),
+		cover("Wildflowers", 3, { lush = 1, palette = "meadowFlowers" }),
+		cover("LowBush", 1.5, { lush = 0.4, palette = "greens" }),
+		cover("Pebbles", 1),
 	},
 	starter = {
 		decor("Flowers", 4, { lush = 1, palette = "forestFlowers" }),
@@ -735,6 +754,10 @@ EnvironmentData.Decor = {
 		decor("FallenLog", 0.6),
 		decor("Stump", 0.6),
 		decor("BerryBush", 1, { lush = 1 }),
+		cover("FernClump", 4, { lush = 0.6 }),
+		cover("MushroomCluster", 1.5, { lush = 0.7 }),
+		cover("GroundCover", 2, { lush = 0.3, palette = "forestFlowers" }),
+		cover("Wildflowers", 1.5, { lush = 1, palette = "forestFlowers" }),
 	},
 	hills = {
 		decor("Bush", 3, { lush = 0.4, palette = "hillGreens", size = { 2.2, 4.2 } }),
@@ -745,6 +768,11 @@ EnvironmentData.Decor = {
 		decor("GrassTuft", 4, { lush = 0.3 }),
 		decor("FallenLog", 0.8),
 		decor("Stump", 0.6),
+		cover("FernClump", 2.5, { lush = 0.6 }),
+		cover("MushroomCluster", 1, { lush = 0.6 }),
+		cover("GroundCover", 2.5, { lush = 0.3, palette = "hillFlowers" }),
+		cover("Wildflowers", 1.5, { lush = 1, palette = "hillFlowers" }),
+		cover("LowBush", 1.5, { lush = 0.4, palette = "hillGreens" }),
 	},
 	snow = {
 		decor("Rock", 3, { palette = "snowStone", size = { 1, 2.6 }, sink = 0.3 }),
@@ -766,6 +794,9 @@ EnvironmentData.Decor = {
 		decor("Crystal", 1, { palette = "amethyst", size = { 0.8, 1.8 } }),
 		decor("Fern", 3, { lush = 0.6 }),
 		decor("DeadBranch", 1),
+		cover("FernClump", 3, { lush = 0.6 }),
+		cover("LowBush", 1.5, { lush = 0.4, palette = "groveGreens" }),
+		cover("Wildflowers", 1, { lush = 1, palette = "groveFlowers" }),
 	},
 	-- By the water's edge, any biome: reeds and cattails on the bank, lily
 	-- pads on still water (DecorSpots picks this table near the water).
@@ -782,6 +813,11 @@ EnvironmentData.DecorCandidates = { meadow = 18, starter = 26, hills = 22, snow 
 	[string]: number,
 }
 EnvironmentData.DecorAcceptance = 0.6 -- share of candidates kept at Healthy vitality
+-- Ground-cover candidates per cell (DecorCoverSpots; the biomes with cover
+-- rows). AmbientLife loads this layer on the high quality tier only.
+EnvironmentData.DecorCoverCandidates = { meadow = 12, starter = 8, hills = 9, grove = 6 } :: {
+	[string]: number,
+}
 
 export type DecorSpot = {
 	biome: string, -- the Decor table it came from ("meadow" for open country)
@@ -848,21 +884,29 @@ local function shoreFits(kind: string, shoreKind: string?): boolean
 	return (kind == "LilyPad") == (shoreKind == "water")
 end
 
--- The deterministic decoration of cell (cellX, cellZ): every player sees
--- the same meadow. `vitalityOf(biomeId)` gives each grove's vitality
--- (0..100); thriving groves grow more flowers. Trees aren't avoided here
--- (they come and go); AmbientLife skips spots too close to one.
-function EnvironmentData.DecorSpots(
+-- The cover layer's rng is salted past every first-layer seed in the world.
+local COVER_SALT = 50000017
+
+-- One layer of a cell's scatter. The first layer (`coverLayer` false) is
+-- DecorSpots exactly as it always was: the same seed, the same six draws
+-- per candidate, the same picks among the rows without `cover`. The cover
+-- layer has its own seed and picks only among `cover` rows, and stays off
+-- the water and its bank (the reeds' place).
+local function scatter(
 	cellX: number,
 	cellZ: number,
-	vitalityOf: (biomeId: string) -> number
+	vitalityOf: (biomeId: string) -> number,
+	coverLayer: boolean
 ): { DecorSpot }
 	local size = EnvironmentData.DecorCell
 	local out: { DecorSpot } = {}
-	local rng = Kit.rng((cellX + 4096) * 8209 + (cellZ + 4096) + 11)
+	local seed = (cellX + 4096) * 8209 + (cellZ + 4096) + 11
+	local rng = Kit.rng(if coverLayer then seed + COVER_SALT else seed)
 	local cx, cz = (cellX + 0.5) * size, (cellZ + 0.5) * size
 	local cellBiome = EnvironmentData.DecorBiomeAt(cx, cz)
-	local candidates = EnvironmentData.DecorCandidates[cellBiome] or 10
+	local candidates = if coverLayer
+		then EnvironmentData.DecorCoverCandidates[cellBiome] or 0
+		else EnvironmentData.DecorCandidates[cellBiome] or 10
 	for _ = 1, candidates do
 		-- Always draw the same numbers per candidate, so the rest of the
 		-- cell doesn't reshuffle when one spot is rejected.
@@ -887,19 +931,29 @@ function EnvironmentData.DecorSpots(
 			shoreKind = "bank"
 		end
 		if shoreKind then
+			if coverLayer then
+				continue
+			end
 			biome = "shore"
 		end
 		local list = EnvironmentData.Decor[biome]
 		local total = 0
-		for _, d in ipairs(list) do
-			if shoreFits(d.kind, shoreKind) then
-				total += d.weight
+		local last = 0 -- the fallback pick: this layer's last row
+		for i, d in ipairs(list) do
+			if (d.cover == true) == coverLayer then
+				last = i
+				if shoreFits(d.kind, shoreKind) then
+					total += d.weight
+				end
 			end
 		end
+		if total <= 0 then
+			continue -- no rows of this layer here (only the cover layer)
+		end
 		local roll = kindRoll * total
-		local pickIndex = #list
+		local pickIndex = last
 		for i, d in ipairs(list) do
-			if shoreFits(d.kind, shoreKind) then
+			if (d.cover == true) == coverLayer and shoreFits(d.kind, shoreKind) then
 				roll -= d.weight
 				if roll < 0 then
 					pickIndex = i
@@ -943,6 +997,31 @@ function EnvironmentData.DecorSpots(
 		})
 	end
 	return out
+end
+
+-- The deterministic decoration of cell (cellX, cellZ): every player sees
+-- the same meadow. `vitalityOf(biomeId)` gives each grove's vitality
+-- (0..100); thriving groves grow more flowers. Trees aren't avoided here
+-- (they come and go); AmbientLife skips spots too close to one.
+function EnvironmentData.DecorSpots(
+	cellX: number,
+	cellZ: number,
+	vitalityOf: (biomeId: string) -> number
+): { DecorSpot }
+	return scatter(cellX, cellZ, vitalityOf, false)
+end
+
+-- The cell's ground cover: grass patches, wildflowers, low bushes, fern
+-- clumps and mushroom clusters (the `cover` rows) on top of DecorSpots,
+-- from a second rng, so adding it moved nothing DecorSpots places. Never
+-- on the water or its bank. The same spot shape; `index` is the row in
+-- Decor[biome], as for DecorSpots.
+function EnvironmentData.DecorCoverSpots(
+	cellX: number,
+	cellZ: number,
+	vitalityOf: (biomeId: string) -> number
+): { DecorSpot }
+	return scatter(cellX, cellZ, vitalityOf, true)
 end
 
 ---------------------------------------------------------------------------

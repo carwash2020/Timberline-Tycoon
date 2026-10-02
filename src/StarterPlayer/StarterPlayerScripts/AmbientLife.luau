@@ -8,6 +8,9 @@
 --    EnvironmentData.DecorSpots (deterministic, so every player sees the
 --    same meadow), placed on TerrainGen's ground without raycasts, never
 --    on roads, water, town or the plots, nor within 4 studs of a tree.
+--    On the high tier a second layer, EnvironmentData.DecorCoverSpots,
+--    adds ground cover: grass patches, wildflowers, low bushes, fern
+--    clumps and mushroom clusters (low keeps its phone budget).
 --    Cells load within ~200 studs and unload past ~260, a couple per
 --    frame; models are pooled and the live count is capped. Thriving
 --    groves (workspace "Vitality_<biome>") grow more flowers: when a
@@ -87,7 +90,7 @@ end
 local CELL = EnvironmentData.DecorCell
 -- Cells load within Quality.Budget().DecorLoadRadius (200 studs, 110 on low
 -- quality) and unload past DecorUnloadRadius (260, 130 on low), with at
--- most Quality.Budget().MaxDecor live decoration models (420, 148 on low),
+-- most Quality.Budget().MaxDecor live decoration models (560, 148 on low),
 -- all cells together. Shared/QualityBudgets.
 local TREE_CLEARANCE = 4
 local CELLS_PER_FRAME = 2
@@ -180,6 +183,22 @@ local BUILDERS: { [string]: Builder } = {
 	end,
 	LilyPad = function(_row, _variant, seed)
 		return PropArt.LilyPad(seed)
+	end,
+	-- Ground cover (EnvironmentData.DecorCoverSpots)
+	GroundCover = function(row, _variant, seed, biome)
+		return PropArt.GroundCover(seed, tints(biome).grass, paletteOf(row))
+	end,
+	Wildflowers = function(row, _variant, seed)
+		return PropArt.Wildflowers(seed, paletteOf(row))
+	end,
+	LowBush = function(row, _variant, seed)
+		return PropArt.LowBush(seed, paletteOf(row))
+	end,
+	FernClump = function(_row, _variant, seed, biome)
+		return PropArt.FernClump(seed, tints(biome).grass)
+	end,
+	MushroomCluster = function(_row, _variant, seed)
+		return PropArt.MushroomCluster(seed)
 	end,
 }
 
@@ -295,12 +314,24 @@ local function unloadCell(cell: Cell)
 	cells[cell.key] = nil
 end
 
+-- The quality tiers that also load the ground-cover layer (grass patches,
+-- wildflowers, low bushes, fern clumps, mushroom clusters). Low keeps its
+-- phone budget: the first layer alone fills its MaxDecor.
+local COVER_TIERS: { [string]: boolean } = { high = true }
+
 local function loadCell(cx: number, cz: number, key: string)
 	local consulted: { [string]: boolean } = {}
-	local spots = EnvironmentData.DecorSpots(cx, cz, function(biomeId: string): number
+	local function vitality(biomeId: string): number
 		consulted[biomeId] = true
 		return vitalityOf(biomeId)
-	end)
+	end
+	local spots = EnvironmentData.DecorSpots(cx, cz, vitality)
+	if COVER_TIERS[Quality.Budget().Tier] then
+		-- After the first layer, so when the cap bites it takes cover first.
+		for _, spot in ipairs(EnvironmentData.DecorCoverSpots(cx, cz, vitality)) do
+			table.insert(spots, spot)
+		end
+	end
 	local cell: Cell = { key = key, cx = cx, cz = cz, items = {}, biomes = consulted }
 	local parent = root()
 	for _, spot in ipairs(spots) do
