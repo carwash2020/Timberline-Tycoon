@@ -10,7 +10,7 @@
 -- BiomeData, GameConfig) and builds the trees with Shared/TreeGen, so the
 -- volumes are the game's own. The per-u³ prices, hardness and axe stats are
 -- LT2's rows renamed (V2_PLAN §2; that provenance lives only in tools/ and
--- the plan). Truck beds use the §4c target sizes until M1.5 lands them.
+-- the plan). Truck beds are TruckLayout's, as the game builds them.
 --
 -- It's a model, not a measurement: trees always available, nobody
 -- competing. EFFICIENCY scales the ideal player to a real one: the value
@@ -63,18 +63,19 @@ local A = {
 	sharing = 4, -- players sharing a biome's regrowth (a rare wood's cap on $/h)
 }
 
--- Truck beds at the §4c target sizes: length, interior width, wall height.
--- The Scout ATV's rack carries no wood. Trailers add their bed.
-local BEDS = {
-	Rustbucket = { 10, 5.6, 1.4 },
-	Pickup = { 12, 6.0, 1.6 },
-	ScoutATV = { 0, 0, 0 },
-	Flatbed = { 18, 6.8, 2.5 },
-	LoggingRig = { 26, 7.2, 3.2 },
-	PonyTrailer = { 10, 5.6, 1.2 },
-	RanchTrailer = { 14, 6.0, 2.0 },
-	HeavyHauler = { 20, 6.8, 2.5 },
-}
+-- Truck and trailer beds as the game builds them (TruckLayout): length,
+-- interior width, wall height. The Scout ATV's rack carries no wood.
+local TruckLayout = modules:shared("TruckLayout")
+local BEDS = {}
+for id, truck in pairs(ItemCatalog.Trucks) do
+	local l = TruckLayout.For(truck)
+	BEDS[id] = { l.bedLength, l.bedWidth, l.wallHeight }
+end
+local towLayout = TruckLayout.For(ItemCatalog.GetTruck("Rustbucket"))
+for id, trailer in pairs(ItemCatalog.Trailers) do
+	local l = TruckLayout.ForTrailer(trailer, towLayout)
+	BEDS[id] = { l.bedLength, l.bedWidth, l.wallHeight }
+end
 
 -- §17's estimates of $ per mature tree, logs / planks (for comparison).
 local PLAN_PER_TREE = {
@@ -568,7 +569,7 @@ line(
 line()
 line(
 	string.format(
-		'**Model, not measurement.** Trees always there, nobody competing. "Real player" = the ideal model × EFFICIENCY (%.2f), %s. Truck beds are the V2_PLAN §4c target sizes (they land in M1.5).',
+		'**Model, not measurement.** Trees always there, nobody competing. "Real player" = the ideal model × EFFICIENCY (%.2f), %s. Truck beds are TruckLayout\'s, as the game builds them.',
 		EFFICIENCY,
 		if calibration then "from tools/calibration.json" else "a guess until a playtest calibrates it"
 	)
