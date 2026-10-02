@@ -6,6 +6,78 @@ return function(t)
 	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
 	local BiomeData = t.shared("BiomeData")
 	local Vector3 = t.roblox.Vector3
+	local Vector2 = t.roblox.Vector2
+
+	-- The ground's shape is a contract: trees, props, roads, plots, the
+	-- crater and these specs all place things with HeightAt. Restyling the
+	-- surface (materials, colours) must never move it. The fingerprint is
+	-- HeightAt over a jittered grid across the whole map, plus every road
+	-- (centre, shoulders, verges) and the town and plot district, taken from
+	-- the code before the WLD-13 material pass. If you change the land's
+	-- shape on purpose, re-sample it and say so in the commit.
+	local HEIGHT_FINGERPRINT = {
+		n = 7187,
+		sum = 89387.784620697072,
+		wsum = -326.97902728736778,
+		sq = 9366691.7479857393,
+		lo = -13.781769507273463,
+		hi = 205.78311827742994,
+	}
+	local function heightFingerprint()
+		local n, sum, wsum, sq, lo, hi = 0, 0, 0, 0, math.huge, -math.huge
+		local function add(x, z)
+			local h = TerrainGen.HeightAt(x, z)
+			n += 1
+			sum += h
+			wsum += h * math.sin(n * 0.731)
+			sq += h * h
+			lo = math.min(lo, h)
+			hi = math.max(hi, h)
+		end
+		for i = 0, 63 do
+			for k = 0, 63 do
+				add(-1490 + i * 47.3 + (k % 7) * 1.7, -1490 + k * 47.3 + (i % 5) * 2.3)
+			end
+		end
+		for _, road in ipairs(WorldLayout.Roads) do
+			local pts = road.points
+			for i = 1, #pts - 1 do
+				local a, b = pts[i], pts[i + 1]
+				local len = (b - a).Magnitude
+				local side = Vector2.new(a.Y - b.Y, b.X - a.X) / math.max(len, 1e-6)
+				for s = 0, len, 19 do
+					local p = a:Lerp(b, s / math.max(len, 1e-6))
+					for _, off in ipairs({ 0, road.width * 0.4, -road.width * 0.4, road.width + 9, -(road.width + 21) }) do
+						local q = p + side * off
+						add(q.X, q.Y)
+					end
+				end
+			end
+		end
+		for x = -150, 150, 13 do
+			for z = -40, 260, 13 do
+				add(x, z)
+			end
+		end
+		for x = 600, 1200, 31 do
+			for z = -800, -200, 31 do
+				add(x, z)
+			end
+		end
+		return { n = n, sum = sum, wsum = wsum, sq = sq, lo = lo, hi = hi }
+	end
+
+	t.test("the ground's heights are exactly as they were (materials only may change)", function()
+		local got = heightFingerprint()
+		local want = HEIGHT_FINGERPRINT
+		t.eq(got.n, want.n)
+		for _, key in ipairs({ "sum", "wsum", "sq", "lo", "hi" }) do
+			t.ok(
+				math.abs(got[key] - want[key]) < 1e-5 * math.max(1, math.abs(want[key]) * 1e-6),
+				string.format("HeightAt fingerprint %s is %.9f, was %.9f", key, got[key], want[key])
+			)
+		end
+	end)
 
 	t.test("town and plot district are perfectly flat at y = 0", function()
 		for _, p in ipairs({ { 0, 40 }, { 0, 110 }, { -80, 100 }, { 60, 25 }, { 250, -60 }, { 910, -500 } }) do
@@ -88,6 +160,94 @@ return function(t)
 			local outside = TerrainGen.HeightAt(cone.x + cx * (cone.crater + 0.05), cone.z + sz * (cone.crater + 0.05))
 			t.ok(math.abs(inside - outside) < 6, "no cliff at the rim")
 			t.ok(inside > floor + 20, "the crater is deep")
+		end
+	end)
+
+	-- What a column's surface is, with the slope TerrainBuilder would see.
+	local function materialAt(x, z)
+		local _, m = TerrainGen.Sample(x, z)
+		return m
+	end
+
+	t.test("open country is a mixed meadow: Grass and LeafyGrass swaths, a few worn patches", function()
+		local counts, n = {}, 0
+		-- South of town, between the Starter Forest and the map's south edge.
+		for x = -420, 420, 12 do
+			for z = -1150, -650, 12 do
+				local m = materialAt(x, z)
+				counts[m] = (counts[m] or 0) + 1
+				n += 1
+			end
+		end
+		local grass, leafy, ground = counts.Grass or 0, counts.LeafyGrass or 0, counts.Ground or 0
+		t.ok(leafy / n > 0.12 and leafy / n < 0.5, string.format("LeafyGrass is %.0f%% of the meadow", leafy / n * 100))
+		t.ok(grass / n > 0.4, string.format("Grass is %.0f%% of the meadow", grass / n * 100))
+		t.ok(ground / n > 0.003 and ground / n < 0.08, string.format("worn Ground is %.1f%%", ground / n * 100))
+	end)
+
+	t.test("biome edges fray over a band: pure deep inside, mixed across the edge, gone outside", function()
+		-- Rays south from the Snowfields and south-west from the Volcano
+		-- (away from the mountains' own snow and rock).
+		for _, spec in ipairs({
+			{ id = "snow", extra = 150, mat = "Snow", angles = { 200, 230, 260, 290, 320 } },
+			{ id = "volcano", extra = 40, mat = "Basalt", angles = { 190, 215, 240, 265 } },
+		}) do
+			local a = BiomeData.Get(spec.id).area
+			local r = a.radius + spec.extra
+			local deep, mixedIn, mixedOut, outside, switches = 0, 0, 0, 0, 0
+			for _, deg in ipairs(spec.angles) do
+				local cx, sz = math.cos(math.rad(deg)), math.sin(math.rad(deg))
+				local was = nil
+				for d = r - 160, r + 160, 2 do
+					local x, z = a.x + cx * d, a.z + sz * d
+					local m = materialAt(x, z)
+					local isBiome = m == spec.mat or m == "Glacier" or m == "Slate" or m == "CrackedLava"
+					if was ~= nil and was ~= isBiome then
+						switches += 1
+					end
+					was = isBiome
+					if d < r - 110 then
+						deep += if isBiome then 0 else 1
+					elseif d > r + 110 then
+						outside += if isBiome then 1 else 0
+					elseif isBiome then
+						mixedIn += 1
+					else
+						mixedOut += 1
+					end
+				end
+			end
+			t.eq(deep, 0)
+			t.eq(outside, 0)
+			t.ok(mixedIn > 20 and mixedOut > 20, string.format("%s edge: %d in, %d out", spec.id, mixedIn, mixedOut))
+			-- A dithered edge flips back and forth; a hard disc crosses once.
+			t.ok(switches >= 3 * #spec.angles, string.format("%s edge flips only %d times", spec.id, switches))
+		end
+	end)
+
+	t.test("the plot district keeps a plain Grass lawn; the town plaza keeps its paint", function()
+		local zone
+		for _, z in ipairs(WorldLayout.FlatZones) do
+			if z.name == "Plots" then
+				zone = z
+			end
+		end
+		for x = zone.x0, zone.x1, 9 do
+			for z = zone.z0, zone.z1, 9 do
+				local m = materialAt(x, z)
+				t.ok(m == "Grass" or m == "Ground" or m == "Cobblestone", string.format("plots (%d, %d): %s", x, z, m))
+			end
+		end
+		-- Paint overlaps, and the first patch listed wins.
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			local x, z = (paint.x0 + paint.x1) / 2, (paint.z0 + paint.z1) / 2
+			local want
+			for _, p in ipairs(WorldLayout.TownPaint) do
+				if want == nil and x > p.x0 and x < p.x1 and z > p.z0 and z < p.z1 then
+					want = p.material
+				end
+			end
+			t.eq(materialAt(x, z), want)
 		end
 	end)
 
