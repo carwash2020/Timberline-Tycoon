@@ -86,14 +86,14 @@ function TerrainFit.Fit(samples: { Sample }): (Fit, string)
 	for _, s in ipairs(samples) do
 		local offset = s.drawn - s.written
 		if offset ~= offset or math.abs(offset) > TerrainFit.MaxOffset then
-			return IDENTITY, string.format("a pad read %.2f studs off; not trusted, ground left as written", offset)
+			return IDENTITY, string.format("a pad read %.2f studs off; not trusted, left as written", offset)
 		end
 		local base = math.floor(s.written / VOXEL) * VOXEL
 		table.insert(points, { r = s.written - base, d = s.drawn - base })
 		sum += offset
 	end
 	if #points == 0 then
-		return IDENTITY, "no pad was measured; ground left as written"
+		return IDENTITY, "no pad was measured; left as written"
 	end
 	local mean = sum / #points
 	local worst = 0
@@ -109,11 +109,11 @@ function TerrainFit.Fit(samples: { Sample }): (Fit, string)
 	-- Drawn must rise with written (one voxel on, it repeats 4 higher).
 	for i = 2, #points do
 		if points[i].d < points[i - 1].d - 0.05 then
-			return IDENTITY, "the pads drew out of order; ground left as written"
+			return IDENTITY, "the pads drew out of order; left as written"
 		end
 	end
 	if points[1].d + VOXEL < points[#points].d - 0.05 then
-		return IDENTITY, "the pads drew out of order across a voxel; ground left as written"
+		return IDENTITY, "the pads drew out of order across a voxel; left as written"
 	end
 	local fwdWritten, fwdDrawn = {}, {}
 	for shift = -1, 1 do

@@ -93,44 +93,63 @@ return function(t)
 		return terrain
 	end
 
-	t.test("calibration writes a pad per residue, reads each, then clears them", function()
-		local terrain = fakeTerrain()
-		local TerrainBuilder = builderWith(terrain)
-		-- The pads' written surfaces, from what was written: the top of the
-		-- highest solid voxel's occupancy.
-		local casts = {}
-		local function cast(x, z, fromY, toY)
-			table.insert(casts, { x = x, z = z })
-			-- Find the pad under (x, z) among the writes so far and draw
-			-- its surface 2.7 high.
+	-- A fake engine's rays over the pads written so far: ground drawn
+	-- `groundUp` high, water `waterUp` high (both from what was written:
+	-- the top of the highest voxel's occupancy).
+	local function fakeCast(terrain, groundUp, waterUp, casts)
+		return function(x, z, fromY, toY, water)
+			table.insert(casts, { x = x, z = z, water = water })
 			for _, w in ipairs(terrain.writes) do
 				local r = w.region
 				local min = r.CFrame.Position - r.Size / 2
 				local max = r.CFrame.Position + r.Size / 2
 				if x > min.X and x < max.X and z > min.Z and z < max.Z then
-					local top = nil
+					local top, wet = nil, false
 					local plane = w.mats[1]
 					for j = 1, #plane do
-						if plane[j][1].Name ~= "Air" then
+						local name = plane[j][1].Name
+						if name ~= "Air" and (water or name ~= "Water") then
 							top = min.Y + (j - 1) * 4 + 4 * w.occs[1][j][1]
+							wet = name == "Water"
 						end
 					end
 					if top then
 						t.ok(top < fromY and top > toY, "the ray spans the pad")
-						return top + 2.7
+						return top + (if wet then waterUp else groundUp)
 					end
 				end
 			end
 			return nil
 		end
-		-- Rays see only what is still written: clear writes after reading.
-		local fit, note = TerrainBuilder.Calibrate(terrain, cast, function() end)
+	end
+
+	t.test("calibration writes ground and water pads, reads each, then clears them", function()
+		local terrain = fakeTerrain()
+		local TerrainBuilder = builderWith(terrain)
+		local casts = {}
+		local fit, note, waterFit, waterNote = TerrainBuilder.Calibrate(
+			terrain,
+			fakeCast(terrain, 2.7, 0.6, casts),
+			function() end
+		)
 		t.ok(not fit.identity, note)
-		near(fit.offset, 2.7, 1e-6, "offset")
-		t.eq(#casts, #TerrainFit.Residues)
-		t.eq(#terrain.writes, 2 * #TerrainFit.Residues)
+		near(fit.offset, 2.7, 1e-6, "ground offset")
+		t.ok(not waterFit.identity, waterNote)
+		near(waterFit.offset, 0.6, 1e-6, "water offset")
+		local ground, water = 0, 0
+		for _, c in ipairs(casts) do
+			if c.water then
+				water += 1
+			else
+				ground += 1
+			end
+		end
+		t.eq(ground, #TerrainFit.Residues)
+		t.ok(water >= 2, "water pads read: " .. water)
+		local pads = ground + water
+		t.eq(#terrain.writes, 2 * pads)
 		-- The last writes are all air (the pads are gone).
-		for i = #TerrainFit.Residues + 1, #terrain.writes do
+		for i = pads + 1, #terrain.writes do
 			for _, plane in ipairs(terrain.writes[i].mats) do
 				for _, row in ipairs(plane) do
 					for _, m in ipairs(row) do
@@ -139,30 +158,76 @@ return function(t)
 				end
 			end
 		end
-		-- Every pad is under the world's deepest ground and grid-aligned.
-		for i = 1, #TerrainFit.Residues do
+		-- Every pad is under the world's deepest ground, grid-aligned, and
+		-- no two overlap.
+		for i = 1, pads do
 			local r = terrain.writes[i].region
 			local top = r.CFrame.Position.Y + r.Size.Y / 2
 			t.ok(top < -300, "pad top " .. top)
 			t.eq((r.CFrame.Position.X - r.Size.X / 2) % 4, 0)
 			t.eq((r.CFrame.Position.Y - r.Size.Y / 2) % 4, 0)
 			t.eq((r.CFrame.Position.Z - r.Size.Z / 2) % 4, 0)
+			for k = i + 1, pads do
+				local q = terrain.writes[k].region
+				local apart = math.abs(r.CFrame.Position.X - q.CFrame.Position.X) >= r.Size.X
+					or math.abs(r.CFrame.Position.Z - q.CFrame.Position.Z) >= r.Size.Z
+				t.ok(apart, string.format("pads %d and %d overlap", i, k))
+			end
 		end
 	end)
 
-	t.test("calibration with no answering rays leaves the ground as written", function()
+	t.test("calibration with no answering rays leaves the ground and water as written", function()
 		local terrain = fakeTerrain()
 		local TerrainBuilder = builderWith(terrain)
 		local waits = 0
-		local fit, note = TerrainBuilder.Calibrate(terrain, function()
+		local fit, note, waterFit = TerrainBuilder.Calibrate(terrain, function()
 			return nil
 		end, function()
 			waits += 1
 		end)
 		t.ok(fit.identity, note)
-		t.ok(waits > 1 and waits <= 30, "waited " .. waits)
-		-- Still cleaned up.
-		t.eq(#terrain.writes, 2 * #TerrainFit.Residues)
+		t.ok(waterFit.identity)
+		t.ok(waits > 1 and waits <= 60, "waited " .. waits)
+		-- Still cleaned up: every pad written, then cleared.
+		local cleared = 0
+		for _, w in ipairs(terrain.writes) do
+			local allAir = true
+			for _, plane in ipairs(w.mats) do
+				for _, row in ipairs(plane) do
+					for _, m in ipairs(row) do
+						allAir = allAir and m.Name == "Air"
+					end
+				end
+			end
+			if allAir then
+				cleared += 1
+			end
+		end
+		t.eq(cleared * 2, #terrain.writes)
+	end)
+
+	t.test("water levels follow the water's fit, ground the ground's", function()
+		local terrain = fakeTerrain()
+		local TerrainBuilder = builderWith(terrain)
+		local groundFit = TerrainFit.Fit({ { written = -400, drawn = -397.3 } })
+		local waterFit = TerrainFit.Fit({ { written = -400, drawn = -399.4 } })
+		local pond = t.load("ReplicatedStorage/Shared/World/WorldLayout").Pond
+		local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+		-- The pond's middle column.
+		local x0, z0 = math.floor(pond.x / 4) * 4 - 16, math.floor(pond.z / 4) * 4 - 16
+		TerrainBuilder._writeChunk(terrain, x0, z0, 8, 8, groundFit, waterFit)
+		local w = terrain.writes[1]
+		local min = w.region.CFrame.Position - w.region.Size / 2
+		local x, z = x0 + 4 * 4 + 2, z0 + 4 * 4 + 2
+		local surface = TerrainGen.WaterLevelAt(x, z)
+		t.ok(surface ~= nil, "the pond's middle is wet")
+		local waterTop = nil
+		for j = 1, #w.mats[5] do
+			if w.mats[5][j][5].Name == "Water" then
+				waterTop = min.Y + (j - 1) * 4 + 4 * w.occs[5][j][5]
+			end
+		end
+		near(waterTop, surface - 0.6, 1e-6, "water written 0.6 lower")
 	end)
 
 	t.test("a calibrated chunk writes the town lower so it is drawn at y = 0", function()
