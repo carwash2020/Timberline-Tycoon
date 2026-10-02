@@ -52,7 +52,7 @@ return function(t)
 	t.test("FellSummary lists the toughest woods an axe cuts in 30 hits or fewer", function()
 		t.eq(ShopLogic.FellSummary(axe("RustyAxe")), "Fells oak in 6 · birch in 12")
 		t.eq(ShopLogic.FellSummary(axe("SteelAxe")), "Fells oak in 3 · birch in 5 · pine in 13")
-		t.eq(ShopLogic.FellSummary(axe("InfernoAxe")), "Fells frostwood in 4 · emberwood in 6 · phantomwood in 15")
+		t.eq(ShopLogic.FellSummary(axe("InfernoAxe")), "Fells frostwood in 4 · emberwood in 6 · gloamwood in 15")
 		t.eq(ShopLogic.FellSummary(axe("RustyAxe"), 3), "Too weak for any tree")
 	end)
 

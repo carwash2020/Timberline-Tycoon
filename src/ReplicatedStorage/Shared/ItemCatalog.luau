@@ -16,9 +16,23 @@ export type ForgeRecipe = {
 	materials: { [string]: number },
 }
 
+-- The v2 core loop's stats (V2_PLAN.md §2c): damage per hit against a cut
+-- (required = hardness x cut area in u², Shared/CoreLoop), reach in studs,
+-- seconds between swings, and per-wood overrides for specialists. Only the
+-- v2 loop reads it; `priceCash`/`damage` stay the v1 numbers until the flip.
+export type AxeStatsV2 = { damage: number?, cooldown: number? }
+export type AxeV2 = {
+	price: number,
+	damage: number,
+	range: number,
+	cooldown: number,
+	vs: { [string]: AxeStatsV2 }?, -- by WoodData id
+}
+
 export type AxeDef = {
 	id: string,
 	displayName: string,
+	v2: AxeV2?,
 	look: AxeLook,
 	sold: boolean?, -- false = never in the shop (forged instead); default true
 	forge: ForgeRecipe?,
@@ -37,6 +51,7 @@ export type TruckLook = { color: string, width: number, bedLength: number, bedWa
 export type TruckDef = {
 	id: string,
 	displayName: string,
+	v2: { price: number }?, -- the v2 loop's price (V2_PLAN.md §2d)
 	bedCapacity: number,
 	priceCash: number,
 	topSpeed: number, -- studs/s flat out (reverse is slower; GameConfig)
@@ -51,6 +66,7 @@ export type TruckDef = {
 export type TrailerDef = {
 	id: string,
 	displayName: string,
+	v2: { price: number }?, -- the v2 loop's price (V2_PLAN.md §2d)
 	extraCapacity: number,
 	priceCash: number,
 	look: { color: string, bedLength: number },
@@ -234,7 +250,7 @@ ItemCatalog.Gear = {
 	Lantern = {
 		id = "Lantern",
 		displayName = "Lantern",
-		effect = "Light to chop by in the Phantom Grove",
+		effect = "Light to chop by in the Gloam Hollow",
 		priceCash = 150,
 		biome = "grove",
 		color = "#F2C14E",
@@ -285,6 +301,70 @@ ItemCatalog.Materials = {
 		node = { hits = 12, yield = 1, respawnSec = 600, color = "#9FD4FF" },
 	},
 }
+
+-- v2 rows (V2_PLAN.md §2c, §2d), attached to the definitions above.
+local AXES_V2: { [string]: AxeV2 } = {
+	RustyAxe = { price = 0, damage = 0.2, range = 4.8, cooldown = 0.65 },
+	SteelAxe = { price = 90, damage = 0.55, range = 6, cooldown = 0.73 },
+	HardenedAxe = { price = 190, damage = 0.93, range = 8, cooldown = 0.70 },
+	SilverAxe = { price = 550, damage = 1.45, range = 8, cooldown = 0.65 },
+	CobaltAxe = { price = 2040, damage = 1.6, range = 10, cooldown = 0.48 },
+	GoldAxe = { price = 7720, damage = 1.68, range = 9, cooldown = 0.40 },
+	ObsidianAxe = { price = 11000, damage = 10.2, range = 16, cooldown = 1.9 },
+	InfernoAxe = {
+		price = 14400,
+		damage = 0.6,
+		range = 9,
+		cooldown = 0.55,
+		vs = { emberwood = { damage = 6.35, cooldown = 0.35 } },
+	},
+	StarfallAxe = {
+		price = 0,
+		damage = 1.65,
+		range = 16,
+		cooldown = 0.4,
+		vs = { emberwood = { damage = 2.5 }, lumenwood = { damage = 3.9 } },
+	},
+}
+local VEHICLES_V2: { [string]: number } = {
+	Rustbucket = 0,
+	Pickup = 400,
+	ScoutATV = 2500,
+	Flatbed = 5000,
+	LoggingRig = 19000,
+	PonyTrailer = 1800,
+	RanchTrailer = 6000,
+	HeavyHauler = 13000,
+}
+for id, v2 in pairs(AXES_V2) do
+	local axe = ItemCatalog.Axes[id]
+	if axe then
+		axe.v2 = v2
+	end
+end
+for id, price in pairs(VEHICLES_V2) do
+	local truck = ItemCatalog.Trucks[id]
+	if truck then
+		truck.v2 = { price = price }
+	end
+	local trailer = ItemCatalog.Trailers[id]
+	if trailer then
+		trailer.v2 = { price = price }
+	end
+end
+
+-- The v2 loop: damage per hit and seconds between swings for `axe`
+-- against `woodId` (its `vs` entry overrides either), or nil without v2
+-- stats.
+function ItemCatalog.AxeStats(axe: AxeDef, woodId: string): (number?, number?)
+	local v2 = axe.v2
+	if not v2 then
+		return nil, nil
+	end
+	local vs = if v2.vs then v2.vs[woodId] else nil
+	return (if vs and vs.damage then vs.damage else v2.damage),
+		(if vs and vs.cooldown then vs.cooldown else v2.cooldown)
+end
 
 function ItemCatalog.GetAxe(axeId: string): AxeDef?
 	local axe = ItemCatalog.Axes[axeId]

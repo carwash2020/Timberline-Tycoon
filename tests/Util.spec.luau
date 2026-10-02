@@ -53,7 +53,7 @@ return function(t)
 			palmwood = "a palmwood",
 			frostwood = "a frostwood",
 			emberwood = "an emberwood",
-			phantomwood = "a phantomwood",
+			gloamwood = "a gloamwood",
 			lumenwood = "a lumenwood",
 		}
 		local checked = 0

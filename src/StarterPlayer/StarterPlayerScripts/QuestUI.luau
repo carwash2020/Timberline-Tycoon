@@ -266,7 +266,7 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 			return model:GetAttribute("OwnerId") == player.UserId
 		end)
 	elseif target == "stump" then
-		-- The nearest stump you hold a Heartseed for (hidden Phantom Grove
+		-- The nearest stump you hold a Heartseed for (hidden Gloam Hollow
 		-- stumps and ones already sprouting don't count).
 		local stump = nearestTagged("Stump", from, function(model, pp)
 			return seedsFor(model) > 0 and pp.Transparency < 1 and model:GetAttribute("Sprouting") ~= true

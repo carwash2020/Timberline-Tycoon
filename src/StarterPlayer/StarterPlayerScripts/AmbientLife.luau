@@ -21,7 +21,7 @@
 --    songbirds pecking that fly off, butterflies by day near flowers,
 --    fireflies at night, rabbits and deer that bound away, ducks on the
 --    starter pond, fish leaping in the river and lake, wisps in the
---    Phantom Grove at night, ember sprites at the Volcano. One BulkMoveTo
+--    Gloam Hollow at night, ember sprites at the Volcano. One BulkMoveTo
 --    a frame moves them all.
 -- 3. Golden motes around the Skyroot, pouring off its crown during a
 --    Skyroot Bloom (workspace "SkyrootBloom").

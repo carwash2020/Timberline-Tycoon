@@ -443,7 +443,7 @@ local function checkElder()
 	local groves: { ForestLogic.GroveState } = {}
 	for _, id in ipairs(ForestData.Groves) do
 		local biome = BiomeData.Get(id)
-		-- Night-only groves (the Phantom Grove) only wake one at night, with
+		-- Night-only groves (the Gloam Hollow) only wake one at night, with
 		-- enough of it left to fell it (it fades at dawn).
 		local awake = biome ~= nil and (not biome.nightOnly or nightLeft() >= ForestData.Elder.nightLeftSeconds)
 		if biome and biome.area and biome.trees and awake then
@@ -740,7 +740,7 @@ function ForestService.Tick(dt: number)
 		end
 	end
 
-	-- Stakes hide with their trees (the Phantom Grove by day).
+	-- Stakes hide with their trees (the Gloam Hollow by day).
 	for uid, stake in pairs(stakeOf) do
 		local rec = TreeService.GetTree(uid)
 		if not rec then

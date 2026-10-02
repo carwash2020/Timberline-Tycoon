@@ -1,7 +1,7 @@
 --!strict
 -- CritterArt: the world's small wildlife, part-built in the cozy low-poly
 -- style (GAME_DESIGN §13, §16 "thriving groves come alive"): songbirds,
--- butterflies, rabbits, deer, ducks, fish, the Phantom Grove's wisps, the
+-- butterflies, rabbits, deer, ducks, fish, the Gloam Hollow's wisps, the
 -- Volcano's ember sprites, and firefly / mote clouds. Pure (see Kit), so
 -- the preview (tools/preview/scenes/critters.luau) shows exactly what
 -- AmbientLife animates. Critters exist only on clients and never collide.
@@ -491,7 +491,7 @@ local function glow(part: BasePart, color: Color3, range: number, brightness: nu
 	light.Parent = part
 end
 
--- A Phantom Grove wisp: a glowing violet orb with a trailing tail,
+-- A Gloam Hollow wisp: a glowing violet orb with a trailing tail,
 -- centred on the origin. Named parts: Core (light + Trail emitter), Halo,
 -- Tail.
 function CritterArt.Wisp(seed: number): Model

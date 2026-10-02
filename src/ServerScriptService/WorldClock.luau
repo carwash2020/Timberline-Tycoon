@@ -1,7 +1,7 @@
 --!strict
 -- WorldClock: runs day and night (Shared/WorldTime). Mirrors the clock on
 -- the workspace "IsNight" attribute, and wakes the night-only biomes' trees
--- (the Phantom Grove) at dusk and hides them at dawn.
+-- (the Gloam Hollow) at dusk and hides them at dawn.
 --
 -- It does NOT set Lighting.ClockTime: that property doesn't replicate, and
 -- the sun would only step once a second if it did. Every client works the

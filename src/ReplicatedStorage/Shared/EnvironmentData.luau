@@ -182,8 +182,8 @@ end
 -- Cozy days, golden evenings, nights dark enough that lanterns and lit
 -- windows matter. The night holds from 22:00 to 04:00. WLD-06 lifted it
 -- (from brightness 0.6, ambient 26,28,46, outdoor 55,65,105) so a trunk
--- still reads at 30 studs without a lantern, in the Hills too; the Phantom
--- Grove's override keeps it the darkest place, and never black.
+-- still reads at 30 studs without a lantern, in the Hills too; Gloam
+-- Hollow's override keeps it the darkest place, and never black.
 local NIGHT = {
 	brightness = 0.8,
 	exposure = -0.2,
@@ -1106,7 +1106,7 @@ local LEAFY: { [string]: boolean } = { [""] = true, starter = true, hills = true
 -- Who is out right now, most special first (AmbientLife fills up to
 -- MaxCritters in this order). Thriving groves bring more butterflies,
 -- deer and fireflies; rain sends the butterflies home; night brings out
--- fireflies, and the Phantom Grove's wisps.
+-- fireflies, and the Gloam Hollow's wisps.
 function EnvironmentData.CritterPlan(ctx: CritterContext): { CritterWant }
 	local out: { CritterWant } = {}
 	local function want(kind: CritterKind, count: number)

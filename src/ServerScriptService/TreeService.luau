@@ -17,7 +17,7 @@
 --   * A tree only comes back solid (regrown, woken at night, or new) when
 --     no truck or player is where it stands; until then it's a ghost (no
 --     collisions), checked again every couple of seconds.
---   * Night-only woods (the Phantom Grove): SetBiomeDormant hides a biome's
+--   * Night-only woods (the Gloam Hollow): SetBiomeDormant hides a biome's
 --     trees and stumps by day and brings them back at night (WorldClock).
 --   * Log records: state "world" | "carried". Ownership: PickupGraceSec to
 --     the feller, then free-for-all. Logs left in the world despawn after
@@ -350,7 +350,7 @@ local function setTreeSolid(rec: TreeRecord, solid: boolean)
 	end
 end
 
--- Hidden stumps (the Phantom Grove by day) are no invisible obstacle either.
+-- Hidden stumps (the Gloam Hollow by day) are no invisible obstacle either.
 local function setStumpVisible(rec: TreeRecord, visible: boolean)
 	local parts = rec.stumpParts
 	if rec.stump and parts then
@@ -693,7 +693,7 @@ function TreeService.Regrow(uid: string, planterId: number?)
 	end
 end
 
--- Hides (or brings back) every tree of a biome, e.g. the Phantom Grove by
+-- Hides (or brings back) every tree of a biome, e.g. the Gloam Hollow by
 -- day. A tree that's down stays down until it regrows.
 function TreeService.SetBiomeDormant(biomeId: string, dormant: boolean)
 	for _, rec in pairs(trees) do

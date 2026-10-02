@@ -81,7 +81,7 @@ end
 
 local function isAlive(tree: Model): boolean
 	local hp = tree:GetAttribute("HP")
-	-- Dormant = hidden for now (the Phantom Grove by day).
+	-- Dormant = hidden for now (the Gloam Hollow by day).
 	return type(hp) == "number" and hp > 0 and tree:GetAttribute("Dormant") ~= true
 end
 

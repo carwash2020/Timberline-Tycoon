@@ -107,7 +107,7 @@ end
 
 -- The dust a felled tree throws up, by the ground of its home biome
 -- (TreeFX): earth in the forests, sand on the coast, powder snow, volcanic
--- ash, the Phantom Grove's violet loam, pale isle soil.
+-- ash, the Gloam Hollow's violet loam, pale isle soil.
 local EARTH_DUST = Color3.fromRGB(196, 174, 140)
 local DUST: { [string]: Color3 } = {
 	starter = EARTH_DUST,
@@ -550,7 +550,7 @@ builders.emberwood = function(model, def, pal, H, F, rng)
 	end
 end
 
--- Phantomwood: a twisted dead tree, wisps of violet and glowing pods.
+-- Gloamwood: a twisted dead tree, wisps of violet and glowing pods.
 builders.phantomwood = function(model, def, pal, H, F, rng)
 	local D = 0.16 * H
 	trunk(model, def, H, D)

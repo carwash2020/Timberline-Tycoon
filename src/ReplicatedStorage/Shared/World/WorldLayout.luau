@@ -185,7 +185,7 @@ WorldLayout.Island = { x = 1395, z = -760, radius = 70, height = 9 }
 WorldLayout.VolcanoCone =
 	{ x = volcano.X + 105, z = volcano.Y + 115, radius = 150, height = 175, crater = 30, pool = 14 }
 
--- The Phantom Grove sits in a hollow ringed by ridges (no road in).
+-- The Gloam Hollow sits in a hollow ringed by ridges (no road in).
 WorldLayout.GroveRidge = { inner = 132, outer = 205, height = 34, gapAngle = math.rad(35) }
 
 -- Mountains frame the map's north and west edges (a backdrop; the world

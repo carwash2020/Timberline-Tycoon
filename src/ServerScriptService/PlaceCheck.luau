@@ -183,6 +183,38 @@ function PlaceCheck.Report(results: { Result }, dataStoreState: string?): Report
 	return { warnings = warnings, notes = notes, ok = #warnings == 0 }
 end
 
+-- Studio-only override attributes left on Workspace (V2_PLAN.md §0):
+-- CoreLoop and Tune_<key>. In Studio a reminder to clear them before
+-- publishing; on a live server a note that they are ignored. Pure.
+function PlaceCheck.Overrides(attributes: { [string]: any }, isStudio: boolean): { string }
+	local found: { string } = {}
+	for name, value in pairs(attributes) do
+		if name == "CoreLoop" or string.sub(name, 1, 5) == "Tune_" then
+			table.insert(found, string.format("%s = %s", name, PlaceCheck.Show(value)))
+		end
+	end
+	table.sort(found)
+	if #found == 0 then
+		return {}
+	end
+	if isStudio then
+		return {
+			string.format(
+				"[PlaceCheck] Studio overrides are set on Workspace (%s). Fix: clear them before publishing"
+					.. " (workspace:SetAttribute(name, nil)); live servers ignore them.",
+				table.concat(found, ", ")
+			),
+		}
+	end
+	return {
+		string.format(
+			"[PlaceCheck] this place was published with Studio overrides on Workspace (%s); live servers ignore"
+				.. " them. Fix: clear them in Studio and publish again.",
+			table.concat(found, ", ")
+		),
+	}
+end
+
 -- ProfileStore's probe in Studio is a DataStore write; wait for its answer.
 local function dataStoreState(): string
 	local deadline = os.clock() + PlaceCheck.DataStoreWait
@@ -208,6 +240,15 @@ function PlaceCheck.Run(): boolean
 	end)
 	local results = PlaceCheck.Compare(instances)
 	local report = PlaceCheck.Report(results, if RunService:IsStudio() then dataStoreState() else nil)
+	local okAttrs, attrs = pcall(function(): any
+		return workspaceService:GetAttributes()
+	end)
+	for _, line in
+		ipairs(PlaceCheck.Overrides(if okAttrs and type(attrs) == "table" then attrs else {}, RunService:IsStudio()))
+	do
+		table.insert(report.warnings, line)
+		report.ok = false
+	end
 	for _, line in ipairs(report.notes) do
 		print(line)
 	end

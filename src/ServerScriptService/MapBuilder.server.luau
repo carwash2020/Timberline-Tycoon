@@ -27,9 +27,12 @@
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
@@ -44,6 +47,15 @@ local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
 
 local started = os.clock()
+
+-- Which core loop this server runs (V2_PLAN.md §0), decided once, before
+-- anything is built: every server module and client reads CoreLoopActive.
+do
+	local loop =
+		CoreLoop.Resolve(GameConfig.CoreLoop, workspace:GetAttribute(CoreLoop.Attribute), RunService:IsStudio())
+	workspace:SetAttribute(CoreLoop.ActiveAttribute, loop)
+	print(string.format("[CoreLoop] %d%s", loop, if loop ~= GameConfig.CoreLoop then " (Studio override)" else ""))
+end
 
 -- Runs one build step on its own. A failure warns once, with a traceback,
 -- and is counted (the MapBuildFailures attribute); the world carries on.
@@ -327,7 +339,7 @@ step("5. The boulders", function()
 	end
 end)
 
--- The Phantom Grove's glowing mushrooms (its tell at night).
+-- The Gloam Hollow's glowing mushrooms (its tell at night).
 step("5. The grove's mushrooms", function()
 	for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
 		place(atomic(PropArt.Mushroom(i, true)), cf)

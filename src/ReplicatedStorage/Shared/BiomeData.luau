@@ -93,7 +93,7 @@ local biomes: { BiomeDef } = {
 	{ id = "island", displayName = "The Island", access = "boat", haulStuds = 900 },
 	{
 		id = "grove",
-		displayName = "Phantom Grove",
+		displayName = "Gloam Hollow",
 		access = "truck",
 		haulStuds = 800,
 		requiresGear = "Lantern",

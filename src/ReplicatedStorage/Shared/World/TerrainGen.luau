@@ -15,7 +15,7 @@
 --   * roads smoothed to an easy grade with the bumps taken out;
 --   * per biome: gentle Starter Forest, rolling Hills, the raised
 --     Snowfields plateau, the Volcano's basalt shelf and cone (a level lava
---     pool in its crater), the Phantom Grove's hidden hollow behind a ring
+--     pool in its crater), the Gloam Hollow's hidden hollow behind a ring
 --     of ridges;
 --   * the river, Mirror Lake, the pond and the east coast cut below water;
 --   * mountains framing the north, west and south edges.
@@ -182,7 +182,7 @@ local function landmarks(x: number, z: number, h: number): number
 		h = math.max(h, cone)
 	end
 
-	-- Phantom Grove: a hollow behind a ring of ridges, open toward town.
+	-- Gloam Hollow: a hollow behind a ring of ridges, open toward town.
 	dx, dz = x - GROVE.x, z - GROVE.z
 	d = sqrt(dx * dx + dz * dz)
 	if d < GROVE.radius + 10 then
@@ -623,7 +623,7 @@ TerrainGen.MaterialColors = {
 	Grass = Color3.fromRGB(100, 152, 64),
 	LeafyGrass = Color3.fromRGB(76, 126, 54),
 	Ground = Color3.fromRGB(150, 116, 78),
-	Mud = Color3.fromRGB(64, 50, 72), -- the Phantom Grove's violet floor
+	Mud = Color3.fromRGB(64, 50, 72), -- the Gloam Hollow's violet floor
 	Sand = Color3.fromRGB(226, 205, 150),
 	Rock = Color3.fromRGB(122, 98, 78),
 	Snow = Color3.fromRGB(238, 244, 250),

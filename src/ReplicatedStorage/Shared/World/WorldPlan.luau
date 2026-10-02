@@ -565,7 +565,7 @@ function WorldPlan.Boulders(): { Boulder }
 	return out
 end
 
--- Glowing mushrooms in the Phantom Grove (its tell at night).
+-- Glowing mushrooms in the Gloam Hollow (its tell at night).
 function WorldPlan.GroveMushrooms(): { CFrame }
 	local def = BiomeData.Get("grove")
 	local area = if def then def.area else nil
@@ -1207,7 +1207,7 @@ function WorldPlan.Town(): Town
 end
 
 -- Signposts where the roads reach each biome: facing back down the road,
--- listing the woods and the gear you need. (The Phantom Grove has none.)
+-- listing the woods and the gear you need. (The Gloam Hollow has none.)
 -- Each stands beside the road's last stretch, its near post a little over
 -- SIGN_CLEAR studs off the road, where the ground under both posts is
 -- level within a stud: from 6 studs before the road's end, stepping back
@@ -2583,7 +2583,7 @@ local function clutter(): Clutter
 		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
 		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
 	end
-	-- Each biome's own ground (its trees, its Elder): the Phantom Grove's
+	-- Each biome's own ground (its trees, its Elder): the Gloam Hollow's
 	-- ridge and all, and the Skyroot's foot under the isles (its roots, its
 	-- waterfall's pool, the gondola's foot station), as the scenery keeps.
 	local biomes: { Disc } = {}

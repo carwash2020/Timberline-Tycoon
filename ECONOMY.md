@@ -52,7 +52,7 @@ Current: **0.50 (a guess)**. For reference, the ideal model earns $35/min on bir
 | Palmwood | The Island | 300 | 15 | 6 | $20 | $120 | $40 | 900 studs by boat |
 | Frostwood | Snowfields | 400 | 20 | 7 | $25 | $175 | $44 | 1200 studs by truck |
 | Emberwood | The Volcano | 900 | 50 | 8 | $55 | $440 | $49 | 1600 studs by truck |
-| Phantomwood | Phantom Grove | 1200 | 70 | 9 | $65 | $585 | $49 | 800 studs by truck |
+| Gloamwood | Gloam Hollow | 1200 | 70 | 9 | $65 | $585 | $49 | 800 studs by truck |
 | Lumenwood | Aether Isles | 2000 | 120 | 10 | $120 | $1,200 | $60 | gondola + Cloud Chute |
 
 ## Best wood for each axe
@@ -96,7 +96,7 @@ The whole world, with a player who always buys whichever upgrade pays for itself
 
 ## Hits to fell one tree
 
-| Axe (damage) | Oak (30 HP, hardness 0) | Birch (60 HP, hardness 0) | Pine (100 HP, hardness 4) | Maple (200 HP, hardness 10) | Palmwood (300 HP, hardness 15) | Frostwood (400 HP, hardness 20) | Emberwood (900 HP, hardness 50) | Phantomwood (1200 HP, hardness 70) | Lumenwood (2000 HP, hardness 120) |
+| Axe (damage) | Oak (30 HP, hardness 0) | Birch (60 HP, hardness 0) | Pine (100 HP, hardness 4) | Maple (200 HP, hardness 10) | Palmwood (300 HP, hardness 15) | Frostwood (400 HP, hardness 20) | Emberwood (900 HP, hardness 50) | Gloamwood (1200 HP, hardness 70) | Lumenwood (2000 HP, hardness 120) |
 |---|---|---|---|---|---|---|---|---|---|
 | Rusty Axe (5) | 6 | 12 | 100 | — | — | — | — | — | — |
 | Steel Axe (12) | 3 | 5 | 13 | 100 | — | — | — | — | — |
@@ -135,13 +135,13 @@ Per tree: 1.40 Heartseeds on average (1, +1 for a large tree, +1 on a 15% roll).
 | Maple | $9 | 1200 | 18 | $536 | $54 |
 | Frostwood | $26 | 2400 | 21 | $1,565 | $156 |
 | Emberwood | $66 | 5400 | 24 | $3,934 | $393 |
-| Phantomwood | $88 | 7200 | 27 | $5,230 | $523 |
+| Gloamwood | $88 | 7200 | 27 | $5,230 | $523 |
 
 ## Assumptions
 
 - Swing every 0.8 s; carry 2 logs by hand (GameConfig).
 - Walk 16 studs/s; trucks drive at their top speed (Rustbucket 26, Pickup 28, Scout ATV 40, Flatbed 26, Logging Rig 24 studs/s); boats 26 studs/s.
-- One-way haul to the sawmill in studs, from BiomeData: Starter Forest 190 (truck), The Hills 400 (truck), Snowfields 1200 (truck), The Volcano 1600 (truck), The Island 900 (boat), Phantom Grove 800 (truck).
+- One-way haul to the sawmill in studs, from BiomeData: Starter Forest 190 (truck), The Hills 400 (truck), Snowfields 1200 (truck), The Volcano 1600 (truck), The Island 900 (boat), Gloam Hollow 800 (truck).
 - Aether Isles: gondola 40 s each way ($250 a ride), logs carried 30 studs to the Cloud Chute, Sky Bin holds 30.
 - Forged axes cost their cash plus the logs and materials given up (at sell value), plus 1 min per Sky Shard to mine.
 - 15 studs between trees, 20 studs from tree to truck, 0.5 s per prompt press, 8 s to get in/out and park.

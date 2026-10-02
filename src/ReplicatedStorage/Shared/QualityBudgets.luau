@@ -63,7 +63,7 @@ QualityBudgets.High = table.freeze({
 -- until it is DecorUnloadRadius away, and once MaxDecor is reached nothing
 -- new loads. So the cells inside DecorUnloadRadius must roughly fit
 -- MaxDecor, or the cap fills with cells behind you while the ground beside
--- you stays bare. The Hills and the Phantom Grove hold about 12 models a
+-- you stays bare. The Hills and the Gloam Hollow hold about 12 models a
 -- 64-stud cell, so 148 roughly covers the 13 cells within 130 studs, but
 -- not the 52 within 260 (high's unload radius) or the 15 within 140 (the
 -- load radius PLAY-05 first asked for). Cells load within 110, and the 20

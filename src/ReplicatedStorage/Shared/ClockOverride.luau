@@ -3,7 +3,7 @@
 -- workspace attribute "ClockOverride" to an hour from 0 to 24, e.g. in the
 -- server command bar during Play:
 --     workspace:SetAttribute("ClockOverride", 23)
--- WorldClock (the server: IsNight, the Phantom Grove's trees) and
+-- WorldClock (the server: IsNight, the Gloam Hollow's trees) and
 -- LightingController (each client: the sun, the light, the lamps and
 -- windows) then use that hour instead of the shared clock; clear it
 -- (workspace:SetAttribute("ClockOverride", nil)) to go back. Both read it

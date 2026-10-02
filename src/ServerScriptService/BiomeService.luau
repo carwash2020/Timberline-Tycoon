@@ -7,7 +7,7 @@
 --   * The Volcano: the ground burns without Heat Boots.
 --   * Chopping a biome's trees needs that biome's gear (CanChop, called by
 --     GameServer's ChopTree): Heat Boots on the Volcano, a Lantern in the
---     Phantom Grove.
+--     Gloam Hollow.
 --   * At night a Lantern glows on whoever owns one.
 -- Gear lives in profile.gear (bought at Hearth & Home, ShopService).
 

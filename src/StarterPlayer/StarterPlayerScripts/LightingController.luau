@@ -14,7 +14,7 @@
 --     mist, STY-05: thicker air 23:00-06:30, lifting by 09:30), the biome you're
 --     in (your "Biome" attribute, set by BiomeService) and the weather
 --     (workspace "Weather" / "WeatherIntensity", read for your biome),
---     eased over ~3 s so walking into the Volcano or the Phantom Grove
+--     eased over ~3 s so walking into the Volcano or the Gloam Hollow
 --     crossfades instead of snapping.
 --   * Owns (creates locally) the Atmosphere, Sky, Clouds (under
 --     workspace.Terrain, the only place they render), Bloom, colour

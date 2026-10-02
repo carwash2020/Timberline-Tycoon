@@ -96,7 +96,7 @@ NPCData.List = {
 		lines = {
 			"Back in my day we felled trees uphill. Both ways.",
 			"Plant a Heartseed in a fresh stump and the forest remembers who you are.",
-			"The Phantom Grove only shows itself after dark. Bring a lantern. And your nerve.",
+			"The Gloam Hollow only shows itself after dark. Bring a lantern. And your nerve.",
 			"Curly bark, dimpled bark, lumpy bark... that's figure hidin' in the grain. Don't sell it cheap.",
 			"See that giant up yonder? The Skyroot. Been growin' since before I was a sapling.",
 			"This coffee's older than your truck. Tastes it, too.",
@@ -242,7 +242,7 @@ NPCData.List = {
 		},
 		greetings = { "Oh, hello dear!", "Come in, come in, it's cold out!", "Welcome to Hearth & Home." },
 		lines = {
-			"No lantern, no Phantom Grove, dear. The dark out there is hungry.",
+			"No lantern, no Gloam Hollow, dear. The dark out there is hungry.",
 			"Snowfields? You'll want the Insulated Coat. Three layers of wool and a pocket for snacks.",
 			"Heat Boots, for the volcano. Unless you like toasted toes.",
 			"A Featherfall Cloak turns a fall off the isles into a nice float down.",
@@ -329,7 +329,7 @@ NPCData.List = {
 			"Found three chanterelles by the river. Don't tell anyone!",
 			"Berries taste better after rain. So do mushrooms. Probably.",
 			"When the grove's thriving, the deer come out. Replant a stump and watch.",
-			"The Phantom Grove's mushrooms glow at night. I only pick the ones that don't hum.",
+			"The Gloam Hollow's mushrooms glow at night. I only pick the ones that don't hum.",
 			"A tree you plant wears your name. Isn't that sweet?",
 		},
 	},

@@ -233,8 +233,8 @@ function HudRules.SeedToast(
 end
 
 -- The corner clock (WorldUI) for `clockTime`, an hour from 0 to 24
--- (Lighting.ClockTime): "Day 14:05", or "Night 22:10" while the Phantom
--- Grove's trees are out (WorldTime.IsNight).
+-- (Lighting.ClockTime): "Day 14:05", or "Night 22:10" while Gloam
+-- Hollow's trees are out (WorldTime.IsNight).
 function HudRules.ClockText(clockTime: number): string
 	return string.format("%s %s", if WorldTime.IsNight(clockTime) then "Night" else "Day", WorldTime.Format(clockTime))
 end

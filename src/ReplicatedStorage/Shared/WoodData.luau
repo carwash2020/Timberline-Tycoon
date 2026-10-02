@@ -10,9 +10,27 @@
 
 local WoodData = {}
 
+-- The v2 core loop's numbers (V2_PLAN.md §2b): prices per cubic timber
+-- unit (GameConfig.WoodUnit studs a side), hardness per u² of cut, how
+-- long a sapling takes to grow up, the core (heartwood and plank) colour
+-- and material. Used only when the v2 loop runs (Shared/CoreLoop); the v1
+-- economy model ignores it. `shape` (the section-tree look) lands with the
+-- tree generator.
+export type WoodV2 = {
+	logPrice: number, -- $ per u³ of log
+	plankPrice: number, -- $ per u³ of plank
+	hardness: number, -- damage per u² of cut face
+	growSec: number, -- sapling to mature
+	lifespan: { number }, -- min, max multiples of growSec
+	core: string, -- hex: the cut face and the planks
+	coreMaterial: string, -- Enum.Material name
+	shape: { [string]: any }?,
+}
+
 export type WoodDef = {
 	id: string,
 	displayName: string,
+	v2: WoodV2?,
 	treeHP: number,
 	hardness: number, -- subtracted from each axe hit
 	logsPerTree: number,
@@ -142,7 +160,7 @@ local woods: { WoodDef } = {
 	},
 	{
 		id = "phantomwood",
-		displayName = "Phantomwood",
+		displayName = "Gloamwood",
 		treeHP = 1200,
 		hardness = 70,
 		logsPerTree = 9,
@@ -174,8 +192,94 @@ local woods: { WoodDef } = {
 	},
 }
 
+-- v2 rows (V2_PLAN.md §2b; §18 for emberwood and the Gloam pair).
+local V2: { [string]: WoodV2 } = {
+	oak = {
+		logPrice = 1.5,
+		plankPrice = 10,
+		hardness = 2,
+		growSec = 240,
+		lifespan = { 3, 6 },
+		core = "#E2BE84",
+		coreMaterial = "Wood",
+	},
+	birch = {
+		logPrice = 2.25,
+		plankPrice = 15,
+		hardness = 7,
+		growSec = 960,
+		lifespan = { 3, 6 },
+		core = "#F1E3C2",
+		coreMaterial = "Wood",
+	},
+	pine = {
+		logPrice = 3.2,
+		plankPrice = 18,
+		hardness = 5.5,
+		growSec = 600,
+		lifespan = { 3, 6 },
+		core = "#E8C98F",
+		coreMaterial = "Wood",
+	},
+	maple = {
+		logPrice = 2.8,
+		plankPrice = 26.4,
+		hardness = 6,
+		growSec = 1140,
+		lifespan = { 3, 6 },
+		core = "#E6C38E",
+		coreMaterial = "Wood",
+	},
+	palmwood = {
+		logPrice = 2.9,
+		plankPrice = 32,
+		hardness = 2.9,
+		growSec = 480,
+		lifespan = { 3, 6 },
+		core = "#EFD6A2",
+		coreMaterial = "Wood",
+	},
+	frostwood = {
+		logPrice = 9,
+		plankPrice = 106,
+		hardness = 10,
+		growSec = 360,
+		lifespan = { 3, 6 },
+		core = "#E4F2FA",
+		coreMaterial = "Ice",
+	},
+	emberwood = {
+		logPrice = 5.7,
+		plankPrice = 36,
+		hardness = 11,
+		growSec = 1020,
+		lifespan = { 3, 6 },
+		core = "#FFB25A",
+		coreMaterial = "CrackedLava",
+	},
+	phantomwood = {
+		logPrice = 19,
+		plankPrice = 54,
+		hardness = 23,
+		growSec = 1200,
+		lifespan = { 3, 6 },
+		core = "#C8B5F0",
+		coreMaterial = "Foil",
+	},
+	lumenwood = {
+		logPrice = 25,
+		plankPrice = 90,
+		hardness = 30,
+		growSec = 1800,
+		lifespan = { 3, 6 },
+		core = "#FFF6DA",
+		coreMaterial = "Neon",
+	},
+}
+
 local byId: { [string]: WoodDef } = {}
 for _, def in ipairs(woods) do
+	def.v2 = V2[def.id]
 	byId[def.id] = def
 end
 

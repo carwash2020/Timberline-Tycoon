@@ -33,7 +33,7 @@ local GameConfig = {
 	-- World (biome areas and rules are in BiomeData)
 	DayCycleMinutes = 20, -- one full day and night, real minutes; the same on every server
 	NightStartsAt = 19, -- in-game hour (ClockTime) the night starts
-	NightEndsAt = 5, -- ... and ends; the Phantom Grove only exists in between
+	NightEndsAt = 5, -- ... and ends; the Gloam Hollow only exists in between
 	LavaDamagePerSecond = 5, -- on the Volcano without Heat Boots (100 health = 20 s)
 
 	-- HUD
@@ -64,6 +64,79 @@ local GameConfig = {
 	-- Store; empty = silent.
 	ChopSoundId = "",
 	FellSoundId = "",
+
+	-- The v2 core loop (V2_PLAN.md §2f): section trees cut anywhere, wood
+	-- dragged by hand and carried loose on beds, value by volume. 1 = the
+	-- v1 loop (live until the flip), 2 = v2. In Studio the workspace
+	-- attribute CoreLoop overrides it (Shared/CoreLoop); live servers never.
+	CoreLoop = 1,
+	WoodUnit = 1.6, -- studs in one timber unit "u"; prices are $/u³, hardness per u² of cut
+	StartingCash = 20, -- v2: a new player's cash
+	-- cutting
+	CutK = 1, -- required damage = hardness * (width/u) * (depth/u) * CutK
+	CutWindow = 0.6, -- studs: a hit this near an existing cut adds to it
+	CutEdge = 0.3, -- studs: cuts keep this far from a section's ends
+	MaxCutsPerSection = 2,
+	MinPieceVolume = 0.05, -- u³: smaller offcuts vanish
+	FallNoCollideSec = 2.5, -- a falling piece passes through players this long
+	FellImpulse = 8, -- studs/s pushed away from the cut face
+	LeafDropSec = 1.5, -- a felled piece's leaves fall off after this
+	-- wood physics
+	WoodDensity = 0.15,
+	WoodFriction = 0.8,
+	WoodElasticity = 0.05,
+	BedFriction = 1.0,
+	BedAutoWeld = false, -- fallback if loads jitter on a moving bed
+	-- grab and drag
+	GrabRange = 12, -- studs from the character to start holding a piece
+	HoldMin = 3,
+	HoldMax = 14, -- studs: how far in front of the camera a held piece floats
+	ReleaseDistance = 20, -- a held piece further than this lets go
+	DragForcePerMass = 400,
+	DragForceCap = 4000,
+	DragResponsiveness = 30,
+	DragMaxSpeed = 40,
+	ReleaseKeepOwnerSec = 2, -- the dropper keeps network ownership briefly
+	-- wood lifetime and caps
+	WoodUnownedAfterSec = 600, -- off a plot, untouched: loses its owner
+	WoodDespawnAfterSec = 300, -- ...then vanishes this much later
+	MaxWoodPiecesPerPlayer = 150,
+	MaxWoodPartsServer = 2500,
+	WoodMaxSpeed = 80, -- a player-owned piece faster than this is put back
+	WoodJudgeEvery = 0.5,
+	SellPollSec = 0.25,
+	MaxSavedPieces = 40,
+	MaxSavedSections = 300,
+	-- growth
+	GrowTickSec = 5,
+	GrowStages = 4,
+	TreesPerGrowTick = 12,
+	PreDeadAt = 0.9, -- of a tree's lifespan: its leaves go
+	DeadSinkSec = 4,
+	-- later phases (M2-M6)
+	PlankYield = 1,
+	PlankStep = 0.2, -- u
+	PlankMinX = 0.6, -- u
+	PlankMinY = 0.4, -- u
+	FirstPlotPrice = 100,
+	ExpansionPriceStep = 3000, -- expansion k costs ExpansionPriceStep * k
+	PlotSquare = 40, -- studs
+	PlotGrid = 5,
+	BlueprintPricePerUnit = 10,
+	VehicleRespawnFeeRate = 0.02,
+	TollFee = 100,
+	TollSeconds = 180,
+	FerryFare = 400,
+	FerryIntervalSec = 360,
+	BlastingChargePrice = 220,
+	BoulderRespawnSec = 1200,
+	WaterDamage = 15,
+	WaterTickSec = 1.5,
+	ConveyorSpeed = 4,
+	LogicEvalsPerTick = 200,
+	LogicTickSec = 0.1,
+	MaxConveyorsPerPlot = 150,
+	MaxLogicPerPlot = 200,
 }
 
 return GameConfig

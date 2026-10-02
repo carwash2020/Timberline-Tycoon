@@ -6,7 +6,7 @@
 --     walk slower without an Insulated Coat"). If the grove you're in
 --     changes tier, a toast says so.
 --   * A clock next to the cash: "Day 14:05" / "Night 22:10" (night is when
---     the Phantom Grove's trees come out). On a phone it's in the corner's
+--     the Gloam Hollow's trees come out). On a phone it's in the corner's
 --     second line instead, and hidden during the tutorial and while the
 --     save loads (HudLayout.ClockLine).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30").

@@ -623,7 +623,7 @@ function PropArt.LilyPad(seed: number): Model
 end
 
 -- A mushroom with a stepped, faceted cap (and a little one beside it).
--- Glowing ones (the Phantom Grove's) are Neon teal or violet with a soft
+-- Glowing ones (the Gloam Hollow's) are Neon teal or violet with a soft
 -- light; the rest are red with white spots.
 function PropArt.Mushroom(seed: number, glowing: boolean): Model
 	local model = Kit.model("Mushroom")

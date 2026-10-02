@@ -446,7 +446,7 @@ VehicleLogic.DustSpeed = 9 -- studs/s before the wheels kick up dust
 -- palette, paler), by Enum.Material name. Grass, rock, cobbles: none.
 local DUST: { [string]: Color3 } = {
 	Ground = Color3.fromRGB(176, 146, 108), -- dirt tracks
-	Mud = Color3.fromRGB(104, 90, 116), -- the Phantom Grove's violet floor
+	Mud = Color3.fromRGB(104, 90, 116), -- the Gloam Hollow's violet floor
 	Sand = Color3.fromRGB(232, 216, 172),
 	Sandstone = Color3.fromRGB(214, 182, 136),
 	Salt = Color3.fromRGB(236, 233, 226),
