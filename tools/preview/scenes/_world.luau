@@ -107,8 +107,14 @@ function World.build(ctx)
 		local tree = TreeArt.Build(def, seed, size.scale)
 		place(tree, CF.new(p) * CF.Angles(0, Kit.rng(seed + 202):range(0, math.pi * 2), 0))
 	end
+	-- Coloured and turned as MapBuilder does them.
+	local C3 = roblox.Color3
+	local SNOWY = { C3.fromRGB(232, 238, 245), C3.fromRGB(200, 208, 218), C3.fromRGB(150, 150, 156) }
+	local DARK = { C3.fromRGB(58, 52, 50), C3.fromRGB(44, 40, 40), C3.fromRGB(72, 64, 60) }
 	for _, b in ipairs(WorldPlan.Boulders()) do
-		place(PropArt.Rock(b.size, b.seed), CF.new(b.position) * CF.Angles(0, b.seed % 6, 0)) -- turned as MapBuilder turns them
+		local colors = if b.snowy then SNOWY elseif b.dark then DARK else PropArt.BrownTones[b.seed % 2 + 1]
+		local moss = if colors ~= SNOWY and colors ~= DARK and b.seed % 3 == 0 then PropArt.Moss else nil
+		place(PropArt.Rock(b.size, b.seed, colors, moss), CF.new(b.position) * CF.Angles(0, b.seed % 6, 0))
 	end
 	for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
 		place(PropArt.Mushroom(i, true), cf)

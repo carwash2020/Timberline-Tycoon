@@ -27,7 +27,16 @@ local function hex(h: string): Color3
 end
 
 local STONE = { Color3.fromRGB(140, 134, 126), Color3.fromRGB(120, 116, 110), Color3.fromRGB(158, 150, 140) }
+-- Brown rock for the open country (STY-03: LT2's boulders are brown, not
+-- grey): a warm brown and a greyer umber, so a field of rocks isn't one
+-- flat colour. The lone boulders, the scenery outcrops and the boulder
+-- clusters (LandmarkArt.BrownRock) all use these.
+PropArt.BrownTones = {
+	{ Color3.fromRGB(132, 102, 78), Color3.fromRGB(116, 90, 70), Color3.fromRGB(148, 118, 90) },
+	{ Color3.fromRGB(118, 100, 84), Color3.fromRGB(102, 88, 76), Color3.fromRGB(134, 116, 98) },
+} :: { { Color3 } }
 local MOSS = hex("#7FA650")
+PropArt.Moss = MOSS -- a mossy cap's colour (PropArt.Rock's `moss`)
 local STEM = hex("#5E9442")
 local LEAF = hex("#6FAE4E")
 local BARK = hex("#6E5038")
@@ -1227,6 +1236,7 @@ end
 -- An outcrop: three or four big rocks (6 to 14 studs) huddled together.
 -- Like a lone boulder, each rock's three stones collide; the pebbles and
 -- moss are looks only.
+-- (brown, PropArt.BrownTones, unless `colors` says otherwise).
 function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
 	local model = Kit.model("Outcrop")
 	local rng = Kit.rng(seed)
@@ -1236,7 +1246,7 @@ function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
 		local size = if i == 1 then rng:range(10, 14) else rng:range(6, 10)
 		local a = start + i * 2.1 + rng:range(-0.3, 0.3)
 		local r = if i == 1 then 0 else rng:range(5.5, 8)
-		local rock = PropArt.Rock(size, seed * 7 + i, colors)
+		local rock = PropArt.Rock(size, seed * 7 + i, colors or PropArt.BrownTones[seed % 2 + 1])
 		Kit.placeAt(rock, CFrame.new(math.cos(a) * r, 0, math.sin(a) * r))
 		rock.Parent = model
 	end

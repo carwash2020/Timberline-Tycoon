@@ -127,11 +127,9 @@ end
 ---------------------------------------------------------------------------
 
 -- Brown rock: LT2's boulders are brown, not grey. Two tones, so a field of
--- clusters isn't one flat colour: a warm brown and a greyer umber.
-LandmarkArt.ROCK_TONES = {
-	{ Color3.fromRGB(132, 102, 78), Color3.fromRGB(116, 90, 70), Color3.fromRGB(148, 118, 90) },
-	{ Color3.fromRGB(118, 100, 84), Color3.fromRGB(102, 88, 76), Color3.fromRGB(134, 116, 98) },
-} :: { { Color3 } }
+-- clusters isn't one flat colour: a warm brown and a greyer umber (shared
+-- with the lone boulders and the outcrops: PropArt.BrownTones).
+LandmarkArt.ROCK_TONES = PropArt.BrownTones
 local MOSS = Color3.fromRGB(104, 146, 66)
 
 -- One brown boulder `size` studs across (PropArt.Rock, as the lone

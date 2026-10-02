@@ -273,4 +273,34 @@ return function(t)
 			end
 		end
 	end)
+	t.test(
+		"STY-03: every rock out in the green is brown: lone boulders, outcrops and clusters share one palette",
+		function()
+			local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
+			local LandmarkArt = t.load("ReplicatedStorage/Shared/Art/LandmarkArt")
+			t.eq(LandmarkArt.ROCK_TONES, PropArt.BrownTones)
+			local function brown(c)
+				local r, g, b = rgb(c)
+				return r > b + 15 and r >= g
+			end
+			for seed = 1, 6 do
+				local outcrop = PropArt.Outcrop(seed)
+				local stones = 0
+				for _, d in ipairs(outcrop:GetDescendants()) do
+					if d:IsA("BasePart") and d.Name == "Rock" then
+						stones += 1
+						t.ok(brown(d.Color), string.format("outcrop %d stone %d,%d,%d", seed, rgb(d.Color)))
+					end
+				end
+				t.ok(stones >= 9, "an outcrop has its stones")
+			end
+			-- MapBuilder colours the lone boulders the same way (snowy and
+			-- volcanic ones keep their own).
+			local src = require("@lune/fs").readFile("src/ServerScriptService/MapBuilder.server.luau")
+			t.ok(
+				string.find(src, "else PropArt.BrownTones[b.seed % 2 + 1]", 1, true) ~= nil,
+				"MapBuilder's lone boulders are brown"
+			)
+		end
+	)
 end
