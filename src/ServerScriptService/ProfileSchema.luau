@@ -60,12 +60,14 @@ export type BedLog = {
 }
 
 -- Wood waiting in the Sky Bin under the v2 loop (V2_PLAN.md §5): its wood
--- id, volume in u³, figure, and whether it was a plank.
+-- id, volume in u³, figure, whether it was a plank, and its boost (2 when
+-- it was cut under 2x Wood).
 export type SkyWood = {
 	w: string,
 	v: number,
 	f: string?,
 	p: boolean?,
+	b: number?,
 }
 
 -- The Living Forest (ForestService): your Heartseeds and steward record.
