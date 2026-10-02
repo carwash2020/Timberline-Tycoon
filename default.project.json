@@ -28,6 +28,7 @@
         "StreamingIntegrityMode": "PauseOutsideLoadedArea",
         "StreamingMinRadius": 96,
         "StreamingTargetRadius": 1024,
+        "StreamOutBehavior": "Opportunistic",
         "GlobalWind": [
           6,
           0,
@@ -38,9 +39,14 @@
         "$ignoreUnknownInstances": true,
         "$properties": {
           "Decoration": true,
-          "GrassLength": 0.45
+          "GrassLength": 0.5
         }
       }
+    },
+    "MaterialService": {
+      "$className": "MaterialService",
+      "$path": "src/MaterialService",
+      "$ignoreUnknownInstances": true
     },
     "Lighting": {
       "$ignoreUnknownInstances": true,

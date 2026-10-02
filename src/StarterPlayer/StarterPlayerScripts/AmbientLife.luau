@@ -93,6 +93,9 @@ local CELL = EnvironmentData.DecorCell
 -- most Quality.Budget().MaxDecor live decoration models (560, 148 on low),
 -- all cells together. Shared/QualityBudgets.
 local TREE_CLEARANCE = 4
+-- Nor inside a ForestFiller tree's trunk (FOR-02: WorldPlan's plan, once
+-- ForestFiller has worked it out; the cells loaded before then re-scatter).
+local FILLER_CLEARANCE = 2.5
 local CELLS_PER_FRAME = 2
 local SCAN_EVERY = 0.4
 local POOL_SPARE = 24 -- unused models kept per look
@@ -338,7 +341,7 @@ local function loadCell(cx: number, cz: number, key: string)
 		if liveDecor >= Quality.Budget().MaxDecor then
 			break
 		end
-		if not nearTree(spot.x, spot.z) then
+		if not nearTree(spot.x, spot.z) and not WorldPlan.FillerTrunkNear(spot.x, spot.z, FILLER_CLEARANCE) then
 			local d = acquireDecor(spot)
 			if d then
 				local at = CFrame.new(spot.x, spot.y, spot.z) * CFrame.Angles(0, spot.yaw, 0)
@@ -1547,12 +1550,19 @@ function AmbientLife.Start()
 
 	local sinceScan = math.huge
 	local sincePlan = 0
+	local fillerSeen = false
 	RunService.Heartbeat:Connect(function(dt: number)
 		local player = focusPoint()
 		-- Decoration: rescan now and then, load a couple of cells a frame.
 		sinceScan += dt
 		if sinceScan >= SCAN_EVERY then
 			sinceScan = 0
+			if not fillerSeen and WorldPlan.FillerReady() then
+				fillerSeen = true -- re-scatter what loaded before the filler's plan
+				for key in pairs(cells) do
+					dirty[key] = true
+				end
+			end
 			scanCells(player)
 			table.clear(dirty)
 			updateMotes(player)

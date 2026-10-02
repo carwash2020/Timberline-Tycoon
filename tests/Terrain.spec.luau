@@ -171,14 +171,21 @@ return function(t)
 
 	t.test("open country is a mixed meadow: Grass and LeafyGrass swaths, a few worn patches", function()
 		local counts, n = {}, 0
-		-- South of town, between the Starter Forest and the map's south edge.
-		for x = -420, 420, 12 do
-			for z = -1150, -650, 12 do
-				local m = materialAt(x, z)
-				counts[m] = (counts[m] or 0) + 1
-				n += 1
+		-- South of town, between the Starter Forest and the map's south edge,
+		-- and the wild band west of the river: where it's open (FOR-04: under
+		-- the forest's canopy the floor is LeafyGrass, its own test below).
+		for _, r in ipairs({ { -420, 420, -1150, -650 }, { -1150, -950, -1100, -400 } }) do
+			for x = r[1], r[2], 12 do
+				for z = r[3], r[4], 12 do
+					if WorldLayout.ForestCover(x, z) <= 0.3 then
+						local m = materialAt(x, z)
+						counts[m] = (counts[m] or 0) + 1
+						n += 1
+					end
+				end
 			end
 		end
+		t.ok(n > 1500, n .. " open samples")
 		local grass, leafy, ground = counts.Grass or 0, counts.LeafyGrass or 0, counts.Ground or 0
 		t.ok(leafy / n > 0.12 and leafy / n < 0.5, string.format("LeafyGrass is %.0f%% of the meadow", leafy / n * 100))
 		t.ok(grass / n > 0.4, string.format("Grass is %.0f%% of the meadow", grass / n * 100))

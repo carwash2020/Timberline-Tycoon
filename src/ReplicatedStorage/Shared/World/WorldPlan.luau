@@ -502,18 +502,36 @@ function WorldPlan.CountryStands(): { Stand }
 	return stands
 end
 
--- Every tree on the ground, in spawn order: the first 322 (each biome's
--- trees, then the wild groves), then the country stands' (the sky's
--- Lumenwood is in WorldPlan.Sky).
-function WorldPlan.Trees(): { TreeSpot }
-	if cachedTrees then
-		return cachedTrees
+-- The first 322 and the country stands' trees, in spawn order: every tree
+-- there was before the forest's (FOR-03). The boulder clusters, the
+-- landmarks and the lighthouse's line of sight were placed round these
+-- and keep using them, so the forest's trees move none of them (they keep
+-- off all of it instead).
+local cachedBase: { TreeSpot }? = nil
+local function baseTrees(): { TreeSpot }
+	if cachedBase then
+		return cachedBase
 	end
 	local out = table.clone(firstTrees())
 	for _, stand in ipairs(WorldPlan.CountryStands()) do
 		for _, spot in ipairs(stand.trees) do
 			table.insert(out, spot)
 		end
+	end
+	cachedBase = out
+	return out
+end
+
+-- Every tree on the ground, in spawn order: the first 322 (each biome's
+-- trees, then the wild groves), then the country stands', then the
+-- forest's (WorldPlan.ForestTrees; the sky's Lumenwood is in WorldPlan.Sky).
+function WorldPlan.Trees(): { TreeSpot }
+	if cachedTrees then
+		return cachedTrees
+	end
+	local out = table.clone(baseTrees())
+	for _, spot in ipairs(WorldPlan.ForestTrees()) do
+		table.insert(out, spot)
 	end
 	cachedTrees = out
 	return out
@@ -2526,7 +2544,8 @@ end
 ---------------------------------------------------------------------------
 
 -- What everything here keeps clear of, binned by 64-stud squares so a
--- check looks at its neighbours only: every tree on the ground, the
+-- check looks at its neighbours only: every tree on the ground but the
+-- forest's (baseTrees: those came after and keep off all this), the
 -- boulders, the scenery and the road signs (each a disc: its middle and
 -- how far it reaches), and the gondola's two routes seen from above.
 type Disc = { x: number, z: number, r: number }
@@ -2557,7 +2576,7 @@ local function clutter(): Clutter
 			end
 		end
 	end
-	for _, tree in ipairs(WorldPlan.Trees()) do
+	for _, tree in ipairs(baseTrees()) do -- (not the forest's: they keep off all this)
 		add(tree.position.X, tree.position.Z, 0)
 	end
 	for _, b in ipairs(WorldPlan.Boulders()) do
@@ -3306,7 +3325,7 @@ local function inSightOfSpawn(lamp: Vector3, overLand: boolean): boolean
 			return false
 		end
 	end
-	for _, tree in ipairs(WorldPlan.Trees()) do
+	for _, tree in ipairs(baseTrees()) do -- (the forest's keep out of its lane)
 		if hides(tree.position, 10, 40) then
 			return false
 		end
@@ -3376,6 +3395,937 @@ function WorldPlan.Lighthouse(): Lighthouse?
 	end
 	cachedLighthouse, lighthouseSearched = found, true
 	return found
+end
+
+---------------------------------------------------------------------------
+-- Trees to chop where the forest is (phase 10, FOR-03)
+---------------------------------------------------------------------------
+-- More choppable trees where players walk and drive past the forest ring
+-- (Connor asked for more trees; their count isn't frozen for this), in
+-- three kinds of place, each its own share of ForestMost:
+--   * the verges of the haul roads through the ring: about every
+--     ForestVergeStep along each, one each side, ForestVerge studs off
+--     the road's edge (the filler's wall stands behind them);
+--   * the forest's edges, on their open side (ForestCover 0.18 to 0.42
+--     with canopy close by), ForestEdgeApart apart: facing the plot
+--     district, the lanes, the Hills' and the grove's rooms;
+--   * the ring's clearings: a group of three to five round a middle deep
+--     in one, Starter Forest spacing.
+-- They come after the first 322 and the country stands and draw their own
+-- rng, so none of those move. Each is on good ground (dry, lowland, no
+-- steeper than 0.6, reachable on foot), WILD_NEAREST from the sawmill
+-- (pine and maple STAND_FAR), out of town, the plots, the beach and every
+-- biome's own ground, ForestSpacing off every other tree, and clear of
+-- the gondola's routes, the boulders, the road signs, the scenery, the
+-- boulder clusters, the footbridge, the docks and the lanes (the spawn's
+-- view of the lighthouse). Their woods follow the nearest biome, as the
+-- country stands' do. Like every tree they are built by the server
+-- (TreeService, through MapBuilder's "5. The trees").
+
+WorldPlan.ForestVergeStep = 30
+WorldPlan.ForestVerge = { 11, 16 } -- studs off a road's edge (the trunk's middle)
+WorldPlan.ForestEdgeApart = 30
+WorldPlan.ForestSpacing = 14
+WorldPlan.ForestMost = { verge = 100, edge = 140, clearing = 80 } -- 320 at most
+local FOREST_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
+local FOREST_CLEAR = 10 -- studs a forest tree keeps off a scenery piece, cluster or landmark
+
+local cachedForestTrees: { TreeSpot }? = nil
+
+function WorldPlan.ForestTrees(): { TreeSpot }
+	if cachedForestTrees then
+		return cachedForestTrees
+	end
+	local out: { TreeSpot } = {}
+	local rng = Kit.rng(hashString("forest trees"))
+	local mill = Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z)
+	local coast = WorldLayout.Coast
+	local beachX = coast.shoreX - coast.beachWidth - 40
+
+	-- What they keep clear of, as discs (x, z, reach).
+	local discs: { { number } } = {}
+	for _, b in ipairs(WorldPlan.Boulders()) do
+		table.insert(discs, { b.position.X, b.position.Z, b.size / 2 + STAND_ROCK })
+	end
+	for _, sign in
+		ipairs(WorldPlan.RoadSigns(function(): string
+			return ""
+		end))
+	do
+		local p = sign.cframe.Position
+		table.insert(discs, { p.X, p.Z, STAND_SIGN })
+	end
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		table.insert(discs, { spot.center.X, spot.center.Z, spot.radius + FOREST_CLEAR })
+	end
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		table.insert(discs, { c.center.X, c.center.Z, c.radius + FOREST_CLEAR })
+	end
+	local bridge = WorldPlan.Footbridge()
+	if bridge then
+		local a, along = bridge.cframe.Position, bridge.cframe.LookVector
+		for s = -10, bridge.span + 10, 4 do
+			local p = a + along * s
+			table.insert(discs, { p.X, p.Z, bridge.width / 2 + FOREST_CLEAR })
+		end
+		local sign = bridge.sign
+		if sign then
+			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
+		end
+	end
+	for _, dock in ipairs(WorldPlan.Docks()) do
+		local a, along = dock.cframe.Position, dock.cframe.LookVector
+		for s = -8, dock.length + 4, 4 do
+			local p = a + along * s
+			table.insert(discs, { p.X, p.Z, dock.width / 2 + FOREST_CLEAR })
+		end
+		local sign = dock.sign
+		if sign then
+			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
+		end
+	end
+	local biomes: { { number } } = {}
+	for _, biome in ipairs(BiomeData.All()) do
+		local area = biome.area
+		if area then
+			local r = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else area.radius + 30
+			table.insert(biomes, { area.x, area.z, r })
+		end
+	end
+	local routes: { { Vector2 } } = {}
+	local sky = WorldPlan.Sky()
+	if sky then
+		local top = sky.gondolaTop.Position
+		local town = WorldPlan.TownGondolaSpot
+		local base = sky.gondolaBase.Position
+		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
+		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+
+	-- Every tree so far, binned by 32-stud squares for the spacing checks.
+	local bins: { [number]: { Vector3 } } = {}
+	local function addTree(p: Vector3)
+		local key = binKey(p.X // 32, p.Z // 32)
+		local bin = bins[key]
+		if not bin then
+			bin = {}
+			bins[key] = bin
+		end
+		table.insert(bin, p)
+	end
+	local function crowded(x: number, z: number, d: number): boolean
+		local reach = math.ceil(d / 32)
+		for bx = x // 32 - reach, x // 32 + reach do
+			for bz = z // 32 - reach, z // 32 + reach do
+				for _, p in ipairs(bins[binKey(bx, bz)] or {}) do
+					local dx, dz = x - p.X, z - p.Z
+					if dx * dx + dz * dz < d * d then
+						return true
+					end
+				end
+			end
+		end
+		return false
+	end
+	for _, spot in ipairs(baseTrees()) do
+		addTree(spot.position)
+	end
+
+	-- Whether a forest tree could grow at (x, z), `setBack` off the roads.
+	local function ground(x: number, z: number, setBack: number): boolean
+		if math.abs(x) > STAND_EDGE or math.abs(z) > STAND_EDGE or (z < coast.northZ and x > beachX) then
+			return false
+		end
+		local p = Vector2.new(x, z)
+		if (p - mill).Magnitude <= WILD_NEAREST or WorldLayout.FlatWeight(x, z) > 0 then
+			return false
+		end
+		for _, d in ipairs(biomes) do
+			local dx, dz = x - d[1], z - d[2]
+			if dx * dx + dz * dz < d[3] * d[3] then
+				return false
+			end
+		end
+		for _, d in ipairs(discs) do
+			local dx, dz = x - d[1], z - d[2]
+			if dx * dx + dz * dz < d[3] * d[3] then
+				return false
+			end
+		end
+		for _, route in ipairs(routes) do
+			if WorldLayout.SegmentDistance(p, route[1], route[2]) < STAND_GONDOLA then
+				return false
+			end
+		end
+		for _, lane in ipairs(WorldLayout.Forest.lanes) do
+			if WorldLayout.SegmentDistance(p, lane.a, lane.b) < lane.half + 10 then
+				return false
+			end
+		end
+		return TerrainGen.HeightAt(x, z) < STAND_LOW and goodGround(x, z, setBack, 0.6)
+	end
+
+	local function plant(x: number, z: number, spacing: number): boolean
+		local flat = Vector3.new(x, 0, z) -- rounded as a Vector3 stores it: what's checked is what's spawned
+		x, z = flat.X, flat.Z
+		if crowded(x, z, spacing) then
+			return false
+		end
+		local c = Vector2.new(x, z)
+		local woods = wildWoodsNear(c)
+		if (c - mill).Magnitude < STAND_FAR then
+			woods = { "oak", "oak", "birch" }
+		end
+		local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+		table.insert(out, { woodId = rng:pick(woods), position = p, biome = "wild" })
+		addTree(p)
+		return true
+	end
+	local most = WorldPlan.ForestMost
+
+	-- 1. The verges of the haul roads where they run through the ring.
+	local verge = 0
+	for _, name in ipairs(FOREST_ROADS) do
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == name then
+				local pts = road.points
+				local walked, nextAt = 0, rng:range(0, WorldPlan.ForestVergeStep)
+				for i = 1, #pts - 1 do
+					local a, b = pts[i], pts[i + 1]
+					local len = (b - a).Magnitude
+					local dir = (b - a).Unit
+					local normal = Vector2.new(-dir.Y, dir.X)
+					while nextAt <= walked + len do
+						local along = a + dir * (nextAt - walked)
+						for _, s in ipairs({ 1, -1 }) do
+							-- The same draws each side, planted or not.
+							local off = road.width / 2 + rng:range(WorldPlan.ForestVerge[1], WorldPlan.ForestVerge[2])
+							local at = along + dir * rng:range(-8, 8) + normal * (s * off)
+							if verge < most.verge then
+								local _, ring = WorldLayout.ForestCover(at.X, at.Y)
+								if
+									ring > 0.5
+									and TerrainGen.RoadClearance(at.X, at.Y) >= WorldPlan.ForestVerge[1] - 0.5
+									and ground(at.X, at.Y, WorldPlan.ForestVerge[1] - 1)
+									and plant(at.X, at.Y, WorldPlan.ForestSpacing)
+								then
+									verge += 1
+								end
+							end
+						end
+						nextAt += WorldPlan.ForestVergeStep
+					end
+					walked += len
+				end
+			end
+		end
+	end
+
+	-- Candidates on a grid over the ring, in a shuffled order (so the caps
+	-- don't leave one side bare): forest edges and clearings' middles.
+	local edges: { Vector2 } = {}
+	local middles: { Vector2 } = {}
+	local steps = (STAND_EDGE * 2) // 12
+	for ix = 0, steps do
+		for iz = 0, steps do
+			local x, z = -STAND_EDGE + ix * 12, -STAND_EDGE + iz * 12
+			local c, ring = WorldLayout.ForestCover(x, z)
+			if c > 0.18 and c < 0.42 then
+				local near = 0
+				for _, o in ipairs({ { 18, 0 }, { -18, 0 }, { 0, 18 }, { 0, -18 } }) do
+					near = math.max(near, (WorldLayout.ForestCover(x + o[1], z + o[2])))
+				end
+				if near > 0.65 then
+					table.insert(edges, Vector2.new(x, z))
+				end
+			elseif ring > 0.6 and c < 0.08 and ix % 3 == 0 and iz % 3 == 0 then
+				table.insert(middles, Vector2.new(x, z))
+			end
+		end
+	end
+	for _, list in ipairs({ edges, middles }) do
+		for i = #list, 2, -1 do
+			local j = rng:int(1, i)
+			list[i], list[j] = list[j], list[i]
+		end
+	end
+
+	-- 2. The forest's edges, on their open side.
+	local edge = 0
+	local edgeAt: { Vector2 } = {}
+	for _, p in ipairs(edges) do
+		if edge >= most.edge then
+			break
+		end
+		local x, z = p.X + rng:range(-4, 4), p.Y + rng:range(-4, 4)
+		local apart = true
+		for _, q in ipairs(edgeAt) do
+			if (q - Vector2.new(x, z)).Magnitude < WorldPlan.ForestEdgeApart then
+				apart = false
+				break
+			end
+		end
+		if apart and ground(x, z, STAND_SET_BACK) and plant(x, z, WorldPlan.ForestSpacing) then
+			table.insert(edgeAt, Vector2.new(x, z))
+			edge += 1
+		end
+	end
+
+	-- 3. A group of three to five deep in a clearing, 150 studs apart at least.
+	local clearing = 0
+	local groupAt: { Vector2 } = {}
+	for _, m in ipairs(middles) do
+		if clearing > most.clearing - 3 then
+			break
+		end
+		local apart = true
+		for _, q in ipairs(groupAt) do
+			if (q - m).Magnitude < 150 then
+				apart = false
+				break
+			end
+		end
+		if apart and ground(m.X, m.Y, STAND_SET_BACK) then
+			local want = math.min(rng:int(3, 5), most.clearing - clearing)
+			local planted = 0
+			for _ = 1, want * 12 do
+				if planted >= want then
+					break
+				end
+				local a, r = rng:range(0, math.pi * 2), math.sqrt(rng:next()) * 22
+				local x, z = m.X + math.cos(a) * r, m.Y + math.sin(a) * r
+				if ground(x, z, STAND_SET_BACK) and plant(x, z, STAND_SPACING) then
+					planted += 1
+				end
+			end
+			if planted > 0 then
+				table.insert(groupAt, m)
+				clearing += planted
+			end
+		end
+	end
+
+	cachedForestTrees = out
+	return out
+end
+
+---------------------------------------------------------------------------
+-- The forest's filler (phase 10, FOR-02)
+---------------------------------------------------------------------------
+-- The trees that make WorldLayout.Forest's ring a forest are built by each
+-- client round its own camera (StarterPlayerScripts/ForestFiller), never
+-- by the server: thousands of them would cost every player replication
+-- and the server its part budget. They're looks only (PropArt.FillerTree:
+-- no collisions, clicks or touches; a collider only one client has fights
+-- the trucks, which the driver's client simulates), so where they stand
+-- is planned here, the same on every client: the map is cut into
+-- FillerCellSize-stud cells; each cell's trees come from its own rng.
+--   * A jittered 3 x 3 grid of candidates per cell (about 10.7 studs
+--     apart), each drawing the same rng numbers whether it grows or not.
+--     A candidate grows by its spot's density: in the ring's canopy
+--     (ForestCover over 0.5) FillerDensity.core (one tree per ~200 sq
+--     studs), at the forest's edges (cover under FillerEdge) and along the
+--     roads (within FillerWall of a road's edge) FillerDensity.edge (rows
+--     8 to 12 apart: the view from the hub and the roads closes there), in
+--     the wild band's copses FillerDensity.copse, on the hub's lawn
+--     (outside the town's and the plots' flat ground) a lone ornamental
+--     tree now and then (FillerDensity.ornament: conifers, birches,
+--     maples, never an oak-like one, so Murph's "find an oak" still means
+--     a tree you can chop). Round the Volcano they grow at half density.
+--   * Every filler trunk keeps FillerRoad off a road's edge (the corridor),
+--     FillerTreeGap off every choppable tree (WorldPlan.Trees), FillerGap
+--     off every boulder, boulder cluster, scenery piece and road sign,
+--     FillerGondola off the gondola's routes (seen from above), out of the
+--     town's and the plots' flat ground, off the water (ForestCover keeps
+--     its margin) and out of the mountains (lowland only).
+--   * The woods round about choose the kind (FillerMix): broadleaf and
+--     birch in the Starter Forest's ring, pine and maple round the Hills,
+--     pines (snowy near the plateau) toward the Snowfields, darker pines
+--     round the Phantom Grove, dead trees round the Volcano.
+--   * Far off (past QualityBudgets' FillerNear) a cell of forest is one or
+--     two dark canopy blocks instead (FillerFarCell), so the forest reads
+--     from a distance; FillerPlanAround says which cells are which round
+--     a camera.
+-- tests/Forest.spec.luau proves the gaps and the budgets.
+
+WorldPlan.FillerCellSize = 32
+WorldPlan.FillerRoad = 14 -- studs a filler trunk keeps off a road's edge
+WorldPlan.FillerWall = 26 -- within this of a road's edge, the forest grows its edge rows
+WorldPlan.FillerEdge = 0.82 -- ForestCover under this (and over 0.5) is a forest edge
+WorldPlan.FillerTreeGap = 9 -- studs off a choppable tree
+WorldPlan.FillerGap = 6 -- studs off a boulder, cluster rock, scenery piece or road sign
+WorldPlan.FillerGondola = 12 -- studs off the gondola's routes
+WorldPlan.FillerHysteresis = 48 -- studs a loaded cell keeps its look past its radius
+WorldPlan.FillerDensity = { core = 0.55, edge = 0.85, copse = 0.4, ornament = 0.03 }
+local FILLER_CELL = WorldPlan.FillerCellSize
+local FILLER_GRID = 3
+local FILLER_JITTER = 3.6
+local FILLER_LOW = 70 -- lowland only (the mountains rise above it)
+
+-- What grows round each place: kind = share, and how far from the place's
+-- middle it reaches (first match wins; anything else is `default`).
+type Mix = { { kind: string, share: number } }
+local FILLER_MIX: { { biome: string?, reach: number, mix: Mix } } = {
+	{
+		biome = "volcano",
+		reach = 560,
+		mix = { { kind = "dead", share = 0.55 }, { kind = "conifer", share = 0.3 }, { kind = "broad", share = 0.15 } },
+	},
+	{
+		biome = "snow",
+		reach = 560,
+		mix = {
+			{ kind = "snowpine", share = 0.45 },
+			{ kind = "conifer", share = 0.4 },
+			{ kind = "birch", share = 0.15 },
+		},
+	},
+	{
+		biome = "snow",
+		reach = 800,
+		mix = { { kind = "conifer", share = 0.6 }, { kind = "birch", share = 0.2 }, { kind = "broad", share = 0.2 } },
+	},
+	{
+		biome = "hills",
+		reach = 470,
+		mix = {
+			{ kind = "conifer", share = 0.45 },
+			{ kind = "maple", share = 0.25 },
+			{ kind = "broad", share = 0.2 },
+			{ kind = "birch", share = 0.1 },
+		},
+	},
+	{
+		biome = "grove",
+		reach = 430,
+		mix = { { kind = "conifer", share = 0.5 }, { kind = "broad", share = 0.35 }, { kind = "birch", share = 0.15 } },
+	},
+	{
+		biome = "sky",
+		reach = 450,
+		mix = { { kind = "broad", share = 0.5 }, { kind = "birch", share = 0.3 }, { kind = "conifer", share = 0.2 } },
+	},
+	{
+		biome = nil, -- the default: the Starter Forest's ring and the south
+		reach = math.huge,
+		mix = { { kind = "broad", share = 0.55 }, { kind = "birch", share = 0.25 }, { kind = "conifer", share = 0.2 } },
+	},
+}
+local ORNAMENT_MIX: Mix =
+	{ { kind = "conifer", share = 0.5 }, { kind = "birch", share = 0.3 }, { kind = "maple", share = 0.2 } }
+local VOLCANO_SPARSE = 0.5 -- density there
+
+-- The mix at (x, z): the first place whose reach (dithered a little, so
+-- the change isn't a hard line) covers it.
+local MIX_PLACES: { { x: number, z: number, reach: number, mix: Mix, id: string? } } = {}
+for _, entry in ipairs(FILLER_MIX) do
+	local def = if entry.biome then BiomeData.Get(entry.biome) else nil
+	local area = if def then def.area else nil
+	if area then
+		table.insert(MIX_PLACES, { x = area.x, z = area.z, reach = entry.reach, mix = entry.mix, id = entry.biome })
+	elseif entry.biome == nil then
+		table.insert(MIX_PLACES, { x = 0, z = 0, reach = math.huge, mix = entry.mix, id = nil })
+	end
+end
+local function mixAt(x: number, z: number): (Mix, string?)
+	local wobble = math.noise(x / 60, z / 60, 12.9) * 60
+	for _, place in ipairs(MIX_PLACES) do
+		local dx, dz = x - place.x, z - place.z
+		local reach = place.reach + wobble
+		if dx * dx + dz * dz < reach * reach then
+			return place.mix, place.id
+		end
+	end
+	return FILLER_MIX[#FILLER_MIX].mix, nil
+end
+local function pickKind(mix: Mix, roll: number): string
+	for _, entry in ipairs(mix) do
+		roll -= entry.share
+		if roll < 0 then
+			return entry.kind
+		end
+	end
+	return mix[#mix].kind
+end
+
+-- What every filler trunk keeps clear of (each a disc already widened by
+-- its gap), binned by FILLER_CELL squares, and the gondola's routes.
+type FillerClutter = { bins: { [number]: { Disc } }, routes: { { Vector2 } } }
+local cachedFillerClutter: FillerClutter? = nil
+local function fillerClutter(): FillerClutter
+	if cachedFillerClutter then
+		return cachedFillerClutter
+	end
+	local bins: { [number]: { Disc } } = {}
+	local function add(x: number, z: number, r: number)
+		local disc = { x = x, z = z, r = r }
+		for bx = (x - r) // FILLER_CELL, (x + r) // FILLER_CELL do
+			for bz = (z - r) // FILLER_CELL, (z + r) // FILLER_CELL do
+				local key = binKey(bx, bz)
+				local bin = bins[key]
+				if not bin then
+					bin = {}
+					bins[key] = bin
+				end
+				table.insert(bin, disc)
+			end
+		end
+	end
+	for _, tree in ipairs(WorldPlan.Trees()) do
+		add(tree.position.X, tree.position.Z, WorldPlan.FillerTreeGap)
+	end
+	local gap = WorldPlan.FillerGap
+	for _, b in ipairs(WorldPlan.Boulders()) do
+		add(b.position.X, b.position.Z, b.size / 2 + gap)
+	end
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		add(spot.center.X, spot.center.Z, spot.radius + gap)
+	end
+	for _, sign in
+		ipairs(WorldPlan.RoadSigns(function(): string
+			return ""
+		end))
+	do
+		local p = sign.cframe.Position
+		add(p.X, p.Z, SIGN_POST + gap)
+	end
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		add(c.center.X, c.center.Z, c.radius + gap)
+	end
+	local routes: { { Vector2 } } = {}
+	local sky = WorldPlan.Sky()
+	if sky then
+		local top = sky.gondolaTop.Position
+		local town = WorldPlan.TownGondolaSpot
+		local base = sky.gondolaBase.Position
+		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
+		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+	local made: FillerClutter = { bins = bins, routes = routes }
+	cachedFillerClutter = made
+	return made
+end
+
+-- Whether the filler's plan is worked out (ForestFiller does it in steps
+-- at start, so no one frame pays for all of it; AmbientLife waits for it).
+function WorldPlan.FillerReady(): boolean
+	return cachedFillerClutter ~= nil
+end
+
+-- The steps ForestFiller works the plan out in, one a frame: each is
+-- cached, so the last (the filler's own index) finds the rest done.
+WorldPlan.FillerSteps = {
+	WorldPlan.Boulders,
+	WorldPlan.Scenery,
+	WorldPlan.CountryStands,
+	WorldPlan.BoulderClusters,
+	WorldPlan.Footbridge,
+	WorldPlan.Docks,
+	WorldPlan.ForestTrees,
+	WorldPlan.Trees,
+	function(): any
+		return fillerClutter()
+	end,
+} :: { () -> any }
+
+-- Whether a disc of radius `r` at (x, z) keeps clear of the filler's clutter.
+local function fillerClear(x: number, z: number, r: number): boolean
+	local c = fillerClutter()
+	for bx = (x - r) // FILLER_CELL, (x + r) // FILLER_CELL do
+		for bz = (z - r) // FILLER_CELL, (z + r) // FILLER_CELL do
+			for _, d in ipairs(c.bins[binKey(bx, bz)] or NO_DISCS) do
+				local dx, dz = x - d.x, z - d.z
+				if dx * dx + dz * dz < (d.r + r) ^ 2 then
+					return false
+				end
+			end
+		end
+	end
+	local p = Vector2.new(x, z)
+	for _, route in ipairs(c.routes) do
+		if WorldLayout.SegmentDistance(p, route[1], route[2]) < WorldPlan.FillerGondola + r then
+			return false
+		end
+	end
+	return true
+end
+
+-- How likely a filler tree is at (x, z), and the mix it picks from: 0 where
+-- nothing grows. `roadClearance` is TerrainGen.RoadClearance there.
+local function fillerDensity(x: number, z: number, roadClearance: number): (number, Mix)
+	local density = WorldPlan.FillerDensity
+	local c, ring = WorldLayout.ForestCover(x, z)
+	if c > 0.5 then
+		local p
+		if ring > 0.5 then
+			p = if c < WorldPlan.FillerEdge or roadClearance < WorldPlan.FillerWall then density.edge else density.core
+		else
+			p = density.copse
+		end
+		local mix, id = mixAt(x, z)
+		if id == "volcano" then
+			p *= VOLCANO_SPARSE
+		end
+		return p, mix
+	end
+	local beach = WorldLayout.Coast.shoreX - WorldLayout.Forest.coast
+	if ring == 0 and WorldLayout.HubDistance(x, z) <= 0 and roadClearance > 20 and x < beach then
+		-- The hub's lawn: a lone ornamental tree, never in a lane.
+		for _, lane in ipairs(WorldLayout.Forest.lanes) do
+			if WorldLayout.SegmentDistance(Vector2.new(x, z), lane.a, lane.b) < lane.half + 10 then
+				return 0, ORNAMENT_MIX
+			end
+		end
+		return density.ornament, ORNAMENT_MIX
+	end
+	return 0, ORNAMENT_MIX
+end
+
+-- A filler tree: `kind` (PropArt.FillerKinds) in look `variant`
+-- (1..PropArt's FillerVariants), its trunk's foot at (x, y, z) on the
+-- ground, turned `yaw`, at `scale`.
+export type FillerTree = { kind: string, variant: number, x: number, y: number, z: number, yaw: number, scale: number }
+local FILLER_VARIANTS = 6 -- PropArt.FillerVariants (Shared code can't require Art's builders here)
+
+local function cellSeed(cx: number, cz: number): number
+	return (cx + 1000) * 7919 + (cz + 1000) * 104729 + 17
+end
+
+local cachedFillerCells: { [number]: { FillerTree } } = {}
+
+-- The filler trees in cell (cx, cz) (its corner at (cx, cz) * FillerCellSize).
+function WorldPlan.FillerCellTrees(cx: number, cz: number): { FillerTree }
+	local key = binKey(cx, cz)
+	local done = cachedFillerCells[key]
+	if done then
+		return done
+	end
+	local out: { FillerTree } = {}
+	local rng = Kit.rng(cellSeed(cx, cz))
+	local step = FILLER_CELL / FILLER_GRID
+	for i = 0, FILLER_GRID - 1 do
+		for k = 0, FILLER_GRID - 1 do
+			-- The same seven draws for every candidate, grown or not.
+			local jx, jz = rng:range(-FILLER_JITTER, FILLER_JITTER), rng:range(-FILLER_JITTER, FILLER_JITTER)
+			local roll, kindRoll = rng:next(), rng:next()
+			local variant = rng:int(1, FILLER_VARIANTS)
+			local yaw, scaleRoll = rng:range(0, math.pi * 2), rng:next()
+			local x = cx * FILLER_CELL + (i + 0.5) * step + jx
+			local z = cz * FILLER_CELL + (k + 0.5) * step + jz
+			if WorldLayout.FlatWeight(x, z) <= 0 then
+				local roads = TerrainGen.RoadClearance(x, z)
+				if roads >= WorldPlan.FillerRoad then
+					local p, mix = fillerDensity(x, z, roads)
+					if roll < p and fillerClear(x, z, 0) then
+						local h = TerrainGen.HeightAt(x, z)
+						if h < FILLER_LOW then -- (dry: ForestCover keeps its margin off the water)
+							table.insert(out, {
+								kind = pickKind(mix, kindRoll),
+								variant = variant,
+								x = x,
+								y = h,
+								z = z,
+								yaw = yaw,
+								scale = 0.85 + scaleRoll * 0.35,
+							})
+						end
+					end
+				end
+			end
+		end
+	end
+	cachedFillerCells[key] = out
+	return out
+end
+
+-- A far stand-in: a dark block standing for a cell's canopy.
+export type FarBlock = { cframe: CFrame, size: Vector3, kind: string }
+local cachedFarCells: { [number]: { FarBlock } } = {}
+local FAR_TOP: { [string]: number } = { -- canopy tops (studs over the ground), as PropArt's trees
+	broad = 17,
+	birch = 18,
+	maple = 17,
+	conifer = 19,
+	snowpine = 19,
+	dead = 12,
+}
+
+-- The stand-ins for cell (cx, cz): none unless two of five spots in it are forest; one
+-- block over most of the cell (kept clear of the roads and the clutter, as
+-- the trees are) and, deep in the forest, a second, smaller block on top
+-- for a bumpy skyline. Coloured by the kind of tree there
+-- (PropArt.FillerFarColor).
+function WorldPlan.FillerFarCell(cx: number, cz: number): { FarBlock }
+	local key = binKey(cx, cz)
+	local done = cachedFarCells[key]
+	if done then
+		return done
+	end
+	local out: { FarBlock } = {}
+	local x0, z0 = cx * FILLER_CELL, cz * FILLER_CELL
+	local forest, sx, sz = 0, 0, 0
+	for _, o in ipairs({ { 0, 0 }, { -9, -9 }, { 9, -9 }, { -9, 9 }, { 9, 9 } }) do
+		local x, z = x0 + FILLER_CELL / 2 + o[1], z0 + FILLER_CELL / 2 + o[2]
+		local c = WorldLayout.ForestCover(x, z)
+		if c > 0.5 then
+			forest += 1
+			sx += x
+			sz += z
+		end
+	end
+	-- Over the forest's part of the cell.
+	local mx, mz = if forest > 0 then sx / forest else 0, if forest > 0 then sz / forest else 0
+	if forest >= 2 and WorldLayout.FlatWeight(mx, mz) <= 0 then
+		local rng = Kit.rng(cellSeed(cx, cz) + 55)
+		local yaw, kindRoll, bump, bx, bz = rng:range(0, math.pi / 2), rng:next(), rng:next(), rng:next(), rng:next()
+		local h = TerrainGen.HeightAt(mx, mz)
+		local roads = TerrainGen.RoadClearance(mx, mz)
+		-- (A turned square reaches 1.42 x its half out: never into a road's corridor.)
+		local half = math.min(9 + forest, (roads - 4) / 1.42)
+		while half >= 7 and not fillerClear(mx, mz, half * 1.42) do
+			half -= 3
+		end
+		if half >= 7 and h < FILLER_LOW then
+			local mix = mixAt(mx, mz)
+			local kind = pickKind(mix, kindRoll)
+			local top = FAR_TOP[kind] or 17
+			local turn = CFrame.Angles(0, yaw, 0)
+			table.insert(out, {
+				cframe = CFrame.new(mx, h + (top - 3) / 2, mz) * turn,
+				size = Vector3.new(half * 2, top + 3, half * 2),
+				kind = kind,
+			})
+			if forest == 5 and bump < 0.6 then
+				local s = half * 1.1
+				table.insert(out, {
+					cframe = CFrame.new(mx + (bx - 0.5) * 6, h + top + 1.5, mz + (bz - 0.5) * 6)
+						* CFrame.Angles(0, yaw + math.pi / 4, 0),
+					size = Vector3.new(s, 5, s),
+					kind = kind,
+				})
+			end
+		end
+	end
+	cachedFarCells[key] = out
+	return out
+end
+
+-- Whether a filler trunk stands within `r` of (x, z) (AmbientLife keeps
+-- its ground decoration out of them). False until the plan is ready.
+-- Grass tufts (FOR-04): clumps of PropArt.GrassTuft where grass grows
+-- long, round the camera (ForestFiller, within QualityBudgets' TuftNear):
+-- along the forest's fringe (ForestCover TUFT_EDGE), on the road verges
+-- (within TUFT_VERGE of a road's edge, never on it), round the boulders,
+-- the cluster rocks and the scenery's outcrops, and at the foot of the
+-- scenery's fence posts. Never in town or on the plots, on the water,
+-- snow or the volcano's rock, nor up the mountains. `biome` picks the
+-- grass's tint (PropArt.Tints).
+export type Tuft = { x: number, y: number, z: number, yaw: number, seed: number, biome: string }
+local TUFT_EDGE = { 0.28, 0.62 }
+local TUFT_VERGE = { 0.6, 3.5 }
+local TUFT_TRIES = 16 -- candidates per cell for the fringe and the verges
+local TUFT_NO: { [string]: boolean } = { snow = true, volcano = true }
+
+-- What tufts gather round, binned by FILLER_CELL squares: rocks (a disc to
+-- ring) and fence posts (a point beside each).
+type TuftAnchor = { x: number, z: number, r: number, post: boolean }
+local cachedTuftAnchors: { [number]: { TuftAnchor } }? = nil
+local function tuftAnchors(): { [number]: { TuftAnchor } }
+	if cachedTuftAnchors then
+		return cachedTuftAnchors
+	end
+	local bins: { [number]: { TuftAnchor } } = {}
+	local function add(x: number, z: number, r: number, post: boolean)
+		local key = binKey(x // FILLER_CELL, z // FILLER_CELL)
+		local bin = bins[key]
+		if not bin then
+			bin = {}
+			bins[key] = bin
+		end
+		table.insert(bin, { x = x, z = z, r = r, post = post })
+	end
+	for _, b in ipairs(WorldPlan.Boulders()) do
+		add(b.position.X, b.position.Z, b.size * 0.5, false)
+	end
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		for _, rock in ipairs(c.rocks) do
+			add(rock.position.X, rock.position.Z, rock.size * 0.5, false)
+		end
+	end
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		for _, item in ipairs(spot.items) do
+			if item.builder == "Outcrop" then
+				add(item.cframe.X, item.cframe.Z, 5, false)
+			elseif item.builder == "Fence" then
+				local posts = math.max(2, math.floor(item.size / 6) + 1)
+				for i = 0, posts - 1 do
+					local x = -item.size / 2 + i * item.size / (posts - 1)
+					for _, side in ipairs({ -0.9, 0.9 }) do
+						local p = item.cframe * Vector3.new(x, 0, side)
+						add(p.X, p.Z, 0, true)
+					end
+				end
+			end
+		end
+	end
+	cachedTuftAnchors = bins
+	return bins
+end
+
+local cachedTuftCells: { [number]: { Tuft } } = {}
+
+-- The grass tufts in cell (cx, cz). Each candidate draws the same rng
+-- numbers whether it grows or not.
+function WorldPlan.TuftCell(cx: number, cz: number): { Tuft }
+	local key = binKey(cx, cz)
+	local done = cachedTuftCells[key]
+	if done then
+		return done
+	end
+	local out: { Tuft } = {}
+	local rng = Kit.rng(cellSeed(cx, cz) + 909)
+	local function add(x: number, z: number, yaw: number, seed: number)
+		if WorldLayout.FlatWeight(x, z) > 0 or TerrainGen.RoadClearance(x, z) < TUFT_VERGE[1] then
+			return
+		end
+		if TerrainGen.WaterLevelAt(x, z) ~= nil then
+			return
+		end
+		local coast = WorldLayout.Coast
+		if z < coast.northZ and x > coast.shoreX - coast.beachWidth - 10 then
+			return
+		end
+		local biome = BiomeData.At(x, z)
+		local id = if biome then biome.id else "starter"
+		if TUFT_NO[id] then
+			return
+		end
+		local h = TerrainGen.HeightAt(x, z)
+		if h < FILLER_LOW then
+			table.insert(out, { x = x, y = h, z = z, yaw = yaw, seed = seed, biome = id })
+		end
+	end
+	-- The forest's fringe and the road verges.
+	for _ = 1, TUFT_TRIES do
+		local x = cx * FILLER_CELL + rng:next() * FILLER_CELL
+		local z = cz * FILLER_CELL + rng:next() * FILLER_CELL
+		local roll, yaw, seed = rng:next(), rng:range(0, math.pi * 2), rng:int(1, 99999)
+		local roads = TerrainGen.RoadClearance(x, z)
+		if roads <= TUFT_VERGE[2] then
+			if roll < 0.55 then
+				add(x, z, yaw, seed)
+			end
+		elseif roll < 0.6 then
+			local c = WorldLayout.ForestCover(x, z)
+			if c > TUFT_EDGE[1] and c < TUFT_EDGE[2] then
+				add(x, z, yaw, seed)
+			end
+		end
+	end
+	-- Round the rocks and at the fence posts whose middles are in this cell.
+	local anchors: { TuftAnchor } = tuftAnchors()[key] or {}
+	for _, anchor in ipairs(anchors) do
+		local count = if anchor.post then 1 else 3
+		local start = rng:range(0, math.pi * 2)
+		for k = 1, count do
+			local a = start + k * math.pi * 2 / count + rng:range(-0.4, 0.4)
+			local r = if anchor.post then 0 else anchor.r + rng:range(0.2, 0.8)
+			add(anchor.x + math.cos(a) * r, anchor.z + math.sin(a) * r, rng:range(0, math.pi * 2), rng:int(1, 99999))
+		end
+	end
+	cachedTuftCells[key] = out
+	return out
+end
+
+-- The cells round (px, py, pz) that get their tufts (within `near`, or
+-- `near` + FillerHysteresis for the ones `current` has).
+function WorldPlan.TuftPlanAround(
+	px: number,
+	py: number,
+	pz: number,
+	near: number,
+	current: { [number]: boolean }?
+): { [number]: boolean }
+	local out: { [number]: boolean } = {}
+	local dy = math.max(0, py - TerrainGen.HeightAt(px, pz) - 40)
+	local reach = near + WorldPlan.FillerHysteresis
+	if dy >= reach then
+		return out
+	end
+	for cx = (px - reach) // FILLER_CELL, (px + reach) // FILLER_CELL do
+		for cz = (pz - reach) // FILLER_CELL, (pz + reach) // FILLER_CELL do
+			local dx = (cx + 0.5) * FILLER_CELL - px
+			local dz = (cz + 0.5) * FILLER_CELL - pz
+			local d = math.sqrt(dx * dx + dz * dz + dy * dy)
+			local key = binKey(cx, cz)
+			if d <= near or (current and current[key] and d <= reach) then
+				out[key] = true
+			end
+		end
+	end
+	return out
+end
+
+function WorldPlan.FillerTrunkNear(x: number, z: number, r: number): boolean
+	if not cachedFillerClutter then
+		return false
+	end
+	for cx = (x - r) // FILLER_CELL, (x + r) // FILLER_CELL do
+		for cz = (z - r) // FILLER_CELL, (z + r) // FILLER_CELL do
+			for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
+				local dx, dz = tree.x - x, tree.z - z
+				if dx * dx + dz * dz < r * r then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+-- Cell keys (as FillerCellKey) round a camera at (px, py, pz): "near"
+-- (real trees) within `near` studs of the camera, "far" (stand-ins) out
+-- to `far`. Distance is to the cell's middle, with the camera's height
+-- over 150 studs counted too (from the isles the ground is all far). A
+-- cell already loaded (`current`) keeps its look FillerHysteresis past its
+-- radius, so standing at a cell's edge doesn't flip it to and fro.
+function WorldPlan.FillerCellKey(cx: number, cz: number): number
+	return binKey(cx, cz)
+end
+function WorldPlan.FillerCellOf(key: number): (number, number)
+	return key // 4096 - 1000, key % 4096 - 1000
+end
+function WorldPlan.FillerPlanAround(
+	px: number,
+	py: number,
+	pz: number,
+	near: number,
+	far: number,
+	current: { [number]: string }?
+): { [number]: string }
+	local out: { [number]: string } = {}
+	local hyst = WorldPlan.FillerHysteresis
+	local dy = math.max(0, py - 150)
+	local reach = math.sqrt(math.max(0, (far + hyst) ^ 2 - dy * dy))
+	if reach <= 0 then
+		return out
+	end
+	local half = WorldLayout.WorldHalf
+	for cx = math.max(-half, px - reach) // FILLER_CELL, math.min(half - 1, px + reach) // FILLER_CELL do
+		for cz = math.max(-half, pz - reach) // FILLER_CELL, math.min(half - 1, pz + reach) // FILLER_CELL do
+			local dx = (cx + 0.5) * FILLER_CELL - px
+			local dz = (cz + 0.5) * FILLER_CELL - pz
+			local d = math.sqrt(dx * dx + dz * dz + dy * dy)
+			local key = binKey(cx, cz)
+			local was = if current then current[key] else nil
+			if d <= near or (was == "near" and d <= near + hyst) then
+				out[key] = "near"
+			elseif d <= far or (was == "far" and d <= far + hyst) then
+				out[key] = "far"
+			end
+		end
+	end
+	return out
 end
 
 return WorldPlan
