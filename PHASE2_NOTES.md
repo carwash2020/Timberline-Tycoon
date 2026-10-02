@@ -56,7 +56,7 @@ Anything red becomes a P0 and jumps the queue.
 | # | Do this | Good looks like |
 |---|---|---|
 | 1 | Press **Play** with **View > Output** open | Roblox's loader, then a brown **Timberline Tycoon** card with a rotating tip, then a fade into the spawn. No grey frames. Output: a white `[PlaceCheck] can't check ...` line, `[PlaceCheck] OK`, `[MapBuilder] World built in Xs (terrain Ys)`, `[GameServer] Online: world built in Xs (terrain Ys), 334 trees, 1 player`, `[Client] Timberline Tycoon client started.` No red lines. Note X |
-| 2 | Look around at the spawn | You face the sawmill with SELL LOGS HERE between the two lamps (from Build #2). Mountains, snow and the volcano on the horizon (say if the horizon is empty: WLD-02) |
+| 2 | Look around at the spawn | You face the sawmill with SELL LOGS HERE between the two lamps (from Build #2). A mountain ring, the volcano and the sea fill the horizon in every direction (Build #4) |
 | 3 | Tutorial step 1: fell the oak Murph points at | Murph says the woods are south of town and says **Click** (Tap on a phone, Press RT on a pad). The swing turns you to face the tree |
 | 4 | Steps 2-3: pick up logs, load the truck | Your arms come up under the logs (Build #2) and the hint changes to "Take logs to your truck's tailgate" |
 | 5 | Step 4: drive to the sawmill and sell | Sitting in the truck switches the hint to "WASD to drive · Space to hop out". The rear wheels follow the front in a tight turn (no tail slide). Under 4 min from spawn to sale. Say if a truck stops dead at a road edge (ACT-05) |
@@ -68,6 +68,34 @@ Anything red becomes a P0 and jumps the queue.
 | 11 | **File > Studio Settings > Network > Incoming Replication Lag** 0.2, drive 60 s | No rubber-banding, no put-back |
 | 12 | **Device Emulator**: iPhone SE, then iPhone 14 Pro (landscape) | Toasts stack under the tracker and never cover the cash, ♪ or tracker. During the tutorial: no Daily Goals button and no clock. Note anything that overlaps |
 | 13 | Phone emulation + **View > MicroProfiler**. Night: in the **Server** command bar run `workspace:SetAttribute("ClockOverride", 23)` (`nil` clears it). Town at night, the Starter Forest, the Snowfields, the isles | 30+ fps (frame under 33 ms). Note the top script costs |
+
+### Build #4 (the horizon, the town, the truck ladder)
+
+- **WLD-02 / WLD-09 horizon** Stand on the spawn and turn slowly 360
+  degrees, on desktop and in the iPhone emulator: north, west and south
+  show mossy ridges in front of grey snow-capped peaks; north-east the
+  volcano's dark cone; east and south-east a sea horizon with low
+  islands. No flicker where snow meets rock. During Play,
+  Workspace.TimberlineMap.Backdrop exists with 284 parts (Persistent;
+  nothing collides). Ride the gondola to the main isle and look N, W and
+  E: no void and no cut edge. Walk round the volcano: no dark faceted
+  faces poking through the real cone. At ClockOverride 23 the ring is a
+  dark silhouette; at 13 hazy but visible.
+- **TWN-01 town greenery** From the spawn, a maple behind the Dealership,
+  a birch behind the Tool Shed and pine tips beside the mill; from above,
+  trees frame the town in stone rings. Swinging at a town tree does
+  nothing (no outline, no HP bar). Only trunks block you; bushes,
+  flowers, ring stones and rocks don't. No greenery in a pull-out lane,
+  on a road, or in the gondola's way.
+- **TWN-04 markers** From the spawn on an iPhone 14 (landscape): SELL
+  LOGS, AXES, TRUCKS, BLUEPRINTS & GEAR and GONDOLA cards float over the
+  right buildings, readable; they fade as you walk up and hide while a
+  shop is open. A SELL LOGS HERE signpost stands by the pad (on the Tool
+  Shed side: say if it reads as the Tool Shed buying logs).
+- **ACT-07** In the Dealership line-up, the trucks step up in height:
+  Rustbucket < Pickup < Flatbed (glossy mustard) < Logging Rig (bigger
+  wheels, tallest cab, tall chrome stacks). The Rig still parks in its
+  slot, loads from the tailgate, and turns as in Build #3.
 
 ### Build #3 (phones, frame rate, driving, the gondola, trees)
 
