@@ -325,6 +325,11 @@ return function(t)
 		t.eq(count, 4)
 	end)
 
+	-- The one exception: while you hold a piece of wood (the v2 loop's
+	-- DragController), the D-pad pushes, pulls and turns it. Checked below:
+	-- only while holding, over HUD's shortcuts, and handed back on the drop.
+	local WHILE_HOLDING = "DragController"
+
 	t.test("each D-pad direction is bound by its own controller and by nothing else on the client", function()
 		local fs = require("@lune/fs")
 		local dir = "src/StarterPlayer/StarterPlayerScripts"
@@ -342,7 +347,9 @@ return function(t)
 			local files = users[owner.key] or {}
 			t.ok(files[owner.file], string.format("%s (%s) isn't bound in %s", name, owner.key, owner.file))
 			for file in pairs(files) do
-				t.eq(file, owner.file, owner.key .. " is also bound in " .. file)
+				if file ~= WHILE_HOLDING then
+					t.eq(file, owner.file, owner.key .. " is also bound in " .. file)
+				end
 			end
 		end
 		for _, name in ipairs({ "daily", "guide", "settings" }) do
@@ -357,6 +364,33 @@ return function(t)
 				owner.file .. " shows its glyph chip"
 			)
 		end
+	end)
+
+	t.test("a held piece of wood takes the D-pad only while held, over HUD's shortcuts", function()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/" .. WHILE_HOLDING .. ".luau")
+		-- Every D-pad key it names is in bindHold (the grab), nowhere else.
+		local from = string.find(source, "local function bindHold()", 1, true)
+		local to = string.find(source, "local function unbindHold()", 1, true)
+		t.ok(from and to and from < to, "bindHold, then unbindHold")
+		local count = 0
+		local at = 1
+		while true do
+			local s, e = string.find(source, "Enum%.KeyCode%.DPad%a+", at)
+			if not s then
+				break
+			end
+			count += 1
+			t.ok(s > from and s < to, "a D-pad key named outside bindHold at " .. s)
+			at = e + 1
+		end
+		t.eq(count, 4, "all four, for pushing, pulling and turning")
+		t.ok(
+			string.find(source, "HOLD_PRIORITY = Enum.ContextActionPriority.High.Value + 1", 1, true),
+			"over HUD.PadShortcut's priority (High)"
+		)
+		local unbind = string.sub(source, to, (string.find(source, "\nend\n", to, true)))
+		t.ok(string.find(unbind, 'UnbindAction("DragPad")', 1, true), "handed back on the drop")
 	end)
 
 	t.test("a D-pad shortcut works only when nothing else holds the pad", function()
