@@ -1,5 +1,6 @@
 --!nocheck
--- Kit (the art kit): sign text is laid out on its board's own shape.
+-- Kit (the art kit): sign text is laid out on its board's own shape;
+-- a rock collides (COL-01); scaleModel scales about the origin.
 
 return function(t)
 	local roblox = t.roblox
@@ -60,6 +61,24 @@ return function(t)
 			end
 		end
 		t.ok(guis >= 10, string.format("only %d signs", guis))
+	end)
+
+	t.test("COL-01: Kit.rock's stones collide; Kit.solid undoes Kit.decor's collisions and clicks", function()
+		local model = Kit.model("Rocks")
+		local stones = Kit.rock(model, CFrame.new(3, 0, 4), 1.6, Kit.rng(7), { Color3.new(0.5, 0.5, 0.5) })
+		t.eq(#stones, 3)
+		for _, p in ipairs(stones) do
+			t.ok(p.CanCollide and p.CanQuery, "a rock's stone collides and can be clicked")
+			t.ok(not p.CanTouch, "nothing listens for its touches")
+			t.eq(p.Name, "Rock")
+			t.eq(p.Parent, model)
+		end
+		local part =
+			Kit.decor(Kit.part(model, "Trough", Vector3.new(2, 1, 1), CFrame.identity, Color3.new(1, 1, 1)), false)
+		t.ok(not part.CanCollide and not part.CanQuery and not part.CastShadow, "decor first")
+		t.eq(Kit.solid(part), part, "returns the part")
+		t.ok(part.CanCollide and part.CanQuery, "then solid")
+		t.ok(not part.CanTouch and not part.CastShadow, "still untouched and shadowless")
 	end)
 
 	t.test("scaleModel scales sizes, positions, lights and attachments about the origin (TWN-13)", function()

@@ -323,6 +323,65 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"nothing in town that collides stands in a parking bay or its pull-out, up to the street (COL-01)",
+		function()
+			local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+			local street
+			for _, paint in ipairs(WorldLayout.TownPaint) do
+				if paint.name == "MainStreet" then
+					street = paint
+				end
+			end
+			-- Each slot's pull-out, as TWN-01 keeps the greenery out of it: its own
+			-- lane (a stud wider each side), 25 studs on past either end, as far as
+			-- the street's south edge (the lamps and crates across the street
+			-- stand where they always have).
+			local areas = {}
+			for i, cf in ipairs(town.parkingSlots) do
+				table.insert(areas, {
+					name = "pull-out of slot " .. i,
+					x0 = cf.X - 4.25,
+					x1 = cf.X + 4.25,
+					z0 = cf.Z - 18.5 - 25,
+					z1 = math.min(cf.Z + 18.5 + 25, street.z0),
+				})
+			end
+			local problems, checked = {}, 0
+			for _, thing in ipairs(townThings()) do
+				for _, p in ipairs(parts(thing.model)) do
+					if p.CanCollide then
+						checked += 1
+						for _, area in ipairs(areas) do
+							local reach = reachInto(p.CFrame, p.Size, area)
+							if reach > 1e-3 then
+								table.insert(
+									problems,
+									string.format(
+										"%s's %s reaches %.2f into the %s",
+										thing.label,
+										p.Name,
+										reach,
+										area.name
+									)
+								)
+							end
+						end
+					end
+				end
+			end
+			t.ok(checked > 300, string.format("only %d colliding parts in town", checked))
+			t.ok(#problems == 0, table.concat(problems, "\n"))
+			-- The check itself: a log pile in slot 3's pull-out is caught.
+			local pile = placed(BuildingArt.Prop("LogPile", 3), CFrame.new(town.parkingSlots[3].X, 0, 66))
+			local caught = false
+			for _, p in ipairs(parts(pile)) do
+				caught = caught or (p.CanCollide and reachInto(p.CFrame, p.Size, areas[3]) > 1e-3)
+			end
+			t.ok(caught, "a log pile in a pull-out is caught")
+		end
+	)
+
 	-- Every problem a check found, a line each (the first 25).
 	local function report(problems)
 		local lines = {}
@@ -542,7 +601,7 @@ return function(t)
 	end)
 
 	t.test(
-		"the town's trees: 20 to 30 birch, maple and pine (no oaks), trunks the only thing that collides (TWN-01)",
+		"the town's trees: 20 to 30 birch, maple and pine (no oaks); only trunks and rocks' stones collide (TWN-01, COL-01)",
 		function()
 			local trees, woods = 0, {}
 			for _, g in ipairs(town.greenery) do
@@ -576,14 +635,22 @@ return function(t)
 					)
 				end
 			end
+			-- A tree's Trunk collides; so do a rock's three stones (COL-01);
+			-- nothing else in the greenery does, or can be clicked.
+			local rocks = 0
 			for _, g in ipairs(greenery()) do
+				local solidName = if g.model.Name == "Rock" then "Rock" else "Trunk"
+				if solidName == "Rock" then
+					rocks += 1
+				end
 				for _, p in ipairs(parts(g.model)) do
 					if p.CanCollide then
-						t.eq(p.Name, "Trunk", g.label .. "'s " .. p.Name .. " collides")
+						t.eq(p.Name, solidName, g.label .. "'s " .. p.Name .. " collides")
 					end
-					t.ok(p.CanQuery == (p.Name == "Trunk"), g.label .. "'s " .. p.Name .. " can be clicked")
+					t.ok(p.CanQuery == (p.Name == solidName), g.label .. "'s " .. p.Name .. " can be clicked")
 				end
 			end
+			t.ok(rocks >= 4, "the town's rocks")
 		end
 	)
 
@@ -780,6 +847,25 @@ return function(t)
 				end
 			end
 			t.eq(posts, 2)
+		end
+	end)
+
+	t.test("biome road signs' boards collide, 2+ studs off the road; their rocks are looks only (COL-01)", function()
+		for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+			-- As MapBuilder builds them: unlit, the board solid.
+			local model = placed(BuildingArt.Signpost(sign.text, false, true), sign.cframe)
+			local boards = 0
+			for _, p in ipairs(parts(model)) do
+				if p.CanCollide then
+					local c = roadClearance(p.CFrame, p.Size)
+					t.ok(c >= ROAD_MARGIN, string.format("%s: its %s is %.2f studs off the road", sign.text, p.Name, c))
+					boards += if p.Name == "Board" then 1 else 0
+				end
+				if p.Name == "Rock" then
+					t.ok(not p.CanCollide, sign.text .. ": a rock at its foot collides") -- some are 1.5 off the road
+				end
+			end
+			t.eq(boards, 1, sign.text .. "'s board collides")
 		end
 	end)
 
@@ -1662,6 +1748,40 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test("scenery: all that collides keeps 4+ studs off the roads (COL-01)", function()
+		-- A part whose corners all lie within `far` of its piece's middle (a
+		-- disc round the middle then holds the whole box: both are convex) is
+		-- at least the middle's road clearance less `far` off every road, as
+		-- the clearance falls at most a stud a stud.
+		local solid = 0
+		for _, spot in ipairs(scenery) do
+			local c, r = spot.center, spot.radius
+			local here = string.format("%s at (%.0f, %.0f)", spot.kind, c.X, c.Z)
+			local clear = TerrainGen.RoadClearance(c.X, c.Z)
+			for _, model in ipairs(sceneryModels(spot)) do
+				for _, p in ipairs(parts(model)) do
+					if p.CanCollide then
+						solid += 1
+						local far = 0
+						for _, corner in ipairs(corners(p.Size)) do
+							local w = p.CFrame * corner
+							far = math.max(far, Vector2.new(w.X - c.X, w.Z - c.Z).Magnitude)
+						end
+						t.ok(
+							far <= r + 1,
+							string.format("%s: its solid %s reaches %.1f out (footprint %d)", here, p.Name, far, r)
+						)
+						t.ok(
+							clear - far >= 4,
+							string.format("%s: its solid %s may be %.1f off a road", here, p.Name, clear - far)
+						)
+					end
+				end
+			end
+		end
+		t.ok(solid >= 1000, solid .. " solid scenery parts")
 	end)
 
 	t.test("scenery stands on the ground: nothing floats, its uphill side sinks at most ScenerySink", function()

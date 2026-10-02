@@ -279,6 +279,16 @@ function Kit.decorAll(root: Instance, keep: { [string]: boolean }?)
 	end
 end
 
+-- The opposite of Kit.decor, for a part built by a looks-only helper that
+-- players should bump into after all: it collides and can be clicked
+-- again, like any Kit.part. It stays untouchable (nothing listens for a
+-- prop's touches) and keeps its shadow setting. Returns the part.
+function Kit.solid<T>(p: T & BasePart): T
+	p.CanCollide = true
+	p.CanQuery = true
+	return p
+end
+
 ---------------------------------------------------------------------------
 -- Low-poly surfaces
 ---------------------------------------------------------------------------
@@ -566,7 +576,9 @@ function Kit.stoneCourse(
 	end
 end
 
--- A faceted rock: a few tilted, overlapping blocks.
+-- A faceted rock: a few tilted, overlapping blocks. They collide (COL-01:
+-- a rock you walk through reads as a ghost); Kit.decor the parts it
+-- returns where a rock must not stop anyone (by a truck's lane).
 function Kit.rock(parent: Instance, cf: CFrame, size: number, rng: Rng, colors: { Color3 }): { Part }
 	local parts = Kit.blob(
 		parent,
@@ -578,6 +590,9 @@ function Kit.rock(parent: Instance, cf: CFrame, size: number, rng: Rng, colors: 
 		colors,
 		Enum.Material.Slate
 	)
+	for _, p in ipairs(parts) do
+		Kit.solid(p)
+	end
 	return parts
 end
 

@@ -722,9 +722,10 @@ local function ledger(parent: Instance, cf: CFrame)
 	end
 end
 
--- A grindstone: a stone wheel turning in a trough on splayed legs.
+-- A grindstone: a stone wheel turning in a trough on splayed legs. The
+-- trough and the wheel collide (the legs stand under them).
 local function grindstone(parent: Instance, cf: CFrame)
-	dBox(parent, "GrindTrough", V3(2.6, 0.7, 1.3), cf * CF(0, 1.9, 0), TIMBER_LIGHT)
+	Kit.solid(dBox(parent, "GrindTrough", V3(2.6, 0.7, 1.3), cf * CF(0, 1.9, 0), TIMBER_LIGHT))
 	for _, sx in ipairs({ -1, 1 }) do
 		for _, sz in ipairs({ -1, 1 }) do
 			dBeam(
@@ -738,7 +739,7 @@ local function grindstone(parent: Instance, cf: CFrame)
 			)
 		end
 	end
-	dCyl(parent, "Grindstone", 0.55, 2.6, cf * CF(0, 2.9, 0), hex("#B9AE98"), MAT.Sandstone)
+	Kit.solid(dCyl(parent, "Grindstone", 0.55, 2.6, cf * CF(0, 2.9, 0), hex("#B9AE98"), MAT.Sandstone))
 	dCyl(parent, "Axle", 2.9, 0.25, cf * CF(0, 2.9, 0), IRON, MAT.Metal)
 	dBox(parent, "Crank", V3(0.2, 0.9, 0.2), cf * CF(1.5, 2.55, 0), IRON, MAT.Metal)
 	dCyl(parent, "CrankHandle", 0.7, 0.25, cf * CF(1.8, 2.15, 0), HANDLE)
@@ -930,12 +931,13 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dBeam(model, "SlipChain", slipA + V3(0, 0.25, 0), slipB + V3(0, 0.25, 0), 0.35, 0.25, IRON, MAT.Metal)
 	local slipDir = (slipB - slipA).Unit
 	local onSlip = slipA:Lerp(slipB, 0.45) + V3(0, 1.45, 0)
-	log(model, lookAt(onSlip, onSlip + slipDir) * ANG(0, PI / 2, 0), 6.5, 2.2, rng, 2)
-	-- The log deck: a pyramid of logs, cut ends to the front.
+	log(model, lookAt(onSlip, onSlip + slipDir) * ANG(0, PI / 2, 0), 6.5, 2.2, rng, 2, true)
+	-- The log deck: a pyramid of logs, cut ends to the front (all of it
+	-- solid, inside the bottom row's footprint).
 	for row = 0, 2 do
 		for i = 0, 2 - row do
 			local x = 16.3 + (i - (2 - row) / 2) * 2.1
-			log(model, CF(x, 1.0 + row * 1.75, -6.6) * ANG(0, PI / 2, 0), 6.4, 2.0, rng, 1, row == 0)
+			log(model, CF(x, 1.0 + row * 1.75, -6.6) * ANG(0, PI / 2, 0), 6.4, 2.0, rng, 1, true)
 		end
 	end
 
@@ -951,7 +953,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 		end
 		dBox(model, "Knee", V3(0.7, 2.2, 0.6), CF(carX + dx * 0.76, FLOOR + 2.15, -1.75), TIMBER_LIGHT)
 	end
-	log(model, CF(carX, FLOOR + 2.35, -0.1), 6.2, 2.6, rng, 2)
+	log(model, CF(carX, FLOOR + 2.35, -0.1), 6.2, 2.6, rng, 2, true)
 
 	local bladeCf = CF(-3.2, 6, 1.35) * ANG(0, PI / 2, 0)
 	local blade = Kit.cylinder(model, "SawBlade", 0.3, 9, bladeCf, hex("#DDE2E6"), MAT.Metal)
@@ -1039,7 +1041,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 	lumberStack(model, CF(-16.4, 0, -10.5), 5.4, 2.2, 3, 2, rng)
 	barrel(model, CF(-12.6, 0, -8.6), rng, true)
 	crate(model, CF(-19, 0, -8.4) * ANG(0, 0.2, 0), 1.8, rng, true)
-	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, false)
+	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, true)
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	return model
 end
@@ -1177,9 +1179,10 @@ local function toolShed(model: Model, title: string, accent: Color3)
 			material(axe.look.material, MAT.Metal)
 		)
 	end
-	dBox(model, "Workbench", V3(1.9, 0.35, 5.6), CF(-HX + 1.4, FLOOR + 2.9, 2.6), PLANK[2])
+	-- The workbench along the west wall: its top and legs collide.
+	Kit.solid(dBox(model, "Workbench", V3(1.9, 0.35, 5.6), CF(-HX + 1.4, FLOOR + 2.9, 2.6), PLANK[2]))
 	for _, z in ipairs({ 0.4, 4.8 }) do
-		dBox(model, "BenchLeg", V3(1.6, 2.7, 0.35), CF(-HX + 1.4, FLOOR + 1.35, z), TIMBER)
+		Kit.solid(dBox(model, "BenchLeg", V3(1.6, 2.7, 0.35), CF(-HX + 1.4, FLOOR + 1.35, z), TIMBER))
 	end
 	dBox(model, "Vise", V3(0.8, 0.7, 0.6), CF(-HX + 2.1, FLOOR + 3.4, 1.0), IRON, MAT.Metal)
 	dBox(model, "Saw", V3(0.1, 1.0, 3.2), CF(-HX + 0.45, 6.1, 2.6), STEEL, MAT.Metal)
@@ -1194,13 +1197,14 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		)
 	end
 
-	-- Out front: the grindstone and the chopping block; logs by the wall.
+	-- Out front: the grindstone and the chopping block; firewood stacked by
+	-- the east wall (all of it solid).
 	grindstone(model, CF(-6.9, 0, -9.3))
 	choppingBlock(model, CF(6.8, 0, -9.4), rng)
 	for row = 0, 1 do
 		for i = 0, 1 - row do
 			local z = -2 + (i - (1 - row) / 2) * 1.55
-			log(model, CF(HX + 1.25, 0.75 + row * 1.32, z), 2, 1.5, rng, 1, row == 0)
+			log(model, CF(HX + 1.25, 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true)
 		end
 	end
 end
@@ -1302,7 +1306,8 @@ local function dealership(model: Model, title: string, accent: Color3)
 	barrel(model, CF(-7.6, FLOOR, 5.4), rng, true, paint[1])
 	barrel(model, CF(-7.4, FLOOR, 3.2), rng, true, hex("#C8402F"))
 
-	-- The apron: a tyre stack and the gas pump on its island.
+	-- The apron: a tyre stack (every tyre solid) and the gas pump on its
+	-- island.
 	for i = 1, 4 do
 		local t = Kit.post(
 			model,
@@ -1314,7 +1319,7 @@ local function dealership(model: Model, title: string, accent: Color3)
 			MAT.Rubber
 		)
 		if i > 1 then
-			dec(t)
+			t.CastShadow = false -- small parts cast none (see dec)
 		end
 	end
 	dec(Kit.post(model, "TyreHole", V3(-8.3, FLOOR + 3.1, -8.1), 0.04, 1.1, hex("#1E1C1C"), MAT.Rubber))
@@ -1432,7 +1437,7 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 
 	-- The bay window (west) and a shuttered window (east), with flowers.
 	local bay = CF(-6.4, 0, -HZ - 0.3)
-	dBox(model, "BayBase", V3(4.2, 2.2, 1.3), bay * CF(0, FLOOR + 1.1, -0.65), STONE[1], MAT.Slate)
+	Kit.solid(dBox(model, "BayBase", V3(4.2, 2.2, 1.3), bay * CF(0, FLOOR + 1.1, -0.65), STONE[1], MAT.Slate))
 	Kit.window(model, bay * CF(0, 4, -1.3), 3.2, 2.6, wood, true)
 	for _, s in ipairs({ -1, 1 }) do
 		dBox(model, "BayGlass", V3(0.2, 2.6, 1.0), bay * CF(s * 1.95, 4, -0.65), GLOW, MAT.Neon)
@@ -1442,14 +1447,16 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	window(model, CF(6.4, 4.4, -HZ - 0.3), 2.2, 2.6, wood, SHUTTER, rng)
 	window(model, CF(-HX - 0.3, 4.6, 0) * ANG(0, PI / 2, 0), 2.4, 2.4, wood, nil, nil)
 
-	-- Inside the door: the gear on display, the counter, shelves.
+	-- Inside the door: the gear on display, the counter, shelves. The coat
+	-- stand (its post, the coat and the cloak) and the boots' step shelf
+	-- collide; the path to the counter runs between them.
 	local stand = CF(-2.7, FLOOR, -5.2)
 	local coat = gearColor("InsulatedCoat", "#5C87B8")
-	dBox(model, "StandPost", V3(0.3, 5.4, 0.3), stand * CF(0, 2.7, 0), wood)
+	Kit.solid(dBox(model, "StandPost", V3(0.3, 5.4, 0.3), stand * CF(0, 2.7, 0), wood))
 	dBox(model, "StandFoot", V3(1.8, 0.25, 0.3), stand * CF(0, 0.12, 0), wood)
 	dBox(model, "StandFoot", V3(0.3, 0.25, 1.8), stand * CF(0, 0.12, 0), wood)
 	dBox(model, "StandHook", V3(1.6, 0.18, 0.18), stand * CF(0, 5.1, 0), IRON, MAT.Metal)
-	dBox(model, "Coat", V3(1.6, 2.6, 0.8), stand * CF(0, 3.6, -0.45), coat, MAT.Fabric)
+	Kit.solid(dBox(model, "Coat", V3(1.6, 2.6, 0.8), stand * CF(0, 3.6, -0.45), coat, MAT.Fabric))
 	for _, s in ipairs({ -1, 1 }) do
 		dBox(
 			model,
@@ -1461,17 +1468,19 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 		)
 	end
 	dBox(model, "CoatCollar", V3(1.5, 0.45, 0.95), stand * CF(0, 4.95, -0.45), TRIM, MAT.Fabric)
-	dWedge(
-		model,
-		"Cloak",
-		V3(1.7, 3.2, 0.7),
-		stand * CF(0, 3.4, 0.45) * ANG(0, PI, 0),
-		gearColor("FeatherfallCloak", "#BFD8FF"),
-		MAT.Fabric
+	Kit.solid(
+		dWedge(
+			model,
+			"Cloak",
+			V3(1.7, 3.2, 0.7),
+			stand * CF(0, 3.4, 0.45) * ANG(0, PI, 0),
+			gearColor("FeatherfallCloak", "#BFD8FF"),
+			MAT.Fabric
+		)
 	)
 	local shelf = CF(2.8, FLOOR, -5.2)
-	dBox(model, "Shelf", V3(2.6, 0.9, 1.6), shelf * CF(0, 0.45, 0), wood)
-	dBox(model, "Shelf", V3(2.6, 0.9, 0.8), shelf * CF(0, 1.35, 0.4), wood)
+	Kit.solid(dBox(model, "Shelf", V3(2.6, 0.9, 1.6), shelf * CF(0, 0.45, 0), wood))
+	Kit.solid(dBox(model, "Shelf", V3(2.6, 0.9, 0.8), shelf * CF(0, 1.35, 0.4), wood))
 	local boots = gearColor("HeatBoots", "#B5472A")
 	for _, s in ipairs({ -1, 1 }) do
 		dBox(model, "Boot", V3(0.5, 0.9, 0.55), shelf * CF(s * 0.35 - 0.6, 1.35, -0.45), boots, MAT.Leather)
@@ -1645,7 +1654,7 @@ function BuildingArt.GondolaStation(): Model
 		SIGN_INK,
 		true
 	)
-	dBox(model, "Lectern", V3(1.2, 2.6, 0.9), CF(3.2, 2.3, -3.6), TIMBER_LIGHT)
+	Kit.solid(dBox(model, "Lectern", V3(1.2, 2.6, 0.9), CF(3.2, 2.3, -3.6), TIMBER_LIGHT)) -- its stand collides
 	dBox(model, "Lectern", V3(1.5, 0.2, 1.1), CF(3.2, 3.7, -3.6) * ANG(-0.3, 0, 0), PLANK[4])
 	dBall(model, "Bell", 0.55, CF(3.5, 4.0, -3.5), BRASS, MAT.Metal)
 	return model
@@ -1657,16 +1666,25 @@ end
 
 -- A signpost: two posts with a framed board between them facing -Z (text
 -- on both faces) under a little shingled cap. Named parts: "Board" (the
--- 9 x 4.4 text board, its middle 7 studs up). `lit` adds two gooseneck
--- lamps over the front face (night lights: see gooseneck).
-function BuildingArt.Signpost(text: string, lit: boolean?): Model
+-- 9 x 4.4 text board, its middle 7 studs up, so its bottom is 4.8 up).
+-- `lit` adds two gooseneck lamps over the front face (night lights: see
+-- gooseneck). The posts collide. The board only collides when asked
+-- (`solidBoard`, for the biome signs out by the roads: COL-01): people
+-- walk under the town's (TO THE WOODS stands across the walk from the
+-- spawn to Murph) and a Logging Rig drives under SELL LOGS HERE's. The
+-- rocks at the posts' feet are looks only (SELL LOGS HERE's stand by the
+-- pad's lane, some road signs' 1.5 studs off the road).
+function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?): Model
 	local model = Kit.model("Signpost")
 	local rng = Kit.rng(#text * 13 + 5)
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "Post", V3(0.7, 9.8, 0.7), CF(s * 4.95, 4.9, 0), TIMBER, MAT.Wood)
 		dBox(model, "PostCap", V3(0.95, 0.3, 0.95), CF(s * 4.95, 9.9, 0), TIMBER_LIGHT)
 	end
-	signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+	local board = signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+	if solidBoard then
+		Kit.solid(board)
+	end
 	if lit then
 		-- Two goosenecks over the front (-Z) face, under the cap (TWN-07).
 		for _, x in ipairs({ -2.5, 2.5 }) do
@@ -1683,7 +1701,9 @@ function BuildingArt.Signpost(text: string, lit: boolean?): Model
 		)
 	end
 	for _, s in ipairs({ -1, 1 }) do
-		Kit.rock(model, CF(s * 5.6, 0, rng:range(-0.4, 0.4)), rng:range(0.9, 1.3), rng, STONE)
+		for _, p in ipairs(Kit.rock(model, CF(s * 5.6, 0, rng:range(-0.4, 0.4)), rng:range(0.9, 1.3), rng, STONE)) do
+			Kit.decor(p)
+		end
 	end
 	return model
 end
@@ -1949,10 +1969,18 @@ function BuildingArt.Campsite(): Model
 	hangingLantern(model, (hook * V3(0, 5, -1.0)), 0.35, 0.8)
 	for row = 0, 1 do
 		for i = 0, 2 - row do
-			log(model, CF(-4.3 + (i - (2 - row) / 2) * 0.85, 0.4 + row * 0.72, 7.2) * ANG(0, PI / 2, 0), 2, 0.8, rng, 1)
+			log(
+				model,
+				CF(-4.3 + (i - (2 - row) / 2) * 0.85, 0.4 + row * 0.72, 7.2) * ANG(0, PI / 2, 0),
+				2,
+				0.8,
+				rng,
+				1,
+				true
+			)
 		end
 	end
-	Kit.rock(model, CF(-5.6, 0, -1.4), 1.6, rng, STONE)
+	Kit.rock(model, CF(-5.6, 0, -1.4), 1.6, rng, STONE) -- the rocks collide (Kit.rock)
 	Kit.rock(model, CF(6, 0, -0.8), 1.2, rng, STONE)
 	dBox(model, "SignStake", V3(0.3, 2, 0.3), CF(5.9, 1.0, -2.4), TIMBER)
 	signBoard(
@@ -1978,14 +2006,14 @@ type PropBuilder = (model: Model, rng: Rng) -> ()
 
 local PROPS: { [string]: PropBuilder } = {}
 
--- A log pile, cut ends to the front (-Z); the bottom row collides.
+-- A log pile, cut ends to the front (-Z); every log collides.
 PROPS.LogPile = function(model, rng)
 	local dia, len = rng:range(1.2, 1.5), rng:range(5, 6.5)
 	for row = 0, 2 do
 		for i = 0, 2 - row do
 			local x = (i - (2 - row) / 2) * (dia + 0.06)
 			local cf = CF(x, dia / 2 + row * dia * 0.86, rng:range(-0.25, 0.25)) * ANG(0, PI / 2, 0)
-			log(model, cf, len * rng:range(0.92, 1.04), dia * rng:range(0.92, 1.05), rng, 2, row == 0)
+			log(model, cf, len * rng:range(0.92, 1.04), dia * rng:range(0.92, 1.05), rng, 2, true)
 		end
 	end
 	for _, s in ipairs({ -1, 1 }) do
@@ -2010,7 +2038,7 @@ PROPS.Barrel = function(model, rng)
 	barrel(model, CFrame.identity, rng, true)
 end
 
--- A bench you'd sit on facing -Z (the seat collides).
+-- A bench you'd sit on facing -Z (the seat and the back collide).
 PROPS.Bench = function(model, rng)
 	for i, z in ipairs({ -0.35, 0.35 }) do
 		Kit.part(model, "Seat", V3(5, 0.25, 0.65), CF(0, 1.55, z), Kit.vary(PLANK[i], rng, 0.04), MAT.WoodPlanks)
@@ -2020,7 +2048,9 @@ PROPS.Bench = function(model, rng)
 		dBox(model, "BenchLeg", V3(0.3, 2, 0.25), CF(x, 2.4, 0.8) * ANG(-0.15, 0, 0), TIMBER)
 	end
 	for _, y in ipairs({ 2.35, 3.05 }) do
-		dBox(model, "BenchBack", V3(5, 0.45, 0.2), CF(0, y, 0.9) * ANG(-0.15, 0, 0), Kit.vary(PLANK[3], rng, 0.04))
+		Kit.solid(
+			dBox(model, "BenchBack", V3(5, 0.45, 0.2), CF(0, y, 0.9) * ANG(-0.15, 0, 0), Kit.vary(PLANK[3], rng, 0.04))
+		)
 	end
 end
 
@@ -2050,14 +2080,15 @@ PROPS.Well = function(model, rng)
 	gableRoof(model, CF(0, 5.4, 0), 5.8, 3.2, 1.5, 0.4, rng, style)
 end
 
--- A hand cart loaded with logs (the bed collides).
+-- A hand cart loaded with logs (the bed, its sides, the wheels and the
+-- logs collide; the spokes, hubs, shafts and axle are looks only).
 PROPS.Cart = function(model, rng)
 	Kit.part(model, "CartBed", V3(3.4, 0.3, 5), CF(0, 1.95, 0), PLANK[1], MAT.WoodPlanks)
 	for _, s in ipairs({ -1, 1 }) do
-		dBox(model, "CartSide", V3(0.25, 0.9, 5), CF(s * 1.6, 2.5, 0), PLANK[3])
-		dBox(model, "CartSide", V3(3.4, 0.9, 0.25), CF(0, 2.5, s * 2.45), PLANK[2])
+		Kit.solid(dBox(model, "CartSide", V3(0.25, 0.9, 5), CF(s * 1.6, 2.5, 0), PLANK[3]))
+		Kit.solid(dBox(model, "CartSide", V3(3.4, 0.9, 0.25), CF(0, 2.5, s * 2.45), PLANK[2]))
 		local wheel = CF(s * 2, 1.6, 0.4)
-		dCyl(model, "Wheel", 0.3, 3.2, wheel, TIMBER_LIGHT)
+		Kit.solid(dCyl(model, "Wheel", 0.3, 3.2, wheel, TIMBER_LIGHT))
 		for _, a in ipairs({ PI / 4, -PI / 4 }) do
 			dBox(model, "Spoke", V3(0.36, 2.9, 0.3), wheel * ANG(a, 0, 0), TIMBER)
 		end
@@ -2066,7 +2097,7 @@ PROPS.Cart = function(model, rng)
 	end
 	dCyl(model, "Axle", 4.4, 0.3, CF(0, 1.6, 0.4), IRON, MAT.Metal)
 	for i = -1, 1 do
-		log(model, CF(i * 0.95, 2.6 + (if i == 0 then 0.6 else 0), 0) * ANG(0, PI / 2, 0), 4.6, 0.95, rng, 2)
+		log(model, CF(i * 0.95, 2.6 + (if i == 0 then 0.6 else 0), 0) * ANG(0, PI / 2, 0), 4.6, 0.95, rng, 2, true)
 	end
 end
 
@@ -2113,10 +2144,14 @@ PROPS.WaterTower = function(model, rng)
 	dRod(model, "Spout", V3(3.6, H + 0.4, 0), V3(3.6, H - 1.4, 0), 0.45, IRON, MAT.Metal)
 end
 
+-- A mailbox on a post. The box collides: it overhangs the thin post all
+-- round at chest height (3.4 to 4 up), so it stops anyone walking into the
+-- mailbox, and the post stays looks only, no obstacle at ground level for
+-- the town's flower bed at its foot (TWN-01 keeps those 4 studs apart).
 PROPS.Mailbox = function(model, rng)
 	local green = Kit.vary(hex("#4E7A4C"), rng, 0.05)
 	dBox(model, "Post", V3(0.4, 3.4, 0.4), CF(0, 1.7, 0), TIMBER)
-	dBox(model, "Mailbox", V3(1.05, 0.6, 1.7), CF(0, 3.7, 0), green, MAT.Metal)
+	Kit.solid(dBox(model, "Mailbox", V3(1.05, 0.6, 1.7), CF(0, 3.7, 0), green, MAT.Metal))
 	dCyl(model, "Mailbox", 1.7, 1.05, CF(0, 4, 0) * ANG(0, PI / 2, 0), green, MAT.Metal)
 	dBox(model, "MailDoor", V3(0.9, 0.85, 0.08), CF(0, 3.85, -0.88), Kit.shade(green, -0.15), MAT.Metal)
 	dBox(model, "Flag", V3(0.1, 1, 0.12), CF(0.6, 4.1, 0.3), hex("#C8402F"), MAT.Metal)
@@ -2139,6 +2174,8 @@ PROPS.Haybale = function(model, rng)
 	end
 end
 
+-- A wheelbarrow of sawdust. Looks only: the town's stands on the plaza by
+-- the sell pad, where nothing may collide (TWN-08) and trucks swing past.
 PROPS.Wheelbarrow = function(model, rng)
 	local tray = CF(0, 1.45, 0.2)
 	dBox(model, "Tray", V3(1.9, 0.9, 1.6), tray, hex("#7E8A72"), MAT.Metal)
@@ -2153,13 +2190,13 @@ PROPS.Wheelbarrow = function(model, rng)
 end
 
 -- A tool rack: two posts and rails with an axe, a shovel, a rake and a
--- crosscut saw hung on it.
+-- crosscut saw hung on it (the posts and rails collide).
 PROPS.ToolRack = function(model, rng)
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(model, "Post", V3(0.4, 4.6, 0.4), CF(s * 2.2, 2.3, 0), TIMBER, MAT.Wood)
 	end
 	for _, y in ipairs({ 1.2, 4 }) do
-		dBox(model, "Rail", V3(4.8, 0.3, 0.3), CF(0, y, -0.1), PLANK[3])
+		Kit.solid(dBox(model, "Rail", V3(4.8, 0.3, 0.3), CF(0, y, -0.1), PLANK[3]))
 	end
 	rackAxe(model, CF(-1.5, 0.6, -0.4), 3.4, hex("#A7ADB4"), MAT.Metal)
 	dBox(model, "ShovelHandle", V3(0.22, 3.6, 0.22), CF(-0.4, 2.4, -0.4), HANDLE)
@@ -2280,9 +2317,10 @@ end
 -- A piece of the town's greenery (WorldPlan.Town().greenery) by kind:
 -- "tree" (TownTree: `woodId` at scale `size`), "bush" (PropArt.Bush `size`
 -- studs across, in the planters' greens), "flowers" (a bed `size` studs
--- across) or "rock" (PropArt.Rock `size` studs across, as decoration). All
--- of it is looks only (no collisions, clicks or touches) but a tree's
--- Trunk. An unknown kind builds a bush. On the ground at the origin.
+-- across) or "rock" (PropArt.Rock `size` studs across). All of it is looks
+-- only (no collisions, clicks or touches) but a tree's Trunk and a rock's
+-- three "Rock" stones (COL-01), which collide and can be clicked. An
+-- unknown kind builds a bush. On the ground at the origin.
 function BuildingArt.Greenery(kind: string, size: number, seed: number, woodId: string?): Model
 	if kind == "tree" then
 		return BuildingArt.TownTree(woodId or "birch", seed, size)
@@ -2290,7 +2328,7 @@ function BuildingArt.Greenery(kind: string, size: number, seed: number, woodId: 
 		return flowerBed(size, seed)
 	elseif kind == "rock" then
 		local rock = PropArt.Rock(size, seed, STONE)
-		Kit.decorAll(rock)
+		Kit.decorAll(rock, { Rock = true })
 		return rock
 	end
 	return PropArt.Bush(size, seed, LEAF)
@@ -2485,10 +2523,17 @@ function BuildingArt.StarfallForge(): Model
 	return model
 end
 
+-- How high a rope bridge's invisible side guards stand over its planks
+-- (the rope rails' height at the posts).
+BuildingArt.BridgeGuardHeight = 3.2
+
 -- A rope bridge from `a` to `b` (world points; the planks' tops run
 -- through both), `width` wide: planks on two stringers, a post at each
 -- corner, sagging rope rails with hangers down to the deck. Built in world
--- space. Named parts: "Deck" (the stringers; it and the planks collide).
+-- space. Named parts: "Deck" (the stringers; it and the planks collide),
+-- "BridgeGuard" (one each side under the rope, from the planks' tops up
+-- to BridgeGuardHeight, end post to end post: invisible, it collides, so
+-- nobody walks off through the rope; COL-01).
 function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 	local model = Kit.model("Bridge")
 	local span = (b - a).Magnitude
@@ -2548,6 +2593,23 @@ function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 			local top = rail(t)
 			dRod(model, "Hanger", top, ends[1]:Lerp(ends[2], t) + V3(0, -0.1, 0), 0.1, ROPE, MAT.Fabric)
 		end
+		-- The guard under this side's rope: from the planks' undersides up to
+		-- the rail's height at the posts, the bridge's whole length.
+		local h = BuildingArt.BridgeGuardHeight
+		local guard = Kit.part(
+			model,
+			"BridgeGuard",
+			V3(0.5, h + 0.25, span),
+			frame * CF(s * (width / 2 + 0.25), (h - 0.25) / 2, 0),
+			ROPE,
+			MAT.SmoothPlastic
+		)
+		guard.Transparency = 1
+		guard.CastShadow = false
+		guard.CanTouch = false
+		-- Roblox ignores this while the part collides (raycasts still hit it),
+		-- but it says what's meant: nothing to click.
+		guard.CanQuery = false
 	end
 	return model
 end

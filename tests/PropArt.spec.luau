@@ -1,8 +1,9 @@
 --!nocheck
 -- PropArt: every prop builds, stays cheap (clients scatter hundreds), is
--- decoration only (Rock's stones aside), sits on the ground, is placed
--- with CFrame only and comes out the same for the same seed; the biome
--- mixes only name props that exist.
+-- decoration only (Rock's stones and the open-country set pieces' big
+-- bodies aside, COL-01; Scatter's are all decoration), sits on the
+-- ground, is placed with CFrame only and comes out the same for the same
+-- seed; the biome mixes only name props that exist.
 
 return function(t)
 	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
@@ -205,13 +206,34 @@ return function(t)
 		end
 	end)
 
-	t.test("props are decoration; only Rock's stones collide", function()
+	-- What collides in each prop (COL-01): a boulder's (and an outcrop's)
+	-- stones and the open-country set pieces' big bodies. The rest of every
+	-- prop is decoration.
+	local SOLID = {
+		Rock = { Rock = true },
+		Outcrop = { Rock = true },
+		RuinedCabin = {
+			Footing = true,
+			Floor = true,
+			WallLog = true,
+			CornerPost = true,
+			Chimney = true,
+			FallenRoof = true,
+		},
+		Windmill = { MillBase = true, Tower = true },
+		LookoutTower = { Leg = true, Deck = true, Rail = true, Ladder = true },
+	}
+
+	t.test("props are decoration but for Rock's stones and the set pieces' big bodies (COL-01)", function()
 		for _, prop in ipairs(PROPS) do
+			local solidNames = SOLID[prop[1]] or {}
 			for seed = 1, 8 do
+				local seen = {}
 				for _, p in ipairs(parts(prop[2](seed))) do
 					t.ok(p.Anchored, prop[1] .. " parts are anchored")
-					if prop[1] == "Rock" and p.Name == "Rock" then
-						t.ok(p.CanCollide, "a boulder's stones collide")
+					if solidNames[p.Name] then
+						seen[p.Name] = true
+						t.ok(p.CanCollide and p.CanQuery, prop[1] .. ": " .. p.Name .. " collides and can be clicked")
 					else
 						t.ok(
 							not p.CanCollide and not p.CanQuery and not p.CanTouch,
@@ -219,7 +241,50 @@ return function(t)
 						)
 					end
 				end
+				-- Every one of them is there to bump into.
+				for name in pairs(solidNames) do
+					t.ok(seen[name], string.format("%s seed %d has a solid %s", prop[1], seed, name))
+				end
 			end
+		end
+	end)
+
+	t.test("COL-01: every outcrop rock, cabin wall, windmill tower and lookout leg collides", function()
+		for seed = 1, 30 do
+			local stones = 0
+			for _, p in ipairs(parts(PropArt.Outcrop(seed))) do
+				if p.Name == "Rock" then
+					stones += 1
+					t.ok(p.CanCollide, "an outcrop's stone collides")
+				end
+			end
+			t.ok(stones >= 9 and stones <= 12, "3 stones a rock, 3-4 rocks: " .. stones)
+			local counts = {}
+			for _, model in ipairs({ PropArt.RuinedCabin(seed), PropArt.Windmill(seed), PropArt.LookoutTower(seed) }) do
+				for _, p in ipairs(parts(model)) do
+					if p.CanCollide then
+						counts[p.Name] = (counts[p.Name] or 0) + 1
+					end
+				end
+			end
+			t.eq(counts.Footing, 4, "the cabin's four footing courses")
+			t.eq(counts.WallLog, 6, "its wall logs")
+			t.eq(counts.CornerPost, 2)
+			t.eq(counts.Chimney, 2)
+			t.eq(counts.FallenRoof, 1)
+			t.eq(counts.Floor, 1)
+			t.eq(counts.MillBase, 1, "the windmill's base")
+			t.eq(counts.Tower, 2, "and its tower")
+			t.eq(counts.Leg, 4, "the lookout's legs")
+			t.eq(counts.Deck, 1)
+			t.eq(counts.Rail, 4)
+			t.eq(counts.Ladder, 2)
+			-- The trim stays walk-through.
+			t.eq(counts.Sail, nil)
+			t.eq(counts.Spar, nil)
+			t.eq(counts.Brace, nil)
+			t.eq(counts.Rung, nil)
+			t.eq(counts.Board, nil)
 		end
 	end)
 
