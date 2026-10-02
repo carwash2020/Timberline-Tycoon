@@ -161,6 +161,51 @@ function World.forest(ctx, root, eye, budget)
 	return count
 end
 
+-- The grass tufts (FOR-04) ForestFiller builds round each of `eyes`
+-- (Vector3s) within `near` studs, as it builds them: one of eight
+-- PropArt.GrassTuft looks per grass tint, turned and stood on its spot.
+function World.tufts(ctx, root, eyes, near)
+	local CF = ctx.roblox.CFrame
+	local PropArt = ctx.art("PropArt")
+	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
+	for _, step in ipairs(WorldPlan.FillerSteps) do
+		step()
+	end
+	local done, looks = {}, {}
+	for _, eye in ipairs(eyes) do
+		for key in pairs(WorldPlan.TuftPlanAround(eye.X, eye.Y, eye.Z, near)) do
+			if not done[key] then
+				done[key] = true
+				local cx, cz = WorldPlan.FillerCellOf(key)
+				for _, tuft in ipairs(WorldPlan.TuftCell(cx, cz)) do
+					local variant = tuft.seed % 8 + 1
+					local id = tuft.biome .. "/" .. variant
+					local look = looks[id]
+					if not look then
+						look = {}
+						for _, p in
+							ipairs(
+								PropArt.GrassTuft(variant * 37 + 5, PropArt.Tints(tuft.biome).grass):GetDescendants()
+							)
+						do
+							if p:IsA("BasePart") then
+								table.insert(look, p)
+							end
+						end
+						looks[id] = look
+					end
+					local base = CF.new(tuft.x, tuft.y, tuft.z) * CF.Angles(0, tuft.yaw, 0)
+					for _, template in ipairs(look) do
+						local p = template:Clone()
+						p.CFrame = base * template.CFrame
+						p.Parent = root
+					end
+				end
+			end
+		end
+	end
+end
+
 function World.build(ctx, opts)
 	local roblox = ctx.roblox
 	local CF, V3 = roblox.CFrame, roblox.Vector3

@@ -20,6 +20,10 @@
 --   * A crown between the camera and what it looks at (or round the camera
 --     itself) fades (LocalTransparencyModifier), so the forest never hides
 --     your character.
+--   * Closer in (TuftNear), clumps of grass tufts (FOR-04: WorldPlan.TuftCell,
+--     PropArt.GrassTuft) at the forest's fringe, on the road verges, round
+--     the rocks and at the fence posts: their own layer of cells, built
+--     after the trees round you and before the stand-ins.
 -- Everything lives in the workspace folder "ForestFiller".
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -50,9 +54,16 @@ type Tree = { crown: { BasePart }, at: Vector3, r: number }
 type Cell = { mode: string, folder: Folder?, trees: { Tree } }
 local cells: { [number]: Cell } = {}
 local modes: { [number]: string } = {} -- each loaded cell's look, for FillerPlanAround
-type Job = { key: number, mode: string, d: number }
+type Job = { key: number, mode: string, d: number } -- mode "near", "far" or "tuft"
 local queue: { Job } = {} -- nearest last
 local unloads: { number } = {}
+
+-- The tufts' layer: per cell, its folder (nil when it has none).
+local TUFT_LOOKS = 8 -- looks per grass tint
+local tuftCells: { [number]: { folder: Folder? } } = {}
+local tuftLoaded: { [number]: boolean } = {} -- for TuftPlanAround
+local tuftUnloads: { number } = {}
+local tuftLooks: { [string]: { { PartSpec } } } = {}
 
 local folder: Folder? = nil
 local function root(): Folder
@@ -177,6 +188,71 @@ local function build(key: number, mode: string): Cell
 	return { mode = mode, folder = made, trees = trees }
 end
 
+-- A grass tint's tuft looks (PropArt.GrassTuft), built once each.
+local function tuftLook(biome: string, variant: number): { PartSpec }
+	local list = tuftLooks[biome]
+	if not list then
+		list = {}
+		tuftLooks[biome] = list
+	end
+	local look = list[variant]
+	if not look then
+		local parts: { PartSpec } = {}
+		local model = PropArt.GrassTuft(variant * 37 + 5, PropArt.Tints(biome).grass)
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local cf = d.CFrame
+				d.Parent = nil
+				table.insert(
+					parts,
+					{ template = d, offset = cf.Position, turn = cf - cf.Position, size = d.Size, crown = false }
+				)
+			end
+		end
+		model:Destroy()
+		list[variant] = parts
+		look = parts
+	end
+	return look
+end
+
+-- Builds cell `key`'s grass tufts (no folder if it has none).
+local function buildTufts(key: number)
+	local cx, cz = WorldPlan.FillerCellOf(key)
+	local made: Folder? = nil
+	for _, tuft in ipairs(WorldPlan.TuftCell(cx, cz)) do
+		local f: Folder
+		local existing = made
+		if existing then
+			f = existing
+		else
+			f = Instance.new("Folder")
+			f.Name = string.format("tuft %d %d", cx, cz)
+			made = f
+		end
+		local base = CFrame.new(tuft.x, tuft.y, tuft.z) * CFrame.Angles(0, tuft.yaw, 0)
+		for _, spec in ipairs(tuftLook(tuft.biome, tuft.seed % TUFT_LOOKS + 1)) do
+			local p = spec.template:Clone()
+			p.CFrame = base * CFrame.new(spec.offset) * spec.turn
+			p.Parent = f
+		end
+	end
+	if made then
+		made.Parent = root()
+	end
+	tuftCells[key] = { folder = made }
+	tuftLoaded[key] = true
+end
+
+local function unloadTufts(key: number)
+	local cell = tuftCells[key]
+	tuftCells[key] = nil
+	tuftLoaded[key] = nil
+	if cell and cell.folder then
+		cell.folder:Destroy()
+	end
+end
+
 local function unload(key: number)
 	local cell = cells[key]
 	if cell then
@@ -211,8 +287,22 @@ local function scan()
 		if modes[key] ~= mode then
 			local cx, cz = WorldPlan.FillerCellOf(key)
 			local dx, dz = (cx + 0.5) * CELL - p.X, (cz + 0.5) * CELL - p.Z
-			-- Real trees first, then the stand-ins, each nearest first.
-			table.insert(queue, { key = key, mode = mode, d = dx * dx + dz * dz + (if mode == "near" then 0 else 1e8) })
+			-- Real trees first, then the tufts, then the stand-ins, each nearest first.
+			table.insert(queue, { key = key, mode = mode, d = dx * dx + dz * dz + (if mode == "near" then 0 else 2e8) })
+		end
+	end
+	table.clear(tuftUnloads)
+	local tufts = WorldPlan.TuftPlanAround(p.X, p.Y, p.Z, budget.TuftNear, tuftLoaded)
+	for key in pairs(tuftCells) do
+		if not tufts[key] then
+			table.insert(tuftUnloads, key)
+		end
+	end
+	for key in pairs(tufts) do
+		if not tuftCells[key] then
+			local cx, cz = WorldPlan.FillerCellOf(key)
+			local dx, dz = (cx + 0.5) * CELL - p.X, (cz + 0.5) * CELL - p.Z
+			table.insert(queue, { key = key, mode = "tuft", d = dx * dx + dz * dz + 1e8 })
 		end
 	end
 	table.sort(queue, function(a: Job, b: Job): boolean
@@ -226,15 +316,25 @@ local function work()
 		unload(table.remove(unloads) :: number)
 		n += 1
 	end
+	while #tuftUnloads > 0 and n < UNLOADS_PER_FRAME do
+		unloadTufts(table.remove(tuftUnloads) :: number)
+		n += 1
+	end
 	local started = os.clock()
 	local budget = Quality.Budget().FillerBuildMs / 1000
 	while #queue > 0 and os.clock() - started < budget do
 		local job = table.remove(queue) :: Job
-		local old = cells[job.key]
-		cells[job.key] = build(job.key, job.mode)
-		modes[job.key] = job.mode
-		if old and old.folder then
-			old.folder:Destroy() -- after the new look is in
+		if job.mode == "tuft" then
+			if not tuftCells[job.key] then
+				buildTufts(job.key)
+			end
+		else
+			local old = cells[job.key]
+			cells[job.key] = build(job.key, job.mode)
+			modes[job.key] = job.mode
+			if old and old.folder then
+				old.folder:Destroy() -- after the new look is in
+			end
 		end
 	end
 end

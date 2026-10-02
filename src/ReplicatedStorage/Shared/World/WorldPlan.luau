@@ -4112,6 +4112,160 @@ end
 
 -- Whether a filler trunk stands within `r` of (x, z) (AmbientLife keeps
 -- its ground decoration out of them). False until the plan is ready.
+-- Grass tufts (FOR-04): clumps of PropArt.GrassTuft where grass grows
+-- long, round the camera (ForestFiller, within QualityBudgets' TuftNear):
+-- along the forest's fringe (ForestCover TUFT_EDGE), on the road verges
+-- (within TUFT_VERGE of a road's edge, never on it), round the boulders,
+-- the cluster rocks and the scenery's outcrops, and at the foot of the
+-- scenery's fence posts. Never in town or on the plots, on the water,
+-- snow or the volcano's rock, nor up the mountains. `biome` picks the
+-- grass's tint (PropArt.Tints).
+export type Tuft = { x: number, y: number, z: number, yaw: number, seed: number, biome: string }
+local TUFT_EDGE = { 0.28, 0.62 }
+local TUFT_VERGE = { 0.6, 3.5 }
+local TUFT_TRIES = 16 -- candidates per cell for the fringe and the verges
+local TUFT_NO: { [string]: boolean } = { snow = true, volcano = true }
+
+-- What tufts gather round, binned by FILLER_CELL squares: rocks (a disc to
+-- ring) and fence posts (a point beside each).
+type TuftAnchor = { x: number, z: number, r: number, post: boolean }
+local cachedTuftAnchors: { [number]: { TuftAnchor } }? = nil
+local function tuftAnchors(): { [number]: { TuftAnchor } }
+	if cachedTuftAnchors then
+		return cachedTuftAnchors
+	end
+	local bins: { [number]: { TuftAnchor } } = {}
+	local function add(x: number, z: number, r: number, post: boolean)
+		local key = binKey(x // FILLER_CELL, z // FILLER_CELL)
+		local bin = bins[key]
+		if not bin then
+			bin = {}
+			bins[key] = bin
+		end
+		table.insert(bin, { x = x, z = z, r = r, post = post })
+	end
+	for _, b in ipairs(WorldPlan.Boulders()) do
+		add(b.position.X, b.position.Z, b.size * 0.5, false)
+	end
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		for _, rock in ipairs(c.rocks) do
+			add(rock.position.X, rock.position.Z, rock.size * 0.5, false)
+		end
+	end
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		for _, item in ipairs(spot.items) do
+			if item.builder == "Outcrop" then
+				add(item.cframe.X, item.cframe.Z, 5, false)
+			elseif item.builder == "Fence" then
+				local posts = math.max(2, math.floor(item.size / 6) + 1)
+				for i = 0, posts - 1 do
+					local x = -item.size / 2 + i * item.size / (posts - 1)
+					for _, side in ipairs({ -0.9, 0.9 }) do
+						local p = item.cframe * Vector3.new(x, 0, side)
+						add(p.X, p.Z, 0, true)
+					end
+				end
+			end
+		end
+	end
+	cachedTuftAnchors = bins
+	return bins
+end
+
+local cachedTuftCells: { [number]: { Tuft } } = {}
+
+-- The grass tufts in cell (cx, cz). Each candidate draws the same rng
+-- numbers whether it grows or not.
+function WorldPlan.TuftCell(cx: number, cz: number): { Tuft }
+	local key = binKey(cx, cz)
+	local done = cachedTuftCells[key]
+	if done then
+		return done
+	end
+	local out: { Tuft } = {}
+	local rng = Kit.rng(cellSeed(cx, cz) + 909)
+	local function add(x: number, z: number, yaw: number, seed: number)
+		if WorldLayout.FlatWeight(x, z) > 0 or TerrainGen.RoadClearance(x, z) < TUFT_VERGE[1] then
+			return
+		end
+		if TerrainGen.WaterLevelAt(x, z) ~= nil then
+			return
+		end
+		local coast = WorldLayout.Coast
+		if z < coast.northZ and x > coast.shoreX - coast.beachWidth - 10 then
+			return
+		end
+		local biome = BiomeData.At(x, z)
+		local id = if biome then biome.id else "starter"
+		if TUFT_NO[id] then
+			return
+		end
+		local h = TerrainGen.HeightAt(x, z)
+		if h < FILLER_LOW then
+			table.insert(out, { x = x, y = h, z = z, yaw = yaw, seed = seed, biome = id })
+		end
+	end
+	-- The forest's fringe and the road verges.
+	for _ = 1, TUFT_TRIES do
+		local x = cx * FILLER_CELL + rng:next() * FILLER_CELL
+		local z = cz * FILLER_CELL + rng:next() * FILLER_CELL
+		local roll, yaw, seed = rng:next(), rng:range(0, math.pi * 2), rng:int(1, 99999)
+		local roads = TerrainGen.RoadClearance(x, z)
+		if roads <= TUFT_VERGE[2] then
+			if roll < 0.55 then
+				add(x, z, yaw, seed)
+			end
+		elseif roll < 0.6 then
+			local c = WorldLayout.ForestCover(x, z)
+			if c > TUFT_EDGE[1] and c < TUFT_EDGE[2] then
+				add(x, z, yaw, seed)
+			end
+		end
+	end
+	-- Round the rocks and at the fence posts whose middles are in this cell.
+	local anchors: { TuftAnchor } = tuftAnchors()[key] or {}
+	for _, anchor in ipairs(anchors) do
+		local count = if anchor.post then 1 else 3
+		local start = rng:range(0, math.pi * 2)
+		for k = 1, count do
+			local a = start + k * math.pi * 2 / count + rng:range(-0.4, 0.4)
+			local r = if anchor.post then 0 else anchor.r + rng:range(0.2, 0.8)
+			add(anchor.x + math.cos(a) * r, anchor.z + math.sin(a) * r, rng:range(0, math.pi * 2), rng:int(1, 99999))
+		end
+	end
+	cachedTuftCells[key] = out
+	return out
+end
+
+-- The cells round (px, py, pz) that get their tufts (within `near`, or
+-- `near` + FillerHysteresis for the ones `current` has).
+function WorldPlan.TuftPlanAround(
+	px: number,
+	py: number,
+	pz: number,
+	near: number,
+	current: { [number]: boolean }?
+): { [number]: boolean }
+	local out: { [number]: boolean } = {}
+	local dy = math.max(0, py - TerrainGen.HeightAt(px, pz) - 40)
+	local reach = near + WorldPlan.FillerHysteresis
+	if dy >= reach then
+		return out
+	end
+	for cx = (px - reach) // FILLER_CELL, (px + reach) // FILLER_CELL do
+		for cz = (pz - reach) // FILLER_CELL, (pz + reach) // FILLER_CELL do
+			local dx = (cx + 0.5) * FILLER_CELL - px
+			local dz = (cz + 0.5) * FILLER_CELL - pz
+			local d = math.sqrt(dx * dx + dz * dz + dy * dy)
+			local key = binKey(cx, cz)
+			if d <= near or (current and current[key] and d <= reach) then
+				out[key] = true
+			end
+		end
+	end
+	return out
+end
+
 function WorldPlan.FillerTrunkNear(x: number, z: number, r: number): boolean
 	if not cachedFillerClutter then
 		return false

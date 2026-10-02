@@ -583,10 +583,15 @@ return function(t)
 				far += #WorldPlan.FillerFarCell(cx, cz)
 			end
 		end
+		-- And the grass tufts (FOR-04): 9 parts each at most (PropArt.spec).
+		for key in pairs(WorldPlan.TuftPlanAround(x, y, z, budget.TuftNear)) do
+			local cx, cz = WorldPlan.FillerCellOf(key)
+			near += #WorldPlan.TuftCell(cx, cz) * 9
+		end
 		return near, far, trees
 	end
 
-	t.test("FOR-02: budgets: filler and stand-ins in view stay under 6,000 parts on low, 14,000 on high", function()
+	t.test("FOR-02: budgets: filler, tufts and stand-ins in view under 6,000 parts on low, 14,000 on high", function()
 		local spots = {
 			{ "the spawn", WorldPlan.SpawnEye() },
 			{ "the Starter Forest", t.roblox.Vector3.new(0, 8, -110) },
@@ -606,7 +611,7 @@ return function(t)
 				local limit = if tier == "low" then 6000 else 14000
 				t.ok(
 					near + far < limit,
-					string.format("%s at %s: %d filler + %d stand-in parts", tier, spot[1], near, far)
+					string.format("%s at %s: %d filler and tuft + %d stand-in parts", tier, spot[1], near, far)
 				)
 				most[tier] = math.max(most[tier], near + far)
 			end
@@ -862,4 +867,235 @@ return function(t)
 		t.ok(forest / #forestTrees <= 36, string.format("%.1f parts a forest tree", forest / #forestTrees))
 		t.ok(total < 27500, total .. " parts in the ground's trees")
 	end)
+
+	---------------------------------------------------------------------------
+	-- FOR-04: the ground: the forest floor, the grass, the tufts
+	---------------------------------------------------------------------------
+
+	local function materialAt(x, z)
+		local _, m = TerrainGen.Sample(x, z)
+		return m
+	end
+
+	t.test("FOR-04: under the canopy the floor is LeafyGrass (bare Ground where worn), never bladed Grass", function()
+		local counts, n = {}, 0
+		local problems = {}
+		for x = -1150, 1150, 19 do
+			for z = -1150, 1150, 19 do
+				local c, ring = cover(x, z)
+				if c > 0.66 and land(x, z) and not BiomeData.At(x, z) and TerrainGen.RoadClearance(x, z) > 2 then
+					local m = materialAt(x, z)
+					counts[m] = (counts[m] or 0) + 1
+					n += 1
+					if m == "Grass" then
+						table.insert(problems, string.format("Grass under the canopy at (%d, %d)", x, z))
+					end
+				end
+			end
+		end
+		t.ok(n > 2000, n .. " samples under the canopy")
+		t.ok(#problems == 0, report(problems))
+		t.ok(
+			(counts.LeafyGrass or 0) / n > 0.85,
+			string.format("%.0f%% LeafyGrass", (counts.LeafyGrass or 0) / n * 100)
+		)
+		t.ok((counts.Ground or 0) / n > 0.01, "and some bare earth")
+	end)
+
+	t.test("FOR-04: the hub's lawns and the open meadows keep their bladed Grass", function()
+		-- The plot district's lawn (Terrain.spec pins it plain Grass), the
+		-- town's lawn north of the pine band, and the wild meadows.
+		local function share(x0, x1, z0, z1)
+			local grass, n = 0, 0
+			for x = x0, x1, 9 do
+				for z = z0, z1, 9 do
+					if cover(x, z) == 0 and TerrainGen.RoadClearance(x, z) > 3 and land(x, z) then
+						n += 1
+						grass += if materialAt(x, z) == "Grass" then 1 else 0
+					end
+				end
+			end
+			return grass / math.max(n, 1), n
+		end
+		local lawn, n1 = share(-100, 120, 240, 300)
+		t.ok(n1 > 50 and lawn > 0.4, string.format("the town's north lawn is %.0f%% Grass", lawn * 100))
+		local meadow, n2 = share(-1150, -950, -1100, -400)
+		t.ok(n2 > 300 and meadow > 0.4, string.format("the west meadow is %.0f%% Grass", meadow * 100))
+	end)
+
+	t.test(
+		"FOR-04: the new floor moves nothing that stands on grass: clusters, footbridge, docks, lighthouse",
+		function()
+			-- A fingerprint of the boulder clusters' rocks, the footbridge, the
+			-- docks and the lighthouse, worked out before the forest floor (their
+			-- searches read the terrain's material: grass under a rock or a deck).
+			local h = 7
+			local function add(s)
+				for k = 1, #s do
+					h = (h * 31 + string.byte(s, k)) % 1000000007
+				end
+			end
+			for _, c in ipairs(WorldPlan.BoulderClusters()) do
+				for _, r in ipairs(c.rocks) do
+					add(string.format("%.2f %.2f %.2f;", r.position.X, r.position.Z, r.size))
+				end
+			end
+			local b = WorldPlan.Footbridge()
+			add(string.format("%.2f %.2f %.2f;", b.cframe.X, b.cframe.Z, b.span))
+			for _, d in ipairs(WorldPlan.Docks()) do
+				add(string.format("%s %.2f %.2f;", d.kind, d.cframe.X, d.cframe.Z))
+			end
+			local l = WorldPlan.Lighthouse()
+			add(string.format("%.2f %.2f;", l.cframe.X, l.cframe.Z))
+			t.eq(h, 749653094, "a cluster or landmark moved")
+		end
+	)
+
+	t.test("FOR-04: the project's grass: blades on, GrassLength 0.45-0.6; streaming out far content", function()
+		local serde = require("@lune/serde")
+		local tree = serde.decode("json", fs.readFile("default.project.json")).tree
+		local terrain = tree.Workspace.Terrain["$properties"]
+		t.eq(terrain.Decoration, true, "grass blades on (they grow on Grass only)")
+		t.ok(terrain.GrassLength >= 0.45 and terrain.GrassLength <= 0.6, "GrassLength " .. terrain.GrassLength)
+		local workspace = tree.Workspace["$properties"]
+		t.eq(workspace.StreamOutBehavior, "Opportunistic", "far server content streams out on any device")
+		t.ok(
+			QualityBudgets.High.FillerFar < workspace.StreamingTargetRadius,
+			"stand-ins never outreach the streamed terrain"
+		)
+	end)
+
+	t.test("FOR-04: Timber ground MaterialVariants are in MaterialService, off until checked in Studio", function()
+		local serde = require("@lune/serde")
+		local want = { TimberGrass = "Grass", TimberLeafy = "LeafyGrass", TimberGround = "Ground" }
+		for name, base in pairs(want) do
+			local file = "src/MaterialService/" .. name .. ".model.json"
+			local def = serde.decode("json", fs.readFile(file))
+			t.eq(def.className, "MaterialVariant", file)
+			local props = def.properties
+			t.eq(props.BaseMaterial, base, name .. "'s base material")
+			for _, map in ipairs({ "ColorMap", "NormalMap", "RoughnessMap" }) do
+				t.ok(string.match(props[map], "^rbxassetid://%d+$"), name .. "'s " .. map)
+			end
+			t.ok(props.StudsPerTile >= 16 and props.StudsPerTile <= 24, name .. "'s tiling")
+			t.eq(props.MaterialPattern, "Organic", name .. " tiles organically")
+		end
+		local tree = serde.decode("json", fs.readFile("default.project.json")).tree
+		local service = tree.MaterialService
+		t.eq(service["$className"], "MaterialService")
+		t.eq(service["$path"], "src/MaterialService")
+		t.eq(service["$ignoreUnknownInstances"], true, "never deletes a variant made in Studio")
+		-- The textures can't be checked from here (Roblox's asset servers are
+		-- out of reach): no base material is switched over to them until
+		-- Connor has seen them in Studio (GrassName and friends stay default).
+		local props = service["$properties"] or {}
+		for _, key in ipairs({ "GrassName", "LeafyGrassName", "GroundName" }) do
+			t.eq(props[key], nil, key .. " is left to Studio for now")
+		end
+	end)
+
+	t.test("FOR-04: a grass tuft is 5-7 thin fanned blades with two lighter tips, shadowless decoration", function()
+		local grass = PropArt.Tints("starter").grass
+		local _, _, gv = grass:ToHSV()
+		for seed = 1, 40 do
+			local model = PropArt.GrassTuft(seed, grass)
+			local blades, tips = {}, {}
+			for _, p in ipairs(parts(model)) do
+				t.ok(not p.CanCollide and not p.CanQuery and not p.CanTouch and not p.CastShadow, "decoration")
+				t.ok(p.Size.X <= 0.16, "thin")
+				if p.Name == "Blade" then
+					table.insert(blades, p)
+				elseif p.Name == "BladeTip" then
+					table.insert(tips, p)
+				end
+			end
+			t.ok(#blades >= 5 and #blades <= 7, #blades .. " blades")
+			t.eq(#tips, 2, "two sunlit tips")
+			for _, tip in ipairs(tips) do
+				local _, _, v = tip.Color:ToHSV()
+				t.ok(v > gv, "a tip is lighter than the grass")
+			end
+			-- Fanned: each blade leans away from the root (its top further out).
+			local out = 0
+			for _, p in ipairs(blades) do
+				local top = (p.CFrame * t.roblox.Vector3.new(0, p.Size.Y / 2, 0))
+				local foot = (p.CFrame * t.roblox.Vector3.new(0, -p.Size.Y / 2, 0))
+				local reachTop = Vector2.new(top.X, top.Z).Magnitude
+				local reachFoot = Vector2.new(foot.X, foot.Z).Magnitude
+				out += if reachTop > reachFoot then 1 else 0
+				t.ok(foot.Y < 0.05 and top.Y > 0.5, "rooted in the ground, standing up")
+			end
+			t.ok(out >= #blades - 1, out .. " of " .. #blades .. " blades lean outward")
+		end
+	end)
+
+	t.test(
+		"FOR-04: tufts gather at the forest's fringe, the verges, the rocks and the fences, never on a road",
+		function()
+			local problems = {}
+			local kinds = { fringe = 0, verge = 0, rock = 0 }
+			local rocks = {}
+			for _, b in ipairs(WorldPlan.Boulders()) do
+				table.insert(rocks, { b.position.X, b.position.Z, b.size })
+			end
+			for _, c in ipairs(WorldPlan.BoulderClusters()) do
+				for _, r in ipairs(c.rocks) do
+					table.insert(rocks, { r.position.X, r.position.Z, r.size })
+				end
+			end
+			local total = 0
+			for cx = -30, 29 do
+				for cz = -30, 29 do
+					for _, tuft in ipairs(WorldPlan.TuftCell(cx, cz)) do
+						total += 1
+						local x, z = tuft.x, tuft.z
+						local here = string.format("a tuft at (%.0f, %.0f)", x, z)
+						if TerrainGen.RoadClearance(x, z) < 0.6 then
+							table.insert(problems, here .. " on a road")
+						end
+						if WorldLayout.FlatWeight(x, z) > 0 then
+							table.insert(problems, here .. " in town or on the plots")
+						end
+						if TerrainGen.WaterLevelAt(x, z) ~= nil then
+							table.insert(problems, here .. " in the water")
+						end
+						if math.abs(tuft.y - TerrainGen.HeightAt(x, z)) > 1e-6 then
+							table.insert(problems, here .. " off the ground")
+						end
+						local biome = BiomeData.At(x, z)
+						if biome and (biome.id == "snow" or biome.id == "volcano") then
+							table.insert(problems, here .. " on " .. biome.id)
+						end
+						local roads = TerrainGen.RoadClearance(x, z)
+						if roads <= 3.6 then
+							kinds.verge += 1
+						else
+							local nearRock = false
+							for _, r in ipairs(rocks) do
+								if Vector2.new(x - r[1], z - r[2]).Magnitude < r[3] then
+									nearRock = true
+									break
+								end
+							end
+							if nearRock then
+								kinds.rock += 1
+							else
+								kinds.fringe += 1
+							end
+						end
+					end
+				end
+			end
+			t.ok(#problems == 0, report(problems))
+			for kind, n in pairs(kinds) do
+				t.ok(n > 30, string.format("%d tufts by the %ss", n, kind))
+			end
+			local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan")
+			for i = 1, 30 do
+				local cx, cz = (i * 7) % 40 - 20, (i * 11) % 40 - 20
+				t.eq(again.TuftCell(cx, cz), WorldPlan.TuftCell(cx, cz), "the same tufts on every client")
+			end
+			t.ok(total > 1000, total .. " tufts in the middle of the map")
+		end
+	)
 end

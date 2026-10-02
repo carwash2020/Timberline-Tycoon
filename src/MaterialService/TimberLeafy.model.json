@@ -1,0 +1,11 @@
+{
+  "className": "MaterialVariant",
+  "properties": {
+    "BaseMaterial": "LeafyGrass",
+    "ColorMap": "rbxassetid://9920557906",
+    "NormalMap": "rbxassetid://9439080781",
+    "RoughnessMap": "rbxassetid://9439080950",
+    "StudsPerTile": 18,
+    "MaterialPattern": "Organic"
+  }
+}

@@ -28,6 +28,7 @@ return function(t)
 		"FillerNear",
 		"FillerFar",
 		"FillerBuildMs",
+		"TuftNear",
 	}
 
 	t.test("high is today's look", function()
@@ -50,6 +51,7 @@ return function(t)
 			FillerNear = 480,
 			FillerFar = 1000,
 			FillerBuildMs = 2,
+			TuftNear = 150, -- grass tufts (FOR-04, new)
 		})
 		t.eq(QualityBudgets.High.MaxCritters, EnvironmentData.MaxCritters, "the same cap the critter plan was made for")
 	end)
@@ -72,6 +74,7 @@ return function(t)
 			FillerNear = 340, -- the forest's edges round the spawn stay trees
 			FillerFar = 640,
 			FillerBuildMs = 1.2,
+			TuftNear = 90,
 		})
 	end)
 
@@ -417,7 +420,7 @@ return function(t)
 			WeatherController = { "WeatherRate" },
 			LightingController = { "SunRays", "DepthOfField", "Bloom" },
 			TownFX = { "TownFxNear" },
-			ForestFiller = { "FillerNear", "FillerFar", "FillerBuildMs" },
+			ForestFiller = { "FillerNear", "FillerFar", "FillerBuildMs", "TuftNear" },
 		}
 		local gone = {
 			AmbientLife = {

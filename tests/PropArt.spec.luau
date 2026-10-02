@@ -69,7 +69,7 @@ return function(t)
 			function(s)
 				return PropArt.GrassTuft(s, tints.grass)
 			end,
-			4,
+			9, -- 5-7 fanned blades and 2 sunlit tips (FOR-04)
 		},
 		{
 			"Fern",

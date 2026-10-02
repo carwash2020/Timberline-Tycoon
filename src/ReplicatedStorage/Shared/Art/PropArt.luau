@@ -471,22 +471,44 @@ function PropArt.Flowers(seed: number, colors: { Color3 }): Model
 	return model
 end
 
--- A tuft of 2-4 thin, pointed grass blades.
+-- A tuft of grass (FOR-04): five to seven thin pointed blades fanned out
+-- from one root, the tall middle ones lighter, the two tallest with a
+-- sunlit yellow-green tip (a little wedge over the blade's point, nudged
+-- forward so its faces never fight the blade's). Shadowless decoration.
+local TIP = hex("#E4E28C")
 function PropArt.GrassTuft(seed: number, color: Color3): Model
 	local model = Kit.model("GrassTuft")
 	local rng = Kit.rng(seed)
 	local yaw = rng:range(0, math.pi * 2)
-	for i = 1, rng:int(2, 4) do
-		local h = rng:range(0.8, 1.6)
-		local a = yaw + i * 2.3
+	local n = rng:int(5, 7)
+	local spread = rng:range(0.42, 0.6) -- radians between neighbouring blades
+	local blades: { { h: number, cf: CFrame, size: Vector3 } } = {}
+	for i = 1, n do
+		local mid = 1 - math.abs(i - (n + 1) / 2) / ((n + 1) / 2) -- 1 in the middle, ~0 at the ends
+		local h = rng:range(0.7, 1.0) + mid * rng:range(0.5, 0.8)
+		local a = yaw + (i - (n + 1) / 2) * spread
+		local size = Vector3.new(rng:range(0.1, 0.13), h, rng:range(0.32, 0.46))
+		-- Rooted together, each leaning out along its own side of the fan.
+		local cf = CFrame.new(math.cos(a) * 0.12, 0, math.sin(a) * 0.12)
+			* CFrame.Angles(0, -a - math.pi / 2, 0) -- its front (-Z) toward (cos a, sin a)
+			* CFrame.Angles(-(0.12 + (1 - mid) * rng:range(0.25, 0.45)), 0, rng:range(-0.12, 0.12))
+			* CFrame.new(0, h / 2 - 0.05, 0)
+		local shade = Kit.shade(Kit.vary(color, rng, 0.05), -0.08 + mid * 0.16)
+		wedgeBit(model, "Blade", size, cf, shade, Enum.Material.SmoothPlastic)
+		table.insert(blades, { h = h, cf = cf, size = size })
+	end
+	table.sort(blades, function(p, q)
+		return p.h > q.h
+	end)
+	for k = 1, 2 do
+		local b = blades[k]
+		local tip = b.size * Vector3.new(1.12, 0.32, 0.32)
 		wedgeBit(
 			model,
-			"Blade",
-			Vector3.new(0.12, h, rng:range(0.35, 0.55)),
-			CFrame.new(math.cos(a) * 0.15, h / 2 - 0.05, math.sin(a) * 0.15)
-				* CFrame.Angles(0, a, 0)
-				* CFrame.Angles(rng:range(-0.35, -0.05), 0, rng:range(-0.2, 0.2)),
-			Kit.vary(color, rng, 0.06),
+			"BladeTip",
+			tip,
+			b.cf * CFrame.new(0, (b.size.Y - tip.Y) / 2, (b.size.Z - tip.Z) / 2 - 0.02),
+			Kit.vary(color:Lerp(TIP, 0.55), rng, 0.04),
 			Enum.Material.SmoothPlastic
 		)
 	end

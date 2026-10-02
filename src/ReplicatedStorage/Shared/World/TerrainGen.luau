@@ -461,7 +461,17 @@ local function meadow(x: number, z: number, flat: number, bank: number): string
 	if noise(x / 80, z / 80, 10.3) > 0.45 and dither(x, z) > -0.1 then
 		return "Ground"
 	end
-	return swaths(x, z)
+	-- Under the forest's canopy (FOR-04: WorldLayout.ForestCover over 0.5,
+	-- its edge dithered) the floor is LeafyGrass, which grows no grass
+	-- blades: cheaper, and no blades poking through the trees. Its worn
+	-- patches stay Ground (bare earth under the trees), so whatever stood
+	-- on grass before still does (the boulder clusters, the landmarks).
+	-- (Only a Grass swath asks: a LeafyGrass one is the forest floor anyway.)
+	local swath = swaths(x, z)
+	if swath == "Grass" and WorldLayout.ForestCover(x, z) > 0.5 + dither(x, z) * 0.12 then
+		return "LeafyGrass"
+	end
+	return swath
 end
 
 -- The surface material (an Enum.Material name) for a column of height h

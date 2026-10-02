@@ -120,7 +120,19 @@ return function(t)
 				far += #w.WorldPlan.FillerFarCell(cx, cz)
 			end
 		end
-		return near, far
+		-- The tufts' layer (FOR-04): every tuft is one of PropArt.GrassTuft's
+		-- looks, so count each cell's by building them.
+		local tufts = 0
+		for key in pairs(w.WorldPlan.TuftPlanAround(at.X, at.Y, at.Z, budget.TuftNear)) do
+			local cx, cz = w.WorldPlan.FillerCellOf(key)
+			for _, tuft in ipairs(w.WorldPlan.TuftCell(cx, cz)) do
+				local look = w.PropArt.GrassTuft((tuft.seed % 8 + 1) * 37 + 5, w.PropArt.Tints(tuft.biome).grass)
+				for _, d in ipairs(look:GetDescendants()) do
+					tufts += if d:IsA("BasePart") then 1 else 0
+				end
+			end
+		end
+		return near, far, tufts
 	end
 
 	-- A part's LocalTransparencyModifier (Lune has no default for it: unset is 0).
@@ -132,15 +144,18 @@ return function(t)
 	end
 
 	local function count(folder)
-		local near, far, bad = 0, 0, {}
+		local near, far, tufts, bad = 0, 0, 0, {}
 		local names = {}
 		for _, cell in ipairs(folder:GetChildren()) do
 			t.ok(not names[cell.Name], "cell " .. cell.Name .. " built twice")
 			names[cell.Name] = true
 			for _, p in ipairs(cell:GetChildren()) do
 				if p:IsA("BasePart") then
-					if string.sub(cell.Name, 1, 4) == "near" then
+					local mode = string.match(cell.Name, "^%a+")
+					if mode == "near" then
 						near += 1
+					elseif mode == "tuft" then
+						tufts += 1
 					else
 						far += 1
 					end
@@ -150,7 +165,7 @@ return function(t)
 				end
 			end
 		end
-		return near, far, bad
+		return near, far, bad, tufts
 	end
 
 	t.test("it builds exactly the plan round the camera, all of it decoration", function()
@@ -164,11 +179,13 @@ return function(t)
 			t.ok(frames < 4000, tier .. ": it finishes loading")
 			local folder = w.folder()
 			t.ok(folder and folder:IsA("Folder"), "the ForestFiller folder")
-			local near, far, bad = count(folder)
-			local wantNear, wantFar = expected(w, at)
+			local near, far, bad, tufts = count(folder)
+			local wantNear, wantFar, wantTufts = expected(w, at)
 			t.eq(near, wantNear, tier .. ": filler parts")
 			t.eq(far, wantFar, tier .. ": stand-in parts")
+			t.eq(tufts, wantTufts, tier .. ": grass tuft parts")
 			t.ok(near > 1000, tier .. ": " .. near .. " filler parts round you")
+			t.ok(tufts > 0, tier .. ": " .. tufts .. " tuft parts round you")
 			t.eq(#bad, 0, "parts that aren't decoration: " .. table.concat(bad, ", "))
 		end
 	end)

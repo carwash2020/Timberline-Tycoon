@@ -14,6 +14,12 @@ return {
 	build = function(ctx)
 		local built = World.build(ctx, { forest = true })
 		built.cameras = Eye.cameras(ctx)
+		-- And the grass tufts round each eye (FOR-04), as ForestFiller builds them.
+		local eyes = {}
+		for _, cam in ipairs(built.cameras) do
+			table.insert(eyes, ctx.roblox.Vector3.new(cam.pos[1], cam.pos[2], cam.pos[3]))
+		end
+		World.tufts(ctx, built.root, eyes, ctx.shared("QualityBudgets").High.TuftNear)
 		return built
 	end,
 }

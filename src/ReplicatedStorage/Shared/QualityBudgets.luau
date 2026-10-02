@@ -42,6 +42,7 @@ export type Budget = {
 	FillerNear: number, -- studs: real filler trees in the cells within this of the camera
 	FillerFar: number, -- studs: and dark stand-in blocks for the forest out to this
 	FillerBuildMs: number, -- milliseconds a frame it may spend building cells
+	TuftNear: number, -- studs: grass tufts at the forest's fringe, verges, rocks and fences (FOR-04)
 }
 
 QualityBudgets.High = table.freeze({
@@ -64,6 +65,7 @@ QualityBudgets.High = table.freeze({
 	FillerNear = 480,
 	FillerFar = 1000,
 	FillerBuildMs = 2,
+	TuftNear = 150,
 }) :: Budget
 
 -- PLAY-05's acceptance: on low, the workspace.AmbientLife folder holds 160
@@ -100,6 +102,7 @@ QualityBudgets.Low = table.freeze({
 	FillerNear = 340, -- the forest edges round the spawn (300-340 studs off) are real trees
 	FillerFar = 640,
 	FillerBuildMs = 1.2,
+	TuftNear = 90,
 }) :: Budget
 
 -- The budget for a tier ("low" or "high"; anything else gets "high").
