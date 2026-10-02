@@ -29,6 +29,9 @@ return function(t)
 		"FillerFar",
 		"FillerBuildMs",
 		"TuftNear",
+		"ChipCount",
+		"LeafPool",
+		"LeafShadows",
 	}
 
 	t.test("high is today's look", function()
@@ -52,6 +55,10 @@ return function(t)
 			FillerFar = 1000,
 			FillerBuildMs = 2,
 			TuftNear = 150, -- grass tufts (FOR-04, new)
+			-- WoodFX (the v2 loop, V2_PLAN.md §16, new): pooled chips and leaves.
+			ChipCount = 48,
+			LeafPool = 64,
+			LeafShadows = true,
 		})
 		t.eq(QualityBudgets.High.MaxCritters, EnvironmentData.MaxCritters, "the same cap the critter plan was made for")
 	end)
@@ -75,6 +82,10 @@ return function(t)
 			FillerFar = 640,
 			FillerBuildMs = 1.2,
 			TuftNear = 90,
+			-- WoodFX (V2_PLAN.md §16): half the chips and leaves, no leaf shadows.
+			ChipCount = 24,
+			LeafPool = 32,
+			LeafShadows = false,
 		})
 	end)
 
@@ -365,7 +376,7 @@ return function(t)
 			t.ok(table.isfrozen(budget), "frozen")
 		end
 		for _, key in ipairs(KEYS) do
-			if key ~= "Tier" then
+			if key ~= "Tier" and type(QualityBudgets.High[key]) == "number" then
 				t.ok(QualityBudgets.Low[key] <= QualityBudgets.High[key], key)
 				t.ok(QualityBudgets.Low[key] >= 0, key)
 			end
@@ -421,6 +432,7 @@ return function(t)
 			LightingController = { "SunRays", "DepthOfField", "Bloom" },
 			TownFX = { "TownFxNear" },
 			ForestFiller = { "FillerNear", "FillerFar", "FillerBuildMs", "TuftNear" },
+			WoodFX = { "ChipCount", "LeafPool", "LeafShadows" }, -- the v2 loop (M1.3)
 		}
 		local gone = {
 			AmbientLife = {

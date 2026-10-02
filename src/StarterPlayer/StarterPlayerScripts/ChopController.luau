@@ -18,6 +18,10 @@
 -- only when it's more than 15 degrees off to the side), so the slash lands
 -- on the trunk; holding to chop turns you again on every swing. Not while
 -- you sit or climb.
+--
+-- The v1 loop only: under the v2 loop (Shared/CoreLoop) CutController
+-- swings the axe (sections and crystal nodes) and this never swings or
+-- outlines anything.
 
 local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
@@ -26,6 +30,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -225,6 +230,9 @@ local function equipped(): (Tool?, ItemCatalog.AxeDef?, BasePart?)
 end
 
 local function trySwing(fromClick: boolean)
+	if CoreLoop.V2() then
+		return -- CutController swings in the v2 loop
+	end
 	local now = os.clock()
 	if now < cooldownUntil then
 		return
@@ -259,6 +267,10 @@ end
 local function updateOutline()
 	local hl = highlight
 	if not hl then
+		return
+	end
+	if CoreLoop.V2() then
+		hl.Enabled = false
 		return
 	end
 	local _tool, axe, hrp = equipped()

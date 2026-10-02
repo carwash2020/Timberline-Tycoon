@@ -49,8 +49,9 @@
 -- PlanterId, Uid) plus HomePivot (its PrimaryPart's CFrame), SwayTop (the
 -- top of its trunk, where the crown rocks about), Sapling (true while a
 -- sapling), GrewAt (server time it last grew: the regrow spring),
--- PreDead, Dead and DeadAt (server time: the death sink), and after a
--- felling the Stump tag with TreeUid, FellAt and FallDir.
+-- PreDead, Dead and DeadAt (server time: the death sink), HP (1 while it
+-- can be cut, else 0), and after a felling the Stump tag with TreeUid,
+-- FellAt and FallDir.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -346,8 +347,16 @@ local function canBeCut(rec: TreeRecord): boolean
 	return not rec.felled and not rec.dormant and not rec.dead and rec.stage > 0
 end
 
+-- The model's HP attribute mirrors it, 1 or 0, for code that finds a
+-- standing tree that way (QuestUI's beacon; TreeUI shows no bar without
+-- MaxHP).
+local function setAlive(rec: TreeRecord, alive: boolean)
+	rec.alive = alive
+	rec.model:SetAttribute("HP", if alive then 1 else 0)
+end
+
 local function refreshAlive(rec: TreeRecord)
-	rec.alive = canBeCut(rec)
+	setAlive(rec, canBeCut(rec))
 end
 
 ---------------------------------------------------------------------------
@@ -606,7 +615,7 @@ end
 -- Dead: dark, dull, nothing to cut; clients sink it, then it goes.
 local function die(rec: TreeRecord)
 	rec.dead = true
-	rec.alive = false
+	setAlive(rec, false)
 	local model = rec.model
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
@@ -810,7 +819,7 @@ end
 ---------------------------------------------------------------------------
 
 local function fall(rec: TreeRecord, swinger: Player, dir: Vector3, pieceUid: string): Player
-	rec.alive = false
+	setAlive(rec, false)
 	rec.felled = true
 	rec.ghost = false
 	rec.growth += 1

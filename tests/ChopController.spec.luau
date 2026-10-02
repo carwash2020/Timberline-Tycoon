@@ -27,7 +27,7 @@ return function(t)
 
 	-- A world with one oak at `treeAt` (its base) and the character's root
 	-- part at `rootCf`. Returns handles to drive and inspect it.
-	local function setup(rootCf, treeAt)
+	local function setup(rootCf, treeAt, loop)
 		local clock = 100
 		local heartbeat = nil
 		local fired = {} -- { remote, uid, look } per FireServer, look = the root's then
@@ -183,6 +183,10 @@ return function(t)
 					GetPropertyChangedSignal = function()
 						return signal()
 					end,
+					-- Which core loop runs (Shared/CoreLoop): v1 unless a test says.
+					GetAttribute = function(_, name)
+						return if name == "CoreLoopActive" then loop or 1 else nil
+					end,
 				},
 			},
 		})
@@ -284,5 +288,12 @@ return function(t)
 			t.eq(#w.fired, 1, "case " .. i .. " still chops")
 			t.eq(w.hrp.CFrame, FACING_NORTH, "case " .. i .. " doesn't turn")
 		end
+	end)
+
+	t.test("under the v2 loop it never swings (CutController does)", function()
+		local w = setup(FACING_NORTH, EAST_TREE, 2)
+		w.press()
+		t.eq(#w.fired, 0, "no ChopTree")
+		t.eq(#w.slashes, 0, "no slash")
 	end)
 end

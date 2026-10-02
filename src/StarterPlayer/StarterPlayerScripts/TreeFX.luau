@@ -19,6 +19,8 @@
 --     solid too, whatever this client last did to it.
 -- The server never moves a tree, so everything here starts and ends on the
 -- HomePivot attribute.
+-- The v1 loop only: under the v2 loop (Shared/CoreLoop) the section trees
+-- are WoodFX's (their fall is real physics), so no tree is attached here.
 
 local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
@@ -26,6 +28,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
@@ -526,7 +529,7 @@ local function regrow(tree: Model, state: State)
 end
 
 local function attach(tree: Model)
-	if states[tree] then
+	if states[tree] or CoreLoop.V2() then
 		return
 	end
 	local def = WoodData.Get(tostring(tree:GetAttribute("WoodId")))

@@ -25,6 +25,11 @@
 --     it), and kept until the tree streams out. A canopy WindSway left
 --     leaning (felled or wobbling as you walked away) is never re-read as
 --     the rest pose, so it can't be baked in.
+--   * v2 section trees (M1.3) rock about the top of their trunk (their
+--     SwayTop attribute; their PrimaryPart's length is up its Y axis), and
+--     a tree that loses parts (a limb cut free, leaves dropped before it
+--     dies) is captured afresh, so a falling piece's leaves are never
+--     pulled back to where they hung.
 --   * The wind (workspace.GlobalWind, set locally) gusts around the base
 --     breeze (6, 0, 3) and blows harder in storms, blizzards and up on
 --     the isles; grass, clouds and the weather's particles all follow it,
@@ -51,6 +56,7 @@ type Sway = {
 	parts: { BasePart },
 	rest: { CFrame }, -- each part's rest CFrame (HomePivot * its offset)
 	top: Vector3, -- the trunk's top: what the canopy rocks about
+	v2: boolean, -- a section tree: its parts can leave it (a cut limb, dropped leaves)
 	phase: number,
 	freq: number, -- radians per second; tall trees rock slower
 }
@@ -140,6 +146,12 @@ local function capture(tree: Model): Sway?
 	local trunk = tree.PrimaryPart
 	local length = if trunk then trunk.Size.X else 8
 	local top = home.Position + home.RightVector * (length / 2)
+	local swayTop = tree:GetAttribute("SwayTop")
+	if typeof(swayTop) == "Vector3" then
+		-- A v2 section tree: its trunk's top, and how tall that is.
+		top = swayTop
+		length = math.max(4, swayTop.Y - (home.Position.Y - (if trunk then trunk.Size.Y / 2 else 0)))
+	end
 	local p = home.Position
 	local phase = (math.sin(p.X * 0.137 + p.Z * 0.071) * 0.5 + 0.5) * math.pi * 2
 	return {
@@ -150,6 +162,7 @@ local function capture(tree: Model): Sway?
 		top = top,
 		phase = phase,
 		freq = 1.15 / math.sqrt(math.max(0.6, length / 12)),
+		v2 = typeof(swayTop) == "Vector3",
 	}
 end
 
@@ -304,6 +317,25 @@ local function costOf(i: number): number
 	local tree = s.tree
 	if tree.Parent == nil or not idle(tree, s.home) then
 		return 0
+	end
+	if s.v2 then
+		-- A v2 tree whose parts left it (a limb cut free, its leaves dropped)
+		-- starts over with what it has now: the parts that left are never
+		-- moved again (they fall with their piece).
+		for _, part in ipairs(s.parts) do
+			if not part:IsDescendantOf(tree) then
+				sways[tree] = nil
+				local offsets = restOf[tree]
+				if offsets then
+					for _, p in ipairs(s.parts) do
+						if not p:IsDescendantOf(tree) then
+							offsets[p] = nil
+						end
+					end
+				end
+				return 0
+			end
+		end
 	end
 	if (s.top - frameEye):Dot(frameLook) < -25 then
 		return 0 -- behind the camera: nobody sees it rock

@@ -295,6 +295,7 @@ return function(t)
 				fellCredit = feller
 			end
 			local base = rec.sections[1]
+			t.eq(rec.model:GetAttribute("HP"), 1, "a standing tree reads as standing")
 			local hits = s.SectionLogic.HitsToCut(2, base.Size.X, 0.2)
 			t.eq(hits, 16, "the plan's oak: 16 hits with the hatchet")
 			local n, ok, _, result = s.cutThrough(p, base)
@@ -304,6 +305,7 @@ return function(t)
 			t.eq(felled[1].feller, p)
 			t.eq(fellCredit, p)
 			t.ok(rec.felled and not rec.alive, "down")
+			t.eq(rec.model:GetAttribute("HP"), 0, "HP mirrors it (QuestUI finds standing trees that way)")
 			t.eq(#result.freed, 1)
 			local piece = result.freed[1]
 			t.eq(felled[1].uids, { piece.uid })
