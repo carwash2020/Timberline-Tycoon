@@ -510,6 +510,54 @@ local function line(s: string?)
 	table.insert(out, s or "")
 end
 
+-- --calibrate <seconds> <wood>=<u³> ...: how long a perfect player would
+-- take to cut, drag, haul and sell that much wood with the starter kit
+-- (Rusty Axe, or the first axe up the ladder that cuts the wood, and the
+-- Rustbucket), divided by how long the playtester took (first chop to last
+-- sale). MilestoneService's stopwatch prints the line in Studio.
+if process.args[1] == "--calibrate" then
+	local usage = "usage: lune run tools/economy2 --calibrate <seconds> <wood>=<u3> ..."
+	local seconds = tonumber(process.args[2])
+	assert(seconds and seconds > 0, usage)
+	local idealSeconds, volumes, total = 0, {}, 0
+	for i = 3, #process.args do
+		local woodId, amount = string.match(process.args[i], "^(%w+)=(%d+)$")
+		local wood = if woodId then WoodData.Get(woodId) else nil
+		assert(wood and wood.v2, "not a <wood>=<u3> pair: " .. process.args[i] .. "\n" .. usage)
+		local owned = { Rustbucket = true }
+		local secs = nil
+		for _, axe in ipairs(AXES) do
+			owned[axe.id] = true
+			local tool = bestAxeFor(owned, wood)
+			secs = if tool then loadCycle(tool, wood, owned) else nil
+			if secs then
+				break
+			end
+		end
+		assert(secs, "no axe and the Rustbucket can fetch " .. woodId)
+		local cap = haulFor(BiomeData.Get(wood.biome), owned)
+		idealSeconds += tonumber(amount) / cap * secs
+		volumes[woodId] = tonumber(amount)
+		total += tonumber(amount)
+	end
+	assert(total > 0, usage)
+	local measured = idealSeconds / seconds
+	if measured > 1 then
+		print(
+			string.format(
+				"Warning: you beat the ideal model (%.2f). Its assumptions (walk and drag distances, cut times) are too slow; review them in tools/economy2.luau. Saving 1.0.",
+				measured
+			)
+		)
+		measured = 1
+	end
+	measured = math.floor(measured * 100 + 0.5) / 100
+	print(string.format("EFFICIENCY %.2f -> %.2f (saved to %s)", EFFICIENCY, measured, CALIBRATION_FILE))
+	calibration = { efficiency = measured, seconds = seconds, volumes = volumes, loop = 2, date = os.date("%Y-%m-%d") }
+	fs.writeFile(CALIBRATION_FILE, serde.encode("json", calibration, true) .. "\n")
+	EFFICIENCY = measured
+end
+
 local steps, events, final = simulate()
 
 line("# Economy report, v2 core loop")
