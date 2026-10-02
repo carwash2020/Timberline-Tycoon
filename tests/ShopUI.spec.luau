@@ -21,4 +21,28 @@ return function(t)
 		end
 		t.eq(found, 4, "the Tool Shed, the Dealership, Hearth & Home and the Store")
 	end)
+
+	-- M1.8b: under the v2 core loop the shops show what ShopService charges
+	-- (ShopLogic.Price with the loop) and the loop's card texts; the Field
+	-- Guide shows the loop's wood pages and Daily Goals the loop's bonus.
+	t.test("the shops, the Field Guide and Daily Goals read the core loop's prices and texts", function()
+		local shop = fs.readFile(dir .. "ShopUI.luau")
+		for _, kind in ipairs({ "axe", "trailer", "truck" }) do
+			t.ok(
+				string.find(shop, string.format("ShopLogic.Price(%s, loop)", kind), 1, true),
+				kind .. ": its price for the loop"
+			)
+			t.ok(not string.find(shop, kind .. ".priceCash", 1, true), kind .. ": no v1-only price left")
+		end
+		t.ok(string.find(shop, "ShopLogic.AxeDetail(axe, loop)", 1, true))
+		t.ok(string.find(shop, "ShopLogic.TruckDetailFor(truck, loop)", 1, true))
+		t.ok(string.find(shop, "ShopLogic.TrailerDetailFor(trailer, loop)", 1, true))
+		t.ok(string.find(shop, "local loop = CoreLoop.Active()", 1, true), "the loop that runs")
+		local guide = fs.readFile(dir .. "FieldGuideUI.luau")
+		t.ok(string.find(guide, "FieldGuide.FactsFor(wood, CoreLoop.Active())", 1, true), "the loop's wood page")
+		t.ok(not string.find(guide, "FieldGuide.Facts(wood)", 1, true), "no v1-only page left")
+		local daily = fs.readFile(dir .. "DailyUI.luau")
+		t.ok(string.find(daily, "DailyData.ProgressText(goal)", 1, true), "v2 progress in its units")
+		t.ok(string.find(daily, "DailyData.Bonus(bestAxeTier(), nextStreak, if loop == 2 then 2 else nil)", 1, true))
+	end)
 end

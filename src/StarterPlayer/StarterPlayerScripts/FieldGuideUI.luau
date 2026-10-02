@@ -12,10 +12,13 @@
 -- On a gamepad (UI-15) DPadLeft opens it once you have it (HUD.PadShortcut),
 -- with a glyph chip right of the button; ShopUI selects its first row and
 -- B closes it.
+-- A found wood's page is the core loop's (FieldGuide.FactsFor with
+-- CoreLoop.Active()): v2's prices per u³, size and hits a cut under v2.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
@@ -88,14 +91,14 @@ local function woodsPage(): ShopUI.Shop
 			local known = found()[id] == true
 			return {
 				name = if known then wood.displayName else "???",
-				detail = if known then FieldGuide.Facts(wood) else FieldGuide.Hint(wood),
+				detail = if known then FieldGuide.FactsFor(wood, CoreLoop.Active()) else FieldGuide.Hint(wood),
 				color = if known then wood.leafColor else SILHOUETTE,
 				ring = if known and wood.id == "lumenwood" then UITheme.Colors.Ice else nil,
 				dim = not known,
 				button = if known then "Found" else "?",
 				state = if known then "full" else "locked",
 				onClick = function()
-					HUD.Toast(if known then FieldGuide.Facts(wood) else FieldGuide.Hint(wood))
+					HUD.Toast(if known then FieldGuide.FactsFor(wood, CoreLoop.Active()) else FieldGuide.Hint(wood))
 				end,
 			}
 		end,

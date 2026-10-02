@@ -23,6 +23,9 @@
 -- buttons; every way of closing goes through ShopUI.Close, which tells the
 -- HUD it's gone. On a gamepad the first Buy button is selected when it
 -- opens.
+-- Prices and the cards' detail lines are the core loop's (CoreLoop.Active()):
+-- ShopLogic.Price, AxeDetail, TruckDetailFor, TrailerDetailFor (v2 prices
+-- and per-hit stats under v2), as ShopService charges.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -31,6 +34,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -144,9 +148,11 @@ local AXES: Shop = {
 		local cash, bestTier, counts, total = axeState()
 		local owned = counts[axe.id] or 0
 		local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, bestTier, owned, total)
+		local loop = CoreLoop.Active()
+		local price = ShopLogic.Price(axe, loop)
 		local button, state
 		if ShopLogic.CanPurchase(status) then
-			button, state = priceButton(axe.priceCash, cash)
+			button, state = priceButton(price, cash)
 		elseif status == "forged" then
 			button, state = "Forged", "forged"
 		elseif status == "starter" then
@@ -163,7 +169,7 @@ local AXES: Shop = {
 		return {
 			name = axe.displayName,
 			own = if owned > 0 then string.format("· you own %d", owned) else nil,
-			detail = ShopLogic.DamageText(axe) .. "\n" .. ShopLogic.FellSummary(axe),
+			detail = ShopLogic.AxeDetail(axe, loop),
 			color = Color3.fromHex(axe.look.headColor),
 			ring = ring,
 			dim = status == "locked",
@@ -172,8 +178,8 @@ local AXES: Shop = {
 			onClick = function()
 				if not ShopLogic.CanPurchase(status) then
 					HUD.Toast(ShopLogic.WhyNot(status, axe, bestTier))
-				elseif cash < axe.priceCash then
-					needMore(axe.priceCash, cash, axe.displayName)
+				elseif cash < price then
+					needMore(price, cash, axe.displayName)
 				else
 					Net.Remote("BuyItem"):FireServer("Axe", axe.id) -- the server re-checks all of it
 				end
@@ -192,9 +198,11 @@ local function trailerView(id: string): RowView
 	local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrailers") :: string?) or "")
 	local hitched = (player:GetAttribute("HitchedTrailer") :: string?) or ""
 	local status: ShopLogic.TrailerStatus = ShopLogic.TrailerStatusOf(trailer, owned, hitched)
+	local loop = CoreLoop.Active()
+	local price = ShopLogic.Price(trailer, loop)
 	local button, state
 	if status == "buy" then
-		button, state = priceButton(trailer.priceCash, cash)
+		button, state = priceButton(price, cash)
 	elseif status == "hitch" then
 		button, state = "Hitch", "use"
 	else
@@ -203,14 +211,14 @@ local function trailerView(id: string): RowView
 	return {
 		name = trailer.displayName,
 		own = if status == "hitched" then "· hitched" elseif status == "hitch" then "· owned" else nil,
-		detail = ShopLogic.TrailerDetail(trailer),
+		detail = ShopLogic.TrailerDetailFor(trailer, loop),
 		color = Color3.fromHex(trailer.look.color),
 		dim = false,
 		button = button,
 		state = state,
 		onClick = function()
-			if status == "buy" and cash < trailer.priceCash then
-				needMore(trailer.priceCash, cash, trailer.displayName)
+			if status == "buy" and cash < price then
+				needMore(price, cash, trailer.displayName)
 			elseif status == "buy" then
 				Net.Remote("BuyItem"):FireServer("Trailer", trailer.id)
 			else
@@ -246,9 +254,11 @@ local TRUCKS: Shop = {
 		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrucks") :: string?) or "")
 		local equipped = (player:GetAttribute("EquippedTruck") :: string?) or "Rustbucket"
 		local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, owned, equipped)
+		local loop = CoreLoop.Active()
+		local price = ShopLogic.Price(truck, loop)
 		local button, state
 		if status == "buy" then
-			button, state = priceButton(truck.priceCash, cash)
+			button, state = priceButton(price, cash)
 		elseif status == "use" then
 			button, state = "Use", "use"
 		else
@@ -257,7 +267,7 @@ local TRUCKS: Shop = {
 		return {
 			name = truck.displayName,
 			own = if status ~= "buy" then "· owned" else nil,
-			detail = ShopLogic.TruckDetail(truck),
+			detail = ShopLogic.TruckDetailFor(truck, loop),
 			color = Color3.fromHex(truck.look.color),
 			dim = false,
 			button = button,
@@ -267,8 +277,8 @@ local TRUCKS: Shop = {
 					HUD.Toast(string.format("You're already using the %s.", truck.displayName))
 				elseif status == "use" then
 					Net.Remote("EquipItem"):FireServer("Truck", truck.id)
-				elseif cash < truck.priceCash then
-					needMore(truck.priceCash, cash, truck.displayName)
+				elseif cash < price then
+					needMore(price, cash, truck.displayName)
 				else
 					Net.Remote("BuyItem"):FireServer("Truck", truck.id)
 				end

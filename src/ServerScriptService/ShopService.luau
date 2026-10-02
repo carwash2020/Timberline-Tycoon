@@ -13,6 +13,9 @@
 -- bought truck replaces the current one in their parking slot
 -- (VehicleService.Equip). The result comes back as a toast. The
 -- OwnedTrucks and EquippedTruck player attributes feed the shop screen.
+-- Axes, trucks and trailers cost ShopLogic.Price(item, loop): their v2
+-- prices under the v2 core loop (GameServer passes CoreLoop.Active() to
+-- Init), priceCash under v1. Gear has one price.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -40,6 +43,7 @@ local SHOP_FOR: { [string]: string } = {
 
 local map: Instance? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
+local loop = 1 -- the core loop that runs (Init)
 
 local function shopPoint(category: string): Vector3?
 	local shopName = SHOP_FOR[category]
@@ -70,19 +74,16 @@ local function buyAxe(player: Player, axeId: string)
 		notify(player, ShopLogic.WhyNot(status, axe, profile.bestAxeTier))
 		return
 	end
-	if profile.cash < axe.priceCash then
+	local price = ShopLogic.Price(axe, loop)
+	if profile.cash < price then
 		notify(
 			player,
-			string.format(
-				"You need %s more for the %s.",
-				Util.formatCash(axe.priceCash - profile.cash),
-				axe.displayName
-			)
+			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), axe.displayName)
 		)
 		return
 	end
 	-- Nothing below yields, so the checks above still hold.
-	if not EconomyService.SpendCash(player, axe.priceCash, "bought " .. axe.displayName, axe.id) then
+	if not EconomyService.SpendCash(player, price, "bought " .. axe.displayName, axe.id) then
 		return
 	end
 	local _item, tool = AxeService.Grant(player, axe.id)
@@ -178,18 +179,15 @@ local function buyTrailer(player: Player, trailerId: string)
 		notify(player, string.format("You already own the %s.", trailer.displayName))
 		return
 	end
-	if profile.cash < trailer.priceCash then
+	local price = ShopLogic.Price(trailer, loop)
+	if profile.cash < price then
 		notify(
 			player,
-			string.format(
-				"You need %s more for the %s.",
-				Util.formatCash(trailer.priceCash - profile.cash),
-				trailer.displayName
-			)
+			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), trailer.displayName)
 		)
 		return
 	end
-	if not EconomyService.SpendCash(player, trailer.priceCash, "bought " .. trailer.displayName, trailer.id) then
+	if not EconomyService.SpendCash(player, price, "bought " .. trailer.displayName, trailer.id) then
 		return
 	end
 	table.insert(profile.ownedTrailers, trailer.id)
@@ -246,18 +244,15 @@ local function buyTruck(player: Player, truckId: string)
 		notify(player, string.format("You already own the %s.", truck.displayName))
 		return
 	end
-	if profile.cash < truck.priceCash then
+	local price = ShopLogic.Price(truck, loop)
+	if profile.cash < price then
 		notify(
 			player,
-			string.format(
-				"You need %s more for the %s.",
-				Util.formatCash(truck.priceCash - profile.cash),
-				truck.displayName
-			)
+			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), truck.displayName)
 		)
 		return
 	end
-	if not EconomyService.SpendCash(player, truck.priceCash, "bought " .. truck.displayName, truck.id) then
+	if not EconomyService.SpendCash(player, price, "bought " .. truck.displayName, truck.id) then
 		return
 	end
 	table.insert(profile.ownedTrucks, truck.id)
@@ -349,15 +344,19 @@ function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profil
 	publishGear(player, profile)
 end
 
--- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's notify).
+-- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's
+-- notify); `activeLoop` is the core loop that runs (CoreLoop.Active(); 1
+-- when not given).
 function ShopService.Init(
 	mapFolder: Instance,
 	buyRemote: RemoteEvent,
 	equipRemote: RemoteEvent,
-	notifyFn: (Player, string) -> ()
+	notifyFn: (Player, string) -> (),
+	activeLoop: number?
 )
 	map = mapFolder
 	notify = notifyFn
+	loop = if activeLoop == 2 then 2 else 1
 	buyRemote.OnServerEvent:Connect(onBuyItem)
 	equipRemote.OnServerEvent:Connect(onEquipItem)
 end
