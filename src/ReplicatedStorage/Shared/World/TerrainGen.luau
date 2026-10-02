@@ -580,14 +580,17 @@ end
 
 -- Colours for each terrain material in the cozy palette (GAME_DESIGN §13).
 -- TerrainBuilder applies them with Terrain:SetMaterialColor; the preview
--- tool paints with them.
+-- tool paints with them. STY-01 (phase 10) moved the land a little toward
+-- Lumber Tycoon 2's look: a deeper meadow green (Grass was 116,170,74 and
+-- LeafyGrass 86,140,62) and brown rock for the mountains, cliffs and
+-- snowline (Rock was a grey 128,122,114).
 TerrainGen.MaterialColors = {
-	Grass = Color3.fromRGB(116, 170, 74),
-	LeafyGrass = Color3.fromRGB(86, 140, 62),
+	Grass = Color3.fromRGB(100, 152, 64),
+	LeafyGrass = Color3.fromRGB(76, 126, 54),
 	Ground = Color3.fromRGB(150, 116, 78),
 	Mud = Color3.fromRGB(64, 50, 72), -- the Phantom Grove's violet floor
 	Sand = Color3.fromRGB(226, 205, 150),
-	Rock = Color3.fromRGB(128, 122, 114),
+	Rock = Color3.fromRGB(122, 98, 78),
 	Snow = Color3.fromRGB(238, 244, 250),
 	Glacier = Color3.fromRGB(172, 214, 236),
 	Basalt = Color3.fromRGB(52, 46, 44),
