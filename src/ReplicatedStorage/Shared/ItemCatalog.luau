@@ -45,7 +45,9 @@ export type AxeDef = {
 
 -- How a truck is built (VehicleService, via TruckLayout): paint colour
 -- (hex), body width, bed length in studs (0 = no bed) and whether the bed
--- has walls or is a flat deck with stake posts.
+-- has walls or is a flat deck with stake posts. The sizes are looks only
+-- (the v1 bed holds bedCapacity logs whatever its size); they grew with the
+-- trees in V2_PLAN §4c (M1.5).
 export type TruckLook = { color: string, width: number, bedLength: number, bedWalls: boolean }
 
 export type TruckDef = {
@@ -174,7 +176,7 @@ ItemCatalog.Trucks = {
 		priceCash = 0,
 		topSpeed = 26,
 		turnRate = 1.4,
-		look = { color = "#964830", width = 4, bedLength = 7, bedWalls = true },
+		look = { color = "#964830", width = 6.2, bedLength = 10, bedWalls = true },
 	},
 	Pickup = {
 		id = "Pickup",
@@ -183,7 +185,7 @@ ItemCatalog.Trucks = {
 		priceCash = 1200,
 		topSpeed = 28,
 		turnRate = 1.4,
-		look = { color = "#2F6DB5", width = 4.4, bedLength = 8, bedWalls = true },
+		look = { color = "#2F6DB5", width = 6.6, bedLength = 12, bedWalls = true },
 	},
 	ScoutATV = {
 		id = "ScoutATV",
@@ -192,7 +194,7 @@ ItemCatalog.Trucks = {
 		priceCash = 2500,
 		topSpeed = 40,
 		turnRate = 2,
-		look = { color = "#5E8C31", width = 3.4, bedLength = 0, bedWalls = false },
+		look = { color = "#5E8C31", width = 4.6, bedLength = 0, bedWalls = false },
 		note = "Fast recon, no cargo",
 	},
 	Flatbed = {
@@ -202,7 +204,7 @@ ItemCatalog.Trucks = {
 		priceCash = 6000,
 		topSpeed = 26,
 		turnRate = 1.2,
-		look = { color = "#E3AE2A", width = 5, bedLength = 12, bedWalls = false },
+		look = { color = "#E3AE2A", width = 7.2, bedLength = 18, bedWalls = false },
 	},
 	LoggingRig = {
 		id = "LoggingRig",
@@ -211,7 +213,7 @@ ItemCatalog.Trucks = {
 		priceCash = 25000,
 		topSpeed = 24,
 		turnRate = 1,
-		look = { color = "#B23A26", width = 5.4, bedLength = 18, bedWalls = false },
+		look = { color = "#B23A26", width = 7.8, bedLength = 26, bedWalls = false },
 	},
 }
 
@@ -221,21 +223,21 @@ ItemCatalog.Trailers = {
 		displayName = "Pony Trailer",
 		extraCapacity = 6,
 		priceCash = 600,
-		look = { color = "#7A5A3A", bedLength = 7 },
+		look = { color = "#7A5A3A", bedLength = 10 },
 	},
 	RanchTrailer = {
 		id = "RanchTrailer",
 		displayName = "Ranch Trailer",
 		extraCapacity = 12,
 		priceCash = 3000,
-		look = { color = "#6E7F46", bedLength = 9 },
+		look = { color = "#6E7F46", bedLength = 14 },
 	},
 	HeavyHauler = {
 		id = "HeavyHauler",
 		displayName = "Heavy Hauler",
 		extraCapacity = 24,
 		priceCash = 12000,
-		look = { color = "#4A4F57", bedLength = 10 },
+		look = { color = "#4A4F57", bedLength = 20 },
 	},
 }
 

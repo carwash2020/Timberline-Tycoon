@@ -104,4 +104,44 @@ return function(t)
 		t.eq(s.profile.equippedTrailer, "PonyTrailer")
 		t.eq(s.switched, { "Rustbucket+PonyTrailer" })
 	end)
+
+	-- The hitch on the bigger trucks (M1.5): every trailer couples at its
+	-- truck's back, its bed a tongue (2 studs) behind, and nothing of one
+	-- runs into the other: the skids leave a gap and the trailer's tyres
+	-- stand clear of the truck's.
+	t.test("every trailer hitches to every truck with a bed, clear of it", function()
+		local ItemCatalog = t.shared("ItemCatalog")
+		local TruckLayout = t.shared("TruckLayout")
+		local TruckArt = t.shared("Art/TruckArt")
+		for truckId, def in pairs(ItemCatalog.Trucks) do
+			if def.bedCapacity > 0 then
+				local lay = TruckLayout.For(def)
+				local lastAxle = -math.huge
+				for _, z in ipairs(lay.wheelZ) do
+					lastAxle = math.max(lastAxle, z)
+				end
+				for trailerId, trailer in pairs(ItemCatalog.Trailers) do
+					local label = truckId .. " + " .. trailerId
+					local tl = TruckLayout.ForTrailer(trailer, lay)
+					t.eq(tl.hitchZ, lay.length / 2, label .. ": hitched at the truck's back")
+					t.ok(math.abs(tl.bedStart - tl.hitchZ - TruckLayout.Tongue) < 1e-9, label .. ": a tongue behind it")
+					local model = TruckArt.Build(def, lay, trailer, tl)
+					local coupler = model:FindFirstChild("Coupler")
+					t.ok(coupler, label .. " has a coupler")
+					local front = coupler.CFrame.Z - coupler.Size.Z / 2
+					t.ok(math.abs(front - tl.hitchZ) < 0.2, label .. ": the coupler meets the truck's back")
+					local skid, trailerSkid = model:FindFirstChild("Skid"), model:FindFirstChild("TrailerSkid")
+					local skidBack = skid.CFrame.Z + skid.Size.Z / 2 + TruckArt.SkidRampRun
+					local trailerFront = trailerSkid.CFrame.Z - trailerSkid.Size.Z / 2 - TruckArt.SkidRampRun
+					t.ok(trailerFront - skidBack >= 1, label .. ": the skids don't meet")
+					for _, z in ipairs(tl.axleZ) do
+						t.ok(
+							z - tl.wheelRadius >= lastAxle + lay.wheelRadius + 1,
+							label .. ": the trailer's tyres clear the truck's"
+						)
+					end
+				end
+			end
+		end
+	end)
 end

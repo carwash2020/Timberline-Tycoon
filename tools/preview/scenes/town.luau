@@ -59,7 +59,7 @@ return {
 			local slot = Kit.part(
 				root,
 				"ParkingSlot_" .. index,
-				V3.new(6.5, 0.2, 37),
+				WorldPlan.ParkingSlotSize,
 				cf,
 				C3.fromRGB(186, 168, 140),
 				Enum.Material.Slate

@@ -22,14 +22,29 @@ return function(t)
 		t.ok(TruckHome.Far(TruckHome.Max))
 	end)
 
-	t.test("far means more than 20 studs; no truck (nil) is never far", function()
-		t.eq(TruckHome.ShowBeyond, 20)
+	t.test("far means more than 30 studs; no truck (nil) is never far", function()
+		t.eq(TruckHome.ShowBeyond, 30)
 		t.eq(TruckHome.Far(nil), false)
-		t.eq(TruckHome.Far("30"), false)
+		t.eq(TruckHome.Far("40"), false)
 		t.eq(TruckHome.Far(0), false)
-		t.eq(TruckHome.Far(20), false)
-		t.eq(TruckHome.Far(21), true)
+		t.eq(TruckHome.Far(30), false)
+		t.eq(TruckHome.Far(31), true)
 		t.eq(TruckHome.Far(800), true)
+	end)
+
+	-- M1.5: the slots are 60 long. A truck parked anywhere in its own bay
+	-- (its pivot inside the slot, so at most half a slot from where it's
+	-- built) never offers "Send truck home".
+	t.test("a truck anywhere in its own bay isn't far", function()
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local slot = WorldPlan.ParkingSlotSize
+		t.ok(TruckHome.ShowBeyond >= slot.Z / 2, "half a slot or more")
+		local home = Vector3.new(15, 1.8, 21)
+		for _, along in ipairs({ -slot.Z / 2, -10, 0, 12, slot.Z / 2 }) do
+			local at = home + Vector3.new(slot.X / 2 - 1, 0, along)
+			t.eq(TruckHome.Far(TruckHome.Distance(at, home)), false, "parked " .. along .. " along its bay")
+		end
+		t.ok(TruckHome.Far(TruckHome.Distance(home + Vector3.new(0, 0, slot.Z), home)), "a slot's length off is far")
 	end)
 
 	t.test("sent the first time, then every couple of studs", function()
@@ -43,12 +58,21 @@ return function(t)
 	end)
 
 	t.test("crossing the button's line is always sent, even by one stud", function()
-		t.ok(TruckHome.ShouldPublish(20, 21), "leaving the lot")
-		t.ok(TruckHome.ShouldPublish(21, 20), "parking again")
-		t.ok(TruckHome.ShouldPublish(19, 21))
-		-- So what the client holds is always on the right side of the line.
+		t.ok(TruckHome.ShouldPublish(30, 31), "leaving the lot")
+		t.ok(TruckHome.ShouldPublish(31, 30), "parking again")
+		t.ok(TruckHome.ShouldPublish(29, 31))
+		-- So what the client holds is always on the right side of the line:
+		-- driving out a stud or two at a time past it, far, then back.
 		local shown = nil
-		for _, d in ipairs({ 0, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 20, 21, 22, 40, 39, 21, 20, 2 }) do
+		local readings = {}
+		for d = 0, 27, 3 do
+			table.insert(readings, d)
+			table.insert(readings, d + 1)
+		end
+		for _, d in ipairs({ 29, 30, 31, 32, 50, 49, 31, 30, 2 }) do
+			table.insert(readings, d)
+		end
+		for _, d in ipairs(readings) do
 			if TruckHome.ShouldPublish(shown, d) then
 				shown = d
 			end

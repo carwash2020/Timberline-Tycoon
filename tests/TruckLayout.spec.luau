@@ -40,15 +40,101 @@ return function(t)
 		t.eq(#TruckLayout.For(ItemCatalog.GetTruck("LoggingRig")).wheelZ, 3)
 	end)
 
-	t.test("every rig fits a parking slot (6.5 x 37 studs), trailer and all", function()
+	t.test("every rig fits a parking slot (10 x 60 studs), trailer and all", function()
+		local SLOT = t.load("ReplicatedStorage/Shared/World/WorldPlan").ParkingSlotSize
+		t.ok(math.abs(SLOT.X - 10) < 1e-9 and math.abs(SLOT.Z - 60) < 1e-9, "10 x 60 slots")
+		local longest = 0
 		for id, truck in pairs(ItemCatalog.Trucks) do
 			local layout = TruckLayout.For(truck)
-			t.ok(2 * layout.wheelX + layout.tyreWidth <= 6.5 + 0.5, id .. " too wide")
-			t.ok(layout.length <= 37, id .. " too long")
+			t.ok(2 * layout.wheelX + layout.tyreWidth <= SLOT.X, id .. " too wide")
+			t.ok(layout.length <= SLOT.Z, id .. " too long")
 			for trailerId, trailer in pairs(ItemCatalog.Trailers) do
 				local tl = TruckLayout.ForTrailer(trailer, layout)
-				t.ok(layout.length + tl.length <= 37, id .. " + " .. trailerId .. " too long")
+				t.ok(2 * tl.wheelX + tl.tyreWidth <= SLOT.X, id .. " + " .. trailerId .. " too wide")
+				t.ok(layout.length + tl.length <= SLOT.Z, id .. " + " .. trailerId .. " too long")
+				longest = math.max(longest, layout.length + tl.length)
 			end
+		end
+		t.ok(
+			math.abs(longest - 57.9) < 1e-6,
+			string.format("the longest rig is %.2f (the Rig + Heavy Hauler)", longest)
+		)
+	end)
+
+	-- M1.5 (V2_PLAN §4c): the trucks grew to carry the bigger trees. Body
+	-- width, cab length, bed length x inside width, walls (or stakes) over
+	-- the bed floor, the bed floor's top and the overall length, per truck;
+	-- the bed sizes climb the ladder.
+	t.test("the bigger trucks: each body and bed the size V2_PLAN §4c sets", function()
+		local want = {
+			Rustbucket = { width = 6.2, cab = 7.0, bed = 10, inside = 5.6, walls = 1.4, floor = 3.0, length = 17.5 },
+			Pickup = { width = 6.6, cab = 7.4, bed = 12, inside = 6.0, walls = 1.6, floor = 3.1, length = 19.9 },
+			ScoutATV = { width = 4.6, cab = 6.5, bed = 0, inside = 0, walls = 0, length = 8.5 },
+			Flatbed = { width = 7.2, cab = 7.8, bed = 18, inside = 6.8, walls = 2.5, floor = 3.3, length = 26.3 },
+			LoggingRig = { width = 7.8, cab = 9.4, bed = 26, inside = 7.2, walls = 3.2, floor = 4.0, length = 35.9 },
+		}
+		local function near(a, b)
+			return math.abs(a - b) < 1e-6
+		end
+		for id, w in pairs(want) do
+			local layout = TruckLayout.For(ItemCatalog.GetTruck(id))
+			t.ok(near(layout.width, w.width), id .. " body width")
+			t.ok(near(layout.cabLength, w.cab), id .. " cab length")
+			t.ok(near(layout.bedLength, w.bed), id .. " bed length")
+			t.ok(near(layout.bedWidth, w.inside), id .. " bed inside width")
+			t.ok(near(layout.wallHeight, w.walls), id .. " walls")
+			if w.floor then
+				t.ok(near(layout.bedFloorY + TruckLayout.BedFloorThickness / 2, w.floor), id .. " bed floor top")
+			end
+			t.ok(near(layout.length, w.length), id .. " overall length")
+			t.ok(layout.logLength < layout.bedWidth or layout.bedLength == 0, id .. " logs fit inside the walls")
+		end
+		local ladder = { "Rustbucket", "Pickup", "Flatbed", "LoggingRig" }
+		for i = 2, #ladder do
+			local a, b =
+				TruckLayout.For(ItemCatalog.GetTruck(ladder[i - 1])), TruckLayout.For(ItemCatalog.GetTruck(ladder[i]))
+			t.ok(b.bedLength > a.bedLength and b.bedWidth > a.bedWidth, ladder[i] .. "'s bed is bigger")
+		end
+	end)
+
+	t.test("the bigger trailers: tongue 2, beds 10 / 14 / 20, walls 1.2 / 2 / 2.5, floor top 2.5", function()
+		local want = {
+			PonyTrailer = { bed = 10, walls = 1.2, wheel = 1.15, length = 12, axles = 1 },
+			RanchTrailer = { bed = 14, walls = 2.0, wheel = 1.2, length = 16, axles = 1 },
+			HeavyHauler = { bed = 20, walls = 2.5, wheel = 1.25, length = 22, axles = 2 },
+		}
+		t.eq(TruckLayout.Tongue, 2)
+		for _, truckId in ipairs({ "Rustbucket", "LoggingRig" }) do
+			local truck = TruckLayout.For(ItemCatalog.GetTruck(truckId))
+			for id, w in pairs(want) do
+				local tl = TruckLayout.ForTrailer(ItemCatalog.GetTrailer(id), truck)
+				local label = truckId .. " + " .. id
+				t.eq(tl.width, truck.width, label .. ": as wide as its truck")
+				t.eq(tl.bedLength, w.bed, label .. " bed")
+				t.ok(math.abs(tl.wallHeight - w.walls) < 1e-6, label .. " walls")
+				t.ok(math.abs(tl.wheelRadius - w.wheel) < 1e-6, label .. " wheels")
+				t.ok(math.abs(tl.bedFloorY + TruckLayout.BedFloorThickness / 2 - 2.5) < 1e-6, label .. " floor top")
+				t.eq(tl.length, w.length, label .. " length")
+				t.eq(#tl.axleZ, w.axles, label .. " axles")
+				t.ok(tl.bedWidth > truck.logLength, label .. " logs fit inside its walls")
+			end
+		end
+	end)
+
+	-- The v1 bed still holds its bedCapacity logs in the same layers as
+	-- before the beds grew (6, 7, 11 and 17 a layer), spread out along them.
+	t.test("bed logs: as many a layer as before, further apart", function()
+		local perLayer = { Rustbucket = 6, Pickup = 7, Flatbed = 11, LoggingRig = 17 }
+		for id, n in pairs(perLayer) do
+			local slots = TruckLayout.For(ItemCatalog.GetTruck(id)).logSlots
+			local first = 0
+			for _, slot in ipairs(slots) do
+				if math.abs(slot.Y - slots[1].Y) < 1e-6 then
+					first += 1
+				end
+			end
+			t.eq(first, math.min(n, #slots), id .. " logs in the bottom layer")
+			t.ok(math.abs(slots[2].Z - slots[1].Z) >= 1.5 - 1e-6, id .. " logs 1.5 apart or more")
 		end
 	end)
 
@@ -130,7 +216,9 @@ return function(t)
 				ladder[i] .. " has bigger wheels than the " .. ladder[i - 1]
 			)
 		end
-		t.ok(math.abs(radius("LoggingRig") - 1.4) < 0.11, "the Rig's wheels are about 1.4")
+		-- M1.5's 1.8, eased to 1.75 so the raised deck (its top at 4.0)
+		-- still clears the tyres (and the Flatbed's 1.45 to 1.4).
+		t.ok(math.abs(radius("LoggingRig") - 1.8) < 0.11, "the Rig's wheels are about 1.8")
 		for id, truck in pairs(ItemCatalog.Trucks) do
 			local layout = TruckLayout.For(truck)
 			if layout.bedLength > 0 and not truck.look.bedWalls then
@@ -165,7 +253,7 @@ return function(t)
 		-- The long beds (12+ studs) are the tandem ones.
 		t.eq(axles, { Rustbucket = 2, Pickup = 2, ScoutATV = 2, Flatbed = 3, LoggingRig = 3 })
 		local rig = TruckLayout.For(ItemCatalog.GetTruck("LoggingRig"))
-		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 9.25) < 1e-9, "the Logging Rig's tandem middle")
+		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 11.15) < 1e-9, "the Logging Rig's tandem middle")
 	end)
 
 	t.test("wheelbase: front axle to the axle it turns about", function()

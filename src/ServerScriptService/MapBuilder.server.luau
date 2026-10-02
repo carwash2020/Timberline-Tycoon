@@ -241,14 +241,15 @@ step("4. The town", function()
 
 	-- Parking lot: one slot per player, so trucks never spawn inside each other.
 	-- VehicleService claims slots by Index. Paint on the ground: no lip for a
-	-- truck to snag on.
+	-- truck to snag on. Each slot is WorldPlan.ParkingSlotSize (M1.5: 10 x 60,
+	-- room for the biggest rig).
 	local slots: { BasePart } = {}
 	step("4. The parking lot", function()
 		for index, cf in ipairs(town.parkingSlots) do
 			local slot = Kit.part(
 				map,
 				"ParkingSlot_" .. index,
-				Vector3.new(6.5, 0.2, 37),
+				WorldPlan.ParkingSlotSize,
 				cf,
 				Color3.fromRGB(186, 168, 140),
 				Enum.Material.Slate

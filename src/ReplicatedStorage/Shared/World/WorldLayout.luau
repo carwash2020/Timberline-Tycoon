@@ -114,8 +114,10 @@ do
 end
 
 -- The parking lot east of the spawn (a gravel lot; MapBuilder paints the
--- slots on it).
-WorldLayout.ParkingLot = { x0 = 8, x1 = 112, z0 = -18, z1 = 68 }
+-- slots on it). M1.5 grew it east (it ended at x 112) for one row of 12
+-- slots 10 wide, 11 apart (WorldPlan.Town), its east rail at x 145; the
+-- ground there is flat already (the Town and Plots zones meet over it).
+WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
 -- pad, packed dirt for the main street, the shop paths, the spawn walk, the

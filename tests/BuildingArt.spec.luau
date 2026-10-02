@@ -278,7 +278,7 @@ return function(t)
 		local Kit = loader:load("ReplicatedStorage/Shared/Art/Kit")
 		local Enum = roblox.Enum
 		local cf = roblox.CFrame.new(40, 0.1, 45)
-		local size = V3.new(6.5, 0.2, 37)
+		local size = loader:load("ReplicatedStorage/Shared/World/WorldPlan").ParkingSlotSize -- 10 x 60 (M1.5)
 		local slot = Kit.part(roblox.Instance.new("Folder"), "ParkingSlot_7", size, cf, C3.fromRGB(186, 168, 140))
 		slot.CanCollide = false
 		BuildingArt.ParkingBay(slot, 7)
@@ -298,11 +298,17 @@ return function(t)
 					not d.CanCollide and not d.CanQuery and not d.CanTouch and not d.CastShadow,
 					d.Name .. " is looks-only"
 				)
-				-- Inside the bay (the stop bar runs 0.75 past each side), not
-				-- under the ground, and flat but for the lamp's light holder.
+				-- Inside the bay (the stop bar runs 0.5 past each side, meeting
+				-- the next bay's: slots stand 11 apart), not under the ground,
+				-- and flat but for the lamp's light holder.
 				local local_ = cf:PointToObjectSpace(d.CFrame.Position)
 				local lo, hi = bounds(d)
-				t.ok(math.abs(local_.X) <= 4 + 1e-3 and math.abs(local_.Z) <= 18.5, d.Name .. " is in the bay")
+				local half = (d.CFrame.RightVector * d.Size.X / 2).Magnitude
+				t.ok(
+					math.abs(local_.X) + (if d.Name == "StopBar" then half else 0) <= size.X / 2 + 0.5 + 1e-3
+						and math.abs(local_.Z) <= size.Z / 2,
+					d.Name .. " is in the bay"
+				)
 				t.ok(lo.Y >= -1e-3, d.Name .. " is above the ground")
 				if d.Transparency < 1 then
 					t.ok(hi.Y <= 0.25, d.Name .. " is flat paint")
@@ -321,7 +327,11 @@ return function(t)
 				t.eq(d.Color:ToHex(), C3.fromRGB(230, 222, 200):ToHex())
 				t.eq(d.Material, Enum.Material.SmoothPlastic)
 			elseif d.Name == "StopBar" then
-				t.ok(cf:PointToObjectSpace(d.CFrame.Position).Z < -17, "the stop bar is at the head (-Z)")
+				t.ok(
+					cf:PointToObjectSpace(d.CFrame.Position).Z < -(size.Z / 2 - 1.5),
+					"the stop bar is at the head (-Z)"
+				)
+				t.ok(math.abs(d.Size.X - (size.X + 1)) < 1e-4, "the stop bar spans the slot and the stud to the next")
 			end
 		end
 		t.ok(texts(slot)["7"], "the bay's number is painted on")

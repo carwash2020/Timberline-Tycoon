@@ -1714,8 +1714,8 @@ end
 -- by looks-only children of it (no collide, query, touch or shadow), flat
 -- on the ground in the slot's own height band: a cream bay line down each
 -- side, a stop bar across the head (the -Z end, where the truck's nose
--- points; it runs 1.5 past the slot's width, so a row of slots 8 apart
--- reads as one bar), the bay's number painted just behind it (read from
+-- points; it runs a stud past the slot's width, so a row of 10-wide slots
+-- 11 apart reads as one bar), the bay's number painted just behind it (read from
 -- the driver's seat), and a lamp: a flat "LanternGlow" plate at the head
 -- that glows after dark (LightingController), with a second, invisible
 -- LanternGlow 3 studs over it holding the dim PointLight (built switched
@@ -1733,7 +1733,7 @@ function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	for _, s in ipairs({ -1, 1 }) do
 		paint("BayLine", V3(BAY_LINE, size.Y, size.Z), CF(s * (hx - BAY_LINE / 2), 0, 0), BAY_PAINT)
 	end
-	paint("StopBar", V3(size.X + 1.5, size.Y, 0.5), CF(0, 0, -hz + 0.25), BAY_PAINT)
+	paint("StopBar", V3(size.X + 1, size.Y, 0.5), CF(0, 0, -hz + 0.25), BAY_PAINT)
 	local number = paint("BayNumber", V3(2.4, size.Y, 2), CF(0, 0, -hz + 3.6), BAY_PAINT)
 	number.Transparency = 1 -- only its painted digits show
 	Kit.signText(number, tostring(index), BAY_PAINT, { Enum.NormalId.Top })

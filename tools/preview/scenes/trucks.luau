@@ -23,13 +23,14 @@ return {
 		local WoodData = ctx.shared("WoodData")
 		local root = roblox.Instance.new("Model")
 
-		Common.ground(ctx, root, 260, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 10))
-		-- A packed-dirt lot under the trucks.
+		Common.ground(ctx, root, 300, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 10))
+		-- A packed-dirt lot under the trucks (they grew in M1.5: the longest
+		-- rig is 57.9 studs).
 		Kit.part(
 			root,
 			"Lot",
-			V3.new(78, 0.1, 64),
-			CF.new(20, 0.02, 12),
+			V3.new(110, 0.1, 100),
+			CF.new(24, 0.02, 4),
 			C3.fromRGB(176, 146, 104),
 			Enum.Material.Ground
 		)
@@ -106,7 +107,7 @@ return {
 			{ "Flatbed", "RanchTrailer", 16, 0 },
 			{ "LoggingRig", "HeavyHauler", 40, 20 },
 		}
-		local spacing = 11
+		local spacing = 11 -- as far apart as the parking slots
 		for i, entry in ipairs(rigs) do
 			local def = ItemCatalog.GetTruck(entry[1])
 			local layout = TruckLayout.For(def)
@@ -126,7 +127,7 @@ return {
 		local rust = ItemCatalog.GetTruck("Rustbucket")
 		local rustLayout = TruckLayout.For(rust)
 		local lone = TruckArt.Build(rust, rustLayout)
-		Kit.placeAt(lone, CF.new(-16, 0, -22) * CF.Angles(0, math.rad(35), 0))
+		Kit.placeAt(lone, CF.new(-24, 0, -32) * CF.Angles(0, math.rad(35), 0))
 		lone.Parent = root
 		seatDriver(lone, C3.fromHex("#4C7A3E"))
 		load(lone, rustLayout, "BedFloor", rustLayout.logSlots, 6, 2)
@@ -134,23 +135,33 @@ return {
 		local function at(i)
 			return (i - 1) * spacing
 		end
+		-- Where the Pickup's driver's head is (for the seated-driver view).
+		local pickupSeat = TruckLayout.For(ItemCatalog.GetTruck("Pickup")).front + 6.1
 		return {
 			root = root,
-			shadowRadius = 90,
+			shadowRadius = 110,
 			cameras = {
-				{ pos = { -30, 26, -52 }, target = { 22, 2, 6 }, label = "line-up" },
-				{ pos = { 21, 9, -46 }, target = { 22, 3, 2 }, label = "line-up, front" },
-				{ pos = { -15, 6, -35 }, target = { -16.5, 2.4, -22 }, label = "Rustbucket" },
-				{ pos = { -27, 5, -14 }, target = { -16, 2.4, -22 }, label = "Rustbucket, side" },
-				{ pos = { -8, 8, 17 }, target = { at(1), 2.5, 9 }, label = "Rustbucket + Pony, rear" },
-				{ pos = { at(2) - 9, 7, -16 }, target = { at(2), 3, -4 }, label = "Pickup" },
-				{ pos = { at(3) - 6, 5, -9 }, target = { at(3), 2.2, 0 }, label = "Scout ATV" },
-				{ pos = { at(4) - 10, 9, -20 }, target = { at(4), 3, -4 }, label = "Flatbed" },
-				{ pos = { at(5) - 12, 9, -24 }, target = { at(5), 3.5, -8 }, label = "Logging Rig" },
-				{ pos = { at(5) + 18, 10, 18 }, target = { at(5), 3, 10 }, label = "Logging Rig + Heavy Hauler" },
+				{ pos = { -40, 34, -70 }, target = { 28, 3, 8 }, label = "line-up" },
+				{ pos = { 28, 12, -62 }, target = { 28, 4, 2 }, label = "line-up, front" },
+				{ pos = { -22, 8, -50 }, target = { -24.5, 3.2, -32 }, label = "Rustbucket" },
+				{ pos = { -41, 7, -19 }, target = { -24, 3.2, -32 }, label = "Rustbucket, side" },
+				{ pos = { -11, 11, 40 }, target = { at(1), 3, 16 }, label = "Rustbucket + Pony, rear" },
+				{ pos = { at(2) - 12, 9, -24 }, target = { at(2), 4, -6 }, label = "Pickup" },
+				{ pos = { at(3) - 8, 6.5, -12 }, target = { at(3), 3, 0 }, label = "Scout ATV" },
+				{ pos = { at(4) - 14, 12, -30 }, target = { at(4), 4, -6 }, label = "Flatbed" },
+				{ pos = { at(5) - 16, 12, -38 }, target = { at(5), 4.5, -10 }, label = "Logging Rig" },
+				{ pos = { at(5) + 26, 14, 36 }, target = { at(5), 4, 20 }, label = "Logging Rig + Heavy Hauler" },
 				-- From the Pickup's passenger side: the seated driver's head and hat
 				-- under the roof, the Burl on the load behind the cab.
-				{ pos = { at(2) + 7.5, 5.4, -3.6 }, target = { at(2), 4.5, -1.6 }, label = "Pickup, seated driver" },
+				{
+					pos = { at(2) + 9, 6.8, pickupSeat - 1.5 },
+					target = { at(2), 5.6, pickupSeat },
+					label = "Pickup, seated driver",
+				},
+				-- Every cab from the front at hat height (M1.5): each driver (an
+				-- avatar-sized figure, a 0.6 hat on) sits with room to spare under
+				-- the roofs, the bigger the truck the more.
+				{ pos = { 21, 6.4, -46 }, target = { 21, 6.0, -10 }, label = "hats under the roofs, front" },
 			},
 		}
 	end,
