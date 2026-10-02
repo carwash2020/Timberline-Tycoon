@@ -19,6 +19,7 @@ local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
 local BootReport = require(script.Parent.BootReport)
 local DailyService = require(script.Parent.DailyService)
+local DevCommands = require(script.Parent.DevCommands)
 local EconomyService = require(script.Parent.EconomyService)
 local FieldGuideService = require(script.Parent.FieldGuideService)
 local ForestService = require(script.Parent.ForestService)
@@ -550,9 +551,10 @@ safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed,
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("NPCService.Init", NPCService.Init, mapFolder)
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
--- and drag loose wood.
+-- and drag loose wood, and Studio's /spawnwood to try it.
 if CoreLoop.V2() then
 	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
+	safely("DevCommands.Init", DevCommands.Init, notify)
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
