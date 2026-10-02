@@ -10,12 +10,13 @@
 --     always meets it); the top two voxels take the surface material,
 --     deeper ones what lies beneath (TerrainGen.SubMaterial).
 --   * Yields between chunks, so the server keeps ticking.
---   * First it measures where the engine draws what we write (TER-01,
---     Shared/World/TerrainFit): flat test pads far below the map, a ray
---     onto each, and every height after that is written so the ground is
---     drawn where TerrainGen says. The live game drew the town 2-3 studs
---     high before this. Then it checks the town's ground with rays and
---     reports it (workspace attributes TerrainOffset and TownGroundY).
+--   * The engine draws the ground where it likes (the live game drew the
+--     flat town 2 studs above the y = 0 we wrote), so the chunks under the
+--     town go first and are rewritten, shifted, until rays read the town's
+--     ground at 0 (TER-04, Shared/World/TerrainFit.NextShift). The same
+--     shift then goes on every height and water level in the world. Output
+--     says what it found; workspace attributes TerrainShift (studs added to
+--     every written height) and TownGroundY (what the town reads after).
 -- A place that already has the terrain saved can skip all this: set the
 -- attribute Prebuilt = true on Workspace.Terrain in Studio.
 
@@ -56,20 +57,11 @@ local function setLook(terrain: Terrain)
 end
 
 -- Writes one chunk of nx by nz voxel columns starting at world (x0, z0),
--- each height passed through `fit` and each water level through
--- `waterFit` (TerrainFit; identity if nil) so they are drawn where
--- TerrainGen says. Materials follow the true heights.
-local function writeChunk(
-	terrain: Terrain,
-	x0: number,
-	z0: number,
-	nx: number,
-	nz: number,
-	fit: TerrainFit.Fit?,
-	waterFit: TerrainFit.Fit?
-)
-	local f = fit or TerrainFit.Identity
-	local wf = waterFit or TerrainFit.Identity
+-- every height and water level written `shift` studs higher (0 if nil) so
+-- the engine draws them where TerrainGen says. Materials follow the true
+-- heights. Returns the region it wrote.
+local function writeChunk(terrain: Terrain, x0: number, z0: number, nx: number, nz: number, shift: number?): Region3
+	local lift = shift or 0
 	-- Heights with a one-column border, for slopes.
 	local heights: { { number } } = table.create(nx + 2)
 	for i = 1, nx + 2 do
@@ -97,8 +89,8 @@ local function writeChunk(
 			) / (2 * VOXEL)
 			srow[k] = TerrainGen.SurfaceMaterial(x, z, h, slope)
 			local w = TerrainGen.WaterLevelAt(x, z)
-			local hw = TerrainFit.Written(f, h)
-			local ww = if w then TerrainFit.Written(wf, w) else nil
+			local hw = h + lift
+			local ww = if w then w + lift else nil
 			wrow[k] = ww or NO_WATER
 			hrow[k] = hw
 			lo = math.min(lo, hw)
@@ -147,6 +139,7 @@ local function writeChunk(
 	local region =
 		Region3.new(Vector3.new(x0, yMin * VOXEL, z0), Vector3.new(x0 + nx * VOXEL, yMax * VOXEL, z0 + nz * VOXEL))
 	terrain:WriteVoxels(region, VOXEL, mats, occs)
+	return region
 end
 
 TerrainBuilder._writeChunk = writeChunk -- for tests
@@ -190,128 +183,6 @@ function TerrainBuilder.LiftOnto(x: number, y: number, z: number, reach: number?
 	return y
 end
 
--- The test pads: 8 x 8 columns each, side by side along X, their surfaces
--- written PAD_BASE + residue high, well under the deepest ground (the
--- world's crust stops a few voxels under its lowest valley). Ground pads
--- in one row; water pads (a rock bed two voxels down, water up to the
--- residue) in a second row behind them.
-local PAD_BASE = -400
-local PAD_COLUMNS = 8
-local PAD_STEP = 40 -- studs between pads' corners (8 clear between)
-local PAD_X0 = -160
-local PAD_Z0 = -16
-local WATER_Z0 = PAD_Z0 + PAD_STEP
-local PAD_Y0 = PAD_BASE - 12 -- three voxels of rock under each pad
-local PAD_VOXELS = 5
-local WATER_RESIDUES = { 0, 1, 2, 3 }
-
--- `surface`: the ground's written height (nil clears the pad). `water`:
--- a water surface over a bed at `surface`.
-local function writePad(terrain: Terrain, x0: number, z0: number, surface: number?, water: number?)
-	local mats: { { { Enum.Material } } } = table.create(PAD_COLUMNS)
-	local occs: { { { number } } } = table.create(PAD_COLUMNS)
-	for i = 1, PAD_COLUMNS do
-		local mx, ox = table.create(PAD_VOXELS), table.create(PAD_VOXELS)
-		for j = 1, PAD_VOXELS do
-			local kind, occ = "air", 0
-			if surface then
-				kind, occ = TerrainGen.Voxel(surface, water, PAD_Y0 + (j - 1) * VOXEL)
-			end
-			local m = if kind == "solid"
-				then Enum.Material.Rock
-				elseif kind == "water" then Enum.Material.Water
-				else Enum.Material.Air
-			mx[j] = table.create(PAD_COLUMNS, m)
-			ox[j] = table.create(PAD_COLUMNS, if kind == "air" then 0 else occ)
-		end
-		mats[i], occs[i] = mx, ox
-	end
-	local region = Region3.new(
-		Vector3.new(x0, PAD_Y0, z0),
-		Vector3.new(x0 + PAD_COLUMNS * VOXEL, PAD_Y0 + PAD_VOXELS * VOXEL, z0 + PAD_COLUMNS * VOXEL)
-	)
-	terrain:WriteVoxels(region, VOXEL, mats, occs)
-end
-
--- Reads every pad (written heights `heights`, pads in the row at `z0`),
--- trying for up to 30 frames; returns the samples and how many never
--- answered.
-local function readPads(
-	castFn: Cast,
-	waitFn: () -> (),
-	heights: { number },
-	z0: number,
-	water: boolean
-): ({ TerrainFit.Sample }, number)
-	local samples: { TerrainFit.Sample } = {}
-	local missing = #heights
-	local tries = 0
-	local got: { [number]: boolean } = {}
-	while missing > 0 and tries < 30 do
-		waitFn()
-		tries += 1
-		for i, h in ipairs(heights) do
-			if not got[i] then
-				-- The middle of the pad: the centre of its fourth column each way.
-				local x = PAD_X0 + (i - 1) * PAD_STEP + 3.5 * VOXEL
-				local z = z0 + 3.5 * VOXEL
-				local y = castFn(x, z, PAD_BASE + 16, PAD_BASE - 10, water)
-				if y then
-					got[i] = true
-					missing -= 1
-					table.insert(samples, { written = h, drawn = y })
-				end
-			end
-		end
-	end
-	return samples, missing
-end
-
-local function fitFrom(samples: { TerrainFit.Sample }, missing: number, total: number): (TerrainFit.Fit, string)
-	if missing > 0 then
-		if #samples == 0 then
-			return TerrainFit.Identity, "no ray reached the test pads; left as written"
-		end
-		return TerrainFit.Identity, string.format("only %d of %d test pads answered; left as written", #samples, total)
-	end
-	return TerrainFit.Fit(samples)
-end
-
--- Writes one ground pad per TerrainFit.Residues and a few water pads,
--- casts onto the middle of each, clears them and returns the ground's fit
--- and note, then the water's. `cast` and `wait` can be swapped for tests.
-function TerrainBuilder.Calibrate(
-	terrain: Terrain,
-	cast: Cast?,
-	wait: (() -> ())?
-): (TerrainFit.Fit, string, TerrainFit.Fit, string)
-	local castFn: Cast = cast or castTerrain
-	local waitFn = wait or function()
-		task.wait()
-	end
-	local ground: { number } = {}
-	for i, r in ipairs(TerrainFit.Residues) do
-		ground[i] = PAD_BASE + r
-		writePad(terrain, PAD_X0 + (i - 1) * PAD_STEP, PAD_Z0, ground[i])
-	end
-	local water: { number } = {}
-	for i, r in ipairs(WATER_RESIDUES) do
-		water[i] = PAD_BASE + r
-		writePad(terrain, PAD_X0 + (i - 1) * PAD_STEP, WATER_Z0, PAD_BASE - 8, water[i])
-	end
-	local groundSamples, groundMissing = readPads(castFn, waitFn, ground, PAD_Z0, false)
-	local waterSamples, waterMissing = readPads(castFn, waitFn, water, WATER_Z0, true)
-	for i = 1, #ground do
-		writePad(terrain, PAD_X0 + (i - 1) * PAD_STEP, PAD_Z0, nil)
-	end
-	for i = 1, #water do
-		writePad(terrain, PAD_X0 + (i - 1) * PAD_STEP, WATER_Z0, nil)
-	end
-	local fit, note = fitFrom(groundSamples, groundMissing, #ground)
-	local waterFit, waterNote = fitFrom(waterSamples, waterMissing, #water)
-	return fit, note, waterFit, waterNote
-end
-
 -- Spots on the town's flat ground (y = 0 by design): the spawn walk, the
 -- parking lot, the sell pad's apron, the shop paths.
 TerrainBuilder.TownProbes = {
@@ -324,26 +195,27 @@ TerrainBuilder.TownProbes = {
 }
 
 -- Where the town's ground really is: the highest of the probes (nil if no
--- ray hit), and how many hit.
-function TerrainBuilder.TownGround(cast: Cast?): (number?, number)
+-- ray hit), how many hit, and their mean.
+function TerrainBuilder.TownGround(cast: Cast?): (number?, number, number?)
 	local castFn: Cast = cast or castTerrain
 	local top: number? = nil
-	local hits = 0
+	local hits, sum = 0, 0
 	for _, p in ipairs(TerrainBuilder.TownProbes) do
 		local y = castFn(p.X, p.Y, 40, -40)
 		if y then
 			hits += 1
+			sum += y
 			top = if top then math.max(top, y) else y
 		end
 	end
-	return top, hits
+	return top, hits, if hits > 0 then sum / hits else nil
 end
 
-local function reportTown(terrain: Terrain)
-	local top, hits = TerrainBuilder.TownGround()
+local function reportTown(terrain: Terrain, cast: Cast?): number?
+	local top, hits = TerrainBuilder.TownGround(cast)
 	if top == nil then
 		warn("[TerrainBuilder] Town ground check: no ray hit the town's ground")
-		return
+		return nil
 	end
 	workspace:SetAttribute("TownGroundY", math.floor(top * 100 + 0.5) / 100)
 	if math.abs(top) > 0.3 then
@@ -354,43 +226,22 @@ local function reportTown(terrain: Terrain)
 				hits,
 				if terrain:GetAttribute("Prebuilt") == true
 					then " The baked terrain is out of date: clear Workspace.Terrain's Prebuilt attribute and publish again."
-					else ""
+					else " Send this line to Claude."
 			)
 		)
 	else
 		print(string.format("[TerrainBuilder] Town ground at y = %.2f (%d probes): good", top, hits))
 	end
+	return top
 end
 
--- Builds the whole world's terrain. `onProgress(done, total)` is called
--- after each chunk. Returns how many seconds it took.
-function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
-	local started = os.clock()
-	local terrain = workspace.Terrain
-	setLook(terrain)
-	if terrain:GetAttribute("Prebuilt") == true then
-		reportTown(terrain)
-		return 0
-	end
-	terrain:Clear()
-	local useFit: TerrainFit.Fit = TerrainFit.Identity
-	local waterFit: TerrainFit.Fit = TerrainFit.Identity
-	local note, waterNote = "", ""
-	local okFit, fitErr = pcall(function()
-		useFit, note, waterFit, waterNote = TerrainBuilder.Calibrate(terrain)
-	end)
-	if not okFit then
-		useFit, waterFit = TerrainFit.Identity, TerrainFit.Identity
-		note = "failed (" .. tostring(fitErr) .. "); left as written"
-		waterNote = note
-	end
-	workspace:SetAttribute("TerrainOffset", math.floor(useFit.offset * 100 + 0.5) / 100)
-	workspace:SetAttribute("WaterOffset", math.floor(waterFit.offset * 100 + 0.5) / 100)
-	print(string.format("[TerrainBuilder] Calibration: ground %s; water %s", note, waterNote))
+export type Job = { x0: number, z0: number, nx: number, nz: number, dist: number }
+
+-- Every chunk of the world, nearest the sawmill first.
+function TerrainBuilder.Jobs(): { Job }
 	local half = WorldLayout.WorldHalf
 	local totalColumns = math.floor(2 * half / VOXEL)
 	local chunksPerSide = math.ceil(totalColumns / CHUNK)
-	type Job = { x0: number, z0: number, nx: number, nz: number, dist: number }
 	local jobs: { Job } = {}
 	local hub = WorldLayout.Sawmill
 	for cx = 0, chunksPerSide - 1 do
@@ -410,18 +261,140 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
 	table.sort(jobs, function(a, b)
 		return a.dist < b.dist
 	end)
+	return jobs
+end
+
+-- Whether a chunk holds one of the town probes.
+local function underTown(job: Job): boolean
+	for _, p in ipairs(TerrainBuilder.TownProbes) do
+		if p.X >= job.x0 and p.X < job.x0 + job.nx * VOXEL and p.Y >= job.z0 and p.Y < job.z0 + job.nz * VOXEL then
+			return true
+		end
+	end
+	return false
+end
+
+-- Writes the chunks under the town and moves them up or down until the
+-- town's ground reads y = 0 (TER-04): each try clears what the last one
+-- wrote, writes them `shift` studs higher, waits a frame and casts the
+-- town probes (TerrainFit.NextShift picks the next shift). Ends on the
+-- best try. Returns the shift, the town's ground at it (nil if no ray
+-- ever hit), the tries, and the chunks it wrote. `cast` and `wait` can be
+-- swapped for tests.
+function TerrainBuilder.SettleTown(
+	terrain: Terrain,
+	jobs: { Job },
+	cast: Cast?,
+	wait: (() -> ())?
+): (number, number?, { TerrainFit.Try }, { [Job]: boolean })
+	local waitFn = wait or function()
+		task.wait()
+	end
+	local town: { Job } = {}
+	local done: { [Job]: boolean } = {}
+	for _, job in ipairs(jobs) do
+		if underTown(job) then
+			table.insert(town, job)
+			done[job] = true
+		end
+	end
+	local regions: { Region3 } = {}
+	local function write(shift: number)
+		for _, r in ipairs(regions) do
+			terrain:FillBlock(r.CFrame, r.Size, Enum.Material.Air)
+		end
+		table.clear(regions)
+		for _, job in ipairs(town) do
+			table.insert(regions, writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, shift))
+		end
+	end
+	local function measure(): number?
+		for _ = 1, 30 do
+			waitFn()
+			local _, hits, mean = TerrainBuilder.TownGround(cast)
+			if mean and hits >= math.ceil(#TerrainBuilder.TownProbes / 2) then
+				return mean
+			end
+		end
+		return nil
+	end
+	local tries: { TerrainFit.Try } = {}
+	local shift = 0
+	write(shift)
+	local first = measure()
+	if first == nil then
+		return 0, nil, tries, done
+	end
+	table.insert(tries, { shift = shift, error = first })
+	while #tries < TerrainFit.MaxTries do
+		local nextShift = TerrainFit.NextShift(tries)
+		if nextShift == nil then
+			break
+		end
+		shift = nextShift
+		write(shift)
+		local got = measure()
+		if got == nil then
+			break
+		end
+		table.insert(tries, { shift = shift, error = got })
+	end
+	local best = TerrainFit.Best(tries)
+	if best.shift ~= shift then
+		write(best.shift)
+		waitFn()
+	end
+	return best.shift, best.error, tries, done
+end
+
+-- Builds the whole world's terrain. `onProgress(done, total)` is called
+-- after each chunk. Returns how many seconds it took.
+function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
+	local started = os.clock()
+	local terrain = workspace.Terrain
+	setLook(terrain)
+	if terrain:GetAttribute("Prebuilt") == true then
+		reportTown(terrain)
+		return 0
+	end
+	terrain:Clear()
+	local jobs = TerrainBuilder.Jobs()
+	local shift, tries, done = 0, {} :: { TerrainFit.Try }, {} :: { [Job]: boolean }
+	local okSettle, settleErr = pcall(function()
+		local s, _, t, d = TerrainBuilder.SettleTown(terrain, jobs)
+		shift, tries, done = s, t, d
+	end)
+	if not okSettle then
+		warn("[TerrainBuilder] Settling the town's ground failed: " .. tostring(settleErr))
+		shift, done = 0, {}
+	end
+	local steps: { string } = {}
+	for _, t in ipairs(tries) do
+		table.insert(steps, string.format("%+.2f -> %.2f", t.shift, t.error))
+	end
+	print(
+		string.format(
+			"[TerrainBuilder] Town ground: written at 0, drawn at %s; heights shifted %+.2f studs (tries: %s)",
+			if tries[1] then string.format("%.2f", tries[1].error) else "?",
+			shift,
+			if #steps > 0 then table.concat(steps, ", ") else "none: no ray hit the town"
+		)
+	)
+	workspace:SetAttribute("TerrainShift", math.floor(shift * 100 + 0.5) / 100)
 	for index, job in ipairs(jobs) do
-		local ok, err = pcall(function(): any
-			writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, useFit, waterFit)
-			return nil
-		end)
-		if not ok then
-			warn(string.format("[TerrainBuilder] chunk at (%d, %d) failed: %s", job.x0, job.z0, tostring(err)))
+		if not done[job] then
+			local ok, err = pcall(function(): any
+				writeChunk(terrain, job.x0, job.z0, job.nx, job.nz, shift)
+				return nil
+			end)
+			if not ok then
+				warn(string.format("[TerrainBuilder] chunk at (%d, %d) failed: %s", job.x0, job.z0, tostring(err)))
+			end
+			task.wait()
 		end
 		if onProgress then
 			onProgress(index, #jobs)
 		end
-		task.wait()
 	end
 	reportTown(terrain)
 	return os.clock() - started

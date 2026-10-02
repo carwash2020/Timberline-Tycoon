@@ -63,8 +63,8 @@ On the live game, the same Output lines are in the in-game console: press
 
 | # | Do this | Good looks like |
 |---|---|---|
-| 1 | Play with Output open | A line `[TerrainBuilder] Calibration: ground ...; water ...` and then `[TerrainBuilder] Town ground at y = 0.0x (6 probes): good`. **Paste both lines to Claude** whatever they say: they are the first real measurement of where Roblox draws our terrain. A yellow `Town ground is at y = ...` warning means the ground is still off |
-| 2 | Look at the townsfolk: Millie by the sell pad, the three shopkeepers, Murph, the walkers (Rosa, Pip, ...) | Feet on the ground, whole legs visible. Nobody waist-deep |
+| 1 | Play with Output open | `[TerrainBuilder] Town ground: written at 0, drawn at 2.00; heights shifted -2.00 studs (tries: ...)` (the first Studio run read 2.00) and then `[TerrainBuilder] Town ground at y = 0.0x (6 probes): good`. **Paste both lines to Claude.** A yellow `Town ground is at y = ...` warning means the ground is still off |
+| 2 | Look at the townsfolk: Millie by the sell pad, the three shopkeepers, Murph, the walkers (Rosa, Pip, ...), and Murph's camp | Feet on the ground, whole legs visible, nobody waist-deep. The tent, campfire and log seats stand on the ground |
 | 3 | Walk to the parking lot | Your truck sits on its wheels; every slot shows its pale lines, number and lamp |
 | 4 | Respawn a few times (reset your character) | You appear standing on the spawn pad, never inside the ground |
 | 5 | Walk into each shop and the gondola station | Packed dirt round the walls and no grass poking up through the floor or hiding the fronts; grass elsewhere is shorter |
