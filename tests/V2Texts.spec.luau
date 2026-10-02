@@ -13,6 +13,8 @@ return function(t)
 	local ShopLogic = t.shared("ShopLogic")
 	local TutorialData = t.shared("TutorialData")
 	local WoodData = t.shared("WoodData")
+	local ForgeLogic = t.shared("ForgeLogic")
+	local SellLogic = t.shared("SellLogic")
 	local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
 
 	-- The source game's own names (places, shops, keepers, items, woods,
@@ -109,6 +111,19 @@ return function(t)
 			add("shop " .. trailer.id, ShopLogic.TrailerDetailV2(trailer))
 		end
 		add("bed chip", HudRules.BedChip(41.2, 96, 61.8, false).text)
+		-- M1.7b: the Sky Bin and the forge.
+		add("sky bin", SellLogic.BinText(17.25, 120))
+		add("sky bin sale", SellLogic.SaleText(3, 17.25, 431.6))
+		local forged = ItemCatalog.GetAxe("StarfallAxe")
+		local recipe = ForgeLogic.RecipeV2(forged)
+		local stock = { cash = 100, wood = { lumenwood = 17.25 }, materials = { SkyShard = 3 } }
+		for _, line in ipairs(ForgeLogic.MissingV2(recipe, stock)) do
+			add("forge missing", line)
+		end
+		add("forge progress", ForgeLogic.ProgressV2(recipe, stock))
+		add("forge refuses oak", ForgeLogic.RefusalV2(recipe, stock, "oak", nil) :: string)
+		add("forge refuses figures", ForgeLogic.RefusalV2(recipe, stock, "lumenwood", "burl") :: string)
+		add("forged", ForgeLogic.ForgedTextV2(forged, recipe))
 		return out
 	end
 
@@ -167,6 +182,7 @@ return function(t)
 			-- and M1.7b's Sky Bin, chutes and forge
 			"src/ServerScriptService/AetherService.luau",
 			"src/ReplicatedStorage/Shared/SellLogic.luau",
+			"src/ReplicatedStorage/Shared/ForgeLogic.luau",
 			"src/StarterPlayer/StarterPlayerScripts/WorldUI.luau",
 		}) do
 			local name = banned(fs.readFile(path))

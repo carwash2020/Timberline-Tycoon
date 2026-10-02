@@ -15,7 +15,11 @@
 --   * the chute's prompt says "Check Sky Bin" under v2;
 --   * "Sell Sky Bin" by the pad pays the bin through SellService.PayEntries
 --     (as a pad sale), empties it, only from beside the bin, rate-limited,
---     and keeps it while the pad isn't selling.
+--     and keeps it while the pad isn't selling;
+--   * the hoppers' boxes fit BuildingArt's chute and forge;
+--   * the Starfall Forge takes plain lumenwood's u³ up to the recipe (60)
+--     and refuses other woods, figured wood and wood past the recipe;
+--     "Forge" spends forgeWood and never touches forgeLogs.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
@@ -31,6 +35,10 @@ return function(t)
 	local CHUTE_AT = CFrame.new(100, 1.5, 0) -- the hopper box's centre (4 x 3 x 4: its top at y 3)
 	local BIN_AT = CFrame.new(-18, 2, 86) -- the Sky Bin by the pad (WorldPlan town.skyBin)
 	local ON_TOP = Vector3.new(100, 4.3, 0) -- a 2.6-thick log lying on it
+	-- The forge, turned a quarter, off on its own.
+	local FORGE_AT = CFrame.new(300, 0, 0) * CFrame.Angles(0, math.pi / 2, 0)
+	local BuildingArt = t.loader():load("ReplicatedStorage/Shared/Art/BuildingArt")
+	local UP = Vector3.new(0, 1, 0)
 
 	local function setup(options)
 		options = options or {}
@@ -98,7 +106,15 @@ return function(t)
 		s.chute = chute
 		local isle = Instance.new("Folder")
 		chute.Parent = isle
-		local tagged = { CloudChute = { chute } }
+		local forge = BuildingArt.StarfallForge()
+		forge:PivotTo(FORGE_AT * forge:GetPivot()) -- as Kit.placeAt (MapBuilder) places it
+		forge.Parent = isle
+		s.anvil = forge:FindFirstChild("StarfallForge")
+		s.hearth = forge:FindFirstChild("ForgeHearth")
+		-- A 2.6-thick log lying on the hearth.
+		s.onHearth = s.hearth.CFrame * Vector3.new(0, s.hearth.Size.Y / 2, 0) + UP * 1.3
+		local tagged = { CloudChute = { chute }, StarfallForge = { s.anvil } }
+		s.granted = {}
 
 		loader = t.loader({
 			mocks = {
@@ -126,6 +142,10 @@ return function(t)
 				AxeService = {
 					OwnedCounts = function()
 						return {}, 0
+					end,
+					Grant = function(_, axeId)
+						table.insert(s.granted, axeId)
+						return { uid = "u", id = axeId }, nil
 					end,
 				},
 				NodeService = { Publish = function() end },
@@ -190,7 +210,12 @@ return function(t)
 		Aether.Init(function(p, message)
 			table.insert(s.toasts, { id = p.UserId, text = message })
 		end)
-		s.chutePrompt = s.prompts[1]
+		-- Each prompt by its text as made (under v1, before InitV2).
+		s.byV1 = {}
+		for _, prompt in ipairs(s.prompts) do
+			s.byV1[prompt.ActionText] = prompt
+		end
+		s.chutePrompt = s.byV1["Send logs down"]
 		s.v1Text = s.chutePrompt and s.chutePrompt.ActionText
 
 		local folder = Instance.new("Folder")
@@ -450,5 +475,116 @@ return function(t)
 		local s = setup({ noBin = true })
 		t.eq(s.binPrompt, nil)
 		t.ok(string.find(s.loader.warnings[1] or "", "No Sky Bin", 1, true) ~= nil, "warned")
+	end)
+
+	t.test("the hoppers' boxes fit the art: wood laid on them is in, wood on the ground beside isn't", function()
+		local s = setup()
+		local function inside(cf, size, point)
+			local l = cf:PointToObjectSpace(point)
+			return math.abs(l.X) <= size.X / 2 and math.abs(l.Y) <= size.Y / 2 and math.abs(l.Z) <= size.Z / 2
+		end
+		local cf, size = s.A.HopperZone(s.anvil, "forge")
+		t.ok(inside(cf, size, s.onHearth), "on the hearth")
+		t.ok(inside(cf, size, s.anvil.CFrame * Vector3.new(0, s.anvil.Size.Y / 2, 0) + UP * 1.3), "on the anvil")
+		t.ok(not inside(cf, size, FORGE_AT * Vector3.new(0, 1.3, -3)), "on the ground in front")
+		t.ok(not inside(cf, size, FORGE_AT * Vector3.new(4.5, 1.3, 1)), "on the ground beside")
+		local chute = BuildingArt.CloudChute()
+		chute:PivotTo(CFrame.new(-50, 0, 20) * CFrame.Angles(0, 0.7, 0) * chute:GetPivot())
+		local box = chute:FindFirstChild("CloudChute")
+		local ccf, csize = s.A.HopperZone(box, "chute")
+		t.ok(inside(ccf, csize, box.CFrame * Vector3.new(0, box.Size.Y / 2, 0) + UP * 1.3), "on the chute")
+		t.ok(
+			not inside(ccf, csize, box.CFrame * Vector3.new(box.Size.X / 2 + 1.3, -box.Size.Y / 2 + 1.3, 0)),
+			"beside it"
+		)
+		local step = chute:FindFirstChild("ChuteStep")
+		t.ok(not inside(ccf, csize, step.CFrame * Vector3.new(0, step.Size.Y / 2, 0) + UP * 1.3), "on its step")
+	end)
+
+	t.test("the forge takes plain lumenwood's u³ up to 60 and leaves forgeLogs alone", function()
+		local s = setup()
+		local profile = s.profiles[1]
+		profile.forgeWood = { lumenwood = 50 }
+		profile.forgeLogs = { lumenwood = 12 }
+		local a = s.piece("a", 1, "lumenwood", 4, nil, s.onHearth)
+		s.settle()
+		t.ok(s.gone(a), "into the forge")
+		t.eq(profile.forgeWood.lumenwood, 54)
+		t.eq(s.players[1].attrs.ForgeWood, "lumenwood=54")
+		t.eq(toastsFor(s, 1), { "Into the forge: 4 u³. Lumenwood 54/60 u³ · Sky Shards 0/12 · $60,000" })
+		local b = s.piece("b", 1, "lumenwood", 10, nil, s.onHearth)
+		s.settle()
+		t.ok(s.gone(b), "a piece bigger than what's left is used up")
+		t.eq(profile.forgeWood.lumenwood, 60, "never past the recipe")
+		t.eq(
+			toastsFor(s, 1)[2],
+			"Into the forge: 6 u³ (all it needed). Lumenwood 60/60 u³ · Sky Shards 0/12 · $60,000"
+		)
+		local c = s.piece("c", 1, "lumenwood", 3, nil, s.onHearth)
+		s.settle()
+		t.ok(not s.gone(c), "full: it stays")
+		t.eq(toastsFor(s, 1)[3], "The forge has all the Lumenwood it needs.")
+		t.eq(profile.forgeLogs, { lumenwood = 12 }, "forgeLogs untouched")
+		t.eq(#profile.skyWood, 0, "the forge isn't a chute")
+	end)
+
+	t.test(
+		"the forge refuses other woods and figured lumenwood, and the last holder's offline owner rule holds",
+		function()
+			local s = setup()
+			local oak = s.piece("a", 1, "oak", 4, nil, s.onHearth)
+			local figured = s.piece("b", 1, "lumenwood", 4, { Figure = "starfall" }, s.onHearth)
+			local left = s.piece("c", 9, "lumenwood", 5, { holder = 2 }, s.onHearth)
+			s.settle()
+			t.ok(not s.gone(oak) and not s.gone(figured))
+			t.eq(s.profiles[1].forgeWood, {})
+			local said = toastsFor(s, 1)
+			table.sort(said)
+			t.eq(said, {
+				"Figured wood is worth more sold than forged: take it to the sawmill.",
+				"The forge takes plain Lumenwood only.",
+			})
+			t.ok(s.gone(left))
+			t.eq(s.profiles[2].forgeWood, { lumenwood = 5 }, "the last holder's forge, for an owner who left")
+		end
+	)
+
+	t.test("Forge under v2 spends forgeWood, keeps forgeLogs, and says what's short in u³", function()
+		local s = setup()
+		local profile = s.profiles[1]
+		profile.cash = 70000
+		profile.forgeWood = { lumenwood = 47.5 }
+		profile.forgeLogs = { lumenwood = 40 }
+		profile.materials = { SkyShard = 12 }
+		local forgePrompt = s.byV1["Forge the Starfall Axe"]
+		forgePrompt.fire(s.player(1))
+		t.eq(s.granted, {})
+		t.eq(toastsFor(s, 1), { "The forge needs 12.5 more u³ of Lumenwood." })
+		t.eq(profile.cash, 70000)
+		profile.forgeWood.lumenwood = 60
+		forgePrompt.fire(s.player(1))
+		t.eq(s.granted, { "StarfallAxe" })
+		t.eq(profile.cash, 10000)
+		t.eq(profile.forgeWood.lumenwood, 0)
+		t.eq(profile.forgeLogs.lumenwood, 40, "forgeLogs untouched (a rollback to v1 keeps it)")
+		t.eq(profile.materials.SkyShard, 0)
+		t.eq(s.players[1].attrs.ForgeWood, "")
+		local said = toastsFor(s, 1)
+		t.ok(
+			string.find(said[#said], "^The Starfall Axe is yours! It cuts a Lumenwood trunk in %d+ hits%.$") ~= nil,
+			said[#said]
+		)
+	end)
+
+	t.test("the forge's feed prompt says how far along it is under v2", function()
+		local s = setup()
+		local feed = s.byV1["Add lumenwood"]
+		t.eq(feed.ActionText, "Check the forge")
+		s.profiles[1].forgeWood = { lumenwood = 18 }
+		s.profiles[1].materials = { SkyShard = 5 }
+		feed.fire(s.player(1))
+		t.eq(toastsFor(s, 1), {
+			"Lay plain Lumenwood on the forge to feed it. Lumenwood 18/60 u³ · Sky Shards 5/12 · $60,000",
+		})
 	end)
 end
