@@ -28,6 +28,9 @@
 -- works and how full the bin is. Taking a piece is the pad's: the record
 -- marked selling, let go of, forgotten, destroyed. Mirrored on the
 -- SkyBinVolume attribute (u³ in the bin).
+--   * The Sky Bin by the sell pad gets a "Sell Sky Bin" prompt (from
+--     beside it, RateLimiter "SellSkyBin"): SellService.PayEntries pays the
+--     entries as the pad pays pieces, and the bin empties.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local CollectionService = game:GetService("CollectionService")
@@ -60,6 +63,7 @@ export type V2Deps = {
 	resolve: (Model) -> Piece?, -- a piece's record (as SellService's resolve)
 	release: (Model) -> (), -- lets go of a held piece before it goes
 	forget: (Model) -> (), -- drops it from the registries
+	skyBin: BasePart?, -- SellArea's SkyBin by the pad: its "Sell Sky Bin" prompt
 	-- Seams for the specs: what's in a box, the clock, who's online.
 	partsInBox: ((CFrame, Vector3, Instance) -> { BasePart })?,
 	now: (() -> number)?,
@@ -76,6 +80,7 @@ local FALL_BELOW = 40 -- studs under the deck that count as falling off
 local NEAR = 250 -- further than this from the isles (sideways) isn't a fall: a respawn or teleport
 
 local CHUTE_ZONE_HEIGHT = 6 -- studs above a chute's hopper box that count as in it
+local PROMPT_RANGE = 10 -- every prompt here (ProximityPrompt.MaxActivationDistance)
 AetherService.RefuseToastSec = 4 -- at most one "won't fit" toast per player this often
 
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
@@ -436,6 +441,38 @@ function AetherService.ChuteInfo(player: Player)
 	)
 end
 
+-- The Sky Bin's prompt by the sell pad (v2): sells what the chutes sent
+-- down through SellService.PayEntries (paid, toasted and counted as a pad
+-- sale), from beside the bin. The entries leave the save before the sale
+-- and come back only if the pad isn't selling yet.
+function AetherService.SellSkyBin(player: Player)
+	local d = v2
+	if not d or not RateLimiter.Allow(player, "SellSkyBin") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local bin = d.skyBin
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not profile or not bin or not root or not root:IsA("BasePart") then
+		return
+	end
+	local reach = PROMPT_RANGE + GameConfig.RangeTolerance
+	if (root.CFrame.Position - bin.CFrame.Position).Magnitude > reach then
+		return
+	end
+	if #profile.skyWood == 0 then
+		notify(player, "Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it.")
+		return
+	end
+	local entries = profile.skyWood
+	profile.skyWood = {}
+	if not SellService.PayEntries(player, entries) then
+		profile.skyWood = entries
+	end
+	publish(player, profile)
+end
+
 -- Puts the lumenwood in the player's hands into the forge (up to the recipe).
 function AetherService.AddToForge(player: Player)
 	if not RateLimiter.Allow(player, "LoadToTruck") then
@@ -618,7 +655,7 @@ local function addPrompt(
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = action
 	prompt.ObjectText = object
-	prompt.MaxActivationDistance = 10
+	prompt.MaxActivationDistance = PROMPT_RANGE
 	prompt.HoldDuration = hold
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = part
@@ -712,11 +749,18 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 end
 
 -- The v2 loop's hoppers (GameServer, under CoreLoop.V2(), after Init).
--- The chutes' prompts turn informational.
+-- The chutes' prompts turn informational; the Sky Bin gets its prompt.
 function AetherService.InitV2(deps: V2Deps)
 	v2 = deps
 	for _, entry in ipairs(relabel) do
 		entry.prompt.ActionText = entry.v2
+	end
+	local bin = deps.skyBin
+	if bin then
+		local prompt = addPrompt(bin, "Sell Sky Bin", "Sky Bin", 0, AetherService.SellSkyBin)
+		prompt.Name = "SellSkyBin" -- WorldUI shows it only while your bin has wood in it
+	else
+		warn("[AetherService] No Sky Bin by the sell pad: it can't be sold")
 	end
 	for _, player in ipairs(Players:GetPlayers()) do
 		local profile = ProfileService.GetProfile(player)

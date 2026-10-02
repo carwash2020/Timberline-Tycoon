@@ -31,6 +31,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SaveSetting = 4,
 	Grab = 6, -- v2 loop (V2_PLAN.md §12)
 	Release = 6,
+	SellSkyBin = 2, -- v2: the Sky Bin's prompt by the pad (AetherService; a ProximityPrompt, not a remote)
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

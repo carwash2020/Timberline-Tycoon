@@ -229,6 +229,52 @@ return function(t)
 		t.eq(paid.pieceVolumes, { 10 })
 	end)
 
+	-- M1.7b: the Sky Bin's sale pays its entries as the pad pays pieces.
+	t.test("PayEntries pays figure x boost x plank price, 2x Cash once, with the pad's toast and hook", function()
+		local s = setup()
+		local SellLogic = t.shared("SellLogic")
+		local entries = {
+			SellLogic.Entry("maple", "plank", 2, "curly", 2),
+			SellLogic.Entry("lumenwood", "log", 12, nil, 1),
+			{ w = "oak", v = 0 / 0 }, -- a broken entry counts for nothing
+		}
+		local p2 = s.player(2) -- 2x Cash
+		local sale = s.SellService.PayEntries(p2, entries)
+		local maple = WoodData.Get("maple").v2
+		local lumen = WoodData.Get("lumenwood").v2
+		local ForestLogic = t.shared("ForestLogic")
+		local value = 2 * maple.plankPrice * ForestLogic.Multiplier("curly") * 2 + 12 * lumen.logPrice
+		t.eq(#s.paid, 1, "one AddCash")
+		t.eq(s.paid[1].id, 2)
+		t.eq(s.paid[1].amount, math.floor(value * 2 + 0.5))
+		t.eq(s.paid[1].sku, "wood")
+		t.eq(sale.pieces, 2)
+		t.eq(sale.volume, 14)
+		t.eq(sale.credited, sale.paid)
+		t.eq(sale.figures, { "curly" })
+		t.eq(sale.figured, 2)
+		t.eq(sale.woods, { maple = 2, lumenwood = 12 })
+		t.eq(sale.pieceVolumes, { 2, 12 })
+		t.eq(s.toasts[1].text, SellLogic.SaleText(2, 14, sale.paid))
+		t.eq(s.sold, { sale }, "the tutorial, dailies and reveals hear of it")
+		t.eq(#s.released + #s.forgotten, 0, "no pieces in the world were touched")
+	end)
+
+	t.test("PayEntries: the wallet's room, nothing to pay, and before Init", function()
+		local s = setup({ room = 5 })
+		local SellLogic = t.shared("SellLogic")
+		local sale = s.SellService.PayEntries(s.player(1), { SellLogic.Entry("lumenwood", "log", 10, nil, 1) })
+		t.eq(sale.credited, 5, "the cap took the rest")
+		t.ok(string.find(s.toasts[1].text, "· $5", 1, true) ~= nil, s.toasts[1].text)
+		local none = s.SellService.PayEntries(s.player(1), { { w = "oak", v = -1 } })
+		t.eq(none.pieces, 0)
+		t.eq(#s.paid, 1, "nothing paid")
+		t.eq(#s.toasts, 1, "nothing said")
+		t.eq(#s.sold, 1, "nothing heard")
+		s.SellService._reset()
+		t.eq(s.SellService.PayEntries(s.player(1), { SellLogic.Entry("oak", "log", 4) }), nil, "not running")
+	end)
+
 	t.test("a listener that errors for one payee doesn't stop the next one's pay", function()
 		local s = setup({ failFor = 1 })
 		local _, a = s.piece("a", 1, "oak", 4)

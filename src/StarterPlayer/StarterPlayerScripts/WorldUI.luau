@@ -11,7 +11,8 @@
 --     save loads (HudLayout.ClockLine).
 --   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30"),
 --     or under the v2 loop the u³ in it ("SKY BIN 14/120 u³", from the
---     SkyBinVolume attribute).
+--     SkyBinVolume attribute); its "Sell Sky Bin" prompt (the server's)
+--     shows only while there's wood in it.
 -- The server sets the Biome and OwnedGear attributes and the
 -- VitalityTier_<biome> workspace attributes (ForestService). The clock
 -- reads Lighting.ClockTime, the hour the sky shows: LightingController
@@ -169,6 +170,7 @@ local function watchSkyBin()
 	local sky = BiomeData.Get("sky")
 	local capacity = if sky then sky.skyBinCapacity or 30 else 30
 	local volumeCap = if sky then sky.skyBinVolume or 120 else 120
+	local sellPrompt: ProximityPrompt? = nil
 	local function refresh()
 		local text: string
 		if CoreLoop.V2() then
@@ -181,11 +183,23 @@ local function watchSkyBin()
 		for _, label in ipairs(labels) do
 			label.Text = text
 		end
+		local prompt = sellPrompt
+		if prompt then
+			local used = player:GetAttribute("SkyBinVolume")
+			prompt.Enabled = type(used) == "number" and used > 0
+		end
 	end
 	player:GetAttributeChangedSignal("SkyBin"):Connect(refresh)
 	player:GetAttributeChangedSignal("SkyBinVolume"):Connect(refresh)
 	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(refresh)
 	refresh()
+	if CoreLoop.V2() then
+		local found = bin:WaitForChild("SellSkyBin", 30)
+		if found and found:IsA("ProximityPrompt") then
+			sellPrompt = found
+			refresh()
+		end
+	end
 end
 
 -- A toast when the grove you're standing in changes tier.

@@ -12,7 +12,10 @@
 --     most every few seconds;
 --   * an offline owner's piece goes to its last holder; nobody online, it
 --     stays; a piece already going, dead, a shop's or unknown stays;
---   * the chute's prompt says "Check Sky Bin" under v2.
+--   * the chute's prompt says "Check Sky Bin" under v2;
+--   * "Sell Sky Bin" by the pad pays the bin through SellService.PayEntries
+--     (as a pad sale), empties it, only from beside the bin, rate-limited,
+--     and keeps it while the pad isn't selling.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
@@ -26,6 +29,7 @@ return function(t)
 	end
 
 	local CHUTE_AT = CFrame.new(100, 1.5, 0) -- the hopper box's centre (4 x 3 x 4: its top at y 3)
+	local BIN_AT = CFrame.new(-18, 2, 86) -- the Sky Bin by the pad (WorldPlan town.skyBin)
 	local ON_TOP = Vector3.new(100, 4.3, 0) -- a 2.6-thick log lying on it
 
 	local function setup(options)
@@ -71,6 +75,13 @@ return function(t)
 						self.attrs[key] = value
 					end,
 				}
+				local character = Instance.new("Model")
+				local hrp = Instance.new("Part")
+				hrp.Name = "HumanoidRootPart"
+				hrp.CFrame = BIN_AT * CFrame.new(0, 1, -6) -- on the pad's edge, beside the bin
+				hrp.Parent = character
+				p.Character = character
+				p.hrp = hrp
 				s.players[id] = p
 				local profile = Util.deepCopy(Schema.Template)
 				s.profiles[id] = profile
@@ -144,6 +155,38 @@ return function(t)
 		})
 		local Aether = loader:server("AetherService")
 		s.A = Aether
+		s.loader = loader
+		-- The sell pad's side of the Sky Bin's sale (the same module
+		-- AetherService required).
+		s.paid, s.sold = {}, {}
+		s.Sell = loader:server("SellService")
+		s.Sell._use({
+			zone = Instance.new("Part"),
+			woodFolder = Instance.new("Folder"),
+			resolve = function()
+				return nil
+			end,
+			addCash = function(p, amount, reason, sku)
+				table.insert(s.paid, { id = p.UserId, amount = amount, reason = reason, sku = sku })
+				return nil
+			end,
+			saleMultiplier = function()
+				return 1
+			end,
+			notify = function(p, text)
+				table.insert(s.toasts, { id = p.UserId, text = text })
+			end,
+			release = function() end,
+			forget = function() end,
+			onSold = function(sale)
+				table.insert(s.sold, sale)
+			end,
+		})
+		local bin = Instance.new("Part")
+		bin.Name = "SkyBin"
+		bin.Size = Vector3.new(4, 4, 4)
+		bin.CFrame = BIN_AT
+		s.bin = bin
 		Aether.Init(function(p, message)
 			table.insert(s.toasts, { id = p.UserId, text = message })
 		end)
@@ -178,6 +221,7 @@ return function(t)
 		end
 		Aether.InitV2({
 			woodFolder = folder,
+			skyBin = if options.noBin then nil else bin,
 			resolve = function(model)
 				return s.records[model]
 			end,
@@ -204,6 +248,11 @@ return function(t)
 				return if s.online[id] then s.player(id) else nil
 			end,
 		})
+		for _, prompt in ipairs(s.prompts) do
+			if prompt.Name == "SellSkyBin" then
+				s.binPrompt = prompt
+			end
+		end
 		function s.tick(dt)
 			s.clock += dt or 0
 			Aether.HopperTick()
@@ -341,5 +390,65 @@ return function(t)
 			toastsFor(s, 1),
 			{ "Lay wood in the Cloud Chute and it goes down to your Sky Bin by the sawmill. Sky Bin 14/120 u³." }
 		)
+	end)
+
+	t.test("Sell Sky Bin pays the bin as a pad sale and empties it", function()
+		local s = setup()
+		local SellLogic = t.shared("SellLogic")
+		t.ok(s.binPrompt ~= nil, "the prompt is on the bin")
+		t.eq(s.binPrompt.Parent, s.bin)
+		t.eq(s.binPrompt.ActionText, "Sell Sky Bin")
+		local entries = {
+			SellLogic.Entry("lumenwood", "log", 12, nil, 1),
+			SellLogic.Entry("maple", "plank", 2, "curly", 2),
+		}
+		s.profiles[1].skyWood = entries
+		s.binPrompt.fire(s.player(1))
+		local value = SellLogic.EntriesValue(entries)
+		t.eq(#s.paid, 1)
+		t.eq(s.paid[1].amount, SellLogic.Payout(value, 1))
+		t.eq(s.profiles[1].skyWood, {}, "the bin is empty")
+		t.eq(s.players[1].attrs.SkyBinVolume, 0)
+		t.eq(#s.sold, 1, "the tutorial, dailies and reveals hear of it")
+		t.eq(s.sold[1].figures, { "curly" })
+		t.eq(toastsFor(s, 1), { SellLogic.SaleText(2, 14, s.paid[1].amount) })
+	end)
+
+	t.test("Sell Sky Bin: not from afar, says when it's empty, keeps the bin if the pad isn't selling", function()
+		local s = setup()
+		local entry = { w = "oak", v = 10 }
+		s.profiles[1].skyWood = { entry }
+		local p1 = s.player(1)
+		p1.hrp.CFrame = BIN_AT * CFrame.new(0, 0, -40)
+		s.binPrompt.fire(p1)
+		t.eq(#s.paid, 0, "too far from the bin")
+		t.eq(s.profiles[1].skyWood, { entry })
+		local p2 = s.player(2)
+		s.binPrompt.fire(p2)
+		t.eq(toastsFor(s, 2), {
+			"Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it.",
+		})
+		p1.hrp.CFrame = BIN_AT * CFrame.new(0, 1, -6)
+		s.Sell._reset()
+		s.binPrompt.fire(p1)
+		t.eq(s.profiles[1].skyWood, { entry }, "kept for later")
+		t.eq(#s.paid, 0)
+	end)
+
+	t.test("Sell Sky Bin is rate-limited", function()
+		local s = setup()
+		local p1 = s.player(1)
+		for _ = 1, 3 do
+			s.profiles[1].skyWood = { { w = "oak", v = 10 } }
+			s.binPrompt.fire(p1)
+		end
+		t.eq(#s.paid, 2, "2 a second")
+		t.eq(#s.profiles[1].skyWood, 1, "the third press waited")
+	end)
+
+	t.test("without a Sky Bin part there's no sale prompt, and a warning", function()
+		local s = setup({ noBin = true })
+		t.eq(s.binPrompt, nil)
+		t.ok(string.find(s.loader.warnings[1] or "", "No Sky Bin", 1, true) ~= nil, "warned")
 	end)
 end
