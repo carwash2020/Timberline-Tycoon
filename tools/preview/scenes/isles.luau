@@ -46,15 +46,11 @@ return {
 		end
 		place(IsleArt.Skyroot(sky.trunkHeight, rel, sky.main.dir, sky.waterfall.top - sky.root), CF.new(sky.root))
 
-		-- The waterfall's isle: the one whose centre is nearest the fall.
+		-- The waterfall's isle, as WorldPlan names it. (The fall's lip is a
+		-- stud past the rim, so the old "nearest centre within the radius"
+		-- search never matched and the scene drew no waterfall.)
 		local fall = sky.waterfall
-		local fallIsle, fallDir = nil, nil
-		for _, isle in ipairs(sky.isles) do
-			local d = V3.new(fall.top.X - isle.center.X, 0, fall.top.Z - isle.center.Z)
-			if d.Magnitude <= isle.radius then
-				fallIsle, fallDir = isle, d.Unit
-			end
-		end
+		local fallIsle, fallDir = sky.isles[fall.isle], fall.dir
 
 		-- Isles, keeping decoration off the bridge ends, chutes and stations.
 		local function clearFor(center)
@@ -153,8 +149,8 @@ return {
 
 		-- The waterfall, from the isle's rim down to the river's spring.
 		if fallIsle then
-			local lip = fallIsle.center + fallDir * (fallIsle.radius + 1) - V3.new(0, 0.4, 0)
-			place(IsleArt.Waterfall(lip.Y - fall.bottom.Y, 10), lookAt(lip, lip + fallDir))
+			-- Where MapBuilder puts it: the lip at fall.top, -Z away from the isle.
+			place(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10), lookAt(fall.top, fall.top + fallDir))
 		end
 
 		-- Cloud banks drifting under and between the isles.
@@ -172,7 +168,8 @@ return {
 		local r = sky.root
 		local town = sky.main.dir
 		local side = V3.new(-town.Z, 0, town.X)
-		local isle1, isle3 = sky.isles[1].center, sky.isles[3].center
+		local isle1 = sky.isles[1].center
+		local fallDrop = fall.top.Y - fall.bottom.Y
 		local fd = fallDir or V3.new(1, 0, 0)
 		local fp = V3.new(-fd.Z, 0, fd.X)
 		local function off(p, v)
@@ -219,9 +216,10 @@ return {
 					label = "standing on the main isle",
 				},
 				{
-					pos = off(isle3, fd * 170 - fp * 210 - V3.new(0, 40, 0)),
-					target = off(isle3, fd * 40 - V3.new(0, 110, 0)),
-					label = "the waterfall isle",
+					-- The whole fall, lip to foot, from off to one side (WLD-05).
+					pos = off(fall.top, fd * 330 - fp * 640 - V3.new(0, fallDrop * 0.5, 0)),
+					target = off(fall.top, fd * 20 - V3.new(0, fallDrop * 0.5, 0)),
+					label = "the waterfall, lip to foot",
 				},
 				{
 					pos = off(r, town * 105 + side * 12 + V3.new(0, 5, 0)),

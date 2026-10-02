@@ -269,6 +269,89 @@ return function(t)
 		end
 	end)
 
+	t.test("the waterfall moves: a particle curtain, not a glass pole (WLD-05)", function()
+		local function emittersOf(inst)
+			local out = {}
+			for _, d in ipairs(inst:GetDescendants()) do
+				if d:IsA("ParticleEmitter") then
+					table.insert(out, d)
+				end
+			end
+			return out
+		end
+		for _, h in ipairs({ 710, 120, 30 }) do
+			local fall = IsleArt.Waterfall(h, 10)
+			-- Nothing visible is a pole: the one sheet is the top 40 studs only.
+			local sheets = 0
+			for _, p in ipairs(parts(fall)) do
+				if p.Transparency < 1 then
+					t.ok(halfHeight(p) * 2 <= IsleArt.FallSheet + 0.01, p.Name .. " is no taller than the top sheet")
+				end
+				if p.Name == "Waterfall" then
+					sheets += 1
+					t.ok(p.CFrame.Y - halfHeight(p) >= -IsleArt.FallSheet - 0.01, "the sheet stays in the top 40 studs")
+					t.ok(p.Transparency > 0 and p.Transparency < 1, "translucent")
+				end
+			end
+			t.eq(sheets, 1, "one sheet")
+			-- The curtain: an invisible part spanning the height, with several
+			-- streams at its top pouring down at 50-70 studs/s for as long as
+			-- the fall takes.
+			local curtain = fall:FindFirstChild("WaterfallCurtain")
+			t.ok(curtain ~= nil and curtain:IsA("BasePart"), "a curtain part")
+			t.eq(curtain.Transparency, 1, "invisible")
+			t.ok(not curtain.CanCollide and not curtain.CanQuery and not curtain.CanTouch, "a ghost")
+			t.ok(math.abs(halfHeight(curtain) * 2 - h) < 0.01, "spans the height")
+			t.ok(math.abs(curtain.CFrame.Y + h / 2) < 0.01, "from the lip to the foot")
+			local streams = {}
+			for _, e in ipairs(emittersOf(curtain)) do
+				if e.Name == "Curtain" then
+					table.insert(streams, e)
+				end
+			end
+			t.ok(#streams >= 3, "several streams across the width")
+			local xs = {}
+			for _, e in ipairs(streams) do
+				t.ok(e.Rate >= 60 and e.Rate <= 100, "Rate 60-100")
+				t.ok(e.Speed.Min >= 50 and e.Speed.Max <= 70, "Speed 50-70")
+				t.eq(e.EmissionDirection, t.roblox.Enum.NormalId.Bottom)
+				t.ok(math.abs(e.LightEmission - 0.3) < 1e-6, "LightEmission 0.3")
+				t.ok(e.Squash.Keypoints[1].Value > 0, "squashed into streaks")
+				local mean = (e.Speed.Min + e.Speed.Max) / 2
+				local reach = mean * e.Lifetime.Max
+				t.ok(math.abs(reach - h) <= h * 0.05, string.format("lives as long as the fall (%.0f of %d)", reach, h))
+				t.ok(string.find(e.Texture, "^rbxasset://textures/particles/") ~= nil, "a built-in texture")
+				local at = e.Parent
+				t.ok(at:IsA("Attachment") and at.Parent == curtain, "on the curtain")
+				t.ok(math.abs(at.CFrame.Y - (h / 2 - 0.5)) < 0.01, "at its top")
+				table.insert(xs, at.CFrame.X)
+			end
+			table.sort(xs)
+			t.ok(xs[#xs] - xs[1] >= 10 * 0.5, "spread across the width")
+			-- The mist band at 60-90% of the way down (long falls).
+			local spray = fall:FindFirstChild("WaterfallSpray")
+			if h > 40 then
+				t.ok(spray ~= nil, "a mist band")
+				t.eq(spray.Transparency, 1, "the band is particles only")
+				local top, bottom = spray.CFrame.Y + halfHeight(spray), spray.CFrame.Y - halfHeight(spray)
+				t.ok(math.abs(top + h * 0.6) < 0.01 and math.abs(bottom + h * 0.9) < 0.01, "60-90% of the height")
+				t.ok(spray:FindFirstChildOfClass("ParticleEmitter") ~= nil, "mist emitter")
+			end
+			-- Spray at the foot.
+			local mist = fall:FindFirstChild("WaterfallMist")
+			t.ok(mist:FindFirstChild("Spray") ~= nil, "spray at the foot")
+			-- Every emitter carries its full rate for the client's quality scale,
+			-- and the whole fall stays inside a phone-friendly budget (live
+			-- particles: rate x the longest life; low quality halves it).
+			local live = 0
+			for _, e in ipairs(emittersOf(fall)) do
+				t.eq(e:GetAttribute(IsleArt.FallRateAttribute), e.Rate, e.Name .. " has its BaseRate")
+				live += e.Rate * e.Lifetime.Max
+			end
+			t.ok(live <= 2400, string.format("about %d live particles (high); half on low", live))
+		end
+	end)
+
 	t.test("cloud banks are soft, cheap and sit on their base", function()
 		for seed = 1, 10 do
 			local cloud = IsleArt.CloudBank(100, seed)

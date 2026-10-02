@@ -8,6 +8,8 @@
 --   * The Volcano: ash always falls and embers rise; thick in Ashfall.
 --   * The Aether Isles: golden motes drifting up around you.
 --   * Fog: low mist rolling over the ground (the lighting thickens the air).
+--   * The waterfall's emitters (a "BaseRate" attribute) at half rate on
+--     low quality, like the weather (WLD-05).
 --   * Lightning (WorldFX "LightningWarn" then "Lightning"): the air
 --     crackles on the spot, then a jagged bolt from the sky, a flash of the
 --     whole scene, and thunder after a delay that grows with distance.
@@ -731,6 +733,57 @@ local function placeRainbow()
 end
 
 ---------------------------------------------------------------------------
+-- Map emitters (WLD-05)
+---------------------------------------------------------------------------
+
+-- Emitters the map builds with a "BaseRate" attribute (the waterfall's
+-- curtain, mist band and spray: IsleArt.Waterfall) run at BaseRate x the
+-- Quality tier's WeatherRate (WeatherSchedule.MapEmitterRate): half on low
+-- quality. Re-applied with the weather rates, so they follow the slider.
+local MAP_RATE_ATTRIBUTE = "BaseRate"
+local mapEmitters: { [ParticleEmitter]: true } = {}
+
+local function scaleMapEmitter(e: ParticleEmitter, scale: number)
+	local rate = WeatherSchedule.MapEmitterRate(e:GetAttribute(MAP_RATE_ATTRIBUTE), scale)
+	if rate and math.abs(e.Rate - rate) > 0.01 then
+		e.Rate = rate
+	end
+end
+
+local function trackMapEmitter(d: Instance)
+	if d:IsA("ParticleEmitter") and d:GetAttribute(MAP_RATE_ATTRIBUTE) ~= nil then
+		mapEmitters[d] = true
+		scaleMapEmitter(d, Quality.Budget().WeatherRate)
+	end
+end
+
+local function updateMapEmitters()
+	local scale = Quality.Budget().WeatherRate
+	for e in pairs(mapEmitters) do
+		if e.Parent == nil then
+			mapEmitters[e] = nil
+		else
+			scaleMapEmitter(e, scale)
+		end
+	end
+end
+
+local function watchMapEmitters()
+	task.spawn(function()
+		local map = workspace:WaitForChild("TimberlineMap")
+		map.DescendantAdded:Connect(trackMapEmitter)
+		map.DescendantRemoving:Connect(function(d: Instance)
+			if d:IsA("ParticleEmitter") then
+				mapEmitters[d] = nil
+			end
+		end)
+		for _, d in ipairs(map:GetDescendants()) do
+			trackMapEmitter(d)
+		end
+	end)
+end
+
+---------------------------------------------------------------------------
 -- Start
 ---------------------------------------------------------------------------
 
@@ -748,6 +801,7 @@ function WeatherController.Start()
 	end
 
 	aurora = buildAurora()
+	watchMapEmitters()
 
 	task.spawn(function()
 		local worldFx = Net.Remote("WorldFX")
@@ -789,6 +843,7 @@ function WeatherController.Start()
 		sinceRates = 0
 		local env = LightingController.Environment()
 		updateRates(env, step)
+		updateMapEmitters()
 		updateRainSound(step)
 		updateAurora(env, os.clock())
 		updateRainbow(env)

@@ -174,6 +174,16 @@ function WeatherSchedule.IsWet(kind: string): boolean
 	return kind == "Rain" or kind == "Storm" or kind == "Snow" or kind == "Blizzard" or kind == "Ashfall"
 end
 
+-- WLD-05: the Rate for a map emitter (the waterfall's) from its
+-- "BaseRate" attribute and the Quality tier's WeatherRate (1 on high, 0.5
+-- on low). nil when the attribute isn't a usable number (leave it alone).
+function WeatherSchedule.MapEmitterRate(baseRate: unknown, scale: number): number?
+	if type(baseRate) ~= "number" or baseRate ~= baseRate or baseRate < 0 or baseRate == math.huge then
+		return nil
+	end
+	return baseRate * math.clamp(scale, 0, 1)
+end
+
 -- The next `count` slots after the one at `t`: { kind, slotStart }.
 -- (A forecast for the HUD; fog shows as Fog even if it only lies at night.)
 function WeatherSchedule.Forecast(t: number, count: number): { { kind: Kind, slotStart: number } }
