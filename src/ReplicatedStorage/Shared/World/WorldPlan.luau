@@ -927,4 +927,983 @@ function WorldPlan.IslesFromRoot(sky: Sky): { Vector3 }
 	return out
 end
 
+---------------------------------------------------------------------------
+-- The backdrop beyond the world's edge (WLD-02, WLD-09)
+---------------------------------------------------------------------------
+
+-- Clients stream the world in about 1,024 studs round them, so from town
+-- the mountains at the map's edges, the volcano and the ground under the
+-- Skyroot are mostly not there; and from the isles and high ground the
+-- world's cut edge at +-1500 shows. The backdrop fills the horizon all
+-- round. It is looks only: MapBuilder builds it as one Persistent model of
+-- decor parts, and the world previews draw the same pieces.
+--   * A skirt of land beyond the north, west and south walls, out to
+--     BackdropReach, its top just under the terrain along the wall, so it
+--     never stands up as a cliff above the rim; its inner edge a bank
+--     rising from the wall (no flat wall face toward town). The Lake's
+--     outflow runs on into a canyon.
+--   * A ring of low-poly mountains on it: a near row of mossy ridges and a
+--     far row of grey, snow-capped peaks, every one a pitched gable whose
+--     end faces the world. They stay low behind the volcano, as seen from
+--     the town square, so its cone stands against the sky.
+--   * The sea beyond the east wall (beyond the beach, and beyond the sea
+--     cliffs north of it, so the volcano stands against sky and sea), and
+--     south of the south wall from the coast, with a few far islands.
+--   * An impostor of the volcano's cone, wholly inside and under the real
+--     one: it shows only while the terrain there isn't streamed in.
+--   * A footing under the Skyroot's roots, just under the ground.
+-- Every piece is beyond a world wall, or under dry ground wherever it
+-- reaches inside them (WorldPlan.spec proves both).
+
+export type BackdropPiece = {
+	name: string,
+	kind: string, -- "Block", "Wedge" (Kit.wedge's shape) or "Cylinder" (along its X axis)
+	cframe: CFrame,
+	size: Vector3,
+	color: Color3,
+	material: Enum.Material,
+	transparency: number,
+}
+
+local HALF = WorldLayout.WorldHalf
+local SEA_LEVEL = WorldLayout.SeaLevel
+local BACKDROP_REACH = 3000 -- the skirt and the sea run out this far from the middle
+WorldPlan.BackdropReach = BACKDROP_REACH
+WorldPlan.BackdropSeaTop = SEA_LEVEL - 0.2 -- just under the terrain's own sea
+-- The town square at eye height: the volcano's gap in the ring is cut for
+-- this eye.
+WorldPlan.BackdropEye = Vector3.new(0, 6, 90)
+
+local SKIRT_STEP = 4 -- studs between the terrain samples along a wall
+local SKIRT_IN = 2 -- the samples sit this far inside the wall
+local SKIRT_BELOW = 4 -- a skirt block's top sits this far under the lowest of them
+local SKIRT_LONG = 500 -- the longest skirt block along a wall
+local SKIRT_CLIFF = 40 -- a jump this big between samples splits the skirt (cliffs, river banks)
+local SKIRT_BOTTOM = SEA_LEVEL - 15 -- every skirt block reaches down to here
+local BANK = 400 -- a skirt block's bank rises from SKIRT_BOTTOM at the wall to its top this far out
+local FOOT_BELOW = 25 -- mountain feet sink this far under the skirt
+local CAP_CLEAR = 10 -- a snow cap's faces stand this far off the rock's (no z-fighting far off)
+local FACET = 3 -- the volcano impostor's facets are this thick, inward
+local FOOTING_RADIUS = 85 -- the Skyroot's footing (its roots spread 110; the river's spring is 112 out)
+local FOOTING_BELOW = 3 -- under the lowest ground over it
+
+local BACKDROP_COLORS = {
+	snow = Color3.fromRGB(222, 230, 240),
+	moss = {
+		Color3.fromRGB(98, 118, 88),
+		Color3.fromRGB(106, 124, 92),
+		Color3.fromRGB(92, 110, 84),
+		Color3.fromRGB(112, 122, 102),
+	},
+	rock = {
+		Color3.fromRGB(116, 116, 120),
+		Color3.fromRGB(126, 124, 126),
+		Color3.fromRGB(110, 112, 118),
+		Color3.fromRGB(136, 134, 136),
+		Color3.fromRGB(122, 120, 116),
+	},
+	island = { Color3.fromRGB(86, 132, 70), Color3.fromRGB(96, 140, 76), Color3.fromRGB(104, 128, 84) },
+	skirt = Color3.fromRGB(104, 136, 78),
+	sea = Color3.fromRGB(62, 140, 150),
+	seabed = Color3.fromRGB(56, 108, 112),
+	riverbed = Color3.fromRGB(70, 74, 62),
+	basalt = Color3.fromRGB(52, 46, 44),
+	slate = Color3.fromRGB(74, 66, 62),
+}
+
+local function backdropPiece(
+	name: string,
+	kind: string,
+	cframe: CFrame,
+	size: Vector3,
+	color: Color3,
+	material: Enum.Material,
+	transparency: number?
+): BackdropPiece
+	return {
+		name = name,
+		kind = kind,
+		cframe = cframe,
+		size = size,
+		color = color,
+		material = material,
+		transparency = transparency or 0,
+	}
+end
+
+-- A wall of the world: `out` points away from the middle, `along` runs
+-- along it.
+type Side = { name: string, out: Vector3, along: Vector3 }
+local SIDE_N: Side = { name = "N", out = Vector3.new(0, 0, 1), along = Vector3.new(1, 0, 0) }
+local SIDE_W: Side = { name = "W", out = Vector3.new(-1, 0, 0), along = Vector3.new(0, 0, 1) }
+local SIDE_S: Side = { name = "S", out = Vector3.new(0, 0, -1), along = Vector3.new(1, 0, 0) }
+
+-- The point `u` along a wall and `d` beyond it, on the ground plane.
+local function sidePoint(side: Side, u: number, d: number): Vector3
+	return side.out * (HALF + d) + side.along * u
+end
+
+-- A stretch beyond a wall, from u0 to u1 along it: a skirt block (its
+-- top, and whether its inner edge is a bank), a river leaving the world
+-- (its water's surface and bed) or a gap where the sea runs on.
+type Stretch = { u0: number, u1: number, top: number, bed: number?, bank: boolean? }
+type Wall = { side: Side, blocks: { Stretch }, rivers: { Stretch }, gaps: { Stretch } }
+
+-- The terrain just inside a wall, every SKIRT_STEP studs, split into runs
+-- where it jumps.
+type Sample = { u: number, h: number, water: number? }
+local function wallRuns(side: Side): { { Sample } }
+	local runs: { { Sample } } = {}
+	local current: { Sample } = {}
+	local last: Sample? = nil
+	for u = -HALF, HALF, SKIRT_STEP do
+		local p = sidePoint(side, u, -SKIRT_IN)
+		local s: Sample = { u = u, h = TerrainGen.HeightAt(p.X, p.Z), water = TerrainGen.WaterLevelAt(p.X, p.Z) }
+		if last and math.abs(s.h - last.h) > SKIRT_CLIFF then
+			table.insert(runs, current)
+			current = {}
+		end
+		table.insert(current, s)
+		last = s
+	end
+	table.insert(runs, current)
+	-- A run of only a few samples (a ledge on a river's bank) joins the
+	-- next one (the last joins the one before).
+	local merged: { { Sample } } = {}
+	for i, run in ipairs(runs) do
+		if #run < 4 and i < #runs then
+			local nextRun = runs[i + 1]
+			for k = #run, 1, -1 do
+				table.insert(nextRun, 1, run[k])
+			end
+		elseif #run < 4 and #merged > 0 then
+			for _, s in ipairs(run) do
+				table.insert(merged[#merged], s)
+			end
+		else
+			table.insert(merged, run)
+		end
+	end
+	return merged
+end
+
+-- One wall's skirt: blocks (at most SKIRT_LONG long) over its dry runs,
+-- each SKIRT_BELOW under the lowest terrain along it; the rivers it
+-- crosses; and gaps where the run dips to the sea.
+local function wallSkirt(side: Side): Wall
+	local wall: Wall = { side = side, blocks = {}, rivers = {}, gaps = {} }
+	local runs = wallRuns(side)
+	local lows: { number } = {}
+	for r, run in ipairs(runs) do
+		lows[r] = math.huge
+		for _, s in ipairs(run) do
+			lows[r] = math.min(lows[r], s.h)
+		end
+	end
+	-- Where two runs meet (at a cliff), the stretch between their samples
+	-- goes to the lower one: a block never overhangs the drop.
+	local function cut(r: number): number
+		local before, after = runs[r - 1], runs[r]
+		return if lows[r - 1] < lows[r] then after[1].u else before[#before].u
+	end
+	for r, run in ipairs(runs) do
+		local u0 = if r == 1 then -HALF else cut(r)
+		local u1 = if r == #runs then HALF else cut(r + 1)
+		local lowest = lows[r]
+		local river: number? = nil
+		for _, s in ipairs(run) do
+			local w = s.water
+			if w and w > SEA_LEVEL + 0.5 then
+				river = math.max(river or w, w)
+			end
+		end
+		if lowest - SKIRT_BELOW < SEA_LEVEL + 0.5 then
+			if river then
+				table.insert(wall.rivers, { u0 = u0, u1 = u1, top = river, bed = lowest })
+			else
+				table.insert(wall.gaps, { u0 = u0, u1 = u1, top = SEA_LEVEL })
+			end
+		else
+			local n = math.ceil((u1 - u0) / SKIRT_LONG - 1e-6)
+			for k = 0, n - 1 do
+				local a, b = u0 + (u1 - u0) * k / n, u0 + (u1 - u0) * (k + 1) / n
+				local low = math.huge
+				for _, s in ipairs(run) do
+					if s.u >= a - SKIRT_STEP and s.u <= b + SKIRT_STEP then
+						low = math.min(low, s.h)
+					end
+				end
+				table.insert(wall.blocks, { u0 = a, u1 = b, top = low - SKIRT_BELOW })
+			end
+		end
+	end
+	return wall
+end
+
+-- The block of `wall` at its +u end (`atEnd`) or its -u end, if it has one.
+local function endBlock(wall: Wall, atEnd: boolean): Stretch?
+	for _, b in ipairs(wall.blocks) do
+		if (atEnd and b.u1 >= HALF - 1) or (not atEnd and b.u0 <= -HALF + 1) then
+			return b
+		end
+	end
+	return nil
+end
+
+-- The ground beyond `wall` from uLo to uHi along it, `depth` out: the
+-- lowest skirt there (down its bank, if it has one), river beds and the sea
+-- included (or the nearest, if none).
+local function groundUnder(wall: Wall, uLo: number, uHi: number, depth: number): number
+	local low = math.huge
+	local nearest, nearestGap = 0, math.huge
+	local function consider(top: number, u0: number, u1: number)
+		if u1 >= uLo and u0 <= uHi then
+			low = math.min(low, top)
+		else
+			local gap = math.max(u0 - uHi, uLo - u1)
+			if gap < nearestGap then
+				nearest, nearestGap = top, gap
+			end
+		end
+	end
+	for _, b in ipairs(wall.blocks) do
+		local up = if b.bank then math.clamp(depth / BANK, 0, 1) else 1
+		consider(SKIRT_BOTTOM + (b.top - SKIRT_BOTTOM) * up, b.u0, b.u1)
+	end
+	for _, r in ipairs(wall.rivers) do
+		consider(r.bed or r.top, r.u0, r.u1)
+	end
+	for _, g in ipairs(wall.gaps) do
+		consider(SEA_LEVEL - 10, g.u0, g.u1)
+	end
+	return if low < math.huge then low else nearest
+end
+
+-- The volcano's impostor: rings of { radius, y } from its foot up, under
+-- the real cone's lowest flank (which is concave, so two straight tiers
+-- hug it) and under its crater's floor.
+local CONE = WorldLayout.VolcanoCone
+local IMPOSTOR_RINGS = { { 126, 0 }, { 78, 58 }, { 36, 108 } }
+local IMPOSTOR_SIDES = 8
+
+-- The volcano's gap in the ring, as seen from BackdropEye: anything whose
+-- azimuth comes within `half` of the cone's keeps under `elevation`, so the
+-- impostor (or the real cone) stands against the sky.
+local EYE = WorldPlan.BackdropEye
+local VOLCANO_AZ = math.atan2(CONE.z - EYE.Z, CONE.x - EYE.X)
+local VOLCANO_DIST = Vector2.new(CONE.x - EYE.X, CONE.z - EYE.Z).Magnitude
+local IMPOSTOR_TOP = IMPOSTOR_RINGS[#IMPOSTOR_RINGS]
+local GAP_HALF = math.atan(IMPOSTOR_RINGS[1][1] / VOLCANO_DIST) + math.rad(3)
+local GAP_ELEVATION = 0.55 * math.atan((IMPOSTOR_TOP[2] - EYE.Y) / (VOLCANO_DIST - IMPOSTOR_TOP[1]))
+WorldPlan.BackdropVolcanoGap = { azimuth = VOLCANO_AZ, half = GAP_HALF, elevation = GAP_ELEVATION }
+
+-- a - b as an angle, -pi..pi.
+local function angleFrom(a: number, b: number): number
+	return (a - b + math.pi) % (math.pi * 2) - math.pi
+end
+
+-- Whether any of these points lies in the volcano's gap, and the nearest
+-- of them to the eye (flat).
+local function inVolcanoGap(points: { Vector3 }): (boolean, number)
+	local lo, hi, nearest = math.huge, -math.huge, math.huge
+	for _, p in ipairs(points) do
+		local d = angleFrom(math.atan2(p.Z - EYE.Z, p.X - EYE.X), VOLCANO_AZ)
+		lo, hi = math.min(lo, d), math.max(hi, d)
+		nearest = math.min(nearest, Vector2.new(p.X - EYE.X, p.Z - EYE.Z).Magnitude)
+	end
+	return lo <= GAP_HALF and hi >= -GAP_HALF and hi - lo < math.pi, nearest
+end
+
+-- The highest anything `dist` from the eye may stand in the volcano's gap.
+local function gapCeiling(dist: number): number
+	return EYE.Y + dist * math.tan(GAP_ELEVATION)
+end
+
+-- A gable: two wedges back to back along `frame`'s X (`length` long),
+-- `height` tall over `left` (toward the frame's -Z) and `right` (+Z).
+local function gable(
+	out: { BackdropPiece },
+	name: string,
+	frame: CFrame,
+	height: number,
+	left: number,
+	right: number,
+	length: number,
+	color: Color3,
+	material: Enum.Material
+)
+	table.insert(
+		out,
+		backdropPiece(
+			name,
+			"Wedge",
+			frame * CFrame.new(length / 2, height / 2, -left / 2),
+			Vector3.new(length, height, left),
+			color,
+			material
+		)
+	)
+	table.insert(
+		out,
+		backdropPiece(
+			name,
+			"Wedge",
+			frame * CFrame.new(length / 2, height / 2, right / 2) * CFrame.Angles(0, math.pi, 0),
+			Vector3.new(length, height, right),
+			color,
+			material
+		)
+	)
+end
+
+-- A mountain: a gable whose end (a triangle `left + right` wide standing
+-- at `foot`, its peak at world height `peak`) faces back along `dir` and
+-- leans back by `pitch`, its ridge running out along `dir` (flat) and down
+-- into the ground. Above `snowLine` a snow cap rides its top.
+type Mountain = {
+	foot: Vector3, -- its y is the foot's height
+	dir: Vector3,
+	peak: number,
+	left: number,
+	right: number,
+	pitch: number,
+	color: Color3,
+	snowLine: number,
+}
+local function mountainPieces(m: Mountain): { BackdropPiece }
+	local out: { BackdropPiece } = {}
+	local height = (m.peak - m.foot.Y) / math.cos(m.pitch)
+	local length = math.min(2000, 1.15 * height / math.tan(m.pitch))
+	local frame = CFrame.fromMatrix(m.foot, m.dir, Vector3.yAxis) * CFrame.Angles(0, 0, -m.pitch)
+	gable(out, "BackdropRidge", frame, height, m.left, m.right, length, m.color, Enum.Material.Slate)
+	if m.peak > m.snowLine + 60 then
+		-- Lifted so its slopes stand CAP_CLEAR off the rock's, measured
+		-- square to the steeper (narrower) one; its front CAP_CLEAR ahead.
+		local steep = math.min(m.left, m.right)
+		local lift = CAP_CLEAR * math.sqrt(height * height + steep * steep) / steep
+		local cap = math.clamp((m.peak - m.snowLine) / math.cos(m.pitch), height * 0.18, height * 0.42) + lift
+		local capFrame = frame * CFrame.new(-CAP_CLEAR, height + lift - cap, 0)
+		gable(
+			out,
+			"BackdropSnow",
+			capFrame,
+			cap,
+			cap * m.left / height,
+			cap * m.right / height,
+			length * 0.5 + CAP_CLEAR,
+			BACKDROP_COLORS.snow,
+			Enum.Material.Snow
+		)
+	end
+	return out
+end
+
+-- Every corner of a piece's box, in the world.
+local function pieceCorners(p: BackdropPiece): { Vector3 }
+	local h = p.size / 2
+	local out: { Vector3 } = {}
+	for _, x in ipairs({ -1, 1 }) do
+		for _, y in ipairs({ -1, 1 }) do
+			for _, z in ipairs({ -1, 1 }) do
+				table.insert(out, (p.cframe * CFrame.new(h.X * x, h.Y * y, h.Z * z)).Position)
+			end
+		end
+	end
+	return out
+end
+
+-- Whether a mountain stands in the volcano's gap, and the nearest of its
+-- corners to the eye.
+local function mountainInGap(pieces: { BackdropPiece }): (boolean, number)
+	local corners: { Vector3 } = {}
+	for _, p in ipairs(pieces) do
+		for _, c in ipairs(pieceCorners(p)) do
+			table.insert(corners, c)
+		end
+	end
+	return inVolcanoGap(corners)
+end
+
+-- A mountain's pieces into `out`, lowered (or left out: false) where it
+-- would stand in the volcano's gap.
+local function placeMountain(out: { BackdropPiece }, m: Mountain): boolean
+	local pieces = mountainPieces(m)
+	local inGap, nearest = mountainInGap(pieces)
+	if inGap then
+		local ceiling = gapCeiling(nearest)
+		if ceiling < m.foot.Y + 60 then
+			return false
+		end
+		m.peak = math.min(m.peak, ceiling)
+		pieces = mountainPieces(m)
+	end
+	for _, p in ipairs(pieces) do
+		table.insert(out, p)
+	end
+	return true
+end
+
+-- A row of mountains along a wall: `depth` beyond it, `width` across, each
+-- the next `overlap` of its width along (so neighbours always overlap),
+-- leaning `pitch` degrees back, turned up to `yaw` degrees off square, snow
+-- above `snow`.
+-- Their peaks stand `elevation` degrees over BackdropEye's horizon (so the
+-- ring reads evenly from town, the far corners as well as the walls'
+-- middles), in massifs: tall and low stretches follow a slow noise along
+-- the wall.
+type Row = {
+	depth: { number },
+	overlap: { number },
+	width: { number },
+	elevation: { number },
+	pitch: { number },
+	yaw: number,
+	colors: { Color3 },
+	snow: { number },
+}
+local NEAR_ROW: Row = {
+	depth = { 20, 120 },
+	overlap = { 0.75, 0.95 },
+	width = { 380, 720 },
+	elevation = { 8, 13 },
+	pitch = { 28, 44 },
+	yaw = 20,
+	colors = BACKDROP_COLORS.moss,
+	snow = { 360, 440 },
+}
+local FAR_ROW: Row = {
+	depth = { 420, 800 },
+	overlap = { 0.5, 0.72 },
+	width = { 600, 1000 },
+	elevation = { 10.5, 16.5 },
+	pitch = { 28, 40 },
+	yaw = 16,
+	colors = BACKDROP_COLORS.rock,
+	snow = { 380, 520 },
+}
+local PEAK_MAX = 1000 -- however far off
+
+-- A row along `wall`: from u0 to u1 (or out both ways from `anchor`), or,
+-- given `fill`, one mountain on the eye's line through each of its points
+-- (another row's saddles: so this row's peaks fill the gaps between the
+-- row in front, and its own saddles hide behind that row's peaks).
+-- Returns its own saddles, and a point past each end.
+local function placeRow(
+	out: { BackdropPiece },
+	wall: Wall,
+	row: Row,
+	seed: number,
+	span: { u0: number, u1: number, anchor: number? }?,
+	fill: { Vector3 }?
+): { Vector3 }
+	local rng = Kit.rng(seed)
+	local side = wall.side
+	local eye = Vector3.new(EYE.X, 0, EYE.Z)
+	-- How far along the wall the eye's line through `p` is, `depth` out.
+	local function alongRay(p: Vector3, depth: number): number
+		local t = (HALF + depth - eye:Dot(side.out)) / (p:Dot(side.out) - eye:Dot(side.out))
+		return (eye + (p - eye) * t):Dot(side.along)
+	end
+	-- How tall (0..1) the row stands at u: massifs along the wall, a little
+	-- jitter on top; the taller, the wider.
+	type Station = { u: number, tall: number, width: number, ray: Vector3? }
+	local function station(u: number): Station
+		local tall = math.clamp(0.5 + math.noise(u / 1100, seed * 1.37, 0.5) * 0.9 + rng:range(-0.25, 0.25), 0, 1)
+		return {
+			u = u,
+			tall = tall,
+			width = row.width[1] + (row.width[2] - row.width[1]) * (0.5 * tall + 0.5 * rng:next()),
+		}
+	end
+	local stations: { Station } = {}
+	if fill then
+		for _, p in ipairs(fill) do
+			local st = station(alongRay(p, (row.depth[1] + row.depth[2]) / 2))
+			st.ray = p
+			table.insert(stations, st)
+		end
+	elseif span then
+		local anchor = span.anchor
+		local s = station(if anchor then anchor else span.u0 + rng:range(0, row.width[1] / 2))
+		while s.u <= span.u1 do
+			table.insert(stations, s)
+			s = station(s.u + s.width * rng:range(row.overlap[1], row.overlap[2]))
+		end
+		if anchor and #stations > 0 then
+			s = stations[1]
+			s = station(s.u - s.width * rng:range(row.overlap[1], row.overlap[2]))
+			while s.u >= span.u0 do
+				table.insert(stations, s)
+				s = station(s.u - s.width * rng:range(row.overlap[1], row.overlap[2]))
+			end
+		end
+	end
+	type Placed = { u: number, width: number, depth: number }
+	local placed: { Placed } = {}
+	for _, st in ipairs(stations) do
+		local tall, width = st.tall, st.width
+		local split = rng:range(0.3, 0.7)
+		local left, right = width * split, width * (1 - split)
+		local yaw = math.rad(rng:range(-row.yaw, row.yaw))
+		local dir = Vector3.new(
+			side.out.X * math.cos(yaw) - side.out.Z * math.sin(yaw),
+			0,
+			side.out.X * math.sin(yaw) + side.out.Z * math.cos(yaw)
+		)
+		-- Deep enough that its near corners stay beyond the wall however
+		-- it turns (and its snow cap's front with them).
+		local depth = rng:range(row.depth[1], row.depth[2])
+			+ math.max(left, right) * math.abs(math.sin(yaw))
+			+ CAP_CLEAR
+			+ 10
+		local pitch = math.rad(rng:range(row.pitch[1], row.pitch[2]))
+		local rise = math.tan(math.rad(row.elevation[1] + (row.elevation[2] - row.elevation[1]) * tall))
+		local snowLine = rng:range(row.snow[1], row.snow[2])
+		local color = Kit.vary(rng:pick(row.colors), rng, 0.03)
+		-- The south is the sunny side: less snow.
+		if side == SIDE_S then
+			snowLine += 120
+		end
+		-- The mountain standing at `u` along the wall.
+		local function at(u: number): Mountain
+			local spot = sidePoint(side, u, depth)
+			local footY = groundUnder(wall, u - width / 2, u + width / 2, depth) - FOOT_BELOW
+			-- The peak sits (peak - footY) * tan(pitch) back from the foot,
+			-- so for it to stand `rise` (a slope) over the eye's horizon:
+			-- peak = eye + (away + (peak - footY) * back) * rise.
+			local back = math.tan(pitch) * math.abs(dir:Dot(side.out))
+			local away = Vector2.new(spot.X - EYE.X, spot.Z - EYE.Z).Magnitude
+			return {
+				foot = Vector3.new(spot.X, footY, spot.Z),
+				dir = dir,
+				peak = math.min(PEAK_MAX, (EYE.Y + away * rise - footY * back * rise) / (1 - back * rise)),
+				left = left,
+				right = right,
+				pitch = pitch,
+				color = color,
+				snowLine = snowLine,
+			}
+		end
+		local ray = st.ray
+		local u = if ray then alongRay(ray, depth) else st.u
+		-- One that would stand in the volcano's gap steps aside, out of it,
+		-- if it can (else it is lowered, or left out).
+		local m = at(u)
+		if mountainInGap(mountainPieces(m)) then
+			for k = 1, 12 do
+				local moved: number? = nil
+				for _, sign in ipairs({ -1, 1 }) do
+					if not moved and not mountainInGap(mountainPieces(at(u + sign * 40 * k))) then
+						moved = u + sign * 40 * k
+					end
+				end
+				if moved then
+					u = moved
+					m = at(moved)
+					break
+				end
+			end
+		end
+		if placeMountain(out, m) then
+			table.insert(placed, { u = u, width = width, depth = depth })
+		end
+	end
+	-- The saddles between neighbours (where their flanks meet, roughly),
+	-- and a point past each end.
+	table.sort(placed, function(a, b)
+		return a.u < b.u
+	end)
+	local saddles: { Vector3 } = {}
+	for i, a in ipairs(placed) do
+		if i == 1 then
+			table.insert(saddles, sidePoint(side, a.u - a.width * 0.45, a.depth))
+		end
+		local b = placed[i + 1]
+		if b then
+			local u = a.u + (b.u - a.u) * a.width / (a.width + b.width)
+			table.insert(saddles, sidePoint(side, u, (a.depth + b.depth) / 2))
+		else
+			table.insert(saddles, sidePoint(side, a.u + a.width * 0.45, a.depth))
+		end
+	end
+	return saddles
+end
+
+-- An axis-aligned block from (x0, y0, z0) to (x1, y1, z1).
+local function slab(
+	name: string,
+	x0: number,
+	x1: number,
+	y0: number,
+	y1: number,
+	z0: number,
+	z1: number,
+	color: Color3,
+	material: Enum.Material,
+	transparency: number?
+): BackdropPiece
+	return backdropPiece(
+		name,
+		"Block",
+		CFrame.new((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+		Vector3.new(x1 - x0, y1 - y0, z1 - z0),
+		color,
+		material,
+		transparency
+	)
+end
+
+-- A block beyond a wall, from u0 to u1 along it and d0 to d1 out, from y0
+-- up to y1.
+local function beyondWall(
+	name: string,
+	side: Side,
+	u0: number,
+	u1: number,
+	d0: number,
+	d1: number,
+	y0: number,
+	y1: number,
+	color: Color3,
+	material: Enum.Material,
+	transparency: number?
+): BackdropPiece
+	local a, b = sidePoint(side, u0, d0), sidePoint(side, u1, d1)
+	return slab(
+		name,
+		math.min(a.X, b.X),
+		math.max(a.X, b.X),
+		y0,
+		y1,
+		math.min(a.Z, b.Z),
+		math.max(a.Z, b.Z),
+		color,
+		material,
+		transparency
+	)
+end
+
+-- The volcano's impostor: IMPOSTOR_SIDES facets per tier between its
+-- rings, each an isosceles trapezoid plate FACET thick behind its face (a
+-- block down its middle and a right-angled wedge each side), and a floor
+-- a little down inside its crater.
+local function impostor(out: { BackdropPiece })
+	local center = Vector3.new(CONE.x, 0, CONE.z)
+	local function ring(r: { number }, a: number): Vector3
+		return Vector3.new(CONE.x + math.cos(a) * r[1], r[2], CONE.z + math.sin(a) * r[1])
+	end
+	for tier = 1, #IMPOSTOR_RINGS - 1 do
+		local lo, hi = IMPOSTOR_RINGS[tier], IMPOSTOR_RINGS[tier + 1]
+		for i = 1, IMPOSTOR_SIDES do
+			local a0 = (i - 1) / IMPOSTOR_SIDES * math.pi * 2
+			local a1 = i / IMPOSTOR_SIDES * math.pi * 2
+			local b0, b1, t0, t1 = ring(lo, a0), ring(lo, a1), ring(hi, a0), ring(hi, a1)
+			local mb, mt = (b0 + b1) / 2, (t0 + t1) / 2
+			local u, v = (b1 - b0).Unit, (mt - mb).Unit
+			local slant = (mt - mb).Magnitude
+			local top = (t1 - t0).Magnitude
+			local flare = ((b1 - b0).Magnitude - top) / 2
+			local n = u:Cross(v)
+			local outward = Vector3.new(mb.X - center.X, 0, mb.Z - center.Z)
+			local inset = (if n:Dot(outward) > 0 then n else -n) * (-FACET / 2)
+			local color = if (i + tier) % 2 == 0 then BACKDROP_COLORS.basalt else BACKDROP_COLORS.slate
+			table.insert(
+				out,
+				backdropPiece(
+					"VolcanoImpostor",
+					"Block",
+					CFrame.fromMatrix((mb + mt) / 2 + inset, u, v),
+					Vector3.new(top, slant, FACET),
+					color,
+					Enum.Material.Basalt
+				)
+			)
+			-- The side triangles, right-angled at the block's bottom corners.
+			for _, sign in ipairs({ 1, -1 }) do
+				local corner = mb + u * (sign * top / 2)
+				local middle = corner + v * (slant / 2) + u * (sign * flare / 2)
+				local cf = if sign > 0
+					then CFrame.fromMatrix(middle + inset, u:Cross(v), v, -u)
+					else CFrame.fromMatrix(middle + inset, v:Cross(u), v, u)
+				table.insert(
+					out,
+					backdropPiece(
+						"VolcanoImpostor",
+						"Wedge",
+						cf,
+						Vector3.new(FACET, slant, flare),
+						color,
+						Enum.Material.Basalt
+					)
+				)
+			end
+		end
+	end
+	table.insert(
+		out,
+		backdropPiece(
+			"VolcanoImpostor",
+			"Cylinder",
+			CFrame.new(CONE.x, IMPOSTOR_TOP[2] - 6, CONE.z) * CFrame.Angles(0, 0, math.pi / 2),
+			Vector3.new(2, IMPOSTOR_TOP[1] * 2, IMPOSTOR_TOP[1] * 2),
+			BACKDROP_COLORS.basalt,
+			Enum.Material.Basalt
+		)
+	)
+end
+
+-- An island far out to sea: two pitched gables back to back, their peaks
+-- meeting `peak` high over (x, z), the ridge running along `yaw` degrees.
+local function island(out: { BackdropPiece }, x: number, z: number, peak: number, yaw: number, seed: number)
+	local rng = Kit.rng(seed)
+	local base = SEA_LEVEL - 11
+	local pitch = math.rad(rng:range(17, 25))
+	local height = (peak - base) / math.cos(pitch)
+	local length = 1.15 * height / math.tan(pitch)
+	local dir = Vector3.new(math.cos(math.rad(yaw)), 0, math.sin(math.rad(yaw)))
+	local left, right = rng:range(130, 220), rng:range(130, 220)
+	local color = rng:pick(BACKDROP_COLORS.island)
+	for _, way in ipairs({ 1, -1 }) do
+		local d = dir * way
+		local foot = Vector3.new(x, base, z) - d * (height * math.sin(pitch))
+		local frame = CFrame.fromMatrix(foot, d, Vector3.yAxis) * CFrame.Angles(0, 0, -pitch)
+		-- Turned round, one gable's left is the other's right.
+		local l = if way > 0 then left else right
+		local r = if way > 0 then right else left
+		gable(out, "BackdropIsland", frame, height, l, r, length, color, Enum.Material.Grass)
+	end
+end
+
+local cachedBackdrop: { BackdropPiece }? = nil
+
+function WorldPlan.Backdrop(): { BackdropPiece }
+	if cachedBackdrop then
+		return cachedBackdrop
+	end
+	local out: { BackdropPiece } = {}
+	local reach = BACKDROP_REACH - HALF -- how far the skirt runs out beyond a wall
+	-- No skirt east: the sea runs on beyond the coast, and beyond the
+	-- mountains north of it (sea cliffs), so the volcano stands against the
+	-- sky and the sea from town.
+	local walls = { wallSkirt(SIDE_N), wallSkirt(SIDE_W), wallSkirt(SIDE_S) }
+	local north, west, south = walls[1], walls[2], walls[3]
+
+	-- The north-west and south-west corners, beyond two walls, take the
+	-- lower of the skirts beside them (the eastern two are sea).
+	local function lower(a: Stretch?, b: Stretch?): number?
+		if a and b then
+			return math.min(a.top, b.top)
+		end
+		return if a then a.top elseif b then b.top else nil
+	end
+	local nw = lower(endBlock(north, false), endBlock(west, true))
+	local sw = lower(endBlock(south, false), endBlock(west, false))
+	if nw then
+		table.insert(north.blocks, 1, { u0 = -BACKDROP_REACH, u1 = -HALF, top = nw })
+	end
+	if sw then
+		table.insert(south.blocks, 1, { u0 = -BACKDROP_REACH, u1 = -HALF, top = sw })
+	end
+
+	-- The skirt (lowered in the volcano's gap). A river leaving the world
+	-- runs on into a canyon between its blocks, and a mountain closes it.
+	for _, wall in ipairs(walls) do
+		for _, b in ipairs(wall.blocks) do
+			local inGap, nearest = inVolcanoGap({
+				sidePoint(wall.side, b.u0, 0),
+				sidePoint(wall.side, b.u1, 0),
+				sidePoint(wall.side, b.u0, reach),
+				sidePoint(wall.side, b.u1, reach),
+			})
+			if inGap then
+				b.top = math.min(b.top, gapCeiling(nearest))
+			end
+			-- A bank along the wall, but not where the corners meet or beside
+			-- a river (its canyon's walls).
+			local corner = b.u1 <= -HALF + 1 or b.u0 >= HALF - 1
+			local byRiver = false
+			for _, r in ipairs(wall.rivers) do
+				byRiver = byRiver or (b.u1 >= r.u0 - 1 and b.u0 <= r.u1 + 1)
+			end
+			b.bank = not corner and not byRiver
+			if b.top > SKIRT_BOTTOM + 1 then
+				local side = wall.side
+				local from = if b.bank then BANK else 0
+				if b.bank then
+					-- Kit.wedge's slope runs down to its front (-Z): the wall.
+					local up = Vector3.yAxis
+					local middle = sidePoint(side, (b.u0 + b.u1) / 2, BANK / 2)
+					table.insert(
+						out,
+						backdropPiece(
+							"BackdropBank",
+							"Wedge",
+							CFrame.fromMatrix(
+								Vector3.new(middle.X, (SKIRT_BOTTOM + b.top) / 2, middle.Z),
+								up:Cross(side.out),
+								up,
+								side.out
+							),
+							Vector3.new(b.u1 - b.u0, b.top - SKIRT_BOTTOM, BANK),
+							BACKDROP_COLORS.skirt,
+							Enum.Material.Grass
+						)
+					)
+				end
+				table.insert(
+					out,
+					beyondWall(
+						"BackdropSkirt",
+						side,
+						b.u0,
+						b.u1,
+						from,
+						reach,
+						SKIRT_BOTTOM,
+						b.top,
+						BACKDROP_COLORS.skirt,
+						Enum.Material.Grass
+					)
+				)
+			end
+		end
+		for _, r in ipairs(wall.rivers) do
+			table.insert(
+				out,
+				beyondWall(
+					"BackdropRiver",
+					wall.side,
+					r.u0,
+					r.u1,
+					0,
+					400,
+					r.top - 1.2,
+					r.top - 0.2,
+					BACKDROP_COLORS.sea,
+					Enum.Material.SmoothPlastic,
+					0.3
+				)
+			)
+			table.insert(
+				out,
+				beyondWall(
+					"BackdropRiverbed",
+					wall.side,
+					r.u0,
+					r.u1,
+					0,
+					reach,
+					SKIRT_BOTTOM,
+					(r.bed or r.top) - 2,
+					BACKDROP_COLORS.riverbed,
+					Enum.Material.Slate
+				)
+			)
+		end
+	end
+
+	-- The mountains: a near row and a far row on the north, west and south
+	-- (the north's end where the sea begins, the south's at the coast).
+	-- The west's near row closes the Lake's outflow canyon.
+	local outflow = west.rivers[1]
+	local riverAt = if outflow then (outflow.u0 + outflow.u1) / 2 else nil
+	local function ring(wall: Wall, u0: number, u1: number, seed: number, anchor: number?)
+		local saddles = placeRow(out, wall, NEAR_ROW, seed, { u0 = u0, u1 = u1, anchor = anchor })
+		placeRow(out, wall, FAR_ROW, seed + 1, nil, saddles)
+	end
+	ring(north, -2900, 1300, 101)
+	ring(west, -1450, 1450, 201, riverAt)
+	ring(south, -2900, 1200, 301)
+
+	-- The sea east of the coast (a part is at most 2,048 studs a side), its
+	-- bed under it, and on south of the south wall from where the coast
+	-- cuts it.
+	local seaTop = WorldPlan.BackdropSeaTop
+	local function sea(x0: number, x1: number, z0: number, z1: number)
+		table.insert(
+			out,
+			slab(
+				"BackdropSea",
+				x0,
+				x1,
+				seaTop - 1,
+				seaTop,
+				z0,
+				z1,
+				BACKDROP_COLORS.sea,
+				Enum.Material.SmoothPlastic,
+				0.3
+			)
+		)
+		table.insert(
+			out,
+			slab(
+				"BackdropSeabed",
+				x0,
+				x1,
+				SEA_LEVEL - 11,
+				SEA_LEVEL - 10,
+				z0,
+				z1,
+				BACKDROP_COLORS.seabed,
+				Enum.Material.SmoothPlastic
+			)
+		)
+	end
+	for k = 0, 2 do
+		sea(HALF, BACKDROP_REACH, -BACKDROP_REACH + k * 2000, -BACKDROP_REACH + (k + 1) * 2000)
+	end
+	local coast = math.huge
+	for _, g in ipairs(south.gaps) do
+		coast = math.min(coast, g.u0)
+	end
+	if coast < HALF then
+		sea(math.max(coast - 20, -HALF), HALF, -BACKDROP_REACH, -HALF)
+	end
+
+	-- Far islands, so the east horizon isn't one flat line.
+	for i, spot in ipairs({
+		{ 2150, -520, 120, 80 },
+		{ 2520, -1480, 92, 20 },
+		{ 2760, 300, 140, 100 },
+		{ 2380, -2300, 76, 60 },
+	}) do
+		island(out, spot[1], spot[2], spot[3], spot[4], 500 + i)
+	end
+
+	impostor(out)
+
+	-- The Skyroot's footing: a disc of ground just under the terrain there,
+	-- so the Skyroot (Persistent) never stands on nothing while the ground
+	-- round it isn't streamed in.
+	local sky = WorldPlan.Sky()
+	if sky then
+		local root = sky.root
+		local lowest = math.huge
+		local r = FOOTING_RADIUS + SKIRT_STEP
+		for dx = -r, r, SKIRT_STEP do
+			for dz = -r, r, SKIRT_STEP do
+				if dx * dx + dz * dz <= r * r then
+					lowest = math.min(lowest, TerrainGen.HeightAt(root.X + dx, root.Z + dz))
+				end
+			end
+		end
+		local top = lowest - FOOTING_BELOW
+		table.insert(
+			out,
+			backdropPiece(
+				"BackdropFooting",
+				"Cylinder",
+				CFrame.new(root.X, top - 1, root.Z) * CFrame.Angles(0, 0, math.pi / 2),
+				Vector3.new(2, FOOTING_RADIUS * 2, FOOTING_RADIUS * 2),
+				TerrainGen.MaterialColors.Grass,
+				Enum.Material.Grass
+			)
+		)
+	end
+
+	cachedBackdrop = out
+	return out
+end
+
 return WorldPlan

@@ -14,7 +14,8 @@
 --      palm island offshore, signposts where the roads arrive.
 --   6. The Skyroot and the Aether Isles: isles, bridges, Lumenwood, Sky
 --      Shard nodes, Cloud Chutes, the Starfall Forge, the waterfall.
---   7. Walls at the world's edge, the day/night clock, then characters.
+--   7. The backdrop beyond the world's edge (mountains, sea, the volcano's
+--      impostor), walls at the edge, the day/night clock, then characters.
 -- Each part of 3-7 runs on its own (step() below): an error in one is
 -- warned with a traceback and the rest still builds. The last three steps
 -- (SellArea in, CharacterAutoLoads back on, load anyone waiting) always
@@ -522,6 +523,38 @@ end)
 ---------------------------------------------------------------------------
 -- 7. The edge of the world, the clock, and in you come
 ---------------------------------------------------------------------------
+
+-- The backdrop (WLD-02, WLD-09): mountains, skirt and sea beyond the walls,
+-- the volcano's impostor and the Skyroot's footing (WorldPlan.Backdrop).
+-- Persistent, so every client always has the horizon however little of
+-- the terrain it has streamed in; looks only, so nothing collides, is
+-- clicked or touched, or casts a shadow.
+step("7. The backdrop", function()
+	local backdrop = Instance.new("Model")
+	backdrop.Name = "Backdrop"
+	backdrop.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+	for _, piece in ipairs(WorldPlan.Backdrop()) do
+		local part: BasePart
+		if piece.kind == "Wedge" then
+			part = Kit.wedge(backdrop, piece.name, piece.size, piece.cframe, piece.color, piece.material)
+		elseif piece.kind == "Cylinder" then
+			part = Kit.cylinder(
+				backdrop,
+				piece.name,
+				piece.size.X,
+				piece.size.Y,
+				piece.cframe,
+				piece.color,
+				piece.material
+			)
+		else
+			part = Kit.part(backdrop, piece.name, piece.size, piece.cframe, piece.color, piece.material)
+		end
+		part.Transparency = piece.transparency
+		Kit.decor(part, false)
+	end
+	backdrop.Parent = map
+end)
 
 -- Invisible walls at the edge (a part can be at most 2,048 studs long, so
 -- each side is several segments; tall enough for the mountains).

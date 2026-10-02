@@ -1,6 +1,7 @@
 --!nocheck
 -- The whole world as MapBuilder builds it (Shared/World/WorldPlan + the art
--- modules): terrain, every tree, the town, boulders, the Skyroot and isles.
+-- modules): terrain, every tree, the town, boulders, the Skyroot and isles,
+-- and the backdrop beyond the walls.
 -- Client-side decoration (flowers, critters) isn't part of it.
 -- A helper (files starting with _ aren't scenes): world.luau and
 -- world-eye.luau are this build with their own cameras. World.build(ctx)
@@ -9,6 +10,25 @@
 local Common = require("./_common")
 
 local World = {}
+
+-- WorldPlan.Backdrop()'s pieces into `root`, the way MapBuilder's "7. The
+-- backdrop" step builds them (isles.luau draws them too).
+function World.backdrop(ctx, root)
+	local Kit = ctx.art("Kit")
+	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
+	for _, piece in ipairs(WorldPlan.Backdrop()) do
+		local part
+		if piece.kind == "Wedge" then
+			part = Kit.wedge(root, piece.name, piece.size, piece.cframe, piece.color, piece.material)
+		elseif piece.kind == "Cylinder" then
+			part = Kit.cylinder(root, piece.name, piece.size.X, piece.size.Y, piece.cframe, piece.color, piece.material)
+		else
+			part = Kit.part(root, piece.name, piece.size, piece.cframe, piece.color, piece.material)
+		end
+		part.Transparency = piece.transparency
+		Kit.decor(part, false)
+	end
+end
 
 function World.build(ctx)
 	local roblox = ctx.roblox
@@ -179,6 +199,9 @@ function World.build(ctx)
 			end
 		end
 	end
+
+	-- The backdrop beyond the walls (WLD-02, WLD-09), as MapBuilder builds it.
+	World.backdrop(ctx, root)
 
 	return {
 		root = root,

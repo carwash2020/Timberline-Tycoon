@@ -3,11 +3,13 @@
 -- dressed the way MapBuilder dresses them: isles, bridges, Lumenwood, the
 -- Cloud Chutes and their flumes (WorldPlan.ChuteFlume), the Starfall Forge,
 -- the gondola stations and cables (WorldPlan.GondolaCable), the waterfall,
--- cloud banks, lantern posts. Terrain around the Skyroot's foot.
+-- cloud banks, lantern posts. Terrain around the Skyroot's foot (up to the
+-- world's walls, as in the game) and the backdrop beyond them (_world.luau).
 
 local Common = require("./_common")
+local World = require("./_world")
 
-local REACH = 700 -- the terrain runs this far round the Skyroot's foot
+local REACH = 700 -- the terrain runs this far round the Skyroot's foot (inside the walls)
 
 return {
 	build = function(ctx)
@@ -176,9 +178,19 @@ return {
 		local function off(p, v)
 			return { p.X + v.X, p.Y + v.Y, p.Z + v.Z }
 		end
+		-- The backdrop beyond the walls, as MapBuilder builds it.
+		World.backdrop(ctx, root)
+		local half = ctx.load("ReplicatedStorage/Shared/World/WorldLayout").WorldHalf
 		return {
 			root = root,
-			terrain = Common.terrain(ctx, r.X - REACH, r.Z - REACH, r.X + REACH, r.Z + REACH, 10),
+			terrain = Common.terrain(
+				ctx,
+				math.max(-half, r.X - REACH),
+				math.max(-half, r.Z - REACH),
+				math.min(half, r.X + REACH),
+				math.min(half, r.Z + REACH),
+				10
+			),
 			shadowRadius = 900,
 			lighting = {
 				sunDir = { 0.35, 0.75, -0.55 },
