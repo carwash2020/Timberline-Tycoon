@@ -207,6 +207,49 @@ return function(t)
 		end
 	end)
 
+	t.test("hubs: a round cap on the axle and one bolt off it, spinning with the tyre (ACT-09)", function()
+		for _, rig in ipairs(rigs()) do
+			local model = build(rig)
+			local label = rig.label
+			local capped = 0
+			for _, w in ipairs(named(model, "Wheel")) do
+				local r = w:GetAttribute("Radius")
+				local hub = w:FindFirstChild("Hub")
+				local bolt = w:FindFirstChild("HubBolt")
+				t.eq(hub ~= nil, bolt ~= nil, label .. " a hub cap comes with its bolt")
+				if w:GetAttribute("Steer") then
+					t.ok(hub, label .. " front wheels have a hub cap")
+				end
+				if hub and bolt then
+					capped += 1
+					local rim = w:FindFirstChild("Rim")
+					for _, p in ipairs({ hub, bolt }) do
+						t.ok(p:IsA("BasePart") and p.Shape.Name == "Cylinder", label .. " " .. p.Name .. " is round")
+						t.ok(
+							p.CFrame.RightVector:Dot(w.CFrame.RightVector) > 0.999,
+							label .. " " .. p.Name .. " along the axle"
+						)
+						t.ok(
+							not p.CanCollide and not p.CanQuery and not p.CanTouch,
+							label .. " " .. p.Name .. " is decor"
+						)
+						t.ok(p.Size.X > rim.Size.X, label .. " " .. p.Name .. " stands proud of the rim")
+					end
+					-- The cap: centred on the axle, about r * 0.42 across.
+					t.ok((hub.CFrame.Position - w.CFrame.Position).Magnitude < 1e-4, label .. " cap on the axle")
+					t.ok(math.abs(hub.Size.Y - r * 0.42) < 1e-4, label .. " cap diameter")
+					-- The bolt: off the centre, past the cap's edge, inside the rim.
+					local off = bolt.CFrame.Position - w.CFrame.Position
+					local out = off - w.CFrame.RightVector * off:Dot(w.CFrame.RightVector)
+					local near, far = out.Magnitude - bolt.Size.Y / 2, out.Magnitude + bolt.Size.Y / 2
+					t.ok(near > hub.Size.Y / 2, label .. " bolt clear of the cap's centre")
+					t.ok(far < rim.Size.Y / 2, label .. " bolt on the rim")
+				end
+			end
+			t.ok(capped >= 2, label .. " at least two hub caps")
+		end
+	end)
+
 	t.test("fits its parking slot, sits on the ground, budget kept", function()
 		for _, rig in ipairs(rigs()) do
 			local model, layout = build(rig)
@@ -226,9 +269,11 @@ return function(t)
 			t.ok(math.max(-lo.X, hi.X) <= 3.8, label .. " fits between neighbours (8 studs apart)")
 			t.ok(hi.Z - lo.Z <= 37.5, label .. " fits a 37-stud slot")
 			t.ok(lo.Z >= layout.front - 0.6, label .. " nothing far in front of the bumper")
-			-- 72: 70 plus the two invisible skid ramps (ACT-05); a trailer's
-			-- skid brings its own two inside its 34.
-			local budget = 72 + (if rig.trailer then 34 else 0)
+			-- 74: 70 plus the two invisible skid ramps (ACT-05) plus two for
+			-- the hub bolts (ACT-09: one a hubbed wheel, up to four, so the
+			-- Rustbucket and the Rig hold 73). A trailer's 36: its skid's own
+			-- two ramps and the bolts on the Pony's and Ranch's two hubs.
+			local budget = 74 + (if rig.trailer then 36 else 0)
 			t.ok(count <= budget, string.format("%s has %d parts (budget %d)", label, count, budget))
 		end
 	end)

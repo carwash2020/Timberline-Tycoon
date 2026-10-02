@@ -152,6 +152,100 @@ return function(t)
 		end)
 	end)
 
+	-- ACT-08: Starfall's crescent reads as one unbroken band with one
+	-- unbroken glowing rim, on a deep indigo haft, with Neon only on the rim.
+	t.test("Starfall: a continuous crescent and rim, an indigo haft, Neon only on the rim", function()
+		local def = ItemCatalog.Axes.StarfallAxe
+		local m = AxeArt.Build(def)
+		local haft = m.PrimaryPart.Color
+		t.ok(
+			math.abs(haft.R * 255 - 0x2B) < 0.5
+				and math.abs(haft.G * 255 - 0x3A) < 0.5
+				and math.abs(haft.B * 255 - 0x6B) < 0.5,
+			"the haft is deep indigo #2B3A6B"
+		)
+		local rims, band, middles = {}, {}, {}
+		for _, p in ipairs(parts(m)) do
+			if p.Name == "Rim" then
+				table.insert(rims, p)
+			elseif p.Material.Name == "Neon" then
+				t.ok(false, "Starfall " .. p.Name .. " is Neon (only the rim glows)")
+			end
+			if p.Name == "Crescent" or p.Name == "Horn" then
+				table.insert(band, p)
+			end
+			if p.Name == "Crescent" then
+				table.insert(middles, p)
+			end
+		end
+		t.ok(#rims >= 3 and #middles == 3, "a rim and three crescent segments")
+		-- The arc's centre: the circle (in the side view, y and z) through the
+		-- three middle segments.
+		local function yz(p)
+			local at = p.CFrame.Position
+			return at.Y, at.Z
+		end
+		local ay, az = yz(middles[1])
+		local by, bz = yz(middles[2])
+		local cy, cz = yz(middles[3])
+		local d = 2 * (ay * (bz - cz) + by * (cz - az) + cy * (az - bz))
+		local a2, b2, c2 = ay * ay + az * az, by * by + bz * bz, cy * cy + cz * cz
+		local oy = (a2 * (bz - cz) + b2 * (cz - az) + c2 * (az - bz)) / d
+		local oz = (a2 * (cy - by) + b2 * (ay - cy) + c2 * (by - ay)) / d
+		local radius = math.sqrt((ay - oy) ^ 2 + (az - oz) ^ 2)
+		local function angleOf(p)
+			local y, z = yz(p)
+			return math.atan2(y - oy, oz - z)
+		end
+		local function radiusOf(p)
+			local y, z = yz(p)
+			return math.sqrt((y - oy) ^ 2 + (z - oz) ^ 2)
+		end
+		local function isIn(p, y, z)
+			local l = p.CFrame:Inverse() * Vector3.new(0, y, z)
+			local h = p.Size / 2 + Vector3.new(1e-3, 1e-3, 1e-3)
+			return math.abs(l.X) <= h.X and math.abs(l.Y) <= h.Y and math.abs(l.Z) <= h.Z
+		end
+		-- Two neighbouring pieces join when some point on the line halfway
+		-- between them (in angle), between radii r0 and r1, is inside both.
+		local function joined(a, b, r0, r1)
+			local mid = (angleOf(a) + angleOf(b)) / 2
+			for i = 0, 200 do
+				local r = r0 + (r1 - r0) * i / 200
+				local y, z = oy + r * math.sin(mid), oz - r * math.cos(mid)
+				if isIn(a, y, z) and isIn(b, y, z) then
+					return true
+				end
+			end
+			return false
+		end
+		local function byAngle(list)
+			table.sort(list, function(a, b)
+				return angleOf(a) < angleOf(b)
+			end)
+			return list
+		end
+		byAngle(rims)
+		byAngle(band)
+		t.ok(#band == #rims, "a rim piece on every crescent piece")
+		-- The rim: every joint closes, so it glows as one unbroken curve.
+		for i = 1, #rims - 1 do
+			local r = radiusOf(rims[i])
+			t.ok(
+				joined(rims[i], rims[i + 1], r - 0.2, r + 0.2),
+				string.format("a gap in the rim at %.0f degrees", math.deg(angleOf(rims[i])))
+			)
+		end
+		-- The band: every joint closes right out to its outer edge (no notch
+		-- under the rim), the horns' joints included.
+		for i = 1, #band - 1 do
+			t.ok(
+				joined(band[i], band[i + 1], radius + 0.12, radius + 0.4),
+				string.format("a gap in the crescent at %.0f degrees", math.deg(angleOf(band[i])))
+			)
+		end
+	end)
+
 	t.test("an axe without a design still gets a Handle (the generic look)", function()
 		local def = {
 			id = "TestAxe",
