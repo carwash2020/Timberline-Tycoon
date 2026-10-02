@@ -22,8 +22,12 @@
 --     options.spout: "SpringPool" and "Stream". Under ~120 parts.
 --   * Waterfall(height, width): origin at the top lip, the water falling
 --     to y = -height in front of it (-Z); place it with -Z pointing away
---     from the isle. Named parts "Waterfall" (sheets), "WaterfallMist"
---     (holds the "Mist" ParticleEmitter, at the bottom).
+--     from the isle. Named parts "Waterfall" (the sheet, top 40 studs),
+--     "WaterfallCurtain" (invisible, the whole height: its attachments
+--     hold the "Curtain" emitters), "WaterfallSpray" (invisible, the mist
+--     band; "Veil" emitter) and "WaterfallMist" (at the bottom: the "Mist"
+--     and "Spray" emitters). Every emitter's full rate is in its
+--     "BaseRate" attribute (the client halves it on low quality).
 --   * CloudBank(size, seed): a cloud about `size` studs long (X), its base
 --     at y = 0. Decoration. CloudSpots(...) says where they go.
 --   * LanternPost(seed): a crooked post with a lantern; "LanternGlow".
@@ -1141,10 +1145,33 @@ end
 -- Waterfall, clouds, lanterns
 ---------------------------------------------------------------------------
 
--- A stylized waterfall: layered translucent sheets, white ribbons, a foam
--- lip at the top, a misty veil over the last stretch and a splash at the
--- bottom. The origin is the top lip; the water falls to y = -height in
--- front of it (-Z), arriving from +Z (the isle side).
+-- WLD-05: the waterfall's particle numbers (IsleArt.spec pins them; the
+-- client halves every rate on low quality: see FALL_RATE_ATTRIBUTE).
+IsleArt.FallStreams = 3 -- curtain emitters across the width
+IsleArt.FallStreamRate = 60 -- particles a second, each stream
+IsleArt.FallSpeed = { 55, 65 } -- studs a second, straight down
+IsleArt.FallSheet = 40 -- studs: the one translucent sheet, at the top only
+IsleArt.FallMistBand = { 0.6, 0.9 } -- the mist band, as fractions of the fall from the lip
+-- Every waterfall emitter carries its full (high quality) rate in this
+-- attribute; WeatherController sets Rate = BaseRate x the Quality tier's
+-- WeatherRate (WeatherSchedule.MapEmitterRate), so phones get half.
+IsleArt.FallRateAttribute = "BaseRate"
+
+local FALL_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
+-- A Rate the client can scale (see IsleArt.FallRateAttribute).
+local function setRate(e: ParticleEmitter, rate: number)
+	e.Rate = rate
+	e:SetAttribute(IsleArt.FallRateAttribute, rate)
+end
+
+-- A stylized waterfall that moves (WLD-05): a foam lip and one translucent
+-- sheet for the top 40 studs, then a curtain of falling water streaks
+-- (several emitters across the width, on an invisible "WaterfallCurtain"
+-- spanning the height) that frays into a mist band ("WaterfallSpray",
+-- 60-90% of the way down) and lands in foam and spray ("WaterfallMist").
+-- The origin is the top lip; the water falls to y = -height in front of it
+-- (-Z), arriving from +Z (the isle side).
 function IsleArt.Waterfall(height: number, width: number): Model
 	local model = Kit.model("Waterfall")
 	local rng = Kit.rng(math.floor(height + width * 7))
@@ -1152,6 +1179,7 @@ function IsleArt.Waterfall(height: number, width: number): Model
 	local deep = hex("#79C3EA")
 	local pale = hex("#BFE6FA")
 	local white = Color3.new(1, 1, 1)
+	local front = -w * 0.4 -- z of the falling water's face
 
 	-- The lip: water curling over the edge, and foam where it breaks.
 	local lip =
@@ -1173,66 +1201,110 @@ function IsleArt.Waterfall(height: number, width: number): Model
 		foam.Transparency = 0.05
 	end
 
-	-- The sheets: a deep back layer and a paler, narrower front one.
-	for layer = 1, 2 do
-		local sheet = Kit.part(
-			model,
-			"Waterfall",
-			Vector3.new(w * (if layer == 1 then 1 else 0.78), height, w * (if layer == 1 then 0.5 else 0.3)),
-			CFrame.new(0, -height / 2, -w * (if layer == 1 then 0.3 else 0.42)),
-			if layer == 1 then deep else pale,
-			Enum.Material.Glass
-		)
-		Kit.decor(sheet, false)
-		sheet.Transparency = if layer == 1 then 0.3 else 0.45
-	end
-	-- White ribbons running the whole height.
-	local ribbons = math.clamp(math.floor(w / 3), 2, 4)
-	local core: Part? = nil
-	for i = 1, ribbons do
-		local x = ((i - 0.5) / ribbons - 0.5) * w * 0.8 + rng:range(-0.3, 0.3)
-		local ribbon = Kit.part(
-			model,
-			"Waterfall",
-			Vector3.new(w * rng:range(0.07, 0.12), height, 0.3),
-			CFrame.new(x, -height / 2, -w * 0.59),
-			hex("#EAF8FF"),
-			if i == 1 then Enum.Material.Neon else Enum.Material.SmoothPlastic
-		)
-		Kit.decor(ribbon, false)
-		ribbon.Transparency = 0.35
-		if i == 1 then
-			core = ribbon
-		end
-	end
-	if core then
-		-- Droplets streaming down the whole fall.
-		local e = emitter(core, "Droplets")
-		e.Color = ColorSequence.new(white)
-		e.LightEmission = 0.4
+	-- One translucent sheet, for the top stretch only: the water leaving
+	-- the lip as a glassy tongue before it breaks into streaks.
+	local sheetHeight = math.min(IsleArt.FallSheet, height)
+	local sheet = Kit.part(
+		model,
+		"Waterfall",
+		Vector3.new(w, sheetHeight, w * 0.4),
+		CFrame.new(0, -sheetHeight / 2, -w * 0.3),
+		deep,
+		Enum.Material.Glass
+	)
+	Kit.decor(sheet, false)
+	sheet.Transparency = 0.35
+
+	-- The curtain: an invisible part spanning the fall, with a row of
+	-- emitters along its top edge pouring soft streaks straight down. Each
+	-- streak lives as long as the fall takes at the middle speed, so the
+	-- water reaches the foot (the mist band and the spray hide the ragged
+	-- end), and a small spread widens the column as it falls.
+	local curtain = Kit.part(
+		model,
+		"WaterfallCurtain",
+		Vector3.new(w, height, 1),
+		CFrame.new(0, -height / 2, front),
+		white,
+		Enum.Material.SmoothPlastic
+	)
+	Kit.decor(curtain, false)
+	curtain.Transparency = 1
+	local speedLow, speedHigh = IsleArt.FallSpeed[1], IsleArt.FallSpeed[2]
+	local fallTime = height / ((speedLow + speedHigh) / 2)
+	local streams = IsleArt.FallStreams
+	for i = 1, streams do
+		local at = Instance.new("Attachment")
+		at.Name = "Stream" .. i
+		at.CFrame = CFrame.new(((i - 0.5) / streams - 0.5) * w * 0.8, height / 2 - 0.5, 0)
+		at.Parent = curtain
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "Curtain"
+		e.Texture = FALL_TEXTURE
+		e.Color = ColorSequence.new(hex("#DDF2FF"), hex("#F4FBFF"))
+		e.LightEmission = 0.3
+		e.LightInfluence = 0.6
 		e.EmissionDirection = Enum.NormalId.Bottom
-		e.Rate = math.clamp(height / 20, 4, 30)
-		e.Lifetime = NumberRange.new(1.5, 2.5)
-		e.Speed = NumberRange.new(30, 45)
-		e.SpreadAngle = Vector2.new(4, 4)
-		e.Size = NumberSequence.new(math.max(0.6, w * 0.08))
-		e.Transparency = NumberSequence.new(0.3)
+		e.Orientation = Enum.ParticleOrientation.FacingCameraWorldUp
+		e.Speed = NumberRange.new(speedLow, speedHigh)
+		e.SpreadAngle = Vector2.new(1, 1)
+		e.Lifetime = NumberRange.new(fallTime * 0.97, fallTime)
+		e.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, w * 0.35),
+			NumberSequenceKeypoint.new(1, w * 0.6),
+		})
+		e.Squash = NumberSequence.new({ -- stretched tall: streaks, not puffs
+			NumberSequenceKeypoint.new(0, 1.6),
+			NumberSequenceKeypoint.new(1, 1.1),
+		})
+		e.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(0.05, 0.3),
+			NumberSequenceKeypoint.new(0.85, 0.45),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		e.Rotation = NumberRange.new(-8, 8)
+		setRate(e, IsleArt.FallStreamRate)
+		e.Parent = at
 	end
-	-- The veil: a long fall frays into spray before it lands.
+
+	-- The mist band: the long fall frays into spray before it lands.
+	local mistBand = IsleArt.FallMistBand
 	if height > 40 then
-		local veil = Kit.ellipsoid(
+		local bandHeight = height * (mistBand[2] - mistBand[1])
+		local veil = Kit.part(
 			model,
 			"WaterfallSpray",
-			Vector3.new(w * 1.7, height * 0.34, w * 1.0),
-			CFrame.new(0, -height * 0.83, -w * 0.36),
+			Vector3.new(w * 1.6, bandHeight, w * 1.2),
+			CFrame.new(0, -height * (mistBand[1] + mistBand[2]) / 2, front),
 			white,
 			Enum.Material.SmoothPlastic
 		)
 		Kit.decor(veil, false)
-		veil.Transparency = 0.65
+		veil.Transparency = 1
+		local e = emitter(veil, "Veil")
+		e.Texture = FALL_TEXTURE
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		e.Color = ColorSequence.new(hex("#F2FAFF"))
+		e.LightEmission = 0.3
+		e.LightInfluence = 0.7
+		e.EmissionDirection = Enum.NormalId.Bottom
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, w * 0.8), NumberSequenceKeypoint.new(1, w * 1.6) })
+		e.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.2, 0.6),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		e.Lifetime = NumberRange.new(2.5, 3.5)
+		e.Speed = NumberRange.new(4, 9)
+		e.SpreadAngle = Vector2.new(35, 35)
+		e.Rotation = NumberRange.new(0, 360)
+		e.RotSpeed = NumberRange.new(-20, 20)
+		setRate(e, math.clamp(math.floor(bandHeight / 10), 4, 24))
 	end
 
-	-- The splash: foam on the water and mist rising.
+	-- The foot: foam on the water, spray bursting out and mist rising.
 	local splashY = -height
 	Kit.decor(
 		Kit.cylinder(
@@ -1240,7 +1312,7 @@ function IsleArt.Waterfall(height: number, width: number): Model
 			"Foam",
 			0.4,
 			w * 1.7,
-			CFrame.new(0, splashY + 0.2, -w * 0.3) * CFrame.Angles(0, 0, math.pi / 2),
+			CFrame.new(0, splashY + 0.2, front) * CFrame.Angles(0, 0, math.pi / 2),
 			white,
 			Enum.Material.SmoothPlastic
 		),
@@ -1255,7 +1327,7 @@ function IsleArt.Waterfall(height: number, width: number): Model
 				model,
 				"Foam",
 				Vector3.new(s, s * 0.6, s),
-				CFrame.new(math.cos(a) * w * 0.8, splashY + s * 0.15, -w * 0.3 + math.sin(a) * w * 0.8)
+				CFrame.new(math.cos(a) * w * 0.8, splashY + s * 0.15, front + math.sin(a) * w * 0.8)
 					* CFrame.Angles(math.rad(35.26), a, 0),
 				white,
 				Enum.Material.SmoothPlastic
@@ -1267,22 +1339,35 @@ function IsleArt.Waterfall(height: number, width: number): Model
 		model,
 		"WaterfallMist",
 		Vector3.new(w * 1.6, 1, w * 1.6),
-		CFrame.new(0, splashY + 1, -w * 0.3),
+		CFrame.new(0, splashY + 1, front),
 		white,
 		Enum.Material.SmoothPlastic
 	)
 	Kit.decor(mist, false)
 	mist.Transparency = 1
 	local e = emitter(mist, "Mist")
-	e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	e.Texture = FALL_TEXTURE
 	e.Color = ColorSequence.new(hex("#F2FAFF"))
 	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, w * 0.6), NumberSequenceKeypoint.new(1, w * 2.4) })
 	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) })
 	e.Lifetime = NumberRange.new(3, 5)
-	e.Rate = 8
 	e.Speed = NumberRange.new(4, 10)
 	e.SpreadAngle = Vector2.new(70, 70)
 	e.LightInfluence = 0.7
+	setRate(e, 8)
+	local spray = emitter(mist, "Spray")
+	spray.Texture = FALL_TEXTURE
+	spray.Color = ColorSequence.new(white)
+	spray.LightEmission = 0.3
+	spray.LightInfluence = 0.6
+	spray.EmissionDirection = Enum.NormalId.Top
+	spray.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, w * 0.2), NumberSequenceKeypoint.new(1, w * 0.5) })
+	spray.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	spray.Lifetime = NumberRange.new(0.8, 1.4)
+	spray.Speed = NumberRange.new(10, 18)
+	spray.SpreadAngle = Vector2.new(55, 55)
+	spray.Acceleration = Vector3.new(0, -25, 0)
+	setRate(spray, 24)
 	return model
 end
 

@@ -165,4 +165,17 @@ return function(t)
 		t.eq(f[1].slotStart, (index + 1) * SLOT)
 		t.eq(f[1].kind, WeatherSchedule.SlotKind(index + 1))
 	end)
+
+	t.test("map emitters (the waterfall) run at their BaseRate, half on low quality", function()
+		local rate = WeatherSchedule.MapEmitterRate
+		t.eq(rate(60, 1), 60, "high: the full rate")
+		t.eq(rate(60, 0.5), 30, "low: half")
+		t.eq(rate(8, 0.5), 4)
+		t.eq(rate(60, 2), 60, "never above the base")
+		t.eq(rate(nil, 1), nil, "no attribute: leave the emitter alone")
+		t.eq(rate("60", 1), nil)
+		t.eq(rate(-5, 1), nil)
+		t.eq(rate(0 / 0, 1), nil)
+		t.eq(rate(math.huge, 1), nil)
+	end)
 end
