@@ -183,12 +183,16 @@ step("4. The town", function()
 		end
 	end)
 
+	-- The zone reaches south of the pad over the street (M1.5), so a big
+	-- truck backed in has its whole bed in it; the prompt stays over the
+	-- pad's middle.
 	step("4. The sell area", function()
-		local sellZone = Kit.part(sellArea, "SellZone", Vector3.new(24, 12, 18), town.sellZone, Color3.new(1, 1, 1))
+		local sellZone = Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, Color3.new(1, 1, 1))
 		ghost(sellZone, 1)
 		local sellPoint = Instance.new("Attachment") -- where the client's "Sell logs" prompt appears
 		sellPoint.Name = "SellPoint"
-		sellPoint.Position = Vector3.new(0, -2.5, 0)
+		local padMiddle = town.sellZone:ToObjectSpace(town.sellPad).Position
+		sellPoint.Position = Vector3.new(padMiddle.X, -2.5, padMiddle.Z)
 		sellPoint.Parent = sellZone
 
 		local padArt = BuildingArt.SellPad(24, 18)

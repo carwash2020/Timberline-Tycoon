@@ -943,7 +943,7 @@ export type Town = {
 	spawn: Vector3,
 	spawnFacing: CFrame, -- the SpawnLocation's CFrame: at `spawn`, its front toward the sawmill
 	sawmill: CFrame,
-	sellZone: CFrame, -- centre of the 24 x 12 x 18 sell volume
+	sellZone: CFrame, -- centre of the sell volume (WorldPlan.SellZoneSize)
 	sellPad: CFrame,
 	skyBin: CFrame,
 	shops: { ShopSpot },
@@ -960,6 +960,12 @@ export type Town = {
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
+
+-- The sell volume over the pad (MapBuilder's SellZone): the pad's width and
+-- 26 deep, from the pad's north edge (z 95) out over the street to z 69,
+-- so a truck backed in from the street has its whole bed in it, the
+-- Logging Rig's 26-stud deck too (M1.5; it was 18 deep, the pad's own).
+WorldPlan.SellZoneSize = Vector3.new(24, 12, 26)
 
 -- A parking slot (MapBuilder builds a ParkingSlot part this size at each
 -- of town.parkingSlots): as wide as the widest rig with room to open a
@@ -1209,7 +1215,9 @@ function WorldPlan.Town(): Town
 		-- spawn walk; the shops' on their paths. They grew back and sideways
 		-- (the Tool Shed and Hearth & Home west, the Dealership east).
 		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
-		sellZone = CFrame.new(mill.X, 6, mill.Z - 24),
+		-- Its north edge on the pad's (z 95), reaching south over the street
+		-- (WorldPlan.SellZoneSize); its centre (z 82) still on the pad.
+		sellZone = CFrame.new(mill.X, 6, mill.Z + 9 - 24 - WorldPlan.SellZoneSize.Z / 2),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
 		skyBin = CFrame.new(mill.X - 18, 2, mill.Z - 24),
 		shops = {

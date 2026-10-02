@@ -31,7 +31,7 @@ return function(t)
 		map.Name = "TimberlineMap"
 		local sellArea = Instance.new("Model")
 		sellArea.Name = "SellArea"
-		Kit.part(sellArea, "SellZone", Vector3.new(24, 12, 18), town.sellZone, Color3.new(1, 1, 1))
+		Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, Color3.new(1, 1, 1))
 		local pad = BuildingArt.SellPad(24, 18)
 		Kit.placeAt(pad, town.sellPad)
 		pad.Parent = sellArea
@@ -67,8 +67,11 @@ return function(t)
 		t.eq(map.SellArea:FindFirstChild("SellPad"), nil)
 		local pad = map.SellArea:FindFirstChild("SellPad", true)
 		t.ok(pad, "the pad is in the sell area")
+		-- Over the pad: the zone's middle is on it, 4 studs south of the pad's
+		-- own since M1.5 deepened the zone south over the street (z 69 to 95).
 		local a, b = pad.CFrame.Position, part.CFrame.Position
-		t.ok(math.abs(a.X - b.X) < 0.01 and math.abs(a.Z - b.Z) < 0.01, "right over it")
+		t.ok(math.abs(a.X - b.X) < 0.01, "right over it, across")
+		t.ok(math.abs(a.Z - b.Z) <= 4 + 0.01 and math.abs(b.Z - a.Z) < pad.Size.Z / 2, "over the pad, along")
 	end)
 
 	t.test("the Tool Shed beacon is its counter", function()

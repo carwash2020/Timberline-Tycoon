@@ -122,7 +122,7 @@ return {
 		place(BuildingArt.SellPad(24, 18), town.sellPad)
 		local sellArea = roblox.Instance.new("Model")
 		sellArea.Name = "SellArea"
-		local zone = Kit.part(sellArea, "SellZone", V3.new(24, 12, 18), town.sellZone, C3.new(1, 1, 1))
+		local zone = Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, C3.new(1, 1, 1))
 		zone.Transparency = 1
 		sellArea.Parent = root
 		built.SellArea = sellArea

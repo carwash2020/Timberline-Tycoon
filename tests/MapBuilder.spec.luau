@@ -149,6 +149,19 @@ return function(t)
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "SellZone")
 		t.ok(s.sellArea:FindFirstChild("SellZone"):FindFirstChild("SellPoint"), "SellPoint")
+		-- M1.5: the zone runs from the pad's north edge (z 95) out over the
+		-- street to z 69, the pad's width; the prompt stays over the pad's
+		-- middle (z 86), where it always was.
+		do
+			local zone = s.sellArea:FindFirstChild("SellZone")
+			local c, size = zone.CFrame.Position, zone.Size
+			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 26) < 1e-4, "the sell zone is 24 x 26")
+			t.ok(math.abs(c.Z + size.Z / 2 - 95) < 1e-4 and math.abs(c.Z - size.Z / 2 - 69) < 1e-4, "z 69 to 95")
+			t.ok(math.abs(c.X) < 1e-4, "centred on the spawn walk")
+			local point = zone.CFrame * zone:FindFirstChild("SellPoint").Position
+			t.ok(math.abs(point.X) < 1e-4 and math.abs(point.Z - 86) < 1e-4, "the prompt over the pad's middle")
+			t.ok(zone.CanCollide == false and zone.CanQuery == false and zone.Transparency == 1, "a ghost")
+		end
 		t.ok(s.clockStarted, "the clock started")
 		t.ok(s.clockBeforeSellArea, "the clock (the last build step) starts before SellArea goes in")
 		t.ok(s.treeBeforeSellArea, "every tree spawns before SellArea goes in")

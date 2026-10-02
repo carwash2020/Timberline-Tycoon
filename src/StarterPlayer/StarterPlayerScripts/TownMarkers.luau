@@ -53,7 +53,9 @@ TownMarkers.Markers = {
 		text = "SELL LOGS",
 		icon = "logs",
 		chip = C.Money,
-		offset = Vector3.new(0, 16, 9), -- the zone's middle is 6 up; back toward the mill, under its crest
+		-- The zone's middle is 6 up, 4 south of the pad's (M1.5 deepened it
+		-- over the street); back toward the mill, under its crest, at z 95.
+		offset = Vector3.new(0, 16, 13),
 	},
 	{
 		name = "Axes",
