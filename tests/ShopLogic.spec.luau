@@ -119,4 +119,167 @@ return function(t)
 		t.eq(counts, { GoldAxe = 3 })
 		t.eq(total, 3)
 	end)
+
+	---------------------------------------------------------------------------
+	-- The v2 loop (V2_PLAN.md §2c-§2d)
+	---------------------------------------------------------------------------
+
+	local BiomeData = t.shared("BiomeData")
+	local FieldGuide = t.shared("FieldGuide")
+	local WoodData = t.shared("WoodData")
+	local short = FieldGuide.ShortNumber
+
+	t.test("v2: prices: axes, trucks and trailers by their v2 row; gear the same in both loops", function()
+		local items = {}
+		for _, a in ipairs(ItemCatalog.AxeLadder()) do
+			table.insert(items, a)
+		end
+		for _, x in ipairs(ItemCatalog.TruckList()) do
+			table.insert(items, x)
+		end
+		for _, x in ipairs(ItemCatalog.TrailerList()) do
+			table.insert(items, x)
+		end
+		for _, item in ipairs(items) do
+			t.ok(item.v2 ~= nil, item.id .. " has a v2 row")
+			t.eq(ShopLogic.Price(item, 2), item.v2.price, item.id .. " under v2")
+			t.eq(ShopLogic.Price(item, 1), item.priceCash, item.id .. " under v1")
+			t.eq(ShopLogic.Price(item, 3), item.priceCash, item.id .. ": anything else is v1")
+		end
+		for _, gear in ipairs(ItemCatalog.GearList()) do
+			t.eq(ShopLogic.Price(gear, 2), gear.priceCash, gear.id)
+		end
+		t.eq(ShopLogic.Price({ priceCash = 5, v2 = { price = "x" } }, 2), 5, "a broken v2 price isn't used")
+	end)
+
+	t.test("v2: the damage line comes from the axe's v2 row, specialists named by wood", function()
+		for _, a in ipairs(ItemCatalog.AxeLadder()) do
+			local line = ShopLogic.DamageTextV2(a)
+			local v2 = a.v2
+			local head = string.format(
+				"%s damage · reach %s studs · %s s a swing",
+				short(v2.damage, 2),
+				short(v2.range, 1),
+				short(v2.cooldown, 2)
+			)
+			t.eq(string.sub(line, 1, #head), head, a.id)
+			for woodId, vs in pairs(v2.vs or {}) do
+				local name = string.lower(WoodData.Get(woodId).displayName)
+				t.ok(
+					string.find(line, name .. ": " .. short(vs.damage, 2) .. " damage", 1, true),
+					a.id .. " vs " .. woodId .. ": " .. line
+				)
+				if vs.cooldown then
+					t.ok(
+						string.find(line, short(vs.cooldown, 2) .. " s", 1, true),
+						a.id .. " vs " .. woodId .. " swing"
+					)
+				end
+			end
+			if not v2.vs then
+				t.eq(line, head, a.id .. ": nothing after a plain axe")
+			end
+		end
+		local inferno = axe("InfernoAxe").v2
+		t.eq(
+			ShopLogic.DamageTextV2(axe("InfernoAxe")),
+			string.format(
+				"%s damage · reach %s studs · %s s a swing · emberwood: %s damage, %s s",
+				short(inferno.damage, 2),
+				short(inferno.range, 1),
+				short(inferno.cooldown, 2),
+				short(inferno.vs.emberwood.damage, 2),
+				short(inferno.vs.emberwood.cooldown, 2)
+			)
+		)
+		t.eq(ShopLogic.DamageTextV2({ id = "x", damage = 1, priceCash = 1 }), "", "no v2 row")
+	end)
+
+	t.test("v2: the cut line: an oak trunk first, then specialist woods, then the toughest it cuts at pace", function()
+		local oak = WoodData.Get(ShopLogic.ReferenceWood)
+		t.eq(oak.id, WoodData.All()[1].id, "the reference wood is the starter forest's first")
+		local singular = false
+		for _, a in ipairs(ItemCatalog.AxeLadder()) do
+			local line = ShopLogic.CutSummary(a)
+			local n = FieldGuide.TrunkHits(a, oak)
+			local lead = string.format("Cuts an oak trunk in %d hit%s", n, if n == 1 then "" else "s")
+			singular = singular or n == 1
+			t.eq(string.sub(line, 1, #lead), lead, a.id .. ": " .. line)
+			local listed, order = {}, {}
+			for name, hits in string.gmatch(line, " · (%a+) in (%d+)") do
+				local wood
+				for _, w in ipairs(WoodData.All()) do
+					if string.lower(w.displayName) == name then
+						wood = w
+					end
+				end
+				t.ok(wood ~= nil, a.id .. ": unknown wood " .. name)
+				t.eq(tonumber(hits), FieldGuide.TrunkHits(a, wood), a.id .. " on " .. wood.id)
+				t.ok(BiomeData.IsOpen(wood.biome), a.id .. ": " .. wood.id .. " doesn't grow in the world yet")
+				local special = a.v2.vs and a.v2.vs[wood.id]
+				t.ok(special or tonumber(hits) <= FieldGuide.UsefulHitsV2, a.id .. ": " .. wood.id .. " is slow")
+				listed[wood.id] = true
+				table.insert(order, table.find(WoodData.All(), wood))
+			end
+			t.ok(#order <= 2, a.id .. ": two woods after the oak at most")
+			for i = 2, #order do
+				t.ok(order[i] > order[i - 1], a.id .. ": in WoodData's order")
+			end
+			for woodId in pairs(a.v2.vs or {}) do
+				t.ok(listed[woodId], a.id .. ": its specialist wood " .. woodId .. " is listed")
+			end
+			if #order < 2 then
+				-- Room left: no open wood it cuts at pace was left out.
+				for _, w in ipairs(WoodData.All()) do
+					if
+						w ~= oak
+						and BiomeData.IsOpen(w.biome)
+						and FieldGuide.TrunkHits(a, w) <= FieldGuide.UsefulHitsV2
+					then
+						t.ok(listed[w.id], a.id .. ": " .. w.id .. " left out")
+					end
+				end
+			end
+		end
+		t.ok(singular, "one axe fells oak in a single hit: '1 hit'")
+		t.eq(ShopLogic.CutSummary({ id = "x", damage = 1, priceCash = 1 }), "", "no v2 row")
+	end)
+
+	t.test("v2: an axe's card text per loop; v1's is what the shop shows today", function()
+		for _, a in ipairs(ItemCatalog.AxeLadder()) do
+			t.eq(ShopLogic.AxeDetail(a, 1), ShopLogic.DamageText(a) .. "\n" .. ShopLogic.FellSummary(a), a.id)
+			t.eq(ShopLogic.AxeDetail(a, 2), ShopLogic.DamageTextV2(a) .. "\n" .. ShopLogic.CutSummary(a), a.id)
+		end
+		local fs = require("@lune/fs")
+		local shopUI = fs.readFile("src/StarterPlayer/StarterPlayerScripts/ShopUI.luau")
+		t.ok(
+			string.find(shopUI, 'ShopLogic.DamageText(axe) .. "\\n" .. ShopLogic.FellSummary(axe)', 1, true)
+				or string.find(shopUI, "ShopLogic.AxeDetail(", 1, true),
+			"ShopUI's axe card moved: keep AxeDetail(axe, 1) the same text"
+		)
+	end)
+
+	t.test("v2: trucks and trailers by bed size, never a log count", function()
+		for _, truck in ipairs(ItemCatalog.TruckList()) do
+			local text = ShopLogic.TruckDetailV2(truck)
+			t.ok(not string.find(text, "logs", 1, true), truck.id .. ": " .. text)
+			if truck.look.bedLength > 0 then
+				t.ok(string.find(text, "Bed " .. short(truck.look.bedLength, 1) .. " studs long", 1, true), truck.id)
+			else
+				t.ok(string.find(text, "No bed", 1, true), truck.id)
+			end
+			t.ok(string.find(text, "top speed " .. truck.topSpeed, 1, true), truck.id)
+			t.eq(ShopLogic.TruckDetailFor(truck, 2), text)
+			t.eq(ShopLogic.TruckDetailFor(truck, 1), ShopLogic.TruckDetail(truck))
+		end
+		for _, trailer in ipairs(ItemCatalog.TrailerList()) do
+			local text = ShopLogic.TrailerDetailV2(trailer)
+			t.eq(
+				text,
+				string.format("+%s-stud bed · tows behind any truck with a bed", short(trailer.look.bedLength, 1))
+			)
+			t.eq(ShopLogic.TrailerDetailFor(trailer, 2), text)
+			t.eq(ShopLogic.TrailerDetailFor(trailer, 1), ShopLogic.TrailerDetail(trailer))
+		end
+	end)
 end

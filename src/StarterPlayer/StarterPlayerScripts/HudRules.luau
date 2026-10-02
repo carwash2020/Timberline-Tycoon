@@ -25,13 +25,21 @@
 --     Goals, the Field Guide and Settings, only while nothing else has the
 --     pad; PadGlyphs() and PadSelects(): their glyph chips show, and a
 --     popup takes the selection, only while you're on a gamepad (or a TV).
+-- The v2 core loop (V2_PLAN.md §4, Shared/CoreLoop) has no hands to
+-- count (ShowsHands): what you hold or point at gets a tooltip instead
+-- (WoodTooltip, "Oak log · 26 u³ · $39"), and the bed chip reads in u³
+-- (BedChip, "Bed 41 / 96 u³ · $61"). VolumeText, PriceText and CashText
+-- are how u³ and dollars read everywhere (FieldGuide's, so the server's
+-- toasts and the shop agree).
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
 local HudRules = {}
@@ -277,6 +285,85 @@ end
 -- button (so A works at once): the same, so a mouse never gets a ring.
 function HudRules.PadSelects(device: string): boolean
 	return device == "console"
+end
+
+---------------------------------------------------------------------------
+-- The v2 loop
+---------------------------------------------------------------------------
+
+-- How u³ and dollars read on the HUD (the rounding rules live in
+-- FieldGuide, shared with the server's toasts): "26 u³" / "4.4 u³",
+-- "$1.50/u³", "$39" (whole dollars, rounded as the sell pad pays them).
+HudRules.VolumeText = FieldGuide.VolumeText
+HudRules.VolumeNumber = FieldGuide.VolumeNumber
+HudRules.PriceText = FieldGuide.PriceText
+HudRules.CashText = FieldGuide.CashText
+
+-- Whether the load chip counts logs in your hands ("Hands 1/2"): only in
+-- the v1 loop. Under v2 you drag one piece at a time and its tooltip says
+-- what it is.
+function HudRules.ShowsHands(loop: number): boolean
+	return loop ~= 2
+end
+
+-- The tooltip for a piece of wood you hold or point at, from its
+-- attributes as read (any type): WoodId, Kind ("log" or "plank"), Volume
+-- (u³) and Value ($): "Oak log · 26 u³ · $39". A part that isn't known
+-- wood gets none (nil); a missing Volume or Value leaves that part out.
+function HudRules.WoodTooltip(woodId: unknown, kind: unknown, volume: unknown, value: unknown): string?
+	local wood = if type(woodId) == "string" then WoodData.Get(woodId) else nil
+	if not wood then
+		return nil
+	end
+	local parts = { string.format("%s %s", wood.displayName, if kind == "plank" then "plank" else "log") }
+	if type(volume) == "number" and volume == volume then
+		table.insert(parts, FieldGuide.VolumeText(volume))
+	end
+	if type(value) == "number" and value == value then
+		table.insert(parts, FieldGuide.CashText(value))
+	end
+	return table.concat(parts, " · ")
+end
+
+export type BedChip = {
+	shown: boolean,
+	text: string, -- "Bed 41 / 96 u³ · $61"
+	full: boolean, -- at or over the bed's room: the chip turns amber
+}
+
+-- The longest the bed chip's text gets, in characters: the v1 chip's
+-- longest ("Hands 2/2 · Bed 12/12"), which HudLayout.spec fits beside the
+-- hint on a small phone.
+HudRules.BedChipMaxChars = 21
+
+-- The v2 bed chip (HUD), from the truck's BedVolume (u³), the bed's room
+-- (u³; nil or 0 when there's no figure for it) and BedValue ($), as read
+-- (any type), and whether a panel is open (`modal`):
+--   * "Bed 41 / 96 u³" with a room, "Bed 41 u³" without, then " · $61"
+--     once the load is worth anything (CashText: what the pad would pay),
+--     unless that would make it longer than BedChipMaxChars;
+--   * amber (`full`) once the load reaches the room;
+--   * hidden while the bed is empty (no noise from minute one, as the v1
+--     chip) and while a panel is open.
+function HudRules.BedChip(volume: unknown, room: unknown, value: unknown, modal: boolean): BedChip
+	local function amount(n: unknown): number
+		return if type(n) == "number" and n == n and n > 0 and n ~= math.huge then n else 0
+	end
+	local inBed, space, worth = amount(volume), amount(room), amount(value)
+	local text = if space > 0
+		then string.format("Bed %s / %s", FieldGuide.VolumeNumber(inBed), FieldGuide.VolumeText(space))
+		else "Bed " .. FieldGuide.VolumeText(inBed)
+	if worth > 0 then
+		local withValue = text .. " · " .. FieldGuide.CashText(worth)
+		if (utf8.len(withValue) or #withValue) <= HudRules.BedChipMaxChars then
+			text = withValue
+		end
+	end
+	return {
+		shown = not modal and inBed > 0,
+		text = text,
+		full = space > 0 and inBed >= space,
+	}
 end
 
 return HudRules

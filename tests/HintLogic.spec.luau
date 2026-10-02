@@ -121,4 +121,175 @@ return function(t)
 		t.eq(HintLogic.Expand("{Press} or {click}", "console"), "Press or press RT", "two tokens, two meanings")
 		t.ok(not HintLogic.HasToken(HintLogic.Expand("{Press} again", "phone")))
 	end)
+
+	---------------------------------------------------------------------------
+	-- The v2 loop's hints (V2_PLAN.md §4)
+	---------------------------------------------------------------------------
+
+	t.test("v2: every device has a line for every v2 context: one line, short on a phone, no tokens", function()
+		t.eq(#HintLogic.ContextsV2, 9)
+		for _, device in ipairs(HintLogic.Devices) do
+			for _, context in ipairs(HintLogic.ContextsV2) do
+				local line = HintLogic.PickV2(device, context)
+				local where = device .. " x " .. context
+				t.ok(type(line) == "string" and #line > 0, where .. ": no line")
+				local length = utf8.len(line)
+				t.ok(
+					length and length <= HintLogic.MaxLength,
+					string.format("%s: %q is %s characters", where, line, tostring(length))
+				)
+				t.ok(not HintLogic.HasToken(line), where .. ": a token left in the hint")
+				if device == "phone" then
+					t.ok(
+						#line <= HintLogic.PhoneMaxBytes,
+						string.format("%s: %q is longer than a phone hint gets", where, line)
+					)
+				end
+			end
+		end
+		-- PhoneMaxBytes is the longest v1 phone hint, the one HudLayout.spec fits.
+		local longest = 0
+		for _, context in ipairs(HintLogic.Contexts) do
+			longest = math.max(longest, #HintLogic.Pick("phone", context))
+		end
+		t.eq(HintLogic.PhoneMaxBytes, longest)
+	end)
+
+	t.test("v2: chopping, driving and building read as in v1; the drag hints are each device's own", function()
+		for _, device in ipairs(HintLogic.Devices) do
+			for _, context in ipairs({ "chop", "driving", "build" }) do
+				t.eq(HintLogic.PickV2(device, context), HintLogic.Pick(device, context), device .. " x " .. context)
+			end
+		end
+		for _, context in ipairs({ "drag", "unequip", "holding" }) do
+			local seen = {}
+			for _, device in ipairs(HintLogic.Devices) do
+				local line = HintLogic.PickV2(device, context)
+				t.ok(not seen[line], context .. ": two devices share a line")
+				seen[line] = true
+			end
+		end
+		for _, context in ipairs(HintLogic.ContextsV2) do
+			t.ok(not string.find(string.lower(HintLogic.PickV2("phone", context)), "click"), context)
+			t.ok(not string.find(string.lower(HintLogic.PickV2("desktop", context)), "tap"), context)
+			t.ok(not string.find(string.lower(HintLogic.PickV2("console", context)), "tap"), context)
+		end
+		t.eq(HintLogic.PickV2("desktop", "nope"), HintLogic.Pick("desktop", "chop"), "unknown: the chopping line")
+		-- What each says.
+		t.ok(string.find(HintLogic.PickV2("desktop", "unequip"), "axe away", 1, true))
+		t.ok(string.find(HintLogic.PickV2("console", "unequip"), "LB + RB", 1, true), "the backpack's unequip")
+		t.ok(string.find(HintLogic.PickV2("desktop", "holding"), "Scroll", 1, true), "distance by the wheel")
+		t.ok(string.find(HintLogic.PickV2("phone", "holding"), "+/-", 1, true), "distance by the buttons")
+		t.ok(string.find(HintLogic.PickV2("console", "holding"), "D-pad", 1, true), "distance by the D-pad")
+		t.ok(string.find(HintLogic.PickV2("phone", "tooLong"), "shorter to fit your bed", 1, true))
+		t.ok(string.find(HintLogic.PickV2("console", "backUp"), "sell the bed", 1, true))
+		t.ok(string.find(HintLogic.PickV2("desktop", "tooHard"), "better", 1, true))
+	end)
+
+	t.test("v2: which context wins: driving, then a held piece, then an axe out, else dragging", function()
+		local function state(over)
+			local s = {
+				driving = false,
+				axeOut = false,
+				holding = false,
+				onWood = false,
+				tooHard = false,
+				tooLong = false,
+				bedVolume = 0,
+				nearPad = false,
+			}
+			for k, v in pairs(over) do
+				s[k] = v
+			end
+			return s
+		end
+		t.eq(HintLogic.ContextForV2(state({})), "drag", "empty hands: how to drag")
+		t.eq(HintLogic.ContextForV2(state({ onWood = true })), "drag")
+		t.eq(HintLogic.ContextForV2(state({ axeOut = true })), "chop")
+		t.eq(HintLogic.ContextForV2(state({ axeOut = true, onWood = true })), "unequip", "an axe out over loose wood")
+		t.eq(HintLogic.ContextForV2(state({ axeOut = true, tooHard = true })), "tooHard")
+		t.eq(
+			HintLogic.ContextForV2(state({ axeOut = true, onWood = true, tooHard = true })),
+			"unequip",
+			"you can still drag it"
+		)
+		t.eq(HintLogic.ContextForV2(state({ holding = true })), "holding")
+		t.eq(HintLogic.ContextForV2(state({ holding = true, tooLong = true })), "tooLong")
+		t.eq(HintLogic.ContextForV2(state({ holding = true, axeOut = true, onWood = true })), "holding")
+		t.eq(HintLogic.ContextForV2(state({ driving = true })), "driving")
+		t.eq(
+			HintLogic.ContextForV2(state({ driving = true, nearPad = true })),
+			"driving",
+			"an empty bed: nothing to sell"
+		)
+		t.eq(HintLogic.ContextForV2(state({ driving = true, bedVolume = 4 })), "driving", "loaded, far from the pad")
+		t.eq(HintLogic.ContextForV2(state({ driving = true, bedVolume = 4, nearPad = true })), "backUp")
+		t.eq(
+			HintLogic.ContextForV2(state({ driving = true, bedVolume = 0 / 0, nearPad = true })),
+			"driving",
+			"NaN: empty"
+		)
+		t.eq(HintLogic.ContextForV2(state({ driving = true, holding = true, axeOut = true })), "driving")
+	end)
+
+	t.test("v2: too long for the bed, too hard for the axe, near the pad", function()
+		t.eq(HintLogic.TooLong(12, 10), true)
+		t.eq(HintLogic.TooLong(10, 10), false, "exactly the bed's length fits")
+		t.eq(HintLogic.TooLong(4, 10), false)
+		t.eq(HintLogic.TooLong(12, nil), false, "no truck: nothing to fit")
+		t.eq(HintLogic.TooLong(12, 0), false, "a bed-less truck")
+		t.eq(HintLogic.TooLong(0 / 0, 10), false)
+		t.eq(HintLogic.TooLong(12, 0 / 0), false)
+		t.eq(HintLogic.TooLong("12", 10), false)
+
+		local FieldGuide = t.shared("FieldGuide")
+		t.eq(HintLogic.TooHardHits, 2 * FieldGuide.UsefulHitsV2)
+		t.eq(HintLogic.TooHard(HintLogic.TooHardHits), false)
+		t.eq(HintLogic.TooHard(HintLogic.TooHardHits + 1), true)
+		t.eq(HintLogic.TooHard(math.huge), true, "an axe that can't cut it at all")
+		t.eq(HintLogic.TooHard(0 / 0), false, "not known: no hint")
+
+		local GameConfig = t.shared("GameConfig")
+		t.eq(HintLogic.NearPad(GameConfig.SellTruckRange), true, "the range itself counts, as the sell prompt's")
+		t.eq(HintLogic.NearPad(GameConfig.SellTruckRange + 0.5), false)
+		t.eq(HintLogic.NearPad(nil), false, "no truck streamed in")
+	end)
+
+	t.test("v2: the too-hard hint never fires on wood the Field Guide calls a useful pace", function()
+		local FieldGuide = t.shared("FieldGuide")
+		local ItemCatalog = t.shared("ItemCatalog")
+		local WoodData = t.shared("WoodData")
+		local slow = 0
+		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
+			for _, wood in ipairs(WoodData.All()) do
+				local hits = FieldGuide.TrunkHits(axe, wood)
+				if hits <= FieldGuide.UsefulHitsV2 then
+					t.ok(not HintLogic.TooHard(hits), axe.id .. " on " .. wood.id)
+				elseif HintLogic.TooHard(hits) then
+					slow += 1
+				end
+			end
+		end
+		t.ok(slow > 0, "some wood is too hard for some axe")
+		local starter = ItemCatalog.AxeLadder()[1]
+		t.ok(not HintLogic.TooHard(FieldGuide.TrunkHits(starter, WoodData.Get("oak"))), "the tutorial's oak")
+		t.ok(not HintLogic.TooHard(FieldGuide.TrunkHits(starter, WoodData.Get("birch"))), "birch is slow, not too hard")
+	end)
+
+	t.test("v2: {unequip} and {grab} are each device's words, capitalised at a sentence start", function()
+		t.eq(HintLogic.Expand("Put it away ({unequip}).", "desktop"), "Put it away (press 1).")
+		t.eq(HintLogic.Expand("Put it away ({unequip}).", "phone"), "Put it away (tap your axe).")
+		t.eq(HintLogic.Expand("Put it away ({unequip}).", "console"), "Put it away (press LB + RB).")
+		t.eq(HintLogic.Expand("{Unequip} first.", "console"), "Press LB + RB first.")
+		t.eq(HintLogic.Expand("Then {grab} on a log.", "desktop"), "Then click and hold on a log.")
+		t.eq(HintLogic.Expand("Then {grab} on a log.", "phone"), "Then tap and hold on a log.")
+		t.eq(HintLogic.Expand("Then {grab} on a log.", "console"), "Then hold LT on a log.")
+		t.eq(HintLogic.Expand("{Grab} on a log.", "phone"), "Tap and hold on a log.")
+		t.eq(HintLogic.Expand("{Grab} on a log.", "console"), "Hold LT on a log.")
+		for _, device in ipairs(HintLogic.Devices) do
+			t.ok(not HintLogic.HasToken(HintLogic.Expand("{unequip} {Grab}", device)), device)
+		end
+		t.ok(not string.find(HintLogic.Expand("{grab}", "phone"), "click"), "a phone never clicks")
+		t.ok(not string.find(HintLogic.Expand("{unequip}", "desktop"), "tap"), "a computer never taps")
+	end)
 end
