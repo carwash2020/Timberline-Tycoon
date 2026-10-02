@@ -458,7 +458,7 @@ step("5. The scenery", function()
 	end
 end)
 
--- The landscape, a little toward Lumber Tycoon 2 (phase 10, STY-03,
+-- The landscape, a little toward the classic lumber-game look (phase 10, STY-03,
 -- STY-04): brown boulder clusters over the open grass
 -- (WorldPlan.BoulderClusters), each its own Atomic model under
 -- TimberlineMap.BoulderClusters; then, under TimberlineMap.Landmarks, a

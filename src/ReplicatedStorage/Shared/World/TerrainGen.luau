@@ -626,7 +626,7 @@ end
 -- Colours for each terrain material in the cozy palette (GAME_DESIGN §13).
 -- TerrainBuilder applies them with Terrain:SetMaterialColor; the preview
 -- tool paints with them. STY-01 (phase 10) moved the land a little toward
--- Lumber Tycoon 2's look: a deeper meadow green (Grass was 116,170,74 and
+-- the classic lumber-game look: a deeper meadow green (Grass was 116,170,74 and
 -- LeafyGrass 86,140,62) and brown rock for the mountains, cliffs and
 -- snowline (Rock was a grey 128,122,114).
 TerrainGen.MaterialColors = {

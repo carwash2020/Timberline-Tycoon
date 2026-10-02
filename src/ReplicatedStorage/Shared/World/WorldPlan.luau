@@ -2540,7 +2540,7 @@ function WorldPlan.Backdrop(): { BackdropPiece }
 end
 
 ---------------------------------------------------------------------------
--- The landscape, a little toward Lumber Tycoon 2 (phase 10, STY-03)
+-- The landscape, a little toward the classic lumber-game look (phase 10, STY-03)
 ---------------------------------------------------------------------------
 
 -- What everything here keeps clear of, binned by 64-stud squares so a
@@ -2648,7 +2648,7 @@ local function clearOfClutter(x: number, z: number, r: number, gap: number, gond
 	return true
 end
 
--- Boulder clusters (STY-03): Lumber Tycoon 2's brown rocks scattered over
+-- Boulder clusters (STY-03): brown rocks scattered over
 -- the open grass, three to five half-buried rocks of mixed sizes huddled
 -- together, one cluster per CLUSTER_CELL square at most. MapBuilder builds
 -- each rock with PropArt.Rock (as the lone boulders: it collides) in a

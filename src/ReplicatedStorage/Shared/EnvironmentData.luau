@@ -416,7 +416,7 @@ EnvironmentData.WeatherOverrides = {
 	},
 } :: { [string]: Override }
 
--- The night mist (STY-05), Lumber Tycoon 2's way: the air thickens late
+-- The night mist (STY-05), the classic lumber-game way: the air thickens late
 -- in the evening (from 22:00, full by 23:00), holds through the night and
 -- lifts through the morning (from 06:30, clear by 09:30). MistWeight(clock)
 -- is how much of Mist.override Blend applies at that hour: after the

@@ -12,6 +12,7 @@
 --     who has left passes it to the last player who held it; nobody
 --     online gets nothing (the wood still goes).
 
+local FieldGuide = require(script.Parent.FieldGuide)
 local ForestLogic = require(script.Parent.ForestLogic)
 local GameConfig = require(script.Parent.GameConfig)
 local WoodData = require(script.Parent.WoodData)
@@ -66,35 +67,25 @@ function SellLogic.Payee(ownerId: number?, lastHolderId: number?, online: (numbe
 	return nil
 end
 
--- "41 u³": volumes under 10 to one decimal, the rest whole.
-function SellLogic.VolumeText(u3: number): string
-	if u3 < 10 then
-		local s = string.format("%.1f", u3)
-		s = string.gsub(s, "%.0$", "")
-		return s .. " u³"
-	end
-	return string.format("%d u³", math.floor(u3 + 0.5))
+-- "41 u³" and "$1,234": the same formatting as the HUD and the Field
+-- Guide (FieldGuide.VolumeText / CashText), so a toast never disagrees
+-- with a tooltip.
+SellLogic.VolumeText = FieldGuide.VolumeText
+
+-- "1,234": whole dollars with separators, without the "$".
+function SellLogic.Money(dollars: number): string
+	return string.sub(FieldGuide.CashText(dollars), 2)
 end
 
 -- The sale toast: "Sold 3 pieces · 41 u³ · $96".
 function SellLogic.SaleText(pieces: number, u3: number, dollars: number): string
 	return string.format(
-		"Sold %d piece%s · %s · $%s",
+		"Sold %d piece%s · %s · %s",
 		pieces,
 		if pieces == 1 then "" else "s",
-		SellLogic.VolumeText(u3),
-		SellLogic.Money(dollars)
+		FieldGuide.VolumeText(u3),
+		FieldGuide.CashText(dollars)
 	)
-end
-
--- "$1,234" without the "$".
-function SellLogic.Money(dollars: number): string
-	local s = tostring(math.floor(dollars + 0.5))
-	local out = string.reverse(s)
-	out = string.gsub(out, "(%d%d%d)", "%1,")
-	out = string.reverse(out)
-	out = string.gsub(out, "^,", "")
-	return out
 end
 
 return SellLogic

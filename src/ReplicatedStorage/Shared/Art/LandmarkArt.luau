@@ -126,7 +126,7 @@ end
 -- Brown boulders (STY-03)
 ---------------------------------------------------------------------------
 
--- Brown rock: LT2's boulders are brown, not grey. Two tones, so a field of
+-- Brown rock: the open country's boulders are brown, not grey. Two tones, so a field of
 -- clusters isn't one flat colour: a warm brown and a greyer umber (shared
 -- with the lone boulders and the outcrops: PropArt.BrownTones).
 LandmarkArt.ROCK_TONES = PropArt.BrownTones

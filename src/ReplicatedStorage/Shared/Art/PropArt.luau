@@ -27,7 +27,7 @@ local function hex(h: string): Color3
 end
 
 local STONE = { Color3.fromRGB(140, 134, 126), Color3.fromRGB(120, 116, 110), Color3.fromRGB(158, 150, 140) }
--- Brown rock for the open country (STY-03: LT2's boulders are brown, not
+-- Brown rock for the open country (STY-03: brown boulders on green, not
 -- grey): a warm brown and a greyer umber, so a field of rocks isn't one
 -- flat colour. The lone boulders, the scenery outcrops and the boulder
 -- clusters (LandmarkArt.BrownRock) all use these.
