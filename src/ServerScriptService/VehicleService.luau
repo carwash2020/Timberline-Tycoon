@@ -48,6 +48,9 @@
 --     nobody skips the haul home. Left-behind logs still lying out when the
 --     player leaves are saved (profile.leftLoad, GameServer) and put back
 --     where they lay on rejoin (RestoreLeftLoad).
+--   * The v2 loop carries loose wood on the beds instead (TruckLoad),
+--     through three hooks (VehicleService.Hooks, nil under v1): the driver
+--     changing, a truck being rebuilt, and how many pieces ride on a bed.
 --   * TruckSlotDistance on the player: how far their truck is from its own
 --     parking spot, in whole studs (Shared/TruckHome), checked twice a
 --     second and sent only when it moves a couple of studs; nil with no
@@ -136,6 +139,40 @@ local slotShown: { [number]: number } = {} -- [userId] = the TruckSlotDistance l
 local slotWarned = false
 
 local notify: ((Player, string) -> ())? = nil
+
+-- The v2 loop's hooks for TruckLoad (V2_PLAN.md §4b, M1.6): loose wood
+-- riding on the beds. GameServer sets them only under the v2 loop; under
+-- v1 they stay nil and nothing below changes. None of them touch the
+-- truck's own physics, and each runs guarded (an error is logged, never
+-- breaks driving or spawning).
+--   onDriverChanged(truck, driver?): the owner sat in the driver seat
+--     (driver, after its physics went to their device) or got out (nil,
+--     as it starts to settle).
+--   onRebuild(player, old?, keepsLoad, at?): a truck is about to be built
+--     for `player`: `old` is the truck a recall or a switch replaces (nil
+--     when it's the first truck since joining), `keepsLoad` whether its
+--     load comes along (in town, VehicleLogic.InTown; on joining, whether
+--     the saved spot was), `at` where it stands (or stood when they left;
+--     nil when the save doesn't say). It may return a function that gets
+--     the new truck once it's built and parked.
+--   loadCount(truck): loose pieces riding on its beds (Recall warns before
+--     leaving them out of town, as it does for the v1 bed's logs).
+export type Hooks = {
+	onDriverChanged: ((truck: Model, driver: Player?) -> ())?,
+	onRebuild: ((player: Player, old: Model?, keepsLoad: boolean, at: CFrame?) -> ((Model) -> ())?)?,
+	loadCount: ((truck: Model) -> number)?,
+}
+VehicleService.Hooks = {} :: Hooks
+
+local function guarded(name: string, fn: () -> ())
+	local ok, err = pcall(function(): any
+		fn()
+		return nil
+	end)
+	if not ok then
+		warn(string.format("[VehicleService] hook %s failed: %s", name, tostring(err)))
+	end
+end
 
 -- A toast for `player` (GameServer's notify once Init has run).
 local function tell(player: Player, message: string)
@@ -617,6 +654,12 @@ local function onOccupantChanged(rec: TruckRecord)
 		if GameConfig.VehiclePhysics and player then
 			startDriving(rec, player)
 		end
+		local onDriver = VehicleService.Hooks.onDriverChanged
+		if onDriver and player then
+			guarded("onDriverChanged", function()
+				onDriver(rec.model, player)
+			end)
+		end
 		return
 	end
 	local driver = rec.driver
@@ -631,6 +674,12 @@ local function onOccupantChanged(rec: TruckRecord)
 		task.spawn(settle, rec)
 	else
 		noteSpot(rec)
+	end
+	local onDriver = VehicleService.Hooks.onDriverChanged
+	if onDriver then
+		guarded("onDriverChanged", function()
+			onDriver(rec.model, nil)
+		end)
 	end
 	task.defer(stepOut, rec, driver)
 end
@@ -1086,11 +1135,29 @@ function VehicleService.SpawnTruck(
 	end
 	-- Where a load out of town is left (the truck's last spot).
 	local leaveAt: CFrame? = nil
+	-- The v2 loop's loose load (TruckLoad): told before the old truck goes,
+	-- handed the new one once it's built.
+	local onRebuild = VehicleService.Hooks.onRebuild
+	local carry: ((Model) -> ())? = nil
 	if old then
 		if load and #load > 0 and not keepsLoad(old) then
 			leaveAt = trustedCFrame(old) * CFrame.new(0, 0, rigShiftOf(old.trailerLayout)) -- the rig's middle
 		end
+		if onRebuild then
+			local oldModel, keeps, at = old.model, keepsLoad(old), trustedCFrame(old)
+			guarded("onRebuild", function()
+				carry = onRebuild(player, oldModel, keeps, at)
+			end)
+		end
 		destroyTruck(old)
+	elseif onRebuild then
+		-- Joining: was the truck in town when they left? (Old saves don't
+		-- say, and keep their load.)
+		local was = savedSpot(player)
+		local keeps = was == nil or inTown(was, slotCFrame(slot, overflowIndex).Position)
+		guarded("onRebuild", function()
+			carry = onRebuild(player, nil, keeps, if was then CFrame.new(was) else nil)
+		end)
 	end
 
 	local layout = TruckLayout.For(def)
@@ -1217,6 +1284,12 @@ function VehicleService.SpawnTruck(
 	end
 	publishBed(rec)
 	saveBed(rec) -- the save matches what's really in the bed now, and where the truck is
+	local onBuilt = carry
+	if onBuilt then
+		guarded("onRebuild (new truck)", function()
+			onBuilt(model)
+		end)
+	end
 	player:SetAttribute("EquippedTruck", def.id)
 	return model, dropped
 end
@@ -1266,16 +1339,24 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 	end
 	-- A load out of town stays where the truck stands: say so, and only go
 	-- ahead on a second press within a few seconds (a stray tap mustn't
-	-- strand a full bed in the Volcano).
-	if #rec.bed > 0 and not keepsLoad(rec) then
+	-- strand a full bed in the Volcano). The v2 loop's loose pieces count
+	-- too (Hooks.loadCount).
+	local onBed = #rec.bed
+	local countLoose = VehicleService.Hooks.loadCount
+	if countLoose then
+		guarded("loadCount", function()
+			onBed += countLoose(rec.model)
+		end)
+	end
+	if onBed > 0 and not keepsLoad(rec) then
 		local asked = leaveAsked[player.UserId]
 		if not asked or now - asked > LEAVE_CONFIRM_SECONDS then
 			leaveAsked[player.UserId] = now
 			return false,
 				string.format(
 					"Your %d log%s will be left where your truck stands. Press Send truck home again to go ahead.",
-					#rec.bed,
-					if #rec.bed == 1 then "" else "s"
+					onBed,
+					if onBed == 1 then "" else "s"
 				)
 		end
 	end

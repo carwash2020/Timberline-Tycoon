@@ -1,0 +1,244 @@
+--!nocheck
+-- VehicleService's three hooks for the v2 loop's loose wood (M1.6,
+-- V2_PLAN §4b): the real VehicleService spawning and recalling real
+-- TruckArt trucks over a faked world (one parking slot, no terrain, no
+-- physics). It proves:
+--   * with no hooks (the v1 loop) a truck spawns and recalls as before;
+--   * onRebuild hears the first truck after joining (no old truck; whether
+--     the saved spot was in town, and where), and a recall or a switch
+--     (the old truck, still there; in town or not; where it stands), and
+--     what it returns gets the new truck once it's built and parked;
+--   * Recall's warning before leaving a load out of town counts loose
+--     pieces (loadCount) as it counts the v1 bed's logs;
+--   * a hook that errors never breaks spawning.
+return function(t)
+	local roblox = t.roblox
+	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
+
+	-- Lune's instances lack these; VehicleService only needs them to exist.
+	roblox.implementMethod("VehicleSeat", "GetPropertyChangedSignal", function()
+		return {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		}
+	end)
+	roblox.implementMethod("WorldModel", "GetPartBoundsInBox", function()
+		return {}
+	end)
+	roblox.implementMethod("WorldModel", "Raycast", function()
+		return nil
+	end)
+
+	local function signal()
+		return {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		}
+	end
+
+	local SLOT_AT = Vector3.new(40, 0.1, 30)
+
+	local function setup()
+		local ws = Instance.new("WorldModel")
+		local slot = Instance.new("Part")
+		slot.Name = "ParkingSlot"
+		slot.Size = Vector3.new(10, 0.2, 60)
+		slot.CFrame = CFrame.new(SLOT_AT)
+		slot.Position = SLOT_AT
+		slot:AddTag("ParkingSlot")
+		slot:SetAttribute("Index", 1)
+		slot.Parent = ws
+		local w = { profile = { truckBed = {}, truckAt = {}, leftLoad = {} }, toasts = {} }
+		local loader = t.loader({
+			mocks = {
+				ProfileService = {
+					GetProfile = function()
+						return w.profile
+					end,
+				},
+				TreeService = { LogDiameter = 0.9 },
+				TerrainBuilder = {
+					LiftOnto = function(_, y)
+						return y
+					end,
+				},
+			},
+			services = {
+				Players = {
+					GetPlayers = function()
+						return {}
+					end,
+					GetPlayerFromCharacter = function()
+						return nil
+					end,
+				},
+				CollectionService = {
+					AddTag = function(_, inst, tag)
+						inst:AddTag(tag)
+					end,
+					GetTagged = function(_, tag)
+						local out = {}
+						for _, d in ipairs(ws:GetDescendants()) do
+							if d:HasTag(tag) then
+								table.insert(out, d)
+							end
+						end
+						return out
+					end,
+				},
+				RunService = {
+					IsStudio = function()
+						return false
+					end,
+					Heartbeat = signal(),
+				},
+			},
+			globals = {
+				workspace = ws,
+				task = {
+					spawn = function() end,
+					defer = function() end,
+					delay = function() end,
+				},
+				OverlapParams = {
+					new = function()
+						return {}
+					end,
+				},
+				RaycastParams = {
+					new = function()
+						return {}
+					end,
+				},
+				-- @lune/roblox instances have no events: a stand-in prompt.
+				Instance = {
+					new = function(class)
+						if class == "ProximityPrompt" then
+							return {
+								Triggered = signal(),
+								SetAttribute = function() end,
+							}
+						end
+						return Instance.new(class)
+					end,
+				},
+			},
+		})
+		w.VehicleService = loader:server("VehicleService")
+		w.VehicleService.Init(function(player, message)
+			table.insert(w.toasts, { player = player, message = message })
+		end)
+		w.loader = loader
+		w.player = {
+			UserId = 7,
+			Name = "Dale",
+			DisplayName = "Dale",
+			SetAttribute = function() end,
+		}
+		return w
+	end
+
+	t.test("no hooks (the v1 loop): a truck spawns and recalls as before", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		t.eq(VehicleService.Hooks.onRebuild, nil)
+		local model = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		t.ok(model and model.Parent ~= nil, "spawned")
+		t.ok(model:FindFirstChild("BedFloor"):FindFirstChild("BedZone"), "with its BedZone (inert)")
+		local ok = VehicleService.Recall(w.player)
+		t.ok(ok, "recalled")
+		t.eq(model.Parent, nil, "the old one is gone")
+		t.ok(VehicleService.GetVehicle(w.player) ~= model, "a new one")
+	end)
+
+	t.test("onRebuild: joining, then a recall; the new truck is handed over once built", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		local heard = {}
+		VehicleService.Hooks.onRebuild = function(player, old, keepsLoad, at)
+			local call = { player = player, old = old, keepsLoad = keepsLoad, at = at, oldParent = old and old.Parent }
+			table.insert(heard, call)
+			return function(new)
+				call.new = new
+				call.newParked = new.PrimaryPart.Anchored
+				call.newIsTheirs = VehicleService.GetVehicle(player) == new
+			end
+		end
+		-- Joining, the save saying the truck was far out in the Snowfields.
+		w.profile.truckAt = { x = 900, y = 40, z = -700 }
+		local first = VehicleService.SpawnTruck(w.player, "Pickup")
+		t.eq(#heard, 1)
+		t.eq(heard[1].old, nil, "the first truck since joining")
+		t.eq(heard[1].keepsLoad, false, "the saved spot wasn't in town")
+		t.ok((heard[1].at.Position - Vector3.new(900, 40, -700)).Magnitude < 1e-6, "where it stood")
+		t.eq(heard[1].new, first, "handed the new truck")
+		t.ok(heard[1].newParked and heard[1].newIsTheirs, "built, parked and theirs by then")
+		-- A recall from the lot: in town.
+		VehicleService.Recall(w.player)
+		t.eq(#heard, 2)
+		t.eq(heard[2].old, first, "told about the old truck")
+		t.ok(heard[2].oldParent ~= nil, "while it's still there")
+		t.eq(heard[2].keepsLoad, true, "in town: the load comes along")
+		t.ok(heard[2].new ~= first and heard[2].new == VehicleService.GetVehicle(w.player))
+	end)
+
+	t.test("joining with an old save that doesn't say where the truck was keeps the load", function()
+		local w = setup()
+		local seen
+		w.VehicleService.Hooks.onRebuild = function(_, _, keepsLoad, at)
+			seen = { keepsLoad = keepsLoad, at = at }
+			return nil
+		end
+		w.VehicleService.SpawnTruck(w.player, "Rustbucket")
+		t.eq(seen.keepsLoad, true)
+		t.eq(seen.at, nil)
+	end)
+
+	t.test("Recall warns before leaving loose pieces out of town (loadCount)", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		VehicleService.Hooks.loadCount = function(truck)
+			t.eq(truck, VehicleService.GetVehicle(w.player))
+			return 3
+		end
+		local truck = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		truck:PivotTo(CFrame.new(900, 40, -700)) -- parked far out
+		local ok, why = VehicleService.Recall(w.player)
+		t.eq(ok, false)
+		t.eq(why, "Your 3 logs will be left where your truck stands. Press Send truck home again to go ahead.")
+		t.ok(VehicleService.Recall(w.player), "the second press goes ahead")
+	end)
+
+	t.test("without hooks, Recall's warning still counts the v1 bed's logs", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		local truck = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		t.ok(VehicleService.AddBedLog(w.player, { woodId = "oak", value = 7 }))
+		t.eq(VehicleService.GetBedCount(w.player), 1)
+		truck:PivotTo(CFrame.new(900, 40, -700))
+		local ok, why = VehicleService.Recall(w.player)
+		t.eq(ok, false)
+		t.eq(why, "Your 1 log will be left where your truck stands. Press Send truck home again to go ahead.")
+	end)
+
+	t.test("a hook that errors never stops a truck spawning", function()
+		local w = setup()
+		w.VehicleService.Hooks.onRebuild = function()
+			error("boom")
+		end
+		w.VehicleService.Hooks.loadCount = function()
+			error("boom")
+		end
+		local model = w.VehicleService.SpawnTruck(w.player, "Flatbed")
+		t.ok(model and model.Parent ~= nil, "spawned anyway")
+		local warned = false
+		for _, line in ipairs(w.loader.warnings) do
+			if string.find(line, "hook onRebuild failed", 1, true) then
+				warned = true
+			end
+		end
+		t.ok(warned, "and the error is logged")
+	end)
+end

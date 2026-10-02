@@ -39,6 +39,7 @@ local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
+local TruckLoad = require(script.Parent.TruckLoad)
 local VehicleService = require(script.Parent.VehicleService)
 local WeatherService = require(script.Parent.WeatherService)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
@@ -482,8 +483,16 @@ local function onSellLogs(player: Player)
 end
 
 -- Instant Delivery (a Robux product): sells the truck bed from anywhere.
+-- The v2 loop sells the loose wood on the beds instead (SellService.SellBed:
+-- the same wallet check, then one use).
 local function onInstantDelivery(player: Player)
 	if not RateLimiter.Allow(player, "SellLogs") then
+		return
+	end
+	if CoreLoop.V2() then
+		SellService.SellBed(player, function(): boolean
+			return MonetizationService.UseInstantDelivery(player)
+		end)
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
@@ -581,7 +590,35 @@ if CoreLoop.V2() then
 			GrabService.ReleasePiece(model, "sold")
 		end,
 		forget = GrabService.Unregister,
+		-- Instant Delivery v2: the wood riding on the player's beds.
+		bedPieces = function(player: Player): { Model }
+			return TruckLoad.PiecesOn(player)
+		end,
+		walletRoom = function(player: Player): number
+			local profile = ProfileService.GetProfile(player)
+			return if profile then GameConfig.CashCap - profile.cash else 0
+		end,
 	})
+	-- Loose wood rides on the truck beds (M1.6): by friction, simulated by
+	-- the driver's device while they drive, saved in profile.truckLoad.
+	safely("TruckLoad.Init", TruckLoad.Init, {
+		woodFolder = woodFolder :: Instance,
+		truckOf = VehicleService.GetVehicle,
+		profileOf = function(player: Player): any
+			return ProfileService.GetProfile(player)
+		end,
+		notify = notify,
+		forget = GrabService.Unregister,
+	})
+	VehicleService.Hooks.onDriverChanged = TruckLoad.OnDriverChanged
+	VehicleService.Hooks.onRebuild = TruckLoad.OnRebuild
+	VehicleService.Hooks.loadCount = TruckLoad.LoadCount
+	-- A piece of yours came to rest on your own bed: the tutorial's "load"
+	-- step (TutorialData.StepsV2) and the funnel.
+	TruckLoad.Hooks.onLoaded = function(player: Player)
+		MilestoneService.Mark(player, "First log loaded")
+		QuestService.Event(player, "woodLoaded")
+	end
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
@@ -744,6 +781,11 @@ local function onPlayerRemoving(player: Player)
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
+	-- v2: the loose wood on the truck's beds goes into the save, and with it
+	-- out of the world (rebuilt on the bed on rejoin).
+	if CoreLoop.V2() then
+		safely("TruckLoad.PlayerRemoving", TruckLoad.PlayerRemoving, player)
+	end
 	-- Left-behind logs still lying out go into the save (put back on rejoin).
 	safely("save left-behind logs", function()
 		local profile = ProfileService.GetProfile(player)
