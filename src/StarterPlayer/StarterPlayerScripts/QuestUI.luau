@@ -12,6 +12,13 @@
 --     Elder (QuestUI.TutorialTree).
 -- The server owns progress: it sets the TutorialStep (0 = done) and
 -- TutorialProgress attributes, and this redraws from them.
+-- The steps are TutorialData.ForLoop(CoreLoop.Active()), as the server's.
+-- The v2 loop's beacons: "wood" (the nearest loose piece you own, else
+-- the nearest anyone may take: QuestUI.WoodRank) and "truckBed" (your
+-- truck's BedFloor: QuestUI.BedPart); "tree" looks for the step's
+-- beaconWood first. Trees count as standing by their HP while they have
+-- one (v1), else by Felled (QuestUI.TutorialTree), so the tree beacon
+-- works for both loops' trees.
 -- Looks per the UI spec (03, 04): a kraft card with the step and Skip (tap
 -- twice: it turns amber and asks again), Murph's wood card under it with
 -- his portrait (a live view of the Murph by the spawn), and an amber arrow
@@ -24,6 +31,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
@@ -58,9 +66,14 @@ local speechLine = "" -- the line on the card, before its device words (HintLogi
 local lastStep = -1
 local skipped = false -- this player pressed Skip: no farewell speech
 
+-- The tutorial's steps in the loop that runs.
+local function steps(): { Step }
+	return TutorialData.ForLoop(CoreLoop.Active())
+end
+
 local function currentStep(): (number, Step?)
 	local index = (player:GetAttribute("TutorialStep") :: number?) or 0
-	return index, TutorialData.Steps[index]
+	return index, steps()[index]
 end
 
 -- Fades Murph's card (alpha 0 = shown, 1 = gone): every surface and text
@@ -221,9 +234,18 @@ function QuestUI.FindBeaconPart(map: Instance?, target: string): BasePart?
 end
 
 -- A tree standing (not felled, not hidden by day) that you could chop.
+-- A v1 tree says so by its HP; a v2 section tree has none, and says it
+-- by Felled (false while it stands; nil means its attributes haven't
+-- arrived, so it doesn't count yet, as a v1 tree without HP doesn't).
 local function standing(model: Model): boolean
+	if model:GetAttribute("Dormant") == true then
+		return false
+	end
 	local hp = model:GetAttribute("HP")
-	return type(hp) == "number" and hp > 0 and model:GetAttribute("Dormant") ~= true
+	if hp ~= nil then
+		return type(hp) == "number" and hp > 0
+	end
+	return model:GetAttribute("Felled") == false
 end
 
 -- A tree the tutorial may point you at: standing, and not an Elder. An
@@ -238,6 +260,31 @@ function QuestUI.TutorialTree(model: Model, elderUid: unknown): boolean
 	end
 	local uid = model:GetAttribute("Uid")
 	return not (type(elderUid) == "string" and elderUid ~= "" and uid == elderUid)
+end
+
+-- The drag step's pick among loose pieces (tag Wood): 1 for one you own,
+-- 2 for one nobody owns (Owner 0: anyone may take it), nil for someone
+-- else's, or one in someone else's hands (HeldBy).
+function QuestUI.WoodRank(model: Model, userId: number): number?
+	local heldBy = model:GetAttribute("HeldBy")
+	if type(heldBy) == "number" and heldBy ~= 0 and heldBy ~= userId then
+		return nil
+	end
+	local owner = model:GetAttribute("Owner")
+	if owner == userId then
+		return 1
+	end
+	return if owner == 0 then 2 else nil
+end
+
+-- Where the load step's beacon hangs on your truck: its bed floor, or its
+-- PrimaryPart for a truck without a bed (the Scout ATV).
+function QuestUI.BedPart(truck: Model): BasePart?
+	local bed = truck:FindFirstChild("BedFloor")
+	if bed and bed:IsA("BasePart") then
+		return bed
+	end
+	return truck.PrimaryPart
 end
 
 -- How many Heartseeds of this tree's or stump's wood you hold.
@@ -255,7 +302,32 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		return QuestUI.TutorialTree(model, elderUid)
 	end
 	if target == "tree" then
+		local wood = step.beaconWood
+		if wood then
+			-- The step's wood first (v2: Murph's oaks), else any tree.
+			local first = nearestTagged("Tree", from, function(model)
+				return choppable(model) and model:GetAttribute("WoodId") == wood
+			end)
+			if first then
+				return first
+			end
+		end
 		return nearestTagged("Tree", from, choppable)
+	elseif target == "wood" then
+		-- Your own nearest loose piece, else the nearest anyone may take.
+		local userId = player.UserId
+		return nearestTagged("Wood", from, function(model)
+			return QuestUI.WoodRank(model, userId) == 1
+		end) or nearestTagged("Wood", from, function(model)
+			return QuestUI.WoodRank(model, userId) == 2
+		end)
+	elseif target == "truckBed" then
+		for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
+			if inst:IsA("Model") and inst:GetAttribute("OwnerId") == player.UserId then
+				return QuestUI.BedPart(inst)
+			end
+		end
+		return nil
 	elseif target == "log" then
 		-- Logs lying in the world have a "Pick up" prompt; carried ones don't.
 		return nearestTagged("Log", from, function(_model, pp)
@@ -327,7 +399,7 @@ local function refresh()
 			skipRoot.Visible = showSkip
 		end
 		if stepLabel then
-			stepLabel.Text = string.format("TUTORIAL · %d/%d", index, #TutorialData.Steps)
+			stepLabel.Text = string.format("TUTORIAL · %d/%d", index, #steps())
 			stepLabel.Size = UDim2.new(1, if showSkip then -skipWidth else 0, 0, 28)
 		end
 	end

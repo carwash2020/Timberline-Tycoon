@@ -182,4 +182,84 @@ return function(t)
 		t.eq(QuestUI.FindBeaconPart(townMap(), "tree"), nil)
 		t.eq(QuestUI.FindBeaconPart(Instance.new("Model"), "toolShed"), nil)
 	end)
+
+	---------------------------------------------------------------------------
+	-- The v2 loop (TutorialData.StepsV2)
+	---------------------------------------------------------------------------
+
+	t.test("v2: every beacon is found by tag (wood, your truck's bed) or has a path that resolves", function()
+		local V2_MOVING = { tree = true, wood = true, truckBed = true, stump = true }
+		local map = townMap()
+		local seen = {}
+		for _, step in ipairs(TutorialData.StepsV2) do
+			local beacon = step.beacon
+			if beacon then
+				seen[beacon] = true
+				if not V2_MOVING[beacon] then
+					local part = QuestUI.FindBeaconPart(map, beacon)
+					t.ok(part and part:IsA("BasePart"), step.id .. ": beacon " .. beacon .. " finds no part")
+				end
+			end
+		end
+		t.ok(seen.wood and seen.truckBed, "the drag and load steps point at wood and the bed")
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
+		t.ok(string.find(source, 'target == "wood"', 1, true), "QuestUI finds the wood beacon")
+		t.ok(string.find(source, 'target == "truckBed"', 1, true), "and the bed")
+		t.ok(string.find(source, "TutorialData.ForLoop(CoreLoop.Active())", 1, true), "the loop's steps")
+		t.ok(not string.find(source, "TutorialData.Steps[", 1, true), "no step read from v1's list alone")
+	end)
+
+	t.test("v2: section trees (no HP) stand by Felled; v1 trees still by HP", function()
+		local function tree(attrs)
+			local model = Instance.new("Model")
+			for key, value in pairs(attrs) do
+				model:SetAttribute(key, value)
+			end
+			return model
+		end
+		t.eq(QuestUI.TutorialTree(tree({ Felled = false, Uid = "a" }), ""), true, "a standing section tree")
+		t.eq(QuestUI.TutorialTree(tree({ Felled = true, Uid = "a" }), ""), false, "a felled one (its stub)")
+		t.eq(QuestUI.TutorialTree(tree({ Uid = "a" }), ""), false, "attributes not here yet")
+		t.eq(QuestUI.TutorialTree(tree({ Felled = false, Dormant = true }), ""), false, "Gloam Hollow by day")
+		t.eq(QuestUI.TutorialTree(tree({ Felled = false, Elder = true, Uid = "e" }), ""), false, "an Elder")
+		t.eq(QuestUI.TutorialTree(tree({ Felled = false, Uid = "e" }), "e"), false, "the Elder before its attribute")
+		-- A v1 tree has both: HP decides, as before.
+		t.eq(QuestUI.TutorialTree(tree({ HP = 0, Felled = false, Uid = "a" }), ""), false, "v1: HP 0 is felled")
+		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Felled = false, Uid = "a" }), ""), true)
+	end)
+
+	t.test("v2: the drag step points at your own loose piece first, then anyone's to take", function()
+		local function piece(attrs)
+			local model = Instance.new("Model")
+			for key, value in pairs(attrs) do
+				model:SetAttribute(key, value)
+			end
+			return model
+		end
+		local me = 7
+		t.eq(QuestUI.WoodRank(piece({ Owner = me, HeldBy = 0 }), me), 1, "yours")
+		t.eq(QuestUI.WoodRank(piece({ Owner = me, HeldBy = me }), me), 1, "yours, in your hands")
+		t.eq(QuestUI.WoodRank(piece({ Owner = 0, HeldBy = 0 }), me), 2, "nobody's: yours to take")
+		t.eq(QuestUI.WoodRank(piece({ Owner = 9, HeldBy = 0 }), me), nil, "someone else's")
+		t.eq(QuestUI.WoodRank(piece({ Owner = me, HeldBy = 9 }), me), nil, "in someone else's hands")
+		t.eq(QuestUI.WoodRank(piece({ Owner = 0, HeldBy = 9 }), me), nil)
+		t.eq(QuestUI.WoodRank(piece({}), me), nil, "attributes not here yet")
+	end)
+
+	t.test("v2: the load step's beacon hangs over your truck's bed floor", function()
+		local truck = Instance.new("Model")
+		local chassis = Instance.new("Part")
+		chassis.Name = "Chassis"
+		chassis.Parent = truck
+		truck.PrimaryPart = chassis
+		t.eq(QuestUI.BedPart(truck), chassis, "no bed (the Scout ATV): the truck itself")
+		local bed = Instance.new("Part")
+		bed.Name = "BedFloor"
+		bed.Parent = truck
+		t.eq(QuestUI.BedPart(truck), bed)
+		local fs = require("@lune/fs")
+		local art = fs.readFile("src/ReplicatedStorage/Shared/Art/TruckArt.luau")
+		t.ok(string.find(art, 'bedFloor(m, "BedFloor"', 1, true), "TruckArt still names its bed floor BedFloor")
+	end)
 end

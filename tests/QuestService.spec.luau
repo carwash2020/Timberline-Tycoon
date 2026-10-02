@@ -1,7 +1,8 @@
 --!nocheck
 -- Murph's tutorial on the server: progress, rewards, skipping.
 return function(t)
-	local function setup(profileOverrides)
+	-- `loop`: the core loop GameServer passes to Init (nil: v1, as before).
+	local function setup(profileOverrides, loop)
 		local loader = t.loader()
 		local Schema = loader:server("ProfileSchema")
 		local profile = loader:shared("Util").deepCopy(Schema.Template)
@@ -41,10 +42,10 @@ return function(t)
 			},
 		}, function(_, message)
 			table.insert(toasts, message)
-		end)
+		end, loop)
 		return {
 			Quest = Quest,
-			Steps = loader:shared("TutorialData").Steps,
+			Steps = loader:shared("TutorialData").ForLoop(loop or 1),
 			profile = profile,
 			player = player,
 			toasts = toasts,
@@ -225,5 +226,107 @@ return function(t)
 		local s = setup({ tutorialStep = 99 })
 		s.Quest.Start(s.player, s.profile)
 		t.eq(s.player.attrs.TutorialStep, 1)
+	end)
+
+	---------------------------------------------------------------------------
+	-- The v2 loop (V2_PLAN.md §13): Init with loop 2 runs StepsV2 on the v2
+	-- events, as GameServer wires them: woodGrabbed from the grab hook, the
+	-- sale through QuestService.WoodSold (pieces, then whole dollars).
+	---------------------------------------------------------------------------
+
+	t.test("v2: Init with loop 2 runs StepsV2; without a loop it's v1's steps", function()
+		local TutorialData = t.shared("TutorialData")
+		local v2 = setup(nil, 2)
+		t.eq(v2.Steps, TutorialData.StepsV2)
+		v2.Quest.Start(v2.player, v2.profile)
+		t.eq(v2.player.attrs.TutorialStep, 1)
+		t.eq(v2.Steps[1].event, "treeFelled")
+		t.eq(v2.Steps[2].event, "woodGrabbed")
+		local v1 = setup()
+		t.eq(v1.Steps, TutorialData.Steps)
+	end)
+
+	t.test("v2: the walk on the wired events: fell, grab, load, sold, plant, sold cash, buy", function()
+		local s = setup(nil, 2)
+		local function at()
+			return s.Steps[s.profile.tutorialStep].id
+		end
+		s.Quest.Start(s.player, s.profile)
+		s.event("treeFelled") -- the chop path (SectionTrees' OnFelled from M1.3)
+		t.eq(at(), "pickup")
+		s.event("logPickedUp")
+		t.eq(at(), "pickup", "v1's pickup counts for nothing under v2")
+		s.event("woodGrabbed") -- GrabService.Hooks.onGrab
+		t.eq(at(), "load")
+		s.Quest.WoodSold(s.player, 2, 30)
+		t.eq(at(), "load", "a sale doesn't load the truck")
+		s.event("woodLoaded") -- TruckLoad (M1.6)
+		t.eq(at(), "sell")
+		local cash = s.profile.cash
+		s.Quest.WoodSold(s.player, 2, 30)
+		t.eq(at(), "plant", "the first sale moves the sell step on")
+		t.eq(s.player.attrs.TutorialProgress, 0, "and its cash doesn't count toward the plant step")
+		s.event("seedPlanted")
+		t.eq(at(), "loads")
+		local loads = s.Steps[s.profile.tutorialStep]
+		t.eq(loads.unit, "cash")
+		s.Quest.WoodSold(s.player, 3, 45)
+		t.eq(s.player.attrs.TutorialProgress, 45, "dollars, not pieces")
+		t.eq(s.profile.cash, cash, "no reward yet (Murph's share comes at the end)")
+		s.Quest.WoodSold(s.player, 1, 20.7)
+		t.eq(at(), "steel", "45 + 20 whole dollars passes $60")
+		t.eq(s.profile.cash, cash + loads.rewardCash)
+		t.eq(s.toasts, { string.format("Murph chipped in $%d!", loads.rewardCash) })
+		s.profile.bestAxeTier = 2
+		s.event("axeBought")
+		t.ok(s.profile.tutorialDone)
+		t.eq(s.player.attrs.TutorialStep, 0)
+		t.eq(s.marks, { "Finished the tutorial" })
+	end)
+
+	t.test("v2: a sale's junk numbers count for nothing; a sale the wallet cap ate counts its pieces", function()
+		local s = setup(nil, 2)
+		s.Quest.Start(s.player, s.profile)
+		for _, event in ipairs({ "treeFelled", "woodGrabbed", "woodLoaded" }) do
+			s.event(event)
+		end
+		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
+		s.Quest.WoodSold(s.player, 0, 30)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "sell", "no pieces")
+		s.Quest.WoodSold(s.player, 1, 0)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plant", "nothing credited (a full wallet): still a sale")
+		s.event("seedPlanted")
+		for _, junk in ipairs({ 0, -5, 0 / 0, math.huge, 0.6 }) do
+			s.Quest.WoodSold(s.player, 1, junk)
+		end
+		t.eq(s.profile.tutorialProgress, 0, "no whole dollars")
+		t.eq(s.player.attrs.TutorialProgress, 0)
+	end)
+
+	t.test("v1 is untouched: the v2 events count for nothing under loop 1", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		s.event("treeFelled")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "pickup")
+		s.event("woodGrabbed")
+		s.Quest.WoodSold(s.player, 3, 90)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "pickup")
+		t.eq(s.profile.tutorialProgress, 0)
+		s.event("logPickedUp")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "load")
+	end)
+
+	t.test("v2: stumps wait for the plant step the same way", function()
+		local s = setup(nil, 2)
+		s.Quest.Start(s.player, s.profile)
+		local held = {}
+		for _, step in ipairs(s.Steps) do
+			held[step.id] = s.trees.StumpHold(s.player)
+			s.event(step.event, step.count)
+		end
+		t.eq(held.fell, 240)
+		t.eq(held.plant, 240)
+		t.eq(held.loads, 0)
+		t.ok(s.profile.tutorialDone)
 	end)
 end

@@ -15,6 +15,25 @@
 --     then a player keeps their seeds (ForestService refuses planting,
 --     TutorialData.CanPlant), and the stumps they fell wait for them
 --     (TreeService.StumpHold, TutorialData.StumpHold).
+--   * The steps are TutorialData.ForLoop(loop), for the core loop that
+--     runs (GameServer passes CoreLoop.Active() to Init; 1, the v1 steps,
+--     when not given). The v2 loop's steps (StepsV2: the same ids in the
+--     same order, so saves carry over) count the v2 events, reported
+--     through QuestService.Event like the v1 ones:
+--       woodGrabbed   GameServer, from GrabService.Hooks.onGrab
+--       woodSold      QuestService.WoodSold (SellService's onSold): pieces
+--       woodSoldCash  the same sale's whole dollars credited, right after
+--       seedPlanted   ForestService, as today
+--       axeBought     ShopService, as today
+--       treeFelled    today the v1 chop path (GameServer); with section
+--                     trees (M1.3) SectionTrees' OnFelled must call
+--                     QuestService.Event(feller, "treeFelled") once per
+--                     tree, for the feller ForestLogic.Feller picks
+--       woodLoaded    TruckLoad (M1.6) must call
+--                     QuestService.Event(owner, "woodLoaded") when a piece
+--                     of the owner's comes to rest in their own BedZone
+--     Under the v1 loop the v2 events count for nothing (no v1 step
+--     listens to them), and the other way round.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +53,12 @@ type TutorialEvent = TutorialData.TutorialEvent
 local QuestService = {}
 
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
+local loop = 1 -- the core loop that runs (Init)
+
+-- The tutorial's steps in the loop that runs.
+local function steps(): { TutorialData.Step }
+	return TutorialData.ForLoop(loop)
+end
 
 local function publish(player: Player, profile: Profile)
 	player:SetAttribute("TutorialStep", if profile.tutorialDone then 0 else profile.tutorialStep)
@@ -68,7 +93,7 @@ local function finish(player: Player, profile: Profile, how: "completed" | "skip
 	publish(player, profile)
 	FieldGuideService.Refresh(player) -- Murph hands over the Field Guide
 	if how == "completed" then
-		logFunnelStep(player, profile, #TutorialData.Steps + 1, "Done")
+		logFunnelStep(player, profile, #steps() + 1, "Done")
 		MilestoneService.Mark(player, "Finished the tutorial")
 	end
 	analytics(function()
@@ -79,10 +104,11 @@ end
 -- Starts step `index`, skipping any the player is already past; finishes
 -- the tutorial after the last one.
 local function enterStep(player: Player, profile: Profile, index: number)
-	local step = TutorialData.Steps[index]
+	local list = steps()
+	local step = list[index]
 	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier) do
 		index += 1
-		step = TutorialData.Steps[index]
+		step = list[index]
 	end
 	if not step then
 		finish(player, profile, "completed")
@@ -101,7 +127,7 @@ end
 -- is the one they're really on. Progress toward it is kept.
 local function realign(profile: Profile)
 	local latest = 0
-	for i, step in ipairs(TutorialData.Steps) do
+	for i, step in ipairs(steps()) do
 		if profile.onboarding["Tutorial:" .. step.id] then
 			latest = i
 		end
@@ -122,7 +148,7 @@ function QuestService.Start(player: Player, profile: Profile)
 		finish(player, profile, "bypassed") -- a save from before the tutorial existed
 		return
 	end
-	local step = TutorialData.Steps[profile.tutorialStep]
+	local step = steps()[profile.tutorialStep]
 	if not step or TutorialData.AlreadyDone(step, profile.bestAxeTier) then
 		enterStep(player, profile, if step then profile.tutorialStep + 1 else 1)
 	elseif profile.tutorialStep == 1 and profile.tutorialProgress == 0 then
@@ -139,7 +165,7 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 	if not profile or profile.tutorialDone then
 		return
 	end
-	local step = TutorialData.Steps[profile.tutorialStep]
+	local step = steps()[profile.tutorialStep]
 	if not step or step.event ~= event then
 		return
 	end
@@ -154,6 +180,22 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 		notify(player, string.format("Murph chipped in %s!", Util.formatCash(reward)))
 	end
 	enterStep(player, profile, profile.tutorialStep + 1)
+end
+
+-- A v2 sale paid `player` for `pieces` pieces and `credited` dollars (what
+-- reached their wallet: SellService's onSold, per payee per tick). The
+-- sell step counts the pieces (woodSold), the dollars step the whole
+-- dollars (woodSoldCash), in that order: the first sale moves the sell
+-- step on, and its cash doesn't count toward the "more wood" step after
+-- the Heartseed beat.
+function QuestService.WoodSold(player: Player, pieces: number, credited: number)
+	if type(pieces) == "number" and pieces >= 1 then
+		QuestService.Event(player, "woodSold", math.floor(pieces))
+	end
+	local dollars = if type(credited) == "number" and credited == credited then math.floor(credited) else 0
+	if dollars >= 1 and dollars ~= math.huge then
+		QuestService.Event(player, "woodSoldCash", dollars)
+	end
 end
 
 -- How long a stump this player has just felled keeps before its tree grows
@@ -178,9 +220,11 @@ local function onSkip(player: Player)
 	end
 end
 
--- `notifyFn` shows a toast (GameServer's notify).
-function QuestService.Init(skipRemote: RemoteEvent, notifyFn: (Player, string) -> ())
+-- `notifyFn` shows a toast (GameServer's notify); `activeLoop` is the core
+-- loop that runs (CoreLoop.Active(); 1 when not given).
+function QuestService.Init(skipRemote: RemoteEvent, notifyFn: (Player, string) -> (), activeLoop: number?)
 	notify = notifyFn
+	loop = if activeLoop == 2 then 2 else 1
 	skipRemote.OnServerEvent:Connect(onSkip)
 	TreeService.StumpHold = QuestService.StumpHoldFor
 end

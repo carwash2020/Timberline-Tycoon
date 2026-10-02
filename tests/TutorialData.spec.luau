@@ -270,10 +270,10 @@ return function(t)
 		t.ok(not TutorialData.AlreadyDone(V2[1], 5))
 	end)
 
-	-- QuestService as the wiring slice will run it: its step list is
-	-- TutorialData.ForLoop(2). The service's own rules (only the current
-	-- step's event counts, amounts add up, rewards pay) carry the v2 steps
-	-- through unchanged.
+	-- QuestService as GameServer runs it under v2 (Init with the loop): its
+	-- step list is TutorialData.ForLoop(2). The service's own rules (only
+	-- the current step's event counts, amounts add up, rewards pay) carry
+	-- the v2 steps through unchanged.
 	t.test("v2: QuestService walks StepsV2 end to end on the v2 events", function()
 		local loader = t.loader()
 		local profile = loader:shared("Util").deepCopy(loader:server("ProfileSchema").Template)
@@ -285,10 +285,8 @@ return function(t)
 			end,
 		}
 		local toasts, marks = {}, {}
-		local v2Data = setmetatable({ Steps = TutorialData.ForLoop(2) }, { __index = TutorialData })
 		loader = t.loader({
 			mocks = {
-				TutorialData = v2Data,
 				TreeService = {},
 				ProfileService = {
 					GetProfile = function(p)
@@ -305,7 +303,7 @@ return function(t)
 		local Quest = loader:server("QuestService")
 		Quest.Init({ OnServerEvent = { Connect = function() end } }, function(_, message)
 			table.insert(toasts, message)
-		end)
+		end, 2)
 		local function at()
 			return V2[profile.tutorialStep].id
 		end
