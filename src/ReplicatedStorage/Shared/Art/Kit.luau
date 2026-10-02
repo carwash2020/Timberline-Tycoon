@@ -703,6 +703,67 @@ function Kit.placeAt(model: Model, cf: CFrame)
 	model:PivotTo(cf * model:GetPivot())
 end
 
+-- Scales a model that was just built around the origin by `s` about the
+-- origin (so the ground stays at y = 0 and the front still faces -Z): every
+-- part's size and position (its turn is kept), sphere-mesh offsets,
+-- attachments, joint offsets, light ranges (capped at 60), Fire and Smoke.
+-- Sign text needs nothing: Kit.signText lays out by PixelsPerStud, so the
+-- canvas grows with its board. Welds are switched off while parts move and
+-- back on after, so welded parts (a saw blade's teeth) keep their offsets.
+-- `rigid` parts (e.g. a shop counter and what stands on it) keep their
+-- size and turn and move as one with the floor under them: each moves by
+-- anchor * (s - 1), where `anchor` is the point (on the floor) it moves
+-- with. Adds no parts. Like Kit.placeAt, use it only while the model is
+-- at the origin.
+function Kit.scaleModel(model: Model, s: number, rigid: { [BasePart]: Vector3 }?)
+	if math.abs(s - 1) < 1e-9 then
+		return
+	end
+	local welds: { WeldConstraint } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("WeldConstraint") then -- (builders only make enabled ones)
+			d.Enabled = false
+			table.insert(welds, d)
+		end
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			local cf = d.CFrame
+			local anchor = if rigid then rigid[d] else nil
+			if anchor then
+				d.CFrame = cf + anchor * (s - 1)
+			else
+				d.Size = d.Size * s
+				d.CFrame = CFrame.new(cf.Position * s) * (cf - cf.Position)
+			end
+		end
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		local owner = d.Parent
+		if rigid and owner and owner:IsA("BasePart") and rigid[owner] then
+			continue -- a rigid part's own bits keep their size too
+		elseif d:IsA("SpecialMesh") then
+			d.Offset = d.Offset * s
+		elseif d:IsA("Attachment") then
+			d.Position = d.Position * s
+		elseif d:IsA("JointInstance") then
+			d.C0 = CFrame.new(d.C0.Position * s) * (d.C0 - d.C0.Position)
+			d.C1 = CFrame.new(d.C1.Position * s) * (d.C1 - d.C1.Position)
+		elseif d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight") then
+			local lamp = d :: any -- all three have a Range
+			lamp.Range = math.min(lamp.Range * s, 60)
+		elseif d:IsA("Fire") then
+			d.Size = math.clamp(d.Size * s, 2, 30)
+		elseif d:IsA("Smoke") then
+			d.Size = math.clamp(d.Size * s, 0.1, 100)
+			d.RiseVelocity = math.clamp(d.RiseVelocity * s, -25, 25)
+		end
+	end
+	for _, w in ipairs(welds) do
+		w.Enabled = true
+	end
+end
+
 -- A new Model with a name, parented (or not yet, if parent is nil).
 function Kit.model(name: string, parent: Instance?): Model
 	local m = Instance.new("Model")

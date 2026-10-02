@@ -153,7 +153,7 @@ NPCData.List = {
 		id = "Tink",
 		name = "Tink",
 		role = "Tool Shed",
-		spot = { kind = "counter", model = "ToolShed", fallback = Vector3.new(-45, 0, 103.5) },
+		spot = { kind = "counter", model = "ToolShed", fallback = Vector3.new(-57, 0, 110) },
 		idle = "glasses",
 		look = {
 			name = "Tink",
@@ -189,7 +189,7 @@ NPCData.List = {
 		id = "Dale",
 		name = "Dale",
 		role = "Dealership",
-		spot = { kind = "counter", model = "Dealership", fallback = Vector3.new(45, 0, 103.5) },
+		spot = { kind = "counter", model = "Dealership", fallback = Vector3.new(48, 0, 110.4) },
 		idle = "wipe",
 		look = {
 			name = "Dale",
@@ -224,7 +224,7 @@ NPCData.List = {
 		id = "Hazel",
 		name = "Hazel",
 		role = "Hearth & Home",
-		spot = { kind = "counter", model = "HearthAndHome", fallback = Vector3.new(-80, 0, 103.5) },
+		spot = { kind = "counter", model = "HearthAndHome", fallback = Vector3.new(-93.5, 0, 110.3) },
 		idle = "lookAround",
 		look = {
 			name = "Hazel",

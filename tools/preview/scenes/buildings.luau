@@ -30,31 +30,32 @@ return {
 			end
 		end
 
-		-- Row 1: the sawmill and the three shops.
-		place(BuildingArt.Sawmill(), 0, 0, "Sawmill", -18, { -26, 18, -46, 8 })
+		-- Row 1: the sawmill and the three shops, at the size the game builds
+		-- them (BuildingArt.Scale, TWN-13).
+		place(BuildingArt.Sawmill(), -22, 0, "Sawmill", -27, { -39, 27, -69, 12 })
 		place(
 			BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44)),
-			55,
+			35,
 			0,
 			"ToolShed",
-			-14,
-			{ -13, 9, -26, 5 }
+			-21,
+			{ -19.5, 13.5, -39, 7.5 }
 		)
 		place(
 			BuildingArt.Shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181)),
-			85,
+			73,
 			0,
 			"Dealership",
-			-14,
-			{ 13, 9, -26, 5 }
+			-21,
+			{ 19.5, 13.5, -39, 7.5 }
 		)
 		place(
 			BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", C3.fromRGB(122, 90, 60)),
-			115,
+			111,
 			0,
 			"HearthAndHome",
-			-14,
-			{ -12, 8, -26, 5 }
+			-21,
+			{ -18, 12, -39, 7.5 }
 		)
 
 		-- Row 2: the station, Murph's camp, the isle pieces, street furniture.
@@ -91,7 +92,7 @@ return {
 		BuildingArt.Bridge(V3.new(20, 8, 144), V3.new(20, 9, 174), 6).Parent = root
 		table.insert(cameras, { pos = { 4, 14, 128 }, target = { 20, 7, 160 }, label = "Bridge" })
 
-		table.insert(cameras, 1, { pos = { 60, 70, -90 }, target = { 70, 0, 60 }, label = "overview" })
+		table.insert(cameras, 1, { pos = { 48, 85, -112 }, target = { 52, 0, 60 }, label = "overview" })
 		return {
 			root = root,
 			shadowRadius = 220,

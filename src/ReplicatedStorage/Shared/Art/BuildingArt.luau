@@ -17,6 +17,11 @@
 -- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
 -- them): Sawmill 400, each Shop 226, GondolaStation 140, Campsite 110,
 -- a TownTree 70.
+--
+-- The sawmill and the shops are built at their design size, then scaled up
+-- by BuildingArt.Scale (TWN-13: Connor wanted the town's buildings much
+-- bigger) with Kit.scaleModel, which adds no parts. A shop's counter, and
+-- what stands on it, keeps its size: people still lean on it.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -91,6 +96,15 @@ local AWNING = { hex("#C9473C"), hex("#F4E7CC") }
 local TERRACOTTA = hex("#B8603E")
 local PAD = hex("#D9AE63")
 local PAD_INK = hex("#5A3820")
+
+-- How much bigger than its design size each building is built (TWN-13).
+-- WorldPlan.Town() places them so their fronts stay where they were.
+BuildingArt.Scale = {
+	Sawmill = 1.5,
+	ToolShed = 1.5,
+	Dealership = 1.5,
+	HearthAndHome = 1.5,
+} :: { [string]: number }
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -772,10 +786,12 @@ end
 -- The sawmill
 ---------------------------------------------------------------------------
 
--- The sawmill: about 40 x 30 studs (x -20..21, z -13..15), the mill shed's
--- open front (-Z) on the sell side. Below 8 studs up, nothing within
--- |x| < 12 reaches past z = -13, so the sell pad can start 13 studs in
--- front of the centre (the Sky Bin spot, (-18, -24), is clear too).
+-- The sawmill: at its design size (scale 1) about 43 x 29 studs (x
+-- -21..22, z -14..15), the mill shed's open front (-Z) on the sell side.
+-- Below 8 studs up, nothing within |x| < 12 reaches past z = -13, so the
+-- sell pad can start 13 studs in front of the centre. `scale` (default
+-- BuildingArt.Scale.Sawmill) scales all of it about the origin, those
+-- numbers included.
 --   * the mill shed (x -11..11): plank deck at y = 1 up a front ramp, the
 --     headrig inside (log carriage on rails, the saw, a steam engine and
 --     boiler), a "TIMBERLINE SAWMILL" crest sign above the roof ridge;
@@ -789,7 +805,7 @@ end
 --     with it. Not collidable.
 --   "Smokestack": the top of the brick stack (y 25.7..27.9), holding the
 --     Smoke.
-function BuildingArt.Sawmill(): Model
+function BuildingArt.Sawmill(scale: number?): Model
 	local model = Kit.model("Sawmill")
 	local rng = Kit.rng(1907)
 	local roofStyle: RoofStyle = { colors = SHINGLE, deck = ROOF_DECK, trim = TIMBER, rowLen = 2.3, pieceLen = 9 }
@@ -1024,6 +1040,7 @@ function BuildingArt.Sawmill(): Model
 	barrel(model, CF(-12.6, 0, -8.6), rng, true)
 	crate(model, CF(-19, 0, -8.4) * ANG(0, 0.2, 0), 1.8, rng, true)
 	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, false)
+	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	return model
 end
 
@@ -1496,7 +1513,11 @@ end
 --   "Counter": a direct child, axis-aligned with the model, collides; its
 --     -Z face is the customer side (MapBuilder puts the ShopPoint there,
 --     and the floor in front of it is clear to the open front).
-function BuildingArt.Shop(kind: string, title: string, accent: Color3): Model
+-- `scale` (default BuildingArt.Scale[kind], else 1) scales the shop about
+-- its origin, all but the counter: it, its top and what stands on it keep
+-- their size, at the same height over the (raised) floor, so it stays
+-- waist high and the keeper behind it shows.
+function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: number?): Model
 	local model = Kit.model(kind)
 	if kind == "ToolShed" then
 		toolShed(model, title, accent)
@@ -1505,6 +1526,31 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3): Model
 	else
 		hearthAndHome(model, title, accent)
 	end
+	local s = scale or BuildingArt.Scale[kind] or 1
+	local counter = model:FindFirstChild("Counter")
+	local rigid: { [BasePart]: Vector3 } = {}
+	if counter and counter:IsA("BasePart") then
+		-- The counter group: every part whose middle is over the counter
+		-- (half a stud round it) and from its bottom to 2 studs over its top.
+		local ccf, size = counter.CFrame, counter.Size
+		local bottom = ccf.Position.Y - size.Y / 2
+		local anchor = Vector3.new(ccf.Position.X, bottom, ccf.Position.Z)
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local p = ccf:PointToObjectSpace(d.CFrame.Position)
+				local y = d.CFrame.Position.Y
+				if
+					math.abs(p.X) <= size.X / 2 + 0.5
+					and math.abs(p.Z) <= size.Z / 2 + 0.5
+					and y >= bottom
+					and y <= bottom + size.Y + 2
+				then
+					rigid[d] = anchor
+				end
+			end
+		end
+	end
+	Kit.scaleModel(model, s, rigid)
 	return model
 end
 
