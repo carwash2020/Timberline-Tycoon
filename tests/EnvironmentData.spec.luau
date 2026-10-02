@@ -188,7 +188,8 @@ return function(t)
 
 	t.test("write throttle: 10 Hz with the frames' dt added up", function()
 		t.eq(EnvironmentData.WriteEvery, 0.1)
-		-- 60 fps: five frames wait, the sixth writes with all six frames' dt.
+		-- 60 fps: five frames wait, the sixth writes with all six frames' dt
+		-- (exactly 100 writes in 10 s: 0.0999... counts).
 		local pending, writes, eased = 0, 0, 0
 		for _ = 1, 600 do
 			local write, by, left = EnvironmentData.WriteTick(pending, 1 / 60)
@@ -202,7 +203,7 @@ return function(t)
 				t.eq(by, 0)
 			end
 		end
-		t.ok(writes >= 83 and writes <= 100, "about 10 writes a second at 60 fps: " .. writes)
+		t.eq(writes, 100)
 		t.ok(math.abs(eased + pending - 10) < 1e-6, "no time lost: " .. (eased + pending))
 		-- 5 fps: every frame writes, easing by its own (long) dt.
 		local write, by = EnvironmentData.WriteTick(0, 0.2)
@@ -229,10 +230,10 @@ return function(t)
 		t.ok(color(c, Color3.fromRGB(100, 120, 139)), "one step in blue: write")
 		local clock = EnvironmentData.ClockMoved
 		t.ok(clock(nil, 12), "never written: write")
-		t.ok(not clock(12, 12.004), "under 0.005 h: skip")
-		t.ok(clock(12, 12.006), "over 0.005 h: write")
-		t.ok(not clock(23.999, 0.002), "across midnight it's 0.003 h: skip")
-		t.ok(clock(23.998, 0.004), "across midnight it's 0.006 h: write")
+		t.ok(not clock(12, 12.00005), "under the epsilon (a still clock): skip")
+		t.ok(clock(12, 12 + 1 / 3000), "one 60 fps frame of a 20-minute day: write")
+		t.ok(not clock(23.99995, 0.00004), "across midnight it's 0.00009 h: skip")
+		t.ok(clock(23.9999, 0.0002), "across midnight it's 0.0003 h: write")
 		t.ok(clock(12, 23), "a ClockOverride jump: write")
 		-- Easing toward a still target settles: after a while nothing moves
 		-- past an epsilon, so idle frames write nothing.

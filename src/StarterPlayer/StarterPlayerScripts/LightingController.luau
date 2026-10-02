@@ -7,8 +7,9 @@
 --   * WLD-18: the look is eased and written 10 times a second (the frames
 --     between add their dt up), and each property only when it has moved
 --     past its epsilon since the last write (EnvironmentData.WriteTick,
---     NumberMoved, ColorMoved, ClockMoved): idle frames write nothing.
---     Only the lightning flash (ExposureCompensation) is per frame.
+--     NumberMoved, ColorMoved): idle frames write nothing. Per frame: the
+--     sun (ClockTime, so shadows glide) and the lightning flash
+--     (ExposureCompensation), each only when it moves.
 --   * The look: Shared/EnvironmentData.Blend for the hour, the biome you're
 --     in (your "Biome" attribute, set by BiomeService) and the weather
 --     (workspace "Weather" / "WeatherIntensity", read for your biome),
@@ -273,8 +274,8 @@ local function colorMoved(key: string, value: Color3): boolean
 	return false
 end
 
--- ExposureCompensation: the eased exposure plus any lightning flash. The
--- only property written every frame (and only when it moves).
+-- ExposureCompensation: the eased exposure plus any lightning flash.
+-- Written every frame it moves, like ClockTime.
 local function applyExposure(s: LightingState, flash: number)
 	local exposure = math.clamp(s.exposure + flash, -3, 3)
 	if numberMoved("Lighting.ExposureCompensation", exposure) then
@@ -375,9 +376,9 @@ local function apply(owned: Owned, s: LightingState)
 	end
 end
 
--- The sun: Lighting.ClockTime, only when it has moved more than
--- EnvironmentData.ClockEpsilon (0.005 h) since the last write. WorldUI's
--- clock label reads it back.
+-- The sun: Lighting.ClockTime, every frame it has moved more than
+-- EnvironmentData.ClockEpsilon since the last write (so long shadows glide
+-- at dusk). WorldUI's clock label reads it back.
 local function applyClock(clock: number)
 	if EnvironmentData.ClockMoved(written["Lighting.ClockTime"], clock) then
 		written["Lighting.ClockTime"] = clock
@@ -615,9 +616,10 @@ function LightingController.Start()
 		-- last write, so the ease is the same at any frame rate.
 		local write, easeBy, left = EnvironmentData.WriteTick(pending, dt)
 		pending = left
+		-- The sun, every frame, from the server's clock (or Studio's
+		-- ClockOverride): one property, and shadows must not step.
+		applyClock(clockAt(workspace:GetServerTimeNow()))
 		if write then
-			-- The sun, from the server's clock (or Studio's ClockOverride).
-			applyClock(clockAt(workspace:GetServerTimeNow()))
 			local target = targetLook(LightingController.Environment())
 			easeToward(current, target, 1 - math.exp(-easeBy / EASE_SECONDS))
 			apply(owned, current)

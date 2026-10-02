@@ -577,14 +577,18 @@ end
 EnvironmentData.WriteEvery = 0.1 -- seconds between eased writes
 EnvironmentData.NumberEpsilon = 1e-3
 EnvironmentData.ColorEpsilon = 1 / 255 -- one 8-bit step in any channel
-EnvironmentData.ClockEpsilon = 0.005 -- in-game hours (0.25 real s; 0.075 degrees of sun)
+-- The sun is written every frame it moves (long shadows at dusk and dawn
+-- step visibly at anything coarser); this only skips frames where the
+-- clock stands still. 1e-4 in-game hours is 5 ms of a 20-minute day.
+EnvironmentData.ClockEpsilon = 1e-4
 
 -- Adds a frame's `dt` to the time `pending` since the last write. Returns
 -- whether to write now, the time to ease by (all of it, so the ease is
 -- the same at any frame rate), and what is left pending.
 function EnvironmentData.WriteTick(pending: number, dt: number): (boolean, number, number)
 	local total = pending + math.max(dt, 0)
-	if total >= EnvironmentData.WriteEvery then
+	-- A hair under WriteEvery, so six 1/60 s frames (0.0999...) count.
+	if total >= EnvironmentData.WriteEvery - 1e-6 then
 		return true, total, 0
 	end
 	return false, 0, total
