@@ -8,7 +8,7 @@ local World = require("./_world")
 
 return {
 	build = function(ctx)
-		local built = World.build(ctx)
+		local built = World.build(ctx, { forest = true })
 		built.cameras = {
 			{ pos = { 60, 45, -10 }, target = { 0, 8, 110 }, label = "from the spawn: the town and sawmill" },
 			{ pos = { 260, 220, -260 }, target = { 0, 0, 60 }, label = "town and starter forest from above" },

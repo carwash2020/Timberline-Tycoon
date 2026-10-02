@@ -118,28 +118,31 @@ return function(t)
 		end
 	end)
 
-	t.test("FOR-01: the ring is 55-70% canopy, with clearings; the wild band only copses", function()
-		local inRing, canopy, wild, copse = 0, 0, 0, 0
-		for x = -1150, 1150, 23 do
-			for z = -1150, 1150, 23 do
-				if land(x, z) then
-					local c, ring = cover(x, z)
-					if ring > 0.5 then
-						inRing += 1
-						canopy += if c > 0.5 then 1 else 0
-					elseif ring == 0 and WorldLayout.HubDistance(x, z) > 0 then
-						wild += 1
-						copse += if c > 0.5 then 1 else 0
+	t.test(
+		"FOR-01: the ring is 65-80% canopy (Connor: more trees), with clearings; the wild band only copses",
+		function()
+			local inRing, canopy, wild, copse = 0, 0, 0, 0
+			for x = -1150, 1150, 23 do
+				for z = -1150, 1150, 23 do
+					if land(x, z) then
+						local c, ring = cover(x, z)
+						if ring > 0.5 then
+							inRing += 1
+							canopy += if c > 0.5 then 1 else 0
+						elseif ring == 0 and WorldLayout.HubDistance(x, z) > 0 then
+							wild += 1
+							copse += if c > 0.5 then 1 else 0
+						end
 					end
 				end
 			end
+			local share = canopy / inRing
+			t.ok(share >= 0.65 and share <= 0.8, string.format("the ring is %.0f%% canopy", share * 100))
+			t.ok(inRing > 2500, inRing .. " samples in the ring") -- about 1.4 million sq studs
+			local copses = copse / wild
+			t.ok(copses >= 0.03 and copses <= 0.12, string.format("the wild band is %.0f%% copse", copses * 100))
 		end
-		local share = canopy / inRing
-		t.ok(share >= 0.55 and share <= 0.7, string.format("the ring is %.0f%% canopy", share * 100))
-		t.ok(inRing > 2500, inRing .. " samples in the ring") -- about 1.4 million sq studs
-		local copses = copse / wild
-		t.ok(copses >= 0.03 and copses <= 0.12, string.format("the wild band is %.0f%% copse", copses * 100))
-	end)
+	)
 
 	t.test("FOR-01: every wild biome keeps its own ground: no canopy in it or its margin", function()
 		local problems = {}
@@ -256,5 +259,459 @@ return function(t)
 			t.ok(c >= 0 and c <= 1 and ring >= 0 and ring <= 1, "in range")
 			t.ok(ring == 0 or c <= ring + 1e-9, "a clearing only takes canopy away")
 		end
+	end)
+
+	---------------------------------------------------------------------------
+	-- FOR-02: the client-built filler forest
+	---------------------------------------------------------------------------
+
+	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
+	local QualityBudgets = t.shared("QualityBudgets")
+	local fs = require("@lune/fs")
+	local CELL = WorldPlan.FillerCellSize
+
+	local function parts(model)
+		local out = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				table.insert(out, d)
+			end
+		end
+		return out
+	end
+
+	-- Parts per filler look (ForestFiller clones exactly these).
+	local partsOf = {}
+	for _, kind in ipairs(PropArt.FillerKinds) do
+		partsOf[kind] = {}
+		for v = 1, PropArt.FillerVariants do
+			partsOf[kind][v] = #parts(PropArt.FillerTree(kind, v))
+		end
+	end
+
+	-- Every filler tree on the map, worked out once: { tree, cx, cz }.
+	local allFiller
+	local function everyFiller()
+		if allFiller then
+			return allFiller
+		end
+		allFiller = {}
+		local half = WorldLayout.WorldHalf // CELL
+		for cx = -half, half - 1 do
+			for cz = -half, half - 1 do
+				for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
+					table.insert(allFiller, { tree = tree, cx = cx, cz = cz })
+				end
+			end
+		end
+		return allFiller
+	end
+
+	t.test("FOR-02: a filler tree is 3-5 SmoothPlastic parts of decoration, shadowless, on the ground", function()
+		local seen = {}
+		for _, kind in ipairs(PropArt.FillerKinds) do
+			for v = 1, PropArt.FillerVariants do
+				local model = PropArt.FillerTree(kind, v)
+				local list = parts(model)
+				t.ok(#list >= 3 and #list <= 5, string.format("%s %d: %d parts", kind, v, #list))
+				local lowest, highest = math.huge, -math.huge
+				for _, p in ipairs(list) do
+					local here = string.format("%s %d's %s", kind, v, p.Name)
+					t.eq(p.Material, t.roblox.Enum.Material.SmoothPlastic, here)
+					t.ok(p.Anchored, here .. " is anchored")
+					t.ok(not p.CanCollide and not p.CanQuery and not p.CanTouch, here .. " is decoration")
+					t.ok(not p.CastShadow, here .. " casts a shadow")
+					t.ok(
+						p.Name == "FillerTrunk" or p.Name == "FillerCrown" or p.Name == "FillerBranch",
+						here .. ": a filler part's name (never Leaves, Frond, Tier or Facet)"
+					)
+					local y, s = p.CFrame.Position.Y, p.Size.Magnitude / 2
+					lowest, highest = math.min(lowest, y - s), math.max(highest, y + s)
+				end
+				t.ok(lowest < -0.5, kind .. ": its trunk's foot sits in the ground")
+				t.ok(highest > 10 and highest < 28, string.format("%s %d: %.0f tall", kind, v, highest))
+				seen[kind] = true
+			end
+			local a, b = PropArt.FillerTree(kind, 1), PropArt.FillerTree(kind, 1)
+			local pa, pb = parts(a), parts(b)
+			for i = 1, #pa do
+				t.ok((pa[i].CFrame.Position - pb[i].CFrame.Position).Magnitude < 1e-6, kind .. ": the same look")
+			end
+		end
+		t.eq(PropArt.FillerVariants, 6, "WorldPlan's FILLER_VARIANTS")
+	end)
+
+	t.test("FOR-02: the filler is the same on every client", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan")
+		for i = 1, 60 do
+			local cx, cz = (i * 37) % 80 - 40, (i * 53) % 80 - 40
+			local a, b = WorldPlan.FillerCellTrees(cx, cz), again.FillerCellTrees(cx, cz)
+			t.eq(#a, #b)
+			for k, tree in ipairs(a) do
+				t.eq(b[k], tree)
+			end
+			local fa, fb = WorldPlan.FillerFarCell(cx, cz), again.FillerFarCell(cx, cz)
+			t.eq(#fa, #fb)
+			for k, block in ipairs(fa) do
+				t.ok((block.cframe.Position - fb[k].cframe.Position).Magnitude < 1e-9, "the same stand-in")
+				t.eq(block.size, fb[k].size)
+				t.eq(block.kind, fb[k].kind)
+			end
+		end
+	end)
+
+	t.test(
+		"FOR-02: the filler keeps off roads, trees, rocks, scenery, signs, gondola, town, water, mountains",
+		function()
+			local problems = {}
+			local function check(ok, what)
+				if not ok then
+					table.insert(problems, what)
+				end
+			end
+			local trees = WorldPlan.Trees()
+			local treeBins = {}
+			for _, tree in ipairs(trees) do
+				local k = (tree.position.X // 32) .. "," .. (tree.position.Z // 32)
+				treeBins[k] = treeBins[k] or {}
+				table.insert(treeBins[k], tree.position)
+			end
+			local discs = {}
+			for _, b in ipairs(WorldPlan.Boulders()) do
+				table.insert(discs, { b.position.X, b.position.Z, b.size / 2, "a boulder" })
+			end
+			for _, spot in ipairs(WorldPlan.Scenery()) do
+				table.insert(discs, { spot.center.X, spot.center.Z, spot.radius, "a " .. spot.kind })
+			end
+			for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+				local p = sign.cframe.Position
+				table.insert(discs, { p.X, p.Z, 5.3, "a road sign" })
+			end
+			for _, c in ipairs(WorldPlan.BoulderClusters()) do
+				table.insert(discs, { c.center.X, c.center.Z, c.radius, "a boulder cluster" })
+			end
+			-- The landmarks (the plan never looks at them: the water's margin
+			-- and the beach keep the forest off them).
+			local bridge = WorldPlan.Footbridge()
+			if bridge then
+				local a = bridge.cframe.Position
+				local along = bridge.cframe.LookVector
+				for s = -8, bridge.span + 8, 2 do
+					local p = a + along * s
+					table.insert(discs, { p.X, p.Z, bridge.width / 2 + 1, "the footbridge" })
+				end
+				if bridge.sign then
+					table.insert(discs, { bridge.sign.X, bridge.sign.Z, 5.3, "the footbridge's sign" })
+				end
+			end
+			for _, dock in ipairs(WorldPlan.Docks()) do
+				local a = dock.cframe.Position
+				for s = -4, dock.length, 2 do
+					local p = a + dock.cframe.LookVector * s
+					table.insert(discs, { p.X, p.Z, dock.width / 2 + 1, "a dock" })
+				end
+				if dock.sign then
+					table.insert(discs, { dock.sign.X, dock.sign.Z, 5.3, "a dock's sign" })
+				end
+			end
+			local lighthouse = WorldPlan.Lighthouse()
+			table.insert(discs, { lighthouse.cframe.X, lighthouse.cframe.Z, 8, "the lighthouse" })
+			local sky = WorldPlan.Sky()
+			local top = sky.gondolaTop.Position
+			local routes = {}
+			for _, from in ipairs({ WorldPlan.TownGondolaSpot, sky.gondolaBase.Position }) do
+				table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+			end
+			local count = 0
+			for _, entry in ipairs(everyFiller()) do
+				local tree = entry.tree
+				count += 1
+				local x, z = tree.x, tree.z
+				local here = string.format("filler %s at (%.0f, %.0f)", tree.kind, x, z)
+				check(
+					x >= entry.cx * CELL and x < (entry.cx + 1) * CELL + 4 and z >= entry.cz * CELL - 4,
+					here .. ": outside its cell"
+				)
+				check(TerrainGen.RoadClearance(x, z) >= WorldPlan.FillerRoad, here .. " is in a road's corridor")
+				check(WorldLayout.FlatWeight(x, z) <= 0, here .. " is on the town's or the plots' ground")
+				check(math.abs(tree.y - TerrainGen.HeightAt(x, z)) < 1e-6, here .. " isn't on the ground")
+				check(tree.y < 70, here .. " is up in the mountains")
+				for k = 0, 7 do
+					local a = k * math.pi / 4
+					check(
+						TerrainGen.WaterLevelAt(x + math.cos(a) * 6, z + math.sin(a) * 6) == nil,
+						here .. " is within 6 studs of the water"
+					)
+				end
+				for ix = x // 32 - 1, x // 32 + 1 do
+					for iz = z // 32 - 1, z // 32 + 1 do
+						for _, p in ipairs(treeBins[ix .. "," .. iz] or {}) do
+							local d = Vector2.new(p.X - x, p.Z - z).Magnitude
+							check(
+								d >= WorldPlan.FillerTreeGap,
+								string.format("%s is %.1f from a choppable tree", here, d)
+							)
+						end
+					end
+				end
+				for _, disc in ipairs(discs) do
+					local dx, dz = x - disc[1], z - disc[2]
+					local reach = disc[3] + WorldPlan.FillerGap
+					if math.abs(dx) < reach and math.abs(dz) < reach then
+						check(dx * dx + dz * dz >= reach * reach, here .. " stands in " .. disc[4])
+					end
+				end
+				for _, route in ipairs(routes) do
+					check(
+						WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) >= WorldPlan.FillerGondola,
+						here .. " is under the gondola"
+					)
+				end
+			end
+			t.ok(#problems == 0, report(problems))
+			t.ok(count > 3000, count .. " filler trees on the map")
+		end
+	)
+
+	t.test("FOR-02: a forest's density: about one tree per 150-250 sq studs, denser rows at its edges", function()
+		-- Deep in the forest: whole cells under full canopy, well off the roads.
+		local deep, deepCells = 0, 0
+		for cx = -40, 39 do
+			for cz = -40, 39 do
+				local mx, mz = (cx + 0.5) * CELL, (cz + 0.5) * CELL
+				local lo = math.huge
+				for _, o in ipairs({ { -14, -14 }, { 14, -14 }, { -14, 14 }, { 14, 14 }, { 0, 0 } }) do
+					local c, ring = cover(mx + o[1], mz + o[2])
+					lo = math.min(lo, if ring < 0.5 then -1 else c)
+				end
+				if lo > 0.9 and TerrainGen.RoadClearance(mx, mz) >= 60 and land(mx, mz) then
+					deep += #WorldPlan.FillerCellTrees(cx, cz)
+					deepCells += 1
+				end
+			end
+		end
+		t.ok(deepCells > 200, deepCells .. " deep cells")
+		local perTree = deepCells * CELL * CELL / deep
+		t.ok(perTree >= 150 and perTree <= 260, string.format("deep in the forest a tree per %.0f sq studs", perTree))
+		-- Its edges (canopy 0.5 to FillerEdge): the area there, every 4 studs,
+		-- and the trees standing in it, in the north and south forests.
+		local function edgeBand(x, z)
+			local c, ring = cover(x, z)
+			return ring > 0.5 and c > 0.5 and c < WorldPlan.FillerEdge and TerrainGen.RoadClearance(x, z) >= 60
+		end
+		local regions = { { -500, 700, -1150, -700 }, { -400, 800, 340, 800 } }
+		local area, trees = 0, 0
+		for _, r in ipairs(regions) do
+			for x = r[1], r[2], 4 do
+				for z = r[3], r[4], 4 do
+					if edgeBand(x, z) then
+						area += 16
+					end
+				end
+			end
+			for cx = r[1] // CELL, r[2] // CELL do
+				for cz = r[3] // CELL, r[4] // CELL do
+					for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
+						if tree.x >= r[1] and tree.x < r[2] + 4 and tree.z >= r[3] and tree.z < r[4] + 4 then
+							trees += if edgeBand(tree.x, tree.z) then 1 else 0
+						end
+					end
+				end
+			end
+		end
+		t.ok(area > 50000 and trees > 100, string.format("%d sq studs of edge, %d trees in it", area, trees))
+		local perEdge = area / trees
+		t.ok(
+			perEdge < perTree * 0.8,
+			string.format("at its edges a tree per %.0f sq studs (deep: %.0f)", perEdge, perTree)
+		)
+		t.ok(perEdge >= 90, string.format("but not a solid wall: a tree per %.0f sq studs", perEdge))
+	end)
+
+	t.test("FOR-02: from the spawn, the forest closes the view 220-500 studs out (north, west, south)", function()
+		local eye = WorldPlan.SpawnEye()
+		local bins = {}
+		for _, entry in ipairs(everyFiller()) do
+			local tree = entry.tree
+			local k = (tree.x // 16) .. "," .. (tree.z // 16)
+			bins[k] = bins[k] or {}
+			table.insert(bins[k], tree)
+		end
+		for _, spot in ipairs(WorldPlan.Trees()) do
+			local p = spot.position
+			local k = (p.X // 16) .. "," .. (p.Z // 16)
+			bins[k] = bins[k] or {}
+			table.insert(bins[k], { x = p.X, z = p.Z })
+		end
+		-- The first tree (filler or choppable) a crown's width off the line of sight.
+		local function firstTree(deg)
+			local dir = Vector2.new(math.sin(math.rad(deg)), math.cos(math.rad(deg))) -- 0 = north (+Z)
+			for d = 20, 800, 4 do
+				local x, z = eye.X + dir.X * d, eye.Z + dir.Y * d
+				for _, tree in ipairs(bins[(x // 16) .. "," .. (z // 16)] or {}) do
+					if (Vector2.new(tree.x, tree.z) - Vector2.new(x, z)).Magnitude < 5 then
+						return d
+					end
+				end
+			end
+			return nil
+		end
+		-- North past the sawmill and the pine band (either side of the Snow
+		-- Road), round to the west over the Hills' edge, and south through
+		-- the Starter Forest.
+		for _, deg in ipairs({ -40, -25, 20, 35, 180, 200, 220 }) do
+			local d = firstTree(deg)
+			t.ok(
+				d ~= nil and d <= 500,
+				string.format("looking %d deg from north: the first tree at %s", deg, tostring(d))
+			)
+		end
+	end)
+
+	-- Filler and stand-in parts a camera at (x, y, z) loads on a tier.
+	local function loaded(budget, x, y, z)
+		local plan = WorldPlan.FillerPlanAround(x, y, z, budget.FillerNear, budget.FillerFar)
+		local near, far, trees = 0, 0, 0
+		for key, mode in pairs(plan) do
+			local cx, cz = WorldPlan.FillerCellOf(key)
+			if mode == "near" then
+				for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
+					near += partsOf[tree.kind][tree.variant]
+					trees += 1
+				end
+			else
+				far += #WorldPlan.FillerFarCell(cx, cz)
+			end
+		end
+		return near, far, trees
+	end
+
+	t.test("FOR-02: budgets: filler and stand-ins in view stay under 6,000 parts on low, 14,000 on high", function()
+		local spots = {
+			{ "the spawn", WorldPlan.SpawnEye() },
+			{ "the Starter Forest", t.roblox.Vector3.new(0, 8, -110) },
+			{ "the Hills", t.roblox.Vector3.new(-420, 40, 110) },
+			{ "the Snowfields", t.roblox.Vector3.new(0, 45, 1240) },
+			{ "the Phantom Grove", t.roblox.Vector3.new(-565, 4, -455) },
+			{ "deep in the south forest", t.roblox.Vector3.new(-100, 8, -450) },
+			{ "on the Snow Road in the forest", t.roblox.Vector3.new(30, 8, 450) },
+			{ "on the isles", t.roblox.Vector3.new(-1050, 706, 1050) },
+		}
+		local most = { low = 0, high = 0 }
+		for _, tier in ipairs({ "low", "high" }) do
+			local budget = QualityBudgets.For(tier)
+			for _, spot in ipairs(spots) do
+				local p = spot[2]
+				local near, far = loaded(budget, p.X, p.Y, p.Z)
+				local limit = if tier == "low" then 6000 else 14000
+				t.ok(
+					near + far < limit,
+					string.format("%s at %s: %d filler + %d stand-in parts", tier, spot[1], near, far)
+				)
+				most[tier] = math.max(most[tier], near + far)
+			end
+		end
+		-- And the forest is really there: thousands of trees round you in it.
+		local _, _, trees = loaded(QualityBudgets.High, -100, 8, -450)
+		t.ok(trees > 800, trees .. " filler trees round you deep in the forest on high")
+		t.ok(most.low < most.high, "low loads less")
+	end)
+
+	t.test("FOR-02: FillerPlanAround: trees near, stand-ins out to FillerFar, a margin before a cell flips", function()
+		local budget = QualityBudgets.High
+		local plan = WorldPlan.FillerPlanAround(0, 6, 40, budget.FillerNear, budget.FillerFar)
+		local nearCount, farCount = 0, 0
+		for key, mode in pairs(plan) do
+			local cx, cz = WorldPlan.FillerCellOf(key)
+			t.eq(WorldPlan.FillerCellKey(cx, cz), key, "keys round-trip")
+			local d = Vector2.new((cx + 0.5) * CELL, (cz + 0.5) * CELL - 40).Magnitude
+			if mode == "near" then
+				nearCount += 1
+				t.ok(d <= budget.FillerNear, "a near cell within FillerNear")
+			else
+				farCount += 1
+				t.eq(mode, "far")
+				t.ok(d > budget.FillerNear and d <= budget.FillerFar, "a far cell between the radii")
+			end
+		end
+		t.ok(nearCount > 600 and farCount > 2000, nearCount .. " near, " .. farCount .. " far")
+		-- Moved 30 studs on: the cells it had keep their looks (hysteresis).
+		local moved = WorldPlan.FillerPlanAround(30, 6, 40, budget.FillerNear, budget.FillerFar, plan)
+		for key, mode in pairs(plan) do
+			local cx, cz = WorldPlan.FillerCellOf(key)
+			local d = Vector2.new((cx + 0.5) * CELL - 30, (cz + 0.5) * CELL - 40).Magnitude
+			if mode == "near" and d <= budget.FillerNear + WorldPlan.FillerHysteresis then
+				t.eq(moved[key], "near", "a near cell stays near just past the radius")
+			end
+		end
+		-- From the isles the ground is all far: stand-ins only.
+		for _, mode in pairs(WorldPlan.FillerPlanAround(-1050, 706, 1050, budget.FillerNear, budget.FillerFar)) do
+			t.eq(mode, "far")
+		end
+	end)
+
+	t.test("FOR-02: stand-ins stand only over forest, off the roads, and never hide the lighthouse", function()
+		local lighthouse = WorldPlan.Lighthouse()
+		local eye = WorldPlan.SpawnEye()
+		local lamp = lighthouse.lamp
+		local a, b = Vector2.new(eye.X, eye.Z), Vector2.new(lamp.X, lamp.Z)
+		local problems = {}
+		local blocks = 0
+		for cx = -47, 46 do
+			for cz = -47, 46 do
+				for _, block in ipairs(WorldPlan.FillerFarCell(cx, cz)) do
+					blocks += 1
+					local p = block.cframe.Position
+					local reach = math.max(block.size.X, block.size.Z) * 0.71
+					local here = string.format("a stand-in at (%.0f, %.0f)", p.X, p.Z)
+					if TerrainGen.RoadClearance(p.X, p.Z) < reach then
+						table.insert(problems, here .. " on a road")
+					end
+					if cover(p.X, p.Z) <= 0 then
+						table.insert(problems, here .. " over open ground")
+					end
+					local d, s = WorldLayout.SegmentDistance(Vector2.new(p.X, p.Z), a, b)
+					local lineY = eye.Y + (lamp.Y - eye.Y) * s
+					if d < reach + 2 and lineY < p.Y + block.size.Y / 2 then
+						table.insert(problems, here .. " hides the lighthouse")
+					end
+				end
+			end
+		end
+		-- Nor does any filler tree (its crown 20 studs up, 8 across).
+		for _, entry in ipairs(everyFiller()) do
+			local tree = entry.tree
+			local d, s = WorldLayout.SegmentDistance(Vector2.new(tree.x, tree.z), a, b)
+			if d < 10 and eye.Y + (lamp.Y - eye.Y) * s < tree.y + 24 then
+				table.insert(
+					problems,
+					string.format("a filler tree at (%.0f, %.0f) hides the lighthouse", tree.x, tree.z)
+				)
+			end
+		end
+		t.ok(#problems == 0, report(problems))
+		t.ok(blocks > 500, blocks .. " stand-ins")
+	end)
+
+	t.test("FOR-02: ForestFiller starts with the client, builds decoration only, reads its budgets", function()
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/ForestFiller.luau")
+		local code = string.gsub(source, "%-%-[^\n]*", "")
+		local client = fs.readFile("src/StarterPlayer/StarterPlayerScripts/Client.client.luau")
+		t.ok(string.find(client, "require(script.Parent.ForestFiller)", 1, true), "Client.client starts it")
+		for _, key in ipairs({ "FillerNear", "FillerFar", "FillerBuildMs" }) do
+			t.ok(string.find(code, "%." .. key .. "%f[%W]") ~= nil, "reads " .. key)
+		end
+		t.eq(string.find(code, "CanCollide = true", 1, true), nil, "nothing it builds collides")
+		t.eq(string.find(code, "CanQuery = true", 1, true), nil, "nothing it builds is clickable")
+		t.eq(string.find(code, "CastShadow = true", 1, true), nil, "nothing it builds casts a shadow")
+		t.ok(string.find(code, "Kit.decor(block, false)", 1, true), "its stand-in block is decoration")
+		t.ok(string.find(code, "PropArt.FillerTree(", 1, true), "its trees are PropArt's")
+		t.eq(string.find(code, "CollectionService", 1, true), nil, "never tagged (not a Tree)")
+		-- AmbientLife keeps its decoration out of the filler's trunks.
+		local life = fs.readFile("src/StarterPlayer/StarterPlayerScripts/AmbientLife.luau")
+		t.ok(string.find(life, "WorldPlan.FillerTrunkNear(", 1, true), "AmbientLife asks about the trunks")
+		local entry = everyFiller()[100]
+		t.ok(WorldPlan.FillerTrunkNear(entry.tree.x + 1, entry.tree.z, 2.5), "a trunk is found")
+		t.ok(WorldPlan.FillerReady(), "the plan is ready once worked out")
 	end)
 end

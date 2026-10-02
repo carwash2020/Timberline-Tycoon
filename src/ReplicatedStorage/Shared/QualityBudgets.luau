@@ -10,6 +10,9 @@
 --     loaded closer; fewer critters; fewer swaying canopies; half the
 --     rain, snow and ash; no sun rays or far blur; softer bloom; the
 --     sawmill blade and campfires animate only close by.
+--   * Both: the forest ring's filler trees (ForestFiller, FOR-02), real
+--     trees out to FillerNear and stand-in blocks out to FillerFar, built
+--     FillerBuildMs a frame at most (closer and cheaper on low).
 -- Pure: no services, so tests and both sides can read it.
 
 local QualityBudgets = {}
@@ -35,6 +38,10 @@ export type Budget = {
 	Bloom: number, -- Bloom intensity
 	-- TownFX
 	TownFxNear: number, -- studs: the saw blade spins and flames flicker within this
+	-- ForestFiller (FOR-02): the forest ring's client-built trees
+	FillerNear: number, -- studs: real filler trees in the cells within this of the camera
+	FillerFar: number, -- studs: and dark stand-in blocks for the forest out to this
+	FillerBuildMs: number, -- milliseconds a frame it may spend building cells
 }
 
 QualityBudgets.High = table.freeze({
@@ -51,6 +58,12 @@ QualityBudgets.High = table.freeze({
 	DepthOfField = 1,
 	Bloom = 1,
 	TownFxNear = 260,
+	-- The forest (FOR-02): trees out to 480 studs, stand-ins to 1,000 (inside
+	-- StreamingTargetRadius, so they never stand on terrain that isn't
+	-- there). tests/Forest.spec.luau counts the parts this loads.
+	FillerNear = 480,
+	FillerFar = 1000,
+	FillerBuildMs = 2,
 }) :: Budget
 
 -- PLAY-05's acceptance: on low, the workspace.AmbientLife folder holds 160
@@ -84,6 +97,9 @@ QualityBudgets.Low = table.freeze({
 	DepthOfField = 0,
 	Bloom = 0.5,
 	TownFxNear = 120,
+	FillerNear = 340, -- the forest edges round the spawn (300-340 studs off) are real trees
+	FillerFar = 640,
+	FillerBuildMs = 1.2,
 }) :: Budget
 
 -- The budget for a tier ("low" or "high"; anything else gets "high").

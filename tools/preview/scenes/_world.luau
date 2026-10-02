@@ -1,11 +1,14 @@
 --!nocheck
 -- The whole world as MapBuilder builds it (Shared/World/WorldPlan + the art
 -- modules): terrain, every tree, the town, boulders, the Skyroot and isles,
--- and the backdrop beyond the walls.
--- Client-side decoration (flowers, critters) isn't part of it.
+-- and the backdrop beyond the walls; with `opts.forest`, the forest ring's
+-- filler trees too, which every client builds round its camera (FOR-02:
+-- World.forest, every one of them here). Other client-side decoration
+-- (flowers, critters) isn't part of it.
 -- A helper (files starting with _ aren't scenes): world.luau and
--- world-eye.luau are this build with their own cameras. World.build(ctx)
--- returns everything a scene returns but the cameras.
+-- world-eye.luau are this build (with the forest) with their own cameras.
+-- World.build(ctx, opts?) returns everything a scene returns but the
+-- cameras.
 
 local Common = require("./_common")
 
@@ -79,7 +82,86 @@ function World.landmarks(ctx, root, inside)
 	end
 end
 
-function World.build(ctx)
+-- One ForestFiller tree (FOR-02) into `root`, built the way the client
+-- builds it: PropArt.FillerTree's look, scaled about its foot, turned and
+-- stood on its spot.
+local fillerLooks = {}
+function World.fillerTree(ctx, root, tree)
+	local CF = ctx.roblox.CFrame
+	local PropArt = ctx.art("PropArt")
+	local key = tree.kind .. "/" .. tree.variant
+	local look = fillerLooks[key]
+	if not look then
+		look = {}
+		for _, p in ipairs(PropArt.FillerTree(tree.kind, tree.variant):GetDescendants()) do
+			if p:IsA("BasePart") then
+				table.insert(look, p)
+			end
+		end
+		fillerLooks[key] = look
+	end
+	local s = tree.scale
+	local base = CF.new(tree.x, tree.y, tree.z) * CF.Angles(0, tree.yaw, 0)
+	for _, template in ipairs(look) do
+		local p = template:Clone()
+		local cf = template.CFrame
+		p.Size = template.Size * s
+		p.CFrame = base * CF.new(cf.Position * s) * (cf - cf.Position)
+		p.Parent = root
+	end
+end
+
+-- The forest's filler into `root`: with `eye` (a Vector3) and a tier's
+-- budget, exactly what ForestFiller loads round a camera there (trees
+-- within FillerNear, stand-in blocks out to FillerFar); without, every
+-- filler tree on the map (how the forest looks with all of it near).
+function World.forest(ctx, root, eye, budget)
+	local Kit = ctx.art("Kit")
+	local PropArt = ctx.art("PropArt")
+	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
+	local WorldLayout = ctx.load("ReplicatedStorage/Shared/World/WorldLayout")
+	local Enum = ctx.roblox.Enum
+	for _, step in ipairs(WorldPlan.FillerSteps) do
+		step()
+	end
+	local count = 0
+	if eye then
+		for key, mode in pairs(WorldPlan.FillerPlanAround(eye.X, eye.Y, eye.Z, budget.FillerNear, budget.FillerFar)) do
+			local cx, cz = WorldPlan.FillerCellOf(key)
+			if mode == "near" then
+				for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
+					World.fillerTree(ctx, root, tree)
+					count += 1
+				end
+			else
+				for _, b in ipairs(WorldPlan.FillerFarCell(cx, cz)) do
+					local p = Kit.part(
+						root,
+						"FillerFar",
+						b.size,
+						b.cframe,
+						PropArt.FillerFarColor(b.kind),
+						Enum.Material.SmoothPlastic
+					)
+					Kit.decor(p, false)
+				end
+			end
+		end
+	else
+		local half = WorldLayout.WorldHalf // WorldPlan.FillerCellSize
+		for cx = -half, half - 1 do
+			for cz = -half, half - 1 do
+				for _, tree in ipairs(WorldPlan.FillerCellTrees(cx, cz)) do
+					World.fillerTree(ctx, root, tree)
+					count += 1
+				end
+			end
+		end
+	end
+	return count
+end
+
+function World.build(ctx, opts)
 	local roblox = ctx.roblox
 	local CF, V3 = roblox.CFrame, roblox.Vector3
 	local Kit = ctx.art("Kit")
@@ -203,6 +285,11 @@ function World.build(ctx)
 
 	-- The landscape's landmarks (STY-*), as MapBuilder's "5. The landmarks" builds them.
 	World.landmarks(ctx, root)
+
+	-- The forest ring's filler (FOR-02), when asked for: every tree of it.
+	if opts and opts.forest then
+		World.forest(ctx, root)
+	end
 
 	-- The Skyroot and the isles.
 	local sky = WorldPlan.Sky()

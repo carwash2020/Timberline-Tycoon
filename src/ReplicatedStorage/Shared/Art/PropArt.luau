@@ -1664,4 +1664,155 @@ function PropArt.MushroomCluster(seed: number): Model
 	return model
 end
 
+---------------------------------------------------------------------------
+-- The forest's filler trees (phase 10, FOR-02)
+---------------------------------------------------------------------------
+-- The trees that make the forest ring a forest: every client builds them
+-- round its camera (StarterPlayerScripts/ForestFiller, from
+-- WorldPlan.FillerCellTrees), so they're looks only and cheap. Lumber
+-- Tycoon 2's blocky style: a trunk and two to four tilted blocks, 3 to 5
+-- parts, every one SmoothPlastic, decoration (no collisions, clicks or
+-- touches: a collider only one client has would fight the trucks) and
+-- shadowless. A step darker than the choppable woods' palettes, so a
+-- tree you can chop stands out at the forest's edge. Never named Leaves,
+-- Frond, Tier or Facet (WindSway and CanopyFade's names), never tagged.
+-- On the ground at the origin, about as tall as a choppable tree at size 1.
+
+PropArt.FillerKinds = { "broad", "birch", "maple", "conifer", "snowpine", "dead" }
+PropArt.FillerVariants = 6 -- looks per kind (ForestFiller builds each once)
+
+local FILLER_PALETTES: { [string]: { crown: { Color3 }, trunk: Color3, snow: Color3? } } = {
+	broad = { crown = { hex("#4E8E3E"), hex("#5A9A44"), hex("#437F37"), hex("#6AA54C") }, trunk = hex("#5E4130") },
+	birch = { crown = { hex("#94BC52"), hex("#A6C65E"), hex("#83AE48"), hex("#B4CC66") }, trunk = hex("#DCD6C8") },
+	maple = { crown = { hex("#C27A28"), hex("#B45A26"), hex("#CC8E34"), hex("#A84422") }, trunk = hex("#5A3E2C") },
+	conifer = { crown = { hex("#2A6A37"), hex("#337A40"), hex("#245E31"), hex("#3C8550") }, trunk = hex("#5A4030") },
+	snowpine = {
+		crown = { hex("#2A6A37"), hex("#245E31"), hex("#2F7040") },
+		trunk = hex("#5A4030"),
+		snow = hex("#E3ECF1"),
+	},
+	dead = { crown = { hex("#6F6258"), hex("#5E534A") }, trunk = hex("#6F6258") },
+}
+
+-- The colour of a far stand-in block over a stretch of `kind` (darker than
+-- the trees: far canopy reads as shade).
+local FILLER_FAR: { [string]: Color3 } = {
+	broad = hex("#3E7434"),
+	birch = hex("#6E9442"),
+	maple = hex("#99582A"),
+	conifer = hex("#24572F"),
+	snowpine = hex("#3A5E4A"),
+	dead = hex("#5A5048"),
+}
+function PropArt.FillerFarColor(kind: string): Color3
+	return FILLER_FAR[kind] or FILLER_FAR.broad
+end
+
+local function fillerBlock(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3)
+	Kit.decor(Kit.part(model, name, size, cf, color, Enum.Material.SmoothPlastic), false)
+end
+
+-- One filler tree of `kind` (PropArt.FillerKinds; anything else is a
+-- broad one), look `variant` (1..FillerVariants).
+function PropArt.FillerTree(kind: string, variant: number): Model
+	local pal = FILLER_PALETTES[kind] or FILLER_PALETTES.broad
+	local model = Kit.model("FillerTree")
+	local seed = 9001 + variant * 131
+	for i = 1, #kind do
+		seed += string.byte(kind, i) * i * 17
+	end
+	local rng = Kit.rng(seed)
+	local yaw = rng:range(0, math.pi * 2)
+	local function crown(): Color3
+		return Kit.vary(pal.crown[rng:int(1, #pal.crown)], rng, 0.05)
+	end
+	-- A trunk `w` across, from 1.5 under the ground to `h` over it.
+	local function trunk(w: number, h: number)
+		fillerBlock(
+			model,
+			"FillerTrunk",
+			Vector3.new(w, h + 1.5, w),
+			CFrame.new(0, (h - 1.5) / 2, 0) * CFrame.Angles(0, yaw, 0),
+			Kit.vary(pal.trunk, rng, 0.04)
+		)
+	end
+	-- A tilted crown block.
+	local function crownBlock(size: Vector3, at: Vector3, tilt: number, color: Color3)
+		fillerBlock(
+			model,
+			"FillerCrown",
+			size,
+			CFrame.new(at)
+				* CFrame.Angles(0, yaw + rng:range(-0.8, 0.8), 0)
+				* CFrame.Angles(rng:range(-tilt, tilt), 0, rng:range(-tilt, tilt)),
+			color
+		)
+	end
+	if kind == "conifer" or kind == "snowpine" then
+		-- Stacked square tiers, each turned 45 degrees on the one below.
+		local h = rng:range(7, 9)
+		trunk(rng:range(1, 1.25), h)
+		local w = rng:range(9, 10.5)
+		local y = h - 1
+		for t = 1, 4 do
+			local tw = w * (1 - (t - 1) * 0.24)
+			local th = if t == 4 then 4 else 3.6
+			local snowy = kind == "snowpine" and t >= 3
+			local color = if snowy and pal.snow then Kit.vary(pal.snow, rng, 0.03) else crown()
+			fillerBlock(
+				model,
+				"FillerCrown",
+				Vector3.new(tw, th, tw),
+				CFrame.new(0, y + th / 2, 0) * CFrame.Angles(0, yaw + t * math.pi / 4, 0),
+				color
+			)
+			y += th * 0.92
+		end
+	elseif kind == "dead" then
+		-- A bare grey trunk and two broken limbs.
+		local h = rng:range(9, 12)
+		trunk(rng:range(1, 1.3), h)
+		for i = 1, 2 do
+			local a = yaw + i * math.pi * 0.9
+			local len = rng:range(3.5, 5)
+			local at = Vector3.new(math.cos(a) * len * 0.3, h * (0.55 + i * 0.15), math.sin(a) * len * 0.3)
+			fillerBlock(
+				model,
+				"FillerBranch",
+				Vector3.new(0.5, len, 0.5),
+				CFrame.new(at) * CFrame.Angles(0, -a, 0) * CFrame.Angles(0, 0, math.rad(rng:range(40, 55))),
+				Kit.vary(pal.crown[i], rng, 0.04)
+			)
+		end
+	elseif kind == "birch" then
+		-- A slim pale trunk and a tall crown of two blocks.
+		local h = rng:range(10, 12)
+		trunk(rng:range(0.8, 1), h)
+		crownBlock(Vector3.new(7, 8, 7) * rng:range(0.9, 1.1), Vector3.new(0, h + 1, 0), 0.25, crown())
+		crownBlock(Vector3.new(5, 5.5, 5) * rng:range(0.9, 1.1), Vector3.new(0.6, h + 5.5, -0.4), 0.3, crown())
+	else
+		-- Broadleaf (and maple, in autumn colours): a stout trunk under a
+		-- big crown, a top block and a side block.
+		local h = rng:range(8, 10)
+		trunk(rng:range(1.3, 1.6), h)
+		local w = rng:range(10, 12)
+		crownBlock(Vector3.new(w, w * 0.65, w), Vector3.new(0, h + 2.5, 0), 0.22, crown())
+		local a = rng:range(0, math.pi * 2)
+		crownBlock(
+			Vector3.new(w * 0.62, w * 0.5, w * 0.62),
+			Vector3.new(math.cos(a) * 1.4, h + 6.2, math.sin(a) * 1.4),
+			0.3,
+			crown()
+		)
+		a += rng:range(2, 4)
+		crownBlock(
+			Vector3.new(w * 0.5, w * 0.4, w * 0.5),
+			Vector3.new(math.cos(a) * w * 0.42, h + 2, math.sin(a) * w * 0.42),
+			0.3,
+			crown()
+		)
+	end
+	return model
+end
+
 return PropArt

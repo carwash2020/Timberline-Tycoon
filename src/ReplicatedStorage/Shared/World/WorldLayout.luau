@@ -341,12 +341,12 @@ WorldLayout.Forest = {
 	},
 	hubNoise = 30,
 	edge = 50,
-	ring = 520,
+	ring = 600,
 	ringNoise = 90,
 	-- Noise above `from` opens a clearing (fully open `soft` above it), but
 	-- not within `keep` studs of the hub's lawn: the edge facing the town
 	-- and the plots stays a wall of trees.
-	clearing = { scale = 160, fine = 55, from = 0.02, soft = 0.16, keep = 70 },
+	clearing = { scale = 110, fine = 40, from = 0.1, soft = 0.14, keep = 70 },
 	-- Studs past each biome's area the forest keeps off (the grove's from its
 	-- ridge's outer foot). The Starter Forest's own trees are its edge.
 	wild = { starter = 8, hills = 40, snow = 170, volcano = 140, grove = 25, sky = 90 },
@@ -362,7 +362,7 @@ WorldLayout.Forest = {
 		{ name = "GroveTrail", a = gapFoot, b = gapFoot + toTown * 300, half = 18 },
 	},
 	-- Out in the wild landscapes: small copses where this noise is high.
-	copse = { scale = 95, from = 0.22, soft = 0.08 },
+	copse = { scale = 95, from = 0.2, soft = 0.08 },
 } :: ForestPlan
 
 local FOREST = WorldLayout.Forest

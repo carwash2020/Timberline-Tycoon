@@ -12,7 +12,7 @@ local World = require("./_world")
 
 return {
 	build = function(ctx)
-		local built = World.build(ctx)
+		local built = World.build(ctx, { forest = true })
 		built.cameras = Eye.cameras(ctx)
 		return built
 	end,
