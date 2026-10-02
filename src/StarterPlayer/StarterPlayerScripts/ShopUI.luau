@@ -232,7 +232,7 @@ local TRUCKS: Shop = {
 	building = "Dealership",
 	promptText = "Browse trucks",
 	title = "Dealership",
-	subtitle = "Bigger beds haul more logs per trip.",
+	subtitle = "Bigger beds haul more wood per trip.",
 	-- Trucks first, then trailers ("Trailer:" ids).
 	ids = function()
 		local ids = {}
