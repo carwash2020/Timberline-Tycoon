@@ -9,7 +9,10 @@
 --   4. The town: sawmill and sell area, the three shops, the gondola
 --      station, Murph's camp, the parking lot, lamps, signs, props, and
 --      its greenery (ornamental trees no one can chop, bushes, flowers).
---   5. The biomes: every wild tree (BiomeData counts) on the terrain,
+--   5. The biomes: every wild tree (BiomeData counts) on the terrain
+--      (TreeService's under the v1 loop; SectionTrees' section trees,
+--      most mature and some young, under v2, after the v2 wood collision
+--      groups are registered),
 --      boulders, the volcano's crater, the grove's glowing mushrooms, the
 --      palm island offshore, signposts where the roads arrive, the
 --      open country's scenery (decor set pieces), and the landscape's
@@ -42,6 +45,7 @@ local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local NodeService = require(script.Parent.NodeService)
+local SectionTrees = require(script.Parent.SectionTrees)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
@@ -138,6 +142,17 @@ end
 
 -- Trees spawned (the MapTrees attribute, for GameServer's boot report).
 local treesSpawned = 0
+-- The v2 loop's trees are section trees (V2_PLAN.md M1.3), planted at a
+-- random age so the world isn't all saplings; v1 keeps TreeService's.
+local V2 = CoreLoop.V2()
+local function spawnTree(woodId: string, at: Vector3)
+	if V2 then
+		SectionTrees.SpawnTree(woodId, CFrame.new(at), { boot = true })
+	else
+		TreeService.SpawnTree(woodId, CFrame.new(at))
+	end
+	treesSpawned += 1
+end
 
 -- The sell area in front of the sawmill. SellArea is Persistent so every
 -- client always has the sell zone (CarryController's prompt). It is made
@@ -319,9 +334,15 @@ end)
 ---------------------------------------------------------------------------
 
 step("5. The trees", function()
+	if V2 then
+		SectionTrees.RegisterGroups() -- Wood, WoodFalling, WoodHeld, Leaves, Players
+	end
+	local before = os.clock()
 	for _, spot in ipairs(WorldPlan.Trees()) do
-		TreeService.SpawnTree(spot.woodId, CFrame.new(spot.position))
-		treesSpawned += 1
+		spawnTree(spot.woodId, spot.position)
+	end
+	if V2 then
+		print(string.format("[MapBuilder] %d section trees in %.1fs", treesSpawned, os.clock() - before))
 	end
 end)
 
@@ -586,8 +607,7 @@ step("6. The Skyroot and the Aether Isles", function()
 	end)
 	step("6. The Lumenwood", function()
 		for _, pos in ipairs(sky.lumenwood) do
-			TreeService.SpawnTree("lumenwood", CFrame.new(pos))
-			treesSpawned += 1
+			spawnTree("lumenwood", pos)
 		end
 	end)
 	step("6. The Sky Shards", function()

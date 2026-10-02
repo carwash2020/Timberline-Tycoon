@@ -24,6 +24,9 @@ return function(t)
 		templateSpawn.Parent = ws
 		s.workspace = ws
 		s.baseplate, s.templateSpawn = baseplate, templateSpawn
+		if options.loop then
+			ws:SetAttribute("CoreLoop", options.loop) -- the Studio override (RunService says Studio below)
+		end
 
 		local function sellAreaIn()
 			local map = ws:FindFirstChild("TimberlineMap")
@@ -89,6 +92,21 @@ return function(t)
 						s.treeBeforeSellArea = (s.treeBeforeSellArea ~= false) and not sellAreaIn()
 					end,
 				},
+				-- The v2 loop's section trees (M1.3).
+				SectionTrees = {
+					SpawnTree = function(woodId, _cf, opts)
+						s.sectionSpawned = (s.sectionSpawned or 0) + 1
+						s.sectionBoot = (s.sectionBoot ~= false) and opts ~= nil and opts.boot == true
+						s.groupsFirst = (s.groupsFirst ~= false) and s.groups == true
+						s.sectionWoods = s.sectionWoods or {}
+						s.sectionWoods[woodId] = (s.sectionWoods[woodId] or 0) + 1
+						s.treeBeforeSellArea = (s.treeBeforeSellArea ~= false) and not sellAreaIn()
+					end,
+					RegisterGroups = function()
+						s.groups = true
+						return true
+					end,
+				},
 				NodeService = { Spawn = function() end },
 				WorldClock = {
 					Start = function()
@@ -97,7 +115,17 @@ return function(t)
 					end,
 				},
 			},
-			services = { Players = Players },
+			services = {
+				Players = Players,
+				RunService = {
+					IsStudio = function()
+						return options.loop ~= nil
+					end,
+					IsServer = function()
+						return true
+					end,
+				},
+			},
 			globals = {
 				workspace = ws,
 				task = {
@@ -332,6 +360,29 @@ return function(t)
 		t.eq(s.workspace:GetAttribute("MapTerrainSeconds"), 1.25)
 		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
 		t.ok(type(s.workspace:GetAttribute("MapBuildSeconds")) == "number", "MapBuildSeconds")
+	end)
+
+	t.test("v2 loop (M1.3): section trees on every site, groups first, at a boot age, before SellArea", function()
+		local s = build({ loop = 2, sky = true })
+		t.eq(s.warnings, {})
+		lastStepsRan(s)
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local sky = WorldPlan.Sky()
+		t.eq(s.spawned, 0, "no TreeService trees under v2")
+		t.eq(s.sectionSpawned, #WorldPlan.Trees() + #sky.lumenwood, "every site, the isles' lumenwood too")
+		t.eq(s.workspace:GetAttribute("MapTrees"), s.sectionSpawned)
+		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 2)
+		t.ok(s.groupsFirst, "the collision groups are registered before the first tree")
+		t.ok(s.sectionBoot, "every site planted at a boot age")
+		t.ok(s.treeBeforeSellArea, "every tree before SellArea goes in")
+		t.eq(s.sectionWoods.lumenwood >= #sky.lumenwood, true)
+	end)
+
+	t.test("v1 loop: TreeService's trees, SectionTrees untouched", function()
+		local s = build()
+		t.eq(s.sectionSpawned, nil)
+		t.eq(s.groups, nil, "no v2 collision groups on a v1 server")
+		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 1)
 	end)
 
 	t.test("an erroring BuildingArt builder: one warning, the rest of the town, SellArea, spawning", function()

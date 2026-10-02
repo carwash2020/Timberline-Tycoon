@@ -766,4 +766,36 @@ function ForestArt.FigureBand(log: BasePart, figureId: string): Part
 	return band
 end
 
+-- The v2 loop's band (M1.3): a square collar round a loose piece's section
+-- (a block, its length along Y), a fifth of the way along it, in the
+-- figure's colour (glowing for Stormgrain and Starfall). Welded to it,
+-- unanchored and massless; every client draws its own (WoodFX), so the
+-- server adds no parts.
+function ForestArt.SectionBand(section: BasePart, figureId: string): Part
+	local old = section:FindFirstChild("FigureBand")
+	if old then
+		old:Destroy()
+	end
+	local length = section.Size.Y
+	local width = math.max(section.Size.X, section.Size.Z)
+	local glowing = figureId == "stormgrain" or figureId == "starfall"
+	local band = Kit.part(
+		section,
+		"FigureBand",
+		Vector3.new(width * 1.08, math.min(0.5, length * 0.18), width * 1.08),
+		section.CFrame * CFrame.new(0, length * 0.28, 0),
+		figureColor(figureId),
+		if glowing then Enum.Material.Neon else Enum.Material.SmoothPlastic
+	)
+	Kit.decor(band, false)
+	band.Massless = true
+	band:SetAttribute("Figure", figureId)
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = section
+	weld.Part1 = band
+	weld.Parent = band
+	band.Anchored = false
+	return band
+end
+
 return ForestArt

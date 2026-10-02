@@ -225,10 +225,25 @@ function World.build(ctx, opts)
 		return model
 	end
 
+	-- With `opts.v2`, the v2 loop's section trees, exactly as SectionTrees
+	-- plants them at boot (GrowLogic.BootTree: most mature, some young).
+	local function sectionTree(woodId, p)
+		local GrowLogic = ctx.shared("GrowLogic")
+		local TreeGen = ctx.shared("TreeGen")
+		local def = WoodData.Get(woodId)
+		local boot = GrowLogic.BootTree(def, p)
+		local skel = if boot.stage < 1 then TreeGen.AtStage(boot.skel, boot.stage) else boot.skel
+		place(TreeArt.FromSkeleton(def, skel), CF.new(p) * CF.Angles(0, boot.yaw, 0))
+	end
+
 	-- Trees, exactly as TreeService builds them (seed and size from the spot).
 	for _, spot in ipairs(WorldPlan.Trees()) do
 		local def = WoodData.Get(spot.woodId)
 		local p = spot.position
+		if opts and opts.v2 then
+			sectionTree(spot.woodId, p)
+			continue
+		end
 		local seed = Kit.seedAt(p.X, p.Z)
 		local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
 		local tree = TreeArt.Build(def, seed, size.scale)
@@ -366,7 +381,11 @@ function World.build(ctx, opts)
 		end
 		place(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10), CF.lookAt(fall.top, fall.top + fall.dir))
 		for i, pos in ipairs(sky.lumenwood) do
-			place(TreeArt.Build(WoodData.Get("lumenwood"), i, 1), CF.new(pos))
+			if opts and opts.v2 then
+				sectionTree("lumenwood", pos)
+			else
+				place(TreeArt.Build(WoodData.Get("lumenwood"), i, 1), CF.new(pos))
+			end
 		end
 		for _, cf in ipairs(sky.chutes) do
 			place(BuildingArt.CloudChute(), cf)

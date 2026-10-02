@@ -267,6 +267,31 @@ return function(t)
 			return tree
 		end
 
+		-- A v2 section tree (M1.3) at (x, 0, z), as SectionTrees sets it up:
+		-- HomePivot and the top of its trunk (SwayTop).
+		function w.sectionTree(woodId, x, z, seed)
+			local TreeGen = loader:shared("TreeGen")
+			local skel = TreeGen.Skeleton(woodId, seed or 7, 1)
+			local tree = TreeArt.FromSkeleton(WoodData.Get(woodId), skel)
+			Kit.placeAt(tree, CFrame.new(x, 0, z))
+			tree:SetAttribute("HomePivot", tree:GetPivot())
+			local top = Vector3.new(x, 0, z)
+			for _, sec in ipairs(skel.sections) do
+				if sec.depth == skel.trunkSegments - 1 then
+					top = Vector3.new(x, 0, z) + TreeGen.TopOf(sec)
+				end
+			end
+			tree:SetAttribute("SwayTop", top)
+			tree.Parent = folder
+			for _, d in ipairs(tree:GetDescendants()) do
+				if d:IsA("BasePart") then
+					w.owner[d] = tree
+				end
+			end
+			table.insert(w.tagged.Tree, tree)
+			return tree
+		end
+
 		-- One frame, dt seconds long. Returns the parts moved and, per
 		-- tree, whether it moved.
 		function w.frame(dt)
@@ -556,5 +581,21 @@ return function(t)
 		t.eq(drift(parts, before), 0)
 		w.busy[tree] = nil
 		t.ok(run(w, 30)[tree], "and again after")
+	end)
+
+	t.test("v2 (M1.3): a section tree sways about its trunk's top; a part cut free is never moved again", function()
+		local w = world()
+		local tree = w.sectionTree("oak", 0, -20)
+		local parts = canopyOf(tree)
+		w.WindSway.Start()
+		t.ok(run(w, 20)[tree], "a section tree sways")
+		-- A limb cut free: its leaves go to a loose piece.
+		local piece = Instance.new("Model")
+		local leaf = parts[1]
+		leaf.Parent = piece
+		local at = leaf.CFrame
+		run(w, 60) -- across a scan (0.4 s), so the tree is captured afresh
+		t.eq(leaf.CFrame, at, "the piece's leaf stays where its piece has it")
+		t.ok(run(w, 30)[tree], "the tree goes on swaying with what it has left")
 	end)
 end

@@ -14,10 +14,10 @@
 -- section (its length along Y) with a cut face at each end in the wood's
 -- core colour, unanchored, CustomPhysicalProperties(WoodDensity,
 -- WoodFriction, WoodElasticity), and the attributes Uid, Owner (you),
--- WoodId, Kind, Volume (u³), Value ($), HeldBy. GrabService knows them
--- (Register) until WoodService does, and they're yours alone for
--- PickupGraceSec, like freshly cut wood. At most MaxPieces lie around at
--- once: the oldest go first.
+-- WoodId, Kind, Volume (u³), Value ($), HeldBy. WoodService files them
+-- like any cut piece (so GrabService, SellService and the axe know them),
+-- and they're yours alone for PickupGraceSec, like freshly cut wood. At
+-- most MaxPieces lie around at once: the oldest go first.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -31,6 +31,7 @@ local Tune = require(ReplicatedStorage.Shared.Tune)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local GrabService = require(script.Parent.GrabService)
+local WoodService = require(script.Parent.WoodService)
 
 local DevCommands = {}
 
@@ -236,15 +237,14 @@ function DevCommands.Spawn(player: Player, pieces: { PieceSpec }): number
 		local model = DevCommands.Build(spec, player.UserId, Util.guid())
 		model:PivotTo(spot.Rotation + Vector3.new(spot.Position.X, y, spot.Position.Z))
 		model.Parent = folder
-		local now = os.clock()
-		GrabService.Register({ model = model, ownerId = player.UserId, createdAt = now, lastInteracted = now })
+		WoodService.Register(model, { woodId = spec.woodId, nodes = {}, parts = {}, ownerId = player.UserId })
 		table.insert(spawned, model)
 	end
 	while #spawned > DevCommands.MaxPieces do
 		local oldest = table.remove(spawned, 1)
 		if oldest then
 			GrabService.ReleasePiece(oldest, "despawned")
-			GrabService.Unregister(oldest)
+			WoodService.Forget(oldest)
 			oldest:Destroy()
 		end
 	end

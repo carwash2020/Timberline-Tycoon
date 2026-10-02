@@ -27,6 +27,7 @@ Net.RemoteNames = {
 	"SaveSetting", -- client -> server: ("music" | "sfx", on) remember a Settings toggle
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
 	"Release", -- client -> server: (part) let go of it
+	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...

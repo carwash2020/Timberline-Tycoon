@@ -19,6 +19,8 @@ local controllers: { { name: string, module: { Start: () -> () } } } = {
 	{ name = "CarryController", module = require(script.Parent.CarryController) },
 	{ name = "CarryPose", module = require(script.Parent.CarryPose) },
 	{ name = "DragController", module = require(script.Parent.DragController) }, -- the v2 loop only
+	{ name = "CutController", module = require(script.Parent.CutController) }, -- the v2 loop only
+	{ name = "WoodFX", module = require(script.Parent.WoodFX) }, -- the v2 loop only
 	{ name = "AxeController", module = require(script.Parent.AxeController) },
 	{ name = "ShopUI", module = require(script.Parent.ShopUI) },
 	{ name = "QuestUI", module = require(script.Parent.QuestUI) },

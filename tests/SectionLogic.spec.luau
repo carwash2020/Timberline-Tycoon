@@ -249,4 +249,44 @@ return function(t)
 		t.eq(SectionLogic.Largest(g), 2)
 		t.eq(SectionLogic.Largest({}), nil)
 	end)
+
+	-- M1.3: where a swing lands (CutController aims, SectionTrees checks).
+	t.test("a swing at a standing trunk goes in between knee and chest, on the side facing you", function()
+		local trunk = CFrame.new(0, 2.25, 0) -- a 2 x 4.5 x 2 section, its bottom on the ground
+		local size = Vector3.new(2, 4.5, 2)
+		local root = Vector3.new(5, 3, 0) -- the root part 3 studs above the feet
+		local hit, normal = SectionLogic.AimAt(trunk, size, root, nil, nil)
+		t.ok(math.abs(hit.Y - 3) < 1e-5, "no pointer: the root part's height")
+		t.ok((normal - Vector3.xAxis).Magnitude < 1e-5, "the face toward you")
+		t.ok(math.abs(hit.X - 1) < 1e-5, "on the bark")
+		-- Pointing at your feet or over your head is kept knee to chest.
+		local low = SectionLogic.AimAt(trunk, size, root, Vector3.new(1, 0.2, 0), Vector3.xAxis)
+		t.ok(math.abs(low.Y - (3 + SectionLogic.KneeAbove)) < 1e-5, "knee: " .. low.Y)
+		local high = SectionLogic.AimAt(trunk, size, root, Vector3.new(1, 4.4, 0), Vector3.xAxis)
+		t.ok(math.abs(high.Y - (3 + SectionLogic.ChestAbove)) < 1e-5, "chest")
+		-- Inside the band the pointer's height counts, so different heights stay apart.
+		local a = SectionLogic.AimAt(trunk, size, root, Vector3.new(1, 2.0, 0), Vector3.xAxis)
+		local b = SectionLogic.AimAt(trunk, size, root, Vector3.new(1, 3.6, 0), Vector3.xAxis)
+		t.ok(math.abs(a.Y - b.Y) > 1.2, "a different height each swing")
+		-- Standing on a slope above the trunk: kept CutEdge inside its ends.
+		local edge = SectionLogic.AimAt(trunk, size, Vector3.new(5, 12, 0), nil, nil)
+		t.ok(math.abs(edge.Y - (4.5 - 0.3)) < 1e-5, "never past the end")
+		-- The pointer's side face wins over the side toward you.
+		local _, side = SectionLogic.AimAt(trunk, size, root, Vector3.new(0, 3, -1), Vector3.new(0, 0, -1))
+		t.ok((side - Vector3.new(0, 0, -1)).Magnitude < 1e-5)
+	end)
+
+	t.test("a log on the ground is cut where you point; the box check allows 0.6", function()
+		local log = CFrame.new(0, 1, 0) * CFrame.Angles(0, 0, math.pi / 2) -- length along world X
+		local size = Vector3.new(2, 8, 2)
+		local hit, normal = SectionLogic.AimAt(log, size, Vector3.new(0, 3, 4), Vector3.new(2.5, 2, 0), Vector3.yAxis)
+		t.ok(math.abs(hit.X - 2.5) < 1e-6, "along the log where you pointed")
+		t.ok(normal.Magnitude > 0.99)
+		local h = SectionLogic.HeightOn(log, size, hit)
+		t.ok(h > 0 and h < 8, "a height up the section")
+		t.ok(SectionLogic.InBox(log, size, Vector3.new(0, 2.5, 0)))
+		t.ok(not SectionLogic.InBox(log, size, Vector3.new(0, 2.7, 0)), "past the 0.6 margin")
+		t.eq(SectionLogic.Message("far"), "Too far away. Walk closer to cut.")
+		t.eq(SectionLogic.Message("cooldown"), nil, "a swing too soon is quiet")
+	end)
 end

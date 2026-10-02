@@ -43,6 +43,10 @@ export type Budget = {
 	FillerFar: number, -- studs: and dark stand-in blocks for the forest out to this
 	FillerBuildMs: number, -- milliseconds a frame it may spend building cells
 	TuftNear: number, -- studs: grass tufts at the forest's fringe, verges, rocks and fences (FOR-04)
+	-- WoodFX (the v2 loop, V2_PLAN.md §16): pooled chips and falling leaves
+	ChipCount: number, -- wood chips in the air or on the ground at once
+	LeafPool: number, -- falling leaves at once (a felled tree's crown)
+	LeafShadows: boolean, -- false: trees' leaf parts cast no shadow on this device
 }
 
 QualityBudgets.High = table.freeze({
@@ -66,6 +70,9 @@ QualityBudgets.High = table.freeze({
 	FillerFar = 1000,
 	FillerBuildMs = 2,
 	TuftNear = 150,
+	ChipCount = 48,
+	LeafPool = 64,
+	LeafShadows = true,
 }) :: Budget
 
 -- PLAY-05's acceptance: on low, the workspace.AmbientLife folder holds 160
@@ -103,6 +110,9 @@ QualityBudgets.Low = table.freeze({
 	FillerFar = 640,
 	FillerBuildMs = 1.2,
 	TuftNear = 90,
+	ChipCount = 24,
+	LeafPool = 32,
+	LeafShadows = false,
 }) :: Budget
 
 -- The budget for a tier ("low" or "high"; anything else gets "high").

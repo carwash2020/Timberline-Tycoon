@@ -42,6 +42,23 @@ return function(t)
 		t.eq(burst(limiter, player, "ChopTree", 3), 3, "a new second, a new budget")
 	end)
 
+	t.test("the v2 loop's Chop (M1.3): six swings a second", function()
+		local limiter = setup()
+		t.eq(burst(limiter, fakePlayer(), "Chop", 10), 6)
+	end)
+
+	t.test("every client-to-server remote in Net has a budget", function()
+		local limiter = setup()
+		local Net = t.shared("Net")
+		-- Server-to-client remotes need none; Instant Delivery shares SellLogs' budget.
+		local skip = { CashChanged = true, Notify = true, WorldFX = true, UseInstantDelivery = true }
+		for _, name in ipairs(Net.RemoteNames) do
+			if not skip[name] then
+				t.ok(limiter.Allow(fakePlayer(), name), name .. " has a LIMITS entry")
+			end
+		end
+	end)
+
 	t.test("remotes have separate budgets; unknown remotes are refused", function()
 		local limiter = setup()
 		local player = fakePlayer()

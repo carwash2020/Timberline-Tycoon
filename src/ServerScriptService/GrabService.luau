@@ -38,6 +38,11 @@
 --
 -- Under v2 every character's parts are in the Players collision group
 -- (WoodHeld doesn't collide with it).
+--
+-- Once WoodService runs (M1.3), its WoodWatch judges every piece a
+-- player's device simulates, held ones included, and GameServer sets
+-- GrabService.JudgeMoves = false so pieces aren't judged twice: Watch then
+-- keeps only the hold's own checks (gone, died, seated, too far away).
 
 local Players = game:GetService("Players")
 local PhysicsService = game:GetService("PhysicsService")
@@ -57,6 +62,7 @@ GrabService.HeldGroup = "WoodHeld" -- held wood: doesn't collide with players
 GrabService.PlayersGroup = "Players" -- every character's parts (v2)
 GrabService.HitMargin = 2 -- studs: a grab may land this far off its part (the piece moved meanwhile)
 GrabService.PutBackHoldSec = 1 -- a piece put back stays the server's this long
+GrabService.JudgeMoves = true -- false: WoodService's WoodWatch judges moves instead
 
 -- What GrabService needs of a piece's record (WoodService's records have
 -- all of it). Times are the server's os.clock().
@@ -506,7 +512,9 @@ function GrabService.Watch(now: number)
 			continue
 		end
 		local cf = h.root.CFrame
-		local verdict = VehicleLogic.JudgeMove(h.lastGood.Position, cf.Position, now - h.lastGoodAt, maxSpeed)
+		local verdict: VehicleLogic.MoveVerdict = if GrabService.JudgeMoves
+			then VehicleLogic.JudgeMove(h.lastGood.Position, cf.Position, now - h.lastGoodAt, maxSpeed)
+			else "ok"
 		if verdict == "tooFar" then
 			local lastGood = h.lastGood
 			finish(h, "teleport", "server")
@@ -533,7 +541,7 @@ function GrabService.Watch(now: number)
 			loose[model] = nil
 			continue
 		end
-		if l.judge then
+		if l.judge and GrabService.JudgeMoves then
 			local cf = l.root.CFrame
 			local verdict = VehicleLogic.JudgeMove(l.lastGood.Position, cf.Position, now - l.lastGoodAt, maxSpeed)
 			if verdict == "tooFar" then
