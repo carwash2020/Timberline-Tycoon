@@ -365,6 +365,75 @@ function TerrainGen.WaterLevelAt(x: number, z: number): number?
 	return nil
 end
 
+-- Surface materials. This runs once per 4-stud column of the whole map
+-- (about 560,000 times a build), so it stays cheap: a few math.noise calls,
+-- no allocation. Heights never depend on it.
+
+-- Studs over which a biome's edge dithers into the land around it (WLD-13).
+local BAND = 80
+
+-- Fine noise for dithering edges: specks a voxel or two across, roughly -1..1.
+local function dither(x: number, z: number): number
+	return noise(x / 9, z / 9, 21.7) * 0.75 + noise(x / 3.7, z / 3.7, 4.9) * 0.45
+end
+
+-- How far inside a biome's edge (r studs from its centre) (x, z) is: 1 at
+-- half a band inside the edge or deeper, 0 at half a band outside or
+-- further, 0.5 on the edge. Between, the biome's material wins the voxels
+-- whose dither is under 0.9w - 0.45 (the dither spreads about +-0.45), a
+-- transition material the ones under 1.2w - 0.45, and the land outside the
+-- rest: a frayed edge across the whole band, no ring where it ends.
+local function inwardness(x: number, z: number, a: Area, r: number): number
+	local dx, dz = x - a.x, z - a.z
+	local reach = r + BAND / 2
+	local d2 = dx * dx + dz * dz
+	if d2 >= reach * reach then
+		return 0
+	end
+	return clamp(0.5 - (sqrt(d2) - r) / BAND, 0, 1)
+end
+
+-- Grass and LeafyGrass in broad swaths, a finer layer breaking up their
+-- edges (so it reads from above and at eye level).
+local function swaths(x: number, z: number): string
+	local v = noise(x / 90, z / 90, 5.1) + noise(x / 28, z / 28, 7.9) * 0.45
+	return if v > 0.22 then "LeafyGrass" else "Grass"
+end
+
+local PLOTS: WorldLayout.FlatZone? = nil
+for _, zone in ipairs(WorldLayout.FlatZones) do
+	if zone.name == "Plots" then
+		PLOTS = zone
+	end
+end
+
+-- The open meadow: swaths of grass, sparse worn patches of bare Ground and
+-- a little bare earth at the water's edge. The plot district keeps a plain Grass
+-- lawn (its edge dithered into the meadow), and the town's lawn gets the
+-- swaths but no bare patches, so its paths stay the only dirt there.
+local function meadow(x: number, z: number, flat: number, bank: number): string
+	if flat > 0 then
+		local plots = PLOTS
+		if plots then
+			local dx = math.max(plots.x0 - x, 0, x - plots.x1)
+			local dz = math.max(plots.z0 - z, 0, z - plots.z1)
+			if dx * dx + dz * dz < (plots.blend * (0.55 + 0.4 * dither(x, z))) ^ 2 then
+				return "Grass"
+			end
+		end
+		if flat > 0.2 then
+			return swaths(x, z)
+		end
+	end
+	if bank > 0.15 and noise(x / 6, z / 6, 2.9) > -0.2 then
+		return "Ground" -- damp earth at the water's edge (Mud is the Grove's violet)
+	end
+	if noise(x / 80, z / 80, 10.3) > 0.45 and dither(x, z) > -0.1 then
+		return "Ground"
+	end
+	return swaths(x, z)
+end
+
 -- The surface material (an Enum.Material name) for a column of height h
 -- and slope (rise over run).
 function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: number): string
@@ -419,41 +488,57 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		if north and h > 115 + noise(x / 40, z / 40, 8.8) * 20 then
 			return "Snow"
 		end
-		return if slope > 0.55 then "Rock" else "Grass"
+		return if slope > 0.55 then "Rock" else swaths(x, z)
 	end
 
-	-- Biome edges wander with noise instead of ending in a hard circle.
+	-- Biome edges wander with noise instead of ending in a hard circle,
+	-- and dither into their neighbour across a BAND-stud transition.
 	local edge = noise(x / 70, z / 70, 13.7) * 60
-	local function inside(a: Area, extra: number): boolean
-		local dx, dz = x - a.x, z - a.z
-		local r = a.radius + extra + edge
-		return dx * dx + dz * dz < r * r
-	end
-	if inside(SNOW, 150) then
-		return if slope > 0.7 then "Glacier" else "Snow"
-	end
-	if inside(VOLCANO, 40) then
-		if noise(x / 55, z / 55, 12.5) > 0.32 then
-			return "CrackedLava"
+	local w = inwardness(x, z, SNOW, SNOW.radius + 150 + edge)
+	if w > 0 then
+		local d = dither(x, z)
+		if w >= 1 or d < 0.9 * w - 0.45 then
+			return if slope > 0.7 then "Glacier" else "Snow"
+		elseif d < 1.2 * w - 0.45 then
+			-- The snowline: grass breaking through, rock showing.
+			return if noise(x / 16, z / 16, 15.2) > 0.2 then "Rock" else "LeafyGrass"
 		end
-		return if slope > 0.6 then "Slate" else "Basalt"
 	end
-	if inside(GROVE, 6) then
+	w = inwardness(x, z, VOLCANO, VOLCANO.radius + 40 + edge)
+	if w > 0 then
+		local d = dither(x, z)
+		if w >= 1 or d < 0.9 * w - 0.45 then
+			if w > 0.5 and noise(x / 55, z / 55, 12.5) > 0.32 then
+				return "CrackedLava"
+			end
+			return if slope > 0.6 then "Slate" else "Basalt"
+		elseif d < 1.2 * w - 0.45 then
+			-- Scorched earth between the basalt and the grass.
+			return "Ground"
+		end
+	end
+	local gdx, gdz = x - GROVE.x, z - GROVE.z
+	local gr = GROVE.radius + 6 + edge
+	if gdx * gdx + gdz * gdz < gr * gr then
 		return if noise(x / 25, z / 25, 3.3) > 0.25 then "Ground" else "Mud"
 	end
-	if inside(HILLS, 70) then
+	w = inwardness(x, z, HILLS, HILLS.radius + 70 + edge)
+	if w > 0 and (w >= 1 or dither(x, z) < 0.9 * w - 0.45) then
 		if slope > 0.75 then
 			return "Rock"
 		end
-		return if noise(x / 45, z / 45, 2.8) > 0.36 then "Ground" else "LeafyGrass"
+		-- Worn trails, not blotches.
+		return if noise(x / 30, z / 30, 2.8) > 0.55 then "Ground" else "LeafyGrass"
 	end
 	if slope > 0.9 then
 		return "Rock"
 	end
-	if inside(STARTER, 10) then
+	local sdx, sdz = x - STARTER.x, z - STARTER.z
+	local sr = STARTER.radius + 10 + edge
+	if sdx * sdx + sdz * sdz < sr * sr then
 		return if noise(x / 30, z / 30, 4.4) > 0.2 then "LeafyGrass" else "Grass"
 	end
-	return "Grass"
+	return meadow(x, z, flat, bank)
 end
 
 -- Height, surface material and water surface (if any) at (x, z).
