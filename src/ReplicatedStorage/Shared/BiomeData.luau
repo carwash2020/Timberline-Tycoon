@@ -27,7 +27,8 @@ export type BiomeDef = {
 	-- Sky biome: gondola up and down, logs sent down the Cloud Chute into
 	-- the player's Sky Bin at the sawmill.
 	gondola: { rideSec: number, fee: number }?,
-	skyBinCapacity: number?,
+	skyBinCapacity: number?, -- logs (the v1 loop)
+	skyBinVolume: number?, -- u³ (the v2 loop, V2_PLAN.md §5)
 	chuteWalkStuds: number?, -- from the trees to the chute
 	hazards: { string }?,
 	-- In the world: a circle around (x, z), radius in studs, and for the
@@ -109,6 +110,7 @@ local biomes: { BiomeDef } = {
 		access = "gondola",
 		gondola = { rideSec = 40, fee = 250 },
 		skyBinCapacity = 30,
+		skyBinVolume = 120,
 		chuteWalkStuds = 30,
 		hazards = { "wind gusts", "lightning" },
 		-- Floating above the Skyroot in the far north-west corner. The

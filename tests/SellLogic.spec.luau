@@ -67,4 +67,47 @@ return function(t)
 		local v = SellLogic.PieceValue("oak", "log", u3, nil, 1)
 		t.ok(v > 7 and v < 15, string.format("$%.2f for %.1f u³", v, u3))
 	end)
+
+	-- M1.7b: the Sky Bin keeps pieces as short entries and pays them as the
+	-- pad would have.
+	t.test("a Sky Bin entry keeps wood, u³, figure, plank and a boost over 1", function()
+		t.eq(SellLogic.Entry("oak", "log", 4, nil, 1), { w = "oak", v = 4 })
+		t.eq(SellLogic.Entry("maple", "plank", 2.5, "curly", 2), { w = "maple", v = 2.5, f = "curly", p = true, b = 2 })
+		t.eq(SellLogic.Entry("oak", "log", 4, nil, 0 / 0), { w = "oak", v = 4 }, "a broken boost is 1")
+	end)
+
+	t.test("an entry is worth what the piece was worth on the pad", function()
+		local entry = SellLogic.Entry("maple", "plank", 2, "curly", 2)
+		near(SellLogic.EntryValue(entry), SellLogic.PieceValue("maple", "plank", 2, "curly", 2), 1e-9, "figured plank")
+		local plain = SellLogic.Entry("lumenwood", "log", 12, nil, 1)
+		near(SellLogic.EntryValue(plain), 12 * WoodData.Get("lumenwood").v2.logPrice, 1e-9, "lumenwood log")
+	end)
+
+	t.test("a list of entries adds up; malformed ones count for nothing", function()
+		local entries = {
+			SellLogic.Entry("oak", "log", 10, nil, 1),
+			SellLogic.Entry("pine", "log", 5, "birdseye", 2),
+			{ w = "oak", v = 0 / 0 },
+			{ w = "oak", v = -3 },
+			{ w = 7, v = 3 },
+			"oak",
+		}
+		local value, volume, count = SellLogic.EntriesValue(entries)
+		local oak, pine = WoodData.Get("oak").v2, WoodData.Get("pine").v2
+		near(value, 10 * oak.logPrice + 5 * pine.logPrice * ForestLogic.Multiplier("birdseye") * 2, 1e-9, "value")
+		t.eq(volume, 15)
+		t.eq(count, 2)
+		t.eq({ SellLogic.EntriesValue({}) }, { 0, 0, 0 })
+		t.ok(not SellLogic.ValidEntry({ w = "oak", v = math.huge }), "an infinite volume")
+		t.eq(SellLogic.EntryValue({ w = "oak", v = -1 }), 0)
+	end)
+
+	t.test("the bin's room and its label", function()
+		t.ok(SellLogic.Fits(100, 20, 120), "exactly full fits")
+		t.ok(not SellLogic.Fits(100, 20.5, 120))
+		t.ok(SellLogic.Fits(0.1 + 0.2, 119.7, 120), "float noise doesn't refuse")
+		t.eq(SellLogic.BinText(14, 120), "14/120 u³")
+		t.eq(SellLogic.BinText(0, 120), "0/120 u³")
+		t.eq(SellLogic.BinText(4.25, 120), "4.3/120 u³")
+	end)
 end

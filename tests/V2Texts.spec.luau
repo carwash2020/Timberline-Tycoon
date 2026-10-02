@@ -164,6 +164,10 @@ return function(t)
 			"src/StarterPlayer/StarterPlayerScripts/ShopUI.luau",
 			"src/StarterPlayer/StarterPlayerScripts/FieldGuideUI.luau",
 			"src/StarterPlayer/StarterPlayerScripts/HUD.luau",
+			-- and M1.7b's Sky Bin, chutes and forge
+			"src/ServerScriptService/AetherService.luau",
+			"src/ReplicatedStorage/Shared/SellLogic.luau",
+			"src/StarterPlayer/StarterPlayerScripts/WorldUI.luau",
 		}) do
 			local name = banned(fs.readFile(path))
 			t.ok(name == nil, path .. " mentions " .. tostring(name))
