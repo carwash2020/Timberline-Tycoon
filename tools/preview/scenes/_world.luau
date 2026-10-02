@@ -109,7 +109,7 @@ function World.build(ctx)
 	place(BuildingArt.SkyBin(), town.skyBin * CF.new(0, -2, 0))
 	place(BuildingArt.Signpost("SKYROOT GONDOLA\nto the Aether Isles\n$250 a ride"), town.gondolaSign)
 	for _, sign in ipairs(town.signs) do
-		place(BuildingArt.Signpost(sign.text), sign.cframe)
+		place(BuildingArt.Signpost(sign.text, sign.lit), sign.cframe)
 	end
 	for _, g in ipairs(town.greenery) do
 		place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)

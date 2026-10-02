@@ -18,8 +18,8 @@
 --   * Owns (creates locally) the Atmosphere, Sky, Clouds (under
 --     workspace.Terrain, the only place they render), Bloom, colour
 --     grading, sun rays and a far blur used only on the Aether Isles.
---   * Night lights: parts named WindowGlass, LampGlow and LanternGlow
---     anywhere in the map (and every "StreetLamp"-tagged model) glow Neon
+--   * Night lights: parts named WindowGlass, LampGlow, LanternGlow and
+--     LampBulb (the sign goosenecks' bulbs) anywhere in the map (and every "StreetLamp"-tagged model) glow Neon
 --     with their lights on at night and are plain glass / lanterns by day.
 --     They come on one by one at dusk, and a few windows go dark in the
 --     small hours.
@@ -401,7 +401,7 @@ end
 -- Night lights
 ---------------------------------------------------------------------------
 
-local GLOW_NAMES: { [string]: boolean } = { WindowGlass = true, LampGlow = true, LanternGlow = true }
+local GLOW_NAMES: { [string]: boolean } = { WindowGlass = true, LampGlow = true, LanternGlow = true, LampBulb = true }
 local WINDOW_DAY = Color3.fromRGB(150, 190, 210)
 local WINDOW_NIGHT = Color3.fromRGB(255, 196, 110)
 local LANTERN_NIGHT = Color3.fromRGB(255, 200, 110)

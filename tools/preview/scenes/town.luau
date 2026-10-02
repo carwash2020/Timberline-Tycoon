@@ -75,7 +75,7 @@ return {
 			place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
 		end
 		for _, sign in ipairs(town.signs) do
-			place(BuildingArt.Signpost(sign.text), sign.cframe)
+			place(BuildingArt.Signpost(sign.text, sign.lit), sign.cframe)
 		end
 		local skyBiome = BiomeData.Get("sky")
 		local fee = if skyBiome and skyBiome.gondola then skyBiome.gondola.fee else 250
@@ -121,6 +121,7 @@ return {
 				{ pos = { 0, 260, 90 }, target = { 0, 0, 91 }, label = "top down" },
 				{ pos = { 2, 6.5, 32 }, target = { 0, 9, 110 }, label = "the spawn walk at night", night = true },
 				{ pos = { 80, 14, 24 }, target = { 40, 0, 30 }, label = "the lot at night", night = true },
+				{ pos = { 20, 7, 62 }, target = { 20, 7, 92 }, label = "the sell sign and pad at night", night = true },
 			},
 		}
 	end,

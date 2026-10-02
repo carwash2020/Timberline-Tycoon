@@ -137,7 +137,9 @@ return function(t)
 			local x = cf.Position.X
 			local hit = blockers(model, V3.new(x - 1.5, 0.7, -8), V3.new(x + 1.5, 6, front - 0.05), counter)
 			t.eq(hit, {}, shop.kind .. " path to the counter")
-			t.ok(#parts(model) <= 220, shop.kind .. " parts: " .. #parts(model))
+			-- 226: 220 plus the two sign goosenecks (3 parts each) the Tool
+			-- Shed and Hearth & Home got in TWN-07, on purpose.
+			t.ok(#parts(model) <= 226, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)
@@ -164,6 +166,37 @@ return function(t)
 		-- The 5 x 5 cabin rides from the platform's middle out the back (+Z).
 		t.eq(blockers(station, V3.new(-2.6, 1.2, -2.6), V3.new(2.6, 7.5, 9), platform), {}, "cabin path")
 		t.ok(#parts(station) <= 140, "station parts: " .. #parts(station))
+	end)
+
+	t.test("sign lamps (TWN-07): every shop sign and the lit signpost have gooseneck LampBulbs", function()
+		local function bulbs(model)
+			local out = {}
+			for _, p in ipairs(parts(model)) do
+				if p.Name == "LampBulb" then
+					table.insert(out, p)
+					local l = p:FindFirstChildOfClass("PointLight")
+					t.ok(l and not l.Shadows, model.Name .. " bulb has a shadowless light")
+					t.ok(not p.CanCollide and not p.CanQuery, model.Name .. " bulb is looks-only")
+				end
+			end
+			return out
+		end
+		for _, shop in ipairs(SHOPS) do
+			t.eq(#bulbs(BuildingArt.Shop(shop.kind, shop.title, shop.accent)), 2, shop.kind .. " sign lamps")
+		end
+		t.eq(#bulbs(BuildingArt.Signpost("SELL LOGS HERE", true)), 2, "a lit signpost has two lamps")
+		t.eq(#bulbs(BuildingArt.Signpost("TO THE WOODS")), 0, "a plain signpost has none")
+		-- The bulbs only glow at night: LightingController switches parts by
+		-- name, so the name must be one of its GLOW_NAMES.
+		local fs = require("@lune/fs")
+		local controller = fs.readFile("src/StarterPlayer/StarterPlayerScripts/LightingController.luau")
+		local list = string.match(controller, "local GLOW_NAMES[^=]*= {([^}]*)}")
+		t.ok(list and string.find(list, "LampBulb = true", 1, true), "LampBulb is a night light")
+		-- The town's SELL LOGS HERE sign is the lit one.
+		local WorldPlan = loader:load("ReplicatedStorage/Shared/World/WorldPlan")
+		for _, sign in ipairs(WorldPlan.Town().signs) do
+			t.eq(sign.lit == true, sign.text == "SELL LOGS HERE", sign.text .. " lit")
+		end
 	end)
 
 	t.test("street furniture keeps its named parts", function()

@@ -25,6 +25,18 @@ return function(t)
 		end
 	end)
 
+	t.test("sign text reads at night: LightInfluence 0.25 unless asked otherwise (TWN-07)", function()
+		local board =
+			Kit.part(Kit.model("Board"), "Board", Vector3.new(9, 2.3, 0.4), CFrame.identity, Color3.new(1, 1, 1))
+		for _, label in ipairs(Kit.signText(board, "TOOL SHED", Color3.new(0, 0, 0))) do
+			t.ok(math.abs(label.Parent.LightInfluence - 0.25) < 1e-4, "default 0.25")
+		end
+		local glow = Kit.part(Kit.model("Board"), "Board", Vector3.new(4, 1, 0.4), CFrame.identity, Color3.new(1, 1, 1))
+		local labels = Kit.signText(glow, "HI", Color3.new(0, 0, 0), { Enum.NormalId.Front }, nil, 0.7)
+		t.eq(#labels, 1)
+		t.ok(math.abs(labels[1].Parent.LightInfluence - 0.7) < 1e-4, "an explicit value is kept")
+	end)
+
 	t.test("every sign in town is sized to its board", function()
 		local models = {
 			BuildingArt.Signpost("TO THE WOODS"),

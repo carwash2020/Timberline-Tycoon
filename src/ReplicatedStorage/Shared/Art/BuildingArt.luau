@@ -15,7 +15,7 @@
 -- Only what players stand on or bump into collides (floors, walls, posts,
 -- roofs, counters, big props); everything else is Kit.decor, and small
 -- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
--- them): Sawmill 400, each Shop 220, GondolaStation 140, Campsite 110,
+-- them): Sawmill 400, each Shop 226, GondolaStation 140, Campsite 110,
 -- a TownTree 70.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
@@ -541,7 +541,9 @@ local function signBoard(
 end
 
 -- A gooseneck lamp shining down on a sign; `cf` = where the arm leaves
--- the sign's top edge, facing -Z.
+-- the sign's top edge, facing -Z. Its "LampBulb" is one of
+-- LightingController's night lights: Neon with its light on after dark,
+-- plain and unlit by day.
 local function gooseneck(parent: Instance, cf: CFrame)
 	dRod(parent, "LampArm", (cf * CF(0, -0.1, 0.1)).Position, (cf * CF(0, 0.9, -1.0)).Position, 0.18, IRON, MAT.Metal)
 	dBox(parent, "LampShade", V3(0.9, 0.35, 0.7), cf * CF(0, 0.95, -1.25) * ANG(-0.45, 0, 0), IRON, MAT.Metal)
@@ -1118,6 +1120,9 @@ local function toolShed(model: Model, title: string, accent: Color3)
 
 	-- The sign on the gable, a hay hoist above it, windows, lanterns.
 	signBoard(model, "Sign", CF(0, 10.6, -HZ - 0.45), 9.6, 2.3, title, TRIM, TIMBER, doorRed, false)
+	for _, x in ipairs({ -3.2, 3.2 }) do
+		gooseneck(model, CF(x, 11.9, -HZ - 0.53)) -- either side of the hoist (TWN-07)
+	end
 	dBox(model, "HoistBeam", V3(0.7, 0.7, 2.8), CF(0, 13.45, -HZ - 1.1), TIMBER)
 	dCyl(model, "Pulley", 0.3, 0.8, CF(0, 12.85, -HZ - 2.2), IRON, MAT.Metal)
 	dBox(model, "Rope", V3(0.12, 0.7, 0.12), CF(0, 12.2, -HZ - 2.55), ROPE, MAT.Fabric)
@@ -1404,6 +1409,9 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	end
 	dBox(model, "AwningBeam", V3(9.2, 0.35, 0.4), CF(0, 6.65, -9.75), wood)
 	signBoard(model, "Sign", CF(0, 7.95, -9.75), 8, 1.9, title, hex("#3E5E3A"), wood, TRIM, true)
+	for _, x in ipairs({ -2.4, 2.4 }) do
+		gooseneck(model, CF(x, 9.05, -9.83)) -- lighting the street side (TWN-07)
+	end
 
 	-- The bay window (west) and a shuttered window (east), with flowers.
 	local bay = CF(-6.4, 0, -HZ - 0.3)
@@ -1603,8 +1611,9 @@ end
 
 -- A signpost: two posts with a framed board between them facing -Z (text
 -- on both faces) under a little shingled cap. Named parts: "Board" (the
--- 9 x 4.4 text board, its middle 7 studs up).
-function BuildingArt.Signpost(text: string): Model
+-- 9 x 4.4 text board, its middle 7 studs up). `lit` adds two gooseneck
+-- lamps over the front face (night lights: see gooseneck).
+function BuildingArt.Signpost(text: string, lit: boolean?): Model
 	local model = Kit.model("Signpost")
 	local rng = Kit.rng(#text * 13 + 5)
 	for _, s in ipairs({ -1, 1 }) do
@@ -1612,6 +1621,12 @@ function BuildingArt.Signpost(text: string): Model
 		dBox(model, "PostCap", V3(0.95, 0.3, 0.95), CF(s * 4.95, 9.9, 0), TIMBER_LIGHT)
 	end
 	signBoard(model, "Board", CF(0, 7, 0), 9, 4.4, text, PLANK[2], TIMBER, SIGN_INK, true)
+	if lit then
+		-- Two goosenecks over the front (-Z) face, under the cap (TWN-07).
+		for _, x in ipairs({ -2.5, 2.5 }) do
+			gooseneck(model, CF(x, 8.7, -0.3))
+		end
+	end
 	for _, s in ipairs({ -1, 1 }) do
 		dWedge(
 			model,

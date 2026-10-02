@@ -649,15 +649,23 @@ function Kit.lantern(parent: Instance, cf: CFrame, scale: number?): Part
 	return glow
 end
 
+-- How much the world's light shades sign text (SurfaceGui.LightInfluence)
+-- unless a caller asks otherwise: a quarter, so a board still reads by
+-- night without a lamp of its own (TWN-07) and keeps a little of the sun's
+-- warmth by day.
+Kit.SIGN_LIGHT_INFLUENCE = 0.25
+
 -- Text on one or both faces of a board (signs), laid out at 40 pixels a
 -- stud so the canvas takes the face's shape (a new SurfaceGui's default
--- fixed 800 x 600 canvas would stretch the text to fit). Returns the labels.
+-- fixed 800 x 600 canvas would stretch the text to fit). `lightInfluence`
+-- defaults to Kit.SIGN_LIGHT_INFLUENCE. Returns the labels.
 function Kit.signText(
 	part: BasePart,
 	text: string,
 	color: Color3,
 	faces: { Enum.NormalId }?,
-	font: Enum.Font?
+	font: Enum.Font?,
+	lightInfluence: number?
 ): { TextLabel }
 	local out: { TextLabel } = {}
 	for _, face in ipairs(faces or { Enum.NormalId.Front, Enum.NormalId.Back }) do
@@ -665,7 +673,7 @@ function Kit.signText(
 		sg.Face = face
 		sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 		sg.PixelsPerStud = 40
-		sg.LightInfluence = 0.6
+		sg.LightInfluence = lightInfluence or Kit.SIGN_LIGHT_INFLUENCE
 		sg.Parent = part
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)

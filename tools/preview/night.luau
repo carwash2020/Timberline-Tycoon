@@ -3,7 +3,7 @@
 -- game's LightingController switches on after dark. export.luau tags them in
 -- the scene it writes, and viewer.html uses the tags on a camera marked
 -- `night = true`:
---   * a part named WindowGlass, LampGlow or LanternGlow glows Neon at night,
+--   * a part named WindowGlass, LampGlow, LanternGlow or LampBulb glows Neon at night,
 --     in its night colour (GlowColor);
 --   * a light inside one of those parts, or anywhere in a "StreetLamp"-tagged
 --     model, is on at night even if it was built switched off (IsNightLight).
@@ -13,7 +13,7 @@
 local Night = {}
 
 -- LightingController's GLOW_NAMES.
-Night.GlowNames = { WindowGlass = true, LampGlow = true, LanternGlow = true }
+Night.GlowNames = { WindowGlass = true, LampGlow = true, LanternGlow = true, LampBulb = true }
 
 -- LightingController's WINDOW_NIGHT (255, 196, 110) and LANTERN_NIGHT
 -- (255, 200, 110), as hex.

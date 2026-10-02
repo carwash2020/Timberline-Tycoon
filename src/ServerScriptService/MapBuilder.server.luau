@@ -263,7 +263,7 @@ step("4. The town", function()
 			place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe)
 		end
 		for _, sign in ipairs(town.signs) do
-			place(atomic(BuildingArt.Signpost(sign.text)), sign.cframe)
+			place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe)
 		end
 		do
 			local skyBiome = BiomeData.Get("sky")
