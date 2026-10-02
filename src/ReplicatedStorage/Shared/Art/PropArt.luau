@@ -1164,4 +1164,306 @@ function PropArt.Scatter(biomeId: string?, seed: number, spot: string?): Model
 	return model
 end
 
+---------------------------------------------------------------------------
+-- Open-country set pieces (WLD-01): WorldPlan.Scenery places them out
+-- between the biomes and along the haul roads. Looks only (nothing
+-- collides, is clicked or touched; parts under a stud cast no shadow), 25
+-- parts at most each, on the ground at the origin, front to -Z.
+---------------------------------------------------------------------------
+
+local SET_PLANK = { hex("#A4693E"), hex("#B07548"), hex("#985F37") }
+local SET_OLD = { hex("#7E6A55"), hex("#8A7660"), hex("#6F5D4A") } -- weathered boards
+local SET_TIMBER = hex("#5B3920")
+local SET_STONE = { hex("#9C968D"), hex("#ABA498"), hex("#8E887F") }
+local SET_SHINGLE = { hex("#8B4831"), hex("#9A5338") }
+local SAILCLOTH = hex("#F2E7CF")
+
+-- A looks-only box from a to b (`w` x `h` across), e.g. a beam or a leg.
+local function plank(
+	model: Model,
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	w: number,
+	h: number,
+	color: Color3,
+	material: Enum.Material?
+): Part
+	local p = Kit.part(model, name, Vector3.new(w, h, (b - a).Magnitude), lookAt((a + b) / 2, b), color, material)
+	Kit.decor(p, math.max(w, h, (b - a).Magnitude) >= 1)
+	return p
+end
+
+-- A looks-only block (casts a shadow unless it's under a stud).
+local function block(
+	model: Model,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	material: Enum.Material?
+): Part
+	local p = Kit.part(model, name, size, cf, color, material)
+	Kit.decor(p, math.max(size.X, size.Y, size.Z) >= 1)
+	return p
+end
+
+-- An outcrop: three or four big rocks (6 to 14 studs) huddled together.
+-- Unlike a lone boulder, nothing in it collides.
+function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
+	local model = Kit.model("Outcrop")
+	local rng = Kit.rng(seed)
+	local count = rng:int(3, 4)
+	local start = rng:range(0, math.pi * 2)
+	for i = 1, count do
+		local size = if i == 1 then rng:range(10, 14) else rng:range(6, 10)
+		local a = start + i * 2.1 + rng:range(-0.3, 0.3)
+		local r = if i == 1 then 0 else rng:range(5.5, 8)
+		local rock = PropArt.Rock(size, seed * 7 + i, colors)
+		Kit.placeAt(rock, CFrame.new(math.cos(a) * r, 0, math.sin(a) * r))
+		rock.Parent = model
+	end
+	Kit.decorAll(model)
+	return model
+end
+
+-- A ruined log cabin (about 12 x 10): a stone footing, broken log walls,
+-- a stone chimney still standing, the roof fallen in.
+function PropArt.RuinedCabin(seed: number): Model
+	local model = Kit.model("RuinedCabin")
+	local rng = Kit.rng(seed)
+	local W, D = 12, 10
+	local logD = 1.1
+	-- The footing: four low stone courses round the floor.
+	for _, s in ipairs({ -1, 1 }) do
+		block(
+			model,
+			"Footing",
+			Vector3.new(W + 1, 0.9, 1.1),
+			CFrame.new(0, 0.35, s * D / 2),
+			rng:pick(SET_STONE),
+			Enum.Material.Slate
+		)
+		block(
+			model,
+			"Footing",
+			Vector3.new(1.1, 0.9, D - 1),
+			CFrame.new(s * W / 2, 0.35, 0),
+			rng:pick(SET_STONE),
+			Enum.Material.Slate
+		)
+	end
+	block(model, "Floor", Vector3.new(W - 1, 0.2, D - 1), CFrame.new(0, 0.6, 0), SET_OLD[3], Enum.Material.WoodPlanks)
+	local function log(name: string, a: Vector3, b: Vector3)
+		rod(model, name, a, b, logD * rng:range(0.92, 1.05), Kit.vary(rng:pick(SET_OLD), rng, 0.05), Enum.Material.Wood)
+	end
+	-- The back wall (+Z): three courses, each shorter than the last.
+	for row = 0, 2 do
+		local y = 1.3 + row * logD
+		local cut = row * rng:range(1.5, 2.5)
+		log("WallLog", Vector3.new(-W / 2 - 0.4, y, D / 2), Vector3.new(W / 2 + 0.4 - cut, y, D / 2))
+	end
+	-- The left wall: two courses; the right: one, broken off.
+	for row = 0, 1 do
+		local y = 1.3 + row * logD
+		log("WallLog", Vector3.new(-W / 2, y, -D / 2 - 0.4), Vector3.new(-W / 2, y, D / 2 + 0.4 - row * 3))
+	end
+	log("WallLog", Vector3.new(W / 2, 1.3, D / 2 + 0.4), Vector3.new(W / 2, 1.3, -D / 2 + 3))
+	-- Corner posts at the front, one snapped short.
+	for i, x in ipairs({ -W / 2, W / 2 }) do
+		local h = if i == 1 then 4.6 else 2.2
+		block(
+			model,
+			"CornerPost",
+			Vector3.new(0.8, h, 0.8),
+			CFrame.new(x, 0.8 + h / 2, -D / 2),
+			SET_TIMBER,
+			Enum.Material.Wood
+		)
+	end
+	-- The chimney at the back right, still standing.
+	block(
+		model,
+		"Chimney",
+		Vector3.new(2.6, 5, 2.4),
+		CFrame.new(W / 2 - 1.8, 2.6, D / 2 + 0.6),
+		SET_STONE[1],
+		Enum.Material.Slate
+	)
+	block(
+		model,
+		"Chimney",
+		Vector3.new(1.9, 2.4, 1.8),
+		CFrame.new(W / 2 - 1.8, 6.3, D / 2 + 0.6),
+		SET_STONE[2],
+		Enum.Material.Slate
+	)
+	-- The roof fallen in: one slope leans from the back wall to the floor,
+	-- the ridge beam lies across it, and loose boards lie about.
+	local roof = block(
+		model,
+		"Roof",
+		Vector3.new(W - 3, 0.35, 7),
+		CFrame.new(-0.8, 2.4, 1.6) * CFrame.Angles(math.rad(-28), rng:range(-0.08, 0.08), rng:range(-0.05, 0.05)),
+		rng:pick(SET_SHINGLE),
+		Enum.Material.WoodPlanks
+	)
+	roof.Name = "FallenRoof"
+	plank(
+		model,
+		"Ridge",
+		Vector3.new(-W / 2 + 1, 0.9, -1.5),
+		Vector3.new(W / 2 - 1.5, 3.4, 3.2),
+		0.7,
+		0.7,
+		SET_TIMBER,
+		Enum.Material.Wood
+	)
+	for i = 1, 3 do
+		local a = rng:range(0, math.pi * 2)
+		local at =
+			Vector3.new(rng:range(-W / 2 + 1, W / 2 - 1), 0.12, -D / 2 - rng:range(1, 3) * (if i == 3 then -1 else 1))
+		block(
+			model,
+			"Board",
+			Vector3.new(0.9, 0.2, rng:range(3, 5)),
+			CFrame.new(at) * CFrame.Angles(0, a, 0),
+			Kit.vary(rng:pick(SET_OLD), rng, 0.05),
+			Enum.Material.WoodPlanks
+		)
+	end
+	return model
+end
+
+-- An old windmill (about 15 tall, 7 across): a stone base, a boarded
+-- tower, a little roof, and four sails on a hub facing -Z.
+function PropArt.Windmill(seed: number): Model
+	local model = Kit.model("Windmill")
+	local rng = Kit.rng(seed)
+	local base = Kit.decor(Kit.post(model, "Base", Vector3.new(0, -0.5, 0), 4.5, 8, SET_STONE[1], Enum.Material.Slate))
+	base.Name = "MillBase"
+	Kit.decor(Kit.post(model, "Tower", Vector3.new(0, 4, 0), 6.5, 6.6, rng:pick(SET_PLANK), Enum.Material.WoodPlanks))
+	Kit.decor(Kit.post(model, "Tower", Vector3.new(0, 10.5, 0), 3, 5.6, rng:pick(SET_PLANK), Enum.Material.WoodPlanks))
+	block(model, "Door", Vector3.new(2, 3.2, 0.3), CFrame.new(0, 1.6 + 0.1, -3.95), SET_TIMBER, Enum.Material.Wood)
+	block(model, "Window", Vector3.new(1.2, 1.4, 0.3), CFrame.new(0, 7.2, -3.35), SET_TIMBER, Enum.Material.Wood)
+	-- The cap: a ridge roof over the top.
+	for _, s in ipairs({ -1, 1 }) do
+		block(
+			model,
+			"MillRoof",
+			Vector3.new(4.2, 0.4, 7),
+			CFrame.new(s * 1.55, 14.4, 0) * CFrame.Angles(0, 0, -s * math.rad(38)),
+			SET_SHINGLE[1],
+			Enum.Material.WoodPlanks
+		)
+	end
+	block(model, "Gable", Vector3.new(5.6, 1.2, 5.6), CFrame.new(0, 13.6, 0), SET_PLANK[3], Enum.Material.WoodPlanks)
+	-- The hub and the sails, turned a little so each mill looks different.
+	local hub = CFrame.new(0, 12.4, -3.9)
+	Kit.decor(
+		Kit.cylinder(model, "Hub", 1.4, 1.3, hub * CFrame.Angles(0, math.pi / 2, 0), SET_TIMBER, Enum.Material.Wood)
+	)
+	local turn = rng:range(0, math.pi / 2)
+	for i = 0, 3 do
+		local a = turn + i * math.pi / 2
+		local dir = Vector3.new(math.cos(a), math.sin(a), 0)
+		local side = Vector3.new(-dir.Y, dir.X, 0)
+		local at = hub.Position + Vector3.new(0, 0, -0.5)
+		plank(model, "Spar", at, at + dir * 9, 0.4, 0.4, SET_TIMBER, Enum.Material.Wood)
+		local mid = at + dir * 5.6 + side * 0.9 + Vector3.new(0, 0, 0.05)
+		block(
+			model,
+			"Sail",
+			Vector3.new(6.4, 1.6, 0.15),
+			CFrame.fromMatrix(mid, dir, side, Vector3.zAxis),
+			SAILCLOTH,
+			Enum.Material.Fabric
+		)
+	end
+	return model
+end
+
+-- A timber lookout tower (about 17 tall): four splayed legs, cross braces,
+-- a railed deck, a little roof and a ladder up the front (-Z).
+function PropArt.LookoutTower(seed: number): Model
+	local model = Kit.model("LookoutTower")
+	local rng = Kit.rng(seed)
+	local DECK = 11
+	local timber = Kit.vary(SET_TIMBER, rng, 0.04)
+	local corners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
+	local function foot(c: { number }): Vector3
+		return Vector3.new(c[1] * 3, -0.4, c[2] * 3)
+	end
+	local function top(c: { number }, y: number): Vector3
+		return Vector3.new(c[1] * 2.2, y, c[2] * 2.2)
+	end
+	for i, c in ipairs(corners) do
+		plank(model, "Leg", foot(c), top(c, DECK + 4.2), 0.6, 0.6, timber, Enum.Material.Wood)
+		-- One brace per side, from this foot up to the next corner.
+		local n = corners[i % 4 + 1]
+		plank(
+			model,
+			"Brace",
+			foot(c) + Vector3.new(0, 1, 0),
+			top(n, DECK - 1),
+			0.35,
+			0.35,
+			SET_PLANK[3],
+			Enum.Material.Wood
+		)
+		-- The deck's rail on this side.
+		plank(model, "Rail", top(c, DECK + 1.4), top(n, DECK + 1.4), 0.3, 0.3, SET_PLANK[2], Enum.Material.Wood)
+	end
+	block(model, "Deck", Vector3.new(5.6, 0.4, 5.6), CFrame.new(0, DECK, 0), SET_PLANK[1], Enum.Material.WoodPlanks)
+	block(
+		model,
+		"LookoutRoof",
+		Vector3.new(6.4, 0.4, 6.4),
+		CFrame.new(0, DECK + 4.4, 0),
+		SET_SHINGLE[1],
+		Enum.Material.WoodPlanks
+	)
+	block(
+		model,
+		"LookoutRoof",
+		Vector3.new(4, 0.9, 4),
+		CFrame.new(0, DECK + 5, 0) * CFrame.Angles(0, math.pi / 4, 0),
+		SET_SHINGLE[2],
+		Enum.Material.WoodPlanks
+	)
+	-- The ladder up the front.
+	for _, x in ipairs({ -0.55, 0.55 }) do
+		plank(
+			model,
+			"Ladder",
+			Vector3.new(x, -0.2, -3.6),
+			Vector3.new(x, DECK, -2.9),
+			0.25,
+			0.25,
+			SET_TIMBER,
+			Enum.Material.Wood
+		)
+	end
+	for _, y in ipairs({ 3, 6.5 }) do
+		local z = -3.6 + 0.7 * (y / DECK)
+		block(model, "Rung", Vector3.new(1.3, 0.2, 0.2), CFrame.new(0, y, z), SET_TIMBER, Enum.Material.Wood)
+	end
+	return model
+end
+
+-- A set piece by name ("Outcrop", "RuinedCabin", "Windmill",
+-- "LookoutTower"), or nil for a name it doesn't know.
+function PropArt.SetPiece(name: string, seed: number): Model?
+	if name == "Outcrop" then
+		return PropArt.Outcrop(seed)
+	elseif name == "RuinedCabin" then
+		return PropArt.RuinedCabin(seed)
+	elseif name == "Windmill" then
+		return PropArt.Windmill(seed)
+	elseif name == "LookoutTower" then
+		return PropArt.LookoutTower(seed)
+	end
+	return nil
+end
+
 return PropArt

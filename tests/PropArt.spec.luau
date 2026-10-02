@@ -147,6 +147,34 @@ return function(t)
 			end,
 			4,
 		},
+		{
+			"Outcrop",
+			function(s)
+				return PropArt.Outcrop(s)
+			end,
+			25,
+		},
+		{
+			"RuinedCabin",
+			function(s)
+				return PropArt.RuinedCabin(s)
+			end,
+			25,
+		},
+		{
+			"Windmill",
+			function(s)
+				return PropArt.Windmill(s)
+			end,
+			25,
+		},
+		{
+			"LookoutTower",
+			function(s)
+				return PropArt.LookoutTower(s)
+			end,
+			25,
+		},
 	}
 
 	local function parts(model)
@@ -344,6 +372,34 @@ return function(t)
 				-- Sunk 0.2 deeper than before: the body's bottom is 0.2 lower.
 				local bottom = body.CFrame.Y - halfHeight(body)
 				t.ok(bottom < -0.3, string.format("%s seed %d: sunk to %.2f", bodyName, seed, bottom))
+			end
+		end
+	end)
+
+	t.test("the open-country set pieces (WLD-01): SetPiece builds each; outcrops are 3-4 big rocks", function()
+		for _, name in ipairs({ "Outcrop", "RuinedCabin", "Windmill", "LookoutTower" }) do
+			local model = PropArt.SetPiece(name, 9)
+			t.ok(model and model.Name == name, name .. " builds")
+			for _, p in ipairs(parts(model)) do
+				local s = p.Size
+				if math.max(s.X, s.Y, s.Z) < 1 then
+					t.eq(p.CastShadow, false, name .. ": a small " .. p.Name .. " casts a shadow")
+				end
+			end
+		end
+		t.eq(PropArt.SetPiece("Nope", 1), nil)
+		for seed = 1, 30 do
+			local rocks = PropArt.Outcrop(seed):GetChildren()
+			t.ok(#rocks >= 3 and #rocks <= 4, "3-4 rocks")
+			for _, rock in ipairs(rocks) do
+				local widest = 0
+				for _, p in ipairs(parts(rock)) do
+					if p.Name == "Rock" then
+						widest = math.max(widest, p.Size.X)
+					end
+				end
+				-- Rock's body is 0.92 of its size across.
+				t.ok(widest / 0.92 >= 6 - 1e-6 and widest / 0.92 <= 14 + 1e-6, "an outcrop's rocks are 6-14")
 			end
 		end
 	end)

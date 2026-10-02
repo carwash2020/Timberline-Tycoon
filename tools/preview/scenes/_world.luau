@@ -128,6 +128,22 @@ function World.build(ctx)
 	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
 		place(BuildingArt.Signpost(sign.text), sign.cframe)
 	end
+	-- The open country's scenery (WLD-01), as MapBuilder's "5. The scenery" builds it.
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		for _, item in ipairs(spot.items) do
+			local model
+			if item.builder == "Fence" then
+				model = BuildingArt.Fence(item.size)
+			elseif item.builder == "LogPile" or item.builder == "Haybale" then
+				model = BuildingArt.Prop(item.builder, item.seed)
+			else
+				model = PropArt.SetPiece(item.builder, item.seed)
+			end
+			if model then
+				place(model, item.cframe)
+			end
+		end
+	end
 
 	-- The Skyroot and the isles.
 	local sky = WorldPlan.Sky()

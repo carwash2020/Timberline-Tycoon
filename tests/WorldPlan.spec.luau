@@ -1524,4 +1524,182 @@ return function(t)
 			t.ok(impostorTop > 3, "the impostor reads from town: " .. impostorTop .. " degrees")
 		end
 	)
+
+	---------------------------------------------------------------------------
+	-- Open-country scenery (WLD-01)
+	---------------------------------------------------------------------------
+
+	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
+	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+	local scenery = WorldPlan.Scenery()
+
+	-- A piece's models, built the way MapBuilder's "5. The scenery" builds them.
+	local function sceneryModels(spot)
+		local out = {}
+		for _, item in ipairs(spot.items) do
+			local model
+			if item.builder == "Fence" then
+				model = BuildingArt.Fence(item.size)
+			elseif item.builder == "LogPile" or item.builder == "Haybale" then
+				model = BuildingArt.Prop(item.builder, item.seed)
+			else
+				model = PropArt.SetPiece(item.builder, item.seed)
+			end
+			t.ok(model, spot.kind .. ": " .. item.builder .. " builds")
+			Kit.placeAt(model, item.cframe)
+			table.insert(out, model)
+		end
+		return out
+	end
+
+	t.test("scenery: 120-260 set pieces of 25 parts at most, 3,000-5,000 parts in all (WLD-01)", function()
+		t.ok(#scenery >= 120 and #scenery <= 260, #scenery .. " pieces")
+		local total = 0
+		for _, spot in ipairs(scenery) do
+			t.ok(WorldPlan.SceneryRadius[spot.kind] ~= nil, "a known kind: " .. spot.kind)
+			t.ok(#spot.items >= 1, spot.kind .. " has items")
+			local n = 0
+			for _, model in ipairs(sceneryModels(spot)) do
+				n += #parts(model)
+			end
+			t.ok(
+				n >= 1 and n <= 25,
+				string.format("%s at (%.0f, %.0f): %d parts", spot.kind, spot.center.X, spot.center.Z, n)
+			)
+			total += n
+		end
+		t.ok(total >= 3000 and total <= 5000, total .. " scenery parts")
+		-- No balance change: the trees are the ones the economy was tuned on.
+		t.eq(#WorldPlan.Trees(), 322)
+	end)
+
+	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
+		local boulders = WorldPlan.Boulders()
+		local signs = WorldPlan.RoadSigns(WorldPlan.BiomeSignText)
+		local trees = WorldPlan.Trees()
+		local routes = {}
+		local top = sky.gondolaTop.Position
+		for _, from in ipairs({ town.gondola.Position, sky.gondolaBase.Position }) do
+			table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+		end
+		for i, spot in ipairs(scenery) do
+			local c, r = spot.center, spot.radius
+			local here = string.format("%s at (%.0f, %.0f)", spot.kind, c.X, c.Z)
+			t.ok(TerrainGen.RoadClearance(c.X, c.Z) >= r + 4, here .. " is 4+ studs off the road")
+			for _, sample in ipairs(WorldPlan.SceneryFootprint(c.X, c.Z, r)) do
+				t.ok(TerrainGen.WaterLevelAt(sample.X, sample.Y) == nil, here .. " stands in water")
+				t.eq(WorldLayout.FlatWeight(sample.X, sample.Y), 0, here .. " is out of town and the plots")
+				t.ok(TerrainGen.RoadClearance(sample.X, sample.Y) >= 4, here .. " reaches the road")
+			end
+			for _, tree in ipairs(trees) do
+				local d = Vector2.new(c.X - tree.position.X, c.Z - tree.position.Z).Magnitude
+				t.ok(d >= r + 8, here .. " is within 8 studs of a tree")
+			end
+			for _, b in ipairs(boulders) do
+				local d = Vector2.new(c.X - b.position.X, c.Z - b.position.Z).Magnitude
+				t.ok(d >= r + b.size / 2 + 4, here .. " runs into a boulder")
+			end
+			for _, sign in ipairs(signs) do
+				local p = sign.cframe.Position
+				t.ok(Vector2.new(c.X - p.X, c.Z - p.Z).Magnitude >= r + 12, here .. " hides a road sign")
+			end
+			for _, biome in ipairs(BiomeData.All()) do
+				local a = biome.area
+				if a then
+					local d = Vector2.new(c.X - a.x, c.Z - a.z).Magnitude
+					t.ok(d >= a.radius + r + 20, here .. " is in " .. biome.id)
+				end
+			end
+			for _, route in ipairs(routes) do
+				local d = WorldLayout.SegmentDistance(Vector2.new(c.X, c.Z), route[1], route[2])
+				t.ok(d >= r + 30, here .. " is under the gondola")
+			end
+			for j = i + 1, #scenery do
+				local o = scenery[j]
+				local d = Vector2.new(c.X - o.center.X, c.Z - o.center.Z).Magnitude
+				t.ok(d >= r + o.radius + 4, here .. " overlaps another piece")
+			end
+			-- Everything in it stands inside its footprint.
+			for _, model in ipairs(sceneryModels(spot)) do
+				for _, p in ipairs(parts(model)) do
+					local at = p.CFrame.Position
+					local d = Vector2.new(at.X - c.X, at.Z - c.Z).Magnitude
+					t.ok(d <= r, string.format("%s: %s stands %.1f out (footprint %d)", here, p.Name, d, r))
+				end
+			end
+		end
+	end)
+
+	t.test("scenery stands on the ground: nothing floats, its uphill side sinks at most ScenerySink", function()
+		for _, spot in ipairs(scenery) do
+			local c, r = spot.center, spot.radius
+			local here = string.format("%s at (%.0f, %.0f)", spot.kind, c.X, c.Z)
+			local lo, hi = math.huge, -math.huge
+			for _, sample in ipairs(WorldPlan.SceneryFootprint(c.X, c.Z, r)) do
+				local h = TerrainGen.HeightAt(sample.X, sample.Y)
+				lo, hi = math.min(lo, h), math.max(hi, h)
+				t.ok(c.Y <= h, string.format("%s floats %.2f over the ground", here, c.Y - h))
+				t.ok(h - c.Y <= WorldPlan.ScenerySink + 0.15, string.format("%s sinks %.2f", here, h - c.Y))
+			end
+			t.ok((hi - lo) / (2 * r) <= WorldPlan.SceneryGrade, here .. " stands on a steep slope")
+			t.ok(hi < 75, here .. " is up in the mountains")
+			for _, item in ipairs(spot.items) do
+				t.ok(math.abs(item.cframe.Position.Y - c.Y) < 1e-6, here .. ": its items share its base")
+				t.ok(item.cframe.UpVector.Y > 0.99999, here .. ": its items stand upright")
+			end
+		end
+	end)
+
+	t.test("scenery lines the Snow, Volcano and Skyroot roads: something within 120 studs of 80% of them", function()
+		for _, name in ipairs({ "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }) do
+			local road
+			for _, r in ipairs(WorldLayout.Roads) do
+				if r.name == name then
+					road = r
+				end
+			end
+			local checked, near = 0, 0
+			for i = 1, #road.points - 1 do
+				local a, b = road.points[i], road.points[i + 1]
+				local len = (b - a).Magnitude
+				for d = 0, len, 30 do
+					local p = a + (b - a).Unit * d
+					if WorldLayout.FlatWeight(p.X, p.Y) <= 0 and BiomeData.At(p.X, p.Y) == nil then
+						checked += 1
+						for _, spot in ipairs(scenery) do
+							if Vector2.new(spot.center.X - p.X, spot.center.Z - p.Y).Magnitude < 120 then
+								near += 1
+								break
+							end
+						end
+					end
+				end
+			end
+			-- The Hills Road's open stretch is about 90 studs up a bank (steeper
+			-- than SceneryGrade) between the town's edge and the Hills.
+			if name == "HillsRoad" then
+				t.ok(checked <= 5, name .. "'s open stretch is short: " .. checked .. " points")
+			else
+				t.ok(checked > 0, name .. " runs through open country")
+				t.ok(near / checked >= 0.8, string.format("%s: %d of %d points have scenery near", name, near, checked))
+			end
+		end
+	end)
+
+	t.test("scenery is the same on every server", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan").Scenery()
+		t.eq(#again, #scenery)
+		for i, spot in ipairs(scenery) do
+			local o = again[i]
+			t.eq(o.kind, spot.kind)
+			t.ok((o.center - spot.center).Magnitude < 1e-6, spot.kind .. " in the same place")
+			t.eq(#o.items, #spot.items)
+			for k, item in ipairs(spot.items) do
+				t.eq(o.items[k].builder, item.builder)
+				t.eq(o.items[k].seed, item.seed)
+				t.eq(o.items[k].size, item.size)
+				t.ok((o.items[k].cframe.Position - item.cframe.Position).Magnitude < 1e-6, "same item spot")
+			end
+		end
+	end)
 end
