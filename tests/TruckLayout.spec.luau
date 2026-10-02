@@ -117,6 +117,29 @@ return function(t)
 		t.eq(#layout.logSlots, 0)
 	end)
 
+	-- ACT-07: the trucks read as a ladder, and the big wheels stay clear of
+	-- an open deck (its underside no lower than the tyre tops).
+	t.test("the wheel ladder: Rustbucket < Pickup < Flatbed < Rig; open decks clear their tyres", function()
+		local function radius(id)
+			return TruckLayout.For(ItemCatalog.GetTruck(id)).wheelRadius
+		end
+		local ladder = { "Rustbucket", "Pickup", "Flatbed", "LoggingRig" }
+		for i = 2, #ladder do
+			t.ok(
+				radius(ladder[i]) > radius(ladder[i - 1]),
+				ladder[i] .. " has bigger wheels than the " .. ladder[i - 1]
+			)
+		end
+		t.ok(math.abs(radius("LoggingRig") - 1.4) < 0.11, "the Rig's wheels are about 1.4")
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			if layout.bedLength > 0 and not truck.look.bedWalls then
+				local floorBottom = layout.bedFloorY - TruckLayout.BedFloorThickness / 2
+				t.ok(floorBottom >= 2 * layout.wheelRadius - 1e-6, id .. " deck sits on its tyres")
+			end
+		end
+	end)
+
 	-- ACT-03: VehicleService's DriveAttachment (where Drive holds the
 	-- truck's velocity) goes on the rear axle, so trucks turn about their
 	-- rear wheels instead of their middle.
