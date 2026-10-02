@@ -402,6 +402,33 @@ return function(t)
 		for _, id in ipairs({ "hills", "snow", "volcano", "sky" }) do
 			t.eq(signText(id), WorldPlan.BiomeSignText(id), id .. "'s sign")
 		end
+		-- COL-01: the road signs' boards collide; the town's signposts' boards
+		-- don't (people walk under TO THE WOODS's, a rig drives under SELL
+		-- LOGS HERE's), and no signpost's rocks do.
+		local road = {}
+		for _, id in ipairs({ "hills", "snow", "volcano", "sky" }) do
+			road[WorldPlan.BiomeSignText(id)] = true
+		end
+		local boards, solidBoards = 0, 0
+		for _, model in ipairs(s.map:GetChildren()) do
+			if model.Name == "Signpost" then
+				local board = model:FindFirstChild("Board")
+				local label = board and board:FindFirstChildWhichIsA("TextLabel", true)
+				local text = if label then label.Text else "?"
+				boards += 1
+				t.eq(board.CanCollide, road[text] == true, text .. "'s board collides")
+				if board.CanCollide then
+					solidBoards += 1
+				end
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") and d.Name == "Rock" then
+						t.ok(not d.CanCollide, text .. "'s rock collides")
+					end
+				end
+			end
+		end
+		t.eq(solidBoards, 4, "the four road signs' boards")
+		t.ok(boards >= 8, boards .. " signposts")
 		-- One flume per chute, along WorldPlan.ChuteFlume (out off the isle).
 		local flumes = {}
 		for _, child in ipairs(s.map:GetChildren()) do

@@ -386,10 +386,11 @@ step("5. The palm island", function()
 end)
 
 -- Signposts where the roads arrive: the biome, its woods, the gear it needs
--- (WorldPlan.BiomeSignText, which the world preview shows too).
+-- (WorldPlan.BiomeSignText, which the world preview shows too). Their
+-- boards collide (COL-01), 2+ studs off the road.
 step("5. The road signs", function()
 	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
-		place(atomic(BuildingArt.Signpost(sign.text)), sign.cframe)
+		place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
 	end
 end)
 

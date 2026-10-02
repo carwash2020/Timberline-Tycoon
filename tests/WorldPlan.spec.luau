@@ -850,6 +850,25 @@ return function(t)
 		end
 	end)
 
+	t.test("biome road signs' boards collide, 2+ studs off the road; their rocks are looks only (COL-01)", function()
+		for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+			-- As MapBuilder builds them: unlit, the board solid.
+			local model = placed(BuildingArt.Signpost(sign.text, false, true), sign.cframe)
+			local boards = 0
+			for _, p in ipairs(parts(model)) do
+				if p.CanCollide then
+					local c = roadClearance(p.CFrame, p.Size)
+					t.ok(c >= ROAD_MARGIN, string.format("%s: its %s is %.2f studs off the road", sign.text, p.Name, c))
+					boards += if p.Name == "Board" then 1 else 0
+				end
+				if p.Name == "Rock" then
+					t.ok(not p.CanCollide, sign.text .. ": a rock at its foot collides") -- some are 1.5 off the road
+				end
+			end
+			t.eq(boards, 1, sign.text .. "'s board collides")
+		end
+	end)
+
 	t.test("BiomeSignText: each road sign's name, woods and gear, as MapBuilder always wrote them", function()
 		t.eq(WorldPlan.BiomeSignText("hills"), "THE HILLS\npine · maple")
 		t.eq(WorldPlan.BiomeSignText("snow"), "SNOWFIELDS\nfrostwood\nBring: Insulated Coat") -- its slowdown's gear
