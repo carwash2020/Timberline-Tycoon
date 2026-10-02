@@ -10,7 +10,8 @@
 --     NumberMoved, ColorMoved): idle frames write nothing. Per frame: the
 --     sun (ClockTime, so shadows glide) and the lightning flash
 --     (ExposureCompensation), each only when it moves.
---   * The look: Shared/EnvironmentData.Blend for the hour, the biome you're
+--   * The look: Shared/EnvironmentData.Blend for the hour (with its night
+--     mist, STY-05: thicker air 23:00-06:30, lifting by 09:30), the biome you're
 --     in (your "Biome" attribute, set by BiomeService) and the weather
 --     (workspace "Weather" / "WeatherIntensity", read for your biome),
 --     eased over ~3 s so walking into the Volcano or the Phantom Grove
