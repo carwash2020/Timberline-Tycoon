@@ -3,14 +3,17 @@
 -- core loop (V2_PLAN.md §4a), pure so they're tested
 -- (tests/GrabLogic.spec.luau). GrabService (server) and DragController
 -- (client) both use it.
---   * CanGrab(facts): who may take hold of a piece. Dead, selling or held
---     by someone else: no. A shop's display item: yes. On someone else's
---     truck bed: no. Unowned, your own, or an Elder's piece: yes. Someone
---     else's piece within GameConfig.PickupGraceSec of being cut free: no
---     (the cutter's time to haul it off). Otherwise yes: moving someone's
---     wood never changes who is paid for it (NewOwner), but unowned wood
---     becomes the grabber's. `plotAllows` is the hook plot permissions use
---     later (M3): false refuses.
+--   * CanGrab(facts): who may take hold of (or cut) a piece. Dead,
+--     selling or held by someone else: no. A shop's display item: yes. On
+--     someone else's truck bed: no; on your own: yes, whoever's it is (so
+--     nobody can dump wood on your bed). Unowned, your own, or an Elder's
+--     piece: yes. Someone else's piece while they're in the server: no
+--     (wood is its owner's; WoodService drops the owner of wood left
+--     untouched for WoodUnownedAfterSec). An owner who has left: their
+--     piece is free once GameConfig.PickupGraceSec has passed since it was
+--     cut free. Moving someone's wood never changes who is paid for it
+--     (NewOwner), but unowned wood becomes the grabber's. `plotAllows` is
+--     the hook plot permissions use later (M3): false refuses.
 --   * Force/Torque/CanLift: the drag's pull, mass x DragForcePerMass
 --     capped at DragForceCap, so light wood flies and heavy wood drags
 --     along the ground (about 20 mass is the most that lifts).
@@ -32,7 +35,7 @@ local GrabLogic = {}
 -- Who may grab what
 ---------------------------------------------------------------------------
 
-export type Reason = "dead" | "selling" | "held" | "bed" | "plot" | "grace" | "far"
+export type Reason = "dead" | "selling" | "held" | "bed" | "plot" | "owned" | "grace" | "far"
 
 -- What the server knows about one grab request.
 export type Facts = {
@@ -46,8 +49,15 @@ export type Facts = {
 	elder: boolean?, -- an Elder's wood: anyone may grab it at once
 	shopItem: boolean?, -- a shop's display item (M2)
 	bedOwnerId: number?, -- resting on this player's truck bed (M1.6), nil = not on a bed
+	ownerHere: boolean?, -- whether the owner is in the server (nil: count them as here)
 	plotAllows: boolean?, -- plot permissions (M3): false = the plot's owner says no
 }
+
+-- Whether the piece is someone else's (not unowned, not theirs, not an
+-- Elder's, which are everyone's).
+function GrabLogic.OwnedByOther(facts: Facts): boolean
+	return facts.ownerId ~= 0 and facts.ownerId ~= facts.userId and not facts.elder
+end
 
 -- Seconds `facts.userId` still has to wait before grabbing someone else's
 -- fresh piece (0: no wait).
@@ -73,6 +83,10 @@ function GrabLogic.CanGrab(facts: Facts): (boolean, Reason?)
 		return false, "bed"
 	elseif facts.plotAllows == false then
 		return false, "plot"
+	elseif facts.bedOwnerId == facts.userId then
+		return true, nil -- your own truck bed: you may move anything on it
+	elseif GrabLogic.OwnedByOther(facts) and facts.ownerHere ~= false then
+		return false, "owned"
 	elseif GrabLogic.GraceLeft(facts) > 0 then
 		return false, "grace"
 	end
@@ -90,12 +104,15 @@ function GrabLogic.NewOwner(facts: Facts): number
 end
 
 -- The toast for a refused grab, or nil for none (a dead or selling piece
--- is about to vanish). `bedOwnerName` names whose truck it's on.
-function GrabLogic.Message(reason: string?, facts: Facts?, bedOwnerName: string?): string?
+-- is about to vanish). `name` names whose truck it's on ("bed") or whose
+-- wood it is ("owned").
+function GrabLogic.Message(reason: string?, facts: Facts?, name: string?): string?
 	if reason == "held" then
 		return "Someone else is holding that."
 	elseif reason == "bed" then
-		return string.format("That's on %s's truck.", bedOwnerName or "someone")
+		return string.format("That's on %s's truck.", name or "someone")
+	elseif reason == "owned" then
+		return string.format("That's %s's wood.", name or "someone else")
 	elseif reason == "plot" then
 		return "That's on someone's land. Ask them to let you."
 	elseif reason == "far" then

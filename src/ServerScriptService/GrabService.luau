@@ -12,7 +12,8 @@
 -- on the part it names (GrabLogic.ClampToBox: it may have moved a little),
 -- within GrabRange (+ RangeTolerance) of the character, and
 -- GrabLogic.CanGrab (dead, selling, held, someone's truck bed, plot
--- permission, the cutter's PickupGraceSec). Then:
+-- permission, someone else's wood while they're here, the cutter's
+-- PickupGraceSec once they've left). Then:
 --   * the piece's physics goes to the holder's device (SetNetworkOwner),
 --   * its parts join the WoodHeld collision group (it passes through
 --     players, so nobody can ride their own log),
@@ -60,6 +61,12 @@ local GrabService = {}
 
 GrabService.HeldGroup = "WoodHeld" -- held wood: doesn't collide with players
 GrabService.PlayersGroup = "Players" -- every character's parts (v2)
+
+-- Who's in the server, by UserId (a seam for the specs): someone else's
+-- wood is theirs only while they're here (GrabLogic.CanGrab).
+function GrabService.PlayerById(userId: number): Player?
+	return Players:GetPlayerByUserId(userId)
+end
 GrabService.HitMargin = 2 -- studs: a grab may land this far off its part (the piece moved meanwhile)
 GrabService.PutBackHoldSec = 1 -- a piece put back stays the server's this long
 GrabService.JudgeMoves = true -- false: WoodService's WoodWatch judges moves instead
@@ -402,6 +409,7 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 	local current = holdOf[model]
 	local hooks = GrabService.Hooks
 	local bedOwner = if hooks.bedOwner then hooks.bedOwner(piece) else nil
+	local ownerPlayer = if piece.ownerId ~= 0 then GrabService.PlayerById(piece.ownerId) else nil
 	local facts: GrabLogic.Facts = {
 		userId = player.UserId,
 		ownerId = piece.ownerId,
@@ -413,11 +421,13 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 		elder = piece.elder,
 		shopItem = piece.shopItem,
 		bedOwnerId = if bedOwner then bedOwner.UserId else nil,
+		ownerHere = ownerPlayer ~= nil,
 		plotAllows = if hooks.permission then hooks.permission(player, piece) else nil,
 	}
 	local ok, reason = GrabLogic.CanGrab(facts)
 	if not ok then
-		local message = GrabLogic.Message(reason, facts, if bedOwner then bedOwner.DisplayName else nil)
+		local who = if reason == "bed" then bedOwner elseif reason == "owned" then ownerPlayer else nil
+		local message = GrabLogic.Message(reason, facts, if who then who.DisplayName else nil)
 		if message then
 			notify(player, message)
 		end

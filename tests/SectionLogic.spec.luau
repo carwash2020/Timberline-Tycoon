@@ -289,4 +289,24 @@ return function(t)
 		t.eq(SectionLogic.Message("far"), "Too far away. Walk closer to cut.")
 		t.eq(SectionLogic.Message("cooldown"), nil, "a swing too soon is quiet")
 	end)
+
+	t.test("a claim keeps others off a tree while its holder is here and has hit it within TreeClaimSec", function()
+		local GameConfig = t.shared("GameConfig")
+		t.eq(GameConfig.TreeClaimSec, 60)
+		local here = { [1] = true, [2] = true }
+		local function isHere(id)
+			return here[id] == true
+		end
+		local claim = { userId = 1, at = 100 }
+		t.eq(SectionLogic.ClaimBlocks(nil, 2, 100, false, isHere), nil, "no claim: anyone")
+		t.eq(SectionLogic.ClaimBlocks(claim, 1, 150, false, isHere), nil, "your own")
+		t.eq(SectionLogic.ClaimBlocks(claim, 2, 150, false, isHere), 1, "someone else's, fresh")
+		t.eq(SectionLogic.ClaimBlocks(claim, 2, 159.9, false, isHere), 1, "just inside")
+		t.eq(SectionLogic.ClaimBlocks(claim, 2, 160, false, isHere), nil, "lapsed at TreeClaimSec")
+		t.eq(SectionLogic.ClaimBlocks(claim, 2, 101, true, isHere), nil, "an Elder is everyone's")
+		here[1] = nil
+		t.eq(SectionLogic.ClaimBlocks(claim, 2, 101, false, isHere), nil, "its holder left")
+		t.eq(SectionLogic.Message("claimed", "Dale"), "Dale is cutting this tree. Find another one.")
+		t.eq(SectionLogic.Message("claimed"), "Someone is cutting this tree. Find another one.")
+	end)
 end

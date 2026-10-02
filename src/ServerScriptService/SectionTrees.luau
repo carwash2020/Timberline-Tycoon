@@ -35,8 +35,13 @@
 --     (HoldRegrow and StumpHold as TreeService has them). Cutting only
 --     limbs ("limbing") never fells it.
 --   * Felled = the first cut through a trunk section: OnFelled(feller,
---     rec, pieceUids, fallDir) fires once, the feller decided by
---     ForestLogic.Feller over the whole tree's damageBy.
+--     rec, pieceUids, fallDir) fires once. The feller (and the owner of
+--     every piece it frees) is the tree's claimer: the first cut claims a
+--     tree, and nobody else may cut it while the claimer is in the server
+--     and has hit it within GameConfig.TreeClaimSec (SectionLogic
+--     .ClaimBlocks). An Elder is everyone's: its feller is ForestLogic
+--     .Feller over its damageBy, a piece's owner whoever did most of that
+--     cut (SectionLogic.Owner).
 --   * Night-only woods (the Gloam Hollow): SetBiomeDormant hides a biome's
 --     trees and stubs by day (a half-cut tree is whole again tomorrow
 --     night) and brings them back at night (WorldClock).
@@ -121,6 +126,7 @@ export type TreeRecord = {
 	seed: number,
 	planterId: number?,
 	damageBy: { [number]: number }, -- damage each player has done to this growth
+	claim: SectionLogic.Claim?, -- who is cutting it (SectionLogic.ClaimBlocks), nil = nobody
 	temporary: boolean, -- an Elder: gone once felled or faded
 	growth: number, -- counts growths (fellings, deaths): stale work checks it
 	-- The section tree:
@@ -225,6 +231,38 @@ end
 
 local function isHere(userId: number): boolean
 	return Players:GetPlayerByUserId(userId) ~= nil
+end
+
+-- The tree each player is cutting (their claim): one at a time, so nobody
+-- can lock up a grove by hitting every tree once.
+local claimOf: { [number]: TreeRecord } = {}
+
+-- Sets (or clears) who is cutting `rec`, mirrored on its model as
+-- ClaimedBy (a UserId, 0 = nobody) and ClaimedAt (server time of their
+-- last hit) for anything on the client that wants to show it. A player's
+-- new claim ends their old one.
+local function setClaim(rec: TreeRecord, claim: SectionLogic.Claim?)
+	local old = rec.claim
+	if old and claimOf[old.userId] == rec then
+		claimOf[old.userId] = nil
+	end
+	if claim then
+		local previous = claimOf[claim.userId]
+		if previous and previous ~= rec and previous.claim and previous.claim.userId == claim.userId then
+			previous.claim = nil
+			if previous.model.Parent ~= nil then
+				previous.model:SetAttribute("ClaimedBy", 0)
+				previous.model:SetAttribute("ClaimedAt", nil)
+			end
+		end
+		claimOf[claim.userId] = rec
+	end
+	rec.claim = claim
+	local model = rec.model
+	if model.Parent ~= nil then
+		model:SetAttribute("ClaimedBy", if claim then claim.userId else 0)
+		model:SetAttribute("ClaimedAt", if claim then serverTime() else nil)
+	end
 end
 
 local function notify(player: Player, message: string?)
@@ -542,6 +580,7 @@ function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOp
 		seed = seed,
 		planterId = opts.planterId,
 		damageBy = {},
+		claim = nil,
 		temporary = opts.temporary == true,
 		growth = growth,
 		cuts = {},
@@ -731,6 +770,7 @@ function SectionTrees.Regrow(uid: string, planterId: number?, opts: RegrowOption
 	rec.regrowAt = nil
 	rec.heldUntil = nil
 	rec.damageBy = {}
+	setClaim(rec, nil)
 	rec.cut = false
 	rec.preDead = false
 	rec.dead = false
@@ -760,6 +800,7 @@ function SectionTrees.SetBiomeDormant(biomeId: string, dormant: boolean)
 						WoodService.ClearCuts(rec, id)
 					end
 					rec.damageBy = {}
+					setClaim(rec, nil)
 				end
 				rec.ghost = false
 				setVisible(rec, false)
@@ -823,8 +864,10 @@ local function fall(rec: TreeRecord, swinger: Player, dir: Vector3, pieceUid: st
 	rec.felled = true
 	rec.ghost = false
 	rec.growth += 1
-	local most = ForestLogic.Feller(rec.damageBy, swinger.UserId, isHere)
+	local claim = if rec.elder then nil else rec.claim
+	local most = if claim then claim.userId else ForestLogic.Feller(rec.damageBy, swinger.UserId, isHere)
 	local feller = Players:GetPlayerByUserId(most) or swinger
+	setClaim(rec, nil) -- it's down: the wood is the feller's now
 	local model = rec.model
 	model:SetAttribute("Felled", true)
 	model:SetAttribute("FellAt", serverTime())
@@ -934,7 +977,11 @@ local function split(rec: TreeRecord, player: Player, sid: number, hit: WoodServ
 		dir = Vector3.new(out.X, 0, out.Z)
 		dir = if dir.Magnitude > 0.05 then dir.Unit else TreeLogic.FallDirection(rec.base, from, 0)
 	end
-	local ownerId = SectionLogic.Owner(hit.cut, player.UserId, isHere)
+	-- What a claimed tree yields is its claimer's (the one cutting it: only
+	-- they can cut it while it's claimed); an Elder's goes by who did most
+	-- of the cut.
+	local claim = if rec.elder then nil else rec.claim
+	local ownerId = if claim then claim.userId else SectionLogic.Owner(hit.cut, player.UserId, isHere)
 	local owner = Players:GetPlayerByUserId(ownerId) or player
 	local boost = 1
 	local multiplier = SectionTrees.LogMultiplier
@@ -1147,6 +1194,15 @@ function SectionTrees.Chop(
 		WoodService.FireNear(at, "Clink", { pos = at, userId = player.UserId })
 		return false, "tooHard", nil
 	end
+	-- Someone else's tree, mid-cut: theirs while they're at it.
+	if rec then
+		local holder = SectionLogic.ClaimBlocks(rec.claim, player.UserId, now, rec.elder, isHere)
+		if holder then
+			local who = Players:GetPlayerByUserId(holder)
+			notify(player, SectionLogic.Message("claimed", if who then who.DisplayName else nil))
+			return false, "claimed", nil
+		end
+	end
 	local p = piece
 	if p then
 		local held = GrabService.HeldBy(p.model)
@@ -1168,10 +1224,13 @@ function SectionTrees.Chop(
 			elder = p.elder,
 			shopItem = p.shopItem,
 			bedOwnerId = if bedOwner then bedOwner.UserId else nil,
+			ownerHere = p.ownerId ~= 0 and isHere(p.ownerId),
 		}
 		local ok, reason = GrabLogic.CanGrab(facts)
 		if not ok then
-			notify(player, GrabLogic.Message(reason, facts, if bedOwner then bedOwner.DisplayName else nil))
+			local owner = if reason == "owned" then Players:GetPlayerByUserId(p.ownerId) else nil
+			local who = if reason == "bed" then bedOwner else owner
+			notify(player, GrabLogic.Message(reason, facts, if who then who.DisplayName else nil))
 			return false, reason, nil
 		end
 	end
@@ -1181,6 +1240,10 @@ function SectionTrees.Chop(
 		task.spawn(hook, player, def.id)
 	end
 	if rec and sid then
+		if not rec.elder then
+			-- The first cut claims the tree; every hit of theirs keeps it.
+			setClaim(rec, { userId = player.UserId, at = now })
+		end
 		return true, nil, cutStanding(player, rec, sid, at, facing, damage)
 	end
 	local cutPiece = p :: WoodService.Piece
@@ -1363,6 +1426,7 @@ end
 -- For the specs: forget everything.
 function SectionTrees._reset()
 	table.clear(trees)
+	table.clear(claimOf)
 	table.clear(byModel)
 	table.clear(counters)
 	table.clear(folders)

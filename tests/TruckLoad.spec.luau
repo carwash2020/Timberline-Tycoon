@@ -74,6 +74,14 @@ return function(t)
 					GetPlayers = function()
 						return w.players
 					end,
+					GetPlayerByUserId = function(_, userId)
+						for _, p in ipairs(w.players) do
+							if p.UserId == userId then
+								return p
+							end
+						end
+						return nil
+					end,
 				},
 				PhysicsService = {
 					IsCollisionGroupRegistered = function()

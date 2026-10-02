@@ -76,6 +76,10 @@ local GameConfig = {
 	StartingCash = 20, -- v2: a new player's cash
 	-- cutting
 	CutK = 1, -- required damage = hardness * (width/u) * (depth/u) * CutK
+	-- The first player to cut a standing tree claims it: nobody else may cut
+	-- it while they're in the server and have hit it within this many
+	-- seconds (SectionLogic.ClaimBlocks). Elders are everyone's.
+	TreeClaimSec = 60,
 	CutWindow = 0.6, -- studs: a hit this near an existing cut adds to it
 	CutEdge = 0.3, -- studs: cuts keep this far from a section's ends
 	MaxCutsPerSection = 2,

@@ -34,6 +34,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
+local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local UITheme = require(script.Parent.UITheme)
 
@@ -262,6 +263,18 @@ function QuestUI.TutorialTree(model: Model, elderUid: unknown): boolean
 	return not (type(elderUid) == "string" and elderUid ~= "" and uid == elderUid)
 end
 
+-- Whether someone else is cutting this tree (its ClaimedBy / ClaimedAt,
+-- SectionLogic.ClaimBlocks at server time `now`): the beacon looks for
+-- another one. `isHere` says who's in the server.
+function QuestUI.ClaimedByOther(model: Model, userId: number, now: number, isHere: (number) -> boolean): boolean
+	local by, at = model:GetAttribute("ClaimedBy"), model:GetAttribute("ClaimedAt")
+	if type(by) ~= "number" or by == 0 or type(at) ~= "number" then
+		return false
+	end
+	return SectionLogic.ClaimBlocks({ userId = by, at = at }, userId, now, model:GetAttribute("Elder") == true, isHere)
+		~= nil
+end
+
 -- The drag step's pick among loose pieces (tag Wood): 1 for one you own,
 -- 2 for one nobody owns (Owner 0: anyone may take it), nil for someone
 -- else's, or one in someone else's hands (HeldBy).
@@ -298,8 +311,12 @@ end
 local function beaconTarget(step: Step, from: Vector3): BasePart?
 	local target = step.beacon
 	local elderUid = workspace:GetAttribute("ElderUid")
+	local now = workspace:GetServerTimeNow()
+	local function isHere(userId: number): boolean
+		return Players:GetPlayerByUserId(userId) ~= nil
+	end
 	local function choppable(model: Model): boolean
-		return QuestUI.TutorialTree(model, elderUid)
+		return QuestUI.TutorialTree(model, elderUid) and not QuestUI.ClaimedByOther(model, player.UserId, now, isHere)
 	end
 	if target == "tree" then
 		local wood = step.beaconWood

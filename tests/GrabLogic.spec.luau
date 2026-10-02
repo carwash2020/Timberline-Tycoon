@@ -33,8 +33,24 @@ return function(t)
 			-- { what, facts, ok, reason }
 			{ "unowned wood", {}, true },
 			{ "your own fresh cut", { ownerId = ME, createdAt = fresh }, true },
-			{ "someone else's fresh cut", { ownerId = OTHER, createdAt = fresh }, false, "grace" },
-			{ "someone else's, after the grace", { ownerId = OTHER, createdAt = old }, true },
+			{ "someone else's wood while they're here", { ownerId = OTHER, createdAt = old }, false, "owned" },
+			{
+				"someone else's (not known to have left)",
+				{ ownerId = OTHER, createdAt = old, ownerHere = nil },
+				false,
+				"owned",
+			},
+			{
+				"someone else's fresh cut, and they've left",
+				{ ownerId = OTHER, createdAt = fresh, ownerHere = false },
+				false,
+				"grace",
+			},
+			{
+				"someone else's, they've left, after the grace",
+				{ ownerId = OTHER, createdAt = old, ownerHere = false },
+				true,
+			},
 			{ "an Elder's piece, at once", { ownerId = OTHER, createdAt = fresh, elder = true }, true },
 			{ "held by someone else", { heldBy = OTHER }, false, "held" },
 			{ "held by you (a new grip)", { ownerId = ME, heldBy = ME }, true },
@@ -44,7 +60,12 @@ return function(t)
 			{ "a display item someone holds", { shopItem = true, heldBy = OTHER }, false, "held" },
 			{ "on someone else's truck bed", { ownerId = OTHER, createdAt = old, bedOwnerId = OTHER }, false, "bed" },
 			{ "unowned, on someone else's bed", { bedOwnerId = THIRD }, false, "bed" },
-			{ "on your own bed", { ownerId = OTHER, createdAt = old, bedOwnerId = ME }, true },
+			{ "someone else's wood on your own bed", { ownerId = OTHER, createdAt = old, bedOwnerId = ME }, true },
+			{
+				"someone else's fresh cut on your own bed",
+				{ ownerId = OTHER, createdAt = fresh, bedOwnerId = ME },
+				true,
+			},
 			{ "a plot that says no", { plotAllows = false }, false, "plot" },
 			{ "a plot that says yes", { plotAllows = true }, true },
 		}
@@ -55,9 +76,23 @@ return function(t)
 		end
 	end)
 
-	t.test("the grace is PickupGraceSec (45 s) from being cut free, to the second", function()
+	t.test("someone else's wood is theirs while they're here, an Elder's anyone's", function()
+		local f = facts({ ownerId = OTHER, createdAt = NOW - 3600, ownerHere = true })
+		t.eq({ GrabLogic.CanGrab(f) }, { false, "owned" })
+		t.eq(GrabLogic.Message("owned", f, "Pal2"), "That's Pal2's wood.")
+		t.eq(GrabLogic.Message("owned", f), "That's someone else's wood.")
+		t.ok(GrabLogic.OwnedByOther(f))
+		t.ok(not GrabLogic.OwnedByOther(facts({ ownerId = ME })), "yours")
+		t.ok(not GrabLogic.OwnedByOther(facts({ ownerId = 0 })), "nobody's")
+		t.ok(not GrabLogic.OwnedByOther(facts({ ownerId = OTHER, elder = true })), "an Elder's")
+		t.ok(GrabLogic.CanGrab(facts({ ownerId = OTHER, elder = true, ownerHere = true })))
+		f.ownerHere = false
+		t.ok(GrabLogic.CanGrab(f), "once they've left (and the grace is over), anyone's")
+	end)
+
+	t.test("an owner who has left: the grace is PickupGraceSec (45 s) from being cut free, to the second", function()
 		t.eq(GameConfig.PickupGraceSec, 45)
-		local f = facts({ ownerId = OTHER, createdAt = NOW - 44.5 })
+		local f = facts({ ownerId = OTHER, createdAt = NOW - 44.5, ownerHere = false })
 		t.ok(not GrabLogic.CanGrab(f))
 		t.eq(GrabLogic.GraceLeft(f), 0.5)
 		t.eq(GrabLogic.Message("grace", f), "Someone else just cut that. It's free to take in 1 second.")

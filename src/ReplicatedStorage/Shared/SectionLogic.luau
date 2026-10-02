@@ -373,10 +373,38 @@ function SectionLogic.HeightOn(cf: CFrame, size: Vector3, point: Vector3): numbe
 	return cf:PointToObjectSpace(point).Y + size.Y / 2
 end
 
+-- Who is cutting a standing tree: the claim the first cut makes, renewed
+-- by every hit of theirs (`at` = their last hit, on the server's clock).
+export type Claim = { userId: number, at: number }
+
+-- The holder of `claim` when it keeps `userId` off the tree (so they can't
+-- take over someone's half-cut tree), else nil: no claim, their own, an
+-- Elder (everyone helps fell those), a holder who has left (`isHere`
+-- says who's in the server), or one who hasn't hit it for
+-- GameConfig.TreeClaimSec.
+function SectionLogic.ClaimBlocks(
+	claim: Claim?,
+	userId: number,
+	now: number,
+	elder: boolean?,
+	isHere: (number) -> boolean
+): number?
+	if claim == nil or elder or claim.userId == userId then
+		return nil
+	end
+	if now - claim.at >= GameConfig.TreeClaimSec or not isHere(claim.userId) then
+		return nil
+	end
+	return claim.userId
+end
+
 -- The toast for a refused swing, or nil for none (a swing too soon is
--- just ignored; the client mirrors the cooldown).
-function SectionLogic.Message(reason: string?): string?
-	if reason == "far" then
+-- just ignored; the client mirrors the cooldown). `name` is who holds a
+-- claimed tree.
+function SectionLogic.Message(reason: string?, name: string?): string?
+	if reason == "claimed" then
+		return string.format("%s is cutting this tree. Find another one.", name or "Someone")
+	elseif reason == "far" then
 		return "Too far away. Walk closer to cut."
 	elseif reason == "noLOS" then
 		return "Something's in the way."

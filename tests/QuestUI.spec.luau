@@ -98,6 +98,16 @@ return function(t)
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Dormant = true }), ""), false, "the Phantom Grove by day")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 4000, Elder = true, Uid = "e" }), ""), false, "an Elder")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 4000, Uid = "e" }), "e"), false, "the Elder before its attribute lands")
+		-- A tree someone else is cutting (ClaimedBy/ClaimedAt): the beacon finds another.
+		local here = function(id)
+			return id == 7 or id == 9
+		end
+		local claimed = tree({ HP = 1, Uid = "c", ClaimedBy = 9, ClaimedAt = 1000 })
+		t.eq(QuestUI.ClaimedByOther(claimed, 7, 1010, here), true, "someone else's, fresh")
+		t.eq(QuestUI.ClaimedByOther(claimed, 9, 1010, here), false, "your own")
+		t.eq(QuestUI.ClaimedByOther(claimed, 7, 1060, here), false, "lapsed")
+		t.eq(QuestUI.ClaimedByOther(tree({ HP = 1, ClaimedBy = 0 }), 7, 1010, here), false, "nobody's")
+		t.eq(QuestUI.ClaimedByOther(tree({ HP = 1 }), 7, 1010, here), false, "never claimed")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), "e"), true, "any other tree while one is awake")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Elder = false, Uid = "a" }), ""), true)
 	end)

@@ -336,7 +336,7 @@ return function(t)
 		end
 	)
 
-	t.test("wood resting on someone's truck bed is theirs to cut, as it is to grab", function()
+	t.test("wood on someone's truck bed, or anyone's while they're here, is theirs to cut", function()
 		local s = setup()
 		local rec = s.tree("oak")
 		local owner = s.player(1)
@@ -353,9 +353,98 @@ return function(t)
 		t.eq(ok, false)
 		t.eq(why, "bed")
 		onBed = false
-		local ok2 = s.swing(other, part)
-		t.ok(ok2, "off the bed, anyone may cut it once the grace is over")
+		local ok2, why2 = s.swing(other, part)
+		t.eq(ok2, false)
+		t.eq(why2, "owned", "off the bed it's still its owner's while they're here")
+		s.byId[1] = nil -- the owner leaves
+		t.ok(s.swing(other, part), "then anyone may cut it")
 		s.Grab.Hooks.bedOwner = nil
+	end)
+
+	t.test("the first cut claims a tree: nobody else may cut it while its claimer is here and at it", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local base = rec.sections[1]
+		local a = s.player(1)
+		local b = s.player(2, Vector3.new(4, 3, 1))
+		t.eq(rec.model:GetAttribute("ClaimedBy"), nil, "nobody's yet")
+		t.ok(s.swing(a, base), "the first cut")
+		t.eq(rec.model:GetAttribute("ClaimedBy"), 1)
+		local ok, why = s.swing(b, base)
+		t.eq(ok, false)
+		t.eq(why, "claimed")
+		t.eq(s.toasts[#s.toasts][2], "P1 is cutting this tree. Find another one.")
+		-- 59 s after their last hit it's still theirs.
+		s.now += s.GameConfig.TreeClaimSec - 1.7
+		t.eq(select(2, s.swing(b, base)), "claimed", "still theirs just inside TreeClaimSec")
+		local _, okA, _, result = s.cutThrough(a, base)
+		t.ok(okA, "the claimer carries on")
+		t.eq(result.feller, a)
+		t.eq(result.freed[1].ownerId, 1, "what falls is theirs")
+		t.eq(rec.model:GetAttribute("ClaimedBy"), 0, "down: the claim is over")
+	end)
+
+	t.test(
+		"a claim lapses TreeClaimSec after its holder's last hit, or when they leave; the taker owns what falls",
+		function()
+			local s = setup()
+			local rec = s.tree("oak")
+			local base = rec.sections[1]
+			local a = s.player(1)
+			local b = s.player(2, Vector3.new(4, 3, 1))
+			for _ = 1, 12 do
+				t.ok(s.swing(a, base))
+			end
+			s.now += s.GameConfig.TreeClaimSec -- they wander off
+			t.ok(s.swing(b, base), "free to take over")
+			t.eq(rec.model:GetAttribute("ClaimedBy"), 2)
+			t.eq(select(2, s.swing(a, base)), "claimed", "now it's theirs: the first claimer can't cut in")
+			local _, _, _, result = s.cutThrough(b, base)
+			t.eq(result.feller, b, "the taker fells it, though most of the cut was the first player's")
+			t.eq(result.freed[1].ownerId, 2)
+			-- Leaving frees a tree at once.
+			local other = s.tree("oak", Vector3.new(60, 0, 0))
+			local c = s.player(3, Vector3.new(64, 3, 0))
+			local d = s.player(4, Vector3.new(64, 3, 1))
+			t.ok(s.swing(c, other.sections[1]))
+			t.eq(select(2, s.swing(d, other.sections[1])), "claimed")
+			s.byId[3] = nil -- c leaves
+			t.ok(s.swing(d, other.sections[1]), "their tree is free the moment they've gone")
+			t.eq(other.model:GetAttribute("ClaimedBy"), 4)
+		end
+	)
+
+	t.test("one tree at a time: a player's new claim frees their last tree", function()
+		local s = setup()
+		local first = s.tree("oak")
+		local second = s.tree("oak", Vector3.new(0, 0, 8))
+		local a = s.player(1)
+		local b = s.player(2, Vector3.new(4, 3, 1))
+		t.ok(s.swing(a, first.sections[1]))
+		a.root.Position = Vector3.new(4, 3, 8)
+		t.ok(s.swing(a, second.sections[1]), "on to another tree")
+		t.eq(first.model:GetAttribute("ClaimedBy"), 0, "the first one is free again")
+		t.eq(second.model:GetAttribute("ClaimedBy"), 1)
+		t.ok(s.swing(b, first.sections[1]), "so someone else may cut it")
+	end)
+
+	t.test("an Elder is everyone's: no claim, and helpers cut it together", function()
+		local s = setup()
+		local ForestLogic = t.shared("ForestLogic")
+		local model = s.Trees.SpawnTree("oak", CFrame.new(0, 0, 0), {
+			seed = 5,
+			size = ForestLogic.ElderSize(s.WoodData.Get("oak")),
+			temporary = true,
+		})
+		local rec = s.Trees.GetTree(model:GetAttribute("Uid"))
+		local base = rec.sections[1]
+		local reach = base.Size.X / 2 + 3
+		local a = s.player(1, Vector3.new(reach, 3, 0))
+		local b = s.player(2, Vector3.new(reach, 3, 1))
+		t.ok(s.swing(a, base))
+		t.ok(s.swing(b, base), "a helper may cut in")
+		t.eq(rec.claim, nil)
+		t.eq(model:GetAttribute("ClaimedBy"), nil)
 	end)
 
 	t.test("the swing schedule: too soon is refused (cooldown), on time is taken", function()

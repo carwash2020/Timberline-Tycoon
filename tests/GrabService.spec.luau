@@ -67,11 +67,15 @@ return function(t)
 				collidable[a .. "/" .. b] = on
 			end,
 		}
+		local here = {} -- [UserId] = player: who's in the server (w.player adds them)
 		local players = {
 			PlayerAdded = signal(),
 			PlayerRemoving = signal(),
 			GetPlayers = function()
 				return {}
+			end,
+			GetPlayerByUserId = function(_, userId)
+				return here[userId]
 			end,
 		}
 		local loader = t.loader({
@@ -171,9 +175,13 @@ return function(t)
 					return if class == "Humanoid" then humanoid else nil
 				end,
 			}
-			return { UserId = id, Name = "Player" .. id, DisplayName = "Pal" .. id, Character = character },
-				hrp,
-				humanoid
+			local player = { UserId = id, Name = "Player" .. id, DisplayName = "Pal" .. id, Character = character }
+			here[id] = player
+			return player, hrp, humanoid
+		end
+		-- `id` leaves the server (their wood is no longer guarded as theirs).
+		function w.leave(id)
+			here[id] = nil
 		end
 		function w.wait(seconds)
 			now += seconds
@@ -253,20 +261,34 @@ return function(t)
 		t.eq(#w.ownerCalls, 1)
 	end)
 
-	t.test("someone else's fresh cut waits out the 45 s; moving it never changes its owner", function()
+	t.test("someone else's wood is theirs while they're here, however old; once they've left, anyone's", function()
+		local w = setup()
+		local record, section = w.piece(nil, { ownerId = 1, createdAt = 100 - 10 })
+		local owner = w.player(1)
+		local other = w.player(2)
+		t.eq({ w.GrabService.Grab(other, section, HIT) }, { false, "owned" })
+		t.eq(w.toasts[1].message, "That's Pal1's wood.")
+		w.wait(3600)
+		t.eq({ w.GrabService.Grab(other, section, HIT) }, { false, "owned" }, "still theirs an hour on")
+		t.ok(w.GrabService.Grab(owner, section, HIT), "the owner may")
+		w.GrabService.Release(owner, section)
+		w.leave(1)
+		t.ok(w.GrabService.Grab(other, section, HIT), "an owner who left: anyone may")
+		t.eq(record.ownerId, 1, "moving it never changes who's paid")
+		t.eq(record.model:GetAttribute("Owner"), nil, "the attribute wasn't touched")
+		t.eq(record.lastHolderId, 2)
+	end)
+
+	t.test("a fresh cut whose owner has left waits out the 45 s, then it's anyone's", function()
 		local w = setup()
 		local record, section = w.piece(nil, { ownerId = 1, createdAt = 100 - 10 })
 		local other = w.player(2)
+		-- (player 1 was never here: they've left)
 		t.eq({ w.GrabService.Grab(other, section, HIT) }, { false, "grace" })
 		t.eq(w.toasts[1].message, "Someone else just cut that. It's free to take in 35 seconds.")
-		local owner = w.player(1)
-		t.ok(w.GrabService.Grab(owner, section, HIT), "the cutter may")
-		w.GrabService.Release(owner, section)
 		w.wait(GameConfig.PickupGraceSec)
 		t.ok(w.GrabService.Grab(other, section, HIT), "after the grace anyone may")
 		t.eq(record.ownerId, 1, "still the cutter's: they're paid for it")
-		t.eq(record.model:GetAttribute("Owner"), nil, "the attribute wasn't touched")
-		t.eq(record.lastHolderId, 2)
 	end)
 
 	t.test("beforeHold runs once a grab has passed every check, before the physics is handed over (M1.6)", function()
@@ -389,7 +411,9 @@ return function(t)
 
 	t.test("grabbed again inside the window: no automatic handover later", function()
 		local w = setup()
-		local _, section = w.piece()
+		-- An Elder's piece, so a second player may take it straight away
+		-- (anyone else's wood is its owner's while they're here).
+		local _, section = w.piece(nil, { elder = true })
 		local a = w.player(1)
 		local b = w.player(2)
 		t.ok(w.GrabService.Grab(a, section, HIT))
