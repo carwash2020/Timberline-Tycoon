@@ -13,10 +13,11 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | M1.4 grab and drag (+ /spawnwood in Studio) | on main, dormant | 8f4cc09 |
 | M1.7a SellLogic, M1.7 SellService (sells /spawnwood pieces) | on main, dormant | 5aee212, ccc882a |
 | M1.8a v2 tutorial, hints, HUD rules, dailies, guide, shop data | on main, dormant | 2da706e |
-| M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | in progress | |
+| M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | on main, dormant | e444b1b |
 | M1.5 bigger trucks, lot, pad zone (lands live) | in progress | |
 | M1.8b wiring the tutorial, dailies, shop, guide, HUD | in progress | |
-| M1.3 cut anywhere, M1.6 trucks by friction, M1.9 flip, M1.10 cleanup | next | |
+| M1.3 cut anywhere (SectionTrees, WoodService, CutController, WoodFX) | in progress | |
+| M1.6 trucks by friction, M1.9 flip, M1.10 cleanup | next | |
 
 ---
 
