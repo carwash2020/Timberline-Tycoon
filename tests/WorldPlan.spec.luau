@@ -2238,6 +2238,10 @@ return function(t)
 					if water then
 						wet += 1
 						t.ok(top >= water + 1, "the deck stands a stud over the water")
+					else
+						-- No engine grass (it grows on Grass and LeafyGrass) up through the planks.
+						local _, m = TerrainGen.Sample(w.X, w.Z)
+						t.ok(m ~= "Grass" and m ~= "LeafyGrass", "grass under the footbridge's deck")
 					end
 				end
 			elseif plank.Name == "Post" then
@@ -2282,6 +2286,10 @@ return function(t)
 					for _, c in ipairs(corners(p.Size)) do
 						local w = p.CFrame * c
 						t.ok(TerrainGen.HeightAt(w.X, w.Z) <= top - 0.05, here .. ": the ground pokes through its deck")
+						if TerrainGen.WaterLevelAt(w.X, w.Z) == nil then
+							local _, m = TerrainGen.Sample(w.X, w.Z)
+							t.ok(m ~= "Grass" and m ~= "LeafyGrass", here .. ": grass under its deck")
+						end
 					end
 				elseif p.Name == "Post" then
 					local foot = p.CFrame * Vector3.new(0, -p.Size.Y / 2, 0)

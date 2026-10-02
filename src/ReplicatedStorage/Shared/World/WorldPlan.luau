@@ -2886,6 +2886,14 @@ local function landmarkClear(x: number, z: number, r: number): boolean
 		and TerrainGen.RoadClearance(x, z) >= WorldPlan.LandmarkRoad + r
 end
 
+-- Whether the terrain at (x, z) is grass, which grows the engine's grass
+-- blades (Terrain.Decoration): they would poke up through a deck resting
+-- on it (as WorldLayout.TownFloors keeps them out of the shops).
+local function grassUnder(x: number, z: number): boolean
+	local _, material = TerrainGen.Sample(x, z)
+	return material == "Grass" or material == "LeafyGrass"
+end
+
 -- The CFrame at (x, y, z) whose -Z points along the flat direction `dir`.
 local function facingAlong(x: number, y: number, z: number, dir: Vector2): CFrame
 	return CFrame.new(x, y, z) * CFrame.Angles(0, math.atan2(-dir.X, -dir.Y), 0)
@@ -2912,12 +2920,14 @@ local function signBeside(at: Vector2, along: Vector2, off: number, facing: Vect
 end
 
 -- The timber footbridge (STY-04a). No haul road crosses the river, so this
--- is a footbridge for players: where the river runs out from under the
--- Skyroot (the first stretch from its spring that fits), across it from
--- bank to bank. `cframe` is end a on its bank, its -Z toward end b; the
--- deck (LandmarkArt.DeckTop) clears the banks and the water all along,
--- and `beds` is the ground or bed under each post station, over end a's
--- ground. `sign` is the TIMBER BRIDGE signpost by its head.
+-- is a footbridge for players, across it from bank to bank at the first
+-- spot down from its spring under the Skyroot that fits (the Skyroot in
+-- view upstream): level, firm banks with no grass under the deck (the
+-- engine's grass blades would poke through its planks). `cframe` is end a
+-- on its bank, its -Z toward end b; the deck (LandmarkArt.DeckTop) clears
+-- the banks and the water all along, and `beds` is the ground or bed
+-- under each post station, over end a's ground. `sign` is the TIMBER
+-- BRIDGE signpost by its head.
 export type Footbridge = {
 	cframe: CFrame,
 	span: number,
@@ -2987,6 +2997,9 @@ local function bridgeAcross(p: Vector2, n: Vector2): Footbridge?
 			end
 			if wet and top < wet + 1 then
 				return nil
+			end
+			if not wet and grassUnder(q.X, q.Y) then
+				return nil -- the engine's grass would poke up through its planks
 			end
 		end
 	end
@@ -3096,6 +3109,9 @@ local function dockAt(kind: string, land: Vector2, out: Vector2, length: number,
 			local ground = TerrainGen.HeightAt(q.X, q.Y)
 			if ground > top - (if k <= DOCK_ON_BANK then 0.05 else 0.9) then
 				return nil
+			end
+			if TerrainGen.WaterLevelAt(q.X, q.Y) == nil and grassUnder(q.X, q.Y) then
+				return nil -- the engine's grass would poke up through its planks
 			end
 		end
 	end
