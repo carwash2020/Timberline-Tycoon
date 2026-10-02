@@ -15,10 +15,11 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | M1.8a v2 tutorial, hints, HUD rules, dailies, guide, shop data | on main, dormant | 2da706e |
 | M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | on main, dormant | e444b1b |
 | M1.5 bigger trucks, lot, pad zone (LIVE) | on main | 0077061 |
-| M1.8b wiring the tutorial, dailies, shop, guide, HUD | in progress | |
+| M1.8b wiring the tutorial, dailies, shop, guide, HUD | on main, dormant (felling/loading events wait for M1.3/M1.6) | see log |
 | M1.3 cut anywhere (SectionTrees, WoodService, CutController, WoodFX) | in progress | |
 | M1.6 trucks by friction (TruckLoad, BedZones, saved loads) | in progress | |
-| M1.9 migration and the flip, M1.10 cleanup | next | |
+| M1.9 migration and the flip | next: Connor said go ahead without a Studio pass (2 Oct 2026) | |
+| M1.10 cleanup | after about a week live | |
 
 ---
 
