@@ -7,7 +7,9 @@ return function(t)
 	local Instance, Vector3 = roblox.Instance, roblox.Vector3
 	local WoodData = t.shared("WoodData")
 
-	local function setup()
+	-- `options.room`: the wallet's room (addCash credits at most this).
+	local function setup(options)
+		options = options or {}
 		local s = { clock = 0, paid = {}, toasts = {}, released = {}, forgotten = {}, sold = {}, inZone = {} }
 		local loader =
 			t.loader({ services = { Players = {
@@ -57,6 +59,7 @@ return function(t)
 			end,
 			addCash = function(p, amount, reason, sku)
 				table.insert(s.paid, { id = p.UserId, amount = amount, reason = reason, sku = sku })
+				return if options.room then math.min(amount, options.room) else nil
 			end,
 			saleMultiplier = function(p)
 				return if p.UserId == 2 then 2 else 1
@@ -72,6 +75,9 @@ return function(t)
 			end,
 			onSold = function(sale)
 				table.insert(s.sold, sale)
+				if options.failFor == sale.payee.UserId then
+					error("a broken listener")
+				end
 			end,
 			partsInZone = function()
 				return s.inZone
@@ -192,5 +198,46 @@ return function(t)
 		s.tick(0)
 		s.tick(0.5)
 		t.eq(#s.paid, 0)
+	end)
+
+	-- M1.8b: the onSold hook gets what the quests and dailies count.
+	t.test("the sale carries what reached the wallet, each piece's u³ and the figured u³", function()
+		local s = setup({ room = 5 })
+		local _, a = s.piece("a", 1, "pine", 3)
+		local _, b = s.piece("b", 1, "pine", 4, { Figure = "curly" })
+		s.inZone = { a, b }
+		s.tick(0)
+		local sales = s.tick(0.4)
+		t.eq(#sales, 1)
+		local sale = sales[1]
+		t.ok(sale.paid > 5, "worth more than the wallet's room")
+		t.eq(sale.credited, 5, "the cap took the rest")
+		t.ok(string.find(s.toasts[1].text, "· $5", 1, true) ~= nil, "the toast says what was credited")
+		t.eq(s.sold[1], sale, "the hook gets the same sale")
+		table.sort(sale.pieceVolumes)
+		t.eq(sale.pieceVolumes, { 3, 4 })
+		t.eq(sale.figured, 4)
+		t.eq(sale.pieces, 2)
+		-- With room for it all (addCash says nothing back): all of it.
+		local plain = setup()
+		local _, c = plain.piece("c", 1, "oak", 10)
+		plain.inZone = { c }
+		plain.tick(0)
+		local paid = plain.tick(0.4)[1]
+		t.eq(paid.credited, paid.paid)
+		t.eq(paid.figured, 0)
+		t.eq(paid.pieceVolumes, { 10 })
+	end)
+
+	t.test("a listener that errors for one payee doesn't stop the next one's pay", function()
+		local s = setup({ failFor = 1 })
+		local _, a = s.piece("a", 1, "oak", 4)
+		local _, b = s.piece("b", 2, "oak", 4)
+		s.inZone = { a, b }
+		s.tick(0)
+		local sales = s.tick(0.4)
+		t.eq(#sales, 2)
+		t.eq(#s.paid, 2, "both paid")
+		t.eq(#s.sold, 2, "both heard")
 	end)
 end

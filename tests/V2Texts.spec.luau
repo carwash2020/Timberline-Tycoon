@@ -152,6 +152,18 @@ return function(t)
 			"src/ReplicatedStorage/Shared/FieldGuide.luau",
 			"src/ReplicatedStorage/Shared/ShopLogic.luau",
 			"src/StarterPlayer/StarterPlayerScripts/HudRules.luau",
+			-- and the modules M1.8b wired them into
+			"src/ServerScriptService/QuestService.luau",
+			"src/ServerScriptService/DailyService.luau",
+			"src/ServerScriptService/ShopService.luau",
+			"src/ServerScriptService/SellService.luau",
+			"src/ServerScriptService/MilestoneService.luau",
+			"src/ServerScriptService/GameServer.server.luau",
+			"src/StarterPlayer/StarterPlayerScripts/QuestUI.luau",
+			"src/StarterPlayer/StarterPlayerScripts/DailyUI.luau",
+			"src/StarterPlayer/StarterPlayerScripts/ShopUI.luau",
+			"src/StarterPlayer/StarterPlayerScripts/FieldGuideUI.luau",
+			"src/StarterPlayer/StarterPlayerScripts/HUD.luau",
 		}) do
 			local name = banned(fs.readFile(path))
 			t.ok(name == nil, path .. " mentions " .. tostring(name))

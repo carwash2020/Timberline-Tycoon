@@ -13,8 +13,9 @@
 --     record (the resolver: GrabService's registry today, WoodService's
 --     records once section trees land).
 --   * Per payee per tick: one EconomyService.AddCash, one toast ("Sold 3
---     pieces · 41 u³ · $96") and the onSold hook (quests, dailies, figure
---     reveals).
+--     pieces · 41 u³ · $96", the dollars that reached the wallet: the cap
+--     may take some) and the onSold hook (GameServer: the tutorial, the
+--     daily goals, the stopwatch, figure reveals), with the sale's totals.
 -- Runs only in the v2 loop (GameServer wires it under CoreLoop.V2()).
 
 local Players = game:GetService("Players")
@@ -44,16 +45,19 @@ export type Sale = {
 	pieces: number,
 	volume: number, -- u³
 	value: number, -- $ before 2x Cash
-	paid: number, -- $ credited
+	paid: number, -- $ paid out (whole dollars, 2x Cash in)
+	credited: number, -- $ of that which reached the wallet (EconomyService.AddCash; the cap may take some)
 	figures: { string },
 	woods: { [string]: number }, -- u³ by wood id
+	pieceVolumes: { number }, -- each piece's u³
+	figured: number, -- u³ of figured wood among them
 }
 
 export type Deps = {
 	zone: BasePart,
 	woodFolder: Instance,
 	resolve: (Model) -> Piece?,
-	addCash: (Player, number, string, string) -> (),
+	addCash: (Player, number, string, string) -> number?, -- returns what was credited (nil: all of it)
 	saleMultiplier: (Player) -> number,
 	notify: (Player, string) -> (),
 	release: (Model) -> (), -- lets go of a held piece before it goes
@@ -163,7 +167,18 @@ function SellService.Tick(): { Sale }
 		local payee = if payeeId then findPlayer(payeeId) else nil
 		if payee then
 			local sale: Sale = byPayee[payee]
-				or { payee = payee, pieces = 0, volume = 0, value = 0, paid = 0, figures = {}, woods = {} }
+				or {
+					payee = payee,
+					pieces = 0,
+					volume = 0,
+					value = 0,
+					paid = 0,
+					credited = 0,
+					figures = {},
+					woods = {},
+					pieceVolumes = {},
+					figured = 0,
+				}
 			if byPayee[payee] == nil then
 				byPayee[payee] = sale
 				table.insert(order, sale)
@@ -172,19 +187,32 @@ function SellService.Tick(): { Sale }
 			sale.volume += volume
 			sale.value += value
 			sale.woods[woodId] = (sale.woods[woodId] or 0) + volume
+			table.insert(sale.pieceVolumes, volume)
 			if figure then
 				table.insert(sale.figures, figure)
+				sale.figured += volume
 			end
 		end
 	end
 	for _, sale in ipairs(order) do
 		sale.paid = SellLogic.Payout(sale.value, d.saleMultiplier(sale.payee))
 		if sale.paid > 0 then
-			d.addCash(sale.payee, sale.paid, "sold wood", "wood")
+			local credited = d.addCash(sale.payee, sale.paid, "sold wood", "wood")
+			sale.credited = if type(credited) == "number" and credited == credited
+				then math.clamp(credited, 0, sale.paid)
+				else sale.paid
 		end
-		d.notify(sale.payee, SellLogic.SaleText(sale.pieces, sale.volume, sale.paid))
-		if d.onSold then
-			d.onSold(sale)
+		d.notify(sale.payee, SellLogic.SaleText(sale.pieces, sale.volume, sale.credited))
+		local onSold = d.onSold
+		if onSold then
+			-- On its own: a broken listener mustn't stop the next payee's pay.
+			local ok, err = pcall(function(): any
+				onSold(sale)
+				return nil
+			end)
+			if not ok then
+				warn("[SellService] onSold failed: " .. tostring(err))
+			end
 		end
 	end
 	return order

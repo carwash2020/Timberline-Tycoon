@@ -528,14 +528,59 @@ local function onInstantDelivery(player: Player)
 	completeSale(player, profile, total, count, byWood, figures)
 end
 
+-- A v2 sale (SellService, per payee per tick), which SellService has paid
+-- and toasted: what the stopwatch, the Living Forest's reveals, the
+-- tutorial and the daily goals hear about, as completeSale tells them of
+-- a v1 sale.
+local function onWoodSold(sale: SellService.Sale)
+	local player = sale.payee
+	if not ProfileService.GetProfile(player) then
+		return -- left meanwhile: nothing was credited
+	end
+	local credited = sale.credited
+	MilestoneService.Mark(player, "First sale")
+	MilestoneService.CashEarned(player, credited)
+	MilestoneService.WoodSold(player, sale.pieces, sale.woods)
+	if #sale.figures > 0 then
+		local figures: { [string]: number } = {}
+		for _, figure in ipairs(sale.figures) do
+			figures[figure] = (figures[figure] or 0) + 1
+		end
+		safely("ForestService.OnSale", ForestService.OnSale, player, figures)
+	end
+	local overflow = sale.paid - credited
+	if overflow > 0 then
+		notify(
+			player,
+			string.format(
+				"Wallet full at %s: %s didn't fit. Spend some!",
+				Util.formatCash(GameConfig.CashCap),
+				Util.formatCash(overflow)
+			)
+		)
+	end
+	-- After the sale's toasts, so rewards read last.
+	safely("QuestService.WoodSold", QuestService.WoodSold, player, sale.pieces, credited)
+	safely("DailyService.WoodSold", DailyService.WoodSold, player, {
+		volume = sale.volume,
+		cash = credited,
+		byWood = sale.woods,
+		pieces = sale.pieceVolumes,
+		figured = sale.figured,
+	})
+end
+
 -- Each Init on its own (safely): one failing leaves that service broken
--- but the server, the other services and spawning carry on.
-safely("MilestoneService.Init", MilestoneService.Init, notify)
+-- but the server, the other services and spawning carry on. The services
+-- that read v2 data (prices, tutorial steps, daily goals) get the core
+-- loop that runs (MapBuilder published it before the map was built).
+local activeLoop = CoreLoop.Active()
+safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
 safely("AxeService.Init", AxeService.Init, notify)
-safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify)
+safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify, activeLoop)
 safely("VehicleService.Init", VehicleService.Init, notify)
-safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify)
-safely("DailyService.Init", DailyService.Init, notify)
+safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify, activeLoop)
+safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
 safely("FieldGuideService.Init", FieldGuideService.Init, notify)
@@ -556,6 +601,20 @@ safely("NPCService.Init", NPCService.Init, mapFolder)
 if CoreLoop.V2() then
 	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
 	safely("DevCommands.Init", DevCommands.Init, notify)
+	-- Grabbing a piece: the tutorial's drag step and the funnel's pickup.
+	GrabService.Hooks.onGrab = function(player: Player, _piece: GrabService.Piece)
+		safely("woodGrabbed", function()
+			MilestoneService.Mark(player, "First log picked up")
+			QuestService.Event(player, "woodGrabbed")
+		end)
+	end
+	-- Still to come, each its own slice's call (QuestService.Event):
+	--   SectionTrees (M1.3), once per tree felled, for the feller:
+	--     QuestService.Event(feller, "treeFelled") and
+	--     DailyService.Event(feller, "treeFelled", 1), as onChopTree does;
+	--   TruckLoad (M1.6), when a piece comes to rest in its owner's own
+	--     BedZone: QuestService.Event(owner, "woodLoaded") and
+	--     MilestoneService.Mark(owner, "First log loaded").
 	-- The sell pad sells loose wood by volume (M1.7).
 	local woodFolder = mapFolder:FindFirstChild("Wood")
 	if not woodFolder then
@@ -572,8 +631,9 @@ if CoreLoop.V2() then
 			local piece = if root then GrabService.PieceOf(root) else nil
 			return piece :: any
 		end,
-		addCash = function(player: Player, amount: number, reason: string, sku: string)
-			EconomyService.AddCash(player, amount, reason, sku)
+		addCash = function(player: Player, amount: number, reason: string, sku: string): number?
+			local credited = EconomyService.AddCash(player, amount, reason, sku)
+			return credited
 		end,
 		saleMultiplier = MonetizationService.SaleMultiplier,
 		notify = notify,
@@ -581,6 +641,7 @@ if CoreLoop.V2() then
 			GrabService.ReleasePiece(model, "sold")
 		end,
 		forget = GrabService.Unregister,
+		onSold = onWoodSold,
 	})
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
