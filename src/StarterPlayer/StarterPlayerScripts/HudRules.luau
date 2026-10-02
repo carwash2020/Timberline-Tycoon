@@ -21,6 +21,10 @@
 --   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
 --   * SeedToast() (ForestUI): what Heartseeds landing in your pouch say.
 --   * ClockText() (WorldUI): the corner clock, "Day 14:05" / "Night 22:10".
+--   * PadKeys, PadShortcut() (HUD.PadShortcut): the D-pad opens Daily
+--     Goals, the Field Guide and Settings, only while nothing else has the
+--     pad; PadGlyphs() and PadSelects(): their glyph chips show, and a
+--     popup takes the selection, only while you're on a gamepad (or a TV).
 -- The server stays in charge of what any of them do.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -233,6 +237,46 @@ end
 -- Grove's trees are out (WorldTime.IsNight).
 function HudRules.ClockText(clockTime: number): string
 	return string.format("%s %s", if WorldTime.IsNight(clockTime) then "Night" else "Day", WorldTime.Format(clockTime))
+end
+
+-- The gamepad's D-pad shortcuts (KeyCode names), one direction each.
+-- DPadDown is "Drop axe" (AxeController's side button, UI-06). None of
+-- them is a button anything else binds: ButtonA/B/X/Y, the shoulders,
+-- the triggers and the thumbsticks belong to Roblox's controls, the world
+-- prompts, the shops (B closes), the placer and the truck.
+HudRules.PadKeys = {
+	daily = "DPadUp", -- Daily Goals (DailyUI)
+	guide = "DPadLeft", -- the Field Guide (FieldGuideUI), once you have it
+	settings = "DPadRight", -- Settings (SettingsUI)
+	dropAxe = "DPadDown", -- Drop axe (AxeController)
+}
+
+-- What's going on when a D-pad shortcut is pressed.
+export type PadState = {
+	available: boolean, -- what it opens is there for you (Daily after the tutorial, the guide once Murph gave it)
+	typing: boolean, -- a text box has focus (the chat)
+	selecting: boolean, -- a menu has the pad (GuiService.SelectedObject is set)
+	modal: boolean, -- a shop panel is open (HUD.SetModal: the shops, the Store, the Field Guide)
+	seated: boolean, -- you're in a seat (driving a truck)
+	prompt: boolean, -- a world prompt on screen uses the same button
+}
+
+-- Whether a D-pad shortcut does its thing: only when it's available and
+-- nothing else holds the pad.
+function HudRules.PadShortcut(state: PadState): boolean
+	return state.available and not (state.typing or state.selecting or state.modal or state.seated or state.prompt)
+end
+
+-- The glyph chips beside the corner buttons (which D-pad direction opens
+-- what): only while you're on a gamepad, or on a TV (UITheme.Device()).
+function HudRules.PadGlyphs(device: string): boolean
+	return device == "console"
+end
+
+-- Whether opening a popup puts the gamepad's selection on its first
+-- button (so A works at once): the same, so a mouse never gets a ring.
+function HudRules.PadSelects(device: string): boolean
+	return device == "console"
 end
 
 return HudRules

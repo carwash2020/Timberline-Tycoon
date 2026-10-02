@@ -20,7 +20,7 @@ return function(t)
 			services = {
 				GuiService = {
 					IsTenFootInterface = function()
-						return false
+						return device.tenFoot == true
 					end,
 					TopbarInset = device.topbar or roblox.Rect.new(0, 0, 0, 0),
 					GetGuiInset = function()
@@ -116,6 +116,27 @@ return function(t)
 			{ math.floor(danger.R * 255 + 0.5), math.floor(danger.G * 255 + 0.5), math.floor(danger.B * 255 + 0.5) },
 			{ 192, 80, 58 }
 		)
+	end)
+
+	-- UI-15: the glyph chip's text when Roblox has no image for a button.
+	t.test("a glyph chip without Roblox's image shows the D-pad's arrow or the button's letter", function()
+		local UITheme = theme({})
+		t.eq(UITheme.GlyphText("DPadUp"), "▲")
+		t.eq(UITheme.GlyphText("DPadDown"), "▼")
+		t.eq(UITheme.GlyphText("DPadLeft"), "◀")
+		t.eq(UITheme.GlyphText("DPadRight"), "▶")
+		t.eq(UITheme.GlyphText("ButtonB"), "B")
+		t.eq(UITheme.GlyphText("ButtonR2"), "R2")
+	end)
+
+	-- UI-15: a TV (the ten-foot interface) gets the desktop sizes, never the phone's.
+	t.test("a console's TV reads the desktop sizes, not the phone's", function()
+		local UITheme = theme({}, { touch = false, keyboard = false, tenFoot = true })
+		t.eq(UITheme.Device(), "console")
+		t.eq(UITheme.IsPhone(), false)
+		t.eq(select(1, UITheme.Margin()), 64, "inside a TV's safe area")
+		t.ok(UITheme.Sized("DailyButton") == UITheme.Sizes.desktop.DailyButton)
+		t.ok(UITheme.Sized("SettingsToggle") == UITheme.Sizes.desktop.SettingsToggle)
 	end)
 
 	-- UI-07: the phone sizes (UITheme.Sizes.phone), what Sized() reads on a phone.

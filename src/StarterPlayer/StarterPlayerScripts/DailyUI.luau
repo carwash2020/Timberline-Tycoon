@@ -7,6 +7,9 @@
 --   * Tapping it opens the day's goals (one of the corner's popups, under
 --     it): progress bars, each goal's reward, the bonus for finishing them
 --     all, and the time until new goals.
+--   * On a gamepad, DPadUp opens and closes it too (HUD.PadShortcut), and
+--     a glyph chip left of the button says so; B closes it (HUD.Popup).
+--     It has no buttons, so nothing is selected: you can still walk.
 -- The server owns progress: it sets the DailyGoals, DailyStreak and
 -- DailyResetAt attributes, and this redraws from them.
 
@@ -253,6 +256,13 @@ local function build()
 		refresh()
 	end
 	b.Activated:Connect(toggle)
+	-- The pad's shortcut, and its glyph just left of the button (UI-15).
+	HUD.PadShortcut(Enum.KeyCode.DPadUp, function() -- HudRules.PadKeys.daily
+		return b.Visible
+	end, toggle)
+	local glyph = HUD.PadGlyph(Enum.KeyCode.DPadUp, b)
+	glyph.LayoutOrder = b.LayoutOrder - 1
+	glyph.Parent = line
 	UITheme.Clicks(b) -- a plain button: it clicks like the Buttons (its HitPad does too)
 	local slot = buttonSlot
 	if spec.hit and slot then
