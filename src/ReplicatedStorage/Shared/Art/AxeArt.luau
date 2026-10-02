@@ -5,7 +5,8 @@
 -- into a long bearded bit; Cobalt is icy blue with a spike; Gold is a
 -- double-bitted labrys with a ruby; Obsidian is jagged black glass;
 -- Inferno has a glowing edge, flame tongues and embers; Starfall is a
--- white-gold crescent with a star and sparkles. Pure (see Kit).
+-- white crescent with a glowing gold rim on an indigo haft, with a star and
+-- sparkles. Pure (see Kit).
 --
 -- Contract (AxeService, the preview):
 --   * Build(def) returns a Model built upright around the origin: the
@@ -572,15 +573,24 @@ builders.InfernoAxe = function(model, def)
 	sparks.Parent = glow
 end
 
--- Starfall: a white-gold crescent with a glowing rim, a star on the poll,
--- gold spirals up the haft and a drift of sparkles.
+-- Starfall: a white crescent with a glowing gold rim (its only Neon) on a
+-- deep indigo haft with gold bands, a gold star on the poll and a drift of
+-- sparkles.
 builders.StarfallAxe = function(model, def)
-	local ctx = haft(model, 3.4, hex("#EFE6D2"), hex(def.look.headColor), Enum.Material.Fabric)
+	local indigo = hex("#2B3A6B")
+	local ctx = haft(model, 3.4, indigo, Kit.shade(indigo, -0.25), Enum.Material.Fabric)
 	local white = hex("#F4EEDC")
 	local gold = hex("#E1B530")
 	local rim = hex("#FFE7A0")
 	local blue = hex(def.look.headColor)
 	local mat = Enum.Material.SmoothPlastic
+	-- The grip's two bands in gold, like the ones up the haft.
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") and d.Name == "GripBand" then
+			d.Color = gold
+			d.Material = Enum.Material.Foil
+		end
+	end
 	collar(ctx, white, mat, 0.8)
 	part(
 		ctx,
@@ -602,32 +612,31 @@ builders.StarfallAxe = function(model, def)
 		mat
 	)
 	-- The crescent: a band of segments on an arc bowing forward, its horns
-	-- sweeping back past the eye, a glowing rim round its outer curve.
+	-- sweeping back past the eye, a glowing rim round its outer curve. The
+	-- pieces are long enough (and the horns close enough, at 65 degrees)
+	-- that their outer corners meet at every joint, so the band and its rim
+	-- read as one unbroken curve (AxeArt.spec walks the joints). The horns
+	-- are thinner on the inside only: the outer edge stays smooth while the
+	-- inner one tapers.
 	local radius = 0.95
 	local front = -COLLAR_D / 2 - neck - 0.15 -- the band's middle (its front-to-back centre)
 	local glow: BasePart = ctx.handle
-	for i, deg in ipairs({ 0, 35, -35, 70, -70 }) do
+	for i, deg in ipairs({ 0, 35, -35, 65, -65 }) do
 		local a = math.rad(deg)
 		local horn = math.abs(deg) > 50
-		local len = if horn then 0.5 else 0.62
+		local len = if horn then 0.64 else 0.8
 		local at = CFrame.new(0, ctx.headY + radius * math.sin(a), front + radius * (1 - math.cos(a)))
 			* CFrame.Angles(a, 0, 0)
 		part(
 			ctx,
 			if horn then "Horn" else "Crescent",
 			Vector3.new(shape.thick, len, if horn then 0.24 else 0.32),
-			at,
+			if horn then at * CFrame.new(0, 0, -0.04) else at,
 			white,
 			mat
 		)
-		local r = part(
-			ctx,
-			"Rim",
-			Vector3.new(0.12, len + 0.02, 0.07),
-			at * CFrame.new(0, 0, if horn then -0.14 else -0.18),
-			rim,
-			Enum.Material.Neon
-		)
+		local r =
+			part(ctx, "Rim", Vector3.new(0.12, len + 0.04, 0.07), at * CFrame.new(0, 0, -0.18), rim, Enum.Material.Neon)
 		if i == 1 then
 			glow = r
 		end
@@ -639,10 +648,10 @@ builders.StarfallAxe = function(model, def)
 		"Star",
 		Vector3.new(0.08, 0.44, 0.44),
 		starAt * CFrame.Angles(math.rad(45), 0, 0),
-		rim,
-		Enum.Material.Neon
+		gold,
+		Enum.Material.Foil
 	)
-	part(ctx, "Star", Vector3.new(0.1, 0.3, 0.3), starAt, gold, Enum.Material.Foil)
+	part(ctx, "Star", Vector3.new(0.1, 0.3, 0.3), starAt, rim, mat)
 	cheeks(
 		ctx,
 		"Gem",
@@ -654,7 +663,7 @@ builders.StarfallAxe = function(model, def)
 		Enum.Material.Glass,
 		math.rad(45)
 	)
-	-- Gold spirals up the haft.
+	-- Gold bands spiralling up the haft.
 	for i, y in ipairs({ 1.45, 1.8, 2.15, 2.5 }) do
 		part(
 			ctx,
