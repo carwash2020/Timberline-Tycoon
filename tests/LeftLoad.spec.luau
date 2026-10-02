@@ -131,6 +131,108 @@ return function(t)
 		t.eq(LeftLoad.ToRestore({}), {})
 	end)
 
+	-- v2 (M1.6): the loose wood on the bed, saved in profile.truckLoad.
+	local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
+	local function isWood(id)
+		return id == "oak" or id == "pine"
+	end
+	local function near(a, b, eps)
+		return (a.Position - b.Position).Magnitude < (eps or 0.002)
+			and (a.LookVector - b.LookVector).Magnitude < 0.001
+			and (a.UpVector - b.UpVector).Magnitude < 0.001
+	end
+	-- A saved piece with `sections` sections.
+	local function piece(sections, over)
+		local s = {}
+		for i = 1, sections do
+			table.insert(s, LeftLoad.EncodeSection(Vector3.new(2, 9, 2), CFrame.new(0, (i - 1) * 9, 0), 3))
+		end
+		local p = { w = "oak", k = "log", bed = "BedFloor", at = LeftLoad.EncodeCFrame(CFrame.new(0, 1.25, 0)), s = s }
+		for k, v in pairs(over or {}) do
+			p[k] = v
+		end
+		return p
+	end
+
+	t.test("a place on the bed round-trips through 6 saved numbers", function()
+		local cf = CFrame.new(1.234, 2.5, -7.75) * CFrame.fromEulerAnglesXYZ(0.3, -1.2, 2.5)
+		local saved = LeftLoad.EncodeCFrame(cf)
+		t.eq(#saved, 6)
+		t.ok(near(LeftLoad.DecodeCFrame(saved), cf), "same place, same turn")
+		t.eq(LeftLoad.DecodeCFrame({ 1, 2, 3 }), nil, "too few numbers")
+		t.eq(LeftLoad.DecodeCFrame({ 0 / 0, 0, 0, 0, 0, 0 }), nil, "NaN")
+		t.eq(LeftLoad.DecodeCFrame({ 1e6, 0, 0, 0, 0, 0 }), nil, "miles from its bed")
+		t.eq(LeftLoad.DecodeCFrame("junk"), nil)
+		local size, rel, faces = LeftLoad.DecodeSection(LeftLoad.EncodeSection(Vector3.new(2, 9, 2), cf, 2))
+		t.eq(size, Vector3.new(2, 9, 2))
+		t.ok(near(rel, cf), "section place")
+		t.eq(faces, 2)
+		t.eq(LeftLoad.DecodeSection({ 0, 9, 2, 0, 0, 0, 0, 0, 0, 0 }), nil, "a flat section is junk")
+	end)
+
+	t.test("CleanPiece keeps a sane piece and drops junk", function()
+		local good = piece(2, { f = "burl", x = 2 })
+		local clean = LeftLoad.CleanPiece(good, isWood)
+		t.ok(clean, "kept")
+		t.eq(clean.w, "oak")
+		t.eq(clean.f, "burl")
+		t.eq(clean.x, 2)
+		t.eq(#clean.s, 2)
+		t.ok(clean ~= good and clean.s ~= good.s, "a new table")
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "weird" }), isWood).k, "log", "an odd kind reads as a log")
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank" }), isWood).k, "plank")
+		t.eq(LeftLoad.CleanPiece(piece(1, { x = 1 }), isWood).x, nil, "boost 1 is no boost")
+		t.eq(LeftLoad.CleanPiece(piece(1, { x = 50 }), isWood).x, LeftLoad.MaxBoost, "boost capped")
+		t.eq(LeftLoad.CleanPiece(piece(1, { w = "unobtainium" }), isWood), nil, "unknown wood")
+		t.eq(LeftLoad.CleanPiece(piece(1, { bed = "Roof" }), isWood), nil, "unknown bed")
+		t.eq(LeftLoad.CleanPiece(piece(1, { at = { 1, 2 } }), isWood), nil, "no place")
+		t.eq(LeftLoad.CleanPiece(piece(0), isWood), nil, "no sections")
+		local broken = piece(2)
+		broken.s[2] = { "x" }
+		t.eq(LeftLoad.CleanPiece(broken, isWood), nil, "a broken section")
+		t.eq(LeftLoad.CleanPiece(5, isWood), nil)
+	end)
+
+	t.test("the save holds MaxSavedPieces pieces and MaxSavedSections sections, most valuable first", function()
+		t.eq(GameConfig.MaxSavedPieces, 40)
+		t.eq(GameConfig.MaxSavedSections, 300)
+		local many = {}
+		for i = 1, 60 do
+			table.insert(many, piece(1, { f = tostring(i) }))
+		end
+		local kept, dropped = LeftLoad.Fit(many)
+		t.eq(#kept, 40)
+		t.eq(dropped, 20)
+		for i = 1, 40 do
+			t.ok(kept[i] == many[i], "kept in the order given: " .. i)
+		end
+		-- Sections: a big piece that doesn't fit is skipped, a smaller one
+		-- after it still goes in.
+		local list = { piece(250), piece(60), piece(50) }
+		local fit, over = LeftLoad.Fit(list)
+		t.eq(#fit, 2)
+		t.eq(over, 1)
+		t.ok(fit[1] == list[1] and fit[2] == list[3], "the 60-section piece is skipped")
+		local total = 0
+		for _, p in ipairs(fit) do
+			total += #p.s
+		end
+		t.ok(total <= GameConfig.MaxSavedSections, "sections capped")
+	end)
+
+	t.test("PiecesToRestore cleans then caps a saved truckLoad", function()
+		local saved = { piece(1), "junk", piece(1, { w = "gone" }) }
+		for _ = 1, 45 do
+			table.insert(saved, piece(1, { w = "pine" }))
+		end
+		local kept, dropped = LeftLoad.PiecesToRestore(saved, isWood)
+		t.eq(#kept, 40)
+		t.eq(dropped, 2 + 6)
+		t.eq(kept[1].w, "oak")
+		t.eq(LeftLoad.PiecesToRestore(nil, isWood), {})
+		t.eq(LeftLoad.PiecesToRestore({}, isWood), {})
+	end)
+
 	t.test("restoring 150 saved logs creates 72 log models at most, each with one prompt", function()
 		local restore = world()
 		local restored, models, prompts = restore(LeftLoad.ToRestore(saves(150)))
