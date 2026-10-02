@@ -1569,8 +1569,10 @@ return function(t)
 			total += n
 		end
 		t.ok(total >= 3000 and total <= 5000, total .. " scenery parts")
-		-- No balance change: the trees are the ones the economy was tuned on.
-		t.eq(#WorldPlan.Trees(), 322)
+		-- The 322 trees the economy was tuned on, then the country stands
+		-- (phase 10, Connor asked for many more trees; the economy model
+		-- doesn't read WorldPlan, so ECONOMY.md stays as it was).
+		t.eq(#WorldPlan.Trees(), 500)
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -1700,6 +1702,171 @@ return function(t)
 				t.eq(o.items[k].size, item.size)
 				t.ok((o.items[k].cframe.Position - item.cframe.Position).Magnitude < 1e-6, "same item spot")
 			end
+		end
+	end)
+
+	---------------------------------------------------------------------------
+	-- Country stands (phase 10: more wild trees in the open country)
+	---------------------------------------------------------------------------
+
+	local FIRST = 322 -- the trees every server spawned before the stands
+	local stands = WorldPlan.CountryStands()
+
+	t.test("the first 322 trees never move: same woods, places and order as before the stands", function()
+		local trees = WorldPlan.Trees()
+		-- A fingerprint of the first 322 (index, wood, biome, x, z), worked out
+		-- from the code before the stands were added (phase 10).
+		local h = 7
+		for i = 1, FIRST do
+			local tree = trees[i]
+			local s = string.format("%d %s %s %.2f %.2f;", i, tree.woodId, tree.biome, tree.position.X, tree.position.Z)
+			for k = 1, #s do
+				h = (h * 31 + string.byte(s, k)) % 1000000007
+			end
+		end
+		t.eq(h, 60810855, "the first 322 trees moved, changed wood or changed order")
+		local function at(i, woodId, biome, x, z)
+			local tree = trees[i]
+			t.eq(tree.woodId, woodId)
+			t.eq(tree.biome, biome)
+			t.ok(math.abs(tree.position.X - x) < 0.01 and math.abs(tree.position.Z - z) < 0.01, "tree " .. i)
+		end
+		at(1, "birch", "starter", 13.32, -109.42)
+		at(161, "emberwood", "volcano", 1026.22, 1000.44)
+		at(FIRST, "pine", "wild", -827.12, 642.62)
+	end)
+
+	t.test("country stands: 150-200 new trees after the first 322, in stands of 4-9", function()
+		local trees = WorldPlan.Trees()
+		local i = FIRST
+		for _, stand in ipairs(stands) do
+			t.ok(#stand.trees >= 4 and #stand.trees <= 9, #stand.trees .. " trees in a stand")
+			for _, spot in ipairs(stand.trees) do
+				i += 1
+				t.eq(trees[i], spot, "the stands' trees come after the first 322, in order")
+				t.eq(spot.biome, "wild")
+			end
+		end
+		t.eq(#trees, i)
+		local added = #trees - FIRST
+		t.ok(added >= 150 and added <= 200, added .. " new trees")
+		t.ok(#stands >= 20, #stands .. " stands")
+	end)
+
+	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()
+		local common = { oak = true, birch = true, pine = true, maple = true }
+		for _, stand in ipairs(stands) do
+			local c = stand.center
+			local here = string.format("the stand at (%.0f, %.0f)", c.X, c.Y)
+			-- Never sparser than one tree per 1,200 sq studs, never denser than the Starter Forest's 400.
+			local perTree = math.pi * stand.radius ^ 2 / #stand.trees
+			t.ok(perTree >= 399 and perTree <= 1200, string.format("%s: %.0f sq studs a tree", here, perTree))
+			for k, spot in ipairs(stand.trees) do
+				local p = spot.position
+				t.ok(common[spot.woodId], here .. " grows " .. spot.woodId .. " (a biome's own wood)")
+				t.ok(Vector2.new(p.X - c.X, p.Z - c.Y).Magnitude <= stand.radius + 1e-3, here .. ": a tree outside it")
+				for j = k + 1, #stand.trees do
+					local q = stand.trees[j].position
+					local d = Vector2.new(p.X - q.X, p.Z - q.Z).Magnitude
+					t.ok(d >= WorldPlan.StandSpacing, string.format("%s: two trees %.1f apart", here, d))
+				end
+			end
+		end
+	end)
+
+	t.test(
+		"country stands keep off roads, water, steep ground, town, plots, biomes, gondola, rocks, signs, scenery",
+		function()
+			local trees = WorldPlan.Trees()
+			local boulders = WorldPlan.Boulders()
+			local signs = WorldPlan.RoadSigns(WorldPlan.BiomeSignText)
+			local mill = Vector2.new(0, 110)
+			local coast = WorldLayout.Coast
+			local routes = {}
+			local top = sky.gondolaTop.Position
+			for _, from in ipairs({ town.gondola.Position, sky.gondolaBase.Position }) do
+				table.insert(routes, { Vector2.new(from.X, from.Z), Vector2.new(top.X, top.Z) })
+			end
+			for _, stand in ipairs(stands) do
+				local road
+				for _, r in ipairs(WorldLayout.Roads) do
+					if r.name == stand.road then
+						road = r
+					end
+				end
+				t.ok(stand.road == nil or road ~= nil, "a stand lines a real road")
+				for _, spot in ipairs(stand.trees) do
+					local p = spot.position
+					local x, z = p.X, p.Z
+					local here = string.format("%s at (%.0f, %.0f)", spot.woodId, x, z)
+					t.ok(WorldPlan.GoodGround(x, z, WorldPlan.StandSetBack, 0.6), here .. ": bad ground or near a road")
+					t.ok(TerrainGen.RoadClearance(x, z) >= 20, here .. " is within 20 studs of a road")
+					if road then
+						local d = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points) - road.width / 2
+						t.ok(d <= WorldPlan.StandRoadside + 1e-3, string.format("%s: %.0f off %s", here, d, road.name))
+					end
+					t.ok(TerrainGen.WaterLevelAt(x, z) == nil, here .. " is in water")
+					t.ok(TerrainGen.HeightAt(x, z) < 70, here .. " is up in the mountains")
+					t.ok(math.abs(p.Y - (TerrainGen.HeightAt(x, z) - 0.3)) < 1e-3, here .. " stands on the ground")
+					t.eq(WorldLayout.FlatWeight(x, z), 0, here .. " is in town or the plots")
+					t.ok(
+						not (z < coast.northZ and x > coast.shoreX - coast.beachWidth - 40),
+						here .. " is on the beach"
+					)
+					local fromMill = (Vector2.new(x, z) - mill).Magnitude
+					t.ok(fromMill > 300, string.format("%s is %.0f from the sawmill", here, fromMill))
+					if spot.woodId == "pine" or spot.woodId == "maple" then
+						t.ok(fromMill >= 400, string.format("%s is %.0f from the sawmill", here, fromMill))
+					end
+					for _, biome in ipairs(BiomeData.All()) do
+						local a = biome.area
+						if a then
+							local d = Vector2.new(x - a.x, z - a.z).Magnitude
+							local margin = if biome.id == "grove"
+								then WorldLayout.GroveRidge.outer + 15
+								else a.radius + 30
+							t.ok(d >= margin, here .. " is in " .. biome.id)
+						end
+					end
+					for _, route in ipairs(routes) do
+						t.ok(
+							WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) >= 30,
+							here .. ": gondola"
+						)
+					end
+					for _, b in ipairs(boulders) do
+						local d = Vector2.new(x - b.position.X, z - b.position.Z).Magnitude
+						t.ok(d >= b.size / 2 + 6, here .. " is within 6 studs of a boulder")
+					end
+					for _, sign in ipairs(signs) do
+						local s = sign.cframe.Position
+						t.ok(Vector2.new(x - s.X, z - s.Z).Magnitude >= 12, here .. " hides a road sign")
+					end
+					for _, piece in ipairs(scenery) do
+						local d = Vector2.new(x - piece.center.X, z - piece.center.Z).Magnitude
+						t.ok(d >= piece.radius + 8, here .. " stands in a " .. piece.kind)
+					end
+				end
+			end
+			-- And 10+ studs between any two trees on the ground (12 between stand trees).
+			for i = FIRST + 1, #trees do
+				local p = trees[i].position
+				for j = 1, i - 1 do
+					local q = trees[j].position
+					local d = Vector2.new(p.X - q.X, p.Z - q.Z).Magnitude
+					t.ok(d >= 10, string.format("trees %d and %d are %.1f apart", i, j, d))
+				end
+			end
+		end
+	)
+
+	t.test("country stands are the same on every server", function()
+		local again = t.loader():load("ReplicatedStorage/Shared/World/WorldPlan").Trees()
+		local trees = WorldPlan.Trees()
+		t.eq(#again, #trees)
+		for i, spot in ipairs(trees) do
+			t.eq(again[i].woodId, spot.woodId)
+			t.ok((again[i].position - spot.position).Magnitude < 1e-6, "tree " .. i .. " in the same place")
 		end
 	end)
 end

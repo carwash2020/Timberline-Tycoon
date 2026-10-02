@@ -97,11 +97,14 @@ local function wildWoodsNear(c: Vector2): { string }
 	return { "oak", "oak", "birch" }
 end
 
--- Every tree on the ground: each biome's trees (BiomeData counts), then the
--- wild groves between them (the sky's Lumenwood is in WorldPlan.Sky).
-function WorldPlan.Trees(): { TreeSpot }
-	if cachedTrees then
-		return cachedTrees
+-- The first 322 trees, in the order every server has always spawned them
+-- (saves and planted stakes may point at them): each biome's trees
+-- (BiomeData counts), then the wild groves between them. Never change
+-- what this returns; new trees go after it (WorldPlan.Trees).
+local cachedFirst: { TreeSpot }? = nil
+local function firstTrees(): { TreeSpot }
+	if cachedFirst then
+		return cachedFirst
 	end
 	local out: { TreeSpot } = {}
 	local taken: { Vector3 } = {}
@@ -212,6 +215,305 @@ function WorldPlan.Trees(): { TreeSpot }
 			end
 		end
 	end
+	cachedFirst = out
+	return out
+end
+
+-- Country stands: more wild stands out in the open country, so the land
+-- between the places is never empty (Connor asked for many more trees).
+-- First one about every STAND_ROAD_STEP along each haul road, sides
+-- alternating, set back so its trees stand STAND_SET_BACK to STAND_ROADSIDE
+-- studs off the road's edge; then one in each STAND_CELL square of open
+-- country that has no tree yet. 4-9 trees each, spread like the Starter
+-- Forest (one per 400 sq studs, STAND_SPACING apart). Every tree is on
+-- good ground (dry, flat enough, lowland), out of town, the plots, the
+-- beach and every biome (they have their own forests), off the gondola's
+-- routes, the boulders, the road signs, the scenery (WLD-01) and every
+-- other tree, and WILD_NEAREST from the sawmill (pine and maple STAND_FAR).
+-- Their woods follow the nearest biome, as the wild groves' do. They come
+-- after the first 322 trees and draw their own rng, so those never move.
+-- Boulders() and Scenery() see only those 322, and the stands keep off
+-- both (so nothing goes round in a circle, and neither moves).
+local STAND_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
+local STAND_ROAD_STEP = 150 -- a roadside stand about this far along each haul road
+local STAND_CELL = 200 -- then one per square this big with no tree in it
+local STAND_EDGE = 1150 -- clear of the mountains at the world's edge (as the scenery)
+local STAND_LOW = 70 -- lowland only
+local STAND_SET_BACK = 20 -- studs every stand tree keeps off a road's edge
+local STAND_ROADSIDE = 80 -- a roadside stand's trees stand at most this far off its road's edge
+local STAND_SPACING = 12 -- studs between two trees
+local STAND_APART = 100 -- studs between two stands' middles
+local STAND_CLEAR = 20 -- studs between a stand's edge and the trees already there
+local STAND_GONDOLA = 30 -- studs off the gondola's routes (seen from above)
+local STAND_ROCK = 6 -- studs off a boulder's side
+local STAND_SIGN = 12 -- studs off a road sign
+local STAND_SCENERY = 8 -- studs off a scenery piece's footprint (the scenery's own gap to a tree)
+local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
+local STAND_MAX = 180 -- new trees in all (about 33 parts each)
+local STAND_OPEN_MOST = 6 -- trees in an open-country stand (4 to this; roadside ones 4-9)
+
+-- A country stand: `trees` round `center` (all within `radius`); `road`
+-- names the haul road it lines (nil out in the open country).
+export type Stand = { center: Vector2, radius: number, road: string?, trees: { TreeSpot } }
+WorldPlan.StandRoadside = STAND_ROADSIDE
+WorldPlan.StandSetBack = STAND_SET_BACK
+WorldPlan.StandSpacing = STAND_SPACING
+
+local cachedStands: { Stand }? = nil
+
+function WorldPlan.CountryStands(): { Stand }
+	if cachedStands then
+		return cachedStands
+	end
+	local stands: { Stand } = {}
+	local rng = Kit.rng(hashString("country stands"))
+	local mill = Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z)
+	local coast = WorldLayout.Coast
+	local beachX = coast.shoreX - coast.beachWidth - 40
+	local boulders = WorldPlan.Boulders()
+	local scenery = WorldPlan.Scenery()
+	local signs = WorldPlan.RoadSigns(function(): string
+		return ""
+	end)
+	local routes: { { Vector2 } } = {}
+	local sky = WorldPlan.Sky()
+	if sky then
+		local top = sky.gondolaTop.Position
+		local town = WorldPlan.TownGondolaSpot
+		local base = sky.gondolaBase.Position
+		table.insert(routes, { Vector2.new(town.X, town.Z), Vector2.new(top.X, top.Z) })
+		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
+	end
+	local discs: { { x: number, z: number, r: number } } = {}
+	for _, biome in ipairs(BiomeData.All()) do
+		local area = biome.area
+		if area then
+			local r = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else area.radius + 30
+			table.insert(discs, { x = area.x, z = area.z, r = r })
+		end
+	end
+	-- Every tree so far, binned by 32-stud squares for the spacing checks.
+	local bins: { [string]: { Vector3 } } = {}
+	local all: { Vector3 } = {}
+	local function addTree(p: Vector3)
+		local k = (p.X // 32) .. "," .. (p.Z // 32)
+		local bin = bins[k] or {}
+		bins[k] = bin
+		table.insert(bin, p)
+		table.insert(all, p)
+	end
+	local function crowded(x: number, z: number, d: number): boolean
+		local reach = math.ceil(d / 32)
+		local bx, bz = x // 32, z // 32
+		for ix = bx - reach, bx + reach do
+			for iz = bz - reach, bz + reach do
+				for _, p in ipairs(bins[ix .. "," .. iz] or {}) do
+					local dx, dz = x - p.X, z - p.Z
+					if dx * dx + dz * dz < d * d then
+						return true
+					end
+				end
+			end
+		end
+		return false
+	end
+	for _, spot in ipairs(firstTrees()) do
+		addTree(spot.position)
+	end
+	for _, spot in ipairs(scenery) do -- a square with a set piece in it isn't bare
+		table.insert(all, spot.center)
+	end
+
+	-- Whether a stand tree could grow at (x, z).
+	local function ground(x: number, z: number): boolean
+		if math.abs(x) > STAND_EDGE or math.abs(z) > STAND_EDGE or (z < coast.northZ and x > beachX) then
+			return false
+		end
+		if Vector2.new(x - mill.X, z - mill.Y).Magnitude <= WILD_NEAREST or WorldLayout.FlatWeight(x, z) > 0 then
+			return false
+		end
+		for _, d in ipairs(discs) do
+			local dx, dz = x - d.x, z - d.z
+			if dx * dx + dz * dz < d.r * d.r then
+				return false
+			end
+		end
+		for _, route in ipairs(routes) do
+			if WorldLayout.SegmentDistance(Vector2.new(x, z), route[1], route[2]) < STAND_GONDOLA then
+				return false
+			end
+		end
+		for _, b in ipairs(boulders) do
+			local dx, dz = x - b.position.X, z - b.position.Z
+			if dx * dx + dz * dz < (b.size / 2 + STAND_ROCK) ^ 2 then
+				return false
+			end
+		end
+		for _, sign in ipairs(signs) do
+			local p = sign.cframe.Position
+			if Vector2.new(x - p.X, z - p.Z).Magnitude < STAND_SIGN then
+				return false
+			end
+		end
+		for _, spot in ipairs(scenery) do
+			local dx, dz = x - spot.center.X, z - spot.center.Z
+			if dx * dx + dz * dz < (spot.radius + STAND_SCENERY) ^ 2 then
+				return false
+			end
+		end
+		return TerrainGen.HeightAt(x, z) < STAND_LOW and goodGround(x, z, STAND_SET_BACK, 0.6)
+	end
+
+	local planted = 0
+	-- A stand of `most` (4-9) trees round the middle `at(radius)` gives, if 4+ fit.
+	local function plant(at: (radius: number) -> Vector2, road: WorldLayout.Road?, most: number): Stand?
+		local want = math.min(rng:int(4, most), STAND_MAX - planted)
+		if want < 4 then
+			return nil
+		end
+		local radius = math.sqrt(400 * want / math.pi) -- the Starter Forest's one tree per 400 sq studs
+		local c = at(radius)
+		if not ground(c.X, c.Y) or crowded(c.X, c.Y, radius + STAND_CLEAR) then
+			return nil
+		end
+		for _, s in ipairs(stands) do
+			if (s.center - c).Magnitude < STAND_APART then
+				return nil
+			end
+		end
+		local woods = wildWoodsNear(c)
+		if (c - mill).Magnitude < STAND_FAR + radius then
+			woods = { "oak", "oak", "birch" }
+		end
+		local trees: { TreeSpot } = {}
+		local attempts = 0
+		while #trees < want and attempts < want * 30 do
+			attempts += 1
+			local angle = rng:range(0, math.pi * 2)
+			local r = math.sqrt(rng:next()) * radius
+			-- Rounded the way a Vector3 stores it, so what's checked is what's spawned.
+			local flat = Vector3.new(c.X + math.cos(angle) * r, 0, c.Y + math.sin(angle) * r)
+			local x, z = flat.X, flat.Z
+			local ok = ground(x, z) and not crowded(x, z, STAND_SPACING)
+			if ok and road then -- a roadside stand stays beside its road
+				ok = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points) - road.width / 2 <= STAND_ROADSIDE
+			end
+			if ok then
+				for _, q in ipairs(trees) do
+					local dx, dz = x - q.position.X, z - q.position.Z
+					if dx * dx + dz * dz < STAND_SPACING * STAND_SPACING then
+						ok = false
+						break
+					end
+				end
+			end
+			if ok then
+				local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+				table.insert(trees, { woodId = rng:pick(woods), position = p, biome = "wild" })
+			end
+		end
+		if #trees < 4 then
+			return nil
+		end
+		for _, spot in ipairs(trees) do
+			addTree(spot.position)
+		end
+		planted += #trees
+		local stand: Stand = { center = c, radius = radius, road = if road then road.name else nil, trees = trees }
+		table.insert(stands, stand)
+		return stand
+	end
+
+	-- Along the haul roads, every STAND_ROAD_STEP, sides alternating.
+	for _, name in ipairs(STAND_ROADS) do
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == name then
+				local pts = road.points
+				local side = if rng:next() < 0.5 then 1 else -1
+				local walked, nextAt = 0, rng:range(0, STAND_ROAD_STEP)
+				for i = 1, #pts - 1 do
+					local a, b = pts[i], pts[i + 1]
+					local len = (b - a).Magnitude
+					local dir = (b - a).Unit
+					local normal = Vector2.new(-dir.Y, dir.X)
+					while nextAt <= walked + len do
+						local along = a + dir * (nextAt - walked)
+						local done = false
+						for _, s in ipairs({ side, -side }) do
+							for _, shift in ipairs({ 0, 30, -30, 60, -60 }) do
+								local function at(radius: number): Vector2
+									-- Its far edge STAND_ROADSIDE off the road's edge.
+									return along
+										+ dir * shift
+										+ normal * (s * (road.width / 2 + STAND_ROADSIDE - radius))
+								end
+								if plant(at, road, 9) then
+									done = true
+									break
+								end
+							end
+							if done then
+								break
+							end
+						end
+						side = -side
+						nextAt += STAND_ROAD_STEP
+					end
+					walked += len
+				end
+			end
+		end
+	end
+
+	-- Then one stand per square of open country with no tree or set piece in it yet, the
+	-- squares in a shuffled order (so STAND_MAX doesn't leave one side bare).
+	local cells: { Vector2 } = {}
+	for cx = -STAND_EDGE, STAND_EDGE - 1, STAND_CELL do
+		for cz = -STAND_EDGE, STAND_EDGE - 1, STAND_CELL do
+			table.insert(cells, Vector2.new(cx, cz))
+		end
+	end
+	for i = #cells, 2, -1 do
+		local j = rng:int(1, i)
+		cells[i], cells[j] = cells[j], cells[i]
+	end
+	for _, cell in ipairs(cells) do
+		local cx, cz = cell.X, cell.Y
+		local bare = true
+		for _, p in ipairs(all) do
+			if p.X >= cx and p.X < cx + STAND_CELL and p.Z >= cz and p.Z < cz + STAND_CELL then
+				bare = false
+				break
+			end
+		end
+		if bare then
+			for _ = 1, 16 do
+				local x, z = rng:range(cx + 30, cx + STAND_CELL - 30), rng:range(cz + 30, cz + STAND_CELL - 30)
+				if plant(function(): Vector2
+					return Vector2.new(x, z)
+				end, nil, STAND_OPEN_MOST) then
+					break
+				end
+			end
+		end
+	end
+	cachedStands = stands
+	return stands
+end
+
+-- Every tree on the ground, in spawn order: the first 322 (each biome's
+-- trees, then the wild groves), then the country stands' (the sky's
+-- Lumenwood is in WorldPlan.Sky).
+function WorldPlan.Trees(): { TreeSpot }
+	if cachedTrees then
+		return cachedTrees
+	end
+	local out = table.clone(firstTrees())
+	for _, stand in ipairs(WorldPlan.CountryStands()) do
+		for _, spot in ipairs(stand.trees) do
+			table.insert(out, spot)
+		end
+	end
 	cachedTrees = out
 	return out
 end
@@ -228,7 +530,7 @@ export type Boulder = { position: Vector3, size: number, seed: number, snowy: bo
 function WorldPlan.Boulders(): { Boulder }
 	local out: { Boulder } = {}
 	local rng = Kit.rng(4242)
-	local trees = WorldPlan.Trees()
+	local trees = firstTrees() -- not the country stands: they keep off the boulders
 	local tries = 0
 	while #out < 90 and tries < 2000 do
 		tries += 1
@@ -393,7 +695,9 @@ function WorldPlan.Scenery(): { ScenerySpot }
 	end
 	local out: { ScenerySpot } = {}
 	local rng = Kit.rng(hashString("open-country scenery"))
-	local trees = WorldPlan.Trees()
+	-- The first 322 trees: the country stands come after the scenery and
+	-- keep off it, so it is 8+ studs off every tree all the same.
+	local trees = firstTrees()
 	local boulders = WorldPlan.Boulders()
 	local signs = WorldPlan.RoadSigns(function(): string
 		return ""
