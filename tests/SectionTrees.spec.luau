@@ -640,4 +640,25 @@ return function(t)
 		t.eq(result.freed[1].boost, 2)
 		t.eq(result.freed[1].model:GetAttribute("Boost"), 2)
 	end)
+
+	t.test("a boot site stands as GrowLogic.BootTree says (the preview's v2 world draws the same forest)", function()
+		local s = setup()
+		local young, n = 0, 0
+		for i = 1, 40 do
+			local pos = Vector3.new(i * 37.3, 0, -i * 11.9)
+			local model = s.Trees.SpawnTree("oak", CFrame.new(pos), { boot = true })
+			local rec = s.Trees.GetTree(model:GetAttribute("Uid"))
+			local boot = s.GrowLogic.BootTree(s.WoodData.Get("oak"), pos)
+			t.eq(rec.seed, boot.seed)
+			t.eq(rec.scale, boot.scale)
+			t.eq(rec.stage, boot.stage)
+			t.ok(math.abs((s.now - rec.bornAt) - boot.age) < 1e-6, "the same age")
+			t.ok(rec.stage > 0, "never a sapling at boot")
+			n += 1
+			if rec.stage < 1 then
+				young += 1
+			end
+		end
+		t.ok(young > 0 and young < n / 2, "some young, most mature")
+	end)
 end

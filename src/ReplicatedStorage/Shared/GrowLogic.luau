@@ -18,7 +18,12 @@
 --     random growth stage (never a sapling).
 --   * TakeDue(due, now, n): the growth tick's batch: at most n of the
 --     trees whose next change is due, the most overdue first.
+--   * BootTree(def, pos): a site's tree as the server plants it at boot
+--     (Site, its mature skeleton, its lifespan, its boot age and stage):
+--     what SectionTrees.SpawnTree builds with { boot = true }, so the
+--     preview's v2 world (tools/preview) draws the same forest.
 
+local ForestData = require(script.Parent.ForestData)
 local GameConfig = require(script.Parent.GameConfig)
 local Kit = require(script.Parent.Art.Kit)
 local TreeGen = require(script.Parent.TreeGen)
@@ -113,6 +118,39 @@ function GrowLogic.BootAge(def: WoodDef, seed: number, life: number): number
 	end
 	local room = math.max(0, life * GameConfig.PreDeadAt - growSec)
 	return growSec + rng:next() * room * GrowLogic.BootMatureSpread
+end
+
+export type Boot = {
+	seed: number,
+	sizeName: string,
+	scale: number,
+	yaw: number,
+	skel: TreeGen.Skeleton, -- the mature tree
+	life: number,
+	age: number,
+	stage: number,
+}
+
+-- A site's tree at server start (see the header). `seed` and `elder` as
+-- SectionTrees.SpawnTree takes them.
+function GrowLogic.BootTree(def: WoodDef, pos: Vector3, seed: number?, elder: boolean?): Boot
+	local s, sizeName, scale, yaw = GrowLogic.Site(pos, seed)
+	if elder then
+		sizeName, scale = "elder", ForestData.Elder.scale
+	end
+	local skel = TreeGen.Skeleton(def.id, s, scale, { elder = elder == true })
+	local life = GrowLogic.Lifespan(def, s, 0)
+	local age = if elder then GrowLogic.GrowSec(def) else GrowLogic.BootAge(def, s, life)
+	return {
+		seed = s,
+		sizeName = sizeName,
+		scale = scale,
+		yaw = yaw,
+		skel = skel,
+		life = life,
+		age = age,
+		stage = GrowLogic.StageAt(age, GrowLogic.GrowSec(def)),
+	}
 end
 
 export type Due = { uid: string, at: number }
