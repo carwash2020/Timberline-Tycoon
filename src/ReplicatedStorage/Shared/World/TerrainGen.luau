@@ -408,7 +408,7 @@ for _, zone in ipairs(WorldLayout.FlatZones) do
 end
 
 -- The open meadow: swaths of grass, sparse worn patches of bare Ground and
--- a little Mud at the water's edge. The plot district keeps a plain Grass
+-- a little bare earth at the water's edge. The plot district keeps a plain Grass
 -- lawn (its edge dithered into the meadow), and the town's lawn gets the
 -- swaths but no bare patches, so its paths stay the only dirt there.
 local function meadow(x: number, z: number, flat: number, bank: number): string
@@ -426,7 +426,7 @@ local function meadow(x: number, z: number, flat: number, bank: number): string
 		end
 	end
 	if bank > 0.15 and noise(x / 6, z / 6, 2.9) > -0.2 then
-		return "Mud"
+		return "Ground" -- damp earth at the water's edge (Mud is the Grove's violet)
 	end
 	if noise(x / 80, z / 80, 10.3) > 0.45 and dither(x, z) > -0.1 then
 		return "Ground"
