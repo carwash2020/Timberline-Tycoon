@@ -4,6 +4,22 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 
 ---
 
+## Status (kept by the lead)
+
+| Slice | State | Commit |
+|---|---|---|
+| Plan | on main | b13fa65 |
+| M1.0 flag, Tune, v2 data, Gloamwood | on main, dormant | 1260925 |
+| M1.4 grab and drag (+ /spawnwood in Studio) | on main, dormant | 8f4cc09 |
+| M1.7a SellLogic, M1.7 SellService (sells /spawnwood pieces) | on main, dormant | 5aee212, ccc882a |
+| M1.8a v2 tutorial, hints, HUD rules, dailies, guide, shop data | on main, dormant | 2da706e |
+| M1.1 + M1.2 TreeGen, SectionLogic, economy2, the tree remodel | in progress | |
+| M1.5 bigger trucks, lot, pad zone (lands live) | in progress | |
+| M1.8b wiring the tutorial, dailies, shop, guide, HUD | in progress | |
+| M1.3 cut anywhere, M1.6 trucks by friction, M1.9 flip, M1.10 cleanup | next | |
+
+---
+
 ## 0. Decisions and ground rules
 
 **Connor's calls**
@@ -170,7 +186,7 @@ StarfallAxe = { sold = false, v2 = { price = 0, damage = 1.65, range = 16, coold
 -- ItemCatalog.AxeStats(axe, woodId): (damage, cooldown); a `vs` entry overrides either field
 ```
 
-**Hits to cut a mature trunk at its base**, computed as `ceil(hardness * (t/1.6)^2 / damage)`, with t from §3a. Time per cut is (hits - 1) x cooldown. economy2 regenerates this table; SectionLogic.spec pins it.
+**Hits to cut a mature trunk at its base**, computed as (the emberwood column below predates §18's hardness 11; with it: Rusty 124, Steel 45, Hardened 27, Silver 18, Cobalt 16, Gold 15, Obsidian 3, Inferno 4, Starfall 10, as FieldGuide.CutHits and economy2 compute), `ceil(hardness * (t/1.6)^2 / damage)`, with t from §3a. Time per cut is (hits - 1) x cooldown. economy2 regenerates this table; SectionLogic.spec pins it.
 
 | Axe | oak 2.0 | birch 1.6 | pine 2.6 | maple 2.4 | palm 1.8 | frost 2.2 | ember 2.4 | phantom 2.0 | lumen 2.6 |
 |---|---|---|---|---|---|---|---|---|---|
