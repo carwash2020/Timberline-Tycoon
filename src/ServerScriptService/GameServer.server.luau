@@ -644,6 +644,25 @@ if CoreLoop.V2() then
 		forget = GrabService.Unregister,
 		onSold = onWoodSold,
 	})
+	-- The isles take loose wood (M1.7b): the Cloud Chutes and the Starfall
+	-- Forge are hoppers found the way the pad finds pieces, the Sky Bin by
+	-- the pad sells through SellService.PayEntries, and wood that falls off
+	-- the isles is lost.
+	local skyBinPart = sellArea:FindFirstChild("SkyBin")
+	safely("AetherService.InitV2", AetherService.InitV2, {
+		woodFolder = woodFolder :: Instance,
+		resolve = function(model: Model): SellService.Piece?
+			local root = model.PrimaryPart
+			local piece = if root then GrabService.PieceOf(root) else nil
+			return piece :: any
+		end,
+		release = function(model: Model)
+			GrabService.ReleasePiece(model, "taken")
+		end,
+		forget = GrabService.Unregister,
+		skyBin = if skyBinPart and skyBinPart:IsA("BasePart") then skyBinPart else nil,
+		heldBy = GrabService.HeldBy,
+	})
 end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
