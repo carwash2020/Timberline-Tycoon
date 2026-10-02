@@ -102,21 +102,76 @@ return function(t)
 	end)
 
 	t.test("the sawmill leaves the sell pad and the Sky Bin clear", function()
-		local mill = BuildingArt.Sawmill()
-		-- The Sky Bin (4 x 4 x 4) stands 24 in front and 18 to the west.
-		t.eq(blockers(mill, V3.new(-21, 0, -27), V3.new(-15, 6, -21)), {}, "Sky Bin spot")
-		-- The pad (24 x 18) starts 13 studs in front of the mill's centre;
-		-- only things over 8 studs up (lanterns, the crest sign) reach over it.
-		for _, p in ipairs(parts(mill)) do
-			local lo, hi = bounds(p)
-			if lo.X < 12 and hi.X > -12 and lo.Y < 8 then
-				t.ok(lo.Z >= -13.05, p.Name .. " reaches into the sell pad at z " .. lo.Z)
+		-- Its design-size numbers, scaled (BuildingArt.Scale, TWN-13); and at
+		-- its design size too.
+		for _, s in ipairs({ BuildingArt.Scale.Sawmill, 1 }) do
+			local mill = BuildingArt.Sawmill(s)
+			local front = -13.05 * s
+			-- The Sky Bin (4 x 4 x 4) stands 8 to 14 studs in front of it, 18 west.
+			t.eq(blockers(mill, V3.new(-21, 0, front - 14), V3.new(-15, 6, front - 8)), {}, "Sky Bin spot")
+			-- The pad (24 x 18) starts at its front; only things over 8 studs
+			-- up (lanterns, the crest sign) reach over it.
+			for _, p in ipairs(parts(mill)) do
+				local lo, hi = bounds(p)
+				if lo.X < 12 and hi.X > -12 and lo.Y < 8 then
+					t.ok(lo.Z >= front, p.Name .. " reaches into the sell pad at z " .. lo.Z)
+				end
+				t.ok(lo.Y > -0.6 * s or p.Name == "Sawdust", p.Name .. " sinks into the ground") -- sawdust mounds are half buried
+				t.ok(
+					math.abs(lo.X) < 23 * s and math.abs(hi.X) < 23 * s and lo.Z > -15 * s and hi.Z < 17 * s,
+					p.Name .. " is outside the footprint"
+				)
 			end
-			t.ok(lo.Y > -0.6 or p.Name == "Sawdust", p.Name .. " sinks into the ground") -- sawdust mounds are half buried
+		end
+	end)
+
+	t.test("TWN-13: the sawmill and the shops are built 1.5x, with no more parts; counters stay waist high", function()
+		t.eq(BuildingArt.Scale, { Sawmill = 1.5, ToolShed = 1.5, Dealership = 1.5, HearthAndHome = 1.5 })
+		local function extent(model)
+			local lo, hi
+			for _, p in ipairs(parts(model)) do
+				local a, b = bounds(p)
+				lo = if lo then lo:Min(a) else a
+				hi = if hi then hi:Max(b) else b
+			end
+			return hi - lo
+		end
+		local small, big = BuildingArt.Sawmill(1), BuildingArt.Sawmill()
+		t.eq(#parts(big), #parts(small), "scaling adds no parts")
+		t.ok(near(extent(big), extent(small) * 1.5), "the sawmill is 1.5x in every dimension")
+		local blade, smallBlade = big:FindFirstChild("SawBlade"), small:FindFirstChild("SawBlade")
+		t.ok(math.abs(blade.Size.Y - smallBlade.Size.Y * 1.5) < 1e-3, "the blade grew")
+		for _, p in ipairs(parts(big)) do
+			local weld = p:FindFirstChildOfClass("WeldConstraint")
+			if weld and weld.Part0 == blade then
+				t.ok(weld.Enabled and not p.Anchored, p.Name .. " stays welded and unanchored")
+			end
+		end
+		for _, shop in ipairs(SHOPS) do
+			local s = BuildingArt.Scale[shop.kind]
+			local a = BuildingArt.Shop(shop.kind, shop.title, shop.accent, 1)
+			local b = BuildingArt.Shop(shop.kind, shop.title, shop.accent)
+			t.eq(#parts(b), #parts(a), shop.kind .. ": scaling adds no parts")
+			local ea, eb = extent(a), extent(b)
+			t.ok(math.abs(eb.X - ea.X * s) < 0.05 and math.abs(eb.Z - ea.Z * s) < 0.05, shop.kind .. " is 1.5x across")
+			local ca, cb = a:FindFirstChild("Counter"), b:FindFirstChild("Counter")
+			t.ok(near(cb.Size, ca.Size), shop.kind .. " counter keeps its size")
+			local pa, pb = ca.CFrame.Position, cb.CFrame.Position
+			local bottomA, bottomB = pa.Y - ca.Size.Y / 2, pb.Y - cb.Size.Y / 2
+			t.ok(math.abs(bottomB - bottomA * s) < 1e-3, shop.kind .. " counter stands on the raised floor")
 			t.ok(
-				math.abs(lo.X) < 23 and math.abs(hi.X) < 23 and lo.Z > -15 and hi.Z < 17,
-				p.Name .. " is outside the footprint"
+				math.abs(pb.X - pa.X * s) < 1e-3 and math.abs(pb.Z - pa.Z * s) < 1e-3,
+				shop.kind .. " counter moved out"
 			)
+			-- What stands on it came along (the register, the ledger).
+			local onTop = 0
+			for _, p in ipairs(parts(b)) do
+				local lp = cb.CFrame:PointToObjectSpace(p.CFrame.Position)
+				if p ~= cb and math.abs(lp.X) < cb.Size.X / 2 and lp.Y > cb.Size.Y / 2 and lp.Y < cb.Size.Y / 2 + 2 then
+					onTop += 1
+				end
+			end
+			t.ok(onTop >= 3, shop.kind .. " keeps its counter top, register and ledger on it: " .. onTop)
 		end
 	end)
 
@@ -135,7 +190,8 @@ return function(t)
 			-- Clear floor from the open front to the counter's customer side.
 			local front = cf.Position.Z - counter.Size.Z / 2
 			local x = cf.Position.X
-			local hit = blockers(model, V3.new(x - 1.5, 0.7, -8), V3.new(x + 1.5, 6, front - 0.05), counter)
+			local s = BuildingArt.Scale[shop.kind]
+			local hit = blockers(model, V3.new(x - 1.5, 0.7 * s, -8 * s), V3.new(x + 1.5, 6, front - 0.05), counter)
 			t.eq(hit, {}, shop.kind .. " path to the counter")
 			-- 226: 220 plus the two sign goosenecks (3 parts each) the Tool
 			-- Shed and Hearth & Home got in TWN-07, on purpose.
@@ -144,7 +200,7 @@ return function(t)
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)
 				t.ok(
-					lo.X > -12 and hi.X < 12.5 and lo.Z > -11.6 and hi.Z < 9.2,
+					lo.X > -12 * s and hi.X < 12.5 * s and lo.Z > -11.6 * s and hi.Z < 9.2 * s,
 					shop.kind .. " " .. p.Name .. " is outside the footprint"
 				)
 			end

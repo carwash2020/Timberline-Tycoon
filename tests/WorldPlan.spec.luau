@@ -307,7 +307,7 @@ return function(t)
 		-- corner), and a corner lamp moved onto the pad, are all caught.
 		local old = {
 			{ "Well", -38, 77, "prop", "MainStreet" },
-			{ "Barrel", -26, 117.5, "prop", "GondolaPath" },
+			{ "Barrel", -36, 117.5, "prop", "GondolaPath" },
 			{ "LogPile", 28, 98, "prop", "Plaza" },
 			{ "LampPost", -12, 80, "lamp", "SellPad" },
 		}

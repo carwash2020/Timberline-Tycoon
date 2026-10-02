@@ -39,12 +39,13 @@ export type Marker = {
 }
 
 -- The shops' chips are their accents (WorldPlan.Town().shops). Each
--- stands on a point 16-17.5 studs over its part (its bottom edge there:
+-- stands on a point 16-19 studs over its part (its bottom edge there:
 -- SizeOffset), clear of its building's roof whatever its size, over its
--- own building: nudged a little east or west so that from the spawn, on a
+-- own building: nudged east or toward the street (the 1.5x buildings of
+-- TWN-13: over a low part of the roof, and so that from the spawn, on a
 -- phone, the three on the right (gondola, Tool Shed, Hearth & Home) stand
--- side by side, and SELL LOGS sits above the sawmill's crest, not over it
--- (TownMarkers.spec).
+-- side by side), and SELL LOGS sits back over the pad, under the sawmill's
+-- crest, not over it (TownMarkers.spec).
 TownMarkers.Markers = {
 	{
 		name = "SellLogs",
@@ -52,7 +53,7 @@ TownMarkers.Markers = {
 		text = "SELL LOGS",
 		icon = "logs",
 		chip = C.Money,
-		offset = Vector3.new(0, 16.5, 0), -- the zone's middle is 6 up
+		offset = Vector3.new(0, 16, 9), -- the zone's middle is 6 up; back toward the mill, under its crest
 	},
 	{
 		name = "Axes",
@@ -60,7 +61,7 @@ TownMarkers.Markers = {
 		text = "AXES",
 		icon = "axe",
 		chip = Color3.fromRGB(150, 62, 44),
-		offset = Vector3.new(-3, 16, 0),
+		offset = Vector3.new(14, 19, -14),
 	},
 	{
 		name = "Trucks",
@@ -68,7 +69,7 @@ TownMarkers.Markers = {
 		text = "TRUCKS",
 		icon = "truck",
 		chip = Color3.fromRGB(47, 109, 181),
-		offset = Vector3.new(0, 16, 0),
+		offset = Vector3.new(16, 16, 0),
 	},
 	{
 		name = "Gear",
@@ -76,7 +77,7 @@ TownMarkers.Markers = {
 		text = "BLUEPRINTS\n& GEAR",
 		icon = "blueprint",
 		chip = Color3.fromRGB(122, 90, 60),
-		offset = Vector3.new(5, 16, 0),
+		offset = Vector3.new(9, 18.3, 2),
 	},
 	{
 		name = "Gondola",

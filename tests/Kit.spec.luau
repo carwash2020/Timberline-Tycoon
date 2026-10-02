@@ -4,6 +4,7 @@
 return function(t)
 	local roblox = t.roblox
 	local Enum, Vector3, CFrame, Color3 = roblox.Enum, roblox.Vector3, roblox.CFrame, roblox.Color3
+	local Instance = roblox.Instance
 	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 	local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
 
@@ -59,5 +60,34 @@ return function(t)
 			end
 		end
 		t.ok(guis >= 10, string.format("only %d signs", guis))
+	end)
+
+	t.test("scaleModel scales sizes, positions, lights and attachments about the origin (TWN-13)", function()
+		local model = Kit.model("M")
+		local turn = CFrame.Angles(0, 0.5, 0)
+		local box = Kit.part(model, "Box", Vector3.new(2, 4, 6), CFrame.new(1, 2, -3) * turn, Color3.new(1, 1, 1))
+		local light = Instance.new("PointLight")
+		light.Range = 10
+		light.Parent = box
+		local at = Instance.new("Attachment")
+		at.Position = Vector3.new(0, 1, 0)
+		at.Parent = box
+		local tooth = Kit.part(model, "Tooth", Vector3.new(1, 1, 1), CFrame.new(1, 4, -3), Color3.new(1, 1, 1))
+		tooth.Anchored = false
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0, weld.Part1, weld.Parent = box, tooth, tooth
+		local kept = Kit.part(model, "Counter", Vector3.new(4, 3, 2), CFrame.new(2, 2, 2), Color3.new(1, 1, 1))
+		local before = #model:GetDescendants()
+		Kit.scaleModel(model, 1.5, { [kept] = Vector3.new(2, 0.5, 2) })
+		t.eq(#model:GetDescendants(), before, "adds nothing")
+		t.ok((box.Size - Vector3.new(3, 6, 9)).Magnitude < 1e-4, "sizes scale")
+		t.ok((box.CFrame.Position - Vector3.new(1.5, 3, -4.5)).Magnitude < 1e-4, "positions scale about the origin")
+		t.ok(box.CFrame.LookVector:Dot(turn.LookVector) > 0.9999, "turns are kept")
+		t.eq(light.Range, 15)
+		t.ok((at.Position - Vector3.new(0, 1.5, 0)).Magnitude < 1e-4, "attachments follow")
+		t.ok((tooth.CFrame.Position - Vector3.new(1.5, 6, -4.5)).Magnitude < 1e-4, "welded parts move too")
+		t.ok(weld.Enabled and weld.Part0 == box and weld.Part1 == tooth, "the weld is back on")
+		t.ok((kept.Size - Vector3.new(4, 3, 2)).Magnitude < 1e-4, "a rigid part keeps its size")
+		t.ok((kept.CFrame.Position - Vector3.new(3, 2.25, 3)).Magnitude < 1e-4, "and moves with its anchor")
 	end)
 end

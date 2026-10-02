@@ -980,17 +980,17 @@ function WorldPlan.Town(): Town
 	end
 	table.insert(lamps, at(-8, 60, -math.pi / 2))
 	table.insert(lamps, at(8, 60, math.pi / 2))
-	table.insert(lamps, at(-23, 132, math.pi / 2))
-	table.insert(lamps, at(26, 122, 0))
+	table.insert(lamps, at(-41, 134, -math.pi / 2)) -- west of the gondola path, arm east over it
+	table.insert(lamps, at(36, 124, 0)) -- east of the mill's lean-to
 	table.insert(lamps, at(118, 40, math.pi))
 	table.insert(lamps, at(120, 0, math.pi / 2))
 
 	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east
 	-- edge (z 6 to 42, ending short of the Plot Road).
 	local fences: { Fence } = {
-		{ length = 26, cframe = at(-88, 136) },
-		{ length = 26, cframe = at(-88, 114) },
-		{ length = 22, cframe = at(-101, 125, math.pi / 2) },
+		{ length = 26, cframe = at(-92, 140) },
+		{ length = 26, cframe = at(-92, 124) },
+		{ length = 16, cframe = at(-105, 132, math.pi / 2) },
 		{ length = 36, cframe = at(111, 24, math.pi / 2) },
 	}
 
@@ -1003,32 +1003,32 @@ function WorldPlan.Town(): Town
 	local lantern = campsite * Vector3.new(9, 0, 2)
 
 	local propSpots: { { any } } = { -- { name, x, z, yaw? }
-		{ "Haybale", -93, 128, 0.3 },
-		{ "Haybale", -85, 121, -0.5 },
-		{ "Haybale", -80, 130, 1.2 },
+		{ "Haybale", -97, 134, 0.3 },
+		{ "Haybale", -89, 129, -0.5 },
+		{ "Haybale", -84, 134.5, 1.2 },
 		{ "Cart", -71, 124, -0.4 },
 		{ "WaterTower", -58, 126 },
-		{ "ToolRack", -33, 97, -math.pi / 2 },
+		{ "ToolRack", 34.4, 100, math.pi / 2 }, -- between the mill and the Dealership
 		{ "Well", -49, 60 }, -- on the green south of the street, between the benches
 		{ "Bench", -58, 66, math.pi },
 		{ "Bench", -40, 66, math.pi },
-		{ "Barrel", -32.5, 92 },
-		{ "Crate", -57, 92, 0.3 },
+		{ "Barrel", -30.5, 92 },
+		{ "Crate", -30.5, 88.6, 0.3 },
 		{ "Barrel", 32, 93 },
-		{ "Crate", 57, 93, -0.2 },
-		{ "Crate", 57.5, 89.5, 0.5 },
-		{ "Planter", -66, 92 },
-		{ "Planter", -94, 92 },
-		{ "Mailbox", -91, 87, 0 },
-		{ "FlowerBox", -86, 90.5, 0 },
-		{ "LogPile", 28, 108, 0 },
-		{ "LogPile", 29, 98, 0.1 }, -- clear of the plaza's corner
+		{ "Crate", 71, 93, -0.2 },
+		{ "Crate", 71.5, 89.5, 0.5 },
+		{ "Planter", -67, 87 },
+		{ "Planter", -109, 86.2 },
+		{ "Mailbox", -102.5, 88, 0 },
+		{ "FlowerBox", -84.5, 87.5, 0 },
+		{ "LogPile", 39, 131, 0 }, -- east of the mill, clear of the yard lamp
+		{ "LogPile", 39, 137, 0.1 },
 		{ "Wheelbarrow", 20, 93, -0.6 },
-		{ "SawdustPile", 22, 114 }, -- by the lean-to, clear of the yard lamp
-		{ "SawdustPile", -21, 99 },
+		{ "SawdustPile", 40, 125 }, -- by the lean-to, clear of the yard lamp
+		{ "SawdustPile", -29.5, 91 },
 		{ "Lantern", lantern.X, lantern.Z, campYaw },
-		{ "Barrel", -22, 116 }, -- against the mill's side shed, off the gondola path
-		{ "Barrel", -22, 113.5 },
+		{ "Barrel", 34.5, 105 }, -- between the mill's lean-to and the Dealership
+		{ "Barrel", 34.5, 107.2 },
 	}
 	local props: { Placement } = {}
 	for i, p in ipairs(propSpots) do
@@ -1095,18 +1095,18 @@ function WorldPlan.Town(): Town
 		{ "tree", -58, 196, 1.22, "pine" },
 		{ "tree", -62, 147, 1, "pine" },
 		{ "tree", -80, 163, 1.22, "pine" },
-		{ "tree", -94, 150, 1, "pine" },
+		{ "tree", -95, 153, 1, "pine" },
 		{ "tree", -106, 174, 1.22, "pine" },
 		-- Birch and maple round the edges.
 		{ "tree", -106, 56, 1.22, "maple" },
-		{ "tree", -116, 86, 1, "birch" },
-		{ "tree", -112, 110, 1.22, "birch" },
+		{ "tree", -118, 84, 1, "birch" },
+		{ "tree", -119, 112, 1.22, "birch" },
 		{ "tree", -118, 138, 1, "maple" },
 		{ "tree", -80, 50, 1, "maple" },
 		{ "tree", -62, 6, 1, "birch" },
 		{ "tree", -98, 14, 1.22, "birch" },
-		{ "tree", -46, 118, 1, "birch" },
-		{ "tree", 50, 122, 1, "maple" },
+		{ "tree", -66, 137, 1, "birch" },
+		{ "tree", 50, 128, 1, "maple" },
 		{ "tree", 78, 114, 1.22, "birch" },
 		{ "tree", 104, 128, 1.22, "maple" },
 		{ "tree", 130, 98, 1, "birch" },
@@ -1116,14 +1116,14 @@ function WorldPlan.Town(): Town
 		{ "tree", 128, 24, 1, "birch" },
 		{ "tree", 132, -14, 1.22, "maple" },
 		-- Bushes along the shops' sides, the mill's back and the station.
-		{ "bush", -66, 100, 2.8 },
-		{ "bush", -66.5, 105.5, 2.4 },
-		{ "bush", -57, 100, 2.6 },
-		{ "bush", -57.5, 106, 3 },
-		{ "bush", 58, 101, 2.8 },
-		{ "bush", 58.5, 106.5, 2.4 },
-		{ "bush", -8, 129, 2.6 },
-		{ "bush", 8, 129, 2.8 },
+		{ "bush", -112, 100, 2.8 },
+		{ "bush", -112.5, 105.5, 2.4 },
+		{ "bush", 74, 117, 2.6 },
+		{ "bush", 69, 120.5, 3 },
+		{ "bush", 71, 101, 2.8 },
+		{ "bush", 71.5, 106.5, 2.4 },
+		{ "bush", -6, 143, 2.6 },
+		{ "bush", 10, 142.5, 2.8 },
 		{ "bush", -51.5, 146, 2.8 },
 		{ "bush", -28, 148, 2.6 },
 		{ "bush", -28.5, 154, 2.4 },
@@ -1132,13 +1132,13 @@ function WorldPlan.Town(): Town
 		-- the townsfolk walk: NPCData's routes pass 3 studs or more away.)
 		{ "flowers", -30, 54.5, 2.4 },
 		{ "flowers", -8.4, 53.6, 2 },
-		{ "flowers", -72.5, 87.2, 2.2 },
-		{ "flowers", -87.5, 86, 1.8 },
+		{ "flowers", -85, 85.8, 2.2 },
+		{ "flowers", -102, 85.4, 1.8 },
 		{ "flowers", -57.5, 57, 2.4 },
 		-- Rocks.
 		{ "rock", -55, 150, 1.8 },
-		{ "rock", 66, 110, 2 },
-		{ "rock", -101, 100, 1.6 },
+		{ "rock", 73, 112, 2 },
+		{ "rock", -114, 95, 1.6 },
 		{ "rock", 116, 72, 1.8 },
 	}
 	for _, g in ipairs(greenSpots) do
@@ -1163,7 +1163,12 @@ function WorldPlan.Town(): Town
 	return {
 		spawn = spawn,
 		spawnFacing = spawnFacing,
-		sawmill = CFrame.new(mill) * FACING_SOUTH,
+		-- The sawmill and the shops are built 1.5x their design size
+		-- (BuildingArt.Scale, TWN-13), placed so their fronts stay where they
+		-- were: the mill's at z 97, behind the sell pad, centred on the
+		-- spawn walk; the shops' on their paths. They grew back and sideways
+		-- (the Tool Shed and Hearth & Home west, the Dealership east).
+		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
 		sellZone = CFrame.new(mill.X, 6, mill.Z - 24),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
 		skyBin = CFrame.new(mill.X - 18, 2, mill.Z - 24),
@@ -1172,19 +1177,19 @@ function WorldPlan.Town(): Town
 				kind = "ToolShed",
 				title = "TOOL SHED",
 				accent = Color3.fromRGB(150, 62, 44),
-				cframe = CFrame.new(-45, 0, 100),
+				cframe = CFrame.new(-57, 0, 105.7),
 			},
 			{
 				kind = "Dealership",
 				title = "DEALERSHIP",
 				accent = Color3.fromRGB(47, 109, 181),
-				cframe = CFrame.new(45, 0, 100),
+				cframe = CFrame.new(52, 0, 104.7),
 			},
 			{
 				kind = "HearthAndHome",
 				title = "HEARTH & HOME",
 				accent = Color3.fromRGB(122, 90, 60),
-				cframe = CFrame.new(-80, 0, 100),
+				cframe = CFrame.new(-93.5, 0, 105.75),
 			},
 		},
 		gondola = townGondola(),
