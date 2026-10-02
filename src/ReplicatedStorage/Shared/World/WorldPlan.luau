@@ -12,6 +12,7 @@
 local BiomeData = require(script.Parent.Parent.BiomeData)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Parent.Art.Kit)
+local LandmarkArt = require(script.Parent.Parent.Art.LandmarkArt)
 local TerrainGen = require(script.Parent.TerrainGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local WorldLayout = require(script.Parent.WorldLayout)
@@ -2583,11 +2584,12 @@ local function clutter(): Clutter
 		table.insert(routes, { Vector2.new(base.X, base.Z), Vector2.new(top.X, top.Z) })
 	end
 	-- Each biome's own ground (its trees, its Elder): the Phantom Grove's
-	-- ridge and all.
+	-- ridge and all, and the Skyroot's foot under the isles (its roots, its
+	-- waterfall's pool, the gondola's foot station), as the scenery keeps.
 	local biomes: { Disc } = {}
 	for _, biome in ipairs(BiomeData.All()) do
 		local area = biome.area
-		if area and area.y == nil then
+		if area then
 			local r = if biome.id == "grove" then WorldLayout.GroveRidge.outer + 15 else area.radius + 20
 			table.insert(biomes, { x = area.x, z = area.z, r = r })
 		end
@@ -2841,6 +2843,509 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 	end
 	cachedClusters = out
 	return out
+end
+
+---------------------------------------------------------------------------
+-- Landmarks (phase 10, STY-04): a timber footbridge over the river, plank
+-- docks on Mirror Lake and on the east coast facing the Island, and a
+-- lighthouse on the coast's headland. Each is found by a fixed search
+-- (the same on every server), comes after everything else and keeps
+-- LandmarkGap studs off it: every tree, boulder, scenery piece, road sign
+-- and boulder cluster, the gondola's routes and every biome's own ground,
+-- and LandmarkRoad studs off the roads (none of them is anywhere a truck
+-- drives). Nil when no spot fits (MapBuilder then builds nothing there).
+---------------------------------------------------------------------------
+
+WorldPlan.LandmarkGap = 6
+WorldPlan.LandmarkRoad = 30
+WorldPlan.BridgeWidth = 7 -- inside the rails
+WorldPlan.BridgeRise = 1.6 -- the arch over the line from bank to bank
+WorldPlan.BridgeLand = 5 -- studs each end rests on its bank past the water
+WorldPlan.BridgeStations = 5 -- post bents from end to end
+WorldPlan.BridgeLongest = 46
+WorldPlan.BridgeText = "TIMBER BRIDGE"
+WorldPlan.DockWidth = 5
+WorldPlan.DockStations = 4
+WorldPlan.LakeDockText = "MIRROR LAKE"
+
+-- Whether a disc of radius `r` at (x, z) keeps `gap` off every boulder cluster.
+local function clearOfClusters(x: number, z: number, r: number, gap: number): boolean
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		local dx, dz = x - c.center.X, z - c.center.Z
+		if dx * dx + dz * dz < (c.radius + r + gap) ^ 2 then
+			return false
+		end
+	end
+	return true
+end
+
+-- Whether a disc of radius `r` at (x, z) is clear for a landmark.
+local function landmarkClear(x: number, z: number, r: number): boolean
+	return clearOfClutter(x, z, r, WorldPlan.LandmarkGap, WorldPlan.LandmarkGap * 5)
+		and clearOfClusters(x, z, r, WorldPlan.LandmarkGap)
+		and TerrainGen.RoadClearance(x, z) >= WorldPlan.LandmarkRoad + r
+end
+
+-- The CFrame at (x, y, z) whose -Z points along the flat direction `dir`.
+local function facingAlong(x: number, y: number, z: number, dir: Vector2): CFrame
+	return CFrame.new(x, y, z) * CFrame.Angles(0, math.atan2(-dir.X, -dir.Y), 0)
+end
+
+-- A signpost (BuildingArt.Signpost: posts at +-SIGN_POST) beside `at`,
+-- `off` studs to either side of `along`, its face toward `facing`: on
+-- level, dry, clear ground, set down on its lower post. Nil if neither side fits.
+local function signBeside(at: Vector2, along: Vector2, off: number, facing: Vector2): CFrame?
+	local side = Vector2.new(-along.Y, along.X)
+	for _, s in ipairs({ 1, -1 }) do
+		local c = at + side * (s * off)
+		local a, b = c - side * SIGN_POST, c + side * SIGN_POST
+		local ha, hb, hm = TerrainGen.HeightAt(a.X, a.Y), TerrainGen.HeightAt(b.X, b.Y), TerrainGen.HeightAt(c.X, c.Y)
+		local level = math.max(ha, hb, hm) - math.min(ha, hb, hm) < 1
+			and TerrainGen.WaterLevelAt(a.X, a.Y) == nil
+			and TerrainGen.WaterLevelAt(b.X, b.Y) == nil
+			and TerrainGen.WaterLevelAt(c.X, c.Y) == nil
+		if level and landmarkClear(c.X, c.Y, SIGN_POST + 1) then
+			return facingAlong(c.X, math.min(ha, hb), c.Y, facing)
+		end
+	end
+	return nil
+end
+
+-- The timber footbridge (STY-04a). No haul road crosses the river, so this
+-- is a footbridge for players: where the river runs out from under the
+-- Skyroot (the first stretch from its spring that fits), across it from
+-- bank to bank. `cframe` is end a on its bank, its -Z toward end b; the
+-- deck (LandmarkArt.DeckTop) clears the banks and the water all along,
+-- and `beds` is the ground or bed under each post station, over end a's
+-- ground. `sign` is the TIMBER BRIDGE signpost by its head.
+export type Footbridge = {
+	cframe: CFrame,
+	span: number,
+	drop: number,
+	width: number,
+	rise: number,
+	beds: { number },
+	sign: CFrame?,
+}
+
+local cachedBridge: Footbridge? = nil
+local bridgeSearched = false
+
+local function bridgeAcross(p: Vector2, n: Vector2): Footbridge?
+	if TerrainGen.WaterLevelAt(p.X, p.Y) == nil then
+		return nil
+	end
+	local function edge(sign: number): number?
+		for d = 0, 30, 0.5 do
+			local q = p + n * (sign * d)
+			if TerrainGen.WaterLevelAt(q.X, q.Y) == nil then
+				return d
+			end
+		end
+		return nil
+	end
+	local e1, e2 = edge(1), edge(-1)
+	if not e1 or not e2 then
+		return nil
+	end
+	local land = WorldPlan.BridgeLand
+	local a, b = p - n * (e2 + land), p + n * (e1 + land)
+	local span = (b - a).Magnitude
+	if span > WorldPlan.BridgeLongest then
+		return nil
+	end
+	local ha, hb = TerrainGen.HeightAt(a.X, a.Y), TerrainGen.HeightAt(b.X, b.Y)
+	local lake = WorldLayout.LakeLevel
+	if math.abs(ha - hb) > 1.2 or ha < lake + 1 or hb < lake + 1 then
+		return nil
+	end
+	if TerrainGen.SlopeAt(a.X, a.Y) > 0.3 or TerrainGen.SlopeAt(b.X, b.Y) > 0.3 then
+		return nil
+	end
+	local axis = (b - a).Unit
+	local side = Vector2.new(-axis.Y, axis.X)
+	local width, rise, drop = WorldPlan.BridgeWidth, WorldPlan.BridgeRise, hb - ha
+	local reach = width / 2 + 1
+	-- Its ends rest on the banks (level across), the deck's top clears the
+	-- ground there, and out over the river its underside clears the ground
+	-- and its top the water, right across.
+	for k = 0, 40 do
+		local t = k / 40
+		local d = span * t
+		local top = ha + LandmarkArt.DeckTop(t, drop, rise)
+		local onBank = d < land or d > span - land
+		for _, off in ipairs({ -reach, 0, reach }) do
+			local q = a + axis * d + side * off
+			local ground = TerrainGen.HeightAt(q.X, q.Y)
+			local wet = TerrainGen.WaterLevelAt(q.X, q.Y)
+			if k == 0 or k == 40 then
+				if math.abs(ground - (if k == 0 then ha else hb)) > 0.6 then
+					return nil -- a bank that falls away across the bridge's end
+				end
+			elseif ground > top - (if onBank then 0.1 else LandmarkArt.BRIDGE_UNDER) then
+				return nil
+			end
+			if wet and top < wet + 1 then
+				return nil
+			end
+		end
+	end
+	-- Clear of everything, the approaches (8 studs on past each end) too.
+	for k = -2, 10 do
+		local q = a + axis * (span * k / 8)
+		if not landmarkClear(q.X, q.Y, reach) then
+			return nil
+		end
+	end
+	for _, q in ipairs({ a - axis * 8, b + axis * 8 }) do
+		if TerrainGen.WaterLevelAt(q.X, q.Y) ~= nil or TerrainGen.SlopeAt(q.X, q.Y) > 0.4 then
+			return nil
+		end
+	end
+	local beds: { number } = {}
+	local stations = WorldPlan.BridgeStations
+	for s = 1, stations do
+		local q = a + axis * (span * (s - 1) / (stations - 1))
+		local lowest = math.huge
+		for _, off in ipairs({ -reach, reach }) do
+			local o = q + side * off
+			lowest = math.min(lowest, TerrainGen.HeightAt(o.X, o.Y))
+		end
+		table.insert(beds, lowest - ha)
+	end
+	local sign = signBeside(a - axis * 2, axis, reach + SIGN_POST + 1.5, -axis)
+		or signBeside(b + axis * 2, axis, reach + SIGN_POST + 1.5, axis)
+	return {
+		cframe = facingAlong(a.X, ha, a.Y, axis),
+		span = span,
+		drop = drop,
+		width = width,
+		rise = rise,
+		beds = beds,
+		sign = sign,
+	}
+end
+
+function WorldPlan.Footbridge(): Footbridge?
+	if bridgeSearched then
+		return cachedBridge
+	end
+	local found: Footbridge? = nil
+	local pts = WorldLayout.River.points
+	for i = 1, #pts - 1 do
+		local a, b = pts[i], pts[i + 1]
+		local len = (b - a).Magnitude
+		local dir = (b - a).Unit
+		local n = Vector2.new(-dir.Y, dir.X)
+		for s = 0, len, 6 do
+			found = bridgeAcross(a + dir * s, n)
+			if found then
+				break
+			end
+		end
+		if found then
+			break
+		end
+	end
+	cachedBridge, bridgeSearched = found, true
+	return found
+end
+
+-- The plank docks (STY-04b): one on Mirror Lake's east shore pointing out
+-- across the lake, one on the east coast pointing out to sea toward the
+-- palm Island. `cframe` is the land end on the bank, its -Z out over the
+-- water; the deck's top is `deck` over that ground (a step of a stud at
+-- most), clears the ground under it and stands `deck - water` over the
+-- water's surface (`water`, over the land end's ground, as `beds`). The
+-- far end is deep enough for its ladder; `boat` is where the moored
+-- rowboat floats (its waterline), alongside the dock's far half.
+export type Dock = {
+	kind: string, -- "lake" or "coast"
+	cframe: CFrame,
+	length: number,
+	width: number,
+	deck: number,
+	water: number,
+	beds: { number },
+	boat: CFrame,
+	sign: CFrame?,
+}
+
+local cachedDocks: { Dock }? = nil
+local DOCK_ON_BANK = 3 -- a dock's first studs rest on its bank (its land end is 2.5 past the water's edge)
+
+-- A dock from `land` out along `out` over water whose surface is at
+-- `level`, `length` long, if it fits there.
+local function dockAt(kind: string, land: Vector2, out: Vector2, length: number, level: number): Dock?
+	if TerrainGen.WaterLevelAt(land.X, land.Y) ~= nil or TerrainGen.SlopeAt(land.X, land.Y) > 0.3 then
+		return nil
+	end
+	local h = TerrainGen.HeightAt(land.X, land.Y)
+	local deck = math.max(0.3, level + 1.2 - h)
+	if deck > 1.0 then
+		return nil -- the bank is too low: a step up onto the deck
+	end
+	local top = h + deck
+	local width = WorldPlan.DockWidth
+	local side = Vector2.new(-out.Y, out.X)
+	-- Its first studs rest on the bank (the deck's top clears it), then its
+	-- planks and stringers clear the ground under the water.
+	for k = 0, math.floor(length) do
+		for _, off in ipairs({ -width / 2, 0, width / 2 }) do
+			local q = land + out * k + side * off
+			local ground = TerrainGen.HeightAt(q.X, q.Y)
+			if ground > top - (if k <= DOCK_ON_BANK then 0.05 else 0.9) then
+				return nil
+			end
+		end
+	end
+	local far = land + out * length
+	if TerrainGen.WaterLevelAt(far.X, far.Y) == nil or level - TerrainGen.HeightAt(far.X, far.Y) < 2.5 then
+		return nil -- the far end must stand in water deep enough for the ladder
+	end
+	-- The rowboat, alongside its far half on the dock's -X side (its cleat's).
+	local boatAt = land + out * (length - 6) - side * (width / 2 + 2)
+	for _, q in ipairs({ boatAt, boatAt + out * 3, boatAt - out * 3 }) do
+		if TerrainGen.WaterLevelAt(q.X, q.Y) == nil or level - TerrainGen.HeightAt(q.X, q.Y) < 1.2 then
+			return nil
+		end
+	end
+	for k = -1, 6 do
+		local q = land + out * (length * k / 5)
+		if not landmarkClear(q.X, q.Y, width / 2 + 3) then
+			return nil
+		end
+	end
+	local behind = land - out * 6
+	if TerrainGen.WaterLevelAt(behind.X, behind.Y) ~= nil then
+		return nil
+	end
+	local beds: { number } = {}
+	local stations = WorldPlan.DockStations
+	for s = 1, stations do
+		local q = land + out * (0.6 + (length - 1.2) * (s - 1) / (stations - 1))
+		local lowest = math.huge
+		for _, off in ipairs({ -width / 2, width / 2 }) do
+			local o = q + side * off
+			lowest = math.min(lowest, TerrainGen.HeightAt(o.X, o.Y))
+		end
+		table.insert(beds, lowest - h)
+	end
+	local sign = if kind == "lake" then signBeside(land - out * 3, out, width / 2 + SIGN_POST + 2, -out) else nil
+	-- The boat lies along the dock, bow toward the shore, turned a little.
+	local boatDir = Vector2.new(-out.X, -out.Y)
+	return {
+		kind = kind,
+		cframe = facingAlong(land.X, h, land.Y, out),
+		length = length,
+		width = width,
+		deck = deck,
+		water = level - h,
+		beds = beds,
+		boat = facingAlong(boatAt.X, level, boatAt.Y, boatDir) * CFrame.Angles(0, 0.12, 0),
+		sign = sign,
+	}
+end
+
+function WorldPlan.Docks(): { Dock }
+	if cachedDocks then
+		return cachedDocks
+	end
+	local docks: { Dock } = {}
+	-- Mirror Lake: its east shore, out toward the middle (the river comes in
+	-- from the north, the outflow leaves west).
+	local lake = WorldLayout.Lake
+	local centre = Vector2.new(lake.x, lake.z)
+	local found: Dock? = nil
+	for k = 0, 24 do
+		local turn = math.rad(5) * math.ceil(k / 2) * (if k % 2 == 0 then 1 else -1)
+		local away = Vector2.new(math.cos(turn), math.sin(turn))
+		for r = lake.radius * 0.7, lake.radius * 1.4, 0.5 do
+			local q = centre + away * r
+			if TerrainGen.WaterLevelAt(q.X, q.Y) == nil then
+				found = dockAt("lake", q + away * 2.5, -away, 20, WorldLayout.LakeLevel)
+				break
+			end
+		end
+		if found then
+			break
+		end
+	end
+	if found then
+		table.insert(docks, found)
+	end
+	-- The east coast, facing the Island across the water.
+	local isle = WorldLayout.Island
+	found = nil
+	for k = 0, 30 do
+		local z = isle.z + 10 * math.ceil(k / 2) * (if k % 2 == 0 then 1 else -1)
+		for x = 1080, 1400, 1 do
+			if TerrainGen.WaterLevelAt(x, z) ~= nil then
+				found = dockAt("coast", Vector2.new(x - 4, z), Vector2.new(1, 0), 26, WorldLayout.SeaLevel)
+				break
+			end
+		end
+		if found then
+			break
+		end
+	end
+	if found then
+		table.insert(docks, found)
+	end
+	cachedDocks = docks
+	return docks
+end
+
+-- The lighthouse (STY-04c) on the east coast's headland: where the shore
+-- reaches furthest east between z LIGHTHOUSE_Z[1] and [2] (north of the
+-- plot district, so from the spawn its line of sight runs over open
+-- country) and its lamp is in sight of the spawn (inSightOfSpawn), set
+-- back on the sand from the water. `cframe` is its base on the ground (the
+-- lowest under its footprint), its door (-Z) toward town; `lamp` is the
+-- lamp's middle.
+export type Lighthouse = { cframe: CFrame, lamp: Vector3 }
+local LIGHTHOUSE_Z = { 120, 460 }
+local LIGHTHOUSE_BACK = 26 -- studs inland from the water's edge
+WorldPlan.LighthouseSeen = Vector3.new(0, 30, 0) -- the spawn sees the tower from here up, not just its lamp
+
+-- How tall each kind of scenery piece stands, with a stud or two to spare
+-- (a fence line only hides a lighthouse's foot; a windmill hides more).
+local SCENERY_TALL: { [string]: number } = {
+	Outcrop = 13.5,
+	LogPile = 5,
+	FenceLine = 4.5,
+	HayLine = 4,
+	RuinedCabin = 9,
+	Windmill = 23,
+	LookoutTower = 18,
+}
+
+-- A player's eye on the spawn pad (MapBuilder's is a stud tall).
+function WorldPlan.SpawnEye(): Vector3
+	return WorldPlan.Town().spawn + Vector3.new(0, 0.5 + 5.5, 0)
+end
+
+-- Whether the line from a player's eye on the spawn pad to `lamp` clears
+-- the land by 2+ studs (when `overLand`) and passes clear of what stands
+-- near it: the
+-- town's signs, lamps, props, greenery, fences and buildings, the trees,
+-- the scenery and the boulder clusters (each a disc this wide and tall).
+local function inSightOfSpawn(lamp: Vector3, overLand: boolean): boolean
+	local town = WorldPlan.Town()
+	local eye = WorldPlan.SpawnEye()
+	local a, b = Vector2.new(eye.X, eye.Z), Vector2.new(lamp.X, lamp.Z)
+	local function hides(at: Vector3, r: number, tall: number): boolean
+		local d, s = WorldLayout.SegmentDistance(Vector2.new(at.X, at.Z), a, b)
+		return d < r and eye.Y + (lamp.Y - eye.Y) * s < at.Y + tall
+	end
+	for k = 1, if overLand then 199 else 0 do
+		local q = eye:Lerp(lamp, k / 200)
+		if q.Y - TerrainGen.HeightAt(q.X, q.Z) < 2 then
+			return false
+		end
+	end
+	local discs: { { at: Vector3, r: number, tall: number } } = {
+		{ at = town.sawmill.Position, r = 45, tall = 45 },
+		{ at = town.gondola.Position, r = 16, tall = 25 },
+		{ at = town.campsite.Position, r = 12, tall = 9 },
+	}
+	for _, spot in ipairs(town.shops) do
+		table.insert(discs, { at = spot.cframe.Position, r = 26, tall = 32 })
+	end
+	for _, sign in ipairs(town.signs) do
+		table.insert(discs, { at = sign.cframe.Position, r = SIGN_POST + 3, tall = 11 })
+	end
+	for _, cf in ipairs(town.lamps) do
+		table.insert(discs, { at = cf.Position, r = 3.5, tall = 11 })
+	end
+	for _, prop in ipairs(town.props) do
+		table.insert(discs, { at = prop.cframe.Position, r = 6, tall = 8 })
+	end
+	for _, fence in ipairs(town.fences) do
+		table.insert(discs, { at = fence.cframe.Position, r = fence.length / 2 + 1, tall = 4 })
+	end
+	for _, g in ipairs(town.greenery) do
+		local tree = g.kind == "tree"
+		table.insert(
+			discs,
+			{ at = g.cframe.Position, r = if tree then 10 else g.size / 2 + 2, tall = if tree then 30 else 5 }
+		)
+	end
+	for _, d in ipairs(discs) do
+		if hides(d.at, d.r, d.tall) then
+			return false
+		end
+	end
+	for _, tree in ipairs(WorldPlan.Trees()) do
+		if hides(tree.position, 10, 40) then
+			return false
+		end
+	end
+	for _, spot in ipairs(WorldPlan.Scenery()) do
+		if hides(spot.center, spot.radius + 4, SCENERY_TALL[spot.kind] or 30) then
+			return false
+		end
+	end
+	for _, c in ipairs(WorldPlan.BoulderClusters()) do
+		if hides(c.center, c.radius + 2, 12) then
+			return false
+		end
+	end
+	return true
+end
+local cachedLighthouse: Lighthouse? = nil
+local lighthouseSearched = false
+
+function WorldPlan.Lighthouse(): Lighthouse?
+	if lighthouseSearched then
+		return cachedLighthouse
+	end
+	-- The water's edge every 4 studs up the coast, furthest east first.
+	type Tip = { x: number, z: number }
+	local tips: { Tip } = {}
+	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
+		for x = 1050, 1400, 1 do
+			if TerrainGen.WaterLevelAt(x, z) ~= nil then
+				table.insert(tips, { x = x, z = z })
+				break
+			end
+		end
+	end
+	table.sort(tips, function(p: Tip, q: Tip): boolean
+		if p.x ~= q.x then
+			return p.x > q.x
+		end
+		return p.z < q.z
+	end)
+	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
+	local found: Lighthouse? = nil
+	local mill = WorldLayout.Sawmill
+	for _, tip in ipairs(tips) do
+		local x, z = tip.x - LIGHTHOUSE_BACK, tip.z
+		local ok = landmarkClear(x, z, radius)
+		local lowest = math.huge
+		if ok then
+			for _, q in ipairs(WorldPlan.SceneryFootprint(x, z, radius)) do
+				if TerrainGen.WaterLevelAt(q.X, q.Y) ~= nil then
+					ok = false
+					break
+				end
+				lowest = math.min(lowest, TerrainGen.HeightAt(q.X, q.Y))
+			end
+		end
+		if ok and TerrainGen.HeightAt(x, z) - lowest < 1.5 then
+			local toTown = Vector2.new(mill.X - x, mill.Z - z).Unit
+			local cf = facingAlong(x, lowest - 0.2, z, toTown)
+			local lamp = (cf * CFrame.new(0, LandmarkArt.LIGHTHOUSE_LAMP, 0)).Position
+			-- The lamp over the land, and the tower's top half beside it.
+			if inSightOfSpawn(lamp, true) and inSightOfSpawn(cf.Position + WorldPlan.LighthouseSeen, false) then
+				found = { cframe = cf, lamp = lamp }
+				break
+			end
+		end
+	end
+	cachedLighthouse, lighthouseSearched = found, true
+	return found
 end
 
 return WorldPlan

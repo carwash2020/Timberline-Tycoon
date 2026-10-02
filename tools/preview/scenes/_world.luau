@@ -31,21 +31,51 @@ function World.backdrop(ctx, root)
 end
 
 -- What MapBuilder's "5. The landmarks" step builds (phase 10, STY-*) into
--- `root`: the boulder clusters, the ones `inside(position)` keeps (all of
--- them when it's nil).
+-- `root`: the boulder clusters, the footbridge and its sign, the docks with
+-- their rowboats (and the lake's sign) and the lighthouse, the ones
+-- `inside(position)` keeps (all of them when it's nil).
 function World.landmarks(ctx, root, inside)
 	local CF = ctx.roblox.CFrame
 	local Kit = ctx.art("Kit")
 	local LandmarkArt = ctx.art("LandmarkArt")
+	local BuildingArt = ctx.art("BuildingArt")
 	local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
+	local function keep(cf)
+		return inside == nil or inside(cf.Position)
+	end
+	local function place(model, cf)
+		Kit.placeAt(model, cf)
+		model.Parent = root
+	end
 	for _, spot in ipairs(WorldPlan.BoulderClusters()) do
 		if inside == nil or inside(spot.center) then
 			for _, r in ipairs(spot.rocks) do
-				local rock = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
-				Kit.placeAt(rock, CF.new(r.position) * CF.Angles(0, r.yaw, 0))
-				rock.Parent = root
+				place(
+					LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy),
+					CF.new(r.position) * CF.Angles(0, r.yaw, 0)
+				)
 			end
 		end
+	end
+	local bridge = WorldPlan.Footbridge()
+	if bridge and keep(bridge.cframe) then
+		place(LandmarkArt.Footbridge(bridge.span, bridge.drop, bridge.width, bridge.rise, bridge.beds), bridge.cframe)
+		if bridge.sign then
+			place(BuildingArt.Signpost(WorldPlan.BridgeText), bridge.sign)
+		end
+	end
+	for i, dock in ipairs(WorldPlan.Docks()) do
+		if keep(dock.cframe) then
+			place(LandmarkArt.Dock(dock.length, dock.width, dock.deck, dock.water, dock.beds), dock.cframe)
+			place(LandmarkArt.Rowboat(i * 17), dock.boat)
+			if dock.sign then
+				place(BuildingArt.Signpost(WorldPlan.LakeDockText), dock.sign)
+			end
+		end
+	end
+	local lighthouse = WorldPlan.Lighthouse()
+	if lighthouse and keep(lighthouse.cframe) then
+		place(LandmarkArt.Lighthouse(), lighthouse.cframe)
 	end
 end
 
