@@ -79,6 +79,9 @@ return function(t)
 						onProgress(24, 24)
 						return 1.25
 					end,
+					LiftOnto = function(_, y)
+						return y
+					end,
 				},
 				TreeService = {
 					SpawnTree = function()

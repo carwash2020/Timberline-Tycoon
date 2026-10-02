@@ -177,6 +177,19 @@ local function castTerrain(x: number, z: number, fromY: number, toY: number, wat
 	return if hit then hit.Position.Y else nil
 end
 
+-- The terrain's surface under (x, z), if it is drawn more than 0.15 studs
+-- above `y` (and less than `reach`, default 6, over it); otherwise `y`.
+-- NPCs, parked trucks and the spawn use it so they never stand buried if
+-- the ground is not where it was written (a failed calibration, an old
+-- Prebuilt bake). Rays that error (tests' fake worlds) change nothing.
+function TerrainBuilder.LiftOnto(x: number, y: number, z: number, reach: number?): number
+	local ok, hit = pcall(castTerrain, x, z, y + (reach or 6), y - 2, false)
+	if ok and type(hit) == "number" and hit > y + 0.15 then
+		return hit
+	end
+	return y
+end
+
 -- The test pads: 8 x 8 columns each, side by side along X, their surfaces
 -- written PAD_BASE + residue high, well under the deepest ground (the
 -- world's crust stops a few voxels under its lowest valley). Ground pads

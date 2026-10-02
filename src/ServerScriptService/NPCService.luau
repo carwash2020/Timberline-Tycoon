@@ -25,6 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CharacterArt = require(ReplicatedStorage.Shared.Art.CharacterArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
+local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local NPCService = {}
 
@@ -59,7 +60,14 @@ local function build(npc: NPCData.NPC, find: (string, string) -> (CFrame?, Vecto
 			)
 		end
 	end
-	Kit.placeAt(model, NPCData.SpotFor(npc, find))
+	local feet = NPCData.SpotFor(npc, find)
+	-- Never buried: if the ground is drawn above their feet, stand on it.
+	local p = feet.Position
+	local lifted = TerrainBuilder.LiftOnto(p.X, p.Y, p.Z)
+	if lifted ~= p.Y then
+		feet += Vector3.new(0, lifted - p.Y, 0)
+	end
+	Kit.placeAt(model, feet)
 	local root = model.PrimaryPart
 	if npc.route and root then
 		model:SetAttribute("Route", NPCData.EncodeRoute(npc.route))

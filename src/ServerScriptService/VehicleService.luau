@@ -70,6 +70,7 @@ local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ProfileService = require(script.Parent.ProfileService)
+local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TreeService = require(script.Parent.TreeService)
 
 type TruckDef = ItemCatalog.TruckDef
@@ -719,10 +720,12 @@ end
 local function slotCFrame(slot: BasePart?, overflowIndex: number?): CFrame
 	if slot then
 		local ground = slot.Position - Vector3.new(0, slot.Size.Y / 2, 0)
-		return CFrame.new(ground + Vector3.new(0, WHEEL_CLEARANCE, 0)) * slot.CFrame.Rotation
+		-- On the drawn ground if it is above the slot (never parked buried).
+		local y = TerrainBuilder.LiftOnto(ground.X, ground.Y, ground.Z)
+		return CFrame.new(ground.X, y + WHEEL_CLEARANCE, ground.Z) * slot.CFrame.Rotation
 	end
 	local spot = VehicleLogic.OverflowSpot(overflowIndex or 0)
-	return CFrame.new(spot.X, WHEEL_CLEARANCE, spot.Z)
+	return CFrame.new(spot.X, TerrainBuilder.LiftOnto(spot.X, 0, spot.Z) + WHEEL_CLEARANCE, spot.Z)
 end
 
 -- How far forward a rig's pivot sits so the whole rig (truck + trailer)

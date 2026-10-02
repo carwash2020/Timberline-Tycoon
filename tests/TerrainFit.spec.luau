@@ -278,4 +278,47 @@ return function(t)
 		t.eq(hits, #TerrainBuilder.TownProbes)
 		near(top, 0.04, 1e-9, "town ground")
 	end)
+	t.test("LiftOnto stands things on drawn ground that is too high, and leaves them otherwise", function()
+		local Vector3 = t.roblox.Vector3
+		local drawn = 0
+		local rays = {}
+		local workspace = {
+			Terrain = {},
+			Raycast = function(_, origin, direction, params)
+				table.insert(rays, { origin = origin, direction = direction, params = params })
+				local bottom = origin.Y + direction.Y
+				if drawn <= origin.Y and drawn >= bottom then
+					return { Position = Vector3.new(origin.X, drawn, origin.Z) }
+				end
+				return nil
+			end,
+		}
+		local loader = t.loader({
+			globals = {
+				workspace = workspace,
+				task = { wait = function() end },
+				RaycastParams = {
+					new = function()
+						return {}
+					end,
+				},
+			},
+		})
+		local TerrainBuilder = loader:server("TerrainBuilder")
+		drawn = 2.7 -- the live town before TER-01
+		near(TerrainBuilder.LiftOnto(40, 0, 25), 2.7, 1e-5, "lifted onto the drawn ground")
+		t.eq(rays[1].params.FilterDescendantsInstances[1], workspace.Terrain)
+		t.ok(rays[1].params.IgnoreWater, "stands on the bed, not the water")
+		drawn = 0.08 -- within a hair of the design: left alone
+		t.eq(TerrainBuilder.LiftOnto(40, 0, 25), 0)
+		drawn = -1 -- drawn lower: never pushed down (a floor may be holding it up)
+		t.eq(TerrainBuilder.LiftOnto(40, 0, 25), 0)
+		drawn = 9 -- far above (a cliff overhead, a roof): out of reach
+		t.eq(TerrainBuilder.LiftOnto(40, 0, 25), 0)
+		-- Rays that error leave things where they are.
+		workspace.Raycast = function()
+			error("no physics here")
+		end
+		t.eq(TerrainBuilder.LiftOnto(40, 0.75, 25), 0.75)
+	end)
 end

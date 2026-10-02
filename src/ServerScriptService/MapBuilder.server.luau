@@ -146,7 +146,11 @@ step("4. The town", function()
 		local spawn = Instance.new("SpawnLocation")
 		spawn.Name = "SpawnLocation"
 		spawn.Size = Vector3.new(6, 1, 6)
-		spawn.CFrame = town.spawnFacing -- players spawn facing the sawmill
+		-- Players spawn facing the sawmill, on the drawn ground if it is
+		-- above the town's y = 0 (TerrainBuilder.LiftOnto: never underground).
+		local at = town.spawnFacing.Position
+		local lift = TerrainBuilder.LiftOnto(at.X, 0, at.Z)
+		spawn.CFrame = town.spawnFacing + Vector3.new(0, lift, 0)
 		spawn.Anchored = true
 		spawn.Neutral = true
 		spawn.Duration = 0 -- no force field bubble
