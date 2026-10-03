@@ -36,6 +36,7 @@ local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local PlotFill = require(script.Parent.PlotFill)
 local PlotDoors = require(script.Parent.PlotDoors)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
@@ -86,6 +87,8 @@ local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
 local offerRemote: RemoteEvent? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
+-- Last time a fill refusal was told, so a plank sitting nearby doesn't toast every frame.
+local fillTold: { [string]: number } = {}
 
 ---------------------------------------------------------------------------
 -- The district
@@ -1158,7 +1161,7 @@ function PlotService.FillStep()
 								local dist = (root.Position - origin).Magnitude
 								if FillLogic.InRange(dist) then
 									local heldBy = piece.model:GetAttribute("HeldBy")
-									local changed = PlotFill.Apply(
+									local changed, why = PlotFill.Apply(
 										item,
 										{
 											uid = piece.uid,
@@ -1195,6 +1198,22 @@ function PlotService.FillStep()
 										then
 											BlueprintModels.ApplyWood(model, item.wood)
 											BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+										end
+									elseif type(why) == "string" then
+										local woodName = nil
+										if type(item.wood) == "string" then
+											local def = WoodData.Get(item.wood)
+											woodName = if def then def.displayName else item.wood
+										end
+										local text = FillLogic.Message(why, bp.displayName, woodName)
+										if text and notify then
+											local key = tostring(player.UserId) .. ":" .. item.uid .. ":" .. why
+											local now = os.clock()
+											local prev = fillTold[key]
+											if not prev or now - prev >= 2 then
+												fillTold[key] = now
+												notify(player, text)
+											end
 										end
 									end
 								end

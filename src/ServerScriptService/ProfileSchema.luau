@@ -336,16 +336,30 @@ function ProfileSchema.Migrate(data: any)
 			if item.wood ~= nil and (type(item.wood) ~= "string" or WoodData.Get(item.wood) == nil) then
 				item.wood = nil
 			end
-			if item.fill ~= nil then
-				local units = if type(item.fill) == "table" then item.fill.units else nil
-				if type(units) ~= "number" or units ~= units or units < 0 then
-					item.fill = nil
-				else
-					item.fill = { units = units }
-				end
-			end
-			if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
+			local bp = if type(item.blueprintId) == "string" then PlotData.Blueprint(item.blueprintId) else nil
+			if not bp or bp.kit ~= true then
+				item.fill = nil
 				item.paid = nil
+			else
+				if item.fill ~= nil then
+					local units = if type(item.fill) == "table" then item.fill.units else nil
+					local need = bp.woodUnits
+					if type(units) ~= "number" or units ~= units or units < 0 then
+						item.fill = nil
+					elseif type(need) == "number" and units >= need then
+						item.fill = nil
+					else
+						item.fill = { units = units }
+					end
+				end
+				if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
+					item.paid = nil
+				elseif type(item.paid) == "number" then
+					local price = PlotData.Price(bp)
+					if item.paid > price then
+						item.paid = price
+					end
+				end
 			end
 			table.insert(kept, item)
 		end

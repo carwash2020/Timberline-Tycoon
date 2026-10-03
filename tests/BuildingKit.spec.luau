@@ -99,7 +99,15 @@ return function(t)
 		local log =
 			{ uid = "l", kind = "log", woodId = "oak", volume = 5, ownerId = 7, held = false, size = offer.size }
 		t.eq(FillLogic.Accept(nil, 0, 8, log, 7), false)
+		t.eq(select(2, FillLogic.Accept(nil, 0, 8, log, 7)), "logs")
 		t.eq(FillLogic.Accept("birch", 1, 8, offer, 7), false, "the first wood locks it")
+		t.eq(select(2, FillLogic.Accept("birch", 1, 8, offer, 7)), "wood")
+		for _, code in ipairs(FillLogic.Reasons) do
+			local text = FillLogic.Message(code, "Stairs", "Birch")
+			t.ok(type(text) == "string" and text ~= "", code .. " has player text")
+		end
+		t.eq(FillLogic.Message("wood", "Stairs", "Birch"), "This Stairs is being built with Birch.")
+		t.eq(FillLogic.Message("logs", "Wall", "Oak"), "Saw logs into planks first.")
 		local item = { uid = "wall", blueprintId = "Wall", x = 0, z = 0, rot = 0, fill = { units = 0 } }
 		local alive = true
 		local spawned = 0
@@ -183,6 +191,41 @@ return function(t)
 		t.eq(data.plot.placed[2].paid, 48)
 		t.eq(data.plot.placed[2].open, nil)
 		t.eq(data.plot.placed[2].wood, "oak")
+	end)
+
+	t.test("H-Save: a full fill is built, a non-kit piece drops fill, and paid clamps", function()
+		local data = Util.deepCopy(Schema.Template)
+		data.plot.claimed = true
+		data.plot.placed = {
+			{
+				uid = "full",
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = { units = 8 },
+				paid = 32,
+				wood = "birch",
+			},
+			{
+				uid = "over",
+				blueprintId = "Wall",
+				x = 2,
+				z = 0,
+				rot = 0,
+				fill = { units = 3 },
+				paid = 999,
+				wood = "oak",
+			},
+			{ uid = "shed", blueprintId = "Shed", x = 8, z = 0, rot = 0, fill = { units = 2 }, paid = 50 },
+		}
+		Schema.Migrate(data)
+		t.eq(data.plot.placed[1].fill, nil, "units already cover the wall")
+		t.eq(data.plot.placed[1].wood, "birch")
+		t.eq(data.plot.placed[2].fill.units, 3)
+		t.eq(data.plot.placed[2].paid, PlotData.Price(bp("Wall")), "paid clamps to the fee")
+		t.eq(data.plot.placed[3].fill, nil, "a shed is not a kit piece")
+		t.eq(data.plot.placed[3].paid, nil)
 	end)
 
 	t.test("H-Legacy: an old wall sells at the old price, an empty kit piece refunds the fee", function()
@@ -312,11 +355,18 @@ return function(t)
 		local blocked = { doorItem, post }
 		t.eq(DoorLogic.ArcBlocked("Door", 0, 0, 0, 0, blockers(doorItem, blocked)), true, "a post in the arc")
 		t.eq(DoorLogic.Hint, "Something is blocking this door.")
-		local turned = at("Door", 0, 0, 2, 0, "door")
+		local away = at("Door", 0, 0, 2, 0, "door")
 		t.eq(
-			DoorLogic.ArcBlocked("Door", 0, 0, 0, 2, blockers(turned, { turned, post })),
+			DoorLogic.ArcBlocked(
+				away.blueprintId,
+				away.x,
+				away.y or 0,
+				away.z,
+				away.rot,
+				blockers(away, { away, post })
+			),
 			false,
-			"turned around, the post is behind it"
+			"a door rotated 180 degrees, away from a blocking post, clears its swing"
 		)
 
 		t.eq(DoorLogic.MayClose(false), true, "a player in the arc is not in this check")

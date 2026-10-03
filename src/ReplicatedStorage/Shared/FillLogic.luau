@@ -53,6 +53,29 @@ function FillLogic.Accept(
 	return true, nil
 end
 
+-- Every reason Accept can return. A missing message is a bug.
+FillLogic.Reasons = { "built", "logs", "held", "owner", "empty", "wood" }
+
+-- Player text for a refusal. `pieceName` and `woodName` are display names.
+function FillLogic.Message(reason: string?, pieceName: string?, woodName: string?): string?
+	local piece = if type(pieceName) == "string" and pieceName ~= "" then pieceName else "piece"
+	local wood = if type(woodName) == "string" and woodName ~= "" then woodName else "another wood"
+	if reason == "wood" then
+		return string.format("This %s is being built with %s.", piece, wood)
+	elseif reason == "logs" then
+		return "Saw logs into planks first."
+	elseif reason == "held" then
+		return "Drop the plank before it can go into the build."
+	elseif reason == "owner" then
+		return "That wood isn't yours."
+	elseif reason == "empty" then
+		return "That plank is too small to use."
+	elseif reason == "built" then
+		return string.format("This %s is already built.", piece)
+	end
+	return nil
+end
+
 -- How much of `volume` fills the piece, and what is left on a new plank.
 function FillLogic.Take(filled: number, need: number, volume: number): (number, number)
 	local room = math.max(0, need - filled)
