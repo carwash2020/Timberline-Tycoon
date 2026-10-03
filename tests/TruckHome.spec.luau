@@ -22,29 +22,43 @@ return function(t)
 		t.ok(TruckHome.Far(TruckHome.Max))
 	end)
 
-	t.test("far means more than 30 studs; no truck (nil) is never far", function()
-		t.eq(TruckHome.ShowBeyond, 30)
+	t.test("far means more than 42 studs; no truck (nil) is never far", function()
+		t.eq(TruckHome.ShowBeyond, 42)
 		t.eq(TruckHome.Far(nil), false)
-		t.eq(TruckHome.Far("40"), false)
+		t.eq(TruckHome.Far("50"), false)
 		t.eq(TruckHome.Far(0), false)
-		t.eq(TruckHome.Far(30), false)
-		t.eq(TruckHome.Far(31), true)
+		t.eq(TruckHome.Far(42), false)
+		t.eq(TruckHome.Far(43), true)
 		t.eq(TruckHome.Far(800), true)
 	end)
 
-	-- M1.5: the slots are 60 long. A truck parked anywhere in its own bay
-	-- (its pivot inside the slot, so at most half a slot from where it's
-	-- built) never offers "Send truck home".
-	t.test("a truck anywhere in its own bay isn't far", function()
+	-- Phase 12: the bays come in sizes, the longest 80 long (M1.5's were all
+	-- 60). A truck parked anywhere in its own bay, whichever bay it is (its
+	-- pivot inside the bay, so at most half the bay from where it's built),
+	-- never offers "Send truck home".
+	t.test("a truck anywhere in its own bay isn't far, whatever the bay", function()
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-		local slot = WorldPlan.ParkingSlotSize
-		t.ok(TruckHome.ShowBeyond >= slot.Z / 2, "half a slot or more")
-		local home = Vector3.new(15, 1.8, 21)
-		for _, along in ipairs({ -slot.Z / 2, -10, 0, 12, slot.Z / 2 }) do
-			local at = home + Vector3.new(slot.X / 2 - 1, 0, along)
-			t.eq(TruckHome.Far(TruckHome.Distance(at, home)), false, "parked " .. along .. " along its bay")
+		local sizes = WorldPlan.Town().parkingSizes
+		t.ok(#sizes >= 12, "every bay has its size")
+		local longest = 0
+		for i, slot in ipairs(sizes) do
+			longest = math.max(longest, slot.Z)
+			local home = Vector3.new(15, 2.3, 21)
+			for _, along in ipairs({ -slot.Z / 2, -10, 0, 12, slot.Z / 2 }) do
+				local at = home + Vector3.new(slot.X / 2 - 1, 0, along)
+				t.eq(
+					TruckHome.Far(TruckHome.Distance(at, home)),
+					false,
+					"bay " .. i .. ": parked " .. along .. " along it"
+				)
+			end
 		end
-		t.ok(TruckHome.Far(TruckHome.Distance(home + Vector3.new(0, 0, slot.Z), home)), "a slot's length off is far")
+		t.ok(TruckHome.ShowBeyond >= longest / 2, "half the longest bay or more")
+		local home = Vector3.new(15, 2.3, 21)
+		t.ok(
+			TruckHome.Far(TruckHome.Distance(home + Vector3.new(0, 0, longest), home)),
+			"the longest bay's length off is far"
+		)
 	end)
 
 	t.test("sent the first time, then every couple of studs", function()
@@ -58,18 +72,18 @@ return function(t)
 	end)
 
 	t.test("crossing the button's line is always sent, even by one stud", function()
-		t.ok(TruckHome.ShouldPublish(30, 31), "leaving the lot")
-		t.ok(TruckHome.ShouldPublish(31, 30), "parking again")
-		t.ok(TruckHome.ShouldPublish(29, 31))
+		t.ok(TruckHome.ShouldPublish(42, 43), "leaving the lot")
+		t.ok(TruckHome.ShouldPublish(43, 42), "parking again")
+		t.ok(TruckHome.ShouldPublish(41, 43))
 		-- So what the client holds is always on the right side of the line:
 		-- driving out a stud or two at a time past it, far, then back.
 		local shown = nil
 		local readings = {}
-		for d = 0, 27, 3 do
+		for d = 0, 39, 3 do
 			table.insert(readings, d)
 			table.insert(readings, d + 1)
 		end
-		for _, d in ipairs({ 29, 30, 31, 32, 50, 49, 31, 30, 2 }) do
+		for _, d in ipairs({ 41, 42, 43, 44, 60, 59, 43, 42, 2 }) do
 			table.insert(readings, d)
 		end
 		for _, d in ipairs(readings) do

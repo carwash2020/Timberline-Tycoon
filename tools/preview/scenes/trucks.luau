@@ -23,14 +23,14 @@ return {
 		local WoodData = ctx.shared("WoodData")
 		local root = roblox.Instance.new("Model")
 
-		Common.ground(ctx, root, 300, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 10))
-		-- A packed-dirt lot under the trucks (they grew in M1.5: the longest
-		-- rig is 57.9 studs).
+		Common.ground(ctx, root, 360, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 10))
+		-- A packed-dirt lot under the trucks (they grew in M1.5 and again,
+		-- 1.3x, in phase 12: the longest rig is 75.3 studs).
 		Kit.part(
 			root,
 			"Lot",
-			V3.new(110, 0.1, 100),
-			CF.new(24, 0.02, 4),
+			V3.new(140, 0.1, 130),
+			CF.new(20, 0.02, 0),
 			C3.fromRGB(176, 146, 104),
 			Enum.Material.Ground
 		)
@@ -107,7 +107,8 @@ return {
 			{ "Flatbed", "RanchTrailer", 16, 0 },
 			{ "LoggingRig", "HeavyHauler", 40, 20 },
 		}
-		local spacing = 11 -- as far apart as the parking slots
+		local spacing = 16 -- about a parking bay apart (WorldPlan.ParkingBays)
+		local pickupSeat -- the Pickup's DriverSeat, for the seated-driver view
 		for i, entry in ipairs(rigs) do
 			local def = ItemCatalog.GetTruck(entry[1])
 			local layout = TruckLayout.For(def)
@@ -117,6 +118,9 @@ return {
 			Kit.placeAt(model, CF.new((i - 1) * spacing, 0, 0))
 			model.Parent = root
 			seatDriver(model, C3.fromHex(shirts[i]))
+			if entry[1] == "Pickup" then
+				pickupSeat = model:FindFirstChild("DriverSeat").CFrame.Position
+			end
 			load(model, layout, "BedFloor", layout.logSlots, entry[3], i, entry[5])
 			if tl then
 				load(model, layout, "TrailerBed", tl.logSlots, entry[4], i + 3)
@@ -127,7 +131,7 @@ return {
 		local rust = ItemCatalog.GetTruck("Rustbucket")
 		local rustLayout = TruckLayout.For(rust)
 		local lone = TruckArt.Build(rust, rustLayout)
-		Kit.placeAt(lone, CF.new(-24, 0, -32) * CF.Angles(0, math.rad(35), 0))
+		Kit.placeAt(lone, CF.new(-31, 0, -42) * CF.Angles(0, math.rad(35), 0))
 		lone.Parent = root
 		seatDriver(lone, C3.fromHex("#4C7A3E"))
 		load(lone, rustLayout, "BedFloor", rustLayout.logSlots, 6, 2)
@@ -135,33 +139,33 @@ return {
 		local function at(i)
 			return (i - 1) * spacing
 		end
-		-- Where the Pickup's driver's head is (for the seated-driver view).
-		local pickupSeat = TruckLayout.For(ItemCatalog.GetTruck("Pickup")).front + 6.1
+		-- The seated driver's head: about 3 studs over the seat's middle.
+		local head = pickupSeat + V3.new(0, 3, 0)
 		return {
 			root = root,
-			shadowRadius = 110,
+			shadowRadius = 140,
 			cameras = {
-				{ pos = { -40, 34, -70 }, target = { 28, 3, 8 }, label = "line-up" },
-				{ pos = { 28, 12, -62 }, target = { 28, 4, 2 }, label = "line-up, front" },
-				{ pos = { -22, 8, -50 }, target = { -24.5, 3.2, -32 }, label = "Rustbucket" },
-				{ pos = { -41, 7, -19 }, target = { -24, 3.2, -32 }, label = "Rustbucket, side" },
-				{ pos = { -11, 11, 40 }, target = { at(1), 3, 16 }, label = "Rustbucket + Pony, rear" },
-				{ pos = { at(2) - 12, 9, -24 }, target = { at(2), 4, -6 }, label = "Pickup" },
-				{ pos = { at(3) - 8, 6.5, -12 }, target = { at(3), 3, 0 }, label = "Scout ATV" },
-				{ pos = { at(4) - 14, 12, -30 }, target = { at(4), 4, -6 }, label = "Flatbed" },
-				{ pos = { at(5) - 16, 12, -38 }, target = { at(5), 4.5, -10 }, label = "Logging Rig" },
-				{ pos = { at(5) + 26, 14, 36 }, target = { at(5), 4, 20 }, label = "Logging Rig + Heavy Hauler" },
+				{ pos = { -50, 44, -91 }, target = { 36, 4, 10 }, label = "line-up" },
+				{ pos = { 32, 15, -84 }, target = { 32, 5, 3 }, label = "line-up, front" },
+				{ pos = { -28.5, 10.5, -65 }, target = { -31.8, 4.2, -41.6 }, label = "Rustbucket" },
+				{ pos = { -53, 9, -25 }, target = { -31, 4.2, -41.6 }, label = "Rustbucket, side" },
+				{ pos = { -14, 14, 52 }, target = { at(1), 4, 21 }, label = "Rustbucket + Pony, rear" },
+				{ pos = { at(2) - 15.5, 11.5, -31 }, target = { at(2), 5.2, -8 }, label = "Pickup" },
+				{ pos = { at(3) - 10.5, 8.5, -15.5 }, target = { at(3), 4, 0 }, label = "Scout ATV" },
+				{ pos = { at(4) - 18, 15.5, -39 }, target = { at(4), 5.2, -8 }, label = "Flatbed" },
+				{ pos = { at(5) - 21, 15.5, -49 }, target = { at(5), 6, -13 }, label = "Logging Rig" },
+				{ pos = { at(5) + 34, 18, 47 }, target = { at(5), 5.2, 26 }, label = "Logging Rig + Heavy Hauler" },
 				-- From the Pickup's passenger side: the seated driver's head and hat
 				-- under the roof, the Burl on the load behind the cab.
 				{
-					pos = { at(2) + 9, 6.8, pickupSeat - 1.5 },
-					target = { at(2), 5.6, pickupSeat },
+					pos = { head.X + 11, head.Y + 0.6, head.Z - 2 },
+					target = { head.X, head.Y, head.Z },
 					label = "Pickup, seated driver",
 				},
 				-- Every cab from the front at hat height (M1.5): each driver (an
 				-- avatar-sized figure, a 0.6 hat on) sits with room to spare under
 				-- the roofs, the bigger the truck the more.
-				{ pos = { 21, 6.4, -46 }, target = { 21, 6.0, -10 }, label = "hats under the roofs, front" },
+				{ pos = { 32, 7.8, -66 }, target = { 32, 7.5, -13 }, label = "hats under the roofs, front" },
 			},
 		}
 	end,

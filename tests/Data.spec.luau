@@ -100,9 +100,10 @@ return function(t)
 			t.ok(truck.bedCapacity >= 0, key)
 			t.ok(truck.topSpeed > 0 and truck.turnRate > 0, key .. " speed")
 			t.ok(isHex(truck.look.color), key .. " color")
-			-- The bodies grew in M1.5 (4.6 to 7.8); with wheels and mirrors the
-			-- widest still fits a 10-stud parking slot (TruckLayout.spec).
-			t.ok(truck.look.width >= 3 and truck.look.width <= 8, key .. " width fits a parking slot")
+			-- The bodies grew in M1.5 (4.6 to 7.8) and 1.3x again in phase 12
+			-- (5.98 to 10.14); with wheels and mirrors the widest still fits a
+			-- 16-stud long parking bay (TruckLayout.spec, TruckArt.spec).
+			t.ok(truck.look.width >= 3 and truck.look.width <= 10.5, key .. " width fits a parking bay")
 			t.eq(truck.look.bedLength > 0, truck.bedCapacity > 0, key .. ": a bed exactly when it carries logs")
 		end
 		for key, trailer in pairs(ItemCatalog.Trailers) do

@@ -952,6 +952,7 @@ export type Town = {
 	murph: CFrame, -- where Murph stands, facing the spawn
 	gondolaSign: CFrame, -- the "SKYROOT GONDOLA" signpost
 	parkingSlots: { CFrame }, -- in claim order (Index 1, 2, ...)
+	parkingSizes: { Vector3 }, -- each slot's size, in the same order (WorldPlan.ParkingBays)
 	lamps: { CFrame },
 	fences: { Fence },
 	props: { Placement },
@@ -962,18 +963,34 @@ export type Town = {
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
 
 -- The sell volume over the pad (MapBuilder's SellZone): the pad's width and
--- 26 deep, from the pad's north edge (z 95) out over the street to z 69,
--- so a truck backed in from the street has its whole bed in it, the
--- Logging Rig's 26-stud deck too (M1.5; it was 18 deep, the pad's own).
-WorldPlan.SellZoneSize = Vector3.new(24, 12, 26)
+-- 40 deep, z 62 to 102, so a truck backed in from the street until it
+-- meets the mill (its front at z 97) has its whole bed in it, the Logging
+-- Rig's 33.8-stud deck too (phase 12; M1.5's was 26 deep, z 69 to 95, for
+-- a 26-stud deck; the pad's own 18 before that). Its middle stays at z 82,
+-- on the pad, where Millie, the SELL LOGS marker and the quest beacon are
+-- placed from, so it grew both ways: north into the mill's front, south
+-- over the street to the plaza, short of the spawn walk's lamps (z 60).
+WorldPlan.SellZoneSize = Vector3.new(24, 12, 40)
 
--- A parking slot (MapBuilder builds a ParkingSlot part this size at each
--- of town.parkingSlots): as wide as the widest rig with room to open a
--- door, as long as the longest (the Logging Rig with a Heavy Hauler, 57.9).
--- Each keeps ParkingPullOut studs clear past both ends, so a truck can
--- drive out forward or back out (WorldPlan.spec).
-WorldPlan.ParkingSlotSize = Vector3.new(10, 0.2, 60)
-WorldPlan.ParkingPullOut = 35
+-- Parking bays (phase 12; M1.5's were all 10 x 60, so a Rustbucket sat in
+-- a runway): each painted bay (MapBuilder builds a ParkingSlot part this
+-- size; BuildingArt.ParkingBay paints its edges) is the size of the rigs
+-- it's for, about 3 studs wider and 4 longer (TruckLayout.RigSize;
+-- WorldPlan.spec). VehicleService gives each rig the smallest free bay it
+-- fits (VehicleLogic.BayChoices).
+WorldPlan.ParkingBays = {
+	small = Vector3.new(14.25, 0.2, 30), -- the Rustbucket, the Pickup, the Scout ATV
+	flatbed = Vector3.new(15, 0.2, 38.75), -- the Flatbed, or the Rustbucket with the Pony trailer (38.7 bumper to bumper)
+	long = Vector3.new(16, 0.2, 51), -- pull-through: the Logging Rig, a small truck with a trailer, the Flatbed with the Pony
+	longest = Vector3.new(16, 0.2, 80), -- pull-through: the Logging Rig with any trailer (the Heavy Hauler: 75.4)
+}
+-- The standard bay (most of the lot's).
+WorldPlan.ParkingSlotSize = WorldPlan.ParkingBays.small
+-- Each bay keeps this many studs clear past its head (where the trucks'
+-- noses point, the way they drive out) and, for a pull-through bay, past
+-- its tail too (WorldPlan.spec). A rig longer than any free bay parks with
+-- its tail at a bay's tail and its nose out over this lane (VehicleService).
+WorldPlan.ParkingPullOut = 26
 
 -- The town's gondola station; it turns its open back (+Z) toward the top
 -- station on the isles, along the cable.
@@ -1001,7 +1018,7 @@ function WorldPlan.Town(): Town
 	-- Lamps (the layout from tools/preview/scenes/town.luau): along the
 	-- main street (z 70 to 84) with their arms over it, at the head of the
 	-- spawn walk, by the gondola path and the mill yard, and by the lot.
-	-- None stand where trucks pull out of the parking slots (x 9 to 142),
+	-- None stand where trucks pull out of the parking bays (x 9 to 138),
 	-- and none on a road (like every colliding thing in town: WorldPlan.spec).
 	-- The lot's two lamps stand past its east rail (M1.5: the lot grew east),
 	-- one south of the Plot Road's mouth, its arm toward it, one with its
@@ -1071,15 +1088,48 @@ function WorldPlan.Town(): Town
 		table.insert(props, { name = name, cframe = at(x, z, yaw), seed = i * 13 })
 	end
 
-	-- Parking (M1.5): one row of 12 slots (a server holds 12 players), 11
-	-- apart, facing the forest (-Z), each ParkingSlotSize: room for the
-	-- longest rig (VehicleService claims them by Index, slot 1 nearest the
-	-- spawn). The row spans z -9 to 51: its pull-outs run on to z -44 south,
-	-- short of the Starter Forest's first trunks, and north to the street;
-	-- the Plot Road comes in along the north ends of the last few.
+	-- Parking (phase 12): 13 bays on the lot's gravel (WorldLayout.ParkingLot,
+	-- x 8 to 146, z -18 to 68; a server holds 12 players), each the size of
+	-- its rigs (WorldPlan.ParkingBays), a stud apart so their stop bars meet.
+	-- West to east, in claim order (Index 1 first: VehicleService gives a
+	-- rig the smallest free bay it fits, the lowest Index on a tie):
+	--   1-4   small, facing the forest (-Z), heads on z -17;
+	--   5-8   small, back to back with them, facing the street (+Z), heads
+	--         on z 44 (the lot's north end and the street beyond, to drive
+	--         out on);
+	--   9-10  the Flatbed's, 9 facing the forest, 10 the street;
+	--   11    the longest (80), pull-through, facing the forest;
+	--   12-13 long (51), pull-through, facing the forest.
+	-- The pull-through bays stand where nothing grows south of the lot (east
+	-- of x 77), so a long rig drives out straight; 11 stops 2 studs short
+	-- of the Plot Road's mouth (x 110, z 50), 12 and 13 end at z 34. Every
+	-- head (and pull-through tail) keeps ParkingPullOut clear; the westmost
+	-- lane passes the spawn walk's lamp at (8, 60) (WorldPlan.spec).
+	local bays = WorldPlan.ParkingBays
 	local slots: { CFrame } = {}
-	for col = 0, 11 do
-		table.insert(slots, CFrame.new(15 + col * 11, WorldPlan.ParkingSlotSize.Y / 2, 21))
+	local sizes: { Vector3 } = {}
+	local toStreet = CFrame.Angles(0, math.pi, 0)
+	local function bay(x: number, z: number, size: Vector3, north: boolean?)
+		local cf = CFrame.new(x, size.Y / 2, z)
+		table.insert(slots, if north then cf * toStreet else cf)
+		table.insert(sizes, size)
+	end
+	local smallX: { number } = {}
+	for col = 0, 3 do
+		table.insert(smallX, 10 + col * (bays.small.X + 1) + bays.small.X / 2)
+	end
+	for _, x in ipairs(smallX) do
+		bay(x, -17 + bays.small.Z / 2, bays.small)
+	end
+	for _, x in ipairs(smallX) do
+		bay(x, 44 - bays.small.Z / 2, bays.small, true)
+	end
+	local flatbedX = 71 + bays.flatbed.X / 2
+	bay(flatbedX, -17 + bays.flatbed.Z / 2, bays.flatbed)
+	bay(flatbedX, -17 + bays.flatbed.Z * 1.5 + 1, bays.flatbed, true) -- tail a stud past 9's
+	bay(87 + bays.longest.X / 2, -17 + bays.longest.Z / 2, bays.longest)
+	for _, x0 in ipairs({ 104, 121 }) do
+		bay(x0 + bays.long.X / 2, -17 + bays.long.Z / 2, bays.long)
 	end
 
 	-- Signs: one by the spawn with every destination, the plots, and SELL
@@ -1215,9 +1265,9 @@ function WorldPlan.Town(): Town
 		-- spawn walk; the shops' on their paths. They grew back and sideways
 		-- (the Tool Shed and Hearth & Home west, the Dealership east).
 		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
-		-- Its north edge on the pad's (z 95), reaching south over the street
-		-- (WorldPlan.SellZoneSize); its centre (z 82) still on the pad.
-		sellZone = CFrame.new(mill.X, 6, mill.Z + 9 - 24 - WorldPlan.SellZoneSize.Z / 2),
+		-- Its middle at z 82, on the pad (WorldPlan.SellZoneSize: 40 deep,
+		-- z 62 to 102, over the street and the mill's front).
+		sellZone = CFrame.new(mill.X, 6, mill.Z - 28),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
 		skyBin = CFrame.new(mill.X - 18, 2, mill.Z - 24),
 		shops = {
@@ -1245,6 +1295,7 @@ function WorldPlan.Town(): Town
 		murph = campsite * CFrame.new(0, 0, -3),
 		gondolaSign = facing(-36, 128, 0, 80),
 		parkingSlots = slots,
+		parkingSizes = sizes,
 		lamps = lamps,
 		fences = fences,
 		props = props,

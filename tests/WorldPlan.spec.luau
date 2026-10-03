@@ -142,23 +142,41 @@ return function(t)
 		return out
 	end
 
-	-- Each parking slot's pull-out (M1.5): its own lane (a stud wider than
-	-- the slot each side), WorldPlan.ParkingPullOut (35) studs on past either
-	-- end (a truck leaves forward or backs out). With `street`, a lane that
+	-- Each parking bay's pull-out (phase 12): its own lane (a stud wider
+	-- than the bay each side), WorldPlan.ParkingPullOut (26) studs on past
+	-- its head (where its trucks face: they drive out forward), the first
+	-- #parkingSlots areas, in slot order; then, for each pull-through bay
+	-- (the long ones), the same past its tail. With `street`, a lane that
 	-- runs into the main street stops at the street's south edge.
 	local function pullOuts(street)
-		local slot = WorldPlan.ParkingSlotSize
-		local half, len, reach = slot.X / 2 + 1, slot.Z / 2, WorldPlan.ParkingPullOut
-		local areas = {}
+		local reach = WorldPlan.ParkingPullOut
+		local heads, tails = {}, {}
 		for i, cf in ipairs(town.parkingSlots) do
+			local size = town.parkingSizes[i]
+			local half, len = size.X / 2 + 1, size.Z / 2
 			local x0, x1 = cf.X - half, cf.X + half
-			local z1 = cf.Z + len + reach
-			if street and x0 < street.x1 and x1 > street.x0 then
-				z1 = math.min(z1, street.z0)
+			local north = cf.LookVector.Z > 0 -- faces the street: its head is its north end
+			local function lane(name, toNorth)
+				local z0, z1
+				if toNorth then
+					z0, z1 = cf.Z + len, cf.Z + len + reach
+					if street and x0 < street.x1 and x1 > street.x0 then
+						z1 = math.min(z1, street.z0)
+					end
+				else
+					z0, z1 = cf.Z - len - reach, cf.Z - len
+				end
+				return { name = name, x0 = x0, x1 = x1, z0 = z0, z1 = z1 }
 			end
-			table.insert(areas, { name = "pull-out of slot " .. i, x0 = x0, x1 = x1, z0 = cf.Z - len - reach, z1 = z1 })
+			table.insert(heads, lane("pull-out of slot " .. i, north))
+			if size.Z >= WorldPlan.ParkingBays.long.Z then
+				table.insert(tails, lane("pull-through of slot " .. i, not north))
+			end
 		end
-		return areas
+		for _, area in ipairs(tails) do
+			table.insert(heads, area)
+		end
+		return heads
 	end
 
 	-- A part's world bounding box.
@@ -352,10 +370,10 @@ return function(t)
 					street = paint
 				end
 			end
-			-- Each slot's pull-out, as TWN-01 keeps the greenery out of it, but
+			-- Each bay's pull-out, as TWN-01 keeps the greenery out of it, but
 			-- where a lane runs into the main street it stops at the street's
 			-- south edge (the lamps and crates across the street stand where
-			-- they always have). East of the street's end it runs its full 35.
+			-- they always have). East of the street's end it runs its full 26.
 			local areas = pullOuts(street)
 			local problems, checked = {}, 0
 			for _, thing in ipairs(townThings()) do
@@ -382,14 +400,16 @@ return function(t)
 			end
 			t.ok(checked > 300, string.format("only %d colliding parts in town", checked))
 			t.ok(#problems == 0, table.concat(problems, "\n"))
-			-- The check itself: a log pile in slot 3's pull-out is caught.
-			local pile = placed(BuildingArt.Prop("LogPile", 3), CFrame.new(town.parkingSlots[3].X, 0, 66))
+			-- The check itself: a log pile in slot 3's pull-out (south of its
+			-- head) is caught.
+			local pile = placed(BuildingArt.Prop("LogPile", 3), CFrame.new(town.parkingSlots[3].X, 0, -30))
 			local caught = false
 			for _, p in ipairs(parts(pile)) do
 				caught = caught or (p.CanCollide and reachInto(p.CFrame, p.Size, areas[3]) > 1e-3)
 			end
 			t.ok(caught, "a log pile in a pull-out is caught")
-			-- And where the lot's east lamp and rail stood before it grew (M1.5).
+			-- And where the lot's east lamp and rail stood before M1.5: now in
+			-- a pull-through bay's lane.
 			local lamp = placed(BuildingArt.LampPost(), CFrame.new(118, 0, 40))
 			caught = false
 			for _, p in ipairs(parts(lamp)) do
@@ -397,45 +417,149 @@ return function(t)
 					caught = caught or (p.CanCollide and reachInto(p.CFrame, p.Size, area) > 1e-3)
 				end
 			end
-			t.ok(caught, "a lamp at the old lot's east edge is now in a bay")
+			t.ok(caught, "a lamp at the old lot's east edge is in a pull-through lane")
 		end
 	)
 
-	-- M1.5 (V2_PLAN §4c): the trucks grew, so the lot holds one row of 12
-	-- slots (a server holds 12 players), each 10 x 60 (the biggest rig, 57.9
-	-- long, fits), 11 apart, flat, inside the lot with their lanes.
-	t.test("the parking lot: one row of 12 slots, 10 x 60, 11 apart, on flat ground in the lot (M1.5)", function()
+	-- Phase 12: the bays are the size of their rigs (WorldPlan.ParkingBays;
+	-- M1.5's were all 10 x 60): eight small, two for the Flatbed, two long
+	-- and one longest, pull-through, 13 in all (a server holds 12 players).
+	-- Each lies flat inside the lot with its lane, faces its pull-out (the
+	-- forest, or the street for the rows back to back with them), and stands
+	-- a stud from its neighbours (their stop bars meet; no paint overlaps).
+	t.test("the parking lot: 13 bays sized for their rigs, a stud apart, on flat ground in the lot", function()
 		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
-		local slot = WorldPlan.ParkingSlotSize
-		t.ok(slot == Vector3.new(10, 0.2, 60), "10 x 60 slots")
-		t.eq(WorldPlan.ParkingPullOut, 35)
-		local slots = town.parkingSlots
-		t.eq(#slots, 12)
-		local lot = WorldLayout.ParkingLot
-		for i, cf in ipairs(slots) do
-			local label = "slot " .. i
-			t.ok(math.abs(cf.Y - slot.Y / 2) < 1e-6, label .. " lies on the ground")
-			t.ok(math.abs(cf.Z - slots[1].Z) < 1e-6, label .. " in the row")
-			if i > 1 then
-				t.ok(math.abs(cf.X - slots[i - 1].X - 11) < 1e-6, label .. " 11 studs on from the one before")
+		local VehicleLogic = t.shared("VehicleLogic")
+		local B = WorldPlan.ParkingBays
+		t.ok(WorldPlan.ParkingSlotSize == B.small, "the standard bay is the small one")
+		t.eq(WorldPlan.ParkingPullOut, 26)
+		t.ok(VehicleLogic.MaxOverhang <= WorldPlan.ParkingPullOut, "an overhanging nose stays in its cleared lane")
+		local slots, sizes = town.parkingSlots, town.parkingSizes
+		t.eq(#slots, 13)
+		t.eq(#sizes, #slots, "a size for every bay")
+		local count = { small = 0, flatbed = 0, long = 0, longest = 0 }
+		for i, size in ipairs(sizes) do
+			local kind
+			for name, s in pairs(B) do
+				if size == s then
+					kind = name
+				end
 			end
-			t.ok(cf.X - slot.X / 2 - 1 >= lot.x0 and cf.X + slot.X / 2 + 1 <= lot.x1, label .. "'s lane in the lot")
-			t.ok(cf.Z - slot.Z / 2 >= lot.z0 and cf.Z + slot.Z / 2 <= lot.z1, label .. " in the lot, end to end")
+			t.ok(kind, "bay " .. i .. " is one of WorldPlan.ParkingBays")
+			if kind then
+				count[kind] += 1
+			end
+		end
+		t.eq(count, { small = 8, flatbed = 2, long = 2, longest = 1 })
+		local lot = WorldLayout.ParkingLot
+		local boxes = {}
+		for i, cf in ipairs(slots) do
+			local size = sizes[i]
+			local label = "bay " .. i
+			t.ok(math.abs(cf.Y - size.Y / 2) < 1e-6, label .. " lies on the ground")
+			t.ok(cf.UpVector.Y > 0.99999, label .. " is level")
+			t.ok(math.abs(cf.LookVector.Z) > 0.99999, label .. " faces the forest or the street")
+			t.ok(cf.X - size.X / 2 - 1 >= lot.x0 and cf.X + size.X / 2 + 1 <= lot.x1, label .. "'s lane in the lot")
+			t.ok(cf.Z - size.Z / 2 >= lot.z0 and cf.Z + size.Z / 2 <= lot.z1, label .. " in the lot, end to end")
 			for _, dx in ipairs({ -1, 1 }) do
 				for _, dz in ipairs({ -1, 0, 1 }) do
-					local x, z = cf.X + dx * slot.X / 2, cf.Z + dz * slot.Z / 2
+					local x, z = cf.X + dx * size.X / 2, cf.Z + dz * size.Z / 2
 					t.eq(TerrainGen.HeightAt(x, z), 0, string.format("%s flat at (%g, %g)", label, x, z))
 				end
 			end
+			boxes[i] =
+				{ x0 = cf.X - size.X / 2, x1 = cf.X + size.X / 2, z0 = cf.Z - size.Z / 2, z1 = cf.Z + size.Z / 2 }
 		end
-		t.ok(slots[1].X < slots[12].X, "slot 1 (claimed first) nearest the spawn")
-		t.ok(slots[1].X - slot.X / 2 - 1 > 6, "clear of the spawn walk")
+		-- A stud apart: no two bays' paint closer than a stud, and side by
+		-- side ones exactly a stud apart (BuildingArt.ParkingBay's stop bar
+		-- runs half a stud past each side: the bars meet, never overlap).
+		for i = 1, #boxes do
+			for j = i + 1, #boxes do
+				local a, b = boxes[i], boxes[j]
+				local gapX = math.max(b.x0 - a.x1, a.x0 - b.x1)
+				local gapZ = math.max(b.z0 - a.z1, a.z0 - b.z1)
+				t.ok(
+					math.max(gapX, gapZ) >= 1 - 1e-6,
+					string.format("bays %d and %d are %.2f apart", i, j, math.max(gapX, gapZ))
+				)
+				if gapZ < 0 and gapX < 1.5 then
+					t.ok(math.abs(gapX - 1) < 1e-6, string.format("bays %d and %d side by side, a stud apart", i, j))
+				end
+			end
+		end
+		-- Claim order: the small bays first, 1-4 facing the forest from the
+		-- spawn's side of the lot, west to east, a row at a time.
+		t.ok(slots[1].X - sizes[1].X / 2 - 1 > 6, "clear of the spawn walk")
+		for i = 1, 8 do
+			t.ok(sizes[i] == B.small, "bay " .. i .. " is small")
+			t.eq(
+				slots[i].LookVector.Z < 0,
+				i <= 4,
+				"bay " .. i .. (if i <= 4 then " faces the forest" else " faces the street")
+			)
+			if i ~= 1 and i ~= 5 then
+				t.ok(slots[i].X > slots[i - 1].X, "bay " .. i .. " east of bay " .. (i - 1))
+			end
+		end
+		for i = 9, 13 do
+			t.ok(slots[i].X > slots[8].X, "bay " .. i .. " east of the small ones")
+		end
+		-- The pull-through bays face the forest where nothing grows south of
+		-- the lot: no tree within 4 studs of their lanes on to z -150.
+		for i, size in ipairs(sizes) do
+			if size.Z >= B.long.Z then
+				t.ok(slots[i].LookVector.Z < 0, "pull-through bay " .. i .. " faces the forest")
+				local x0, x1 = slots[i].X - size.X / 2 - 1, slots[i].X + size.X / 2 + 1
+				for _, tree in ipairs(WorldPlan.Trees()) do
+					local p = tree.position
+					t.ok(
+						not (p.X > x0 - 4 and p.X < x1 + 4 and p.Z < slots[i].Z and p.Z > -150),
+						string.format("a tree at (%.0f, %.0f) ahead of pull-through bay %d", p.X, p.Z, i)
+					)
+				end
+			end
+		end
+	end)
+
+	-- The lot is paint on the gravel, but it keeps off the roads and the
+	-- town's walked and driven ground all the same: every bay a stud or more
+	-- off a road (the Plot Road comes in at z 50, its mouth at x 110), never
+	-- on the street, the plaza, the paths, the walk or the sell pad.
+	t.test("the parking bays stay off the roads, the street, the plaza, the paths, the walk and the pad", function()
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local pad = town.sellPad.Position
+		local areas = { { name = "SellPad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 } }
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			table.insert(areas, paint)
+		end
+		local function problems(cf, size)
+			local out = {}
+			local c = roadClearance(cf, Vector3.new(size.X, 0, size.Z))
+			if c < 1 then
+				table.insert(out, string.format("%.2f studs off a road", c))
+			end
+			for _, area in ipairs(areas) do
+				if reachInto(cf, size, area) > 1e-3 then
+					table.insert(out, "on the " .. area.name)
+				end
+			end
+			return out
+		end
+		for i, cf in ipairs(town.parkingSlots) do
+			local found = problems(cf, town.parkingSizes[i])
+			t.ok(#found == 0, "bay " .. i .. ": " .. table.concat(found, ", "))
+		end
+		-- The check itself: a long bay pushed north onto the Plot Road's
+		-- mouth, and a small one onto the street, are caught.
+		local long = WorldPlan.ParkingBays.long
+		t.ok(#problems(CFrame.new(112, 0.1, 30), long) > 0, "a bay on the Plot Road is caught")
+		t.ok(#problems(CFrame.new(30, 0.1, 70), WorldPlan.ParkingSlotSize) > 0, "a bay on the street is caught")
 	end)
 
 	-- No world tree (the first 322, the stands and the forest's), boulder,
 	-- rock cluster or scenery piece stands in a bay or its pull-out: a truck
 	-- leaving forward meets the Starter Forest's first trunks past the end.
-	t.test("no tree, boulder, rock cluster or scenery piece in a parking bay or its pull-out (M1.5)", function()
+	t.test("no tree, boulder, rock cluster or scenery piece in a parking bay or its pull-out", function()
 		local areas = pullOuts(nil)
 		local problems = {}
 		local function clear(what, x, z, r)
@@ -469,59 +593,131 @@ return function(t)
 		t.ok(#problems > before, "a trunk in a pull-out is caught")
 	end)
 
-	-- The sell zone (M1.5): 26 deep, from the pad's north edge out over the
-	-- street, so the Logging Rig's 26-stud deck fits when it backs in; its
-	-- middle still on the pad, north of the spawn walk's lamps. The way in:
-	-- the Rig backed onto the pad reaches back to z 59, between those
-	-- lamps, and nothing that collides stands there.
-	t.test(
-		"the sell zone reaches over the street, and the Rig backs onto the pad clear of everything (M1.5)",
-		function()
-			local size, zone, pad = WorldPlan.SellZoneSize, town.sellZone.Position, town.sellPad.Position
-			t.ok(size == Vector3.new(24, 12, 26), "24 x 12 x 26")
-			t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
-			t.ok(math.abs(zone.Z + size.Z / 2 - 95) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 69) < 1e-6, "z 69 to 95")
-			t.ok(math.abs(zone.Z - pad.Z) < 9, "its middle on the pad")
-			t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")
-			-- The pad stays a ghost: nothing of it collides, the pad itself no
-			-- more than 0.25 tall (its trim barely more), so trucks roll over it.
-			for _, p in ipairs(parts(placed(BuildingArt.SellPad(24, 18), town.sellPad))) do
-				t.ok(not p.CanCollide, "the pad's " .. p.Name .. " doesn't collide")
-				local _, hi = boxOf(p)
-				t.ok(hi.Y <= (if p.Name == "SellPad" then 0.25 else 0.3) + 1e-6, "the pad's " .. p.Name .. " is flat")
+	-- The sell zone (phase 12): 40 deep round its middle (z 82, on the pad,
+	-- where it was since M1.5: Millie, the SELL LOGS marker and the quest
+	-- beacon are placed from it), z 62 to 102, into the mill's front and
+	-- over the street, north of the spawn walk's lamps. Every bed fits it end
+	-- to end; the Logging Rig backed in until it meets the mill (the foot of
+	-- the ramp up to its saw deck, z 97) has its whole 33.8-stud deck in it.
+	-- The way in: the Rig backing onto the pad from the street (its tail from
+	-- z 84 to 96, between the walk's lamps at (+-8, 60)) keeps everything in
+	-- town that collides a stud from what of it collides (chassis, skids,
+	-- deck, stakes) and clear of all of it (tyres, fenders, mirrors, stacks).
+	-- M1.5 checked a box as wide as its wheels and a stud each side; the 1.3x
+	-- Rig's tyres pass those lamps 0.9 clear, its hull 2.2.
+	t.test("the sell zone holds every bed, and the Rig backs onto the pad clear of everything", function()
+		local size, zone, pad = WorldPlan.SellZoneSize, town.sellZone.Position, town.sellPad.Position
+		t.ok(size == Vector3.new(24, 12, 40), "24 x 12 x 40")
+		t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
+		t.ok(math.abs(zone.Z - 82) < 1e-6, "its middle at z 82, where it was")
+		t.ok(math.abs(zone.Z + size.Z / 2 - 102) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 62) < 1e-6, "z 62 to 102")
+		t.ok(math.abs(zone.Z - pad.Z) < 9, "its middle on the pad")
+		t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")
+		-- The pad stays a ghost: nothing of it collides, the pad itself no
+		-- more than 0.25 tall (its trim barely more), so trucks roll over it.
+		for _, p in ipairs(parts(placed(BuildingArt.SellPad(24, 18), town.sellPad))) do
+			t.ok(not p.CanCollide, "the pad's " .. p.Name .. " doesn't collide")
+			local _, hi = boxOf(p)
+			t.ok(hi.Y <= (if p.Name == "SellPad" then 0.25 else 0.3) + 1e-6, "the pad's " .. p.Name .. " is flat")
+		end
+		local ItemCatalog = t.shared("ItemCatalog")
+		local TruckLayout = t.shared("TruckLayout")
+		local TruckArt = t.shared("Art/TruckArt")
+		-- Every bed of every rig fits the zone end to end, with room to spare.
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			t.ok(layout.bedLength <= size.Z - 4, id .. "'s bed fits the zone")
+			for trailerId, trailer in pairs(ItemCatalog.Trailers) do
+				local tl = TruckLayout.ForTrailer(trailer, layout)
+				t.ok(tl.bedLength <= size.Z - 4, trailerId .. "'s bed fits the zone")
 			end
-			local TruckLayout = t.shared("TruckLayout")
-			local rig = TruckLayout.For(t.shared("ItemCatalog").GetTruck("LoggingRig"))
-			local half = math.max(rig.width / 2, rig.wheelX + rig.tyreWidth / 2) + 1
-			local back = zone.Z + size.Z / 2
-			local lane = {
-				name = "the Rig's way onto the pad",
-				x0 = pad.X - half,
-				x1 = pad.X + half,
-				z0 = back - rig.length,
-				z1 = back,
-			}
-			t.ok(rig.bedLength <= size.Z, "the Rig's deck fits the zone")
-			local problems = {}
-			for _, thing in ipairs(townThings()) do
-				for _, p in ipairs(parts(thing.model)) do
-					if p.CanCollide and reachInto(p.CFrame, p.Size, lane) > 1e-3 then
-						table.insert(problems, thing.label .. "'s " .. p.Name)
+		end
+		-- The Logging Rig, facing the street (-Z) as it backs in.
+		local def = ItemCatalog.GetTruck("LoggingRig")
+		local rig = TruckLayout.For(def)
+		local model = TruckArt.Build(def, rig)
+		local hull, body = {}, {}
+		for _, p in ipairs(parts(model)) do
+			local lo, hi = boxOf(p)
+			table.insert(body, { lo = lo, hi = hi })
+			if p.CanCollide then
+				table.insert(hull, { lo = lo, hi = hi })
+			end
+		end
+		local near = {}
+		for _, thing in ipairs(townThings()) do
+			for _, p in ipairs(parts(thing.model)) do
+				if p.CanCollide then
+					local lo, hi = boxOf(p)
+					if hi.X > pad.X - 20 and lo.X < pad.X + 20 and hi.Z > 20 and lo.Z < 110 then
+						table.insert(near, { part = p, label = thing.label })
 					end
 				end
 			end
-			t.ok(#problems == 0, "in " .. lane.name .. ": " .. table.concat(problems, ", "))
-			-- Millie and the SELL LOGS HERE posts stand east of it.
-			local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
-				if model == "SellArea" and part == "SellZone" then
-					return town.sellZone, size
-				end
-				return nil, nil
-			end).Position
-			t.ok((millie - Vector3.new(14.6, 0, 92.5)).Magnitude < 1e-4, "Millie stands where she always has")
-			t.ok(millie.X > pad.X + 12 + 2, "Millie east of the pad and its lane")
 		end
-	)
+		t.ok(#near > 0, "things by the way in")
+		-- What of `boxes` (truck-local), the truck's middle `dz` along z,
+		-- comes within `margin` of something in town that collides.
+		local function hits(boxes, dz, margin, found)
+			for _, b in ipairs(boxes) do
+				local rect = {
+					x0 = pad.X + b.lo.X - margin,
+					x1 = pad.X + b.hi.X + margin,
+					z0 = b.lo.Z + dz - margin,
+					z1 = b.hi.Z + dz + margin,
+				}
+				for _, n in ipairs(near) do
+					if reachInto(n.part.CFrame, n.part.Size, rect) > 1e-3 then
+						found[n.label .. "'s " .. n.part.Name] = true
+					end
+				end
+			end
+			return found
+		end
+		local problems = {}
+		for back = 84, 96, 2 do
+			local dz = back - rig.length / 2
+			local found = hits(body, dz, 0, hits(hull, dz, 1, {}))
+			for what in pairs(found) do
+				table.insert(problems, string.format("%s (its tail at z %d)", what, back))
+			end
+		end
+		t.ok(#problems == 0, "on the Rig's way onto the pad: " .. table.concat(problems, ", "))
+		-- Backed up to the mill (its tail at the ramp's foot, z 97), the whole
+		-- deck is in the zone.
+		local deck = model:FindFirstChild("BedFloor")
+		local dz = 97 - rig.length / 2
+		local d0, d1 = deck.CFrame.Z - deck.Size.Z / 2 + dz, deck.CFrame.Z + deck.Size.Z / 2 + dz
+		t.ok(
+			d0 >= zone.Z - size.Z / 2 and d1 <= zone.Z + size.Z / 2,
+			string.format("the Rig's deck (z %.1f to %.1f) lies in the zone", d0, d1)
+		)
+		-- And the check itself: a lamp a stud nearer the walk's middle is in
+		-- the Rig's way.
+		local lamp = placed(BuildingArt.LampPost(), CFrame.new(-6.5, 0, 60))
+		local before = #near
+		for _, p in ipairs(parts(lamp)) do
+			if p.CanCollide then
+				table.insert(near, { part = p, label = "a test lamp" })
+			end
+		end
+		local caught = false
+		for back = 84, 96, 2 do
+			for what in pairs(hits(body, back - rig.length / 2, 0, {})) do
+				caught = caught or string.find(what, "a test lamp", 1, true) ~= nil
+			end
+		end
+		t.ok(caught and #near > before, "a lamp in the Rig's way is caught")
+		-- Millie and the SELL LOGS HERE posts stand east of it.
+		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
+			if model == "SellArea" and part == "SellZone" then
+				return town.sellZone, size
+			end
+			return nil, nil
+		end).Position
+		t.ok((millie - Vector3.new(14.6, 0, 92.5)).Magnitude < 1e-4, "Millie stands where she always has")
+		t.ok(millie.X > pad.X + 12 + 2, "Millie east of the pad and its lane")
+	end)
 
 	-- Every problem a check found, a line each (the first 25).
 	local function report(problems)
@@ -549,10 +745,11 @@ return function(t)
 			areas,
 			{ name = "sell pad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 }
 		)
-		-- Each slot's pull-out: its own lane (a stud wider each side), 35 studs
-		-- on past either end (a truck leaves forward or backs out; M1.5).
+		-- Each bay's pull-out: its own lane (a stud wider each side), 26 studs
+		-- on past its head and, for a pull-through bay, past its tail (phase
+		-- 12). A bay faces the forest (-Z) or the street (+Z).
 		for i, cf in ipairs(town.parkingSlots) do
-			t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.9999, "slot " .. i .. " faces the forest (-Z)")
+			t.ok(math.abs(cf.LookVector.Z) > 0.9999, "slot " .. i .. " faces the forest or the street")
 		end
 		for _, area in ipairs(pullOuts(nil)) do
 			table.insert(areas, area)
@@ -611,9 +808,10 @@ return function(t)
 		t.ok(caught("tree", 60, 30, "parking lot"), "a tree in the lot is caught")
 		t.ok(caught("tree", -60, 17, "road"), "a tree by the Hills Road is caught")
 		t.ok(caught("flowers", 40, -30, "pull-out of slot 3"), "a flower bed in a pull-out is caught")
-		-- Where the rock and two trees by the old, smaller lot stood (M1.5).
+		-- Where a tree by the old, smaller lot stood (M1.5), and a bush north
+		-- of the Flatbed's street-side bay (phase 12).
 		t.ok(caught("tree", 128, 24, "parking lot"), "the lot's old east-side birch spot is now in the lot")
-		t.ok(caught("bush", 116, 72, "pull-out of slot 10"), "the old rock spot is now in a pull-out")
+		t.ok(caught("bush", 78, 75, "pull-out of slot 10"), "a bush in bay 10's pull-out is caught")
 	end)
 
 	t.test("the town's greenery keeps 4 studs from the props and out of the buildings (TWN-01)", function()

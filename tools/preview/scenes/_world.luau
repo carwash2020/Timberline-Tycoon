@@ -315,7 +315,7 @@ function World.build(ctx, opts)
 		local slot = Kit.part(
 			root,
 			"Slot",
-			WorldPlan.ParkingSlotSize,
+			town.parkingSizes[index] or WorldPlan.ParkingSlotSize,
 			cf,
 			roblox.Color3.fromRGB(186, 168, 140),
 			roblox.Enum.Material.Slate

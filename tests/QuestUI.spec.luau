@@ -68,7 +68,8 @@ return function(t)
 		local pad = map.SellArea:FindFirstChild("SellPad", true)
 		t.ok(pad, "the pad is in the sell area")
 		-- Over the pad: the zone's middle is on it, 4 studs south of the pad's
-		-- own since M1.5 deepened the zone south over the street (z 69 to 95).
+		-- own since M1.5 deepened the zone south over the street (z 69 to 95;
+		-- 40 deep round that middle since phase 12, z 62 to 102).
 		local a, b = pad.CFrame.Position, part.CFrame.Position
 		t.ok(math.abs(a.X - b.X) < 0.01, "right over it, across")
 		t.ok(math.abs(a.Z - b.Z) <= 4 + 0.01 and math.abs(b.Z - a.Z) < pad.Size.Z / 2, "over the pad, along")

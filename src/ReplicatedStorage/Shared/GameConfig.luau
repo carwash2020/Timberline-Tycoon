@@ -50,7 +50,7 @@ local GameConfig = {
 
 	-- Truck + sawmill
 	LoadPromptRange = 8, -- studs from the tailgate (the server allows + RangeTolerance)
-	SellTruckRange = 35, -- the truck bed only sells if the truck is this close to the sell zone
+	SellTruckRange = 45, -- the truck bed only sells if the truck is this close to the sell zone (35 before the trucks grew again, phase 12)
 
 	-- Driving (each truck's top speed and turn rate are in ItemCatalog)
 	VehiclePhysics = true, -- false = Phase 1 arcade driving (glides through trees and walls)

@@ -25,12 +25,12 @@ return {
 		local WoodData = ctx.shared("WoodData")
 		local root = roblox.Instance.new("Model")
 
-		Common.ground(ctx, root, 400, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 40))
+		Common.ground(ctx, root, 460, C3.fromRGB(116, 164, 84), V3.new(20, -0.5, 70))
 		Kit.part(
 			root,
 			"Lot",
-			V3.new(70, 0.1, 150),
-			CF.new(16, 0.02, 40),
+			V3.new(90, 0.1, 210),
+			CF.new(23, 0.02, 70),
 			C3.fromRGB(176, 146, 104),
 			Enum.Material.Ground
 		)
@@ -117,7 +117,7 @@ return {
 			{ "Flatbed", "RanchTrailer", "pine", "oak", 2 },
 			{ "LoggingRig", "HeavyHauler", "pine", "frostwood", 2 },
 		}
-		local spacing = 11
+		local spacing = 16 -- about a parking bay apart (WorldPlan.ParkingBays)
 		local function rig(entry, i, z)
 			local def = ItemCatalog.GetTruck(entry[1])
 			local layout = TruckLayout.For(def)
@@ -134,7 +134,7 @@ return {
 			load(model, "TrailerBed", entry[4], entry[5], i * 7 + 3)
 		end
 		-- The back row: empty, BedZones drawn.
-		local ZONES = 80
+		local ZONES = 110
 		for i, entry in ipairs(rigs) do
 			local model = rig(entry, i, ZONES)
 			for _, z in ipairs(TruckArt.BedZones(model)) do
@@ -158,7 +158,7 @@ return {
 			hat = "none",
 			tag = false,
 		})
-		Kit.placeAt(fig, CF.new(-7, 0, 6))
+		Kit.placeAt(fig, CF.new(-9, 0, 8))
 		fig.Parent = root
 
 		local function at(i)
@@ -166,14 +166,14 @@ return {
 		end
 		return {
 			root = root,
-			shadowRadius = 110,
+			shadowRadius = 150,
 			cameras = {
-				{ pos = { -34, 30, 52 }, target = { 18, 3, 14 }, label = "1 loaded line-up" },
-				{ pos = { at(1) - 13, 12, 26 }, target = { at(1), 3, 10 }, label = "2 Rustbucket + Pony" },
-				{ pos = { at(2) - 13, 13, 30 }, target = { at(2), 3, 12 }, label = "3 Pickup + Ranch" },
-				{ pos = { at(3) - 15, 15, 36 }, target = { at(3), 3.5, 14 }, label = "4 Flatbed + Ranch" },
-				{ pos = { at(4) + 18, 17, 44 }, target = { at(4), 4, 16 }, label = "5 Logging Rig + Heavy Hauler" },
-				{ pos = { -30, 34, ZONES + 50 }, target = { 18, 3, ZONES + 12 }, label = "6 BedZones" },
+				{ pos = { -46, 40, 69 }, target = { 24, 4, 18 }, label = "1 loaded line-up" },
+				{ pos = { at(1) - 17, 15.5, 34 }, target = { at(1), 4, 13 }, label = "2 Rustbucket + Pony" },
+				{ pos = { at(2) - 17, 17, 39 }, target = { at(2), 4, 15.5 }, label = "3 Pickup + Ranch" },
+				{ pos = { at(3) - 19.5, 19.5, 47 }, target = { at(3), 4.5, 18 }, label = "4 Flatbed + Ranch" },
+				{ pos = { at(4) + 23.5, 22, 57 }, target = { at(4), 5.2, 21 }, label = "5 Logging Rig + Heavy Hauler" },
+				{ pos = { -44, 44, ZONES + 65 }, target = { 24, 4, ZONES + 16 }, label = "6 BedZones" },
 			},
 		}
 	end,

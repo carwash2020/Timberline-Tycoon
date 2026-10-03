@@ -180,14 +180,16 @@ return function(t)
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "SellZone")
 		t.ok(s.sellArea:FindFirstChild("SellZone"):FindFirstChild("SellPoint"), "SellPoint")
-		-- M1.5: the zone runs from the pad's north edge (z 95) out over the
-		-- street to z 69, the pad's width; the prompt stays over the pad's
-		-- middle (z 86), where it always was.
+		-- Phase 12: the zone runs 40 deep round its middle (z 82, where it
+		-- was since M1.5), from the mill's front (z 102) over the street to
+		-- z 62, the pad's width; the prompt stays over the pad's middle
+		-- (z 86), where it always was.
 		do
 			local zone = s.sellArea:FindFirstChild("SellZone")
 			local c, size = zone.CFrame.Position, zone.Size
-			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 26) < 1e-4, "the sell zone is 24 x 26")
-			t.ok(math.abs(c.Z + size.Z / 2 - 95) < 1e-4 and math.abs(c.Z - size.Z / 2 - 69) < 1e-4, "z 69 to 95")
+			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 40) < 1e-4, "the sell zone is 24 x 40")
+			t.ok(math.abs(c.Z - 82) < 1e-4, "its middle at z 82")
+			t.ok(math.abs(c.Z + size.Z / 2 - 102) < 1e-4 and math.abs(c.Z - size.Z / 2 - 62) < 1e-4, "z 62 to 102")
 			t.ok(math.abs(c.X) < 1e-4, "centred on the spawn walk")
 			local point = zone.CFrame * zone:FindFirstChild("SellPoint").Position
 			t.ok(math.abs(point.X) < 1e-4 and math.abs(point.Z - 86) < 1e-4, "the prompt over the pad's middle")
@@ -295,8 +297,10 @@ return function(t)
 		local s = build()
 		t.eq(#s.warnings, 0, table.concat(s.warnings, "\n"))
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-		local plan = WorldPlan.Town().parkingSlots
-		t.eq(#plan, 12, "12 slots planned: one for each player a server holds")
+		local town = WorldPlan.Town()
+		local plan = town.parkingSlots
+		t.eq(#plan, 13, "13 bays planned: one for each player a server holds, and one to spare")
+		t.eq(#town.parkingSizes, #plan, "a size for every bay")
 		for index, cf in ipairs(plan) do
 			local slot = s.map:FindFirstChild("ParkingSlot_" .. index)
 			t.ok(slot and slot:IsA("BasePart"), "ParkingSlot_" .. index .. " is built")
@@ -307,14 +311,12 @@ return function(t)
 					and slot.CFrame.LookVector:Dot(cf.LookVector) > 0.9999,
 				"slot " .. index .. " sits where WorldPlan puts it"
 			)
-			-- 10 x 60 (M1.5): the biggest rig fits; Size.Y is what VehicleService
-			-- reads to find the ground under it.
-			t.ok(
-				math.abs(slot.Size.X - 10) < 1e-4
-					and math.abs(slot.Size.Y - 0.2) < 1e-4
-					and math.abs(slot.Size.Z - 60) < 1e-4,
-				"slot " .. index .. " size"
-			)
+			-- Its bay's size (phase 12: VehicleService fits each rig to the
+			-- slots' Size.X and Size.Z); Size.Y is what it reads to find the
+			-- ground under it.
+			local want = town.parkingSizes[index]
+			t.ok((slot.Size - want).Magnitude < 1e-4, "slot " .. index .. " size")
+			t.ok(math.abs(slot.Size.Y - 0.2) < 1e-4, "slot " .. index .. " is 0.2 thick")
 			t.ok(math.abs(slot.CFrame.Y - slot.Size.Y / 2) < 1e-4, "slot " .. index .. " lies on the ground")
 			t.eq(slot.Transparency, 1)
 			local glows = 0

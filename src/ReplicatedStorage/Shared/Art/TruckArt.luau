@@ -50,6 +50,12 @@
 -- cab, bed, wheels, the walls' height), and each cab round a seated driver
 -- who stays avatar-sized: the seat (SEAT_TOP) and the roof (HEADROOM over
 -- it) are set per truck, so a hat clears every roof (TruckArt.spec).
+-- Phase 12 grew every truck and trailer TruckLayout.Scale (1.3) times
+-- again: the builders below still draw in M1.5's units, round the layout
+-- shrunk by Scale (designOf), and Build grows the drawn body by Scale
+-- (grow, the way Kit.scaleModel grows the shops), so each truck keeps its
+-- look; the chassis, the skids, the BedZones and the LoadPoint are added
+-- at full size after. A seated driver sits higher and has more room.
 
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
@@ -87,6 +93,12 @@ local RUST = hex("#8C4A26")
 
 TruckArt.HeadlightColor = HEADLIGHT
 TruckArt.TaillightColor = TAILLIGHT
+
+-- The builders draw in M1.5's units (see Sizes above); Build grows them
+-- by S. A bed floor's thickness in those units, so it's TruckLayout's once
+-- grown (and a wall stands on its top).
+local S = TruckLayout.Scale
+local FLOOR = TruckLayout.BedFloorThickness / S
 
 ---------------------------------------------------------------------------
 -- Pieces
@@ -373,7 +385,7 @@ local function driverSeat(model: Model, size: Vector3, cf: CFrame, color: Color3
 end
 
 local function bedFloor(model: Model, name: string, width: number, length: number, y: number, z: number, color: Color3)
-	return hull(model, name, V3(width, TruckLayout.BedFloorThickness, length), CF(0, y, z), color, M.WoodPlanks)
+	return hull(model, name, V3(width, FLOOR, length), CF(0, y, z), color, M.WoodPlanks)
 end
 
 -- Skids: what a truck rests and slides on. Each is a flat box with a
@@ -387,12 +399,13 @@ end
 -- 196.2, so a truck lifting itself up a ramp from a standstill needs
 -- tan(slope) < 120 / 196.2 = 0.61 (31 degrees), and the truck's own lean
 -- onto the step (VehicleController's ground rays) adds a few degrees.
--- 1.3 over 2.6 studs is 26.6 degrees (it was 1 over 2 before the chassis
--- rose with the bigger wheels, M1.5). Steeper ramps (or balls at the
--- wheels, whose contact with a 0.5 step is nearly a wall) climb only at
--- speed.
+-- Each ramp rises the skid's height over twice that, 26.6 degrees: 1.84
+-- over 3.68 studs since the chassis rose with the bigger wheels again
+-- (phase 12; 1.3 over 2.6 in M1.5, 1 over 2 before). Steeper ramps (or
+-- balls at the wheels, whose contact with a 0.5 step is nearly a wall)
+-- climb only at speed.
 local SKID_HEIGHT = TruckLayout.ChassisY - 0.5 -- up to the chassis's underside (it's 1 tall)
-TruckArt.SkidRampRun = 2.6 -- studs along the truck that each ramp rises over
+TruckArt.SkidRampRun = 2 * SKID_HEIGHT -- studs along the truck that each ramp rises over
 local SKID_MIN_FLAT = 1 -- a short skid keeps at least this much flat bottom
 
 local function slippery(p: BasePart)
@@ -444,10 +457,13 @@ type Ctx = {
 local builders: { [string]: (Ctx) -> () } = {}
 
 -- Each style's driver seat (its top, over the ground) and, under a roof, the
--- roof's underside over that. A seated avatar's head tops out about 3.25
--- over the seat and a hat adds more, so the roofs stand 4.6 or more over
--- it, the bigger the truck the more (V2_PLAN §4c, TruckArt.spec).
-local SEAT_TOP = { farm = 2.85, pickup = 2.6, atv = 3.5, flatbed = 2.8, rig = 3.7 }
+-- roof's underside over that, in M1.5's units (Build grows them by S: seat
+-- tops 3.4 to 4.8, roofs 6 to 6.6 over them). A seated avatar's head tops
+-- out about 3.25 over the seat and a hat adds more, so the roofs stand well
+-- over it, the bigger the truck the more (V2_PLAN §4c, TruckArt.spec).
+-- (The Rustbucket's bench rose a tenth in phase 12: an avatar's straight legs
+-- end under its cowl, not in the gap in front of the grown seat.)
+local SEAT_TOP = { farm = 2.95, pickup = 2.6, atv = 3.5, flatbed = 2.8, rig = 3.7 }
 local HEADROOM = { pickup = 4.65, flatbed = 4.9, rig = 5.05 }
 
 -- The Rustbucket: held together by hope.
@@ -457,7 +473,7 @@ builders.farm = function(c: Ctx)
 	local r, tw, wx = lay.wheelRadius, lay.tyreWidth, lay.wheelX
 	local zF, zR = lay.wheelZ[1], lay.wheelZ[2]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
-	local floorTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local floorTop = lay.bedFloorY + FLOOR / 2
 	local wall = (W - lay.bedWidth) / 2
 	local seatTop, seatZ = SEAT_TOP.farm, f + 5.8
 	local primer = hex("#7F8E6E") -- the replacement door, never painted
@@ -658,7 +674,7 @@ builders.pickup = function(c: Ctx)
 	local wx = lay.wheelX
 	local zF, zR = lay.wheelZ[1], lay.wheelZ[2]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
-	local floorTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local floorTop = lay.bedFloorY + FLOOR / 2
 	local wall = (W - lay.bedWidth) / 2
 	local wallY = floorTop + lay.wallHeight / 2
 	local seatTop, seatZ = SEAT_TOP.pickup, f + 6.1
@@ -918,7 +934,7 @@ builders.flatbed = function(c: Ctx)
 	local zF = lay.wheelZ[1]
 	local zRear, zTandem = lay.wheelZ[2], lay.wheelZ[3] or lay.wheelZ[2]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
-	local deckTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local deckTop = lay.bedFloorY + FLOOR / 2
 	local wall = (W - lay.bedWidth) / 2
 	local seatTop, seatZ = SEAT_TOP.flatbed, f + 6.3
 	local steel = hex("#6A6E72")
@@ -1035,7 +1051,7 @@ builders.rig = function(c: Ctx)
 	local r, tw, wx = lay.wheelRadius, lay.tyreWidth, lay.wheelX
 	local zF = lay.wheelZ[1]
 	local bedStart, bedEnd = lay.bedStart, lay.bedStart + lay.bedLength
-	local deckTop = lay.bedFloorY + TruckLayout.BedFloorThickness / 2
+	local deckTop = lay.bedFloorY + FLOOR / 2
 	local wall = (W - lay.bedWidth) / 2
 	local seatTop, seatZ = SEAT_TOP.rig, f + 7.9
 	local steel = hex("#3D4045")
@@ -1165,23 +1181,23 @@ end
 -- Trailers
 ---------------------------------------------------------------------------
 
--- Adds a trailer to `model` (a truck built by TruckArt.Build), behind the
--- truck in truck-local studs: tongue, bed ("TrailerBed"), skid
--- ("TrailerSkid"), axle(s), fenders, lights and the style's sides.
-function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
+-- Draws a trailer's body into `model` in M1.5's units (`tl` is a
+-- TrailerLayout shrunk by S: trailerDesignOf), behind the truck in
+-- truck-local studs: tongue, bed ("TrailerBed"), axle(s), fenders, lights
+-- and the style's sides. AddTrailer grows it and adds the skid.
+local function drawTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
 	local W = tl.width
 	local bs, be, bc, y = tl.bedStart, tl.bedStart + tl.bedLength, tl.bedCenterZ, tl.bedFloorY
 	local r, tw = tl.wheelRadius, tl.tyreWidth
 	local paint = hex(trailer.look.color)
-	local rng = Kit.rng(#trailer.id * 97 + tl.bedLength)
-	local deckTop = y + TruckLayout.BedFloorThickness / 2
+	local rng = Kit.rng(#trailer.id * 97 + math.floor(tl.bedLength + 0.5)) -- M1.5's seeds: the same boards
+	local deckTop = y + FLOOR / 2
 	local wall = (W - tl.bedWidth) / 2
 	local wallH = tl.wallHeight
 	local wood = hex("#8A6038")
 
 	local deckColor = if tl.style == "heavy" then hex("#5B4A3C") else wood
 	bedFloor(model, "TrailerBed", W, tl.bedLength, y, bc, deckColor)
-	frictionlessSkid(model, "TrailerSkid", W - 0.4, tl.bedLength - 1, bc)
 	deco(model, "TrailerFrame", V3(W - 1.5, 0.45, tl.bedLength), CF(0, y - 0.5, bc), FRAME, M.Metal)
 
 	-- A-frame tongue to a coupler at the truck's back.
@@ -1322,12 +1338,119 @@ local function seedOf(id: string): number
 	return n
 end
 
+local function shrunk(list: { number }): { number }
+	local out: { number } = table.create(#list)
+	for i, v in ipairs(list) do
+		out[i] = v / S
+	end
+	return out
+end
+
+-- A truck's layout in M1.5's units, the builders' (every length / S).
+local function designOf(lay: Layout): Layout
+	local slots: { Vector3 } = table.create(#lay.logSlots)
+	for i, v in ipairs(lay.logSlots) do
+		slots[i] = v / S
+	end
+	return {
+		style = lay.style,
+		width = lay.width / S,
+		length = lay.length / S,
+		front = lay.front / S,
+		cabLength = lay.cabLength / S,
+		bedLength = lay.bedLength / S,
+		bedStart = lay.bedStart / S,
+		bedCenterZ = lay.bedCenterZ / S,
+		bedFloorY = lay.bedFloorY / S,
+		bedWidth = lay.bedWidth / S,
+		wallHeight = lay.wallHeight / S,
+		wheelRadius = lay.wheelRadius / S,
+		tyreWidth = lay.tyreWidth / S,
+		wheelX = lay.wheelX / S,
+		wheelZ = shrunk(lay.wheelZ),
+		logLength = lay.logLength / S,
+		logSlots = slots,
+	}
+end
+
+-- A trailer's layout in M1.5's units (every length / S).
+local function trailerDesignOf(tl: TrailerLayout): TrailerLayout
+	local slots: { Vector3 } = table.create(#tl.logSlots)
+	for i, v in ipairs(tl.logSlots) do
+		slots[i] = v / S
+	end
+	return {
+		style = tl.style,
+		width = tl.width / S,
+		bedLength = tl.bedLength / S,
+		bedStart = tl.bedStart / S,
+		bedCenterZ = tl.bedCenterZ / S,
+		bedFloorY = tl.bedFloorY / S,
+		bedWidth = tl.bedWidth / S,
+		wallHeight = tl.wallHeight / S,
+		length = tl.length / S,
+		hitchZ = tl.hitchZ / S,
+		wheelRadius = tl.wheelRadius / S,
+		tyreWidth = tl.tyreWidth / S,
+		wheelX = tl.wheelX / S,
+		wheelZ = tl.wheelZ / S,
+		axleZ = shrunk(tl.axleZ),
+		logSlots = slots,
+	}
+end
+
+-- Grows a body drawn in M1.5's units at the origin to full size, as
+-- Kit.scaleModel grows a shop: every part's size and position (its turn
+-- kept), each attachment's offset (the exhausts' ExhaustOut; set by CFrame,
+-- which Lune's previews can read) and each wheel's Radius.
+local function grow(model: Model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			local cf = d.CFrame
+			d.Size = d.Size * S
+			d.CFrame = CF(cf.Position * S) * (cf - cf.Position)
+			local radius = d:GetAttribute("Radius")
+			if d.Name == "Wheel" and type(radius) == "number" then
+				d:SetAttribute("Radius", radius * S)
+			end
+		elseif d:IsA("Attachment") then
+			local cf = d.CFrame
+			d.CFrame = CF(cf.Position * S) * (cf - cf.Position)
+		end
+	end
+end
+
+-- Adds a trailer to `model` (a truck built by TruckArt.Build), behind the
+-- truck in truck-local studs (`tl`, its TrailerLayout): its body (drawn in
+-- M1.5's units and grown, drawTrailer) and its skid ("TrailerSkid").
+function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayout)
+	local body = Instance.new("Model")
+	drawTrailer(body, trailer, trailerDesignOf(tl))
+	grow(body)
+	for _, child in ipairs(body:GetChildren()) do
+		child.Parent = model
+	end
+	body:Destroy()
+	frictionlessSkid(model, "TrailerSkid", tl.width - 0.4, tl.bedLength - 1, tl.bedCenterZ)
+end
+
 -- A truck (and its trailer, when given) at the origin, ground y = 0, front
 -- -Z. Every part is anchored; Rig turns it into one rigid body.
 function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, trailerLayout: TrailerLayout?): Model
 	local lay = layout or TruckLayout.For(def)
 	local model = Instance.new("Model")
 	model.Name = def.id
+
+	-- The body, drawn in M1.5's units round the layout shrunk by S, grown.
+	local build = builders[lay.style] or builders.flatbed
+	build({
+		model = model,
+		def = def,
+		lay = designOf(lay),
+		paint = hex(def.look.color),
+		rng = Kit.rng(seedOf(def.id)),
+	})
+	grow(model)
 
 	-- The chassis carries the truck (its only massive part); the frictionless
 	-- skid under it is what touches the ground.
@@ -1344,15 +1467,6 @@ function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, tr
 	chassis.CastShadow = false
 	model.PrimaryPart = chassis
 	frictionlessSkid(model, "Skid", lay.width - 0.4, lay.length - 1, 0)
-
-	local build = builders[lay.style] or builders.flatbed
-	build({
-		model = model,
-		def = def,
-		lay = lay,
-		paint = hex(def.look.color),
-		rng = Kit.rng(seedOf(def.id)),
-	})
 
 	local bed = model:FindFirstChild("BedFloor")
 	if bed and bed:IsA("BasePart") then
