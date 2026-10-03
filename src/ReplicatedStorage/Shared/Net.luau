@@ -7,10 +7,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Net = {}
 
 Net.RemoteNames = {
-	"ChopTree", -- client -> server: (treeUid)
-	"PickupLog", -- client -> server: (logUid)
-	"LoadToTruck", -- client -> server: ()
-	"SellLogs", -- client -> server: ()
 	"DropAxe", -- client -> server: (axeUid)
 	"BuyItem", -- client -> server: (category, itemId); the result comes back as a Notify toast
 	"SkipTutorial", -- client -> server: ()

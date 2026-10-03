@@ -134,20 +134,10 @@ return function(t)
 		return rec
 	end
 
-	t.test("under the v1 loop it does nothing at all", function()
-		local rec = setup(1)
-		t.eq(rec.binds, {}, "no actions bound")
-		t.eq(rec.connections, 0, "no input, render or tag signals")
-		t.eq(rec.made, {}, "nothing built")
-		t.eq(#rec.playerGui:GetChildren(), 0)
-		t.eq(rec.waited, 0, "and it didn't wait: the loop was known")
-	end)
-
-	t.test("no word from the server about the loop: it waits a while, then stays off", function()
+	t.test("it starts without waiting for a loop attribute", function()
 		local rec = setup(nil)
-		t.ok(rec.waited >= 60, "waited " .. rec.waited)
-		t.eq(rec.binds, {})
-		t.eq(rec.connections, 0)
+		t.eq(#rec.binds, 1, "the touch action is bound")
+		t.eq(rec.waited, 0)
 	end)
 
 	t.test("under v2: touches through a low-priority action, the hold's keys only while holding", function()

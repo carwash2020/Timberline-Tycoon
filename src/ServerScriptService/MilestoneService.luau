@@ -11,11 +11,10 @@
 --   * On leaving, prints a one-line session summary.
 --   * Prints a ready-to-paste command that calibrates the economy model
 --     from what you actually did: time from first chop to last sale, and
---     the logs sold by wood ("lune run tools/economy1 --calibrate ...").
---     Under the v2 core loop (GameServer passes CoreLoop.Active() to Init)
---     it's the live model's command, with the u³ sold by wood (WoodSold):
---     "lune run tools/economy --calibrate 612 birch=16 oak=24", and
---     "could afford" uses the v2 prices (ShopLogic.Price).
+--     the u³ sold by wood (WoodSold):
+--     "lune run tools/economy --calibrate 612 birch=16 oak=24".
+--     "could afford" uses the loop's prices (ShopLogic.Price); GameServer
+--     passes loop 2.
 --
 -- On live servers:
 --   * Logs the steps as Roblox's onboarding funnel (Creator Hub ->
@@ -57,8 +56,7 @@ end
 
 local IS_STUDIO = RunService:IsStudio()
 local REPORT_EVERY = 60 -- seconds, Studio only
-local CALIBRATE_MIN_LOGS = 10 -- don't suggest calibrating from less than this
-local CALIBRATE_MIN_PIECES = 10 -- (v2: pieces sold)
+local CALIBRATE_MIN_PIECES = 10 -- pieces sold
 local CALIBRATE_MIN_SECONDS = 120
 
 type Session = {
@@ -74,6 +72,7 @@ type Session = {
 	-- The same for the v2 model (tools/economy): u³ by wood, pieces sold.
 	volumeByWood: { [string]: number },
 	piecesSold: number,
+	creditedMin: number, -- playtime minutes already added to the profile this session
 }
 
 local sessions: { [Player]: Session } = {}
@@ -105,37 +104,29 @@ local function stopwatch(player: Player, session: Session, text: string)
 end
 
 -- The calibrate command for `seconds` from first chop to last sale and
--- what was sold by wood (`byWood`: logs under v1, u³ under v2, rounded to
--- whole numbers), or nil from too little (`count`: logs under v1, pieces
--- under v2; or too short a session):
--- "lune run tools/economy1 --calibrate 612 birch=16 oak=24" (v1),
--- "lune run tools/economy --calibrate 612 birch=16 oak=24" (v2, u³).
+-- the u³ sold by wood (rounded to whole numbers), or nil when there
+-- aren't enough pieces or the session is too short:
+-- "lune run tools/economy --calibrate 612 birch=16 oak=24".
+-- `activeLoop` is ignored: the live loop is v2. It stays so older callers
+-- still type-check.
 function MilestoneService.CalibrateLine(
 	seconds: number,
 	byWood: { [string]: number },
 	count: number,
-	activeLoop: number
+	_activeLoop: number
 ): string?
-	local v2 = activeLoop == 2
-	local parts, total = {}, 0
+	local parts = {}
 	for woodId, amount in pairs(byWood) do
-		local n = if v2 then math.floor(amount + 0.5) else amount
-		if not v2 or n >= 1 then
+		local n = math.floor(amount + 0.5)
+		if n >= 1 then
 			table.insert(parts, string.format("%s=%d", woodId, n))
 		end
-		total += amount
 	end
-	local enough = if v2 then count >= CALIBRATE_MIN_PIECES and #parts > 0 else total >= CALIBRATE_MIN_LOGS
-	if not enough or seconds < CALIBRATE_MIN_SECONDS then
+	if count < CALIBRATE_MIN_PIECES or #parts == 0 or seconds < CALIBRATE_MIN_SECONDS then
 		return nil
 	end
 	table.sort(parts)
-	return string.format(
-		"lune run tools/%s --calibrate %d %s",
-		if v2 then "economy" else "economy1",
-		math.floor(seconds),
-		table.concat(parts, " ")
-	)
+	return string.format("lune run tools/economy --calibrate %d %s", math.floor(seconds), table.concat(parts, " "))
 end
 
 -- The session's calibrate command, or nil if it doesn't have enough sales
@@ -146,10 +137,7 @@ local function calibrationCommand(session: Session): string?
 		return nil
 	end
 	local seconds = math.floor(last - first)
-	if loop == 2 then
-		return MilestoneService.CalibrateLine(seconds, session.volumeByWood, session.piecesSold, 2)
-	end
-	return MilestoneService.CalibrateLine(seconds, session.soldByWood, 0, 1)
+	return MilestoneService.CalibrateLine(seconds, session.volumeByWood, session.piecesSold, 2)
 end
 
 -- `player`'s calibrate command this session so far, or nil.
@@ -222,6 +210,7 @@ function MilestoneService.Start(player: Player, profile: Profile)
 		soldByWood = {},
 		volumeByWood = {},
 		piecesSold = 0,
+		creditedMin = 0,
 	}
 	sessions[player] = session
 	MilestoneService.Mark(player, "Joined")
@@ -291,15 +280,39 @@ function MilestoneService.WoodSold(player: Player, pieces: number, volumeByWood:
 	end
 end
 
--- Call when the player leaves.
-function MilestoneService.Stop(player: Player)
+-- Whole minutes this session should have added so far (rounded, same as
+-- a single credit at the end). Never less than `already` credited.
+function MilestoneService.MinutesToCredit(elapsedSec: number, already: number): number
+	if type(elapsedSec) ~= "number" or elapsedSec ~= elapsedSec or elapsedSec <= 0 then
+		return already
+	end
+	return math.max(already, math.floor(elapsedSec / 60 + 0.5))
+end
+
+-- Adds any playtime not yet in the profile. Safe to call on every save
+-- and again when the player leaves: a minute is counted once.
+function MilestoneService.Flush(player: Player)
 	local session = sessions[player]
-	sessions[player] = nil
 	if not session then
 		return
 	end
+	local total = MilestoneService.MinutesToCredit(os.clock() - session.startedAt, session.creditedMin)
+	local add = total - session.creditedMin
+	if add > 0 then
+		session.profile.stats.playtimeMin += add
+		session.creditedMin = total
+	end
+end
+
+-- Call when the player leaves.
+function MilestoneService.Stop(player: Player)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	MilestoneService.Flush(player)
 	local elapsed = os.clock() - session.startedAt
-	session.profile.stats.playtimeMin += math.floor(elapsed / 60 + 0.5)
+	sessions[player] = nil
 	if IS_STUDIO then
 		print(
 			string.format(

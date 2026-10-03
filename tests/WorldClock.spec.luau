@@ -33,12 +33,6 @@ return function(t)
 		local loader = t.loader({
 			services = { Lighting = lighting },
 			mocks = {
-				TreeService = {
-					SetBiomeDormant = function(id, isDormant)
-						dormant[id] = isDormant
-					end,
-				},
-				-- The v2 loop's trees (M1.3): the same call.
 				SectionTrees = {
 					SetBiomeDormant = function(id, isDormant)
 						sectionDormant[id] = isDormant
@@ -61,21 +55,16 @@ return function(t)
 		end, sectionDormant
 	end
 
-	t.test(
-		"v2 loop (M1.3): the night-only grove's section trees sleep and wake, TreeService's are left alone",
-		function()
-			local WorldClock, _, attributes, dormant, _, _, sectionDormant = setup(BASE + cycle / 2, true) -- noon
-			WorldClock.Start()
-			t.eq(attributes.IsNight, false)
-			t.eq(sectionDormant.grove, true)
-			t.eq(dormant.grove, nil, "TreeService isn't asked under v2")
-			local Night, _, _, nightDormant, _, _, nightSections = setup(BASE, true) -- midnight
-			Night.Start()
-			t.ok(Night.IsNight())
-			t.eq(nightSections.grove, false, "the grove wakes at night")
-			t.eq(nightDormant.grove, nil)
-		end
-	)
+	t.test("the night-only grove's trees sleep by day and wake at night", function()
+		local WorldClock, _, attributes, _, _, _, sectionDormant = setup(BASE + cycle / 2, true) -- noon
+		WorldClock.Start()
+		t.eq(attributes.IsNight, false)
+		t.eq(sectionDormant.grove, true)
+		local Night, _, _, _, _, _, nightSections = setup(BASE, true) -- midnight
+		Night.Start()
+		t.ok(Night.IsNight())
+		t.eq(nightSections.grove, false, "the grove wakes at night")
+	end)
 
 	t.test("never writes Lighting.ClockTime", function()
 		local WorldClock, writes = setup(BASE + cycle / 2)
@@ -84,19 +73,19 @@ return function(t)
 	end)
 
 	t.test("night: IsNight is set and the Phantom Grove wakes", function()
-		local WorldClock, _, attributes, dormant = setup(BASE) -- midnight
+		local WorldClock, _, attributes, _, _, _, sectionDormant = setup(BASE) -- midnight
 		WorldClock.Start()
 		t.eq(attributes.IsNight, true)
-		t.eq(dormant.grove, false)
+		t.eq(sectionDormant.grove, false)
 		t.ok(WorldClock.IsNight())
 		t.ok(math.abs(WorldClock.ClockTime()) < 1e-9)
 	end)
 
 	t.test("day: IsNight is false and the grove sleeps", function()
-		local WorldClock, _, attributes, dormant = setup(BASE + cycle / 2) -- noon
+		local WorldClock, _, attributes, _, _, _, sectionDormant = setup(BASE + cycle / 2) -- noon
 		WorldClock.Start()
 		t.eq(attributes.IsNight, false)
-		t.eq(dormant.grove, true)
+		t.eq(sectionDormant.grove, true)
 		t.ok(not WorldClock.IsNight())
 		t.ok(math.abs(WorldClock.ClockTime() - 12) < 1e-9)
 	end)

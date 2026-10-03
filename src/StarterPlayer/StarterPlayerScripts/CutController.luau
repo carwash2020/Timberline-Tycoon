@@ -30,7 +30,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
@@ -49,8 +48,6 @@ CutController.RayLength = 250
 CutController.WoodGroup = "Wood" -- the ray's collision group: leaves don't collide with it
 CutController.NearSlack = 1.5 -- studs past the axe's reach the nearest-section search looks
 CutController.HardToastEvery = 3
-CutController.BootWait = 120 -- seconds to wait for the server to say which loop runs
-
 local READY_COLOR = Color3.fromRGB(255, 244, 214)
 local HARD_COLOR = Color3.fromRGB(255, 170, 70)
 local RETRY_INTERVAL = 0.2
@@ -463,14 +460,6 @@ local function watchCharacter(char: Model)
 end
 
 function CutController.Start()
-	-- MapBuilder says which loop runs before it builds anything.
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < CutController.BootWait do
-		waited += task.wait(0.25)
-	end
-	if not CoreLoop.V2() then
-		return -- the v1 loop: ChopController swings
-	end
 	local hl = Instance.new("Highlight")
 	hl.Name = "CutTarget"
 	hl.FillTransparency = 1

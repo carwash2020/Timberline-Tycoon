@@ -40,7 +40,6 @@ local RunService = game:GetService("RunService")
 
 local LightingController = require(script.Parent.LightingController)
 local Quality = require(script.Parent.Quality)
-local TreeFX = require(script.Parent.TreeFX)
 
 local WindSway = {}
 
@@ -84,7 +83,7 @@ end
 
 -- Whether WindSway may move this tree's leaves right now.
 local function idle(tree: Model, home: CFrame): boolean
-	if TreeFX.IsBusy(tree) then
+	if tree:GetAttribute("FXBusy") == true then
 		return false
 	end
 	if tree:GetAttribute("Felled") == true or tree:GetAttribute("Dormant") == true then

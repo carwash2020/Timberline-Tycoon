@@ -65,7 +65,7 @@ return function(t)
 				},
 			},
 			mocks = {
-				TreeService = {
+				SectionTrees = {
 					SetBiomeDormant = function(id, isDormant)
 						s.dormant[id] = isDormant
 					end,

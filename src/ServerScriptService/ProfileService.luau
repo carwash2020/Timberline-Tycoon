@@ -14,6 +14,7 @@ local RunService = game:GetService("RunService")
 
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileStore = require(script.Parent.Vendor.ProfileStore)
+local SaveFlush = require(script.Parent.SaveFlush)
 
 local ProfileService = {}
 
@@ -58,6 +59,14 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 		return nil, "left"
 	end
 
+	-- Both fire before Profile.Data is copied into the DataStore write,
+	-- including the BindToClose shutdown save. OnLastSave also fires on a
+	-- normal EndSession, so a leave and a shutdown take the same path.
+	local function flush()
+		SaveFlush.Run(player)
+	end
+	session.OnSave:Connect(flush)
+	session.OnLastSave:Connect(flush)
 	session.OnSessionEnd:Connect(function()
 		if sessions[player] ~= session then
 			return -- we ended it ourselves in ReleaseProfile (player left)

@@ -88,18 +88,6 @@ return function(t)
 		t.eq(HintLogic.SellCount(1.7, 0, nil, 0, RANGE), 1, "whole logs")
 	end)
 
-	t.test("SellCount counts what CarryController's Sell prompt counts", function()
-		-- CarryController belongs to another stream: if its sell rule loses
-		-- or gains an ingredient, SellCount (and this) should follow.
-		local fs = require("@lune/fs")
-		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/CarryController.luau")
-		local sell = string.match(source, "local function setupSellPrompt%(%).-\nend\n")
-		t.ok(sell, "CarryController's setupSellPrompt moved")
-		for _, ingredient in ipairs({ "carried()", "bedCount()", "GameConfig.SellTruckRange", '"SkyBin"', "n > 0" }) do
-			t.ok(string.find(sell, ingredient, 1, true), "the Sell prompt no longer uses " .. ingredient)
-		end
-	end)
-
 	t.test("{click} and {tap} become each device's word, capitalised at a sentence start", function()
 		t.eq(HintLogic.Expand("{Click}, or hold.", "phone"), "Tap, or hold.")
 		t.eq(HintLogic.Expand("{Click}, or hold.", "desktop"), "Click, or hold.")

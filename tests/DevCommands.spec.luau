@@ -149,14 +149,10 @@ return function(t)
 		end
 	end)
 
-	t.test("outside Studio, or under the v1 loop, it does nothing at all", function()
+	t.test("outside Studio it does nothing at all", function()
 		local live, _, made, connections = load(false)
 		live.Init(function() end)
 		t.eq(made, {}, "no chat command made")
 		t.eq(connections(), 0, "nothing connected")
-		local v1, _, madeV1, connectionsV1 = load(true, 1)
-		v1.Init(function() end)
-		t.eq(madeV1, {})
-		t.eq(connectionsV1(), 0)
 	end)
 end

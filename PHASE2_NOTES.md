@@ -98,7 +98,8 @@ the trunk and limbs into pieces. You put the axe away and drag the wood
 truck's bed by friction, and wood resting on the green sell pad by the
 sawmill sells by volume: u³ x the wood's price per u³. A new player starts
 with $20 and a Rusty Axe. Prices and axe numbers are the spec's (ECONOMY.md
-is the v2 model now; ECONOMY_V1.md keeps the old one).
+is the v2 model). The v1 loop and its economy report were removed in the
+hardening pass; `GameConfig.CoreLoop` stays 2.
 
 **Old saves.** The first time a player joins, the logs they had on hand
 (truck bed, left-behind logs, Sky Bin) are bought back at their saved
@@ -108,8 +109,9 @@ in the forge becomes forge wood (40 logs = 60 u³). Axes, trucks, plots,
 Heartseeds, the Field Guide, streaks and Robux purchases are all kept;
 tutorial progress restarts only on the steps whose unit changed.
 
-**Rollback** if something is badly wrong: set `CoreLoop = 1` in
-GameConfig, rebuild and republish. Migrated saves load fine under v1.
+**Rollback.** The v1 chop-and-carry loop is gone. Setting `CoreLoop` to 1
+does not bring it back: the server always runs loop 2. Old saves still
+load; leftover carried logs are bought back by MigrateV2.
 
 ### How to update the live game
 
@@ -128,14 +130,14 @@ Update), so no server keeps running the old loop.
 | 4 | Step 2: press 1 to put the axe away, then click and hold a log | It drags. A whole trunk is heavy: cut it in half (about 16 hits) and drag the halves. Cutting a limb where it joins frees it |
 | 5 | Step 3: drag the wood onto the Rustbucket's bed | It rests there; the HUD shows the bed's u³ and $ |
 | 6 | Step 4: drive to the mill at full speed and back onto the green pad | Nothing falls off on the straights (a hard turn may slide a log). On the pad: "Sold N pieces · X u³ · $Y". The truck stays. Spawn to first sale under 4 minutes |
-| 7 | Steps 5-7: plant the Heartseed in your stump, sell $60 more, buy the Steel Axe | The sapling grows with your name; Murph pays $25; the Steel Axe costs $90 |
+| 7 | Steps 5-7: plant the Heartseed in your stump, sell $140 more, buy the Steel Axe | The sapling grows with your name; Murph pays $25; the Steel Axe costs $180 |
 | 8 | Stop and Play again with wood on the bed, parked in town | The load is back on the bed where it lay. Leave it out in the forest instead: "Your last load is waiting where you left your truck." |
 | 9 | **Test > Clients and Servers**, 2 players | Player 2 can't grab wood on your bed ("That's on <you>'s truck."); a log of theirs you sell pays them; no jitter on either screen |
 | 9b | Ownership (2 players): player 1 hits an oak once, then player 2 swings at it; player 1 fells it, then player 2 tries to grab the trunk; then player 1 leaves | Player 2: "Player1 is cutting this tree. Find another one."; then "That's Player1's wood."; once player 1 has left (and 45 s after the cut), player 2 can take it. A tree player 1 stops hitting for 60 s is free to take over |
 | 10 | If logs jitter on the bed: Server command bar `workspace:SetAttribute("Tune_BedAutoWeld", 1)` | Resting logs weld within a second; grabbing one unwelds it. Tell Claude if you needed it |
 | 11 | The isles: lay a Lumenwood piece on a Cloud Chute's hopper; at the mill press **Sell Sky Bin**; lay plain Lumenwood on the forge | "Sent 1 piece down the Cloud Chute. Sky Bin X/120 u³"; the bin sells with the usual toast; "Into the forge: X u³. Lumenwood X/60 u³ · Sky Shards ... · $20,000" |
 | 12 | Phone emulator + **View > MicroProfiler** during a felling in the Starter Forest | 30+ fps, no long spike when the tree lands |
-| 13 | Rollback check: in edit mode `workspace:SetAttribute("CoreLoop", 1)`, Play | Today's game as before (logs in hands, Load and Sell prompts). Clear the attribute afterwards (`nil`): PlaceCheck warns if it's left set |
+| 13 | In edit mode set `workspace:SetAttribute("CoreLoop", 1)`, Play, then clear it | Output still says `[CoreLoop] 2` and you still chop sections and drag wood. PlaceCheck warns if the attribute is left set |
 
 The stopwatch prints `lune run tools/economy --calibrate ...` once you've
 sold enough: paste it to Claude (it calibrates ECONOMY.md).

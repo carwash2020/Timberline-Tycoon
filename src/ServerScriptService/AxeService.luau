@@ -188,7 +188,8 @@ local function giveTool(player: Player, item: AxeItem): Tool?
 	end
 	local tool = Instance.new("Tool")
 	tool.Name = def.displayName -- what the hotbar shows
-	tool.ToolTip = string.format("%s: %d damage", def.displayName, def.damage)
+	local shown = if def.v2 then string.format("%g", def.v2.damage) else tostring(def.damage)
+	tool.ToolTip = string.format("%s: %s damage", def.displayName, shown)
 	tool.RequiresHandle = true
 	tool.CanBeDropped = false -- dropping goes through Drop(), not Roblox's built-in drop
 	tool:SetAttribute("AxeId", def.id)

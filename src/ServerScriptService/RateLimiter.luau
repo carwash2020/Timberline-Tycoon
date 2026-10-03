@@ -10,10 +10,7 @@
 local RateLimiter = {}
 
 local LIMITS: { [string]: number } = { -- max requests per second
-	ChopTree = 4,
-	PickupLog = 8,
-	LoadToTruck = 4,
-	SellLogs = 4,
+	UseInstantDelivery = 2, -- sell the truck's loose wood from anywhere (a Robux product)
 	DropAxe = 2,
 	PickUpAxe = 4,
 	BuyItem = 3,
@@ -33,6 +30,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	Release = 6,
 	Chop = 6, -- v2 loop: a swing at a section (SectionTrees; the axe's cooldown is checked too)
 	SellSkyBin = 2, -- v2: the Sky Bin's prompt by the pad (AetherService; a ProximityPrompt, not a remote)
+	CheckSkyBin = 2, -- the chute's "how full is my bin" prompt
+	CheckForge = 2, -- the forge's "how far along" prompt
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

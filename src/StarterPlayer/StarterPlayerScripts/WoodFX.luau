@@ -32,7 +32,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
@@ -59,8 +58,6 @@ WoodFX.RingHold = 2.5 -- seconds the ring stays after the last swing
 WoodFX.SpringFrom = 0.72 -- a tree that grew springs up from this much of its size
 WoodFX.SpringTime = 0.9
 WoodFX.SpringWindow = 1.5 -- seconds after GrewAt a tree still springs (it may stream in late)
-WoodFX.BootWait = 120
-
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local LEAF_FLAT = CFrame.Angles(0, 0, math.pi / 2)
 local LEAF_ROCK = math.rad(40)
@@ -735,14 +732,6 @@ local function watchPiece(inst: Instance)
 end
 
 function WoodFX.Start()
-	-- MapBuilder says which loop runs before it builds anything.
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < WoodFX.BootWait do
-		waited += task.wait(0.25)
-	end
-	if not CoreLoop.V2() then
-		return -- the v1 loop: TreeFX draws the trees
-	end
 	Net.Remote("WorldFX").OnClientEvent:Connect(function(kind: unknown, payload: unknown)
 		if type(kind) == "string" then
 			onWorldFX(kind, payload)

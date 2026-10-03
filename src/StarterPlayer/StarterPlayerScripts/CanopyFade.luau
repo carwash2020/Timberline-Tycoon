@@ -30,7 +30,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local CanopyLogic = require(ReplicatedStorage.Shared.CanopyLogic)
-local TreeFX = require(script.Parent.TreeFX)
 
 local CanopyFade = {}
 
@@ -56,10 +55,11 @@ local function treesFolder(): Instance?
 	return if map then map:FindFirstChild("Trees") else nil
 end
 
--- Trees TreeFX (or the server) owns right now: felled, dormant, or
--- falling or regrowing.
+-- Felled, dormant, or mid-fall / mid-regrow (attribute FXBusy).
 local function blocked(tree: Model): boolean
-	return tree:GetAttribute("Felled") == true or tree:GetAttribute("Dormant") == true or TreeFX.IsBusy(tree)
+	return tree:GetAttribute("Felled") == true
+		or tree:GetAttribute("Dormant") == true
+		or tree:GetAttribute("FXBusy") == true
 end
 
 -- The tree (a child of the Trees folder) a hit part belongs to.

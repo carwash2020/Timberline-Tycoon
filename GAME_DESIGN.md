@@ -169,7 +169,7 @@ plot for a 10% fee), cosmetic buildings.
 
 ## 4. Economy targets
 
-> **v2:** the targets are V2_PLAN §17's (first sale under 3 min, Steel Axe in 5-8 min, first $1k in 15-20 min, Cobalt in about 1 h, a full plot in 20-40 h). `lune run tools/economy` checks them in ECONOMY.md; the v1 model is `tools/economy1` (ECONOMY_V1.md). The wallet cap and the automation rule below are unchanged.
+> **v2:** the targets are V2_PLAN §17's (first sale under 3 min, Steel Axe in 5-8 min, first $1k in 15-20 min, Cobalt in about 1 h, a full plot in 20-40 h). `lune run tools/economy` checks them in ECONOMY.md. The wallet cap and the automation rule below are unchanged.
 
 - New player earns ~$150–200 in the first 15 minutes (oak/birch, Rusty Axe).
 - Mid-game (Steel Axe + Pickup, pine/maple): ~$1,500/hour of active play.
@@ -454,7 +454,7 @@ game.
 
 ## 11. New player experience (first 10 minutes)
 
-> **v2:** Murph's seven steps keep their ids and order with v2 objectives (V2_PLAN §13, `TutorialData.StepsV2`): fell a tree, drag a log, drag it onto your bed, sell on the pad, plant a Heartseed, sell $60 more ($25 from Murph), buy the Steel Axe ($90). A new player starts with $20.
+> **v2:** Murph's seven steps keep their ids and order with v2 objectives (V2_PLAN §13, `TutorialData.StepsV2`): fell a tree, drag a log, drag it onto your bed, sell on the pad, plant a Heartseed, sell $140 more ($25 from Murph), buy the Steel Axe ($180). A new player starts with $20.
 
 A mentor NPC — **Murph**, a retired lumberjack — teaches by doing, not by
 dialogue walls. One objective at a time in a quest tracker, beacon guidance,

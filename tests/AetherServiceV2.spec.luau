@@ -214,13 +214,12 @@ return function(t)
 		Aether.Init(function(p, message)
 			table.insert(s.toasts, { id = p.UserId, text = message })
 		end)
-		-- Each prompt by its text as made (under v1, before InitV2).
-		s.byV1 = {}
+		-- Each prompt by the text Init gives it.
+		s.byText = {}
 		for _, prompt in ipairs(s.prompts) do
-			s.byV1[prompt.ActionText] = prompt
+			s.byText[prompt.ActionText] = prompt
 		end
-		s.chutePrompt = s.byV1["Send logs down"]
-		s.v1Text = s.chutePrompt and s.chutePrompt.ActionText
+		s.chutePrompt = s.byText["Check Sky Bin"]
 
 		local folder = Instance.new("Folder")
 		folder.Name = "Wood"
@@ -412,10 +411,9 @@ return function(t)
 		t.eq(#s.profiles[1].skyWood, 1, "and only once")
 	end)
 
-	t.test("the chute's prompt sends logs under v1 and says how full your bin is under v2", function()
+	t.test("the chute's prompt says how full your bin is", function()
 		local s = setup()
-		t.eq(s.v1Text, "Send logs down", "made under v1")
-		t.eq(s.chutePrompt.ActionText, "Check Sky Bin", "relabelled by InitV2")
+		t.eq(s.chutePrompt.ActionText, "Check Sky Bin")
 		s.profiles[1].skyWood = { { w = "oak", v = 14 } }
 		s.chutePrompt.fire(s.player(1))
 		t.eq(
@@ -563,7 +561,7 @@ return function(t)
 		profile.forgeWood = { lumenwood = 47.5 }
 		profile.forgeLogs = { lumenwood = 40 }
 		profile.materials = { SkyShard = 12 }
-		local forgePrompt = s.byV1["Forge the Starfall Axe"]
+		local forgePrompt = s.byText["Forge the Starfall Axe"]
 		forgePrompt.fire(s.player(1))
 		t.eq(s.granted, {})
 		t.eq(toastsFor(s, 1), { "The forge needs 12.5 more u³ of Lumenwood." })
@@ -585,7 +583,7 @@ return function(t)
 
 	t.test("the forge's feed prompt says how far along it is under v2", function()
 		local s = setup()
-		local feed = s.byV1["Add lumenwood"]
+		local feed = s.byText["Check the forge"]
 		t.eq(feed.ActionText, "Check the forge")
 		s.profiles[1].forgeWood = { lumenwood = 18 }
 		s.profiles[1].materials = { SkyShard = 5 }
@@ -668,17 +666,12 @@ return function(t)
 		t.ok(s.gone(n), "lost")
 	end)
 
-	t.test("GameServer starts all this only under the v2 loop, after Init", function()
+	t.test("GameServer starts the hoppers after Init, so the prompts exist first", function()
 		local fs = require("@lune/fs")
 		local source = fs.readFile("src/ServerScriptService/GameServer.server.luau")
 		local init = string.find(source, 'safely("AetherService.Init", AetherService.Init', 1, true)
-		local block = string.find(source, "\nif CoreLoop.V2() then\n", 1, true)
 		local v2 = string.find(source, 'safely("AetherService.InitV2", AetherService.InitV2', 1, true)
-		local after = string.find(source, "\nend\n", v2 or 1, true)
-		t.ok(init and block and v2 and after, "the calls are there")
+		t.ok(init and v2, "both calls are there")
 		t.ok(init < v2, "Init first: the prompts exist to relabel")
-		t.ok(block < v2, "inside the v2 block")
-		local between = string.sub(source, block, v2)
-		t.ok(not string.find(between, "\nend\n", 1, true), "the block hasn't closed before it")
 	end)
 end

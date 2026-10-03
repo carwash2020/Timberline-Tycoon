@@ -125,6 +125,9 @@ return function(t)
 		}
 		local loader = t.loader({
 			mocks = {
+				-- ForestService requires SectionTrees at load. The fake above
+				-- is the one UseV2 drives; don't pull in GrabService.
+				SectionTrees = Trees,
 				ProfileService = {
 					GetProfile = function(p)
 						return s.profiles[p]
@@ -219,8 +222,8 @@ return function(t)
 		end
 
 		function s.start()
-			-- Init draws the first Elder check's wait before UseV2 grows the trees.
-			table.insert(s.rolls, 1, 0.5)
+			-- The Elder check's wait is rolled after the standing trees' figures.
+			table.insert(s.rolls, 0.5)
 			s.Forest.Init({
 				PlantSeed = {
 					OnServerEvent = {
@@ -250,13 +253,14 @@ return function(t)
 					return if #s.rolls > 0 then table.remove(s.rolls, 1) else 0.5
 				end,
 				manual = true,
+				-- The live path: Init turns the forest onto these trees once.
+				sectionTrees = Trees,
+				setFigure = function(piece, figure)
+					piece.figure = figure
+					piece.value = piece.volume * piece.price * s.ForestLogic.Multiplier(figure)
+					table.insert(s.figures, { piece = piece, figure = figure })
+				end,
 			})
-			-- WoodService.SetFigure: the figure, and the value it's worth now.
-			s.Forest.UseV2(Trees, function(piece, figure)
-				piece.figure = figure
-				piece.value = piece.volume * piece.price * s.ForestLogic.Multiplier(figure)
-				table.insert(s.figures, { piece = piece, figure = figure })
-			end)
 		end
 
 		function s.runDelays()

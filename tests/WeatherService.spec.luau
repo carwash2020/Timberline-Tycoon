@@ -58,7 +58,7 @@ return function(t)
 						return options.struckUid
 					end,
 				},
-				TreeService = {
+				SectionTrees = {
 					GetTree = function()
 						return options.tree
 					end,

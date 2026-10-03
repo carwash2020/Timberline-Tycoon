@@ -23,7 +23,7 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | Phase 12 VEH: trucks 1.3x, driving retuned, 13 bays in 4 sizes, sell zone 40 deep | on main | c0f865d |
 | Phase 12 ATMOS: dark muted meadow, grey roads, night fog, region air, bold signs | on main | 58a5520 |
 | Phase 12 TREE, ROADS, REGIONS, TOWN (LT2_RESEARCH.md plan) | in progress | |
-| M1.10 cleanup | after about a week live | |
+| M1.10 cleanup | v1 loop removed (services, remotes, client). Nested `v2` fields and profile fields stay | |
 
 **As built, where it differs from the plan (lead's notes, 2 Oct 2026):**
 - Dead trees stay anchored and non-colliding while clients sink them (unanchored, they'd collapse and fight the sink).
@@ -857,11 +857,11 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 | load | Drag a log onto your truck's bed | woodLoaded (1: your piece rests in your BedZone) | "That's your Rustbucket. Drag the wood up onto the bed and lay it flat so it rides." | truck bed |
 | sell | Sell wood at the sawmill | woodSold (1) | "Back her onto the green pad by the mill and the wood sells itself. Bigger logs pay more. It's all by the cubic unit." | sellPad |
 | plant | Fell a tree, then plant its Heartseed in the stump | seedPlanted (1) | (unchanged) | stump |
-| loads | Sell $%d more wood | woodSoldCash (60), reward $25 | "See it grow? That tree's yours now. That old hatchet's slow on birch, though. Sell a few more loads and I'll chip in for a Steel Axe." | |
+| loads | Sell $%d more wood | woodSoldCash (140), reward $25 | "See it grow? That tree's yours now. That old hatchet's slow on birch, though. Sell a few more loads and I'll chip in for a Steel Axe." | |
 | steel | Buy the Steel Axe at the Tool Shed | axeBought (1) | "Here's a little somethin' from me. Tink's Tool Shed is just west of the mill." In M2 this becomes "Set the Steel Axe on Tink's counter and talk to him." | toolShed |
 
 - New HintLogic token `{unequip}`: "press 1", "press the D-pad", "tap your axe".
-- Rough cash path: start $20, first oak about $35, $60 more sold, $25 from Murph, about $140 against the $90 Steel Axe.
+- Rough cash path: start $20, sell $140 more, $25 from Murph, $185 against the $180 Steel Axe.
 - `StumpHold` and `CanPlant` are unchanged.
 - **Old saves mid-tutorial**: `tutorialStep` and the onboarding keys carry over because ids and order match. `MigrateV2` sets `tutorialProgress = 0` if the current step is pickup, load, sell or loads (their units changed). AlreadyDone (best tier ≥ 2) and realign are unchanged.
 - Later beats (M3 "Buy your first plot square") are **appended** after `steel`.
@@ -1092,7 +1092,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
 
 **Targets**
 - First sale under 3 minutes (GAME_DESIGN §2).
-- Steel Axe ($90) in 5-8 minutes.
+- Steel Axe ($180) in 5-8 minutes.
 - First $1k in 15-20 minutes.
 - Cobalt ($2,040, LT2's best store axe) in about 1 hour.
 - Full plot ($900,100) in 20-40 hours.

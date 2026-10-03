@@ -25,7 +25,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Tune = require(ReplicatedStorage.Shared.Tune)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -278,7 +277,7 @@ end
 -- `notifyFn` shows a toast. Studio and the v2 loop only: anywhere else
 -- this does nothing.
 function DevCommands.Init(notifyFn: (Player, string) -> ())
-	if not RunService:IsStudio() or not CoreLoop.V2() then
+	if not RunService:IsStudio() then
 		return
 	end
 	notify = notifyFn

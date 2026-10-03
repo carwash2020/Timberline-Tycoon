@@ -127,10 +127,4 @@ return function(t)
 		t.eq(#section:GetChildren(), 1, "a new figure replaces the band")
 		t.eq(again.Material, roblox.Enum.Material.Neon, "Stormgrain glows")
 	end)
-
-	t.test("under the v1 loop it starts nothing", function()
-		local fx, connected = load(1)
-		fx.Start()
-		t.eq(connected(), 0)
-	end)
 end

@@ -330,11 +330,11 @@ return function(t)
 		t.eq(s.profile.cash, steel.v2.price - 10)
 		t.eq(s.granted, {})
 		t.eq(s.toasts, { "You need $10 more for the Steel Axe." })
-		-- Enough under v2 is still short under v1 (the Steel Axe got cheaper).
-		local v1 = setup({ cash = steel.v2.price })
+		-- Short of the v1 price is refused the same way.
+		local v1 = setup({ cash = steel.priceCash - 1, loop = 1 })
 		v1.buy("Axe", "SteelAxe")
 		t.eq(v1.granted, {})
-		t.eq(v1.profile.cash, steel.v2.price)
+		t.eq(v1.profile.cash, steel.priceCash - 1)
 	end)
 
 	t.test("v2: trucks and trailers cost their v2 prices", function()

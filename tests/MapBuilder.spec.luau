@@ -351,7 +351,7 @@ return function(t)
 	end)
 
 	t.test("the build line has the shape WLD-03 and the checklist read, and the stats are published", function()
-		local s = build({ loop = 1 }) -- TreeService's stub counts the spawns
+		local s = build()
 		local line = builtLine(s)
 		t.ok(line, "a World built line")
 		t.ok(
@@ -360,7 +360,7 @@ return function(t)
 		)
 		t.ok(string.find(line, "(terrain 1.2s)", 1, true) or string.find(line, "(terrain 1.3s)", 1, true), line)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-		t.eq(s.spawned, #WorldPlan.Trees())
+		t.eq(s.sectionSpawned, #WorldPlan.Trees())
 		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees())
 		t.eq(s.workspace:GetAttribute("MapTerrainSeconds"), 1.25)
 		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
@@ -408,13 +408,6 @@ return function(t)
 			end
 		end
 		t.eq(found, 1)
-	end)
-
-	t.test("v1 loop (a rollback, or Studio's CoreLoop = 1): TreeService's trees, SectionTrees untouched", function()
-		local s = build({ loop = 1 })
-		t.eq(s.sectionSpawned, nil)
-		t.eq(s.groups, nil, "no v2 collision groups on a v1 server")
-		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 1)
 	end)
 
 	t.test("an erroring BuildingArt builder: one warning, the rest of the town, SellArea, spawning", function()

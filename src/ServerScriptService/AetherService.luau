@@ -59,14 +59,11 @@ local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local AxeService = require(script.Parent.AxeService)
-local CarryService = require(script.Parent.CarryService)
 local EconomyService = require(script.Parent.EconomyService)
 local NodeService = require(script.Parent.NodeService)
-local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local SellService = require(script.Parent.SellService)
-local TreeService = require(script.Parent.TreeService)
 
 type Profile = ProfileService.Profile
 type Piece = SellService.Piece
@@ -120,11 +117,7 @@ local function sky(): BiomeData.BiomeDef
 	return BiomeData.Get("sky") :: BiomeData.BiomeDef
 end
 
-local function binCapacity(): number
-	return sky().skyBinCapacity or 30
-end
-
--- u³ the v2 Sky Bin holds at most.
+-- u³ the Sky Bin holds at most.
 local function binVolume(): number
 	return sky().skyBinVolume or 120
 end
@@ -155,16 +148,7 @@ local function publish(player: Player, profile: Profile)
 	end
 end
 
-local function stockOf(profile: Profile): ForgeLogic.Stock
-	return { cash = profile.cash, logs = profile.forgeLogs, materials = profile.materials }
-end
-
-local function recipe(): ItemCatalog.ForgeRecipe
-	local axe = ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef
-	return axe.forge :: ItemCatalog.ForgeRecipe
-end
-
--- The v2 recipe: wood in u³ (ForgeLogic.RecipeV2).
+-- The forge recipe: wood in u³ (ForgeLogic.RecipeV2).
 local function recipeV2(): ForgeLogic.RecipeV2?
 	return ForgeLogic.RecipeV2(ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef)
 end
@@ -173,70 +157,8 @@ local function stockV2(profile: Profile): ForgeLogic.StockV2
 	return { cash = profile.cash, wood = profile.forgeWood, materials = profile.materials }
 end
 
--- How many figured logs of these woods the player is holding.
-local function figuredInHand(player: Player, woodIds: { [string]: any }): number
-	local n = 0
-	for uid in pairs(CarryService.Hands(player) or {}) do
-		local log = TreeService.GetLog(uid)
-		if log and woodIds[log.def.id] ~= nil and log.tags.figure ~= nil then
-			n += 1
-		end
-	end
-	return n
-end
-
--- Sends the logs in the player's hands down the Cloud Chute.
-function AetherService.SendDown(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
-		return
-	end
-	local profile = ProfileService.GetProfile(player)
-	if not profile then
-		return
-	end
-	local space = binCapacity() - #profile.skyBin
-	if space <= 0 then
-		notify(player, string.format("Your Sky Bin is full (%d). Sell it at the sawmill.", binCapacity()))
-		return
-	end
-	-- Each log keeps its value and figure in the bin.
-	local sent = CarryService.TakeLogs(player, function()
-		return true
-	end, space)
-	if #sent == 0 then
-		notify(player, "Bring logs to send them down the Cloud Chute.")
-		return
-	end
-	for _, log in ipairs(sent) do
-		table.insert(profile.skyBin, { woodId = log.woodId, value = log.value, figure = log.figure })
-	end
-	publish(player, profile)
-	notify(
-		player,
-		string.format(
-			"Sent %d log%s down the Cloud Chute. Sky Bin %d/%d.",
-			#sent,
-			if #sent == 1 then "" else "s",
-			#profile.skyBin,
-			binCapacity()
-		)
-	)
-end
-
--- Empties the player's Sky Bin (selling at the sawmill) and returns its logs.
-function AetherService.TakeSkyBin(player: Player): { ProfileSchema.BedLog }
-	local profile = ProfileService.GetProfile(player)
-	if not profile or #profile.skyBin == 0 then
-		return {}
-	end
-	local out = profile.skyBin
-	profile.skyBin = {}
-	publish(player, profile)
-	return out
-end
-
 ---------------------------------------------------------------------------
--- The v2 loop: hoppers (V2_PLAN.md §5)
+-- Hoppers (V2_PLAN.md §5): chutes and the forge take loose wood.
 ---------------------------------------------------------------------------
 
 local function playerById(userId: number): Player?
@@ -524,7 +446,7 @@ end
 
 -- The chute's prompt under v2: how it works, and how full your bin is.
 function AetherService.ChuteInfo(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
+	if not RateLimiter.Allow(player, "CheckSkyBin") then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
@@ -543,7 +465,7 @@ end
 -- The forge's "Add lumenwood" prompt under v2: what it takes, and how
 -- far along it is.
 function AetherService.ForgeInfo(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
+	if not RateLimiter.Allow(player, "CheckForge") then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
@@ -593,42 +515,9 @@ function AetherService.SellSkyBin(player: Player)
 	publish(player, profile)
 end
 
--- Puts the lumenwood in the player's hands into the forge (up to the recipe).
-function AetherService.AddToForge(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
-		return
-	end
-	local profile = ProfileService.GetProfile(player)
-	if not profile then
-		return
-	end
-	local r = recipe()
-	local added = 0
-	for woodId in pairs(r.logs) do
-		local want = ForgeLogic.LogsWanted(r, stockOf(profile), woodId)
-		if want > 0 then
-			-- Figured logs are worth more sold: the forge leaves them in hand.
-			local taken = CarryService.TakeLogs(player, function(wood, figure)
-				return wood.id == woodId and figure == nil
-			end, want)
-			profile.forgeLogs[woodId] = (profile.forgeLogs[woodId] or 0) + #taken
-			added += #taken
-		end
-	end
-	if figuredInHand(player, r.logs) > 0 then
-		notify(player, "Figured logs are worth more sold than forged: take them to the sawmill.")
-	end
-	publish(player, profile)
-	if added == 0 then
-		notify(player, "The forge takes Lumenwood logs. Progress: " .. ForgeLogic.Progress(r, stockOf(profile)))
-	else
-		notify(player, "Into the forge. " .. ForgeLogic.Progress(r, stockOf(profile)))
-	end
-end
-
 -- Forges a Starfall Axe if everything's there; otherwise says what's missing.
--- Under v2 the wood is u³ in forgeWood (ForgeLogic.RecipeV2); forgeLogs
--- is left as it is.
+-- Wood is u³ in forgeWood (ForgeLogic.RecipeV2). profile.forgeLogs stays
+-- so an old save still has it; the forge doesn't read it.
 function AetherService.Forge(player: Player)
 	if not RateLimiter.Allow(player, "BuyItem") then
 		return
@@ -642,31 +531,24 @@ function AetherService.Forge(player: Player)
 		notify(player, string.format("You own %d axes, the most you can carry. Drop one first.", ownedTotal))
 		return
 	end
-	local r = recipe()
-	local rV2 = if v2 then recipeV2() else nil
-	if v2 and not rV2 then
+	local rV2 = recipeV2()
+	if not v2 or not rV2 then
 		return
 	end
-	local missing = if rV2 then ForgeLogic.MissingV2(rV2, stockV2(profile)) else ForgeLogic.Missing(r, stockOf(profile))
+	local missing = ForgeLogic.MissingV2(rV2, stockV2(profile))
 	if #missing > 0 then
 		notify(player, "The forge needs " .. table.concat(missing, ", ") .. ".")
 		return
 	end
-	local cash = if rV2 then rV2.cash else r.cash
+	local cash = rV2.cash
 	-- Nothing below yields, so the check above still holds.
 	if not EconomyService.SpendCash(player, cash, "forged Starfall Axe", FORGED_AXE) then
 		return
 	end
-	if rV2 then
-		for woodId, u3 in pairs(rV2.wood) do
-			profile.forgeWood[woodId] = round2(math.max(0, (profile.forgeWood[woodId] or 0) - u3))
-		end
-	else
-		for woodId, n in pairs(r.logs) do
-			profile.forgeLogs[woodId] -= n
-		end
+	for woodId, u3 in pairs(rV2.wood) do
+		profile.forgeWood[woodId] = round2(math.max(0, (profile.forgeWood[woodId] or 0) - u3))
 	end
-	for materialId, n in pairs(if rV2 then rV2.materials else r.materials) do
+	for materialId, n in pairs(rV2.materials) do
 		profile.materials[materialId] -= n
 	end
 	local _item, tool = AxeService.Grant(player, FORGED_AXE)
@@ -677,12 +559,7 @@ function AetherService.Forge(player: Player)
 	end
 	publish(player, profile)
 	NodeService.Publish(player)
-	notify(
-		player,
-		if rV2
-			then ForgeLogic.ForgedTextV2(ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef, rV2)
-			else "The Starfall Axe is yours! It fells Lumenwood in 12 hits."
-	)
+	notify(player, ForgeLogic.ForgedTextV2(ItemCatalog.GetAxe(FORGED_AXE) :: ItemCatalog.AxeDef, rV2))
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "StarfallForged")
 	end)
@@ -723,16 +600,6 @@ local function stopGlide(root: BasePart)
 	end
 end
 
--- Fell off without a cloak: the logs in your hands are lost to the clouds.
-local function loseLogs(player: Player)
-	local lost = CarryService.TakeWhere(player, function()
-		return true
-	end)
-	if #lost > 0 then
-		notify(player, string.format("You fell! %d log%s lost to the clouds.", #lost, if #lost == 1 then "" else "s"))
-	end
-end
-
 local function tick()
 	local area = sky().area
 	if not area then
@@ -752,16 +619,14 @@ local function tick()
 			elseif flat2 <= (area.radius + 30) ^ 2 and pos.Y >= deck - 5 then
 				onIsles[player] = true
 			elseif onIsles[player] then
-				if flat2 > (area.radius + NEAR) ^ 2 then
-					onIsles[player] = false -- gone some other way
-				elseif hasCloak(player) then
+				local near = flat2 <= (area.radius + NEAR) ^ 2
+				if hasCloak(player) and near then
 					if pos.Y < deck - GLIDE_BELOW and root.AssemblyLinearVelocity.Y < -8 then
 						onIsles[player] = false
 						startGlide(player, root)
 					end
-				elseif pos.Y < deck - FALL_BELOW then
-					onIsles[player] = false
-					loseLogs(player)
+				elseif not near or pos.Y < deck - FALL_BELOW then
+					onIsles[player] = false -- walked off, or fell without the cloak
 				end
 			end
 			-- The glide ends on landing (or in the water).
@@ -876,14 +741,7 @@ local function addPrompt(
 	return prompt
 end
 
--- A prompt whose action reads `v1Text` or, under the v2 loop, `v2Text`
--- (InitV2 relabels the ones made before it).
-local function loopPrompt(part: Instance, v1Text: string, v2Text: string, object: string, fn: (Player) -> ())
-	local prompt = addPrompt(part, if v2 then v2Text else v1Text, object, 0, fn)
-	table.insert(relabel, { prompt = prompt, v1 = v1Text, v2 = v2Text })
-end
-
--- A tagged part the v2 loop polls as a hopper (once, however often its tag
+-- A tagged part polled as a hopper (once, however often its tag
 -- signal fires).
 local function addHopper(part: Instance, kind: HopperKind)
 	if not part:IsA("BasePart") then
@@ -910,23 +768,11 @@ end
 function AetherService.Init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
 	onTagged("CloudChute", function(part)
-		loopPrompt(part, "Send logs down", "Check Sky Bin", "Cloud Chute", function(player: Player)
-			if v2 then
-				AetherService.ChuteInfo(player)
-			else
-				AetherService.SendDown(player)
-			end
-		end)
+		addPrompt(part, "Check Sky Bin", "Cloud Chute", 0, AetherService.ChuteInfo)
 		addHopper(part, "chute")
 	end)
 	onTagged("StarfallForge", function(part)
-		loopPrompt(part, "Add lumenwood", "Check the forge", "Starfall Forge", function(player: Player)
-			if v2 then
-				AetherService.ForgeInfo(player)
-			else
-				AetherService.AddToForge(player)
-			end
-		end)
+		addPrompt(part, "Check the forge", "Starfall Forge", 0, AetherService.ForgeInfo)
 		addHopper(part, "forge")
 		local forge = Instance.new("Attachment") -- a second prompt needs its own spot
 		forge.Name = "ForgePoint"

@@ -18,9 +18,8 @@ local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
-local TreeService = require(script.Parent.TreeService)
+local SectionTrees = require(script.Parent.SectionTrees)
 
 local WorldClock = {}
 
@@ -28,14 +27,8 @@ local IS_STUDIO = RunService:IsStudio()
 
 local night: boolean? = nil
 
--- The trees: TreeService, or SectionTrees under the v2 loop (the same
--- SetBiomeDormant). Required only when the v2 loop runs.
 local function setDormant(biomeId: string, dormant: boolean)
-	if CoreLoop.V2() then
-		require(script.Parent.SectionTrees).SetBiomeDormant(biomeId, dormant)
-	else
-		TreeService.SetBiomeDormant(biomeId, dormant)
-	end
+	SectionTrees.SetBiomeDormant(biomeId, dormant)
 end
 
 local function setNight(isNight: boolean)

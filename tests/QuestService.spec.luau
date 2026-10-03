@@ -19,7 +19,7 @@ return function(t)
 		local toasts, marks = {}, {}
 		local trees = {} -- TreeService: QuestService sets its StumpHold hook
 		local mocks = {
-			TreeService = trees,
+			SectionTrees = trees,
 			ProfileService = {
 				GetProfile = function(p)
 					return if p == player then profile else nil
@@ -273,8 +273,8 @@ return function(t)
 		s.Quest.WoodSold(s.player, 3, 45)
 		t.eq(s.player.attrs.TutorialProgress, 45, "dollars, not pieces")
 		t.eq(s.profile.cash, cash, "no reward yet (Murph's share comes at the end)")
-		s.Quest.WoodSold(s.player, 1, 20.7)
-		t.eq(at(), "steel", "45 + 20 whole dollars passes $60")
+		s.Quest.WoodSold(s.player, 1, loads.count - 45 + 0.7)
+		t.eq(at(), "steel", "the rest of the dollars, and only the whole ones")
 		t.eq(s.profile.cash, cash + loads.rewardCash)
 		t.eq(s.toasts, { string.format("Murph chipped in $%d!", loads.rewardCash) })
 		s.profile.bestAxeTier = 2

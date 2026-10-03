@@ -23,13 +23,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local ForestService = require(script.Parent.ForestService)
-local TreeService = require(script.Parent.TreeService)
+local SectionTrees = require(script.Parent.SectionTrees)
 
 local WeatherService = {}
 
@@ -146,14 +145,9 @@ local function candidates(): { Vector3 }
 	return out
 end
 
--- The struck tree's model and base: TreeService's, or SectionTrees' under
--- the v2 loop (the same records; required only then).
+-- The struck tree's model and base (SectionTrees).
 local function struckTree(uid: string): (Model?, Vector3?)
-	if CoreLoop.V2() then
-		local rec = require(script.Parent.SectionTrees).GetTree(uid)
-		return if rec then rec.model else nil, if rec then rec.base else nil
-	end
-	local rec = TreeService.GetTree(uid)
+	local rec = SectionTrees.GetTree(uid)
 	return if rec then rec.model else nil, if rec then rec.base else nil
 end
 

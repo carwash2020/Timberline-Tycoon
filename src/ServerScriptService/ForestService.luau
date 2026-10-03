@@ -73,16 +73,17 @@ local FieldGuideService = require(script.Parent.FieldGuideService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
-local TreeService = require(script.Parent.TreeService)
+local SectionTrees = require(script.Parent.SectionTrees)
 
 type Profile = ProfileService.Profile
-type TreeRecord = TreeService.TreeRecord
+-- Section trees in production. The living-forest spec still drives the
+-- pre-section figure path through a fake with the same hooks plus GetLog.
+type TreeRecord = any
 
 local ForestService = {}
 
--- The trees: TreeService, or under the v2 loop SectionTrees (the same API
--- and record shape), which Init is given.
-local Trees = TreeService
+-- SectionTrees, or the spec's stand-in. UseV2 points this at the live trees.
+local Trees: any = SectionTrees
 local v2 = false
 local sectionTrees: any = nil -- v2: SectionTrees, for its own calls (Regrow with a stage)
 local setFigure: (piece: any, figure: string?) -> () = function(_piece: any, _figure: string?) end
@@ -595,7 +596,7 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 
 	-- v2: the pieces already carry the figure (onPieceFreed).
 	for _, logUid in ipairs(if v2 then {} else logUids) do
-		local log = TreeService.GetLog(logUid)
+		local log = Trees.GetLog(logUid)
 		if log then
 			if figure then
 				log.value = ForestLogic.LogValue(def.pricePerLog, figure)
@@ -734,7 +735,7 @@ local function finishSprout(uid: string, sprout: Sprout)
 			-- Back mature at once: planting beats waiting out growSec.
 			sectionTrees.Regrow(uid, sprout.userId, { stage = 1 })
 		else
-			TreeService.Regrow(uid, sprout.userId) -- OnRegrown rolls its figure and puts up the stake
+			Trees.Regrow(uid, sprout.userId) -- OnRegrown rolls its figure and puts up the stake
 		end
 	end
 end
@@ -932,9 +933,9 @@ function ForestService.Init(r: Remotes, notifyFn: (Player, string) -> (), option
 	workspace:SetAttribute("SkyrootBloom", false)
 	setElderAttributes(nil, nil)
 
-	Trees = TreeService
-	TreeService.OnFelled = onFelled
-	TreeService.OnRegrown = onRegrown
+	Trees = SectionTrees
+	SectionTrees.OnFelled = onFelled
+	SectionTrees.OnRegrown = onRegrown
 	if opts.sectionTrees then
 		ForestService.UseV2(opts.sectionTrees, opts.setFigure)
 	else

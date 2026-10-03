@@ -51,7 +51,7 @@ export type Step = {
 	count: number, -- how many of `event` (logs, for the log events)
 	beacon: BeaconTarget?,
 	beaconWood: string?, -- v2: the wood the "tree" beacon looks for first (a WoodData id)
-	unit: "cash"?, -- v2: `count` is dollars, so the tracker reads "($23/$60)"
+	unit: "cash"?, -- v2: `count` is dollars, so the tracker reads "($23/$140)"
 	rewardCash: number?, -- paid when the step is done
 	murphBack: string?, -- v2: what Murph says instead to a returning player on the refresher (RefresherLast)
 }
@@ -190,7 +190,7 @@ TutorialData.StepsV2 = {
 			steelAxe.displayName
 		),
 		event = "woodSoldCash",
-		count = 60,
+		count = 140,
 		unit = "cash",
 		rewardCash = 25,
 	},
@@ -245,7 +245,7 @@ function TutorialData.TotalReward(loop: number?): number
 end
 
 -- The tracker line for a step, with progress: "Sell 18 more logs (4/18)",
--- or for a step counted in dollars "Sell $60 more wood ($23/$60)".
+-- or for a step counted in dollars "Sell $140 more wood ($23/$140)".
 function TutorialData.ObjectiveText(step: Step, progress: number): string
 	local text = string.gsub(step.objective, "%%d", tostring(step.count))
 	if step.count > 1 then

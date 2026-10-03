@@ -154,6 +154,10 @@ type Truck = {
 local deps: Deps? = nil
 local trucks: { [Player]: Truck } = {}
 local loadedOnce: { [Model]: boolean } = {} -- pieces whose onLoaded has fired
+-- Set once the leave snapshot is taken and its models destroyed, so a
+-- later save (ProfileStore's OnSave after EndSession) doesn't replace it
+-- with an empty bed.
+local sealed: { [Player]: boolean } = {}
 -- Pieces a load left on the ground out of town, by owner (UserId): saved
 -- as groundLoad when they leave, if still theirs and lying about.
 local leftOf: { [number]: { [Model]: boolean } } = {}
@@ -1000,6 +1004,9 @@ end
 
 -- A truck is about to be built for `player` (VehicleService.Hooks.onRebuild).
 function TruckLoad.OnRebuild(player: Player, old: Model?, keepsLoad: boolean, at: CFrame?): ((Model) -> ())?
+	-- A new truck session (join, or send-home). The previous leave sealed
+	-- its snapshot; this session has to be allowed to save again.
+	sealed[player] = nil
 	local d = deps
 	if not d then
 		return nil
@@ -1301,20 +1308,56 @@ function TruckLoad.Tick()
 	end
 end
 
--- `player` is leaving: their load is saved (TruckLoad.Save's rules) and
--- the saved pieces leave the world with them. Call before the final save.
+-- Writes the live bed and any left-behind ground wood into the profile.
+-- Does not destroy models. No-op once PlayerRemoving has sealed the
+-- snapshot, and it won't blank a save it can't see yet (no truck, and
+-- ground wood not being tracked). Called on every save and on leave.
+function TruckLoad.Flush(player: Player)
+	if sealed[player] then
+		return
+	end
+	local d = deps
+	if not d then
+		return
+	end
+	local profile = d.profileOf(player)
+	if not profile then
+		return
+	end
+	local truck = d.truckOf(player)
+	local trackingGround = leftOf[player.UserId] ~= nil
+	if truck then
+		local kept, models = keepable(player, riderOf(player))
+		profile.truckLoad = kept
+		if trackingGround then
+			local withBed: { [Model]: boolean } = {}
+			for _, m in ipairs(models) do
+				withBed[m] = true
+			end
+			profile.groundLoad = groundKeepable(player, withBed)
+		end
+	elseif trackingGround then
+		profile.groundLoad = groundKeepable(player, {})
+	end
+end
+
+-- `player` is leaving: their load is saved (Flush) and the saved pieces
+-- leave the world with them. Call before the final save. A save that
+-- runs after this keeps the snapshot (sealed).
 function TruckLoad.PlayerRemoving(player: Player)
+	if sealed[player] then
+		return
+	end
+	TruckLoad.Flush(player)
 	local d = deps
 	local profile = if d then d.profileOf(player) else nil
 	if d and profile then
-		local kept, models = keepable(player, riderOf(player))
-		profile.truckLoad = kept
+		local _, models = keepable(player, riderOf(player))
 		local withBed: { [Model]: boolean } = {}
 		for _, m in ipairs(models) do
 			withBed[m] = true
 		end
-		local ground, groundModels = groundKeepable(player, withBed)
-		profile.groundLoad = ground
+		local _, groundModels = groundKeepable(player, withBed)
 		for _, list in ipairs({ models, groundModels }) do
 			for _, m in ipairs(list) do
 				GrabService.ReleasePiece(m, "left")
@@ -1331,6 +1374,7 @@ function TruckLoad.PlayerRemoving(player: Player)
 		release(t)
 		trucks[player] = nil
 	end
+	sealed[player] = true
 end
 
 local function hookUp(newDeps: Deps)
@@ -1339,6 +1383,7 @@ local function hookUp(newDeps: Deps)
 	table.clear(trucks)
 	table.clear(loadedOnce)
 	table.clear(leftOf)
+	table.clear(sealed)
 	GrabService.Hooks.bedOwner = TruckLoad.BedOwner
 	GrabService.Hooks.beforeHold = TruckLoad.Unweld
 end

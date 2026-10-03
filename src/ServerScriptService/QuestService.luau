@@ -45,7 +45,7 @@ local FieldGuideService = require(script.Parent.FieldGuideService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
-local TreeService = require(script.Parent.TreeService)
+local SectionTrees = require(script.Parent.SectionTrees)
 
 type Profile = ProfileService.Profile
 type TutorialEvent = TutorialData.TutorialEvent
@@ -254,7 +254,7 @@ function QuestService.Init(skipRemote: RemoteEvent, notifyFn: (Player, string) -
 	notify = notifyFn
 	loop = if activeLoop == 2 then 2 else 1
 	skipRemote.OnServerEvent:Connect(onSkip)
-	TreeService.StumpHold = QuestService.StumpHoldFor
+	SectionTrees.StumpHold = QuestService.StumpHoldFor
 end
 
 return QuestService

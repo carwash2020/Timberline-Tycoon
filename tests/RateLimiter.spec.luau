@@ -37,9 +37,9 @@ return function(t)
 	t.test("allows up to the limit per second, then drops", function()
 		local limiter = setup()
 		local player = fakePlayer()
-		t.eq(burst(limiter, player, "ChopTree", 10), 4)
+		t.eq(burst(limiter, player, "Chop", 10), 6)
 		now += 1
-		t.eq(burst(limiter, player, "ChopTree", 3), 3, "a new second, a new budget")
+		t.eq(burst(limiter, player, "Chop", 3), 3, "a new second, a new budget")
 	end)
 
 	t.test("the v2 loop's Chop (M1.3): six swings a second", function()
@@ -50,8 +50,8 @@ return function(t)
 	t.test("every client-to-server remote in Net has a budget", function()
 		local limiter = setup()
 		local Net = t.shared("Net")
-		-- Server-to-client remotes need none; Instant Delivery shares SellLogs' budget.
-		local skip = { CashChanged = true, Notify = true, WorldFX = true, UseInstantDelivery = true }
+		-- Server-to-client remotes need none. Instant Delivery has its own budget.
+		local skip = { CashChanged = true, Notify = true, WorldFX = true }
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
 				t.ok(limiter.Allow(fakePlayer(), name), name .. " has a LIMITS entry")
@@ -62,7 +62,7 @@ return function(t)
 	t.test("remotes have separate budgets; unknown remotes are refused", function()
 		local limiter = setup()
 		local player = fakePlayer()
-		t.eq(burst(limiter, player, "ChopTree", 4), 4)
+		t.eq(burst(limiter, player, "Chop", 4), 4)
 		t.eq(burst(limiter, player, "BuyItem", 5), 3)
 		t.ok(not limiter.Allow(player, "NotARemote"))
 	end)
@@ -71,12 +71,12 @@ return function(t)
 		local limiter, loader = setup()
 		local player = fakePlayer()
 		for _ = 1, 30 do -- 30 seconds of 4x over the limit
-			burst(limiter, player, "ChopTree", 16)
+			burst(limiter, player, "Chop", 16)
 			now += 1
 		end
 		t.eq(player.kicked, nil)
 		t.eq(#loader.warnings, 0, "no strikes below 5x")
-		burst(limiter, player, "ChopTree", 100)
+		burst(limiter, player, "Chop", 100)
 		t.eq(#loader.warnings, 1, "one strike for one flooded second")
 		t.eq(player.kicked, nil)
 	end)
@@ -85,13 +85,13 @@ return function(t)
 		local limiter = setup()
 		local slow = fakePlayer()
 		for _ = 1, 5 do
-			burst(limiter, slow, "ChopTree", 100)
+			burst(limiter, slow, "Chop", 100)
 			now += 61 -- each strike has expired before the next
 		end
 		t.eq(slow.kicked, nil)
 		local fast = fakePlayer()
 		for _ = 1, 5 do
-			burst(limiter, fast, "ChopTree", 100)
+			burst(limiter, fast, "Chop", 100)
 			now += 1
 		end
 		t.ok(fast.kicked ~= nil, "kicked after 5 strikes in 60 s")
@@ -100,9 +100,17 @@ return function(t)
 	t.test("Forget clears a player's budgets", function()
 		local limiter = setup()
 		local player = fakePlayer()
-		burst(limiter, player, "SellLogs", 4)
-		t.ok(not limiter.Allow(player, "SellLogs"))
+		t.eq(burst(limiter, player, "Chop", 6), 6)
+		t.ok(not limiter.Allow(player, "Chop"))
 		limiter.Forget(player)
-		t.ok(limiter.Allow(player, "SellLogs"))
+		t.ok(limiter.Allow(player, "Chop"))
+	end)
+
+	t.test("Instant Delivery has its own budget, separate from selling", function()
+		local limiter = setup()
+		local player = fakePlayer()
+		t.eq(burst(limiter, player, "UseInstantDelivery", 5), 2)
+		t.eq(burst(limiter, player, "Chop", 6), 6, "another remote is unaffected")
+		t.ok(not limiter.Allow(player, "UseInstantDelivery"))
 	end)
 end

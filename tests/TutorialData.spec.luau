@@ -287,7 +287,7 @@ return function(t)
 		local toasts, marks = {}, {}
 		loader = t.loader({
 			mocks = {
-				TreeService = {},
+				SectionTrees = {},
 				ProfileService = {
 					GetProfile = function(p)
 						return if p == player then profile else nil

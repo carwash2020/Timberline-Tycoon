@@ -47,7 +47,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Tune = require(ReplicatedStorage.Shared.Tune)
@@ -67,7 +66,6 @@ local TOUCH_PRIORITY = Enum.ContextActionPriority.Low.Value -- under the touch t
 local HINT_EVERY = 6 -- seconds between "put your axe away" hints
 local POLL = 0.2 -- seconds between the reticle's checks
 local HEAL_AFTER = 1 -- a piece the server still says we hold, after we let go: tell it again
-local BOOT_WAIT = 120 -- seconds to wait for the server to say which loop runs
 local BUTTON_SIZE = Vector2.new(60, UITheme.Size.Tap)
 
 type Device = "mouse" | "touch" | "pad"
@@ -778,15 +776,6 @@ end
 ---------------------------------------------------------------------------
 
 function DragController.Start()
-	-- MapBuilder says which loop runs before it builds anything.
-	local waited = 0
-	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
-		waited += task.wait(0.25)
-	end
-	if not CoreLoop.V2() then
-		return -- the v1 loop: nothing here runs
-	end
-
 	local folder = Instance.new("Folder")
 	folder.Name = "GrabBalls"
 	folder.Parent = workspace

@@ -198,18 +198,6 @@ return function(t)
 	-- A point on the log's top face, 3 studs from its middle.
 	local HIT = PIECE_AT + Vector3.new(3, 1, 0)
 
-	t.test("under the v1 loop nothing happens", function()
-		local w = setup({ loop = 1 })
-		local _, section = w.piece()
-		local player = w.player(1)
-		t.eq({ w.GrabService.Grab(player, section, HIT) }, { false, "off" })
-		w.handlers.Grab(player, section, HIT)
-		w.handlers.Release(player, section)
-		t.eq(#w.ownerCalls, 0)
-		t.eq(section.Parent:GetAttribute("HeldBy"), 0)
-		t.eq(w.GrabService.Holding(player), nil)
-	end)
-
 	t.test("a grab in reach: the holder's device gets the physics, WoodHeld, HeldBy and GrabPoint", function()
 		local w = setup()
 		local record, section, face = w.piece()

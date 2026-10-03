@@ -554,6 +554,50 @@ return function(t)
 		t.eq(#w.profiles[dale].truckLoad, w.GameConfig.MaxSavedPieces)
 	end)
 
+	t.test(
+		"a save copies the bed and ground wood without taking it, and a later save keeps the leave snapshot",
+		function()
+			local w = setup()
+			local dale = w.player(1)
+			local truck = w.truck(dale, "Rustbucket", nil, CFrame.new(40, 1.8, 30))
+			local a = w.piece(w.onBed(truck, "BedFloor", 0), { ownerId = 1, woodId = "oak" })
+			w.tick()
+			w.profiles[dale].truckLoad = {}
+			w.profiles[dale].groundLoad = { { w = "stale" } }
+			w.TruckLoad.Flush(dale)
+			t.eq(#w.profiles[dale].truckLoad, 1, "the bed is in the profile")
+			t.eq(a.model.Parent ~= nil, true, "still in the world")
+			-- Sent home from out of town: the load stays where the truck stood,
+			-- the new truck is empty in town. A save before they leave must
+			-- remember the wood on the ground.
+			w.TruckLoad.OnRebuild(dale, truck, false, truck:GetPivot())
+			truck:Destroy()
+			w.trucks[dale] = nil
+			a.root.CFrame = CFrame.new(900, 41, -700)
+			w.truck(dale, "Rustbucket", nil, CFrame.new(40, 1.8, 30))
+			w.TruckLoad.Flush(dale)
+			t.ok(#w.profiles[dale].groundLoad >= 1, "ground wood is in the profile before they leave")
+			t.eq(a.model.Parent ~= nil, true, "a save doesn't pick it up")
+			w.TruckLoad.PlayerRemoving(dale)
+			local savedBed = #w.profiles[dale].truckLoad
+			local savedGround = #w.profiles[dale].groundLoad
+			w.profiles[dale].truckLoad = {}
+			w.profiles[dale].groundLoad = {}
+			w.TruckLoad.Flush(dale)
+			t.eq(#w.profiles[dale].truckLoad, 0, "flush after leaving does not invent a load")
+			-- The leave handler already wrote; a sealed flush must not replace that
+			-- with whatever is passed in. Restore the snapshot the way the save
+			-- hook sees it: Flush is a no-op, so an empty table we stuffed in stays
+			-- only if we stuffed it. Put the snapshot back and confirm Flush leaves it.
+			w.profiles[dale].truckLoad = { "kept" }
+			w.profiles[dale].groundLoad = { "kept" }
+			w.TruckLoad.Flush(dale)
+			t.eq(w.profiles[dale].truckLoad, { "kept" }, "sealed: the leave snapshot stays")
+			t.eq(w.profiles[dale].groundLoad, { "kept" })
+			t.eq(savedBed + savedGround >= 1, true)
+		end
+	)
+
 	t.test("leave and rejoin in town: the load is back on the bed, where it lay", function()
 		local w = setup()
 		local dale = w.player(1)

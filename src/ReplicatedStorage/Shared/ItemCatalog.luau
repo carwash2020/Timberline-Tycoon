@@ -310,27 +310,32 @@ ItemCatalog.Materials = {
 }
 
 -- v2 rows (V2_PLAN.md §2c, §2d), attached to the definitions above.
+-- Each tier hits harder than the one before it (damage and damage per
+-- second on ordinary wood both climb, and reach never goes backwards).
+-- Starfall, the forged axe, is the best on every wood, including the
+-- specialists' own. Steel's price is what puts it in the 5-8 minute
+-- window (ECONOMY.md); the old $90 arrived about 1.5× too soon.
 local AXES_V2: { [string]: AxeV2 } = {
 	RustyAxe = { price = 0, damage = 0.2, range = 4.8, cooldown = 0.65 },
-	SteelAxe = { price = 90, damage = 0.55, range = 6, cooldown = 0.73 },
+	SteelAxe = { price = 180, damage = 0.55, range = 6, cooldown = 0.73 },
 	HardenedAxe = { price = 190, damage = 0.93, range = 8, cooldown = 0.70 },
 	SilverAxe = { price = 550, damage = 1.45, range = 8, cooldown = 0.65 },
 	CobaltAxe = { price = 2040, damage = 1.6, range = 10, cooldown = 0.48 },
-	GoldAxe = { price = 7720, damage = 1.68, range = 9, cooldown = 0.40 },
-	ObsidianAxe = { price = 11000, damage = 10.2, range = 16, cooldown = 1.9 },
+	GoldAxe = { price = 7720, damage = 2.05, range = 11, cooldown = 0.36 },
+	ObsidianAxe = { price = 11000, damage = 2.55, range = 13, cooldown = 0.34 },
 	InfernoAxe = {
 		price = 14400,
-		damage = 0.6,
-		range = 9,
-		cooldown = 0.55,
-		vs = { emberwood = { damage = 6.35, cooldown = 0.35 } },
+		damage = 3.55,
+		range = 14,
+		cooldown = 0.32,
+		vs = { emberwood = { damage = 4.6, cooldown = 0.28 } },
 	},
 	StarfallAxe = {
 		price = 0,
-		damage = 1.65,
+		damage = 4.2,
 		range = 16,
-		cooldown = 0.4,
-		vs = { emberwood = { damage = 2.5 }, lumenwood = { damage = 3.9 } },
+		cooldown = 0.28,
+		vs = { emberwood = { damage = 5.5 }, lumenwood = { damage = 7.2 } },
 		forgeWood = { lumenwood = 60 }, -- the v1 recipe's 40 logs at ProfileSchema.ForgeU3PerLog (1.5)
 		forgeCash = 20000, -- V2_PLAN §2c
 	},

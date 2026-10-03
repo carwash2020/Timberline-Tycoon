@@ -27,10 +27,10 @@ return function(t)
 		HardenedAxe = { 4, 8, 16, 15, 4, 21, 27, 39, 86 },
 		SilverAxe = { 3, 5, 11, 10, 3, 14, 18, 25, 55 },
 		CobaltAxe = { 2, 5, 10, 9, 3, 12, 16, 23, 50 },
-		GoldAxe = { 2, 5, 9, 9, 3, 12, 15, 22, 48 },
-		ObsidianAxe = { 1, 1, 2, 2, 1, 2, 3, 4, 8 },
-		InfernoAxe = { 6, 12, 25, 23, 7, 32, 4, 60, 133 },
-		StarfallAxe = { 2, 5, 9, 9, 3, 12, 10, 22, 21 },
+		GoldAxe = { 2, 4, 8, 7, 2, 10, 13, 18, 39 },
+		ObsidianAxe = { 2, 3, 6, 6, 2, 8, 10, 15, 32 },
+		InfernoAxe = { 1, 2, 5, 4, 2, 6, 6, 11, 23 },
+		StarfallAxe = { 1, 2, 4, 4, 1, 5, 5, 9, 12 },
 	}
 
 	t.test("the hits table: every axe against every wood's mature trunk", function()

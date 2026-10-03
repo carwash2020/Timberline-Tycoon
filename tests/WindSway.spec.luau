@@ -575,11 +575,11 @@ return function(t)
 		t.eq(drift(parts, before), 0)
 		tree:SetAttribute("Felled", false)
 		t.ok(run(w, 30)[tree], "again once it stands")
-		w.busy[tree] = true -- TreeFX.IsBusy: a regrow spring, say
+		tree:SetAttribute("FXBusy", true)
 		before = snapshot(parts)
 		t.eq(run(w, 30)[tree], nil, "not while TreeFX is busy with it")
 		t.eq(drift(parts, before), 0)
-		w.busy[tree] = nil
+		tree:SetAttribute("FXBusy", false)
 		t.ok(run(w, 30)[tree], "and again after")
 	end)
 

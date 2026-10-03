@@ -81,7 +81,7 @@ DailyData.Kinds = KINDS
 -- axe prices (ItemCatalog `v2.price`) until tools/economy can size them:
 -- `reward` is one goal's cash; a day's goals plus the one-day bonus come
 -- to well under the next axe on the ladder, so goals help along the
--- cheap first rungs (Steel $90, Hardened $190) without skipping them.
+-- cheap first rungs (Steel $180, Hardened $190) without skipping them.
 -- `volume` (u³ sold) is worth about the `cash` goal at the tier's woods;
 -- `figured` is u³ of figured wood (about half a tree); `pieces` counts
 -- sold logs of at least MinPieceVolumeV2 each (so slivers don't count).

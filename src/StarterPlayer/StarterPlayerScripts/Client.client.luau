@@ -23,9 +23,6 @@ local MODULES = {
 	"BlueprintPlacer",
 	"CameraShake",
 	"CanopyFade",
-	"CarryController",
-	"CarryPose",
-	"ChopController",
 	"CutController",
 	"DailyUI",
 	"DragController",
@@ -48,8 +45,6 @@ local MODULES = {
 	"StoreUI",
 	"TownFX",
 	"TownMarkers",
-	"TreeFX",
-	"TreeUI",
 	"UITheme",
 	"VehicleController",
 	"VehicleFX",
@@ -100,36 +95,6 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "LightingController",
 		get = function()
 			return require(script.Parent.LightingController)
-		end,
-	},
-	{
-		name = "ChopController",
-		get = function()
-			return require(script.Parent.ChopController)
-		end,
-	},
-	{
-		name = "TreeUI",
-		get = function()
-			return require(script.Parent.TreeUI)
-		end,
-	},
-	{
-		name = "TreeFX",
-		get = function()
-			return require(script.Parent.TreeFX)
-		end,
-	},
-	{
-		name = "CarryController",
-		get = function()
-			return require(script.Parent.CarryController)
-		end,
-	},
-	{
-		name = "CarryPose",
-		get = function()
-			return require(script.Parent.CarryPose)
 		end,
 	},
 	{

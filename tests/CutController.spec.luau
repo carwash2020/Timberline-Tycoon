@@ -156,15 +156,9 @@ return function(t)
 		t.eq({ damage, cooldown, range }, { 0.2, 0.65, 4.8 })
 		local inferno = ItemCatalog.GetAxe("InfernoAxe")
 		local d2, c2 = CutController.Stats(inferno, "emberwood")
-		t.eq({ d2, c2 }, { 6.35, 0.35 })
+		t.eq({ d2, c2 }, { 4.6, 0.28 })
 		local d3 = CutController.Stats(inferno, "oak")
-		t.eq(d3, 0.6)
-	end)
-
-	t.test("under the v1 loop it starts nothing", function()
-		local controller, connected = load(1)
-		controller.Start()
-		t.eq(connected(), 0, "no signal connected")
+		t.eq(d3, 3.55)
 	end)
 
 	-- The HUD's v2 hints: pointing at loose wood (put the axe away to drag

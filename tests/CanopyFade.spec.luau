@@ -421,7 +421,7 @@ return function(t)
 		local busy = w.tree(w.along(0.7))
 		felled:SetAttribute("Felled", true)
 		dormant:SetAttribute("Dormant", true)
-		w.busy[busy] = true
+		busy:SetAttribute("FXBusy", true)
 		w.CanopyFade.Start()
 		w.run(0.5)
 		for _, tree in ipairs({ felled, dormant, busy }) do
@@ -470,7 +470,7 @@ return function(t)
 		w2.CanopyFade.Start()
 		w2.run(0.3)
 		t.ok(faded(leaves2))
-		w2.busy[tree2] = true
+		tree2:SetAttribute("FXBusy", true)
 		w2.frame(1 / 60)
 		t.ok(ltm(leaves2) > 0.6 and ltm(leaves2) < 0.7, "eases, no snap: " .. ltm(leaves2))
 		w2.run(0.45)

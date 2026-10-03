@@ -140,7 +140,7 @@ return function(t)
 
 		local loader = t.loader({
 			mocks = {
-				TreeService = TreeService,
+				SectionTrees = TreeService,
 				ProfileService = {
 					GetProfile = function(p)
 						return s.profiles[p]

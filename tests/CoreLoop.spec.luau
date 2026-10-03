@@ -14,16 +14,17 @@ return function(t)
 		t.eq(CoreLoop.Resolve(GameConfig.CoreLoop, nil, false), 2)
 	end)
 
-	t.test("Studio may override the loop with the CoreLoop attribute; a live server never", function()
+	t.test("the loop is always v2: a Studio attribute and a bad setting cannot roll it back", function()
 		t.eq(CoreLoop.Resolve(1, 2, true), 2)
-		t.eq(CoreLoop.Resolve(1, 2, false), 1)
-		t.eq(CoreLoop.Resolve(2, 1, true), 1)
-		-- Nonsense overrides keep the setting; a nonsense setting falls back to 1.
+		t.eq(CoreLoop.Resolve(1, 2, false), 2)
+		t.eq(CoreLoop.Resolve(2, 1, true), 2)
 		for _, bad in ipairs({ 0, 3, 1.5, "2", true, 0 / 0 }) do
-			t.eq(CoreLoop.Resolve(1, bad, true), 1)
+			t.eq(CoreLoop.Resolve(bad, bad, true), 2)
 		end
-		t.eq(CoreLoop.Resolve(7, nil, true), 1)
-		t.eq(CoreLoop.Resolve(nil, nil, false), 1)
+		t.eq(CoreLoop.Resolve(7, nil, true), 2)
+		t.eq(CoreLoop.Resolve(nil, nil, false), 2)
+		t.eq(CoreLoop.Active(), 2)
+		t.eq(CoreLoop.V2(), true)
 	end)
 
 	t.test("Tune: Studio number attributes override GameConfig numbers, nothing else", function()
@@ -75,11 +76,33 @@ return function(t)
 
 	t.test("AxeStats: a specialist's override, otherwise the axe's own", function()
 		local inferno = ItemCatalog.GetAxe("InfernoAxe")
-		t.eq({ ItemCatalog.AxeStats(inferno, "emberwood") }, { 6.35, 0.35 })
-		t.eq({ ItemCatalog.AxeStats(inferno, "oak") }, { 0.6, 0.55 })
+		t.eq({ ItemCatalog.AxeStats(inferno, "emberwood") }, { 4.6, 0.28 })
+		t.eq({ ItemCatalog.AxeStats(inferno, "oak") }, { 3.55, 0.32 })
 		local starfall = ItemCatalog.GetAxe("StarfallAxe")
-		t.eq({ ItemCatalog.AxeStats(starfall, "lumenwood") }, { 3.9, 0.4 }) -- damage only: cooldown stays
+		t.eq({ ItemCatalog.AxeStats(starfall, "lumenwood") }, { 7.2, 0.28 }) -- damage only: cooldown stays
 		t.eq({ ItemCatalog.AxeStats({ id = "x" }, "oak") }, { nil, nil })
+	end)
+
+	t.test("each axe tier out-cuts the last, and the Starfall Axe is the best on every wood", function()
+		local ladder = ItemCatalog.AxeLadder()
+		local function dps(axe, woodId)
+			local damage, cooldown = ItemCatalog.AxeStats(axe, woodId)
+			return damage / cooldown
+		end
+		for i = 2, #ladder do
+			local prev, axe = ladder[i - 1], ladder[i]
+			t.ok(axe.v2.damage > prev.v2.damage, axe.id .. " damage")
+			t.ok(axe.v2.range >= prev.v2.range, axe.id .. " reach")
+			t.ok(dps(axe, "oak") > dps(prev, "oak"), axe.id .. " swings faster on oak")
+		end
+		local star = ItemCatalog.GetAxe("StarfallAxe")
+		for _, axe in ipairs(ladder) do
+			if axe ~= star then
+				for _, wood in ipairs(WoodData.All()) do
+					t.ok(dps(star, wood.id) > dps(axe, wood.id), string.format("Starfall vs %s on %s", axe.id, wood.id))
+				end
+			end
+		end
 	end)
 
 	t.test("hits to cut a 2-stud oak trunk with the Rusty Axe: about 16 (V2_PLAN §2c)", function()

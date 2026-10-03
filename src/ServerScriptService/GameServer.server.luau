@@ -5,8 +5,8 @@
 --     (AxeService; axes are items the player can switch, drop and pick up).
 --   * PlayerRemoving: drop carried logs, final save + release the session.
 --   * Every remote is rate-limited and server-validated. The client only
---     sends intents; TreeService/EconomyService own the truth. BuyItem is
---     handled by ShopService.
+--     sends intents; the services own the truth. BuyItem is handled by
+--     ShopService.
 -- Autosave, shutdown flushing and session locks are ProfileStore's job
 -- (see ProfileService).
 
@@ -15,7 +15,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
-local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
 local BootReport = require(script.Parent.BootReport)
 local DailyService = require(script.Parent.DailyService)
@@ -27,20 +26,18 @@ local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local SellService = require(script.Parent.SellService)
-local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
-local PickupGrace = require(script.Parent.PickupGrace)
 local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
+local SaveFlush = require(script.Parent.SaveFlush)
 local RateLimiter = require(script.Parent.RateLimiter)
 local ShopService = require(script.Parent.ShopService)
-local TreeService = require(script.Parent.TreeService)
 local TruckLoad = require(script.Parent.TruckLoad)
 local VehicleService = require(script.Parent.VehicleService)
 local WeatherService = require(script.Parent.WeatherService)
@@ -142,81 +139,6 @@ local function getCharacterParts(player: Player): (Model?, BasePart?)
 	return char, hrp
 end
 
-local function countHands(hands: { [string]: boolean }): number
-	local n = 0
-	for _ in pairs(hands) do
-		n += 1
-	end
-	return n
-end
-
-local function flatDistance(a: Vector3, b: Vector3): number
-	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
-end
-
--- Remote handlers ----------------------------------------------------------
-
-local function onChopTree(player: Player, treeUid: unknown)
-	if type(treeUid) ~= "string" or not RateLimiter.Allow(player, "ChopTree") then
-		return
-	end
-	local char = getCharacterParts(player)
-	local profile = ProfileService.GetProfile(player)
-	if not char or not profile then
-		return
-	end
-	local axe = AxeService.GetEquippedAxe(player) -- only a real, owned axe counts
-	if not axe then
-		return
-	end
-	-- A swing may arrive up to SwingTolerance early (network jitter), but the
-	-- schedule advances from when it was due, so over time nobody can swing
-	-- faster than once per SwingCooldown.
-	local now = os.clock()
-	local due = nextSwingAt[player.UserId] or 0
-	if now < due - GameConfig.SwingTolerance then
-		return
-	end
-	-- Some woods need gear: Heat Boots on the Volcano, a Lantern in the Grove.
-	local wood = TreeService.GetTreeWood(treeUid)
-	if wood then
-		local ok, why = BiomeService.CanChop(player, wood)
-		if not ok then
-			if why then
-				notify(player, why)
-			end
-			return
-		end
-	end
-	local newHp, err, feller = TreeService.ApplyChop(player, treeUid, axe)
-	if newHp == nil then
-		if err == "far" then
-			notify(player, "Too far away. Walk closer to chop.")
-		elseif err == "tooHard" then
-			notify(
-				player,
-				string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName)
-			)
-		end
-		return
-	end
-	nextSwingAt[player.UserId] = math.max(now, due) + GameConfig.SwingCooldown
-	MilestoneService.Mark(player, "First chop")
-	-- The felling counts for whoever chopped the most of the tree (its logs
-	-- are theirs too), not just whoever landed the last swing.
-	local credited = if newHp <= 0 then feller or player else nil
-	local creditedProfile = if credited then ProfileService.GetProfile(credited) else nil
-	if credited and creditedProfile then
-		creditedProfile.stats.treesChopped += 1
-		MilestoneService.Mark(credited, "First tree felled")
-		QuestService.Event(credited, "treeFelled")
-		DailyService.Event(credited, "treeFelled", 1)
-		if wood then
-			FieldGuideService.Discover(credited, wood.id)
-		end
-	end
-end
-
 -- One swing at a crystal node (any axe; the same swing cooldown as chopping).
 local function onMineNode(player: Player, nodeUid: unknown)
 	if type(nodeUid) ~= "string" or not RateLimiter.Allow(player, "MineNode") then
@@ -239,312 +161,20 @@ local function onMineNode(player: Player, nodeUid: unknown)
 	end
 end
 
-local function serverPickupLog(player: Player, logUid: unknown)
-	if type(logUid) ~= "string" or not RateLimiter.Allow(player, "PickupLog") then
-		return
-	end
-	local char, hrp = getCharacterParts(player)
-	local hands = CarryService.Hands(player)
-	if not char or not hrp or not hands or not ProfileService.GetProfile(player) then
-		return
-	end
-	local log = TreeService.GetLog(logUid)
-	if not log or log.state ~= "world" then
-		return
-	end
-	local pp = log.model.PrimaryPart
-	if not pp then
-		return
-	end
-	if (hrp.Position - pp.Position).Magnitude > GameConfig.PickupPromptRange + GameConfig.RangeTolerance then
-		return
-	end
-	-- Grace period: only the feller can grab these for PickupGraceSec (a
-	-- load left behind by a truck stays its owner's for longer).
-	local graceLeft = PickupGrace.WaitFor(log, player.UserId, os.time())
-	if graceLeft > 0 then
-		notify(player, PickupGrace.Message(log, graceLeft))
-		return
-	end
-	local already = countHands(hands)
-	if already >= GameConfig.HandCapacity then
-		notify(
-			player,
-			string.format("Hands full (%d/%d). Load them into your truck.", already, GameConfig.HandCapacity)
-		)
-		return
-	end
-	local torso = (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")) :: BasePart?
-	if not torso or not TreeService.ClaimLog(logUid) then
-		return
-	end
-	pp.Anchored = false
-	pp.CanCollide = false
-	pp.Massless = true
-	-- The lowest free spot in the stack, so a log never lands inside another
-	-- after one was sold or loaded out of the middle.
-	local used: { [number]: boolean } = {}
-	for uid in pairs(hands) do
-		local held = TreeService.GetLog(uid)
-		local slot = if held and held.model.PrimaryPart then held.model.PrimaryPart:GetAttribute("CarrySlot") else nil
-		if type(slot) == "number" then
-			used[slot] = true
-		end
-	end
-	local slot = 0
-	while used[slot] do
-		slot += 1
-	end
-	pp:SetAttribute("CarrySlot", slot)
-	pp.CFrame = torso.CFrame * CFrame.new(0, 0.35 - slot * 1.25, -1.35) -- = CarryLayout.LogOffset(slot)
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = torso
-	weld.Part1 = pp
-	weld.Parent = pp
-	hands[logUid] = true
-	player:SetAttribute("CarriedLogs", already + 1)
-	MilestoneService.Mark(player, "First log picked up")
-	QuestService.Event(player, "logPickedUp")
-end
-
--- ProximityPrompts on logs call the same validated path.
-TreeService.PickupCallback = serverPickupLog
-TreeService.LogMultiplier = MonetizationService.LogMultiplier
-
-local function onLoadToTruck(player: Player)
-	if not RateLimiter.Allow(player, "LoadToTruck") then
-		return
-	end
-	local _char, hrp = getCharacterParts(player)
-	local truck = VehicleService.GetVehicle(player)
-	local hands = CarryService.Hands(player)
-	if not hrp or not truck or not hands then
-		return
-	end
-	local loadPoint = VehicleService.GetLoadPoint(player)
-	if not loadPoint then
-		notify(player, "This truck has no bed. Switch trucks at the Dealership.")
-		return
-	end
-	if (hrp.Position - loadPoint).Magnitude > GameConfig.LoadPromptRange + GameConfig.RangeTolerance then
-		notify(player, "Get closer to your truck's tailgate.")
-		return
-	end
-	local uids: { string } = {}
-	for uid in pairs(hands) do
-		table.insert(uids, uid)
-	end
-	if #uids == 0 then
-		return
-	end
-	local capacity = VehicleService.GetBedCapacity(player)
-	if VehicleService.GetBedCount(player) >= capacity then
-		notify(player, "Truck bed full. Sell at the sawmill.")
-		return
-	end
-	local moved, fresh = 0, 0 -- fresh: not a left-behind load being picked up again
-	for _, uid in ipairs(uids) do
-		local log = TreeService.GetLog(uid)
-		if not log then
-			hands[uid] = nil -- stale entry; drop it
-		elseif
-			VehicleService.AddBedLog(player, { woodId = log.def.id, value = log.value, figure = log.tags.figure })
-		then
-			-- Only destroy the carried log once it's safely in the bed.
-			TreeService.TakeLog(uid)
-			log.model:Destroy()
-			hands[uid] = nil
-			moved += 1
-			if log.tags.leftBehind ~= true then
-				fresh += 1
-			end
-		end
-	end
-	player:SetAttribute("CarriedLogs", countHands(hands))
-	if moved > 0 then
-		MilestoneService.Mark(player, "First log loaded")
-		if fresh > 0 then
-			QuestService.Event(player, "logsLoaded", fresh)
-			DailyService.Event(player, "logsLoaded", fresh)
-		end
-		notify(
-			player,
-			string.format(
-				"Loaded %d log%s. Bed %d/%d.",
-				moved,
-				moved == 1 and "" or "s",
-				VehicleService.GetBedCount(player),
-				capacity
-			)
-		)
-	end
-end
-
--- Pays for `count` logs worth `total` and reports the sale everywhere:
--- stats, the stopwatch, the tutorial, daily goals, the Living Forest's
--- figure reveals. 2x Cash applies here.
-local function completeSale(
-	player: Player,
-	profile: ProfileService.Profile,
-	total: number,
-	count: number,
-	byWood: { [string]: number },
-	figures: { [string]: number }
-)
-	total *= MonetizationService.SaleMultiplier(player)
-	profile.stats.logsSold += count
-	local credited, overflow = EconomyService.AddCash(player, total, string.format("sold %d logs", count), "logs")
-	MilestoneService.Mark(player, "First sale")
-	MilestoneService.CashEarned(player, credited)
-	MilestoneService.LogsSold(player, byWood)
-	-- Report what was actually paid (the wallet cap may have taken some).
-	notify(player, string.format("Sold %d log%s for %s", count, count == 1 and "" or "s", Util.formatCash(credited)))
-	if next(figures) then
-		local ok, err = pcall(function(): any
-			ForestService.OnSale(player, figures)
-			return nil
-		end)
-		if not ok then
-			warn("[GameServer] ForestService.OnSale failed: " .. tostring(err))
-		end
-	end
-	if overflow > 0 then
-		notify(
-			player,
-			string.format(
-				"Wallet full at %s: %s didn't fit. Spend some!",
-				Util.formatCash(GameConfig.CashCap),
-				Util.formatCash(overflow)
-			)
-		)
-	end
-	-- After the sale's toasts, so rewards read last.
-	QuestService.Event(player, "logsSold", count)
-	DailyService.Event(player, "logsSold", count, byWood, credited)
-end
-
-local function onSellLogs(player: Player)
-	if not RateLimiter.Allow(player, "SellLogs") then
-		return
-	end
-	local _char, hrp = getCharacterParts(player)
-	local profile = ProfileService.GetProfile(player)
-	local hands = CarryService.Hands(player)
-	if not hrp or not profile or not hands then
-		return
-	end
-	if not Util.pointInPart(sellZone, hrp.Position) then
-		notify(player, "Stand on the sawmill's sell pad to sell.")
-		return
-	end
-	local total, count = 0, 0
-	local byWood: { [string]: number } = {} -- for the stopwatch's calibration line
-	local figures: { [string]: number } = {} -- figured logs, for the reveal
-	-- Logs in hands: valued from SERVER records, then destroyed.
-	for uid in pairs(hands) do
-		local log = TreeService.TakeLog(uid)
-		if log then
-			total += log.value
-			count += 1
-			byWood[log.def.id] = (byWood[log.def.id] or 0) + 1
-			local figure = log.tags.figure
-			if type(figure) == "string" then
-				figures[figure] = (figures[figure] or 0) + 1
-			end
-			log.model:Destroy()
-		end
-	end
-	table.clear(hands)
-	-- The truck bed only sells if the truck is actually at the mill: where
-	-- the server vouches it is, judged right now (its driver's device moves
-	-- it, and could have teleported it onto the pad a moment ago).
-	local truckAt = VehicleService.TrustedTruckPosition(player)
-	if truckAt and flatDistance(truckAt, sellZone.Position) <= GameConfig.SellTruckRange then
-		for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
-			total += entry.value
-			count += 1
-			byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
-			if entry.figure then
-				figures[entry.figure] = (figures[entry.figure] or 0) + 1
-			end
-		end
-	end
-	-- The Sky Bin sits by the pad: logs sent down the Cloud Chute.
-	for _, entry in ipairs(AetherService.TakeSkyBin(player)) do
-		total += entry.value
-		count += 1
-		byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
-		if entry.figure then
-			figures[entry.figure] = (figures[entry.figure] or 0) + 1
-		end
-	end
-	player:SetAttribute("CarriedLogs", 0)
-	if count == 0 then
-		notify(player, "Nothing to sell. Bring logs, or park your truck by the mill.")
-		return
-	end
-	completeSale(player, profile, total, count, byWood, figures)
-end
-
--- Instant Delivery (a Robux product): sells the truck bed from anywhere.
--- The v2 loop sells the loose wood on the beds instead (SellService.SellBed:
--- the same wallet check, then one use).
+-- Instant Delivery (a Robux product): sells the loose wood on the truck
+-- from anywhere. SellService checks the wallet before spending a use.
 local function onInstantDelivery(player: Player)
-	if not RateLimiter.Allow(player, "SellLogs") then
+	if not RateLimiter.Allow(player, "UseInstantDelivery") then
 		return
 	end
-	if CoreLoop.V2() then
-		SellService.SellBed(player, function(): boolean
-			return MonetizationService.UseInstantDelivery(player)
-		end)
-		return
-	end
-	local profile = ProfileService.GetProfile(player)
-	if not profile or VehicleService.GetBedCount(player) == 0 then
-		return
-	end
-	-- A load the wallet cap would eat (some or all of it) isn't worth a
-	-- paid use: say so before one is spent.
-	local worth = math.floor(VehicleService.GetBedValue(player) * MonetizationService.SaleMultiplier(player))
-	local room = GameConfig.CashCap - profile.cash
-	if worth > room then
-		notify(
-			player,
-			if room <= 0
-				then string.format(
-					"Your wallet is full (%s). Spend some before using Instant Delivery.",
-					Util.formatCash(GameConfig.CashCap)
-				)
-				else string.format(
-					"This load is worth %s but your wallet only has room for %s. Spend some before using Instant Delivery.",
-					Util.formatCash(worth),
-					Util.formatCash(room)
-				)
-		)
-		return
-	end
-	if not MonetizationService.UseInstantDelivery(player) then
-		notify(player, "You have no Instant Deliveries left.")
-		return
-	end
-	local total, count = 0, 0
-	local byWood: { [string]: number } = {}
-	local figures: { [string]: number } = {}
-	for _, entry in ipairs(VehicleService.TakeBedLogs(player)) do
-		total += entry.value
-		count += 1
-		byWood[entry.woodId] = (byWood[entry.woodId] or 0) + 1
-		if entry.figure then
-			figures[entry.figure] = (figures[entry.figure] or 0) + 1
-		end
-	end
-	completeSale(player, profile, total, count, byWood, figures)
+	SellService.SellBed(player, function(): boolean
+		return MonetizationService.UseInstantDelivery(player)
+	end)
 end
 
--- A v2 sale (SellService, per payee per tick), which SellService has paid
+-- A sale (SellService, per payee per tick), which SellService has paid
 -- and toasted: what the stopwatch, the Living Forest's reveals, the
--- tutorial and the daily goals hear about, as completeSale tells them of
--- a v1 sale.
+-- tutorial and the daily goals hear about.
 local function onWoodSold(sale: SellService.Sale)
 	local player = sale.payee
 	local profile = ProfileService.GetProfile(player)
@@ -608,196 +238,191 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	SellPlaced = remote.SellPlaced,
 	UpgradePlot = remote.UpgradePlot,
 }, notify)
-safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
+safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify, {
+	sectionTrees = SectionTrees,
+	setFigure = WoodService.SetFigure,
+})
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("NPCService.Init", NPCService.Init, mapFolder)
--- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
--- and drag loose wood, and Studio's /spawnwood to try it.
-if CoreLoop.V2() then
-	-- Grabbing a piece: the tutorial's drag step and the funnel's pickup.
-	GrabService.Hooks.onGrab = function(player: Player, _piece: GrabService.Piece)
-		safely("woodGrabbed", function()
-			MilestoneService.Mark(player, "First log picked up")
-			QuestService.Event(player, "woodGrabbed")
-		end)
-	end
-	-- The sell pad sells loose wood by volume (M1.7).
-	local woodFolder = mapFolder:FindFirstChild("Wood")
-	if not woodFolder then
-		local made = Instance.new("Folder")
-		made.Name = "Wood"
-		made.Parent = mapFolder
-		woodFolder = made
-	end
-	-- Loose wood (M1.3): every piece a cut frees, its despawn and caps, and
-	-- WoodWatch (which judges held wood too, so GrabService doesn't).
-	safely("WoodService.Init", WoodService.Init, { worldFx = remote.WorldFX, folder = woodFolder })
-	GrabService.SetResolver(function(part: BasePart): GrabService.Piece?
-		return WoodService.FromPart(part) :: any
+-- Grab and drag loose wood, and Studio's /spawnwood.
+-- Grabbing a piece: the tutorial's drag step and the funnel's pickup.
+GrabService.Hooks.onGrab = function(player: Player, _piece: GrabService.Piece)
+	safely("woodGrabbed", function()
+		MilestoneService.Mark(player, "First log picked up")
+		QuestService.Event(player, "woodGrabbed")
 	end)
-	GrabService.JudgeMoves = false
-	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
-	safely("DevCommands.Init", DevCommands.Init, notify)
-	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
-	local function saleFx(model: Model)
-		local piece = WoodService.FromModel(model)
-		if not piece then
-			return
-		end
-		local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, function(userId: number): boolean
-			return Players:GetPlayerByUserId(userId) ~= nil
-		end)
-		local payee = if payeeId then Players:GetPlayerByUserId(payeeId) else nil
-		if payee then
-			WoodService.SaleFx(model, SellLogic.Payout(piece.value, MonetizationService.SaleMultiplier(payee)))
-		end
-	end
-	safely("SellService.Init", SellService.Init, {
-		zone = sellZone,
-		woodFolder = woodFolder :: Instance,
-		resolve = function(model: Model): SellService.Piece?
-			-- Only wood WoodWatch last found where it should be (no teleports to the pad).
-			local piece = WoodService.FromModel(model)
-			if piece and not WoodService.VerdictOk(piece) then
-				return nil
-			end
-			return piece :: any
-		end,
-		addCash = function(player: Player, amount: number, reason: string, sku: string): number?
-			local credited = EconomyService.AddCash(player, amount, reason, sku)
-			return credited
-		end,
-		saleMultiplier = MonetizationService.SaleMultiplier,
-		notify = notify,
-		release = function(model: Model)
-			GrabService.ReleasePiece(model, "sold")
-		end,
-		forget = function(model: Model)
-			saleFx(model)
-			WoodService.Forget(model)
-			GrabService.Unregister(model)
-		end,
-		onSold = onWoodSold,
-		-- Instant Delivery v2: the wood riding on the player's beds.
-		bedPieces = function(player: Player): { Model }
-			return TruckLoad.PiecesOn(player)
-		end,
-		walletRoom = function(player: Player): number
-			local profile = ProfileService.GetProfile(player)
-			return if profile then GameConfig.CashCap - profile.cash else 0
-		end,
-	})
-	-- Loose wood rides on the truck beds (M1.6): by friction, simulated by
-	-- the driver's device while they drive, saved in profile.truckLoad.
-	safely("TruckLoad.Init", TruckLoad.Init, {
-		woodFolder = woodFolder :: Instance,
-		truckOf = VehicleService.GetVehicle,
-		profileOf = function(player: Player): any
-			return ProfileService.GetProfile(player)
-		end,
-		notify = notify,
-		-- A saved load comes back as WoodService pieces (its sections
-		-- linked by contact), so they cut, grab and sell like any other.
-		build = function(saved: any, owner: Player, cf: CFrame, graceSec: number): Model?
-			local model = TruckLoad.Build(saved, owner, cf, graceSec)
-			if model then
-				GrabService.Unregister(model)
-				WoodService.Register(model, {
-					woodId = saved.w,
-					nodes = {},
-					parts = {},
-					ownerId = owner.UserId,
-					figure = saved.f,
-					boost = saved.x,
-					createdAt = os.clock() - GameConfig.PickupGraceSec + math.max(0, graceSec),
-				})
-			end
-			return model
-		end,
-		forget = function(model: Model)
-			WoodService.Forget(model)
-			GrabService.Unregister(model)
-		end,
-		moved = WoodService.Moved,
-	})
-	VehicleService.Hooks.onDriverChanged = TruckLoad.OnDriverChanged
-	VehicleService.Hooks.onRebuild = TruckLoad.OnRebuild
-	VehicleService.Hooks.loadCount = TruckLoad.LoadCount
-	-- A piece of yours came to rest on your own bed: the tutorial's "load"
-	-- step (TutorialData.StepsV2) and the funnel.
-	TruckLoad.Hooks.onLoaded = function(player: Player)
-		MilestoneService.Mark(player, "First log loaded")
-		QuestService.Event(player, "woodLoaded")
-	end
-	-- The section trees (M1.3): the Living Forest moves onto them, and the
-	-- Chop remote cuts them (and loose pieces) wherever you swing.
-	SectionTrees.StumpHold = QuestService.StumpHoldFor
-	SectionTrees.LogMultiplier = MonetizationService.LogMultiplier
-	safely("ForestService.UseV2", ForestService.UseV2, SectionTrees, WoodService.SetFigure)
-	-- A felling counts for whoever cut the most of the tree (stats, the
-	-- tutorial's treeFelled, dailies, the Field Guide), as in v1.
-	SectionTrees.Hooks.onFelled = function(feller: Player, rec: SectionTrees.TreeRecord)
-		local profile = ProfileService.GetProfile(feller)
-		if not profile then
-			return
-		end
-		profile.stats.treesChopped += 1
-		MilestoneService.Mark(feller, "First tree felled")
-		QuestService.Event(feller, "treeFelled")
-		DailyService.Event(feller, "treeFelled", 1)
-		FieldGuideService.Discover(feller, rec.def.id)
-	end
-	SectionTrees.Hooks.onSwing = function(player: Player)
-		MilestoneService.Mark(player, "First chop")
-	end
-	safely("SectionTrees.Init", SectionTrees.Init, {
-		notify = notify,
-		worldFx = remote.WorldFX,
-		getAxe = AxeService.GetEquippedAxe,
-		canChop = BiomeService.CanChop,
-		swingDue = function(player: Player): number
-			return nextSwingAt[player.UserId] or 0
-		end,
-		setSwingDue = function(player: Player, at: number)
-			nextSwingAt[player.UserId] = at
-		end,
-	})
-	remote.Chop.OnServerEvent:Connect(function(player: Player, part: unknown, hitPos: unknown, normal: unknown)
-		SectionTrees.Chop(player, part, hitPos, normal)
-	end)
-	-- The isles take loose wood (M1.7b): the Cloud Chutes and the Starfall
-	-- Forge are hoppers found the way the pad finds pieces, the Sky Bin by
-	-- the pad sells through SellService.PayEntries, and wood that falls off
-	-- the isles is lost.
-	local skyBinPart = sellArea:FindFirstChild("SkyBin")
-	safely("AetherService.InitV2", AetherService.InitV2, {
-		woodFolder = woodFolder :: Instance,
-		resolve = function(model: Model): SellService.Piece?
-			-- As the pad: only wood WoodWatch last found where it should be.
-			local piece = WoodService.FromModel(model)
-			if piece and not WoodService.VerdictOk(piece) then
-				return nil
-			end
-			return piece :: any
-		end,
-		release = function(model: Model)
-			GrabService.ReleasePiece(model, "taken")
-		end,
-		forget = function(model: Model)
-			WoodService.Forget(model)
-			GrabService.Unregister(model)
-		end,
-		skyBin = if skyBinPart and skyBinPart:IsA("BasePart") then skyBinPart else nil,
-		heldBy = GrabService.HeldBy,
-	})
 end
+-- The sell pad sells loose wood by volume (M1.7).
+local woodFolder = mapFolder:FindFirstChild("Wood")
+if not woodFolder then
+	local made = Instance.new("Folder")
+	made.Name = "Wood"
+	made.Parent = mapFolder
+	woodFolder = made
+end
+-- Loose wood (M1.3): every piece a cut frees, its despawn and caps, and
+-- WoodWatch (which judges held wood too, so GrabService doesn't).
+safely("WoodService.Init", WoodService.Init, { worldFx = remote.WorldFX, folder = woodFolder })
+GrabService.SetResolver(function(part: BasePart): GrabService.Piece?
+	return WoodService.FromPart(part) :: any
+end)
+GrabService.JudgeMoves = false
+safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
+safely("DevCommands.Init", DevCommands.Init, notify)
+-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
+local function saleFx(model: Model)
+	local piece = WoodService.FromModel(model)
+	if not piece then
+		return
+	end
+	local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, function(userId: number): boolean
+		return Players:GetPlayerByUserId(userId) ~= nil
+	end)
+	local payee = if payeeId then Players:GetPlayerByUserId(payeeId) else nil
+	if payee then
+		WoodService.SaleFx(model, SellLogic.Payout(piece.value, MonetizationService.SaleMultiplier(payee)))
+	end
+end
+safely("SellService.Init", SellService.Init, {
+	zone = sellZone,
+	woodFolder = woodFolder :: Instance,
+	resolve = function(model: Model): SellService.Piece?
+		-- Only wood WoodWatch last found where it should be (no teleports to the pad).
+		local piece = WoodService.FromModel(model)
+		if piece and not WoodService.VerdictOk(piece) then
+			return nil
+		end
+		return piece :: any
+	end,
+	addCash = function(player: Player, amount: number, reason: string, sku: string): number?
+		local credited = EconomyService.AddCash(player, amount, reason, sku)
+		return credited
+	end,
+	saleMultiplier = MonetizationService.SaleMultiplier,
+	notify = notify,
+	release = function(model: Model)
+		GrabService.ReleasePiece(model, "sold")
+	end,
+	forget = function(model: Model)
+		saleFx(model)
+		WoodService.Forget(model)
+		GrabService.Unregister(model)
+	end,
+	onSold = onWoodSold,
+	-- Instant Delivery v2: the wood riding on the player's beds.
+	bedPieces = function(player: Player): { Model }
+		return TruckLoad.PiecesOn(player)
+	end,
+	walletRoom = function(player: Player): number
+		local profile = ProfileService.GetProfile(player)
+		return if profile then GameConfig.CashCap - profile.cash else 0
+	end,
+})
+-- Loose wood rides on the truck beds (M1.6): by friction, simulated by
+-- the driver's device while they drive, saved in profile.truckLoad.
+safely("TruckLoad.Init", TruckLoad.Init, {
+	woodFolder = woodFolder :: Instance,
+	truckOf = VehicleService.GetVehicle,
+	profileOf = function(player: Player): any
+		return ProfileService.GetProfile(player)
+	end,
+	notify = notify,
+	-- A saved load comes back as WoodService pieces (its sections
+	-- linked by contact), so they cut, grab and sell like any other.
+	build = function(saved: any, owner: Player, cf: CFrame, graceSec: number): Model?
+		local model = TruckLoad.Build(saved, owner, cf, graceSec)
+		if model then
+			GrabService.Unregister(model)
+			WoodService.Register(model, {
+				woodId = saved.w,
+				nodes = {},
+				parts = {},
+				ownerId = owner.UserId,
+				figure = saved.f,
+				boost = saved.x,
+				createdAt = os.clock() - GameConfig.PickupGraceSec + math.max(0, graceSec),
+			})
+		end
+		return model
+	end,
+	forget = function(model: Model)
+		WoodService.Forget(model)
+		GrabService.Unregister(model)
+	end,
+	moved = WoodService.Moved,
+})
+VehicleService.Hooks.onDriverChanged = TruckLoad.OnDriverChanged
+VehicleService.Hooks.onRebuild = TruckLoad.OnRebuild
+VehicleService.Hooks.loadCount = TruckLoad.LoadCount
+-- A piece of yours came to rest on your own bed: the tutorial's "load"
+-- step (TutorialData.StepsV2) and the funnel.
+TruckLoad.Hooks.onLoaded = function(player: Player)
+	MilestoneService.Mark(player, "First log loaded")
+	QuestService.Event(player, "woodLoaded")
+end
+-- The section trees (M1.3): the Living Forest moves onto them, and the
+-- Chop remote cuts them (and loose pieces) wherever you swing.
+SectionTrees.StumpHold = QuestService.StumpHoldFor
+SectionTrees.LogMultiplier = MonetizationService.LogMultiplier
+-- A felling counts for whoever cut the most of the tree (stats, the
+-- tutorial's treeFelled, dailies, the Field Guide), as in v1.
+SectionTrees.Hooks.onFelled = function(feller: Player, rec: SectionTrees.TreeRecord)
+	local profile = ProfileService.GetProfile(feller)
+	if not profile then
+		return
+	end
+	profile.stats.treesChopped += 1
+	MilestoneService.Mark(feller, "First tree felled")
+	QuestService.Event(feller, "treeFelled")
+	DailyService.Event(feller, "treeFelled", 1)
+	FieldGuideService.Discover(feller, rec.def.id)
+end
+SectionTrees.Hooks.onSwing = function(player: Player)
+	MilestoneService.Mark(player, "First chop")
+end
+safely("SectionTrees.Init", SectionTrees.Init, {
+	notify = notify,
+	worldFx = remote.WorldFX,
+	getAxe = AxeService.GetEquippedAxe,
+	canChop = BiomeService.CanChop,
+	swingDue = function(player: Player): number
+		return nextSwingAt[player.UserId] or 0
+	end,
+	setSwingDue = function(player: Player, at: number)
+		nextSwingAt[player.UserId] = at
+	end,
+})
+remote.Chop.OnServerEvent:Connect(function(player: Player, part: unknown, hitPos: unknown, normal: unknown)
+	SectionTrees.Chop(player, part, hitPos, normal)
+end)
+-- The isles take loose wood (M1.7b): the Cloud Chutes and the Starfall
+-- Forge are hoppers found the way the pad finds pieces, the Sky Bin by
+-- the pad sells through SellService.PayEntries, and wood that falls off
+-- the isles is lost.
+local skyBinPart = sellArea:FindFirstChild("SkyBin")
+safely("AetherService.InitV2", AetherService.InitV2, {
+	woodFolder = woodFolder :: Instance,
+	resolve = function(model: Model): SellService.Piece?
+		-- As the pad: only wood WoodWatch last found where it should be.
+		local piece = WoodService.FromModel(model)
+		if piece and not WoodService.VerdictOk(piece) then
+			return nil
+		end
+		return piece :: any
+	end,
+	release = function(model: Model)
+		GrabService.ReleasePiece(model, "taken")
+	end,
+	forget = function(model: Model)
+		WoodService.Forget(model)
+		GrabService.Unregister(model)
+	end,
+	skyBin = if skyBinPart and skyBinPart:IsA("BasePart") then skyBinPart else nil,
+	heldBy = GrabService.HeldBy,
+})
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
-remote.ChopTree.OnServerEvent:Connect(onChopTree)
-remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
-remote.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
-remote.SellLogs.OnServerEvent:Connect(onSellLogs)
 remote.DropAxe.OnServerEvent:Connect(AxeService.Drop)
 remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	if not RateLimiter.Allow(player, "CallTruck") then
@@ -828,29 +453,11 @@ end)
 
 -- Player lifecycle --------------------------------------------------------
 
-local function dropCarriedLogs(player: Player)
-	local hands = CarryService.Hands(player)
-	if not hands then
-		return
-	end
-	local char = player.Character
-	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-	local dropPos = if hrp then hrp.Position else Vector3.new(0, 3, 40)
-	for uid in pairs(hands) do
-		TreeService.DropLog(uid, dropPos, player)
-	end
-	table.clear(hands)
-	player:SetAttribute("CarriedLogs", 0)
-end
-
 local function onCharacterAdded(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
 		return
 	end
-	humanoid.Died:Connect(function()
-		dropCarriedLogs(player)
-	end)
 	if player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10) then
 		AxeService.GiveLoadout(player, character)
 	end
@@ -858,8 +465,6 @@ end
 
 local function onPlayerAdded(player: Player)
 	player:SetAttribute("ProfileLoaded", false) -- the HUD shows "Loading your save..."
-	player:SetAttribute("CarriedLogs", 0)
-	CarryService.Start(player)
 	lastNotice[player.UserId] = {}
 
 	local profile, err = ProfileService.LoadProfile(player)
@@ -881,26 +486,24 @@ local function onPlayerAdded(player: Player)
 		profile.equippedTrailer = ""
 	end
 
-	-- The v2 loop: v1 logs still on hand are bought back (and a first join
-	-- topped up to StartingCash) into v2Credit, before the truck spawns or
-	-- left-behind logs come back (V2_PLAN.md §14).
+	-- v1 logs still on hand are bought back (and a first join topped up to
+	-- StartingCash) into v2Credit, before the truck spawns (V2_PLAN.md §14).
+	-- MigrateV2 is idempotent, so a save already on v2 is left alone.
 	local boughtBack = 0
-	if CoreLoop.V2() then
-		safely("ProfileSchema.MigrateV2", function()
-			local moved = ProfileSchema.MigrateV2(profile)
-			boughtBack = moved.boughtBack
-			if moved.migrated then
-				print(
-					string.format(
-						"[GameServer] %s's save is now on the v2 loop (bought back $%d, topped up $%d)",
-						player.Name,
-						moved.boughtBack,
-						moved.toppedUp
-					)
+	safely("ProfileSchema.MigrateV2", function()
+		local moved = ProfileSchema.MigrateV2(profile)
+		boughtBack = moved.boughtBack
+		if moved.migrated then
+			print(
+				string.format(
+					"[GameServer] %s's save is now on the v2 loop (bought back $%d, topped up $%d)",
+					player.Name,
+					moved.boughtBack,
+					moved.toppedUp
 				)
-			end
-		end)
-	end
+			)
+		end
+	end)
 
 	player:SetAttribute("Cash", profile.cash)
 	player:SetAttribute("SettingMusic", profile.settings.music ~= false)
@@ -910,7 +513,7 @@ local function onPlayerAdded(player: Player)
 		EconomyService.PayPending(player)
 	end
 	-- What MigrateV2 left owed, through the wallet (overflow banked).
-	if CoreLoop.V2() and profile.v2Credit > 0 then
+	if profile.v2Credit > 0 then
 		safely("pay v2Credit", function()
 			local owed = math.floor(profile.v2Credit)
 			profile.v2Credit = 0
@@ -924,36 +527,6 @@ local function onPlayerAdded(player: Player)
 	safely("VehicleService.SpawnTruck", function()
 		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
 	end)
-	-- Logs left behind (Truck to lot from afar) that were still lying out
-	-- when the player last left: back where they lay, at most MaxLeftLogs
-	-- of them (saves made under the old cap can hold 150).
-	if #profile.leftLoad > 0 and not CoreLoop.V2() then
-		safely("VehicleService.RestoreLeftLoad", function()
-			local saved = LeftLoad.ToRestore(profile.leftLoad)
-			if #saved < #profile.leftLoad then
-				warn(
-					string.format(
-						"[GameServer] %s: %d saved left-behind log(s) over MaxLeftLogs (%d) not restored",
-						player.Name,
-						#profile.leftLoad - #saved,
-						GameConfig.MaxLeftLogs
-					)
-				)
-			end
-			local n = VehicleService.RestoreLeftLoad(player, saved)
-			profile.leftLoad = {}
-			if n > 0 then
-				notify(
-					player,
-					string.format(
-						"Your %d left-behind log%s are still where you left them.",
-						n,
-						if n == 1 then "" else "s"
-					)
-				)
-			end
-		end)
-	end
 
 	player.CharacterAdded:Connect(function(char)
 		onCharacterAdded(player, char)
@@ -979,38 +552,32 @@ local function onPlayerAdded(player: Player)
 end
 
 local function onPlayerRemoving(player: Player)
-	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
-	safely("MilestoneService.Stop", MilestoneService.Stop, player) -- before the final save, so playtime is included
-	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- dropped axes go back to the save
+	-- Playtime and the truck's wood are also copied in ProfileStore's OnSave
+	-- (SaveFlush), which runs on BindToClose before this handler. Stop and
+	-- PlayerRemoving still write them here, then seal the truck snapshot so
+	-- a later save doesn't blank it after the models are gone.
+	safely("MilestoneService.Stop", MilestoneService.Stop, player)
+	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models only; the axe stays in the save
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
-	-- v2: the loose wood on the truck's beds goes into the save, and with it
-	-- out of the world (rebuilt on the bed on rejoin).
-	if CoreLoop.V2() then
-		safely("TruckLoad.PlayerRemoving", TruckLoad.PlayerRemoving, player)
-	end
-	-- Left-behind logs still lying out go into the save (put back on rejoin).
-	safely("save left-behind logs", function()
-		local profile = ProfileService.GetProfile(player)
-		if profile then
-			local left = TreeService.TakeLeftBehind(player.UserId)
-			for _, entry in ipairs(left) do
-				if #profile.leftLoad >= GameConfig.MaxLeftLogs then
-					break
-				end
-				table.insert(profile.leftLoad, entry)
-			end
-		end
-	end)
+	safely("TruckLoad.PlayerRemoving", TruckLoad.PlayerRemoving, player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)
-	CarryService.Stop(player)
 	nextSwingAt[player.UserId] = nil
 	lastNotice[player.UserId] = nil
 	print(string.format("[GameServer] %s left (saving)", player.Name))
 end
+
+-- Before any profile loads: every save, including BindToClose, copies
+-- live playtime and truck wood into the profile first.
+SaveFlush.Add(function(player: Player)
+	MilestoneService.Flush(player)
+end)
+SaveFlush.Add(function(player: Player)
+	TruckLoad.Flush(player)
+end)
 
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(onPlayerRemoving)

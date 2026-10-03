@@ -1,5 +1,9 @@
 # V1 plan
 
+The v1 core loop has been removed from the game. This file is the historical
+list of what that loop was. Saves still keep its fields; MigrateV2 buys
+leftover v1 logs back into cash. The live loop is v2 (V2_PLAN.md).
+
 What V1 needs, what's done, and the order to build the rest. Keep this file
 current: tick items as they land, and move anything cut to "After V1".
 

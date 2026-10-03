@@ -50,7 +50,6 @@ local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local Tune = require(ReplicatedStorage.Shared.Tune)
@@ -368,9 +367,6 @@ end
 -- The Grab remote: see the header. Returns whether it's held now, and
 -- why not.
 function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (boolean, string?)
-	if not CoreLoop.V2() then
-		return false, "off"
-	end
 	if not RateLimiter.Allow(player, "Grab") then
 		return false, "rate"
 	end
@@ -482,7 +478,7 @@ end
 -- The Release remote: lets go of what `player` holds (`part`, if given,
 -- must be on it; nil when it has streamed out on their device).
 function GrabService.Release(player: Player, part: unknown)
-	if not CoreLoop.V2() or not RateLimiter.Allow(player, "Release") then
+	if not RateLimiter.Allow(player, "Release") then
 		return
 	end
 	local h = holds[player]

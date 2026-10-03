@@ -3,9 +3,10 @@
 Roblox game, Rojo + Luau. Design spec: GAME_DESIGN.md (§14 is the
 implementation spec; ask Connor before deviating from its data values or
 architecture). Since 2 October 2026 the live core loop is v2
-(`GameConfig.CoreLoop = 2`): V2_PLAN.md is its plan and status; the v1
-code stays for a rollback until M1.10. What V1 needs and where it
-stands: V1_PLAN.md (keep it current). Playtest checklists: PHASE1_NOTES.md
+(`GameConfig.CoreLoop = 2`): V2_PLAN.md is its plan and status. The v1
+loop (whole trees, carried logs, bed slots) has been removed; profile
+fields from those saves stay, and MigrateV2 still buys them back.
+V1_PLAN.md is the historical v1 list. Playtest checklists: PHASE1_NOTES.md
 (phase 1), PHASE2_NOTES.md (everything since; all on main). Tonight's
 cleanup plan: HANDOFF.md.
 
@@ -30,9 +31,7 @@ cleanup plan: HANDOFF.md.
   need converting).
 - Balance lives in WoodData / ItemCatalog / BiomeData (v2 numbers in their
   `v2` fields); shared tuning in GameConfig. After any balance change,
-  re-run `lune run tools/economy` (the v2 model, ECONOMY.md) and
-  `lune run tools/economy1` (v1's, ECONOMY_V1.md, until M1.10) and commit
-  the regenerated reports.
+  re-run `lune run tools/economy` and commit the regenerated ECONOMY.md.
 - Commit messages: `phase-N: <what changed>`.
 - Scope guardrails (from Connor):
   - Gathered materials are OK, but each needs a job (a recipe input for a

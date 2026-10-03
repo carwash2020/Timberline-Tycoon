@@ -65,12 +65,10 @@ local GameConfig = {
 	ChopSoundId = "",
 	FellSoundId = "",
 
-	-- The v2 core loop (V2_PLAN.md §2f): section trees cut anywhere, wood
-	-- dragged by hand and carried loose on beds, value by volume. 2 = v2,
-	-- live since the M1.9 flip; 1 = the v1 loop (a rollback: set 1 and
-	-- republish; saves migrated to v2 load fine under v1). In Studio the
-	-- workspace attribute CoreLoop overrides it (Shared/CoreLoop); live
-	-- servers never.
+	-- The live loop (V2_PLAN.md §2f): section trees cut anywhere, wood
+	-- dragged by hand and carried loose on beds, value by volume. Always 2.
+	-- CoreLoop.Resolve ignores a Studio override; this field stays so older
+	-- notes and PlaceCheck still have a name for it.
 	CoreLoop = 2,
 	WoodUnit = 1.6, -- studs in one timber unit "u"; prices are $/u³, hardness per u² of cut
 	StartingCash = 20, -- v2: a new player's cash

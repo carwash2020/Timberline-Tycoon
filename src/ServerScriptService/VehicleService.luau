@@ -48,15 +48,13 @@
 --   * BedCount / BedCapacity are attributes on the truck AND on the player
 --     (the HUD keeps working while the truck is streamed out).
 --   * Recall ("Send truck home") and switching trucks rebuild the truck in the
---     player's slot. The load comes along (when it fits) only if the truck
---     was already in town (VehicleLogic.InTown); from further out it's
---     left on the ground where the truck stood, as the player's logs, so
---     nobody skips the haul home. Left-behind logs still lying out when the
---     player leaves are saved (profile.leftLoad, GameServer) and put back
---     where they lay on rejoin (RestoreLeftLoad).
---   * The v2 loop carries loose wood on the beds instead (TruckLoad),
---     through three hooks (VehicleService.Hooks, nil under v1): the driver
---     changing, a truck being rebuilt, and how many pieces ride on a bed.
+--     player's slot. Loose wood on the beds is TruckLoad's (the hooks
+--     below). Old bed-slot logs in profile.truckBed, if a save still has
+--     them, come back on the truck; MigrateV2 buys that list back into
+--     cash before the first spawn.
+--   * Loose wood rides on the beds (TruckLoad) through three hooks
+--     (VehicleService.Hooks): the driver changing, a truck being rebuilt,
+--     and how many pieces ride on a bed.
 --   * TruckSlotDistance on the player: how far their truck is from its own
 --     parking spot, in whole studs (Shared/TruckHome), checked twice a
 --     second and sent only when it moves a couple of studs; nil with no
@@ -80,7 +78,6 @@ local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ProfileService = require(script.Parent.ProfileService)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
-local TreeService = require(script.Parent.TreeService)
 
 type TruckDef = ItemCatalog.TruckDef
 type TrailerDef = ItemCatalog.TrailerDef
@@ -99,8 +96,6 @@ local PARK_RAY = 40 -- studs below a tipped truck that parking looks for the gro
 local HOLD_SECONDS = 1 -- a truck the speed check put back stays the server's this long
 local EXIT_GAP = 3.4 -- studs beside the truck where the driver steps out (clear of the wheels: 2 before M1.5, 2.6 before phase 12)
 local OVERFLOW_SEARCH = 31 -- overflow spots tried when every free slot is blocked
-local WORLD_LOG_LENGTH = 3 -- TreeService's world logs (a load left behind)
-local SPILL_RAY = 60 -- studs down from above a truck that a load left behind looks for the ground
 
 export type BedEntry = VehicleLogic.BedEntry
 
@@ -991,107 +986,9 @@ local function keepsLoad(rec: TruckRecord): boolean
 	return inTown(trustedCFrame(rec).Position, slotCFrame(rec.slot, rec.overflowIndex).Position)
 end
 
--- What a log left on the ground mustn't land on: people, trucks, trees
--- and other logs.
-local function spillParams(): RaycastParams
-	local skip: { Instance } = CollectionService:GetTagged(TRUCK_TAG)
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p.Character then
-			table.insert(skip, p.Character)
-		end
-	end
-	local map = workspace:FindFirstChild("TimberlineMap")
-	if map then
-		for _, name in ipairs({ "Trees", "Logs", "Stumps" }) do
-			local folder = map:FindFirstChild(name)
-			if folder then
-				table.insert(skip, folder)
-			end
-		end
-	end
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = skip
-	params.RespectCanCollide = true -- skip leaves, zones, decoration
-	return params
-end
-
--- Leaves `load` on the ground where a truck stood (`at`) as `player`'s
--- world logs (TreeService), each keeping its worth and its figure: rows
--- lying across the truck's line, centred on where it stood, each log on
--- the ground under it (the terrain's height when no ray finds it).
-local function spillLoad(player: Player, load: { BedEntry }, at: CFrame)
-	local frame = VehicleLogic.HeadingCFrame(at.LookVector, Vector3.yAxis) + at.Position
-	local params = spillParams()
-	local radius = TreeService.LogDiameter / 2
-	for i, offset in ipairs(VehicleLogic.SpillSpots(#load, WORLD_LOG_LENGTH, TreeService.LogDiameter)) do
-		local entry = load[i]
-		local def = WoodData.Get(entry.woodId)
-		if not def then
-			continue
-		end
-		local spot = frame * offset
-		local hit = workspace:Raycast(spot + Vector3.new(0, 10, 0), Vector3.new(0, -SPILL_RAY, 0), params)
-		local y = if hit then hit.Position.Y else TerrainGen.HeightAt(spot.X, spot.Z)
-		local model, uid =
-			TreeService.SpawnLog(def, frame.Rotation + Vector3.new(spot.X, y + radius, spot.Z), player.UserId, {
-				graceSec = GameConfig.LeftLoadGraceSec, -- time to drive back for it
-				despawnSec = GameConfig.LeftLoadDespawnSec,
-			})
-		local log = TreeService.GetLog(uid)
-		if log then
-			log.value = entry.value
-			log.tags.leftBehind = true -- saved if its owner leaves before collecting it; not new work to load
-			model:SetAttribute("Value", entry.value)
-			if entry.figure then
-				log.tags.figure = entry.figure
-				model:SetAttribute("Figure", entry.figure)
-				local part = model.PrimaryPart
-				if part then
-					ForestArt.FigureBand(part, entry.figure) -- the same band it wore in the bed
-				end
-			end
-		end
-	end
-end
-
 ---------------------------------------------------------------------------
 -- Public API
 ---------------------------------------------------------------------------
-
--- Puts left-behind logs saved when the player last left (profile.leftLoad)
--- back where they lay, theirs again for LeftLoadGraceSec. Returns how many.
-function VehicleService.RestoreLeftLoad(player: Player, saved: { any }): number
-	local restored = 0
-	for _, raw in ipairs(saved) do
-		local entry = VehicleLogic.CleanLeftLog(raw, function(id: string): boolean
-			return WoodData.Get(id) ~= nil
-		end)
-		local def = if entry then WoodData.Get(entry.woodId) else nil
-		if entry and def then
-			local model, uid = TreeService.SpawnLog(def, CFrame.new(entry.x, entry.y, entry.z), player.UserId, {
-				graceSec = GameConfig.LeftLoadGraceSec,
-				despawnSec = GameConfig.LeftLoadDespawnSec,
-			})
-			local log = TreeService.GetLog(uid)
-			if log then
-				log.value = entry.value
-				log.tags.leftBehind = true
-				model:SetAttribute("Value", entry.value)
-				if entry.figure then
-					log.tags.figure = entry.figure
-					model:SetAttribute("Figure", entry.figure)
-					local part = model.PrimaryPart
-					if part then
-						ForestArt.FigureBand(part, entry.figure)
-					end
-				end
-				restored += 1
-			end
-		end
-	end
-	return restored
-end
 
 -- Mirrors how far this truck is from its own parking spot (where the
 -- rig's pivot sits when parked there) on its owner's TruckSlotDistance.
@@ -1170,9 +1067,8 @@ end
 -- Builds the player's truck (replacing any they have) in their parking
 -- slot, with `trailerId` hitched behind if it can tow. `load` refills the
 -- bed (a recall or a switch); with no `load`, the bed comes back from the
--- player's save. Either way the load only comes along if the truck was in
--- town (keepsLoad, or the saved spot); otherwise it's left on the ground
--- where the truck was. Returns the model and how many logs didn't fit.
+-- player's save. Returns the model and how many logs didn't fit. Loose
+-- wood out of town is TruckLoad's decision (onRebuild), not a ground spill.
 function VehicleService.SpawnTruck(
 	player: Player,
 	truckId: string,
@@ -1199,16 +1095,11 @@ function VehicleService.SpawnTruck(
 		homeSlot,
 		if homeSlot then nil else (oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
 	).Position
-	-- Where a load out of town is left (the truck's last spot).
-	local leaveAt: CFrame? = nil
-	-- The v2 loop's loose load (TruckLoad): told before the old truck goes,
-	-- handed the new one once it's built.
+	-- Loose wood (TruckLoad): told before the old truck goes, handed the
+	-- new one once it's built.
 	local onRebuild = VehicleService.Hooks.onRebuild
 	local carry: ((Model) -> ())? = nil
 	if old then
-		if load and #load > 0 and not keepsLoad(old) then
-			leaveAt = trustedCFrame(old) * CFrame.new(0, 0, rigShiftOf(old.trailerLayout)) -- the rig's middle
-		end
 		if onRebuild then
 			local oldModel, keeps, at = old.model, keepsLoad(old), trustedCFrame(old)
 			guarded("onRebuild", function()
@@ -1237,26 +1128,6 @@ function VehicleService.SpawnTruck(
 		if lost > 0 then
 			warn(string.format("[VehicleService] %s: %d saved bed log(s) couldn't be restored", player.Name, lost))
 		end
-		-- Joining: the save says where the truck was (old saves don't, and
-		-- keep their load).
-		local was = savedSpot(player)
-		if not old and #restored > 0 and was and not inTown(was, homeAt) then
-			leaveAt = CFrame.new(was)
-		end
-	end
-	if leaveAt and #entries > 0 then
-		spillLoad(player, entries, leaveAt)
-		entries = {}
-		local profile = ProfileService.GetProfile(player)
-		if profile then
-			profile.truckBed = {} -- on the ground now: never restored twice
-		end
-		tell(
-			player,
-			if load
-				then "Your load was left where your truck stood."
-				else "Your last load is waiting where you left your truck."
-		)
 	end
 
 	local built = buildTruckModel(def, layout, trailer, trailerLayout)

@@ -19,17 +19,7 @@ return function(t)
 		return Milestone, player, profile
 	end
 
-	t.test("v1's calibrate line: logs by wood, from 10 logs and 2 minutes", function()
-		local Milestone = setup()
-		t.eq(
-			Milestone.CalibrateLine(612, { oak = 24, birch = 16 }, 0, 1),
-			"lune run tools/economy1 --calibrate 612 birch=16 oak=24"
-		)
-		t.eq(Milestone.CalibrateLine(612, { oak = 9 }, 0, 1), nil, "fewer than 10 logs")
-		t.eq(Milestone.CalibrateLine(119, { oak = 24 }, 0, 1), nil, "under 2 minutes")
-	end)
-
-	t.test("v2's calibrate line: the v2 model's, u³ by wood in whole units, from 10 pieces", function()
+	t.test("the calibrate line is the live model's, u³ by wood in whole units, from 10 pieces", function()
 		local Milestone = setup(2)
 		t.eq(
 			Milestone.CalibrateLine(612, { oak = 26.4, birch = 15.6, pine = 0.2 }, 12, 2),
@@ -44,17 +34,33 @@ return function(t)
 	t.test("could afford the next axe at the loop's price", function()
 		local ItemCatalog = t.shared("ItemCatalog")
 		local steel = ItemCatalog.GetAxe("SteelAxe")
-		local between = steel.v2.price -- enough under v2, short under v1
-		t.ok(between < steel.priceCash)
-		local v2Milestone, v2Player, v2Profile = setup(2, between)
+		local v2Milestone, v2Player, v2Profile = setup(2, steel.v2.price)
 		v2Milestone.CashEarned(v2Player, 10)
 		t.eq(v2Profile.onboarding["Could afford an upgrade"], true, "v2: the Steel Axe at its v2 price")
-		local v1Milestone, v1Player, v1Profile = setup(nil, between)
+		local short, shortPlayer, shortProfile = setup(2, steel.v2.price - 1)
+		short.CashEarned(shortPlayer, 10)
+		t.eq(shortProfile.onboarding["Could afford an upgrade"], nil, "a dollar short")
+		local v1Milestone, v1Player, v1Profile = setup(1, steel.priceCash)
 		v1Milestone.CashEarned(v1Player, 10)
-		t.eq(v1Profile.onboarding["Could afford an upgrade"], nil, "v1: still short of its v1 price")
-		v1Profile.cash = steel.priceCash
-		v1Milestone.CashEarned(v1Player, 10)
-		t.eq(v1Profile.onboarding["Could afford an upgrade"], true)
+		t.eq(v1Profile.onboarding["Could afford an upgrade"], true, "v1 price when that loop is asked")
+	end)
+
+	t.test("playtime is credited once across a save and the leave", function()
+		local Milestone, player, profile = setup(2)
+		-- Start stamps os.clock (1000). Move it, then flush.
+		clock.now = 1000 + 50
+		Milestone.Flush(player)
+		t.eq(profile.stats.playtimeMin, 1, "50 s rounds to a minute")
+		Milestone.Flush(player)
+		t.eq(profile.stats.playtimeMin, 1, "the same minute isn't added twice")
+		clock.now = 1000 + 200
+		Milestone.Stop(player)
+		t.eq(profile.stats.playtimeMin, 3, "only the minutes not yet credited")
+		Milestone.Flush(player)
+		t.eq(profile.stats.playtimeMin, 3, "after leaving there is nothing left to add")
+		t.eq(Milestone.MinutesToCredit(90, 1), 2)
+		t.eq(Milestone.MinutesToCredit(20, 0), 0)
+		t.eq(Milestone.MinutesToCredit(0 / 0, 4), 4)
 	end)
 
 	t.test("v2 sales add up pieces and u³ by wood, apart from v1's log counts", function()
@@ -67,11 +73,5 @@ return function(t)
 		clock.now += 12
 		Milestone.WoodSold(player, 4, { oak = 5, maple = 3.4 })
 		t.eq(Milestone.CalibrationFor(player), "lune run tools/economy --calibrate 312 maple=3 oak=15")
-		local v1, v1Player = setup()
-		v1.Mark(v1Player, "First chop")
-		clock.now += 200
-		v1.LogsSold(v1Player, { oak = 12 })
-		v1.WoodSold(v1Player, 10, { oak = 500 })
-		t.eq(v1.CalibrationFor(v1Player), "lune run tools/economy1 --calibrate 200 oak=12", "v1 as before")
 	end)
 end
