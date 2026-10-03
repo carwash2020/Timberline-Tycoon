@@ -75,10 +75,10 @@ return function(t)
 
 	t.test("AxeStats: a specialist's override, otherwise the axe's own", function()
 		local inferno = ItemCatalog.GetAxe("InfernoAxe")
-		t.eq({ ItemCatalog.AxeStats(inferno, "emberwood") }, { 6.35, 0.35 })
-		t.eq({ ItemCatalog.AxeStats(inferno, "oak") }, { 0.6, 0.55 })
+		t.eq({ ItemCatalog.AxeStats(inferno, "emberwood") }, { 7.5, 0.4 })
+		t.eq({ ItemCatalog.AxeStats(inferno, "oak") }, { 4.6, 0.5 })
 		local starfall = ItemCatalog.GetAxe("StarfallAxe")
-		t.eq({ ItemCatalog.AxeStats(starfall, "lumenwood") }, { 3.9, 0.4 }) -- damage only: cooldown stays
+		t.eq({ ItemCatalog.AxeStats(starfall, "lumenwood") }, { 12, 0.35 }) -- damage only: cooldown stays
 		t.eq({ ItemCatalog.AxeStats({ id = "x" }, "oak") }, { nil, nil })
 	end)
 

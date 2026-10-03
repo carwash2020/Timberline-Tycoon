@@ -312,25 +312,31 @@ ItemCatalog.Materials = {
 -- v2 rows (V2_PLAN.md §2c, §2d), attached to the definitions above.
 local AXES_V2: { [string]: AxeV2 } = {
 	RustyAxe = { price = 0, damage = 0.2, range = 4.8, cooldown = 0.65 },
-	SteelAxe = { price = 90, damage = 0.55, range = 6, cooldown = 0.73 },
+	-- $160, not $90: at $90 the model bought it in 3.3 min (target 5-8).
+	-- The tutorial's loads step is sized so start + that sale + Murph's
+	-- reward still reaches this price.
+	SteelAxe = { price = 160, damage = 0.55, range = 6, cooldown = 0.73 },
 	HardenedAxe = { price = 190, damage = 0.93, range = 8, cooldown = 0.70 },
 	SilverAxe = { price = 550, damage = 1.45, range = 8, cooldown = 0.65 },
 	CobaltAxe = { price = 2040, damage = 1.6, range = 10, cooldown = 0.48 },
-	GoldAxe = { price = 7720, damage = 1.68, range = 9, cooldown = 0.40 },
-	ObsidianAxe = { price = 11000, damage = 10.2, range = 16, cooldown = 1.9 },
+	GoldAxe = { price = 7720, damage = 1.68, range = 10, cooldown = 0.40 },
+	-- Was 10.2 damage: that one-cut almost every trunk and beat the forged
+	-- Starfall Axe. Damage, reach and cooldown now climb the ladder, and
+	-- Starfall is the fastest cut on every wood.
+	ObsidianAxe = { price = 11000, damage = 3.4, range = 12, cooldown = 0.7 },
 	InfernoAxe = {
 		price = 14400,
-		damage = 0.6,
-		range = 9,
-		cooldown = 0.55,
-		vs = { emberwood = { damage = 6.35, cooldown = 0.35 } },
+		damage = 4.6,
+		range = 14,
+		cooldown = 0.5,
+		vs = { emberwood = { damage = 7.5, cooldown = 0.4 } },
 	},
 	StarfallAxe = {
 		price = 0,
-		damage = 1.65,
+		damage = 6.5,
 		range = 16,
-		cooldown = 0.4,
-		vs = { emberwood = { damage = 2.5 }, lumenwood = { damage = 3.9 } },
+		cooldown = 0.35,
+		vs = { emberwood = { damage = 9.5 }, lumenwood = { damage = 12 } },
 		forgeWood = { lumenwood = 60 }, -- the v1 recipe's 40 logs at ProfileSchema.ForgeU3PerLog (1.5)
 		forgeCash = 20000, -- V2_PLAN §2c
 	},

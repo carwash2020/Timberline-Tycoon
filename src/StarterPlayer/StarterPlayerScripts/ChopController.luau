@@ -41,6 +41,10 @@ local HUD = require(script.Parent.HUD)
 
 local ChopController = {}
 
+-- Seconds to wait for MapBuilder to publish which loop runs. Until then
+-- Active() reads as v1, and arming this chopper would fight CutController.
+local BOOT_WAIT = 120
+
 local player = Players.LocalPlayer
 
 local TARGET_TAGS = { "Tree", "Node" }
@@ -347,6 +351,13 @@ local function track(tag: string)
 end
 
 function ChopController.Start()
+	local waited = 0
+	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
+		waited += task.wait(0.25)
+	end
+	if CoreLoop.V2() then
+		return -- CutController swings in the v2 loop
+	end
 	for _, tag in ipairs(TARGET_TAGS) do
 		track(tag)
 	end

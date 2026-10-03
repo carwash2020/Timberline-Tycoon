@@ -148,7 +148,7 @@ return function(t)
 				phantomwood = 66,
 				lumenwood = 145,
 			},
-			StarfallAxe = { lumenwood = 21 },
+			StarfallAxe = { lumenwood = 7 },
 		}
 		for axeId, row in pairs(plan) do
 			for woodId, hits in pairs(row) do

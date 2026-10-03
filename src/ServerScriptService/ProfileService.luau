@@ -12,6 +12,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local LeaveCommit = require(script.Parent.LeaveCommit)
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileStore = require(script.Parent.Vendor.ProfileStore)
 
@@ -68,6 +69,11 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 			player:Kick("Your save was opened on another server. Please rejoin.")
 		end
 	end)
+	-- Shutdown saves from ProfileStore's BindToClose, which does not wait
+	-- for PlayerRemoving. OnLastSave runs at the start of that save (and
+	-- of a normal leave), so playtime, the truck load and left-behind wood
+	-- are in Data before it is written. LeaveCommit runs once per player.
+	LeaveCommit.Bind(session.OnLastSave, player)
 	sessions[player] = session
 	return session.Data :: Profile, nil
 end

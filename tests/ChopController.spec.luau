@@ -192,7 +192,9 @@ return function(t)
 		})
 		local ChopController = loader:load("StarterPlayer/StarterPlayerScripts/ChopController")
 		ChopController.Start()
-		assert(heartbeat, "ChopController didn't connect Heartbeat")
+		if (loop or 1) ~= 2 then
+			assert(heartbeat, "ChopController didn't connect Heartbeat")
+		end
 
 		return {
 			hrp = hrp,

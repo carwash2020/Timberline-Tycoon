@@ -256,7 +256,7 @@ ShopLogic.ReferenceWood = "oak"
 local short = FieldGuide.ShortNumber
 
 -- "0.55 damage · reach 6 studs · 0.73 s a swing", with a specialist's
--- woods after it: "... · emberwood: 6.35 damage, 0.35 s". "" for an axe
+-- woods after it: "... · emberwood: 7.5 damage, 0.4 s". "" for an axe
 -- without v2 stats.
 function ShopLogic.DamageTextV2(axe: AxeDef): string
 	local v2 = axe.v2

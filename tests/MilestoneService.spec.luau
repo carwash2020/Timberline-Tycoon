@@ -44,17 +44,17 @@ return function(t)
 	t.test("could afford the next axe at the loop's price", function()
 		local ItemCatalog = t.shared("ItemCatalog")
 		local steel = ItemCatalog.GetAxe("SteelAxe")
-		local between = steel.v2.price -- enough under v2, short under v1
-		t.ok(between < steel.priceCash)
-		local v2Milestone, v2Player, v2Profile = setup(2, between)
+		-- v2 costs more than v1: the v1 price doesn't buy the v2 axe.
+		t.ok(steel.v2.price > steel.priceCash)
+		local v2Milestone, v2Player, v2Profile = setup(2, steel.priceCash)
+		v2Milestone.CashEarned(v2Player, 10)
+		t.eq(v2Profile.onboarding["Could afford an upgrade"], nil, "v2: still short of its v2 price")
+		v2Profile.cash = steel.v2.price
 		v2Milestone.CashEarned(v2Player, 10)
 		t.eq(v2Profile.onboarding["Could afford an upgrade"], true, "v2: the Steel Axe at its v2 price")
-		local v1Milestone, v1Player, v1Profile = setup(nil, between)
+		local v1Milestone, v1Player, v1Profile = setup(nil, steel.priceCash)
 		v1Milestone.CashEarned(v1Player, 10)
-		t.eq(v1Profile.onboarding["Could afford an upgrade"], nil, "v1: still short of its v1 price")
-		v1Profile.cash = steel.priceCash
-		v1Milestone.CashEarned(v1Player, 10)
-		t.eq(v1Profile.onboarding["Could afford an upgrade"], true)
+		t.eq(v1Profile.onboarding["Could afford an upgrade"], true, "v1: the Steel Axe at its v1 price")
 	end)
 
 	t.test("v2 sales add up pieces and u³ by wood, apart from v1's log counts", function()
