@@ -366,8 +366,8 @@ return function(t)
 		t.ok(string.find(line, "(terrain 1.2s)", 1, true) or string.find(line, "(terrain 1.3s)", 1, true), line)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local TutorialGrove = t.shared("TutorialGrove")
-		t.eq(s.spawned, #WorldPlan.Trees() + #TutorialGrove.Trees)
-		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees() + #TutorialGrove.Trees)
+		t.eq(s.spawned, #WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees)
+		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees)
 		t.eq(s.workspace:GetAttribute("MapTerrainSeconds"), 1.25)
 		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
 		t.ok(type(s.workspace:GetAttribute("MapBuildSeconds")) == "number", "MapBuildSeconds")
@@ -383,7 +383,7 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.sectionSpawned,
-			#WorldPlan.Trees() + #sky.lumenwood + #TutorialGrove.Trees,
+			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #sky.lumenwood + #TutorialGrove.Trees,
 			"every site, the isles' lumenwood, and the tutorial oaks"
 		)
 		t.eq(s.workspace:GetAttribute("MapTrees"), s.sectionSpawned)
@@ -412,7 +412,11 @@ return function(t)
 		end
 		t.ok(birches > 0, "the plan has birches")
 		local TutorialGrove = t.shared("TutorialGrove")
-		t.eq(s.sectionSpawned, #WorldPlan.Trees() - birches + #TutorialGrove.Trees, "every other tree, plus the grove")
+		t.eq(
+			s.sectionSpawned,
+			#WorldPlan.Trees() - birches + #WorldPlan.ReachTrees() + #TutorialGrove.Trees,
+			"every other tree, plus the grove and the reach"
+		)
 		local found = 0
 		for _, line in ipairs(s.allWarnings) do
 			if string.find(tostring(line), "tree(s) failed to build", 1, true) then
@@ -604,7 +608,7 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.workspace:GetAttribute("MapTrees"),
-			#WorldPlan.Trees() + #WorldPlan.Sky().lumenwood + #TutorialGrove.Trees
+			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #WorldPlan.Sky().lumenwood + #TutorialGrove.Trees
 		)
 	end)
 

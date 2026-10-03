@@ -18,6 +18,21 @@ return {
 			{ pos = { 850, 100, 900 }, target = { 1150, 60, 1250 }, label = "the Volcano" },
 			{ pos = { -700, 400, 650 }, target = { -1050, 500, 1050 }, label = "the Skyroot and the isles" },
 			{ pos = { -1000, 740, 960 }, target = { -1050, 700, 1050 }, label = "on the isles" },
+			{ pos = { -430, 55, -340 }, target = { -565, 6, -455 }, label = "Gloam Hollow" },
+			{ pos = { 1080, 28, -80 }, target = { 1200, 3, -120 }, label = "the beach" },
+			{ pos = { -700, 36, 280 }, target = { -800, 0, 200 }, label = "the river" },
+			{ pos = { -620, 48, -520 }, target = { -760, 10, -650 }, label = "the Petrified Reach" },
+			{
+				pos = { -480, 80, -340 },
+				target = { -680, 8, -560 },
+				label = "the ridge between Gloam Hollow and the Petrified Reach",
+			},
+			{ pos = { 560, 90, -220 }, target = { 320, 4, 0 }, label = "East Meadow, the lane, and the lot" },
+			{ pos = { 80, 980, -420 }, target = { -10, 0, 160 }, label = "the homesteads from above" },
+			-- Birch Side's north edge, eye height, looking back along the lane.
+			{ pos = { 34, 8, -200 }, target = { 0, 2, -320 }, label = "Birch Side and its lane, from the ground" },
+			-- Just south of the Starter Forest's disc, looking in.
+			{ pos = { 48, 10, -240 }, target = { 0, 6, -160 }, label = "the Starter Forest's south border" },
 			{ pos = { 0, 2400, -1800 }, target = { 0, 0, 100 }, label = "the whole map" },
 		}
 		return built

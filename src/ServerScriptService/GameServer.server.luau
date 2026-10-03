@@ -45,6 +45,7 @@ local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local RegionWake = require(script.Parent.RegionWake)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local TruckLoad = require(script.Parent.TruckLoad)
@@ -692,9 +693,13 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	MoveBlueprint = remote.MoveBlueprint,
 	SellPlaced = remote.SellPlaced,
 	UpgradePlot = remote.UpgradePlot,
+	PlotOffer = remote.PlotOffer,
+	ClaimPlot = remote.ClaimPlot,
+	PlotPass = remote.PlotPass,
 }, notify)
 safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
+safely("RegionWake.Init", RegionWake.Init)
 safely("NPCService.Init", NPCService.Init, mapFolder)
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
@@ -1084,6 +1089,11 @@ local function onPlayerAdded(player: Player)
 			end
 		end)
 	end
+	-- Before the truck and the left-behind logs come back. A spot on a new
+	-- pad, under the ground, or in the water waits in the town truck lot
+	-- instead of appearing on somebody's yard. Claiming still moves it to
+	-- the delivery pad.
+	safely("PlotService.ParkStrays", PlotService.ParkStrays, profile)
 	if truckId ~= "" then
 		safely("VehicleService.SpawnTruck", function()
 			VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
@@ -1205,9 +1215,14 @@ local function rebuildSlotNow(player: Player)
 	player:SetAttribute("OwnsTruck", truckId ~= "")
 	player:SetAttribute("EquippedTruck", truckId)
 	AxeService.PlayerRemoving(player)
-	PlotService.PlayerRemoving(player)
 	VehicleService.DespawnTruck(player)
-	PlotService.PlayerJoined(player, profile)
+	-- A different save, same pad: the buildings are pad-relative, and they
+	-- already picked a homestead this visit.
+	if not PlotService.Reload(player, profile) then
+		-- No pad yet, so a bad saved spot must not spawn on one.
+		PlotService.ParkStrays(profile)
+		PlotService.PlayerJoined(player, profile)
+	end
 	if truckId ~= "" then
 		VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
 	end

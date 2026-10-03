@@ -27,6 +27,7 @@
 local AnalyticsService = game:GetService("AnalyticsService")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -34,6 +35,10 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
+local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
+local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
@@ -54,6 +59,8 @@ PlotService.UndoSeconds = UNDO_SECONDS
 type Slot = {
 	index: number,
 	cframe: CFrame, -- the plot's centre on the ground
+	placeName: string,
+	region: string,
 	model: Model,
 	pad: Part,
 	post: Part,
@@ -62,12 +69,18 @@ type Slot = {
 	items: Folder,
 	signLabels: { TextLabel }, -- both faces of the sign
 	claim: ProximityPrompt,
+	spawn: SpawnLocation,
+	delivery: CFrame, -- where a bought truck is dropped (GetDeliveryPad)
 	owner: Player?,
 }
 
 local slots: { Slot } = {}
 local slotOf: { [Player]: Slot } = {}
 local placedAt: { [string]: number } = {} -- uid -> os.clock() when placed this session
+local pickingUntil: { [Player]: number } = {}
+local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
+local watching: { [Player]: boolean } = {}
+local offerRemote: RemoteEvent? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 
 ---------------------------------------------------------------------------
@@ -172,7 +185,7 @@ end
 
 local function refreshSign(slot: Slot)
 	local owner = slot.owner
-	local text = string.format("PLOT %d\nFREE", slot.index)
+	local text = string.format("%s\nFREE", string.upper(slot.placeName))
 	if owner then
 		local profile = ProfileService.GetProfile(owner)
 		local tier = if profile then PlotData.Tier(profile.plot.tier) else nil
@@ -186,13 +199,19 @@ local function refreshSign(slot: Slot)
 end
 
 local function buildSlot(index: number, center: Vector2, parent: Instance, onClaim: (Player, Slot) -> ()): Slot
+	local home = PlotData.Home(index)
+	local placeName = if home then home.name else ("Plot " .. index)
+	local region = if home then home.region else ""
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
 	model:SetAttribute("Index", index)
+	model:SetAttribute("PlaceName", placeName)
+	model:SetAttribute("Region", region)
 	-- Before anything is parented into the world: an Atomic model only
 	-- streams its initial descendants together.
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	local cframe = CFrame.new(center.X, 0, center.Y)
+	local ground = TerrainGen.HeightAt(center.X, center.Y)
+	local cframe = CFrame.new(center.X, ground, center.Y)
 	local pad = part(
 		"Pad",
 		Vector3.new(120, 0.2, 120),
@@ -244,9 +263,38 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	claim.RequiresLineOfSight = false
 	claim.Parent = board
 
+	-- Not Neutral: only the player whose RespawnLocation this is wakes up
+	-- here. Everyone else still uses the town spawn.
+	local plotSpawn = Instance.new("SpawnLocation")
+	plotSpawn.Name = "PlotSpawn"
+	plotSpawn.Size = Vector3.new(6, 1, 6)
+	plotSpawn.Anchored = true
+	plotSpawn.Neutral = false
+	plotSpawn.Enabled = true
+	plotSpawn.Duration = 0
+	plotSpawn.CanCollide = false
+	plotSpawn.Transparency = 1
+	plotSpawn.CFrame = cframe * CFrame.new(0, 2, -18) * CFrame.Angles(0, math.pi, 0)
+	plotSpawn.Parent = model
+
+	local delivery = WorldLayout.DeliveryCFrame(index, ground + 1) or (cframe * CFrame.new(0, 1, 0))
+	local drop = part(
+		"DeliveryPad",
+		Vector3.new(PlotData.DeliveryLength, 0.12, PlotData.DeliveryWidth),
+		delivery,
+		Color3.fromRGB(120, 96, 64),
+		Enum.Material.Ground,
+		model
+	)
+	drop.CanCollide = false
+	drop.CanQuery = false
+	drop.Transparency = 0.35
+
 	local slot: Slot = {
 		index = index,
 		cframe = cframe,
+		placeName = placeName,
+		region = region,
 		model = model,
 		pad = pad,
 		post = post,
@@ -255,6 +303,8 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		items = items,
 		signLabels = labels,
 		claim = claim,
+		spawn = plotSpawn,
+		delivery = delivery,
 		owner = nil,
 	}
 	claim.Triggered:Connect(function(player: Player)
@@ -327,6 +377,37 @@ local function assign(player: Player, slot: Slot, profile: Profile)
 	refreshSign(slot)
 end
 
+-- Far from the pad (the picker, or a join at town): stand on it. Already
+-- at the sign: don't yank them off the prompt. The owner is already set.
+-- Streaming and the pivot wait, so the claim itself does not yield.
+local function adoptSpawn(player: Player, slot: Slot, moveIfFar: boolean)
+	player.RespawnLocation = slot.spawn
+	if not moveIfFar then
+		return
+	end
+	local pos = slot.spawn.CFrame.Position
+	local function arrive()
+		local ask = (player :: any).RequestStreamAroundAsync
+		if type(ask) == "function" then
+			pcall(function()
+				ask(player, pos, 5)
+			end)
+		end
+		local char = player.Character
+		local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+		local pivotTo = if char then (char :: any).PivotTo else nil
+		if not root or type(pivotTo) ~= "function" then
+			return
+		end
+		local here = root.Position
+		local dx, dz = here.X - pos.X, here.Z - pos.Z
+		if dx * dx + dz * dz > 80 * 80 then
+			pivotTo(char, slot.spawn.CFrame + Vector3.new(0, 3, 0))
+		end
+	end
+	task.spawn(arrive)
+end
+
 local function release(player: Player)
 	local slot = slotOf[player]
 	slotOf[player] = nil
@@ -343,6 +424,10 @@ local function release(player: Player)
 	slot.model:SetAttribute("Tier", nil)
 	player:SetAttribute("PlotSlot", nil)
 	player:SetAttribute("PlotTier", nil)
+	player:SetAttribute("Picking", nil)
+	-- Back to the town's Neutral spawn. The property's type won't take nil.
+	local who: any = player
+	who.RespawnLocation = nil
 	drawBounds(slot, PlotData.Tiers[1].size, false)
 	refreshSign(slot)
 end
@@ -354,6 +439,159 @@ local function freeSlot(): Slot?
 		end
 	end
 	return nil
+end
+
+local function takenFlags(): { boolean }
+	local flags: { boolean } = {}
+	for index, slot in ipairs(slots) do
+		flags[index] = slot.owner ~= nil
+	end
+	return flags
+end
+
+local function offerFor(_player: Player): PlotPickerLogic.Offer
+	local plots: { PlotPickerLogic.OfferPlot } = {}
+	for _, slot in ipairs(slots) do
+		local owner = slot.owner
+		table.insert(plots, {
+			index = slot.index,
+			name = slot.placeName,
+			region = slot.region,
+			x = slot.cframe.Position.X,
+			z = slot.cframe.Position.Z,
+			y = slot.cframe.Position.Y,
+			taken = owner ~= nil,
+			owner = if owner then owner.DisplayName else "",
+		})
+	end
+	return { timeout = PlotPickerLogic.TimeoutSeconds, plots = plots }
+end
+
+local function fireOffer(player: Player, notice: string?)
+	local payload = offerFor(player)
+	payload.notice = notice
+	lastOffer[player] = payload
+	local remote = offerRemote
+	if remote and remote.FireClient then
+		remote:FireClient(player, payload)
+	end
+end
+
+local function refreshPickers()
+	for player in pairs(pickingUntil) do
+		fireOffer(player)
+	end
+end
+
+-- A saved world spot that the new ground swallowed, drowned, or built a
+-- pad on, moved onto this player's delivery pad. Memory only: no yield.
+local function rescueProfile(profile: Profile, delivery: CFrame)
+	local function land(x: number, y: number, z: number): (number, number, number)
+		local move = SpotRescue.ShouldMove(
+			y,
+			TerrainGen.HeightAt(x, z),
+			TerrainGen.WaterLevelAt(x, z) ~= nil,
+			WorldLayout.OnPlotPad(x, z)
+		)
+		if not move then
+			return x, y, z
+		end
+		local p = delivery.Position
+		return p.X, p.Y + 2, p.Z
+	end
+	local truck = profile.truckAt
+	if
+		type(truck) == "table"
+		and type(truck.x) == "number"
+		and type(truck.y) == "number"
+		and type(truck.z) == "number"
+	then
+		truck.x, truck.y, truck.z = land(truck.x :: number, truck.y :: number, truck.z :: number)
+	end
+	if type(profile.leftLoad) == "table" then
+		for _, log in ipairs(profile.leftLoad) do
+			log.x, log.y, log.z = land(log.x, log.y, log.z)
+		end
+	end
+	if type(profile.groundLoad) ~= "table" then
+		return
+	end
+	for _, piece in ipairs(profile.groundLoad) do
+		if type(piece) == "table" then
+			local g = (piece :: any).g
+			if type(g) == "table" and type(g[1]) == "number" and type(g[2]) == "number" and type(g[3]) == "number" then
+				g[1], g[2], g[3] = land(g[1], g[2], g[3])
+			end
+		end
+	end
+end
+
+local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: boolean, told: string)
+	pickingUntil[player] = nil
+	lastOffer[player] = nil
+	player:SetAttribute("Picking", nil)
+	local first = profile.plot.claimed ~= true
+	profile.plot.claimed = true
+	-- Owner is set here, before any quest, analytics, or save work.
+	assign(player, slot, profile)
+	adoptSpawn(player, slot, moveIfFar)
+	rescueProfile(profile, slot.delivery)
+	if first then
+		QuestService.Event(player, "plotClaimed")
+		MilestoneService.Mark(player, "Claimed a plot")
+		pcall(function()
+			AnalyticsService:LogCustomEvent(player, "PlotClaimed")
+		end)
+	end
+	notify(player, told)
+	refreshPickers()
+end
+
+-- The server's decision. No yield between the check and assign, so two
+-- players claiming one pad can't both win.
+local function tryGrant(player: Player, index: number, moveIfFar: boolean, told: string): boolean
+	if slotOf[player] then
+		notify(player, "You already have a plot here.")
+		return false
+	end
+	local profile = ProfileService.GetProfile(player)
+	local slot = slots[index]
+	if not profile or not profile.plot or not slot then
+		return false
+	end
+	-- owner == nil and the assign below are the same breath: nothing here yields.
+	if slot.owner ~= nil then
+		notify(player, "Someone else claimed that plot. Pick another.")
+		if pickingUntil[player] then
+			fireOffer(player, "taken")
+		end
+		return false
+	end
+	slot.owner = player
+	grant(player, slot, profile, moveIfFar, told)
+	return true
+end
+
+local FULL = "This server's plot district is full, so your plot isn't out today. Try another server!"
+
+local function autoAssign(player: Player)
+	if slotOf[player] then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	pickingUntil[player] = nil
+	local index = PlotPickerLogic.FirstFree(takenFlags())
+	if not index then
+		player:SetAttribute("Picking", nil)
+		warn("[PlotService] No free plot for " .. player.Name .. "; add slots in PlotData")
+		notify(player, FULL)
+		return
+	end
+	local slot = slots[index]
+	tryGrant(player, index, true, string.format("%s is yours. You'll wake up here.", slot.placeName))
 end
 
 -- The sign's board, within the prompt's distance plus the shared slack.
@@ -384,14 +622,7 @@ local function onClaim(player: Player, slot: Slot)
 		notify(player, "Walk up to the sign to claim this plot.")
 		return
 	end
-	profile.plot.claimed = true
-	assign(player, slot, profile)
-	QuestService.Event(player, "plotClaimed")
-	MilestoneService.Mark(player, "Claimed a plot")
-	notify(player, "It's yours! Stand on your plot and press BUILD to start building.")
-	pcall(function()
-		AnalyticsService:LogCustomEvent(player, "PlotClaimed")
-	end)
+	tryGrant(player, slot.index, false, "It's yours! Stand on your plot and press BUILD to start building.")
 end
 
 -- The player's slot, if they stand on (or next to) their plot.
@@ -632,24 +863,121 @@ function PlotService.Upgrade(player: Player)
 	end)
 end
 
--- Call once the save has loaded: a player who has claimed a plot gets one.
+-- Call once the save has loaded. Opens the picker; nothing is assigned
+-- until they claim, close it, or the timer runs out. A pad they already
+-- hold this session (a save-slot swap) is left alone — call Reload.
+local function watchSpawn(player: Player)
+	if watching[player] then
+		return
+	end
+	local added = (player :: any).CharacterAdded
+	if type(added) ~= "table" or type(added.Connect) ~= "function" then
+		return
+	end
+	watching[player] = true
+	added:Connect(function()
+		local slot = slotOf[player]
+		if slot then
+			adoptSpawn(player, slot, true)
+		end
+	end)
+end
+
+-- Before the truck and the loose logs spawn. A saved world spot that the
+-- new ground swallowed, drowned, or built a pad on goes to the town truck
+-- lot. Claiming still moves a bad spot onto that player's delivery pad.
+function PlotService.ParkStrays(profile: Profile)
+	local lot = WorldLayout.ParkingLot
+	local x = (lot.x0 + lot.x1) / 2
+	local z = (lot.z0 + lot.z1) / 2
+	local y = TerrainGen.HeightAt(x, z) + 2
+	rescueProfile(profile, CFrame.new(x, y, z))
+end
+
 function PlotService.PlayerJoined(player: Player, profile: Profile)
-	if not profile.plot.claimed or slotOf[player] then
+	watchSpawn(player)
+	if slotOf[player] or not PlotPickerLogic.ShouldPick(slotOf[player] ~= nil) then
 		return
 	end
-	local slot = freeSlot()
-	if not slot then
-		-- More players than plots (the place's Max Players should be at most
-		-- #PlotData.Slots): tell them, rather than failing silently.
+	-- profile is the save that will load onto whichever pad they pick.
+	if profile.plot == nil or not freeSlot() then
 		warn("[PlotService] No free plot for " .. player.Name .. "; add slots in PlotData")
-		notify(player, "This server's plot district is full, so your plot isn't out today. Try another server!")
+		notify(player, FULL)
+		player:SetAttribute("Picking", nil)
 		return
 	end
-	assign(player, slot, profile)
-	notify(player, "Your plot is ready in the plot district, east of town.")
+	pickingUntil[player] = os.clock() + PlotPickerLogic.TimeoutSeconds
+	player:SetAttribute("Picking", true)
+	fireOffer(player)
+end
+
+function PlotService.OfferOf(player: Player): PlotPickerLogic.Offer?
+	return lastOffer[player]
+end
+
+function PlotService.Claim(player: Player, index: unknown)
+	if not RateLimiter.Allow(player, "ClaimPlot") then
+		return
+	end
+	local slotIndex = PlotPickerLogic.ClaimIndex(index, #slots)
+	if not slotIndex then
+		return
+	end
+	-- No range check: the picker claims from the camera, not from the sign.
+	tryGrant(player, slotIndex, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
+end
+
+-- Where the town's truck delivery should drop this player's vehicle.
+-- Nil until they have a pad this visit.
+function PlotService.GetDeliveryPad(player: Player): CFrame?
+	local slot = slotOf[player]
+	return if slot then slot.delivery else nil
+end
+
+function PlotService.Pass(player: Player)
+	if not RateLimiter.Allow(player, "PlotPass") then
+		return
+	end
+	autoAssign(player)
+end
+
+function PlotService.Sweep()
+	local now = os.clock()
+	for player, deadline in pairs(pickingUntil) do
+		if now >= deadline then
+			autoAssign(player)
+		end
+	end
+end
+
+-- The same pad, the other save's buildings. Returns false when they
+-- haven't picked yet, so the caller can open the picker instead.
+function PlotService.Reload(player: Player, profile: Profile): boolean
+	local slot = slotOf[player]
+	if not slot or not profile.plot then
+		return false
+	end
+	for _, model in ipairs(slot.items:GetChildren()) do
+		placedAt[model.Name] = nil
+	end
+	slot.items:ClearAllChildren()
+	slot.model:SetAttribute("Tier", profile.plot.tier)
+	player:SetAttribute("PlotTier", profile.plot.tier)
+	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+	drawBounds(slot, tier.size, true)
+	for _, item in ipairs(profile.plot.placed) do
+		buildItem(slot, player, item)
+	end
+	refreshSign(slot)
+	rescueProfile(profile, slot.delivery)
+	return true
 end
 
 function PlotService.PlayerRemoving(player: Player)
+	-- Drop the timer first, so a timeout can't assign a pad after they leave.
+	pickingUntil[player] = nil
+	lastOffer[player] = nil
+	watching[player] = nil
 	release(player)
 end
 
@@ -667,6 +995,23 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 	remotes.MoveBlueprint.OnServerEvent:Connect(PlotService.Move)
 	remotes.SellPlaced.OnServerEvent:Connect(PlotService.Sell)
 	remotes.UpgradePlot.OnServerEvent:Connect(PlotService.Upgrade)
+	offerRemote = remotes.PlotOffer
+	if remotes.ClaimPlot then
+		remotes.ClaimPlot.OnServerEvent:Connect(function(player: Player, index: unknown)
+			PlotService.Claim(player, index)
+		end)
+	end
+	if remotes.PlotPass then
+		remotes.PlotPass.OnServerEvent:Connect(function(player: Player)
+			PlotService.Pass(player)
+		end)
+	end
+	local heartbeat = (RunService :: any).Heartbeat
+	if typeof(heartbeat) == "RBXScriptSignal" or (type(heartbeat) == "table" and heartbeat.Connect) then
+		heartbeat:Connect(function()
+			PlotService.Sweep()
+		end)
+	end
 end
 
 return PlotService

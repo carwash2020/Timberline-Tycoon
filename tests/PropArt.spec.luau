@@ -8,7 +8,7 @@
 return function(t)
 	local PropArt = t.load("ReplicatedStorage/Shared/Art/PropArt")
 	local BiomeData = t.shared("BiomeData")
-	local Color3 = t.roblox.Color3
+	local Color3, Vector3 = t.roblox.Color3, t.roblox.Vector3
 
 	local tints = PropArt.Tints("starter")
 	local ICE = Color3.fromRGB(159, 230, 255)
@@ -453,7 +453,31 @@ return function(t)
 			end
 		end
 		t.eq(PropArt.SetPiece("Nope", 1), nil)
+		local function solidReach(rock)
+			local far = 0
+			for _, p in ipairs(parts(rock)) do
+				if p.CanCollide then
+					local h = p.Size / 2
+					for _, sx in ipairs({ -1, 1 }) do
+						for _, sy in ipairs({ -1, 1 }) do
+							for _, sz in ipairs({ -1, 1 }) do
+								local w = p.CFrame * Vector3.new(h.X * sx, h.Y * sy, h.Z * sz)
+								far = math.max(far, math.sqrt(w.X * w.X + w.Z * w.Z))
+							end
+						end
+					end
+				end
+			end
+			return far
+		end
+		-- Seed 87250 is the one whose tipped satellite used to reach 16.3,
+		-- past the outcrop footprint (radius 15, one stud of slack).
+		local seeds = {}
 		for seed = 1, 30 do
+			table.insert(seeds, seed)
+		end
+		table.insert(seeds, 87250)
+		for _, seed in ipairs(seeds) do
 			local rocks = PropArt.Outcrop(seed):GetChildren()
 			t.ok(#rocks >= 3 and #rocks <= 4, "3-4 rocks")
 			for _, rock in ipairs(rocks) do
@@ -465,6 +489,7 @@ return function(t)
 				end
 				-- Rock's body is 0.92 of its size across.
 				t.ok(widest / 0.92 >= 6 - 1e-6 and widest / 0.92 <= 14 + 1e-6, "an outcrop's rocks are 6-14")
+				t.ok(solidReach(rock) <= 16, string.format("seed %d rock stays inside the footprint", seed))
 			end
 		end
 	end)

@@ -1259,6 +1259,48 @@ end
 -- Like a lone boulder, each rock's three stones collide; the pebbles and
 -- moss are looks only.
 -- (brown, PropArt.BrownTones, unless `colors` says otherwise).
+-- WorldPlan.SceneryRadius.Outcrop is 15, and a solid corner may sit one
+-- stud past that. A satellite rock (size 10, 8 studs out, tipped) can
+-- land a corner past 16, so that rock is pulled in until it fits.
+local OUTCROP_SOLID = 16
+
+local function solidReach(rock: Model): number
+	local far = 0
+	for _, d in ipairs(rock:GetDescendants()) do
+		if d:IsA("BasePart") and d.CanCollide then
+			local h = d.Size / 2
+			for _, sx in ipairs({ -1, 1 }) do
+				for _, sy in ipairs({ -1, 1 }) do
+					for _, sz in ipairs({ -1, 1 }) do
+						local w = d.CFrame * Vector3.new(h.X * sx, h.Y * sy, h.Z * sz)
+						local xz = w.X * w.X + w.Z * w.Z
+						if xz > far then
+							far = xz
+						end
+					end
+				end
+			end
+		end
+	end
+	return math.sqrt(far)
+end
+
+local function keepInFootprint(rock: Model)
+	for _ = 1, 6 do
+		local reach = solidReach(rock)
+		if reach <= OUTCROP_SOLID then
+			return
+		end
+		local pivot = rock:GetPivot()
+		local flat = Vector3.new(pivot.Position.X, 0, pivot.Position.Z)
+		if flat.Magnitude < 0.5 then
+			return
+		end
+		local step = math.min(reach - OUTCROP_SOLID + 0.05, flat.Magnitude - 0.25)
+		rock:PivotTo(pivot - flat.Unit * step)
+	end
+end
+
 function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
 	local model = Kit.model("Outcrop")
 	local rng = Kit.rng(seed)
@@ -1270,6 +1312,7 @@ function PropArt.Outcrop(seed: number, colors: { Color3 }?): Model
 		local r = if i == 1 then 0 else rng:range(5.5, 8)
 		local rock = PropArt.Rock(size, seed * 7 + i, colors or PropArt.BrownTones[seed % 2 + 1])
 		Kit.placeAt(rock, CFrame.new(math.cos(a) * r, 0, math.sin(a) * r))
+		keepInFootprint(rock)
 		rock.Parent = model
 	end
 	Kit.decorAll(model, { Rock = true })

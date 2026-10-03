@@ -26,12 +26,13 @@ return function(t)
 	-- decoration cell reshuffled. Phase 12 re-sampled on purpose: the six
 	-- draws per candidate are unchanged, and the wider roads, junction
 	-- flares and hollow pools reject a few of those candidates. Re-sampled
-	-- again when the plot district became 3×4: flowers don't grow on the pads.
+	-- again when the homesteads scattered, and again for the display lot:
+	-- flowers still skip the shelves and that patch.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1608, 141015027, 374386409 },
-			[60] = { 2044, 155046150, 230359012 },
-			[85] = { 2534, 125044142, 4093083 },
+			[20] = { 1557, 102900845, 825287505 },
+			[60] = { 1953, 96732441, 643137331 },
+			[85] = { 2428, 37091171, 981016911 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0
@@ -348,7 +349,7 @@ return function(t)
 				route({ { 0, 40 }, { 0, 700 }, centre("snow") }, 40),
 				120,
 			},
-			{ "potter about the open country", route({ { 300, 300 }, { 320, 320 } }, 10), 90 },
+			{ "potter about the open country", route({ { 800, -600 }, { 820, -580 } }, 10), 90 },
 			{ "walk a loop through the Hills", loop("hills", 100), 120 },
 			{ "walk a loop through the Starter Forest", loop("starter", 60), 90 },
 			{ "walk a loop through the Phantom Grove", loop("grove", 70), 90 },

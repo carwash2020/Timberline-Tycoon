@@ -146,7 +146,7 @@ return function(t)
 					t.ok(math.abs(p.Y - TerrainGen.HeightAt(p.X, p.Z)) < 0.01, "on the terrain")
 				end
 			end
-			t.ok(found > 150, "usually finds ground")
+			t.ok(found > 150, string.format("usually finds ground near (%.0f, %.0f): %d", near.X, near.Z, found))
 		end
 	end)
 

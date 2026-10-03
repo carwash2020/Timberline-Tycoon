@@ -7,32 +7,72 @@
 -- relative to the plot's centre, rot is 0-3 quarter turns. A plot's area is
 -- `size` x `size` around its centre.
 
+local GameConfig = require(script.Parent.GameConfig)
+
 local PlotData = {}
 
--- The plot district, east of town: 12 plots, 3 columns by 4 rows. One
--- server holds up to 12 players, so everyone fits. The biggest tier is
--- 200 x 200. The gap between those pads is wide enough for a lane a
--- Logging Rig can drive (LaneWidth) with grass either side. The north
--- road stays on the town's plot-road mouth (its centre is RoadSetback
--- studs north of the biggest pad, so the claim sign is not in the
--- roadway). The west edge stays east of the parking-lot loop; the east
--- edge stays off the beach.
-PlotData.Columns = 3
-PlotData.Rows = 4
-PlotData.SlotSpacing = 248
+-- Homesteads spread around the map, not a grid beside town. One server
+-- holds MaxPlayers people; two extra pads stay open so the last arrival
+-- still has a choice. The flat shelf is Pad studs on a side (the biggest
+-- tier). Each pad gets a lane (LaneWidth, a Logging Rig wide) to the
+-- nearest road, and a clear delivery pad on that edge for the truck.
+-- Builds stay in plot-local studs, so a layout loads on whichever pad
+-- you pick this visit. The picker opens on Birch Side, then Orchard
+-- Edge and Oak Side (the Starter Forest), then The Climb. The rest are
+-- nearest the sawmill first. East Meadow stays east of the lot.
+export type Home = {
+	id: string,
+	name: string,
+	region: string, -- what the plot picker calls the place
+	x: number,
+	z: number,
+}
+
 PlotData.LaneWidth = 22
-PlotData.RoadSetback = 28
+PlotData.Pad = 200
+PlotData.Blend = 56 -- the shelf eases into the country over at least 50 studs
+PlotData.DeliveryWidth = 16 -- studs back from the road edge into the yard
+PlotData.DeliveryLength = 80 -- along that edge: a Logging Rig plus a Heavy Hauler
+PlotData.MinSpacing = 248
+PlotData.NearHaul = 500 -- the homes listed first sit inside this of the sawmill
+PlotData.GroveReach = 640
+-- Everyone online, plus two spare pads.
+PlotData.Count = GameConfig.MaxPlayers + 2
+
+-- Centres chosen clear of the river, the lake, the coast, the lava, the
+-- gondola and the haul roads. Shelves stay 48 studs apart on the wider
+-- axis (MinSpacing minus Pad). Each is within GroveReach of a grove.
+-- The first four are the opening offer. After that, nearest the sawmill.
+PlotData.Homes = {
+	{ id = "birch", name = "Birch Side", region = "Starter Forest", x = 0, z = -350 },
+	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -360, z = -160 },
+	-- South of East Meadow, and far enough west that the two shelves
+	-- don't meet. About (230, -350); a little further so the gap holds.
+	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 248, z = -380 },
+	-- Ten studs north of the old spot, so the blend clears the display
+	-- lot's north edge (z 123) by more than 10 studs.
+	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 290 },
+	{ id = "north", name = "North Bend", region = "the north road", x = -190, z = 530 },
+	-- East of the display lot (x 184-296). The shelf and its blend stay
+	-- south of the lot and the path from the showroom.
+	{ id = "mill", name = "East Meadow", region = "east of town", x = 450, z = -130 },
+	{ id = "meadow", name = "North Meadow", region = "the north road", x = 130, z = 680 },
+	{ id = "west", name = "West Shelf", region = "west country", x = -250, z = -420 },
+	{ id = "pine", name = "Pine Bend", region = "The Hills", x = -580, z = 380 },
+	{ id = "east", name = "East Field", region = "east country", x = 698, z = 100 },
+	{ id = "ridge", name = "Lower Ridge", region = "south country", x = 520, z = -430 },
+	{ id = "high", name = "High Meadow", region = "the north road", x = -460, z = 720 },
+	{ id = "ash", name = "Ash Gate", region = "the east road", x = 720, z = -180 },
+	{ id = "long", name = "Long Meadow", region = "south country", x = 200, z = -650 },
+} :: { Home }
+
 PlotData.Slots = {} :: { Vector2 }
--- Row 0's north edge lands RoadSetback south of the plot road at z = 50.
--- Column 0's west edge (200) clears the lot loop, whose east fence is at x = 180.
-local ORIGIN_X, ORIGIN_Z = 300, -78
-for row = 0, PlotData.Rows - 1 do
-	for col = 0, PlotData.Columns - 1 do
-		table.insert(
-			PlotData.Slots,
-			Vector2.new(ORIGIN_X + col * PlotData.SlotSpacing, ORIGIN_Z - row * PlotData.SlotSpacing)
-		)
-	end
+for _, home in ipairs(PlotData.Homes) do
+	table.insert(PlotData.Slots, Vector2.new(home.x, home.z))
+end
+
+function PlotData.Home(index: number): Home?
+	return PlotData.Homes[index]
 end
 
 PlotData.Grid = 2 -- studs: item centres snap to this (GAME_DESIGN §14.6)

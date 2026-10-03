@@ -19,7 +19,14 @@ return {
 				{ pos = { -150, 300, 300 }, target = { -500, 20, 300 }, label = "hills + river" },
 				{ pos = { 400, 400, 700 }, target = { 1150, 60, 1250 }, label = "volcano" },
 				{ pos = { -250, 220, -150 }, target = { -600, 0, -400 }, label = "grove + lake" },
-				{ pos = { 900, 480, 120 }, target = { 520, 0, -420 }, label = "the plot district" },
+				-- The 14 homestead shelves, from East Meadow east of town out to the far pads.
+				{ pos = { 40, 1450, -520 }, target = { -20, 0, 140 }, label = "all 14 homesteads" },
+				-- East Meadow, south of the dealership display lot, and the lane west to the loop.
+				{ pos = { 560, 150, -300 }, target = { 360, 0, -40 }, label = "East Meadow south of the display lot" },
+				-- The Snowfields' plateau edge, where the country changes material.
+				{ pos = { 180, 160, 860 }, target = { 0, 30, 1080 }, label = "snowfields border" },
+				-- Eye height on Birch Side, looking north up its lane.
+				{ pos = { 22, 7, -270 }, target = { 0, 2, -140 }, label = "Birch Side shelf and lane at ground level" },
 			},
 		}
 	end,

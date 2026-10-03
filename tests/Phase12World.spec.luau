@@ -25,8 +25,6 @@ return function(t)
 			SnowRoad = 28,
 			VolcanoRoad = 28,
 			SkyrootRoad = 24,
-			PlotRoad = 16,
-			PlotLane = 22,
 			MillRoad = 22,
 			LotLoop = 16,
 		}
@@ -35,6 +33,15 @@ return function(t)
 			t.ok(road, name)
 			t.eq(road.width, width, name)
 		end
+		local spurs = 0
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == "PlotSpur" then
+				spurs += 1
+				t.eq(road.width, 22, "a homestead lane is a Logging Rig wide")
+			end
+			t.ok(road.name ~= "PlotRoad" and road.name ~= "PlotLane", "the old plot grid is gone")
+		end
+		t.eq(spurs, 14, "one lane for each homestead")
 	end)
 
 	t.test("the snow and volcano junctions flare, and the flare is pale road", function()
@@ -172,10 +179,9 @@ return function(t)
 		t.eq(WorldPlan.ForestEdgeApart, 45)
 		t.eq(WorldPlan.ForestVergeStep, 40)
 		local trees = WorldPlan.Trees()
-		-- 771 after the lighthouse vista moved onto the next headland (was 772;
-		-- two stand trees stood in the lane). Before that, 775, until the
-		-- 3×4 plots took seven.
-		t.ok(#trees >= 771, #trees .. " trees")
+		-- Main's lighthouse vista left 771 choppable trees. The shelves and
+		-- their lanes take the rest. 730 is the live count on that world.
+		t.ok(#trees >= 730, #trees .. " trees")
 		local wet = 0
 		for i = 1, 322 do
 			local p = trees[i].position

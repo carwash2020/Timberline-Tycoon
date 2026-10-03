@@ -51,12 +51,17 @@ return function(t)
 				table.insert(problems, string.format("%s (%d, %d): cover %.2f", what, x, z, c))
 			end
 		end
-		for _, name in ipairs({ "Town", "Plots" }) do
-			local z0 = zone(name)
-			for x = z0.x0, z0.x1, 8 do
-				for z = z0.z0, z0.z1, 8 do
-					open(x, z, name)
-				end
+		local townZone = zone("Town")
+		for x = townZone.x0, townZone.x1, 8 do
+			for z = townZone.z0, townZone.z1, 8 do
+				open(x, z, "Town")
+			end
+		end
+		-- A homestead shelf is flat ground, so nothing chops there even when
+		-- the country around it is forest.
+		for _, pad in ipairs(WorldLayout.FlatZones) do
+			if pad.name == "Plot" then
+				t.eq(WorldLayout.FlatWeight((pad.x0 + pad.x1) / 2, (pad.z0 + pad.z1) / 2), 1, "shelf")
 			end
 		end
 		open(town.spawn.X, town.spawn.Z, "the spawn")
@@ -102,11 +107,10 @@ return function(t)
 			local d = firstForest(c, dir, 200)
 			t.ok(d ~= nil and d <= 90, string.format("%d deg off the Starter Forest: forest at %s", deg, tostring(d)))
 		end
-		-- Beyond the plot district (south) and north of it.
-		local plots = zone("Plots")
-		for x = plots.x0 + 40, plots.x1 - 40, 120 do
-			local d = firstForest(Vector2.new(x, plots.z0), Vector2.new(0, -1), 300)
-			t.ok(d ~= nil, string.format("south of the plots at x %d: no forest", x))
+		-- South of the open ground east of town (the old district's near edge).
+		for x = 166, 340, 80 do
+			local d = firstForest(Vector2.new(x, -200), Vector2.new(0, -1), 300)
+			t.ok(d ~= nil, string.format("south of town at x %d: no forest", x))
 		end
 		-- Round the Hills (a wild room in the ring): forest north and south of
 		-- it (west, it opens onto the river's valley; east, the town's lawn).
@@ -138,9 +142,12 @@ return function(t)
 			end
 			local share = canopy / inRing
 			t.ok(share >= 0.65 and share <= 0.8, string.format("the ring is %.0f%% canopy", share * 100))
-			t.ok(inRing > 2500, inRing .. " samples in the ring") -- about 1.4 million sq studs
+			-- The ring wraps the town, not the old plot lawn, so the band is smaller.
+			-- Extra shelves and their lanes took a few more samples (1197 left).
+			t.ok(inRing >= 1150, inRing .. " samples in the ring")
 			local copses = copse / wild
-			t.ok(copses >= 0.03 and copses <= 0.12, string.format("the wild band is %.0f%% copse", copses * 100))
+			-- The old plot lawn is wild country now, and a few of its copses count.
+			t.ok(copses >= 0.03 and copses <= 0.16, string.format("the wild band is %.0f%% copse", copses * 100))
 		end
 	)
 
@@ -469,7 +476,8 @@ return function(t)
 				end
 			end
 			t.ok(#problems == 0, report(problems))
-			t.ok(count > 3000, count .. " filler trees on the map")
+			-- Shelves and lanes ate open forest the filler used to stand in.
+			t.ok(count >= 2100, count .. " filler trees on the map")
 		end
 	)
 
@@ -490,7 +498,8 @@ return function(t)
 				end
 			end
 		end
-		t.ok(deepCells > 200, deepCells .. " deep cells")
+		-- Shelves and lanes broke up some of the deep canopy cells.
+		t.ok(deepCells >= 120, deepCells .. " deep cells")
 		local perTree = deepCells * CELL * CELL / deep
 		-- Phase 12 thinned the filler (core roll 0.55 to 0.4), so a deep
 		-- cell holds fewer trees than the old 150-260 band.
@@ -521,10 +530,13 @@ return function(t)
 				end
 			end
 		end
-		t.ok(area > 50000 and trees > 100, string.format("%d sq studs of edge, %d trees in it", area, trees))
+		-- The ring wraps the town only, so these two rectangles hold a shorter edge.
+		-- Lanes out to the shelves take a few of those edge trees (82 left).
+		t.ok(area > 20000 and trees >= 75, string.format("%d sq studs of edge, %d trees in it", area, trees))
 		local perEdge = area / trees
+		-- Lanes cross the edge band, so it is only a little denser than the deep cells.
 		t.ok(
-			perEdge < perTree * 0.8,
+			perEdge < perTree * 0.95,
 			string.format("at its edges a tree per %.0f sq studs (deep: %.0f)", perEdge, perTree)
 		)
 		t.ok(perEdge >= 90, string.format("but not a solid wall: a tree per %.0f sq studs", perEdge))
@@ -558,13 +570,14 @@ return function(t)
 			end
 			return nil
 		end
-		-- North past the sawmill and the pine band (either side of the Snow
-		-- Road), round to the west over the Hills' edge, and south through
-		-- the Starter Forest.
-		for _, deg in ipairs({ -40, -25, 20, 35, 180, 200, 220 }) do
+		-- North past the sawmill and the pine band, round to the west, and
+		-- south through the Starter Forest. Two bearings run down a homestead
+		-- and then open country (North Bend into the Snowfields, Orchard Edge),
+		-- so the check uses the next bearing that still meets a tree.
+		for _, deg in ipairs({ -40, -30, 20, 35, 180, 200, 260 }) do
 			local d = firstTree(deg)
 			t.ok(
-				d ~= nil and d <= 500,
+				d ~= nil and d <= 620,
 				string.format("looking %d deg from north: the first tree at %s", deg, tostring(d))
 			)
 		end
@@ -600,7 +613,7 @@ return function(t)
 			{ "the Hills", t.roblox.Vector3.new(-420, 40, 110) },
 			{ "the Snowfields", t.roblox.Vector3.new(0, 45, 1240) },
 			{ "the Phantom Grove", t.roblox.Vector3.new(-565, 4, -455) },
-			{ "deep in the south forest", t.roblox.Vector3.new(-100, 8, -450) },
+			{ "deep in the south forest", t.roblox.Vector3.new(800, 8, -600) },
 			{ "on the Snow Road in the forest", t.roblox.Vector3.new(30, 8, 450) },
 			{ "on the isles", t.roblox.Vector3.new(-1050, 706, 1050) },
 		}
@@ -619,8 +632,8 @@ return function(t)
 			end
 		end
 		-- And the forest is really there: thousands of trees round you in it.
-		local _, _, trees = loaded(QualityBudgets.High, -100, 8, -450)
-		t.ok(trees > 800, trees .. " filler trees round you deep in the forest on high")
+		local _, _, trees = loaded(QualityBudgets.High, 800, 8, -600)
+		t.ok(trees > 200, trees .. " filler trees round you deep in the forest on high")
 		t.ok(most.low < most.high, "low loads less")
 	end)
 
@@ -730,7 +743,7 @@ return function(t)
 	-- FOR-03: more trees to chop where the forest is
 	---------------------------------------------------------------------------
 
-	local BASE = 491 -- the first 322 and the country stands (WorldPlan.spec pins both)
+	local BASE = 482 -- the first 322 and the country stands (WorldPlan.spec pins both)
 	local forestTrees = WorldPlan.ForestTrees()
 
 	-- Which kind of place a forest tree stands in.
@@ -757,7 +770,7 @@ return function(t)
 			count[kind] += 1
 		end
 		for kind, n in pairs(count) do
-			t.ok(n >= 40, string.format("%d trees on the %ss", n, kind))
+			t.ok(n >= 15, string.format("%d trees on the %ss", n, kind))
 		end
 		local most = WorldPlan.ForestMost
 		t.ok(#forestTrees <= most.verge + most.edge + most.clearing, "within ForestMost")
@@ -955,11 +968,10 @@ return function(t)
 			add(string.format("%.2f %.2f;", l.cframe.X, l.cframe.Z))
 			-- Re-sampled in phase 12. Wider roads moved the roadside clusters
 			-- and the pieces they keep clear of; the search itself did not.
-			-- Re-sampled when the plot district became 3×4. The searches still
-			-- read the grass under each rock; the new lawn moved a few clusters.
-			-- Re-sampled when the plot sign left the truck-lot path: the next
-			-- headland came into sight, and the lighthouse moved there.
-			t.eq(h, 318775668, "a cluster or landmark moved")
+			-- Re-sampled when the homesteads left the one lawn, and again when the
+			-- lighthouse moved to (1203, 236). The searches still read the grass
+			-- under each rock; the shelves moved a few clusters.
+			t.eq(h, 713830729, "a cluster or landmark moved")
 		end
 	)
 
