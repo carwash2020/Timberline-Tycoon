@@ -77,7 +77,7 @@ return function(t)
 		t.ok(math.abs(angle) > 0.15, "the swing is visible")
 	end)
 
-	test("every truck is narrower than a plot lane", function()
+	t.test("every truck is narrower than a plot lane", function()
 		for id, def in pairs(ItemCatalog.Trucks) do
 			local width = TruckLayout.For(def).width
 			t.ok(width < PlotData.LaneWidth, string.format("%s is %.2f, lane is %d", id, width, PlotData.LaneWidth))
