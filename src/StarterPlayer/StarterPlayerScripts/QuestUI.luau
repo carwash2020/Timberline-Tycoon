@@ -531,6 +531,38 @@ local function refresh()
 	updateBeacon()
 end
 
+-- The parts QuestUI clones into Murph's portrait. Beard and Beanie are
+-- welded to Head but parented on the model, so a separate clone leaves
+-- the weld pointing at the live Head. FillPortrait retargets any Weld
+-- or WeldConstraint onto the cloned part of the same name.
+local PORTRAIT_PARTS = { "Head", "Beard", "Beanie", "Torso", "LeftArm", "RightArm" }
+
+function QuestUI.FillPortrait(view: Instance, murph: Instance)
+	for _, name in ipairs(PORTRAIT_PARTS) do
+		local part = murph:FindFirstChild(name)
+		if part then
+			part:Clone().Parent = view
+		end
+	end
+	local function match(part: BasePart?): BasePart?
+		if part == nil or part:IsDescendantOf(view) then
+			return part
+		end
+		local found = view:FindFirstChild(part.Name, true)
+		if found and found:IsA("BasePart") then
+			return found
+		end
+		return part
+	end
+	for _, d in ipairs(view:GetDescendants()) do
+		if d:IsA("Weld") or d:IsA("WeldConstraint") then
+			local joint = d :: Weld
+			joint.Part0 = match(joint.Part0)
+			joint.Part1 = match(joint.Part1)
+		end
+	end
+end
+
 -- Murph's portrait: his head and beard from the figure by the spawn, in a
 -- little viewport (an empty circle until his model streams in).
 local function portrait(parent: Instance): ViewportFrame
@@ -551,12 +583,7 @@ local function portrait(parent: Instance): ViewportFrame
 		if not head or not head:IsA("BasePart") or not murph then
 			return
 		end
-		for _, name in ipairs({ "Head", "Beard", "Beanie", "Torso", "LeftArm", "RightArm" }) do
-			local part = murph:FindFirstChild(name)
-			if part then
-				part:Clone().Parent = view
-			end
-		end
+		QuestUI.FillPortrait(view, murph)
 		local camera = Instance.new("Camera")
 		camera.FieldOfView = 30
 		-- Far enough back for the whole beanie and its pompom.

@@ -1,9 +1,9 @@
 --!strict
 -- StoreBoard: the town bulletin board that opens the Robux store.
 -- West of the spawn walk and of Old Bram's route, south of the street,
--- north of the tutorial grove and clear of Murph's camp. Atomic, with
--- the prompt on the board. Pure placement so tests can check it doesn't
--- stand on a road.
+-- north of the tutorial grove and clear of Murph's camp. Persistent so
+-- the prompt still works with StreamingEnabled. Pure placement so tests
+-- can check it doesn't stand on a road.
 
 local Kit = require(script.Parent.Art.Kit)
 local StoreData = require(script.Parent.StoreData)

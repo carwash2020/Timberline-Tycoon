@@ -1,7 +1,7 @@
 --!nocheck
 -- NPCService: builds the townsfolk into a map the way GameServer's call
 -- finds it (shops with Counters, the sell zone, the gondola platform):
--- Murph Atomic under the map, everyone else Atomic in "Townsfolk",
+-- Murph Persistent under the map, everyone else Atomic in "Townsfolk",
 -- keepers behind their counters, walkers published with their routes.
 
 return function(t)
@@ -53,13 +53,13 @@ return function(t)
 		return loader:server("NPCService"), loader:shared("NPCData"), loader
 	end
 
-	t.test("Murph: an Atomic model straight under the map, with QuestUI's parts", function()
+	t.test("Murph: a Persistent model straight under the map, with QuestUI's parts", function()
 		local NPCService = service()
 		local map = fakeMap()
 		NPCService.Init(map)
 		local murph = map:FindFirstChild("Murph")
 		t.ok(murph and murph:IsA("Model"), "Murph")
-		t.eq(murph.ModelStreamingMode, Enum.ModelStreamingMode.Atomic)
+		t.eq(murph.ModelStreamingMode, Enum.ModelStreamingMode.Persistent)
 		for _, name in ipairs({ "Head", "Beard", "Beanie", "Torso", "LeftArm", "RightArm" }) do
 			t.ok(murph:FindFirstChild(name), name)
 		end

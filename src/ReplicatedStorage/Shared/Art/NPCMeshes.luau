@@ -94,7 +94,10 @@ local function placeUp(part: MeshPart, cursor: CFrame)
 	end
 end
 
-local function weldTo(part: BasePart, host: BasePart)
+-- Visual runs here, on every mesh that gets a weld, so a walker picks up
+-- no collision and a Talk prompt's ray is not blocked by the costume.
+local function weldTo(part: BasePart, host: BasePart, meshId: number)
+	MeshKit.Visual(part, meshId)
 	local weld = Instance.new("Weld")
 	weld.Name = "Weld"
 	weld.Part0 = host
@@ -159,7 +162,6 @@ function NPCMeshes.Dress(model: Model, assetId: string): boolean
 			end
 			return false
 		end
-		MeshKit.Visual(part)
 		MeshKit.Fidelity(part, TownMeshes.FidelityFor(piece.name, asset.tris))
 		byName[piece.name] = part
 		table.insert(made, part)
@@ -276,8 +278,15 @@ function NPCMeshes.Dress(model: Model, assetId: string): boolean
 			end
 			return false
 		end
+		local piece = TownModels.Piece(asset, part.Name)
+		if not piece then
+			for _, old in ipairs(made) do
+				old:Destroy()
+			end
+			return false
+		end
 		part.Parent = host
-		weldTo(part, host)
+		weldTo(part, host, piece.meshId)
 	end
 
 	for _, d in ipairs(model:GetDescendants()) do

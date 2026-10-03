@@ -15,10 +15,9 @@
 -- It fades out within FadeWithin studs of you (checked every Check
 -- seconds; walk up to a shop and the shop's own sign takes over) and
 -- while a shop screen is open (ShopUI's ScreenGui is enabled).
--- The marked parts stream in with their models (SellArea is Persistent;
--- the shops and the station are Atomic), so each marker is set up when
--- its part appears (ChildAdded, no WaitForChild): nothing here waits
--- forever or warns.
+-- The marked parts are in Persistent models that reach a client after it
+-- starts, so each marker is set up when its part appears (ChildAdded, no
+-- WaitForChild): nothing here waits forever or warns.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")

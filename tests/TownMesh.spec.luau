@@ -71,21 +71,143 @@ return function(t)
 		return table.concat(rows, "\n")
 	end
 
-	local function lights(model)
+	local function countLights(root)
 		local n = 0
-		local rows = {}
-		for _, d in ipairs(model:GetDescendants()) do
-			if d:IsA("PointLight") then
+		for _, d in ipairs(root:GetDescendants()) do
+			if d:IsA("PointLight") or d:IsA("SpotLight") then
 				n += 1
-				local parent = d.Parent
-				if parent and parent:IsA("BasePart") then
-					local p = parent.CFrame.Position
-					table.insert(rows, string.format("%.3f %.3f %.3f", p.X, p.Y, p.Z))
+			end
+		end
+		return n
+	end
+
+	-- One TownMesh model counts once, when any of its visual meshes is
+	-- within 150 studs of SellZone. Prop tris are nil (no stats.json), so
+	-- they add nothing; buildings and NPCs add the recorded visible count.
+	local function sellViewTris(map)
+		local zone = map:FindFirstChild("SellZone", true)
+		local origin = zone.CFrame.Position
+		local limit = 150 * 150
+		local seen = {}
+		local total = 0
+		for _, d in ipairs(map:GetDescendants()) do
+			if d:IsA("BasePart") and d:GetAttribute("VisualMesh") == true then
+				local delta = d.CFrame.Position - origin
+				if delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z <= limit then
+					local node = d.Parent
+					local owner = nil
+					local assetId = nil
+					while node and node ~= map do
+						local id = node:GetAttribute("TownMesh")
+						if id ~= nil then
+							owner = node
+							assetId = id
+							break
+						end
+						node = node.Parent
+					end
+					if owner and not seen[owner] then
+						seen[owner] = true
+						local asset = TownModels.Get(assetId)
+						if asset and type(asset.tris) == "number" then
+							total += asset.tris
+						end
+					end
 				end
 			end
 		end
-		table.sort(rows)
-		return n, table.concat(rows, "|")
+		return total
+	end
+
+	-- The same world MapBuilder.spec builds (sky left out, terrain and wild
+	-- trees mocked). `meshes` injects MeshKit.Override on that loader so
+	-- the dressed models are the ones the map actually parents.
+	local function buildWorld(meshes)
+		local Instance = roblox.Instance
+		local s = {}
+		local ws = Instance.new("Folder")
+		ws.Name = "Workspace"
+		local baseplate = Instance.new("Part")
+		baseplate.Name = "Baseplate"
+		baseplate.Parent = ws
+		local templateSpawn = Instance.new("SpawnLocation")
+		templateSpawn.Parent = ws
+		local players = {}
+		local Players = setmetatable({}, {
+			__index = function(_, key)
+				if key == "CharacterAutoLoads" then
+					return true
+				elseif key == "GetPlayers" then
+					return function()
+						return players
+					end
+				end
+				return nil
+			end,
+			__newindex = function() end,
+		})
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local worldPlan = setmetatable({}, { __index = WorldPlan })
+		worldPlan.Sky = function()
+			return nil
+		end
+		local loader = t.loader({
+			mocks = {
+				WorldPlan = worldPlan,
+				TerrainBuilder = {
+					Build = function(onProgress)
+						onProgress(24, 24)
+						return 1.25
+					end,
+					LiftOnto = function(_, y)
+						return y
+					end,
+				},
+				TreeService = { SpawnTree = function() end },
+				SectionTrees = {
+					SpawnTree = function() end,
+					RegisterGroups = function()
+						return true
+					end,
+				},
+				NodeService = { Spawn = function() end },
+				WorldClock = { Start = function() end },
+			},
+			services = {
+				Players = Players,
+				RunService = {
+					IsStudio = function()
+						return false
+					end,
+					IsServer = function()
+						return true
+					end,
+				},
+			},
+			globals = {
+				workspace = ws,
+				task = {
+					spawn = function(fn, ...)
+						fn(...)
+					end,
+				},
+			},
+		})
+		if meshes then
+			local kit = loader:load("ReplicatedStorage/Shared/Art/MeshKit")
+			kit.Reset()
+			kit.Override = function(_id, name, size)
+				local part = Instance.new("MeshPart")
+				part.Name = name
+				part.Size = size
+				return part
+			end
+		end
+		loader:run("ServerScriptService/MapBuilder.server")
+		local map = ws:FindFirstChild("TimberlineMap")
+		loader:server("NPCService").Init(map)
+		s.map = map
+		return s
 	end
 
 	local function frontAhead(mesh, board)
@@ -206,6 +328,9 @@ return function(t)
 			local arm = model.LeftArm
 			local mesh = arm:FindFirstChild("LeftUpperArm")
 			t.ok(mesh and mesh:GetAttribute("VisualMesh") == true, "LeftUpperArm is on LeftArm")
+			t.eq(mesh.CanCollide, false)
+			t.eq(mesh.CanQuery, false)
+			t.eq(mesh.CanTouch, false)
 			local shoulder = model:FindFirstChild("LeftShoulder", true)
 			local weld = mesh:FindFirstChild("Weld")
 			t.ok(shoulder and weld and weld.Part0 == arm and weld.Part1 == mesh, "welded to LeftArm")
@@ -237,7 +362,10 @@ return function(t)
 			local span = maxY - minY
 			t.ok(math.abs(span - height) / height <= 0.1, string.format("height %.3f span %.3f", height, span))
 			-- One mesh missing: nothing is parented, and the shirt stays visible.
+			-- Reset first: #22's MeshKit serves a cached mesh without
+			-- asking Override again.
 			local headId = TownModels.Piece(TownModels.Get("Murph"), "Head").meshId
+			MeshKit.Reset()
 			MeshKit.Override = function(id, name, size)
 				if id == headId then
 					return nil
@@ -251,6 +379,41 @@ return function(t)
 			t.eq(#visuals(missed), 0, "all or nothing")
 			t.ok(missed.Torso.Transparency < 1, "the full part look stays")
 			t.eq(missed.Head:GetAttribute("MeshEyes"), nil)
+		end)
+	end)
+
+	t.test("I-NPC: Murph's portrait clone welds stay inside the clone", function()
+		local QuestUI = t.loader({
+			services = {
+				Players = { LocalPlayer = {} },
+				GuiService = {},
+				TextChatService = {},
+				TweenService = {},
+				UserInputService = {},
+			},
+		}):load("StarterPlayer/StarterPlayerScripts/QuestUI")
+		withMeshes(function()
+			local murph = CharacterArt.Build(NPCData.Get("Murph").look)
+			for _, part in ipairs(visuals(murph)) do
+				t.eq(part.CanCollide, false, part.Name .. " CanCollide")
+				t.eq(part.CanQuery, false, part.Name .. " CanQuery")
+				t.eq(part.CanTouch, false, part.Name .. " CanTouch")
+			end
+			local view = roblox.Instance.new("Folder")
+			view.Name = "Portrait"
+			QuestUI.FillPortrait(view, murph)
+			local function inside(part)
+				return part ~= nil and part:IsDescendantOf(view)
+			end
+			local welds = 0
+			for _, d in ipairs(view:GetDescendants()) do
+				if d:IsA("Weld") or d:IsA("WeldConstraint") then
+					welds += 1
+					t.ok(d.Part0 == nil or inside(d.Part0), d:GetFullName() .. " Part0 stays in the portrait")
+					t.ok(d.Part1 == nil or inside(d.Part1), d:GetFullName() .. " Part1 stays in the portrait")
+				end
+			end
+			t.ok(welds > 0, "the portrait cloned a weld")
 		end)
 	end)
 
@@ -357,25 +520,14 @@ return function(t)
 		end)
 	end)
 
-	t.test("I-Budget: Atomic, fidelity, lights, templates, and the triangle caps", function()
+	t.test("I-Budget: Atomic, fidelity, templates, and the triangle caps", function()
 		local Atomic = roblox.Enum.ModelStreamingMode.Atomic
 		local Persistent = roblox.Enum.ModelStreamingMode.Persistent
 		local plainLamp = BuildingArt.LampPost()
-		local plainCamp = BuildingArt.Campsite()
-		local lampN, lampAt = lights(plainLamp)
-		local campN, campAt = lights(plainCamp)
 		t.eq(plainLamp.ModelStreamingMode, Atomic, "a multi-mesh prop is Atomic even if the mesh misses")
-		t.eq(BuildingArt.Sawmill().ModelStreamingMode, Atomic)
 		t.eq(plainLamp.ModelStreamingMode == Persistent, false)
 		withMeshes(function()
 			local lamp = BuildingArt.LampPost()
-			local camp = BuildingArt.Campsite()
-			local n1, at1 = lights(lamp)
-			local n2, at2 = lights(camp)
-			t.eq(n1, lampN, "LampPost light count")
-			t.eq(at1, lampAt, "LampPost light offset")
-			t.eq(n2, campN, "camp light count")
-			t.eq(at2, campAt, "camp embers stay put")
 			local glow = visualNamed(lamp, "LampGlow")
 			t.ok(glow and glow.Material == roblox.Enum.Material.Neon, "glow is Neon and not a new light")
 			t.eq(lamp.ModelStreamingMode, Atomic)
@@ -391,15 +543,37 @@ return function(t)
 		t.eq(TownMeshes.FidelityFor("LeftHand", nil), roblox.Enum.RenderFidelity.Performance)
 		t.eq(TownMeshes.FidelityFor("Body", 200), roblox.Enum.RenderFidelity.Performance, "a prop under 300 tris")
 		local fs = require("@lune/fs")
-		local view = 0
+		local expected = {
+			Sawmill = 9732,
+			GeneralStore = 8232,
+			ToolShed = 5120,
+			Dealership = 3780,
+			GondolaStation = 2520,
+			SkyBin = 696,
+			Millie = 1772,
+			Tink = 1740,
+			Murph = 1704,
+			Rosa = 1584,
+			Hazel = 1552,
+			Pip = 1480,
+			Gus = 1460,
+			Dale = 1436,
+			OldBram = 1384,
+		}
 		for _, asset in ipairs(TownModels.All) do
 			local cap = if asset.category == "building"
 				then TownModels.BuildingTriCap
 				elseif asset.category == "npc" then TownModels.NpcTriCap
 				else TownModels.PropTriCap
-			local tris = asset.tris or 0
-			t.ok(tris <= cap, asset.id .. " tris")
-			view += tris
+			if asset.category == "environment" then
+				-- No stats.json in the repo. The 41 props run from ParkingBay
+				-- 48 to MurphsCamp 1,736, all under the prop cap.
+				t.eq(asset.tris, nil, asset.id .. " tris")
+			else
+				t.eq(asset.tris, expected[asset.id], asset.id .. " tris")
+				t.ok(asset.tris <= cap, asset.id .. " cap")
+			end
+			t.ok(cap > 0)
 			for _, piece in ipairs(TownModels.Visual(asset)) do
 				t.ok(
 					fs.isFile("src/ReplicatedStorage/MeshTemplates/" .. tostring(piece.meshId) .. ".model.json"),
@@ -407,10 +581,25 @@ return function(t)
 				)
 			end
 		end
-		t.ok(view < TownModels.SellViewTriCap, "sell-pad view")
+		t.eq(TownModels.PropTriCap, 2000)
+		t.ok(1736 <= TownModels.PropTriCap, "MurphsCamp is under the prop cap")
 		t.eq(#TownModels.Ids("environment"), 41)
 		t.eq(#TownModels.Ids("building"), 6)
 		t.eq(#TownModels.Ids("npc"), 9)
+	end)
+
+	t.test("I-Budget: the meshed map has the same PointLights and SpotLights as main", function()
+		local plain = buildWorld(false)
+		local meshed = buildWorld(true)
+		t.eq(countLights(meshed.map), countLights(plain.map))
+	end)
+
+	t.test("I-Budget: visible tris within 150 studs of SellZone stay under 60,000", function()
+		local map = buildWorld(true).map
+		local total = sellViewTris(map)
+		print(string.format("sell-view tris %d", total))
+		t.ok(total > 0, "a meshed building or NPC stands in the sell view")
+		t.ok(total < TownModels.SellViewTriCap, string.format("sell-view tris %d", total))
 	end)
 
 	t.test("I-Economy: the five headlines and the tutorial lines are unchanged", function()

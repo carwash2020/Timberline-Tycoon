@@ -145,9 +145,15 @@ local function hinge(part: BasePart, localPoint: Vector3, axis: string)
 	part:SetAttribute("SpinAxis", axis)
 end
 
-local function finishPiece(part: MeshPart, asset: TownModels.Asset, hosts: { [string]: BasePart }, root: CFrame)
+local function finishPiece(
+	part: MeshPart,
+	asset: TownModels.Asset,
+	hosts: { [string]: BasePart },
+	root: CFrame,
+	meshId: number
+)
 	local name = part.Name
-	MeshKit.Visual(part)
+	MeshKit.Visual(part, meshId)
 	MeshKit.Fidelity(part, TownMeshes.FidelityFor(name, asset.tris))
 	part.Anchored = true
 	if GLOW[name] then
@@ -311,6 +317,7 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 		return false
 	end
 	local made: { MeshPart } = {}
+	local ids: { number } = {}
 	for _, piece in ipairs(TownModels.Visual(asset)) do
 		local size = scaled(piece.size, scale)
 		local part = MeshKit.Create(piece.meshId, piece.name, size)
@@ -321,6 +328,7 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 			return false
 		end
 		table.insert(made, part)
+		table.insert(ids, piece.meshId)
 	end
 	if #made == 0 then
 		return false
@@ -332,11 +340,11 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 	end
 	local hosts = hostsOf(model)
 	local fresh: { [BasePart]: boolean } = {}
-	for _, part in ipairs(made) do
+	for i, part in ipairs(made) do
 		place(part, root)
 		part.Parent = model
 		fresh[part] = true
-		finishPiece(part, asset, hosts, root)
+		finishPiece(part, asset, hosts, root, ids[i])
 	end
 	pcall(function()
 		model.WorldPivot = locked
@@ -354,6 +362,7 @@ function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boo
 		return false
 	end
 	local made: { MeshPart } = {}
+	local ids: { number } = {}
 	for _, piece in ipairs(TownModels.Visual(asset)) do
 		local part = MeshKit.Create(piece.meshId, piece.name, piece.size)
 		if not part then
@@ -363,10 +372,11 @@ function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boo
 			return false
 		end
 		table.insert(made, part)
+		table.insert(ids, piece.meshId)
 	end
-	for _, part in ipairs(made) do
+	for i, part in ipairs(made) do
 		place(part, pivot)
-		MeshKit.Visual(part)
+		MeshKit.Visual(part, ids[i])
 		MeshKit.Fidelity(part, TownMeshes.FidelityFor(part.Name, asset.tris))
 		part.Anchored = true
 		if GLOW[part.Name] then

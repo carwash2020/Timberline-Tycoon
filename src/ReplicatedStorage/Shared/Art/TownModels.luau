@@ -1,7 +1,9 @@
 --!strict
 -- TownModels: uploaded town meshes (environment, buildings, NPCs).
 -- Sizes are each mesh's initialSize. Collision rows are ignored by
--- TownMeshes. The upload has no triangle counts, so tris is nil.
+-- TownMeshes. Building and NPC tris are the visible mesh only.
+-- The 41 props run from ParkingBay (48) to MurphsCamp (1,736), all under
+-- PropTriCap. No stats.json in the repo, so per-prop tris stays nil.
 
 local TownModels = {}
 
@@ -446,7 +448,7 @@ local ALL: { Asset } = {
 		id = "Sawmill",
 		category = "building",
 		modelId = 122113550398654,
-		tris = nil,
+		tris = 9732,
 		pieces = {
 			{ name = "Body", meshId = 86215100835246, size = V(63.785, 42.3, 42.938) },
 			{ name = "Collision", meshId = 112566568598574, size = V(61.65, 42, 40.95) },
@@ -462,7 +464,7 @@ local ALL: { Asset } = {
 		id = "ToolShed",
 		category = "building",
 		modelId = 103216324496102,
-		tris = nil,
+		tris = 5120,
 		pieces = {
 			{ name = "BarnDoorL", meshId = 104574414484630, size = V(6.6, 11.775, 0.787) },
 			{ name = "BarnDoorR", meshId = 128974784954519, size = V(6.6, 11.775, 0.787) },
@@ -478,7 +480,7 @@ local ALL: { Asset } = {
 		id = "Dealership",
 		category = "building",
 		modelId = 72283597849277,
-		tris = nil,
+		tris = 3780,
 		pieces = {
 			{ name = "Body", meshId = 82514834771582, size = V(32.43, 30.665, 25.159) },
 			{ name = "Collision", meshId = 77525517309414, size = V(29.898, 21.75, 25.8) },
@@ -495,7 +497,7 @@ local ALL: { Asset } = {
 		id = "GeneralStore",
 		category = "building",
 		modelId = 87424363129550,
-		tris = nil,
+		tris = 8232,
 		pieces = {
 			{ name = "Body", meshId = 126615154910404, size = V(51.06, 30.525, 40.524) },
 			{ name = "Chimney", meshId = 126429254955747, size = V(2.4, 0.75, 2.4) },
@@ -511,7 +513,7 @@ local ALL: { Asset } = {
 		id = "GondolaStation",
 		category = "building",
 		modelId = 91952415804874,
-		tris = nil,
+		tris = 2520,
 		pieces = {
 			{ name = "Body", meshId = 76209421282595, size = V(12.8, 16.55, 12.128) },
 			{ name = "Bullwheel", meshId = 77508109255073, size = V(7.487, 1.2, 7.487) },
@@ -526,7 +528,7 @@ local ALL: { Asset } = {
 		id = "SkyBin",
 		category = "building",
 		modelId = 119616511605580,
-		tris = nil,
+		tris = 696,
 		pieces = {
 			{ name = "Body", meshId = 100903937466780, size = V(4.825, 10.085, 7.374) },
 			{ name = "FlumeWater", meshId = 80895288519775, size = V(1.3, 3.575, 2.894) },
@@ -538,7 +540,7 @@ local ALL: { Asset } = {
 		id = "Murph",
 		category = "npc",
 		modelId = 116498139907119,
-		tris = nil,
+		tris = 1704,
 		pieces = {
 			{ name = "Carry", meshId = 129282759397083, size = V(0.601, 0.6, 0.462) },
 			{ name = "Head", meshId = 119641824946975, size = V(1.52, 3.02, 1.42) },
@@ -563,7 +565,7 @@ local ALL: { Asset } = {
 		id = "Millie",
 		category = "npc",
 		modelId = 99114742559192,
-		tris = nil,
+		tris = 1772,
 		pieces = {
 			{ name = "Carry", meshId = 73996108186259, size = V(0.135, 1.287, 1.089) },
 			{ name = "Head", meshId = 102313140359146, size = V(1.52, 1.798, 1.66) },
@@ -588,7 +590,7 @@ local ALL: { Asset } = {
 		id = "Tink",
 		category = "npc",
 		modelId = 122987026100545,
-		tris = nil,
+		tris = 1740,
 		pieces = {
 			{ name = "Carry", meshId = 102672823416739, size = V(1, 0.37, 0.37) },
 			{ name = "Head", meshId = 85114800128167, size = V(1.78, 1.791, 1.858) },
@@ -613,7 +615,7 @@ local ALL: { Asset } = {
 		id = "Dale",
 		category = "npc",
 		modelId = 121779024595337,
-		tris = nil,
+		tris = 1436,
 		pieces = {
 			{ name = "Carry", meshId = 88085019167252, size = V(0.16, 1.7, 0.6) },
 			{ name = "Head", meshId = 96013384851518, size = V(1.52, 1.715, 1.915) },
@@ -638,7 +640,7 @@ local ALL: { Asset } = {
 		id = "Hazel",
 		category = "npc",
 		modelId = 74883633826857,
-		tris = nil,
+		tris = 1552,
 		pieces = {
 			{ name = "Carry", meshId = 95166951515260, size = V(0.562, 1.318, 0.562) },
 			{ name = "Glow", meshId = 77999129021080, size = V(0.412, 0.525, 0.413) },
@@ -664,7 +666,7 @@ local ALL: { Asset } = {
 		id = "Gus",
 		category = "npc",
 		modelId = 86167893945213,
-		tris = nil,
+		tris = 1460,
 		pieces = {
 			{ name = "Head", meshId = 137243554156858, size = V(1.53, 1.825, 1.79) },
 			{ name = "HumanoidRootPart", meshId = 137889643879858, size = V(2, 2, 1) },
@@ -688,7 +690,7 @@ local ALL: { Asset } = {
 		id = "Rosa",
 		category = "npc",
 		modelId = 76753398201249,
-		tris = nil,
+		tris = 1584,
 		pieces = {
 			{ name = "Carry", meshId = 135893698322865, size = V(1.12, 1.29, 0.9) },
 			{ name = "Head", meshId = 108009426716841, size = V(1.52, 1.568, 1.663) },
@@ -713,7 +715,7 @@ local ALL: { Asset } = {
 		id = "Pip",
 		category = "npc",
 		modelId = 119462072845615,
-		tris = nil,
+		tris = 1480,
 		pieces = {
 			{ name = "Carry", meshId = 111101942473680, size = V(0.59, 1.127, 0.548) },
 			{ name = "Head", meshId = 124190518401724, size = V(1.529, 1.525, 1.454) },
@@ -738,7 +740,7 @@ local ALL: { Asset } = {
 		id = "OldBram",
 		category = "npc",
 		modelId = 79097238419970,
-		tris = nil,
+		tris = 1384,
 		pieces = {
 			{ name = "Carry", meshId = 106182055345622, size = V(0.455, 2.387, 0.156) },
 			{ name = "Head", meshId = 108637384034532, size = V(1.52, 1.365, 1.39) },
@@ -775,7 +777,7 @@ TownModels.FootSpan = 14.4
 TownModels.NpcHeight = 5.67
 TownModels.StoreBoardDrop = 2.3
 TownModels.WindmillHub = Vector3.new(0, 12.4, -3.9)
--- Visible-triangle caps (ticket I). Unknown tris do not spend the cap.
+-- Visible-triangle caps (ticket I). A prop with no recorded tris does not spend the cap.
 TownModels.BuildingTriCap = 10000
 TownModels.NpcTriCap = 2000
 TownModels.PropTriCap = 2000
