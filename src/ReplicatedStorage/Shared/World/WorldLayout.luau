@@ -37,6 +37,11 @@ local function plotBounds(): (number, number, number, number)
 end
 
 local px0, px1, pz0, pz1 = plotBounds()
+-- 16 wide, grown north and starting further east than the old 10-wide road,
+-- so its south edge and its west end stay clear of the longest bay and the
+-- lot's east fence.
+local plotRoadZ = pz1 + 10
+local plotRoadX = 118
 
 WorldLayout.FlatZones = {
 	-- Town: spawn, sawmill, shops, parking, gondola station.
@@ -55,35 +60,110 @@ end
 local hills, snow, volcano, sky = center("hills"), center("snow"), center("volcano"), center("sky")
 
 WorldLayout.Roads = {
-	-- Town to the Starter Forest (south, a short walk).
-	{ name = "ForestPath", points = { Vector2.new(0, 20), Vector2.new(-6, -30) }, width = 10 },
-	-- West to the Hills, curving past Hearth & Home.
+	-- Town to the Starter Forest (south, a short walk). Wide enough for the
+	-- Logging Rig (phase 12).
+	{ name = "ForestPath", points = { Vector2.new(0, 20), Vector2.new(-6, -30) }, width = 16 },
+	-- West to the Hills, curving past Hearth & Home. A haul road: 28 studs,
+	-- so two rigs can pass on a bend.
 	{
 		name = "HillsRoad",
 		points = { Vector2.new(-20, 20), Vector2.new(-140, 40), Vector2.new(-230, 90), hills + Vector2.new(120, 0) },
-		width = 14,
+		width = 28,
 	},
 	-- North from behind the sawmill, up onto the Snowfields plateau.
 	{
 		name = "SnowRoad",
 		points = { Vector2.new(0, 205), Vector2.new(30, 450), Vector2.new(-20, 760), snow - Vector2.new(0, 160) },
-		width = 14,
+		width = 28,
 	},
 	-- North-east to the Volcano, branching off the snow road.
 	{
 		name = "VolcanoRoad",
 		points = { Vector2.new(30, 450), Vector2.new(380, 640), Vector2.new(760, 900), volcano - Vector2.new(150, 120) },
-		width = 14,
+		width = 28,
 	},
 	-- West-north-west from the snow road to the Skyroot's foot.
 	{
 		name = "SkyrootRoad",
 		points = { Vector2.new(-20, 760), Vector2.new(-420, 860), Vector2.new(-760, 960), sky + Vector2.new(120, -40) },
-		width = 12,
+		width = 24,
 	},
 	-- The road along the north side of the plot district.
-	{ name = "PlotRoad", points = { Vector2.new(110, pz1 + 10), Vector2.new(px1, pz1 + 10) }, width = 10 },
+	{ name = "PlotRoad", points = { Vector2.new(plotRoadX, plotRoadZ), Vector2.new(px1, plotRoadZ) }, width = 16 },
+	-- East of the Dealership, then north to the Snow Road's start. The mill
+	-- yard and the shop fill x 22 to 70, so the way stays east of them.
+	{
+		name = "MillRoad",
+		points = {
+			Vector2.new(64, 76),
+			Vector2.new(102, 76),
+			Vector2.new(102, 158),
+			Vector2.new(48, 186),
+			Vector2.new(14, 200),
+			Vector2.new(0, 205),
+		},
+		width = 22,
+	},
+	-- South of the lot's pull-outs, around to the plot road, so a long rig
+	-- can turn without backing the length of the lot.
+	{
+		name = "LotLoop",
+		points = {
+			Vector2.new(-6, -30),
+			Vector2.new(8, -58),
+			Vector2.new(160, -58),
+			Vector2.new(172, -10),
+			Vector2.new(172, plotRoadZ),
+			Vector2.new(130, plotRoadZ),
+		},
+		width = 16,
+	},
 } :: { Road }
+
+-- Flared turns where a haul road splits, wide enough for the Logging Rig.
+-- Discs, not extra roads: a short segment would fail the "runs through the
+-- country" sample. TerrainGen paints and grades them with the haul roads.
+export type Junction = { name: string, at: Vector2, radius: number, haul: boolean }
+WorldLayout.Junctions = {
+	{ name = "SnowVolcano", at = Vector2.new(30, 450), radius = 32, haul = true },
+	{ name = "SnowSkyroot", at = Vector2.new(-20, 760), radius = 32, haul = true },
+} :: { Junction }
+
+-- A cliff ring outside a biome's trees, with one angular gap (the road).
+-- `gap` is the opening's centre angle (atan2 of z, x from the centre);
+-- `half` is how far either side of it the wall stays down.
+export type Rim = {
+	kind: string,
+	cx: number,
+	cz: number,
+	inner: number,
+	outer: number,
+	height: number,
+	gap: number,
+	half: number,
+}
+WorldLayout.Rims = {
+	{
+		kind = "snow",
+		cx = snow.X,
+		cz = snow.Y,
+		inner = 246,
+		outer = 316,
+		height = 16,
+		gap = -math.pi / 2,
+		half = 0.62,
+	},
+	{
+		kind = "volcano",
+		cx = volcano.X,
+		cz = volcano.Y,
+		inner = 228,
+		outer = 302,
+		height = 24,
+		gap = math.atan2(-120, -150),
+		half = 0.7,
+	},
+} :: { Rim }
 
 -- Lanes between the plots (in the gaps the biggest tier leaves).
 do
@@ -98,7 +178,7 @@ do
 			local laneX = x - PlotData.SlotSpacing / 2
 			table.insert(
 				WorldLayout.Roads,
-				{ name = "PlotLane", points = { Vector2.new(laneX, pz1 + 10), Vector2.new(laneX, pz0) }, width = 8 }
+				{ name = "PlotLane", points = { Vector2.new(laneX, plotRoadZ), Vector2.new(laneX, pz0) }, width = 8 }
 			)
 		end
 	end
@@ -130,7 +210,14 @@ WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 export type Paint = { name: string, x0: number, x1: number, z0: number, z1: number, material: string }
 WorldLayout.TownPaint = {
 	{ name = "Plaza", x0 = -26, x1 = 26, z0 = 64, z1 = 97, material = "Cobblestone" },
-	{ name = "MainStreet", x0 = -104, x1 = 64, z0 = 70, z1 = 84, material = "Ground" },
+	-- 22 studs wide (was 14): a Logging Rig has room to line up on the sell pad.
+	{ name = "MainStreet", x0 = -104, x1 = 64, z0 = 62, z1 = 84, material = "Ground" },
+	-- Where the Forest Path meets the town, wider than the spawn walk.
+	{ name = "ForestMouth", x0 = -18, x1 = 6, z0 = 14, z1 = 36, material = "Ground" },
+	-- Where the Hills Road meets the town, south of Murph's camp.
+	{ name = "HillsMouth", x0 = -42, x1 = 4, z0 = 6, z1 = 34, material = "Ground" },
+	-- The turn off the street's east end onto the way north (the mill road).
+	{ name = "PlazaEastMouth", x0 = 70, x1 = 112, z0 = 68, z1 = 96, material = "Ground" },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
 	{ name = "HearthAndHomePath", x0 = -99.5, x1 = -87.5, z0 = 82, z1 = 93, material = "Ground" },
 	{ name = "ToolShedPath", x0 = -63, x1 = -51, z0 = 82, z1 = 93, material = "Ground" },
@@ -327,7 +414,15 @@ export type ForestPlan = {
 }
 
 local grove = center("grove")
--- The grove's ridge opens toward the sawmill (TerrainGen's GROVE_GAP).
+-- The grove's ridge opens toward the sawmill (TerrainGen reads this too).
+WorldLayout.GroveGap = math.atan2(WorldLayout.Sawmill.Z - grove.Y, WorldLayout.Sawmill.X - grove.X)
+-- Shallow bowls on the hollow's floor, off the trail through the gap.
+export type Pool = { x: number, z: number, radius: number, depth: number }
+WorldLayout.GrovePools = {
+	{ x = grove.X + 48, z = grove.Y - 18, radius = 8, depth = 1.15 },
+	{ x = grove.X - 36, z = grove.Y + 42, radius = 7, depth = 1.05 },
+	{ x = grove.X + 18, z = grove.Y + 58, radius = 6.5, depth = 1.0 },
+} :: { Pool }
 local toTown = (Vector2.new(WorldLayout.Sawmill.X, WorldLayout.Sawmill.Z) - grove).Unit
 local gapFoot = grove + toTown * (WorldLayout.GroveRidge.inner - 10)
 

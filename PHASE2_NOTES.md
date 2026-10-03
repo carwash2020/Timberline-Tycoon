@@ -78,10 +78,30 @@ bigger again, and the trees and world should look like the reference game
     violet mist in the Gloam Hollow
   - big, bold name signs on the sawmill and the shops
 
-Still to come in this round (each lands on main when it passes the
-checks): LT2-style box trees, wide roads (28 studs), brown boulders over
-the open grass, a thinner background forest, the Snowfields and Volcano
-ringed with one gate each, and truck routes through town.
+The world slice landed with that look:
+
+- **Trees.** Section trunks are boxes in that wood's bark (frostwood and
+  lumenwood smooth, phantomwood concrete, the rest wood). Leaf crowns are
+  crisp cubes. The biome forests are spaced about 1.5x wider and still
+  have more than 775 trees. The filler woods behind them are thinner.
+- **Roads.** Hills, Snow and Volcano roads are 28 wide, Skyroot 24, Forest
+  Path and the plot road 16. The splits at about (30, 450) and (-20, 760)
+  flare out. Brown boulders sit on the open grass.
+- **Regions.** A brown cliff ring around the Snowfields with one pass on
+  the Snow Road. A dark stone rim around the Volcano with one gap on the
+  Volcano Road. Three shallow pools in the Gloam Hollow. A sign at each
+  gate (SNOWFIELDS, VOLCANO, GLOAM).
+- **Town.** A 22-wide way east of the Dealership, then north to the Snow
+  Road. A 16-wide loop south of the lot, around to the plot road. The
+  street is wider up to the sell pad, the lamps sit back off it, and the
+  Forest Path, Hills Road and mill road open onto the plaza. Murph's camp
+  sits just north of the widened Hills Road.
+
+The first 322 trees kept the spots they had before the roads widened
+(their height follows the new ground). Lune counts 778 tree spots and
+31,409 section-tree parts (average 40.4, about 1.17x the old round
+trees). Studio boot of this slice was not timed here; the earlier Studio
+boot was 775 section trees in 0.6 s and the world in 4.6 s.
 
 ### What to check (in Studio)
 
@@ -105,7 +125,10 @@ sets the hour (`nil` clears it); `workspace:SetAttribute("WeatherOverride",
 | 12 | Jump to (950, 1060) at 13:00 (stand in a truck or wear Heat Boots), then 01:00 | A thick red-orange fog, emberwood trees still findable at 60-100 studs; at night a dark red fog, not glowing. Walking out past the Volcano's edge it fades back in about 3 s |
 | 13 | Jump to (0, 1080) and (-565, -455), at 13:00 and 01:00 | The Snowfields: a light cold white-blue haze by day, no whiteout. The Gloam Hollow: a violet mist, the darkest place at night but never black |
 | 14 | Look at the shops from the spawn, the middle of the lot (about 80, 0, 24) and a truck on the street; again at 22:00 | DEALERSHIP, TIMBERLINE SAWMILL, TOOL SHED and HEARTH & HOME readable from the lot, letters filling the boards, nothing through a roof or blocking a door; two lamps light each sign at night. If the letters look small inside a big board, tell Claude |
-| 15 | Known tight spots until the town routes land | The main street leaves a Logging Rig about 1 stud a side; the haul roads are 14 wide (a Rig fills them); there's no truck-wide way past the sawmill to the Snow Road yet |
+| 15 | In the Rustbucket, then the Logging Rig: drive the Hills Road, the Snow Road, and through both splits (toward the Volcano near (30, 450), toward the Skyroot near (-20, 760)) | The haul roads are wide enough that the Rig isn't filling the lane; each split opens into a flare instead of a sharp corner; the road stays pale grey |
+| 16 | Drive east of the Dealership, north past the sawmill, onto the Snow Road; then south of the lot, around the loop, and up to the sell pad | A truck-wide road clears the mill and the shops and meets the Snow Road; the south loop lets a long rig turn without backing the length of the lot; backing onto the pad is a straight, wide approach; lamps and benches sit off the street |
+| 17 | Walk a birch, a pine and (if you can reach it) a frostwood or phantomwood; look at the crowns | Trunks are square boxes in that wood's colour; crowns are blocky cubes, not soft blobs; trees in a biome forest stand further apart than they used to, and the woods still read as a forest |
+| 18 | From town, look across the open grass; then jump to the Snowfields pass (0, 1240, then south to the cliff), the Volcano gap (950, 1060), and the Gloam Hollow (-565, -455) | Brown boulders on the open grass, with a thinner scatter of background trees. Snow: a brown rock wall with one low pass. Volcano: a dark rim with one gap. Hollow: three shallow pools and a GLOAM sign; SNOWFIELDS and VOLCANO signs stand at their gates |
 
 ## The v2 loop goes live (M1.9, 2 October 2026)
 

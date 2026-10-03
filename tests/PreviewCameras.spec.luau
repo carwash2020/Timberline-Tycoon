@@ -125,7 +125,7 @@ return function(t)
 	t.test("npcs 9: Murph at his camp, centred and in plain view", function()
 		local built = scene("npcs")
 		local cam = built.cameras[9]
-		local spot = Vector3.new(-25, 0, 41.8) -- NPCData's Murph
+		local spot = Vector3.new(-25.0467, 0, 44.4726) -- NPCData's Murph
 		local murph
 		for _, m in ipairs(models(built.root, "Murph")) do
 			if flat(m.PrimaryPart.CFrame.Position, spot) < 1 then

@@ -23,12 +23,14 @@ return function(t)
 	-- These are the first layer's numbers from before the cover layer: a
 	-- hash of every spot's place, look and row in a 16x16 sample of cells
 	-- across the whole map, at three vitalities. If this fails, every
-	-- decoration cell reshuffled.
+	-- decoration cell reshuffled. Phase 12 re-sampled on purpose: the six
+	-- draws per candidate are unchanged, and the wider roads, junction
+	-- flares and hollow pools reject a few of those candidates.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1636, 89357715, 371595739 },
-			[60] = { 2081, 87601353, 635759279 },
-			[85] = { 2596, 38177784, 23738877 },
+			[20] = { 1627, 82777153, 863413116 },
+			[60] = { 2069, 79842856, 469395158 },
+			[85] = { 2580, 27311202, 24507670 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

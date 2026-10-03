@@ -368,7 +368,7 @@ step("5. The boulders", function()
 	rocks.Parent = map
 	local SNOWY = { Color3.fromRGB(232, 238, 245), Color3.fromRGB(200, 208, 218), Color3.fromRGB(150, 150, 156) }
 	local DARK = { Color3.fromRGB(58, 52, 50), Color3.fromRGB(44, 40, 40), Color3.fromRGB(72, 64, 60) }
-	for _, b in ipairs(WorldPlan.Boulders()) do
+	local function placeRock(b: WorldPlan.Boulder)
 		-- Brown out in the green (STY-03), like the clusters and outcrops.
 		local colors = if b.snowy then SNOWY elseif b.dark then DARK else PropArt.BrownTones[b.seed % 2 + 1]
 		local moss = if colors ~= SNOWY and colors ~= DARK and b.seed % 3 == 0 then PropArt.Moss else nil
@@ -377,6 +377,12 @@ step("5. The boulders", function()
 			CFrame.new(b.position) * CFrame.Angles(0, b.seed % 6, 0),
 			rocks
 		)
+	end
+	for _, b in ipairs(WorldPlan.Boulders()) do
+		placeRock(b)
+	end
+	for _, b in ipairs(WorldPlan.MeadowBoulders()) do
+		placeRock(b)
 	end
 end)
 
@@ -452,6 +458,9 @@ end)
 -- boards collide (COL-01), 2+ studs off the road.
 step("5. The road signs", function()
 	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+		place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
+	end
+	for _, sign in ipairs(WorldPlan.GateSigns(WorldPlan.BiomeSignText)) do
 		place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
 	end
 end)
