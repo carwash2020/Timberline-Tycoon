@@ -831,7 +831,11 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 	local model = Instance.new("Model")
 	model.Name = "Wood_" .. uid
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	local bark = barkOf(wood)
+	local kind: SellLogic.Kind = if saved.k == "plank" then "plank" else "log"
+	local color, material = barkOf(wood), Enum.Material.Wood
+	if kind == "plank" then
+		color, material = TreeArt.Core(wood)
+	end
 	local root: BasePart? = nil
 	local volume = 0
 	for i, raw in ipairs(saved.s) do
@@ -843,8 +847,8 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 		part.Name = "Section"
 		part.Size = size
 		part.CFrame = rel
-		part.Material = Enum.Material.Wood
-		part.Color = bark
+		part.Material = material
+		part.Color = color
 		part.Anchored = false
 		part.CanCollide = true
 		part.CanQuery = true
@@ -863,10 +867,10 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 			root = part
 			model.PrimaryPart = part
 		end
-		if bit32.band(faces, 1) ~= 0 then
+		if kind ~= "plank" and bit32.band(faces, 1) ~= 0 then
 			TreeArt.CutFace(wood, part, true)
 		end
-		if bit32.band(faces, 2) ~= 0 then
+		if kind ~= "plank" and bit32.band(faces, 2) ~= 0 then
 			TreeArt.CutFace(wood, part, false)
 		end
 		volume += SellLogic.VolumeU3(size.X, size.Y, size.Z)
@@ -875,7 +879,6 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 		model:Destroy()
 		return nil
 	end
-	local kind: SellLogic.Kind = if saved.k == "plank" then "plank" else "log"
 	local value = SellLogic.PieceValue(wood.id, kind, volume, saved.f, saved.x)
 	model:AddTag("Wood")
 	model:SetAttribute("Uid", uid)

@@ -30,6 +30,25 @@ Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
 
+## Sawmills and planks (M2.2)
+
+A straight log pushed into a sawmill on your plot comes out as planks.
+Planks drag, ride the truck and sell for more than the same wood as a log
+(oak is 2.5×). Buy one at the Tool Shed (**Browse saws**), then
+place it from **BUILD** on your plot. The Rickety ($130) takes an oak
+trunk and refuses a pine base or anything with a branch.
+
+### What to check (in Studio)
+
+| # | Do this | Good looks like |
+|---|---|---|
+| 1 | Claim the free plot. At the Tool Shed, Browse saws, buy the Rickety Sawmill ($130). Open BUILD on your plot | The mill is listed with "Place" and "in stock". The ghost is the saw, not an empty box. Placing it does not charge again |
+| 2 | Cut a straight oak piece about 9 studs long (no branches) and push it into the back of the mill | After a short pause, core-coloured planks come out the front. The X/Y buttons step the cut by 0.2 u and the panel reads the size |
+| 3 | Push a branched piece, then a thick pine base | A toast refuses each. A plank pushed back in is ignored |
+| 4 | Drag the planks onto the truck and sell them on the pad | The toast pays the plank price (oak is 2.5× the log price) |
+| 5 | Leave and rejoin with planks on the truck | They come back as planks, core-coloured, not bark |
+| 6 | A second player presses your mill's X/Y buttons | Your cut does not change |
+
 ## Day 3: bigger trucks and the LT2 look (3 October 2026)
 
 Connor's day-3 feedback: the car wouldn't drive, the tutorial never

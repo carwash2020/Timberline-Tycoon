@@ -22,8 +22,9 @@ players, hunt rare wood types in dangerous biomes, and build up your plot.
 > 1. Swing at a trunk anywhere: hits in one spot grow a notch until the cut goes through; a cut trunk tips and falls (section trees, Shared/TreeGen).
 > 2. Cut the fallen trunk and limbs into pieces wherever you like. Put the axe away and drag them (heavy pieces drag slowly: cut them shorter).
 > 3. Drag the wood onto your truck's bed; it rides loose, by friction.
-> 4. Wood resting on the green sell pad sells by volume: u³ (1.6-stud cubes) x the wood's $ per u³, times its figure and boosts.
-> 5. Spend, then push into farther biomes, as below.
+> 4. A sawmill on your plot (bought at the Tool Shed, then placed) takes one straight log and cuts it into planks. Bigger mills take longer and thicker logs. Planks sell for more than the same wood as a log.
+> 5. Wood resting on the green sell pad sells by volume: u³ (1.6-stud cubes) x the wood's $ per u³, times its figure and boosts. Planks use the plank price.
+> 6. Spend, then push into farther biomes, as below.
 >
 > The steps below are the v1 loop, kept for a rollback (`CoreLoop = 1`) until M1.10.
 

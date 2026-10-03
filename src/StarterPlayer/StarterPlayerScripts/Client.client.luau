@@ -43,6 +43,7 @@ local MODULES = {
 	"PromptUI",
 	"Quality",
 	"QuestUI",
+	"SawmillController",
 	"SettingsUI",
 	"ShopUI",
 	"StoreUI",
@@ -220,6 +221,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "PlotUI",
 		get = function()
 			return require(script.Parent.PlotUI)
+		end,
+	},
+	{
+		name = "SawmillController", -- the v2 loop only
+		get = function()
+			return require(script.Parent.SawmillController)
 		end,
 	},
 	{

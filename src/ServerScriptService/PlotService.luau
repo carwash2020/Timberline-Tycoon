@@ -24,8 +24,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -219,16 +222,34 @@ local function placeModel(slot: Slot, model: Model, item: PlotLogic.Placed)
 end
 
 local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
-	local bp = PlotData.Blueprint(item.blueprintId)
+	local bp = PlotLogic.Blueprint(item.blueprintId)
 	if not bp then
 		return
 	end
-	local model = BlueprintModels.Build(bp, false)
+	local model = if SawmillLogic.Blueprint(item.blueprintId)
+		then MachineArt.Build(item.blueprintId, false)
+		else BlueprintModels.Build(bp, false)
+	if not model then
+		return
+	end
 	model.Name = item.uid
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model:SetAttribute("OwnerId", owner.UserId)
 	model:SetAttribute("Uid", item.uid)
 	model:SetAttribute("BlueprintId", item.blueprintId)
+	local mill = ItemCatalog.GetSawmill(item.blueprintId)
+	if mill then
+		local saved = item.data
+		local settings = SawmillLogic.ClampSettings(
+			mill,
+			if saved and type(saved.x) == "number" then saved.x else 1,
+			if saved and type(saved.y) == "number" then saved.y else 0.6
+		)
+		item.data = settings
+		model:SetAttribute("CutX", settings.x)
+		model:SetAttribute("CutY", settings.y)
+		MachineArt.SetCut(model, settings.x, settings.y)
+	end
 	placeModel(slot, model, item)
 	CollectionService:AddTag(model, "PlacedItem")
 	model.Parent = slot.items
@@ -339,7 +360,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	local bp = PlotData.Blueprint(blueprintId)
+	local bp = PlotLogic.Blueprint(blueprintId)
 	if not profile or not bp then
 		return
 	end
@@ -356,20 +377,40 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 		end
 		return
 	end
-	if profile.cash < bp.priceCash then
+	-- A sawmill bought at the Tool Shed is already paid for: placing takes
+	-- one out of stock. Otherwise you pay here, the same as a blueprint.
+	local fromStock = false
+	if ItemCatalog.GetSawmill(bp.id) then
+		local stock = profile.sawmillStock
+		if type(stock) ~= "table" then
+			stock = {}
+			profile.sawmillStock = stock
+		end
+		local at = table.find(stock, bp.id)
+		if at then
+			table.remove(stock, at)
+			fromStock = true
+			player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(stock))
+		end
+	end
+	local price = if fromStock then 0 else bp.priceCash
+	if profile.cash < price then
 		notify(
 			player,
-			string.format("You need %s more for the %s.", Util.formatCash(bp.priceCash - profile.cash), bp.displayName)
+			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), bp.displayName)
 		)
 		return
 	end
-	if bp.priceCash > 0 and not EconomyService.SpendCash(player, bp.priceCash, "placed " .. bp.displayName, bp.id) then
+	if price > 0 and not EconomyService.SpendCash(player, price, "placed " .. bp.displayName, bp.id) then
 		return
 	end
 	local item: PlotLogic.Placed = { uid = Util.guid(), blueprintId = bp.id, x = px, z = pz, rot = rot :: number }
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
 	buildItem(slot, player, item)
+	if fromStock then
+		notify(player, string.format("Placed your %s.", bp.displayName))
+	end
 end
 
 function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, rot: unknown)
@@ -388,7 +429,7 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 		return
 	end
 	local item = findPlaced(profile, uid :: string)
-	local bp = if item then PlotData.Blueprint(item.blueprintId) else nil
+	local bp = if item then PlotLogic.Blueprint(item.blueprintId) else nil
 	if not item or not bp then
 		return
 	end
@@ -426,7 +467,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 		return
 	end
 	local item, index = findPlaced(profile, uid)
-	local bp = if item then PlotData.Blueprint(item.blueprintId) else nil
+	local bp = if item then PlotLogic.Blueprint(item.blueprintId) else nil
 	if not item or not bp then
 		return
 	end

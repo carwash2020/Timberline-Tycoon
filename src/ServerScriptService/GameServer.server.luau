@@ -27,6 +27,7 @@ local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
+local SawmillService = require(script.Parent.SawmillService)
 local SellService = require(script.Parent.SellService)
 local LeaveCommit = require(script.Parent.LeaveCommit)
 local LeftLoad = require(script.Parent.LeftLoad)
@@ -639,6 +640,8 @@ if CoreLoop.V2() then
 	end)
 	GrabService.JudgeMoves = false
 	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
+	-- Placed sawmills (M2.2): a straight log in the intake comes out as planks.
+	safely("SawmillService.Init", SawmillService.Init, notify, remote.SawmillSet)
 	safely("DevCommands.Init", DevCommands.Init, notify)
 	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
 	local function saleFx(model: Model)

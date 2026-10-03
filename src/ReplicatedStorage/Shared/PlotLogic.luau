@@ -4,12 +4,25 @@
 -- or red) agree, and tests can run it.
 
 local PlotData = require(script.Parent.PlotData)
+local SawmillLogic = require(script.Parent.SawmillLogic)
 
 type Blueprint = PlotData.Blueprint
 
 local PlotLogic = {}
 
-export type Placed = { uid: string, blueprintId: string, x: number, z: number, rot: number }
+export type Placed = {
+	uid: string,
+	blueprintId: string,
+	x: number,
+	z: number,
+	rot: number,
+	data: { x: number, y: number }?,
+}
+
+-- A decor blueprint, or a sawmill (they place on the same grid).
+function PlotLogic.Blueprint(id: string): Blueprint?
+	return PlotData.Blueprint(id) or SawmillLogic.Blueprint(id)
+end
 
 export type Rect = { x: number, z: number, w: number, d: number } -- centre + size
 
@@ -73,7 +86,7 @@ function PlotLogic.Check(
 	end
 	for _, item in ipairs(placed) do
 		if item.uid ~= ignoreUid then
-			local other = PlotData.Blueprint(item.blueprintId)
+			local other = PlotLogic.Blueprint(item.blueprintId)
 			if other and overlaps(rect, PlotLogic.RectOf(other, item.x, item.z, item.rot)) then
 				return false, "Something's in the way"
 			end

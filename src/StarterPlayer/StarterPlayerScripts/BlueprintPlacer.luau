@@ -19,6 +19,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
@@ -241,7 +243,9 @@ end
 function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	BlueprintPlacer.Stop()
 	local opts: Options = options or {}
-	local ghost = BlueprintModels.Build(bp, true)
+	local ghost = if ItemCatalog.GetSawmill(bp.id)
+		then MachineArt.Build(bp.id, true) or BlueprintModels.Build(bp, true)
+		else BlueprintModels.Build(bp, true)
 	ghost.Name = "BlueprintGhost"
 	local highlight = Instance.new("Highlight")
 	highlight.FillTransparency = 0.55
