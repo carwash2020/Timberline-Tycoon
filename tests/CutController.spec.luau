@@ -166,4 +166,27 @@ return function(t)
 		controller.Start()
 		t.eq(connected(), 0, "no signal connected")
 	end)
+
+	-- The HUD's v2 hints: pointing at loose wood (put the axe away to drag
+	-- it) and at wood too hard for the axe.
+	t.test("what the axe points at, for the hint: loose wood, and wood too hard for it", function()
+		local HintLogic = t.shared("HintLogic")
+		local FieldGuide = t.shared("FieldGuide")
+		local rusty = ItemCatalog.GetAxe("RustyAxe")
+		local part = Instance.new("Part")
+		part.Size = Vector3.new(2, 9, 2)
+		local function seen(kind, woodId, problem)
+			return { part = part, model = Instance.new("Model"), kind = kind, woodId = woodId, problem = problem }
+		end
+		t.eq({ CutController.PointingFacts(nil, rusty) }, { false, false }, "nothing")
+		t.eq({ CutController.PointingFacts(seen("node"), rusty) }, { false, false }, "a crystal node")
+		t.eq({ CutController.PointingFacts(seen("tree", "oak"), rusty) }, { false, false }, "an oak the hatchet cuts")
+		t.eq({ CutController.PointingFacts(seen("wood", "oak"), rusty) }, { true, false }, "a loose oak log")
+		t.eq({ CutController.PointingFacts(seen("tree", "frostwood", "hard"), rusty) }, { false, true }, "can't cut it")
+		-- A thick lumenwood trunk with the hatchet: far past the useful pace.
+		part.Size = Vector3.new(4, 9, 4)
+		local hits = FieldGuide.CutHits(rusty, "lumenwood", 4, 4)
+		t.ok(HintLogic.TooHard(hits), "lumenwood takes " .. hits .. " hits")
+		t.eq({ CutController.PointingFacts(seen("tree", "lumenwood"), rusty) }, { false, true }, "too many hits")
+	end)
 end

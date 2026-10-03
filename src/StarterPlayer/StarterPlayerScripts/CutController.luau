@@ -31,7 +31,9 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
@@ -188,6 +190,27 @@ type Target = {
 	woodId: string?,
 	problem: string?, -- "far" | "hard" | nil
 }
+
+-- What the HUD's hint needs to know about what the axe is pointing at
+-- (`seen`: the target, or what the pointer found and why it won't do):
+-- whether it's a loose piece (put the axe away to drag it), and whether
+-- it's wood this axe can't cut or needs too many hits for
+-- (HintLogic.TooHard over FieldGuide.CutHits).
+function CutController.PointingFacts(seen: Target?, axe: ItemCatalog.AxeDef?): (boolean, boolean)
+	if seen == nil or axe == nil or seen.kind == "node" then
+		return false, false
+	end
+	local onWood = seen.kind == "wood"
+	if seen.problem == "hard" then
+		return onWood, true
+	end
+	local woodId = seen.woodId
+	if woodId == nil or woodId == "" then
+		return onWood, false
+	end
+	local size = seen.part.Size
+	return onWood, HintLogic.TooHard(FieldGuide.CutHits(axe, woodId, size.X, size.Z))
+end
 
 -- The equipped axe tool, its definition and the root part, or nils.
 local function equipped(): (Tool?, ItemCatalog.AxeDef?, BasePart?)
@@ -387,6 +410,7 @@ local function updateOutline()
 	local _tool, axe, hrp = equipped()
 	local adornee: Instance? = nil
 	local color = READY_COLOR
+	local onWood, tooHard = false, false
 	if axe and hrp then
 		local target, refused = pickTarget(hrp, axe)
 		if target then
@@ -394,7 +418,9 @@ local function updateOutline()
 		elseif refused and refused.problem == "hard" then
 			adornee, color = refused.part, HARD_COLOR
 		end
+		onWood, tooHard = CutController.PointingFacts(target or refused, axe)
 	end
+	HUD.SetPointing(onWood, tooHard)
 	if adornee then
 		hl.Adornee = adornee
 		hl.OutlineColor = color
