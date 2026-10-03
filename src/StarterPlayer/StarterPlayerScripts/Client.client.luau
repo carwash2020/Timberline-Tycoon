@@ -39,6 +39,7 @@ local MODULES = {
 	"HudRules",
 	"LifeFX",
 	"LightingController",
+	"LuxFX",
 	"NPCController",
 	"PlotPickerUI",
 	"PlotUI",
@@ -153,6 +154,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "WoodFX", -- the v2 loop only
 		get = function()
 			return require(script.Parent.WoodFX)
+		end,
+	},
+	{
+		name = "LuxFX",
+		get = function()
+			return require(script.Parent.LuxFX)
 		end,
 	},
 	{

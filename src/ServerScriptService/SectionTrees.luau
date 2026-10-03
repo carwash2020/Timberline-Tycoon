@@ -1073,6 +1073,7 @@ local function cutStanding(
 		progress = hit.progress,
 		userId = player.UserId,
 		through = hit.through,
+		lux = luxSwing == true,
 	})
 	local result: SwingResult = { tree = rec, piece = nil, hit = hit, freed = {}, feller = nil }
 	if hit.through then

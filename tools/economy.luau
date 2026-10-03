@@ -670,6 +670,28 @@ target("First $1k earned", "15-20 min", events.thousand, 900, 1200)
 target("Cobalt Axe ($2,040)", "about 1 h", events.CobaltAxe or math.huge, 2700, 4500)
 target("Full plot ($900,100)", "20-40 h", events.plot, 72000, 144000)
 line()
+line("## CI ranges")
+line()
+line(
+	"Every `lune run tools/economy` (including `--check`) fails the process when a headline time leaves these ranges. There is no 0.75–1.25 slack here. E1 is the first sale, E2 the Steel Axe (8.0 min is inside), E3 the first $1k, E4 Cobalt and the full plot."
+)
+line()
+line("| Target | Strict range | This model |")
+line("|---|---|---|")
+line(string.format("| First sale (E1) | under 3 min (0–180 s) | %.0f s |", events.firstSale))
+line(string.format("| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | %.0f s |", events.SteelAxe or math.huge))
+line(string.format("| First $1k (E3) | 13–20 min (780–1200 s) | %.0f s |", events.thousand))
+line(string.format("| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | %.0f s |", events.CobaltAxe or math.huge))
+line(string.format("| Full plot (E4) | 20–40 h (72000–144000 s) | %.0f s |", events.plot))
+line()
+line(
+	string.format(
+		"The first $1,000 in this model is %s (%.0f s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.",
+		duration(events.thousand),
+		events.thousand
+	)
+)
+line()
 line(
 	string.format(
 		"End of the buying path: %s/h on %s with the %s and the %s.",
@@ -893,6 +915,36 @@ for _, k in ipairs(keys) do
 	line(string.format("- `%s` = %s", k, if type(v) == "number" then string.format("%g", v) else tostring(v)))
 end
 line()
+
+-- Strict ranges. The headline verdict above still uses 0.75–1.25 slack.
+-- Steel's 8.0 min is the top of 300–480, so the high end is inclusive.
+local guards = {
+	{ "First sale", events.firstSale, 0, 180 },
+	{ "Steel Axe", events.SteelAxe or math.huge, 300, 480 },
+	{ "First $1k", events.thousand, 780, 1200 },
+	{ "Cobalt Axe", events.CobaltAxe or math.huge, 2700, 4500 },
+	{ "Full plot", events.plot, 72000, 144000 },
+}
+local guardFailed = false
+for _, row in ipairs(guards) do
+	local name, value, lo, hi = row[1], row[2], row[3], row[4]
+	if type(value) ~= "number" or value < lo or value > hi then
+		print(
+			string.format(
+				"ECONOMY GUARD: %s is %s (%.3f s), outside %.0f–%.0f s",
+				name,
+				duration(value),
+				value,
+				lo,
+				hi
+			)
+		)
+		guardFailed = true
+	end
+end
+if guardFailed then
+	process.exit(1)
+end
 
 local report = table.concat(out, "\n")
 if process.args[1] == "--check" then

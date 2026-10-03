@@ -307,4 +307,25 @@ return function(t)
 		t.ok(w.VehicleService.Recall(w.player), "a later recall works")
 		t.eq(w.profile.cash, 92, "Pickup is 2% of $400, and at least $2")
 	end)
+
+	t.test("despawn keeps the saved load, and a recall with no truck puts it back", function()
+		local w = setup()
+		w.profile.ownedTrucks = { "Rustbucket" }
+		w.profile.equippedTruck = "Rustbucket"
+		w.profile.cash = 0
+		local VehicleService = w.VehicleService
+		local model = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		t.ok(model and model.Parent ~= nil, "spawned")
+		t.ok(VehicleService.AddBedLog(w.player, { woodId = "oak", value = 7 }))
+		t.eq(#w.profile.truckBed, 1, "AddBedLog writes the save")
+		VehicleService.DespawnTruck(w.player)
+		t.eq(model.Parent, nil, "the truck is gone")
+		t.eq(VehicleService.GetVehicle(w.player), nil)
+		t.eq(#w.profile.truckBed, 1, "the log is still saved")
+		t.eq(w.profile.truckBed[1].woodId, "oak")
+		local ok = VehicleService.Recall(w.player)
+		t.ok(ok, "recalled from the save")
+		t.eq(VehicleService.GetBedCount(w.player), 1, "the load came back")
+		t.eq(w.profile.truckBed[1].woodId, "oak")
+	end)
 end

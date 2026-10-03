@@ -65,6 +65,7 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
+local MeshKit = require(ReplicatedStorage.Shared.Art.MeshKit)
 local GrabService = require(script.Parent.GrabService)
 
 type WoodDef = WoodData.WoodDef
@@ -323,7 +324,8 @@ end
 local function partsIn(model: Model): number
 	local n = 0
 	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") then
+		-- Crown meshes are looks-only. A cut section is still one part.
+		if d:IsA("BasePart") and MeshKit.Counts(d) then
 			n += 1
 		end
 	end
@@ -1274,6 +1276,7 @@ function WoodService.CutPiece(
 		progress = hit.progress,
 		userId = player.UserId,
 		through = hit.through,
+		lux = swingLux == true,
 	})
 	if not hit.through then
 		return { hit = hit, pieces = {} }

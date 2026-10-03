@@ -92,11 +92,13 @@ return function(t)
 			globals = { os = fakeOs, workspace = fakeWorkspace },
 		})
 		local GrabService = loader:server("GrabService")
+		local realSetOwner = GrabService.Physics.SetOwner
 		local w = {
 			GrabService = GrabService,
 			loader = loader,
 			registered = registered,
 			collidable = collidable,
+			realSetOwner = realSetOwner,
 			owners = {}, -- [part] = player, nil (the server) or "auto"
 			ownerCalls = {},
 			autos = {},
@@ -382,6 +384,20 @@ return function(t)
 		t.eq({ stuck.GrabService.Grab(p, stuckSection, HIT) }, { false, "stuck" })
 		t.eq(record.model:GetAttribute("HeldBy"), 0)
 		t.eq(stuckSection.CollisionGroup, "Default")
+		-- The engine refuses an anchored part. That false does not flip true.
+		local anchored = Instance.new("Part")
+		anchored.Anchored = true
+		local player = w.player(3)
+		local first = w.realSetOwner(anchored, player)
+		local second = w.realSetOwner(anchored, player)
+		t.eq(first, false)
+		t.eq(second, false)
+		-- And a loose part the engine still refuses (no physics here) is stuck.
+		w.GrabService.Physics.SetOwner = w.realSetOwner
+		local _, loose = w.piece()
+		loose.Anchored = false
+		t.eq({ w.GrabService.Grab(w.player(4), loose, HIT) }, { false, "stuck" })
+		t.eq(w.realSetOwner(loose, player), false)
 	end)
 
 	t.test("letting go: groups and attributes back; the dropper keeps the physics 2 s, then automatic", function()

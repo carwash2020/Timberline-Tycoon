@@ -180,8 +180,11 @@ return function(t)
 						model.Name = bp.id
 						return model
 					end,
-					Place = function(model, _plotCFrame, x, z, rot)
+					Place = function(model, plotCFrame, x, z, rot)
 						model.placedAt = { x, z, rot }
+						-- World pose: the pad's origin, then the plot-local offset.
+						local world = plotCFrame * t.roblox.CFrame.new(x, 0, z)
+						model.placedWorld = world.Position
 					end,
 				},
 				MachineArt = {
@@ -419,6 +422,12 @@ return function(t)
 		t.eq(ann.attrs.PlotSlot, 2)
 		t.eq(#s.items(2), 1)
 		t.eq(s.items(2)[1].Name, "a")
+		-- P6: the bench is the pad 2 origin plus the saved (4, 4), plot-local.
+		local slot = s.PlotData.Slots[2]
+		local bench = s.items(2)[1]
+		t.eq(bench.placedAt, { 4, 4, 0 })
+		t.eq(bench.placedWorld.X, slot.X + 4)
+		t.eq(bench.placedWorld.Z, slot.Y + 4)
 		s.P.PlayerRemoving(ann)
 		t.eq(#s.items(2), 0)
 		t.eq(s.plot(2):GetAttribute("OwnerId"), nil)

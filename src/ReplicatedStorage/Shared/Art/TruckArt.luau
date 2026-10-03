@@ -69,6 +69,7 @@ local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 local TreeArt = require(script.Parent.TreeArt)
+local VehicleMeshes = require(script.Parent.VehicleMeshes)
 
 type TruckDef = ItemCatalog.TruckDef
 type TrailerDef = ItemCatalog.TrailerDef
@@ -1596,6 +1597,9 @@ function TruckArt.Build(
 	if def.classic == true then
 		addClassic(model, if extras then extras.doorName else nil)
 	end
+	-- Uploaded meshes when every one loads. A miss keeps this part-built truck.
+	-- Door plates and the load gauge are already on the model; VehicleMeshes keeps them.
+	VehicleMeshes.Apply(model, def.id, if trailer then trailer.id else nil)
 	return model
 end
 
