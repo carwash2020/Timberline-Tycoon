@@ -253,6 +253,13 @@ return function(t)
 		t.eq(ForestLogic.StruckFigure("quilted"), "stormgrain")
 		t.eq(ForestLogic.StruckFigure("burl"), "burl", "a struck burl is still worth more as a burl")
 		t.eq(ForestLogic.StruckFigure("starfall"), "starfall")
+		-- A rare bolt pays burl (x4) instead of Stormgrain (x3). A bolt at
+		-- the origin stays Stormgrain, which is what the strike tests fell.
+		t.eq(ForestLogic.BoltFigure(nil, 0.5), "stormgrain")
+		t.eq(ForestLogic.BoltFigure(nil, 0), "burl")
+		t.eq(ForestLogic.BoltFigure("starfall", 0), "starfall", "a rarer hidden grain stays")
+		t.eq(ForestLogic.BoltFigure("burl", 0), "burl")
+		t.ok(ForestLogic.BoltRoll(0, 0) >= ForestData.Storm.rareChance, "the origin's bolt is the common one")
 		t.eq(ForestLogic.MultiplierText(2), "x2")
 		t.eq(ForestLogic.MultiplierText(1.5), "x1.5")
 		t.eq(ForestLogic.MultiplierText(2.5), "x2.5")

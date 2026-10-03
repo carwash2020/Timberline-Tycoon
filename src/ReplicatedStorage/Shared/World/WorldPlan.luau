@@ -14,6 +14,7 @@ local DealershipLot = require(script.Parent.Parent.Art.DealershipLot)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local LandmarkArt = require(script.Parent.Parent.Art.LandmarkArt)
+local RegionLogic = require(script.Parent.Parent.RegionLogic)
 local TerrainGen = require(script.Parent.TerrainGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local WorldLayout = require(script.Parent.WorldLayout)
@@ -558,6 +559,167 @@ function WorldPlan.Trees(): { TreeSpot }
 		table.insert(out, spot)
 	end
 	cachedTrees = out
+	return out
+end
+
+-- The Petrified Reach: a few gloamwood on the far side of the hollow's
+-- ridge. Appended nowhere in Trees() — the first 322 and everything
+-- placed against them stay put. Night-only, because the wood's biome is
+-- the grove (SectionTrees.SetBiomeDormant). Same price as the hollow's.
+local cachedReach: { TreeSpot }? = nil
+
+local function nearTree(x: number, z: number, gap: number): boolean
+	for _, spot in ipairs(WorldPlan.Trees()) do
+		local p = spot.position
+		local dx, dz = p.X - x, p.Z - z
+		if dx * dx + dz * dz < gap * gap then
+			return true
+		end
+	end
+	return false
+end
+
+function WorldPlan.ReachTrees(): { TreeSpot }
+	if cachedReach then
+		return cachedReach
+	end
+	local out: { TreeSpot } = {}
+	local cx, cz, radius = RegionLogic.ReachCenter()
+	local rng = Kit.rng(hashString("petrified reach"))
+	local placed: { Vector2 } = {}
+	local tries = 0
+	while #out < 4 and tries < 500 do
+		tries += 1
+		local ang = rng:range(0, math.pi * 2)
+		local rad = math.sqrt(rng:next()) * math.max(radius - 6, 8)
+		local x, z = cx + math.cos(ang) * rad, cz + math.sin(ang) * rad
+		local apart = true
+		for _, q in ipairs(placed) do
+			if (q - Vector2.new(x, z)).Magnitude < 14 then
+				apart = false
+				break
+			end
+		end
+		if apart and goodGround(x, z, 8, 0.7) and not nearTree(x, z, 14) and TerrainGen.HeightAt(x, z) < 80 then
+			table.insert(placed, Vector2.new(x, z))
+			table.insert(out, {
+				woodId = "phantomwood",
+				position = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z),
+				biome = "reach",
+			})
+		end
+	end
+	cachedReach = out
+	return out
+end
+
+export type PointOfInterest = {
+	id: string,
+	name: string,
+	kind: string,
+	region: string,
+	cframe: CFrame,
+	seed: number,
+	secret: string?,
+	text: string?,
+}
+
+local cachedPoints: { PointOfInterest }? = nil
+
+function WorldPlan.PointsOfInterest(): { PointOfInterest }
+	if cachedPoints then
+		return cachedPoints
+	end
+	local out: { PointOfInterest } = {}
+	local taken: { Vector2 } = {}
+	for index, anchor in ipairs(RegionLogic.Anchors()) do
+		local rng = Kit.rng(hashString("poi " .. anchor.id))
+		local found: Vector2? = nil
+		local slope = if anchor.kind == "Cave" then 1.05 else 0.72
+		for _ = 1, 90 do
+			local ang = rng:range(0, math.pi * 2)
+			local rad = rng:next() * anchor.search
+			local x = anchor.x + math.cos(ang) * rad
+			local z = anchor.z + math.sin(ang) * rad
+			local clear = WorldLayout.FlatWeight(x, z) < 0.35
+				and TerrainGen.WaterLevelAt(x, z) == nil
+				and TerrainGen.RoadClearance(x, z) >= 8
+				and TerrainGen.SlopeAt(x, z) < slope
+				and TerrainGen.HeightAt(x, z) < 96
+				and not nearTree(x, z, 11)
+			if clear then
+				for _, q in ipairs(taken) do
+					if (q - Vector2.new(x, z)).Magnitude < 22 then
+						clear = false
+						break
+					end
+				end
+			end
+			if clear then
+				found = Vector2.new(x, z)
+				break
+			end
+		end
+		local at = found
+		if at then
+			table.insert(taken, at)
+			local y = TerrainGen.HeightAt(at.X, at.Y)
+			local dirx, dirz = anchor.x - at.X, anchor.z - at.Y
+			if dirx * dirx + dirz * dirz < 4 then
+				dirx, dirz = 0, -1
+			end
+			table.insert(out, {
+				id = anchor.id,
+				name = anchor.name,
+				kind = anchor.kind,
+				region = anchor.region,
+				cframe = CFrame.lookAt(Vector3.new(at.X, y, at.Y), Vector3.new(at.X + dirx, y, at.Y + dirz)),
+				seed = 7000 + index * 17,
+				secret = anchor.secret,
+				text = anchor.text,
+			})
+		end
+	end
+	cachedPoints = out
+	return out
+end
+
+export type TrailSlab = { name: string, cframe: CFrame }
+
+local cachedSlabs: { TrailSlab }? = nil
+
+-- Worn slabs along the footpaths. Anything on a road, in town, on the
+-- plots or in the water is dropped, so a trail never plants a tree's spot
+-- and never paves the haul roads.
+function WorldPlan.TrailSlabs(): { TrailSlab }
+	if cachedSlabs then
+		return cachedSlabs
+	end
+	local out: { TrailSlab } = {}
+	for _, trail in ipairs(RegionLogic.Trails()) do
+		local dx, dz = trail.bx - trail.ax, trail.bz - trail.az
+		local len = math.sqrt(dx * dx + dz * dz)
+		local steps = math.max(math.floor(len / 12), 1)
+		local yaw = math.atan2(dx, dz)
+		for i = 0, steps do
+			local t = i / steps
+			local x = trail.ax + dx * t
+			local z = trail.az + dz * t
+			if
+				WorldLayout.FlatWeight(x, z) < 0.4
+				and TerrainGen.WaterLevelAt(x, z) == nil
+				and TerrainGen.RoadClearance(x, z) > 7
+				and TerrainGen.SlopeAt(x, z) < 0.85
+			then
+				local y = TerrainGen.HeightAt(x, z)
+				table.insert(out, {
+					name = trail.name,
+					cframe = CFrame.new(x, y + 0.12, z) * CFrame.Angles(0, yaw, 0),
+				})
+			end
+		end
+	end
+	cachedSlabs = out
 	return out
 end
 
@@ -4160,6 +4322,9 @@ local function fillerClutter(): FillerClutter
 	for _, tree in ipairs(WorldPlan.Trees()) do
 		add(tree.position.X, tree.position.Z, WorldPlan.FillerTreeGap)
 	end
+	for _, tree in ipairs(WorldPlan.ReachTrees()) do
+		add(tree.position.X, tree.position.Z, WorldPlan.FillerTreeGap)
+	end
 	local gap = WorldPlan.FillerGap
 	for _, b in ipairs(WorldPlan.Boulders()) do
 		add(b.position.X, b.position.Z, b.size / 2 + gap)
@@ -4240,8 +4405,10 @@ local function fillerClear(x: number, z: number, r: number): boolean
 end
 
 -- How likely a filler tree is at (x, z), and the mix it picks from: 0 where
--- nothing grows. `roadClearance` is TerrainGen.RoadClearance there.
-local function fillerDensity(x: number, z: number, roadClearance: number): (number, Mix)
+-- nothing grows. `roadClearance` is TerrainGen.RoadClearance there. The
+-- third value is whether a species stand may replace the mix (forest and
+-- copses; the hub's lone ornament trees keep their own mix).
+local function fillerDensity(x: number, z: number, roadClearance: number): (number, Mix, boolean)
 	local density = WorldPlan.FillerDensity
 	local c, ring = WorldLayout.ForestCover(x, z)
 	if c > 0.5 then
@@ -4255,19 +4422,19 @@ local function fillerDensity(x: number, z: number, roadClearance: number): (numb
 		if id == "volcano" then
 			p *= VOLCANO_SPARSE
 		end
-		return p, mix
+		return p, mix, true
 	end
 	local beach = WorldLayout.Coast.shoreX - WorldLayout.Forest.coast
 	if ring == 0 and WorldLayout.HubDistance(x, z) <= 0 and roadClearance > 20 and x < beach then
 		-- The hub's lawn: a lone ornamental tree, never in a lane.
 		for _, lane in ipairs(WorldLayout.Forest.lanes) do
 			if WorldLayout.SegmentDistance(Vector2.new(x, z), lane.a, lane.b) < lane.half + 10 then
-				return 0, ORNAMENT_MIX
+				return 0, ORNAMENT_MIX, false
 			end
 		end
-		return density.ornament, ORNAMENT_MIX
+		return density.ornament, ORNAMENT_MIX, false
 	end
-	return 0, ORNAMENT_MIX
+	return 0, ORNAMENT_MIX, false
 end
 
 -- A filler tree: `kind` (PropArt.FillerKinds) in look `variant`
@@ -4304,12 +4471,17 @@ function WorldPlan.FillerCellTrees(cx: number, cz: number): { FillerTree }
 			if WorldLayout.FlatWeight(x, z) <= 0 then
 				local roads = TerrainGen.RoadClearance(x, z)
 				if roads >= WorldPlan.FillerRoad then
-					local p, mix = fillerDensity(x, z, roads)
+					local p, mix, stands = fillerDensity(x, z, roads)
 					if roll < p and fillerClear(x, z, 0) then
 						local h = TerrainGen.HeightAt(x, z)
 						if h < FILLER_LOW then -- (dry: ForestCover keeps its margin off the water)
+							local kind = pickKind(mix, kindRoll)
+							if stands then
+								-- One species per stand, neighbor kinds only in the border band.
+								kind = RegionLogic.StandKind(x, z) or kind
+							end
 							table.insert(out, {
-								kind = pickKind(mix, kindRoll),
+								kind = kind,
 								variant = variant,
 								x = x,
 								y = h,
@@ -4376,7 +4548,8 @@ function WorldPlan.FillerFarCell(cx: number, cz: number): { FarBlock }
 		end
 		if half >= 7 and h < FILLER_LOW then
 			local mix = mixAt(mx, mz)
-			local kind = pickKind(mix, kindRoll)
+			-- The same stands as the trees, so a far canopy matches the grove under it.
+			local kind = RegionLogic.StandKind(mx, mz) or pickKind(mix, kindRoll)
 			local top = FAR_TOP[kind] or 17
 			local turn = CFrame.Angles(0, yaw, 0)
 			table.insert(out, {

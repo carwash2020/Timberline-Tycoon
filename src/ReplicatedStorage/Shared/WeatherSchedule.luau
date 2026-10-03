@@ -4,13 +4,13 @@
 -- anything. Pure; shared by WeatherService (publishes it), the clients
 -- (draw it) and tests.
 --
---   * Time is cut into 10-minute slots. Each slot's weather comes from a
+--   * Time is cut into 4-minute slots. Each slot's weather comes from a
 --     hash of its index: Clear 50, Cloudy 20, Rain 15, Storm 7, Fog 8.
 --   * A slot's weather eases in over its first 40 s and out over its last
 --     40 s, unless the slot next to it has the same weather (so two rainy
 --     slots in a row are one long shower, not two).
 --   * Fog only lies at night and in the early morning (a day is 20 real
---     minutes, so a slot is half a day): a fog slot is foggy from 21:00 to
+--     minutes, so a slot is a fifth of a day): a fog slot is foggy from 21:00 to
 --     08:30 in-game, burning off with the morning, and clear in between.
 --   * Each biome reads the weather its own way (ForBiome): rain falls as
 --     snow on the Snowfields, storms are blizzards there and ashfall at the
@@ -30,7 +30,7 @@ export type State = {
 	slotEnd: number, -- ... and ends
 }
 
-WeatherSchedule.SlotSeconds = 600
+WeatherSchedule.SlotSeconds = 240
 WeatherSchedule.EaseSeconds = 40
 
 -- The weathers a slot can roll, with their weights (out of 100).

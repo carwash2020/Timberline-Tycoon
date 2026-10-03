@@ -103,7 +103,7 @@ export type Options = {
 -- What onPieceFreed reads of a WoodService piece.
 type FreedPiece = { volume: number, value: number }
 
-type Struck = { untilAt: number, glow: Instance }
+type Struck = { untilAt: number, glow: Instance, roll: number }
 type Sprout = { userId: number, growth: number } -- a sapling, into the stump of that felling
 type Elder = { uid: string, woodId: string, biome: string, wokeAt: number, aura: Model? }
 
@@ -584,8 +584,9 @@ local function onFelled(player: Player, rec: TreeRecord, logUids: { string }, _f
 	local def = rec.def
 	local hidden = figureOf[uid]
 	figureOf[uid] = nil
-	local wasStruck = struck[uid] ~= nil
-	local figure = if wasStruck then ForestLogic.StruckFigure(hidden) else hidden
+	local strike = struck[uid]
+	local wasStruck = strike ~= nil
+	local figure = if strike then ForestLogic.BoltFigure(hidden, strike.roll) else hidden
 	clearStruck(uid)
 	removeClue(uid)
 	removeStake(uid)
@@ -669,7 +670,8 @@ end
 local function onPieceFreed(cutter: Player, rec: TreeRecord, piece: FreedPiece)
 	local uid = rec.uid
 	local hidden = figureOf[uid]
-	local figure = if struck[uid] then ForestLogic.StruckFigure(hidden) else hidden
+	local strike = struck[uid]
+	local figure = if strike then ForestLogic.BoltFigure(hidden, strike.roll) else hidden
 	if figure then
 		setFigure(piece, figure)
 	end
@@ -1055,7 +1057,11 @@ function ForestService.Strike(position: Vector3): string?
 	if not made then
 		return nil
 	end
-	struck[uid] = { untilAt = clock() + ForestData.Storm.glowSeconds, glow = made }
+	struck[uid] = {
+		untilAt = clock() + ForestData.Storm.glowSeconds,
+		glow = made,
+		roll = ForestLogic.BoltRoll(rec.base.X, rec.base.Z),
+	}
 	local trunk = trunkOf(rec.model)
 	fireAll("Struck", {
 		uid = uid,
