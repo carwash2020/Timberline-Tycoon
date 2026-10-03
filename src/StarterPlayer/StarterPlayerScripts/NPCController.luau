@@ -258,8 +258,10 @@ local function placeBubble(rig: Rig)
 	local offset = phoneLayout.studsOffset
 	local screen, visible = camera:WorldToViewportPoint(rig.head.Position)
 	local top = if phoneLayout.phone then 100 else 78
+	-- Near the top of the screen, nudge aside. Don't drop into the head:
+	-- the tail is the offset, and the scalp is about 0.6 studs up.
 	if visible and screen.Y < top then
-		offset = Vector3.new(offset.X, offset.Y - 1.6, 0)
+		offset = Vector3.new(offset.X + 0.45, math.max(1.45, offset.Y - 0.35), 0)
 	end
 	gui.StudsOffset = offset
 end
@@ -270,7 +272,10 @@ local function say(rig: Rig, text: string, now: number)
 	local layout = phoneLayout
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "SpeechBubble"
-	gui.Size = UDim2.fromOffset(layout.width + 28, 120)
+	-- Tall, with the tail at the centre (the studs offset, above the head).
+	-- The card grows upward from there. The lower half is empty, so even
+	-- when that empty space crosses the head the words do not.
+	gui.Size = UDim2.fromOffset(layout.width + 28, 220)
 	gui.StudsOffset = layout.studsOffset
 	gui.SizeOffset = Vector2.new(0, 0)
 	gui.MaxDistance = layout.maxDistance
@@ -281,7 +286,7 @@ local function say(rig: Rig, text: string, now: number)
 	local card = Instance.new("Frame")
 	card.Name = "Card"
 	card.AnchorPoint = Vector2.new(0.5, 1)
-	card.Position = UDim2.new(0.5, 0, 1, -14)
+	card.Position = UDim2.fromScale(0.5, 0.5)
 	card.Size = UDim2.fromOffset(0, 0)
 	card.AutomaticSize = Enum.AutomaticSize.XY
 	card.BackgroundColor3 = CREAM
@@ -320,7 +325,7 @@ local function say(rig: Rig, text: string, now: number)
 	tail.Name = "Tail"
 	tail.BackgroundTransparency = 1
 	tail.AnchorPoint = Vector2.new(0.5, 0)
-	tail.Position = UDim2.new(0.5, 0, 1, -17)
+	tail.Position = UDim2.new(0.5, 0, 0.5, -2)
 	tail.Size = UDim2.fromOffset(24, 18)
 	tail.Font = Enum.Font.GothamBlack
 	tail.TextSize = 20

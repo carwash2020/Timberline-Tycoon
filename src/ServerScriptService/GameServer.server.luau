@@ -854,7 +854,15 @@ if CoreLoop.V2() then
 		end,
 	})
 	remote.Chop.OnServerEvent:Connect(function(player: Player, part: unknown, hitPos: unknown, normal: unknown)
-		SectionTrees.Chop(player, part, hitPos, normal)
+		local ok, why = SectionTrees.Chop(player, part, hitPos, normal)
+		-- One line per swing, matching the client's [Chop] note, so Output
+		-- shows whether the server cut or why it refused. Not inside
+		-- SectionTrees.Chop: the specs call that directly.
+		if ok then
+			print("[Chop] cut")
+		else
+			print("[Chop] rejected: " .. tostring(why))
+		end
 	end)
 	-- The isles take loose wood (M1.7b): the Cloud Chutes and the Starfall
 	-- Forge are hoppers found the way the pad finds pieces, the Sky Bin by

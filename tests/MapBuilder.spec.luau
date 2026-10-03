@@ -708,10 +708,13 @@ return function(t)
 				t.ok(model:IsA("Model"), "a Model")
 				t.eq(model.Name, spots[i].kind)
 				t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, model.Name .. " streams Atomic")
-				local lod = if model.Name == "LookoutTower"
-					then roblox.Enum.ModelLevelOfDetail.StreamingMesh
-					else roblox.Enum.ModelLevelOfDetail.Automatic
-				t.eq(model.LevelOfDetail, lod, model.Name .. " far-away detail")
+				-- LevelOfDetail is plugin-only. A game script that sets
+				-- StreamingMesh throws and the rest of the scenery step never runs.
+				t.eq(
+					model.LevelOfDetail,
+					roblox.Enum.ModelLevelOfDetail.Automatic,
+					model.Name .. " keeps the default detail"
+				)
 				local n, solid = 0, {}
 				for _, d in ipairs(model:GetDescendants()) do
 					if d:IsA("BasePart") then

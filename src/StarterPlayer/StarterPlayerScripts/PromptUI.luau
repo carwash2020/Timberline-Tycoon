@@ -28,23 +28,35 @@ local player = Players.LocalPlayer
 
 local WIDTH, HEIGHT = 360, 72 -- the billboard; the card sits in its middle
 
+-- How far above a Head (its centre) a Talk card's tail sits. The card
+-- grows upward from there, so it clears the scalp instead of sitting on
+-- the torso. A pixel UIOffset does not: up close it lands on the body.
+PromptUI.HeadLift = 1.55
+
+-- Where a prompt's card is drawn. A model with a Head (an NPC) uses the
+-- head and a studs offset above it; the second return is that offset.
+-- Anything else is the part itself (or the model's PrimaryPart), and the
+-- caller keeps the prompt's pixel UIOffset.
+function PromptUI.Adornee(parent: Instance?): (Instance?, Vector3?)
+	if parent and (parent:IsA("BasePart") or parent:IsA("Attachment")) then
+		return parent, nil
+	elseif parent and parent:IsA("Model") then
+		local head = parent:FindFirstChild("Head")
+		if head and head:IsA("BasePart") then
+			return head, Vector3.new(0, PromptUI.HeadLift, 0)
+		end
+		return parent.PrimaryPart, nil
+	end
+	return nil, nil
+end
+
 local function keyName(key: Enum.KeyCode): string
 	local names: { [string]: string } = { Return = "↵", Backspace = "⌫", Space = "␣" }
 	return names[key.Name] or key.Name
 end
 
-local function adorneeOf(prompt: ProximityPrompt): Instance?
-	local parent = prompt.Parent
-	if parent and (parent:IsA("BasePart") or parent:IsA("Attachment")) then
-		return parent
-	elseif parent and parent:IsA("Model") then
-		return parent.PrimaryPart
-	end
-	return nil
-end
-
 local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
-	local adornee = adorneeOf(prompt)
+	local adornee, studs = PromptUI.Adornee(prompt.Parent)
 	if not adornee then
 		return
 	end
@@ -57,13 +69,26 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	billboard.AlwaysOnTop = true
 	billboard.Active = true
 	billboard.LightInfluence = 0
-	billboard.Size = UDim2.fromOffset(WIDTH, HEIGHT)
-	billboard.SizeOffset = Vector2.new(prompt.UIOffset.X / WIDTH, prompt.UIOffset.Y / HEIGHT)
 	billboard.ResetOnSpawn = false
+	if studs then
+		-- Tail at the head offset; the card grows up. Empty space below
+		-- may cross the head. The pixel lift would not stay clear up close.
+		billboard.Size = UDim2.fromOffset(WIDTH, HEIGHT * 2)
+		billboard.StudsOffset = studs
+		billboard.SizeOffset = Vector2.zero
+	else
+		billboard.Size = UDim2.fromOffset(WIDTH, HEIGHT)
+		billboard.SizeOffset = Vector2.new(prompt.UIOffset.X / WIDTH, prompt.UIOffset.Y / HEIGHT)
+	end
 
 	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
-	card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
-	card.outer.Position = UDim2.fromScale(0.5, 0.5)
+	if studs then
+		card.outer.AnchorPoint = Vector2.new(0.5, 1)
+		card.outer.Position = UDim2.fromScale(0.5, 0.5)
+	else
+		card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
+		card.outer.Position = UDim2.fromScale(0.5, 0.5)
+	end
 	UITheme.stroke(card.face, C.Ink, 2)
 	UITheme.padding(card.face, 8, 18, 8, 8)
 	local row = UITheme.list(card.face, 12, true)

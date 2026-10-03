@@ -357,9 +357,10 @@ end
 
 -- Registers the v2 wood groups once (MapBuilder does it before it builds
 -- the trees, GameServer again for safety; GrabService registers WoodHeld
--- and Players too). Falling and held wood pass through players; chop rays
--- (CollisionGroup "Wood") skip leaves. Mill and MillBelt are the plot
--- sawmill's cage and conveyor (see the sets below). Safe to call again.
+-- and Players too). Falling and held wood pass through players; the
+-- server's sight ray (CollisionGroup "Wood") skips leaves. Mill and
+-- MillBelt are the plot sawmill's cage and conveyor (see the sets below).
+-- Safe to call again.
 -- True if done.
 function WoodService.RegisterGroups(): boolean
 	local ok, err = pcall(function(): any

@@ -85,9 +85,10 @@ return function(t)
 		t.eq(columnAt({ ChatWindowConfiguration = window, ChatInputBarConfiguration = bar }), { 0, 12, 0, 270 })
 	end)
 
-	t.test("no chat, or chat turned off: 30% down the screen", function()
-		t.eq(columnAt({}), { 0, 12, 0.3, 0 })
-		t.eq(columnAt({ ChatWindowConfiguration = unreadable(false) }), { 0, 12, 0.3, 0 })
+	t.test("no chat, or chat turned off: under the top bar, not mid-screen", function()
+		-- Default GuiInset top is 58; the column sits 8 under that.
+		t.eq(columnAt({}), { 0, 12, 0, 66 })
+		t.eq(columnAt({ ChatWindowConfiguration = unreadable(false) }), { 0, 12, 0, 66 })
 	end)
 
 	t.test("WatchLeftColumn hands over the column once it exists, or straight away", function()
@@ -301,7 +302,7 @@ return function(t)
 
 	t.test("a chat box that can't be read counts as 0 instead of erroring", function()
 		local bar = { Enabled = true, AbsolutePosition = Vector2.new(8, 224), AbsoluteSize = Vector2.new(300, 36) }
-		t.eq(columnAt({ ChatWindowConfiguration = unreadable(true) }), { 0, 12, 0.3, 0 })
+		t.eq(columnAt({ ChatWindowConfiguration = unreadable(true) }), { 0, 12, 0, 66 })
 		-- The other one still counts.
 		t.eq(
 			columnAt({ ChatWindowConfiguration = unreadable(true), ChatInputBarConfiguration = bar }),

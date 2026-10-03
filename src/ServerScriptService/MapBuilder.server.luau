@@ -581,11 +581,8 @@ step("5. The scenery", function()
 			end
 		end
 		-- Lookout towers stay Atomic (they stream in whole when you're
-		-- close) and show a mesh impostor from across the map, so a phone
-		-- isn't holding every tower's parts.
-		if spot.kind == "LookoutTower" then
-			piece.LevelOfDetail = Enum.ModelLevelOfDetail.StreamingMesh
-		end
+		-- close). LevelOfDetail is plugin-only: a game script cannot set
+		-- StreamingMesh, and trying to threw away the rest of this step.
 		atomic(piece).Parent = folder
 	end
 end)
