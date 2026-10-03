@@ -328,6 +328,7 @@ return function(t)
 	t.test("moving is free and checked like placing", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
+		profile.furnitureBlueprints = { Fence = true }
 		s.claim(ann, 1)
 		ann.standOn(1)
 		s.P.Place(ann, "Fence", 0, 0, 0)

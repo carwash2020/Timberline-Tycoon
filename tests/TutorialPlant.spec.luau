@@ -1,8 +1,8 @@
 --!nocheck
--- Murph's plant step end to end on the server: the real TreeService,
--- ForestService and QuestService together (the profiles, money, remotes,
--- timers and the clock faked). A tutorial player's first seed waits for
--- the plant step, and so does the stump they felled for it.
+-- Planting end to end on the server: the real TreeService, ForestService
+-- and QuestService together (the profiles, money, remotes, timers and the
+-- clock faked). The short tutorial has no Heartseed beat, so a seed plants
+-- any time and a stump uses the tree's own regrowth.
 return function(t)
 	local roblox = t.roblox
 	local Vector3, CFrame = roblox.Vector3, roblox.CFrame
@@ -289,52 +289,36 @@ return function(t)
 		return s
 	end
 
-	t.test("a tutorial player's oak stump is still there two minutes on, and the plant step plants in it", function()
+	t.test("a tutorial player's seed plants straight away, and the stump isn't held", function()
 		local s = setup()
 		local rec = s.oak(Vector3.new(0, 0, 0))
 		local ada = s.player(1, Vector3.new(4, 0, 0))
 		local profile = s.profiles[ada]
-		t.eq(s.stepId(ada), "fell")
+		t.eq(s.stepId(ada), "plot")
 		s.fell(ada, rec)
-		t.eq(s.stepId(ada), "pickup")
+		t.eq(s.stepId(ada), "plot", "felling waits until the plot is claimed")
 		t.ok(rec.felled and rec.stump ~= nil, "a stump")
 		t.eq(profile.heartseeds.oak, 1, "and an oak Heartseed")
-
-		-- Planting before the plant step: refused, the seed kept.
-		s.plant(ada, rec.uid)
-		t.eq(s.lastToast(ada), "Hang onto it: Murph will show you where.")
-		t.eq(profile.heartseeds.oak, 1, "the seed is kept")
-		t.ok(rec.felled and rec.stump ~= nil)
-
-		-- Two minutes hauling and selling (the oak's own 45 s pass).
-		s.Quest.Event(ada, "logPickedUp")
-		s.Quest.Event(ada, "logsSold", 2)
-		s.Quest.Event(ada, "logsLoaded", 2)
-		s.wait(120)
-		s.Quest.Event(ada, "logsSold", 2)
-		t.eq(s.stepId(ada), "plant")
-		t.ok(rec.felled, "not grown back")
-		t.ok(rec.stump ~= nil and rec.stump.Parent ~= nil, "the stump is still there")
-		t.ok(rec.stump:HasTag("Stump"), "and still a stump to plant in")
+		t.eq(s.Trees.RegrowsIn(rec.uid), rec.def.respawnSec, "no tutorial hold")
 
 		s.plant(ada, rec.uid)
 		t.eq(profile.heartseeds.oak, nil, "planted")
 		t.eq(profile.forest.planted, 1)
 		t.ok(string.find(s.lastToast(ada), "Planted!") ~= nil)
-		t.eq(s.stepId(ada), "loads", "the plant step is done")
+		t.eq(s.stepId(ada), "plot", "planting isn't a tutorial step")
 		s.wait(10) -- the sapling sprouts
 		t.ok(rec.alive and not rec.felled, "it stands again")
 		t.eq(rec.planterId, 1, "as Ada's tree")
 	end)
 
-	t.test("left unplanted, a held stump still grows back once the hold is over", function()
+	t.test("left unplanted, a stump grows back on the oak's own timer", function()
 		local s = setup()
 		local rec = s.oak(Vector3.new(0, 0, 0))
 		local ada = s.player(1, Vector3.new(4, 0, 0))
 		s.fell(ada, rec)
-		s.wait(200)
-		t.ok(rec.felled, "held")
-		s.wait(45)
+		s.wait(rec.def.respawnSec - 1)
+		t.ok(rec.felled, "still the stump")
+		s.wait(2)
 		t.ok(rec.alive and not rec.felled, "grown back on its own")
 		t.eq(rec.planterId, nil)
 	end)

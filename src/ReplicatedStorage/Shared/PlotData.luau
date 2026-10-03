@@ -75,7 +75,17 @@ export type Blueprint = {
 	footprint: Vector2, -- width (x) and depth (z) in studs at rot 0
 	boxes: { Box },
 	note: string?, -- what it does (buildings that work come in later slices)
+	unlock: boolean?, -- bought once at the General Store; placing copies is free
+	woodUnits: number?, -- price is 10 cash per wood unit when set
 }
+
+-- What the General Store charges. Structural pieces are $10 a wood unit.
+function PlotData.Price(bp: Blueprint): number
+	if type(bp.woodUnits) == "number" then
+		return bp.woodUnits * 10
+	end
+	return bp.priceCash
+end
 
 local WOOD = "#654321"
 local WOOD_LIGHT = "#825A32"
@@ -83,10 +93,176 @@ local STONE = "#8C8680"
 
 PlotData.Blueprints = {
 	{
+		id = "Wall",
+		displayName = "Wall",
+		category = "Buildings",
+		priceCash = 80,
+		woodUnits = 8,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(8, 1),
+		boxes = {
+			{ size = Vector3.new(8, 6, 0.6), offset = Vector3.new(0, 3, 0), color = WOOD, material = "WoodPlanks" },
+		},
+		note = "A straight wall section",
+	},
+	{
+		id = "Floor",
+		displayName = "Floor",
+		category = "Buildings",
+		priceCash = 120,
+		woodUnits = 12,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(8, 8),
+		boxes = {
+			{
+				size = Vector3.new(8, 0.4, 8),
+				offset = Vector3.new(0, 0.2, 0),
+				color = WOOD_LIGHT,
+				material = "WoodPlanks",
+			},
+		},
+		note = "A square of floor",
+	},
+	{
+		id = "Door",
+		displayName = "Door",
+		category = "Buildings",
+		priceCash = 40,
+		woodUnits = 4,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(4, 1),
+		boxes = {
+			{ size = Vector3.new(3.2, 6, 0.4), offset = Vector3.new(0, 3, 0), color = WOOD_LIGHT, material = "Wood" },
+		},
+		note = "A door for a wall",
+	},
+	{
+		id = "Window",
+		displayName = "Window",
+		category = "Buildings",
+		priceCash = 60,
+		woodUnits = 6,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(4, 1),
+		boxes = {
+			{ size = Vector3.new(3.2, 2.4, 0.3), offset = Vector3.new(0, 4, 0), color = "#C9E4F2", material = "Glass" },
+		},
+		note = "A window for a wall",
+	},
+	{
+		id = "Stairs",
+		displayName = "Stairs",
+		category = "Buildings",
+		priceCash = 180,
+		woodUnits = 18,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(4, 8),
+		boxes = {
+			{ size = Vector3.new(4, 0.4, 8), offset = Vector3.new(0, 2, 0), color = WOOD, material = "WoodPlanks" },
+		},
+		note = "A short flight of stairs",
+	},
+	{
+		id = "Shed",
+		displayName = "Small Shed",
+		category = "Buildings",
+		priceCash = 600,
+		woodUnits = 60,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(10, 8),
+		boxes = {
+			{
+				size = Vector3.new(10, 0.4, 8),
+				offset = Vector3.new(0, 0.2, 0),
+				color = WOOD_LIGHT,
+				material = "WoodPlanks",
+			},
+			{
+				size = Vector3.new(10, 5, 0.4),
+				offset = Vector3.new(0, 2.7, 3.8),
+				color = WOOD,
+				material = "WoodPlanks",
+			},
+			{
+				size = Vector3.new(0.4, 5, 8),
+				offset = Vector3.new(-4.8, 2.7, 0),
+				color = WOOD,
+				material = "WoodPlanks",
+			},
+			{ size = Vector3.new(0.4, 5, 8), offset = Vector3.new(4.8, 2.7, 0), color = WOOD, material = "WoodPlanks" },
+			{ size = Vector3.new(10, 0.4, 8), offset = Vector3.new(0, 5.2, 0), color = "#6B4423", material = "Wood" },
+		},
+		note = "A starter shed",
+	},
+	{
+		id = "WoodSign",
+		displayName = "Wood Sign",
+		category = "Decor",
+		priceCash = 40,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(4, 1),
+		boxes = {
+			{ size = Vector3.new(0.3, 3, 0.3), offset = Vector3.new(0, 1.5, 0), color = WOOD, material = "Wood" },
+			{
+				size = Vector3.new(3.2, 1.4, 0.2),
+				offset = Vector3.new(0, 3.2, 0),
+				color = WOOD_LIGHT,
+				material = "Wood",
+			},
+		},
+		note = "A sign for your plot",
+	},
+	{
+		id = "PaintCan",
+		displayName = "Paint Can",
+		category = "Decor",
+		priceCash = 60,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(2, 2),
+		boxes = {
+			{
+				size = Vector3.new(1.2, 1.4, 1.2),
+				offset = Vector3.new(0, 0.7, 0),
+				color = "#C8402F",
+				material = "Metal",
+			},
+		},
+		note = "A can of barn-red paint",
+	},
+	{
+		id = "Mailbox",
+		displayName = "Mailbox",
+		category = "Decor",
+		priceCash = 80,
+		unlock = true,
+		tier = 1,
+		footprint = Vector2.new(2, 2),
+		boxes = {
+			{ size = Vector3.new(0.3, 3, 0.3), offset = Vector3.new(0, 1.5, 0), color = WOOD, material = "Wood" },
+			{
+				size = Vector3.new(1.4, 0.8, 0.8),
+				offset = Vector3.new(0, 3.2, 0),
+				color = "#3A6FD8",
+				material = "Metal",
+			},
+		},
+		note = "A mailbox by the path",
+	},
+	{
 		id = "Fence",
 		displayName = "Fence",
 		category = "Decor",
-		priceCash = 40,
+		priceCash = 30,
+		woodUnits = 3,
+		unlock = true,
 		tier = 1,
 		footprint = Vector2.new(8, 1),
 		boxes = {

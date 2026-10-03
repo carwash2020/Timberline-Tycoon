@@ -166,8 +166,10 @@ local function refreshCallButton()
 	-- A truck far away may not be streamed in at all: that counts as far.
 	local truckPart = if truck then truck.PrimaryPart else nil
 	local fromYou = if hrp and truckPart then (hrp.Position - truckPart.Position).Magnitude else nil
-	button.root.Visible =
-		HudRules.SendHome(hrp ~= nil and session == nil, fromYou, player:GetAttribute("TruckSlotDistance"))
+	local sendHome = HudRules.SendHome(hrp ~= nil and session == nil, fromYou, player:GetAttribute("TruckSlotDistance"))
+	local show, text = HudRules.TruckButton(player:GetAttribute("OwnsTruck") == true, sendHome)
+	button.root.Visible = show
+	button:SetText(text)
 end
 
 local function buildButton()
@@ -182,6 +184,8 @@ local function buildButton()
 		end,
 	})
 	player:GetAttributeChangedSignal("TruckSlotDistance"):Connect(refreshCallButton)
+	player:GetAttributeChangedSignal("OwnsTruck"):Connect(refreshCallButton)
+	refreshCallButton()
 end
 
 local function watchCharacter(char: Model)

@@ -335,6 +335,75 @@ return function(t)
 		t.eq(data.slots[2].truckLoad == nil or #data.slots[2].truckLoad == 0, true)
 	end)
 
+	t.test("starter grant: three played slots get one truck, and a second load adds none", function()
+		local data = Util.deepCopy(Schema.Template)
+		data.ownedTrucks = {}
+		data.equippedTruck = ""
+		data.starterTruckGranted = false
+		data.totalEarned = 40
+		data.truckLoad = { { w = "oak", value = 12 } }
+		data.truckAt = { x = 4, y = 1, z = 8 }
+		data.slots = {}
+		data.activeSlot = 1
+		for i = 1, 3 do
+			local slot = Util.deepCopy(Schema.Template)
+			slot.fresh = false
+			slot.ownedTrucks = {}
+			slot.equippedTruck = ""
+			slot.starterTruckGranted = false
+			slot.totalEarned = 40
+			slot.truckBed = { { woodId = "oak", value = 5 } }
+			slot.truckLoad = { { w = "birch" } }
+			slot.truckAt = { x = i, y = 2, z = 3 }
+			data.slots[i] = slot
+		end
+		Schema.Migrate(data)
+		Schema.Migrate(data)
+		t.eq(data.ownedTrucks, { "Rustbucket" })
+		t.eq(data.equippedTruck, "Rustbucket")
+		t.eq(data.truckLoad, { { w = "oak", value = 12 } })
+		t.eq(data.truckAt.x, 4)
+		for i = 2, 3 do
+			t.eq(data.slots[i].ownedTrucks, { "Rustbucket" }, "slot " .. i)
+			t.eq(data.slots[i].equippedTruck, "Rustbucket")
+			t.eq(#data.slots[i].truckBed, 1)
+			t.eq(data.slots[i].truckLoad[1].w, "birch")
+			t.eq(data.slots[i].truckAt.x, i)
+		end
+		t.eq(data.slots[1].ownedTrucks, { "Rustbucket" })
+		t.eq(#data.slots[1].ownedTrucks, 1)
+	end)
+
+	t.test("a fresh slot is not given a truck", function()
+		local data = fresh()
+		t.eq(data.ownedTrucks, {})
+		t.eq(data.equippedTruck, "")
+		t.eq(data.starterTruckGranted, true)
+		t.eq(data.slots[2].fresh, true)
+		t.eq(data.slots[2].ownedTrucks, {})
+		t.eq(data.slots[3].ownedTrucks, {})
+	end)
+
+	t.test("cargo with no truck is kept and the slot gets exactly one starter", function()
+		local data = Util.deepCopy(Schema.Template)
+		data.slots = nil
+		data.ownedTrucks = {}
+		data.equippedTruck = ""
+		data.starterTruckGranted = false
+		data.totalEarned = 15
+		data.truckBed = { { woodId = "oak", value = 9 } }
+		data.truckLoad = { { w = "oak" } }
+		data.truckAt = { x = 2, y = 0, z = 5 }
+		Schema.Migrate(data)
+		t.eq(data.ownedTrucks, { "Rustbucket" })
+		t.eq(data.truckBed[1].value, 9)
+		t.eq(data.truckLoad[1].w, "oak")
+		t.eq(data.truckAt.z, 5)
+		Schema.Migrate(data)
+		t.eq(data.ownedTrucks, { "Rustbucket" })
+		t.eq(#data.truckBed, 1)
+	end)
+
 	t.test("a bad slot index is refused before anything is committed", function()
 		local data = fresh()
 		Schema.Migrate(data)

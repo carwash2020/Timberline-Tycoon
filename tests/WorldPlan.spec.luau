@@ -117,6 +117,8 @@ return function(t)
 		for _, spot in ipairs(town.shops) do
 			add(spot.kind, "shop", BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end
+		local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
+		add("dealership lot", "lot", DealershipLot.Build(), town.displayLot)
 		-- The greenery (TWN-01): a tree's trunk collides, the rest is looks.
 		for _, g in ipairs(town.greenery) do
 			local label = string.format(

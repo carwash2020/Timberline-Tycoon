@@ -67,17 +67,21 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local StreamAhead = require(ReplicatedStorage.Shared.StreamAhead)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
 local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
 local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
+local Util = require(ReplicatedStorage.Shared.Util)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
+local EconomyService = require(script.Parent.EconomyService)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ProfileService = require(script.Parent.ProfileService)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
@@ -125,6 +129,7 @@ type TruckRecord = {
 	bedFolder: Folder,
 	slot: BasePart?,
 	overflowIndex: number?, -- an overflow spot, when every ParkingSlot is taken
+	homeCF: CFrame?, -- the plot delivery pad, when the truck isn't in a public bay
 	conns: { RBXScriptConnection },
 	arcadeSpeed: number,
 	driver: Humanoid?, -- the owner, while they sit in the driver seat
@@ -172,6 +177,9 @@ export type Hooks = {
 	onDriverChanged: ((truck: Model, driver: Player?) -> ())?,
 	onRebuild: ((player: Player, old: Model?, keepsLoad: boolean, at: CFrame?) -> ((Model) -> ())?)?,
 	loadCount: ((truck: Model) -> number)?,
+	-- Where a truck is delivered when the player has a plot (the road-edge
+	-- pad). Nil means the public parking lot, smallest free bay.
+	deliveryCFrame: ((player: Player) -> CFrame?)?,
 }
 VehicleService.Hooks = {} :: Hooks
 
@@ -1147,8 +1155,11 @@ end
 -- Mirrors how far this truck is from its own parking spot (where the
 -- rig's pivot sits when parked there) on its owner's TruckSlotDistance.
 local function publishSlotDistance(rec: TruckRecord)
-	local shift = homeShift(rec.slot, rec.layout, rec.trailerLayout)
-	local home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -shift)
+	local home = rec.homeCF
+	if not home then
+		local shift = homeShift(rec.slot, rec.layout, rec.trailerLayout)
+		home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -shift)
+	end
 	local distance = TruckHome.Distance(trustedCFrame(rec).Position, home.Position)
 	local userId = rec.owner.UserId
 	if TruckHome.ShouldPublish(slotShown[userId], distance) then
@@ -1218,9 +1229,67 @@ local function savedSpot(player: Player): Vector3?
 	return if profile then VehicleLogic.CleanSpot(profile.truckAt) else nil
 end
 
--- Builds the player's truck (replacing any they have) in their parking
--- slot, with `trailerId` hitched behind if it can tow. `load` refills the
--- bed (a recall or a switch); with no `load`, the bed comes back from the
+-- The plot pad, when GameServer has one for this player. Nil uses a bay.
+local function deliveryPad(player: Player): CFrame?
+	local ask = VehicleService.Hooks.deliveryCFrame
+	if not ask then
+		return nil
+	end
+	local cf = ask(player)
+	if typeof(cf) == "CFrame" then
+		return cf
+	end
+	return nil
+end
+
+-- A CFrame on `pad` (its ground), wheels down, nudged along the pad so the
+-- rig's box doesn't sit on another truck or a player.
+local function padParking(pad: CFrame, rel: CFrame, size: Vector3): CFrame
+	local ground = pad.Position - Vector3.new(0, 0.1, 0)
+	local y = TerrainBuilder.LiftOnto(ground.X, ground.Y, ground.Z)
+	local base = CFrame.new(ground.X, y + WHEEL_CLEARANCE, ground.Z) * pad.Rotation
+	local function clear(cf: CFrame): boolean
+		local box = cf * rel
+		return #trucksInBox(box, size) == 0 and not peopleInBox(box, size + Vector3.new(0, 4, 0))
+	end
+	if clear(base) then
+		return base
+	end
+	for n = 1, 6 do
+		local shift = n * 10
+		for _, sign in ipairs({ -1, 1 }) do
+			local cf = base * CFrame.new(sign * shift, 0, 0)
+			if clear(cf) then
+				return cf
+			end
+		end
+	end
+	return base * CFrame.new(70, 0, 0)
+end
+
+-- 2% to bring a stuck truck back (Rustbucket free). A profile with no
+-- wallet (tests) is not charged. Returns false when the wallet is short.
+local function chargeRespawn(player: Player, def: TruckDef): (boolean, string?)
+	local fee = ShopLogic.RespawnFee(def, CoreLoop.Active())
+	if fee <= 0 then
+		return true, nil
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or type(profile.cash) ~= "number" then
+		return true, nil
+	end
+	local short = string.format("You need %s to bring your %s back.", Util.formatCash(fee), def.displayName)
+	if profile.cash < fee or not EconomyService.SpendCash(player, fee, "respawned " .. def.displayName, def.id) then
+		return false, short
+	end
+	return true, nil
+end
+
+-- Builds the player's truck (replacing any they have). With a plot it
+-- parks on that plot's delivery pad; otherwise in the smallest free
+-- public bay. Nothing is built for an id the player doesn't have a
+-- catalog entry for (no starter fallback). `load` refills the bed (a
+-- recall or a switch); with no `load`, the bed comes back from the
 -- player's save. Either way the load only comes along if the truck was in
 -- town (keepsLoad, or the saved spot); otherwise it's left on the ground
 -- where the truck was. Returns the model and how many logs didn't fit.
@@ -1229,9 +1298,11 @@ function VehicleService.SpawnTruck(
 	truckId: string,
 	load: { BedEntry }?,
 	trailerId: string?
-): (Model, number)
-	local def = ItemCatalog.GetTruck(truckId) or ItemCatalog.GetTruck("Rustbucket")
-	assert(def, "[VehicleService] Rustbucket missing from ItemCatalog")
+): (Model?, number)
+	local def = ItemCatalog.GetTruck(truckId)
+	if not def then
+		return nil, 0
+	end
 	local layout = TruckLayout.For(def)
 	local trailer = towedTrailer(def, trailerId)
 	local trailerLayout = if trailer then TruckLayout.ForTrailer(trailer, layout) else nil
@@ -1244,12 +1315,15 @@ function VehicleService.SpawnTruck(
 	local oldOverflow = if old then old.overflowIndex else nil
 	local rigLength, rigWidth = TruckLayout.RigSize(layout, trailerLayout)
 	local choices = bayChoices(rigLength, rigWidth, oldSlot)
+	local pad = deliveryPad(player)
 	-- Where it will most likely park, for a joining player's saved spot.
 	local homeSlot = choices[1] or oldSlot
-	local homeAt = slotCFrame(
-		homeSlot,
-		if homeSlot then nil else (oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
-	).Position
+	local homeAt = if pad
+		then pad.Position
+		else slotCFrame(
+			homeSlot,
+			if homeSlot then nil else (oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
+		).Position
 	-- Where a load out of town is left (the truck's last spot).
 	local leaveAt: CFrame? = nil
 	-- The v2 loop's loose load (TruckLoad): told before the old truck goes,
@@ -1314,12 +1388,25 @@ function VehicleService.SpawnTruck(
 	local model = built.model
 	-- The whole rig (truck + trailer) centred on its bay, or its nose out
 	-- past the head of one it's longer than (homeShift), once no other
-	-- truck is in the way.
+	-- truck is in the way. A plot's delivery pad skips the public bays.
 	local rel, size = footprint(model)
-	local slot, overflowIndex =
-		clearSpot(player.UserId, choices, oldSlot, oldOverflow, layout, trailerLayout, rel, size)
-	model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -homeShift(slot, layout, trailerLayout)))
-	if old and slot ~= oldSlot then
+	local slot: BasePart? = nil
+	local overflowIndex: number? = nil
+	local homeCF: CFrame? = nil
+	if pad then
+		if oldSlot then
+			slotOwner[oldSlot] = nil
+		end
+		if oldOverflow then
+			overflowUsed[oldOverflow] = nil
+		end
+		homeCF = padParking(pad, rel, size)
+		model:PivotTo(homeCF)
+	else
+		slot, overflowIndex = clearSpot(player.UserId, choices, oldSlot, oldOverflow, layout, trailerLayout, rel, size)
+		model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -homeShift(slot, layout, trailerLayout)))
+	end
+	if old and not pad and slot ~= oldSlot then
 		-- Moved to a bay that fits (or out of the lot): say where.
 		tell(
 			player,
@@ -1368,6 +1455,7 @@ function VehicleService.SpawnTruck(
 		bedFolder = bedFolder,
 		slot = slot,
 		overflowIndex = overflowIndex,
+		homeCF = homeCF,
 		conns = {},
 		arcadeSpeed = 0,
 		driver = nil,
@@ -1456,16 +1544,32 @@ end
 -- truck stood (SpawnTruck). Returns false and why not when it can't.
 function VehicleService.Recall(player: Player): (boolean, string?)
 	local rec = trucks[player.UserId]
-	if not rec then
-		return false, nil
-	end
-	if isDriving(player, rec) then
-		return false, "Hop out first."
-	end
 	local now = os.clock()
 	local remaining = GameConfig.TruckRecallCooldown - (now - (lastRecall[player.UserId] or -math.huge))
 	if remaining > 0 then
 		return false, string.format("Your truck's on its way. Try again in %d s.", math.ceil(remaining))
+	end
+	if not rec then
+		local profile = ProfileService.GetProfile(player)
+		local id = if profile then profile.equippedTruck else ""
+		local def = if type(id) == "string" then ItemCatalog.GetTruck(id) else nil
+		local owns = def ~= nil and profile ~= nil and table.find(profile.ownedTrucks, id) ~= nil
+		if not owns or not def or not profile then
+			return false, "Buy a truck at the dealership"
+		end
+		local paid, why = chargeRespawn(player, def)
+		if not paid then
+			return false, why
+		end
+		lastRecall[player.UserId] = now
+		local model = VehicleService.SpawnTruck(player, id, nil, profile.equippedTrailer)
+		if not model then
+			return false, nil
+		end
+		return true, nil
+	end
+	if isDriving(player, rec) then
+		return false, "Hop out first."
 	end
 	-- A load out of town stays where the truck stands: say so, and only go
 	-- ahead on a second press within a few seconds (a stray tap mustn't
@@ -1491,6 +1595,10 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 		end
 	end
 	leaveAsked[player.UserId] = nil
+	local paid, whyNot = chargeRespawn(player, rec.def)
+	if not paid then
+		return false, whyNot
+	end
 	lastRecall[player.UserId] = now
 	VehicleService.SpawnTruck(player, rec.def.id, rec.bed, if rec.trailer then rec.trailer.id else nil)
 	return true, nil

@@ -38,6 +38,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -279,7 +280,7 @@ local TRUCKS: Shop = {
 		local truck = ItemCatalog.GetTruck(id) :: TruckDef
 		local cash = (player:GetAttribute("Cash") :: number?) or 0
 		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedTrucks") :: string?) or "")
-		local equipped = (player:GetAttribute("EquippedTruck") :: string?) or "Rustbucket"
+		local equipped = (player:GetAttribute("EquippedTruck") :: string?) or ""
 		local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, owned, equipped)
 		local loop = CoreLoop.Active()
 		local price = ShopLogic.Price(truck, loop)
@@ -318,50 +319,117 @@ local TRUCKS: Shop = {
 -- Hearth & Home: gear
 ---------------------------------------------------------------------------
 
+local function gearView(id: string): RowView
+	local gear = ItemCatalog.GetGear(id) :: GearDef
+	local cash = (player:GetAttribute("Cash") :: number?) or 0
+	local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
+	local status: ShopLogic.GearStatus = ShopLogic.GearStatusOf(gear, owned)
+	local loop = CoreLoop.Active()
+	local price = ShopLogic.Price(gear, loop)
+	local button, state
+	if status == "buy" then
+		button, state = priceButton(price, cash)
+	elseif status == "owned" then
+		button, state = "Owned", "inuse"
+	else
+		button, state = "Soon", "locked"
+	end
+	return {
+		name = gear.displayName,
+		detail = ShopLogic.GearDetail(gear),
+		color = Color3.fromHex(gear.color),
+		dim = status == "soon",
+		button = button,
+		state = state,
+		onClick = function()
+			if status == "owned" then
+				HUD.Toast(string.format("You already have the %s.", gear.displayName))
+			elseif status == "soon" then
+				HUD.Toast(string.format("The %s goes on sale when its biome opens.", gear.displayName))
+			elseif cash < price then
+				needMore(price, cash, gear.displayName)
+			else
+				Net.Remote("BuyItem"):FireServer("Gear", gear.id)
+			end
+		end,
+	}
+end
+
+local function blueprintView(id: string): RowView
+	local bp = PlotData.Blueprint(id)
+	local cash = (player:GetAttribute("Cash") :: number?) or 0
+	local owned = ShopLogic.DecodeSet((player:GetAttribute("Blueprints") :: string?) or "")
+	local have = owned[id] == true
+	local price = if bp then PlotData.Price(bp) else 0
+	local name = if bp then bp.displayName else id
+	local button, state
+	if have then
+		button, state = "Owned", "inuse"
+	else
+		button, state = priceButton(price, cash)
+	end
+	return {
+		name = name,
+		own = if have then "· owned" else nil,
+		detail = "Place it on your plot, as many times as you like.",
+		color = Color3.fromHex("#A4693E"),
+		dim = false,
+		button = button,
+		state = state,
+		onClick = function()
+			if have then
+				HUD.Toast(string.format("You already own the %s blueprint.", name))
+			elseif cash < price then
+				needMore(price, cash, name)
+			else
+				Net.Remote("BuyItem"):FireServer("Blueprint", id)
+			end
+		end,
+	}
+end
+
+-- General Store (the Hearth & Home building): blueprints bought once,
+-- the axe ladder (the Lux Axe still opens the Robux store), and trinkets.
 local GEAR: Shop = {
 	building = "HearthAndHome",
-	promptText = "Browse gear",
-	title = "Hearth & Home",
-	subtitle = "Gear for far biomes. Buy once, keep it.",
+	promptText = "Browse the store",
+	title = "General Store",
+	subtitle = "Blueprints, axes and trinkets.",
 	ids = function()
 		local ids = {}
+		for _, bp in ipairs(PlotData.Blueprints) do
+			if bp.unlock then
+				table.insert(ids, "Bp:" .. bp.id)
+			end
+		end
+		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
+			table.insert(ids, "Axe:" .. axe.id)
+		end
+		local extra = {}
+		for _, axe in pairs(ItemCatalog.Axes) do
+			if axe.robux then
+				table.insert(extra, axe.id)
+			end
+		end
+		table.sort(extra)
+		for _, id in ipairs(extra) do
+			table.insert(ids, "Axe:" .. id)
+		end
 		for _, gear in ipairs(ItemCatalog.GearList()) do
 			table.insert(ids, gear.id)
 		end
 		return ids
 	end,
 	view = function(id: string): RowView
-		local gear = ItemCatalog.GetGear(id) :: GearDef
-		local cash = (player:GetAttribute("Cash") :: number?) or 0
-		local owned = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
-		local status: ShopLogic.GearStatus = ShopLogic.GearStatusOf(gear, owned)
-		local button, state
-		if status == "buy" then
-			button, state = priceButton(gear.priceCash, cash)
-		elseif status == "owned" then
-			button, state = "Owned", "inuse"
-		else
-			button, state = "Soon", "locked"
+		local blueprintId = string.match(id, "^Bp:(.+)$")
+		if blueprintId then
+			return blueprintView(blueprintId)
 		end
-		return {
-			name = gear.displayName,
-			detail = ShopLogic.GearDetail(gear),
-			color = Color3.fromHex(gear.color),
-			dim = status == "soon",
-			button = button,
-			state = state,
-			onClick = function()
-				if status == "owned" then
-					HUD.Toast(string.format("You already have the %s.", gear.displayName))
-				elseif status == "soon" then
-					HUD.Toast(string.format("The %s goes on sale when its biome opens.", gear.displayName))
-				elseif cash < gear.priceCash then
-					needMore(gear.priceCash, cash, gear.displayName)
-				else
-					Net.Remote("BuyItem"):FireServer("Gear", gear.id)
-				end
-			end,
-		}
+		local axeId = string.match(id, "^Axe:(.+)$")
+		if axeId then
+			return AXES.view(axeId)
+		end
+		return gearView(id)
 	end,
 }
 

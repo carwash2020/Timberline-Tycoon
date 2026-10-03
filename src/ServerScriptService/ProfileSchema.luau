@@ -121,6 +121,11 @@ export type Profile = {
 	equippedAxe: string, -- uid of the axe last held; re-equipped on spawn
 	ownedTrucks: { string },
 	equippedTruck: string,
+	-- Set once a slot has been considered for the one-time starter truck.
+	-- false (the template) means not yet. Old saves get false from
+	-- Reconcile; GrantStarterTrucks then gives a truck only to a slot that
+	-- was actually played. A brand-new game is marked true with no truck.
+	starterTruckGranted: boolean,
 	ownedTrailers: { string },
 	equippedTrailer: string, -- hitched trailer id, "" for none
 	ownedBoats: { string },
@@ -209,8 +214,9 @@ local TEMPLATE: Profile = {
 	axes = {}, -- a Rusty Axe is added on first load (see Migrate)
 	bestAxeTier = 1,
 	equippedAxe = "",
-	ownedTrucks = { "Rustbucket" },
-	equippedTruck = "Rustbucket",
+	ownedTrucks = {},
+	equippedTruck = "",
+	starterTruckGranted = false,
 	ownedTrailers = {},
 	equippedTrailer = "",
 	ownedBoats = {},

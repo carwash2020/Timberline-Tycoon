@@ -236,6 +236,7 @@ QuestUI.BeaconPaths = {
 	toolShed = { "ToolShed", "Counter" },
 	murphCart = { "TutorialGrove", "CartZone" },
 	plotSign = { "Plots", "Plot_1", "Sign" },
+	dealership = { "Dealership", "Counter" },
 } :: { [string]: { string } }
 
 -- The fixed part for the beacon `target` under `map` (TimberlineMap), if

@@ -55,8 +55,8 @@ local A = {
 	aimSec = 1.5, -- s to walk to and line up each cut after the first
 	tripOverhead = 8, -- s per round trip: get in, park, get out (§17)
 	sellSec = 4, -- s at the pad (§17)
-	murphReward = 25, -- the tutorial's `loads` reward (§13), after murphAfter dollars sold
-	murphAfter = 120, -- TutorialData's v2 loads step (dollars sold before Murph pays)
+	murphReward = 25, -- paid on the first sale (the tutorial's sell step)
+	murphAfter = 0, -- the bonus lands with that sale, not after a later grind
 	groveTier = "Healthy", -- figured-wood average, as tools/economy
 	plotPrice = 900100, -- a full plot (§2f: $100 + 3000 x (1 + ... + 24))
 	sharing = 4, -- players sharing a biome's regrowth (a rare wood's cap on $/h)
@@ -469,14 +469,12 @@ end
 local function firstSale()
 	local oak = WoodData.Get("oak")
 	local rusty = ItemCatalog.GetAxe("RustyAxe")
-	local truck = ItemCatalog.GetTruck("Rustbucket")
-	local cap = bedU3("Rustbucket")
-	local perTree = treeWork(rusty, oak, bedLength("Rustbucket"))
+	-- On foot: one oak, walked to Murph. The truck is bought after this sale.
+	local perTree = treeWork(rusty, oak, 0)
+	local walk = 80 / A.walkSpeed
+	local secs = (walk + perTree + A.sellSec) / EFFICIENCY
 	local tree = TREES.oak.mean.volume
-	local toTruck = 25 / A.walkSpeed
-	local drive = 80 / truck.topSpeed + 2 * BiomeData.Get("starter").haulStuds / truck.topSpeed + A.tripOverhead
-	local secs = (toTruck + drive + perTree + A.sellSec) / EFFICIENCY
-	return secs, math.min(cap, tree) * oak.v2.logPrice
+	return secs, tree * oak.v2.logPrice
 end
 
 local function priceOf(item): number
@@ -487,11 +485,11 @@ local function priceOf(item): number
 end
 
 local function simulate()
-	local owned = { RustyAxe = true, Rustbucket = true }
+	local owned = { RustyAxe = true }
 	local t, value = firstSale()
-	local cash = GameConfig.StartingCash + value
+	local cash = GameConfig.StartingCash + value + A.murphReward
 	local earned = value
-	local murphPaid = false
+	local murphPaid = true
 	local events = { firstSale = t }
 	local steps = {}
 	local candidates = {}

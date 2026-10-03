@@ -76,7 +76,7 @@ TownMarkers.Markers = {
 	{
 		name = "Gear",
 		path = { "HearthAndHome", "Counter" },
-		text = "BLUEPRINTS\n& GEAR",
+		text = "GENERAL\nSTORE",
 		icon = "blueprint",
 		chip = Color3.fromRGB(122, 90, 60),
 		offset = Vector3.new(9, 18.3, 2),

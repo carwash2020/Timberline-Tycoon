@@ -70,6 +70,12 @@ local PLOT_ROAD_WIDTH = 16
 WorldLayout.FlatZones = {
 	-- Town: spawn, sawmill, shops, parking, gondola station.
 	{ name = "Town", x0 = -125, x1 = 140, z0 = -32, z1 = 205, blend = 45 },
+	-- The dealership's display lot, on the lawn north of the plot road.
+	-- That lawn is already inside the Plots zone's blend (trees keep off
+	-- it), so this only flattens the ground under the trucks. The blend
+	-- stops at the Plots zone's own edge (z = 124) and does not grow the
+	-- forest hub (the hub pads name Town and Plots only).
+	{ name = "DealershipLot", x0 = 184, x1 = 296, z0 = 64, z1 = 123, blend = 1 },
 	-- The plot district east of town, with its roads and lanes. The west
 	-- and north edges stay where the old 4×3 lawn was (x = 126, z = 74):
 	-- the gap beside the pond and the plot road's north shoulder stay
@@ -273,7 +279,7 @@ WorldLayout.TownPaint = {
 	-- The turn off the street's east end onto the way north (the mill road).
 	{ name = "PlazaEastMouth", x0 = 70, x1 = 112, z0 = 68, z1 = 96, material = "Ground" },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
-	{ name = "HearthAndHomePath", x0 = -99.5, x1 = -87.5, z0 = 82, z1 = 93, material = "Ground" },
+	{ name = "HearthAndHomePath", x0 = -106, x1 = -94, z0 = 84, z1 = 98, material = "Ground" },
 	{ name = "ToolShedPath", x0 = -63, x1 = -51, z0 = 82, z1 = 93, material = "Ground" },
 	{ name = "DealershipPath", x0 = 42, x1 = 54, z0 = 82, z1 = 93, material = "Ground" },
 	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 66, material = "Ground" },
@@ -288,7 +294,7 @@ WorldLayout.TownPaint = {
 -- MillYard. TerrainGen paints these after TownPaint.
 WorldLayout.TownFloors = {
 	{ name = "ToolShedFloor", x0 = -73.5, x1 = -38.5, z0 = 88.5, z1 = 119.5, material = "Ground" },
-	{ name = "HearthAndHomeFloor", x0 = -110.5, x1 = -74, z0 = 88.5, z1 = 120.5, material = "Ground" },
+	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -70, z0 = 94, z1 = 144, material = "Ground" },
 	{ name = "DealershipFloor", x0 = 35, x1 = 69.5, z0 = 89, z1 = 118, material = "Ground" },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
 } :: { Paint }

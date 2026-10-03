@@ -251,6 +251,14 @@ step("4. The town", function()
 		end
 	end)
 
+	-- Display lot: every truck and trailer, anchored, bought from its sign.
+	step("4. The dealership lot", function()
+		local DealershipLot = require(ReplicatedStorage.Shared.Art.DealershipLot)
+		local lot = DealershipLot.Build()
+		lot.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+		place(lot, town.displayLot)
+	end)
+
 	-- The gondola station in town.
 	step("4. The gondola station", function()
 		townStation = station("GondolaTown", town.gondola)
