@@ -49,6 +49,7 @@ local MODULES = {
 	"StoreUI",
 	"TownFX",
 	"TownMarkers",
+	"TreeCosmetics",
 	"TreeFX",
 	"TreeUI",
 	"UITheme",
@@ -257,6 +258,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "WindSway",
 		get = function()
 			return require(script.Parent.WindSway)
+		end,
+	},
+	{
+		name = "TreeCosmetics",
+		get = function()
+			return require(script.Parent.TreeCosmetics)
 		end,
 	},
 	{

@@ -395,7 +395,8 @@ step("5. The trees", function()
 		SectionTrees.RegisterGroups() -- Wood, WoodFalling, WoodHeld, Leaves, Players
 	end
 	-- The tutorial oaks: small, mature, a fixed seed. Not boot-aged, so
-	-- they aren't saplings a new player can't fell.
+	-- they aren't saplings a new player can't fell. Same crystal-cut oak
+	-- as the rest of the forest (section trees), so the grove matches.
 	for i, spot in ipairs(TutorialGrove.Trees) do
 		local ok, err = pcall(function(): any
 			local y = TerrainGen.HeightAt(spot.x, spot.z) - 0.3
