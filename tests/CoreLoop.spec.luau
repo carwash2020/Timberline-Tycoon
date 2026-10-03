@@ -99,15 +99,30 @@ return function(t)
 		end
 	end)
 
-	t.test("PlaceCheck reminds you to clear CoreLoop and Tune_ overrides before publishing", function()
+	t.test("PlaceCheck reminds you to clear Studio debug overrides before publishing", function()
 		local PlaceCheck = t.loader({ mocks = { ProfileStore = { DataStoreState = "Access" } } }):server("PlaceCheck")
-		t.eq(PlaceCheck.Overrides({ ClockOverride = 23, MapTrees = 500 }, true), {})
-		local studio = PlaceCheck.Overrides({ CoreLoop = 2, Tune_BedFriction = 1.2 }, true)
+		t.eq(PlaceCheck.Overrides({ MapTrees = 500, Weather = "Clear" }, true), {})
+		local studio = PlaceCheck.Overrides({
+			CoreLoop = 2,
+			Tune_BedFriction = 1.2,
+			ClockOverride = 23,
+			WeatherOverride = "Storm",
+			WeatherOverrideIntensity = 1,
+			RainbowTest = true,
+		}, true)
 		t.eq(#studio, 1)
-		t.ok(string.find(studio[1], "CoreLoop = 2", 1, true) ~= nil, studio[1])
-		t.ok(string.find(studio[1], "Tune_BedFriction", 1, true) ~= nil, studio[1])
-		t.ok(string.find(studio[1], "before publishing", 1, true) ~= nil, studio[1])
-		local live = PlaceCheck.Overrides({ CoreLoop = 2 }, false)
+		for _, name in ipairs({
+			"CoreLoop = 2",
+			"Tune_BedFriction",
+			"ClockOverride = 23",
+			"WeatherOverride = Storm",
+			"WeatherOverrideIntensity = 1",
+			"RainbowTest = true",
+			"before publishing",
+		}) do
+			t.ok(string.find(studio[1], name, 1, true) ~= nil, studio[1] .. " missing " .. name)
+		end
+		local live = PlaceCheck.Overrides({ WeatherOverride = "Storm" }, false)
 		t.ok(string.find(live[1], "ignore", 1, true) ~= nil, live[1])
 	end)
 end

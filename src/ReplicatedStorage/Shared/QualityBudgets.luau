@@ -63,11 +63,14 @@ QualityBudgets.High = table.freeze({
 	DepthOfField = 1,
 	Bloom = 1,
 	TownFxNear = 260,
-	-- The forest (FOR-02): trees out to 480 studs, stand-ins to 1,000 (inside
-	-- StreamingTargetRadius, so they never stand on terrain that isn't
-	-- there). tests/Forest.spec.luau counts the parts this loads.
+	-- The forest (FOR-02): trees out to 480 studs, stand-ins to 600. That
+	-- stays inside StreamingTargetRadius (640) so stand-ins never sit on
+	-- terrain that hasn't streamed. 1024 used to stream most of the map
+	-- onto every phone; the shorter radius is the launch default, and the
+	-- haze is meant to hide the pop-in around 600. tests/Forest.spec.luau
+	-- counts the parts this loads.
 	FillerNear = 480,
-	FillerFar = 1000,
+	FillerFar = 600,
 	FillerBuildMs = 2,
 	TuftNear = 150,
 	ChipCount = 48,
@@ -107,7 +110,7 @@ QualityBudgets.Low = table.freeze({
 	Bloom = 0.5,
 	TownFxNear = 120,
 	FillerNear = 340, -- the forest edges round the spawn (300-340 studs off) are real trees
-	FillerFar = 640,
+	FillerFar = 520, -- inside the 640 stream radius, and short of high's 600
 	FillerBuildMs = 1.2,
 	TuftNear = 90,
 	ChipCount = 24,

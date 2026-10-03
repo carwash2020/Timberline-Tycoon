@@ -197,6 +197,14 @@ return function(t)
 		t.eq(s.prompts, {})
 	end)
 
+	t.test("a pass id of 0 is never granted, even if a prompt finishes", function()
+		local s = setup()
+		s.StoreData.Pass("DoubleCash").id = 0
+		s.passFinished("DoubleCash", true)
+		t.eq(s.M.SaleMultiplier(s.player), 1)
+		t.eq(s.player.attrs.Pass_DoubleCash, nil)
+	end)
+
 	t.test("a pass check that errors is retried; buying an owned pass turns it on instead of prompting", function()
 		local first = setup({ ownsPass = 101, passErrors = 2 })
 		local key = first.StoreData.Passes[1].key

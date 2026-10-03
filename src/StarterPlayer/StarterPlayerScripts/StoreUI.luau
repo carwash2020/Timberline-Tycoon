@@ -35,7 +35,22 @@ local function robux(price: number?): string
 	return if price then "R$ " .. tostring(price) else "R$ …"
 end
 
--- Loads each item's price from Roblox once, then redraws.
+-- A row that must never prompt. ids() already omits anything not for sale;
+-- this is the fallback if a row is asked for anyway.
+local function notForSale(): ShopUI.RowView
+	return {
+		name = "Not for sale",
+		detail = "This item isn't set up yet.",
+		color = ROBUX_GREEN,
+		dim = true,
+		button = "Soon",
+		state = "inuse",
+		onClick = function() end,
+	}
+end
+
+-- Loads each item's price from Roblox once, then redraws. An id of 0 is
+-- skipped: GetProductInfo(0) errors.
 local function loadPrices()
 	local function fetch(key: string, id: number, infoType: Enum.InfoType)
 		task.spawn(function()
@@ -49,12 +64,12 @@ local function loadPrices()
 		end)
 	end
 	for _, pass in ipairs(StoreData.Passes) do
-		if pass.id ~= 0 then
+		if StoreData.IsForSale(pass.id) then
 			fetch("Pass:" .. pass.key, pass.id, Enum.InfoType.GamePass)
 		end
 	end
 	for _, product in ipairs(StoreData.Products) do
-		if product.id ~= 0 then
+		if StoreData.IsForSale(product.id) then
 			fetch("Product:" .. product.key, product.id, Enum.InfoType.Product)
 		end
 	end
@@ -72,12 +87,12 @@ local STORE: ShopUI.Shop = {
 	ids = function()
 		local ids = {}
 		for _, pass in ipairs(StoreData.Passes) do
-			if pass.id ~= 0 then
+			if StoreData.IsForSale(pass.id) then
 				table.insert(ids, "Pass:" .. pass.key)
 			end
 		end
 		for _, product in ipairs(StoreData.Products) do
-			if product.id ~= 0 then
+			if StoreData.IsForSale(product.id) then
 				table.insert(ids, "Product:" .. product.key)
 			end
 		end
@@ -86,7 +101,10 @@ local STORE: ShopUI.Shop = {
 	view = function(id: string): ShopUI.RowView
 		local kind, key = string.match(id, "^(%a+):(%w+)$")
 		if kind == "Pass" then
-			local pass = StoreData.Pass(key or "") :: StoreData.Pass
+			local pass = StoreData.Pass(key or "")
+			if not pass or not StoreData.IsForSale(pass.id) then
+				return notForSale()
+			end
 			local has = player:GetAttribute("Pass_" .. pass.key) == true
 			return {
 				name = pass.name,
@@ -105,7 +123,10 @@ local STORE: ShopUI.Shop = {
 				end,
 			}
 		end
-		local product = StoreData.Product(key or "") :: StoreData.Product
+		local product = StoreData.Product(key or "")
+		if not product or not StoreData.IsForSale(product.id) then
+			return notForSale()
+		end
 		local cash = (player:GetAttribute("Cash") :: number?) or 0
 		local fits = StoreData.PackFits(product, cash, GameConfig.CashCap)
 		local name = product.name
@@ -183,7 +204,7 @@ local function buildButtons()
 		textSize = spec.text,
 	})
 	store.root.LayoutOrder = 10 -- left of the clock (HUD's corner, beside the cash)
-	store.root.Visible = #STORE.ids() > 0 -- hidden until something's set up in StoreData
+	store.root.Visible = #STORE.ids() > 0 -- hidden while every CreatorIds entry is still 0
 	store.root.Parent = HUD.BesideCash()
 	local function openStore()
 		ShopUI.OpenCustom(STORE)

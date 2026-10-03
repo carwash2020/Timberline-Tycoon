@@ -16,13 +16,16 @@
 --   * Clear nights over the Snowfields: an aurora (GAME_DESIGN §12).
 --   * A rainbow when a shower has just passed by day. (To see one in
 --     Studio without waiting for rain: on the server, by day, in clear
---     weather, workspace:SetAttribute("RainbowTest", true).)
+--     weather, workspace:SetAttribute("RainbowTest", true). A live
+--     server ignores it.)
 -- Every emitter is toggled by Enabled and its Rate changed only a few
 -- times a second; nothing here allocates per frame.
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local IS_STUDIO = RunService:IsStudio()
 local SoundService = game:GetService("SoundService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
@@ -664,8 +667,8 @@ local function rainbowLevel(env: LightingController.Environment): number
 	if env.weather ~= "Clear" and env.weather ~= "Cloudy" then
 		return 0
 	end
-	if workspace:GetAttribute("RainbowTest") == true then
-		return 1 -- a tester asked for one (see the header)
+	if IS_STUDIO and workspace:GetAttribute("RainbowTest") == true then
+		return 1 -- a tester asked for one, in Studio only (see the header)
 	end
 	local slot = math.floor(env.serverTime / WeatherSchedule.SlotSeconds)
 	local before = WeatherSchedule.SlotKind(slot - 1)

@@ -22,7 +22,8 @@ return function(t)
 		return {
 			Workspace = {
 				StreamingEnabled = true,
-				StreamingTargetRadius = 1024,
+				StreamingTargetRadius = 640,
+				StreamingMinRadius = 128,
 				StreamingIntegrityMode = Enum.StreamingIntegrityMode.PauseOutsideLoadedArea,
 			},
 			Terrain = { Decoration = true },
@@ -141,7 +142,7 @@ return function(t)
 		place.Terrain.Decoration = false
 		local s = run({ place = place })
 		t.eq(#s.warnings, 5)
-		t.ok(has(s.warnings, "Workspace.StreamingTargetRadius is 512, expected 1024."))
+		t.ok(has(s.warnings, "Workspace.StreamingTargetRadius is 512, expected 640."))
 		t.ok(has(s.warnings, "Workspace.StreamingIntegrityMode is Default, expected PauseOutsideLoadedArea."))
 		t.ok(has(s.warnings, "Lighting.LightingStyle is Soft, expected Realistic."))
 		t.ok(has(s.warnings, "Lighting.PrioritizeLightingQuality is true, expected false."))
@@ -172,7 +173,7 @@ return function(t)
 		t.eq(#s.prints, 2)
 		t.eq(
 			s.prints[1],
-			"[PlaceCheck] can't check Workspace.StreamingTargetRadius = 1024, "
+			"[PlaceCheck] can't check Workspace.StreamingTargetRadius = 640, "
 				.. "Workspace.StreamingIntegrityMode = PauseOutsideLoadedArea, Workspace.Terrain.Decoration = true "
 				.. "from a script: look in Studio's Properties panel."
 		)
@@ -184,7 +185,7 @@ return function(t)
 		place.Workspace.StreamingEnabled = false
 		local s = run({ place = place, unreadable = { Workspace = { StreamingTargetRadius = true } } })
 		t.eq(#s.warnings, 1)
-		t.ok(has(s.prints, "can't check Workspace.StreamingTargetRadius = 1024 from a script"))
+		t.ok(has(s.prints, "can't check Workspace.StreamingTargetRadius = 640 from a script"))
 		t.ok(not has(s.prints, "[PlaceCheck] OK"))
 	end)
 
@@ -238,6 +239,7 @@ return function(t)
 			Workspace = tree.Workspace["$properties"],
 			Terrain = tree.Workspace.Terrain["$properties"],
 			Lighting = tree.Lighting["$properties"],
+			Players = tree.Players["$properties"],
 		}
 		local PlaceCheck = module()
 		local checked = 0

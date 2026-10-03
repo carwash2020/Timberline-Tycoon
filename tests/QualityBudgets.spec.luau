@@ -49,10 +49,10 @@ return function(t)
 			DepthOfField = 1,
 			Bloom = 1,
 			TownFxNear = 260, -- TownFX NEAR
-			-- ForestFiller (FOR-02, new): trees to 480 studs, stand-ins to 1,000
-			-- (inside StreamingTargetRadius 1024), 2 ms of building a frame.
+			-- ForestFiller (FOR-02): trees to 480 studs, stand-ins to 600
+			-- (inside StreamingTargetRadius 640), 2 ms of building a frame.
 			FillerNear = 480,
-			FillerFar = 1000,
+			FillerFar = 600,
 			FillerBuildMs = 2,
 			TuftNear = 150, -- grass tufts (FOR-04, new)
 			-- WoodFX (the v2 loop, V2_PLAN.md §16, new): pooled chips and leaves.
@@ -79,7 +79,7 @@ return function(t)
 			Bloom = 0.5,
 			TownFxNear = 120,
 			FillerNear = 340, -- the forest's edges round the spawn stay trees
-			FillerFar = 640,
+			FillerFar = 520,
 			FillerBuildMs = 1.2,
 			TuftNear = 90,
 			-- WoodFX (V2_PLAN.md §16): half the chips and leaves, no leaf shadows.

@@ -9,6 +9,7 @@ at the sawmill, and grow a lumber empire. Built with Rojo + Luau.
 - **The October 2026 redesign (rules, contracts, status):** [REDESIGN.md](REDESIGN.md)
 - **Where Phase 1 stands:** [PHASE1_NOTES.md](PHASE1_NOTES.md)
 - **How to test everything in Studio:** [PHASE2_NOTES.md](PHASE2_NOTES.md)
+- **How to publish:** [LAUNCH.md](LAUNCH.md)
 - **Everything V1 needs, and where it stands:** [V1_PLAN.md](V1_PLAN.md)
 - **How fast the economy runs:** [ECONOMY.md](ECONOMY.md) (generated; re-run with `lune run tools/economy`)
 

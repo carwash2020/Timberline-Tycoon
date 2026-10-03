@@ -18,9 +18,12 @@
 -- server, e.g. in the command bar: workspace:SetAttribute("WeatherOverride",
 -- "Storm")) to force a weather at full strength; clear it to go back to
 -- the schedule. "WeatherOverrideIntensity" (0..1) sets its strength.
+-- A live server ignores both, so a value saved into the place can't stick
+-- the published game on one weather. PlaceCheck warns if either is set.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
@@ -52,15 +55,28 @@ local function rand(lo: number, hi: number): number
 	return lo + (hi - lo) * WeatherService.Random()
 end
 
--- The weather right now: the schedule, unless a tester forced one.
+-- A tester's forced weather, or nil outside Studio (and for a name that
+-- isn't a weather). Pure.
+function WeatherService.Forced(forced: unknown, intensity: unknown, isStudio: boolean): (WeatherSchedule.Kind?, number?)
+	if not isStudio or type(forced) ~= "string" or WeatherSchedule.Windiness[forced] == nil then
+		return nil, nil
+	end
+	local level = if type(intensity) == "number" then math.clamp(intensity, 0, 1) else 1
+	return forced :: WeatherSchedule.Kind, level
+end
+
+-- The weather right now: the schedule, unless a tester forced one in Studio.
 function WeatherService.Current(now: number): WeatherSchedule.State
 	local state = WeatherSchedule.At(now)
-	local forced = workspace:GetAttribute("WeatherOverride")
-	if type(forced) == "string" and WeatherSchedule.Windiness[forced] ~= nil then
-		local level = workspace:GetAttribute("WeatherOverrideIntensity")
+	local kind, level = WeatherService.Forced(
+		workspace:GetAttribute("WeatherOverride"),
+		workspace:GetAttribute("WeatherOverrideIntensity"),
+		RunService:IsStudio()
+	)
+	if kind ~= nil and level ~= nil then
 		return {
-			kind = forced :: WeatherSchedule.Kind,
-			intensity = if type(level) == "number" then math.clamp(level, 0, 1) else 1,
+			kind = kind :: WeatherSchedule.Kind,
+			intensity = level,
 			slotStart = state.slotStart,
 			slotEnd = state.slotEnd,
 		}
