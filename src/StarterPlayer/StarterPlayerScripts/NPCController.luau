@@ -31,6 +31,10 @@
 --   * Beyond ANIMATE_RANGE they're left alone (joints reset), walkers just
 --     keep their place on the route. Who to look at is refreshed a few
 --     times a second, not every frame.
+--   * The pose loop follows Quality.Budget().CosmeticHz: every frame on
+--     high, about 20 times a second on medium, about twice a second on
+--     low. Poses, routes and lines are read from the clock, so a slower
+--     tier is coarser motion, not a different place or a skipped line.
 -- Streaming-tolerant: NPCs are found by the "NPC" tag as they stream in
 -- and dropped as they stream out. Binding gives up after a few tries.
 
@@ -45,9 +49,12 @@ local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local UITheme = require(script.Parent.UITheme)
+
+local Quality = require(script.Parent.Quality)
 
 local NPCController = {}
 
@@ -785,10 +792,14 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	if now >= rig.blinkAt then
 		rig.blinkUntil = now + BLINK_TIME
 		rig.blinkAt = now + rig.rng:NextNumber(2.2, 5.5)
-		for _, eye in ipairs(rig.eyes) do
-			eye.part.Size = Vector3.new(eye.size.X, 0.04 * s, eye.size.Z)
-			if eye.shine then
-				eye.shine.Transparency = 1
+		-- A coarse quality step outlasts a blink, which would leave the
+		-- eyes shut until the next sample. Reschedule and skip the pose.
+		if dt < BLINK_TIME then
+			for _, eye in ipairs(rig.eyes) do
+				eye.part.Size = Vector3.new(eye.size.X, 0.04 * s, eye.size.Z)
+				if eye.shine then
+					eye.shine.Transparency = 1
+				end
 			end
 		end
 	elseif rig.blinkUntil > 0 and now >= rig.blinkUntil then
@@ -834,7 +845,14 @@ local function nearbyBodies(now: number)
 	end
 end
 
+local sinceCosmetic = 0
 local function step(dt: number)
+	sinceCosmetic += dt
+	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+		return
+	end
+	local elapsed = sinceCosmetic
+	sinceCosmetic = 0
 	local now = os.clock()
 	refreshLayout(now)
 	nearbyBodies(now)
@@ -873,7 +891,7 @@ local function step(dt: number)
 		local focus = if index then bodies[index] else nil
 		local focusHead = if index then bodyHeads[index] else nil
 		rig.active = true
-		animate(rig, now, dt, focus, focusHead, d)
+		animate(rig, now, elapsed, focus, focusHead, d)
 		if rig.bubble then
 			placeBubble(rig)
 		end

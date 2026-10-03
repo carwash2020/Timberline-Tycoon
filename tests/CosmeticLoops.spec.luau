@@ -29,6 +29,7 @@ return function(t)
 		"TreeFX",
 		"WoodFX",
 		"ForestUI",
+		"NPCController",
 	}
 
 	-- These loops decide gameplay. Throttling them would change the outcome.
