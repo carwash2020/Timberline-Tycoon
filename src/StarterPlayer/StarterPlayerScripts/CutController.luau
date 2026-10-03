@@ -539,7 +539,7 @@ local function trySwing(fromClick: boolean)
 		chopNote("fired")
 	end
 	playSlash(tool)
-	SoundData.Play("Swing")
+	SoundData.Play(SoundData.SwingFor(tool:GetAttribute("AxeId")))
 end
 
 -- Activated and the mouse or trigger that caused it both arrive for one

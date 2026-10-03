@@ -121,6 +121,16 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 | Gloam Hollow | Gloamwood | 15 | 25.0 min | 36 | - | $3,301 |
 | Aether Isles | Lumenwood | 12 | 45.0 min | 16 | 20 | $5,243 |
 
+## Lux Axe (Robux)
+
+Not on the cash ladder and not in the buying path above. A game pass (StoreData LuxAxe). Stats sit just above the Inferno Axe's main row and below the Starfall Axe. Wood whose final chop was this axe sells for 10% more (GameConfig.LuxSellBonus), once, on the piece, before 2x Cash.
+
+| Axe | v2 damage | range | cooldown | v1 damage |
+|---|---|---|---|---|
+| Inferno Axe | 4.6 | 14 | 0.5 | 150 |
+| Lux Axe | 5.5 | 15 | 0.42 | 165 |
+| Starfall Axe | 6.5 | 16 | 0.35 | 180 |
+
 ## Assumptions
 
 - `aimSec` = 1.5

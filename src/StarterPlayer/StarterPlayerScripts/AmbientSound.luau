@@ -84,7 +84,8 @@ local function stepBed(b: Bed, dt: number)
 		return
 	end
 	-- Fade along a curve the ear hears as even.
-	s.Volume = b.base * b.level * b.level
+	local user = if b.music then SoundData.MusicVolume else SoundData.SfxVolume
+	s.Volume = b.base * b.level * b.level * user
 	if not s.IsPlaying then
 		s:Play()
 	end

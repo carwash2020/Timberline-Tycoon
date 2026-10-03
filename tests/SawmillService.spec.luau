@@ -67,6 +67,7 @@ return function(t)
 			ownerId = 7,
 			figure = "curly",
 			boost = 1.2,
+			lux = true,
 			lastHolderId = 4,
 			verdictOk = true,
 			selling = nil,
@@ -137,6 +138,7 @@ return function(t)
 			t.eq(info.ownerId, 7)
 			t.eq(info.figure, "curly")
 			t.eq(info.boost, 1.2)
+			t.eq(info.lux, true, "planks keep the Lux tag, they don't add another")
 			t.eq(info.lastHolderId, 4)
 			back += Sell.VolumeU3(info.size.X, info.size.Y, info.size.Z)
 		end

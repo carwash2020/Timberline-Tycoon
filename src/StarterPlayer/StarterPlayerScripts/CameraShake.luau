@@ -15,6 +15,7 @@ local CameraShake = {}
 
 local amplitude = 0 -- degrees
 local decay = 1 -- per second
+local enabled = true -- Settings: camera shake on/off
 local bound = false
 local t = 0
 -- The camera as Roblox's camera left it, and as the shake left it, last
@@ -52,7 +53,18 @@ end
 
 -- Shakes the camera by up to `strength` (about 0.2 subtle .. 1 big) for
 -- `duration` seconds.
+function CameraShake.SetEnabled(on: boolean)
+	enabled = on
+	if not on then
+		amplitude = 0
+	end
+end
+
 function CameraShake.Shake(strength: number, duration: number)
+	if not enabled then
+		amplitude = 0
+		return
+	end
 	local hz = Quality.Budget().CosmeticHz
 	if hz <= 2 then
 		return -- low: the shake stays off

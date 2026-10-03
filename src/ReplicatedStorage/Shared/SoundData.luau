@@ -31,6 +31,7 @@ SoundData.Sounds = {
 	Chop = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.6, speed = { 1.45, 1.7 }, rolloff = 90 },
 	ChopFinal = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.8, speed = { 1.05, 1.15 }, rolloff = 100 },
 	Swing = { id = "rbxasset://sounds/swordslash.wav", volume = 0.25, speed = { 0.75, 0.9 } },
+	LuxSwing = { id = "rbxasset://sounds/swordlunge.wav", volume = 0.32, speed = { 0.9, 1.05 } },
 	ChopTooHard = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.5, speed = { 2.4, 2.6 }, rolloff = 60 },
 	TreeCreak = { id = "", volume = 0.6, rolloff = 120 },
 	TreeFall = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.35, speed = { 0.5, 0.6 }, rolloff = 160 },
@@ -84,6 +85,16 @@ SoundData.Sounds = {
 -- Player settings (the Settings menu flips these).
 SoundData.SfxEnabled = true
 SoundData.MusicEnabled = true
+SoundData.SfxVolume = 1 -- 0 to 1, the Settings stepper (mute is SfxEnabled)
+SoundData.MusicVolume = 1
+
+-- The swing for an axe. The Lux Axe has its own; everything else shares Swing.
+function SoundData.SwingFor(axeId: unknown): string
+	if axeId == GameConfig.LuxAxeId then
+		return "LuxSwing"
+	end
+	return "Swing"
+end
 
 local function idFor(name: string, def: SoundDef): string
 	if name == "Chop" and GameConfig.ChopSoundId ~= "" then
@@ -148,6 +159,7 @@ function SoundData.PlayAt(name: string, position: Vector3)
 	holder.Name = "Sound_" .. name
 	holder.WorldPosition = position
 	holder.Parent = workspace.Terrain
+	s.Volume *= SoundData.SfxVolume
 	s.Parent = holder
 	s:Play()
 	removeWhenDone(s, holder)
@@ -162,6 +174,7 @@ function SoundData.Play(name: string)
 	if not s then
 		return
 	end
+	s.Volume *= SoundData.SfxVolume
 	s.Parent = SoundService
 	s:Play()
 	removeWhenDone(s, s)

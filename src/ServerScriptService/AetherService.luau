@@ -341,6 +341,7 @@ type Facts = {
 	volume: number,
 	figure: string?,
 	boost: number,
+	lux: boolean,
 	payee: Player,
 	profile: Profile,
 }
@@ -375,6 +376,7 @@ local function factsOf(d: V2Deps, model: Model): Facts?
 		volume = volume,
 		figure = attrString(model, "Figure"),
 		boost = attrNumber(model, "Boost") or 1,
+		lux = model:GetAttribute("LuxCut") == true,
 		payee = payee,
 		profile = profile,
 	}
@@ -425,7 +427,7 @@ local function chuteTick(h: Hopper, d: V2Deps, now: number)
 			continue
 		end
 		take(d, h, model, f.piece)
-		table.insert(f.profile.skyWood, SellLogic.Entry(f.woodId, f.kind, f.volume, f.figure, f.boost))
+		table.insert(f.profile.skyWood, SellLogic.Entry(f.woodId, f.kind, f.volume, f.figure, f.boost, f.lux))
 		if sent[f.payee] == nil then
 			sent[f.payee] = 0
 			table.insert(order, f.payee)

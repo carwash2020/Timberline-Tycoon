@@ -105,6 +105,7 @@ return function(t)
 		t.eq(HudRules.DropAxe(3, nil), false, "nothing in hand")
 		t.eq(HudRules.DropAxe(0, nil), false)
 		t.eq(HudRules.DropAxe(1, "NoSuchAxe"), false, "an unknown axe counts as the starter")
+		t.eq(HudRules.DropAxe(3, "LuxAxe"), false, "a pass axe never offers Drop")
 	end)
 
 	t.test("Drop axe takes two presses, 0.3 to 3 s apart", function()

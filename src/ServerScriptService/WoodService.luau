@@ -137,6 +137,7 @@ export type Piece = {
 	lastHolderId: number?,
 	figure: string?,
 	boost: number,
+	lux: boolean, -- final chop was the Lux Axe (SellLogic.InheritLux)
 	planterId: number?,
 	treeUid: string?,
 	createdAt: number, -- os.clock() it was cut free (GrabLogic's grace)
@@ -175,6 +176,7 @@ export type Info = {
 	lastHolderId: number?,
 	figure: string?,
 	boost: number?,
+	lux: boolean?,
 	planterId: number?,
 	treeUid: string?,
 	createdAt: number?,
@@ -466,7 +468,7 @@ local function worth(p: Piece): (number, number)
 	for _, part in pairs(p.parts) do
 		volume += SectionLogic.Volume(part.Size.X, part.Size.Y, part.Size.Z)
 	end
-	return volume, SellLogic.PieceValue(p.woodId, p.kind, volume, p.figure, p.boost)
+	return volume, SellLogic.PieceValue(p.woodId, p.kind, volume, p.figure, p.boost, p.lux)
 end
 
 -- The piece's mass by its sections (dress is massless), as the engine
@@ -494,6 +496,7 @@ local function publish(p: Piece)
 	m:SetAttribute("Value", round2(value))
 	m:SetAttribute("Figure", p.figure)
 	m:SetAttribute("Boost", if p.boost > 1 then p.boost else nil)
+	m:SetAttribute("LuxCut", if p.lux then true else nil)
 	m:SetAttribute("Elder", if p.elder then true else nil)
 	m:SetAttribute("LastInteracted", p.lastInteracted)
 	if m:GetAttribute("HeldBy") == nil then
@@ -585,6 +588,7 @@ local function makeRecord(model: Model, info: Info): Piece
 		lastHolderId = info.lastHolderId,
 		figure = info.figure,
 		boost = math.max(1, info.boost or 1),
+		lux = info.lux == true,
 		planterId = info.planterId,
 		treeUid = info.treeUid,
 		createdAt = info.createdAt or now,
@@ -995,6 +999,7 @@ function WoodService.Register(model: Model, info: Info?): Piece
 		ownerId = i.ownerId,
 		figure = i.figure,
 		boost = i.boost,
+		lux = if i.lux ~= nil then i.lux else model:GetAttribute("LuxCut") == true,
 		createdAt = i.createdAt,
 		uid = i.uid or (if type(uidAttr) == "string" and uidAttr ~= "" then uidAttr else nil),
 	})
@@ -1007,6 +1012,7 @@ export type PlankInfo = {
 	ownerId: number,
 	figure: string?,
 	boost: number?,
+	lux: boolean?,
 	lastHolderId: number?,
 }
 
@@ -1041,6 +1047,7 @@ function WoodService.SpawnPlank(info: PlankInfo): Piece?
 		lastHolderId = info.lastHolderId,
 		figure = info.figure,
 		boost = info.boost,
+		lux = info.lux,
 	})
 	weld(model, section)
 	setGroup(model, WoodService.WoodGroup)
@@ -1249,7 +1256,8 @@ function WoodService.CutPiece(
 	part: BasePart,
 	hitPos: Vector3,
 	normal: Vector3,
-	damage: number
+	damage: number,
+	swingLux: boolean?
 ): CutResult?
 	local sid = sectionOf(part)
 	if not sid or p.parts[sid] ~= part or byModel[p.model] ~= p then
@@ -1270,14 +1278,14 @@ function WoodService.CutPiece(
 	if not hit.through then
 		return { hit = hit, pieces = {} }
 	end
-	return { hit = hit, pieces = WoodService.SplitPiece(p, sid, hit.height) }
+	return { hit = hit, pieces = WoodService.SplitPiece(p, sid, hit.height, swingLux) }
 end
 
 -- Splits loose piece `p` through section `sid` at `h` studs up it: the
 -- piece keeps the low side (and its uid and record), a new piece takes the
 -- high side; both keep the owner, figure, boost and creation time, and the
 -- assembly's motion. Returns the pieces left (one if a side was chips).
-function WoodService.SplitPiece(p: Piece, sid: number, h: number): { Piece }
+function WoodService.SplitPiece(p: Piece, sid: number, h: number, swingLux: boolean?): { Piece }
 	local model = p.model
 	local root = p.root
 	GrabService.ReleasePiece(model, "cut")
@@ -1335,6 +1343,8 @@ function WoodService.SplitPiece(p: Piece, sid: number, h: number): { Piece }
 	end
 	local volA = SectionLogic.GraphVolume(a)
 	local volB = SectionLogic.GraphVolume(b)
+	-- Both sides keep a Lux tag, and a Lux chop through a plain log tags both.
+	p.lux = SellLogic.InheritLux(p.lux, swingLux)
 	local out: { Piece } = {}
 	-- Side A stays in this model and record.
 	if SectionLogic.IsChips(volA) then
@@ -1375,6 +1385,7 @@ function WoodService.SplitPiece(p: Piece, sid: number, h: number): { Piece }
 			lastHolderId = p.lastHolderId,
 			figure = p.figure,
 			boost = p.boost,
+			lux = p.lux,
 			planterId = p.planterId,
 			treeUid = p.treeUid,
 			createdAt = p.createdAt,

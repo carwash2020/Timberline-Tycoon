@@ -31,12 +31,36 @@ local MonetizationService = {}
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local clock: () -> number = os.time -- tests replace this
 local owned: { [Player]: { [string]: boolean } } = {} -- passes, per player
+-- GameServer wires this to grant the Lux Axe without a require cycle.
+local onPass: ((Player, string) -> ())? = nil
 
-local function setPass(player: Player, key: string)
+-- `persist` false only seeds the in-memory cache from a save. A real grant
+-- (a purchase, or Roblox confirming ownership) writes profile.passes so a
+-- later join still has the pass if UserOwnsGamePassAsync fails. Never
+-- clears a pass: a false or a failed check leaves the backup in place.
+local function setPass(player: Player, key: string, persist: boolean?)
 	local set = owned[player] or {}
 	owned[player] = set
 	set[key] = true
 	player:SetAttribute("Pass_" .. key, true)
+	if persist == false then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if profile then
+		if type(profile.passes) ~= "table" then
+			profile.passes = {}
+		end
+		profile.passes[key] = true
+	end
+	local hook = onPass
+	if hook then
+		hook(player, key)
+	end
+end
+
+function MonetizationService.SetPassListener(fn: (Player, string) -> ())
+	onPass = fn
 end
 
 local function publishBoosts(player: Player, profile: Profile)
@@ -174,6 +198,16 @@ end
 -- Call once the player's save has loaded.
 function MonetizationService.PlayerJoined(player: Player, profile: Profile)
 	publishBoosts(player, profile)
+	-- The save is the backup: active immediately, before Roblox answers.
+	-- An ownership check only turns a pass on. It never takes one away.
+	owned[player] = {}
+	if type(profile.passes) == "table" then
+		for key, on in pairs(profile.passes) do
+			if on == true and StoreData.Pass(key) then
+				setPass(player, key, false)
+			end
+		end
+	end
 	for _, pass in ipairs(StoreData.Passes) do
 		if StoreData.IsForSale(pass.id) then
 			task.spawn(function()

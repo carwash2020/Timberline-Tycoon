@@ -188,7 +188,11 @@ local function giveTool(player: Player, item: AxeItem): Tool?
 	end
 	local tool = Instance.new("Tool")
 	tool.Name = def.displayName -- what the hotbar shows
-	tool.ToolTip = string.format("%s: %d damage", def.displayName, def.damage)
+	local tip = string.format("%s: %d damage", def.displayName, def.damage)
+	if def.robux then
+		tip ..= "\n" .. GameConfig.LuxPerkLine()
+	end
+	tool.ToolTip = tip
 	tool.RequiresHandle = true
 	tool.CanBeDropped = false -- dropping goes through Drop(), not Roblox's built-in drop
 	tool:SetAttribute("AxeId", def.id)
@@ -237,6 +241,15 @@ function AxeService.GiveLoadout(player: Player, character: Model)
 		return
 	end
 	publishOwned(player)
+	-- A pass axe comes back on every spawn, from the save (and the attribute
+	-- the ownership check sets). Ensure won't add a second copy.
+	local passes = profile.passes
+	if
+		(passes and passes[GameConfig.LuxAxeId] == true)
+		or player:GetAttribute("Pass_" .. GameConfig.LuxAxeId) == true
+	then
+		AxeService.Ensure(player, GameConfig.LuxAxeId)
+	end
 	local toEquip: Tool? = nil
 	for _, item in ipairs(allItems(player)) do
 		local tool = giveTool(player, item)
@@ -254,6 +267,25 @@ function AxeService.GiveLoadout(player: Player, character: Model)
 			profile.equippedAxe = uid
 		end
 	end)
+end
+
+-- Makes sure the player has exactly one saved `axeId` (a pass axe), and
+-- that its tool is in the Backpack when it isn't lying in the world.
+-- A second call does not add another item.
+function AxeService.Ensure(player: Player, axeId: string)
+	if not ItemCatalog.GetAxe(axeId) then
+		return
+	end
+	local counts = ownedCounts(player)
+	if (counts[axeId] or 0) > 0 then
+		for _, item in ipairs(allItems(player)) do
+			if item.id == axeId then
+				giveTool(player, item)
+			end
+		end
+		return
+	end
+	AxeService.Grant(player, axeId, false)
 end
 
 -- Adds a new axe to the player's inventory and Backpack, and returns it
@@ -317,6 +349,10 @@ function AxeService.Drop(player: Player, uid: unknown)
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 	local def = if item then ItemCatalog.GetAxe(item.id) else nil
 	if not item or not def or not tool or not char or not hrp or dropped[uid] then
+		return
+	end
+	if def.robux then
+		notify(player, string.format("The %s can't be dropped or sold.", def.displayName))
 		return
 	end
 	if not keepsAnAxe(player, uid) then

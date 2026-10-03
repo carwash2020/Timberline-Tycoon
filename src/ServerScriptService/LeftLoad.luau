@@ -45,6 +45,7 @@ end
 -- One saved piece (ProfileSchema.TruckPiece has the same shape):
 --   w    wood id                  k   "log" | "plank"
 --   f    figure id, if figured    x   boost (2 = cut under 2x Wood), if any
+--   l    true when the Lux Axe cut it
 --   bed  the bed it rode: "BedFloor" (the truck's) or "TrailerBed"
 --   at   its root section's CFrame relative to that bed part: { x, y, z,
 --        rx, ry, rz } (studs; radians, CFrame.fromEulerAnglesXYZ)
@@ -56,6 +57,7 @@ export type Piece = {
 	k: string,
 	f: string?,
 	x: number?,
+	l: boolean?,
 	bed: string,
 	at: { number },
 	s: { { number } },
@@ -202,6 +204,7 @@ function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean, beds: { 
 		k = if r.k == "plank" then "plank" else "log",
 		f = if type(r.f) == "string" and r.f ~= "" then r.f else nil,
 		x = if finite(boost) and (boost :: number) > 1 then math.min(boost :: number, LeftLoad.MaxBoost) else nil,
+		l = if r.l == true then true else nil,
 		bed = r.bed,
 		at = { at[1], at[2], at[3], at[4], at[5], at[6] },
 		s = sections,

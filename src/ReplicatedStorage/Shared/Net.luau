@@ -24,7 +24,8 @@ Net.RemoteNames = {
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
 	"PlantSeed", -- client -> server: (treeUid) plant a Heartseed in a felled tree's stump (ForestService)
-	"SaveSetting", -- client -> server: ("music" | "sfx", on) remember a Settings toggle
+	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
+	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
 	"Release", -- client -> server: (part) let go of it
 	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)

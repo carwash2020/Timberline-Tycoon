@@ -10,6 +10,9 @@ return function(t)
 		local Schema = loader:server("ProfileSchema")
 		local profile = loader:shared("Util").deepCopy(Schema.Template)
 		profile.cash = options.cash or 0
+		if options.passes then
+			profile.passes = options.passes
+		end
 		local player = {
 			UserId = 7,
 			Name = "Tester",
@@ -214,5 +217,60 @@ return function(t)
 		s.buy("Pass", key)
 		t.ok(s.M.HasPass(s.player, key), "the Buy press asked again")
 		t.eq(#s.prompts, 0, "no purchase prompt for a pass they own")
+	end)
+
+	t.test("every pass and product prompts with its Creator Hub id; id 0 does not", function()
+		local sample = setup()
+		for _, pass in ipairs(sample.StoreData.Passes) do
+			local s = setup()
+			s.buy("Pass", pass.key)
+			t.eq(s.prompts, { "pass " .. s.StoreData.Pass(pass.key).id }, pass.key)
+		end
+		for _, product in ipairs(sample.StoreData.Products) do
+			local s = setup()
+			s.buy("Product", product.key)
+			t.eq(s.prompts, { "product " .. s.StoreData.Product(product.key).id }, product.key)
+		end
+		local hidden = setup()
+		for _, pass in ipairs(hidden.StoreData.Passes) do
+			pass.id = 0
+		end
+		for _, product in ipairs(hidden.StoreData.Products) do
+			product.id = 0
+		end
+		t.eq(hidden.StoreData.AnyForSale(), false, "the button hides when every id is 0")
+		hidden.buy("Pass", "LuxAxe")
+		hidden.buy("Product", "Cash1k")
+		t.eq(hidden.prompts, {})
+	end)
+
+	t.test("2x Cash is saved, stays after a failed ownership check, and doubles at once", function()
+		local saved = setup({ passes = { DoubleCash = true } })
+		t.eq(saved.M.SaleMultiplier(saved.player), 2, "the save is live before Roblox answers")
+		t.eq(saved.profile.passes.DoubleCash, true)
+		local hiccup = setup({ passes = { DoubleCash = true }, passErrors = 3 })
+		t.eq(hiccup.M.SaleMultiplier(hiccup.player), 2, "errors don't take the pass away")
+		t.eq(hiccup.profile.passes.DoubleCash, true)
+		local fresh = setup()
+		t.eq(fresh.M.SaleMultiplier(fresh.player), 1)
+		fresh.passFinished("DoubleCash", true)
+		t.eq(fresh.M.SaleMultiplier(fresh.player), 2)
+		t.eq(fresh.profile.passes.DoubleCash, true, "the purchase is written into the save")
+	end)
+
+	t.test("buying the Lux Axe pass tells the listener once per grant", function()
+		local s = setup()
+		local grants = 0
+		s.M.SetPassListener(function(_, key)
+			if key == "LuxAxe" then
+				grants += 1
+			end
+		end)
+		s.passFinished("LuxAxe", true)
+		t.eq(grants, 1)
+		t.eq(s.player.attrs.Pass_LuxAxe, true)
+		t.eq(s.profile.passes.LuxAxe, true)
+		s.passFinished("LuxAxe", false)
+		t.eq(grants, 1, "a cancelled prompt doesn't grant")
 	end)
 end

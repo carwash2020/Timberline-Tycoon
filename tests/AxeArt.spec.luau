@@ -259,4 +259,32 @@ return function(t)
 		t.ok(m:FindFirstChildWhichIsA("PointLight", true), "glow")
 		t.ok(AxeArt.Grip(def), "a grip")
 	end)
+
+	t.test("the Lux Axe: black haft, gold and diamond, a Glint, within the part budget", function()
+		local def = ItemCatalog.GetAxe("LuxAxe")
+		t.ok(AxeArt.Designed("LuxAxe"))
+		local m = AxeArt.Build(def)
+		t.eq(m.PrimaryPart.Name, "Handle")
+		t.ok(#parts(m) <= MAX_PARTS, "part budget")
+		local lo, hi = bounds(m)
+		t.ok(math.abs(lo.Y) < 0.05, "foot on the ground")
+		t.ok(hi.Y - lo.Y >= 2.8 and hi.Y - lo.Y <= 4.4, "a sensible height")
+		t.ok(lo.Z < -0.5, "blade toward -Z")
+		local handle = m.PrimaryPart
+		t.ok(handle.Color.R < 0.15 and handle.Color.G < 0.15 and handle.Color.B < 0.15, "black haft")
+		local glint = m:FindFirstChild("Glint", true)
+		t.ok(glint and glint:IsA("ParticleEmitter"), "named Glint")
+		t.ok(m:FindFirstChildWhichIsA("PointLight", true) ~= nil, "a glint light")
+		local gold, diamond = false, false
+		for _, p in ipairs(parts(m)) do
+			if p.Color.G > 0.6 and p.Color.R > 0.7 and p.Color.B < 0.5 then
+				gold = true
+			end
+			if p.Name == "Diamond" or (p.Material == roblox.Enum.Material.Neon and p.Color.B > 0.9) then
+				diamond = true
+			end
+		end
+		t.ok(gold, "gold")
+		t.ok(diamond, "diamond")
+	end)
 end

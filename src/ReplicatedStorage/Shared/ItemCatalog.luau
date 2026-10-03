@@ -40,6 +40,7 @@ export type AxeDef = {
 	v2: AxeV2?,
 	look: AxeLook,
 	sold: boolean?, -- false = never in the shop (forged instead); default true
+	robux: boolean?, -- true = a game pass (StoreData), not a rung on the cash ladder
 	forge: ForgeRecipe?,
 	damage: number,
 	-- Optional per-biome damage that replaces `damage` against trees from
@@ -167,6 +168,20 @@ ItemCatalog.Axes = {
 		damage = 180,
 		biomeDamage = { sky = 300 },
 		priceCash = 60000, -- the forge's cash part; also its place on the ladder
+	},
+	-- Robux exclusive (the Lux Axe pass). Not a rung: priceCash 0 would tie
+	-- the Rusty Axe, and a rung would move every tier, daily goal and the
+	-- economy's buying path. Stats sit just above the Inferno (Fire) Axe's
+	-- main row and below the Starfall Axe. No biome override, so the Fire
+	-- Axe stays better on emberwood and Starfall stays best on lumenwood.
+	LuxAxe = {
+		id = "LuxAxe",
+		displayName = "Lux Axe",
+		look = { headColor = "#F2D36B", material = "Metal", glow = true },
+		sold = false,
+		robux = true,
+		damage = 165, -- v1: between Inferno 150 and Starfall 180
+		priceCash = 0,
 	},
 }
 
@@ -420,6 +435,10 @@ local AXES_V2: { [string]: AxeV2 } = {
 		forgeWood = { lumenwood = 60 }, -- the v1 recipe's 40 logs at ProfileSchema.ForgeU3PerLog (1.5)
 		forgeCash = 20000, -- V2_PLAN §2c
 	},
+	-- Just above the Fire Axe's main row (4.6 / 14 / 0.5), below Starfall
+	-- (6.5 / 16 / 0.35). No `vs` line: the Fire Axe's emberwood 7.5 stays
+	-- its own, and Starfall stays the best general axe.
+	LuxAxe = { price = 0, damage = 5.5, range = 15, cooldown = 0.42 },
 }
 local VEHICLES_V2: { [string]: number } = {
 	Rustbucket = 0,
@@ -475,7 +494,9 @@ end
 -- to one rung above that, so older axes can be re-bought for a collection.
 local axeLadder: { AxeDef } = {}
 for _, axe in pairs(ItemCatalog.Axes) do
-	table.insert(axeLadder, axe)
+	if not axe.robux then -- a pass axe is not a cash rung
+		table.insert(axeLadder, axe)
+	end
 end
 table.sort(axeLadder, function(a, b)
 	return a.priceCash < b.priceCash

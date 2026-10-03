@@ -38,10 +38,29 @@ function SellLogic.PricePerU3(woodId: string, kind: Kind): number
 end
 
 -- The worth of a piece: `volumeU3` of `woodId` as `kind`, with its figure
--- (or nil) and boost (1, or 2 with 2x Wood). Never negative.
-function SellLogic.PieceValue(woodId: string, kind: Kind, volumeU3: number, figure: string?, boost: number?): number
+-- (or nil) and boost (1, or 2 with 2x Wood). `lux` is the Lux Axe's tag
+-- (GameConfig.LuxSellBonus, once, on this piece). Never negative. 2x Cash
+-- is not applied here: Payout does that once on the sale total.
+function SellLogic.PieceValue(
+	woodId: string,
+	kind: Kind,
+	volumeU3: number,
+	figure: string?,
+	boost: number?,
+	lux: boolean?
+): number
 	local v = math.max(0, volumeU3) * SellLogic.PricePerU3(woodId, kind)
-	return v * ForestLogic.Multiplier(figure) * math.max(1, boost or 1)
+	v = v * ForestLogic.Multiplier(figure) * math.max(1, boost or 1)
+	if lux then
+		v *= GameConfig.LuxSellBonus
+	end
+	return v
+end
+
+-- The tag a child piece keeps. A Lux chop tags the wood; a later chop never
+-- strips it. Standing trees have no parent tag, so only the swing counts.
+function SellLogic.InheritLux(parentLux: boolean?, swingLux: boolean?): boolean
+	return parentLux == true or swingLux == true
 end
 
 -- Whole dollars a sale pays: `total` (the pieces' values summed) times
@@ -93,20 +112,28 @@ end
 -- ProfileSchema.SkyWood): its wood id, volume in u³, figure, true for a
 -- plank, and its boost (nil = 1). Short keys: a save holds a list of them.
 
-export type Entry = { w: string, v: number, f: string?, p: boolean?, b: number? }
+export type Entry = { w: string, v: number, f: string?, p: boolean?, b: number?, l: boolean? }
 
 local function finite(n: unknown): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
 end
 
 -- The bin entry for a piece, from what SellService reads off it.
-function SellLogic.Entry(woodId: string, kind: Kind, volumeU3: number, figure: string?, boost: number?): Entry
+function SellLogic.Entry(
+	woodId: string,
+	kind: Kind,
+	volumeU3: number,
+	figure: string?,
+	boost: number?,
+	lux: boolean?
+): Entry
 	return {
 		w = woodId,
 		v = volumeU3,
 		f = figure,
 		p = if kind == "plank" then true else nil,
 		b = if finite(boost) and (boost :: number) > 1 then boost else nil,
+		l = if lux then true else nil,
 	}
 end
 
@@ -129,7 +156,14 @@ function SellLogic.EntryValue(entry: Entry): number
 	end
 	local figure = if type(entry.f) == "string" then entry.f else nil
 	local boost = if finite(entry.b) then entry.b else nil
-	return SellLogic.PieceValue(entry.w, if entry.p == true then "plank" else "log", entry.v, figure, boost)
+	return SellLogic.PieceValue(
+		entry.w,
+		if entry.p == true then "plank" else "log",
+		entry.v,
+		figure,
+		boost,
+		entry.l == true
+	)
 end
 
 -- What `entries` add up to: their worth ($, before 2x Cash), their

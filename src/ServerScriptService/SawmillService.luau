@@ -49,6 +49,7 @@ type Job = {
 	ownerId: number,
 	figure: string?,
 	boost: number,
+	lux: boolean,
 	lastHolderId: number?,
 	consumed: boolean,
 	next: number,
@@ -292,6 +293,7 @@ local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCata
 		ownerId = piece.ownerId,
 		figure = piece.figure,
 		boost = piece.boost,
+		lux = piece.lux == true,
 		lastHolderId = piece.lastHolderId,
 		consumed = false,
 		next = 1,
@@ -374,6 +376,7 @@ local function emitOne(c: Context, job: Job)
 		ownerId = job.ownerId,
 		figure = job.figure,
 		boost = job.boost,
+		lux = job.lux,
 		lastHolderId = job.lastHolderId,
 	})
 	-- Shove it out along the outfeed. SpawnPlank leaves the plank loose.

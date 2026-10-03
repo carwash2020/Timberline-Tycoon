@@ -147,6 +147,7 @@ return function(t)
 				ownerId = info.ownerId or 1,
 				figure = info.figure,
 				boost = info.boost,
+				lux = info.lux,
 				fall = info.fall,
 				elder = info.elder,
 			})
@@ -267,6 +268,7 @@ return function(t)
 			t.eq(q.ownerId, 7, "cutting a loose piece keeps its owner")
 			t.eq(q.figure, "birdseye")
 			t.eq(q.boost, 2)
+			t.eq(q.lux, false)
 			t.eq(q.model:GetAttribute("Figure"), "birdseye")
 			t.ok(q.model.Parent ~= nil)
 		end
@@ -283,6 +285,34 @@ return function(t)
 		end
 		t.eq(faces, 2)
 		t.ok(s.velocities[b.root] ~= nil, "the new piece keeps the assembly's motion")
+	end)
+
+	t.test("a Lux tag passes to both pieces, and a Lux chop tags a plain log", function()
+		local s = setup()
+		local tagged = s.log(3, 4, 2, nil, { lux = true })
+		t.eq(tagged.model:GetAttribute("LuxCut"), true)
+		local part = tagged.parts[2]
+		local result
+		local n = 0
+		repeat
+			n += 1
+			result = s.Wood.CutPiece(s.player(1), tagged, part, part.CFrame.Position, Vector3.yAxis, 5, false)
+		until #result.pieces > 0 or n > 20
+		t.eq(#result.pieces, 2)
+		t.eq(result.pieces[1].lux, true)
+		t.eq(result.pieces[2].lux, true)
+		t.eq(result.pieces[2].model:GetAttribute("LuxCut"), true)
+		local plain = s.log(2, 4, 2, nil, { lux = false })
+		local side = plain.parts[1]
+		local swung
+		local m = 0
+		repeat
+			m += 1
+			swung = s.Wood.CutPiece(s.player(1), plain, side, side.CFrame.Position, Vector3.yAxis, 5, true)
+		until #swung.pieces > 0 or m > 20
+		for _, q in ipairs(swung.pieces) do
+			t.eq(q.lux, true, "this chop is the final chop")
+		end
 	end)
 
 	t.test("an offcut under MinPieceVolume becomes chips", function()

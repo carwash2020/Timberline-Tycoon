@@ -150,7 +150,12 @@ return function(t)
 			},
 			mocks = {
 				HUD = { Toast = function() end },
-				SoundData = { Play = function() end },
+				SoundData = {
+					Play = function() end,
+					SwingFor = function()
+						return "Swing"
+					end,
+				},
 				Net = {
 					Remote = function(name)
 						return {

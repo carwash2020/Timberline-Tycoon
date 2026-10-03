@@ -23,13 +23,16 @@ local ShopLogic = {}
 
 -- "buy": the next new axe. "rebuy": owned, can buy another (collections,
 -- displays). "starter": the free Rusty Axe. "locked": buy the one before it
--- first. "forged": never sold (the Starfall Axe). "full": the player owns
--- GameConfig.MaxOwnedAxes axes already.
-export type AxeStatus = "buy" | "rebuy" | "starter" | "locked" | "forged" | "full"
+-- first. "forged": never sold (the Starfall Axe). "robux": a game pass
+-- (the Lux Axe). "full": the player owns GameConfig.MaxOwnedAxes axes already.
+export type AxeStatus = "buy" | "rebuy" | "starter" | "locked" | "forged" | "robux" | "full"
 
 -- `owned` is how many of this axe the player has; `ownedTotal` how many
 -- axes of any kind.
 function ShopLogic.StatusOf(axe: AxeDef, bestTier: number, owned: number, ownedTotal: number): AxeStatus
+	if axe.robux then
+		return "robux"
+	end
 	if axe.sold == false then
 		return "forged"
 	end
@@ -60,6 +63,8 @@ function ShopLogic.WhyNot(status: AxeStatus, axe: AxeDef, bestTier: number): str
 			else "Axes are sold in order."
 	elseif status == "forged" then
 		return string.format("The %s is forged in the Aether Isles, not sold.", axe.displayName)
+	elseif status == "robux" then
+		return string.format("The %s is a Robux exclusive. Open the Store.", axe.displayName)
 	elseif status == "starter" then
 		return string.format("Everyone starts with the %s. It isn't sold.", axe.displayName)
 	elseif status == "full" then

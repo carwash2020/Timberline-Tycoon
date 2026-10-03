@@ -44,7 +44,12 @@ return function(t)
 						return "high"
 					end,
 				},
-				SoundData = { Play = function() end },
+				SoundData = {
+					Play = function() end,
+					SwingFor = function()
+						return "Swing"
+					end,
+				},
 				Net = {
 					Remote = function()
 						return { FireServer = function() end }
@@ -351,7 +356,12 @@ return function(t)
 						return "high"
 					end,
 				},
-				SoundData = { Play = function() end },
+				SoundData = {
+					Play = function() end,
+					SwingFor = function()
+						return "Swing"
+					end,
+				},
 				Net = {
 					Remote = function(name)
 						return {

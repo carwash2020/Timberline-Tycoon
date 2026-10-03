@@ -322,11 +322,23 @@ function UITheme.Bottom(): number
 	return bottom + (if UITheme.IsPhone() then 58 else HOTBAR)
 end
 
+local userScale = 1
+local rescaleFn: (() -> ())? = nil
+
 local function scaleFor(): number
 	local camera = workspace.CurrentCamera
 	local viewport = if camera then camera.ViewportSize else Vector2.zero
 	local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-	return UITheme.ScaleFor(viewport, handheld, GuiService:IsTenFootInterface())
+	return UITheme.ScaleFor(viewport, handheld, GuiService:IsTenFootInterface()) * userScale
+end
+
+-- Settings: small 0.85, normal 1, large 1.15, on top of the screen scale.
+function UITheme.SetUserScale(multiplier: number)
+	userScale = multiplier
+	local rescale = rescaleFn
+	if rescale then
+		rescale()
+	end
 end
 
 local scales: { UIScale } = {}
@@ -1025,6 +1037,7 @@ function UITheme.Start()
 			task.spawn(fn)
 		end
 	end
+	rescaleFn = rescale
 	local function watchCamera()
 		local camera = workspace.CurrentCamera
 		if camera then

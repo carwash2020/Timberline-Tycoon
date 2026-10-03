@@ -204,4 +204,13 @@ return function(t)
 		s.AxeService.Drop(s.player, "rusty")
 		t.eq(#s.world, 1, "the same axe twice: once")
 	end)
+
+	t.test("the Lux Axe can't be dropped, even with another axe to hand", function()
+		local s = setup({ { uid = "lux", id = "LuxAxe" }, { uid = "rusty", id = "RustyAxe" } })
+		s.AxeService.Drop(s.player, "lux")
+		t.eq(#s.world, 0)
+		t.eq(s.tools.lux.destroyed, false)
+		t.eq(#s.profile.axes, 2)
+		t.ok(string.find(s.toasts[1], "can't be dropped") ~= nil)
+	end)
 end

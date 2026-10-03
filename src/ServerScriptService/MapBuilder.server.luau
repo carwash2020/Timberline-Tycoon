@@ -48,6 +48,7 @@ local NodeService = require(script.Parent.NodeService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
+local StoreBoard = require(ReplicatedStorage.Shared.StoreBoard)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TreeService = require(script.Parent.TreeService)
@@ -384,6 +385,13 @@ step("4. The town", function()
 		end
 		model.Parent = map
 	end)
+end)
+
+-- The Robux store's bulletin board, off the roads and Bram's walk.
+-- Persistent: the prompt has to be there when the player streams in.
+step("4. The store board", function()
+	local model = persistent(StoreBoard.Build())
+	place(model, StoreBoard.CFrame)
 end)
 
 ---------------------------------------------------------------------------
