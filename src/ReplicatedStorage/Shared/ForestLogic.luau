@@ -320,6 +320,28 @@ function ForestLogic.StruckFigure(hidden: string?): string
 	return storm
 end
 
+-- 0..1 from where the tree stands. The same tree always rolls the same
+-- bolt, and calling it doesn't touch math.random.
+function ForestLogic.BoltRoll(x: number, z: number): number
+	local n = bit32.bxor(math.floor(x * 13 + 50000) % 4294967296, math.floor(z * 29 + 80000) % 4294967296)
+	n = bit32.bxor(n, bit32.rshift(n, 16))
+	n = bit32.bxor(n, 0xA5A5F00D)
+	return (n % 10000) / 10000
+end
+
+-- Stormgrain, or a rarer figure when `roll` (BoltRoll) falls under
+-- Storm.rareChance and that figure is worth more than what the strike
+-- would already pay.
+function ForestLogic.BoltFigure(hidden: string?, roll: number): string
+	local struck = ForestLogic.StruckFigure(hidden)
+	local chance = ForestData.Storm.rareChance or 0
+	local rare = ForestData.Storm.rareFigure
+	if rare and roll < chance and ForestLogic.Multiplier(rare) > ForestLogic.Multiplier(struck) then
+		return rare
+	end
+	return struck
+end
+
 -- The average multiplier of a figured tree of this wood (plain rolls).
 function ForestLogic.FiguredAverage(woodId: string): number
 	local total, sum = 0, 0

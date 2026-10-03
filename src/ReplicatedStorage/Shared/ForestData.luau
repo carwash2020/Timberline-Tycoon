@@ -209,6 +209,11 @@ ForestData.Storm = {
 	strikeRadius = 60, -- studs (flat) from the bolt to the tree it hits
 	glowSeconds = 120, -- fell it before this runs out for Stormgrain
 	figure = "stormgrain",
+	-- A few bolts leave a rarer grain (burl, x4) instead of Stormgrain (x3).
+	-- The roll comes from where the tree stands, so it doesn't shuffle the
+	-- server's random stream.
+	rareChance = 0.12,
+	rareFigure = "burl",
 }
 
 ---------------------------------------------------------------------------

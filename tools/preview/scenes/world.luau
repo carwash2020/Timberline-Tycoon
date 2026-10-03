@@ -18,6 +18,10 @@ return {
 			{ pos = { 850, 100, 900 }, target = { 1150, 60, 1250 }, label = "the Volcano" },
 			{ pos = { -700, 400, 650 }, target = { -1050, 500, 1050 }, label = "the Skyroot and the isles" },
 			{ pos = { -1000, 740, 960 }, target = { -1050, 700, 1050 }, label = "on the isles" },
+			{ pos = { -430, 55, -340 }, target = { -565, 6, -455 }, label = "Gloam Hollow" },
+			{ pos = { 1080, 28, -80 }, target = { 1200, 3, -120 }, label = "the beach" },
+			{ pos = { -700, 36, 280 }, target = { -800, 0, 200 }, label = "the river" },
+			{ pos = { -620, 48, -520 }, target = { -760, 10, -650 }, label = "the Petrified Reach" },
 			{ pos = { 0, 2400, -1800 }, target = { 0, 0, 100 }, label = "the whole map" },
 		}
 		return built

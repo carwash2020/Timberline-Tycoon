@@ -45,6 +45,7 @@ local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local RegionWake = require(script.Parent.RegionWake)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
 local TruckLoad = require(script.Parent.TruckLoad)
@@ -692,6 +693,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 }, notify)
 safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
+safely("RegionWake.Init", RegionWake.Init)
 safely("NPCService.Init", NPCService.Init, mapFolder)
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
