@@ -77,6 +77,12 @@ WoodService.FallingGroup = "WoodFalling"
 WoodService.HeldGroup = "WoodHeld"
 WoodService.LeavesGroup = "Leaves"
 WoodService.PlayersGroup = "Players"
+-- Plot sawmills (MachineArt). Mill is the cage: players and a falling tree
+-- hit it, loose and carried logs do not, so a feed can pass the blade.
+-- MillBelt is the conveyor: loose logs ride it; players, held logs and
+-- falling trees do not.
+WoodService.MillGroup = "Mill"
+WoodService.MillBeltGroup = "MillBelt"
 WoodService.FellOwnerSec = 3 -- the cutter's device simulates a fresh piece this long
 WoodService.PutBackHoldSec = 1 -- a piece WoodWatch put back stays the server's this long
 WoodService.FellTilt = math.rad(4) -- a felled trunk starts this far over its far edge
@@ -350,7 +356,9 @@ end
 -- Registers the v2 wood groups once (MapBuilder does it before it builds
 -- the trees, GameServer again for safety; GrabService registers WoodHeld
 -- and Players too). Falling and held wood pass through players; chop rays
--- (CollisionGroup "Wood") skip leaves. Safe to call again. True if done.
+-- (CollisionGroup "Wood") skip leaves. Mill and MillBelt are the plot
+-- sawmill's cage and conveyor (see the sets below). Safe to call again.
+-- True if done.
 function WoodService.RegisterGroups(): boolean
 	local ok, err = pcall(function(): any
 		local PhysicsService = game:GetService("PhysicsService")
@@ -360,6 +368,8 @@ function WoodService.RegisterGroups(): boolean
 			WoodService.HeldGroup,
 			WoodService.LeavesGroup,
 			WoodService.PlayersGroup,
+			WoodService.MillGroup,
+			WoodService.MillBeltGroup,
 		}) do
 			if not PhysicsService:IsCollisionGroupRegistered(name) then
 				PhysicsService:RegisterCollisionGroup(name)
@@ -368,6 +378,19 @@ function WoodService.RegisterGroups(): boolean
 		PhysicsService:CollisionGroupSetCollidable(WoodService.FallingGroup, WoodService.PlayersGroup, false)
 		PhysicsService:CollisionGroupSetCollidable(WoodService.HeldGroup, WoodService.PlayersGroup, false)
 		PhysicsService:CollisionGroupSetCollidable(WoodService.LeavesGroup, WoodService.WoodGroup, false)
+		-- The cage (roof, end guards, blade guard) stops players. A loose or
+		-- carried log passes through it onto the belt. A tree still falling
+		-- hits the mill like any other building.
+		for _, wood in ipairs({ WoodService.WoodGroup, WoodService.HeldGroup }) do
+			PhysicsService:CollisionGroupSetCollidable(WoodService.MillGroup, wood, false)
+		end
+		-- The belt carries loose logs. It does not grab a player, a log in
+		-- someone's arms, or a tree on its way down, and it doesn't fight
+		-- the cage where the two overlap.
+		PhysicsService:CollisionGroupSetCollidable(WoodService.MillBeltGroup, WoodService.PlayersGroup, false)
+		PhysicsService:CollisionGroupSetCollidable(WoodService.MillBeltGroup, WoodService.HeldGroup, false)
+		PhysicsService:CollisionGroupSetCollidable(WoodService.MillBeltGroup, WoodService.FallingGroup, false)
+		PhysicsService:CollisionGroupSetCollidable(WoodService.MillBeltGroup, WoodService.MillGroup, false)
 		return nil
 	end)
 	if not ok then

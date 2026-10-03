@@ -4,18 +4,47 @@
 -- attachment (planks leave the front) and a Panel of X/Y buttons. The
 -- SawBlade is tagged so the town's blade spin picks it up. A ghost is the
 -- same model, see-through, for the plot preview.
+--
+-- Collision (three groups, registered in WoodService):
+--   * "Mill" — the roof and the invisible FeedGuard / BladeGuard. Players
+--     bump them and can't walk into the saw. Loose and carried logs do not,
+--     so a feed can pass the blade without jamming on it.
+--   * "MillBelt" — the Conveyor. It collides with loose logs and its
+--     AssemblyLinearVelocity (AimBelt) runs along the belt, toward +Z.
+--     Players, held logs and falling trees do not ride it.
+--   * Default — the deck, the walls and the guard rails. Logs bump the
+--     walls instead of sliding through them; the belt is wide enough for
+--     this mill's thickest log, and the rails sit just outside that, so a
+--     log snapped to the belt never meets a wall.
 
 local CollectionService = game:GetService("CollectionService")
 
+local GameConfig = require(script.Parent.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
 
 local MachineArt = {}
 
+-- Keep these equal to WoodService.MillGroup / MillBeltGroup.
+local MILL_GROUP = "Mill"
+local BELT_GROUP = "MillBelt"
+
 local WOOD = Kit.hex("#6B4423")
 local WOOD_DARK = Kit.hex("#3C2A1E")
 local BLADE = Kit.hex("#D5D8DC")
 local PANEL = Kit.hex("#2C241C")
+local BELT = Kit.hex("#3A342F")
+
+local function touchless(p: BasePart): BasePart
+	p.CanTouch = false
+	return p
+end
+
+local function inGroup(p: BasePart, group: string): BasePart
+	p.CollisionGroup = group
+	p.CanTouch = false
+	return p
+end
 
 local function part(
 	model: Model,
@@ -63,6 +92,21 @@ function MachineArt.SetCut(model: Model, x: number, y: number)
 	end
 end
 
+-- Points the belt's conveyor velocity out the front (+Z of the belt). A
+-- ghost has nothing to push. Safe to call every poll; placement can turn
+-- the mill, and the velocity is in world space.
+function MachineArt.AimBelt(model: Model)
+	local belt = model:FindFirstChild("Conveyor", true)
+	if not belt or not belt:IsA("BasePart") or not belt.CanCollide then
+		return
+	end
+	local look = belt.CFrame.LookVector
+	if look.Magnitude < 1e-4 then
+		return
+	end
+	belt.AssemblyLinearVelocity = look.Unit * GameConfig.ConveyorSpeed
+end
+
 -- `ghost` is the placement preview: nothing collides and there are no buttons.
 function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	local mill = ItemCatalog.GetSawmill(millId)
@@ -73,68 +117,120 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	local w, d = mill.width, mill.depth
 	local frame = Kit.hex(mill.color)
 	local model = Kit.model(mill.id)
+	-- Thickest log this mill accepts, in studs. The belt is that wide plus
+	-- a margin; the rails stand just outside it.
+	local logDia = mill.maxWidth * GameConfig.WoodUnit
+	local beltTop = 0.72
+	local beltH = 0.32
+	local beltY = beltTop - beltH / 2
+	local beltW = logDia + 0.55
+	local beltLen = math.max(3, d - 1.8)
 
 	local root =
 		part(model, "Root", Vector3.new(w, 0.2, d), CFrame.new(0, 0.1, 0), WOOD, Enum.Material.Wood, true, false)
 	root.Transparency = 1
 	model.PrimaryPart = root
 
-	part(
+	local deck = part(
 		model,
 		"Deck",
-		Vector3.new(w - 1, 0.45, d - 1.5),
-		CFrame.new(0, 0.5, 0.2),
+		Vector3.new(w - 0.4, 0.4, d - 0.4),
+		CFrame.new(0, 0.2, 0),
 		WOOD,
 		Enum.Material.WoodPlanks,
 		preview,
 		true
 	)
-	local leg = 0.45
-	for _, corner in ipairs({
-		Vector3.new(-w / 2 + 0.6, 0, -d / 2 + 0.8),
-		Vector3.new(w / 2 - 0.6, 0, -d / 2 + 0.8),
-		Vector3.new(-w / 2 + 0.6, 0, d / 2 - 0.8),
-		Vector3.new(w / 2 - 0.6, 0, d / 2 - 0.8),
-	}) do
-		part(
-			model,
-			"Leg",
-			Vector3.new(leg, 0.7, leg),
-			CFrame.new(corner + Vector3.new(0, 0.35, 0)),
-			WOOD_DARK,
-			Enum.Material.Wood,
-			preview,
-			true
-		)
+	if not preview then
+		touchless(deck)
 	end
 
-	local postH = 3.4 + mill.maxWidth
+	-- LookVector +Z (a half turn; Lune's lookAt disagrees with Roblox).
+	-- Length runs along Z, from the infeed to the outfeed.
+	local belt = part(
+		model,
+		"Conveyor",
+		Vector3.new(beltW, beltH, beltLen),
+		CFrame.new(0, beltY, 0) * CFrame.Angles(0, math.pi, 0),
+		BELT,
+		Enum.Material.Metal,
+		preview,
+		true
+	)
+	if not preview then
+		inGroup(belt, BELT_GROUP)
+		MachineArt.AimBelt(model)
+	end
+
+	local roofBottom = math.max(beltTop + logDia + 2.4, 5.4)
+	local wallH = roofBottom - 0.4
+	local wallY = 0.4 + wallH / 2
 	for _, side in ipairs({ -1, 1 }) do
-		part(
+		local wall = part(
 			model,
-			"Post",
-			Vector3.new(0.45, postH, 0.45),
-			CFrame.new(side * (w / 2 - 0.7), postH / 2, -0.4),
+			"Wall",
+			Vector3.new(0.65, wallH, d - 1.2),
+			CFrame.new(side * (w / 2 - 0.5), wallY, 0),
 			frame,
 			Enum.Material.Wood,
 			preview,
 			true
 		)
+		local rail = part(
+			model,
+			"GuardRail",
+			Vector3.new(0.28, 1.35, beltLen - 0.4),
+			CFrame.new(side * (logDia / 2 + 0.55), 0.4 + 0.75, 0),
+			WOOD_DARK,
+			Enum.Material.Wood,
+			preview,
+			true
+		)
+		if not preview then
+			touchless(wall)
+			touchless(rail)
+		end
 	end
-	part(
-		model,
-		"AxleBeam",
-		Vector3.new(w - 1.2, 0.4, 0.4),
-		CFrame.new(0, postH - 0.3, -0.4),
-		frame,
-		Enum.Material.Wood,
-		preview,
-		false
-	)
 
-	local bladeD = math.clamp(mill.maxWidth * 2.4, 3.2, 6.5)
-	local blade =
-		Kit.cylinder(model, "SawBlade", 0.28, bladeD, CFrame.new(0, postH * 0.62, 0.3), BLADE, Enum.Material.Metal)
+	-- Invisible end walls: players stop, a log on the belt passes through
+	-- (Mill group). They meet the roof so there is no gap to jump.
+	for _, endZ in ipairs({ -(d / 2 - 0.85), d / 2 - 0.85 }) do
+		local gate = part(
+			model,
+			"FeedGuard",
+			Vector3.new(w - 1.7, wallH, 0.45),
+			CFrame.new(0, wallY, endZ),
+			WOOD,
+			Enum.Material.Wood,
+			preview,
+			true
+		)
+		gate.Transparency = 1
+		gate.CastShadow = false
+		if not preview then
+			inGroup(gate, MILL_GROUP)
+		end
+	end
+
+	local roof = part(
+		model,
+		"Roof",
+		Vector3.new(w, 0.36, d - 0.2),
+		CFrame.new(0, roofBottom + 0.1, 0),
+		frame,
+		Enum.Material.WoodPlanks,
+		preview,
+		true
+	)
+	if not preview then
+		inGroup(roof, MILL_GROUP)
+	end
+
+	-- Disc in the XY plane (its X axis, the axle, runs along Z) so a log
+	-- fed along the belt passes through it once. TownFX spins that axle.
+	local bladeD = math.max(logDia + 1.2, 3.4)
+	local bladeCf = CFrame.new(0, beltTop + bladeD / 2, 0.35) * CFrame.Angles(0, math.pi / 2, 0)
+	local blade = Kit.cylinder(model, "SawBlade", 0.22, bladeD, bladeCf, BLADE, Enum.Material.Metal)
 	if preview then
 		blade.Transparency = 0.45
 		blade.CanCollide = false
@@ -143,6 +239,21 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	else
 		Kit.decor(blade)
 		CollectionService:AddTag(blade, "SawBlade")
+	end
+	local guard = part(
+		model,
+		"BladeGuard",
+		Vector3.new(bladeD + 0.8, bladeD + 0.6, 1.3),
+		CFrame.new(0, beltTop + bladeD / 2, 0.35),
+		WOOD,
+		Enum.Material.SmoothPlastic,
+		preview,
+		true
+	)
+	guard.Transparency = 1
+	guard.CastShadow = false
+	if not preview then
+		inGroup(guard, MILL_GROUP)
 	end
 
 	-- The log is pushed in from the back (-Z). The box is tall enough that a
@@ -182,6 +293,7 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 			false
 		)
 		panel.CanQuery = true
+		panel.CanTouch = false
 		local gui = Instance.new("SurfaceGui")
 		gui.Name = "PanelGui"
 		gui.Face = Enum.NormalId.Front

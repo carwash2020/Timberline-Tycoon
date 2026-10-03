@@ -692,6 +692,10 @@ return function(t)
 				t.ok(model:IsA("Model"), "a Model")
 				t.eq(model.Name, spots[i].kind)
 				t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic, model.Name .. " streams Atomic")
+				local lod = if model.Name == "LookoutTower"
+					then roblox.Enum.ModelLevelOfDetail.StreamingMesh
+					else roblox.Enum.ModelLevelOfDetail.Automatic
+				t.eq(model.LevelOfDetail, lod, model.Name .. " far-away detail")
 				local n, solid = 0, {}
 				for _, d in ipairs(model:GetDescendants()) do
 					if d:IsA("BasePart") then
@@ -839,6 +843,38 @@ return function(t)
 			t.ok(texts["TIMBER BRIDGE"] and texts["MIRROR LAKE"], "the signs' text")
 		end
 	)
+
+	t.test("horizon landmarks stay visible, and the shop paths are saw-cut rounds", function()
+		local s = build()
+		t.eq(s.warnings, {})
+		local Persistent = roblox.Enum.ModelStreamingMode.Persistent
+		local sawmill = s.map:FindFirstChild("Sawmill")
+		t.eq(sawmill.ModelStreamingMode, Persistent, "the sawmill is Persistent")
+		t.eq(s.map:FindFirstChild("HearthAndHome").ModelStreamingMode, Persistent, "the town hall is Persistent")
+		t.eq(s.map:FindFirstChild("Lighthouse", true).ModelStreamingMode, Persistent, "the lighthouse is Persistent")
+		local rounds = s.map:FindFirstChild("PathRounds")
+		t.ok(rounds and #rounds:GetChildren() == 9, "three rounds on each shop path")
+		for _, model in ipairs(rounds:GetChildren()) do
+			t.eq(model.Name, "PathRound")
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") then
+					t.ok(d.Anchored and not d.CanCollide and not d.CanQuery and not d.CanTouch, "a round is flat decor")
+				end
+			end
+		end
+		local grove = false
+		for _, model in ipairs(s.map:GetChildren()) do
+			if model.Name == "Signpost" then
+				local label = model:FindFirstChild("Board", true)
+				label = label and label:FindFirstChildWhichIsA("TextLabel", true)
+				if label and string.find(label.Text, "FIRST GROVE", 1, true) then
+					grove = true
+					t.ok(model:FindFirstChild("LampBulb", true), "the exit sign is lit")
+				end
+			end
+		end
+		t.ok(grove, "a sign points to the first grove")
+	end)
 
 	t.test("an erroring landmark plan fails its own step alone: the other landmarks, SellArea, spawning", function()
 		local s = build({

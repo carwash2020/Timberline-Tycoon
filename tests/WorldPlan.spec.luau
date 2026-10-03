@@ -1107,6 +1107,43 @@ return function(t)
 		end
 	end)
 
+	t.test("the grove gate is a lit sign at the south exit, and the spawn stays open", function()
+		local found = nil
+		for _, sign in ipairs(town.signs) do
+			if string.find(sign.text, "FIRST GROVE", 1, true) and string.find(sign.text, "SAWMILL", 1, true) then
+				found = sign
+			end
+		end
+		t.ok(found, "a sign names the sawmill and the first grove")
+		t.eq(found.lit, true, "lit")
+		t.ok(found.cframe.UpVector.Y > 0.99999, "upright")
+		-- South of the spawn and of the forest mouth, west of the path,
+		-- outside the parking lot (which starts at x 8).
+		t.ok(found.cframe.Z < 0 and found.cframe.Z > -30, "at the town's south edge")
+		t.ok(found.cframe.X < -12, "west of the Forest Path")
+		t.ok(found.cframe.LookVector.X > 0.9, "the board faces the path")
+		-- The spawn stretch (the walk and the ground just south of it) has
+		-- none of the new pieces: a tutorial grove and Murph's cart land there.
+		local function inSpawn(x, z)
+			return math.abs(x) < 16 and z > 18 and z < 58
+		end
+		t.ok(not inSpawn(found.cframe.X, found.cframe.Z), "the sign is not by the spawn")
+		local bell = 0
+		for _, prop in ipairs(town.props) do
+			if prop.name == "MillBell" then
+				bell += 1
+				t.ok(not inSpawn(prop.cframe.X, prop.cframe.Z), "the bell is not by the spawn")
+				t.ok(prop.cframe.X < found.cframe.X - 4, "the bell stands west of the sign")
+			end
+		end
+		t.eq(bell, 1, "one mill bell")
+		t.eq(#town.pathRounds, 9, "three shop paths, three rounds each")
+		for _, cf in ipairs(town.pathRounds) do
+			t.ok(not inSpawn(cf.X, cf.Z), "no round on the spawn walk")
+			t.ok(cf.Z > 84, "north of the street, on the shop paths")
+		end
+	end)
+
 	t.test("no grass grows under a building: dirt or cobbles under every wall and floor (TER-02)", function()
 		local buildings = { { "Sawmill", placed(BuildingArt.Sawmill(), town.sawmill) } }
 		for _, spot in ipairs(town.shops) do

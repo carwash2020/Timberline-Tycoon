@@ -86,6 +86,9 @@ return {
 		for _, g in ipairs(town.greenery) do
 			place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
 		end
+		for _, cf in ipairs(town.pathRounds) do
+			place(BuildingArt.PathRound(), cf)
+		end
 
 		return {
 			root = root,
