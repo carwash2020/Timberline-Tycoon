@@ -1155,8 +1155,10 @@ end
 -- Mirrors how far this truck is from its own parking spot (where the
 -- rig's pivot sits when parked there) on its owner's TruckSlotDistance.
 local function publishSlotDistance(rec: TruckRecord)
-	local home = rec.homeCF
-	if not home then
+	local home: CFrame
+	if rec.homeCF then
+		home = rec.homeCF
+	else
 		local shift = homeShift(rec.slot, rec.layout, rec.trailerLayout)
 		home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -shift)
 	end
@@ -1400,8 +1402,9 @@ function VehicleService.SpawnTruck(
 		if oldOverflow then
 			overflowUsed[oldOverflow] = nil
 		end
-		homeCF = padParking(pad, rel, size)
-		model:PivotTo(homeCF)
+		local parked = padParking(pad, rel, size)
+		homeCF = parked
+		model:PivotTo(parked)
 	else
 		slot, overflowIndex = clearSpot(player.UserId, choices, oldSlot, oldOverflow, layout, trailerLayout, rel, size)
 		model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -homeShift(slot, layout, trailerLayout)))

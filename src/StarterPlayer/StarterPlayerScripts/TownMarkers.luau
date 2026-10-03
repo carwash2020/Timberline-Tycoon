@@ -79,7 +79,9 @@ TownMarkers.Markers = {
 		text = "GENERAL\nSTORE",
 		icon = "blueprint",
 		chip = Color3.fromRGB(122, 90, 60),
-		offset = Vector3.new(9, 18.3, 2),
+		-- East of the name sign, over the roof's low east edge, so the
+		-- board and its lamps don't eat the chip, and it stays on a phone.
+		offset = Vector3.new(22, 18.3, 2),
 	},
 	{
 		name = "Gondola",

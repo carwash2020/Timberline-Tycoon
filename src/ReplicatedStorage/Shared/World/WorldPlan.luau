@@ -1035,6 +1035,8 @@ export type Town = {
 	greenery: { Greenery }, -- ornamental: never choppable
 	-- Saw-cut rounds down the middle of each shop path (looks only).
 	pathRounds: { CFrame },
+	-- Open display lot: trucks and trailers for sale, north of the plot road.
+	displayLot: CFrame,
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already

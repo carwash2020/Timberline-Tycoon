@@ -6,7 +6,6 @@
 -- ShopDisplay tag.
 
 local CollectionService = game:GetService("CollectionService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CoreLoop = require(script.Parent.Parent.CoreLoop)
 local GameConfig = require(script.Parent.Parent.GameConfig)

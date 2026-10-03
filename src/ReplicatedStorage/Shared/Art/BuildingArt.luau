@@ -92,8 +92,6 @@ local HAY = hex("#DDB65C")
 local WATER = hex("#7CC4F2")
 local STAR = hex("#B5D3FF")
 local ANVIL = hex("#3C3F48")
-local AWNING = { hex("#C9473C"), hex("#F4E7CC") }
-local TERRACOTTA = hex("#B8603E")
 local PAD = hex("#D9AE63")
 local PAD_INK = hex("#5A3820")
 

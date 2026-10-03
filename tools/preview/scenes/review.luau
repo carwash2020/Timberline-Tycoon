@@ -146,9 +146,12 @@ return {
 					label = "store interior from the door",
 				},
 				{
-					pos = { lot.X, 42, lot.Z - 100 },
-					target = { lot.X, 1, lot.Z + 6 },
-					fov = 58,
+					-- North of the row and a little west, looking back toward
+					-- the street, so the trailers (behind the shorter trucks)
+					-- sit in front of the trucks instead of hidden by them.
+					pos = { lot.X - 40, 32, lot.Z + 62 },
+					target = { lot.X + 8, 2, lot.Z - 8 },
+					fov = 52,
 					label = "dealership lot",
 				},
 				{

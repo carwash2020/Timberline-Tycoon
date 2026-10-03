@@ -137,7 +137,7 @@ return {
 					label = "store interior from the door",
 				},
 				-- The open display lot, trucks facing the plot road.
-				{ pos = { 241, 42, -6 }, target = { 241, 1, 100 }, fov = 58, label = "dealership display lot" },
+				{ pos = { 169, 34, 32 }, target = { 247, 2, 100 }, fov = 48, label = "dealership display lot" },
 			},
 		}
 	end,
