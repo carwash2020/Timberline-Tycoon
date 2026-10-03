@@ -25,6 +25,16 @@ local WorldLayout = require(script.Parent.WorldLayout)
 
 local TerrainGen = {}
 
+-- True only while the first 322 trees are placed, so they keep the roads
+-- and the land they were saved against. The live world (wider roads, the
+-- mill road and lot loop, junction flares, cliff rings, hollow pools) is
+-- what everything else sees.
+local legacyLayout = false
+
+function TerrainGen.SetLegacyLayout(on: boolean)
+	legacyLayout = on
+end
+
 local noise = math.noise
 local clamp = math.clamp
 local sqrt = math.sqrt
@@ -77,7 +87,7 @@ local LAKE_LEVEL = WorldLayout.LakeLevel
 local SEA_LEVEL = WorldLayout.SeaLevel
 
 -- Where the grove's ridge opens (toward town, so the curious can find it).
-local GROVE_GAP = math.atan2(110 - GROVE.z, 0 - GROVE.x)
+local GROVE_GAP = WorldLayout.GroveGap
 
 local function angleDiff(a: number, b: number): number
 	local d = (a - b + math.pi) % (math.pi * 2) - math.pi
@@ -167,6 +177,33 @@ local POOL_Y = 12
 	- CONE.crater * 1.1
 	+ mountainLift(CONE.x, CONE.z)
 
+-- Which ring, if any, is holding (x, z) up, and by how much. Zero inside
+-- the pass and off the ring.
+local function rimAt(x: number, z: number): (string?, number)
+	local kind: string? = nil
+	local lift = 0
+	for _, rim in ipairs(WorldLayout.Rims) do
+		local dx, dz = x - rim.cx, z - rim.cz
+		local d = sqrt(dx * dx + dz * dz)
+		if d >= rim.inner and d <= rim.outer then
+			local t = (d - rim.inner) / (rim.outer - rim.inner)
+			local ridge = math.sin(clamp(t, 0, 1) * math.pi) * rim.height
+			local open = smoothstep((angleDiff(math.atan2(dz, dx), rim.gap) - rim.half) / (rim.half * 0.45))
+			local here = math.max(0, ridge) * open
+			if here > lift then
+				lift = here
+				kind = rim.kind
+			end
+		end
+	end
+	return kind, lift
+end
+
+local function rimLift(x: number, z: number): number
+	local _, lift = rimAt(x, z)
+	return lift
+end
+
 -- Features that override everything: the volcano cone, the grove hollow,
 -- mountains, coast, island.
 local function landmarks(x: number, z: number, h: number): number
@@ -193,6 +230,13 @@ local function landmarks(x: number, z: number, h: number): number
 		local ridge = math.sin(clamp(t, 0, 1) * math.pi) * RIDGE.height * (0.75 + 0.35 * noise(x / 35, z / 35, 2.2))
 		local gap = smoothstep((angleDiff(math.atan2(dz, dx), GROVE_GAP) - RIDGE.gapAngle * 0.5) / RIDGE.gapAngle)
 		h += math.max(0, ridge) * gap
+	end
+
+	-- Snowfields and Volcano: a ring of cliffs outside the trees, with one
+	-- gap where the road comes in. Skipped while the first trees are placed
+	-- (they were laid out before the rings existed).
+	if not legacyLayout then
+		h += rimLift(x, z)
 	end
 
 	-- Mountains framing the north, west and south edges.
@@ -273,6 +317,22 @@ local function water(x: number, z: number): (number?, number?, number)
 			bank = math.max(bank, 1 - clamp((d - r) / 7, 0, 1))
 		end
 	end
+	-- Shallow bowls in the Gloam Hollow. Their surface sits under the
+	-- hollow's floor, so the banks stay dry and Mud (no lake-bank lift).
+	if not legacyLayout then
+		for _, pool in ipairs(WorldLayout.GrovePools) do
+			local dx, dz = x - pool.x, z - pool.z
+			local reach = pool.radius
+			if dx * dx + dz * dz < reach * reach then
+				local d = sqrt(dx * dx + dz * dz)
+				local t = d / reach
+				local surfaceY = -4.2
+				local bed = surfaceY - pool.depth * (1 - t * t)
+				bestBed = if bestBed then math.min(bestBed, bed) else bed
+				surface = surfaceY
+			end
+		end
+	end
 	return bestBed, surface, bank
 end
 
@@ -284,17 +344,60 @@ for _, road in ipairs(WorldLayout.Roads) do
 	table.insert(ROADS, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
 end
 
+-- Widths from before phase 12's roads. The mill road, the lot loop and the
+-- junction flares are new, so they are absent here.
+local LEGACY_WIDTH: { [string]: number } = {
+	ForestPath = 10,
+	HillsRoad = 14,
+	SnowRoad = 14,
+	VolcanoRoad = 14,
+	SkyrootRoad = 12,
+	PlotRoad = 10,
+	PlotLane = 8,
+}
+local LEGACY_ROADS: { FastRoad } = {}
+for _, road in ipairs(WorldLayout.Roads) do
+	local width = LEGACY_WIDTH[road.name]
+	if width then
+		table.insert(LEGACY_ROADS, { line = WorldLayout.FastLine(road.points), half = width / 2 })
+	end
+end
+
+local function roadsNow(): { FastRoad }
+	return if legacyLayout then LEGACY_ROADS else ROADS
+end
+
+local function considerRoad(
+	best: number,
+	onRoad: number,
+	half: number,
+	d: number,
+	x: number,
+	z: number
+): (number, number)
+	local cap = half + 23
+	if d < cap then
+		best = math.max(best, smoothstep(1 - (d - half) / 22))
+		if d < half + noise(x / 9, z / 9, 6.6) * 1.2 then
+			onRoad = 1
+		end
+	end
+	return best, onRoad
+end
+
 local function roadWeight(x: number, z: number): (number, number)
 	local best = 0
 	local onRoad = 0
-	for _, road in ipairs(ROADS) do
+	for _, road in ipairs(roadsNow()) do
 		local cap = road.half + 23
 		local d = WorldLayout.FastDistance(road.line, x, z, cap)
-		if d < cap then
-			best = math.max(best, smoothstep(1 - (d - road.half) / 22))
-			if d < road.half + noise(x / 9, z / 9, 6.6) * 1.2 then
-				onRoad = 1
-			end
+		best, onRoad = considerRoad(best, onRoad, road.half, d, x, z)
+	end
+	if not legacyLayout then
+		for _, junction in ipairs(WorldLayout.Junctions) do
+			local dx, dz = x - junction.at.X, z - junction.at.Y
+			local d = sqrt(dx * dx + dz * dz)
+			best, onRoad = considerRoad(best, onRoad, junction.radius, d, x, z)
 		end
 	end
 	return best, onRoad
@@ -312,20 +415,38 @@ TerrainGen.GravelMaterial = "Pavement"
 local GRAVEL_EDGE = 1 -- studs in from a haul road's edge where its pale surface ends (dirt beyond)
 TerrainGen.GravelEdge = GRAVEL_EDGE
 local HAUL: { FastRoad } = {}
+local LEGACY_HAUL: { FastRoad } = {}
 for _, road in ipairs(WorldLayout.Roads) do
 	if table.find(TerrainGen.HaulRoads, road.name) then
 		table.insert(HAUL, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
+		local legacy = LEGACY_WIDTH[road.name]
+		if legacy then
+			table.insert(LEGACY_HAUL, { line = WorldLayout.FastLine(road.points), half = legacy / 2 })
+		end
 	end
 end
 
 -- Whether (x, z) is on a haul road's pale surface (its edge frayed a
--- little, as the road's own is).
+-- little, as the road's own is). Junction flares count, the same way.
 local function onGravel(x: number, z: number): boolean
-	for _, road in ipairs(HAUL) do
+	local haul = if legacyLayout then LEGACY_HAUL else HAUL
+	for _, road in ipairs(haul) do
 		local half = road.half - GRAVEL_EDGE
 		local d = WorldLayout.FastDistance(road.line, x, z, half + 1)
 		if d < half + noise(x / 7, z / 7, 8.2) * 0.8 then
 			return true
+		end
+	end
+	if not legacyLayout then
+		for _, junction in ipairs(WorldLayout.Junctions) do
+			if junction.haul then
+				local dx, dz = x - junction.at.X, z - junction.at.Y
+				local d = sqrt(dx * dx + dz * dz)
+				local half = junction.radius - GRAVEL_EDGE
+				if d < half + noise(x / 7, z / 7, 8.2) * 0.8 then
+					return true
+				end
+			end
 		end
 	end
 	return false
@@ -334,10 +455,19 @@ end
 -- How far (x, z) is from the edge of the nearest road (negative = on it).
 function TerrainGen.RoadClearance(x: number, z: number): number
 	local best = math.huge
-	for _, road in ipairs(ROADS) do
+	for _, road in ipairs(roadsNow()) do
 		local d = WorldLayout.FastDistance(road.line, x, z, road.half + 60) - road.half
 		if d < best then
 			best = d
+		end
+	end
+	if not legacyLayout then
+		for _, junction in ipairs(WorldLayout.Junctions) do
+			local dx, dz = x - junction.at.X, z - junction.at.Y
+			local d = sqrt(dx * dx + dz * dz) - junction.radius
+			if d < best then
+				best = d
+			end
 		end
 	end
 	return best
@@ -521,6 +651,19 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	local lot = WorldLayout.ParkingLot
 	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then
 		return "Ground"
+	end
+
+	-- Cliff rings: brown rock round the Snowfields, dark stone round the
+	-- Volcano. The pass (no lift) keeps whatever the biome paints.
+	if not legacyLayout then
+		local kind, lift = rimAt(x, z)
+		if lift > 8 then
+			if kind == "snow" then
+				return "Rock"
+			elseif kind == "volcano" then
+				return if slope > 0.6 then "Slate" else "Basalt"
+			end
+		end
 	end
 
 	-- The volcano's cone: dark rock, a lava-filled crater (checked before

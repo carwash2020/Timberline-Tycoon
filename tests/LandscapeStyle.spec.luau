@@ -139,6 +139,18 @@ return function(t)
 		end
 		return bestRoad, best
 	end
+	-- A haul-road junction flare is pale past the road's own edge, on purpose.
+	local function inHaulJunction(x, z)
+		for _, junction in ipairs(WorldLayout.Junctions) do
+			if
+				junction.haul
+				and (Vector2.new(x, z) - junction.at).Magnitude < junction.radius - TerrainGen.GravelEdge + 0.81
+			then
+				return true
+			end
+		end
+		return false
+	end
 
 	-- Phase 12 (ATMOS) changed the rule: phase 10 laid a pale beige gravel
 	-- crown (182, 174, 158) between dirt verges 3 studs wide; now a haul road
@@ -239,7 +251,7 @@ return function(t)
 						-- road's, give or take 0.8), never out on the grass.
 						local nh = nearest.width / 2
 						t.ok(
-							edge + nh <= nh - TerrainGen.GravelEdge + 0.81,
+							edge + nh <= nh - TerrainGen.GravelEdge + 0.81 or inHaulJunction(x, z),
 							string.format("pale road at (%d, %d) past the road's edge", x, z)
 						)
 						t.ok(WorldLayout.FlatWeight(x, z) < 0.6, string.format("pale road at (%d, %d) in town", x, z))
@@ -252,7 +264,7 @@ return function(t)
 		for x = -1490, 1490, 37 do
 			for z = -1490, 1490, 37 do
 				local _, edge = nearestRoad(x, z)
-				if edge > 2 then
+				if edge > 2 and not inHaulJunction(x, z) then
 					t.ok(materialAt(x, z) ~= GRAVEL, string.format("pale road off the roads at (%d, %d)", x, z))
 				end
 			end

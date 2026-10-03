@@ -492,7 +492,9 @@ return function(t)
 		end
 		t.ok(deepCells > 200, deepCells .. " deep cells")
 		local perTree = deepCells * CELL * CELL / deep
-		t.ok(perTree >= 150 and perTree <= 260, string.format("deep in the forest a tree per %.0f sq studs", perTree))
+		-- Phase 12 thinned the filler (core roll 0.55 to 0.4), so a deep
+		-- cell holds fewer trees than the old 150-260 band.
+		t.ok(perTree >= 250 and perTree <= 400, string.format("deep in the forest a tree per %.0f sq studs", perTree))
 		-- Its edges (canopy 0.5 to FillerEdge): the area there, every 4 studs,
 		-- and the trees standing in it, in the north and south forests.
 		local function edgeBand(x, z)
@@ -947,7 +949,9 @@ return function(t)
 			end
 			local l = WorldPlan.Lighthouse()
 			add(string.format("%.2f %.2f;", l.cframe.X, l.cframe.Z))
-			t.eq(h, 749653094, "a cluster or landmark moved")
+			-- Re-sampled in phase 12. Wider roads moved the roadside clusters
+			-- and the pieces they keep clear of; the search itself did not.
+			t.eq(h, 910492024, "a cluster or landmark moved")
 		end
 	)
 

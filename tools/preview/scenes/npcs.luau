@@ -216,7 +216,7 @@ return {
 				-- West to Murph by his campfire, from 12 studs south of the spawn
 				-- pad: from the pad itself, (-2, 6, 40), the TO THE WOODS sign at
 				-- (-16, 44) hides his head and chest.
-				cam(-4, 6, 28, -25, 3.5, 41.8, "Murph at his camp, from by the spawn"),
+				cam(-4, 6, 28, -25.05, 3.5, 44.47, "Murph at his camp, from by the spawn"),
 				cam(-45, 7, 84, -45, 3.5, 102, "Tink behind the Tool Shed counter"),
 				cam(4, 9, 66, 12, 3, 90, "Millie by the sell pad"),
 				cam(-24, 9, 128, -36, 3, 148, "Gus by the gondola"),
