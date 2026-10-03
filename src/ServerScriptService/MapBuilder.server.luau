@@ -139,7 +139,7 @@ end
 
 -- A gondola station (GondolaService rides from its Platform).
 local function station(name: string, cf: CFrame): Model
-	local model = persistent(BuildingArt.GondolaStation())
+	local model = atomic(BuildingArt.GondolaStation())
 	model.Name = name
 	return place(model, cf)
 end
@@ -197,11 +197,9 @@ step("4. The town", function()
 
 	-- The sawmill, and the sell area in front of it.
 	step("4. The sawmill", function()
-		-- Persistent: the mill is the landmark you steer by from the biomes.
-		-- (Lookout towers, further out and numerous, use a StreamingMesh
-		-- instead — see the scenery step. The lighthouse is Persistent too.
-		-- Hearth & Home, the town hall, is Persistent with the other shops.)
-		local sawmill = place(persistent(BuildingArt.Sawmill()), town.sawmill)
+		-- Atomic: the mill streams in whole (ticket I). Lookout towers, further
+		-- out, still use a StreamingMesh. SellArea stays Persistent.
+		local sawmill = place(atomic(BuildingArt.Sawmill()), town.sawmill)
 		local blade = sawmill:FindFirstChild("SawBlade", true)
 		if blade then
 			CollectionService:AddTag(blade, "SawBlade") -- TownFX spins it
@@ -236,11 +234,11 @@ step("4. The town", function()
 		end
 	end)
 
-	-- Shops: Persistent, with a Counter whose ShopPoint is where the client's
+	-- Shops: Atomic, with a Counter whose ShopPoint is where the client's
 	-- "Browse" prompt appears and what ShopService measures range from.
 	step("4. The shops", function()
 		for _, spot in ipairs(town.shops) do
-			local shop = persistent(BuildingArt.Shop(spot.kind, spot.title, spot.accent))
+			local shop = atomic(BuildingArt.Shop(spot.kind, spot.title, spot.accent))
 			shop.Name = spot.kind
 			local counter = shop:FindFirstChild("Counter")
 			assert(counter and counter:IsA("BasePart"), "[MapBuilder] " .. spot.kind .. " has no Counter")
@@ -398,9 +396,9 @@ step("4. The town", function()
 end)
 
 -- The Robux store's bulletin board, off the roads and Bram's walk.
--- Persistent: the prompt has to be there when the player streams in.
+-- Atomic with the rest of the multi-mesh props. The prompt is on the board.
 step("4. The store board", function()
-	local model = persistent(StoreBoard.Build())
+	local model = atomic(StoreBoard.Build())
 	place(model, StoreBoard.CFrame)
 end)
 
@@ -712,7 +710,7 @@ step("5. The landmarks", function()
 	step("5. The lighthouse", function()
 		local lighthouse = WorldPlan.Lighthouse()
 		if lighthouse then
-			place(persistent(LandmarkArt.Lighthouse()), lighthouse.cframe, landmarks)
+			place(atomic(LandmarkArt.Lighthouse()), lighthouse.cframe, landmarks)
 		end
 	end)
 end)

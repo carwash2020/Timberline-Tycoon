@@ -3,9 +3,9 @@
 -- Init(mapFolder) runs once the whole world is built, so it can find the
 -- shop Counters, the sell zone and the gondola station to stand beside.
 --
---   * Murph: a Persistent Model "Murph" directly under TimberlineMap
+--   * Murph: an Atomic Model "Murph" directly under TimberlineMap
 --     (QuestUI clones his Head, Beard, Beanie, Torso, LeftArm, RightArm
---     for its portrait and puts its Talk prompt on his Torso).
+--     for its portrait). He streams in whole, same as the other townsfolk.
 --   * Everyone else: Atomic models in a Folder "Townsfolk" under
 --     TimberlineMap (each streams in whole, so a client never sees half a
 --     person).
@@ -19,8 +19,8 @@
 --     Walkers don't collide (they'd shove players about); the others
 --     block like a person would.
 --   * Every NPC carries a Talk prompt on the model (F / ButtonY, clickable,
---     no line-of-sight check) so it arrives with the Atomic or Persistent
---     model. The client never WaitForChilds it. NPCService does not run a
+--     no line-of-sight check) so it arrives with the Atomic model. The
+--     client never WaitForChilds it. NPCService does not run a
 --     loop: animation, bubbles, and head turns are all on the client.
 
 local CollectionService = game:GetService("CollectionService")
@@ -114,7 +114,7 @@ function NPCService.Init(mapFolder: Instance)
 		local ok, err = pcall(function()
 			local model = build(npc, find)
 			if npc.id == "Murph" then
-				model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+				model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 				model.Parent = mapFolder
 			else
 				model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic

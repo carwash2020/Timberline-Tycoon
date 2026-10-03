@@ -288,13 +288,12 @@ return function(t)
 				at and at:IsA("BasePart"),
 				marker.name .. ": TimberlineMap." .. table.concat(marker.path, ".") .. " is a part"
 			)
-			-- Its model is Persistent: always streamed in on every client.
+			-- SellArea stays Persistent. Shops and the station are Atomic.
 			local model = s.map:FindFirstChild(marker.path[1])
-			t.eq(
-				model.ModelStreamingMode,
-				roblox.Enum.ModelStreamingMode.Persistent,
-				marker.path[1] .. " is Persistent"
-			)
+			local mode = if marker.path[1] == "SellArea"
+				then roblox.Enum.ModelStreamingMode.Persistent
+				else roblox.Enum.ModelStreamingMode.Atomic
+			t.eq(model.ModelStreamingMode, mode, marker.path[1] .. " streaming")
 		end
 	end)
 
@@ -807,74 +806,67 @@ return function(t)
 		end
 	end)
 
-	t.test(
-		"the landmarks: footbridge, docks and rowboats Atomic, the lighthouse Persistent, in a Landmarks folder",
-		function()
-			local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-			local s = build()
-			t.eq(s.warnings, {})
-			lastStepsRan(s)
-			local folder = s.map:FindFirstChild("Landmarks")
-			t.ok(folder and folder:IsA("Folder"), "a Landmarks folder in TimberlineMap")
-			local Atomic, Persistent = roblox.Enum.ModelStreamingMode.Atomic, roblox.Enum.ModelStreamingMode.Persistent
-			local count = {}
-			for _, model in ipairs(folder:GetChildren()) do
-				t.ok(model:IsA("Model"), model.Name .. " is a Model")
-				count[model.Name] = (count[model.Name] or 0) + 1
-				local mode = if model.Name == "Lighthouse" then Persistent else Atomic
-				t.eq(model.ModelStreamingMode, mode, model.Name .. "'s streaming")
-				local solid = 0
-				for _, d in ipairs(model:GetDescendants()) do
-					if d:IsA("BasePart") then
-						t.eq(d.Anchored, true, model.Name .. ": " .. d.Name .. " is anchored")
-						if d.CanCollide then
-							solid += 1
-						end
-					end
-				end
-				if model.Name == "Rowboat" then
-					t.eq(solid, 0, "the rowboats are looks only")
-				else
-					t.ok(solid > 0, model.Name .. " has something to stand on or bump into")
-				end
-			end
-			local docks = WorldPlan.Docks()
-			t.eq(count.Footbridge, 1)
-			t.eq(count.Dock, #docks)
-			t.eq(count.Rowboat, #docks)
-			t.eq(count.Lighthouse, 1)
-			t.eq(count.Signpost, 2, "the TIMBER BRIDGE and MIRROR LAKE signs")
-			-- The lamp LightingController lights at dusk, where WorldPlan says.
-			local lighthouse = folder:FindFirstChild("Lighthouse")
-			local lamp = lighthouse:FindFirstChild("LampGlow", true)
-			t.ok(lamp and lamp.Material == roblox.Enum.Material.Neon, "a Neon LampGlow")
-			t.ok(
-				(lamp.CFrame.Position - WorldPlan.Lighthouse().lamp).Magnitude < 1e-3,
-				"the lamp where WorldPlan puts it"
-			)
-			-- The signs say what they're for.
-			local texts = {}
-			for _, model in ipairs(folder:GetChildren()) do
-				if model.Name == "Signpost" then
-					for _, d in ipairs(model:GetDescendants()) do
-						if d:IsA("TextLabel") then
-							texts[d.Text] = true
-						end
+	t.test("the landmarks: footbridge, docks, rowboats and the lighthouse Atomic, in a Landmarks folder", function()
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local s = build()
+		t.eq(s.warnings, {})
+		lastStepsRan(s)
+		local folder = s.map:FindFirstChild("Landmarks")
+		t.ok(folder and folder:IsA("Folder"), "a Landmarks folder in TimberlineMap")
+		local Atomic = roblox.Enum.ModelStreamingMode.Atomic
+		local count = {}
+		for _, model in ipairs(folder:GetChildren()) do
+			t.ok(model:IsA("Model"), model.Name .. " is a Model")
+			count[model.Name] = (count[model.Name] or 0) + 1
+			t.eq(model.ModelStreamingMode, Atomic, model.Name .. "'s streaming")
+			local solid = 0
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") then
+					t.eq(d.Anchored, true, model.Name .. ": " .. d.Name .. " is anchored")
+					if d.CanCollide then
+						solid += 1
 					end
 				end
 			end
-			t.ok(texts["TIMBER BRIDGE"] and texts["MIRROR LAKE"], "the signs' text")
+			if model.Name == "Rowboat" then
+				t.eq(solid, 0, "the rowboats are looks only")
+			else
+				t.ok(solid > 0, model.Name .. " has something to stand on or bump into")
+			end
 		end
-	)
+		local docks = WorldPlan.Docks()
+		t.eq(count.Footbridge, 1)
+		t.eq(count.Dock, #docks)
+		t.eq(count.Rowboat, #docks)
+		t.eq(count.Lighthouse, 1)
+		t.eq(count.Signpost, 2, "the TIMBER BRIDGE and MIRROR LAKE signs")
+		-- The lamp LightingController lights at dusk, where WorldPlan says.
+		local lighthouse = folder:FindFirstChild("Lighthouse")
+		local lamp = lighthouse:FindFirstChild("LampGlow", true)
+		t.ok(lamp and lamp.Material == roblox.Enum.Material.Neon, "a Neon LampGlow")
+		t.ok((lamp.CFrame.Position - WorldPlan.Lighthouse().lamp).Magnitude < 1e-3, "the lamp where WorldPlan puts it")
+		-- The signs say what they're for.
+		local texts = {}
+		for _, model in ipairs(folder:GetChildren()) do
+			if model.Name == "Signpost" then
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("TextLabel") then
+						texts[d.Text] = true
+					end
+				end
+			end
+		end
+		t.ok(texts["TIMBER BRIDGE"] and texts["MIRROR LAKE"], "the signs' text")
+	end)
 
 	t.test("horizon landmarks stay visible, and the shop paths are saw-cut rounds", function()
 		local s = build()
 		t.eq(s.warnings, {})
-		local Persistent = roblox.Enum.ModelStreamingMode.Persistent
+		local Atomic = roblox.Enum.ModelStreamingMode.Atomic
 		local sawmill = s.map:FindFirstChild("Sawmill")
-		t.eq(sawmill.ModelStreamingMode, Persistent, "the sawmill is Persistent")
-		t.eq(s.map:FindFirstChild("HearthAndHome").ModelStreamingMode, Persistent, "the town hall is Persistent")
-		t.eq(s.map:FindFirstChild("Lighthouse", true).ModelStreamingMode, Persistent, "the lighthouse is Persistent")
+		t.eq(sawmill.ModelStreamingMode, Atomic, "the sawmill is Atomic")
+		t.eq(s.map:FindFirstChild("HearthAndHome").ModelStreamingMode, Atomic, "the town hall is Atomic")
+		t.eq(s.map:FindFirstChild("Lighthouse", true).ModelStreamingMode, Atomic, "the lighthouse is Atomic")
 		local rounds = s.map:FindFirstChild("PathRounds")
 		t.ok(rounds and #rounds:GetChildren() == 9, "three rounds on each shop path")
 		for _, model in ipairs(rounds:GetChildren()) do

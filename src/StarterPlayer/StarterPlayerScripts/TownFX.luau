@@ -1,9 +1,12 @@
 --!strict
 -- TownFX: small motions that make the town feel worked in, all local.
 --   * The sawmill's big blade ("SawBlade" tag, MapBuilder) spins about its
---     own X axis (BuildingArt: its teeth are welded to it and follow).
+--     own X axis (the part-built blade). A mesh blade sets SpinAxis to Z
+--     and turns about the arbor; the bullwheel turns on Y, sails on Z
+--     through their hub. Low quality stops the sails only.
 --   * Campfire flames ("Flame" tag) flicker: they breathe in size and
---     brightness, each on its own phase.
+--     brightness, each on its own phase. Glow meshes (MeshGlow) are Neon
+--     and, on low quality, hidden. No light is added here.
 -- Only what's near the camera moves. Streaming-safe: tagged parts come and
 -- go through CollectionService signals.
 
@@ -13,6 +16,7 @@ local RunService = game:GetService("RunService")
 
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local TownMotion = require(ReplicatedStorage.Shared.Art.TownMotion)
 local Quality = require(script.Parent.Quality)
 
 local TownFX = {}
@@ -26,8 +30,34 @@ type Flame = { part: BasePart, size: Vector3, phase: number }
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
 local blades: { [BasePart]: boolean } = {}
+local wheels: { [BasePart]: boolean } = {}
+local sails: { [BasePart]: boolean } = {}
+local glows: { [BasePart]: boolean } = {}
 local flames: { [BasePart]: Flame } = {}
 local chimneys: { [BasePart]: ParticleEmitter } = {}
+
+local function axisOf(part: BasePart): string
+	local axis = part:GetAttribute("SpinAxis")
+	if axis == "Y" or axis == "Z" then
+		return axis
+	end
+	return "X"
+end
+
+local function hingeOf(part: BasePart): Vector3
+	local function num(name: string): number
+		local value = part:GetAttribute(name)
+		return if type(value) == "number" then value else 0
+	end
+	if type(part:GetAttribute("HubX")) == "number" then
+		return Vector3.new(num("HubX"), num("HubY"), num("HubZ"))
+	end
+	return Vector3.new(num("HingeX"), num("HingeY"), num("HingeZ"))
+end
+
+local function spin(part: BasePart, angle: number)
+	part.CFrame = TownMotion.Step(part.CFrame, axisOf(part), hingeOf(part), angle)
+end
 
 local function puff(part: BasePart): ParticleEmitter
 	local e = Instance.new("ParticleEmitter")
@@ -77,6 +107,22 @@ function TownFX.Start()
 	end, function(part)
 		blades[part] = nil
 	end)
+	track("BullwheelSpin", function(part)
+		wheels[part] = true
+	end, function(part)
+		wheels[part] = nil
+	end)
+	track("WindmillSails", function(part)
+		sails[part] = true
+	end, function(part)
+		sails[part] = nil
+	end)
+	track("MeshGlow", function(part)
+		glows[part] = true
+	end, function(part)
+		glows[part] = nil
+		part.LocalTransparencyModifier = 0
+	end)
 	track("Flame", function(part)
 		flames[part] = { part = part, size = part.Size, phase = (part.Position.X + part.Position.Z) % 6.28 }
 	end, function(part)
@@ -110,8 +156,15 @@ function TownFX.Start()
 			return
 		end
 		local eye = camera.CFrame.Position
-		local near = Quality.Budget().TownFxNear
-		local chimneyRate = EnvironmentData.ChimneyRate(Quality.Budget().Tier)
+		local budget = Quality.Budget()
+		local near = budget.TownFxNear
+		local chimneyRate = EnvironmentData.ChimneyRate(budget.Tier)
+		local low = not TownMotion.WindmillSpins(budget.Tier)
+		for glow in pairs(glows) do
+			if glow.Parent then
+				glow.LocalTransparencyModifier = if low then 1 else 0
+			end
+		end
 		for part, emitter in pairs(chimneys) do
 			if part.Parent then
 				local close = (part.Position - eye).Magnitude < near
@@ -120,7 +173,19 @@ function TownFX.Start()
 		end
 		for blade in pairs(blades) do
 			if blade.Parent and (blade.Position - eye).Magnitude < near then
-				blade.CFrame *= CFrame.Angles(BLADE_SPEED * step, 0, 0)
+				spin(blade, BLADE_SPEED * step)
+			end
+		end
+		for wheel in pairs(wheels) do
+			if wheel.Parent and (wheel.Position - eye).Magnitude < near then
+				spin(wheel, BLADE_SPEED * 0.35 * step)
+			end
+		end
+		if TownMotion.WindmillSpins(budget.Tier) then
+			for sail in pairs(sails) do
+				if sail.Parent and (sail.Position - eye).Magnitude < near then
+					spin(sail, 0.6 * step)
+				end
 			end
 		end
 		for part, flame in pairs(flames) do

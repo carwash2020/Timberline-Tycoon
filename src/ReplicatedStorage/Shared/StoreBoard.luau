@@ -1,12 +1,14 @@
 --!strict
 -- StoreBoard: the town bulletin board that opens the Robux store.
 -- West of the spawn walk and of Old Bram's route, south of the street,
--- north of the tutorial grove and clear of Murph's camp. Persistent so
--- the prompt still works with StreamingEnabled. Pure placement so tests
--- can check it doesn't stand on a road.
+-- north of the tutorial grove and clear of Murph's camp. Atomic, with
+-- the prompt on the board. Pure placement so tests can check it doesn't
+-- stand on a road.
 
 local Kit = require(script.Parent.Art.Kit)
 local StoreData = require(script.Parent.StoreData)
+local TownMeshes = require(script.Parent.Art.TownMeshes)
+local TownModels = require(script.Parent.Art.TownModels)
 
 local StoreBoard = {}
 
@@ -163,6 +165,9 @@ function StoreBoard.Build(): Model
 	prompt.MaxActivationDistance = 12
 	prompt.HoldDuration = 0
 	prompt.Parent = board
+	-- The board's centre is the game's position. The mesh sits 2.3 lower
+	-- so that centre still lands on this part.
+	TownMeshes.Dress(model, "StoreBoard", { pivot = CFrame.new(0, -TownModels.StoreBoardDrop, 0) })
 	prompt:AddTag("StorePrompt")
 	return model
 end

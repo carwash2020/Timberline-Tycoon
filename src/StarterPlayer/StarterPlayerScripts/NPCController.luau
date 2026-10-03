@@ -474,14 +474,18 @@ local function bind(model: Instance, tries: number?)
 	local id = model:GetAttribute("NPCId")
 	local npc = if type(id) == "string" then NPCData.Get(id) else nil
 	local eyes = {}
-	for _, d in ipairs(head:GetChildren()) do
-		if d:IsA("BasePart") and d.Name == "Eye" then
-			local shine = d:FindFirstChild("EyeShine")
-			table.insert(eyes, {
-				part = d,
-				size = d.Size,
-				shine = if shine and shine:IsA("BasePart") then shine else nil,
-			})
+	-- A head mesh brings its own eyes. Leave the part eyes hidden and
+	-- don't blink them back on.
+	if head:GetAttribute("MeshEyes") ~= true then
+		for _, d in ipairs(head:GetChildren()) do
+			if d:IsA("BasePart") and d.Name == "Eye" then
+				local shine = d:FindFirstChild("EyeShine")
+				table.insert(eyes, {
+					part = d,
+					size = d.Size,
+					shine = if shine and shine:IsA("BasePart") then shine else nil,
+				})
+			end
 		end
 	end
 	local routeText = model:GetAttribute("Route")
