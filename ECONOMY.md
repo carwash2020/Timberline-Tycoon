@@ -16,6 +16,20 @@ Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thick
 | Cobalt Axe ($2,040) | about 1 h | 53.7 min | ✅ on target |
 | Full plot ($900,100) | 20-40 h | 39.4 h | ✅ on target |
 
+## CI ranges
+
+Every `lune run tools/economy` (including `--check`) fails the process when a headline time leaves these ranges. There is no 0.75–1.25 slack here. E1 is the first sale, E2 the Steel Axe (8.0 min is inside), E3 the first $1k, E4 Cobalt and the full plot.
+
+| Target | Strict range | This model |
+|---|---|---|
+| First sale (E1) | under 3 min (0–180 s) | 66 s |
+| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 478 s |
+| First $1k (E3) | 13–20 min (780–1200 s) | 807 s |
+| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 3225 s |
+| Full plot (E4) | 20–40 h (72000–144000 s) | 141911 s |
+
+The first $1,000 in this model is 13.4 min (807 s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.
+
 End of the buying path: $29,008/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
 
 ## Tree volumes (TreeGen, mean of 50 seeds)

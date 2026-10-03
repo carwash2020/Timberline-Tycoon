@@ -24,7 +24,9 @@
 --   * Glowing axes (look.glow) carry a PointLight and particles.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local AxeModels = require(script.Parent.AxeModels)
 local Kit = require(script.Parent.Kit)
+local MeshKit = require(script.Parent.MeshKit)
 
 type AxeDef = ItemCatalog.AxeDef
 
@@ -761,6 +763,79 @@ end
 
 local handleLengths: { [string]: number } = {} -- [axe id], filled by Build
 
+-- Visual meshes only. The gameplay Handle (size, grip, swing, hitbox) is
+-- the part-built haft. A mesh id of 0, or any mesh that fails to load,
+-- leaves that axe exactly as the builder made it.
+local function applyAxeMeshes(model: Model, def: AxeDef): boolean
+	local spec = AxeModels.Get(def.id)
+	local handle = model.PrimaryPart
+	if not spec or not handle then
+		return false
+	end
+	local required = { spec.Handle, spec.Head }
+	if spec.Glow then
+		table.insert(required, spec.Glow)
+	end
+	for _, piece in ipairs(required) do
+		if not AxeModels.UsesMesh(piece.meshId) then
+			return false
+		end
+	end
+	local made: { MeshPart } = {}
+	local function abandon(): boolean
+		for _, mesh in ipairs(made) do
+			mesh:Destroy()
+		end
+		return false
+	end
+	local function add(piece: AxeModels.Piece, name: string): MeshPart?
+		local mesh = MeshKit.Create(piece.meshId, name, piece.size)
+		if not mesh then
+			return nil
+		end
+		MeshKit.Visual(mesh, piece.meshId)
+		mesh.Parent = model
+		table.insert(made, mesh)
+		return mesh
+	end
+	local handleMesh = add(spec.Handle, "MeshHandle")
+	local headMesh = add(spec.Head, "MeshHead")
+	if not handleMesh or not headMesh then
+		return abandon()
+	end
+	local glowMesh: MeshPart? = nil
+	if spec.Glow then
+		glowMesh = add(spec.Glow, "MeshGlow")
+		if not glowMesh then
+			return abandon()
+		end
+	end
+	-- The visual haft is longer than the tool's Handle. Its foot stays at
+	-- y = 0; it is not scaled down to the gameplay haft.
+	local visualLen = handleMesh.Size.Y
+	handleMesh.CFrame = CFrame.new(0, visualLen / 2, 0)
+	local function placeOnBlade(mesh: MeshPart)
+		local size = mesh.Size
+		local y = visualLen - size.Y / 2 + 0.05
+		local z = AxeModels.BladeFrontZ + size.Z / 2
+		mesh.CFrame = CFrame.new(0, y, z)
+	end
+	placeOnBlade(headMesh)
+	if glowMesh then
+		placeOnBlade(glowMesh)
+	end
+	local drop: { Instance } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d ~= handle and d:GetAttribute("VisualMesh") ~= true then
+			table.insert(drop, d)
+		end
+	end
+	for _, d in ipairs(drop) do
+		d:Destroy()
+	end
+	return true
+end
+
 -- Every axe id with its own design (the rest get the generic one).
 function AxeArt.Designed(axeId: string): boolean
 	return builders[axeId] ~= nil
@@ -777,6 +852,13 @@ function AxeArt.Build(def: AxeDef): Model
 		generic(model, def)
 	end
 	local handle = model.PrimaryPart :: BasePart
+	applyAxeMeshes(model, def)
+	if def.id == "LuxAxe" then
+		-- Always, even when the meshes fail, so the swing effect has a home
+		-- on the part-built axe. Offsets are the Blender points minus half
+		-- this Handle's length (the tool haft, not the visual mesh).
+		AxeModels.AddLuxAttachments(handle)
+	end
 	handleLengths[def.id] = handle.Size.Y
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and d ~= handle then

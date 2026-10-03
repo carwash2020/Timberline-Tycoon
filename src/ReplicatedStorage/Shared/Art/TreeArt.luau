@@ -29,6 +29,7 @@
 local TreeGen = require(script.Parent.Parent.TreeGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
+local TreeMeshes = require(script.Parent.TreeMeshes)
 
 type WoodDef = WoodData.WoodDef
 type Rng = Kit.Rng
@@ -1503,6 +1504,8 @@ function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOption
 			end
 		end
 	end
+	-- Uploaded meshes when every one loads. A miss keeps this part-built tree.
+	TreeMeshes.Apply(model, def, skel)
 	return model
 end
 
