@@ -409,20 +409,10 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	end
 	-- A sawmill bought at the Tool Shed is already paid for: placing takes
 	-- one out of stock. Otherwise you pay here, the same as a blueprint.
-	local fromStock = false
-	if ItemCatalog.GetSawmill(bp.id) then
-		local stock = profile.sawmillStock
-		if type(stock) ~= "table" then
-			stock = {}
-			profile.sawmillStock = stock
-		end
-		local at = table.find(stock, bp.id)
-		if at then
-			table.remove(stock, at)
-			fromStock = true
-			player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(stock))
-		end
-	end
+	-- Stock is spent only after the cash check, so a refused place leaves it.
+	local stock = if type(profile.sawmillStock) == "table" then profile.sawmillStock else nil
+	local stockAt = if ItemCatalog.GetSawmill(bp.id) and stock then table.find(stock, bp.id) else nil
+	local fromStock = stockAt ~= nil
 	local price = if fromStock then 0 else bp.priceCash
 	if profile.cash < price then
 		notify(
@@ -433,6 +423,10 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	end
 	if price > 0 and not EconomyService.SpendCash(player, price, "placed " .. bp.displayName, bp.id) then
 		return
+	end
+	if fromStock and stock and stockAt then
+		table.remove(stock, stockAt)
+		player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(stock))
 	end
 	local item: PlotLogic.Placed = { uid = Util.guid(), blueprintId = bp.id, x = px, z = pz, rot = rot :: number }
 	table.insert(profile.plot.placed, item)
