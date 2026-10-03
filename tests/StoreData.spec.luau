@@ -29,27 +29,70 @@ return function(t)
 		t.eq(StoreData.CreatorIds.Products.DoubleWood, 0)
 		t.eq(StoreData.CreatorIds.Products.InstantDelivery, 0)
 		local forSale = 0
+		local seen = {}
 		for _, pass in ipairs(StoreData.Passes) do
 			t.eq(pass.id, StoreData.CreatorIds.Passes[pass.key], pass.key)
 			if StoreData.IsForSale(pass.id) then
 				forSale += 1
+				t.ok(not seen[pass.id], "pass id used twice")
+				seen[pass.id] = true
 			end
 		end
 		for _, product in ipairs(StoreData.Products) do
 			t.eq(product.id, StoreData.CreatorIds.Products[product.key], product.key)
 			if StoreData.IsForSale(product.id) then
 				forSale += 1
+				t.ok(not seen[product.id], "product id used twice")
+				seen[product.id] = true
 			end
 		end
-		t.eq(forSale, 4, "2x Cash, the Lux Axe, and both cash packs are for sale")
+		-- Five passes and two cash packs. 2x Wood and Instant Delivery stay hidden.
+		t.eq(forSale, 7)
 		t.eq(StoreData.AnyForSale(), true)
-		t.eq(#StoreData.ListedPasses(), 2)
+		t.eq(#StoreData.ListedPasses(), 5)
 		t.eq(#StoreData.ListedProducts(), 2)
 		t.eq(StoreData.Product("DoubleWood").id, 0)
 		t.eq(StoreData.Product("InstantDelivery").id, 0)
-		t.eq(StoreData.Pass("LuxAxe").image, 0, "image slot left at 0")
+		t.eq(StoreData.ProductById(0), nil, "id 0 never lists a product")
+		t.eq(StoreData.Pass("LuxAxe").image, 0, "Lux Axe image slot left at 0")
+		t.eq(StoreData.Pass("DoubleCash").image, 0, "2x Cash image slot left at 0")
 		t.eq(StoreData.Pass("DoubleCash").key, "DoubleCash")
 		t.eq(StoreData.Passes[1].key, "DoubleCash", "2x Cash stays first so its test id stays 101")
+		t.eq(StoreData.CreatorIds.Passes.DoubleCash, 2005256811)
+		t.eq(StoreData.CreatorIds.Passes.LuxAxe, 2005226878)
+		t.eq(StoreData.CreatorIds.Passes.TowService, 2006186967)
+		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 2006912886)
+		t.eq(StoreData.CreatorIds.Passes.PaintShop, 2006456926)
+		t.eq(StoreData.CreatorIds.Products.Cash1k, 3716312861)
+		t.eq(StoreData.CreatorIds.Products.Cash10k, 3716312899)
+		t.eq(StoreData.Pass("TowService").image, 91282142796474)
+		t.eq(StoreData.Pass("TimberClassic").image, 79037897236948)
+		t.eq(StoreData.Pass("PaintShop").image, 71028498113750)
+		-- Retired cash passes are not for sale and are not ids we grant.
+		local retired = { [2005844842] = true, [2004962887] = true }
+		for id in pairs(seen) do
+			t.ok(not retired[id], "retired cash pass id " .. tostring(id))
+		end
+		t.eq(
+			StoreData.Pass("DoubleCash").description,
+			"Wood you sell pays double. It doesn't change your axes, trucks, or how fast you chop, and everything in the game can still be earned without it."
+		)
+		t.eq(
+			StoreData.Pass("LuxAxe").description,
+			"A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold."
+		)
+		t.eq(
+			StoreData.Pass("TowService").description,
+			"Free recalls for every truck you own. Without this pass, a recall costs 2% of the truck's price, with a $2 minimum."
+		)
+		t.eq(
+			StoreData.Pass("TimberClassic").description,
+			"Unlocks the Timber Classic, an old-school pickup with the same stats as the Pickup. Its dashboard gauge shows what your load is worth, as an estimate at the Wood Dropoff. Your display name is painted on both doors."
+		)
+		t.eq(
+			StoreData.Pass("PaintShop").description,
+			"Paint your trucks in any color from the Paint Shop palette. Paint is cosmetic only and stays on after you rejoin."
+		)
 	end)
 
 	t.test("set-up ids are unique", function()
@@ -62,6 +105,17 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test("a pass with IsForSale == false is hidden", function()
+		for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
+			local pass = StoreData.Pass(key)
+			t.eq(StoreData.PassCardVisible(pass.id, false), false, key .. " is off sale")
+		end
+		t.eq(StoreData.PassCardVisible(StoreData.Pass("LuxAxe").id, nil), false, "hidden until the lookup")
+		t.eq(StoreData.PassCardVisible(StoreData.Pass("DoubleCash").id, true), true, "2x Cash is on sale")
+		t.eq(StoreData.PassCardVisible(StoreData.Pass("LuxAxe").id, true), true, "Lux Axe is on sale")
+		t.eq(StoreData.PassCardVisible(0, true), false, "no id, still hidden")
 	end)
 
 	t.test("cash packs only fit under the wallet cap", function()

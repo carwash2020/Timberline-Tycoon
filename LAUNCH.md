@@ -95,7 +95,7 @@ and the smoke test). Skip the rest until something looks wrong.
 | 6 | Drive out of the lot and back onto the sell pad | You fit in the cab, you can turn, you hop out beside the door, nothing on the bed falls off on a straight road |
 | 7 | **Test → Device Emulator**, iPhone SE and iPhone 14 Pro, landscape | `[Quality] low` in Output. Buttons don't cover the cash. In town, the Starter Forest, and on the Snow Road, about 30 fps or better (View → Stats; a frame under 33 ms). Drive the Rustbucket at full speed toward the Snowfields: no long pause spinner |
 | 8 | Look north from the spawn, desktop and the phone emulator | The mountain backdrop is still there. Trees don't pop in on top of empty void at the forest edge. If the horizon is gone or a truck pauses the whole way, tell Claude before changing the stream radius |
-| 9 | Look at the screen corner | No **STORE** button yet. That's correct until step 4 |
+| 9 | Look at the screen corner | A **STORE** button. 2x Cash, Lux Axe, Tow Service, Timber Classic, and Paint Shop are listed. 2x Wood and Instant Delivery are not (their ids are still 0) |
 
 On the live game the same server lines are in the in-game console: **F9**
 (or `/console`) → **Server**.
@@ -105,7 +105,7 @@ On the live game the same server lines are in the in-game console: **F9**
 Claiming a plot is free. There is no teleport: walk south-east from town
 to the plot district. The mill in town sells logs and planks. A sawmill
 you own is bought at the Tool Shed and placed from BUILD on your plot.
-The Robux STORE stays hidden while every id in `StoreData.CreatorIds` is 0.
+The Robux STORE is on screen: several passes and the two cash packs have real ids. A row stays hidden only while its id is 0 (2x Wood and Instant Delivery).
 
 | Do this | Good looks like |
 |---|---|
@@ -119,62 +119,60 @@ The Robux STORE stays hidden while every id in `StoreData.CreatorIds` is 0.
 | Hearth & Home | The price you pay matches the card. Each piece of gear is bought once. |
 | Rest a log and a plank on the mill pad | Both sell. The plank pays the plank price. |
 | Sky Bin by the pad | Its sell prompt shows only while the bin has wood. |
-| Instant Delivery, if the save already has a use | It sells the bed from anywhere, and refuses when none are left. No STORE button, and no side button unless a use is already owned. |
+| Instant Delivery, if the save already has a use | It sells the bed from anywhere, and refuses when none are left. No Store row for it, and no side button unless a use is already owned. |
 | Fill the server (12), have one leave, rejoin on a save that already claimed | One plot each. Leaving frees the slot. A full server tells you the district is full and keeps the save. |
 | Drive far enough that the plot streams out, then come back | The sign and the buildings return together. Move and Sell are on what you placed. |
 
-## 4. Robux (when you want the Store)
+## 4. Robux
 
-Ids start at 0. While they are 0 the STORE button is hidden, those rows
-aren't listed, and the server will not prompt or grant a purchase. Nothing
-errors.
-
-Prices are set in Creator Hub, not in the code. The game asks Roblox what
-each item costs.
-
-1. Publish the place once (step 5) if you haven't. Passes belong to the
-   experience.
-2. [create.roblox.com](https://create.roblox.com) → **Creations** →
-   Timberline Tycoon → **Monetization → Passes** → Create a Pass named
-   **2x Cash**. Give it an icon, put it on sale, copy the **ID** (a number).
-3. **Monetization → Developer Products** → Create four products:
-   **$1,000**, **$10,000**, **2x Wood (48 hours)**, **Instant Delivery**.
-   Set each price. Copy each ID.
-4. Paste the numbers into `src/ReplicatedStorage/Shared/StoreData.luau`,
-   in the `CreatorIds` table at the top. That table is the only place an
-   id is written. Leave a line at 0 to keep that one item hidden.
+Universe 10768809532. Ids live only in `StoreData.CreatorIds`. An id of 0
+hides that one button and the server will not prompt it. "Off sale" in
+Creator Hub does not hide the button: Roblox still shows its live price.
+Cash packs are developer products, not game passes.
 
 ```lua
 StoreData.CreatorIds = {
 	Passes = {
-		DoubleCash = 0, -- paste the 2x Cash pass id
+		DoubleCash = 2005256811, -- on sale
+		LuxAxe = 2005226878,
+		TowService = 2006186967, -- 99 R$
+		TimberClassic = 2006912886, -- 349 R$
+		PaintShop = 2006456926, -- 249 R$
 	},
 	Products = {
-		Cash1k = 0,
-		Cash10k = 0,
-		DoubleWood = 0,
-		InstantDelivery = 0,
+		Cash1k = 3716312861, -- $1,000, 49 R$
+		Cash10k = 3716312899, -- $10,000, 299 R$
+		DoubleWood = 0, -- no product yet: hidden
+		InstantDelivery = 0, -- no product yet: hidden
 	},
 }
 ```
 
-5. `rojo serve` is already connected, so Play again. The STORE button
-   shows once at least one id is filled in. Studio purchases are free test
-   purchases.
+Studio purchases are free test purchases. Prices on the cards are whatever
+Roblox says, not numbers in the code.
 
 | Check | Good looks like |
 |---|---|
 | Buy $1,000 | Roblox's prompt, then +$1,000 and a thank-you |
 | Wallet near the $2,000,000 cap | The $10,000 pack says "Wallet full" and never prompts |
-| Buy 2x Wood | Trees drop double; the Store shows hours left |
-| Buy Instant Delivery with logs in the truck | "Sell here" sells the bed from anywhere, once |
-| Buy 2x Cash, then rejoin | Sales pay double; the Store says Owned; still owned after rejoin |
+| Buy 2x Cash, then rejoin | Sales pay double. Axes and trucks feel the same. The Store says Owned after rejoin |
+| Buy the Lux Axe | It arrives in your hotbar. Wood you cut with it pays 10% more. Starfall is still in the Tool Shed for cash |
+| Buy Tow Service, then send a Pickup home | No fee. Without the pass, the same recall costs 2% of the price ($2 minimum). The Rustbucket stays free either way |
+| Buy Timber Classic | It shows up at the Dealership as owned, same speed and bed as the Pickup. Your display name is on both doors. Sit in the driver seat: the dash shows an estimate at the Wood Dropoff. A passenger does not see it |
+| Buy Paint Shop | You can paint only your own truck, only from the palette. Stop and Play: the color is still there. A second change inside 2 seconds is refused |
 | Leave during a purchase and rejoin | Granted once, not twice |
+| Open the Store | No row for 2x Wood or Instant Delivery |
 
-What they do: 2x Cash doubles sale money forever. The cash packs add cash
-only if it fits under the $2,000,000 cap. 2x Wood doubles logs from trees
-for 48 hours (buying again extends it). Instant Delivery sells the current
-truck load from anywhere, once.
+What they do: 2x Cash doubles sale money forever and does not change axes,
+trucks, or chop speed. The Lux Axe sits between the Inferno Axe and the
+Starfall Axe; wood you cut with it sells for 10% more, and the Starfall
+Axe is still bought with cash. Tow Service makes every recall free
+(without it, a recall is 2% of the truck's price, $2 minimum; the
+Rustbucket stays free). Timber Classic is the Pickup's stats with your
+display name on both doors and a dash estimate of the load at the Wood
+Dropoff. Paint Shop repaints only your own trucks from a fixed palette;
+the color stays after you rejoin. The cash packs add cash only if it fits
+under the $2,000,000 cap. 2x Wood and Instant Delivery have no product yet.
 
 ## 5. Publish, then go public
 

@@ -279,7 +279,9 @@ local function simulate(biomes: { [string]: boolean }?)
 		local function consider(bundle)
 			local price = 0
 			for _, item in ipairs(bundle) do
-				if owned[item.id] or itemPrice(item) <= 0 then
+				-- A pass truck is not a cash buy. Forged axes are sold == false
+				-- and still belong on this path, so this does not skip those.
+				if item.robux == true or owned[item.id] or itemPrice(item) <= 0 then
 					return
 				end
 				price += itemPrice(item)

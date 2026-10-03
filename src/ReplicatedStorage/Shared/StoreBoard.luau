@@ -87,7 +87,8 @@ local function poster(parent: Instance, item: { name: string, description: strin
 end
 
 -- The wooden board, posts, posters for whatever is for sale, and the
--- prompt. Nothing for sale yet: a "coming soon" label, prompt still there.
+-- prompt. An id of 0 is left off the board. With nothing for sale, a
+-- "coming soon" label; the prompt stays either way.
 function StoreBoard.Build(): Model
 	local model = Instance.new("Model")
 	model.Name = "StoreBoard"

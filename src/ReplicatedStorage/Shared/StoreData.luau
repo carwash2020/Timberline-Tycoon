@@ -10,7 +10,7 @@
 
 local StoreData = {}
 
-export type PassKey = "DoubleCash" | "LuxAxe"
+export type PassKey = "DoubleCash" | "LuxAxe" | "TowService" | "TimberClassic" | "PaintShop"
 export type ProductKey = "Cash1k" | "Cash10k" | "DoubleWood" | "InstantDelivery"
 
 -- The only place a Creator Hub id is written. Fill these in when the pass
@@ -21,6 +21,9 @@ StoreData.CreatorIds = {
 	Passes = {
 		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
 		LuxAxe = 2005226878, -- PASTE: Monetization → Passes → Lux Axe → ID
+		TowService = 2006186967, -- Tow Service
+		TimberClassic = 2006912886, -- Timber Classic
+		PaintShop = 2006456926, -- Paint Shop
 	},
 	Products = {
 		Cash1k = 3716312861, -- PASTE: Monetization → Developer Products → $1,000 → ID
@@ -62,6 +65,27 @@ StoreData.Passes = {
 		image = 0, -- PASTE decal id
 		name = "Lux Axe",
 		description = "A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold.",
+	},
+	{
+		key = "TowService",
+		id = StoreData.CreatorIds.Passes.TowService,
+		image = 91282142796474,
+		name = "Tow Service",
+		description = "Free recalls for every truck you own. Without this pass, a recall costs 2% of the truck's price, with a $2 minimum.",
+	},
+	{
+		key = "TimberClassic",
+		id = StoreData.CreatorIds.Passes.TimberClassic,
+		image = 79037897236948,
+		name = "Timber Classic",
+		description = "Unlocks the Timber Classic, an old-school pickup with the same stats as the Pickup. Its dashboard gauge shows what your load is worth, as an estimate at the Wood Dropoff. Your display name is painted on both doors.",
+	},
+	{
+		key = "PaintShop",
+		id = StoreData.CreatorIds.Passes.PaintShop,
+		image = 71028498113750,
+		name = "Paint Shop",
+		description = "Paint your trucks in any color from the Paint Shop palette. Paint is cosmetic only and stays on after you rejoin.",
 	},
 } :: { Pass }
 
@@ -148,6 +172,13 @@ end
 -- a positive id) is not for sale: hide the button, don't prompt, don't grant.
 function StoreData.IsForSale(id: number): boolean
 	return id > 0
+end
+
+-- A pass card stays hidden until Roblox's GetProductInfo says IsForSale.
+-- `robloxForSale` is that field, or nil while the lookup hasn't come back
+-- (or it failed). A pasted id alone is not enough to show the card.
+function StoreData.PassCardVisible(id: number, robloxForSale: boolean?): boolean
+	return StoreData.IsForSale(id) and robloxForSale == true
 end
 
 -- The pass with this Creator Hub id, if it's for sale.

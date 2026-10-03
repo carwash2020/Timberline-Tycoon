@@ -37,6 +37,13 @@ return function(t)
 				end
 				return options.ownsPass == id
 			end,
+			GetProductInfo = function(_, id)
+				local onSale = options.isForSale
+				if type(onSale) ~= "boolean" then
+					onSale = true
+				end
+				return { IsForSale = onSale, PriceInRobux = 300 }
+			end,
 			PromptGamePassPurchaseFinished = {
 				Connect = function(_, fn)
 					passFinished = fn
@@ -256,6 +263,18 @@ return function(t)
 		fresh.passFinished("DoubleCash", true)
 		t.eq(fresh.M.SaleMultiplier(fresh.player), 2)
 		t.eq(fresh.profile.passes.DoubleCash, true, "the purchase is written into the save")
+	end)
+
+	t.test("a pass with IsForSale == false is not offered", function()
+		local s = setup({ isForSale = false })
+		s.buy("Pass", "TowService")
+		s.buy("Pass", "TimberClassic")
+		s.buy("Pass", "PaintShop")
+		s.buy("Pass", "LuxAxe")
+		t.eq(s.prompts, {}, "an off-sale pass never opens a purchase prompt")
+		local on = setup()
+		on.buy("Pass", "LuxAxe")
+		t.eq(on.prompts, { "pass " .. on.StoreData.Pass("LuxAxe").id }, "an on-sale pass still prompts")
 	end)
 
 	t.test("buying the Lux Axe pass tells the listener once per grant", function()

@@ -5,6 +5,7 @@
 --     id is still 0. Each card has an image slot (a placeholder when the
 --     decal id is 0), the name, the description, Roblox's live price, and
 --     Buy. An owned pass says Owned. A card whose id is 0 is not shown.
+--     A pass stays hidden until GetProductInfo says IsForSale.
 --   * The town bulletin board's prompt (StorePrompt) opens the same panel.
 --   * "Sell load here" stays while you have Instant Deliveries and wood
 --     on the truck.
@@ -36,6 +37,9 @@ local F = UITheme.Fonts
 local ROBUX_GREEN = Color3.fromRGB(0, 176, 111)
 
 local prices: { [string]: number } = {}
+-- GetProductInfo.IsForSale, keyed like prices. Absent until that lookup
+-- returns; a pass card stays hidden until then.
+local passOnSale: { [string]: boolean } = {}
 local deliveryButton: UITheme.Button? = nil
 local tab: "Passes" | "Products" = "Passes"
 local panel: Frame? = nil
@@ -115,7 +119,7 @@ local function card(
 	local row = Instance.new("Frame")
 	row.Name = name
 	row.BackgroundColor3 = C.Cream
-	row.Size = UDim2.new(1, -8, 0, 108)
+	row.Size = UDim2.new(1, -8, 0, 188)
 	row.BorderSizePixel = 0
 	UITheme.corner(row, 10)
 	UITheme.stroke(row, C.Bark, 2)
@@ -123,7 +127,7 @@ local function card(
 	art.Name = "Image"
 	art.BackgroundColor3 = ROBUX_GREEN
 	art.Size = UDim2.fromOffset(72, 72)
-	art.Position = UDim2.fromOffset(10, 18)
+	art.Position = UDim2.fromOffset(10, 58)
 	art.BorderSizePixel = 0
 	art.ScaleType = Enum.ScaleType.Fit
 	if imageId > 0 then
@@ -146,8 +150,8 @@ local function card(
 	title.Size = UDim2.new(1, -180, 0, 22)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	local body = UITheme.label(row, detail, F.Body, 13, C.Bark)
-	body.Position = UDim2.fromOffset(92, 30)
-	body.Size = UDim2.new(1, -180, 0, 70)
+	body.Position = UDim2.fromOffset(92, 32)
+	body.Size = UDim2.new(1, -180, 0, 148)
 	body.TextWrapped = true
 	body.TextXAlignment = Enum.TextXAlignment.Left
 	body.TextYAlignment = Enum.TextYAlignment.Top
@@ -183,10 +187,10 @@ local function redraw()
 	if tab == "Passes" then
 		local shown = 0
 		for _, pass in ipairs(StoreData.Passes) do
-			if StoreData.IsForSale(pass.id) then
+			local id = "Pass:" .. pass.key
+			if StoreData.PassCardVisible(pass.id, passOnSale[id]) then
 				shown += 1
 				local has = player:GetAttribute("Pass_" .. pass.key) == true
-				local id = "Pass:" .. pass.key
 				card(frame, pass.name, pass.description, pass.image, robux(prices[id]), has, function()
 					Net.Remote("BuyRobuxItem"):FireServer("Pass", pass.key)
 				end)
@@ -242,8 +246,13 @@ local function loadPrices()
 			local ok, info = pcall(function()
 				return MarketplaceService:GetProductInfo(id, infoType)
 			end)
-			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
-				prices[key] = info.PriceInRobux
+			if ok and type(info) == "table" then
+				if type(info.PriceInRobux) == "number" then
+					prices[key] = info.PriceInRobux
+				end
+				if infoType == Enum.InfoType.GamePass then
+					passOnSale[key] = info.IsForSale == true
+				end
 				redraw()
 			end
 		end)

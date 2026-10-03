@@ -39,6 +39,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SellSkyBin = 2, -- v2: the Sky Bin's prompt by the pad (AetherService; a ProximityPrompt, not a remote)
 	SawmillSet = 6, -- v2: one step of a placed mill's cut (SawmillService)
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
+	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

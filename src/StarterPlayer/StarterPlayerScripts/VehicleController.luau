@@ -25,6 +25,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Handling = require(ReplicatedStorage.Shared.Handling)
@@ -197,6 +198,35 @@ local function buildButton()
 	refreshCallButton()
 end
 
+-- The Classic's dash estimate shows only while you sit in your own
+-- driver seat. Passengers and other trucks stay hidden. Enabled is local,
+-- so other players still see the server's hidden gauge.
+local function refreshGauges()
+	if typeof(CollectionService.GetTagged) ~= "function" then
+		return
+	end
+	local character = player.Character
+	local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+	local seat = if humanoid then humanoid.SeatPart else nil
+	for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
+		if inst:IsA("Model") then
+			local part = inst:FindFirstChild("LoadGauge", true)
+			local gui = if part then part:FindFirstChild("GaugeGui") else nil
+			if gui and gui:IsA("SurfaceGui") then
+				local truckId = inst:GetAttribute("TruckId")
+				local ownerId = inst:GetAttribute("OwnerId")
+				local driving = seat ~= nil and seat.Name == "DriverSeat" and seat:IsDescendantOf(inst)
+				gui.Enabled = driving
+					and ClassicGauge.Show(
+						if type(truckId) == "string" then truckId else "",
+						if type(ownerId) == "number" then ownerId else 0,
+						player.UserId
+					)
+			end
+		end
+	end
+end
+
 local function watchCharacter(char: Model)
 	session = nil
 	local humanoid = char:WaitForChild("Humanoid", 10)
@@ -211,6 +241,7 @@ local function watchCharacter(char: Model)
 		else
 			session = nil
 		end
+		refreshGauges()
 	end)
 end
 
@@ -242,6 +273,7 @@ function VehicleController.Start()
 		if sinceRefresh >= 0.5 then
 			sinceRefresh = 0
 			refreshCallButton()
+			refreshGauges()
 		end
 	end)
 end

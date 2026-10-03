@@ -137,7 +137,7 @@ export type Piece = {
 	lastHolderId: number?,
 	figure: string?,
 	boost: number,
-	lux: boolean, -- final chop was the Lux Axe (SellLogic.InheritLux)
+	lux: boolean, -- a Lux swing tagged this piece, or the piece it was cut from (SellLogic.InheritLux)
 	planterId: number?,
 	treeUid: string?,
 	createdAt: number, -- os.clock() it was cut free (GrabLogic's grace)

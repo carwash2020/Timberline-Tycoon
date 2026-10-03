@@ -54,12 +54,19 @@ return function(t)
 		t.eq(prompt.ActionText, "Browse")
 		t.eq(prompt.KeyboardKeyCode.Name, "E")
 		t.eq(prompt.RequiresLineOfSight, false)
-		t.ok(model:FindFirstChild("2x Cash", true), "2x Cash poster")
-		t.ok(model:FindFirstChild("Lux Axe", true), "Lux Axe poster")
-		t.ok(model:FindFirstChild("$1,000", true), "$1,000 poster")
-		t.ok(model:FindFirstChild("$10,000", true), "$10,000 poster")
-		t.ok(not model:FindFirstChild("2x Wood (48 hours)", true), "2x Wood stays off the board")
-		t.ok(not model:FindFirstChild("Instant Delivery", true), "Instant Delivery stays off the board")
-		t.ok(not model:FindFirstChild("ComingSoon", true), "coming soon hides once something is for sale")
+		t.eq(model:FindFirstChild("ComingSoon", true), nil, "items are on sale, so no coming-soon label")
+		local StoreData = t.shared("StoreData")
+		local posters = 0
+		for _, pass in ipairs(StoreData.ListedPasses()) do
+			t.ok(model:FindFirstChild(pass.name, true), pass.name)
+			posters += 1
+		end
+		for _, product in ipairs(StoreData.ListedProducts()) do
+			t.ok(model:FindFirstChild(product.name, true), product.name)
+			posters += 1
+		end
+		t.eq(posters, 7, "five passes and two cash packs")
+		t.eq(model:FindFirstChild("2x Wood (48 hours)", true), nil)
+		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
 	end)
 end

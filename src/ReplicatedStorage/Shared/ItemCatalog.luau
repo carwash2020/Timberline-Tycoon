@@ -66,6 +66,9 @@ export type TruckDef = {
 	turnRate: number, -- radians/s at full steer
 	look: TruckLook,
 	note: string?,
+	robux: boolean?, -- a game pass, not sold for cash
+	sold: boolean?, -- false = never on the cash buying path
+	classic: boolean?, -- Timber Classic: gauge and the owner's name on the doors
 }
 
 -- Hitched behind a truck at the Dealership; adds bed space. `look` is its
@@ -234,6 +237,22 @@ ItemCatalog.Trucks = {
 		topSpeed = 24,
 		turnRate = 1,
 		look = { color = "#B23A26", width = 10.14, bedLength = 33.8, bedWalls = false },
+	},
+	-- Robux exclusive (the Timber Classic pass). The Pickup's stats, bed and
+	-- handling, with its own paint. Not a cash purchase and not a better truck.
+	TimberClassic = {
+		id = "TimberClassic",
+		displayName = "Timber Classic",
+		bedCapacity = 12,
+		priceCash = 1200,
+		topSpeed = 30,
+		turnRate = 1.4,
+		look = { color = "#C4A46A", width = 8.58, bedLength = 15.6, bedWalls = true },
+		note = "Same stats as the Pickup",
+		robux = true,
+		sold = false,
+		classic = true,
+		v2 = { price = 400 },
 	},
 }
 

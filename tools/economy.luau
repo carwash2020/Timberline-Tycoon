@@ -521,7 +521,7 @@ local function simulate()
 		-- vehicle or gear: the shortest payback wins.
 		local pick, pickScore = nil, math.huge
 		local function consider(item)
-			if owned[item.id] or item.sold == false then
+			if owned[item.id] or item.sold == false or item.robux == true then
 				return
 			end
 			local price = priceOf(item)
@@ -863,7 +863,7 @@ line()
 line("## Lux Axe (Robux)")
 line()
 line(
-	"Not on the cash ladder and not in the buying path above. A game pass (StoreData LuxAxe). Stats sit just above the Inferno Axe's main row and below the Starfall Axe. Wood whose final chop was this axe sells for "
+	"Not on the cash ladder and not in the buying path above. A game pass (StoreData LuxAxe). Stats sit just above the Inferno Axe's main row and below the Starfall Axe. Any Lux swing tags the wood, and the tag carries to child pieces. That wood sells for "
 		.. string.format("%d%%", math.floor((GameConfig.LuxSellBonus - 1) * 100 + 0.5))
 		.. " more (GameConfig.LuxSellBonus), once, on the piece, before 2x Cash."
 )

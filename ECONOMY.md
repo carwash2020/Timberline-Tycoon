@@ -77,6 +77,7 @@ u³ a trip = length × width × (walls + 2 studs piled) × 0.4 packing / u³ (§
 | Scout ATV | rack only | 0.0 | $0 | $2,500 |
 | Pony Trailer | 13 × 7.41, walls 1.56 | 33.5 | $50 | $1,800 |
 | Rustbucket | 13 × 7.28, walls 1.82 | 35.3 | $53 | $75 |
+| Timber Classic | 15.6 × 7.8, walls 2.08 | 48.5 | $73 | $400 |
 | Pickup | 15.6 × 7.8, walls 2.08 | 48.5 | $73 | $400 |
 | Ranch Trailer | 18.2 × 7.384, walls 2.6 | 60.4 | $91 | $6,000 |
 | Heavy Hauler | 26 × 7.228, walls 3.25 | 96.3 | $145 | $13,000 |
@@ -124,7 +125,7 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 
 ## Lux Axe (Robux)
 
-Not on the cash ladder and not in the buying path above. A game pass (StoreData LuxAxe). Stats sit just above the Inferno Axe's main row and below the Starfall Axe. Wood whose final chop was this axe sells for 10% more (GameConfig.LuxSellBonus), once, on the piece, before 2x Cash.
+Not on the cash ladder and not in the buying path above. A game pass (StoreData LuxAxe). Stats sit just above the Inferno Axe's main row and below the Starfall Axe. Any Lux swing tags the wood, and the tag carries to child pieces. That wood sells for 10% more (GameConfig.LuxSellBonus), once, on the piece, before 2x Cash.
 
 | Axe | v2 damage | range | cooldown | v1 damage |
 |---|---|---|---|---|

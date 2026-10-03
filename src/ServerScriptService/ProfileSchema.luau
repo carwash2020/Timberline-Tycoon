@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -169,6 +170,8 @@ export type Profile = {
 	-- UserOwnsGamePassAsync: once true, a failed ownership check on rejoin
 	-- does not take the pass away.
 	passes: { [string]: boolean },
+	-- Paint Shop colors, per truck id, on this slot. Cosmetic only.
+	truckPaint: { [string]: string },
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
 	instantDeliveries: number, -- Instant Delivery uses left
 	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
@@ -240,6 +243,7 @@ local TEMPLATE: Profile = {
 	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
 	purchaseIds = {},
 	passes = {},
+	truckPaint = {},
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
 	onboarding = {},
@@ -337,6 +341,9 @@ function ProfileSchema.Migrate(data: any)
 	if type(data.passes) ~= "table" then
 		data.passes = {}
 	end
+	-- Per slot, with the truck. Anything that isn't a palette color on a
+	-- real truck is dropped.
+	data.truckPaint = PaintShop.Sanitize(data.truckPaint)
 	if data.tutorialReplay ~= true then
 		data.tutorialReplay = false
 	end

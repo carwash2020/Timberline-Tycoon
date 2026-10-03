@@ -139,6 +139,8 @@ return function(t)
 		local old = {
 			Rustbucket = math.max(10 / 1.4, 0.75 * 9.2),
 			Pickup = math.max(10 / 1.4, 0.75 * 10.2),
+			-- The Timber Classic is the Pickup's body, so it keeps that circle.
+			TimberClassic = math.max(10 / 1.4, 0.75 * 10.2),
 			ScoutATV = math.max(10 / 2, 0.75 * 4),
 			Flatbed = math.max(10 / 1.2, 0.75 * 13.05),
 			LoggingRig = math.max(10 / 1, 0.75 * 19.75),

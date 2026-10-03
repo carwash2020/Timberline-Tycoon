@@ -67,9 +67,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local Handling = require(ReplicatedStorage.Shared.Handling)
+local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local StreamAhead = require(ReplicatedStorage.Shared.StreamAhead)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -186,6 +188,10 @@ export type Hooks = {
 	deliveryCFrame: ((player: Player) -> CFrame?)?,
 	-- Tests: when set, SpawnTruck builds nothing and leaves the old truck.
 	blockSpawn: boolean?,
+	-- Tow Service: true means this recall is free (GameServer).
+	freeRecall: ((player: Player) -> boolean)?,
+	-- 2x Cash, for the Classic's dash estimate (GameServer).
+	saleMultiplier: ((player: Player) -> number)?,
 }
 VehicleService.Hooks = {} :: Hooks
 
@@ -235,9 +241,10 @@ local function buildTruckModel(
 	def: TruckDef,
 	layout: TruckLayout.Layout,
 	trailer: TrailerDef?,
-	trailerLayout: TruckLayout.TrailerLayout?
+	trailerLayout: TruckLayout.TrailerLayout?,
+	extras: TruckArt.BuildExtras?
 ): Built
-	local model = TruckArt.Build(def, layout, trailer, trailerLayout)
+	local model = TruckArt.Build(def, layout, trailer, trailerLayout, extras)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- streams in whole, trailer included
 	TruckArt.Rig(model)
 
@@ -335,11 +342,45 @@ local function addBedVisual(rec: TruckRecord, entry: BedEntry, index: number)
 	log.Parent = rec.bedFolder
 end
 
+-- The Classic's dash: v1 bed worth plus loose wood (TruckLoad's LooseValue),
+-- then 2x Cash once. No gauge on any other truck.
+local function refreshClassicGauge(model: Model, owner: Player)
+	if model:FindFirstChild("LoadGauge", true) == nil then
+		return
+	end
+	local pieces: { number } = {}
+	local loose = model:GetAttribute("LooseValue")
+	local bed = model:GetAttribute("V1BedValue")
+	if type(loose) == "number" then
+		table.insert(pieces, loose)
+	end
+	if type(bed) == "number" then
+		table.insert(pieces, bed)
+	end
+	local mult = 1
+	local sale = VehicleService.Hooks.saleMultiplier
+	if sale then
+		local n = sale(owner)
+		if type(n) == "number" then
+			mult = n
+		end
+	end
+	ClassicGauge.Apply(model, ClassicGauge.Estimate(pieces, mult))
+end
+
 -- The bed's numbers, on the truck and on its owner.
 local function publishBed(rec: TruckRecord)
 	rec.model:SetAttribute("BedCount", #rec.bed)
 	rec.owner:SetAttribute("BedCount", #rec.bed)
 	rec.owner:SetAttribute("BedCapacity", rec.capacity)
+	local worth = 0
+	for _, entry in ipairs(rec.bed) do
+		if type(entry.value) == "number" then
+			worth += math.max(0, entry.value)
+		end
+	end
+	rec.model:SetAttribute("V1BedValue", worth)
+	refreshClassicGauge(rec.model, rec.owner)
 end
 
 -- Where the truck is, as far as the server can vouch: while its driver's
@@ -1288,10 +1329,22 @@ local function padParking(pad: CFrame, rel: CFrame, size: Vector3): CFrame
 	return base * CFrame.new(70, 0, 0)
 end
 
--- 2% to bring a stuck truck back (Rustbucket free). A profile with no
--- wallet (tests) is not charged. Returns false when the wallet is short.
+-- The recall fee for this player: Tow Service makes it 0. The same number
+-- is what a failed spawn refunds, so a free recall never pays cash back.
+local function respawnFee(player: Player, def: TruckDef): number
+	local ownsTow = false
+	local free = VehicleService.Hooks.freeRecall
+	if free then
+		ownsTow = free(player) == true
+	end
+	return ShopLogic.RecallFee(def, CoreLoop.Active(), ownsTow)
+end
+
+-- 2% to bring a stuck truck back (Rustbucket free; Tow Service free). A
+-- profile with no wallet (tests) is not charged. Returns false when the
+-- wallet is short.
 local function chargeRespawn(player: Player, def: TruckDef): (boolean, string?)
-	local fee = ShopLogic.RespawnFee(def, CoreLoop.Active())
+	local fee = respawnFee(player, def)
 	if fee <= 0 then
 		return true, nil
 	end
@@ -1309,7 +1362,7 @@ end
 -- Gives a fee back when the truck never appeared. A profile with no wallet
 -- (tests) was never charged, so there is nothing to return.
 local function refundRespawn(player: Player, def: TruckDef)
-	local fee = ShopLogic.RespawnFee(def, CoreLoop.Active())
+	local fee = respawnFee(player, def)
 	if fee <= 0 then
 		return
 	end
@@ -1319,6 +1372,10 @@ local function refundRespawn(player: Player, def: TruckDef)
 	end
 	EconomyService.Refund(player, fee, "refunded a failed respawn", def.id)
 end
+
+-- Paint and the Classic door name. Defined below, after isDriving's neighbors;
+-- SpawnTruck calls it once the function exists.
+local truckExtras: (Player, TruckDef) -> TruckArt.BuildExtras?
 
 -- Builds the player's truck (replacing any they have). With a plot it
 -- parks on that plot's delivery pad; otherwise in the smallest free
@@ -1422,7 +1479,7 @@ function VehicleService.SpawnTruck(
 		)
 	end
 
-	local built = buildTruckModel(def, layout, trailer, trailerLayout)
+	local built = buildTruckModel(def, layout, trailer, trailerLayout, truckExtras(player, def))
 	local model = built.model
 	-- The whole rig (truck + trailer) centred on its bay, or its nose out
 	-- past the head of one it's longer than (homeShift), once no other
@@ -1572,6 +1629,33 @@ function VehicleService.DespawnTruck(player: Player)
 	player:SetAttribute("TruckSlotDistance", nil)
 end
 
+-- Paint and the Classic's door name. Paint applies only while the Paint
+-- Shop pass is on the save (the backup still works if the live check failed).
+function truckExtras(player: Player, def: TruckDef): TruckArt.BuildExtras?
+	local profile = ProfileService.GetProfile(player)
+	local paint: string? = nil
+	if profile and type(profile.passes) == "table" and profile.passes.PaintShop == true then
+		local saved = if type(profile.truckPaint) == "table" then profile.truckPaint[def.id] else nil
+		local color = PaintShop.Normalize(saved)
+		if color and PaintShop.InPalette(color) then
+			paint = color
+		end
+	end
+	local doorName: string? = nil
+	if def.classic == true then
+		local display = (player :: any).DisplayName
+		local name = player.Name
+		doorName = if type(display) == "string" and display ~= ""
+			then display
+			elseif type(name) == "string" then name
+			else ""
+	end
+	if paint == nil and doorName == nil then
+		return nil
+	end
+	return { paint = paint, doorName = doorName }
+end
+
 -- True if this player is sitting in their own truck's driver seat.
 local function isDriving(player: Player, rec: TruckRecord): boolean
 	local occupant = rec.seat.Occupant
@@ -1680,6 +1764,34 @@ function VehicleService.Equip(player: Player, truckId: string, trailerId: string
 	end
 	VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil, trailerId)
 	return true, nil
+end
+
+-- Recolors the truck where it stands. Rebuilding it would park it in a bay
+-- and leave an out-of-town load behind, which is a free recall.
+function VehicleService.Repaint(player: Player, truckId: string)
+	local rec = trucks[player.UserId]
+	if not rec or rec.def.id ~= truckId then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local saved = if profile and type(profile.truckPaint) == "table" then profile.truckPaint[truckId] else nil
+	local color = PaintShop.Normalize(saved)
+	if not color or not PaintShop.InPalette(color) then
+		return
+	end
+	local model = rec.model
+	local current = model:GetAttribute("PaintHex")
+	local fromHex = if type(current) == "string" then current else rec.def.look.color
+	local from = Color3.fromHex(fromHex)
+	local to = Color3.fromHex(color)
+	if from ~= to then
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Color == from then
+				d.Color = to
+			end
+		end
+	end
+	model:SetAttribute("PaintHex", color)
 end
 
 function VehicleService.GetVehicle(player: Player): Model?

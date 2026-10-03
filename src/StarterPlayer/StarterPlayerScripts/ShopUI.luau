@@ -285,7 +285,9 @@ local TRUCKS: Shop = {
 		local loop = CoreLoop.Active()
 		local price = ShopLogic.Price(truck, loop)
 		local button, state
-		if status == "buy" then
+		if status == "buy" and truck.robux == true then
+			button, state = "Robux", "forged"
+		elseif status == "buy" then
 			button, state = priceButton(price, cash)
 		elseif status == "use" then
 			button, state = "Use", "use"
@@ -301,7 +303,14 @@ local TRUCKS: Shop = {
 			button = button,
 			state = state,
 			onClick = function()
-				if status == "inUse" then
+				if status == "buy" and truck.robux == true then
+					local openStore = storeOpener
+					if openStore then
+						openStore()
+					else
+						HUD.Toast(string.format("The %s is in the Store.", truck.displayName))
+					end
+				elseif status == "inUse" then
 					HUD.Toast(string.format("You're already using the %s.", truck.displayName))
 				elseif status == "use" then
 					Net.Remote("EquipItem"):FireServer("Truck", truck.id)

@@ -26,6 +26,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -288,6 +289,10 @@ local function buyTruck(player: Player, truckId: string)
 		notify(player, string.format("You already own the %s.", truck.displayName))
 		return
 	end
+	if not ShopLogic.TruckForCash(truck) then
+		notify(player, string.format("The %s is in the Store.", truck.displayName))
+		return
+	end
 	local price = ShopLogic.Price(truck, loop)
 	if profile.cash < price then
 		notify(
@@ -475,6 +480,23 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	elseif category == "Blueprint" then
 		buyBlueprint(player, itemId)
 	end
+end
+
+-- The Timber Classic pass: every slot, including a new game. Doesn't
+-- replace a truck they're already driving. Completes the tutorial's truck
+-- step when that step is the current one.
+function ShopService.GrantPassTruck(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	SaveSlotLogic.GrantPassTrucks(profile)
+	publishTrucks(player, profile)
+	player:SetAttribute("OwnsTruck", #profile.ownedTrucks > 0)
+	if VehicleService.GetVehicle(player) == nil and profile.equippedTruck ~= "" then
+		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
+	end
+	QuestService.Event(player, "truckBought")
 end
 
 -- Call once the player's save has loaded (after their truck spawned).
