@@ -62,6 +62,12 @@ export type Piece = {
 }
 
 LeftLoad.Beds = { BedFloor = true, TrailerBed = true } :: { [string]: boolean }
+-- Loose wood left on the ground (a load left out of town that its owner
+-- hadn't fetched when they left): `bed` "Ground", `at` its turn only, and
+-- `g` where it lay in the world (TruckLoad.PlayerRemoving / OnRebuild).
+LeftLoad.GroundBed = "Ground"
+LeftLoad.GroundBeds = { Ground = true } :: { [string]: boolean }
+LeftLoad.WorldLimit = 20000 -- studs from the origin: a saved spot further out is junk
 LeftLoad.MaxOffset = 150 -- studs (an Elder pine is about 90 long): a saved place further than this from its bed (or root) is junk
 LeftLoad.MaxSize = 80 -- studs: a section bigger than this is junk
 LeftLoad.MinSize = 0.05
@@ -164,7 +170,7 @@ end
 -- A saved piece made safe to rebuild: a known wood (`isWood`), a kind, a
 -- bed, a sane place and at least one sane section; figure and boost kept
 -- when they make sense. Nil for junk. A new table (nothing shared).
-function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean): Piece?
+function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean, beds: { [string]: boolean }?): Piece?
 	if type(raw) ~= "table" then
 		return nil
 	end
@@ -172,7 +178,7 @@ function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean): Piece?
 	if type(r.w) ~= "string" or not isWood(r.w) then
 		return nil
 	end
-	if type(r.bed) ~= "string" or not LeftLoad.Beds[r.bed] then
+	if type(r.bed) ~= "string" or not (beds or LeftLoad.Beds)[r.bed] then
 		return nil
 	end
 	if not LeftLoad.DecodeCFrame(r.at) or type(r.s) ~= "table" then
@@ -219,6 +225,50 @@ function LeftLoad.Fit(pieces: { Piece }): ({ Piece }, number)
 		end
 	end
 	return out, dropped
+end
+
+-- Where a ground piece lay (its `g`), or nil when it isn't sane.
+function LeftLoad.DecodeSpot(raw: unknown): Vector3?
+	if type(raw) ~= "table" then
+		return nil
+	end
+	local g = raw :: { any }
+	for k = 1, 3 do
+		if not finite(g[k]) or math.abs(g[k] :: number) > LeftLoad.WorldLimit then
+			return nil
+		end
+	end
+	return Vector3.new(g[1], g[2], g[3])
+end
+
+export type GroundPiece = { piece: Piece, spot: Vector3 }
+
+-- A saved groundLoad made safe to rebuild: each piece cleaned (junk, or a
+-- spot that isn't sane, dropped), then capped (Fit). Returns the pieces
+-- with their spots, and how many didn't come back.
+function LeftLoad.GroundToRestore(saved: unknown, isWood: (string) -> boolean): ({ GroundPiece }, number)
+	if type(saved) ~= "table" then
+		return {}, 0
+	end
+	local clean: { Piece } = {}
+	local spots: { [Piece]: Vector3 } = {}
+	local junk = 0
+	for _, raw in ipairs(saved :: { any }) do
+		local p = LeftLoad.CleanPiece(raw, isWood, LeftLoad.GroundBeds)
+		local spot = if type(raw) == "table" then LeftLoad.DecodeSpot((raw :: any).g) else nil
+		if p and spot then
+			table.insert(clean, p)
+			spots[p] = spot
+		else
+			junk += 1
+		end
+	end
+	local kept, over = LeftLoad.Fit(clean)
+	local out: { GroundPiece } = {}
+	for _, p in ipairs(kept) do
+		table.insert(out, { piece = p, spot = spots[p] })
+	end
+	return out, junk + over
 end
 
 -- A saved truckLoad made safe to rebuild: each piece cleaned (junk

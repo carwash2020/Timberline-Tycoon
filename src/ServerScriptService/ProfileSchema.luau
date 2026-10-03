@@ -159,6 +159,10 @@ export type Profile = {
 	-- if that was in town, else it waits there on the ground (VehicleService).
 	truckAt: { x: number?, y: number?, z: number? },
 	leftLoad: { LeftLog }, -- left-behind logs still on the ground when you left (put back on rejoin)
+	-- v2: loose wood a load left out of town that you hadn't fetched when
+	-- you left (TruckLoad): LeftLoad pieces with bed "Ground" and a world
+	-- spot `g`, put back where they lay on rejoin.
+	groundLoad: { any },
 	-- The v2 loop's loose wood on your truck's beds (TruckLoad), saved as it
 	-- rides and when you leave; rebuilt on the bed when you rejoin (on the
 	-- ground where the truck stood if that wasn't in town). Unused by v1.
@@ -210,6 +214,7 @@ local TEMPLATE: Profile = {
 	truckAt = {},
 	leftLoad = {},
 	truckLoad = {},
+	groundLoad = {},
 	settings = { music = true, sfx = true },
 	pendingCash = 0,
 }

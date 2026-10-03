@@ -50,6 +50,10 @@
 --     is rebuilt on the bed, or on the ground where the truck stood when
 --     that wasn't in town (yours for LeftLoadGraceSec).
 --   * LoadCount: Recall's warning before a load is left out of town.
+-- A load left on the ground out of town (a rejoin, Send truck home) is
+-- remembered per owner; what of it is still theirs and lying about when
+-- they leave goes into profile.groundLoad (each piece where it lay) and
+-- comes back there on their next join, yours for LeftLoadGraceSec.
 -- Saving: your own and unowned pieces on your beds go into
 -- profile.truckLoad (LeftLoad has the format), the most valuable first,
 -- capped at MaxSavedPieces and MaxSavedSections: whenever the load changes
@@ -150,6 +154,18 @@ type Truck = {
 local deps: Deps? = nil
 local trucks: { [Player]: Truck } = {}
 local loadedOnce: { [Model]: boolean } = {} -- pieces whose onLoaded has fired
+-- Pieces a load left on the ground out of town, by owner (UserId): saved
+-- as groundLoad when they leave, if still theirs and lying about.
+local leftOf: { [number]: { [Model]: boolean } } = {}
+
+local function trackLeft(userId: number, model: Model)
+	local set = leftOf[userId]
+	if not set then
+		set = {}
+		leftOf[userId] = set
+	end
+	set[model] = true
+end
 local query: ((CFrame, Vector3) -> { BasePart })? = nil
 
 ---------------------------------------------------------------------------
@@ -675,9 +691,18 @@ end
 -- more sections than the save holds). Its sections are the parts named
 -- "Section", its root (PrimaryPart) first.
 function TruckLoad.Snapshot(model: Model, bed: BasePart): SavedPiece?
+	if not LeftLoad.Beds[bed.Name] then
+		return nil
+	end
+	return TruckLoad.SnapshotAt(model, bed.CFrame, bed.Name)
+end
+
+-- `model` as a save record placed relative to `ref` (a bed's CFrame, or
+-- for wood on the ground the spot it lies at), its `bed` named `bedName`.
+function TruckLoad.SnapshotAt(model: Model, ref: CFrame, bedName: string): SavedPiece?
 	local root = model.PrimaryPart
 	local woodId = attrString(model, "WoodId")
-	if not root or not woodId or not WoodData.Get(woodId) or not LeftLoad.Beds[bed.Name] then
+	if not root or not woodId or not WoodData.Get(woodId) then
 		return nil
 	end
 	local sections: { BasePart } = { root }
@@ -704,8 +729,8 @@ function TruckLoad.Snapshot(model: Model, bed: BasePart): SavedPiece?
 		k = if model:GetAttribute("Kind") == "plank" then "plank" else "log",
 		f = attrString(model, "Figure"),
 		x = if boost and boost > 1 then boost else nil,
-		bed = bed.Name,
-		at = LeftLoad.EncodeCFrame(bed.CFrame:ToObjectSpace(root.CFrame)),
+		bed = bedName,
+		at = LeftLoad.EncodeCFrame(ref:ToObjectSpace(root.CFrame)),
 		s = s,
 	}
 end
@@ -929,6 +954,9 @@ local function restore(player: Player, truck: Model, pieces: { SavedPiece }, kee
 		if model then
 			loadedOnce[model] = true
 			n += 1
+			if not keepsLoad then
+				trackLeft(player.UserId, model)
+			end
 		end
 	end
 	local profile = d.profileOf(player)
@@ -999,6 +1027,7 @@ function TruckLoad.OnRebuild(player: Player, old: Model?, keepsLoad: boolean, at
 						math.max(piece.createdAt, now - GameConfig.PickupGraceSec + GameConfig.LeftLoadGraceSec)
 					piece.lastInteracted = now
 					mine += 1
+					trackLeft(player.UserId, piece.model)
 				end
 			end
 			if mine > 0 and d.notify then
@@ -1030,8 +1059,12 @@ function TruckLoad.OnRebuild(player: Player, old: Model?, keepsLoad: boolean, at
 			end
 		end
 	end
-	-- Joining: the load saved last time.
+	-- Joining: wood left on the ground last time comes back where it lay.
 	local profile = d.profileOf(player)
+	if profile then
+		TruckLoad.RestoreGround(player, profile)
+	end
+	-- And the load saved last time.
 	local saved = if profile then profile.truckLoad else nil
 	if type(saved) ~= "table" or #saved == 0 then
 		return nil
@@ -1045,6 +1078,107 @@ function TruckLoad.OnRebuild(player: Player, old: Model?, keepsLoad: boolean, at
 	return function(truck: Model)
 		restore(player, truck, pieces, keepsLoad, at)
 	end
+end
+
+TruckLoad.GroundText = "Your logs are still where you left them."
+
+-- Rebuilds `profile.groundLoad` (wood left on the ground when `player`
+-- last left) where each piece lay, theirs for LeftLoadGraceSec, and
+-- empties it. Returns how many came back.
+function TruckLoad.RestoreGround(player: Player, profile: any): number
+	local d = deps
+	local saved = profile.groundLoad
+	if not d or type(saved) ~= "table" or #saved == 0 then
+		return 0
+	end
+	local pieces, dropped = LeftLoad.GroundToRestore(saved, function(id: string): boolean
+		return WoodData.Get(id) ~= nil
+	end)
+	if dropped > 0 then
+		warn(string.format("[TruckLoad] %s: %d saved ground piece(s) couldn't be rebuilt", player.Name, dropped))
+	end
+	local build: (SavedPiece, Player, CFrame, number) -> Model? = d.build or TruckLoad.Build
+	local n = 0
+	for _, g in ipairs(pieces) do
+		local turn = LeftLoad.DecodeCFrame(g.piece.at)
+		if turn then
+			local model = build(g.piece, player, CFrame.new(g.spot) * turn, GameConfig.LeftLoadGraceSec)
+			if model then
+				n += 1
+				trackLeft(player.UserId, model)
+			end
+		end
+	end
+	profile.groundLoad = {}
+	if n > 0 and d.notify then
+		d.notify(player, TruckLoad.GroundText)
+	end
+	return n
+end
+
+-- What of `player`'s left-behind wood to save as groundLoad (still theirs,
+-- lying about, not held by anyone else, not on someone's bed, not already
+-- saved with the bed), the most valuable first, capped; and those models.
+local function groundKeepable(player: Player, savedWithBed: { [Model]: boolean }): ({ any }, { Model })
+	local set = leftOf[player.UserId]
+	if not set then
+		return {}, {}
+	end
+	type GroundEntry = { saved: SavedPiece, model: Model, value: number, uid: string }
+	local entries: { GroundEntry } = {}
+	for m in pairs(set) do
+		local root = m.PrimaryPart
+		if m.Parent == nil or root == nil or savedWithBed[m] then
+			continue
+		end
+		local piece = GrabService.PieceOf(root)
+		local holder = GrabService.HeldBy(m)
+		if not piece or piece.ownerId ~= player.UserId or (holder ~= nil and holder ~= player) then
+			continue
+		end
+		if TruckLoad.BedOwner(piece :: any) ~= nil then
+			continue -- riding on a truck: that's the truck's to save
+		end
+		local spot = root.CFrame.Position
+		local saved = TruckLoad.SnapshotAt(m, CFrame.new(spot), LeftLoad.GroundBed)
+		if saved then
+			local record = saved :: any
+			record.g = {
+				math.floor(spot.X * 100 + 0.5) / 100,
+				math.floor(spot.Y * 100 + 0.5) / 100,
+				math.floor(spot.Z * 100 + 0.5) / 100,
+			}
+			local uid = m:GetAttribute("Uid")
+			table.insert(entries, {
+				saved = saved,
+				model = m,
+				value = valueOf(m),
+				uid = if type(uid) == "string" then uid else m.Name,
+			})
+		end
+	end
+	table.sort(entries, function(a: GroundEntry, b: GroundEntry): boolean
+		if a.value ~= b.value then
+			return a.value > b.value
+		end
+		return a.uid < b.uid
+	end)
+	local list: { SavedPiece } = {}
+	for i, e in ipairs(entries) do
+		list[i] = e.saved
+	end
+	local kept = LeftLoad.Fit(list)
+	local isKept: { [SavedPiece]: boolean } = {}
+	for _, p in ipairs(kept) do
+		isKept[p] = true
+	end
+	local models: { Model } = {}
+	for _, e in ipairs(entries) do
+		if isKept[e.saved] then
+			table.insert(models, e.model)
+		end
+	end
+	return kept :: { any }, models
 end
 
 -- How many pieces ride on `truck`'s beds (Recall's warning).
@@ -1175,14 +1309,23 @@ function TruckLoad.PlayerRemoving(player: Player)
 	if d and profile then
 		local kept, models = keepable(player, riderOf(player))
 		profile.truckLoad = kept
+		local withBed: { [Model]: boolean } = {}
 		for _, m in ipairs(models) do
-			GrabService.ReleasePiece(m, "left")
-			if d.forget then
-				d.forget(m)
+			withBed[m] = true
+		end
+		local ground, groundModels = groundKeepable(player, withBed)
+		profile.groundLoad = ground
+		for _, list in ipairs({ models, groundModels }) do
+			for _, m in ipairs(list) do
+				GrabService.ReleasePiece(m, "left")
+				if d.forget then
+					d.forget(m)
+				end
+				m:Destroy()
 			end
-			m:Destroy()
 		end
 	end
+	leftOf[player.UserId] = nil
 	local t = trucks[player]
 	if t then
 		release(t)
@@ -1195,6 +1338,7 @@ local function hookUp(newDeps: Deps)
 	query = nil
 	table.clear(trucks)
 	table.clear(loadedOnce)
+	table.clear(leftOf)
 	GrabService.Hooks.bedOwner = TruckLoad.BedOwner
 	GrabService.Hooks.beforeHold = TruckLoad.Unweld
 end

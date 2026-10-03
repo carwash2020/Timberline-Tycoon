@@ -684,6 +684,114 @@ return function(t)
 		t.ok(sameCF(a.root.CFrame, at), "nowhere to put it")
 	end)
 
+	t.test("wood a load left on the ground is saved when you leave, and back where it lay when you rejoin", function()
+		local w = setup()
+		local dale = w.player(1)
+		local pal = w.player(9)
+		local old = w.truck(dale, "Pickup", nil, CFrame.new(900, 41.8, -700))
+		local a = w.piece(w.onBed(old, "BedFloor", 2), { ownerId = 1, figure = "curly" })
+		local b = w.piece(w.onBed(old, "BedFloor", -2), { ownerId = 1, woodId = "pine" })
+		local sold = w.piece(w.onBed(old, "BedFloor", 0), { ownerId = 1 })
+		w.tick()
+		-- Send truck home from out in the woods: the load stays there.
+		t.eq(w.TruckLoad.OnRebuild(dale, old, false, old:GetPivot()), nil)
+		old:Destroy()
+		w.truck(dale, "Pickup", nil, CFrame.new(40, 1.8, 30))
+		-- It settles on the ground; one is sold meanwhile, one is picked up by a pal.
+		local spotA = CFrame.new(905, 41, -702) * CFrame.Angles(math.pi / 2, 0.3, 0)
+		a.root.CFrame = spotA
+		b.root.CFrame = CFrame.new(895, 41, -698) * CFrame.Angles(math.pi / 2, 0, 0)
+		sold.model.Parent = nil
+		t.ok(w.GrabService.Grab(dale, b.root, b.root.CFrame.Position) ~= nil)
+		w.GrabService.Release(dale, b.root)
+		w.TruckLoad.PlayerRemoving(dale)
+		local ground = w.profiles[dale].groundLoad
+		t.eq(#ground, 2, "the two still lying there (not the sold one)")
+		t.eq(ground[1].bed, "Ground")
+		t.eq(a.model.Parent, nil, "gone with him")
+		t.eq(b.model.Parent, nil)
+		-- Rejoining: back where they lay, his, with the toast.
+		local profile = w.profiles[dale]
+		w.TruckLoad.OnRebuild(dale, nil, true, CFrame.new(40, 1.8, 30))
+		t.eq(profile.groundLoad, {}, "rebuilt: emptied")
+		t.eq(w.toasts[#w.toasts].message, w.TruckLoad.GroundText)
+		local back = {}
+		for _, model in ipairs(w.folder:GetChildren()) do
+			back[model:GetAttribute("WoodId")] = model
+		end
+		t.ok(back.oak and back.pine, "both back")
+		t.ok(sameCF(back.oak.PrimaryPart.CFrame, spotA, 0.02), "the oak exactly where it lay")
+		t.eq(back.oak:GetAttribute("Owner"), 1)
+		t.eq(back.oak:GetAttribute("Figure"), "curly")
+		-- Leaving again without fetching them: saved again.
+		w.TruckLoad.PlayerRemoving(dale)
+		t.eq(#w.profiles[dale].groundLoad, 2, "still remembered")
+		t.ok(pal, "a second player was around throughout")
+	end)
+
+	t.test("ground wood that ends up on someone's truck is the truck's to save, not the ground's", function()
+		local w = setup()
+		local dale = w.player(1)
+		local pal = w.player(9)
+		local old = w.truck(dale, "Pickup", nil, CFrame.new(900, 41.8, -700))
+		local onTruck = w.piece(w.onBed(old, "BedFloor", 2), { ownerId = 1 })
+		local lying = w.piece(w.onBed(old, "BedFloor", -2), { ownerId = 1 })
+		w.tick()
+		w.TruckLoad.OnRebuild(dale, old, false, old:GetPivot())
+		old:Destroy()
+		w.truck(dale, "Pickup", nil, CFrame.new(40, 1.8, 30))
+		-- His pal's truck rolls up; one piece is on its bed, the other on the ground.
+		local palTruck = w.truck(pal, "Pickup", nil, CFrame.new(880, 41.8, -700))
+		onTruck.root.CFrame = w.onBed(palTruck, "BedFloor", 0)
+		lying.root.CFrame = CFrame.new(910, 41, -700)
+		-- His pal can't pick up his wood while he's here (it's his).
+		pal.hrp.Position = Vector3.new(910, 43, -695)
+		t.eq(select(2, w.GrabService.Grab(pal, lying.root, lying.root.CFrame.Position)), "owned")
+		w.TruckLoad.PlayerRemoving(dale)
+		t.eq(#w.profiles[dale].groundLoad, 1, "only the piece lying on the ground")
+		t.ok(onTruck.model.Parent ~= nil, "the one on the pal's truck stays in the world")
+		t.eq(lying.model.Parent, nil, "the saved one leaves with him")
+	end)
+
+	t.test("LeftLoad: ground pieces need a sane spot and a Ground bed", function()
+		local w = setup()
+		local LeftLoad = t.loader():server("LeftLoad")
+		local function isWood(id)
+			return id == "oak"
+		end
+		local good = {
+			w = "oak",
+			k = "log",
+			bed = "Ground",
+			at = { 0, 0, 0, 1.5708, 0, 0 },
+			s = { { 1.6, 6, 1.6, 0, 0, 0, 0, 0, 0, 3 } },
+			g = { 905, 41, -702 },
+		}
+		local function copy(over)
+			local c = table.clone(good)
+			for k, v in pairs(over) do
+				c[k] = v
+			end
+			return c
+		end
+		local pieces, dropped = LeftLoad.GroundToRestore({
+			good,
+			copy({ g = { 0 / 0, 1, 1 } }),
+			copy({ g = { 1e9, 0, 0 } }),
+			(function()
+				local c = table.clone(good)
+				c.g = nil -- no spot at all
+				return c
+			end)(),
+			copy({ bed = "BedFloor" }),
+			"junk",
+		}, isWood)
+		t.eq(#pieces, 1)
+		t.eq(dropped, 5)
+		t.ok(near(pieces[1].spot, Vector3.new(905, 41, -702)), "its spot")
+		t.eq(#LeftLoad.PiecesToRestore({ good }, isWood), 0, "a Ground piece isn't a bed piece")
+	end)
+
 	t.test("onLoaded: once per piece of yours on your own bed", function()
 		local w = setup()
 		local dale = w.player(1)
