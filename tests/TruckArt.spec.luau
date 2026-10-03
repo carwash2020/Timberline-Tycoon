@@ -515,15 +515,17 @@ return function(t)
 	end
 
 	-- Seat tops: each seat rose with its bigger body in M1.5 (V2_PLAN §4c)
-	-- and stays put there; the headroom comes from the roofs, not from
-	-- sinking the seats (ACT-04). Each roof's underside stands at least
-	-- HEADROOM over its seat (the plan's table: a hat clears, the bigger the
+	-- and again with the 1.3x trucks (phase 12: M1.5's 2.85, 2.6, 3.5, 2.8
+	-- and 3.7 times 1.3, the Rustbucket's bench a tenth higher so straight
+	-- legs end under its cowl), and stays put there; the headroom comes from
+	-- the roofs, not from sinking the seats (ACT-04). Each roof's underside
+	-- stands at least HEADROOM over its seat (a hat clears, the bigger the
 	-- truck the more room). The Rustbucket and the Scout are open.
-	local SEAT_TOP = { Rustbucket = 2.85, Pickup = 2.6, ScoutATV = 3.5, Flatbed = 2.8, LoggingRig = 3.7 }
-	local HEADROOM = { Pickup = 4.6, Flatbed = 4.8, LoggingRig = 5.0 }
+	local SEAT_TOP = { Rustbucket = 3.835, Pickup = 3.38, ScoutATV = 4.55, Flatbed = 3.64, LoggingRig = 4.81 }
+	local HEADROOM = { Pickup = 6.0, Flatbed = 6.3, LoggingRig = 6.5 }
 	local ROOFED = { pickup = true, flatbed = true, rig = true }
 
-	t.test("seats stay put; a roofed cab has 4.6 to 5 studs over the seat", function()
+	t.test("seats stay put; a roofed cab has 6 to 6.5 studs over the seat", function()
 		for id, def in pairs(ItemCatalog.Trucks) do
 			local model, layout = build({ def = def })
 			local seat = model:FindFirstChild("DriverSeat")

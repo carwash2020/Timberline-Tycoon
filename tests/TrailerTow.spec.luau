@@ -106,7 +106,7 @@ return function(t)
 	end)
 
 	-- The hitch on the bigger trucks (M1.5): every trailer couples at its
-	-- truck's back, its bed a tongue (2 studs) behind, and nothing of one
+	-- truck's back, its bed a tongue (2.6 studs) behind, and nothing of one
 	-- runs into the other: the skids leave a gap and the trailer's tyres
 	-- stand clear of the truck's.
 	t.test("every trailer hitches to every truck with a bed, clear of it", function()

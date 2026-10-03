@@ -86,22 +86,48 @@ return function(t)
 			t.ok(fits(bays.small, length, width), id .. " fits a small bay")
 		end
 		t.ok(
-			math.abs(longest - 57.9) < 1e-6,
+			math.abs(longest - 75.27) < 1e-6,
 			string.format("the longest rig is %.2f (the Rig + Heavy Hauler)", longest)
 		)
 	end)
 
-	-- M1.5 (V2_PLAN §4c): the trucks grew to carry the bigger trees. Body
-	-- width, cab length, bed length x inside width, walls (or stakes) over
-	-- the bed floor, the bed floor's top and the overall length, per truck;
-	-- the bed sizes climb the ladder.
-	t.test("the bigger trucks: each body and bed the size V2_PLAN §4c sets", function()
+	-- M1.5 (V2_PLAN §4c): the trucks grew to carry the bigger trees; phase
+	-- 12 grew them 1.3x again (TruckLayout.Scale), all but the bed floor's
+	-- thickness (0.5). Body width, cab length, bed length x inside width,
+	-- walls (or stakes) over the bed floor, the bed floor's top and the
+	-- overall length, per truck; the bed sizes climb the ladder.
+	t.test("the bigger trucks: each body and bed 1.3x the size V2_PLAN §4c set", function()
+		t.eq(TruckLayout.Scale, 1.3)
 		local want = {
-			Rustbucket = { width = 6.2, cab = 7.0, bed = 10, inside = 5.6, walls = 1.4, floor = 3.0, length = 17.5 },
-			Pickup = { width = 6.6, cab = 7.4, bed = 12, inside = 6.0, walls = 1.6, floor = 3.1, length = 19.9 },
-			ScoutATV = { width = 4.6, cab = 6.5, bed = 0, inside = 0, walls = 0, length = 8.5 },
-			Flatbed = { width = 7.2, cab = 7.8, bed = 18, inside = 6.8, walls = 2.5, floor = 3.3, length = 26.3 },
-			LoggingRig = { width = 7.8, cab = 9.4, bed = 26, inside = 7.2, walls = 3.2, floor = 4.0, length = 35.9 },
+			Rustbucket = {
+				width = 8.06,
+				cab = 9.1,
+				bed = 13,
+				inside = 7.28,
+				walls = 1.82,
+				floor = 3.825,
+				length = 22.75,
+			},
+			Pickup = { width = 8.58, cab = 9.62, bed = 15.6, inside = 7.8, walls = 2.08, floor = 3.955, length = 25.87 },
+			ScoutATV = { width = 5.98, cab = 8.45, bed = 0, inside = 0, walls = 0, length = 11.05 },
+			Flatbed = {
+				width = 9.36,
+				cab = 10.14,
+				bed = 23.4,
+				inside = 8.84,
+				walls = 3.25,
+				floor = 4.215,
+				length = 34.19,
+			},
+			LoggingRig = {
+				width = 10.14,
+				cab = 12.22,
+				bed = 33.8,
+				inside = 9.36,
+				walls = 4.16,
+				floor = 5.125,
+				length = 46.67,
+			},
 		}
 		local function near(a, b)
 			return math.abs(a - b) < 1e-6
@@ -127,24 +153,26 @@ return function(t)
 		end
 	end)
 
-	t.test("the bigger trailers: tongue 2, beds 10 / 14 / 20, walls 1.2 / 2 / 2.5, floor top 2.5", function()
+	-- Phase 12: 1.3x M1.5's (tongue 2, beds 10 / 14 / 20, walls 1.2 / 2 /
+	-- 2.5, floor top 2.5).
+	t.test("the bigger trailers: tongue 2.6, beds 13 / 18.2 / 26, walls 1.56 / 2.6 / 3.25, floor top 3.175", function()
 		local want = {
-			PonyTrailer = { bed = 10, walls = 1.2, wheel = 1.15, length = 12, axles = 1 },
-			RanchTrailer = { bed = 14, walls = 2.0, wheel = 1.2, length = 16, axles = 1 },
-			HeavyHauler = { bed = 20, walls = 2.5, wheel = 1.25, length = 22, axles = 2 },
+			PonyTrailer = { bed = 13, walls = 1.56, wheel = 1.495, length = 15.6, axles = 1 },
+			RanchTrailer = { bed = 18.2, walls = 2.6, wheel = 1.56, length = 20.8, axles = 1 },
+			HeavyHauler = { bed = 26, walls = 3.25, wheel = 1.625, length = 28.6, axles = 2 },
 		}
-		t.eq(TruckLayout.Tongue, 2)
+		t.ok(math.abs(TruckLayout.Tongue - 2.6) < 1e-9, "a 2.6-stud tongue")
 		for _, truckId in ipairs({ "Rustbucket", "LoggingRig" }) do
 			local truck = TruckLayout.For(ItemCatalog.GetTruck(truckId))
 			for id, w in pairs(want) do
 				local tl = TruckLayout.ForTrailer(ItemCatalog.GetTrailer(id), truck)
 				local label = truckId .. " + " .. id
 				t.eq(tl.width, truck.width, label .. ": as wide as its truck")
-				t.eq(tl.bedLength, w.bed, label .. " bed")
+				t.ok(math.abs(tl.bedLength - w.bed) < 1e-6, label .. " bed")
 				t.ok(math.abs(tl.wallHeight - w.walls) < 1e-6, label .. " walls")
 				t.ok(math.abs(tl.wheelRadius - w.wheel) < 1e-6, label .. " wheels")
-				t.ok(math.abs(tl.bedFloorY + TruckLayout.BedFloorThickness / 2 - 2.5) < 1e-6, label .. " floor top")
-				t.eq(tl.length, w.length, label .. " length")
+				t.ok(math.abs(tl.bedFloorY + TruckLayout.BedFloorThickness / 2 - 3.175) < 1e-6, label .. " floor top")
+				t.ok(math.abs(tl.length - w.length) < 1e-6, label .. " length")
 				t.eq(#tl.axleZ, w.axles, label .. " axles")
 				t.ok(tl.bedWidth > truck.logLength, label .. " logs fit inside its walls")
 			end
@@ -246,9 +274,9 @@ return function(t)
 				ladder[i] .. " has bigger wheels than the " .. ladder[i - 1]
 			)
 		end
-		-- M1.5's 1.8, eased to 1.75 so the raised deck (its top at 4.0)
-		-- still clears the tyres (and the Flatbed's 1.45 to 1.4).
-		t.ok(math.abs(radius("LoggingRig") - 1.8) < 0.11, "the Rig's wheels are about 1.8")
+		-- M1.5's 1.8, eased to 1.75 so the raised deck still clears the tyres
+		-- (and the Flatbed's 1.45 to 1.4); 1.3x since phase 12.
+		t.ok(math.abs(radius("LoggingRig") - 1.8 * 1.3) < 0.11 * 1.3, "the Rig's wheels are about 2.3")
 		for id, truck in pairs(ItemCatalog.Trucks) do
 			local layout = TruckLayout.For(truck)
 			if layout.bedLength > 0 and not truck.look.bedWalls then
@@ -283,7 +311,7 @@ return function(t)
 		-- The long beds (12+ studs) are the tandem ones.
 		t.eq(axles, { Rustbucket = 2, Pickup = 2, ScoutATV = 2, Flatbed = 3, LoggingRig = 3 })
 		local rig = TruckLayout.For(ItemCatalog.GetTruck("LoggingRig"))
-		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 11.15) < 1e-9, "the Logging Rig's tandem middle")
+		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 11.15 * 1.3) < 1e-9, "the Logging Rig's tandem middle")
 	end)
 
 	t.test("wheelbase: front axle to the axle it turns about", function()
@@ -366,7 +394,8 @@ return function(t)
 	t.test("BedRoomU3 matches ECONOMY.md's u³ a trip for every truck", function()
 		local U = t.shared("GameConfig").WoodUnit
 		-- ECONOMY.md "Beds": length x width x (walls + 2) x 0.4 / u³.
-		local trip = { Rustbucket = 18.6, Pickup = 25.3, Flatbed = 53.8, LoggingRig = 95.1, ScoutATV = 0 }
+		-- (Phase 12's 1.3x beds: they were 18.6, 25.3, 53.8 and 95.1.)
+		local trip = { Rustbucket = 35.3, Pickup = 48.5, Flatbed = 106.1, LoggingRig = 190.3, ScoutATV = 0 }
 		for id, want in pairs(trip) do
 			local layout = TruckLayout.For(ItemCatalog.GetTruck(id))
 			local room = TruckLayout.BedRoomU3(layout.bedLength, layout.bedWidth, layout.wallHeight, U)

@@ -963,10 +963,14 @@ export type Town = {
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
 
 -- The sell volume over the pad (MapBuilder's SellZone): the pad's width and
--- 26 deep, from the pad's north edge (z 95) out over the street to z 69,
--- so a truck backed in from the street has its whole bed in it, the
--- Logging Rig's 26-stud deck too (M1.5; it was 18 deep, the pad's own).
-WorldPlan.SellZoneSize = Vector3.new(24, 12, 26)
+-- 40 deep, z 62 to 102, so a truck backed in from the street until it
+-- meets the mill (its front at z 97) has its whole bed in it, the Logging
+-- Rig's 33.8-stud deck too (phase 12; M1.5's was 26 deep, z 69 to 95, for
+-- a 26-stud deck; the pad's own 18 before that). Its middle stays at z 82,
+-- on the pad, where Millie, the SELL LOGS marker and the quest beacon are
+-- placed from, so it grew both ways: north into the mill's front, south
+-- over the street to the plaza, short of the spawn walk's lamps (z 60).
+WorldPlan.SellZoneSize = Vector3.new(24, 12, 40)
 
 -- Parking bays (phase 12; M1.5's were all 10 x 60, so a Rustbucket sat in
 -- a runway): each painted bay (MapBuilder builds a ParkingSlot part this
@@ -977,7 +981,7 @@ WorldPlan.SellZoneSize = Vector3.new(24, 12, 26)
 WorldPlan.ParkingBays = {
 	small = Vector3.new(14.25, 0.2, 30), -- the Rustbucket, the Pickup, the Scout ATV
 	flatbed = Vector3.new(15, 0.2, 38), -- the Flatbed
-	long = Vector3.new(16, 0.2, 51), -- pull-through: the Logging Rig, a small truck or the Flatbed with a trailer
+	long = Vector3.new(16, 0.2, 51), -- pull-through: the Logging Rig, a small truck with a trailer, the Flatbed with the Pony
 	longest = Vector3.new(16, 0.2, 80), -- pull-through: the Logging Rig with any trailer (the Heavy Hauler: 75.4)
 }
 -- The standard bay (most of the lot's).
@@ -1261,9 +1265,9 @@ function WorldPlan.Town(): Town
 		-- spawn walk; the shops' on their paths. They grew back and sideways
 		-- (the Tool Shed and Hearth & Home west, the Dealership east).
 		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
-		-- Its north edge on the pad's (z 95), reaching south over the street
-		-- (WorldPlan.SellZoneSize); its centre (z 82) still on the pad.
-		sellZone = CFrame.new(mill.X, 6, mill.Z + 9 - 24 - WorldPlan.SellZoneSize.Z / 2),
+		-- Its middle at z 82, on the pad (WorldPlan.SellZoneSize: 40 deep,
+		-- z 62 to 102, over the street and the mill's front).
+		sellZone = CFrame.new(mill.X, 6, mill.Z - 28),
 		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
 		skyBin = CFrame.new(mill.X - 18, 2, mill.Z - 24),
 		shops = {

@@ -180,14 +180,16 @@ return function(t)
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "SellZone")
 		t.ok(s.sellArea:FindFirstChild("SellZone"):FindFirstChild("SellPoint"), "SellPoint")
-		-- M1.5: the zone runs from the pad's north edge (z 95) out over the
-		-- street to z 69, the pad's width; the prompt stays over the pad's
-		-- middle (z 86), where it always was.
+		-- Phase 12: the zone runs 40 deep round its middle (z 82, where it
+		-- was since M1.5), from the mill's front (z 102) over the street to
+		-- z 62, the pad's width; the prompt stays over the pad's middle
+		-- (z 86), where it always was.
 		do
 			local zone = s.sellArea:FindFirstChild("SellZone")
 			local c, size = zone.CFrame.Position, zone.Size
-			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 26) < 1e-4, "the sell zone is 24 x 26")
-			t.ok(math.abs(c.Z + size.Z / 2 - 95) < 1e-4 and math.abs(c.Z - size.Z / 2 - 69) < 1e-4, "z 69 to 95")
+			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 40) < 1e-4, "the sell zone is 24 x 40")
+			t.ok(math.abs(c.Z - 82) < 1e-4, "its middle at z 82")
+			t.ok(math.abs(c.Z + size.Z / 2 - 102) < 1e-4 and math.abs(c.Z - size.Z / 2 - 62) < 1e-4, "z 62 to 102")
 			t.ok(math.abs(c.X) < 1e-4, "centred on the spawn walk")
 			local point = zone.CFrame * zone:FindFirstChild("SellPoint").Position
 			t.ok(math.abs(point.X) < 1e-4 and math.abs(point.Z - 86) < 1e-4, "the prompt over the pad's middle")

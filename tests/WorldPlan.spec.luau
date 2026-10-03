@@ -593,59 +593,131 @@ return function(t)
 		t.ok(#problems > before, "a trunk in a pull-out is caught")
 	end)
 
-	-- The sell zone (M1.5): 26 deep, from the pad's north edge out over the
-	-- street, so the Logging Rig's 26-stud deck fits when it backs in; its
-	-- middle still on the pad, north of the spawn walk's lamps. The way in:
-	-- the Rig backed onto the pad reaches back to z 59, between those
-	-- lamps, and nothing that collides stands there.
-	t.test(
-		"the sell zone reaches over the street, and the Rig backs onto the pad clear of everything (M1.5)",
-		function()
-			local size, zone, pad = WorldPlan.SellZoneSize, town.sellZone.Position, town.sellPad.Position
-			t.ok(size == Vector3.new(24, 12, 26), "24 x 12 x 26")
-			t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
-			t.ok(math.abs(zone.Z + size.Z / 2 - 95) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 69) < 1e-6, "z 69 to 95")
-			t.ok(math.abs(zone.Z - pad.Z) < 9, "its middle on the pad")
-			t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")
-			-- The pad stays a ghost: nothing of it collides, the pad itself no
-			-- more than 0.25 tall (its trim barely more), so trucks roll over it.
-			for _, p in ipairs(parts(placed(BuildingArt.SellPad(24, 18), town.sellPad))) do
-				t.ok(not p.CanCollide, "the pad's " .. p.Name .. " doesn't collide")
-				local _, hi = boxOf(p)
-				t.ok(hi.Y <= (if p.Name == "SellPad" then 0.25 else 0.3) + 1e-6, "the pad's " .. p.Name .. " is flat")
+	-- The sell zone (phase 12): 40 deep round its middle (z 82, on the pad,
+	-- where it was since M1.5: Millie, the SELL LOGS marker and the quest
+	-- beacon are placed from it), z 62 to 102, into the mill's front and
+	-- over the street, north of the spawn walk's lamps. Every bed fits it end
+	-- to end; the Logging Rig backed in until it meets the mill (the foot of
+	-- the ramp up to its saw deck, z 97) has its whole 33.8-stud deck in it.
+	-- The way in: the Rig backing onto the pad from the street (its tail from
+	-- z 84 to 96, between the walk's lamps at (+-8, 60)) keeps everything in
+	-- town that collides a stud from what of it collides (chassis, skids,
+	-- deck, stakes) and clear of all of it (tyres, fenders, mirrors, stacks).
+	-- M1.5 checked a box as wide as its wheels and a stud each side; the 1.3x
+	-- Rig's tyres pass those lamps 0.9 clear, its hull 2.2.
+	t.test("the sell zone holds every bed, and the Rig backs onto the pad clear of everything", function()
+		local size, zone, pad = WorldPlan.SellZoneSize, town.sellZone.Position, town.sellPad.Position
+		t.ok(size == Vector3.new(24, 12, 40), "24 x 12 x 40")
+		t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
+		t.ok(math.abs(zone.Z - 82) < 1e-6, "its middle at z 82, where it was")
+		t.ok(math.abs(zone.Z + size.Z / 2 - 102) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 62) < 1e-6, "z 62 to 102")
+		t.ok(math.abs(zone.Z - pad.Z) < 9, "its middle on the pad")
+		t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")
+		-- The pad stays a ghost: nothing of it collides, the pad itself no
+		-- more than 0.25 tall (its trim barely more), so trucks roll over it.
+		for _, p in ipairs(parts(placed(BuildingArt.SellPad(24, 18), town.sellPad))) do
+			t.ok(not p.CanCollide, "the pad's " .. p.Name .. " doesn't collide")
+			local _, hi = boxOf(p)
+			t.ok(hi.Y <= (if p.Name == "SellPad" then 0.25 else 0.3) + 1e-6, "the pad's " .. p.Name .. " is flat")
+		end
+		local ItemCatalog = t.shared("ItemCatalog")
+		local TruckLayout = t.shared("TruckLayout")
+		local TruckArt = t.shared("Art/TruckArt")
+		-- Every bed of every rig fits the zone end to end, with room to spare.
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			t.ok(layout.bedLength <= size.Z - 4, id .. "'s bed fits the zone")
+			for trailerId, trailer in pairs(ItemCatalog.Trailers) do
+				local tl = TruckLayout.ForTrailer(trailer, layout)
+				t.ok(tl.bedLength <= size.Z - 4, trailerId .. "'s bed fits the zone")
 			end
-			local TruckLayout = t.shared("TruckLayout")
-			local rig = TruckLayout.For(t.shared("ItemCatalog").GetTruck("LoggingRig"))
-			local half = math.max(rig.width / 2, rig.wheelX + rig.tyreWidth / 2) + 1
-			local back = zone.Z + size.Z / 2
-			local lane = {
-				name = "the Rig's way onto the pad",
-				x0 = pad.X - half,
-				x1 = pad.X + half,
-				z0 = back - rig.length,
-				z1 = back,
-			}
-			t.ok(rig.bedLength <= size.Z, "the Rig's deck fits the zone")
-			local problems = {}
-			for _, thing in ipairs(townThings()) do
-				for _, p in ipairs(parts(thing.model)) do
-					if p.CanCollide and reachInto(p.CFrame, p.Size, lane) > 1e-3 then
-						table.insert(problems, thing.label .. "'s " .. p.Name)
+		end
+		-- The Logging Rig, facing the street (-Z) as it backs in.
+		local def = ItemCatalog.GetTruck("LoggingRig")
+		local rig = TruckLayout.For(def)
+		local model = TruckArt.Build(def, rig)
+		local hull, body = {}, {}
+		for _, p in ipairs(parts(model)) do
+			local lo, hi = boxOf(p)
+			table.insert(body, { lo = lo, hi = hi })
+			if p.CanCollide then
+				table.insert(hull, { lo = lo, hi = hi })
+			end
+		end
+		local near = {}
+		for _, thing in ipairs(townThings()) do
+			for _, p in ipairs(parts(thing.model)) do
+				if p.CanCollide then
+					local lo, hi = boxOf(p)
+					if hi.X > pad.X - 20 and lo.X < pad.X + 20 and hi.Z > 20 and lo.Z < 110 then
+						table.insert(near, { part = p, label = thing.label })
 					end
 				end
 			end
-			t.ok(#problems == 0, "in " .. lane.name .. ": " .. table.concat(problems, ", "))
-			-- Millie and the SELL LOGS HERE posts stand east of it.
-			local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
-				if model == "SellArea" and part == "SellZone" then
-					return town.sellZone, size
-				end
-				return nil, nil
-			end).Position
-			t.ok((millie - Vector3.new(14.6, 0, 92.5)).Magnitude < 1e-4, "Millie stands where she always has")
-			t.ok(millie.X > pad.X + 12 + 2, "Millie east of the pad and its lane")
 		end
-	)
+		t.ok(#near > 0, "things by the way in")
+		-- What of `boxes` (truck-local), the truck's middle `dz` along z,
+		-- comes within `margin` of something in town that collides.
+		local function hits(boxes, dz, margin, found)
+			for _, b in ipairs(boxes) do
+				local rect = {
+					x0 = pad.X + b.lo.X - margin,
+					x1 = pad.X + b.hi.X + margin,
+					z0 = b.lo.Z + dz - margin,
+					z1 = b.hi.Z + dz + margin,
+				}
+				for _, n in ipairs(near) do
+					if reachInto(n.part.CFrame, n.part.Size, rect) > 1e-3 then
+						found[n.label .. "'s " .. n.part.Name] = true
+					end
+				end
+			end
+			return found
+		end
+		local problems = {}
+		for back = 84, 96, 2 do
+			local dz = back - rig.length / 2
+			local found = hits(body, dz, 0, hits(hull, dz, 1, {}))
+			for what in pairs(found) do
+				table.insert(problems, string.format("%s (its tail at z %d)", what, back))
+			end
+		end
+		t.ok(#problems == 0, "on the Rig's way onto the pad: " .. table.concat(problems, ", "))
+		-- Backed up to the mill (its tail at the ramp's foot, z 97), the whole
+		-- deck is in the zone.
+		local deck = model:FindFirstChild("BedFloor")
+		local dz = 97 - rig.length / 2
+		local d0, d1 = deck.CFrame.Z - deck.Size.Z / 2 + dz, deck.CFrame.Z + deck.Size.Z / 2 + dz
+		t.ok(
+			d0 >= zone.Z - size.Z / 2 and d1 <= zone.Z + size.Z / 2,
+			string.format("the Rig's deck (z %.1f to %.1f) lies in the zone", d0, d1)
+		)
+		-- And the check itself: a lamp a stud nearer the walk's middle is in
+		-- the Rig's way.
+		local lamp = placed(BuildingArt.LampPost(), CFrame.new(-6.5, 0, 60))
+		local before = #near
+		for _, p in ipairs(parts(lamp)) do
+			if p.CanCollide then
+				table.insert(near, { part = p, label = "a test lamp" })
+			end
+		end
+		local caught = false
+		for back = 84, 96, 2 do
+			for what in pairs(hits(body, back - rig.length / 2, 0, {})) do
+				caught = caught or string.find(what, "a test lamp", 1, true) ~= nil
+			end
+		end
+		t.ok(caught and #near > before, "a lamp in the Rig's way is caught")
+		-- Millie and the SELL LOGS HERE posts stand east of it.
+		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
+			if model == "SellArea" and part == "SellZone" then
+				return town.sellZone, size
+			end
+			return nil, nil
+		end).Position
+		t.ok((millie - Vector3.new(14.6, 0, 92.5)).Magnitude < 1e-4, "Millie stands where she always has")
+		t.ok(millie.X > pad.X + 12 + 2, "Millie east of the pad and its lane")
+	end)
 
 	-- Every problem a check found, a line each (the first 25).
 	local function report(problems)

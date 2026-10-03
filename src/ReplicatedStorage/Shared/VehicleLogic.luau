@@ -329,11 +329,12 @@ function VehicleLogic.NextFreeIndex(used: { [number]: boolean }): number
 end
 
 -- Ground position (x, 0, z) of overflow spot `index`: rows of eight west
--- of spawn, for when every ParkingSlot is taken. Side by side they're as
--- far apart as the parking slots (OverflowApart), so the bigger trucks
--- (M1.5) never overlap their neighbours; a long rig can reach the next
--- row, and VehicleService skips any spot a truck is in.
-VehicleLogic.OverflowApart = 11
+-- of spawn, for when every ParkingSlot is taken. Side by side they're the
+-- widest rig apart and a stud (OverflowApart: the Logging Rig is 12.9
+-- across its fenders since phase 12; 11 before), so the trucks never
+-- overlap their neighbours; a long rig can reach the next row, and
+-- VehicleService skips any spot a truck is in.
+VehicleLogic.OverflowApart = 14
 function VehicleLogic.OverflowSpot(index: number): Vector3
 	return Vector3.new(-20 - (index % 8) * VehicleLogic.OverflowApart, 0, 56 - (index // 8) * 28)
 end

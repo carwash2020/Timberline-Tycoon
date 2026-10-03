@@ -45,12 +45,14 @@ DriveMath.GripSpeed = 10 -- studs/s: below this a truck turns in proportion to i
 -- follows at full steer) is at least this many times its wheelbase
 -- (TruckLayout.Wheelbase: front axle to the axle it turns about), so a
 -- long rig sweeps a wider circle than a short truck, as a real one does
--- (wheelbase / tan(max steer), here about 58 degrees of lock). It was
--- 0.75 before the trucks grew (M1.5, V2_PLAN §4c); at 0.62 every truck's
--- circle stays within 10% of what it was (DriveMath.spec): the Logging
--- Rig's 25.5-stud wheelbase gives 15.8 (was 14.8), the Rustbucket's 12.4
--- gives 7.7 (was its own 10 / turnRate = 7.1).
-DriveMath.TurnRadiusPerWheelbase = 0.62
+-- (wheelbase / tan(max steer), here about 64 degrees of lock). It was
+-- 0.75 before the trucks grew (M1.5, V2_PLAN §4c), then 0.62; the trucks
+-- grew 1.3x again in phase 12 and at 0.477 (0.62 / 1.3) every truck turns
+-- the circle it did in M1.5, within 10% of its first (DriveMath.spec): the
+-- Logging Rig's 33.15-stud wheelbase gives 15.8 (was 14.8), the
+-- Rustbucket's 16.12 gives 7.7 (was its own 10 / turnRate = 7.1). The town
+-- and the roads didn't grow, so the circles mustn't either.
+DriveMath.TurnRadiusPerWheelbase = 0.477
 
 function DriveMath.MinTurnRadius(wheelbase: number): number
 	return DriveMath.TurnRadiusPerWheelbase * math.max(wheelbase, 0)

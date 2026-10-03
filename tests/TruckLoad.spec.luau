@@ -297,7 +297,8 @@ return function(t)
 		local onTrailer = w.piece(w.onBed(truck, "TrailerBed", 1), { ownerId = 1 })
 		-- 6 long, its middle 1 stud past the tailgate: overlaps the zone but
 		-- its centre is out.
-		local hanging = w.piece(w.onBed(truck, "BedFloor", 6), { ownerId = 1 })
+		local tailgate = truck:FindFirstChild("BedFloor").Size.Z / 2
+		local hanging = w.piece(w.onBed(truck, "BedFloor", tailgate + 1), { ownerId = 1 })
 		local beside = w.piece(truck:GetPivot() * CFrame.new(8, 1, 0), { ownerId = 1 })
 		w.tick()
 		t.eq(w.TruckLoad.LoadCount(truck), 2)
@@ -332,7 +333,7 @@ return function(t)
 			room += z.zone:GetAttribute("Room")
 		end
 		t.ok(math.abs(truck:GetAttribute("BedRoom") - room) < 0.051, "BedRoom: both beds' u³ a trip")
-		t.eq(dale:GetAttribute("BedLength"), 10, "the longest bed (Rustbucket 10, Pony 10)")
+		t.eq(dale:GetAttribute("BedLength"), 13, "the longest bed (Rustbucket 13, Pony 13: phase 12's 1.3x)")
 		-- Sold off the bed: the numbers follow (once a second).
 		b.model:Destroy()
 		w.tick(0.5)

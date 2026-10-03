@@ -128,11 +128,12 @@ return function(t)
 	end)
 
 	-- M1.5 (V2_PLAN §4c): the trucks grew (longer wheelbases), and
-	-- TurnRadiusPerWheelbase went from 0.75 to 0.62, so each one's tightest
-	-- circle (at a crawl, full lock) is within 10% of what it was before, and
-	-- never tighter: driving feels the same.
+	-- TurnRadiusPerWheelbase went from 0.75 to 0.62; phase 12 grew them 1.3x
+	-- again and it went to 0.477 (0.62 / 1.3). So each one's tightest circle
+	-- (at a crawl, full lock) is within 10% of what it was before M1.5, and
+	-- never tighter: driving feels the same, in a town that didn't grow.
 	t.test("the bigger trucks turn within 10% of their old circles", function()
-		t.ok(math.abs(DriveMath.TurnRadiusPerWheelbase - 0.62) < 1e-9, "0.62 a stud of wheelbase")
+		t.ok(math.abs(DriveMath.TurnRadiusPerWheelbase - 0.477) < 1e-9, "0.477 a stud of wheelbase")
 		-- Each truck's circle before M1.5: the turnRate rule (GripSpeed /
 		-- turnRate) or 0.75 x its old wheelbase (9.2, 10.2, 4, 13.05, 19.75).
 		local old = {

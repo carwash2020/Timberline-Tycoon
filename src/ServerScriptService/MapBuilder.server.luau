@@ -198,9 +198,9 @@ step("4. The town", function()
 		end
 	end)
 
-	-- The zone reaches south of the pad over the street (M1.5), so a big
-	-- truck backed in has its whole bed in it; the prompt stays over the
-	-- pad's middle.
+	-- The zone reaches over the street and into the mill's front (40 deep
+	-- round the pad's middle, phase 12), so a big truck backed in has its
+	-- whole bed in it; the prompt stays over the pad's middle.
 	step("4. The sell area", function()
 		local sellZone = Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, Color3.new(1, 1, 1))
 		ghost(sellZone, 1)

@@ -97,7 +97,7 @@ local SETTLE_SPEED = 1.5 -- studs/s: slower than this counts as stopped
 local PARK_TILT = math.rad(30) -- the steepest slope a truck parks on
 local PARK_RAY = 40 -- studs below a tipped truck that parking looks for the ground
 local HOLD_SECONDS = 1 -- a truck the speed check put back stays the server's this long
-local EXIT_GAP = 2.6 -- studs beside the truck where the driver steps out (clear of the bigger wheels, M1.5)
+local EXIT_GAP = 3.4 -- studs beside the truck where the driver steps out (clear of the wheels: 2 before M1.5, 2.6 before phase 12)
 local OVERFLOW_SEARCH = 31 -- overflow spots tried when every free slot is blocked
 local WORLD_LOG_LENGTH = 3 -- TreeService's world logs (a load left behind)
 local SPILL_RAY = 60 -- studs down from above a truck that a load left behind looks for the ground
@@ -711,7 +711,7 @@ local function makeDrivePrompt(seat: VehicleSeat, owner: Player, def: TruckDef):
 	prompt.Name = "DrivePrompt"
 	prompt.ActionText = "Drive"
 	prompt.ObjectText = string.format("%s's %s", owner.DisplayName, def.displayName)
-	prompt.MaxActivationDistance = 7
+	prompt.MaxActivationDistance = 9 -- from beside the cab of the biggest truck, to its seat (7 before phase 12)
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
 	prompt:SetAttribute("OwnerId", owner.UserId) -- VehicleFX hides it from everyone else

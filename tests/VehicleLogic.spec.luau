@@ -302,17 +302,28 @@ return function(t)
 		t.eq(75 / 2 - VehicleLogic.OverhangShift(51, 75), 51 / 2)
 	end)
 
-	-- M1.5: the trucks grew (the widest rig, wheels and fenders, is under
-	-- 10 studs), so side-by-side overflow spots are 11 apart, like the
-	-- parking slots.
-	t.test("overflow spots side by side are 11 studs apart or more", function()
-		t.ok(VehicleLogic.OverflowApart >= 11)
+	-- The trucks grew (M1.5, then 1.3x in phase 12: the widest rig is 12.6
+	-- across its tyres, 12.9 across its fenders), so side-by-side overflow
+	-- spots are the widest rig apart and a stud (14; 11 in M1.5).
+	t.test("overflow spots side by side are the widest rig and a stud apart", function()
+		local TruckLayout = t.shared("TruckLayout")
+		local ItemCatalog = t.shared("ItemCatalog")
+		local widest = 0
+		for _, truck in pairs(ItemCatalog.Trucks) do
+			local _, width = TruckLayout.RigSize(TruckLayout.For(truck))
+			widest = math.max(widest, width)
+		end
+		t.ok(VehicleLogic.OverflowApart >= widest + 1, string.format("the widest rig is %.2f", widest))
+		t.eq(VehicleLogic.OverflowApart, 14)
 		for i = 0, 31 do
 			local a = VehicleLogic.OverflowSpot(i)
 			for k = i + 1, 31 do
 				local b = VehicleLogic.OverflowSpot(k)
 				if math.abs(a.Z - b.Z) < 1e-6 then
-					t.ok(math.abs(a.X - b.X) >= 11 - 1e-6, string.format("spots %d and %d side by side", i, k))
+					t.ok(
+						math.abs(a.X - b.X) >= VehicleLogic.OverflowApart - 1e-6,
+						string.format("spots %d and %d side by side", i, k)
+					)
 				end
 			end
 		end
@@ -329,8 +340,9 @@ return function(t)
 		t.ok(not VehicleLogic.InTown(home + Vector3.new(0, 0, 40.1), town, home))
 	end)
 
-	-- RigCorners and RestingCFrame with the biggest rig M1.5 builds: the
-	-- Logging Rig (7.8 wide, 35.9 long) with a Heavy Hauler (22 more).
+	-- RigCorners and RestingCFrame with the biggest rig there is: the
+	-- Logging Rig (10.14 wide, 46.67 long since phase 12) with a Heavy
+	-- Hauler (28.6 more).
 	t.test("the biggest rig's corners span it, and it's set down on them", function()
 		local TruckLayout = t.shared("TruckLayout")
 		local ItemCatalog = t.shared("ItemCatalog")

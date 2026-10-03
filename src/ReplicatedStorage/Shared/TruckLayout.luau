@@ -13,6 +13,13 @@
 -- M1.5 (V2_PLAN §4c): the trucks and trailers grew to carry the bigger
 -- trees. Drivers didn't, so the cabs grew taller round them (TruckArt.spec:
 -- a seated driver's hat clears every roof).
+--
+-- Phase 12 (Connor, after seeing the live build: "Cars can get upsized
+-- again"): every truck and trailer is Scale (1.3) times its M1.5 size,
+-- cab, bed, wheels, walls and all, so a 5-stud character stands by chunky
+-- trucks. The proportions below are M1.5's, times Scale; TruckArt still
+-- draws each body in M1.5's units and grows it by Scale, so each one keeps
+-- its look. Drivers stay avatar-sized, sat a little higher in bigger cabs.
 
 local ItemCatalog = require(script.Parent.ItemCatalog)
 
@@ -21,21 +28,25 @@ type TrailerDef = ItemCatalog.TrailerDef
 
 local TruckLayout = {}
 
-TruckLayout.CabLength = 7 -- the default cab (hood + seat); see STYLES for each truck's own
-TruckLayout.LogDiameter = 0.9
+TruckLayout.Scale = 1.3
+local S = TruckLayout.Scale
+
+TruckLayout.CabLength = 7 * S -- the default cab (hood + seat); see STYLES for each truck's own
+TruckLayout.LogDiameter = 0.9 -- the v1 bed's logs (TreeService's): they didn't grow
 -- The chassis's centre above the ground (VehicleService's WHEEL_CLEARANCE):
--- just over the biggest wheels' axles (the Rig's 1.75), so every wheel's
+-- just over the biggest wheels' axles (the Rig's 2.275), so every wheel's
 -- centre is below it. Its underside, half a stud lower, is the top of the
 -- skids TruckArt hangs under it.
-TruckLayout.ChassisY = 1.8
+TruckLayout.ChassisY = 1.8 * S
 TruckLayout.BedFloorThickness = 0.5
-local TAIL = 0.5 -- chassis behind the bed
-local ATV_REAR = 2 -- the Scout ATV's rear rack instead of a bed
+local TAIL = 0.5 * S -- chassis behind the bed
+local ATV_REAR = 2 * S -- the Scout ATV's rear rack instead of a bed
 -- Along the bed, centre to centre: each truck's bed holds as many logs a
--- layer as it did before the beds grew (M1.5), spread out along them.
-local LOG_SPACING = 1.5
+-- layer as it did before the beds grew (M1.5, phase 12), spread out along
+-- them.
+local LOG_SPACING = 1.5 * S
 local BED_FLOOR_TOP = 0.25 -- above the bed floor part's centre (it's 0.5 thick)
-TruckLayout.Tongue = 2 -- gap between the truck's back and the trailer's bed
+TruckLayout.Tongue = 2 * S -- gap between the truck's back and the trailer's bed
 
 -- Body styles: "farm" | "pickup" | "atv" | "flatbed" | "rig" (trucks),
 -- "pony" | "ranch" | "heavy" (trailers). TruckArt has a builder for each.
@@ -57,67 +68,68 @@ type StyleSpec = {
 
 -- The axles set each truck's wheelbase, and with it its tightest turning
 -- circle (DriveMath.MinTurnRadius): each truck's stays within 10% of what
--- it was before the trucks grew (DriveMath.spec).
+-- it was before the trucks grew (DriveMath.spec). In studs: M1.5's sizes
+-- times Scale.
 local STYLES: { [Style]: StyleSpec } = {
 	farm = {
-		cabLength = 7,
-		wheelRadius = 1.3,
-		tyreWidth = 1,
-		frontAxle = 2.4,
-		rearAxle = 2.7,
+		cabLength = 7 * S,
+		wheelRadius = 1.3 * S,
+		tyreWidth = 1 * S,
+		frontAxle = 2.4 * S,
+		rearAxle = 2.7 * S,
 		tandem = false,
 		tandemGap = 0,
-		bedFloorY = 2.75, -- floor top 3.0
-		wall = 0.3, -- 5.6 inside
-		wallHeight = 1.4,
+		bedFloorY = 2.75 * S, -- floor top 3.825
+		wall = 0.3 * S, -- 7.28 inside
+		wallHeight = 1.4 * S,
 	},
 	pickup = {
-		cabLength = 7.4,
-		wheelRadius = 1.35,
-		tyreWidth = 1.05,
-		frontAxle = 2.5,
-		rearAxle = 4.5, -- two thirds of the way back along the bed, as on a real pickup
+		cabLength = 7.4 * S,
+		wheelRadius = 1.35 * S,
+		tyreWidth = 1.05 * S,
+		frontAxle = 2.5 * S,
+		rearAxle = 4.5 * S, -- two thirds of the way back along the bed, as on a real pickup
 		tandem = false,
 		tandemGap = 0,
-		bedFloorY = 2.85, -- floor top 3.1
-		wall = 0.3, -- 6.0 inside
-		wallHeight = 1.6,
+		bedFloorY = 2.85 * S, -- floor top 3.955
+		wall = 0.3 * S, -- 7.8 inside
+		wallHeight = 1.6 * S,
 	},
 	atv = {
-		cabLength = 6.5,
-		wheelRadius = 1.25,
-		tyreWidth = 1.4,
-		frontAxle = 1.7,
-		rearAxle = 1.7,
+		cabLength = 6.5 * S,
+		wheelRadius = 1.25 * S,
+		tyreWidth = 1.4 * S,
+		frontAxle = 1.7 * S,
+		rearAxle = 1.7 * S,
 		tandem = false,
 		tandemGap = 0,
-		bedFloorY = 2.75,
+		bedFloorY = 2.75 * S,
 		wall = 0,
 		wallHeight = 0,
 	},
 	flatbed = {
-		cabLength = 7.8,
-		wheelRadius = 1.4, -- the deck's underside (2.8) clears the tyre tops
-		tyreWidth = 1.1,
-		frontAxle = 2.9,
-		rearAxle = 4.6,
+		cabLength = 7.8 * S,
+		wheelRadius = 1.4 * S, -- the deck's underside (3.715) clears the tyre tops (3.64)
+		tyreWidth = 1.1 * S,
+		frontAxle = 2.9 * S,
+		rearAxle = 4.6 * S,
 		tandem = true,
-		tandemGap = 3.2,
-		bedFloorY = 3.05, -- deck top 3.3
-		wall = 0.2, -- the stakes: 6.8 inside
-		wallHeight = 2.5,
+		tandemGap = 3.2 * S,
+		bedFloorY = 3.05 * S, -- deck top 4.215
+		wall = 0.2 * S, -- the stakes: 8.84 inside
+		wallHeight = 2.5 * S,
 	},
 	rig = {
-		cabLength = 9.4,
-		wheelRadius = 1.75, -- the biggest wheels: the top of the ladder (ACT-07)
-		tyreWidth = 1.15,
-		frontAxle = 3.6, -- under the long nose
-		rearAxle = 4.9, -- the tandem under the back bunks, the load hanging over
+		cabLength = 9.4 * S,
+		wheelRadius = 1.75 * S, -- the biggest wheels: the top of the ladder (ACT-07)
+		tyreWidth = 1.15 * S,
+		frontAxle = 3.6 * S, -- under the long nose
+		rearAxle = 4.9 * S, -- the tandem under the back bunks, the load hanging over
 		tandem = true,
-		tandemGap = 3.8,
-		bedFloorY = 3.75, -- a raised deck (top 4.0), its underside clear of the big wheels' tops
-		wall = 0.3, -- the bunk stakes: 7.2 inside
-		wallHeight = 3.2,
+		tandemGap = 3.8 * S,
+		bedFloorY = 3.75 * S, -- a raised deck (top 5.125), its underside clear of the big wheels' tops
+		wall = 0.3 * S, -- the bunk stakes: 9.36 inside
+		wallHeight = 3.2 * S,
 	},
 }
 
@@ -172,7 +184,7 @@ local function logSlots(bedLength: number, count: number): { Vector3 }
 	if bedLength <= 0 then
 		return slots
 	end
-	local perLayer = math.max(1, math.floor((bedLength - 0.4) / LOG_SPACING))
+	local perLayer = math.max(1, math.floor((bedLength - 0.4 * S) / LOG_SPACING))
 	for i = 1, count do
 		local layer = (i - 1) // perLayer
 		local col = (i - 1) % perLayer
@@ -213,10 +225,10 @@ function TruckLayout.For(def: TruckDef): Layout
 		wallHeight = spec.wallHeight,
 		wheelRadius = spec.wheelRadius,
 		tyreWidth = spec.tyreWidth,
-		-- The tyre tucks 0.2 studs under the body's side.
-		wheelX = width / 2 + spec.tyreWidth / 2 - 0.2,
+		-- The tyre tucks 0.26 studs under the body's side.
+		wheelX = width / 2 + spec.tyreWidth / 2 - 0.2 * S,
 		wheelZ = wheelZ,
-		logLength = width - 0.8,
+		logLength = width - 0.8 * S,
 		logSlots = logSlots(bedLength, def.bedCapacity),
 	}
 end
@@ -226,8 +238,9 @@ end
 ---------------------------------------------------------------------------
 
 -- How tall a bed's BedZone stands over the bed floor's top: a piece whose
--- centre is inside it rides on that bed (TruckLoad).
-TruckLayout.BedZoneHeight = 4
+-- centre is inside it rides on that bed (TruckLoad). Over the tallest
+-- walls (the Rig's bunk stakes, 4.16): 4 before the trucks grew again.
+TruckLayout.BedZoneHeight = 4 * S
 
 -- A bed's BedZone, relative to its bed floor part (0.5 thick): `width`
 -- (the inside of the walls or stakes) x BedZoneHeight x `length` (the
@@ -311,14 +324,14 @@ type TrailerSpec = {
 }
 
 local TRAILERS: { [TrailerStyle]: TrailerSpec } = {
-	pony = { wheelRadius = 1.15, tyreWidth = 0.85, tandemGap = 0, wall = 0.25, wallHeight = 1.2 },
-	ranch = { wheelRadius = 1.2, tyreWidth = 0.85, tandemGap = 0, wall = 0.26, wallHeight = 2 },
-	heavy = { wheelRadius = 1.25, tyreWidth = 0.9, tandemGap = 2.6, wall = 0.32, wallHeight = 2.5 },
+	pony = { wheelRadius = 1.15 * S, tyreWidth = 0.85 * S, tandemGap = 0, wall = 0.25 * S, wallHeight = 1.2 * S },
+	ranch = { wheelRadius = 1.2 * S, tyreWidth = 0.85 * S, tandemGap = 0, wall = 0.26 * S, wallHeight = 2 * S },
+	heavy = { wheelRadius = 1.25 * S, tyreWidth = 0.9 * S, tandemGap = 2.6 * S, wall = 0.32 * S, wallHeight = 2.5 * S },
 }
-local TRAILER_FLOOR_Y = 2.25 -- the trailer bed floor's centre (top 2.5)
+local TRAILER_FLOOR_Y = 2.25 * S -- the trailer bed floor's centre (top 3.175)
 -- A trailer's tyres tuck this far under its deck, so a trailer as wide as
 -- the Rig, fenders and all, still fits a parking slot.
-local TRAILER_TUCK = 0.3
+local TRAILER_TUCK = 0.3 * S
 
 -- A rig's footprint seen from above, in studs: its length (the truck and
 -- its trailer end to end) and width (its body or its tyres, whichever
