@@ -186,12 +186,30 @@ return function(t)
 			t.eq(data.tutorialProgress, if keeps then 2 else 0, step.id)
 			t.eq(data.tutorialStep, index, "the step itself is kept")
 		end
+	end)
+
+	t.test("MigrateV2 reopens a finished tutorial as a refresher of the new steps, once", function()
 		local Schema, done = v1Save()
 		done.tutorialDone = true
-		done.tutorialStep = 4
+		done.tutorialStep = 7
 		done.tutorialProgress = 1
+		t.eq(done.tutorialRefresher, false, "the template's")
 		Schema.MigrateV2(done, 20)
-		t.eq(done.tutorialProgress, 1, "a finished tutorial is left alone")
+		t.eq(done.tutorialDone, false)
+		t.eq(done.tutorialStep, 1)
+		t.eq(done.tutorialProgress, 0)
+		t.eq(done.tutorialRefresher, true)
+		-- Finished again (QuestService), a later join leaves it finished.
+		done.tutorialDone = true
+		done.tutorialRefresher = false
+		Schema.MigrateV2(done, 20)
+		t.eq(done.tutorialDone, true, "once only (schema 2)")
+		-- Mid-tutorial players carry on where they were, no refresher.
+		local _, mid = v1Save()
+		mid.tutorialStep = 5
+		Schema.MigrateV2(mid, 20)
+		t.eq(mid.tutorialStep, 5)
+		t.eq(mid.tutorialRefresher, false)
 	end)
 
 	t.test("MigrateV2 rerolls today's v1 daily goals and keeps the streak", function()

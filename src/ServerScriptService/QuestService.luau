@@ -63,6 +63,18 @@ end
 local function publish(player: Player, profile: Profile)
 	player:SetAttribute("TutorialStep", if profile.tutorialDone then 0 else profile.tutorialStep)
 	player:SetAttribute("TutorialProgress", profile.tutorialProgress)
+	-- A returning player's refresher (QuestUI shows its length and Murph's
+	-- welcome-back line).
+	player:SetAttribute(
+		"TutorialRefresher",
+		if profile.tutorialRefresher and not profile.tutorialDone then true else nil
+	)
+end
+
+-- Whether `profile` is on the v2 refresher (a save that came into the v2
+-- loop with the tutorial finished: ProfileSchema.MigrateV2).
+local function onRefresher(profile: Profile): boolean
+	return loop == 2 and profile.tutorialRefresher == true
 end
 
 -- Analytics must never break gameplay.
@@ -90,6 +102,7 @@ end
 local function finish(player: Player, profile: Profile, how: "completed" | "skipped" | "bypassed")
 	profile.tutorialDone = true
 	profile.tutorialProgress = 0
+	profile.tutorialRefresher = false
 	publish(player, profile)
 	FieldGuideService.Refresh(player) -- Murph hands over the Field Guide
 	if how == "completed" then
@@ -105,10 +118,13 @@ end
 -- the tutorial after the last one.
 local function enterStep(player: Player, profile: Profile, index: number)
 	local list = steps()
-	local step = list[index]
+	local step: TutorialData.Step? = list[index]
 	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier) do
 		index += 1
 		step = list[index]
+	end
+	if onRefresher(profile) and index > TutorialData.RefresherLast then
+		step = nil -- the refresher ends after the first sale
 	end
 	if not step then
 		finish(player, profile, "completed")
@@ -141,6 +157,18 @@ end
 function QuestService.Start(player: Player, profile: Profile)
 	if profile.tutorialDone then
 		publish(player, profile)
+		return
+	end
+	if onRefresher(profile) then
+		-- No realign or bypass: their v1 funnel and better axe say they've
+		-- done it all, and the point is to walk the new steps.
+		local index = math.clamp(math.floor(tonumber(profile.tutorialStep) or 1), 1, TutorialData.RefresherLast)
+		if index == 1 and profile.tutorialProgress == 0 then
+			enterStep(player, profile, 1)
+		else
+			profile.tutorialStep = index
+			publish(player, profile)
+		end
 		return
 	end
 	realign(profile)

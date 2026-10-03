@@ -141,6 +141,9 @@ export type Profile = {
 	tutorialDone: boolean,
 	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
 	tutorialProgress: number, -- count toward the current step
+	-- A returning player's short run of the v2 tutorial (MigrateV2 sets it
+	-- when the v1 tutorial was finished; QuestService clears it when done).
+	tutorialRefresher: boolean,
 	seasonId: string,
 	daily: DailyState,
 	-- Robux (MonetizationService)
@@ -194,6 +197,7 @@ local TEMPLATE: Profile = {
 	tutorialDone = false,
 	tutorialStep = 1,
 	tutorialProgress = 0,
+	tutorialRefresher = false,
 	seasonId = "spring",
 	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
 	purchaseIds = {},
@@ -311,7 +315,8 @@ end
 --   * Once (schema below 2): cash + credit is topped up to StartingCash,
 --     the forge's v1 logs become forge wood (forgeLogs is kept, so a
 --     rollback to v1 loses nothing), tutorial progress restarts on a step
---     whose unit changed (TutorialData.KeepsProgressV2), daily goals rolled
+--     whose unit changed (TutorialData.KeepsProgressV2), a finished
+--     tutorial reopens as a refresher of the new steps, daily goals rolled
 --     from the v1 pool are rerolled (the streak is kept), and schema = 2.
 -- Idempotent: a second call finds nothing to buy back and changes nothing.
 function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Result
@@ -368,7 +373,14 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 		end
 	end
 	local step = tonumber(data.tutorialStep) or 1
-	if not data.tutorialDone and not TutorialData.KeepsProgressV2(step) then
+	if data.tutorialDone then
+		-- The loop changed under them: a short refresher of the new steps
+		-- (QuestService, TutorialData.RefresherLast).
+		data.tutorialDone = false
+		data.tutorialStep = 1
+		data.tutorialProgress = 0
+		data.tutorialRefresher = true
+	elseif not TutorialData.KeepsProgressV2(step) then
 		data.tutorialProgress = 0
 	end
 	local daily = data.daily

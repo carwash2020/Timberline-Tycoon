@@ -65,6 +65,7 @@ local distanceLabel: TextLabel? = nil
 local speechToken = 0
 local speechLine = "" -- the line on the card, before its device words (HintLogic.Expand)
 local lastStep = -1
+local lastRefresher = false -- the last step shown was on a returning player's refresher
 local skipped = false -- this player pressed Skip: no farewell speech
 
 -- The tutorial's steps in the loop that runs.
@@ -75,6 +76,21 @@ end
 local function currentStep(): (number, Step?)
 	local index = (player:GetAttribute("TutorialStep") :: number?) or 0
 	return index, steps()[index]
+end
+
+-- Whether this player is on the returning player's refresher (the
+-- server's TutorialRefresher attribute).
+local function onRefresher(): boolean
+	return player:GetAttribute("TutorialRefresher") == true
+end
+
+-- The tracker's title: "TUTORIAL · 2/7", or "WHAT'S NEW · 2/4" on a
+-- returning player's refresher (TutorialData.RefresherLast steps).
+function QuestUI.TrackerTitle(index: number, total: number, refresher: boolean): string
+	if refresher then
+		return string.format("WHAT'S NEW · %d/%d", index, math.min(total, TutorialData.RefresherLast))
+	end
+	return string.format("TUTORIAL · %d/%d", index, total)
 end
 
 -- Fades Murph's card (alpha 0 = shown, 1 = gone): every surface and text
@@ -452,16 +468,17 @@ local function refresh()
 			skipRoot.Visible = showSkip
 		end
 		if stepLabel then
-			stepLabel.Text = string.format("TUTORIAL · %d/%d", index, #steps())
+			stepLabel.Text = QuestUI.TrackerTitle(index, #steps(), onRefresher())
 			stepLabel.Size = UDim2.new(1, if showSkip then -skipWidth else 0, 0, 28)
 		end
 	end
 	-- A new step: Murph says his line. (Also on join, as a reminder.)
 	if index ~= lastStep then
 		if step then
-			say(step.murph)
+			lastRefresher = onRefresher()
+			say(TutorialData.MurphLine(step, lastRefresher))
 		elseif lastStep > 0 and not skipped then
-			say(TutorialData.Farewell)
+			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
 		end
 		lastStep = index
 	end
@@ -759,7 +776,11 @@ local function setupMurph()
 	prompt.Parent = torso
 	prompt.Triggered:Connect(function()
 		local _, step = currentStep()
-		say(if step then step.murph else TutorialData.Farewell)
+		if step then
+			say(TutorialData.MurphLine(step, onRefresher()))
+		else
+			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
+		end
 	end)
 end
 

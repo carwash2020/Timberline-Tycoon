@@ -53,6 +53,7 @@ export type Step = {
 	beaconWood: string?, -- v2: the wood the "tree" beacon looks for first (a WoodData id)
 	unit: "cash"?, -- v2: `count` is dollars, so the tracker reads "($23/$60)"
 	rewardCash: number?, -- paid when the step is done
+	murphBack: string?, -- v2: what Murph says instead to a returning player on the refresher (RefresherLast)
 }
 
 TutorialData.Steps = {
@@ -140,6 +141,8 @@ TutorialData.StepsV2 = {
 			"Mornin'! I'm Murph. Follow the arrow to the oaks south of town, past the parking lot. Swing low on a trunk and keep hittin' the same spot: about %d whacks and she tips. {Click}, or hold, to keep swingin'.",
 			FieldGuide.TrunkHits(starterAxe, oak)
 		),
+		-- (no hit count: a returning player's axe is likely better than the Rusty Axe)
+		murphBack = "Welcome back! Things work different now: cut a tree anywhere, drag the wood, and the mill buys it by the cubic unit. Swing low on a trunk and keep hittin' the same spot till she tips. {Click}, or hold, to keep swingin'.",
 		event = "treeFelled",
 		count = 1,
 		beacon = "tree",
@@ -227,6 +230,10 @@ end
 TutorialData.Farewell =
 	"Now that's an axe! Take my old Field Guide: every new wood you fell goes in it. Pine grows in the hills. And kid, some woods only show at night."
 
+-- What Murph says when a returning player's refresher is done.
+TutorialData.FarewellBack =
+	"That's the new way of it! Same woods, same mill: bigger logs pay more now, so cut 'em to fit your bed. Go get 'em."
+
 -- Total cash the tutorial pays out (the economy model counts it toward the
 -- first purchase): the v1 steps', or `loop`'s.
 function TutorialData.TotalReward(loop: number?): number
@@ -273,6 +280,26 @@ local function indexOf(id: string): number
 	error("[TutorialData] no step " .. id)
 end
 TutorialData.PlantStep = indexOf("plant")
+
+-- A save that came into the v2 loop with the tutorial finished gets a
+-- refresher (ProfileSchema.MigrateV2, QuestService): StepsV2 up to and
+-- including the first sale, the steps whose mechanics changed. Then it's
+-- done again.
+local function indexOfV2(id: string): number
+	for i, step in ipairs(TutorialData.StepsV2) do
+		if step.id == id then
+			return i
+		end
+	end
+	error("[TutorialData] no v2 step " .. id)
+end
+TutorialData.RefresherLast = indexOfV2("sell")
+
+-- What Murph says for `step`: his welcome-back line on the refresher, when
+-- the step has one.
+function TutorialData.MurphLine(step: Step, refresher: boolean): string
+	return if refresher and step.murphBack then step.murphBack else step.murph
+end
 
 -- How long a stump felled on the way to the plant step waits before its
 -- tree grows back on its own (TreeService.HoldRegrow): long enough to haul

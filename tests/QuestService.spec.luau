@@ -329,4 +329,62 @@ return function(t)
 		t.eq(held.loads, 0)
 		t.ok(s.profile.tutorialDone)
 	end)
+
+	-- A returning player (MigrateV2 reopened their finished tutorial).
+	t.test("v2 refresher: a returning veteran walks fell, grab, load, sell, then it's done", function()
+		local TutorialData = t.shared("TutorialData")
+		local onboarding = {}
+		for _, step in ipairs(TutorialData.StepsV2) do
+			onboarding["Tutorial:" .. step.id] = true -- they reached every step in v1
+		end
+		local s = setup({
+			tutorialDone = false,
+			tutorialStep = 1,
+			tutorialProgress = 0,
+			tutorialRefresher = true,
+			bestAxeTier = 5,
+			onboarding = onboarding,
+		}, 2)
+		s.Quest.Start(s.player, s.profile)
+		t.ok(not s.profile.tutorialDone, "no bypass for a better axe, no realign from the v1 funnel")
+		t.eq(s.player.attrs.TutorialStep, 1)
+		t.eq(s.player.attrs.TutorialRefresher, true)
+		s.event("treeFelled")
+		s.event("woodGrabbed")
+		s.event("woodLoaded")
+		t.eq(s.profile.tutorialStep, TutorialData.RefresherLast)
+		local cash = s.profile.cash
+		s.Quest.WoodSold(s.player, 2, 30)
+		t.ok(s.profile.tutorialDone, "done after the first sale")
+		t.eq(s.profile.tutorialRefresher, false)
+		t.eq(s.player.attrs.TutorialStep, 0)
+		t.eq(s.player.attrs.TutorialRefresher, nil)
+		t.eq(s.profile.cash, cash, "no rewards on the refresher")
+	end)
+
+	t.test("v2 refresher: Skip ends it; a rejoin mid-way carries on; under v1 it's the normal tutorial", function()
+		local s = setup({ tutorialRefresher = true, bestAxeTier = 4 }, 2)
+		s.Quest.Start(s.player, s.profile)
+		s.event("treeFelled")
+		t.eq(s.profile.tutorialStep, 2)
+		s.Quest.Start(s.player, s.profile) -- a rejoin
+		t.eq(s.profile.tutorialStep, 2, "carries on")
+		s.skip()
+		t.ok(s.profile.tutorialDone)
+		t.eq(s.profile.tutorialRefresher, false)
+		local v1 = setup({ tutorialRefresher = true, bestAxeTier = 4 })
+		v1.Quest.Start(v1.player, v1.profile)
+		t.ok(v1.profile.tutorialDone, "a rollback to v1 bypasses as before (better axe)")
+	end)
+
+	t.test("the refresher's texts: Murph's welcome-back line and the tracker title", function()
+		local TutorialData = t.shared("TutorialData")
+		local first = TutorialData.StepsV2[1]
+		t.eq(TutorialData.MurphLine(first, false), first.murph)
+		t.ok(string.find(TutorialData.MurphLine(first, true), "Welcome back", 1, true) ~= nil)
+		local second = TutorialData.StepsV2[2]
+		t.eq(TutorialData.MurphLine(second, true), second.murph, "no special line: the usual one")
+		t.eq(TutorialData.StepsV2[TutorialData.RefresherLast].id, "sell")
+		t.ok(#TutorialData.FarewellBack > 0)
+	end)
 end
