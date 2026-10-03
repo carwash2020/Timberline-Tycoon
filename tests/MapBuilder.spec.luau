@@ -513,7 +513,9 @@ return function(t)
 		-- don't (people walk under TO THE WOODS's, a rig drives under SELL
 		-- LOGS HERE's), and no signpost's rocks do.
 		local road = {}
-		for _, id in ipairs({ "hills", "snow", "volcano", "sky" }) do
+		-- The gate signs (snow, volcano, grove) use the same boards as the
+		-- road signs, so their boards collide too. Town signs stay open.
+		for _, id in ipairs({ "hills", "snow", "volcano", "sky", "grove" }) do
 			road[WorldPlan.BiomeSignText(id)] = true
 		end
 		local boards, solidBoards = 0, 0
@@ -534,7 +536,7 @@ return function(t)
 				end
 			end
 		end
-		t.eq(solidBoards, 4, "the four road signs' boards")
+		t.eq(solidBoards, 7, "the four road signs and the three gate signs")
 		t.ok(boards >= 8, boards .. " signposts")
 		-- One flume per chute, along WorldPlan.ChuteFlume (out off the isle).
 		local flumes = {}
@@ -714,7 +716,9 @@ return function(t)
 				t.ok(n >= 1 and n <= 25, model.Name .. ": " .. n .. " parts")
 				total += n
 			end
-			t.ok(total >= 3000 and total <= 5000, total .. " scenery parts")
+			-- Phase 12's wider roads and cliff rings took the flat spots the
+			-- scenery used to claim. WorldPlan.spec uses the same floor.
+			t.ok(total >= 2500 and total <= 5000, total .. " scenery parts")
 			t.ok(solidTotal >= 1000 and solidTotal < total, solidTotal .. " of them solid")
 		end
 	)

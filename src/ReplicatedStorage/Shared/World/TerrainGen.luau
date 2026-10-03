@@ -429,7 +429,7 @@ end
 -- Whether (x, z) is on a haul road's pale surface (its edge frayed a
 -- little, as the road's own is). Junction flares count, the same way.
 local function onGravel(x: number, z: number): boolean
-	local haul = if legacyLayout then LEGACY_HAUL else HAUL
+	local haul: { FastRoad } = if legacyLayout then LEGACY_HAUL else HAUL
 	for _, road in ipairs(haul) do
 		local half = road.half - GRAVEL_EDGE
 		local d = WorldLayout.FastDistance(road.line, x, z, half + 1)

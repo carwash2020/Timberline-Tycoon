@@ -1098,9 +1098,12 @@ function WorldPlan.Town(): Town
 	-- one south of the Plot Road's mouth, its arm toward it, one with its
 	-- arm over the lot.
 	local lamps: { CFrame } = {}
-	for _, x in ipairs({ -92, -64, -30, -14 }) do
+	for _, x in ipairs({ -92, -64, -30 }) do
 		table.insert(lamps, at(x, 54, math.pi)) -- south side, set back off the widened street
 	end
+	-- The east one sits further south: Old Bram walks the corner, and the
+	-- flower bed sits just east of where a closer lamp would stand.
+	table.insert(lamps, at(-14, 38, math.pi))
 	for _, x in ipairs({ 30, 58 }) do
 		table.insert(lamps, at(x, 92, 0)) -- north side, set back off the street
 	end
