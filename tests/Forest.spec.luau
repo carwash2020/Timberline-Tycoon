@@ -143,7 +143,8 @@ return function(t)
 			local share = canopy / inRing
 			t.ok(share >= 0.65 and share <= 0.8, string.format("the ring is %.0f%% canopy", share * 100))
 			-- The ring wraps the town, not the old plot lawn, so the band is smaller.
-			t.ok(inRing > 1200, inRing .. " samples in the ring")
+			-- Extra shelves and their lanes took a few more samples (1197 left).
+			t.ok(inRing >= 1150, inRing .. " samples in the ring")
 			local copses = copse / wild
 			-- The old plot lawn is wild country now, and a few of its copses count.
 			t.ok(copses >= 0.03 and copses <= 0.16, string.format("the wild band is %.0f%% copse", copses * 100))
@@ -475,7 +476,8 @@ return function(t)
 				end
 			end
 			t.ok(#problems == 0, report(problems))
-			t.ok(count > 2400, count .. " filler trees on the map")
+			-- Shelves and lanes ate open forest the filler used to stand in.
+			t.ok(count >= 2100, count .. " filler trees on the map")
 		end
 	)
 
@@ -496,7 +498,8 @@ return function(t)
 				end
 			end
 		end
-		t.ok(deepCells >= 140, deepCells .. " deep cells")
+		-- Shelves and lanes broke up some of the deep canopy cells.
+		t.ok(deepCells >= 120, deepCells .. " deep cells")
 		local perTree = deepCells * CELL * CELL / deep
 		-- Phase 12 thinned the filler (core roll 0.55 to 0.4), so a deep
 		-- cell holds fewer trees than the old 150-260 band.
@@ -528,11 +531,12 @@ return function(t)
 			end
 		end
 		-- The ring wraps the town only, so these two rectangles hold a shorter edge.
-		-- A lane out to the lot loop takes a few of those edge trees.
-		t.ok(area > 20000 and trees >= 90, string.format("%d sq studs of edge, %d trees in it", area, trees))
+		-- Lanes out to the shelves take a few of those edge trees (82 left).
+		t.ok(area > 20000 and trees >= 75, string.format("%d sq studs of edge, %d trees in it", area, trees))
 		local perEdge = area / trees
+		-- Lanes cross the edge band, so it is only a little denser than the deep cells.
 		t.ok(
-			perEdge < perTree * 0.88,
+			perEdge < perTree * 0.95,
 			string.format("at its edges a tree per %.0f sq studs (deep: %.0f)", perEdge, perTree)
 		)
 		t.ok(perEdge >= 90, string.format("but not a solid wall: a tree per %.0f sq studs", perEdge))
@@ -739,7 +743,7 @@ return function(t)
 	-- FOR-03: more trees to chop where the forest is
 	---------------------------------------------------------------------------
 
-	local BASE = 497 -- the first 322 and the country stands (WorldPlan.spec pins both)
+	local BASE = 483 -- the first 322 and the country stands (WorldPlan.spec pins both)
 	local forestTrees = WorldPlan.ForestTrees()
 
 	-- Which kind of place a forest tree stands in.
@@ -966,7 +970,7 @@ return function(t)
 			-- and the pieces they keep clear of; the search itself did not.
 			-- Re-sampled when the homesteads left the one lawn. The searches still
 			-- read the grass under each rock; the shelves moved a few clusters.
-			t.eq(h, 123176330, "a cluster or landmark moved")
+			t.eq(h, 353948815, "a cluster or landmark moved")
 		end
 	)
 

@@ -125,6 +125,11 @@ return function(t)
 		local loader = t.loader({
 			globals = {
 				Instance = Instance,
+				task = {
+					spawn = function(fn)
+						fn()
+					end,
+				},
 				os = {
 					clock = function()
 						return clock
@@ -677,7 +682,8 @@ return function(t)
 		s.P.PlayerJoined(ann, profile)
 		local offer = s.P.OfferOf(ann)
 		t.eq(#offer.plots, #s.PlotData.Slots)
-		t.eq(offer.plots[1].region, "east of town")
+		t.eq(offer.plots[1].name, "Birch Side")
+		t.eq(offer.plots[1].region, "Starter Forest")
 		for _, plot in ipairs(offer.plots) do
 			t.eq(plot.taken, false)
 		end
@@ -763,6 +769,52 @@ return function(t)
 		t.eq(profile.truckAt.x, town.x)
 		t.eq(profile.truckAt.z, town.z)
 		t.eq(s.P.GetDeliveryPad(ann).Position.X, drop.Position.X)
+	end)
+
+	t.test("a saved truckAt that sits on a new pad must spawn elsewhere on join", function()
+		local s = setup()
+		local _, profile = s.newPlayer(1, "Ann")
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local pad = s.PlotData.Slots[1]
+		profile.truckAt = { x = pad.X, y = 3, z = pad.Y }
+		profile.leftLoad = { { woodId = "oak", value = 4, x = pad.X, y = 3, z = pad.Y } }
+		profile.groundLoad = { { g = { pad.X, 3, pad.Y } } }
+		local server = require("@lune/fs").readFile("src/ServerScriptService/GameServer.server.luau")
+		local parkAt = string.find(server, "PlotService.ParkStrays", 1, true)
+		local spawnAt = string.find(server, "VehicleService.SpawnTruck", 1, true)
+		t.ok(parkAt ~= nil and spawnAt ~= nil and parkAt < spawnAt, "the lot pass runs before the truck spawns")
+		s.P.ParkStrays(profile)
+		t.eq(WorldLayout.OnPlotPad(profile.truckAt.x, profile.truckAt.z), false)
+		local lot = WorldLayout.ParkingLot
+		t.ok(profile.truckAt.x > lot.x0 and profile.truckAt.x < lot.x1, "truckAt is in the town lot")
+		t.ok(profile.truckAt.z > lot.z0 and profile.truckAt.z < lot.z1, "truckAt is in the town lot")
+		t.eq(WorldLayout.OnPlotPad(profile.leftLoad[1].x, profile.leftLoad[1].z), false)
+		t.eq(WorldLayout.OnPlotPad(profile.groundLoad[1].g[1], profile.groundLoad[1].g[3]), false)
+	end)
+
+	t.test("a build saved on one pad loads at the same spot on the pad you claim next", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.placed = {
+			{ uid = "bench", blueprintId = "Bench", x = 12, z = -6, rot = 1 },
+			{ uid = "flag", blueprintId = "Flag", x = -4, z = 8, rot = 2 },
+		}
+		s.P.PlayerJoined(ann, profile)
+		s.P.Claim(ann, 2)
+		t.eq(#s.items(2), 2)
+		s.P.PlayerRemoving(ann)
+		t.eq(#s.items(2), 0, "the old pad is clear")
+		t.eq(s.plot(2):GetAttribute("OwnerId"), nil)
+		s.P.PlayerJoined(ann, profile)
+		s.P.Claim(ann, 5)
+		t.eq(#s.items(2), 0, "nothing left on the first pad")
+		t.eq(#s.items(5), 2)
+		local found = {}
+		for _, model in ipairs(s.items(5)) do
+			found[model.Name] = model.placedAt
+		end
+		t.eq(found.bench, { 12, -6, 1 })
+		t.eq(found.flag, { -4, 8, 2 })
 	end)
 
 	t.test("a claim has to be a whole slot you don't already own", function()

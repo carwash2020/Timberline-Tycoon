@@ -1089,6 +1089,11 @@ local function onPlayerAdded(player: Player)
 			end
 		end)
 	end
+	-- Before the truck and the left-behind logs come back. A spot on a new
+	-- pad, under the ground, or in the water waits in the town truck lot
+	-- instead of appearing on somebody's yard. Claiming still moves it to
+	-- the delivery pad.
+	safely("PlotService.ParkStrays", PlotService.ParkStrays, profile)
 	if truckId ~= "" then
 		safely("VehicleService.SpawnTruck", function()
 			VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
@@ -1214,6 +1219,8 @@ local function rebuildSlotNow(player: Player)
 	-- A different save, same pad: the buildings are pad-relative, and they
 	-- already picked a homestead this visit.
 	if not PlotService.Reload(player, profile) then
+		-- No pad yet, so a bad saved spot must not spawn on one.
+		PlotService.ParkStrays(profile)
 		PlotService.PlayerJoined(player, profile)
 	end
 	if truckId ~= "" then

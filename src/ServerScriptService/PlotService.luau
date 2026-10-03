@@ -378,24 +378,34 @@ local function assign(player: Player, slot: Slot, profile: Profile)
 end
 
 -- Far from the pad (the picker, or a join at town): stand on it. Already
--- at the sign: don't yank them off the prompt.
+-- at the sign: don't yank them off the prompt. The owner is already set.
+-- Streaming and the pivot wait, so the claim itself does not yield.
 local function adoptSpawn(player: Player, slot: Slot, moveIfFar: boolean)
 	player.RespawnLocation = slot.spawn
 	if not moveIfFar then
 		return
 	end
-	local char = player.Character
-	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-	local pivotTo = if char then (char :: any).PivotTo else nil
-	if not root or type(pivotTo) ~= "function" then
-		return
+	local pos = slot.spawn.CFrame.Position
+	local function arrive()
+		local ask = (player :: any).RequestStreamAroundAsync
+		if type(ask) == "function" then
+			pcall(function()
+				ask(player, pos, 5)
+			end)
+		end
+		local char = player.Character
+		local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+		local pivotTo = if char then (char :: any).PivotTo else nil
+		if not root or type(pivotTo) ~= "function" then
+			return
+		end
+		local here = root.Position
+		local dx, dz = here.X - pos.X, here.Z - pos.Z
+		if dx * dx + dz * dz > 80 * 80 then
+			pivotTo(char, slot.spawn.CFrame + Vector3.new(0, 3, 0))
+		end
 	end
-	local here = root.Position
-	local there = slot.spawn.CFrame.Position
-	local dx, dz = here.X - there.X, here.Z - there.Z
-	if dx * dx + dz * dz > 80 * 80 then
-		pivotTo(char, slot.spawn.CFrame + Vector3.new(0, 3, 0))
-	end
+	task.spawn(arrive)
 end
 
 local function release(player: Player)
@@ -871,6 +881,17 @@ local function watchSpawn(player: Player)
 			adoptSpawn(player, slot, true)
 		end
 	end)
+end
+
+-- Before the truck and the loose logs spawn. A saved world spot that the
+-- new ground swallowed, drowned, or built a pad on goes to the town truck
+-- lot. Claiming still moves a bad spot onto that player's delivery pad.
+function PlotService.ParkStrays(profile: Profile)
+	local lot = WorldLayout.ParkingLot
+	local x = (lot.x0 + lot.x1) / 2
+	local z = (lot.z0 + lot.z1) / 2
+	local y = TerrainGen.HeightAt(x, z) + 2
+	rescueProfile(profile, CFrame.new(x, y, z))
 end
 
 function PlotService.PlayerJoined(player: Player, profile: Profile)

@@ -49,18 +49,57 @@ return function(t)
 		end
 		t.ok(kinds >= 4, kinds .. " different stretches of country")
 		t.ok(regions["Starter Forest"] and regions["The Hills"], "starter and the hills both have a pad")
-		-- The tutorial still says the land is east of town, past the lot.
-		-- The dealership display lot and the path from the showroom are reserved.
-		local mill = PlotData.Homes[1]
-		t.eq(mill.name, "Mill Meadow")
-		t.ok(mill.x > 296 and mill.z > -140 and mill.z < 80, "east of the display lot")
+		-- The picker opens in the Starter Forest. The timeout takes that same
+		-- first free pad.
+		local PlotPickerLogic = t.shared("PlotPickerLogic")
+		local first = PlotData.Homes[1]
+		t.eq(first.region, "Starter Forest")
+		t.eq(first.name, "Birch Side")
+		t.eq(PlotData.Homes[2].name, "Orchard Edge")
+		t.eq(PlotData.Homes[2].region, "Starter Forest")
+		t.eq(PlotData.Homes[3].name, "Oak Side")
+		t.eq(PlotData.Homes[3].region, "Starter Forest")
+		t.eq(PlotData.Homes[4].name, "The Climb")
+		local open = {}
+		for i = 1, #PlotData.Homes do
+			open[i] = false
+		end
+		local free = PlotPickerLogic.FirstFree(open)
+		t.eq(PlotData.Homes[free].region, "Starter Forest")
+		-- East Meadow stays east of the display lot, south of the path.
+		local meadow = nil
+		for _, home in ipairs(PlotData.Homes) do
+			if home.name == "East Meadow" then
+				meadow = home
+			end
+		end
+		t.ok(meadow ~= nil)
+		t.ok(meadow.x > 296 and meadow.z > -140 and meadow.z < 80, "east of the display lot")
+		local sawForOrder = WorldLayout.Sawmill
+		local function haulOf(home)
+			return math.sqrt((home.x - sawForOrder.X) ^ 2 + (home.z - sawForOrder.Z) ^ 2)
+		end
+		for i = 5, #PlotData.Homes - 1 do
+			t.ok(
+				haulOf(PlotData.Homes[i]) <= haulOf(PlotData.Homes[i + 1]) + 1e-4,
+				PlotData.Homes[i].name .. " is listed before a nearer home"
+			)
+		end
 		for _, zone in ipairs(WorldLayout.FlatZones) do
 			if zone.name ~= "Town" then
 				for _, box in ipairs(WorldLayout.Reserved) do
 					local gap = WorldLayout.ReservedDistance(zone.x0, zone.z0, zone.x1, zone.z1, box)
+					local need = zone.blend
+					-- The Climb's blend clears the display lot (the edge at
+					-- z 123) by at least 10 studs, not only by the blend.
+					for _, home in ipairs(PlotData.Homes) do
+						if home.name == "The Climb" and zone.cx == home.x and zone.cz == home.z then
+							need += 10
+						end
+					end
 					t.ok(
-						gap >= zone.blend,
-						string.format("%s comes within %.0f of %s (blend %d)", zone.name, gap, box.name, zone.blend)
+						gap >= need,
+						string.format("%s comes within %.0f of %s (need %d)", zone.name, gap, box.name, need)
 					)
 				end
 			end
@@ -230,6 +269,11 @@ return function(t)
 			for j, b in ipairs(PlotData.Slots) do
 				if i < j then
 					local apart = math.sqrt((a.X - b.X) ^ 2 + (a.Y - b.Y) ^ 2)
+					local axis = math.max(math.abs(a.X - b.X), math.abs(a.Y - b.Y)) - PlotData.Pad
+					t.ok(
+						axis >= PlotData.MinSpacing - PlotData.Pad,
+						string.format("plots %d and %d have %.0f studs between shelves", i, j, axis)
+					)
 					t.ok(apart >= PlotData.MinSpacing, string.format("plots %d and %d are %.0f apart", i, j, apart))
 					t.ok(
 						not rectsOverlap(a.X, a.Y, MAX, MAX, b.X, b.Y, MAX, MAX),

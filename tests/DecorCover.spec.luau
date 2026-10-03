@@ -29,9 +29,9 @@ return function(t)
 	-- again when the homesteads scattered: flowers still skip the shelves.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1571, 102532434, 943175042 },
-			[60] = { 1981, 97754799, 585207029 },
-			[85] = { 2460, 36737587, 41932429 },
+			[20] = { 1559, 103607631, 614819595 },
+			[60] = { 1956, 97762453, 348348431 },
+			[85] = { 2434, 39083386, 319275631 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

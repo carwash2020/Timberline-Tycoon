@@ -80,12 +80,14 @@ local function frame(plot: Plot)
 		return
 	end
 	local focus = Vector3.new(plot.x, plot.y + 4, plot.z)
-	-- The pad has to be in memory before the camera arrives, or a phone
-	-- shows an empty shelf for a moment.
+	-- Ask for the pad, but don't wait: the camera tween starts at once.
+	-- The stream fills in while the shot is already moving.
 	local ask = (player :: any).RequestStreamAroundAsync
 	if type(ask) == "function" then
-		pcall(function()
-			ask(player, focus)
+		task.spawn(function()
+			pcall(function()
+				ask(player, focus, 2)
+			end)
 		end)
 	end
 	local from = Vector3.new(plot.x - 78, plot.y + 62, plot.z + 96)

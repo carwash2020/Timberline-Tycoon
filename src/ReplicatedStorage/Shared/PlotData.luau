@@ -17,9 +17,9 @@ local PlotData = {}
 -- tier). Each pad gets a lane (LaneWidth, a Logging Rig wide) to the
 -- nearest road, and a clear delivery pad on that edge for the truck.
 -- Builds stay in plot-local studs, so a layout loads on whichever pad
--- you pick this visit. The first homes are the ones near town and the
--- tutorial grove; the rest are further out. Mill Meadow stays east of
--- the lot: the tutorial still sends a new player that way.
+-- you pick this visit. The picker opens on Birch Side, then Orchard
+-- Edge and Oak Side (the Starter Forest), then The Climb. The rest are
+-- nearest the sawmill first. East Meadow stays east of the lot.
 export type Home = {
 	id: string,
 	name: string,
@@ -40,25 +40,30 @@ PlotData.GroveReach = 640
 PlotData.Count = GameConfig.MaxPlayers + 2
 
 -- Centres chosen clear of the river, the lake, the coast, the lava, the
--- gondola and the haul roads, at least MinSpacing apart, each within
--- GroveReach of a grove. The first five are the near ones.
+-- gondola and the haul roads. Shelves stay 48 studs apart on the wider
+-- axis (MinSpacing minus Pad). Each is within GroveReach of a grove.
+-- The first four are the opening offer. After that, nearest the sawmill.
 PlotData.Homes = {
-	-- East of the display lot (x 184-296). The shelf and its blend stay
-	-- south of the lot and the path from the showroom, so neither is graded.
-	{ id = "mill", name = "Mill Meadow", region = "east of town", x = 450, z = -130 },
-	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -360, z = -160 },
-	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 280 },
-	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 250, z = -320 },
 	{ id = "birch", name = "Birch Side", region = "Starter Forest", x = 0, z = -350 },
+	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -360, z = -160 },
+	-- South of East Meadow, and far enough west that the two shelves
+	-- don't meet. About (230, -350); a little further so the gap holds.
+	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 248, z = -380 },
+	-- Ten studs north of the old spot, so the blend clears the display
+	-- lot's north edge (z 123) by more than 10 studs.
+	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 290 },
 	{ id = "north", name = "North Bend", region = "the north road", x = -190, z = 530 },
-	{ id = "east", name = "East Field", region = "east country", x = 540, z = 110 },
-	{ id = "ash", name = "Ash Gate", region = "the east road", x = 700, z = -110 },
-	{ id = "west", name = "West Shelf", region = "west country", x = -250, z = -390 },
+	-- East of the display lot (x 184-296). The shelf and its blend stay
+	-- south of the lot and the path from the showroom.
+	{ id = "mill", name = "East Meadow", region = "east of town", x = 450, z = -130 },
 	{ id = "meadow", name = "North Meadow", region = "the north road", x = 130, z = 680 },
-	{ id = "long", name = "Long Meadow", region = "south country", x = 230, z = -600 },
+	{ id = "west", name = "West Shelf", region = "west country", x = -250, z = -420 },
 	{ id = "pine", name = "Pine Bend", region = "The Hills", x = -580, z = 380 },
-	{ id = "high", name = "High Meadow", region = "the north road", x = -400, z = 710 },
-	{ id = "ridge", name = "Lower Ridge", region = "south country", x = 480, z = -430 },
+	{ id = "east", name = "East Field", region = "east country", x = 698, z = 100 },
+	{ id = "ridge", name = "Lower Ridge", region = "south country", x = 520, z = -430 },
+	{ id = "high", name = "High Meadow", region = "the north road", x = -460, z = 720 },
+	{ id = "ash", name = "Ash Gate", region = "the east road", x = 720, z = -180 },
+	{ id = "long", name = "Long Meadow", region = "south country", x = 200, z = -650 },
 } :: { Home }
 
 PlotData.Slots = {} :: { Vector2 }

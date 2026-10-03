@@ -19,10 +19,10 @@ return function(t)
 	-- Re-sampled again when the one plot lawn became 14 homestead shelves.
 	-- The shelves are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
-		n = 7422,
-		sum = 91405.033494433606393,
-		wsum = -249.109872040797740,
-		sq = 9516605.515676690265536,
+		n = 7467,
+		sum = 91494.066286186236539,
+		wsum = -315.269925447270225,
+		sq = 9517182.132267072796822,
 		lo = -13.781769507273463,
 		hi = 205.783118277429935,
 	}

@@ -27,7 +27,7 @@ return {
 				target = { -680, 8, -560 },
 				label = "the ridge between Gloam Hollow and the Petrified Reach",
 			},
-			{ pos = { 560, 90, -220 }, target = { 320, 4, 0 }, label = "Mill Meadow, the lane, and the lot" },
+			{ pos = { 560, 90, -220 }, target = { 320, 4, 0 }, label = "East Meadow, the lane, and the lot" },
 			{ pos = { 80, 980, -420 }, target = { -10, 0, 160 }, label = "the homesteads from above" },
 			{ pos = { 0, 2400, -1800 }, target = { 0, 0, 100 }, label = "the whole map" },
 		}
