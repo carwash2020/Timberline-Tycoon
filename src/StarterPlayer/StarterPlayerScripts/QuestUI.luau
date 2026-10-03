@@ -498,10 +498,11 @@ local function portrait(parent: Instance): ViewportFrame
 	UITheme.stroke(view, C.Amber, 2)
 	view.Parent = parent
 	task.spawn(function()
-		local map = workspace:WaitForChild("TimberlineMap")
-		local murph = map:WaitForChild("Murph")
-		local head = murph:WaitForChild("Head", 30)
-		if not head or not head:IsA("BasePart") then
+		-- Bounded: a missing map must not leave this thread waiting forever.
+		local map = workspace:WaitForChild("TimberlineMap", 30)
+		local murph = if map then map:WaitForChild("Murph", 30) else nil
+		local head = if murph then murph:WaitForChild("Head", 15) else nil
+		if not head or not head:IsA("BasePart") or not murph then
 			return
 		end
 		for _, name in ipairs({ "Head", "Beard", "Beanie", "Torso", "LeftArm", "RightArm" }) do
@@ -763,23 +764,60 @@ local function build()
 end
 
 -- "Talk" on Murph repeats the current line (or a goodbye once done).
-local function setupMurph()
-	local map = workspace:WaitForChild("TimberlineMap")
-	local murph = map:WaitForChild("Murph") -- a Persistent model: always streamed in
-	local torso = murph:WaitForChild("Torso")
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Talk"
-	prompt.ObjectText = "Murph"
-	prompt.MaxActivationDistance = 10
-	prompt.HoldDuration = 0
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = torso
+-- The prompt is built with the model (NPCService), so it streams in with
+-- him. This only connects to it: no WaitForChild, and no second prompt.
+local murphHooked = false
+
+local function hookMurph(model: Instance): boolean
+	if murphHooked or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
+		return false
+	end
+	local prompt = model:FindFirstChild("Talk")
+	if not (prompt and prompt:IsA("ProximityPrompt")) then
+		return false
+	end
+	murphHooked = true
 	prompt.Triggered:Connect(function()
 		local _, step = currentStep()
 		if step then
 			say(TutorialData.MurphLine(step, onRefresher()))
 		else
 			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
+		end
+	end)
+	return true
+end
+
+local function watchMurph(model: Instance)
+	if hookMurph(model) or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
+		return
+	end
+	-- The tag can replicate a moment before the prompt.
+	local childConn: RBXScriptConnection? = nil
+	childConn = model.ChildAdded:Connect(function()
+		if hookMurph(model) and childConn then
+			childConn:Disconnect()
+		end
+	end)
+end
+
+local function setupMurph()
+	for _, model in ipairs(CollectionService:GetTagged("NPC")) do
+		watchMurph(model)
+		if murphHooked then
+			return
+		end
+	end
+	local conn: RBXScriptConnection? = nil
+	conn = CollectionService:GetInstanceAddedSignal("NPC"):Connect(function(model: Instance)
+		watchMurph(model)
+		if murphHooked and conn then
+			conn:Disconnect()
+		end
+	end)
+	task.delay(30, function()
+		if not murphHooked then
+			warn("[QuestUI] Murph's Talk prompt never streamed in")
 		end
 	end)
 end

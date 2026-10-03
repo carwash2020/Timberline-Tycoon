@@ -6,8 +6,8 @@
 
 return function(t)
 	local roblox = t.roblox
-	local Instance, Vector3, CFrame, Color3, Enum =
-		roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
+	local Instance, Vector3, Vector2, CFrame, Color3, Enum =
+		roblox.Instance, roblox.Vector3, roblox.Vector2, roblox.CFrame, roblox.Color3, roblox.Enum
 
 	local function part(parent, name, size, cf)
 		local p = Instance.new("Part")
@@ -139,5 +139,31 @@ return function(t)
 		t.ok((feet - NPCData.Get("Dale").spot.fallback).Magnitude < 1e-3, "Dale at the fallback")
 		t.ok(#loader.warnings >= 1 and string.find(loader.warnings[1], "Dale"), "a warning names Dale")
 		local _ = Color3
+	end)
+
+	t.test("every NPC has a Talk prompt that streams with the model", function()
+		local NPCService, NPCData = service()
+		local map = fakeMap()
+		NPCService.Init(map)
+		for _, npc in ipairs(NPCData.All()) do
+			local m = map:FindFirstChild(npc.id, true)
+			local prompt = m:FindFirstChild("Talk")
+			t.ok(prompt and prompt:IsA("ProximityPrompt"), npc.id .. " Talk")
+			t.eq(prompt.Parent, m, "on the model, so an Atomic or Persistent stream includes it")
+			t.eq(prompt.ActionText, "Talk")
+			t.eq(prompt.ObjectText, npc.name)
+			t.eq(prompt.RequiresLineOfSight, false)
+			t.eq(prompt.ClickablePrompt, true)
+			t.eq(prompt.HoldDuration, 0)
+			t.eq(prompt.KeyboardKeyCode, Enum.KeyCode.F)
+			t.eq(prompt.GamepadKeyCode, Enum.KeyCode.ButtonY)
+			t.eq(prompt.MaxActivationDistance, NPCData.TalkDistance)
+			t.ok(prompt.MaxActivationDistance > 0, npc.id)
+			if npc.promptLift and npc.promptLift ~= 0 then
+				t.eq(prompt.UIOffset, Vector2.new(0, npc.promptLift))
+			end
+			-- Not on the Torso: QuestUI clones that for Murph's portrait.
+			t.eq(m.Torso:FindFirstChild("Talk"), nil)
+		end
 	end)
 end

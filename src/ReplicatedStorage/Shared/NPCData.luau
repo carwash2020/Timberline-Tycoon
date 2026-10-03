@@ -14,6 +14,13 @@
 --
 -- The town is flat at y = 0 (WorldLayout's Town zone: x -125..140,
 -- z -32..205); waypoints are (x, z) on it.
+--
+-- Each NPC has a job (`work`: chop, saw, sweep, or carry), a name and a
+-- role for the name tag, and a Talk prompt NPCService parents to the
+-- model so it streams in with them. `react` is the situational lines
+-- (hour, weather, the first sale, the first real axe, a sawmill);
+-- `tips` is the short onboarding Murph gives a new player. NPCDialogue
+-- picks among them.
 
 local CharacterArt = require(script.Parent.Art.CharacterArt)
 
@@ -37,6 +44,22 @@ export type Waypoint = {
 	face: number?, -- degrees to face while paused (0 = -Z, 90 = -X, 180 = +Z)
 }
 
+-- Situational lines. NPCDialogue picks one pool; empty fields are skipped.
+export type React = {
+	morning: { string }?,
+	day: { string }?,
+	evening: { string }?,
+	night: { string }?,
+	rain: { string }?,
+	storm: { string }?,
+	fog: { string }?,
+	rusty: { string }?, -- still on the starter axe
+	axe: { string }?, -- bought a better one
+	unsold: { string }?, -- hasn't sold wood yet
+	sale: { string }?, -- has
+	sawmill: { string }?, -- bought or placed one
+}
+
 export type NPC = {
 	id: string, -- also the model's name
 	name: string,
@@ -46,9 +69,14 @@ export type NPC = {
 	route: { Waypoint }?,
 	speed: number?, -- walkers, studs per second
 	idle: string?, -- an idle flourish NPCController knows: "sip", "clipboard", "glasses", "wipe", "lookAround"
-	tutorialQuiet: boolean?, -- no bubbles while the player's tutorial runs (QuestUI owns Murph's lines)
+	work: ("chop" | "saw" | "sweep" | "carry")?, -- a work clip, client-side (NPCAnim)
+	workLoops: number?, -- chops in a row (a saw or a sweep is already a phrase)
+	promptLift: number?, -- Talk's UIOffset Y, so it sits above a shop or pad prompt
+	tutorialQuiet: boolean?, -- no chatter while the tutorial runs (QuestUI owns Murph's lines; one tip still plays)
+	tips: { string }?, -- onboarding, the first time a new player meets them
 	greetings: { string },
 	lines: { string },
+	react: React?,
 }
 
 local function hex(h: string): Color3
@@ -68,7 +96,14 @@ NPCData.List = {
 		-- the camp at (-28, 45) turned toward the spawn, 3 studs out).
 		spot = { kind = "fixed", position = Vector3.new(-25.0467, 0, 44.4726), lookAt = Vector3.new(0, 0, 40) },
 		idle = "sip",
+		work = "chop",
 		tutorialQuiet = true,
+		promptLift = 0,
+		tips = {
+			"I'm Murph. Chop a tree, haul the wood, sell it at the mill.",
+			"Follow the amber arrow. Press F if you forget the step.",
+			"Start on the oaks south of town. They're the friendly ones.",
+		},
 		look = {
 			name = "Murph",
 			role = "Retired lumberjack",
@@ -104,6 +139,25 @@ NPCData.List = {
 			"I've retired three times. The forest keeps callin' me back.",
 			"Your Field Guide's got empty pages, kid. Go fill 'em.",
 		},
+		react = {
+			morning = {
+				"Mornin'. Coffee first. The woods can wait one sip.",
+				"Dawn's the best time to fell. The birds agree.",
+			},
+			evening = { "Sun's headed down. One more load before dark?" },
+			night = {
+				"Dark already? The Gloam Hollow wakes up about now.",
+				"I keep the fire going. Night chopping is for owls.",
+			},
+			rain = { "Rain's good for saplings. Slippery for boots, though." },
+			storm = { "If a tree glows in the storm, that's lightning wood." },
+			fog = { "Fog like this, stay on the road. The hollow can wait." },
+			rusty = { "That rusty axe'll do for oaks. The hills want better." },
+			axe = { "Now that's an axe. The hills won't know what hit them." },
+			unsold = { "Mill's up the road. Green pad. You can't miss it." },
+			sale = { "First sale's the sweet one. Don't spend it all on coffee." },
+			sawmill = { "Your own saw? Planks pay better than the same log." },
+		},
 	},
 	{
 		id = "Millie",
@@ -120,6 +174,8 @@ NPCData.List = {
 			fallback = Vector3.new(14.6, 0, 92.5),
 		},
 		idle = "clipboard",
+		work = "saw",
+		promptLift = 80,
 		look = {
 			name = "Millie",
 			role = "Sawmill keeper",
@@ -150,16 +206,28 @@ NPCData.List = {
 			"Sawdust in my hair, sawdust in my tea. Wouldn't have it any other way.",
 			"Rare wood's worth more at the mill. Lumenwood glows right through the till.",
 		},
+		react = {
+			morning = { "Blade's warmed up. I'm ready when you are." },
+			night = { "I keep the lamp on. Night loads pay the same." },
+			rain = { "Wet logs still sell. I don't mind the mud." },
+			storm = { "Blade's loud, but that thunder's louder." },
+			unsold = { "Back the truck onto the green, sweetie. She'll sell." },
+			sale = { "Heard the till sing. Bring me another load." },
+			sawmill = { "A saw of your own? I still buy the planks." },
+			rusty = { "Any axe'll do. The pad pays the wood, not the tool." },
+		},
 	},
 	{
 		id = "Tink",
 		name = "Tink",
-		role = "Tool Shed",
+		role = "Axe smith",
 		spot = { kind = "counter", model = "ToolShed", fallback = Vector3.new(-57, 0, 110) },
 		idle = "glasses",
+		work = "chop",
+		promptLift = 150,
 		look = {
 			name = "Tink",
-			role = "Tool Shed",
+			role = "Axe smith",
 			seed = 37,
 			skin = hex("#F0C8A6"),
 			shirt = hex("#8EB5D6"),
@@ -186,16 +254,27 @@ NPCData.List = {
 			"Starfall Axes aren't sold, they're forged. Up on the isles, where the stars land.",
 			"Too hard to chop? It's not you, it's your axe. Mostly.",
 		},
+		react = {
+			morning = { "Sharpest in the morning. The axes, not me." },
+			night = { "Shop's still open. Axes don't sleep." },
+			rain = { "Rain rusts an edge. Step inside and I'll look." },
+			rusty = { "Rusty to Steel. Best upgrade you'll make. Until the next." },
+			axe = { "Look at that edge. I do good work, if I say so." },
+			unsold = { "Sell a load at the mill, then come back for a better axe." },
+			sale = { "Till's been ringing. Ready for a real edge?" },
+			sawmill = { "Saws are on the other board. Axes are my favourite." },
+		},
 	},
 	{
 		id = "Dale",
 		name = "Dale",
-		role = "Dealership",
+		role = "Truck dealer",
 		spot = { kind = "counter", model = "Dealership", fallback = Vector3.new(48, 0, 110.4) },
 		idle = "wipe",
+		promptLift = 80,
 		look = {
 			name = "Dale",
-			role = "Dealership",
+			role = "Truck dealer",
 			seed = 41,
 			skin = hex("#8D5A3C"),
 			shirt = hex("#E9E2D3"),
@@ -221,16 +300,27 @@ NPCData.List = {
 			"Lay your wood flat on the bed before you drive. Take the corners slow. Trust me.",
 			"I can fix anything. Except my sense of direction.",
 		},
+		react = {
+			morning = { "Roads are empty this early. Good day for a test drive." },
+			day = { "That Rustbucket's got one more hill in her. Probably." },
+			rain = { "Wet roads. Take the corners slow. I mean it." },
+			storm = { "Don't race a storm in the Rustbucket. She loses." },
+			unsold = { "Sell a load first. Then we'll talk about a bigger bed." },
+			sale = { "Cash in your pocket? I've got a truck with your name on it." },
+			axe = { "Nice axe. It won't haul the logs, though. That's my job." },
+		},
 	},
 	{
 		id = "Hazel",
 		name = "Hazel",
-		role = "Hearth & Home",
+		role = "Gear keeper",
 		spot = { kind = "counter", model = "HearthAndHome", fallback = Vector3.new(-93.5, 0, 110.3) },
 		idle = "lookAround",
+		work = "sweep",
+		promptLift = 80,
 		look = {
 			name = "Hazel",
-			role = "Hearth & Home",
+			role = "Gear keeper",
 			seed = 53,
 			skin = hex("#EAC1A0"),
 			shirt = hex("#C27A86"),
@@ -251,6 +341,16 @@ NPCData.List = {
 			"I knitted this scarf from fireflies. Well, from yarn. But I thought about fireflies.",
 			"A well-loved forest gets busier. Deer, butterflies, birdsong. Plant a few seeds, you'll see.",
 		},
+		react = {
+			morning = { "I swept the porch at dawn. Try not to track the woods in." },
+			evening = { "Getting dark, dear. A lantern is cheaper than a bruise." },
+			night = { "Lantern's by the door if you're heading to the hollow." },
+			rain = { "Come in, you'll drip on my floor. I just swept it." },
+			fog = { "Fog's thick. Take the coat. And a snack." },
+			storm = { "Storm weather. The coat stays dry. Mostly." },
+			unsold = { "Sell a little wood first, dear. Then we'll fit you out." },
+			sale = { "A sale already? Treat yourself to something warm." },
+		},
 	},
 	{
 		id = "Gus",
@@ -265,6 +365,7 @@ NPCData.List = {
 			fallback = Vector3.new(-33.2, 0, 147),
 		},
 		idle = "lookAround",
+		promptLift = 80,
 		look = {
 			name = "Gus",
 			role = "Gondola operator",
@@ -292,6 +393,16 @@ NPCData.List = {
 			"Logs from the isles go down a Cloud Chute. Millie catches 'em in the Sky Bin.",
 			"Sky Shards up top feed the Starfall Forge. Bring a strong axe.",
 		},
+		react = {
+			morning = { "First car up is the quiet one. Best view, too." },
+			evening = { "Evening run turns the isles gold. Worth the fare." },
+			night = { "Night ride's the pretty one. The Skyroot glows." },
+			storm = { "Cable hums in a storm. She still rides." },
+			fog = { "Fog below, stars above. That's the whole ride." },
+			unsold = { "Sell a load first. The isles will still be up there." },
+			sale = { "A fare, then? The view's free. The ride isn't." },
+			axe = { "That axe'll do on the isles. Mind the edge of the cloud." },
+		},
 	},
 	{
 		id = "Rosa",
@@ -299,6 +410,7 @@ NPCData.List = {
 		role = "Forager",
 		spot = { kind = "route" },
 		speed = 4.6,
+		work = "carry",
 		route = {
 			{ x = -32, z = 58 },
 			{ x = -50, z = 66 },
@@ -334,6 +446,15 @@ NPCData.List = {
 			"The Gloam Hollow's mushrooms glow at night. I only pick the ones that don't hum.",
 			"A tree you plant wears your name. Isn't that sweet?",
 		},
+		react = {
+			morning = { "The deer are out if you walk soft. I always do." },
+			day = { "Basket's for berries. And the occasional pinecone." },
+			rain = { "Berries taste better after rain. Don't tell a soul." },
+			storm = { "I pick nothing that hums. Storm mushrooms hum." },
+			unsold = { "New here? The green pad by the mill buys your wood." },
+			sale = { "You sold some! The forest notices. So do I." },
+			sawmill = { "Your own saw? Save me a curly offcut. For the basket." },
+		},
 	},
 	{
 		id = "Pip",
@@ -341,6 +462,8 @@ NPCData.List = {
 		role = "Apprentice",
 		spot = { kind = "route" },
 		speed = 6,
+		work = "chop",
+		workLoops = 2,
 		route = {
 			{ x = 20, z = 70 },
 			{ x = 36, z = 76 },
@@ -374,6 +497,16 @@ NPCData.List = {
 			"Did you know trees hit by lightning glow? I saw one! Kinda.",
 			"Millie says I can work the saw when I'm taller. I'm almost taller!",
 		},
+		react = {
+			morning = { "I'm practicing swings before school. Gerald's watching." },
+			day = { "Gerald grew a whole inch. I measured. With a stick." },
+			rain = { "Rain makes the grip slippery. I still chopped. Kinda." },
+			rusty = { "Your axe is bigger than mine. Kinda. Almost." },
+			axe = { "Whoa. That axe could fell Gerald. Please don't." },
+			unsold = { "Millie pays you at the green pad. I checked. Twice." },
+			sale = { "You sold wood! Millie smiled. I saw it." },
+			sawmill = { "You got a saw? I'm almost tall enough to help. Almost." },
+		},
 	},
 	{
 		id = "Bram",
@@ -381,6 +514,7 @@ NPCData.List = {
 		role = "Retired logger",
 		spot = { kind = "route" },
 		speed = 2.6,
+		work = "carry",
 		route = {
 			{ x = -17, z = 50 },
 			{ x = -18, z = 66, pause = 5, face = 104 }, -- watching the saw
@@ -412,6 +546,16 @@ NPCData.List = {
 			"Read the bark, youngster. The Field Guide shows you the clues, the forest does the rest.",
 			"Big old trees wake up when a grove's well loved. Takes the whole town to fell one.",
 		},
+		react = {
+			morning = { "Fine mornin'. Murph still owes me from '62." },
+			evening = { "Knees say it's evening. The sun can catch up." },
+			night = { "These knees and this dark. One of them should retire." },
+			storm = { "Lightning wood. Sold a piece once. Still bragging." },
+			rain = { "Rain on a bald head. That's why the young wear hats." },
+			unsold = { "Haven't sold yet? The pad is that green bit. Can't miss it." },
+			sale = { "A sale. Good. I out-chopped Murph with less." },
+			axe = { "Steel, is it? I felled oaks with worse. Don't tell Tink." },
+		},
 	},
 } :: { NPC }
 
@@ -430,6 +574,14 @@ end
 
 -- The shops that need a keeper behind their Counter.
 NPCData.Shops = { "ToolShed", "Dealership", "HearthAndHome" }
+
+-- Talk, on every NPC. F and ButtonY, so it doesn't take the E / ButtonX
+-- the shops, the sell pad, and the gondola already use. ClickablePrompt
+-- covers a mouse click; PromptUI's card covers a tap. Line of sight stays
+-- off: hats, counters, and streaming would hide the prompt otherwise.
+NPCData.TalkDistance = 12
+NPCData.TalkKeyboard = Enum.KeyCode.F
+NPCData.TalkGamepad = Enum.KeyCode.ButtonY
 
 ---------------------------------------------------------------------------
 -- Spots
@@ -556,6 +708,23 @@ end
 
 -- Which way an NPC at `pos` wants to face: toward `player` (a position, or
 -- nil) when it is within `range` (flat distance), else `home`.
+-- The nearest point in `points` within `maxDist` studs (flat), ignoring
+-- anyone standing inside half a stud (no spin when you're on their toes).
+-- Returns the index, or nil.
+function NPCData.NearestIndex(origin: Vector3, points: { Vector3 }, maxDist: number): number?
+	local best: number? = nil
+	local bestD = maxDist
+	for i, p in ipairs(points) do
+		local dx, dz = p.X - origin.X, p.Z - origin.Z
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d < bestD and d > 0.5 then
+			best = i
+			bestD = d
+		end
+	end
+	return best
+end
+
 function NPCData.FaceYaw(home: number, pos: Vector3, player: Vector3?, range: number): number
 	if player then
 		local dx, dz = player.X - pos.X, player.Z - pos.Z

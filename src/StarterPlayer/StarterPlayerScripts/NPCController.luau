@@ -6,28 +6,46 @@
 --   * Idle: breathing, blinking, now and then a flourish of their own
 --     (Murph sips his coffee, Millie checks her clipboard, Tink pushes his
 --     glasses up, Dale wipes his brow, the others look around).
---   * They turn their head to look at you when you're near, and wave the
---     first time you come within WAVE_RANGE (again after you've wandered
---     off for a while), with a greeting.
+--   * Work and a walk, from NPCAnim (these rigs aren't R15, so there's no
+--     catalog animation to play): Millie saws, Hazel sweeps, Murph and Pip
+--     and Tink chop, Rosa and Bram carry, the walkers stride their route.
+--     A bubble adds a small talking gesture. All of it is Motor6D.Transform
+--     on this client.
+--   * They turn their head toward the nearest player, and wave the first
+--     time you come within WAVE_RANGE (again after you've wandered off for
+--     a while), with a greeting. A new player's first hello from Murph is
+--     a short onboarding tip.
 --   * Walkers stroll their loop (NPCData.RouteState from the shared server
---     clock, so everyone sees them in the same place) swinging arms and
---     legs, and pause at their waypoints.
---   * The nearest NPC within TALK_RANGE says one of their lines in a speech
---     bubble every so often. Murph keeps quiet while your tutorial runs
---     (QuestUI owns his lines then); he still looks at you and waves.
+--     clock, so everyone sees them in the same place) and pause at their
+--     waypoints. The server never moves them.
+--   * The nearest NPC within TALK_RANGE says a line in a speech bubble
+--     every so often (NPCDialogue: the hour, the weather, a first sale, a
+--     better axe, a sawmill, or a general line). Talk (F, or a tap on the
+--     prompt) asks for one sooner. Murph keeps quiet while your tutorial
+--     runs (QuestUI owns his button); he still looks, waves, and gives
+--     that one tip.
+--   * Bubbles sit beside the head, cap their width, and fade past a short
+--     distance. On a phone they're smaller and drop lower if the head is
+--     up in the money plaque's band.
 --   * Beyond ANIMATE_RANGE they're left alone (joints reset), walkers just
---     keep their place on the route.
+--     keep their place on the route. Who to look at is refreshed a few
+--     times a second, not every frame.
 -- Streaming-tolerant: NPCs are found by the "NPC" tag as they stream in
--- and dropped as they stream out.
+-- and dropped as they stream out. Binding gives up after a few tries.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
+local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
+local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
+local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
 local NPCController = {}
 
@@ -40,7 +58,6 @@ local WAVE_RANGE = 14
 local WAVE_RESET = 30 -- wander this far off and they'll wave again...
 local WAVE_COOLDOWN = 45 -- ...but not more often than this
 local TALK_RANGE = 16
-local TALK_GAP = { 9, 16 } -- seconds between lines
 local WAVE_TIME = 1.9
 local BLINK_TIME = 0.13
 
@@ -91,9 +108,56 @@ type Rig = {
 	bubbleUntil: number,
 	bubbleLength: number,
 	bag: { number },
+	bagKind: string,
+	met: boolean, -- heard the onboarding tip
+	lastPrompt: number,
+	promptConn: RBXScriptConnection?,
+	working: boolean,
+	workStart: number,
+	workLength: number,
+	nextWork: number,
 }
 
 local rigs: { [Model]: Rig } = {}
+
+local phoneLayout: NPCDialogue.Layout = NPCDialogue.LayoutFor(false)
+local layoutAt = -1
+
+local function applyTag(tag: BillboardGui?, layout: NPCDialogue.Layout)
+	if not tag then
+		return
+	end
+	tag.MaxDistance = layout.tagDistance
+	tag.Size = UDim2.fromOffset(layout.tagSize.X, layout.tagSize.Y)
+	local name = tag:FindFirstChild("Name")
+	if name and name:IsA("TextLabel") then
+		name.TextSize = layout.tagName
+		name.Size = UDim2.new(1, 0, 0, layout.tagName + 6)
+	end
+	local role = tag:FindFirstChild("Role")
+	if role and role:IsA("TextLabel") then
+		role.TextSize = layout.tagRole
+		role.Position = UDim2.fromOffset(0, layout.tagName + 2)
+		role.Size = UDim2.new(1, 0, 0, layout.tagRole + 4)
+	end
+end
+
+local function refreshLayout(now: number)
+	if now - layoutAt < 0.5 then
+		return
+	end
+	layoutAt = now
+	local camera = workspace.CurrentCamera
+	local width = if camera then camera.ViewportSize.X else 1920
+	local phone = NPCDialogue.IsPhone(UserInputService.TouchEnabled, UserInputService.KeyboardEnabled, width)
+	local layout = NPCDialogue.LayoutFor(phone)
+	if layout.phone ~= phoneLayout.phone then
+		for _, rig in pairs(rigs) do
+			applyTag(rig.tag, layout)
+		end
+	end
+	phoneLayout = layout
+end
 
 ---------------------------------------------------------------------------
 -- Little helpers
@@ -120,6 +184,10 @@ local function setTransform(motor: Motor6D?, cf: CFrame)
 	if motor then
 		motor.Transform = cf
 	end
+end
+
+local function limb(pitch: number, yaw: number, roll: number): CFrame
+	return CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, roll)
 end
 
 -- TutorialStep is 0 once the tutorial is done or skipped; until the profile
@@ -167,14 +235,33 @@ local function closeBubble(rig: Rig, instant: boolean?)
 	end)
 end
 
+-- Drop the bubble if the head is up in the money plaque's band.
+local function placeBubble(rig: Rig)
+	local gui = rig.bubble
+	local camera = workspace.CurrentCamera
+	if not gui or not camera then
+		return
+	end
+	local offset = phoneLayout.studsOffset
+	local screen, visible = camera:WorldToViewportPoint(rig.head.Position)
+	local top = if phoneLayout.phone then 100 else 78
+	if visible and screen.Y < top then
+		offset = Vector3.new(offset.X, offset.Y - 1.6, 0)
+	end
+	gui.StudsOffset = offset
+end
+
 local function say(rig: Rig, text: string, now: number)
 	closeBubble(rig, true)
+	refreshLayout(now)
+	local layout = phoneLayout
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "SpeechBubble"
-	gui.Size = UDim2.fromOffset(260, 140)
-	gui.StudsOffset = Vector3.new(0, rig.topOffset + 0.4 * rig.scale, 0)
-	gui.SizeOffset = Vector2.new(0, 0.5)
-	gui.MaxDistance = 70
+	gui.Size = UDim2.fromOffset(layout.width + 28, 120)
+	gui.StudsOffset = layout.studsOffset
+	gui.SizeOffset = Vector2.new(0, 0)
+	gui.MaxDistance = layout.maxDistance
+	gui.AlwaysOnTop = false
 	gui.LightInfluence = 0
 	gui.Adornee = rig.head
 
@@ -206,14 +293,14 @@ local function say(rig: Rig, text: string, now: number)
 	label.Size = UDim2.fromOffset(0, 0)
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.Font = Enum.Font.GothamMedium
-	label.TextSize = 16
+	label.TextSize = layout.textSize
 	label.TextColor3 = INK
 	label.TextWrapped = true
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Text = text
 	label.Parent = card
 	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(230, 400)
+	limit.MaxSize = Vector2.new(layout.width, 96)
 	limit.Parent = label
 	-- The tail under the card.
 	local tail = Instance.new("TextLabel")
@@ -241,25 +328,93 @@ local function say(rig: Rig, text: string, now: number)
 		rig.tag.Enabled = false
 	end
 	rig.bubble = gui
-	rig.bubbleLength = math.min(8, 2.6 + #text * 0.045)
+	rig.bubbleLength = NPCDialogue.BubbleSeconds(text)
 	rig.bubbleUntil = now + rig.bubbleLength
+	placeBubble(rig)
 	SoundData.PlayAt("NPCChatter", rig.head.Position)
 end
 
--- A line from the NPC's list, in a shuffled order that doesn't repeat until
--- all have been said.
-local function nextLine(rig: Rig): string?
-	local npc = rig.npc
-	if not npc or #npc.lines == 0 then
-		return nil
+local function hasPlacedSawmill(): boolean
+	local slot = player:GetAttribute("PlotSlot")
+	if type(slot) ~= "number" then
+		return false
 	end
-	if #rig.bag == 0 then
-		for i = 1, #npc.lines do
-			table.insert(rig.bag, rig.rng:NextInteger(1, #rig.bag + 1), i)
+	local map = workspace:FindFirstChild("TimberlineMap")
+	local plots = if map then map:FindFirstChild("Plots") else nil
+	local plot = if plots then plots:FindFirstChild("Plot_" .. tostring(slot)) else nil
+	if not plot then
+		return false
+	end
+	for _, child in ipairs(plot:GetChildren()) do
+		local id = child:GetAttribute("BlueprintId")
+		if type(id) == "string" and string.sub(id, 1, 7) == "Sawmill" then
+			return true
 		end
 	end
-	local i = table.remove(rig.bag)
-	return if i then npc.lines[i] else nil
+	return false
+end
+
+local function playerContext(): NPCDialogue.Context
+	local hour = ClockOverride.Apply(
+		WorldTime.ClockTime(workspace:GetServerTimeNow()),
+		workspace:GetAttribute(ClockOverride.Attribute),
+		RunService:IsStudio()
+	)
+	local weather = workspace:GetAttribute("Weather")
+	return {
+		band = NPCDialogue.BandOf(hour),
+		weather = if type(weather) == "string" then weather else "Clear",
+		progress = NPCDialogue.ProgressOf({
+			loaded = player:GetAttribute("ProfileLoaded") == true,
+			tutorialStep = player:GetAttribute("TutorialStep"),
+			tutorialRefresher = player:GetAttribute("TutorialRefresher"),
+			bestAxeTier = player:GetAttribute("BestAxeTier"),
+			sawmillStock = player:GetAttribute("SawmillStock"),
+			placedSawmill = hasPlacedSawmill(),
+		}),
+	}
+end
+
+-- A line for this moment. `firstMeet` lets Murph's onboarding tip win once.
+local function takeLine(rig: Rig, firstMeet: boolean): (string?, string)
+	local npc = rig.npc
+	if not npc then
+		return nil, ""
+	end
+	local pool = NPCDialogue.PoolFor(npc, playerContext(), rig.rng:NextNumber(), firstMeet and not rig.met)
+	if pool.kind ~= rig.bagKind then
+		rig.bagKind = pool.kind
+		rig.bag = {}
+	end
+	local line, bag = NPCDialogue.Draw(pool.lines, rig.bag, rig.rng)
+	rig.bag = bag
+	if pool.kind == "tip" then
+		rig.met = true
+	end
+	return line, pool.kind
+end
+
+-- Talk on the model. Murph's button belongs to QuestUI (it repeats the lesson).
+local function onTalk(rig: Rig)
+	local npc = rig.npc
+	if not npc or npc.tutorialQuiet then
+		return
+	end
+	local now = os.clock()
+	if now < rig.lastPrompt + NPCDialogue.PromptCooldown then
+		return
+	end
+	if quiet(rig) then
+		return
+	end
+	local line, _kind = takeLine(rig, true)
+	if not line then
+		return
+	end
+	say(rig, line, now)
+	rig.lastPrompt = now
+	local gap = NPCDialogue.AmbientGap
+	rig.nextLine = now + rig.rng:NextNumber(gap[1], gap[2])
 end
 
 ---------------------------------------------------------------------------
@@ -321,9 +476,12 @@ local function bind(model: Instance, tries: number?)
 	local offset = model:GetAttribute("RouteOffset")
 	local seed = seedOf(model.Name)
 	local tag = head:FindFirstChild("NameTag")
+	local nameTag = if tag and tag:IsA("BillboardGui") then tag else nil
+	applyTag(nameTag, phoneLayout)
 	local now = os.clock()
 	local rng = Random.new(seed + math.floor(now * 1000) % 1000)
-	rigs[model] = {
+	local prompt = model:FindFirstChild("Talk")
+	local rig: Rig = {
 		model = model,
 		npc = npc,
 		root = root,
@@ -336,7 +494,7 @@ local function bind(model: Instance, tries: number?)
 		leftHip = motorIn(torso, "LeftHip"),
 		rightHip = motorIn(torso, "RightHip"),
 		eyes = eyes,
-		tag = if tag and tag:IsA("BillboardGui") then tag else nil,
+		tag = nameTag,
 		route = if route and #route >= 2 then route else nil,
 		speed = if type(speed) == "number" then speed else 4,
 		offset = if type(offset) == "number" then offset else 0,
@@ -364,7 +522,21 @@ local function bind(model: Instance, tries: number?)
 		bubbleUntil = 0,
 		bubbleLength = 1,
 		bag = {},
+		bagKind = "",
+		met = false,
+		lastPrompt = -100,
+		promptConn = nil,
+		working = false,
+		workStart = 0,
+		workLength = 1,
+		nextWork = now + rng:NextNumber(2, 6),
 	}
+	if prompt and prompt:IsA("ProximityPrompt") then
+		rig.promptConn = prompt.Triggered:Connect(function()
+			onTalk(rig)
+		end)
+	end
+	rigs[model] = rig
 end
 
 local function rest(rig: Rig)
@@ -390,6 +562,9 @@ local function unbind(model: Instance)
 	local rig = rigs[model :: Model]
 	if rig then
 		rigs[model :: Model] = nil
+		if rig.promptConn then
+			rig.promptConn:Disconnect()
+		end
 		closeBubble(rig, true)
 	end
 end
@@ -407,7 +582,7 @@ local FLOURISHES: { [string]: { length: number, gap: { number } } } = {
 	lookAround = { length = 2.8, gap = { 6, 11 } },
 }
 
-local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focusHead: Vector3?)
+local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focusHead: Vector3?, selfDist: number)
 	local s = rig.scale
 	local npc = rig.npc
 
@@ -440,19 +615,18 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	local w = rig.walkBlend
 	local stride = 4.2 * s
 	local phase = walked / stride * math.pi * 2
-	local swing = math.sin(phase)
 
-	-- Breathing.
+	-- Breathing (the walk's bob lives in the pose).
 	local breath = math.sin(now * 1.7 + rig.seed % 7)
-	local bob = 0.03 * breath * s + math.abs(math.sin(phase)) * 0.12 * s * w
 
-	-- Looking at you.
-	local dist = if focus
+	-- Looking at the nearest player. Waving and bubbles follow you.
+	local dist = selfDist
+	local lookDist = if focus
 		then (Vector3.new(focus.X, 0, focus.Z) - Vector3.new(rig.root.Position.X, 0, rig.root.Position.Z)).Magnitude
 		else math.huge
 	local wantYaw, wantPitch = 0, 0
 	local neck = rig.neck
-	if focusHead and neck and dist < LOOK_RANGE then
+	if focusHead and neck and lookDist < LOOK_RANGE then
 		local pivot = rig.torso.CFrame * neck.C0
 		local rel = pivot:PointToObjectSpace(focusHead)
 		local dx, dy, dz = rel.X, rel.Y - 0.7 * s, rel.Z
@@ -471,7 +645,19 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 		rig.waved = true
 		rig.lastWave = now
 		rig.waveStart = now
-		if npc and not quiet(rig) and #npc.greetings > 0 then
+		-- A new player's first hello from Murph is one short tip. Everyone
+		-- else waves with a greeting, unless the tutorial has Murph quiet.
+		local tipped = false
+		local progress = playerContext().progress
+		if npc and npc.tips and not rig.met and progress.loaded and progress.newPlayer then
+			local line, kind = takeLine(rig, true)
+			if kind == "tip" and line then
+				say(rig, line, now)
+				rig.nextLine = math.max(rig.nextLine, now + 6)
+				tipped = true
+			end
+		end
+		if not tipped and npc and not quiet(rig) and #npc.greetings > 0 then
 			say(rig, npc.greetings[rig.rng:NextInteger(1, #npc.greetings)], now)
 			rig.nextLine = math.max(rig.nextLine, now + 4.5)
 		end
@@ -512,12 +698,52 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	rig.yaw = approach(rig.yaw, wantYaw, 6, dt)
 	rig.pitch = approach(rig.pitch, wantPitch, 6, dt)
 
-	-- Arms and legs.
-	local legSwing = 0.6 * swing * w
-	local armSwing = 0.45 * swing * w
-	local carried = if npc and npc.look.carry and npc.look.carry ~= "none" then 0.5 else 1
-	local left = CFrame.Angles(-armSwing * carried, 0, -0.03 * breath * (1 - w))
-	local right = CFrame.Angles(armSwing, 0, 0.03 * breath * (1 - w))
+	-- Walk, a held prop, a work clip, and a talking gesture (NPCAnim).
+	-- Flourishes and the wave still win the arms, below.
+	local work = if npc then npc.work else nil
+	local timed = work == "chop" or work == "saw" or work == "sweep"
+	if rig.working and now - rig.workStart > rig.workLength then
+		rig.working = false
+	end
+	if timed and work and not rig.working and now >= rig.nextWork and w < 0.15 and wave <= 0 and not fl then
+		local loops = if npc and npc.workLoops and npc.workLoops > 0 then npc.workLoops else 1
+		local length = NPCAnim.Length(work) * loops
+		if length > 0 then
+			rig.working = true
+			rig.workStart = now
+			rig.workLength = length
+			rig.nextWork = now + length + rig.rng:NextNumber(6, 12)
+		end
+	end
+	local workWeight = 0
+	local workU = 0
+	local workTime = 0
+	if rig.working and work then
+		local elapsed = now - rig.workStart
+		workWeight = envelope(elapsed, rig.workLength, 0.18, 0.25)
+		local clip = NPCAnim.Length(work)
+		workU = if clip > 0 then (elapsed % clip) / clip else 0
+		workTime = elapsed
+	end
+	local spokenFor = if rig.bubble then now - (rig.bubbleUntil - rig.bubbleLength) else 0
+	local talking = if rig.bubble then math.max(0, 1 - spokenFor / 1.6) else 0
+	local carry = if npc and NPCAnim.Holds(npc.look.carry) then npc.look.carry else nil
+	local sample = NPCAnim.Sample({
+		phase = phase,
+		walk = w,
+		carry = carry,
+		work = work,
+		workU = workU,
+		workTime = workTime,
+		workWeight = if fl then 0 else workWeight,
+		talkTime = spokenFor,
+		talkWeight = if fl or wave > 0 then 0 else talking,
+		breath = breath,
+	})
+
+	-- Arms and legs. Flourishes pose over the sample.
+	local left = limb(sample.leftPitch, sample.leftYaw, sample.leftRoll)
+	local right = limb(sample.rightPitch, sample.rightYaw, sample.rightRoll)
 	if kind == "sip" then
 		-- The mug up to the mouth: raise forward, swing in.
 		left = CFrame.Angles(0, -0.55 * f, 0) * CFrame.Angles(1.85 * f, 0, 0)
@@ -535,16 +761,19 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 		right = right:Lerp(CFrame.Angles(0.15, 0, 2.75 + wiggle), wave)
 	end
 
-	-- A little nodding while they talk (the first second or two of a line).
-	local talking = if rig.bubble then math.max(0, 1 - (now - (rig.bubbleUntil - rig.bubbleLength)) / 1.6) else 0
-	local nod = 0.06 * math.sin(now * 11) * talking
-
-	setTransform(rig.rootJoint, CFrame.new(0, bob, 0) * CFrame.Angles(0.04 * w, 0, 0))
-	setTransform(rig.neck, CFrame.Angles(0, rig.yaw, 0) * CFrame.Angles(rig.pitch + nod, 0, 0.08 * wave))
+	setTransform(
+		rig.rootJoint,
+		CFrame.new(0, (sample.bob + 0.03 * breath) * s, 0) * CFrame.Angles(sample.rootPitch, sample.rootYaw, 0)
+	)
+	setTransform(
+		rig.neck,
+		CFrame.Angles(0, rig.yaw + sample.neckYaw, 0)
+			* CFrame.Angles(rig.pitch + sample.neckPitch, 0, sample.neckRoll + 0.08 * wave)
+	)
 	setTransform(rig.leftShoulder, left)
 	setTransform(rig.rightShoulder, right)
-	setTransform(rig.leftHip, CFrame.Angles(legSwing, 0, 0))
-	setTransform(rig.rightHip, CFrame.Angles(-legSwing, 0, 0))
+	setTransform(rig.leftHip, CFrame.Angles(sample.leftHip, 0, 0))
+	setTransform(rig.rightHip, CFrame.Angles(sample.rightHip, 0, 0))
 
 	-- Blinking.
 	if now >= rig.blinkAt then
@@ -572,24 +801,51 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	end
 end
 
+-- Nearby players, refreshed a few times a second (12 of them is still cheap,
+-- and the head lerp covers the gap).
+local bodies: { Vector3 } = {}
+local bodyHeads: { Vector3 } = {}
+local bodiesAt = -1
+
+local function nearbyBodies(now: number)
+	if now - bodiesAt < 0.15 then
+		return
+	end
+	bodiesAt = now
+	table.clear(bodies)
+	table.clear(bodyHeads)
+	for _, other in ipairs(Players:GetPlayers()) do
+		local char = other.Character
+		local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+		if root and root:IsA("BasePart") then
+			table.insert(bodies, root.Position)
+			local head = char:FindFirstChild("Head")
+			table.insert(
+				bodyHeads,
+				if head and head:IsA("BasePart") then head.Position else root.Position + Vector3.new(0, 1.5, 0)
+			)
+		end
+	end
+end
+
 local function step(dt: number)
 	local now = os.clock()
+	refreshLayout(now)
+	nearbyBodies(now)
 	local char = player.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
-	local headPart = if char then char:FindFirstChild("Head") else nil
-	local focus: Vector3? = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
-	local focusHead: Vector3? = if headPart and headPart:IsA("BasePart")
-		then headPart.Position
-		elseif focus then focus + Vector3.new(0, 1.5, 0)
-		else nil
+	local mine: Vector3? = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
 	local camera = workspace.CurrentCamera
-	local eye = focus or (if camera then camera.CFrame.Position else Vector3.zero)
+	local eye = mine or (if camera then camera.CFrame.Position else Vector3.zero)
 
-	-- Who gets to chat: the nearest NPC within TALK_RANGE.
+	-- Who gets to chat: the nearest NPC within TALK_RANGE of you.
 	local speaker: Rig? = nil
 	local speakerDist = TALK_RANGE
 	for model, rig in pairs(rigs) do
 		if not model.Parent then
+			if rig.promptConn then
+				rig.promptConn:Disconnect()
+			end
 			rigs[model] = nil
 			continue
 		end
@@ -607,24 +863,41 @@ local function step(dt: number)
 			end
 			continue
 		end
+		local index = NPCData.NearestIndex(rig.root.Position, bodies, LOOK_RANGE)
+		local focus = if index then bodies[index] else nil
+		local focusHead = if index then bodyHeads[index] else nil
 		rig.active = true
-		animate(rig, now, dt, focus, focusHead)
-		if d < speakerDist and not quiet(rig) then
+		animate(rig, now, dt, focus, focusHead, d)
+		if rig.bubble then
+			placeBubble(rig)
+		end
+		local wantsTip = rig.npc ~= nil and rig.npc.tips ~= nil and not rig.met
+		if d < speakerDist and (wantsTip or not quiet(rig)) then
 			speaker, speakerDist = rig, d
 		end
 	end
 
 	local who = speaker
 	if who and not who.bubble and now >= who.nextLine then
-		local line = nextLine(who)
-		if line then
-			say(who, line, now)
+		local wantsTip = who.npc ~= nil and who.npc.tips ~= nil and not who.met
+		if wantsTip or not quiet(who) then
+			local loaded = player:GetAttribute("ProfileLoaded") == true
+			if wantsTip and not loaded then
+				who.nextLine = now + 1 -- the save isn't here yet; don't burn the tip
+			else
+				local line, kind = takeLine(who, true)
+				if line and (kind == "tip" or not quiet(who)) then
+					say(who, line, now)
+				end
+				local gap = NPCDialogue.AmbientGap
+				who.nextLine = now + who.rng:NextNumber(gap[1], gap[2])
+			end
 		end
-		who.nextLine = now + who.rng:NextNumber(TALK_GAP[1], TALK_GAP[2])
 	end
 end
 
 function NPCController.Start()
+	refreshLayout(os.clock())
 	for _, model in ipairs(CollectionService:GetTagged("NPC")) do
 		bind(model)
 	end
