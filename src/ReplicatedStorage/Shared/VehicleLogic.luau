@@ -236,6 +236,86 @@ function VehicleLogic.RestingCFrame(
 end
 
 ---------------------------------------------------------------------------
+-- Parking bays (phase 12)
+---------------------------------------------------------------------------
+
+-- A parking bay as VehicleService sees it: its slot's Index and its
+-- painted size (the ParkingSlot part's Size.Z and Size.X, studs).
+export type BayInfo = { index: number, length: number, width: number }
+
+-- The furthest a rig's nose may stick out past a bay's head when no free
+-- bay is long enough: it parks with its tail at the bay's tail, its nose
+-- over the bay's pull-out (WorldPlan.ParkingPullOut, kept clear of
+-- everything, is longer).
+VehicleLogic.MaxOverhang = 25
+
+-- Whether a rig `length` long and `width` wide (TruckLayout.RigSize) fits
+-- inside a bay's paint.
+function VehicleLogic.BayFits(bay: BayInfo, length: number, width: number): boolean
+	return length <= bay.length and width <= bay.width
+end
+
+-- Whether a rig may park in a bay at all: it fits, or it's no wider and
+-- at most MaxOverhang longer (its nose out past the head).
+function VehicleLogic.BayTakes(bay: BayInfo, length: number, width: number): boolean
+	return width <= bay.width and length <= bay.length + VehicleLogic.MaxOverhang
+end
+
+-- The bays a rig `length` x `width` should park in, best first, as slot
+-- Indexes, from `bays` (the free ones, and `current`, the Index of the
+-- bay its player holds now, which counts as free for them): first every
+-- bay it fits, the smallest first (shortest, then narrowest), `current`
+-- ahead of another of the same size (so a rebuild keeps a bay that's
+-- still the best fit), then the lowest Index (nearest the spawn); then
+-- the bays it only overhangs (BayTakes), the longest first. A bay it
+-- can't take isn't listed; none at all means an overflow spot.
+function VehicleLogic.BayChoices(bays: { BayInfo }, length: number, width: number, current: number?): { number }
+	local fits: { BayInfo } = {}
+	local over: { BayInfo } = {}
+	for _, bay in ipairs(bays) do
+		if VehicleLogic.BayFits(bay, length, width) then
+			table.insert(fits, bay)
+		elseif VehicleLogic.BayTakes(bay, length, width) then
+			table.insert(over, bay)
+		end
+	end
+	local function tieBreak(a: BayInfo, b: BayInfo): boolean
+		if (a.index == current) ~= (b.index == current) then
+			return a.index == current
+		end
+		return a.index < b.index
+	end
+	table.sort(fits, function(a: BayInfo, b: BayInfo): boolean
+		if a.length ~= b.length then
+			return a.length < b.length
+		elseif a.width ~= b.width then
+			return a.width < b.width
+		end
+		return tieBreak(a, b)
+	end)
+	table.sort(over, function(a: BayInfo, b: BayInfo): boolean
+		if a.length ~= b.length then
+			return a.length > b.length
+		end
+		return tieBreak(a, b)
+	end)
+	local out: { number } = {}
+	for _, list in ipairs({ fits, over }) do
+		for _, bay in ipairs(list) do
+			table.insert(out, bay.index)
+		end
+	end
+	return out
+end
+
+-- How far ahead of its bay's middle (toward the head) a rig's middle
+-- parks: 0 when it fits (centred), else half what it's longer, so its
+-- tail meets the bay's tail and its nose sticks out past the head.
+function VehicleLogic.OverhangShift(bayLength: number, rigLength: number): number
+	return math.max(0, rigLength - bayLength) / 2
+end
+
+---------------------------------------------------------------------------
 -- Overflow parking
 ---------------------------------------------------------------------------
 

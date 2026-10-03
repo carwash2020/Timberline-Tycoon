@@ -2,9 +2,15 @@
 -- VehicleService: builds and owns player trucks.
 --   * Every truck is drawn by Shared/Art/TruckArt from its ItemCatalog entry
 --     (Shared/TruckLayout says where each piece goes) in the player's own
---     ParkingSlot. Trucks never spawn inside each other: a truck parked in
---     the way is sent back to its own spot, else the rig takes another
---     free slot that's clear. TruckArt.Rig makes it one rigid body: the
+--     ParkingSlot. The bays come in sizes (WorldPlan.ParkingBays, phase
+--     12): each rig takes the smallest free one it fits, centred in it
+--     (VehicleLogic.BayChoices), and a rebuild (a recall, a switch at the
+--     Dealership) moves it to a better fit when there is one. A rig longer
+--     than every free bay parks with its tail at a bay's tail and its nose
+--     out over the pull-out; with no bay at all, in an overflow spot.
+--     Trucks never spawn inside each other: a truck parked in the way is
+--     sent back to its own spot, else the rig takes its next choice that's
+--     clear. TruckArt.Rig makes it one rigid body: the
 --     invisible chassis is its only massive part, every other part is
 --     massless and welded to it, and each wheel hangs on a Motor6D that
 --     VehicleFX spins and steers on every client.
@@ -747,23 +753,32 @@ local function sortedSlots(): { BasePart }
 	return slots
 end
 
-local function claimSlot(userId: number): BasePart?
-	for _, slot in ipairs(sortedSlots()) do
-		if slotOwner[slot] == nil then
-			slotOwner[slot] = userId
-			return slot
-		end
-	end
-	return nil
+local function slotIndex(slot: BasePart): number
+	local index = slot:GetAttribute("Index")
+	return if type(index) == "number" then index else 0
 end
 
--- More players than parking slots: a spot in the overflow rows, held
--- until the player leaves (so rebuilding never walks it along).
-local function claimOverflow(): number
-	local index = VehicleLogic.NextFreeIndex(overflowUsed)
-	overflowUsed[index] = true
-	warn("[VehicleService] Out of parking slots; add more in MapBuilder")
-	return index
+-- The slots a rig `length` x `width` (TruckLayout.RigSize) should park in,
+-- best first (VehicleLogic.BayChoices): the smallest free one it fits,
+-- or, with none, the longest it may overhang. `current`, the slot its
+-- player holds now, counts as free for them, and stays first while it's
+-- as good as any. Slots it can't take aren't listed.
+local function bayChoices(length: number, width: number, current: BasePart?): { BasePart }
+	local infos: { VehicleLogic.BayInfo } = {}
+	local byIndex: { [number]: BasePart } = {}
+	for _, slot in ipairs(sortedSlots()) do
+		if slotOwner[slot] == nil or slot == current then
+			local index = slotIndex(slot)
+			table.insert(infos, { index = index, length = slot.Size.Z, width = slot.Size.X })
+			byIndex[index] = slot
+		end
+	end
+	local out: { BasePart } = {}
+	local currentIndex = if current then slotIndex(current) else nil
+	for _, index in ipairs(VehicleLogic.BayChoices(infos, length, width, currentIndex)) do
+		table.insert(out, byIndex[index])
+	end
+	return out
 end
 
 local function slotCFrame(slot: BasePart?, overflowIndex: number?): CFrame
@@ -777,10 +792,24 @@ local function slotCFrame(slot: BasePart?, overflowIndex: number?): CFrame
 	return CFrame.new(spot.X, TerrainBuilder.LiftOnto(spot.X, 0, spot.Z) + WHEEL_CLEARANCE, spot.Z)
 end
 
--- How far forward a rig's pivot sits so the whole rig (truck + trailer)
--- is centred on its parking spot.
+-- How far forward a rig's pivot (the truck's middle) sits from the rig's
+-- own middle: the trailer is behind it.
 local function rigShiftOf(trailerLayout: TruckLayout.TrailerLayout?): number
 	return if trailerLayout then trailerLayout.length / 2 else 0
+end
+
+-- How far forward of its spot's middle a rig's pivot parks: the whole rig
+-- (truck + trailer) centred on its bay, or, when the rig is longer than
+-- the bay, its tail at the bay's tail and its nose out past the head over
+-- the bay's pull-out (VehicleLogic.OverhangShift). An overflow spot has no
+-- bay: the rig is centred on it.
+local function homeShift(slot: BasePart?, layout: TruckLayout.Layout, trailerLayout: TruckLayout.TrailerLayout?): number
+	local shift = rigShiftOf(trailerLayout)
+	if slot then
+		local length = TruckLayout.RigSize(layout, trailerLayout)
+		shift += VehicleLogic.OverhangShift(slot.Size.Z, length)
+	end
+	return shift
 end
 
 -- A model's bounding box relative to its pivot, so it can be checked at a
@@ -831,7 +860,8 @@ local function sendHome(other: TruckRecord): boolean
 	if other.seat.Occupant ~= nil or not other.chassis.Anchored or not other.model.Parent then
 		return false
 	end
-	local home = slotCFrame(other.slot, other.overflowIndex) * CFrame.new(0, 0, -rigShiftOf(other.trailerLayout))
+	local shift = homeShift(other.slot, other.layout, other.trailerLayout)
+	local home = slotCFrame(other.slot, other.overflowIndex) * CFrame.new(0, 0, -shift)
 	local rel, size = footprint(other.model)
 	if #trucksInBox(home * rel, size, other) > 0 then
 		return false
@@ -855,56 +885,80 @@ local function sendHome(other: TruckRecord): boolean
 	return true
 end
 
--- Where a new rig goes (its footprint `rel`/`size`, centred `rigShift`
--- ahead): its own spot when no other truck is in it. A parked, empty truck
--- in the way is sent home first; if something's still there (a truck
--- being driven through), the rig takes the next free slot that's clear,
--- or a clear overflow spot, and gives its old one up.
+-- Where a new rig goes (`layout`/`trailerLayout`, its footprint
+-- `rel`/`size` about its pivot): the first of `choices` (bayChoices: the
+-- bays it fits best first, its player's own among them while that's as
+-- good as any) with no other truck in the rig's footprint there. A parked,
+-- empty truck in the way of the first choice is sent home first. With no
+-- choice clear (or none at all: every bay that takes the rig is taken),
+-- the player's overflow spot if they hold one, else the first clear
+-- overflow spot. Claims what it returns and gives the player's old slot or
+-- overflow spot (`oldSlot`, `oldOverflow`) up if it moved.
 local function clearSpot(
 	userId: number,
-	slot: BasePart?,
-	overflowIndex: number?,
-	rigShift: number,
+	choices: { BasePart },
+	oldSlot: BasePart?,
+	oldOverflow: number?,
+	layout: TruckLayout.Layout,
+	trailerLayout: TruckLayout.TrailerLayout?,
 	rel: CFrame,
 	size: Vector3
 ): (BasePart?, number?)
 	local function blocked(s: BasePart?, o: number?): { TruckRecord }
-		return trucksInBox(slotCFrame(s, o) * CFrame.new(0, 0, -rigShift) * rel, size)
+		local shift = homeShift(s, layout, trailerLayout)
+		return trucksInBox(slotCFrame(s, o) * CFrame.new(0, 0, -shift) * rel, size)
 	end
-	local inWay = blocked(slot, overflowIndex)
-	if #inWay == 0 then
-		return slot, overflowIndex
-	end
-	for _, other in ipairs(inWay) do
-		sendHome(other)
-	end
-	if #blocked(slot, overflowIndex) == 0 then
-		return slot, overflowIndex
-	end
-	local function release()
-		if slot then
-			slotOwner[slot] = nil
+	local function take(s: BasePart?, o: number?): (BasePart?, number?)
+		if oldSlot and oldSlot ~= s then
+			slotOwner[oldSlot] = nil
 		end
-		if overflowIndex then
-			overflowUsed[overflowIndex] = nil
+		if oldOverflow and oldOverflow ~= o then
+			overflowUsed[oldOverflow] = nil
 		end
-	end
-	for _, s in ipairs(sortedSlots()) do
-		if slotOwner[s] == nil and #blocked(s, nil) == 0 then
-			release()
+		if s then
 			slotOwner[s] = userId
-			return s, nil
 		end
+		if o then
+			overflowUsed[o] = true
+		end
+		return s, o
+	end
+	for i, s in ipairs(choices) do
+		local owner = slotOwner[s]
+		if owner ~= nil and owner ~= userId then
+			continue -- someone claimed it meanwhile (a hook yielded)
+		end
+		local inWay = blocked(s, nil)
+		if #inWay > 0 and i == 1 then
+			for _, other in ipairs(inWay) do
+				sendHome(other)
+			end
+			inWay = blocked(s, nil)
+		end
+		if #inWay == 0 then
+			return take(s, nil)
+		end
+	end
+	if #choices == 0 then
+		warn("[VehicleService] No free parking bay fits this rig; parking it in an overflow spot")
+	end
+	if oldOverflow and #blocked(nil, oldOverflow) == 0 then
+		return take(nil, oldOverflow)
 	end
 	for i = 0, OVERFLOW_SEARCH do
 		if not overflowUsed[i] and #blocked(nil, i) == 0 then
-			release()
-			overflowUsed[i] = true
-			return nil, i
+			return take(nil, i)
 		end
 	end
-	warn("[VehicleService] No clear parking spot; building the truck in its own anyway")
-	return slot, overflowIndex
+	warn("[VehicleService] No clear parking spot; building the truck where it was meant to go anyway")
+	local first = choices[1]
+	if first then
+		return take(first, nil)
+	end
+	if oldSlot then
+		return take(oldSlot, nil)
+	end
+	return take(nil, oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
 end
 
 ---------------------------------------------------------------------------
@@ -1042,7 +1096,8 @@ end
 -- Mirrors how far this truck is from its own parking spot (where the
 -- rig's pivot sits when parked there) on its owner's TruckSlotDistance.
 local function publishSlotDistance(rec: TruckRecord)
-	local home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -rigShiftOf(rec.trailerLayout))
+	local shift = homeShift(rec.slot, rec.layout, rec.trailerLayout)
+	local home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -shift)
 	local distance = TruckHome.Distance(trustedCFrame(rec).Position, home.Position)
 	local userId = rec.owner.UserId
 	if TruckHome.ShouldPublish(slotShown[userId], distance) then
@@ -1126,13 +1181,24 @@ function VehicleService.SpawnTruck(
 ): (Model, number)
 	local def = ItemCatalog.GetTruck(truckId) or ItemCatalog.GetTruck("Rustbucket")
 	assert(def, "[VehicleService] Rustbucket missing from ItemCatalog")
+	local layout = TruckLayout.For(def)
+	local trailer = towedTrailer(def, trailerId)
+	local trailerLayout = if trailer then TruckLayout.ForTrailer(trailer, layout) else nil
 
+	-- The bay this rig parks in (phase 12): the smallest free one it fits.
+	-- A rebuild (a recall, a switch at the Dealership) keeps the player's
+	-- bay while it's as good a fit as any, else moves them (clearSpot).
 	local old = trucks[player.UserId]
-	local slot = if old then old.slot else claimSlot(player.UserId)
-	local overflowIndex = if old then old.overflowIndex else nil
-	if not slot and overflowIndex == nil then
-		overflowIndex = claimOverflow()
-	end
+	local oldSlot = if old then old.slot else nil
+	local oldOverflow = if old then old.overflowIndex else nil
+	local rigLength, rigWidth = TruckLayout.RigSize(layout, trailerLayout)
+	local choices = bayChoices(rigLength, rigWidth, oldSlot)
+	-- Where it will most likely park, for a joining player's saved spot.
+	local homeSlot = choices[1] or oldSlot
+	local homeAt = slotCFrame(
+		homeSlot,
+		if homeSlot then nil else (oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
+	).Position
 	-- Where a load out of town is left (the truck's last spot).
 	local leaveAt: CFrame? = nil
 	-- The v2 loop's loose load (TruckLoad): told before the old truck goes,
@@ -1154,15 +1220,12 @@ function VehicleService.SpawnTruck(
 		-- Joining: was the truck in town when they left? (Old saves don't
 		-- say, and keep their load.)
 		local was = savedSpot(player)
-		local keeps = was == nil or inTown(was, slotCFrame(slot, overflowIndex).Position)
+		local keeps = was == nil or inTown(was, homeAt)
 		guarded("onRebuild", function()
 			carry = onRebuild(player, nil, keeps, if was then CFrame.new(was) else nil)
 		end)
 	end
 
-	local layout = TruckLayout.For(def)
-	local trailer = towedTrailer(def, trailerId)
-	local trailerLayout = if trailer then TruckLayout.ForTrailer(trailer, layout) else nil
 	local capacity = capacityOf(def, trailer)
 	local dropped = 0
 	local entries: { BedEntry }
@@ -1177,7 +1240,7 @@ function VehicleService.SpawnTruck(
 		-- Joining: the save says where the truck was (old saves don't, and
 		-- keep their load).
 		local was = savedSpot(player)
-		if not old and #restored > 0 and was and not inTown(was, slotCFrame(slot, overflowIndex).Position) then
+		if not old and #restored > 0 and was and not inTown(was, homeAt) then
 			leaveAt = CFrame.new(was)
 		end
 	end
@@ -1198,12 +1261,25 @@ function VehicleService.SpawnTruck(
 
 	local built = buildTruckModel(def, layout, trailer, trailerLayout)
 	local model = built.model
-	-- Centre the whole rig (truck + trailer) on its parking spot, once no
-	-- other truck is in it.
-	local rigShift = rigShiftOf(trailerLayout)
+	-- The whole rig (truck + trailer) centred on its bay, or its nose out
+	-- past the head of one it's longer than (homeShift), once no other
+	-- truck is in the way.
 	local rel, size = footprint(model)
-	slot, overflowIndex = clearSpot(player.UserId, slot, overflowIndex, rigShift, rel, size)
-	model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -rigShift))
+	local slot, overflowIndex =
+		clearSpot(player.UserId, choices, oldSlot, oldOverflow, layout, trailerLayout, rel, size)
+	model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -homeShift(slot, layout, trailerLayout)))
+	if old and slot ~= oldSlot then
+		-- Moved to a bay that fits (or out of the lot): say where.
+		tell(
+			player,
+			if slot
+				then string.format("Your %s parks in bay %d now.", def.displayName, slotIndex(slot))
+				else string.format(
+					"Every parking bay that fits your %s is taken: it waits west of the spawn.",
+					def.displayName
+				)
+		)
+	end
 	model:SetAttribute("OwnerId", player.UserId)
 	model:SetAttribute("TruckId", def.id)
 	model:SetAttribute("TrailerId", if trailer then trailer.id else "")
@@ -1403,6 +1479,14 @@ end
 function VehicleService.GetVehicle(player: Player): Model?
 	local rec = trucks[player.UserId]
 	return if rec then rec.model else nil
+end
+
+-- The Index of the parking bay this player's rig parks in (painted on the
+-- bay), or nil without a truck or in an overflow spot.
+function VehicleService.GetBayIndex(player: Player): number?
+	local rec = trucks[player.UserId]
+	local slot = if rec then rec.slot else nil
+	return if slot then slotIndex(slot) else nil
 end
 
 -- Where this player's truck is, as far as the server can vouch (nil

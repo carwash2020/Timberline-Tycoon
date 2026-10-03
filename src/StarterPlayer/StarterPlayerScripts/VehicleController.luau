@@ -14,7 +14,7 @@
 --   * "Send truck home" side button (Y on a gamepad): sends your truck back
 --     to your parking slot when it's far away (left somewhere, or stuck).
 --     It shows only while you're on foot, away from the truck, and the
---     truck is more than 30 studs from its own spot (the server's
+--     truck is more than 42 studs from its own spot (the server's
 --     TruckSlotDistance attribute; HudRules.SendHome), so it isn't on
 --     screen while the truck sits in the lot. The load comes along only
 --     from town; otherwise the server leaves it on the ground where the

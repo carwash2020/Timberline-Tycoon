@@ -320,6 +320,19 @@ local TRAILER_FLOOR_Y = 2.25 -- the trailer bed floor's centre (top 2.5)
 -- the Rig, fenders and all, still fits a parking slot.
 local TRAILER_TUCK = 0.3
 
+-- A rig's footprint seen from above, in studs: its length (the truck and
+-- its trailer end to end) and width (its body or its tyres, whichever
+-- stick out further). Fenders and mirrors add a few tenths (TruckArt.spec).
+-- What VehicleService fits to a parking bay (VehicleLogic.BayChoices).
+function TruckLayout.RigSize(layout: Layout, trailer: TrailerLayout?): (number, number)
+	local length = layout.length + (if trailer then trailer.length else 0)
+	local width = math.max(layout.width, 2 * layout.wheelX + layout.tyreWidth)
+	if trailer then
+		width = math.max(width, 2 * trailer.wheelX + trailer.tyreWidth)
+	end
+	return length, width
+end
+
 function TruckLayout.TrailerStyleOf(trailer: TrailerDef): TrailerStyle
 	local style = TRAILER_STYLE_FOR[trailer.id]
 	if style then

@@ -243,6 +243,65 @@ return function(t)
 		end
 	end)
 
+	-- Phase 12: parking bays come in sizes; a rig takes the smallest free
+	-- one it fits (VehicleService, through BayChoices).
+	local function bay(index, length, width)
+		return { index = index, length = length, width = width }
+	end
+
+	t.test("BayFits and BayTakes: inside the paint, or a nose out no further than MaxOverhang", function()
+		local b = bay(1, 30, 14.25)
+		t.ok(VehicleLogic.BayFits(b, 30, 14.25), "exactly its size fits")
+		t.ok(VehicleLogic.BayFits(b, 26.3, 11.6), "a Pickup fits")
+		t.ok(not VehicleLogic.BayFits(b, 30.1, 11), "a stud too long doesn't")
+		t.ok(not VehicleLogic.BayFits(b, 20, 14.3), "too wide doesn't")
+		t.ok(VehicleLogic.BayTakes(b, 26.3, 11.6), "what fits, it takes")
+		t.ok(VehicleLogic.BayTakes(b, 30 + VehicleLogic.MaxOverhang, 11), "a nose out up to MaxOverhang")
+		t.ok(not VehicleLogic.BayTakes(b, 30.1 + VehicleLogic.MaxOverhang, 11), "but no further")
+		t.ok(not VehicleLogic.BayTakes(b, 20, 14.3), "and never wider")
+	end)
+
+	t.test("BayChoices: the smallest bay it fits first, then the lowest Index; overhangs last", function()
+		local small1, small2 = bay(1, 30, 14.25), bay(2, 30, 14.25)
+		local flat, long, longest = bay(9, 38, 15), bay(12, 51, 16), bay(11, 80, 16)
+		local all = { longest, long, flat, small2, small1 }
+		t.eq(
+			VehicleLogic.BayChoices(all, 26, 11.6, nil),
+			{ 1, 2, 9, 12, 11 },
+			"a Pickup: small first, nearest the spawn"
+		)
+		t.eq(
+			VehicleLogic.BayChoices(all, 34, 12.4, nil),
+			{ 9, 12, 11, 1, 2 },
+			"a Flatbed: its own, then bigger; small ones overhung"
+		)
+		t.eq(VehicleLogic.BayChoices(all, 46.7, 12.9, nil), { 12, 11, 9, 1, 2 }, "a Rig: long, longest, then overhangs")
+		t.eq(
+			VehicleLogic.BayChoices(all, 75.4, 12.9, nil),
+			{ 11, 12 },
+			"the biggest rig: the longest, else a nose out of a long one"
+		)
+		t.eq(VehicleLogic.BayChoices({ small1, small2 }, 75.4, 12.9, nil), {}, "nothing takes it: an overflow spot")
+		-- The player's own bay stays first while it's as good as any.
+		t.eq(VehicleLogic.BayChoices(all, 26, 11.6, 2), { 2, 1, 9, 12, 11 }, "keeps its small bay")
+		t.eq(VehicleLogic.BayChoices(all, 26, 11.6, 9)[1], 1, "leaves a Flatbed bay for a free small one")
+		t.eq(VehicleLogic.BayChoices({ longest, flat }, 26, 11.6, 11), { 9, 11 }, "and the longest for the Flatbed's")
+		t.eq(
+			VehicleLogic.BayChoices({ long, small1 }, 75.4, 12.9, 1),
+			{ 12 },
+			"a bay that can't take it isn't listed, even its own"
+		)
+	end)
+
+	t.test("OverhangShift: centred when it fits, else its tail at the bay's tail", function()
+		t.eq(VehicleLogic.OverhangShift(30, 26), 0)
+		t.eq(VehicleLogic.OverhangShift(30, 30), 0)
+		t.eq(VehicleLogic.OverhangShift(51, 75), 12)
+		-- The rig's middle 12 ahead of the bay's: its back end 75 / 2 - 12 =
+		-- 25.5 behind the bay's middle, on the bay's tail.
+		t.eq(75 / 2 - VehicleLogic.OverhangShift(51, 75), 51 / 2)
+	end)
+
 	-- M1.5: the trucks grew (the widest rig, wheels and fenders, is under
 	-- 10 studs), so side-by-side overflow spots are 11 apart, like the
 	-- parking slots.

@@ -16,17 +16,21 @@ return function(t)
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
 
 	-- Lune's instances lack these; VehicleService only needs them to exist.
-	roblox.implementMethod("VehicleSeat", "GetPropertyChangedSignal", function()
+	-- A method registers once a process (VehicleBays.spec adds the same).
+	local function stub(class, method, fn)
+		pcall(roblox.implementMethod, class, method, fn)
+	end
+	stub("VehicleSeat", "GetPropertyChangedSignal", function()
 		return {
 			Connect = function()
 				return { Disconnect = function() end }
 			end,
 		}
 	end)
-	roblox.implementMethod("WorldModel", "GetPartBoundsInBox", function()
+	stub("WorldModel", "GetPartBoundsInBox", function()
 		return {}
 	end)
-	roblox.implementMethod("WorldModel", "Raycast", function()
+	stub("WorldModel", "Raycast", function()
 		return nil
 	end)
 

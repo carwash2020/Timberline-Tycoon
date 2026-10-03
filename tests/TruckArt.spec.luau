@@ -250,17 +250,27 @@ return function(t)
 		end
 	end)
 
-	-- The parking lot's slots (M1.5: 10 x 60, side by side, 11 apart).
+	-- The parking lot's bays (phase 12: sized for their rigs,
+	-- WorldPlan.ParkingBays). The bay VehicleService gives a rig in an empty
+	-- lot: the first of its choices (VehicleLogic.BayChoices) among them all.
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-	local SLOT = WorldPlan.ParkingSlotSize
-	local townSlots = WorldPlan.Town().parkingSlots
-	local SLOT_APART = math.abs(townSlots[2].X - townSlots[1].X)
+	local VehicleLogic = t.shared("VehicleLogic")
+	local townSizes = WorldPlan.Town().parkingSizes
+	local function bayFor(length, width)
+		local infos = {}
+		for i, size in ipairs(townSizes) do
+			table.insert(infos, { index = i, length = size.Z, width = size.X })
+		end
+		local choice = VehicleLogic.BayChoices(infos, length, width, nil)[1]
+		return if choice then townSizes[choice] else nil
+	end
 
-	t.test("fits its parking slot, sits on the ground, budget kept", function()
-		t.ok(SLOT.X <= SLOT_APART, "slots side by side, none overlapping")
+	t.test("fits its parking bay, sits on the ground, budget kept", function()
 		for _, rig in ipairs(rigs()) do
-			local model, layout = build(rig)
+			local model, layout, tl = build(rig)
 			local label = rig.label
+			local bay = bayFor(TruckLayout.RigSize(layout, tl))
+			t.ok(bay ~= nil, label .. " has a bay that fits it")
 			local lo, hi
 			local count = 0
 			for _, p in ipairs(parts(model)) do
@@ -273,13 +283,15 @@ return function(t)
 				end), label .. " " .. p.Name .. " placed with .Position")
 			end
 			t.ok(lo.Y > -0.02, label .. " nothing below the ground")
+			-- Built, fenders, mirrors and bumpers and all, it fits inside its
+			-- bay's paint.
 			t.ok(
-				math.max(-lo.X, hi.X) <= SLOT.X / 2,
-				string.format("%s is %.2f wide: fits its %g-wide slot", label, 2 * math.max(-lo.X, hi.X), SLOT.X)
+				math.max(-lo.X, hi.X) <= bay.X / 2,
+				string.format("%s is %.2f wide: fits its %g-wide bay", label, 2 * math.max(-lo.X, hi.X), bay.X)
 			)
 			t.ok(
-				hi.Z - lo.Z <= SLOT.Z,
-				string.format("%s is %.2f long: fits a %g-stud slot", label, hi.Z - lo.Z, SLOT.Z)
+				hi.Z - lo.Z <= bay.Z,
+				string.format("%s is %.2f long: fits its %g-stud bay", label, hi.Z - lo.Z, bay.Z)
 			)
 			t.ok(lo.Z >= layout.front - 0.6, label .. " nothing far in front of the bumper")
 			-- 74: 70 plus the two invisible skid ramps (ACT-05) plus two for

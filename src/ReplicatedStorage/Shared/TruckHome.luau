@@ -9,10 +9,11 @@
 
 local TruckHome = {}
 
--- Studs from its spot: further than this, the button can show. Half a
--- parking slot (M1.5: 60 long; it was 20 for the 37-stud slots), so a
--- truck parked anywhere in its own bay never offers it.
-TruckHome.ShowBeyond = 30
+-- Studs from its spot: further than this, the button can show. Half the
+-- longest parking bay's diagonal, rounded up (phase 12: 80 x 16,
+-- WorldPlan.ParkingBays; it was 30 for M1.5's 60-stud slots), so a truck
+-- parked anywhere in its own bay, whichever it is, never offers it.
+TruckHome.ShowBeyond = 42
 TruckHome.Step = 2 -- studs the distance moves before it's sent again
 TruckHome.Every = 0.5 -- seconds between the server's checks
 TruckHome.Max = 99999 -- the most it reads (and what a broken position reads)

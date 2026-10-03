@@ -153,17 +153,31 @@ return function(t)
 		end
 	end)
 
-	-- Pulling out of a parking slot (WorldPlan's lot: 10 x 60 slots, side by
-	-- side) with both neighbouring slots taken, the way a driver does it:
-	-- straight out (forward, or reversing) for `straight` studs, then full
-	-- lock at a crawl until the rig is at right angles to its row. A 2D
-	-- sim of the rig's footprint (truck and trailer, wheels included) about
-	-- its rear axle, as VehicleController drives it. Returns how far past
-	-- the end of its row the rig reached, or nil if it went into a
-	-- neighbour's slot.
-	local SLOT_W, SLOT_L = WorldPlan.ParkingSlotSize.X, WorldPlan.ParkingSlotSize.Z
-	local slots = WorldPlan.Town().parkingSlots
-	local spacing = math.abs(slots[2].Position.X - slots[1].Position.X)
+	-- Driving out of its parking bay (WorldPlan's lot, phase 12: bays sized
+	-- for their rigs; the small and Flatbed rows back to back, each facing
+	-- its own pull-out; the long bays pull-through) with every other bay
+	-- taken, the way a driver does it: forward out of the bay's head (where
+	-- the trucks face) for `straight` studs, then full lock at a crawl until
+	-- the rig is at right angles to its bay. A 2D sim of the rig's footprint
+	-- (truck and trailer, wheels included) about its rear axle, as
+	-- VehicleController drives it, from where VehicleService parks it: the
+	-- bay it would give the rig in an empty lot (VehicleLogic.BayChoices),
+	-- the rig centred in it. Returns how far past the bay's head the rig
+	-- reached, or nil if it went into another bay.
+	local VehicleLogic = t.shared("VehicleLogic")
+	local town = WorldPlan.Town()
+	local bays = {}
+	for i, cf in ipairs(town.parkingSlots) do
+		local size = town.parkingSizes[i]
+		table.insert(bays, {
+			index = i,
+			x = cf.Position.X,
+			z = cf.Position.Z,
+			length = size.Z,
+			width = size.X,
+			facing = if cf.LookVector.Z < 0 then -1 else 1, -- -1: toward the forest (-Z)
+		})
+	end
 
 	local function footprint(def, trailer)
 		local lay = TruckLayout.For(def)
@@ -172,12 +186,15 @@ return function(t)
 		if tl then
 			half = math.max(half, tl.wheelX + tl.tyreWidth / 2)
 		end
+		local length, width = TruckLayout.RigSize(lay, tl)
+		local bay = bays[VehicleLogic.BayChoices(bays, length, width, nil)[1]]
 		return {
 			half = half,
 			front = lay.front,
 			rear = lay.length / 2 + (if tl then tl.length else 0),
-			centre = if tl then -tl.length / 2 else 0, -- the rig is centred on its slot
+			centre = if tl then -tl.length / 2 else 0, -- the rig is centred on its bay
 			drive = TruckLayout.DriveAxleZ(lay),
+			bay = bay,
 		}
 	end
 
@@ -207,10 +224,16 @@ return function(t)
 		return true
 	end
 
-	local function pullOut(rig, straight, reverse, steer, minRadius)
-		local dt, speed = 1 / 30, if reverse then -4 else 4
-		local fx, fz = 0, -1 -- facing (the slots face -Z)
-		local px, pz = 0, rig.centre + rig.drive -- the rear axle
+	local function pullOut(rig, straight, steer, minRadius)
+		local bay = rig.bay
+		local dt, speed = 1 / 30, 4
+		local dir = bay.facing
+		local fx, fz = 0, dir -- facing out of the bay's head
+		-- The rear axle: the truck's middle `centre` along its truck-local z
+		-- from the bay's middle (the rig centred on it), the axle `drive`
+		-- further back; truck-local -Z is the way the bay faces.
+		local px, pz = bay.x, bay.z - dir * (rig.centre + rig.drive)
+		local head = bay.z + dir * bay.length / 2
 		local turned, reach, moved = 0, -math.huge, 0
 		while turned < math.pi / 2 do
 			if moved >= straight then
@@ -221,55 +244,65 @@ return function(t)
 			end
 			px += fx * speed * dt
 			pz += fz * speed * dt
-			moved += math.abs(speed) * dt
+			moved += speed * dt
 			local rx, rz = -fz, fx
 			local corners = {}
 			for _, c in ipairs({ { -1, rig.front }, { 1, rig.front }, { 1, rig.rear }, { -1, rig.rear } }) do
 				local lx, back = c[1] * rig.half, c[2] - rig.drive
 				local x, z = px + rx * lx - fx * back, pz + rz * lx - fz * back
 				table.insert(corners, { x, z })
-				reach = math.max(reach, if reverse then z - SLOT_L / 2 else -SLOT_L / 2 - z)
+				reach = math.max(reach, dir * (z - head))
 			end
-			for _, side in ipairs({ -1, 1 }) do
-				local nx = side * spacing
-				if overlaps(corners, nx - SLOT_W / 2, nx + SLOT_W / 2, -SLOT_L / 2, SLOT_L / 2) then
-					return nil
+			for _, other in ipairs(bays) do
+				if other ~= bay then
+					local hw, hl = other.width / 2, other.length / 2
+					if overlaps(corners, other.x - hw, other.x + hw, other.z - hl, other.z + hl) then
+						return nil
+					end
 				end
 			end
 		end
 		return reach
 	end
 
-	-- The least room past the row the rig needs to get out that way.
-	local function roomNeeded(rig, reverse, minRadius)
+	-- The least room past its bay's head the rig needs to get out: the
+	-- earliest turn that clears every other bay, either way (a later one
+	-- only reaches further out).
+	local function roomNeeded(rig, minRadius)
 		local best
 		for _, steer in ipairs({ -1, 1 }) do
-			for straight = 0, 60, 0.5 do
-				local reach = pullOut(rig, straight, reverse, steer, minRadius)
-				if reach and (not best or reach < best) then
-					best = reach
+			for straight = 0, 120, 0.5 do
+				local reach = pullOut(rig, straight, steer, minRadius)
+				if reach then
+					if not best or reach < best then
+						best = reach
+					end
+					break
 				end
 			end
 		end
 		return best
 	end
 
-	t.test("every rig still pulls out of a slot between two taken ones, either way", function()
-		t.ok(spacing >= SLOT_W, "slots side by side")
+	t.test("every rig drives out of its bay forward, every other bay taken", function()
 		for _, rig in ipairs(rigs()) do
 			local fp = footprint(rig.def, rig.trailer)
+			t.ok(fp.bay, rig.label .. " has a bay")
 			fp.turnRate = rig.def.turnRate
-			for _, reverse in ipairs({ false, true }) do
-				local way = rig.label .. (if reverse then " reversing out" else " driving out")
-				local before = roomNeeded(fp, reverse, nil)
-				local now = roomNeeded(fp, reverse, radiusOf(rig.def))
-				t.ok(before, way .. ": got out before")
-				t.ok(now, way .. ": still gets out without touching a neighbour's slot")
-				t.ok(
-					now <= before + 5,
-					string.format("%s: needs %.1f studs past the row (was %.1f)", way, now or -1, before or -1)
+			local way = string.format("%s out of bay %d", rig.label, fp.bay.index)
+			local before = roomNeeded(fp, nil)
+			local now = roomNeeded(fp, radiusOf(rig.def))
+			t.ok(before, way .. ": gets out on the turnRate rule alone")
+			t.ok(now, way .. ": gets out without touching another bay")
+			t.ok(
+				now <= before + 5,
+				string.format(
+					"%s: needs %.1f studs past its head (%.1f on the turnRate rule)",
+					way,
+					now or -1,
+					before or -1
 				)
-			end
+			)
 		end
 	end)
 end

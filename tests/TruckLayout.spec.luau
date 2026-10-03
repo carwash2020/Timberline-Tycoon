@@ -40,20 +40,50 @@ return function(t)
 		t.eq(#TruckLayout.For(ItemCatalog.GetTruck("LoggingRig")).wheelZ, 3)
 	end)
 
-	t.test("every rig fits a parking slot (10 x 60 studs), trailer and all", function()
-		local SLOT = t.load("ReplicatedStorage/Shared/World/WorldPlan").ParkingSlotSize
-		t.ok(math.abs(SLOT.X - 10) < 1e-9 and math.abs(SLOT.Z - 60) < 1e-9, "10 x 60 slots")
+	-- RigSize: what VehicleService fits to a parking bay. End to end, truck
+	-- and trailer; as wide as the body or the tyres, whichever stick out.
+	t.test("RigSize: the truck and trailer end to end, as wide as the body or the tyres", function()
+		for id, truck in pairs(ItemCatalog.Trucks) do
+			local layout = TruckLayout.For(truck)
+			local length, width = TruckLayout.RigSize(layout)
+			t.ok(math.abs(length - layout.length) < 1e-9, id .. " alone: its own length")
+			t.ok(math.abs(width - math.max(layout.width, 2 * layout.wheelX + layout.tyreWidth)) < 1e-9, id .. " width")
+			t.ok(width >= layout.width and width >= 2 * layout.wheelX + layout.tyreWidth, id .. ": nothing sticks out")
+			for trailerId, trailer in pairs(ItemCatalog.Trailers) do
+				local tl = TruckLayout.ForTrailer(trailer, layout)
+				local l2, w2 = TruckLayout.RigSize(layout, tl)
+				local label = id .. " + " .. trailerId
+				t.ok(math.abs(l2 - (layout.length + tl.length)) < 1e-9, label .. ": end to end")
+				t.ok(w2 >= width and w2 >= 2 * tl.wheelX + tl.tyreWidth - 1e-9, label .. ": the trailer's tyres too")
+			end
+		end
+	end)
+
+	-- Phase 12: the parking bays come in sizes (WorldPlan.ParkingBays) and
+	-- VehicleService gives each rig the smallest free one it fits. Every
+	-- rig, trailer and all, fits the longest bay; the small trucks fit the
+	-- small bays.
+	t.test("every rig fits a parking bay, trailer and all; the small trucks the small ones", function()
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local VehicleLogic = t.shared("VehicleLogic")
+		local bays = WorldPlan.ParkingBays
+		local function fits(bay, length, width)
+			return VehicleLogic.BayFits({ index = 0, length = bay.Z, width = bay.X }, length, width)
+		end
 		local longest = 0
 		for id, truck in pairs(ItemCatalog.Trucks) do
 			local layout = TruckLayout.For(truck)
-			t.ok(2 * layout.wheelX + layout.tyreWidth <= SLOT.X, id .. " too wide")
-			t.ok(layout.length <= SLOT.Z, id .. " too long")
+			local length, width = TruckLayout.RigSize(layout)
+			t.ok(fits(bays.longest, length, width), id .. " fits the longest bay")
 			for trailerId, trailer in pairs(ItemCatalog.Trailers) do
-				local tl = TruckLayout.ForTrailer(trailer, layout)
-				t.ok(2 * tl.wheelX + tl.tyreWidth <= SLOT.X, id .. " + " .. trailerId .. " too wide")
-				t.ok(layout.length + tl.length <= SLOT.Z, id .. " + " .. trailerId .. " too long")
-				longest = math.max(longest, layout.length + tl.length)
+				local l2, w2 = TruckLayout.RigSize(layout, TruckLayout.ForTrailer(trailer, layout))
+				t.ok(fits(bays.longest, l2, w2), id .. " + " .. trailerId .. " fits the longest bay")
+				longest = math.max(longest, l2)
 			end
+		end
+		for _, id in ipairs({ "Rustbucket", "Pickup", "ScoutATV" }) do
+			local length, width = TruckLayout.RigSize(TruckLayout.For(ItemCatalog.GetTruck(id)))
+			t.ok(fits(bays.small, length, width), id .. " fits a small bay")
 		end
 		t.ok(
 			math.abs(longest - 57.9) < 1e-6,

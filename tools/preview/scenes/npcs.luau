@@ -141,8 +141,9 @@ return {
 		for _, sign in ipairs(town.signs) do
 			place(BuildingArt.Signpost(sign.text), sign.cframe)
 		end
-		for _, cf in ipairs(town.parkingSlots) do
-			Kit.part(root, "Slot", WorldPlan.ParkingSlotSize, cf, C3.fromRGB(186, 168, 140), Enum.Material.Slate)
+		for index, cf in ipairs(town.parkingSlots) do
+			local size = town.parkingSizes[index] or WorldPlan.ParkingSlotSize
+			Kit.part(root, "Slot", size, cf, C3.fromRGB(186, 168, 140), Enum.Material.Slate)
 		end
 		Kit.part(
 			root,
