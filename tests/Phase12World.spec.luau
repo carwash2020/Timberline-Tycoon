@@ -179,10 +179,10 @@ return function(t)
 		t.eq(WorldPlan.ForestEdgeApart, 45)
 		t.eq(WorldPlan.ForestVergeStep, 40)
 		local trees = WorldPlan.Trees()
-		-- 761 with the homesteads scattered: the country stands filled back to
-		-- their cap, and the yards and lanes took some forest spots (was 772
-		-- when every pad shared one lawn).
-		t.ok(#trees >= 750, #trees .. " trees")
+		-- 737 once Mill Meadow, Oak Side, Ash Gate and Long Meadow moved off
+		-- the dealership lot: a few country stands and forest spots sit on
+		-- those shelves and lanes (was 772 when every pad shared one lawn).
+		t.ok(#trees >= 720, #trees .. " trees")
 		local wet = 0
 		for i = 1, 322 do
 			local p = trees[i].position
