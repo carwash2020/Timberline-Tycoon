@@ -25,6 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
@@ -32,7 +33,6 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
-local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
@@ -54,19 +54,19 @@ local function groveTier(biome: BiomeData.BiomeDef): ForestData.Tier?
 	return if type(id) == "string" then ForestLogic.Tier(id) else nil
 end
 
-local function woodsOf(biome: BiomeData.BiomeDef): string
-	local names: { string } = {}
-	for _, wood in ipairs(WoodData.All()) do
-		if (biome.trees or {})[wood.id] then
-			table.insert(names, string.lower(wood.displayName))
-		end
-	end
-	return table.concat(names, ", ")
-end
-
 local function gearName(id: string): string
 	local gear = ItemCatalog.GetGear(id)
 	return if gear then gear.displayName else id
+end
+
+-- Entering a named region: the place, its shape and what grows there.
+local function onRegionChanged()
+	local line = RegionLogic.Toast((player:GetAttribute("Region") :: string?) or "")
+	if line then
+		local biome = BiomeData.Get((player:GetAttribute("Biome") :: string?) or "")
+		local tier = if biome then groveTier(biome) else nil
+		HUD.Toast(if tier then line .. " · " .. tier.blurb else line)
+	end
 end
 
 local function onBiomeChanged()
@@ -74,8 +74,6 @@ local function onBiomeChanged()
 	if not biome then
 		return
 	end
-	local tier = groveTier(biome)
-	HUD.Toast(string.format("%s · %s%s", biome.displayName, woodsOf(biome), if tier then " · " .. tier.blurb else ""))
 	local gear = ShopLogic.DecodeSet((player:GetAttribute("OwnedGear") :: string?) or "")
 	local rules = BiomeData.Rules(biome, gear)
 	if rules.speedFactor < 1 and biome.slowdown then
@@ -272,6 +270,7 @@ function WorldUI.Start()
 	buildClock()
 	task.spawn(watchSkyBin)
 	watchGroves()
+	player:GetAttributeChangedSignal("Region"):Connect(onRegionChanged)
 	player:GetAttributeChangedSignal("Biome"):Connect(onBiomeChanged)
 end
 

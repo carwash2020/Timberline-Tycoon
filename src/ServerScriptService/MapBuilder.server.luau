@@ -149,13 +149,15 @@ local treesSpawned = 0
 -- The v2 loop's trees are section trees (V2_PLAN.md M1.3), planted at a
 -- random age so the world isn't all saplings; v1 keeps TreeService's.
 local V2 = CoreLoop.V2()
-local function spawnTree(woodId: string, at: Vector3)
-	if V2 then
-		SectionTrees.SpawnTree(woodId, CFrame.new(at), { boot = true })
-	else
-		TreeService.SpawnTree(woodId, CFrame.new(at))
+local function spawnTree(woodId: string, at: Vector3, region: string): Model?
+	local model = if V2
+		then SectionTrees.SpawnTree(woodId, CFrame.new(at), { boot = true })
+		else TreeService.SpawnTree(woodId, CFrame.new(at))
+	if model then
+		model:SetAttribute("Region", region)
 	end
 	treesSpawned += 1
+	return model
 end
 
 -- The sell area in front of the sawmill. SellArea is Persistent so every
@@ -416,6 +418,7 @@ step("5. The trees", function()
 			-- A stub (the build test) may not hand back a model.
 			if model then
 				model:SetAttribute("TutorialGrove", true)
+				model:SetAttribute("Region", "starter")
 			end
 			treesSpawned += 1
 			return nil
@@ -430,7 +433,7 @@ step("5. The trees", function()
 	local failed, firstErr = 0, nil
 	for _, spot in ipairs(WorldPlan.Trees()) do
 		local ok, err = pcall(function(): any
-			spawnTree(spot.woodId, spot.position)
+			spawnTree(spot.woodId, spot.position, spot.biome)
 			return nil
 		end)
 		if not ok then
@@ -440,6 +443,16 @@ step("5. The trees", function()
 	end
 	if failed > 0 then
 		warn(string.format("[MapBuilder] %d tree(s) failed to build; the first: %s", failed, tostring(firstErr)))
+	end
+	-- The Petrified Reach, after the fingerprint trees, so none of those move.
+	for _, spot in ipairs(WorldPlan.ReachTrees()) do
+		local ok, err = pcall(function(): any
+			spawnTree(spot.woodId, spot.position, spot.biome)
+			return nil
+		end)
+		if not ok then
+			warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
+		end
 	end
 	if V2 then
 		print(string.format("[MapBuilder] %d section trees in %.1fs", treesSpawned, os.clock() - before))
@@ -475,6 +488,50 @@ end)
 step("5. The grove's mushrooms", function()
 	for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
 		place(atomic(PropArt.Mushroom(i, true)), cf)
+	end
+end)
+
+-- Named places worth the walk: a lookout, the old ranger cabin, a cave
+-- mouth, the pale cache, and the falls. Decor and a few things you can
+-- stand on. Secrets live on the Secret attribute for anyone who looks.
+step("5. Points of interest", function()
+	local folder = Instance.new("Folder")
+	folder.Name = "PointsOfInterest"
+	folder.Parent = map
+	local DARK = { Color3.fromRGB(42, 36, 34), Color3.fromRGB(28, 24, 24), Color3.fromRGB(58, 48, 46) }
+	for _, poi in ipairs(WorldPlan.PointsOfInterest()) do
+		local model: Model
+		if poi.kind == "LookoutTower" then
+			model = PropArt.LookoutTower(poi.seed)
+		elseif poi.kind == "RuinedCabin" then
+			model = PropArt.RuinedCabin(poi.seed)
+		elseif poi.kind == "Cave" then
+			model = PropArt.Outcrop(poi.seed, DARK)
+		elseif poi.kind == "Crystal" then
+			model = PropArt.Crystal(poi.seed, Color3.fromRGB(186, 230, 255), 2.4)
+		else
+			model = BuildingArt.Signpost(poi.text or poi.name, false, true)
+		end
+		model.Name = poi.id
+		model:SetAttribute("PointOfInterest", poi.name)
+		model:SetAttribute("Region", poi.region)
+		if poi.secret then
+			model:SetAttribute("Secret", poi.secret)
+		end
+		place(atomic(model), poi.cframe, folder)
+	end
+end)
+
+-- Footpaths: a short run of worn slabs. Not roads, so the haul roads and
+-- the tree rules are unchanged.
+step("5. The trails", function()
+	local folder = Instance.new("Folder")
+	folder.Name = "Trails"
+	folder.Parent = map
+	local dirt = Color3.fromRGB(150, 116, 78)
+	for _, slab in ipairs(WorldPlan.TrailSlabs()) do
+		local part = Kit.part(folder, slab.name, Vector3.new(3.2, 0.25, 7), slab.cframe, dirt, Enum.Material.Ground)
+		Kit.decor(part, false)
 	end
 end)
 
@@ -719,7 +776,7 @@ step("6. The Skyroot and the Aether Isles", function()
 	end)
 	step("6. The Lumenwood", function()
 		for _, pos in ipairs(sky.lumenwood) do
-			spawnTree("lumenwood", pos)
+			spawnTree("lumenwood", pos, "sky")
 		end
 	end)
 	step("6. The Sky Shards", function()

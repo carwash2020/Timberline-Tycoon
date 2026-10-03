@@ -23,6 +23,9 @@ Net.RemoteNames = {
 	"MoveBlueprint", -- client -> server: (uid, x, z, rot) move a placed item on your plot
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
+	"PlotOffer", -- server -> client: (offer) the open homesteads, for the join picker
+	"ClaimPlot", -- client -> server: (index) claim that homestead (no range check)
+	"PlotPass", -- client -> server: () close the picker; the server assigns a free one
 	"PlantSeed", -- client -> server: (treeUid) plant a Heartseed in a felled tree's stump (ForestService)
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)

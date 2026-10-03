@@ -20,6 +20,7 @@ local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ProfileService = require(script.Parent.ProfileService)
+local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
 local WorldClock = require(script.Parent.WorldClock)
 
 local BiomeService = {}
@@ -85,6 +86,14 @@ local function update(player: Player)
 	local pos = root.Position
 	local biome = BiomeData.At(pos.X, pos.Z, pos.Y)
 	local biomeId = if biome then biome.id else ""
+	-- The named region (a meadow, the beach, the hidden reach) is finer
+	-- than the biome disc. Set it first so the arrival toast names the
+	-- place before any gear warning.
+	local place = RegionLogic.At(pos.X, pos.Z, pos.Y)
+	local regionId = if place then place.id else ""
+	if player:GetAttribute("Region") ~= regionId then
+		player:SetAttribute("Region", regionId)
+	end
 	if player:GetAttribute("Biome") ~= biomeId then
 		player:SetAttribute("Biome", biomeId)
 		burningWarned[player] = nil

@@ -246,7 +246,16 @@ return function(t)
 						seen += 1
 						local nearest, edge = nearestRoad(q.X, q.Y)
 						local x, z = q.X, q.Y
-						t.ok(haul[nearest.name], string.format("pale road at (%d, %d) on %s", x, z, nearest.name))
+						local joining = haul[nearest.name] or inHaulJunction(x, z)
+						if not joining then
+							for _, haulRoad in ipairs(WorldLayout.Roads) do
+								if haul[haulRoad.name] and fromCentre(haulRoad, x, z) <= haulRoad.width / 2 + 1 then
+									joining = true
+									break
+								end
+							end
+						end
+						t.ok(joining, string.format("pale road at (%d, %d) on %s", x, z, nearest.name))
 						-- On the road (its pale edge ends GravelEdge in from the
 						-- road's, give or take 0.8), never out on the grass.
 						local nh = nearest.width / 2
@@ -274,8 +283,8 @@ return function(t)
 	t.test("STY-02: the town's roads, street and paths stay dirt", function()
 		-- The Hills Road and the Snow Road where they run through town (the
 		-- pale road frays into the town's dirt where its flat ground begins),
-		-- the Forest Path, the plot district's road and lanes.
-		for _, name in ipairs({ "ForestPath", "PlotRoad", "PlotLane", "HillsRoad", "SnowRoad" }) do
+		-- and the Forest Path. Homestead lanes stay out in the country.
+		for _, name in ipairs({ "ForestPath", "HillsRoad", "SnowRoad" }) do
 			for _, road in ipairs(WorldLayout.Roads) do
 				if road.name == name then
 					for _, s in ipairs(along(road, 5)) do

@@ -24,8 +24,8 @@ return function(t)
 		end
 	end)
 
-	t.test("slots are 10 minutes and the state names its slot", function()
-		t.eq(SLOT, 600)
+	t.test("slots are 4 minutes and the state names its slot", function()
+		t.eq(SLOT, 240)
 		local s = WeatherSchedule.At(BASE + 125)
 		t.ok(s.slotStart <= BASE + 125 and BASE + 125 < s.slotEnd)
 		t.eq(s.slotEnd - s.slotStart, SLOT)
@@ -73,7 +73,7 @@ return function(t)
 		for i = 0, 400 do
 			local index = first + i
 			if WeatherSchedule.SlotKind(index) == "Fog" then
-				for k = 0, 600, 5 do
+				for k = 0, SLOT, 5 do
 					local now = index * SLOT + k
 					local clock = WorldTime.ClockTime(now)
 					if clock > 10 and clock < 19 then

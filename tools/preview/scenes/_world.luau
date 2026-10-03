@@ -261,6 +261,51 @@ function World.build(ctx, opts)
 	for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
 		place(PropArt.Mushroom(i, true), cf)
 	end
+	-- The Petrified Reach, and the points of interest (the same models
+	-- MapBuilder places). The reach's trees are gloamwood.
+	for _, spot in ipairs(WorldPlan.ReachTrees()) do
+		local def = WoodData.Get(spot.woodId)
+		local p = spot.position
+		if opts and opts.v2 then
+			sectionTree(spot.woodId, p)
+			continue
+		end
+		local seed = Kit.seedAt(p.X, p.Z)
+		local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
+		place(
+			TreeArt.Build(def, seed, size.scale),
+			CF.new(p) * CF.Angles(0, Kit.rng(seed + 202):range(0, math.pi * 2), 0)
+		)
+	end
+	local CAVE = { C3.fromRGB(42, 36, 34), C3.fromRGB(28, 24, 24), C3.fromRGB(58, 48, 46) }
+	for _, poi in ipairs(WorldPlan.PointsOfInterest()) do
+		local model
+		if poi.kind == "LookoutTower" then
+			model = PropArt.LookoutTower(poi.seed)
+		elseif poi.kind == "RuinedCabin" then
+			model = PropArt.RuinedCabin(poi.seed)
+		elseif poi.kind == "Cave" then
+			model = PropArt.Outcrop(poi.seed, CAVE)
+		elseif poi.kind == "Crystal" then
+			model = PropArt.Crystal(poi.seed, C3.fromRGB(186, 230, 255), 2.4)
+		else
+			model = BuildingArt.Signpost(poi.text or poi.name, false, true)
+		end
+		place(model, poi.cframe)
+	end
+	for _, slab in ipairs(WorldPlan.TrailSlabs()) do
+		Kit.decor(
+			Kit.part(
+				root,
+				slab.name,
+				V3.new(3.2, 0.25, 7),
+				slab.cframe,
+				C3.fromRGB(150, 116, 78),
+				roblox.Enum.Material.Ground
+			),
+			false
+		)
+	end
 	local palm = WoodData.Get("palmwood")
 	for i, pos in ipairs(WorldPlan.IslandPalms()) do
 		place(TreeArt.Build(palm, 3000 + i, 0.9 + (i % 3) * 0.1), CF.new(pos))
