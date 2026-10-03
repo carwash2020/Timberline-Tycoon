@@ -50,13 +50,25 @@ return function(t)
 	t.test("every client-to-server remote in Net has a budget", function()
 		local limiter = setup()
 		local Net = t.shared("Net")
-		-- Server-to-client remotes need none; Instant Delivery shares SellLogs' budget.
-		local skip = { CashChanged = true, Notify = true, WorldFX = true, UseInstantDelivery = true }
+		-- Server-to-client remotes need none.
+		local skip = { CashChanged = true, Notify = true, WorldFX = true }
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
 				t.ok(limiter.Allow(fakePlayer(), name), name .. " has a LIMITS entry")
 			end
 		end
+	end)
+
+	t.test("Instant Delivery has its own budget, separate from selling", function()
+		local limiter = setup()
+		local player = fakePlayer()
+		t.eq(burst(limiter, player, "SellLogs", 4), 4)
+		t.ok(not limiter.Allow(player, "SellLogs"))
+		t.eq(burst(limiter, player, "UseInstantDelivery", 2), 2, "its own two a second")
+		t.ok(not limiter.Allow(player, "UseInstantDelivery"))
+		now += 1
+		t.ok(limiter.Allow(player, "UseInstantDelivery"), "a new second")
+		t.ok(limiter.Allow(player, "SellLogs"), "and selling has its own second")
 	end)
 
 	t.test("remotes have separate budgets; unknown remotes are refused", function()

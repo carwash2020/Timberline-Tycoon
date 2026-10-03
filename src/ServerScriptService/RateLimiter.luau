@@ -14,6 +14,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PickupLog = 8,
 	LoadToTruck = 4,
 	SellLogs = 4,
+	UseInstantDelivery = 2, -- the Robux bed sale; its own budget, not SellLogs'
 	DropAxe = 2,
 	PickUpAxe = 4,
 	BuyItem = 3,

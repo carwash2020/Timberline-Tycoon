@@ -28,9 +28,9 @@ return function(t)
 		SilverAxe = { 3, 5, 11, 10, 3, 14, 18, 25, 55 },
 		CobaltAxe = { 2, 5, 10, 9, 3, 12, 16, 23, 50 },
 		GoldAxe = { 2, 5, 9, 9, 3, 12, 15, 22, 48 },
-		ObsidianAxe = { 1, 1, 2, 2, 1, 2, 3, 4, 8 },
-		InfernoAxe = { 6, 12, 25, 23, 7, 32, 4, 60, 133 },
-		StarfallAxe = { 2, 5, 9, 9, 3, 12, 10, 22, 21 },
+		ObsidianAxe = { 1, 3, 5, 4, 2, 6, 8, 11, 24 },
+		InfernoAxe = { 1, 2, 4, 3, 1, 5, 4, 8, 18 },
+		StarfallAxe = { 1, 2, 3, 3, 1, 3, 3, 6, 7 },
 	}
 
 	t.test("the hits table: every axe against every wood's mature trunk", function()
@@ -49,6 +49,56 @@ return function(t)
 		-- Every axe on the ladder is in the table.
 		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
 			t.ok(HITS[axe.id], axe.id .. " is in the hits table")
+		end
+	end)
+
+	t.test("each tier cuts at least as fast as the one below it, and Starfall is the fastest", function()
+		local ladder = ItemCatalog.AxeLadder()
+		local function secs(axe, woodId)
+			local wood = WoodData.Get(woodId)
+			local damage, cooldown = ItemCatalog.AxeStats(axe, woodId)
+			local hits = SectionLogic.HitsToCut(wood.v2.hardness, wood.v2.shape.trunkThickness, damage)
+			return SectionLogic.CutSeconds(hits, cooldown)
+		end
+		for _, woodId in ipairs(WOODS) do
+			local prev = math.huge
+			for i, axe in ipairs(ladder) do
+				local cut = secs(axe, woodId)
+				t.ok(
+					cut <= prev + 1e-9,
+					string.format(
+						"%s is slower than %s on %s",
+						axe.id,
+						ladder[i - 1] and ladder[i - 1].id or "-",
+						woodId
+					)
+				)
+				prev = cut
+			end
+			local star = secs(ladder[#ladder], woodId)
+			for _, axe in ipairs(ladder) do
+				t.ok(star <= secs(axe, woodId) + 1e-9, axe.id .. " beats Starfall on " .. woodId)
+			end
+		end
+		-- Easy trunks one-shot near the top, so the strict step is on the
+		-- woods you buy the later axes to cut.
+		for _, woodId in ipairs({ "frostwood", "emberwood", "lumenwood" }) do
+			local prevName, prev = nil, math.huge
+			for _, axe in ipairs(ladder) do
+				local cut = secs(axe, woodId)
+				if prevName then
+					t.ok(
+						cut < prev - 1e-9,
+						string.format("%s should beat %s on %s (%.2fs vs %.2fs)", axe.id, prevName, woodId, cut, prev)
+					)
+				end
+				prevName, prev = axe.id, cut
+			end
+		end
+		local reach = 0
+		for _, axe in ipairs(ladder) do
+			t.ok(axe.v2.range + 1e-9 >= reach, axe.id .. " reach goes backwards")
+			reach = axe.v2.range
 		end
 	end)
 

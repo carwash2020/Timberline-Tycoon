@@ -7,8 +7,9 @@
 --   * Every remote is rate-limited and server-validated. The client only
 --     sends intents; TreeService/EconomyService own the truth. BuyItem is
 --     handled by ShopService.
--- Autosave, shutdown flushing and session locks are ProfileStore's job
--- (see ProfileService).
+-- Autosave and session locks are ProfileStore's job (see ProfileService).
+-- The final save also commits playtime, the truck load and left-behind
+-- wood (LeaveCommit), including when the server shuts down.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -27,6 +28,7 @@ local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local SellService = require(script.Parent.SellService)
+local LeaveCommit = require(script.Parent.LeaveCommit)
 local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
@@ -490,7 +492,7 @@ end
 -- The v2 loop sells the loose wood on the beds instead (SellService.SellBed:
 -- the same wallet check, then one use).
 local function onInstantDelivery(player: Player)
-	if not RateLimiter.Allow(player, "SellLogs") then
+	if not RateLimiter.Allow(player, "UseInstantDelivery") then
 		return
 	end
 	if CoreLoop.V2() then
@@ -794,10 +796,16 @@ end
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 
-remote.ChopTree.OnServerEvent:Connect(onChopTree)
-remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
-remote.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
-remote.SellLogs.OnServerEvent:Connect(onSellLogs)
+-- The v1 loop's remotes (whole trees, carried logs, bed slots, the sell
+-- button). The live game is v2: Chop, Grab and the sell pad own those
+-- intents, so a client can't drive the old handlers. A Studio override
+-- back to loop 1 still connects them.
+if not CoreLoop.V2() then
+	remote.ChopTree.OnServerEvent:Connect(onChopTree)
+	remote.PickupLog.OnServerEvent:Connect(serverPickupLog)
+	remote.LoadToTruck.OnServerEvent:Connect(onLoadToTruck)
+	remote.SellLogs.OnServerEvent:Connect(onSellLogs)
+end
 remote.DropAxe.OnServerEvent:Connect(AxeService.Drop)
 remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	if not RateLimiter.Allow(player, "CallTruck") then
@@ -978,31 +986,48 @@ local function onPlayerAdded(player: Player)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
+-- Into the profile before the final save. Also run from OnLastSave
+-- (ProfileService), so a shutdown save that beats PlayerRemoving still
+-- gets them. Once only: the truck save destroys the wood, and a second
+-- pass would write an empty load.
+local function savePlaytime(player: Player)
+	MilestoneService.Stop(player)
+end
+
+local function saveTruckLoad(player: Player)
+	if CoreLoop.V2() then
+		TruckLoad.PlayerRemoving(player)
+	end
+end
+
+local function saveLeftBehind(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	local left = TreeService.TakeLeftBehind(player.UserId)
+	for _, entry in ipairs(left) do
+		if #profile.leftLoad >= GameConfig.MaxLeftLogs then
+			break
+		end
+		table.insert(profile.leftLoad, entry)
+	end
+end
+
+LeaveCommit.Add("playtime", savePlaytime)
+LeaveCommit.Add("truckLoad", saveTruckLoad)
+LeaveCommit.Add("leftBehind", saveLeftBehind)
+
 local function onPlayerRemoving(player: Player)
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
-	safely("MilestoneService.Stop", MilestoneService.Stop, player) -- before the final save, so playtime is included
-	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- dropped axes go back to the save
+	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
-	-- v2: the loose wood on the truck's beds goes into the save, and with it
-	-- out of the world (rebuilt on the bed on rejoin).
-	if CoreLoop.V2() then
-		safely("TruckLoad.PlayerRemoving", TruckLoad.PlayerRemoving, player)
-	end
-	-- Left-behind logs still lying out go into the save (put back on rejoin).
-	safely("save left-behind logs", function()
-		local profile = ProfileService.GetProfile(player)
-		if profile then
-			local left = TreeService.TakeLeftBehind(player.UserId)
-			for _, entry in ipairs(left) do
-				if #profile.leftLoad >= GameConfig.MaxLeftLogs then
-					break
-				end
-				table.insert(profile.leftLoad, entry)
-			end
-		end
-	end)
+	-- Playtime, the truck's loose wood and left-behind logs. Before the
+	-- release, and again (as a no-op) from the final save if shutdown
+	-- already committed them.
+	safely("LeaveCommit.Flush", LeaveCommit.Flush, player)
 	ProfileService.ReleaseProfile(player)
 	VehicleService.DespawnTruck(player)
 	RateLimiter.Forget(player)

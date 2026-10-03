@@ -54,8 +54,8 @@ local A = {
 	aimSec = 1.5, -- s to walk to and line up each cut after the first
 	tripOverhead = 8, -- s per round trip: get in, park, get out (§17)
 	sellSec = 4, -- s at the pad (§17)
-	murphReward = 25, -- the tutorial's `loads` reward (§13), after $60 sold
-	murphAfter = 60,
+	murphReward = 25, -- the tutorial's `loads` reward (§13), after murphAfter dollars sold
+	murphAfter = 120, -- TutorialData's v2 loads step (dollars sold before Murph pays)
 	groveTier = "Healthy", -- figured-wood average, as tools/economy
 	plotPrice = 900100, -- a full plot (§2f: $100 + 3000 x (1 + ... + 24))
 	sharing = 4, -- players sharing a biome's regrowth (a rare wood's cap on $/h)
@@ -581,7 +581,13 @@ local function target(name, goal, value, lo, hi)
 	line(string.format("| %s | %s | %s | %s |", name, goal, duration(value), verdict(value, lo, hi)))
 end
 target("First sale", "under 3 min", events.firstSale, 0, 180)
-target("Steel Axe ($90)", "5-8 min", events.SteelAxe or math.huge, 300, 480)
+target(
+	"Steel Axe (" .. money(ItemCatalog.GetAxe("SteelAxe").v2.price) .. ")",
+	"5-8 min",
+	events.SteelAxe or math.huge,
+	300,
+	480
+)
 target("First $1k earned", "15-20 min", events.thousand, 900, 1200)
 target("Cobalt Axe ($2,040)", "about 1 h", events.CobaltAxe or math.huge, 2700, 4500)
 target("Full plot ($900,100)", "20-40 h", events.plot, 72000, 144000)
