@@ -211,7 +211,9 @@ return function(t)
 			local front = cf.Position.Z - counter.Size.Z / 2
 			local x = cf.Position.X
 			local s = BuildingArt.Scale[shop.kind]
-			local hit = blockers(model, V3.new(x - 1.5, 0.7 * s, -8 * s), V3.new(x + 1.5, 6, front - 0.05), counter)
+			-- The general store's door is further south than the old cottage.
+			local pathStart = if shop.kind == "HearthAndHome" then -18 else -8 * s
+			local hit = blockers(model, V3.new(x - 1.5, 0.7 * s, pathStart), V3.new(x + 1.5, 6, front - 0.05), counter)
 			t.eq(hit, {}, shop.kind .. " path to the counter")
 			-- 226: 220 plus the two sign goosenecks (3 parts each) the Tool
 			-- Shed and Hearth & Home got in TWN-07, on purpose.
@@ -219,8 +221,13 @@ return function(t)
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)
+				local minX, maxX, minZ, maxZ = -12 * s, 12.5 * s, -11.6 * s, 9.2 * s
+				if shop.kind == "HearthAndHome" then
+					-- 48 x 36 studs once scaled, plus the sign over the door.
+					minX, maxX, minZ, maxZ = -26, 26, -24, 20
+				end
 				t.ok(
-					lo.X > -12 * s and hi.X < 12.5 * s and lo.Z > -11.6 * s and hi.Z < 9.2 * s,
+					lo.X > minX and hi.X < maxX and lo.Z > minZ and hi.Z < maxZ,
 					shop.kind .. " " .. p.Name .. " is outside the footprint"
 				)
 			end
@@ -808,25 +815,16 @@ return function(t)
 		local garage = BuildingArt.Shop(SHOPS[2].kind, SHOPS[2].title, SHOPS[2].accent)
 		solid(garage, "Tyre", "the Dealership's tyre stack", 4)
 		local store = BuildingArt.Shop(SHOPS[3].kind, SHOPS[3].title, SHOPS[3].accent)
-		for _, name in ipairs({ "StandPost", "Coat", "Cloak", "BayBase" }) do
-			solid(store, name, "Hearth & Home", 1)
-		end
-		-- Its boots' step shelf (the two low "Shelf" blocks) collides; the wall
-		-- shelves behind the counter stay looks only.
-		local low, high = 0, 0
+		solid(store, "Counter", "the general store", 1)
+		solid(store, "Shelf", "the general store", 4)
+		local aisle = 0
 		for _, p in ipairs(parts(store)) do
-			if p.Name == "Shelf" then
-				local lo = bounds(p)
-				if lo.Y < 4 then
-					low += 1
-					t.ok(p.CanCollide and p.CanQuery, "the step shelf collides")
-				else
-					high += 1
-				end
+			if p.Name == "Shelf" and p.CanCollide then
+				aisle += 1
+				t.ok(math.abs(p.CFrame.Position.X) >= 10, "shelves stay out of the centre aisle")
 			end
 		end
-		t.eq(low, 2, "the step shelf's two steps")
-		t.ok(high >= 1, "the wall shelves")
+		t.eq(aisle, 4, "two shelves each side")
 		-- The gondola station's lectern stand (not its sloped top).
 		local stands = 0
 		for _, p in ipairs(parts(BuildingArt.GondolaStation())) do

@@ -3,11 +3,11 @@
 -- QuestService (server) counts progress from game events; QuestUI (client)
 -- shows the objective, Murph's line and a beacon. Tuning = editing this.
 --
--- The first sale is at Murph's cart beside the tutorial oaks (TutorialGrove),
--- so a new player is paid before they learn the truck. The haul to the
--- sawmill is the next lesson. After the Steel Axe they claim a free plot
--- (and plant a sapling once that blueprint exists). QuestService then
--- keeps one next goal on the tracker (NextGoal).
+-- Order: claim a plot, chop, pick up, sell the first load at Murph's cart
+-- (he chips in $25 on that sale), then buy the Rustbucket (delivered to
+-- the plot's pad). After that the old lessons stay: load, mill, plant,
+-- the three loads, and the Steel Axe. QuestService then keeps one next
+-- goal on the tracker (NextGoal).
 --
 -- Inserting a step shifts the ones after it: QuestService moves saves
 -- made before the insert to the latest step they had reached (by the
@@ -40,6 +40,7 @@ export type TutorialEvent =
 	| "woodSold"
 	| "woodSoldCash"
 	| "plotClaimed"
+	| "truckBought"
 
 -- What the beacon points at (QuestUI finds it in the world; "stump" is a
 -- stump you hold a Heartseed for, which ForestUI also marks). v2 adds
@@ -56,6 +57,7 @@ export type BeaconTarget =
 	| "truckBed"
 	| "murphCart"
 	| "plotSign"
+	| "dealership"
 
 export type Step = {
 	id: string,
@@ -88,6 +90,7 @@ local starterAxe = ItemCatalog.AxeLadder()[1]
 local steelAxe = ItemCatalog.AxeLadder()[2] -- AlreadyDone's tier 2
 local oak = WoodData.Get("oak") :: WoodData.WoodDef
 local birch = WoodData.Get("birch") :: WoodData.WoodDef
+local rustbucket = ItemCatalog.GetTruck("Rustbucket") :: ItemCatalog.TruckDef
 local saplings = TutorialData.SaplingsExist()
 
 local function logLoad(id: string, reward: number, murph: string): Step
@@ -131,7 +134,25 @@ local function plotStep(): Step
 	}
 end
 
+local function truckStep(loop: number): Step
+	local price = ShopLogic.Price(rustbucket, loop)
+	return {
+		id = "truck",
+		objective = "Buy the Rustbucket at the dealership",
+		murph = if price > 0
+			then string.format(
+				"That sale's yours, and a little extra from me. The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.",
+				price
+			)
+			else "That sale's yours, and a little extra from me. Buy the Rustbucket at the dealership and it shows up on your plot.",
+		event = "truckBought",
+		count = 1,
+		beacon = "dealership",
+	}
+end
+
 TutorialData.Steps = {
+	plotStep(),
 	{
 		id = "fell",
 		objective = "Chop down a tree",
@@ -158,7 +179,9 @@ TutorialData.Steps = {
 		event = "logsSold",
 		count = 1,
 		beacon = "murphCart",
+		rewardCash = 25,
 	},
+	truckStep(1),
 	{
 		id = "load",
 		objective = "Load logs into your truck",
@@ -198,7 +221,6 @@ TutorialData.Steps = {
 		count = 1,
 		beacon = "toolShed",
 	},
-	plotStep(),
 } :: { Step }
 
 -- The v2 loop's steps: the same ids in the same order as Steps. Wood is
@@ -207,6 +229,7 @@ TutorialData.Steps = {
 -- trip after the truck. Each step's event is what the v2 services report.
 -- Murph's numbers come from the v2 data: hits from FieldGuide.TrunkHits.
 TutorialData.StepsV2 = {
+	plotStep(),
 	{
 		id = "fell",
 		objective = "Chop down a tree",
@@ -236,7 +259,9 @@ TutorialData.StepsV2 = {
 		event = "woodSold",
 		count = 1,
 		beacon = "murphCart",
+		rewardCash = 25,
 	},
+	truckStep(2),
 	{
 		id = "load",
 		objective = "Drag a log onto your truck's bed",
@@ -286,7 +311,6 @@ TutorialData.StepsV2 = {
 		count = 1,
 		beacon = "toolShed",
 	},
-	plotStep(),
 } :: { Step }
 
 -- The events the v2 steps listen for, in step order (woodSold and
@@ -446,11 +470,14 @@ end
 -- Whether a player who's already past this step (from their save) should
 -- have it done on the spot: they bought the Steel Axe, or they already
 -- claimed a plot and the step doesn't still need a sapling.
-function TutorialData.AlreadyDone(step: Step, bestAxeTier: number, plotClaimed: boolean?): boolean
+function TutorialData.AlreadyDone(step: Step, bestAxeTier: number, plotClaimed: boolean?, ownsTruck: boolean?): boolean
 	if step.event == "axeBought" and bestAxeTier >= 2 then
 		return true
 	end
 	if step.event == "plotClaimed" and plotClaimed == true and step.also == nil then
+		return true
+	end
+	if step.event == "truckBought" and ownsTruck == true then
 		return true
 	end
 	return false

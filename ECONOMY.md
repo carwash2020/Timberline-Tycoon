@@ -10,10 +10,10 @@ Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thick
 
 | Target | Goal | Model | Verdict |
 |---|---|---|---|
-| First sale | under 3 min | 1.8 min | ✅ on target |
-| Steel Axe ($160) | 5-8 min | 6.5 min | ✅ on target |
-| First $1k earned | 15-20 min | 12.5 min | ✅ on target |
-| Cobalt Axe ($2,040) | about 1 h | 52.7 min | ✅ on target |
+| First sale | under 3 min | 66 s | ✅ on target |
+| Steel Axe ($160) | 5-8 min | 8.0 min | ✅ on target |
+| First $1k earned | 15-20 min | 13.5 min | ✅ on target |
+| Cobalt Axe ($2,040) | about 1 h | 54.1 min | ✅ on target |
 | Full plot ($900,100) | 20-40 h | 39.4 h | ✅ on target |
 
 End of the buying path: $29,008/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
@@ -76,7 +76,7 @@ u³ a trip = length × width × (walls + 2 studs piled) × 0.4 packing / u³ (§
 |---|---|---|---|---|
 | Scout ATV | rack only | 0.0 | $0 | $2,500 |
 | Pony Trailer | 13 × 7.41, walls 1.56 | 33.5 | $50 | $1,800 |
-| Rustbucket | 13 × 7.28, walls 1.82 | 35.3 | $53 | $0 |
+| Rustbucket | 13 × 7.28, walls 1.82 | 35.3 | $53 | $75 |
 | Pickup | 15.6 × 7.8, walls 2.08 | 48.5 | $73 | $400 |
 | Ranch Trailer | 18.2 × 7.384, walls 2.6 | 60.4 | $91 | $6,000 |
 | Heavy Hauler | 26 × 7.228, walls 3.25 | 96.3 | $145 | $13,000 |
@@ -89,21 +89,22 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 
 | At | Buys | Price | $/h before | $/h after | Then cuts |
 |---|---|---|---|---|---|
-| 4.8 min | Rickety Sawmill | $130 | $1,610 | $4,652 | Frostwood (Rusty Axe) |
-| 6.5 min | Steel Axe | $160 | $4,652 | $6,581 | Frostwood (Steel Axe) |
-| 10.2 min | Pickup | $400 | $6,581 | $8,635 | Frostwood (Steel Axe) |
-| 11.5 min | Hardened Axe | $190 | $8,635 | $9,866 | Frostwood (Hardened Axe) |
-| 14.8 min | Silver Axe | $550 | $9,866 | $10,715 | Frostwood (Silver Axe) |
-| 23.2 min | Pony Trailer | $1,800 | $10,715 | $12,995 | Frostwood (Silver Axe) |
-| 25.6 min | Insulated Coat | $500 | $12,995 | $13,446 | Frostwood (Silver Axe) |
-| 45.2 min | Flatbed | $5,000 | $13,446 | $15,324 | Frostwood (Silver Axe) |
-| 52.7 min | Cobalt Axe | $2,040 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
-| 72.7 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
-| 2.2 h | Logging Rig | $19,000 | $16,655 | $17,742 | Frostwood (Cobalt Axe) |
-| 2.6 h | Gold Axe | $7,720 | $17,742 | $18,210 | Frostwood (Gold Axe) |
-| 6.9 h | Millmaster 200 Long | $86,500 | $18,210 | $22,968 | Frostwood (Gold Axe) |
-| 7.4 h | Heavy Hauler | $13,000 | $22,968 | $23,549 | Frostwood (Gold Axe) |
-| 7.8 h | Obsidian Axe | $11,000 | $23,549 | $24,014 | Frostwood (Obsidian Axe) |
+| 66 s | Rustbucket | $75 | $0 | $1,610 | Maple (Rusty Axe) |
+| 5.9 min | Rickety Sawmill | $130 | $1,610 | $4,652 | Frostwood (Rusty Axe) |
+| 8.0 min | Steel Axe | $160 | $4,652 | $6,581 | Frostwood (Steel Axe) |
+| 11.6 min | Pickup | $400 | $6,581 | $8,635 | Frostwood (Steel Axe) |
+| 12.9 min | Hardened Axe | $190 | $8,635 | $9,866 | Frostwood (Hardened Axe) |
+| 16.3 min | Silver Axe | $550 | $9,866 | $10,715 | Frostwood (Silver Axe) |
+| 24.7 min | Pony Trailer | $1,800 | $10,715 | $12,995 | Frostwood (Silver Axe) |
+| 27.0 min | Insulated Coat | $500 | $12,995 | $13,446 | Frostwood (Silver Axe) |
+| 46.6 min | Flatbed | $5,000 | $13,446 | $15,324 | Frostwood (Silver Axe) |
+| 54.1 min | Cobalt Axe | $2,040 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
+| 74.2 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
+| 2.3 h | Logging Rig | $19,000 | $16,655 | $17,742 | Frostwood (Cobalt Axe) |
+| 2.7 h | Gold Axe | $7,720 | $17,742 | $18,210 | Frostwood (Gold Axe) |
+| 7.0 h | Millmaster 200 Long | $86,500 | $18,210 | $22,968 | Frostwood (Gold Axe) |
+| 7.5 h | Heavy Hauler | $13,000 | $22,968 | $23,549 | Frostwood (Gold Axe) |
+| 7.9 h | Obsidian Axe | $11,000 | $23,549 | $24,014 | Frostwood (Obsidian Axe) |
 | 8.4 h | Inferno Axe | $14,400 | $24,014 | $24,630 | Frostwood (Inferno Axe) |
 
 ## Supply: how many players a biome feeds
@@ -142,7 +143,7 @@ Not on the cash ladder and not in the buying path above. A game pass (StoreData 
 - `liftU3` = 31.7383
 - `millDetourSec` = 40
 - `millFeedSec` = 15
-- `murphAfter` = 120
+- `murphAfter` = 0
 - `murphReward` = 25
 - `plotPrice` = 900100
 - `seeds` = 50

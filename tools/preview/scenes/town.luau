@@ -19,6 +19,7 @@ return {
 		local Enum = roblox.Enum
 		local Kit = ctx.art("Kit")
 		local BuildingArt = ctx.art("BuildingArt")
+		local DealershipLot = ctx.art("DealershipLot")
 		local BiomeData = ctx.shared("BiomeData")
 		local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local root = roblox.Instance.new("Model")
@@ -53,6 +54,7 @@ return {
 		for _, spot in ipairs(town.shops) do
 			place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
 		end
+		place(DealershipLot.Build(), town.displayLot)
 		place(BuildingArt.GondolaStation(), town.gondola)
 		place(BuildingArt.Campsite(), town.campsite)
 		for index, cf in ipairs(town.parkingSlots) do
@@ -92,7 +94,8 @@ return {
 
 		return {
 			root = root,
-			terrain = Common.terrain(ctx, -190, -70, 190, 250, 4),
+			-- East edge covers the display lot (x about 188 to 294).
+			terrain = Common.terrain(ctx, -190, -70, 310, 250, 4),
 			shadowRadius = 200,
 			fov = 50,
 			lighting = {
@@ -126,6 +129,15 @@ return {
 				{ pos = { 80, 14, 24 }, target = { 40, 0, 30 }, label = "the lot at night", night = true },
 				{ pos = { 20, 7, 62 }, target = { 20, 7, 92 }, label = "the sell sign and pad at night", night = true },
 				{ pos = { -6, 5.5, -12 }, target = { -22, 4.2, -16 }, label = "south exit, grove gate" },
+				-- Standing in the General Store's doorway, looking in at the counter.
+				{
+					pos = { -100, 6.2, 97.5 },
+					target = { -100, 4.5, 122 },
+					fov = 62,
+					label = "store interior from the door",
+				},
+				-- The open display lot, trucks facing the plot road.
+				{ pos = { 169, 34, 32 }, target = { 247, 2, 100 }, fov = 48, label = "dealership display lot" },
 			},
 		}
 	end,

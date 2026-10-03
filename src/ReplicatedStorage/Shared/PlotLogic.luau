@@ -97,7 +97,19 @@ end
 
 -- What selling a placed item pays back.
 function PlotLogic.SellValue(bp: Blueprint): number
+	if bp.unlock then
+		return 0 -- copies of a store unlock don't pay cash back
+	end
 	return math.floor(bp.priceCash * PlotData.SellBack)
+end
+
+-- Cash to place one. An unlock the player already bought is free. An unlock
+-- they haven't bought can't be placed from here (the store sells it once).
+function PlotLogic.PlacePrice(bp: Blueprint, unlocked: boolean): number?
+	if bp.unlock then
+		return if unlocked then 0 else nil
+	end
+	return PlotData.Price(bp)
 end
 
 return PlotLogic

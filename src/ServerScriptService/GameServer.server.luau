@@ -662,6 +662,9 @@ local activeLoop = CoreLoop.Active()
 safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
 safely("AxeService.Init", AxeService.Init, notify)
 safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify, activeLoop)
+VehicleService.Hooks.deliveryCFrame = function(player: Player): CFrame?
+	return PlotService.DeliveryCFrame(player)
+end
 safely("VehicleService.Init", VehicleService.Init, notify)
 safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify, activeLoop, remote.ResetTutorial)
 safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
@@ -930,7 +933,11 @@ remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	end
 	local ok, why = VehicleService.Recall(player)
 	if ok then
-		notify(player, "Your truck is back in your parking spot.")
+		if PlotService.DeliveryCFrame(player) then
+			notify(player, "Your truck is back on your plot.")
+		else
+			notify(player, "Your truck is back in your parking spot.")
+		end
 	elseif why then
 		notify(player, why)
 	end
@@ -990,6 +997,25 @@ local function onCharacterAdded(player: Player, character: Model)
 	end
 end
 
+-- An owned truck stays equipped. No owned truck means no id and no spawn
+-- (the old Rustbucket fallback is gone). A trailer that isn't owned comes off.
+local function ownedEquipped(profile: ProfileSchema.Profile): string
+	if profile.equippedTrailer ~= "" and not table.find(profile.ownedTrailers, profile.equippedTrailer) then
+		profile.equippedTrailer = ""
+	end
+	local id = profile.equippedTruck
+	if ItemCatalog.GetTruck(id) and table.find(profile.ownedTrucks, id) then
+		return id
+	end
+	local first = profile.ownedTrucks[1]
+	if type(first) == "string" and ItemCatalog.GetTruck(first) then
+		profile.equippedTruck = first
+		return first
+	end
+	profile.equippedTruck = ""
+	return ""
+end
+
 local function onPlayerAdded(player: Player)
 	if joining[player] then
 		return
@@ -1008,16 +1034,9 @@ local function onPlayerAdded(player: Player)
 		return -- "left": they're already gone
 	end
 
-	-- A save naming a truck that no longer exists (or isn't owned) falls
-	-- back to the starter.
-	if
-		not ItemCatalog.GetTruck(profile.equippedTruck) or not table.find(profile.ownedTrucks, profile.equippedTruck)
-	then
-		profile.equippedTruck = "Rustbucket"
-	end
-	if profile.equippedTrailer ~= "" and not table.find(profile.ownedTrailers, profile.equippedTrailer) then
-		profile.equippedTrailer = ""
-	end
+	local truckId = ownedEquipped(profile)
+	player:SetAttribute("OwnsTruck", truckId ~= "")
+	player:SetAttribute("EquippedTruck", truckId)
 
 	-- The v2 loop: v1 logs still on hand are bought back (and a first join
 	-- topped up to StartingCash) into v2Credit, before the truck spawns or
@@ -1061,9 +1080,11 @@ local function onPlayerAdded(player: Player)
 			end
 		end)
 	end
-	safely("VehicleService.SpawnTruck", function()
-		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
-	end)
+	if truckId ~= "" then
+		safely("VehicleService.SpawnTruck", function()
+			VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
+		end)
+	end
 	-- Logs left behind (Truck to lot from afar) that were still lying out
 	-- when the player last left: back where they lay, at most MaxLeftLogs
 	-- of them (saves made under the old cap can hold 150).
@@ -1176,19 +1197,16 @@ local function rebuildSlotNow(player: Player)
 	if not profile then
 		return
 	end
-	if
-		not ItemCatalog.GetTruck(profile.equippedTruck) or not table.find(profile.ownedTrucks, profile.equippedTruck)
-	then
-		profile.equippedTruck = "Rustbucket"
-	end
-	if profile.equippedTrailer ~= "" and not table.find(profile.ownedTrailers, profile.equippedTrailer) then
-		profile.equippedTrailer = ""
-	end
+	local truckId = ownedEquipped(profile)
+	player:SetAttribute("OwnsTruck", truckId ~= "")
+	player:SetAttribute("EquippedTruck", truckId)
 	AxeService.PlayerRemoving(player)
 	PlotService.PlayerRemoving(player)
 	VehicleService.DespawnTruck(player)
 	PlotService.PlayerJoined(player, profile)
-	VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
+	if truckId ~= "" then
+		VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
+	end
 	ShopService.PlayerJoined(player, profile)
 	ForestService.PlayerJoined(player, profile)
 	DailyService.Start(player, profile)

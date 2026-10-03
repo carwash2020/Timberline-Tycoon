@@ -155,12 +155,16 @@ local function claimedPlot(profile: Profile): boolean
 	return profile.plot ~= nil and profile.plot.claimed == true
 end
 
+local function ownsTruck(profile: Profile): boolean
+	return type(profile.ownedTrucks) == "table" and #profile.ownedTrucks > 0
+end
+
 -- Starts step `index`, skipping any the player is already past; finishes
 -- the tutorial after the last one.
 local function enterStep(player: Player, profile: Profile, index: number)
 	local list = steps()
 	local step: TutorialData.Step? = list[index]
-	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile)) do
+	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile), ownsTruck(profile)) do
 		index += 1
 		step = list[index]
 	end
@@ -230,7 +234,7 @@ function QuestService.Start(player: Player, profile: Profile)
 		return
 	end
 	local step = steps()[profile.tutorialStep]
-	if not step or TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile)) then
+	if not step or TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile), ownsTruck(profile)) then
 		enterStep(player, profile, if step then profile.tutorialStep + 1 else 1)
 	elseif profile.tutorialStep == 1 and profile.tutorialProgress == 0 then
 		enterStep(player, profile, 1) -- logs the funnel's first step
@@ -260,7 +264,9 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 		return
 	end
 	local reward = step.rewardCash
-	if reward and reward > 0 then
+	-- A returning player's refresher walks the new steps without the cash
+	-- (they already had the first-sale bonus, or never will: it's once).
+	if reward and reward > 0 and not onRefresher(profile) then
 		EconomyService.AddCash(player, reward, "tutorial: " .. step.id, "tutorial")
 		notify(player, string.format("Murph chipped in %s!", Util.formatCash(reward)))
 	end

@@ -92,8 +92,6 @@ local HAY = hex("#DDB65C")
 local WATER = hex("#7CC4F2")
 local STAR = hex("#B5D3FF")
 local ANVIL = hex("#3C3F48")
-local AWNING = { hex("#C9473C"), hex("#F4E7CC") }
-local TERRACOTTA = hex("#B8603E")
 local PAD = hex("#D9AE63")
 local PAD_INK = hex("#5A3820")
 
@@ -1407,187 +1405,96 @@ local function dealership(model: Model, title: string, accent: Color3)
 	dBox(model, "Nozzle", V3(0.25, 0.7, 0.3), pump * CF(0.75, 2.65, -0.42) * ANG(0.3, 0, 0), STEEL, MAT.Metal)
 end
 
--- Hearth & Home: a timber-framed cottage store with a slate roof, a
--- cross gable over the entrance, a striped awning with the sign above it,
--- a bay window, flower boxes, hanging lanterns and a chimney. The gear it
--- sells (ItemCatalog) is on display inside the door: the coat and cloak on
--- a stand, the boots and lanterns on a step shelf.
+-- General Store (still the HearthAndHome model): about 32 x 24 at design
+-- size, 48 x 36 once scaled. The counter sits by the open door so you can
+-- read it from the entrance. Side aisles stay wide (shelves at x = ±12,
+-- more than 8 studs between them after the 1.5 scale). Each price board
+-- hangs on the back wall facing the door, at least 4 studs wide, with one
+-- sample of that item on the ledge under it.
 local function hearthAndHome(model: Model, title: string, accent: Color3)
-	local rng = Kit.rng(733)
-	local plaster = { hex("#F0E2C6"), hex("#EBDBBB"), hex("#F3E7CF") }
+	local plaster = hex("#F0E2C6")
 	local wood = Kit.shade(accent, -0.32)
-	local roofStyle: RoofStyle = { colors = SLATE_ROOF, deck = ROOF_DECK, trim = wood, rowLen = 2.8, pieceLen = 9 }
-	local HX, HZ, FLOOR, TOP, RISE = 9, 7, 0.6, 8.6, 5.8
-	local function gearColor(id: string, fallback: string): Color3
-		local gear = ItemCatalog.GetGear(id)
-		return hex(if gear then gear.color else fallback)
+	local HX, HZ, FLOOR, TOP = 16, 12, 0.4, 10
+	local mid = (FLOOR + TOP) / 2
+	local wallH = TOP - FLOOR
+
+	Kit.part(model, "Floor", V3(2 * HX, FLOOR, 2 * HZ), CF(0, FLOOR / 2, 0), PLANK[2], MAT.WoodPlanks)
+	local function wall(cf: CFrame, w: number, h: number)
+		Kit.part(model, "Wall", V3(w, h, 0.6), cf, plaster, MAT.Plaster)
+	end
+	wall(CF(-HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
+	wall(CF(HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
+	wall(CF(0, mid, HZ), 2 * HX, wallH)
+	-- Front opens on an 8-stud door, tall enough to see the counter.
+	wall(CF(-10, mid, -HZ), 12, wallH)
+	wall(CF(10, mid, -HZ), 12, wallH)
+	wall(CF(0, (8 + TOP) / 2, -HZ), 8, TOP - 8)
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), SLATE_ROOF[1], MAT.Slate)
+
+	-- Above the roof, and no further south than the roof's overhang, so the
+	-- board doesn't hang past the front or sit inside the roof.
+	local signW, signH = 18, 2.8
+	local signY, signZ = 12.8, -HZ - 0.6
+	nameSign(model, CF(0, signY, signZ), signW, signH, title, hex("#3E6A3A"), wood, TRIM, false)
+	for _, x in ipairs({ -4, 4 }) do
+		gooseneck(model, CF(x, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
 
-	plinth(model, CF(0, 0, 0), 2 * HX, 2 * HZ, FLOOR, rng, { left = true, right = true }, 3)
-	for _, s in ipairs({ -1, 1 }) do
-		stones(model, CF(s * 6.4, 0, -HZ), 5.2, FLOOR, 0.7, rng, 2, 3)
-	end
-	Kit.wedge(model, "Ramp", V3(7.6, FLOOR, 1.2), CF(0, FLOOR / 2, -HZ - 0.6), STONE[2], MAT.Slate)
+	-- Counter by the door (customer side faces -Z, the entrance).
+	local counterZ = -7.2
+	Kit.part(model, "Counter", V3(8, 3, 1.8), CF(0, FLOOR + 1.5, counterZ), Kit.shade(accent, -0.1), MAT.WoodPlanks)
+	dBox(model, "CounterTop", V3(8.6, 0.3, 2.3), CF(0, FLOOR + 3.15, counterZ), PLANK[4])
+	register(model, CF(2.2, FLOOR + 3.3, counterZ + 0.2))
+	ledger(model, CF(-2.2, FLOOR + 3.3, counterZ - 0.1))
 
-	-- Plaster walls; the front opens on a 7.6-wide entrance.
-	local mid, h = (FLOOR + TOP) / 2, TOP - FLOOR
-	local function wall(cf: CFrame, w: number, height: number)
-		Kit.part(model, "Wall", V3(w, height, 0.6), cf, rng:pick(plaster), MAT.Plaster)
-	end
-	wall(CF(-HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, h)
-	wall(CF(HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, h)
-	wall(CF(0, mid, HZ), 2 * HX, h)
-	wall(CF(-6.4, mid, -HZ), 5.2, h)
-	wall(CF(6.4, mid, -HZ), 5.2, h)
-	wall(CF(0, (7.2 + TOP) / 2, -HZ), 7.6, TOP - 7.2)
-
-	-- The dark timber frame on the plaster.
-	local fz = -HZ - 0.33
-	local function timber(a: Vector3, b: Vector3)
-		dBeam(model, "Timber", a, b, 0.5, 0.45, wood)
-	end
-	for _, sx in ipairs({ -1, 1 }) do
-		for _, sz in ipairs({ -1, 1 }) do
-			dBox(model, "Timber", V3(0.65, h, 0.65), CF(sx * (HX + 0.05), mid, sz * (HZ + 0.05)), wood)
-		end
-		dBox(model, "Timber", V3(0.5, 6.6, 0.45), CF(sx * 3.95, FLOOR + 3.3, fz), wood)
-		timber(V3(sx * HX, 6.7, fz), V3(sx * 3.95, 6.7, fz))
-		timber(V3(sx * (HX - 0.4), 6.9, fz), V3(sx * (HX - 1.9), TOP - 0.3, fz))
-		timber(V3(sx * HX, FLOOR + 0.25, fz), V3(sx * 3.95, FLOOR + 0.25, fz))
-		local sideX = sx * (HX + 0.33)
-		timber(V3(sideX, TOP - 0.25, -HZ), V3(sideX, TOP - 0.25, HZ))
-		for _, z in ipairs({ -3.6, 3.6 }) do
-			timber(V3(sideX, FLOOR + 0.4, z), V3(sideX, TOP - 0.4, z))
+	-- Shelves down each side. The gap between them is the aisle.
+	for _, side in ipairs({ -1, 1 }) do
+		local x = side * 12
+		for _, y in ipairs({ 3.2, 6.2 }) do
+			Kit.part(model, "Shelf", V3(3.2, 0.3, 14), CF(x, y, 1), wood, MAT.Wood)
 		end
 	end
-	timber(V3(-HX, TOP - 0.25, fz), V3(HX, TOP - 0.25, fz))
 
-	-- Slate roof (ridge along X), plaster gables with a king post, and a
-	-- cross gable over the entrance with a little window.
-	gableRoof(model, CF(-0.4, TOP, 0), 2 * HX + 1.6, 2 * HZ + 0.6, RISE, 1.3, rng, roofStyle)
-	for _, s in ipairs({ -1, 1 }) do
-		local g = CF(s * HX, TOP, 0) * ANG(0, -s * PI / 2, 0)
-		gable(model, g, 2 * HZ, RISE, 0.6, plaster[1], MAT.Plaster)
-		dBox(model, "Timber", V3(0.45, RISE - 0.6, 0.4), g * CF(0, (RISE - 0.6) / 2, -0.38), wood)
-		dBox(model, "Timber", V3(7.4, 0.4, 0.4), g * CF(0, RISE * 0.42, -0.38), wood)
-	end
-	gable(model, CF(0, TOP, -HZ), 9, 4.2, 0.6, plaster[2], MAT.Plaster)
-	gableRoof(model, CF(0, TOP, -4.6) * ANG(0, PI / 2, 0), 7.4, 9.6, 4.2, 0.7, rng, roofStyle, 1)
-	window(model, CF(0, TOP + 1.45, -HZ - 0.3), 1.6, 1.3, wood, nil, nil)
-
-	-- The chimney on the east gable end.
-	Kit.part(model, "ChimneyBase", V3(2.6, 8.6, 2.4), CF(HX + 1.6, 4.3, 1.6), STONE[2], MAT.Slate)
-	Kit.part(model, "ChimneyStack", V3(1.9, 8.4, 1.7), CF(HX + 1.75, 12.8, 1.6), STONE[1], MAT.Slate)
-	dBox(model, "ChimneyCap", V3(2.4, 0.4, 2.2), CF(HX + 1.75, 17.2, 1.6), STONE[3], MAT.Slate)
-	local pot = Kit.part(model, "Chimney", V3(1, 1, 1), CF(HX + 1.75, 17.9, 1.6), TERRACOTTA, MAT.Brick)
-	local smoke = Instance.new("Smoke")
-	smoke.Color = Color3.fromRGB(232, 228, 222)
-	smoke.Opacity = 0.12
-	smoke.RiseVelocity = 3
-	smoke.Size = 2
-	smoke.Parent = pot
-
-	-- The striped awning over the entrance on two posts, the sign on top.
-	local stripes = 6
-	for i = 0, stripes - 1 do
-		local x = -4.5 + (i + 0.5) * 9 / stripes
-		local color = AWNING[i % 2 + 1]
-		dBeam(model, "Awning", V3(x, 7.5, -HZ - 0.35), V3(x, 6.7, -9.9), 9 / stripes, 0.18, color, MAT.Fabric)
-		dBox(model, "Valance", V3(9 / stripes - 0.06, 0.55, 0.12), CF(x, 6.4, -9.95), color, MAT.Fabric)
-	end
-	for _, s in ipairs({ -1, 1 }) do
-		Kit.part(model, "AwningPost", V3(0.5, 9, 0.5), CF(s * 4.35, 4.5, -9.75), wood, MAT.Wood)
-		hangingLantern(model, V3(s * 2.6, 6.6, -9.75), 0.35, 0.8)
-		planter(model, CF(s * 5.7, 0, -9.3), rng)
-	end
-	dBox(model, "AwningBeam", V3(9.2, 0.35, 0.4), CF(0, 6.65, -9.75), wood)
-	-- The name sign over the entrance (phase 12): a long board in a deep
-	-- shutter green, framed in the timbers' brown, standing on the awning
-	-- posts' tops (9 up), its name on both faces, lit by two goosenecks kept
-	-- to the middle (the BLUEPRINTS & GEAR marker floats over the east roof).
-	local signW, signH = 17.6, 2.6
-	local signY = 9 + 0.02 + NAME_FRAME + signH / 2
-	nameSign(model, CF(0, signY, -9.75), signW, signH, title, hex("#3E6A3A"), wood, TRIM, true)
-	for _, x in ipairs({ -2.6, 2.6 }) do
-		gooseneck(model, CF(x, signY + (signH + NAME_FRAME) / 2, -9.83)) -- lighting the street side (TWN-07)
-	end
-
-	-- The bay window (west) and a shuttered window (east), with flowers.
-	local bay = CF(-6.4, 0, -HZ - 0.3)
-	Kit.solid(dBox(model, "BayBase", V3(4.2, 2.2, 1.3), bay * CF(0, FLOOR + 1.1, -0.65), STONE[1], MAT.Slate))
-	Kit.window(model, bay * CF(0, 4, -1.3), 3.2, 2.6, wood, true)
-	for _, s in ipairs({ -1, 1 }) do
-		dBox(model, "BayGlass", V3(0.2, 2.6, 1.0), bay * CF(s * 1.95, 4, -0.65), GLOW, MAT.Neon)
-	end
-	dWedge(model, "BayRoof", V3(4.6, 0.9, 1.7), bay * CF(0, 5.75, -0.8), SLATE_ROOF[1], MAT.Slate)
-	flowerBox(model, bay * CF(0, 2.35, -1.75), 4, rng)
-	window(model, CF(6.4, 4.4, -HZ - 0.3), 2.2, 2.6, wood, SHUTTER, rng)
-	window(model, CF(-HX - 0.3, 4.6, 0) * ANG(0, PI / 2, 0), 2.4, 2.4, wood, nil, nil)
-
-	-- Inside the door: the gear on display, the counter, shelves. The coat
-	-- stand (its post, the coat and the cloak) and the boots' step shelf
-	-- collide; the path to the counter runs between them.
-	local stand = CF(-2.7, FLOOR, -5.2)
-	local coat = gearColor("InsulatedCoat", "#5C87B8")
-	Kit.solid(dBox(model, "StandPost", V3(0.3, 5.4, 0.3), stand * CF(0, 2.7, 0), wood))
-	dBox(model, "StandFoot", V3(1.8, 0.25, 0.3), stand * CF(0, 0.12, 0), wood)
-	dBox(model, "StandFoot", V3(0.3, 0.25, 1.8), stand * CF(0, 0.12, 0), wood)
-	dBox(model, "StandHook", V3(1.6, 0.18, 0.18), stand * CF(0, 5.1, 0), IRON, MAT.Metal)
-	Kit.solid(dBox(model, "Coat", V3(1.6, 2.6, 0.8), stand * CF(0, 3.6, -0.45), coat, MAT.Fabric))
-	for _, s in ipairs({ -1, 1 }) do
-		dBox(
-			model,
-			"CoatSleeve",
-			V3(0.5, 2.2, 0.6),
-			stand * CF(s * 0.98, 3.7, -0.45) * ANG(0, 0, -s * 0.12),
-			Kit.shade(coat, -0.1),
-			MAT.Fabric
-		)
-	end
-	dBox(model, "CoatCollar", V3(1.5, 0.45, 0.95), stand * CF(0, 4.95, -0.45), TRIM, MAT.Fabric)
-	Kit.solid(
-		dWedge(
-			model,
-			"Cloak",
-			V3(1.7, 3.2, 0.7),
-			stand * CF(0, 3.4, 0.45) * ANG(0, PI, 0),
-			gearColor("FeatherfallCloak", "#BFD8FF"),
-			MAT.Fabric
-		)
-	)
-	local shelf = CF(2.8, FLOOR, -5.2)
-	Kit.solid(dBox(model, "Shelf", V3(2.6, 0.9, 1.6), shelf * CF(0, 0.45, 0), wood))
-	Kit.solid(dBox(model, "Shelf", V3(2.6, 0.9, 0.8), shelf * CF(0, 1.35, 0.4), wood))
-	local boots = gearColor("HeatBoots", "#B5472A")
-	for _, s in ipairs({ -1, 1 }) do
-		dBox(model, "Boot", V3(0.5, 0.9, 0.55), shelf * CF(s * 0.35 - 0.6, 1.35, -0.45), boots, MAT.Leather)
-		dBox(model, "Boot", V3(0.5, 0.35, 0.5), shelf * CF(s * 0.35 - 0.6, 1.08, -0.85), boots, MAT.Leather)
-	end
-	local lanternColor = gearColor("Lantern", "#F2C14E")
-	for i, s in ipairs({ 0.55, 0.7 }) do
-		local at = shelf * CF(-0.5 + i * 0.75, (if i == 1 then 0.9 else 1.8) + 0.6 * s, if i == 1 then -0.45 else 0.4)
-		dBox(model, "LanternCap", V3(0.9, 0.25, 0.9) * s, at * CF(0, 0.7 * s, 0), IRON, MAT.Metal)
-		local g = dBox(model, "LanternGlow", V3(0.6, 1, 0.6) * s, at, lanternColor, MAT.Neon)
-		if i == 2 then
-			light(g, 10, 1)
+	-- Prices hang on the back wall, facing the door, each above a sample
+	-- of that item on the ledge. Wide enough to read from the entrance.
+	local function sample(x: number, y: number, z: number, kind: string)
+		local top = y + 0.16
+		local function show(size: Vector3, cf: CFrame, color: Color3, surface: Enum.Material)
+			local p = Kit.part(model, "Display", size, cf, color, surface)
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+		end
+		if kind == "fence" then
+			show(V3(0.35, 1.2, 0.35), CF(x - 0.5, top + 0.6, z), wood, MAT.Wood)
+			show(V3(1.4, 0.16, 0.16), CF(x + 0.25, top + 0.8, z), hex("#C4B49A"), MAT.Wood)
+		elseif kind == "shed" then
+			show(V3(1.15, 0.8, 0.9), CF(x, top + 0.4, z), hex("#8C6A45"), MAT.WoodPlanks)
+			show(V3(1.35, 0.14, 1.05), CF(x, top + 0.87, z), SLATE_ROOF[1], MAT.Slate)
+		elseif kind == "lantern" then
+			show(V3(0.18, 0.95, 0.18), CF(x, top + 0.48, z), wood, MAT.Wood)
+			show(V3(0.48, 0.36, 0.48), CF(x, top + 1.05, z), hex("#F6D58A"), MAT.Neon)
+		else
+			show(V3(0.16, 1.15, 0.16), CF(x, top + 0.5, z) * ANG(0, 0, 0.7), wood, MAT.Wood)
+			show(V3(0.6, 0.3, 0.12), CF(x + 0.22, top + 0.95, z), hex("#C0C6CE"), MAT.Metal)
 		end
 	end
-	Kit.part(model, "Counter", V3(7, 3, 1.8), CF(0, FLOOR + 1.5, 1.6), Kit.shade(accent, -0.1), MAT.WoodPlanks)
-	dBox(model, "CounterTop", V3(7.6, 0.3, 2.3), CF(0, FLOOR + 3.15, 1.6), PLANK[4])
-	register(model, CF(2, FLOOR + 3.3, 1.8))
-	ledger(model, CF(-2, FLOOR + 3.3, 1.5))
-	for _, y in ipairs({ 4.2, 6.4 }) do
-		dBox(model, "Shelf", V3(10, 0.3, 1.2), CF(0, y, HZ - 0.9), wood)
-	end
-	for i = 1, 3 do
-		dBox(
-			model,
-			"Blanket",
-			V3(1.5, 0.7, 0.95),
-			CF(-4.6 + i * 2.3, (if i % 2 == 0 then 6.4 else 4.2) + 0.5, HZ - 0.9),
-			rng:pick({ hex("#B5472A"), hex("#5C87B8"), hex("#6E8F4E"), hex("#E2B04A"), TRIM }),
-			MAT.Fabric
-		)
+	local ledge = Kit.part(model, "Ledge", V3(26, 0.22, 1.5), CF(0, 3.35, 10.55), wood, MAT.Wood)
+	ledge.CanQuery = false
+	local offers = {
+		{ x = -9.6, label = "WALL  $80\nFENCE  $30", kind = "fence" },
+		{ x = -3.2, label = "SHED  $600", kind = "shed" },
+		{ x = 3.2, label = "LANTERN  $120\nSIGN  $40", kind = "lantern" },
+		{ x = 9.6, label = "STEEL AXE  $160", kind = "axe" },
+	}
+	for _, offer in ipairs(offers) do
+		local board =
+			Kit.part(model, "PriceTag", V3(5.4, 2.3, 0.16), CF(offer.x, 6.15, 11.42), hex("#3E2A18"), MAT.Wood)
+		board.CanCollide = false
+		board.CanQuery = false
+		board.CanTouch = false
+		Kit.signText(board, offer.label, TRIM, { Enum.NormalId.Front, Enum.NormalId.Back })
+		sample(offer.x, 3.35, 10.35, offer.kind)
 	end
 end
 
