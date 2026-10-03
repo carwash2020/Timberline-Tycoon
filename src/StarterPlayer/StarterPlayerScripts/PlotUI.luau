@@ -38,6 +38,9 @@ local building = false
 local buildButton: UITheme.Button? = nil
 local modeBar: Frame? = nil
 local itemPrompts: { [Instance]: { ProximityPrompt } } = {}
+-- Client-only. SetAttribute on a server model is rejected, so a flag
+-- attribute would throw and the prompts would never appear.
+local promptWait: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 
 local function cash(): number
 	return (player:GetAttribute("Cash") :: number?) or 0
@@ -245,6 +248,18 @@ local function addPrompts(model: Instance)
 	local bp = PlotLogic.Blueprint((model:GetAttribute("BlueprintId") :: string?) or "")
 	local root = model:FindFirstChild("Root")
 	if not uid or not bp or not root then
+		-- An Atomic model arrives whole. One that streamed in pieces (or
+		-- whose Root is a frame behind the tag) still gets its prompts.
+		if uid and bp and not root and not promptWait[model] then
+			promptWait[model] = true
+			task.spawn(function()
+				local found = model:WaitForChild("Root", 8)
+				if found and found.Parent and building then
+					addPrompts(model)
+					PlotUI.Refresh()
+				end
+			end)
+		end
 		return
 	end
 	local reach = math.max(10, math.max(bp.footprint.X, bp.footprint.Y) / 2 + 6)

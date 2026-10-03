@@ -17,6 +17,12 @@
 -- PlotSlot and PlotTier attributes; plot models carry OwnerId, OwnerName
 -- and Tier; placed items (tag "PlacedItem") carry OwnerId, Uid,
 -- BlueprintId, X, Z and Rot, so the client can preview and add prompts.
+--
+-- Streaming (radius 640): the plot shell (pad, sign, claim prompt) is one
+-- Atomic model, so the sign never arrives without its prompt. Placed
+-- items are their own Atomic models beside that shell. A model that is
+-- already Atomic does not keep children added later atomic, and a cabin
+-- streaming part by part is how Move/Sell prompts (they need Root) vanish.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local CollectionService = game:GetService("CollectionService")
@@ -39,6 +45,7 @@ type Profile = ProfileService.Profile
 local PlotService = {}
 
 local BUILD_REACH = 40 -- studs past your plot's edge you can still build from
+local CLAIM_RANGE = 10 -- studs from the sign; the prompt uses the same distance
 local UNDO_SECONDS = 60 -- selling something this soon after placing it refunds it all
 PlotService.UndoSeconds = UNDO_SECONDS
 
@@ -138,7 +145,9 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
 	model:SetAttribute("Index", index)
-	model.Parent = parent
+	-- Before anything is parented into the world: an Atomic model only
+	-- streams its initial descendants together.
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	local cframe = CFrame.new(center.X, 0, center.Y)
 	local pad = part(
 		"Pad",
@@ -154,9 +163,11 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	local border = Instance.new("Folder")
 	border.Name = "Border"
 	border.Parent = model
+	-- Beside the shell, not inside it: items are built when someone claims
+	-- or places, after the shell has already streamed to whoever is nearby.
 	local items = Instance.new("Folder")
-	items.Name = "Items"
-	items.Parent = model
+	items.Name = "PlotItems_" .. index
+	items.Parent = parent
 
 	-- The signpost (drawBounds puts it at the north edge).
 	local post =
@@ -184,7 +195,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	local claim = Instance.new("ProximityPrompt")
 	claim.ActionText = "Claim this plot"
 	claim.ObjectText = "Free plot"
-	claim.MaxActivationDistance = 10
+	claim.MaxActivationDistance = CLAIM_RANGE
 	claim.HoldDuration = 0.5
 	claim.RequiresLineOfSight = false
 	claim.Parent = board
@@ -207,6 +218,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	end)
 	drawBounds(slot, PlotData.Tiers[1].size, false)
 	refreshSign(slot)
+	model.Parent = parent
 	return slot
 end
 
@@ -285,6 +297,8 @@ local function release(player: Player)
 	slot.model:SetAttribute("OwnerId", nil)
 	slot.model:SetAttribute("OwnerName", nil)
 	slot.model:SetAttribute("Tier", nil)
+	player:SetAttribute("PlotSlot", nil)
+	player:SetAttribute("PlotTier", nil)
 	drawBounds(slot, PlotData.Tiers[1].size, false)
 	refreshSign(slot)
 end
@@ -298,6 +312,18 @@ local function freeSlot(): Slot?
 	return nil
 end
 
+-- The sign's board, within the prompt's distance plus the shared slack.
+-- The engine also checks the prompt; this is the same rule the other
+-- remotes use, so a trigger from across the map does not claim.
+local function nearSign(player: Player, slot: Slot): boolean
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not root then
+		return false
+	end
+	return (root.Position - slot.board.CFrame.Position).Magnitude <= CLAIM_RANGE + GameConfig.RangeTolerance
+end
+
 local function onClaim(player: Player, slot: Slot)
 	local profile = ProfileService.GetProfile(player)
 	if not profile then
@@ -308,6 +334,10 @@ local function onClaim(player: Player, slot: Slot)
 		return
 	end
 	if slot.owner then
+		return
+	end
+	if not nearSign(player, slot) then
+		notify(player, "Walk up to the sign to claim this plot.")
 		return
 	end
 	profile.plot.claimed = true
@@ -498,8 +528,12 @@ function PlotService.Upgrade(player: Player)
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	local slot = slotOf[player]
-	if not profile or not slot then
+	if not profile then
+		return
+	end
+	local slot = nearOwnPlot(player, profile)
+	if not slot then
+		notify(player, "Stand on your plot to grow it.")
 		return
 	end
 	local nextTier = PlotData.Tier(profile.plot.tier + 1)
@@ -534,7 +568,7 @@ end
 
 -- Call once the save has loaded: a player who has claimed a plot gets one.
 function PlotService.PlayerJoined(player: Player, profile: Profile)
-	if not profile.plot.claimed then
+	if not profile.plot.claimed or slotOf[player] then
 		return
 	end
 	local slot = freeSlot()

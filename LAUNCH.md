@@ -100,6 +100,29 @@ and the smoke test). Skip the rest until something looks wrong.
 On the live game the same server lines are in the in-game console: **F9**
 (or `/console`) → **Server**.
 
+### Plots and shops
+
+Claiming a plot is free. There is no teleport: walk south-east from town
+to the plot district. The mill in town sells logs and planks. A sawmill
+you own is bought at the Tool Shed and placed from BUILD on your plot.
+The Robux STORE stays hidden while every id in `StoreData.CreatorIds` is 0.
+
+| Do this | Good looks like |
+|---|---|
+| Claim a free sign, on desktop and with a phone tap | Nothing is charged. The sign shows your name and CAMPSITE. BUILD shows while you stand on the pad. |
+| Place a fence, Stop, then Play | The plot comes back on a free slot with the fence. Cash is unchanged by the rejoin. |
+| A second player claims your sign, or builds while standing on your pad | They can't. A second claim of their own says "You already have a plot here." |
+| Grow the plot from the BUILD screen, on the pad and after walking off | Homestead costs $2,500 and only while you stand on your plot. Short cash takes nothing. |
+| Tool Shed: buy the Steel Axe, then buy it with too little cash | The card says $160. It goes to the hotbar and is still there after Stop and Play. A short wallet takes nothing. |
+| Tool Shed: buy a Rickety Sawmill and place it from BUILD | You pay the card's price once. It appears only on your plot. Stop and Play: the mill and its cut are still there. A straight log through it becomes planks. |
+| Dealership: buy the Pickup, then press it again | You own it and can drive it. The second press does not charge you. |
+| Hearth & Home | The price you pay matches the card. Each piece of gear is bought once. |
+| Rest a log and a plank on the mill pad | Both sell. The plank pays the plank price. |
+| Sky Bin by the pad | Its sell prompt shows only while the bin has wood. |
+| Instant Delivery, if the save already has a use | It sells the bed from anywhere, and refuses when none are left. No STORE button, and no side button unless a use is already owned. |
+| Fill the server (12), have one leave, rejoin on a save that already claimed | One plot each. Leaving frees the slot. A full server tells you the district is full and keeps the save. |
+| Drive far enough that the plot streams out, then come back | The sign and the buildings return together. Move and Sell are on what you placed. |
+
 ## 4. Robux (when you want the Store)
 
 Ids start at 0. While they are 0 the STORE button is hidden, those rows

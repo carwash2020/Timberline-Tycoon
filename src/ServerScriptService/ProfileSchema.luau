@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -247,11 +248,47 @@ function ProfileSchema.Migrate(data: any)
 	end
 	-- Saves from before plots were built had a `size` (tiers replaced it) and
 	-- could only hold an empty layout; anything not in plot-local x/z/rot
-	-- form is dropped.
+	-- form is dropped. NaN or infinite coordinates would break the rebuild
+	-- (PivotTo) and leave the player with no plot for the session.
+	if type(data.plot) ~= "table" then
+		data.plot = { claimed = false, tier = 1, placed = {} }
+	end
+	if data.plot.claimed ~= true then
+		data.plot.claimed = false
+	end
+	local tier = data.plot.tier
+	local tierOk = type(tier) == "number"
+		and tier == tier
+		and tier >= 1
+		and tier <= #PlotData.Tiers
+		and tier == math.floor(tier)
+	if not tierOk then
+		data.plot.tier = 1
+	end
 	data.plot.size = nil
+	if type(data.plot.placed) ~= "table" then
+		data.plot.placed = {}
+	end
 	local kept = {}
 	for _, item in ipairs(data.plot.placed) do
-		if type(item.x) == "number" and type(item.z) == "number" and type(item.rot) == "number" then
+		local x, z, rot =
+			if type(item) == "table" then item.x else nil,
+			if type(item) == "table" then item.z else nil,
+			if type(item) == "table" then item.rot else nil
+		local finite = type(x) == "number"
+			and type(z) == "number"
+			and type(rot) == "number"
+			and x == x
+			and z == z
+			and rot == rot
+			and x ~= math.huge
+			and z ~= math.huge
+			and rot ~= math.huge
+			and x ~= -math.huge
+			and z ~= -math.huge
+			and rot ~= -math.huge
+		if type(item) == "table" and type(item.uid) == "string" and item.uid ~= "" and finite then
+			item.rot = math.floor(rot :: number) % 4
 			table.insert(kept, item)
 		end
 	end

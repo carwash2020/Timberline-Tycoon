@@ -59,6 +59,31 @@ return function(t)
 		t.eq(data.plot.placed[1].uid, "new")
 	end)
 
+	t.test("a plot save with a bad tier or non-finite positions is made safe", function()
+		local Schema, data = fresh()
+		data.plot = {
+			claimed = "yes",
+			tier = 9,
+			placed = {
+				{ uid = "nan", blueprintId = "Fence", x = 0 / 0, z = 1, rot = 0 },
+				{ uid = "inf", blueprintId = "Fence", x = math.huge, z = 0, rot = 0 },
+				{ uid = "", blueprintId = "Fence", x = 1, z = 1, rot = 0 },
+				{ blueprintId = "Fence", x = 1, z = 1, rot = 0 },
+				{ uid = "ok", blueprintId = "Fence", x = 2, z = 4, rot = 5.9 },
+			},
+		}
+		Schema.Migrate(data)
+		t.eq(data.plot.claimed, false)
+		t.eq(data.plot.tier, 1)
+		t.eq(#data.plot.placed, 1)
+		t.eq(data.plot.placed[1].uid, "ok")
+		t.eq(data.plot.placed[1].rot, 1)
+		Schema.Migrate(data)
+		t.eq(data.plot.placed[1].rot, 1)
+		t.eq(data.plot.tier, 1)
+		t.eq(data.plot.claimed, false)
+	end)
+
 	t.test("migrating twice changes nothing", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)

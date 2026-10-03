@@ -152,14 +152,23 @@ local function buildClock()
 	end)
 end
 
--- The Sky Bin by the sell pad shows this player's own count.
-local function watchSkyBin()
-	local map = workspace:WaitForChild("TimberlineMap")
-	local area = map:WaitForChild("SellArea") -- Persistent: always streamed in
-	local bin = area:WaitForChild("SkyBin", 30)
-	if not bin then
-		return
+-- Calls `fn` with the named child now, and when a later one arrives.
+-- SellArea is parented at the end of the map build, and the Sky Bin's
+-- sell prompt is added after that. A bare WaitForChild warns during boot
+-- and would hang forever on a part that had streamed out.
+local function whenChild(parent: Instance, name: string, fn: (Instance) -> ())
+	local found = parent:FindFirstChild(name)
+	if found then
+		fn(found)
 	end
+	parent.ChildAdded:Connect(function(child: Instance)
+		if child.Name == name then
+			fn(child)
+		end
+	end)
+end
+
+local function bindSkyBin(bin: Instance)
 	local labels: { TextLabel } = {}
 	for _, gui in ipairs(bin:GetChildren()) do
 		local label = if gui:IsA("SurfaceGui") then gui:FindFirstChildOfClass("TextLabel") else nil
@@ -191,15 +200,47 @@ local function watchSkyBin()
 	end
 	player:GetAttributeChangedSignal("SkyBin"):Connect(refresh)
 	player:GetAttributeChangedSignal("SkyBinVolume"):Connect(refresh)
-	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(refresh)
-	refresh()
-	if CoreLoop.V2() then
-		local found = bin:WaitForChild("SellSkyBin", 30)
-		if found and found:IsA("ProximityPrompt") then
-			sellPrompt = found
-			refresh()
+	local armed = false
+	local function armPrompt()
+		if armed or not CoreLoop.V2() then
+			return
 		end
+		armed = true
+		whenChild(bin, "SellSkyBin", function(found: Instance)
+			if found:IsA("ProximityPrompt") then
+				sellPrompt = found
+				refresh()
+			end
+		end)
 	end
+	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(function()
+		refresh()
+		armPrompt()
+	end)
+	refresh()
+	armPrompt()
+end
+
+-- The Sky Bin by the sell pad shows this player's own count.
+local function watchSkyBinOn(map: Instance)
+	whenChild(map, "SellArea", function(area: Instance)
+		whenChild(area, "SkyBin", function(bin: Instance)
+			bindSkyBin(bin)
+		end)
+	end)
+end
+
+local function watchSkyBin()
+	local map = workspace:FindFirstChild("TimberlineMap")
+	if map then
+		watchSkyBinOn(map)
+		return
+	end
+	workspace.ChildAdded:Connect(function(child: Instance)
+		if child.Name == "TimberlineMap" then
+			watchSkyBinOn(child)
+		end
+	end)
 end
 
 -- A toast when the grove you're standing in changes tier.
