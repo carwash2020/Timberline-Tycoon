@@ -135,7 +135,9 @@ TutorialData.Steps = {
 	{
 		id = "fell",
 		objective = "Chop down a tree",
-		murph = "Mornin'! I'm Murph. See the little oaks just to your left? Give one a whack. {Click}, or hold, to keep swingin'.",
+		-- The hello and the grove are Murph's first-wave tip (NPCData). This
+		-- line is only how to swing, so a new player doesn't hear it twice.
+		murph = "Give one a whack. {Click}, or hold, to keep swingin'.",
 		event = "treeFelled",
 		count = 1,
 		beacon = "tree",
@@ -209,7 +211,7 @@ TutorialData.StepsV2 = {
 		id = "fell",
 		objective = "Chop down a tree",
 		murph = string.format(
-			"Mornin'! I'm Murph. See the little oaks just to your left? Swing low on a trunk and keep hittin' the same spot: about %d whacks and she tips. {Click}, or hold, to keep swingin'.",
+			"Swing low on a trunk and keep hittin' the same spot: about %d whacks and she tips. {Click}, or hold, to keep swingin'.",
 			FieldGuide.TrunkHits(starterAxe, oak)
 		),
 		murphBack = "Welcome back! The little oaks are just to your left. Things work different now: cut a tree anywhere, drag the wood, and the mill buys it by the cubic unit. Swing low on a trunk and keep hittin' the same spot till she tips. {Click}, or hold, to keep swingin'.",

@@ -6,6 +6,7 @@
 return function(t)
 	local NPCDialogue = t.shared("NPCDialogue")
 	local NPCData = t.shared("NPCData")
+	local TutorialData = t.shared("TutorialData")
 
 	local function ctx(progress, band, weather)
 		return {
@@ -71,10 +72,19 @@ return function(t)
 		t.eq(newbie.sold, false)
 		t.eq(newbie.upgradedAxe, false)
 		t.eq(newbie.sawmill, false)
-		-- Step 4 is the first sale; finishing it advances to 5.
+		-- The cart is the sell step. Standing on it hasn't sold yet.
+		local onCart = NPCDialogue.ProgressOf({
+			loaded = true,
+			tutorialStep = TutorialData.RefresherLast,
+			tutorialRefresher = false,
+			bestAxeTier = 1,
+			sawmillStock = nil,
+			placedSawmill = false,
+		})
+		t.eq(onCart.sold, false)
 		local sold = NPCDialogue.ProgressOf({
 			loaded = true,
-			tutorialStep = 5,
+			tutorialStep = TutorialData.RefresherLast + 1,
 			tutorialRefresher = false,
 			bestAxeTier = 2,
 			sawmillStock = nil,

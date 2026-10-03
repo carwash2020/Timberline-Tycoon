@@ -7,6 +7,7 @@
 -- above the hat, and fades out past a few dozen studs.
 
 local NPCData = require(script.Parent.NPCData)
+local TutorialData = require(script.Parent.TutorialData)
 
 local NPCDialogue = {}
 
@@ -115,8 +116,8 @@ function NPCDialogue.ProgressOf(attrs: {
 		loaded = true,
 		-- TutorialStep 0 is finished. A refresher already played the old loop.
 		newPlayer = step > 0 and not refresher,
-		-- Step 4 is the first sale; finishing it advances to 5.
-		sold = step == 0 or step >= 5 or refresher,
+		-- The cart is the sell step. Finishing it advances past RefresherLast.
+		sold = step == 0 or step > TutorialData.RefresherLast or refresher,
 		upgradedAxe = tier >= 2,
 		sawmill = stocked or attrs.placedSawmill == true,
 	}

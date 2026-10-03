@@ -102,7 +102,7 @@ NPCData.List = {
 		tips = {
 			"I'm Murph. Chop a tree, haul the wood, sell it at the mill.",
 			"Follow the amber arrow. Press F if you forget the step.",
-			"Start on the oaks south of town. They're the friendly ones.",
+			"The little oaks just to your left. They're the friendly ones.",
 		},
 		look = {
 			name = "Murph",

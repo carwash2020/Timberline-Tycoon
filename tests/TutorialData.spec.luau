@@ -92,7 +92,11 @@ return function(t)
 		t.ok(string.find(HintLogic.Expand(first, "phone"), "Tap, or hold", 1, true), "Tap on a phone")
 		t.ok(string.find(HintLogic.Expand(first, "desktop"), "Click, or hold", 1, true), "Click with a mouse")
 		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
-		t.ok(string.find(first, "just to your left", 1, true), "it points at the oaks by the spawn")
+		t.ok(not string.find(first, "I'm Murph", 1, true), "Murph's tip already said hello")
+		t.ok(not string.find(first, "just to your left", 1, true), "the swing line doesn't repeat the tip")
+		local tip = table.concat(t.shared("NPCData").Get("Murph").tips, " ")
+		t.ok(string.find(tip, "I'm Murph", 1, true), "the first hello is the tip")
+		t.ok(string.find(tip, "just to your left", 1, true), "the tip points at the grove")
 	end)
 
 	t.test("rewards help toward the Steel Axe but don't buy it outright", function()
@@ -265,7 +269,8 @@ return function(t)
 		t.ok(string.find(HintLogic.Expand(drag, "console"), "hold LT on a log", 1, true))
 		local first = V2[1].murph
 		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
-		t.ok(string.find(first, "just to your left", 1, true), "it points at the oaks by the spawn")
+		t.ok(not string.find(first, "I'm Murph", 1, true), "Murph's tip already said hello")
+		t.ok(not string.find(first, "just to your left", 1, true), "the swing line doesn't repeat the tip")
 		local function byId(id)
 			for _, step in ipairs(V2) do
 				if step.id == id then
