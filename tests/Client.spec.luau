@@ -85,4 +85,31 @@ return function(t)
 		t.eq(failures(warnings), { "QuestUI" })
 		t.eq(prints[#prints], "[Client] Timberline Tycoon client started.")
 	end)
+
+	-- PlayerScripts' modules arrive one by one: the client waits for all of
+	-- them before its first require (a missing HUD stopped everything once).
+	t.test("it waits for every module in its folder before the first require", function()
+		local fs = require("@lune/fs")
+		local folder = "src/StarterPlayer/StarterPlayerScripts"
+		local onDisk = {}
+		for _, entry in ipairs(fs.readDir(folder)) do
+			local name = string.match(entry, "^([^%.]+)%.luau$")
+			if name then
+				table.insert(onDisk, name)
+			end
+		end
+		table.sort(onDisk)
+		local source = fs.readFile(folder .. "/Client.client.luau")
+		local list = string.match(source, "local MODULES = (%b{})")
+		t.ok(list, "a MODULES list")
+		local listed = {}
+		for name in string.gmatch(list, '"([^"]+)"') do
+			table.insert(listed, name)
+		end
+		table.sort(listed)
+		t.eq(listed, onDisk, "MODULES names every module in StarterPlayerScripts, no more, no less")
+		local waits = string.find(source, "WaitForChild(name, MODULE_WAIT)", 1, true)
+		local firstRequire = string.find(source, "require(script.Parent.", 1, true)
+		t.ok(waits and firstRequire and waits < firstRequire, "the wait comes before any require")
+	end)
 end

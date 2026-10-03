@@ -8,6 +8,64 @@
 -- protected: if it fails, the others still start (without the HUD's corner
 -- and side buttons, which they skip with a warning).
 
+-- StarterPlayerScripts' modules are copied into PlayerScripts one by one,
+-- and this script can start before all its siblings have arrived: a plain
+-- require of one that isn't there yet stops the whole client (no HUD,
+-- quest, axe or drag). So wait for every one of them first (each module
+-- requires its siblings directly). The list is every module in this
+-- folder (Client.spec checks it).
+local MODULES = {
+	"AmbientLife",
+	"AmbientSound",
+	"AxeController",
+	"BlueprintPlacer",
+	"CameraShake",
+	"CanopyFade",
+	"CarryController",
+	"CarryPose",
+	"ChopController",
+	"CutController",
+	"DailyUI",
+	"DragController",
+	"FaceTarget",
+	"FieldGuideUI",
+	"ForestFiller",
+	"ForestUI",
+	"GondolaController",
+	"HUD",
+	"HudLayout",
+	"HudRules",
+	"LightingController",
+	"NPCController",
+	"PlotUI",
+	"PromptUI",
+	"Quality",
+	"QuestUI",
+	"SettingsUI",
+	"ShopUI",
+	"StoreUI",
+	"TownFX",
+	"TownMarkers",
+	"TreeFX",
+	"TreeUI",
+	"UITheme",
+	"VehicleController",
+	"VehicleFX",
+	"WeatherController",
+	"WindSway",
+	"WoodFX",
+	"WorldUI",
+}
+local MODULE_WAIT = 30 -- seconds for any one module before giving up on it
+do
+	local folder = script.Parent
+	for _, name in ipairs(MODULES) do
+		if folder:FindFirstChild(name) == nil and folder:WaitForChild(name, MODULE_WAIT) == nil then
+			warn(string.format("[Client] %s never arrived in PlayerScripts (waited %d s)", name, MODULE_WAIT))
+		end
+	end
+end
+
 local HUD = require(script.Parent.HUD)
 
 local controllers: { { name: string, module: { Start: () -> () } } } = {

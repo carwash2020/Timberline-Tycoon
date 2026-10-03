@@ -115,8 +115,16 @@ local function scan(dir: string, parent: any?)
 		end
 	end
 	nodes[dir] = node
+	-- A folder's own lookups (a script waiting for its siblings): the child,
+	-- or nil.
+	local function lookup(self: any, name: string): any
+		return rawget(self, name)
+	end
 	return setmetatable(node, {
 		__index = function(_, key)
+			if key == "WaitForChild" or key == "FindFirstChild" then
+				return lookup
+			end
 			error(string.format("[loader] %s has no child %q", dir, tostring(key)), 2)
 		end,
 	})
