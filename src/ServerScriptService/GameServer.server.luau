@@ -690,6 +690,9 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	MoveBlueprint = remote.MoveBlueprint,
 	SellPlaced = remote.SellPlaced,
 	UpgradePlot = remote.UpgradePlot,
+	PlotOffer = remote.PlotOffer,
+	ClaimPlot = remote.ClaimPlot,
+	PlotPass = remote.PlotPass,
 }, notify)
 safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
@@ -1187,9 +1190,12 @@ local function rebuildSlotNow(player: Player)
 		profile.equippedTrailer = ""
 	end
 	AxeService.PlayerRemoving(player)
-	PlotService.PlayerRemoving(player)
 	VehicleService.DespawnTruck(player)
-	PlotService.PlayerJoined(player, profile)
+	-- A different save, same pad: the buildings are pad-relative, and they
+	-- already picked a homestead this visit.
+	if not PlotService.Reload(player, profile) then
+		PlotService.PlayerJoined(player, profile)
+	end
 	VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
 	ShopService.PlayerJoined(player, profile)
 	ForestService.PlayerJoined(player, profile)

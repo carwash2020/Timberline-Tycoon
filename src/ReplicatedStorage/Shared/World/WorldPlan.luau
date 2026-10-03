@@ -268,7 +268,7 @@ local STAND_ROCK = 6 -- studs off a boulder's side
 local STAND_SIGN = 12 -- studs off a road sign
 local STAND_SCENERY = 8 -- studs off a scenery piece's footprint (the scenery's own gap to a tree)
 local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
-local STAND_MAX = 178 -- cap. The 3×4 plots leave room for 171 (trees 323-493)
+local STAND_MAX = 178 -- cap. A few stands sit where a homestead shelf is, so the live count is under this.
 local STAND_OPEN_MOST = 6 -- trees in an open-country stand (4 to this; roadside ones 4-9)
 
 -- A country stand: `trees` round `center` (all within `radius`); `road`

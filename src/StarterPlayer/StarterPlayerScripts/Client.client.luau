@@ -40,6 +40,7 @@ local MODULES = {
 	"LifeFX",
 	"LightingController",
 	"NPCController",
+	"PlotPickerUI",
 	"PlotUI",
 	"PromptUI",
 	"Quality",
@@ -218,6 +219,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "BlueprintPlacer",
 		get = function()
 			return require(script.Parent.BlueprintPlacer)
+		end,
+	},
+	{
+		name = "PlotPickerUI",
+		get = function()
+			return require(script.Parent.PlotPickerUI)
 		end,
 	},
 	{

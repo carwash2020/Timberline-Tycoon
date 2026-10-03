@@ -19,17 +19,136 @@ return function(t)
 		return dx * dx + dz * dz < r * r
 	end
 
-	t.test("twelve roomy plots, lanes a logging rig can drive, clear of the roads", function()
+	t.test("homesteads: a shelf, a lane and a delivery pad for every player plus two", function()
+		local GameConfig = t.shared("GameConfig")
 		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local ItemCatalog = t.shared("ItemCatalog")
-		t.eq(#PlotData.Slots, 12)
-		local widest = 0
-		for _, truck in pairs(ItemCatalog.Trucks) do
-			widest = math.max(widest, truck.look.width)
+		t.eq(#PlotData.Homes, GameConfig.MaxPlayers + 2)
+		t.eq(#PlotData.Slots, PlotData.Count)
+		t.eq(PlotData.Pad, 200)
+		t.ok(PlotData.Blend >= 50, "blend " .. PlotData.Blend)
+		t.ok(PlotData.LaneWidth >= 22, "lane " .. PlotData.LaneWidth)
+		local rig = ItemCatalog.Trucks.LoggingRig
+		local hauler = ItemCatalog.Trailers.HeavyHauler
+		t.ok(PlotData.LaneWidth >= rig.look.width + 8, "a Logging Rig fits the lane")
+		t.ok(PlotData.DeliveryWidth >= rig.look.width + 4, "the delivery pad is wider than the rig")
+		t.ok(
+			PlotData.DeliveryLength >= rig.look.bedLength + hauler.look.bedLength + 12,
+			"the delivery pad holds a rig plus a Heavy Hauler"
+		)
+		local regions = {}
+		for _, home in ipairs(PlotData.Homes) do
+			regions[home.region] = true
+			t.ok(#home.name > 0 and #home.region > 0, home.id)
 		end
-		t.ok(PlotData.LaneWidth >= widest + 8, string.format("lane %d vs rig %.2f", PlotData.LaneWidth, widest))
-		local gap = PlotData.SlotSpacing - MAX
-		t.ok(gap >= PlotData.LaneWidth + 16, "grass either side of the lane at the biggest tier")
+		local kinds = 0
+		for _ in pairs(regions) do
+			kinds += 1
+		end
+		t.ok(kinds >= 4, kinds .. " different stretches of country")
+		t.ok(regions["Starter Forest"] and regions["The Hills"], "starter and the hills both have a pad")
+		-- The tutorial still says the land is east of town, past the lot.
+		-- The dealership display lot and the path from the showroom are reserved.
+		local mill = PlotData.Homes[1]
+		t.eq(mill.name, "Mill Meadow")
+		t.ok(mill.x > 296 and mill.z > -140 and mill.z < 80, "east of the display lot")
+		for _, zone in ipairs(WorldLayout.FlatZones) do
+			if zone.name ~= "Town" then
+				for _, box in ipairs(WorldLayout.Reserved) do
+					local gap = WorldLayout.ReservedDistance(zone.x0, zone.z0, zone.x1, zone.z1, box)
+					t.ok(
+						gap >= zone.blend,
+						string.format("%s comes within %.0f of %s (blend %d)", zone.name, gap, box.name, zone.blend)
+					)
+				end
+			end
+		end
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == "PlotSpur" then
+				local pts = road.points
+				local reach = PlotData.LaneWidth / 2
+				for i = 1, #pts - 1 do
+					local a, b = pts[i], pts[i + 1]
+					local len = (b - a).Magnitude
+					local steps = math.max(1, math.ceil(len / 4))
+					for s = 0, steps do
+						local p = a:Lerp(b, s / steps)
+						for _, box in ipairs(WorldLayout.Reserved) do
+							local dx = math.max(box.x0 - p.X, 0, p.X - box.x1)
+							local dz = math.max(box.z0 - p.Y, 0, p.Y - box.z1)
+							t.ok(dx * dx + dz * dz >= reach * reach, string.format("a lane crosses %s", box.name))
+						end
+					end
+				end
+			end
+		end
+		local saw = WorldLayout.Sawmill
+		local nearCount = 0
+		for i, home in ipairs(PlotData.Homes) do
+			local haul = math.sqrt((home.x - saw.X) ^ 2 + (home.z - saw.Z) ^ 2)
+			if i <= 6 then
+				if haul <= PlotData.NearHaul then
+					nearCount += 1
+				end
+			else
+				t.ok(haul > PlotData.NearHaul, home.name .. " is one of the further homes")
+			end
+		end
+		t.ok(nearCount >= 4 and nearCount <= 6, nearCount .. " homes within a short haul, listed first")
+		local harsh = { snow = true, volcano = true, grove = true }
+		for i, home in ipairs(PlotData.Homes) do
+			local haul = math.sqrt((home.x - saw.X) ^ 2 + (home.z - saw.Z) ^ 2)
+			t.ok(haul < 800, string.format("%s is %.0f studs from town", home.name, haul))
+			t.eq(TerrainGen.WaterLevelAt(home.x, home.z), nil, home.name .. " is dry")
+			local h = TerrainGen.HeightAt(home.x, home.z)
+			local lo, hi = h, h
+			for x = -80, 80, 40 do
+				for z = -80, 80, 40 do
+					local sample = TerrainGen.HeightAt(home.x + x, home.z + z)
+					lo, hi = math.min(lo, sample), math.max(hi, sample)
+				end
+			end
+			t.ok(hi - lo < 1, string.format("%s shelf varies by %.2f", home.name, hi - lo))
+			local grove = math.huge
+			for _, biome in ipairs(BiomeData.All()) do
+				local area = biome.area
+				if area and (biome.id == "starter" or biome.id == "hills" or biome.id == "grove") then
+					local d = math.sqrt((home.x - area.x) ^ 2 + (home.z - area.z) ^ 2) - area.radius
+					grove = math.min(grove, math.max(0, d))
+				end
+			end
+			t.ok(grove <= PlotData.GroveReach, string.format("%s is %.0f from a grove", home.name, grove))
+			for _, biome in ipairs(BiomeData.All()) do
+				local area = biome.area
+				if area and harsh[biome.id] then
+					local dx, dz = home.x - area.x, home.z - area.z
+					t.ok(
+						dx * dx + dz * dz > (area.radius + MAX / 2) ^ 2,
+						string.format("%s sits in %s", home.name, biome.id)
+					)
+				end
+			end
+			for j = 1, 322 do
+				local tree = WorldPlan.Trees()[j]
+				local dx, dz = tree.position.X - home.x, tree.position.Z - home.z
+				t.ok(
+					math.max(math.abs(dx), math.abs(dz)) > MAX / 2,
+					string.format("saved tree %d stands on %s", j, home.name)
+				)
+			end
+		end
+		local zones = 0
+		for _, zone in ipairs(WorldLayout.FlatZones) do
+			if zone.name == "Plot" then
+				zones += 1
+				t.eq(zone.x1 - zone.x0, PlotData.Pad)
+				t.eq(zone.z1 - zone.z0, PlotData.Pad)
+				t.ok(zone.blend >= 50, "blend " .. tostring(zone.blend))
+			end
+		end
+		t.eq(zones, PlotData.Count)
 		local function hits(sx, sz, size, ax, az, bx, bz, width)
 			local len = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
 			local steps = math.max(1, math.ceil(len / 4))
@@ -48,12 +167,7 @@ return function(t)
 		local function nearLane(sx, sz)
 			local best = math.huge
 			for _, road in ipairs(WorldLayout.Roads) do
-				if
-					road.name == "PlotRoad"
-					or road.name == "PlotLane"
-					or road.name == "PlotSouth"
-					or road.name == "ForestExit"
-				then
+				if road.name == "PlotSpur" then
 					local pts = road.points
 					for i = 1, #pts - 1 do
 						local a, b = pts[i], pts[i + 1]
@@ -73,7 +187,30 @@ return function(t)
 			return best
 		end
 		for i, slot in ipairs(PlotData.Slots) do
-			t.ok(nearLane(slot.X, slot.Y) <= PlotData.RoadSetback + 4, "plot " .. i .. " meets a road")
+			t.ok(nearLane(slot.X, slot.Y) <= PlotData.LaneWidth + 8, "plot " .. i .. " meets a road")
+			local drive = WorldLayout.Drives[i]
+			t.ok(drive ~= nil, "plot " .. i .. " has a delivery pad")
+			if drive then
+				local dx = math.abs(drive.x - slot.X)
+				local dz = math.abs(drive.z - slot.Y)
+				t.ok(dx <= MAX / 2 and dz <= MAX / 2, "delivery pad sits on the yard")
+				t.eq(TerrainGen.WaterLevelAt(drive.x, drive.z), nil, "delivery pad is dry")
+				local halfL, halfW = PlotData.DeliveryLength / 2, PlotData.DeliveryWidth / 2
+				local tx, tz = -drive.uz, drive.ux
+				for _, corner in ipairs({
+					{ drive.ux * halfW + tx * halfL, drive.uz * halfW + tz * halfL },
+					{ drive.ux * halfW - tx * halfL, drive.uz * halfW - tz * halfL },
+					{ -drive.ux * halfW + tx * halfL, -drive.uz * halfW + tz * halfL },
+					{ -drive.ux * halfW - tx * halfL, -drive.uz * halfW - tz * halfL },
+				}) do
+					local x, z = drive.x + corner[1], drive.z + corner[2]
+					t.eq(TerrainGen.WaterLevelAt(x, z), nil, "delivery corner is dry")
+					t.ok(
+						math.abs(x - slot.X) <= MAX / 2 + 1 and math.abs(z - slot.Y) <= MAX / 2 + 1,
+						"delivery stays on the pad"
+					)
+				end
+			end
 			for _, road in ipairs(WorldLayout.Roads) do
 				local pts = road.points
 				for s = 1, #pts - 1 do
@@ -92,16 +229,18 @@ return function(t)
 		for i, a in ipairs(PlotData.Slots) do
 			for j, b in ipairs(PlotData.Slots) do
 				if i < j then
+					local apart = math.sqrt((a.X - b.X) ^ 2 + (a.Y - b.Y) ^ 2)
+					t.ok(apart >= PlotData.MinSpacing, string.format("plots %d and %d are %.0f apart", i, j, apart))
 					t.ok(
-						not rectsOverlap(a.X, a.Y, MAX + 10, MAX + 10, b.X, b.Y, MAX + 10, MAX + 10),
-						string.format("plots %d and %d leave no lane between them", i, j)
+						not rectsOverlap(a.X, a.Y, MAX, MAX, b.X, b.Y, MAX, MAX),
+						string.format("plots %d and %d share ground", i, j)
 					)
 				end
 			end
 		end
 	end)
 
-	t.test("plots stay clear of the biomes, the town and the world's edge", function()
+	t.test("homesteads stay out of town and inside the world", function()
 		for i, slot in ipairs(PlotData.Slots) do
 			for _, biome in ipairs(BiomeData.All()) do
 				local area = biome.area

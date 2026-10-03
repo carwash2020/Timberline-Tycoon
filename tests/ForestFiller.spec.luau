@@ -175,7 +175,7 @@ return function(t)
 	t.test("it builds exactly the plan round the camera, all of it decoration", function()
 		for _, tier in ipairs({ "high", "low" }) do
 			local w = world(tier)
-			local at = Vector3.new(-100, 8, -450) -- deep in the south forest
+			local at = Vector3.new(800, 8, -600) -- south forest, off the homesteads
 			w.look(at)
 			w.ForestFiller.Start()
 			t.eq(#w.heartbeat, 1, "it steps on Heartbeat")
@@ -196,7 +196,7 @@ return function(t)
 
 	t.test("it spreads the work over frames, nearest cells first", function()
 		local w = world("high")
-		local at = Vector3.new(-100, 8, -450)
+		local at = Vector3.new(800, 8, -600)
 		w.look(at)
 		w.ForestFiller.Start()
 		local seen, firstFar = 0, nil
@@ -227,7 +227,7 @@ return function(t)
 
 	t.test("moving the camera swaps cells in and out; the totals follow it", function()
 		local w = world("low")
-		w.look(Vector3.new(-100, 8, -450))
+		w.look(Vector3.new(800, 8, -600))
 		w.ForestFiller.Start()
 		w.settle(4000)
 		local to = Vector3.new(200, 8, 500) -- the north forest
@@ -243,16 +243,19 @@ return function(t)
 
 	t.test("a crown between the camera and its focus fades, and comes back", function()
 		local w = world("high")
-		local at = Vector3.new(-100, 8, -450)
+		local at = Vector3.new(800, 8, -600)
 		w.look(at)
 		w.ForestFiller.Start()
 		w.settle(4000)
-		-- A filler tree near the camera: look through its crown at a spot behind it.
+		-- A filler tree the camera actually built: look through its crown.
 		local tree
-		for cx = -5, -3 do
-			for cz = -16, -13 do
+		for cx = 24, 26 do
+			for cz = -20, -18 do
 				for _, spot in ipairs(w.WorldPlan.FillerCellTrees(cx, cz)) do
-					tree = tree or spot
+					local dx, dz = spot.x - at.X, spot.z - at.Z
+					if dx * dx + dz * dz < 80 * 80 then
+						tree = tree or spot
+					end
 				end
 			end
 		end
