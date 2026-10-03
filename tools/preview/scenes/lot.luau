@@ -119,7 +119,11 @@ return {
 
 		built.cameras = {
 			{ pos = { 20, 70, 115 }, target = { 75, 0, 20 }, label = "1 the lot from above" },
-			{ pos = { 4, 6.5, 40 }, target = { 60, 3, 18 }, label = "2 the lot from the spawn" },
+			{
+				pos = { -4, 15, 36 },
+				target = { 56, 1, 12 },
+				label = "2 the lot from the spawn, at chase-camera height",
+			},
 			{ pos = { 40, 10, 68 }, target = { 40, 3, 25 }, label = "3 the small bays" },
 			{
 				pos = { 125, 18, 78 },
