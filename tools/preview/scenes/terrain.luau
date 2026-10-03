@@ -25,6 +25,8 @@ return {
 				{ pos = { 560, 150, -300 }, target = { 360, 0, -40 }, label = "East Meadow south of the display lot" },
 				-- The Snowfields' plateau edge, where the country changes material.
 				{ pos = { 180, 160, 860 }, target = { 0, 30, 1080 }, label = "snowfields border" },
+				-- Eye height on Birch Side, looking north up its lane.
+				{ pos = { 22, 7, -270 }, target = { 0, 2, -140 }, label = "Birch Side shelf and lane at ground level" },
 			},
 		}
 	end,

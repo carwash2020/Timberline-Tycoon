@@ -16,13 +16,14 @@ return function(t)
 	-- in phase 12 when the haul roads widened, the mill road and lot loop
 	-- were added, and the cliff rings and hollow pools changed the shape.
 	-- The volcano ring was then raised to 24 so its one gap stays one gap.
-	-- Re-sampled again when the one plot lawn became 14 homestead shelves.
-	-- The shelves are flat at their own height, and each lane is a sample.
+	-- Re-sampled again when the one plot lawn became 14 homestead shelves,
+	-- and once more for the dealership display lot's flat patch. The shelves
+	-- are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
 		n = 7467,
-		sum = 91494.066286186236539,
-		wsum = -315.269925447270225,
-		sq = 9517182.132267072796822,
+		sum = 91507.958874459785875,
+		wsum = -314.994143459616794,
+		sq = 9517163.260794047266245,
 		lo = -13.781769507273463,
 		hi = 205.783118277429935,
 	}

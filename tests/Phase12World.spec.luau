@@ -179,8 +179,8 @@ return function(t)
 		t.eq(WorldPlan.ForestEdgeApart, 45)
 		t.eq(WorldPlan.ForestVergeStep, 40)
 		local trees = WorldPlan.Trees()
-		-- Shelves and lanes take a few country stands (was 772 when every
-		-- pad shared one lawn). The floor stays under the live count.
+		-- Main's lighthouse vista left 771 choppable trees. The shelves and
+		-- their lanes take the rest. 730 is the live count on that world.
 		t.ok(#trees >= 730, #trees .. " trees")
 		local wet = 0
 		for i = 1, 322 do

@@ -29,6 +29,10 @@ return {
 			},
 			{ pos = { 560, 90, -220 }, target = { 320, 4, 0 }, label = "East Meadow, the lane, and the lot" },
 			{ pos = { 80, 980, -420 }, target = { -10, 0, 160 }, label = "the homesteads from above" },
+			-- Birch Side's north edge, eye height, looking back along the lane.
+			{ pos = { 34, 8, -200 }, target = { 0, 2, -320 }, label = "Birch Side and its lane, from the ground" },
+			-- Just south of the Starter Forest's disc, looking in.
+			{ pos = { 48, 10, -240 }, target = { 0, 6, -160 }, label = "the Starter Forest's south border" },
 			{ pos = { 0, 2400, -1800 }, target = { 0, 0, 100 }, label = "the whole map" },
 		}
 		return built

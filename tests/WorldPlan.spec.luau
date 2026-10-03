@@ -2070,9 +2070,10 @@ return function(t)
 		-- (phase 10, Connor asked for many more trees; the economy model
 		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
 		-- forest's (FOR-03, tests/Forest.spec.luau).
-		-- 322 original trees plus 178 country stands. Scattering the homesteads
+		-- 322 original trees plus 160 country stands. Scattering the homesteads
 		-- gave the open country its stands back (the one lawn had left 171).
-		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 483)
+		-- One stand sits off the spawn's line to the lighthouse.
+		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 482)
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2290,10 +2291,10 @@ return function(t)
 
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
 		local trees = WorldPlan.Trees()
-		-- A fingerprint of the country stands (trees 323 to 483: index, wood,
+		-- A fingerprint of the country stands (trees 323 to 482: index, wood,
 		-- biome, x, z). Re-sampled when the shelves moved apart. The first
 		-- 322 were not.
-		local lastStand = 483
+		local lastStand = 482
 		local h = 7
 		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
@@ -2302,10 +2303,10 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 71294027, "the country stands moved, changed wood or changed order")
+		t.eq(h, 825862283, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "oak")
 		t.ok((trees[FIRST + 1].position - Vector3.new(89.8205, -1.1982, 433.2526)).Magnitude < 0.01, "tree 323")
-		t.ok((trees[lastStand].position - Vector3.new(-309.5934, 11.8135, 335.1345)).Magnitude < 0.01, "the last stand")
+		t.ok((trees[lastStand].position - Vector3.new(-339.2624, 11.7967, 338.8768)).Magnitude < 0.01, "the last stand")
 	end)
 
 	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()

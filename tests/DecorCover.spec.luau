@@ -26,12 +26,13 @@ return function(t)
 	-- decoration cell reshuffled. Phase 12 re-sampled on purpose: the six
 	-- draws per candidate are unchanged, and the wider roads, junction
 	-- flares and hollow pools reject a few of those candidates. Re-sampled
-	-- again when the homesteads scattered: flowers still skip the shelves.
+	-- again when the homesteads scattered, and again for the display lot:
+	-- flowers still skip the shelves and that patch.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1559, 103607631, 614819595 },
-			[60] = { 1956, 97762453, 348348431 },
-			[85] = { 2434, 39083386, 319275631 },
+			[20] = { 1557, 102900845, 825287505 },
+			[60] = { 1953, 96732441, 643137331 },
+			[85] = { 2428, 37091171, 981016911 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

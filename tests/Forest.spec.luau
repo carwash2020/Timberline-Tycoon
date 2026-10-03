@@ -743,7 +743,7 @@ return function(t)
 	-- FOR-03: more trees to chop where the forest is
 	---------------------------------------------------------------------------
 
-	local BASE = 483 -- the first 322 and the country stands (WorldPlan.spec pins both)
+	local BASE = 482 -- the first 322 and the country stands (WorldPlan.spec pins both)
 	local forestTrees = WorldPlan.ForestTrees()
 
 	-- Which kind of place a forest tree stands in.
@@ -968,9 +968,10 @@ return function(t)
 			add(string.format("%.2f %.2f;", l.cframe.X, l.cframe.Z))
 			-- Re-sampled in phase 12. Wider roads moved the roadside clusters
 			-- and the pieces they keep clear of; the search itself did not.
-			-- Re-sampled when the homesteads left the one lawn. The searches still
-			-- read the grass under each rock; the shelves moved a few clusters.
-			t.eq(h, 353948815, "a cluster or landmark moved")
+			-- Re-sampled when the homesteads left the one lawn, and again when the
+			-- lighthouse moved to (1203, 236). The searches still read the grass
+			-- under each rock; the shelves moved a few clusters.
+			t.eq(h, 713830729, "a cluster or landmark moved")
 		end
 	)
 

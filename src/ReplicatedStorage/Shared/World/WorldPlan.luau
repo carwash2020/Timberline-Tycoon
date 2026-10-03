@@ -933,6 +933,53 @@ local function sceneryItems(kind: string, base: CFrame, rng: Kit.Rng): { Scenery
 	return items
 end
 
+-- Where the lighthouse lamp will stand: the furthest-east headland the
+-- coast offers, set back on the sand. Scenery keeps off the line from the
+-- spawn to it. Not Lighthouse() itself (that reads the scenery).
+local cachedSight: { Vector3 }? = nil
+local function sightOfLamp(): (Vector3, Vector3)
+	local cached = cachedSight
+	if cached then
+		return cached[1], cached[2]
+	end
+	local eye = WorldPlan.Town().spawn + Vector3.new(0, 6, 0)
+	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
+	local tips: { { x: number, z: number } } = {}
+	for z = 120, 460, 4 do
+		for x = 1050, 1400 do
+			if TerrainGen.WaterLevelAt(x, z) ~= nil then
+				table.insert(tips, { x = x, z = z })
+				break
+			end
+		end
+	end
+	table.sort(tips, function(p, q)
+		if p.x ~= q.x then
+			return p.x > q.x
+		end
+		return p.z < q.z
+	end)
+	local lamp = Vector3.new(1203, 48, 236)
+	for _, tip in ipairs(tips) do
+		local x, z = tip.x - 26, tip.z
+		local lowest = math.huge
+		local dry = true
+		for _, q in ipairs(WorldPlan.SceneryFootprint(x, z, radius)) do
+			if TerrainGen.WaterLevelAt(q.X, q.Y) ~= nil then
+				dry = false
+				break
+			end
+			lowest = math.min(lowest, TerrainGen.HeightAt(q.X, q.Y))
+		end
+		if dry and TerrainGen.HeightAt(x, z) - lowest < 1.5 then
+			lamp = Vector3.new(x, lowest - 0.2 + LandmarkArt.LIGHTHOUSE_LAMP, z)
+			break
+		end
+	end
+	cachedSight = { eye, lamp }
+	return eye, lamp
+end
+
 local cachedScenery: { ScenerySpot }? = nil
 
 -- Decor-only set pieces out in the open country (WLD-01): outcrops, log
@@ -1033,6 +1080,17 @@ function WorldPlan.Scenery(): { ScenerySpot }
 			lo, hi = math.min(lo, h), math.max(hi, h)
 		end
 		if hi > SCENERY_LOW or hi - lo > math.min(WorldPlan.SceneryGrade * 2 * r, WorldPlan.ScenerySink) then
+			return nil
+		end
+		-- The spawn's view of the lighthouse lamp. A piece within its
+		-- footprint of that line, and not 30 studs under it, hides the lamp
+		-- (WorldPlan.spec). The lamp is the coast's headland; asking
+		-- Lighthouse() here would ask for the scenery again.
+		local eye, lamp = sightOfLamp()
+		local d, along =
+			WorldLayout.SegmentDistance(Vector2.new(x, z), Vector2.new(eye.X, eye.Z), Vector2.new(lamp.X, lamp.Z))
+		local lineY = eye.Y + (lamp.Y - eye.Y) * along
+		if d < r + 4 and lineY - (lo - 0.1) <= 30 then
 			return nil
 		end
 		return lo - 0.1

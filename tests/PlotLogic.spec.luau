@@ -86,7 +86,9 @@ return function(t)
 			)
 		end
 		for _, zone in ipairs(WorldLayout.FlatZones) do
-			if zone.name ~= "Town" then
+			-- Town, and the display lot's own flat patch, are the town job's
+			-- ground. Shelves and the apron still stay clear of both reserved boxes.
+			if zone.name ~= "Town" and zone.name ~= "DealershipLot" then
 				for _, box in ipairs(WorldLayout.Reserved) do
 					local gap = WorldLayout.ReservedDistance(zone.x0, zone.z0, zone.x1, zone.z1, box)
 					local need = zone.blend
