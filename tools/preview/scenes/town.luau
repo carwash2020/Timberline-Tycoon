@@ -86,6 +86,9 @@ return {
 		for _, g in ipairs(town.greenery) do
 			place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
 		end
+		for _, cf in ipairs(town.pathRounds) do
+			place(BuildingArt.PathRound(), cf)
+		end
 
 		return {
 			root = root,
@@ -122,6 +125,7 @@ return {
 				{ pos = { 2, 6.5, 32 }, target = { 0, 9, 110 }, label = "the spawn walk at night", night = true },
 				{ pos = { 80, 14, 24 }, target = { 40, 0, 30 }, label = "the lot at night", night = true },
 				{ pos = { 20, 7, 62 }, target = { 20, 7, 92 }, label = "the sell sign and pad at night", night = true },
+				{ pos = { -6, 5.5, -12 }, target = { -22, 4.2, -16 }, label = "south exit, grove gate" },
 			},
 		}
 	end,

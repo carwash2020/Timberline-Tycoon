@@ -847,7 +847,10 @@ end
 --     pointing along world Z (the blade faces the sell pad). Spin it on
 --     clients with blade.CFrame *= CFrame.Angles(step, 0, 0). Its teeth,
 --     hub and rivets are welded to it (unanchored, massless), so they turn
---     with it. Not collidable.
+--     with it. Not collidable. "SawGuard" is an invisible box over the
+--     blade, and "GuardRail" closes the front of the headrig and the east
+--     opening: players and loose logs bump those instead of walking into
+--     the saw.
 --   "Smokestack": the top of the brick stack (y 25.7..27.9), holding the
 --     Smoke.
 function BuildingArt.Sawmill(scale: number?): Model
@@ -1020,20 +1023,19 @@ function BuildingArt.Sawmill(scale: number?): Model
 		)
 	end
 	onBlade(Kit.cylinder(model, "BladeHub", 0.5, 1.8, bladeCf, IRON, MAT.Metal))
-	for i = 0, 2 do
-		local a = i / 3 * PI * 2 + 0.5
-		onBlade(
-			Kit.cylinder(
-				model,
-				"BladeRivet",
-				0.34,
-				0.6,
-				CF(hub + V3(math.cos(a), math.sin(a), 0) * 2.6) * ANG(0, PI / 2, 0),
-				IRON,
-				MAT.Metal
-			)
+	-- One rivet: the teeth and the hub already meet the weld count.
+	local a = 0.5
+	onBlade(
+		Kit.cylinder(
+			model,
+			"BladeRivet",
+			0.34,
+			0.6,
+			CF(hub + V3(math.cos(a), math.sin(a), 0) * 2.6) * ANG(0, PI / 2, 0),
+			IRON,
+			MAT.Metal
 		)
-	end
+	)
 	dCyl(model, "Arbor", 3.4, 0.55, CF(-3.2, 6, 3) * ANG(0, PI / 2, 0), STEEL_DARK, MAT.Metal)
 	Kit.part(model, "SawFrame", V3(1.6, 4.6, 1.4), CF(-3.2, FLOOR + 2.3, 3.4), TIMBER, MAT.Wood)
 	dBox(model, "Bearing", V3(1.9, 0.9, 1.6), CF(-3.2, 6, 3.4), IRON, MAT.Metal)
@@ -1060,6 +1062,19 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dRod(model, "Flue", V3(-8, FLOOR + 6, 9.8), V3(-8, 9.6, 9.8), 0.9, IRON, MAT.Metal)
 	dRod(model, "Flue", V3(-8, 9.6, 9.8), V3(-13.9, 9.6, 12.4), 0.9, IRON, MAT.Metal)
 	dRod(model, "SteamPipe", V3(-7.6, FLOOR + 4.2, 8.3), V3(-7.2, FLOOR + 2.6, 5.4), 0.35, STEEL_DARK, MAT.Metal)
+
+	-- The blade doesn't collide (it has to spin). An invisible box covers
+	-- the disc down to the deck, short of the log on the carriage. A rail
+	-- across the front of the headrig and one in the east opening keep
+	-- people on the deck side of the saw.
+	local sawGuard = Kit.part(model, "SawGuard", V3(8.2, 11, 2.2), CF(-3.9, 6.55, 1.35), TIMBER, MAT.Wood)
+	sawGuard.Transparency = 1
+	sawGuard.CastShadow = false
+	sawGuard.CanTouch = false
+	local frontRail = Kit.part(model, "GuardRail", V3(14, 3.4, 0.4), CF(-2, 2.75, -3.1), TIMBER, MAT.Wood)
+	frontRail.CanTouch = false
+	local eastRail = Kit.part(model, "GuardRail", V3(0.45, 5.2, 6.2), CF(9.7, 3.65, -0.5), TIMBER, MAT.Wood)
+	eastRail.CanTouch = false
 
 	-- Inside: cut lumber, sawdust, barrels, lanterns from the tie beam.
 	lumberStack(model, CF(-7.4, FLOOR, -8.4), 5.6, 2.4, 3, 2, rng)
@@ -2289,10 +2304,21 @@ PROPS.Planter = function(model, rng)
 	planter(model, CFrame.identity, rng)
 end
 
+-- A brass bell on a timber post, the grove gate's marker (the post
+-- collides; the bell is looks only).
+PROPS.MillBell = function(model, rng)
+	local post = Kit.part(model, "Post", V3(0.55, 5.2, 0.55), CF(0, 2.6, 0), TIMBER, MAT.Wood)
+	post.CanTouch = false
+	dBox(model, "Cap", V3(0.85, 0.22, 0.85), CF(0, 5.28, 0), TIMBER_LIGHT)
+	dBall(model, "Bell", 0.85, CF(0, 4.45, 0.55), Kit.vary(BRASS, rng, 0.04), MAT.Metal)
+	dBox(model, "Clapper", V3(0.12, 0.35, 0.12), CF(0, 4.1, 0.55), IRON, MAT.Metal)
+end
+
 -- Town dressing, by name: "LogPile", "Crate", "Barrel", "Bench", "Well",
 -- "Cart", "SawdustPile", "WaterTower", "Mailbox", "FlowerBox", "Haybale",
--- "Wheelbarrow", "ToolRack", "Lantern", "Planter". An unknown name builds a
--- crate. Each is built on the ground at the origin; `seed` varies it.
+-- "Wheelbarrow", "ToolRack", "Lantern", "Planter", "MillBell". An unknown
+-- name builds a crate. Each is built on the ground at the origin; `seed`
+-- varies it.
 function BuildingArt.Prop(name: string, seed: number): Model
 	local model = Kit.model(name)
 	local build = PROPS[name] or PROPS.Crate
@@ -2308,6 +2334,16 @@ function BuildingArt.PropNames(): { string }
 	end
 	table.sort(names)
 	return names
+end
+
+-- A saw-cut log round set into a path: one flat disc, looks only. The
+-- town's shop paths are paved with these (Timberline's own walk, not a
+-- plain dirt track).
+function BuildingArt.PathRound(): Model
+	local model = Kit.model("PathRound")
+	local round = Kit.cylinder(model, "Round", 0.1, 1.6, CF(0, 0.08, 0) * ANG(0, 0, PI / 2), HEART, MAT.Wood)
+	Kit.decor(round, false)
+	return model
 end
 
 ---------------------------------------------------------------------------

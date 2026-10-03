@@ -108,6 +108,17 @@ return function(t)
 		Sawmill.Tick()
 		t.eq(piece.selling, true)
 		t.eq(part.Anchored, true)
+		-- Snapped onto the belt: length along the feed, centred, not still
+		-- wherever it was dropped.
+		local belt = mill:FindFirstChild("Conveyor")
+		t.ok(part.CFrame.UpVector:Dot(belt.CFrame.LookVector) > 0.99, "the log lies along the belt")
+		t.ok(math.abs(part.CFrame.X) < 0.2, "centred, clear of the walls")
+		t.ok(part.CFrame.Y > belt.CFrame.Position.Y, "sitting on the belt")
+		local before = part.CFrame.Position
+		now += Logic.ProcessSeconds(volume) / 2
+		Sawmill.Tick()
+		local moved = part.CFrame.Position - before
+		t.ok(moved.Z > 0.2 and math.abs(moved.X) < 1e-3, "it feeds along the belt, not through a wall")
 		local expect = Logic.Cut(
 			volume,
 			Logic.DefaultSettings(Catalog.GetSawmill("SawmillRickety")),

@@ -5,11 +5,14 @@
 --
 -- Every GameConfig.SellPollSec each mill's Intake is one box query over
 -- the Wood folder. A log that has rested there for Settle seconds, that
--- SawmillLogic will take, and whose WoodWatch verdict is good, is anchored
--- and fed through over 1-3 s. It is marked selling while that happens, so
--- it can't be grabbed, sold or milled twice. Then it is destroyed and its
--- volume comes back as planks (the log's wood, owner, figure and boost),
--- one at a time, at the Output attachment.
+-- SawmillLogic will take, and whose WoodWatch verdict is good, is anchored,
+-- snapped onto the conveyor (length along the belt, centred so it misses
+-- the walls) and slid to the outfeed over 1-3 s. The belt's own
+-- AssemblyLinearVelocity matches GameConfig.ConveyorSpeed, aimed out the
+-- front. The log is marked selling while that happens, so it can't be
+-- grabbed, sold or milled twice. Then it is destroyed and its volume comes
+-- back as planks (the log's wood, owner, figure and boost), one at a time,
+-- on the ground just past the Output attachment, shoved along the outfeed.
 --
 -- Planks are ordinary loose wood after that: drag them, load them, and the
 -- sell pad pays the plank price.
@@ -38,6 +41,7 @@ type Job = {
 	mill: Model,
 	piece: Piece,
 	from: CFrame,
+	to: CFrame,
 	start: number,
 	duration: number,
 	planks: { SawmillLogic.Plank },
@@ -133,14 +137,69 @@ local function outputCf(model: Model): CFrame
 	return model:GetPivot() * CFrame.new(0, 2, 8)
 end
 
--- Length (the part's Y) points out of the mill. Planks pile just past the
--- outfeed, four high, so a burst doesn't spawn inside itself.
-local function plankCf(out: CFrame, plank: SawmillLogic.Plank, index: number): CFrame
-	local look = out.LookVector
-	if look.Magnitude < 1e-6 then
-		look = Vector3.zAxis
+local function unit(v: Vector3): Vector3
+	if v.Magnitude < 1e-6 then
+		return Vector3.zAxis
 	end
-	look = look.Unit
+	return v.Unit
+end
+
+local function beltPart(mill: Model): BasePart?
+	local belt = mill:FindFirstChild("Conveyor", true)
+	if belt and belt:IsA("BasePart") and belt.CanCollide then
+		return belt
+	end
+	return nil
+end
+
+local function lengthOf(piece: Piece): number
+	local n = 0
+	for _, part in pairs(piece.parts) do
+		n += part.Size.Y
+	end
+	return math.max(n, 0.2)
+end
+
+local function radiusOf(piece: Piece): number
+	local r = 0.2
+	for _, part in pairs(piece.parts) do
+		r = math.max(r, math.min(part.Size.X, part.Size.Z) / 2)
+	end
+	return r
+end
+
+-- Y axis (a section's length) lies along `dir`.
+local function along(pos: Vector3, dir: Vector3): CFrame
+	local yAxis = unit(dir)
+	local xAxis = yAxis:Cross(Vector3.yAxis)
+	if xAxis.Magnitude < 0.2 then
+		xAxis = yAxis:Cross(Vector3.xAxis)
+	end
+	xAxis = xAxis.Unit
+	return CFrame.fromMatrix(pos, xAxis, yAxis, xAxis:Cross(yAxis))
+end
+
+-- Both poses sit on the belt centreline, so the slide never walks the log
+-- into a side wall. The centre travels nearly the whole belt; a log longer
+-- than the mill hangs out the ends (those guards don't collide with wood).
+local function beltEnds(belt: BasePart, piece: Piece): (CFrame, CFrame)
+	local look = unit(belt.CFrame.LookVector)
+	local half = belt.Size.Z / 2
+	local nose = math.min(lengthOf(piece) / 2, half * 0.35)
+	local lift = belt.CFrame.UpVector * (belt.Size.Y / 2 + radiusOf(piece))
+	-- CFrame, not .Position: art is placed with CFrame, and a part's
+	-- Position stays unset until something writes it.
+	local at = belt.CFrame.Position
+	local entry = at - look * (half - nose) + lift
+	local exit = at + look * (half - nose) + lift
+	return along(entry, look), along(exit, look)
+end
+
+-- Length (the part's Y) points out of the mill. Planks sit on the ground
+-- just past the outfeed, four high, so a burst doesn't spawn inside the
+-- housing or inside itself.
+local function plankCf(out: CFrame, plank: SawmillLogic.Plank, index: number): CFrame
+	local look = unit(out.LookVector)
 	local up = if math.abs(look:Dot(Vector3.yAxis)) > 0.99 then Vector3.zAxis else Vector3.yAxis
 	local right = look:Cross(up)
 	if right.Magnitude < 1e-6 then
@@ -149,10 +208,8 @@ local function plankCf(out: CFrame, plank: SawmillLogic.Plank, index: number): C
 	right = right.Unit
 	local layer = (index - 1) % 4
 	local row = math.floor((index - 1) / 4)
-	local pos = out.Position
-		+ look * (plank.sy / 2 + 1.4)
-		+ Vector3.yAxis * (layer * (plank.sz + 0.2) + plank.sz / 2)
-		+ right * (row * (plank.sx + 0.25))
+	local pos = out.Position + look * (plank.sy / 2 + 0.6) + right * (row * (plank.sx + 0.3))
+	pos = Vector3.new(pos.X, 0.05 + plank.sz / 2 + layer * (plank.sz + 0.12), pos.Z)
 	return CFrame.fromMatrix(pos, right, look)
 end
 
@@ -212,11 +269,22 @@ local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCata
 	c.moved(piece.model)
 	WoodService.Physics.SetOwner(piece.root, nil)
 	anchor(piece, true)
+	local fromCf, toCf
+	local belt = beltPart(mill)
+	if belt then
+		fromCf, toCf = beltEnds(belt, piece)
+	else
+		fromCf = piece.model:GetPivot()
+		local intake = mill:FindFirstChild("Intake")
+		toCf = if intake and intake:IsA("BasePart") then intake.CFrame else outputCf(mill)
+	end
+	piece.model:PivotTo(fromCf)
 	firstSeen[piece.model] = nil
 	jobs[mill] = {
 		mill = mill,
 		piece = piece,
-		from = piece.model:GetPivot(),
+		from = fromCf,
+		to = toCf,
 		start = now,
 		duration = SawmillLogic.ProcessSeconds(volume),
 		planks = planks,
@@ -297,8 +365,9 @@ local function emitOne(c: Context, job: Job)
 		jobs[job.mill] = nil
 		return
 	end
-	local cf = plankCf(outputCf(job.mill), plank, job.next)
-	c.spawn({
+	local out = outputCf(job.mill)
+	local cf = plankCf(out, plank, job.next)
+	local spawned = c.spawn({
 		woodId = job.woodId,
 		size = Vector3.new(plank.sx, plank.sy, plank.sz),
 		cf = cf,
@@ -307,6 +376,10 @@ local function emitOne(c: Context, job: Job)
 		boost = job.boost,
 		lastHolderId = job.lastHolderId,
 	})
+	-- Shove it out along the outfeed. SpawnPlank leaves the plank loose.
+	if spawned and spawned.root then
+		spawned.root.AssemblyLinearVelocity = unit(out.LookVector) * GameConfig.ConveyorSpeed
+	end
 	job.next += 1
 	job.nextAt += SawmillService.PlankGap
 	if job.planks[job.next] == nil then
@@ -328,9 +401,11 @@ local function stepJobs(c: Context, now: number)
 				continue
 			end
 			local alpha = math.clamp((now - job.start) / math.max(job.duration, 0.05), 0, 1)
-			local intake = mill:FindFirstChild("Intake")
-			local goal = if intake and intake:IsA("BasePart") then intake.CFrame else outputCf(mill)
-			piece.model:PivotTo(job.from:Lerp(goal, alpha))
+			piece.model:PivotTo(job.from:Lerp(job.to, alpha))
+			local travel = job.to.Position - job.from.Position
+			if travel.Magnitude > 1e-3 then
+				piece.root.AssemblyLinearVelocity = travel.Unit * GameConfig.ConveyorSpeed
+			end
 			c.moved(piece.model)
 			if alpha < 1 then
 				continue
@@ -352,6 +427,9 @@ function SawmillService.Tick()
 		return
 	end
 	local now = c.now()
+	for _, mill in ipairs(c.mills()) do
+		MachineArt.AimBelt(mill)
+	end
 	poll(c, now)
 	stepJobs(c, now)
 end

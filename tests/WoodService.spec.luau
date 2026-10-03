@@ -480,4 +480,38 @@ return function(t)
 		t.eq(p.lastGoodAt, s.now)
 		t.ok(s.Wood.VerdictOk(p))
 	end)
+
+	t.test("mill groups: logs pass the cage, the belt carries only loose wood", function()
+		local pairs = {}
+		local Physics = {
+			IsCollisionGroupRegistered = function()
+				return true
+			end,
+			RegisterCollisionGroup = function() end,
+			CollisionGroupSetCollidable = function(_, a, b, on)
+				pairs[a .. "|" .. b] = on
+			end,
+		}
+		local loader = t.loader({
+			services = {
+				PhysicsService = Physics,
+				Players = {
+					GetPlayers = function()
+						return {}
+					end,
+				},
+			},
+		})
+		local Wood = loader:server("WoodService")
+		t.eq(Wood.RegisterGroups(), true)
+		t.eq(pairs["Mill|Wood"], false, "a loose log passes the blade cage")
+		t.eq(pairs["Mill|WoodHeld"], false, "a carried log can be pushed in")
+		t.eq(pairs["MillBelt|Players"], false)
+		t.eq(pairs["MillBelt|WoodHeld"], false)
+		t.eq(pairs["MillBelt|WoodFalling"], false, "a falling tree is not launched")
+		t.eq(pairs["MillBelt|Mill"], false)
+		-- Loose wood still hits the belt: that pair is never turned off.
+		t.eq(pairs["MillBelt|Wood"], nil)
+		t.eq(pairs["Mill|WoodFalling"], nil, "a falling tree still hits the mill")
+	end)
 end
