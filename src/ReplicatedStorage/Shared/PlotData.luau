@@ -76,7 +76,13 @@ function PlotData.Home(index: number): Home?
 end
 
 PlotData.Grid = 2 -- studs: item centres snap to this (GAME_DESIGN §14.6)
-PlotData.MaxItems = 200 -- per plot, to keep saves small
+PlotData.HeightStep = 0.2 -- studs: stacked pieces sit on this (ground 0, floor top 0.4, foundation top 2)
+PlotData.MaxBuildY = 40 -- studs above the plot: the tallest a piece's base may sit
+PlotData.MaxItems = 200 -- prebuilt pieces per plot (sheds, decor, sawmills)
+PlotData.MaxKit = 400 -- kit pieces per plot, counted apart from MaxItems
+PlotData.KitCashPerUnit = 4 -- blueprint fee. The old fee was 10; that stays in priceCash for saves with no `paid`
+PlotData.EdgeTrim = 0.5 -- studs cut off each end of an edge piece, along its length only
+PlotData.RoofOverhang = 0.5 -- visual only: roofs stick out this far and the overlap test ignores it
 PlotData.SellBack = 0.5 -- selling a placed item returns this share of its price
 
 export type Tier = {
@@ -102,6 +108,8 @@ export type Box = {
 	color: string, -- hex
 	material: string, -- Enum.Material name
 	shape: string?, -- "Cylinder" (axis X), "Ball", or "Wedge" (low end at -Z); default a block
+	role: string?, -- "Wood", "Glass", "Glow", "Sign", "Flag", "Metal", "Prop"; tint only Wood and Door
+	leaf: boolean?, -- the part that swings; posts and jambs do not
 	light: boolean?, -- a warm PointLight in it
 	smoke: boolean?, -- a chimney: the client puffs smoke here (not on Low)
 }
@@ -116,14 +124,32 @@ export type Blueprint = {
 	boxes: { Box },
 	note: string?, -- what it does (buildings that work come in later slices)
 	unlock: boolean?, -- bought once at the General Store; placing copies is free
-	woodUnits: number?, -- price is 10 cash per wood unit when set
+	woodUnits: number?, -- kit: plank units to fill, and the fee is KitCashPerUnit each. Others: $10 a unit
+	kit: boolean?, -- pay the fee on every place, then fill it with planks of one wood
+	edge: boolean?, -- overlap trims EdgeTrim off each end, along local X only
+	roof: boolean?, -- overlap ignores RoofOverhang on local X and Z
+	fits: string?, -- "Door" or "Window": may only sit inside that opening
+	opens: boolean?, -- a door or a gate: the owner toggles it
+	hinge: number?, -- local X the leaf swings around (toward +Z)
+	slot: { size: Vector3, offset: Vector3 }?, -- the opening a Door or Window must sit inside
 }
 
--- What the General Store charges. Structural pieces are $10 a wood unit.
+-- What placing charges now. A kit piece is KitCashPerUnit per wood unit.
+-- Anything else priced in wood units is still the old $10 a unit. `priceCash`
+-- on an existing kit id is that old price, kept so a save with no `paid`
+-- sells back at the old rate.
 function PlotData.Price(bp: Blueprint): number
+	if bp.kit == true and type(bp.woodUnits) == "number" then
+		return bp.woodUnits * PlotData.KitCashPerUnit
+	end
 	if type(bp.woodUnits) == "number" then
 		return bp.woodUnits * 10
 	end
+	return bp.priceCash
+end
+
+-- The price a save from before `paid` sells against (half of this).
+function PlotData.LegacyPrice(bp: Blueprint): number
 	return bp.priceCash
 end
 
@@ -136,15 +162,16 @@ PlotData.Blueprints = {
 		id = "Wall",
 		displayName = "Wall",
 		category = "Buildings",
-		priceCash = 80,
+		priceCash = 80, -- legacy ×10; the fee you pay now is woodUnits × 4
 		woodUnits = 8,
-		unlock = true,
+		kit = true,
+		edge = true,
 		tier = 1,
 		footprint = Vector2.new(8, 1),
 		boxes = {
-			{ size = Vector3.new(8, 6, 0.6), offset = Vector3.new(0, 3, 0), color = WOOD, material = "WoodPlanks" },
+			{ size = Vector3.new(8, 6, 1), offset = Vector3.new(0, 3, 0), color = WOOD, material = "WoodPlanks" },
 		},
-		note = "A straight wall section",
+		note = "A straight wall, 8 studs",
 	},
 	{
 		id = "Floor",
@@ -152,7 +179,7 @@ PlotData.Blueprints = {
 		category = "Buildings",
 		priceCash = 120,
 		woodUnits = 12,
-		unlock = true,
+		kit = true,
 		tier = 1,
 		footprint = Vector2.new(8, 8),
 		boxes = {
@@ -171,13 +198,23 @@ PlotData.Blueprints = {
 		category = "Buildings",
 		priceCash = 40,
 		woodUnits = 4,
-		unlock = true,
+		kit = true,
+		fits = "Door",
+		opens = true,
+		hinge = -1.6,
 		tier = 1,
 		footprint = Vector2.new(4, 1),
 		boxes = {
-			{ size = Vector3.new(3.2, 6, 0.4), offset = Vector3.new(0, 3, 0), color = WOOD_LIGHT, material = "Wood" },
+			{
+				size = Vector3.new(3.2, 6, 0.4),
+				offset = Vector3.new(0, 3, 0),
+				color = WOOD_LIGHT,
+				material = "Wood",
+				role = "Door",
+				leaf = true,
+			},
 		},
-		note = "A door for a wall",
+		note = "Hangs in a door wall and swings open",
 	},
 	{
 		id = "Window",
@@ -185,13 +222,20 @@ PlotData.Blueprints = {
 		category = "Buildings",
 		priceCash = 60,
 		woodUnits = 6,
-		unlock = true,
+		kit = true,
+		fits = "Window",
 		tier = 1,
 		footprint = Vector2.new(4, 1),
 		boxes = {
-			{ size = Vector3.new(3.2, 2.4, 0.3), offset = Vector3.new(0, 4, 0), color = "#C9E4F2", material = "Glass" },
+			{
+				size = Vector3.new(4, 3, 0.3),
+				offset = Vector3.new(0, 3.5, 0),
+				color = "#C9E4F2",
+				material = "Glass",
+				role = "Glass",
+			},
 		},
-		note = "A window for a wall",
+		note = "Glass for a window wall. The glass stays clear",
 	},
 	{
 		id = "Stairs",
@@ -199,7 +243,7 @@ PlotData.Blueprints = {
 		category = "Buildings",
 		priceCash = 180,
 		woodUnits = 18,
-		unlock = true,
+		kit = true,
 		tier = 1,
 		footprint = Vector2.new(4, 8),
 		boxes = {
@@ -309,15 +353,14 @@ PlotData.Blueprints = {
 		category = "Decor",
 		priceCash = 30,
 		woodUnits = 3,
-		unlock = true,
+		kit = true,
+		edge = true,
 		tier = 1,
 		footprint = Vector2.new(8, 1),
 		boxes = {
-			{ size = Vector3.new(8, 0.4, 0.3), offset = Vector3.new(0, 2.2, 0), color = WOOD_LIGHT, material = "Wood" },
-			{ size = Vector3.new(8, 0.4, 0.3), offset = Vector3.new(0, 1.2, 0), color = WOOD_LIGHT, material = "Wood" },
-			{ size = Vector3.new(0.5, 3, 0.5), offset = Vector3.new(-3.75, 1.5, 0), color = WOOD, material = "Wood" },
-			{ size = Vector3.new(0.5, 3, 0.5), offset = Vector3.new(3.75, 1.5, 0), color = WOOD, material = "Wood" },
+			{ size = Vector3.new(8, 3, 1), offset = Vector3.new(0, 1.5, 0), color = WOOD, material = "WoodPlanks" },
 		},
+		note = "A run of fence, 8 studs",
 	},
 	{
 		id = "FlowerBed",
@@ -545,6 +588,11 @@ PlotData.Blueprints = {
 		},
 	},
 } :: { Blueprint }
+
+local KitPieces = require(script.Parent.KitPieces) :: { any }
+for _, extra in ipairs(KitPieces) do
+	table.insert(PlotData.Blueprints, extra :: Blueprint)
+end
 
 local byId: { [string]: Blueprint } = {}
 for _, bp in ipairs(PlotData.Blueprints) do

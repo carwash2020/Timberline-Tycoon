@@ -30,11 +30,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local PlotFill = require(script.Parent.PlotFill)
+local PlotDoors = require(script.Parent.PlotDoors)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
@@ -335,10 +338,12 @@ end
 ---------------------------------------------------------------------------
 
 local function placeModel(slot: Slot, model: Model, item: PlotLogic.Placed)
-	BlueprintModels.Place(model, slot.cframe, item.x, item.z, item.rot)
+	BlueprintModels.Place(model, slot.cframe, item.x, item.z, item.rot, item.y)
 	model:SetAttribute("X", item.x)
+	model:SetAttribute("Y", item.y or 0)
 	model:SetAttribute("Z", item.z)
 	model:SetAttribute("Rot", item.rot)
+	model:SetAttribute("Open", false)
 end
 
 local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
@@ -371,6 +376,42 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		MachineArt.SetCut(model, settings.x, settings.y)
 	end
 	placeModel(slot, model, item)
+	if bp.kit then
+		local apply = (BlueprintModels :: any).ApplyWood
+		local fade = (BlueprintModels :: any).SetFaded
+		if type(apply) == "function" then
+			apply(model, item.wood)
+		end
+		if type(fade) == "function" and not PlotLogic.IsBuilt(bp, item) then
+			fade(model, true)
+		end
+	end
+	if bp.opens and PlotLogic.IsBuilt(bp, item) and type(model.GetDescendants) == "function" then
+		local host: Instance = model
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d:GetAttribute("Leaf") == true then
+				host = d
+				break
+			end
+		end
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "DoorPrompt"
+		prompt.ActionText = "Open"
+		prompt.ObjectText = bp.displayName
+		prompt.MaxActivationDistance = 10
+		prompt.RequiresLineOfSight = false
+		prompt.Parent = host
+		prompt.Triggered:Connect(function(who: Player)
+			local profile = ProfileService.GetProfile(who)
+			if not profile then
+				return
+			end
+			local _, hint = PlotDoors.Toggle(who, model, item, profile.plot.placed, slot.cframe, slot.items, os.clock())
+			if hint then
+				notify(who, hint)
+			end
+		end)
+	end
 	CollectionService:AddTag(model, "PlacedItem")
 	model.Parent = slot.items
 end
@@ -670,7 +711,7 @@ local function isNumber(value: unknown): boolean
 	return type(value) == "number" and value == value
 end
 
-function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: unknown, rot: unknown)
+function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
 	if
 		type(blueprintId) ~= "string"
 		or not isNumber(x)
@@ -691,7 +732,8 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 		return
 	end
 	local px, pz = PlotLogic.Snap(x :: number), PlotLogic.Snap(z :: number)
-	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed)
+	local py = if isNumber(y) then PlotLogic.SnapY(y :: number) else 0
+	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, nil, py)
 	if not ok then
 		if why ~= "bad" then -- only a tampered client sends nonsense
 			notify(player, (why or "Can't build there") .. ".")
@@ -726,7 +768,18 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 		table.remove(stock, stockAt)
 		player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(stock))
 	end
-	local item: PlotLogic.Placed = { uid = Util.guid(), blueprintId = bp.id, x = px, z = pz, rot = rot :: number }
+	local item: PlotLogic.Placed = {
+		uid = Util.guid(),
+		blueprintId = bp.id,
+		x = px,
+		z = pz,
+		rot = rot :: number,
+		y = if py ~= 0 then py else nil,
+	}
+	if bp.kit then
+		item.paid = price
+		item.fill = { units = 0 }
+	end
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
 	buildItem(slot, player, item)
@@ -735,7 +788,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	end
 end
 
-function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, rot: unknown)
+function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
 	if
 		type(uid) ~= "string"
 		or not isNumber(x)
@@ -756,7 +809,8 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 		return
 	end
 	local px, pz = PlotLogic.Snap(x :: number), PlotLogic.Snap(z :: number)
-	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, item.uid)
+	local py = if isNumber(y) then PlotLogic.SnapY(y :: number) else (item.y or 0)
+	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, item.uid, py)
 	if not ok then
 		if why ~= "bad" then
 			notify(player, (why or "Can't move it there") .. ".")
@@ -764,24 +818,64 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 		return
 	end
 	item.x, item.z, item.rot = px, pz, rot :: number
+	item.y = if py ~= 0 then py else nil
 	local model = slot.items:FindFirstChild(item.uid)
 	if model and model:IsA("Model") then
 		placeModel(slot, model, item)
 	end
 end
 
--- What selling `item` pays back right now. An unlock blueprint was bought
--- at the store and placed for free, so selling it (even right away) pays
--- nothing: a refund of the store price would print cash.
-local function sellValue(item: PlotLogic.Placed, bp: PlotData.Blueprint): number
-	if bp.unlock then
-		return 0
+-- What selling gives back: cash, plank units, and which wood those planks are.
+-- An unlock bought at the store refunds nothing. Within a minute a finished
+-- piece (or an empty kit piece) gives the whole fee back.
+local function sellPlan(item: PlotLogic.Placed, bp: PlotData.Blueprint): (number, number, string?)
+	local plan = PlotLogic.SellPlan(bp, item)
+	if plan.planks > 0 then
+		return 0, plan.planks, plan.wood
 	end
 	local at = placedAt[item.uid]
 	if at and os.clock() - at <= UNDO_SECONDS then
-		return bp.priceCash
+		if bp.unlock then
+			return 0, 0, nil
+		end
+		if bp.kit then
+			return item.paid or PlotData.Price(bp), 0, nil
+		end
+		return bp.priceCash, 0, nil
 	end
-	return PlotLogic.SellValue(bp)
+	return plan.cash, 0, nil
+end
+
+local woodMod: any = nil
+local woodTried = false
+
+local function woodModule(): any
+	if woodTried then
+		return woodMod
+	end
+	woodTried = true
+	local ok, mod = pcall(function()
+		return require(script.Parent.WoodService)
+	end)
+	if ok then
+		woodMod = mod
+	end
+	return woodMod
+end
+
+local function givePlanks(player: Player, slot: Slot, item: PlotLogic.Placed, units: number, woodId: string?): boolean
+	local wood = woodModule()
+	if not wood or type(woodId) ~= "string" or units <= 0 or type(wood.SpawnPlank) ~= "function" then
+		return false
+	end
+	local u = GameConfig.WoodUnit
+	local spawned = wood.SpawnPlank({
+		woodId = woodId,
+		size = Vector3.new(u, math.max(units, 0.05) * u, u),
+		cf = slot.cframe * CFrame.new(item.x, (item.y or 0) + 2, item.z),
+		ownerId = player.UserId,
+	})
+	return spawned ~= nil
 end
 
 -- Where a bought truck is delivered: the plot's road-edge pad, or nil
@@ -812,9 +906,13 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if not item or not bp then
 		return
 	end
-	local refund = sellValue(item, bp)
+	local refund, planks, woodId = sellPlan(item, bp)
 	if refund > 0 and profile.cash + refund > GameConfig.CashCap then
 		notify(player, "Your wallet is too full to sell that. Spend some first.")
+		return
+	end
+	if planks > 0 and not givePlanks(player, slot, item, planks, woodId) then
+		notify(player, "Those planks had nowhere to go. Try again in a moment.")
 		return
 	end
 	table.remove(profile.plot.placed, index)
@@ -826,12 +924,19 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if refund > 0 then
 		EconomyService.Refund(player, refund, "sold " .. bp.displayName, bp.id)
 	end
-	notify(
-		player,
-		if refund == bp.priceCash
-			then string.format("Took back the %s: %s refunded.", bp.displayName, Util.formatCash(refund))
-			else string.format("Sold the %s for %s.", bp.displayName, Util.formatCash(refund))
-	)
+	local full = if bp.kit then (item.paid or PlotData.Price(bp)) else bp.priceCash
+	if bp.unlock then
+		full = 0
+	end
+	local text = if planks > 0
+		then string.format("Took apart the %s. The planks are on the ground.", bp.displayName)
+		elseif refund == full and refund > 0 then string.format(
+			"Took back the %s: %s refunded.",
+			bp.displayName,
+			Util.formatCash(refund)
+		)
+		else string.format("Sold the %s for %s.", bp.displayName, Util.formatCash(refund))
+	notify(player, text)
 end
 
 function PlotService.Upgrade(player: Player)
@@ -1025,7 +1130,80 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 	if typeof(heartbeat) == "RBXScriptSignal" or (type(heartbeat) == "table" and heartbeat.Connect) then
 		heartbeat:Connect(function()
 			PlotService.Sweep()
+			PlotService.FillStep()
 		end)
+	end
+end
+
+function PlotService.FillStep()
+	local wood = woodModule()
+	if not wood or type(wood.All) ~= "function" then
+		return
+	end
+	local pieces = wood.All()
+	if type(pieces) ~= "table" then
+		return
+	end
+	for player, slot in pairs(slotOf) do
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			for _, item in ipairs(profile.plot.placed) do
+				if item.fill then
+					local bp = PlotLogic.Blueprint(item.blueprintId)
+					if bp and bp.kit then
+						local origin = (slot.cframe * CFrame.new(item.x, item.y or 0, item.z)).Position
+						for _, piece in pairs(pieces) do
+							local root = piece.root
+							if piece.dead ~= true and typeof(root) == "Instance" and root:IsA("BasePart") then
+								local dist = (root.Position - origin).Magnitude
+								if FillLogic.InRange(dist) then
+									local heldBy = piece.model:GetAttribute("HeldBy")
+									local changed = PlotFill.Apply(
+										item,
+										{
+											uid = piece.uid,
+											kind = piece.kind,
+											woodId = piece.woodId,
+											volume = piece.volume,
+											ownerId = piece.ownerId,
+											held = type(heldBy) == "number" and heldBy ~= 0,
+											size = root.Size,
+											cf = root.CFrame,
+											figure = piece.figure,
+											boost = piece.boost,
+											lux = piece.lux,
+										},
+										player.UserId,
+										{
+											Get = function(id: string)
+												return wood.Get(id)
+											end,
+											Remove = function(got: any, reason: string)
+												wood.Remove(got, reason)
+											end,
+											SpawnPlank = function(info: any)
+												return wood.SpawnPlank(info)
+											end,
+										}
+									)
+									if changed then
+										local model = slot.items:FindFirstChild(item.uid)
+										if
+											model
+											and model:IsA("Model")
+											and type(BlueprintModels.ApplyWood) == "function"
+										then
+											BlueprintModels.ApplyWood(model, item.wood)
+											BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
 	end
 end
 

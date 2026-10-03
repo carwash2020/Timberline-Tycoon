@@ -27,6 +27,10 @@ export type PlacedItem = {
 	x: number,
 	z: number,
 	rot: number,
+	y: number?, -- base height; missing means the ground
+	wood: string?, -- filled wood; missing means the authored look
+	fill: { units: number }?, -- kit blueprint still taking planks; missing means built
+	paid: number?, -- fee charged to place a kit piece; missing means the legacy price
 	-- A placed sawmill's cut, in timber units (V2_PLAN.md §7). Other items
 	-- leave it unset.
 	data: { x: number, y: number }?,
@@ -325,6 +329,24 @@ function ProfileSchema.Migrate(data: any)
 			and rot ~= -math.huge
 		if type(item) == "table" and type(item.uid) == "string" and item.uid ~= "" and finite then
 			item.rot = math.floor(rot :: number) % 4
+			item.open = nil
+			if type(item.y) ~= "number" or item.y ~= item.y or item.y < 0 or item.y > PlotData.MaxBuildY then
+				item.y = nil
+			end
+			if item.wood ~= nil and (type(item.wood) ~= "string" or WoodData.Get(item.wood) == nil) then
+				item.wood = nil
+			end
+			if item.fill ~= nil then
+				local units = if type(item.fill) == "table" then item.fill.units else nil
+				if type(units) ~= "number" or units ~= units or units < 0 then
+					item.fill = nil
+				else
+					item.fill = { units = units }
+				end
+			end
+			if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
+				item.paid = nil
+			end
 			table.insert(kept, item)
 		end
 	end
