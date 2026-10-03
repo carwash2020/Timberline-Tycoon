@@ -17,8 +17,6 @@ export type ProductKey = "Cash1k" | "Cash10k" | "DoubleWood" | "InstantDelivery"
 -- or product exists; leave 0 until then.
 -- PASTE each id from Creator Hub. 0 = not for sale (button hidden, server
 -- refuses). image is a decal asset id for the card; 0 draws a placeholder.
--- Cash packs are developer products (ProcessReceipt), never game passes.
--- Universe 10768809532.
 StoreData.CreatorIds = {
 	Passes = {
 		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
