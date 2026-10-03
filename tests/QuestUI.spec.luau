@@ -122,7 +122,11 @@ return function(t)
 		t.eq(QuestUI.ClaimedByOther(tree({ HP = 1 }), 7, 1010, here), false, "never claimed")
 		-- The tracker's title, and on a returning player's refresher.
 		t.eq(QuestUI.TrackerTitle(2, 7, false), "TUTORIAL · 2/7")
-		t.eq(QuestUI.TrackerTitle(2, 7, true), "WHAT'S NEW · 2/4")
+		t.eq(
+			QuestUI.TrackerTitle(2, 7, true),
+			string.format("WHAT'S NEW · 2/%d", TutorialData.RefresherLast),
+			"the refresher ends at the cart"
+		)
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), "e"), true, "any other tree while one is awake")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Elder = false, Uid = "a" }), ""), true)
 	end)

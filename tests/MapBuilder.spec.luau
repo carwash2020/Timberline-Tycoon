@@ -99,11 +99,16 @@ return function(t)
 							error("a bad seed")
 						end
 						s.sectionSpawned = (s.sectionSpawned or 0) + 1
-						s.sectionBoot = (s.sectionBoot ~= false) and opts ~= nil and opts.boot == true
-						s.groupsFirst = (s.groupsFirst ~= false) and s.groups == true
 						s.sectionWoods = s.sectionWoods or {}
 						s.sectionWoods[woodId] = (s.sectionWoods[woodId] or 0) + 1
-						s.treeBeforeSellArea = (s.treeBeforeSellArea ~= false) and not sellAreaIn()
+						-- The tutorial oaks carry a fixed seed and stay mature. A
+						-- world site is { boot = true }; forgetting that still fails.
+						local tutorial = type(opts) == "table" and opts.seed ~= nil
+						if not tutorial then
+							s.sectionBoot = (s.sectionBoot ~= false) and opts ~= nil and opts.boot == true
+							s.groupsFirst = (s.groupsFirst ~= false) and s.groups == true
+							s.treeBeforeSellArea = (s.treeBeforeSellArea ~= false) and not sellAreaIn()
+						end
 					end,
 					RegisterGroups = function()
 						s.groups = true
@@ -360,8 +365,9 @@ return function(t)
 		)
 		t.ok(string.find(line, "(terrain 1.2s)", 1, true) or string.find(line, "(terrain 1.3s)", 1, true), line)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-		t.eq(s.spawned, #WorldPlan.Trees())
-		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees())
+		local TutorialGrove = t.shared("TutorialGrove")
+		t.eq(s.spawned, #WorldPlan.Trees() + #TutorialGrove.Trees)
+		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees() + #TutorialGrove.Trees)
 		t.eq(s.workspace:GetAttribute("MapTerrainSeconds"), 1.25)
 		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
 		t.ok(type(s.workspace:GetAttribute("MapBuildSeconds")) == "number", "MapBuildSeconds")
@@ -374,7 +380,12 @@ return function(t)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local sky = WorldPlan.Sky()
 		t.eq(s.spawned, 0, "no TreeService trees under v2")
-		t.eq(s.sectionSpawned, #WorldPlan.Trees() + #sky.lumenwood, "every site, the isles' lumenwood too")
+		local TutorialGrove = t.shared("TutorialGrove")
+		t.eq(
+			s.sectionSpawned,
+			#WorldPlan.Trees() + #sky.lumenwood + #TutorialGrove.Trees,
+			"every site, the isles' lumenwood, and the tutorial oaks"
+		)
 		t.eq(s.workspace:GetAttribute("MapTrees"), s.sectionSpawned)
 		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 2)
 		t.ok(s.groupsFirst, "the collision groups are registered before the first tree")
@@ -400,7 +411,8 @@ return function(t)
 			end
 		end
 		t.ok(birches > 0, "the plan has birches")
-		t.eq(s.sectionSpawned, #WorldPlan.Trees() - birches, "every other tree")
+		local TutorialGrove = t.shared("TutorialGrove")
+		t.eq(s.sectionSpawned, #WorldPlan.Trees() - birches + #TutorialGrove.Trees, "every other tree, plus the grove")
 		local found = 0
 		for _, line in ipairs(s.allWarnings) do
 			if string.find(tostring(line), "tree(s) failed to build", 1, true) then
@@ -589,7 +601,11 @@ return function(t)
 		t.ok(isles and isles:FindFirstChild("MainIsle"), "the isles are built")
 		t.ok(s.map:FindFirstChild("GondolaTop") and s.map:FindFirstChild("GondolaBase"), "the sky stations")
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
-		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees() + #WorldPlan.Sky().lumenwood)
+		local TutorialGrove = t.shared("TutorialGrove")
+		t.eq(
+			s.workspace:GetAttribute("MapTrees"),
+			#WorldPlan.Trees() + #WorldPlan.Sky().lumenwood + #TutorialGrove.Trees
+		)
 	end)
 
 	t.test(

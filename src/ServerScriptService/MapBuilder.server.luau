@@ -404,7 +404,10 @@ step("5. The trees", function()
 			local model = if V2
 				then SectionTrees.SpawnTree("oak", at, options)
 				else TreeService.SpawnTree("oak", at, options)
-			model:SetAttribute("TutorialGrove", true)
+			-- A stub (the build test) may not hand back a model.
+			if model then
+				model:SetAttribute("TutorialGrove", true)
+			end
 			treesSpawned += 1
 			return nil
 		end)
