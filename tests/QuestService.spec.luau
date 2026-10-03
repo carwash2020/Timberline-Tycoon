@@ -87,29 +87,54 @@ return function(t)
 		s.event("plotClaimed")
 		t.eq(s.profile.tutorialStep, 2)
 		t.eq(s.player.attrs.TutorialStep, 2)
+		t.eq(s.Steps[2].id, "fell")
 	end)
 
-	t.test("the first sale pays Murph's $25 and moves on to the truck", function()
+	t.test("counted steps track progress, then pay their reward", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		playUntil(s, "loads")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads")
+		local cashBefore = s.profile.cash
+		s.event("logsSold", 5)
+		t.eq(s.player.attrs.TutorialProgress, 5)
+		t.eq(s.profile.cash, cashBefore, "no reward yet")
+		s.event("logsSold", 1)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads2")
+		t.eq(s.profile.cash, cashBefore + 8)
+		s.event("logsSold", 6)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads3")
+		s.event("logsSold", 6)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "steel")
+		t.eq(s.profile.cash, cashBefore + 25)
+		t.eq(s.toasts, {
+			"Murph chipped in $25!",
+			"Murph chipped in $8!",
+			"Murph chipped in $8!",
+			"Murph chipped in $9!",
+		})
+	end)
+
+	t.test("the first sale pays Murph's $25 and the next step is the truck", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
 		playUntil(s, "sell")
 		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
 		local cashBefore = s.profile.cash
-		s.event("treeFelled")
-		t.eq(s.profile.cash, cashBefore, "no reward yet")
 		s.event("logsSold", 1)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "truck")
 		t.eq(s.profile.cash, cashBefore + 25)
 		t.eq(s.toasts, { "Murph chipped in $25!" })
 	end)
 
-	t.test("buying the truck finishes it, after the first sale", function()
+	t.test("buying the Steel Axe finishes it; the plot was the first step", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
-		playUntil(s, "truck")
-		t.eq(s.Steps[s.profile.tutorialStep].id, "truck")
+		t.eq(s.Steps[1].id, "plot")
+		playUntil(s, "steel")
+		s.profile.bestAxeTier = 2
 		t.ok(not s.profile.tutorialDone)
-		s.event("truckBought")
+		s.event("axeBought")
 		t.ok(s.profile.tutorialDone)
 		t.eq(s.player.attrs.TutorialStep, 0)
 		t.eq(s.marks, { "Finished the tutorial", "Saw a next goal" })
@@ -118,23 +143,32 @@ return function(t)
 		t.eq(s.player.attrs.TutorialStep, 0)
 	end)
 
+	t.test("buying the Steel Axe early skips that step when it comes up", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		playUntil(s, "loads")
+		s.profile.bestAxeTier = 2 -- bought it with their own cash
+		s.event("logsSold", 6)
+		s.event("logsSold", 6)
+		s.event("logsSold", 6)
+		t.ok(s.profile.tutorialDone, "the axe was the last step, and it was already done")
+		t.eq(s.player.attrs.TutorialStep, 0)
+	end)
+
 	t.test("owning a truck already skips that step when the sale is done", function()
 		local s = setup({ ownedTrucks = { "Rustbucket" } })
 		s.Quest.Start(s.player, s.profile)
-		s.event("plotClaimed")
-		s.event("treeFelled")
-		t.ok(not s.profile.tutorialDone)
+		playUntil(s, "sell")
 		s.event("logsSold", 1)
-		t.ok(s.profile.tutorialDone, "the truck step was already done")
-		t.eq(s.marks, { "Finished the tutorial", "Saw a next goal" })
+		t.eq(s.Steps[s.profile.tutorialStep].id, "load", "the truck step was already done")
+		t.ok(not s.profile.tutorialDone)
 	end)
 
 	t.test("progress survives a rejoin", function()
-		local s = setup({ tutorialStep = 3, tutorialProgress = 0 })
+		local s = setup({ tutorialStep = 5, tutorialProgress = 7 })
 		s.Quest.Start(s.player, s.profile)
-		t.eq(s.player.attrs.TutorialStep, 3)
-		t.eq(s.player.attrs.TutorialProgress, 0)
-		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
+		t.eq(s.player.attrs.TutorialStep, 5)
+		t.eq(s.player.attrs.TutorialProgress, 7)
 	end)
 
 	t.test("old saves with a better axe skip it; mid-tutorial players don't", function()
@@ -169,31 +203,65 @@ return function(t)
 		t.eq(again.player.attrs.TutorialStep, 0)
 	end)
 
-	t.test("a save from the long tutorial lands on the latest step that still exists", function()
-		local reached = {}
-		for _, id in ipairs({ "fell", "pickup", "load", "sell" }) do
-			reached["Tutorial:" .. id] = true
-		end
-		local mid = setup({ tutorialStep = 6, tutorialProgress = 4, onboarding = table.clone(reached) })
-		mid.Quest.Start(mid.player, mid.profile)
-		t.eq(
-			mid.Steps[mid.profile.tutorialStep].id,
-			"sell",
-			"pickup and load are gone; the cart sale is the latest that remains"
-		)
-		t.eq(mid.player.attrs.TutorialProgress, 4, "progress kept")
-		mid.event("logsSold", 1)
-		t.eq(mid.Steps[mid.profile.tutorialStep].id, "truck")
+	t.test("the Heartseed beat: planting a seed in a stump moves it on", function()
+		local s = setup()
+		s.Quest.Start(s.player, s.profile)
+		playUntil(s, "plant")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plant")
+		t.eq(s.Steps[s.profile.tutorialStep - 1].id, "mill", "right after the haul to the mill")
+		s.event("logsSold", 5)
+		s.event("treeFelled")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plant", "only planting counts")
+		s.event("seedPlanted")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads")
+		t.eq(s.player.attrs.TutorialProgress, 0)
 	end)
 
-	t.test("the short tutorial holds no stumps", function()
+	t.test("saves from before the Heartseed beat keep their place", function()
+		-- Steps those saves reached, logged by the funnel.
+		local reached = {}
+		for _, id in ipairs({ "fell", "pickup", "load", "sell", "loads" }) do
+			reached["Tutorial:" .. id] = true
+		end
+		-- On "loads" (then step 5, now 6), 7 logs in.
+		local mid = setup({ tutorialStep = 5, tutorialProgress = 7, onboarding = table.clone(reached) })
+		mid.Quest.Start(mid.player, mid.profile)
+		t.eq(mid.Steps[mid.profile.tutorialStep].id, "loads")
+		t.eq(mid.player.attrs.TutorialProgress, 7, "progress kept")
+		-- On "steel" (then 6, now 7).
+		local late = table.clone(reached)
+		late["Tutorial:steel"] = true
+		local s = setup({ tutorialStep = 6, tutorialProgress = 0, onboarding = late })
+		s.Quest.Start(s.player, s.profile)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "steel")
+		-- Just sold for the first time: planting is next, as for everyone.
+		local early = {}
+		for _, id in ipairs({ "fell", "pickup", "load", "sell" }) do
+			early["Tutorial:" .. id] = true
+		end
+		local e = setup({ tutorialStep = 4, tutorialProgress = 0, onboarding = early })
+		e.Quest.Start(e.player, e.profile)
+		t.eq(e.Steps[e.profile.tutorialStep].id, "load", "the truck lesson is later than the cart")
+		e.event("logsSold", 3)
+		t.eq(e.Steps[e.profile.tutorialStep].id, "load", "a sale doesn't load the truck")
+		e.event("logsLoaded", 1)
+		t.eq(e.Steps[e.profile.tutorialStep].id, "mill")
+	end)
+
+	t.test("stumps a player fells wait for the plant step, and only until then", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
 		t.eq(s.trees.StumpHold, s.Quest.StumpHoldFor, "Init hands TreeService the hook")
+		local held = {}
 		for _, step in ipairs(s.Steps) do
-			t.eq(s.trees.StumpHold(s.player), 0, step.id)
+			held[step.id] = s.trees.StumpHold(s.player)
 			s.event(step.event, step.count)
 		end
+		for _, id in ipairs({ "plot", "fell", "pickup", "sell", "truck", "load", "plant" }) do
+			t.eq(held[id], 240, id .. ": up to the plant step the stump waits 4 minutes")
+		end
+		t.eq(held.loads, 0, "planted: trees regrow as usual")
+		t.eq(held.steel, 0)
 		t.ok(s.profile.tutorialDone)
 		t.eq(s.trees.StumpHold(s.player), 0, "finished")
 		t.eq(s.trees.StumpHold({}), 0, "no profile (left)")
@@ -202,7 +270,7 @@ return function(t)
 	t.test("a skipped tutorial holds no stumps", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
-		t.eq(s.Quest.StumpHoldFor(s.player), 0)
+		t.eq(s.Quest.StumpHoldFor(s.player), 240)
 		s.skip()
 		t.eq(s.Quest.StumpHoldFor(s.player), 0)
 	end)
@@ -231,32 +299,56 @@ return function(t)
 		t.eq(v1.Steps, TutorialData.Steps)
 	end)
 
-	t.test("v2: the walk is plot, chop, first sale, then the truck", function()
+	t.test("v2: the walk on the wired events: fell, grab, load, sold, plant, sold cash, buy", function()
 		local s = setup(nil, 2)
 		local function at()
 			return s.Steps[s.profile.tutorialStep].id
 		end
 		s.Quest.Start(s.player, s.profile)
 		t.eq(at(), "plot")
-		s.event("treeFelled")
-		t.eq(at(), "plot", "chopping waits for the claim")
 		s.event("plotClaimed")
 		t.eq(at(), "fell")
-		s.event("woodGrabbed")
-		t.eq(at(), "fell", "dragging isn't its own step")
-		s.event("treeFelled")
+		s.event("treeFelled") -- the chop path (SectionTrees' OnFelled from M1.3)
+		t.eq(at(), "pickup")
+		s.event("logPickedUp")
+		t.eq(at(), "pickup", "v1's pickup counts for nothing under v2")
+		s.event("woodGrabbed") -- GrabService.Hooks.onGrab
 		t.eq(at(), "sell")
 		s.event("woodLoaded")
 		t.eq(at(), "sell", "a load doesn't sell the cart")
 		local cash = s.profile.cash
 		s.Quest.WoodSold(s.player, 2, 30)
-		t.eq(at(), "truck", "the first sale, however many pieces")
+		t.eq(at(), "truck", "the first sale moves the cart step on")
 		t.eq(s.profile.cash, cash + 25, "Murph's share on that sale")
-		t.eq(s.toasts, { "Murph chipped in $25!" })
-		s.event("axeBought")
-		t.eq(at(), "truck", "the Steel Axe is the next goal, not a step")
+		t.eq(s.player.attrs.TutorialProgress, 0, "and its cash doesn't count toward the truck")
 		s.event("truckBought")
-		t.ok(s.profile.tutorialDone)
+		t.eq(at(), "load")
+		s.event("woodLoaded") -- TruckLoad (M1.6)
+		t.eq(at(), "mill")
+		s.Quest.WoodSold(s.player, 2, 30)
+		t.eq(at(), "plant", "the mill sale, and its cash waits")
+		s.event("seedPlanted")
+		t.eq(at(), "loads")
+		local loads = s.Steps[s.profile.tutorialStep]
+		t.eq(loads.unit, "cash")
+		local purse = s.profile.cash
+		local partial = loads.count - 30
+		s.Quest.WoodSold(s.player, 3, partial)
+		t.eq(s.player.attrs.TutorialProgress, partial, "dollars, not pieces")
+		t.eq(s.profile.cash, purse, "no reward yet")
+		s.Quest.WoodSold(s.player, 1, 30.7)
+		t.eq(at(), "loads2", string.format("%d + 30 whole dollars passes $%d", partial, loads.count))
+		t.eq(s.profile.cash, purse + loads.rewardCash)
+		t.eq(s.toasts, {
+			"Murph chipped in $25!",
+			string.format("Murph chipped in $%d!", loads.rewardCash),
+		})
+		s.Quest.WoodSold(s.player, 1, s.Steps[s.profile.tutorialStep].count)
+		s.Quest.WoodSold(s.player, 1, s.Steps[s.profile.tutorialStep].count)
+		t.eq(at(), "steel")
+		s.profile.bestAxeTier = 2
+		s.event("axeBought")
+		t.ok(s.profile.tutorialDone, "the Steel Axe is the last step")
 		t.eq(s.player.attrs.TutorialStep, 0)
 		t.eq(s.marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
@@ -265,17 +357,23 @@ return function(t)
 		local s = setup(nil, 2)
 		s.Quest.Start(s.player, s.profile)
 		s.event("plotClaimed")
-		s.event("treeFelled")
+		for _, event in ipairs({ "treeFelled", "woodGrabbed" }) do
+			s.event(event)
+		end
 		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
 		s.Quest.WoodSold(s.player, 0, 30)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "sell", "no pieces")
 		s.Quest.WoodSold(s.player, 1, 0)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "truck", "nothing credited (a full wallet): still a sale")
+		s.event("truckBought")
+		s.event("woodLoaded")
+		s.Quest.WoodSold(s.player, 1, 0)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plant")
+		s.event("seedPlanted")
 		for _, junk in ipairs({ 0, -5, 0 / 0, math.huge, 0.6 }) do
 			s.Quest.WoodSold(s.player, 1, junk)
 		end
-		t.eq(s.Steps[s.profile.tutorialStep].id, "truck", "dollars don't buy the truck")
-		t.eq(s.profile.tutorialProgress, 0)
+		t.eq(s.profile.tutorialProgress, 0, "no whole dollars")
 		t.eq(s.player.attrs.TutorialProgress, 0)
 	end)
 
@@ -284,21 +382,27 @@ return function(t)
 		s.Quest.Start(s.player, s.profile)
 		s.event("plotClaimed")
 		t.eq(s.Steps[s.profile.tutorialStep].id, "fell")
+		s.event("treeFelled")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "pickup")
 		s.event("woodGrabbed")
 		s.Quest.WoodSold(s.player, 3, 90)
-		t.eq(s.Steps[s.profile.tutorialStep].id, "fell")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "pickup")
 		t.eq(s.profile.tutorialProgress, 0)
-		s.event("treeFelled")
+		s.event("logPickedUp")
 		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
 	end)
 
-	t.test("v2: the short tutorial holds no stumps", function()
+	t.test("v2: stumps wait for the plant step the same way", function()
 		local s = setup(nil, 2)
 		s.Quest.Start(s.player, s.profile)
+		local held = {}
 		for _, step in ipairs(s.Steps) do
-			t.eq(s.trees.StumpHold(s.player), 0, step.id)
+			held[step.id] = s.trees.StumpHold(s.player)
 			s.event(step.event, step.count)
 		end
+		t.eq(held.fell, 240)
+		t.eq(held.plant, 240)
+		t.eq(held.loads, 0)
 		t.ok(s.profile.tutorialDone)
 	end)
 
@@ -323,7 +427,10 @@ return function(t)
 		t.eq(s.player.attrs.TutorialRefresher, true)
 		s.event("plotClaimed")
 		s.event("treeFelled")
+		s.event("woodGrabbed")
+		s.event("woodLoaded")
 		t.eq(s.profile.tutorialStep, TutorialData.RefresherLast)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
 		local cash = s.profile.cash
 		s.Quest.WoodSold(s.player, 2, 30)
 		t.ok(s.profile.tutorialDone, "done after the first sale")
@@ -338,6 +445,7 @@ return function(t)
 		s.Quest.Start(s.player, s.profile)
 		s.event("plotClaimed")
 		t.eq(s.profile.tutorialStep, 2)
+		t.eq(s.Steps[2].id, "fell")
 		s.Quest.Start(s.player, s.profile) -- a rejoin
 		t.eq(s.profile.tutorialStep, 2, "carries on")
 		s.skip()
@@ -351,12 +459,13 @@ return function(t)
 	t.test("the refresher's texts: Murph's welcome-back line and the tracker title", function()
 		local TutorialData = t.shared("TutorialData")
 		local plot = TutorialData.StepsV2[1]
+		t.eq(plot.id, "plot")
 		t.eq(TutorialData.MurphLine(plot, true), plot.murph, "the claim has no welcome-back line")
 		local fell = TutorialData.StepsV2[2]
 		t.eq(TutorialData.MurphLine(fell, false), fell.murph)
 		t.ok(string.find(TutorialData.MurphLine(fell, true), "Welcome back", 1, true) ~= nil)
-		local sell = TutorialData.StepsV2[3]
-		t.eq(TutorialData.MurphLine(sell, true), sell.murph, "no special line: the usual one")
+		local pickup = TutorialData.StepsV2[3]
+		t.eq(TutorialData.MurphLine(pickup, true), pickup.murph, "no special line: the usual one")
 		t.eq(TutorialData.StepsV2[TutorialData.RefresherLast].id, "sell")
 		t.ok(#TutorialData.FarewellBack > 0)
 	end)

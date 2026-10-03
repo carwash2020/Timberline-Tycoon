@@ -1408,8 +1408,9 @@ end
 -- General Store (still the HearthAndHome model): about 32 x 24 at design
 -- size, 48 x 36 once scaled. The counter sits by the open door so you can
 -- read it from the entrance. Side aisles stay wide (shelves at x = ±12,
--- more than 8 studs between them after the 1.5 scale). Price boards are
--- tall enough to read on a phone (about 100 px once scaled, at 40 px/stud).
+-- more than 8 studs between them after the 1.5 scale). Each price board
+-- hangs on the back wall facing the door, at least 4 studs wide, with one
+-- sample of that item on the ledge under it.
 local function hearthAndHome(model: Model, title: string, accent: Color3)
 	local plaster = hex("#F0E2C6")
 	local wood = Kit.shade(accent, -0.32)
@@ -1447,20 +1448,54 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	ledger(model, CF(-2.2, FLOOR + 3.3, counterZ - 0.1))
 
 	-- Shelves down each side. The gap between them is the aisle.
-	local function aisle(side: number, label: string, y: number)
+	for _, side in ipairs({ -1, 1 }) do
 		local x = side * 12
-		Kit.part(model, "Shelf", V3(3.2, 0.3, 14), CF(x, y, 1), wood, MAT.Wood)
+		for _, y in ipairs({ 3.2, 6.2 }) do
+			Kit.part(model, "Shelf", V3(3.2, 0.3, 14), CF(x, y, 1), wood, MAT.Wood)
+		end
+	end
+
+	-- Prices hang on the back wall, facing the door, each above a sample
+	-- of that item on the ledge. Wide enough to read from the entrance.
+	local function sample(x: number, y: number, z: number, kind: string)
+		local top = y + 0.16
+		local function show(size: Vector3, cf: CFrame, color: Color3, surface: Enum.Material)
+			local p = Kit.part(model, "Display", size, cf, color, surface)
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+		end
+		if kind == "fence" then
+			show(V3(0.35, 1.2, 0.35), CF(x - 0.5, top + 0.6, z), wood, MAT.Wood)
+			show(V3(1.4, 0.16, 0.16), CF(x + 0.25, top + 0.8, z), hex("#C4B49A"), MAT.Wood)
+		elseif kind == "shed" then
+			show(V3(1.15, 0.8, 0.9), CF(x, top + 0.4, z), hex("#8C6A45"), MAT.WoodPlanks)
+			show(V3(1.35, 0.14, 1.05), CF(x, top + 0.87, z), SLATE_ROOF[1], MAT.Slate)
+		elseif kind == "lantern" then
+			show(V3(0.18, 0.95, 0.18), CF(x, top + 0.48, z), wood, MAT.Wood)
+			show(V3(0.48, 0.36, 0.48), CF(x, top + 1.05, z), hex("#F6D58A"), MAT.Neon)
+		else
+			show(V3(0.16, 1.15, 0.16), CF(x, top + 0.5, z) * ANG(0, 0, 0.7), wood, MAT.Wood)
+			show(V3(0.6, 0.3, 0.12), CF(x + 0.22, top + 0.95, z), hex("#C0C6CE"), MAT.Metal)
+		end
+	end
+	local ledge = Kit.part(model, "Ledge", V3(26, 0.22, 1.5), CF(0, 3.35, 10.55), wood, MAT.Wood)
+	ledge.CanQuery = false
+	local offers = {
+		{ x = -9.6, label = "WALL  $80\nFENCE  $30", kind = "fence" },
+		{ x = -3.2, label = "SHED  $600", kind = "shed" },
+		{ x = 3.2, label = "LANTERN  $120\nSIGN  $40", kind = "lantern" },
+		{ x = 9.6, label = "STEEL AXE  $160", kind = "axe" },
+	}
+	for _, offer in ipairs(offers) do
 		local board =
-			Kit.part(model, "PriceTag", V3(0.16, 1.7, 3.2), CF(x - side * 1.75, y + 1.2, -4), hex("#3E2A18"), MAT.Wood)
+			Kit.part(model, "PriceTag", V3(5.4, 2.3, 0.16), CF(offer.x, 6.15, 11.42), hex("#3E2A18"), MAT.Wood)
 		board.CanCollide = false
 		board.CanQuery = false
 		board.CanTouch = false
-		Kit.signText(board, label, TRIM, { if side > 0 then Enum.NormalId.Left else Enum.NormalId.Right })
+		Kit.signText(board, offer.label, TRIM, { Enum.NormalId.Front, Enum.NormalId.Back })
+		sample(offer.x, 3.35, 10.35, offer.kind)
 	end
-	aisle(-1, "WALL  $80\nFENCE  $30", 3.2)
-	aisle(-1, "SHED  $600", 6.2)
-	aisle(1, "LANTERN  $120\nSIGN  $40", 3.2)
-	aisle(1, "STEEL AXE  $160", 6.2)
 end
 
 -- A shop: about 18 x 14 studs, its front (-Z) open on the counter. `kind`

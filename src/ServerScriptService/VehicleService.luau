@@ -180,6 +180,8 @@ export type Hooks = {
 	-- Where a truck is delivered when the player has a plot (the road-edge
 	-- pad). Nil means the public parking lot, smallest free bay.
 	deliveryCFrame: ((player: Player) -> CFrame?)?,
+	-- Tests: when set, SpawnTruck builds nothing and leaves the old truck.
+	blockSpawn: boolean?,
 }
 VehicleService.Hooks = {} :: Hooks
 
@@ -1287,6 +1289,20 @@ local function chargeRespawn(player: Player, def: TruckDef): (boolean, string?)
 	return true, nil
 end
 
+-- Gives a fee back when the truck never appeared. A profile with no wallet
+-- (tests) was never charged, so there is nothing to return.
+local function refundRespawn(player: Player, def: TruckDef)
+	local fee = ShopLogic.RespawnFee(def, CoreLoop.Active())
+	if fee <= 0 then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or type(profile.cash) ~= "number" then
+		return
+	end
+	EconomyService.AddCash(player, fee, "refunded a failed respawn", def.id)
+end
+
 -- Builds the player's truck (replacing any they have). With a plot it
 -- parks on that plot's delivery pad; otherwise in the smallest free
 -- public bay. Nothing is built for an id the player doesn't have a
@@ -1301,6 +1317,9 @@ function VehicleService.SpawnTruck(
 	load: { BedEntry }?,
 	trailerId: string?
 ): (Model?, number)
+	if VehicleService.Hooks.blockSpawn then
+		return nil, 0
+	end
 	local def = ItemCatalog.GetTruck(truckId)
 	if not def then
 		return nil, 0
@@ -1564,11 +1583,12 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 		if not paid then
 			return false, why
 		end
-		lastRecall[player.UserId] = now
 		local model = VehicleService.SpawnTruck(player, id, nil, profile.equippedTrailer)
 		if not model then
+			refundRespawn(player, def)
 			return false, nil
 		end
+		lastRecall[player.UserId] = now
 		return true, nil
 	end
 	if isDriving(player, rec) then
@@ -1602,8 +1622,12 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 	if not paid then
 		return false, whyNot
 	end
+	local model = VehicleService.SpawnTruck(player, rec.def.id, rec.bed, if rec.trailer then rec.trailer.id else nil)
+	if not model then
+		refundRespawn(player, rec.def)
+		return false, nil
+	end
 	lastRecall[player.UserId] = now
-	VehicleService.SpawnTruck(player, rec.def.id, rec.bed, if rec.trailer then rec.trailer.id else nil)
 	return true, nil
 end
 

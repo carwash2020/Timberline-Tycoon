@@ -438,19 +438,31 @@ return function(t)
 		t.ok(board ~= nil and find(board, "TextLabel").Text == "Ada", "it says who planted it")
 	end)
 
-	t.test("the short tutorial lets you plant on any step", function()
+	t.test("Murph's tutorial: no planting before its plant step, and the seed is kept", function()
 		local s = setup()
 		local rec = s.tree("oak", Vector3.new(10, 0, 10))
 		s.start()
+		local TutorialData = t.shared("TutorialData")
 		local a = s.player(1, "Ada", Vector3.new(12, 0, 10))
 		local profile = s.profiles[a]
 		profile.tutorialDone = false
-		profile.tutorialStep = 2
 		s.fell(a, rec)
 		t.eq(profile.heartseeds.oak, 1)
 		s.fxAll = {}
+		for step = 1, TutorialData.PlantStep - 1 do
+			profile.tutorialStep = step
+			a.attrs.TutorialStep = TutorialData.PlantStep -- the client's word counts for nothing
+			s.plant(a, rec.uid)
+			t.eq(s.lastToast(a), "Hang onto it: Murph will show you where.", "step " .. step)
+			t.eq(profile.heartseeds.oak, 1, "the seed is kept")
+			t.eq(profile.forest.planted, 0)
+			t.eq(s.fxKinds(), {}, "nothing sprouts")
+			t.eq(s.quest, {})
+			t.ok(rec.felled and rec.stump ~= nil, "the stump waits")
+		end
+		profile.tutorialStep = TutorialData.PlantStep
 		s.plant(a, rec.uid)
-		t.eq(profile.heartseeds.oak, nil, "planted mid-tutorial")
+		t.eq(profile.heartseeds.oak, nil, "at the plant step it goes in")
 		t.eq(s.fxKinds(), { "Sprout" })
 		t.eq(s.quest, { { a, "seedPlanted" } })
 	end)
@@ -465,7 +477,7 @@ return function(t)
 		s.profiles[skipped].tutorialDone = true
 		local later = s.player(2, "Bo", Vector3.new(-12, 0, -10))
 		s.profiles[later].tutorialDone = false
-		s.profiles[later].tutorialStep = 6 -- selling loads, after planting
+		s.profiles[later].tutorialStep = t.shared("TutorialData").PlantStep + 1 -- the loads, after planting
 		s.fell(skipped, one)
 		s.fell(later, two)
 		s.fxAll = {}

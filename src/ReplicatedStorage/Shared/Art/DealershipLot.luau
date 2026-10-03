@@ -1,9 +1,13 @@
 --!strict
--- The dealership's open display lot: every truck in one row facing the
--- street (-Z), every trailer unhitched in a row behind. Each model is
--- anchored, has no scripts, streams Atomic, and carries a price sign and
--- a buy prompt. MapBuilder places the model; ShopService buys from the
--- ShopDisplay tag.
+-- The dealership's open display lot: all eight trucks and trailers in one
+-- row, facing the path along the south side (-Z). Each model is anchored,
+-- has no scripts, streams Atomic, and carries a price sign on its own
+-- front plus a buy prompt. MapBuilder places the model; ShopService buys
+-- from the ShopDisplay tag.
+--
+-- Eight parking bays (about 118 studs before the gaps between them) do not
+-- fit the lawn Job B keeps for this lot (x 184 to 296). The row uses each
+-- vehicle's real width and the same walk gap between neighbours.
 
 local CollectionService = game:GetService("CollectionService")
 
@@ -18,17 +22,25 @@ local Util = require(script.Parent.Parent.Util)
 
 local DealershipLot = {}
 
-local GAP = 6
-local MARGIN = 4
-local DEPTH = 56 -- fits the lawn north of the plot road
--- Trailers sit unhitched behind the three shorter trucks. The Flatbed and
--- the Logging Rig are too long to leave a trailer behind them in that depth,
--- so the long trailer goes behind the Scout and the short one behind the Pickup.
-local TRUCKS = { "Rustbucket", "Pickup", "ScoutATV", "Flatbed", "LoggingRig" }
-local BEHIND = {
-	Rustbucket = "RanchTrailer",
-	Pickup = "PonyTrailer",
-	ScoutATV = "HeavyHauler",
+-- Southwest corner of the row, inside the reserved lawn (x 184 to 296,
+-- z 64 to 123). The path occupies z 64 to 70; the trucks start at z 70.
+DealershipLot.OriginX = 184
+DealershipLot.OriginZ = 70
+
+local LOT_W = 112
+local LOT_D = 53
+local SIDE = 2.5 -- studs from the row's ends to the reserved edges
+local FRONT = 4.2 -- bumper line, leaving the price sign inside the lot
+
+local ORDER = {
+	{ kind = "Truck", id = "Rustbucket" },
+	{ kind = "Truck", id = "Pickup" },
+	{ kind = "Truck", id = "ScoutATV" },
+	{ kind = "Truck", id = "Flatbed" },
+	{ kind = "Truck", id = "LoggingRig" },
+	{ kind = "Trailer", id = "PonyTrailer" },
+	{ kind = "Trailer", id = "RanchTrailer" },
+	{ kind = "Trailer", id = "HeavyHauler" },
 }
 
 -- The loop the price signs use. MapBuilder publishes CoreLoopActive before
@@ -48,49 +60,32 @@ local function priceLoop(): number
 	return if GameConfig.CoreLoop == 2 then 2 else 1
 end
 
-local function bayWidth(id: string): number
-	if id == "Flatbed" then
-		return 15
-	elseif id == "LoggingRig" then
-		return 16
+-- How wide the vehicle is, tyres included, and how long it is nose to tail.
+local function measure(kind: string, id: string): (number, number)
+	if kind == "Truck" then
+		local def = ItemCatalog.GetTruck(id)
+		if not def then
+			return 10, 20
+		end
+		local lay = TruckLayout.For(def)
+		return math.max(lay.width, 2 * lay.wheelX + lay.tyreWidth), lay.length
 	end
-	return 14.25
-end
-
-local function truckLength(id: string): number
-	local def = ItemCatalog.GetTruck(id)
-	return if def then TruckLayout.For(def).length else 20
-end
-
-local function trailerLayout(id: string): TruckLayout.TrailerLayout?
 	local trailer = ItemCatalog.GetTrailer(id)
 	local truck = ItemCatalog.GetTruck("Pickup")
 	if not trailer or not truck then
-		return nil
+		return 10, 20
 	end
-	return TruckLayout.ForTrailer(trailer, TruckLayout.For(truck))
+	local lay = TruckLayout.ForTrailer(trailer, TruckLayout.For(truck))
+	return math.max(lay.width, 2 * lay.wheelX + lay.tyreWidth), lay.length
 end
 
-local function trailerLength(id: string): number
-	local lay = trailerLayout(id)
-	return if lay then lay.length else 20
-end
-
--- Width and depth of the open lot, in studs. About 106 x 56: one row of
--- trucks facing the road, trailers unhitched behind the shorter ones.
+-- Width and depth of the open lot, in studs: the reserved lawn's width,
+-- and enough depth for the Logging Rig plus its price sign.
 function DealershipLot.Size(): (number, number)
-	local width = MARGIN
-	for i, id in ipairs(TRUCKS) do
-		width += bayWidth(id)
-		if i < #TRUCKS then
-			width += GAP
-		end
-	end
-	width += MARGIN
-	return math.max(100, width), DEPTH
+	return LOT_W, LOT_D
 end
 
-local function prep(model: Model, category: string, id: string, priceText: string, frontZ: number)
+local function prep(model: Model, category: string, id: string)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model:SetAttribute("Category", category)
 	model:SetAttribute("ItemId", id)
@@ -113,14 +108,20 @@ local function prep(model: Model, category: string, id: string, priceText: strin
 	if seat and seat:IsA("VehicleSeat") then
 		seat.Disabled = true
 	end
+end
+
+-- The price board on this model's own nose, after it has been parked.
+-- Relative to the pivot, so a later placeAt keeps it on this vehicle.
+local function attachSign(model: Model, priceText: string, length: number)
 	local sign = Kit.part(
 		model,
 		"PriceSign",
 		Vector3.new(4.5, 2.4, 0.3),
-		CFrame.new(0, 3.2, frontZ - 3),
+		CFrame.new(),
 		Color3.fromRGB(62, 42, 24),
 		Enum.Material.Wood
 	)
+	sign.CFrame = model:GetPivot() * CFrame.new(0, 3.2, -length / 2 - 2)
 	sign.CanCollide = false
 	sign.CanQuery = false
 	Kit.signText(sign, priceText, Color3.fromRGB(245, 235, 215), { Enum.NormalId.Front, Enum.NormalId.Back })
@@ -133,65 +134,68 @@ local function prep(model: Model, category: string, id: string, priceText: strin
 	prompt.Parent = sign
 end
 
+local function priceOf(kind: string, id: string): string
+	local item = if kind == "Truck" then ItemCatalog.GetTruck(id) else ItemCatalog.GetTrailer(id)
+	if not item then
+		return id
+	end
+	return item.displayName .. "\n" .. Util.formatCash(ShopLogic.Price(item, priceLoop()))
+end
+
 local function placeTruck(id: string): Model?
 	local def = ItemCatalog.GetTruck(id)
 	if not def then
 		return nil
 	end
 	local model = TruckArt.Build(def)
-	local price = ShopLogic.Price(def, priceLoop())
-	prep(model, "Truck", id, def.displayName .. "\n" .. Util.formatCash(price), -TruckLayout.For(def).length / 2)
+	prep(model, "Truck", id)
 	return model
 end
 
 local function placeTrailer(id: string): Model?
 	local def = ItemCatalog.GetTrailer(id)
-	local lay = trailerLayout(id)
-	if not def or not lay then
+	local truck = ItemCatalog.GetTruck("Pickup")
+	if not def or not truck then
 		return nil
 	end
+	local lay = TruckLayout.ForTrailer(def, TruckLayout.For(truck))
 	local model = Instance.new("Model")
 	model.Name = id
 	TruckArt.AddTrailer(model, def, lay)
-	local centerZ = lay.hitchZ + lay.length / 2
-	model:PivotTo(CFrame.new(0, 0, -centerZ))
-	local price = ShopLogic.Price(def, priceLoop())
-	prep(model, "Trailer", id, def.displayName .. "\n" .. Util.formatCash(price), -lay.length / 2)
+	-- Nose (the hitch) toward -Z, centred on the pivot, same as a truck.
+	model:PivotTo(CFrame.new(0, 0, -(lay.hitchZ + lay.length / 2)))
+	prep(model, "Trailer", id)
 	return model
 end
 
--- The lot around the origin, front (-Z) toward the street. Place it with
+-- The lot around the origin, front (-Z) toward the path. Place it with
 -- Kit.placeAt. Returns the model; each vehicle is a child model.
 function DealershipLot.Build(): Model
 	local width, depth = DealershipLot.Size()
 	local lot = Instance.new("Model")
 	lot.Name = "DealershipLot"
-	local front = -depth / 2 + MARGIN
-	local x = -width / 2 + MARGIN
-	local spot: { [string]: { x: number, length: number } } = {}
-	for _, id in ipairs(TRUCKS) do
-		local bay = bayWidth(id)
-		local model = placeTruck(id)
-		local length = truckLength(id)
-		local cx = x + bay / 2
+	local spans: { number } = {}
+	local lengths: { number } = {}
+	local sum = 0
+	for _, entry in ipairs(ORDER) do
+		local span, length = measure(entry.kind, entry.id)
+		table.insert(spans, span)
+		table.insert(lengths, length)
+		sum += span
+	end
+	local gap = (width - 2 * SIDE - sum) / math.max(1, #ORDER - 1)
+	local bumper = -depth / 2 + FRONT
+	local x = -width / 2 + SIDE
+	for i, entry in ipairs(ORDER) do
+		local model = if entry.kind == "Truck" then placeTruck(entry.id) else placeTrailer(entry.id)
+		local length = lengths[i]
+		local cx = x + spans[i] / 2
 		if model then
 			model.Parent = lot
-			model:PivotTo(CFrame.new(cx, 0, front + length / 2))
+			model:PivotTo(CFrame.new(cx, 0, bumper + length / 2))
+			attachSign(model, priceOf(entry.kind, entry.id), length)
 		end
-		spot[id] = { x = cx, length = length }
-		x += bay + GAP
-	end
-	for _, id in ipairs(TRUCKS) do
-		local trailerId = BEHIND[id]
-		local here = spot[id]
-		if trailerId and here then
-			local model = placeTrailer(trailerId)
-			if model then
-				model.Parent = lot
-				local length = trailerLength(trailerId)
-				model:PivotTo(CFrame.new(here.x, 0, front + here.length + 4 + length / 2))
-			end
-		end
+		x += spans[i] + gap
 	end
 	return lot
 end

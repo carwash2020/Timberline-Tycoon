@@ -233,6 +233,7 @@ return function(t)
 				end
 			end
 		end
+		t.ok(seen.wood and seen.truckBed, "the drag and load steps point at wood and the bed")
 		t.ok(
 			seen.plotSign and seen.tree and seen.murphCart and seen.dealership,
 			"claim a plot, chop, sell at the cart, then buy the truck"

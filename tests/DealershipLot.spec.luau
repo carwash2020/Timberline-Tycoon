@@ -70,6 +70,21 @@ return function(t)
 			end
 		end
 		t.eq(displays, 8, "5 trucks and 3 trailers")
+		local facing = nil
+		for _, child in ipairs(lot:GetChildren()) do
+			if child:IsA("Model") and child:GetAttribute("ItemId") then
+				local look = child:GetPivot().LookVector
+				if facing == nil then
+					facing = look
+				else
+					t.ok(look:Dot(facing) > 0.99, child.Name .. " faces with the row")
+				end
+				local sign = child:FindFirstChild("PriceSign", true)
+				local localPos = child:GetPivot():PointToObjectSpace(sign.CFrame.Position)
+				t.ok(localPos.Z < -1, child.Name .. " price sign is in front of the model")
+				t.ok(math.abs(localPos.X) < 3, child.Name .. " price sign is on this model, not an empty spot")
+			end
+		end
 	end)
 
 	t.test("the store and the dealership lot stay off the street, plaza and paths", function()

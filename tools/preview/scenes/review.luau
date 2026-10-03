@@ -21,6 +21,7 @@ return {
 		local PlotData = ctx.shared("PlotData")
 		local HudRules = ctx.load("StarterPlayer/StarterPlayerScripts/HudRules")
 		local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
+		local WorldLayout = ctx.load("ReplicatedStorage/Shared/World/WorldLayout")
 		local root = roblox.Instance.new("Model")
 		local town = WorldPlan.Town()
 
@@ -59,6 +60,25 @@ return {
 			Enum.Material.Ground
 		)
 		place(DealershipLot.Build(), town.displayLot)
+		-- The ground path from the showroom's east side to the lot, and the
+		-- sign at the turn, so this shot is the one the review asked for.
+		for _, area in ipairs(WorldLayout.TownPaint) do
+			if area.name == "TruckLotPath" then
+				Kit.part(
+					root,
+					"TruckLotPath",
+					V3.new(area.x1 - area.x0, 0.35, area.z1 - area.z0),
+					CF.new((area.x0 + area.x1) / 2, 0.15, (area.z0 + area.z1) / 2),
+					C3.fromRGB(176, 154, 116),
+					Enum.Material.Ground
+				)
+			end
+		end
+		for _, post in ipairs(town.signs) do
+			if string.find(post.text, "TRUCK LOT", 1, true) then
+				place(BuildingArt.Signpost(post.text), post.cframe)
+			end
+		end
 
 		-- Plot 1 (the campsite, nearest town) and its delivery pad, the
 		-- same size and place PlotService draws when the world has none.
@@ -105,7 +125,7 @@ return {
 			C3.fromRGB(63, 122, 52),
 			Enum.Material.SmoothPlastic
 		)
-		Kit.signText(cash, "$20", C3.fromRGB(240, 225, 195), { Enum.NormalId.Front })
+		Kit.signText(cash, "$20", C3.fromRGB(240, 225, 195), { Enum.NormalId.Front, Enum.NormalId.Back })
 		local button = Kit.part(
 			root,
 			"HudButton",
@@ -114,7 +134,7 @@ return {
 			C3.fromHex("#2F6DB5"),
 			Enum.Material.SmoothPlastic
 		)
-		Kit.signText(button, HudRules.NoTruckText, C3.fromHex("#F0E1C3"), { Enum.NormalId.Front })
+		Kit.signText(button, HudRules.NoTruckText, C3.fromHex("#F0E1C3"), { Enum.NormalId.Front, Enum.NormalId.Back })
 
 		local lot = town.displayLot.Position
 		local store = storeCf.Position
@@ -146,12 +166,11 @@ return {
 					label = "store interior from the door",
 				},
 				{
-					-- North of the row and a little west, looking back toward
-					-- the street, so the trailers (behind the shorter trucks)
-					-- sit in front of the trucks instead of hidden by them.
-					pos = { lot.X - 40, 32, lot.Z + 62 },
-					target = { lot.X + 8, 2, lot.Z - 8 },
-					fov = 52,
+					-- South of the row, looking north, so the trucks face the
+					-- camera and the path and the Truck Lot sign are in frame.
+					pos = { lot.X - 90, 42, lot.Z - 70 },
+					target = { lot.X - 10, 3, lot.Z + 4 },
+					fov = 50,
 					label = "dealership lot",
 				},
 				{
@@ -161,9 +180,11 @@ return {
 					label = "truck on the delivery pad",
 				},
 				{
-					pos = { 0, 8, -412 },
-					target = { 0, 8, -420 },
-					fov = 32,
+					-- The board's front is its -Z face. This camera sits on
+					-- that side and looks back at the button.
+					pos = { 0.5, 3.1, -428 },
+					target = { 0.6, 2.8, -420 },
+					fov = 26,
 					label = "HUD with no truck",
 				},
 			},

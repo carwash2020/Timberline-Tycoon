@@ -3,10 +3,11 @@
 -- QuestService (server) counts progress from game events; QuestUI (client)
 -- shows the objective, Murph's line and a beacon. Tuning = editing this.
 --
--- Order: claim a plot, chop a tree, sell the first load at Murph's cart
--- (he chips in $25 on that sale), buy the Rustbucket (it is delivered to
--- the plot). Then NextGoal takes over (the Steel Axe). The first sale is
--- at the cart beside the tutorial oaks (TutorialGrove), before any truck.
+-- Order: claim a plot, chop, pick up, sell the first load at Murph's cart
+-- (he chips in $25 on that sale), then buy the Rustbucket (delivered to
+-- the plot's pad). After that the old lessons stay: load, mill, plant,
+-- the three loads, and the Steel Axe. QuestService then keeps one next
+-- goal on the tracker (NextGoal).
 --
 -- Inserting a step shifts the ones after it: QuestService moves saves
 -- made before the insert to the latest step they had reached (by the
@@ -86,17 +87,50 @@ function TutorialData.SaplingsExist(): boolean
 end
 
 local starterAxe = ItemCatalog.AxeLadder()[1]
+local steelAxe = ItemCatalog.AxeLadder()[2] -- AlreadyDone's tier 2
 local oak = WoodData.Get("oak") :: WoodData.WoodDef
+local birch = WoodData.Get("birch") :: WoodData.WoodDef
 local rustbucket = ItemCatalog.GetTruck("Rustbucket") :: ItemCatalog.TruckDef
+local saplings = TutorialData.SaplingsExist()
+
+local function logLoad(id: string, reward: number, murph: string): Step
+	return {
+		id = id,
+		objective = "Sell %d more logs",
+		murph = murph,
+		event = "logsSold",
+		count = 6,
+		rewardCash = reward,
+		axeGoal = true,
+		axePrice = ShopLogic.Price(steelAxe, 1),
+	}
+end
+
+local function cashLoad(id: string, reward: number, murph: string): Step
+	return {
+		id = id,
+		objective = "Sell $%d more wood",
+		murph = murph,
+		event = "woodSoldCash",
+		count = 40,
+		unit = "cash",
+		rewardCash = reward,
+		axeGoal = true,
+		axePrice = ShopLogic.Price(steelAxe, 2),
+	}
+end
 
 local function plotStep(): Step
 	return {
 		id = "plot",
-		objective = "Claim a free plot",
-		murph = "Every lumberjack needs land, and this one's free. Pick a plot and claim it. We'll cut a tree once it's yours.",
+		objective = if saplings then "Claim a free plot and plant a sapling" else "Claim a free plot",
+		murph = if saplings
+			then "Every lumberjack needs land, and this one's free. The plot district is east of town, past the lot. Claim one, then plant a sapling on it."
+			else "Every lumberjack needs land, and this one's free. The plot district is east of town, past the lot. Claim one.",
 		event = "plotClaimed",
 		count = 1,
 		beacon = "plotSign",
+		also = if saplings then "seedPlanted" :: TutorialEvent else nil,
 	}
 end
 
@@ -131,15 +165,62 @@ TutorialData.Steps = {
 		grove = true,
 	},
 	{
+		id = "pickup",
+		objective = "Pick up a log",
+		murph = "Timber! Now grab those logs. You can carry two at a time.",
+		event = "logPickedUp",
+		count = 1,
+		beacon = "log",
+	},
+	{
 		id = "sell",
 		objective = "Sell your first load at Murph's cart",
-		murph = "My cart's right here. Haul a log over by hand and sell this first load. Same price as the mill.",
+		murph = "My cart's right here. Stand by it and sell this first load. Same price as the mill.",
 		event = "logsSold",
 		count = 1,
 		beacon = "murphCart",
 		rewardCash = 25,
 	},
 	truckStep(1),
+	{
+		id = "load",
+		objective = "Load logs into your truck",
+		murph = "That's your Rustbucket. She ain't pretty, but she hauls. Load 'em up at the tailgate.",
+		event = "logsLoaded",
+		count = 1,
+		beacon = "truck",
+	},
+	{
+		id = "mill",
+		objective = "Sell logs at the sawmill",
+		murph = "Hop in and drive to the sawmill up north. Park close, stand on the pad and sell 'em.",
+		event = "logsSold",
+		count = 1,
+		beacon = "sellPad",
+	},
+	{
+		id = "plant",
+		objective = "Fell a tree, then plant its Heartseed in the stump",
+		murph = "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.",
+		event = "seedPlanted",
+		count = 1,
+		beacon = "stump",
+	},
+	logLoad(
+		"loads",
+		8,
+		"See it grow? That tree's yours now. That Rusty Axe won't cut it in the hills, though. Sell another load at the mill and I'll chip in for a Steel Axe."
+	),
+	logLoad("loads2", 8, "Another load at the mill. You're getting the hang of the haul."),
+	logLoad("loads3", 9, "One more load at the mill, and I'll chip in for that axe."),
+	{
+		id = "steel",
+		objective = "Buy the Steel Axe at the Tool Shed",
+		murph = "Here's a little somethin' from me. The Tool Shed's just west of the mill. Go get yourself a real axe, kid.",
+		event = "axeBought",
+		count = 1,
+		beacon = "toolShed",
+	},
 } :: { Step }
 
 -- The v2 loop's steps: the same ids in the same order as Steps. Wood is
@@ -164,15 +245,72 @@ TutorialData.StepsV2 = {
 		grove = true,
 	},
 	{
+		id = "pickup",
+		objective = "Drag a log",
+		murph = "Timber! Put your axe away ({unequip}). Then {grab} on a log to drag it. Big ones are heavy: chop 'em shorter first.",
+		event = "woodGrabbed",
+		count = 1,
+		beacon = "wood",
+	},
+	{
 		id = "sell",
 		objective = "Sell your first load at Murph's cart",
-		murph = "Don't drive off yet. Put your axe away ({unequip}). Then {grab} a log and drag it onto my cart. I'll buy this first load, same price the mill pays.",
+		murph = "Don't drive off yet. My cart's right beside you. Drag the log onto it and I'll buy this first load, same price the mill pays.",
 		event = "woodSold",
 		count = 1,
 		beacon = "murphCart",
 		rewardCash = 25,
 	},
 	truckStep(2),
+	{
+		id = "load",
+		objective = "Drag a log onto your truck's bed",
+		murph = "That was the easy one. That's your Rustbucket. She ain't pretty, but she hauls. Drag a log up onto her bed and lay it flat so it rides. Too long for the bed? Cut it to fit.",
+		event = "woodLoaded",
+		count = 1,
+		beacon = "truckBed",
+	},
+	{
+		id = "mill",
+		objective = "Sell wood at the sawmill",
+		murph = "Hop in and drive to the mill up north. Back her onto the pad that says SELL LOGS HERE and the whole bed sells itself, or push a log onto it by hand. Bigger logs pay more: it's all by the cubic unit, u³. A saw from the Tool Shed turns straight logs into planks, and planks pay more.",
+		event = "woodSold",
+		count = 1,
+		beacon = "sellPad",
+	},
+	{
+		id = "plant",
+		objective = "Fell a tree, then plant its Heartseed in the stump",
+		murph = "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.",
+		event = "seedPlanted",
+		count = 1,
+		beacon = "stump",
+	},
+	cashLoad(
+		"loads",
+		8,
+		string.format(
+			"See it grow? That tree's yours now. That %s of yours takes %d hits a cut on birch, though. Sell another load at the mill and I'll chip in for a %s.",
+			starterAxe.displayName,
+			FieldGuide.TrunkHits(starterAxe, birch),
+			steelAxe.displayName
+		)
+	),
+	cashLoad("loads2", 8, "Another load at the mill. Haul it up north and sell it on the pad."),
+	cashLoad("loads3", 9, "One more load at the mill. Then that axe is yours to buy."),
+	{
+		id = "steel",
+		objective = "Buy the Steel Axe at the Tool Shed",
+		murph = string.format(
+			"Here's a little somethin' from me. Tink's Tool Shed is just west of the mill. A %s cuts an oak trunk in %d hits, not %d. Go get yourself a real axe, kid.",
+			steelAxe.displayName,
+			FieldGuide.TrunkHits(steelAxe, oak),
+			FieldGuide.TrunkHits(starterAxe, oak)
+		),
+		event = "axeBought",
+		count = 1,
+		beacon = "toolShed",
+	},
 } :: { Step }
 
 -- The events the v2 steps listen for, in step order (woodSold and
@@ -191,7 +329,7 @@ end
 
 -- The line Murph says once the last step is done (both loops).
 TutorialData.Farewell =
-	"The truck's on your plot. Next, save up for a Steel Axe at the Tool Shed. Take my old Field Guide: every new wood you fell goes in it. Pine grows in the hills. And kid, some woods only show at night."
+	"The plot's yours, and that axe will do. Take my old Field Guide: every new wood you fell goes in it. Pine grows in the hills. And kid, some woods only show at night."
 
 -- What Murph says when a returning player's refresher is done.
 TutorialData.FarewellBack =
@@ -286,9 +424,8 @@ local function indexOf(id: string): number
 			return i
 		end
 	end
-	return 0
+	error("[TutorialData] no step " .. id)
 end
--- 0 when the short tutorial has no Heartseed beat: planting is allowed any time.
 TutorialData.PlantStep = indexOf("plant")
 
 -- A save that came into the v2 loop with the tutorial finished gets a
@@ -320,9 +457,6 @@ TutorialData.StumpHoldSeconds = 240
 -- once it's finished or skipped) may plant a Heartseed. Before the plant
 -- step they keep their seed: Murph shows them where.
 function TutorialData.CanPlant(step: number): boolean
-	if TutorialData.PlantStep <= 0 then
-		return true
-	end
 	return step <= 0 or step >= TutorialData.PlantStep
 end
 
@@ -330,9 +464,6 @@ end
 -- the usual regrowth): anyone still on the way to the plant step, so the
 -- stump is there when Murph asks for it.
 function TutorialData.StumpHold(step: number): number
-	if TutorialData.PlantStep <= 0 then
-		return 0
-	end
 	return if step > 0 and step <= TutorialData.PlantStep then TutorialData.StumpHoldSeconds else 0
 end
 

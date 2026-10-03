@@ -1243,6 +1243,9 @@ function WorldPlan.Town(): Town
 		-- (1194, 188). Only a sliver of spots here does that (WorldPlan.spec
 		-- pins the lighthouse).
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 67, 0, 40) },
+		-- The turn off the street's east end, just north of PlazaEastMouth,
+		-- facing back down the path to the truck lot.
+		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },
 		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
 		-- The south exit, where the Forest Path leaves town for the Starter
 		-- Forest. West of the road (the lot is to the east), lit, and well
@@ -1409,7 +1412,11 @@ function WorldPlan.Town(): Town
 		pathRounds = pathRounds,
 		-- Open display lot on the lawn north of the plot road. Trucks face
 		-- -Z, toward that road. The corner is the zone in WorldLayout.
-		displayLot = CFrame.new(188 + DealershipLot.Size() / 2, 0, 66 + select(2, DealershipLot.Size()) / 2),
+		displayLot = CFrame.new(
+			DealershipLot.OriginX + DealershipLot.Size() / 2,
+			0,
+			DealershipLot.OriginZ + select(2, DealershipLot.Size()) / 2
+		),
 	}
 end
 

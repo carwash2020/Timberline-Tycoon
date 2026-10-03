@@ -278,6 +278,12 @@ WorldLayout.TownPaint = {
 	{ name = "HillsMouth", x0 = -42, x1 = 4, z0 = 6, z1 = 34, material = "Ground" },
 	-- The turn off the street's east end onto the way north (the mill road).
 	{ name = "PlazaEastMouth", x0 = 70, x1 = 112, z0 = 68, z1 = 96, material = "Ground" },
+	-- Showroom east wall (DealershipFloor ends at x 69.5) to the lot's west
+	-- edge, then along the lot's south side. The jog stays west of the birch
+	-- at (130, 98) and south of the one at (160, 84).
+	{ name = "TruckLotPath", x0 = 69.5, x1 = 124, z0 = 90, z1 = 98, material = "Ground" },
+	{ name = "TruckLotPath", x0 = 116, x1 = 124, z0 = 64, z1 = 98, material = "Ground" },
+	{ name = "TruckLotPath", x0 = 116, x1 = 296, z0 = 64, z1 = 70, material = "Ground" },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
 	{ name = "HearthAndHomePath", x0 = -106, x1 = -94, z0 = 84, z1 = 98, material = "Ground" },
 	{ name = "ToolShedPath", x0 = -63, x1 = -51, z0 = 82, z1 = 93, material = "Ground" },
