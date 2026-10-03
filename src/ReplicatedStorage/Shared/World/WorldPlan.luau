@@ -268,7 +268,7 @@ local STAND_ROCK = 6 -- studs off a boulder's side
 local STAND_SIGN = 12 -- studs off a road sign
 local STAND_SCENERY = 8 -- studs off a scenery piece's footprint (the scenery's own gap to a tree)
 local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
-local STAND_MAX = 178 -- cap. The 3×4 plots leave room for 171 (trees 323-493)
+local STAND_MAX = 178 -- cap. The 3×4 plots and the lighthouse vista leave room for 169 (trees 323-491)
 local STAND_OPEN_MOST = 6 -- trees in an open-country stand (4 to this; roadside ones 4-9)
 
 -- A country stand: `trees` round `center` (all within `radius`); `road`
@@ -1237,12 +1237,10 @@ function WorldPlan.Town(): Town
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
 		-- Just north of the truck-lot path (the apron ends at z=70 and the
-		-- posts reach about five studs south), past the lot's east rail
-		-- (M1.5: it stood at (124, 64)). From the spawn it hides
-		-- the same stretch of the coast as before, so the lighthouse (which
-		-- stands where the spawn sees it, inSightOfSpawn) stays where it was:
-		-- (1194, 188). Only a sliver of spots here does that (WorldPlan.spec
-		-- pins the lighthouse).
+		-- posts reach about five studs south), past the lot's east rail,
+		-- facing the plot road (M1.5: it stood at (124, 64), then on the
+		-- apron at (148.5, 67)). Clear of that apron, the next headland is
+		-- in sight, so the lighthouse stands at (1203, 236).
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
