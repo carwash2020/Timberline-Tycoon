@@ -49,11 +49,14 @@ local FUNNEL: { string } = {
 	"Could afford an upgrade",
 	"First upgrade bought",
 	"Finished the tutorial",
+	"Saw a next goal",
 }
 local STEP_NUMBER: { [string]: number } = {}
 for i, name in ipairs(FUNNEL) do
 	STEP_NUMBER[name] = i
 end
+-- The same list, for the specs. New names go at the end only.
+MilestoneService.Funnel = FUNNEL
 
 local IS_STUDIO = RunService:IsStudio()
 local REPORT_EVERY = 60 -- seconds, Studio only

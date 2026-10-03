@@ -72,6 +72,7 @@ return function(t)
 					Event = function(_, event)
 						table.insert(quests, event)
 					end,
+					RefreshNextGoal = function() end,
 				},
 				VehicleService = {
 					Equip = function(_, truckId, trailerId)

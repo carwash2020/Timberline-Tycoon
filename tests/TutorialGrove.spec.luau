@@ -1,0 +1,120 @@
+--!nocheck
+-- Murph's cart: one small tutorial sale, and a spot that stays off the
+-- roads, the street, the spawn walk and the townsfolk.
+return function(t)
+	local TutorialGrove = t.shared("TutorialGrove")
+	local WorldLayout = t.shared("World/WorldLayout")
+	local NPCData = t.shared("NPCData")
+	local TreeGen = t.shared("TreeGen")
+	local SectionLogic = t.shared("SectionLogic")
+
+	local function offer(extra)
+		local base = { done = false, stepId = "sell", used = false, pieces = 1, volume = 10, logs = 1 }
+		for k, v in pairs(extra or {}) do
+			base[k] = v
+		end
+		return base
+	end
+
+	t.test("the cart buys one small load, and only during the sell step", function()
+		local ok, why = TutorialGrove.Accept(offer())
+		t.eq(ok, true)
+		t.eq(why, nil)
+		t.eq(select(1, TutorialGrove.Accept(offer({ pieces = 0 }))), false)
+		t.eq(select(2, TutorialGrove.Accept(offer({ used = true }))), TutorialGrove.RefuseUsed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ done = true }))), TutorialGrove.RefuseClosed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "load" }))), TutorialGrove.RefuseClosed)
+		local over = offer()
+		over.stepId = nil -- a finished tutorial has no step
+		t.eq(select(2, TutorialGrove.Accept(over)), TutorialGrove.RefuseClosed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ pieces = TutorialGrove.MaxPieces + 1 }))), TutorialGrove.RefuseBig)
+		t.eq(select(2, TutorialGrove.Accept(offer({ volume = TutorialGrove.MaxVolume + 1 }))), TutorialGrove.RefuseBig)
+		t.eq(select(2, TutorialGrove.Accept(offer({ logs = TutorialGrove.MaxLogs + 1 }))), TutorialGrove.RefuseBig)
+		t.eq(select(1, TutorialGrove.Accept(offer({ volume = nil, logs = nil, pieces = 2 }))), true)
+	end)
+
+	local function spots()
+		local out = {}
+		for _, tree in ipairs(TutorialGrove.Trees) do
+			table.insert(out, tree)
+		end
+		local c = TutorialGrove.Cart
+		local half = TutorialGrove.ZoneSize / 2
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				table.insert(out, { x = c.x + sx * half.X, z = c.z + sz * half.Z })
+			end
+		end
+		table.insert(out, c)
+		return out
+	end
+
+	local function segDist(px, pz, ax, az, bx, bz)
+		local dx, dz = bx - ax, bz - az
+		local len2 = dx * dx + dz * dz
+		local t = if len2 <= 0 then 0 else math.clamp(((px - ax) * dx + (pz - az) * dz) / len2, 0, 1)
+		local qx, qz = ax + dx * t, az + dz * t
+		return math.sqrt((px - qx) ^ 2 + (pz - qz) ^ 2)
+	end
+
+	t.test("the grove and the cart stay off the roads, the town paint and the walkers", function()
+		for _, spot in ipairs(spots()) do
+			t.ok(
+				math.sqrt(spot.x ^ 2 + (spot.z - 40) ^ 2) < 35,
+				string.format("near the spawn: %g, %g", spot.x, spot.z)
+			)
+			for _, road in ipairs(WorldLayout.Roads) do
+				local points = road.points
+				for i = 1, #points - 1 do
+					local a, b = points[i], points[i + 1]
+					local d = segDist(spot.x, spot.z, a.X, a.Y, b.X, b.Y)
+					t.ok(
+						d > road.width / 2 + 2,
+						string.format("%s is %0.1f from (%g, %g)", road.name, d, spot.x, spot.z)
+					)
+				end
+			end
+			for _, paint in ipairs(WorldLayout.TownPaint) do
+				local inside = spot.x >= paint.x0 - 2
+					and spot.x <= paint.x1 + 2
+					and spot.z >= paint.z0 - 2
+					and spot.z <= paint.z1 + 2
+				t.ok(not inside, string.format("%s covers (%g, %g)", paint.name, spot.x, spot.z))
+			end
+			local lot = WorldLayout.ParkingLot
+			local inLot = spot.x >= lot.x0 - 2
+				and spot.x <= lot.x1 + 2
+				and spot.z >= lot.z0 - 2
+				and spot.z <= lot.z1 + 2
+			t.ok(not inLot, "the lot")
+			t.ok(math.sqrt((spot.x + 28) ^ 2 + (spot.z - 45) ^ 2) > 6, "Murph's camp")
+		end
+		for _, npc in ipairs(NPCData.List) do
+			local route = npc.route
+			if route then
+				for i, w in ipairs(route) do
+					for _, spot in ipairs(spots()) do
+						local d = math.sqrt((spot.x - w.x) ^ 2 + (spot.z - w.z) ^ 2)
+						t.ok(d > 4, string.format("%s mark (%g, %g) is %0.1f from the grove", npc.id, w.x, w.z, d))
+						local nxt = route[i % #route + 1]
+						local along = segDist(spot.x, spot.z, w.x, w.z, nxt.x, nxt.z)
+						t.ok(along > 4, string.format("%s's walk passes %0.1f from the grove", npc.id, along))
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("one small oak fits on the cart", function()
+		local scale = TreeGen.ScaleFor("small")
+		for seed = 4100, 4106 do
+			local skel = TreeGen.Skeleton("oak", seed, scale)
+			local volume = 0
+			for _, section in ipairs(skel.sections) do
+				volume += SectionLogic.Volume(section.thickness, section.length, section.thickness)
+			end
+			t.ok(volume > 5, "a real tree")
+			t.ok(volume <= TutorialGrove.MaxVolume, string.format("seed %d is %0.1f u³", seed, volume))
+		end
+	end)
+end

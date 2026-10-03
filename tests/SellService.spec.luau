@@ -45,6 +45,8 @@ return function(t)
 		s.folder = folder
 		local zone = Instance.new("Part")
 		s.zone = zone
+		s.gateZone = Instance.new("Part")
+		s.inGate = {}
 		function s.piece(id, owner, woodId, volume, extra)
 			local m = Instance.new("Model")
 			m.Name = "Wood_" .. id
@@ -95,9 +97,18 @@ return function(t)
 			walletRoom = function()
 				return s.room
 			end,
-			partsInZone = function()
+			partsInZone = function(zone)
+				if zone == s.gateZone then
+					return s.inGate
+				end
 				return s.inZone
 			end,
+			gate = if options.gate
+				then {
+					zone = s.gateZone,
+					accept = options.gate,
+				}
+				else nil,
 			now = function()
 				return s.clock
 			end,
@@ -462,6 +473,47 @@ return function(t)
 		s.bed[1] = { ma }
 		local _, why = s.SellService.SellBed(s.player(1))
 		t.eq(why, "empty")
+		t.eq(#s.paid, 1)
+	end)
+
+	t.test("the tutorial cart sells one small load, and a refusal leaves the wood and toasts once", function()
+		local calls = 0
+		local s = setup({
+			gate = function(_payee, pieces, volume)
+				calls += 1
+				t.eq(pieces, 1)
+				t.ok(volume > 0)
+				return "That's more than my cart can take. The sawmill buys a full load."
+			end,
+		})
+		local model, part = s.piece("a", 1, "oak", 10)
+		s.inGate = { part }
+		t.eq(#s.tick(0), 0, "just arrived")
+		t.eq(#s.tick(s.SellService.Settle), 0, "refused")
+		t.eq(calls, 1)
+		t.eq(#s.toasts, 1)
+		t.eq(model.Parent, s.folder, "still in the world")
+		s.tick(1)
+		t.eq(#s.toasts, 1, "not told again while it sits there")
+		t.eq(#s.paid, 0)
+	end)
+
+	t.test("the tutorial cart pays when the gate accepts, and the pad still sells its own wood once", function()
+		local s = setup({
+			gate = function()
+				return nil
+			end,
+		})
+		local cartModel, cartPart = s.piece("cart", 1, "oak", 8)
+		local padModel, padPart = s.piece("pad", 1, "birch", 12)
+		s.inGate = { cartPart }
+		s.inZone = { padPart }
+		s.tick(0)
+		local sales = s.tick(s.SellService.Settle)
+		t.eq(#sales, 1, "one payee, cart and pad together")
+		t.eq(sales[1].pieces, 2)
+		t.eq(cartModel.Parent, nil)
+		t.eq(padModel.Parent, nil)
 		t.eq(#s.paid, 1)
 	end)
 end

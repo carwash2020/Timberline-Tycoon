@@ -162,6 +162,8 @@ return function(t)
 		local fs = require("@lune/fs")
 		for _, path in ipairs({
 			"src/ReplicatedStorage/Shared/TutorialData.luau",
+			"src/ReplicatedStorage/Shared/TutorialGrove.luau",
+			"src/ReplicatedStorage/Shared/NextGoal.luau",
 			"src/ReplicatedStorage/Shared/HintLogic.luau",
 			"src/ReplicatedStorage/Shared/DailyData.luau",
 			"src/ReplicatedStorage/Shared/FieldGuide.luau",

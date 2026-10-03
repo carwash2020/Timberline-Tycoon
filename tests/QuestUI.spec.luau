@@ -4,7 +4,7 @@
 -- placed inside it) and the shops (each named by its kind, Counter inside).
 return function(t)
 	local roblox = t.roblox
-	local Instance, Vector3, Color3 = roblox.Instance, roblox.Vector3, roblox.Color3
+	local Instance, Vector3, Color3, CFrame = roblox.Instance, roblox.Vector3, roblox.Color3, roblox.CFrame
 	local loader = t.loader({
 		services = {
 			Players = { LocalPlayer = {} },
@@ -42,6 +42,17 @@ return function(t)
 			Kit.placeAt(shop, spot.cframe)
 			shop.Parent = map
 		end
+		local grove = Instance.new("Model")
+		grove.Name = "TutorialGrove"
+		Kit.part(grove, "CartZone", Vector3.new(7, 12, 7), CFrame.new(-13, 6, 42), Color3.new(1, 1, 1))
+		grove.Parent = map
+		local plots = Instance.new("Model")
+		plots.Name = "Plots"
+		local plot = Instance.new("Model")
+		plot.Name = "Plot_1"
+		plot.Parent = plots
+		Kit.part(plot, "Sign", Vector3.new(8, 3.5, 0.4), CFrame.new(), Color3.new(1, 1, 1))
+		plots.Parent = map
 		return map
 	end
 
@@ -111,7 +122,11 @@ return function(t)
 		t.eq(QuestUI.ClaimedByOther(tree({ HP = 1 }), 7, 1010, here), false, "never claimed")
 		-- The tracker's title, and on a returning player's refresher.
 		t.eq(QuestUI.TrackerTitle(2, 7, false), "TUTORIAL · 2/7")
-		t.eq(QuestUI.TrackerTitle(2, 7, true), "WHAT'S NEW · 2/4")
+		t.eq(
+			QuestUI.TrackerTitle(2, 7, true),
+			string.format("WHAT'S NEW · 2/%d", TutorialData.RefresherLast),
+			"the refresher ends at the cart"
+		)
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), "e"), true, "any other tree while one is awake")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Elder = false, Uid = "a" }), ""), true)
 	end)

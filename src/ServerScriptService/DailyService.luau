@@ -31,6 +31,7 @@ local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
+local QuestService = require(script.Parent.QuestService)
 
 type Profile = ProfileService.Profile
 type Goal = DailyData.Goal
@@ -122,6 +123,7 @@ local function finishDay(player: Player, profile: Profile)
 		)
 	)
 	analytics(player, "DailyAllDone", daily.streak)
+	QuestService.RefreshNextGoal(player)
 end
 
 -- Adds to each of today's open goals what `addFor` says it gains, paying
@@ -157,6 +159,9 @@ local function progress(player: Player, profile: Profile, addFor: (Goal) -> numb
 	end
 	if changed then
 		publish(player, profile)
+	end
+	if rolled then
+		QuestService.RefreshNextGoal(player)
 	end
 end
 
@@ -218,6 +223,7 @@ function DailyService.Start(player: Player, profile: Profile)
 	end
 	rollIfNewDay(player, profile)
 	publish(player, profile)
+	QuestService.RefreshNextGoal(player)
 end
 
 -- New goals at midnight for everyone online.
@@ -229,6 +235,7 @@ local function midnightLoop()
 			if profile and rollIfNewDay(player, profile) then
 				publish(player, profile)
 				toast(player, profile, "New daily goals are in!")
+				QuestService.RefreshNextGoal(player)
 			end
 		end
 	end

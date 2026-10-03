@@ -234,6 +234,8 @@ QuestUI.SkipArmed = "{Press} again to skip"
 QuestUI.BeaconPaths = {
 	sellPad = { "SellArea", "SellZone" },
 	toolShed = { "ToolShed", "Counter" },
+	murphCart = { "TutorialGrove", "CartZone" },
+	plotSign = { "Plots", "Plot_1", "Sign" },
 } :: { [string]: { string } }
 
 -- The fixed part for the beacon `target` under `map` (TimberlineMap), if
@@ -335,6 +337,14 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 		return QuestUI.TutorialTree(model, elderUid) and not QuestUI.ClaimedByOther(model, player.UserId, now, isHere)
 	end
 	if target == "tree" then
+		if step.grove then
+			local grove = nearestTagged("Tree", from, function(model)
+				return choppable(model) and model:GetAttribute("TutorialGrove") == true
+			end)
+			if grove then
+				return grove
+			end
+		end
 		local wood = step.beaconWood
 		if wood then
 			-- The step's wood first (v2: Murph's oaks), else any tree.
@@ -428,12 +438,33 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 	return nil
 end
 
+-- The tutorial step, or a stand-in so the post-tutorial goal can point
+-- at the Tool Shed (or wherever NextGoalBeacon names).
+local function beaconStep(): Step?
+	local _, step = currentStep()
+	if step then
+		return step
+	end
+	local name = player:GetAttribute("NextGoalBeacon")
+	if type(name) ~= "string" or name == "" then
+		return nil
+	end
+	return {
+		id = "next",
+		objective = "",
+		murph = "",
+		event = "treeFelled",
+		count = 1,
+		beacon = name :: TutorialData.BeaconTarget,
+	}
+end
+
 local function updateBeacon()
 	local gui = beacon
 	if not gui then
 		return
 	end
-	local _, step = currentStep()
+	local step = beaconStep()
 	local from = rootPosition()
 	local target = if step and from then beaconTarget(step, from) else nil
 	local d = if target and from then (target.Position - from).Magnitude else 0
@@ -454,14 +485,17 @@ end
 
 local function refresh()
 	local index, step = currentStep()
+	local nextText = player:GetAttribute("NextGoal")
+	local showingNext = step == nil and type(nextText) == "string" and nextText ~= ""
 	local frame = tracker
 	if frame then
-		frame.Visible = step ~= nil
+		frame.Visible = step ~= nil or showingNext
 	end
 	if step then
 		local progress = (player:GetAttribute("TutorialProgress") :: number?) or 0
+		local cash = player:GetAttribute("Cash")
 		if objectiveLabel then
-			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress)
+			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress, if type(cash) == "number" then cash else 0)
 		end
 		local showSkip = QuestUI.ShowSkip(index)
 		if skipRoot then
@@ -470,6 +504,17 @@ local function refresh()
 		if stepLabel then
 			stepLabel.Text = QuestUI.TrackerTitle(index, #steps(), onRefresher())
 			stepLabel.Size = UDim2.new(1, if showSkip then -skipWidth else 0, 0, 28)
+		end
+	elseif showingNext then
+		if objectiveLabel then
+			objectiveLabel.Text = nextText :: string
+		end
+		if skipRoot then
+			skipRoot.Visible = false
+		end
+		if stepLabel then
+			stepLabel.Text = "NEXT"
+			stepLabel.Size = UDim2.new(1, 0, 0, 28)
 		end
 	end
 	-- A new step: Murph says his line. (Also on join, as a reminder.)
@@ -826,6 +871,9 @@ function QuestUI.Start()
 	build()
 	player:GetAttributeChangedSignal("TutorialStep"):Connect(refresh)
 	player:GetAttributeChangedSignal("TutorialProgress"):Connect(refresh)
+	player:GetAttributeChangedSignal("NextGoal"):Connect(refresh)
+	player:GetAttributeChangedSignal("NextGoalBeacon"):Connect(refresh)
+	player:GetAttributeChangedSignal("Cash"):Connect(refresh)
 	refresh()
 	task.spawn(setupMurph)
 end

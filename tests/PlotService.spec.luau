@@ -81,7 +81,7 @@ return function(t)
 		options = options or {}
 		local Instance = fakeInstances()
 		local clock = 0
-		local toasts, tags = {}, {}
+		local toasts, tags, questEvents = {}, {}, {}
 		local base = t.loader()
 		local Schema = base:server("ProfileSchema")
 		local Util = base:shared("Util")
@@ -148,6 +148,11 @@ return function(t)
 				RateLimiter = {
 					Allow = function()
 						return true
+					end,
+				},
+				QuestService = {
+					Event = function(_player, event)
+						table.insert(questEvents, event)
 					end,
 				},
 				EconomyService = {
@@ -224,6 +229,7 @@ return function(t)
 			items = items,
 			itemFolder = itemFolder,
 			toasts = toasts,
+			questEvents = questEvents,
 			tags = tags,
 			remotes = remotes,
 			lastToast = function()
@@ -257,6 +263,7 @@ return function(t)
 		local ann, profile = s.newPlayer(1, "Ann")
 		s.claim(ann, 3)
 		t.ok(profile.plot.claimed)
+		t.eq(s.questEvents, { "plotClaimed" })
 		t.eq(ann.attrs.PlotSlot, 3)
 		t.eq(ann.attrs.PlotTier, 1)
 		t.eq(s.plot(3):GetAttribute("OwnerId"), 1)
