@@ -19,12 +19,12 @@ export type ProductKey = "Cash1k" | "Cash10k" | "DoubleWood" | "InstantDelivery"
 -- refuses). image is a decal asset id for the card; 0 draws a placeholder.
 StoreData.CreatorIds = {
 	Passes = {
-		DoubleCash = 0, -- PASTE: Monetization → Passes → 2x Cash → ID
-		LuxAxe = 0, -- PASTE: Monetization → Passes → Lux Axe → ID
+		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
+		LuxAxe = 2005226878, -- PASTE: Monetization → Passes → Lux Axe → ID
 	},
 	Products = {
-		Cash1k = 0, -- PASTE: Monetization → Developer Products → $1,000 → ID
-		Cash10k = 0, -- PASTE: Monetization → Developer Products → $10,000 → ID
+		Cash1k = 3716312861, -- PASTE: Monetization → Developer Products → $1,000 → ID
+		Cash10k = 3716312899, -- PASTE: Monetization → Developer Products → $10,000 → ID
 		DoubleWood = 0, -- PASTE: Monetization → Developer Products → 2x Wood → ID
 		InstantDelivery = 0, -- PASTE: Monetization → Developer Products → Instant Delivery → ID
 	},
@@ -54,14 +54,14 @@ StoreData.Passes = {
 		id = StoreData.CreatorIds.Passes.DoubleCash,
 		image = 0, -- PASTE decal id
 		name = "2x Cash",
-		description = "All the wood you sell pays double, forever.",
+		description = "Wood you sell pays double. It doesn't change your axes, trucks, or how fast you chop, and everything in the game can still be earned without it.",
 	},
 	{
 		key = "LuxAxe",
 		id = StoreData.CreatorIds.Passes.LuxAxe,
 		image = 0, -- PASTE decal id
 		name = "Lux Axe",
-		description = "Forged for lumber barons. The Lux Axe has a black handle with gold inlays and a gold head set with diamonds. It chops harder than the Fire Axe, and every log you cut with it sells for 10% more. It's yours forever and can't be sold.",
+		description = "A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold.",
 	},
 } :: { Pass }
 
