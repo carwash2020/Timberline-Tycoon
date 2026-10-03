@@ -292,4 +292,52 @@ return function(t)
 		end
 		t.ok(steps > 30 and steps < 90, steps .. " frames to turn round")
 	end)
+
+	t.test("every townsfolk has a role, and the work set is the whole job list", function()
+		local works = { chop = false, saw = false, sweep = false, carry = false }
+		local walkers = 0
+		for _, npc in ipairs(NPCData.All()) do
+			t.ok(npc.role ~= "" and npc.look.role == npc.role, npc.id .. " role")
+			t.ok(npc.react ~= nil, npc.id .. " reacts to something")
+			if npc.work then
+				t.ok(works[npc.work] ~= nil, npc.id .. " unknown work " .. npc.work)
+				works[npc.work] = true
+			end
+			if npc.route then
+				walkers += 1
+			end
+			local pools = { npc.lines, npc.greetings, npc.tips }
+			if npc.react then
+				for _, lines in pairs(npc.react) do
+					table.insert(pools, lines)
+				end
+			end
+			for _, pool in ipairs(pools) do
+				if pool then
+					for _, line in ipairs(pool) do
+						local cap = if pool == npc.lines or pool == npc.greetings then 110 else 90
+						t.ok(#line <= cap and #line > 0, string.format("%s line is %d chars: %q", npc.id, #line, line))
+					end
+				end
+			end
+		end
+		for name, seen in pairs(works) do
+			t.ok(seen, "nobody " .. name .. "s")
+		end
+		t.ok(walkers >= 3, "walkers")
+		local murph = NPCData.Get("Murph")
+		t.ok(murph.tips and #murph.tips >= 2, "Murph's onboarding tips")
+		t.eq(NPCData.Get("Bram").role, "Retired logger")
+		t.eq(NPCData.Get("Millie").work, "saw")
+		t.eq(NPCData.Get("Hazel").work, "sweep")
+		t.eq(NPCData.Get("Rosa").work, "carry")
+	end)
+
+	t.test("NearestIndex picks the closest player and ignores someone on their toes", function()
+		local origin = Vector3.new(0, 0, 0)
+		local points = { Vector3.new(0.2, 0, 0), Vector3.new(10, 0, 0), Vector3.new(30, 0, 0) }
+		t.eq(NPCData.NearestIndex(origin, points, 16), 2)
+		t.eq(NPCData.NearestIndex(origin, { Vector3.new(40, 0, 0) }, 16), nil)
+		t.eq(NPCData.NearestIndex(origin, {}, 16), nil)
+	end)
 end

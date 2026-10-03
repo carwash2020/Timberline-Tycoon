@@ -18,6 +18,10 @@
 --     (NPCData.RouteState), so all players see the same stroll for free.
 --     Walkers don't collide (they'd shove players about); the others
 --     block like a person would.
+--   * Every NPC carries a Talk prompt on the model (F / ButtonY, clickable,
+--     no line-of-sight check) so it arrives with the Atomic or Persistent
+--     model. The client never WaitForChilds it. NPCService does not run a
+--     loop: animation, bubbles, and head turns are all on the client.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -75,6 +79,28 @@ local function build(npc: NPCData.NPC, find: (string, string) -> (CFrame?, Vecto
 		model:SetAttribute("RouteOffset", NPCData.RouteOffset(npc.id))
 		root.CanCollide = false
 	end
+	if npc.work then
+		model:SetAttribute("Work", npc.work)
+	end
+	-- On the model, not the Torso: QuestUI clones the Torso for Murph's
+	-- portrait, and a prompt in that clone would talk from a ViewportFrame.
+	-- PromptUI adorns the PrimaryPart when the parent is a Model.
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "Talk"
+	prompt.ActionText = "Talk"
+	prompt.ObjectText = npc.name
+	prompt.MaxActivationDistance = NPCData.TalkDistance
+	prompt.HoldDuration = 0
+	prompt.RequiresLineOfSight = false
+	prompt.ClickablePrompt = true
+	prompt.KeyboardKeyCode = NPCData.TalkKeyboard
+	prompt.GamepadKeyCode = NPCData.TalkGamepad
+	prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+	local lift = npc.promptLift
+	if lift and lift ~= 0 then
+		prompt.UIOffset = Vector2.new(0, lift)
+	end
+	prompt.Parent = model
 	CollectionService:AddTag(model, "NPC")
 	return model
 end
