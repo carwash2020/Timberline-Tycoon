@@ -13,24 +13,25 @@ local StoreData = {}
 export type PassKey = "DoubleCash" | "LuxAxe" | "TowService" | "TimberClassic" | "PaintShop"
 export type ProductKey = "Cash1k" | "Cash10k" | "DoubleWood" | "InstantDelivery"
 
--- The only place a Creator Hub id is written. 0 means that button stays
--- hidden and the server refuses the purchase. Cash packs are developer
--- products (ProcessReceipt), never game passes. image is a decal asset id
--- for the card; 0 draws a placeholder.
+-- The only place a Creator Hub id is written. Fill these in when the pass
+-- or product exists; leave 0 until then.
+-- PASTE each id from Creator Hub. 0 = not for sale (button hidden, server
+-- refuses). image is a decal asset id for the card; 0 draws a placeholder.
+-- Cash packs are developer products (ProcessReceipt), never game passes.
 -- Universe 10768809532.
 StoreData.CreatorIds = {
 	Passes = {
-		DoubleCash = 2005256811, -- 2x Cash, on sale
-		LuxAxe = 2005226878, -- Lux Axe
-		TowService = 2006186967, -- Tow Service, 99 R$
-		TimberClassic = 2006912886, -- Timber Classic, 349 R$
-		PaintShop = 2006456926, -- Paint Shop, 249 R$
+		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
+		LuxAxe = 2005226878, -- PASTE: Monetization → Passes → Lux Axe → ID
+		TowService = 2006186967, -- Tow Service
+		TimberClassic = 2006912886, -- Timber Classic
+		PaintShop = 2006456926, -- Paint Shop
 	},
 	Products = {
-		Cash1k = 3716312861, -- $1,000, 49 R$
-		Cash10k = 3716312899, -- $10,000, 299 R$
-		DoubleWood = 0, -- no product yet: button hidden
-		InstantDelivery = 0, -- no product yet: button hidden
+		Cash1k = 3716312861, -- PASTE: Monetization → Developer Products → $1,000 → ID
+		Cash10k = 3716312899, -- PASTE: Monetization → Developer Products → $10,000 → ID
+		DoubleWood = 0, -- PASTE: Monetization → Developer Products → 2x Wood → ID
+		InstantDelivery = 0, -- PASTE: Monetization → Developer Products → Instant Delivery → ID
 	},
 }
 
@@ -173,6 +174,13 @@ end
 -- a positive id) is not for sale: hide the button, don't prompt, don't grant.
 function StoreData.IsForSale(id: number): boolean
 	return id > 0
+end
+
+-- A pass card stays hidden until Roblox's GetProductInfo says IsForSale.
+-- `robloxForSale` is that field, or nil while the lookup hasn't come back
+-- (or it failed). A pasted id alone is not enough to show the card.
+function StoreData.PassCardVisible(id: number, robloxForSale: boolean?): boolean
+	return StoreData.IsForSale(id) and robloxForSale == true
 end
 
 -- The pass with this Creator Hub id, if it's for sale.

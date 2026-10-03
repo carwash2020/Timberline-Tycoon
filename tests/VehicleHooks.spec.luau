@@ -267,6 +267,28 @@ return function(t)
 		t.ok(warned, "and the error is logged")
 	end)
 
+	t.test("painting a truck parked outside town leaves it there with its cargo", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		local truck = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		local spot = CFrame.new(900, 40, -700)
+		truck:PivotTo(spot)
+		t.ok(VehicleService.AddBedLog(w.player, { woodId = "oak", value = 7 }))
+		local cargo = truck:FindFirstChild("BedVisuals"):GetChildren()[1]
+		t.ok(cargo ~= nil, "a log is on the bed")
+		w.profile.truckPaint = { Rustbucket = "#8E3B2F" }
+		VehicleService.Repaint(w.player, "Rustbucket")
+		t.eq(VehicleService.GetVehicle(w.player), truck, "the same truck, not a new one")
+		t.eq(truck.Parent, w.world, "still in the world")
+		t.ok((truck:GetPivot().Position - spot.Position).Magnitude < 1e-4, "still parked outside town")
+		t.eq(truck:GetPivot(), spot, "the same spot")
+		t.eq(cargo.Parent, truck:FindFirstChild("BedVisuals"), "the load is still on the bed")
+		t.eq(VehicleService.GetBedCount(w.player), 1)
+		local hood = truck:FindFirstChild("Hood", true)
+		t.eq(hood.Color, roblox.Color3.fromHex("#8E3B2F"), "the body took the new color")
+		t.eq(truck:GetAttribute("PaintHex"), "#8E3B2F")
+	end)
+
 	t.test("a failed respawn doesn't charge", function()
 		local w = setup()
 		local CoreLoop = w.loader:shared("CoreLoop")

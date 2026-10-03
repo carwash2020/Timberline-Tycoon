@@ -5,6 +5,7 @@
 --     id is still 0. Each card has an image slot (a placeholder when the
 --     decal id is 0), the name, the description, Roblox's live price, and
 --     Buy. An owned pass says Owned. A card whose id is 0 is not shown.
+--     A pass stays hidden until GetProductInfo says IsForSale.
 --   * The town bulletin board's prompt (StorePrompt) opens the same panel.
 --   * "Sell load here" stays while you have Instant Deliveries and wood
 --     on the truck.
@@ -36,6 +37,9 @@ local F = UITheme.Fonts
 local ROBUX_GREEN = Color3.fromRGB(0, 176, 111)
 
 local prices: { [string]: number } = {}
+-- GetProductInfo.IsForSale, keyed like prices. Absent until that lookup
+-- returns; a pass card stays hidden until then.
+local passOnSale: { [string]: boolean } = {}
 local deliveryButton: UITheme.Button? = nil
 local tab: "Passes" | "Products" = "Passes"
 local panel: Frame? = nil
@@ -183,10 +187,10 @@ local function redraw()
 	if tab == "Passes" then
 		local shown = 0
 		for _, pass in ipairs(StoreData.Passes) do
-			if StoreData.IsForSale(pass.id) then
+			local id = "Pass:" .. pass.key
+			if StoreData.PassCardVisible(pass.id, passOnSale[id]) then
 				shown += 1
 				local has = player:GetAttribute("Pass_" .. pass.key) == true
-				local id = "Pass:" .. pass.key
 				card(frame, pass.name, pass.description, pass.image, robux(prices[id]), has, function()
 					Net.Remote("BuyRobuxItem"):FireServer("Pass", pass.key)
 				end)
@@ -242,8 +246,13 @@ local function loadPrices()
 			local ok, info = pcall(function()
 				return MarketplaceService:GetProductInfo(id, infoType)
 			end)
-			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
-				prices[key] = info.PriceInRobux
+			if ok and type(info) == "table" then
+				if type(info.PriceInRobux) == "number" then
+					prices[key] = info.PriceInRobux
+				end
+				if infoType == Enum.InfoType.GamePass then
+					passOnSale[key] = info.IsForSale == true
+				end
 				redraw()
 			end
 		end)

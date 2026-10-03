@@ -1766,18 +1766,32 @@ function VehicleService.Equip(player: Player, truckId: string, trailerId: string
 	return true, nil
 end
 
--- Rebuilds a parked truck so a saved color shows up. Driving keeps the
--- color in the save; the next spawn (recall, rejoin, switching) applies it.
+-- Recolors the truck where it stands. Rebuilding it would park it in a bay
+-- and leave an out-of-town load behind, which is a free recall.
 function VehicleService.Repaint(player: Player, truckId: string)
 	local rec = trucks[player.UserId]
 	if not rec or rec.def.id ~= truckId then
 		return
 	end
-	if isDriving(player, rec) then
+	local profile = ProfileService.GetProfile(player)
+	local saved = if profile and type(profile.truckPaint) == "table" then profile.truckPaint[truckId] else nil
+	local color = PaintShop.Normalize(saved)
+	if not color or not PaintShop.InPalette(color) then
 		return
 	end
-	local trailerId = if rec.trailer then rec.trailer.id else nil
-	VehicleService.SpawnTruck(player, truckId, rec.bed, trailerId)
+	local model = rec.model
+	local current = model:GetAttribute("PaintHex")
+	local fromHex = if type(current) == "string" then current else rec.def.look.color
+	local from = Color3.fromHex(fromHex)
+	local to = Color3.fromHex(color)
+	if from ~= to then
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Color == from then
+				d.Color = to
+			end
+		end
+	end
+	model:SetAttribute("PaintHex", color)
 end
 
 function VehicleService.GetVehicle(player: Player): Model?

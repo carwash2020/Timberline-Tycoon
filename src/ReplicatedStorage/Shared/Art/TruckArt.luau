@@ -1538,10 +1538,12 @@ function TruckArt.Build(
 
 	-- The body, drawn in M1.5's units round the layout shrunk by S, grown.
 	local build = builders[lay.style] or builders.flatbed
-	local paint = hex(def.look.color)
+	local paintHex = def.look.color
 	if extras and type(extras.paint) == "string" then
-		paint = hex(extras.paint)
+		paintHex = extras.paint
 	end
+	local paint = hex(paintHex)
+	model:SetAttribute("PaintHex", paintHex)
 	build({
 		model = model,
 		def = def,

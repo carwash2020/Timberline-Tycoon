@@ -2,8 +2,8 @@
 -- Paint Shop: the PaintTruck remote. The player names one of their own
 -- trucks and a color. PaintShop.Decide clamps it to the palette, refuses
 -- someone else's truck, and waits two seconds between accepted changes.
--- The color is saved on the slot and applied the next time that truck is
--- built (immediately, when it isn't being driven).
+-- The color is saved on the slot and painted onto the truck where it
+-- stands. The next spawn (recall, rejoin, switching) uses the same save.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

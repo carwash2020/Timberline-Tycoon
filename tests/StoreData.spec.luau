@@ -107,6 +107,17 @@ return function(t)
 		end
 	end)
 
+	t.test("a pass with IsForSale == false is hidden", function()
+		for _, key in ipairs({ "TowService", "TimberClassic", "PaintShop" }) do
+			local pass = StoreData.Pass(key)
+			t.eq(StoreData.PassCardVisible(pass.id, false), false, key .. " is off sale")
+		end
+		t.eq(StoreData.PassCardVisible(StoreData.Pass("LuxAxe").id, nil), false, "hidden until the lookup")
+		t.eq(StoreData.PassCardVisible(StoreData.Pass("DoubleCash").id, true), true, "2x Cash is on sale")
+		t.eq(StoreData.PassCardVisible(StoreData.Pass("LuxAxe").id, true), true, "Lux Axe is on sale")
+		t.eq(StoreData.PassCardVisible(0, true), false, "no id, still hidden")
+	end)
+
 	t.test("cash packs only fit under the wallet cap", function()
 		local pack = StoreData.Product("Cash10k")
 		t.ok(StoreData.PackFits(pack, 0, 2_000_000))

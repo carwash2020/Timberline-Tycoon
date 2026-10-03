@@ -177,6 +177,13 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 			notify(player, string.format("You already own %s; it's active now.", pass.name))
 			return
 		end
+		-- Off sale in Creator Hub: no prompt. A failed lookup stays refused.
+		local ok, info = pcall(function(): any
+			return MarketplaceService:GetProductInfo(pass.id, Enum.InfoType.GamePass)
+		end)
+		if not ok or type(info) ~= "table" or info.IsForSale ~= true then
+			return
+		end
 		MarketplaceService:PromptGamePassPurchase(player, pass.id)
 	elseif kind == "Product" then
 		local product = StoreData.Product(key)
