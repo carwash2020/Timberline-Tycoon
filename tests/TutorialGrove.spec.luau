@@ -57,7 +57,10 @@ return function(t)
 
 	t.test("the grove and the cart stay off the roads, the town paint and the walkers", function()
 		for _, spot in ipairs(spots()) do
-			t.ok(math.sqrt(spot.x ^ 2 + (spot.z - 40) ^ 2) < 35, string.format("near the spawn: %g, %g", spot.x, spot.z))
+			t.ok(
+				math.sqrt(spot.x ^ 2 + (spot.z - 40) ^ 2) < 35,
+				string.format("near the spawn: %g, %g", spot.x, spot.z)
+			)
 			for _, road in ipairs(WorldLayout.Roads) do
 				local points = road.points
 				for i = 1, #points - 1 do
@@ -77,7 +80,10 @@ return function(t)
 				t.ok(not inside, string.format("%s covers (%g, %g)", paint.name, spot.x, spot.z))
 			end
 			local lot = WorldLayout.ParkingLot
-			local inLot = spot.x >= lot.x0 - 2 and spot.x <= lot.x1 + 2 and spot.z >= lot.z0 - 2 and spot.z <= lot.z1 + 2
+			local inLot = spot.x >= lot.x0 - 2
+				and spot.x <= lot.x1 + 2
+				and spot.z >= lot.z0 - 2
+				and spot.z <= lot.z1 + 2
 			t.ok(not inLot, "the lot")
 			t.ok(math.sqrt((spot.x + 28) ^ 2 + (spot.z - 45) ^ 2) > 6, "Murph's camp")
 		end

@@ -495,8 +495,7 @@ local function refresh()
 		local progress = (player:GetAttribute("TutorialProgress") :: number?) or 0
 		local cash = player:GetAttribute("Cash")
 		if objectiveLabel then
-			objectiveLabel.Text =
-				TutorialData.ObjectiveText(step, progress, if type(cash) == "number" then cash else 0)
+			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress, if type(cash) == "number" then cash else 0)
 		end
 		local showSkip = QuestUI.ShowSkip(index)
 		if skipRoot then

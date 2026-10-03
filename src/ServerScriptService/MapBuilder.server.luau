@@ -355,7 +355,8 @@ step("4. The town", function()
 		model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 		local spot = TutorialGrove.Cart
 		place(atomic(BuildingArt.Prop("Cart", 7)), CFrame.new(spot.x, 0, spot.z), model)
-		local zone = Kit.part(model, "CartZone", TutorialGrove.ZoneSize, TutorialGrove.CartCFrame(), Color3.new(1, 1, 1))
+		local zone =
+			Kit.part(model, "CartZone", TutorialGrove.ZoneSize, TutorialGrove.CartCFrame(), Color3.new(1, 1, 1))
 		ghost(zone, 1)
 		local board = Kit.part(
 			model,

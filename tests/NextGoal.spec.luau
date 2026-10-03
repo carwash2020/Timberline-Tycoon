@@ -16,7 +16,10 @@ return function(t)
 		local goal = NextGoal.Pick(2, 1, foundNone(), 0)
 		t.eq(goal.kind, "axe")
 		t.eq(goal.beacon, "toolShed")
-		t.eq(goal.text, string.format("Buy the %s (%s)", steel.displayName, FieldGuide.CashText(ShopLogic.Price(steel, 2))))
+		t.eq(
+			goal.text,
+			string.format("Buy the %s (%s)", steel.displayName, FieldGuide.CashText(ShopLogic.Price(steel, 2)))
+		)
 		t.eq(ShopLogic.Price(steel, 2), 160)
 		local hardened = ItemCatalog.AxeLadder()[3]
 		local nextUp = NextGoal.Pick(2, 2, foundNone(), 0)
