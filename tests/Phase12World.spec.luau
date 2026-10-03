@@ -172,8 +172,10 @@ return function(t)
 		t.eq(WorldPlan.ForestEdgeApart, 45)
 		t.eq(WorldPlan.ForestVergeStep, 40)
 		local trees = WorldPlan.Trees()
-		-- 772 after the 3×4 plot district (was 775; seven stand trees stood on the new lawn).
-		t.ok(#trees >= 772, #trees .. " trees")
+		-- 771 after the lighthouse vista moved onto the next headland (was 772;
+		-- two stand trees stood in the lane). Before that, 775, until the
+		-- 3×4 plots took seven.
+		t.ok(#trees >= 771, #trees .. " trees")
 		local wet = 0
 		for i = 1, 322 do
 			local p = trees[i].position
