@@ -27,6 +27,7 @@ local TweenService = game:GetService("TweenService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
@@ -38,6 +39,7 @@ local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local CameraShake = require(script.Parent.CameraShake)
 local HUD = require(script.Parent.HUD)
+local Quality = require(script.Parent.Quality)
 local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
@@ -460,10 +462,17 @@ local function targetOf(target: Player?): Vector3?
 	return if hrp then hrp.Position + Vector3.new(0, 1, 0) else nil
 end
 
+local sinceOrbs = 0
 local function stepOrbs(dt: number)
+	sinceOrbs += dt
+	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceOrbs) then
+		return
+	end
+	local step = sinceOrbs
+	sinceOrbs = 0
 	for i = #orbs, 1, -1 do
 		local o = orbs[i]
-		o.t += dt
+		o.t += step
 		local to = targetOf(o.target) or o.mid
 		if o.t < o.duration then
 			local u = math.clamp(o.t / o.duration, 0, 1)

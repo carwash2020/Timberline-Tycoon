@@ -8,8 +8,10 @@
 -- go through CollectionService signals.
 
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Quality = require(script.Parent.Quality)
 
 local TownFX = {}
@@ -53,8 +55,15 @@ function TownFX.Start()
 	end)
 
 	local t = 0
+	local sinceCosmetic = 0
 	RunService.RenderStepped:Connect(function(dt: number)
-		t += dt
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
+		t += step
 		local camera = workspace.CurrentCamera
 		if not camera then
 			return
@@ -63,7 +72,7 @@ function TownFX.Start()
 		local near = Quality.Budget().TownFxNear
 		for blade in pairs(blades) do
 			if blade.Parent and (blade.Position - eye).Magnitude < near then
-				blade.CFrame *= CFrame.Angles(BLADE_SPEED * dt, 0, 0)
+				blade.CFrame *= CFrame.Angles(BLADE_SPEED * step, 0, 0)
 			end
 		end
 		for part, flame in pairs(flames) do

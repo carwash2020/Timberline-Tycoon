@@ -1,12 +1,12 @@
 --!strict
 -- Quality (PLAY-05): which Shared/QualityBudgets tier this device gets.
--- AmbientLife, WindSway, WeatherController, LightingController and TownFX
--- read their numbers from Quality.Budget() each time they use one (a
--- cached table, so it's cheap).
+-- Cosmetic loops read Quality.Budget() (a cached table) and run on its
+-- CosmeticHz: every frame on high, slower on medium, nearly off on low.
 --   * "low" when the player's graphics quality (Roblox menu > Settings >
 --     Graphics Quality: UserGameSettings.SavedQualityLevel) is 1 to 4, or
 --     Automatic on a touch-only device (a phone or tablet with no
---     keyboard); "high" otherwise (QualityBudgets.TierFor).
+--     keyboard). "medium" at levels 5-7. "high" at 8-10, and Automatic
+--     on anything that isn't touch-only (QualityBudgets.TierFor).
 --   * Re-read when the setting changes (its changed signal) and every
 --     couple of seconds anyway (a keyboard plugged in, or a signal that
 --     never fires), so the effects follow the slider.

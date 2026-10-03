@@ -37,6 +37,7 @@ local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local LightingController = require(script.Parent.LightingController)
 local Quality = require(script.Parent.Quality)
@@ -320,7 +321,7 @@ end
 -- The quality tiers that also load the ground-cover layer (grass patches,
 -- wildflowers, low bushes, fern clumps, mushroom clusters). Low keeps its
 -- phone budget: the first layer alone fills its MaxDecor.
-local COVER_TIERS: { [string]: boolean } = { high = true }
+local COVER_TIERS: { [string]: boolean } = { high = true, medium = true }
 
 local function loadCell(cx: number, cz: number, key: string)
 	local consulted: { [string]: boolean } = {}
@@ -1551,10 +1552,17 @@ function AmbientLife.Start()
 	local sinceScan = math.huge
 	local sincePlan = 0
 	local fillerSeen = false
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
 		local player = focusPoint()
 		-- Decoration: rescan now and then, load a couple of cells a frame.
-		sinceScan += dt
+		sinceScan += step
 		if sinceScan >= SCAN_EVERY then
 			sinceScan = 0
 			if not fillerSeen and WorldPlan.FillerReady() then
@@ -1578,12 +1586,12 @@ function AmbientLife.Start()
 		end
 		-- Critters.
 		local ctx: Ctx = { player = player, now = os.clock(), env = LightingController.Environment() }
-		sincePlan += dt
+		sincePlan += step
 		if sincePlan >= PLAN_EVERY then
 			sincePlan = 0
 			plan(ctx)
 		end
-		stepCritters(math.min(dt, 0.1), ctx)
+		stepCritters(math.min(step, 0.1), ctx)
 	end)
 end
 

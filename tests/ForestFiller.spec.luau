@@ -64,8 +64,12 @@ return function(t)
 			w.camera.Focus = CFrame.new(focus or at + Vector3.new(0, 0, -12))
 		end
 		function w.frame()
+			-- Low and medium cosmetic loops skip most 1/60 s frames. Step
+			-- one cosmetic period so a settle still finishes the same work.
+			local hz = QualityBudgets.For(w.tier).CosmeticHz
+			local dt = if hz >= 60 then 1 / 60 else 1 / hz
 			for _, fn in ipairs(w.heartbeat) do
-				fn(1 / 60)
+				fn(dt)
 			end
 		end
 		-- Frames until nothing changes for a while (or `most` frames).
