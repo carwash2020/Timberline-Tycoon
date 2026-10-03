@@ -1,7 +1,7 @@
 --!nocheck
--- The landscape's look, nudged toward Lumber Tycoon 2 (phase 10, STY-*),
--- keeping the cozy low-poly palette:
---   STY-01 a deeper meadow green and brown rock (TerrainGen.MaterialColors).
+-- The landscape's look, nudged toward Lumber Tycoon 2 (phase 10, STY-*;
+-- taken further in phase 12, ATMOS), keeping the cozy low-poly palette:
+--   STY-01 a dark, muted meadow green and brown rock (TerrainGen.MaterialColors).
 --   STY-02 the haul roads' pale gravel crown between dirt verges.
 --   STY-03 brown boulders (LandmarkArt.BrownRock; WorldPlan.spec and
 --          MapBuilder.spec check where the clusters go and how they build).
@@ -42,16 +42,33 @@ return function(t)
 		end
 	end)
 
-	t.test("STY-01: the meadow is a deeper green, LeafyGrass a step darker, still the cozy hue", function()
+	t.test("STY-01: the meadow is a dark, muted green, LeafyGrass a step darker, still the cozy hue", function()
+		-- The colours before phase 10, and phase 10's first step (STY-01).
+		-- Phase 12 (ATMOS) took the home meadow on to the classic dark, muted
+		-- green: clearly darker than phase 10's and a little less saturated.
 		local oldGrass = Color3.fromRGB(116, 170, 74)
 		local oldLeafy = Color3.fromRGB(86, 140, 62)
+		local p10Grass = Color3.fromRGB(100, 152, 64)
+		local p10Leafy = Color3.fromRGB(76, 126, 54)
 		local grass, leafy = colors.Grass, colors.LeafyGrass
-		for _, pair in ipairs({ { "Grass", grass, oldGrass }, { "LeafyGrass", leafy, oldLeafy } }) do
-			local name, now, was = pair[1], pair[2], pair[3]
-			-- Deeper: 5-20% darker than before (moderate: still recognisable).
+		local function sat(c)
+			local _, s = c:ToHSV()
+			return s
+		end
+		for _, set in ipairs({ { "Grass", grass, oldGrass, p10Grass }, { "LeafyGrass", leafy, oldLeafy, p10Leafy } }) do
+			local name, now, was, p10 = set[1], set[2], set[3], set[4]
+			-- Dark: 15-35% darker than the original (still a meadow, not a bog).
 			local drop = 1 - lum(now) / lum(was)
-			t.ok(drop >= 0.05 and drop <= 0.2, string.format("%s is %.0f%% darker than before", name, drop * 100))
-			-- Still a warm meadow green, the same family as before.
+			t.ok(
+				drop >= 0.15 and drop <= 0.35,
+				string.format("%s is %.0f%% darker than the original", name, drop * 100)
+			)
+			-- Clearly darker than phase 10's step, not a nudge.
+			t.ok(lum(now) <= lum(p10) * 0.92, name .. " is clearly darker than phase 10's")
+			-- Muted: a little less saturated than phase 10's, still a real green.
+			t.ok(sat(now) < sat(p10), string.format("%s is less saturated (%.3f)", name, sat(now)))
+			t.ok(sat(now) > sat(p10) - 0.1, string.format("%s stays a green, not a grey (%.3f)", name, sat(now)))
+			-- Still a meadow green, the same family as before (never olive-brown).
 			t.ok(math.abs(hue(now) - hue(was)) < 0.03, name .. " keeps its hue")
 			t.ok(now.G > now.R * 1.3 and now.G > now.B * 2, name .. " is green")
 		end

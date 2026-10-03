@@ -628,14 +628,18 @@ end
 -- tool paints with them. STY-01 (phase 10) moved the land a little toward
 -- the classic lumber-game look: a deeper meadow green (Grass was 116,170,74 and
 -- LeafyGrass 86,140,62) and brown rock for the mountains, cliffs and
--- snowline (Rock was a grey 128,122,114).
+-- snowline (Rock was a grey 128,122,114). Phase 12 (ATMOS) took the meadow
+-- on to a dark, muted green (Grass was 100,152,64 and LeafyGrass 76,126,54;
+-- both about 17% darker and a little less saturated now, the same hue) and
+-- the rock a touch darker (it was 122,98,78), so the cliffs still read
+-- against the darker grass.
 TerrainGen.MaterialColors = {
-	Grass = Color3.fromRGB(100, 152, 64),
-	LeafyGrass = Color3.fromRGB(76, 126, 54),
+	Grass = Color3.fromRGB(84, 125, 55),
+	LeafyGrass = Color3.fromRGB(66, 104, 46),
 	Ground = Color3.fromRGB(150, 116, 78),
 	Mud = Color3.fromRGB(64, 50, 72), -- the Gloam Hollow's violet floor
 	Sand = Color3.fromRGB(226, 205, 150),
-	Rock = Color3.fromRGB(122, 98, 78),
+	Rock = Color3.fromRGB(114, 92, 74),
 	Snow = Color3.fromRGB(238, 244, 250),
 	Glacier = Color3.fromRGB(172, 214, 236),
 	Basalt = Color3.fromRGB(52, 46, 44),
