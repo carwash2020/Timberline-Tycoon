@@ -203,7 +203,7 @@ ItemCatalog.Trucks = {
 		displayName = "Pickup",
 		bedCapacity = 12,
 		priceCash = 1200,
-		topSpeed = 28,
+		topSpeed = 30,
 		turnRate = 1.4,
 		look = { color = "#2F6DB5", width = 8.58, bedLength = 15.6, bedWalls = true },
 	},

@@ -375,7 +375,7 @@ return function(t)
 		t.eq(w.owners[a.root], dale, "at once")
 		t.eq(w.owners[b.root], dale, "unowned wood on his bed too")
 		-- Driving along: the truck and its load move together, 5 studs in a
-		-- quarter second (20 studs/s, inside the speed check).
+		-- quarter second (20 studs/s, inside the speed check). Not settled yet.
 		local before = truck:GetPivot()
 		truck:PivotTo(before * CFrame.new(0, 0, -5))
 		local delta = truck:GetPivot() * before:Inverse()
@@ -383,22 +383,23 @@ return function(t)
 			p.model:PivotTo(delta * p.model:GetPivot())
 		end
 		w.tick(0.25)
-		t.eq(w.owners[a.root], dale, "still his")
-		-- b slides off the side on a bend.
+		t.eq(w.owners[a.root], dale, "still loose, still his")
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "half a second, not a quarter")
+		-- b slides off the side on a bend, before it can lock.
 		b.model:PivotTo(b.model:GetPivot() + Vector3.new(6, -2, 0))
 		w.tick(0.25)
+		t.ok(a.root:FindFirstChild("BedWeld"), "a rested on the bed and locked")
+		t.eq(a.root.Massless, true, "locked cargo adds no mass")
 		t.eq(w.owners[b.root], dale, "fallen off: still his a moment")
 		w.tick(w.GameConfig.ReleaseKeepOwnerSec)
 		t.eq(w.owners[b.root], "auto", "then automatic")
-		t.eq(w.owners[a.root], dale)
-		-- He gets out: the truck settles on the server, the load with it.
+		t.ok(a.root:FindFirstChild("BedWeld"), "the locked log stayed through the turn")
+		-- He gets out. The loose load settles with the truck; the weld stays.
 		w.TruckLoad.OnDriverChanged(truck, nil)
-		t.eq(w.owners[a.root], nil, "the server's while it settles")
 		w.tick(1)
-		t.eq(w.owners[a.root], nil, "still settling")
 		chassis.Anchored = true -- parked
 		w.tick(1)
-		t.eq(w.owners[a.root], "auto", "parked: automatic")
+		t.ok(a.root:FindFirstChild("BedWeld"), "parked cargo stays locked")
 	end)
 
 	t.test("a held piece is never handed to the driver", function()
@@ -452,8 +453,9 @@ return function(t)
 		t.eq(w.owners[a.root], nil, "the server's")
 		w.tick(0.25)
 		t.eq(w.owners[a.root], nil, "not handed straight back")
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "not locked in the same moment it's put back")
 		w.tick(1)
-		t.eq(w.owners[a.root], dale, "the driver's again after PutBackHoldSec")
+		t.ok(a.root:FindFirstChild("BedWeld"), "once it rests again it locks, and is not handed out on its own")
 	end)
 
 	t.test("nobody else can grab your load; you can", function()
@@ -468,58 +470,64 @@ return function(t)
 		t.ok(w.GrabService.Grab(dale, a.root, at), "Dale may")
 	end)
 
-	t.test("BedAutoWeld: off by default; Tune_BedAutoWeld = 1 in Studio welds resting wood; a grab lets go", function()
-		t.eq(t.shared("GameConfig").BedAutoWeld, false)
+	t.test("cargo locks after it rests, on every tier, and a grab breaks the weld first", function()
+		t.eq(t.shared("GameConfig").BedAutoWeld, false, "the old flag stays off; locking does not read it")
 		local w0 = setup()
 		local AutoWeldOn = w0.TruckLoad.AutoWeldOn
 		t.eq(AutoWeldOn(false, nil, true), false)
 		t.eq(AutoWeldOn(false, 1, true), true)
-		t.eq(AutoWeldOn(false, true, true), true)
 		t.eq(AutoWeldOn(false, 1, false), false, "a live server ignores the attribute")
-		t.eq(AutoWeldOn(true, 0, true), false)
-		t.eq(AutoWeldOn(true, nil, false), true)
-		-- Off: nothing welds.
-		local d0 = w0.player(1)
-		local truck0 = w0.truck(d0, "Pickup")
-		local p0 = w0.piece(w0.onBed(truck0), { ownerId = 1 })
-		w0.tick()
-		w0.tick(1)
-		w0.tick(1)
-		t.eq(p0.root:FindFirstChild("BedWeld"), nil, "off by default")
 
-		local w = setup({ studio = true })
-		w.attrs.Tune_BedAutoWeld = 1
-		local dale = w.player(1)
-		local truck = w.truck(dale, "Pickup")
-		local a = w.piece(w.onBed(truck, "BedFloor", -2), { ownerId = 1 })
-		local sliding = w.piece(w.onBed(truck, "BedFloor", 2), { ownerId = 1 })
-		w.tick()
-		t.eq(a.root:FindFirstChild("BedWeld"), nil, "not yet: it has to rest a moment")
-		sliding.model:PivotTo(sliding.model:GetPivot() * CFrame.new(0, 0, 0.1) * CFrame.new(1.5, 0, 0))
-		w.tick(1)
-		local weld = a.root:FindFirstChild("BedWeld")
-		t.ok(weld and weld:IsA("WeldConstraint"), "resting: welded")
-		t.eq(weld.Part0, truck:FindFirstChild("BedFloor"))
-		t.eq(weld.Part1, a.root)
-		t.eq(sliding.root:FindFirstChild("BedWeld"), nil, "a piece still sliding isn't")
-		-- Driving: a welded piece is part of the truck, never handed out on its own.
-		truck.PrimaryPart.Anchored = false
-		w.TruckLoad.OnDriverChanged(truck, dale)
-		t.eq(w.owners[a.root], nil, "rides with the truck")
-		w.TruckLoad.OnDriverChanged(truck, nil)
-		truck.PrimaryPart.Anchored = true
-		-- A grab lets go of the bed first.
-		dale.hrp.Position = a.root.CFrame.Position + Vector3.new(0, 0, 4)
-		t.ok(w.GrabService.Grab(dale, a.root, a.root.CFrame.Position))
-		t.eq(a.root:FindFirstChild("BedWeld"), nil, "unwelded on grab")
-		t.eq(w.owners[a.root], dale)
-		-- Turning it off lets go of the rest.
-		w.tick(1)
-		w.tick(1)
-		t.ok(sliding.root:FindFirstChild("BedWeld"), "the other one rested and welded")
-		w.attrs.Tune_BedAutoWeld = 0
-		w.tick(1)
-		t.eq(sliding.root:FindFirstChild("BedWeld"), nil, "off again: unwelded")
+		for _, id in ipairs({ "Rustbucket", "Pickup", "Flatbed", "LoggingRig" }) do
+			local w = setup()
+			local dale = w.player(1)
+			local truck = w.truck(dale, id)
+			local a = w.piece(w.onBed(truck, "BedFloor", -1), { ownerId = 1 })
+			local partsBefore = 0
+			for _, d in ipairs(a.model:GetDescendants()) do
+				if d:IsA("BasePart") then
+					partsBefore += 1
+				end
+			end
+			w.tick()
+			t.eq(a.root:FindFirstChild("BedWeld"), nil, id .. " not on the first look")
+			w.tick(1)
+			local weld = a.root:FindFirstChild("BedWeld")
+			t.ok(weld and weld:IsA("WeldConstraint"), id .. " locked")
+			t.eq(weld.Part0, truck:FindFirstChild("BedFloor"), id .. " welded straight to the bed")
+			t.eq(weld.Part1, a.root)
+			w.tick(1)
+			local welds = 0
+			for _, d in ipairs(a.model:GetDescendants()) do
+				if d.Name == "BedWeld" then
+					welds += 1
+				end
+			end
+			t.eq(welds, 1, id .. " locking again doesn't add a weld")
+			local partsAfter = 0
+			for _, d in ipairs(a.model:GetDescendants()) do
+				if d:IsA("BasePart") then
+					partsAfter += 1
+				end
+			end
+			t.eq(partsAfter, partsBefore, id .. " a lock adds no part, so the wood cap is unchanged")
+			-- The weld is gone before physics is handed to the grabber.
+			local weldAtHandoff = "not called"
+			local prev = w.GrabService.Physics.SetOwner
+			w.GrabService.Physics.SetOwner = function(part, player)
+				weldAtHandoff = part:FindFirstChild("BedWeld")
+				t.eq(part, a.root, id .. " the log is what changes owner, never the chassis")
+				t.ok(part ~= truck.PrimaryPart)
+				return prev(part, player)
+			end
+			dale.hrp.Position = a.root.CFrame.Position + Vector3.new(0, 0, 4)
+			t.ok(w.GrabService.Grab(dale, a.root, a.root.CFrame.Position))
+			t.eq(weldAtHandoff, nil, id .. " weld destroyed before SetNetworkOwner")
+			t.eq(a.root:FindFirstChild("BedWeld"), nil)
+			t.eq(a.root.Massless, false, "mass comes back")
+			w.TruckLoad.Unweld(dale, a.record)
+			t.eq(a.root:FindFirstChild("BedWeld"), nil, "unlock twice is fine")
+		end
 	end)
 
 	t.test("saving: your own and unowned pieces, most valuable first; someone else's stays out", function()
@@ -609,6 +617,21 @@ return function(t)
 		end
 		t.eq(faces, 2, "with its cut faces")
 		t.ok(w.GrabService.PieceOf(ra.PrimaryPart), "grabbable: GrabService knows it")
+		local function weldCount(model)
+			local n = 0
+			for _, d in ipairs(model:GetDescendants()) do
+				if d.Name == "BedWeld" and d:IsA("WeldConstraint") then
+					n += 1
+				end
+			end
+			return n
+		end
+		t.eq(weldCount(ra), 1, "saved cargo comes back locked")
+		t.eq(ra.PrimaryPart:FindFirstChild("BedWeld").Part0, nf)
+		t.eq(weldCount(rb), 1, "the trailer piece too, one weld")
+		t.eq(rb.PrimaryPart:FindFirstChild("BedWeld").Part0, nt)
+		w.tick(1)
+		t.eq(weldCount(ra), 1, "a later look doesn't add a second weld")
 		-- On the bed it rides, and no tutorial event fires for it again.
 		local loadedBefore = #w.loaded -- the first load, before he left
 		w.tick(1)
@@ -807,6 +830,72 @@ return function(t)
 		t.eq(w.loaded[1].piece, mine.record)
 		t.ok(math.abs(w.loaded[1].volume - mine.volume) < 1e-6)
 		t.eq(mine.record.lastInteracted, w.clock, "wood on its owner's bed never ages")
+	end)
+
+	t.test("a second player grabbing locked cargo never takes the truck", function()
+		local w = setup()
+		local dale = w.player(1)
+		local truck = w.truck(dale, "Pickup")
+		local a = w.piece(w.onBed(truck), { ownerId = 0 })
+		w.tick()
+		w.tick(1)
+		t.ok(a.root:FindFirstChild("BedWeld"))
+		truck.PrimaryPart.Anchored = false
+		w.TruckLoad.OnDriverChanged(truck, dale)
+		local chassisCalls = 0
+		local prev = w.GrabService.Physics.SetOwner
+		w.GrabService.Physics.SetOwner = function(part, player)
+			if part == truck.PrimaryPart then
+				chassisCalls += 1
+			end
+			return prev(part, player)
+		end
+		local at = a.root.CFrame.Position
+		local other = w.player(2, at + Vector3.new(0, 0, 4))
+		t.eq({ w.GrabService.Grab(other, a.root, at) }, { false, "bed" })
+		t.eq(chassisCalls, 0, "the chassis network owner is untouched")
+		t.ok(a.root:FindFirstChild("BedWeld"), "still locked")
+	end)
+
+	t.test("a log more than half off, in the air, or released far away never locks", function()
+		local w = setup()
+		local dale = w.player(1)
+		local truck = w.truck(dale, "Flatbed")
+		local bed = truck:FindFirstChild("BedFloor")
+		local hung = w.piece(w.onBed(truck, "BedFloor", 0) + Vector3.new(bed.Size.X / 2 + 1.2, 0, 0), { ownerId = 1 })
+		local air = w.piece(w.onBed(truck, "BedFloor", 2) + Vector3.new(0, 5, 0), { ownerId = 1 })
+		w.tick()
+		w.tick(1)
+		t.eq(hung.root:FindFirstChild("BedWeld"), nil, "more than half past the edge")
+		t.eq(air.root:FindFirstChild("BedWeld"), nil, "still in the air")
+		local loose = w.piece(CFrame.new(0, 4, 80), { ownerId = 1 })
+		dale.hrp.Position = loose.root.CFrame.Position + Vector3.new(0, 0, 3)
+		t.ok(w.GrabService.Grab(dale, loose.root, loose.root.CFrame.Position))
+		w.GrabService.Release(dale, nil)
+		loose.model:PivotTo(w.onBed(truck, "BedFloor", -2))
+		w.tick(0.3)
+		w.tick(1)
+		t.eq(loose.root:FindFirstChild("BedWeld"), nil, "released far away: never locks")
+	end)
+
+	t.test("sell, despawn and a recall drop the weld before the truck goes", function()
+		local w = setup()
+		local dale = w.player(1)
+		local truck = w.truck(dale, "Pickup")
+		local a = w.piece(w.onBed(truck), { ownerId = 1 })
+		w.tick()
+		w.tick(1)
+		t.ok(a.root:FindFirstChild("BedWeld"))
+		w.TruckLoad.ReleaseWeld(a.model)
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "a sale lets go first")
+		t.eq(a.model.Parent ~= nil, true, "the piece is still there to be sold")
+		w.tick(1)
+		w.tick(1)
+		t.ok(a.root:FindFirstChild("BedWeld"), "dropped back on the bed, it locks again")
+		w.TruckLoad.DropWelds(truck)
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "despawn drops the weld")
+		t.eq(a.model.Parent ~= nil, true, "the log stays in the world")
+		t.eq(a.root.Massless, false)
 	end)
 
 	t.test("ClampOnto keeps a carried piece over a smaller bed, never under its floor", function()

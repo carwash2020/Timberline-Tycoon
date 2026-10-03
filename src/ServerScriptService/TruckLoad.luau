@@ -27,10 +27,15 @@
 --     it settles; once it's parked (anchored again), back to automatic.
 --   * Every bed part of a player's truck grips at BedFriction (Tune;
 --     TruckArt.ApplyBedFriction). v1 trucks never get it.
---   * BedAutoWeld (Tune; off), the fallback if loads jitter on a moving bed:
---     a piece resting on the bed (moving under WeldSpeed relative to it for
---     WeldRestSec) is welded to it; grabbing it (GrabService's beforeHold)
---     or turning the setting off lets go. In Studio, Tune_BedAutoWeld = 1.
+--   * Cargo lock (always, every tier the same): a piece that has rested on
+--     the bed (slower than WeldSpeed relative to it for WeldRestSec, its
+--     bottom on the bed or on locked cargo, at least half its footprint
+--     inside the bed) is welded straight to that bed, one weld, massless
+--     so it doesn't change the truck's handling. Grabbing it (after
+--     GrabLogic.CanGrab, GrabService's beforeHold) destroys the weld
+--     before the piece's physics is handed over, so the grab never takes
+--     the truck. A piece let go of far from the truck never locks.
+--     BedAutoWeld remains a Tune flag; locking no longer depends on it.
 --   * Nobody but the truck's owner can grab what's on its beds
 --     (GrabService's bedOwner hook, GrabLogic.CanGrab).
 --   * Wood resting on its owner's bed never ages (lastInteracted).
@@ -66,8 +71,8 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
+local CargoLock = require(ReplicatedStorage.Shared.CargoLock)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
@@ -154,6 +159,9 @@ type Truck = {
 local deps: Deps? = nil
 local trucks: { [Player]: Truck } = {}
 local loadedOnce: { [Model]: boolean } = {} -- pieces whose onLoaded has fired
+-- Where a piece was let go of. A release far from every bed never locks
+-- until the piece is grabbed again (the teleport guard).
+local farAt: { [Model]: Vector3 } = {}
 -- Pieces a load left on the ground out of town, by owner (UserId): saved
 -- as groundLoad when they leave, if still theirs and lying about.
 local leftOf: { [number]: { [Model]: boolean } } = {}
@@ -185,7 +193,9 @@ end
 function TruckLoad.Centre(model: Model): Vector3?
 	local sum, total = Vector3.zero, 0
 	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") and not d.Massless then
+		-- A locked piece is massless so it doesn't weigh the truck down, but
+		-- it is still the piece: CargoLocked marks the parts that count.
+		if d:IsA("BasePart") and (not d.Massless or d:GetAttribute(CargoLock.LockedAttr) == true) then
 			local s = d.Size
 			local v = s.X * s.Y * s.Z
 			sum += d.CFrame.Position * v
@@ -256,12 +266,6 @@ local function partsIn(cf: CFrame, size: Vector3): { BasePart }
 		query = fn
 	end
 	return (fn :: (CFrame, Vector3) -> { BasePart })(cf, size)
-end
-
-local function autoWeld(): boolean
-	local d = deps
-	local studio = if d and d.isStudio then d.isStudio() else RunService:IsStudio()
-	return TruckLoad.AutoWeldOn(Tune.Get("BedAutoWeld"), workspace:GetAttribute(Tune.Prefix .. "BedAutoWeld"), studio)
 end
 
 local function attrNumber(model: Model, name: string): number?
@@ -357,6 +361,65 @@ local function unweldModel(model: Model)
 	end
 end
 
+-- Massless while locked, so a full bed doesn't change the truck's mass.
+-- CargoLocked marks the parts that were solid, so Centre still finds them
+-- and a later unlock gives the mass back. Cut faces were already massless.
+local function lockMass(model: Model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and not d.Massless then
+			d:SetAttribute(CargoLock.LockedAttr, true)
+			d.Massless = true
+		end
+	end
+end
+
+local function unlockMass(model: Model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute(CargoLock.LockedAttr) == true then
+			d.Massless = false
+			d:SetAttribute(CargoLock.LockedAttr, nil)
+		end
+	end
+	local click = model:FindFirstChild("LockClick", true)
+	if click then
+		click:Destroy()
+	end
+end
+
+local function lockClick(root: BasePart)
+	if root:FindFirstChild("LockClick") then
+		return
+	end
+	local sound = Instance.new("Sound")
+	sound.Name = "LockClick"
+	sound.SoundId = "rbxasset://sounds/button.wav"
+	sound.Volume = 0.35
+	sound.Parent = root
+	pcall(function()
+		sound:Play()
+	end)
+end
+
+-- One weld, the piece's root straight to the bed. A second call finds the
+-- weld it already made and does not add another.
+local function lockOnto(model: Model, zone: Zone)
+	local root = model.PrimaryPart
+	if not root then
+		return
+	end
+	local existing = root:FindFirstChild(TruckLoad.WeldName)
+	if existing and existing:IsA("WeldConstraint") then
+		return
+	end
+	lockMass(model)
+	local w = Instance.new("WeldConstraint")
+	w.Name = TruckLoad.WeldName
+	w.Part0 = zone.bed
+	w.Part1 = root
+	w.Parent = root
+	lockClick(root)
+end
+
 ---------------------------------------------------------------------------
 -- Trucks
 ---------------------------------------------------------------------------
@@ -384,7 +447,8 @@ end
 -- Undoes what TruckLoad did to a truck's load: its welds let go, and the
 -- pieces the driver or the server simulated go back to automatic.
 local function release(t: Truck)
-	for _, w in pairs(t.welds) do
+	for model, w in pairs(t.welds) do
+		unlockMass(model)
 		if w.Parent then
 			w:Destroy()
 		end
@@ -488,75 +552,123 @@ local function judge(t: Truck, model: Model, c: Carried, now: number): boolean
 	return true
 end
 
+-- Adopts a weld already on the piece, or makes the one weld to the bed.
+-- The piece then moves with the truck: it is not simulated on its own.
 local function weld(t: Truck, model: Model, zone: Zone, root: BasePart)
-	GrabService.ReleasePiece(model, "welded") -- ends a dropper's keep window: it's the truck's now
-	t.cargo[model] = nil -- part of the truck's assembly: it moves (and is owned) with the truck
-	local w = Instance.new("WeldConstraint")
-	w.Name = TruckLoad.WeldName
-	w.Part0 = zone.bed
-	w.Part1 = root
-	w.Parent = root
-	t.welds[model] = w
-end
-
--- BedAutoWeld: welds pieces that have rested on the bed a moment; with
--- the setting off, lets go of any it welded.
-local function weldPass(t: Truck, riding: { [Model]: Riding }, now: number)
-	if not autoWeld() then
-		for _, w in pairs(t.welds) do
-			if w.Parent then
-				w:Destroy()
-			end
-		end
-		table.clear(t.welds)
-		table.clear(t.still)
+	local existing = t.welds[model]
+	if existing and existing.Parent then
 		return
 	end
-	for model, w in pairs(t.welds) do
-		if model.Parent == nil or w.Parent == nil or not riding[model] then
-			if w.Parent then
-				w:Destroy()
+	local found = root:FindFirstChild(TruckLoad.WeldName)
+	if found and found:IsA("WeldConstraint") then
+		t.welds[model] = found
+		t.cargo[model] = nil
+		t.still[model] = nil
+		return
+	end
+	GrabService.ReleasePiece(model, "welded") -- ends a dropper's keep window: it's the truck's now
+	t.cargo[model] = nil -- part of the truck's assembly: it moves (and is owned) with the truck
+	lockOnto(model, zone)
+	local made = root:FindFirstChild(TruckLoad.WeldName)
+	if made and made:IsA("WeldConstraint") then
+		t.welds[model] = made
+	end
+	t.still[model] = nil
+end
+
+-- Solid parts of a piece (not the massless cut faces) in bed space.
+local function solids(model: Model): { BasePart }
+	local out: { BasePart } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name ~= "CutFace" and d.Transparency < 1 then
+			table.insert(out, d)
+		end
+	end
+	return out
+end
+
+local function footprintShare(bed: BasePart, model: Model): number
+	local best = 0
+	for _, part in ipairs(solids(model)) do
+		local rel = bed.CFrame:ToObjectSpace(part.CFrame)
+		best = math.max(best, CargoLock.InsideShare(bed.Size, rel, part.Size))
+	end
+	return best
+end
+
+local function touching(bed: BasePart, model: Model, locked: { Model }): boolean
+	local parts = solids(model)
+	for _, part in ipairs(parts) do
+		local rel = bed.CFrame:ToObjectSpace(part.CFrame)
+		if CargoLock.ContactsBed(bed.Size, rel, part.Size, CargoLock.ContactGap) then
+			return true
+		end
+		for _, other in ipairs(locked) do
+			if other ~= model then
+				for _, op in ipairs(solids(other)) do
+					local orel = bed.CFrame:ToObjectSpace(op.CFrame)
+					if CargoLock.StackedOn(rel, part.Size, orel, op.Size, CargoLock.ContactGap) then
+						return true
+					end
+				end
 			end
+		end
+	end
+	return false
+end
+
+local function releasedFar(model: Model, bed: BasePart): boolean
+	local at = farAt[model]
+	if not at then
+		return false
+	end
+	return (at - bed.CFrame.Position).Magnitude > CargoLock.FarStuds
+end
+
+-- Welds pieces that have rested on the bed. A weld stays until a grab, a
+-- sale, or the truck going away: driving off does not unlock it.
+local function weldPass(t: Truck, riding: { [Model]: Riding }, now: number)
+	local locked: { Model } = {}
+	for model, w in pairs(t.welds) do
+		if model.Parent == nil or w.Parent == nil then
 			t.welds[model] = nil
+		else
+			table.insert(locked, model)
 		end
 	end
 	for model, r in pairs(riding) do
 		local root = model.PrimaryPart
-		if t.welds[model] or not root or GrabService.HeldBy(model) ~= nil then
+		if not root or GrabService.HeldBy(model) ~= nil then
 			t.still[model] = nil
 			continue
 		end
-		local rel = r.zone.bed.CFrame:ToObjectSpace(root.CFrame)
-		local s = t.still[model]
-		if not s then
-			t.still[model] = { rel = rel, at = now, since = nil }
+		local found = root:FindFirstChild(TruckLoad.WeldName)
+		if t.welds[model] or (found and found:IsA("WeldConstraint")) then
+			weld(t, model, r.zone, root)
+			t.still[model] = nil
 			continue
 		end
-		local dt = now - s.at
-		if dt <= 0 then
+		local pos = r.zone.bed.CFrame:PointToObjectSpace(root.CFrame.Position)
+		local share = footprintShare(r.zone.bed, model)
+		local on = touching(r.zone.bed, model, locked)
+		local far = releasedFar(model, r.zone.bed)
+		if not CargoLock.MayLock(share, on, far) then
+			t.still[model] = { rel = CFrame.new(pos), at = now, since = nil }
 			continue
 		end
-		local reach = root.Size.Magnitude / 2
-		local moved = math.max(
-			(rel.Position - s.rel.Position).Magnitude,
-			(rel.LookVector - s.rel.LookVector).Magnitude * reach,
-			(rel.UpVector - s.rel.UpVector).Magnitude * reach
-		)
-		if moved / dt < TruckLoad.WeldSpeed then
-			local since = s.since or s.at
-			s.since = since
-			if now - since >= TruckLoad.WeldRestSec then
-				weld(t, model, r.zone, root)
-				t.still[model] = nil
-				continue
-			end
-		else
-			s.since = nil
+		local prev = t.still[model]
+		local sample: CargoLock.Sample? = if prev
+			then { pos = prev.rel.Position, at = prev.at, since = prev.since }
+			else nil
+		local nextSample, settled = CargoLock.NoteRest(sample, pos, now)
+		t.still[model] = { rel = CFrame.new(nextSample.pos), at = nextSample.at, since = nextSample.since }
+		if settled then
+			weld(t, model, r.zone, root)
+			table.insert(locked, model)
 		end
-		s.rel, s.at = rel, now
 	end
 	for model in pairs(t.still) do
-		if not riding[model] then
+		if not riding[model] and not t.welds[model] then
 			t.still[model] = nil
 		end
 	end
@@ -591,6 +703,12 @@ local function look(t: Truck, now: number)
 				end
 			end
 		end
+	end
+	-- Lock before any loose piece is handed to the driver, so a weld is
+	-- never created onto a part whose owner was just set.
+	weldPass(t, riding, now)
+	for m in pairs(riding) do
+		local held = GrabService.HeldBy(m) ~= nil
 		if driver and not held and not t.welds[m] and (t.kept[m] or 0) <= now then
 			carry(t, m, driver, now)
 		end
@@ -626,7 +744,6 @@ local function look(t: Truck, now: number)
 		end
 		table.clear(t.cargo)
 	end
-	weldPass(t, riding, now)
 	for m, untilAt in pairs(t.kept) do
 		if untilAt <= now or m.Parent == nil then
 			t.kept[m] = nil
@@ -927,10 +1044,12 @@ local function place(model: Model, z: Zone, rel: CFrame)
 	end
 	local target = z.bed.CFrame * TruckLoad.ClampOnto(rel, z.zone.Size) + Vector3.new(0, TruckLoad.Lift, 0)
 	GrabService.ReleasePiece(model, "moved") -- not held (checked); a keep window would judge the move a teleport
+	unlockMass(model)
 	unweldModel(model)
 	model:PivotTo(target * root.CFrame:ToObjectSpace(model:GetPivot()))
 	stop(root)
 	GrabService.Physics.SetAuto(root)
+	lockOnto(model, z) -- welded before anyone is given the truck
 	loadedOnce[model] = true
 	local d = deps
 	if d and d.moved then
@@ -969,7 +1088,9 @@ local function restore(player: Player, truck: Model, pieces: { SavedPiece }, kee
 		if model then
 			loadedOnce[model] = true
 			n += 1
-			if not keepsLoad then
+			if keepsLoad and z then
+				lockOnto(model, z) -- PivotTo already happened; weld before the driver gets the truck
+			else
 				trackLeft(player.UserId, model)
 			end
 		end
@@ -1023,10 +1144,11 @@ function TruckLoad.OnRebuild(player: Player, old: Model?, keepsLoad: boolean, at
 		local riding = ridingOn(zonesOf(old))
 		local t = trucks[player]
 		if t and t.model == old then
-			release(t)
+			release(t) -- welds drop, and the mass comes back, before the truck goes
 			trucks[player] = nil
 		end
 		for m in pairs(riding) do
+			unlockMass(m)
 			unweldModel(m) -- its bed is going
 		end
 		if not keepsLoad then
@@ -1249,8 +1371,11 @@ function TruckLoad.PiecesOn(player: Player): { Model }
 end
 
 -- GrabService's beforeHold: a piece TruckLoad welded lets go of the bed.
+-- The weld is destroyed before GrabService hands the piece's physics to
+-- the grabber. Doing it the other way round would hand them the truck.
 function TruckLoad.Unweld(_player: Player, piece: Piece)
 	local model = piece.model
+	farAt[model] = nil -- a real grab clears the teleport guard
 	for _, t in pairs(trucks) do
 		local w = t.welds[model]
 		if w then
@@ -1261,7 +1386,66 @@ function TruckLoad.Unweld(_player: Player, piece: Piece)
 			end
 		end
 	end
+	unweldModel(model) -- gone before SetNetworkOwner runs
+	unlockMass(model)
+end
+
+-- Drops the weld and gives the mass back, without destroying the piece
+-- (a sale, or a truck that is about to despawn under a load left behind).
+function TruckLoad.ReleaseWeld(model: Model)
+	farAt[model] = nil
+	for _, t in pairs(trucks) do
+		t.welds[model] = nil
+		t.still[model] = nil
+		t.cargo[model] = nil
+	end
 	unweldModel(model)
+	unlockMass(model)
+end
+
+-- Every weld on `truck` lets go before the truck is destroyed, so cargo
+-- is not dragged away with it. The pieces stay in the world.
+function TruckLoad.DropWelds(truck: Model)
+	local beds: { [BasePart]: boolean } = {}
+	for _, d in ipairs(truck:GetDescendants()) do
+		if d:IsA("BasePart") and (d.Name == "BedFloor" or d.Name == "TrailerBed") then
+			beds[d] = true
+		end
+	end
+	for _, t in pairs(trucks) do
+		if t.model == truck then
+			for model, w in pairs(t.welds) do
+				unlockMass(model)
+				if w.Parent then
+					w:Destroy()
+				end
+				t.welds[model] = nil
+				t.still[model] = nil
+			end
+		end
+	end
+	local d = deps
+	if not d then
+		return
+	end
+	for _, child in ipairs(d.woodFolder:GetChildren()) do
+		if child:IsA("Model") then
+			local root = child.PrimaryPart
+			local w = if root then root:FindFirstChild(TruckLoad.WeldName) else nil
+			local bed = if w and w:IsA("WeldConstraint") then w.Part0 else nil
+			if bed and beds[bed] == true then
+				TruckLoad.ReleaseWeld(child)
+			end
+		end
+	end
+end
+
+-- GrabService's onRelease: remember where the piece was let go of.
+function TruckLoad.NoteRelease(_player: Player, piece: Piece, _reason: string)
+	local root = piece.model.PrimaryPart
+	if root then
+		farAt[piece.model] = root.CFrame.Position
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1332,6 +1516,7 @@ function TruckLoad.PlayerRemoving(player: Player)
 		profile.groundLoad = ground
 		for _, list in ipairs({ models, groundModels }) do
 			for _, m in ipairs(list) do
+				TruckLoad.ReleaseWeld(m) -- the weld goes before the piece does
 				GrabService.ReleasePiece(m, "left")
 				if d.forget then
 					d.forget(m)
@@ -1354,8 +1539,16 @@ local function hookUp(newDeps: Deps)
 	table.clear(trucks)
 	table.clear(loadedOnce)
 	table.clear(leftOf)
+	table.clear(farAt)
 	GrabService.Hooks.bedOwner = TruckLoad.BedOwner
 	GrabService.Hooks.beforeHold = TruckLoad.Unweld
+	local priorRelease = GrabService.Hooks.onRelease
+	GrabService.Hooks.onRelease = function(player: Player, piece: Piece, reason: string)
+		TruckLoad.NoteRelease(player, piece, reason)
+		if priorRelease then
+			priorRelease(player, piece, reason)
+		end
+	end
 end
 
 local running = false
