@@ -98,6 +98,7 @@ local function buyAxe(player: Player, axeId: string)
 	notify(player, string.format("Bought the %s! It's in your hotbar.", axe.displayName))
 	MilestoneService.Mark(player, "First upgrade bought")
 	QuestService.Event(player, "axeBought")
+	QuestService.RefreshNextGoal(player)
 end
 
 local function publishGear(player: Player, profile: ProfileService.Profile)

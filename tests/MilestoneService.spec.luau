@@ -19,6 +19,13 @@ return function(t)
 		return Milestone, player, profile
 	end
 
+	t.test("the onboarding funnel keeps its old steps and adds the next goal at the end", function()
+		local Milestone = setup()
+		t.eq(Milestone.Funnel[9], "Finished the tutorial")
+		t.eq(Milestone.Funnel[10], "Saw a next goal")
+		t.eq(#Milestone.Funnel, 10)
+	end)
+
 	t.test("v1's calibrate line: logs by wood, from 10 logs and 2 minutes", function()
 		local Milestone = setup()
 		t.eq(

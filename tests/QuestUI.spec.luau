@@ -4,7 +4,7 @@
 -- placed inside it) and the shops (each named by its kind, Counter inside).
 return function(t)
 	local roblox = t.roblox
-	local Instance, Vector3, Color3 = roblox.Instance, roblox.Vector3, roblox.Color3
+	local Instance, Vector3, Color3, CFrame = roblox.Instance, roblox.Vector3, roblox.Color3, roblox.CFrame
 	local loader = t.loader({
 		services = {
 			Players = { LocalPlayer = {} },
@@ -42,6 +42,17 @@ return function(t)
 			Kit.placeAt(shop, spot.cframe)
 			shop.Parent = map
 		end
+		local grove = Instance.new("Model")
+		grove.Name = "TutorialGrove"
+		Kit.part(grove, "CartZone", Vector3.new(7, 12, 7), CFrame.new(-13, 6, 42), Color3.new(1, 1, 1))
+		grove.Parent = map
+		local plots = Instance.new("Model")
+		plots.Name = "Plots"
+		local plot = Instance.new("Model")
+		plot.Name = "Plot_1"
+		plot.Parent = plots
+		Kit.part(plot, "Sign", Vector3.new(8, 3.5, 0.4), CFrame.new(), Color3.new(1, 1, 1))
+		plots.Parent = map
 		return map
 	end
 

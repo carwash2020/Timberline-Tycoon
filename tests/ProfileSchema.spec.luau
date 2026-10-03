@@ -207,7 +207,7 @@ return function(t)
 			data.tutorialStep = index
 			data.tutorialProgress = 2
 			Schema.MigrateV2(data, 20)
-			local keeps = step.id == "fell" or step.id == "plant" or step.id == "steel"
+			local keeps = TutorialData.KeepsProgressV2(index)
 			t.eq(data.tutorialProgress, if keeps then 2 else 0, step.id)
 			t.eq(data.tutorialStep, index, "the step itself is kept")
 		end

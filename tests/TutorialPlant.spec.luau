@@ -308,6 +308,7 @@ return function(t)
 
 		-- Two minutes hauling and selling (the oak's own 45 s pass).
 		s.Quest.Event(ada, "logPickedUp")
+		s.Quest.Event(ada, "logsSold", 2)
 		s.Quest.Event(ada, "logsLoaded", 2)
 		s.wait(120)
 		s.Quest.Event(ada, "logsSold", 2)

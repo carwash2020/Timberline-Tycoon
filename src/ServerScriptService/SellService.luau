@@ -80,10 +80,19 @@ export type Deps = {
 	partsInZone: ((BasePart, Instance) -> { BasePart })?,
 	now: (() -> number)?,
 	player: ((number) -> Player?)?,
+	-- Murph's tutorial cart: a second zone. `accept` returns why not, or
+	-- nil to sell at the mill's own price. Wood already in the main zone
+	-- sells there and is not asked again.
+	gate: {
+		zone: BasePart,
+		accept: (Player, number, number) -> string?,
+	}?,
 }
 
 local deps: Deps? = nil
 local firstSeen: { [Model]: number } = {}
+local gateSeen: { [Model]: number } = {}
+local gateTold: { [Model]: boolean } = {}
 
 local function defaultPartsInZone(zone: BasePart, folder: Instance): { BasePart }
 	local params = OverlapParams.new()
@@ -174,6 +183,8 @@ local function sell(d: Deps, list: { Priced }): { Sale }
 		local model, piece = p.model, p.piece
 		piece.selling = true
 		firstSeen[model] = nil
+		gateSeen[model] = nil
+		gateTold[model] = nil
 		local payeeId = SellLogic.Payee(piece.ownerId, piece.lastHolderId, online)
 		d.release(model)
 		d.forget(model)
@@ -267,6 +278,79 @@ function SellService.Tick(): { Sale }
 			end
 		end
 	end
+	-- The tutorial cart, only when one was wired. Pieces the main pad
+	-- already has are left to it, so a spec's single zone query can't
+	-- sell the same wood twice.
+	local gate = d.gate
+	if gate then
+		local findPlayer, online = onlineCheck(d)
+		local gin = query(gate.zone, d.woodFolder)
+		local gseen: { [Model]: boolean } = {}
+		for _, part in ipairs(gin) do
+			local model = pieceModel(part)
+			if model and not gseen[model] then
+				gseen[model] = true
+				if gateSeen[model] == nil then
+					gateSeen[model] = now
+				end
+			end
+		end
+		for model in pairs(gateSeen) do
+			if not gseen[model] then
+				gateSeen[model] = nil
+				gateTold[model] = nil
+			end
+		end
+		local byPayee: { [Player]: { Priced } } = {}
+		local payees: { Player } = {}
+		for model, since in pairs(gateSeen) do
+			if not seen[model] and now - since >= SellService.Settle then
+				local p = price(d, model)
+				if p then
+					local payeeId = SellLogic.Payee(p.piece.ownerId, p.piece.lastHolderId, online)
+					local payee = if payeeId then findPlayer(payeeId) else nil
+					if payee then
+						local list = byPayee[payee]
+						if not list then
+							list = {}
+							byPayee[payee] = list
+							table.insert(payees, payee)
+						end
+						table.insert(list, p)
+					end
+				end
+			end
+		end
+		for _, payee in ipairs(payees) do
+			local list = byPayee[payee]
+			if not list then
+				continue
+			end
+			local pieces, volume = 0, 0
+			for _, p in ipairs(list) do
+				pieces += 1
+				volume += p.volume
+			end
+			local why = gate.accept(payee, pieces, volume)
+			if why then
+				local fresh = false
+				for _, p in ipairs(list) do
+					if not gateTold[p.model] then
+						fresh = true
+					end
+					gateTold[p.model] = true
+				end
+				if fresh then
+					d.notify(payee, why)
+				end
+			else
+				for _, p in ipairs(list) do
+					gateTold[p.model] = nil
+					table.insert(ready, p)
+				end
+			end
+		end
+	end
 	return sell(d, ready)
 end
 
@@ -335,6 +419,8 @@ local running = false
 function SellService.Init(newDeps: Deps)
 	deps = newDeps
 	table.clear(firstSeen)
+	table.clear(gateSeen)
+	table.clear(gateTold)
 	if running then
 		return
 	end
@@ -355,12 +441,16 @@ function SellService._reset()
 	deps = nil
 	running = false
 	table.clear(firstSeen)
+	table.clear(gateSeen)
+	table.clear(gateTold)
 end
 
 -- For the specs: start without the polling loop.
 function SellService._use(newDeps: Deps)
 	deps = newDeps
 	table.clear(firstSeen)
+	table.clear(gateSeen)
+	table.clear(gateTold)
 end
 
 -- The Sky Bin's sale (M1.7b, AetherService's "Sell Sky Bin" prompt): pays

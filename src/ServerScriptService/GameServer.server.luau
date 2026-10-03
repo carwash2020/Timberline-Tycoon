@@ -53,6 +53,8 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
+local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 -- Runs one service's Init, join or leave hook on its own: an error in one
@@ -88,6 +90,11 @@ assert(sellArea, "[GameServer] SellArea missing")
 local sellZoneInst = sellArea:WaitForChild("SellZone", 30)
 assert(sellZoneInst and sellZoneInst:IsA("BasePart"), "[GameServer] SellZone missing")
 local sellZone = sellZoneInst :: BasePart
+-- Murph's cart, beside the tutorial oaks. Missing (a failed map step)
+-- just means the first sale is the mill, as before.
+local groveFolder = mapFolder:FindFirstChild("TutorialGrove")
+local cartInst = if groveFolder then groveFolder:FindFirstChild("CartZone") else nil
+local cartZone = if cartInst and cartInst:IsA("BasePart") then cartInst :: BasePart else nil
 
 -- Remotes -----------------------------------------------------------------
 local remotes = Instance.new("Folder")
@@ -216,6 +223,7 @@ local function onChopTree(player: Player, treeUid: unknown)
 		DailyService.Event(credited, "treeFelled", 1)
 		if wood then
 			FieldGuideService.Discover(credited, wood.id)
+			QuestService.RefreshNextGoal(credited)
 		end
 	end
 end
@@ -434,6 +442,57 @@ local function onSellLogs(player: Player)
 	local profile = ProfileService.GetProfile(player)
 	local hands = CarryService.Hands(player)
 	if not hrp or not profile or not hands then
+		return
+	end
+	-- The tutorial cart buys one small handful, at the mill's prices, and
+	-- only during the sell step (TutorialGrove). The truck bed and the Sky
+	-- Bin stay at the mill.
+	if cartZone and Util.pointInPart(cartZone, hrp.Position) then
+		local pieces = 0
+		for _ in pairs(hands) do
+			pieces += 1
+		end
+		if pieces < 1 then
+			notify(player, "Nothing to sell.")
+			return
+		end
+		local list = TutorialData.ForLoop(1)
+		local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
+		local ok, why = TutorialGrove.Accept({
+			done = profile.tutorialDone,
+			stepId = if step then step.id else nil,
+			used = profile.onboarding[TutorialGrove.UsedKey] == true,
+			pieces = pieces,
+			logs = pieces,
+		})
+		if not ok then
+			notify(player, why :: string)
+			return
+		end
+		local total, count = 0, 0
+		local byWood: { [string]: number } = {}
+		local figures: { [string]: number } = {}
+		for uid in pairs(hands) do
+			local log = TreeService.TakeLog(uid)
+			if log then
+				total += log.value
+				count += 1
+				byWood[log.def.id] = (byWood[log.def.id] or 0) + 1
+				local figure = log.tags.figure
+				if type(figure) == "string" then
+					figures[figure] = (figures[figure] or 0) + 1
+				end
+				log.model:Destroy()
+			end
+		end
+		table.clear(hands)
+		player:SetAttribute("CarriedLogs", 0)
+		if count == 0 then
+			notify(player, "Nothing to sell.")
+			return
+		end
+		profile.onboarding[TutorialGrove.UsedKey] = true
+		completeSale(player, profile, total, count, byWood, figures)
 		return
 	end
 	if not Util.pointInPart(sellZone, hrp.Position) then
@@ -691,6 +750,31 @@ if CoreLoop.V2() then
 			local profile = ProfileService.GetProfile(player)
 			return if profile then GameConfig.CashCap - profile.cash else 0
 		end,
+		gate = if cartZone
+			then {
+				zone = cartZone,
+				accept = function(player: Player, pieces: number, volume: number): string?
+					local profile = ProfileService.GetProfile(player)
+					if not profile then
+						return TutorialGrove.RefuseClosed
+					end
+					local list = TutorialData.ForLoop(2)
+					local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
+					local ok, why = TutorialGrove.Accept({
+						done = profile.tutorialDone,
+						stepId = if step then step.id else nil,
+						used = profile.onboarding[TutorialGrove.UsedKey] == true,
+						pieces = pieces,
+						volume = volume,
+					})
+					if ok then
+						profile.onboarding[TutorialGrove.UsedKey] = true
+						return nil
+					end
+					return why
+				end,
+			}
+			else nil,
 	})
 	-- Loose wood rides on the truck beds (M1.6): by friction, simulated by
 	-- the driver's device while they drive, saved in profile.truckLoad.
@@ -751,6 +835,7 @@ if CoreLoop.V2() then
 		QuestService.Event(feller, "treeFelled")
 		DailyService.Event(feller, "treeFelled", 1)
 		FieldGuideService.Discover(feller, rec.def.id)
+		QuestService.RefreshNextGoal(feller)
 	end
 	SectionTrees.Hooks.onSwing = function(player: Player)
 		MilestoneService.Mark(player, "First chop")

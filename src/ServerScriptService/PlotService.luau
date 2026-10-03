@@ -38,6 +38,7 @@ local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
+local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
 
 type Profile = ProfileService.Profile
@@ -342,6 +343,7 @@ local function onClaim(player: Player, slot: Slot)
 	end
 	profile.plot.claimed = true
 	assign(player, slot, profile)
+	QuestService.Event(player, "plotClaimed")
 	notify(player, "It's yours! Stand on your plot and press BUILD to start building.")
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "PlotClaimed")

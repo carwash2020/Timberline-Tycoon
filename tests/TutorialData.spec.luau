@@ -10,8 +10,18 @@ return function(t)
 		logsSold = true,
 		seedPlanted = true,
 		axeBought = true,
+		plotClaimed = true,
 	}
-	local BEACONS = { tree = true, log = true, truck = true, sellPad = true, stump = true, toolShed = true }
+	local BEACONS = {
+		tree = true,
+		log = true,
+		truck = true,
+		sellPad = true,
+		stump = true,
+		toolShed = true,
+		murphCart = true,
+		plotSign = true,
+	}
 
 	t.test("right after the first sale, Murph teaches planting a Heartseed", function()
 		local ids = {}
@@ -19,7 +29,8 @@ return function(t)
 			ids[step.id] = i
 		end
 		t.ok(ids.plant ~= nil, "there's a planting beat")
-		t.eq(ids.plant, ids.sell + 1, "it comes right after the first sale")
+		t.eq(ids.mill, ids.load + 1, "the sawmill is the trip after the truck")
+		t.eq(ids.plant, ids.mill + 1, "planting comes right after that haul")
 		local plant = TutorialData.Steps[ids.plant]
 		t.eq(plant.event, "seedPlanted")
 		t.eq(plant.count, 1)
@@ -50,7 +61,8 @@ return function(t)
 			t.ok(#step.objective > 0 and #step.murph > 0, step.id .. " text")
 			t.ok(i > 1 or step.event == "treeFelled", "the tutorial starts with chopping")
 		end
-		t.eq(TutorialData.Steps[#TutorialData.Steps].event, "axeBought", "it ends by buying the Steel Axe")
+		t.eq(TutorialData.Steps[#TutorialData.Steps - 1].event, "axeBought", "the Steel Axe is still a step")
+		t.eq(TutorialData.Steps[#TutorialData.Steps].event, "plotClaimed", "then a free plot")
 	end)
 
 	t.test("Murph's device words ({click}) expand on every device; the tracker lines have none", function()
@@ -80,7 +92,7 @@ return function(t)
 		t.ok(string.find(HintLogic.Expand(first, "phone"), "Tap, or hold", 1, true), "Tap on a phone")
 		t.ok(string.find(HintLogic.Expand(first, "desktop"), "Click, or hold", 1, true), "Click with a mouse")
 		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
-		t.ok(string.find(first, "south of town, past the parking lot", 1, true), "it points the way to the woods")
+		t.ok(string.find(first, "just to your left", 1, true), "it points at the oaks by the spawn")
 	end)
 
 	t.test("rewards help toward the Steel Axe but don't buy it outright", function()
@@ -98,10 +110,64 @@ return function(t)
 	end)
 
 	t.test("the Steel Axe step counts as done for a player who already has it", function()
-		local steel = TutorialData.Steps[#TutorialData.Steps]
+		local steel, plot
+		for _, step in ipairs(TutorialData.Steps) do
+			if step.id == "steel" then
+				steel = step
+			elseif step.id == "plot" then
+				plot = step
+			end
+		end
 		t.ok(TutorialData.AlreadyDone(steel, 2))
 		t.ok(not TutorialData.AlreadyDone(steel, 1))
 		t.ok(not TutorialData.AlreadyDone(TutorialData.Steps[1], 5))
+		t.ok(not TutorialData.AlreadyDone(plot, 2, false))
+		t.ok(TutorialData.AlreadyDone(plot, 1, true), "a claimed plot skips the claim-only step")
+	end)
+
+	t.test("three short loads add up to the old grind, and the tracker shows the Steel Axe", function()
+		local sold, reward = 0, 0
+		local ids = {}
+		for _, step in ipairs(TutorialData.Steps) do
+			if step.id == "loads" or step.id == "loads2" or step.id == "loads3" then
+				table.insert(ids, step.id)
+				t.eq(step.count, 6)
+				t.eq(step.axeGoal, true)
+				sold += step.count
+				reward += step.rewardCash
+			end
+		end
+		t.eq(ids, { "loads", "loads2", "loads3" })
+		t.eq(sold, 18)
+		t.eq(reward, 25)
+		t.eq(TutorialData.TotalReward(), 25)
+		local loads = TutorialData.Steps[7]
+		t.eq(
+			TutorialData.ObjectiveText(loads, 2, 40),
+			string.format("Sell 6 more logs (2/6) · $40 of $%d to Steel Axe", loads.axePrice)
+		)
+	end)
+
+	t.test("a step that needs two events stores a bit each", function()
+		local step = {
+			id = "both",
+			objective = "Claim a free plot and plant a sapling",
+			murph = "Claim one, then plant a sapling on it.",
+			event = "plotClaimed",
+			count = 1,
+			also = "seedPlanted",
+		}
+		local progress, done = TutorialData.Apply(step, 0, "logsSold", 1)
+		t.eq(progress, 0)
+		t.eq(done, false)
+		progress, done = TutorialData.Apply(step, progress, "plotClaimed", 1)
+		t.eq(progress, 1)
+		t.eq(done, false)
+		t.eq(TutorialData.ObjectiveText(step, progress), "Claim a free plot and plant a sapling (1/2)")
+		progress, done = TutorialData.Apply(step, progress, "seedPlanted", 1)
+		t.eq(progress, 3)
+		t.eq(done, true)
+		t.ok(not TutorialData.AlreadyDone(step, 1, true), "the sapling half still waits")
 	end)
 
 	---------------------------------------------------------------------------
@@ -116,7 +182,16 @@ return function(t)
 	for _, event in ipairs(TutorialData.EventsV2) do
 		V2_EVENTS[event] = true
 	end
-	local V2_BEACONS = { tree = true, wood = true, truckBed = true, sellPad = true, stump = true, toolShed = true }
+	local V2_BEACONS = {
+		tree = true,
+		wood = true,
+		truckBed = true,
+		sellPad = true,
+		stump = true,
+		toolShed = true,
+		murphCart = true,
+		plotSign = true,
+	}
 
 	local function ids(steps)
 		local out = {}
@@ -155,7 +230,8 @@ return function(t)
 		t.eq(V2[1].event, "treeFelled", "it starts with chopping")
 		t.eq(V2[1].beacon, "tree")
 		t.eq(V2[1].beaconWood, "oak", "Murph points at an oak")
-		t.eq(V2[#V2].event, "axeBought", "it ends by buying the Steel Axe")
+		t.eq(V2[#V2 - 1].event, "axeBought", "the Steel Axe is still a step")
+		t.eq(V2[#V2].event, "plotClaimed", "then a free plot")
 		t.eq(#TutorialData.EventsV2, #V2)
 	end)
 
@@ -165,7 +241,7 @@ return function(t)
 		t.eq(V2[plant].event, "seedPlanted")
 		t.eq(V2[plant].objective, TutorialData.Steps[plant].objective, "unchanged")
 		t.eq(V2[plant].murph, TutorialData.Steps[plant].murph, "unchanged")
-		t.eq(V2[plant - 1].id, "sell", "right after the first sale")
+		t.eq(V2[plant - 1].id, "mill", "right after the haul to the mill")
 	end)
 
 	t.test("v2: Murph's device words expand everywhere; the drag beat says how to put the axe away", function()
@@ -189,9 +265,17 @@ return function(t)
 		t.ok(string.find(HintLogic.Expand(drag, "console"), "hold LT on a log", 1, true))
 		local first = V2[1].murph
 		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
-		t.ok(string.find(first, "south of town, past the parking lot", 1, true), "it points the way to the woods")
-		t.ok(string.find(V2[3].murph, "Cut it to fit", 1, true), "the load beat: cut it to fit the bed")
-		t.ok(string.find(V2[4].murph, "SELL LOGS HERE", 1, true), "the sell beat names the pad as it reads")
+		t.ok(string.find(first, "just to your left", 1, true), "it points at the oaks by the spawn")
+		local function byId(id)
+			for _, step in ipairs(V2) do
+				if step.id == id then
+					return step
+				end
+			end
+			return nil
+		end
+		t.ok(string.find(byId("load").murph, "Cut it to fit", 1, true), "the load beat: cut it to fit the bed")
+		t.ok(string.find(byId("mill").murph, "SELL LOGS HERE", 1, true), "the mill beat names the pad as it reads")
 	end)
 
 	t.test("v2: every number Murph says comes from the v2 data", function()
@@ -211,39 +295,59 @@ return function(t)
 		local function has(line, n)
 			return string.find(line, "%f[%d]" .. n .. "%f[%D]") ~= nil
 		end
+		local function byId(id)
+			for _, step in ipairs(V2) do
+				if step.id == id then
+					return step
+				end
+			end
+			return nil
+		end
 		t.ok(has(V2[1].murph, FieldGuide.TrunkHits(starter, oak)), "hits for the first oak")
-		t.ok(has(V2[6].murph, FieldGuide.TrunkHits(starter, birch)), "the starter axe on birch")
+		t.ok(has(byId("loads").murph, FieldGuide.TrunkHits(starter, birch)), "the starter axe on birch")
 		t.ok(
-			string.find(V2[6].murph, starter.displayName, 1, true)
-				and string.find(V2[6].murph, steel.displayName, 1, true)
+			string.find(byId("loads").murph, starter.displayName, 1, true)
+				and string.find(byId("loads").murph, steel.displayName, 1, true)
 		)
-		t.ok(has(V2[7].murph, FieldGuide.TrunkHits(steel, oak)), "the Steel Axe on oak")
-		t.ok(has(V2[7].murph, FieldGuide.TrunkHits(starter, oak)), "...against the starter's")
+		t.ok(has(byId("steel").murph, FieldGuide.TrunkHits(steel, oak)), "the Steel Axe on oak")
+		t.ok(has(byId("steel").murph, FieldGuide.TrunkHits(starter, oak)), "...against the starter's")
 		t.ok(FieldGuide.TrunkHits(steel, oak) < FieldGuide.TrunkHits(starter, oak), "and it's quicker")
 	end)
 
 	t.test("v2: the cash path reaches the Steel Axe; Murph's share doesn't buy it", function()
 		local steel = t.shared("ItemCatalog").AxeLadder()[2]
-		local loads = V2[6]
-		t.eq(loads.id, "loads")
-		t.eq(loads.event, "woodSoldCash")
-		t.eq(loads.unit, "cash", "counted in dollars")
+		local sold = 0
+		for _, step in ipairs(V2) do
+			if step.event == "woodSoldCash" then
+				t.eq(step.unit, "cash", "counted in dollars")
+				t.eq(step.axeGoal, true)
+				sold += step.count
+			end
+		end
+		t.eq(sold, 120, "three loads of $40, the old $120 grind")
 		local reward = TutorialData.TotalReward(2)
 		t.ok(reward > 0)
 		t.ok(reward < steel.v2.price, "Murph helps, the player earns it")
-		t.ok(GameConfig.StartingCash + loads.count + reward >= steel.v2.price, "start + the sold loads + Murph's share")
+		t.eq(reward, 25)
+		t.ok(GameConfig.StartingCash + sold + reward >= steel.v2.price, "start + the sold loads + Murph's share")
 		t.eq(TutorialData.TotalReward(), TutorialData.TotalReward(1), "no loop: v1's, as the economy model reads it")
 	end)
 
 	t.test("v2: the tracker reads a cash step in dollars", function()
-		local loads = V2[6]
+		local loads
+		for _, step in ipairs(V2) do
+			if step.id == "loads" then
+				loads = step
+			end
+		end
 		local Util = t.shared("Util")
 		local function expect(progress)
 			return string.format(
-				"Sell %s more wood (%s/%s)",
+				"Sell %s more wood (%s/%s) · $0 of %s to Steel Axe",
 				Util.formatCash(loads.count),
 				Util.formatCash(progress),
-				Util.formatCash(loads.count)
+				Util.formatCash(loads.count),
+				Util.formatCash(loads.axePrice)
 			)
 		end
 		t.eq(TutorialData.ObjectiveText(loads, 23), expect(23))
@@ -259,15 +363,24 @@ return function(t)
 				table.insert(kept, step.id)
 			end
 		end
-		t.eq(kept, { "fell", "plant", "steel" }, "V2_PLAN §14: pickup, load, sell and loads start again")
+		t.eq(kept, { "fell", "plant", "steel", "plot" }, "pickup, load, the cart, the mill and the loads start again")
 		t.eq(TutorialData.KeepsProgressV2(0), false)
 		t.eq(TutorialData.KeepsProgressV2(#V2 + 1), false)
 	end)
 
 	t.test("v2: the Steel Axe step counts as done for a player who already has it", function()
-		t.ok(TutorialData.AlreadyDone(V2[#V2], 2))
-		t.ok(not TutorialData.AlreadyDone(V2[#V2], 1))
+		local steel, plot
+		for _, step in ipairs(V2) do
+			if step.id == "steel" then
+				steel = step
+			elseif step.id == "plot" then
+				plot = step
+			end
+		end
+		t.ok(TutorialData.AlreadyDone(steel, 2))
+		t.ok(not TutorialData.AlreadyDone(steel, 1))
 		t.ok(not TutorialData.AlreadyDone(V2[1], 5))
+		t.ok(not TutorialData.AlreadyDone(plot, 2))
 	end)
 
 	-- QuestService as GameServer runs it under v2 (Init with the loop): its
@@ -316,11 +429,13 @@ return function(t)
 		Quest.Event(player, "logPickedUp")
 		t.eq(at(), "pickup", "v1's events count for nothing under v2")
 		Quest.Event(player, "woodGrabbed")
-		t.eq(at(), "load")
-		Quest.Event(player, "woodLoaded")
-		t.eq(at(), "sell")
+		t.eq(at(), "sell", "the cart, before the truck")
 		Quest.Event(player, "woodSold", 3)
-		t.eq(at(), "plant", "the first sale, however many pieces")
+		t.eq(at(), "load", "the first sale, however many pieces")
+		Quest.Event(player, "woodLoaded")
+		t.eq(at(), "mill")
+		Quest.Event(player, "woodSold", 2)
+		t.eq(at(), "plant")
 		Quest.Event(player, "seedPlanted")
 		t.eq(at(), "loads")
 		local loads = V2[profile.tutorialStep]
@@ -331,13 +446,18 @@ return function(t)
 		t.eq(player.attrs.TutorialProgress, loads.count - 1)
 		t.eq(profile.cash, cash, "no reward yet")
 		Quest.Event(player, "woodSoldCash", 30)
-		t.eq(at(), "steel")
+		t.eq(at(), "loads2")
 		t.eq(profile.cash, cash + loads.rewardCash, "Murph's share")
 		t.eq(toasts, { string.format("Murph chipped in $%d!", loads.rewardCash) })
+		Quest.Event(player, "woodSoldCash", V2[profile.tutorialStep].count)
+		Quest.Event(player, "woodSoldCash", V2[profile.tutorialStep].count)
+		t.eq(at(), "steel")
 		profile.bestAxeTier = 2
 		Quest.Event(player, "axeBought")
+		t.eq(at(), "plot")
+		Quest.Event(player, "plotClaimed")
 		t.ok(profile.tutorialDone)
 		t.eq(player.attrs.TutorialStep, 0)
-		t.eq(marks, { "Finished the tutorial" })
+		t.eq(marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
 end

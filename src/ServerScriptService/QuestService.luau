@@ -38,6 +38,7 @@
 local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local NextGoal = require(ReplicatedStorage.Shared.NextGoal)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
@@ -99,6 +100,39 @@ local function logFunnelStep(player: Player, profile: Profile, index: number, na
 	end)
 end
 
+-- One objective after the tutorial: the next axe, a Field Guide "???", or
+-- the daily streak. Cleared while the tutorial is still running. Logged
+-- once on the onboarding funnel, after "Finished the tutorial" when they
+-- actually finished (Mark is a no-op the second time).
+local function refreshNext(player: Player, profile: Profile)
+	if not profile.tutorialDone then
+		player:SetAttribute("NextGoal", nil)
+		player:SetAttribute("NextGoalBeacon", nil)
+		return
+	end
+	local found = profile.compendium
+	if type(found) ~= "table" then
+		found = {}
+	end
+	local streak = 0
+	if profile.daily and type(profile.daily.streak) == "number" then
+		streak = profile.daily.streak
+	end
+	local goal = NextGoal.Pick(loop, profile.bestAxeTier or 1, found, streak)
+	player:SetAttribute("NextGoal", goal.text)
+	player:SetAttribute("NextGoalBeacon", goal.beacon)
+	MilestoneService.Mark(player, "Saw a next goal")
+end
+
+-- Call when cash, the axe ladder, the Field Guide or the streak changes
+-- after the tutorial, so the tracker stays on the one current goal.
+function QuestService.RefreshNextGoal(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if profile then
+		refreshNext(player, profile)
+	end
+end
+
 local function finish(player: Player, profile: Profile, how: "completed" | "skipped" | "bypassed")
 	profile.tutorialDone = true
 	profile.tutorialProgress = 0
@@ -112,6 +146,12 @@ local function finish(player: Player, profile: Profile, how: "completed" | "skip
 	analytics(function()
 		AnalyticsService:LogCustomEvent(player, "Tutorial_" .. how, profile.tutorialStep)
 	end)
+	-- After "Finished the tutorial", so the funnel numbers stay in order.
+	refreshNext(player, profile)
+end
+
+local function claimedPlot(profile: Profile): boolean
+	return profile.plot ~= nil and profile.plot.claimed == true
 end
 
 -- Starts step `index`, skipping any the player is already past; finishes
@@ -119,7 +159,7 @@ end
 local function enterStep(player: Player, profile: Profile, index: number)
 	local list = steps()
 	local step: TutorialData.Step? = list[index]
-	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier) do
+	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile)) do
 		index += 1
 		step = list[index]
 	end
@@ -136,19 +176,25 @@ local function enterStep(player: Player, profile: Profile, index: number)
 	publish(player, profile)
 end
 
--- A save from before a step was inserted (the Heartseed beat after the
--- first sale) points at whatever step now sits at its old index. The
--- funnel remembers every step a player has reached (profile.onboarding,
--- by step id), and steps are reached in order, so the latest one reached
--- is the one they're really on. Progress toward it is kept.
+-- A save from before a step was inserted points at whatever step now sits
+-- at its old index. The funnel remembers every step a player has reached
+-- (profile.onboarding, by step id). When that index now holds a different
+-- step, move to the latest one they reached, even if its new index is
+-- lower (the cart sale sits before the truck). Progress toward it is kept.
 local function realign(profile: Profile)
+	local list = steps()
 	local latest = 0
-	for i, step in ipairs(steps()) do
+	for i, step in ipairs(list) do
 		if profile.onboarding["Tutorial:" .. step.id] then
 			latest = i
 		end
 	end
-	if latest > profile.tutorialStep then
+	if latest == 0 then
+		return
+	end
+	local at = list[profile.tutorialStep]
+	local there = list[latest]
+	if there and (at == nil or at.id ~= there.id) then
 		profile.tutorialStep = latest
 	end
 end
@@ -157,6 +203,7 @@ end
 function QuestService.Start(player: Player, profile: Profile)
 	if profile.tutorialDone then
 		publish(player, profile)
+		refreshNext(player, profile)
 		return
 	end
 	if onRefresher(profile) then
@@ -177,7 +224,7 @@ function QuestService.Start(player: Player, profile: Profile)
 		return
 	end
 	local step = steps()[profile.tutorialStep]
-	if not step or TutorialData.AlreadyDone(step, profile.bestAxeTier) then
+	if not step or TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile)) then
 		enterStep(player, profile, if step then profile.tutorialStep + 1 else 1)
 	elseif profile.tutorialStep == 1 and profile.tutorialProgress == 0 then
 		enterStep(player, profile, 1) -- logs the funnel's first step
@@ -194,11 +241,15 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 		return
 	end
 	local step = steps()[profile.tutorialStep]
-	if not step or step.event ~= event then
+	if not step then
 		return
 	end
-	profile.tutorialProgress += amount or 1
-	if profile.tutorialProgress < step.count then
+	local progress, done = TutorialData.Apply(step, profile.tutorialProgress, event, amount or 1)
+	if progress == profile.tutorialProgress and not done then
+		return
+	end
+	profile.tutorialProgress = progress
+	if not done then
 		publish(player, profile)
 		return
 	end

@@ -46,6 +46,9 @@ local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local NodeService = require(script.Parent.NodeService)
 local SectionTrees = require(script.Parent.SectionTrees)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
+local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
+local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TreeService = require(script.Parent.TreeService)
 local WorldClock = require(script.Parent.WorldClock)
@@ -341,6 +344,45 @@ step("4. The town", function()
 			place(atomic(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId)), g.cframe, folder)
 		end
 	end)
+
+	-- A few small oaks and Murph's buy cart, west of the spawn. The cart
+	-- buys one small load (SellService's gate / the v1 sell handler). The
+	-- zone is a ghost: the beacon and the server read its box, and it
+	-- doesn't stand on the street or Bram's walk.
+	step("4. The tutorial grove", function()
+		local model = Instance.new("Model")
+		model.Name = "TutorialGrove"
+		model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+		local spot = TutorialGrove.Cart
+		place(atomic(BuildingArt.Prop("Cart", 7)), CFrame.new(spot.x, 0, spot.z), model)
+		local zone = Kit.part(model, "CartZone", TutorialGrove.ZoneSize, TutorialGrove.CartCFrame(), Color3.new(1, 1, 1))
+		ghost(zone, 1)
+		local board = Kit.part(
+			model,
+			"Board",
+			Vector3.new(4.2, 1.8, 0.2),
+			CFrame.new(spot.x, 4.4, spot.z),
+			Color3.fromRGB(101, 67, 33),
+			Enum.Material.Wood
+		)
+		board.CanCollide = false
+		board.CanQuery = false
+		board.CastShadow = false
+		for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face
+			gui.Parent = board
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundTransparency = 1
+			label.Text = "MURPH BUYS\nFirst load"
+			label.TextScaled = true
+			label.Font = Enum.Font.GothamBold
+			label.TextColor3 = Color3.fromRGB(255, 244, 220)
+			label.Parent = gui
+		end
+		model.Parent = map
+	end)
 end)
 
 ---------------------------------------------------------------------------
@@ -350,6 +392,24 @@ end)
 step("5. The trees", function()
 	if V2 then
 		SectionTrees.RegisterGroups() -- Wood, WoodFalling, WoodHeld, Leaves, Players
+	end
+	-- The tutorial oaks: small, mature, a fixed seed. Not boot-aged, so
+	-- they aren't saplings a new player can't fell.
+	for i, spot in ipairs(TutorialGrove.Trees) do
+		local ok, err = pcall(function(): any
+			local y = TerrainGen.HeightAt(spot.x, spot.z) - 0.3
+			local at = CFrame.new(spot.x, y, spot.z)
+			local options = { size = TreeLogic.Sizes[1], seed = 4100 + i }
+			local model = if V2
+				then SectionTrees.SpawnTree("oak", at, options)
+				else TreeService.SpawnTree("oak", at, options)
+			model:SetAttribute("TutorialGrove", true)
+			treesSpawned += 1
+			return nil
+		end)
+		if not ok then
+			warn(string.format("[MapBuilder] tutorial oak %d failed: %s", i, tostring(err)))
+		end
 	end
 	local before = os.clock()
 	-- One tree that fails to build (a bad seed) mustn't take the rest of
