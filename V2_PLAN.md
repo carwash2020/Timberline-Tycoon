@@ -41,6 +41,7 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 - The HUD's v2 hints now know what the axe points at (loose wood, wood too hard) and whether a held piece is longer than the bed (2c40a6f).
 - The client also loads each module in its own protected call (a1ba6ed): one whose top level errors is skipped with a warning instead of stopping the rest, and the module wait is 30 s for all of them together.
 - VEH landed (c0f865d): every truck and trailer 1.3x (`TruckLayout.Scale`), `TurnRadiusPerWheelbase` 0.477 (each truck turns its M1.5 circle), 13 bays in 4 sizes picked by `VehicleLogic.BayChoices`, SellZone 24 x 12 x 40 (z 62-102), SellTruckRange 45, ShowBeyond 42, EXIT_GAP 3.4, Drive prompt 9. Beds carry about twice the u³ a trip, which moved ECONOMY.md toward §17 (first $1k 19 min, Cobalt 81 min, full plot 46 h) but brings the Steel Axe at 3.3 min (target 5-8): a price question for Connor.
+- Axe ladder retuned (3 Oct 2026): Steel is $160 so the model buys it in the 5-8 minute window (the tutorial's loads step is $120). Obsidian's 10.2 damage out-cut the forged Starfall Axe, and Inferno was a downgrade off emberwood. Damage, reach and cooldown now climb the ladder; Starfall is the fastest cut on every wood. See ItemCatalog `v2` and ECONOMY.md.
 - ATMOS landed (58a5520), per LT2_RESEARCH.md: Grass 84,125,55 / LeafyGrass 66,104,46, haul roads Pavement 170,169,165 edge to edge, the night mist +0.16 density in a grey-blue (23:00-09:30), the Volcano's air 0.55 red-orange at every hour, a cold Snowfields haze, a violet Gloam Hollow mist at 0.53, and big name signs (`BuildingArt.nameSign`, 120 px boards).
 - TREE, ROADS, REGIONS and TOWN landed (LT2_RESEARCH.md plan). Box logs use each wood's bark (frostwood and lumenwood smooth, phantomwood concrete, the rest wood) and the leaf crowns are crisp cubes. Biome forests are spaced about 1.5x wider and still clear 775 trees. Haul roads (Hills, Snow, Volcano) are 28 wide, Skyroot 24, Forest Path and Plot Road 16, with flares at (30, 450) and (-20, 760). Brown boulders sit on the open grass and the filler forest is thinner. The Snowfields have a brown cliff ring with one pass, the Volcano a dark rim with one gap, the Gloam Hollow three shallow pools, and a sign at each gate. Town has a 22-wide way east of the mill to the Snow Road, a 16-wide loop south of the lot, a wider street up to the sell pad, lamps set back, and road mouths at the plaza. The first 322 trees kept their old XZ (they were placed on the old road widths, then their Y was snapped to the new ground).
 - Server boot measured in Studio before this slice: 775 section trees in 0.6 s, world built in 4.6 s. This slice was not timed in Studio. Lune counts 778 tree spots and 31,409 section-tree parts (average 40.4, about 1.17x the round trees).
@@ -196,42 +197,42 @@ The ladder order is unchanged, so `bestAxeTier` keeps its meaning. LT2's rows ar
 | HardenedAxe | Steel Axe | 190 | 0.93 | 8 | 0.70 | |
 | SilverAxe | Hardened Axe | 550 | 1.45 | 8 | 0.65 | |
 | CobaltAxe | Silver Axe | 2,040 | 1.6 | 10 | 0.48 | |
-| GoldAxe | quest-axe stats (sold here) | 7,720 | 1.68 | 9 | 0.40 | |
-| ObsidianAxe | "best generalist" event axe | 11,000 (ours; LT2 has no price) | 10.2 | 16 | 1.9 | |
-| InfernoAxe | Fire Axe | 14,400 | 0.6 | 9 | 0.55 | emberwood 6.35 / 0.35 |
-| StarfallAxe | Bird Axe | forged | 1.65 | 16 | 0.40 | emberwood 2.5, lumenwood 3.9 |
+| GoldAxe | quest-axe stats (sold here) | 7,720 | 1.68 | 10 | 0.40 | |
+| ObsidianAxe | "best generalist" event axe | 11,000 (ours; LT2 has no price) | 3.4 | 12 | 0.7 | retuned: 10.2 out-cut Starfall |
+| InfernoAxe | Fire Axe | 14,400 | 4.6 | 14 | 0.5 | emberwood 7.5 / 0.4 |
+| StarfallAxe | Bird Axe | forged | 6.5 | 16 | 0.35 | emberwood 9.5, lumenwood 12 |
 | (M6 quest axe, off the ladder) | Amber Axe (slow heavy hitter) | quest | 3.73 | 9 | 1.25 | |
 
 ```lua
 -- ItemCatalog.Axes[*].v2
 RustyAxe    = { v2 = { price = 0,     damage = 0.2,  range = 4.8, cooldown = 0.65 } },
-SteelAxe    = { v2 = { price = 90,    damage = 0.55, range = 6,   cooldown = 0.73 } },
+SteelAxe    = { v2 = { price = 160,   damage = 0.55, range = 6,   cooldown = 0.73 } },
 HardenedAxe = { v2 = { price = 190,   damage = 0.93, range = 8,   cooldown = 0.70 } },
 SilverAxe   = { v2 = { price = 550,   damage = 1.45, range = 8,   cooldown = 0.65 } },
 CobaltAxe   = { v2 = { price = 2040,  damage = 1.6,  range = 10,  cooldown = 0.48 } },
-GoldAxe     = { v2 = { price = 7720,  damage = 1.68, range = 9,   cooldown = 0.40 } },
-ObsidianAxe = { v2 = { price = 11000, damage = 10.2, range = 16,  cooldown = 1.9 } },
-InfernoAxe  = { v2 = { price = 14400, damage = 0.6,  range = 9,   cooldown = 0.55,
-	vs = { emberwood = { damage = 6.35, cooldown = 0.35 } } } },
-StarfallAxe = { sold = false, v2 = { price = 0, damage = 1.65, range = 16, cooldown = 0.4,
-	vs = { emberwood = { damage = 2.5 }, lumenwood = { damage = 3.9 } },
+GoldAxe     = { v2 = { price = 7720,  damage = 1.68, range = 10,  cooldown = 0.40 } },
+ObsidianAxe = { v2 = { price = 11000, damage = 3.4,  range = 12,  cooldown = 0.7 } },
+InfernoAxe  = { v2 = { price = 14400, damage = 4.6,  range = 14,  cooldown = 0.5,
+	vs = { emberwood = { damage = 7.5, cooldown = 0.4 } } } },
+StarfallAxe = { sold = false, v2 = { price = 0, damage = 6.5, range = 16, cooldown = 0.35,
+	vs = { emberwood = { damage = 9.5 }, lumenwood = { damage = 12 } },
 	forge = { cash = 20000, wood = { lumenwood = 60 }, materials = { SkyShard = 12 } } } },
 -- ItemCatalog.AxeStats(axe, woodId): (damage, cooldown); a `vs` entry overrides either field
 ```
 
-**Hits to cut a mature trunk at its base**, computed as (the emberwood column below predates §18's hardness 11; with it: Rusty 124, Steel 45, Hardened 27, Silver 18, Cobalt 16, Gold 15, Obsidian 3, Inferno 4, Starfall 10, as FieldGuide.CutHits and economy2 compute), `ceil(hardness * (t/1.6)^2 / damage)`, with t from §3a. Time per cut is (hits - 1) x cooldown. economy2 regenerates this table; SectionLogic.spec pins it.
+**Hits to cut a mature trunk at its base**, `ceil(hardness * (t/1.6)^2 / damage)`, with t from §3a. Time per cut is (hits - 1) x cooldown. Emberwood uses hardness 11 (Rusty 124, Steel 45, Hardened 27, Silver 18, Cobalt 16, Gold 15, Obsidian 8, Inferno 4, Starfall 3). SectionLogic.spec pins the table.
 
 | Axe | oak 2.0 | birch 1.6 | pine 2.6 | maple 2.4 | palm 1.8 | frost 2.2 | ember 2.4 | phantom 2.0 | lumen 2.6 |
 |---|---|---|---|---|---|---|---|---|---|
-| Rusty | 16 | 35 | 73 | 68 | 19 | 95 | 79 | 180 | 397 |
-| Steel | 6 | 13 | 27 | 25 | 7 | 35 | 29 | 66 | 145 |
-| Hardened | 4 | 8 | 16 | 15 | 4 | 21 | 17 | 39 | 86 |
-| Silver | 3 | 5 | 11 | 10 | 3 | 14 | 11 | 25 | 55 |
-| Cobalt | 2 | 5 | 10 | 9 | 3 | 12 | 10 | 23 | 50 |
-| Gold | 2 | 5 | 9 | 9 | 3 | 12 | 10 | 22 | 48 |
-| Obsidian | 1 | 1 | 2 | 2 | 1 | 2 | 2 | 4 | 8 |
-| Inferno | 6 | 12 | 25 | 23 | 7 | 32 | **3** | 60 | 133 |
-| Starfall | 2 | 5 | 9 | 9 | 3 | 12 | 7 | 22 | **21** |
+| Rusty | 16 | 35 | 73 | 68 | 19 | 95 | 124 | 180 | 397 |
+| Steel | 6 | 13 | 27 | 25 | 7 | 35 | 45 | 66 | 145 |
+| Hardened | 4 | 8 | 16 | 15 | 4 | 21 | 27 | 39 | 86 |
+| Silver | 3 | 5 | 11 | 10 | 3 | 14 | 18 | 25 | 55 |
+| Cobalt | 2 | 5 | 10 | 9 | 3 | 12 | 16 | 23 | 50 |
+| Gold | 2 | 5 | 9 | 9 | 3 | 12 | 15 | 22 | 48 |
+| Obsidian | 1 | 3 | 5 | 4 | 2 | 6 | 8 | 11 | 24 |
+| Inferno | 1 | 2 | 4 | 3 | 1 | 5 | **4** | 8 | 18 |
+| Starfall | 1 | 2 | 3 | 3 | 1 | 3 | **3** | 6 | **7** |
 
 ### 2d. Trucks and trailers
 
@@ -857,11 +858,11 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 | load | Drag a log onto your truck's bed | woodLoaded (1: your piece rests in your BedZone) | "That's your Rustbucket. Drag the wood up onto the bed and lay it flat so it rides." | truck bed |
 | sell | Sell wood at the sawmill | woodSold (1) | "Back her onto the green pad by the mill and the wood sells itself. Bigger logs pay more. It's all by the cubic unit." | sellPad |
 | plant | Fell a tree, then plant its Heartseed in the stump | seedPlanted (1) | (unchanged) | stump |
-| loads | Sell $%d more wood | woodSoldCash (60), reward $25 | "See it grow? That tree's yours now. That old hatchet's slow on birch, though. Sell a few more loads and I'll chip in for a Steel Axe." | |
+| loads | Sell $%d more wood | woodSoldCash (120), reward $25 | "See it grow? That tree's yours now. That old hatchet's slow on birch, though. Sell a few more loads and I'll chip in for a Steel Axe." | |
 | steel | Buy the Steel Axe at the Tool Shed | axeBought (1) | "Here's a little somethin' from me. Tink's Tool Shed is just west of the mill." In M2 this becomes "Set the Steel Axe on Tink's counter and talk to him." | toolShed |
 
 - New HintLogic token `{unequip}`: "press 1", "press the D-pad", "tap your axe".
-- Rough cash path: start $20, first oak about $35, $60 more sold, $25 from Murph, about $140 against the $90 Steel Axe.
+- Rough cash path: start $20, first oak about $35, $120 more sold, $25 from Murph, which reaches the $160 Steel Axe.
 - `StumpHold` and `CanPlant` are unchanged.
 - **Old saves mid-tutorial**: `tutorialStep` and the onboarding keys carry over because ids and order match. `MigrateV2` sets `tutorialProgress = 0` if the current step is pickup, load, sell or loads (their units changed). AlreadyDone (best tier ≥ 2) and realign are unchanged.
 - Later beats (M3 "Buy your first plot square") are **appended** after `steel`.
@@ -1092,7 +1093,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
 
 **Targets**
 - First sale under 3 minutes (GAME_DESIGN §2).
-- Steel Axe ($90) in 5-8 minutes.
+- Steel Axe ($160) in 5-8 minutes.
 - First $1k in 15-20 minutes.
 - Cobalt ($2,040, LT2's best store axe) in about 1 hour.
 - Full plot ($900,100) in 20-40 hours.

@@ -190,7 +190,7 @@ TutorialData.StepsV2 = {
 			steelAxe.displayName
 		),
 		event = "woodSoldCash",
-		count = 60,
+		count = 120, -- StartingCash + this + the reward reaches the Steel Axe's v2 price
 		unit = "cash",
 		rewardCash = 25,
 	},

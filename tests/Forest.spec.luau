@@ -641,7 +641,11 @@ return function(t)
 				t.ok(d > budget.FillerNear and d <= budget.FillerFar, "a far cell between the radii")
 			end
 		end
-		t.ok(nearCount > 600 and farCount > 2000, nearCount .. " near, " .. farCount .. " far")
+		-- The far ring is the band between FillerNear and FillerFar. Launch
+		-- keeps that band inside StreamingTargetRadius 640, so it is a few
+		-- hundred cells, not the old ring out to 1,000.
+		t.ok(nearCount > 600, nearCount .. " near cells")
+		t.ok(farCount > 100, nearCount .. " near, " .. farCount .. " far")
 		-- Moved 30 studs on: the cells it had keep their looks (hysteresis).
 		local moved = WorldPlan.FillerPlanAround(30, 6, 40, budget.FillerNear, budget.FillerFar, plan)
 		for key, mode in pairs(plan) do
@@ -967,6 +971,12 @@ return function(t)
 			QualityBudgets.High.FillerFar < workspace.StreamingTargetRadius,
 			"stand-ins never outreach the streamed terrain"
 		)
+		t.ok(
+			QualityBudgets.Low.FillerFar < workspace.StreamingTargetRadius,
+			"a phone's stand-ins stay inside the streamed terrain too"
+		)
+		t.eq(workspace.StreamingTargetRadius, 640, "phones stream a 640-stud disc, not 1024")
+		t.eq(workspace.StreamingMinRadius, 128, "the pause bubble is 128 studs")
 	end)
 
 	t.test("FOR-04: Timber ground MaterialVariants are in MaterialService, off until checked in Studio", function()

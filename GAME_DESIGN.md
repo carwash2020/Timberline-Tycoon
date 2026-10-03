@@ -454,7 +454,7 @@ game.
 
 ## 11. New player experience (first 10 minutes)
 
-> **v2:** Murph's seven steps keep their ids and order with v2 objectives (V2_PLAN §13, `TutorialData.StepsV2`): fell a tree, drag a log, drag it onto your bed, sell on the pad, plant a Heartseed, sell $60 more ($25 from Murph), buy the Steel Axe ($90). A new player starts with $20.
+> **v2:** Murph's seven steps keep their ids and order with v2 objectives (V2_PLAN §13, `TutorialData.StepsV2`): fell a tree, drag a log, drag it onto your bed, sell on the pad, plant a Heartseed, sell $120 more ($25 from Murph), buy the Steel Axe ($160). A new player starts with $20.
 
 A mentor NPC — **Murph**, a retired lumberjack — teaches by doing, not by
 dialogue walls. One objective at a time in a quest tracker, beacon guidance,

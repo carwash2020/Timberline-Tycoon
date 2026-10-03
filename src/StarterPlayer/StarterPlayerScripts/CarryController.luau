@@ -12,17 +12,25 @@
 -- point, so your Drive prompt is hidden (on this device) while Sell is up.
 -- The server re-validates range, capacity and the sell zone on every
 -- request.
+--
+-- The v1 loop only. Under v2 the sell pad and DragController handle wood,
+-- and this script stays idle so it doesn't put up a second Sell prompt.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 local CarryController = {}
+
+-- Seconds to wait for MapBuilder to publish which loop runs. Until then
+-- Active() reads as v1, and the old Sell prompt would fight the v2 pad.
+local BOOT_WAIT = 120
 
 local player = Players.LocalPlayer
 
@@ -196,6 +204,13 @@ local function setupSellPrompt()
 end
 
 function CarryController.Start()
+	local waited = 0
+	while workspace:GetAttribute(CoreLoop.ActiveAttribute) == nil and waited < BOOT_WAIT do
+		waited += task.wait(0.25)
+	end
+	if CoreLoop.V2() then
+		return
+	end
 	player:GetAttributeChangedSignal("CarriedLogs"):Connect(refreshLoadPrompt)
 	for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
 		if inst:IsA("Model") then

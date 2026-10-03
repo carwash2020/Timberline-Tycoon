@@ -20,14 +20,20 @@
         "$path": "src/StarterPlayer/StarterPlayerScripts"
       }
     },
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "MaxPlayers": 12
+      }
+    },
     "Workspace": {
       "$ignoreUnknownInstances": true,
       "$properties": {
         "StreamingEnabled": true,
         "ModelStreamingBehavior": "Improved",
         "StreamingIntegrityMode": "PauseOutsideLoadedArea",
-        "StreamingMinRadius": 96,
-        "StreamingTargetRadius": 1024,
+        "StreamingMinRadius": 128,
+        "StreamingTargetRadius": 640,
         "StreamOutBehavior": "Opportunistic",
         "GlobalWind": [
           6,

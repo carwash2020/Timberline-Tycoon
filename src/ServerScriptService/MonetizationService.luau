@@ -139,7 +139,7 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 	end
 	if kind == "Pass" then
 		local pass = StoreData.Pass(key)
-		if not pass or pass.id == 0 then
+		if not pass or not StoreData.IsForSale(pass.id) then
 			return
 		end
 		if MonetizationService.HasPass(player, pass.key) then
@@ -157,7 +157,7 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 	elseif kind == "Product" then
 		local product = StoreData.Product(key)
 		local profile = ProfileService.GetProfile(player)
-		if not product or product.id == 0 or not profile then
+		if not product or not StoreData.IsForSale(product.id) or not profile then
 			return
 		end
 		if not StoreData.PackFits(product, profile.cash, GameConfig.CashCap) then
@@ -175,7 +175,7 @@ end
 function MonetizationService.PlayerJoined(player: Player, profile: Profile)
 	publishBoosts(player, profile)
 	for _, pass in ipairs(StoreData.Passes) do
-		if pass.id ~= 0 then
+		if StoreData.IsForSale(pass.id) then
 			task.spawn(function()
 				if ownsPass(player, pass.id) then
 					setPass(player, pass.key)
@@ -202,11 +202,11 @@ function MonetizationService.Init(buyRemote: RemoteEvent, notifyFn: (Player, str
 			if not purchased then
 				return
 			end
-			for _, pass in ipairs(StoreData.Passes) do
-				if pass.id == passId then
-					setPass(player, pass.key)
-					notify(player, string.format("Thanks! %s is yours.", pass.name))
-				end
+			-- id 0 is not a pass: never grant because a prompt finished with 0.
+			local pass = StoreData.PassById(passId)
+			if pass then
+				setPass(player, pass.key)
+				notify(player, string.format("Thanks! %s is yours.", pass.name))
 			end
 		end
 	)
