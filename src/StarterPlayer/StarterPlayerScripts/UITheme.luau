@@ -23,9 +23,10 @@
 --   * Bottom(): where bottom-centre things (the hint, bars) start: above
 --     Roblox's tool hotbar, which the spec didn't allow for.
 --   * LeftColumn(): one list down the left (the Field Guide button, the
---     tutorial), just under Roblox's chat window, wherever and however big
---     it is; what's in it stacks instead of overlapping. WatchLeftColumn()
---     hands its frame to whoever needs to keep clear of it (the toasts).
+--     tutorial), under the top bar and under Roblox's chat window when
+--     that window is actually open. What's in it stacks instead of
+--     overlapping. WatchLeftColumn() hands its frame to whoever needs to
+--     keep clear of it (the toasts).
 --   * Textures: the spec's wood grain and kraft fibre are tiled images;
 --     until they're uploaded (set the ids below) surfaces are flat colour.
 --   * Size and Sized(): what a phone needs (a fingertip is 44 px, text at
@@ -387,21 +388,22 @@ end
 
 local function placeLeft()
 	local side = UITheme.Margin()
-	local position: UDim2
-	if UITheme.IsPhone() then
-		position = UDim2.fromOffset(side, 60) -- the spec's y 96, under the top bar (chat is a button)
-	else
+	local scale = math.max(currentScale, 0.01)
+	-- Under the top bar (the Roblox menu). Offsets are scaled by the
+	-- UIScale; TopBar and the chat box are screen pixels. Never 30% down
+	-- the screen: with chat closed that parked the tutorial in the middle
+	-- of the view, and on a short window only its end stayed on screen.
+	local yPx = math.max(UITheme.TopBar(), 36) + 8
+	if not UITheme.IsPhone() then
 		local bottom = chatBottom()
-		if bottom > 0 then
-			-- Our offsets are scaled by the UIScale, the chat's aren't.
-			position = UDim2.fromOffset(side, (bottom + 10) / currentScale)
-		else
-			position = UDim2.new(0, side, 0.3, 0)
+		if bottom > yPx then
+			yPx = bottom + 10
 		end
 	end
 	local column = leftColumn
 	if column then
-		column.Position = position
+		column.AnchorPoint = Vector2.zero
+		column.Position = UDim2.fromOffset(side, yPx / scale)
 	end
 end
 

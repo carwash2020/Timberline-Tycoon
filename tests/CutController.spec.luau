@@ -118,7 +118,7 @@ return function(t)
 		stray.Name = "Section"
 		stray:SetAttribute("Section", 1)
 		t.eq(CutController.TargetOf(stray), nil, "a section of nothing")
-		t.eq(CutController.WoodGroup, "Wood", "the ray's group: leaves don't collide with Wood")
+		t.eq(CutController.WoodGroup, "Wood", "nearest-section search; the pointer ray does not use it")
 	end)
 
 	t.test("a stub, a sapling, a dormant or a dead tree is no target; a node is mined", function()
@@ -133,6 +133,28 @@ return function(t)
 		local _, m, kind = CutController.TargetOf(crystal)
 		t.ok(m == node)
 		t.eq(kind, "node")
+	end)
+
+	t.test("a crown click cuts the in-reach trunk, and a far crown says so", function()
+		local model, section, leaves = tree("Tree", { WoodId = "oak" })
+		local high = Instance.new("Part")
+		high.Name = "Section"
+		high:SetAttribute("Section", 2)
+		high.Size = Vector3.new(1.2, 8, 1.2)
+		high.CFrame = CFrame.new(0, 16, 0)
+		high.Parent = model
+		leaves:SetAttribute("Section", 2)
+		local rusty = ItemCatalog.GetAxe("RustyAxe")
+		local root = Vector3.new(3, 3, 0)
+		local near = CutController.PickSection(model, "tree", rusty, root, Vector3.new(0, 12, 0), Vector3.yAxis)
+		t.ok(near ~= nil)
+		t.ok(near.part == section, "the trunk you can reach, not the leaf's high branch")
+		t.eq(near.problem, nil)
+		local far =
+			CutController.PickSection(model, "tree", rusty, Vector3.new(40, 3, 0), Vector3.new(0, 12, 0), Vector3.yAxis)
+		t.ok(far ~= nil)
+		t.eq(far.problem, "far", "out of reach says so, instead of a silent miss")
+		t.ok(far.part == section)
 	end)
 
 	t.test("auto-target: a trunk is cut between knee and chest by the root part, on the side facing you", function()
@@ -251,6 +273,10 @@ return function(t)
 		section.Size = Vector3.new(2, 4.5, 2)
 		section.CFrame = CFrame.new(0, 2.25, 0)
 		section.Parent = model
+		local leaves = Instance.new("Part")
+		leaves.Name = "Leaves"
+		leaves:SetAttribute("Section", 1)
+		leaves.Parent = model
 		local hrp = Instance.new("Part")
 		hrp.Name = "HumanoidRootPart"
 		hrp.CFrame = CFrame.new(3, 3, 0)
@@ -345,8 +371,13 @@ return function(t)
 					GetPropertyChangedSignal = function()
 						return signal()
 					end,
-					Raycast = function()
+					Raycast = function(_, _, params)
 						if hitInstance == nil then
+							return nil
+						end
+						-- Group Wood does not collide with Leaves: a Wood-group
+						-- pointer ray misses a crown and hits nothing here.
+						if params and params.CollisionGroup == "Wood" and hitInstance.Name == "Leaves" then
 							return nil
 						end
 						return { Instance = hitInstance, Position = Vector3.new(1, 3, 0), Normal = Vector3.xAxis }
@@ -397,6 +428,14 @@ return function(t)
 			fires = fires,
 			rays = rays,
 			section = section,
+			leaves = leaves,
+			press = function(inputType, keyCode, processed)
+				inputBegan:Fire({
+					UserInputType = inputType,
+					KeyCode = keyCode,
+					Position = roblox.Vector3.zero,
+				}, processed == true)
+			end,
 			tap = function(pos, processed)
 				touchTap:Fire(pos, processed == true)
 			end,
@@ -484,6 +523,46 @@ return function(t)
 		w.hit(nil)
 		w.radius({ w.section })
 		w.activate()
+		t.eq(#w.fires, 1)
+		t.eq(w.fires[1].name, "Chop")
+		t.ok(w.fires[1].args[1] == w.section)
+		t.eq(#w.rays, 0, "no pointer")
+	end)
+
+	t.test("clicking the crown fires Chop at the trunk; a Wood-group ray would miss", function()
+		local Enum = roblox.Enum
+		local w = swingWorld()
+		w.input("MouseButton1")
+		w.hit(w.leaves)
+		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+		t.eq(#w.fires, 1)
+		t.eq(w.fires[1].name, "Chop")
+		t.ok(w.fires[1].args[1] == w.section, "the trunk, not the leaves")
+		w.advance(1)
+		w.section.CFrame = CFrame.new(40, 2.25, 0)
+		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+		t.eq(#w.fires, 1, "a crown you can't reach does not fire")
+	end)
+
+	t.test("a mouse button and the tool's Activated are one swing; a button's click is none", function()
+		local Enum = roblox.Enum
+		local w = swingWorld()
+		w.input("MouseButton1")
+		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+		w.activate()
+		t.eq(#w.fires, 1, "Activated does not swing the click again")
+		w.advance(1)
+		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, true)
+		t.eq(#w.fires, 1, "a Gui button already took it")
+	end)
+
+	t.test("ButtonR2 fires Chop at the nearest section without Activated", function()
+		local Enum = roblox.Enum
+		local w = swingWorld()
+		w.input("Gamepad1")
+		w.hit(nil)
+		w.radius({ w.section })
+		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, false)
 		t.eq(#w.fires, 1)
 		t.eq(w.fires[1].name, "Chop")
 		t.ok(w.fires[1].args[1] == w.section)

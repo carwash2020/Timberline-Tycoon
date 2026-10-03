@@ -8,18 +8,27 @@
 -- (ItemCatalog.AxeStats). The live remote is Chop (v2). ChopTree is the
 -- v1 loop's and is not connected on a live server, so this never fires it.
 -- Each swing:
---   * Aims at the section under the pointer: one ray in collision group
---     Wood, so leaves never catch it (you cut the trunk behind them). A
---     mouse uses GetMouseLocation with ViewportPointToRay. A touch uses
---     the finger (TouchTapInWorld / InputObject.Position, screen pixels,
---     ScreenPointToRay), including a touch the engine marked processed:
---     Tool.Activated on a phone runs before that position is stored, and
---     dropping a processed touch left the ray nil, so a tap did nothing
---     unless a section was already inside the axe's few studs (no toast).
---     With no finger stored, the mouse location is the fallback (on a
---     touch screen it follows the finger). A gamepad has no pointer: the
+--   * Aims at the section under the pointer. The ray stays in the default
+--     collision group, so a click on the crown hits the leaves (they can
+--     be queried). A leaf is not a section: PickSection turns it into an
+--     in-reach upright trunk of that same tree, and that trunk is what
+--     Chop is sent. A Wood-group ray passes through the crown and, on a
+--     trunk only a couple of studs wide, hits the ground; the swing then
+--     did nothing (no toast, no remote, no Output). The nearest-section
+--     search still uses group Wood, so it finds trunks and not leaves.
+--     A mouse uses GetMouseLocation with ViewportPointToRay, and also
+--     MouseButton1, so a click still swings when the tool's Activated
+--     never arrives. A touch uses the finger (TouchTapInWorld /
+--     InputObject.Position, screen pixels, ScreenPointToRay), including a
+--     touch the engine marked processed: Tool.Activated on a phone runs
+--     before that position is stored, and dropping a processed touch left
+--     the ray nil, so a tap did nothing unless a section was already
+--     inside the axe's few studs (no toast). With no finger stored, the
+--     mouse location is the fallback (on a touch screen it follows the
+--     finger). A gamepad has no pointer: ButtonR2 or the trigger, and the
 --     nearest section within the axe's reach. Crystal nodes (tag Node)
---     are mined as before (MineNode).
+--     are mined as before (MineNode). One click is one swing: Activated
+--     and the key that caused it share a short gap.
 --   * Picks the spot (SectionLogic.AimAt): on a standing trunk, between
 --     your knee and your chest at the pointer's height, on the side facing
 --     you, so you never have to aim at your own feet; on a limb or a log
@@ -56,7 +65,7 @@ local CutController = {}
 
 CutController.HoverHz = { high = 30, low = 15 } -- the outline's ray, a second
 CutController.RayLength = 250
-CutController.WoodGroup = "Wood" -- the ray's collision group: leaves don't collide with it
+CutController.WoodGroup = "Wood" -- nearest-section search; the pointer ray does not use it
 CutController.NearSlack = 1.5 -- studs past the axe's reach the nearest-section search looks
 CutController.HardToastEvery = 3
 CutController.BootWait = 120 -- seconds to wait for the server to say which loop runs
@@ -163,14 +172,15 @@ local overlap = OverlapParams.new()
 overlap.FilterType = Enum.RaycastFilterType.Exclude
 local grouped = false
 
--- The queries' collision group (leaves don't collide with Wood), set once
--- the server has registered it (MapBuilder, before the trees).
-local function useWoodGroup()
+-- The nearest-section search's group (leaves don't overlap with Wood),
+-- set once the server has registered it (MapBuilder, before the trees).
+-- The pointer ray is left in the default group on purpose: a Wood-group
+-- ray never hits the crown, and the trunk behind it is easy to miss.
+local function useOverlapGroup()
 	if grouped then
 		return
 	end
 	grouped = pcall(function(): any
-		rayParams.CollisionGroup = CutController.WoodGroup
 		overlap.CollisionGroup = CutController.WoodGroup
 		return nil
 	end)
@@ -325,30 +335,79 @@ local function describe(
 	}
 end
 
--- The section (or node) under the pointer, if any.
+-- A click on dress (leaves, a tier, bark) is not itself a section. Of this
+-- model's sections, the one to cut: an in-reach upright trunk when the
+-- player is standing at the tree (a crown click), otherwise the closest
+-- upright trunk, which comes back "far" so the swing says so instead of
+-- vanishing. A loose piece has no upright trunk: the closest in-reach
+-- section, or the closest one.
+function CutController.PickSection(
+	model: Model,
+	kind: Kind,
+	axe: ItemCatalog.AxeDef,
+	root: Vector3,
+	pointer: Vector3?,
+	pointerNormal: Vector3?
+): Target?
+	local best: Target? = nil
+	local bestScore = math.huge
+	local fallback: Target? = nil
+	local fallbackD = math.huge
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name == "Section" and type(d:GetAttribute("Section")) == "number" then
+			local target = describe(d, model, kind, axe, root, pointer, pointerNormal)
+			local upright = math.abs(d.CFrame.UpVector.Y) >= SectionLogic.Upright
+			local dist = (target.hit - root).Magnitude
+			if target.problem == nil then
+				local score = dist + (if upright or kind ~= "tree" then 0 else 50)
+				if score < bestScore then
+					best, bestScore = target, score
+				end
+			elseif (upright or kind ~= "tree") and dist < fallbackD then
+				fallback, fallbackD = target, dist
+			end
+		end
+	end
+	return best or fallback
+end
+
+-- The section (or node) under the pointer, if any. A leaf hit resolves to
+-- a section of that tree (PickSection); the leaf itself is never sent.
 local function pointed(hrp: BasePart, axe: ItemCatalog.AxeDef): Target?
 	local camera = workspace.CurrentCamera
 	local ray = if camera then pointerRay(camera) else nil
 	if not ray then
 		return nil
 	end
-	useWoodGroup()
 	rayParams.FilterDescendantsInstances = { player.Character :: Instance }
 	local result = workspace:Raycast(ray.Origin, ray.Direction * CutController.RayLength, rayParams)
 	if not result then
 		return nil
 	end
 	local part, model, kind = CutController.TargetOf(result.Instance)
-	if not part or not model or not kind then
+	if part and model and kind then
+		return describe(part, model, kind, axe, hrp.Position, result.Position, result.Normal)
+	end
+	if not result.Instance:IsA("BasePart") then
 		return nil
 	end
-	return describe(part, model, kind, axe, hrp.Position, result.Position, result.Normal)
+	local owner, ownerKind = ownerModel(result.Instance)
+	if not owner or (ownerKind ~= "tree" and ownerKind ~= "wood") then
+		return nil
+	end
+	if ownerKind == "tree" and not CutController.TreeCuttable(owner) then
+		return nil
+	end
+	if owner:GetAttribute("Dead") == true then
+		return nil
+	end
+	return CutController.PickSection(owner, ownerKind :: Kind, axe, hrp.Position, result.Position, result.Normal)
 end
 
 -- The nearest section within the axe's reach (a gamepad, a missed tap).
 local function nearest(hrp: BasePart, axe: ItemCatalog.AxeDef): Target?
 	local range = if axe.v2 then axe.v2.range else GameConfig.ChopRange
-	useWoodGroup()
+	useOverlapGroup()
 	overlap.FilterDescendantsInstances = { player.Character :: Instance }
 	local parts = workspace:GetPartBoundsInRadius(hrp.Position, range + CutController.NearSlack, overlap)
 	local best: Target? = nil
@@ -418,6 +477,25 @@ local function playSlash(tool: Tool)
 	Debris:AddItem(anim, 1)
 end
 
+-- One line per swing attempt, so a Studio test with no chop is conclusive:
+-- "fired" means Chop was sent, "rejected: …" means it was not (and why).
+-- Identical rejects inside 0.75s are dropped so a held click doesn't flood
+-- Output. Hover (the outline) never prints.
+local lastReject = ""
+local lastRejectAt = 0
+
+local function chopNote(line: string)
+	if string.sub(line, 1, 9) == "rejected" then
+		local now = os.clock()
+		if line == lastReject and now - lastRejectAt < 0.75 then
+			return
+		end
+		lastReject = line
+		lastRejectAt = now
+	end
+	print("[Chop] " .. line)
+end
+
 local function trySwing(fromClick: boolean)
 	local now = os.clock()
 	if now < cooldownUntil then
@@ -425,14 +503,19 @@ local function trySwing(fromClick: boolean)
 	end
 	local tool, axe, hrp = equipped()
 	if not tool or not axe or not hrp then
+		if fromClick then
+			chopNote("rejected: no axe")
+		end
 		return
 	end
 	local target, refused = pickTarget(hrp, axe)
 	if not target then
-		if fromClick and refused then
-			if refused.problem == "far" then
+		if fromClick then
+			local why = if refused and refused.problem then refused.problem else "no target"
+			chopNote("rejected: " .. why)
+			if refused and refused.problem == "far" then
 				HUD.Toast(SectionLogic.Message("far") :: string)
-			elseif refused.problem == "hard" then
+			elseif refused and refused.problem == "hard" then
 				SoundData.Play("ChopTooHard")
 				if now - lastHardToast > CutController.HardToastEvery then
 					lastHardToast = now
@@ -452,8 +535,24 @@ local function trySwing(fromClick: boolean)
 		cooldownUntil = now + cooldown
 		Net.Remote("Chop"):FireServer(target.part, target.hit, target.normal)
 	end
+	if fromClick then
+		chopNote("fired")
+	end
 	playSlash(tool)
 	SoundData.Play("Swing")
+end
+
+-- Activated and the mouse or trigger that caused it both arrive for one
+-- click. The first swings; the other, inside this gap, does not.
+local lastClickAt = 0
+
+local function clickSwing()
+	local now = os.clock()
+	if now - lastClickAt < 0.12 then
+		return
+	end
+	lastClickAt = now
+	trySwing(true)
 end
 
 -- Outlines what you'd cut (see the header).
@@ -510,10 +609,10 @@ local function bindTool(tool: Tool)
 				if tap and not CutController.TouchAims(false, tap, screen) then
 					return
 				end
-				trySwing(true)
+				clickSwing()
 			end)
 		else
-			task.defer(trySwing, true)
+			task.defer(clickSwing)
 		end
 	end)
 	tool.Deactivated:Connect(function()
@@ -560,9 +659,19 @@ function CutController.Start()
 	end)
 	-- The finger, even when the tool activation marks the touch processed
 	-- (that was the miss: the position was thrown away and the ray was nil).
-	UserInputService.InputBegan:Connect(function(input: InputObject)
+	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
 		if input.UserInputType == Enum.UserInputType.Touch then
 			lastTap = Vector2.new(input.Position.X, input.Position.Y)
+			return
+		end
+		-- A button already took the click. MouseButton1 and the trigger
+		-- also swing here: Tool.Activated does not always arrive (click to
+		-- move, a Studio camera), and that used to be a silent miss.
+		if gameProcessed then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonR2 then
+			clickSwing()
 		end
 	end)
 	-- A tap that landed in the world, not on a button and not on the
@@ -576,7 +685,7 @@ function CutController.Start()
 		end
 		lastTap = position
 		recentTouchSwing = os.clock()
-		trySwing(true)
+		clickSwing()
 	end)
 	local sinceAim = 0
 	RunService.Heartbeat:Connect(function(dt: number)

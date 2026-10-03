@@ -244,9 +244,12 @@ function NPCDialogue.IsPhone(touch: boolean, keyboard: boolean, viewportX: numbe
 	return touch and not keyboard and viewportX < 900
 end
 
--- Phone: a short bubble beside the head (under the money plaque), a small
--- tag, and a short draw distance so three NPCs don't fill the screen.
--- Desktop tags stay the size CharacterArt builds.
+-- Phone: a short bubble beside and above the head, a small tag, and a
+-- short draw distance so three NPCs don't fill the screen. Desktop tags
+-- stay the size CharacterArt builds. The offset is where the tail sits
+-- (NPCController grows the card upward from it). Head centre is the
+-- adornee; the scalp is about 0.6 studs up, so both stay clear of it.
+-- The phone sits a little lower than the desktop, still above the head.
 function NPCDialogue.LayoutFor(phone: boolean): Layout
 	if phone then
 		return {
@@ -254,7 +257,7 @@ function NPCDialogue.LayoutFor(phone: boolean): Layout
 			maxDistance = 32,
 			width = 188,
 			textSize = 14,
-			studsOffset = Vector3.new(1.2, -0.05, 0),
+			studsOffset = Vector3.new(1.15, 1.7, 0),
 			tagDistance = 40,
 			tagSize = Vector2.new(160, 38),
 			tagName = 18,
@@ -266,7 +269,7 @@ function NPCDialogue.LayoutFor(phone: boolean): Layout
 		maxDistance = 52,
 		width = 230,
 		textSize = 16,
-		studsOffset = Vector3.new(1.65, 0.3, 0),
+		studsOffset = Vector3.new(1.6, 1.9, 0),
 		tagDistance = 60,
 		tagSize = Vector2.new(220, 50),
 		tagName = 24,

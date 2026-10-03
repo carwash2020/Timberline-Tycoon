@@ -840,7 +840,9 @@ end
 --     BarkMark, Crack, Vein, PalmRing, Coconut, Pod, PodStem. Every dress
 --     part has attribute Section (the section it rides on), never collides
 --     or fires touches, can be queried (pointing at leaves finds the tree),
---     and sits in collision group "Leaves" so chop rays skip it.
+--     and sits in collision group "Leaves". The server's sight ray is in
+--     group Wood, so the crown doesn't block it; the client's pointer ray
+--     is not, so a click on the crown still finds this tree.
 --   * Model attributes: WoodId, Seed, Stage, Scale, Elder, Felled, Dormant,
 --     PlanterId, and Uid when given; the service adds HomePivot once the
 --     tree is placed.
