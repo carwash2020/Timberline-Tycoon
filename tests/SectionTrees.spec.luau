@@ -771,6 +771,26 @@ return function(t)
 		t.eq(result.freed[1].model:GetAttribute("Boost"), 2)
 	end)
 
+	-- The live Chop remote (crown clicks included) lands in SectionTrees.Chop.
+	-- The Lux tag is decided there from the equipped axe, then copied onto
+	-- the piece the cut frees.
+	t.test("a Lux chop tags the freed piece; another axe does not", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		s.axe = "LuxAxe"
+		local _, _, _, result = s.cutThrough(p, rec.sections[1])
+		local piece = result.freed[1]
+		t.eq(piece.lux, true)
+		t.eq(piece.model:GetAttribute("LuxCut"), true)
+		local plain = s.tree("oak", Vector3.new(30, 0, 0))
+		p.root.Position = Vector3.new(34, 3, 0)
+		s.axe = "RustyAxe"
+		local _, _, _, other = s.cutThrough(p, plain.sections[1])
+		t.eq(other.freed[1].lux, false)
+		t.eq(other.freed[1].model:GetAttribute("LuxCut"), nil)
+	end)
+
 	t.test("a boot site stands as GrowLogic.BootTree says (the preview's v2 world draws the same forest)", function()
 		local s = setup()
 		local young, n = 0, 0
