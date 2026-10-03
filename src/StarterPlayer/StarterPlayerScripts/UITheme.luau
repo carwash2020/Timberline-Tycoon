@@ -10,10 +10,13 @@
 --     it drops onto its edge; on a computer it brightens under the mouse.
 --     Every press clicks (Click(): SoundData's UIClick, silent with SOUND
 --     FX off), as do HitPads and the buttons Clicks() is given.
---   * Screen(): a ScreenGui with a UIScale for the device: 1x on phones,
---     the screen height / 864 on computers (1.25x at 1080p), / 720 on
---     consoles (1.5x on a TV), never below 1x; under the top bar, or
---     ("device") over it but inside the notch's safe area. TopBar(): where
+--   * Screen(): a ScreenGui with a UIScale for the device. A handheld
+--     (touch, no keyboard) or a short window (shorter side under
+--     CompactEdge) scales down (ScaleFor), so the same offsets don't
+--     cover a phone. Computers scale by the screen height / 864 (1.25x
+--     at 1080p), consoles / 720 (1.5x on a TV), never below 1x. Screens
+--     sit under the top bar and inside the core-UI safe area, or
+--     ("device") over the top bar but inside the notch. TopBar(): where
 --     the top bar ends.
 --   * Margin(): the gap to the screen edge: 12, or the 5% TV-safe area on
 --     a console (64 at the sides, 36 at the bottom).
@@ -124,6 +127,60 @@ function UITheme.IsPhone(): boolean
 	return UserInputService.TouchEnabled
 		and not UserInputService.KeyboardEnabled
 		and (camera == nil or camera.ViewportSize.Y < 600)
+end
+
+-- Shorter side under this (px) is a small window. A handheld scales down
+-- even when Roblox reports a dense framebuffer taller than this.
+UITheme.CompactEdge = 500
+UITheme.CompactDivisor = 480 -- short / this, when the short side is under CompactEdge
+UITheme.DenseDivisor = 640 -- this / short, on a handheld whose framebuffer is large
+UITheme.CompactFloor = 0.7
+UITheme.CompactCeil = 0.85
+
+-- True on a touch device with no keyboard, or when the shorter side of
+-- `viewport` is under CompactEdge. A desktop (keyboard, a tall window)
+-- is false. `viewport` nil means it isn't known yet: only the touch
+-- check applies.
+function UITheme.IsCompact(viewport: Vector2?, touch: boolean, keyboard: boolean): boolean
+	if touch and not keyboard then
+		return true
+	end
+	if viewport then
+		local short = math.min(viewport.X, viewport.Y)
+		if short > 0 and short < UITheme.CompactEdge then
+			return true
+		end
+	end
+	return false
+end
+
+function UITheme.Compact(): boolean
+	local camera = workspace.CurrentCamera
+	local viewport = if camera then camera.ViewportSize else nil
+	return UITheme.IsCompact(viewport, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
+end
+
+-- The UIScale for a screen. `handheld` is touch with no keyboard. Those
+-- and short windows shrink (a 390px phone is short/CompactDivisor, about
+-- 0.81; a dense framebuffer uses DenseDivisor/short and is clamped, so it
+-- is never scaled up the way a monitor is). Otherwise the window height
+-- over 864 (720 on a TV), at least 1. A zero viewport that isn't a
+-- handheld is 1 (no camera yet).
+function UITheme.ScaleFor(viewport: Vector2, handheld: boolean, tenFoot: boolean): number
+	local short = math.min(viewport.X, viewport.Y)
+	local compact = handheld or (short > 0 and short < UITheme.CompactEdge)
+	if compact then
+		if short <= 0 then
+			return 0.75
+		end
+		local raw = if short < UITheme.CompactEdge then short / UITheme.CompactDivisor else UITheme.DenseDivisor / short
+		return math.clamp(raw, UITheme.CompactFloor, UITheme.CompactCeil)
+	end
+	if viewport.Y <= 0 then
+		return 1
+	end
+	local base = if tenFoot then 720 else 864
+	return math.max(1, viewport.Y / base)
 end
 
 ---------------------------------------------------------------------------
@@ -266,18 +323,14 @@ end
 
 local function scaleFor(): number
 	local camera = workspace.CurrentCamera
-	if not camera then
-		return 1
-	end
-	local base = if GuiService:IsTenFootInterface() then 720 else 864
-	if UITheme.IsPhone() then
-		return 1
-	end
-	return math.max(1, camera.ViewportSize.Y / base)
+	local viewport = if camera then camera.ViewportSize else Vector2.zero
+	local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	return UITheme.ScaleFor(viewport, handheld, GuiService:IsTenFootInterface())
 end
 
 local scales: { UIScale } = {}
 local currentScale = 1
+local layoutWatchers: { () -> () } = {}
 local leftColumn: Frame? = nil
 local columnWatchers: { (Frame) -> () } = {} -- waiting for the left column to exist
 local chatWatchers: { () -> () } = {} -- told when the chat window moves
@@ -370,6 +423,14 @@ function UITheme.Scale(): number
 	return currentScale
 end
 
+-- Calls `fn` now and whenever the scale or the viewport changes (a phone
+-- rotating, a window resizing): screens that collapse on a handheld
+-- (the Field Guide, Daily Goals) listen here.
+function UITheme.WatchLayout(fn: () -> ())
+	table.insert(layoutWatchers, fn)
+	task.spawn(fn)
+end
+
 -- Puts `obj` in the left column, under the chat, at `order` (top to
 -- bottom), and keeps it there.
 function UITheme.LeftColumn(obj: GuiObject, order: number)
@@ -419,8 +480,8 @@ function UITheme.WatchLeftColumn(fn: (Frame) -> ())
 end
 
 -- Which part of the screen a ScreenGui lays out in:
---   * nil (Roblox's default): under the top bar, and inside the device's
---     safe area (clear of a notch, a camera cutout, the home bar);
+--   * nil: under the top bar and inside the core-UI safe area (clear of
+--     the Roblox menu, a notch, the home indicator);
 --   * "device": the device's safe area, the top bar's strip included, for
 --     screens that keep clear of the bar themselves (TopBar()) or are
 --     measured from the true screen centre: the side buttons, the shop,
@@ -434,14 +495,15 @@ function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): S
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.DisplayOrder = displayOrder or 0
-	-- The default screens keep Roblox's default ScreenInsets.
+	-- IgnoreGuiInset first: ScreenInsets is the newer of the two and has
+	-- the last word. Default screens stay inside the core UI (the Roblox
+	-- menu, the top bar). Device screens cover the top bar's strip but
+	-- not a notch. Neither draws into the unsafe area.
 	gui.IgnoreGuiInset = insets == "device"
-	if insets == "device" then
-		-- Over the top bar's strip, but not into a notch. After
-		-- IgnoreGuiInset, as ScreenInsets is the newer of the two and has
-		-- the last word.
-		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
-	end
+	gui.ScreenInsets = if insets == "device"
+		then Enum.ScreenInsets.DeviceSafeInsets
+		else Enum.ScreenInsets.CoreUISafeInsets
+	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 	local scale = Instance.new("UIScale")
 	scale.Scale = scaleFor()
 	scale.Parent = gui
@@ -957,6 +1019,9 @@ function UITheme.Start()
 			scale.Scale = currentScale
 		end
 		placeLeft()
+		for _, fn in ipairs(layoutWatchers) do
+			task.spawn(fn)
+		end
 	end
 	local function watchCamera()
 		local camera = workspace.CurrentCamera

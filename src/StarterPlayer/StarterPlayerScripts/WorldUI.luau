@@ -116,6 +116,10 @@ local function buildClock()
 
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()
+		local compact = UITheme.Compact()
+		local box = if compact then Vector2.new(92, 28) else (spec.size or Vector2.new(100, 30))
+		label.Size = UDim2.fromOffset(box.X, box.Y)
+		label.TextSize = if compact then 13 else spec.text
 		-- (nil while the save loads: hidden on a phone until it's in)
 		local spot = HudLayout.ClockLine(UITheme.IsPhone(), player:GetAttribute("TutorialStep"))
 		local under = HUD.UnderCash()
@@ -127,6 +131,7 @@ local function buildClock()
 		label.Visible = spot ~= "none"
 	end
 	place()
+	UITheme.WatchLayout(place)
 	player:GetAttributeChangedSignal("TutorialStep"):Connect(place)
 	UserInputService.LastInputTypeChanged:Connect(place)
 	local camera = workspace.CurrentCamera

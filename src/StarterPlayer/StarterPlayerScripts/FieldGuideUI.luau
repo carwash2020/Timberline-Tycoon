@@ -198,6 +198,40 @@ function FieldGuideUI.Start()
 		textSize = spec.text,
 	})
 	b.root.Visible = false
+	-- A page, shown instead of the words on a handheld so the button is a
+	-- small icon clear of the Roblox menu.
+	local icon = Instance.new("Frame")
+	icon.Name = "Page"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.46)
+	icon.Size = UDim2.fromOffset(16, 18)
+	icon.BackgroundColor3 = UITheme.Colors.Cream
+	icon.BorderSizePixel = 0
+	icon.Visible = false
+	icon.ZIndex = 2
+	UITheme.corner(icon, 2)
+	local spine = Instance.new("Frame")
+	spine.Name = "Spine"
+	spine.Size = UDim2.new(0, 2, 1, 0)
+	spine.BackgroundColor3 = UITheme.Colors.Ink
+	spine.BorderSizePixel = 0
+	spine.ZIndex = 2
+	spine.Parent = icon
+	icon.Parent = b.face
+	local function layout()
+		local compact = UITheme.Compact()
+		icon.Visible = compact
+		if compact then
+			b:SetText("")
+			b.root.Size = UDim2.fromOffset(40, 43)
+		else
+			local face = UITheme.Sized("FieldGuide").size or Vector2.new(130, 34)
+			b:SetText("FIELD GUIDE")
+			b.root.Size = UDim2.fromOffset(face.X, face.Y + 3)
+		end
+	end
+	layout()
+	UITheme.WatchLayout(layout)
 	-- Top of the left column, where the tutorial tracker was: above
 	-- Murph's farewell card (QuestUI, next in the column), not under it.
 	UITheme.LeftColumn(b.root, 1)

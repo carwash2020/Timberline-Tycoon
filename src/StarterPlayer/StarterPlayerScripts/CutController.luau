@@ -3,14 +3,23 @@
 -- every device. Under the v1 loop it does nothing at all (ChopController
 -- swings there); under v2 ChopController stands aside and this swings.
 --
--- A click, a tap and the gamepad trigger all fire the axe Tool's
--- Activated; hold to keep swinging, once per the axe's v2 cooldown for
--- that wood (ItemCatalog.AxeStats). Each swing:
---   * Aims at the section under the pointer (mouse, or the last tap): one
---     ray in collision group Wood, so leaves never catch it (you cut the
---     trunk behind them). With no pointer (a gamepad) or nothing under it,
---     the nearest section within the axe's reach (a bounds query round
---     you). Crystal nodes (tag Node) are mined as before (MineNode).
+-- A click, a tap and the gamepad trigger all swing the equipped axe; hold
+-- to keep swinging, once per the axe's v2 cooldown for that wood
+-- (ItemCatalog.AxeStats). The live remote is Chop (v2). ChopTree is the
+-- v1 loop's and is not connected on a live server, so this never fires it.
+-- Each swing:
+--   * Aims at the section under the pointer: one ray in collision group
+--     Wood, so leaves never catch it (you cut the trunk behind them). A
+--     mouse uses GetMouseLocation with ViewportPointToRay. A touch uses
+--     the finger (TouchTapInWorld / InputObject.Position, screen pixels,
+--     ScreenPointToRay), including a touch the engine marked processed:
+--     Tool.Activated on a phone runs before that position is stored, and
+--     dropping a processed touch left the ray nil, so a tap did nothing
+--     unless a section was already inside the axe's few studs (no toast).
+--     With no finger stored, the mouse location is the fallback (on a
+--     touch screen it follows the finger). A gamepad has no pointer: the
+--     nearest section within the axe's reach. Crystal nodes (tag Node)
+--     are mined as before (MineNode).
 --   * Picks the spot (SectionLogic.AimAt): on a standing trunk, between
 --     your knee and your chest at the pointer's height, on the side facing
 --     you, so you never have to aim at your own feet; on a limb or a log
@@ -33,6 +42,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -167,18 +177,63 @@ local function useWoodGroup()
 end
 
 local lastTap: Vector2? = nil
+local recentTouchSwing = 0 -- os.clock of a TouchTapInWorld swing, so Activated doesn't swing it again
+
+export type AimDevice = "touch" | "mouse" | "gamepad"
+export type PointSpace = "screen" | "viewport"
+
+-- "touch", "gamepad" (any Gamepad* input) or "mouse" (everything else).
+local function pointerKind(inputName: string): AimDevice
+	if inputName == "Touch" then
+		return "touch"
+	elseif string.sub(inputName, 1, 7) == "Gamepad" then
+		return "gamepad"
+	end
+	return "mouse"
+end
+
+function CutController.PointerKind(inputName: string): AimDevice
+	return pointerKind(inputName)
+end
+
+-- Where the swing's ray starts, and which camera method that point uses.
+--   * touch + a stored finger: screen pixels (ScreenPointToRay). The finger
+--     is stored even when the engine marks the touch processed.
+--   * touch with no finger yet: the mouse location (ViewportPointToRay).
+--     Never "no ray": that was the mobile miss.
+--   * mouse: the mouse location.
+--   * gamepad: no pointer (nil). The nearest section in reach is the aim.
+function CutController.PointerPoint(kind: string, tap: Vector2?, mouse: Vector2): (Vector2?, PointSpace)
+	if kind == "gamepad" then
+		return nil, "viewport"
+	end
+	if kind == "touch" and tap then
+		return tap, "screen"
+	end
+	return mouse, "viewport"
+end
+
+-- A tap in the world should swing: not one a button already took, and not
+-- one in the thumbstick's corner (that walks; it doesn't chop).
+function CutController.TouchAims(processedByUI: boolean, pos: Vector2, screen: Vector2): boolean
+	if processedByUI then
+		return false
+	end
+	return not GrabLogic.InThumbstickZone(pos, screen)
+end
 
 -- Ray from wherever the player is pointing, or nil for gamepads.
 local function pointerRay(camera: Camera): Ray?
-	local last = UserInputService:GetLastInputType()
-	if last == Enum.UserInputType.Touch then
-		local tap = lastTap
-		return if tap then camera:ScreenPointToRay(tap.X, tap.Y) else nil
-	elseif string.sub(last.Name, 1, 7) == "Gamepad" then
+	local kind = pointerKind(UserInputService:GetLastInputType().Name)
+	local mouse = UserInputService:GetMouseLocation()
+	local point, space = CutController.PointerPoint(kind, lastTap, mouse)
+	if not point then
 		return nil
 	end
-	local m = UserInputService:GetMouseLocation()
-	return camera:ViewportPointToRay(m.X, m.Y)
+	if space == "screen" then
+		return camera:ScreenPointToRay(point.X, point.Y)
+	end
+	return camera:ViewportPointToRay(point.X, point.Y)
 end
 
 type Target = {
@@ -438,7 +493,28 @@ local function bindTool(tool: Tool)
 	bound[tool] = true
 	tool.Activated:Connect(function()
 		holding = true
-		task.defer(trySwing, true) -- after a tap's InputBegan has recorded where it landed
+		-- Touch: TouchTapInWorld swings with the finger on this tap. Activated
+		-- on a phone runs first, before that position exists, so wait a
+		-- frame and only swing if the tap didn't (a device that fires
+		-- Activated alone). Mouse and gamepad swing on the defer, as before.
+		if CutController.PointerKind(UserInputService:GetLastInputType().Name) == "touch" then
+			task.delay(0, function()
+				if os.clock() - recentTouchSwing < 0.2 then
+					return
+				end
+				-- A thumbstick touch can activate the tool. That walks; it
+				-- doesn't chop. A world tap already swung (or refused) above.
+				local tap = lastTap
+				local camera = workspace.CurrentCamera
+				local screen = if camera then camera.ViewportSize else Vector2.zero
+				if tap and not CutController.TouchAims(false, tap, screen) then
+					return
+				end
+				trySwing(true)
+			end)
+		else
+			task.defer(trySwing, true)
+		end
 	end)
 	tool.Deactivated:Connect(function()
 		holding = false
@@ -482,10 +558,25 @@ function CutController.Start()
 	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
 		hl.Parent = workspace.CurrentCamera
 	end)
-	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-		if not gameProcessed and input.UserInputType == Enum.UserInputType.Touch then
+	-- The finger, even when the tool activation marks the touch processed
+	-- (that was the miss: the position was thrown away and the ray was nil).
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputType == Enum.UserInputType.Touch then
 			lastTap = Vector2.new(input.Position.X, input.Position.Y)
 		end
+	end)
+	-- A tap that landed in the world, not on a button and not on the
+	-- thumbstick. This is what a phone swing is: the position is known
+	-- here, so it aims before Activated's deferred swing can run blind.
+	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processedByUI: boolean)
+		local camera = workspace.CurrentCamera
+		local screen = if camera then camera.ViewportSize else Vector2.zero
+		if not CutController.TouchAims(processedByUI, position, screen) then
+			return
+		end
+		lastTap = position
+		recentTouchSwing = os.clock()
+		trySwing(true)
 	end)
 	local sinceAim = 0
 	RunService.Heartbeat:Connect(function(dt: number)

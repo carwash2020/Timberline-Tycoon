@@ -254,7 +254,35 @@ return function(t)
 		local device = UITheme.Screen("SideButtons", 1, "device")
 		t.eq(device.IgnoreGuiInset, true, "over the top bar's strip")
 		t.eq(device.ScreenInsets, roblox.Enum.ScreenInsets.DeviceSafeInsets, "but clear of a notch and the home bar")
+		t.eq(plain.ScreenInsets, roblox.Enum.ScreenInsets.CoreUISafeInsets, "clear of the Roblox menu and the top bar")
+		t.eq(plain.SafeAreaCompatibility, roblox.Enum.SafeAreaCompatibility.None)
+		t.eq(device.SafeAreaCompatibility, roblox.Enum.SafeAreaCompatibility.None)
 		t.ok(device:FindFirstChildOfClass("UIScale"), "scaled for the device like the rest")
+	end)
+
+	t.test("a handheld or a short window scales down; a desktop still scales up from 864", function()
+		local UITheme = theme({})
+		local function scale(viewport, handheld, tenFoot)
+			return UITheme.ScaleFor(viewport, handheld, tenFoot)
+		end
+		t.eq(scale(Vector2.new(1920, 1080), false, false), 1080 / 864, "a 1080p desktop, as before")
+		t.eq(scale(Vector2.new(1920, 1080), false, true), 1080 / 720, "a TV")
+		t.eq(scale(Vector2.zero, false, false), 1, "no camera yet on a desktop")
+		t.eq(scale(Vector2.new(844, 390), true, false), 390 / 480, "an iPhone's short side")
+		t.eq(scale(Vector2.new(2532, 1170), true, false), 0.7, "a dense framebuffer is clamped, never scaled up")
+		t.eq(
+			scale(Vector2.new(1180, 820), true, false),
+			640 / 820,
+			"an iPad is a handheld even though it isn't a phone"
+		)
+		t.eq(scale(Vector2.zero, true, false), 0.75, "a handheld before the camera exists")
+		t.eq(scale(Vector2.new(1280, 400), false, false), 400 / 480, "a short window, keyboard or not")
+		t.eq(scale(Vector2.new(1920, 1080), false, false), 1080 / 864, "touch with a keyboard stays a desktop")
+		t.eq(UITheme.IsCompact(nil, true, false), true, "touch, no keyboard, no camera yet")
+		t.eq(UITheme.IsCompact(Vector2.new(1180, 820), true, false), true, "an iPad")
+		t.eq(UITheme.IsCompact(Vector2.new(1180, 820), false, true), false, "a desktop that tall")
+		t.eq(UITheme.IsCompact(Vector2.new(800, 400), false, true), true, "short side under 500")
+		t.eq(UITheme.IsCompact(Vector2.new(1920, 1080), true, true), false, "a touch laptop")
 	end)
 
 	t.test("TopBar: the top bar's real bottom edge, even before it has a size", function()
