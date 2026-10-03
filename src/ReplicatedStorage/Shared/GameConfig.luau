@@ -11,6 +11,9 @@ local GameConfig = {
 	-- sell the same wood twice.
 	SlotCooldownSec = 120,
 	SlotCount = 3,
+	-- Creator Hub max players for this place (PlaceCheck). Plot count is
+	-- this plus two spare pads, so the last person on still has a choice.
+	MaxPlayers = 12,
 	-- Chopping
 	SwingCooldown = 0.8, -- seconds between chops (GAME_DESIGN §14.8)
 	SwingTolerance = 0.15, -- server accepts a swing this early, to absorb network jitter

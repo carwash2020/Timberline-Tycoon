@@ -554,7 +554,7 @@ return function(t)
 		-- The check itself: a long bay pushed north onto the Plot Road's
 		-- mouth, and a small one onto the street, are caught.
 		local long = WorldPlan.ParkingBays.long
-		t.ok(#problems(CFrame.new(112, 0.1, 30), long) > 0, "a bay on the Plot Road is caught")
+		t.ok(#problems(CFrame.new(80, 0.1, -58), long) > 0, "a bay on the lot loop is caught")
 		t.ok(#problems(CFrame.new(30, 0.1, 70), WorldPlan.ParkingSlotSize) > 0, "a bay on the street is caught")
 	end)
 
@@ -2070,10 +2070,9 @@ return function(t)
 		-- (phase 10, Connor asked for many more trees; the economy model
 		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
 		-- forest's (FOR-03, tests/Forest.spec.luau).
-		-- 322 original trees plus 169 country stands. The 3×4 plot district
-		-- took the spots of 7 stand trees (was 178, and the first 500). The
-		-- vista now ends on the next headland and took 2 more.
-		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 491)
+		-- 322 original trees plus 178 country stands. Scattering the homesteads
+		-- gave the open country its stands back (the one lawn had left 171).
+		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 497)
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2291,14 +2290,11 @@ return function(t)
 
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
 		local trees = WorldPlan.Trees()
-		-- A fingerprint of the country stands (trees 323 to 491: index, wood,
-		-- biome, x, z). Re-sampled in phase 12 when the haul roads widened,
-		-- and again when the plot district became 3×4 (a few open-country
-		-- stands moved off the new lawn), and again when the lighthouse
-		-- vista moved onto the next headland (two stand trees stood in it).
-		-- The first 322 were not, and the first stand tree is still the pine
-		-- beside the snow road.
-		local lastStand = 491
+		-- A fingerprint of the country stands (trees 323 to 497: index, wood,
+		-- biome, x, z). Re-sampled when the homesteads left the one lawn,
+		-- and again when Mill Meadow, Oak Side and Ash Gate moved off the
+		-- dealership lot. The first 322 were not.
+		local lastStand = 497
 		local h = 7
 		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
@@ -2307,10 +2303,10 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 672265935, "the country stands moved, changed wood or changed order")
-		t.eq(trees[FIRST + 1].woodId, "pine")
-		t.ok((trees[FIRST + 1].position - Vector3.new(73.1337, -2.5153, 544.4336)).Magnitude < 0.01, "tree 323")
-		t.ok((trees[lastStand].position - Vector3.new(485.4641, -1.6756, 223.2839)).Magnitude < 0.01, "the last stand")
+		t.eq(h, 125323120, "the country stands moved, changed wood or changed order")
+		t.eq(trees[FIRST + 1].woodId, "oak")
+		t.ok((trees[FIRST + 1].position - Vector3.new(89.8205, -1.1982, 433.2526)).Magnitude < 0.01, "tree 323")
+		t.ok((trees[lastStand].position - Vector3.new(-870.7682, -2.1735, 320.9300)).Magnitude < 0.01, "the last stand")
 	end)
 
 	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()
@@ -2628,7 +2624,8 @@ return function(t)
 				end
 				return n
 			end
-			t.ok(near("starter", 350) >= 3, near("starter", 350) .. " clusters round the Starter Forest")
+			-- Two shelves sit on this grassland, so one cluster moved off it.
+			t.ok(near("starter", 350) >= 2, near("starter", 350) .. " clusters round the Starter Forest")
 			t.ok(near("hills", 350) >= 3, near("hills", 350) .. " clusters on the Hills' grassland")
 			local far = 0
 			for _, spot in ipairs(clusters) do

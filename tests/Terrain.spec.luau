@@ -16,15 +16,13 @@ return function(t)
 	-- in phase 12 when the haul roads widened, the mill road and lot loop
 	-- were added, and the cliff rings and hollow pools changed the shape.
 	-- The volcano ring was then raised to 24 so its one gap stays one gap.
-	-- Re-sampled again when the plot district became 3 columns by 4 rows:
-	-- that lawn is flat, and the new lanes add sample points. And once
-	-- more for the dealership display lot's flat patch on the lawn north
-	-- of the plot road (a few grid samples sit on that patch).
+	-- Re-sampled again when the one plot lawn became 14 homestead shelves.
+	-- The shelves are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
-		n = 7662,
-		sum = 90892.923091641845531,
-		wsum = -265.142704743345121,
-		sq = 9506734.196213660761714,
+		n = 7422,
+		sum = 91405.033494433606393,
+		wsum = -249.109872040797740,
+		sq = 9516605.515676690265536,
 		lo = -13.781769507273463,
 		hi = 205.783118277429935,
 	}
@@ -84,8 +82,8 @@ return function(t)
 		end
 	end)
 
-	t.test("town and plot district are perfectly flat at y = 0", function()
-		for _, p in ipairs({ { 0, 40 }, { 0, 110 }, { -80, 100 }, { 60, 25 }, { 250, -60 }, { 910, -500 } }) do
+	t.test("the town is perfectly flat at y = 0", function()
+		for _, p in ipairs({ { 0, 40 }, { 0, 110 }, { -80, 100 }, { 60, 25 } }) do
 			t.eq(TerrainGen.HeightAt(p[1], p[2]), 0)
 		end
 	end)
@@ -237,17 +235,15 @@ return function(t)
 		end
 	end)
 
-	t.test("the plot district keeps a plain Grass lawn; the town plaza keeps its paint", function()
-		local zone
-		for _, z in ipairs(WorldLayout.FlatZones) do
-			if z.name == "Plots" then
-				zone = z
-			end
-		end
-		for x = zone.x0, zone.x1, 9 do
-			for z = zone.z0, zone.z1, 9 do
-				local m = materialAt(x, z)
-				t.ok(m == "Grass" or m == "Ground" or m == "Cobblestone", string.format("plots (%d, %d): %s", x, z, m))
+	t.test("each homestead shelf is plain Grass; the town plaza keeps its paint", function()
+		for _, zone in ipairs(WorldLayout.FlatZones) do
+			if zone.name == "Plot" then
+				for x = zone.x0 + 16, zone.x1 - 16, 20 do
+					for z = zone.z0 + 16, zone.z1 - 16, 20 do
+						local m = materialAt(x, z)
+						t.eq(m, "Grass", string.format("plot (%d, %d) is %s", x, z, m))
+					end
+				end
 			end
 		end
 		-- Paint overlaps, and the first patch listed wins.

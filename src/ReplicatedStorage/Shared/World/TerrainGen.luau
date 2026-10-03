@@ -127,6 +127,13 @@ local function lowHeight(x: number, z: number): number
 	return h
 end
 
+-- Homestead shelves sit on the broad shape, not in a hole at y = 0.
+for _, zone in ipairs(WorldLayout.FlatZones) do
+	if zone.terrace and zone.cx and zone.cz then
+		zone.y = lowHeight(zone.cx, zone.cz)
+	end
+end
+
 -- Bumps and ridges on top of the broad shape (roads smooth these away).
 local function detailHeight(x: number, z: number): number
 	local h = 3.2 * fbm(x, z, 1 / 190, 3, 11)
@@ -490,8 +497,10 @@ function TerrainGen.SlopeAt(x: number, z: number): number
 	) / 3
 end
 
--- Ground height at (x, z), in studs.
-function TerrainGen.HeightAt(x: number, z: number): number
+-- Ground height before a homestead lane is graded. A lane is a ramp from
+-- the shelf to the road it meets: the country under it can bump, and a
+-- truck still climbs at the ramp's slope.
+local function groundHeight(x: number, z: number): number
 	local low = lowHeight(x, z)
 	local detail = detailHeight(x, z)
 	local rw = roadWeight(x, z)
@@ -508,10 +517,75 @@ function TerrainGen.HeightAt(x: number, z: number): number
 		h = math.min(h, bed)
 	end
 
-	-- Building zones are perfectly flat at 0.
-	local flat = WorldLayout.FlatWeight(x, z)
-	if flat > 0 then
-		h = h * (1 - flat)
+	-- Building zones are perfectly flat. Town pulls to 0; a homestead
+	-- pulls to its shelf. A shelf's blend must not fill a pond or a river.
+	local flat, target = WorldLayout.FlatAt(x, z)
+	if flat > 0 and not (bed and surface) then
+		h = h * (1 - flat) + target * flat
+	end
+	return h
+end
+
+type SpurGrade = { points: { Vector2 }, half: number, ha: number, hb: number, total: number }
+local SPUR_GRADE: { SpurGrade } = {}
+for _, road in ipairs(WorldLayout.Roads) do
+	if road.name == "PlotSpur" and #road.points >= 2 then
+		local total = 0
+		for i = 1, #road.points - 1 do
+			total += (road.points[i + 1] - road.points[i]).Magnitude
+		end
+		local a, b = road.points[1], road.points[#road.points]
+		if total > 1 then
+			table.insert(SPUR_GRADE, {
+				points = road.points,
+				half = road.width / 2,
+				ha = groundHeight(a.X, a.Y),
+				hb = groundHeight(b.X, b.Y),
+				total = total,
+			})
+		end
+	end
+end
+
+local function spurChord(x: number, z: number): number?
+	local bestH: number? = nil
+	local bestD = math.huge
+	for _, spur in ipairs(SPUR_GRADE) do
+		local along, dist = 0, math.huge
+		local acc = 0
+		local pts = spur.points
+		for i = 1, #pts - 1 do
+			local a, b = pts[i], pts[i + 1]
+			local abx, abz = b.X - a.X, b.Y - a.Y
+			local len2 = abx * abx + abz * abz
+			local len = math.sqrt(len2)
+			local t = if len2 > 1e-6 then math.clamp(((x - a.X) * abx + (z - a.Y) * abz) / len2, 0, 1) else 0
+			local dx, dz = x - (a.X + abx * t), z - (a.Y + abz * t)
+			local d2 = dx * dx + dz * dz
+			if d2 < dist then
+				dist = d2
+				along = acc + len * t
+			end
+			acc += len
+		end
+		if dist < spur.half * spur.half and dist < bestD then
+			bestD = dist
+			bestH = spur.ha + (spur.hb - spur.ha) * (along / spur.total)
+		end
+	end
+	return bestH
+end
+
+-- Ground height at (x, z), in studs.
+function TerrainGen.HeightAt(x: number, z: number): number
+	local h = groundHeight(x, z)
+	local bed = water(x, z)
+	if bed then
+		return h
+	end
+	local chord = spurChord(x, z)
+	if chord then
+		return chord
 	end
 	return h
 end
@@ -645,11 +719,17 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 				return floor.material
 			end
 		end
+		-- A homestead's pad is a grass yard, whichever region it sits in.
+		if flat > 0.85 and WorldLayout.OnPlotPad(x, z) then
+			return "Grass"
+		end
 	end
 	if onRoad > 0 then
 		-- Out in the country a haul road is pale road its whole width
 		-- (STY-02), fraying into dirt where the town's flat ground begins.
-		if flat < 0.35 + 0.2 * dither(x, z) and onGravel(x, z) then
+		-- A homestead's blend can reach a haul road. Pale road holds until
+		-- the ground is mostly a shelf or the town (those stay dirt).
+		if flat < 0.55 and onGravel(x, z) then
 			return TerrainGen.GravelMaterial
 		end
 		return "Ground"

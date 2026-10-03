@@ -113,11 +113,11 @@ return function(t)
 				local c = if i then PlotData.Slots[i] else Vector2.new(-2000, -2000)
 				root.Position = Vector3.new(c.X, 3, c.Y)
 			end
-			-- At the unclaimed sign: the board sits just north of the pad.
+			player.root = root
+			-- At the unclaimed sign. The board's height follows the shelf,
+			-- so the spot is the sign itself, not a guess from y = 3.
 			function player.standAtSign(i)
-				local c = PlotData.Slots[i]
-				local size = PlotData.Tiers[1].size
-				root.Position = Vector3.new(c.X, 3, c.Y + size / 2 + 3)
+				root.Position = Vector3.new(PlotData.Slots[i].X, 3, PlotData.Slots[i].Y)
 			end
 			return player, profile
 		end
@@ -210,8 +210,9 @@ return function(t)
 			return plots:FindFirstChild("Plot_" .. i)
 		end
 		local function claim(player, i)
-			player.standAtSign(i)
-			plot(i):FindFirstChild("Sign"):FindFirstChild("ProximityPrompt").Triggered.fn(player)
+			local board = plot(i):FindFirstChild("Sign")
+			player.root.Position = board.CFrame.Position
+			board:FindFirstChild("ProximityPrompt").Triggered.fn(player)
 		end
 		-- Placed models live beside the plot shell (PlotItems_N), not inside it.
 		local function itemFolder(i)
@@ -408,6 +409,8 @@ return function(t)
 			{ uid = "b", blueprintId = "Retired", x = 0, z = 0, rot = 0 }, -- a blueprint that no longer exists
 		}
 		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.PlotSlot, nil, "joining opens the picker, it doesn't assign")
+		s.P.Pass(ann)
 		t.eq(ann.attrs.PlotSlot, 2)
 		t.eq(#s.items(2), 1)
 		t.eq(s.items(2)[1].Name, "a")
@@ -448,6 +451,7 @@ return function(t)
 			{ uid = "mill", blueprintId = "SawmillRickety", x = 0, z = 0, rot = 0, data = { x = 1.4, y = 0.8 } },
 		}
 		s.P.PlayerJoined(ann, profile)
+		s.P.Pass(ann)
 		local model = s.items(1)[1]
 		t.eq(model:GetAttribute("CutX"), 1.4)
 		t.eq(model:GetAttribute("CutY"), 0.8)
@@ -529,6 +533,7 @@ return function(t)
 		profile.plot.claimed = true
 		profile.plot.placed = { { uid = "a", blueprintId = "Bench", x = 4, z = 4, rot = 0 } }
 		s.P.PlayerJoined(ann, profile)
+		s.P.Pass(ann)
 		t.eq(ann.attrs.PlotSlot, 1)
 		t.eq(#s.items(1), 1)
 		s.P.PlayerJoined(ann, profile)
@@ -557,6 +562,7 @@ return function(t)
 		t.eq(owners[1].attrs.PlotSlot, nil)
 		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
 		s.P.PlayerJoined(extra, profile)
+		s.P.Pass(extra)
 		t.eq(extra.attrs.PlotSlot, 1)
 		t.eq(#s.items(1), 1)
 		t.eq(s.items(1)[1].Name, "bench")
@@ -568,6 +574,210 @@ return function(t)
 				taken += 1
 			end
 		end
-		t.eq(taken, 12)
+		t.eq(taken, #s.PlotData.Slots)
+	end)
+
+	t.test("twelve players each get a plot, and two pads stay open", function()
+		local s = setup()
+		local lastOffer
+		for i = 1, 12 do
+			local player, profile = s.newPlayer(i, "P" .. i)
+			s.P.PlayerJoined(player, profile)
+			if i == 12 then
+				lastOffer = s.P.OfferOf(player)
+				local free = 0
+				for _, plot in ipairs(lastOffer.plots) do
+					if not plot.taken then
+						free += 1
+					end
+				end
+				t.eq(free, 3, "the last player still has a choice")
+			end
+			s.P.Claim(player, i)
+			t.eq(player.attrs.PlotSlot, i)
+		end
+		local free = 0
+		for i = 1, #s.PlotData.Slots do
+			if s.plot(i):GetAttribute("OwnerId") == nil then
+				free += 1
+			end
+		end
+		t.eq(free, #s.PlotData.Slots - 12)
+	end)
+
+	t.test("two claims of one plot in the same breath: one wins, the other is told to pick again", function()
+		local s = setup()
+		local ann, annProfile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		annProfile.plot.placed = { { uid = "ann", blueprintId = "Bench", x = 2, z = 2, rot = 0 } }
+		bobProfile.plot.placed = { { uid = "bob", blueprintId = "Flag", x = 4, z = 4, rot = 0 } }
+		s.P.PlayerJoined(ann, annProfile)
+		s.P.PlayerJoined(bob, bobProfile)
+		s.P.Claim(ann, 4)
+		s.P.Claim(bob, 4)
+		t.eq(ann.attrs.PlotSlot, 4)
+		t.eq(bob.attrs.PlotSlot, nil)
+		t.eq(s.plot(4):GetAttribute("OwnerId"), 1)
+		t.eq(#s.items(4), 1)
+		t.eq(s.items(4)[1].Name, "ann")
+		t.eq(s.lastToast(), "Someone else claimed that plot. Pick another.")
+		local offer = s.P.OfferOf(bob)
+		t.eq(offer.notice, "taken")
+		t.eq(offer.plots[4].taken, true)
+		local jump = t.shared("PlotPickerLogic").NextOpen(offer.plots, 4)
+		t.ok(jump ~= 4 and offer.plots[jump].taken ~= true, "the picker moves on")
+		s.P.Claim(bob, jump)
+		t.eq(bob.attrs.PlotSlot, jump)
+		t.eq(#s.items(jump), 1)
+		t.eq(s.items(jump)[1].Name, "bob")
+	end)
+
+	t.test("closing the picker or letting it time out assigns a free plot", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.placed = { { uid = "a", blueprintId = "Bench", x = 2, z = 2, rot = 0 } }
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(ann.attrs.Picking, true)
+		s.advance(59)
+		s.P.Sweep()
+		t.eq(ann.attrs.PlotSlot, nil, "the timer has not run out")
+		s.advance(1)
+		s.P.Sweep()
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(#s.items(1), 1)
+		t.eq(ann.attrs.Picking, nil)
+
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.P.PlayerJoined(bob, bobProfile)
+		s.P.Pass(bob)
+		t.eq(bob.attrs.PlotSlot, 2)
+		t.eq(s.lastToast(), s.PlotData.Homes[2].name .. " is yours. You'll wake up here.")
+	end)
+
+	t.test("leaving while the picker is open reserves nothing", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.Picking, true)
+		s.P.PlayerRemoving(ann)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
+		s.advance(120)
+		s.P.Sweep()
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil, "the timer was cancelled")
+		for i = 1, #s.PlotData.Slots do
+			t.eq(s.plot(i):GetAttribute("OwnerId"), nil)
+		end
+	end)
+
+	t.test("looking through the picker does not reserve a pad", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.P.PlayerJoined(ann, profile)
+		local offer = s.P.OfferOf(ann)
+		t.eq(#offer.plots, #s.PlotData.Slots)
+		t.eq(offer.plots[1].region, "east of town")
+		for _, plot in ipairs(offer.plots) do
+			t.eq(plot.taken, false)
+		end
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
+	end)
+
+	t.test("a claimed plot is the spawn; before that, town", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		local landed = nil
+		ann.Character.PivotTo = function(_, cf)
+			landed = cf
+		end
+		ann.CharacterAdded = {
+			Connect = function(self, fn)
+				self.fn = fn
+			end,
+		}
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.RespawnLocation, nil)
+		if ann.CharacterAdded.fn then
+			ann.CharacterAdded.fn()
+		end
+		t.eq(landed, nil, "still the town spawn")
+		s.P.Claim(ann, 3)
+		t.ok(ann.RespawnLocation == s.plot(3):FindFirstChild("PlotSpawn"))
+		t.eq(ann.attrs.PlotSlot, 3)
+		landed = nil
+		ann.CharacterAdded.fn()
+		t.ok(landed ~= nil, "death and rejoin put them on the pad")
+	end)
+
+	t.test("loading another save keeps the pad you already stand on", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.tier = 1
+		profile.plot.placed = { { uid = "old", blueprintId = "Bench", x = 2, z = 2, rot = 0 } }
+		s.P.PlayerJoined(ann, profile)
+		s.P.Claim(ann, 5)
+		local other = {
+			plot = {
+				claimed = true,
+				tier = 3,
+				placed = { { uid = "new", blueprintId = "Flag", x = 6, z = 6, rot = 1 } },
+			},
+		}
+		t.eq(s.P.Reload(ann, other), true)
+		t.eq(ann.attrs.PlotSlot, 5)
+		t.eq(ann.attrs.Picking, nil)
+		t.eq(ann.attrs.PlotTier, 3)
+		t.eq(#s.items(5), 1)
+		t.eq(s.items(5)[1].Name, "new")
+		t.eq(s.plot(5):GetAttribute("OwnerId"), 1)
+	end)
+
+	t.test("a bad saved spot moves onto the delivery pad", function()
+		local s = setup()
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local ann, profile = s.newPlayer(1, "Ann")
+		local lake = WorldLayout.Lake
+		local pad = s.PlotData.Slots[2]
+		profile.truckAt = { x = lake.x, y = 4, z = lake.z }
+		profile.leftLoad = { { woodId = "oak", value = 8, x = pad.X, y = 3, z = pad.Y } }
+		profile.groundLoad = { { g = { pad.X, -40, pad.Y } } }
+		profile.truckAt = profile.truckAt
+		local town = { x = 0, y = 4, z = 40 }
+		-- A second log that is fine stays put: checked after, on a fresh profile field.
+		s.P.PlayerJoined(ann, profile)
+		s.P.Claim(ann, 1)
+		local drop = s.P.GetDeliveryPad(ann)
+		t.ok(drop ~= nil)
+		local function nearDrop(x, z)
+			local p = drop.Position
+			return math.abs(x - p.X) < 0.01 and math.abs(z - p.Z) < 0.01
+		end
+		t.ok(nearDrop(profile.truckAt.x, profile.truckAt.z), "truckAt left the lake")
+		t.ok(nearDrop(profile.leftLoad[1].x, profile.leftLoad[1].z), "leftLoad left the pad")
+		t.ok(nearDrop(profile.groundLoad[1].g[1], profile.groundLoad[1].g[3]), "groundLoad left the hole")
+		-- A dry town spot is not a pad and not under the ground.
+		local kept = { x = town.x, y = town.y, z = town.z }
+		profile.truckAt = kept
+		s.P.Reload(ann, profile)
+		t.eq(profile.truckAt.x, town.x)
+		t.eq(profile.truckAt.z, town.z)
+		t.eq(s.P.GetDeliveryPad(ann).Position.X, drop.Position.X)
+	end)
+
+	t.test("a claim has to be a whole slot you don't already own", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.P.PlayerJoined(ann, profile)
+		s.P.Claim(ann, 1.5)
+		s.P.Claim(ann, 0)
+		s.P.Claim(ann, #s.PlotData.Slots + 1)
+		s.P.Claim(ann, "nope")
+		t.eq(ann.attrs.PlotSlot, nil)
+		s.P.Claim(ann, 2)
+		s.P.Claim(ann, 3)
+		t.eq(ann.attrs.PlotSlot, 2)
+		t.eq(s.plot(3):GetAttribute("OwnerId"), nil)
+		t.eq(s.lastToast(), "You already have a plot here.")
 	end)
 end

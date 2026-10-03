@@ -26,17 +26,30 @@ WorldLayout.Sawmill = Vector3.new(0, 0, 110)
 WorldLayout.SeaLevel = -3 -- ocean surface
 WorldLayout.LakeLevel = -2 -- river and lake surface
 
--- A rectangle (x0..x1, z0..z1) the terrain keeps perfectly flat at y = 0,
--- blending back to the countryside over `blend` studs.
-export type FlatZone = { name: string, x0: number, x1: number, z0: number, z1: number, blend: number }
+-- A rectangle (x0..x1, z0..z1) the terrain keeps perfectly flat, blending
+-- back to the countryside over `blend` studs. Town pads sit at y = 0.
+-- A homestead with `terrace` sits at the broad height of its centre
+-- (TerrainGen fills in `y`) so a pad in the hills is a shelf, not a pit.
+export type FlatZone = {
+	name: string,
+	x0: number,
+	x1: number,
+	z0: number,
+	z1: number,
+	blend: number,
+	terrace: boolean?,
+	y: number?,
+	cx: number?,
+	cz: number?,
+}
 
 -- A road: a dirt track along these points, `width` studs wide; the terrain
 -- under it is smoothed so trucks have an easy ride.
 export type Road = { name: string, points: { Vector2 }, width: number }
 
 -- The 4×3 district those first trees were placed around (spacing 220, the
--- road at z = 50). Widths are the pre-phase-12 ones. The live district is
--- the 3×4 grid.
+-- road at z = 50). Widths are the pre-phase-12 ones. The live homesteads
+-- are scattered; this lawn exists only while those 322 trees are placed.
 WorldLayout.LegacyPlots = { name = "Plots", x0 = 126, x1 = 1034, z0 = -624, z1 = 74, blend = 50 } :: FlatZone
 WorldLayout.LegacyPlotRoads = {
 	{ name = "PlotRoad", points = { Vector2.new(118, 50), Vector2.new(1010, 50) }, width = 10 },
@@ -47,48 +60,68 @@ WorldLayout.LegacyPlotRoads = {
 	{ name = "PlotLane", points = { Vector2.new(150, -390), Vector2.new(1010, -390) }, width = 8 },
 } :: { Road }
 
-local function plotBounds(): (number, number, number, number)
-	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+-- One 200×200 shelf per homestead. The blend is at least 50 studs, so
+-- the country rises back up outside the yard instead of a cliff. Not one
+-- lawn: the old grid's rectangle would have flattened every region.
+local function plotZones(): { FlatZone }
+	local half = PlotData.Pad / 2
+	local zones: { FlatZone } = {}
 	for _, slot in ipairs(PlotData.Slots) do
-		minX, maxX = math.min(minX, slot.X), math.max(maxX, slot.X)
-		minZ, maxZ = math.min(minZ, slot.Y), math.max(maxZ, slot.Y)
+		table.insert(zones, {
+			name = "Plot",
+			x0 = slot.X - half,
+			x1 = slot.X + half,
+			z0 = slot.Y - half,
+			z1 = slot.Y + half,
+			blend = PlotData.Blend,
+			terrace = true,
+			cx = slot.X,
+			cz = slot.Y,
+		})
 	end
-	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
-	return minX - half, maxX + half, minZ - half, maxZ + half
+	return zones
 end
 
-local px0, px1, pz0, pz1 = plotBounds()
--- The town's plot-road mouth is fixed (lamps, the lot fence and the long
--- bays were laid out against z = 50, 16 wide). The pads sit RoadSetback
--- south of that centre, so the sign and a strip of grass stay off the
--- roadway. Lanes between the pads are wider; this mouth is not.
-local plotRoadZ = pz1 + PlotData.RoadSetback
-local plotRoadX = 118
-local plotLane = PlotData.LaneWidth
-local PLOT_ROAD_WIDTH = 16
-
 WorldLayout.FlatZones = {
-	-- Town: spawn, sawmill, shops, parking, gondola station.
+	-- Town: spawn, sawmill, shops, parking, gondola station. Left as the
+	-- town work laid it out.
 	{ name = "Town", x0 = -125, x1 = 140, z0 = -32, z1 = 205, blend = 45 },
 	-- The dealership's display lot, on the lawn north of the plot road.
-	-- That lawn is already inside the Plots zone's blend (trees keep off
-	-- it), so this only flattens the ground under the trucks. The blend
-	-- stops at the Plots zone's own edge (z = 124) and does not grow the
-	-- forest hub (the hub pads name Town and Plots only).
+	-- Blend 1, so it flattens the trucks' ground and does not grow the
+	-- forest hub (the hub names Town only). The homesteads are shelves,
+	-- not this lawn.
 	{ name = "DealershipLot", x0 = 184, x1 = 296, z0 = 64, z1 = 123, blend = 1 },
-	-- The plot district east of town, with its roads and lanes. The west
-	-- and north edges stay where the old 4×3 lawn was (x = 126, z = 74):
-	-- the gap beside the pond and the plot road's north shoulder stay
-	-- open grass, so filler doesn't sprout in the water there.
-	{
-		name = "Plots",
-		x0 = math.min(px0 - 24, 126),
-		x1 = px1 + 24,
-		z0 = pz0 - 24,
-		z1 = math.max(pz1 + 34, 74),
-		blend = 50,
-	},
+	-- The lot's east rail and the turnaround (the loop ends at x 172, z 50)
+	-- used to sit on the district lawn. Keep that patch level so the town's
+	-- driveway doesn't climb. It stops short of the dealership display lot
+	-- and the path up to it: the blend ends before that ground. Not a homestead.
+	{ name = "LotApron", x0 = 126, x1 = 178, z0 = -70, z1 = 52, blend = 12 },
 } :: { FlatZone }
+for _, zone in ipairs(plotZones()) do
+	table.insert(WorldLayout.FlatZones, zone)
+end
+
+-- Ground the dealership job owns. The display lot is the open lawn north
+-- of the old plot road. The approach is the path from the showroom (the
+-- building spans x 35 to 69.5) to that lot's west side. A homestead shelf,
+-- its blend, and a lane must not change either one. The town flat zone is
+-- left as the town laid it out.
+export type ReservedBox = { name: string, x0: number, x1: number, z0: number, z1: number }
+WorldLayout.Reserved = {
+	{ name = "DealershipLot", x0 = 184, x1 = 296, z0 = 64, z1 = 123 },
+	{ name = "DealershipApproach", x0 = 69.5, x1 = 184, z0 = 64, z1 = 123 },
+} :: { ReservedBox }
+
+-- Distance from rectangle (x0, z0)-(x1, z1) to a reserved box. 0 when they
+-- share ground.
+function WorldLayout.ReservedDistance(x0: number, z0: number, x1: number, z1: number, box: ReservedBox): number
+	local sepX = math.max(x0 - box.x1, box.x0 - x1)
+	local sepZ = math.max(z0 - box.z1, box.z0 - z1)
+	if sepX < 0 and sepZ < 0 then
+		return 0
+	end
+	return math.sqrt(math.max(sepX, 0) ^ 2 + math.max(sepZ, 0) ^ 2)
+end
 
 -- Biome centres, for the roads below.
 local function center(id: string): Vector2
@@ -128,14 +161,6 @@ WorldLayout.Roads = {
 		points = { Vector2.new(-20, 760), Vector2.new(-420, 860), Vector2.new(-760, 960), sky + Vector2.new(120, -40) },
 		width = 24,
 	},
-	-- The road along the north side of the plot district. 16 wide, the
-	-- width the town's mouth was built for (a Logging Rig fits; two don't
-	-- need to pass here). The lanes between plots are the wide ones.
-	{
-		name = "PlotRoad",
-		points = { Vector2.new(plotRoadX, plotRoadZ), Vector2.new(px1, plotRoadZ) },
-		width = PLOT_ROAD_WIDTH,
-	},
 	-- East of the Dealership, then north to the Snow Road's start. The mill
 	-- yard and the shop fill x 22 to 70, so the way stays east of them.
 	{
@@ -159,8 +184,8 @@ WorldLayout.Roads = {
 			Vector2.new(8, -58),
 			Vector2.new(160, -58),
 			Vector2.new(172, -10),
-			Vector2.new(172, plotRoadZ),
-			Vector2.new(130, plotRoadZ),
+			Vector2.new(172, 50),
+			Vector2.new(130, 50),
 		},
 		width = 16,
 	},
@@ -211,52 +236,263 @@ WorldLayout.Rims = {
 	},
 } :: { Rim }
 
--- Lanes between the plots (in the gaps the biggest tier leaves), plus a
--- road along the south edge and a spur into the forest so the back row
--- isn't a dead end.
+-- Where a bought truck is delivered: the centre of a clear pad on the
+-- road edge of the yard, and the flat direction out to that road.
+export type Drive = {
+	index: number,
+	x: number,
+	z: number,
+	ux: number,
+	uz: number,
+}
+
+-- A lane from each homestead to the nearest haul road (not another lane,
+-- and not a point inside town). The centreline starts just outside the
+-- pad, so the lane never paves the yard. The delivery pad sits on the
+-- inside of that same edge.
+WorldLayout.Drives = {} :: { Drive }
 do
-	local xs, zs = {}, {}
-	for _, slot in ipairs(PlotData.Slots) do
-		xs[slot.X], zs[slot.Y] = true, true
+	local town = WorldLayout.FlatZones[1]
+	local half = PlotData.Pad / 2
+	local mouth = half + PlotData.LaneWidth / 2 + 2
+	local haul: { Road } = table.clone(WorldLayout.Roads)
+	local function inTown(x: number, z: number): boolean
+		return x >= town.x0 and x <= town.x1 and z >= town.z0 and z <= town.z1
 	end
-	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
-	local minX = px0 + half
-	local southZ = pz0 - 20
-	for x in pairs(xs) do
-		if x > minX then
-			local laneX = x - PlotData.SlotSpacing / 2
+	local function hitsSquare(px: number, pz: number, sx: number, sz: number, reach: number): boolean
+		local dx = math.max(math.abs(px - sx) - half, 0)
+		local dz = math.max(math.abs(pz - sz) - half, 0)
+		return dx * dx + dz * dz < reach * reach
+	end
+	-- A straight lane. It has to miss every yard, including its own.
+	local function laneClear(ax: number, az: number, bx: number, bz: number): boolean
+		local len = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+		local steps = math.max(1, math.ceil(len / 8))
+		local reach = PlotData.LaneWidth / 2 - 0.5
+		for _, other in ipairs(PlotData.Slots) do
+			for s = 0, steps do
+				local u = s / steps
+				local x = ax + (bx - ax) * u
+				local z = az + (bz - az) * u
+				if hitsSquare(x, z, other.X, other.Y, reach) then
+					return false
+				end
+				-- The lane's body, not only its centreline, stays off the
+				-- dealership lot and the path from the showroom.
+				local laneReach = PlotData.LaneWidth / 2
+				for _, box in ipairs(WorldLayout.Reserved) do
+					local dx = math.max(box.x0 - x, 0, x - box.x1)
+					local dz = math.max(box.z0 - z, 0, z - box.z1)
+					if dx * dx + dz * dz < laneReach * laneReach then
+						return false
+					end
+				end
+				-- The maple past the south pull-outs. A lane up to the lot
+				-- loop used to pave it. The centreline stays clear of its crown.
+				local treeX, treeZ, treeR = 132, -80, 28
+				local tdx, tdz = x - treeX, z - treeZ
+				if tdx * tdx + tdz * tdz < treeR * treeR then
+					return false
+				end
+			end
+		end
+		return true
+	end
+	-- The delivery pad is a rectangle, so it sits on the north, south, east
+	-- or west edge: the side the road is nearest. A diagonal pad would hang
+	-- off the square.
+	local function cardinal(dx: number, dz: number): (number, number)
+		if math.abs(dx) >= math.abs(dz) then
+			return if dx >= 0 then 1 else -1, 0
+		end
+		return 0, if dz >= 0 then 1 else -1
+	end
+	-- Goals sit on the haul roads, outside town. A lane may bend around
+	-- yards; it still has to arrive on the road itself.
+	local STEP = 16
+	local goals: { Vector2 } = {}
+	local goalAt: { [number]: Vector2 } = {}
+	local goalDist: { [number]: number } = {}
+	local function cellKey(x: number, z: number): number
+		return math.floor(x / STEP) * 10000 + math.floor(z / STEP)
+	end
+	for _, road in ipairs(haul) do
+		local pts = road.points
+		for i = 1, #pts - 1 do
+			local a, b = pts[i], pts[i + 1]
+			local len = (b - a).Magnitude
+			local steps = math.max(1, math.ceil(len / 12))
+			for s = 0, steps do
+				local p = a:Lerp(b, s / steps)
+				local endX, endZ = road.points[#road.points].X, road.points[#road.points].Y
+				local fromEnd = (p.X - endX) * (p.X - endX) + (p.Y - endZ) * (p.Y - endZ)
+				-- The biome signs stand on the last stretch of a haul road.
+				-- A lane joins further back, so it doesn't pave their posts.
+				if not inTown(p.X, p.Y) and fromEnd > 90 * 90 and laneClear(p.X, p.Y, p.X, p.Y) then
+					table.insert(goals, p)
+					local gx, gz = math.floor(p.X / STEP), math.floor(p.Y / STEP)
+					for ox = -1, 1 do
+						for oz = -1, 1 do
+							local key = (gx + ox) * 10000 + (gz + oz)
+							local cx = (gx + ox) * STEP + STEP / 2
+							local cz = (gz + oz) * STEP + STEP / 2
+							local dist = (p.X - cx) * (p.X - cx) + (p.Y - cz) * (p.Y - cz)
+							local prev = goalDist[key]
+							if not prev or dist < prev then
+								goalDist[key] = dist
+								goalAt[key] = p
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	local function simplify(points: { Vector2 }): { Vector2 }
+		if #points <= 2 then
+			return points
+		end
+		local simple = { points[1] }
+		for i = 2, #points - 1 do
+			local a, b, c = simple[#simple], points[i], points[i + 1]
+			local cross = (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X)
+			if math.abs(cross) > 1 then
+				table.insert(simple, b)
+			end
+		end
+		table.insert(simple, points[#points])
+		return simple
+	end
+	-- Grid search from just outside one edge of the yard to the nearest
+	-- haul road. Straight shots and single elbows miss yards that sit
+	-- between a pad and the road; walking the gap does not.
+	local function findPath(sx: number, sz: number, ux: number, uz: number): { Vector2 }?
+		local mouthX, mouthZ = sx + ux * mouth, sz + uz * mouth
+		if not laneClear(mouthX, mouthZ, mouthX, mouthZ) then
+			return nil
+		end
+		local startKey = cellKey(mouthX, mouthZ)
+		local direct = goalAt[startKey]
+		if direct and laneClear(mouthX, mouthZ, direct.X, direct.Y) then
+			return { Vector2.new(mouthX, mouthZ), direct }
+		end
+		local xs = { mouthX }
+		local zs = { mouthZ }
+		local parent = { 0 }
+		local seen: { [number]: boolean } = { [startKey] = true }
+		local head = 1
+		local found: number? = nil
+		local foundGoal: Vector2? = nil
+		while head <= #xs and #xs < 6000 do
+			local here = head
+			local x, z = xs[here], zs[here]
+			head += 1
+			local steps = {
+				{ x + STEP, z },
+				{ x - STEP, z },
+				{ x, z + STEP },
+				{ x, z - STEP },
+			}
+			for _, step in ipairs(steps) do
+				local nx, nz = step[1], step[2]
+				if math.abs(nx) < 1500 and math.abs(nz) < 1500 and not inTown(nx, nz) then
+					local key = cellKey(nx, nz)
+					if not seen[key] and laneClear(x, z, nx, nz) then
+						seen[key] = true
+						table.insert(xs, nx)
+						table.insert(zs, nz)
+						table.insert(parent, here)
+						local goal = goalAt[key]
+						if goal and laneClear(nx, nz, goal.X, goal.Y) then
+							found = #xs
+							foundGoal = goal
+							break
+						end
+					end
+				end
+			end
+			if found then
+				break
+			end
+		end
+		if not found or not foundGoal then
+			return nil
+		end
+		local points = { foundGoal }
+		local cursor: number? = found
+		while cursor and cursor > 0 do
+			table.insert(points, Vector2.new(xs[cursor], zs[cursor]))
+			local prev = parent[cursor]
+			cursor = if prev > 0 then prev else nil
+		end
+		local ordered = {}
+		for i = #points, 1, -1 do
+			table.insert(ordered, points[i])
+		end
+		return simplify(ordered)
+	end
+	for index, slot in ipairs(PlotData.Slots) do
+		local nearestGoal: Vector2? = nil
+		local nearestDist = math.huge
+		for _, goal in ipairs(goals) do
+			local dist = (goal.X - slot.X) ^ 2 + (goal.Y - slot.Y) ^ 2
+			if dist < nearestDist then
+				nearestDist = dist
+				nearestGoal = goal
+			end
+		end
+		local dirs = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+		if nearestGoal then
+			local preferX, preferZ = cardinal(nearestGoal.X - slot.X, nearestGoal.Y - slot.Y)
+			table.sort(dirs, function(a, b)
+				local ap = if a[1] == preferX and a[2] == preferZ then 0 else 1
+				local bp = if b[1] == preferX and b[2] == preferZ then 0 else 1
+				return ap < bp
+			end)
+		end
+		local points: { Vector2 }? = nil
+		local ux, uz = 0, 1
+		for _, dir in ipairs(dirs) do
+			local routed = findPath(slot.X, slot.Y, dir[1], dir[2])
+			if routed then
+				points = routed
+				ux, uz = dir[1], dir[2]
+				break
+			end
+		end
+		if points then
+			local inset = PlotData.DeliveryWidth / 2
+			WorldLayout.Drives[index] = {
+				index = index,
+				x = slot.X + ux * (half - inset),
+				z = slot.Y + uz * (half - inset),
+				ux = ux,
+				uz = uz,
+			}
 			table.insert(WorldLayout.Roads, {
-				name = "PlotLane",
-				points = { Vector2.new(laneX, plotRoadZ), Vector2.new(laneX, southZ) },
-				width = plotLane,
+				name = "PlotSpur",
+				points = points,
+				width = PlotData.LaneWidth,
 			})
 		end
 	end
-	for z in pairs(zs) do
-		if z < pz1 - half then
-			local laneZ = z + PlotData.SlotSpacing / 2
-			table.insert(
-				WorldLayout.Roads,
-				{ name = "PlotLane", points = { Vector2.new(px0, laneZ), Vector2.new(px1, laneZ) }, width = plotLane }
-			)
-		end
+end
+
+-- The delivery pad's centre, looking out along the lane. `y` is the shelf.
+function WorldLayout.DeliveryCFrame(index: number, y: number): CFrame?
+	local drive = WorldLayout.Drives[index]
+	if not drive then
+		return nil
 	end
-	table.insert(
-		WorldLayout.Roads,
-		{ name = "PlotSouth", points = { Vector2.new(px0, southZ), Vector2.new(px1, southZ) }, width = plotLane }
-	)
-	local midX = (px0 + px1) / 2
-	table.insert(WorldLayout.Roads, {
-		name = "ForestExit",
-		points = { Vector2.new(midX, southZ), Vector2.new(midX, southZ - 160) },
-		width = plotLane,
-	})
+	local at = Vector3.new(drive.x, y, drive.z)
+	local ahead = at + Vector3.new(drive.ux, 0, drive.uz)
+	return CFrame.lookAt(at, ahead)
 end
 
 -- The parking lot east of the spawn (a gravel lot; MapBuilder paints the
 -- slots on it). M1.5 grew it east (it ended at x 112) for one row of 12
--- slots 10 wide, 11 apart (WorldPlan.Town), its east rail at x 145; the
--- ground there is flat already (the Town and Plots zones meet over it).
+-- slots 10 wide, 11 apart (WorldPlan.Town), its east rail at x 145. The
+-- LotApron keeps that rail and the turnaround level.
 WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
@@ -420,14 +656,27 @@ function WorldLayout.PolylineDistance(p: Vector2, points: { Vector2 }): number
 	return best
 end
 
--- The flat zone containing (x, z), if any, with how deep inside it is
--- (0 at its edge, growing inward), or the nearest zone's outside distance.
-function WorldLayout.FlatWeight(x: number, z: number): number
-	local weight = 0
+-- While the first 322 trees are placed, the ground they avoid is the old
+-- district lawn, not today's shelves.
+local function flatZonesNow(): { FlatZone }
+	if not legacyLayout then
+		return WorldLayout.FlatZones
+	end
+	local zones: { FlatZone } = {}
 	for _, zone in ipairs(WorldLayout.FlatZones) do
-		if legacyLayout and zone.name == "Plots" then
-			zone = WorldLayout.LegacyPlots
+		if zone.name == "Town" then
+			table.insert(zones, zone)
 		end
+	end
+	table.insert(zones, WorldLayout.LegacyPlots)
+	return zones
+end
+
+-- How flat (x, z) is (0 at a zone's blend edge, 1 deep inside) and the
+-- height that flat pulls toward. Town and the old lawn pull to 0.
+function WorldLayout.FlatAt(x: number, z: number): (number, number)
+	local weight, target = 0, 0
+	for _, zone in ipairs(flatZonesNow()) do
 		local dx = math.max(zone.x0 - x, 0, x - zone.x1)
 		local dz = math.max(zone.z0 - z, 0, z - zone.z1)
 		local outside = math.sqrt(dx * dx + dz * dz)
@@ -435,9 +684,29 @@ function WorldLayout.FlatWeight(x: number, z: number): number
 		w = w * w * (3 - 2 * w) -- smoothstep
 		if w > weight then
 			weight = w
+			target = zone.y or 0
 		end
 	end
+	return weight, target
+end
+
+function WorldLayout.FlatWeight(x: number, z: number): number
+	local weight = WorldLayout.FlatAt(x, z)
 	return weight
+end
+
+-- Inside a homestead's biggest pad (not the blend, not the old lawn).
+function WorldLayout.OnPlotPad(x: number, z: number): boolean
+	if legacyLayout then
+		return false
+	end
+	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+	for _, slot in ipairs(PlotData.Slots) do
+		if math.abs(x - slot.X) <= half and math.abs(z - slot.Y) <= half then
+			return true
+		end
+	end
+	return false
 end
 
 ---------------------------------------------------------------------------
@@ -502,8 +771,6 @@ WorldLayout.Forest = {
 		-- Starter Forest starts there); east it meets the plot district.
 		-- Every pad is at least hubNoise, so the wander never eats a zone.
 		{ zone = "Town", west = 80, east = 30, south = 30, north = 110 },
-		-- The plot district's lawn: a strip round it, out to the beach east.
-		{ zone = "Plots", west = 40, east = 130, south = 50, north = 45 },
 	},
 	hubNoise = 30,
 	edge = 50,
@@ -551,6 +818,10 @@ for _, pad in ipairs(FOREST.hub) do
 		end
 	end
 end
+-- The near east of town used to be the district lawn, so a phone at the
+-- spawn didn't grow a forest there. Keep that patch of the ring open.
+-- The homesteads further out sit in the country.
+table.insert(HUB_RECTS, { 126, 380, -200, 80 })
 
 -- Each wild biome's disc (x, z, the radius the forest keeps out of).
 local WILD_DISCS: { { number } } = {}

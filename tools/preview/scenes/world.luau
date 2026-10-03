@@ -22,6 +22,13 @@ return {
 			{ pos = { 1080, 28, -80 }, target = { 1200, 3, -120 }, label = "the beach" },
 			{ pos = { -700, 36, 280 }, target = { -800, 0, 200 }, label = "the river" },
 			{ pos = { -620, 48, -520 }, target = { -760, 10, -650 }, label = "the Petrified Reach" },
+			{
+				pos = { -480, 80, -340 },
+				target = { -680, 8, -560 },
+				label = "the ridge between Gloam Hollow and the Petrified Reach",
+			},
+			{ pos = { 460, 70, -40 }, target = { 280, 6, 40 }, label = "Mill Meadow, the lane, and the lot" },
+			{ pos = { 80, 980, -420 }, target = { -10, 0, 160 }, label = "the homesteads from above" },
 			{ pos = { 0, 2400, -1800 }, target = { 0, 0, 100 }, label = "the whole map" },
 		}
 		return built
