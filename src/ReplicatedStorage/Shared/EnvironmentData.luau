@@ -311,38 +311,53 @@ EnvironmentData.BiomeOverrides = {
 	-- Warm greens and honey light.
 	starter = { add = { saturation = 0.03 } },
 	hills = { add = { saturation = 0.02, contrast = 0.02 } },
-	-- Cool and bright: pale blues, white drifts, cool rim light.
+	-- Cool and bright: pale blues, white drifts, cool rim light, and a cold,
+	-- frosty white-blue haze (phase 12). Its air is a floor more than an
+	-- extra (x0.7 then +0.17): a clear midday's 0.28 comes out at 0.37, but
+	-- a night that is already thick only gets a little thicker, so a clear
+	-- night here stays under the Fog weather's 0.55.
 	snow = {
-		mul = { brightness = 1.12 },
-		add = { exposure = 0.1, saturation = -0.05, atmosphereDensity = 0.04, atmosphereHaze = 0.5 },
+		mul = { brightness = 1.12, atmosphereDensity = 0.7 },
+		add = { exposure = 0.1, saturation = -0.05, atmosphereDensity = 0.17, atmosphereHaze = 1 },
 		tint = {
 			outdoorAmbient = scale(0.95, 1.0, 1.12),
-			atmosphereColor = scale(0.9, 0.97, 1.08),
+			atmosphereColor = scale(1.05, 1.08, 1.12),
+			atmosphereDecay = scale(1.1, 1.15, 1.22),
 			colorShiftTop = scale(0.8, 0.9, 1.1),
 		},
 		paint = { tint = rgb(235, 245, 255) },
 	},
-	-- Charred rock, ember-orange glow, ash in the air. (The midday tint
-	-- comes out at (255, 215, 190), the decay at (180, 80, 60).)
+	-- Charred rock, ember-orange glow, ash in the air, and its signature: a
+	-- thick red fog (phase 12). Its air is set, not added, so it is the
+	-- same at any hour: 0.55 (the Fog weather's thickness: a tree still
+	-- shows 60-100 studs off) and hazy, red-orange toward the sun and deep
+	-- red away from it (tints, so its nights stay dark). The midday tint
+	-- comes out at (255, 215, 190), the air (255, 140, 100) and the decay
+	-- (201, 61, 33).
 	volcano = {
-		add = { atmosphereDensity = 0.08, atmosphereHaze = 1, saturation = 0.02, bloomIntensity = 0.1 },
+		set = { atmosphereDensity = 0.55, atmosphereHaze = 3 },
+		add = { saturation = 0.02, bloomIntensity = 0.1 },
 		tint = {
 			tint = scale(1, 0.843, 0.745),
-			atmosphereDecay = scale(1.7, 0.66, 0.42),
-			atmosphereColor = scale(1.15, 0.85, 0.7),
+			atmosphereDecay = scale(1.9, 0.5, 0.23),
+			atmosphereColor = scale(1.3, 0.66, 0.45),
 			outdoorAmbient = scale(1.15, 0.9, 0.8),
 			cloudColor = scale(0.75, 0.6, 0.55),
 		},
 	},
-	-- Deep purples and teal glow, darker than anywhere.
+	-- Deep purples and teal glow, darker than anywhere, and a low violet
+	-- swamp mist hanging in the hollow at any hour (phase 12): its air is
+	-- set to 0.53 (thicker than any clear night out in the country, under
+	-- the Fog weather's 0.55), hazy, tinted violet.
 	grove = {
 		mul = { brightness = 0.6 },
-		add = { exposure = -0.15, atmosphereDensity = 0.08, bloomIntensity = 0.2 },
+		set = { atmosphereDensity = 0.53 },
+		add = { exposure = -0.15, atmosphereHaze = 1.2, bloomIntensity = 0.2 },
 		tint = {
 			tint = scale(0.745, 0.706, 1),
 			outdoorAmbient = scale(0.75, 0.65, 1),
-			atmosphereColor = scale(0.8, 0.7, 1.1),
-			atmosphereDecay = scale(0.8, 0.6, 1.2),
+			atmosphereColor = scale(0.8, 0.66, 1.15),
+			atmosphereDecay = scale(0.78, 0.56, 1.25),
 		},
 	},
 	-- White-gold light above the clouds, the whole map spread out below.

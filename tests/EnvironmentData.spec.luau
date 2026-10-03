@@ -153,7 +153,10 @@ return function(t)
 		local base = EnvironmentData.Blend(13, "", "Clear", 0)
 		local volcano = EnvironmentData.Blend(13, "volcano", "Clear", 0)
 		t.ok(colorDiff(volcano.tint, Color3.fromRGB(255, 215, 190)) < 2 / 255, "volcano tint")
-		t.ok(colorDiff(volcano.atmosphereDecay, Color3.fromRGB(180, 80, 60)) < 3 / 255, "volcano decay")
+		-- Phase 12 (ATMOS): its red fog (the decay was 180, 80, 60 and the air
+		-- 230, 180, 155 before).
+		t.ok(colorDiff(volcano.atmosphereDecay, Color3.fromRGB(201, 61, 33)) < 3 / 255, "volcano decay")
+		t.ok(colorDiff(volcano.atmosphereColor, Color3.fromRGB(255, 140, 100)) < 3 / 255, "volcano air")
 		local grove = EnvironmentData.Blend(13, "grove", "Clear", 0)
 		t.ok(colorDiff(grove.tint, Color3.fromRGB(190, 180, 255)) < 2 / 255, "grove tint")
 		t.ok(grove.brightness < base.brightness, "grove is darker")
@@ -170,6 +173,69 @@ return function(t)
 		-- A volcano night stays a night, just a redder one.
 		local volcanoNight = EnvironmentData.Blend(1, "volcano", "Clear", 0)
 		t.ok(volcanoNight.atmosphereDecay.R < 0.4)
+	end)
+
+	-- Phase 12 (ATMOS): each region's own air. (The preview can't draw
+	-- Atmosphere, so these numbers are the whole check before Studio.)
+	t.test("region air: the Volcano's red fog, the Snowfields' frost haze, Gloam Hollow's violet swamp mist", function()
+		local function lum(c)
+			return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+		end
+		local country = EnvironmentData.Blend(13, "", "Clear", 0)
+		-- The Volcano: its signature, a thick red fog at any hour. Thick, but
+		-- a tree still shows 60-100 studs off (0.5-0.6, the Fog weather's
+		-- 0.55 give or take), hazy, red-orange toward the sun and deep red
+		-- away from it; never black (its light is the hour's).
+		for _, h in ipairs({ 1, 4, 6, 9, 13, 17.5, 20, 23 }) do
+			local v = EnvironmentData.Blend(h, "volcano", "Clear", 0)
+			local here = string.format("the Volcano at %.1f", h)
+			t.ok(v.atmosphereDensity >= 0.5 and v.atmosphereDensity <= 0.6, here .. ": " .. v.atmosphereDensity)
+			t.ok(v.atmosphereHaze >= 2.5, here .. " is hazy")
+			local c, d = v.atmosphereColor, v.atmosphereDecay
+			t.ok(c.R > c.G * 1.5 and c.R > c.B * 1.8, here .. ": red-orange air")
+			t.ok(d.R > d.G * 2.5 and d.R > d.B * 3, here .. ": a deep red decay")
+			t.eq(v.brightness, EnvironmentData.Blend(h, "", "Clear", 0).brightness, here .. ": the hour's light")
+		end
+		t.ok(
+			EnvironmentData.Blend(13, "volcano", "Clear", 0).atmosphereDensity > country.atmosphereDensity + 0.2,
+			"the Volcano is much thicker than the country by day"
+		)
+		-- The Snowfields: a cold, frosty white-blue haze, a modest step up
+		-- from the country's air, and never clearer than it at night.
+		local snow = EnvironmentData.Blend(13, "snow", "Clear", 0)
+		t.ok(
+			snow.atmosphereDensity > country.atmosphereDensity + 0.05
+				and snow.atmosphereDensity < country.atmosphereDensity + 0.15,
+			"a modest frost haze: " .. snow.atmosphereDensity
+		)
+		t.ok(snow.atmosphereHaze > country.atmosphereHaze + 0.5, "hazier than the country")
+		local air = snow.atmosphereColor
+		t.ok(air.B >= air.G and air.G >= air.R and lum(air) > 0.8, "pale blue-white air")
+		t.ok(snow.atmosphereDecay.B > snow.atmosphereDecay.R, "cold away from the sun")
+		for _, h in ipairs({ 1, 6, 23 }) do
+			local s = EnvironmentData.Blend(h, "snow", "Clear", 0)
+			local open = EnvironmentData.Blend(h, "", "Clear", 0)
+			t.ok(s.atmosphereDensity >= open.atmosphereDensity, string.format("the snow's air at %.1f", h))
+			if h ~= 6 then -- (dawn is pink everywhere)
+				t.ok(s.atmosphereColor.B > s.atmosphereColor.R, string.format("a cold night fog at %.1f", h))
+			end
+		end
+		-- Gloam Hollow: a low violet swamp mist hanging in the hollow at any
+		-- hour, mistier and hazier than the country (its light, the darkest
+		-- at night and never black, is the test above).
+		for _, h in ipairs({ 1, 13, 23 }) do
+			local g = EnvironmentData.Blend(h, "grove", "Clear", 0)
+			local open = EnvironmentData.Blend(h, "", "Clear", 0)
+			local here = string.format("Gloam Hollow at %.1f", h)
+			t.ok(g.atmosphereDensity >= open.atmosphereDensity, here .. " is mistier")
+			t.ok(g.atmosphereHaze > open.atmosphereHaze + 0.5, here .. " is hazier")
+			local c = g.atmosphereColor
+			t.ok(c.B > c.R and c.R > c.G, here .. ": violet air")
+		end
+		t.ok(
+			EnvironmentData.Blend(13, "grove", "Clear", 0).atmosphereDensity >= country.atmosphereDensity + 0.15,
+			"a real mist by day"
+		)
 	end)
 
 	-- STY-05: the night mist, LT2's way.
@@ -199,12 +265,16 @@ return function(t)
 		local bare = EnvironmentData.TimeOfDay(1)
 		t.ok(math.abs(night.atmosphereDensity - (bare.atmosphereDensity + mist.atmosphereDensity)) < 1e-9, "denser")
 		t.ok(math.abs(night.atmosphereHaze - (bare.atmosphereHaze + mist.atmosphereHaze)) < 1e-9, "hazier")
-		-- A little: under the Fog weather's 0.55 in every biome on a clear night.
+		-- A little: under the Fog weather's 0.55 in every biome on a clear
+		-- night but one: the Volcano's red fog is its own (phase 12), thick at
+		-- any hour, but never so thick its trees vanish.
 		t.ok(mist.atmosphereDensity > 0 and mist.atmosphereDensity <= 0.1, "a little")
-		for _, biome in ipairs({ "", "starter", "hills", "snow", "volcano", "grove" }) do
+		for _, biome in ipairs({ "", "starter", "hills", "snow", "grove" }) do
 			local s = EnvironmentData.Blend(1, biome, "Clear", 0)
 			t.ok(s.atmosphereDensity < 0.55, string.format("%s's clear night is thinner than fog", biome))
 		end
+		local volcanoNight = EnvironmentData.Blend(1, "volcano", "Clear", 0)
+		t.ok(volcanoNight.atmosphereDensity <= 0.65, "the Volcano's night stays findable")
 		-- Only the air: the night's light is what it was.
 		t.eq(night.brightness, bare.brightness)
 		t.ok(colorDiff(night.outdoorAmbient, bare.outdoorAmbient) < 1e-9, "the night's fill")
