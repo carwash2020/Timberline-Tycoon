@@ -101,7 +101,7 @@ export type Box = {
 	offset: Vector3, -- centre, relative to the item's ground centre
 	color: string, -- hex
 	material: string, -- Enum.Material name
-	shape: string?, -- "Cylinder" (axis X) or "Ball"; default a block
+	shape: string?, -- "Cylinder" (axis X), "Ball", or "Wedge" (low end at -Z); default a block
 	light: boolean?, -- a warm PointLight in it
 	smoke: boolean?, -- a chimney: the client puffs smoke here (not on Low)
 }
@@ -203,9 +203,16 @@ PlotData.Blueprints = {
 		tier = 1,
 		footprint = Vector2.new(4, 8),
 		boxes = {
-			{ size = Vector3.new(4, 0.4, 8), offset = Vector3.new(0, 2, 0), color = WOOD, material = "WoodPlanks" },
+			-- WedgePart: full height at +Z, ground at -Z. Matches the stair mesh (rise 4 over 8).
+			{
+				size = Vector3.new(4, 4, 8),
+				offset = Vector3.new(0, 2, 0),
+				color = WOOD,
+				material = "WoodPlanks",
+				shape = "Wedge",
+			},
 		},
-		note = "A short flight of stairs",
+		note = "A flight of stairs, rising toward the back",
 	},
 	{
 		id = "Shed",
