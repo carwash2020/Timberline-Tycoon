@@ -27,6 +27,7 @@ local RunService = game:GetService("RunService")
 
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local Handling = require(ReplicatedStorage.Shared.Handling)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local TruckLayout = require(ReplicatedStorage.Shared.TruckLayout)
@@ -39,10 +40,9 @@ local VehicleController = {}
 
 local player = Players.LocalPlayer
 
-local MAX_TILT = math.rad(30) -- the steepest the truck leans to follow the ground
+local MAX_TILT = math.rad(30) -- the steepest a loose truck leans to follow the ground
 local RAY_UP = 2.5 -- corner rays start this far above the chassis...
 local RAY_DOWN = 9 -- ...and look this far down
-local UP_SMOOTHING = 12 -- how fast the truck's lean follows the ground (per second)
 
 type Session = {
 	truck: Model,
@@ -52,7 +52,8 @@ type Session = {
 	heading: AlignOrientation,
 	topSpeed: number,
 	turnRate: number,
-	minRadius: number?, -- tightest turning circle (DriveMath.MinTurnRadius)
+	minRadius: number?, -- tightest turning circle (DriveMath.MinTurnRadius, wider while towing)
+	feel: Handling.Profile,
 	speed: number,
 	facing: Vector3, -- flat unit vector the truck is steering toward
 	up: Vector3, -- the ground's up under the truck, smoothed
@@ -84,7 +85,11 @@ local function startDriving(seat: VehicleSeat)
 	-- change it). Unknown truck: no limit beyond turnRate.
 	local truckId = truck:GetAttribute("TruckId")
 	local def = if type(truckId) == "string" then ItemCatalog.GetTruck(truckId) else nil
-	local minRadius = if def then DriveMath.MinTurnRadius(TruckLayout.Wheelbase(TruckLayout.For(def))) else nil
+	local feel = Handling.For(if type(truckId) == "string" then truckId else nil)
+	local hitched = type(truck:GetAttribute("TrailerId")) == "string" and truck:GetAttribute("TrailerId") ~= ""
+	local minRadius = if def
+		then Handling.TowRadius(DriveMath.MinTurnRadius(TruckLayout.Wheelbase(TruckLayout.For(def))), hitched)
+		else nil
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { truck, player.Character :: Instance }
@@ -98,6 +103,7 @@ local function startDriving(seat: VehicleSeat)
 		topSpeed = (truck:GetAttribute("TopSpeed") :: number?) or 26,
 		turnRate = (truck:GetAttribute("TurnRate") :: number?) or 1.4,
 		minRadius = minRadius,
+		feel = feel,
 		speed = 0,
 		facing = VehicleLogic.FlatFacing(chassis.CFrame.LookVector),
 		up = chassis.CFrame.UpVector,
@@ -133,14 +139,17 @@ local function step(dt: number)
 	end
 	local velocity = s.chassis.AssemblyLinearVelocity
 	local actual = Vector3.new(velocity.X, 0, velocity.Z):Dot(s.facing)
-	s.speed = DriveMath.Speed(s.speed, s.seat.ThrottleFloat, s.topSpeed, dt, actual)
-	local turn = DriveMath.Turn(s.speed, s.seat.SteerFloat, s.turnRate, dt, s.minRadius)
+	s.speed = Handling.Speed(s.speed, s.seat.ThrottleFloat, s.topSpeed, dt, actual, s.feel)
+	local turn = Handling.Turn(s.speed, s.seat.SteerFloat, s.turnRate, dt, s.minRadius, s.feel, s.topSpeed)
 	s.facing = VehicleLogic.FlatFacing(CFrame.Angles(0, turn, 0):VectorToWorldSpace(s.facing))
 
-	-- Lean with the ground, smoothly (slopes, bumps, later biomes).
-	local target = groundUp(s)
-	local alpha = 1 - math.exp(-UP_SMOOTHING * dt)
-	s.up = VehicleLogic.ClampTilt(s.up:Lerp(target, alpha), MAX_TILT)
+	-- Lean with the ground, pulled upright by this truck's tip resistance.
+	local target = Handling.Lean(groundUp(s), s.feel.tipResist, MAX_TILT)
+	local alpha = 1 - math.exp(-s.feel.suspension * dt)
+	s.up = s.up:Lerp(target, alpha)
+	if s.up.Magnitude > 1e-4 then
+		s.up = s.up.Unit
+	end
 	s.heading.CFrame = VehicleLogic.HeadingCFrame(s.facing, s.up)
 	local move = s.facing * s.speed
 	s.drive.PlaneVelocity = Vector2.new(move.X, move.Z)
