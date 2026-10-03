@@ -58,9 +58,12 @@ SoundData.Sounds = {
 	-- A truck's engine loop (VehicleFX sets the pitch per truck). Silent
 	-- until an id is picked: Toolbox > Audio, Creator = Roblox, "engine".
 	Engine = { id = "", volume = 0.35, looped = true, rolloff = 80 },
-	-- Ambience (loops)
+	-- Ambience (loops). River and the waterfall are public-domain Creator
+	-- Store sounds (Pro Sound Effects: "River Water 1", "Waterfall
+	-- Background Water Roar 1"). 6564308795 was a private upload Studio
+	-- refuses ("experience doesn't have access permission").
 	Rain = { id = "rbxassetid://1516791621", volume = 0.35, looped = true },
-	River = { id = "rbxassetid://6564308795", volume = 0.4, rolloff = 70, looped = true },
+	River = { id = "rbxassetid://9118187543", volume = 0.4, rolloff = 70, looped = true },
 	-- The living world (AmbientSound, AmbientLife, WeatherController). Empty
 	-- ids are slots waiting for a sound picked in Studio (Toolbox -> Audio,
 	-- Creator = Roblox): until then they stay silent and nothing breaks.
@@ -68,7 +71,7 @@ SoundData.Sounds = {
 	CricketsNight = { id = "", volume = 0.25, looped = true }, -- crickets and frogs, at night
 	WindHowl = { id = "", volume = 0.35, looped = true }, -- the Snowfields, the isles, storms
 	LavaRumble = { id = "", volume = 0.4, looped = true }, -- a low rumble at the Volcano
-	WaterfallRoar = { id = "rbxassetid://6564308795", volume = 0.7, rolloff = 260, looped = true },
+	WaterfallRoar = { id = "rbxassetid://9120549564", volume = 0.7, rolloff = 260, looped = true },
 	FishSplash = { id = "rbxasset://sounds/impact_water.mp3", volume = 0.22, speed = { 1.5, 1.8 }, rolloff = 60 },
 	Wings = { id = "", volume = 0.4, rolloff = 60 }, -- a flock taking off
 	Quack = { id = "", volume = 0.35, rolloff = 50 },

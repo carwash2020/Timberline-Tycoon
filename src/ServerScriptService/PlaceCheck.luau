@@ -1,8 +1,10 @@
 --!strict
 -- PlaceCheck: does the live place match default.project.json? (PLAY-02)
--- `rojo serve` doesn't sync place settings, and Max Players and Studio API
--- access are set by hand, so the place being tested (or the one players
--- get) can drift. GameServer runs this once at boot:
+-- `rojo serve` doesn't sync place settings. Max Players is a Game
+-- Settings value: Studio Play does not read it from the file (a fresh
+-- build.rbxlx still plays at 60), and Studio API access is set by hand,
+-- so the place being tested (or the one players get) can drift.
+-- GameServer runs this once at boot:
 --   * one warning per setting that differs, naming the fix;
 --   * "can't check X from a script" (a print, never an error) for a
 --     setting Roblox doesn't let scripts read;
@@ -64,7 +66,8 @@ PlaceCheck.Expected = {
 		property = "MaxPlayers",
 		value = 12,
 		atMost = true,
-		fix = "Game Settings > Places > Max Players = 12",
+		fix = "Game Settings > Places > Max Players = 12."
+			.. " A fresh build.rbxlx does not set this: Roblox stores Max Players on the place, not in the file",
 	},
 } :: { Expectation }
 

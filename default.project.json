@@ -62,7 +62,14 @@
         "ShadowSoftness": 0.35,
         "EnvironmentDiffuseScale": 0.6,
         "EnvironmentSpecularScale": 0.35,
-        "GeographicLatitude": 35
+        "GeographicLatitude": 35,
+        "Attributes": {
+          "RBX_BackupBrightness": { "Float32": 1 },
+          "RBX_BackupExposureCompensation": { "Float32": 0 },
+          "RBX_LightingCompatibilityMigrated": { "Bool": true },
+          "RBX_LightingTechnologyUnifiedMigration": { "Bool": true },
+          "RBX_OriginalTechnologyOnFileLoad": { "Int32": 2 }
+        }
       }
     }
   }
