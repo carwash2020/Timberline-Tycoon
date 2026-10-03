@@ -564,6 +564,50 @@ local function gooseneck(parent: Instance, cf: CFrame)
 	light(dBall(parent, "LampBulb", 0.42, cf * CF(0, 0.72, -1.32), GLOW, MAT.Neon), 10, 1.2)
 end
 
+-- A shop's or the sawmill's name sign (phase 12): a big, bold board in the
+-- building's colours with a thick frame, its name on the front (or both
+-- faces), up where the street and the lot can read it. Looks only, like
+-- every sign (nothing of it collides). `cf` = the board's middle, facing
+-- -Z. The board is named "Sign"; fitNameSign sizes its text once the
+-- building is scaled.
+local NAME_FRAME = 0.45 -- a name sign's frame (a plain board's is 0.3)
+local function nameSign(
+	parent: Instance,
+	cf: CFrame,
+	w: number,
+	h: number,
+	text: string,
+	board: Color3,
+	frame: Color3,
+	ink: Color3,
+	bothSides: boolean
+): Part
+	local b = dBox(parent, "Sign", V3(w, h, 0.5), cf, board)
+	Kit.signText(b, text, ink, if bothSides then nil else { Enum.NormalId.Front })
+	local f = NAME_FRAME
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(parent, "SignFrame", V3(w + 2 * f, f, 0.7), cf * CF(0, s * (h + f) / 2, 0), frame)
+		dBox(parent, "SignFrame", V3(f, h, 0.7), cf * CF(s * (w + f) / 2, 0, 0), frame)
+	end
+	return b
+end
+
+-- Roblox draws TextScaled text 100 pixels tall at most, so at Kit.signText's
+-- 40 pixels a stud a sign's letters never grow past about 2.5 studs, however
+-- big its board. A name sign's text gets as many pixels a stud as fit the
+-- board's height into NAME_SIGN_PIXELS (its text box, inside the padding,
+-- about 100), so its letters fill the board the way a small sign's do. Run
+-- it on the finished (scaled) board.
+local NAME_SIGN_PIXELS = 120
+local function fitNameSign(board: BasePart)
+	local pixelsPerStud = math.clamp(NAME_SIGN_PIXELS / board.Size.Y, 10, 40)
+	for _, gui in ipairs(board:GetChildren()) do
+		if gui:IsA("SurfaceGui") then
+			gui.PixelsPerStud = pixelsPerStud
+		end
+	end
+end
+
 -- A log along cf's X with pale end caps (`caps` 0, 1 = the +X end, 2).
 local function log(
 	parent: Instance,
@@ -855,25 +899,18 @@ function BuildingArt.Sawmill(scale: number?): Model
 	dCyl(model, "Medallion", 0.48, 0.6, slice, Kit.shade(HEART, -0.25))
 	gableRoof(model, CF(0, TOP, zMid) * ANG(0, PI / 2, 0), depth + 2.4, 23.4, RISE, 1.4, rng, roofStyle)
 
-	-- The crest sign above the ridge, on two posts standing on the roof.
-	local signY, signZ = TOP + RISE + 2.4, Z0 - 0.3
-	signBoard(
-		model,
-		"Sign",
-		CF(0, signY, signZ),
-		17,
-		3.4,
-		"TIMBERLINE SAWMILL",
-		SIGN_BOARD,
-		TIMBER_LIGHT,
-		SIGN_INK,
-		true
-	)
+	-- The crest sign above the ridge (phase 12: bigger and bolder, still
+	-- cream on dark brown, now in a honey frame), its frame clear of the
+	-- ridge cap, on two posts standing on the roof, lit by two goosenecks.
+	local signW, signH = 26.4, 4.6
+	local signY, signZ = TOP + RISE + 0.85 + NAME_FRAME + signH / 2, Z0 - 0.3
+	local crest =
+		nameSign(model, CF(0, signY, signZ), signW, signH, "TIMBERLINE SAWMILL", SIGN_BOARD, LUMBER, SIGN_INK, true)
 	for _, s in ipairs({ -1, 1 }) do
-		local roofY = TOP + RISE * (1 - 5.5 / 11.7)
-		local h = signY - 1.7 - roofY + 0.6
-		Kit.part(model, "SignPost", V3(0.7, h, 0.7), CF(s * 5.5, roofY - 0.6 + h / 2, signZ + 0.65), TIMBER, MAT.Wood)
-		gooseneck(model, CF(s * 4.6, signY + 1.85, signZ - 0.2))
+		local roofY = TOP + RISE * (1 - 8 / 11.7)
+		local h = signY - signH / 2 - roofY + 0.6
+		Kit.part(model, "SignPost", V3(0.7, h, 0.7), CF(s * 8, roofY - 0.6 + h / 2, signZ + 0.6), TIMBER, MAT.Wood)
+		gooseneck(model, CF(s * 8.8, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
 
 	-- The office cabin (west): x -20..-11.3, z -7..9.
@@ -1043,6 +1080,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 	crate(model, CF(-19, 0, -8.4) * ANG(0, 0.2, 0), 1.8, rng, true)
 	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, true)
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
+	fitNameSign(crest)
 	return model
 end
 
@@ -1137,10 +1175,19 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		end
 	end
 
-	-- The sign on the gable, a hay hoist above it, windows, lanterns.
-	signBoard(model, "Sign", CF(0, 10.6, -HZ - 0.45), 9.6, 2.3, title, TRIM, TIMBER, doorRed, false)
-	for _, x in ipairs({ -3.2, 3.2 }) do
-		gooseneck(model, CF(x, 11.9, -HZ - 0.53)) -- either side of the hoist (TWN-07)
+	-- The name sign up on the ridge (phase 12): a big board in the barn's
+	-- red, framed in white like its doors, its frame clear of the ridge cap,
+	-- on two posts standing on the roof, lit by two goosenecks (kept in from
+	-- the east end, where the AXES marker floats). Then the hay hoist on the
+	-- gable, windows, lanterns.
+	local signW, signH = 17, 3.8
+	local signY, signZ = RY + 1.05 + NAME_FRAME + signH / 2, -HZ - 0.4
+	nameSign(model, CF(0, signY, signZ), signW, signH, title, accent, TRIM, TRIM, false)
+	for _, s in ipairs({ -1, 1 }) do
+		local roofY = RY - (RY - KY) * 4.6 / KX -- the upper roof, 4.6 out from the ridge
+		local h = signY - signH / 2 - roofY + 0.5
+		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(s * 4.6, roofY - 0.5 + h / 2, signZ + 0.5), TIMBER)
+		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
 	dBox(model, "HoistBeam", V3(0.7, 0.7, 2.8), CF(0, 13.45, -HZ - 1.1), TIMBER)
 	dCyl(model, "Pulley", 0.3, 0.8, CF(0, 12.85, -HZ - 2.2), IRON, MAT.Metal)
@@ -1246,9 +1293,18 @@ local function dealership(model: Model, title: string, accent: Color3)
 	dBox(model, "Stripe", V3(GX1 - GX0 + 0.2, 0.35, 0.2), CF(gx, TOP - 0.2, Z0 - 0.38), paint[1])
 	dCyl(model, "Badge", 0.3, 1.3, CF(gx, 13.75, Z0 - 0.42) * ANG(0, PI / 2, 0), TYRE, MAT.Rubber)
 	dCyl(model, "Badge", 0.36, 0.6, CF(gx, 13.75, Z0 - 0.42) * ANG(0, PI / 2, 0), paint[1], MAT.Metal)
-	signBoard(model, "Sign", CF(gx, 11.55, Z0 - 0.42), 11.2, 2.3, title, paint[3], dark, TRIM, false)
-	for _, x in ipairs({ gx - 3.8, gx + 3.8 }) do
-		gooseneck(model, CF(x, 12.85, Z0 - 0.5))
+	-- The name sign up on the false front (phase 12): a big board in the
+	-- accent blue, framed in white, its frame clear of the cornice, on two
+	-- posts standing on the side cornices, lit by two goosenecks. It runs
+	-- from the shop's west edge to just short of the office, over which the
+	-- TRUCKS marker floats.
+	local signX, signW, signH = -3.35, 16.2, 3.6
+	local signY, signZ = 14.9 + 0.2 + NAME_FRAME + signH / 2, Z0 - 0.5
+	nameSign(model, CF(signX, signY, signZ), signW, signH, title, paint[1], TRIM, TRIM, false)
+	for _, s in ipairs({ -1, 1 }) do
+		local h = signY - signH / 2 - 13.15 -- from just inside the side cornice (its top at 13.4)
+		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(signX + s * 4.3, 13.15 + h / 2, Z0), dark, MAT.Metal)
+		gooseneck(model, CF(signX + s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
 	for _, x in ipairs({ DX0, DX1 }) do
 		Kit.part(model, "DoorJamb", V3(0.8, DH - FLOOR, 0.9), CF(x, (DH + FLOOR) / 2, Z0 - 0.15), dark, MAT.Metal)
@@ -1430,9 +1486,15 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 		planter(model, CF(s * 5.7, 0, -9.3), rng)
 	end
 	dBox(model, "AwningBeam", V3(9.2, 0.35, 0.4), CF(0, 6.65, -9.75), wood)
-	signBoard(model, "Sign", CF(0, 7.95, -9.75), 8, 1.9, title, hex("#3E5E3A"), wood, TRIM, true)
-	for _, x in ipairs({ -2.4, 2.4 }) do
-		gooseneck(model, CF(x, 9.05, -9.83)) -- lighting the street side (TWN-07)
+	-- The name sign over the entrance (phase 12): a long board in a deep
+	-- shutter green, framed in the timbers' brown, standing on the awning
+	-- posts' tops (9 up), its name on both faces, lit by two goosenecks kept
+	-- to the middle (the BLUEPRINTS & GEAR marker floats over the east roof).
+	local signW, signH = 17.6, 2.6
+	local signY = 9 + 0.02 + NAME_FRAME + signH / 2
+	nameSign(model, CF(0, signY, -9.75), signW, signH, title, hex("#3E6A3A"), wood, TRIM, true)
+	for _, x in ipairs({ -2.6, 2.6 }) do
+		gooseneck(model, CF(x, signY + (signH + NAME_FRAME) / 2, -9.83)) -- lighting the street side (TWN-07)
 	end
 
 	-- The bay window (west) and a shuttered window (east), with flowers.
@@ -1560,6 +1622,10 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		end
 	end
 	Kit.scaleModel(model, s, rigid)
+	local sign = model:FindFirstChild("Sign")
+	if sign and sign:IsA("BasePart") then
+		fitNameSign(sign)
+	end
 	return model
 end
 
