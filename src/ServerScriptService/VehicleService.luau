@@ -69,6 +69,7 @@ local RunService = game:GetService("RunService")
 
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
+local StreamAhead = require(ReplicatedStorage.Shared.StreamAhead)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
@@ -133,6 +134,10 @@ type TruckRecord = {
 	lastGood: CFrame, -- the last position it accepted
 	lastGoodAt: number, -- when (os.clock)
 	lastCheck: number,
+	-- Streaming ahead of a loaded truck (Shared/StreamAhead). The place's
+	-- stream radius and pause mode stay as PlaceCheck set them.
+	lastStreamAt: number,
+	streamBusy: boolean,
 }
 
 local trucks: { [number]: TruckRecord } = {} -- [userId]
@@ -640,6 +645,52 @@ local function judgeNow(rec: TruckRecord, accept: boolean): CFrame
 end
 
 -- While driving: judges the truck every SPEED_CHECK_EVERY seconds.
+local STREAM_TIMEOUT = 10 -- seconds one RequestStreamAroundAsync may take (the gondola uses the same)
+
+-- The bed's saved logs, or loose wood riding on it (the v2 hook).
+local function truckLoaded(rec: TruckRecord): boolean
+	if #rec.bed > 0 then
+		return true
+	end
+	local countLoose = VehicleService.Hooks.loadCount
+	if not countLoose then
+		return false
+	end
+	local ok, n = pcall(countLoose, rec.model)
+	return ok and type(n) == "number" and n > 0
+end
+
+-- While the owner drives a loaded truck, ask their client to stream the
+-- point a few seconds ahead along the velocity. Once a second, one request
+-- at a time, and a failure never touches the drive. Same shape as the
+-- gondola's RequestStreamAroundAsync.
+local function streamLoadedTruck(rec: TruckRecord)
+	local player = rec.owner
+	if player.Parent == nil or rec.chassis.Parent == nil then
+		return
+	end
+	local velocity = if GameConfig.VehiclePhysics
+		then rec.chassis.AssemblyLinearVelocity
+		else rec.chassis.CFrame.LookVector * rec.arcadeSpeed
+	if velocity.Magnitude < StreamAhead.MinSpeed then
+		return
+	end
+	local since = os.clock() - rec.lastStreamAt
+	if not StreamAhead.Due(true, truckLoaded(rec), since, rec.streamBusy, StreamAhead.Every) then
+		return
+	end
+	local ahead = StreamAhead.Ahead(rec.chassis.Position, velocity, StreamAhead.Seconds)
+	rec.lastStreamAt = os.clock()
+	rec.streamBusy = true
+	task.spawn(function()
+		pcall(function(): any
+			player:RequestStreamAroundAsync(ahead, STREAM_TIMEOUT)
+			return nil
+		end)
+		rec.streamBusy = false
+	end)
+end
+
 local function speedCheck(rec: TruckRecord)
 	if os.clock() - rec.lastCheck >= SPEED_CHECK_EVERY then
 		judgeNow(rec, true)
@@ -1325,6 +1376,8 @@ function VehicleService.SpawnTruck(
 		lastGood = model:GetPivot(),
 		lastGoodAt = now,
 		lastCheck = now,
+		lastStreamAt = 0,
+		streamBusy = false,
 	}
 	trucks[player.UserId] = rec
 	table.insert(
@@ -1345,6 +1398,7 @@ function VehicleService.SpawnTruck(
 			if not rec.driver or not rec.driver.Parent then
 				return
 			end
+			streamLoadedTruck(rec)
 			if GameConfig.VehiclePhysics then
 				speedCheck(rec)
 			else

@@ -17,10 +17,12 @@ local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local LightingController = require(script.Parent.LightingController)
+local Quality = require(script.Parent.Quality)
 
 local AmbientSound = {}
 
@@ -192,21 +194,28 @@ function AmbientSound.Start()
 
 	local sinceUpdate = math.huge
 	local sinceWater = math.huge
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
-		sinceWater += dt
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
+		sinceWater += step
 		if sinceWater >= WATER_EVERY then
 			sinceWater = 0
 			updateWater()
 		end
-		sinceUpdate += dt
+		sinceUpdate += step
 		if sinceUpdate < UPDATE_EVERY then
 			return
 		end
-		local step = sinceUpdate
+		local elapsed = sinceUpdate
 		sinceUpdate = 0
 		setTargets(LightingController.Environment())
 		for _, b in pairs(beds) do
-			stepBed(b, step)
+			stepBed(b, elapsed)
 		end
 	end)
 end

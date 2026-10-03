@@ -83,8 +83,13 @@ return function(t)
 		end
 	end)
 
-	t.test("graphics quality 5-10 is high, even on a phone", function()
-		for level = 5, 10 do
+	t.test("graphics quality 5-7 is medium and 8-10 is high, even on a phone", function()
+		for level = 5, 7 do
+			local c = client("QualityLevel" .. level, true, false)
+			t.eq(c.Quality.Tier(), "medium")
+			t.eq(c.Quality.Budget(), QualityBudgets.Medium)
+		end
+		for level = 8, 10 do
 			local c = client("QualityLevel" .. level, true, false)
 			t.eq(c.Quality.Budget(), QualityBudgets.High)
 		end
@@ -119,10 +124,10 @@ return function(t)
 		c.set("QualityLevel3")
 		t.eq(c.Quality.Tier(), "low")
 		c.set("QualityLevel6")
-		t.eq(c.Quality.Tier(), "high")
+		t.eq(c.Quality.Tier(), "medium")
 		t.eq(
 			c.prints,
-			{ "[Quality] high (QualityLevel8)", "[Quality] low (QualityLevel2)", "[Quality] high (QualityLevel6)" },
+			{ "[Quality] high (QualityLevel8)", "[Quality] low (QualityLevel2)", "[Quality] medium (QualityLevel6)" },
 			"one line per change"
 		)
 		t.eq(#c.warnings, 0)

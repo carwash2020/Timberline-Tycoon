@@ -11,6 +11,7 @@
 -- The final save also commits playtime, the truck load and left-behind
 -- wood (LeaveCommit), including when the server shuts down.
 
+local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -1143,4 +1144,15 @@ for _, p in ipairs(Players:GetPlayers()) do
 end
 
 -- The boot report (PLAY-01): how long the world took, trees, players.
+-- The same timings go to Creator Hub as custom events. LogCustomEvent
+-- needs a player, so if the server is still empty they ride the first join.
 print(BootReport.Line(workspace, #Players:GetPlayers()))
+if not BootReport.Log(workspace, Players:GetPlayers(), AnalyticsService) then
+	local bootConn: RBXScriptConnection? = nil
+	bootConn = Players.PlayerAdded:Connect(function(player: Player)
+		if BootReport.Log(workspace, { player }, AnalyticsService) and bootConn then
+			bootConn:Disconnect()
+			bootConn = nil
+		end
+	end)
+end

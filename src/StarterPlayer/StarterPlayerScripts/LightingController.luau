@@ -38,6 +38,7 @@ local RunService = game:GetService("RunService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local Quality = require(script.Parent.Quality)
@@ -612,10 +613,19 @@ function LightingController.Start()
 	apply(owned, current)
 	applyExposure(current, 0)
 
+	local sinceCosmetic = 0
 	RunService.RenderStepped:Connect(function(dt: number)
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
 		-- WLD-18: ease and write 10 times a second, by all the time since the
-		-- last write, so the ease is the same at any frame rate.
-		local write, easeBy, left = EnvironmentData.WriteTick(pending, dt)
+		-- last write, so the ease is the same at any frame rate. On medium
+		-- and low the whole pass runs less often; `step` is the time since
+		-- the last one, so the ease still matches the clock.
+		local write, easeBy, left = EnvironmentData.WriteTick(pending, step)
 		pending = left
 		-- The sun, every frame, from the server's clock (or Studio's
 		-- ClockOverride): one property, and shadows must not step.

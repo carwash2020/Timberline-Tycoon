@@ -36,8 +36,10 @@
 --     and the canopies lean the same way.
 
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local LightingController = require(script.Parent.LightingController)
 local Quality = require(script.Parent.Quality)
 local TreeFX = require(script.Parent.TreeFX)
@@ -404,14 +406,21 @@ function WindSway.Start()
 
 	local sinceScan = math.huge
 	local sinceWind = math.huge
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
 		local now = os.clock()
-		sinceWind += dt
+		sinceWind += step
 		if sinceWind >= WIND_EVERY then
 			sinceWind = 0
 			updateWind(now)
 		end
-		sinceScan += dt
+		sinceScan += step
 		if sinceScan >= SCAN_EVERY then
 			sinceScan = 0
 			scan()

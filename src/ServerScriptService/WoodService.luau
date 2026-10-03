@@ -39,7 +39,9 @@
 --     WoodDespawnAfterSec more it goes. Held wood and wood on its owner's
 --     bed (Hooks.onBed) count as touched. Past MaxWoodPiecesPerPlayer
 --     (a player's oldest untouched go) or MaxWoodPartsServer (the oldest
---     unowned go first, then the oldest untouched) pieces are removed.
+--     unowned loose wood goes first, then the oldest untouched) pieces
+--     are removed. Sawmill planks are pieces too: the cap counts every
+--     part on the model, a plank included, not a cached guess.
 --     Wood that drops 50 below the isles' floor is lost to the clouds.
 --   * WoodWatch (Watch, every WoodJudgeEvery): every piece a player's
 --     device simulates (held, just let go, freshly felled, on a driven
@@ -722,10 +724,15 @@ end
 local function enforceCaps()
 	local entries: { CapEntry } = {}
 	for uid, p in pairs(pieces) do
+		-- Count the parts that are actually there (a sawmill plank is one
+		-- section; a log's bark and cut faces count too). The oldest loose
+		-- wood is what PickEvictions drops first.
+		local parts = partsIn(p.model)
+		p.partCount = parts
 		table.insert(entries, {
 			uid = uid,
 			ownerId = p.ownerId,
-			parts = p.partCount,
+			parts = parts,
 			lastInteracted = p.lastInteracted,
 			protected = p.selling == true or GrabService.HeldBy(p.model) ~= nil,
 		})
