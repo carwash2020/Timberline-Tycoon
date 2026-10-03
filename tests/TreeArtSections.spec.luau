@@ -27,7 +27,7 @@ return function(t)
 	local WoodData = t.shared("WoodData")
 	local ForestData = t.shared("ForestData")
 	local roblox = t.roblox
-	local Enum, Vector3, CFrame = roblox.Enum, roblox.Vector3, roblox.CFrame
+	local Enum, Vector3, CFrame, Color3 = roblox.Enum, roblox.Vector3, roblox.CFrame, roblox.Color3
 
 	local woods = WoodData.All()
 	local ELDER = ForestData.Elder.scale
@@ -93,27 +93,135 @@ return function(t)
 		end
 	end)
 
-	t.test("leaf crowns are crisp cubes; bark follows the wood", function()
+	t.test("leaf crowns are crystal-cut wedges; bark follows the wood", function()
 		for _, id in ipairs({ "oak", "birch", "pine", "maple", "frostwood", "phantomwood", "lumenwood" }) do
 			local model = build(id, 4, 1)
 			local def = WoodData.Get(id)
-			local crown = 0
+			local crown, tilted = 0, 0
+			local signed = false
 			for _, p in ipairs(parts(model)) do
 				if p.Name == "Leaves" or p.Name == "Facet" then
 					crown += 1
-					t.eq(p.Shape, Enum.PartType.Block, id .. " crown is boxes")
-					t.ok(math.abs(p.CFrame.UpVector.Y) > 0.99, id .. " " .. p.Name .. " sits flat")
-					t.ok(math.abs(p.Size.X - p.Size.Z) < 1e-3, id .. ": a square footprint")
+					t.ok(p:IsA("WedgePart"), id .. " " .. p.Name .. " is a crystal facet")
+					if math.abs(p.CFrame.UpVector.Y) < 0.99 then
+						tilted += 1
+					end
 				elseif p.Name == "Section" then
 					t.eq(p.Material, TreeArt.BarkMaterial(def), id .. " bark")
 				end
+				if p:GetAttribute("Signature") == TreeArt.Signatures[id] then
+					signed = true
+				end
 			end
 			t.ok(crown >= 4, id .. " has a crown")
+			t.ok(tilted >= 1, id .. " facets are cut, not flat cubes")
+			t.ok(signed, id .. " carries its signature (" .. tostring(TreeArt.Signatures[id]) .. ")")
 		end
 		t.eq(TreeArt.BarkMaterial(WoodData.Get("oak")), Enum.Material.Wood)
 		t.eq(TreeArt.BarkMaterial(WoodData.Get("frostwood")), Enum.Material.SmoothPlastic)
 		t.eq(TreeArt.BarkMaterial(WoodData.Get("lumenwood")), Enum.Material.SmoothPlastic)
 		t.eq(TreeArt.BarkMaterial(WoodData.Get("phantomwood")), Enum.Material.Concrete)
+	end)
+
+	t.test("each species' signature is the one you can name, and seeds vary the colour", function()
+		local function colorsOf(id, seed)
+			local model = build(id, seed, 1)
+			local out = {}
+			for _, p in ipairs(parts(model)) do
+				if p.Name == "Leaves" or p.Name == "Facet" then
+					table.insert(out, p.Color:ToHex())
+				end
+			end
+			table.sort(out)
+			return out
+		end
+		t.ok(colorsOf("oak", 1) ~= nil)
+		local a, b = colorsOf("maple", 2), colorsOf("maple", 9)
+		local same = true
+		if #a ~= #b then
+			same = false
+		else
+			for i = 1, #a do
+				if a[i] ~= b[i] then
+					same = false
+				end
+			end
+		end
+		t.ok(not same, "two maples of different seeds are not the same green")
+		local oak = build("oak", 3, 1)
+		local heart = TreeArt.HeartColor(WoodData.Get("oak"))
+		local knot = false
+		for _, p in ipairs(parts(oak)) do
+			if p:GetAttribute("Signature") == "sap-knot" then
+				knot = true
+				t.eq(p.Material, Enum.Material.Wood, "the sap knot is cut wood")
+				t.eq(string.upper(p.Color:ToHex()), string.upper(heart:ToHex()), "the sap knot is heartwood")
+			end
+		end
+		t.ok(knot, "an oak shows a sap knot")
+		local frost = build("frostwood", 3, 1)
+		local caps = 0
+		for _, p in ipairs(parts(frost)) do
+			if p:GetAttribute("Signature") == "frost-tip" then
+				caps += 1
+				t.eq(p.Material, Enum.Material.Snow)
+			end
+		end
+		t.ok(caps >= 4, "frost tips sit on the upper tiers")
+		for _, id in ipairs({ "emberwood", "palmwood" }) do
+			local model = build(id, 1, 1)
+			local signed = false
+			for _, p in ipairs(parts(model)) do
+				if p:GetAttribute("Signature") == TreeArt.Signatures[id] then
+					signed = true
+				end
+			end
+			t.ok(signed, id .. " carries " .. TreeArt.Signatures[id])
+		end
+	end)
+
+	t.test("the tutorial grove oaks are the same crystal oak", function()
+		-- MapBuilder plants these: small, seeds 4101..4103 (TutorialGrove.Trees).
+		for i = 1, 3 do
+			local model = build("oak", 4100 + i, TreeGen.ScaleFor("small"))
+			local knot, wedges = false, 0
+			for _, p in ipairs(parts(model)) do
+				if p.Name == "Leaves" then
+					wedges += 1
+					t.ok(p:IsA("WedgePart"), "grove oak leaves are facets")
+				end
+				if p:GetAttribute("Signature") == "sap-knot" then
+					knot = true
+				end
+				if p.Name == "Section" then
+					t.eq(p.Shape, Enum.PartType.Block, "the grove oak is still cut by its sections")
+				end
+			end
+			t.ok(wedges >= 4, "grove oak " .. i .. " has a crown")
+			t.ok(knot, "grove oak " .. i .. " has its sap knot")
+		end
+	end)
+
+	t.test("seasonal tint and quality extras stay off the phone tier", function()
+		t.eq(TreeArt.SeasonIndex(0), 0)
+		t.eq(TreeArt.SeasonIndex(TreeArt.SeasonSeconds), 1)
+		t.eq(TreeArt.SeasonIndex(TreeArt.SeasonSeconds * 5 + 10), 1)
+		local green = Color3.fromRGB(80, 140, 60)
+		t.eq(TreeArt.TintLeaf(green, "maple", 1, 1), green, "summer is the painted colour")
+		t.eq(TreeArt.TintLeaf(green, "maple", 2, 0), green, "amount 0 leaves it")
+		local autumn = TreeArt.TintLeaf(green, "maple", 2, 1)
+		t.ok(autumn.R > green.R and autumn.B < green.B, "autumn warms a maple")
+		local pineWinter = TreeArt.TintLeaf(green, "pine", 3, 1)
+		local oakWinter = TreeArt.TintLeaf(green, "oak", 3, 1)
+		t.ok(pineWinter.B > oakWinter.B, "winter cools a pine more than an oak")
+		t.eq(TreeArt.Cosmetics("low"), { tint = 0, accents = false })
+		t.eq(TreeArt.Cosmetics("medium").accents, false)
+		t.ok(TreeArt.Cosmetics("medium").tint > 0 and TreeArt.Cosmetics("medium").tint < 1)
+		t.eq(TreeArt.Cosmetics("high"), { tint = 1, accents = true })
+		t.eq(TreeArt.AccentColor("oak"), nil, "oak's signature is the knot, not a mote")
+		t.ok(TreeArt.AccentColor("frostwood") ~= nil)
+		t.ok(TreeArt.AccentColor("maple") ~= nil)
+		t.eq(TreeArt.AccentColor("emberwood"), nil, "emberwood already sheds sparks")
 	end)
 
 	t.test("sections collide and can be chopped; dress never collides", function()
