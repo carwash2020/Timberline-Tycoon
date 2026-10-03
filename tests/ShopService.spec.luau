@@ -125,6 +125,23 @@ return function(t)
 		}
 	end
 
+	t.test("a sawmill goes into stock at the Tool Shed, and only under the v2 loop", function()
+		local s = setup({ cash = 200, loop = 2 })
+		s.buy("Sawmill", "SawmillRickety")
+		t.eq(s.profile.cash, 70)
+		t.eq(s.profile.sawmillStock, { "SawmillRickety" })
+		t.eq(s.toasts, { "Bought a Rickety Sawmill! Place it from BUILD on your plot." })
+		local v1 = setup({ cash = 200, loop = 1 })
+		v1.buy("Sawmill", "SawmillRickety")
+		t.eq(v1.profile.cash, 200)
+		t.eq(v1.profile.sawmillStock, nil)
+		t.eq(v1.toasts, {})
+		local short = setup({ cash = 100, loop = 2 })
+		short.buy("Sawmill", "SawmillRickety")
+		t.eq(short.profile.cash, 100)
+		t.eq(short.toasts, { "You need $30 more for the Rickety Sawmill." })
+	end)
+
 	t.test("buys the next axe: takes the cash, grants it and puts it in hand", function()
 		local s = setup({ cash = 200 })
 		s.buy("Axe", "SteelAxe")

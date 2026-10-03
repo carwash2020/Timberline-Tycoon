@@ -19,7 +19,7 @@ return function(t)
 				t.ok(#text > 0, file .. ": a subtitle")
 			end
 		end
-		t.eq(found, 4, "the Tool Shed, the Dealership, Hearth & Home and the Store")
+		t.eq(found, 5, "the Tool Shed, the Dealership, Hearth & Home, the saws and the Store")
 	end)
 
 	-- M1.8b: under the v2 core loop the shops show what ShopService charges

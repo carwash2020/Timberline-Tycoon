@@ -288,6 +288,86 @@ ItemCatalog.Gear = {
 	},
 }
 
+-- Sawmills (V2_PLAN.md §2e). Limits are in timber units: a log longer than
+-- maxLength or thicker than maxWidth won't go in, and the cut (x by y) can't
+-- pass maxX / maxY. The Rickety takes an oak trunk (2.0 studs < 2.24) and
+-- not a pine base (2.6). width and depth are the plot footprint in studs.
+export type SawmillDef = {
+	id: string,
+	displayName: string,
+	priceCash: number,
+	maxLength: number,
+	maxWidth: number,
+	maxX: number,
+	maxY: number,
+	width: number,
+	depth: number,
+	color: string, -- the shop swatch and the frame
+}
+
+ItemCatalog.Sawmills = {
+	SawmillRickety = {
+		id = "SawmillRickety",
+		displayName = "Rickety Sawmill",
+		priceCash = 130,
+		maxLength = 10.9,
+		maxWidth = 1.4,
+		maxX = 1.8,
+		maxY = 1.2,
+		width = 12,
+		depth = 8,
+		color = "#8B5A2B",
+	},
+	SawmillSturdy = {
+		id = "SawmillSturdy",
+		displayName = "Sturdy Sawmill",
+		priceCash = 1600,
+		maxLength = 10.9,
+		maxWidth = 1.6,
+		maxX = 2.4,
+		maxY = 1.6,
+		width = 14,
+		depth = 8,
+		color = "#6B4423",
+	},
+	Millmaster100 = {
+		id = "Millmaster100",
+		displayName = "Millmaster 100",
+		priceCash = 11000,
+		maxLength = 10.9,
+		maxWidth = 2.0,
+		maxX = 3.0,
+		maxY = 2.0,
+		width = 16,
+		depth = 10,
+		color = "#A33B32",
+	},
+	Millmaster200 = {
+		id = "Millmaster200",
+		displayName = "Millmaster 200",
+		priceCash = 22500,
+		maxLength = 10.9,
+		maxWidth = 2.6,
+		maxX = 3.0,
+		maxY = 2.6,
+		width = 18,
+		depth = 10,
+		color = "#4A4E57",
+	},
+	Millmaster200L = {
+		id = "Millmaster200L",
+		displayName = "Millmaster 200 Long",
+		priceCash = 86500,
+		maxLength = 18.9,
+		maxWidth = 2.6,
+		maxX = 3.0,
+		maxY = 2.6,
+		width = 26,
+		depth = 10,
+		color = "#3E4A62",
+	},
+} :: { [string]: SawmillDef }
+
 -- Materials: gathered, used in recipes, sellable.
 -- A material's `node` is what you mine it from: `hits` swings of any axe
 -- break one, it gives `yield`, and it comes back after `respawnSec`.
@@ -498,6 +578,27 @@ end)
 
 function ItemCatalog.GearList(): { GearDef }
 	return gearList
+end
+
+function ItemCatalog.GetSawmill(millId: string): SawmillDef?
+	local mill = ItemCatalog.Sawmills[millId]
+	if type(mill) == "table" then
+		return mill
+	end
+	return nil
+end
+
+-- Every sawmill, cheapest first (the Tool Shed's order).
+local sawmillList: { SawmillDef } = {}
+for _, mill in pairs(ItemCatalog.Sawmills) do
+	table.insert(sawmillList, mill)
+end
+table.sort(sawmillList, function(a, b)
+	return a.priceCash < b.priceCash
+end)
+
+function ItemCatalog.SawmillList(): { SawmillDef }
+	return sawmillList
 end
 
 return ItemCatalog

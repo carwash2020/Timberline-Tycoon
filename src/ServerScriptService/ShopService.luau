@@ -1,7 +1,8 @@
 --!strict
 -- ShopService: the BuyItem and EquipItem remotes. The Tool Shed sells
--- axes; the Dealership sells trucks and swaps between the ones you own;
--- Hearth & Home sells biome gear (once each, yours for good).
+-- axes, and (v2) sawmills into stock you place on your plot. The
+-- Dealership sells trucks and swaps between the ones you own. Hearth &
+-- Home sells biome gear (once each, yours for good).
 --
 -- Every purchase is checked here, whatever the client showed:
 --   * the player stands within GameConfig.ShopRange (+ tolerance) of that
@@ -21,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local AxeService = require(script.Parent.AxeService)
@@ -39,6 +41,7 @@ local SHOP_FOR: { [string]: string } = {
 	Truck = "Dealership",
 	Trailer = "Dealership",
 	Gear = "HearthAndHome",
+	Sawmill = "ToolShed",
 }
 
 local map: Instance? = nil
@@ -316,6 +319,48 @@ local function onEquipItem(player: Player, category: unknown, itemId: unknown)
 	end
 end
 
+local function publishStock(player: Player, profile: ProfileService.Profile)
+	local stock = profile.sawmillStock
+	if type(stock) ~= "table" then
+		stock = {}
+		profile.sawmillStock = stock
+	end
+	player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(stock))
+end
+
+-- A sawmill goes into stock. You place it from BUILD on your plot (that
+-- spends the stock; placing without one charges the price there instead).
+local function buySawmill(player: Player, millId: string)
+	if loop ~= 2 then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	local mill = ItemCatalog.GetSawmill(millId)
+	if not profile or not mill then
+		return
+	end
+	if profile.cash < mill.priceCash then
+		notify(
+			player,
+			string.format(
+				"You need %s more for the %s.",
+				Util.formatCash(mill.priceCash - profile.cash),
+				mill.displayName
+			)
+		)
+		return
+	end
+	if not EconomyService.SpendCash(player, mill.priceCash, "bought " .. mill.displayName, mill.id) then
+		return
+	end
+	if type(profile.sawmillStock) ~= "table" then
+		profile.sawmillStock = {}
+	end
+	table.insert(profile.sawmillStock, mill.id)
+	publishStock(player, profile)
+	notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", mill.displayName))
+end
+
 local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	if type(category) ~= "string" or type(itemId) ~= "string" or not RateLimiter.Allow(player, "BuyItem") then
 		return
@@ -335,6 +380,8 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 		buyTrailer(player, itemId)
 	elseif category == "Gear" then
 		buyGear(player, itemId)
+	elseif category == "Sawmill" then
+		buySawmill(player, itemId)
 	end
 end
 
@@ -342,6 +389,7 @@ end
 function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profile)
 	publishTrucks(player, profile)
 	publishGear(player, profile)
+	publishStock(player, profile)
 end
 
 -- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's

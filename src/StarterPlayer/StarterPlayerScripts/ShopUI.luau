@@ -38,6 +38,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
@@ -73,6 +74,7 @@ export type RowView = {
 -- Robux Store), the prompt, the header, and its rows.
 export type Shop = {
 	building: string?, -- model in TimberlineMap
+	promptOffset: Vector2?, -- so two prompts on one counter don't stack
 	promptText: string,
 	title: string,
 	subtitle: string, -- 40 characters at most (ShopUI.SubtitleMax): two lines on a phone
@@ -338,7 +340,43 @@ local GEAR: Shop = {
 	end,
 }
 
-local SHOPS: { Shop } = { AXES, TRUCKS, GEAR }
+-- Tool Shed: sawmills. Buying puts one in stock; BUILD on your plot places it.
+local SAWS: Shop = {
+	building = "ToolShed",
+	promptOffset = Vector2.new(0, 70),
+	promptText = "Browse saws",
+	title = "Saws",
+	subtitle = "Logs in, planks out. Place on your plot.",
+	ids = function()
+		local ids = {}
+		for _, mill in ipairs(ItemCatalog.SawmillList()) do
+			table.insert(ids, mill.id)
+		end
+		return ids
+	end,
+	view = function(id: string): RowView
+		local mill = ItemCatalog.GetSawmill(id) :: ItemCatalog.SawmillDef
+		local cash = (player:GetAttribute("Cash") :: number?) or 0
+		local affordable = cash >= mill.priceCash
+		return {
+			name = mill.displayName,
+			detail = SawmillLogic.Detail(mill),
+			color = Color3.fromHex(mill.color),
+			dim = false,
+			button = if affordable then "Buy " .. Util.formatCash(mill.priceCash) else Util.formatCash(mill.priceCash),
+			state = if affordable then "buy" else "cant",
+			onClick = function()
+				if cash < mill.priceCash then
+					needMore(mill.priceCash, cash, mill.displayName)
+					return
+				end
+				Net.Remote("BuyItem"):FireServer("Sawmill", mill.id)
+			end,
+		}
+	end,
+}
+
+local SHOPS: { Shop } = { AXES, TRUCKS, GEAR, SAWS }
 
 ---------------------------------------------------------------------------
 -- The panel
@@ -770,6 +808,9 @@ local function setupPrompt(shop: Shop)
 	pp.MaxActivationDistance = GameConfig.ShopPromptRange
 	pp.HoldDuration = 0
 	pp.RequiresLineOfSight = false
+	if shop.promptOffset then
+		pp.UIOffset = shop.promptOffset
+	end
 	pp.Parent = point
 	pp.Triggered:Connect(function()
 		open(shop)
@@ -798,6 +839,7 @@ function ShopUI.Start()
 		"OwnedTrailers",
 		"HitchedTrailer",
 		"OwnedGear",
+		"SawmillStock",
 	}) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end

@@ -168,6 +168,20 @@ return function(t)
 						model.placedAt = { x, z, rot }
 					end,
 				},
+				MachineArt = {
+					Build = function(id)
+						local model = Instance.new("Model")
+						model.Name = id
+						local root = Instance.new("Part")
+						root.Name = "Root"
+						root.Parent = model
+						model.PrimaryPart = root
+						return model
+					end,
+					SetCut = function(model, x, y)
+						model:SetAttribute("CutShown", string.format("%.1f %.1f", x, y))
+					end,
+				},
 			},
 		})
 		local PlotService = loader:server("PlotService")
@@ -384,5 +398,38 @@ return function(t)
 		local cara, fresh = s.newPlayer(3, "Cara")
 		s.P.PlayerJoined(cara, fresh) -- never claimed: no plot yet
 		t.eq(cara.attrs.PlotSlot, nil)
+	end)
+
+	t.test("a sawmill from stock places free, and one you don't own is paid for", function()
+		local s = setup({ cash = 200 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.sawmillStock = { "SawmillRickety" }
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "SawmillRickety", 0, 0, 0)
+		t.eq(profile.cash, 200)
+		t.eq(profile.sawmillStock, {})
+		t.eq(ann.attrs.SawmillStock, "")
+		t.eq(profile.plot.placed[1].data, { x = 1, y = 0.6 })
+		t.eq(s.items(1)[1]:GetAttribute("CutX"), 1)
+		t.eq(s.tags[s.items(1)[1]], "PlacedItem")
+		s.P.Place(ann, "SawmillRickety", 0, 20, 0)
+		t.eq(profile.cash, 70)
+		t.eq(#profile.plot.placed, 2)
+	end)
+
+	t.test("a saved cut comes back on the mill", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
+		profile.plot.placed = {
+			{ uid = "mill", blueprintId = "SawmillRickety", x = 0, z = 0, rot = 0, data = { x = 1.4, y = 0.8 } },
+		}
+		s.P.PlayerJoined(ann, profile)
+		local model = s.items(1)[1]
+		t.eq(model:GetAttribute("CutX"), 1.4)
+		t.eq(model:GetAttribute("CutY"), 0.8)
+		t.eq(model:GetAttribute("CutShown"), "1.4 0.8")
+		t.eq(profile.plot.placed[1].data, { x = 1.4, y = 0.8 })
 	end)
 end

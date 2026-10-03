@@ -167,7 +167,7 @@ TutorialData.StepsV2 = {
 	{
 		id = "sell",
 		objective = "Sell wood at the sawmill",
-		murph = "Hop in and drive to the mill up north. Back her onto the pad that says SELL LOGS HERE and the whole bed sells itself, or push a log onto it by hand. Bigger logs pay more: it's all by the cubic unit, u³.",
+		murph = "Hop in and drive to the mill up north. Back her onto the pad that says SELL LOGS HERE and the whole bed sells itself, or push a log onto it by hand. Bigger logs pay more: it's all by the cubic unit, u³. A saw from the Tool Shed turns straight logs into planks, and planks pay more.",
 		event = "woodSold",
 		count = 1,
 		beacon = "sellPad",

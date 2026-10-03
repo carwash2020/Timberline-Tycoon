@@ -240,10 +240,13 @@ local woods: { WoodDef } = {
 }
 
 -- v2 rows (V2_PLAN.md §2b; §18 for emberwood and the Gloam pair).
+-- Plank prices are the plan's, scaled by 0.35 and never below 2.5× the log
+-- price. The full ratios (oak 6.7×, frostwood 11.8×) made a Rickety mill
+-- blow the §17 headlines; see ECONOMY.md.
 local V2: { [string]: WoodV2 } = {
 	oak = {
 		logPrice = 1.5,
-		plankPrice = 10,
+		plankPrice = 3.75,
 		hardness = 2,
 		growSec = 240,
 		lifespan = { 3, 6 },
@@ -252,7 +255,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	birch = {
 		logPrice = 2.25,
-		plankPrice = 15,
+		plankPrice = 5.625,
 		hardness = 7,
 		growSec = 960,
 		lifespan = { 3, 6 },
@@ -261,7 +264,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	pine = {
 		logPrice = 3.2,
-		plankPrice = 18,
+		plankPrice = 8,
 		hardness = 5.5,
 		growSec = 600,
 		lifespan = { 3, 6 },
@@ -270,7 +273,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	maple = {
 		logPrice = 2.8,
-		plankPrice = 26.4,
+		plankPrice = 9.24,
 		hardness = 6,
 		growSec = 1140,
 		lifespan = { 3, 6 },
@@ -279,7 +282,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	palmwood = {
 		logPrice = 2.9,
-		plankPrice = 32,
+		plankPrice = 11.2,
 		hardness = 2.9,
 		growSec = 480,
 		lifespan = { 3, 6 },
@@ -288,7 +291,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	frostwood = {
 		logPrice = 9,
-		plankPrice = 106,
+		plankPrice = 37.1,
 		hardness = 10,
 		growSec = 360,
 		lifespan = { 3, 6 },
@@ -297,7 +300,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	emberwood = {
 		logPrice = 5.7,
-		plankPrice = 36,
+		plankPrice = 14.25,
 		hardness = 11,
 		growSec = 1020,
 		lifespan = { 3, 6 },
@@ -306,7 +309,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	phantomwood = {
 		logPrice = 19,
-		plankPrice = 54,
+		plankPrice = 47.5,
 		hardness = 23,
 		growSec = 1200,
 		lifespan = { 3, 6 },
@@ -315,7 +318,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	lumenwood = {
 		logPrice = 25,
-		plankPrice = 90,
+		plankPrice = 62.5,
 		hardness = 30,
 		growSec = 1800,
 		lifespan = { 3, 6 },

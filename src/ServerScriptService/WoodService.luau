@@ -969,6 +969,54 @@ function WoodService.Register(model: Model, info: Info?): Piece
 	})
 end
 
+export type PlankInfo = {
+	woodId: string,
+	size: Vector3, -- studs; Y is the length
+	cf: CFrame, -- the plank's centre
+	ownerId: number,
+	figure: string?,
+	boost: number?,
+	lastHolderId: number?,
+}
+
+-- One loose plank (a sawmill's output). Core colour all the way through,
+-- the log's figure and boost kept, so it drags, rides and sells like any
+-- other piece. Nil for an unknown wood.
+function WoodService.SpawnPlank(info: PlankInfo): Piece?
+	local def = WoodData.Get(info.woodId)
+	if not def or info.size.X <= 0 or info.size.Y <= 0 or info.size.Z <= 0 then
+		return nil
+	end
+	local model = WoodService.NewModel()
+	local section = Instance.new("Part")
+	section.Name = "Section"
+	section.Size = info.size
+	section.CFrame = info.cf
+	section.Anchored = true
+	local color, material = TreeArt.Core(def)
+	section.Color = color
+	section.Material = material
+	section.TopSurface = Enum.SurfaceType.Smooth
+	section.BottomSurface = Enum.SurfaceType.Smooth
+	section:SetAttribute("Section", 1)
+	section.Parent = model
+	model.PrimaryPart = section
+	local p = makeRecord(model, {
+		woodId = def.id,
+		kind = "plank",
+		nodes = { [1] = { parent = nil, children = {} } },
+		parts = { [1] = section },
+		ownerId = info.ownerId,
+		lastHolderId = info.lastHolderId,
+		figure = info.figure,
+		boost = info.boost,
+	})
+	weld(model, section)
+	setGroup(model, WoodService.WoodGroup)
+	enforceCaps()
+	return if byModel[model] == p then p else nil
+end
+
 ---------------------------------------------------------------------------
 -- Cutting
 ---------------------------------------------------------------------------

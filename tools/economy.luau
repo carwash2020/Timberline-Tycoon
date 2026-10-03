@@ -34,6 +34,7 @@ local ForestData = modules:shared("ForestData")
 local ForestLogic = modules:shared("ForestLogic")
 local TreeGen = modules:shared("TreeGen")
 local SectionLogic = modules:shared("SectionLogic")
+local SawmillLogic = modules:shared("SawmillLogic")
 
 local CALIBRATION_FILE = "tools/calibration.json"
 local calibration = if fs.isFile(CALIBRATION_FILE) then serde.decode("json", fs.readFile(CALIBRATION_FILE)) else nil
@@ -59,6 +60,12 @@ local A = {
 	groveTier = "Healthy", -- figured-wood average, as tools/economy
 	plotPrice = 900100, -- a full plot (§2f: $100 + 3000 x (1 + ... + 24))
 	sharing = 4, -- players sharing a biome's regrowth (a rare wood's cap on $/h)
+	-- A sawmill you own mills a piece when that pays more than selling the
+	-- log. The blade's own time is SawmillLogic.ProcessSeconds; these are
+	-- the rest (stop at the plot, feed each piece). Plank prices in WoodData
+	-- were scaled so this handling still lands the §17 headlines.
+	millFeedSec = 15, -- drag one piece in and the planks back onto the truck
+	millDetourSec = 40, -- unload, mill and reload, on the way to the pad
 }
 
 -- Truck and trailer beds as the game builds them (TruckLayout): length,
@@ -297,7 +304,54 @@ local function haulFor(b, owned)
 	return bestCap + trailerCap, secs, 0, label, bedLength(bestTruck.id)
 end
 
--- One load of `wood`: (seconds, cash) for a perfect player, or nil.
+-- The biggest mill owned (width, then length). Nil when the player has none,
+-- which is the first sale and `--calibrate` (logs only).
+local function bestMill(owned)
+	local best = nil
+	for _, mill in ipairs(ItemCatalog.SawmillList()) do
+		if owned[mill.id] then
+			if
+				not best
+				or mill.maxWidth > best.maxWidth
+				or (mill.maxWidth == best.maxWidth and mill.maxLength > best.maxLength)
+			then
+				best = mill
+			end
+		end
+	end
+	return best
+end
+
+-- Share of a mean tree this mill can take: the trunk if its base is thin
+-- enough (half the trunk if only the middle is), and the limbs if they are.
+local function milledShare(mill, wood): number
+	if not mill then
+		return 0
+	end
+	local tree = TREES[wood.id].mean
+	if tree.volume <= 0 then
+		return 0
+	end
+	local limit = mill.maxWidth * U + 1e-3
+	local trunk = 0
+	if tree.base <= limit then
+		trunk = tree.trunk
+	elseif tree.mid <= limit then
+		trunk = tree.trunk * 0.5
+	end
+	local limbs = if tree.limbT <= limit then math.max(0, tree.volume - tree.trunk) else 0
+	return math.clamp((trunk + limbs) / tree.volume, 0, 1)
+end
+
+-- $/u³ this load actually sells for, and the share of it that was milled.
+local function unitPrice(wood, mill): (number, number)
+	local share = milledShare(mill, wood)
+	return wood.v2.logPrice * (1 - share) + wood.v2.plankPrice * share, share
+end
+
+-- One load of `wood`: (seconds, cash, $/u³) for a perfect player, or nil.
+-- Logs, or planks when a mill you own can take some of the tree and the
+-- extra time still pays. Milled pieces are bucked down to the mill's length.
 local function loadCycle(axe, wood, owned, cash: number?)
 	local b = BiomeData.Get(wood.biome)
 	if b.nightOnly or (b.requiresGear and not owned[b.requiresGear]) then
@@ -307,16 +361,32 @@ local function loadCycle(axe, wood, owned, cash: number?)
 	if cap <= 0 or (cash ~= nil and fee > cash) then
 		return nil -- (a trip's fee must be affordable: the gondola's)
 	end
-	local perTree, _ = treeWork(axe, wood, bedLen)
-	if perTree == math.huge then
-		return nil
-	end
 	local slow = if b.slowdown and not owned[b.slowdown.removedBy] then 1 / (1 - b.slowdown.amount) else 1
-	local tree = TREES[wood.id].mean.volume
-	local trees = cap / tree
-	local secs = trees * perTree * slow + tripSec + A.sellSec
-	local cash = cap * wood.v2.logPrice * figureFactor(wood) - fee
-	return secs, cash
+	local tree = TREES[wood.id].mean
+	local trees = cap / tree.volume
+	local function trip(fitLen: number, price: number, extra: number): (number?, number?, number?)
+		local perTree, pieces = treeWork(axe, wood, fitLen)
+		if perTree == math.huge or pieces <= 0 then
+			return nil
+		end
+		local secs = trees * perTree * slow + tripSec + A.sellSec + extra
+		local earned = cap * price * figureFactor(wood) - fee
+		return secs, earned, price
+	end
+	local secs, earned, price = trip(bedLen, wood.v2.logPrice, 0)
+	local mill = bestMill(owned)
+	local plankPrice, share = unitPrice(wood, mill)
+	if mill and share > 0 and secs then
+		local fitLen = math.min(bedLen, mill.maxLength * U)
+		local _, pieces = treeWork(axe, wood, fitLen)
+		local handle = SawmillLogic.ProcessSeconds(tree.volume / math.max(pieces, 1)) + A.millFeedSec
+		local extra = trees * pieces * share * handle + A.millDetourSec
+		local mSecs, mEarned, mPrice = trip(fitLen, plankPrice, extra)
+		if mSecs and mEarned and mEarned / mSecs > earned / secs then
+			secs, earned, price = mSecs, mEarned, mPrice
+		end
+	end
+	return secs, earned, price
 end
 
 local AXES = ItemCatalog.AxeLadder()
@@ -345,8 +415,9 @@ end
 
 -- $/hour of a wood one player can get when A.sharing players share its
 -- biome's regrowth.
-supplyRate = function(wood): number
-	return regrowPerHour(wood) / A.sharing * TREES[wood.id].mean.volume * wood.v2.logPrice * figureFactor(wood)
+supplyRate = function(wood, pricePerU3: number?): number
+	local price = pricePerU3 or wood.v2.logPrice
+	return regrowPerHour(wood) / A.sharing * TREES[wood.id].mean.volume * price * figureFactor(wood)
 end
 
 -- Best $/hour (real player) for what's owned, filling the hour wood by
@@ -358,9 +429,14 @@ local function bestRate(owned, cash: number?)
 	for _, wood in ipairs(WOODS) do
 		local axe = bestAxeFor(owned, wood)
 		if axe then
-			local secs, value = loadCycle(axe, wood, owned, cash)
+			local secs, value, price = loadCycle(axe, wood, owned, cash)
 			if secs and value > 0 then
-				table.insert(options, { wood = wood, axe = axe, rate = value / secs * 3600 * EFFICIENCY })
+				table.insert(options, {
+					wood = wood,
+					axe = axe,
+					price = price,
+					rate = value / secs * 3600 * EFFICIENCY,
+				})
 			end
 		end
 	end
@@ -373,7 +449,7 @@ local function bestRate(owned, cash: number?)
 		if left <= 1e-9 then
 			break
 		end
-		local share = math.min(left, supplyRate(o.wood) / o.rate)
+		local share = math.min(left, supplyRate(o.wood, o.price) / o.rate)
 		total += share * o.rate
 		left -= share
 		if share > mainShare then
@@ -419,7 +495,7 @@ local function simulate()
 	local events = { firstSale = t }
 	local steps = {}
 	local candidates = {}
-	for _, list in ipairs({ ItemCatalog.Trucks, ItemCatalog.Trailers, ItemCatalog.Gear }) do
+	for _, list in ipairs({ ItemCatalog.Trucks, ItemCatalog.Trailers, ItemCatalog.Gear, ItemCatalog.Sawmills }) do
 		for _, item in pairs(list) do
 			table.insert(candidates, item)
 		end
@@ -571,6 +647,10 @@ line(
 		EFFICIENCY,
 		if calibration then "from tools/calibration.json" else "a guess until a playtest calibrates it"
 	)
+)
+line()
+line(
+	"Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thicker than its maxWidth, bucked to its maxLength) when that pays more per hour than selling the logs. Extra time is the blade plus `millFeedSec` a piece and `millDetourSec` a trip. Plank prices are WoodData's. The first sale and `--calibrate` haul logs only."
 )
 line()
 line("## Headline targets (V2_PLAN §17)")

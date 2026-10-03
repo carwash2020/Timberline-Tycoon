@@ -23,6 +23,7 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | Phase 12 VEH: trucks 1.3x, driving retuned, 13 bays in 4 sizes, sell zone 40 deep | on main | c0f865d |
 | Phase 12 ATMOS: dark muted meadow, grey roads, night fog, region air, bold signs | on main | 58a5520 |
 | Phase 12 TREE, ROADS, REGIONS, TOWN (LT2_RESEARCH.md plan) | in progress | |
+| M2.2 sawmills and planks (Tool Shed stock, place on a plot; M2.1 boxes not in this slice) | in review | |
 | M1.10 cleanup | after about a week live | |
 
 **As built, where it differs from the plan (lead's notes, 2 Oct 2026):**
@@ -45,6 +46,7 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 - ATMOS landed (58a5520), per LT2_RESEARCH.md: Grass 84,125,55 / LeafyGrass 66,104,46, haul roads Pavement 170,169,165 edge to edge, the night mist +0.16 density in a grey-blue (23:00-09:30), the Volcano's air 0.55 red-orange at every hour, a cold Snowfields haze, a violet Gloam Hollow mist at 0.53, and big name signs (`BuildingArt.nameSign`, 120 px boards).
 - In progress (LT2_RESEARCH.md plan): TREE (box logs in each wood's bark, crisp cube leaf crowns, spacing), ROADS (haul roads 28, Skyroot 24, Forest Path and Plot Road 16; junction flares; brown boulders over the open grass; a thinner filler forest), REGIONS (the Snowfields ringed by brown cliffs with one pass, a dark rim round the Volcano with one gap, shallow pools in the Gloam Hollow, the biome signs at the gates) and TOWN (a truck-wide way past the sawmill to the Snow Road, a lot loop south, an easier sell-pad approach, the street lamps set back, the road mouths by the plaza).
 - Server boot measured in Studio: 775 section trees in 0.6 s, world built in 4.6 s.
+- M2.2 first slice (sawmills): bought at the Tool Shed ("Browse saws") into `profile.sawmillStock`, then placed from BUILD, or paid for on the plot if you have none in stock. `PlacedItem.data` is the cut (`{x, y}` in u). The panel is the owner only, in range (`SawmillSet`); permissions wait for M3. Plank prices are the §2b ratios scaled by 0.35, and never under 2.5× the log (oak is 2.5×, not 6.7×): a Rickety mill can take frostwood, and the full ratios made the first $1k about twice too fast even with a few minutes of handling per load. Not in this slice: M2.1 counters, boxes and dialogue, a "sell planks" daily, and saving loose wood on the plot (M3.2).
 
 **Follow-ups after the flip (from the pre-flip review, 2 Oct 2026):**
 - ~~Wood a rejoin or "Send truck home" leaves on the ground out of town is lost if the player leaves again.~~ Fixed (day 3): TruckLoad remembers each owner's left-behind pieces and saves what's still theirs and lying about as `groundLoad` (each piece where it lay); it comes back there on rejoin.
@@ -1030,7 +1032,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
   - Risks: flinging display items, dialogue on phones.
 - **M2.2 Sawmills and planks** (§7).
   - Files: ItemCatalog.Sawmills (lead), SawmillLogic, SawmillService, MachineArt (new), WoodService (planks), TreeArt.Plank, PlotService (place from a box, `data`).
-  - Studio: buy a Rickety Sawmill, place it, feed it a 9-stud oak trunk: planks come out; X/Y buttons step 0.32 studs; a branched piece or a pine base is refused; planks sell at about 6.7x the oak log price.
+  - Studio: buy a Rickety Sawmill, place it, feed it a 9-stud oak trunk: planks come out; X/Y buttons step 0.32 studs; a branched piece or a pine base is refused; planks sell at 2.5x the oak log price (prices scaled, see the status notes).
 - **M2.3 Plank economy**: economy2 adds a plank path, a "sell planks" daily, Field Guide plank prices, figured planks.
 
 ### M3 Land and building

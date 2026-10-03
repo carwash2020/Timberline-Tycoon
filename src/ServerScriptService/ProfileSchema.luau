@@ -23,6 +23,9 @@ export type PlacedItem = {
 	x: number,
 	z: number,
 	rot: number,
+	-- A placed sawmill's cut, in timber units (V2_PLAN.md §7). Other items
+	-- leave it unset.
+	data: { x: number, y: number }?,
 }
 
 -- One axe the player owns. Axes are items: duplicates are fine, and each
@@ -163,6 +166,9 @@ export type Profile = {
 	-- you left (TruckLoad): LeftLoad pieces with bed "Ground" and a world
 	-- spot `g`, put back where they lay on rejoin.
 	groundLoad: { any },
+	-- Sawmills bought at the Tool Shed and not placed yet (ids; duplicates
+	-- are two mills). Placing one on your plot takes it off this list.
+	sawmillStock: { string },
 	-- The v2 loop's loose wood on your truck's beds (TruckLoad), saved as it
 	-- rides and when you leave; rebuilt on the bed when you rejoin (on the
 	-- ground where the truck stood if that wasn't in town). Unused by v1.
@@ -215,6 +221,7 @@ local TEMPLATE: Profile = {
 	leftLoad = {},
 	truckLoad = {},
 	groundLoad = {},
+	sawmillStock = {},
 	settings = { music = true, sfx = true },
 	pendingCash = 0,
 }

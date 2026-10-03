@@ -14,9 +14,11 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
@@ -120,28 +122,53 @@ local function plotRow(): ShopUI.RowView
 	}
 end
 
+local function stockCount(id: string): number
+	return SawmillLogic.CountStock(SawmillLogic.DecodeStock((player:GetAttribute("SawmillStock") :: string?) or ""), id)
+end
+
+-- A sawmill you already bought places for free. The table the placer sees
+-- has price 0 so the ghost doesn't ask for cash the server won't charge.
+local function forPlacer(bp: PlotData.Blueprint): PlotData.Blueprint
+	if stockCount(bp.id) > 0 then
+		local copy = table.clone(bp)
+		copy.priceCash = 0
+		return copy
+	end
+	return bp
+end
+
 local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local locked = bp.tier > tier()
 	local needed = PlotData.Tier(bp.tier)
-	local affordable = cash() >= bp.priceCash
+	local stocked = stockCount(bp.id)
+	local price = if stocked > 0 then 0 else bp.priceCash
+	local affordable = cash() >= price
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
 		detail ..= " · needs " .. Util.article(needed.name) .. " plot"
 	elseif bp.note then
 		detail ..= " · " .. bp.note
 	end
+	if stocked > 0 then
+		detail ..= string.format(" · %d ready to place", stocked)
+	end
+	local mill = ItemCatalog.GetSawmill(bp.id)
+	local swatch = if mill then mill.color elseif bp.boxes[1] then bp.boxes[1].color else "#654321"
 	local button, state
 	if locked then
 		button, state = if needed then needed.name else "Locked", "locked"
+	elseif stocked > 0 then
+		button, state = "Place", "buy"
 	elseif affordable then
-		button, state = "Build " .. Util.formatCash(bp.priceCash), "buy"
+		button, state = "Build " .. Util.formatCash(price), "buy"
 	else
-		button, state = Util.formatCash(bp.priceCash), "cant"
+		button, state = Util.formatCash(price), "cant"
 	end
 	return {
 		name = bp.displayName,
+		own = if stocked > 0 then "· in stock" else nil,
 		detail = detail,
-		color = Color3.fromHex(bp.boxes[1].color),
+		color = Color3.fromHex(swatch),
 		dim = locked,
 		button = button,
 		state = state,
@@ -153,17 +180,13 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 						Util.article(if needed then needed.name else "bigger plot")
 					)
 				)
-			elseif cash() < bp.priceCash then
+			elseif cash() < price then
 				HUD.Toast(
-					string.format(
-						"You need %s more for the %s.",
-						Util.formatCash(bp.priceCash - cash()),
-						bp.displayName
-					)
+					string.format("You need %s more for the %s.", Util.formatCash(price - cash()), bp.displayName)
 				)
 			else
 				ShopUI.Close()
-				BlueprintPlacer.Begin(bp, { onStop = PlotUI.Refresh })
+				BlueprintPlacer.Begin(forPlacer(bp), { onStop = PlotUI.Refresh })
 				PlotUI.Refresh()
 			end
 		end,
@@ -177,6 +200,9 @@ local STORE: ShopUI.Shop = {
 	subtitle = "You pay when you place it. Sold back: half (all of it within a minute).",
 	ids = function()
 		local ids = { PLOT_ROW }
+		for _, mill in ipairs(ItemCatalog.SawmillList()) do
+			table.insert(ids, mill.id)
+		end
 		local sorted = table.clone(PlotData.Blueprints)
 		table.sort(sorted, function(a, b)
 			if a.tier ~= b.tier then
@@ -193,7 +219,7 @@ local STORE: ShopUI.Shop = {
 		if id == PLOT_ROW then
 			return plotRow()
 		end
-		return blueprintRow(PlotData.Blueprint(id) :: PlotData.Blueprint)
+		return blueprintRow(PlotLogic.Blueprint(id) :: PlotData.Blueprint)
 	end,
 }
 
@@ -216,7 +242,7 @@ local function addPrompts(model: Instance)
 		return
 	end
 	local uid = model:GetAttribute("Uid") :: string?
-	local bp = PlotData.Blueprint((model:GetAttribute("BlueprintId") :: string?) or "")
+	local bp = PlotLogic.Blueprint((model:GetAttribute("BlueprintId") :: string?) or "")
 	local root = model:FindFirstChild("Root")
 	if not uid or not bp or not root then
 		return
@@ -339,7 +365,7 @@ function PlotUI.Start()
 		end
 	end)
 	CollectionService:GetInstanceRemovedSignal("PlacedItem"):Connect(removePrompts)
-	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash" }) do
+	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash", "SawmillStock" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			ShopUI.Refresh()
 			PlotUI.Refresh()
