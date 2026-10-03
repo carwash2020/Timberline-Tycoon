@@ -279,6 +279,7 @@ return function(t)
 		local ok = w.VehicleService.Recall(w.player)
 		t.eq(ok, false, "the truck never appeared")
 		t.eq(w.profile.cash, 100, "the 2% fee is refunded")
+		t.eq(w.profile.totalEarned, 0)
 		t.eq(w.VehicleService.GetVehicle(w.player), nil, "nothing was left behind")
 		w.VehicleService.Hooks.blockSpawn = false
 		t.ok(w.VehicleService.Recall(w.player), "a later recall works")

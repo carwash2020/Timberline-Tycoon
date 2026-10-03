@@ -1236,13 +1236,14 @@ function WorldPlan.Town(): Town
 	-- street, the pad or a path (WorldPlan.spec).
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
-		-- North of the Plot Road's mouth, past the lot's east rail (M1.5: it
-		-- stood at (124, 64), now in a pull-out). From the spawn it hides
+		-- Just north of the truck-lot path (the apron ends at z=70 and the
+		-- posts reach about five studs south), past the lot's east rail
+		-- (M1.5: it stood at (124, 64)). From the spawn it hides
 		-- the same stretch of the coast as before, so the lighthouse (which
 		-- stands where the spawn sees it, inSightOfSpawn) stays where it was:
 		-- (1194, 188). Only a sliver of spots here does that (WorldPlan.spec
 		-- pins the lighthouse).
-		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 67, 0, 40) },
+		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
 		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },

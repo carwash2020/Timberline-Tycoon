@@ -110,6 +110,7 @@ return function(t)
 			DealershipPath = true,
 			SpawnWalk = true,
 			GondolaPath = true,
+			TruckLotPath = true,
 		}
 		local function hits(part, area)
 			local p = part.CFrame.Position

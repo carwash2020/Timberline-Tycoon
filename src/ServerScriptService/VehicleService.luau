@@ -1300,7 +1300,7 @@ local function refundRespawn(player: Player, def: TruckDef)
 	if not profile or type(profile.cash) ~= "number" then
 		return
 	end
-	EconomyService.AddCash(player, fee, "refunded a failed respawn", def.id)
+	EconomyService.Refund(player, fee, "refunded a failed respawn", def.id)
 end
 
 -- Builds the player's truck (replacing any they have). With a plot it
