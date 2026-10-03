@@ -1,8 +1,9 @@
 --!nocheck
--- The landscape's look, nudged toward Lumber Tycoon 2 (phase 10, STY-*),
--- keeping the cozy low-poly palette:
---   STY-01 a deeper meadow green and brown rock (TerrainGen.MaterialColors).
---   STY-02 the haul roads' pale gravel crown between dirt verges.
+-- The landscape's look, nudged toward Lumber Tycoon 2 (phase 10, STY-*;
+-- taken further in phase 12, ATMOS), keeping the cozy low-poly palette:
+--   STY-01 a dark, muted meadow green and brown rock (TerrainGen.MaterialColors).
+--   STY-02 the haul roads: pale grey road their whole width (phase 12; phase
+--          10 laid a pale gravel crown between dirt verges).
 --   STY-03 brown boulders (LandmarkArt.BrownRock; WorldPlan.spec and
 --          MapBuilder.spec check where the clusters go and how they build).
 return function(t)
@@ -42,16 +43,33 @@ return function(t)
 		end
 	end)
 
-	t.test("STY-01: the meadow is a deeper green, LeafyGrass a step darker, still the cozy hue", function()
+	t.test("STY-01: the meadow is a dark, muted green, LeafyGrass a step darker, still the cozy hue", function()
+		-- The colours before phase 10, and phase 10's first step (STY-01).
+		-- Phase 12 (ATMOS) took the home meadow on to the classic dark, muted
+		-- green: clearly darker than phase 10's and a little less saturated.
 		local oldGrass = Color3.fromRGB(116, 170, 74)
 		local oldLeafy = Color3.fromRGB(86, 140, 62)
+		local p10Grass = Color3.fromRGB(100, 152, 64)
+		local p10Leafy = Color3.fromRGB(76, 126, 54)
 		local grass, leafy = colors.Grass, colors.LeafyGrass
-		for _, pair in ipairs({ { "Grass", grass, oldGrass }, { "LeafyGrass", leafy, oldLeafy } }) do
-			local name, now, was = pair[1], pair[2], pair[3]
-			-- Deeper: 5-20% darker than before (moderate: still recognisable).
+		local function sat(c)
+			local _, s = c:ToHSV()
+			return s
+		end
+		for _, set in ipairs({ { "Grass", grass, oldGrass, p10Grass }, { "LeafyGrass", leafy, oldLeafy, p10Leafy } }) do
+			local name, now, was, p10 = set[1], set[2], set[3], set[4]
+			-- Dark: 15-35% darker than the original (still a meadow, not a bog).
 			local drop = 1 - lum(now) / lum(was)
-			t.ok(drop >= 0.05 and drop <= 0.2, string.format("%s is %.0f%% darker than before", name, drop * 100))
-			-- Still a warm meadow green, the same family as before.
+			t.ok(
+				drop >= 0.15 and drop <= 0.35,
+				string.format("%s is %.0f%% darker than the original", name, drop * 100)
+			)
+			-- Clearly darker than phase 10's step, not a nudge.
+			t.ok(lum(now) <= lum(p10) * 0.92, name .. " is clearly darker than phase 10's")
+			-- Muted: a little less saturated than phase 10's, still a real green.
+			t.ok(sat(now) < sat(p10), string.format("%s is less saturated (%.3f)", name, sat(now)))
+			t.ok(sat(now) > sat(p10) - 0.1, string.format("%s stays a green, not a grey (%.3f)", name, sat(now)))
+			-- Still a meadow green, the same family as before (never olive-brown).
 			t.ok(math.abs(hue(now) - hue(was)) < 0.03, name .. " keeps its hue")
 			t.ok(now.G > now.R * 1.3 and now.G > now.B * 2, name .. " is green")
 		end
@@ -122,72 +140,91 @@ return function(t)
 		return bestRoad, best
 	end
 
-	t.test("STY-02: the gravel is a real terrain material of its own, pale grey-beige", function()
+	-- Phase 12 (ATMOS) changed the rule: phase 10 laid a pale beige gravel
+	-- crown (182, 174, 158) between dirt verges 3 studs wide; now a haul road
+	-- is pale grey road its whole width, the classic way, its edge fraying
+	-- into dirt for a stud or so at most.
+
+	t.test("STY-02: the pale road is a real terrain material of its own, a light, cool grey", function()
 		t.ok(t.roblox.Enum.Material[GRAVEL] ~= nil, GRAVEL .. " is an Enum.Material")
 		for _, used in ipairs({ "Grass", "LeafyGrass", "Ground", "Mud", "Sand", "Rock", "Snow", "Glacier" }) do
-			t.ok(used ~= GRAVEL, "the gravel isn't " .. used)
+			t.ok(used ~= GRAVEL, "the road isn't " .. used)
 		end
 		for _, used in ipairs({ "Basalt", "Slate", "CrackedLava", "Cobblestone" }) do
-			t.ok(used ~= GRAVEL, "the gravel isn't " .. used)
+			t.ok(used ~= GRAVEL, "the road isn't " .. used)
 		end
 		local c = colors[GRAVEL]
-		t.ok(c ~= nil, "the gravel has a colour in MaterialColors (TerrainBuilder's setLook applies it)")
+		t.ok(c ~= nil, "the road has a colour in MaterialColors (TerrainBuilder's setLook applies it)")
 		local _, s, v = c:ToHSV()
-		t.ok(s < 0.2, "grey-beige: barely saturated")
+		t.ok(s < 0.06, "grey: hardly any colour in it")
 		t.ok(v > 0.6, "pale")
-		t.ok(lum(c) > lum(colors.Ground) * 1.15, "paler than the dirt verges")
-		t.ok(c.R >= c.G and c.G >= c.B, "a warm grey (beige), not a cold one")
+		t.ok(lum(c) > lum(colors.Ground) * 1.25, "much paler than dirt")
+		-- Cooler and greyer than phase 10's beige: a neutral light grey, a
+		-- hair warm at most, never blue, pink or green.
+		local r, g, b = rgb(c)
+		t.ok(r - b >= 0 and r - b <= 8, string.format("a neutral grey, not beige (%d, %d, %d)", r, g, b))
+		t.ok(math.abs(r - g) <= 4, string.format("neither pink nor green (%d, %d, %d)", r, g, b))
 		for name, other in pairs(colors) do
 			if name ~= GRAVEL then
 				local d = math.max(math.abs(c.R - other.R), math.abs(c.G - other.G), math.abs(c.B - other.B))
-				t.ok(d > 4 / 255, "the gravel's colour is its own, not " .. name .. "'s")
+				t.ok(d > 4 / 255, "the road's colour is its own, not " .. name .. "'s")
 			end
 		end
 	end)
 
-	t.test("STY-02: every haul road's crown is gravel out in the country, its verges dirt", function()
-		for _, name in ipairs(TerrainGen.HaulRoads) do
-			local road = roadNamed(name)
-			t.ok(road ~= nil, name .. " is a road")
-			local half = road.width / 2
-			local crown = math.max(half - TerrainGen.GravelVerge, TerrainGen.GravelLeast)
-			local centre, gravel, verges, dirt = 0, 0, 0, 0
-			for _, s in ipairs(along(road, 9)) do
-				local p = s.p
-				if WorldLayout.FlatWeight(p.X, p.Y) <= 0 then
-					centre += 1
-					if materialAt(p.X, p.Y) == GRAVEL then
-						gravel += 1
-					end
-					-- Both verges: past the gravel's frayed edge, short of the dirt's.
-					local off = (crown + 0.85 + half - 1.25) / 2
-					for _, sign in ipairs({ -1, 1 }) do
-						local q = p + s.side * (sign * off)
-						-- Only where this road is the nearest (not at a fork).
-						local nearest = nearestRoad(q.X, q.Y)
-						if nearest == road and math.abs(fromCentre(road, q.X, q.Y) - off) < 0.01 then
-							verges += 1
-							if materialAt(q.X, q.Y) == "Ground" then
-								dirt += 1
+	t.test(
+		"STY-02: out in the country every haul road is pale road its whole width, a thin dirt edge at most",
+		function()
+			local edge = TerrainGen.GravelEdge
+			t.ok(edge >= 0 and edge <= 1.5, "the dirt edge is thin")
+			for _, name in ipairs(TerrainGen.HaulRoads) do
+				local road = roadNamed(name)
+				t.ok(road ~= nil, name .. " is a road")
+				local half = road.width / 2
+				-- Inside the pale surface's frayed edge (it wanders 0.8 either way):
+				-- pale every time. Dirt only in that frayed edge: the outer couple
+				-- of studs each side, so at least three quarters of the road's
+				-- width is pale (more on the wider roads to come). (A terrain voxel
+				-- is 4 studs: in game the dirt is the odd edge voxel.)
+				local solid = half - edge - 0.85
+				local centre, inside, pale, across, paleAcross = 0, 0, 0, 0, 0
+				for _, s in ipairs(along(road, 9)) do
+					local p = s.p
+					if WorldLayout.FlatWeight(p.X, p.Y) <= 0 then
+						centre += 1
+						for off = -half, half, 0.5 do
+							local q = p + s.side * off
+							-- Only where this road is the nearest (not at a fork).
+							if nearestRoad(q.X, q.Y) == road then
+								local m = materialAt(q.X, q.Y)
+								across += 1
+								paleAcross += if m == GRAVEL then 1 else 0
+								if math.abs(off) <= solid then
+									inside += 1
+									pale += if m == GRAVEL then 1 else 0
+								end
 							end
 						end
 					end
 				end
+				t.ok(centre > 10, name .. " runs through the country")
+				t.ok(inside > centre * 10, name .. " has its middle checked")
+				t.eq(pale, inside, name .. ": pale all the way across")
+				t.ok(
+					paleAcross / across >= 0.75,
+					string.format("%s: %.0f%% of its width is pale road", name, paleAcross / across * 100)
+				)
 			end
-			t.ok(centre > 10, name .. " runs through the country")
-			t.eq(gravel, centre, name .. ": gravel all along its crown")
-			t.ok(verges > 10, name .. " has verges checked")
-			t.ok(dirt / verges >= 0.95, string.format("%s: %d of %d verge points are dirt", name, dirt, verges))
 		end
-	end)
+	)
 
-	t.test("STY-02: the gravel is only on the haul roads, never in town, on the plots or anywhere else", function()
+	t.test("STY-02: the pale road is only on the haul roads, never in town, on the plots or anywhere else", function()
 		local seen = 0
 		local haul = {}
 		for _, name in ipairs(TerrainGen.HaulRoads) do
 			haul[name] = true
 		end
-		-- Across every road, from verge to verge and a little past.
+		-- Across every road, from edge to edge and a little past.
 		for _, road in ipairs(WorldLayout.Roads) do
 			local half = road.width / 2
 			for _, s in ipairs(along(road, 3)) do
@@ -197,32 +234,35 @@ return function(t)
 						seen += 1
 						local nearest, edge = nearestRoad(q.X, q.Y)
 						local x, z = q.X, q.Y
-						t.ok(haul[nearest.name], string.format("gravel at (%d, %d) on %s", x, z, nearest.name))
-						-- Within the crown (and its frayed edge), never out on a verge.
+						t.ok(haul[nearest.name], string.format("pale road at (%d, %d) on %s", x, z, nearest.name))
+						-- On the road (its pale edge ends GravelEdge in from the
+						-- road's, give or take 0.8), never out on the grass.
 						local nh = nearest.width / 2
-						local crown = math.max(nh - TerrainGen.GravelVerge, TerrainGen.GravelLeast)
-						t.ok(edge + nh <= crown + 0.81, string.format("gravel at (%d, %d) on the verge", x, z))
-						t.ok(nh - crown >= 2.5, nearest.name .. " keeps dirt verges 2.5+ studs wide")
-						t.ok(WorldLayout.FlatWeight(x, z) < 0.6, string.format("gravel at (%d, %d) in town", x, z))
+						t.ok(
+							edge + nh <= nh - TerrainGen.GravelEdge + 0.81,
+							string.format("pale road at (%d, %d) past the road's edge", x, z)
+						)
+						t.ok(WorldLayout.FlatWeight(x, z) < 0.6, string.format("pale road at (%d, %d) in town", x, z))
 					end
 				end
 			end
 		end
-		t.ok(seen > 2000, seen .. " gravel samples")
+		t.ok(seen > 4000, seen .. " pale road samples")
 		-- Far from any road, never: a coarse sweep of the rest of the map.
 		for x = -1490, 1490, 37 do
 			for z = -1490, 1490, 37 do
 				local _, edge = nearestRoad(x, z)
 				if edge > 2 then
-					t.ok(materialAt(x, z) ~= GRAVEL, string.format("gravel off the roads at (%d, %d)", x, z))
+					t.ok(materialAt(x, z) ~= GRAVEL, string.format("pale road off the roads at (%d, %d)", x, z))
 				end
 			end
 		end
 	end)
 
 	t.test("STY-02: the town's roads, street and paths stay dirt", function()
-		-- The Hills Road and the Forest Path where they run through town,
-		-- the plot district's road and lanes.
+		-- The Hills Road and the Snow Road where they run through town (the
+		-- pale road frays into the town's dirt where its flat ground begins),
+		-- the Forest Path, the plot district's road and lanes.
 		for _, name in ipairs({ "ForestPath", "PlotRoad", "PlotLane", "HillsRoad", "SnowRoad" }) do
 			for _, road in ipairs(WorldLayout.Roads) do
 				if road.name == name then

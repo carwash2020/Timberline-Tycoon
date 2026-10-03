@@ -255,6 +255,139 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"bold name signs (phase 12): big boards over the street in the shop's colours, lit, out of the way",
+		function()
+			local function lum(c)
+				return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+			end
+			-- The name boards before phase 12, at design size (width, height).
+			local OLD = {
+				Sawmill = { 17, 3.4 },
+				ToolShed = { 9.6, 2.3 },
+				Dealership = { 11.2, 2.3 },
+				HearthAndHome = { 8, 1.9 },
+			}
+			-- The sign's own parts: the board, its frame and posts, its lamps.
+			local OWN =
+				{ Sign = true, SignFrame = true, SignPost = true, LampArm = true, LampShade = true, LampBulb = true }
+			local list = {
+				{
+					kind = "Sawmill",
+					model = BuildingArt.Sawmill(),
+					s = BuildingArt.Scale.Sawmill,
+					title = "TIMBERLINE SAWMILL",
+				},
+			}
+			for _, shop in ipairs(SHOPS) do
+				table.insert(list, {
+					kind = shop.kind,
+					model = BuildingArt.Shop(shop.kind, shop.title, shop.accent),
+					s = BuildingArt.Scale[shop.kind],
+					title = shop.title,
+					accent = shop.accent,
+				})
+			end
+			for _, b in ipairs(list) do
+				local kind, model, s = b.kind, b.model, b.s
+				local sign = model:FindFirstChild("Sign")
+				t.ok(sign and sign:IsA("BasePart"), kind .. ": a direct-child Sign board")
+				-- Much bigger than before: 1.4x as wide or more (the Dealership's is
+				-- held to its false front by its footprint and by the TRUCKS marker
+				-- over its office), 1.3x as tall or more.
+				local old = OLD[kind]
+				t.ok(sign.Size.X >= old[1] * s * 1.4, string.format("%s: the board is %.1f wide", kind, sign.Size.X))
+				t.ok(sign.Size.Y >= old[2] * s * 1.3, string.format("%s: the board is %.1f tall", kind, sign.Size.Y))
+				-- Upright, facing the street (-Z).
+				t.ok(sign.CFrame.LookVector:Dot(V3.new(0, 0, -1)) > 0.999, kind .. " faces the street")
+				t.ok(sign.CFrame.UpVector.Y > 0.999, kind .. " stands upright")
+				-- Its title, light on dark, as big as the board allows: Roblox draws
+				-- TextScaled text 100 px tall at most, so the text box gets about
+				-- that many pixels (Kit's 40 a stud would cap the letters at about
+				-- 2.5 studs, however big the board).
+				local front = false
+				for _, gui in ipairs(sign:GetChildren()) do
+					if gui:IsA("SurfaceGui") then
+						local label = gui:FindFirstChildOfClass("TextLabel")
+						t.eq(label.Text, b.title, kind .. " sign text")
+						t.ok(label.TextScaled, kind .. ": the text scales to the board")
+						front = front or gui.Face == roblox.Enum.NormalId.Front
+						local pad = label:FindFirstChildOfClass("UIPadding")
+						local box = sign.Size.Y
+							* (1 - pad.PaddingTop.Scale - pad.PaddingBottom.Scale)
+							* gui.PixelsPerStud
+						t.ok(box >= 85 and box <= 101, string.format("%s: the text box is %.0f px tall", kind, box))
+						t.ok(lum(label.TextColor3) - lum(sign.Color) >= 0.5, kind .. ": light ink on a dark board")
+					end
+				end
+				t.ok(front, kind .. ": the title is on the front")
+				-- The Tool Shed's and the Dealership's boards are their accents.
+				if b.accent and kind ~= "HearthAndHome" then
+					local c, a = sign.Color, b.accent
+					local d = math.max(math.abs(c.R - a.R), math.abs(c.G - a.G), math.abs(c.B - a.B))
+					t.ok(d < 1.5 / 255, kind .. ": the board is the shop's accent")
+				end
+				-- The board and its frame: looks only, above every doorway, behind
+				-- the building's front, and nothing of the building in their way
+				-- (no roof, wall or post through them).
+				local lo, hi = bounds(sign)
+				for _, p in ipairs(parts(model)) do
+					if p.Name == "SignFrame" then
+						local a, c = bounds(p)
+						if
+							a.Y > lo.Y - 1.5 * s
+							and c.Y < hi.Y + 1.5 * s
+							and a.X > lo.X - 1.5 * s
+							and c.X < hi.X + 1.5 * s
+						then
+							lo, hi = lo:Min(a), hi:Max(c)
+							t.ok(not p.CanCollide and not p.CanQuery, kind .. ": its frame is looks only")
+						end
+					end
+				end
+				t.ok(not sign.CanCollide and not sign.CanQuery, kind .. ": the board is looks only")
+				t.ok(lo.Y >= 9 * s - 0.01, string.format("%s: the sign's bottom is %.1f up", kind, lo.Y))
+				local front0 = math.huge
+				for _, p in ipairs(parts(model)) do
+					if p.CanCollide then
+						front0 = math.min(front0, (bounds(p)).Z)
+					end
+				end
+				t.ok(lo.Z >= front0 - 0.5 * s, string.format("%s: the sign hangs out past the building's front", kind))
+				local tol = 0.02
+				for _, p in ipairs(parts(model)) do
+					if not OWN[p.Name] then
+						local a, c = bounds(p)
+						local through = a.X < hi.X - tol
+							and c.X > lo.X + tol
+							and a.Y < hi.Y - tol
+							and c.Y > lo.Y + tol
+							and a.Z < hi.Z - tol
+							and c.Z > lo.Z + tol
+						t.ok(not through, string.format("%s: its %s is in the sign's way", kind, p.Name))
+					end
+				end
+				-- Lit at night: both lamps hang over the board's front, at its top.
+				local lamps = 0
+				for _, p in ipairs(parts(model)) do
+					if p.Name == "LampBulb" then
+						local at = p.CFrame.Position
+						if
+							at.X > lo.X
+							and at.X < hi.X
+							and at.Y > hi.Y - 0.5 * s
+							and at.Y < hi.Y + 2 * s
+							and at.Z < lo.Z
+						then
+							lamps += 1
+						end
+					end
+				end
+				t.eq(lamps, 2, kind .. ": two lamps over the sign")
+			end
+		end
+	)
+
 	t.test("street furniture keeps its named parts", function()
 		local sign = BuildingArt.Signpost("TO THE WOODS")
 		t.ok(find(sign, "Board") and texts(sign)["TO THE WOODS"], "Signpost board and text")

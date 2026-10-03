@@ -51,12 +51,20 @@ return function(t)
 			BuildingArt.Shop("Dealership", "DEALERSHIP", Color3.new(0, 0, 1)),
 			BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", Color3.new(0, 1, 0)),
 		}
+		-- The sawmill's and the shops' big name boards ("Sign", phase 12) take
+		-- fewer pixels a stud, by their height, so their letters can fill them
+		-- (Roblox stops TextScaled at 100 px; BuildingArt.spec checks them):
+		-- still sized to the face, never stretched.
+		local named = { Sawmill = true, ToolShed = true, Dealership = true, HearthAndHome = true }
 		local guis = 0
 		for _, model in ipairs(models) do
 			for _, d in ipairs(model:GetDescendants()) do
 				if d:IsA("SurfaceGui") then
 					guis += 1
-					t.ok(sizedToFace(d), string.format("%s's %s text is stretched", model.Name, d.Parent.Name))
+					local sized = if named[model.Name] and d.Parent.Name == "Sign"
+						then d.SizingMode == Enum.SurfaceGuiSizingMode.PixelsPerStud and d.PixelsPerStud <= 40
+						else sizedToFace(d)
+					t.ok(sized, string.format("%s's %s text is stretched", model.Name, d.Parent.Name))
 				end
 			end
 		end

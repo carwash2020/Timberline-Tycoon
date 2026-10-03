@@ -311,38 +311,53 @@ EnvironmentData.BiomeOverrides = {
 	-- Warm greens and honey light.
 	starter = { add = { saturation = 0.03 } },
 	hills = { add = { saturation = 0.02, contrast = 0.02 } },
-	-- Cool and bright: pale blues, white drifts, cool rim light.
+	-- Cool and bright: pale blues, white drifts, cool rim light, and a cold,
+	-- frosty white-blue haze (phase 12). Its air is a floor more than an
+	-- extra (x0.7 then +0.17): a clear midday's 0.28 comes out at 0.37, but
+	-- a night that is already thick only gets a little thicker, so a clear
+	-- night here stays under the Fog weather's 0.55.
 	snow = {
-		mul = { brightness = 1.12 },
-		add = { exposure = 0.1, saturation = -0.05, atmosphereDensity = 0.04, atmosphereHaze = 0.5 },
+		mul = { brightness = 1.12, atmosphereDensity = 0.7 },
+		add = { exposure = 0.1, saturation = -0.05, atmosphereDensity = 0.17, atmosphereHaze = 1 },
 		tint = {
 			outdoorAmbient = scale(0.95, 1.0, 1.12),
-			atmosphereColor = scale(0.9, 0.97, 1.08),
+			atmosphereColor = scale(1.05, 1.08, 1.12),
+			atmosphereDecay = scale(1.1, 1.15, 1.22),
 			colorShiftTop = scale(0.8, 0.9, 1.1),
 		},
 		paint = { tint = rgb(235, 245, 255) },
 	},
-	-- Charred rock, ember-orange glow, ash in the air. (The midday tint
-	-- comes out at (255, 215, 190), the decay at (180, 80, 60).)
+	-- Charred rock, ember-orange glow, ash in the air, and its signature: a
+	-- thick red fog (phase 12). Its air is set, not added, so it is the
+	-- same at any hour: 0.55 (the Fog weather's thickness: a tree still
+	-- shows 60-100 studs off) and hazy, red-orange toward the sun and deep
+	-- red away from it (tints, so its nights stay dark). The midday tint
+	-- comes out at (255, 215, 190), the air (255, 140, 100) and the decay
+	-- (201, 61, 33).
 	volcano = {
-		add = { atmosphereDensity = 0.08, atmosphereHaze = 1, saturation = 0.02, bloomIntensity = 0.1 },
+		set = { atmosphereDensity = 0.55, atmosphereHaze = 3 },
+		add = { saturation = 0.02, bloomIntensity = 0.1 },
 		tint = {
 			tint = scale(1, 0.843, 0.745),
-			atmosphereDecay = scale(1.7, 0.66, 0.42),
-			atmosphereColor = scale(1.15, 0.85, 0.7),
+			atmosphereDecay = scale(1.9, 0.5, 0.23),
+			atmosphereColor = scale(1.3, 0.66, 0.45),
 			outdoorAmbient = scale(1.15, 0.9, 0.8),
 			cloudColor = scale(0.75, 0.6, 0.55),
 		},
 	},
-	-- Deep purples and teal glow, darker than anywhere.
+	-- Deep purples and teal glow, darker than anywhere, and a low violet
+	-- swamp mist hanging in the hollow at any hour (phase 12): its air is
+	-- set to 0.53 (thicker than any clear night out in the country, under
+	-- the Fog weather's 0.55), hazy, tinted violet.
 	grove = {
 		mul = { brightness = 0.6 },
-		add = { exposure = -0.15, atmosphereDensity = 0.08, bloomIntensity = 0.2 },
+		set = { atmosphereDensity = 0.53 },
+		add = { exposure = -0.15, atmosphereHaze = 1.2, bloomIntensity = 0.2 },
 		tint = {
 			tint = scale(0.745, 0.706, 1),
 			outdoorAmbient = scale(0.75, 0.65, 1),
-			atmosphereColor = scale(0.8, 0.7, 1.1),
-			atmosphereDecay = scale(0.8, 0.6, 1.2),
+			atmosphereColor = scale(0.8, 0.66, 1.15),
+			atmosphereDecay = scale(0.78, 0.56, 1.25),
 		},
 	},
 	-- White-gold light above the clouds, the whole map spread out below.
@@ -416,12 +431,25 @@ EnvironmentData.WeatherOverrides = {
 	},
 } :: { [string]: Override }
 
--- The night mist (STY-05), the classic lumber-game way: the air thickens late
--- in the evening (from 22:00, full by 23:00), holds through the night and
--- lifts through the morning (from 06:30, clear by 09:30). MistWeight(clock)
--- is how much of Mist.override Blend applies at that hour: after the
--- hour's own light, before the biome and the weather (so the Fog weather
--- and the isles' own air still set theirs). Never on the isles (above the
+-- 0 at night, 1 by day, easing through dawn (5-7) and dusk (17.5-19.5).
+function EnvironmentData.Daylight(clockTime: number): number
+	local h = clockTime % 24
+	if h < 12 then
+		return smoothstep((h - 5) / 2)
+	end
+	return 1 - smoothstep((h - 17.5) / 2)
+end
+
+-- The night fog (STY-05; phase 12 made it a real fog), the classic
+-- lumber-game way: the air thickens late in the evening (from 22:00, full
+-- by 23:00), holds through the night and lifts through the morning (from
+-- 06:30, clear by 09:30). MistWeight(clock) is how much of Mist.override
+-- Blend applies at that hour: after the hour's own light, before the biome
+-- and the weather (so the Fog weather and a biome's own air still set
+-- theirs). Its colour, a cool grey-blue (Mist.colour), comes with the dark
+-- (MistColourWeight), so dawn lights the morning fog its own colour. Only
+-- the air: the night's light (brightness, ambient, WLD-06) is what it was,
+-- so a trunk still reads at 30 studs. Never on the isles (above the
 -- clouds), and never by day: 09:30 to 22:00 looks exactly as it did, so a
 -- phone's horizon stays clear.
 EnvironmentData.Mist = {
@@ -429,10 +457,16 @@ EnvironmentData.Mist = {
 	thick = 23,
 	liftFrom = 6.5,
 	clear = 9.5,
-	override = { add = { atmosphereDensity = 0.07, atmosphereHaze = 0.6 } } :: Override,
+	-- A clear night out in the country is 0.52 thick and 2.0 hazy now (the
+	-- Fog weather is 0.55 and 3); STY-05's mist added 0.07 and 0.6.
+	override = { add = { atmosphereDensity = 0.16, atmosphereHaze = 1.5 } } :: Override,
+	-- As dark as the night's own blue (90, 100, 140 and 40, 45, 80), greyer.
+	colour = {
+		paint = { atmosphereColor = rgb(94, 102, 124), atmosphereDecay = rgb(44, 49, 66) },
+	} :: Override,
 }
 
--- 0..1: how thick the night mist is at `clockTime` (0..24).
+-- 0..1: how thick the night fog is at `clockTime` (0..24).
 function EnvironmentData.MistWeight(clockTime: number): number
 	local h = clockTime % 24
 	local m = EnvironmentData.Mist
@@ -442,6 +476,13 @@ function EnvironmentData.MistWeight(clockTime: number): number
 		return 1
 	end
 	return 1 - smoothstep((h - m.liftFrom) / (m.clear - m.liftFrom))
+end
+
+-- 0..1: how much of the night fog's colour shows at `clockTime`: the fog's
+-- own weight while it is dark, fading out as the day comes (05:00-07:00),
+-- so the morning fog (thick until 06:30) takes dawn's colour.
+function EnvironmentData.MistColourWeight(clockTime: number): number
+	return EnvironmentData.MistWeight(clockTime) * (1 - EnvironmentData.Daylight(clockTime))
 end
 
 local NUMBER_SET: { [string]: boolean } = {}
@@ -478,6 +519,7 @@ for name, o in pairs(EnvironmentData.WeatherOverrides) do
 	checkOverride(name, o)
 end
 checkOverride("Mist", EnvironmentData.Mist.override)
+checkOverride("Mist colour", EnvironmentData.Mist.colour)
 
 local function copy(s: LightingState): LightingState
 	return table.clone(s)
@@ -570,13 +612,15 @@ function EnvironmentData.TimeOfDay(clockTime: number): LightingState
 	return EnvironmentData.Lerp(prev.state, nextFrame.state, t)
 end
 
--- The full picture: the hour's light and its night mist, then the biome
--- you're in ("" or nil = open country), then the weather at `intensity`
--- (0..1).
+-- The full picture: the hour's light and its night fog (and the fog's
+-- colour while it's dark), then the biome you're in ("" or nil = open
+-- country), then the weather at `intensity` (0..1).
 function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: string?, intensity: number?): LightingState
 	local s = EnvironmentData.TimeOfDay(clockTime)
 	if biomeId ~= "sky" then
-		EnvironmentData.Apply(s, EnvironmentData.Mist.override, EnvironmentData.MistWeight(clockTime))
+		local mist = EnvironmentData.Mist
+		EnvironmentData.Apply(s, mist.override, EnvironmentData.MistWeight(clockTime))
+		EnvironmentData.Apply(s, mist.colour, EnvironmentData.MistColourWeight(clockTime))
 	end
 	local biome = if biomeId then EnvironmentData.BiomeOverrides[biomeId] else nil
 	if biome then
@@ -588,15 +632,6 @@ function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: str
 	end
 	EnvironmentData.Clamp(s)
 	return s
-end
-
--- 0 at night, 1 by day, easing through dawn (5-7) and dusk (17.5-19.5).
-function EnvironmentData.Daylight(clockTime: number): number
-	local h = clockTime % 24
-	if h < 12 then
-		return smoothstep((h - 5) / 2)
-	end
-	return 1 - smoothstep((h - 17.5) / 2)
 end
 
 ---------------------------------------------------------------------------
