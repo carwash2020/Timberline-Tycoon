@@ -791,15 +791,30 @@ local function buildPanel()
 	g.Parent = player:WaitForChild("PlayerGui")
 end
 
-local function setupPrompt(shop: Shop)
-	local buildingName = shop.building
-	if not buildingName then
+-- Calls `fn` with the named child now, and again if a later one arrives
+-- (the shops are built after the client can start). A timed WaitForChild
+-- warns when the map is still building; this never waits forever.
+local function whenChild(parent: Instance, name: string, fn: (Instance) -> ())
+	local found = parent:FindFirstChild(name)
+	if found then
+		fn(found)
+	end
+	parent.ChildAdded:Connect(function(child: Instance)
+		if child.Name == name then
+			fn(child)
+		end
+	end)
+end
+
+local function setupPrompt(shop: Shop, building: Instance)
+	if points[shop] then
 		return
 	end
-	local map = workspace:WaitForChild("TimberlineMap")
-	local building = map:WaitForChild(buildingName) -- a Persistent model: always streamed in
-	local counter = building:WaitForChild("Counter")
-	local point = counter:WaitForChild("ShopPoint") :: Attachment
+	local counter = building:FindFirstChild("Counter")
+	local point = if counter then counter:FindFirstChild("ShopPoint") else nil
+	if not point or not point:IsA("Attachment") then
+		return
+	end
 	points[shop] = point
 
 	local pp = Instance.new("ProximityPrompt")
@@ -843,8 +858,32 @@ function ShopUI.Start()
 	}) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
-	for _, shop in ipairs(SHOPS) do
-		task.spawn(setupPrompt, shop)
+	-- Prices follow the loop MapBuilder publishes. Until that attribute
+	-- replicates, Active() reads as v1 and the cards would show v1 prices.
+	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(refresh)
+	-- Shops are Persistent, but they are parented during the map build,
+	-- which can still be running when this client starts. Find them when
+	-- they appear; a bare WaitForChild warns and, if one were streamed
+	-- out, would wait forever.
+	local function watchMap(map: Instance)
+		for _, shop in ipairs(SHOPS) do
+			local buildingName = shop.building
+			if buildingName then
+				whenChild(map, buildingName, function(building: Instance)
+					setupPrompt(shop, building)
+				end)
+			end
+		end
+	end
+	local mapNow = workspace:FindFirstChild("TimberlineMap")
+	if mapNow then
+		watchMap(mapNow)
+	else
+		workspace.ChildAdded:Connect(function(child: Instance)
+			if child.Name == "TimberlineMap" then
+				watchMap(child)
+			end
+		end)
 	end
 	-- Walked away (or respawned somewhere else)? Close the screen.
 	local elapsed = 0

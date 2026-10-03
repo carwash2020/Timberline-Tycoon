@@ -312,7 +312,14 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	table.insert(
 		s.conns,
 		UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-			if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
+			-- A finger also reports a mouse click. On a touch screen the tap
+			-- only aims (TouchTapInWorld); PLACE confirms. Treating that
+			-- click as Place built wherever the ghost already sat.
+			if
+				not processed
+				and input.UserInputType == Enum.UserInputType.MouseButton1
+				and UserInputService:GetLastInputType() ~= Enum.UserInputType.Touch
+			then
 				BlueprintPlacer.Place()
 			end
 		end)

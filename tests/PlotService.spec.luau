@@ -113,6 +113,12 @@ return function(t)
 				local c = if i then PlotData.Slots[i] else Vector2.new(-2000, -2000)
 				root.Position = Vector3.new(c.X, 3, c.Y)
 			end
+			-- At the unclaimed sign: the board sits just north of the pad.
+			function player.standAtSign(i)
+				local c = PlotData.Slots[i]
+				local size = PlotData.Tiers[1].size
+				root.Position = Vector3.new(c.X, 3, c.Y + size / 2 + 3)
+			end
 			return player, profile
 		end
 
@@ -199,10 +205,15 @@ return function(t)
 			return plots:FindFirstChild("Plot_" .. i)
 		end
 		local function claim(player, i)
+			player.standAtSign(i)
 			plot(i):FindFirstChild("Sign"):FindFirstChild("ProximityPrompt").Triggered.fn(player)
 		end
+		-- Placed models live beside the plot shell (PlotItems_N), not inside it.
+		local function itemFolder(i)
+			return plots:FindFirstChild("PlotItems_" .. i)
+		end
 		local function items(i)
-			return plot(i):FindFirstChild("Items"):GetChildren()
+			return itemFolder(i):GetChildren()
 		end
 		return {
 			P = PlotService,
@@ -211,6 +222,7 @@ return function(t)
 			plot = plot,
 			claim = claim,
 			items = items,
+			itemFolder = itemFolder,
 			toasts = toasts,
 			tags = tags,
 			remotes = remotes,
@@ -261,6 +273,7 @@ return function(t)
 		local s = setup({ cash = 1000 })
 		local ann, profile = s.newPlayer(1, "Ann")
 		s.claim(ann, 1)
+		ann.standOn(nil)
 		s.P.Place(ann, "Bench", 10.6, -3.4, 1)
 		t.eq(s.lastToast(), "Stand on your plot to build.")
 		t.eq(#profile.plot.placed, 0)
@@ -319,7 +332,7 @@ return function(t)
 		s.P.Move(ann, first.uid, 20.9, -5, 1)
 		t.eq({ first.x, first.z, first.rot }, { 20, -4, 1 })
 		t.eq(profile.cash, cash)
-		local model = s.plot(1):FindFirstChild("Items"):FindFirstChild(first.uid)
+		local model = s.itemFolder(1):FindFirstChild(first.uid)
 		t.eq(model.placedAt, { 20, -4, 1 })
 		t.eq(model:GetAttribute("Rot"), 1)
 		s.P.Move(ann, "someone-else", 0, 0, 0) -- not yours: nothing happens
@@ -361,6 +374,7 @@ return function(t)
 		local s = setup({ cash = 3000 })
 		local ann, profile = s.newPlayer(1, "Ann")
 		s.claim(ann, 1)
+		ann.standOn(1)
 		s.P.Upgrade(ann)
 		t.eq(profile.plot.tier, 2)
 		t.eq(profile.cash, 500)
@@ -431,5 +445,121 @@ return function(t)
 		t.eq(model:GetAttribute("CutY"), 0.8)
 		t.eq(model:GetAttribute("CutShown"), "1.4 0.8")
 		t.eq(profile.plot.placed[1].data, { x = 1.4, y = 0.8 })
+	end)
+
+	t.test("a sawmill on someone else's plot stays in stock", function()
+		local s = setup({ cash = 200 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		profile.sawmillStock = { "SawmillRickety" }
+		s.claim(ann, 1)
+		s.claim(bob, 2)
+		ann.standOn(2)
+		s.P.Place(ann, "SawmillRickety", 0, 0, 0)
+		t.eq(profile.sawmillStock, { "SawmillRickety" })
+		t.eq(profile.cash, 200)
+		t.eq(#profile.plot.placed, 0)
+		t.eq(s.lastToast(), "Stand on your plot to build.")
+	end)
+
+	t.test("claiming only works at the sign", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		ann.standOn(nil)
+		s.plot(1):FindFirstChild("Sign"):FindFirstChild("ProximityPrompt").Triggered.fn(ann)
+		t.eq(profile.plot.claimed, false)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(s.lastToast(), "Walk up to the sign to claim this plot.")
+	end)
+
+	t.test("growing only works while you stand on your plot", function()
+		local s = setup({ cash = 3000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(nil)
+		s.P.Upgrade(ann)
+		t.eq(profile.plot.tier, 1)
+		t.eq(profile.cash, 3000)
+		t.eq(s.lastToast(), "Stand on your plot to grow it.")
+	end)
+
+	t.test("you can only build on your own plot", function()
+		local s = setup({ cash = 1000 })
+		local ann, annProfile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		s.claim(bob, 2)
+		ann.standOn(2)
+		s.P.Place(ann, "Bench", 0, 0, 0)
+		t.eq(#annProfile.plot.placed, 0)
+		t.eq(annProfile.cash, 1000)
+		t.eq(s.lastToast(), "Stand on your plot to build.")
+		t.eq(#bobProfile.plot.placed, 0)
+	end)
+
+	t.test("a plot and what you place on it stream as whole models, beside the shell", function()
+		local s = setup()
+		local ann = s.newPlayer(1, "Ann")
+		local Atomic = t.roblox.Enum.ModelStreamingMode.Atomic
+		for i = 1, #s.PlotData.Slots do
+			t.eq(s.plot(i).ModelStreamingMode, Atomic, "plot " .. i)
+		end
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Bench", 0, 0, 0)
+		local models = s.items(1)
+		t.eq(#models, 1)
+		t.eq(models[1].ModelStreamingMode, Atomic)
+		t.eq(models[1].Parent.Name, "PlotItems_1")
+		t.ok(models[1].Parent.Parent == s.plot(1).Parent, "placed items sit in the Plots folder")
+		t.ok(models[1].Parent ~= s.plot(1), "placed items are not children of the plot model")
+	end)
+
+	t.test("joining twice does not hand out a second plot", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
+		profile.plot.placed = { { uid = "a", blueprintId = "Bench", x = 4, z = 4, rot = 0 } }
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(#s.items(1), 1)
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(s.plot(2):GetAttribute("OwnerId"), nil)
+		t.eq(#s.items(1), 1)
+	end)
+
+	t.test("a full district keeps a saved layout until a slot frees", function()
+		local s = setup()
+		local owners = {}
+		for i = 1, #s.PlotData.Slots do
+			local player = s.newPlayer(i, "P" .. i)
+			s.claim(player, i)
+			table.insert(owners, player)
+			t.eq(player.attrs.PlotSlot, i)
+		end
+		local extra, profile = s.newPlayer(99, "Extra")
+		profile.plot.claimed = true
+		profile.plot.placed = { { uid = "bench", blueprintId = "Bench", x = 2, z = 2, rot = 0 } }
+		s.P.PlayerJoined(extra, profile)
+		t.eq(extra.attrs.PlotSlot, nil)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(s.lastToast(), "This server's plot district is full, so your plot isn't out today. Try another server!")
+		s.P.PlayerRemoving(owners[1])
+		t.eq(owners[1].attrs.PlotSlot, nil)
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
+		s.P.PlayerJoined(extra, profile)
+		t.eq(extra.attrs.PlotSlot, 1)
+		t.eq(#s.items(1), 1)
+		t.eq(s.items(1)[1].Name, "bench")
+		s.P.PlayerJoined(extra, profile)
+		t.eq(extra.attrs.PlotSlot, 1)
+		local taken = 0
+		for i = 1, #s.PlotData.Slots do
+			if s.plot(i):GetAttribute("OwnerId") ~= nil then
+				taken += 1
+			end
+		end
+		t.eq(taken, 12)
 	end)
 end

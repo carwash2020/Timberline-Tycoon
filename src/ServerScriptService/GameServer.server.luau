@@ -839,6 +839,11 @@ end)
 
 -- Player lifecycle --------------------------------------------------------
 
+-- PlayerAdded and the "already here" loop can both see the same player
+-- (they join while the loop is running). A second pass would start a
+-- second save session and hand them a second plot.
+local joining: { [Player]: boolean } = {}
+
 local function dropCarriedLogs(player: Player)
 	local hands = CarryService.Hands(player)
 	if not hands then
@@ -868,6 +873,10 @@ local function onCharacterAdded(player: Player, character: Model)
 end
 
 local function onPlayerAdded(player: Player)
+	if joining[player] then
+		return
+	end
+	joining[player] = true
 	player:SetAttribute("ProfileLoaded", false) -- the HUD shows "Loading your save..."
 	player:SetAttribute("CarriedLogs", 0)
 	CarryService.Start(player)
@@ -1022,6 +1031,7 @@ LeaveCommit.Add("truckLoad", saveTruckLoad)
 LeaveCommit.Add("leftBehind", saveLeftBehind)
 
 local function onPlayerRemoving(player: Player)
+	joining[player] = nil
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
