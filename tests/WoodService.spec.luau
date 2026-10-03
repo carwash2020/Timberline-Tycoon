@@ -493,11 +493,14 @@ return function(t)
 			end,
 		}
 		local loader = t.loader({
-			services = { PhysicsService = Physics, Players = {
-				GetPlayers = function()
-					return {}
-				end,
-			} },
+			services = {
+				PhysicsService = Physics,
+				Players = {
+					GetPlayers = function()
+						return {}
+					end,
+				},
+			},
 		})
 		local Wood = loader:server("WoodService")
 		t.eq(Wood.RegisterGroups(), true)

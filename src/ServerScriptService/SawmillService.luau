@@ -187,8 +187,11 @@ local function beltEnds(belt: BasePart, piece: Piece): (CFrame, CFrame)
 	local half = belt.Size.Z / 2
 	local nose = math.min(lengthOf(piece) / 2, half * 0.35)
 	local lift = belt.CFrame.UpVector * (belt.Size.Y / 2 + radiusOf(piece))
-	local entry = belt.Position - look * (half - nose) + lift
-	local exit = belt.Position + look * (half - nose) + lift
+	-- CFrame, not .Position: art is placed with CFrame, and a part's
+	-- Position stays unset until something writes it.
+	local at = belt.CFrame.Position
+	local entry = at - look * (half - nose) + lift
+	local exit = at + look * (half - nose) + lift
 	return along(entry, look), along(exit, look)
 end
 

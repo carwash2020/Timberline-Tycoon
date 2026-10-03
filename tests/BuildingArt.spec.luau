@@ -268,10 +268,12 @@ return function(t)
 		local controller = fs.readFile("src/StarterPlayer/StarterPlayerScripts/LightingController.luau")
 		local list = string.match(controller, "local GLOW_NAMES[^=]*= {([^}]*)}")
 		t.ok(list and string.find(list, "LampBulb = true", 1, true), "LampBulb is a night light")
-		-- The town's SELL LOGS HERE sign is the lit one.
+		-- Two town signs are lit: SELL LOGS HERE, and the south exit
+		-- (sawmill north, first grove south). The rest stay dark.
 		local WorldPlan = loader:load("ReplicatedStorage/Shared/World/WorldPlan")
 		for _, sign in ipairs(WorldPlan.Town().signs) do
-			t.eq(sign.lit == true, sign.text == "SELL LOGS HERE", sign.text .. " lit")
+			local should = sign.text == "SELL LOGS HERE" or string.find(sign.text, "FIRST GROVE", 1, true) ~= nil
+			t.eq(sign.lit == true, should, sign.text .. " lit")
 		end
 	end)
 
