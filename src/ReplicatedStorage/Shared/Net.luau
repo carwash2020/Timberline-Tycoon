@@ -33,6 +33,8 @@ Net.RemoteNames = {
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...
+	"SlotAction", -- client -> server: ("load" | "reset", index, confirm)
+	"SlotState", -- server -> client: (summary) the three slots
 }
 
 local folder: Folder? = nil

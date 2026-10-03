@@ -3,6 +3,8 @@
 -- the server (placed items) and the client (the ghost preview), so the two
 -- always match. The model's pivot is its ground centre.
 
+local CollectionService = game:GetService("CollectionService")
+
 local PlotData = require(script.Parent.PlotData)
 
 local BlueprintModels = {}
@@ -45,6 +47,10 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 			light.Color = Color3.fromRGB(255, 214, 140)
 			light.Range = 18
 			light.Parent = p
+		end
+		if box.smoke and not ghost then
+			p:SetAttribute("HearthSmoke", true)
+			CollectionService:AddTag(p, "HearthSmoke")
 		end
 		p.Parent = model
 	end

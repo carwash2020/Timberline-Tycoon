@@ -51,7 +51,7 @@ return function(t)
 		local limiter = setup()
 		local Net = t.shared("Net")
 		-- Server-to-client remotes need none.
-		local skip = { CashChanged = true, Notify = true, WorldFX = true }
+		local skip = { CashChanged = true, Notify = true, WorldFX = true, SlotState = true }
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
 				t.ok(limiter.Allow(fakePlayer(), name), name .. " has a LIMITS entry")

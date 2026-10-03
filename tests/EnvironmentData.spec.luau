@@ -603,4 +603,13 @@ return function(t)
 		t.ok(rd < 40)
 		t.eq(rp.Y, WorldLayout.LakeLevel)
 	end)
+
+	t.test("ambient extras stay off on low", function()
+		t.eq(EnvironmentData.LeafRate("low"), 0)
+		t.eq(EnvironmentData.RiverMotes("low"), 0)
+		t.eq(EnvironmentData.ChimneyRate("low"), 0)
+		t.ok(EnvironmentData.LeafRate("high") > EnvironmentData.LeafRate("medium"))
+		t.ok(EnvironmentData.RiverMotes("medium") > 0)
+		t.ok(EnvironmentData.ChimneyRate("high") > 0)
+	end)
 end

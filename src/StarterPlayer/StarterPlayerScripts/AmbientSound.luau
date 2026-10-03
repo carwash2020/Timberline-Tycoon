@@ -116,6 +116,11 @@ local function setTargets(env: LightingController.Environment)
 	birds.target = day * (LEAFY[biome] or 0.5) * math.clamp(0.55 + 0.3 * life, 0.5, 1.2) * (1 - wet * 0.85)
 	local crickets = beds.CricketsNight
 	crickets.target = (1 - day) * (CRICKETS[biome] or 0.5) * (1 - wet * 0.9)
+	local owl = beds.Owl
+	if owl then
+		local leafy = LEAFY[biome] or 0
+		owl.target = (1 - day) * leafy * (1 - wet) * 0.85
+	end
 
 	local wind = beds.WindHowl
 	local windy = if biome == "snow" then 0.6 elseif biome == "sky" then 0.75 else 0
@@ -183,6 +188,7 @@ end
 function AmbientSound.Start()
 	bed("BirdsDay", SoundService, FADE_SECONDS, false)
 	bed("CricketsNight", SoundService, FADE_SECONDS, false)
+	bed("Owl", SoundService, FADE_SECONDS, false)
 	bed("WindHowl", SoundService, FADE_SECONDS, false)
 	bed("LavaRumble", SoundService, FADE_SECONDS, false)
 	bed("MusicDay", SoundService, MUSIC_FADE_SECONDS, true)

@@ -95,19 +95,19 @@ local function part(
 end
 
 -- Pad, rails and sign for the plot's current size. The sign stands just
--- outside the north edge, facing the road.
+-- outside the north edge, off to the west, so a driveway up the middle
+-- stays clear. Rails and corner posts show even when the plot is free:
+-- a faint pad alone was easy to miss, and easy to drive through.
 local function drawBounds(slot: Slot, size: number, claimed: boolean)
 	slot.pad.Size = Vector3.new(size, 0.2, size)
-	slot.pad.Transparency = if claimed then 0 else 0.6
-	local signAt = slot.cframe * CFrame.new(0, 0, size / 2 + 3)
+	slot.pad.Transparency = if claimed then 0 else 0.25
+	local signAt = slot.cframe * CFrame.new(-10, 0, size / 2 + 3)
 	slot.post.CFrame = signAt * CFrame.new(0, 3, 0)
 	slot.board.CFrame = signAt * CFrame.new(0, 6.5, 0)
 	slot.border:ClearAllChildren()
-	if not claimed then
-		return
-	end
 	local half = size / 2
-	local rail = Color3.fromRGB(130, 90, 50)
+	local rail = if claimed then Color3.fromRGB(130, 90, 50) else Color3.fromRGB(196, 168, 120)
+	local postColor = Color3.fromRGB(90, 62, 36)
 	for _, side in ipairs({
 		{ 0, half, size, 0.4 },
 		{ 0, -half, size, 0.4 },
@@ -117,24 +117,51 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean)
 		local x, z, w, d = side[1], side[2], side[3], side[4]
 		local fence = part(
 			"Rail",
-			Vector3.new(w, 0.4, d),
-			slot.cframe * CFrame.new(x, 1.5, z),
+			Vector3.new(w, 0.35, d),
+			slot.cframe * CFrame.new(x, 0.5, z),
 			rail,
 			Enum.Material.Wood,
 			slot.border
 		)
 		fence.CanCollide = false -- a marker, not a wall
 	end
+	for _, corner in ipairs({
+		{ half, half },
+		{ half, -half },
+		{ -half, half },
+		{ -half, -half },
+	}) do
+		local post = part(
+			"Corner",
+			Vector3.new(0.8, 3.2, 0.8),
+			slot.cframe * CFrame.new(corner[1], 1.6, corner[2]),
+			postColor,
+			Enum.Material.Wood,
+			slot.border
+		)
+		post.CanCollide = false
+	end
+	-- A short gravel apron off the north edge, toward the lane or the road.
+	local apron = part(
+		"Apron",
+		Vector3.new(16, 0.15, 10),
+		slot.cframe * CFrame.new(0, 0.12, half + 5),
+		Color3.fromRGB(150, 116, 78),
+		Enum.Material.Ground,
+		slot.border
+	)
+	apron.CanCollide = false
+	apron.CanQuery = false
 end
 
 local function refreshSign(slot: Slot)
 	local owner = slot.owner
-	local text = "FREE PLOT\nClaim it here"
+	local text = string.format("PLOT %d\nFREE", slot.index)
 	if owner then
 		local profile = ProfileService.GetProfile(owner)
 		local tier = if profile then PlotData.Tier(profile.plot.tier) else nil
-		text =
-			string.format("%s'S\n%s", string.upper(owner.DisplayName), string.upper(if tier then tier.name else "PLOT"))
+		local tierName = string.upper(if tier then tier.name else "CAMPSITE")
+		text = string.format("PLOT %d\n%s\n%s", slot.index, tierName, owner.DisplayName)
 	end
 	for _, label in ipairs(slot.signLabels) do
 		label.Text = text
@@ -576,7 +603,7 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 		return
 	end
 	assign(player, slot, profile)
-	notify(player, "Your plot is ready in the plot district, south-east of town.")
+	notify(player, "Your plot is ready in the plot district, east of town.")
 end
 
 function PlotService.PlayerRemoving(player: Player)

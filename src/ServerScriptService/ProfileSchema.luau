@@ -10,6 +10,7 @@ local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -187,6 +188,14 @@ export type Profile = {
 	truckLoad: { TruckPiece },
 	settings: SettingsLogic.Settings,
 	pendingCash: number, -- Robux cash that didn't fit under the wallet cap, paid out as room frees up
+	-- Save slots (SaveSlotLogic). The fields above are the slot you're
+	-- playing. `slots` holds all three; Robux state (purchaseIds, the 2x
+	-- Wood timer, Instant Delivery, pendingCash, accountAxes) is NOT inside
+	-- a slot.
+	activeSlot: number,
+	slotCooldownUntil: number, -- unix time a load or reset is allowed again
+	accountAxes: { string }, -- pass axes (Lux Axe), kept across every slot
+	slots: { any },
 }
 
 -- New players start from this. Fields added here later are filled into
@@ -238,6 +247,10 @@ local TEMPLATE: Profile = {
 	sawmillStock = {},
 	settings = SettingsLogic.Sanitize(nil),
 	pendingCash = 0,
+	activeSlot = 1,
+	slotCooldownUntil = 0,
+	accountAxes = {},
+	slots = {},
 }
 ProfileSchema.Template = TEMPLATE
 
@@ -321,6 +334,11 @@ function ProfileSchema.Migrate(data: any)
 	if data.tutorialReplay ~= true then
 		data.tutorialReplay = false
 	end
+	-- One save becomes slot 1. Live cash, axes, plot and wood stay put.
+	-- Settings and passes are account-wide, so they are not copied into a slot.
+	SaveSlotLogic.Migrate(data, TEMPLATE, function()
+		return Util.guid()
+	end, os.time())
 end
 
 -- The v2 loop (V2_PLAN.md §14) ---------------------------------------------

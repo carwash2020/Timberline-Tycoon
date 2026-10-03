@@ -37,12 +37,14 @@ local MODULES = {
 	"HUD",
 	"HudLayout",
 	"HudRules",
+	"LifeFX",
 	"LightingController",
 	"NPCController",
 	"PlotUI",
 	"PromptUI",
 	"Quality",
 	"QuestUI",
+	"SaveSlotUI",
 	"SawmillController",
 	"SettingsUI",
 	"ShopUI",
@@ -225,6 +227,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		end,
 	},
 	{
+		name = "SaveSlotUI",
+		get = function()
+			return require(script.Parent.SaveSlotUI)
+		end,
+	},
+	{
 		name = "SawmillController", -- the v2 loop only
 		get = function()
 			return require(script.Parent.SawmillController)
@@ -246,6 +254,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "AmbientLife",
 		get = function()
 			return require(script.Parent.AmbientLife)
+		end,
+	},
+	{
+		name = "LifeFX",
+		get = function()
+			return require(script.Parent.LifeFX)
 		end,
 	},
 	{

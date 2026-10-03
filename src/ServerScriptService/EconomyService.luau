@@ -148,6 +148,25 @@ function EconomyService.AddOwedCash(
 	return credited, overflow
 end
 
+-- Sets the wallet to `amount` (a save-slot load or reset). Not an earn and
+-- not a spend: the dollars were already in that slot. Clamped, then mirrored
+-- to the client. No economy analytics event, so changing slots doesn't look
+-- like cash appearing from nowhere.
+function EconomyService.ReplaceCash(player: Player, amount: number, reason: string)
+	amount = math.floor(amount)
+	if amount ~= amount then
+		amount = 0
+	end
+	amount = math.clamp(amount, 0, GameConfig.CashCap)
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	profile.cash = amount
+	publish(player, profile.cash)
+	print(string.format("[Economy] %s wallet set to %d (%s)", player.Name, amount, reason))
+end
+
 -- Moves banked cash (AddPaidCash) into the wallet while there's room.
 -- SpendCash calls it; GameServer calls it when a save loads.
 function EconomyService.PayPending(player: Player)

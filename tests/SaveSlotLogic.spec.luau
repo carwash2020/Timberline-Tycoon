@@ -1,0 +1,350 @@
+--!nocheck
+-- Save slots: migration into slot 1, load, reset, and the anti-dupe rule
+-- (wood is committed before the swap, cash does not copy, Robux stays).
+return function(t)
+	local SaveSlotLogic = t.shared("SaveSlotLogic")
+	local Schema = t.server("ProfileSchema")
+	local Util = t.shared("Util")
+
+	local function guidFactory()
+		local n = 0
+		return function()
+			n += 1
+			return "id-" .. n
+		end
+	end
+
+	local function fresh()
+		local data = Util.deepCopy(Schema.Template)
+		Schema.Migrate(data)
+		return data
+	end
+
+	local function worldFor(data)
+		local ground = {}
+		local calls = {}
+		return {
+			ground = ground,
+			calls = calls,
+			hooks = {
+				commit = function(profile)
+					table.insert(calls, "commit")
+					-- The leave path: wood in the world is written onto the
+					-- live slot (bed pieces and ground pieces, LuxCut tag
+					-- and all), then removed from the world.
+					local riding, lying = {}, {}
+					for _, log in ipairs(ground) do
+						if log.where == "ground" then
+							table.insert(lying, log)
+						else
+							table.insert(riding, log)
+						end
+					end
+					table.clear(ground)
+					profile.truckLoad = riding
+					profile.groundLoad = lying
+				end,
+				setCash = function(amount)
+					table.insert(calls, "cash")
+					data.cash = amount
+				end,
+				rebuild = function()
+					table.insert(calls, "rebuild")
+				end,
+			},
+		}
+	end
+
+	t.test("an old single save becomes slot 1 and keeps its cash, axe and plot", function()
+		local data = Util.deepCopy(Schema.Template)
+		data.slots = nil
+		data.activeSlot = nil
+		data.cash = 4321
+		data.axes = { { uid = "axe-1", id = "SteelAxe" } }
+		data.bestAxeTier = 2
+		data.equippedAxe = "axe-1"
+		data.plot =
+			{ claimed = true, tier = 2, placed = { { uid = "cabin", blueprintId = "Cabin", x = 4, z = 4, rot = 0 } } }
+		data.truckLoad = { { w = "oak" } }
+		data.purchaseIds = { "receipt-9" }
+		data.doubleWoodUntil = 5000
+		data.instantDeliveries = 2
+		data.pendingCash = 80
+		Schema.Migrate(data)
+		t.eq(data.cash, 4321)
+		t.eq(data.activeSlot, 1)
+		t.eq(#data.slots, 3)
+		t.eq(data.slots[1].cash, 4321)
+		t.eq(data.slots[1].axes[1].id, "SteelAxe")
+		t.eq(data.slots[1].plot.claimed, true)
+		t.eq(data.slots[1].plot.placed[1].uid, "cabin")
+		t.eq(data.slots[1].truckLoad[1].w, "oak")
+		t.eq(data.slots[1].fresh, false)
+		t.eq(data.slots[2].fresh, true)
+		t.eq(data.slots[2].cash, 0)
+		t.eq(data.slots[3].fresh, true)
+		-- Robux never moved into a slot snapshot as the thing a load copies
+		-- over the account. The account fields are still the originals.
+		t.eq(data.purchaseIds[1], "receipt-9")
+		t.eq(data.doubleWoodUntil, 5000)
+		t.eq(data.instantDeliveries, 2)
+		t.eq(data.pendingCash, 80)
+		t.eq(data.slots[1].purchaseIds, nil)
+		t.eq(data.slots[1].doubleWoodUntil, nil)
+		t.eq(data.slots[1].instantDeliveries, nil)
+		t.eq(data.slots[1].pendingCash, nil)
+	end)
+
+	t.test("migrating twice does not wipe a parked slot", function()
+		local data = fresh()
+		data.cash = 100
+		data.slots[1] = SaveSlotLogic.Blank(Schema.Template, guidFactory(), 0)
+		data.slots[1].fresh = false
+		data.slots[1].cash = 100
+		data.slots[2].cash = 777
+		data.slots[2].fresh = false
+		data.slots[2].axes = { { uid = "kept", id = "SteelAxe" } }
+		Schema.Migrate(data)
+		t.eq(data.slots[2].cash, 777)
+		t.eq(data.slots[2].axes[1].id, "SteelAxe")
+	end)
+
+	t.test("loading a slot commits wood first, and does not copy cash or receipts", function()
+		local data = fresh()
+		data.cash = 900
+		data.purchaseIds = { "receipt-1" }
+		data.doubleWoodUntil = 80
+		data.instantDeliveries = 3
+		data.pendingCash = 40
+		data.accountAxes = { "LuxAxe" }
+		data.axes = { { uid = "lux", id = "LuxAxe" }, { uid = "rusty", id = "RustyAxe" } }
+		data.slots[1] = nil
+		Schema.Migrate(data)
+		local world = worldFor(data)
+		table.insert(world.ground, { w = "pine", v = 12 })
+		local ok, why = SaveSlotLogic.Perform(data, "load", 2, 1_000, Schema.Template, guidFactory(), world.hooks)
+		t.eq(ok, true, why)
+		t.eq(world.calls[1], "commit")
+		t.eq(#world.ground, 0, "the log left the world")
+		t.eq(data.slots[1].truckLoad[1].w, "pine", "the log is only in the slot you left")
+		t.eq(#data.truckLoad, 0, "the new slot did not receive it")
+		t.eq(data.cash, 0)
+		t.eq(data.slots[1].cash, 900)
+		t.eq(data.activeSlot, 2)
+		t.eq(data.purchaseIds[1], "receipt-1")
+		t.eq(data.doubleWoodUntil, 80)
+		t.eq(data.instantDeliveries, 3)
+		t.eq(data.pendingCash, 40)
+		t.eq(data.slots[2].purchaseIds, nil)
+		local ids = {}
+		for _, item in ipairs(data.axes) do
+			ids[item.id] = true
+		end
+		t.eq(ids.LuxAxe, true, "the Lux Axe came with the account")
+		-- Back to slot 1: the pine and the $900 return, and are not also in slot 2.
+		local again = SaveSlotLogic.Perform(
+			data,
+			"load",
+			1,
+			1_000 + SaveSlotLogic.Cooldown,
+			Schema.Template,
+			guidFactory(),
+			world.hooks
+		)
+		t.eq(again, true)
+		t.eq(data.cash, 900)
+		t.eq(data.truckLoad[1].w, "pine")
+		t.eq(data.slots[2].cash, 0)
+		t.ok(data.slots[2].truckLoad == nil or #data.slots[2].truckLoad == 0)
+	end)
+
+	t.test("a second load inside the cooldown does nothing, so it cannot dupe", function()
+		local data = fresh()
+		data.cash = 50
+		Schema.Migrate(data)
+		local world = worldFor(data)
+		table.insert(world.ground, { w = "oak" })
+		t.eq(SaveSlotLogic.Perform(data, "load", 2, 10, Schema.Template, guidFactory(), world.hooks), true)
+		table.insert(world.ground, { w = "oak" }) -- a bug that left a copy in the world
+		local ok, why = SaveSlotLogic.Perform(data, "load", 1, 10 + 5, Schema.Template, guidFactory(), world.hooks)
+		t.eq(ok, false)
+		t.ok(string.find(why, "seconds", 1, true) ~= nil, why)
+		t.eq(#world.calls, 3, "commit, cash, rebuild — and then nothing")
+		t.eq(#world.ground, 1, "the leftover log was not committed into a second slot")
+		t.eq(data.activeSlot, 2)
+		t.eq(data.cash, 0)
+	end)
+
+	t.test("reset wipes the slot's cash and wood, keeps Robux, and needs the cooldown", function()
+		local data = fresh()
+		data.cash = 2500
+		data.purchaseIds = { "receipt-2" }
+		data.doubleWoodUntil = 99
+		data.instantDeliveries = 1
+		data.pendingCash = 15
+		data.axes = { { uid = "lux", id = "LuxAxe" } }
+		data.accountAxes = { "LuxAxe" }
+		data.plot =
+			{ claimed = true, tier = 3, placed = { { uid = "mill", blueprintId = "Sawmill", x = 0, z = 0, rot = 0 } } }
+		Schema.Migrate(data)
+		local world = worldFor(data)
+		table.insert(world.ground, { w = "maple" })
+		local ok = SaveSlotLogic.Perform(data, "reset", 0, 50, Schema.Template, guidFactory(), world.hooks)
+		t.eq(ok, true)
+		t.eq(#world.ground, 0)
+		t.eq(data.cash, 0)
+		t.eq(#data.truckLoad, 0)
+		t.eq(data.plot.claimed, false)
+		t.eq(#data.plot.placed, 0)
+		t.eq(data.slots[1].cash, 0)
+		t.eq(data.slots[1].truckLoad == nil or #data.slots[1].truckLoad == 0, true)
+		t.eq(data.purchaseIds[1], "receipt-2")
+		t.eq(data.doubleWoodUntil, 99)
+		t.eq(data.instantDeliveries, 1)
+		t.eq(data.pendingCash, 15)
+		local kept = false
+		for _, item in ipairs(data.axes) do
+			if item.id == "LuxAxe" then
+				kept = true
+			end
+		end
+		t.eq(kept, true)
+		local blocked = SaveSlotLogic.Perform(data, "reset", 0, 50 + 1, Schema.Template, guidFactory(), world.hooks)
+		t.eq(blocked, false)
+	end)
+
+	t.test("Robux passes, settings and the Lux Axe stay on the account across a load and a redo", function()
+		local data = fresh()
+		data.cash = 400
+		data.passes = { DoubleCash = true, LuxAxe = true }
+		data.settings = {
+			music = false,
+			sfx = true,
+			musicVolume = 0.25,
+			sfxVolume = 0.5,
+			graphics = "low",
+			cameraShake = false,
+			uiScale = "small",
+			showTips = false,
+		}
+		data.purchaseIds = { "receipt-lux" }
+		data.doubleWoodUntil = 9_000
+		data.instantDeliveries = 4
+		data.pendingCash = 25
+		data.axes = { { uid = "lux", id = "LuxAxe" } }
+		data.accountAxes = { "LuxAxe" }
+		data.slots[1] = nil
+		Schema.Migrate(data)
+		t.eq(data.slots[1].passes, nil)
+		t.eq(data.slots[1].settings, nil)
+		t.eq(data.slots[1].purchaseIds, nil)
+		local world = worldFor(data)
+		t.eq(SaveSlotLogic.Perform(data, "load", 2, 2_000, Schema.Template, guidFactory(), world.hooks), true)
+		t.eq(data.passes.DoubleCash, true)
+		t.eq(data.passes.LuxAxe, true)
+		t.eq(data.settings.music, false)
+		t.eq(data.settings.graphics, "low")
+		t.eq(data.settings.uiScale, "small")
+		t.eq(data.purchaseIds[1], "receipt-lux")
+		t.eq(data.doubleWoodUntil, 9_000)
+		t.eq(data.instantDeliveries, 4)
+		t.eq(data.pendingCash, 25)
+		t.eq(data.slots[2].passes, nil)
+		t.eq(data.slots[2].settings, nil)
+		local onFresh = false
+		for _, item in ipairs(data.axes) do
+			if item.id == "LuxAxe" then
+				onFresh = true
+			end
+		end
+		t.eq(onFresh, true, "the Lux Axe is on the fresh slot too")
+		-- A parked slot that somehow carried its own settings and passes
+		-- must not overwrite the account when it is loaded.
+		data.slots[1].settings = { music = true, graphics = "high" }
+		data.slots[1].passes = { DoubleCash = false }
+		local back = SaveSlotLogic.Perform(
+			data,
+			"load",
+			1,
+			2_000 + SaveSlotLogic.Cooldown,
+			Schema.Template,
+			guidFactory(),
+			world.hooks
+		)
+		t.eq(back, true)
+		t.eq(data.settings.music, false)
+		t.eq(data.settings.graphics, "low")
+		t.eq(data.passes.DoubleCash, true)
+		t.eq(
+			SaveSlotLogic.Perform(
+				data,
+				"reset",
+				0,
+				2_000 + SaveSlotLogic.Cooldown * 2,
+				Schema.Template,
+				guidFactory(),
+				world.hooks
+			),
+			true
+		)
+		t.eq(data.passes.LuxAxe, true)
+		t.eq(data.passes.DoubleCash, true)
+		t.eq(data.settings.music, false)
+		t.eq(data.purchaseIds[1], "receipt-lux")
+		t.eq(data.doubleWoodUntil, 9_000)
+		t.eq(data.instantDeliveries, 4)
+		local afterRedo = false
+		for _, item in ipairs(data.axes) do
+			if item.id == "LuxAxe" then
+				afterRedo = true
+			end
+		end
+		t.eq(afterRedo, true, "a redo does not take the Lux Axe")
+		local summary = SaveSlotLogic.Summary(data)
+		t.eq(summary[1].axeName, "Lux Axe")
+	end)
+
+	t.test("a LuxCut tag stays on the wood when a slot is stashed and loaded back", function()
+		local data = fresh()
+		data.skyWood = { { w = "birch", v = 4, l = true } }
+		Schema.Migrate(data)
+		local world = worldFor(data)
+		table.insert(world.ground, { w = "pine", v = 8, l = true })
+		table.insert(world.ground, { w = "oak", v = 3, l = true, where = "ground", g = { 12, 1, -4 } })
+		t.eq(SaveSlotLogic.Perform(data, "load", 2, 3_000, Schema.Template, guidFactory(), world.hooks), true)
+		t.eq(data.slots[1].truckLoad[1].l, true, "the bed piece keeps LuxCut in the slot you left")
+		t.eq(data.slots[1].groundLoad[1].l, true, "the ground piece keeps LuxCut too")
+		t.eq(data.slots[1].skyWood[1].l, true)
+		t.eq(data.truckLoad == nil or #data.truckLoad == 0, true)
+		t.eq(data.skyWood == nil or #data.skyWood == 0, true, "the fresh slot did not inherit the cut")
+		local back = SaveSlotLogic.Perform(
+			data,
+			"load",
+			1,
+			3_000 + SaveSlotLogic.Cooldown,
+			Schema.Template,
+			guidFactory(),
+			world.hooks
+		)
+		t.eq(back, true)
+		t.eq(data.truckLoad[1].w, "pine")
+		t.eq(data.truckLoad[1].l, true, "loading the slot restores the LuxCut tag")
+		t.eq(data.groundLoad[1].l, true)
+		t.eq(data.groundLoad[1].g[1], 12)
+		t.eq(data.skyWood[1].l, true)
+		t.eq(data.slots[2].truckLoad == nil or #data.slots[2].truckLoad == 0, true)
+	end)
+
+	t.test("a bad slot index is refused before anything is committed", function()
+		local data = fresh()
+		Schema.Migrate(data)
+		local world = worldFor(data)
+		local ok = SaveSlotLogic.Perform(data, "load", 9, 1, Schema.Template, guidFactory(), world.hooks)
+		t.eq(ok, false)
+		t.eq(#world.calls, 0)
+		t.eq(
+			SaveSlotLogic.Perform(data, "load", data.activeSlot, 1, Schema.Template, guidFactory(), world.hooks),
+			false
+		)
+	end)
+end

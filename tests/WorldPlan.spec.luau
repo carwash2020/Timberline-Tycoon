@@ -2068,7 +2068,9 @@ return function(t)
 		-- (phase 10, Connor asked for many more trees; the economy model
 		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
 		-- forest's (FOR-03, tests/Forest.spec.luau).
-		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 500)
+		-- 322 original trees plus 171 country stands. The 3×4 plot district
+		-- took the spots of 7 stand trees (was 178, and the first 500).
+		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 493)
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2286,21 +2288,24 @@ return function(t)
 
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
 		local trees = WorldPlan.Trees()
-		-- A fingerprint of trees 323 to 500 (index, wood, biome, x, z).
-		-- Re-sampled in phase 12: the stands line the roads, and the roads
-		-- widened, so they were placed again. The first 322 were not.
+		-- A fingerprint of the country stands (trees 323 to 493: index, wood,
+		-- biome, x, z). Re-sampled in phase 12 when the haul roads widened,
+		-- and again when the plot district became 3×4 (a few open-country
+		-- stands moved off the new lawn). The first 322 were not, and the
+		-- first stand tree is still the pine beside the snow road.
+		local lastStand = 493
 		local h = 7
-		for i = FIRST + 1, 500 do
+		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
 			local s = string.format("%d %s %s %.2f %.2f;", i, tree.woodId, tree.biome, tree.position.X, tree.position.Z)
 			for k = 1, #s do
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 358050706, "the country stands moved, changed wood or changed order")
+		t.eq(h, 82146204, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "pine")
 		t.ok((trees[FIRST + 1].position - Vector3.new(73.1337, -2.5153, 544.4336)).Magnitude < 0.01, "tree 323")
-		t.ok((trees[500].position - Vector3.new(-1105.2963, -6.7121, 209.2968)).Magnitude < 0.01, "tree 500")
+		t.ok((trees[lastStand].position - Vector3.new(553.4734, -2.7692, 166.9969)).Magnitude < 0.01, "the last stand")
 	end)
 
 	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()

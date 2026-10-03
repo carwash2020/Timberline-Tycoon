@@ -231,7 +231,7 @@ On the live game, the same Output lines are in the in-game console: press
 | 14 | The timber footbridge over the river at about (-877, 575); the plank docks on Mirror Lake (-716, -111) and on the east coast (1194, -760) | You walk on and off the bridge without a hop, the rails stop you, TIMBER BRIDGE and MIRROR LAKE signs read. Each dock has a ladder, a lantern (lit at dusk) and a rowboat you can walk through |
 | 15 | On the spawn pad, look east | A small red-and-white lighthouse on the horizon just left of the PLOT DISTRICT sign. At night its lamp glows (Server command bar: `workspace:SetAttribute("ClockOverride", 22)`, `nil` to clear) |
 | 16 | `ClockOverride` 1, then 8, then 12 (and 12 on a phone emulator) | A little hazier at night, thinning through the morning, exactly today's look by day |
-| 17 | The forest ring (FOR-01..04): stand on the spawn and turn round, then walk into the forest about (-100, -450) and drive the Snow Road north | The town and plots stay an open lawn; a forest edge closes the view about 300 studs out; inside, blocky background trees all round (you walk through those; they fade if they'd hide you) and detailed choppable trees along the edges, clearings and road verges (775 on the ground now, was 500). Output: `[ForestFiller] plan ready in X s` (under ~2 s), no `plan step N failed` |
+| 17 | The forest ring (FOR-01..04): stand on the spawn and turn round, then walk into the forest about (-100, -450) and drive the Snow Road north | The town and plots stay an open lawn; a forest edge closes the view about 300 studs out; inside, blocky background trees all round (you walk through those; they fade if they'd hide you) and detailed choppable trees along the edges, clearings and road verges (772 on the ground now; the roomier plots took seven stand trees). Output: `[ForestFiller] plan ready in X s` (under ~2 s), no `plan step N failed` |
 | 18 | The forest floor and grass | No grass blades under the forest (a leafy floor instead); blades on the town lawn, plots and meadows; fanned tufts with light tips along forest fringes, road edges, rocks and fence posts |
 | 19 | Phone emulator (iPhone SE, 14 Pro) in the deep south forest and on the Snow Road, with the frame-rate stats | 30+ fps, `[Quality] low` in Output, the `workspace.ForestFiller` folder about 4k parts or fewer (desktop about 7.5k or fewer) |
 | 20 | Optional: Roblox's textures on the ground. In Studio, MaterialService: GrassName = TimberGrass, LeafyGrassName = TimberLeafy, GroundName = TimberGround | Textured ground at a softer tiling, blades still on Grass. If it looks grey or flat, clear the three names again; if it looks good, tell Claude and they go into the project |
@@ -1195,9 +1195,14 @@ Quick test with a Studio test axe: `/giveaxe inferno` or `/giveaxe starfall`.
 
 ## Plots (V1_PLAN §6, first slices)
 
-The **plot district** is east of the parking lot: 12 plots (one per player
-on a full server) with a road along the north side and lanes between them.
-A sign at each plot's north edge says whose it is.
+The **plot district** is east of the parking lot: 12 plots, 3 columns by
+4 rows (one per player on a full server). The north road stays on the
+town's mouth. Lanes between the pads are wide enough for a Logging Rig,
+with grass either side, and a road runs along the south edge out toward
+the forest. Each pad is marked with rails and corner posts even before
+anyone claims it. A sign at the north edge, off the driveway, reads
+PLOT n / FREE, or the tier and your name once it's yours. A 13th player
+is told the district is full and keeps their save until a plot frees.
 
 - **Claiming:** walk to a free plot's sign, "Claim this plot" (hold). It's
   free, and you keep it: each time you join, your saved layout is rebuilt
@@ -1230,8 +1235,9 @@ A sign at each plot's north edge says whose it is.
 ### Playtest checklist
 - [ ] The plot district is east of the parking lot, with roads and a
       "PLOT DISTRICT" sign; the old plot markers by town are gone
-- [ ] Claim a plot: the sign shows your name and "CAMPSITE", a rail marks
-      the edge; claiming a second one says you already have one
+- [ ] Claim a plot: the sign reads PLOT n, CAMPSITE and your name; rails
+      and corner posts mark the edge (they're there on free plots too);
+      claiming a second one says you already have one
 - [ ] BUILD shows only on your plot; walking off ends build mode
 - [ ] Place a fence: the ghost snaps, turns with R, goes red over another
       fence or past the edge (with the reason), green where it fits;
@@ -1249,6 +1255,37 @@ A sign at each plot's north edge says whose it is.
 - [ ] On a phone: tap to aim, PLACE / ROTATE / CANCEL work, prompts are
       reachable
 - [ ] Lamp posts glow at night
+- [ ] Drive a Logging Rig down a lane between two Timber Empire pads and
+      out the south road; the claim sign is not sitting in the north road
+- [ ] A full server (or a 13th Studio player): the extra player gets a
+      toast that the district is full, and a plot when someone leaves
+
+## Save slots (three per account)
+
+**SAVES** on the right opens three cards. Each shows cash, the best axe,
+and when it was last played. The one you're in has **REDO**; the others
+have **LOAD** or **START**. Redo asks you to confirm. After a load or a
+redo, saves are locked for 2 minutes (the lock is in the save, so leaving
+and rejoining doesn't clear it). Wood in the world is put into the slot
+you're leaving before the other one loads, so it can't be in both.
+
+Robux stays on the account, not the slot: 2x Cash, 2x Wood, Instant
+Delivery charges, cash-pack receipts, and the Lux Axe. An old single save
+loads as slot 1; slots 2 and 3 start empty.
+
+### Playtest checklist
+- [ ] An existing Studio save opens as slot 1 with the same cash, axe,
+      plot and truck wood; slots 2 and 3 say New game
+- [ ] START slot 2: your plot is empty, cash is $0, you have a Rusty Axe,
+      and slot 1 still has what you left (including logs that were on the
+      ground)
+- [ ] LOAD slot 1: the money and the build come back. A second load inside
+      2 minutes is refused, and a log you drop in that window is not copied
+      onto the other slot
+- [ ] REDO, then confirm: the current slot is a fresh game. Cancel does
+      nothing. The Lux Axe, if you own it, is still in your inventory
+- [ ] Buy a cash pack or spend an Instant Delivery on one slot, switch
+      slots, and it is not granted again
 
 ## The new look (Claude Design UI spec)
 

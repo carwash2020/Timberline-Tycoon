@@ -19,6 +19,7 @@ return {
 				{ pos = { -150, 300, 300 }, target = { -500, 20, 300 }, label = "hills + river" },
 				{ pos = { 400, 400, 700 }, target = { 1150, 60, 1250 }, label = "volcano" },
 				{ pos = { -250, 220, -150 }, target = { -600, 0, -400 }, label = "grove + lake" },
+				{ pos = { 900, 480, 120 }, target = { 520, 0, -420 }, label = "the plot district" },
 			},
 		}
 	end,

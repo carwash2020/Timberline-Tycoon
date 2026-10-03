@@ -68,8 +68,10 @@ SoundData.Sounds = {
 	-- The living world (AmbientSound, AmbientLife, WeatherController). Empty
 	-- ids are slots waiting for a sound picked in Studio (Toolbox -> Audio,
 	-- Creator = Roblox): until then they stay silent and nothing breaks.
-	BirdsDay = { id = "", volume = 0.3, looped = true }, -- birdsong bed, by day in leafy places
+	-- Same public Pro Sound Effects pack as River (9118…) and the waterfall.
+	BirdsDay = { id = "rbxassetid://9116970949", volume = 0.28, looped = true }, -- morning forest birds
 	CricketsNight = { id = "", volume = 0.25, looped = true }, -- crickets and frogs, at night
+	Owl = { id = "rbxassetid://9117181540", volume = 0.2, looped = true }, -- a hoot in the woods at night
 	WindHowl = { id = "", volume = 0.35, looped = true }, -- the Snowfields, the isles, storms
 	LavaRumble = { id = "", volume = 0.4, looped = true }, -- a low rumble at the Volcano
 	WaterfallRoar = { id = "rbxassetid://9120549564", volume = 0.7, rolloff = 260, looped = true },
