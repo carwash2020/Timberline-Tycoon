@@ -29,6 +29,7 @@ local IS_STUDIO = RunService:IsStudio()
 local SoundService = game:GetService("SoundService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
@@ -821,8 +822,14 @@ function WeatherController.Start()
 	end)
 
 	local sinceRates = 0
-	RunService.RenderStepped:Connect(function()
-		-- The boxes follow the camera (one CFrame each per frame).
+	local sinceBoxes = 0
+	RunService.RenderStepped:Connect(function(dt: number)
+		sinceBoxes += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceBoxes) then
+			return
+		end
+		sinceBoxes = 0
+		-- The boxes follow the camera (one CFrame each time this runs).
 		local camera = workspace.CurrentCamera
 		if not camera then
 			return
@@ -837,17 +844,24 @@ function WeatherController.Start()
 		placeRainbow()
 	end)
 
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
-		sinceRates += dt
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
+		sinceRates += step
 		if sinceRates < RATE_EVERY then
 			return
 		end
-		local step = sinceRates
+		local elapsed = sinceRates
 		sinceRates = 0
 		local env = LightingController.Environment()
-		updateRates(env, step)
+		updateRates(env, elapsed)
 		updateMapEmitters()
-		updateRainSound(step)
+		updateRainSound(elapsed)
 		updateAurora(env, os.clock())
 		updateRainbow(env)
 	end)

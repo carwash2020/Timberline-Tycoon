@@ -6,10 +6,14 @@
 --     as constants before PLAY-05 (AmbientLife, EnvironmentData.MaxCritters,
 --     WeatherController, LightingController, TownFX), plus WindSway's
 --     PLAY-04 budget. tests/QualityBudgets.spec.luau pins them.
+--   * "medium": graphics levels 5-7. The same world as high, with the
+--     cosmetic loops (sway, weather, critters, town motion) doing less
+--     work and updating about 20 times a second instead of every frame.
 --   * "low": phones and low graphics settings. Less ground decoration,
 --     loaded closer; fewer critters; fewer swaying canopies; half the
 --     rain, snow and ash; no sun rays or far blur; softer bloom; the
---     sawmill blade and campfires animate only close by.
+--     sawmill blade and campfires animate only close by. Cosmetic loops
+--     run about twice a second (nearly off).
 --   * Both: the forest ring's filler trees (ForestFiller, FOR-02), real
 --     trees out to FillerNear and stand-in blocks out to FillerFar, built
 --     FillerBuildMs a frame at most (closer and cheaper on low).
@@ -17,7 +21,7 @@
 
 local QualityBudgets = {}
 
-export type Tier = "low" | "high"
+export type Tier = "low" | "medium" | "high"
 
 export type Budget = {
 	Tier: Tier,
@@ -47,6 +51,10 @@ export type Budget = {
 	ChipCount: number, -- wood chips in the air or on the ground at once
 	LeafPool: number, -- falling leaves at once (a felled tree's crown)
 	LeafShadows: boolean, -- false: trees' leaf parts cast no shadow on this device
+	-- Cosmetic per-frame loops (sway, critters, weather boxes, town motion,
+	-- canopy fade, filler builds, truck dust). 60 or more: every frame.
+	-- Lower: that many times a second. The loops read CosmeticDue.
+	CosmeticHz: number,
 }
 
 QualityBudgets.High = table.freeze({
@@ -76,6 +84,7 @@ QualityBudgets.High = table.freeze({
 	ChipCount = 48,
 	LeafPool = 64,
 	LeafShadows = true,
+	CosmeticHz = 60,
 }) :: Budget
 
 -- PLAY-05's acceptance: on low, the workspace.AmbientLife folder holds 160
@@ -116,26 +125,79 @@ QualityBudgets.Low = table.freeze({
 	ChipCount = 24,
 	LeafPool = 32,
 	LeafShadows = false,
+	CosmeticHz = 2,
 }) :: Budget
 
--- The budget for a tier ("low" or "high"; anything else gets "high").
+-- Between the two: high's world, cheaper motion. Graphics levels 5-7.
+QualityBudgets.Medium = table.freeze({
+	Tier = "medium" :: Tier,
+	MaxDecor = 560,
+	DecorLoadRadius = 200,
+	DecorUnloadRadius = 260,
+	MaxCritters = 12,
+	SwayParts = 600,
+	SwayTrees = 24,
+	SwayRange = 100,
+	WeatherRate = 0.7,
+	SunRays = 1,
+	DepthOfField = 1,
+	Bloom = 0.75,
+	TownFxNear = 180,
+	FillerNear = 480,
+	FillerFar = 600,
+	FillerBuildMs = 1.6,
+	TuftNear = 150,
+	ChipCount = 36,
+	LeafPool = 48,
+	LeafShadows = true,
+	CosmeticHz = 20,
+}) :: Budget
+
+-- The budget for a tier. Anything that isn't "low" or "medium" is "high".
 function QualityBudgets.For(tier: string): Budget
-	return if tier == "low" then QualityBudgets.Low else QualityBudgets.High
+	if tier == "low" then
+		return QualityBudgets.Low
+	elseif tier == "medium" then
+		return QualityBudgets.Medium
+	end
+	return QualityBudgets.High
 end
 
--- Graphics levels this low or lower get the "low" tier.
-QualityBudgets.LowestHighLevel = 5
+-- Graphics levels below this are "medium" (and below LowestMediumLevel, "low").
+QualityBudgets.LowestHighLevel = 8
+
+-- Graphics levels below this are "low". 5-7 are "medium".
+QualityBudgets.LowestMediumLevel = 5
+
+-- True when a cosmetic loop that last ran `elapsed` seconds ago should run
+-- again. `hz` is the tier's CosmeticHz: 60 or more runs every frame (high),
+-- 0 never runs, and anything in between runs that many times a second.
+function QualityBudgets.CosmeticDue(hz: number, elapsed: number): boolean
+	if hz <= 0 then
+		return false
+	end
+	if hz >= 60 then
+		return true
+	end
+	return elapsed >= 1 / hz - 1e-4
+end
 
 -- The tier for a device. `savedLevel` is the name of the player's
 -- UserGameSettings.SavedQualityLevel (Enum.SavedQualitySetting:
 -- "Automatic" or "QualityLevel1" to "QualityLevel10"); `touchOnly` is a
 -- touch screen with no keyboard (a phone or tablet). Levels 1-4 are "low"
--- on any device. "Automatic" (or anything unreadable) is "low" on a
--- touch-only device and "high" everywhere else.
+-- on any device, 5-7 are "medium", 8-10 are "high". "Automatic" (or
+-- anything unreadable) is "low" on a touch-only device and "high"
+-- everywhere else: the same device heuristic as before.
 function QualityBudgets.TierFor(savedLevel: string?, touchOnly: boolean): Tier
 	local level = if savedLevel then tonumber(string.match(savedLevel, "^QualityLevel(%d+)$")) else nil
 	if level then
-		return if level < QualityBudgets.LowestHighLevel then "low" else "high"
+		if level < QualityBudgets.LowestMediumLevel then
+			return "low"
+		elseif level < QualityBudgets.LowestHighLevel then
+			return "medium"
+		end
+		return "high"
 	end
 	return if touchOnly then "low" else "high"
 end

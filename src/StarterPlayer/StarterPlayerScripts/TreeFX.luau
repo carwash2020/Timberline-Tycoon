@@ -29,11 +29,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local CameraShake = require(script.Parent.CameraShake)
+local Quality = require(script.Parent.Quality)
 
 type WoodDef = WoodData.WoodDef
 
@@ -136,7 +138,13 @@ local function release(batch: Batch, piece: Piece)
 end
 
 -- Moves every piece along its flight; stops when none are left.
-local function stepPieces()
+local sincePieces = 0
+local function stepPieces(dt: number?)
+	sincePieces += if type(dt) == "number" then dt else 0
+	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sincePieces) then
+		return
+	end
+	sincePieces = 0
 	local now = os.clock()
 	local any = false
 	for _, batch in ipairs(batches) do
@@ -462,11 +470,22 @@ local function fall(tree: Model, def: WoodDef, state: State)
 		local landed = false
 		local fading: { BasePart }? = nil
 		local t = math.max(0, started)
+		local sincePose = math.huge
 		local stop = math.max(TreeLogic.FallTime + 0.05, TreeLogic.FellFadeStart + TreeLogic.FellFadeTime)
 		while true do
 			if state.token ~= token or tree.Parent == nil then
 				return
 			end
+			if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sincePose) then
+				if t >= stop then
+					break
+				end
+				local dt = RunService.Heartbeat:Wait()
+				t += dt
+				sincePose += dt
+				continue
+			end
+			sincePose = 0
 			local angle = TreeLogic.FallProgress(t) * TreeLogic.FallAngle
 			tree:PivotTo(CFrame.new(base) * CFrame.fromAxisAngle(axis, angle) * CFrame.new(-base) * home)
 			if not landed and t >= TreeLogic.FallTime * 0.86 then
@@ -488,7 +507,9 @@ local function fall(tree: Model, def: WoodDef, state: State)
 			if t >= stop then
 				break
 			end
-			t += RunService.Heartbeat:Wait()
+			local dt = RunService.Heartbeat:Wait()
+			t += dt
+			sincePose += dt
 		end
 	end)
 end
@@ -511,16 +532,26 @@ local function regrow(tree: Model, state: State)
 	local up = home.RightVector
 	task.spawn(function()
 		local t = 0
+		local sincePose = math.huge
 		while t < REGROW_TIME do
 			if state.token ~= token or tree.Parent == nil then
 				return
 			end
+			if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sincePose) then
+				local dt = RunService.Heartbeat:Wait()
+				t += dt
+				sincePose += dt
+				continue
+			end
+			sincePose = 0
 			local x = t / REGROW_TIME
 			-- Ease out with a little overshoot, like a spring.
 			local s = 0.2 + 0.8 * (1 - (1 - x) ^ 3) + math.sin(x * math.pi) * 0.06
 			tree:ScaleTo(math.max(0.05, s))
 			tree:PivotTo(CFrame.new(base + up * (length * s / 2)) * home.Rotation)
-			t += RunService.Heartbeat:Wait()
+			local dt = RunService.Heartbeat:Wait()
+			t += dt
+			sincePose += dt
 		end
 		tree:ScaleTo(1)
 		tree:PivotTo(home)

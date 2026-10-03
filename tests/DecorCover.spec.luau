@@ -179,12 +179,13 @@ return function(t)
 		t.ok(rows >= 10, "cover rows: " .. rows)
 	end)
 
-	t.test("low never loads the cover layer; high does", function()
+	t.test("low never loads the cover layer; medium and high do", function()
 		local code =
 			string.gsub(fs.readFile("src/StarterPlayer/StarterPlayerScripts/AmbientLife.luau"), "%-%-[^\n]*", "")
 		t.ok(
-			string.find(code, "local COVER_TIERS: { [string]: boolean } = { high = true }", 1, true) ~= nil,
-			"cover on high only"
+			string.find(code, "local COVER_TIERS: { [string]: boolean } = { high = true, medium = true }", 1, true)
+				~= nil,
+			"cover on medium and high"
 		)
 		t.ok(string.find(code, "if COVER_TIERS[Quality.Budget().Tier] then", 1, true) ~= nil)
 		t.eq(QualityBudgets.Low.MaxDecor, 148, "low's phone budget is unchanged")

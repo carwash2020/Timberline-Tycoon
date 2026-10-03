@@ -30,6 +30,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local CanopyLogic = require(ReplicatedStorage.Shared.CanopyLogic)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local Quality = require(script.Parent.Quality)
 local TreeFX = require(script.Parent.TreeFX)
 
 local CanopyFade = {}
@@ -227,16 +229,23 @@ end
 
 function CanopyFade.Start()
 	local since = math.huge
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local elapsed = sinceCosmetic
+		sinceCosmetic = 0
 		local now = os.clock()
-		since += dt
+		since += elapsed
 		-- (The slack keeps six 60 fps frames, 0.0999... in floats, a look.)
 		if since >= CanopyLogic.Every - 1e-4 then
 			since = 0
 			look(now)
 		end
 		if next(fades) ~= nil then
-			step(now, dt)
+			step(now, elapsed)
 		end
 	end)
 end

@@ -22,9 +22,11 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
+local Quality = require(script.Parent.Quality)
 
 local VehicleFX = {}
 
@@ -472,12 +474,19 @@ local function onTruckRemoved(inst: Instance)
 	end
 end
 
+local sinceCosmetic = 0
 local function step(dt: number)
+	sinceCosmetic += dt
+	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+		return
+	end
+	local elapsed = sinceCosmetic
+	sinceCosmetic = 0
 	local camera = workspace.CurrentCamera
 	local cameraPos = if camera then camera.CFrame.Position else Vector3.zero
 	for model, rig in pairs(rigs) do
 		if model.Parent and rig.chassis.Parent then
-			updateRig(rig, dt, cameraPos)
+			updateRig(rig, elapsed, cameraPos)
 		end
 	end
 end

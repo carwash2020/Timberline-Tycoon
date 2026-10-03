@@ -372,6 +372,53 @@ return function(t)
 		end
 	)
 
+	t.test("sawmill planks count toward MaxWoodPartsServer; the oldest loose wood goes first", function()
+		local s = setup()
+		local saved = s.GameConfig.MaxWoodPartsServer
+		s.GameConfig.MaxWoodPartsServer = 4
+		-- One section plus its leaf: two parts, unowned, older than the planks.
+		local loose = s.log(1, 4, 2, nil, { ownerId = 0 })
+		t.eq(loose.partCount, 2, "the log's parts are counted")
+		s.now += 5
+		local planks = {}
+		for i = 1, 3 do
+			s.now += 1
+			local plank = s.Wood.SpawnPlank({
+				woodId = "oak",
+				size = Vector3.new(1.6, 4, 1),
+				cf = CFrame.new(i * 3, 2, 0),
+				ownerId = 2,
+			})
+			t.ok(plank, "the mill made a plank")
+			t.eq(plank.kind, "plank")
+			t.eq(plank.partCount, 1, "a plank is a part the cap can see")
+			table.insert(planks, plank)
+		end
+		t.eq(loose.model.Parent, nil, "the older loose log went before the new planks")
+		t.eq(s.Wood.Get(loose.uid), nil)
+		for _, plank in ipairs(planks) do
+			t.ok(plank.model.Parent ~= nil, "the newer planks stayed")
+		end
+		-- Only planks left (3 parts). Two more put the pile over 4, so the oldest plank goes.
+		s.now += 1
+		s.Wood.SpawnPlank({
+			woodId = "oak",
+			size = Vector3.new(1.6, 4, 1),
+			cf = CFrame.new(20, 2, 0),
+			ownerId = 2,
+		})
+		s.now += 1
+		s.Wood.SpawnPlank({
+			woodId = "oak",
+			size = Vector3.new(1.6, 4, 1),
+			cf = CFrame.new(24, 2, 0),
+			ownerId = 2,
+		})
+		t.eq(planks[1].model.Parent, nil, "the oldest plank went next")
+		t.ok(planks[3].model.Parent ~= nil, "a newer plank stayed")
+		s.GameConfig.MaxWoodPartsServer = saved
+	end)
+
 	t.test(
 		"WoodWatch: a player-simulated piece that teleports is put back, stopped, the server's for a moment",
 		function()

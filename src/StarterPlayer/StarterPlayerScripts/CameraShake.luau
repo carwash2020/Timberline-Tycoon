@@ -9,6 +9,8 @@
 local HapticService = game:GetService("HapticService")
 local RunService = game:GetService("RunService")
 
+local Quality = require(script.Parent.Quality)
+
 local CameraShake = {}
 
 local amplitude = 0 -- degrees
@@ -51,6 +53,13 @@ end
 -- Shakes the camera by up to `strength` (about 0.2 subtle .. 1 big) for
 -- `duration` seconds.
 function CameraShake.Shake(strength: number, duration: number)
+	local hz = Quality.Budget().CosmeticHz
+	if hz <= 2 then
+		return -- low: the shake stays off
+	end
+	if hz < 60 then
+		strength *= 0.65 -- medium: a lighter shake
+	end
 	if not bound then
 		bound = true
 		-- The undo runs every frame from now on, so the last frame's offset

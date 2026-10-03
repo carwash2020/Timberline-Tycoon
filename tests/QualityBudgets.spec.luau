@@ -32,6 +32,7 @@ return function(t)
 		"ChipCount",
 		"LeafPool",
 		"LeafShadows",
+		"CosmeticHz",
 	}
 
 	t.test("high is today's look", function()
@@ -59,6 +60,7 @@ return function(t)
 			ChipCount = 48,
 			LeafPool = 64,
 			LeafShadows = true,
+			CosmeticHz = 60, -- cosmetic loops run every frame
 		})
 		t.eq(QualityBudgets.High.MaxCritters, EnvironmentData.MaxCritters, "the same cap the critter plan was made for")
 	end)
@@ -86,7 +88,16 @@ return function(t)
 			ChipCount = 24,
 			LeafPool = 32,
 			LeafShadows = false,
+			CosmeticHz = 2, -- cosmetic loops nearly off
 		})
+	end)
+
+	t.test("medium sits between low and high, and cosmetic loops run slower", function()
+		t.eq(QualityBudgets.Medium.Tier, "medium")
+		t.eq(QualityBudgets.Medium.CosmeticHz, 20)
+		t.eq(QualityBudgets.Medium.MaxDecor, QualityBudgets.High.MaxDecor, "the same ground cover as high")
+		t.ok(QualityBudgets.Medium.SwayParts < QualityBudgets.High.SwayParts)
+		t.ok(QualityBudgets.Medium.SwayParts > QualityBudgets.Low.SwayParts)
 	end)
 
 	-- PLAY-05's acceptance counts the whole workspace.AmbientLife folder on
@@ -357,14 +368,14 @@ return function(t)
 	end)
 
 	t.test("decoration cells unload a little past where they load", function()
-		for _, budget in ipairs({ QualityBudgets.High, QualityBudgets.Low }) do
+		for _, budget in ipairs({ QualityBudgets.High, QualityBudgets.Medium, QualityBudgets.Low }) do
 			-- An edge cell must not load and unload as you sway while chopping.
 			t.ok(budget.DecorUnloadRadius >= budget.DecorLoadRadius + 20, budget.Tier)
 		end
 	end)
 
-	t.test("both tiers have every key, low never asks for more than high, and neither can be changed", function()
-		for _, budget in ipairs({ QualityBudgets.High, QualityBudgets.Low }) do
+	t.test("every tier has every key, low never asks for more than medium or high, and none can be changed", function()
+		for _, budget in ipairs({ QualityBudgets.High, QualityBudgets.Medium, QualityBudgets.Low }) do
 			local count = 0
 			for _ in pairs(budget) do
 				count += 1
@@ -377,7 +388,8 @@ return function(t)
 		end
 		for _, key in ipairs(KEYS) do
 			if key ~= "Tier" and type(QualityBudgets.High[key]) == "number" then
-				t.ok(QualityBudgets.Low[key] <= QualityBudgets.High[key], key)
+				t.ok(QualityBudgets.Low[key] <= QualityBudgets.Medium[key], key .. " low <= medium")
+				t.ok(QualityBudgets.Medium[key] <= QualityBudgets.High[key], key .. " medium <= high")
 				t.ok(QualityBudgets.Low[key] >= 0, key)
 			end
 		end
@@ -391,13 +403,23 @@ return function(t)
 
 	t.test("For: a tier's budget, high for anything else", function()
 		t.eq(QualityBudgets.For("low"), QualityBudgets.Low)
+		t.eq(QualityBudgets.For("medium"), QualityBudgets.Medium)
 		t.eq(QualityBudgets.For("high"), QualityBudgets.High)
-		t.eq(QualityBudgets.For("medium"), QualityBudgets.High)
+		t.eq(QualityBudgets.For("nope"), QualityBudgets.High)
 	end)
 
-	t.test("TierFor: graphics quality 1-4 is low on any device, 5-10 high", function()
+	t.test("CosmeticDue: every frame on high, slower on medium, nearly off on low, never when off", function()
+		t.eq(QualityBudgets.CosmeticDue(60, 0), true, "high runs the first frame")
+		t.eq(QualityBudgets.CosmeticDue(20, 1 / 60), false, "medium skips a single frame")
+		t.eq(QualityBudgets.CosmeticDue(20, 1 / 20), true)
+		t.eq(QualityBudgets.CosmeticDue(2, 0.4), false)
+		t.eq(QualityBudgets.CosmeticDue(2, 0.5), true, "low, twice a second")
+		t.eq(QualityBudgets.CosmeticDue(0, 10), false, "off")
+	end)
+
+	t.test("TierFor: graphics quality 1-4 is low, 5-7 medium, 8-10 high, on any device", function()
 		for level = 1, 10 do
-			local want = if level <= 4 then "low" else "high"
+			local want = if level <= 4 then "low" elseif level <= 7 then "medium" else "high"
 			t.eq(QualityBudgets.TierFor("QualityLevel" .. level, false), want, "desktop " .. level)
 			t.eq(QualityBudgets.TierFor("QualityLevel" .. level, true), want, "phone " .. level)
 		end
@@ -418,7 +440,8 @@ return function(t)
 			if item.Name == "Automatic" then
 				t.eq(tier, "high")
 			else
-				t.eq(tier, if item.Value <= 4 then "low" else "high", item.Name)
+				local want = if item.Value <= 4 then "low" elseif item.Value <= 7 then "medium" else "high"
+				t.eq(tier, want, item.Name)
 			end
 		end
 	end)
@@ -427,7 +450,7 @@ return function(t)
 		local SPS = "src/StarterPlayer/StarterPlayerScripts/"
 		local readers = {
 			AmbientLife = { "MaxDecor", "DecorLoadRadius", "DecorUnloadRadius", "MaxCritters" },
-			WindSway = { "SwayParts", "SwayTrees", "SwayRange" },
+			WindSway = { "SwayParts", "SwayTrees", "SwayRange", "CosmeticHz" },
 			WeatherController = { "WeatherRate" },
 			LightingController = { "SunRays", "DepthOfField", "Bloom" },
 			TownFX = { "TownFxNear" },

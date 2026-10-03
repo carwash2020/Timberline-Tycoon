@@ -373,28 +373,31 @@ return function(t)
 		return most, when
 	end
 
-	t.test("on low quality: at most 400 parts a frame, the nearest 16 within 80 studs, each every 4 frames", function()
+	t.test("on low quality: sway is nearly off, at most 400 parts, only the nearest 16", function()
 		local w = world()
 		w.tier = "low"
 		local trees = frostStand(w)
 		w.WindSway.Start()
 		local most, when = watch(w, 120)
 		t.ok(most <= 400, string.format("a frame moved %d parts", most))
+		t.ok(most > 0, "it still sways, twice a second")
 		local eye = w.camera.CFrame.Position
 		local swaying = 0
+		local movedFrames = 0
 		for i, tree in ipairs(trees) do
 			if i <= 16 then
 				t.ok((tree:GetPivot().Position - eye).Magnitude <= 80, "the nearest 16 are inside 80 studs")
-				t.ok(
-					when[tree] ~= nil and longestGap(when[tree]) <= 4,
-					string.format("tree %d sways every 4 frames", i)
-				)
+				t.ok(when[tree] ~= nil, string.format("tree %d still sways", i))
+				-- 2 Hz over 120 frames at 1/60 s: a few updates, not every frame.
+				t.ok(#when[tree] <= 8, string.format("tree %d moved on %d frames", i, #when[tree]))
 				swaying += 1
+				movedFrames = math.max(movedFrames, #when[tree])
 			else
 				t.eq(when[tree], nil, "nothing past the nearest 16")
 			end
 		end
 		t.eq(swaying, 16)
+		t.ok(movedFrames <= 5, string.format("low updated on %d frames of 120", movedFrames))
 	end)
 
 	t.test("lowering the quality while playing takes effect, and the trees let go are put back at rest", function()

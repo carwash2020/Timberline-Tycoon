@@ -34,6 +34,7 @@ local TweenService = game:GetService("TweenService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
@@ -194,7 +195,13 @@ local leafBatch: Batch = {
 table.insert(batches, chipBatch)
 table.insert(batches, leafBatch)
 
-local function stepPieces()
+local sincePieces = 0
+local function stepPieces(dt: number?)
+	sincePieces += if type(dt) == "number" then dt else 0
+	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sincePieces) then
+		return
+	end
+	sincePieces = 0
 	local now = os.clock()
 	local any = false
 	for _, batch in ipairs(batches) do
@@ -590,7 +597,13 @@ local springing: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: an
 
 local LEAF_NAMES: { [string]: boolean } = { Leaves = true, Frond = true, Facet = true }
 
-local function stepSinks()
+local sinceSinks = 0
+local function stepSinks(dt: number?)
+	sinceSinks += if type(dt) == "number" then dt else 0
+	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceSinks) then
+		return
+	end
+	sinceSinks = 0
 	local now = workspace:GetServerTimeNow()
 	local any = false
 	for tree, s in pairs(sinks) do
@@ -757,8 +770,15 @@ function WoodFX.Start()
 	end
 	CollectionService:GetInstanceAddedSignal("Wood"):Connect(watchPiece)
 	local since = 0
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
-		since += dt
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
+		since += step
 		if since >= 0.25 then
 			since = 0
 			hideRingIfIdle()

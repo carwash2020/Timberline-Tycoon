@@ -31,6 +31,7 @@ local RunService = game:GetService("RunService")
 
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local Quality = require(script.Parent.Quality)
 
@@ -398,9 +399,16 @@ function ForestFiller.Start()
 		makeLooks()
 		print(string.format("[ForestFiller] plan ready in %.1f s", os.clock() - started))
 		local sinceScan, sinceFade = math.huge, 0
+		local sinceCosmetic = 0
 		RunService.Heartbeat:Connect(function(dt: number)
-			sinceScan += dt
-			sinceFade += dt
+			sinceCosmetic += dt
+			if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+				return
+			end
+			local step = sinceCosmetic
+			sinceCosmetic = 0
+			sinceScan += step
+			sinceFade += step
 			local camera = workspace.CurrentCamera
 			local moved = if camera and lastScanAt
 				then (camera.CFrame.Position - lastScanAt).Magnitude > MOVED_FAR
