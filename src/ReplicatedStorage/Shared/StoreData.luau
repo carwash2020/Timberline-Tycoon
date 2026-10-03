@@ -10,33 +10,38 @@
 
 local StoreData = {}
 
-export type PassKey = "DoubleCash"
+export type PassKey = "DoubleCash" | "LuxAxe"
 export type ProductKey = "Cash1k" | "Cash10k" | "DoubleWood" | "InstantDelivery"
 
 -- The only place a Creator Hub id is written. Fill these in when the pass
 -- or product exists; leave 0 until then.
+-- PASTE each id from Creator Hub. 0 = not for sale (button hidden, server
+-- refuses). image is a decal asset id for the card; 0 draws a placeholder.
 StoreData.CreatorIds = {
 	Passes = {
-		DoubleCash = 0, -- 2x Cash, forever
+		DoubleCash = 0, -- PASTE: Monetization → Passes → 2x Cash → ID
+		LuxAxe = 0, -- PASTE: Monetization → Passes → Lux Axe → ID
 	},
 	Products = {
-		Cash1k = 0, -- $1,000 cash pack
-		Cash10k = 0, -- $10,000 cash pack
-		DoubleWood = 0, -- 2x Wood for 48 hours
-		InstantDelivery = 0, -- sell the truck bed from anywhere, once
+		Cash1k = 0, -- PASTE: Monetization → Developer Products → $1,000 → ID
+		Cash10k = 0, -- PASTE: Monetization → Developer Products → $10,000 → ID
+		DoubleWood = 0, -- PASTE: Monetization → Developer Products → 2x Wood → ID
+		InstantDelivery = 0, -- PASTE: Monetization → Developer Products → Instant Delivery → ID
 	},
 }
 
 export type Pass = {
 	key: PassKey,
-	id: number, -- game pass id from Creator Hub
+	id: number, -- game pass id from Creator Hub (0 until pasted)
+	image: number, -- PASTE a decal asset id; 0 = styled placeholder
 	name: string,
 	description: string,
 }
 
 export type Product = {
 	key: ProductKey,
-	id: number, -- developer product id from Creator Hub
+	id: number, -- developer product id from Creator Hub (0 until pasted)
+	image: number, -- PASTE a decal asset id; 0 = styled placeholder
 	name: string,
 	description: string,
 	cash: number?, -- cash packs: how much it adds (checked against the wallet cap first)
@@ -47,8 +52,16 @@ StoreData.Passes = {
 	{
 		key = "DoubleCash",
 		id = StoreData.CreatorIds.Passes.DoubleCash,
+		image = 0, -- PASTE decal id
 		name = "2x Cash",
 		description = "All the wood you sell pays double, forever.",
+	},
+	{
+		key = "LuxAxe",
+		id = StoreData.CreatorIds.Passes.LuxAxe,
+		image = 0, -- PASTE decal id
+		name = "Lux Axe",
+		description = "Forged for lumber barons. The Lux Axe has a black handle with gold inlays and a gold head set with diamonds. It chops harder than the Fire Axe, and every log you cut with it sells for 10% more. It's yours forever and can't be sold.",
 	},
 } :: { Pass }
 
@@ -56,6 +69,7 @@ StoreData.Products = {
 	{
 		key = "Cash1k",
 		id = StoreData.CreatorIds.Products.Cash1k,
+		image = 0, -- PASTE decal id
 		name = "$1,000",
 		description = "A little cash to get going.",
 		cash = 1000,
@@ -63,6 +77,7 @@ StoreData.Products = {
 	{
 		key = "Cash10k",
 		id = StoreData.CreatorIds.Products.Cash10k,
+		image = 0, -- PASTE decal id
 		name = "$10,000",
 		description = "A big cash pack.",
 		cash = 10000,
@@ -70,6 +85,7 @@ StoreData.Products = {
 	{
 		key = "DoubleWood",
 		id = StoreData.CreatorIds.Products.DoubleWood,
+		image = 0, -- PASTE decal id
 		name = "2x Wood (48 hours)",
 		description = "Wood you cut in the next 48 hours is worth double.",
 		boostHours = 48,
@@ -77,10 +93,38 @@ StoreData.Products = {
 	{
 		key = "InstantDelivery",
 		id = StoreData.CreatorIds.Products.InstantDelivery,
+		image = 0, -- PASTE decal id
 		name = "Instant Delivery",
 		description = "Sell your truckload from anywhere, once.",
 	},
 } :: { Product }
+
+-- Passes and products whose Creator Hub id is pasted (id > 0).
+function StoreData.ListedPasses(): { Pass }
+	local out: { Pass } = {}
+	for _, pass in ipairs(StoreData.Passes) do
+		if StoreData.IsForSale(pass.id) then
+			table.insert(out, pass)
+		end
+	end
+	return out
+end
+
+function StoreData.ListedProducts(): { Product }
+	local out: { Product } = {}
+	for _, product in ipairs(StoreData.Products) do
+		if StoreData.IsForSale(product.id) then
+			table.insert(out, product)
+		end
+	end
+	return out
+end
+
+-- True when any pass or product has a real id. The STORE button stays
+-- hidden until then.
+function StoreData.AnyForSale(): boolean
+	return #StoreData.ListedPasses() + #StoreData.ListedProducts() > 0
+end
 
 function StoreData.Pass(key: string): Pass?
 	for _, pass in ipairs(StoreData.Passes) do

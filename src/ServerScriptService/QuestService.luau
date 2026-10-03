@@ -137,6 +137,7 @@ local function finish(player: Player, profile: Profile, how: "completed" | "skip
 	profile.tutorialDone = true
 	profile.tutorialProgress = 0
 	profile.tutorialRefresher = false
+	profile.tutorialReplay = false
 	publish(player, profile)
 	FieldGuideService.Refresh(player) -- Murph hands over the Field Guide
 	if how == "completed" then
@@ -219,7 +220,12 @@ function QuestService.Start(player: Player, profile: Profile)
 		return
 	end
 	realign(profile)
-	if profile.bestAxeTier >= 2 and profile.tutorialStep == 1 and profile.tutorialProgress == 0 then
+	if
+		profile.tutorialReplay ~= true
+		and profile.bestAxeTier >= 2
+		and profile.tutorialStep == 1
+		and profile.tutorialProgress == 0
+	then
 		finish(player, profile, "bypassed") -- a save from before the tutorial existed
 		return
 	end
@@ -288,6 +294,25 @@ function QuestService.StumpHoldFor(player: Player): number
 	return TutorialData.StumpHold(profile.tutorialStep)
 end
 
+-- Settings → Reset tutorial. A player who already owns a better axe would
+-- be bypassed on the next join, so tutorialReplay keeps the run alive.
+function QuestService.Reset(player: Player)
+	if not RateLimiter.Allow(player, "ResetTutorial") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	profile.tutorialDone = false
+	profile.tutorialStep = 1
+	profile.tutorialProgress = 0
+	profile.tutorialRefresher = false
+	profile.tutorialReplay = true
+	enterStep(player, profile, 1)
+	notify(player, "Tutorial reset. Murph is waiting by the spawn.")
+end
+
 local function onSkip(player: Player)
 	if not RateLimiter.Allow(player, "SkipTutorial") then
 		return
@@ -301,10 +326,20 @@ end
 
 -- `notifyFn` shows a toast (GameServer's notify); `activeLoop` is the core
 -- loop that runs (CoreLoop.Active(); 1 when not given).
-function QuestService.Init(skipRemote: RemoteEvent, notifyFn: (Player, string) -> (), activeLoop: number?)
+function QuestService.Init(
+	skipRemote: RemoteEvent,
+	notifyFn: (Player, string) -> (),
+	activeLoop: number?,
+	resetRemote: RemoteEvent?
+)
 	notify = notifyFn
 	loop = if activeLoop == 2 then 2 else 1
 	skipRemote.OnServerEvent:Connect(onSkip)
+	if resetRemote then
+		resetRemote.OnServerEvent:Connect(function(player: Player)
+			QuestService.Reset(player)
+		end)
+	end
 	TreeService.StumpHold = QuestService.StumpHoldFor
 end
 

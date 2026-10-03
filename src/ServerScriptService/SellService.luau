@@ -155,12 +155,13 @@ local function price(d: Deps, model: Model): Priced?
 	local kind: SellLogic.Kind = if model:GetAttribute("Kind") == "plank" then "plank" else "log"
 	local figure = attrString(model, "Figure")
 	local boost = attrNumber(model, "Boost") or 1
+	local lux = model:GetAttribute("LuxCut") == true
 	return {
 		model = model,
 		piece = piece,
 		woodId = woodId,
 		volume = volume,
-		value = SellLogic.PieceValue(woodId, kind, volume, figure, boost),
+		value = SellLogic.PieceValue(woodId, kind, volume, figure, boost, lux),
 		figure = figure,
 	}
 end

@@ -143,6 +143,18 @@ local GameConfig = {
 	LogicTickSec = 0.1,
 	MaxConveyorsPerPlot = 150,
 	MaxLogicPerPlot = 200,
+
+	-- The Lux Axe (a Robux pass, StoreData.Passes.LuxAxe). Its stats live in
+	-- ItemCatalog; this is the sell bonus on wood whose final chop was it.
+	LuxAxeId = "LuxAxe",
+	LuxSellBonus = 1.1, -- 10% more at the pad, once, on the piece's value
 }
+
+-- "Logs you cut sell for 10% more." Tracks LuxSellBonus, so a tune changes
+-- the tooltip with it.
+function GameConfig.LuxPerkLine(): string
+	local pct = math.floor((GameConfig.LuxSellBonus - 1) * 100 + 0.5)
+	return string.format("Logs you cut sell for %d%% more.", pct)
+end
 
 return GameConfig

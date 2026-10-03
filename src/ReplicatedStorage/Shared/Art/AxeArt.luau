@@ -693,6 +693,49 @@ builders.StarfallAxe = function(model, def)
 	sparkle.Parent = glow
 end
 
+-- Lux: a polished black haft with gold inlays, a gold head set with
+-- diamonds, and a glint the client scales with the graphics tier.
+builders.LuxAxe = function(model, _def)
+	local black = hex("#141414")
+	local gold = hex("#E8C547")
+	local diamond = hex("#E7FBFF")
+	local ctx = haft(model, 3.5, black, gold, Enum.Material.Metal)
+	collar(ctx, gold, Enum.Material.Metal, 0.8)
+	local shape = { reach = 1.02, near = 0.58, up = 0.22, down = 0.34, thick = 0.24 }
+	local ey, ez, eh = blade(ctx, shape, gold, Enum.Material.Metal)
+	local e = edge(ctx, ey, ez, eh, shape.thick, diamond, Enum.Material.Neon, 0.18)
+	cheeks(
+		ctx,
+		"Inlay",
+		shape.thick,
+		Vector3.new(0.02, 0.16, 0.28),
+		ey + 0.05,
+		ez + 0.35,
+		gold,
+		Enum.Material.Metal,
+		0.2
+	)
+	cheeks(ctx, "Diamond", shape.thick, Vector3.new(0.06, 0.08, 0.08), ey, ez + 0.15, diamond, Enum.Material.Neon, 0)
+	part(ctx, "Poll", Vector3.new(0.36, 0.42, 0.2), CFrame.new(0, ctx.headY, 0.28), gold, Enum.Material.Metal)
+	glowLight(e, gold, 7, 0.8)
+	local glint = Instance.new("ParticleEmitter")
+	glint.Name = "Glint"
+	glint.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	glint.Color = ColorSequence.new(gold, diamond)
+	glint.LightEmission = 1
+	glint.LightInfluence = 0
+	glint.Rate = 5
+	glint.Lifetime = NumberRange.new(0.35, 0.7)
+	glint.Speed = NumberRange.new(0.1, 0.4)
+	glint.SpreadAngle = Vector2.new(180, 180)
+	glint.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.4, 0.12),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	glint.Parent = e
+end
+
 -- Anything not listed above: a plain bit in the catalog's colours.
 local function generic(model: Model, def: AxeDef)
 	local ctx = haft(model, 3.2, hex("#A87444"), hex("#2C2622"))

@@ -202,4 +202,14 @@ function QualityBudgets.TierFor(savedLevel: string?, touchOnly: boolean): Tier
 	return if touchOnly then "low" else "high"
 end
 
+-- Particles named Glint (the Lux Axe) per second. Low turns them off.
+function QualityBudgets.GlintRate(tier: string): number
+	if tier == "high" then
+		return 5
+	elseif tier == "medium" then
+		return 2
+	end
+	return 0
+end
+
 return QualityBudgets

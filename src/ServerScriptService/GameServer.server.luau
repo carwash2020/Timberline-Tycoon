@@ -29,6 +29,7 @@ local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local SawmillService = require(script.Parent.SawmillService)
+local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SellService = require(script.Parent.SellService)
 local LeaveCommit = require(script.Parent.LeaveCommit)
 local LeftLoad = require(script.Parent.LeftLoad)
@@ -657,10 +658,15 @@ safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
 safely("AxeService.Init", AxeService.Init, notify)
 safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify, activeLoop)
 safely("VehicleService.Init", VehicleService.Init, notify)
-safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify, activeLoop)
+safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify, activeLoop, remote.ResetTutorial)
 safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
+safely("MonetizationService.SetPassListener", MonetizationService.SetPassListener, function(player: Player, key: string)
+	if key == GameConfig.LuxAxeId then
+		AxeService.Ensure(player, GameConfig.LuxAxeId)
+	end
+end)
 safely("FieldGuideService.Init", FieldGuideService.Init, notify)
 safely("NodeService.Init", NodeService.Init, notify)
 safely("AetherService.Init", AetherService.Init, notify)
@@ -799,6 +805,7 @@ if CoreLoop.V2() then
 					ownerId = owner.UserId,
 					figure = saved.f,
 					boost = saved.x,
+					lux = saved.l == true,
 					createdAt = os.clock() - GameConfig.PickupGraceSec + math.max(0, graceSec),
 				})
 			end
@@ -916,19 +923,23 @@ remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	end
 end)
 
--- Settings toggles (music, sound effects), mirrored on SettingMusic /
--- SettingSfx attributes so the client applies them when the save loads.
-local SETTING_ATTRIBUTES = { music = "SettingMusic", sfx = "SettingSfx" }
-remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, on: unknown)
+-- Settings (SettingsLogic), mirrored on player attributes so the client
+-- applies them when the save loads.
+remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, value: unknown)
 	if not RateLimiter.Allow(player, "SaveSetting") then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	if not profile or type(key) ~= "string" or type(on) ~= "boolean" or not SETTING_ATTRIBUTES[key] then
+	if not profile or type(key) ~= "string" then
 		return
 	end
-	(profile.settings :: any)[key] = on
-	player:SetAttribute(SETTING_ATTRIBUTES[key], on)
+	if not SettingsLogic.Set(profile.settings, key, value) then
+		return
+	end
+	local attr = SettingsLogic.Attributes[key :: SettingsLogic.Key]
+	if attr then
+		player:SetAttribute(attr, (profile.settings :: any)[key])
+	end
 end)
 
 -- Player lifecycle --------------------------------------------------------
@@ -1017,8 +1028,10 @@ local function onPlayerAdded(player: Player)
 	end
 
 	player:SetAttribute("Cash", profile.cash)
-	player:SetAttribute("SettingMusic", profile.settings.music ~= false)
-	player:SetAttribute("SettingSfx", profile.settings.sfx ~= false)
+	profile.settings = SettingsLogic.Sanitize(profile.settings)
+	for key, attr in pairs(SettingsLogic.Attributes) do
+		player:SetAttribute(attr, (profile.settings :: any)[key])
+	end
 	if profile.pendingCash > 0 then
 		player:SetAttribute("PendingCash", profile.pendingCash)
 		EconomyService.PayPending(player)

@@ -282,4 +282,11 @@ return function(t)
 			t.eq(ShopLogic.TrailerDetailFor(trailer, 1), ShopLogic.TrailerDetail(trailer))
 		end
 	end)
+
+	t.test("the Lux Axe is a Robux exclusive, not forged and not for cash", function()
+		local lux = ItemCatalog.GetAxe("LuxAxe")
+		t.eq(ShopLogic.StatusOf(lux, 9, 0, 0), "robux")
+		t.eq(ShopLogic.CanPurchase("robux"), false)
+		t.ok(string.find(ShopLogic.WhyNot("robux", lux, 1), "Robux exclusive") ~= nil)
+	end)
 end

@@ -742,13 +742,21 @@ local function refreshChip()
 	chipText = text
 end
 
+local tipsOn = true
+
 -- The hint and the load chip show unless a panel is open over the game.
 local function refreshModal()
 	local hint = hintLabel
 	if hint then
-		hint.Visible = modalRect == nil
+		hint.Visible = modalRect == nil and tipsOn
 	end
 	refreshChip()
+end
+
+-- Settings: hide the hint line without closing panels.
+function HUD.SetTips(on: boolean)
+	tipsOn = on
+	refreshModal()
 end
 
 -- A panel open over the game (ShopUI: the shops, the Store, the Field

@@ -1,17 +1,18 @@
 --!strict
--- StoreUI: the Robux Store (items in Shared/StoreData).
---   * A STORE button next to the clock opens it (drawn by ShopUI). It lists
---     every pass and product that's set up (has a Creator Hub id), with
---     Roblox's live price. Buying asks the server, which checks it (a cash
---     pack must fit in the wallet) and shows Roblox's purchase prompt.
---   * "Sell load here" appears while you have Instant Deliveries and logs in
---     your truck bed.
+-- StoreUI: the Robux store.
+--   * A STORE button beside the cash (HUD.BesideCash) opens a cream-and-wood
+--     panel with Passes and Products tabs. Hidden while every Creator Hub
+--     id is still 0. Each card has an image slot (a placeholder when the
+--     decal id is 0), the name, the description, Roblox's live price, and
+--     Buy. An owned pass says Owned. A card whose id is 0 is not shown.
+--   * The town bulletin board's prompt (StorePrompt) opens the same panel.
+--   * "Sell load here" stays while you have Instant Deliveries and wood
+--     on the truck.
 
+local CollectionService = game:GetService("CollectionService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local CollectionService = game:GetService("CollectionService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -19,158 +20,43 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local HudLayout = require(script.Parent.HudLayout)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
 
 local StoreUI = {}
 
-local player = Players.LocalPlayer
+local STORE = {
+	subtitle = "Robux time-savers. Nothing pay-to-win.",
+}
 
+local player = Players.LocalPlayer
+local C = UITheme.Colors
+local F = UITheme.Fonts
 local ROBUX_GREEN = Color3.fromRGB(0, 176, 111)
 
-local prices: { [string]: number } = {} -- "Pass:DoubleCash" -> Robux
+local prices: { [string]: number } = {}
 local deliveryButton: UITheme.Button? = nil
+local tab: "Passes" | "Products" = "Passes"
+local panel: Frame? = nil
+local list: ScrollingFrame? = nil
+local passTab: TextButton? = nil
+local productTab: TextButton? = nil
 
 local function robux(price: number?): string
 	return if price then "R$ " .. tostring(price) else "R$ …"
-end
-
--- A row that must never prompt. ids() already omits anything not for sale;
--- this is the fallback if a row is asked for anyway.
-local function notForSale(): ShopUI.RowView
-	return {
-		name = "Not for sale",
-		detail = "This item isn't set up yet.",
-		color = ROBUX_GREEN,
-		dim = true,
-		button = "Soon",
-		state = "inuse",
-		onClick = function() end,
-	}
-end
-
--- Loads each item's price from Roblox once, then redraws. An id of 0 is
--- skipped: GetProductInfo(0) errors.
-local function loadPrices()
-	local function fetch(key: string, id: number, infoType: Enum.InfoType)
-		task.spawn(function()
-			local ok, info = pcall(function()
-				return MarketplaceService:GetProductInfo(id, infoType)
-			end)
-			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
-				prices[key] = info.PriceInRobux
-				ShopUI.Refresh()
-			end
-		end)
-	end
-	for _, pass in ipairs(StoreData.Passes) do
-		if StoreData.IsForSale(pass.id) then
-			fetch("Pass:" .. pass.key, pass.id, Enum.InfoType.GamePass)
-		end
-	end
-	for _, product in ipairs(StoreData.Products) do
-		if StoreData.IsForSale(product.id) then
-			fetch("Product:" .. product.key, product.id, Enum.InfoType.Product)
-		end
-	end
 end
 
 local function hoursLeft(untilTime: number): number
 	return math.max(0, math.ceil((untilTime - os.time()) / 3600))
 end
 
-local STORE: ShopUI.Shop = {
-	building = nil,
-	promptText = "",
-	title = "Store",
-	subtitle = "Robux time-savers. Nothing pay-to-win.",
-	ids = function()
-		local ids = {}
-		for _, pass in ipairs(StoreData.Passes) do
-			if StoreData.IsForSale(pass.id) then
-				table.insert(ids, "Pass:" .. pass.key)
-			end
-		end
-		for _, product in ipairs(StoreData.Products) do
-			if StoreData.IsForSale(product.id) then
-				table.insert(ids, "Product:" .. product.key)
-			end
-		end
-		return ids
-	end,
-	view = function(id: string): ShopUI.RowView
-		local kind, key = string.match(id, "^(%a+):(%w+)$")
-		if kind == "Pass" then
-			local pass = StoreData.Pass(key or "")
-			if not pass or not StoreData.IsForSale(pass.id) then
-				return notForSale()
-			end
-			local has = player:GetAttribute("Pass_" .. pass.key) == true
-			return {
-				name = pass.name,
-				detail = pass.description,
-				color = ROBUX_GREEN,
-				ring = UITheme.Colors.Amber,
-				dim = false,
-				button = if has then "Owned" else robux(prices[id]),
-				state = if has then "inuse" else "buy",
-				onClick = function()
-					if has then
-						HUD.Toast(string.format("You already have %s.", pass.name))
-					else
-						Net.Remote("BuyRobuxItem"):FireServer("Pass", pass.key)
-					end
-				end,
-			}
-		end
-		local product = StoreData.Product(key or "")
-		if not product or not StoreData.IsForSale(product.id) then
-			return notForSale()
-		end
-		local cash = (player:GetAttribute("Cash") :: number?) or 0
-		local fits = StoreData.PackFits(product, cash, GameConfig.CashCap)
-		local name = product.name
-		if product.boostHours then
-			local left = hoursLeft((player:GetAttribute("DoubleWoodUntil") :: number?) or 0)
-			if left > 0 then
-				name ..= string.format("  ·  on, %dh left", left)
-			end
-		elseif product.key == "InstantDelivery" then
-			local n = (player:GetAttribute("InstantDeliveries") :: number?) or 0
-			if n > 0 then
-				name ..= string.format("  ·  you have %d", n)
-			end
-		end
-		return {
-			name = name,
-			detail = product.description,
-			color = ROBUX_GREEN,
-			dim = not fits,
-			button = if fits then robux(prices[id]) else "Wallet full",
-			state = if fits then "buy" else "inuse",
-			onClick = function()
-				if not fits then
-					HUD.Toast(
-						string.format(
-							"Your wallet can't hold that much (the cap is %s).",
-							Util.formatCash(GameConfig.CashCap)
-						)
-					)
-				else
-					Net.Remote("BuyRobuxItem"):FireServer("Product", product.key)
-				end
-			end,
-		}
-	end,
-}
-
 local function myBedCount(): number
-	-- The v2 loop: the loose wood riding on your beds (TruckLoad's BedVolume, u³).
 	if CoreLoop.V2() then
 		local volume = player:GetAttribute("BedVolume")
 		return if type(volume) == "number" and volume > 0 then volume else 0
 	end
-	local mirrored = player:GetAttribute("BedCount") -- set by the server even when the truck streams out
+	local mirrored = player:GetAttribute("BedCount")
 	if type(mirrored) == "number" then
 		return mirrored
 	end
@@ -192,9 +78,210 @@ local function refreshDelivery()
 	b:SetText(string.format("Sell here (%d)", n))
 end
 
-local function buildButtons()
-	-- A corner pill: on a phone 36 tall, with a fingertip-tall hit area
-	-- round it (UITheme.HitPad).
+local function setModal(open: boolean)
+	local frame = panel
+	if not open or not frame then
+		HUD.SetModal(nil)
+		return
+	end
+	local pos = frame.AbsolutePosition
+	local size = frame.AbsoluteSize
+	local rect: HudLayout.Rect = {
+		left = pos.X,
+		top = pos.Y,
+		right = pos.X + size.X,
+		bottom = pos.Y + size.Y,
+	}
+	HUD.SetModal(rect)
+end
+
+local function clear(frame: Instance)
+	for _, child in ipairs(frame:GetChildren()) do
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+end
+
+local function card(
+	parent: Instance,
+	name: string,
+	detail: string,
+	imageId: number,
+	buttonText: string,
+	owned: boolean,
+	onBuy: () -> ()
+)
+	local row = Instance.new("Frame")
+	row.Name = name
+	row.BackgroundColor3 = C.Cream
+	row.Size = UDim2.new(1, -8, 0, 108)
+	row.BorderSizePixel = 0
+	UITheme.corner(row, 10)
+	UITheme.stroke(row, C.Bark, 2)
+	local art = Instance.new("ImageLabel")
+	art.Name = "Image"
+	art.BackgroundColor3 = ROBUX_GREEN
+	art.Size = UDim2.fromOffset(72, 72)
+	art.Position = UDim2.fromOffset(10, 18)
+	art.BorderSizePixel = 0
+	art.ScaleType = Enum.ScaleType.Fit
+	if imageId > 0 then
+		art.Image = "rbxassetid://" .. tostring(imageId)
+	else
+		art.Image = ""
+		local mark = Instance.new("TextLabel")
+		mark.BackgroundTransparency = 1
+		mark.Size = UDim2.fromScale(1, 1)
+		mark.Font = F.Black
+		mark.TextSize = 18
+		mark.TextColor3 = C.Cream
+		mark.Text = string.sub(name, 1, 1)
+		mark.Parent = art
+	end
+	UITheme.corner(art, 8)
+	art.Parent = row
+	local title = UITheme.label(row, name, F.Black, 16, C.Ink)
+	title.Position = UDim2.fromOffset(92, 8)
+	title.Size = UDim2.new(1, -180, 0, 22)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	local body = UITheme.label(row, detail, F.Body, 13, C.Bark)
+	body.Position = UDim2.fromOffset(92, 30)
+	body.Size = UDim2.new(1, -180, 0, 70)
+	body.TextWrapped = true
+	body.TextXAlignment = Enum.TextXAlignment.Left
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	local buy = UITheme.Button({
+		name = "Buy",
+		text = if owned then "Owned" else buttonText,
+		size = Vector2.new(88, UITheme.Size.Tap),
+		style = if owned then "inuse" else "buy",
+		textSize = 14,
+	})
+	buy.root.AnchorPoint = Vector2.new(1, 0.5)
+	buy.root.Position = UDim2.new(1, -8, 0.5, 0)
+	buy.root.Parent = row
+	buy.face.Activated:Connect(function()
+		if not owned then
+			onBuy()
+		end
+	end)
+	row.Parent = parent
+end
+
+local function redraw()
+	local frame = list
+	local passes = passTab
+	local products = productTab
+	if not frame or not passes or not products then
+		return
+	end
+	passes.BackgroundColor3 = if tab == "Passes" then C.Amber else C.Cream
+	products.BackgroundColor3 = if tab == "Products" then C.Amber else C.Cream
+	clear(frame)
+	local cash = (player:GetAttribute("Cash") :: number?) or 0
+	if tab == "Passes" then
+		local shown = 0
+		for _, pass in ipairs(StoreData.Passes) do
+			if StoreData.IsForSale(pass.id) then
+				shown += 1
+				local has = player:GetAttribute("Pass_" .. pass.key) == true
+				local id = "Pass:" .. pass.key
+				card(frame, pass.name, pass.description, pass.image, robux(prices[id]), has, function()
+					Net.Remote("BuyRobuxItem"):FireServer("Pass", pass.key)
+				end)
+			end
+		end
+		if shown == 0 then
+			local empty = UITheme.label(frame, "Passes coming soon.", F.Body, 16, C.Bark)
+			empty.Size = UDim2.new(1, 0, 0, 40)
+		end
+	else
+		local shown = 0
+		for _, product in ipairs(StoreData.Products) do
+			if StoreData.IsForSale(product.id) then
+				shown += 1
+				local fits = StoreData.PackFits(product, cash, GameConfig.CashCap)
+				local name = product.name
+				if product.boostHours then
+					local left = hoursLeft((player:GetAttribute("DoubleWoodUntil") :: number?) or 0)
+					if left > 0 then
+						name ..= string.format("  ·  %dh left", left)
+					end
+				elseif product.key == "InstantDelivery" then
+					local n = (player:GetAttribute("InstantDeliveries") :: number?) or 0
+					if n > 0 then
+						name ..= string.format("  ·  you have %d", n)
+					end
+				end
+				local label = if fits then robux(prices["Product:" .. product.key]) else "Wallet full"
+				card(frame, name, product.description, product.image, label, false, function()
+					if not fits then
+						HUD.Toast(
+							string.format(
+								"Your wallet can't hold that much (the cap is %s).",
+								Util.formatCash(GameConfig.CashCap)
+							)
+						)
+					else
+						Net.Remote("BuyRobuxItem"):FireServer("Product", product.key)
+					end
+				end)
+			end
+		end
+		if shown == 0 then
+			local empty = UITheme.label(frame, "Products coming soon.", F.Body, 16, C.Bark)
+			empty.Size = UDim2.new(1, 0, 0, 40)
+		end
+	end
+end
+
+local function loadPrices()
+	local function fetch(key: string, id: number, infoType: Enum.InfoType)
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(id, infoType)
+			end)
+			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
+				prices[key] = info.PriceInRobux
+				redraw()
+			end
+		end)
+	end
+	for _, pass in ipairs(StoreData.Passes) do
+		if StoreData.IsForSale(pass.id) then
+			fetch("Pass:" .. pass.key, pass.id, Enum.InfoType.GamePass)
+		end
+	end
+	for _, product in ipairs(StoreData.Products) do
+		if StoreData.IsForSale(product.id) then
+			fetch("Product:" .. product.key, product.id, Enum.InfoType.Product)
+		end
+	end
+end
+
+local function openStore()
+	local frame = panel
+	if not frame then
+		return
+	end
+	frame.Visible = true
+	redraw()
+	task.defer(function()
+		setModal(true)
+	end)
+end
+
+local function closeStore()
+	local frame = panel
+	if frame then
+		frame.Visible = false
+	end
+	setModal(false)
+end
+
+function StoreUI.Start()
+	local gui = UITheme.Screen("StoreUI", 20)
 	local spec = UITheme.Sized("Store")
 	local store = UITheme.Button({
 		name = "Store",
@@ -203,16 +290,90 @@ local function buildButtons()
 		style = "buy",
 		textSize = spec.text,
 	})
-	store.root.LayoutOrder = 10 -- left of the clock (HUD's corner, beside the cash)
-	store.root.Visible = #STORE.ids() > 0 -- hidden while every CreatorIds entry is still 0
+	store.root.LayoutOrder = 10
+	store.root.Visible = StoreData.AnyForSale()
 	store.root.Parent = HUD.BesideCash()
-	local function openStore()
-		ShopUI.OpenCustom(STORE)
-	end
 	store.face.Activated:Connect(openStore)
 	if spec.hit then
-		UITheme.HitPad(store.root, spec.hit).Activated:Connect(openStore) -- under the face: it still looks pressed
+		UITheme.HitPad(store.root, spec.hit).Activated:Connect(openStore)
 	end
+	ShopUI.SetStoreOpener(openStore)
+
+	local shell = UITheme.Card(C.Paper, C.Bark, 3, 14, false)
+	shell.outer.Name = "StorePanel"
+	shell.outer.AnchorPoint = Vector2.new(0.5, 0.5)
+	shell.outer.Position = UDim2.fromScale(0.5, 0.5)
+	shell.outer.Size = UDim2.fromOffset(460, 520)
+	shell.outer.Visible = false
+	panel = shell.outer
+	local head = Instance.new("Frame")
+	head.BackgroundTransparency = 1
+	head.Size = UDim2.new(1, 0, 0, 44)
+	head.Parent = shell.face
+	local heading = UITheme.label(head, "STORE", F.Black, 18, C.Bark)
+	local sub = UITheme.label(head, STORE.subtitle, F.Body, 13, C.Bark)
+	sub.Position = UDim2.fromOffset(90, 12)
+	sub.Size = UDim2.new(1, -160, 0, 20)
+	heading.Size = UDim2.fromOffset(120, 28)
+	heading.Position = UDim2.fromOffset(8, 8)
+	local close = UITheme.Button({
+		name = "Close",
+		text = "X",
+		size = Vector2.new(44, 44),
+		style = "cant",
+		textSize = 18,
+	})
+	close.root.AnchorPoint = Vector2.new(1, 0)
+	close.root.Position = UDim2.new(1, -4, 0, 0)
+	close.root.Parent = head
+	close.face.Activated:Connect(closeStore)
+	local tabs = Instance.new("Frame")
+	tabs.BackgroundTransparency = 1
+	tabs.Position = UDim2.fromOffset(0, 48)
+	tabs.Size = UDim2.new(1, 0, 0, 40)
+	tabs.Parent = shell.face
+	local function tabButton(name: string, x: number): TextButton
+		local b = Instance.new("TextButton")
+		b.Name = name
+		b.Size = UDim2.fromOffset(140, 36)
+		b.Position = UDim2.fromOffset(x, 0)
+		b.Font = F.Black
+		b.TextSize = 15
+		b.Text = string.upper(name)
+		b.TextColor3 = C.Ink
+		b.BackgroundColor3 = C.Cream
+		b.AutoButtonColor = true
+		UITheme.corner(b, 8)
+		UITheme.stroke(b, C.Bark, 2)
+		b.Parent = tabs
+		return b
+	end
+	local passesBtn = tabButton("Passes", 8)
+	local productsBtn = tabButton("Products", 156)
+	passTab = passesBtn
+	productTab = productsBtn
+	passesBtn.Activated:Connect(function()
+		tab = "Passes"
+		redraw()
+	end)
+	productsBtn.Activated:Connect(function()
+		tab = "Products"
+		redraw()
+	end)
+	local rows = Instance.new("ScrollingFrame")
+	rows.Name = "Cards"
+	rows.BackgroundTransparency = 1
+	rows.BorderSizePixel = 0
+	rows.Position = UDim2.fromOffset(0, 92)
+	rows.Size = UDim2.new(1, 0, 1, -100)
+	rows.CanvasSize = UDim2.fromOffset(0, 0)
+	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	rows.ScrollBarThickness = 6
+	rows.Parent = shell.face
+	UITheme.list(rows, 8)
+	UITheme.padding(rows, 4, 8, 8, 8)
+	list = rows
+	shell.outer.Parent = gui
 
 	deliveryButton = HUD.SideButton({
 		name = "InstantDelivery",
@@ -223,14 +384,27 @@ local function buildButtons()
 			Net.Remote("UseInstantDelivery"):FireServer()
 		end,
 	})
-end
 
-function StoreUI.Start()
-	buildButtons()
+	local function bindPrompt(inst: Instance)
+		if inst:IsA("ProximityPrompt") and inst.Name == "StorePrompt" then
+			inst.Triggered:Connect(function()
+				openStore()
+			end)
+		end
+	end
+	for _, inst in ipairs(CollectionService:GetTagged("StorePrompt")) do
+		bindPrompt(inst)
+	end
+	CollectionService:GetInstanceAddedSignal("StorePrompt"):Connect(bindPrompt)
+
 	loadPrices()
-	for _, attribute in ipairs({ "Pass_DoubleCash", "DoubleWoodUntil", "InstantDeliveries" }) do
+	redraw()
+	for _, pass in ipairs(StoreData.Passes) do
+		player:GetAttributeChangedSignal("Pass_" .. pass.key):Connect(redraw)
+	end
+	for _, attribute in ipairs({ "DoubleWoodUntil", "InstantDeliveries", "Cash" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
-			ShopUI.Refresh()
+			redraw()
 			refreshDelivery()
 		end)
 	end
@@ -240,6 +414,7 @@ function StoreUI.Start()
 			refreshDelivery()
 		end
 	end)
+	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
 return StoreUI

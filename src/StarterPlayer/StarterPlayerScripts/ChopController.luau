@@ -264,7 +264,7 @@ local function trySwing(fromClick: boolean)
 	faceTree(hrp, tree)
 	Net.Remote(if isNode(tree) then "MineNode" else "ChopTree"):FireServer(tree:GetAttribute("Uid"))
 	playSlash(tool)
-	SoundData.Play("Swing")
+	SoundData.Play(SoundData.SwingFor(tool:GetAttribute("AxeId")))
 end
 
 -- Outlines what you'd chop right now (see the header).

@@ -36,6 +36,12 @@ return function(t)
 			end
 		end
 		t.eq(forSale, 0, "nothing is for sale until a Creator Hub id is pasted in")
+		t.eq(StoreData.AnyForSale(), false)
+		t.eq(#StoreData.ListedPasses(), 0)
+		t.eq(#StoreData.ListedProducts(), 0)
+		t.eq(StoreData.Pass("LuxAxe").image, 0, "image slot left at 0")
+		t.eq(StoreData.Pass("DoubleCash").key, "DoubleCash")
+		t.eq(StoreData.Passes[1].key, "DoubleCash", "2x Cash stays first so its test id stays 101")
 	end)
 
 	t.test("set-up ids are unique", function()

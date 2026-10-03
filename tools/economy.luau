@@ -862,6 +862,27 @@ for _, biome in ipairs(BiomeData.All()) do
 end
 line()
 
+line("## Lux Axe (Robux)")
+line()
+line(
+	"Not on the cash ladder and not in the buying path above. A game pass (StoreData LuxAxe). Stats sit just above the Inferno Axe's main row and below the Starfall Axe. Wood whose final chop was this axe sells for "
+		.. string.format("%d%%", math.floor((GameConfig.LuxSellBonus - 1) * 100 + 0.5))
+		.. " more (GameConfig.LuxSellBonus), once, on the piece, before 2x Cash."
+)
+line()
+local lux = ItemCatalog.GetAxe("LuxAxe")
+local fire = ItemCatalog.GetAxe("InfernoAxe")
+local top = ItemCatalog.GetAxe("StarfallAxe")
+if lux and lux.v2 and fire and fire.v2 and top and top.v2 then
+	line("| Axe | v2 damage | range | cooldown | v1 damage |")
+	line("|---|---|---|---|---|")
+	for _, axe in ipairs({ fire, lux, top }) do
+		local v2 = axe.v2
+		line(string.format("| %s | %g | %g | %g | %d |", axe.displayName, v2.damage, v2.range, v2.cooldown, axe.damage))
+	end
+	line()
+end
+
 line("## Assumptions")
 line()
 local keys = {}

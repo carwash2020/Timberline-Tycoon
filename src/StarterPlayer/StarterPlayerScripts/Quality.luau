@@ -23,6 +23,32 @@ local Quality = {}
 local POLL_EVERY = 2 -- seconds
 
 local budget: QualityBudgets.Budget? = nil
+-- Settings override. nil (or "auto") follows the device.
+local override: QualityBudgets.Tier? = nil
+
+local function applyGlint(tier: string)
+	local rate = QualityBudgets.GlintRate(tier)
+	local function visit(root: Instance)
+		for _, d in ipairs(root:GetDescendants()) do
+			if d.Name == "Glint" and d:IsA("ParticleEmitter") then
+				d.Rate = rate
+				d.Enabled = rate > 0
+			end
+		end
+	end
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
+	if not player then
+		return
+	end
+	if player.Character then
+		visit(player.Character)
+	end
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	if backpack then
+		visit(backpack)
+	end
+end
 
 -- The player's saved graphics level by name ("Automatic", "QualityLevel3"),
 -- or nil if it can't be read.
@@ -45,7 +71,9 @@ end
 local function refresh(): QualityBudgets.Budget
 	local level = savedLevel()
 	local touch = touchOnly()
-	local now = QualityBudgets.For(QualityBudgets.TierFor(level, touch))
+	local tier = override or QualityBudgets.TierFor(level, touch)
+	local now = QualityBudgets.For(tier)
+	pcall(applyGlint, now.Tier)
 	if now ~= budget then
 		budget = now
 		print(
@@ -67,6 +95,16 @@ end
 
 function Quality.Tier(): QualityBudgets.Tier
 	return Quality.Budget().Tier
+end
+
+-- "auto" follows the device again. "low" | "medium" | "high" force that tier.
+function Quality.SetOverride(mode: string)
+	if mode == "low" or mode == "medium" or mode == "high" then
+		override = mode
+	else
+		override = nil
+	end
+	refresh()
 end
 
 function Quality.Start()

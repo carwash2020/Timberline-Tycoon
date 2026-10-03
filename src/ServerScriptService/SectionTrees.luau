@@ -921,7 +921,13 @@ end
 -- Section `sid` of a standing tree is cut through at `h`: everything above
 -- the cut is one loose piece; through a trunk section the tree is felled.
 -- Returns the piece and, for a felling, who it counts for.
-local function split(rec: TreeRecord, player: Player, sid: number, hit: WoodService.Hit): (WoodService.Piece, Player?)
+local function split(
+	rec: TreeRecord,
+	player: Player,
+	sid: number,
+	hit: WoodService.Hit,
+	luxSwing: boolean?
+): (WoodService.Piece, Player?)
 	local def = rec.def
 	local part = rec.sections[sid]
 	local depth = rec.depth[sid] or 0
@@ -1011,6 +1017,7 @@ local function split(rec: TreeRecord, player: Player, sid: number, hit: WoodServ
 		nextId = rec.nextId,
 		ownerId = ownerId,
 		boost = boost,
+		lux = luxSwing == true,
 		planterId = rec.planterId,
 		treeUid = rec.uid,
 		elder = rec.elder,
@@ -1048,7 +1055,8 @@ local function cutStanding(
 	sid: number,
 	hitPos: Vector3,
 	normal: Vector3,
-	damage: number
+	damage: number,
+	luxSwing: boolean?
 ): SwingResult
 	local part = rec.sections[sid]
 	local hit = WoodService.ApplyHit(rec, rec.def, part, sid, hitPos, normal, damage, player.UserId)
@@ -1068,7 +1076,7 @@ local function cutStanding(
 	})
 	local result: SwingResult = { tree = rec, piece = nil, hit = hit, freed = {}, feller = nil }
 	if hit.through then
-		local piece, feller = split(rec, player, sid, hit)
+		local piece, feller = split(rec, player, sid, hit, luxSwing)
 		table.insert(result.freed, piece)
 		result.feller = feller
 	end
@@ -1245,6 +1253,7 @@ function SectionTrees.Chop(
 		end
 	end
 	d.setSwingDue(player, math.max(now, due) + (cooldown or stats.cooldown))
+	local luxSwing = axe.id == GameConfig.LuxAxeId
 	local hook = SectionTrees.Hooks.onSwing
 	if hook then
 		task.spawn(hook, player, def.id)
@@ -1254,10 +1263,10 @@ function SectionTrees.Chop(
 			-- The first cut claims the tree; every hit of theirs keeps it.
 			setClaim(rec, { userId = player.UserId, at = now })
 		end
-		return true, nil, cutStanding(player, rec, sid, at, facing, damage)
+		return true, nil, cutStanding(player, rec, sid, at, facing, damage, luxSwing)
 	end
 	local cutPiece = p :: WoodService.Piece
-	local result = WoodService.CutPiece(player, cutPiece, target, at, facing, damage)
+	local result = WoodService.CutPiece(player, cutPiece, target, at, facing, damage, luxSwing)
 	return true,
 		nil,
 		{

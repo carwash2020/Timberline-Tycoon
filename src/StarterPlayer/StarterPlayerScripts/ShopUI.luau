@@ -53,6 +53,12 @@ type TrailerDef = ItemCatalog.TrailerDef
 local ShopUI = {}
 
 local player = Players.LocalPlayer
+local storeOpener: (() -> ())? = nil
+
+-- StoreUI sets this so the Lux Axe's "Robux" button opens the store.
+function ShopUI.SetStoreOpener(fn: () -> ())
+	storeOpener = fn
+end
 
 local C = UITheme.Colors
 local F = UITheme.Fonts
@@ -143,6 +149,16 @@ local AXES: Shop = {
 		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
 			table.insert(ids, axe.id)
 		end
+		local extra = {}
+		for _, axe in pairs(ItemCatalog.Axes) do
+			if axe.robux then
+				table.insert(extra, axe.id)
+			end
+		end
+		table.sort(extra)
+		for _, id in ipairs(extra) do
+			table.insert(ids, id)
+		end
 		return ids
 	end,
 	view = function(id: string): RowView
@@ -157,6 +173,8 @@ local AXES: Shop = {
 			button, state = priceButton(price, cash)
 		elseif status == "forged" then
 			button, state = "Forged", "forged"
+		elseif status == "robux" then
+			button, state = "Robux", "forged"
 		elseif status == "starter" then
 			button, state = "Starter", "starter"
 		elseif status == "full" then
@@ -178,7 +196,14 @@ local AXES: Shop = {
 			button = button,
 			state = state,
 			onClick = function()
-				if not ShopLogic.CanPurchase(status) then
+				if status == "robux" then
+					local openStore = storeOpener
+					if openStore then
+						openStore()
+					else
+						HUD.Toast(ShopLogic.WhyNot(status, axe, bestTier))
+					end
+				elseif not ShopLogic.CanPurchase(status) then
 					HUD.Toast(ShopLogic.WhyNot(status, axe, bestTier))
 				elseif cash < price then
 					needMore(price, cash, axe.displayName)

@@ -10,6 +10,7 @@ local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -72,6 +73,7 @@ export type SkyWood = {
 	f: string?,
 	p: boolean?,
 	b: number?,
+	l: boolean?, -- cut with the Lux Axe: +10% at sale
 }
 
 -- One loose piece of wood saved off your truck's beds (the v2 loop,
@@ -79,6 +81,7 @@ export type SkyWood = {
 -- DataStore; LeftLoad has the format, cleans it and caps the list at
 -- GameConfig.MaxSavedPieces pieces and MaxSavedSections sections:
 --   w wood id, k "log" | "plank", f figure id?, x boost? (2 = 2x Wood),
+--   l true when the Lux Axe cut it,
 --   bed "BedFloor" | "TrailerBed", at its place on that bed (x, y, z,
 --   rx, ry, rz), s its sections (size, place on the root, cut faces).
 export type TruckPiece = {
@@ -86,6 +89,7 @@ export type TruckPiece = {
 	k: string,
 	f: string?,
 	x: number?,
+	l: boolean?,
 	bed: string,
 	at: { number },
 	s: { { number } },
@@ -148,10 +152,17 @@ export type Profile = {
 	-- A returning player's short run of the v2 tutorial (MigrateV2 sets it
 	-- when the v1 tutorial was finished; QuestService clears it when done).
 	tutorialRefresher: boolean,
+	-- Set by Reset tutorial so a player who already owns a better axe is
+	-- not immediately marked "bypassed" the next time they join.
+	tutorialReplay: boolean,
 	seasonId: string,
 	daily: DailyState,
 	-- Robux (MonetizationService)
 	purchaseIds: { string }, -- recent developer product receipts already granted
+	-- Game passes already confirmed (MonetizationService). A backup for
+	-- UserOwnsGamePassAsync: once true, a failed ownership check on rejoin
+	-- does not take the pass away.
+	passes: { [string]: boolean },
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
 	instantDeliveries: number, -- Instant Delivery uses left
 	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
@@ -174,7 +185,7 @@ export type Profile = {
 	-- rides and when you leave; rebuilt on the bed when you rejoin (on the
 	-- ground where the truck stood if that wasn't in town). Unused by v1.
 	truckLoad: { TruckPiece },
-	settings: { music: boolean, sfx: boolean },
+	settings: SettingsLogic.Settings,
 	pendingCash: number, -- Robux cash that didn't fit under the wallet cap, paid out as room frees up
 }
 
@@ -209,9 +220,11 @@ local TEMPLATE: Profile = {
 	tutorialStep = 1,
 	tutorialProgress = 0,
 	tutorialRefresher = false,
+	tutorialReplay = false,
 	seasonId = "spring",
 	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
 	purchaseIds = {},
+	passes = {},
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
 	onboarding = {},
@@ -223,7 +236,7 @@ local TEMPLATE: Profile = {
 	truckLoad = {},
 	groundLoad = {},
 	sawmillStock = {},
-	settings = { music = true, sfx = true },
+	settings = SettingsLogic.Sanitize(nil),
 	pendingCash = 0,
 }
 ProfileSchema.Template = TEMPLATE
@@ -299,6 +312,14 @@ function ProfileSchema.Migrate(data: any)
 			local wood = WoodData.Get(entry)
 			data.skyBin[i] = { woodId = entry, value = if wood then wood.pricePerLog else 0 }
 		end
+	end
+	-- Reconcile fills a missing settings table, not keys added inside it.
+	data.settings = SettingsLogic.Sanitize(data.settings)
+	if type(data.passes) ~= "table" then
+		data.passes = {}
+	end
+	if data.tutorialReplay ~= true then
+		data.tutorialReplay = false
 	end
 end
 
