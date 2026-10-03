@@ -191,7 +191,11 @@ step("4. The town", function()
 
 	-- The sawmill, and the sell area in front of it.
 	step("4. The sawmill", function()
-		local sawmill = place(atomic(BuildingArt.Sawmill()), town.sawmill)
+		-- Persistent: the mill is the landmark you steer by from the biomes.
+		-- (Lookout towers, further out and numerous, use a StreamingMesh
+		-- instead — see the scenery step. The lighthouse is Persistent too.
+		-- Hearth & Home, the town hall, is Persistent with the other shops.)
+		local sawmill = place(persistent(BuildingArt.Sawmill()), town.sawmill)
 		local blade = sawmill:FindFirstChild("SawBlade", true)
 		if blade then
 			CollectionService:AddTag(blade, "SawBlade") -- TownFX spins it
@@ -305,6 +309,14 @@ step("4. The town", function()
 		end
 		for _, sign in ipairs(town.signs) do
 			place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe)
+		end
+		-- Saw-cut rounds on the shop paths (looks only). Not on the spawn
+		-- walk: that stretch stays open for the tutorial grove.
+		local rounds = Instance.new("Folder")
+		rounds.Name = "PathRounds"
+		rounds.Parent = map
+		for _, cf in ipairs(town.pathRounds) do
+			place(atomic(BuildingArt.PathRound()), cf, rounds)
 		end
 		do
 			local skyBiome = BiomeData.Get("sky")
@@ -503,6 +515,12 @@ step("5. The scenery", function()
 					Kit.decor(d) -- looks only: no clicks either
 				end
 			end
+		end
+		-- Lookout towers stay Atomic (they stream in whole when you're
+		-- close) and show a mesh impostor from across the map, so a phone
+		-- isn't holding every tower's parts.
+		if spot.kind == "LookoutTower" then
+			piece.LevelOfDetail = Enum.ModelLevelOfDetail.StreamingMesh
 		end
 		atomic(piece).Parent = folder
 	end

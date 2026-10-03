@@ -1032,6 +1032,8 @@ export type Town = {
 	props: { Placement },
 	signs: { Sign },
 	greenery: { Greenery }, -- ornamental: never choppable
+	-- Saw-cut rounds down the middle of each shop path (looks only).
+	pathRounds: { CFrame },
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
@@ -1158,6 +1160,8 @@ function WorldPlan.Town(): Town
 		{ "Lantern", lantern.X, lantern.Z, campYaw },
 		{ "Barrel", 34.5, 105 }, -- between the mill's lean-to and the Dealership
 		{ "Barrel", 34.5, 107.2 },
+		-- The grove gate's bell, west of the exit sign and the Forest Path.
+		{ "MillBell", -28, -16 },
 	}
 	local props: { Placement } = {}
 	for i, p in ipairs(propSpots) do
@@ -1237,7 +1241,28 @@ function WorldPlan.Town(): Town
 		-- pins the lighthouse).
 		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 67, 0, 40) },
 		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
+		-- The south exit, where the Forest Path leaves town for the Starter
+		-- Forest. West of the road (the lot is to the east), lit, and well
+		-- south of the spawn so the tutorial grove and Murph's cart can
+		-- still land there. The board faces the path.
+		{
+			text = "SAWMILL\nnorth, back to town\n\nFIRST GROVE\nsouth, down this road",
+			cframe = facing(-22, -16, -5, -16),
+			lit = true,
+		},
 	}
+
+	-- One round every few studs, on the shop paths and north of the street,
+	-- so a truck on the street never rolls over them. Not on the spawn walk.
+	local pathRounds: { CFrame } = {}
+	local function rounds(x: number)
+		for _, z in ipairs({ 86.5, 89.5, 92.2 }) do
+			table.insert(pathRounds, CFrame.new(x, 0, z))
+		end
+	end
+	rounds(-93.5) -- Hearth & Home
+	rounds(-57) -- Tool Shed
+	rounds(48) -- Dealership
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the
 	-- town (birch and maple round the edges, a pine band behind the mill
@@ -1378,6 +1403,7 @@ function WorldPlan.Town(): Town
 		props = props,
 		signs = signs,
 		greenery = greenery,
+		pathRounds = pathRounds,
 	}
 end
 

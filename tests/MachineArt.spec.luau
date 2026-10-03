@@ -51,8 +51,40 @@ return function(t)
 		MachineArt.SetCut(model, 1.2, 0.8)
 		t.eq(find(model, "CutReadout", "TextLabel").Text, "1.2 × 0.8 u")
 		t.ok(model:HasTag("Sawmill"), "the mill is tagged")
-		t.ok(find(model, "SawBlade"):HasTag("SawBlade"), "the blade spins with the town's")
-		t.ok(parts(model) <= 20, "a small model")
+		local blade = find(model, "SawBlade")
+		t.ok(blade:HasTag("SawBlade"), "the blade spins with the town's")
+		t.ok(not blade.CanCollide and not blade.CanTouch, "the blade is looks only")
+		local belt = find(model, "Conveyor")
+		t.ok(belt.CanCollide and belt.CollisionGroup == "MillBelt", "the belt carries logs")
+		t.ok(belt.CFrame.LookVector.Z > 0.9, "the belt runs toward the outfeed")
+		t.eq(belt.CanTouch, false)
+		MachineArt.AimBelt(model)
+		t.ok(math.abs(belt.AssemblyLinearVelocity.Z - 4) < 1e-3, "conveyor speed, out the front")
+		local walls, rails, guards = 0, 0, 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				if d.Name == "Wall" or d.Name == "GuardRail" or d.Name == "Deck" then
+					t.ok(d.CanCollide and d.CollisionGroup == "Default", d.Name .. " stops a log")
+					t.eq(d.CanTouch, false)
+					if d.Name == "Wall" then
+						walls += 1
+					elseif d.Name == "GuardRail" then
+						rails += 1
+					end
+				elseif d.Name == "FeedGuard" or d.Name == "BladeGuard" or d.Name == "Roof" then
+					t.ok(d.CanCollide and d.CollisionGroup == "Mill", d.Name .. " stops a player")
+					t.eq(d.CanTouch, false)
+					if d.Name ~= "Roof" then
+						t.eq(d.Transparency, 1, d.Name .. " is invisible")
+						guards += 1
+					end
+				end
+			end
+		end
+		t.eq(walls, 2, "a wall each side")
+		t.eq(rails, 2, "a rail each side of the belt")
+		t.eq(guards, 3, "two end guards and the blade guard")
+		t.ok(parts(model) <= 20, "a small model: " .. parts(model))
 		for _, mill in ipairs(Catalog.SawmillList()) do
 			local built = MachineArt.Build(mill.id, false)
 			t.ok(built and find(built, "Intake") and find(built, "Output"), mill.id)

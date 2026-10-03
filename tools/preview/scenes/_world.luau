@@ -311,6 +311,9 @@ function World.build(ctx, opts)
 	for _, g in ipairs(town.greenery) do
 		place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
 	end
+	for _, cf in ipairs(town.pathRounds) do
+		place(BuildingArt.PathRound(), cf)
+	end
 	for index, cf in ipairs(town.parkingSlots) do
 		local slot = Kit.part(
 			root,
