@@ -50,6 +50,14 @@ return function(t)
 						return players
 					end,
 				},
+				RunService = {
+					IsStudio = function()
+						return options.studio ~= false
+					end,
+					IsServer = function()
+						return true
+					end,
+				},
 			},
 			mocks = {
 				ForestService = {
@@ -95,7 +103,7 @@ return function(t)
 		t.ok(math.abs(attributes.WeatherIntensity - s.intensity) <= 0.005)
 	end)
 
-	t.test("a tester can force the weather", function()
+	t.test("a tester can force the weather in Studio", function()
 		local WeatherService, attributes = setup()
 		attributes.WeatherOverride = "Storm"
 		WeatherService.Step(1790000123)
@@ -104,6 +112,18 @@ return function(t)
 		attributes.WeatherOverride = "Hailstorm" -- not a weather: ignored
 		WeatherService.Step(1790000124)
 		t.ok(attributes.Weather ~= "Hailstorm")
+		local kind, level = WeatherService.Forced("Rain", 0.25, true)
+		t.eq(kind, "Rain")
+		t.eq(level, 0.25)
+		t.eq(WeatherService.Forced("Storm", 1, false), nil, "a live server ignores it")
+	end)
+
+	t.test("a live server ignores a weather override saved into the place", function()
+		local WeatherService, attributes = setup({ studio = false })
+		attributes.WeatherOverride = "Storm"
+		attributes.WeatherOverrideIntensity = 1
+		WeatherService.Step(1790000123)
+		t.ok(attributes.Weather ~= "Storm", attributes.Weather)
 	end)
 
 	t.test("strike points: near the player, on the ground, never in town or the plots", function()

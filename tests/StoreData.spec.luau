@@ -17,15 +17,32 @@ return function(t)
 		t.eq(StoreData.Pass("Nope"), nil)
 	end)
 
-	t.test("an id of 0 means not set up: never matches a receipt", function()
+	t.test("CreatorIds is the only id table, and 0 is not for sale", function()
+		t.eq(StoreData.IsForSale(0), false)
+		t.eq(StoreData.IsForSale(-1), false)
 		t.eq(StoreData.ProductById(0), nil)
+		t.eq(StoreData.PassById(0), nil)
+		local forSale = 0
+		for _, pass in ipairs(StoreData.Passes) do
+			t.eq(pass.id, StoreData.CreatorIds.Passes[pass.key], pass.key)
+			if StoreData.IsForSale(pass.id) then
+				forSale += 1
+			end
+		end
+		for _, product in ipairs(StoreData.Products) do
+			t.eq(product.id, StoreData.CreatorIds.Products[product.key], product.key)
+			if StoreData.IsForSale(product.id) then
+				forSale += 1
+			end
+		end
+		t.eq(forSale, 0, "nothing is for sale until a Creator Hub id is pasted in")
 	end)
 
 	t.test("set-up ids are unique", function()
 		local ids = {}
 		for _, list in ipairs({ StoreData.Passes, StoreData.Products }) do
 			for _, item in ipairs(list) do
-				if item.id ~= 0 then
+				if StoreData.IsForSale(item.id) then
 					t.ok(not ids[item.id], "id used twice: " .. item.id)
 					ids[item.id] = true
 				end

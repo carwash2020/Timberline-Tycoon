@@ -45,7 +45,11 @@ export type Report = {
 -- default.project.json's values (and Max Players from the launch plan).
 PlaceCheck.Expected = {
 	{ service = "Workspace", property = "StreamingEnabled", value = true },
-	{ service = "Workspace", property = "StreamingTargetRadius", value = 1024 },
+	-- 640, not 1024: one radius applies to every device, and 1024 streamed
+	-- most of the map onto phones. 128 is the bubble that must be loaded
+	-- before a player can move into it (PauseOutsideLoadedArea).
+	{ service = "Workspace", property = "StreamingTargetRadius", value = 640 },
+	{ service = "Workspace", property = "StreamingMinRadius", value = 128 },
 	{
 		service = "Workspace",
 		property = "StreamingIntegrityMode",
@@ -183,13 +187,22 @@ function PlaceCheck.Report(results: { Result }, dataStoreState: string?): Report
 	return { warnings = warnings, notes = notes, ok = #warnings == 0 }
 end
 
--- Studio-only override attributes left on Workspace (V2_PLAN.md §0):
--- CoreLoop and Tune_<key>. In Studio a reminder to clear them before
--- publishing; on a live server a note that they are ignored. Pure.
+-- Studio debug attributes. Saved into the place, they ship with a publish.
+-- Live servers ignore every one (CoreLoop, Tune_<key>, the clock, a forced
+-- weather, the test rainbow). In Studio a reminder to clear them before
+-- publishing; on a live server a note that this place still has them. Pure.
+local DEBUG_ATTRIBUTE: { [string]: boolean } = {
+	CoreLoop = true,
+	ClockOverride = true,
+	WeatherOverride = true,
+	WeatherOverrideIntensity = true,
+	RainbowTest = true,
+}
+
 function PlaceCheck.Overrides(attributes: { [string]: any }, isStudio: boolean): { string }
 	local found: { string } = {}
 	for name, value in pairs(attributes) do
-		if name == "CoreLoop" or string.sub(name, 1, 5) == "Tune_" then
+		if DEBUG_ATTRIBUTE[name] or string.sub(name, 1, 5) == "Tune_" then
 			table.insert(found, string.format("%s = %s", name, PlaceCheck.Show(value)))
 		end
 	end
