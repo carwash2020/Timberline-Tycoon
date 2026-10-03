@@ -793,7 +793,7 @@ local function applyAxeMeshes(model: Model, def: AxeDef): boolean
 		if not mesh then
 			return nil
 		end
-		MeshKit.Visual(mesh)
+		MeshKit.Visual(mesh, piece.meshId)
 		mesh.Parent = model
 		table.insert(made, mesh)
 		return mesh

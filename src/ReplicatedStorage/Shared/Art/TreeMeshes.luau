@@ -95,7 +95,7 @@ function TreeMeshes.Apply(model: Model, def: WoodDef, skel: Skeleton): boolean
 			destroyAll(made)
 			return false
 		end
-		MeshKit.Visual(mesh)
+		MeshKit.Visual(mesh, piece.meshId)
 		table.insert(made, mesh)
 		table.insert(visuals, { mesh = mesh, section = piece.section })
 	end

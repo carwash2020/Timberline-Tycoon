@@ -4,6 +4,11 @@
 -- asks AssetService. Both sit in a pcall. meshId 0, a failed load, or a
 -- test run with no override returns nil and the caller keeps its old parts.
 -- Tests set Override to hand back a MeshPart without the engine.
+--
+-- Each meshId is loaded once per server. Later uses clone that MeshPart.
+-- A failed id is remembered and not tried again; the caller keeps the
+-- part-built model. Collision is Box unless the caller passes Hull
+-- (a wheel, or any shape a box would misrepresent).
 
 local MeshKit = {}
 
@@ -11,15 +16,27 @@ export type OverrideFn = (meshId: number, name: string, size: Vector3) -> MeshPa
 
 MeshKit.Override = nil :: OverrideFn?
 
--- Looks-only: welded, no physics, and out of raycasts (TruckLoad, the sell
--- zone, the sawmill). WoodService.partsIn skips these.
-function MeshKit.Visual(part: BasePart)
+-- One loaded MeshPart per meshId, and ids that already failed.
+local masters: { [number]: MeshPart } = {}
+local failed: { [number]: boolean } = {}
+
+-- Lune has no AssetService. Remember that so every tree doesn't pay for the miss.
+local noAssetService = false
+
+-- Looks-only. Ticket I uses this same helper. CanCollide, CanTouch and
+-- CanQuery are off, and the part is Massless, so it stays out of raycasts
+-- (TruckLoad, the sell zone, the sawmill). WoodService.partsIn skips these.
+-- meshId is stored as text: a number attribute truncates ids this large.
+function MeshKit.Visual(part: BasePart, meshId: number)
 	part.Massless = true
 	part.CanCollide = false
 	part.CanTouch = false
 	part.CanQuery = false
 	part.CastShadow = true
 	part:SetAttribute("VisualMesh", true)
+	if type(meshId) == "number" and meshId == meshId and meshId ~= 0 then
+		part:SetAttribute("MeshId", tostring(meshId))
+	end
 end
 
 -- True when a part counts toward a gameplay budget (a section, a chassis).
@@ -33,7 +50,16 @@ function MeshKit.Fidelity(part: MeshPart, name: Enum.RenderFidelity)
 	end)
 end
 
-local function finish(part: MeshPart, name: string, size: Vector3): MeshPart
+-- Drops the load cache. Tests call this so one spec does not count as the server.
+function MeshKit.Reset()
+	for _, part in pairs(masters) do
+		part:Destroy()
+	end
+	table.clear(masters)
+	table.clear(failed)
+end
+
+local function finish(part: MeshPart, name: string, size: Vector3, collision: Enum.CollisionFidelity): MeshPart
 	part.Name = name
 	local native = part.Size
 	local pivot = part.PivotOffset
@@ -46,10 +72,13 @@ local function finish(part: MeshPart, name: string, size: Vector3): MeshPart
 			part:SetAttribute("MeshPivot", "authored")
 		end
 	end
+	pcall(function()
+		part.CollisionFidelity = collision
+	end)
 	return part
 end
 
-local function fromTemplate(meshId: number, name: string, size: Vector3): MeshPart?
+local function fromTemplate(meshId: number): MeshPart?
 	local ok, part = pcall(function(): MeshPart?
 		local storage = game:GetService("ReplicatedStorage")
 		local folder = storage:FindFirstChild("MeshTemplates")
@@ -62,7 +91,7 @@ local function fromTemplate(meshId: number, name: string, size: Vector3): MeshPa
 			clone:Destroy()
 			return nil
 		end
-		return finish(clone, name, size)
+		return clone
 	end)
 	if ok then
 		return part
@@ -70,70 +99,84 @@ local function fromTemplate(meshId: number, name: string, size: Vector3): MeshPa
 	return nil
 end
 
--- Lune has no AssetService. Remember that so every tree doesn't pay for the miss.
-local noAssetService = false
-
-local function fromAssetService(meshId: number, name: string, size: Vector3): MeshPart?
+local function fromAssetService(meshId: number, collision: Enum.CollisionFidelity): MeshPart?
 	if noAssetService then
 		return nil
 	end
-	local ok, part = pcall(function(): MeshPart?
-		local assetService = game:GetService("AssetService") :: any
-		local uri = "rbxassetid://" .. tostring(meshId)
-		local created: MeshPart? = nil
-		local function take(value: any): MeshPart?
-			if typeof(value) == "Instance" and value:IsA("MeshPart") then
-				return value
-			end
-			return nil
-		end
-		local firstOk, first = pcall(function()
-			return assetService:CreateMeshPartAsync((Content :: any).fromUri(uri))
-		end)
-		created = if firstOk then take(first) else nil
-		if not created then
-			local secondOk, second = pcall(function()
-				return assetService:CreateMeshPartAsync(uri)
-			end)
-			created = if secondOk then take(second) else nil
-		end
-		if not created then
-			return nil
-		end
-		return finish(created, name, size)
+	local okService, assetService = pcall(function()
+		return game:GetService("AssetService")
 	end)
-	if ok then
-		return part
+	if not okService or assetService == nil then
+		noAssetService = true
+		return nil
 	end
-	noAssetService = true
-	return nil
+	local uri = "rbxassetid://" .. tostring(meshId)
+	local options = {
+		CollisionFidelity = collision,
+		RenderFidelity = Enum.RenderFidelity.Automatic,
+	}
+	local function take(value: any): MeshPart?
+		if typeof(value) == "Instance" and value:IsA("MeshPart") then
+			return value
+		end
+		return nil
+	end
+	local firstOk, first = pcall(function()
+		return (assetService :: any):CreateMeshPartAsync((Content :: any).fromUri(uri), options)
+	end)
+	local created = if firstOk then take(first) else nil
+	if not created then
+		local secondOk, second = pcall(function()
+			return (assetService :: any):CreateMeshPartAsync(uri, collision, Enum.RenderFidelity.Automatic)
+		end)
+		created = if secondOk then take(second) else nil
+	end
+	return created
+end
+
+local function remember(meshId: number, part: MeshPart)
+	part.Name = "MeshCache"
+	masters[meshId] = part
 end
 
 -- A MeshPart named `name` at `size`, or nil. Never throws.
-function MeshKit.Create(meshId: number, name: string, size: Vector3): MeshPart?
+-- `collision` defaults to Box. Pass Hull for a shape a box would get wrong.
+function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: Enum.CollisionFidelity?): MeshPart?
 	if type(meshId) ~= "number" or meshId == 0 or meshId ~= meshId then
 		return nil
 	end
 	if size.X <= 0 or size.Y <= 0 or size.Z <= 0 then
 		return nil
 	end
+	if failed[meshId] then
+		return nil
+	end
+	local fidelity = collision or Enum.CollisionFidelity.Box
+	local master = masters[meshId]
+	if master then
+		return finish(master:Clone(), name, size, fidelity)
+	end
+
 	local override = MeshKit.Override
 	if override then
 		local ok, part = pcall(override, meshId, name, size)
 		if not ok or typeof(part) ~= "Instance" or not part:IsA("MeshPart") then
+			failed[meshId] = true
 			return nil
 		end
-		part.Name = name
-		part.Size = size
-		return part
+		remember(meshId, part)
+		return finish(part:Clone(), name, size, fidelity)
 	end
+
 	-- The engine's import pivot (CreateMeshPartAsync) beats a template,
 	-- which only has the mesh id. The template is the fallback.
-	local made = fromAssetService(meshId, name, size)
-	if made then
-		return made
+	local made = fromAssetService(meshId, fidelity) or fromTemplate(meshId)
+	if not made then
+		failed[meshId] = true
+		return nil
 	end
-	return fromTemplate(meshId, name, size)
+	remember(meshId, made)
+	return finish(made:Clone(), name, size, fidelity)
 end
 
 return MeshKit

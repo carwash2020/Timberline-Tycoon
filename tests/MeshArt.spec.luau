@@ -44,6 +44,7 @@ return function(t)
 	end
 
 	local function withMeshes(fn)
+		MeshKit.Reset()
 		MeshKit.Override = function(id, name, size)
 			local part = Instance.new("MeshPart")
 			part.Name = name
@@ -53,6 +54,7 @@ return function(t)
 		end
 		local ok, err = pcall(fn)
 		MeshKit.Override = nil
+		MeshKit.Reset()
 		if not ok then
 			error(err, 0)
 		end
@@ -212,6 +214,14 @@ return function(t)
 			for _, def in ipairs(ItemCatalog.TruckList()) do
 				local layout = TruckLayout.For(def)
 				local model = TruckArt.Build(def)
+				if VehicleModels.Truck(def.id) == nil then
+					t.eq(model:GetAttribute("VehicleMesh"), nil, def.id .. " has no uploaded mesh")
+					if def.classic == true then
+						t.ok(model:FindFirstChild("LoadGauge", true), "the Classic gauge stays")
+						t.ok(model:FindFirstChild("DoorPlate", true), "the Classic door plate stays")
+					end
+					continue
+				end
 				t.eq(model:GetAttribute("VehicleMesh"), true, def.id)
 				t.eq(model.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic)
 				t.ok(model:FindFirstChild("Chassis", true))
@@ -254,7 +264,7 @@ return function(t)
 			-- 15-part wish. Ranch (stakes and rails) is the heaviest, at 25.
 			for _, trailer in ipairs(ItemCatalog.TrailerList()) do
 				for _, def in ipairs(ItemCatalog.TruckList()) do
-					if def.bedCapacity == 0 then
+					if def.bedCapacity == 0 or VehicleModels.Truck(def.id) == nil then
 						continue
 					end
 					local model = TruckArt.Build(def, nil, trailer)
@@ -284,6 +294,7 @@ return function(t)
 	end)
 
 	t.test("V10: one failed vehicle mesh keeps the part-built truck", function()
+		MeshKit.Reset()
 		MeshKit.Override = function(id)
 			if id == VehicleModels.Truck("Pickup").Glass.meshId then
 				return nil
@@ -294,6 +305,7 @@ return function(t)
 		end
 		local model = TruckArt.Build(ItemCatalog.GetTruck("Pickup"))
 		MeshKit.Override = nil
+		MeshKit.Reset()
 		t.eq(model:GetAttribute("VehicleMesh"), nil)
 		t.eq(model:FindFirstChild("MeshBody", true), nil)
 		t.ok(model:FindFirstChild("BedFloor", true))
@@ -325,5 +337,70 @@ return function(t)
 		t.eq(string.find(source, "PointLight", 1, true), nil)
 		t.ok(string.find(source, "Pass_LuxAxe", 1, true))
 		t.eq(string.find(source, "MarketplaceService", 1, true), nil)
+	end)
+
+	t.test("one mesh id is loaded once and then cloned", function()
+		MeshKit.Reset()
+		local calls = 0
+		MeshKit.Override = function(id)
+			calls += 1
+			local part = Instance.new("MeshPart")
+			part:SetAttribute("MeshId", tostring(id))
+			return part
+		end
+		local a = MeshKit.Create(99, "One", Vector3.new(1, 2, 3))
+		local b = MeshKit.Create(99, "Two", Vector3.new(4, 5, 6))
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		t.eq(calls, 1)
+		t.ok(a ~= b, "each use is its own part")
+		t.eq(a.Name, "One")
+		t.eq(b.Name, "Two")
+		t.eq(a:GetAttribute("MeshId"), "99")
+		t.eq(b:GetAttribute("MeshId"), "99")
+		t.ok((a.Size - Vector3.new(1, 2, 3)).Magnitude < 1e-3)
+		t.ok((b.Size - Vector3.new(4, 5, 6)).Magnitude < 1e-3)
+	end)
+
+	t.test("a failed mesh is tried once per server, then the part model stays", function()
+		MeshKit.Reset()
+		local oakMesh = TreeModels.SectionMesh("oak", 1)
+		local calls = 0
+		MeshKit.Override = function(id, name, size)
+			if id == oakMesh then
+				calls += 1
+				return nil
+			end
+			local part = Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local def = WoodData.Get("oak")
+		local skel = TreeGen.Skeleton("oak", 3, 1)
+		local first = TreeArt.FromSkeleton(def, skel)
+		local second = TreeArt.FromSkeleton(def, skel)
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		t.eq(calls, 1, "the failed id is not loaded again")
+		t.eq(first:GetAttribute("TreeMesh"), nil, "the first tree keeps its blocks")
+		t.eq(second:GetAttribute("TreeMesh"), nil, "the next tree keeps its blocks too")
+		t.eq(#parts(first), TreeGen.PartCount(skel))
+		t.eq(#parts(second), TreeGen.PartCount(skel))
+	end)
+
+	t.test("MeshKit.Visual is the shared looks-only helper", function()
+		local part = Instance.new("Part")
+		part.CanCollide = true
+		part.CanTouch = true
+		part.CanQuery = true
+		part.Massless = false
+		MeshKit.Visual(part, 125228989315064)
+		t.eq(part.CanCollide, false)
+		t.eq(part.CanTouch, false)
+		t.eq(part.CanQuery, false)
+		t.eq(part.Massless, true)
+		t.eq(part:GetAttribute("VisualMesh"), true)
+		t.eq(part:GetAttribute("MeshId"), "125228989315064")
 	end)
 end

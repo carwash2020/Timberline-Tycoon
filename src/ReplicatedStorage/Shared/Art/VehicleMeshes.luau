@@ -166,13 +166,15 @@ local function addRole(
 		return false
 	end
 	local name = if role == "Wheel" then "Wheel" else "Mesh" .. role
-	local part = MeshKit.Create(piece.meshId, name, piece.size)
+	-- A tyre is round. Box collision would be a cube around it.
+	local collision = if role == "Wheel" then Enum.CollisionFidelity.Hull else Enum.CollisionFidelity.Box
+	local part = MeshKit.Create(piece.meshId, name, piece.size, collision)
 	if not part then
 		return false
 	end
 	fidelity(part, role)
 	if role ~= "Wheel" then
-		MeshKit.Visual(part)
+		MeshKit.Visual(part, piece.meshId)
 	end
 	table.insert(made, { part = part, role = role, trailer = trailer, wheel = wheel })
 	return true

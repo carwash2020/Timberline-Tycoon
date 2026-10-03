@@ -114,6 +114,7 @@ return function(t)
 				}, { __index = os }),
 			},
 		})
+		s.loader = loader
 		s.Trees = loader:server("SectionTrees")
 		s.Wood = loader:server("WoodService")
 		s.Grab = loader:server("GrabService")
@@ -810,5 +811,89 @@ return function(t)
 			end
 		end
 		t.ok(young > 0 and young < n / 2, "some young, most mature")
+	end)
+
+	-- TruckLoad locks from the section's box (CargoLock), never from mesh
+	-- triangles. A mesh that keeps that box fits and sells the same.
+	t.test("a meshed oak section fits the truck, sells the same, and one chop removes one section", function()
+		local plain = setup()
+		local plainRec = plain.tree("oak")
+		local leafId, plainLeaf = nil, nil
+		for sid, section in pairs(plainRec.sections) do
+			local node = plainRec.nodes[sid]
+			if node and #node.children == 0 then
+				leafId, plainLeaf = sid, section
+				break
+			end
+		end
+		t.ok(plainLeaf, "an oak has a tip section")
+
+		local meshed = setup()
+		local MeshKit = meshed.loader:load("ReplicatedStorage/Shared/Art/MeshKit")
+		MeshKit.Reset()
+		MeshKit.Override = function(id, name, size)
+			local part = Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			part:SetAttribute("MeshId", tostring(id))
+			return part
+		end
+		local rec = meshed.tree("oak")
+		MeshKit.Override = nil
+		local leaf = rec.sections[leafId]
+		t.ok(leaf:IsA("MeshPart"), "the section is the mesh")
+		t.ok((leaf.Size - plainLeaf.Size).Magnitude < 1e-3, "the mesh keeps the block's size")
+		t.eq(leaf.CanCollide, true)
+		t.eq(leaf.CanQuery, true)
+
+		local CargoLock = meshed.loader:shared("CargoLock")
+		local bedSize = Vector3.new(8, 1, 16)
+		local function lockOf(size)
+			-- Sitting on the bed, the pose TruckLoad's box test uses.
+			local rel = CFrame.new(0, bedSize.Y / 2 + size.Y / 2, 0)
+			local share = CargoLock.InsideShare(bedSize, rel, size)
+			local on = CargoLock.ContactsBed(bedSize, rel, size)
+			return share, CargoLock.MayLock(share, on, false)
+		end
+		local plainShare, plainLocks = lockOf(plainLeaf.Size)
+		local meshShare, meshLocks = lockOf(leaf.Size)
+		t.ok(math.abs(meshShare - plainShare) < 1e-6, "the same share of the bed")
+		t.eq(meshLocks, true, "the mesh section fits TruckLoad's lock")
+		t.eq(plainLocks, true)
+
+		local SellLogic = meshed.loader:shared("SellLogic")
+		local function sell(size)
+			local volume = meshed.SectionLogic.Volume(size.X, size.Y, size.Z)
+			return SellLogic.PieceValue("oak", "log", volume, nil, 1, false)
+		end
+		t.eq(sell(leaf.Size), sell(plainLeaf.Size))
+
+		local before = 0
+		for _ in pairs(rec.sections) do
+			before += 1
+		end
+		local player = meshed.player(1, leaf.CFrame.Position + Vector3.new(2.5, 0, 0))
+		local _, ok, why, result = meshed.cutThrough(player, leaf)
+		t.ok(ok, tostring(why))
+		t.eq(#result.freed, 1)
+		local freedSections = 0
+		for _, d in ipairs(result.freed[1].model:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Section" then
+				freedSections += 1
+			end
+		end
+		t.eq(freedSections, 1, "one oak chop removes one section")
+		local after = 0
+		for _ in pairs(rec.sections) do
+			after += 1
+		end
+		t.eq(after, before, "the stub stays and no other section leaves")
+
+		local plainPlayer = plain.player(1, plainLeaf.CFrame.Position + Vector3.new(2.5, 0, 0))
+		local _, plainOk, _, plainResult = plain.cutThrough(plainPlayer, plainLeaf)
+		t.ok(plainOk)
+		t.eq(result.freed[1].volume, plainResult.freed[1].volume)
+		t.eq(result.freed[1].value, plainResult.freed[1].value)
+		MeshKit.Reset()
 	end)
 end
