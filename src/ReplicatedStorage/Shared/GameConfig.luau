@@ -153,16 +153,18 @@ local GameConfig = {
 	MaxLogicPerPlot = 200,
 
 	-- The Lux Axe (a Robux pass, StoreData.Passes.LuxAxe). Its stats live in
-	-- ItemCatalog; this is the sell bonus on wood whose final chop was it.
+	-- ItemCatalog. LuxSellBonus is the sell bonus on wood a Lux swing tags.
+	-- Any Lux swing tags the piece (SellLogic.InheritLux), and the tag
+	-- carries onto pieces cut from it. It is not only the final chop.
 	LuxAxeId = "LuxAxe",
-	LuxSellBonus = 1.1, -- 10% more at the pad, once, on the piece's value
+	LuxSellBonus = 1.1, -- 10% more at the pad, once, on the piece's value, before 2x Cash
 }
 
--- "Logs you cut sell for 10% more." Tracks LuxSellBonus, so a tune changes
--- the tooltip with it.
+-- "Wood you cut with it sells for 10% more." Tracks LuxSellBonus, so a tune
+-- changes the tooltip with it. At 1.1 this is the Lux Axe pass description.
 function GameConfig.LuxPerkLine(): string
 	local pct = math.floor((GameConfig.LuxSellBonus - 1) * 100 + 0.5)
-	return string.format("Logs you cut sell for %d%% more.", pct)
+	return string.format("Wood you cut with it sells for %d%% more.", pct)
 end
 
 return GameConfig

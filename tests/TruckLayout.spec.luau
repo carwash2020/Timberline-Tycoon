@@ -213,8 +213,12 @@ return function(t)
 		local styles = {}
 		for id, truck in pairs(ItemCatalog.Trucks) do
 			local style = TruckLayout.For(truck).style
-			t.ok(not styles[style], id .. " shares a style with " .. tostring(styles[style]))
-			styles[style] = id
+			if truck.classic == true then
+				t.eq(style, "pickup", id .. " uses the Pickup's body")
+			else
+				t.ok(not styles[style], id .. " shares a style with " .. tostring(styles[style]))
+				styles[style] = id
+			end
 		end
 		t.eq(TruckLayout.StyleOf({ id = "Mystery", look = { bedLength = 0, bedWalls = false } }), "atv")
 		t.eq(TruckLayout.StyleOf({ id = "Mystery", look = { bedLength = 20, bedWalls = false } }), "rig")
@@ -309,7 +313,14 @@ return function(t)
 			t.ok(pivot < layout.length / 2, id .. " under the truck")
 		end
 		-- The long beds (12+ studs) are the tandem ones.
-		t.eq(axles, { Rustbucket = 2, Pickup = 2, ScoutATV = 2, Flatbed = 3, LoggingRig = 3 })
+		t.eq(axles, {
+			Rustbucket = 2,
+			Pickup = 2,
+			ScoutATV = 2,
+			Flatbed = 3,
+			LoggingRig = 3,
+			TimberClassic = 2,
+		})
 		local rig = TruckLayout.For(ItemCatalog.GetTruck("LoggingRig"))
 		t.ok(math.abs(TruckLayout.DriveAxleZ(rig) - 11.15 * 1.3) < 1e-9, "the Logging Rig's tandem middle")
 	end)

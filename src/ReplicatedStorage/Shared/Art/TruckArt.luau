@@ -45,6 +45,11 @@
 --   * Build leaves every part anchored (previews, tests); Rig makes it one
 --     rigid body: the chassis anchored, the rest unanchored, massless and
 --     welded (WeldConstraint) or motored to it.
+--   * Timber Classic (def.classic), added after the body is organized:
+--     two DoorPlate parts, each with a BillboardGui "DoorTag" and a
+--     TextLabel "DoorName" (MaxDistance 60, TextScaled, wrapped), and a
+--     LoadGauge on the dash (SurfaceGui "GaugeGui", Enabled false, TextLabel
+--     "Readout"). The gauge is in the world, not a screen HUD.
 --
 -- Sizes (M1.5, V2_PLAN §4c): each body is drawn round its layout (width,
 -- cab, bed, wheels, the walls' height), and each cab round a seated driver
@@ -57,6 +62,7 @@
 -- look; the chassis, the skids, the BedZones and the LoadPoint are added
 -- at full size after. A seated driver sits higher and has more room.
 
+local ClassicGauge = require(script.Parent.Parent.ClassicGauge)
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
@@ -72,6 +78,11 @@ type WoodDef = WoodData.WoodDef
 type Rng = Kit.Rng
 
 local TruckArt = {}
+
+export type BuildExtras = {
+	paint: string?, -- a Paint Shop hex; otherwise the catalog color
+	doorName: string?, -- Timber Classic: the owner's display name
+}
 
 local V3 = Vector3.new
 local CF = CFrame.new
@@ -1439,20 +1450,103 @@ local sanitize: (Model) -> ()
 local parkTrailer: (Model) -> ()
 local organize: (Model) -> ()
 
+-- The owner's name on both doors, readable out to 60 studs, and the
+-- dashboard estimate. Added after organize so these stay direct children.
+-- TODO: a horn, once there is an original sound for it. Not on the pass.
+local function addClassic(model: Model, doorName: string?)
+	local cab = model:FindFirstChild("Cab", true)
+	if not cab or not cab:IsA("BasePart") then
+		return
+	end
+	local text = if type(doorName) == "string" then doorName else ""
+	local cf, size = cab.CFrame, cab.Size
+	local plateSize = Vector3.new(0.05, math.clamp(size.Y * 0.42, 0.8, 1.6), math.clamp(size.Z * 0.5, 1, 2.4))
+	for _, side in ipairs({ -1, 1 }) do
+		local plate = Kit.part(
+			model,
+			"DoorPlate",
+			plateSize,
+			cf * CFrame.new(side * (size.X / 2 - 0.04), 0, 0),
+			Color3.fromRGB(28, 26, 24),
+			Enum.Material.SmoothPlastic
+		)
+		Kit.decor(plate, false)
+		local tag = Instance.new("BillboardGui")
+		tag.Name = "DoorTag"
+		tag.Size = UDim2.fromOffset(180, 48)
+		tag.StudsOffset = Vector3.zero
+		tag.MaxDistance = 60
+		tag.LightInfluence = 0
+		tag.ClipsDescendants = true
+		tag.AlwaysOnTop = false
+		tag.Parent = plate
+		local label = Instance.new("TextLabel")
+		label.Name = "DoorName"
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.GothamBold
+		label.TextScaled = true
+		label.TextWrapped = true
+		label.TextColor3 = Color3.fromRGB(245, 235, 215)
+		label.Text = text
+		label.Parent = tag
+	end
+	-- In front of the driver (truck front is -Z). The face they see is +Z.
+	local gauge = Kit.part(
+		model,
+		"LoadGauge",
+		Vector3.new(1.4, 0.55, 0.06),
+		cf * CFrame.new(0, size.Y * 0.12, -size.Z * 0.28),
+		Color3.fromRGB(20, 22, 26),
+		Enum.Material.SmoothPlastic
+	)
+	Kit.decor(gauge, false)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "GaugeGui"
+	gui.Face = Enum.NormalId.Back
+	gui.Enabled = false
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 50
+	gui.LightInfluence = 0
+	gui.ClipsDescendants = true
+	gui.Parent = gauge
+	local readout = Instance.new("TextLabel")
+	readout.Name = "Readout"
+	readout.BackgroundTransparency = 1
+	readout.Size = UDim2.fromScale(1, 1)
+	readout.Font = Enum.Font.GothamBold
+	readout.TextScaled = true
+	readout.TextWrapped = true
+	readout.TextColor3 = Color3.fromRGB(120, 220, 140)
+	readout.Text = ""
+	readout.Parent = gui
+	ClassicGauge.Apply(model, 0)
+end
+
 -- A truck (and its trailer, when given) at the origin, ground y = 0, front
 -- -Z. Every part is anchored; Rig turns it into one rigid body.
-function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, trailerLayout: TrailerLayout?): Model
+function TruckArt.Build(
+	def: TruckDef,
+	layout: Layout?,
+	trailer: TrailerDef?,
+	trailerLayout: TrailerLayout?,
+	extras: BuildExtras?
+): Model
 	local lay = layout or TruckLayout.For(def)
 	local model = Instance.new("Model")
 	model.Name = def.id
 
 	-- The body, drawn in M1.5's units round the layout shrunk by S, grown.
 	local build = builders[lay.style] or builders.flatbed
+	local paint = hex(def.look.color)
+	if extras and type(extras.paint) == "string" then
+		paint = hex(extras.paint)
+	end
 	build({
 		model = model,
 		def = def,
 		lay = designOf(lay),
-		paint = hex(def.look.color),
+		paint = paint,
 		rng = Kit.rng(seedOf(def.id)),
 	})
 	grow(model)
@@ -1497,6 +1591,9 @@ function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, tr
 	sanitize(model)
 	parkTrailer(model)
 	organize(model)
+	if def.classic == true then
+		addClassic(model, if extras then extras.doorName else nil)
+	end
 	return model
 end
 

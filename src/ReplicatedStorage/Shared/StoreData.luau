@@ -10,23 +10,27 @@
 
 local StoreData = {}
 
-export type PassKey = "DoubleCash" | "LuxAxe"
+export type PassKey = "DoubleCash" | "LuxAxe" | "TowService" | "TimberClassic" | "PaintShop"
 export type ProductKey = "Cash1k" | "Cash10k" | "DoubleWood" | "InstantDelivery"
 
--- The only place a Creator Hub id is written. Fill these in when the pass
--- or product exists; leave 0 until then.
--- PASTE each id from Creator Hub. 0 = not for sale (button hidden, server
--- refuses). image is a decal asset id for the card; 0 draws a placeholder.
+-- The only place a Creator Hub id is written. 0 means that button stays
+-- hidden and the server refuses the purchase. Cash packs are developer
+-- products (ProcessReceipt), never game passes. image is a decal asset id
+-- for the card; 0 draws a placeholder.
+-- Universe 10768809532.
 StoreData.CreatorIds = {
 	Passes = {
-		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
-		LuxAxe = 2005226878, -- PASTE: Monetization → Passes → Lux Axe → ID
+		DoubleCash = 2005256811, -- 2x Cash, on sale
+		LuxAxe = 2005226878, -- Lux Axe
+		TowService = 2006186967, -- Tow Service, 99 R$
+		TimberClassic = 2006912886, -- Timber Classic, 349 R$
+		PaintShop = 2006456926, -- Paint Shop, 249 R$
 	},
 	Products = {
-		Cash1k = 3716312861, -- PASTE: Monetization → Developer Products → $1,000 → ID
-		Cash10k = 3716312899, -- PASTE: Monetization → Developer Products → $10,000 → ID
-		DoubleWood = 0, -- PASTE: Monetization → Developer Products → 2x Wood → ID
-		InstantDelivery = 0, -- PASTE: Monetization → Developer Products → Instant Delivery → ID
+		Cash1k = 3716312861, -- $1,000, 49 R$
+		Cash10k = 3716312899, -- $10,000, 299 R$
+		DoubleWood = 0, -- no product yet: button hidden
+		InstantDelivery = 0, -- no product yet: button hidden
 	},
 }
 
@@ -62,6 +66,27 @@ StoreData.Passes = {
 		image = 0, -- PASTE decal id
 		name = "Lux Axe",
 		description = "A black axe with a gold head, a diamond edge, and a sparkle. It sits between the Inferno Axe and the Starfall Axe, and the Starfall Axe can still be bought with cash. Wood you cut with it sells for 10% more. It's yours to keep and can't be sold.",
+	},
+	{
+		key = "TowService",
+		id = StoreData.CreatorIds.Passes.TowService,
+		image = 91282142796474,
+		name = "Tow Service",
+		description = "Free recalls for every truck you own. Without this pass, a recall costs 2% of the truck's price, with a $2 minimum.",
+	},
+	{
+		key = "TimberClassic",
+		id = StoreData.CreatorIds.Passes.TimberClassic,
+		image = 79037897236948,
+		name = "Timber Classic",
+		description = "Unlocks the Timber Classic, an old-school pickup with the same stats as the Pickup. Its dashboard gauge shows what your load is worth, as an estimate at the Wood Dropoff. Your display name is painted on both doors.",
+	},
+	{
+		key = "PaintShop",
+		id = StoreData.CreatorIds.Passes.PaintShop,
+		image = 71028498113750,
+		name = "Paint Shop",
+		description = "Paint your trucks in any color from the Paint Shop palette. Paint is cosmetic only and stays on after you rejoin.",
 	},
 } :: { Pass }
 

@@ -36,6 +36,7 @@ local LeaveCommit = require(script.Parent.LeaveCommit)
 local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
+local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
 local PickupGrace = require(script.Parent.PickupGrace)
@@ -674,8 +675,17 @@ safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem
 safely("MonetizationService.SetPassListener", MonetizationService.SetPassListener, function(player: Player, key: string)
 	if key == GameConfig.LuxAxeId then
 		AxeService.Ensure(player, GameConfig.LuxAxeId)
+	elseif key == "TimberClassic" then
+		ShopService.GrantPassTruck(player)
 	end
 end)
+VehicleService.Hooks.freeRecall = function(player: Player): boolean
+	return MonetizationService.HasPass(player, "TowService")
+end
+VehicleService.Hooks.saleMultiplier = function(player: Player): number
+	return MonetizationService.SaleMultiplier(player)
+end
+safely("PaintService.Init", PaintService.Init, remote.PaintTruck, notify)
 safely("FieldGuideService.Init", FieldGuideService.Init, notify)
 safely("NodeService.Init", NodeService.Init, notify)
 safely("AetherService.Init", AetherService.Init, notify)
@@ -847,6 +857,9 @@ if CoreLoop.V2() then
 	end
 	-- A piece of yours came to rest on your own bed: the tutorial's "load"
 	-- step (TutorialData.StepsV2) and the funnel.
+	TruckLoad.Hooks.saleMultiplier = function(player: Player): number
+		return MonetizationService.SaleMultiplier(player)
+	end
 	TruckLoad.Hooks.onLoaded = function(player: Player)
 		MilestoneService.Mark(player, "First log loaded")
 		QuestService.Event(player, "woodLoaded")
@@ -1260,6 +1273,7 @@ local function onPlayerRemoving(player: Player)
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
+	safely("PaintService.PlayerRemoving", PaintService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)

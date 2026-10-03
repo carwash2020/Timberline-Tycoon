@@ -115,7 +115,7 @@ local function card(
 	local row = Instance.new("Frame")
 	row.Name = name
 	row.BackgroundColor3 = C.Cream
-	row.Size = UDim2.new(1, -8, 0, 108)
+	row.Size = UDim2.new(1, -8, 0, 188)
 	row.BorderSizePixel = 0
 	UITheme.corner(row, 10)
 	UITheme.stroke(row, C.Bark, 2)
@@ -123,7 +123,7 @@ local function card(
 	art.Name = "Image"
 	art.BackgroundColor3 = ROBUX_GREEN
 	art.Size = UDim2.fromOffset(72, 72)
-	art.Position = UDim2.fromOffset(10, 18)
+	art.Position = UDim2.fromOffset(10, 58)
 	art.BorderSizePixel = 0
 	art.ScaleType = Enum.ScaleType.Fit
 	if imageId > 0 then
@@ -146,8 +146,8 @@ local function card(
 	title.Size = UDim2.new(1, -180, 0, 22)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	local body = UITheme.label(row, detail, F.Body, 13, C.Bark)
-	body.Position = UDim2.fromOffset(92, 30)
-	body.Size = UDim2.new(1, -180, 0, 70)
+	body.Position = UDim2.fromOffset(92, 32)
+	body.Size = UDim2.new(1, -180, 0, 148)
 	body.TextWrapped = true
 	body.TextXAlignment = Enum.TextXAlignment.Left
 	body.TextYAlignment = Enum.TextYAlignment.Top

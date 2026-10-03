@@ -38,6 +38,7 @@ Net.RemoteNames = {
 	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...
 	"SlotAction", -- client -> server: ("load" | "reset", index, confirm)
 	"SlotState", -- server -> client: (summary) the three slots
+	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
 }
 
 local folder: Folder? = nil

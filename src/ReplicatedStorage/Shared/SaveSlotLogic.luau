@@ -39,6 +39,37 @@ local ACCOUNT: { [string]: boolean } = {
 -- Axes a Robux pass grants. They come back after a reset, on every slot.
 local ACCOUNT_AXE: { [string]: boolean } = { LuxAxe = true }
 
+-- The Timber Classic pass truck. Granted onto every slot, including a new
+-- game, and ignored by the fresh-game check so it doesn't count as play.
+SaveSlotLogic.PassTruckId = "TimberClassic"
+
+local function isPassTruck(id: string): boolean
+	local truck = ItemCatalog.GetTruck(id)
+	return truck ~= nil and truck.robux == true
+end
+
+local function passTruckIds(list: any): { string }
+	local kept: { string } = {}
+	if type(list) ~= "table" then
+		return kept
+	end
+	for _, id in ipairs(list) do
+		if type(id) == "string" and isPassTruck(id) then
+			table.insert(kept, id)
+		end
+	end
+	return kept
+end
+
+-- Drops cash trucks and leaves a pass truck in place.
+local function clearGameplayTrucks(record: any)
+	local kept = passTruckIds(record.ownedTrucks)
+	record.ownedTrucks = kept
+	if not (type(record.equippedTruck) == "string" and table.find(kept, record.equippedTruck) ~= nil) then
+		record.equippedTruck = if kept[1] ~= nil then kept[1] else ""
+	end
+end
+
 export type Summary = {
 	index: number,
 	fresh: boolean,
@@ -176,7 +207,16 @@ function SaveSlotLogic.HasCargo(data: any): boolean
 end
 
 function SaveSlotLogic.HasTruck(data: any): boolean
-	return type(data) == "table" and type(data.ownedTrucks) == "table" and #data.ownedTrucks > 0
+	if type(data) ~= "table" or type(data.ownedTrucks) ~= "table" then
+		return false
+	end
+	for _, id in ipairs(data.ownedTrucks) do
+		-- A pass truck doesn't make a new game look played.
+		if type(id) == "string" and not isPassTruck(id) then
+			return true
+		end
+	end
+	return false
 end
 
 -- A profile or slot that was never played: no truck, no cargo, no progress.
@@ -216,8 +256,7 @@ function SaveSlotLogic.GrantStarterTruck(record: any, fresh: boolean): boolean
 		return false
 	end
 	if fresh == true then
-		record.ownedTrucks = {}
-		record.equippedTruck = ""
+		clearGameplayTrucks(record)
 		record.starterTruckGranted = true
 		return false
 	end
@@ -225,14 +264,15 @@ function SaveSlotLogic.GrantStarterTruck(record: any, fresh: boolean): boolean
 		return false
 	end
 	if SaveSlotLogic.IsFreshGame(record) then
-		record.ownedTrucks = {}
-		record.equippedTruck = ""
+		clearGameplayTrucks(record)
 		record.starterTruckGranted = true
 		return false
 	end
 	local added = false
 	if not SaveSlotLogic.HasTruck(record) then
-		record.ownedTrucks = { "Rustbucket" }
+		local kept = passTruckIds(record.ownedTrucks)
+		table.insert(kept, 1, "Rustbucket")
+		record.ownedTrucks = kept
 		record.equippedTruck = "Rustbucket"
 		added = true
 	else
@@ -240,6 +280,50 @@ function SaveSlotLogic.GrantStarterTruck(record: any, fresh: boolean): boolean
 	end
 	record.starterTruckGranted = true
 	return added
+end
+
+-- Adds the Timber Classic to one record. Doesn't replace a truck they
+-- already drive. Returns whether it was missing.
+function SaveSlotLogic.GrantPassTruck(record: any): boolean
+	if type(record) ~= "table" then
+		return false
+	end
+	local id = SaveSlotLogic.PassTruckId
+	if not ItemCatalog.GetTruck(id) then
+		return false
+	end
+	if type(record.ownedTrucks) ~= "table" then
+		record.ownedTrucks = {}
+	end
+	local added = false
+	if not table.find(record.ownedTrucks, id) then
+		table.insert(record.ownedTrucks, id)
+		added = true
+	end
+	local equipped = record.equippedTruck
+	local ownsEquipped = type(equipped) == "string"
+		and equipped ~= ""
+		and table.find(record.ownedTrucks, equipped) ~= nil
+	if not ownsEquipped then
+		record.equippedTruck = id
+	end
+	return added
+end
+
+-- The live profile and every slot, so a new game shows the Classic too.
+function SaveSlotLogic.GrantPassTrucks(data: any)
+	SaveSlotLogic.GrantPassTruck(data)
+	if type(data.slots) == "table" then
+		for _, slot in ipairs(data.slots) do
+			SaveSlotLogic.GrantPassTruck(slot)
+		end
+	end
+end
+
+local function grantOwnedPassTruck(data: any)
+	if type(data.passes) == "table" and data.passes[SaveSlotLogic.PassTruckId] == true then
+		SaveSlotLogic.GrantPassTrucks(data)
+	end
 end
 
 -- The live profile and every snapshot in `slots`, including the active one.
@@ -345,6 +429,7 @@ function SaveSlotLogic.Migrate(data: any, defaults: any, guid: () -> string, now
 	-- Played slots (fresh == false) get one starter truck, once. A second
 	-- load sees the flag and adds nothing. Cargo stays on the slot.
 	SaveSlotLogic.GrantStarterTrucks(data)
+	grantOwnedPassTruck(data)
 	data.slots[active] = capture(data, now)
 	SaveSlotLogic.SyncAccountAxes(data, guid)
 end
@@ -409,6 +494,7 @@ function SaveSlotLogic.Perform(
 		apply(data, blank, defaults)
 		world.setCash(wallet(blank))
 		SaveSlotLogic.SyncAccountAxes(data, guid)
+		grantOwnedPassTruck(data)
 		data.slots[data.activeSlot] = capture(data, now)
 	else
 		data.slots[data.activeSlot] = capture(data, now)
@@ -422,6 +508,7 @@ function SaveSlotLogic.Perform(
 		world.setCash(wallet(slot))
 		data.activeSlot = index
 		SaveSlotLogic.SyncAccountAxes(data, guid)
+		grantOwnedPassTruck(data)
 		data.slots[index] = capture(data, now)
 	end
 	data.slotCooldownUntil = now + SaveSlotLogic.Cooldown

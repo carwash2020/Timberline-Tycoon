@@ -304,6 +304,8 @@ return function(t)
 				ScoutATV = 40,
 				Flatbed = 90,
 				LoggingRig = 120,
+				-- Pickup body, plus two door plates and the dash gauge.
+				TimberClassic = 76,
 			}
 			local function trailerPart(part)
 				local node = part
@@ -584,8 +586,15 @@ return function(t)
 	-- the roofs, not from sinking the seats (ACT-04). Each roof's underside
 	-- stands at least HEADROOM over its seat (a hat clears, the bigger the
 	-- truck the more room). The Rustbucket and the Scout are open.
-	local SEAT_TOP = { Rustbucket = 3.835, Pickup = 3.38, ScoutATV = 4.55, Flatbed = 3.64, LoggingRig = 4.81 }
-	local HEADROOM = { Pickup = 6.0, Flatbed = 6.3, LoggingRig = 6.5 }
+	local SEAT_TOP = {
+		Rustbucket = 3.835,
+		Pickup = 3.38,
+		ScoutATV = 4.55,
+		Flatbed = 3.64,
+		LoggingRig = 4.81,
+		TimberClassic = 3.38,
+	}
+	local HEADROOM = { Pickup = 6.0, Flatbed = 6.3, LoggingRig = 6.5, TimberClassic = 6.0 }
 	local ROOFED = { pickup = true, flatbed = true, rig = true }
 
 	t.test("seats stay put; a roofed cab has 6 to 6.5 studs over the seat", function()

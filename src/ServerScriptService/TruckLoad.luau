@@ -74,6 +74,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CargoLock = require(ReplicatedStorage.Shared.CargoLock)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
@@ -105,6 +106,8 @@ export type SavedPiece = LeftLoad.Piece
 -- Tutorial, daily and milestone events (GameServer wires them).
 export type Hooks = {
 	onLoaded: ((Player, Piece, number) -> ())?,
+	-- 2x Cash for the Classic gauge (GameServer). 1 when unset.
+	saleMultiplier: ((Player) -> number)?,
 }
 TruckLoad.Hooks = {} :: Hooks
 
@@ -786,6 +789,26 @@ local function publish(t: Truck)
 			end
 			t.owner:SetAttribute(name, n)
 		end
+	end
+	-- Welded pieces stay in `riding`, so this total includes them. The v1
+	-- bed's worth is a separate attribute; the gauge adds the two, then
+	-- 2x Cash once.
+	if t.model.Parent and t.model:FindFirstChild("LoadGauge", true) then
+		t.model:SetAttribute("LooseValue", value)
+		local pieces = { value }
+		local bedWorth = t.model:GetAttribute("V1BedValue")
+		if type(bedWorth) == "number" then
+			table.insert(pieces, bedWorth)
+		end
+		local mult = 1
+		local sale = TruckLoad.Hooks.saleMultiplier
+		if sale then
+			local n = sale(t.owner)
+			if type(n) == "number" then
+				mult = n
+			end
+		end
+		ClassicGauge.Apply(t.model, ClassicGauge.Estimate(pieces, mult))
 	end
 end
 

@@ -140,7 +140,7 @@ Per tree: 1.40 Heartseeds on average (1, +1 for a large tree, +1 on a 15% roll).
 ## Assumptions
 
 - Swing every 0.8 s; carry 2 logs by hand (GameConfig).
-- Walk 16 studs/s; trucks drive at their top speed (Rustbucket 26, Pickup 30, Scout ATV 40, Flatbed 26, Logging Rig 24 studs/s); boats 26 studs/s.
+- Walk 16 studs/s; trucks drive at their top speed (Rustbucket 26, Timber Classic 30, Pickup 30, Scout ATV 40, Flatbed 26, Logging Rig 24 studs/s); boats 26 studs/s.
 - One-way haul to the sawmill in studs, from BiomeData: Starter Forest 190 (truck), The Hills 400 (truck), Snowfields 1200 (truck), The Volcano 1600 (truck), The Island 900 (boat), Gloam Hollow 800 (truck).
 - Aether Isles: gondola 40 s each way ($250 a ride), logs carried 30 studs to the Cloud Chute, Sky Bin holds 30.
 - Forged axes cost their cash plus the logs and materials given up (at sell value), plus 1 min per Sky Shard to mine.

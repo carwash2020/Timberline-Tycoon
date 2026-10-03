@@ -139,10 +139,11 @@ local STYLE_FOR: { [string]: Style } = {
 	ScoutATV = "atv",
 	Flatbed = "flatbed",
 	LoggingRig = "rig",
+	TimberClassic = "pickup",
 }
 
--- A truck's body style: its own for the five trucks, else guessed from the
--- look, so a new ItemCatalog truck still builds.
+-- A truck's body style: its own for each catalog truck, else guessed from
+-- the look, so a new ItemCatalog truck still builds.
 function TruckLayout.StyleOf(def: TruckDef): Style
 	local style = STYLE_FOR[def.id]
 	if style then

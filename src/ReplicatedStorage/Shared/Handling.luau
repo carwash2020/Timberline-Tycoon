@@ -65,6 +65,11 @@ local PROFILES: { [string]: Profile } = {
 }
 
 function Handling.For(truckId: string?): Profile
+	-- The Timber Classic is the Pickup's body and feel. A pass truck must
+	-- not climb, turn or accelerate past the tier it copies.
+	if truckId == "TimberClassic" then
+		return PROFILES.Pickup
+	end
 	return PROFILES[truckId or ""] or PROFILES.Rustbucket
 end
 
