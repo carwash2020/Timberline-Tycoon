@@ -757,6 +757,7 @@ if CoreLoop.V2() then
 		saleMultiplier = MonetizationService.SaleMultiplier,
 		notify = notify,
 		release = function(model: Model)
+			TruckLoad.ReleaseWeld(model) -- the weld goes before the piece is sold
 			GrabService.ReleasePiece(model, "sold")
 		end,
 		forget = function(model: Model)
@@ -836,6 +837,9 @@ if CoreLoop.V2() then
 	VehicleService.Hooks.onDriverChanged = TruckLoad.OnDriverChanged
 	VehicleService.Hooks.onRebuild = TruckLoad.OnRebuild
 	VehicleService.Hooks.loadCount = TruckLoad.LoadCount
+	VehicleService.Hooks.onDespawn = function(_player: Player, truck: Model)
+		TruckLoad.DropWelds(truck)
+	end
 	-- A piece of yours came to rest on your own bed: the tutorial's "load"
 	-- step (TutorialData.StepsV2) and the funnel.
 	TruckLoad.Hooks.onLoaded = function(player: Player)

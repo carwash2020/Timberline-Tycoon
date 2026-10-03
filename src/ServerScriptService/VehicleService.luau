@@ -69,6 +69,7 @@ local RunService = game:GetService("RunService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
+local Handling = require(ReplicatedStorage.Shared.Handling)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local StreamAhead = require(ReplicatedStorage.Shared.StreamAhead)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -177,6 +178,9 @@ export type Hooks = {
 	onDriverChanged: ((truck: Model, driver: Player?) -> ())?,
 	onRebuild: ((player: Player, old: Model?, keepsLoad: boolean, at: CFrame?) -> ((Model) -> ())?)?,
 	loadCount: ((truck: Model) -> number)?,
+	-- A truck is about to be destroyed (despawn, slot switch, recall).
+	-- Drop cargo welds first so the load isn't dragged away with it.
+	onDespawn: ((player: Player, truck: Model) -> ())?,
 	-- Where a truck is delivered when the player has a plot (the road-edge
 	-- pad). Nil means the public parking lot, smallest free bay.
 	deliveryCFrame: ((player: Player) -> CFrame?)?,
@@ -576,8 +580,9 @@ local function startDriving(rec: TruckRecord, driver: Player)
 			return
 		end
 		local mass = rec.chassis.AssemblyMass
-		rec.drive.MaxForce = mass * 120
-		rec.heading.MaxTorque = mass * 5000
+		local feel = Handling.For(rec.def.id)
+		rec.drive.MaxForce = mass * Handling.DriveForce(feel)
+		rec.heading.MaxTorque = mass * Handling.HoldTorque(feel)
 		rec.heading.CFrame = rec.chassis.CFrame.Rotation
 		rec.drive.PlaneVelocity = Vector2.zero
 		rec.drive.Enabled = true
@@ -598,6 +603,8 @@ local function putBack(rec: TruckRecord)
 			rec.chassis:SetNetworkOwner(nil)
 		end)
 	end
+	-- The load is already welded, so this pivot carries it. Ownership
+	-- goes back to the driver only after the truck (and its cargo) is home.
 	rec.model:PivotTo(rec.lastGood)
 	rec.chassis.AssemblyLinearVelocity = Vector3.zero
 	rec.chassis.AssemblyAngularVelocity = Vector3.zero
@@ -754,8 +761,11 @@ end
 -- Arcade driving: the server glides the (anchored) truck.
 local function arcadeStep(rec: TruckRecord, dt: number)
 	local seat = rec.seat
-	rec.arcadeSpeed = DriveMath.Speed(rec.arcadeSpeed, seat.ThrottleFloat, rec.def.topSpeed, dt)
-	local turn = DriveMath.Turn(rec.arcadeSpeed, seat.SteerFloat, rec.def.turnRate, dt)
+	local feel = Handling.For(rec.def.id)
+	local hitched = rec.trailer ~= nil
+	local radius = Handling.TowRadius(DriveMath.MinTurnRadius(TruckLayout.Wheelbase(rec.layout)), hitched)
+	rec.arcadeSpeed = Handling.Speed(rec.arcadeSpeed, seat.ThrottleFloat, rec.def.topSpeed, dt, nil, feel)
+	local turn = Handling.Turn(rec.arcadeSpeed, seat.SteerFloat, rec.def.turnRate, dt, radius, feel, rec.def.topSpeed)
 	if math.abs(rec.arcadeSpeed) < 0.01 and turn == 0 then
 		return
 	end
@@ -1197,6 +1207,13 @@ end
 
 local function destroyTruck(rec: TruckRecord)
 	rec.settleToken += 1
+	local drop = VehicleService.Hooks.onDespawn
+	if drop then
+		local owner, model = rec.owner, rec.model
+		guarded("onDespawn", function()
+			drop(owner, model)
+		end)
+	end
 	for _, conn in ipairs(rec.conns) do
 		conn:Disconnect()
 	end

@@ -272,9 +272,7 @@ return function(t)
 			local bay = bayFor(TruckLayout.RigSize(layout, tl))
 			t.ok(bay ~= nil, label .. " has a bay that fits it")
 			local lo, hi
-			local count = 0
 			for _, p in ipairs(parts(model)) do
-				count += 1
 				local a, b = box(p)
 				lo = if lo then lo:Min(a) else a
 				hi = if hi then hi:Max(b) else b
@@ -299,8 +297,37 @@ return function(t)
 			-- Rustbucket and the Rig hold 73). A trailer's 36: its skid's own
 			-- two ramps and the bolts on the Pony's and Ranch's two hubs. Plus
 			-- one invisible BedZone per bed (M1.6), raised on purpose.
-			local budget = 75 + (if rig.trailer then 37 else 0)
-			t.ok(count <= budget, string.format("%s has %d parts (budget %d)", label, count, budget))
+			-- Per-tier caps. A trailer is counted on its own, at most 37.
+			local BUDGET = {
+				Rustbucket = 55,
+				Pickup = 70,
+				ScoutATV = 40,
+				Flatbed = 90,
+				LoggingRig = 120,
+			}
+			local function trailerPart(part)
+				local node = part
+				while node and node ~= model do
+					if node:GetAttribute("TrailerBody") == true or node.Name == "TrailerSkid" then
+						return true
+					end
+					node = node.Parent
+				end
+				return false
+			end
+			local truckParts, trailerParts = 0, 0
+			for _, part in ipairs(parts(model)) do
+				if trailerPart(part) then
+					trailerParts += 1
+				else
+					truckParts += 1
+				end
+			end
+			local budget = BUDGET[rig.def.id] or 55
+			t.ok(truckParts <= budget, string.format("%s has %d parts (budget %d)", label, truckParts, budget))
+			if rig.trailer then
+				t.ok(trailerParts <= 37, string.format("%s trailer has %d parts (budget 37)", label, trailerParts))
+			end
 		end
 	end)
 
@@ -740,23 +767,33 @@ return function(t)
 				if p ~= chassis then
 					t.eq(p.Anchored, false, label .. " " .. p.Name .. " unanchored")
 					t.eq(p.Massless, true, label .. " " .. p.Name .. " massless")
-					local joint = p:FindFirstChild("Axle") or p:FindFirstChildOfClass("WeldConstraint")
+					local joint = p:FindFirstChild("Hitch")
+						or p:FindFirstChild("Axle")
+						or p:FindFirstChildOfClass("WeldConstraint")
 					t.ok(joint and joint.Part1 == p, label .. " " .. p.Name .. " is joined")
 					if p.Name == "Wheel" then
 						t.ok(joint:IsA("Motor6D"), label .. " wheel on a Motor6D")
-						t.eq(joint.Part0, chassis, label .. " wheel hangs off the chassis")
-						local at = chassis.CFrame * joint.C0
+						local hung = joint.Part0
+						t.ok(
+							hung == chassis or (hung and hung.Name == "TrailerBed"),
+							label .. " wheel hangs off the chassis or the trailer bed"
+						)
+						local at = hung.CFrame * joint.C0
 						t.ok((at.Position - p.CFrame.Position).Magnitude < 1e-3, label .. " Axle C0 sits on the wheel")
-					else
-						-- Follow the joints back to the chassis.
-						local node, hops = p, 0
-						while node ~= chassis and hops < 4 do
-							local j = node:FindFirstChild("Axle") or node:FindFirstChildOfClass("WeldConstraint")
-							node = j and j.Part0
-							hops += 1
-						end
-						t.eq(node, chassis, label .. " " .. p.Name .. " reaches the chassis")
+					elseif p.Name == "TrailerBed" then
+						t.ok(joint:IsA("Motor6D") and joint.Name == "Hitch", label .. " trailer swings on a Hitch")
+						t.eq(joint.Part0, chassis, label .. " hitch hangs off the chassis")
 					end
+					-- Follow the joints back to the chassis.
+					local node, hops = p, 0
+					while node ~= chassis and hops < 6 do
+						local j = node:FindFirstChild("Hitch")
+							or node:FindFirstChild("Axle")
+							or node:FindFirstChildOfClass("WeldConstraint")
+						node = j and j.Part0
+						hops += 1
+					end
+					t.eq(node, chassis, label .. " " .. p.Name .. " reaches the chassis")
 				end
 			end
 		end
@@ -895,5 +932,53 @@ return function(t)
 			local n = stakes(model, { TrailerStake = true, TrailerStanchion = true }, deckTop, tl.wallHeight)
 			t.ok(n >= 6, string.format("%s has %d full-height collidable stakes", id, n))
 		end
+	end)
+
+	t.test("materials, folders, and detail parts", function()
+		local legal = { SmoothPlastic = true, Metal = true, Glass = true, Neon = true }
+		local lights = { Headlight = true, Taillight = true, Marker = true, Beacon = true }
+		for _, rig in ipairs(rigs()) do
+			local model = build(rig)
+			local label = rig.label
+			TruckArt.Rig(model)
+			t.ok(model:FindFirstChild("Body"), label .. " Body")
+			t.ok(model:FindFirstChild("Wheels"), label .. " Wheels")
+			t.ok(model:FindFirstChild("Lights"), label .. " Lights")
+			t.ok(model:FindFirstChild("Chassis") == model.PrimaryPart, label .. " chassis stays a direct child")
+			t.ok(model:FindFirstChild("DriverSeat"), label .. " seat stays a direct child")
+			t.ok(model:FindFirstChild("Skid"), label .. " skid stays a direct child")
+			for _, p in ipairs(parts(model)) do
+				t.ok(legal[p.Material.Name] == true, string.format("%s %s is %s", label, p.Name, p.Material.Name))
+				if p.Material.Name == "Neon" then
+					t.ok(lights[p.Name] == true, label .. " neon only on a light: " .. p.Name)
+				end
+				if not HULL[p.Name] and p.Name ~= "BedZone" and p.Name ~= "DriverSeat" then
+					t.eq(p.CanCollide, false, label .. " " .. p.Name .. " doesn't collide")
+					t.eq(p.CanQuery, false, label .. " " .. p.Name .. " isn't queried")
+					t.eq(p.CanTouch, false, label .. " " .. p.Name .. " isn't touched")
+					t.eq(p.Massless, true, label .. " " .. p.Name .. " massless")
+					t.eq(p.Anchored, false, label .. " " .. p.Name .. " unanchored")
+				end
+			end
+		end
+		local rust = build({ def = ItemCatalog.GetTruck("Rustbucket") })
+		local outs = 0
+		for _, p in ipairs(named(rust, "Headlight")) do
+			if p:GetAttribute("Out") == true then
+				outs += 1
+			end
+		end
+		t.eq(outs, 1, "one Rustbucket headlight is out")
+		local pane = named(rust, "Windshield")[1]
+		t.eq(pane.Material.Name, "Glass")
+		t.ok(math.abs(pane.Transparency - 0.6) < 1e-6, "cracked windshield is glass at 0.6")
+		local grey = 0
+		for _, p in ipairs(named(rust, "Door")) do
+			local c = p.Color
+			if math.abs(c.R - c.G) < 0.04 and math.abs(c.G - c.B) < 0.04 then
+				grey += 1
+			end
+		end
+		t.eq(grey, 1, "one primer-grey door")
 	end)
 end

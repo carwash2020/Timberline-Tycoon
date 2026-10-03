@@ -22,6 +22,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Handling = require(ReplicatedStorage.Shared.Handling)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TruckArt = require(ReplicatedStorage.Shared.Art.TruckArt)
@@ -82,6 +83,9 @@ type Rig = {
 	steer: number,
 	dustTimer: number,
 	wheelsIdle: boolean, -- parked and already drawn at rest: skip the wheels
+	hitch: Motor6D?, -- the trailer's swing, when one is hitched
+	swing: number,
+	look: Vector3?,
 	lit: boolean?, -- the lights' last state: nil = never set
 	braking: boolean,
 	night: boolean,
@@ -211,7 +215,9 @@ local function setLights(rig: Rig, on: boolean, night: boolean)
 	end
 	rig.lit, rig.night = on, night
 	for _, lens in ipairs(rig.heads) do
-		lens.Color = if on then HEAD_ON else HEAD_OFF
+		if lens:GetAttribute("Out") ~= true then
+			lens.Color = if on then HEAD_ON else HEAD_OFF
+		end
 	end
 	for _, beam in ipairs(rig.beams) do
 		beam.Enabled = on and night
@@ -258,6 +264,9 @@ local function buildRig(model: Model): Rig?
 		steer = 0,
 		dustTimer = 0,
 		wheelsIdle = false,
+		hitch = nil,
+		swing = 0,
+		look = nil,
 		lit = nil,
 		braking = false,
 		night = false,
@@ -285,6 +294,9 @@ local function buildRig(model: Model): Rig?
 				end
 			elseif d.Name == "Headlight" then
 				table.insert(rig.heads, d)
+				if d:GetAttribute("Out") == true then
+					continue
+				end
 				local beam = Instance.new("SpotLight")
 				beam.Name = "HeadlightBeam"
 				beam.Face = faceToward(d, forward)
@@ -315,7 +327,7 @@ local function buildRig(model: Model): Rig?
 	end)
 	for i = 1, math.min(2, #rearWheels) do
 		local wheel = rearWheels[i]
-		local hub = wheel.joint.C0.Position
+		local hub = chassis.CFrame:PointToObjectSpace(wheel.part.Position)
 		local att = Instance.new("Attachment")
 		att.Name = "DustPoint"
 		att.CFrame = CFrame.new(hub + Vector3.new(0, -wheel.radius + 0.35, wheel.radius * 0.7))
@@ -329,6 +341,11 @@ local function buildRig(model: Model): Rig?
 		engine.Volume = 0
 		engine.Parent = chassis
 		rig.engine = engine
+	end
+	local bed = model:FindFirstChild("TrailerBed")
+	local hitch = if bed then bed:FindFirstChild("Hitch") else nil
+	if hitch and hitch:IsA("Motor6D") then
+		rig.hitch = hitch
 	end
 	hidePromptFromOthers(model, rig.conns)
 	return rig
@@ -406,6 +423,18 @@ local function updateRig(rig: Rig, dt: number, cameraPos: Vector3)
 			wheel.joint.Transform = turn * CFrame.Angles(wheel.spin, 0, 0)
 		end
 		rig.wheelsIdle = still
+	end
+
+	-- A hitched trailer swings a little with the turn, and stops short of folding.
+	local hitch = rig.hitch
+	if hitch and hitch.Parent then
+		local look = VehicleLogic.FlatFacing(chassis.CFrame.LookVector)
+		local prev = rig.look or look
+		rig.look = look
+		local cross = prev:Cross(look).Y
+		local yawRate = if dt > 0 then math.asin(math.clamp(cross, -1, 1)) / dt else 0
+		rig.swing = Handling.TrailerSwing(rig.swing, yawRate, rig.speed, dt)
+		hitch.Transform = CFrame.Angles(0, rig.swing, 0)
 	end
 
 	-- Lights.

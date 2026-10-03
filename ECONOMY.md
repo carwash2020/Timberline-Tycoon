@@ -12,8 +12,8 @@ Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thick
 |---|---|---|---|
 | First sale | under 3 min | 66 s | ✅ on target |
 | Steel Axe ($160) | 5-8 min | 8.0 min | ✅ on target |
-| First $1k earned | 15-20 min | 13.5 min | ✅ on target |
-| Cobalt Axe ($2,040) | about 1 h | 54.1 min | ✅ on target |
+| First $1k earned | 15-20 min | 13.4 min | ✅ on target |
+| Cobalt Axe ($2,040) | about 1 h | 53.7 min | ✅ on target |
 | Full plot ($900,100) | 20-40 h | 39.4 h | ✅ on target |
 
 End of the buying path: $29,008/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
@@ -92,14 +92,14 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 | 66 s | Rustbucket | $75 | $0 | $1,610 | Maple (Rusty Axe) |
 | 5.9 min | Rickety Sawmill | $130 | $1,610 | $4,652 | Frostwood (Rusty Axe) |
 | 8.0 min | Steel Axe | $160 | $4,652 | $6,581 | Frostwood (Steel Axe) |
-| 11.6 min | Pickup | $400 | $6,581 | $8,635 | Frostwood (Steel Axe) |
-| 12.9 min | Hardened Axe | $190 | $8,635 | $9,866 | Frostwood (Hardened Axe) |
-| 16.3 min | Silver Axe | $550 | $9,866 | $10,715 | Frostwood (Silver Axe) |
-| 24.7 min | Pony Trailer | $1,800 | $10,715 | $12,995 | Frostwood (Silver Axe) |
-| 27.0 min | Insulated Coat | $500 | $12,995 | $13,446 | Frostwood (Silver Axe) |
-| 46.6 min | Flatbed | $5,000 | $13,446 | $15,324 | Frostwood (Silver Axe) |
-| 54.1 min | Cobalt Axe | $2,040 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
-| 74.2 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
+| 11.6 min | Pickup | $400 | $6,581 | $8,761 | Frostwood (Steel Axe) |
+| 12.9 min | Hardened Axe | $190 | $8,761 | $10,031 | Frostwood (Hardened Axe) |
+| 16.1 min | Silver Axe | $550 | $10,031 | $10,909 | Frostwood (Silver Axe) |
+| 24.5 min | Pony Trailer | $1,800 | $10,909 | $13,163 | Frostwood (Silver Axe) |
+| 26.8 min | Insulated Coat | $500 | $13,163 | $13,627 | Frostwood (Silver Axe) |
+| 46.2 min | Flatbed | $5,000 | $13,627 | $15,324 | Frostwood (Silver Axe) |
+| 53.7 min | Cobalt Axe | $2,040 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
+| 73.8 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
 | 2.3 h | Logging Rig | $19,000 | $16,655 | $17,742 | Frostwood (Cobalt Axe) |
 | 2.7 h | Gold Axe | $7,720 | $17,742 | $18,210 | Frostwood (Gold Axe) |
 | 7.0 h | Millmaster 200 Long | $86,500 | $18,210 | $22,968 | Frostwood (Gold Axe) |

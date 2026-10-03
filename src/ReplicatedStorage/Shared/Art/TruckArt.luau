@@ -88,8 +88,6 @@ local GLASS = hex("#9CCBE0")
 local HEADLIGHT = hex("#FFE9B0")
 local TAILLIGHT = hex("#B0241C")
 local AMBER = hex("#FFB23F")
-local ROPE = hex("#C8AE78")
-local RUST = hex("#8C4A26")
 
 TruckArt.HeadlightColor = HEADLIGHT
 TruckArt.TaillightColor = TAILLIGHT
@@ -247,12 +245,24 @@ type FenderStyle = {
 	color: Color3,
 	material: Enum.Material?,
 	tilt: CFrame?, -- a knock or two (the Rustbucket)
+	simple: boolean?, -- one cap, no shoulder wedges (the part budget)
 }
 
 local function fender(parent: Instance, x: number, z0: number, z1: number, s: FenderStyle)
 	local inset = s.r * 0.66
 	local za, zb = z0 - inset, z1 + inset
 	local tilt = s.tilt or CFrame.identity
+	if s.simple then
+		deco(
+			parent,
+			"Fender",
+			V3(s.width, s.thick, zb - za),
+			CF(x, s.top - s.thick / 2, (za + zb) / 2) * tilt,
+			s.color,
+			s.material
+		)
+		return
+	end
 	deco(
 		parent,
 		"Fender",
@@ -476,7 +486,7 @@ builders.farm = function(c: Ctx)
 	local floorTop = lay.bedFloorY + FLOOR / 2
 	local wall = (W - lay.bedWidth) / 2
 	local seatTop, seatZ = SEAT_TOP.farm, f + 5.8
-	local primer = hex("#7F8E6E") -- the replacement door, never painted
+	local primer = hex("#9A9A94") -- the one replacement door, primer grey
 	local cream = hex("#D8C6A0")
 	local oldMetal = hex("#6E5D50")
 	local wood = hex("#7C5A3A")
@@ -495,10 +505,11 @@ builders.farm = function(c: Ctx)
 		M.CorrodedMetal
 	)
 	deco(m, "Hood", V3(hoodW, 1.6, 3.4), CF(0, 3.1, f + 2.45), paint, M.Metal)
-	deco(m, "HoodCrown", V3(hoodW - 0.6, 0.28, 3.4), CF(0, 4.04, f + 2.45), Kit.shade(paint, 0.04), M.Metal)
 	deco(m, "Grille", V3(hoodW + 0.15, 2.0, 0.35), CF(0, 3.05, f + 0.6), cream, M.Metal)
 	deco(m, "GrilleSlats", V3(hoodW - 0.45, 1.5, 0.1), CF(0, 3.0, f + 0.4), hex("#2B2420"), M.Metal)
-	deco(m, "EngineBay", V3(W - 0.9, 0.6, 3.2), CF(0, 2.5, f + 2.45), hex("#2B2420"), M.Metal)
+	for _, side in ipairs({ -1, 1 }) do
+		deco(m, "BumperBlock", V3(0.7, 0.4, 0.5), CF(side * (W / 2 - 0.55), 1.2, f + 0.2), wood, M.SmoothPlastic)
+	end
 	local fenderTop = 2 * r + 0.6
 	for _, side in ipairs({ -1, 1 }) do
 		local dented = side < 0
@@ -512,6 +523,7 @@ builders.farm = function(c: Ctx)
 			color = if dented then Kit.shade(paint, -0.14) else paint,
 			material = M.Metal,
 			tilt = if dented then CFrame.Angles(0.07, 0, -0.06) else nil,
+			simple = true,
 		})
 	end
 	-- Bug-eye headlights on the fender crowns; the right one knocked askew.
@@ -535,12 +547,9 @@ builders.farm = function(c: Ctx)
 	deco(m, "Cowl", V3(W - 0.3, 1.6, 0.7), CF(0, 3.3, f + 4.5), paint, M.Metal)
 	local rake = CFrame.Angles(0.12, 0, 0)
 	local screen = CF(0, 4.95, f + 4.75) * rake
-	for _, side in ipairs({ -1, 1 }) do
-		deco(m, "WindshieldPost", V3(0.2, 1.9, 0.2), CF(side * (W / 2 - 0.3), 0, 0) * screen, oldMetal, M.Metal)
-	end
 	deco(m, "WindshieldTop", V3(W - 0.4, 0.2, 0.2), screen * CF(0, 0.95, 0), oldMetal, M.Metal)
-	glass(m, "Windshield", V3(W - 0.8, 1.65, 0.07), screen, 0.5)
-	deco(m, "Mirror", V3(0.16, 0.5, 0.6), CF(-(W / 2 - 0.05), 5.1, f + 4.9), oldMetal, M.Metal)
+	glass(m, "Windshield", V3(W - 0.8, 1.65, 0.07), screen, 0.6)
+	deco(m, "Crack", V3(0.04, 0.7, 0.02), screen * CF(0.55, -0.15, 0.05), hex("#2A241C"), M.SmoothPlastic)
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
 			m,
@@ -562,7 +571,6 @@ builders.farm = function(c: Ctx)
 	)
 	steeringWheel(m, V3(0, seatTop + 0.85, seatZ - 0.75), 1.0)
 	deco(m, "CabBack", V3(W, 2.0, 0.3), CF(0, 3.5, bedStart + 0.15), paint, M.Metal)
-	deco(m, "CanvasTop", V3(W - 0.4, 0.5, 0.8), CF(0, 4.75, bedStart + 0.15), hex("#7D7A52"), M.Fabric)
 
 	-- Bed: weathered side boards with gaps, rusty corner posts, and a
 	-- tailgate that hangs open on two bits of rope.
@@ -593,17 +601,6 @@ builders.farm = function(c: Ctx)
 	local gateW, gateH = W - 0.7, lay.wallHeight - 0.05
 	hull(m, "Tailgate", V3(gateW, gateH, 0.24), hinge * CF(0, gateH / 2, 0), Kit.vary(wood, rng, 0.05), M.WoodPlanks)
 	for _, side in ipairs({ -1, 1 }) do
-		decoRod(
-			m,
-			"Rope",
-			(hinge * CF(side * (gateW / 2 - 0.15), gateH - 0.05, 0)).Position,
-			V3(side * (W / 2 - 0.17), floorTop + postH - 0.1, bedEnd - 0.17),
-			0.11,
-			ROPE,
-			M.Fabric
-		)
-	end
-	for _, side in ipairs({ -1, 1 }) do
 		fender(m, side * wx, zR, zR, {
 			r = r,
 			width = tw + 0.45,
@@ -613,6 +610,7 @@ builders.farm = function(c: Ctx)
 			back = { 0.8, 2.1 },
 			color = Kit.vary(paint, rng, 0.05),
 			material = M.Metal,
+			simple = true,
 		})
 		local z0, z1 = zF + 0.66 * r + 1.0, zR - 0.66 * r - 0.9
 		deco(
@@ -625,9 +623,7 @@ builders.farm = function(c: Ctx)
 		)
 	end
 
-	-- Rust, and lights that don't match.
-	deco(m, "Rust", V3(0.06, 0.65, 1.0), CF(-(hoodW / 2 + 0.02), 3.2, f + 2.9), RUST, M.CorrodedMetal)
-	deco(m, "Rust", V3(0.9, 0.55, 0.06), hinge * CF(0.95, 0.55, 0.14), RUST, M.CorrodedMetal)
+	-- Lights that don't match: the right headlamp is out.
 	decoCyl(
 		m,
 		"Taillight",
@@ -650,12 +646,13 @@ builders.farm = function(c: Ctx)
 	)
 
 	local hub = hex("#3A322C")
-	wheels(
-		m,
-		lay,
-		{ rim = cream, hub = hub, steer = true, rear = false },
-		{ rim = cream, hub = hub, steer = false, rear = true }
-	)
+	wheels(m, lay, { rim = cream, hub = hub, steer = true, rear = false }, { rim = cream, steer = false, rear = true })
+	for _, d in ipairs(m:GetChildren()) do
+		if d.Name == "Headlight" and d:IsA("BasePart") and d.CFrame.X > 0 then
+			d:SetAttribute("Out", true)
+			d.Color = hex("#3A3428")
+		end
+	end
 	-- One wheel came off another truck.
 	for _, d in ipairs(m:GetChildren()) do
 		if d.Name == "Wheel" and d:IsA("BasePart") and d.CFrame.X > 0 and d.CFrame.Z < 0 then
@@ -686,7 +683,9 @@ builders.pickup = function(c: Ctx)
 	deco(m, "Hood", V3(W - 2.2, 0.65, 3.5), CF(0, 3.975, f + 2.75), paint, M.Metal)
 	decoWedge(m, "HoodNose", V3(W - 2.2, 0.65, 0.5), CF(0, 3.975, f + 0.75), paint, M.Metal)
 	deco(m, "Grille", V3(W - 2.4, 1.3, 0.16), CF(0, 2.85, f + 0.45), CHROME_HI, M.Metal)
-	deco(m, "GrilleBars", V3(W - 2.9, 0.85, 0.08), CF(0, 2.85, f + 0.36), hex("#2A2D33"), M.Metal)
+	for i = 0, 3 do
+		deco(m, "GrilleSlat", V3(W - 2.9, 0.1, 0.06), CF(0, 2.45 + i * 0.26, f + 0.36), hex("#2A2D33"), M.Metal)
+	end
 
 	-- Pontoon front fenders with the headlights in their noses.
 	local fz0, fz1 = f + 0.7, zF + 1.25
@@ -743,6 +742,7 @@ builders.pickup = function(c: Ctx)
 		cream,
 		M.Metal
 	)
+	deco(m, "RoofRack", V3(W - 1.4, 0.1, 1.4), CF(0, roofY + 0.5, (screenHi.Z + bedStart) / 2), BLACK, M.Metal)
 	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#8C6A4A"), M.Leather)
 	deco(
 		m,
@@ -764,8 +764,7 @@ builders.pickup = function(c: Ctx)
 			CHROME_HI,
 			M.Metal
 		)
-		local z0, z1 = fz1 + 1.3, zR - 2.5
-		deco(m, "RunningBoard", V3(1.1, 0.18, z1 - z0), CF(side * (W / 2 + 0.3), 1.95, (z0 + z1) / 2), BLACK, M.Rubber)
+		deco(m, "MudFlap", V3(0.7, 0.85, 0.08), CF(side * (W / 2 + 0.15), 1.35, zR + 1.7), BLACK, M.SmoothPlastic)
 	end
 
 	-- Bed: smooth painted walls with chrome caps; a flared rear fender over
@@ -801,7 +800,7 @@ builders.pickup = function(c: Ctx)
 	exhaust(m, V3(1.7, 1.6, bedEnd - 0.8), V3(1.75, 1.55, L / 2 + 0.3), 0.3, CHROME, M.Metal, 0.3, hex("#8A8580"))
 
 	local front = { rim = cream, rimScale = 0.64, hub = CHROME_HI, steer = true, rear = false }
-	local back = { rim = cream, rimScale = 0.64, hub = CHROME_HI, steer = false, rear = true }
+	local back = { rim = cream, rimScale = 0.64, steer = false, rear = true }
 	wheels(m, lay, front, back)
 	gloss(m, paint, 0.05)
 end
@@ -818,7 +817,7 @@ builders.atv = function(c: Ctx)
 	deco(m, "Frame", V3(2.0, 1.0, 4.7), CF(0, 1.85, 0), FRAME, M.Metal)
 	decoCyl(m, "Engine", 2.35, 1.1, CF(0, 1.95, 0.25), hex("#7E8287"), M.Metal)
 
-	-- Plastic fenders over all four wheels; racks on top front and back.
+	-- One fender cap over each wheel. Knobs go on the tyres below.
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * (wx - 0.1)
 		local style: FenderStyle = {
@@ -830,46 +829,26 @@ builders.atv = function(c: Ctx)
 			back = { 0.6, 2.3 },
 			color = paint,
 			material = M.SmoothPlastic,
+			simple = true,
 		}
 		fender(m, x, zF, zF, style)
-		style.front, style.back = { 0.6, 2.3 }, { 0.72, 2.0 }
 		fender(m, x, zR, zR, style)
-		deco(m, "Footrest", V3(1.1, 0.16, 2.3), CF(side * 1.65, 2.1, 0.1), plastic, M.DiamondPlate)
 		deco(m, "Headlight", V3(0.65, 0.34, 0.12), CF(side * 0.72, 2.65, f + 0.27), HEADLIGHT, M.Neon)
 		deco(m, "Taillight", V3(0.42, 0.24, 0.08), CF(side * 0.65, 2.65, b - 0.15), TAILLIGHT, M.Neon)
 	end
 	deco(m, "Nose", V3(2.9, 0.7, 2.1), CF(0, 2.6, f + 1.35), paint, M.SmoothPlastic)
-	deco(m, "RearFascia", V3(2.2, 0.65, 0.4), CF(0, 2.6, b - 0.4), plastic, M.SmoothPlastic)
 
-	-- Brush guard and racks (tube). The front rack stops short of a seated
-	-- rider's feet (straight legs reach 2 studs ahead of the seat's middle).
+	-- A front basket, clear of a seated rider's feet, and the whip.
 	local rackY = 3.3
 	local seatTop, seatZ = SEAT_TOP.atv, 0.6
-	decoRod(m, "Guard", V3(-1.37, 2.0, f + 0.07), V3(1.37, 2.0, f + 0.07), 0.2, BLACK, M.Metal)
-	for _, side in ipairs({ -1, 1 }) do
-		decoRod(m, "Guard", V3(side * 1.17, 2.0, f + 0.07), V3(side * 1.24, rackY, f + 0.45), 0.18, BLACK, M.Metal)
-	end
-	local function rackFrame(z0: number, z1: number, y: number)
-		for _, side in ipairs({ -1, 1 }) do
-			decoRod(m, "Rack", V3(side * 1.9, y, z0), V3(side * 1.9, y, z1), 0.15, rack, M.Metal)
-		end
-		decoRod(m, "Rack", V3(-1.9, y, z0), V3(1.9, y, z0), 0.15, rack, M.Metal)
-		decoRod(m, "Rack", V3(-1.9, y, z1), V3(1.9, y, z1), 0.15, rack, M.Metal)
-	end
-	rackFrame(f + 0.45, seatZ - 2.25, rackY)
-	rackFrame(zR - 1.0, b - 0.07, rackY + 0.07)
-	deco(m, "SupplyBox", V3(1.7, 0.8, 1.25), CF(0, rackY + 0.52, zR + 0.2), hex("#9B6B3E"), M.WoodPlanks)
+	deco(m, "Basket", V3(2.2, 0.12, 0.9), CF(0, rackY, f + 0.9), rack, M.Metal)
+	deco(m, "Basket", V3(2.2, 0.35, 0.1), CF(0, rackY + 0.2, f + 0.45), rack, M.Metal)
 
 	-- Tank, bars and the saddle. The bars ride just over a seated rider's
 	-- straight legs (the seat's top + 0.5).
 	local barY = seatTop + 0.7
 	deco(m, "Tank", V3(1.6, 0.7, 1.25), CF(0, 3.2, -1.3), paint, M.SmoothPlastic)
-	decoCyl(m, "TankCap", 0.16, 0.4, CF(0, 3.6, -1.35) * CFrame.Angles(0, 0, math.pi / 2), CHROME, M.Metal)
-	decoRod(m, "SteeringColumn", V3(0, 3.0, -2.0), V3(0, barY - 0.06, -1.5), 0.18, BLACK, M.Metal)
 	decoRod(m, "Handlebar", V3(-1.3, barY, -1.45), V3(1.3, barY, -1.45), 0.17, rack, M.Metal)
-	for _, side in ipairs({ -1, 1 }) do
-		decoRod(m, "Grip", V3(side * 1.05, barY, -1.45), V3(side * 1.5, barY, -1.45), 0.28, BLACK, M.Rubber)
-	end
 	deco(m, "SeatBase", V3(1.75, 0.65, 2.75), CF(0, seatTop - 0.875, seatZ), plastic, M.SmoothPlastic)
 	driverSeat(m, V3(1.5, 0.55, 2.4), CF(0, seatTop - 0.275, seatZ), hex("#6B4A33"), M.Leather)
 
@@ -891,8 +870,13 @@ builders.atv = function(c: Ctx)
 		m,
 		lay,
 		{ rim = rim, rimScale = 0.55, hub = plastic, steer = true, rear = false },
-		{ rim = rim, rimScale = 0.55, hub = plastic, steer = false, rear = true }
+		{ rim = rim, rimScale = 0.55, steer = false, rear = true }
 	)
+	for _, d in ipairs(m:GetChildren()) do
+		if d.Name == "Wheel" and d:IsA("BasePart") then
+			decoCyl(d, "Knobby", d.Size.X + 0.08, d.Size.Y * 0.92, d.CFrame, hex("#2A2C28"), M.SmoothPlastic)
+		end
+	end
 end
 
 -- A boxy cab with glass all round: lower body, glass, pillars, roof. Its
@@ -978,6 +962,7 @@ builders.flatbed = function(c: Ctx)
 	local roofY = seatTop + HEADROOM.flatbed
 	boxCab(m, W, (cabZ0 + bedStart) / 2, bedStart - cabZ0, 2.15, seatTop + 1.1, roofY, paint, BLACK, hex("#EEEBE3"))
 	deco(m, "Beacon", V3(1.0, 0.4, 0.5), CF(0, roofY + 0.52, f + 5.4), AMBER, M.Neon)
+	deco(m, "LightBar", V3(W - 1.2, 0.16, 0.28), CF(0, roofY + 0.55, f + 5.4), BLACK, M.Metal)
 	driverSeat(m, V3(2.6, 0.5, 1.4), CF(0, seatTop - 0.25, seatZ), hex("#4A4440"), M.Fabric)
 	steeringWheel(m, V3(0, seatTop + 1.05, seatZ - 0.75), 1.0)
 	exhaust(
@@ -1000,7 +985,7 @@ builders.flatbed = function(c: Ctx)
 	deco(m, "HeadacheRack", V3(W - 0.6, 0.24, 0.24), CF(0, deckTop + 2.1, rackZ), steel, M.Metal)
 
 	-- Deck and stake sides (open at the back).
-	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#8A6038"))
+	bedFloor(m, "BedFloor", W, lay.bedLength, lay.bedFloorY, lay.bedCenterZ, hex("#161616"))
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * (W / 2 - wall / 2)
 		for _, z in ipairs({ bedStart + 0.9, lay.bedCenterZ, bedEnd - 0.5 }) do
@@ -1012,6 +997,7 @@ builders.flatbed = function(c: Ctx)
 				Kit.vary(stake, rng, 0.05),
 				M.Wood
 			)
+			deco(m, "StakePocket", V3(wall + 0.08, 0.22, 0.48), CF(x, deckTop + 0.11, z), BLACK, M.Metal)
 		end
 		for _, y in ipairs({ deckTop + 0.85, deckTop + 1.95 }) do
 			hull(
@@ -1069,8 +1055,8 @@ builders.rig = function(c: Ctx)
 	for _, side in ipairs({ -1, 1 }) do
 		deco(m, "Pinstripe", V3(0.05, 0.26, 5.3), CF(side * 2.52, 3.75, f + 3.42), hex("#F1E6CC"), M.SmoothPlastic)
 	end
-	deco(m, "Grille", V3(3.7, 2.6, 0.32), CF(0, 3.4, f + 0.66), CHROME_HI, M.Foil)
-	deco(m, "GrilleBars", V3(3.2, 2.1, 0.08), CF(0, 3.4, f + 0.48), BLACK, M.Metal)
+	deco(m, "Grille", V3(3.4, 3.3, 0.32), CF(0, 3.55, f + 0.66), CHROME_HI, M.Metal)
+	deco(m, "GrilleBars", V3(2.9, 2.7, 0.08), CF(0, 3.55, f + 0.48), BLACK, M.Metal)
 	for _, side in ipairs({ -1, 1 }) do
 		-- Set in a little, so the rig, fenders and all, fits its parking slot.
 		fender(m, side * (wx - 0.1), zF, zF, {
@@ -1134,7 +1120,8 @@ builders.rig = function(c: Ctx)
 	local bulkTop = roofY
 	local cz = bedStart + 0.2
 	local bulkH = bulkTop - deckTop
-	deco(m, "Bulkhead", V3(W, bulkH, 0.4), CF(0, deckTop + bulkH / 2, cz), hex("#5C6166"), M.DiamondPlate)
+	deco(m, "Bulkhead", V3(W, bulkH, 0.4), CF(0, deckTop + bulkH / 2, cz), hex("#5C6166"), M.Metal)
+	deco(m, "HeadacheRack", V3(W - 0.3, 0.35, 0.4), CF(0, deckTop + bulkH + 0.15, cz), steel, M.Metal)
 	Kit.decor(Kit.post(m, "Crane", V3(1.2, bulkTop, cz), 0.65, 1.5, crane, M.Metal), false)
 	Kit.decor(Kit.post(m, "Crane", V3(1.2, bulkTop + 0.65, cz), 1.95, 0.65, crane, M.Metal), false)
 	local tip = V3(1.2, bulkTop + 3.1, cz + 6.0)
@@ -1155,6 +1142,18 @@ builders.rig = function(c: Ctx)
 				M.Metal
 			)
 		end
+	end
+	for _, side in ipairs({ -1, 1 }) do
+		local x = side * (W / 2 + 0.08)
+		decoRod(
+			m,
+			"Chain",
+			V3(x, deckTop + lay.wallHeight * 0.62, bedStart + lay.bedLength / 3),
+			V3(x, deckTop + lay.wallHeight * 0.62, bedEnd - 0.3),
+			0.08,
+			BLACK,
+			M.Metal
+		)
 	end
 	for _, side in ipairs({ -1, 1 }) do
 		deco(
@@ -1428,11 +1427,17 @@ function TruckArt.AddTrailer(model: Model, trailer: TrailerDef, tl: TrailerLayou
 	drawTrailer(body, trailer, trailerDesignOf(tl))
 	grow(body)
 	for _, child in ipairs(body:GetChildren()) do
+		child:SetAttribute("TrailerBody", true)
 		child.Parent = model
 	end
 	body:Destroy()
 	frictionlessSkid(model, "TrailerSkid", tl.width - 0.4, tl.bedLength - 1, tl.bedCenterZ)
 end
+
+-- Declared below Build; assigned before Build ever runs.
+local sanitize: (Model) -> ()
+local parkTrailer: (Model) -> ()
+local organize: (Model) -> ()
 
 -- A truck (and its trailer, when given) at the origin, ground y = 0, front
 -- -Z. Every part is anchored; Rig turns it into one rigid body.
@@ -1489,7 +1494,113 @@ function TruckArt.Build(def: TruckDef, layout: Layout?, trailer: TrailerDef?, tr
 		point.CFrame = CF(0, 1, lastBed.Size.Z / 2 + 0.6)
 		point.Parent = lastBed
 	end
+	sanitize(model)
+	parkTrailer(model)
+	organize(model)
 	return model
+end
+
+-- Only these materials. Neon stays on light lenses; everything else that
+-- isn't glass or metal becomes SmoothPlastic. No textures, decals or meshes.
+local LIGHT_FACE = { Headlight = true, Taillight = true, Marker = true, Beacon = true }
+local METALISH = { CorrodedMetal = true, Foil = true, DiamondPlate = true }
+
+function sanitize(model: Model)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			local name = d.Material.Name
+			local lit = name == "Neon" and LIGHT_FACE[d.Name] == true
+			if name == "Glass" or name == "Metal" or name == "SmoothPlastic" or lit then
+				continue
+			elseif METALISH[name] == true then
+				d.Material = M.Metal
+			else
+				d.Material = M.SmoothPlastic
+			end
+		elseif d:IsA("Decal") or d:IsA("Texture") or d:IsA("SpecialMesh") then
+			d:Destroy()
+		end
+	end
+end
+
+-- Trailer body (not the skid) hangs off the trailer bed, so it can swing
+-- on the hitch as one piece. The bed and the skid stay direct children.
+function parkTrailer(model: Model)
+	local bed = model:FindFirstChild("TrailerBed")
+	if not bed or not bed:IsA("BasePart") then
+		return
+	end
+	for _, child in ipairs(model:GetChildren()) do
+		-- The coupler and tongue stay on the truck, at the hitch. The bed
+		-- and everything on it swings. Coupler stays a direct child: the
+		-- tow test finds it there.
+		if
+			child:GetAttribute("TrailerBody") == true
+			and child ~= bed
+			and child.Name ~= "Coupler"
+			and child.Name ~= "Tongue"
+		then
+			child.Parent = bed
+		end
+	end
+end
+
+local CONTRACT = {
+	Chassis = true,
+	Skid = true,
+	TrailerSkid = true,
+	DriverSeat = true,
+	BedFloor = true,
+	TrailerBed = true,
+}
+local LIGHTS = { Headlight = true, Taillight = true, LampBezel = true, Beacon = true, Marker = true, LightBar = true }
+local BED = {
+	BedBoard = true,
+	BedWall = true,
+	BedPost = true,
+	Tailgate = true,
+	BedCap = true,
+	BedFront = true,
+	Stake = true,
+	StakeRail = true,
+	StakePocket = true,
+	Stanchion = true,
+	Chain = true,
+	HeadacheRack = true,
+}
+
+local function folderNamed(model: Model, name: string): Folder
+	local found = model:FindFirstChild(name)
+	if found and found:IsA("Folder") then
+		return found
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = name
+	folder.Parent = model
+	return folder
+end
+
+-- Body, Wheels, Bed, Lights. Contract parts stay direct children, and a
+-- part already parented to another part (a rim, a ramp, the trailer) stays.
+function organize(model: Model)
+	local body = folderNamed(model, "Body")
+	local wheelFolder = folderNamed(model, "Wheels")
+	local bed = folderNamed(model, "Bed")
+	local lights = folderNamed(model, "Lights")
+	for _, child in ipairs(model:GetChildren()) do
+		if not child:IsA("BasePart") or CONTRACT[child.Name] or child.Name == "Coupler" or child.Name == "Tongue" then
+			continue
+		end
+		if child.Name == "Wheel" then
+			child.Parent = wheelFolder
+		elseif LIGHTS[child.Name] then
+			child.Parent = lights
+		elseif BED[child.Name] then
+			child.Parent = bed
+		elseif child.Name ~= "Body" and child.Name ~= "Wheels" and child.Name ~= "Bed" and child.Name ~= "Lights" then
+			child.Parent = body
+		end
+	end
 end
 
 -- Makes a built truck one rigid body: the chassis anchored (parked), every
@@ -1504,12 +1615,22 @@ function TruckArt.Rig(model: Model)
 			d.Anchored = false
 			d.Massless = true
 			local parent = d.Parent
-			if d.Name == "Wheel" and d:GetAttribute("Radius") ~= nil then
+			if d.Name == "TrailerBed" then
+				-- The hitch, not a weld: VehicleFX swings it. It never folds.
+				local hitch = Instance.new("Motor6D")
+				hitch.Name = "Hitch"
+				hitch.Part0 = chassis
+				hitch.Part1 = d
+				hitch.C0 = chassis.CFrame:ToObjectSpace(d.CFrame)
+				hitch.C1 = CFrame.identity
+				hitch.Parent = d
+			elseif d.Name == "Wheel" and d:GetAttribute("Radius") ~= nil then
+				local hung = if parent and parent:IsA("BasePart") then parent else chassis
 				local axle = Instance.new("Motor6D")
 				axle.Name = "Axle"
-				axle.Part0 = chassis
+				axle.Part0 = hung
 				axle.Part1 = d
-				axle.C0 = chassis.CFrame:ToObjectSpace(d.CFrame)
+				axle.C0 = hung.CFrame:ToObjectSpace(d.CFrame)
 				axle.C1 = CFrame.identity
 				axle.MaxVelocity = 0 -- only Transform turns it
 				axle.Parent = d

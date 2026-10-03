@@ -85,7 +85,7 @@ return function(t)
 	end)
 
 	t.test("truck details", function()
-		t.eq(ShopLogic.TruckDetail(ItemCatalog.GetTruck("Pickup")), "Bed: 12 logs · top speed 28")
+		t.eq(ShopLogic.TruckDetail(ItemCatalog.GetTruck("Pickup")), "Bed: 12 logs · top speed 30")
 		t.eq(ShopLogic.TruckDetail(ItemCatalog.GetTruck("ScoutATV")), "No bed · top speed 40 · Fast recon, no cargo")
 	end)
 
