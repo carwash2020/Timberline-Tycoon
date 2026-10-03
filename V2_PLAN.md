@@ -20,6 +20,9 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | M1.3 cut anywhere (SectionTrees, WoodService, GrowLogic, CutController, WoodFX) | live | 146a7ce |
 | M1.7b Cloud Chute and forge hoppers, Sky Bin by u³, falls off the isles | live | f8b529a |
 | M1.9 migration (MigrateV2, v2Credit) and the flip (`CoreLoop = 2`; economy2 is now tools/economy, v1's is tools/economy1) | live once Connor publishes; flipped without a Studio pass, at Connor's go-ahead (2 Oct 2026) | see log |
+| Phase 12 VEH: trucks 1.3x, driving retuned, 13 bays in 4 sizes, sell zone 40 deep | on main | c0f865d |
+| Phase 12 ATMOS: dark muted meadow, grey roads, night fog, region air, bold signs | on main | 58a5520 |
+| Phase 12 TREE, ROADS, REGIONS, TOWN (LT2_RESEARCH.md plan) | in progress | |
 | M1.10 cleanup | after about a week live | |
 
 **As built, where it differs from the plan (lead's notes, 2 Oct 2026):**
@@ -36,12 +39,15 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 **Day 3 (3 Oct 2026), after Connor's first Studio run of v2:**
 - His client crashed on its first line (`HUD is not a valid member of PlayerScripts`): no HUD, tutorial, axe, drag or driving. His place was half-synced (new server code, Soft lighting, a client module missing), and the client could also start before its siblings arrived. Client.client now waits for every module in its folder before its first require (19d08a2; Client.spec checks the list).
 - The HUD's v2 hints now know what the axe points at (loose wood, wood too hard) and whether a held piece is longer than the bed (2c40a6f).
-- In progress: VEH (trucks about 1.3x, parking bays sized to the truck, long bays for rigs and trailers) and TREE (round bark logs with visible segments and ringed cut faces, fuller canopies, forests about 1.5x more spread out with at least 775 trees), from his notes.
+- The client also loads each module in its own protected call (a1ba6ed): one whose top level errors is skipped with a warning instead of stopping the rest, and the module wait is 30 s for all of them together.
+- VEH landed (c0f865d): every truck and trailer 1.3x (`TruckLayout.Scale`), `TurnRadiusPerWheelbase` 0.477 (each truck turns its M1.5 circle), 13 bays in 4 sizes picked by `VehicleLogic.BayChoices`, SellZone 24 x 12 x 40 (z 62-102), SellTruckRange 45, ShowBeyond 42, EXIT_GAP 3.4, Drive prompt 9. Beds carry about twice the u³ a trip, which moved ECONOMY.md toward §17 (first $1k 19 min, Cobalt 81 min, full plot 46 h) but brings the Steel Axe at 3.3 min (target 5-8): a price question for Connor.
+- ATMOS landed (58a5520), per LT2_RESEARCH.md: Grass 84,125,55 / LeafyGrass 66,104,46, haul roads Pavement 170,169,165 edge to edge, the night mist +0.16 density in a grey-blue (23:00-09:30), the Volcano's air 0.55 red-orange at every hour, a cold Snowfields haze, a violet Gloam Hollow mist at 0.53, and big name signs (`BuildingArt.nameSign`, 120 px boards).
+- In progress (LT2_RESEARCH.md plan): TREE (box logs in each wood's bark, crisp cube leaf crowns, spacing), ROADS (haul roads 28, Skyroot 24, Forest Path and Plot Road 16; junction flares; brown boulders over the open grass; a thinner filler forest), REGIONS (the Snowfields ringed by brown cliffs with one pass, a dark rim round the Volcano with one gap, shallow pools in the Gloam Hollow, the biome signs at the gates) and TOWN (a truck-wide way past the sawmill to the Snow Road, a lot loop south, an easier sell-pad approach, the street lamps set back, the road mouths by the plaza).
 - Server boot measured in Studio: 775 section trees in 0.6 s, world built in 4.6 s.
 
 **Follow-ups after the flip (from the pre-flip review, 2 Oct 2026):**
 - ~~Wood a rejoin or "Send truck home" leaves on the ground out of town is lost if the player leaves again.~~ Fixed (day 3): TruckLoad remembers each owner's left-behind pieces and saves what's still theirs and lying about as `groundLoad` (each piece where it lay); it comes back there on rejoin.
-- The HUD's v2 hints `tooLong`, `tooHard` and `onWood` are still always false.
+- ~~The HUD's v2 hints `tooLong`, `tooHard` and `onWood` are still always false.~~ Fixed (day 3, 2c40a6f).
 - Calibrate EFFICIENCY from a real session, then tune the pacing (the model has first $1k, Cobalt and a full plot about 1.5x slower than §17).
 - Fixed before the flip: the Instant Delivery button reads BedVolume under v2; the Dealership won't swap a truck with loose wood on it in town; wood on someone's bed can't be cut by others; TreesPerGrowTick 20; WorldClock's tick and each boot tree are guarded; the v1 left-behind restore is v1-only; the tutorial's wood, bed and pad beacons point at a tree when you have no wood (saves migrated mid-tutorial).
 
@@ -693,6 +699,8 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 - `MapBuilder.spec`, `PreviewCameras.spec`.
 
 **Renders:** trucks 1, 3, 6, 8, 9, 10, plus a new view with a seated R15 dummy (hats) in each cab and sections view 7 (logs on beds); town 1, 2, 9; buildings 4 (Dealership display truck).
+
+**As built (phase 12, day 3):** everything above grew 1.3x (`TruckLayout.Scale`; the Rig is 46.7 long and 12.9 wide across its mirrors, 75.3 with the Heavy Hauler); `TurnRadiusPerWheelbase` 0.477 keeps each truck's M1.5 circle; the lot is 13 painted bays in 4 sizes (`WorldPlan.ParkingBays`: small 14.25 x 30, Flatbed 15 x 38.75, long 16 x 51 and longest 16 x 80, both pull-through), each about the rig plus 3 across and 4 along, picked by `VehicleLogic.BayChoices`; SellZone 24 x 12 x 40 (z 62-102). The Rig needs 28-wide haul roads (bends) and flared junctions at (30, 450) and (-20, 760); the ROADS and TOWN slices take that on.
 
 **As built (M1.5):** Flatbed and Rig wheels are 1.4 and 1.75 (the plan's 1.45/1.8 cut into the open decks); the roads were NOT widened (widening moves the pinned first-322 trees and 472 of 775 trees; two rigs pass with outer wheels on the verges); TruckHome.ShowBeyond 20 -> 30; the lot is one row of 12 bays of 10 x 60 east of the spawn; SellZone 24 x 12 x 26 (z 69-95); BedZone comes with M1.6.
 

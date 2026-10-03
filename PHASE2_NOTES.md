@@ -30,6 +30,64 @@ Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
 
+## Day 3: bigger trucks and the LT2 look (3 October 2026)
+
+Connor's day-3 feedback: the car wouldn't drive, the tutorial never
+appeared, the parking spaces were huge runways, the trucks should be
+bigger again, and the trees and world should look like the reference game
+(LT2_RESEARCH.md has what it does). In this build:
+
+- **The client keeps going** when one of its scripts fails to load (the
+  day-3 crash, "HUD is not a valid member of PlayerScripts", stopped
+  everything: no driving, no tutorial). It waits up to 30 s for all of
+  them together, then starts without a missing one and says so.
+- **Trucks 1.3x** (TruckLayout.Scale). Driving is retuned so each truck
+  turns its old circle, the sell zone is 24 x 12 x 40, and the Drive
+  prompt reaches 9 studs. Bigger beds carry about twice the wood a trip:
+  ECONOMY.md moved (first $1k 29 -> 19 min, Cobalt Axe 1.9 h -> 81 min,
+  full plot 59 -> 46 h; the Steel Axe now comes at 3.3 min, faster than
+  its 5-8 min target: a price call for Connor).
+- **Parking bays that fit**: 13 painted bays in 4 sizes (8 small, 2
+  Flatbed, 2 long pull-through, 1 longest pull-through), each about the
+  truck plus 3 across and 4 along. Your truck takes the smallest free bay
+  it fits; switching trucks moves it and a toast names the bay.
+- **The look** (ATMOS):
+  - a darker, muted meadow green (Grass 84,125,55; LeafyGrass 66,104,46)
+  - haul roads pale grey across their whole width
+  - a real night fog from 23:00, lifting by 09:30
+  - a thick red fog in the Volcano, a cold haze in the Snowfields, a
+    violet mist in the Gloam Hollow
+  - big, bold name signs on the sawmill and the shops
+
+Still to come in this round (each lands on main when it passes the
+checks): LT2-style box trees, wide roads (28 studs), brown boulders over
+the open grass, a thinner background forest, the Snowfields and Volcano
+ringed with one gate each, and truck routes through town.
+
+### What to check (in Studio)
+
+Server command bar helpers: `workspace:SetAttribute("ClockOverride", 13)`
+sets the hour (`nil` clears it); `workspace:SetAttribute("WeatherOverride",
+"Clear")`; to jump somewhere: `local TG=require(game.ReplicatedStorage.Shared.World.TerrainGen); local x,z=950,1060; game.Players:GetPlayers()[1].Character:PivotTo(CFrame.new(x,TG.HeightAt(x,z)+8,z))`.
+
+| # | Do this | Good looks like |
+|---|---|---|
+| 1 | Play with Output open | `[Client] Timberline Tycoon client started.` and no red, no `failed to load` or `never arrived` warnings |
+| 2 | Wait a few seconds on the spawn | Murph's tutorial panel appears (a returning save that had finished the old tutorial gets a short "WHAT'S NEW 1/4" version) |
+| 3 | Walk to the lot | Your Rustbucket sits centred in bay 1 (west end, south row), paint showing all round; it looks chunky next to you |
+| 4 | Use the Drive prompt (from about 9 studs), drive out forward, turn round, drive along the street | Your head clears the roof and your legs stay inside the hood; no scraping or sticking; full lock at a crawl turns about the same circle as before; no tipping on fast turns |
+| 5 | Jump out | You stand beside the driver's door, not inside the truck |
+| 6 | Back onto the sell pad with wood on the bed, until the tail meets the mill ramp | The wood sells; the post, Sky Bin and lamps aren't touched |
+| 7 | Switch to the Flatbed, then the Logging Rig + Heavy Hauler, at the Dealership | A toast names the new bay (Flatbed: bay 9; Rig + Heavy Hauler: bay 11), the rig sits inside its paint, and bay 1 is free again |
+| 8 | Drive more than 42 studs from your bay, press Call/Send home | The button shows only beyond 42; the truck returns to its bay (or a better free one, with a toast) |
+| 9 | 2 players | The second Rustbucket takes bay 2; when that player leaves, the bay frees |
+| 10 | 13:00 at the spawn, then drive north up the Snow Road | A dark, muted green (still green, not olive) with darker patches; out of town the road is light grey edge to edge with only the odd brown voxel at its edges |
+| 11 | `ClockOverride` 1, look round the spawn; then 6, 8, 10 | A grey-blue fog: the town clear, things past about 150-300 studs fading, still dark (lamps matter, a trunk reads at 30 studs). 6: a thick rose mist; 8: lifting; 10: exactly the daytime look |
+| 12 | Jump to (950, 1060) at 13:00 (stand in a truck or wear Heat Boots), then 01:00 | A thick red-orange fog, emberwood trees still findable at 60-100 studs; at night a dark red fog, not glowing. Walking out past the Volcano's edge it fades back in about 3 s |
+| 13 | Jump to (0, 1080) and (-565, -455), at 13:00 and 01:00 | The Snowfields: a light cold white-blue haze by day, no whiteout. The Gloam Hollow: a violet mist, the darkest place at night but never black |
+| 14 | Look at the shops from the spawn, the middle of the lot (about 80, 0, 24) and a truck on the street; again at 22:00 | DEALERSHIP, TIMBERLINE SAWMILL, TOOL SHED and HEARTH & HOME readable from the lot, letters filling the boards, nothing through a roof or blocking a door; two lamps light each sign at night. If the letters look small inside a big board, tell Claude |
+| 15 | Known tight spots until the town routes land | The main street leaves a Logging Rig about 1 stud a side; the haul roads are 14 wide (a Rig fills them); there's no truck-wide way past the sawmill to the Snow Road yet |
+
 ## The v2 loop goes live (M1.9, 2 October 2026)
 
 Connor's call (V2_PLAN.md): the game now plays like the spec he sent.
@@ -126,7 +184,7 @@ On the live game, the same Output lines are in the in-game console: press
 | 9 | Drive a Logging Rig from the street onto the sell pad, back out, and between the SELL LOGS HERE posts; walk from the spawn to Murph under TO THE WOODS | Nothing in the way (those boards stay walk-through on purpose) |
 | 10 | Cross each rope bridge on the isles and walk sideways into the rope | An invisible wall stops you; getting on and off at the ends is smooth |
 | 11 | Frame rate in the open country (about 1,650 more solid parts) | Same as before |
-| 12 | A little more Lumber Tycoon 2 (STY-01..05): stand on the spawn, then drive the Snow Road north out of town and look at the hills and mountains | A deeper green meadow, brown cliffs and ridges under white snow, and the haul roads with a pale gravel crown between dirt verges (the town's street stays dirt). If the gravel looks like tiles, tell Claude (it's one setting) |
+| 12 | A little more Lumber Tycoon 2 (STY-01..05): stand on the spawn, then drive the Snow Road north out of town and look at the hills and mountains | A deeper green meadow, brown cliffs and ridges under white snow, and the haul roads with a pale gravel crown between dirt verges (the town's street stays dirt; day 3 made the roads pale grey edge to edge, see the top section). If the gravel looks like tiles, tell Claude (it's one setting) |
 | 13 | West of the Starter Forest, about (-124, -177) and (-261, -189), and the Hills' grassland | Groups of 3-5 half-buried brown boulders; every lone boulder and outcrop is brown too. They block you, and none sit on a road or in water |
 | 14 | The timber footbridge over the river at about (-877, 575); the plank docks on Mirror Lake (-716, -111) and on the east coast (1194, -760) | You walk on and off the bridge without a hop, the rails stop you, TIMBER BRIDGE and MIRROR LAKE signs read. Each dock has a ladder, a lantern (lit at dusk) and a rowboat you can walk through |
 | 15 | On the spawn pad, look east | A small red-and-white lighthouse on the horizon just left of the PLOT DISTRICT sign. At night its lamp glows (Server command bar: `workspace:SetAttribute("ClockOverride", 22)`, `nil` to clear) |

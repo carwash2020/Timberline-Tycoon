@@ -159,9 +159,9 @@ No scene shows the player's eye level or night yet (WLD-19 adds them). Until the
 
 | Thing | Values (today → target) | Lives in |
 |---|---|---|
-| Meadow | Grass 100,152,64, mixed by noise with LeafyGrass 76,126,54 (STY-01, toward LT2; was 116,170,74 and 86,140,62) | `TerrainGen.MaterialColors` |
-| Roads, paths / plaza | Ground 150,116,78 / Cobblestone 170,160,146. Haul roads out of town: a Pavement 182,174,158 gravel crown between Ground verges (STY-02) | same |
-| Rock | Rock 122,98,78 (brown, STY-01). Boulders, outcrops and clusters: `PropArt.BrownTones` (two tones); snowy and volcanic boulders keep theirs | `TerrainGen`, `PropArt` |
+| Meadow | Grass 84,125,55, mixed by noise with LeafyGrass 66,104,46 (ATMOS, phase 12: dark, muted, toward LT2; STY-01 had 100,152,64 and 76,126,54; the original 116,170,74 and 86,140,62) | `TerrainGen.MaterialColors` |
+| Roads, paths / plaza | Ground 150,116,78 / Cobblestone 170,160,146. Haul roads out of town: Pavement 170,169,165, light grey edge to edge with at most a frayed dirt edge (`TerrainGen.GravelEdge`; ATMOS, phase 12; STY-02 had a beige crown between dirt verges) | same |
+| Rock | Rock 114,92,74 (brown; STY-01 122,98,78). Boulders, outcrops and clusters: `PropArt.BrownTones` (two tones); snowy and volcanic boulders keep theirs | `TerrainGen`, `PropArt` |
 | Sand, water | Sand 226,205,150; water 62,140,150 at transparency 0.55, reflectance 0.45 | `TerrainGen`, `TerrainBuilder.setLook` |
 | Snow | Snow 238,244,250 → 222,230,240; Glacier 172,214,236 → 150,196,224; dark Rock/Slate outcrops | `TerrainGen` |
 | Volcano | Basalt 52,46,44, Slate 74,66,62; CrackedLava only in thin veins at 220,90,35 (today: 255,108,30 patches) | `TerrainGen` |
@@ -454,11 +454,11 @@ A split id (WLD-03, WLD-06, WLD-10, WLD-19) shows up as done once its first part
   - QuestUI.BeaconPaths (SellArea/SellZone, ToolShed/Counter).
 - SawBlade teeth stay welded and unanchored. Never re-anchor them.
 - The SellPad stays non-colliding and at most 0.25 tall. Its `ANG(0, PI, 0)` is what makes the text read upright.
-- ParkingSlot parts: VehicleService reads their CFrame, Size.Y, tag and Index. They are 10 x 60 (WorldPlan.ParkingSlotSize, M1.5), one row of 12. Restyle them, but keep that contract.
+- ParkingSlot parts: VehicleService reads their CFrame, Size (X, Y and Z), tag and Index. There are 13 bays in 4 sizes (`WorldPlan.ParkingBays`, phase 12): 8 small, 2 Flatbed, 2 long and 1 longest pull-through; `VehicleLogic.BayChoices` gives a rig the smallest free bay it fits. Restyle them, but keep that contract.
 - Leaves stay CanCollide false (Poppercam and trucks), and canopies stay CanQuery true (clicking leaves targets the tree).
 - Isle tops stay flat, colliding discs. New isle decor is non-colliding and honours `opts.clear`.
 - Gondola cable constants (GONDOLA_OUT, GONDOLA_RIM, CABLE_UP, CABLE_SIDE, CABLE_CLEAR) were just fixed and are covered by specs.
-- TruckArt: the Chassis is the only massive part besides the skids. The skids are frictionless with bottoms at y 0. DriverSeat is a direct child with CanCollide off. Only beds, walls and skids collide. Every rig (truck + trailer) fits a 10 x 60 slot (M1.5; was 6.5 x 37).
+- TruckArt: the Chassis is the only massive part besides the skids. The skids are frictionless with bottoms at y 0. DriverSeat is a direct child with CanCollide off. Only beds, walls and skids collide. Every rig (truck + trailer) fits the bay `VehicleLogic.BayChoices` gives it (phase 12: trucks 1.3x, `TruckLayout.Scale`; M1.5 had one 10 x 60 slot size).
 - AxeArt: Handle is the PrimaryPart, everything else is welded to it, and `AxeArt.Grip` is verified.
 - EnvironmentData's local `checkOverride` asserts that every override key exists. A typo errors at require time and kills the client's lighting.
 - DecorSpots must draw the same rng numbers per candidate, or every decor cell reshuffles.
