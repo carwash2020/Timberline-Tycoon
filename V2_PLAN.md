@@ -22,7 +22,7 @@ Owner: Connor. Plan written 2026-10-02 against `main` at `ea4ccf6`. The lead kee
 | M1.9 migration (MigrateV2, v2Credit) and the flip (`CoreLoop = 2`; economy2 is now tools/economy, v1's is tools/economy1) | live once Connor publishes; flipped without a Studio pass, at Connor's go-ahead (2 Oct 2026) | see log |
 | Phase 12 VEH: trucks 1.3x, driving retuned, 13 bays in 4 sizes, sell zone 40 deep | on main | c0f865d |
 | Phase 12 ATMOS: dark muted meadow, grey roads, night fog, region air, bold signs | on main | 58a5520 |
-| Phase 12 TREE, ROADS, REGIONS, TOWN (LT2_RESEARCH.md plan) | landed | phase-12 world |
+| Phase 12 TREE, ROADS, REGIONS, TOWN (LT2_RESEARCH.md plan) | landed | 2e02fcd |
 | M1.10 cleanup | after about a week live | |
 
 **As built, where it differs from the plan (lead's notes, 2 Oct 2026):**
