@@ -410,7 +410,9 @@ local function readSkeleton(rec: TreeRecord, skel: TreeGen.Skeleton, model: Mode
 		rec.nodes[sec.id] = { parent = sec.parent, children = table.clone(sec.children) }
 		rec.depth[sec.id] = sec.depth
 	end
-	for _, d in ipairs(model:GetChildren()) do
+	-- Descendants, not only direct children: a section grouped under a
+	-- folder (a box trunk) is still that section.
+	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and d.Name == "Section" then
 			local id = d:GetAttribute("Section")
 			if type(id) == "number" then
@@ -838,21 +840,29 @@ function SectionTrees.RegrowsIn(uid: string): number?
 end
 
 -- The standing tree a part belongs to and the section it is (nil, nil if
--- it isn't a section of one).
+-- it isn't a section of one). The part may sit under a folder or an inner
+-- model (a box trunk); walk up to the tagged tree. A part that streamed
+-- out has no parent and is not a section. A dress part that only carries
+-- the section id is not the section itself (the client sends the Section).
 function SectionTrees.FromPart(part: Instance): (TreeRecord?, number?)
-	local model = part.Parent
-	if not model or not model:IsA("Model") then
-		return nil, nil
+	local node: Instance? = part.Parent
+	for _ = 1, 8 do
+		if node == nil then
+			return nil, nil
+		end
+		if node:IsA("Model") then
+			local rec = byModel[node]
+			if rec and rec.model == node then
+				local id = part:GetAttribute("Section")
+				if type(id) ~= "number" or rec.sections[id] ~= part then
+					return rec, nil
+				end
+				return rec, id
+			end
+		end
+		node = node.Parent
 	end
-	local rec = byModel[model]
-	if not rec or rec.model ~= model then
-		return nil, nil
-	end
-	local id = part:GetAttribute("Section")
-	if type(id) ~= "number" or rec.sections[id] ~= part then
-		return rec, nil
-	end
-	return rec, id
+	return nil, nil
 end
 
 ---------------------------------------------------------------------------

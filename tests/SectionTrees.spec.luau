@@ -511,6 +511,25 @@ return function(t)
 		t.eq(s.toasts[#s.toasts][2], "You need a Lantern to chop gloamwood.")
 	end)
 
+	t.test("a section grouped under a folder is still that section; a part with no parent is not", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local part = rec.sections[1]
+		local folder = Instance.new("Folder")
+		folder.Name = "Trunk"
+		folder.Parent = rec.model
+		part.Parent = folder
+		local found, id = s.Trees.FromPart(part)
+		t.ok(found == rec)
+		t.eq(id, part:GetAttribute("Section"))
+		local p = s.player(1)
+		t.ok(s.swing(p, part), "a swing at the nested section lands")
+		part.Parent = nil
+		found, id = s.Trees.FromPart(part)
+		t.eq(found, nil, "streamed out")
+		t.eq(id, nil)
+	end)
+
 	t.test("a swing in a cut window adds to that cut; a new height starts another, at most two a section", function()
 		local s = setup()
 		local rec = s.tree("oak")

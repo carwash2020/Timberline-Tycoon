@@ -161,6 +161,29 @@ return function(t)
 		t.eq(d3, 4.6)
 	end)
 
+	t.test("where a swing aims: the finger on touch, the cursor on a mouse, nothing on a gamepad", function()
+		local Vector2 = roblox.Vector2
+		t.eq(CutController.PointerKind("Touch"), "touch")
+		t.eq(CutController.PointerKind("Gamepad1"), "gamepad")
+		t.eq(CutController.PointerKind("Gamepad2"), "gamepad")
+		t.eq(CutController.PointerKind("MouseButton1"), "mouse")
+		t.eq(CutController.PointerKind("Keyboard"), "mouse")
+		local tap, mouse = Vector2.new(12, 34), Vector2.new(56, 78)
+		local point, space = CutController.PointerPoint("touch", tap, mouse)
+		t.eq({ point.X, point.Y, space }, { 12, 34, "screen" }, "a stored finger is screen pixels")
+		point, space = CutController.PointerPoint("touch", nil, mouse)
+		t.eq({ point.X, point.Y, space }, { 56, 78, "viewport" }, "no finger yet: the mouse location, never no ray")
+		point, space = CutController.PointerPoint("mouse", tap, mouse)
+		t.eq({ point.X, point.Y, space }, { 56, 78, "viewport" })
+		point, space = CutController.PointerPoint("gamepad", tap, mouse)
+		t.eq(point, nil, "a pad has no pointer")
+		t.eq(space, "viewport")
+		local screen = Vector2.new(800, 400)
+		t.eq(CutController.TouchAims(true, Vector2.new(500, 200), screen), false, "a button already took it")
+		t.eq(CutController.TouchAims(false, Vector2.new(100, 300), screen), false, "the thumbstick walks")
+		t.eq(CutController.TouchAims(false, Vector2.new(500, 200), screen), true, "a tap in the world")
+	end)
+
 	t.test("under the v1 loop it starts nothing", function()
 		local controller, connected = load(1)
 		controller.Start()
@@ -188,5 +211,282 @@ return function(t)
 		local hits = FieldGuide.CutHits(rusty, "lumenwood", 4, 4)
 		t.ok(HintLogic.TooHard(hits), "lumenwood takes " .. hits .. " hits")
 		t.eq({ CutController.PointingFacts(seen("tree", "lumenwood"), rusty) }, { false, true }, "too many hits")
+	end)
+
+	-- A live v2 client: tapping a tree fires Chop (not the idle v1 ChopTree),
+	-- aimed with the right camera ray. GetPartBoundsInRadius is empty unless
+	-- a case fills it, so a missing ray cannot be saved by the nearest tree.
+	local function signal()
+		local fns = {}
+		return {
+			Connect = function(_, fn)
+				table.insert(fns, fn)
+				return { Disconnect = function() end }
+			end,
+			Fire = function(_, ...)
+				for _, fn in ipairs(fns) do
+					fn(...)
+				end
+			end,
+		}
+	end
+
+	local function swingWorld()
+		local Vector2, Vector3, CFrame = roblox.Vector2, roblox.Vector3, roblox.CFrame
+		local fires, rays, delayed = {}, {}, {}
+		local inputName = "Touch"
+		local mouse = Vector2.new(120, 80)
+		local radiusParts = {}
+		local time = { now = 1000 }
+		local touchTap = signal()
+		local inputBegan = signal()
+		local activated = signal()
+
+		local model = Instance.new("Model")
+		model:AddTag("Tree")
+		model:SetAttribute("WoodId", "oak")
+		local section = Instance.new("Part")
+		section.Name = "Section"
+		section:SetAttribute("Section", 1)
+		section.Size = Vector3.new(2, 4.5, 2)
+		section.CFrame = CFrame.new(0, 2.25, 0)
+		section.Parent = model
+		local hrp = Instance.new("Part")
+		hrp.Name = "HumanoidRootPart"
+		hrp.CFrame = CFrame.new(3, 3, 0)
+		hrp.Position = Vector3.new(3, 3, 0)
+		local tool = {
+			Activated = activated,
+			Deactivated = signal(),
+			Unequipped = signal(),
+			IsA = function(_, class)
+				return class == "Tool"
+			end,
+			GetAttribute = function(_, key)
+				return if key == "AxeId" then "RustyAxe" else nil
+			end,
+		}
+		local char = {
+			ChildAdded = signal(),
+			GetChildren = function()
+				return { tool }
+			end,
+			FindFirstChild = function(_, name)
+				return if name == "HumanoidRootPart" then hrp else nil
+			end,
+			FindFirstChildOfClass = function(_, class)
+				return if class == "Tool" then tool else nil
+			end,
+		}
+		local hitInstance: any = section
+		local camera = {
+			ViewportSize = Vector2.new(844, 390),
+			ScreenPointToRay = function(_, x, y)
+				table.insert(rays, { method = "screen", x = x, y = y })
+				return { Origin = Vector3.new(0, 8, 8), Direction = Vector3.new(0, -1, -1).Unit }
+			end,
+			ViewportPointToRay = function(_, x, y)
+				table.insert(rays, { method = "viewport", x = x, y = y })
+				return { Origin = Vector3.new(0, 8, 8), Direction = Vector3.new(0, -1, -1).Unit }
+			end,
+		}
+		local function fakeInstance(className)
+			local fields = { ClassName = className }
+			return setmetatable({}, {
+				__index = fields,
+				__newindex = function(_, key, value)
+					fields[key] = value
+				end,
+			})
+		end
+		local loader = t.loader({
+			services = {
+				Debris = { AddItem = function() end },
+				Players = { LocalPlayer = { UserId = 1, Character = char, CharacterAdded = signal() } },
+				RunService = { Heartbeat = signal() },
+				UserInputService = {
+					InputBegan = inputBegan,
+					TouchTapInWorld = touchTap,
+					GetLastInputType = function()
+						return { Name = inputName }
+					end,
+					GetMouseLocation = function()
+						return mouse
+					end,
+				},
+			},
+			mocks = {
+				HUD = {
+					Toast = function() end,
+					SetPointing = function() end,
+				},
+				Quality = {
+					Tier = function()
+						return "high"
+					end,
+				},
+				SoundData = { Play = function() end },
+				Net = {
+					Remote = function(name)
+						return {
+							FireServer = function(_, ...)
+								table.insert(fires, { name = name, args = { ... } })
+							end,
+						}
+					end,
+				},
+			},
+			globals = {
+				workspace = {
+					CurrentCamera = camera,
+					GetAttribute = function(_, name)
+						return if name == "CoreLoopActive" then 2 else nil
+					end,
+					GetPropertyChangedSignal = function()
+						return signal()
+					end,
+					Raycast = function()
+						if hitInstance == nil then
+							return nil
+						end
+						return { Instance = hitInstance, Position = Vector3.new(1, 3, 0), Normal = Vector3.xAxis }
+					end,
+					GetPartBoundsInRadius = function()
+						return radiusParts
+					end,
+				},
+				RaycastParams = {
+					new = function()
+						return {}
+					end,
+				},
+				OverlapParams = {
+					new = function()
+						return {}
+					end,
+				},
+				Instance = { new = fakeInstance },
+				task = {
+					wait = function()
+						return 0.25
+					end,
+					delay = function(_, fn)
+						table.insert(delayed, fn)
+					end,
+					defer = function(fn, ...)
+						fn(...)
+					end,
+				},
+				os = setmetatable({
+					clock = function()
+						return time.now
+					end,
+				}, { __index = os }),
+			},
+		})
+		local controller = loader:load("StarterPlayer/StarterPlayerScripts/CutController")
+		controller.Start()
+		local function flush()
+			local pending = delayed
+			delayed = {}
+			for _, fn in ipairs(pending) do
+				fn()
+			end
+		end
+		return {
+			fires = fires,
+			rays = rays,
+			section = section,
+			tap = function(pos, processed)
+				touchTap:Fire(pos, processed == true)
+			end,
+			finger = function(pos)
+				inputBegan:Fire({
+					UserInputType = roblox.Enum.UserInputType.Touch,
+					Position = roblox.Vector3.new(pos.X, pos.Y, 0),
+				})
+			end,
+			activate = function()
+				activated:Fire()
+			end,
+			flush = flush,
+			input = function(name)
+				inputName = name
+			end,
+			mouse = function(point)
+				mouse = point
+			end,
+			radius = function(parts)
+				radiusParts = parts
+			end,
+			hit = function(inst)
+				hitInstance = inst
+			end,
+			advance = function(dt)
+				time.now += dt
+			end,
+		}
+	end
+
+	t.test("a tap in the world fires Chop along a screen ray; a button or the thumbstick does not", function()
+		local Vector2 = roblox.Vector2
+		local w = swingWorld()
+		w.tap(Vector2.new(500, 100), true)
+		t.eq(#w.fires, 0, "a button")
+		w.tap(Vector2.new(80, 300), false)
+		t.eq(#w.fires, 0, "the thumbstick")
+		w.tap(Vector2.new(500, 100), false)
+		t.eq(#w.fires, 1)
+		t.eq(w.fires[1].name, "Chop", "the live v2 remote, not ChopTree")
+		t.ok(w.fires[1].args[1] == w.section, "the section the ray hit")
+		t.eq(w.rays[1], { method = "screen", x = 500, y = 100 })
+	end)
+
+	t.test("touch Activated with no stored tap still swings, through the mouse-location ray", function()
+		local w = swingWorld()
+		w.radius({})
+		w.mouse(roblox.Vector2.new(120, 80))
+		w.activate()
+		t.eq(#w.fires, 0, "it waits a frame for the tap")
+		w.flush()
+		t.eq(#w.fires, 1)
+		t.eq(w.fires[1].name, "Chop")
+		t.eq(w.rays[1], { method = "viewport", x = 120, y = 80 })
+	end)
+
+	t.test("a world tap and the tool's Activated are one swing, and a thumbstick activate is none", function()
+		local Vector2 = roblox.Vector2
+		local w = swingWorld()
+		w.tap(Vector2.new(500, 100), false)
+		w.activate()
+		w.flush()
+		t.eq(#w.fires, 1, "Activated does not swing the tap again")
+		w.advance(1)
+		w.finger(Vector2.new(80, 300))
+		w.activate()
+		w.flush()
+		t.eq(#w.fires, 1, "activating from the thumbstick doesn't chop")
+	end)
+
+	t.test("a mouse click fires Chop through ViewportPointToRay", function()
+		local w = swingWorld()
+		w.input("MouseButton1")
+		w.mouse(roblox.Vector2.new(40, 50))
+		w.activate()
+		t.eq(#w.fires, 1)
+		t.eq(w.fires[1].name, "Chop")
+		t.eq(w.rays[1], { method = "viewport", x = 40, y = 50 })
+	end)
+
+	t.test("a gamepad trigger fires Chop at the nearest section, with no pointer ray", function()
+		local w = swingWorld()
+		w.input("Gamepad1")
+		w.hit(nil)
+		w.radius({ w.section })
+		w.activate()
+		t.eq(#w.fires, 1)
+		t.eq(w.fires[1].name, "Chop")
+		t.ok(w.fires[1].args[1] == w.section)
+		t.eq(#w.rays, 0, "no pointer")
 	end)
 end

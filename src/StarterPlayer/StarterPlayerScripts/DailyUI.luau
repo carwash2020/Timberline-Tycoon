@@ -110,7 +110,25 @@ local function refresh()
 		if p and not b.Visible then
 			p.Visible = false
 		end
-		b.Text = HudRules.DailyLabel(done, #list, streak(), UITheme.IsPhone())
+		local compact = UITheme.Compact()
+		b.AutomaticSize = if compact then Enum.AutomaticSize.None else Enum.AutomaticSize.X
+		if compact then
+			b.Size = UDim2.fromOffset(52, 36)
+			b.TextSize = 14
+		else
+			local spec = UITheme.Sized("DailyButton")
+			local size = spec.size or Vector2.new(200, 30)
+			b.Size = UDim2.fromOffset(size.X, size.Y)
+			b.TextSize = spec.text
+		end
+		local holder = buttonSlot
+		if holder then
+			holder.AutomaticSize = if compact then Enum.AutomaticSize.None else Enum.AutomaticSize.X
+			holder.Size = if compact then UDim2.fromOffset(52, 36) else UDim2.fromOffset(0, b.Size.Y.Offset)
+		end
+		b.Text = if compact
+			then HudRules.DailyMark(done, #list)
+			else HudRules.DailyLabel(done, #list, streak(), UITheme.IsPhone())
 		b.BackgroundColor3 = if done == #list and #list > 0 then GREEN else BARK
 	end
 	local loop = CoreLoop.Active()
@@ -284,6 +302,7 @@ function DailyUI.Start()
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	refresh()
+	UITheme.WatchLayout(refresh)
 	-- Keep the countdown ticking while the goals are open.
 	task.spawn(function()
 		while true do
