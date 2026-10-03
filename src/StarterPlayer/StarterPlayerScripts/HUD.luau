@@ -138,6 +138,9 @@ local cashInner: Frame? = nil
 local cashLabel: TextLabel? = nil
 local cashOuter: Frame? = nil
 local cashGlow: UIStroke? = nil
+local cashMin: UISizeConstraint? = nil
+local cashInnerMin: UISizeConstraint? = nil
+local cashLabelMin: UISizeConstraint? = nil
 local cashPops: Frame? = nil -- a zero-size spot at the row's left end the pops float from
 local cashShown: NumberValue? = nil -- what the plaque shows; tweens toward the real amount
 local cashTarget: number? = nil -- the real amount (nil until the first update)
@@ -1316,6 +1319,7 @@ local function buildCash(gui: ScreenGui)
 	local min = Instance.new("UISizeConstraint")
 	min.MinSize = Vector2.new(172, 49) -- fits $1,999,999 without growing into the row
 	min.Parent = card.outer
+	cashMin = min
 	local glow = UITheme.stroke(card.outer, C.Amber, 4)
 	glow.Transparency = 0.45
 	glow.Enabled = false
@@ -1334,6 +1338,7 @@ local function buildCash(gui: ScreenGui)
 	local innerMin = Instance.new("UISizeConstraint")
 	innerMin.MinSize = Vector2.new(164, 38)
 	innerMin.Parent = inner
+	cashInnerMin = innerMin
 
 	local label = UITheme.label(inner, "$0", F.Heading, 26, C.Ink)
 	label.AutomaticSize = Enum.AutomaticSize.X
@@ -1341,6 +1346,7 @@ local function buildCash(gui: ScreenGui)
 	local labelMin = Instance.new("UISizeConstraint")
 	labelMin.MinSize = Vector2.new(136, 0)
 	labelMin.Parent = label
+	cashLabelMin = labelMin
 
 	local shown = Instance.new("NumberValue")
 	shown.Name = "CashShown"
@@ -1353,6 +1359,31 @@ local function buildCash(gui: ScreenGui)
 	row.Parent = gui
 	cashOuter, cashFace, cashInner, cashLabel, cashGlow = card.outer, card.face, inner, label, glow
 	cashPops, cashShown = pops, shown
+	-- A handheld doesn't reserve room for $1,999,999: the plaque hugs the
+	-- amount, and the screen's UIScale shrinks it further.
+	local function fitCash()
+		local compact = UITheme.Compact()
+		local cap, paper, words = cashMin, cashInnerMin, cashLabelMin
+		if cap then
+			cap.MinSize = if compact then Vector2.new(72, 32) else Vector2.new(172, 49)
+		end
+		if paper then
+			paper.MinSize = if compact then Vector2.new(56, 26) else Vector2.new(164, 38)
+		end
+		if words then
+			words.MinSize = if compact then Vector2.new(36, 0) else Vector2.new(136, 0)
+		end
+		local face = cashInner
+		if face then
+			face.Size = UDim2.fromOffset(0, if compact then 26 else 38)
+		end
+		local shownLabel = cashLabel
+		if shownLabel then
+			shownLabel.TextSize = if compact then 20 else 26
+		end
+	end
+	fitCash()
+	UITheme.WatchLayout(fitCash)
 end
 
 -- The load chip: a log drawn from frames (no image to upload), then

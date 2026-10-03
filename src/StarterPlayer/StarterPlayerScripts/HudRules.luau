@@ -67,7 +67,13 @@ end
 -- "DAILY GOALS  1/3  ·  5-day streak". On a phone, where the corner's
 -- second line (the clock, the pouch and this) would reach the Field Guide
 -- button on a small screen, a streak drops the GOALS: "DAILY 1/3  ·  5-day
--- streak".
+-- streak". DailyMark is the compact icon: just "1/3".
+function HudRules.DailyMark(done: number, total: number): string
+	local n = if done == done then math.floor(done) else 0
+	local of = if total == total then math.floor(total) else 0
+	return string.format("%d/%d", n, of)
+end
+
 function HudRules.DailyLabel(done: number, total: number, streak: number, phone: boolean): string
 	local days = math.floor(streak)
 	if not (days > 0) or days == math.huge then -- no streak (or not a count: NaN, infinity)

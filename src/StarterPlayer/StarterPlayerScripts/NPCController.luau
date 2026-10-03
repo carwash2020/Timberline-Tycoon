@@ -26,7 +26,8 @@
 --     that one tip.
 --   * Bubbles sit beside the head, cap their width, and fade past a short
 --     distance. On a phone they're smaller and drop lower if the head is
---     up in the money plaque's band.
+--     up in the money plaque's band. A compact screen (a dense phone, a
+--     short window) uses that same phone layout.
 --   * Beyond ANIMATE_RANGE they're left alone (joints reset), walkers just
 --     keep their place on the route. Who to look at is refreshed a few
 --     times a second, not every frame.
@@ -46,6 +47,7 @@ local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
+local UITheme = require(script.Parent.UITheme)
 
 local NPCController = {}
 
@@ -148,8 +150,12 @@ local function refreshLayout(now: number)
 	end
 	layoutAt = now
 	local camera = workspace.CurrentCamera
-	local width = if camera then camera.ViewportSize.X else 1920
+	local viewport = if camera then camera.ViewportSize else nil
+	local width = if viewport then viewport.X else 1920
+	-- A dense phone is wider than NPCDialogue.IsPhone's cutoff. Compact
+	-- selects this phone layout for those screens too.
 	local phone = NPCDialogue.IsPhone(UserInputService.TouchEnabled, UserInputService.KeyboardEnabled, width)
+		or UITheme.IsCompact(viewport, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
 	local layout = NPCDialogue.LayoutFor(phone)
 	if layout.phone ~= phoneLayout.phone then
 		for _, rig in pairs(rigs) do
