@@ -300,16 +300,17 @@ local function roadWeight(x: number, z: number): (number, number)
 	return best, onRoad
 end
 
--- The haul roads' gravel (STY-02): out in the country each haul road is a
--- pale gravel crown (TerrainGen.GravelMaterial, a terrain material nothing
--- else uses) between dirt verges GRAVEL_VERGE studs wide; in town and the
--- plot district every road stays dirt. Material only: no height reads it.
+-- The haul roads (STY-02): out in the country each haul road is pale grey
+-- road its whole width (TerrainGen.GravelMaterial, a terrain material
+-- nothing else uses; phase 12 widened phase 10's gravel crown to the whole
+-- road), its edge fraying into dirt for GRAVEL_EDGE studs or so at most.
+-- In town and the plot district every road stays dirt: the pale road frays
+-- into it where the town's flat ground begins. The plot road and lanes and
+-- the forest path are dirt too. Material only: no height reads it.
 TerrainGen.HaulRoads = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
 TerrainGen.GravelMaterial = "Pavement"
-local GRAVEL_VERGE = 3 -- studs of dirt each side of the gravel
-local GRAVEL_LEAST = 3.5 -- the narrowest the gravel's half gets (the 12-wide Skyroot Road)
-TerrainGen.GravelVerge = GRAVEL_VERGE
-TerrainGen.GravelLeast = GRAVEL_LEAST
+local GRAVEL_EDGE = 1 -- studs in from a haul road's edge where its pale surface ends (dirt beyond)
+TerrainGen.GravelEdge = GRAVEL_EDGE
 local HAUL: { FastRoad } = {}
 for _, road in ipairs(WorldLayout.Roads) do
 	if table.find(TerrainGen.HaulRoads, road.name) then
@@ -317,11 +318,11 @@ for _, road in ipairs(WorldLayout.Roads) do
 	end
 end
 
--- Whether (x, z) is on a haul road's gravel crown (its edge frayed a
--- little, as the dirt's is).
+-- Whether (x, z) is on a haul road's pale surface (its edge frayed a
+-- little, as the road's own is).
 local function onGravel(x: number, z: number): boolean
 	for _, road in ipairs(HAUL) do
-		local half = math.max(road.half - GRAVEL_VERGE, GRAVEL_LEAST)
+		local half = road.half - GRAVEL_EDGE
 		local d = WorldLayout.FastDistance(road.line, x, z, half + 1)
 		if d < half + noise(x / 7, z / 7, 8.2) * 0.8 then
 			return true
@@ -510,8 +511,8 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 		end
 	end
 	if onRoad > 0 then
-		-- Out in the country a haul road's crown is gravel (STY-02), fraying
-		-- into dirt where the town's flat ground begins.
+		-- Out in the country a haul road is pale road its whole width
+		-- (STY-02), fraying into dirt where the town's flat ground begins.
 		if flat < 0.35 + 0.2 * dither(x, z) and onGravel(x, z) then
 			return TerrainGen.GravelMaterial
 		end
@@ -646,7 +647,9 @@ TerrainGen.MaterialColors = {
 	Slate = Color3.fromRGB(74, 66, 62),
 	CrackedLava = Color3.fromRGB(255, 108, 30),
 	Cobblestone = Color3.fromRGB(170, 160, 146),
-	Pavement = Color3.fromRGB(182, 174, 158), -- the haul roads' pale gravel (GravelMaterial, STY-02)
+	-- The haul roads' pale road (GravelMaterial, STY-02): a light, cool grey
+	-- (phase 12; it was a beige 182,174,158).
+	Pavement = Color3.fromRGB(170, 169, 165),
 } :: { [string]: Color3 }
 
 -- What lies under a surface material (cliff faces, the voxels below).
