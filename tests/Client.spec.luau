@@ -5,7 +5,8 @@ return function(t)
 	-- Runs Client.client with every controller faked: `failing` names the
 	-- ones whose Start errors. Returns who started, the warnings and the
 	-- prints, in order.
-	local function run(failing)
+	local function run(failing, failingLoad)
+		failingLoad = failingLoad or {}
 		local started, prints = {}, {}
 		local function fake(name)
 			return {
@@ -22,6 +23,9 @@ return function(t)
 			__index = function(_, name)
 				if name == "Client.client" then
 					return nil -- the script under test
+				end
+				if failingLoad[name] then
+					error(name .. " broke at load") -- its top level errors
 				end
 				fakes[name] = fakes[name] or fake(name)
 				return fakes[name]
@@ -45,10 +49,10 @@ return function(t)
 		return started, loader.warnings, prints, fakes
 	end
 
-	local function failures(warnings)
+	local function failures(warnings, what)
 		local names = {}
 		for _, w in ipairs(warnings) do
-			local name = string.match(w, "^%[Client%] (%S+) failed to start")
+			local name = string.match(w, "^%[Client%] (%S+) failed to " .. (what or "start"))
 			if name then
 				table.insert(names, name)
 			end
@@ -108,8 +112,39 @@ return function(t)
 		end
 		table.sort(listed)
 		t.eq(listed, onDisk, "MODULES names every module in StarterPlayerScripts, no more, no less")
-		local waits = string.find(source, "WaitForChild(name, MODULE_WAIT)", 1, true)
+		local waits = string.find(source, "WaitForChild(name, left)", 1, true)
 		local firstRequire = string.find(source, "require(script.Parent.", 1, true)
 		t.ok(waits and firstRequire and waits < firstRequire, "the wait comes before any require")
+		-- One deadline for all of them: a half-synced place doesn't wait
+		-- MODULE_WAIT for each missing module in turn.
+		t.ok(string.find(source, "local deadline = os.clock() + MODULE_WAIT", 1, true), "a shared deadline")
+		t.ok(string.find(source, "local left = deadline - os.clock()", 1, true), "each wait gets what is left")
+	end)
+
+	-- A module whose top level errors (a broken sibling, a missing remote)
+	-- used to stop the whole client at its require: no HUD, no tutorial, no
+	-- driving. Now it is skipped with a warning and the rest still start.
+	t.test("a controller that fails to load warns, and every other controller still starts", function()
+		local started, warnings, prints = run({}, { VehicleController = true })
+		local all = run({})
+		local expected = {}
+		for _, name in ipairs(all) do
+			if name ~= "VehicleController" then
+				table.insert(expected, name)
+			end
+		end
+		t.eq(started, expected, "every other controller, in the same order")
+		t.eq(failures(warnings, "load"), { "VehicleController" })
+		t.ok(string.find(warnings[1], "VehicleController broke at load", 1, true), "with the error")
+		t.eq(failures(warnings), {}, "nothing failed to start")
+		t.eq(prints[#prints], "[Client] Timberline Tycoon client started.")
+	end)
+
+	t.test("a HUD that fails to load warns, and every other controller still starts", function()
+		local started, warnings, prints = run({}, { HUD = true })
+		t.eq(started[1], "Quality", "the others start, the HUD skipped")
+		t.ok(not table.find(started, "HUD"))
+		t.eq(failures(warnings, "load"), { "HUD" })
+		t.eq(prints[#prints], "[Client] Timberline Tycoon client started.")
 	end)
 end
