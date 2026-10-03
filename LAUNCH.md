@@ -25,8 +25,9 @@ rojo serve
 In Studio: **Plugins → Rojo → Connect**.
 
 `rojo serve` updates scripts. It does **not** update place settings
-(streaming, lighting, grass, max players, wind). Those arrive only when you
-open a fresh `build.rbxlx` and publish that file. If you Connect Rojo to an
+(streaming, lighting, grass, wind). Those arrive only when you open a fresh
+`build.rbxlx` and publish that file. Max Players does not arrive with the
+file: Roblox stores it in Game Settings (step 2). If you Connect Rojo to an
 older place, the scripts are new and the settings may still be the old ones.
 Play will warn. See step 2.
 
@@ -42,9 +43,9 @@ Set these before you call it published. Code cannot set the ones marked
 | Where | Set this | Why |
 |---|---|---|
 | The built place, Workspace | StreamingEnabled **on**, StreamingTargetRadius **640**, StreamingMinRadius **128**, StreamingIntegrityMode **PauseOutsideLoadedArea**, ModelStreamingBehavior **Improved**, StreamOutBehavior **Opportunistic** | A fresh `build.rbxlx` already has these. 640 (it was 1024) is so a phone doesn't keep most of the map in memory. See "Phones" below. |
-| Workspace → Terrain | Decoration **on** | Grass. Scripts often can't read this; check the Properties panel. |
-| Lighting | LightingStyle **Realistic**, PrioritizeLightingQuality **off** | Off keeps town-at-night playable on a phone. |
-| Home → Game Settings → Places | **Max Players = 12** | There are 12 plots. More players than plots get a full-district message. |
+| Workspace → Terrain | Decoration **on** | Grass. A fresh `build.rbxlx` already has this. Scripts often can't read it; check the Properties panel. |
+| Lighting | LightingStyle **Realistic**, PrioritizeLightingQuality **off** | A fresh `build.rbxlx` has both. Studio resets a Rojo place's style to Soft unless the file also carries Studio's internal lighting attributes (they are in the project, on Lighting). Off keeps town-at-night playable on a phone. |
+| Home → Game Settings → Places | **Max Players = 12** | Not part of the place file. Roblox keeps this in Game Settings, and a script cannot write `Players.MaxPlayers`. A fresh `build.rbxlx` does contain an old internal field (`MaxPlayersInternal` = 12); Studio Play ignores it and reports **60** until you set this. There are 12 plots. More players than plots get a full-district message. PlaceCheck keeps warning until you set it. |
 | Home → Game Settings → Security | **Enable Studio Access to API Services** on | Studio playtests can save. A place that was never published has no DataStores: publish once (step 5) before expecting this to work. |
 | Home → Game Settings → Security | **Allow HTTP Requests** off | The game doesn't call websites. Leave it off. |
 | Workspace attributes | Clear the debug ones (below) | Live servers ignore them. Clear them anyway so the next publish is clean. |

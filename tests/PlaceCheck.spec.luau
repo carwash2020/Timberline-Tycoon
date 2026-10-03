@@ -270,6 +270,14 @@ return function(t)
 		t.ok(maxPlayers, "Max Players is checked")
 		t.eq(maxPlayers.value, 12)
 		t.eq(maxPlayers.atMost, true, "12 or fewer")
+		-- Studio resets LightingStyle to Soft on a Rojo place that lacks
+		-- these internal markers (it treats the file as not yet migrated).
+		local markers = fromProject.Lighting.Attributes
+		t.eq(markers.RBX_LightingTechnologyUnifiedMigration, { Bool = true })
+		t.eq(markers.RBX_LightingCompatibilityMigrated, { Bool = true })
+		t.eq(markers.RBX_OriginalTechnologyOnFileLoad, { Int32 = 2 })
+		t.eq(markers.RBX_BackupBrightness, { Float32 = 1 })
+		t.eq(markers.RBX_BackupExposureCompensation, { Float32 = 0 })
 	end)
 
 	t.test("the expected table is data: one more line is one more check", function()
