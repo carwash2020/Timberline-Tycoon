@@ -980,7 +980,7 @@ WorldPlan.SellZoneSize = Vector3.new(24, 12, 40)
 -- fits (VehicleLogic.BayChoices).
 WorldPlan.ParkingBays = {
 	small = Vector3.new(14.25, 0.2, 30), -- the Rustbucket, the Pickup, the Scout ATV
-	flatbed = Vector3.new(15, 0.2, 38), -- the Flatbed
+	flatbed = Vector3.new(15, 0.2, 38.75), -- the Flatbed, or the Rustbucket with the Pony trailer (38.7 bumper to bumper)
 	long = Vector3.new(16, 0.2, 51), -- pull-through: the Logging Rig, a small truck with a trailer, the Flatbed with the Pony
 	longest = Vector3.new(16, 0.2, 80), -- pull-through: the Logging Rig with any trailer (the Heavy Hauler: 75.4)
 }
@@ -1126,7 +1126,7 @@ function WorldPlan.Town(): Town
 	end
 	local flatbedX = 71 + bays.flatbed.X / 2
 	bay(flatbedX, -17 + bays.flatbed.Z / 2, bays.flatbed)
-	bay(flatbedX, 61 - bays.flatbed.Z / 2, bays.flatbed, true)
+	bay(flatbedX, -17 + bays.flatbed.Z * 1.5 + 1, bays.flatbed, true) -- tail a stud past 9's
 	bay(87 + bays.longest.X / 2, -17 + bays.longest.Z / 2, bays.longest)
 	for _, x0 in ipairs({ 104, 121 }) do
 		bay(x0 + bays.long.X / 2, -17 + bays.long.Z / 2, bays.long)

@@ -263,7 +263,7 @@ return function(t)
 
 	t.test("BayChoices: the smallest bay it fits first, then the lowest Index; overhangs last", function()
 		local small1, small2 = bay(1, 30, 14.25), bay(2, 30, 14.25)
-		local flat, long, longest = bay(9, 38, 15), bay(12, 51, 16), bay(11, 80, 16)
+		local flat, long, longest = bay(9, 38.75, 15), bay(12, 51, 16), bay(11, 80, 16)
 		local all = { longest, long, flat, small2, small1 }
 		t.eq(
 			VehicleLogic.BayChoices(all, 26, 11.6, nil),

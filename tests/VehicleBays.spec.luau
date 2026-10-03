@@ -4,7 +4,10 @@
 -- bays, as MapBuilder builds them) over a faked world (no terrain, no
 -- physics). It proves:
 --   * each rig takes the smallest free bay it fits, the lowest Index on a
---     tie (VehicleLogic.BayChoices), centred in it;
+--     tie (VehicleLogic.BayChoices), centred in it: in an empty lot the
+--     small trucks a small bay, the Flatbed (or a Rustbucket + Pony) a
+--     Flatbed bay, the Rig (or a small truck + Ranch) a long one, the Rig
+--     + Heavy Hauler the longest;
 --   * a switch at the Dealership moves the rig to a bay that fits it (a
 --     bigger rig to a bigger bay, a smaller one back to a small bay) and
 --     gives the old bay up; a recall keeps a bay that's still as good a fit
@@ -219,6 +222,39 @@ return function(t)
 		t.eq(VS.GetBayIndex(w.players[2]), 2, "the next: bay 2")
 		t.eq(VS.GetBayIndex(w.players[5]), 11, "the Rig with the Heavy Hauler: the longest bay")
 		t.eq(#w.toasts, 0, "joining says nothing")
+	end)
+
+	t.test("each kind of rig parks in its kind of bay, in an empty lot", function()
+		local w = setup()
+		local VS = w.VehicleService
+		local B = WorldPlan.ParkingBays
+		local cases = {
+			{ "Rustbucket", nil, "small" },
+			{ "Pickup", nil, "small" },
+			{ "ScoutATV", nil, "small" },
+			{ "Flatbed", nil, "flatbed" },
+			{ "Rustbucket", "PonyTrailer", "flatbed" },
+			{ "LoggingRig", nil, "long" },
+			{ "Pickup", "RanchTrailer", "long" },
+			{ "LoggingRig", "HeavyHauler", "longest" },
+		}
+		for i, c in ipairs(cases) do
+			local p = w.player(i)
+			VS.SpawnTruck(p, c[1], nil, c[2])
+			local index = VS.GetBayIndex(p)
+			t.ok(
+				index ~= nil and town.parkingSizes[index] == B[c[3]],
+				string.format(
+					"%s%s parks in a %s bay (got bay %s)",
+					c[1],
+					if c[2] then " + " .. c[2] else "",
+					c[3],
+					tostring(index)
+				)
+			)
+			VS.DespawnTruck(p) -- the lot empty again for the next
+			t.eq(VS.GetBayIndex(p), nil, "gone, its bay given up")
+		end
 	end)
 
 	t.test("a switch moves the rig to a bay that fits, gives the old one up, and says so", function()

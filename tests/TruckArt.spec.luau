@@ -304,6 +304,42 @@ return function(t)
 		end
 	end)
 
+	-- Phase 12: a painted bay looks like a parking space for its truck,
+	-- not a runway: each bay class is the rig it's for, built (mirrors,
+	-- bumpers and all), plus about 3 studs across and 4 along.
+	t.test("each bay class is its rig plus about 3 across and 4 along", function()
+		local B = WorldPlan.ParkingBays
+		local classes = {
+			{ B.small, "Pickup" },
+			{ B.flatbed, "Flatbed" },
+			{ B.long, "LoggingRig" },
+			{ B.longest, "LoggingRig", "HeavyHauler" },
+		}
+		for _, c in ipairs(classes) do
+			local bay, truckId, trailerId = c[1], c[2], c[3]
+			local model = build({
+				def = ItemCatalog.GetTruck(truckId),
+				trailer = if trailerId then ItemCatalog.GetTrailer(trailerId) else nil,
+			})
+			local lo, hi
+			for _, p in ipairs(parts(model)) do
+				local a, b = box(p)
+				lo = if lo then lo:Min(a) else a
+				hi = if hi then hi:Max(b) else b
+			end
+			local label = truckId .. (if trailerId then " + " .. trailerId else "")
+			local across, along = bay.X - (hi.X - lo.X), bay.Z - (hi.Z - lo.Z)
+			t.ok(
+				across >= 2.5 and across <= 3.5,
+				string.format("%s's bay is %.2f wider than it (%g)", label, across, bay.X)
+			)
+			t.ok(
+				along >= 3.5 and along <= 5,
+				string.format("%s's bay is %.2f longer than it (%g)", label, along, bay.Z)
+			)
+		end
+	end)
+
 	-- A WedgePart's corners in the world: its full bottom, and the top edge
 	-- of its full back (+Z) face.
 	local function wedgeCorners(p)
