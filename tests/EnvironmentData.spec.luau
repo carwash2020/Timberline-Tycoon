@@ -238,7 +238,7 @@ return function(t)
 		)
 	end)
 
-	-- STY-05: the night mist, LT2's way.
+	-- STY-05: the night mist, LT2's way (phase 12 made it a real fog).
 	t.test("night mist: thick from 23:00 to 06:30, lifting through the morning, gone by 09:30", function()
 		local w = EnvironmentData.MistWeight
 		for _, h in ipairs({ 23, 23.5, 0, 1, 3, 5, 6.4 }) do
@@ -259,52 +259,90 @@ return function(t)
 		t.ok(math.abs(w(23.9999) - w(0.0001)) < 1e-6, "continuous at midnight")
 	end)
 
-	t.test("night mist: a little thicker air at night in the country, the day untouched, never on the isles", function()
-		local mist = EnvironmentData.Mist.override.add
-		local night = EnvironmentData.Blend(1, "", "Clear", 0)
-		local bare = EnvironmentData.TimeOfDay(1)
-		t.ok(math.abs(night.atmosphereDensity - (bare.atmosphereDensity + mist.atmosphereDensity)) < 1e-9, "denser")
-		t.ok(math.abs(night.atmosphereHaze - (bare.atmosphereHaze + mist.atmosphereHaze)) < 1e-9, "hazier")
-		-- A little: under the Fog weather's 0.55 in every biome on a clear
-		-- night but one: the Volcano's red fog is its own (phase 12), thick at
-		-- any hour, but never so thick its trees vanish.
-		t.ok(mist.atmosphereDensity > 0 and mist.atmosphereDensity <= 0.1, "a little")
-		for _, biome in ipairs({ "", "starter", "hills", "snow", "grove" }) do
-			local s = EnvironmentData.Blend(1, biome, "Clear", 0)
-			t.ok(s.atmosphereDensity < 0.55, string.format("%s's clear night is thinner than fog", biome))
-		end
-		local volcanoNight = EnvironmentData.Blend(1, "volcano", "Clear", 0)
-		t.ok(volcanoNight.atmosphereDensity <= 0.65, "the Volcano's night stays findable")
-		-- Only the air: the night's light is what it was.
-		t.eq(night.brightness, bare.brightness)
-		t.ok(colorDiff(night.outdoorAmbient, bare.outdoorAmbient) < 1e-9, "the night's fill")
-		-- The day is exactly as before: a phone's horizon stays as clear.
-		for h = 9.5, 22, 0.5 do
-			for _, biome in ipairs({ "", "starter", "snow", "volcano" }) do
-				local d = maxDiff(
-					EnvironmentData.Blend(h, biome, "Clear", 0),
-					(function()
-						local s = EnvironmentData.TimeOfDay(h)
-						local o = EnvironmentData.BiomeOverrides[biome]
-						if o then
-							EnvironmentData.Apply(s, o, 1)
-						end
-						EnvironmentData.Clamp(s)
-						return s
-					end)()
-				)
-				t.ok(d < 1e-9, string.format("%s at %.1f changed", biome, h))
+	t.test(
+		"night fog: a real fog at night in the country, a cool grey-blue, the day untouched, never on the isles",
+		function()
+			local mist = EnvironmentData.Mist.override.add
+			local night = EnvironmentData.Blend(1, "", "Clear", 0)
+			local bare = EnvironmentData.TimeOfDay(1)
+			t.ok(math.abs(night.atmosphereDensity - (bare.atmosphereDensity + mist.atmosphereDensity)) < 1e-9, "denser")
+			t.ok(math.abs(night.atmosphereHaze - (bare.atmosphereHaze + mist.atmosphereHaze)) < 1e-9, "hazier")
+			-- A real fog (phase 12, ATMOS; STY-05 added only 0.07 and 0.6, "a
+			-- little"): about +0.16 density and +1.5 haze, so nights feel like
+			-- nights.
+			t.ok(mist.atmosphereDensity >= 0.14 and mist.atmosphereDensity <= 0.18, "a real fog, not a hint")
+			t.ok(mist.atmosphereHaze >= 1.2 and mist.atmosphereHaze <= 1.8, "a hazy one")
+			-- Still under the Fog weather's 0.55 on a clear night in every biome
+			-- but one: the Volcano's red fog is its own, thick at any hour (but
+			-- never so thick its trees vanish).
+			for _, biome in ipairs({ "", "starter", "hills", "snow", "grove" }) do
+				local s = EnvironmentData.Blend(1, biome, "Clear", 0)
+				t.ok(s.atmosphereDensity < 0.55, string.format("%s's clear night is thinner than fog", biome))
 			end
+			local volcanoNight = EnvironmentData.Blend(1, "volcano", "Clear", 0)
+			t.ok(volcanoNight.atmosphereDensity <= 0.65, "the Volcano's night stays findable")
+			-- Only the air: the night's light is what it was (WLD-06).
+			t.eq(night.brightness, bare.brightness)
+			t.eq(night.exposure, bare.exposure)
+			t.ok(colorDiff(night.outdoorAmbient, bare.outdoorAmbient) < 1e-9, "the night's fill")
+			t.ok(colorDiff(night.ambient, bare.ambient) < 1e-9, "the night's ambient")
+			-- Its colour: a cool grey-blue, greyer than the night's own blue and
+			-- no brighter, so the dark stays dark.
+			local function sat(c)
+				local _, s = c:ToHSV()
+				return s
+			end
+			local function lum(c)
+				return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B
+			end
+			local paint = EnvironmentData.Mist.colour.paint
+			for _, k in ipairs({ "atmosphereColor", "atmosphereDecay" }) do
+				local c, was = night[k], bare[k]
+				t.ok(colorDiff(c, paint[k]) < 1e-9, k .. " is the fog's at 01:00")
+				t.ok(c.B > c.G and c.G >= c.R, k .. " is a cool blue-grey")
+				t.ok(sat(c) < sat(was), k .. " is greyer than the night's own")
+				t.ok(lum(c) <= lum(was) * 1.1, k .. " is no brighter than the night's own")
+			end
+			-- The colour comes with the dark: full at night, gone by 07:00, when
+			-- dawn's own colour lights the morning fog (still thick then).
+			t.eq(EnvironmentData.MistColourWeight(1), 1)
+			t.eq(EnvironmentData.MistColourWeight(7), 0)
+			t.ok(EnvironmentData.MistWeight(7) > 0.9, "still foggy at 07:00")
+			local morning = EnvironmentData.Blend(7, "", "Clear", 0)
+			local dawn = EnvironmentData.TimeOfDay(7)
+			t.ok(colorDiff(morning.atmosphereColor, dawn.atmosphereColor) < 1e-9, "the morning fog keeps dawn's colour")
+			t.ok(morning.atmosphereDensity > dawn.atmosphereDensity + 0.1, "the morning fog is still thick")
+			for h = 9.5, 22, 0.25 do
+				t.eq(EnvironmentData.MistColourWeight(h), 0, string.format("no fog colour at %.2f", h))
+			end
+			-- The day is exactly as before: a phone's horizon stays as clear.
+			for h = 9.5, 22, 0.5 do
+				for _, biome in ipairs({ "", "starter", "snow", "volcano" }) do
+					local d = maxDiff(
+						EnvironmentData.Blend(h, biome, "Clear", 0),
+						(function()
+							local s = EnvironmentData.TimeOfDay(h)
+							local o = EnvironmentData.BiomeOverrides[biome]
+							if o then
+								EnvironmentData.Apply(s, o, 1)
+							end
+							EnvironmentData.Clamp(s)
+							return s
+						end)()
+					)
+					t.ok(d < 1e-9, string.format("%s at %.1f changed", biome, h))
+				end
+			end
+			-- The isles keep their own air (above the clouds), night or day.
+			local isles = EnvironmentData.Blend(1, "sky", "Clear", 0)
+			t.ok(math.abs(isles.atmosphereDensity - 0.2) < 1e-9, "the isles' density")
+			local skyHaze = (EnvironmentData.BiomeOverrides.sky.add or {}).atmosphereHaze or 0
+			t.ok(math.abs(isles.atmosphereHaze - (bare.atmosphereHaze + skyHaze)) < 1e-9, "no mist on the isles")
+			-- Fog still sets its own (the mist goes under the weather).
+			local fog = EnvironmentData.Blend(1, "", "Fog", 1)
+			t.ok(math.abs(fog.atmosphereDensity - 0.55) < 1e-9, "fog's density")
 		end
-		-- The isles keep their own air (above the clouds), night or day.
-		local isles = EnvironmentData.Blend(1, "sky", "Clear", 0)
-		t.ok(math.abs(isles.atmosphereDensity - 0.2) < 1e-9, "the isles' density")
-		local skyHaze = (EnvironmentData.BiomeOverrides.sky.add or {}).atmosphereHaze or 0
-		t.ok(math.abs(isles.atmosphereHaze - (bare.atmosphereHaze + skyHaze)) < 1e-9, "no mist on the isles")
-		-- Fog still sets its own (the mist goes under the weather).
-		local fog = EnvironmentData.Blend(1, "", "Fog", 1)
-		t.ok(math.abs(fog.atmosphereDensity - 0.55) < 1e-9, "fog's density")
-	end)
+	)
 
 	t.test("Lerp and Apply leave their inputs alone", function()
 		local a = EnvironmentData.TimeOfDay(6)

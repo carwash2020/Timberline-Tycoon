@@ -431,12 +431,25 @@ EnvironmentData.WeatherOverrides = {
 	},
 } :: { [string]: Override }
 
--- The night mist (STY-05), the classic lumber-game way: the air thickens late
--- in the evening (from 22:00, full by 23:00), holds through the night and
--- lifts through the morning (from 06:30, clear by 09:30). MistWeight(clock)
--- is how much of Mist.override Blend applies at that hour: after the
--- hour's own light, before the biome and the weather (so the Fog weather
--- and the isles' own air still set theirs). Never on the isles (above the
+-- 0 at night, 1 by day, easing through dawn (5-7) and dusk (17.5-19.5).
+function EnvironmentData.Daylight(clockTime: number): number
+	local h = clockTime % 24
+	if h < 12 then
+		return smoothstep((h - 5) / 2)
+	end
+	return 1 - smoothstep((h - 17.5) / 2)
+end
+
+-- The night fog (STY-05; phase 12 made it a real fog), the classic
+-- lumber-game way: the air thickens late in the evening (from 22:00, full
+-- by 23:00), holds through the night and lifts through the morning (from
+-- 06:30, clear by 09:30). MistWeight(clock) is how much of Mist.override
+-- Blend applies at that hour: after the hour's own light, before the biome
+-- and the weather (so the Fog weather and a biome's own air still set
+-- theirs). Its colour, a cool grey-blue (Mist.colour), comes with the dark
+-- (MistColourWeight), so dawn lights the morning fog its own colour. Only
+-- the air: the night's light (brightness, ambient, WLD-06) is what it was,
+-- so a trunk still reads at 30 studs. Never on the isles (above the
 -- clouds), and never by day: 09:30 to 22:00 looks exactly as it did, so a
 -- phone's horizon stays clear.
 EnvironmentData.Mist = {
@@ -444,10 +457,16 @@ EnvironmentData.Mist = {
 	thick = 23,
 	liftFrom = 6.5,
 	clear = 9.5,
-	override = { add = { atmosphereDensity = 0.07, atmosphereHaze = 0.6 } } :: Override,
+	-- A clear night out in the country is 0.52 thick and 2.0 hazy now (the
+	-- Fog weather is 0.55 and 3); STY-05's mist added 0.07 and 0.6.
+	override = { add = { atmosphereDensity = 0.16, atmosphereHaze = 1.5 } } :: Override,
+	-- As dark as the night's own blue (90, 100, 140 and 40, 45, 80), greyer.
+	colour = {
+		paint = { atmosphereColor = rgb(94, 102, 124), atmosphereDecay = rgb(44, 49, 66) },
+	} :: Override,
 }
 
--- 0..1: how thick the night mist is at `clockTime` (0..24).
+-- 0..1: how thick the night fog is at `clockTime` (0..24).
 function EnvironmentData.MistWeight(clockTime: number): number
 	local h = clockTime % 24
 	local m = EnvironmentData.Mist
@@ -457,6 +476,13 @@ function EnvironmentData.MistWeight(clockTime: number): number
 		return 1
 	end
 	return 1 - smoothstep((h - m.liftFrom) / (m.clear - m.liftFrom))
+end
+
+-- 0..1: how much of the night fog's colour shows at `clockTime`: the fog's
+-- own weight while it is dark, fading out as the day comes (05:00-07:00),
+-- so the morning fog (thick until 06:30) takes dawn's colour.
+function EnvironmentData.MistColourWeight(clockTime: number): number
+	return EnvironmentData.MistWeight(clockTime) * (1 - EnvironmentData.Daylight(clockTime))
 end
 
 local NUMBER_SET: { [string]: boolean } = {}
@@ -493,6 +519,7 @@ for name, o in pairs(EnvironmentData.WeatherOverrides) do
 	checkOverride(name, o)
 end
 checkOverride("Mist", EnvironmentData.Mist.override)
+checkOverride("Mist colour", EnvironmentData.Mist.colour)
 
 local function copy(s: LightingState): LightingState
 	return table.clone(s)
@@ -585,13 +612,15 @@ function EnvironmentData.TimeOfDay(clockTime: number): LightingState
 	return EnvironmentData.Lerp(prev.state, nextFrame.state, t)
 end
 
--- The full picture: the hour's light and its night mist, then the biome
--- you're in ("" or nil = open country), then the weather at `intensity`
--- (0..1).
+-- The full picture: the hour's light and its night fog (and the fog's
+-- colour while it's dark), then the biome you're in ("" or nil = open
+-- country), then the weather at `intensity` (0..1).
 function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: string?, intensity: number?): LightingState
 	local s = EnvironmentData.TimeOfDay(clockTime)
 	if biomeId ~= "sky" then
-		EnvironmentData.Apply(s, EnvironmentData.Mist.override, EnvironmentData.MistWeight(clockTime))
+		local mist = EnvironmentData.Mist
+		EnvironmentData.Apply(s, mist.override, EnvironmentData.MistWeight(clockTime))
+		EnvironmentData.Apply(s, mist.colour, EnvironmentData.MistColourWeight(clockTime))
 	end
 	local biome = if biomeId then EnvironmentData.BiomeOverrides[biomeId] else nil
 	if biome then
@@ -603,15 +632,6 @@ function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: str
 	end
 	EnvironmentData.Clamp(s)
 	return s
-end
-
--- 0 at night, 1 by day, easing through dawn (5-7) and dusk (17.5-19.5).
-function EnvironmentData.Daylight(clockTime: number): number
-	local h = clockTime % 24
-	if h < 12 then
-		return smoothstep((h - 5) / 2)
-	end
-	return 1 - smoothstep((h - 17.5) / 2)
 end
 
 ---------------------------------------------------------------------------
