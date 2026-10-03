@@ -20,8 +20,12 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CollectionService = game:GetService("CollectionService")
+
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -35,34 +39,69 @@ local VehicleService = require(script.Parent.VehicleService)
 
 local ShopService = {}
 
--- Which shop building (a model in TimberlineMap) sells each category.
-local SHOP_FOR: { [string]: string } = {
-	Axe = "ToolShed",
-	Truck = "Dealership",
-	Trailer = "Dealership",
-	Gear = "HearthAndHome",
-	Sawmill = "ToolShed",
+-- Which shop buildings (models in TimberlineMap) sell each category.
+-- Axes are at the Tool Shed and the General Store (Hearth & Home).
+local SHOP_FOR: { [string]: { string } } = {
+	Axe = { "ToolShed", "HearthAndHome" },
+	Truck = { "Dealership" },
+	Trailer = { "Dealership" },
+	Gear = { "HearthAndHome" },
+	Sawmill = { "ToolShed" },
+	Blueprint = { "HearthAndHome" },
 }
 
 local map: Instance? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 local loop = 1 -- the core loop that runs (Init)
 
-local function shopPoint(category: string): Vector3?
-	local shopName = SHOP_FOR[category]
-	local shop = if shopName and map then map:FindFirstChild(shopName) else nil
-	local counter = if shop then shop:FindFirstChild("Counter") else nil
-	local point = if counter then counter:FindFirstChild("ShopPoint") else nil
-	return if point and point:IsA("Attachment") then point.WorldPosition else nil
+local function shopPoints(category: string): { Vector3 }
+	local out: { Vector3 } = {}
+	local folder = map
+	for _, shopName in ipairs(SHOP_FOR[category] or {}) do
+		local shop = if folder then folder:FindFirstChild(shopName) else nil
+		local counter = if shop then shop:FindFirstChild("Counter") else nil
+		local point = if counter then counter:FindFirstChild("ShopPoint") else nil
+		if point and point:IsA("Attachment") then
+			table.insert(out, point.WorldPosition)
+		end
+	end
+	return out
+end
+
+local function nearDisplay(hrp: BasePart, category: string): boolean
+	if typeof(CollectionService.GetTagged) ~= "function" then
+		return false
+	end
+	local reach = GameConfig.ShopRange + GameConfig.RangeTolerance
+	for _, inst in ipairs(CollectionService:GetTagged("ShopDisplay")) do
+		if inst:GetAttribute("Category") == category then
+			local pos: Vector3? = nil
+			if inst:IsA("Model") then
+				pos = inst:GetPivot().Position
+			elseif inst:IsA("BasePart") then
+				pos = inst.Position
+			end
+			if pos and (hrp.Position - pos).Magnitude <= reach then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function inRange(player: Player, category: string): boolean
 	local char = player.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-	local point = shopPoint(category)
-	return hrp ~= nil
-		and point ~= nil
-		and (hrp.Position - point).Magnitude <= GameConfig.ShopRange + GameConfig.RangeTolerance
+	if not hrp then
+		return false
+	end
+	local reach = GameConfig.ShopRange + GameConfig.RangeTolerance
+	for _, point in ipairs(shopPoints(category)) do
+		if (hrp.Position - point).Magnitude <= reach then
+			return true
+		end
+	end
+	return nearDisplay(hrp, category)
 end
 
 local function buyAxe(player: Player, axeId: string)
@@ -243,8 +282,9 @@ local function buyTruck(player: Player, truckId: string)
 	if not profile or not truck then
 		return
 	end
-	local status: ShopLogic.TruckStatus = ShopLogic.TruckStatusOf(truck, ownedTruckSet(profile), profile.equippedTruck)
-	if status ~= "buy" then
+	-- Owned check, charge, and grant happen with no yield between them, so a
+	-- second Buy in the same burst cannot charge twice.
+	if table.find(profile.ownedTrucks, truck.id) then
 		notify(player, string.format("You already own the %s.", truck.displayName))
 		return
 	end
@@ -260,9 +300,15 @@ local function buyTruck(player: Player, truckId: string)
 		return
 	end
 	table.insert(profile.ownedTrucks, truck.id)
+	if profile.equippedTruck == "" or not table.find(profile.ownedTrucks, profile.equippedTruck) then
+		profile.equippedTruck = truck.id
+	end
 	publishTrucks(player, profile)
+	player:SetAttribute("OwnsTruck", true)
+	QuestService.Event(player, "truckBought")
+	MilestoneService.Mark(player, "Bought a truck")
 	if switchTo(player, profile, truck) then
-		notify(player, string.format("Bought the %s! It's waiting in your parking spot.", truck.displayName))
+		notify(player, string.format("Bought the %s! It's on its way to your plot.", truck.displayName))
 	else
 		notify(player, string.format("Bought the %s! Switch to it here when you're ready.", truck.displayName))
 	end
@@ -362,6 +408,49 @@ local function buySawmill(player: Player, millId: string)
 	notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", mill.displayName))
 end
 
+local function publishBlueprints(player: Player, profile: ProfileService.Profile)
+	local ids: { string } = {}
+	local owned = profile.furnitureBlueprints
+	if type(owned) == "table" then
+		for id, on in pairs(owned) do
+			if on == true then
+				table.insert(ids, id)
+			end
+		end
+	end
+	player:SetAttribute("Blueprints", ShopLogic.EncodeSet(ids))
+end
+
+-- A blueprint is bought once. Placing copies on your plot is free after that.
+local function buyBlueprint(player: Player, blueprintId: string)
+	local profile = ProfileService.GetProfile(player)
+	local bp = PlotLogic.Blueprint(blueprintId)
+	if not profile or not bp or bp.unlock ~= true then
+		return
+	end
+	if type(profile.furnitureBlueprints) ~= "table" then
+		profile.furnitureBlueprints = {}
+	end
+	if profile.furnitureBlueprints[bp.id] == true then
+		notify(player, string.format("You already own the %s blueprint.", bp.displayName))
+		return
+	end
+	local price = PlotData.Price(bp)
+	if profile.cash < price then
+		notify(
+			player,
+			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), bp.displayName)
+		)
+		return
+	end
+	if not EconomyService.SpendCash(player, price, "bought " .. bp.displayName, bp.id) then
+		return
+	end
+	profile.furnitureBlueprints[bp.id] = true
+	publishBlueprints(player, profile)
+	notify(player, string.format("Bought the %s blueprint. Place it from BUILD on your plot.", bp.displayName))
+end
+
 local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 	if type(category) ~= "string" or type(itemId) ~= "string" or not RateLimiter.Allow(player, "BuyItem") then
 		return
@@ -383,6 +472,8 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 		buyGear(player, itemId)
 	elseif category == "Sawmill" then
 		buySawmill(player, itemId)
+	elseif category == "Blueprint" then
+		buyBlueprint(player, itemId)
 	end
 end
 
@@ -391,6 +482,8 @@ function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profil
 	publishTrucks(player, profile)
 	publishGear(player, profile)
 	publishStock(player, profile)
+	publishBlueprints(player, profile)
+	player:SetAttribute("OwnsTruck", #profile.ownedTrucks > 0)
 end
 
 -- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's
@@ -408,6 +501,34 @@ function ShopService.Init(
 	loop = if activeLoop == 2 then 2 else 1
 	buyRemote.OnServerEvent:Connect(onBuyItem)
 	equipRemote.OnServerEvent:Connect(onEquipItem)
+	-- Display models on the dealership lot carry their own BuyPrompt. The
+	-- test map is a plain table with FindFirstChild only, so skip the scan
+	-- when the folder can't walk its descendants.
+	if typeof(mapFolder.GetDescendants) == "function" then
+		for _, inst in ipairs(mapFolder:GetDescendants()) do
+			if inst:IsA("ProximityPrompt") and inst.Name == "BuyPrompt" then
+				inst.Triggered:Connect(function(player: Player)
+					local node: Instance? = inst
+					local category: string? = nil
+					local itemId: string? = nil
+					while node do
+						if node:IsA("Model") then
+							local cat = node:GetAttribute("Category")
+							local id = node:GetAttribute("ItemId")
+							if type(cat) == "string" and type(id) == "string" then
+								category, itemId = cat, id
+								break
+							end
+						end
+						node = node.Parent
+					end
+					if category and itemId then
+						onBuyItem(player, category, itemId)
+					end
+				end)
+			end
+		end
+	end
 end
 
 return ShopService

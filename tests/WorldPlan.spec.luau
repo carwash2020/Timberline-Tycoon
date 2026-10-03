@@ -117,6 +117,8 @@ return function(t)
 		for _, spot in ipairs(town.shops) do
 			add(spot.kind, "shop", BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end
+		local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
+		add("dealership lot", "lot", DealershipLot.Build(), town.displayLot)
 		-- The greenery (TWN-01): a tree's trunk collides, the rest is looks.
 		for _, g in ipairs(town.greenery) do
 			local label = string.format(
@@ -2068,9 +2070,10 @@ return function(t)
 		-- (phase 10, Connor asked for many more trees; the economy model
 		-- doesn't read WorldPlan, so ECONOMY.md stays as it was), then the
 		-- forest's (FOR-03, tests/Forest.spec.luau).
-		-- 322 original trees plus 171 country stands. The 3×4 plot district
-		-- took the spots of 7 stand trees (was 178, and the first 500).
-		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 493)
+		-- 322 original trees plus 169 country stands. The 3×4 plot district
+		-- took the spots of 7 stand trees (was 178, and the first 500). The
+		-- vista now ends on the next headland and took 2 more.
+		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 491)
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2288,12 +2291,14 @@ return function(t)
 
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
 		local trees = WorldPlan.Trees()
-		-- A fingerprint of the country stands (trees 323 to 493: index, wood,
+		-- A fingerprint of the country stands (trees 323 to 491: index, wood,
 		-- biome, x, z). Re-sampled in phase 12 when the haul roads widened,
 		-- and again when the plot district became 3×4 (a few open-country
-		-- stands moved off the new lawn). The first 322 were not, and the
-		-- first stand tree is still the pine beside the snow road.
-		local lastStand = 493
+		-- stands moved off the new lawn), and again when the lighthouse
+		-- vista moved onto the next headland (two stand trees stood in it).
+		-- The first 322 were not, and the first stand tree is still the pine
+		-- beside the snow road.
+		local lastStand = 491
 		local h = 7
 		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
@@ -2302,10 +2307,10 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 82146204, "the country stands moved, changed wood or changed order")
+		t.eq(h, 672265935, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "pine")
 		t.ok((trees[FIRST + 1].position - Vector3.new(73.1337, -2.5153, 544.4336)).Magnitude < 0.01, "tree 323")
-		t.ok((trees[lastStand].position - Vector3.new(553.4734, -2.7692, 166.9969)).Magnitude < 0.01, "the last stand")
+		t.ok((trees[lastStand].position - Vector3.new(485.4641, -1.6756, 223.2839)).Magnitude < 0.01, "the last stand")
 	end)
 
 	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()

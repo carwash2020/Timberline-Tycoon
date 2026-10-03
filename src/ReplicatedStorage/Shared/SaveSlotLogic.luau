@@ -146,7 +146,112 @@ function SaveSlotLogic.Blank(defaults: any, guid: () -> string, now: number): { 
 		slot.equippedAxe = uid
 		slot.bestAxeTier = 1
 	end
+	-- A new game has no truck. The old template's Rustbucket is not a fallback.
+	slot.ownedTrucks = {}
+	slot.equippedTruck = ""
+	slot.ownedTrailers = {}
+	slot.equippedTrailer = ""
+	slot.starterTruckGranted = true
 	return slot
+end
+
+local function listCount(value: any): number
+	return if type(value) == "table" then #value else 0
+end
+
+-- Cargo sitting on a truck that might not exist: the v1 bed, the v2 loose
+-- load, wood left on the ground, or a saved truck position.
+function SaveSlotLogic.HasCargo(data: any): boolean
+	if type(data) ~= "table" then
+		return false
+	end
+	if listCount(data.truckBed) > 0 or listCount(data.truckLoad) > 0 then
+		return true
+	end
+	if listCount(data.groundLoad) > 0 or listCount(data.leftLoad) > 0 then
+		return true
+	end
+	local at = data.truckAt
+	return type(at) == "table" and (at.x ~= nil or at.y ~= nil or at.z ~= nil)
+end
+
+function SaveSlotLogic.HasTruck(data: any): boolean
+	return type(data) == "table" and type(data.ownedTrucks) == "table" and #data.ownedTrucks > 0
+end
+
+-- A profile or slot that was never played: no truck, no cargo, no progress.
+-- The starter grant must not hand these a Rustbucket.
+function SaveSlotLogic.IsFreshGame(data: any): boolean
+	if type(data) ~= "table" or SaveSlotLogic.HasTruck(data) or SaveSlotLogic.HasCargo(data) then
+		return false
+	end
+	local earned = tonumber(data.totalEarned) or 0
+	local chopped = 0
+	if type(data.stats) == "table" then
+		chopped = tonumber(data.stats.treesChopped) or 0
+	end
+	local claimed = type(data.plot) == "table" and data.plot.claimed == true
+	local done = data.tutorialDone == true
+	local step = tonumber(data.tutorialStep) or 1
+	local progress = tonumber(data.tutorialProgress) or 0
+	return earned <= 0 and chopped <= 0 and not claimed and not done and step <= 1 and progress <= 0
+end
+
+local function equipOwned(record: any)
+	local trucks = record.ownedTrucks
+	local equipped = record.equippedTruck
+	local ownsEquipped = type(equipped) == "string"
+		and ItemCatalog.GetTruck(equipped) ~= nil
+		and table.find(trucks, equipped) ~= nil
+	if not ownsEquipped then
+		record.equippedTruck = trucks[1]
+	end
+end
+
+-- One starter Rustbucket for a slot that was played before trucks were
+-- bought, and never a second time. `fresh` slots (a new game) get no truck.
+-- Cargo is never cleared here. Returns whether a truck was added.
+function SaveSlotLogic.GrantStarterTruck(record: any, fresh: boolean): boolean
+	if type(record) ~= "table" then
+		return false
+	end
+	if fresh == true then
+		record.ownedTrucks = {}
+		record.equippedTruck = ""
+		record.starterTruckGranted = true
+		return false
+	end
+	if record.starterTruckGranted == true then
+		return false
+	end
+	if SaveSlotLogic.IsFreshGame(record) then
+		record.ownedTrucks = {}
+		record.equippedTruck = ""
+		record.starterTruckGranted = true
+		return false
+	end
+	local added = false
+	if not SaveSlotLogic.HasTruck(record) then
+		record.ownedTrucks = { "Rustbucket" }
+		record.equippedTruck = "Rustbucket"
+		added = true
+	else
+		equipOwned(record)
+	end
+	record.starterTruckGranted = true
+	return added
+end
+
+-- The live profile and every snapshot in `slots`, including the active one.
+function SaveSlotLogic.GrantStarterTrucks(data: any)
+	SaveSlotLogic.GrantStarterTruck(data, false)
+	if type(data.slots) == "table" then
+		for _, slot in ipairs(data.slots) do
+			if type(slot) == "table" then
+				SaveSlotLogic.GrantStarterTruck(slot, slot.fresh == true)
+			end
+		end
+	end
 end
 
 local function apply(data: any, slot: any, defaults: any)
@@ -236,6 +341,10 @@ function SaveSlotLogic.Migrate(data: any, defaults: any, guid: () -> string, now
 	-- The live fields are the active slot. Refresh that snapshot so the
 	-- summary matches what you're playing; leave the other slots alone.
 	local active = data.activeSlot
+	data.slots[active] = capture(data, now)
+	-- Played slots (fresh == false) get one starter truck, once. A second
+	-- load sees the flag and adds nothing. Cargo stays on the slot.
+	SaveSlotLogic.GrantStarterTrucks(data)
 	data.slots[active] = capture(data, now)
 	SaveSlotLogic.SyncAccountAxes(data, guid)
 end

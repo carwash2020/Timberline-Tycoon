@@ -62,15 +62,18 @@ return function(t)
 		t.eq(ShopLogic.DamageText(axe("StarfallAxe")), "180 damage (300 vs. lumenwood)")
 	end)
 
-	t.test("trucks: buy, use or in use; the Rustbucket is always yours", function()
+	t.test("trucks: buy, use or in use; nothing is free until you buy it", function()
 		local function truck(id)
 			return ItemCatalog.GetTruck(id)
 		end
 		local owned = { Pickup = true }
 		t.eq(ShopLogic.TruckStatusOf(truck("Pickup"), owned, "Pickup"), "inUse")
-		t.eq(ShopLogic.TruckStatusOf(truck("Rustbucket"), owned, "Pickup"), "use")
-		t.eq(ShopLogic.TruckStatusOf(truck("Rustbucket"), {}, "Pickup"), "use")
+		t.eq(ShopLogic.TruckStatusOf(truck("Rustbucket"), owned, "Pickup"), "buy")
+		t.eq(ShopLogic.TruckStatusOf(truck("Rustbucket"), {}, "Pickup"), "buy")
 		t.eq(ShopLogic.TruckStatusOf(truck("Flatbed"), owned, "Pickup"), "buy")
+		t.eq(ShopLogic.RespawnFee(truck("Rustbucket"), 2), 0)
+		t.eq(ShopLogic.RespawnFee(truck("Pickup"), 2), 8) -- 2% of $400
+		t.eq(ShopLogic.RespawnFee(truck("Flatbed"), 2), 100) -- 2% of $5,000
 	end)
 
 	t.test("trailers: buy, hitch, hitched", function()

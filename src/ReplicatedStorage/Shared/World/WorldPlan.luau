@@ -10,6 +10,7 @@
 -- from the sawmill.
 
 local BiomeData = require(script.Parent.Parent.BiomeData)
+local DealershipLot = require(script.Parent.Parent.Art.DealershipLot)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local LandmarkArt = require(script.Parent.Parent.Art.LandmarkArt)
@@ -267,7 +268,7 @@ local STAND_ROCK = 6 -- studs off a boulder's side
 local STAND_SIGN = 12 -- studs off a road sign
 local STAND_SCENERY = 8 -- studs off a scenery piece's footprint (the scenery's own gap to a tree)
 local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
-local STAND_MAX = 178 -- cap. The 3×4 plots leave room for 171 (trees 323-493)
+local STAND_MAX = 178 -- cap. The 3×4 plots and the lighthouse vista leave room for 169 (trees 323-491)
 local STAND_OPEN_MOST = 6 -- trees in an open-country stand (4 to this; roadside ones 4-9)
 
 -- A country stand: `trees` round `center` (all within `radius`); `road`
@@ -1034,6 +1035,8 @@ export type Town = {
 	greenery: { Greenery }, -- ornamental: never choppable
 	-- Saw-cut rounds down the middle of each shop path (looks only).
 	pathRounds: { CFrame },
+	-- Open display lot: trucks and trailers for sale, north of the plot road.
+	displayLot: CFrame,
 }
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
@@ -1119,9 +1122,9 @@ function WorldPlan.Town(): Town
 	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east
 	-- edge (z 6 to 42, ending short of the Plot Road).
 	local fences: { Fence } = {
-		{ length = 26, cframe = at(-92, 140) },
-		{ length = 26, cframe = at(-92, 124) },
-		{ length = 16, cframe = at(-105, 132, math.pi / 2) },
+		{ length = 20, cframe = at(-118, 192) },
+		{ length = 20, cframe = at(-118, 204) },
+		{ length = 12, cframe = at(-128, 198, math.pi / 2) },
 		{ length = 28, cframe = at(145, 20, math.pi / 2) }, -- ends short of the wider Plot Road
 	}
 
@@ -1134,9 +1137,9 @@ function WorldPlan.Town(): Town
 	local lantern = campsite * Vector3.new(9, 0, 2)
 
 	local propSpots: { { any } } = { -- { name, x, z, yaw? }
-		{ "Haybale", -97, 134, 0.3 },
-		{ "Haybale", -89, 129, -0.5 },
-		{ "Haybale", -84, 134.5, 1.2 },
+		{ "Haybale", -118, 198, 0.3 },
+		{ "Haybale", -112, 196, -0.5 },
+		{ "Haybale", -124, 197, 1.2 },
 		{ "Cart", -71, 124, -0.4 },
 		{ "WaterTower", -58, 126 },
 		{ "ToolRack", 34.4, 100, math.pi / 2 }, -- between the mill and the Dealership
@@ -1150,7 +1153,7 @@ function WorldPlan.Town(): Town
 		{ "Crate", 80, 102, 0.5 }, -- clear of the mill road's east leg
 		{ "Planter", -67, 87 },
 		{ "Planter", -109, 86.2 },
-		{ "Mailbox", -102.5, 88, 0 },
+		{ "Mailbox", -114, 90, 0 },
 		{ "FlowerBox", -84.5, 87.5, 0 },
 		{ "LogPile", 39, 131, 0 }, -- east of the mill, clear of the yard lamp
 		{ "LogPile", 39, 137, 0.1 },
@@ -1233,13 +1236,15 @@ function WorldPlan.Town(): Town
 	-- street, the pad or a path (WorldPlan.spec).
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
-		-- North of the Plot Road's mouth, past the lot's east rail (M1.5: it
-		-- stood at (124, 64), now in a pull-out). From the spawn it hides
-		-- the same stretch of the coast as before, so the lighthouse (which
-		-- stands where the spawn sees it, inSightOfSpawn) stays where it was:
-		-- (1194, 188). Only a sliver of spots here does that (WorldPlan.spec
-		-- pins the lighthouse).
-		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 67, 0, 40) },
+		-- Just north of the truck-lot path (the apron ends at z=70 and the
+		-- posts reach about five studs south), past the lot's east rail,
+		-- facing the plot road (M1.5: it stood at (124, 64), then on the
+		-- apron at (148.5, 67)). Clear of that apron, the next headland is
+		-- in sight, so the lighthouse stands at (1203, 236).
+		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
+		-- The turn off the street's east end, just north of PlazaEastMouth,
+		-- facing back down the path to the truck lot.
+		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },
 		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
 		-- The south exit, where the Forest Path leaves town for the Starter
 		-- Forest. West of the road (the lot is to the east), lit, and well
@@ -1260,7 +1265,7 @@ function WorldPlan.Town(): Town
 			table.insert(pathRounds, CFrame.new(x, 0, z))
 		end
 	end
-	rounds(-93.5) -- Hearth & Home
+	rounds(-100) -- General Store
 	rounds(-57) -- Tool Shed
 	rounds(48) -- Dealership
 
@@ -1295,8 +1300,8 @@ function WorldPlan.Town(): Town
 		-- Birch and maple round the edges.
 		{ "tree", -128, 70, 1.22, "maple" },
 		{ "tree", -118, 84, 1, "birch" },
-		{ "tree", -119, 112, 1.22, "birch" },
-		{ "tree", -118, 138, 1, "maple" },
+		{ "tree", -132, 96, 1.22, "birch" },
+		{ "tree", -146, 128, 1, "maple" },
 		{ "tree", -88, 4, 1, "maple" },
 		{ "tree", -62, 6, 1, "birch" },
 		{ "tree", -112, 0, 1.22, "birch" },
@@ -1314,8 +1319,8 @@ function WorldPlan.Town(): Town
 		{ "tree", 160, 84, 1, "birch" },
 		{ "tree", 132, -80, 1.22, "maple" },
 		-- Bushes along the shops' sides, the mill's back and the station.
-		{ "bush", -112, 100, 2.8 },
-		{ "bush", -112.5, 105.5, 2.4 },
+		{ "bush", -132, 108, 2.8 },
+		{ "bush", -130, 118, 2.4 },
 		{ "bush", 74, 117, 2.6 },
 		{ "bush", 69, 120.5, 3 },
 		{ "bush", 71, 101, 2.8 },
@@ -1330,8 +1335,8 @@ function WorldPlan.Town(): Town
 		-- the townsfolk walk: NPCData's routes pass 3 studs or more away.)
 		{ "flowers", -108, 54, 2.4 },
 		{ "flowers", -8.4, 44, 2 },
-		{ "flowers", -85, 85.8, 2.2 },
-		{ "flowers", -102, 85.4, 1.8 },
+		{ "flowers", -88, 86, 2.2 },
+		{ "flowers", -122, 78, 1.8 },
 		{ "flowers", -57.5, 46, 2.4 },
 		-- Rocks.
 		{ "rock", -55, 150, 1.8 },
@@ -1387,9 +1392,9 @@ function WorldPlan.Town(): Town
 			},
 			{
 				kind = "HearthAndHome",
-				title = "HEARTH & HOME",
+				title = "GENERAL STORE",
 				accent = Color3.fromRGB(122, 90, 60),
-				cframe = CFrame.new(-93.5, 0, 105.75),
+				cframe = CFrame.new(-100, 0, 118),
 			},
 		},
 		gondola = townGondola(),
@@ -1404,6 +1409,13 @@ function WorldPlan.Town(): Town
 		signs = signs,
 		greenery = greenery,
 		pathRounds = pathRounds,
+		-- Open display lot on the lawn north of the plot road. Trucks face
+		-- -Z, toward that road. The corner is the zone in WorldLayout.
+		displayLot = CFrame.new(
+			DealershipLot.OriginX + DealershipLot.Size() / 2,
+			0,
+			DealershipLot.OriginZ + select(2, DealershipLot.Size()) / 2
+		),
 	}
 end
 

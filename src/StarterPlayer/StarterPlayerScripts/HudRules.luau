@@ -96,6 +96,18 @@ function HudRules.SendHome(onFoot: boolean, fromYou: number?, slotDistance: unkn
 	return onFoot and (fromYou == nil or fromYou > HudRules.SendHomeNear) and TruckHome.Far(slotDistance)
 end
 
+-- Shown on the HUD until the player owns a truck. The words are exact.
+HudRules.NoTruckText = "Buy a truck at the dealership"
+
+-- The side button: the buy line when they own nothing, otherwise "Send
+-- truck home" while SendHome would show it.
+function HudRules.TruckButton(ownsTruck: boolean, sendHome: boolean): (boolean, string)
+	if not ownsTruck then
+		return true, HudRules.NoTruckText
+	end
+	return sendHome, "Send truck home"
+end
+
 -- "Drop axe": you hold an axe (`heldId`, nil if you don't) and carry
 -- `carried` axes in all (in hand and in the Backpack, so not counting any
 -- lying on the ground): two or more, or the one in hand isn't the starter

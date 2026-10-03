@@ -17,12 +17,14 @@ return function(t)
 	-- were added, and the cliff rings and hollow pools changed the shape.
 	-- The volcano ring was then raised to 24 so its one gap stays one gap.
 	-- Re-sampled again when the plot district became 3 columns by 4 rows:
-	-- that lawn is flat, and the new lanes add sample points.
+	-- that lawn is flat, and the new lanes add sample points. And once
+	-- more for the dealership display lot's flat patch on the lawn north
+	-- of the plot road (a few grid samples sit on that patch).
 	local HEIGHT_FINGERPRINT = {
 		n = 7662,
-		sum = 90890.971891811219393,
-		wsum = -265.015186866098645,
-		sq = 9506736.314695132896304,
+		sum = 90892.923091641845531,
+		wsum = -265.142704743345121,
+		sq = 9506734.196213660761714,
 		lo = -13.781769507273463,
 		hi = 205.783118277429935,
 	}

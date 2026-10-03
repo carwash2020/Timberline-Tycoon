@@ -273,9 +273,17 @@ ItemCatalog.Gear = {
 		id = "Lantern",
 		displayName = "Lantern",
 		effect = "Light to chop by in the Gloam Hollow",
-		priceCash = 150,
+		priceCash = 120,
 		biome = "grove",
 		color = "#F2C14E",
+	},
+	Flashlight = {
+		id = "Flashlight",
+		displayName = "Flashlight",
+		effect = "A pocket light for camp and the walk back to town",
+		priceCash = 250,
+		biome = "starter",
+		color = "#F4E2A1",
 	},
 	InsulatedCoat = {
 		id = "InsulatedCoat",
@@ -441,7 +449,7 @@ local AXES_V2: { [string]: AxeV2 } = {
 	LuxAxe = { price = 0, damage = 5.5, range = 15, cooldown = 0.42 },
 }
 local VEHICLES_V2: { [string]: number } = {
-	Rustbucket = 0,
+	Rustbucket = 75,
 	Pickup = 400,
 	ScoutATV = 2500,
 	Flatbed = 5000,

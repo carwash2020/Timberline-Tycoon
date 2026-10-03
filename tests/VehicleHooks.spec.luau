@@ -130,6 +130,7 @@ return function(t)
 				},
 			},
 		})
+		w.world = ws
 		w.VehicleService = loader:server("VehicleService")
 		w.VehicleService.Init(function(player, message)
 			table.insert(w.toasts, { player = player, message = message })
@@ -264,5 +265,24 @@ return function(t)
 			end
 		end
 		t.ok(warned, "and the error is logged")
+	end)
+
+	t.test("a failed respawn doesn't charge", function()
+		local w = setup()
+		local CoreLoop = w.loader:shared("CoreLoop")
+		w.world:SetAttribute(CoreLoop.ActiveAttribute, 2)
+		w.profile.cash = 100
+		w.profile.totalEarned = 0
+		w.profile.ownedTrucks = { "Pickup" }
+		w.profile.equippedTruck = "Pickup"
+		w.VehicleService.Hooks.blockSpawn = true
+		local ok = w.VehicleService.Recall(w.player)
+		t.eq(ok, false, "the truck never appeared")
+		t.eq(w.profile.cash, 100, "the 2% fee is refunded")
+		t.eq(w.profile.totalEarned, 0)
+		t.eq(w.VehicleService.GetVehicle(w.player), nil, "nothing was left behind")
+		w.VehicleService.Hooks.blockSpawn = false
+		t.ok(w.VehicleService.Recall(w.player), "a later recall works")
+		t.eq(w.profile.cash, 92, "Pickup is 2% of $400, and at least $2")
 	end)
 end

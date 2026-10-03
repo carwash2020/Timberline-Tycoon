@@ -95,6 +95,7 @@ return function(t)
 
 	t.test("vehicles: the Rustbucket is free and every truck is buildable", function()
 		t.eq(ItemCatalog.GetTruck("Rustbucket").priceCash, 0)
+		t.eq(ItemCatalog.GetTruck("Rustbucket").v2.price, 75)
 		for key, truck in pairs(ItemCatalog.Trucks) do
 			t.eq(truck.id, key)
 			t.ok(truck.bedCapacity >= 0, key)

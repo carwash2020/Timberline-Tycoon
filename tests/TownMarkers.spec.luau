@@ -84,7 +84,7 @@ return function(t)
 			{ "SellLogs", "SellArea", "SellZone", "SELL LOGS" },
 			{ "Axes", "ToolShed", "Counter", "AXES" },
 			{ "Trucks", "Dealership", "Counter", "TRUCKS" },
-			{ "Gear", "HearthAndHome", "Counter", "BLUEPRINTS\n& GEAR" },
+			{ "Gear", "HearthAndHome", "Counter", "GENERAL\nSTORE" },
 			{ "Gondola", "GondolaTown", "Platform", "GONDOLA" },
 		}
 		t.eq(#TownMarkers.Markers, #expect)

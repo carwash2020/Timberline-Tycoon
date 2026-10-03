@@ -477,7 +477,7 @@ return function(t)
 		s.profiles[skipped].tutorialDone = true
 		local later = s.player(2, "Bo", Vector3.new(-12, 0, -10))
 		s.profiles[later].tutorialDone = false
-		s.profiles[later].tutorialStep = 6 -- selling loads, after planting
+		s.profiles[later].tutorialStep = t.shared("TutorialData").PlantStep + 1 -- the loads, after planting
 		s.fell(skipped, one)
 		s.fell(later, two)
 		s.fxAll = {}

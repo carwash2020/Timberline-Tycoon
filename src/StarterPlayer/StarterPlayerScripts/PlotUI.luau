@@ -19,6 +19,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
@@ -129,10 +130,16 @@ local function stockCount(id: string): number
 	return SawmillLogic.CountStock(SawmillLogic.DecodeStock((player:GetAttribute("SawmillStock") :: string?) or ""), id)
 end
 
--- A sawmill you already bought places for free. The table the placer sees
--- has price 0 so the ghost doesn't ask for cash the server won't charge.
+local function ownsBlueprint(id: string): boolean
+	local owned = ShopLogic.DecodeSet((player:GetAttribute("Blueprints") :: string?) or "")
+	return owned[id] == true
+end
+
+-- A sawmill you already bought, or an unlock blueprint you own, places for
+-- free. The table the placer sees has price 0 so the ghost doesn't ask for
+-- cash the server won't charge.
 local function forPlacer(bp: PlotData.Blueprint): PlotData.Blueprint
-	if stockCount(bp.id) > 0 then
+	if stockCount(bp.id) > 0 or (bp.unlock == true and ownsBlueprint(bp.id)) then
 		local copy = table.clone(bp)
 		copy.priceCash = 0
 		return copy
@@ -144,7 +151,9 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local locked = bp.tier > tier()
 	local needed = PlotData.Tier(bp.tier)
 	local stocked = stockCount(bp.id)
-	local price = if stocked > 0 then 0 else bp.priceCash
+	local unlocked = bp.unlock == true and ownsBlueprint(bp.id)
+	local atStore = bp.unlock == true and not unlocked
+	local price = if stocked > 0 or unlocked then 0 else PlotData.Price(bp)
 	local affordable = cash() >= price
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
@@ -160,8 +169,10 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local button, state
 	if locked then
 		button, state = if needed then needed.name else "Locked", "locked"
-	elseif stocked > 0 then
+	elseif stocked > 0 or unlocked then
 		button, state = "Place", "buy"
+	elseif atStore then
+		button, state = "At the store", "locked"
 	elseif affordable then
 		button, state = "Build " .. Util.formatCash(price), "buy"
 	else
@@ -183,6 +194,8 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 						Util.article(if needed then needed.name else "bigger plot")
 					)
 				)
+			elseif atStore then
+				HUD.Toast(string.format("Buy the %s at the General Store first.", bp.displayName))
 			elseif cash() < price then
 				HUD.Toast(
 					string.format("You need %s more for the %s.", Util.formatCash(price - cash()), bp.displayName)
@@ -211,7 +224,7 @@ local STORE: ShopUI.Shop = {
 			if a.tier ~= b.tier then
 				return a.tier < b.tier
 			end
-			return a.priceCash < b.priceCash
+			return PlotData.Price(a) < PlotData.Price(b)
 		end)
 		for _, bp in ipairs(sorted) do
 			table.insert(ids, bp.id)

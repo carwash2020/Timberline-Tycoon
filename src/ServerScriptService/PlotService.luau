@@ -37,6 +37,7 @@ local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
+local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -152,6 +153,21 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean)
 	)
 	apron.CanCollide = false
 	apron.CanQuery = false
+	-- Road-edge delivery pad: 80 along the road (X), 16 deep. A pad the
+	-- world already placed (DeliveryPad) stays where it is.
+	if not slot.model:FindFirstChild("DeliveryPad") then
+		local delivery = part(
+			"DeliveryPad",
+			Vector3.new(80, 0.2, 16),
+			slot.cframe * CFrame.new(0, 0.16, half + 8),
+			Color3.fromRGB(168, 150, 118),
+			Enum.Material.Ground,
+			slot.model
+		)
+		delivery.CanCollide = false
+		delivery.CanQuery = false
+		delivery.CastShadow = false
+	end
 end
 
 local function refreshSign(slot: Slot)
@@ -371,6 +387,7 @@ local function onClaim(player: Player, slot: Slot)
 	profile.plot.claimed = true
 	assign(player, slot, profile)
 	QuestService.Event(player, "plotClaimed")
+	MilestoneService.Mark(player, "Claimed a plot")
 	notify(player, "It's yours! Stand on your plot and press BUILD to start building.")
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "PlotClaimed")
@@ -442,7 +459,14 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	local stock = if type(profile.sawmillStock) == "table" then profile.sawmillStock else nil
 	local stockAt = if ItemCatalog.GetSawmill(bp.id) and stock then table.find(stock, bp.id) else nil
 	local fromStock = stockAt ~= nil
-	local price = if fromStock then 0 else bp.priceCash
+	local unlocked = bp.unlock == true
+		and type(profile.furnitureBlueprints) == "table"
+		and profile.furnitureBlueprints[bp.id] == true
+	if bp.unlock == true and not unlocked and not fromStock then
+		notify(player, string.format("Buy the %s at the General Store first.", bp.displayName))
+		return
+	end
+	local price = if fromStock or unlocked then 0 else PlotData.Price(bp)
 	if profile.cash < price then
 		notify(
 			player,
@@ -501,13 +525,32 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	end
 end
 
--- What selling `item` pays back right now.
+-- What selling `item` pays back right now. An unlock blueprint was bought
+-- at the store and placed for free, so selling it (even right away) pays
+-- nothing: a refund of the store price would print cash.
 local function sellValue(item: PlotLogic.Placed, bp: PlotData.Blueprint): number
+	if bp.unlock then
+		return 0
+	end
 	local at = placedAt[item.uid]
 	if at and os.clock() - at <= UNDO_SECONDS then
 		return bp.priceCash
 	end
 	return PlotLogic.SellValue(bp)
+end
+
+-- Where a bought truck is delivered: the plot's road-edge pad, or nil
+-- when this player has no plot (the town lot is the fallback).
+function PlotService.DeliveryCFrame(player: Player): CFrame?
+	local slot = slotOf[player]
+	if not slot then
+		return nil
+	end
+	local pad = slot.model:FindFirstChild("DeliveryPad")
+	if pad and pad:IsA("BasePart") then
+		return pad.CFrame
+	end
+	return nil
 end
 
 function PlotService.Sell(player: Player, uid: unknown)
