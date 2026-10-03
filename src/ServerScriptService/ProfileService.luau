@@ -138,6 +138,15 @@ function ProfileService.ProcessPurchaseAsync(
 	return Enum.ProductPurchaseDecision.NotProcessedYet
 end
 
+-- Writes the session now (a slot change). ProfileStore retries. No-op if
+-- the session already ended.
+function ProfileService.Save(player: Player)
+	local session = sessions[player]
+	if session ~= nil and session:IsActive() then
+		session:Save()
+	end
+end
+
 -- Final save + release of the session lock. Call when the player leaves.
 function ProfileService.ReleaseProfile(player: Player)
 	local session = sessions[player]

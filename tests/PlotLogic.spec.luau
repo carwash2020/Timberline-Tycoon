@@ -19,6 +19,74 @@ return function(t)
 		return dx * dx + dz * dz < r * r
 	end
 
+	t.test("twelve roomy plots, lanes a logging rig can drive, clear of the roads", function()
+		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+		local ItemCatalog = t.shared("ItemCatalog")
+		t.eq(#PlotData.Slots, 12)
+		local widest = 0
+		for _, truck in pairs(ItemCatalog.Trucks) do
+			widest = math.max(widest, truck.look.width)
+		end
+		t.ok(PlotData.LaneWidth >= widest + 8, string.format("lane %d vs rig %.2f", PlotData.LaneWidth, widest))
+		local gap = PlotData.SlotSpacing - MAX
+		t.ok(gap >= PlotData.LaneWidth + 16, "grass either side of the lane at the biggest tier")
+		local function hits(sx, sz, size, ax, az, bx, bz, width)
+			local len = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+			local steps = math.max(1, math.ceil(len / 4))
+			local reach = width / 2
+			for i = 0, steps do
+				local u = i / steps
+				local x, z = ax + (bx - ax) * u, az + (bz - az) * u
+				local dx = math.max(math.abs(x - sx) - size / 2, 0)
+				local dz = math.max(math.abs(z - sz) - size / 2, 0)
+				if dx * dx + dz * dz < (reach - 0.5) ^ 2 then
+					return true
+				end
+			end
+			return false
+		end
+		local function nearLane(sx, sz)
+			local best = math.huge
+			for _, road in ipairs(WorldLayout.Roads) do
+				if
+					road.name == "PlotRoad"
+					or road.name == "PlotLane"
+					or road.name == "PlotSouth"
+					or road.name == "ForestExit"
+				then
+					local pts = road.points
+					for i = 1, #pts - 1 do
+						local a, b = pts[i], pts[i + 1]
+						local len = math.sqrt((b.X - a.X) ^ 2 + (b.Y - a.Y) ^ 2)
+						local steps = math.max(1, math.ceil(len / 8))
+						for s = 0, steps do
+							local u = s / steps
+							local x = a.X + (b.X - a.X) * u
+							local z = a.Y + (b.Y - a.Y) * u
+							local dx = math.max(math.abs(x - sx) - MAX / 2, 0)
+							local dz = math.max(math.abs(z - sz) - MAX / 2, 0)
+							best = math.min(best, math.sqrt(dx * dx + dz * dz))
+						end
+					end
+				end
+			end
+			return best
+		end
+		for i, slot in ipairs(PlotData.Slots) do
+			t.ok(nearLane(slot.X, slot.Y) <= PlotData.RoadSetback + 4, "plot " .. i .. " meets a road")
+			for _, road in ipairs(WorldLayout.Roads) do
+				local pts = road.points
+				for s = 1, #pts - 1 do
+					local a, b = pts[s], pts[s + 1]
+					t.ok(
+						not hits(slot.X, slot.Y, MAX, a.X, a.Y, b.X, b.Y, road.width),
+						string.format("plot %d overlaps %s", i, road.name)
+					)
+				end
+			end
+		end
+	end)
+
 	t.test("the district has a slot per player, apart even at the biggest tier", function()
 		t.ok(#PlotData.Slots >= 12, "a full server (12) needs 12 plots")
 		for i, a in ipairs(PlotData.Slots) do

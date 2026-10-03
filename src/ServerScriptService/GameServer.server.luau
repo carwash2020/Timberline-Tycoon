@@ -28,6 +28,7 @@ local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
+local SaveSlotService = require(script.Parent.SaveSlotService)
 local SawmillService = require(script.Parent.SawmillService)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SellService = require(script.Parent.SellService)
@@ -63,6 +64,10 @@ local Util = require(ReplicatedStorage.Shared.Util)
 -- is logged with a traceback and doesn't stop the others (a broken Init
 -- must never keep players out). tostring first: debug.traceback itself
 -- errors on a non-string error.
+-- Filled in once leave-commit helpers exist. A slot change calls these.
+local commitSlot: (Player) -> () = function(_player: Player) end
+local rebuildSlot: (Player) -> () = function(_player: Player) end
+
 local function safely(name: string, fn: (...any) -> ...any, ...: any)
 	local args = table.pack(...)
 	local ok, err = xpcall(function(): any
@@ -671,6 +676,14 @@ safely("FieldGuideService.Init", FieldGuideService.Init, notify)
 safely("NodeService.Init", NodeService.Init, notify)
 safely("AetherService.Init", AetherService.Init, notify)
 safely("GondolaService.Init", GondolaService.Init, mapFolder, notify)
+safely("SaveSlotService.Init", SaveSlotService.Init, remote.SlotAction, remote.SlotState, notify, {
+	commit = function(player: Player)
+		commitSlot(player)
+	end,
+	rebuild = function(player: Player)
+		rebuildSlot(player)
+	end,
+})
 safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlaceBlueprint = remote.PlaceBlueprint,
 	MoveBlueprint = remote.MoveBlueprint,
@@ -1102,6 +1115,7 @@ local function onPlayerAdded(player: Player)
 	safely("AetherService.PlayerJoined", AetherService.PlayerJoined, player, profile)
 	safely("PlotService.PlayerJoined", PlotService.PlayerJoined, player, profile)
 	safely("ForestService.PlayerJoined", ForestService.PlayerJoined, player, profile)
+	safely("SaveSlotService.PlayerJoined", SaveSlotService.PlayerJoined, player)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -1137,12 +1151,80 @@ LeaveCommit.Add("playtime", savePlaytime)
 LeaveCommit.Add("truckLoad", saveTruckLoad)
 LeaveCommit.Add("leftBehind", saveLeftBehind)
 
+-- A slot change uses the leave path to pull wood into the profile, then
+-- builds the other slot the way a join does. Commit runs before the swap.
+local function commitSlotNow(player: Player)
+	dropCarriedLogs(player)
+	if CoreLoop.V2() then
+		TruckLoad.PlayerRemoving(player)
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	local left = TreeService.TakeLeftBehind(player.UserId)
+	for _, entry in ipairs(left) do
+		if #profile.leftLoad >= GameConfig.MaxLeftLogs then
+			break
+		end
+		table.insert(profile.leftLoad, entry)
+	end
+end
+
+local function rebuildSlotNow(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	if
+		not ItemCatalog.GetTruck(profile.equippedTruck) or not table.find(profile.ownedTrucks, profile.equippedTruck)
+	then
+		profile.equippedTruck = "Rustbucket"
+	end
+	if profile.equippedTrailer ~= "" and not table.find(profile.ownedTrailers, profile.equippedTrailer) then
+		profile.equippedTrailer = ""
+	end
+	AxeService.PlayerRemoving(player)
+	PlotService.PlayerRemoving(player)
+	VehicleService.DespawnTruck(player)
+	PlotService.PlayerJoined(player, profile)
+	VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
+	ShopService.PlayerJoined(player, profile)
+	ForestService.PlayerJoined(player, profile)
+	DailyService.Start(player, profile)
+	QuestService.Start(player, profile)
+	player:SetAttribute("Cash", profile.cash)
+	remote.CashChanged:FireClient(player, profile.cash)
+	-- Settings and the Robux passes live on the account. A slot swap does
+	-- not change them; mirror them again so the client stays in step.
+	profile.settings = SettingsLogic.Sanitize(profile.settings)
+	for key, attr in pairs(SettingsLogic.Attributes) do
+		player:SetAttribute(attr, (profile.settings :: any)[key])
+	end
+	if type(profile.passes) == "table" then
+		for key, on in pairs(profile.passes) do
+			if on == true then
+				player:SetAttribute("Pass_" .. key, true)
+			end
+		end
+	end
+	player:SetAttribute("DoubleWoodUntil", profile.doubleWoodUntil)
+	player:SetAttribute("InstantDeliveries", profile.instantDeliveries)
+	pcall(function()
+		player:LoadCharacterAsync()
+	end)
+end
+
+commitSlot = commitSlotNow
+rebuildSlot = rebuildSlotNow
+
 local function onPlayerRemoving(player: Player)
 	joining[player] = nil
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
+	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
 	-- Playtime, the truck's loose wood and left-behind logs. Before the
 	-- release, and again (as a no-op) from the final save if shutdown

@@ -11,6 +11,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Quality = require(script.Parent.Quality)
 
@@ -22,8 +23,36 @@ local BLADE_SPEED = 7 -- radians per second
 
 type Flame = { part: BasePart, size: Vector3, phase: number }
 
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
 local blades: { [BasePart]: boolean } = {}
 local flames: { [BasePart]: Flame } = {}
+local chimneys: { [BasePart]: ParticleEmitter } = {}
+
+local function puff(part: BasePart): ParticleEmitter
+	local e = Instance.new("ParticleEmitter")
+	e.Name = "HearthPuff"
+	e.Texture = SMOKE_TEXTURE
+	e.Color = ColorSequence.new(Color3.fromRGB(210, 206, 198), Color3.fromRGB(160, 156, 148))
+	e.LightEmission = 0
+	e.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.6),
+		NumberSequenceKeypoint.new(1, 2.4),
+	})
+	e.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.45),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	e.Lifetime = NumberRange.new(2.2, 3.4)
+	e.Speed = NumberRange.new(1.2, 2.2)
+	e.Acceleration = Vector3.new(0.4, 1.5, 0)
+	e.Drag = 1.5
+	e.Rate = 0
+	e.Rotation = NumberRange.new(0, 360)
+	e.RotSpeed = NumberRange.new(-20, 20)
+	e.Parent = part
+	return e
+end
 
 local function track(tag: string, add: (BasePart) -> (), remove: (BasePart) -> ())
 	local function added(inst: Instance)
@@ -53,6 +82,18 @@ function TownFX.Start()
 	end, function(part)
 		flames[part] = nil
 	end)
+	track("HearthSmoke", function(part)
+		if chimneys[part] then
+			return
+		end
+		chimneys[part] = puff(part)
+	end, function(part)
+		local e = chimneys[part]
+		chimneys[part] = nil
+		if e then
+			e:Destroy()
+		end
+	end)
 
 	local t = 0
 	local sinceCosmetic = 0
@@ -70,6 +111,13 @@ function TownFX.Start()
 		end
 		local eye = camera.CFrame.Position
 		local near = Quality.Budget().TownFxNear
+		local chimneyRate = EnvironmentData.ChimneyRate(Quality.Budget().Tier)
+		for part, emitter in pairs(chimneys) do
+			if part.Parent then
+				local close = (part.Position - eye).Magnitude < near
+				emitter.Rate = if close then chimneyRate else 0
+			end
+		end
 		for blade in pairs(blades) do
 			if blade.Parent and (blade.Position - eye).Magnitude < near then
 				blade.CFrame *= CFrame.Angles(BLADE_SPEED * step, 0, 0)

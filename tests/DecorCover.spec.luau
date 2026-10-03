@@ -25,12 +25,13 @@ return function(t)
 	-- across the whole map, at three vitalities. If this fails, every
 	-- decoration cell reshuffled. Phase 12 re-sampled on purpose: the six
 	-- draws per candidate are unchanged, and the wider roads, junction
-	-- flares and hollow pools reject a few of those candidates.
+	-- flares and hollow pools reject a few of those candidates. Re-sampled
+	-- again when the plot district became 3×4: flowers don't grow on the pads.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1627, 82777153, 863413116 },
-			[60] = { 2069, 79842856, 469395158 },
-			[85] = { 2580, 27311202, 24507670 },
+			[20] = { 1608, 141015027, 374386409 },
+			[60] = { 2044, 155046150, 230359012 },
+			[85] = { 2534, 125044142, 4093083 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

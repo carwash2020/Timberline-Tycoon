@@ -13,6 +13,14 @@ local PlotData = require(script.Parent.Parent.PlotData)
 
 local WorldLayout = {}
 
+-- On while the first 322 trees are placed. Their X and Z were worked out
+-- against the old district; saves and planted stakes point at them.
+local legacyLayout = false
+
+function WorldLayout.SetLegacyLayout(on: boolean)
+	legacyLayout = on
+end
+
 WorldLayout.WorldHalf = 1500 -- the world runs from -1500 to 1500 on both axes
 WorldLayout.Sawmill = Vector3.new(0, 0, 110)
 WorldLayout.SeaLevel = -3 -- ocean surface
@@ -26,6 +34,19 @@ export type FlatZone = { name: string, x0: number, x1: number, z0: number, z1: n
 -- under it is smoothed so trucks have an easy ride.
 export type Road = { name: string, points: { Vector2 }, width: number }
 
+-- The 4×3 district those first trees were placed around (spacing 220, the
+-- road at z = 50). Widths are the pre-phase-12 ones. The live district is
+-- the 3×4 grid.
+WorldLayout.LegacyPlots = { name = "Plots", x0 = 126, x1 = 1034, z0 = -624, z1 = 74, blend = 50 } :: FlatZone
+WorldLayout.LegacyPlotRoads = {
+	{ name = "PlotRoad", points = { Vector2.new(118, 50), Vector2.new(1010, 50) }, width = 10 },
+	{ name = "PlotLane", points = { Vector2.new(360, 50), Vector2.new(360, -600) }, width = 8 },
+	{ name = "PlotLane", points = { Vector2.new(580, 50), Vector2.new(580, -600) }, width = 8 },
+	{ name = "PlotLane", points = { Vector2.new(800, 50), Vector2.new(800, -600) }, width = 8 },
+	{ name = "PlotLane", points = { Vector2.new(150, -170), Vector2.new(1010, -170) }, width = 8 },
+	{ name = "PlotLane", points = { Vector2.new(150, -390), Vector2.new(1010, -390) }, width = 8 },
+} :: { Road }
+
 local function plotBounds(): (number, number, number, number)
 	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
 	for _, slot in ipairs(PlotData.Slots) do
@@ -37,17 +58,30 @@ local function plotBounds(): (number, number, number, number)
 end
 
 local px0, px1, pz0, pz1 = plotBounds()
--- 16 wide, grown north and starting further east than the old 10-wide road,
--- so its south edge and its west end stay clear of the longest bay and the
--- lot's east fence.
-local plotRoadZ = pz1 + 10
+-- The town's plot-road mouth is fixed (lamps, the lot fence and the long
+-- bays were laid out against z = 50, 16 wide). The pads sit RoadSetback
+-- south of that centre, so the sign and a strip of grass stay off the
+-- roadway. Lanes between the pads are wider; this mouth is not.
+local plotRoadZ = pz1 + PlotData.RoadSetback
 local plotRoadX = 118
+local plotLane = PlotData.LaneWidth
+local PLOT_ROAD_WIDTH = 16
 
 WorldLayout.FlatZones = {
 	-- Town: spawn, sawmill, shops, parking, gondola station.
 	{ name = "Town", x0 = -125, x1 = 140, z0 = -32, z1 = 205, blend = 45 },
-	-- The plot district east of town, with its roads and lanes.
-	{ name = "Plots", x0 = px0 - 24, x1 = px1 + 24, z0 = pz0 - 24, z1 = pz1 + 34, blend = 50 },
+	-- The plot district east of town, with its roads and lanes. The west
+	-- and north edges stay where the old 4×3 lawn was (x = 126, z = 74):
+	-- the gap beside the pond and the plot road's north shoulder stay
+	-- open grass, so filler doesn't sprout in the water there.
+	{
+		name = "Plots",
+		x0 = math.min(px0 - 24, 126),
+		x1 = px1 + 24,
+		z0 = pz0 - 24,
+		z1 = math.max(pz1 + 34, 74),
+		blend = 50,
+	},
 } :: { FlatZone }
 
 -- Biome centres, for the roads below.
@@ -88,8 +122,14 @@ WorldLayout.Roads = {
 		points = { Vector2.new(-20, 760), Vector2.new(-420, 860), Vector2.new(-760, 960), sky + Vector2.new(120, -40) },
 		width = 24,
 	},
-	-- The road along the north side of the plot district.
-	{ name = "PlotRoad", points = { Vector2.new(plotRoadX, plotRoadZ), Vector2.new(px1, plotRoadZ) }, width = 16 },
+	-- The road along the north side of the plot district. 16 wide, the
+	-- width the town's mouth was built for (a Logging Rig fits; two don't
+	-- need to pass here). The lanes between plots are the wide ones.
+	{
+		name = "PlotRoad",
+		points = { Vector2.new(plotRoadX, plotRoadZ), Vector2.new(px1, plotRoadZ) },
+		width = PLOT_ROAD_WIDTH,
+	},
 	-- East of the Dealership, then north to the Snow Road's start. The mill
 	-- yard and the shop fill x 22 to 70, so the way stays east of them.
 	{
@@ -165,7 +205,9 @@ WorldLayout.Rims = {
 	},
 } :: { Rim }
 
--- Lanes between the plots (in the gaps the biggest tier leaves).
+-- Lanes between the plots (in the gaps the biggest tier leaves), plus a
+-- road along the south edge and a spur into the forest so the back row
+-- isn't a dead end.
 do
 	local xs, zs = {}, {}
 	for _, slot in ipairs(PlotData.Slots) do
@@ -173,13 +215,15 @@ do
 	end
 	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
 	local minX = px0 + half
+	local southZ = pz0 - 20
 	for x in pairs(xs) do
 		if x > minX then
 			local laneX = x - PlotData.SlotSpacing / 2
-			table.insert(
-				WorldLayout.Roads,
-				{ name = "PlotLane", points = { Vector2.new(laneX, plotRoadZ), Vector2.new(laneX, pz0) }, width = 8 }
-			)
+			table.insert(WorldLayout.Roads, {
+				name = "PlotLane",
+				points = { Vector2.new(laneX, plotRoadZ), Vector2.new(laneX, southZ) },
+				width = plotLane,
+			})
 		end
 	end
 	for z in pairs(zs) do
@@ -187,10 +231,20 @@ do
 			local laneZ = z + PlotData.SlotSpacing / 2
 			table.insert(
 				WorldLayout.Roads,
-				{ name = "PlotLane", points = { Vector2.new(px0, laneZ), Vector2.new(px1, laneZ) }, width = 8 }
+				{ name = "PlotLane", points = { Vector2.new(px0, laneZ), Vector2.new(px1, laneZ) }, width = plotLane }
 			)
 		end
 	end
+	table.insert(
+		WorldLayout.Roads,
+		{ name = "PlotSouth", points = { Vector2.new(px0, southZ), Vector2.new(px1, southZ) }, width = plotLane }
+	)
+	local midX = (px0 + px1) / 2
+	table.insert(WorldLayout.Roads, {
+		name = "ForestExit",
+		points = { Vector2.new(midX, southZ), Vector2.new(midX, southZ - 160) },
+		width = plotLane,
+	})
 end
 
 -- The parking lot east of the spawn (a gravel lot; MapBuilder paints the
@@ -359,6 +413,9 @@ end
 function WorldLayout.FlatWeight(x: number, z: number): number
 	local weight = 0
 	for _, zone in ipairs(WorldLayout.FlatZones) do
+		if legacyLayout and zone.name == "Plots" then
+			zone = WorldLayout.LegacyPlots
+		end
 		local dx = math.max(zone.x0 - x, 0, x - zone.x1)
 		local dz = math.max(zone.z0 - z, 0, z - zone.z1)
 		local outside = math.sqrt(dx * dx + dz * dz)

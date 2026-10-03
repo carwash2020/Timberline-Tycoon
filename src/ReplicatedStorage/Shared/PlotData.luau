@@ -9,14 +9,29 @@
 
 local PlotData = {}
 
--- The plot district, south-east of town: 12 plots on a 220-stud grid, room
--- for the biggest tier (200 x 200) with a lane between each (MapBuilder
--- lays the roads). One server holds up to 12 players, so everyone fits.
-PlotData.SlotSpacing = 220
+-- The plot district, east of town: 12 plots, 3 columns by 4 rows. One
+-- server holds up to 12 players, so everyone fits. The biggest tier is
+-- 200 x 200. The gap between those pads is wide enough for a lane a
+-- Logging Rig can drive (LaneWidth) with grass either side. The north
+-- road stays on the town's plot-road mouth (its centre is RoadSetback
+-- studs north of the biggest pad, so the claim sign is not in the
+-- roadway). The west edge stays east of the parking-lot loop; the east
+-- edge stays off the beach.
+PlotData.Columns = 3
+PlotData.Rows = 4
+PlotData.SlotSpacing = 248
+PlotData.LaneWidth = 22
+PlotData.RoadSetback = 28
 PlotData.Slots = {} :: { Vector2 }
-for row = 0, 2 do
-	for col = 0, 3 do
-		table.insert(PlotData.Slots, Vector2.new(250 + col * PlotData.SlotSpacing, -60 - row * PlotData.SlotSpacing))
+-- Row 0's north edge lands RoadSetback south of the plot road at z = 50.
+-- Column 0's west edge (200) clears the lot loop, whose east fence is at x = 180.
+local ORIGIN_X, ORIGIN_Z = 300, -78
+for row = 0, PlotData.Rows - 1 do
+	for col = 0, PlotData.Columns - 1 do
+		table.insert(
+			PlotData.Slots,
+			Vector2.new(ORIGIN_X + col * PlotData.SlotSpacing, ORIGIN_Z - row * PlotData.SlotSpacing)
+		)
 	end
 end
 
@@ -48,6 +63,7 @@ export type Box = {
 	material: string, -- Enum.Material name
 	shape: string?, -- "Cylinder" (axis X) or "Ball"; default a block
 	light: boolean?, -- a warm PointLight in it
+	smoke: boolean?, -- a chimney: the client puffs smoke here (not on Low)
 }
 
 export type Blueprint = {
@@ -241,6 +257,13 @@ PlotData.Blueprints = {
 				material = "WoodPlanks",
 			},
 			{ size = Vector3.new(13, 1, 11), offset = Vector3.new(0, 8.5, 0), color = "#963C2C", material = "Wood" },
+			{
+				size = Vector3.new(1.6, 3.2, 1.6),
+				offset = Vector3.new(3.6, 10.4, 2.4),
+				color = STONE,
+				material = "Slate",
+				smoke = true,
+			},
 		},
 	},
 	{

@@ -1248,4 +1248,34 @@ function EnvironmentData.NearestWater(x: number, z: number): (Vector3, number, s
 	return Vector3.new(bestX, level, bestZ), bestD, bestKind
 end
 
+-- Falling leaves a second, and river glints in view. Low is nothing: phones
+-- already spend their budget on the trees.
+function EnvironmentData.LeafRate(tier: string): number
+	if tier == "high" then
+		return 6
+	elseif tier == "medium" then
+		return 3
+	end
+	return 0
+end
+
+function EnvironmentData.RiverMotes(tier: string): number
+	if tier == "high" then
+		return 4
+	elseif tier == "medium" then
+		return 2
+	end
+	return 0
+end
+
+-- Chimney puffs a second. Low keeps the chimney, without the particles.
+function EnvironmentData.ChimneyRate(tier: string): number
+	if tier == "high" then
+		return 8
+	elseif tier == "medium" then
+		return 4
+	end
+	return 0
+end
+
 return EnvironmentData

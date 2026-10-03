@@ -33,6 +33,7 @@ local legacyLayout = false
 
 function TerrainGen.SetLegacyLayout(on: boolean)
 	legacyLayout = on
+	WorldLayout.SetLegacyLayout(on)
 end
 
 local noise = math.noise
@@ -358,9 +359,14 @@ local LEGACY_WIDTH: { [string]: number } = {
 local LEGACY_ROADS: { FastRoad } = {}
 for _, road in ipairs(WorldLayout.Roads) do
 	local width = LEGACY_WIDTH[road.name]
-	if width then
+	-- Plot roads moved with the 3×4 district. The first trees still see the
+	-- old polylines (WorldLayout.LegacyPlotRoads), not these.
+	if width and road.name ~= "PlotRoad" and road.name ~= "PlotLane" then
 		table.insert(LEGACY_ROADS, { line = WorldLayout.FastLine(road.points), half = width / 2 })
 	end
+end
+for _, road in ipairs(WorldLayout.LegacyPlotRoads) do
+	table.insert(LEGACY_ROADS, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
 end
 
 local function roadsNow(): { FastRoad }

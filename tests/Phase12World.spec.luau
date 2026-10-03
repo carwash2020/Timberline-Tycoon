@@ -26,7 +26,7 @@ return function(t)
 			VolcanoRoad = 28,
 			SkyrootRoad = 24,
 			PlotRoad = 16,
-			PlotLane = 8,
+			PlotLane = 22,
 			MillRoad = 22,
 			LotLoop = 16,
 		}
@@ -172,7 +172,8 @@ return function(t)
 		t.eq(WorldPlan.ForestEdgeApart, 45)
 		t.eq(WorldPlan.ForestVergeStep, 40)
 		local trees = WorldPlan.Trees()
-		t.ok(#trees >= 775, #trees .. " trees")
+		-- 772 after the 3×4 plot district (was 775; seven stand trees stood on the new lawn).
+		t.ok(#trees >= 772, #trees .. " trees")
 		local wet = 0
 		for i = 1, 322 do
 			local p = trees[i].position

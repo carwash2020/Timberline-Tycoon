@@ -100,9 +100,16 @@ Status key: ✅ built and played · 🟡 built, not yet played in Studio ·
 
 ### 6. Plots and the empire (GAME_DESIGN §9, §10; in V1)
 Slices, in order:
-- 🟡 Claim a plot in the plot district (12 plots east of the parking lot);
-  base tiers (Campsite → Timber Empire) that grow the plot, cash only
-  until Stone and planks exist (tier prices are a first pass to tune)
+- 🟡 Claim a plot in the plot district (12 plots, 3 columns by 4 rows,
+  east of the parking lot; lanes a Logging Rig can drive, the north road
+  on the town's mouth); base tiers (Campsite 120 → Timber Empire 200)
+  that grow the plot, cash only until Stone and planks exist (tier
+  prices are a first pass to tune). A 13th player gets no plot until
+  someone leaves; their save is kept
+- 🟡 Three save slots in the one profile (LT2-style): summary, load,
+  fresh start, redo with a confirm, a 2-minute cooldown so it can't dupe
+  cash or wood. Robux (receipts, 2x Wood, Instant Delivery, banked cash,
+  the Lux Axe) stays on the account. An old single save becomes slot 1
 - 🟡 Blueprint Store + placement: ghost preview, rotate, 2-stud grid snap,
   bounds and overlap checked on the server; move, and sell back for half
   (all of it within a minute); saved with the profile, plot-local so a

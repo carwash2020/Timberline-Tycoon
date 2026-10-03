@@ -16,11 +16,13 @@ return function(t)
 	-- in phase 12 when the haul roads widened, the mill road and lot loop
 	-- were added, and the cliff rings and hollow pools changed the shape.
 	-- The volcano ring was then raised to 24 so its one gap stays one gap.
+	-- Re-sampled again when the plot district became 3 columns by 4 rows:
+	-- that lawn is flat, and the new lanes add sample points.
 	local HEIGHT_FINGERPRINT = {
-		n = 7362,
-		sum = 90387.035782819672022,
-		wsum = -275.683500285217860,
-		sq = 9507401.247142698615789,
+		n = 7662,
+		sum = 90890.971891811219393,
+		wsum = -265.015186866098645,
+		sq = 9506736.314695132896304,
 		lo = -13.781769507273463,
 		hi = 205.783118277429935,
 	}
