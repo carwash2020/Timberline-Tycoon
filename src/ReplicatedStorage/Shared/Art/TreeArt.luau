@@ -832,7 +832,8 @@ end
 --   * FromSkeleton returns a Model tagged "Tree" (ModelStreamingMode
 --     Atomic) whose PrimaryPart is section 1. Each section is a Block named
 --     "Section" (tag "WoodSection", attribute Section = its id), its length
---     up the part's Y axis, bark-coloured Wood, anchored, colliding,
+--     up the part's Y axis, bark-coloured (Wood, or SmoothPlastic / Concrete
+--     for the pale and glassy woods — TreeArt.BarkMaterial), anchored, colliding,
 --     queryable, untouchable, in collision group "Wood".
 --   * Everything else is dress: parts named Leaves, Frond or Facet (inside
 --     "Tier" models too: WindSway and CanopyFade find those names), Root,
@@ -853,6 +854,18 @@ TreeArt.CutFaceInset = 0.86 -- of the section's width
 TreeArt.NotchHeight = 0.35
 TreeArt.NotchMaxDepth = 0.95 -- of the section's width
 TreeArt.NotchShade = -0.25
+
+-- Bark on a standing section. Most woods stay Wood (grain reads as bark).
+-- Frostwood and lumenwood are pale enough that Wood's grain muddies them,
+-- so they go SmoothPlastic; phantomwood's glassy bark is Concrete.
+function TreeArt.BarkMaterial(def: WoodDef): Enum.Material
+	if def.id == "frostwood" or def.id == "lumenwood" then
+		return Enum.Material.SmoothPlastic
+	elseif def.id == "phantomwood" then
+		return Enum.Material.Concrete
+	end
+	return Enum.Material.Wood
+end
 
 -- The wood's core colour and material (cut faces, notches, planks).
 function TreeArt.Core(def: WoodDef): (Color3, Enum.Material)
@@ -931,9 +944,28 @@ local function extents(rot: CFrame, size: Vector3): Vector3
 	) / 2
 end
 
--- A chunky leaf cluster: `d.parts` tilted blocks, every one inside the
--- dress box (so TreeGen's height and width hold), one big core block and
--- the rest pushed out to the box's round surface, one of them to its top.
+-- The lightest and darkest of a leaf palette, so a crown alternates
+-- instead of blending into one mid green.
+local function lightDark(colors: { Color3 }): (Color3, Color3)
+	local function lum(c: Color3): number
+		return c.R * 0.3 + c.G * 0.59 + c.B * 0.11
+	end
+	local light, dark = colors[1], colors[1]
+	for _, c in ipairs(colors) do
+		if lum(c) > lum(light) then
+			light = c
+		end
+		if lum(c) < lum(dark) then
+			dark = c
+		end
+	end
+	return light, dark
+end
+
+-- Crisp cube leaves: `d.parts` axis-aligned blocks (yaw in quarter-turns
+-- only, so a face stays a face), every one inside the dress box. One big
+-- cube sits in the mass and the rest sit on its faces and corners, light
+-- and dark shades alternating.
 local function leafCluster(
 	model: Instance,
 	name: string,
@@ -944,52 +976,41 @@ local function leafCluster(
 	local rng = Kit.rng(d.seed)
 	local half = d.size / 2
 	local out: { BasePart } = {}
-	local start = rng:range(0, math.pi * 2)
-	-- Two neighbouring tones of the palette per mass: a coherent clump, and
-	-- the crown as a whole still mixed.
-	local first = rng:int(1, #colors)
-	local main, alt = colors[first], colors[first % #colors + 1]
-	-- Near-cubes (a flat cluster's are only as flat as its box makes them).
+	local light, dark = lightDark(colors)
 	local side = (d.size.X + d.size.Z) / 2
-	local tall = not d.flat and d.size.Y >= side * 0.38
+	local faces = {
+		Vector3.new(1, 0.1, 0),
+		Vector3.new(-1, 0.1, 0),
+		Vector3.new(0, 0.1, 1),
+		Vector3.new(0, 0.1, -1),
+		Vector3.new(0.75, 0.55, 0.75),
+		Vector3.new(-0.75, 0.55, 0.75),
+		Vector3.new(0.75, 0.55, -0.75),
+		Vector3.new(-0.75, 0.55, -0.75),
+	}
 	for i = 1, d.parts do
-		local frac = if i == 1 then math.clamp(0.68 - 0.025 * d.parts, 0.48, 0.6) else rng:range(0.4, 0.52)
+		local frac = if i == 1 then math.clamp(0.64 - 0.02 * d.parts, 0.48, 0.64) else rng:range(0.4, 0.52)
 		local c = math.min(side * frac, d.grain or math.huge)
-		local dims = Vector3.new(
-			c * rng:range(0.92, 1.08),
-			math.min(c * rng:range(0.86, 1), d.size.Y * 0.92),
-			c * rng:range(0.92, 1.08)
-		)
-		local rot: CFrame
-		if i == 1 then
-			rot = CFrame.Angles(rng:range(-0.12, 0.12), rng:range(0, math.pi / 2), rng:range(-0.12, 0.12))
-		elseif tall and i % 3 ~= 0 then
-			-- A corner up reads rounder.
-			rot = CFrame.Angles(0, rng:range(0, math.pi * 2), 0) * CFrame.Angles(math.rad(35.26), math.rad(45), 0)
-		elseif tall then
-			rot = CFrame.Angles(rng:range(-0.45, 0.45), rng:range(0, math.pi * 2), rng:range(-0.45, 0.45))
-		else
-			rot = CFrame.Angles(rng:range(-0.18, 0.18), rng:range(0, math.pi * 2), rng:range(-0.18, 0.18))
-		end
+		local dims = Vector3.new(c, math.min(c, d.size.Y * 0.92), c)
+		-- Quarter-turn yaw only: the cube stays crisp, top face up.
+		local rot = CFrame.Angles(0, rng:int(0, 3) * (math.pi / 2), 0)
 		local e = extents(rot, dims)
-		local fit = math.min(1, half.X / e.X, half.Y / e.Y, half.Z / e.Z)
+		local fit =
+			math.min(1, half.X / math.max(e.X, 1e-4), half.Y / math.max(e.Y, 1e-4), half.Z / math.max(e.Z, 1e-4))
 		dims *= fit
 		e *= fit
 		local dir: Vector3
 		if i == 1 then
-			dir = Vector3.new(0, -0.15, 0)
+			dir = Vector3.new(0, -0.04, 0)
 		elseif i == 2 then
-			dir = Vector3.new(rng:range(-0.2, 0.2), 1, rng:range(-0.2, 0.2))
+			dir = Vector3.yAxis
 		else
-			local theta = start + i * 2.399
-			local y = rng:range(-0.5, 0.45)
-			local r = math.sqrt(1 - y * y)
-			dir = Vector3.new(math.cos(theta) * r, y, math.sin(theta) * r)
+			dir = faces[(i - 3) % #faces + 1]
 		end
 		local room = half - e
-		local reach = if i == 2 then 1 else rng:range(0.82, 1)
+		local reach = if i <= 2 then 1 else 0.94
 		local offset = Vector3.new(dir.X * room.X, dir.Y * room.Y, dir.Z * room.Z) * reach
-		local color = Kit.vary(if i % 3 == 0 then alt else main, rng, 0.05)
+		local color = if i % 2 == 0 then dark else light
 		local p = Kit.part(model, name, dims, d.cf * CFrame.new(offset) * rot, color, Enum.Material.SmoothPlastic)
 		if transparency then
 			p.Transparency = transparency
@@ -1000,39 +1021,31 @@ local function leafCluster(
 	return out
 end
 
--- A cone tier (or a snow cap): Kit.cone's clickable Facets.
+-- A conifer tier (or a snow cap) as a ring of crisp cubes. `d.cf` is the
+-- tier's base; the cubes fill its height and step in as the tier's box
+-- narrows, so the stack still reads as a cone. Named Facet, like the
+-- wedges they replace, so WindSway and the tier tests find them.
 local function coneDress(parent: Instance, d: Dress, colors: { Color3 }, material: Enum.Material): { BasePart }
 	local rng = Kit.rng(d.seed)
-	local sides = d.sides or 5
-	local jit: { number } = {}
-	for i = 1, sides do
-		jit[i] = rng:range(0.9, 1.06)
-	end
-	local before: { [Instance]: boolean } = {}
-	for _, c in ipairs(parent:GetChildren()) do
-		before[c] = true
-	end
-	Kit.cone(
-		parent,
-		d.cf,
-		d.size.X / 2,
-		d.size.Y,
-		sides,
-		function(i: number): Color3
-			return Kit.vary(colors[(i - 1) % #colors + 1], rng, 0.04)
-		end,
-		material,
-		0.12,
-		function(i: number): number
-			return jit[i]
-		end
-	)
+	-- One cube per counted part (a tier's budget is sides * 2), so the
+	-- part count stays what TreeGen promised.
+	local n = math.max(1, d.parts)
+	local radius = d.size.X / 2
+	local tall = d.size.Y * 0.98
+	local wide = math.max(0.8, math.min(radius * 0.55, tall * 0.85))
+	-- Proportional to the tier's radius, so a stack of tiers still narrows.
+	local reach = math.max(0.35, radius * 0.42)
+	local light, dark = lightDark(colors)
+	local spin = rng:range(0, math.pi * 2)
 	local made: { BasePart } = {}
-	for _, c in ipairs(parent:GetChildren()) do
-		if not before[c] and c:IsA("BasePart") then
-			asDress(c, d.section)
-			table.insert(made, c)
-		end
+	for i = 1, n do
+		local ang = spin + (i - 1) / n * math.pi * 2
+		local offset = Vector3.new(math.cos(ang) * reach, tall / 2, math.sin(ang) * reach)
+		local cf = d.cf * CFrame.new(offset) * CFrame.Angles(0, ang, 0)
+		local color = if i % 2 == 0 then dark else light
+		local p = Kit.part(parent, "Facet", Vector3.new(wide, tall, wide), cf, color, material)
+		asDress(p, d.section)
+		table.insert(made, p)
 	end
 	return made
 end
@@ -1171,7 +1184,7 @@ function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOption
 			Vector3.new(sec.thickness, sec.length, sec.thickness),
 			sec.cf * CFrame.new(0, sec.length / 2, 0),
 			Kit.vary(paint.bark, rng, 0.04),
-			Enum.Material.Wood
+			TreeArt.BarkMaterial(def)
 		)
 		p.CanCollide = true
 		p.CanQuery = true

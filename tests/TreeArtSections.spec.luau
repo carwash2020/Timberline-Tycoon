@@ -93,6 +93,29 @@ return function(t)
 		end
 	end)
 
+	t.test("leaf crowns are crisp cubes; bark follows the wood", function()
+		for _, id in ipairs({ "oak", "birch", "pine", "maple", "frostwood", "phantomwood", "lumenwood" }) do
+			local model = build(id, 4, 1)
+			local def = WoodData.Get(id)
+			local crown = 0
+			for _, p in ipairs(parts(model)) do
+				if p.Name == "Leaves" or p.Name == "Facet" then
+					crown += 1
+					t.eq(p.Shape, Enum.PartType.Block, id .. " crown is boxes")
+					t.ok(math.abs(p.CFrame.UpVector.Y) > 0.99, id .. " " .. p.Name .. " sits flat")
+					t.ok(math.abs(p.Size.X - p.Size.Z) < 1e-3, id .. ": a square footprint")
+				elseif p.Name == "Section" then
+					t.eq(p.Material, TreeArt.BarkMaterial(def), id .. " bark")
+				end
+			end
+			t.ok(crown >= 4, id .. " has a crown")
+		end
+		t.eq(TreeArt.BarkMaterial(WoodData.Get("oak")), Enum.Material.Wood)
+		t.eq(TreeArt.BarkMaterial(WoodData.Get("frostwood")), Enum.Material.SmoothPlastic)
+		t.eq(TreeArt.BarkMaterial(WoodData.Get("lumenwood")), Enum.Material.SmoothPlastic)
+		t.eq(TreeArt.BarkMaterial(WoodData.Get("phantomwood")), Enum.Material.Concrete)
+	end)
+
 	t.test("sections collide and can be chopped; dress never collides", function()
 		for _, def in ipairs(woods) do
 			for _, seed in ipairs({ 1, 9 }) do
@@ -108,7 +131,7 @@ return function(t)
 						local s = ids[p:GetAttribute("Section")]
 						t.ok(s, def.id .. ": a section part with no skeleton section")
 						t.ok(p.CanCollide and p.CanQuery and not p.CanTouch and p.Anchored, def.id .. ": section flags")
-						t.eq(p.Material, Enum.Material.Wood)
+						t.eq(p.Material, TreeArt.BarkMaterial(def))
 						t.eq(p.CollisionGroup, "Wood")
 						t.ok(p:HasTag("WoodSection"), def.id .. ": tagged WoodSection")
 						t.eq(p.Shape, Enum.PartType.Block, "square sections")

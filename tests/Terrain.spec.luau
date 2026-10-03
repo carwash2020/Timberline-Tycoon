@@ -12,16 +12,17 @@ return function(t)
 	-- crater and these specs all place things with HeightAt. Restyling the
 	-- surface (materials, colours) must never move it. The fingerprint is
 	-- HeightAt over a jittered grid across the whole map, plus every road
-	-- (centre, shoulders, verges) and the town and plot district, taken from
-	-- the code before the WLD-13 material pass. If you change the land's
-	-- shape on purpose, re-sample it and say so in the commit.
+	-- (centre, shoulders, verges) and the town and plot district. Re-sampled
+	-- in phase 12 when the haul roads widened, the mill road and lot loop
+	-- were added, and the cliff rings and hollow pools changed the shape.
+	-- The volcano ring was then raised to 24 so its one gap stays one gap.
 	local HEIGHT_FINGERPRINT = {
-		n = 7187,
-		sum = 89387.784620697072,
-		wsum = -326.97902728736778,
-		sq = 9366691.7479857393,
+		n = 7362,
+		sum = 90387.035782819672022,
+		wsum = -275.683500285217860,
+		sq = 9507401.247142698615789,
 		lo = -13.781769507273463,
-		hi = 205.78311827742994,
+		hi = 205.783118277429935,
 	}
 	local function heightFingerprint()
 		local n, sum, wsum, sq, lo, hi = 0, 0, 0, 0, math.huge, -math.huge

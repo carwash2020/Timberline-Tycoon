@@ -107,114 +107,131 @@ local function firstTrees(): { TreeSpot }
 	if cachedFirst then
 		return cachedFirst
 	end
+	-- These 322 were placed on the narrower roads, before the mill road,
+	-- the lot loop, the junction flares, the cliff rings and the hollow
+	-- pools. Place them that way, then sit each trunk on the ground as it
+	-- is now. X and Z never move (saves and stakes may point at them).
+	TerrainGen.SetLegacyLayout(true)
 	local out: { TreeSpot } = {}
 	local taken: { Vector3 } = {}
-	for _, biome in ipairs(BiomeData.All()) do
-		local area = biome.area
-		local counts = biome.trees
-		if area and area.y == nil and counts then
-			local rng = Kit.rng(hashString(biome.id))
-			local woodIds: { string } = {}
-			for woodId in pairs(counts) do
-				table.insert(woodIds, woodId)
-			end
-			table.sort(woodIds) -- the same mix on every server
-			for _, woodId in ipairs(woodIds) do
-				local want = counts[woodId]
-				local placed, tries = 0, 0
-				while placed < want and tries < want * 60 do
-					tries += 1
-					local angle = rng:range(0, math.pi * 2)
-					local r = math.sqrt(rng:next()) * (area.radius - 6) -- even spread over the disc
-					local x, z = area.x + math.cos(angle) * r, area.z + math.sin(angle) * r
-					local ok = goodGround(x, z)
-					if ok then
-						for _, q in ipairs(taken) do
-							local ddx, ddz = x - q.X, z - q.Z
-							if ddx * ddx + ddz * ddz < 10 * 10 then
-								ok = false
-								break
+	local function build(): any
+		for _, biome in ipairs(BiomeData.All()) do
+			local area = biome.area
+			local counts = biome.trees
+			if area and area.y == nil and counts then
+				local rng = Kit.rng(hashString(biome.id))
+				local woodIds: { string } = {}
+				for woodId in pairs(counts) do
+					table.insert(woodIds, woodId)
+				end
+				table.sort(woodIds) -- the same mix on every server
+				for _, woodId in ipairs(woodIds) do
+					local want = counts[woodId]
+					local placed, tries = 0, 0
+					while placed < want and tries < want * 60 do
+						tries += 1
+						local angle = rng:range(0, math.pi * 2)
+						local r = math.sqrt(rng:next()) * (area.radius - 6) -- even spread over the disc
+						local x, z = area.x + math.cos(angle) * r, area.z + math.sin(angle) * r
+						local ok = goodGround(x, z)
+						if ok then
+							for _, q in ipairs(taken) do
+								local ddx, ddz = x - q.X, z - q.Z
+								if ddx * ddx + ddz * ddz < 10 * 10 then
+									ok = false
+									break
+								end
 							end
 						end
+						if ok then
+							local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+							table.insert(taken, p)
+							table.insert(out, { woodId = woodId, position = p, biome = biome.id })
+							placed += 1
+						end
 					end
-					if ok then
-						local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
-						table.insert(taken, p)
-						table.insert(out, { woodId = woodId, position = p, biome = biome.id })
-						placed += 1
-					end
 				end
 			end
 		end
-	end
-	-- Wild groves: small stands of the common woods out in the open country
-	-- between the biomes, so the land between them is never bare. Never
-	-- nearer the sawmill than WILD_NEAREST (past the Starter Forest, so they
-	-- don't shorten the first haul), clear of every biome, the town and the
-	-- plots, the roads, the beach and the mountains. Their woods follow the
-	-- nearest biome; each counts toward its wood's grove like any tree.
-	local wildRng = Kit.rng(hashString("wild groves"))
-	local mill = WorldLayout.Sawmill
-	local half = WorldLayout.WorldHalf - 120
-	local coast = WorldLayout.Coast
-	local centers: { Vector2 } = {}
-	local tries = 0
-	while #centers < WILD_GROVES and tries < 6000 do
-		tries += 1
-		local x, z = wildRng:range(-half, half), wildRng:range(-half, half)
-		local ok = Vector2.new(x - mill.X, z - mill.Z).Magnitude > WILD_NEAREST
-			and WorldLayout.FlatWeight(x, z) <= 0
-			and not (z < coast.northZ and x > coast.shoreX - coast.beachWidth - 40)
-			and goodGround(x, z, 12, 0.55)
-			and TerrainGen.HeightAt(x, z) < 70
-		if ok then
-			for _, biome in ipairs(BiomeData.All()) do
-				local area = biome.area
-				if area and Vector2.new(x - area.x, z - area.z).Magnitude < area.radius + 60 then
-					ok = false
-					break
-				end
-			end
-		end
-		if ok then
-			for _, c in ipairs(centers) do
-				if (c - Vector2.new(x, z)).Magnitude < 170 then
-					ok = false
-					break
-				end
-			end
-		end
-		if ok then
-			table.insert(centers, Vector2.new(x, z))
-		end
-	end
-	for _, c in ipairs(centers) do
-		local woods = wildWoodsNear(c)
-		local want = wildRng:int(4, 8)
-		local placed, attempts = 0, 0
-		while placed < want and attempts < want * 30 do
-			attempts += 1
-			local angle = wildRng:range(0, math.pi * 2)
-			local r = math.sqrt(wildRng:next()) * 26
-			local x, z = c.X + math.cos(angle) * r, c.Y + math.sin(angle) * r
-			local ok = goodGround(x, z, 10, 0.6)
+		-- Wild groves: small stands of the common woods out in the open country
+		-- between the biomes, so the land between them is never bare. Never
+		-- nearer the sawmill than WILD_NEAREST (past the Starter Forest, so they
+		-- don't shorten the first haul), clear of every biome, the town and the
+		-- plots, the roads, the beach and the mountains. Their woods follow the
+		-- nearest biome; each counts toward its wood's grove like any tree.
+		local wildRng = Kit.rng(hashString("wild groves"))
+		local mill = WorldLayout.Sawmill
+		local half = WorldLayout.WorldHalf - 120
+		local coast = WorldLayout.Coast
+		local centers: { Vector2 } = {}
+		local tries = 0
+		while #centers < WILD_GROVES and tries < 6000 do
+			tries += 1
+			local x, z = wildRng:range(-half, half), wildRng:range(-half, half)
+			local ok = Vector2.new(x - mill.X, z - mill.Z).Magnitude > WILD_NEAREST
+				and WorldLayout.FlatWeight(x, z) <= 0
+				and not (z < coast.northZ and x > coast.shoreX - coast.beachWidth - 40)
+				and goodGround(x, z, 12, 0.55)
+				and TerrainGen.HeightAt(x, z) < 70
 			if ok then
-				for _, q in ipairs(taken) do
-					local ddx, ddz = x - q.X, z - q.Z
-					if ddx * ddx + ddz * ddz < 10 * 10 then
+				for _, biome in ipairs(BiomeData.All()) do
+					local area = biome.area
+					if area and Vector2.new(x - area.x, z - area.z).Magnitude < area.radius + 60 then
 						ok = false
 						break
 					end
 				end
 			end
 			if ok then
-				local woodId = wildRng:pick(woods)
-				local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
-				table.insert(taken, p)
-				table.insert(out, { woodId = woodId, position = p, biome = "wild" })
-				placed += 1
+				for _, c in ipairs(centers) do
+					if (c - Vector2.new(x, z)).Magnitude < 170 then
+						ok = false
+						break
+					end
+				end
+			end
+			if ok then
+				table.insert(centers, Vector2.new(x, z))
 			end
 		end
+		for _, c in ipairs(centers) do
+			local woods = wildWoodsNear(c)
+			local want = wildRng:int(4, 8)
+			local placed, attempts = 0, 0
+			while placed < want and attempts < want * 30 do
+				attempts += 1
+				local angle = wildRng:range(0, math.pi * 2)
+				local r = math.sqrt(wildRng:next()) * 26
+				local x, z = c.X + math.cos(angle) * r, c.Y + math.sin(angle) * r
+				local ok = goodGround(x, z, 10, 0.6)
+				if ok then
+					for _, q in ipairs(taken) do
+						local ddx, ddz = x - q.X, z - q.Z
+						if ddx * ddx + ddz * ddz < 10 * 10 then
+							ok = false
+							break
+						end
+					end
+				end
+				if ok then
+					local woodId = wildRng:pick(woods)
+					local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+					table.insert(taken, p)
+					table.insert(out, { woodId = woodId, position = p, biome = "wild" })
+					placed += 1
+				end
+			end
+		end
+		return nil
+	end
+	local placedOk, placedErr = pcall(build)
+	TerrainGen.SetLegacyLayout(false)
+	if not placedOk then
+		error(placedErr)
+	end
+	for _, spot in ipairs(out) do
+		local p = spot.position
+		spot.position = Vector3.new(p.X, TerrainGen.HeightAt(p.X, p.Z) - 0.3, p.Z)
 	end
 	cachedFirst = out
 	return out
@@ -250,7 +267,7 @@ local STAND_ROCK = 6 -- studs off a boulder's side
 local STAND_SIGN = 12 -- studs off a road sign
 local STAND_SCENERY = 8 -- studs off a scenery piece's footprint (the scenery's own gap to a tree)
 local STAND_FAR = 400 -- pine and maple stand at least this far from the sawmill
-local STAND_MAX = 180 -- new trees in all (about 33 parts each)
+local STAND_MAX = 178 -- new trees in all, so the first 500 stay 500 (about 33 parts each)
 local STAND_OPEN_MOST = 6 -- trees in an open-country stand (4 to this; roadside ones 4-9)
 
 -- A country stand: `trees` round `center` (all within `radius`); `road`
@@ -359,6 +376,12 @@ function WorldPlan.CountryStands(): { Stand }
 		for _, spot in ipairs(scenery) do
 			local dx, dz = x - spot.center.X, z - spot.center.Z
 			if dx * dx + dz * dz < (spot.radius + STAND_SCENERY) ^ 2 then
+				return false
+			end
+		end
+		-- The spawn's view of the lighthouse, and the trail out of the hollow.
+		for _, lane in ipairs(WorldLayout.Forest.lanes) do
+			if WorldLayout.SegmentDistance(Vector2.new(x, z), lane.a, lane.b) < lane.half + 10 then
 				return false
 			end
 		end
@@ -577,6 +600,57 @@ function WorldPlan.Boulders(): { Boulder }
 				seed = tries,
 				snowy = id == "snow",
 				dark = id == "volcano" or id == "grove",
+			})
+		end
+	end
+	return out
+end
+
+-- Brown rocks on the open lawn round the town (phase 12). Not part of
+-- Boulders(): those 90 are a fingerprint the country stands keep off, and
+-- these sit inside 300 studs of the sawmill where the stands never grow.
+function WorldPlan.MeadowBoulders(): { Boulder }
+	local out: { Boulder } = {}
+	local rng = Kit.rng(hashString("meadow boulders"))
+	local mill = WorldLayout.Sawmill
+	local tries = 0
+	while #out < 32 and tries < 5000 do
+		tries += 1
+		local ang = rng:range(0, math.pi * 2)
+		local dist = rng:range(155, 265)
+		local x = mill.X + math.cos(ang) * dist
+		local z = mill.Z + math.sin(ang) * dist
+		local ok = WorldLayout.FlatWeight(x, z) == 0
+			and WorldLayout.ForestCover(x, z) == 0
+			and TerrainGen.WaterLevelAt(x, z) == nil
+			and TerrainGen.RoadClearance(x, z) > 16
+			and TerrainGen.SlopeAt(x, z) < 0.35
+			and TerrainGen.HeightAt(x, z) < 8
+		if ok then
+			for _, biome in ipairs(BiomeData.All()) do
+				local area = biome.area
+				if area and Vector2.new(x - area.x, z - area.z).Magnitude < area.radius + 16 then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok then
+			for _, b in ipairs(out) do
+				local dx, dz = x - b.position.X, z - b.position.Z
+				if dx * dx + dz * dz < 28 * 28 then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok then
+			table.insert(out, {
+				position = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.6, z),
+				size = rng:range(3.2, 6.4),
+				seed = tries,
+				snowy = false,
+				dark = false,
 			})
 		end
 	end
@@ -1024,17 +1098,20 @@ function WorldPlan.Town(): Town
 	-- one south of the Plot Road's mouth, its arm toward it, one with its
 	-- arm over the lot.
 	local lamps: { CFrame } = {}
-	for _, x in ipairs({ -92, -64, -30, -14 }) do
-		table.insert(lamps, at(x, 68.5, math.pi)) -- south side, arm north over the street
+	for _, x in ipairs({ -92, -64, -30 }) do
+		table.insert(lamps, at(x, 54, math.pi)) -- south side, set back off the widened street
 	end
+	-- The east one sits further south: Old Bram walks the corner, and the
+	-- flower bed sits just east of where a closer lamp would stand.
+	table.insert(lamps, at(-14, 38, math.pi))
 	for _, x in ipairs({ 30, 58 }) do
-		table.insert(lamps, at(x, 86, 0)) -- north side, arm south over the street
+		table.insert(lamps, at(x, 92, 0)) -- north side, set back off the street
 	end
 	table.insert(lamps, at(-8, 60, -math.pi / 2))
 	table.insert(lamps, at(8, 60, math.pi / 2))
 	table.insert(lamps, at(-41, 134, -math.pi / 2)) -- west of the gondola path, arm east over it
 	table.insert(lamps, at(36, 124, 0)) -- east of the mill's lean-to
-	table.insert(lamps, at(147.5, 40, math.pi))
+	table.insert(lamps, at(147.5, 36, math.pi)) -- south of the wider Plot Road
 	table.insert(lamps, at(147.5, 0, math.pi / 2))
 
 	-- Fences: a paddock behind Hearth & Home, a rail along the lot's east
@@ -1043,14 +1120,14 @@ function WorldPlan.Town(): Town
 		{ length = 26, cframe = at(-92, 140) },
 		{ length = 26, cframe = at(-92, 124) },
 		{ length = 16, cframe = at(-105, 132, math.pi / 2) },
-		{ length = 36, cframe = at(145, 24, math.pi / 2) },
+		{ length = 28, cframe = at(145, 20, math.pi / 2) }, -- ends short of the wider Plot Road
 	}
 
 	-- Murph's camp west of the spawn, behind the TO THE WOODS sign and clear
 	-- of the Hills Road: the campfire at its origin, the tent behind (+Z),
 	-- facing the spawn; Murph stands at camp-local (0, 0, -3), his lantern
 	-- on its hook beside the camp, turned with it.
-	local campsite = facing(-28, 42, 0, 40)
+	local campsite = facing(-28, 45, 0, 40) -- north of the widened Hills Road
 	local _, campYaw = campsite:ToEulerAnglesYXZ()
 	local lantern = campsite * Vector3.new(9, 0, 2)
 
@@ -1061,14 +1138,14 @@ function WorldPlan.Town(): Town
 		{ "Cart", -71, 124, -0.4 },
 		{ "WaterTower", -58, 126 },
 		{ "ToolRack", 34.4, 100, math.pi / 2 }, -- between the mill and the Dealership
-		{ "Well", -49, 60 }, -- on the green south of the street, between the benches
-		{ "Bench", -58, 66, math.pi },
-		{ "Bench", -40, 66, math.pi },
+		{ "Well", -49, 54 }, -- on the green south of the widened street, between the benches
+		{ "Bench", -58, 56, math.pi },
+		{ "Bench", -40, 56, math.pi },
 		{ "Barrel", -30.5, 92 },
 		{ "Crate", -30.5, 88.6, 0.3 },
 		{ "Barrel", 32, 93 },
 		{ "Crate", 71, 93, -0.2 },
-		{ "Crate", 71.5, 89.5, 0.5 },
+		{ "Crate", 80, 102, 0.5 }, -- clear of the mill road's east leg
 		{ "Planter", -67, 87 },
 		{ "Planter", -109, 86.2 },
 		{ "Mailbox", -102.5, 88, 0 },
@@ -1191,26 +1268,26 @@ function WorldPlan.Town(): Town
 		{ "tree", -95, 153, 1, "pine" },
 		{ "tree", -106, 174, 1.22, "pine" },
 		-- Birch and maple round the edges.
-		{ "tree", -106, 56, 1.22, "maple" },
+		{ "tree", -128, 70, 1.22, "maple" },
 		{ "tree", -118, 84, 1, "birch" },
 		{ "tree", -119, 112, 1.22, "birch" },
 		{ "tree", -118, 138, 1, "maple" },
-		{ "tree", -80, 50, 1, "maple" },
+		{ "tree", -88, 4, 1, "maple" },
 		{ "tree", -62, 6, 1, "birch" },
-		{ "tree", -98, 14, 1.22, "birch" },
+		{ "tree", -112, 0, 1.22, "birch" },
 		{ "tree", -66, 137, 1, "birch" },
 		{ "tree", 50, 128, 1, "maple" },
 		{ "tree", 78, 114, 1.22, "birch" },
-		{ "tree", 104, 128, 1.22, "maple" },
+		{ "tree", 78, 136, 1.22, "maple" },
 		{ "tree", 130, 98, 1, "birch" },
 		{ "tree", 124, 150, 1, "maple" },
-		{ "tree", 96, 162, 1.22, "birch" },
-		{ "tree", 68, 168, 1.22, "maple" },
+		{ "tree", 136, 168, 1.22, "birch" },
+		{ "tree", 78, 200, 1.22, "maple" },
 		-- By the lot (M1.5: off it and its pull-outs since it grew east): one
 		-- north of the Plot Road's mouth (and of the lighthouse's line from
 		-- the spawn), one past the south pull-outs.
 		{ "tree", 160, 84, 1, "birch" },
-		{ "tree", 132, -54, 1.22, "maple" },
+		{ "tree", 132, -80, 1.22, "maple" },
 		-- Bushes along the shops' sides, the mill's back and the station.
 		{ "bush", -112, 100, 2.8 },
 		{ "bush", -112.5, 105.5, 2.4 },
@@ -1226,11 +1303,11 @@ function WorldPlan.Town(): Town
 		-- Flower beds: off the plaza's south-west corner, by the spawn walk,
 		-- at the mouths of the Hearth & Home path, by the well. (None where
 		-- the townsfolk walk: NPCData's routes pass 3 studs or more away.)
-		{ "flowers", -30, 54.5, 2.4 },
-		{ "flowers", -8.4, 53.6, 2 },
+		{ "flowers", -108, 54, 2.4 },
+		{ "flowers", -8.4, 44, 2 },
 		{ "flowers", -85, 85.8, 2.2 },
 		{ "flowers", -102, 85.4, 1.8 },
-		{ "flowers", -57.5, 57, 2.4 },
+		{ "flowers", -57.5, 46, 2.4 },
 		-- Rocks.
 		{ "rock", -55, 150, 1.8 },
 		{ "rock", 73, 112, 2 },
@@ -1388,6 +1465,93 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 				spot = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), roadSide))
 			end
 			table.insert(out, { text = text(biomeId), cframe = spot :: CFrame })
+		end
+	end
+	return out
+end
+
+-- A sign at each region's gate: beside the Snow Road and the Volcano Road
+-- where they cross the cliff ring, and beside the trail into the hollow.
+-- Separate from RoadSigns, which stay at the road's end.
+function WorldPlan.GateSigns(text: (biomeId: string) -> string): { Sign }
+	local out: { Sign } = {}
+	local function setDown(flat: CFrame): (CFrame, boolean)
+		local a, b, m = flat * Vector3.new(-SIGN_POST, 0, 0), flat * Vector3.new(SIGN_POST, 0, 0), flat.Position
+		local ha, hb, hm = TerrainGen.HeightAt(a.X, a.Z), TerrainGen.HeightAt(b.X, b.Z), TerrainGen.HeightAt(m.X, m.Z)
+		local level = math.max(ha, hb, hm) - math.min(ha, hb, hm) < 1
+			and TerrainGen.RoadClearance(a.X, a.Z) >= SIGN_CLEAR
+			and TerrainGen.RoadClearance(b.X, b.Z) >= SIGN_CLEAR
+			and TerrainGen.WaterLevelAt(m.X, m.Z) == nil
+		return flat + Vector3.new(0, math.min(ha, hb), 0), level
+	end
+	local function besideRoad(roadName: string, rimKind: string, biomeId: string)
+		local road: WorldLayout.Road? = nil
+		local rim: WorldLayout.Rim? = nil
+		for _, r in ipairs(WorldLayout.Roads) do
+			if r.name == roadName then
+				road = r
+			end
+		end
+		for _, r in ipairs(WorldLayout.Rims) do
+			if r.kind == rimKind then
+				rim = r
+			end
+		end
+		if not road or not rim then
+			return
+		end
+		local pts = road.points
+		local mid = (rim.inner + rim.outer) / 2
+		local bestP, bestDir, bestErr = pts[1], (pts[2] - pts[1]).Unit, math.huge
+		for i = 1, #pts - 1 do
+			local a, b = pts[i], pts[i + 1]
+			local len = (b - a).Magnitude
+			local steps = math.max(2, math.floor(len / 6))
+			for s = 0, steps do
+				local p = a:Lerp(b, s / steps)
+				local err = math.abs((p - Vector2.new(rim.cx, rim.cz)).Magnitude - mid)
+				if err < bestErr then
+					bestErr = err
+					bestP = p
+					bestDir = (b - a).Unit
+				end
+			end
+		end
+		local side = Vector2.new(-bestDir.Y, bestDir.X)
+		local spot: CFrame? = nil
+		for _, s in ipairs({ 1, -1 }) do
+			local at = bestP + side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 1))
+			local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), Vector3.new(bestP.X, 0, bestP.Y)))
+			if level then
+				spot = cf
+				break
+			end
+		end
+		if spot then
+			table.insert(out, { text = text(biomeId), cframe = spot })
+		end
+	end
+	besideRoad("SnowRoad", "snow", "snow")
+	besideRoad("VolcanoRoad", "volcano", "volcano")
+	local grove = BiomeData.Get("grove")
+	local area = if grove then grove.area else nil
+	if area then
+		local gap = WorldLayout.GroveGap
+		local dir = Vector2.new(math.cos(gap), math.sin(gap))
+		local side = Vector2.new(-dir.Y, dir.X)
+		local foot = Vector2.new(area.x, area.z) + dir * (WorldLayout.GroveRidge.inner - 6)
+		local spot: CFrame? = nil
+		for _, s in ipairs({ 1, -1 }) do
+			local at = foot + side * (s * 16)
+			local town = Vector3.new(WorldLayout.Sawmill.X, 0, WorldLayout.Sawmill.Z)
+			local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), town))
+			if level then
+				spot = cf
+				break
+			end
+		end
+		if spot then
+			table.insert(out, { text = text("grove"), cframe = spot })
 		end
 	end
 	return out
@@ -3502,11 +3666,14 @@ end
 -- country stands' do. Like every tree they are built by the server
 -- (TreeService, through MapBuilder's "5. The trees").
 
-WorldPlan.ForestVergeStep = 30
+-- Phase 12: the ring's trees stand about 1.5x further apart than before
+-- (spacing 14 to 21, edge 30 to 45). The verge step is 40 rather than 45
+-- so the wider forest still has at least 775 trees. The caps rose with it.
+WorldPlan.ForestVergeStep = 40
 WorldPlan.ForestVerge = { 11, 16 } -- studs off a road's edge (the trunk's middle)
-WorldPlan.ForestEdgeApart = 30
-WorldPlan.ForestSpacing = 14
-WorldPlan.ForestMost = { verge = 100, edge = 140, clearing = 80 } -- 320 at most
+WorldPlan.ForestEdgeApart = 45
+WorldPlan.ForestSpacing = 21
+WorldPlan.ForestMost = { verge = 110, edge = 150, clearing = 90 } -- 350 at most
 local FOREST_ROADS = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
 local FOREST_CLEAR = 10 -- studs a forest tree keeps off a scenery piece, cluster or landmark
 
@@ -3836,7 +4003,8 @@ WorldPlan.FillerTreeGap = 9 -- studs off a choppable tree
 WorldPlan.FillerGap = 6 -- studs off a boulder, cluster rock, scenery piece or road sign
 WorldPlan.FillerGondola = 12 -- studs off the gondola's routes
 WorldPlan.FillerHysteresis = 48 -- studs a loaded cell keeps its look past its radius
-WorldPlan.FillerDensity = { core = 0.55, edge = 0.85, copse = 0.4, ornament = 0.03 }
+-- Thinner than phase 10 (0.55 / 0.85 / 0.4): the same draws, fewer trees.
+WorldPlan.FillerDensity = { core = 0.4, edge = 0.6, copse = 0.28, ornament = 0.03 }
 local FILLER_CELL = WorldPlan.FillerCellSize
 local FILLER_GRID = 3
 local FILLER_JITTER = 3.6
@@ -3956,6 +4124,9 @@ local function fillerClutter(): FillerClutter
 	end
 	local gap = WorldPlan.FillerGap
 	for _, b in ipairs(WorldPlan.Boulders()) do
+		add(b.position.X, b.position.Z, b.size / 2 + gap)
+	end
+	for _, b in ipairs(WorldPlan.MeadowBoulders()) do
 		add(b.position.X, b.position.Z, b.size / 2 + gap)
 	end
 	for _, spot in ipairs(WorldPlan.Scenery()) do
