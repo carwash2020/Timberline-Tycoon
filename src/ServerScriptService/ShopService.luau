@@ -624,8 +624,12 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 			return fail("locked")
 		end
 		local counts, total = AxeService.OwnedCounts(player)
-		local best = (profile :: any).bestAxeTier or 1
-		local status = ShopLogic.StatusOf(axe, best, counts[axe.id] or 0, total)
+		local rawTier = (profile :: any).bestAxeTier
+		local best: number = if type(rawTier) == "number" then rawTier else 1
+		local ownedCount = counts[axe.id]
+		local have: number = if type(ownedCount) == "number" then ownedCount else 0
+		local many: number = if type(total) == "number" then total else 0
+		local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, best, have, many)
 		if not ShopLogic.CanPurchase(status) then
 			notify(player, ShopLogic.WhyNot(status, axe, best))
 			return fail("locked")

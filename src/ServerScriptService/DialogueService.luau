@@ -130,10 +130,8 @@ local function hook(model: Model)
 	if hooked[model] then
 		return
 	end
-	local id = model:GetAttribute("NPCId")
-	if type(id) ~= "string" then
-		id = model.Name
-	end
+	local attr = model:GetAttribute("NPCId")
+	local id = if type(attr) == "string" then attr else model.Name
 	local shop = SHOP_OF[id]
 	if shop == nil then
 		return

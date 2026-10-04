@@ -600,7 +600,7 @@ local function attachSign(counter: BasePart, host: Attachment)
 	local stock = Instance.new("TextLabel")
 	stock.Name = "Stock"
 	stock.BackgroundTransparency = 1
-	stock.Size = UDim2.new(1, 0, 0.5, 0)
+	stock.Size = UDim2.fromScale(1, 0.5)
 	stock.Font = Enum.Font.GothamBold
 	stock.TextSize = 16
 	stock.TextColor3 = Color3.fromRGB(245, 235, 215)
@@ -611,7 +611,7 @@ local function attachSign(counter: BasePart, host: Attachment)
 	clock.Name = "Timer"
 	clock.BackgroundTransparency = 1
 	clock.Position = UDim2.fromScale(0, 0.5)
-	clock.Size = UDim2.new(1, 0, 0.5, 0)
+	clock.Size = UDim2.fromScale(1, 0.5)
 	clock.Font = Enum.Font.Gotham
 	clock.TextSize = 14
 	clock.TextColor3 = Color3.fromRGB(245, 235, 215)
@@ -1126,7 +1126,10 @@ function BoxService.Init(remoteEvent: RemoteEvent?)
 		bound = true
 		remoteEvent.OnServerEvent:Connect(onBoxOpen)
 	end
-	local ok, err = pcall(registerGroup)
+	local ok, err = pcall(function()
+		registerGroup()
+		return nil
+	end)
 	if not ok then
 		warn("[BoxService] Boxes collision group was not registered: " .. tostring(err))
 	end

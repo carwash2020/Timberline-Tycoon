@@ -56,10 +56,12 @@ local function shopLines(shop: string?): { [string]: string }
 end
 
 function DialogueData.Line(key: string, vars: Vars?): string
-	local v = vars or {}
-	local text = shopLines(v.shop)[key] or LINES.ToolShed[key] or ""
+	local name = if vars and vars.name then vars.name else "item"
+	local price = if vars and vars.price then vars.price else ""
+	local shop = if vars then vars.shop else nil
+	local text = shopLines(shop)[key] or LINES.ToolShed[key] or ""
 	if string.find(text, "%s", 1, true) then
-		return string.format(text, v.name or "item", v.price or "")
+		return string.format(text, name, price)
 	end
 	return text
 end

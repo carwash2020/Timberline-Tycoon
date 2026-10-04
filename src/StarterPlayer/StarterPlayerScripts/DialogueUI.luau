@@ -1,8 +1,9 @@
 --!strict
 -- DialogueUI: the shopkeeper's card, along the bottom of the safe area.
--- Yes and No are fingertip sized. On a gamepad the D-pad moves between
--- them, ButtonX confirms Yes, and ButtonB or Escape cancels. The card
--- never changes how the character walks.
+-- Yes and No are fingertip sized. On a gamepad the selection links move
+-- between them, ButtonX confirms Yes, and ButtonB or Escape cancels. The
+-- card never changes how the character walks. The HUD already owns the
+-- D-pad shortcuts, so this card does not bind those keys.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -108,39 +109,21 @@ function DialogueUI.Start()
 			return
 		end
 		bound = true
-		ContextActionService:BindAction(
-			ACTION,
-			function(_name: string, state: Enum.UserInputState, input: InputObject)
-				if not holder.Visible or state ~= Enum.UserInputState.Begin then
-					return Enum.ContextActionResult.Pass
-				end
-				local key = input.KeyCode
-				if key == Enum.KeyCode.ButtonB or key == Enum.KeyCode.Escape then
-					choose("no")
-					return Enum.ContextActionResult.Sink
-				end
-				if choosing and (key == Enum.KeyCode.ButtonX or key == Enum.KeyCode.E) then
-					choose("yes")
-					return Enum.ContextActionResult.Sink
-				end
-				if choosing and key == Enum.KeyCode.DPadLeft then
-					GuiService.SelectedObject = yes
-					return Enum.ContextActionResult.Sink
-				end
-				if choosing and key == Enum.KeyCode.DPadRight then
-					GuiService.SelectedObject = no
-					return Enum.ContextActionResult.Sink
-				end
+		ContextActionService:BindAction(ACTION, function(_name: string, state: Enum.UserInputState, input: InputObject)
+			if not holder.Visible or state ~= Enum.UserInputState.Begin then
 				return Enum.ContextActionResult.Pass
-			end,
-			false,
-			Enum.KeyCode.ButtonB,
-			Enum.KeyCode.Escape,
-			Enum.KeyCode.ButtonX,
-			Enum.KeyCode.E,
-			Enum.KeyCode.DPadLeft,
-			Enum.KeyCode.DPadRight
-		)
+			end
+			local key = input.KeyCode
+			if key == Enum.KeyCode.ButtonB or key == Enum.KeyCode.Escape then
+				choose("no")
+				return Enum.ContextActionResult.Sink
+			end
+			if choosing and (key == Enum.KeyCode.ButtonX or key == Enum.KeyCode.E) then
+				choose("yes")
+				return Enum.ContextActionResult.Sink
+			end
+			return Enum.ContextActionResult.Pass
+		end, false, Enum.KeyCode.ButtonB, Enum.KeyCode.Escape, Enum.KeyCode.ButtonX, Enum.KeyCode.E)
 	end
 
 	local function show(payload: any)
