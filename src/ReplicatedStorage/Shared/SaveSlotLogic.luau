@@ -34,6 +34,12 @@ local ACCOUNT: { [string]: boolean } = {
 	accountAxes = true,
 	slots = true,
 	passes = true,
+	-- Account-wide progress (wave 0). A load, reset, or swap must not
+	-- trade these away. storage, plot.squares, permissions, and questAxe
+	-- stay on the slot.
+	badgesAwarded = true,
+	secretsFound = true,
+	areasVisited = true,
 }
 
 -- Axes a Robux pass grants. They come back after a reset, on every slot.

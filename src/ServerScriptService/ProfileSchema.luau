@@ -41,6 +41,14 @@ export type PlacedItem = {
 	data: { x: number, y: number }?,
 }
 
+-- A box the server kept when you left it in the world. uid is server-made.
+-- It is never an axe, a truck, or something already placed on the plot.
+export type StoredBox = {
+	uid: string,
+	itemId: string,
+	shop: string,
+}
+
 -- One axe the player owns. Axes are items: duplicates are fine, and each
 -- one can be held, switched to, dropped and picked up (AxeService).
 export type AxeItem = {
@@ -118,7 +126,8 @@ export type ForestState = {
 export type Profile = {
 	-- Which core loop the save has been brought into (V2_PLAN.md §14): 0 =
 	-- never migrated, 2 = the v2 loop (MigrateV2), 3 = plot squares, 4 =
-	-- vehicle pads.
+	-- vehicle pads, 5 = foundations fields (Migrate, once the v2 loop has
+	-- run). A save still on schema 0 stays there until MigrateV2.
 	schema: number,
 	-- Cash owed for the v1 logs bought back when the save came into the v2
 	-- loop (and the top-up to StartingCash); GameServer pays it on join.
@@ -146,7 +155,17 @@ export type Profile = {
 		claimed: boolean,
 		tier: number, -- PlotData.Tiers index (1 = Campsite)
 		placed: { PlacedItem },
+		squares: { string }, -- owned squares, "x,z" (empty until land expansion)
 	},
+	-- Boxes kept for you, per slot. Capped at StorageCap.
+	storage: { StoredBox },
+	-- Who may visit and build, per slot. PermissionService fills this in.
+	permissions: { [string]: any },
+	-- Account-wide (SaveSlotLogic.ACCOUNT): a slot swap does not move these.
+	badgesAwarded: { [string]: boolean },
+	questAxe: { step: number }, -- per slot. 0 = not started
+	secretsFound: { [string]: boolean },
+	areasVisited: { [string]: boolean },
 	compendium: { [string]: boolean },
 	materials: { [string]: number }, -- gathered materials by id (Sky Shards, ...)
 	forgeLogs: { [string]: number }, -- logs put into the Starfall forge, by wood id
@@ -243,7 +262,13 @@ local TEMPLATE: Profile = {
 	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
-	plot = { claimed = false, tier = 1, placed = {} },
+	plot = { claimed = false, tier = 1, placed = {}, squares = {} },
+	storage = {},
+	permissions = {},
+	badgesAwarded = {},
+	questAxe = { step = 0 },
+	secretsFound = {},
+	areasVisited = {},
 	compendium = { oak = true },
 	materials = {},
 	forgeLogs = {},
@@ -286,6 +311,164 @@ local TEMPLATE: Profile = {
 }
 ProfileSchema.Template = TEMPLATE
 
+-- How many boxes a slot may keep. Past this, Migrate drops the rest.
+ProfileSchema.StorageCap = 50
+-- A slot's grid is PlotGrid by PlotGrid (GameConfig). Squares past that are dropped.
+ProfileSchema.SquareCap = GameConfig.PlotGrid * GameConfig.PlotGrid
+-- Foundations version. 2 stays the v2-loop marker (SchemaV2); Migrate bumps
+-- a save to 5 only after that marker is set, so a brand-new save still
+-- receives the one-time v2 migration.
+ProfileSchema.SchemaV2 = 2
+ProfileSchema.Schema = 5
+
+local function markFoundationsSchema(data: any)
+	local schema = data.schema
+	if
+		type(schema) == "number"
+		and schema == schema
+		and schema >= ProfileSchema.SchemaV2
+		and schema < ProfileSchema.Schema
+	then
+		data.schema = ProfileSchema.Schema
+	end
+end
+
+local function booleanMap(value: any): { [string]: boolean }
+	local out: { [string]: boolean } = {}
+	if type(value) ~= "table" then
+		return out
+	end
+	for key, flag in pairs(value) do
+		if type(key) == "string" and type(flag) == "boolean" then
+			out[key] = flag
+		end
+	end
+	return out
+end
+
+local function copyQuest(value: any): { step: number }
+	local step = if type(value) == "table" then value.step else nil
+	if type(step) ~= "number" or step ~= step or step < 0 or step == math.huge then
+		return { step = 0 }
+	end
+	return { step = math.floor(step) }
+end
+
+local function squareList(value: any): { string }
+	local out: { string } = {}
+	if type(value) ~= "table" then
+		return out
+	end
+	local seen: { [string]: boolean } = {}
+	for _, entry in ipairs(value) do
+		if type(entry) == "string" and not seen[entry] and string.match(entry, "^%-?%d+,%-?%d+$") ~= nil then
+			seen[entry] = true
+			table.insert(out, entry)
+			if #out >= ProfileSchema.SquareCap then
+				break
+			end
+		end
+	end
+	return out
+end
+
+local function takenIds(record: any): { [string]: boolean }
+	local taken: { [string]: boolean } = {}
+	local function keep(id: any)
+		if type(id) == "string" and id ~= "" then
+			taken[id] = true
+		end
+	end
+	if type(record.axes) == "table" then
+		for _, axe in ipairs(record.axes) do
+			if type(axe) == "table" then
+				keep(axe.uid)
+				keep(axe.id)
+			end
+		end
+	end
+	if type(record.ownedTrucks) == "table" then
+		for _, id in ipairs(record.ownedTrucks) do
+			keep(id)
+		end
+	end
+	local plot = record.plot
+	if type(plot) == "table" and type(plot.placed) == "table" then
+		for _, item in ipairs(plot.placed) do
+			if type(item) == "table" then
+				keep(item.uid)
+				keep(item.blueprintId)
+			end
+		end
+	end
+	return taken
+end
+
+local function freshUid(used: { [string]: boolean }): string
+	for _ = 1, 8 do
+		local uid = Util.guid()
+		if not used[uid] then
+			return uid
+		end
+	end
+	return Util.guid()
+end
+
+-- Per-slot fields. Missing or wrong-typed fields become the template.
+-- storage keeps at most StorageCap boxes, each with a server uid, and
+-- drops anything that is also an axe, a truck, or a placed item.
+local function applySlotFields(record: any)
+	if type(record.plot) ~= "table" then
+		record.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
+	end
+	record.plot.squares = squareList(record.plot.squares)
+	record.questAxe = copyQuest(record.questAxe)
+	if type(record.permissions) ~= "table" then
+		record.permissions = {}
+	end
+	local identity = takenIds(record)
+	local used: { [string]: boolean } = {}
+	for id in pairs(identity) do
+		used[id] = true
+	end
+	local kept: { StoredBox } = {}
+	if type(record.storage) == "table" then
+		for _, entry in ipairs(record.storage) do
+			if #kept >= ProfileSchema.StorageCap then
+				break
+			end
+			if type(entry) == "table" and type(entry.itemId) == "string" and entry.itemId ~= "" then
+				local uid = if type(entry.uid) == "string" then entry.uid else ""
+				local clashes = identity[entry.itemId] == true or (uid ~= "" and identity[uid] == true)
+				if not clashes then
+					if uid == "" or used[uid] == true then
+						uid = freshUid(used)
+					end
+					used[uid] = true
+					local shop = if type(entry.shop) == "string" then entry.shop else ""
+					table.insert(kept, { uid = uid, itemId = entry.itemId, shop = shop })
+				end
+			end
+		end
+	end
+	record.storage = kept
+end
+
+-- Account-wide fields live on the profile, never inside a slot snapshot.
+local function applyAccountFields(data: any)
+	data.badgesAwarded = booleanMap(data.badgesAwarded)
+	data.secretsFound = booleanMap(data.secretsFound)
+	data.areasVisited = booleanMap(data.areasVisited)
+	data.tollPaidUntil = nil
+end
+
+local function stripAccountFields(slot: any)
+	slot.badgesAwarded = nil
+	slot.secretsFound = nil
+	slot.areasVisited = nil
+	slot.tollPaidUntil = nil
+end
+
 -- Brings older saves up to date. Call on every load, after ProfileStore's
 -- Reconcile() has filled in new fields.
 function ProfileSchema.Migrate(data: any)
@@ -309,7 +492,7 @@ function ProfileSchema.Migrate(data: any)
 	-- form is dropped. NaN or infinite coordinates would break the rebuild
 	-- (PivotTo) and leave the player with no plot for the session.
 	if type(data.plot) ~= "table" then
-		data.plot = { claimed = false, tier = 1, placed = {} }
+		data.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
 	end
 	if data.plot.claimed ~= true then
 		data.plot.claimed = false
@@ -418,9 +601,24 @@ function ProfileSchema.Migrate(data: any)
 	end
 	-- One save becomes slot 1. Live cash, axes, plot and wood stay put.
 	-- Settings and passes are account-wide, so they are not copied into a slot.
+	-- Foundations fields are filled first so the active slot's snapshot
+	-- already has them. Parked slots are filled after, and account-wide
+	-- keys are stripped out of every snapshot.
+	applySlotFields(data)
+	applyAccountFields(data)
 	SaveSlotLogic.Migrate(data, TEMPLATE, function()
 		return Util.guid()
 	end, os.time())
+	if type(data.slots) == "table" then
+		for _, slot in ipairs(data.slots) do
+			if type(slot) == "table" then
+				applySlotFields(slot)
+				stripAccountFields(slot)
+			end
+		end
+	end
+	markFoundationsSchema(data)
+	data.tollPaidUntil = nil
 	ProfileSchema.UnstickCart(data)
 end
 
@@ -624,6 +822,7 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 	end
 	if data.schema >= ProfileSchema.SchemaV2 then
 		applyTutorialOrders(data)
+		markFoundationsSchema(data)
 		return result
 	end
 
@@ -660,6 +859,7 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 		daily.day = 0
 	end
 	data.schema = ProfileSchema.SchemaV2
+	markFoundationsSchema(data)
 	result.migrated = true
 	applyTutorialOrders(data)
 	return result

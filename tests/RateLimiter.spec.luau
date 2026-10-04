@@ -52,7 +52,15 @@ return function(t)
 		local Net = t.shared("Net")
 		-- Server-to-client remotes need none.
 		-- PlotOffer is the join picker the server sends. The client never fires it.
-		local skip = { CashChanged = true, Notify = true, WorldFX = true, SlotState = true, PlotOffer = true }
+		-- BadgeSync is server -> client. The client never fires it, so it has no budget.
+		local skip = {
+			CashChanged = true,
+			Notify = true,
+			WorldFX = true,
+			SlotState = true,
+			PlotOffer = true,
+			BadgeSync = true,
+		}
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
 				t.ok(limiter.Allow(fakePlayer(), name), name .. " has a LIMITS entry")
@@ -70,6 +78,39 @@ return function(t)
 		now += 1
 		t.ok(limiter.Allow(player, "UseInstantDelivery"), "a new second")
 		t.ok(limiter.Allow(player, "SellLogs"), "and selling has its own second")
+	end)
+
+	t.test("wave 0 remotes have their budgets; BadgeSync is server to client and has none", function()
+		local limiter = setup()
+		local budgets = {
+			Dialogue = 4,
+			BoxOpen = 4,
+			SpawnPadPress = 1,
+			ChopSawSet = 6,
+			ExpandLand = 1,
+			SetPermission = 4,
+			Wire = 4,
+			TollPay = 1,
+			FerryBoard = 1,
+		}
+		for name, limit in pairs(budgets) do
+			t.eq(burst(limiter, fakePlayer(), name, limit + 3), limit, name)
+		end
+		t.ok(not limiter.Allow(fakePlayer(), "BadgeSync"), "server -> client, no LIMITS entry")
+		local Net = t.shared("Net")
+		local found = false
+		for _, name in ipairs(Net.RemoteNames) do
+			if name == "BadgeSync" then
+				found = true
+			end
+		end
+		t.ok(found, "BadgeSync is reserved")
+		local fs = require("@lune/fs")
+		local net = fs.readFile("src/ReplicatedStorage/Shared/Net.luau")
+		t.ok(string.find(net, "BadgeSync", 1, true) ~= nil)
+		t.ok(string.find(net, "server -> client", 1, true) ~= nil, "direction is marked on the remote")
+		local limits = fs.readFile("src/ServerScriptService/RateLimiter.luau")
+		t.ok(string.find(limits, "BadgeSync", 1, true) == nil, "no limit line")
 	end)
 
 	t.test("remotes have separate budgets; unknown remotes are refused", function()

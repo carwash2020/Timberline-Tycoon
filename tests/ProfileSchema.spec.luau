@@ -39,7 +39,7 @@ return function(t)
 	t.test("a new save has an unclaimed Campsite plot", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)
-		t.eq(data.plot, { claimed = false, tier = 1, placed = {} })
+		t.eq(data.plot, { claimed = false, tier = 1, placed = {}, squares = {} })
 	end)
 
 	t.test("saves from before plots lose the old size and any old-format items", function()
@@ -149,7 +149,7 @@ return function(t)
 		t.eq(data.leftLoad, {})
 		t.eq(data.skyBin, {})
 		t.eq(data.truckAt, {})
-		t.eq(data.schema, 2)
+		t.eq(data.schema, 5)
 	end)
 
 	t.test("MigrateV2 converts the forge's lumenwood logs to u³, capped at the recipe, and keeps forgeLogs", function()
@@ -437,7 +437,7 @@ return function(t)
 		}
 		local r = Schema.MigrateV2(data, 20)
 		t.ok(r.boughtBack > 0, "a bare wood id is worth its v1 log price")
-		t.eq(data.schema, 2)
+		t.eq(data.schema, 5)
 		t.eq(data.stats.volumeSold, 0)
 		t.eq(data.stats.cuts, 0)
 		t.eq(data.forgeWood, {})
@@ -449,7 +449,7 @@ return function(t)
 		Schema.MigrateV2(data, 20)
 		data.v2Credit = 0
 		Schema.Migrate(data)
-		t.eq(data.schema, 2)
+		t.eq(data.schema, 5)
 		t.eq(data.forgeWood.lumenwood, 18)
 		t.eq(#data.axes > 0, true)
 	end)
@@ -481,5 +481,204 @@ return function(t)
 		Schema.Migrate(data)
 		t.eq(data.truckLoad, { piece })
 		t.eq(data.truckBed, { { woodId = "oak", value = 5 } })
+	end)
+
+	-- Foundations (schema 5). tollPaidUntil is not a save field.
+	local function stripFoundations(data)
+		data.storage = nil
+		data.permissions = nil
+		data.badgesAwarded = nil
+		data.questAxe = nil
+		data.secretsFound = nil
+		data.areasVisited = nil
+		data.tollPaidUntil = nil
+		if type(data.plot) == "table" then
+			data.plot.squares = nil
+		end
+		if type(data.slots) == "table" then
+			for _, slot in ipairs(data.slots) do
+				if type(slot) == "table" then
+					slot.storage = nil
+					slot.permissions = nil
+					slot.questAxe = nil
+					slot.badgesAwarded = nil
+					slot.secretsFound = nil
+					slot.areasVisited = nil
+					slot.tollPaidUntil = nil
+					if type(slot.plot) == "table" then
+						slot.plot.squares = nil
+					end
+				end
+			end
+		end
+	end
+
+	t.test("an old save gains the foundations fields, and a second migrate matches", function()
+		local Schema, data = fresh()
+		data.cash = 80
+		data.schema = 4
+		data.plot.claimed = true
+		stripFoundations(data)
+		data.tollPaidUntil = 12345
+		Schema.Migrate(data)
+		t.eq(data.schema, 5)
+		t.eq(data.cash, 80)
+		t.eq(data.plot.claimed, true)
+		t.eq(data.storage, {})
+		t.eq(data.plot.squares, {})
+		t.eq(data.permissions, {})
+		t.eq(data.badgesAwarded, {})
+		t.eq(data.questAxe, { step = 0 })
+		t.eq(data.secretsFound, {})
+		t.eq(data.areasVisited, {})
+		t.eq(data.tollPaidUntil, nil)
+		t.eq(Schema.Template.tollPaidUntil, nil)
+		local before = t.loader():shared("Util").deepCopy(data)
+		Schema.Migrate(data)
+		t.eq(data, before)
+	end)
+
+	t.test("a wrong-typed foundations field resets to the default and does not error", function()
+		local Schema, data = fresh()
+		data.storage = "box"
+		data.plot.squares = 4
+		data.permissions = 1
+		data.badgesAwarded = false
+		data.questAxe = "done"
+		data.secretsFound = 0
+		data.areasVisited = "snow"
+		Schema.Migrate(data)
+		t.eq(data.storage, {})
+		t.eq(data.plot.squares, {})
+		t.eq(data.permissions, {})
+		t.eq(data.badgesAwarded, {})
+		t.eq(data.questAxe, { step = 0 })
+		t.eq(data.secretsFound, {})
+		t.eq(data.areasVisited, {})
+	end)
+
+	t.test("storage keeps 50 server uids and drops axes, trucks, placed items, and junk", function()
+		local Schema, data = fresh()
+		data.axes = { { uid = "axe-1", id = "SteelAxe" } }
+		data.ownedTrucks = { "Rustbucket" }
+		data.plot.placed = { { uid = "cabin", blueprintId = "Cabin", x = 1, z = 2, rot = 0 } }
+		local boxes = {
+			{ uid = "keep", itemId = "Lantern", shop = "ToolShed" },
+			{ uid = "axe-1", itemId = "HeatBoots", shop = "ToolShed" },
+			{ uid = "box-truck", itemId = "Rustbucket", shop = "Dealership" },
+			{ uid = "cabin", itemId = "Flashlight", shop = "ToolShed" },
+			{ uid = "keep", itemId = "InsulatedCoat", shop = "ToolShed" },
+			{ itemId = "FeatherfallCloak", shop = 5 },
+			"junk",
+			{ uid = "", itemId = "SkyShard" },
+		}
+		for i = 1, 60 do
+			table.insert(boxes, { uid = "extra-" .. i, itemId = "Lantern", shop = "ToolShed" })
+		end
+		data.storage = boxes
+		Schema.Migrate(data)
+		t.eq(#data.storage, Schema.StorageCap)
+		t.eq(data.storage[1].uid, "keep")
+		t.eq(data.storage[1].itemId, "Lantern")
+		local seen = {}
+		for _, box in ipairs(data.storage) do
+			t.eq(type(box.uid), "string")
+			t.ok(#box.uid > 0, "server uid")
+			t.ok(not seen[box.uid], "uids are unique")
+			seen[box.uid] = true
+			t.ok(box.uid ~= "axe-1" and box.itemId ~= "SteelAxe", "not an axe")
+			t.ok(box.itemId ~= "Rustbucket", "not a truck")
+			t.ok(box.uid ~= "cabin" and box.itemId ~= "Cabin", "not a placed item")
+		end
+		-- The duplicate "keep" was given its own uid; the cloak with a bad shop was kept.
+		local cloak = false
+		for _, box in ipairs(data.storage) do
+			if box.itemId == "FeatherfallCloak" then
+				cloak = true
+				t.eq(box.shop, "")
+			end
+			if box.itemId == "InsulatedCoat" then
+				t.ok(box.uid ~= "keep")
+			end
+		end
+		t.ok(cloak, "a bad shop string becomes empty, the box stays")
+		local before = t.loader():shared("Util").deepCopy(data)
+		Schema.Migrate(data)
+		t.eq(data.storage, before.storage)
+	end)
+
+	t.test("schema 0 stays 0 through Migrate so the v2 migration still runs", function()
+		local Schema, data = fresh()
+		data.schema = 0
+		Schema.Migrate(data)
+		t.eq(data.schema, 0)
+		Schema.MigrateV2(data, 20)
+		t.eq(data.schema, 5)
+	end)
+
+	t.test("foundations fields add at most 2 KB to a maxed save", function()
+		local Schema, data = fresh()
+		local placed = {}
+		for i = 1, 400 do
+			placed[i] = { uid = "piece-" .. i, blueprintId = "Floor", x = i, z = 1, rot = i % 4 }
+		end
+		data.plot.placed = placed
+		-- Park the big plot in the slot first, so the measurement below is
+		-- only the foundations fields being filled back in.
+		Schema.Migrate(data)
+		stripFoundations(data)
+		data.schema = 4
+		local function isArray(value)
+			local n = 0
+			for key in pairs(value) do
+				if type(key) ~= "number" or key < 1 or key ~= math.floor(key) then
+					return false
+				end
+				n += 1
+			end
+			return n == #value
+		end
+		local function encode(value)
+			local kind = type(value)
+			if kind == "string" then
+				return '"' .. string.gsub(string.gsub(value, "\\", "\\\\"), '"', '\\"') .. '"'
+			elseif kind == "number" then
+				if value ~= value or value == math.huge or value == -math.huge then
+					return "null"
+				end
+				if value == math.floor(value) and math.abs(value) < 1e15 then
+					return string.format("%d", value)
+				end
+				return tostring(value)
+			elseif kind == "boolean" then
+				return if value then "true" else "false"
+			elseif kind ~= "table" then
+				return "null"
+			elseif isArray(value) then
+				local parts = {}
+				for _, item in ipairs(value) do
+					table.insert(parts, encode(item))
+				end
+				return "[" .. table.concat(parts, ",") .. "]"
+			end
+			local keys = {}
+			for key in pairs(value) do
+				table.insert(keys, key)
+			end
+			table.sort(keys, function(a, b)
+				return tostring(a) < tostring(b)
+			end)
+			local parts = {}
+			for _, key in ipairs(keys) do
+				table.insert(parts, encode(tostring(key)) .. ":" .. encode(value[key]))
+			end
+			return "{" .. table.concat(parts, ",") .. "}"
+		end
+		local before = #encode(data)
+		Schema.Migrate(data)
+		local growth = #encode(data) - before
+		t.ok(growth <= 2048, "grew " .. tostring(growth) .. " bytes")
+		t.eq(#data.plot.placed, 400, "the old plot is still there")
+		t.eq(data.schema, 5)
 	end)
 end

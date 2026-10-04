@@ -40,6 +40,15 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	Swing = 8, -- the pose stamp. A start and a cancel, at the fastest axe, stay under this
 	SellSkyBin = 2, -- v2: the Sky Bin's prompt by the pad (AetherService; a ProximityPrompt, not a remote)
 	SawmillSet = 6, -- v2: one step of a placed mill's cut (SawmillService)
+	Dialogue = 4, -- shop talk: open, or pick a line
+	BoxOpen = 4, -- open a box you own
+	SpawnPadPress = 1, -- the button on a vehicle pad
+	ChopSawSet = 6, -- one step of a chop saw's cut; same budget as SawmillSet
+	ExpandLand = 1, -- buy the next plot square
+	SetPermission = 4, -- one flag for one visitor
+	Wire = 4, -- connect a port, or cut a wire
+	TollPay = 1, -- pay the toll
+	FerryBoard = 1, -- board the ferry
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
 	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
 }

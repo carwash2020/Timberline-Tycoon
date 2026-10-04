@@ -495,6 +495,13 @@ end
 -- LotApron keeps that rail and the turnaround level.
 WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 
+-- Loading pads for boxed vehicles and machines (GameConfig.LoadingPadSize).
+-- Named rects only: not a flat zone, a paint, or a reserved box, so nothing
+-- reads them yet and the ground does not move.
+export type LoadingPad = { x0: number, x1: number, z0: number, z1: number }
+WorldLayout.DealershipLoadingPad = { x0 = 70, x1 = 84, z0 = 97, z1 = 111 } :: LoadingPad
+WorldLayout.ToolShedLoadingPad = { x0 = -88, x1 = -74, z0 = 97, z1 = 111 } :: LoadingPad
+
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
 -- pad, packed dirt for the main street, the shop paths, the spawn walk, the
 -- mill yard and the gondola path. Edges get a little noise. The first
