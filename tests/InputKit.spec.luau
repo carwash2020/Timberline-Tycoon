@@ -85,7 +85,7 @@ return function(t)
 		t.ok(not InputKit.KeysUnique(InputKit.Target.world, false))
 	end)
 
-	t.test("the placer target uses no ButtonX, and a ButtonX bind needs prompts off", function()
+	t.test("the placer target uses no ButtonX, and E or ButtonX needs prompts off", function()
 		for _, row in ipairs(InputKit.Target.placer) do
 			t.ok(row.gamepad ~= Enum.KeyCode.ButtonX, row.action)
 		end
@@ -93,9 +93,23 @@ return function(t)
 		t.eq(rotate.action, "Rotate")
 		t.eq(rotate.keyboard, Enum.KeyCode.R)
 		t.eq(rotate.gamepad, Enum.KeyCode.DPadRight)
-		t.ok(InputKit.PlacerSafe(InputKit.Target.placer, true))
-		-- Today's BlueprintPlacer rotate bind. Safe only while prompts are off.
-		local today = { bind("Rotate", Enum.KeyCode.ButtonX, Enum.KeyCode.R) }
+		-- Raise is still E, which is world Interact. Safe only with prompts off.
+		t.ok(not InputKit.PlacerSafe(InputKit.Target.placer, true))
+		t.ok(InputKit.PlacerSafe(InputKit.Target.placer, false))
+		local raise = { bind("Raise", Enum.KeyCode.ButtonR1, Enum.KeyCode.E) }
+		t.ok(not InputKit.PlacerSafe(raise, true))
+		t.ok(InputKit.PlacerSafe(raise, false))
+	end)
+
+	t.test("today's placer binds fail while prompts are on and pass when they are off", function()
+		-- BlueprintPlacer.luau:360-388. Rotate is still ButtonX. Raise is E.
+		local today = {
+			bind("Rotate", Enum.KeyCode.ButtonX, Enum.KeyCode.R),
+			bind("Place", Enum.KeyCode.ButtonR2, nil),
+			bind("Cancel", Enum.KeyCode.ButtonB, Enum.KeyCode.Q),
+			bind("Raise", Enum.KeyCode.ButtonR1, Enum.KeyCode.E),
+			bind("Lower", Enum.KeyCode.ButtonL1, Enum.KeyCode.C),
+		}
 		t.ok(not InputKit.PlacerSafe(today, true))
 		t.ok(InputKit.PlacerSafe(today, false))
 	end)

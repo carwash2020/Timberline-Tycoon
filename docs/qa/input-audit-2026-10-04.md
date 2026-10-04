@@ -91,7 +91,7 @@ Pass means `ScreenInsets` is `CoreUISafeInsets`. The property's engine default i
 
 3. **Truck.** Enter is the Drive prompt, row 3, gamepad key unset. Drive is the seat: WASD, the stick, the touch thumbstick (`VehicleController.luau:1`). Exit is Jump (`HintLogic` driving line). Recall is ButtonY on the side button (`VehicleController.luau:214`), a menu-context key, unique there. **Fail** the Drive prompt's unset gamepad key. Owner X2.
 
-4. **Build.** Place is R2 (`BlueprintPlacer.luau:367`). Cancel is Q and B (`:372`). Rotate is R and ButtonX (`:360`). That ButtonX is Interact's key, and world prompts stay on while the placer is up. **Fail.** X2 moves `PlacerRotate` from ButtonX to DPadRight and keeps R. `InputKit.Target.placer` is already that map. `InputKit.PlacerSafe` is false for today's bind while prompts are on. Select, copy, move, and delete on the build bar are mouse and touch only (`BuilderTools.luau:666` and `:684`). **Fail** pad select. Owner X2. Bar buttons stay at least 44 (`BuilderBar.luau:18`).
+4. **Build.** Place is R2 (`BlueprintPlacer.luau:367`). Cancel is Q and B (`:372`). Rotate is R and ButtonX (`:360`). Raise is E and ButtonR1 (`:379`). E is world Interact, Talk, and Buy, and ButtonX is those same three on a pad. World prompts stay on while the placer is up. **Fail.** `InputKit.PlacerSafe` is false for today's binds, and for the target map, while prompts are on, because Raise stays on E. It is true when prompts are off. X2 still moves `PlacerRotate` from ButtonX to DPadRight and keeps R. The E clash is fixed by turning world prompts off while the placer is active, the same way drag does (`DragController.luau:351`). Select, copy, move, and delete on the build bar are mouse and touch only (`BuilderTools.luau:666` and `:684`). **Fail** pad select. Owner X2. Bar buttons stay at least 44 (`BuilderBar.luau:18`).
 
 5. **Shops.** Browse, buy, and close exist (`ShopUI`). The menu's pad row passes. The world prompt's gamepad key fails (row 13). Pay-at-counter, open-box, spawn-pad, and chop-saw are not in this build. Sawmill cut size is a prompt-less server path. No extra owner until those batches add the prompts. They should call `PromptDefaults`.
 
@@ -99,7 +99,7 @@ Pass means `ScreenInsets` is `CoreUISafeInsets`. The property's engine default i
 
 7. **Menus.** The pad table above. Eight fail (Store, Saves, Plot picker, Plot bar, Daily, Quest, Forest pouch, and Esc on every closer). Field Guide, Settings, Shop, HUD's popup path, TreeUI, and WorldUI pass the pad rule. Esc fails for every closer. Owner X2 except where a row names another batch.
 
-8. **Prompts.** The 14 rows above. Two prompts in range must not share a key with each other or with a held action. Drag turns prompts off while held. The placer does not, and its rotate bind is ButtonX (item 4). Sell and the forest prompt both use ButtonY and can overlap (the range note).
+8. **Prompts.** The 14 rows above. Two prompts in range must not share a key with each other or with a held action. Drag turns prompts off while held. The placer does not. Its rotate bind is ButtonX and its raise bind is E (item 4). Sell and the forest prompt both use ButtonY and can overlap (the range note).
 
 9. **Touch at 667×375.** Short side 375 is under `UITheme.CompactEdge` (500), so compact layout is on. Fails, all X2 unless noted:
    - Field Guide button becomes 40×43 (`FieldGuideUI.luau:226`).
@@ -120,7 +120,8 @@ Pass means `ScreenInsets` is `CoreUISafeInsets`. The property's engine default i
 
 ## X2 (do not do these here)
 
-- `BlueprintPlacer.luau:360`: change `PlacerRotate`'s gamepad key from ButtonX to DPadRight. Keep keyboard R. Until that lands, either that bind must not use ButtonX or world prompts must be off while the placer is active (`InputKit.PlacerSafe`).
+- `BlueprintPlacer.luau:360`: change `PlacerRotate`'s gamepad key from ButtonX to DPadRight. Keep keyboard R.
+- `BlueprintPlacer.luau:379`: Raise is bound to E, the keyboard key for Interact, Talk, and Buy. Turn world prompts off while the placer is active, the same way `DragController` does around line 351. `PlacerSafe` is false for today's binds while prompts are on, and true when they are off. That also covers the ButtonX rotate bind until it moves.
 - Assign `PromptDefaults` (or the same three properties) on every fail in the prompt table whose owner is X2.
 - Set `SelectedObject` on open and bind B to close for every failed menu row whose owner is X2. Bind Escape to the same close.
 - Raise the under-44 targets and the under-14 text listed in item 9.

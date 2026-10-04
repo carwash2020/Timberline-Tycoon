@@ -12,8 +12,9 @@
 --
 -- The placer's target rotate bind is DPadRight (keyboard R). Today's
 -- BlueprintPlacer still rotates on ButtonX; that move is an X2 change.
--- PlacerSafe is the rule until then: while the placer is active, either
--- none of its binds uses ButtonX, or world prompts are off.
+-- Raise stays on E, and E is world Interact, Talk, and Buy. PlacerSafe
+-- rejects a ButtonX bind or a keyboard E bind while world prompts are on.
+-- The X2 fix is to turn world prompts off while the placer is active.
 --
 -- The console safe area is ScreenInsets.CoreUISafeInsets. It is not a
 -- fraction of the screen.
@@ -238,13 +239,14 @@ function InputKit.KeysUnique(binds: { Bind }, apart: boolean?): boolean
 	return true
 end
 
--- While the placer is up, a ButtonX bind is safe only if world prompts are off.
+-- While the placer is up and world prompts are on, a bind on ButtonX or on
+-- keyboard E clashes with Interact, Talk, and Buy. Prompts off is safe.
 function InputKit.PlacerSafe(binds: { Bind }, worldPromptsOn: boolean): boolean
 	if not worldPromptsOn then
 		return true
 	end
 	for _, bind in ipairs(binds) do
-		if bind.gamepad == Enum.KeyCode.ButtonX then
+		if bind.gamepad == Enum.KeyCode.ButtonX or bind.keyboard == Enum.KeyCode.E then
 			return false
 		end
 	end
