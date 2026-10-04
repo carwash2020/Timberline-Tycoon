@@ -57,7 +57,7 @@ return function(t)
 		t.eq(lift, nil)
 	end)
 
-	t.test("a gamepad prompt selects Press, and B or Esc clears it", function()
+	t.test("a gamepad prompt leaves the selection alone", function()
 		local Enum = t.roblox.Enum
 		local guiService = { SelectedObject = nil }
 		local player = Instance.new("Folder")
@@ -117,11 +117,14 @@ return function(t)
 			InputHoldEnd = function() end,
 		}
 		PromptUI.Show(prompt, Enum.ProximityPromptInputType.Gamepad)
-		t.eq(guiService.SelectedObject.Name, "Press")
-		t.eq(PromptUI.ApplyKey(Enum.KeyCode.ButtonB), "close")
 		t.eq(guiService.SelectedObject, nil)
-		PromptUI.Show(prompt, Enum.ProximityPromptInputType.Gamepad)
-		t.eq(PromptUI.ApplyKey(Enum.KeyCode.Escape), "close")
-		t.eq(guiService.SelectedObject, nil)
+		local press = nil
+		for _, d in ipairs(pg:GetDescendants()) do
+			if d.Name == "Press" then
+				press = d
+			end
+		end
+		t.ok(press, "the card still has a Press face")
+		t.eq(press.Selectable, false)
 	end)
 end

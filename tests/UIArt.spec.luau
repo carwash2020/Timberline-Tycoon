@@ -49,7 +49,7 @@ return function(t)
 	end)
 	-- Lune's buttons have no input signals. Quest's Skip button connects them.
 	for _, prop in ipairs({ "InputBegan", "InputEnded", "SelectionLost", "Activated" }) do
-		roblox.implementProperty("TextButton", prop, function()
+		pcall(roblox.implementProperty, "TextButton", prop, function()
 			return signal()
 		end)
 	end

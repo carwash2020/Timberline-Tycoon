@@ -211,9 +211,15 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	return { gui = gui, root = root, readout = readout, buttons = buttons, close = close }
 end
 
+-- The card lives in a CoreUISafeInsets screen. Its AbsolutePosition is
+-- inside that screen. HUD's screen ignores the inset, so the modal box
+-- is the card plus the inset screen's top-left, in full-screen pixels.
 local function modalRect(root: Frame): { left: number, top: number, right: number, bottom: number }
 	local at, size = root.AbsolutePosition, root.AbsoluteSize
-	return { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
+	local gui = root:FindFirstAncestorOfClass("ScreenGui")
+	local origin = if gui then gui.AbsolutePosition else Vector2.zero
+	local x, y = at.X + origin.X, at.Y + origin.Y
+	return { left = x, top = y, right = x + size.X, bottom = y + size.Y }
 end
 
 -- Screen pixels. The card misses the left column and the hotbar.

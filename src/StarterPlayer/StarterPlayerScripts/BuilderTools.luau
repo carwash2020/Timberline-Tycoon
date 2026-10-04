@@ -43,6 +43,7 @@ local copyDz = 0
 local copyOk = false
 
 local cluster: Frame? = nil
+local toolsGui: ScreenGui? = nil
 local readoutLabel: TextLabel? = nil
 local buttons: { [string]: TextButton } = {}
 
@@ -196,11 +197,19 @@ end
 
 local function layout()
 	local bar = cluster
-	local camera = workspace.CurrentCamera
-	if not bar or not camera then
+	local gui = toolsGui
+	if not bar or not gui then
 		return
 	end
-	local size = camera.ViewportSize
+	-- The bar's screen is already inside CoreUISafeInsets, so its
+	-- AbsoluteSize is the safe rect, not the full viewport. Laying out
+	-- from the viewport pushes the cluster down by the top inset.
+	local ok, size = pcall(function()
+		return gui.AbsoluteSize
+	end)
+	if not ok or typeof(size) ~= "Vector2" or size.X <= 0 or size.Y <= 0 then
+		return
+	end
 	local place = BuilderBar.Layout(size.X, size.Y, UITheme.Bottom())
 	bar.Position = UDim2.fromOffset(place.x, place.y)
 	bar.Size = UDim2.fromOffset(place.w, place.h)
@@ -520,14 +529,21 @@ function BuilderTools.PrimarySelected(): Model?
 end
 
 -- ButtonR2: a ray through the middle of the screen, then the same select
--- (or copy-confirm) path a mouse click uses.
+-- (or copy-confirm) path a mouse click uses. Pass unless that ray hits a
+-- placed piece or copy mode is confirming, so an axe swing still sees R2.
+-- A tool in hand always passes: CutController skips the swing when this
+-- bind sinks the button.
 function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState ~= Enum.UserInputState.Begin or BlueprintPlacer.Active() then
 		return Enum.ContextActionResult.Pass
 	end
+	local char = player.Character
+	if typeof(char) == "Instance" and char:FindFirstChildOfClass("Tool") then
+		return Enum.ContextActionResult.Pass
+	end
 	local camera = workspace.CurrentCamera
 	if not camera then
-		return Enum.ContextActionResult.Sink
+		return Enum.ContextActionResult.Pass
 	end
 	local x, y = BuilderTools.Center(camera.ViewportSize)
 	if copyMode then
@@ -535,9 +551,10 @@ function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): 
 		return Enum.ContextActionResult.Sink
 	end
 	local model = BuilderTools.Aim(camera, x, y)
-	if model then
-		toggle(model)
+	if not model then
+		return Enum.ContextActionResult.Pass
 	end
+	toggle(model)
 	return Enum.ContextActionResult.Sink
 end
 
@@ -662,7 +679,9 @@ function BuilderTools.Start()
 	end
 
 	gui.Parent = player:WaitForChild("PlayerGui")
+	toolsGui = gui
 	layout()
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 
 	local camera = workspace.CurrentCamera
 	if camera then

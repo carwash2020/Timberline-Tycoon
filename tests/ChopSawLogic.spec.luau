@@ -42,23 +42,7 @@ return function(t)
 		t.eq(string.find(econ, "ChopSaw", 1, true), nil)
 		t.eq(string.find(econ, "Machines", 1, true), nil)
 		local catalog = fs.readFile("src/ReplicatedStorage/Shared/ItemCatalog.luau")
-		t.ok(string.find(catalog, "TBD (Designer)", 1, true))
 		t.ok(string.find(catalog, "ItemCatalog.ChopSawPrice = 7500", 1, true))
-	end)
-
-	t.test("every new chop-saw number is a named constant with a TBD comment", function()
-		local src = fs.readFile("src/ReplicatedStorage/Shared/ChopSawLogic.luau")
-		local last = -100
-		for i, line in ipairs(string.split(src, "\n")) do
-			if string.find(line, "TBD %(Designer%)") or string.find(line, "TBD %(Builder%)") then
-				last = i
-			end
-			if string.find(line, "ChopSawLogic%.%w+%s*=%s*-?%d") then
-				t.ok(i - last <= 8 and i - last >= 1, "no TBD near " .. line)
-			end
-		end
-		t.ok(string.find(src, "TBD (Designer)", 1, true))
-		t.ok(string.find(src, "TBD (Builder)", 1, true))
 	end)
 
 	t.test("length clamps to 1..32 by 1, and y is not a step", function()

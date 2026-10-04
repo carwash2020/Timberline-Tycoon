@@ -401,12 +401,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 			s.conns,
 			char.ChildAdded:Connect(function(child: Instance)
 				if child:IsA("Tool") then
-					table.insert(
-						s.conns,
-						child.Unequipped:Connect(function()
-							BlueprintPlacer.Stop()
-						end)
-					)
+					BlueprintPlacer.Stop()
 				end
 			end)
 		)

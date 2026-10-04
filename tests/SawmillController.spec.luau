@@ -101,6 +101,7 @@ return function(t)
 	t.test("opening sets the modal from the card, and the card clears the column and the hotbar", function()
 		local Vector2 = t.roblox.Vector2
 		local panel = Controller.BuildPanel(false)
+		panel.gui.AbsolutePosition = Vector2.new(0, 0)
 		panel.root.AbsolutePosition = Vector2.new(300, 90)
 		panel.root.AbsoluteSize = Vector2.new(240, 200)
 		Controller._open(panel)
@@ -112,6 +113,19 @@ return function(t)
 		t.eq(opened.bottom, 290)
 		Controller._close()
 		t.eq(modalLog[#modalLog].rect, nil)
+
+		-- A 58 px top inset: the card's position is inside the safe screen,
+		-- and the rect HUD gets is that box on the full screen.
+		local inset = 58
+		panel.gui.AbsolutePosition = Vector2.new(0, inset)
+		panel.root.AbsolutePosition = Vector2.new(120, 40)
+		panel.root.AbsoluteSize = Vector2.new(200, 160)
+		Controller._open(panel)
+		local shifted = modalLog[#modalLog].rect
+		t.eq(shifted.left, 120)
+		t.eq(shifted.top, 40 + inset)
+		t.eq(shifted.right, 320)
+		t.eq(shifted.bottom, 200 + inset)
 
 		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
 		local function column(margin)
