@@ -19,20 +19,29 @@ Night.GlowNames = { WindowGlass = true, LampGlow = true, LanternGlow = true, Lam
 -- (255, 200, 110), as hex.
 Night.WindowColor = "FFC46E"
 Night.LanternColor = "FFC86E"
+-- WoodData.LanternGlow, without the hash. WoodFX swaps NightGlow parts to
+-- this at night; the preview's night cameras do the same. TBD (Designer).
+Night.WoodGlow = "FFC45C"
 
 -- The colour (hex, no "#") a part glows at night, or nil when the game
 -- doesn't light it. Like LightingController's trackGlowPart: a window takes
 -- the warm window colour, a part that is already Neon keeps its own colour,
--- and any other glow part takes the lantern colour.
+-- and any other glow part takes the lantern colour. A part marked NightGlow
+-- (Lanternwood leaves, the core band, and planks) takes the wood colour.
 function Night.GlowColor(part): string?
-	if not (part:IsA("BasePart") and Night.GlowNames[part.Name]) then
+	if not part:IsA("BasePart") then
 		return nil
-	elseif part.Name == "WindowGlass" then
-		return Night.WindowColor
-	elseif part.Material.Name == "Neon" then
-		return part.Color:ToHex()
+	elseif Night.GlowNames[part.Name] then
+		if part.Name == "WindowGlass" then
+			return Night.WindowColor
+		elseif part.Material.Name == "Neon" then
+			return part.Color:ToHex()
+		end
+		return Night.LanternColor
+	elseif part:GetAttribute("NightGlow") == true then
+		return Night.WoodGlow
 	end
-	return Night.LanternColor
+	return nil
 end
 
 -- Whether the game turns a light on at night: it sits in a glow part, or in

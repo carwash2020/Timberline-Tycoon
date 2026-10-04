@@ -50,4 +50,36 @@ return function(t)
 		t.ok(string.find(src, "at vitality 75", 1, true) == nil)
 		t.ok(string.find(forest .. src, "planterId", 1, true) == nil)
 	end)
+
+	t.test("W2's six ferry trees are the glow wood, still plain on the server", function()
+		local WorldPlan = t.shared("World/WorldPlan")
+		local TreeGen = t.shared("TreeGen")
+		local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
+		local spots = WorldPlan.Lanternwood()
+		t.eq(#spots, 6)
+		local Enum = t.roblox.Enum
+		for _, spot in ipairs(spots) do
+			t.eq(spot.woodId, "lanternwood")
+			t.eq(spot.biome, "ferryisle")
+		end
+		local def = WoodData.Get(spots[1].woodId)
+		local model = TreeArt.FromSkeleton(def, TreeGen.Skeleton(def.id, 1, 1))
+		t.ok(model:HasTag("Lanternwood"))
+		t.eq(model:GetAttribute("NightHost"), "tree")
+		local glow = 0
+		local band = false
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d:GetAttribute("NightGlow") == true then
+				glow += 1
+				t.ok(d.Material ~= Enum.Material.Neon, d.Name .. " stays day-plain on the server")
+				if d.Name == "CoreBand" then
+					band = true
+					t.eq(d.Material, Enum.Material.Wood)
+				end
+			end
+		end
+		t.ok(band, "the core band is marked")
+		t.ok(glow >= 2, "leaves and the core band are marked")
+		t.eq(model:FindFirstChild("LanternLight", true), nil)
+	end)
 end

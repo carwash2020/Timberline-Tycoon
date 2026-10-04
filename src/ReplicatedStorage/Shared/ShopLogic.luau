@@ -83,8 +83,8 @@ function ShopLogic.FellSummary(axe: AxeDef, maxHits: number?, count: number?): s
 	for i = #woods, 1, -1 do
 		local wood = woods[i]
 		local damage = ItemCatalog.AxeDamage(axe, wood)
-		-- A wood whose biome is not in the world yet (Ferry Island, until
-		-- W2) is not a line on the axe card.
+		-- A closed biome stays off the axe card. Ferry Island is open, so
+		-- Lanternwood is one of the woods an axe can name.
 		if damage > 0 and BiomeData.IsOpen(wood.biome) then
 			local hits = math.ceil(wood.treeHP / damage)
 			if hits <= limit then
