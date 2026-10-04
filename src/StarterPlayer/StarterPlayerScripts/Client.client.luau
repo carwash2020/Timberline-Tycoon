@@ -21,6 +21,7 @@ local MODULES = {
 	"AmbientSound",
 	"AxeController",
 	"BlueprintPlacer",
+	"BuilderTools",
 	"CameraShake",
 	"CanopyFade",
 	"CarryController",
@@ -233,6 +234,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "BlueprintPlacer",
 		get = function()
 			return require(script.Parent.BlueprintPlacer)
+		end,
+	},
+	{
+		name = "BuilderTools",
+		get = function()
+			return require(script.Parent.BuilderTools)
 		end,
 	},
 	{

@@ -9,6 +9,7 @@
 
 local CollectionService = game:GetService("CollectionService")
 
+local EditLogic = require(script.Parent.EditLogic)
 local ItemMeshes = require(script.Parent.ItemMeshes)
 local KitMeshes = require(script.Parent.KitMeshes)
 local PlotData = require(script.Parent.PlotData)
@@ -141,10 +142,19 @@ end
 function BlueprintModels.SetFaded(model: Model, faded: boolean)
 	for _, child in ipairs(model:GetChildren()) do
 		if child:IsA("BasePart") and child.Name ~= "Root" then
+			-- The full-length fence collider stays invisible. The mesh it was
+			-- cloned from stays hidden too; the tiles are the fence you see.
+			if child:GetAttribute("Span") == true or child:GetAttribute("TileSource") == true then
+				child.Transparency = 1
+				child.CanCollide = child:GetAttribute("Span") == true and not faded
+				child.CanTouch = child.CanCollide
+				child.CanQuery = child.CanCollide
+				continue
+			end
 			local visual = child:GetAttribute("ItemVisual") == true
 			if faded then
 				if visual or child:GetAttribute("Role") ~= nil then
-					child.Transparency = 0.5
+					child.Transparency = 0.45
 				end
 				child.CanCollide = false
 			elseif child:GetAttribute("MeshOwnsCollision") == true then
@@ -190,7 +200,120 @@ function BlueprintModels.ApplyWood(model: Model, woodId: string?)
 	end
 end
 
--- Puts a built model at plot-local (x, y, z) with `rot` quarter turns.
+-- Stretches a wall, beam or floor along its length. Height and thickness stay
+-- put. A fence or railing is N copies, each len/N long, over one full-length
+-- collider. The collider's Size is set to that box. It is not scaled from
+-- whatever size it had. Door and gate swing boxes are not in here.
+function BlueprintModels.ApplySize(model: Model, bp: PlotData.Blueprint, len: number?, lenX: number?, lenZ: number?)
+	if not EditLogic.CanResize(bp.id) then
+		return
+	end
+	for _, child in ipairs(model:GetChildren()) do
+		if child:GetAttribute("Tile") == true then
+			child:Destroy()
+		end
+	end
+	local probe = {
+		uid = model.Name,
+		blueprintId = bp.id,
+		x = 0,
+		z = 0,
+		rot = 0,
+		len = len,
+		lenX = lenX,
+		lenZ = lenZ,
+	}
+	local shaped = EditLogic.Shape(bp, probe)
+	local box = shaped.boxes[1]
+	if not box then
+		return
+	end
+	local fullX = shaped.footprint.X
+	local tiling = EditLogic.Tiled(bp.id)
+	local tiles = if tiling then EditLogic.Tiles(fullX, bp.footprint.X) else 1
+	local tileLen = fullX / tiles
+	local template: BasePart? = nil
+	for _, child in ipairs(model:GetChildren()) do
+		if child:IsA("BasePart") and child.Name ~= "Root" and child:GetAttribute("Tile") ~= true then
+			local collider = child:GetAttribute("Collider") == true or child.Name == "Col"
+			local partBox = string.sub(child.Name, 1, 4) == "Part"
+			local visual = child:GetAttribute("ItemVisual") == true or child.Name == "Wood"
+			if tiling and tiles == 1 then
+				-- One copy, drawn at the new length. Height and thickness stay.
+				if visual and not collider then
+					child.Size = Vector3.new(fullX, child.Size.Y, child.Size.Z)
+					child.CFrame = CFrame.new(box.offset.X, child.Position.Y, box.offset.Z)
+				else
+					child.Size = Vector3.new(fullX, box.size.Y, box.size.Z)
+					child.CFrame = CFrame.new(box.offset)
+				end
+			elseif tiling and (collider or partBox) and not visual then
+				child.Size = Vector3.new(fullX, box.size.Y, box.size.Z)
+				child.CFrame = CFrame.new(box.offset)
+				child.Transparency = 1
+				child.CanCollide = true
+				child.CanTouch = true
+				child.CanQuery = true
+				child:SetAttribute("Collider", true)
+				child:SetAttribute("Span", true)
+			elseif tiling and visual then
+				if template == nil then
+					template = child
+				end
+				child:SetAttribute("TileSource", true)
+				child.Transparency = 1
+				child.CanCollide = false
+			elseif not tiling then
+				if visual and not collider then
+					local thick = if bp.id == "Floor" or bp.id == "Floor4" then shaped.footprint.Y else child.Size.Z
+					child.Size = Vector3.new(fullX, child.Size.Y, thick)
+					local pos = child.Position
+					child.CFrame = CFrame.new(box.offset.X, pos.Y, box.offset.Z)
+				else
+					local match = box
+					local index = tonumber(string.sub(child.Name, 5))
+					if index and shaped.boxes[index] then
+						match = shaped.boxes[index]
+					end
+					child.Size = match.size
+					child.CFrame = CFrame.new(match.offset)
+				end
+			end
+		end
+	end
+	if tiles <= 1 then
+		return
+	end
+	if template == nil then
+		local part = model:FindFirstChild("Part1")
+		if part and part:IsA("BasePart") then
+			template = part
+		end
+	end
+	if not template then
+		return
+	end
+	for i = 1, tiles do
+		local tile = template:Clone()
+		tile.Name = "Tile" .. tostring(i)
+		tile:SetAttribute("Tile", true)
+		tile:SetAttribute("Span", nil)
+		tile:SetAttribute("TileSource", nil)
+		tile:SetAttribute("Collider", nil)
+		tile:SetAttribute("MeshOwnsCollision", nil)
+		tile:SetAttribute("Role", "Wood")
+		tile:SetAttribute("ItemVisual", true)
+		tile.Size = Vector3.new(tileLen, box.size.Y, box.size.Z)
+		local x = -fullX / 2 + tileLen * (i - 0.5)
+		tile.CFrame = CFrame.new(x, box.offset.Y, box.offset.Z)
+		tile.Transparency = 0
+		tile.CanCollide = false
+		tile.CanTouch = false
+		tile.CanQuery = false
+		tile.Parent = model
+	end
+end
+
 function BlueprintModels.Place(model: Model, plotCFrame: CFrame, x: number, z: number, rot: number, y: number?)
 	model:PivotTo(plotCFrame * CFrame.new(x, y or 0, z) * CFrame.Angles(0, rot * math.pi / 2, 0))
 end
