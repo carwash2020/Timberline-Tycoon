@@ -43,6 +43,7 @@
 --     (feet to the top of the hat), TopOffset (head centre to hat top).
 
 local Kit = require(script.Parent.Kit)
+local NPCMeshes = require(script.Parent.NPCMeshes)
 
 local CharacterArt = {}
 
@@ -1762,6 +1763,8 @@ function CharacterArt.Build(spec: Spec): Model
 	model:SetAttribute("RootHeight", ROOT_Y * s)
 	model:SetAttribute("TopOffset", ctx.top * s)
 	model:SetAttribute("Height", (headY + ctx.top) * s)
+	-- Uploaded limbs weld onto this rig. A miss keeps the parts above.
+	NPCMeshes.Dress(model, (spec.name:gsub("%s+", "")))
 	return model
 end
 

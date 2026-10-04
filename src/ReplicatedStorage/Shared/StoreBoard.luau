@@ -7,6 +7,8 @@
 
 local Kit = require(script.Parent.Art.Kit)
 local StoreData = require(script.Parent.StoreData)
+local TownMeshes = require(script.Parent.Art.TownMeshes)
+local TownModels = require(script.Parent.Art.TownModels)
 
 local StoreBoard = {}
 
@@ -163,6 +165,9 @@ function StoreBoard.Build(): Model
 	prompt.MaxActivationDistance = 12
 	prompt.HoldDuration = 0
 	prompt.Parent = board
+	-- The board's centre is the game's position. The mesh sits 2.3 lower
+	-- so that centre still lands on this part.
+	TownMeshes.Dress(model, "StoreBoard", { pivot = CFrame.new(0, -TownModels.StoreBoardDrop, 0) })
 	prompt:AddTag("StorePrompt")
 	return model
 end

@@ -27,6 +27,8 @@ local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 local PropArt = require(script.Parent.PropArt)
+local TownMeshes = require(script.Parent.TownMeshes)
+local TownModels = require(script.Parent.TownModels)
 local TreeArt = require(script.Parent.TreeArt)
 
 type Rng = Kit.Rng
@@ -1094,6 +1096,8 @@ function BuildingArt.Sawmill(scale: number?): Model
 	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, true)
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	fitNameSign(crest)
+	-- Authored at 1.5 already: do not scale the meshes again.
+	TownMeshes.Dress(model, "Sawmill")
 	return model
 end
 
@@ -1548,6 +1552,8 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	if sign and sign:IsA("BasePart") then
 		fitNameSign(sign)
 	end
+	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
+	TownMeshes.Dress(model, TownModels.ShopAsset(kind))
 	return model
 end
 
@@ -1645,6 +1651,7 @@ function BuildingArt.GondolaStation(): Model
 	Kit.solid(dBox(model, "Lectern", V3(1.2, 2.6, 0.9), CF(3.2, 2.3, -3.6), TIMBER_LIGHT)) -- its stand collides
 	dBox(model, "Lectern", V3(1.5, 0.2, 1.1), CF(3.2, 3.7, -3.6) * ANG(-0.3, 0, 0), PLANK[4])
 	dBall(model, "Bell", 0.55, CF(3.5, 4.0, -3.5), BRASS, MAT.Metal)
+	TownMeshes.Dress(model, "GondolaStation")
 	return model
 end
 
@@ -1693,6 +1700,7 @@ function BuildingArt.Signpost(text: string, lit: boolean?, solidBoard: boolean?)
 			Kit.decor(p)
 		end
 	end
+	TownMeshes.Dress(model, "Signpost")
 	return model
 end
 
@@ -1735,6 +1743,7 @@ function BuildingArt.ParkingBay(slot: BasePart, index: number)
 	l.Shadows = false
 	l.Enabled = false -- LightingController switches it on at dusk
 	l.Parent = holder
+	TownMeshes.Adorn(slot, "ParkingBay", cf)
 end
 
 -- A street lamp: a stone footing, a timber post, an iron arm reaching out
@@ -1752,6 +1761,7 @@ function BuildingArt.LampPost(): Model
 	dBox(model, "Chain", V3(0.12, 0.4, 0.12), CF(0, 9.43, -2.3), IRON, MAT.Metal)
 	local glow = Kit.lantern(model, CF(0, 8.4, -2.3), 1.1)
 	glow.Name = "LampGlow"
+	TownMeshes.Dress(model, "LampPost")
 	return model
 end
 
@@ -1790,6 +1800,7 @@ function BuildingArt.Fence(length: number): Model
 			rail.CastShadow = true
 		end
 	end
+	TownMeshes.Dress(model, "Fence", { scale = V3(length / TownModels.FenceLength, 1, 1) })
 	return model
 end
 
@@ -1830,6 +1841,7 @@ function BuildingArt.SellPad(w: number, d: number): Model
 			)
 		end
 	end
+	TownMeshes.Dress(model, "SellPad")
 	return model
 end
 
@@ -1840,7 +1852,7 @@ end
 -- A campfire: a ring of stones, crossed logs, glowing embers and three
 -- low-poly flame shapes (neon "Flame" parts; clients may flicker them).
 -- Named parts: "Embers" (with the Fire and a warm PointLight).
-function BuildingArt.Campfire(): Model
+function BuildingArt.Campfire(dress: boolean?): Model
 	local model = Kit.model("Campfire")
 	local rng = Kit.rng(5)
 	for i = 1, 8 do
@@ -1885,6 +1897,9 @@ function BuildingArt.Campfire(): Model
 	fire.Heat = 6
 	fire.Parent = embers
 	light(embers, 18, 1.6, Color3.fromRGB(255, 160, 80))
+	if dress ~= false then
+		TownMeshes.Dress(model, "Campfire")
+	end
 	return model
 end
 
@@ -1896,7 +1911,7 @@ end
 function BuildingArt.Campsite(): Model
 	local model = Kit.model("MurphsCamp")
 	local rng = Kit.rng(1931)
-	BuildingArt.Campfire().Parent = model
+	BuildingArt.Campfire(false).Parent = model
 
 	-- The tent: two canvas sheets over a ridge pole, closed at the back.
 	local tent = CF(0, 0, 5.4)
@@ -1983,6 +1998,7 @@ function BuildingArt.Campsite(): Model
 		SIGN_INK,
 		true
 	)
+	TownMeshes.Dress(model, "MurphsCamp")
 	return model
 end
 
@@ -2230,6 +2246,9 @@ function BuildingArt.Prop(name: string, seed: number): Model
 	local model = Kit.model(name)
 	local build = PROPS[name] or PROPS.Crate
 	build(model, Kit.rng(seed))
+	if TownModels.Get(name) then
+		TownMeshes.Dress(model, name)
+	end
 	return model
 end
 
@@ -2250,6 +2269,12 @@ function BuildingArt.PathRound(): Model
 	local model = Kit.model("PathRound")
 	local round = Kit.cylinder(model, "Round", 0.1, 1.6, CF(0, 0.08, 0) * ANG(0, 0, PI / 2), HEART, MAT.Wood)
 	Kit.decor(round, false)
+	local body = TownModels.Piece(TownModels.Get("PathRound") :: TownModels.Asset, "Body")
+	if body then
+		TownMeshes.Dress(model, "PathRound", {
+			scale = V3(1.6 / body.size.X, 0.1 / body.size.Y, 1.6 / body.size.Z),
+		})
+	end
 	return model
 end
 
@@ -2302,6 +2327,7 @@ function BuildingArt.TownTree(woodId: string, seed: number, scale: number): Mode
 	local trunk = model.PrimaryPart
 	local diameter = if trunk then math.min(trunk.Size.Y, trunk.Size.Z) else 1.5
 	stoneRing(model, BuildingArt.TreeRingRadius(diameter), Kit.rng(seed + 31))
+	TownMeshes.Dress(model, "TownTree")
 	return model
 end
 
@@ -2380,6 +2406,7 @@ function BuildingArt.SkyBin(): Model
 			Color3.fromRGB(250, 250, 255)
 		)
 	end
+	TownMeshes.Dress(model, "SkyBin")
 	return model
 end
 
@@ -2620,6 +2647,10 @@ function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 		-- but it says what's meant: nothing to click.
 		guard.CanQuery = false
 	end
+	TownMeshes.Dress(model, "RopeBridge", {
+		pivot = frame * CF(0, -0.75, 0),
+		scale = V3(1, 1, span / TownModels.RopeSpan),
+	})
 	return model
 end
 

@@ -5,7 +5,7 @@
 --
 --   * Murph: a Persistent Model "Murph" directly under TimberlineMap
 --     (QuestUI clones his Head, Beard, Beanie, Torso, LeftArm, RightArm
---     for its portrait and puts its Talk prompt on his Torso).
+--     for its portrait; QuestUI.luau waits on map:WaitForChild("Murph")).
 --   * Everyone else: Atomic models in a Folder "Townsfolk" under
 --     TimberlineMap (each streams in whole, so a client never sees half a
 --     person).

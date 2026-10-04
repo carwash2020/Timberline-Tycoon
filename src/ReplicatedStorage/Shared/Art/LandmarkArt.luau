@@ -17,6 +17,8 @@
 
 local Kit = require(script.Parent.Kit)
 local PropArt = require(script.Parent.PropArt)
+local TownMeshes = require(script.Parent.TownMeshes)
+local TownModels = require(script.Parent.TownModels)
 
 local LandmarkArt = {}
 
@@ -256,6 +258,10 @@ function LandmarkArt.Footbridge(span: number, drop: number, width: number, rise:
 			)
 		end
 	end
+	TownMeshes.Dress(model, "Footbridge", {
+		pivot = CF(0, 0, -span / 2),
+		scale = V3(1, 1, span / TownModels.FootSpan),
+	})
 	return model
 end
 
@@ -341,6 +347,11 @@ function LandmarkArt.Dock(length: number, width: number, deck: number, water: nu
 	end
 	-- A mooring cleat by the boat's side.
 	box(model, "Cleat", V3(0.3, 0.3, 1.1), CF(-postX + 0.5, deck + 0.15, endZ + 4), IRON, MAT.Metal, false)
+	-- The mesh is 20 long. A longer dock (the coast is 26) stretches on Z.
+	TownMeshes.Dress(model, "Dock", {
+		pivot = CF(0, 0, -length / 2),
+		scale = V3(1, 1, length / TownModels.DockLength),
+	})
 	return model
 end
 
@@ -372,6 +383,7 @@ function LandmarkArt.Rowboat(seed: number): Model
 			false
 		)
 	end
+	TownMeshes.Dress(model, "Rowboat")
 	return model
 end
 
@@ -464,6 +476,7 @@ function LandmarkArt.Lighthouse(): Model
 		Kit.placeAt(rock, CF(math.cos(a) * r, -(0.5 + 0.1 * size), math.sin(a) * r) * ANG(0, rng:range(0, 6), 0))
 		rock.Parent = model
 	end
+	TownMeshes.Dress(model, "Lighthouse")
 	return model
 end
 

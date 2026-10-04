@@ -17,6 +17,8 @@
 -- biome).
 
 local Kit = require(script.Parent.Kit)
+local TownMeshes = require(script.Parent.TownMeshes)
+local TownModels = require(script.Parent.TownModels)
 
 type Rng = Kit.Rng
 
@@ -220,6 +222,36 @@ function PropArt.Rock(size: number, seed: number, colors: { Color3 }?, moss: Col
 		)
 		Kit.decor(m, false)
 	end
+	local function greyPalette(swatch: { Color3 }?): boolean
+		if swatch == nil or swatch == STONE then
+			return true
+		end
+		local c = swatch[1]
+		if not c then
+			return false
+		end
+		local maxc = math.max(c.R, c.G, c.B)
+		local minc = math.min(c.R, c.G, c.B)
+		-- Town grey, not snow, charcoal, or a tinted biome stone.
+		return maxc < 0.75 and minc > 0.35 and (maxc - minc) < 0.12
+	end
+	local assetId: string? = nil
+	if moss then
+		assetId = "RockMossy"
+	elseif colors == PropArt.BrownTones[1] or colors == PropArt.BrownTones[2] then
+		assetId = "RockBrown"
+	elseif greyPalette(colors) then
+		assetId = "RockGrey"
+	end
+	if assetId then
+		local asset = TownModels.Get(assetId)
+		local body = if asset then TownModels.Piece(asset, "Body") else nil
+		if body then
+			local across = math.max(body.size.X, body.size.Z)
+			local k = size / across
+			TownMeshes.Dress(model, assetId, { scale = Vector3.new(k, k, k) })
+		end
+	end
 	return model
 end
 
@@ -405,6 +437,13 @@ function PropArt.Bush(size: number, seed: number, colors: { Color3 }): Model
 			Enum.Material.SmoothPlastic,
 			shadow
 		)
+	end
+	local asset = TownModels.Get("Bush")
+	local body = if asset then TownModels.Piece(asset, "Body") else nil
+	if body then
+		local across = math.max(body.size.X, body.size.Z)
+		local k = size / across
+		TownMeshes.Dress(model, "Bush", { scale = Vector3.new(k, k, k) })
 	end
 	return model
 end
@@ -693,6 +732,7 @@ function PropArt.Mushroom(seed: number, glowing: boolean): Model
 		l.Brightness = 0.8
 		l.Shadows = false
 		l.Parent = cap
+		TownMeshes.Dress(model, "GlowMushrooms")
 	else
 		for i = 1, 2 do
 			local sa = rng:range(0, math.pi * 2)
@@ -856,6 +896,7 @@ function PropArt.FallenLog(seed: number, barkColor: Color3?, moss: Color3?): Mod
 	-- A mushroom on the ground against the log's flank.
 	local mAt = (base * CFrame.new(rng:range(0.05, 0.35) * L, 0, -d * 0.62)).Position
 	toadstool(model, Vector3.new(mAt.X, 0, mAt.Z), rng:range(0.35, 0.5), rng:range(0.4, 0.55), hex("#A8683E"))
+	TownMeshes.Dress(model, "FallenLog")
 	return model
 end
 
@@ -931,6 +972,7 @@ function PropArt.Stump(seed: number, barkColor: Color3?, moss: Color3?): Model
 		CFrame.new(mAt + Vector3.new(0, 0.42, 0)) * CFrame.Angles(0, math.pi / 4, 0),
 		hex("#C4483A")
 	)
+	TownMeshes.Dress(model, "Stump")
 	return model
 end
 
@@ -1429,6 +1471,7 @@ function PropArt.RuinedCabin(seed: number): Model
 		)
 	end
 	solidParts(model, CABIN_SOLID)
+	TownMeshes.Dress(model, "RuinedCabin")
 	return model
 end
 
@@ -1478,6 +1521,7 @@ function PropArt.Windmill(seed: number): Model
 			Enum.Material.Fabric
 		)
 	end
+	TownMeshes.Dress(model, "Windmill")
 	return model
 end
 
@@ -1549,6 +1593,7 @@ function PropArt.LookoutTower(seed: number): Model
 		block(model, "Rung", Vector3.new(1.3, 0.2, 0.2), CFrame.new(0, y, z), SET_TIMBER, Enum.Material.Wood)
 	end
 	solidParts(model, LOOKOUT_SOLID)
+	TownMeshes.Dress(model, "LookoutTower")
 	return model
 end
 
