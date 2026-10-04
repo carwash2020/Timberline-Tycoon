@@ -344,9 +344,11 @@ function ProfileSchema.Migrate(data: any)
 				if item.fill ~= nil then
 					local units = if type(item.fill) == "table" then item.fill.units else nil
 					local need = bp.woodUnits
-					if type(units) ~= "number" or units ~= units or units < 0 then
-						item.fill = nil
-					elseif type(need) == "number" and units >= need then
+					local full = false
+					if type(units) == "number" and type(need) == "number" and units >= need then
+						full = true
+					end
+					if type(units) ~= "number" or units ~= units or units < 0 or full then
 						item.fill = nil
 					else
 						item.fill = { units = units }
