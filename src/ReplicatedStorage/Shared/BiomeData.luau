@@ -52,13 +52,13 @@ export type Rules = {
 
 -- Ferry Island. The disc matches WorldLayout.Island; this module does not
 -- require WorldLayout (that require would cycle). A spec locks the two.
-BiomeData.FerryCenterX = 1395 -- TBD (Designer)
+BiomeData.FerryCenterX = 1395
 BiomeData.FerryCenterZ = -760
-BiomeData.FerryRadius = 70 -- TBD (Designer)
-BiomeData.FerryHaulStuds = 1644 -- TBD (Designer) sawmill (0, 110) is about 1644 studs away
-BiomeData.PalmCount = 30 -- TBD (Designer)
-BiomeData.LanternwoodCount = 6 -- TBD (Designer)
-BiomeData.FerrySand = "#E4C98A" -- TBD (Designer)
+BiomeData.FerryRadius = 70
+BiomeData.FerryHaulStuds = 1644 -- sawmill (0, 110) is about 1644 studs away
+BiomeData.PalmCount = 30
+BiomeData.LanternwoodCount = 6
+BiomeData.FerrySand = "#E4C98A"
 
 local biomes: { BiomeDef } = {
 	{

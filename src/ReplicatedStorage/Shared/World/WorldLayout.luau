@@ -579,122 +579,122 @@ WorldLayout.Island = { x = 1395, z = -760, radius = 70, height = 9 }
 
 -- W2. The north strip is a rectangle past the square, not a larger world.
 -- Every tune is named so a playtest can move it without hunting literals.
-WorldLayout.TollLineZ = 1574 -- TBD (Designer)
-WorldLayout.TollLineX0 = -400 -- TBD (Designer)
-WorldLayout.TollLineX1 = 400 -- TBD (Designer)
-WorldLayout.TollPushX = 0 -- TBD (Builder)
-WorldLayout.TollPushZ = 1566 -- TBD (Builder)
-WorldLayout.GorgeWidth = 24 -- TBD (Designer) across, north-south; at least 20
-WorldLayout.GorgeDepth = 16 -- TBD (Designer) down from the bank; at least 12
-WorldLayout.GorgeWallHeight = 24 -- TBD (Builder) unclimbable lip
-WorldLayout.BridgeWidth = 28 -- TBD (Designer)
-WorldLayout.BridgeCenterX = 0 -- TBD (Builder)
-WorldLayout.BridgeCenterZ = 1580 -- TBD (Builder)
-WorldLayout.BridgeLength = 52 -- TBD (Builder) spans the gorge plus bearings
-WorldLayout.BridgeRailHeight = 3 -- TBD (Designer)
-WorldLayout.BridgeDeckThick = 1 -- TBD (Builder)
-WorldLayout.NorthStripX0 = -400 -- TBD (Designer)
-WorldLayout.NorthStripX1 = 400 -- TBD (Designer)
-WorldLayout.NorthStripZ0 = 1500 -- TBD (Designer)
-WorldLayout.NorthStripZ1 = 1900 -- TBD (Designer)
+WorldLayout.TollLineZ = 1574
+WorldLayout.TollLineX0 = -400
+WorldLayout.TollLineX1 = 400
+WorldLayout.TollPushX = 0
+WorldLayout.TollPushZ = 1566
+WorldLayout.GorgeWidth = 24 -- across, north-south; at least 20
+WorldLayout.GorgeDepth = 16 -- down from the bank; at least 12
+WorldLayout.GorgeWallHeight = 24 -- unclimbable lip
+WorldLayout.BridgeWidth = 28
+WorldLayout.BridgeCenterX = 0
+WorldLayout.BridgeCenterZ = 1580
+WorldLayout.BridgeLength = 52 -- spans the gorge plus bearings
+WorldLayout.BridgeRailHeight = 3
+WorldLayout.BridgeDeckThick = 1
+WorldLayout.NorthStripX0 = -400
+WorldLayout.NorthStripX1 = 400
+WorldLayout.NorthStripZ0 = 1500
+WorldLayout.NorthStripZ1 = 1900
 WorldLayout.NorthStrip = {
 	x0 = WorldLayout.NorthStripX0,
 	x1 = WorldLayout.NorthStripX1,
 	z0 = WorldLayout.NorthStripZ0,
 	z1 = WorldLayout.NorthStripZ1,
 }
-WorldLayout.NorthStripBadgeZ0 = 1586 -- TBD (Designer) north of the booth and the south lip
-WorldLayout.NorthStripBadgeZ1 = 1900 -- TBD (Designer)
-WorldLayout.StripTreeCount = 40 -- TBD (Designer)
-WorldLayout.StripMapleCount = 22 -- TBD (Designer)
-WorldLayout.StripBirchCount = 18 -- TBD (Designer)
-WorldLayout.StripClumpOffRoad = 40 -- TBD (Designer) past the deck's edge
-WorldLayout.StripRoadClear = 20 -- TBD (Builder) extra studs a trunk stays off the deck
-WorldLayout.StripZoneCx = 0 -- TBD (Builder)
-WorldLayout.StripZoneCz = 1750 -- TBD (Builder)
+WorldLayout.NorthStripBadgeZ0 = 1586 -- north of the booth and the south lip
+WorldLayout.NorthStripBadgeZ1 = 1900
+WorldLayout.StripTreeCount = 40
+WorldLayout.StripMapleCount = 22
+WorldLayout.StripBirchCount = 18
+WorldLayout.StripClumpOffRoad = 40 -- past the deck's edge
+WorldLayout.StripRoadClear = 20 -- extra studs a trunk stays off the deck
+WorldLayout.StripZoneCx = 0
+WorldLayout.StripZoneCz = 1750
 WorldLayout.StripZoneRadius = 160
-WorldLayout.StripZoneCap = 40 -- TBD (Designer)
-WorldLayout.StripClumpRadius = 8 -- TBD (Builder)
-WorldLayout.StripTreesPerClump = 5 -- TBD (Designer)
--- Centres sit at least StripClumpOffRoad past the bridge edge. TBD (Designer)
+WorldLayout.StripZoneCap = 40
+WorldLayout.StripClumpRadius = 8
+WorldLayout.StripTreesPerClump = 5
+-- Centres sit at least StripClumpOffRoad past the bridge edge.
 WorldLayout.StripClumps = {
-	{ x = 70, z = 1680 }, -- TBD (Designer)
-	{ x = -70, z = 1680 }, -- TBD (Designer)
-	{ x = 100, z = 1740 }, -- TBD (Designer)
-	{ x = -100, z = 1740 }, -- TBD (Designer)
-	{ x = 70, z = 1800 }, -- TBD (Designer)
-	{ x = -70, z = 1800 }, -- TBD (Designer)
-	{ x = 100, z = 1860 }, -- TBD (Designer)
-	{ x = -100, z = 1860 }, -- TBD (Designer)
+	{ x = 70, z = 1680 },
+	{ x = -70, z = 1680 },
+	{ x = 100, z = 1740 },
+	{ x = -100, z = 1740 },
+	{ x = 70, z = 1800 },
+	{ x = -70, z = 1800 },
+	{ x = 100, z = 1860 },
+	{ x = -100, z = 1860 },
 }
-WorldLayout.FerryDockX = 1180 -- TBD (Builder) mainland dock, west of the deep water
-WorldLayout.FerryDockZ = -700 -- TBD (Builder)
+WorldLayout.FerryDockX = 1180 -- mainland dock, west of the deep water
+WorldLayout.FerryDockZ = -700
 WorldLayout.FerryDock = { x = WorldLayout.FerryDockX, z = WorldLayout.FerryDockZ }
-WorldLayout.FerryLandingInset = 24 -- TBD (Builder) dock sits on the dry crown, not the shoal
-WorldLayout.FerryPathLength = 20 -- TBD (Designer)
-WorldLayout.FerryPathHalf = 4 -- TBD (Builder)
-WorldLayout.LanternwoodRadius = 32 -- TBD (Designer) facing the mainland dock
-WorldLayout.LanternwoodAngleStep = 0.42 -- TBD (Designer)
-WorldLayout.PalmMaxRadius = 40 -- TBD (Designer) dry ground inside the disc
-WorldLayout.PalmGridStep = 8 -- TBD (Designer)
-WorldLayout.TreeSpacing = 8 -- TBD (Designer)
+WorldLayout.FerryLandingInset = 24 -- dock sits on the dry crown, not the shoal
+WorldLayout.FerryPathLength = 20
+WorldLayout.FerryPathHalf = 4
+WorldLayout.LanternwoodRadius = 32 -- facing the mainland dock
+WorldLayout.LanternwoodAngleStep = 0.42
+WorldLayout.PalmMaxRadius = 40 -- dry ground inside the disc
+WorldLayout.PalmGridStep = 8
+WorldLayout.TreeSpacing = 8
 WorldLayout.FogClearance = 60 -- from the booth and both docks
-WorldLayout.FogAtomicMax = 128 -- TBD (Builder) a longer axis needs a Persistent model
-WorldLayout.SecretCaveX = -765 -- TBD (Designer)
-WorldLayout.SecretCaveZ = -655 -- TBD (Designer)
-WorldLayout.SecretCaveRadius = 46 -- TBD (Designer)
+WorldLayout.FogAtomicMax = 128 -- a longer axis needs a Persistent model
+WorldLayout.SecretCaveX = -765
+WorldLayout.SecretCaveZ = -655
+WorldLayout.SecretCaveRadius = 46
 WorldLayout.SecretCave = {
 	x = WorldLayout.SecretCaveX,
 	z = WorldLayout.SecretCaveZ,
 	radius = WorldLayout.SecretCaveRadius,
 }
-WorldLayout.CaveMouthX = -748 -- TBD (Builder)
-WorldLayout.CaveMouthZ = -628 -- TBD (Builder)
-WorldLayout.BackTrailX = -690 -- TBD (Builder)
+WorldLayout.CaveMouthX = -748
+WorldLayout.CaveMouthZ = -628
+WorldLayout.BackTrailX = -690
 WorldLayout.BackTrailZ = -560
-WorldLayout.RidgeBoulderX = -810 -- TBD (Builder)
-WorldLayout.RidgeBoulderZ = -700 -- TBD (Builder)
+WorldLayout.RidgeBoulderX = -810
+WorldLayout.RidgeBoulderZ = -700
 WorldLayout.Breakables = {
 	{ x = WorldLayout.CaveMouthX, z = WorldLayout.CaveMouthZ },
 	{ x = WorldLayout.BackTrailX, z = WorldLayout.BackTrailZ },
 	{ x = WorldLayout.RidgeBoulderX, z = WorldLayout.RidgeBoulderZ },
 }
-WorldLayout.HeatHeight = 18 -- TBD (Designer)
-WorldLayout.HeatPoolPad = 1 -- TBD (Builder) studs past the lava pool
-WorldLayout.Spawn = Vector3.new(0, 0.5, 40) -- TBD (Builder)
-WorldLayout.SpawnBubble = 640 -- TBD (Designer)
-WorldLayout.SpawnPartCap = 1500 -- TBD (Designer)
-WorldLayout.BoothX = 22 -- TBD (Builder) east of the deck
-WorldLayout.BoothZ = 1566 -- TBD (Builder) south of the toll line, off the deck
-WorldLayout.DockClear = 18 -- TBD (Builder)
-WorldLayout.LandingClear = 10 -- TBD (Builder)
-WorldLayout.DeepSeaEdgeInset = 80 -- TBD (Designer) how far inside the rim the deep water starts
-WorldLayout.DeepSeaIslandPad = 12 -- TBD (Builder) shallows kept around Ferry Island
-WorldLayout.ShelfProbeZ = 1499 -- TBD (Builder) last surveyed column; the strip copies its height
+WorldLayout.HeatHeight = 18
+WorldLayout.HeatPoolPad = 1 -- studs past the lava pool
+WorldLayout.Spawn = Vector3.new(0, 0.5, 40)
+WorldLayout.SpawnBubble = 640
+WorldLayout.SpawnPartCap = 1500
+WorldLayout.BoothX = 22 -- east of the deck
+WorldLayout.BoothZ = 1566 -- south of the toll line, off the deck
+WorldLayout.DockClear = 18
+WorldLayout.LandingClear = 10
+WorldLayout.DeepSeaEdgeInset = 80 -- how far inside the rim the deep water starts
+WorldLayout.DeepSeaIslandPad = 12 -- shallows kept around Ferry Island
+WorldLayout.ShelfProbeZ = 1499 -- last surveyed column; the strip copies its height
 
 -- A Pickup climbs a standstill ramp while Drive's 120 stays ahead of
 -- gravity 196.2. Haul roads stay under 0.2, and so does the spur.
-WorldLayout.PickupClimb = 120 / 196.2 -- TBD (Designer)
-WorldLayout.SpurMaxGrade = 0.2 -- TBD (Designer)
-WorldLayout.TollClearance = 4 -- TBD (Builder) setback and gorge rescue sit this far above the ground
-WorldLayout.SpurMeet = 20 -- TBD (Designer) the last studs, flush with the deck top
-WorldLayout.TollSpurJoinZ = 900 -- TBD (Builder) on Snow Road, where the ground is still gentle
+WorldLayout.PickupClimb = 120 / 196.2
+WorldLayout.SpurMaxGrade = 0.2
+WorldLayout.TollClearance = 4 -- setback and gorge rescue sit this far above the ground
+WorldLayout.SpurMeet = 20 -- the last studs, flush with the deck top
+WorldLayout.TollSpurJoinZ = 900 -- on Snow Road, where the ground is still gentle
 -- Inside the wall gap (x -400..400) and clear of the height grid. This
 -- lane is also where the boot forest's trunks stay put; the decor sample
 -- skips the mountain cut itself (see EnvironmentData).
-WorldLayout.TollSpurWestX = -326 -- TBD (Builder)
+WorldLayout.TollSpurWestX = -326
 -- North of the wild clumps and the boulder-cluster search, so the cut
 -- does not move a rock or a tree. The ground south of here is already
 -- gentle enough to drive.
-WorldLayout.TollSpurGradeZ = 1184 -- TBD (Builder)
+WorldLayout.TollSpurGradeZ = 1184
 -- The eastbound legs sit north of the height grid. Two of them, a road
 -- width apart, so the climb out to the deck does not fold back on itself.
-WorldLayout.TollSpurShelfZ = 1518 -- TBD (Builder)
+WorldLayout.TollSpurShelfZ = 1518
 -- Height at the shelf turn. The crossing of the north wall stays under
 -- the skirt run beside the cut (that run bottoms near 44), so the skirt
 -- block owns the trench instead of standing over it.
-WorldLayout.SpurCutHeight = 40 -- TBD (Builder)
-WorldLayout.TollSpurReachX = 180 -- TBD (Builder) where the climb reaches the deck top
+WorldLayout.SpurCutHeight = 40
+WorldLayout.TollSpurReachX = 180 -- where the climb reaches the deck top
 
 local function snowJoin(): Vector2
 	for _, road in ipairs(WorldLayout.Roads) do

@@ -367,15 +367,15 @@ EnvironmentData.BiomeOverrides = {
 		set = { atmosphereDensity = 0.2, atmosphereOffset = 0.4, dofFar = 0.08 },
 		add = { saturation = 0.2, bloomIntensity = 0.1, brightness = 0.3, atmosphereGlare = 0.5 },
 	},
-	-- North strip: a dark blue-green, colder than the meadows. TBD (Designer)
+	-- North strip: a dark blue-green, colder than the meadows.
 	strip = {
-		mul = { brightness = 0.85 }, -- TBD (Designer)
-		tint = { outdoorAmbient = scale(0.75, 0.9, 0.85) }, -- TBD (Designer)
+		mul = { brightness = 0.85 },
+		tint = { outdoorAmbient = scale(0.75, 0.9, 0.85) },
 	},
-	-- Ferry Island: warm coastal light. TBD (Designer)
+	-- Ferry Island: warm coastal light.
 	ferryisle = {
-		add = { saturation = 0.04 }, -- TBD (Designer)
-		tint = { outdoorAmbient = scale(1.05, 1.0, 0.9) }, -- TBD (Designer)
+		add = { saturation = 0.04 },
+		tint = { outdoorAmbient = scale(1.05, 1.0, 0.9) },
 	},
 } :: { [string]: Override }
 

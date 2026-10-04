@@ -53,12 +53,54 @@ local function modelPivot(model)
 	end
 	return model:GetAttribute("__pivot") or (boundingBox(model))
 end
+-- A seated character is welded into the truck. PivotTo on that character
+-- has to carry the seat's assembly, or a spec can't see the second shove.
+-- Only seat joints: ordinary welds (a log on a bed, an axe head) stay put.
+local function isSeatJoint(joint)
+	if joint.Name == "SeatWeld" then
+		return true
+	end
+	local a, b = joint.Part0, joint.Part1
+	return (typeof(a) == "Instance" and a:IsA("VehicleSeat")) or (typeof(b) == "Instance" and b:IsA("VehicleSeat"))
+end
+
+local function carrySeat(joint, delta, moved, queue)
+	for _, other in ipairs({ joint.Part0, joint.Part1 }) do
+		if typeof(other) == "Instance" and other:IsA("BasePart") and not moved[other] and not other.Anchored then
+			other.CFrame = delta * other.CFrame
+			moved[other] = true
+			table.insert(queue, other)
+		end
+	end
+end
+
 roblox.implementMethod("Model", "GetPivot", modelPivot)
 roblox.implementMethod("Model", "PivotTo", function(model, target)
 	local delta = target * modelPivot(model):Inverse()
+	local moved = {}
+	local joints = {}
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
 			d.CFrame = delta * d.CFrame
+			moved[d] = true
+		elseif (d:IsA("Weld") or d:IsA("WeldConstraint")) and isSeatJoint(d) then
+			table.insert(joints, d)
+		end
+	end
+	-- Parts of this model are already placed. A seat joint inside it must
+	-- not move them again; it only pulls parts that live outside.
+	local queue = {}
+	for _, joint in ipairs(joints) do
+		carrySeat(joint, delta, moved, queue)
+	end
+	local head = 1
+	while head <= #queue do
+		local part = queue[head]
+		head += 1
+		for _, d in ipairs(part:GetDescendants()) do
+			if (d:IsA("Weld") or d:IsA("WeldConstraint")) and isSeatJoint(d) then
+				carrySeat(d, delta, moved, queue)
+			end
 		end
 	end
 	if not model.PrimaryPart then

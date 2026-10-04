@@ -7,10 +7,10 @@
 -- the whole assembly. The character sample updates every step, seated or
 -- not, so a driver who paid, crossed, and then got out is not treated as
 -- a fresh crossing when the window expires.
---
+
 -- Anyone who ends up in the gorge (the floor trigger, or this same pass)
 -- is sent to that same landing.
---
+
 -- tollPaidUntil is not a save field. It lives on the server, keyed by
 -- UserId, and is cleared when that player leaves.
 
@@ -46,7 +46,7 @@ setmetatable(watched, { __mode = "k" })
 local bound = false
 local gorgeBound = false
 
-local CHECK_SECONDS = 0.5 -- TBD (Builder) about 2 Hz
+local CHECK_SECONDS = 0.5 -- about 2 Hz
 
 local function toast(player: Player)
 	local notify = GateService.Notify
@@ -118,25 +118,30 @@ local function hasSeat(model: Model): boolean
 end
 
 -- The gorge trigger, and Step, both call this. Anchored map parts
--- (the bridge, the walls) are left where they are.
+-- (the bridge, the walls) are left where they are. A person or a truck
+-- is one assembly, so the whole model moves. Anything else, a plank in
+-- a pile or a loose part of a plot build, moves only its own assembly,
+-- and an anchored sibling stays where it was.
 function GateService.RescueHit(hit: BasePart)
 	if hit.Anchored then
 		return
 	end
 	local model = hit:FindFirstAncestorOfClass("Model")
-	local target: Instance = hit
-	local from = hit.CFrame.Position
 	if model then
 		local name = model.Name
 		if name == "NorthStrip" or name == "TollBridge" or name == "TollBooth" or name == "GorgeWalls" then
 			return
 		end
-		if model:FindFirstChildOfClass("Humanoid") or hasSeat(model) or not hit.Anchored then
-			target = model
-			from = model:GetPivot().Position
+		if model:FindFirstChildOfClass("Humanoid") or hasSeat(model) then
+			placeAtLanding(model, model:GetPivot().Position)
+			return
 		end
 	end
-	placeAtLanding(target, from)
+	-- Roblox fills this in. Lune's fake has no physics world, so a part
+	-- that was never given a root is its own assembly.
+	local rootAny = (hit :: any).AssemblyRootPart
+	local root: BasePart = if typeof(rootAny) == "Instance" and rootAny:IsA("BasePart") then rootAny else hit
+	placeAtLanding(root, root.CFrame.Position)
 end
 
 local function watchVehicle(vehicle: Model)
@@ -233,8 +238,11 @@ function GateService.Step(now: number?)
 				placeAtLanding(vehicle, vpos)
 				local landed = vehicle:GetPivot().Position
 				vehicleSample[vehicle] = landed
-				local delta = landed - vpos
-				if char:IsA("Model") then
+				-- Seated, the driver is welded into the truck, so the
+				-- vehicle pivot already carried them. PivotTo on the
+				-- character would drag that same assembly a second time.
+				if humanoid.SeatPart == nil and char:IsA("Model") then
+					local delta = landed - vpos
 					char:PivotTo(char:GetPivot() + delta)
 				end
 				charSample[player.UserId] = root.CFrame.Position

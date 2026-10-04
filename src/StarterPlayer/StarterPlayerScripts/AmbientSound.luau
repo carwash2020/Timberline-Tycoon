@@ -122,7 +122,7 @@ local function setTargets(env: LightingController.Environment)
 	end
 
 	local wind = beds.WindHowl
-	local STRIP_WIND = 0.5 -- TBD (Designer)
+	local STRIP_WIND = 0.5
 	local windy = if biome == "snow"
 		then 0.6
 		elseif biome == "sky" then 0.75

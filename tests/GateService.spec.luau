@@ -107,6 +107,69 @@ return function(t)
 		t.eq(heard[1], "The toll booth opens soon.")
 	end)
 
+	t.test("a welded driver who crosses unpaid lands the truck once, on the landing", function()
+		local Gate, players = boot()
+		local TollLogic = t.shared("TollLogic")
+		local _, root, humanoid = person(players, 7)
+		local vehicle = Instance.new("Model")
+		local chassis = Instance.new("Part")
+		chassis.Name = "Chassis"
+		chassis.Parent = vehicle
+		vehicle.PrimaryPart = chassis
+		local seat = Instance.new("VehicleSeat")
+		seat.Parent = vehicle
+		-- The seat weld lives on the driver. PivotTo of the character
+		-- follows it into the truck, and the body weld (under the seat,
+		-- outside the character) has to come along too.
+		local seatWeld = Instance.new("Weld")
+		seatWeld.Name = "SeatWeld"
+		seatWeld.Part0 = seat
+		seatWeld.Part1 = root
+		seatWeld.Parent = root
+		local bodyWeld = Instance.new("WeldConstraint")
+		bodyWeld.Part0 = chassis
+		bodyWeld.Part1 = seat
+		bodyWeld.Parent = seat
+		humanoid.SeatPart = seat
+		seat.Occupant = humanoid
+
+		local function put(z)
+			local at = CFrame.new(0, 40, z)
+			root.CFrame = at
+			chassis.CFrame = at
+			seat.CFrame = at
+		end
+
+		put(1560)
+		Gate.Step(1)
+		put(1700)
+		Gate.Step(2)
+		t.eq(vehicle:GetPivot().Position, TollLogic.Landing())
+	end)
+
+	t.test("a loose plank in a pile lands alone and the anchored sibling stays", function()
+		local Gate = boot()
+		local TollLogic = t.shared("TollLogic")
+		local pile = Instance.new("Model")
+		pile.Name = "Planks"
+		local sibling = Instance.new("Part")
+		sibling.Name = "Stack"
+		sibling.Anchored = true
+		sibling.CFrame = CFrame.new(30, 8, 1400)
+		sibling.Parent = pile
+		pile.PrimaryPart = sibling
+		local stayed = sibling.CFrame
+		local plank = Instance.new("Part")
+		plank.Name = "Plank"
+		plank.Anchored = false
+		plank.CFrame = CFrame.new(4, 80, 1700)
+		plank.Parent = pile
+		plank.AssemblyRootPart = plank
+		Gate.RescueHit(plank)
+		t.eq(sibling.CFrame, stayed)
+		t.eq(plank.CFrame.Position, TollLogic.Landing())
+	end)
+
 	t.test("a body dropped on the gorge floor ends up south of the line on solid ground", function()
 		local Gate = boot()
 		local folder = Instance.new("Folder")

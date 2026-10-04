@@ -136,7 +136,7 @@ function WeatherService.StrikePoint(near: Vector3): Vector3?
 		end
 		return nil
 	end
-	local EDGE_MARGIN = 40 -- TBD (Builder) bolts stay off the walls
+	local EDGE_MARGIN = 40 -- bolts stay off the walls
 	local edge = WorldLayout.WorldHalf - EDGE_MARGIN
 	local strip = WorldLayout.NorthStrip
 	local function inPlay(x: number, z: number): boolean

@@ -611,7 +611,7 @@ end
 
 -- Open ground a walker may stand on.
 local function walkable(x: number, z: number): boolean
-	local EDGE_MARGIN = 30 -- TBD (Builder) critters stay off the walls
+	local EDGE_MARGIN = 30 -- critters stay off the walls
 	local edge = WorldLayout.WorldHalf - EDGE_MARGIN
 	local inSquare = math.abs(x) < edge and math.abs(z) < edge
 	local strip = WorldLayout.NorthStrip

@@ -486,50 +486,50 @@ end
 -- W2: toll, gorge, ferry, cave, deep water, heat
 ---------------------------------------------------------------------------
 
-local TOLL_TIMBER = hex("#6B4423") -- TBD (Builder)
-local TOLL_PLANK = hex("#A4693E") -- TBD (Builder)
-local TOLL_IRON = hex("#2A2726") -- TBD (Builder)
-local TOLL_BOOTH = hex("#7A4C2B") -- TBD (Builder)
-local DOCK_PLANK = hex("#8C6239") -- TBD (Builder)
-local CAVE_ROCK = hex("#2A2628") -- TBD (Builder)
-local CAVE_DARK = hex("#141216") -- TBD (Builder)
-local LANTERN = hex("#FFC45C") -- TBD (Builder)
-local DEEP = hex("#071018") -- TBD (Builder)
-local HEAT = hex("#FF6A1A") -- TBD (Builder)
+local TOLL_TIMBER = hex("#6B4423")
+local TOLL_PLANK = hex("#A4693E")
+local TOLL_IRON = hex("#2A2726")
+local TOLL_BOOTH = hex("#7A4C2B")
+local DOCK_PLANK = hex("#8C6239")
+local CAVE_ROCK = hex("#2A2628")
+local CAVE_DARK = hex("#141216")
+local LANTERN = hex("#FFC45C")
+local DEEP = hex("#071018")
+local HEAT = hex("#FF6A1A")
 local BOULDER = hex("#6B6560")
-local PATH = hex("#C4A36A") -- TBD (Builder)
+local PATH = hex("#C4A36A")
 
-local ARM_THICK = 0.6 -- TBD (Builder)
-local ARM_HIGH = 2.2 -- TBD (Builder) above the deck top
-local RAIL_THICK = 1 -- TBD (Builder)
-local POST = 1.2 -- TBD (Builder)
-local DOCK_W = 16 -- TBD (Builder)
-local DOCK_L = 10 -- TBD (Builder)
-local DOCK_T = 1 -- TBD (Builder)
-local CAVE_W = 36 -- TBD (Builder) every fog axis stays under FogAtomicMax
-local CAVE_H = 14 -- TBD (Builder)
-local CAVE_D = 28 -- TBD (Builder)
-local FOG_W = 24 -- TBD (Builder)
-local FOG_H = 10 -- TBD (Builder)
-local FOG_D = 18 -- TBD (Builder)
-local WATER_T = 6 -- TBD (Builder)
-local HEAT_D = 30 -- TBD (Builder)
-local BOULDER_S = 8 -- TBD (Builder)
-local PATH_W = 6 -- TBD (Builder)
-local PATH_T = 0.4 -- TBD (Builder)
-local LIP_THICK = 4 -- TBD (Builder)
-local WATER_INSET = 12 -- TBD (Builder) deep-water bands sit inside the rim
-local PATH_PLANKS = 4 -- TBD (Builder)
-local BOOTH_W = 10 -- TBD (Builder)
-local BOOTH_D = 8 -- TBD (Builder)
-local BOOTH_H = 7 -- TBD (Builder)
-local WALL_T = 1 -- TBD (Builder)
-local FLOOR_T = 1 -- TBD (Builder)
-local ROOF_T = 1 -- TBD (Builder)
-local ROOF_OVER = 2 -- TBD (Builder)
-local COUNTER_W = 6 -- TBD (Builder)
-local COUNTER_H = 3 -- TBD (Builder)
-local COUNTER_Z = -2 -- TBD (Builder)
+local ARM_THICK = 0.6
+local ARM_HIGH = 2.2 -- above the deck top
+local RAIL_THICK = 1
+local POST = 1.2
+local DOCK_W = 16
+local DOCK_L = 10
+local DOCK_T = 1
+local CAVE_W = 36 -- every fog axis stays under FogAtomicMax
+local CAVE_H = 14
+local CAVE_D = 28
+local FOG_W = 24
+local FOG_H = 10
+local FOG_D = 18
+local WATER_T = 6
+local HEAT_D = 30
+local BOULDER_S = 8
+local PATH_W = 6
+local PATH_T = 0.4
+local LIP_THICK = 4
+local WATER_INSET = 12 -- deep-water bands sit inside the rim
+local PATH_PLANKS = 4
+local BOOTH_W = 10
+local BOOTH_D = 8
+local BOOTH_H = 7
+local WALL_T = 1
+local FLOOR_T = 1
+local ROOF_T = 1
+local ROOF_OVER = 2
+local COUNTER_W = 6
+local COUNTER_H = 3
+local COUNTER_Z = -2
 
 local function solid(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material): Part
 	return box(model, name, size, cf, color, mat, true)
@@ -612,7 +612,7 @@ end
 function LandmarkArt.FerryDock(): Model
 	local model = Kit.model("FerryDock")
 	solid(model, "Deck", V3(DOCK_W, DOCK_T, DOCK_L), CF(0, DOCK_T / 2, 0), DOCK_PLANK, MAT.WoodPlanks)
-	local postH = 4 -- TBD (Builder)
+	local postH = 4
 	for _, side in ipairs({ -1, 1 }) do
 		for _, along in ipairs({ -1, 1 }) do
 			solid(
@@ -663,8 +663,8 @@ function LandmarkArt.SecretCave(): Model
 	local lamp = ghost(model, "Lantern", V3(1.2, 1.6, 1.2), CF(0, 8, -4), LANTERN, MAT.Neon)
 	local light = Instance.new("PointLight")
 	light.Color = LANTERN
-	light.Range = 14 -- TBD (Builder)
-	light.Brightness = 0.8 -- TBD (Builder)
+	light.Range = 14
+	light.Brightness = 0.8
 	light.Shadows = false
 	light.Parent = lamp
 	return model
@@ -734,7 +734,7 @@ function LandmarkArt.FerryPath(): Model
 	local anchor = ghost(model, "Anchor", V3(PATH_T, PATH_T, PATH_T), CF(0, 0, 0), PATH, MAT.Sand)
 	model.PrimaryPart = anchor
 	for i = 1, PATH_PLANKS do
-		local fill = 0.8 -- TBD (Builder)
+		local fill = 0.8
 		ghost(model, "Plank", V3(PATH_W, PATH_T, step * fill), CF(0, PATH_T / 2, -step * (i - 0.5)), PATH, MAT.Sand)
 	end
 	return model
