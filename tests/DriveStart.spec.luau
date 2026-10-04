@@ -466,4 +466,158 @@ return function(t)
 		body.Seated:Fire(false, nil)
 		t.eq(body.AutoRotate, false, "a humanoid that was not auto-rotating stays that way")
 	end)
+
+	-- The planted truck (highest tipResist) leans hardest toward upright.
+	-- Sitting still must not start that lean: 3s of the real step loop, no
+	-- throttle or steer, on a cross-slope and nose-down.
+	t.test("holding for 3s keeps the parked slope; the lean waits for input", function()
+		local DriveStart = t.shared("DriveStart")
+		local Handling = t.shared("Handling")
+		local ItemCatalog = t.shared("ItemCatalog")
+		local VehicleLogic = t.shared("VehicleLogic")
+		local bestId, bestResist = nil, -1
+		for id in pairs(ItemCatalog.Trucks) do
+			local resist = Handling.For(id).tipResist
+			if resist > bestResist then
+				bestId, bestResist = id, resist
+			end
+		end
+		t.ok(bestId, "a truck to sit in")
+
+		local function posed(yawDeg, pitchDeg, rollDeg)
+			local flat = CFrame.Angles(0, math.rad(yawDeg), 0)
+			local facing = flat.LookVector
+			local right = flat.RightVector
+			local pitch, roll = math.rad(pitchDeg), math.rad(rollDeg)
+			local up = (Vector3.yAxis * math.cos(pitch) + facing * math.sin(pitch)).Unit
+			up = (up * math.cos(roll) + right * math.sin(roll)).Unit
+			return VehicleLogic.HeadingCFrame(facing, up) + Vector3.new(6, 4, -2)
+		end
+
+		local truck = Instance.new("Model")
+		truck.Name = "Parked"
+		truck:SetAttribute("TruckId", bestId)
+		truck:AddTag("Truck")
+		local chassis = Instance.new("Part")
+		chassis.Name = "Chassis"
+		chassis.Size = Vector3.new(8, 2, 20)
+		chassis.Parent = truck
+		truck.PrimaryPart = chassis
+		local drive = Instance.new("LinearVelocity")
+		drive.Name = "Drive"
+		drive.Parent = chassis
+		local heading = Instance.new("AlignOrientation")
+		heading.Name = "Heading"
+		heading.Parent = chassis
+		local seat = Instance.new("VehicleSeat")
+		seat.Name = "DriverSeat"
+		seat.Parent = truck
+		truck.Parent = Instance.new("Folder")
+
+		local function slopeHit(_, origin)
+			local cf = chassis.CFrame
+			local up = cf.UpVector
+			local tHit = (origin - cf.Position):Dot(up) / up.Y
+			return {
+				Position = origin - Vector3.new(0, tHit, 0),
+				Normal = up,
+			}
+		end
+
+		local preSim = event()
+		local char = Instance.new("Model")
+		local body = Instance.new("Humanoid")
+		body.Name = "Humanoid"
+		body.Parent = char
+		body.AutoRotate = true
+		local player = {
+			UserId = 9,
+			Character = char,
+			CharacterAdded = event(),
+			GetAttribute = function()
+				return nil
+			end,
+			GetAttributeChangedSignal = function()
+				return signal()
+			end,
+		}
+		local loader = t.loader({
+			mocks = {
+				HUD = {
+					SideButton = function()
+						return {
+							root = { Visible = false },
+							SetText = function() end,
+						}
+					end,
+				},
+				UITheme = {},
+			},
+			services = {
+				CollectionService = {
+					GetTagged = function()
+						return { truck }
+					end,
+					HasTag = function(_, inst, tag)
+						return inst:HasTag(tag)
+					end,
+				},
+				Players = { LocalPlayer = player },
+				RunService = {
+					PreSimulation = preSim,
+					Stepped = event(),
+					Heartbeat = event(),
+				},
+			},
+			globals = {
+				workspace = { Raycast = slopeHit },
+				task = {
+					spawn = function(fn, ...)
+						fn(...)
+					end,
+				},
+				RaycastParams = {
+					new = function()
+						return {}
+					end,
+				},
+			},
+		})
+		local VehicleController = loader:load("StarterPlayer/StarterPlayerScripts/VehicleController")
+		VehicleController.Start()
+
+		local cases = {
+			{ name = "15 degree cross-slope", yaw = 90, pitch = 0, roll = 15 },
+			{ name = "28 degree nose-down", yaw = 180, pitch = 28, roll = 0 },
+		}
+		for _, case in ipairs(cases) do
+			local parked = posed(case.yaw, case.pitch, case.roll)
+			chassis.CFrame = parked
+			chassis.AssemblyLinearVelocity = Vector3.zero
+			seat.ThrottleFloat = 0
+			seat.SteerFloat = 0
+			body.Seated:Fire(true, seat)
+			local dt = 1 / 60
+			for _ = 1, 180 do
+				preSim:Fire(dt)
+			end
+			local held = heading.CFrame
+			t.ok(
+				between(held.UpVector, parked.UpVector) < 1,
+				string.format(
+					"%s (%s tipResist %.2f) eased %.2f deg toward level",
+					case.name,
+					bestId,
+					bestResist,
+					between(held.UpVector, parked.UpVector)
+				)
+			)
+			t.ok(yawDelta(yawOf(held), yawOf(parked)) < 1, string.format("%s yaw moved", case.name))
+			-- Still the parked facing: no throttle or steer crossed the deadzone.
+			local _, locked =
+				DriveStart.Facing(true, parked.LookVector, seat.ThrottleFloat, seat.SteerFloat, Vector3.xAxis)
+			t.eq(locked, true, case.name .. " had no input")
+			body.Seated:Fire(false, nil)
+		end
+	end)
 end

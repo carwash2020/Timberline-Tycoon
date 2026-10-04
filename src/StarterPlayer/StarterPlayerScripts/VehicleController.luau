@@ -59,6 +59,7 @@ type Session = {
 	speed: number,
 	facing: Vector3, -- flat unit vector the truck is steering toward
 	up: Vector3, -- the ground's up under the truck, smoothed
+	parkedUp: Vector3, -- the slope it was parked on; held until the first input
 	holding: boolean, -- parked facing, until the first throttle or steer
 	corners: { Vector3 }, -- chassis-local ray starts (VehicleLogic.CornerOffsets)
 	rayParams: RaycastParams,
@@ -114,6 +115,7 @@ local function startDriving(seat: VehicleSeat)
 		speed = 0,
 		facing = VehicleLogic.FlatFacing(parked.LookVector),
 		up = parked.UpVector,
+		parkedUp = parked.UpVector,
 		holding = true,
 		corners = VehicleLogic.CornerOffsets(chassis.Size.X, chassis.Size.Z),
 		rayParams = params,
@@ -160,11 +162,17 @@ local function step(dt: number)
 
 	-- Lean with the ground, pulled upright by this truck's tip resistance.
 	-- Yaw stays the truck's; pitch and roll follow these rays, clamped.
-	local target = Handling.Lean(groundUp(s), s.feel.tipResist, MAX_TILT)
-	local alpha = 1 - math.exp(-s.feel.suspension * dt)
-	s.up = s.up:Lerp(target, alpha)
-	if s.up.Magnitude > 1e-4 then
-		s.up = s.up.Unit
+	-- Not while holding: that lean eases a parked slope toward level
+	-- (a high tipResist, in about a second) before the driver has steered.
+	if s.holding then
+		s.up = s.parkedUp
+	else
+		local target = Handling.Lean(groundUp(s), s.feel.tipResist, MAX_TILT)
+		local alpha = 1 - math.exp(-s.feel.suspension * dt)
+		s.up = s.up:Lerp(target, alpha)
+		if s.up.Magnitude > 1e-4 then
+			s.up = s.up.Unit
+		end
 	end
 	s.heading.CFrame = VehicleLogic.HeadingCFrame(s.facing, s.up)
 	local move = DriveStart.Velocity(s.facing, s.speed)
