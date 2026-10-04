@@ -1098,20 +1098,26 @@ return function(t)
 		t.eq(s.lastToast(), "Buy a square that touches your yard.")
 		t.eq(profile.plot.squares, {})
 		t.eq(profile.cash, 100)
+		local GameConfig = t.shared("GameConfig")
+		local Util = t.shared("Util")
+		local step = GameConfig.ExpansionPriceStep
 		s.P.Expand(ann, 2, 0, 0)
 		t.eq(profile.cash, 0)
 		t.eq(profile.plot.squares, { "2,0" })
-		t.eq(s.lastToast(), "That square is yours for $100. The next one is $3,000.")
+		t.eq(s.lastToast(), "That square is yours for $100. The next one is " .. Util.formatCash(step) .. ".")
 		t.eq(ann.attrs.PlotSquares, "2,0")
 		s.P.Expand(ann, 2, 1, 1)
 		t.eq(s.lastToast(), "You don't have enough for that square.")
 		t.eq(profile.cash, 0)
 		t.eq(#profile.plot.squares, 1)
-		profile.cash = 3000
+		profile.cash = step
 		s.P.Expand(ann, 2, 1, 1)
 		t.eq(profile.cash, 0)
 		t.eq(#profile.plot.squares, 2)
-		t.eq(s.lastToast(), "That square is yours for $3,000. The next one is $6,000.")
+		t.eq(
+			s.lastToast(),
+			"That square is yours for " .. Util.formatCash(step) .. ". The next one is " .. Util.formatCash(step * 2) .. "."
+		)
 		ann.standOn(nil)
 		profile.cash = 6000
 		s.P.Expand(ann, 0, 2, 2)

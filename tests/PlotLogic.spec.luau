@@ -424,7 +424,9 @@ return function(t)
 		for bought = 0, 24 do
 			sum += PlotLogic.ExpansionPrice(bought)
 		end
-		t.eq(sum, 900100)
+		local sumK = 24 * 25 / 2
+		t.eq(sum, GameConfig.FirstPlotPrice + GameConfig.ExpansionPriceStep * sumK)
+		t.eq(sum, 684100)
 		-- The campsite already covers the middle. Only a square that touches it is for sale.
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 0, 0) }, { nil, "yours" })
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 2, 2) }, { nil, "away" })
@@ -465,6 +467,8 @@ return function(t)
 			return api
 		end
 
+		local GameConfig = t.shared("GameConfig")
+		local step = GameConfig.ExpansionPriceStep
 		local short = purse(50)
 		local plot = { tier = 1, squares = {} }
 		local ok, why, price = PlotLogic.TryExpand(plot, 2, 0, short)
@@ -482,9 +486,9 @@ return function(t)
 		t.eq({ paid.read() }, { 0, 1 })
 		t.eq(plot.squares, { "2,0" })
 		-- The button price is the next deduction.
-		t.eq(PlotLogic.ExpansionPrice(#plot.squares), 3000)
+		t.eq(PlotLogic.ExpansionPrice(#plot.squares), step)
 
-		local threw = purse(3000)
+		local threw = purse(step)
 		local take = threw.spend
 		function threw.spend(amount)
 			take(amount)
@@ -494,9 +498,9 @@ return function(t)
 		ok = PlotLogic.TryExpand(plot, 2, 1, threw)
 		t.eq(ok, false)
 		t.eq(#plot.squares, before)
-		t.eq(threw.cash(), 3000)
+		t.eq(threw.cash(), step)
 
-		local refused = purse(3000)
+		local refused = purse(step)
 		local deduct = refused.spend
 		function refused.spend(amount)
 			deduct(amount)
@@ -505,6 +509,6 @@ return function(t)
 		ok = PlotLogic.TryExpand(plot, 2, 1, refused)
 		t.eq(ok, false)
 		t.eq(#plot.squares, before)
-		t.eq(refused.cash(), 3000)
+		t.eq(refused.cash(), step)
 	end)
 end
