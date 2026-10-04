@@ -101,6 +101,12 @@ return function(t)
 		t.eq(WoodFX.SinkAt(GameConfig.DeadSinkSec * 3), 1)
 	end)
 
+	t.test("a chip's long side starts at least 0.3 studs", function()
+		t.eq(WoodFX.ChipMin, 0.3)
+		local src = require("@lune/fs").readFile("src/StarterPlayer/StarterPlayerScripts/WoodFX.luau")
+		t.ok(string.find(src, "WoodFX.ChipMin + math.random()", 1, true))
+	end)
+
 	t.test("leaves flutter in the wood's v2 colours; the pools follow the quality tier", function()
 		local oak = WoodData.Get("oak")
 		local colors = WoodFX.LeafColors(oak)

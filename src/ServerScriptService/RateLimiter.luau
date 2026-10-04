@@ -37,6 +37,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	Grab = 6, -- v2 loop (V2_PLAN.md §12)
 	Release = 6,
 	Chop = 6, -- v2 loop: a swing at a section (SectionTrees; the axe's cooldown is checked too)
+	Swing = 8, -- the pose stamp. A start and a cancel, at the fastest axe, stay under this
 	SellSkyBin = 2, -- v2: the Sky Bin's prompt by the pad (AetherService; a ProximityPrompt, not a remote)
 	SawmillSet = 6, -- v2: one step of a placed mill's cut (SawmillService)
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)

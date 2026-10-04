@@ -268,6 +268,18 @@ return function(t)
 		local touchTap = signal()
 		local inputBegan = signal()
 		local activated = signal()
+		local heartbeat = signal()
+		local unequipped = signal()
+		local humanoid = {
+			Sit = false,
+			SeatPart = nil,
+			PlatformStand = false,
+			Health = 100,
+			GetState = function()
+				return roblox.Enum.HumanoidStateType.Running
+			end,
+		}
+		local carried = 0
 
 		local model = Instance.new("Model")
 		model:AddTag("Tree")
@@ -289,7 +301,7 @@ return function(t)
 		local tool = {
 			Activated = activated,
 			Deactivated = signal(),
-			Unequipped = signal(),
+			Unequipped = unequipped,
 			IsA = function(_, class)
 				return class == "Tool"
 			end,
@@ -306,7 +318,20 @@ return function(t)
 				return if name == "HumanoidRootPart" then hrp else nil
 			end,
 			FindFirstChildOfClass = function(_, class)
-				return if class == "Tool" then tool else nil
+				if class == "Tool" then
+					return tool
+				elseif class == "Humanoid" then
+					return humanoid
+				end
+				return nil
+			end,
+		}
+		local player = {
+			UserId = 1,
+			Character = char,
+			CharacterAdded = signal(),
+			GetAttribute = function(_, key)
+				return if key == "CarriedLogs" then carried else nil
 			end,
 		}
 		local hitInstance: any = section
@@ -333,8 +358,8 @@ return function(t)
 		local loader = t.loader({
 			services = {
 				Debris = { AddItem = function() end },
-				Players = { LocalPlayer = { UserId = 1, Character = char, CharacterAdded = signal() } },
-				RunService = { Heartbeat = signal() },
+				Players = { LocalPlayer = player },
+				RunService = { Heartbeat = heartbeat },
 				UserInputService = {
 					InputBegan = inputBegan,
 					TouchTapInWorld = touchTap,
@@ -474,7 +499,34 @@ return function(t)
 			advance = function(dt)
 				time.now += dt
 			end,
+			-- Past the Rusty impact (0.26 s) and run the timer. Does not
+			-- step Heartbeat, so a held button doesn't start the next swing.
+			land = function()
+				time.now += 0.3
+				flush()
+			end,
+			beat = function(dt)
+				time.now += dt
+				heartbeat:Fire(dt)
+			end,
+			unequip = function()
+				unequipped:Fire()
+			end,
+			humanoid = humanoid,
+			carry = function(n)
+				carried = n
+			end,
 		}
+	end
+
+	local function named(fires, name)
+		local out = {}
+		for _, fire in ipairs(fires) do
+			if fire.name == name then
+				table.insert(out, fire)
+			end
+		end
+		return out
 	end
 
 	t.test("a tap in the world fires Chop along a screen ray; a button or the thumbstick does not", function()
@@ -485,9 +537,12 @@ return function(t)
 		w.tap(Vector2.new(80, 300), false)
 		t.eq(#w.fires, 0, "the thumbstick")
 		w.tap(Vector2.new(500, 100), false)
-		t.eq(#w.fires, 1)
-		t.eq(w.fires[1].name, "Chop", "the live v2 remote, not ChopTree")
-		t.ok(w.fires[1].args[1] == w.section, "the section the ray hit")
+		t.eq(#named(w.fires, "Chop"), 0, "the press starts the swing, it does not cut yet")
+		t.eq(named(w.fires, "Swing")[1].args[1], "oak")
+		w.land()
+		local chops = named(w.fires, "Chop")
+		t.eq(#chops, 1, "the live v2 remote, not ChopTree")
+		t.ok(chops[1].args[1] == w.section, "the section the ray hit")
 		t.eq(w.rays[1], { method = "screen", x = 500, y = 100 })
 	end)
 
@@ -498,8 +553,10 @@ return function(t)
 		w.activate()
 		t.eq(#w.fires, 0, "it waits a frame for the tap")
 		w.flush()
-		t.eq(#w.fires, 1)
-		t.eq(w.fires[1].name, "Chop")
+		t.eq(#named(w.fires, "Chop"), 0, "still winding up")
+		t.eq(#named(w.fires, "Swing"), 1)
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1)
 		t.eq(w.rays[1], { method = "viewport", x = 120, y = 80 })
 	end)
 
@@ -508,13 +565,14 @@ return function(t)
 		local w = swingWorld()
 		w.tap(Vector2.new(500, 100), false)
 		w.activate()
-		w.flush()
-		t.eq(#w.fires, 1, "Activated does not swing the tap again")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "Activated does not swing the tap again")
+		t.eq(#named(w.fires, "Swing"), 1)
 		w.advance(1)
 		w.finger(Vector2.new(80, 300))
 		w.activate()
-		w.flush()
-		t.eq(#w.fires, 1, "activating from the thumbstick doesn't chop")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "activating from the thumbstick doesn't chop")
 	end)
 
 	t.test("a mouse click fires Chop through ViewportPointToRay", function()
@@ -522,8 +580,10 @@ return function(t)
 		w.input("MouseButton1")
 		w.mouse(roblox.Vector2.new(40, 50))
 		w.activate()
-		t.eq(#w.fires, 1)
-		t.eq(w.fires[1].name, "Chop")
+		t.eq(#named(w.fires, "Swing"), 1)
+		t.eq(#named(w.fires, "Chop"), 0)
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1)
 		t.eq(w.rays[1], { method = "viewport", x = 40, y = 50 })
 	end)
 
@@ -533,9 +593,10 @@ return function(t)
 		w.hit(nil)
 		w.radius({ w.section })
 		w.activate()
-		t.eq(#w.fires, 1)
-		t.eq(w.fires[1].name, "Chop")
-		t.ok(w.fires[1].args[1] == w.section)
+		w.land()
+		local chops = named(w.fires, "Chop")
+		t.eq(#chops, 1)
+		t.ok(chops[1].args[1] == w.section)
 		t.eq(#w.rays, 0, "no pointer")
 	end)
 
@@ -545,13 +606,15 @@ return function(t)
 		w.input("MouseButton1")
 		w.hit(w.leaves)
 		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
-		t.eq(#w.fires, 1)
-		t.eq(w.fires[1].name, "Chop")
-		t.ok(w.fires[1].args[1] == w.section, "the trunk, not the leaves")
-		w.advance(1)
+		w.land()
+		local chops = named(w.fires, "Chop")
+		t.eq(#chops, 1)
+		t.ok(chops[1].args[1] == w.section, "the trunk, not the leaves")
+		w.advance(0.5)
 		w.section.CFrame = CFrame.new(40, 2.25, 0)
 		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
-		t.eq(#w.fires, 1, "a crown you can't reach does not fire")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "a crown you can't reach does not fire")
 	end)
 
 	t.test("a mouse button and the tool's Activated are one swing; a button's click is none", function()
@@ -560,10 +623,13 @@ return function(t)
 		w.input("MouseButton1")
 		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
 		w.activate()
-		t.eq(#w.fires, 1, "Activated does not swing the click again")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "Activated does not swing the click again")
+		t.eq(#named(w.fires, "Swing"), 1)
 		w.advance(1)
 		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, true)
-		t.eq(#w.fires, 1, "a Gui button already took it")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "a Gui button already took it")
 	end)
 
 	t.test("ButtonR2 fires Chop at the nearest section without Activated", function()
@@ -573,9 +639,66 @@ return function(t)
 		w.hit(nil)
 		w.radius({ w.section })
 		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, false)
-		t.eq(#w.fires, 1)
-		t.eq(w.fires[1].name, "Chop")
-		t.ok(w.fires[1].args[1] == w.section)
+		w.land()
+		local chops = named(w.fires, "Chop")
+		t.eq(#chops, 1)
+		t.ok(chops[1].args[1] == w.section)
 		t.eq(#w.rays, 0, "no pointer")
+	end)
+
+	t.test("holding chops once per cooldown; a mash inside it does not", function()
+		local Enum = roblox.Enum
+		local w = swingWorld()
+		w.input("MouseButton1")
+		w.activate()
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1)
+		-- Still inside the 0.65 s cooldown (land moved 0.3). Another press is nothing.
+		w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1, "spam-tap")
+		-- The button is still down. The next wind-up starts as the cooldown ends.
+		w.beat(0.4)
+		t.eq(#named(w.fires, "Swing"), 2, "the held swing")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 2)
+	end)
+
+	t.test("unequip, sitting, dying or a log during the wind-up sends no Chop", function()
+		local Enum = roblox.Enum
+		local function press()
+			local w = swingWorld()
+			w.input("MouseButton1")
+			w.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+			return w
+		end
+		local dropped = press()
+		dropped.unequip()
+		dropped.land()
+		t.eq(#named(dropped.fires, "Chop"), 0, "unequip")
+		t.eq(named(dropped.fires, "Swing")[2].args[2], true, "the pose is cancelled")
+
+		local sat = press()
+		sat.humanoid.Sit = true
+		sat.beat(0)
+		sat.land()
+		t.eq(#named(sat.fires, "Chop"), 0, "sit")
+
+		local dead = press()
+		dead.humanoid.Health = 0
+		dead.land()
+		t.eq(#named(dead.fires, "Chop"), 0, "dead")
+
+		local loaded = press()
+		loaded.carry(1)
+		loaded.land()
+		t.eq(#named(loaded.fires, "Chop"), 0, "carrying")
+
+		local already = swingWorld()
+		already.input("MouseButton1")
+		already.humanoid.Sit = true
+		already.press(Enum.UserInputType.MouseButton1, Enum.KeyCode.Unknown, false)
+		already.land()
+		t.eq(#already.fires, 0, "already sitting never starts")
 	end)
 end

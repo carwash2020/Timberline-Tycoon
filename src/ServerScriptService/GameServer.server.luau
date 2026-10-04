@@ -961,6 +961,47 @@ if CoreLoop.V2() then
 		heldBy = GrabService.HeldBy,
 	})
 end
+-- The pose only. Damage stays on Chop / ChopTree / MineNode, which still
+-- arm the next swing when they arrive (setSwingDue is unchanged). SwingLen
+-- is that axe's cooldown so the clip finishes when the next press is allowed.
+local function onSwing(player: Player, woodId: unknown, cancel: unknown)
+	if not RateLimiter.Allow(player, "Swing") then
+		return
+	end
+	local char = player.Character
+	if not char then
+		return
+	end
+	if cancel == true then
+		char:SetAttribute("SwingLen", 0)
+		return
+	end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 or humanoid.Sit or humanoid.SeatPart ~= nil then
+		return
+	end
+	local carried = player:GetAttribute("CarriedLogs")
+	if type(carried) == "number" and carried > 0 then
+		return
+	end
+	local axe = AxeService.GetEquippedAxe(player)
+	if not axe then
+		return
+	end
+	local len = GameConfig.SwingCooldown
+	if woodId ~= "node" and woodId ~= "v1" then
+		if type(woodId) ~= "string" then
+			return
+		end
+		local _, cooldown = ItemCatalog.AxeStats(axe, woodId)
+		if type(cooldown) == "number" then
+			len = cooldown
+		end
+	end
+	char:SetAttribute("SwingAt", workspace:GetServerTimeNow())
+	char:SetAttribute("SwingLen", len)
+end
+remote.Swing.OnServerEvent:Connect(onSwing)
 remote.MineNode.OnServerEvent:Connect(onMineNode)
 remote.UseInstantDelivery.OnServerEvent:Connect(onInstantDelivery)
 

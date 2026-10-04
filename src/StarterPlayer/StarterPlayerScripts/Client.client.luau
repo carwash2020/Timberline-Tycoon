@@ -53,6 +53,7 @@ local MODULES = {
 	"SettingsUI",
 	"ShopUI",
 	"StoreUI",
+	"SwingPose",
 	"TownFX",
 	"TownMarkers",
 	"TreeCosmetics",
@@ -133,6 +134,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "CarryController",
 		get = function()
 			return require(script.Parent.CarryController)
+		end,
+	},
+	{
+		name = "SwingPose", -- before CarryPose, so a carried log wins the arms
+		get = function()
+			return require(script.Parent.SwingPose)
 		end,
 	},
 	{

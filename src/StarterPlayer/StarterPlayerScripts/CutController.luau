@@ -36,13 +36,13 @@
 --   * Checks what the server will (it re-checks everything): in reach
 --     (the axe's v2 range), the axe can dent it, the cooldown. Too far or
 --     too hard says so (a toast and a clink); a swing too soon waits.
---   * Turns you to face the cut (FaceTarget), plays the slash and sends
---     Chop(part, hitPos, normal).
+--   * Turns you to face the cut (FaceTarget) and starts the two-handed
+--     swing (SwingPose). Chop is sent on the impact frame, not the press;
+--     the cooldown starts on the press. The ray is picked again then.
 -- While an axe is out, the section you'd cut is outlined (cream in reach,
 -- amber too far or too hard), checked 30 times a second (15 on low).
 
 local CollectionService = game:GetService("CollectionService")
-local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -57,9 +57,11 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
+local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
 local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
 local Quality = require(script.Parent.Quality)
+local SwingPose = require(script.Parent.SwingPose)
 
 local CutController = {}
 
@@ -469,14 +471,6 @@ local function face(hrp: BasePart, at: Vector3)
 	end
 end
 
-local function playSlash(tool: Tool)
-	local anim = Instance.new("StringValue")
-	anim.Name = "toolanim"
-	anim.Value = "Slash"
-	anim.Parent = tool
-	Debris:AddItem(anim, 1)
-end
-
 -- One line per swing attempt, so a Studio test with no chop is conclusive:
 -- "fired" means Chop was sent, "rejected: …" means it was not (and why).
 -- Identical rejects inside 0.75s are dropped so a held click doesn't flood
@@ -496,9 +490,116 @@ local function chopNote(line: string)
 	print("[Chop] " .. line)
 end
 
+type Armed = { state: SwingLogic.SwingState, fromClick: boolean }
+
+local armed: Armed? = nil
+local swingSerial = 0
+
+local function carriedLogs(): number
+	local read = (player :: any).GetAttribute
+	if type(read) ~= "function" then
+		return 0
+	end
+	local n = player:GetAttribute("CarriedLogs")
+	return if type(n) == "number" then n else 0
+end
+
+-- Nil when the body can chop. A missing humanoid does not block here.
+local function bodyBlock(): string?
+	local char = player.Character
+	if not char then
+		return "dead"
+	end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local health = if humanoid then humanoid.Health else nil
+	local seated = humanoid ~= nil and (humanoid.Sit or humanoid.SeatPart ~= nil)
+	return SwingLogic.Blocked(health, seated, carriedLogs())
+end
+
+local function cancelArmed()
+	local current = armed
+	if not current or current.state.cancelled then
+		return
+	end
+	local beforeImpact = not current.state.fired
+	SwingLogic.Cancel(current.state)
+	SwingPose.CancelLocal(current.state.id)
+	armed = nil
+	if beforeImpact then
+		Net.Remote("Swing"):FireServer(nil, true)
+	end
+end
+
+local function toastRefuse(fromClick: boolean, refused: Target?, now: number)
+	if not fromClick then
+		return
+	end
+	local why = if refused and refused.problem then refused.problem else "no target"
+	chopNote("rejected: " .. why)
+	if refused and refused.problem == "far" then
+		HUD.Toast(SectionLogic.Message("far") :: string)
+	elseif refused and refused.problem == "hard" then
+		SoundData.Play("ChopTooHard")
+		if now - lastHardToast > CutController.HardToastEvery then
+			lastHardToast = now
+			HUD.Toast(SectionLogic.Message("tooHard") :: string)
+		end
+	end
+end
+
+-- The impact frame. Idempotent: the pose hook and the timer both call it,
+-- and the second finds the swing already fired.
+local function deliver(id: number)
+	local current = armed
+	if not current or current.state.id ~= id or current.state.cancelled or current.state.fired then
+		return
+	end
+	local now = os.clock()
+	if now < current.state.impactAt then
+		task.delay(current.state.impactAt - now, function()
+			deliver(id)
+		end)
+		return
+	end
+	local tool, axe, hrp = equipped()
+	if not tool or not axe or not hrp or bodyBlock() ~= nil then
+		cancelArmed()
+		return
+	end
+	local target, refused = pickTarget(hrp, axe)
+	local decision = SwingLogic.Resolve(current.state, now, target ~= nil)
+	if decision ~= "chop" and decision ~= "glance" then
+		return
+	end
+	SwingPose.SetContact(id, if decision == "chop" then "bite" else "glance")
+	if decision == "chop" and target then
+		if target.kind == "node" then
+			Net.Remote("MineNode"):FireServer(target.model:GetAttribute("Uid"))
+		else
+			Net.Remote("Chop"):FireServer(target.part, target.hit, target.normal)
+		end
+		if current.fromClick then
+			chopNote("fired")
+		end
+	else
+		toastRefuse(current.fromClick, refused, now)
+	end
+	SoundData.Play(SoundData.SwingFor(tool:GetAttribute("AxeId")))
+end
+
+SwingPose.HookImpact(deliver)
+
 local function trySwing(fromClick: boolean)
 	local now = os.clock()
 	if now < cooldownUntil then
+		return
+	end
+	local block = bodyBlock()
+	if block then
+		if fromClick then
+			chopNote("rejected: " .. block)
+		end
+		retryAt = now + RETRY_INTERVAL
 		return
 	end
 	local tool, axe, hrp = equipped()
@@ -510,36 +611,23 @@ local function trySwing(fromClick: boolean)
 	end
 	local target, refused = pickTarget(hrp, axe)
 	if not target then
-		if fromClick then
-			local why = if refused and refused.problem then refused.problem else "no target"
-			chopNote("rejected: " .. why)
-			if refused and refused.problem == "far" then
-				HUD.Toast(SectionLogic.Message("far") :: string)
-			elseif refused and refused.problem == "hard" then
-				SoundData.Play("ChopTooHard")
-				if now - lastHardToast > CutController.HardToastEvery then
-					lastHardToast = now
-					HUD.Toast(SectionLogic.Message("tooHard") :: string)
-				end
-			end
-		end
+		toastRefuse(fromClick, refused, now)
 		retryAt = now + RETRY_INTERVAL
 		return
 	end
 	face(hrp, target.hit)
-	if target.kind == "node" then
-		cooldownUntil = now + GameConfig.SwingCooldown
-		Net.Remote("MineNode"):FireServer(target.model:GetAttribute("Uid"))
-	else
-		local _, cooldown = CutController.Stats(axe, target.woodId or "")
-		cooldownUntil = now + cooldown
-		Net.Remote("Chop"):FireServer(target.part, target.hit, target.normal)
-	end
-	if fromClick then
-		chopNote("fired")
-	end
-	playSlash(tool)
-	SoundData.Play(SoundData.SwingFor(tool:GetAttribute("AxeId")))
+	local cooldown = if target.kind == "node"
+		then GameConfig.SwingCooldown
+		else select(2, CutController.Stats(axe, target.woodId or ""))
+	cooldownUntil = now + cooldown
+	swingSerial += 1
+	local state = SwingLogic.Begin(swingSerial, now, cooldown)
+	armed = { state = state, fromClick = fromClick }
+	SwingPose.BeginLocal(state.id, cooldown)
+	Net.Remote("Swing"):FireServer(if target.kind == "node" then "node" else (target.woodId or ""))
+	task.delay(state.impactAt - now, function()
+		deliver(state.id)
+	end)
 end
 
 -- Activated and the mouse or trigger that caused it both arrive for one
@@ -620,11 +708,13 @@ local function bindTool(tool: Tool)
 	end)
 	tool.Unequipped:Connect(function()
 		holding = false
+		cancelArmed()
 	end)
 end
 
 local function watchCharacter(char: Model)
 	holding = false
+	cancelArmed()
 	for _, child in ipairs(char:GetChildren()) do
 		if child:IsA("Tool") then
 			bindTool(child)
@@ -690,6 +780,14 @@ function CutController.Start()
 	local sinceAim = 0
 	RunService.Heartbeat:Connect(function(dt: number)
 		local now = os.clock()
+		local current = armed
+		if current and not current.state.cancelled and not current.state.fired then
+			if bodyBlock() ~= nil then
+				cancelArmed()
+			elseif now >= current.state.impactAt then
+				deliver(current.state.id)
+			end
+		end
 		if holding and now >= cooldownUntil and now >= retryAt then
 			trySwing(false)
 		end
