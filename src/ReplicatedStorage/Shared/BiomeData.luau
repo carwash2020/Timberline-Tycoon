@@ -58,7 +58,7 @@ local biomes: { BiomeDef } = {
 		haulStuds = 190,
 		area = { x = 0, z = -110, radius = 90 }, -- south of spawn
 		ground = { color = "#5B9B48", material = "Grass" },
-		trees = { oak = 40, birch = 15 },
+		trees = { oak = 70, birch = 26 },
 	},
 	{
 		id = "hills",
@@ -67,7 +67,7 @@ local biomes: { BiomeDef } = {
 		haulStuds = 400,
 		area = { x = -420, z = 110, radius = 170 }, -- west
 		ground = { color = "#4F8A3C", material = "LeafyGrass" },
-		trees = { pine = 40, maple = 25 },
+		trees = { pine = 80, maple = 50 },
 	},
 	{
 		id = "snow",
@@ -77,7 +77,7 @@ local biomes: { BiomeDef } = {
 		slowdown = { amount = 0.15, removedBy = "InsulatedCoat" },
 		area = { x = 0, z = 1240, radius = 200 }, -- far north
 		ground = { color = "#E8F0F5", material = "Snow" },
-		trees = { frostwood = 35 },
+		trees = { frostwood = 70 },
 	},
 	{
 		id = "volcano",
@@ -88,7 +88,7 @@ local biomes: { BiomeDef } = {
 		hazards = { "lava", "ash storms" },
 		area = { x = 1100, z = 1180, radius = 220 }, -- the far north-east corner
 		ground = { color = "#2B2522", material = "Basalt" },
-		trees = { emberwood = 30 },
+		trees = { emberwood = 60 },
 	},
 	-- Not in the world yet: needs boats (after V1, see V1_PLAN.md).
 	{ id = "island", displayName = "The Island", access = "boat", haulStuds = 900 },
@@ -101,7 +101,7 @@ local biomes: { BiomeDef } = {
 		nightOnly = true,
 		area = { x = -565, z = -455, radius = 120 }, -- hidden south-west, no road
 		ground = { color = "#3B2E4F", material = "LeafyGrass" },
-		trees = { phantomwood = 15 },
+		trees = { phantomwood = 22 },
 	},
 	{
 		-- V1 finale, high above the map, reached up the trunk of the Skyroot.

@@ -2,8 +2,8 @@
 -- ForestLogic: the Living Forest's rules (GAME_DESIGN §16), pure so tests
 -- and tools can check them. Numbers come from ForestData; randomness comes
 -- in as rolls in [0, 1), so every rule is deterministic here.
---   * Heartseeds: how many a felled tree drops, the pouch's caps, and how
---     long a planted sapling takes.
+--   * Seed drops: how many a felled tree used to drop, and how long a
+--     planted sapling took. The live loop does not grant or plant them.
 --   * Grove Vitality: changes, the drift back to rest, tiers.
 --   * The Hidden Grain: the figure chance, the roll, value multipliers,
 --     and the average a figure adds (the economy model's factor).
@@ -33,7 +33,7 @@ for _, id in ipairs(ForestData.Groves) do
 end
 
 ---------------------------------------------------------------------------
--- Heartseeds
+-- Seed drops (kept so the old numbers stay testable; nothing grants them)
 ---------------------------------------------------------------------------
 
 export type DropFacts = {
@@ -43,7 +43,7 @@ export type DropFacts = {
 	roll: number, -- [0, 1) for the 15% bonus
 }
 
--- Heartseeds a felled tree gives its feller.
+-- How many seeds a felled tree used to give its feller.
 function ForestLogic.SeedDrop(facts: DropFacts): number
 	local s = ForestData.Seeds
 	local n = s.perTree
@@ -235,15 +235,11 @@ function ForestLogic.Multiplier(id: string?): number
 	return if f then f.multiplier else 1
 end
 
--- The chance a growing tree hides a figure: 6% x the grove's tier, +4% if
--- planted, x2 in a Skyroot Bloom. `tierId` nil = outside any grove.
-function ForestLogic.FigureChance(tierId: string?, planted: boolean, bloom: boolean): number
+-- The chance a growing tree hides a figure: the Healthy tier's 6%, x2
+-- during a Skyroot Bloom. Grove tier and planting no longer change it.
+function ForestLogic.FigureChance(_tierId: string?, _planted: boolean, bloom: boolean): number
 	local c = ForestData.FigureChance
-	local tier = ForestLogic.Tier(tierId or ForestData.DefaultTier) or ForestLogic.Tier(ForestData.DefaultTier)
-	local chance = c.base * (if tier then tier.figureMul else 1)
-	if planted then
-		chance += c.plantedBonus
-	end
+	local chance = c.base
 	if bloom then
 		chance *= c.bloomMul
 	end
@@ -455,17 +451,10 @@ function ForestLogic.HelperBonus(totalValue: number): number
 	return math.max(1, math.floor(totalValue * ForestData.Elder.helperShare + 0.5))
 end
 
--- The chance a grove at vitality `v` wakes an Elder at a check: none below
--- Thriving, then rising with vitality.
-function ForestLogic.ElderWakeChance(v: number): number
-	local tier = ForestLogic.TierFor(v)
-	if not tier.alive then
-		return 0
-	end
-	local e = ForestData.Elder
-	local lo = (ForestLogic.Tier("Thriving") :: Tier).min
-	local t = math.clamp((v - lo) / (ForestData.Vitality.max - lo), 0, 1)
-	return e.wakeChanceAtThriving + (e.wakeChanceAtMax - e.wakeChanceAtThriving) * t
+-- Every grove has the same chance to wake an Elder at a check. Vitality
+-- no longer gates it.
+function ForestLogic.ElderWakeChance(_v: number): number
+	return ForestData.Elder.wakeChanceAtThriving
 end
 
 export type GroveState = { biome: string, vitality: number }

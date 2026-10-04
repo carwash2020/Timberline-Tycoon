@@ -425,7 +425,7 @@ function HUD.TopRow(): Frame?
 end
 
 -- The line left of the cash row (the clock, the Store button), and the
--- line under it (the Daily Goals button, the Heartseed pouch): both
+-- line under it (the Daily Goals button): both
 -- right-aligned, by LayoutOrder (higher = further right), and under the
 -- shop panel. Nil before HUD.Start.
 function HUD.BesideCash(): Frame?

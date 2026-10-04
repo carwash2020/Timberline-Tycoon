@@ -9,8 +9,8 @@
 --   * Each goal pays its reward when done. Finishing all of them pays a
 --     bonus that grows with the streak: days in a row with every goal done.
 --   * Missing a day breaks the streak.
---   * Two goals come from the Living Forest (GAME_DESIGN §16): plant
---     Heartseeds, and sell figured logs (read the bark to find them).
+--   * One goal comes from the Living Forest (GAME_DESIGN §16): sell
+--     figured logs (read the bark to find them).
 --   * The v2 core loop (V2_PLAN.md, Shared/CoreLoop) rolls from its own
 --     pool (ForLoop(2)): goals counted in u³, dollars and pieces, with
 --     rewards sized to the v2 prices (TiersV2). Its kinds have names of
@@ -58,8 +58,8 @@ export type Goal = {
 -- Sizes by axe tier (profile.bestAxeTier; 1 = Rusty Axe ... 9 = Starfall).
 -- `reward` is one goal's cash, roughly a minute or three of play at that
 -- tier (ECONOMY.md); the all-done bonus is 2 rewards, times the streak
--- multiplier. `seeds` is a "plant N Heartseeds" goal; `figured` a "sell N
--- figured logs" goal, about one figured tree of that tier's wood.
+-- multiplier. `figured` is a "sell N figured logs" goal, about one figured
+-- tree of that tier's wood. `seeds` is unused (an old plant goal's size).
 type TierScale = { trees: number, logs: number, cash: number, reward: number, seeds: number, figured: number }
 local TIERS: { TierScale } = {
 	{ trees = 4, logs = 12, cash = 60, reward = 15, seeds = 2, figured = 3 }, -- Rusty
@@ -74,7 +74,7 @@ local TIERS: { TierScale } = {
 }
 DailyData.Tiers = TIERS
 
-local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load", "plant", "sellFigured" }
+local KINDS: { GoalKind } = { "fell", "sell", "earn", "sellWood", "load", "sellFigured" }
 DailyData.Kinds = KINDS
 
 -- The v2 loop's sizes by axe tier, set against V2_PLAN.md §17 and the v2
@@ -108,7 +108,7 @@ local TIERS_V2: { TierScaleV2 } = {
 DailyData.TiersV2 = TIERS_V2
 
 local KINDS_V2: { GoalKind } =
-	{ "fellTrees", "sellVolume", "earnCash", "sellWoodVolume", "sellPieces", "plantSeeds", "sellFiguredVolume" }
+	{ "fellTrees", "sellVolume", "earnCash", "sellWoodVolume", "sellPieces", "sellFiguredVolume" }
 DailyData.KindsV2 = KINDS_V2
 
 -- A sold piece counts toward a "sell N logs" goal from this many u³.
@@ -137,6 +137,88 @@ function DailyData.NeedsReroll(goals: { Goal }, loop: number?): boolean
 		end
 	end
 	return false
+end
+
+-- Old plant goals ("plant", "plantSeeds") are not in either pool. Replace
+-- each one with a kind this day doesn't already have. The other goals, their
+-- progress and the streak (which isn't stored on a goal) stay.
+local RETIRED_GOAL: { [string]: boolean } = { plant = true, plantSeeds = true }
+local scaleFor: (tier: number) -> TierScale
+local scaleForV2: (tier: number) -> TierScaleV2
+local rng: (seed: number) -> () -> number
+
+local function fillTarget(goal: Goal, tier: number, loop: number?, random: () -> number)
+	if loop == 2 then
+		local scale = scaleForV2(tier)
+		if goal.kind == "fellTrees" then
+			goal.target = scale.trees
+		elseif goal.kind == "sellVolume" then
+			goal.target = scale.volume
+		elseif goal.kind == "earnCash" then
+			goal.target = scale.cash
+		elseif goal.kind == "sellPieces" then
+			goal.target = scale.pieces
+		elseif goal.kind == "sellFiguredVolume" then
+			goal.target = scale.figured
+		else
+			goal.target = math.ceil(scale.volume / 2)
+			local woods = DailyData.WoodsForV2(tier)
+			goal.wood = woods[math.floor(random() * #woods) + 1]
+		end
+	else
+		local scale = scaleFor(tier)
+		if goal.kind == "fell" then
+			goal.target = scale.trees
+		elseif goal.kind == "sell" or goal.kind == "load" then
+			goal.target = scale.logs
+		elseif goal.kind == "earn" then
+			goal.target = scale.cash
+		elseif goal.kind == "sellFigured" then
+			goal.target = scale.figured
+		else
+			goal.target = math.ceil(scale.logs / 2)
+			local woods = DailyData.WoodsFor(tier)
+			goal.wood = woods[math.floor(random() * #woods) + 1]
+		end
+	end
+end
+
+function DailyData.ReplaceRetired(goals: { Goal }, userId: number, day: number, tier: number, loop: number?): boolean
+	local used: { [string]: boolean } = {}
+	local retired = 0
+	for _, goal in ipairs(goals) do
+		if RETIRED_GOAL[goal.kind] then
+			retired += 1
+		else
+			used[goal.kind] = true
+		end
+	end
+	if retired == 0 then
+		return false
+	end
+	local options: { GoalKind } = {}
+	for _, kind in ipairs(DailyData.ForLoop(loop).kinds) do
+		if not used[kind] then
+			table.insert(options, kind)
+		end
+	end
+	if #options == 0 then
+		return false
+	end
+	local random = rng(math.abs(userId) * 7919 + day * 104729 + 97)
+	for _, goal in ipairs(goals) do
+		if RETIRED_GOAL[goal.kind] and #options > 0 then
+			local index = math.floor(random() * #options) + 1
+			local picked: GoalKind = options[index] :: any
+			table.remove(options, index)
+			goal.kind = picked
+			goal.progress = 0
+			goal.done = false
+			goal.wood = nil
+			fillTarget(goal, tier, loop, random)
+		end
+	end
+	return true
 end
 
 -- Woods a "sell N <wood> logs" goal can ask for at a tier: ones growing in
@@ -184,11 +266,11 @@ function DailyData.StreakMultiplier(streak: number): number
 	return 1 + 0.25 * math.clamp(streak - 1, 0, 4)
 end
 
-local function scaleFor(tier: number): TierScale
+function scaleFor(tier: number): TierScale
 	return TIERS[math.clamp(math.floor(tier), 1, #TIERS)]
 end
 
-local function scaleForV2(tier: number): TierScaleV2
+function scaleForV2(tier: number): TierScaleV2
 	return TIERS_V2[math.clamp(math.floor(tier), 1, #TIERS_V2)]
 end
 
@@ -210,7 +292,7 @@ end
 
 -- A small seeded random number generator (Park–Miller), so the same player
 -- gets the same goals on the same day on any server.
-local function rng(seed: number): () -> number
+function rng(seed: number): () -> number
 	local state = seed % 2147483647
 	if state <= 0 then
 		state += 2147483646
@@ -238,8 +320,6 @@ local function rollV2(random: () -> number, tier: number): { Goal }
 			goal.target = scale.cash
 		elseif kind == "sellPieces" then
 			goal.target = scale.pieces
-		elseif kind == "plantSeeds" then
-			goal.target = scale.seeds
 		elseif kind == "sellFiguredVolume" then
 			goal.target = scale.figured
 		else -- sellWoodVolume
@@ -270,8 +350,6 @@ function DailyData.Roll(userId: number, day: number, tier: number, loop: number?
 			goal.target = scale.logs
 		elseif kind == "earn" then
 			goal.target = scale.cash
-		elseif kind == "plant" then
-			goal.target = scale.seeds
 		elseif kind == "sellFigured" then
 			goal.target = scale.figured
 		else
@@ -294,10 +372,6 @@ function DailyData.GoalText(goal: Goal): string
 		return string.format("Load %d logs into your truck", goal.target)
 	elseif goal.kind == "earn" then
 		return string.format("Earn %s selling logs", Util.formatCash(goal.target))
-	elseif goal.kind == "plant" then
-		return if goal.target == 1
-			then "Plant a Heartseed in a stump"
-			else string.format("Plant %d Heartseeds in stumps", goal.target)
 	elseif goal.kind == "sellFigured" then
 		return string.format("Sell %d figured logs (read the bark!)", goal.target)
 	elseif goal.kind == "fellTrees" then
@@ -312,10 +386,6 @@ function DailyData.GoalText(goal: Goal): string
 			goal.target,
 			FieldGuide.VolumeText(DailyData.MinPieceVolumeV2)
 		)
-	elseif goal.kind == "plantSeeds" then
-		return if goal.target == 1
-			then "Plant a Heartseed in a stump"
-			else string.format("Plant %d Heartseeds in stumps", goal.target)
 	elseif goal.kind == "sellFiguredVolume" then
 		return string.format("Sell %s of figured wood (read the bark!)", FieldGuide.VolumeText(goal.target))
 	end
@@ -352,7 +422,7 @@ export type SaleV2 = {
 }
 
 -- The v2 events a goal can count (DailyService.Event under v2).
-export type EventV2 = "treeFelled" | "seedPlanted" | "woodSold"
+export type EventV2 = "treeFelled" | "woodSold"
 
 local function amountOf(value: unknown): number
 	if type(value) ~= "number" or value ~= value or value == math.huge or value <= 0 then
@@ -361,15 +431,13 @@ local function amountOf(value: unknown): number
 	return value
 end
 
--- How much `event` adds to a v2 goal: trees felled and seeds planted
--- (`amount`, default 1), and from a sale (`sale`) its u³, its cash, its
--- u³ of the goal's wood, its pieces of MinPieceVolumeV2 or more, or its
--- figured u³. 0 for anything else, a v1 goal, or a junk number.
+-- How much `event` adds to a v2 goal: trees felled (`amount`, default 1),
+-- and from a sale (`sale`) its u³, its cash, its u³ of the goal's wood,
+-- its pieces of MinPieceVolumeV2 or more, or its figured u³. 0 for
+-- anything else, a v1 goal, or a junk number.
 function DailyData.CountV2(goal: Goal, event: EventV2, amount: number?, sale: SaleV2?): number
 	if event == "treeFelled" then
 		return if goal.kind == "fellTrees" then amountOf(amount or 1) else 0
-	elseif event == "seedPlanted" then
-		return if goal.kind == "plantSeeds" then amountOf(amount or 1) else 0
 	elseif event ~= "woodSold" or not sale then
 		return 0
 	end

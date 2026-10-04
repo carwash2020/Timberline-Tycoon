@@ -651,7 +651,7 @@ end
 
 -- Keeps a felled tree's stump for at least `seconds` more (at most
 -- MAX_HOLD) before the tree grows back on its own; never brings it back
--- sooner. Planting a Heartseed in it still regrows it early. Nothing for a
+-- sooner. Nothing for a
 -- standing tree or an Elder's stump.
 function TreeService.HoldRegrow(uid: string, seconds: number)
 	local rec = trees[uid]
@@ -665,8 +665,7 @@ function TreeService.HoldRegrow(uid: string, seconds: number)
 end
 
 -- Brings a felled tree back: whole HP, stump gone, standing again (clients
--- play it growing). Also used to regrow a tree early (a planted Heartseed):
--- `planterId` marks who planted it (nil = it grew back wild).
+-- play it growing). `planterId` is unused by the live loop (nil = it grew back wild).
 function TreeService.Regrow(uid: string, planterId: number?)
 	local rec = trees[uid]
 	if not rec or not rec.felled then

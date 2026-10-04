@@ -756,7 +756,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	ClaimPlot = remote.ClaimPlot,
 	PlotPass = remote.PlotPass,
 }, notify)
-safely("ForestService.Init", ForestService.Init, { PlantSeed = remote.PlantSeed, WorldFX = remote.WorldFX }, notify)
+safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("RegionWake.Init", RegionWake.Init)
 safely("NPCService.Init", NPCService.Init, mapFolder)

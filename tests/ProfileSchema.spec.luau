@@ -211,7 +211,11 @@ return function(t)
 			local keeps = TutorialData.KeepsProgressV2(index)
 			local landed = if index <= 1 then 1 else TutorialData.RemapV2Step(index)
 			t.eq(data.tutorialStep, landed, step.id)
-			t.eq(TutorialData.StepsV2[data.tutorialStep].id, if index <= 1 then "fell" else step.id, step.id)
+			-- Saved indexes are the plot-first list, which still names the
+			-- removed plant step. That one lands on the loads after the mill.
+			local from = TutorialData.OrderV2Previous[index]
+			local expectId = if index <= 1 then "fell" elseif from == "plant" then "loads" else from
+			t.eq(TutorialData.StepsV2[data.tutorialStep].id, expectId, step.id)
 			if index <= 1 then
 				t.eq(data.tutorialProgress, 0, "the old first step was the plot; the new one is fell")
 			else
@@ -398,29 +402,36 @@ return function(t)
 		t.eq(v2.daily.day, 20000, "v2 goals stand")
 	end)
 
-	t.test("MigrateV2 keeps axes, trucks, gear, heartseeds, the compendium and Robux fields", function()
+	t.test("MigrateV2 keeps axes, trucks, gear, figures and Robux fields, and drops planting", function()
 		local Schema, data = v1Save()
 		data.axes = { { uid = "a", id = "SteelAxe" }, { uid = "b", id = "CobaltAxe" } }
 		data.bestAxeTier = 4
 		data.ownedTrucks = { "Rustbucket", "Flatbed" }
 		data.gear = { "Lantern" }
 		data.heartseeds = { oak = 2 }
+		data.forest = { planted = 4, harvested = 2, royalties = 30, figures = { curly = 1 }, elders = 1 }
 		data.compendium = { oak = true, birch = true }
 		data.doubleWoodUntil = 123
 		data.instantDeliveries = 2
+		data.cash = 500
 		local before = t.loader():shared("Util").deepCopy(data)
 		Schema.MigrateV2(data, 20)
+		t.eq(data.heartseeds, nil)
+		t.eq(data.forest.planted, nil)
+		t.eq(data.forest.harvested, nil)
+		t.eq(data.forest.royalties, nil)
+		t.eq(data.forest.figures, { curly = 1 })
+		t.eq(data.forest.elders, 1)
+		t.eq(data.cash, 500)
 		for _, key in ipairs({
 			"axes",
 			"bestAxeTier",
 			"ownedTrucks",
 			"gear",
-			"heartseeds",
 			"compendium",
 			"doubleWoodUntil",
 			"instantDeliveries",
 			"plot",
-			"forest",
 			"onboarding",
 		}) do
 			t.eq(data[key], before[key], key)

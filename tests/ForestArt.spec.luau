@@ -1,11 +1,11 @@
 --!nocheck
--- ForestArt (Shared/Art): the Heartseed sprout (NAT-04). On a stump it's
+-- ForestArt (Shared/Art): the sprout (NAT-04). On a stump it's
 -- sized to the cut, so its mound of soil, its glowing halo and the seed
 -- never hang in mid-air past the stump's edge, for every wood's stump at
 -- every size (even an Elder's); without a diameter it keeps the old
 -- fixed-size look. And it grows from a seedling to full size, never past
 -- it (SproutScale, which ForestUI scales the sprout by).
--- And the Heartseed orb (NAT-12): 0.9 across, a lime-gold trail fading to
+-- And the seed orb (NAT-12): 0.9 across, a lime-gold trail fading to
 -- nothing (two Attachments, 0.35 s), a burst-only sparkle emitter with a
 -- soft texture, a quick pop as it lands, and a pooled orb's trail wiped
 -- before it flies again, so it never streaks across the map.
@@ -45,7 +45,7 @@ return function(t)
 	-- How far a round part reaches from the sprout's axis (x = z = 0),
 	-- sideways: its centre's distance out plus its radius across. The
 	-- Mound is an upright ellipsoid (Size.X and Size.Z across), the Halo a
-	-- cylinder turned upright (Size.Y and Size.Z across), the Heartseed a ball.
+	-- cylinder turned upright (Size.Y and Size.Z across), the seed a ball.
 	local function reach(part)
 		local p = part.CFrame.Position
 		local across = if part.Name == "Halo"
@@ -73,7 +73,7 @@ return function(t)
 					t.ok(near(mound.Size.X, d * 0.8) and near(mound.Size.Z, d * 0.8), label .. ": mound 0.8 D across")
 					t.ok(near(mound.Size.Y, 0.35), label .. ": mound 0.35 tall")
 					t.ok(near(halo.Size.Y, d * 0.95), label .. ": halo 0.95 D across")
-					for _, name in ipairs({ "Mound", "Halo", "Heartseed" }) do
+					for _, name in ipairs({ "Mound", "Halo", "SeedGem" }) do
 						local part = sprout:FindFirstChild(name)
 						t.ok(
 							reach(part) <= d / 2 + MARGIN,
@@ -103,7 +103,7 @@ return function(t)
 			local sprout = ForestArt.Sprout(oak, 5, d)
 			local mound = sprout:FindFirstChild("Mound")
 			local halo = sprout:FindFirstChild("Halo")
-			local heart = sprout:FindFirstChild("Heartseed")
+			local heart = sprout:FindFirstChild("SeedGem")
 			t.eq(sprout.PrimaryPart, mound)
 			t.ok(near(mound.Size.X, 2.6) and near(mound.Size.Y, 0.7), "the old 2.6 mound for " .. tostring(d))
 			t.ok(near(halo.Size.Y, 3.6) and near(halo.Size.X, 0.05), "the old 3.6 halo for " .. tostring(d))
@@ -132,13 +132,13 @@ return function(t)
 		return (a - b).Magnitude < 1e-4
 	end
 
-	t.test("the Heartseed orb: 0.9 across, a light, a trail and a sparkle emitter, all looks", function()
+	t.test("the seed orb: 0.9 across, a light, a trail and a sparkle emitter, all looks", function()
 		local orb = ForestArt.SeedOrb()
-		t.eq(orb.Name, "HeartseedOrb")
+		t.eq(orb.Name, "SeedOrbPart")
 		t.ok(near3(orb.Size, Vector3.new(0.9, 0.9, 0.9)), "0.9, up from 0.7")
 		t.eq(orb.Shape, roblox.Enum.PartType.Ball)
 		t.eq(orb.Material, roblox.Enum.Material.Neon)
-		t.eq(orb.Color, ForestArt.HeartseedColor)
+		t.eq(orb.Color, ForestArt.FreshLime)
 		t.eq({ orb.Anchored, orb.CanCollide, orb.CanQuery, orb.CanTouch }, { true, false, false, false })
 		t.ok(orb:FindFirstChildOfClass("PointLight") ~= nil, "it glows")
 		local trail = orb:FindFirstChild("SeedTrail")
@@ -149,8 +149,8 @@ return function(t)
 		t.ok(near3(a0.CFrame.Position - a1.CFrame.Position, Vector3.new(0, 0.6, 0)), "a ribbon 0.6 wide")
 		t.ok(math.abs(trail.Lifetime - 0.35) < 1e-4, "0.35 s long")
 		local color = trail.Color.Keypoints
-		t.eq(color[1].Value, ForestArt.HeartseedColor)
-		t.eq(color[#color].Value, ForestArt.HeartseedColor)
+		t.eq(color[1].Value, ForestArt.FreshLime)
+		t.eq(color[#color].Value, ForestArt.FreshLime)
 		local fade = trail.Transparency.Keypoints
 		t.ok(fade[1].Value < 0.5, "bright at the orb")
 		t.eq(fade[#fade].Value, 1, "fading to nothing")

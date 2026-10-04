@@ -27,7 +27,6 @@ Net.RemoteNames = {
 	"PlotOffer", -- server -> client: (offer) the open homesteads, for the join picker
 	"ClaimPlot", -- client -> server: (index) claim that homestead (no range check)
 	"PlotPass", -- client -> server: () close the picker; the server assigns a free one
-	"PlantSeed", -- client -> server: (treeUid) plant a Heartseed in a felled tree's stump (ForestService)
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)

@@ -130,7 +130,7 @@ local GameConfig = {
 	GrowStages = 4,
 	TreesPerGrowTick = 20, -- the forest asks about 2.9 changes a second at steady state; 4 a second leaves room
 	PreDeadAt = 0.9, -- of a tree's lifespan: its leaves go
-	DeadSinkSec = 4,
+	DeadSinkSec = 5, -- a dead tree blackens and sinks over this many seconds
 	-- later phases (M2-M6)
 	PlankYield = 1,
 	PlankStep = 0.2, -- u

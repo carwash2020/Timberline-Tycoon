@@ -118,14 +118,14 @@ What figures add to wood income, by the grove's vitality tier:
 
 | Grove | Figure chance (wild / planted) | Adds (wild) | Adds (planted) | In a Skyroot Bloom (wild) |
 |---|---|---|---|---|
-| Thinning (0+) | 3% / 7% | +3.1% | +7.1% | +6.1% |
-| Healthy (35+) | 6% / 10% | +6.1% | +10.2% | +12.2% |
-| Thriving (75+) | 9% / 13% | +9.2% | +13.3% | +18.4% |
-| Old Growth (90+) | 12% / 16% | +12.2% | +16.3% | +24.5% |
+| Thinning (0+) | 6% / 6% | +6.1% | +6.1% | +12.2% |
+| Healthy (35+) | 6% / 6% | +6.1% | +6.1% | +12.2% |
+| Thriving (75+) | 6% / 6% | +6.1% | +6.1% | +12.2% |
+| Old Growth (90+) | 6% / 6% | +6.1% | +6.1% | +12.2% |
 
-A grove drifts back toward 60 by 1 a minute, loses 1.5 per wild tree felled (0.5 per planted one) and gains 4 per Heartseed planted: it holds steady while it loses under 0.67 wild trees a minute, and replanting raises it 3.5 per tree (when someone else fells the planted tree, or its planter waits 10 minutes; a quick solo refell takes the planting back).
+Figure chance is flat at the Healthy rate. The grove meter and planting are not in the live loop, so a grove no longer drifts (the old rest was 60, 1 a minute).
 
-Per tree: 1.40 Heartseeds on average (1, +1 for a large tree, +1 on a 15% roll). The planter's share is 15% of a tree's base log value when someone else fells it; an Elder (1.7× size, 6× HP, 3× logs, always Quilted or Burl) pays each helper 10% of its logs' value and 2 Heartseeds.
+An Elder (1.7× size, 6× HP, 3× logs, always Quilted or Burl) pays each helper 10% of its logs' value.
 
 | Wood | Planter's share per tree | Elder HP | Elder logs | Elder value (avg) | Each helper's bonus |
 |---|---|---|---|---|---|

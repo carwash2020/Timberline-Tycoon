@@ -203,21 +203,17 @@ return function(t)
 		t.eq(again.player.attrs.TutorialStep, 0)
 	end)
 
-	t.test("the Heartseed beat: planting a seed in a stump moves it on", function()
+	t.test("the mill is followed by the sell-more loads", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
-		playUntil(s, "plant")
-		t.eq(s.Steps[s.profile.tutorialStep].id, "plant")
-		t.eq(s.Steps[s.profile.tutorialStep - 1].id, "mill", "right after the haul to the mill")
-		s.event("logsSold", 5)
-		s.event("treeFelled")
-		t.eq(s.Steps[s.profile.tutorialStep].id, "plant", "only planting counts")
-		s.event("seedPlanted")
+		playUntil(s, "loads")
 		t.eq(s.Steps[s.profile.tutorialStep].id, "loads")
-		t.eq(s.player.attrs.TutorialProgress, 0)
+		t.eq(s.Steps[s.profile.tutorialStep - 1].id, "mill", "right after the haul to the mill")
+		s.event("treeFelled")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads", "felling doesn't sell a load")
 	end)
 
-	t.test("saves from before the Heartseed beat keep their place", function()
+	t.test("saves from before a later beat keep their place", function()
 		-- Steps those saves reached, logged by the funnel.
 		local reached = {}
 		for _, id in ipairs({ "fell", "pickup", "load", "sell", "loads" }) do
@@ -248,20 +244,14 @@ return function(t)
 		t.eq(e.Steps[e.profile.tutorialStep].id, "mill")
 	end)
 
-	t.test("stumps a player fells wait for the plant step, and only until then", function()
+	t.test("stumps are not held for any tutorial step", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
 		t.eq(s.trees.StumpHold, s.Quest.StumpHoldFor, "Init hands TreeService the hook")
-		local held = {}
 		for _, step in ipairs(s.Steps) do
-			held[step.id] = s.trees.StumpHold(s.player)
+			t.eq(s.trees.StumpHold(s.player), 0, step.id)
 			s.event(step.event, step.count)
 		end
-		for _, id in ipairs({ "plot", "fell", "pickup", "sell", "truck", "load", "plant" }) do
-			t.eq(held[id], 240, id .. ": up to the plant step the stump waits 4 minutes")
-		end
-		t.eq(held.loads, 0, "planted: trees regrow as usual")
-		t.eq(held.steel, 0)
 		t.ok(s.profile.tutorialDone)
 		t.eq(s.trees.StumpHold(s.player), 0, "finished")
 		t.eq(s.trees.StumpHold({}), 0, "no profile (left)")
@@ -270,7 +260,7 @@ return function(t)
 	t.test("a skipped tutorial holds no stumps", function()
 		local s = setup()
 		s.Quest.Start(s.player, s.profile)
-		t.eq(s.Quest.StumpHoldFor(s.player), 240)
+		t.eq(s.Quest.StumpHoldFor(s.player), 0)
 		s.skip()
 		t.eq(s.Quest.StumpHoldFor(s.player), 0)
 	end)
@@ -300,7 +290,7 @@ return function(t)
 		t.eq(v1.Steps, TutorialData.Steps)
 	end)
 
-	t.test("v2: the walk on the wired events: fell, grab, load, sold, plant, sold cash, buy", function()
+	t.test("v2: the walk on the wired events: fell, grab, load, sold, sold cash, buy", function()
 		local s = setup(nil, 2)
 		local function at()
 			return s.Steps[s.profile.tutorialStep].id
@@ -327,9 +317,7 @@ return function(t)
 		s.event("woodLoaded") -- TruckLoad (M1.6)
 		t.eq(at(), "mill")
 		s.Quest.WoodSold(s.player, 2, 30)
-		t.eq(at(), "plant", "the mill sale, and its cash waits")
-		s.event("seedPlanted")
-		t.eq(at(), "loads")
+		t.eq(at(), "loads", "the mill sale, and its cash waits")
 		local loads = s.Steps[s.profile.tutorialStep]
 		t.eq(loads.unit, "cash")
 		local purse = s.profile.cash
@@ -369,8 +357,7 @@ return function(t)
 		s.event("truckBought")
 		s.event("woodLoaded")
 		s.Quest.WoodSold(s.player, 1, 0)
-		t.eq(s.Steps[s.profile.tutorialStep].id, "plant")
-		s.event("seedPlanted")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "loads")
 		for _, junk in ipairs({ 0, -5, 0 / 0, math.huge, 0.6 }) do
 			s.Quest.WoodSold(s.player, 1, junk)
 		end
@@ -393,18 +380,11 @@ return function(t)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "sell")
 	end)
 
-	t.test("v2: stumps wait for the plant step the same way", function()
+	t.test("v2: stumps are not held", function()
 		local s = setup(nil, 2)
 		s.Quest.Start(s.player, s.profile)
-		local held = {}
-		for _, step in ipairs(s.Steps) do
-			held[step.id] = s.trees.StumpHold(s.player)
-			s.event(step.event, step.count)
-		end
-		t.eq(held.fell, 240)
-		t.eq(held.plant, 240)
-		t.eq(held.loads, 0)
-		t.ok(s.profile.tutorialDone)
+		t.eq(s.trees.StumpHold(s.player), 0)
+		t.eq(s.Steps[1].id, "fell")
 	end)
 
 	-- A returning player (MigrateV2 reopened their finished tutorial).

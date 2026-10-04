@@ -114,11 +114,8 @@ export type TruckPiece = {
 	s: { { number } },
 }
 
--- The Living Forest (ForestService): your Heartseeds and steward record.
+-- The Living Forest (ForestService): figures you've revealed, Elders you helped fell.
 export type ForestState = {
-	planted: number, -- Heartseeds you've planted in the wild
-	harvested: number, -- your planted trees others have felled
-	royalties: number, -- cash earned from those (the planter's share)
 	figures: { [string]: number }, -- figured logs you've revealed, by figure id
 	elders: number, -- Elder trees you helped fell
 }
@@ -214,7 +211,6 @@ export type Profile = {
 	cartVolume: number,
 	-- v1 only: this slot already sold once at the cart. A fresh slot is false.
 	cartUsed: boolean,
-	heartseeds: { [string]: number }, -- Heartseeds by wood id (ForestService)
 	forest: ForestState,
 	truckBed: { BedLog }, -- what's in your truck bed (VehicleService)
 	-- Where your truck was when its bed last changed or it last moved (x, y,
@@ -296,8 +292,7 @@ local TEMPLATE: Profile = {
 	onboarding = {},
 	cartVolume = 0,
 	cartUsed = false,
-	heartseeds = {},
-	forest = { planted = 0, harvested = 0, royalties = 0, figures = {}, elders = 0 },
+	forest = { figures = {}, elders = 0 },
 	truckBed = {},
 	truckAt = {},
 	leftLoad = {},
@@ -730,7 +725,6 @@ end
 
 -- The v2 loop (V2_PLAN.md §14) ---------------------------------------------
 
-ProfileSchema.SchemaV2 = 2
 -- u³ of forge wood each v1 log in the Starfall forge becomes (40 lumenwood
 -- logs to 60 u³), never more than the recipe takes.
 ProfileSchema.ForgeU3PerLog = 1.5
@@ -794,6 +788,8 @@ end
 --     tutorial reopens as a refresher of the new steps, daily goals rolled
 --     from the v1 pool are rerolled (the streak is kept), and schema = 2.
 -- Idempotent: a second call finds nothing to buy back and changes nothing.
+local dropPlanting: (data: any) -> ()
+
 function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Result
 	if type(data.schema) ~= "number" or data.schema ~= data.schema then
 		data.schema = 0
@@ -826,6 +822,7 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 			data.truckAt = {}
 		end
 	end
+	dropPlanting(data)
 	if data.schema >= ProfileSchema.SchemaV2 then
 		applyTutorialOrders(data)
 		markFoundationsSchema(data)
@@ -869,6 +866,30 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 	result.migrated = true
 	applyTutorialOrders(data)
 	return result
+end
+
+-- Planting counts and royalties go. No refund. Figures and
+-- Elders stay. Runs for a save that already took the v2 path and for one
+-- taking it now.
+dropPlanting = function(data: any)
+	local function one(record: any)
+		if type(record) ~= "table" then
+			return
+		end
+		record.heartseeds = nil
+		local forest = record.forest
+		if type(forest) == "table" then
+			forest.planted = nil
+			forest.harvested = nil
+			forest.royalties = nil
+		end
+	end
+	one(data)
+	if type(data.slots) == "table" then
+		for _, slot in pairs(data.slots) do
+			one(slot)
+		end
+	end
 end
 
 -- The toast for cash MigrateV2 left owed, or nil for none: the buy-back

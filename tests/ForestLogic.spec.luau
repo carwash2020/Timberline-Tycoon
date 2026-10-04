@@ -202,14 +202,11 @@ return function(t)
 	end)
 
 	t.test("figure chance: 6% x tier, +4% planted, x2 in a bloom", function()
-		near(ForestLogic.FigureChance("Thinning", false, false), 0.03, "thinning")
-		near(ForestLogic.FigureChance("Healthy", false, false), 0.06, "healthy")
-		near(ForestLogic.FigureChance("Thriving", false, false), 0.09, "thriving")
-		near(ForestLogic.FigureChance("OldGrowth", false, false), 0.12, "old growth")
-		near(ForestLogic.FigureChance("Healthy", true, false), 0.10, "planted")
-		near(ForestLogic.FigureChance("Healthy", false, true), 0.12, "bloom")
-		near(ForestLogic.FigureChance("OldGrowth", true, true), 0.32, "everything")
-		near(ForestLogic.FigureChance(nil, false, false), 0.06, "outside the groves: as Healthy")
+		near(ForestLogic.FigureChance("Thinning", false, false), 0.06, "tier is ignored")
+		near(ForestLogic.FigureChance("Healthy", true, false), 0.06, "planting is ignored")
+		near(ForestLogic.FigureChance("OldGrowth", true, false), 0.06, "old growth is the same")
+		near(ForestLogic.FigureChance("Healthy", false, true), 0.12, "bloom doubles it")
+		near(ForestLogic.FigureChance(nil, false, false), 0.06, "outside the groves")
 	end)
 
 	t.test("the figure roll: chance first, then by weight; starfall is 30% of lumenwood burls", function()
@@ -273,9 +270,13 @@ return function(t)
 			"Starfall Burl lifts lumenwood"
 		)
 		near(ForestLogic.FiguredAverage("lumenwood"), (67.5 + 60 + 42.5 + 8 * (0.7 * 4 + 0.3 * 8)) / 100, "lumenwood")
+		t.eq(
+			ForestLogic.FigureBonus("oak", "Thinning", false, false),
+			ForestLogic.FigureBonus("oak", "OldGrowth", true, false)
+		)
 		t.ok(
-			ForestLogic.FigureBonus("oak", "Thinning", false, false)
-				< ForestLogic.FigureBonus("oak", "OldGrowth", true, false)
+			ForestLogic.FigureBonus("oak", "Healthy", false, true)
+				> ForestLogic.FigureBonus("oak", "Healthy", false, false)
 		)
 	end)
 
@@ -305,25 +306,17 @@ return function(t)
 		t.eq(ForestLogic.HelperBonus(1), 1)
 	end)
 
-	t.test("Elders wake in Thriving and Old Growth groves, more likely the higher", function()
-		t.eq(ForestLogic.ElderWakeChance(74.9), 0)
-		near(ForestLogic.ElderWakeChance(75), 0.4, "at 75")
-		near(ForestLogic.ElderWakeChance(100), 1, "at 100")
-		t.ok(ForestLogic.ElderWakeChance(95) > ForestLogic.ElderWakeChance(80))
-		local groves = { { biome = "starter", vitality = 60 }, { biome = "hills", vitality = 100 } }
-		t.eq(ForestLogic.PickElderGrove(groves, 0.5, 0.99), "hills", "the only awake grove")
-		t.eq(
-			ForestLogic.PickElderGrove({ { biome = "starter", vitality = 60 } }, 0.5, 0),
-			nil,
-			"a healthy grove sleeps"
-		)
-		local thriving = { { biome = "starter", vitality = 75 } }
-		t.eq(ForestLogic.PickElderGrove(thriving, 0.5, 0.39), "starter")
-		t.eq(ForestLogic.PickElderGrove(thriving, 0.5, 0.41), nil, "40% at 75")
-		-- Picked by chance: 0.4 vs 1.0 -> starter takes the first 2/7 of the pick roll.
-		local both = { { biome = "starter", vitality = 75 }, { biome = "hills", vitality = 100 } }
+	t.test("every grove has a flat 40% chance to wake an Elder", function()
+		near(ForestLogic.ElderWakeChance(0), 0.4, "thin")
+		near(ForestLogic.ElderWakeChance(60), 0.4, "healthy")
+		near(ForestLogic.ElderWakeChance(100), 0.4, "old growth")
+		local one = { { biome = "starter", vitality = 60 } }
+		t.eq(ForestLogic.PickElderGrove(one, 0.5, 0.39), "starter")
+		t.eq(ForestLogic.PickElderGrove(one, 0.5, 0.41), nil, "the 40% roll missed")
+		-- Equal weight: the first grove takes the first half of the pick roll.
+		local both = { { biome = "starter", vitality = 10 }, { biome = "hills", vitality = 100 } }
 		t.eq(ForestLogic.PickElderGrove(both, 0.2, 0), "starter")
-		t.eq(ForestLogic.PickElderGrove(both, 0.3, 0), "hills")
+		t.eq(ForestLogic.PickElderGrove(both, 0.6, 0), "hills")
 	end)
 
 	t.test("finding a spot: the first candidate the test accepts", function()

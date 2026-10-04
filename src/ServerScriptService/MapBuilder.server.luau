@@ -149,9 +149,13 @@ local treesSpawned = 0
 -- The v2 loop's trees are section trees (V2_PLAN.md M1.3), planted at a
 -- random age so the world isn't all saplings; v1 keeps TreeService's.
 local V2 = CoreLoop.V2()
-local function spawnTree(woodId: string, at: Vector3, region: string): Model?
+local function spawnTree(woodId: string, at: Vector3, region: string, zone: WorldPlan.TreeZone?): Model?
 	local model = if V2
-		then SectionTrees.SpawnTree(woodId, CFrame.new(at), { boot = true })
+		then SectionTrees.SpawnTree(
+			woodId,
+			CFrame.new(at),
+			{ boot = true, zone = zone, cap = if zone then zone.cap else nil }
+		)
 		else TreeService.SpawnTree(woodId, CFrame.new(at))
 	if model then
 		model:SetAttribute("Region", region)
@@ -419,10 +423,14 @@ step("5. The trees", function()
 		local ok, err = pcall(function(): any
 			local y = TerrainGen.HeightAt(spot.x, spot.z) - 0.3
 			local at = CFrame.new(spot.x, y, spot.z)
-			local options = { size = TreeLogic.Sizes[1], seed = 4100 + i }
 			local model = if V2
-				then SectionTrees.SpawnTree("oak", at, options)
-				else TreeService.SpawnTree("oak", at, options)
+				then SectionTrees.SpawnTree("oak", at, {
+					size = TreeLogic.Sizes[1],
+					seed = 4100 + i,
+					zone = { id = "tutorial", cx = -21, cz = 43, radius = 36, cap = 3 },
+					cap = 3,
+				})
+				else TreeService.SpawnTree("oak", at, { size = TreeLogic.Sizes[1], seed = 4100 + i })
 			-- A stub (the build test) may not hand back a model.
 			if model then
 				model:SetAttribute("TutorialGrove", true)
@@ -441,7 +449,7 @@ step("5. The trees", function()
 	local failed, firstErr = 0, nil
 	for _, spot in ipairs(WorldPlan.Trees()) do
 		local ok, err = pcall(function(): any
-			spawnTree(spot.woodId, spot.position, spot.biome)
+			spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
 			return nil
 		end)
 		if not ok then
@@ -455,7 +463,7 @@ step("5. The trees", function()
 	-- The Petrified Reach, after the fingerprint trees, so none of those move.
 	for _, spot in ipairs(WorldPlan.ReachTrees()) do
 		local ok, err = pcall(function(): any
-			spawnTree(spot.woodId, spot.position, spot.biome)
+			spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
 			return nil
 		end)
 		if not ok then
@@ -784,7 +792,14 @@ step("6. The Skyroot and the Aether Isles", function()
 	end)
 	step("6. The Lumenwood", function()
 		for _, pos in ipairs(sky.lumenwood) do
-			spawnTree("lumenwood", pos, "sky")
+			spawnTree("lumenwood", pos, "sky", {
+				id = "sky",
+				cx = pos.X,
+				cz = pos.Z,
+				radius = 0,
+				fixed = true,
+				cap = 12,
+			})
 		end
 	end)
 	step("6. The Sky Shards", function()

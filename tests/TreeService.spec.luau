@@ -368,7 +368,7 @@ return function(t)
 		s.chop(a, rec, 20)
 		s.run(s.TreeLogic.FallTime + 1)
 		s.clock += 120
-		s.Trees.Regrow(rec.uid, 1) -- a Heartseed sprouted
+		s.Trees.Regrow(rec.uid, 1) -- grown back early
 		t.ok(rec.alive and not rec.felled)
 		t.eq(rec.planterId, 1)
 		s.clock += 200

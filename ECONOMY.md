@@ -128,13 +128,13 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 
 | Biome | Wood | Trees | Regrow | Trees an hour | Real players fed (starter kit) | $/h cap a player (shared by 4) |
 |---|---|---|---|---|---|---|
-| Starter Forest | Oak | 40 | 4.8 min | 505 | 11 | $4,181 |
-| Starter Forest | Birch | 15 | 17.0 min | 53 | 2 | $330 |
-| The Hills | Maple | 25 | 21.0 min | 71 | 5 | $2,171 |
-| The Hills | Pine | 40 | 11.5 min | 209 | 22 | $7,616 |
-| Snowfields | Frostwood | 35 | 9.0 min | 233 | 36 | $14,339 |
-| The Volcano | Emberwood | 30 | 21.0 min | 86 | - | $4,271 |
-| Gloam Hollow | Gloamwood | 15 | 25.0 min | 36 | - | $3,301 |
+| Starter Forest | Oak | 70 | 4.8 min | 884 | 19 | $7,318 |
+| Starter Forest | Birch | 26 | 17.0 min | 92 | 3 | $571 |
+| The Hills | Maple | 50 | 21.0 min | 143 | 11 | $4,342 |
+| The Hills | Pine | 80 | 11.5 min | 417 | 45 | $15,232 |
+| Snowfields | Frostwood | 70 | 9.0 min | 467 | 73 | $28,677 |
+| The Volcano | Emberwood | 60 | 21.0 min | 171 | - | $8,542 |
+| Gloam Hollow | Gloamwood | 22 | 25.0 min | 53 | - | $4,842 |
 | Aether Isles | Lumenwood | 12 | 45.0 min | 16 | 20 | $5,243 |
 
 ## Lux Axe (Robux)

@@ -823,29 +823,19 @@ do
 	local v = ForestData.Vitality
 	line(
 		string.format(
-			"A grove drifts back toward %d by %d a minute, loses %.1f per wild tree felled (%.1f per planted one) and gains %d per Heartseed planted: it holds steady while it loses under %.2f wild trees a minute, and replanting raises it %.1f per tree (when someone else fells the planted tree, or its planter waits 10 minutes; a quick solo refell takes the planting back).",
+			"Figure chance is flat at the Healthy rate. The grove meter and planting are not in the live loop, so a grove no longer drifts (the old rest was %d, %d a minute).",
 			v.rest,
-			v.driftPerMinute,
-			-v.fellWild,
-			-v.fellPlanted,
-			v.plant,
-			v.driftPerMinute / -v.fellWild,
-			v.plant + v.fellPlanted
+			v.driftPerMinute
 		)
 	)
 	line()
-	local seeds = ForestData.Seeds
 	line(
 		string.format(
-			"Per tree: %.2f Heartseeds on average (1, +1 for a large tree, +1 on a %d%% roll). The planter's share is %d%% of a tree's base log value when someone else fells it; an Elder (%.1f× size, %d× HP, %d× logs, always Quilted or Burl) pays each helper %d%% of its logs' value and %d Heartseeds.",
-			seeds.perTree + 0.25 * seeds.largeBonus + seeds.rollChance * seeds.rollBonus,
-			math.floor(seeds.rollChance * 100 + 0.5),
-			math.floor(ForestData.PlanterShare * 100 + 0.5),
+			"An Elder (%.1f× size, %d× HP, %d× logs, always Quilted or Burl) pays each helper %d%% of its logs' value.",
 			ForestData.Elder.scale,
 			ForestData.Elder.hpMul,
 			ForestData.Elder.logMul,
-			math.floor(ForestData.Elder.helperShare * 100 + 0.5),
-			ForestData.Elder.helperSeeds
+			math.floor(ForestData.Elder.helperShare * 100 + 0.5)
 		)
 	)
 	line()

@@ -5,7 +5,7 @@
 --     DailyUI.
 --   * Game code reports what happened with DailyService.Event (the same
 --     moments as the tutorial: trees felled, logs loaded, logs sold, and
---     from the Living Forest: Heartseeds planted, figured logs sold).
+--     from the Living Forest: figured logs sold).
 --   * A finished goal pays its reward; finishing all of them pays the
 --     streak bonus and extends the streak. A missed day breaks it.
 --   * New goals roll at midnight UTC, including for players online then.
@@ -19,8 +19,8 @@
 -- CoreLoop.Active() to Init) rolls from its own pool (DailyData.ForLoop):
 -- goals in u³, dollars and pieces. A day rolled under the other loop
 -- (DailyData.NeedsReroll) rolls again on join; the streak is kept. Its
--- goals count with DailyData.CountV2: trees felled and seeds planted
--- through Event (the same calls as v1), and each sale through WoodSold
+-- goals count with DailyData.CountV2: trees felled through Event (the
+-- same call as v1), and each sale through WoodSold
 -- (SellService's onSold, per payee per tick).
 
 local AnalyticsService = game:GetService("AnalyticsService")
@@ -40,13 +40,13 @@ export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold" | "seedPlanted
 
 local DailyService = {}
 
--- The goal kind each event counts toward, one per tree, log or seed.
--- ForestService reports seedPlanted and figuredSold (figured logs sold).
+-- The goal kind each event counts toward, one per tree or log.
+-- ForestService reports figuredSold (figured logs sold). seedPlanted is
+-- still accepted and counts for nothing.
 local COUNTED_BY: { [DailyEvent]: DailyData.GoalKind } = {
 	treeFelled = "fell",
 	logsLoaded = "load",
 	logsSold = "sell",
-	seedPlanted = "plant",
 	figuredSold = "sellFigured",
 }
 
@@ -167,8 +167,8 @@ end
 
 -- Something that counts toward goals happened. `amount` is how many (trees
 -- or logs); for logsSold, `byWood` counts the logs per wood id and `cash`
--- is what the sale paid. Under the v2 loop only trees felled and seeds
--- planted count here (DailyData.CountV2); sales come through WoodSold.
+-- is what the sale paid. Under the v2 loop only trees felled count here
+-- (DailyData.CountV2); sales come through WoodSold.
 function DailyService.Event(
 	player: Player,
 	event: DailyEvent,
@@ -181,7 +181,7 @@ function DailyService.Event(
 		return
 	end
 	if loop == 2 then
-		local v2Event: DailyData.EventV2? = if event == "treeFelled" or event == "seedPlanted" then event else nil
+		local v2Event: DailyData.EventV2? = if event == "treeFelled" then event else nil
 		progress(player, profile, function(goal: Goal): number
 			return if v2Event then DailyData.CountV2(goal, v2Event, amount) else 0
 		end)
@@ -218,6 +218,10 @@ end
 -- loop's pool (a save from before the switch, or after a rollback) roll
 -- again; the streak stays.
 function DailyService.Start(player: Player, profile: Profile)
+	local active = if loop == 2 then 2 else nil
+	-- A saved plant goal is replaced on its own. The other goals and the
+	-- streak stay. A day from the other loop still rolls again, whole.
+	DailyData.ReplaceRetired(profile.daily.goals, player.UserId, profile.daily.day, profile.bestAxeTier, active)
 	if DailyData.NeedsReroll(profile.daily.goals, loop) then
 		profile.daily.day = 0
 	end
