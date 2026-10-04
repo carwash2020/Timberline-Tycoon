@@ -354,14 +354,17 @@ local TOP_TEXT_PAD = 4 -- px the bar must keep above and below the cash text
 
 -- Where the cash row sits on a ScreenGui with ScreenInsets None, anchor
 -- (1, 0), in screen pixels. `topbar` is GuiService.TopbarInset as read.
--- `leftSafe` and `rightSafe` are the device's unsafe insets (GetGuiInset's
--- X on the left and the right: a notch). `textHeight` is the cash text in
--- pixels; it is never shrunk to fit. `fallbackTop` is UITheme.TopBar() + 4.
--- In the bar, the right edge is min(topbar.Max.X, viewport.X - rightSafe)
--- minus 12 and the row is centred on the bar's height. It sits under the
--- bar when the inset is empty, the row is wider than the bar's width
--- minus 16, the bar is shorter than the text plus 4 px above and below,
--- or that in-bar spot would cross a Roblox button or the notch.
+-- `row` is the row's AbsoluteSize after its UIScale (screen pixels).
+-- `leftSafe` and `rightSafe` are the notch insets from the safe-area probe
+-- (a DeviceSafeInsets frame), not GetGuiInset. `textHeight` is the cash
+-- text in screen pixels; it is never shrunk to fit. `fallbackTop` is
+-- UITheme.TopBar() + 4. In the bar, the right edge is
+-- min(topbar.Max.X, viewport.X - rightSafe) minus 12 and the row is
+-- centred on the bar's height. It sits under the bar when the inset is
+-- empty, the row is wider than the bar's width minus 16, the bar is
+-- shorter than the text plus 4 px above and below, the bar is shorter
+-- than the row plus that same pad, or that in-bar spot would cross a
+-- Roblox button or the notch.
 -- `typeof(Rect.new(...))` is the Roblox datatype. This file's own `Rect`
 -- is the {left, top, right, bottom} table, and that name wins as a type.
 function HudLayout.TopRow(
@@ -389,7 +392,8 @@ function HudLayout.TopRow(
 
 	local barW, barH = topbar.Width, topbar.Height
 	local textBand = textHeight + TOP_TEXT_PAD * 2
-	if barW <= 0 or barH <= 0 or row.X > barW - TOP_FIT_SLACK or barH < textBand then
+	local rowBand = row.Y + TOP_TEXT_PAD * 2
+	if barW <= 0 or barH <= 0 or row.X > barW - TOP_FIT_SLACK or barH < textBand or rowBand > barH then
 		return underBar()
 	end
 

@@ -786,10 +786,9 @@ local function buildPanel()
 
 	local paper = Instance.new("Frame")
 	paper.Name = "Paper"
-	-- On the panel's flat center (the slice margin), where the prices sit.
-	local inset = UITheme.SkinInset("Panel")
-	paper.Position = UDim2.fromOffset(inset, inset)
-	paper.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
+	-- The panel face is padded by the slice margin, so this fills the flat
+	-- center the prices sit on.
+	paper.Size = UDim2.fromScale(1, 1)
 	paper.BackgroundColor3 = C.Paper
 	paper.BorderSizePixel = 0
 	paper.ClipsDescendants = true

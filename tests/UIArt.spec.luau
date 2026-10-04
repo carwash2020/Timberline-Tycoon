@@ -34,12 +34,24 @@ return function(t)
 		end
 		return ev
 	end
-	roblox.implementMethod("Frame", "GetPropertyChangedSignal", function()
-		return signal()
+	-- Remembered so a spec can fire the safe probe's AbsoluteSize and
+	-- re-place the row the way a real layout change does.
+	local watched = {}
+	roblox.implementMethod("Frame", "GetPropertyChangedSignal", function(self, prop)
+		local ev = signal()
+		watched[self] = watched[self] or {}
+		watched[self][prop] = ev
+		return ev
 	end)
 	roblox.implementProperty("NumberValue", "Changed", function()
 		return signal()
 	end)
+	-- Lune's buttons have no input signals. Quest's Skip button connects them.
+	for _, prop in ipairs({ "InputBegan", "InputEnded", "SelectionLost", "Activated" }) do
+		roblox.implementProperty("TextButton", prop, function()
+			return signal()
+		end)
+	end
 
 	local PLAQUE = "rbxassetid://139841387610705"
 	local PANEL = "rbxassetid://90740664574742"
@@ -59,11 +71,17 @@ return function(t)
 	local function client(extra)
 		extra = extra or {}
 		local watch = extra.watch
+		local camera = extra.camera
+		if type(camera) == "table" and camera.GetPropertyChangedSignal == nil then
+			camera.GetPropertyChangedSignal = function()
+				return signal()
+			end
+		end
 		return t.loader({
 			services = {
 				GuiService = {
 					IsTenFootInterface = function()
-						return false
+						return extra.tenFoot == true
 					end,
 					TopbarInset = extra.topbar or Rect.new(0, 0, 0, 0),
 					GetGuiInset = function()
@@ -81,10 +99,28 @@ return function(t)
 					end,
 				},
 				Players = { LocalPlayer = extra.player or {} },
-				TextChatService = {},
+				TextChatService = {
+					WaitForChild = function()
+						return nil
+					end,
+					FindFirstChildOfClass = function()
+						return nil
+					end,
+				},
+				ContentProvider = {
+					PreloadAsync = extra.preload or function(_, _, callback)
+						if callback then
+							callback("", Enum.AssetFetchStatus.Success)
+						end
+					end,
+				},
 				UserInputService = {
 					TouchEnabled = extra.touch == true,
 					KeyboardEnabled = if extra.keyboard == nil then true else extra.keyboard,
+					LastInputTypeChanged = signal(),
+					GetLastInputType = function()
+						return Enum.UserInputType.Keyboard
+					end,
 				},
 				ContextActionService = {},
 				ProximityPromptService = {},
@@ -92,7 +128,15 @@ return function(t)
 				TweenService = extra.tween or {},
 			},
 			globals = {
-				workspace = { CurrentCamera = extra.camera },
+				workspace = {
+					CurrentCamera = extra.camera,
+					GetPropertyChangedSignal = function()
+						return signal()
+					end,
+					WaitForChild = function()
+						return nil
+					end,
+				},
 				task = {
 					spawn = function(fn, ...)
 						fn(...)
@@ -255,12 +299,15 @@ return function(t)
 		t.eq(UITheme.SkinInset("Plaque"), 4)
 	end)
 
-	local function cashAt(w, h)
+	local function cashAt(w, h, extra)
+		extra = extra or {}
 		local parent = Instance.new("Folder")
-		local loader = client({
-			camera = { ViewportSize = Vector2.new(w, h) },
-		})
+		local camera = extra.camera or { ViewportSize = Vector2.new(w, h) }
+		camera.ViewportSize = camera.ViewportSize or Vector2.new(w, h)
+		extra.camera = camera
+		local loader = client(extra)
 		local HUD = loader:load("StarterPlayer/StarterPlayerScripts/HUD")
+		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
 		HUD.BuildCash(parent)
 		local screen = parent:FindFirstChild("TimberlineTop")
 		local row = screen:FindFirstChild("TopRow")
@@ -268,6 +315,7 @@ return function(t)
 		local face = plaque:FindFirstChild("Face")
 		local paper = face:FindFirstChild("Paper")
 		local label = paper:FindFirstChildWhichIsA("TextLabel")
+		local probeGui = parent:FindFirstChild("TimberlineSafeProbe")
 		return {
 			screen = screen,
 			row = row,
@@ -276,6 +324,9 @@ return function(t)
 			paper = paper,
 			label = label,
 			HUD = HUD,
+			theme = UITheme,
+			probe = probeGui:FindFirstChild("SafeArea"),
+			probeGui = probeGui,
 		}
 	end
 
@@ -300,12 +351,18 @@ return function(t)
 			t.eq(built.face.BackgroundTransparency, 1)
 			t.eq(built.face.Image, PLAQUE)
 			t.eq(built.screen.ScreenInsets, Enum.ScreenInsets.None)
-			t.eq(built.screen:FindFirstChildOfClass("UIScale"), nil, "the top screen isn't scaled")
+			local uiScale = built.screen:FindFirstChildOfClass("UIScale")
+			t.ok(uiScale and uiScale.Scale >= 1, "the top screen scales up, never down")
 			local pad = paddingOf(built.face)
 			for _, side in ipairs(pad) do
 				t.ok(side >= 4, "plaque inset")
 			end
 		end
+		-- Paper is the text plus 8; the plaque adds the border on each side.
+		t.eq(desk.paper.Size.Y.Offset, 26 + 8)
+		t.eq(phone.paper.Size.Y.Offset, 20 + 8)
+		t.eq(desk.plaque:FindFirstChildOfClass("UISizeConstraint").MinSize.Y, 26 + 8 + 8)
+		t.eq(phone.plaque:FindFirstChildOfClass("UISizeConstraint").MinSize.Y, 20 + 8 + 8)
 		-- The widest desktop label is reserved wide enough for the string.
 		local reserve = desk.label:FindFirstChildOfClass("UISizeConstraint")
 		t.ok(reserve.MinSize.X >= ADVANCE[26], "desktop reserves the widest string")
@@ -328,15 +385,18 @@ return function(t)
 			local w, h = screen[1], screen[2]
 			local textH = if math.min(w, h) < UITheme.CompactEdge then 20 else 26
 			local plaqueW = ADVANCE[textH] + PAPER_PAD * 2 + inset * 2
-			-- A notch on each side, plus the 12 px right margin.
-			local leftSafe, rightSafe = if math.min(w, h) < UITheme.CompactEdge then 44 else 0, 0
+			local plaqueH = textH + 8 + inset * 2
+			-- A notch, read the way the probe reports it, plus the 12 px margin.
+			local probeX = if math.min(w, h) < UITheme.CompactEdge then 44 else 0
+			local probeW = w - probeX
+			local leftSafe, rightSafe = probeX, w - (probeX + probeW)
 			local room = w - leftSafe - rightSafe - 12
 			t.ok(plaqueW <= room, string.format("%dx%d plaque %d in %d", w, h, plaqueW, room))
 			local barH = 36
 			local place = HudLayout.TopRow(
 				Vector2.new(w, h),
 				Rect.new(math.min(160, w * 0.12), 0, w - 48, barH),
-				Vector2.new(plaqueW, textH + inset * 2),
+				Vector2.new(plaqueW, plaqueH),
 				textH,
 				leftSafe,
 				rightSafe,
@@ -345,31 +405,37 @@ return function(t)
 			local left = place.right - plaqueW
 			t.ok(left >= leftSafe, "not in the left notch")
 			t.ok(place.right <= w - rightSafe, "not in the right notch")
-			t.ok(place.inBar, "the plaque's own width fits the bar")
+			-- The plaque is the text plus 8 plus the border, so a 36 px bar
+			-- is too short for the row. The width still clears the notch.
+			local rowBand = plaqueH + 8
+			t.eq(place.inBar, rowBand <= barH and textH + 8 <= barH, "in the bar only when the row fits")
 		end
 	end)
 
 	t.test("the top row clears Roblox's buttons and the notch", function()
 		local HudLayout = t.load("StarterPlayer/StarterPlayerScripts/HudLayout")
-		-- w, h, minX, minY, maxX, maxY, leftSafe, rightSafe, rowW, rowH, textH, fallback, inBar
+		-- w, h, minX, minY, maxX, maxY, probeX, probeW, rowW, rowH, textH, fallback, inBar
+		-- probeX / probeW are the safe frame's AbsolutePosition.X and AbsoluteSize.X.
 		local cases = {
-			{ 375, 667, 48, 0, 330, 36, 0, 0, 180, 28, 20, 40, true },
-			{ 667, 375, 88, 0, 620, 36, 0, 0, 200, 28, 20, 40, true },
-			{ 1024, 768, 150, 0, 980, 36, 0, 0, 220, 34, 26, 40, true },
-			{ 1920, 1080, 160, 0, 1860, 36, 0, 0, 240, 34, 26, 40, true },
-			{ 1920, 1080, 0, 0, 0, 0, 0, 0, 240, 34, 26, 62, false }, -- inset reads 0
-			{ 667, 375, 48, 0, 640, 36, 80, 0, 100, 28, 20, 40, true }, -- left notch, still fits
-			{ 667, 375, 48, 0, 300, 36, 80, 0, 230, 28, 20, 40, false }, -- left notch pushes it under
-			{ 667, 375, 48, 0, 667, 36, 0, 44, 200, 28, 20, 40, true }, -- right notch
-			{ 375, 667, 48, 0, 200, 36, 0, 0, 180, 28, 20, 40, false }, -- wider than the bar
-			{ 1920, 1080, 160, 0, 1860, 24, 0, 0, 240, 34, 26, 28, false }, -- bar shorter than the text
-			{ 800, 600, 48, 0, 248, 36, 0, 0, 184, 34, 26, 40, true }, -- exactly the bar's width minus 16
-			{ 800, 600, 48, 0, 248, 36, 0, 0, 185, 34, 26, 40, false },
+			{ 375, 667, 48, 0, 330, 36, 0, 375, 180, 28, 20, 40, true },
+			{ 667, 375, 88, 0, 620, 36, 0, 667, 200, 28, 20, 40, true },
+			{ 1024, 768, 150, 0, 980, 36, 0, 1024, 220, 34, 26, 40, false }, -- row + pad taller than the bar
+			{ 1920, 1080, 160, 0, 1860, 36, 0, 1920, 240, 34, 26, 40, false },
+			{ 1920, 1080, 0, 0, 0, 0, 0, 1920, 240, 34, 26, 62, false }, -- inset reads 0
+			{ 667, 375, 48, 0, 640, 36, 80, 587, 100, 28, 20, 40, true }, -- left notch, still fits
+			{ 667, 375, 48, 0, 300, 36, 80, 587, 230, 28, 20, 40, false }, -- left notch pushes it under
+			{ 667, 375, 48, 0, 667, 36, 0, 623, 200, 28, 20, 40, true }, -- right notch of 44
+			{ 375, 667, 48, 0, 200, 36, 0, 375, 180, 28, 20, 40, false }, -- wider than the bar
+			{ 1920, 1080, 160, 0, 1860, 24, 0, 1920, 240, 34, 26, 28, false }, -- bar shorter than the text
+			{ 800, 600, 48, 0, 248, 48, 0, 800, 184, 34, 26, 52, true }, -- exactly the bar's width minus 16
+			{ 800, 600, 48, 0, 248, 48, 0, 800, 185, 34, 26, 52, false },
+			{ 1920, 1080, 160, 0, 1860, 58, 0, 1920, 240, 63, 26, 62, false }, -- 58 px bar, 63 px row
 		}
 		for _, c in ipairs(cases) do
 			local w, h = c[1], c[2]
 			local minX, minY, maxX, maxY = c[3], c[4], c[5], c[6]
-			local leftSafe, rightSafe = c[7], c[8]
+			local probeX, probeW = c[7], c[8]
+			local leftSafe, rightSafe = probeX, w - (probeX + probeW)
 			local rowW, rowH, textH, fallback, wantBar = c[9], c[10], c[11], c[12], c[13]
 			local topbar = Rect.new(minX, minY, maxX, maxY)
 			local place = HudLayout.TopRow(
@@ -466,5 +532,225 @@ return function(t)
 		t.eq(face.Image, UIArt.Button.id, "trigger puts Button back")
 		ended:Fire()
 		t.eq(face.Image, UIArt.Button.id, "a second release doesn't stick")
+	end)
+
+	t.test("drawn cash text is never smaller than before", function()
+		local function draw(w, h, tenFoot)
+			local player = Instance.new("Folder")
+			local pg = Instance.new("PlayerGui")
+			pg.Parent = player
+			local loader = client({
+				player = player,
+				camera = { ViewportSize = Vector2.new(w, h) },
+				tenFoot = tenFoot,
+				keyboard = true,
+				touch = false,
+			})
+			local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+			local HUD = loader:load("StarterPlayer/StarterPlayerScripts/HUD")
+			UITheme.Start()
+			HUD.BuildCash(pg)
+			local screen = pg:FindFirstChild("TimberlineTop")
+			local label = screen
+				:FindFirstChild("TopRow")
+				:FindFirstChild("CashPlaque")
+				:FindFirstChild("Face")
+				:FindFirstChild("Paper")
+				:FindFirstChildWhichIsA("TextLabel")
+			local uiScale = screen:FindFirstChildOfClass("UIScale")
+			local drawn = label.TextSize * uiScale.Scale
+			local scaleFor = UITheme.ScaleFor(Vector2.new(w, h), false, tenFoot == true)
+			local least = if math.min(w, h) < UITheme.CompactEdge then 20 else 26 * scaleFor
+			t.ok(uiScale.Scale >= 1, string.format("%dx%d scale", w, h))
+			t.ok(
+				drawn + 1e-6 >= least,
+				string.format("%dx%d drawn %s least %s", w, h, tostring(drawn), tostring(least))
+			)
+		end
+		draw(1920, 1080, false)
+		draw(1920, 1080, true) -- a TV
+		draw(1024, 768, false)
+		draw(375, 667, false)
+	end)
+
+	t.test("a zero top bar inset sits the row at TopBar() + 4", function()
+		local built = cashAt(1920, 1080)
+		t.eq(built.probeGui.ScreenInsets, Enum.ScreenInsets.DeviceSafeInsets)
+		t.eq(built.row.Position.Y.Offset, built.theme.TopBar() + 4)
+	end)
+
+	t.test("notch insets come from the safe probe, not GetGuiInset", function()
+		-- GetGuiInset's X is 0. The probe says the notch is 80. A row that
+		-- would clear 0 but not 80 has to drop under the bar.
+		local built = cashAt(667, 375, {
+			topbar = Rect.new(48, 0, 300, 36),
+			guiInset = Vector2.new(0, 36),
+		})
+		local probe = built.probe
+		probe.AbsolutePosition = Vector2.new(80, 0)
+		probe.AbsoluteSize = Vector2.new(667 - 80, 375)
+		built.row.AbsoluteSize = Vector2.new(230, 28)
+		local ev = watched[probe] and watched[probe].AbsoluteSize
+		t.ok(ev, "re-places when the probe's size changes")
+		ev:Fire()
+		t.eq(built.row.Position.Y.Offset, built.theme.TopBar() + 4, "under the bar, clear of the notch")
+	end)
+
+	t.test("a failed image load builds today's flat card", function()
+		local loader = client({
+			preload = function(_, _, callback)
+				callback("rbxassetid://1", Enum.AssetFetchStatus.Failure)
+			end,
+		})
+		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		local fill, edge = UITheme.Colors.Paper, UITheme.Colors.Bark
+		for _, auto in ipairs({ true, false }) do
+			local failed = UITheme.Card(fill, edge, 3, 14, auto, "Panel")
+			local plain = UITheme.Card(fill, edge, 3, 14, auto)
+			t.eq(snap(failed), snap(plain), if auto then "auto" else "fixed")
+		end
+	end)
+
+	t.test("every skinned face pads to its inset and has no stroke", function()
+		local UITheme, UIArt = theme()
+		for _, name in ipairs(UIArt.Names) do
+			for _, auto in ipairs({ true, false }) do
+				local card = UITheme.Card(UITheme.Colors.Paper, UITheme.Colors.Ink, 3, 12, auto, name)
+				t.eq(card.face:FindFirstChildOfClass("UIStroke"), nil, name)
+				local inset = card.face:GetAttribute("SkinInset")
+				local pad = paddingOf(card.face)
+				t.ok(type(inset) == "number" and pad, name)
+				for _, side in ipairs(pad) do
+					t.ok(side >= inset, name .. " pad " .. side)
+				end
+			end
+		end
+		-- The speech bubble pads 8 inside a 12 px border; the floor lifts it.
+		local bubble = UITheme.Card(UITheme.Colors.Bark, UITheme.Colors.Ink, 3, 12, false, "Panel")
+		UITheme.padding(bubble.face, 8, 10, 8, 8)
+		for _, side in ipairs(paddingOf(bubble.face)) do
+			t.ok(side >= 12, "bubble pad " .. side)
+		end
+	end)
+
+	t.test("skinned card text clears 7:1 on Paper", function()
+		local function channel(c)
+			return if c <= 0.04045 then c / 12.92 else ((c + 0.055) / 1.055) ^ 2.4
+		end
+		local function contrast(a, b)
+			local function lum(color)
+				return 0.2126 * channel(color.R) + 0.7152 * channel(color.G) + 0.0722 * channel(color.B)
+			end
+			local hi, lo = math.max(lum(a), lum(b)), math.min(lum(a), lum(b))
+			return (hi + 0.05) / (lo + 0.05)
+		end
+		local function onPaper(label, face, paper)
+			if label.BackgroundTransparency < 1 or label.Text == "" then
+				return false
+			end
+			local p = label.Parent
+			while p and p ~= face do
+				if p:IsA("GuiObject") and p.BackgroundTransparency < 1 then
+					local c = p.BackgroundColor3
+					local same = math.abs(c.R - paper.R) < 1e-3
+						and math.abs(c.G - paper.G) < 1e-3
+						and math.abs(c.B - paper.B) < 1e-3
+					if not same then
+						return false
+					end
+				end
+				p = p.Parent
+			end
+			return true
+		end
+		local function check(root, paper, where)
+			local n = 0
+			for _, d in ipairs(root:GetDescendants()) do
+				if d:IsA("TextLabel") or d:IsA("TextButton") then
+					local face = d.Parent
+					while face and not (face:IsA("ImageLabel") and face:GetAttribute("UIArt") ~= nil) do
+						face = face.Parent
+					end
+					if face and onPaper(d, face, paper) then
+						n += 1
+						t.ok(
+							contrast(d.TextColor3, paper) >= 7,
+							where .. " " .. d.Text .. " " .. tostring(d.TextColor3)
+						)
+					end
+				end
+			end
+			t.ok(n > 0, where .. " has text on the paper")
+			return n
+		end
+
+		local UITheme = theme()
+		local paper = UITheme.Colors.Paper
+		local bar = UITheme.Bar(Instance.new("Folder"), "BuildMode")
+		bar.label.Text = "Build"
+		check(bar.outer, paper, "bar")
+
+		local built = cashAt(1920, 1080)
+		check(built.plaque, paper, "cash")
+
+		local player = Instance.new("Folder")
+		local pg = Instance.new("PlayerGui")
+		pg.Name = "PlayerGui"
+		pg.Parent = player
+		local began = signal()
+		local prompt = {
+			Parent = Instance.new("Part"),
+			ActionText = "Chop",
+			ObjectText = "Oak",
+			HoldDuration = 0,
+			ClickablePrompt = false,
+			KeyboardKeyCode = Enum.KeyCode.E,
+			GamepadKeyCode = Enum.KeyCode.ButtonX,
+			UIOffset = Vector2.zero,
+			PromptButtonHoldBegan = began,
+			PromptButtonHoldEnded = signal(),
+			Triggered = signal(),
+			PromptHidden = signal(),
+			Destroying = signal(),
+			GetPropertyChangedSignal = function()
+				return signal()
+			end,
+			InputHoldBegin = function() end,
+			InputHoldEnd = function() end,
+		}
+		local loader = client({
+			player = player,
+			tween = {
+				Create = function()
+					return { Play = function() end, Cancel = function() end }
+				end,
+			},
+		})
+		loader:load("StarterPlayer/StarterPlayerScripts/PromptUI").Show(prompt, Enum.ProximityPromptInputType.Keyboard)
+		check(pg, paper, "prompt")
+
+		-- Murph's card. Start wires signals after the card exists; a missing
+		-- one must not hide the text we came to read.
+		local qPlayer = Instance.new("Folder")
+		local qGui = Instance.new("PlayerGui")
+		qGui.Parent = qPlayer
+		local qLoader = client({
+			player = qPlayer,
+			tween = {
+				Create = function()
+					return { Play = function() end, Cancel = function() end }
+				end,
+			},
+			servicesExtra = true,
+		})
+		local QuestUI = qLoader:load("StarterPlayer/StarterPlayerScripts/QuestUI")
+		local started, startErr = pcall(function()
+			QuestUI.Start()
+		end)
+		local speech = qGui:FindFirstChild("Card", true)
+		t.ok(speech, "Murph's card: " .. tostring(startErr) .. " started=" .. tostring(started))
+		if speech then
+			check(speech, paper, "speech")
+		end
 	end)
 end

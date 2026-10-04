@@ -646,12 +646,74 @@ function UITheme.SkinInset(name: string): number
 	return if art then UIArt.Inset(art) else 0
 end
 
+-- Drops a skin off a face: no image, opaque, no slice, no inset.
+local function clearArt(face: ImageLabel)
+	face:SetAttribute("UIArt", nil)
+	face:SetAttribute("SkinInset", nil)
+	face.Image = ""
+	face.BackgroundTransparency = 0
+	face.ScaleType = Enum.ScaleType.Stretch
+	face.SliceCenter = Rect.new(0, 0, 0, 0)
+	face.SliceScale = 1
+	local corner = face:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner:Destroy()
+	end
+	local pad = face:FindFirstChildOfClass("UIPadding")
+	if pad then
+		pad:Destroy()
+	end
+	local stroke = face:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke:Destroy()
+	end
+end
+
+-- The flat card, after a skin's image failed to load. Card stored the
+-- radius, edge, and auto flag on the face before the preload.
+local function restoreFlat(face: ImageLabel)
+	clearArt(face)
+	local outer = face.Parent
+	if not (outer and outer:IsA("Frame")) then
+		return
+	end
+	local radiusAttr = face:GetAttribute("CardRadius")
+	local edgeAttr = face:GetAttribute("CardEdge")
+	local radius = if type(radiusAttr) == "number" then radiusAttr else 0
+	local edge = if type(edgeAttr) == "number" then edgeAttr else 0
+	local auto = face:GetAttribute("CardAuto") == true
+	outer.BackgroundTransparency = 0
+	local outerCorner = outer:FindFirstChildOfClass("UICorner")
+	if outerCorner then
+		outerCorner:Destroy()
+	end
+	UITheme.corner(outer, radius)
+	UITheme.corner(face, radius)
+	if auto then
+		outer.Size = UDim2.new()
+		face.Size = UDim2.new()
+		outer.AutomaticSize = Enum.AutomaticSize.XY
+		face.AutomaticSize = Enum.AutomaticSize.XY
+		UITheme.padding(outer, 0, 0, edge, 0)
+	else
+		outer.AutomaticSize = Enum.AutomaticSize.None
+		face.AutomaticSize = Enum.AutomaticSize.None
+		face.Size = UDim2.new(1, 0, 1, -edge)
+		local outerPad = outer:FindFirstChildOfClass("UIPadding")
+		if outerPad then
+			outerPad:Destroy()
+		end
+	end
+end
+
 -- Puts `skin` on a face: sliced image, transparent background, no corner.
 -- Swapping Button for ButtonPressed (a prompt held down) calls this again.
-function UITheme.ApplySkin(face: ImageLabel, skin: string)
+-- Returns false when there is no skin, or the image fails to load (the
+-- callback then, if the card is already built, puts the flat look back).
+function UITheme.ApplySkin(face: ImageLabel, skin: string): boolean
 	local art = skinArt(skin)
 	if not art then
-		return
+		return false
 	end
 	face:SetAttribute("UIArt", skin)
 	face.Image = art.id
@@ -663,14 +725,30 @@ function UITheme.ApplySkin(face: ImageLabel, skin: string)
 	if corner then
 		corner:Destroy()
 	end
+	-- Approved ids still get this: a failed or moderated load must not
+	-- leave a blank slice where the flat card should be.
+	local failed = false
+	local ContentProvider = game:GetService("ContentProvider")
+	ContentProvider:PreloadAsync({ art.id }, function(_contentId: string, status: Enum.AssetFetchStatus)
+		if status == Enum.AssetFetchStatus.Success then
+			return
+		end
+		failed = true
+		if face:GetAttribute("CardReady") == true then
+			restoreFlat(face)
+		else
+			clearArt(face)
+		end
+	end)
+	return not failed
 end
 
 -- `outer` is the edge colour and `face` sits on it, `edge` px short, so the
 -- edge shows along the bottom. Size and place `outer`; put content in
 -- `face`. With `auto`, both grow to fit the face's content. `skin` (a
 -- UIArt name) draws the face from that art instead: the outer goes fully
--- transparent, the face is sliced with no corner, and an auto card pads
--- the face by the slice margin so content stays on the flat center.
+-- transparent, the face is sliced with no corner, and the face is padded
+-- by the slice margin so content stays on the flat center.
 function UITheme.Card(
 	fill: Color3,
 	edgeColor: Color3,
@@ -687,22 +765,26 @@ function UITheme.Card(
 	face.Name = "Face"
 	face.BackgroundColor3 = fill
 	face.BorderSizePixel = 0
-	if art and skin then
+	-- So a failed preload can rebuild this same flat card.
+	face:SetAttribute("CardRadius", radius)
+	face:SetAttribute("CardEdge", edge)
+	face:SetAttribute("CardAuto", auto == true)
+	if art and skin and UITheme.ApplySkin(face, skin) then
 		-- The shadow and the border are in the art, so the old drop edge
 		-- would only add an empty gap. The face fills the outer.
 		outer.BackgroundTransparency = 1
-		UITheme.ApplySkin(face, skin)
 		if auto then
 			outer.Size = UDim2.new()
 			face.Size = UDim2.new()
 			outer.AutomaticSize = Enum.AutomaticSize.XY
 			face.AutomaticSize = Enum.AutomaticSize.XY
-			local inset = UIArt.Inset(art)
-			face:SetAttribute("SkinInset", inset)
-			UITheme.padding(face, inset, inset, inset, inset)
 		else
 			face.Size = UDim2.fromScale(1, 1)
 		end
+		-- Every skinned face, so a later padding() can't sit inside the border.
+		local inset = UIArt.Inset(art)
+		face:SetAttribute("SkinInset", inset)
+		UITheme.padding(face, inset, inset, inset, inset)
 	else
 		UITheme.corner(outer, radius)
 		face.Image = ""
@@ -720,6 +802,7 @@ function UITheme.Card(
 		end
 	end
 	face.Parent = outer
+	face:SetAttribute("CardReady", true)
 	return { outer = outer, face = face }
 end
 
@@ -943,7 +1026,7 @@ function UITheme.Bar(parent: Instance, name: string): Bar
 	UITheme.padding(card.face, 8, 10, 10, 10)
 	UITheme.list(card.face, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UITheme.texture(card.face, "Wood", 12)
-	local label = UITheme.label(card.face, "", UITheme.Fonts.Bold, 14, C.Cream)
+	local label = UITheme.label(card.face, "", UITheme.Fonts.Bold, 14, C.Ink)
 	label.LayoutOrder = 1
 	label.Size = UDim2.fromOffset(320, 20)
 	label.TextXAlignment = Enum.TextXAlignment.Center

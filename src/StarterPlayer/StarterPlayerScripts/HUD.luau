@@ -1312,14 +1312,20 @@ end
 -- Building it
 ---------------------------------------------------------------------------
 
--- 26 px on a desktop, 20 px on a compact screen. Never scaled down: the
--- top row's screen has no UIScale, and the text doesn't shrink to fit the bar.
+-- 26 px on a desktop, 20 px on a compact screen. The top row's UIScale is
+-- at least 1, so this never draws smaller than that (desktop and TV grow
+-- with UITheme.Scale(); a compact screen stays at 20).
 local function cashTextSize(): number
 	return if UITheme.Compact() then 20 else 26
 end
 
+-- The notch probe: a full-size frame in a hidden DeviceSafeInsets screen.
+-- GetGuiInset does not report the notch. leftSafe is the frame's X;
+-- rightSafe is the viewport past the frame's right edge.
+local safeArea: Frame? = nil
+
 -- Pins TopRow into the top bar, or just under it (HudLayout.TopRow).
--- Screen pixels: that screen isn't scaled.
+-- `row.AbsoluteSize` is after the row's UIScale, in screen pixels.
 local function placeTopRow()
 	local row = HUD.TopRow()
 	if not row then
@@ -1330,22 +1336,30 @@ local function placeTopRow()
 	if viewport.X <= 0 or viewport.Y <= 0 then
 		return
 	end
-	local topLeft, bottomRight = GuiService:GetGuiInset()
+	local probe = safeArea
+	local leftSafe, rightSafe = 0, 0
+	if probe then
+		local pos, size = probe.AbsolutePosition, probe.AbsoluteSize
+		leftSafe = pos.X
+		rightSafe = viewport.X - (pos.X + size.X)
+	end
 	local place = HudLayout.TopRow(
 		viewport,
 		GuiService.TopbarInset,
 		row.AbsoluteSize,
-		cashTextSize(),
-		math.max(0, topLeft.X),
-		math.max(0, bottomRight.X),
+		cashTextSize() * math.max(1, UITheme.Scale()),
+		leftSafe,
+		rightSafe,
 		UITheme.TopBar() + 4
 	)
 	row.AnchorPoint = Vector2.new(1, 0)
 	row.Position = UDim2.fromOffset(place.right, place.top)
 end
 
--- The cash row, in its own screen (no insets, no scale) parented to
--- `playerGui`. SettingsUI adds its button to the row.
+-- The cash row, in its own screen (no insets) parented to `playerGui`.
+-- Its UIScale is at least 1, so desktop and TV text grows with the other
+-- screens and a compact screen does not shrink. SettingsUI adds its
+-- button to the row.
 local function buildCash(playerGui: Instance)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "TimberlineTop"
@@ -1355,6 +1369,31 @@ local function buildCash(playerGui: Instance)
 	gui.IgnoreGuiInset = true
 	gui.ScreenInsets = Enum.ScreenInsets.None
 	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+	local uiScale = Instance.new("UIScale")
+	uiScale.Name = "Scale"
+	local function fitScale()
+		uiScale.Scale = math.max(1, UITheme.Scale())
+	end
+	fitScale()
+	uiScale.Parent = gui
+
+	-- Hidden: it only exists so AbsolutePosition/AbsoluteSize are the
+	-- device safe rect. Not under TimberlineTop, which ignores insets.
+	local probeGui = Instance.new("ScreenGui")
+	probeGui.Name = "TimberlineSafeProbe"
+	probeGui.ResetOnSpawn = false
+	probeGui.DisplayOrder = 0
+	probeGui.IgnoreGuiInset = true
+	probeGui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	probeGui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+	local probe = Instance.new("Frame")
+	probe.Name = "SafeArea"
+	probe.BackgroundTransparency = 1
+	probe.BorderSizePixel = 0
+	probe.Size = UDim2.fromScale(1, 1)
+	probe.Parent = probeGui
+	probeGui.Parent = playerGui
+	safeArea = probe
 
 	local border = UITheme.SkinInset("Plaque")
 	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Plaque")
@@ -1377,7 +1416,7 @@ local function buildCash(playerGui: Instance)
 	pops.LayoutOrder = -100
 	pops.Parent = row
 	local min = Instance.new("UISizeConstraint")
-	min.MinSize = Vector2.new(172, 26 + border * 2) -- wide enough for $1,999,999; tall as the text plus the border
+	min.MinSize = Vector2.new(172, 26 + 8 + border * 2) -- wide enough for $1,999,999; paper is the text plus 8
 	min.Parent = card.outer
 	cashMin = min
 	-- The amber glow sits on the plaque, outside the digits.
@@ -1390,14 +1429,14 @@ local function buildCash(playerGui: Instance)
 	local inner = Instance.new("Frame")
 	inner.Name = "Paper"
 	inner.AutomaticSize = Enum.AutomaticSize.X
-	inner.Size = UDim2.fromOffset(0, 26)
+	inner.Size = UDim2.fromOffset(0, 26 + 8)
 	inner.BackgroundColor3 = C.Paper
 	inner.BorderSizePixel = 0
 	UITheme.corner(inner, 10)
 	UITheme.padding(inner, 0, 14, 0, 14)
 	inner.Parent = card.face
 	local innerMin = Instance.new("UISizeConstraint")
-	innerMin.MinSize = Vector2.new(164, 26)
+	innerMin.MinSize = Vector2.new(164, 26 + 8)
 	innerMin.Parent = inner
 	cashInnerMin = innerMin
 
@@ -1423,25 +1462,26 @@ local function buildCash(playerGui: Instance)
 	cashOuter, cashFace, cashInner, cashLabel, cashGlow = card.outer, card.face, inner, label, glow
 	cashPops, cashShown = pops, shown
 	-- A handheld doesn't reserve room for $1,999,999: the plaque hugs the
-	-- amount. The text stays 20 px there and 26 elsewhere; this screen
-	-- isn't scaled, so neither size shrinks to fit the bar.
+	-- amount. The text stays 20 px there and 26 elsewhere; the screen's
+	-- scale is at least 1, so neither size shrinks to fit the bar.
 	local function fitCash()
 		local compact = UITheme.Compact()
 		local textH = cashTextSize()
-		local tall = textH + border * 2
+		local paperH = textH + 8
+		local tall = paperH + border * 2
 		local cap, paper, words = cashMin, cashInnerMin, cashLabelMin
 		if cap then
 			cap.MinSize = Vector2.new(if compact then 72 else 172, tall)
 		end
 		if paper then
-			paper.MinSize = Vector2.new(if compact then 56 else 164, textH)
+			paper.MinSize = Vector2.new(if compact then 56 else 164, paperH)
 		end
 		if words then
 			words.MinSize = if compact then Vector2.new(36, 0) else Vector2.new(136, 0)
 		end
 		local face = cashInner
 		if face then
-			face.Size = UDim2.fromOffset(0, textH)
+			face.Size = UDim2.fromOffset(0, paperH)
 		end
 		local shownLabel = cashLabel
 		if shownLabel then
@@ -1450,8 +1490,10 @@ local function buildCash(playerGui: Instance)
 		end
 	end
 	fitCash()
+	UITheme.WatchLayout(fitScale)
 	UITheme.WatchLayout(fitCash)
 	row:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTopRow)
+	probe:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTopRow)
 	UITheme.WatchTopBar(placeTopRow)
 	UITheme.WatchLayout(placeTopRow)
 	placeTopRow()

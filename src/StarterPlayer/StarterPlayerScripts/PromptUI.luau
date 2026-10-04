@@ -140,12 +140,12 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	words.BackgroundTransparency = 1
 	UITheme.list(words, 3)
 	words.Parent = card.face
-	local action = UITheme.label(words, prompt.ActionText, F.Black, 16, C.Cream)
+	local action = UITheme.label(words, prompt.ActionText, F.Black, 16, C.Ink)
 	action.LayoutOrder = 1
 	action.Size = UDim2.new()
 	action.AutomaticSize = Enum.AutomaticSize.XY
 	local object =
-		UITheme.label(words, string.upper(prompt.ObjectText), F.Black, UITheme.Sized("PromptObject").text, C.Amber)
+		UITheme.label(words, string.upper(prompt.ObjectText), F.Black, UITheme.Sized("PromptObject").text, C.Bark)
 	object.LayoutOrder = 2
 	object.Size = UDim2.new()
 	object.AutomaticSize = Enum.AutomaticSize.XY

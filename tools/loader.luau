@@ -169,6 +169,15 @@ local function defaultServices()
 				inst:RemoveTag(tag)
 			end,
 		},
+		-- Skinned cards preload their image. A real client reports Success
+		-- or Failure; here the image loads, and a spec can pass its own.
+		ContentProvider = {
+			PreloadAsync = function(_, _, callback)
+				if callback then
+					callback("", roblox.Enum.AssetFetchStatus.Success)
+				end
+			end,
+		},
 	}
 end
 
