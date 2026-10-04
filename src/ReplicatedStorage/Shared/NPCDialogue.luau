@@ -14,6 +14,8 @@ local TutorialData = require(script.Parent.TutorialData)
 
 local NPCDialogue = {}
 
+-- Phone role line, in pixels. Meets the 14 px tag minimum. TBD (Builder).
+NPCDialogue.PhoneTagRole = 14
 NPCDialogue.MaxLine = 110 -- the old cap; a bubble wraps past it into a speech
 NPCDialogue.ReactMax = 90 -- contextual lines and onboarding tips
 NPCDialogue.PromptCooldown = 4.5 -- seconds between Talk presses
@@ -315,7 +317,7 @@ function NPCDialogue.LayoutFor(phone: boolean): Layout
 			tagDistance = 40,
 			tagSize = Vector2.new(160, 38),
 			tagName = 18,
-			tagRole = 11,
+			tagRole = NPCDialogue.PhoneTagRole,
 		}
 	end
 	return {

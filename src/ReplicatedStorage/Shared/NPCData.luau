@@ -23,6 +23,7 @@
 -- picks among them.
 
 local CharacterArt = require(script.Parent.Art.CharacterArt)
+local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 
 local NPCData = {}
 
@@ -72,6 +73,7 @@ export type NPC = {
 	work: ("chop" | "saw" | "sweep" | "carry")?, -- a work clip, client-side (NPCAnim)
 	workLoops: number?, -- chops in a row (a saw or a sweep is already a phrase)
 	promptLift: number?, -- Talk's UIOffset Y, so it sits above a shop or pad prompt
+	shop: string?, -- a counter keeper's shop id (ShopHoursLogic). Nil for everyone else.
 	tutorialQuiet: boolean?, -- no chatter while the tutorial runs (QuestUI owns Murph's lines; one tip still plays)
 	tips: { string }?, -- onboarding, the first time a new player meets them
 	greetings: { string },
@@ -221,6 +223,7 @@ NPCData.List = {
 		id = "Tink",
 		name = "Tink",
 		role = "Axe smith",
+		shop = "ToolShed",
 		spot = { kind = "counter", model = "ToolShed", fallback = Vector3.new(-57, 0, 110) },
 		idle = "glasses",
 		work = "chop",
@@ -269,6 +272,7 @@ NPCData.List = {
 		id = "Dale",
 		name = "Dale",
 		role = "Truck dealer",
+		shop = "Dealership",
 		spot = { kind = "counter", model = "Dealership", fallback = Vector3.new(48, 0, 110.4) },
 		idle = "wipe",
 		promptLift = 80,
@@ -314,6 +318,7 @@ NPCData.List = {
 		id = "Hazel",
 		name = "Hazel",
 		role = "Gear keeper",
+		shop = "HearthAndHome",
 		spot = { kind = "counter", model = "HearthAndHome", fallback = Vector3.new(-93.5, 0, 110.3) },
 		idle = "lookAround",
 		work = "sweep",
@@ -577,13 +582,14 @@ end
 -- The shops that need a keeper behind their Counter.
 NPCData.Shops = { "ToolShed", "Dealership", "HearthAndHome" }
 
--- Talk, on every NPC. F and ButtonY, so it doesn't take the E / ButtonX
--- the shops, the sell pad, and the gondola already use. ClickablePrompt
--- covers a mouse click; PromptUI's card covers a tap. Line of sight stays
--- off: hats, counters, and streaming would hide the prompt otherwise.
+-- Talk, on every NPC. E and ButtonX, the same Interact key as Buy (InputKit
+-- lets Talk and Buy share it; the door uses Open, F / ButtonY, so a closed
+-- door never takes the talk button). ClickablePrompt covers a mouse click;
+-- PromptUI's card covers a tap. Line of sight stays off: hats, counters,
+-- and streaming would hide the prompt otherwise.
 NPCData.TalkDistance = 12
-NPCData.TalkKeyboard = Enum.KeyCode.F
-NPCData.TalkGamepad = Enum.KeyCode.ButtonY
+NPCData.TalkKeyboard = Enum.KeyCode.E
+NPCData.TalkGamepad = Enum.KeyCode.ButtonX
 
 ---------------------------------------------------------------------------
 -- Spots
@@ -597,6 +603,26 @@ NPCData.CounterGap = 1.25
 -- puts the ShopPoint).
 function NPCData.BehindCounter(counter: CFrame, size: Vector3): CFrame
 	return counter * CFrame.new(0, -size.Y / 2, size.Z / 2 + NPCData.CounterGap)
+end
+
+-- Lying behind the counter, on the same spot as BehindCounter, low enough
+-- that the body's top is SleepClearance under the counter top. Up is the
+-- counter's LookVector (flat), so the keeper is not standing. fromMatrix,
+-- not lookAt: Lune's lookAt disagrees with Roblox.
+function NPCData.SleepCFrame(counter: CFrame, size: Vector3): CFrame
+	local stand = NPCData.BehindCounter(counter, size)
+	local top = counter.Position.Y + size.Y / 2
+	local y = top - ShopHoursLogic.SleepClearance - ShopHoursLogic.SleepBodyHalf
+	local pos = Vector3.new(stand.Position.X, y, stand.Position.Z)
+	local up = counter.LookVector
+	local look = -Vector3.yAxis
+	local right = up:Cross(look)
+	if right.Magnitude < 1e-4 then
+		right = counter.RightVector
+	else
+		right = right.Unit
+	end
+	return CFrame.fromMatrix(pos, right, up, -look)
 end
 
 -- Standing beside a part (a platform, a zone), on the ground under it.

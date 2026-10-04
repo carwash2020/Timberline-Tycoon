@@ -22,8 +22,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CollectionService = game:GetService("CollectionService")
 
+local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
@@ -89,6 +91,61 @@ local function nearDisplay(hrp: BasePart, category: string): boolean
 		end
 	end
 	return false
+end
+
+-- The hour shop doors use. Tests replace this. Production reads
+-- WorldTime.Hour() through ShopHoursLogic.Now, so Studio's ClockOverride works.
+function ShopService.Hour(): number
+	return ShopHoursLogic.Now()
+end
+
+-- Shops for this category whose counter the player can reach, and whether
+-- they are also at a display model (the dealership lot).
+local function shopsInReach(player: Player, category: string): ({ string }, boolean)
+	local names: { string } = {}
+	local char = player.Character
+	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not hrp then
+		return names, false
+	end
+	local reach = GameConfig.ShopRange + GameConfig.RangeTolerance
+	local folder = map
+	for _, shopName in ipairs(SHOP_FOR[category] or {}) do
+		local shop = if folder then folder:FindFirstChild(shopName) else nil
+		local counter = if shop then shop:FindFirstChild("Counter") else nil
+		local point = if counter then counter:FindFirstChild("ShopPoint") else nil
+		if point and point:IsA("Attachment") and (hrp.Position - point.WorldPosition).Magnitude <= reach then
+			table.insert(names, shopName)
+		end
+	end
+	return names, nearDisplay(hrp, category)
+end
+
+-- A sale is allowed when any in-range shop for the category is open. The
+-- test map parks every ShopPoint on one spot, so a night axe still sells
+-- at the Tool Shed while Hearth & Home, also "in range", is closed.
+local function closedShop(player: Player, category: string, hour: number): string?
+	local names, display = shopsInReach(player, category)
+	local closedName: string? = nil
+	local anyOpen = false
+	for _, shopName in ipairs(names) do
+		if ShopHoursLogic.IsOpen(shopName, hour) then
+			anyOpen = true
+		else
+			closedName = shopName
+		end
+	end
+	if display then
+		if ShopHoursLogic.IsOpen("Dealership", hour) then
+			anyOpen = true
+		elseif closedName == nil then
+			closedName = "Dealership"
+		end
+	end
+	if anyOpen or (#names == 0 and not display) then
+		return nil
+	end
+	return closedName or "HearthAndHome"
 end
 
 local function inRange(player: Player, category: string): boolean
@@ -468,6 +525,11 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 		notify(player, "Walk up to the counter to buy.")
 		return
 	end
+	local shut = closedShop(player, category, ShopService.Hour())
+	if shut then
+		notify(player, DialogueData.Sleepy(shut, ShopService.Hour()))
+		return
+	end
 	if category == "Axe" then
 		buyAxe(player, itemId)
 	elseif category == "Truck" then
@@ -563,6 +625,7 @@ export type BoxGrant = {
 	kind: string,
 	itemId: string,
 	limited: boolean?,
+	shop: string?,
 }
 
 local settled: { [string]: string } = {}
@@ -610,6 +673,14 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	local profile = ProfileService.GetProfile(player)
 	if not profile then
 		return fail("missing")
+	end
+	local shopId = box.shop
+	if type(shopId) ~= "string" or shopId == "" then
+		local slot = StoreStock.Find(box.kind, box.itemId)
+		shopId = if slot then slot.shop else nil
+	end
+	if type(shopId) == "string" and not ShopHoursLogic.IsOpen(shopId, ShopService.Hour()) then
+		return fail("sleepy")
 	end
 	local limited = box.limited == true or (box.kind == "Cosmetic" and box.itemId == "LampPost")
 	local price = StoreStock.UnitPrice(box.kind, box.itemId, limited, loop)

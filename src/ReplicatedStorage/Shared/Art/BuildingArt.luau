@@ -15,8 +15,8 @@
 -- Only what players stand on or bump into collides (floors, walls, posts,
 -- roofs, counters, big props); everything else is Kit.decor, and small
 -- parts cast no shadow. Part budgets (tests/BuildingArt.spec.luau holds
--- them): Sawmill 400, each Shop 226, GondolaStation 140, Campsite 110,
--- a TownTree 70.
+-- them): Sawmill 400, each Shop 227, GondolaStation 140, Campsite 110,
+-- a TownTree 70. The extra shop part is the hours board.
 --
 -- The sawmill and the shops are built at their design size, then scaled up
 -- by BuildingArt.Scale (TWN-13: Connor wanted the town's buildings much
@@ -24,6 +24,7 @@
 -- what stands on it, keeps its size: people still lean on it.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local ShopHoursLogic = require(script.Parent.Parent.ShopHoursLogic)
 local StoreStock = require(script.Parent.Parent.StoreStock)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
@@ -106,6 +107,13 @@ BuildingArt.Scale = {
 	Dealership = 1.5,
 	HearthAndHome = 1.5,
 } :: { [string]: number }
+
+-- A closed door leaf. Colour and transparency only; no new parts.
+-- TBD (Builder).
+BuildingArt.LockedDoorRed = 40
+BuildingArt.LockedDoorGreen = 48
+BuildingArt.LockedDoorBlue = 62
+BuildingArt.LockedDoorTransparency = 0.35
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -521,8 +529,13 @@ end
 
 -- A plank door with a frame and a brass knob; `cf` = the middle of its
 -- bottom edge on the wall face.
+local function markHoursLeaf(part: BasePart)
+	part:SetAttribute("HoursLeaf", true)
+end
+
 local function door(parent: Instance, cf: CFrame, w: number, h: number, color: Color3, frame: Color3)
-	dBox(parent, "Door", V3(w, h, 0.25), cf * CF(0, h / 2, -0.1), color, MAT.WoodPlanks)
+	local leaf = dBox(parent, "Door", V3(w, h, 0.25), cf * CF(0, h / 2, -0.1), color, MAT.WoodPlanks)
+	markHoursLeaf(leaf)
 	dBox(parent, "DoorFrame", V3(w + 0.7, 0.35, 0.4), cf * CF(0, h + 0.15, -0.15), frame)
 	for _, s in ipairs({ -1, 1 }) do
 		dBox(parent, "DoorFrame", V3(0.35, h, 0.4), cf * CF(s * (w / 2 + 0.15), h / 2, -0.15), frame)
@@ -1184,7 +1197,7 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	local diag, tilt = math.sqrt(3.6 ^ 2 + 6.4 ^ 2), math.atan2(3.6, 6.4)
 	for _, s in ipairs({ -1, 1 }) do
 		local d = CF(s * 7, FLOOR, -HZ - 0.5)
-		dBox(model, "BarnDoor", V3(4.4, 7.2, 0.3), d * CF(0, 3.6, 0), doorRed, MAT.WoodPlanks)
+		markHoursLeaf(dBox(model, "BarnDoor", V3(4.4, 7.2, 0.3), d * CF(0, 3.6, 0), doorRed, MAT.WoodPlanks))
 		for _, bar in ipairs({ { 0, 0.2, 4.4, 0.4 }, { 0, 7.0, 4.4, 0.4 }, { -2, 3.6, 0.4, 7.2 }, { 2, 3.6, 0.4, 7.2 } }) do
 			dBox(model, "DoorTrim", V3(bar[3], bar[4], 0.15), d * CF(bar[1], bar[2], -0.2), TRIM)
 		end
@@ -1330,13 +1343,15 @@ local function dealership(model: Model, title: string, accent: Color3)
 	dBox(model, "DoorHeader", V3(DX1 - DX0 + 1.2, 0.9, 1.0), CF((DX0 + DX1) / 2, DH + 0.35, Z0 - 0.2), dark, MAT.Metal)
 	dBox(model, "DoorDrum", V3(DX1 - DX0, 1.3, 1.3), CF((DX0 + DX1) / 2, DH - 0.1, Z0 + 0.95), paint[3], MAT.Metal)
 	for i = 0, 1 do
-		dBox(
-			model,
-			"DoorSlat",
-			V3(DX1 - DX0 - 0.5, 0.5, 0.18),
-			CF((DX0 + DX1) / 2, DH - 0.3 - i * 0.55, Z0 + 0.15),
-			Kit.shade(STEEL_DARK, i * 0.08),
-			MAT.Metal
+		markHoursLeaf(
+			dBox(
+				model,
+				"DoorSlat",
+				V3(DX1 - DX0 - 0.5, 0.5, 0.18),
+				CF((DX0 + DX1) / 2, DH - 0.3 - i * 0.55, Z0 + 0.15),
+				Kit.shade(STEEL_DARK, i * 0.08),
+				MAT.Metal
+			)
 		)
 	end
 	window(model, CF(GX0 - 0.3, 6.2, 0) * ANG(0, PI / 2, 0), 3, 2.2, TRIM, nil, nil)
@@ -1424,16 +1439,17 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	local wallH = TOP - FLOOR
 
 	Kit.part(model, "Floor", V3(2 * HX, FLOOR, 2 * HZ), CF(0, FLOOR / 2, 0), PLANK[2], MAT.WoodPlanks)
-	local function wall(cf: CFrame, w: number, h: number)
-		Kit.part(model, "Wall", V3(w, h, 0.6), cf, plaster, MAT.Plaster)
+	local function wall(cf: CFrame, w: number, h: number): Part
+		return Kit.part(model, "Wall", V3(w, h, 0.6), cf, plaster, MAT.Plaster)
 	end
 	wall(CF(-HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
 	wall(CF(HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
 	wall(CF(0, mid, HZ), 2 * HX, wallH)
 	-- Front opens on an 8-stud door, tall enough to see the counter.
+	-- The header is the leaf the hours lock recolours. Hearth has no door slab.
 	wall(CF(-10, mid, -HZ), 12, wallH)
 	wall(CF(10, mid, -HZ), 12, wallH)
-	wall(CF(0, (8 + TOP) / 2, -HZ), 8, TOP - 8)
+	markHoursLeaf(wall(CF(0, (8 + TOP) / 2, -HZ), 8, TOP - 8))
 	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), SLATE_ROOF[1], MAT.Slate)
 
 	-- Above the roof, and no further south than the roof's overhang, so the
@@ -1535,6 +1551,90 @@ local function placeShelfSlots(model: Model, kind: string, scale: number)
 	end
 end
 
+-- Colour and transparency only. The leaf's first colour is remembered so an
+-- open door can come back. No parts are added or moved.
+function BuildingArt.PaintDoor(model: Instance, locked: boolean)
+	if type((model :: any).GetDescendants) ~= "function" then
+		return
+	end
+	local tint = Color3.fromRGB(BuildingArt.LockedDoorRed, BuildingArt.LockedDoorGreen, BuildingArt.LockedDoorBlue)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute("HoursLeaf") == true then
+			if d:GetAttribute("HoursBaseR") == nil then
+				d:SetAttribute("HoursBaseR", d.Color.R)
+				d:SetAttribute("HoursBaseG", d.Color.G)
+				d:SetAttribute("HoursBaseB", d.Color.B)
+				d:SetAttribute("HoursBaseT", d.Transparency)
+			end
+			if locked then
+				d.Color = tint
+				d.Transparency = BuildingArt.LockedDoorTransparency
+			else
+				local r = d:GetAttribute("HoursBaseR")
+				local g = d:GetAttribute("HoursBaseG")
+				local b = d:GetAttribute("HoursBaseB")
+				local t = d:GetAttribute("HoursBaseT")
+				if type(r) == "number" and type(g) == "number" and type(b) == "number" then
+					d.Color = Color3.new(r, g, b)
+				end
+				if type(t) == "number" then
+					d.Transparency = t
+				end
+			end
+		end
+	end
+end
+
+-- A 4 x 2 board on the front-most hours leaf, added after the shop is
+-- scaled so the stud size stays put. Text is filled later by
+-- ShopHoursLogic.WriteSigns. Not parented to the name Sign: fitNameSign
+-- would overwrite that board's pixels per stud.
+local function addHoursBoard(model: Model, shopId: string)
+	local host: BasePart? = nil
+	local hostZ = math.huge
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute("HoursLeaf") == true and d.CFrame.Position.Z < hostZ then
+			host = d
+			hostZ = d.CFrame.Position.Z
+		end
+	end
+	if host == nil then
+		return
+	end
+	local w = ShopHoursLogic.SignWidthStuds
+	local h = ShopHoursLogic.SignHeightStuds
+	local depth = ShopHoursLogic.SignDepthStuds
+	local at = host.CFrame.Position
+	local top = at.Y + host.Size.Y / 2
+	local y = top + h / 2
+	local clear = ShopHoursLogic.SignClearY + h / 2
+	if y < clear then
+		y = clear
+	end
+	local board = Kit.part(model, "HoursBoard", V3(w, h, depth), CF(at.X, y, at.Z), SIGN_BOARD, MAT.Wood)
+	Kit.decor(board)
+	board:SetAttribute("ShopId", shopId)
+	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "HoursGui"
+		gui.Face = face
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = ShopHoursLogic.SignPixelsPerStud
+		gui.LightInfluence = 0
+		gui.Parent = board
+		local label = Instance.new("TextLabel")
+		label.Name = "Hours"
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.GothamBold
+		label.TextScaled = true
+		label.TextWrapped = true
+		label.TextColor3 = SIGN_INK
+		label.Text = ""
+		label.Parent = gui
+	end
+end
+
 -- A shop: about 18 x 14 studs, its front (-Z) open on the counter. `kind`
 -- is "ToolShed", "Dealership" or "HearthAndHome" (anything else builds a
 -- Hearth & Home style store); `title` goes on the sign; `accent` is the
@@ -1585,6 +1685,7 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	if sign and sign:IsA("BasePart") then
 		fitNameSign(sign)
 	end
+	addHoursBoard(model, kind)
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
 	TownMeshes.Dress(model, TownModels.ShopAsset(kind))
 	if kind == "ToolShed" or kind == "HearthAndHome" then

@@ -24,8 +24,9 @@
 --     The server never moves them.
 --   * The nearest NPC within TALK_RANGE says a line in a speech bubble
 --     every so often (NPCDialogue: the hour, the weather, a first sale, a
---     better axe, a sawmill, or a general line). Talk (F, or a tap on the
---     prompt) asks for one sooner. Murph keeps quiet while your tutorial
+--     better axe, a sawmill, or a general line). Talk (E, or a tap on the
+--     prompt) asks for one sooner. A sleeping keeper says the server's
+--     SleepLine and is not stood back up. Murph keeps quiet while your tutorial
 --     runs (QuestUI owns his button); he still looks, waves, and gives
 --     that one tip.
 --   * The bubble is adorned to the head, so it follows the walk every
@@ -436,6 +437,14 @@ local function onTalk(rig: Rig)
 	if now < rig.lastPrompt + NPCDialogue.PromptCooldown then
 		return
 	end
+	if rig.model:GetAttribute("Asleep") == true then
+		local sleep = rig.model:GetAttribute("SleepLine")
+		if type(sleep) == "string" and sleep ~= "" then
+			say(rig, sleep, now)
+			rig.lastPrompt = now
+			return
+		end
+	end
 	if quiet(rig) then
 		return
 	end
@@ -629,7 +638,7 @@ local function rest(rig: Rig)
 	end
 	rig.yaw, rig.pitch, rig.walkBlend = 0, 0, 0
 	rig.flourish = nil
-	if not rig.route and rig.bodyYaw ~= rig.homeYaw then
+	if not rig.route and rig.bodyYaw ~= rig.homeYaw and rig.model:GetAttribute("Asleep") ~= true then
 		rig.bodyYaw = rig.homeYaw
 		rig.root.CFrame = CFrame.new(rig.root.Position) * CFrame.Angles(0, rig.homeYaw, 0)
 	end
@@ -663,6 +672,21 @@ local FLOURISHES: { [string]: { length: number, gap: { number } } } = {
 local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focusHead: Vector3?, selfDist: number)
 	local s = rig.scale
 	local npc = rig.npc
+
+	-- The server laid the keeper down. Don't stand them back up, and don't
+	-- play a chop or a wave over the lie.
+	if rig.model:GetAttribute("Asleep") == true then
+		local pose = NPCAnim.Sleep()
+		setTransform(rig.rootJoint, CFrame.Angles(pose.rootPitch, pose.rootYaw, 0))
+		setTransform(rig.neck, CFrame.Angles(pose.neckPitch, pose.neckYaw, pose.neckRoll))
+		setTransform(rig.leftShoulder, limb(pose.leftPitch, pose.leftYaw, pose.leftRoll))
+		setTransform(rig.rightShoulder, limb(pose.rightPitch, pose.rightYaw, pose.rightRoll))
+		if not rig.route then
+			setTransform(rig.leftHip, CFrame.Angles(pose.leftHip, 0, 0))
+			setTransform(rig.rightHip, CFrame.Angles(pose.rightHip, 0, 0))
+		end
+		return
+	end
 
 	-- Walkers are placed every frame in presentWalkers (the clock, eased).
 	-- Standing townsfolk still turn here, on the cosmetic tick.

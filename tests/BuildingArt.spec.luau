@@ -215,9 +215,9 @@ return function(t)
 			local pathStart = if shop.kind == "HearthAndHome" then -18 else -8 * s
 			local hit = blockers(model, V3.new(x - 1.5, 0.7 * s, pathStart), V3.new(x + 1.5, 6, front - 0.05), counter)
 			t.eq(hit, {}, shop.kind .. " path to the counter")
-			-- 226: 220 plus the two sign goosenecks (3 parts each) the Tool
-			-- Shed and Hearth & Home got in TWN-07, on purpose.
-			t.ok(#parts(model) <= 226, shop.kind .. " parts: " .. #parts(model))
+			-- 227: 220 plus the two sign goosenecks (3 parts each) the Tool
+			-- Shed and Hearth & Home got in TWN-07, plus the hours board.
+			t.ok(#parts(model) <= 227, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)

@@ -19,6 +19,13 @@ NPCAnim.ChopLength = 1.35 -- one wind-up, strike, and recover
 NPCAnim.SawLength = 2.4 -- a few strokes
 NPCAnim.SweepLength = 2.6 -- one sweep across and back
 
+-- Asleep, the limbs stay tucked. The lie itself is the root CFrame
+-- (NPCData.SleepCFrame), not a big root pitch. TBD (Builder).
+NPCAnim.SleepArmPitch = 0.15
+NPCAnim.SleepArmRoll = 0.35
+NPCAnim.SleepNeckPitch = 0.25
+NPCAnim.SleepHip = 0.1
+
 function NPCAnim.Length(work: string): number
 	if work == "chop" then
 		return NPCAnim.ChopLength
@@ -148,11 +155,28 @@ export type SampleInput = {
 	talkTime: number,
 	talkWeight: number,
 	breath: number,
+	asleep: boolean?,
 }
+
+-- Tucked limbs for a keeper who is already lying down.
+function NPCAnim.Sleep(): Pose
+	local p = bare()
+	p.leftPitch = NPCAnim.SleepArmPitch
+	p.rightPitch = NPCAnim.SleepArmPitch
+	p.leftRoll = -NPCAnim.SleepArmRoll
+	p.rightRoll = NPCAnim.SleepArmRoll
+	p.neckPitch = NPCAnim.SleepNeckPitch
+	p.leftHip = NPCAnim.SleepHip
+	p.rightHip = NPCAnim.SleepHip
+	return p
+end
 
 -- The pose for this frame: a walk, a held prop, one work clip, and a
 -- talk gesture blended on top. Work wins the arms over talk.
 function NPCAnim.Sample(input: SampleInput): Pose
+	if input.asleep == true then
+		return NPCAnim.Sleep()
+	end
 	local p = bare()
 	local walk = math.clamp(input.walk, 0, 1)
 	local leftHip, rightHip, leftArm, rightArm, bob = NPCAnim.Walk(input.phase, walk)

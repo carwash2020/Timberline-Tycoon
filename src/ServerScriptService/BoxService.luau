@@ -12,6 +12,7 @@ local BoxLogic = require(ReplicatedStorage.Shared.BoxLogic)
 local CounterLogic = require(ReplicatedStorage.Shared.CounterLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local LeaveCommit = require(script.Parent.LeaveCommit)
@@ -433,8 +434,19 @@ function BoxService.Make(opts: MakeOptions): Record
 	return rec
 end
 
+local function shopHour(): number
+	local okShop, shop = pcall(function()
+		return require(script.Parent.ShopService)
+	end)
+	if okShop and type(shop) == "table" and type(shop.Hour) == "function" then
+		return shop.Hour()
+	end
+	return ShopHoursLogic.FallbackHour
+end
+
 function BoxService.RefreshPrompts()
 	BoxService.NoteZones()
+	local hour = shopHour()
 	for _, rec in pairs(records) do
 		local part = rec.part
 		if part == nil then
@@ -443,7 +455,8 @@ function BoxService.RefreshPrompts()
 		local buy = part:FindFirstChild("BuyPrompt")
 		local openPrompt = part:FindFirstChild("OpenPrompt")
 		if buy and buy:IsA("ProximityPrompt") then
-			buy.Enabled = not rec.paid and not rec.opened and BoxService.InCounter(rec)
+			local open = ShopHoursLogic.IsOpen(rec.shop, hour)
+			buy.Enabled = not rec.paid and not rec.opened and BoxService.InCounter(rec) and open
 		end
 		if openPrompt and openPrompt:IsA("ProximityPrompt") then
 			openPrompt.Enabled = rec.paid and not rec.opened
@@ -734,6 +747,7 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 		kind = rec.itemKind,
 		itemId = rec.itemId,
 		limited = rec.limited,
+		shop = rec.shop,
 	})
 	if ok then
 		rec.paid = true
