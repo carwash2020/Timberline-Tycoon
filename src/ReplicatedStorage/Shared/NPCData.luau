@@ -516,10 +516,12 @@ NPCData.List = {
 		speed = 2.6,
 		work = "carry",
 		route = {
-			{ x = -17, z = 50 },
+			-- The south end sits north of the woods sign's posts. A tighter
+			-- line clips the sign (the board and its rocks reach this far).
+			{ x = -17, z = 50.35 },
 			{ x = -18, z = 66, pause = 5, face = 104 }, -- watching the saw
 			{ x = -15.5, z = 64 },
-			{ x = -15, z = 52, pause = 4, face = 270 }, -- watching the street
+			{ x = -15, z = 52.35, pause = 4, face = 270 }, -- watching the street
 		},
 		idle = "lookAround",
 		look = {
