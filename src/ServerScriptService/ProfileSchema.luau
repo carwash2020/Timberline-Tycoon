@@ -725,7 +725,6 @@ end
 
 -- The v2 loop (V2_PLAN.md §14) ---------------------------------------------
 
-ProfileSchema.SchemaV2 = 2
 -- u³ of forge wood each v1 log in the Starfall forge becomes (40 lumenwood
 -- logs to 60 u³), never more than the recipe takes.
 ProfileSchema.ForgeU3PerLog = 1.5
