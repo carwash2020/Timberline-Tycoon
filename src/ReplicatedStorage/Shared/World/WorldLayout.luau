@@ -679,10 +679,10 @@ WorldLayout.SpurMaxGrade = 0.2 -- TBD (Designer)
 WorldLayout.TollClearance = 4 -- TBD (Builder) setback and gorge rescue sit this far above the ground
 WorldLayout.SpurMeet = 20 -- TBD (Designer) the last studs, flush with the deck top
 WorldLayout.TollSpurJoinZ = 900 -- TBD (Builder) on Snow Road, where the ground is still gentle
--- Inside the wall gap (x -400..400), clear of the height grid, and in a
--- decor cell the first-layer sample skips. The whole road width has to
--- fit through the gap or the spur dead-ends on the world wall.
-WorldLayout.TollSpurWestX = -374 -- TBD (Builder)
+-- Inside the wall gap (x -400..400) and clear of the height grid. This
+-- lane is also where the boot forest's trunks stay put; the decor sample
+-- skips the mountain cut itself (see EnvironmentData).
+WorldLayout.TollSpurWestX = -326 -- TBD (Builder)
 -- North of the wild clumps and the boulder-cluster search, so the cut
 -- does not move a rock or a tree. The ground south of here is already
 -- gentle enough to drive.

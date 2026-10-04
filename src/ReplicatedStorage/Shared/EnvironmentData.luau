@@ -1134,8 +1134,27 @@ local function scatter(
 				continue
 			end
 			y = TerrainGen.HeightAt(x, z)
-			if y > 100 then
-				continue -- mountain peaks stay bare
+			-- The toll spur cuts through the mountains, so a peak that was
+			-- bare (over 100) would otherwise grow flowers in the trench.
+			-- The lowland approach was already under that line.
+			local roadside = WorldLayout.TollSpur.width / 2 + 6
+			local cut = false
+			if WorldLayout.OnTollSpur(x, z) then
+				for _, step in ipairs({
+					{ roadside, 0 },
+					{ -roadside, 0 },
+					{ 0, roadside },
+					{ 0, -roadside },
+				}) do
+					local ox, oz = x + step[1], z + step[2]
+					if not WorldLayout.OnTollSpur(ox, oz) and TerrainGen.HeightAt(ox, oz) > 100 then
+						cut = true
+						break
+					end
+				end
+			end
+			if y > 100 or cut then
+				continue -- mountain peaks stay bare, and so does the cut through them
 			end
 		end
 		table.insert(out, {
