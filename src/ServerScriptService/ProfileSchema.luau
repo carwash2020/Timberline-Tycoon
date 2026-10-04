@@ -10,6 +10,7 @@ local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
+local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -31,6 +32,9 @@ export type PlacedItem = {
 	wood: string?, -- filled wood; missing means the authored look
 	fill: { units: number }?, -- kit blueprint still taking planks; missing means built
 	paid: number?, -- fee charged to place a kit piece; missing means the legacy price
+	len: number?, -- resized length; missing means the base. woodUnits is not saved
+	lenX: number?,
+	lenZ: number?,
 	-- A placed sawmill's cut, in timber units (V2_PLAN.md §7). Other items
 	-- leave it unset.
 	data: { x: number, y: number }?,
@@ -340,15 +344,28 @@ function ProfileSchema.Migrate(data: any)
 			if not bp or bp.kit ~= true then
 				item.fill = nil
 				item.paid = nil
+				item.len = nil
+				item.lenX = nil
+				item.lenZ = nil
 			else
+				local along = EditLogic.CanResize(bp.id)
+				if along and bp.id ~= "Floor" and bp.id ~= "Floor4" then
+					item.len = EditLogic.CleanLen(bp.footprint.X, item.len)
+					item.lenX = nil
+					item.lenZ = nil
+				elseif bp.id == "Floor" or bp.id == "Floor4" then
+					item.len = nil
+					item.lenX = EditLogic.CleanLen(bp.footprint.X, item.lenX)
+					item.lenZ = EditLogic.CleanLen(bp.footprint.Y, item.lenZ)
+				else
+					item.len = nil
+					item.lenX = nil
+					item.lenZ = nil
+				end
 				if item.fill ~= nil then
 					local units = if type(item.fill) == "table" then item.fill.units else nil
-					local need = bp.woodUnits
-					local full = false
-					if type(units) == "number" and type(need) == "number" and units >= need then
-						full = true
-					end
-					if type(units) ~= "number" or units ~= units or units < 0 or full then
+					local need = EditLogic.Units(bp, item)
+					if type(units) ~= "number" or units ~= units or units < 0 or units >= need then
 						item.fill = nil
 					else
 						item.fill = { units = units }
@@ -357,7 +374,7 @@ function ProfileSchema.Migrate(data: any)
 				if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
 					item.paid = nil
 				elseif type(item.paid) == "number" then
-					local price = PlotData.Price(bp)
+					local price = EditLogic.Fee(bp, item)
 					if item.paid > price then
 						item.paid = price
 					end

@@ -34,7 +34,7 @@ local player = Players.LocalPlayer
 
 local CREAM = UITheme.Colors.Cream
 local VALID = UITheme.Colors.Green
-local INVALID = UITheme.Colors.Danger
+local INVALID = Color3.fromRGB(255, 80, 80)
 
 local LEAVE_REACH = 40 -- studs past the plot's edge before placing stops (PlotService's BUILD_REACH)
 local ACTIONS = { "PlacerRotate", "PlacerPlace", "PlacerCancel", "PlacerUp", "PlacerDown" }
@@ -92,6 +92,10 @@ function BlueprintPlacer.MyPlaced(): { PlotLogic.Placed }
 			local x, z = inst:GetAttribute("X") :: number?, inst:GetAttribute("Z") :: number?
 			local rot = inst:GetAttribute("Rot") :: number?
 			local y = inst:GetAttribute("Y")
+			local fillUnits = inst:GetAttribute("FillUnits")
+			local len = inst:GetAttribute("Len")
+			local lenX = inst:GetAttribute("LenX")
+			local lenZ = inst:GetAttribute("LenZ")
 			if uid and id and x and z and rot then
 				table.insert(out, {
 					uid = uid,
@@ -100,6 +104,10 @@ function BlueprintPlacer.MyPlaced(): { PlotLogic.Placed }
 					z = z,
 					rot = rot,
 					y = if type(y) == "number" then y else nil,
+					fill = if type(fillUnits) == "number" then { units = fillUnits } else nil,
+					len = if type(len) == "number" then len else nil,
+					lenX = if type(lenX) == "number" then lenX else nil,
+					lenZ = if type(lenZ) == "number" then lenZ else nil,
 				})
 			end
 		end
@@ -229,7 +237,28 @@ function BlueprintPlacer.Place()
 	end
 	local moveUid = s.options.moveUid
 	if moveUid then
-		Net.Remote("MoveBlueprint"):FireServer(moveUid, s.x, s.z, s.rot, s.y)
+		local kitGhost = false
+		for _, inst in ipairs(CollectionService:GetTagged("PlacedItem")) do
+			if
+				inst:GetAttribute("Uid") == moveUid
+				and inst:GetAttribute("Kit") == true
+				and inst:GetAttribute("FillUnits") == 0
+			then
+				kitGhost = true
+			end
+		end
+		if kitGhost then
+			Net.Remote("BlueprintEdit"):FireServer({
+				op = "move",
+				uid = moveUid,
+				x = s.x,
+				z = s.z,
+				rot = s.rot,
+				y = s.y,
+			})
+		else
+			Net.Remote("MoveBlueprint"):FireServer(moveUid, s.x, s.z, s.rot, s.y)
+		end
 		BlueprintPlacer.Stop()
 	else
 		Net.Remote("PlaceBlueprint"):FireServer(s.bp.id, s.x, s.z, s.rot, s.y)

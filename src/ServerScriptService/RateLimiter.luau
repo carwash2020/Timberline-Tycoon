@@ -27,6 +27,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	Gondola = 1,
 	PlaceBlueprint = 2,
 	MoveBlueprint = 2,
+	BlueprintEdit = 5, -- rotate, move, resize, copy, delete, undo
 	SellPlaced = 4,
 	UpgradePlot = 1,
 	ClaimPlot = 4, -- the join picker: next and previous stay on the client

@@ -3,6 +3,7 @@
 -- server (which decides) and the client's ghost preview (which shows green
 -- or red) agree, and tests can run it.
 
+local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local SawmillLogic = require(script.Parent.SawmillLogic)
 
@@ -20,6 +21,9 @@ export type Placed = {
 	wood: string?, -- the wood it shows; missing means the authored look
 	fill: { units: number }?, -- kit only; missing means already built
 	paid: number?, -- the fee charged to place it; missing on a kit piece means the legacy price
+	len: number?, -- resized length along local X; missing means the base length
+	lenX: number?, -- floor width; missing means the base
+	lenZ: number?, -- floor depth; missing means the base
 	data: { x: number, y: number }?,
 }
 
@@ -183,7 +187,7 @@ function PlotLogic.IsBuilt(bp: Blueprint, item: Placed): boolean
 	if fill == nil then
 		return true
 	end
-	return fill.units >= (bp.woodUnits or 0)
+	return fill.units >= PieceSize.Units(bp, item)
 end
 
 export type SellPlan = {
@@ -197,7 +201,7 @@ export type SellPlan = {
 -- of what was paid, or half the legacy price when the save has no `paid`.
 function PlotLogic.SellPlan(bp: Blueprint, item: Placed): SellPlan
 	if bp.kit == true then
-		local need = bp.woodUnits or 0
+		local need = PieceSize.Units(bp, item)
 		local fill = item.fill
 		local filled = if fill then fill.units else need
 		if fill and filled <= 0 then
@@ -281,8 +285,10 @@ function PlotLogic.Check(
 		if item.uid ~= ignoreUid then
 			local other = PlotLogic.Blueprint(item.blueprintId)
 			if other then
-				for _, box in ipairs(other.boxes) do
-					local theirs = { worldBox(item.x, itemY(item), item.z, item.rot, PlotLogic.OverlapBox(other, box)) }
+				local shaped = PieceSize.Shape(other, item)
+				for _, box in ipairs(shaped.boxes) do
+					local theirs =
+						{ worldBox(item.x, itemY(item), item.z, item.rot, PlotLogic.OverlapBox(shaped, box)) }
 					for _, mineBox in ipairs(mine) do
 						if boxesHit(mineBox, theirs) then
 							return false, "Something's in the way"

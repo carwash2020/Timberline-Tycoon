@@ -30,6 +30,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
@@ -82,6 +83,8 @@ type Slot = {
 local slots: { Slot } = {}
 local slotOf: { [Player]: Slot } = {}
 local placedAt: { [string]: number } = {} -- uid -> os.clock() when placed this session
+-- Last 10 blueprint edits, per player. Memory only: leaving clears it.
+local undoStacks: { [Player]: { EditLogic.Entry } } = {}
 local pickingUntil: { [Player]: number } = {}
 local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
@@ -365,6 +368,25 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	model:SetAttribute("OwnerId", owner.UserId)
 	model:SetAttribute("Uid", item.uid)
 	model:SetAttribute("BlueprintId", item.blueprintId)
+	if bp.kit then
+		model:SetAttribute("Kit", true)
+		if item.fill then
+			model:SetAttribute("FillUnits", item.fill.units)
+		end
+		if item.len then
+			model:SetAttribute("Len", item.len)
+		end
+		if item.lenX then
+			model:SetAttribute("LenX", item.lenX)
+		end
+		if item.lenZ then
+			model:SetAttribute("LenZ", item.lenZ)
+		end
+		local size = (BlueprintModels :: any).ApplySize
+		if type(size) == "function" then
+			size(model, bp, item.len, item.lenX, item.lenZ)
+		end
+	end
 	local mill = ItemCatalog.GetSawmill(item.blueprintId)
 	if mill then
 		local saved = item.data
@@ -811,6 +833,10 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	if not item or not bp then
 		return
 	end
+	if bp.kit and EditLogic.Locked(item) then
+		notify(player, EditLogic.Message("filled") or "This piece already has wood in it.")
+		return
+	end
 	local px, pz = PlotLogic.Snap(x :: number), PlotLogic.Snap(z :: number)
 	local py = if isNumber(y) then PlotLogic.SnapY(y :: number) else (item.y or 0)
 	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, item.uid, py)
@@ -940,6 +966,140 @@ function PlotService.Sell(player: Player, uid: unknown)
 		)
 		else string.format("Sold the %s for %s.", bp.displayName, Util.formatCash(refund))
 	notify(player, text)
+end
+
+local function samePiece(a: PlotLogic.Placed, b: PlotLogic.Placed): boolean
+	return a.x == b.x
+		and a.z == b.z
+		and a.rot == b.rot
+		and a.y == b.y
+		and a.len == b.len
+		and a.lenX == b.lenX
+		and a.lenZ == b.lenZ
+		and a.paid == b.paid
+end
+
+local function syncEdits(
+	slot: Slot,
+	player: Player,
+	before: { [string]: PlotLogic.Placed },
+	placed: { PlotLogic.Placed }
+)
+	local now: { [string]: PlotLogic.Placed } = {}
+	for _, item in ipairs(placed) do
+		now[item.uid] = item
+	end
+	for uid in pairs(before) do
+		if not now[uid] then
+			local model = slot.items:FindFirstChild(uid)
+			if model then
+				model:Destroy()
+			end
+		end
+	end
+	for uid, item in pairs(now) do
+		local prev = before[uid]
+		if not prev then
+			buildItem(slot, player, item)
+		elseif not samePiece(prev, item) then
+			local model = slot.items:FindFirstChild(uid)
+			local resized = prev.len ~= item.len or prev.lenX ~= item.lenX or prev.lenZ ~= item.lenZ
+			if resized or not (model and model:IsA("Model")) then
+				if model then
+					model:Destroy()
+				end
+				buildItem(slot, player, item)
+			else
+				placeModel(slot, model :: Model, item)
+			end
+		end
+	end
+end
+
+-- One remote for an unfilled kit ghost: rotate, move, resize, copy, delete, undo.
+function PlotService.Edit(player: Player, request: unknown)
+	if type(request) ~= "table" then
+		return
+	end
+	if not RateLimiter.Allow(player, "BlueprintEdit") then
+		notify(player, EditLogic.Message("rate") or "Slow down a little.")
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return
+	end
+	local slot = nearOwnPlot(player, profile)
+	if not slot or slot.owner ~= player then
+		notify(player, EditLogic.Message("owner") or "That piece isn't on your plot.")
+		return
+	end
+	local stack = undoStacks[player]
+	if not stack then
+		stack = {}
+		undoStacks[player] = stack
+	end
+	-- Cash can still refuse after the edit succeeds. Undo is the wrong
+	-- way back: undoing an undo would touch an older entry. Put the pieces
+	-- and the stack back exactly as they were.
+	local placedSnap: { PlotLogic.Placed } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		table.insert(placedSnap, EditLogic.Snapshot(item))
+	end
+	local stackSnap = table.clone(stack)
+	local before: { [string]: PlotLogic.Placed } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		before[item.uid] = {
+			uid = item.uid,
+			blueprintId = item.blueprintId,
+			x = item.x,
+			z = item.z,
+			rot = item.rot,
+			y = item.y,
+			len = item.len,
+			lenX = item.lenX,
+			lenZ = item.lenZ,
+			paid = item.paid,
+		}
+	end
+	local world: EditLogic.World = {
+		cash = profile.cash,
+		tier = profile.plot.tier,
+		ownerId = player.UserId,
+		playerId = player.UserId,
+		placed = profile.plot.placed,
+		undo = stack,
+	}
+	local cashBefore = profile.cash
+	local ok, why = EditLogic.Run(world, request :: { [string]: any }, function()
+		return Util.guid()
+	end)
+	profile.plot.placed = world.placed
+	if not ok then
+		local text = EditLogic.Message(why)
+		if text then
+			notify(player, text)
+		end
+		return
+	end
+	local function restore()
+		profile.plot.placed = placedSnap
+		undoStacks[player] = stackSnap
+	end
+	local delta = world.cash - cashBefore
+	if delta > 0 and profile.cash + delta > GameConfig.CashCap then
+		restore()
+		notify(player, "Your wallet is too full for that. Spend some first.")
+		return
+	end
+	if delta < 0 and not EconomyService.SpendCash(player, -delta, "changed a blueprint", "kit") then
+		restore()
+		notify(player, EditLogic.Message("cash") or "You don't have enough for that.")
+		return
+	elseif delta > 0 then
+		EconomyService.Refund(player, delta, "changed a blueprint", "kit")
+	end
+	syncEdits(slot, player, before, profile.plot.placed)
 end
 
 function PlotService.Upgrade(player: Player)
@@ -1100,6 +1260,7 @@ function PlotService.PlayerRemoving(player: Player)
 	pickingUntil[player] = nil
 	lastOffer[player] = nil
 	watching[player] = nil
+	undoStacks[player] = nil
 	release(player)
 end
 
@@ -1117,6 +1278,11 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 	remotes.PlaceBlueprint.OnServerEvent:Connect(PlotService.Place)
 	remotes.MoveBlueprint.OnServerEvent:Connect(PlotService.Move)
 	remotes.SellPlaced.OnServerEvent:Connect(PlotService.Sell)
+	if remotes.BlueprintEdit then
+		remotes.BlueprintEdit.OnServerEvent:Connect(function(player: Player, request: unknown)
+			PlotService.Edit(player, request)
+		end)
+	end
 	remotes.UpgradePlot.OnServerEvent:Connect(PlotService.Upgrade)
 	offerRemote = remotes.PlotOffer
 	if remotes.ClaimPlot then
