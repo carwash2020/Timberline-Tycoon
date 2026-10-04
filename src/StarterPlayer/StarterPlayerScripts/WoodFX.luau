@@ -53,6 +53,7 @@ WoodFX.FxRange = 150 -- studs from the camera; farther effects aren't drawn
 WoodFX.ShakeRange = 40 -- a landing shakes the camera this near ...
 WoodFX.ShakeMass = 5 -- ... if it's heavier than this
 WoodFX.ChipsPerHit = 5
+WoodFX.ChipMin = 0.3 -- studs; the long side of a chip never starts under this
 WoodFX.ChipsPerOffcut = 10
 WoodFX.LeavesPerFall = 14
 WoodFX.RingDots = 16
@@ -324,7 +325,7 @@ local function chips(def: WoodDef, pos: Vector3, normal: Vector3, n: number)
 			math.random()
 		)
 		local chip = takePart(chipBatch)
-		chip.Size = Vector3.new(0.22 + math.random() * 0.22, 0.12, 0.3 + math.random() * 0.25)
+		chip.Size = Vector3.new(WoodFX.ChipMin + math.random() * 0.16, 0.16, WoodFX.ChipMin + math.random() * 0.22)
 		chip.Color = if i % 4 == 0 then bark else core
 		local rest = TreeLogic.Upright(groundNormal) * CFrame.Angles(0, math.random() * math.pi * 2, 0)
 		launch(chipBatch, chip, flight, rest, randomAxis(), 10 + math.random() * 10, 0)

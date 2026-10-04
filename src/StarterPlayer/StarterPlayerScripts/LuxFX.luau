@@ -13,7 +13,9 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local LuxEffect = require(ReplicatedStorage.Shared.LuxEffect)
 local Net = require(ReplicatedStorage.Shared.Net)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
 local Quality = require(script.Parent.Quality)
+local SwingPose = require(script.Parent.SwingPose)
 
 local LuxFX = {}
 
@@ -127,55 +129,40 @@ local function equippedLux(): Tool?
 	return nil
 end
 
-local function onSlash(tool: Tool)
-	if not owns() then
-		return
-	end
-	local fx = ensure(tool)
-	if not fx then
-		return
-	end
-	local life = LuxEffect.TrailLifetime(Quality.Tier())
-	fx.trail.Lifetime = life
-	fx.trail.Enabled = true
-	task.delay(life, function()
-		if fx.trail.Parent then
-			fx.trail.Enabled = false
-		end
-	end)
-end
-
-local function watch(tool: Tool)
-	if tool:GetAttribute("AxeId") ~= GameConfig.LuxAxeId then
-		return
-	end
-	tool.ChildAdded:Connect(function(child)
-		if child.Name == "toolanim" and child:IsA("StringValue") and child.Value == "Slash" then
-			onSlash(tool)
-		end
-	end)
-end
-
-local function watchCharacter(character: Model)
-	character.ChildAdded:Connect(function(child)
-		if child:IsA("Tool") then
-			watch(child)
-		end
-	end)
+local function luxTool(character: Model): Tool?
 	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Tool") then
-			watch(child)
+		if child:IsA("Tool") and child:GetAttribute("AxeId") == GameConfig.LuxAxeId then
+			return child
 		end
+	end
+	return nil
+end
+
+-- The trail is on from the impact through the follow-through, on this
+-- client and on anyone else's Lux axe we can see swinging. Cosmetic only.
+local function syncTrails()
+	for _, other in ipairs(Players:GetPlayers()) do
+		local character = other.Character
+		local tool = if character then luxTool(character) else nil
+		if not tool then
+			continue
+		end
+		local fx = ensure(tool)
+		if not fx then
+			continue
+		end
+		local clip = SwingPose.ClipOf(other)
+		local on = clip ~= nil and SwingLogic.TrailOn(clip)
+		if on and not fx.trail.Enabled then
+			fx.trail.Lifetime = LuxEffect.TrailLifetime(Quality.Tier())
+		end
+		fx.trail.Enabled = on
 	end
 end
 
 function LuxFX.Start()
-	player.CharacterAdded:Connect(watchCharacter)
-	if player.Character then
-		watchCharacter(player.Character)
-	end
-
 	RunService.Heartbeat:Connect(function(dt: number)
+		syncTrails()
 		if not owns() then
 			return
 		end

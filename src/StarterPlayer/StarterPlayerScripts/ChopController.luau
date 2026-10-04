@@ -15,16 +15,16 @@
 -- reach, amber when your axe is too weak for it. Out of reach, no outline.
 --
 -- Each swing first turns you to face its tree (FaceTarget: yaw only, and
--- only when it's more than 15 degrees off to the side), so the slash lands
--- on the trunk; holding to chop turns you again on every swing. Not while
--- you sit or climb.
+-- only when it's more than 15 degrees off to the side). The chop is sent
+-- on the impact frame; the cooldown starts on the press. Holding chains
+-- the next wind-up. Sitting, dying, or carrying a log during the wind-up
+-- sends nothing. Climbing or being knocked over still swings, without a turn.
 --
 -- The v1 loop only: under the v2 loop (Shared/CoreLoop) CutController
 -- swings the axe (sections and crystal nodes) and this never swings or
 -- outlines anything.
 
 local CollectionService = game:GetService("CollectionService")
-local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -35,9 +35,11 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
+local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
+local SwingPose = require(script.Parent.SwingPose)
 
 local ChopController = {}
 
@@ -208,16 +210,6 @@ local function faceTree(hrp: BasePart, tree: Model)
 	end
 end
 
--- The default character Animate script plays its built-in tool-slash
--- animation when a StringValue "toolanim" = "Slash" appears in the tool.
-local function playSlash(tool: Tool)
-	local anim = Instance.new("StringValue")
-	anim.Name = "toolanim"
-	anim.Value = "Slash"
-	anim.Parent = tool
-	Debris:AddItem(anim, 1)
-end
-
 -- The equipped axe tool, its definition and the root part, or nils.
 local function equipped(): (Tool?, ItemCatalog.AxeDef?, BasePart?)
 	local char = player.Character
@@ -233,6 +225,93 @@ local function equipped(): (Tool?, ItemCatalog.AxeDef?, BasePart?)
 	return tool, axe, hrp
 end
 
+type Armed = { state: SwingLogic.SwingState, fromClick: boolean }
+
+local armed: Armed? = nil
+local swingSerial = 0
+
+local function carriedLogs(): number
+	local read = (player :: any).GetAttribute
+	if type(read) ~= "function" then
+		return 0
+	end
+	local n = player:GetAttribute("CarriedLogs")
+	return if type(n) == "number" then n else 0
+end
+
+local function bodyBlock(): string?
+	local char = player.Character
+	if not char then
+		return "dead"
+	end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local health = if humanoid then humanoid.Health else nil
+	local seated = humanoid ~= nil and (humanoid.Sit or humanoid.SeatPart ~= nil)
+	return SwingLogic.Blocked(health, seated, carriedLogs())
+end
+
+local function cancelArmed()
+	local current = armed
+	if not current or current.state.cancelled then
+		return
+	end
+	local beforeImpact = not current.state.fired
+	SwingLogic.Cancel(current.state)
+	SwingPose.CancelLocal(current.state.id)
+	armed = nil
+	if beforeImpact then
+		Net.Remote("Swing"):FireServer(nil, true)
+	end
+end
+
+local function refuse(fromClick: boolean, problem: string?, axe: ItemCatalog.AxeDef, now: number)
+	if not fromClick then
+		return
+	end
+	if problem == "far" then
+		HUD.Toast("Too far away. Walk closer to chop.")
+	elseif problem == "hard" then
+		SoundData.Play("ChopTooHard")
+		if now - lastHardToast > 3 then
+			lastHardToast = now
+			HUD.Toast(string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName))
+		end
+	end
+end
+
+local function deliver(id: number)
+	local current = armed
+	if not current or current.state.id ~= id or current.state.cancelled or current.state.fired then
+		return
+	end
+	local now = os.clock()
+	if now < current.state.impactAt then
+		task.delay(current.state.impactAt - now, function()
+			deliver(id)
+		end)
+		return
+	end
+	local tool, axe, hrp = equipped()
+	if not tool or not axe or not hrp or bodyBlock() ~= nil then
+		cancelArmed()
+		return
+	end
+	local tree, problem = pickTarget(hrp, axe)
+	local decision = SwingLogic.Resolve(current.state, now, tree ~= nil)
+	if decision ~= "chop" and decision ~= "glance" then
+		return
+	end
+	SwingPose.SetContact(id, if decision == "chop" then "bite" else "glance")
+	if decision == "chop" and tree then
+		Net.Remote(if isNode(tree) then "MineNode" else "ChopTree"):FireServer(tree:GetAttribute("Uid"))
+	else
+		refuse(current.fromClick, problem, axe, now)
+	end
+	SoundData.Play(SoundData.SwingFor(tool:GetAttribute("AxeId")))
+end
+
+SwingPose.HookImpact(deliver)
+
 local function trySwing(fromClick: boolean)
 	if CoreLoop.V2() then
 		return -- CutController swings in the v2 loop
@@ -241,30 +320,32 @@ local function trySwing(fromClick: boolean)
 	if now < cooldownUntil then
 		return
 	end
+	local block = bodyBlock()
+	if block then
+		retryAt = now + RETRY_INTERVAL
+		return
+	end
 	local tool, axe, hrp = equipped()
 	if not tool or not axe or not hrp then
 		return
 	end
 	local tree, problem = pickTarget(hrp, axe)
 	if not tree then
-		if fromClick and problem == "far" then
-			HUD.Toast("Too far away. Walk closer to chop.")
-		elseif fromClick and problem == "hard" then
-			SoundData.Play("ChopTooHard")
-			if now - lastHardToast > 3 then
-				lastHardToast = now
-				HUD.Toast(string.format("This wood is too hard for your %s. You need a stronger axe.", axe.displayName))
-			end
-		end
+		refuse(fromClick, problem, axe, now)
 		-- Holding with nothing to chop: don't search the forest every frame.
 		retryAt = now + RETRY_INTERVAL
 		return
 	end
 	cooldownUntil = now + GameConfig.SwingCooldown
 	faceTree(hrp, tree)
-	Net.Remote(if isNode(tree) then "MineNode" else "ChopTree"):FireServer(tree:GetAttribute("Uid"))
-	playSlash(tool)
-	SoundData.Play(SoundData.SwingFor(tool:GetAttribute("AxeId")))
+	swingSerial += 1
+	local state = SwingLogic.Begin(swingSerial, now, GameConfig.SwingCooldown)
+	armed = { state = state, fromClick = fromClick }
+	SwingPose.BeginLocal(state.id, GameConfig.SwingCooldown)
+	Net.Remote("Swing"):FireServer(if isNode(tree) then "node" else "v1")
+	task.delay(state.impactAt - now, function()
+		deliver(state.id)
+	end)
 end
 
 -- Outlines what you'd chop right now (see the header).
@@ -316,11 +397,13 @@ local function bindTool(tool: Tool)
 	end)
 	tool.Unequipped:Connect(function()
 		holding = false
+		cancelArmed()
 	end)
 end
 
 local function watchCharacter(char: Model)
 	holding = false
+	cancelArmed()
 	for _, child in ipairs(char:GetChildren()) do
 		if child:IsA("Tool") then
 			bindTool(child)
@@ -381,9 +464,17 @@ function ChopController.Start()
 	end)
 	local sinceAim = 0
 	RunService.Heartbeat:Connect(function(dt: number)
-		-- Hold-to-chop: keep swinging every cooldown while the button is down
-		-- (each swing turns you to its tree again).
+		-- Hold-to-chop: the impact sends the chop; the next wind-up starts
+		-- when the cooldown (counted from the press) is up.
 		local now = os.clock()
+		local current = armed
+		if current and not current.state.cancelled and not current.state.fired then
+			if bodyBlock() ~= nil then
+				cancelArmed()
+			elseif now >= current.state.impactAt then
+				deliver(current.state.id)
+			end
+		end
 		if holding and now >= cooldownUntil and now >= retryAt then
 			trySwing(false)
 		end
