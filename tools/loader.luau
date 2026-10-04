@@ -169,6 +169,15 @@ local function defaultServices()
 				inst:RemoveTag(tag)
 			end,
 		},
+		-- Skinned cards preload their image. A real client reports Success
+		-- or Failure; here the image loads, and a spec can pass its own.
+		ContentProvider = {
+			PreloadAsync = function(_, _, callback)
+				if callback then
+					callback("", roblox.Enum.AssetFetchStatus.Success)
+				end
+			end,
+		},
 	}
 end
 
@@ -264,6 +273,7 @@ function Loader:environment(modulePath: string)
 		NumberSequence = roblox.NumberSequence,
 		NumberSequenceKeypoint = roblox.NumberSequenceKeypoint,
 		PhysicalProperties = roblox.PhysicalProperties,
+		Rect = roblox.Rect,
 		Region3 = roblox.Region3,
 		UDim = roblox.UDim,
 		UDim2 = roblox.UDim2,

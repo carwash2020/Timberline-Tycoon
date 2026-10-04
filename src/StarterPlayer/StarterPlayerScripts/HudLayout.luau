@@ -15,7 +15,9 @@
 --   * BottomRow(): the load chip and the hint, side by side above the
 --     hotbar, clear of a phone's jump button.
 --   * ClockLine(): which corner line the clock goes in.
--- Everything is in a screen's offsets (UIScale units), y down.
+--   * TopRow(): where the cash row sits, in screen pixels (its screen is
+--     not scaled), in the top bar or just under it.
+-- Everything else is in a screen's offsets (UIScale units), y down.
 
 local HudLayout = {}
 
@@ -338,6 +340,70 @@ function HudLayout.ClockLine(phone: boolean, tutorialStep: unknown): ClockLine
 	end
 	local running = type(tutorialStep) ~= "number" or tutorialStep > 0
 	return if running then "none" else "under"
+end
+
+export type TopRowPlace = {
+	right: number, -- screen px: the row's right edge (anchor x)
+	top: number, -- screen px: the row's top (anchor y)
+	inBar: boolean,
+}
+
+local TOP_MARGIN = 12 -- in from the right of the free spot
+local TOP_FIT_SLACK = 16 -- a row wider than the bar's width minus this sits under it
+local TOP_TEXT_PAD = 4 -- px the bar must keep above and below the cash text
+
+-- Where the cash row sits on a ScreenGui with ScreenInsets None, anchor
+-- (1, 0), in screen pixels. `topbar` is GuiService.TopbarInset as read.
+-- `row` is the row's AbsoluteSize after its UIScale (screen pixels).
+-- `leftSafe` and `rightSafe` are the notch insets from the safe-area probe
+-- (a DeviceSafeInsets frame), not GetGuiInset. `textHeight` is the cash
+-- text in screen pixels; it is never shrunk to fit. `fallbackTop` is
+-- UITheme.TopBar() + 4. In the bar, the right edge is
+-- min(topbar.Max.X, viewport.X - rightSafe) minus 12 and the row is
+-- centred on the bar's height. It sits under the bar when the inset is
+-- empty, the row is wider than the bar's width minus 16, the bar is
+-- shorter than the text plus 4 px above and below, the bar is shorter
+-- than the row plus that same pad, or that in-bar spot would cross a
+-- Roblox button or the notch.
+-- `typeof(Rect.new(...))` is the Roblox datatype. This file's own `Rect`
+-- is the {left, top, right, bottom} table, and that name wins as a type.
+function HudLayout.TopRow(
+	viewport: Vector2,
+	topbar: typeof(Rect.new(0, 0, 0, 0)),
+	row: Vector2,
+	textHeight: number,
+	leftSafe: number,
+	rightSafe: number,
+	fallbackTop: number
+): TopRowPlace
+	local function underBar(): TopRowPlace
+		local limit = viewport.X - rightSafe
+		local right = limit - TOP_MARGIN
+		-- Keep the left edge out of a left notch when the row still fits
+		-- in the safe width.
+		if right - row.X < leftSafe then
+			local pinned = leftSafe + row.X
+			if pinned <= limit then
+				right = pinned
+			end
+		end
+		return { right = right, top = fallbackTop, inBar = false }
+	end
+
+	local barW, barH = topbar.Width, topbar.Height
+	local textBand = textHeight + TOP_TEXT_PAD * 2
+	local rowBand = row.Y + TOP_TEXT_PAD * 2
+	if barW <= 0 or barH <= 0 or row.X > barW - TOP_FIT_SLACK or barH < textBand or rowBand > barH then
+		return underBar()
+	end
+
+	local right = math.min(topbar.Max.X, viewport.X - rightSafe) - TOP_MARGIN
+	local left = right - row.X
+	if left < math.max(topbar.Min.X, leftSafe) or right > topbar.Max.X then
+		return underBar()
+	end
+	local top = topbar.Min.Y + (barH - row.Y) / 2
+	return { right = right, top = top, inBar = true }
 end
 
 return HudLayout

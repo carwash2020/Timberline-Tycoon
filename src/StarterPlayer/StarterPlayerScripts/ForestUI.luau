@@ -238,10 +238,9 @@ local function buildPouch()
 	label.Size = UDim2.new(1, -34, 1, 0)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 
-	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true)
+	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true, "Panel")
 	card.outer.Name = "PouchList"
 	card.outer.Visible = false
-	UITheme.stroke(card.face, C.Bark, 2)
 	UITheme.padding(card.face, 6, 10, 6, 10)
 	local text = UITheme.label(card.face, "", F.Bold, UITheme.Sized("PouchList").text, C.Ink)
 	text.RichText = true

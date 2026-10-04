@@ -55,7 +55,9 @@ function SettingsUI.Start()
 	UITheme.Speaker(C.Cream).Parent = open
 	open.Parent = HUD.TopRow() or gui
 
-	local card = UITheme.Card(C.Paper, C.Bark, 3, 12, false)
+	local card = UITheme.Card(C.Paper, C.Bark, 3, 12, false, "Panel")
+	local inset = UITheme.SkinInset("Panel")
+	UITheme.padding(card.face, inset, inset, inset, inset)
 	card.outer.Name = "Settings"
 	card.outer.Visible = false
 	card.outer.Size = UDim2.fromOffset(280, 420)

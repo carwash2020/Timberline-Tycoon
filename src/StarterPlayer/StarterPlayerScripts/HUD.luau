@@ -61,8 +61,10 @@
 --                  [pouch][DAILY GOALS 1/3]      HUD.UnderCash
 --                       [one popup at a time]    HUD.Popup
 --     The cash row (HUD.TopRow, which SettingsUI adds its button to) is in
---     the HUD's layer, over the shop; the rest is in a layer under it. On a
---     phone the clock is in the second line (or hidden: WorldUI).
+--     its own screen with no insets, in the top bar when it fits and just
+--     under it when it doesn't, over the shop; the rest of the corner is in
+--     a layer under the HUD. On a phone the clock is in the second line
+--     (or hidden: WorldUI).
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -198,13 +200,21 @@ local shownPrompts: { [ProximityPrompt]: boolean } = {}
 -- Cash
 ---------------------------------------------------------------------------
 
+-- What the plaque reads: formatCash, or MAX at the wallet cap.
+function HUD.CashText(amount: number): string
+	if amount >= GameConfig.CashCap then
+		return "MAX"
+	end
+	return Util.formatCash(math.floor(amount + 0.5))
+end
+
 local function showCash(amount: number)
 	local label = cashLabel
 	if not label then
 		return
 	end
 	local full = amount >= GameConfig.CashCap
-	label.Text = if full then "MAX" else Util.formatCash(math.floor(amount + 0.5))
+	label.Text = HUD.CashText(amount)
 	label.TextXAlignment = if full then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left
 end
 
@@ -1302,16 +1312,104 @@ end
 -- Building it
 ---------------------------------------------------------------------------
 
-local function buildCash(gui: ScreenGui)
-	local side = UITheme.Margin()
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
+-- 26 px on a desktop, 20 px on a compact screen. The top row's UIScale is
+-- at least 1, so this never draws smaller than that (desktop and TV grow
+-- with UITheme.Scale(); a compact screen stays at 20).
+local function cashTextSize(): number
+	return if UITheme.Compact() then 20 else 26
+end
+
+-- The notch probe: a full-size frame in a hidden DeviceSafeInsets screen.
+-- GetGuiInset does not report the notch. leftSafe is the frame's X;
+-- rightSafe is the viewport past the frame's right edge.
+local safeArea: Frame? = nil
+
+-- TimberlineTop's UIScale. Offsets are multiplied by it, so a screen-pixel
+-- place from HudLayout.TopRow is divided back by Scale before it's written.
+local topScale: UIScale? = nil
+
+-- Pins TopRow into the top bar, or just under it (HudLayout.TopRow).
+-- `row.AbsoluteSize` is after the row's UIScale, in screen pixels.
+-- HudLayout.TopRow stays in screen pixels; the position offsets are not.
+local function placeTopRow()
+	local row = HUD.TopRow()
+	if not row then
+		return
+	end
+	local camera = workspace.CurrentCamera
+	local viewport = if camera then camera.ViewportSize else Vector2.zero
+	if viewport.X <= 0 or viewport.Y <= 0 then
+		return
+	end
+	local probe = safeArea
+	local leftSafe, rightSafe = 0, 0
+	if probe then
+		local pos, size = probe.AbsolutePosition, probe.AbsoluteSize
+		leftSafe = pos.X
+		rightSafe = viewport.X - (pos.X + size.X)
+	end
+	local place = HudLayout.TopRow(
+		viewport,
+		GuiService.TopbarInset,
+		row.AbsoluteSize,
+		cashTextSize() * math.max(1, UITheme.Scale()),
+		leftSafe,
+		rightSafe,
+		UITheme.TopBar() + 4
+	)
+	local s = if topScale and topScale.Scale > 0 then topScale.Scale else 1
+	row.AnchorPoint = Vector2.new(1, 0)
+	row.Position = UDim2.fromOffset(place.right / s, place.top / s)
+end
+
+-- The cash row, in its own screen (no insets) parented to `playerGui`.
+-- Its UIScale is at least 1, so desktop and TV text grows with the other
+-- screens and a compact screen does not shrink. SettingsUI adds its
+-- button to the row.
+local function buildCash(playerGui: Instance)
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "TimberlineTop"
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.DisplayOrder = 11 -- over the HUD (10) and the shop; the Store (20) still covers its panel
+	gui.IgnoreGuiInset = true
+	gui.ScreenInsets = Enum.ScreenInsets.None
+	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+	local uiScale = Instance.new("UIScale")
+	uiScale.Name = "Scale"
+	topScale = uiScale
+	local function fitScale()
+		uiScale.Scale = math.max(1, UITheme.Scale())
+	end
+	fitScale()
+	uiScale.Parent = gui
+
+	-- Hidden: it only exists so AbsolutePosition/AbsoluteSize are the
+	-- device safe rect. Not under TimberlineTop, which ignores insets.
+	local probeGui = Instance.new("ScreenGui")
+	probeGui.Name = "TimberlineSafeProbe"
+	probeGui.ResetOnSpawn = false
+	probeGui.DisplayOrder = 0
+	probeGui.IgnoreGuiInset = true
+	probeGui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	probeGui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+	local probe = Instance.new("Frame")
+	probe.Name = "SafeArea"
+	probe.BackgroundTransparency = 1
+	probe.BorderSizePixel = 0
+	probe.Size = UDim2.fromScale(1, 1)
+	probe.Parent = probeGui
+	probeGui.Parent = playerGui
+	safeArea = probe
+
+	local border = UITheme.SkinInset("Plaque")
+	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Plaque")
 	card.outer.Name = "CashPlaque"
 	card.outer.LayoutOrder = 10
 	-- The top-right row (HUD.TopRow): [pops][other buttons][plaque].
 	local row = Instance.new("Frame")
 	row.Name = "TopRow"
 	row.AnchorPoint = Vector2.new(1, 0)
-	row.Position = UDim2.new(1, -side, 0, 8)
 	row.Size = UDim2.new()
 	row.AutomaticSize = Enum.AutomaticSize.XY
 	row.BackgroundTransparency = 1
@@ -1325,32 +1423,34 @@ local function buildCash(gui: ScreenGui)
 	pops.LayoutOrder = -100
 	pops.Parent = row
 	local min = Instance.new("UISizeConstraint")
-	min.MinSize = Vector2.new(172, 49) -- fits $1,999,999 without growing into the row
+	min.MinSize = Vector2.new(172, 26 + 8 + border * 2) -- wide enough for $1,999,999; paper is the text plus 8
 	min.Parent = card.outer
 	cashMin = min
+	-- The amber glow sits on the plaque, outside the digits.
 	local glow = UITheme.stroke(card.outer, C.Amber, 4)
 	glow.Transparency = 0.45
 	glow.Enabled = false
-	UITheme.padding(card.face, 4, 4, 4, 4)
+	UITheme.padding(card.face, border, border, border, border)
 	UITheme.texture(card.face, "Wood", 14)
 
 	local inner = Instance.new("Frame")
 	inner.Name = "Paper"
 	inner.AutomaticSize = Enum.AutomaticSize.X
-	inner.Size = UDim2.fromOffset(0, 38)
+	inner.Size = UDim2.fromOffset(0, 26 + 8)
 	inner.BackgroundColor3 = C.Paper
 	inner.BorderSizePixel = 0
 	UITheme.corner(inner, 10)
 	UITheme.padding(inner, 0, 14, 0, 14)
 	inner.Parent = card.face
 	local innerMin = Instance.new("UISizeConstraint")
-	innerMin.MinSize = Vector2.new(164, 38)
+	innerMin.MinSize = Vector2.new(164, 26 + 8)
 	innerMin.Parent = inner
 	cashInnerMin = innerMin
 
 	local label = UITheme.label(inner, "$0", F.Heading, 26, C.Ink)
 	label.AutomaticSize = Enum.AutomaticSize.X
 	label.Size = UDim2.fromScale(0, 1)
+	label.TextScaled = false
 	local labelMin = Instance.new("UISizeConstraint")
 	labelMin.MinSize = Vector2.new(136, 0)
 	labelMin.Parent = label
@@ -1365,33 +1465,49 @@ local function buildCash(gui: ScreenGui)
 
 	card.outer.Parent = row
 	row.Parent = gui
+	gui.Parent = playerGui
 	cashOuter, cashFace, cashInner, cashLabel, cashGlow = card.outer, card.face, inner, label, glow
 	cashPops, cashShown = pops, shown
 	-- A handheld doesn't reserve room for $1,999,999: the plaque hugs the
-	-- amount, and the screen's UIScale shrinks it further.
+	-- amount. The text stays 20 px there and 26 elsewhere; the screen's
+	-- scale is at least 1, so neither size shrinks to fit the bar.
 	local function fitCash()
 		local compact = UITheme.Compact()
+		local textH = cashTextSize()
+		local paperH = textH + 8
+		local tall = paperH + border * 2
 		local cap, paper, words = cashMin, cashInnerMin, cashLabelMin
 		if cap then
-			cap.MinSize = if compact then Vector2.new(72, 32) else Vector2.new(172, 49)
+			cap.MinSize = Vector2.new(if compact then 72 else 172, tall)
 		end
 		if paper then
-			paper.MinSize = if compact then Vector2.new(56, 26) else Vector2.new(164, 38)
+			paper.MinSize = Vector2.new(if compact then 56 else 164, paperH)
 		end
 		if words then
 			words.MinSize = if compact then Vector2.new(36, 0) else Vector2.new(136, 0)
 		end
 		local face = cashInner
 		if face then
-			face.Size = UDim2.fromOffset(0, if compact then 26 else 38)
+			face.Size = UDim2.fromOffset(0, paperH)
 		end
 		local shownLabel = cashLabel
 		if shownLabel then
-			shownLabel.TextSize = if compact then 20 else 26
+			shownLabel.TextSize = textH
+			shownLabel.TextScaled = false
 		end
 	end
 	fitCash()
+	UITheme.WatchLayout(fitScale)
 	UITheme.WatchLayout(fitCash)
+	row:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTopRow)
+	probe:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTopRow)
+	UITheme.WatchTopBar(placeTopRow)
+	UITheme.WatchLayout(placeTopRow)
+	placeTopRow()
+end
+
+function HUD.BuildCash(parent: Instance)
+	buildCash(parent)
 end
 
 -- The load chip: a log drawn from frames (no image to upload), then
@@ -1666,7 +1782,7 @@ function HUD.Start()
 	local gui = UITheme.Screen("TimberlineHUD", 10)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
 
-	buildCash(gui)
+	buildCash(playerGui)
 	buildBottomRow(gui)
 
 	-- The toasts' lane: top centre (the spec's y 44, under the top bar)

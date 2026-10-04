@@ -4,7 +4,10 @@
 --   * Colours and fonts (FredokaOne headings, the world signs' face;
 --     Gotham body).
 --   * Card(): a frame with a drop edge (a darker strip under it) instead of
---     a shadow, the spec's "chunky" look.
+--     a shadow, the spec's "chunky" look. An optional skin (UIArt) draws
+--     that frame from the uploaded art once its image has loaded: sliced,
+--     no corner, and texture() leaves it alone. Until that load, and if it
+--     fails, the card stays flat with the same inset. Building never waits.
 --   * Button(): a chunky button with named styles (buy, cant, starter,
 --     locked, forged, full, use, inuse, bark, blue, amber, skip). Pressed,
 --     it drops onto its edge; on a computer it brightens under the mouse.
@@ -39,6 +42,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
+
+local UIArt = require(script.Parent.UIArt)
 
 local UITheme = {}
 
@@ -546,7 +551,17 @@ function UITheme.stroke(parent: GuiObject, color: Color3, thickness: number): UI
 end
 
 function UITheme.padding(parent: GuiObject, top: number, right: number, bottom: number, left: number): UIPadding
-	local p = Instance.new("UIPadding")
+	-- A skinned face already reserves its slice margin. Callers that pad
+	-- less than that would draw into the bark border, so the margin is a floor.
+	local raw = parent:GetAttribute("SkinInset")
+	if type(raw) == "number" then
+		top = math.max(top, raw)
+		right = math.max(right, raw)
+		bottom = math.max(bottom, raw)
+		left = math.max(left, raw)
+	end
+	local found = parent:FindFirstChildOfClass("UIPadding")
+	local p = if found and found:IsA("UIPadding") then found else Instance.new("UIPadding")
 	p.PaddingTop = UDim.new(0, top)
 	p.PaddingRight = UDim.new(0, right)
 	p.PaddingBottom = UDim.new(0, bottom)
@@ -581,6 +596,11 @@ end
 -- card's face (an ImageLabel, so list layouts in it aren't disturbed), or
 -- as a full-size image behind a plain frame's children.
 function UITheme.texture(surface: GuiObject, kind: "Wood" | "Kraft", radius: number)
+	-- A skinned face already carries its art. A tiled texture would cover
+	-- the flat paper center the digits and prices sit on.
+	if surface:GetAttribute("UIArt") ~= nil then
+		return
+	end
 	local id = UITheme.Textures[kind]
 	if id == "" then
 		return
@@ -608,32 +628,180 @@ end
 
 export type Card = { outer: Frame, face: ImageLabel }
 
+-- A named skin with a real image id, or nil when there isn't one (missing
+-- name, or an empty id): Card then builds the flat card below.
+local function skinArt(name: string?): UIArt.Skin?
+	if name == nil or name == "" then
+		return nil
+	end
+	local art = UIArt.Get(name)
+	if art == nil or art.id == "" then
+		return nil
+	end
+	return art
+end
+
+-- The flat center's inset for `name`, or 0 when that skin isn't in use.
+function UITheme.SkinInset(name: string): number
+	local art = skinArt(name)
+	return if art then UIArt.Inset(art) else 0
+end
+
+-- The sliced look only: image, transparency, slice, corners. Size,
+-- AutomaticSize, and padding stay as the card was built (a side shorter
+-- than the slice margin is raised up to it, and a longer one is left).
+local function paintSkin(face: ImageLabel, skin: string, art: UIArt.Skin)
+	face:SetAttribute("UIArt", skin)
+	face:SetAttribute("UIArtWanted", skin)
+	local inset = UIArt.Inset(art)
+	face:SetAttribute("SkinInset", inset)
+	face.Image = art.id
+	face.ScaleType = Enum.ScaleType.Slice
+	face.SliceCenter = art.sliceCenter
+	face.SliceScale = art.sliceScale
+	face.BackgroundTransparency = 1
+	local corner = face:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner:Destroy()
+	end
+	local outer = face.Parent
+	if outer and outer:IsA("GuiObject") then
+		outer.BackgroundTransparency = 1
+		local outerCorner = outer:FindFirstChildOfClass("UICorner")
+		if outerCorner then
+			outerCorner:Destroy()
+		end
+	end
+	local pad = face:FindFirstChildOfClass("UIPadding")
+	if pad and pad:IsA("UIPadding") then
+		local function lift(current: UDim): UDim
+			if current.Offset < inset then
+				return UDim.new(current.Scale, inset)
+			end
+			return current
+		end
+		pad.PaddingTop = lift(pad.PaddingTop)
+		pad.PaddingRight = lift(pad.PaddingRight)
+		pad.PaddingBottom = lift(pad.PaddingBottom)
+		pad.PaddingLeft = lift(pad.PaddingLeft)
+	end
+end
+
+-- Opaque fill and corners, on the skin's layout. No image, so a slow or
+-- failed load is never a blank slice.
+local function paintFlat(outer: Frame, face: ImageLabel, radius: number)
+	outer.BackgroundTransparency = 0
+	local outerCorner = outer:FindFirstChildOfClass("UICorner")
+	if not outerCorner then
+		UITheme.corner(outer, radius)
+	end
+	face.Image = ""
+	face.BackgroundTransparency = 0
+	face.ScaleType = Enum.ScaleType.Stretch
+	face.SliceCenter = Rect.new(0, 0, 0, 0)
+	face.SliceScale = 1
+	local faceCorner = face:FindFirstChildOfClass("UICorner")
+	if not faceCorner then
+		UITheme.corner(face, radius)
+	end
+end
+
+-- Puts `skin` on a face when that image has already loaded. Pending
+-- listens and paints later; it does not block and it does not blank a
+-- face that is already showing. Failure leaves the face as it is.
+-- Swapping Button for ButtonPressed (a prompt held down) calls this again.
+function UITheme.ApplySkin(face: ImageLabel, skin: string): boolean
+	local art = skinArt(skin)
+	if not art then
+		return false
+	end
+	face:SetAttribute("UIArtWanted", skin)
+	local fetch = UIArt.Status(art.id)
+	if fetch == "Success" then
+		paintSkin(face, skin, art)
+		return true
+	end
+	if fetch ~= "Failure" then
+		UIArt.Listen(art.id, function(result: UIArt.LoadStatus)
+			if result == "Success" and face:GetAttribute("UIArtWanted") == skin then
+				paintSkin(face, skin, art)
+			end
+		end)
+	end
+	return false
+end
+
 -- `outer` is the edge colour and `face` sits on it, `edge` px short, so the
 -- edge shows along the bottom. Size and place `outer`; put content in
--- `face`. With `auto`, both grow to fit the face's content.
-function UITheme.Card(fill: Color3, edgeColor: Color3, edge: number, radius: number, auto: boolean?): Card
+-- `face`. With `auto`, both grow to fit the face's content. `skin` (a
+-- UIArt name) draws the face from that art when the image has loaded:
+-- the outer goes fully transparent, the face is sliced with no corner,
+-- and the face is padded by the slice margin so content stays on the
+-- flat center. Until that load (and if it fails) the same padding and
+-- sizes are a flat opaque card, so building never waits on the image.
+function UITheme.Card(
+	fill: Color3,
+	edgeColor: Color3,
+	edge: number,
+	radius: number,
+	auto: boolean?,
+	skin: string?
+): Card
+	local art = skinArt(skin)
 	local outer = Instance.new("Frame")
 	outer.BackgroundColor3 = edgeColor
 	outer.BorderSizePixel = 0
-	UITheme.corner(outer, radius)
 	local face = Instance.new("ImageLabel") -- an image, so a texture can go on it
 	face.Name = "Face"
-	face.Image = ""
 	face.BackgroundColor3 = fill
 	face.BorderSizePixel = 0
-	UITheme.corner(face, radius)
-	if auto then
-		-- AutomaticSize treats Size as a minimum: start from zero so the
-		-- card is exactly as big as what's in it.
-		outer.Size = UDim2.new()
-		face.Size = UDim2.new()
-		outer.AutomaticSize = Enum.AutomaticSize.XY
-		face.AutomaticSize = Enum.AutomaticSize.XY
-		UITheme.padding(outer, 0, 0, edge, 0)
-	else
-		face.Size = UDim2.new(1, 0, 1, -edge)
-	end
 	face.Parent = outer
+	if art and skin then
+		-- The shadow and the border are in the art, so the old drop edge
+		-- would only add an empty gap. The face fills the outer. Pending
+		-- and Failure use this same layout, with a flat opaque look, so a
+		-- later swap never moves Size, AutomaticSize, or the padding.
+		local inset = UIArt.Inset(art)
+		face:SetAttribute("SkinInset", inset)
+		if auto then
+			outer.Size = UDim2.new()
+			face.Size = UDim2.new()
+			outer.AutomaticSize = Enum.AutomaticSize.XY
+			face.AutomaticSize = Enum.AutomaticSize.XY
+		else
+			face.Size = UDim2.fromScale(1, 1)
+		end
+		UITheme.padding(face, inset, inset, inset, inset)
+		local fetch = UIArt.Status(art.id)
+		if fetch == "Success" then
+			paintSkin(face, skin, art)
+		else
+			paintFlat(outer, face, radius)
+			if fetch ~= "Failure" then
+				face:SetAttribute("UIArtWanted", skin)
+				UIArt.Listen(art.id, function(result: UIArt.LoadStatus)
+					if result == "Success" and face:GetAttribute("UIArtWanted") == skin then
+						paintSkin(face, skin, art)
+					end
+				end)
+			end
+		end
+	else
+		UITheme.corner(outer, radius)
+		face.Image = ""
+		UITheme.corner(face, radius)
+		if auto then
+			-- AutomaticSize treats Size as a minimum: start from zero so the
+			-- card is exactly as big as what's in it.
+			outer.Size = UDim2.new()
+			face.Size = UDim2.new()
+			outer.AutomaticSize = Enum.AutomaticSize.XY
+			face.AutomaticSize = Enum.AutomaticSize.XY
+			UITheme.padding(outer, 0, 0, edge, 0)
+		else
+			face.Size = UDim2.new(1, 0, 1, -edge)
+		end
+	end
 	return { outer = outer, face = face }
 end
 
@@ -849,16 +1017,15 @@ export type Bar = { outer: Frame, label: TextLabel, row: Frame }
 -- A bark bar at the bottom centre, just above the control hint: a line of
 -- text and a row of buttons (build mode, placing a blueprint).
 function UITheme.Bar(parent: Instance, name: string): Bar
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 12, true)
+	local card = UITheme.Card(C.Bark, C.Ink, 3, 12, true, "Panel")
 	card.outer.Name = name
 	card.outer.AnchorPoint = Vector2.new(0.5, 1)
 	card.outer.Position = UDim2.new(0.5, 0, 1, -(UITheme.Bottom() + 30 + 8))
 	card.outer.Visible = false
-	UITheme.stroke(card.face, C.Ink, 2)
 	UITheme.padding(card.face, 8, 10, 10, 10)
 	UITheme.list(card.face, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UITheme.texture(card.face, "Wood", 12)
-	local label = UITheme.label(card.face, "", UITheme.Fonts.Bold, 14, C.Cream)
+	local label = UITheme.label(card.face, "", UITheme.Fonts.Bold, 14, C.Ink)
 	label.LayoutOrder = 1
 	label.Size = UDim2.fromOffset(320, 20)
 	label.TextXAlignment = Enum.TextXAlignment.Center

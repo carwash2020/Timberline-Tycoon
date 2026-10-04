@@ -308,7 +308,9 @@ function StoreUI.Start()
 	end
 	ShopUI.SetStoreOpener(openStore)
 
-	local shell = UITheme.Card(C.Paper, C.Bark, 3, 14, false)
+	local shell = UITheme.Card(C.Paper, C.Bark, 3, 14, false, "Panel")
+	local inset = UITheme.SkinInset("Panel")
+	UITheme.padding(shell.face, inset, inset, inset, inset)
 	shell.outer.Name = "StorePanel"
 	shell.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	shell.outer.Position = UDim2.fromScale(0.5, 0.5)

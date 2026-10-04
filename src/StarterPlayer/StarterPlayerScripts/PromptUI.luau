@@ -55,7 +55,7 @@ local function keyName(key: Enum.KeyCode): string
 	return names[key.Name] or key.Name
 end
 
-local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
+function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
 	local adornee, studs = PromptUI.Adornee(prompt.Parent)
 	if not adornee then
 		return
@@ -81,7 +81,7 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 		billboard.SizeOffset = Vector2.new(prompt.UIOffset.X / WIDTH, prompt.UIOffset.Y / HEIGHT)
 	end
 
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true)
+	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Panel")
 	if studs then
 		card.outer.AnchorPoint = Vector2.new(0.5, 1)
 		card.outer.Position = UDim2.fromScale(0.5, 0.5)
@@ -89,7 +89,6 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 		card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 		card.outer.Position = UDim2.fromScale(0.5, 0.5)
 	end
-	UITheme.stroke(card.face, C.Ink, 2)
 	UITheme.padding(card.face, 8, 18, 8, 8)
 	local row = UITheme.list(card.face, 12, true)
 	row.VerticalAlignment = Enum.VerticalAlignment.Center
@@ -97,14 +96,11 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	card.outer.Parent = billboard
 
 	-- The key cap (or TAP on a touch screen).
-	local cap = UITheme.Card(if touch then C.Amber else C.Paper, if touch then C.AmberEdge else C.Muted, 3, 10)
+	local cap =
+		UITheme.Card(if touch then C.Amber else C.Paper, if touch then C.AmberEdge else C.Muted, 3, 10, false, "Button")
 	cap.outer.Name = "Key"
 	cap.outer.LayoutOrder = 1
 	cap.outer.Size = UDim2.fromOffset(40, 43)
-	if touch then
-		UITheme.corner(cap.outer, 20)
-		UITheme.corner(cap.face, 20)
-	end
 	cap.face.ClipsDescendants = true
 	cap.outer.Parent = card.face
 	local fill = Instance.new("Frame")
@@ -144,12 +140,12 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 	words.BackgroundTransparency = 1
 	UITheme.list(words, 3)
 	words.Parent = card.face
-	local action = UITheme.label(words, prompt.ActionText, F.Black, 16, C.Cream)
+	local action = UITheme.label(words, prompt.ActionText, F.Black, 16, C.Ink)
 	action.LayoutOrder = 1
 	action.Size = UDim2.new()
 	action.AutomaticSize = Enum.AutomaticSize.XY
 	local object =
-		UITheme.label(words, string.upper(prompt.ObjectText), F.Black, UITheme.Sized("PromptObject").text, C.Amber)
+		UITheme.label(words, string.upper(prompt.ObjectText), F.Black, UITheme.Sized("PromptObject").text, C.Bark)
 	object.LayoutOrder = 2
 	object.Size = UDim2.new()
 	object.AutomaticSize = Enum.AutomaticSize.XY
@@ -167,16 +163,17 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 		object.Visible = prompt.ObjectText ~= ""
 	end)
 
-	-- Holding: the cap fills from the bottom and sinks onto its edge.
+	-- Holding: the cap fills from the bottom and swaps to the pressed skin.
 	local holding: Tween? = nil
 	local function setHeld(held: boolean)
 		if holding then
 			holding:Cancel()
 			holding = nil
 		end
+		-- ButtonPressed is the same slice, sunk in the art, so the face stays
+		-- put. Releasing always puts Button back; the pressed skin must not stick.
+		UITheme.ApplySkin(cap.face, if held then "ButtonPressed" else "Button")
 		if held then
-			cap.outer.BackgroundColor3 = C.AmberEdge
-			cap.face.Position = UDim2.fromOffset(0, 2)
 			local tween = TweenService:Create(
 				fill,
 				TweenInfo.new(prompt.HoldDuration, Enum.EasingStyle.Linear),
@@ -185,8 +182,6 @@ local function show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInpu
 			tween:Play()
 			holding = tween
 		else
-			cap.outer.BackgroundColor3 = if touch then C.AmberEdge else C.Muted
-			cap.face.Position = UDim2.fromOffset(0, 0)
 			fill.Size = UDim2.fromScale(1, 0)
 		end
 	end
@@ -263,7 +258,7 @@ function PromptUI.Start()
 	ProximityPromptService.PromptShown:Connect(
 		function(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
 			if prompt.Style == Enum.ProximityPromptStyle.Custom then
-				show(prompt, inputType)
+				PromptUI.Show(prompt, inputType)
 			end
 		end
 	)

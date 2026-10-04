@@ -700,7 +700,7 @@ local function build()
 	UITheme.list(column, 6)
 
 	-- The tracker: kraft paper, a bark rim, an ink edge.
-	local card = UITheme.Card(C.Paper, C.Ink, 3, 12, false)
+	local card = UITheme.Card(C.Paper, C.Ink, 3, 12, false, "Panel")
 	card.outer.Name = "Tracker"
 	card.outer.LayoutOrder = 1
 	card.outer.Size = UDim2.fromOffset(280, 0)
@@ -709,7 +709,6 @@ local function build()
 	card.face.AutomaticSize = Enum.AutomaticSize.Y
 	UITheme.padding(card.outer, 0, 0, 3, 0)
 	card.outer.Visible = false
-	UITheme.stroke(card.face, C.Bark, 3)
 	UITheme.padding(card.face, 8, 10, 10, 12)
 	UITheme.list(card.face, 4)
 	UITheme.texture(card.face, "Kraft", 12)
@@ -785,14 +784,13 @@ local function build()
 	holder.BackgroundTransparency = 1
 	holder.Visible = false
 	holder.Parent = column
-	local bubble = UITheme.Card(C.Bark, C.Ink, 3, 12, false)
+	local bubble = UITheme.Card(C.Bark, C.Ink, 3, 12, false, "Panel")
 	bubble.outer.Name = "Card"
 	bubble.outer.Size = UDim2.fromOffset(280, 0)
 	bubble.outer.AutomaticSize = Enum.AutomaticSize.Y
 	bubble.face.Size = UDim2.fromScale(1, 0)
 	bubble.face.AutomaticSize = Enum.AutomaticSize.Y
 	UITheme.padding(bubble.outer, 0, 0, 3, 0)
-	UITheme.stroke(bubble.face, C.Ink, 2)
 	UITheme.padding(bubble.face, 8, 10, 8, 8)
 	UITheme.texture(bubble.face, "Wood", 12)
 	bubble.outer.Parent = holder
@@ -806,10 +804,10 @@ local function build()
 	UITheme.list(words, 3)
 	words.Parent = bubble.face
 	local nameSize = UITheme.Sized("MurphName").text
-	local who = UITheme.label(words, "MURPH", F.Black, nameSize, C.Amber)
+	local who = UITheme.label(words, "MURPH", F.Black, nameSize, C.Bark)
 	who.LayoutOrder = 1
 	who.Size = UDim2.new(1, 0, 0, nameSize)
-	local line = UITheme.label(words, "", F.Bold, UITheme.Sized("MurphLine").text, C.Cream)
+	local line = UITheme.label(words, "", F.Bold, UITheme.Sized("MurphLine").text, C.Ink)
 	line.LayoutOrder = 2
 	line.Size = UDim2.fromScale(1, 0)
 	line.AutomaticSize = Enum.AutomaticSize.Y
