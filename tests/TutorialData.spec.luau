@@ -614,10 +614,51 @@ return function(t)
 				t.shared("Util").formatCash(steel.cashPrice)
 			)
 		)
-		t.ok(string.find(TutorialData.MurphLine(truck, false, 51), "Sell more wood first", 1, true))
-		t.ok(string.find(TutorialData.MurphLine(steel, false, 0), "Sell more wood first", 1, true))
+		t.eq(TutorialData.Beacon(truck, 51), "murphCart")
+		t.ok(string.find(TutorialData.MurphLine(truck, false, 51), "my cart", 1, true))
+		t.eq(
+			TutorialData.MurphLine(truck, false, 51),
+			string.format("Sell more wood at my cart first. The Rustbucket is $%d at the dealership.", truck.cashPrice)
+		)
+		t.eq(TutorialData.Beacon(truck, 75), "dealership")
 		t.eq(TutorialData.MurphLine(truck, false, 75), truck.murph, "enough cash: the usual line")
+		t.ok(string.find(TutorialData.MurphLine(steel, false, 0), "Sell more wood first", 1, true))
+		t.eq(TutorialData.Beacon(steel, 0), steel.beacon, "the Steel Axe still points at the shed")
 		t.eq(TutorialData.MurphLine(steel, false, steel.cashPrice), steel.murph)
+	end)
+
+	t.test("v2: the thank-you for the sale is only on the step right after sell", function()
+		local sellAt = 0
+		for i, step in ipairs(V2) do
+			if step.id == "sell" then
+				sellAt = i
+			end
+		end
+		local function mentions(step)
+			local blob =
+				string.lower((step.murph or "") .. " " .. (step.murphShort or "") .. " " .. (step.murphBack or ""))
+			return string.find(blob, "sale", 1, true) ~= nil
+		end
+		t.ok(mentions(V2[sellAt + 1]), "the plot step thanks them for the sale")
+		t.ok(string.find(V2[sellAt + 1].murph, "That sale's yours", 1, true))
+		for i, step in ipairs(V2) do
+			if mentions(step) then
+				t.eq(i, sellAt + 1, step.id .. " mentions the sale")
+			end
+		end
+		local truck
+		for _, step in ipairs(V2) do
+			if step.id == "truck" then
+				truck = step
+			end
+		end
+		t.eq(
+			truck.murph,
+			string.format(
+				"The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.",
+				truck.cashPrice
+			)
+		)
 	end)
 
 	t.test("the plot line names no direction, and the mill's u³ tip moved to the farewell", function()

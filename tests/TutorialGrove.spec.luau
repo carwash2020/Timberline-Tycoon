@@ -46,15 +46,15 @@ return function(t)
 	end)
 
 	t.test("three single-piece sales in a row pass, and a sale past 80 is refused", function()
-		local onboarding = { cartVolume = 0 }
+		local slot = { cartVolume = 0 }
 		for n = 1, 3 do
 			local ok, why = TutorialGrove.Accept(offer({
 				volume = 10,
-				cartVolume = TutorialGrove.SavedVolume(onboarding),
+				cartVolume = TutorialGrove.SavedVolume(slot),
 			}))
 			t.eq(ok, true, why)
-			TutorialGrove.Remember(onboarding, 10)
-			t.eq(onboarding.cartVolume, n * 10)
+			TutorialGrove.Remember(slot, 10)
+			t.eq(slot.cartVolume, n * 10)
 		end
 		t.eq(select(1, TutorialGrove.Accept(offer({ volume = 10, cartVolume = 70 }))), true, "80 exactly still fits")
 		t.eq(
@@ -62,6 +62,66 @@ return function(t)
 			TutorialGrove.RefuseBig,
 			"75 + 10 passes 80"
 		)
+	end)
+
+	t.test("a second v1 cart sale during the truck step is refused", function()
+		local slot = { cartUsed = false }
+		local first = {
+			done = false,
+			stepId = "sell",
+			used = slot.cartUsed,
+			pieces = 1,
+			logs = 2,
+		}
+		t.eq(select(1, TutorialGrove.AcceptV1(first)), true)
+		slot.cartUsed = true -- GameServer sets this on the slot after the sale
+		t.eq(
+			select(
+				2,
+				TutorialGrove.AcceptV1({
+					done = false,
+					stepId = "truck",
+					used = slot.cartUsed,
+					pieces = 1,
+					logs = 2,
+				})
+			),
+			TutorialGrove.RefuseUsed
+		)
+		-- Another slot has not used its cart, so its first sale still stands.
+		t.eq(
+			select(
+				1,
+				TutorialGrove.AcceptV1({
+					done = false,
+					stepId = "sell",
+					used = false,
+					pieces = 1,
+					logs = 2,
+				})
+			),
+			true
+		)
+	end)
+
+	t.test("starting cash, Murph's bonus and a full cart of oak or birch cover the Rustbucket", function()
+		local GameConfig = t.shared("GameConfig")
+		local SellLogic = t.shared("SellLogic")
+		local TutorialData = t.shared("TutorialData")
+		local bonus = 0
+		for _, step in ipairs(TutorialData.StepsV2) do
+			if step.id == "sell" then
+				bonus = step.rewardCash or 0
+			end
+		end
+		-- The same pricing SellService uses (SellLogic.PieceValue, then Payout).
+		local function cartPay(woodId: string): number
+			local gross = SellLogic.PieceValue(woodId, "log", TutorialGrove.MaxVolume, nil, 1, false)
+			return SellLogic.Payout(gross, 1)
+		end
+		local price = TutorialGrove.TruckPrice(2)
+		t.ok(GameConfig.StartingCash + bonus + cartPay("oak") >= price, "oak")
+		t.ok(GameConfig.StartingCash + bonus + cartPay("birch") >= price, "birch")
 	end)
 
 	t.test("the cart refuses at $75 or with a truck owned", function()

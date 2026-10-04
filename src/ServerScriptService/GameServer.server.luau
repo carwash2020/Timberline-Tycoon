@@ -444,19 +444,36 @@ local function completeSale(
 end
 
 -- Murph's cart. Nil when it buys; a refusal string when it doesn't.
--- A v2 sale also adds its u³ to onboarding.cartVolume.
+-- v1 (loop 1, onSellLogs passes volume nil): one sale, then this slot's
+-- cartUsed refuses. v2 adds the sale's u³ to this slot's cartVolume.
 local function cartDecision(profile: ProfileService.Profile, pieces: number, volume: number?, logs: number?): string?
 	local loop = CoreLoop.Active()
 	local list = TutorialData.ForLoop(loop)
 	local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
+	local stepId = if step then step.id else nil
+	if loop == 1 then
+		local ok, why = TutorialGrove.AcceptV1({
+			done = profile.tutorialDone == true,
+			stepId = stepId,
+			used = profile.cartUsed == true,
+			pieces = pieces,
+			volume = volume,
+			logs = logs,
+		})
+		if not ok then
+			return why
+		end
+		profile.cartUsed = true
+		return nil
+	end
 	local trucks = profile.ownedTrucks
 	local ok, why = TutorialGrove.Accept({
 		done = profile.tutorialDone == true,
-		stepId = if step then step.id else nil,
+		stepId = stepId,
 		pieces = pieces,
 		volume = volume,
 		logs = logs,
-		cartVolume = TutorialGrove.SavedVolume(profile.onboarding),
+		cartVolume = TutorialGrove.SavedVolume(profile),
 		cash = profile.cash,
 		ownsTruck = type(trucks) == "table" and #trucks > 0,
 		truckPrice = TutorialGrove.TruckPrice(loop),
@@ -465,7 +482,7 @@ local function cartDecision(profile: ProfileService.Profile, pieces: number, vol
 		return why
 	end
 	if type(volume) == "number" then
-		TutorialGrove.Remember(profile.onboarding, volume)
+		TutorialGrove.Remember(profile, volume)
 	end
 	return nil
 end

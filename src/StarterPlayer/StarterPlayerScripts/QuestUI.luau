@@ -328,7 +328,8 @@ end
 
 -- The part the beacon should hang over for this step, if it's around.
 local function beaconTarget(step: Step, from: Vector3): BasePart?
-	local target = step.beacon
+	local cash = player:GetAttribute("Cash")
+	local target = TutorialData.Beacon(step, if type(cash) == "number" then cash else 0)
 	local elderUid = workspace:GetAttribute("ElderUid")
 	local now = workspace:GetServerTimeNow()
 	local function isHere(userId: number): boolean

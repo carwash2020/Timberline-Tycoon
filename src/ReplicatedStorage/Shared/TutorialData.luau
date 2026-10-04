@@ -126,13 +126,22 @@ local function cashLoad(id: string, reward: number, murph: string): Step
 	}
 end
 
-local function plotStep(): Step
+local function plotStep(afterSale: boolean?): Step
+	-- v1 claims the plot before any sale, so the thank-you stays off that
+	-- line. v2 says it here, the step right after the cart sale.
+	local claim = if saplings
+		then "Every lumberjack needs land, and this one's free. Claim one, follow the arrow, then plant a sapling on it."
+		else "Every lumberjack needs land, and this one's free. Claim one, follow the arrow."
+	local thanks = "That sale's yours, and a little extra from me. "
+	-- The sapling sentence plus the thank-you is too long for one bubble,
+	-- so that variant drops the "needs land" clause.
+	local after = if saplings
+		then thanks .. "Claim one, follow the arrow, then plant a sapling on it."
+		else thanks .. claim
 	return {
 		id = "plot",
 		objective = if saplings then "Claim a free plot and plant a sapling" else "Claim a free plot",
-		murph = if saplings
-			then "Every lumberjack needs land, and this one's free. Claim one, follow the arrow, then plant a sapling on it."
-			else "Every lumberjack needs land, and this one's free. Claim one, follow the arrow.",
+		murph = if afterSale then after else claim,
 		event = "plotClaimed",
 		count = 1,
 		beacon = "plotSign",
@@ -146,16 +155,10 @@ local function truckStep(loop: number): Step
 		id = "truck",
 		objective = "Buy the Rustbucket at the dealership",
 		murph = if price > 0
-			then string.format(
-				"That sale's yours, and a little extra from me. The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.",
-				price
-			)
+			then string.format("The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.", price)
 			else "That sale's yours, and a little extra from me. Buy the Rustbucket at the dealership and it shows up on your plot.",
 		murphShort = if price > 0
-			then string.format(
-				"Sell more wood first. The Rustbucket is $%d at the dealership, then it shows up on your plot.",
-				price
-			)
+			then string.format("Sell more wood at my cart first. The Rustbucket is $%d at the dealership.", price)
 			else nil,
 		event = "truckBought",
 		count = 1,
@@ -281,7 +284,7 @@ TutorialData.StepsV2 = {
 		beacon = "murphCart",
 		rewardCash = 25,
 	},
-	plotStep(),
+	plotStep(true),
 	truckStep(2),
 	{
 		id = "load",
@@ -493,6 +496,20 @@ function TutorialData.MurphLine(step: Step, refresher: boolean, cash: number?): 
 		end
 	end
 	return if refresher and step.murphBack then step.murphBack else step.murph
+end
+
+-- Where the arrow points. The truck step sends a player who can't afford
+-- it back to Murph's cart; once they can, it points at the dealership.
+-- Every other step uses its own beacon.
+function TutorialData.Beacon(step: Step, cash: number?): BeaconTarget?
+	local price = step.cashPrice
+	if step.id == "truck" and type(price) == "number" and price > 0 then
+		local have = if type(cash) == "number" and cash == cash then cash else 0
+		if have < price then
+			return "murphCart"
+		end
+	end
+	return step.beacon
 end
 
 -- The v2 order before this list (plot led). A saved tutorialStep from that
