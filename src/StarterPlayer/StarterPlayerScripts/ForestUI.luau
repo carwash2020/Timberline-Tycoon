@@ -9,9 +9,11 @@
 -- Everything 3D is local and culled by distance; the streamed world is
 -- only read through tags and attributes.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
@@ -24,11 +26,45 @@ local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local CameraShake = require(script.Parent.CameraShake)
 local HUD = require(script.Parent.HUD)
+local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
 type FigureDef = ForestData.FigureDef
 
 local ForestUI = {}
+
+local stampOpen = false
+local stampFocus: GuiObject? = nil
+local stampGroup: Instance? = nil
+
+function ForestUI.ElderTextPx(tenFoot: boolean): number
+	return if tenFoot then 18 else 14
+end
+
+function ForestUI._open(button: GuiObject?)
+	stampOpen = true
+	stampFocus = button
+	MenuPad.Open(button)
+end
+
+function ForestUI._close()
+	stampOpen = false
+	local group = stampGroup
+	stampGroup = nil
+	MenuPad.Close(stampFocus)
+	stampFocus = nil
+	if group then
+		group:Destroy()
+	end
+end
+
+function ForestUI.ApplyKey(key: Enum.KeyCode): string?
+	if not stampOpen or not MenuPad.Closes(key) then
+		return nil
+	end
+	ForestUI._close()
+	return "close"
+end
 
 local C = UITheme.Colors
 local F = UITheme.Fonts
@@ -147,8 +183,24 @@ local function stamp(gui: ScreenGui, figure: FigureDef, count: number)
 	sub.Size = UDim2.new(1, -28, 0, 34)
 	sub.TextXAlignment = Enum.TextXAlignment.Center
 	sub.TextWrapped = true
+	local dismiss = Instance.new("TextButton")
+	dismiss.Name = "Dismiss"
+	dismiss.AnchorPoint = Vector2.new(1, 0)
+	dismiss.Position = UDim2.new(1, -8, 0, 6)
+	dismiss.Size = UDim2.fromOffset(44, 44)
+	dismiss.BackgroundTransparency = 1
+	dismiss.Text = "X"
+	dismiss.Font = F.Black
+	dismiss.TextSize = 18
+	dismiss.TextColor3 = ink
+	dismiss.Parent = card.face
+	dismiss.Activated:Connect(function()
+		ForestUI.ApplyKey(Enum.KeyCode.ButtonB)
+	end)
 	card.outer.Parent = group
 	group.Parent = gui
+	stampGroup = group
+	ForestUI._open(dismiss)
 
 	SoundData.Play("FigureReveal")
 	TweenService:Create(scale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
@@ -159,11 +211,20 @@ local function stamp(gui: ScreenGui, figure: FigureDef, count: number)
 		CameraShake.Shake(0.3, 0.3)
 	end
 	task.wait(figure.revealSeconds)
+	if stampGroup ~= group then
+		return
+	end
 	local out = TweenService:Create(group, TweenInfo.new(0.25), { GroupTransparency = 1 })
 	out:Play()
 	TweenService:Create(scale, TweenInfo.new(0.25), { Scale = 0.85 }):Play()
 	out.Completed:Wait()
-	group:Destroy()
+	if stampGroup == group then
+		stampGroup = nil
+		ForestUI._close()
+	end
+	if group.Parent then
+		group:Destroy()
+	end
 end
 
 local function runReveals()
@@ -239,7 +300,7 @@ end
 local elderMarker: Part? = nil
 local elderLabel: TextLabel? = nil
 
-local function makeElderMarker(): (Part, TextLabel)
+function ForestUI.MakeElderMarker(tenFoot: boolean): (Part, TextLabel)
 	local part = Instance.new("Part")
 	part.Name = "ElderMarker"
 	part.Anchored = true
@@ -257,10 +318,19 @@ local function makeElderMarker(): (Part, TextLabel)
 	card.outer.Size = UDim2.fromScale(1, 1)
 	UITheme.stroke(card.face, C.Ink, 2)
 	card.outer.Parent = gui
-	local label = UITheme.label(card.face, "", F.Black, 13, C.Ink)
+	local label = UITheme.label(card.face, "", F.Black, ForestUI.ElderTextPx(tenFoot), C.Ink)
 	label.Size = UDim2.fromScale(1, 1)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextWrapped = true
+	return part, label
+end
+
+local function makeElderMarker(): (Part, TextLabel)
+	local ten = false
+	pcall(function()
+		ten = GuiService:IsTenFootInterface() == true
+	end)
+	local part, label = ForestUI.MakeElderMarker(ten)
 	part.Parent = fx()
 	elderMarker, elderLabel = part, label
 	return part, label
@@ -437,6 +507,12 @@ local handlers: { [string]: ({ [string]: any }) -> () } = {
 }
 
 function ForestUI.Start()
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		ForestUI.ApplyKey(input.KeyCode)
+	end)
 	local playerGui = player:WaitForChild("PlayerGui")
 	local reveal = UITheme.Screen("FigureReveal", 12, "device") -- centred in the safe area, clear of a notch
 	reveal.Parent = playerGui

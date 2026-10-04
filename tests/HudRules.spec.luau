@@ -270,6 +270,10 @@ return function(t)
 	-- DragController), the D-pad pushes, pulls and turns it. Checked below:
 	-- only while holding, over HUD's shortcuts, and handed back on the drop.
 	local WHILE_HOLDING = "DragController"
+	-- While a blueprint is being placed, BlueprintPlacer also names
+	-- DPadRight (rotate). Settings stays the shortcut owner; the placer
+	-- binds higher and Settings.OpensOnPad is false while placing.
+	local WHILE_PLACING = { DPadRight = "BlueprintPlacer" }
 
 	t.test("each D-pad direction is bound by its own controller and by nothing else on the client", function()
 		local fs = require("@lune/fs")
@@ -288,11 +292,24 @@ return function(t)
 			local files = users[owner.key] or {}
 			t.ok(files[owner.file], string.format("%s (%s) isn't bound in %s", name, owner.key, owner.file))
 			for file in pairs(files) do
-				if file ~= WHILE_HOLDING then
+				if file ~= WHILE_HOLDING and file ~= WHILE_PLACING[owner.key] then
 					t.eq(file, owner.file, owner.key .. " is also bound in " .. file)
 				end
 			end
 		end
+		local placer = fs.readFile(dir .. "/BlueprintPlacer.luau")
+		t.ok(users.DPadRight.BlueprintPlacer, "the placer names DPadRight")
+		t.ok(string.find(placer, "BindActionAtPriority", 1, true), "at a priority, not the default")
+		t.ok(string.find(placer, "BlueprintPlacer.RotatePriority()", 1, true), "using RotatePriority")
+		t.ok(
+			string.find(placer, "return Enum.ContextActionPriority.High.Value + 100", 1, true),
+			"above HUD.PadShortcut (High)"
+		)
+		local settings = fs.readFile(dir .. "/SettingsUI.luau")
+		t.ok(
+			string.find(settings, "SettingsUI.OpensOnPad(open.Visible, BlueprintPlacer.Active())", 1, true),
+			"Settings stays closed while the placer is up"
+		)
 		for _, name in ipairs({ "daily", "guide", "settings" }) do
 			local owner = PAD_OWNERS[name]
 			local source = fs.readFile(dir .. "/" .. owner.file .. ".luau")

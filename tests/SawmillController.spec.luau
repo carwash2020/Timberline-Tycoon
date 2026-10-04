@@ -3,11 +3,24 @@
 -- and the D-pad (plus arrows) changes X and Y without taking the HUD's keys.
 return function(t)
 	local Enum = t.roblox.Enum
+	local modalLog = {}
 	local loader = t.loader({
 		services = {
-			GuiService = {},
-			Players = {},
-			UserInputService = {},
+			GuiService = {
+				IsTenFootInterface = function()
+					return false
+				end,
+			},
+			Players = { LocalPlayer = {} },
+			UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
+			TextChatService = {},
+		},
+		mocks = {
+			HUD = {
+				SetModal = function(rect)
+					table.insert(modalLog, { rect = rect })
+				end,
+			},
 		},
 	})
 	local Logic = loader:shared("SawmillLogic")
@@ -82,5 +95,44 @@ return function(t)
 		t.ok(string.find(source, "SawmillLogic.PadStep", 1, true), "the open panel asks the logic for the key")
 		t.ok(string.find(source, "SelectedObject", 1, true), "opening the panel takes the pad")
 		t.ok(string.find(source, "SawmillLogic.PanelCloses", 1, true), "B and Esc close it")
+		t.ok(string.find(source, "HUD.SetModal", 1, true), "the open card is a modal")
+	end)
+
+	t.test("opening sets the modal from the card, and the card clears the column and the hotbar", function()
+		local Vector2 = t.roblox.Vector2
+		local panel = Controller.BuildPanel(false)
+		panel.root.AbsolutePosition = Vector2.new(300, 90)
+		panel.root.AbsoluteSize = Vector2.new(240, 200)
+		Controller._open(panel)
+		t.eq(panel.gui.Enabled, true)
+		local opened = modalLog[#modalLog].rect
+		t.eq(opened.left, 300)
+		t.eq(opened.top, 90)
+		t.eq(opened.right, 540)
+		t.eq(opened.bottom, 290)
+		Controller._close()
+		t.eq(modalLog[#modalLog].rect, nil)
+
+		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		local function column(margin)
+			return { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
+		end
+		local cases = {
+			{ w = 667, h = 375, ten = false, phone = true },
+			{ w = 375, h = 667, ten = false, phone = true },
+			{ w = 1920, h = 1080, ten = true, phone = false },
+		}
+		for _, c in ipairs(cases) do
+			local viewport = Vector2.new(c.w, c.h)
+			local scale = UITheme.ScaleFor(viewport, c.phone, c.ten)
+			local cardW, cardH = Logic.CardSize(c.ten)
+			local margin = if c.ten then 64 else 12
+			local hotbar = if c.ten then 36 + 70 elseif c.phone then 12 + 58 else 12 + 70
+			local box = Logic.PlaceCard(c.w, c.h, cardW * scale, cardH * scale, column(margin), c.h - hotbar)
+			local label = c.w .. "x" .. c.h
+			t.eq(Logic.Overlaps(box, column(margin)), false, label .. " column")
+			t.ok(box.bottom <= c.h - hotbar, label .. " hotbar")
+			t.ok(box.top >= 0 and box.left >= 0 and box.right <= c.w, label .. " on screen")
+		end
 	end)
 end

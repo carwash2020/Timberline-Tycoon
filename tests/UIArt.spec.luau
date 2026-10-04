@@ -118,6 +118,7 @@ return function(t)
 				UserInputService = {
 					TouchEnabled = extra.touch == true,
 					KeyboardEnabled = if extra.keyboard == nil then true else extra.keyboard,
+					InputBegan = signal(),
 					LastInputTypeChanged = signal(),
 					GetLastInputType = function()
 						return Enum.UserInputType.Keyboard

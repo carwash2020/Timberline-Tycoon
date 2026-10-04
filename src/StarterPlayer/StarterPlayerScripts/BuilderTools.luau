@@ -6,6 +6,7 @@
 -- and they stay quiet while a new blueprint is being placed.
 
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -488,6 +489,58 @@ local function modelFrom(target: Instance?): Model?
 	return nil
 end
 
+function BuilderTools.Center(viewport: Vector2): (number, number)
+	return viewport.X / 2, viewport.Y / 2
+end
+
+function BuilderTools.PieceFromHit(inst: Instance?): Model?
+	return modelFrom(inst)
+end
+
+-- The piece a screen ray hits. Mouse clicks and the gamepad reticle share it.
+function BuilderTools.Aim(camera: Camera, x: number, y: number): Model?
+	local ray = camera:ViewportPointToRay(x, y)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local char = player.Character
+	if char then
+		params.FilterDescendantsInstances = { char }
+	end
+	local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
+	return if hit then modelFrom(hit.Instance) else nil
+end
+
+function BuilderTools.SelectedCount(): number
+	return #selected
+end
+
+function BuilderTools.PrimarySelected(): Model?
+	local pick = selected[1]
+	return if pick then pick.model else nil
+end
+
+-- ButtonR2: a ray through the middle of the screen, then the same select
+-- (or copy-confirm) path a mouse click uses.
+function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
+	if inputState ~= Enum.UserInputState.Begin or BlueprintPlacer.Active() then
+		return Enum.ContextActionResult.Pass
+	end
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return Enum.ContextActionResult.Sink
+	end
+	local x, y = BuilderTools.Center(camera.ViewportSize)
+	if copyMode then
+		confirmCopy()
+		return Enum.ContextActionResult.Sink
+	end
+	local model = BuilderTools.Aim(camera, x, y)
+	if model then
+		toggle(model)
+	end
+	return Enum.ContextActionResult.Sink
+end
+
 local function onGround(origin: Vector3, direction: Vector3): Vector3?
 	if direction.Y >= -1e-4 then
 		return nil
@@ -559,7 +612,8 @@ function BuilderTools.Start()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "BuilderTools"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
+	gui.IgnoreGuiInset = false
+	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 	gui.DisplayOrder = 8
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -667,19 +721,31 @@ function BuilderTools.Start()
 		if processed or BlueprintPlacer.Active() then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 and copyMode then
-			confirmCopy()
-			return
-		end
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
 			return
 		end
-		local mouse = player:GetMouse()
-		local model = modelFrom(mouse.Target)
+		local cameraNow = workspace.CurrentCamera
+		if not cameraNow then
+			return
+		end
+		if copyMode then
+			confirmCopy()
+			return
+		end
+		local mouse = UserInputService:GetMouseLocation()
+		local model = BuilderTools.Aim(cameraNow, mouse.X, mouse.Y)
 		if model then
 			toggle(model)
 		end
 	end)
+
+	ContextActionService:BindActionAtPriority(
+		"BuilderSelect",
+		BuilderTools.OnSelect,
+		false,
+		Enum.ContextActionPriority.High.Value,
+		Enum.KeyCode.ButtonR2
+	)
 
 	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processedByUI: boolean)
 		if processedByUI or BlueprintPlacer.Active() then

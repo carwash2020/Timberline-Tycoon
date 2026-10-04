@@ -8,7 +8,9 @@
 -- (TreeArt.BarHeight puts it just over your head), which would hide it.
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 
+local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
 local C = UITheme.Colors
@@ -20,7 +22,30 @@ TreeUI.Width = 110 -- the pill, in pixels
 TreeUI.Height = 12
 TreeUI.Stroke = 2
 
-type Bar = { gui: BillboardGui, fill: Frame, conn: RBXScriptConnection }
+type Bar = { gui: BillboardGui, fill: Frame, focus: TextButton, conn: RBXScriptConnection }
+
+local barOpen = false
+
+function TreeUI._open(button: GuiObject?)
+	if GuiService.SelectedObject ~= nil and button and GuiService.SelectedObject ~= button then
+		return
+	end
+	barOpen = true
+	MenuPad.Open(button)
+end
+
+function TreeUI._close(root: Instance?)
+	barOpen = false
+	MenuPad.Close(root)
+end
+
+function TreeUI.ApplyKey(key: Enum.KeyCode): string?
+	if not barOpen or not MenuPad.Closes(key) then
+		return nil
+	end
+	TreeUI._close(nil)
+	return "close"
+end
 
 local bars: { [Model]: Bar } = {}
 
@@ -71,6 +96,14 @@ function TreeUI.MakeBar(offset: Vector3): (BillboardGui, Frame)
 	fill.BorderSizePixel = 0
 	UITheme.corner(fill, h / 2)
 	fill.Parent = track
+
+	local focus = Instance.new("TextButton")
+	focus.Name = "Focus"
+	focus.Size = UDim2.fromScale(1, 1)
+	focus.BackgroundTransparency = 1
+	focus.Text = ""
+	focus.Selectable = true
+	focus.Parent = track
 	return billboard, fill
 end
 
@@ -81,12 +114,21 @@ local function refresh(model: Model)
 	end
 	local hp = model:GetAttribute("HP")
 	local maxHp = model:GetAttribute("MaxHP")
+	local was = bar.gui.Enabled
 	if type(hp) ~= "number" or type(maxHp) ~= "number" or maxHp <= 0 then
 		bar.gui.Enabled = false
+		if was then
+			TreeUI._close(bar.gui)
+		end
 		return
 	end
 	local frac = math.clamp(hp / maxHp, 0, 1)
 	bar.gui.Enabled = frac > 0 and frac < 1
+	if bar.gui.Enabled and not was and GuiService.SelectedObject == nil then
+		TreeUI._open(bar.focus)
+	elseif not bar.gui.Enabled and was then
+		TreeUI._close(bar.gui)
+	end
 	bar.fill.Size = UDim2.fromScale(frac, 1)
 	bar.fill.BackgroundColor3 = TreeUI.FillColor(frac)
 end
@@ -103,9 +145,11 @@ local function attach(model: Model)
 	local billboard, fill = TreeUI.MakeBar(barOffset(model))
 	billboard.Adornee = adornee
 	billboard.Parent = model
+	local focus = billboard:FindFirstChild("Focus", true)
 	bars[model] = {
 		gui = billboard,
 		fill = fill,
+		focus = focus :: TextButton,
 		conn = model:GetAttributeChangedSignal("HP"):Connect(function()
 			refresh(model)
 		end),

@@ -53,6 +53,7 @@ local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ForgeLogic = require(ReplicatedStorage.Shared.ForgeLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
@@ -873,6 +874,7 @@ local function addPrompt(
 	prompt.MaxActivationDistance = PROMPT_RANGE
 	prompt.HoldDuration = hold
 	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
 	prompt.Parent = part
 	prompt.Triggered:Connect(fn)
 	return prompt

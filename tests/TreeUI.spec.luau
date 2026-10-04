@@ -6,11 +6,12 @@
 return function(t)
 	local roblox = t.roblox
 	local Vector3 = roblox.Vector3
+	local gui = {}
 	local loader = t.loader({
 		services = {
 			CollectionService = {},
 			Players = { LocalPlayer = {} },
-			GuiService = {},
+			GuiService = gui,
 			TextChatService = {},
 			UserInputService = {},
 		},
@@ -58,5 +59,19 @@ return function(t)
 		t.eq(gui.AlwaysOnTop, true)
 		t.eq(gui.MaxDistance, 60)
 		t.eq(gui.StudsOffsetWorldSpace, Vector3.new(0, -3, 0)) -- world up, whatever the trunk's turn
+	end)
+
+	t.test("a damaged bar can take the pad, and B or Esc lets it go", function()
+		local Enum = roblox.Enum
+		local bar = TreeUI.MakeBar(Vector3.new(0, 2, 0))
+		local focus = bar:FindFirstChild("Focus", true)
+		t.eq(focus.ClassName, "TextButton")
+		TreeUI._open(focus)
+		t.eq(gui.SelectedObject, focus)
+		t.eq(TreeUI.ApplyKey(Enum.KeyCode.ButtonB), "close")
+		t.eq(gui.SelectedObject, nil)
+		TreeUI._open(focus)
+		t.eq(TreeUI.ApplyKey(Enum.KeyCode.Escape), "close")
+		t.eq(gui.SelectedObject, nil)
 	end)
 end

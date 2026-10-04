@@ -19,6 +19,7 @@
 -- sets it every frame from the server's clock (WorldTime), or in Studio
 -- from the ClockOverride attribute.
 
+local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,10 +37,59 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
+local MenuPad = require(script.Parent.MenuPad)
 local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 local WorldUI = {}
+
+local clockButton: TextButton? = nil
+local clockFocused = false
+
+function WorldUI.MakeClock(parent: Instance, size: Vector2, textSize: number): TextButton
+	local button = Instance.new("TextButton")
+	button.Name = "Clock"
+	button.Size = UDim2.fromOffset(size.X, size.Y)
+	button.BackgroundColor3 = UITheme.Colors.Bark
+	button.TextColor3 = UITheme.Colors.Cream
+	button.Font = UITheme.Fonts.Black
+	button.TextSize = textSize
+	button.Text = ""
+	button.AutoButtonColor = false
+	button.Selectable = true
+	button.TextXAlignment = Enum.TextXAlignment.Center
+	UITheme.corner(button, size.Y / 2)
+	UITheme.stroke(button, UITheme.Colors.Ink, 2)
+	button.Parent = parent
+	return button
+end
+
+-- The clock can take the pad if a stick lands on it. It is not selected
+-- just because the HUD is on screen: there is no clock menu.
+function WorldUI._open(button: GuiObject?)
+	clockFocused = true
+	if button and button:IsA("TextButton") then
+		clockButton = button
+	end
+	MenuPad.Open(button)
+end
+
+function WorldUI._close()
+	clockFocused = false
+	MenuPad.Close(clockButton)
+end
+
+function WorldUI.ApplyKey(key: Enum.KeyCode): string?
+	if not MenuPad.Closes(key) then
+		return nil
+	end
+	local selected = GuiService.SelectedObject
+	if clockFocused or (clockButton ~= nil and selected == clockButton) then
+		WorldUI._close()
+		return "close"
+	end
+	return nil
+end
 
 local player = Players.LocalPlayer
 
@@ -102,15 +152,9 @@ local function buildClock()
 	end
 	local spec = UITheme.Sized("Clock") -- a corner pill: 36 tall on a phone
 	local size = spec.size or Vector2.new(100, 30)
-	local label = UITheme.label(line, "", UITheme.Fonts.Black, spec.text, UITheme.Colors.Cream)
-	label.Name = "Clock"
+	local label = WorldUI.MakeClock(line, size, spec.text)
 	label.LayoutOrder = 20 -- left of HUD's top row (♪ + cash), right of the Store button
-	label.Size = UDim2.fromOffset(size.X, size.Y)
-	label.BackgroundColor3 = UITheme.Colors.Bark
-	label.BackgroundTransparency = 0
-	label.TextXAlignment = Enum.TextXAlignment.Center
-	UITheme.corner(label, size.Y / 2)
-	UITheme.stroke(label, UITheme.Colors.Ink, 2)
+	clockButton = label
 
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()
@@ -267,6 +311,12 @@ local function watchGroves()
 end
 
 function WorldUI.Start()
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		WorldUI.ApplyKey(input.KeyCode)
+	end)
 	buildClock()
 	task.spawn(watchSkyBin)
 	watchGroves()

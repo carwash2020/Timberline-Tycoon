@@ -53,6 +53,7 @@ return function(t)
 		t.ok(prompt, "prompt")
 		t.eq(prompt.ActionText, "Browse")
 		t.eq(prompt.KeyboardKeyCode.Name, "E")
+		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")
 		t.eq(prompt.RequiresLineOfSight, false)
 		t.eq(model:FindFirstChild("ComingSoon", true), nil, "items are on sale, so no coming-soon label")
 		local StoreData = t.shared("StoreData")
@@ -68,5 +69,40 @@ return function(t)
 		t.eq(posters, 7, "five passes and two cash packs")
 		t.eq(model:FindFirstChild("2x Wood (48 hours)", true), nil)
 		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
+	end)
+
+	t.test("poster descriptions are 14 px, wrapped, and at most two lines", function()
+		local Enum = t.roblox.Enum
+		local model = StoreBoard.Build()
+		local gui = model:FindFirstChild("Posters", true)
+		local width = StoreBoard.BodyWidth(gui.CanvasSize.X)
+		local StoreData = t.shared("StoreData")
+		local function check(item)
+			local card = model:FindFirstChild(item.name, true)
+			local body = card:FindFirstChild("Description")
+			t.eq(body.TextSize, 14, item.name)
+			t.eq(body.TextWrapped, true, item.name)
+			t.eq(body.TextTruncate, Enum.TextTruncate.AtEnd, item.name)
+			t.eq(body.Size.Y.Offset, 28, item.name)
+			t.ok(StoreBoard.LineCount(body.Text, width, 14) <= 2, item.name)
+			if StoreBoard.LineCount(item.description, width, 14) <= 2 then
+				t.eq(body.Text, item.description, item.name .. " fits whole")
+			else
+				t.ok(string.sub(body.Text, -#"…") == "…", item.name .. " clips")
+			end
+			local title = nil
+			for _, d in ipairs(card:GetChildren()) do
+				if d:IsA("TextLabel") and d.Text == item.name then
+					title = d
+				end
+			end
+			t.eq(title.TextSize, 16, item.name .. " title")
+		end
+		for _, pass in ipairs(StoreData.ListedPasses()) do
+			check(pass)
+		end
+		for _, product in ipairs(StoreData.ListedProducts()) do
+			check(product)
+		end
 	end)
 end

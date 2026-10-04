@@ -16,6 +16,8 @@ local NPCDialogue = {}
 
 -- Phone role line, in pixels. Meets the 14 px tag minimum. TBD (Builder).
 NPCDialogue.PhoneTagRole = 14
+-- Keeper role line on a TV. The desktop tag stays at 14.
+NPCDialogue.TvTagRole = 18
 NPCDialogue.MaxLine = 110 -- the old cap; a bubble wraps past it into a speech
 NPCDialogue.ReactMax = 90 -- contextual lines and onboarding tips
 NPCDialogue.PromptCooldown = 4.5 -- seconds between Talk presses
@@ -306,7 +308,7 @@ end
 -- builds. studsOffset.X is how far beside the head the tail sits.
 -- studsOffset.Y is the old fixed lift and is not used: the tail's Y is
 -- TopOffset + BubbleClearance, on a phone and a desktop alike.
-function NPCDialogue.LayoutFor(phone: boolean): Layout
+function NPCDialogue.LayoutFor(phone: boolean, tenFoot: boolean?): Layout
 	if phone then
 		return {
 			phone = true,
@@ -329,7 +331,7 @@ function NPCDialogue.LayoutFor(phone: boolean): Layout
 		tagDistance = 60,
 		tagSize = Vector2.new(220, 50),
 		tagName = 24,
-		tagRole = 14,
+		tagRole = if tenFoot then NPCDialogue.TvTagRole else 14,
 	}
 end
 

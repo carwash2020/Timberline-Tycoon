@@ -19,11 +19,18 @@ local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local CameraShake = require(script.Parent.CameraShake)
+local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
 local Quality = require(script.Parent.Quality)
 local UITheme = require(script.Parent.UITheme)
 
 local SettingsUI = {}
+
+-- DPadRight opens Settings only while the button is showing and the
+-- placer is not up. The placer binds that key at a higher priority too.
+function SettingsUI.OpensOnPad(buttonVisible: boolean, placing: boolean): boolean
+	return buttonVisible and not placing
+end
 
 local player = Players.LocalPlayer
 local C = UITheme.Colors
@@ -382,7 +389,7 @@ function SettingsUI.Start()
 		UITheme.HitPad(open, roundSpec.hit).Activated:Connect(toggle)
 	end
 	HUD.PadShortcut(Enum.KeyCode.DPadRight, function()
-		return open.Visible
+		return SettingsUI.OpensOnPad(open.Visible, BlueprintPlacer.Active())
 	end, toggle)
 	local SETTINGS_NAV = "SettingsNav"
 	card.outer:GetPropertyChangedSignal("Visible"):Connect(function()

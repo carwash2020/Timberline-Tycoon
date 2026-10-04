@@ -8,6 +8,7 @@ local GameConfig = require(script.Parent.GameConfig)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local SawmillLogic = require(script.Parent.SawmillLogic)
+local WorldLayout = require(script.Parent.World.WorldLayout)
 
 type Blueprint = PlotData.Blueprint
 
@@ -303,6 +304,59 @@ end
 function PlotLogic.EjectLocal(tierSize: number, squares: { string }): (number, number)
 	local half = PlotLogic.Extent(tierSize, squares) / 2
 	return 0, half + PlotLogic.EjectGap
+end
+
+-- North, east, west, south, then a step further north. The first that
+-- isn't on a road or in the water is where a visitor is put down.
+function PlotLogic.EjectCandidates(tierSize: number, squares: { string }): { { number } }
+	local half = PlotLogic.Extent(tierSize, squares) / 2
+	local gap = PlotLogic.EjectGap
+	local north = half + gap
+	return {
+		{ 0, north },
+		{ north, 0 },
+		{ -north, 0 },
+		{ 0, -(half + gap) },
+		{ 0, north + gap },
+	}
+end
+
+function PlotLogic.EjectSpot(tierSize: number, squares: { string }, bad: (number, number) -> boolean): (number, number)
+	for _, spot in ipairs(PlotLogic.EjectCandidates(tierSize, squares)) do
+		if not bad(spot[1], spot[2]) then
+			return spot[1], spot[2]
+		end
+	end
+	return PlotLogic.EjectLocal(tierSize, squares)
+end
+
+function PlotLogic.OnRoad(x: number, z: number): boolean
+	local p = Vector2.new(x, z)
+	for _, road in ipairs(WorldLayout.Roads) do
+		if WorldLayout.PolylineDistance(p, road.points) <= road.width / 2 + 2 then
+			return true
+		end
+	end
+	return false
+end
+
+function PlotLogic.InWater(x: number, z: number): boolean
+	local function pool(w: { x: number, z: number, radius: number }): boolean
+		local dx, dz = x - w.x, z - w.z
+		return dx * dx + dz * dz <= w.radius * w.radius
+	end
+	if pool(WorldLayout.Lake) or pool(WorldLayout.Pond) then
+		return true
+	end
+	local p = Vector2.new(x, z)
+	if WorldLayout.PolylineDistance(p, WorldLayout.River.points) <= WorldLayout.River.width / 2 then
+		return true
+	end
+	return WorldLayout.PolylineDistance(p, WorldLayout.LakeOutflow.points) <= WorldLayout.LakeOutflow.width / 2
+end
+
+function PlotLogic.GroundBad(inWater: boolean, onRoad: boolean): boolean
+	return inWater or onRoad
 end
 
 local NEIGHBOR = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }

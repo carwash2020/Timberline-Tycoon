@@ -45,6 +45,7 @@
 -- and dropped as they stream out. Binding gives up after a few tries.
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -175,7 +176,11 @@ local function refreshLayout(now: number)
 	-- selects this phone layout for those screens too.
 	local phone = NPCDialogue.IsPhone(UserInputService.TouchEnabled, UserInputService.KeyboardEnabled, width)
 		or UITheme.IsCompact(viewport, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
-	local layout = NPCDialogue.LayoutFor(phone)
+	local tenFoot = false
+	pcall(function()
+		tenFoot = GuiService:IsTenFootInterface() == true
+	end)
+	local layout = NPCDialogue.LayoutFor(phone, tenFoot)
 	if layout.phone ~= phoneLayout.phone then
 		for _, rig in pairs(rigs) do
 			applyTag(rig.tag, layout)

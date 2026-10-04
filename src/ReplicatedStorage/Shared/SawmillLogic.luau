@@ -92,6 +92,58 @@ function SawmillLogic.PanelFace(tenFoot: boolean): number
 	return if tenFoot then SawmillLogic.PanelFaceTvPx else SawmillLogic.PanelFacePx
 end
 
+export type Box = { left: number, top: number, right: number, bottom: number }
+
+function SawmillLogic.Overlaps(a: Box, b: Box): boolean
+	return a.left < b.right and b.left < a.right and a.top < b.bottom and b.top < a.bottom
+end
+
+-- The screen card in pixels before UIScale: padding, the two text lines,
+-- the four step buttons, the hint, and Close.
+function SawmillLogic.CardSize(tenFoot: boolean): (number, number)
+	local face = SawmillLogic.PanelFace(tenFoot)
+	local text = SawmillLogic.PanelTextPx
+	local gap = 8
+	local pad = 12
+	local w = pad * 2 + face * 4 + gap * 3
+	local h = pad * 2 + text + gap + text + gap + face + gap + 48 + gap + face
+	return w, h
+end
+
+-- A spot for the card that misses the left column and sits above the hotbar.
+function SawmillLogic.PlaceCard(
+	screenW: number,
+	screenH: number,
+	cardW: number,
+	cardH: number,
+	column: Box,
+	hotbarTop: number
+): Box
+	local function box(left: number, top: number): Box
+		return { left = left, top = top, right = left + cardW, bottom = top + cardH }
+	end
+	local function clear(b: Box): boolean
+		return b.left >= 0
+			and b.top >= 0
+			and b.right <= screenW
+			and b.bottom <= math.min(hotbarTop, screenH)
+			and not SawmillLogic.Overlaps(b, column)
+	end
+	local centered = box(math.floor((screenW - cardW) / 2), hotbarTop - cardH)
+	if clear(centered) then
+		return centered
+	end
+	local under = box(math.floor((screenW - cardW) / 2), column.bottom + 8)
+	if clear(under) then
+		return under
+	end
+	local beside = box(column.right + 8, math.max(0, hotbarTop - cardH))
+	if clear(beside) then
+		return beside
+	end
+	return beside
+end
+
 -- One press on the open panel: axis and direction, or nothing if this key
 -- doesn't change the cut.
 function SawmillLogic.PadStep(key: Enum.KeyCode): (string?, number?)

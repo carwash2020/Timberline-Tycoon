@@ -5,8 +5,8 @@
 --     the middle of the screen on a gamepad, snapped to PlotData.Grid.
 --   * Green where PlotLogic.Check allows it (and you can pay), red with the
 --     reason where it doesn't. The server checks again: this is a preview.
---   * Click or PLACE (R2 on a gamepad) to place; R or ROTATE (X) for a
---     quarter turn; Q or CANCEL (B) to stop. After placing something new you
+--   * Click or PLACE (R2 on a gamepad) to place; R or ROTATE (D-pad right)
+--     for a quarter turn; Q or CANCEL (B) to stop. After placing something new you
 --     keep placing the same blueprint (fences!) until you cancel. A move
 --     ends after one placement.
 --   * Walking off your plot stops placing.
@@ -14,6 +14,7 @@
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -61,6 +62,7 @@ type State = {
 }
 
 local state: State? = nil
+local promptsWere: boolean? = nil -- ProximityPromptService.Enabled before placing
 local bar: Frame? = nil
 local barLabel: TextLabel? = nil
 -- The mouse is over the build bar: don't drag the ghost under the buttons
@@ -69,6 +71,33 @@ local overBar = false
 
 function BlueprintPlacer.Active(): boolean
 	return state ~= nil
+end
+
+-- Above the HUD's D-pad shortcuts (they bind at High). Returning Sink
+-- from the rotate handler keeps DPadRight from opening Settings.
+function BlueprintPlacer.RotatePriority(): number
+	return Enum.ContextActionPriority.High.Value + 100
+end
+
+function BlueprintPlacer.NextRot(rot: number): number
+	return (rot + 1) % 4
+end
+
+local function hidePrompts()
+	if promptsWere == nil then
+		promptsWere = ProximityPromptService.Enabled
+	end
+	ProximityPromptService.Enabled = false
+end
+
+-- Puts back the value saved in hidePrompts. Never forces Enabled on.
+local function restorePrompts()
+	if promptsWere == nil then
+		return
+	end
+	local previous = promptsWere
+	promptsWere = nil
+	ProximityPromptService.Enabled = previous
 end
 
 -- Your plot's centre, if you have one.
@@ -220,7 +249,7 @@ end
 function BlueprintPlacer.Rotate()
 	local s = state
 	if s then
-		s.rot = (s.rot + 1) % 4
+		s.rot = BlueprintPlacer.NextRot(s.rot)
 		update(s)
 	end
 end
@@ -271,6 +300,7 @@ function BlueprintPlacer.Stop()
 		return
 	end
 	state = nil
+	restorePrompts()
 	for _, conn in ipairs(s.conns) do
 		conn:Disconnect()
 	end
@@ -357,13 +387,38 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	if humanoid then
 		humanoid:UnequipTools()
 	end
+	hidePrompts()
+	if humanoid then
+		table.insert(
+			s.conns,
+			humanoid.Died:Connect(function()
+				BlueprintPlacer.Stop()
+			end)
+		)
+	end
+	if char then
+		table.insert(
+			s.conns,
+			char.ChildAdded:Connect(function(child: Instance)
+				if child:IsA("Tool") then
+					table.insert(
+						s.conns,
+						child.Unequipped:Connect(function()
+							BlueprintPlacer.Stop()
+						end)
+					)
+				end
+			end)
+		)
+	end
 
-	ContextActionService:BindAction(
+	ContextActionService:BindActionAtPriority(
 		"PlacerRotate",
 		action(BlueprintPlacer.Rotate),
 		false,
+		BlueprintPlacer.RotatePriority(),
 		Enum.KeyCode.R,
-		Enum.KeyCode.ButtonX
+		Enum.KeyCode.DPadRight
 	)
 	ContextActionService:BindAction("PlacerPlace", action(BlueprintPlacer.Place), false, Enum.KeyCode.ButtonR2)
 	ContextActionService:BindAction(

@@ -68,6 +68,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
 local DriveStart = require(ReplicatedStorage.Shared.DriveStart)
@@ -842,6 +843,7 @@ local function makeDrivePrompt(seat: VehicleSeat, owner: Player, def: TruckDef):
 	prompt.MaxActivationDistance = 9 -- from beside the cab of the biggest truck, to its seat (7 before phase 12)
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
 	prompt:SetAttribute("OwnerId", owner.UserId) -- VehicleFX hides it from everyone else
 	prompt.Parent = seat
 	return prompt

@@ -35,6 +35,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
@@ -147,6 +148,7 @@ local function addPickupPrompt(logPart: BasePart, uid: string, def: WoodDef)
 	prompt.MaxActivationDistance = GameConfig.PickupPromptRange
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
 	prompt.Parent = logPart
 	prompt.Triggered:Connect(function(player: Player)
 		local cb = TreeService.PickupCallback

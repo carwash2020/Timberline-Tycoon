@@ -11,15 +11,45 @@
 -- The engine still decides when a prompt shows and handles keys and
 -- buttons; touch and clicks go through InputHoldBegin / InputHoldEnd.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
 local PromptUI = {}
+
+local activeCleanup: (() -> ())? = nil
+local activeButton: GuiObject? = nil
+
+function PromptUI._open(button: GuiObject?)
+	activeButton = button
+	MenuPad.Open(button)
+end
+
+function PromptUI._close(root: Instance?)
+	MenuPad.Close(root or activeButton)
+	activeButton = nil
+end
+
+function PromptUI.ApplyKey(key: Enum.KeyCode): string?
+	if not MenuPad.Closes(key) then
+		return nil
+	end
+	local fn = activeCleanup
+	activeCleanup = nil
+	if fn then
+		fn()
+	else
+		PromptUI._close(activeButton)
+	end
+	return "close"
+end
 
 local C = UITheme.Colors
 local F = UITheme.Fonts
@@ -201,14 +231,16 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	-- It clicks as the press goes down, not on Activated (the release): a
 	-- prompt it triggers (Pick up, Sell) is often hidden before the finger
 	-- lifts, and that takes the card, and its Activated, with it.
+	-- A gamepad selects the same button so A presses it.
+	local button = Instance.new("TextButton")
+	button.Name = "Press"
+	button.Size = UDim2.fromScale(1, 1)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Selectable = true
+	button.ZIndex = 5
+	button.Parent = card.outer
 	if touch or prompt.ClickablePrompt then
-		local button = Instance.new("TextButton")
-		button.Name = "Press"
-		button.Size = UDim2.fromScale(1, 1)
-		button.BackgroundTransparency = 1
-		button.Text = ""
-		button.ZIndex = 5
-		button.Parent = card.outer
 		on(button.InputBegan, function(input: InputObject)
 			local t = input.UserInputType
 			if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
@@ -232,10 +264,18 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 			return
 		end
 		gone = true
+		if activeCleanup == cleanup then
+			activeCleanup = nil
+		end
+		PromptUI._close(button)
 		for _, conn in ipairs(conns) do
 			conn:Disconnect()
 		end
 		billboard:Destroy()
+	end
+	activeCleanup = cleanup
+	if gamepad then
+		PromptUI._open(button)
 	end
 	table.insert(conns, prompt.PromptHidden:Once(cleanup))
 	table.insert(conns, prompt.Destroying:Once(cleanup))
@@ -248,6 +288,14 @@ local function restyle(inst: Instance)
 end
 
 function PromptUI.Start()
+	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+		if processed or input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		if activeButton and GuiService.SelectedObject == activeButton then
+			PromptUI.ApplyKey(input.KeyCode)
+		end
+	end)
 	if not GameConfig.CustomPrompts then
 		return
 	end

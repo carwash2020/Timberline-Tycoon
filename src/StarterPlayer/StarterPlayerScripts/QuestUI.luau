@@ -24,6 +24,7 @@
 -- with a distance pill that bobs over the target.
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -35,6 +36,7 @@ local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
 type Step = TutorialData.Step
@@ -54,6 +56,7 @@ local tracker: Frame? = nil
 local objectiveLabel: TextLabel? = nil
 local stepLabel: TextLabel? = nil
 local skipRoot: Frame? = nil -- the Skip button (QuestUI.ShowSkip says when it shows)
+local skipFace: GuiButton? = nil
 local skipWidth = 0 -- its width and gap: the step label ends left of it while it shows
 local speech: Frame? = nil -- the holder in the column
 local speechCard: Frame? = nil -- slides and fades inside it
@@ -66,6 +69,38 @@ local speechLine = "" -- the line on the card, before its device words (HintLogi
 local lastStep = -1
 local lastRefresher = false -- the last step shown was on a returning player's refresher
 local skipped = false -- this player pressed Skip: no farewell speech
+local speechOpen = false
+local hideSpeech: (boolean) -> ()
+
+function QuestUI._open(button: GuiObject?)
+	speechOpen = true
+	MenuPad.Open(button)
+end
+
+function QuestUI._close()
+	speechOpen = false
+	MenuPad.Close(speech)
+end
+
+function QuestUI.ApplyKey(key: Enum.KeyCode): string?
+	if not MenuPad.Closes(key) then
+		return nil
+	end
+	if speech and speech.Visible then
+		hideSpeech(false)
+		return "close"
+	end
+	if speechOpen then
+		QuestUI._close()
+		return "close"
+	end
+	local selected = GuiService.SelectedObject
+	if skipRoot and skipRoot.Visible and selected and (selected == skipRoot or selected:IsDescendantOf(skipRoot)) then
+		MenuPad.Close(skipRoot)
+		return "clear"
+	end
+	return nil
+end
 
 -- The tutorial's steps in the loop that runs.
 local function steps(): { Step }
@@ -127,8 +162,9 @@ local function fadeCard(card: Frame, alpha: number, seconds: number)
 	}):Play()
 end
 
-local function hideSpeech(animated: boolean)
+hideSpeech = function(animated: boolean)
 	speechToken += 1
+	QuestUI._close()
 	local holder, card = speech, speechCard
 	if not holder or not card then
 		return
@@ -179,6 +215,9 @@ local function say(line: string)
 	card.Position = UDim2.fromOffset(0, 0)
 	fadeCard(card, 0, 0)
 	holder.Visible = true
+	if speechTap and speechTap.Visible then
+		QuestUI._open(speechTap)
+	end
 	speechToken += 1
 	local token = speechToken
 	task.delay(SPEECH_SECONDS, function()
@@ -478,8 +517,18 @@ local function refresh()
 			objectiveLabel.Text = TutorialData.ObjectiveText(step, progress, if type(cash) == "number" then cash else 0)
 		end
 		local showSkip = QuestUI.ShowSkip(index)
+		local skipWas = skipRoot ~= nil and skipRoot.Visible
 		if skipRoot then
 			skipRoot.Visible = showSkip
+		end
+		if
+			showSkip
+			and not skipWas
+			and skipFace
+			and GuiService.SelectedObject == nil
+			and not (speech and speech.Visible)
+		then
+			MenuPad.Open(skipFace)
 		end
 		if stepLabel then
 			stepLabel.Text = QuestUI.TrackerTitle(index, #steps(), onRefresher())
@@ -724,6 +773,7 @@ local function build()
 	skip.root.Visible = false -- until step 2 (refresh)
 	skip.root.Parent = header
 	skipRoot, skipWidth = skip.root, skipSize.X + 8
+	skipFace = skip.face
 	local armed = 0
 	local function onSkip()
 		if armed > 0 then
@@ -887,6 +937,12 @@ end
 
 function QuestUI.Start()
 	build()
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		QuestUI.ApplyKey(input.KeyCode)
+	end)
 	player:GetAttributeChangedSignal("TutorialStep"):Connect(refresh)
 	player:GetAttributeChangedSignal("TutorialProgress"):Connect(refresh)
 	player:GetAttributeChangedSignal("NextGoal"):Connect(refresh)

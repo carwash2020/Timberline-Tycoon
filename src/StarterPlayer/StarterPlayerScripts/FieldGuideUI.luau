@@ -25,12 +25,33 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local HUD = require(script.Parent.HUD)
+local MenuPad = require(script.Parent.MenuPad)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
 
 local FieldGuideUI = {}
 
 local player = Players.LocalPlayer
+local guideOpen = false
+
+function FieldGuideUI._open(button: GuiObject?)
+	guideOpen = true
+	MenuPad.Open(button)
+end
+
+function FieldGuideUI._close()
+	guideOpen = false
+	ShopUI.Close()
+	MenuPad.Close(nil)
+end
+
+function FieldGuideUI.ApplyKey(key: Enum.KeyCode): string?
+	if not guideOpen or not MenuPad.Closes(key) then
+		return nil
+	end
+	FieldGuideUI._close()
+	return "close"
+end
 
 local SILHOUETTE = Color3.fromRGB(70, 60, 52)
 local PAGE_ROW = "_page" -- the row that switches pages
@@ -186,6 +207,7 @@ open = function(which: Page)
 	local shop = if which == "grain" then grainPage() else woodsPage()
 	current = shop
 	ShopUI.OpenCustom(shop)
+	FieldGuideUI._open(ShopUI.FirstFace())
 end
 
 function FieldGuideUI.Start()

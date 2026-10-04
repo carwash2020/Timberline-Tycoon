@@ -19,6 +19,8 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local SawmillController = {}
 
@@ -209,6 +211,45 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	return { gui = gui, root = root, readout = readout, buttons = buttons, close = close }
 end
 
+local function modalRect(root: Frame): { left: number, top: number, right: number, bottom: number }
+	local at, size = root.AbsolutePosition, root.AbsoluteSize
+	return { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
+end
+
+-- Screen pixels. The card misses the left column and the hotbar.
+local function placeCard(root: Frame, tenFoot: boolean)
+	local ok, camera = pcall(function(): any
+		return (workspace :: any).CurrentCamera
+	end)
+	if not ok or typeof(camera) ~= "Instance" then
+		return
+	end
+	local viewport = (camera :: Camera).ViewportSize
+	if viewport.X <= 0 or viewport.Y <= 0 then
+		return
+	end
+	local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local ten = false
+	pcall(function()
+		ten = GuiService:IsTenFootInterface() == true
+	end)
+	local scale = UITheme.ScaleFor(viewport, handheld, ten or tenFoot)
+	if scale <= 0 then
+		return
+	end
+	local cardW, cardH = SawmillLogic.CardSize(tenFoot)
+	local sw, sh = cardW * scale, cardH * scale
+	local margin = if ten or tenFoot then 64 else 12
+	local hotbar = 70
+	pcall(function()
+		hotbar = UITheme.Bottom()
+	end)
+	local column = { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
+	local box = SawmillLogic.PlaceCard(viewport.X, viewport.Y, sw, sh, column, viewport.Y - hotbar)
+	root.AnchorPoint = Vector2.new(0, 0)
+	root.Position = UDim2.fromOffset(box.left, box.top)
+end
+
 local built: Panel? = nil
 
 local function readoutText(mill: Model): string
@@ -230,6 +271,7 @@ local function closePanel()
 		GuiService.SelectedObject = nil
 	end
 	selected = nil
+	HUD.SetModal(nil)
 	if mill and mill.Parent then
 		local prompt = mill:FindFirstChild("CutPrompt", true)
 		local player = Players.LocalPlayer
@@ -256,10 +298,12 @@ local function openPanel(mill: Model)
 	end
 	openMill = mill
 	panel.readout.Text = readoutText(mill)
+	placeCard(panel.root, GuiService:IsTenFootInterface())
 	panel.gui.Enabled = true
 	local first = panel.buttons[1]
 	selected = first
 	GuiService.SelectedObject = first
+	HUD.SetModal(modalRect(panel.root))
 end
 
 local function onInput(input: InputObject, _processed: boolean)
@@ -369,6 +413,17 @@ function SawmillController.Start()
 end
 
 -- Specs and a re-open after close. Not used by Start's callers.
+function SawmillController._open(panel: Panel?)
+	local use = panel or built
+	if not use then
+		return
+	end
+	use.gui.Enabled = true
+	selected = use.buttons[1]
+	GuiService.SelectedObject = use.buttons[1]
+	HUD.SetModal(modalRect(use.root))
+end
+
 function SawmillController._close()
 	closePanel()
 end

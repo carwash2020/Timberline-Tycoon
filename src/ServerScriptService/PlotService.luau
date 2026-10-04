@@ -364,6 +364,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	claim.MaxActivationDistance = CLAIM_RANGE
 	claim.HoldDuration = 0.5
 	claim.RequiresLineOfSight = false
+	InputKit.PromptDefaults(claim, "Interact")
 	claim.Parent = board
 	local office = Instance.new("ProximityPrompt")
 	office.Name = "LandOffice"
@@ -894,7 +895,22 @@ local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
 	end
 	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
 	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
-	local lx, lz = PlotLogic.EjectLocal(tier.size, squares)
+	local function spotBad(lx: number, lz: number): boolean
+		local world = (slot.cframe * CFrame.new(lx, 0, lz)).Position
+		local materialName = ""
+		local ok, hit = pcall(function()
+			return workspace:Raycast(Vector3.new(world.X, world.Y + 40, world.Z), Vector3.new(0, -80, 0))
+		end)
+		if ok and typeof(hit) == "RaycastResult" then
+			local mat = (hit :: RaycastResult).Material
+			if mat then
+				materialName = mat.Name
+			end
+		end
+		local wet = PlotLogic.InWater(world.X, world.Z) or materialName == "Water"
+		return PlotLogic.GroundBad(wet, PlotLogic.OnRoad(world.X, world.Z))
+	end
+	local lx, lz = PlotLogic.EjectSpot(tier.size, squares, spotBad)
 	local cf = slot.cframe * CFrame.new(lx, 4, lz)
 	root.CFrame = cf
 	root.Position = cf.Position

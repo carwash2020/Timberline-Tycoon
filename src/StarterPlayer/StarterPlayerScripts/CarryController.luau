@@ -23,6 +23,7 @@ local RunService = game:GetService("RunService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -69,6 +70,7 @@ local function newPrompt(parent: Instance, maxDistance: number): ProximityPrompt
 	prompt.MaxActivationDistance = maxDistance
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
 	prompt.Enabled = false
 	prompt.Parent = parent
 	return prompt

@@ -49,6 +49,7 @@ local RunService = game:GetService("RunService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local GondolaRide = require(ReplicatedStorage.Shared.GondolaRide)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local EconomyService = require(script.Parent.EconomyService)
@@ -368,6 +369,7 @@ function GondolaService._setup(map: Instance)
 		prompt.MaxActivationDistance = 10
 		prompt.HoldDuration = 0.5
 		prompt.RequiresLineOfSight = false
+		InputKit.PromptDefaults(prompt, "Interact")
 		prompt.Parent = platform
 		prompt.Triggered:Connect(go)
 	end
