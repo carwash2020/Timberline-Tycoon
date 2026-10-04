@@ -31,6 +31,7 @@ local RunService = game:GetService("RunService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
@@ -118,6 +119,11 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean)
 	local signAt = slot.cframe * CFrame.new(-10, 0, size / 2 + 3)
 	slot.post.CFrame = signAt * CFrame.new(0, 3, 0)
 	slot.board.CFrame = signAt * CFrame.new(0, 6.5, 0)
+	-- One mesh for the post and the board, pivot on the ground at the sign.
+	-- The board part stays (prompt + both SurfaceGuis) and goes invisible.
+	if ItemMeshes.AttachTo(slot.board, "PlotSign", { hostOffset = CFrame.new(0, -6.5, 0) }) then
+		slot.post.Transparency = 1
+	end
 	slot.border:ClearAllChildren()
 	local half = size / 2
 	local rail = if claimed then Color3.fromRGB(130, 90, 50) else Color3.fromRGB(196, 168, 120)
@@ -138,6 +144,13 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean)
 			slot.border
 		)
 		fence.CanCollide = false -- a marker, not a wall
+		local alongZ = d > w
+		ItemMeshes.AttachTo(fence, "PlotRail", {
+			scaleX = if alongZ then d else w,
+			yaw = if alongZ then math.pi / 2 else 0,
+			color = rail,
+			hostOffset = CFrame.new(0, -0.5, 0),
+		})
 	end
 	for _, corner in ipairs({
 		{ half, half },
@@ -154,6 +167,7 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean)
 			slot.border
 		)
 		post.CanCollide = false
+		ItemMeshes.AttachTo(post, "PlotCorner", { hostOffset = CFrame.new(0, -1.6, 0) })
 	end
 	-- A short gravel apron off the north edge, toward the lane or the road.
 	local apron = part(
@@ -985,6 +999,7 @@ end
 -- SellPlaced and UpgradePlot.
 function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, notifyFn: (Player, string) -> ())
 	notify = notifyFn
+	ItemMeshes.LoadAsync()
 	local folder = Instance.new("Folder")
 	folder.Name = "Plots"
 	folder.Parent = map

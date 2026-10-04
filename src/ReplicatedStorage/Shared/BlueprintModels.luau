@@ -2,9 +2,14 @@
 -- BlueprintModels: builds a blueprint's model from its PlotData boxes, for
 -- the server (placed items) and the client (the ghost preview), so the two
 -- always match. The model's pivot is its ground centre.
+--
+-- When a mesh template exists, visual meshes are welded to Root and the
+-- boxes go invisible. The boxes stay the collider. No template (or a mesh
+-- that failed to load) keeps the boxes as the look.
 
 local CollectionService = game:GetService("CollectionService")
 
+local ItemMeshes = require(script.Parent.ItemMeshes)
 local PlotData = require(script.Parent.PlotData)
 
 local BlueprintModels = {}
@@ -22,17 +27,27 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 	root.CanTouch = false
 	root.Parent = model
 	for i, box in ipairs(bp.boxes) do
-		local p = Instance.new("Part")
+		local p: BasePart
+		if box.shape == "Wedge" then
+			p = Instance.new("WedgePart")
+		else
+			p = Instance.new("Part")
+			if box.shape == "Cylinder" then
+				(p :: Part).Shape = Enum.PartType.Cylinder
+			elseif box.shape == "Ball" then
+				(p :: Part).Shape = Enum.PartType.Ball
+			end
+		end
 		p.Name = "Part" .. i
 		p.Size = box.size
 		p.CFrame = CFrame.new(box.offset)
 		p.Color = Color3.fromHex(box.color)
-		p.Material = Enum.Material:FromName(box.material) or Enum.Material.SmoothPlastic
-		if box.shape == "Cylinder" then
-			p.Shape = Enum.PartType.Cylinder
-		elseif box.shape == "Ball" then
-			p.Shape = Enum.PartType.Ball
+		local named = (Enum.Material :: any)[box.material]
+		local mat: Enum.Material = Enum.Material.SmoothPlastic
+		if typeof(named) == "EnumItem" then
+			mat = named :: Enum.Material
 		end
+		p.Material = mat
 		p.Anchored = true
 		p.TopSurface = Enum.SurfaceType.Smooth
 		p.BottomSurface = Enum.SurfaceType.Smooth
@@ -55,6 +70,7 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 		p.Parent = model
 	end
 	model.PrimaryPart = root
+	ItemMeshes.Attach(model, root, bp.id, ghost)
 	return model
 end
 
