@@ -444,8 +444,10 @@ local function completeSale(
 end
 
 -- Murph's cart. Nil when it buys; a refusal string when it doesn't.
--- v1 (loop 1, onSellLogs passes volume nil): one sale, then this slot's
--- cartUsed refuses. v2 adds the sale's u³ to this slot's cartVolume.
+-- v1 (loop 1, onSellLogs passes volume nil): one sale is allowed. cartUsed
+-- is set by onSellLogs only after a log is actually taken, so a despawned
+-- handful does not use the cart up. v2 adds the sale's u³ to this slot's
+-- cartVolume.
 local function cartDecision(profile: ProfileService.Profile, pieces: number, volume: number?, logs: number?): string?
 	local loop = CoreLoop.Active()
 	local list = TutorialData.ForLoop(loop)
@@ -463,7 +465,6 @@ local function cartDecision(profile: ProfileService.Profile, pieces: number, vol
 		if not ok then
 			return why
 		end
-		profile.cartUsed = true
 		return nil
 	end
 	local trucks = profile.ownedTrucks
@@ -536,6 +537,9 @@ local function onSellLogs(player: Player)
 			notify(player, "Nothing to sell.")
 			return
 		end
+		-- Only a sale that took a log uses up the v1 cart. A handful that
+		-- despawned before TakeLog still leaves the sell step open.
+		profile.cartUsed = true
 		completeSale(player, profile, total, count, byWood, figures)
 		return
 	end
