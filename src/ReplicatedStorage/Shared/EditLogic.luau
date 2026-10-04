@@ -1,7 +1,8 @@
 --!strict
--- EditLogic: rotate, move, resize, copy, delete, and undo for an unfilled
--- kit ghost. Pure. The server applies the cash delta and rebuilds models.
--- Any wood in a piece locks it. Resizing changes only the fee difference.
+-- EditLogic: rotate, move, resize, copy, delete, and undo for a kit ghost.
+-- Pure. The server applies the cash delta and rebuilds models.
+-- Wood locks a piece against edits. A copy is still allowed: it starts
+-- empty and pays its own fee. Resizing changes only the fee difference.
 -- woodUnits is never saved; it is worked out from the size.
 
 local PieceSize = require(script.Parent.PieceSize)
@@ -348,9 +349,7 @@ function EditLogic.Copy(world: World, request: { [string]: any }, newUid: () -> 
 		if not src then
 			return false, "missing"
 		end
-		if EditLogic.Locked(src) then
-			return false, "filled"
-		end
+		-- Filled pieces can be copied. The lock blocks editing the source.
 		local bp = PlotLogic.Blueprint(src.blueprintId)
 		if not bp or bp.kit ~= true then
 			return false, "fixed"
@@ -361,6 +360,7 @@ function EditLogic.Copy(world: World, request: { [string]: any }, newUid: () -> 
 		copy.z += dz
 		copy.wood = nil
 		copy.fill = { units = 0 }
+		copy.data = nil
 		local fee = EditLogic.Fee(bp, copy)
 		copy.paid = fee
 		total += fee

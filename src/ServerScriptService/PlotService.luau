@@ -1039,6 +1039,14 @@ function PlotService.Edit(player: Player, request: unknown)
 		stack = {}
 		undoStacks[player] = stack
 	end
+	-- Cash can still refuse after the edit succeeds. Undo is the wrong
+	-- way back: undoing an undo would touch an older entry. Put the pieces
+	-- and the stack back exactly as they were.
+	local placedSnap: { PlotLogic.Placed } = {}
+	for _, item in ipairs(profile.plot.placed) do
+		table.insert(placedSnap, EditLogic.Snapshot(item))
+	end
+	local stackSnap = table.clone(stack)
 	local before: { [string]: PlotLogic.Placed } = {}
 	for _, item in ipairs(profile.plot.placed) do
 		before[item.uid] = {
@@ -1074,16 +1082,18 @@ function PlotService.Edit(player: Player, request: unknown)
 		end
 		return
 	end
+	local function restore()
+		profile.plot.placed = placedSnap
+		undoStacks[player] = stackSnap
+	end
 	local delta = world.cash - cashBefore
 	if delta > 0 and profile.cash + delta > GameConfig.CashCap then
-		EditLogic.Undo(world)
-		profile.plot.placed = world.placed
+		restore()
 		notify(player, "Your wallet is too full for that. Spend some first.")
 		return
 	end
 	if delta < 0 and not EconomyService.SpendCash(player, -delta, "changed a blueprint", "kit") then
-		EditLogic.Undo(world)
-		profile.plot.placed = world.placed
+		restore()
 		notify(player, EditLogic.Message("cash") or "You don't have enough for that.")
 		return
 	elseif delta > 0 then

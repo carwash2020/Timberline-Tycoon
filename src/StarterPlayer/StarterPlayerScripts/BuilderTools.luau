@@ -1,7 +1,8 @@
 --!strict
 -- BuilderTools: edit an unfilled kit ghost before any wood goes in.
--- One row along the bottom: Rotate, Move, Shorter, Longer, Copy, Delete,
--- Undo, Done. A tap adds a piece, up to 20. Keys do the same on a keyboard,
+-- Rotate, Move, Shorter, Longer, Copy, Delete, Undo, Done. One row on a
+-- wide screen, two rows of four when a phone would shrink them. A tap adds
+-- a piece, up to 20. Keys do the same on a keyboard,
 -- and they stay quiet while a new blueprint is being placed.
 
 local CollectionService = game:GetService("CollectionService")
@@ -205,11 +206,17 @@ local function layout()
 	if label then
 		label.Size = UDim2.fromOffset(place.w, place.readout)
 	end
+	local perRow = if place.rows > 1 then math.ceil(#BuilderBar.Names / place.rows) else #BuilderBar.Names
 	for i, name in ipairs(BuilderBar.Names) do
 		local button = buttons[name]
 		if button then
+			local col = (i - 1) % perRow
+			local row = math.floor((i - 1) / perRow)
 			button.Size = UDim2.fromOffset(place.button, place.button)
-			button.Position = UDim2.fromOffset((i - 1) * (place.button + place.gap), place.readout + place.gap)
+			button.Position = UDim2.fromOffset(
+				col * (place.button + place.gap),
+				place.readout + place.gap + row * (place.button + place.gap)
+			)
 		end
 	end
 end

@@ -129,7 +129,6 @@ return function(t)
 			{ op = "move", uid = "Wall", x = 8, z = 0, rot = 0 },
 			{ op = "resize", uid = "Wall", len = 12 },
 			{ op = "delete", uid = "Wall" },
-			{ op = "copy", uids = { "Wall" }, dx = 16, dz = 0 },
 		}) do
 			local ok, why = run(w, request)
 			t.eq(ok, false, request.op)
@@ -138,6 +137,27 @@ return function(t)
 		t.eq(w.cash, 500)
 		t.eq(#w.placed, 1)
 		t.eq(w.placed[1].x, 0)
+
+		-- Copy is not an edit of the source. A full wall still copies.
+		local built = ghost("Wall", 0, 0, "src")
+		built.fill = { units = 8 }
+		built.wood = "birch"
+		built.data = { x = 1, y = 2 }
+		w = world({ built }, 500)
+		local copied, copyWhy = run(w, { op = "copy", uids = { "src" }, dx = 16, dz = 0 })
+		t.eq(copied, true, copyWhy)
+		t.eq(#w.placed, 2)
+		t.eq(w.cash, 468, "the ghost costs the full $32")
+		t.eq(w.placed[1].wood, "birch")
+		t.eq(w.placed[1].fill.units, 8)
+		t.eq(w.placed[1].data, { x = 1, y = 2 })
+		t.eq(w.placed[1].x, 0)
+		local made = w.placed[2]
+		t.eq(made.wood, nil)
+		t.eq(made.fill.units, 0)
+		t.eq(made.data, nil)
+		t.eq(made.paid, 32)
+		t.eq(made.x, 16)
 
 		w = world({ ghost("Wall") })
 		w.playerId = 2
@@ -387,16 +407,29 @@ return function(t)
 	end)
 
 	t.test("the build bar fits a phone and stays off the jump button", function()
-		t.eq(BuilderBar.Fits(667, 375), true)
-		t.eq(BuilderBar.Fits(1920, 1080), true)
-		local layout = BuilderBar.Layout(667, 375)
-		t.eq(layout.scale < 1, true, "the row shrinks to the gap")
-		t.ok(layout.button <= 56 and layout.button > 30)
-		t.eq(#BuilderBar.Names, 8)
-		local jump = { x = 667 - 120, y = 375 - 140, w = 120, h = 140 }
-		local bar = { x = layout.x, y = layout.y, w = layout.w, h = layout.h }
 		local PlotPickerLogic = t.shared("PlotPickerLogic")
-		t.eq(PlotPickerLogic.BoxesOverlap(bar, jump), false)
+		local function clear(w, h)
+			t.eq(BuilderBar.Fits(w, h), true, w .. "x" .. h)
+			local layout = BuilderBar.Layout(w, h)
+			t.ok(layout.button >= 44, string.format("%dx%d button %.1f", w, h, layout.button))
+			t.ok(layout.rows == 1 or layout.rows == 2, "one or two rows")
+			local bar = { x = layout.x, y = layout.y, w = layout.w, h = layout.h }
+			for _, block in ipairs(PlotPickerLogic.TouchBlockers(w, h)) do
+				t.eq(PlotPickerLogic.BoxesOverlap(bar, block), false, w .. "x" .. h)
+			end
+			return layout
+		end
+		local phone = clear(667, 375)
+		t.eq(phone.rows, 2, "the landscape gap is 248px, so two rows of four")
+		t.eq(phone.button, 56)
+		t.eq(phone.w, 248)
+		local tall = clear(375, 667)
+		t.eq(tall.rows, 2)
+		t.ok(tall.button >= 44)
+		local desk = clear(1920, 1080)
+		t.eq(desk.rows, 1)
+		t.eq(desk.button, 56)
+		t.eq(#BuilderBar.Names, 8)
 		t.eq(BuilderBar.Refuse[1], 255)
 		t.eq(BuilderBar.Refuse[2], 80)
 		t.eq(BuilderBar.Refuse[3], 80)
@@ -414,6 +447,316 @@ return function(t)
 		local group = { count = 3, filled = false, shorter = true, longer = true }
 		t.eq(BuilderBar.Enabled("Copy", group), true)
 		t.eq(BuilderBar.Enabled("Move", group), false)
+	end)
+
+	t.test("a move off the plot or above the build height is refused", function()
+		local w = world({ ghost("Wall") })
+		t.eq(select(2, run(w, { op = "move", uid = "Wall", x = 80, z = 0, rot = 0 })), "bounds")
+		t.eq(w.placed[1].x, 0)
+		local tooHigh = PlotData.MaxBuildY + PlotData.HeightStep
+		t.eq(select(2, run(w, { op = "move", uid = "Wall", x = 0, z = 0, rot = 0, y = tooHigh })), "grid")
+		t.eq(w.placed[1].y, nil)
+		t.eq(w.cash, 1000)
+	end)
+
+	t.test("deleting an unfilled 16-stud wall refunds exactly $64", function()
+		local w = world({ ghost("Wall") }, 200)
+		t.eq(run(w, { op = "resize", uid = "Wall", len = 16 }), true)
+		t.eq(w.placed[1].paid, 64)
+		local cash = w.cash
+		t.eq(run(w, { op = "delete", uid = "Wall" }), true)
+		t.eq(w.cash - cash, 64)
+		t.eq(#w.placed, 0)
+	end)
+
+	t.test("wood drops that undo, and a later undo does not pay it back", function()
+		local item = ghost("Wall")
+		local w = world({ item }, 500)
+		t.eq(run(w, { op = "resize", uid = "Wall", len = 16 }), true)
+		t.eq(w.cash, 468)
+		item.wood = "birch"
+		local ok, why = EditLogic.Undo(w)
+		t.eq(ok, false)
+		t.eq(why, "gone")
+		t.eq(#w.undo, 0, "the entry is dropped")
+		t.eq(w.cash, 468)
+		t.eq(w.placed[1].len, 16)
+		ok, why = EditLogic.Undo(w)
+		t.eq(ok, false)
+		t.eq(why, "empty")
+		t.eq(w.cash, 468)
+	end)
+
+	t.test("rot survives a save and load", function()
+		local data = Util.deepCopy(Schema.Template)
+		data.plot.claimed = true
+		data.plot.placed = {
+			{
+				uid = "turned",
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 2,
+				fill = { units = 0 },
+				paid = 32,
+			},
+		}
+		Schema.Migrate(data)
+		t.eq(data.plot.placed[1].rot, 2)
+		local again = Util.deepCopy(data)
+		Schema.Migrate(again)
+		t.eq(again.plot.placed[1].rot, 2, "a second load keeps the turn")
+	end)
+
+	-- PlotService owns the wallet cap and the memory-only undo stack.
+	local function plotServer(options)
+		options = options or {}
+		local Vector2, Vector3 = t.roblox.Vector2, t.roblox.Vector3
+		local Instance = {}
+		local methods = {}
+		function methods:SetAttribute(key, value)
+			self._attrs[key] = value
+		end
+		function methods:GetAttribute(key)
+			return self._attrs[key]
+		end
+		function methods:GetChildren()
+			return table.clone(self._children)
+		end
+		function methods:FindFirstChild(name)
+			for _, child in ipairs(self._children) do
+				if child.Name == name then
+					return child
+				end
+			end
+			return nil
+		end
+		function methods:ClearAllChildren()
+			for _, child in ipairs(self:GetChildren()) do
+				child.Parent = nil
+			end
+		end
+		function methods:Destroy()
+			self.Parent = nil
+		end
+		function methods:IsA(class)
+			return class == self.ClassName or (class == "BasePart" and self.ClassName == "Part")
+		end
+		function methods:PivotTo(cframe)
+			self.pivot = cframe
+		end
+		function Instance.new(className)
+			local props = { ClassName = className, Name = className, _children = {}, _attrs = {} }
+			local inst = {}
+			return setmetatable(inst, {
+				__index = function(_, key)
+					if props[key] ~= nil then
+						return props[key]
+					end
+					if key == "Triggered" or key == "OnServerEvent" then
+						local signal = {}
+						function signal:Connect(fn)
+							self.fn = fn
+						end
+						props[key] = signal
+						return signal
+					end
+					return methods[key]
+				end,
+				__newindex = function(_, key, value)
+					if key == "Parent" then
+						local old = props.Parent
+						if old then
+							local list = old._children
+							table.remove(list, table.find(list, inst))
+						end
+						if value then
+							table.insert(value._children, inst)
+						end
+					end
+					props[key] = value
+				end,
+			})
+		end
+
+		local toasts = {}
+		local base = t.loader()
+		local serverSchema = base:server("ProfileSchema")
+		local serverUtil = base:shared("Util")
+		local serverPlot = base:shared("PlotData")
+		local profiles = {}
+		local function newPlayer(userId, name)
+			local profile = serverUtil.deepCopy(serverSchema.Template)
+			profile.cash = options.cash or 1000
+			local root = { Position = Vector3.new(0, 3, 0) }
+			local player = {
+				UserId = userId,
+				Name = name,
+				DisplayName = name,
+				attrs = {},
+				Character = {
+					FindFirstChild = function(_, child)
+						return if child == "HumanoidRootPart" then root else nil
+					end,
+				},
+				SetAttribute = function(self, key, value)
+					self.attrs[key] = value
+				end,
+			}
+			profiles[player] = profile
+			function player.standOn(i)
+				local c = if i then serverPlot.Slots[i] else Vector2.new(-2000, -2000)
+				root.Position = Vector3.new(c.X, 3, c.Y)
+			end
+			player.root = root
+			return player, profile
+		end
+		local loader = t.loader({
+			globals = {
+				Instance = Instance,
+				task = {
+					spawn = function(fn)
+						fn()
+					end,
+				},
+			},
+			services = {
+				CollectionService = {
+					AddTag = function() end,
+				},
+			},
+			mocks = {
+				ProfileService = {
+					GetProfile = function(player)
+						return profiles[player]
+					end,
+				},
+				RateLimiter = {
+					Allow = function()
+						return true
+					end,
+				},
+				QuestService = {
+					Event = function() end,
+				},
+				EconomyService = {
+					SpendCash = function(player, amount)
+						local profile = profiles[player]
+						if profile.cash < amount then
+							return false
+						end
+						profile.cash -= amount
+						return true
+					end,
+					Refund = function(player, amount)
+						profiles[player].cash += amount
+						return amount, 0
+					end,
+				},
+				BlueprintModels = {
+					Build = function(bp)
+						local model = Instance.new("Model")
+						model.Name = bp.id
+						return model
+					end,
+					Place = function(model, _plotCFrame, x, z, rot)
+						model.placedAt = { x, z, rot }
+					end,
+				},
+				MachineArt = {
+					Build = function(id)
+						local model = Instance.new("Model")
+						model.Name = id
+						return model
+					end,
+					SetCut = function() end,
+				},
+			},
+		})
+		local PlotService = loader:server("PlotService")
+		local map = Instance.new("Folder")
+		local remotes = {}
+		for _, name in ipairs({ "PlaceBlueprint", "MoveBlueprint", "SellPlaced", "UpgradePlot" }) do
+			remotes[name] = Instance.new("RemoteEvent")
+		end
+		PlotService.Init(map, remotes, function(_, message)
+			table.insert(toasts, message)
+		end)
+		local plots = map:FindFirstChild("Plots")
+		local function claim(player, i)
+			local board = plots:FindFirstChild("Plot_" .. i):FindFirstChild("Sign")
+			player.root.Position = board.CFrame.Position
+			board:FindFirstChild("ProximityPrompt").Triggered.fn(player)
+		end
+		return {
+			P = PlotService,
+			newPlayer = newPlayer,
+			claim = claim,
+			toasts = toasts,
+			lastToast = function()
+				return toasts[#toasts]
+			end,
+		}
+	end
+
+	t.test("undoing a copy that would overflow the wallet changes nothing", function()
+		local GameConfig = t.shared("GameConfig")
+		local s = plotServer({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.placed = {
+			{
+				uid = "wall",
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = { units = 0 },
+				paid = 32,
+			},
+		}
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Edit(ann, { op = "copy", uids = { "wall" }, dx = 16, dz = 0 })
+		t.eq(#profile.plot.placed, 2)
+		t.eq(profile.cash, 968)
+		local copyUid = profile.plot.placed[2].uid
+		profile.cash = GameConfig.CashCap
+		s.P.Edit(ann, { op = "undo" })
+		t.eq(#profile.plot.placed, 2)
+		t.eq(profile.plot.placed[2].uid, copyUid)
+		t.eq(profile.cash, GameConfig.CashCap)
+		t.eq(s.lastToast(), "Your wallet is too full for that. Spend some first.")
+		profile.cash = 0
+		s.P.Edit(ann, { op = "undo" })
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.plot.placed[1].uid, "wall")
+		t.eq(profile.cash, 32, "the copy's fee comes back once the wallet has room")
+	end)
+
+	t.test("the undo stack is empty after a leave and rejoin", function()
+		local s = plotServer({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.placed = {
+			{
+				uid = "wall",
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = { units = 0 },
+				paid = 32,
+			},
+		}
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Edit(ann, { op = "rotate", uid = "wall", rot = 1 })
+		t.eq(profile.plot.placed[1].rot, 1)
+		s.P.PlayerRemoving(ann)
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Edit(ann, { op = "undo" })
+		t.eq(profile.plot.placed[1].rot, 1, "the turn stays")
+		t.eq(s.lastToast(), "Nothing to undo.")
 	end)
 
 	t.test("blueprint edits are capped at five a second", function()
