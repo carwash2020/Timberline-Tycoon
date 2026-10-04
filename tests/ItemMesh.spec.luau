@@ -87,6 +87,9 @@ return function(t)
 	t.test("H1: a missing mesh keeps the old parts, including the stair wedge", function()
 		ItemMeshes.Install(nil)
 		for _, bp in ipairs(PlotData.Blueprints) do
+			if bp.kit then
+				continue
+			end
 			local model = BlueprintModels.Build(bp, false)
 			local visual = 0
 			for _, child in ipairs(model:GetChildren()) do
@@ -126,6 +129,9 @@ return function(t)
 			return model
 		end
 		for _, bp in ipairs(PlotData.Blueprints) do
+			if bp.kit then
+				continue
+			end
 			ItemMeshes.Install(bp.id, template(bp.id))
 			local model = BlueprintModels.Build(bp, false)
 			local visuals = {}

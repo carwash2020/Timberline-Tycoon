@@ -1,0 +1,7 @@
+{
+	"className": "MeshPart",
+	"properties": {
+		"MeshId": "rbxassetid://106581335446864",
+		"CollisionFidelity": "Box"
+	}
+}

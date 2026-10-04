@@ -37,7 +37,7 @@ local VALID = UITheme.Colors.Green
 local INVALID = UITheme.Colors.Danger
 
 local LEAVE_REACH = 40 -- studs past the plot's edge before placing stops (PlotService's BUILD_REACH)
-local ACTIONS = { "PlacerRotate", "PlacerPlace", "PlacerCancel" }
+local ACTIONS = { "PlacerRotate", "PlacerPlace", "PlacerCancel", "PlacerUp", "PlacerDown" }
 
 export type Options = {
 	moveUid: string?, -- moving this placed item instead of buying a new one
@@ -51,6 +51,7 @@ type State = {
 	highlight: Highlight,
 	rot: number,
 	x: number,
+	y: number,
 	z: number,
 	valid: boolean,
 	reason: string?,
@@ -90,8 +91,16 @@ function BlueprintPlacer.MyPlaced(): { PlotLogic.Placed }
 			local id = inst:GetAttribute("BlueprintId") :: string?
 			local x, z = inst:GetAttribute("X") :: number?, inst:GetAttribute("Z") :: number?
 			local rot = inst:GetAttribute("Rot") :: number?
+			local y = inst:GetAttribute("Y")
 			if uid and id and x and z and rot then
-				table.insert(out, { uid = uid, blueprintId = id, x = x, z = z, rot = rot })
+				table.insert(out, {
+					uid = uid,
+					blueprintId = id,
+					x = x,
+					z = z,
+					rot = rot,
+					y = if type(y) == "number" then y else nil,
+				})
 			end
 		end
 	end
@@ -161,20 +170,43 @@ local function update(s: State)
 		local p = plotCFrame:PointToObjectSpace(point)
 		s.x, s.z = PlotLogic.Snap(p.X), PlotLogic.Snap(p.Z)
 	end
-	BlueprintModels.Place(s.ghost, plotCFrame, s.x, s.z, s.rot)
-	local ok, why = PlotLogic.Check(s.bp, s.x, s.z, s.rot, tier(), BlueprintPlacer.MyPlaced(), s.options.moveUid)
+	BlueprintModels.Place(s.ghost, plotCFrame, s.x, s.z, s.rot, s.y)
+	local ok, why = PlotLogic.Check(s.bp, s.x, s.z, s.rot, tier(), BlueprintPlacer.MyPlaced(), s.options.moveUid, s.y)
+	local price = if s.bp.kit then PlotData.Price(s.bp) else s.bp.priceCash
 	if ok and not s.options.moveUid then
 		local cash = (player:GetAttribute("Cash") :: number?) or 0
-		if cash < s.bp.priceCash then
-			ok, why = false, string.format("You need %s more", Util.formatCash(s.bp.priceCash - cash))
+		if cash < price then
+			ok, why = false, string.format("You need %s more", Util.formatCash(price - cash))
 		end
 	end
 	s.valid, s.reason = ok, why
 	s.highlight.FillColor = if ok then VALID else INVALID
 	s.highlight.OutlineColor = s.highlight.FillColor
 	local verb = if s.options.moveUid then "Move" else "Place"
-	local price = if s.options.moveUid then "" else " · " .. Util.formatCash(s.bp.priceCash)
-	setBarText(if ok then string.format("%s the %s%s", verb, s.bp.displayName, price) else (why or "Can't go here"), ok)
+	local priceText = if s.options.moveUid then "" else " · " .. Util.formatCash(price)
+	local height = if s.y ~= 0 then string.format(" · %.1f up", s.y) else ""
+	setBarText(
+		if ok
+			then string.format("%s the %s%s%s", verb, s.bp.displayName, priceText, height)
+			else (why or "Can't go here"),
+		ok
+	)
+end
+
+function BlueprintPlacer.Raise()
+	local s = state
+	if s then
+		s.y = math.min(PlotData.MaxBuildY, PlotLogic.SnapY(s.y + PlotData.HeightStep))
+		update(s)
+	end
+end
+
+function BlueprintPlacer.Lower()
+	local s = state
+	if s then
+		s.y = math.max(0, PlotLogic.SnapY(s.y - PlotData.HeightStep))
+		update(s)
+	end
 end
 
 function BlueprintPlacer.Rotate()
@@ -197,10 +229,10 @@ function BlueprintPlacer.Place()
 	end
 	local moveUid = s.options.moveUid
 	if moveUid then
-		Net.Remote("MoveBlueprint"):FireServer(moveUid, s.x, s.z, s.rot)
+		Net.Remote("MoveBlueprint"):FireServer(moveUid, s.x, s.z, s.rot, s.y)
 		BlueprintPlacer.Stop()
 	else
-		Net.Remote("PlaceBlueprint"):FireServer(s.bp.id, s.x, s.z, s.rot)
+		Net.Remote("PlaceBlueprint"):FireServer(s.bp.id, s.x, s.z, s.rot, s.y)
 	end
 end
 
@@ -255,12 +287,13 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	ghost.Parent = workspace
 
 	local hidden: { BasePart } = {}
-	local rot, x, z = 0, 0, 0
+	local rot, x, y, z = 0, 0, 0, 0
 	if opts.moveUid then
 		for _, inst in ipairs(CollectionService:GetTagged("PlacedItem")) do
 			if inst:GetAttribute("Uid") == opts.moveUid then
 				rot = (inst:GetAttribute("Rot") :: number?) or 0
 				x, z = (inst:GetAttribute("X") :: number?) or 0, (inst:GetAttribute("Z") :: number?) or 0
+				y = (inst:GetAttribute("Y") :: number?) or 0
 				for _, d in ipairs(inst:GetDescendants()) do
 					if d:IsA("BasePart") then
 						d.LocalTransparencyModifier = 1
@@ -278,6 +311,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		highlight = highlight,
 		rot = rot,
 		x = x,
+		y = y,
 		z = z,
 		valid = false,
 		reason = nil,
@@ -308,6 +342,20 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		false,
 		Enum.KeyCode.Q,
 		Enum.KeyCode.ButtonB
+	)
+	ContextActionService:BindAction(
+		"PlacerUp",
+		action(BlueprintPlacer.Raise),
+		false,
+		Enum.KeyCode.E,
+		Enum.KeyCode.ButtonR1
+	)
+	ContextActionService:BindAction(
+		"PlacerDown",
+		action(BlueprintPlacer.Lower),
+		false,
+		Enum.KeyCode.C,
+		Enum.KeyCode.ButtonL1
 	)
 	table.insert(
 		s.conns,
@@ -359,8 +407,10 @@ function BlueprintPlacer.Start()
 		button.face.Activated:Connect(onClick)
 	end
 	add("ROTATE", "bark", 1, BlueprintPlacer.Rotate)
-	add("PLACE", "buy", 2, BlueprintPlacer.Place)
-	add("CANCEL", "skip", 3, BlueprintPlacer.Stop)
+	add("UP", "bark", 2, BlueprintPlacer.Raise)
+	add("DOWN", "bark", 3, BlueprintPlacer.Lower)
+	add("PLACE", "buy", 4, BlueprintPlacer.Place)
+	add("CANCEL", "skip", 5, BlueprintPlacer.Stop)
 	bar = b.outer
 	b.outer.MouseEnter:Connect(function()
 		overBar = true

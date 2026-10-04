@@ -1,0 +1,7 @@
+{
+	"className": "MeshPart",
+	"properties": {
+		"MeshId": "rbxassetid://108430978098778",
+		"CollisionFidelity": "Hull"
+	}
+}
