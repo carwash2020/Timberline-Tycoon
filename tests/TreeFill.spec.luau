@@ -13,6 +13,9 @@ return function(t)
 	local TreeArt = t.shared("Art/TreeArt")
 	local WoodData = t.shared("WoodData")
 	local TutorialGrove = t.shared("TutorialGrove")
+	local TreeFill = t.load("ReplicatedStorage/Shared/World/TreeFill")
+	local ForestLogic = t.shared("ForestLogic")
+	local PlotData = t.shared("PlotData")
 
 	local PREFIX = 730 -- WorldPlan.Trees() on main, before this fill
 	local HAUL = { HillsRoad = true, SnowRoad = true, VolcanoRoad = true, SkyrootRoad = true }
@@ -193,10 +196,9 @@ return function(t)
 		for _, grove in ipairs(TutorialGrove.Trees) do
 			table.insert(spots, { position = Vector2.new(grove.x, grove.z), woodId = "oak", flat = true })
 		end
-		-- Trunks already on main keep their X and Z (saves point at them). A
-		-- few of those were placed on the narrower legacy roads and now sit
-		-- inside a widened haul road; new trees may not.
-		local legacy = {}
+		-- Trunks already on main keep their X and Z. One that sits in a
+		-- widened haul road starts as an open slot, so it is not standing.
+		local standing = {}
 		for _, road in ipairs(WorldLayout.Roads) do
 			if HAUL[road.name] then
 				local half = road.width / 2
@@ -209,17 +211,130 @@ return function(t)
 					end
 					local d = WorldLayout.PolylineDistance(Vector2.new(x, z), road.points)
 					if d < half - 1e-3 then
-						local inPrefix = spot.position ~= nil and index <= PREFIX and not spot.flat
-						if inPrefix then
-							table.insert(legacy, string.format("%s #%d on %s", spot.woodId, index, road.name))
-						else
-							t.ok(false, string.format("%s #%d blocks %s", spot.woodId, index, road.name))
+						local slotted = index <= PREFIX and not spot.flat and TreeFill.InHaulLane(x, z)
+						if not slotted then
+							table.insert(standing, string.format("%s #%d on %s", spot.woodId, index, road.name))
 						end
 					end
 				end
 			end
 		end
-		t.ok(#legacy <= 4, table.concat(legacy, ", "))
+		t.eq(#standing, 0, table.concat(standing, ", "))
+	end)
+
+	local function outsideBox(x, z, x0, z0, x1, z1)
+		local dx = math.max(x0 - x, 0, x - x1)
+		local dz = math.max(z0 - z, 0, z - z1)
+		return math.sqrt(dx * dx + dz * dz)
+	end
+
+	local function haulEdge(x, z)
+		local p = Vector2.new(x, z)
+		local best = math.huge
+		for _, road in ipairs(WorldLayout.Roads) do
+			if HAUL[road.name] then
+				local d = WorldLayout.PolylineDistance(p, road.points) - road.width / 2
+				if d < best then
+					best = d
+				end
+			end
+		end
+		return best
+	end
+
+	local function plotEdge(x, z)
+		local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+		local best = math.huge
+		for _, slot in ipairs(PlotData.Slots) do
+			local d = outsideBox(x, z, slot.X - half, slot.Y - half, slot.X + half, slot.Y + half)
+			if d < best then
+				best = d
+			end
+		end
+		return best
+	end
+
+	t.test("wild trees and their regrow spots stay off haul roads and plots", function()
+		local zones = {}
+		for _, spot in ipairs(trees) do
+			local zone = spot.zone
+			if zone and zone.id == "wild" then
+				local key = string.format("%.2f,%.2f", zone.cx, zone.cz)
+				local row = zones[key]
+				if not row then
+					row = { zone = zone, base = spot.position }
+					zones[key] = row
+				end
+				local x, z = spot.position.X, spot.position.Z
+				t.ok(haulEdge(x, z) >= 20 - 0.05, string.format("wild tree %.1f off a road", haulEdge(x, z)))
+				t.ok(plotEdge(x, z) >= 30 - 0.05, string.format("wild tree %.1f off a plot", plotEdge(x, z)))
+			end
+		end
+		local clumps = 0
+		for _, row in pairs(zones) do
+			clumps += 1
+			local zone, base = row.zone, row.base
+			local got = 0
+			for guard = 1, 40 do
+				local n = 0
+				local x, z = ForestLogic.FindSpot(zone.cx, zone.cz, zone.radius, 48, function()
+					n += 1
+					return (guard * 0.173 + n * 0.091) % 1
+				end, function(px, pz)
+					if dist(px, pz, base.X, base.Z) < 10 then
+						return false
+					end
+					return TreeFill.Ground(px, pz)
+				end)
+				if x and z then
+					got += 1
+					t.ok(TreeFill.Ground(x, z))
+					t.ok(haulEdge(x, z) >= 20 - 0.05, string.format("regrow %.2f off a road", haulEdge(x, z)))
+					t.ok(plotEdge(x, z) >= 30 - 0.05, string.format("regrow %.2f off a plot", plotEdge(x, z)))
+				end
+			end
+			t.ok(got >= 20, string.format("clump at %.0f,%.0f yielded %d spots", zone.cx, zone.cz, got))
+		end
+		t.eq(clumps, 30)
+	end)
+
+	t.test("about 500 regrow spots in each zone pass TreeFill.Ground", function()
+		local zones = {}
+		for _, spot in ipairs(trees) do
+			local zone = spot.zone
+			if zone and not zone.fixed then
+				local key = string.format("%s|%.1f|%.1f|%.1f", zone.id, zone.cx, zone.cz, zone.radius)
+				if not zones[key] then
+					zones[key] = { zone = zone, base = spot.position }
+				end
+			end
+		end
+		local checked = 0
+		for _, row in pairs(zones) do
+			local zone, base = row.zone, row.base
+			local want = 500
+			local got = 0
+			for guard = 1, want do
+				local n = 0
+				local x, z = ForestLogic.FindSpot(zone.cx, zone.cz, zone.radius, 48, function()
+					n += 1
+					return (guard * 0.173 + n * 0.091) % 1
+				end, function(px, pz)
+					if dist(px, pz, base.X, base.Z) < 10 then
+						return false
+					end
+					return TreeFill.Ground(px, pz)
+				end)
+				if x and z then
+					got += 1
+					t.ok(TreeFill.Ground(x, z), zone.id)
+				end
+			end
+			local least = if zone.radius >= 30 then 200 else 20
+			t.ok(got >= least, string.format("%s r %.0f yielded %d", zone.id, zone.radius, got))
+			checked += 1
+		end
+		t.ok(checked > 30, checked .. " zones")
 	end)
 
 	t.test("the phone discs grow by at most 1.7x in trees and parts", function()

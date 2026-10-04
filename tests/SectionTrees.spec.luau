@@ -8,7 +8,7 @@
 -- physics and timers are faked; WoodService and GrabService are real.
 return function(t)
 	local roblox = t.roblox
-	local Vector3, CFrame, Instance = roblox.Vector3, roblox.CFrame, roblox.Instance
+	local Vector2, Vector3, CFrame, Instance = roblox.Vector2, roblox.Vector3, roblox.CFrame, roblox.Instance
 
 	local function setup()
 		local s = {
@@ -785,7 +785,7 @@ return function(t)
 		s.now = (due or s.now) + 1
 		s.Trees.GrowTick(s.now)
 		t.ok(stuck.slot, "no legal spot yet")
-		t.eq(stuck.regrowAt, s.now, "it tries again next tick")
+		t.eq(stuck.regrowAt, s.now + s.Trees.RetrySec, "a miss waits about 30s")
 	end)
 
 	t.test(
@@ -1112,5 +1112,131 @@ return function(t)
 		t.eq(result.freed[1].volume, plainResult.freed[1].volume)
 		t.eq(result.freed[1].value, plainResult.freed[1].value)
 		MeshKit.Reset()
+	end)
+
+	t.test("a boot tree standing in a haul road regrows off it within one tick", function()
+		local s = setup()
+		-- SectionTrees loads WorldPlan, which binds this loader's TreeFill.
+		local WorldLayout = s.loader:load("ReplicatedStorage/Shared/World/WorldLayout")
+		local TreeFill = s.loader:load("ReplicatedStorage/Shared/World/TreeFill")
+		local TerrainGen = s.loader:load("ReplicatedStorage/Shared/World/TerrainGen")
+		local haul = { HillsRoad = true, SnowRoad = true, VolcanoRoad = true, SkyrootRoad = true }
+		local spot = nil
+		for _, road in ipairs(WorldLayout.Roads) do
+			if haul[road.name] and not spot then
+				local pts = road.points
+				for i = 1, #pts - 1 do
+					if spot then
+						break
+					end
+					local mid = pts[i]:Lerp(pts[i + 1], 0.5)
+					if TreeFill.InHaulLane(mid.X, mid.Y) then
+						local along = pts[i + 1] - pts[i]
+						local len = along.Magnitude
+						if len > 1 then
+							local side = Vector2.new(-along.Y / len, along.X / len)
+							for _, reach in ipairs({ 28, 36, 48 }) do
+								for _, sign in ipairs({ 1, -1 }) do
+									local q = mid + side * (sign * reach)
+									if TreeFill.Ground(q.X, q.Y) then
+										spot = {
+											x = mid.X,
+											z = mid.Y,
+											qx = q.X,
+											qz = q.Y,
+											radius = reach + 16,
+										}
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		t.ok(spot ~= nil, "a haul road has ground beside it")
+		local here = spot :: { x: number, z: number, qx: number, qz: number, radius: number }
+		local y = TerrainGen.HeightAt(here.x, here.z) - 0.3
+		local model = s.Trees.SpawnTree("oak", CFrame.new(here.x, y, here.z), {
+			boot = true,
+			seed = 11,
+			zone = { id = "road", cx = here.x, cz = here.z, radius = here.radius },
+		})
+		-- The first FindSpot sample lands on the ground beside the road.
+		local dx, dz = here.qx - here.x, here.qz - here.z
+		local angle = math.atan2(dz, dx)
+		if angle < 0 then
+			angle += math.pi * 2
+		end
+		local reach = math.sqrt(dx * dx + dz * dz)
+		local want = { angle / (math.pi * 2), (reach / here.radius) ^ 2 }
+		local n = 0
+		s.Trees._roll = function()
+			n += 1
+			local target = want[n] or 0
+			return (target - n * 0.173) % 1
+		end
+		t.eq(model, nil, "it does not stand in the lane")
+		local rec = nil
+		for _, tree in pairs(s.Trees.AllTrees()) do
+			if tree.zone and tree.zone.id == "road" then
+				rec = tree
+			end
+		end
+		t.ok(rec ~= nil and rec.slot and rec.regrowAt == s.now, "the first regrow is due now")
+		s.Trees.GrowTick(s.now)
+		t.ok(rec ~= nil and not rec.slot and rec.model ~= nil and rec.model.Parent ~= nil, "standing after one tick")
+		t.ok(not TreeFill.InHaulLane(rec.base.X, rec.base.Z), "off the road")
+		t.ok(TreeFill.Ground(rec.base.X, rec.base.Z), "on legal ground")
+	end)
+
+	t.test("a haul-road boot tree that cannot move waits RetrySec", function()
+		local s = setup()
+		local WorldLayout = s.loader:load("ReplicatedStorage/Shared/World/WorldLayout")
+		local TreeFill = s.loader:load("ReplicatedStorage/Shared/World/TreeFill")
+		local TerrainGen = s.loader:load("ReplicatedStorage/Shared/World/TerrainGen")
+		local mid = nil
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == "HillsRoad" then
+				mid = road.points[1]:Lerp(road.points[2], 0.5)
+			end
+		end
+		t.ok(mid ~= nil and TreeFill.InHaulLane(mid.X, mid.Y), "the road sample is in the lane")
+		local y = TerrainGen.HeightAt(mid.X, mid.Y) - 0.3
+		s.Trees.SpawnTree("oak", CFrame.new(mid.X, y, mid.Y), {
+			boot = true,
+			seed = 12,
+			zone = { id = "stuckroad", cx = mid.X, cz = mid.Y, radius = 4 },
+		})
+		local rec = nil
+		for _, tree in pairs(s.Trees.AllTrees()) do
+			if tree.zone and tree.zone.id == "stuckroad" then
+				rec = tree
+			end
+		end
+		t.ok(rec ~= nil and rec.slot)
+		s.Trees.GrowTick(s.now)
+		t.ok(rec.slot, "the disc is smaller than the gap from the old spot")
+		t.eq(rec.regrowAt, s.now + s.Trees.RetrySec)
+	end)
+
+	t.test("rooted trees over the cap hold a regrow for RetrySec", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0
+		end
+		local zone = { id = "packed", cx = 500, cz = 500, radius = 80, cap = 1 }
+		local recs = {}
+		for i = 1, 3 do
+			recs[i] = s.tree("oak", Vector3.new(500 + (i - 1) * 30, 0, 500), { seed = i, zone = zone, cap = 1 })
+		end
+		local p = s.player(1, recs[1].base + Vector3.new(4, 3, 0))
+		local _, ok = s.cutThrough(p, recs[1].sections[1])
+		t.ok(ok)
+		t.ok(recs[1].slot)
+		s.now = recs[1].regrowAt or s.now
+		s.Trees.GrowTick(s.now)
+		t.ok(recs[1].slot, "two rooted trees still fill a cap of 1")
+		t.eq(recs[1].regrowAt, s.now + s.Trees.RetrySec)
 	end)
 end

@@ -197,6 +197,10 @@ local tryRegrow: (rec: TreeRecord, now: number) -> ()
 -- Specs set this to a 0..1 roll. Live servers use math.random.
 SectionTrees._roll = nil :: (() -> number)?
 
+-- A missed regrow (no legal spot, or the zone is over its cap) waits this
+-- long instead of trying again on the next tick.
+SectionTrees.RetrySec = 30
+
 local function unit(): number
 	local roll = SectionTrees._roll
 	if roll then
@@ -578,7 +582,7 @@ end
 
 -- Plants a site's tree on the ground at `cframe` (its position is the
 -- ground point under the trunk). See SpawnOptions. Returns its Model.
-function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOptions?): Model
+function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOptions?): Model?
 	local def = WoodData.Get(woodId)
 	assert(def, "[SectionTrees] Unknown wood: " .. tostring(woodId))
 	local opts: SpawnOptions = options or {}
@@ -655,6 +659,14 @@ function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOp
 	}
 	trees[uid] = rec
 	rebuild(rec, false)
+	-- A trunk whose saved spot sits in a widened haul road keeps that index
+	-- and does not stand there. The first regrow is due now; a miss waits
+	-- RetrySec.
+	if opts.boot and TreeFill.InHaulLane(pos.X, pos.Z) then
+		openSlot(rec, now)
+		rec.regrowAt = now
+		return nil
+	end
 	return rec.model
 end
 
@@ -1349,7 +1361,7 @@ local function pickSpot(rec: TreeRecord): Vector3?
 		if dx * dx + dz * dz < TREE_GAP * TREE_GAP then
 			return false
 		end
-		if not WorldPlan.GoodGround(px, pz, 8) or not TreeFill.Clear(px, pz) then
+		if not TreeFill.Ground(px, pz) then
 			return false
 		end
 		return not liveBaseNear(rec, px, pz)
@@ -1369,7 +1381,8 @@ local function zoneFull(rec: TreeRecord): boolean
 	local n = 0
 	for _, other in pairs(trees) do
 		local otherZone = other.zone
-		if otherZone and otherZone.id == zone.id and not other.temporary then
+		-- Open slots are not rooted, so they do not hold the cap shut.
+		if otherZone and otherZone.id == zone.id and not other.temporary and not other.slot then
 			if zone.id == "wild" or other.def.id == rec.def.id then
 				n += 1
 			end
@@ -1412,12 +1425,12 @@ tryRegrow = function(rec: TreeRecord, now: number)
 		return
 	end
 	if zoneFull(rec) then
-		rec.regrowAt = now
+		rec.regrowAt = now + SectionTrees.RetrySec
 		return
 	end
 	local pos = pickSpot(rec)
 	if not pos then
-		rec.regrowAt = now
+		rec.regrowAt = now + SectionTrees.RetrySec
 		return
 	end
 	local salt = rec.growth + 1

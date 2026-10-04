@@ -9,6 +9,7 @@
 
 local BiomeData = require(script.Parent.Parent.BiomeData)
 local ForestLogic = require(script.Parent.Parent.ForestLogic)
+local GameConfig = require(script.Parent.Parent.GameConfig)
 local Kit = require(script.Parent.Parent.Art.Kit)
 local PlotData = require(script.Parent.Parent.PlotData)
 local TerrainGen = require(script.Parent.TerrainGen)
@@ -194,11 +195,44 @@ local function landmarkClear(x: number, z: number, extra: number): boolean
 	return true
 end
 
-local function ground(x: number, z: number): boolean
+-- Loading pads and each homestead's grid of squares (PlotSquare by PlotGrid).
+local function yardsClear(x: number, z: number): boolean
+	local pads = { WorldLayout.DealershipLoadingPad, WorldLayout.ToolShedLoadingPad }
+	for _, pad in ipairs(pads) do
+		if outsideBox(x, z, pad.x0, pad.z0, pad.x1, pad.z1) < 1 then
+			return false
+		end
+	end
+	local half = GameConfig.PlotSquare * GameConfig.PlotGrid / 2
+	for _, home in ipairs(PlotData.Homes) do
+		if outsideBox(x, z, home.x - half, home.z - half, home.x + half, home.z + half) < PLOT_GAP then
+			return false
+		end
+	end
+	return true
+end
+
+-- Boot placement and regrowth share this. A point on a widened haul road,
+-- in a loading pad, or on a homestead square is not ground.
+function TreeFill.Ground(x: number, z: number): boolean
 	return world().GoodGround(x, z, ROAD_GAP, 0.75)
 		and TreeFill.Clear(x, z)
 		and sceneryClear(x, z)
 		and landmarkClear(x, z, 0)
+		and yardsClear(x, z)
+end
+
+-- The trunk's plan position sits inside a haul road's paved width.
+function TreeFill.InHaulLane(x: number, z: number): boolean
+	local p = Vector2.new(x, z)
+	for _, road in ipairs(WorldLayout.Roads) do
+		if HAUL[road.name] then
+			if WorldLayout.PolylineDistance(p, road.points) < road.width / 2 - 1e-3 then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 local function placeOne(
@@ -213,7 +247,7 @@ local function placeOne(
 	gap: number
 ): Spot?
 	local function free(px: number, pz: number): boolean
-		return ground(px, pz) and not takenNear(taken, px, pz, gap)
+		return TreeFill.Ground(px, pz) and not takenNear(taken, px, pz, gap)
 	end
 	local x, z = ForestLogic.FindSpot(cx, cz, radius, 80, function()
 		return rng:next()
@@ -477,7 +511,9 @@ function TreeFill.ClumpCenterOk(x: number, z: number, centers: { Vector2 }): boo
 	if not quiet(x, z, 20) or not townClear(x, z) or not biomeClear(x, z) then
 		return false
 	end
-	if not plotClear(x, z, 30) or not haulClear(x, z, 20) or not obstacleClear(x, z) or not sceneryClear(x, z) then
+	-- 40 off a haul road and 50 off a plot, so a regrow inside the 20-stud
+	-- zone stays 20 and 30 clear.
+	if not plotClear(x, z, 50) or not haulClear(x, z, 40) or not obstacleClear(x, z) or not sceneryClear(x, z) then
 		return false
 	end
 	-- The clump's zone is 20 studs, so a regrow stays off the bridge and docks.
@@ -512,7 +548,7 @@ local function ring(c: Vector2, n: number, taken: { Vector3 }, rng: any): { Spot
 			local x, z = c.X + math.cos(aa) * rr, c.Y + math.sin(aa) * rr
 			if
 				dist(x, z, c.X, c.Y) <= 16
-				and ground(x, z)
+				and TreeFill.Ground(x, z)
 				and quiet(x, z, 0)
 				and not takenNear(taken, x, z, TREE_GAP)
 				and not takenNear(reserved, x, z, TREE_GAP)
