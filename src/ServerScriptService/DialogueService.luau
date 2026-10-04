@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CounterLogic = require(ReplicatedStorage.Shared.CounterLogic)
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
+local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BoxService = require(script.Parent.BoxService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -39,11 +40,26 @@ local function profileOf(player: Player): any
 	return service.GetProfile(player)
 end
 
+function DialogueService.Hour(): number
+	local ok, shop = pcall(function()
+		return require(script.Parent.ShopService)
+	end)
+	if ok and type(shop) == "table" and type(shop.Hour) == "function" then
+		return shop.Hour()
+	end
+	return ShopHoursLogic.FallbackHour
+end
+
+local function shopClosed(shop: string): boolean
+	return not ShopHoursLogic.IsOpen(shop, DialogueService.Hour())
+end
+
 function DialogueService.Say(player: Player, line: string, shop: string, rec: any)
 	local text = DialogueData.Line(line, {
 		shop = shop,
 		name = if rec then rec.displayName else nil,
 		price = if rec then Util.formatCash(rec.price) else nil,
+		hour = DialogueService.Hour(),
 	})
 	local payload = {
 		line = line,
@@ -84,6 +100,10 @@ local function onDialogue(player: Player, action: unknown, a: unknown, b: unknow
 	end
 	if action == "open" and type(a) == "string" then
 		talking[player.UserId] = a
+		if shopClosed(a) then
+			DialogueService.Say(player, "sleepy", a, nil)
+			return
+		end
 		local uid = BoxService.Offered(player, a)
 		if uid == nil then
 			local prev = offeredTo[player.UserId]
@@ -104,8 +124,18 @@ local function onDialogue(player: Player, action: unknown, a: unknown, b: unknow
 		local shop = talking[player.UserId] or "ToolShed"
 		DialogueService.Say(player, "declined", shop, BoxService.Get(b))
 	elseif action == "pick" and a == "yes" and type(b) == "string" then
+		local shop = talking[player.UserId] or "ToolShed"
+		if shopClosed(shop) then
+			DialogueService.Say(player, "sleepy", shop, nil)
+			return
+		end
 		BoxService.Pay(player, b)
 	elseif action == "pay" and type(a) == "string" then
+		local shop = talking[player.UserId] or "ToolShed"
+		if shopClosed(shop) then
+			DialogueService.Say(player, "sleepy", shop, nil)
+			return
+		end
 		BoxService.Pay(player, a)
 	end
 end

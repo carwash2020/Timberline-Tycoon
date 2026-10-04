@@ -503,4 +503,28 @@ return function(t)
 		t.eq(s.profile.cash, 2000 - 750)
 		t.eq(StoreStock.Left(), 0)
 	end)
+
+	t.test("a closed shop refuses the sale before cash moves, including a carried box", function()
+		local s = setup({ cash = 1000, loop = 2, bestTier = 1 })
+		s.ShopService.Hour = function()
+			return 22
+		end
+		s.buy("Gear", "InsulatedCoat")
+		t.eq(s.profile.cash, 1000, "hearth is closed at 22:00")
+		t.ok(string.find(s.toasts[1], "7:00", 1, true) ~= nil, s.toasts[1])
+		s.buy("Truck", "Pickup")
+		t.eq(s.profile.cash, 1000, "the lot is closed at 22:00")
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "night-lamp",
+			kind = "Cosmetic",
+			itemId = "LampPost",
+			limited = true,
+			shop = "HearthAndHome",
+		})
+		t.eq(ok, false)
+		t.eq(line, "sleepy")
+		t.eq(s.profile.cash, 1000, "a carried box does not charge")
+		s.buy("Axe", "SteelAxe")
+		t.eq(s.profile.cash, 1000 - 160, "the Tool Shed stays open")
+	end)
 end

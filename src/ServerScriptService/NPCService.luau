@@ -18,17 +18,24 @@
 --     (NPCData.RouteState), so all players see the same stroll for free.
 --     Walkers don't collide (they'd shove players about); the others
 --     block like a person would.
---   * Every NPC carries a Talk prompt on the model (F / ButtonY, clickable,
+--   * Every NPC carries a Talk prompt on the model (E / ButtonX, clickable,
 --     no line-of-sight check) so it arrives with the Atomic or Persistent
---     model. The client never WaitForChilds it. NPCService does not run a
---     loop: animation, bubbles, and head turns are all on the client.
+--     model. The client never WaitForChilds it. Animation and bubbles stay
+--     on the client. Shop hours are applied here: a closed keeper lies
+--     behind the counter, the door leaf changes colour, and the hours
+--     sign is rewritten. The server decides the lock.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
+local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local CharacterArt = require(ReplicatedStorage.Shared.Art.CharacterArt)
+local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
+local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local NPCService = {}
@@ -105,6 +112,192 @@ local function build(npc: NPCData.NPC, find: (string, string) -> (CFrame?, Vecto
 	return model
 end
 
+-- Standing CFrame, remembered before the first time a keeper lies down.
+local homes: { [Model]: CFrame? } = {}
+local doorHooked: { [Instance]: boolean } = {}
+
+local function findNpc(map: Instance, id: string): Model?
+	local direct = map:FindFirstChild(id)
+	if direct and direct:IsA("Model") then
+		return direct
+	end
+	local folder = map:FindFirstChild("Townsfolk")
+	local nested = if folder then folder:FindFirstChild(id) else nil
+	if nested and nested:IsA("Model") then
+		return nested
+	end
+	return nil
+end
+
+local function frontAlong(model: Instance, counter: BasePart): number
+	local look = counter.CFrame.LookVector
+	local origin = counter.CFrame.Position
+	local doorAt = -math.huge
+	local function consider(part: BasePart)
+		local along = (part.CFrame.Position - origin):Dot(look)
+		local extent = math.abs(part.CFrame.RightVector:Dot(look)) * part.Size.X / 2
+			+ math.abs(part.CFrame.UpVector:Dot(look)) * part.Size.Y / 2
+			+ math.abs(part.CFrame.LookVector:Dot(look)) * part.Size.Z / 2
+		local far = along + extent
+		if far > doorAt then
+			doorAt = far
+		end
+	end
+	consider(counter)
+	if type((model :: any).GetDescendants) == "function" then
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				consider(d)
+			end
+		end
+	end
+	if doorAt == -math.huge then
+		return counter.Size.Z / 2
+	end
+	return doorAt
+end
+
+local function rootOf(player: Player): BasePart?
+	local char = player.Character
+	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if hrp and hrp:IsA("BasePart") then
+		return hrp
+	end
+	return nil
+end
+
+function NPCService.OnDoor(player: Player, shopModel: Model, shopId: string, hour: number)
+	local counter = shopModel:FindFirstChild("Counter")
+	if not (counter and counter:IsA("BasePart")) then
+		return
+	end
+	local open = ShopHoursLogic.IsOpen(shopId, hour)
+	local hrp = rootOf(player)
+	local along = if hrp
+		then (hrp.CFrame.Position - counter.CFrame.Position):Dot(counter.CFrame.LookVector)
+		else math.huge
+	local outside = ShopHoursLogic.IsOutside(along, frontAlong(shopModel, counter))
+	if not ShopHoursLogic.MayOpenDoor(open, outside) then
+		return
+	end
+	if not open then
+		shopModel:SetAttribute("DoorHeldUntil", os.clock() + ShopHoursLogic.ExitHold)
+		shopModel:SetAttribute("DoorLocked", false)
+		BuildingArt.PaintDoor(shopModel, false)
+	end
+end
+
+local function ensureDoorPrompt(shopModel: Model, counter: BasePart, shopId: string)
+	local existing = counter:FindFirstChild("ShopDoor")
+	if existing and existing:IsA("ProximityPrompt") then
+		return existing
+	end
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "ShopDoor"
+	prompt.ActionText = "Open"
+	prompt.ObjectText = shopId
+	prompt.HoldDuration = 0
+	prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+	InputKit.PromptDefaults(prompt, "Open")
+	prompt.MaxActivationDistance = InputKit.OpenRange
+	prompt.Parent = counter
+	if not doorHooked[prompt] then
+		doorHooked[prompt] = true
+		pcall(function()
+			prompt.Triggered:Connect(function(who: Player)
+				NPCService.OnDoor(who, shopModel, shopId, ShopHoursLogic.Now())
+			end)
+		end)
+	end
+	return prompt
+end
+
+local function ensureZzz(counter: BasePart)
+	local existing = counter:FindFirstChild("Zzz")
+	if existing and existing:IsA("BillboardGui") then
+		existing.MaxDistance = ShopHoursLogic.ZzzMaxDistance
+		existing.StudsOffset = Vector3.new(0, counter.Size.Y / 2 + ShopHoursLogic.ZzzAbove, 0)
+		return
+	end
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Zzz"
+	gui.Size = UDim2.fromOffset(
+		ShopHoursLogic.ZzzTextPx * ShopHoursLogic.ZzzWidthGlyphs,
+		ShopHoursLogic.ZzzTextPx + ShopHoursLogic.ZzzPad
+	)
+	gui.StudsOffset = Vector3.new(0, counter.Size.Y / 2 + ShopHoursLogic.ZzzAbove, 0)
+	gui.MaxDistance = ShopHoursLogic.ZzzMaxDistance
+	gui.AlwaysOnTop = false
+	gui.Parent = counter
+	local label = Instance.new("TextLabel")
+	label.Name = "ZzzText"
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.Text = "Zzz"
+	label.TextSize = ShopHoursLogic.ZzzTextPx
+	label.TextColor3 = Color3.fromRGB(ShopHoursLogic.ZzzRed, ShopHoursLogic.ZzzGreen, ShopHoursLogic.ZzzBlue)
+	label.Parent = gui
+end
+
+local function clearZzz(counter: BasePart)
+	local existing = counter:FindFirstChild("Zzz")
+	if existing then
+		existing:Destroy()
+	end
+end
+
+-- Sleep, lock, and rewrite signs for `hour`. Idempotent. Tests pass the
+-- hour; the running game passes ShopHoursLogic.Now().
+function NPCService.Apply(mapFolder: Instance, hour: number)
+	for _, npc in ipairs(NPCData.All()) do
+		local shopId = npc.shop
+		if shopId == nil then
+			continue
+		end
+		local shopModel = mapFolder:FindFirstChild(shopId)
+		if not (shopModel and shopModel:IsA("Model")) then
+			continue
+		end
+		local counter = shopModel:FindFirstChild("Counter")
+		local open = ShopHoursLogic.IsOpen(shopId, hour)
+		local held = shopModel:GetAttribute("DoorHeldUntil")
+		local holding = type(held) == "number" and held > os.clock()
+		local locked = not open and not holding
+		shopModel:SetAttribute("DoorLocked", locked)
+		BuildingArt.PaintDoor(shopModel, locked)
+		ShopHoursLogic.WriteSigns(shopModel, hour)
+		if counter and counter:IsA("BasePart") then
+			local prompt = ensureDoorPrompt(shopModel, counter, shopId)
+			prompt.Enabled = locked
+			if open then
+				clearZzz(counter)
+			else
+				ensureZzz(counter)
+			end
+		end
+		local model = findNpc(mapFolder, npc.id)
+		local root = if model then model.PrimaryPart else nil
+		if model and root then
+			if open then
+				local home = homes[model]
+				if home and model:GetAttribute("Asleep") == true then
+					root.CFrame = home
+				end
+				model:SetAttribute("Asleep", false)
+				model:SetAttribute("SleepLine", "")
+			elseif counter and counter:IsA("BasePart") then
+				if homes[model] == nil then
+					homes[model] = root.CFrame
+				end
+				root.CFrame = NPCData.SleepCFrame(counter.CFrame, counter.Size)
+				model:SetAttribute("Asleep", true)
+				model:SetAttribute("SleepLine", DialogueData.Sleepy(shopId, hour))
+			end
+		end
+	end
+end
+
 function NPCService.Init(mapFolder: Instance)
 	local find = finder(mapFolder)
 	local folder = Instance.new("Folder")
@@ -124,6 +317,15 @@ function NPCService.Init(mapFolder: Instance)
 		if not ok then
 			warn(string.format("[NPCService] couldn't build %s: %s", npc.id, tostring(err)))
 		end
+	end
+	NPCService.Apply(mapFolder, ShopHoursLogic.Now())
+	if type(RunService.IsRunning) == "function" and RunService:IsRunning() then
+		task.spawn(function()
+			while RunService:IsRunning() do
+				task.wait(ShopHoursLogic.PollSeconds)
+				NPCService.Apply(mapFolder, ShopHoursLogic.Now())
+			end
+		end)
 	end
 end
 

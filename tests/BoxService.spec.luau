@@ -7,7 +7,7 @@ return function(t)
 	local Vector3 = t.roblox.Vector3
 	local Enum = t.roblox.Enum
 
-	local function boot(grant)
+	local function boot(grant, hour)
 		local charges = {}
 		local profile = {
 			cash = 1000,
@@ -21,6 +21,11 @@ return function(t)
 					Loop = function()
 						return 2
 					end,
+					Hour = if type(hour) == "number"
+						then function()
+							return hour
+						end
+						else nil,
 					ChargeAndGrant = grant or function(_player, box)
 						table.insert(charges, box.uid)
 						return true, "thanks", "axe-1"
@@ -326,5 +331,60 @@ return function(t)
 		t.eq(sent[1].choice, true)
 		t.ok(string.find(sent[1].text, "Steel Axe", 1, true) ~= nil, sent[1].text)
 		t.ok(string.find(sent[1].text, "$160", 1, true) ~= nil, sent[1].text)
+	end)
+
+	t.test("a closed counter hides Buy and will not charge a carried box", function()
+		local seen = {}
+		local _, Box = boot(function(_player, box)
+			table.insert(seen, box)
+			return false, "sleepy", nil
+		end, 22)
+		local counter = counterPart()
+		local rec = Box.Make({
+			uid = "night-box",
+			shop = "HearthAndHome",
+			itemKind = "Gear",
+			itemId = "InsulatedCoat",
+			displayName = "Insulated Coat",
+			price = 500,
+			cf = CFrame.new(0, 4.5, 0),
+			counter = counter,
+			zoneCf = CFrame.new(),
+			zoneSize = Vector3.new(18, 1, 14),
+			onShelf = true,
+		})
+		local buy = rec.part:FindFirstChild("BuyPrompt")
+		t.eq(buy.Enabled, false, "no buy prompt while the shop is closed")
+		local player = person(Vector3.new(0, 4.5, 0))
+		local ok, line = Box.Pay(player, rec.uid)
+		t.eq(ok, false)
+		t.eq(line, "sleepy")
+		t.eq(seen[1].shop, "HearthAndHome")
+		t.eq(rec.paid, false)
+	end)
+
+	t.test("a closed keeper offers no buy card and says when the shop opens", function()
+		local loader = boot(nil, 22)
+		local sent = {}
+		local handler
+		local remote = {
+			OnServerEvent = {
+				Connect = function(_, fn)
+					handler = fn
+					return { Disconnect = function() end }
+				end,
+			},
+			FireClient = function(_, _player, payload)
+				table.insert(sent, payload)
+			end,
+		}
+		local Dialogue = loader:server("DialogueService")
+		Dialogue.Init(remote)
+		handler(person(Vector3.new(0, 4.5, 0)), "open", "HearthAndHome")
+		t.eq(sent[1].line, "sleepy")
+		t.eq(sent[1].choice, false)
+		t.ok(string.find(sent[1].text, "7:00", 1, true) ~= nil, sent[1].text)
+		handler(person(Vector3.new(0, 4.5, 0)), "open", "ToolShed")
+		t.eq(sent[2].line, "greet", "the Tool Shed still greets at night")
 	end)
 end

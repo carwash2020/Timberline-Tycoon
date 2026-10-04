@@ -155,8 +155,8 @@ return function(t)
 			t.eq(prompt.RequiresLineOfSight, false)
 			t.eq(prompt.ClickablePrompt, true)
 			t.eq(prompt.HoldDuration, 0)
-			t.eq(prompt.KeyboardKeyCode, Enum.KeyCode.F)
-			t.eq(prompt.GamepadKeyCode, Enum.KeyCode.ButtonY)
+			t.eq(prompt.KeyboardKeyCode, Enum.KeyCode.E)
+			t.eq(prompt.GamepadKeyCode, Enum.KeyCode.ButtonX)
 			t.eq(prompt.MaxActivationDistance, NPCData.TalkDistance)
 			t.ok(prompt.MaxActivationDistance > 0, npc.id)
 			if npc.promptLift and npc.promptLift ~= 0 then
@@ -165,5 +165,61 @@ return function(t)
 			-- Not on the Torso: QuestUI clones that for Murph's portrait.
 			t.eq(m.Torso:FindFirstChild("Talk"), nil)
 		end
+	end)
+
+	t.test("a closed keeper lies under the counter, and the server locks the door", function()
+		local NPCService, NPCData = service()
+		local ShopHours = t.shared("ShopHoursLogic")
+		local map, counters = fakeMap()
+		NPCService.Init(map)
+		NPCService.Apply(map, 22)
+		local counter = counters.HearthAndHome
+		local hazel = map.Townsfolk:FindFirstChild("Hazel")
+		local root = hazel.PrimaryPart
+		local top = counter.CFrame.Position.Y + counter.Size.Y / 2
+		t.ok(
+			root.CFrame.Position.Y + ShopHours.SleepBodyHalf <= top - ShopHours.SleepClearance + 1e-4,
+			"Hazel is at least a stud under the counter top"
+		)
+		t.ok(math.abs(root.CFrame.UpVector.Y) < 0.05, "she is lying, not standing")
+		local rel = counter.CFrame:PointToObjectSpace(root.CFrame.Position)
+		t.ok(rel.Z > counter.Size.Z / 2, "she is behind the counter")
+		local zzz = counter:FindFirstChild("Zzz")
+		t.eq(zzz.MaxDistance, ShopHours.ZzzMaxDistance)
+		t.ok(zzz.StudsOffset.Y >= counter.Size.Y / 2 + ShopHours.ZzzAbove - 1e-3, "Zzz is 3 studs above the counter")
+		t.eq(hazel:GetAttribute("Asleep"), true)
+		t.ok(string.find(hazel:GetAttribute("SleepLine"), "7:00", 1, true) ~= nil, hazel:GetAttribute("SleepLine"))
+		t.eq(map.HearthAndHome:GetAttribute("DoorLocked"), true)
+		local door = counter:FindFirstChild("ShopDoor")
+		t.eq(door.Enabled, true)
+		t.eq(door.KeyboardKeyCode, Enum.KeyCode.F)
+		t.eq(door.GamepadKeyCode, Enum.KeyCode.ButtonY)
+		local tink = map.Townsfolk:FindFirstChild("Tink")
+		t.eq(tink:GetAttribute("Asleep"), false, "the Tool Shed does not sleep")
+		t.eq(map.ToolShed:GetAttribute("DoorLocked"), false)
+		t.eq(counters.ToolShed:FindFirstChild("Zzz"), nil)
+
+		local look = counter.CFrame.LookVector
+		local function person(at)
+			local hrp = Instance.new("Part")
+			hrp.Name = "HumanoidRootPart"
+			hrp.CFrame = CFrame.new(at)
+			local char = Instance.new("Model")
+			hrp.Parent = char
+			return { Character = char }
+		end
+		local at = counter.CFrame.Position
+		NPCService.OnDoor(person(at + look * 40), map.HearthAndHome, "HearthAndHome", 22)
+		t.eq(map.HearthAndHome:GetAttribute("DoorLocked"), true, "outside cannot open a closed door")
+		NPCService.OnDoor(person(at - look * 6), map.HearthAndHome, "HearthAndHome", 22)
+		t.eq(map.HearthAndHome:GetAttribute("DoorLocked"), false, "inside can hold the door")
+
+		NPCService.Apply(map, 8)
+		t.eq(hazel:GetAttribute("Asleep"), false)
+		t.eq(map.HearthAndHome:GetAttribute("DoorLocked"), false)
+		t.eq(counter:FindFirstChild("Zzz"), nil)
+		local home = NPCData.BehindCounter(counter.CFrame, counter.Size)
+		local feet = root.CFrame.Position.Y - hazel:GetAttribute("RootHeight")
+		t.ok(math.abs(feet - home.Position.Y) < 1e-2, "she stands up again at open")
 	end)
 end
