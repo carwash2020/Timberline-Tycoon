@@ -201,6 +201,8 @@ return function(t)
 						model:SetAttribute("CutShown", string.format("%.1f %.1f", x, y))
 					end,
 				},
+				WoodService = options.wood,
+				PlotFill = options.plotFill,
 			},
 		})
 		local PlotService = loader:server("PlotService")
@@ -840,5 +842,230 @@ return function(t)
 		t.eq(ann.attrs.PlotSlot, 2)
 		t.eq(s.plot(3):GetAttribute("OwnerId"), nil)
 		t.eq(s.lastToast(), "You already have a plot here.")
+	end)
+
+	-- Loose wood for FillStep. One real part: every record can share it, and
+	-- FillStep still sees each record (typeof Instance, a BasePart).
+	local function loose(origin, uid, opts)
+		opts = opts or {}
+		local CFrame = t.roblox.CFrame
+		local model = t.roblox.Instance.new("Model")
+		model.Name = uid
+		local root = t.roblox.Instance.new("Part")
+		root.Name = "Root"
+		root.Size = Vector3.new(1.6, 4, 1.6)
+		local at = origin + (opts.offset or Vector3.zero)
+		root.CFrame = CFrame.new(at)
+		root.Position = at
+		root.Anchored = true
+		root.Parent = model
+		model.PrimaryPart = root
+		model:SetAttribute("HeldBy", opts.heldBy or 0)
+		return {
+			uid = uid,
+			kind = opts.kind or "plank",
+			woodId = opts.woodId or "birch",
+			volume = if opts.volume == nil then 2 else opts.volume,
+			ownerId = if opts.ownerId == nil then 1 else opts.ownerId,
+			root = root,
+			model = model,
+			figure = nil,
+			boost = 0,
+			lux = false,
+		}
+	end
+
+	local function plotOrigin(data, index)
+		local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+		local c = data.Slots[index]
+		return Vector3.new(c.X, TerrainGen.HeightAt(c.X, c.Y), c.Y)
+	end
+
+	local function woodApi(pieces)
+		return {
+			All = function()
+				return pieces
+			end,
+			Get = function(id)
+				return pieces[id]
+			end,
+			Remove = function(piece)
+				pieces[piece.uid] = nil
+			end,
+			SpawnPlank = function()
+				return { uid = "left" }
+			end,
+		}
+	end
+
+	t.test("200 built pieces and 2500 planks give zero PlotFill.Apply calls", function()
+		local applies = 0
+		local pieces = {}
+		local s = setup({
+			wood = woodApi(pieces),
+			plotFill = {
+				Apply = function()
+					applies += 1
+					return false, "built"
+				end,
+			},
+		})
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		local origin = plotOrigin(s.PlotData, 1)
+		local placed = {}
+		for i = 1, 200 do
+			placed[i] = {
+				uid = "w" .. i,
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = { units = 8 },
+				wood = "birch",
+			}
+		end
+		profile.plot.placed = placed
+		for i = 1, 2500 do
+			pieces["p" .. i] = loose(origin, "p" .. i)
+		end
+		s.P.FillStep()
+		t.eq(applies, 0)
+		t.eq(placed[1].fill.units, 8, "a built piece keeps the wood it already has")
+		t.eq(placed[#placed].fill.units, 8)
+	end)
+
+	t.test("a plank on the plot is offered; one past the plot plus reach is not", function()
+		local applies = 0
+		local pieces = {}
+		local s = setup({
+			wood = woodApi(pieces),
+			plotFill = {
+				Apply = function()
+					applies += 1
+					return false, "busy"
+				end,
+			},
+		})
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		local origin = plotOrigin(s.PlotData, 1)
+		profile.plot.placed = {
+			{ uid = "wall", blueprintId = "Wall", x = 0, z = 0, rot = 0, fill = { units = 0 } },
+		}
+		pieces.near = loose(origin, "near")
+		pieces.far = loose(origin, "far", { offset = Vector3.new(0, 0, 500) })
+		s.P.FillStep()
+		t.eq(applies, 1, "only the plank inside the plot plus reach")
+		t.eq(profile.plot.placed[1].fill.units, 0, "the plank past reach did not fill it")
+	end)
+
+	local function clearPieces(pieces)
+		for key in pairs(pieces) do
+			pieces[key] = nil
+		end
+	end
+
+	t.test("a plank resting near a built wall, and a held plank near a blueprint, each give zero notifies", function()
+		local pieces = {}
+		local s = setup({ wood = woodApi(pieces) })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		local origin = plotOrigin(s.PlotData, 1)
+
+		profile.plot.placed = {
+			{
+				uid = "built",
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = { units = 8 },
+				wood = "birch",
+			},
+		}
+		pieces.resting = loose(origin, "resting")
+		local n = #s.toasts
+		s.P.FillStep()
+		t.eq(#s.toasts, n, "a plank resting near a built wall")
+		t.eq(profile.plot.placed[1].fill.units, 8, "a built wall takes no more wood")
+
+		s.advance(1)
+		clearPieces(pieces)
+		profile.plot.placed = {
+			{ uid = "ghost", blueprintId = "Wall", x = 0, z = 0, rot = 0, fill = { units = 0 } },
+		}
+		pieces.held = loose(origin, "held", { heldBy = 1 })
+		s.P.NoteRelease(ann, pieces.held)
+		s.P.FillStep()
+		t.eq(#s.toasts, n, "a held plank near a blueprint")
+		t.eq(profile.plot.placed[1].fill.units, 0, "a held plank does not fill")
+
+		-- The same blueprint, wood that isn't yours, and a log left sitting.
+		s.advance(1)
+		clearPieces(pieces)
+		pieces.theirs = loose(origin, "theirs", { ownerId = 2 })
+		pieces.log = loose(origin, "log", { kind = "log" })
+		s.P.NoteRelease(ann, pieces.theirs)
+		s.P.FillStep()
+		t.eq(#s.toasts, n, "someone else's wood, and a log left sitting, never toast")
+		t.eq(profile.plot.placed[1].fill.units, 0)
+	end)
+
+	t.test("a just-dropped log or the wrong wood toasts once, and leaving forgets that", function()
+		local pieces = {}
+		local s = setup({ wood = woodApi(pieces) })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		local origin = plotOrigin(s.PlotData, 1)
+		profile.plot.placed = {
+			{
+				uid = "ghost",
+				blueprintId = "Wall",
+				x = 0,
+				z = 0,
+				rot = 0,
+				fill = { units = 0 },
+				wood = "birch",
+			},
+		}
+		pieces.oak = loose(origin, "oak", { woodId = "oak" })
+		local n = #s.toasts
+		s.advance(10)
+		s.P.FillStep()
+		t.eq(#s.toasts, n, "resting on the blueprint: no toast")
+		t.eq(profile.plot.placed[1].fill.units, 0, "wrong wood left sitting does not fill")
+
+		s.advance(1)
+		s.P.NoteRelease(ann, pieces.oak)
+		s.P.FillStep()
+		t.eq(s.lastToast(), "This Wall is being built with Birch.")
+		t.eq(#s.toasts, n + 1)
+		t.eq(profile.plot.placed[1].fill.units, 0, "wrong wood does not fill")
+
+		-- Still inside the two seconds, so the same refusal stays quiet.
+		s.advance(0.2)
+		s.P.NoteRelease(ann, pieces.oak)
+		s.P.FillStep()
+		t.eq(#s.toasts, n + 1, "told already")
+
+		s.P.PlayerRemoving(ann)
+		s.claim(ann, 1)
+		s.advance(0.2)
+		s.P.NoteRelease(ann, pieces.oak)
+		s.P.FillStep()
+		t.eq(s.lastToast(), "This Wall is being built with Birch.")
+		t.eq(#s.toasts, n + 3, "leaving cleared the toast memory")
+
+		clearPieces(pieces)
+		profile.plot.placed = {
+			{ uid = "open", blueprintId = "Wall", x = 0, z = 0, rot = 0, fill = { units = 0 } },
+		}
+		pieces.log = loose(origin, "log", { kind = "log" })
+		s.advance(1)
+		s.P.NoteRelease(ann, pieces.log)
+		s.P.FillStep()
+		t.eq(s.lastToast(), "Saw logs into planks first.")
+		t.eq(profile.plot.placed[1].fill.units, 0, "a log does not fill")
 	end)
 end

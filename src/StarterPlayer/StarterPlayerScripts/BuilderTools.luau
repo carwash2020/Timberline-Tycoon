@@ -18,6 +18,7 @@ local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local BuilderTools = {}
 
@@ -199,7 +200,7 @@ local function layout()
 		return
 	end
 	local size = camera.ViewportSize
-	local place = BuilderBar.Layout(size.X, size.Y)
+	local place = BuilderBar.Layout(size.X, size.Y, UITheme.Bottom())
 	bar.Position = UDim2.fromOffset(place.x, place.y)
 	bar.Size = UDim2.fromOffset(place.w, place.h)
 	local label = readoutLabel

@@ -90,8 +90,64 @@ local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
 local offerRemote: RemoteEvent? = nil
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
--- Last time a fill refusal was told, so a plank sitting nearby doesn't toast every frame.
+-- Fill runs at about 5 Hz, not every Heartbeat. A refusal toasts once, and
+-- only for wood this player let go of in the last two seconds.
+local FILL_EVERY = 0.2
+local FILL_WINDOW = 2
+local lastFillAt = -math.huge
+-- userId:woodUid -> os.clock() when this player released that piece.
+local releasedAt: { [string]: number } = {}
+-- userId:blueprintUid:reason -> os.clock() of the last toast.
 local fillTold: { [string]: number } = {}
+
+local function fillKey(userId: number, uid: string): string
+	return tostring(userId) .. ":" .. uid
+end
+
+local function forgetFill(player: Player)
+	local prefix = tostring(player.UserId) .. ":"
+	local n = #prefix
+	for key in pairs(fillTold) do
+		if string.sub(key, 1, n) == prefix then
+			fillTold[key] = nil
+		end
+	end
+	for key in pairs(releasedAt) do
+		if string.sub(key, 1, n) == prefix then
+			releasedAt[key] = nil
+		end
+	end
+end
+
+-- GrabService's onRelease. A drop is the only moment a refusal is worth a toast.
+function PlotService.NoteRelease(player: Player, piece: any)
+	local uid = if type(piece) == "table" then piece.uid else nil
+	if type(uid) ~= "string" then
+		return
+	end
+	releasedAt[fillKey(player.UserId, uid)] = os.clock()
+end
+
+local function releasedJustNow(player: Player, uid: string, now: number): boolean
+	local at = releasedAt[fillKey(player.UserId, uid)]
+	return at ~= nil and now - at <= FILL_WINDOW
+end
+
+-- `wood` and `logs` only, and only for a piece this player just released.
+local function tellFill(player: Player, itemUid: string, why: string, text: string, woodUid: string, now: number)
+	if why ~= "wood" and why ~= "logs" then
+		return
+	end
+	if not releasedJustNow(player, woodUid, now) then
+		return
+	end
+	local key = fillKey(player.UserId, itemUid) .. ":" .. why
+	local prev = fillTold[key]
+	if not prev or now - prev >= FILL_WINDOW then
+		fillTold[key] = now
+		notify(player, text)
+	end
+end
 
 ---------------------------------------------------------------------------
 -- The district
@@ -1261,7 +1317,33 @@ function PlotService.PlayerRemoving(player: Player)
 	lastOffer[player] = nil
 	watching[player] = nil
 	undoStacks[player] = nil
+	forgetFill(player)
 	release(player)
+end
+
+local releaseHooked = false
+
+-- Chain GrabService's onRelease so a drop can toast. TruckLoad wraps whatever
+-- is installed when it starts, and PlotService.Init runs first.
+local function watchReleases()
+	if releaseHooked then
+		return
+	end
+	local ok, grab = pcall(function(): any
+		return require(script.Parent.GrabService)
+	end)
+	if not ok or type(grab) ~= "table" or type((grab :: any).Hooks) ~= "table" then
+		return
+	end
+	releaseHooked = true
+	local hooks = (grab :: any).Hooks
+	local prior = hooks.onRelease
+	hooks.onRelease = function(player: Player, piece: any, reason: string)
+		PlotService.NoteRelease(player, piece)
+		if type(prior) == "function" then
+			prior(player, piece, reason)
+		end
+	end
 end
 
 -- `map` is TimberlineMap; the remotes are PlaceBlueprint, MoveBlueprint,
@@ -1302,9 +1384,39 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 			PlotService.FillStep()
 		end)
 	end
+	watchReleases()
+end
+
+local function woodRoot(piece: any): BasePart?
+	local root = piece.root
+	if piece.dead == true or typeof(root) ~= "Instance" or not root:IsA("BasePart") then
+		return nil
+	end
+	return root
+end
+
+local function woodHeld(piece: any): boolean
+	local model = piece.model
+	if typeof(model) ~= "Instance" then
+		return false
+	end
+	local by = model:GetAttribute("HeldBy")
+	return type(by) == "number" and by ~= 0
+end
+
+-- Plot square, grown by FillLogic.Reach, in the plot's own axes.
+local function onPlot(slot: Slot, size: number, pos: Vector3): boolean
+	local half = size / 2 + FillLogic.Reach
+	local p = slot.cframe:PointToObjectSpace(pos)
+	return math.abs(p.X) <= half and math.abs(p.Z) <= half
 end
 
 function PlotService.FillStep()
+	local now = os.clock()
+	if now - lastFillAt < FILL_EVERY then
+		return
+	end
+	lastFillAt = now
 	local wood = woodModule()
 	if not wood or type(wood.All) ~= "function" then
 		return
@@ -1313,76 +1425,104 @@ function PlotService.FillStep()
 	if type(pieces) ~= "table" then
 		return
 	end
+	local api = {
+		Get = function(id: string)
+			return wood.Get(id)
+		end,
+		Remove = function(got: any, reason: string)
+			wood.Remove(got, reason)
+		end,
+		SpawnPlank = function(info: any)
+			return wood.SpawnPlank(info)
+		end,
+	}
 	for player, slot in pairs(slotOf) do
 		local profile = ProfileService.GetProfile(player)
-		if profile then
-			for _, item in ipairs(profile.plot.placed) do
+		local placed = if profile and profile.plot then profile.plot.placed else nil
+		if profile and placed then
+			-- Built pieces keep `fill` set, so IsBuilt is the gate. Anything
+			-- already built never reaches the wood.
+			local pending: { { item: PlotLogic.Placed, bp: PlotData.Blueprint } } = {}
+			for _, item in ipairs(placed) do
 				if item.fill then
 					local bp = PlotLogic.Blueprint(item.blueprintId)
-					if bp and bp.kit then
-						local origin = (slot.cframe * CFrame.new(item.x, item.y or 0, item.z)).Position
-						for _, piece in pairs(pieces) do
-							local root = piece.root
-							if piece.dead ~= true and typeof(root) == "Instance" and root:IsA("BasePart") then
-								local dist = (root.Position - origin).Magnitude
-								if FillLogic.InRange(dist) then
-									local heldBy = piece.model:GetAttribute("HeldBy")
-									local changed, why = PlotFill.Apply(
-										item,
-										{
-											uid = piece.uid,
-											kind = piece.kind,
-											woodId = piece.woodId,
-											volume = piece.volume,
-											ownerId = piece.ownerId,
-											held = type(heldBy) == "number" and heldBy ~= 0,
-											size = root.Size,
-											cf = root.CFrame,
-											figure = piece.figure,
-											boost = piece.boost,
-											lux = piece.lux,
-										},
-										player.UserId,
-										{
-											Get = function(id: string)
-												return wood.Get(id)
-											end,
-											Remove = function(got: any, reason: string)
-												wood.Remove(got, reason)
-											end,
-											SpawnPlank = function(info: any)
-												return wood.SpawnPlank(info)
-											end,
-										}
-									)
-									if changed then
-										local model = slot.items:FindFirstChild(item.uid)
-										if
-											model
-											and model:IsA("Model")
-											and type(BlueprintModels.ApplyWood) == "function"
-										then
-											BlueprintModels.ApplyWood(model, item.wood)
-											BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
-										end
-									elseif type(why) == "string" then
-										local woodName = nil
-										if type(item.wood) == "string" then
-											local def = WoodData.Get(item.wood)
-											woodName = if def then def.displayName else item.wood
-										end
-										local text = FillLogic.Message(why, bp.displayName, woodName)
-										if text and notify then
-											local key = tostring(player.UserId) .. ":" .. item.uid .. ":" .. why
-											local now = os.clock()
-											local prev = fillTold[key]
-											if not prev or now - prev >= 2 then
-												fillTold[key] = now
-												notify(player, text)
-											end
-										end
-									end
+					if bp and not PlotLogic.IsBuilt(bp, item) then
+						table.insert(pending, { item = item, bp = bp })
+					end
+				end
+			end
+			if #pending > 0 then
+				local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+				local planks: { { piece: any, root: BasePart } } = {}
+				local logs: { { piece: any, root: BasePart } } = {}
+				for _, piece in pairs(pieces) do
+					local root = woodRoot(piece)
+					if
+						root
+						and not woodHeld(piece)
+						and piece.ownerId == player.UserId
+						and piece.ownerId ~= 0
+						and onPlot(slot, tier.size, root.Position)
+					then
+						if piece.kind == "plank" then
+							table.insert(planks, { piece = piece, root = root })
+						elseif
+							piece.kind == "log"
+							and type(piece.uid) == "string"
+							and releasedJustNow(player, piece.uid, now)
+						then
+							-- A log can't fill anything. It only exists here so a
+							-- drop onto a blueprint can say to saw it first.
+							table.insert(logs, { piece = piece, root = root })
+						end
+					end
+				end
+				for _, job in ipairs(pending) do
+					local item = job.item
+					local bp = job.bp
+					local origin = (slot.cframe * CFrame.new(item.x, item.y or 0, item.z)).Position
+					for _, near in ipairs(planks) do
+						local piece = near.piece
+						local root = near.root
+						if FillLogic.InRange((root.Position - origin).Magnitude) then
+							local changed, why = PlotFill.Apply(item, {
+								uid = piece.uid,
+								kind = piece.kind,
+								woodId = piece.woodId,
+								volume = piece.volume,
+								ownerId = piece.ownerId,
+								held = false,
+								size = root.Size,
+								cf = root.CFrame,
+								figure = piece.figure,
+								boost = piece.boost,
+								lux = piece.lux,
+							}, player.UserId, api)
+							if changed then
+								local model = slot.items:FindFirstChild(item.uid)
+								if model and model:IsA("Model") and type(BlueprintModels.ApplyWood) == "function" then
+									BlueprintModels.ApplyWood(model, item.wood)
+									BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
 								end
+							elseif type(why) == "string" and type(piece.uid) == "string" then
+								local woodName = nil
+								if type(item.wood) == "string" then
+									local def = WoodData.Get(item.wood)
+									woodName = if def then def.displayName else item.wood
+								end
+								local text = FillLogic.Message(why, bp.displayName, woodName)
+								if text then
+									tellFill(player, item.uid, why, text, piece.uid, now)
+								end
+							end
+						end
+					end
+					for _, near in ipairs(logs) do
+						local piece = near.piece
+						if FillLogic.InRange((near.root.Position - origin).Magnitude) then
+							local text = FillLogic.Message("logs", bp.displayName, nil)
+							if text then
+								tellFill(player, item.uid, "logs", text, piece.uid, now)
 							end
 						end
 					end
