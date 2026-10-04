@@ -180,6 +180,33 @@ end
 -- in this many hits or fewer.
 FieldGuide.UsefulHitsV2 = 20
 
+-- v2 hardness as 1 to 5 axe marks (B02). A mark fills in at each edge, so
+-- the nine woods read: oak and palm 1, pine and maple 2, birch 3, frost
+-- and ember 4, phantom and lumen 5. The page prints the marks and the
+-- number ("hardness xx... 5.5"). `x` and `.` stay in Gotham, the detail
+-- font, at 14 px on a phone.
+FieldGuide.HardnessBands = { 4, 7, 10, 16 }
+FieldGuide.AxeOn = "x"
+FieldGuide.AxeOff = "."
+
+function FieldGuide.HardnessMarks(hardness: number): number
+	if type(hardness) ~= "number" or hardness ~= hardness then
+		return 1
+	end
+	local marks = 1
+	for _, edge in ipairs(FieldGuide.HardnessBands) do
+		if hardness >= edge then
+			marks += 1
+		end
+	end
+	return math.clamp(marks, 1, 5)
+end
+
+function FieldGuide.HardnessIcons(hardness: number): string
+	local n = FieldGuide.HardnessMarks(hardness)
+	return string.rep(FieldGuide.AxeOn, n) .. string.rep(FieldGuide.AxeOff, 5 - n)
+end
+
 local function finite(n: unknown): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
 end
@@ -353,7 +380,7 @@ function FieldGuide.FactsV2(wood: WoodDef): string
 	end
 	local parts = {
 		biomeName(wood),
-		"hardness " .. short(v2.hardness, 2),
+		"hardness " .. FieldGuide.HardnessIcons(v2.hardness) .. " " .. short(v2.hardness, 2),
 		string.format("logs %s, planks %s", FieldGuide.PriceText(v2.logPrice), FieldGuide.PriceText(v2.plankPrice)),
 	}
 	local size = FieldGuide.TreeSize(wood)

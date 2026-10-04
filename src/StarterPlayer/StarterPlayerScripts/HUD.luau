@@ -167,9 +167,9 @@ local hintState: HintLogic.State = { driving = false, inSellZone = false, carryi
 -- The v2 loop's sources (watchV2: only under CoreLoop.V2()).
 local v2Watching = false
 local heldPiece: Model? = nil -- the Wood model whose HeldBy is you
--- What the axe points at (CutController.PointingFacts): a loose piece, and
--- wood too hard for it.
-local pointingWood, pointingHard = false, false
+-- What the axe points at (CutController.PointingFacts): a loose piece,
+-- wood too hard for the axe, and a thick face.
+local pointingWood, pointingHard, pointingThick = false, false, false
 local woodConns: { [Model]: RBXScriptConnection } = {}
 local axeOut = false -- an axe tool in the character
 local nearPad = false -- your truck by the sell pad (HintLogic.NearPad)
@@ -624,6 +624,7 @@ local function hintStateV2(): HintLogic.StateV2
 		holding = heldPiece ~= nil,
 		onWood = pointingWood,
 		tooHard = pointingHard,
+		thick = pointingThick,
 		tooLong = HintLogic.TooLong(heldLength(), player:GetAttribute("BedLength")),
 		bedVolume = attrAmount("BedVolume"),
 		nearPad = nearPad,
@@ -650,11 +651,12 @@ end
 
 -- What the axe is pointing at (CutController, a few times a second): a
 -- loose piece, and wood too hard for it. Refreshes the hint on a change.
-function HUD.SetPointing(onWood: boolean, tooHard: boolean)
-	if onWood == pointingWood and tooHard == pointingHard then
+function HUD.SetPointing(onWood: boolean, tooHard: boolean, thick: boolean?)
+	local isThick = thick == true
+	if onWood == pointingWood and tooHard == pointingHard and isThick == pointingThick then
 		return
 	end
-	pointingWood, pointingHard = onWood, tooHard
+	pointingWood, pointingHard, pointingThick = onWood, tooHard, isThick
 	refreshHint()
 end
 

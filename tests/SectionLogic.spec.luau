@@ -102,6 +102,30 @@ return function(t)
 		end
 	end)
 
+	t.test("twice the width takes four times the hits, for every wood", function()
+		local u = GameConfig.WoodUnit
+		for _, wood in ipairs(WoodData.All()) do
+			local h = wood.v2.hardness
+			-- Damage equal to hardness: a 1 u square is one hit, and a
+			-- square twice as wide (four times the area) is four hits.
+			local thin = SectionLogic.HitsToCut(h, u, h)
+			local thick = SectionLogic.HitsToCut(h, u * 2, h)
+			t.eq(thin, 1, wood.id .. " thin")
+			t.eq(thick, 4 * thin, wood.id .. ": 2× width ⇒ 4× hits")
+			t.eq(SectionLogic.Required(h, u * 2, u * 2), 4 * SectionLogic.Required(h, u, u), wood.id)
+		end
+		-- A mature pine: the base against the last trunk section, which
+		-- the taper has taken under half the width.
+		local pine = WoodData.Get("pine")
+		local shape = pine.v2.shape
+		local top = shape.trunkThickness * (shape.taper ^ (shape.trunkSegments - 1))
+		local damage = ItemCatalog.AxeStats(ItemCatalog.GetAxe("RustyAxe"), "pine")
+		local baseHits = SectionLogic.HitsToCut(pine.v2.hardness, shape.trunkThickness, damage)
+		local topHits = SectionLogic.HitsToCut(pine.v2.hardness, top, damage)
+		t.ok(top < shape.trunkThickness / 2, "the top is under half the base")
+		t.ok(baseHits > topHits * 2, string.format("pine base %d hits, top %d", baseHits, topHits))
+	end)
+
 	t.test("required damage is hardness times the cut's area in u²", function()
 		t.eq(SectionLogic.Required(2, 1.6, 1.6), 2)
 		t.ok(math.abs(SectionLogic.Required(2, 2.0, 2.0) - 3.125) < 1e-9, "oak's trunk")
@@ -337,6 +361,7 @@ return function(t)
 		t.ok(SectionLogic.InBox(log, size, Vector3.new(0, 2.5, 0)))
 		t.ok(not SectionLogic.InBox(log, size, Vector3.new(0, 2.7, 0)), "past the 0.6 margin")
 		t.eq(SectionLogic.Message("far"), "Too far away. Walk closer to cut.")
+		t.eq(SectionLogic.Message("tooHard"), "Too hard for this axe.")
 		t.eq(SectionLogic.Message("cooldown"), nil, "a swing too soon is quiet")
 	end)
 

@@ -57,6 +57,7 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
+local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local SwingLogic = require(ReplicatedStorage.Shared.SwingLogic)
 local FaceTarget = require(script.Parent.FaceTarget)
 local HUD = require(script.Parent.HUD)
@@ -258,25 +259,37 @@ type Target = {
 	problem: string?, -- "far" | "hard" | nil
 }
 
+-- The axe's listed damage against this wood's biome (a biome override
+-- wins), the number HintLogic.Underpowered compares with hardness.
+local function listedDamage(axe: ItemCatalog.AxeDef, biome: string): number
+	local override = if axe.biomeDamage then axe.biomeDamage[biome] else nil
+	return override or axe.damage
+end
+
 -- What the HUD's hint needs to know about what the axe is pointing at
 -- (`seen`: the target, or what the pointer found and why it won't do):
--- whether it's a loose piece (put the axe away to drag it), and whether
--- it's wood this axe can't cut or needs too many hits for
--- (HintLogic.TooHard over FieldGuide.CutHits).
-function CutController.PointingFacts(seen: Target?, axe: ItemCatalog.AxeDef?): (boolean, boolean)
+-- whether it's a loose piece (put the axe away to drag it), whether it's
+-- wood this axe can't cut, needs too many hits for, or whose hardness
+-- beats the axe's damage (HintLogic.TooHard / Underpowered), and whether
+-- the face is thick (HintLogic.Thicker: thicker cuts take longer).
+function CutController.PointingFacts(seen: Target?, axe: ItemCatalog.AxeDef?): (boolean, boolean, boolean)
 	if seen == nil or axe == nil or seen.kind == "node" then
-		return false, false
+		return false, false, false
 	end
 	local onWood = seen.kind == "wood"
+	local size = seen.part.Size
+	local thick = HintLogic.Thicker(size.X, size.Z)
 	if seen.problem == "hard" then
-		return onWood, true
+		return onWood, true, thick
 	end
 	local woodId = seen.woodId
 	if woodId == nil or woodId == "" then
-		return onWood, false
+		return onWood, false, thick
 	end
-	local size = seen.part.Size
-	return onWood, HintLogic.TooHard(FieldGuide.CutHits(axe, woodId, size.X, size.Z))
+	local hitsHard = HintLogic.TooHard(FieldGuide.CutHits(axe, woodId, size.X, size.Z))
+	local wood = WoodData.Get(woodId)
+	local weak = wood ~= nil and HintLogic.Underpowered(listedDamage(axe, wood.biome), wood.hardness)
+	return onWood, hitsHard or weak, thick
 end
 
 -- The equipped axe tool, its definition and the root part, or nils.
@@ -581,6 +594,16 @@ local function deliver(id: number)
 		if current.fromClick then
 			chopNote("fired")
 		end
+		-- The swing still lands. The toast is the "too hard" hint for an
+		-- axe whose listed damage is under the wood's hardness.
+		local woodId = target.woodId
+		local wood = if type(woodId) == "string" then WoodData.Get(woodId) else nil
+		if wood and HintLogic.Underpowered(listedDamage(axe, wood.biome), wood.hardness) then
+			if now - lastHardToast > CutController.HardToastEvery then
+				lastHardToast = now
+				HUD.Toast(SectionLogic.Message("tooHard") :: string)
+			end
+		end
 	else
 		toastRefuse(current.fromClick, refused, now)
 	end
@@ -652,7 +675,7 @@ local function updateOutline()
 	local _tool, axe, hrp = equipped()
 	local adornee: Instance? = nil
 	local color = READY_COLOR
-	local onWood, tooHard = false, false
+	local onWood, tooHard, thick = false, false, false
 	if axe and hrp then
 		local target, refused = pickTarget(hrp, axe)
 		if target then
@@ -660,9 +683,9 @@ local function updateOutline()
 		elseif refused and refused.problem == "hard" then
 			adornee, color = refused.part, HARD_COLOR
 		end
-		onWood, tooHard = CutController.PointingFacts(target or refused, axe)
+		onWood, tooHard, thick = CutController.PointingFacts(target or refused, axe)
 	end
-	HUD.SetPointing(onWood, tooHard)
+	HUD.SetPointing(onWood, tooHard, thick)
 	if adornee then
 		hl.Adornee = adornee
 		hl.OutlineColor = color

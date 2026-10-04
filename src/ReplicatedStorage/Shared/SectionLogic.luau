@@ -409,7 +409,7 @@ function SectionLogic.Message(reason: string?, name: string?): string?
 	elseif reason == "noLOS" then
 		return "Something's in the way."
 	elseif reason == "tooHard" then
-		return "This wood needs a special axe."
+		return "Too hard for this axe."
 	elseif reason == "noAxe" then
 		return "Take out an axe to cut."
 	end

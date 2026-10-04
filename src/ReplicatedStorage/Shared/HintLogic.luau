@@ -192,12 +192,35 @@ end
 --   * unequip: an axe out, pointing at a loose piece: put it away to drag.
 --   * holding: dragging a piece: distance and turning.
 --   * tooLong: dragging a piece longer than your truck's bed.
---   * tooHard: pointing at wood your axe needs too many hits for.
+--   * tooHard: pointing at wood your axe needs too many hits for, or
+--     whose listed hardness beats the axe's listed damage.
+--   * thick: pointing at a thick face. A face twice as wide takes about
+--     four times the swings.
 --   * backUp: driving with wood on the bed, near the sell pad.
-export type ContextV2 = "chop" | "drag" | "unequip" | "holding" | "tooLong" | "tooHard" | "driving" | "backUp" | "build"
+export type ContextV2 =
+	"chop"
+	| "drag"
+	| "unequip"
+	| "holding"
+	| "tooLong"
+	| "tooHard"
+	| "thick"
+	| "driving"
+	| "backUp"
+	| "build"
 
-HintLogic.ContextsV2 =
-	{ "chop", "drag", "unequip", "holding", "tooLong", "tooHard", "driving", "backUp", "build" } :: { ContextV2 }
+HintLogic.ContextsV2 = {
+	"chop",
+	"drag",
+	"unequip",
+	"holding",
+	"tooLong",
+	"tooHard",
+	"thick",
+	"driving",
+	"backUp",
+	"build",
+} :: { ContextV2 }
 
 -- A phone's v2 hint is at most this many bytes: the longest v1 phone hint,
 -- which HudLayout.spec shows fits beside the load chip on a small phone.
@@ -229,6 +252,11 @@ local LINES_V2: { [string]: { [string]: string } } = { -- [ContextV2][Device]; o
 		desktop = "Too hard for this axe: get a better one",
 		console = "Too hard for this axe: get a better one",
 	},
+	thick = {
+		phone = "Thicker cuts take longer",
+		desktop = "Thicker cuts take longer",
+		console = "Thicker cuts take longer",
+	},
 	backUp = {
 		phone = "Back onto the pad to sell the bed",
 		desktop = "Back onto the pad to sell the bed",
@@ -252,6 +280,29 @@ HintLogic.TooHardHits = 2 * FieldGuide.UsefulHitsV2
 -- a number (NaN) counts as not known: no hint.
 function HintLogic.TooHard(hits: number): boolean
 	return hits == hits and hits > HintLogic.TooHardHits
+end
+
+-- The axe's listed damage doesn't beat the wood's listed hardness, so one
+-- hit can't dent it (the same comparison as a v1 swing that deals 0). The
+-- v2 swing still lands; the HUD and the toast say to get a better axe.
+-- Not a number (NaN) counts as not known: no hint.
+function HintLogic.Underpowered(damage: number, hardness: number): boolean
+	if damage ~= damage or hardness ~= hardness then
+		return false
+	end
+	return damage < hardness
+end
+
+-- A square face this many studs across is a thick cut: pine's base is 2.6,
+-- a tapered top of that trunk is under 2. Twice the width is four times
+-- the swings (SectionLogic.Required).
+HintLogic.ThickStuds = 2
+
+function HintLogic.Thicker(width: number, depth: number): boolean
+	if width ~= width or depth ~= depth then
+		return false
+	end
+	return math.min(width, depth) >= HintLogic.ThickStuds
 end
 
 -- Whether a held piece `pieceLength` studs long (its longest side) is
@@ -279,7 +330,8 @@ export type StateV2 = {
 	axeOut: boolean, -- an axe in hand
 	holding: boolean, -- dragging a piece (its HeldBy is you)
 	onWood: boolean, -- pointing at a loose piece (tag Wood) within reach
-	tooHard: boolean, -- pointing at wood this axe finds too hard (TooHard)
+	tooHard: boolean, -- pointing at wood this axe finds too hard (TooHard, Underpowered)
+	thick: boolean, -- pointing at a thick face (Thicker)
 	tooLong: boolean, -- the held piece is longer than your bed (TooLong)
 	bedVolume: number, -- u³ on your truck's bed (BedVolume)
 	nearPad: boolean, -- your truck is near the sell pad (NearPad)
@@ -300,7 +352,10 @@ function HintLogic.ContextForV2(state: StateV2): ContextV2
 		if state.onWood then
 			return "unequip"
 		end
-		return if state.tooHard then "tooHard" else "chop"
+		if state.tooHard then
+			return "tooHard"
+		end
+		return if state.thick then "thick" else "chop"
 	end
 	return "drag"
 end

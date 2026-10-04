@@ -226,6 +226,31 @@ return function(t)
 		t.eq(FieldGuide.UsefulHitsV2, 20)
 	end)
 
+	t.test("v2: hardness is 1 to 5 axe marks, and every wood lists them", function()
+		local expect = {
+			oak = 1,
+			palmwood = 1,
+			pine = 2,
+			maple = 2,
+			birch = 3,
+			frostwood = 4,
+			emberwood = 4,
+			phantomwood = 5,
+			lumenwood = 5,
+		}
+		t.eq(#WoodData.All(), 9)
+		for _, wood in ipairs(WoodData.All()) do
+			local marks = FieldGuide.HardnessMarks(wood.v2.hardness)
+			t.eq(marks, expect[wood.id], wood.id)
+			local icons = FieldGuide.HardnessIcons(wood.v2.hardness)
+			t.eq(#icons, 5, wood.id)
+			t.eq(string.sub(icons, 1, marks), string.rep("x", marks), wood.id)
+			t.eq(string.sub(icons, marks + 1), string.rep(".", 5 - marks), wood.id)
+			t.ok(string.find(FieldGuide.FactsV2(wood), "hardness " .. icons, 1, true) ~= nil, wood.id)
+		end
+		t.eq(FieldGuide.HardnessMarks(0 / 0), 1, "not a number: the softest mark")
+	end)
+
 	t.test("v2: a found wood's page: where, hardness, $/u³, size, and the axe for it", function()
 		local short = FieldGuide.ShortNumber
 		for _, wood in ipairs(WoodData.All()) do
@@ -247,7 +272,7 @@ return function(t)
 				page,
 				table.concat({
 					biome.displayName,
-					"hardness " .. short(v2.hardness, 2),
+					"hardness " .. FieldGuide.HardnessIcons(v2.hardness) .. " " .. short(v2.hardness, 2),
 					string.format(
 						"logs %s, planks %s",
 						FieldGuide.PriceText(v2.logPrice),
