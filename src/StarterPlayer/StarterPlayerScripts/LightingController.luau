@@ -16,8 +16,10 @@
 --     (workspace "Weather" / "WeatherIntensity", read for your biome),
 --     eased over ~3 s so walking into the Volcano or the Gloam Hollow
 --     crossfades instead of snapping. A part tagged FogZone (a cave, or
---     FogPreset "fog") thickens that same atmosphere while you stand in it.
---     No extra particles, so Quality low does not grow a new emitter.
+--     FogPreset "fog") replaces the weather while you stand in it and holds
+--     the air to density 0.65 and brightness 0.45. No extra particles, so
+--     Quality low does not grow a new emitter. W2 parents each part to the
+--     cave's Atomic model, or a Persistent model if it is over 128 studs.
 --   * Owns (creates locally) the Atmosphere, Sky, Clouds (under
 --     workspace.Terrain, the only place they render), Bloom, colour
 --     grading, sun rays and a far blur used only on the Aether Isles.

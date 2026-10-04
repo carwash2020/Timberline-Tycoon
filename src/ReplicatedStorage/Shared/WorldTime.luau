@@ -15,7 +15,7 @@ local GameConfig = require(script.Parent.GameConfig)
 
 local WorldTime = {}
 
--- TBD (Designer): 2. Each hour from 20:00 to 04:00 takes half as long as a
+-- Approved: 2. Each hour from 20:00 to 04:00 takes half as long as a
 -- daytime hour (36 s instead of 72 s), so that stretch of night is 4.8 real
 -- minutes and the other sixteen hours fill the rest of the 24. The window
 -- sits evenly around midnight, so noon is still halfway through the day.

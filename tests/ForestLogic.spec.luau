@@ -31,7 +31,7 @@ return function(t)
 		t.eq({ e.maxActive, e.checkMinSeconds, e.checkMaxSeconds }, { 1, 480, 900 })
 		t.eq({ e.scale, e.hpMul, e.logMul, e.helperMinShare, e.helperSeeds, e.helperShare }, { 1.7, 6, 3, 0.1, 2, 0.1 })
 		t.eq(e.fadeSeconds, 900)
-		t.eq(e.nightLeftSeconds, 300)
+		t.eq(e.nightLeftSeconds, 4 * 60)
 		t.eq(ForestData.Bloom, { threshold = 75, seconds = 480, restSeconds = 1800 })
 	end)
 

@@ -499,6 +499,13 @@ end
 -- the local player is inside the part. No particles: it only nudges the
 -- atmosphere the night mist already uses, so a low quality phone does not
 -- grow a new emitter.
+--
+-- W2: put each FogZone part inside the cave's Atomic model, or in a
+-- Persistent model if the part is bigger than 128 studs.
+--
+-- Inside an active zone the weather step is skipped (a storm must not
+-- stack on the cave), and the result is held to density <= 0.65 and
+-- brightness >= 0.45.
 EnvironmentData.FogZoneTag = "FogZone"
 EnvironmentData.FogPresets = {
 	-- Darker than the hour, and thicker. A night in the open is brightness
@@ -652,9 +659,10 @@ end
 
 -- The full picture: the hour's light and its night fog (and the fog's
 -- colour while it's dark), then the biome you're in ("" or nil = open
--- country), then the weather at `intensity` (0..1), then a FogZone preset
--- at `fogWeight` (0..1) when the player is inside one. Omit the last two
--- and the picture is what it was.
+-- country), then the weather at `intensity` (0..1). Inside a FogZone
+-- (`fogWeight` > 0) the weather step is skipped and the zone's preset is
+-- applied instead; density is then held to 0.65 and brightness to at least
+-- 0.45. Omit the last two arguments and the picture is what it was.
 function EnvironmentData.Blend(
 	clockTime: number,
 	biomeId: string?,
@@ -673,18 +681,27 @@ function EnvironmentData.Blend(
 	if biome then
 		EnvironmentData.Apply(s, biome, 1)
 	end
-	local w = if weather then EnvironmentData.WeatherOverrides[weather] else nil
-	if w then
-		EnvironmentData.Apply(s, w, math.clamp(intensity or 1, 0, 1))
-	end
 	local zone = fogWeight or 0
-	if zone > 0 then
+	local inZone = zone > 0
+	-- A cave already has its own air. Stacking the weather on top (a storm
+	-- in the grove) pushes it past what you can see through.
+	if not inZone then
+		local w = if weather then EnvironmentData.WeatherOverrides[weather] else nil
+		if w then
+			EnvironmentData.Apply(s, w, math.clamp(intensity or 1, 0, 1))
+		end
+	end
+	if inZone then
 		local preset = EnvironmentData.FogPresets[EnvironmentData.FogPresetName(fogPreset)]
 		if preset then
 			EnvironmentData.Apply(s, preset, math.clamp(zone, 0, 1))
 		end
 	end
 	EnvironmentData.Clamp(s)
+	if inZone then
+		s.atmosphereDensity = math.min(s.atmosphereDensity, 0.65)
+		s.brightness = math.max(s.brightness, 0.45)
+	end
 	return s
 end
 

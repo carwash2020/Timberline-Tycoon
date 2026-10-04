@@ -31,10 +31,11 @@ return function(t)
 		t.ok(math.abs(WorldTime.ClockTime(night + FAST) - 22) < 1e-6, "a fast hour")
 		local day = WorldTime.SecondsFromMidnight(10)
 		t.ok(math.abs(WorldTime.ClockTime(day + SLOW) - 11) < 1e-6, "a slow hour")
-		-- The clock is continuous across the speed changes and midnight.
-		for _, h in ipairs({ 0, 4, 12, 19, 20, 23.5 }) do
+		-- Integer tenths, so 4.0 and 20.0 are hit exactly. Adding 0.1 drifts.
+		for i = 0, 239 do
+			local h = i / 10
 			local at = WorldTime.SecondsFromMidnight(h)
-			t.ok(math.abs(WorldTime.ClockTime(at) - (h % 24)) < 1e-6, "hour " .. h)
+			t.ok(math.abs(WorldTime.ClockTime(at) - h) < 1e-6, "hour " .. h)
 		end
 		t.eq(WorldTime.SecondsFromMidnight(24), cycle)
 	end)

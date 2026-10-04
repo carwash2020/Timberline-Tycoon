@@ -26,6 +26,7 @@
 -- Sapling) are at the bottom, with their own contract; Build, Stump and
 -- Log stay as they are for the v1 loop until the flip.
 
+local GameConfig = require(script.Parent.Parent.GameConfig)
 local TreeGen = require(script.Parent.Parent.TreeGen)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
@@ -133,9 +134,9 @@ function TreeArt.HeartColor(def: WoodDef): Color3
 	return TreeArt.Palette(def).heart
 end
 
--- One season is two in-game days (GameConfig.DayCycleMinutes is 20).
+-- One season is two in-game days.
 -- 0 spring, 1 summer (the painted colours), 2 autumn, 3 winter.
-TreeArt.SeasonSeconds = 40 * 60
+TreeArt.SeasonSeconds = 2 * GameConfig.DayCycleMinutes * 60
 
 function TreeArt.SeasonIndex(unix: number): number
 	local len = TreeArt.SeasonSeconds
