@@ -1116,7 +1116,11 @@ return function(t)
 		t.eq(#profile.plot.squares, 2)
 		t.eq(
 			s.lastToast(),
-			"That square is yours for " .. Util.formatCash(step) .. ". The next one is " .. Util.formatCash(step * 2) .. "."
+			"That square is yours for "
+				.. Util.formatCash(step)
+				.. ". The next one is "
+				.. Util.formatCash(step * 2)
+				.. "."
 		)
 		ann.standOn(nil)
 		profile.cash = 6000
