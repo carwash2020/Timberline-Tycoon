@@ -27,7 +27,7 @@ return function(t)
 		t.eq(BadgeData.IsLive(1), true)
 	end)
 
-	t.test("the list is the three firsts, eight places, and the rare woods", function()
+	t.test("the list is the three firsts, the places, and the rare woods", function()
 		t.eq(keys(), {
 			"FirstSale",
 			"FirstTruck",
@@ -40,17 +40,26 @@ return function(t)
 			"AreaSky",
 			"AreaFerry",
 			"AreaCave",
+			"AreaToll",
 			"WoodFrostwood",
 			"WoodEmberwood",
 			"WoodGloamwood",
 			"WoodLumenwood",
-			"WoodNightGlow",
+			"WoodLanternwood",
 		})
 		t.eq(BadgeData.Get("WoodGloamwood").woodId, "phantomwood")
+		-- Lanternwood is its own wood. The glow placeholder stays lumenwood.
 		t.eq(GameConfig.NightGlowWoodId, "lumenwood")
-		t.eq(BadgeData.Get("WoodNightGlow").woodId, GameConfig.NightGlowWoodId)
-		t.eq(BadgeData.ForWood("lumenwood"), { "WoodLumenwood", "WoodNightGlow" })
+		t.eq(BadgeData.Get("WoodLanternwood").name, "Lanternwood")
+		t.eq(BadgeData.Get("WoodLanternwood").woodId, "lanternwood")
+		t.eq(BadgeData.ForWood("lumenwood"), { "WoodLumenwood" })
+		t.eq(BadgeData.ForWood("lanternwood"), { "WoodLanternwood" })
 		t.eq(BadgeData.ForWood("oak"), {})
+		t.eq(BadgeData.NotBuilt, { "AreaFerry", "AreaCave", "AreaToll" })
+		for _, key in ipairs(BadgeData.NotBuilt) do
+			t.eq(BadgeData.Ids[key], 0, key)
+			t.eq(BadgeData.IsLive(BadgeData.RobloxId(key)), false, key)
+		end
 	end)
 
 	t.test("rows show locked and earned, and the wire form drops unknown keys", function()
@@ -77,6 +86,7 @@ return function(t)
 		t.eq(BadgeData.KeysFor("wood", { woodId = "frostwood" }), { "WoodFrostwood" })
 		t.eq(BadgeData.KeysFor("area", { id = "snow" }), { "AreaSnow" })
 		t.eq(BadgeData.KeysFor("area", { id = "AreaCave" }), { "AreaCave" })
+		t.eq(BadgeData.KeysFor("area", { id = "toll" }), { "AreaToll" })
 		t.eq(BadgeData.KeysFor("nope", nil), {})
 		t.eq(BadgeData.AreasAt(0, 30, 1240), { "AreaSnow" })
 		t.eq(BadgeData.AreasAt(0, 20, -110), { "AreaStarter" })
@@ -85,8 +95,11 @@ return function(t)
 		t.eq(BadgeData.AreasAt(-1050, 700, 1050), { "AreaSky" })
 		t.eq(BadgeData.AreasAt(-1050, 0, 1050), {})
 		t.eq(BadgeData.AreasAt(1395, 12, -760), { "AreaFerry" })
-		local cave = BadgeData.AreasAt(1010, 40, 1110)
-		t.eq(cave, { "AreaVolcano", "AreaCave" })
+		-- The cave on the Volcano is Cinder Cave, not the Secret Cave.
+		t.eq(BadgeData.AreasAt(1010, 40, 1110), { "AreaVolcano" })
+		local RegionLogic = t.shared("RegionLogic")
+		local rx, rz = RegionLogic.ReachCenter()
+		t.eq(BadgeData.AreasAt(rx, 20, rz), { "AreaCave" })
 		t.eq(BadgeData.AreasAt(9000, 0, 9000), {})
 	end)
 

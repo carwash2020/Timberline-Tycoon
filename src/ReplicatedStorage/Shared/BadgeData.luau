@@ -5,11 +5,10 @@
 -- for that badge, and nothing errors. Never invent an id.
 --   Creator Hub → your experience → Engagement → Badges → Create → ID
 --
--- Lumenwood is also the night-glow wood (GameConfig.NightGlowWoodId). It
--- has its own badge, and a second badge follows that config id. While the
--- config still names lumenwood, finding that wood earns both.
+-- Lanternwood is the night-glow wood, its own id ("lanternwood"). It is
+-- not lumenwood. Ferry Island, the Secret Cave, and the toll area are not
+-- built yet: those three ids stay 0, and 0 is never sent to Roblox.
 
-local GameConfig = require(script.Parent.GameConfig)
 local RegionLogic = require(script.Parent.RegionLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
@@ -55,14 +54,19 @@ BadgeData.Ids = {
 	AreaVolcano = 0, -- PASTE: Engagement → Badges → Volcano → ID
 	AreaGrove = 0, -- PASTE: Engagement → Badges → Gloam Hollow → ID
 	AreaSky = 0, -- PASTE: Engagement → Badges → Aether Isles → ID
-	AreaFerry = 0, -- PASTE: Engagement → Badges → Ferry Island → ID
-	AreaCave = 0, -- PASTE: Engagement → Badges → Secret Cave → ID
+	-- Not built yet. Leave these at 0. Awarding skips 0.
+	AreaFerry = 0,
+	AreaCave = 0,
+	AreaToll = 0,
 	WoodFrostwood = 0, -- PASTE: Engagement → Badges → Frostwood → ID
 	WoodEmberwood = 0, -- PASTE: Engagement → Badges → Emberwood → ID
 	WoodGloamwood = 0, -- PASTE: Engagement → Badges → Gloamwood → ID
 	WoodLumenwood = 0, -- PASTE: Engagement → Badges → Lumenwood → ID
-	WoodNightGlow = 0, -- PASTE: Engagement → Badges → Night Glow → ID
+	WoodLanternwood = 0, -- PASTE: Engagement → Badges → Lanternwood → ID
 } :: { [string]: number }
+
+-- Places that are not in the world yet. Their ids stay 0.
+BadgeData.NotBuilt = { "AreaFerry", "AreaCave", "AreaToll" }
 
 -- A phone tap target (InputKit.MinTouchPx). BadgeUI rows and the open
 -- button are at least this tall.
@@ -145,9 +149,16 @@ local ALL: { BadgeDef } = {
 	{
 		key = "AreaCave",
 		name = "Secret Cave",
-		detail = "Find the secret cave.",
+		detail = "Find the secret cave, past Gloam Hollow.",
 		group = "area",
 		visit = "cave",
+	},
+	{
+		key = "AreaToll",
+		name = "Toll",
+		detail = "Cross the toll into the new ground.",
+		group = "area",
+		visit = "toll",
 	},
 	{
 		key = "WoodFrostwood",
@@ -178,11 +189,11 @@ local ALL: { BadgeDef } = {
 		woodId = "lumenwood",
 	},
 	{
-		key = "WoodNightGlow",
-		name = "Night Glow",
-		detail = "Cut or sell the wood that glows after dark.",
+		key = "WoodLanternwood",
+		name = "Lanternwood",
+		detail = "Cut or sell Lanternwood. It grows on Ferry Island after dark.",
 		group = "wood",
-		woodId = GameConfig.NightGlowWoodId,
+		woodId = "lanternwood",
 	},
 }
 
@@ -208,6 +219,7 @@ local REGION_BADGE: { [string]: string } = {
 	ferry = "AreaFerry",
 	island = "AreaFerry",
 	cave = "AreaCave",
+	toll = "AreaToll",
 }
 
 function BadgeData.All(): { BadgeDef }
@@ -284,7 +296,8 @@ end
 
 -- Area badges for a world position (x, y, z). Region discs come from
 -- RegionLogic. Ferry Island is the offshore island. The secret cave is the
--- cave anchor. A spot can earn more than one (the cave sits in the Volcano).
+-- reach past Gloam Hollow, not the cave on the Volcano. The toll ground is
+-- not on the map yet, so no position earns it.
 function BadgeData.AreasAt(x: number, y: number, z: number): { string }
 	local keys: { string } = {}
 	local seen: { [string]: boolean } = {}
@@ -302,10 +315,9 @@ function BadgeData.AreasAt(x: number, y: number, z: number): { string }
 	if inside(x, z, island.x, island.z, island.radius) then
 		add("AreaFerry")
 	end
-	for _, anchor in ipairs(RegionLogic.Anchors()) do
-		if anchor.id == "cave" and inside(x, z, anchor.x, anchor.z, anchor.search) then
-			add("AreaCave")
-		end
+	local rx, rz, rr = RegionLogic.ReachCenter()
+	if inside(x, z, rx, rz, rr) then
+		add("AreaCave")
 	end
 	return keys
 end
