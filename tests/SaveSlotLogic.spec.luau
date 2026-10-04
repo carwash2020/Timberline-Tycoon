@@ -486,4 +486,77 @@ return function(t)
 		t.eq(data.permissions, { visit = true })
 		t.eq(data.questAxe, { step = 2 })
 	end)
+
+	t.test("a slot name other players can see is the filtered one, or the default", function()
+		local data = fresh()
+		local name, why = SaveSlotLogic.VisibleName(1, "  North Yard ", "North Yard")
+		t.eq(name, "North Yard", why)
+		t.eq(SaveSlotLogic.SetName(data, 1, name), true)
+		t.eq(SaveSlotLogic.Summary(data)[1].name, "North Yard")
+		t.eq(data.slots[1].name, "North Yard")
+		-- A filter failure does not keep the typed text.
+		local fallback = SaveSlotLogic.VisibleName(2, "Secret Name", nil)
+		t.eq(fallback, "Save 2")
+		t.eq(SaveSlotLogic.SetName(data, 2, fallback), true)
+		t.eq(data.slots[2].name, "Save 2")
+		t.eq(SaveSlotLogic.Summary(data)[2].name, "Save 2")
+		t.eq(SaveSlotLogic.VisibleName(1, "Hello", ""), "Save 1")
+		t.eq(SaveSlotLogic.VisibleName(1, "Hello", "####"), "####")
+		local bad, message = SaveSlotLogic.VisibleName(1, "this name is far too long", "fine")
+		t.eq(bad, nil)
+		t.ok(string.find(message, "letters", 1, true) ~= nil, message)
+	end)
+
+	t.test("a named slot says when it was saved, and loading it back restores the build", function()
+		local data = fresh()
+		data.cash = 400
+		data.plot.placed = {
+			{ uid = "cabin", blueprintId = "Cabin", x = 4, z = 8, rot = 1 },
+		}
+		data.slots[2].fresh = false
+		data.slots[2].cash = 900
+		data.slots[2].lastPlayed = 1000
+		data.slots[2].plot = {
+			claimed = true,
+			tier = 1,
+			placed = { { uid = "bench", blueprintId = "Bench", x = 2, z = 2, rot = 0 } },
+			squares = {},
+		}
+		local named, nameWhy = SaveSlotLogic.SetName(data, 1, "  North Yard ")
+		t.eq(named, true, nameWhy)
+		t.eq(SaveSlotLogic.SetName(data, 2, "Mill"), true)
+		t.eq(SaveSlotLogic.SetName(data, 1, "this name is far too long"), false)
+		t.eq(data.slots[1].name, "North Yard")
+		t.eq(SaveSlotLogic.Summary(data)[1].name, "North Yard")
+		t.eq(SaveSlotLogic.Summary(data)[2].name, "Mill")
+		t.eq(SaveSlotLogic.SavedText(1000, 1180), "Saved 3 min ago")
+		t.eq(SaveSlotLogic.SavedText(0, 1180), "Not saved")
+		t.eq(SaveSlotLogic.SavedText(1150, 1180), "Saved just now")
+
+		local world = worldFor(data)
+		local ok, why = SaveSlotLogic.Perform(data, "load", 2, 2000, Schema.Template, guidFactory(), world.hooks)
+		t.eq(ok, true, why)
+		t.eq(data.plot.placed[1].blueprintId, "Bench")
+		t.eq(data.slots[1].name, "North Yard")
+		t.eq(data.slots[1].plot.placed[1].uid, "cabin")
+		t.eq(data.slots[1].plot.placed[1].x, 4)
+
+		-- Inside the cooldown the leftover log is not written into a second slot.
+		table.insert(world.ground, { w = "oak" })
+		local again, message = SaveSlotLogic.Perform(data, "load", 1, 2010, Schema.Template, guidFactory(), world.hooks)
+		t.eq(again, false)
+		t.ok(string.find(message, "seconds", 1, true) ~= nil, message)
+		t.eq(#world.ground, 1)
+		t.eq(data.activeSlot, 2)
+		t.eq(data.plot.placed[1].blueprintId, "Bench")
+
+		data.slotCooldownUntil = 0
+		ok, why = SaveSlotLogic.Perform(data, "load", 1, 4000, Schema.Template, guidFactory(), world.hooks)
+		t.eq(ok, true, why)
+		t.eq(data.plot.placed[1].blueprintId, "Cabin")
+		t.eq(data.plot.placed[1].x, 4)
+		t.eq(data.plot.placed[1].rot, 1)
+		t.eq(data.slots[2].name, "Mill")
+		t.eq(SaveSlotLogic.NameOf(data.slots[1], 1), "North Yard")
+	end)
 end

@@ -3,6 +3,7 @@
 -- and rebuilding a saved layout on whichever slot you get.
 return function(t)
 	local Vector2, Vector3 = t.roblox.Vector2, t.roblox.Vector3
+	local spendDuring: (() -> ())? = nil
 
 	-- Just enough of Roblox's Instance for PlotService: properties, children,
 	-- attributes, and events that record their handler.
@@ -167,6 +168,9 @@ return function(t)
 							return false
 						end
 						profile.cash -= amount
+						if spendDuring then
+							spendDuring()
+						end
 						return true
 					end,
 					Refund = function(player, amount)
@@ -487,7 +491,7 @@ return function(t)
 		t.eq(profile.sawmillStock, { "SawmillRickety" })
 		t.eq(profile.cash, 200)
 		t.eq(#profile.plot.placed, 0)
-		t.eq(s.lastToast(), "Stand on your plot to build.")
+		t.eq(s.lastToast(), "You can't build on this plot.")
 	end)
 
 	t.test("claiming only works at the sign", function()
@@ -521,7 +525,7 @@ return function(t)
 		s.P.Place(ann, "Bench", 0, 0, 0)
 		t.eq(#annProfile.plot.placed, 0)
 		t.eq(annProfile.cash, 1000)
-		t.eq(s.lastToast(), "Stand on your plot to build.")
+		t.eq(s.lastToast(), "You can't build on this plot.")
 		t.eq(#bobProfile.plot.placed, 0)
 	end)
 
@@ -1067,5 +1071,128 @@ return function(t)
 		s.P.FillStep()
 		t.eq(s.lastToast(), "Saw logs into planks first.")
 		t.eq(profile.plot.placed[1].fill.units, 0, "a log does not fill")
+	end)
+
+	t.test("the land office uses the interact button and opens once the plot is claimed", function()
+		local s = setup()
+		local sign = s.plot(1):FindFirstChild("Sign")
+		local office = sign:FindFirstChild("LandOffice")
+		t.eq(office.Name, "LandOffice")
+		t.eq(office.GamepadKeyCode, t.roblox.Enum.KeyCode.ButtonX)
+		t.eq(office.KeyboardKeyCode, t.roblox.Enum.KeyCode.E)
+		t.eq(office.Enabled, false)
+		t.ok(sign:FindFirstChild("ProximityPrompt").Enabled, "the claim prompt is still the unnamed one")
+		local ann = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		t.eq(office.Enabled, true)
+		t.eq(sign:FindFirstChild("ProximityPrompt").Enabled, false)
+	end)
+
+	t.test("expanding deducts the shown price, and too little cash buys nothing", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.cash = 100
+		s.P.Expand(ann, 2, 2, 0)
+		t.eq(s.lastToast(), "Buy a square that touches your yard.")
+		t.eq(profile.plot.squares, {})
+		t.eq(profile.cash, 100)
+		s.P.Expand(ann, 2, 0, 0)
+		t.eq(profile.cash, 0)
+		t.eq(profile.plot.squares, { "2,0" })
+		t.eq(s.lastToast(), "That square is yours for $100. The next one is $3,000.")
+		t.eq(ann.attrs.PlotSquares, "2,0")
+		s.P.Expand(ann, 2, 1, 1)
+		t.eq(s.lastToast(), "You don't have enough for that square.")
+		t.eq(profile.cash, 0)
+		t.eq(#profile.plot.squares, 1)
+		profile.cash = 3000
+		s.P.Expand(ann, 2, 1, 1)
+		t.eq(profile.cash, 0)
+		t.eq(#profile.plot.squares, 2)
+		t.eq(s.lastToast(), "That square is yours for $3,000. The next one is $6,000.")
+		ann.standOn(nil)
+		profile.cash = 6000
+		s.P.Expand(ann, 0, 2, 2)
+		t.eq(s.lastToast(), "Stand on your plot to expand it.")
+		t.eq(#profile.plot.squares, 2)
+		t.eq(profile.cash, 6000)
+	end)
+
+	t.test("two rapid expands charge once and add one square", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.cash = 10000
+		local nested = 0
+		spendDuring = function()
+			nested += 1
+			if nested == 1 then
+				-- Still inside the first spend: same count, a second square.
+				s.P.Expand(ann, 2, 1, 0)
+			end
+		end
+		local ran, err = pcall(function()
+			s.P.Expand(ann, 2, 0, 0)
+		end)
+		spendDuring = nil
+		if not ran then
+			error(err)
+		end
+		t.eq(nested, 1)
+		t.eq(profile.plot.squares, { "2,0" })
+		t.eq(profile.cash, 9900)
+		-- The tap after that still quotes the old count.
+		s.P.Expand(ann, 2, 1, 0)
+		t.eq(s.lastToast(), "That price changed. Look again.")
+		t.eq(profile.plot.squares, { "2,0" })
+		t.eq(profile.cash, 9900)
+	end)
+
+	t.test("a friend cannot build until build is ticked, and a stranger with visit off is moved off", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Bench", 0, 0, 0)
+		local first = profile.plot.placed[1]
+		local annCash = profile.cash
+		bob.standOn(1)
+		s.P.Place(bob, "Bench", 20, 0, 0)
+		t.eq(s.lastToast(), "You can't build on this plot.")
+		s.P.Move(bob, first.uid, 10, 0, 0)
+		t.eq(s.lastToast(), "You can't build on this plot.")
+		t.eq(first.x, 0)
+		s.P.Sell(bob, first.uid)
+		t.eq(s.lastToast(), "You can't take that apart.")
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.cash, annCash)
+		t.eq(bobProfile.cash, 100000)
+
+		profile.permissions = { anyone = { build = true } }
+		s.P.Place(bob, "Bench", 20, 0, 0)
+		t.eq(#profile.plot.placed, 2)
+		t.eq(profile.cash, annCash, "the host does not pay")
+		t.eq(bobProfile.cash, 100000 - 80)
+		local second = profile.plot.placed[2]
+		t.eq(s.itemFolder(1):FindFirstChild(second.uid):GetAttribute("OwnerId"), 1)
+		s.P.Move(bob, first.uid, 10, 0, 1)
+		t.eq({ first.x, first.z, first.rot }, { 10, 0, 1 })
+		s.P.Sell(bob, first.uid)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.cash, annCash + 80, "the refund goes to the owner")
+		t.eq(bobProfile.cash, 100000 - 80)
+
+		profile.permissions = { anyone = { visit = false } }
+		local center = s.PlotData.Slots[1]
+		bob.standOn(1)
+		s.P.VisitStep({ bob, ann })
+		t.eq(bob.root.Position.X, center.X)
+		t.eq(bob.root.Position.Z, center.Y + 68)
+		t.eq(ann.root.Position.X, center.X)
+		t.eq(ann.root.Position.Z, center.Y)
 	end)
 end

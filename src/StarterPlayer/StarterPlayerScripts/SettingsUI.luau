@@ -4,12 +4,18 @@
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
 -- volume stepper; graphics, camera shake, UI scale and tips apply at once
 -- and save (SaveSetting). Reset tutorial asks twice, then ResetTutorial.
--- On a gamepad DPadRight opens it and B closes it.
+-- Visitors is the plot permission list. On a gamepad DPadRight opens the
+-- card, the D-pad moves between the rows, B on Visitors returns to the
+-- game list, and B or Esc closes the card.
 
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local CameraShake = require(script.Parent.CameraShake)
@@ -60,7 +66,7 @@ function SettingsUI.Start()
 	UITheme.padding(card.face, inset, inset, inset, inset)
 	card.outer.Name = "Settings"
 	card.outer.Visible = false
-	card.outer.Size = UDim2.fromOffset(280, 420)
+	card.outer.Size = UDim2.fromOffset(280, 300)
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Rows"
 	scroll.BackgroundTransparency = 1
@@ -84,24 +90,157 @@ function SettingsUI.Start()
 
 	local rowSpec = UITheme.Sized("SettingsToggle")
 	local rowSize = rowSpec.size or Vector2.new(248, 44)
+	local tap = math.max(rowSize.Y, PermissionLogic.Tap, UITheme.Size.Tap)
 	local firstFace: GuiButton? = nil
 	local resetArmed = false
+	local tabName = "game"
+	local visitorTarget = PermissionLogic.Anyone
+	local gameRows: { GuiObject } = {}
 
-	local function row(name: string, text: string, onPress: () -> ()): TextButton
+	local function makeButton(
+		parent: Instance,
+		name: string,
+		text: string,
+		style: string,
+		onPress: () -> ()
+	): UITheme.Button
 		local button = UITheme.Button({
 			name = name,
 			text = text,
-			size = Vector2.new(rowSize.X, math.max(rowSize.Y, UITheme.Size.Tap)),
-			style = "buy",
+			size = Vector2.new(rowSize.X, tap),
+			style = style,
 			textSize = rowSpec.text,
 		})
-		button.root.Parent = scroll
+		button.root.Parent = parent
 		button.face.Activated:Connect(onPress)
-		if firstFace == nil then
-			firstFace = button.face
-		end
+		return button
+	end
+
+	local function row(name: string, text: string, onPress: () -> ()): TextButton
+		local button = makeButton(scroll, name, text, "buy", onPress)
+		button.root.LayoutOrder = 10
+		table.insert(gameRows, button.root)
 		return button.face
 	end
+
+	local visitors = Instance.new("Frame")
+	visitors.Name = "Visitors"
+	visitors.BackgroundTransparency = 1
+	visitors.Size = UDim2.fromScale(1, 0)
+	visitors.AutomaticSize = Enum.AutomaticSize.Y
+	visitors.Visible = false
+	visitors.LayoutOrder = 50
+	UITheme.list(visitors, 6)
+	visitors.Parent = scroll
+
+	local gameTab: UITheme.Button
+	local visitorTab: UITheme.Button
+
+	local function permissions(): { [string]: PermissionLogic.Row }
+		return PermissionLogic.Decode(player:GetAttribute("PlotPermissions"))
+	end
+
+	local function people(): { { id: string, label: string } }
+		local list = { { id = PermissionLogic.Anyone, label = "Anyone" } }
+		local seen: { [string]: boolean } = { [PermissionLogic.Anyone] = true }
+		for _, other in ipairs(Players:GetPlayers()) do
+			if other ~= player then
+				local id = tostring(other.UserId)
+				if not seen[id] then
+					seen[id] = true
+					local label = if other.DisplayName ~= "" then other.DisplayName else other.Name
+					table.insert(list, { id = id, label = label })
+				end
+			end
+		end
+		for key in pairs(permissions()) do
+			if not seen[key] and PermissionLogic.Target(key) == key then
+				seen[key] = true
+				table.insert(list, { id = key, label = "Player " .. key })
+			end
+		end
+		return list
+	end
+
+	local function rebuildVisitors()
+		for _, child in ipairs(visitors:GetChildren()) do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+		local known = false
+		for _, person in ipairs(people()) do
+			if person.id == visitorTarget then
+				known = true
+			end
+		end
+		if not known then
+			visitorTarget = PermissionLogic.Anyone
+		end
+		local sheet = permissions()
+		for _, person in ipairs(people()) do
+			local picked = person.id == visitorTarget
+			local who = person
+			makeButton(
+				visitors,
+				"Who" .. who.id,
+				if picked then who.label .. "  ·" else who.label,
+				if picked then "bark" else "skip",
+				function()
+					visitorTarget = who.id
+					rebuildVisitors()
+				end
+			)
+		end
+		for _, flag in ipairs(PermissionLogic.Flags) do
+			local on = PermissionLogic.Stored(sheet, visitorTarget, flag)
+			local label = PermissionLogic.Label[flag] or flag
+			local name = flag
+			makeButton(
+				visitors,
+				"Flag" .. name,
+				string.format("%s: %s", label, if on then "ON" else "OFF"),
+				if on then "buy" else "skip",
+				function()
+					local current = PermissionLogic.Stored(permissions(), visitorTarget, name)
+					Net.Remote("SetPermission"):FireServer(visitorTarget, name, not current)
+				end
+			)
+		end
+	end
+
+	local function showTab(name: string)
+		if not SettingsLogic.HasTab(name) then
+			return
+		end
+		tabName = name
+		local visitorsOn = name == "visitors"
+		for _, rowRoot in ipairs(gameRows) do
+			rowRoot.Visible = not visitorsOn
+		end
+		visitors.Visible = visitorsOn
+		gameTab:SetStyle(if visitorsOn then "skip" else "buy")
+		visitorTab:SetStyle(if visitorsOn then "buy" else "skip")
+		if visitorsOn then
+			rebuildVisitors()
+			local first = visitors:FindFirstChildWhichIsA("GuiButton", true)
+			if first and UITheme.Device() == "console" then
+				GuiService.SelectedObject = first
+			end
+		elseif firstFace and UITheme.Device() == "console" then
+			GuiService.SelectedObject = firstFace
+		end
+	end
+
+	gameTab = makeButton(scroll, "TabGame", "GAME", "buy", function()
+		showTab("game")
+	end)
+	gameTab.root.LayoutOrder = 1
+	visitorTab = makeButton(scroll, "TabVisitors", "VISITORS", "skip", function()
+		showTab("visitors")
+	end)
+	visitorTab.root.LayoutOrder = 2
+	firstFace = gameTab.face
 
 	local musicFace: TextButton
 	local musicVolFace: TextButton
@@ -220,6 +359,18 @@ function SettingsUI.Start()
 	for _, attr in pairs(SettingsLogic.Attributes) do
 		player:GetAttributeChangedSignal(attr):Connect(applyAll)
 	end
+	player:GetAttributeChangedSignal("PlotPermissions"):Connect(function()
+		if tabName == "visitors" then
+			rebuildVisitors()
+		end
+	end)
+	local function refreshPeople()
+		if tabName == "visitors" and card.outer.Visible then
+			rebuildVisitors()
+		end
+	end
+	Players.PlayerAdded:Connect(refreshPeople)
+	Players.PlayerRemoving:Connect(refreshPeople)
 	applyAll()
 
 	local function toggle()
@@ -233,6 +384,40 @@ function SettingsUI.Start()
 	HUD.PadShortcut(Enum.KeyCode.DPadRight, function()
 		return open.Visible
 	end, toggle)
+	local SETTINGS_NAV = "SettingsNav"
+	card.outer:GetPropertyChangedSignal("Visible"):Connect(function()
+		if not card.outer.Visible then
+			ContextActionService:UnbindAction(SETTINGS_NAV)
+			if tabName ~= "game" then
+				showTab("game")
+			end
+			return
+		end
+		ContextActionService:BindActionAtPriority(
+			SETTINGS_NAV,
+			function(_name, state, input)
+				if state ~= Enum.UserInputState.Begin or not card.outer.Visible then
+					return Enum.ContextActionResult.Pass
+				end
+				local code = input.KeyCode
+				local back = code == InputKit.Actions.Cancel.gamepad
+				local esc = code == InputKit.Actions.Cancel.keyboard
+				if tabName == "visitors" and back then
+					showTab("game")
+					return Enum.ContextActionResult.Sink
+				end
+				if back or esc then
+					card.outer.Visible = false
+					return Enum.ContextActionResult.Sink
+				end
+				return Enum.ContextActionResult.Pass
+			end,
+			false,
+			Enum.ContextActionPriority.High.Value + 20,
+			InputKit.Actions.Cancel.keyboard,
+			InputKit.Actions.Cancel.gamepad
+		)
+	end)
 	local glyph = HUD.PadGlyph(Enum.KeyCode.DPadRight, open)
 	glyph.LayoutOrder = open.LayoutOrder - 1
 	glyph.Parent = open.Parent

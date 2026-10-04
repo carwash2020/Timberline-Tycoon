@@ -2,6 +2,9 @@
 -- PlotData: plots and blueprints (GAME_DESIGN §9, §10). Where the plots
 -- are, the base tiers that grow a plot, and every blueprint you can place.
 -- Tuning = editing this table (placement rules are in PlotLogic).
+-- The five tiers stay the base yard and what each blueprint needs.
+-- Squares past that yard are bought outward (PlotLogic), up to PlotGrid
+-- by PlotGrid of PlotSquare studs, each one pricier than the last.
 --
 -- Placed items are saved in plot-local studs: (x, z) is the item's centre
 -- relative to the plot's centre, rot is 0-3 quarter turns. A plot's area is

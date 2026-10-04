@@ -1,5 +1,6 @@
 --!strict
--- PlotDoors: the owner toggles a door or a gate. The server moves the leaf
+-- PlotDoors: the owner, or someone they allowed to interact, toggles a door
+-- or a gate. The server moves the leaf
 -- collider and sets Open. Clients tween the visual. A placed piece in the
 -- open quarter refuses the open. A character in the doorway refuses the shut.
 
@@ -194,11 +195,17 @@ function PlotDoors.Toggle(
 	placed: { PlotLogic.Placed },
 	plotCFrame: CFrame,
 	folder: Instance,
-	now: number
+	now: number,
+	allowed: boolean?
 ): (boolean, string?)
 	local owner = model:GetAttribute("OwnerId")
-	local ok, why =
-		DoorLogic.MayToggle(if type(owner) == "number" then owner else -1, player.UserId, now, lastAt[item.uid])
+	local ok, why = DoorLogic.MayToggle(
+		if type(owner) == "number" then owner else -1,
+		player.UserId,
+		now,
+		lastAt[item.uid],
+		allowed
+	)
 	if not ok then
 		return false, if why == "owner" then nil else nil
 	end
