@@ -3,12 +3,18 @@
 -- and the D-pad (plus arrows) changes X and Y without taking the HUD's keys.
 return function(t)
 	local Enum = t.roblox.Enum
+	local Vector2 = t.roblox.Vector2
 	local modalLog = {}
+	-- GetGuiInset's top left. ScreenGui.AbsolutePosition is not this.
+	local guiInset = Vector2.zero
 	local loader = t.loader({
 		services = {
 			GuiService = {
 				IsTenFootInterface = function()
 					return false
+				end,
+				GetGuiInset = function()
+					return guiInset
 				end,
 			},
 			Players = { LocalPlayer = {} },
@@ -99,9 +105,11 @@ return function(t)
 	end)
 
 	t.test("opening sets the modal from the card, and the card clears the column and the hotbar", function()
-		local Vector2 = t.roblox.Vector2
 		local panel = Controller.BuildPanel(false)
-		panel.gui.AbsolutePosition = Vector2.new(0, 0)
+		-- A decoy: the engine can report this as (0, 0), and either way it
+		-- is not the inset. GetGuiInset is.
+		guiInset = Vector2.zero
+		panel.gui.AbsolutePosition = Vector2.new(400, 250)
 		panel.root.AbsolutePosition = Vector2.new(300, 90)
 		panel.root.AbsoluteSize = Vector2.new(240, 200)
 		Controller._open(panel)
@@ -114,10 +122,11 @@ return function(t)
 		Controller._close()
 		t.eq(modalLog[#modalLog].rect, nil)
 
-		-- A 58 px top inset: the card's position is inside the safe screen,
-		-- and the rect HUD gets is that box on the full screen.
+		-- A 58 px top inset from GetGuiInset. The card's position is inside
+		-- the safe screen, and the rect HUD gets is that box on the full screen.
 		local inset = 58
-		panel.gui.AbsolutePosition = Vector2.new(0, inset)
+		guiInset = Vector2.new(0, inset)
+		panel.gui.AbsolutePosition = Vector2.new(0, 0)
 		panel.root.AbsolutePosition = Vector2.new(120, 40)
 		panel.root.AbsoluteSize = Vector2.new(200, 160)
 		Controller._open(panel)
@@ -148,5 +157,123 @@ return function(t)
 			t.ok(box.bottom <= c.h - hotbar, label .. " hotbar")
 			t.ok(box.top >= 0 and box.left >= 0 and box.right <= c.w, label .. " on screen")
 		end
+	end)
+
+	t.test("a 58 px inset keeps the card's on-screen bottom at or above the hotbar on a 667x375 phone", function()
+		local roblox = t.roblox
+		local UDim2 = roblox.UDim2
+		local signals = _G.__screenGuiSignals
+		if not signals then
+			signals = {}
+			_G.__screenGuiSignals = signals
+			pcall(roblox.implementMethod, "ScreenGui", "GetPropertyChangedSignal", function(self, prop)
+				local listeners = {}
+				local ev = {
+					Connect = function(_, fn)
+						table.insert(listeners, fn)
+						return { Disconnect = function() end }
+					end,
+					Fire = function()
+						for _, fn in ipairs(listeners) do
+							fn()
+						end
+					end,
+				}
+				signals[self] = signals[self] or {}
+				signals[self][prop] = ev
+				return ev
+			end)
+		end
+		pcall(roblox.implementProperty, "TextButton", "Activated", function()
+			return {
+				Connect = function()
+					return { Disconnect = function() end }
+				end,
+			}
+		end)
+		local function signal()
+			return {
+				Connect = function()
+					return { Disconnect = function() end }
+				end,
+			}
+		end
+		local inset = 58
+		local viewportH = 375
+		local camera = { ViewportSize = Vector2.new(667, viewportH) }
+		local attributes = { CoreLoopActive = 2 }
+		local phonePlayer = roblox.Instance.new("Folder")
+		local pg = roblox.Instance.new("Folder")
+		pg.Name = "PlayerGui"
+		pg.Parent = phonePlayer
+		local phoneInset = Vector2.new(0, inset)
+		local phoneLoader = t.loader({
+			services = {
+				GuiService = {
+					IsTenFootInterface = function()
+						return false
+					end,
+					GetGuiInset = function()
+						return phoneInset
+					end,
+				},
+				Players = { LocalPlayer = phonePlayer },
+				UserInputService = {
+					TouchEnabled = true,
+					KeyboardEnabled = false,
+					InputBegan = signal(),
+				},
+				TextChatService = {},
+				CollectionService = {
+					GetTagged = function()
+						return {}
+					end,
+					GetInstanceAddedSignal = function()
+						return signal()
+					end,
+				},
+			},
+			globals = {
+				workspace = {
+					CurrentCamera = camera,
+					GetAttribute = function(_, name)
+						return attributes[name]
+					end,
+				},
+			},
+			mocks = {
+				HUD = {
+					SetModal = function() end,
+				},
+			},
+		})
+		local UITheme = phoneLoader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		local PhoneLogic = phoneLoader:shared("SawmillLogic")
+		local Phone = phoneLoader:load("StarterPlayer/StarterPlayerScripts/SawmillController")
+		Phone.Start()
+		local gui = pg:FindFirstChild("SawmillCut")
+		t.ok(gui, "the cut screen")
+		local root = gui:FindFirstChild("Card")
+		t.ok(root, "the card")
+		-- The safe screen is the viewport minus the top inset. AbsolutePosition
+		-- stays (0, 0), which is what the engine can report.
+		gui.AbsolutePosition = Vector2.new(0, 0)
+		gui.AbsoluteSize = Vector2.new(667, viewportH - inset)
+		root.AbsolutePosition = Vector2.new(0, 0)
+		root.AbsoluteSize = Vector2.new(10, 10)
+		Phone._open()
+		root.Position = UDim2.fromOffset(0, viewportH)
+		local watched = signals[gui]
+		t.ok(watched and watched.AbsoluteSize, "the card listens for its screen size")
+		watched.AbsoluteSize:Fire()
+		local size = gui.AbsoluteSize
+		local scale = UITheme.ScaleFor(size, true, false)
+		local _, cardH = PhoneLogic.CardSize(false)
+		local onScreenBottom = phoneInset.Y + root.Position.Y.Offset + cardH * scale
+		local hotbar = viewportH - UITheme.Bottom()
+		t.ok(
+			onScreenBottom <= hotbar + 1e-4,
+			"on-screen bottom " .. tostring(onScreenBottom) .. " hotbar " .. tostring(hotbar)
+		)
 	end)
 end

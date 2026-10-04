@@ -211,27 +211,42 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	return { gui = gui, root = root, readout = readout, buttons = buttons, close = close }
 end
 
+-- Top-left of the core-UI inset. HUD's screen ignores the inset, so a
+-- modal box in full-screen pixels starts here. ScreenGui.AbsolutePosition
+-- can read (0, 0) for an inset screen; GetGuiInset is the same edge
+-- UITheme.TopBar already reads.
+local function insetOrigin(): Vector2
+	local topLeft = Vector2.zero
+	local ok, inset = pcall(function()
+		return GuiService:GetGuiInset()
+	end)
+	if ok and typeof(inset) == "Vector2" then
+		topLeft = inset
+	end
+	return topLeft
+end
+
 -- The card lives in a CoreUISafeInsets screen. Its AbsolutePosition is
--- inside that screen. HUD's screen ignores the inset, so the modal box
--- is the card plus the inset screen's top-left, in full-screen pixels.
+-- inside that screen, so the modal box is the card plus the inset origin.
 local function modalRect(root: Frame): { left: number, top: number, right: number, bottom: number }
 	local at, size = root.AbsolutePosition, root.AbsoluteSize
-	local gui = root:FindFirstAncestorOfClass("ScreenGui")
-	local origin = if gui then gui.AbsolutePosition else Vector2.zero
+	local origin = insetOrigin()
 	local x, y = at.X + origin.X, at.Y + origin.Y
 	return { left = x, top = y, right = x + size.X, bottom = y + size.Y }
 end
 
--- Screen pixels. The card misses the left column and the hotbar.
+-- Screen pixels inside the inset SawmillCut gui. Its AbsoluteSize is the
+-- safe rect, not the camera viewport: the hotbar floor from the viewport
+-- sits one inset too low, and the card lands on the hotbar.
 local function placeCard(root: Frame, tenFoot: boolean)
-	local ok, camera = pcall(function(): any
-		return (workspace :: any).CurrentCamera
-	end)
-	if not ok or typeof(camera) ~= "Instance" then
+	local gui = root:FindFirstAncestorOfClass("ScreenGui")
+	if not gui then
 		return
 	end
-	local viewport = (camera :: Camera).ViewportSize
-	if viewport.X <= 0 or viewport.Y <= 0 then
+	local ok, size = pcall(function()
+		return gui.AbsoluteSize
+	end)
+	if not ok or typeof(size) ~= "Vector2" or size.X <= 0 or size.Y <= 0 then
 		return
 	end
 	local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
@@ -239,7 +254,7 @@ local function placeCard(root: Frame, tenFoot: boolean)
 	pcall(function()
 		ten = GuiService:IsTenFootInterface() == true
 	end)
-	local scale = UITheme.ScaleFor(viewport, handheld, ten or tenFoot)
+	local scale = UITheme.ScaleFor(size, handheld, ten or tenFoot)
 	if scale <= 0 then
 		return
 	end
@@ -251,12 +266,22 @@ local function placeCard(root: Frame, tenFoot: boolean)
 		hotbar = UITheme.Bottom()
 	end)
 	local column = { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
-	local box = SawmillLogic.PlaceCard(viewport.X, viewport.Y, sw, sh, column, viewport.Y - hotbar)
+	local box = SawmillLogic.PlaceCard(size.X, size.Y, sw, sh, column, size.Y - hotbar)
 	root.AnchorPoint = Vector2.new(0, 0)
 	root.Position = UDim2.fromOffset(box.left, box.top)
 end
 
 local built: Panel? = nil
+
+-- The open card, again, after the inset screen changes size.
+local function refreshCard()
+	local panel = built
+	if not panel or not panel.gui.Enabled then
+		return
+	end
+	placeCard(panel.root, GuiService:IsTenFootInterface())
+	HUD.SetModal(modalRect(panel.root))
+end
 
 local function readoutText(mill: Model): string
 	local x = mill:GetAttribute("CutX")
@@ -407,6 +432,7 @@ function SawmillController.Start()
 			end)
 		end
 		panel.close.Activated:Connect(closePanel)
+		panel.gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshCard)
 	end
 	if not listening then
 		listening = true
@@ -425,6 +451,7 @@ function SawmillController._open(panel: Panel?)
 		return
 	end
 	use.gui.Enabled = true
+	placeCard(use.root, GuiService:IsTenFootInterface())
 	selected = use.buttons[1]
 	GuiService.SelectedObject = use.buttons[1]
 	HUD.SetModal(modalRect(use.root))

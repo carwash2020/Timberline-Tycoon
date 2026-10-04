@@ -109,6 +109,9 @@ return function(t)
 	t.test("a 58 px top inset keeps the build bar's on-screen top at 141 on a 667x375 phone", function()
 		local roblox = t.roblox
 		local watched = {}
+		-- Later specs fire the same ScreenGui signal. The method can only
+		-- be registered once, so the events live on this shared table.
+		_G.__screenGuiSignals = watched
 		pcall(roblox.implementProperty, "TextButton", "Activated", function()
 			return {
 				Connect = function()
