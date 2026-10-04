@@ -189,12 +189,23 @@ function BlueprintModels.ApplyWood(model: Model, woodId: string?)
 		return
 	end
 	local color, material = TreeArt.Core(def)
+	local lantern = woodId == WoodData.LanternId
+	if lantern then
+		if not model:HasTag("Lanternwood") then
+			model:AddTag("Lanternwood")
+		end
+		model:SetAttribute("NightHost", "plank")
+		model:SetAttribute("WoodId", woodId)
+	end
 	for _, child in ipairs(model:GetDescendants()) do
 		if child:IsA("BasePart") then
 			local role = child:GetAttribute("Role")
 			if role == "Wood" or role == "Door" then
 				child.Color = color
 				child.Material = material
+				if lantern then
+					child:SetAttribute("NightGlow", true)
+				end
 			end
 		end
 	end

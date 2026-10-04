@@ -93,7 +93,18 @@ local TRUCKS = sortedByPrice(ItemCatalog.Trucks)
 local TRAILERS = sortedByPrice(ItemCatalog.Trailers)
 local BOATS = sortedByPrice(ItemCatalog.Boats)
 local GEAR = sortedByPrice(ItemCatalog.Gear)
-local WOODS = WoodData.All()
+-- Ferry Island is not on the buying path (W2 owns the biome). Leaving
+-- lanternwood out holds the published headlines. TBD (Designer).
+local function economyWoods()
+	local list = {}
+	for _, wood in ipairs(WoodData.All()) do
+		if wood.biome ~= WoodData.LanternBiome then
+			table.insert(list, wood)
+		end
+	end
+	return list
+end
+local WOODS = economyWoods()
 
 -- math.huge when the axe can't cut the wood (hardness >= damage).
 local function hitsToFell(axe, wood): number

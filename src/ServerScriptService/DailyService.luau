@@ -36,13 +36,12 @@ local QuestService = require(script.Parent.QuestService)
 type Profile = ProfileService.Profile
 type Goal = DailyData.Goal
 
-export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold" | "seedPlanted" | "figuredSold"
+export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold" | "figuredSold"
 
 local DailyService = {}
 
 -- The goal kind each event counts toward, one per tree or log.
--- ForestService reports figuredSold (figured logs sold). seedPlanted is
--- still accepted and counts for nothing.
+-- ForestService reports figuredSold (figured logs sold).
 local COUNTED_BY: { [DailyEvent]: DailyData.GoalKind } = {
 	treeFelled = "fell",
 	logsLoaded = "load",

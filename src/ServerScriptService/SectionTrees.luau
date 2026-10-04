@@ -53,7 +53,7 @@
 -- Model contract (CutController, WoodFX, WindSway, CanopyFade, ForestUI):
 -- tag Tree, in TimberlineMap/Trees, Atomic; FromSkeleton's parts and
 -- attributes (WoodId, Seed, Stage, Scale, Elder, Felled, Dormant,
--- PlanterId, Uid) plus HomePivot (its PrimaryPart's CFrame), SwayTop (the
+-- Uid) plus HomePivot (its PrimaryPart's CFrame), SwayTop (the
 -- top of its trunk, where the crown rocks about), Sapling (true while a
 -- sapling), GrewAt (server time it last grew: the regrow spring),
 -- PreDead, Dead and DeadAt (server time: the death sink), HP (1 while it
@@ -129,7 +129,6 @@ export type TreeRecord = {
 	regrowAt: number?,
 	heldUntil: number?,
 	seed: number,
-	planterId: number?,
 	damageBy: { [number]: number }, -- damage each player has done to this growth
 	claim: SectionLogic.Claim?, -- who is cutting it (SectionLogic.ClaimBlocks), nil = nobody
 	temporary: boolean, -- an Elder: gone once felled or faded
@@ -162,7 +161,6 @@ export type TreeRecord = {
 export type SpawnOptions = {
 	seed: number?,
 	size: TreeLogic.SizeClass?, -- an Elder passes ForestLogic.ElderSize (name "elder")
-	planterId: number?,
 	temporary: boolean?,
 	boot: boolean?, -- a site planted at server start: GrowLogic.BootAge
 	stage: number?, -- start at this stage (0 sapling ... 1 mature; default mature)
@@ -504,12 +502,20 @@ local function rebuild(rec: TreeRecord, grew: boolean)
 		model:SetAttribute("Elder", rec.elder)
 		model:SetAttribute("Felled", false)
 		model:SetAttribute("Dormant", false)
-		model:SetAttribute("PlanterId", rec.planterId or 0)
 		model:SetAttribute("Sapling", true)
+		if def.id == WoodData.LanternId then
+			model:AddTag("Lanternwood")
+			model:SetAttribute("NightHost", "tree")
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") and (d.Name == "Leaves" or d.Name == "Facet" or d.Name == "CoreBand") then
+					d:SetAttribute("NightGlow", true)
+				end
+			end
+		end
 	else
 		local staged = TreeGen.AtStage(rec.skel, rec.stage)
 		skel = staged
-		model = TreeArt.FromSkeleton(def, staged, { uid = rec.uid, planterId = rec.planterId })
+		model = TreeArt.FromSkeleton(def, staged, { uid = rec.uid })
 	end
 	rec.builds += 1
 	counters[def.id] = (counters[def.id] or 0) + 1
@@ -629,7 +635,6 @@ function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOp
 		regrowAt = nil,
 		heldUntil = nil,
 		seed = seed,
-		planterId = opts.planterId,
 		damageBy = {},
 		claim = nil,
 		temporary = opts.temporary == true,
@@ -819,7 +824,7 @@ function SectionTrees.HoldRegrow(uid: string, seconds: number)
 end
 
 -- Grows an open slot back, at a new spot in its zone. See tryRegrow.
-function SectionTrees.Regrow(uid: string, _planterId: number?, _opts: RegrowOptions?)
+function SectionTrees.Regrow(uid: string, _opts: RegrowOptions?)
 	local rec = trees[uid]
 	if not rec or not rec.slot then
 		return
@@ -1051,7 +1056,6 @@ local function split(
 		ownerId = ownerId,
 		boost = boost,
 		lux = luxSwing == true,
-		planterId = rec.planterId,
 		treeUid = rec.uid,
 		elder = rec.elder,
 		fall = { cutter = player, dir = dir, felled = felled, pivot = pivot },
@@ -1445,7 +1449,6 @@ tryRegrow = function(rec: TreeRecord, now: number)
 	rec.skel = TreeGen.Skeleton(rec.def.id, seed, scale, { elder = rec.elder })
 	rec.base = pos
 	rec.homeCf = CFrame.new(pos) * CFrame.Angles(0, yaw, 0)
-	rec.planterId = nil
 	rec.felled = false
 	rec.slot = false
 	rec.regrowAt = nil

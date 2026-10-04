@@ -97,6 +97,7 @@ TreeGen.Budgets = {
 	emberwood = 42,
 	phantomwood = 44,
 	lumenwood = 40,
+	lanternwood = 48, -- tightened after a part-count pass; TBD (Builder)
 } :: { [string]: number }
 TreeGen.DefaultBudget = 48
 
@@ -110,6 +111,14 @@ TreeGen.Stages = { 0.25, 0.5, 0.75, 1 }
 TreeGen.SizeScales = { small = 0.85, normal = 1, large = 1.15 } :: { [string]: number }
 TreeGen.WispSize = 4.2 -- a gloamwood wisp's size at scale 1
 TreeGen.TierOverlap = 0.42 -- of a conifer tier's height, inside the next one up
+-- Lanternwood's thin heartwood collar. TBD (Builder).
+TreeGen.CoreBandAlong = 0.42 -- along the first trunk section. TBD (Builder)
+TreeGen.CoreBandStep = 0.16 -- the next collar sits this much further up. TBD (Builder)
+TreeGen.CoreBandAlongLo = 0.2 -- TBD (Builder)
+TreeGen.CoreBandAlongHi = 0.8 -- TBD (Builder)
+TreeGen.CoreBandThin = 0.14 -- of the trunk's thickness, along the trunk. TBD (Builder)
+TreeGen.CoreBandMin = 0.22 -- studs, the collar never thinner than this. TBD (Builder)
+TreeGen.CoreBandOver = 1.08 -- diameter over the trunk, so the collar shows. TBD (Builder)
 
 -- The look of each canopy, beyond the shape data (art tuning, not balance).
 -- A leafy crown is a few leaf masses, each a lumpy blob of parts sized to
@@ -220,6 +229,22 @@ local LOOKS: { [string]: Look } = {
 		fill = 99,
 		rise = 0.08,
 		out = 0.22,
+	},
+	-- Compact broadleaf. TBD (Builder).
+	lanternwood = {
+		leafShare = 0.6, -- TBD (Builder)
+		size = 1.1, -- TBD (Builder)
+		clusterY = 0.8, -- TBD (Builder)
+		lift = 0.16, -- TBD (Builder)
+		merge = 0.75, -- TBD (Builder)
+		massParts = 4, -- TBD (Builder)
+		maxParts = 6, -- TBD (Builder)
+		maxGrow = 1.6, -- TBD (Builder)
+		flatten = 0.2, -- TBD (Builder)
+		layers = 0, -- TBD (Builder)
+		fill = 0.7, -- TBD (Builder)
+		rise = 0.28, -- TBD (Builder)
+		out = 0.08, -- TBD (Builder)
 	},
 	lumenwood = {
 		leafShare = 0.62,
@@ -332,7 +357,11 @@ type Layout = { cf: { CFrame }, top: { Vector3 }, length: { number } }
 
 -- The details (non-leaf dress) a wood always carries, and how many parts.
 local function detailParts(shape: Shape): number
-	local n = (shape.flares or 0) + (shape.barkMarks or 0) + (shape.cracks or 0) + (shape.veins or 0)
+	local n = (shape.flares or 0)
+		+ (shape.barkMarks or 0)
+		+ (shape.cracks or 0)
+		+ (shape.veins or 0)
+		+ (shape.coreBands or 0)
 	if shape.canopy == "fronds" then
 		n += (shape.fronds or 0) * 2 + (shape.coconuts or 0) + (shape.rings or 0)
 	elseif shape.canopy == "wisps" then
@@ -599,6 +628,35 @@ local function flares(root: Section, count: number, rng: Rng): { Dress }
 			size = Vector3.new(wide, tall, long),
 			parts = 1,
 			seed = rng:int(1, 1e6),
+		})
+	end
+	return out
+end
+
+-- A thin collar around the first trunk section. Day-plain; the client
+-- turns a Lanternwood collar neon at night. One part per band.
+local function coreBandDress(sections: { Section }, count: number): { Dress }
+	local out: { Dress } = {}
+	local s = sections[1]
+	if not s or count <= 0 then
+		return out
+	end
+	for i = 1, count do
+		local along = math.clamp(
+			TreeGen.CoreBandAlong + (i - 1) * TreeGen.CoreBandStep,
+			TreeGen.CoreBandAlongLo,
+			TreeGen.CoreBandAlongHi
+		)
+		local length = math.max(TreeGen.CoreBandMin, s.thickness * TreeGen.CoreBandThin)
+		local diameter = s.thickness * TreeGen.CoreBandOver
+		local cf = s.cf * CFrame.new(0, s.length * along, 0) * CFrame.Angles(0, 0, math.pi / 2)
+		table.insert(out, {
+			kind = "coreband",
+			section = s.id,
+			cf = cf,
+			size = Vector3.new(length, diameter, diameter),
+			parts = 1,
+			seed = i,
 		})
 	end
 	return out
@@ -1163,6 +1221,9 @@ local function dressUp(plan: Plan, k: number): { Section }
 	end
 	if shape.veins then
 		add(barkStrips(sections, shape.trunkSegments, "vein", shape.veins, rng))
+	end
+	if (shape.coreBands or 0) > 0 then
+		add(coreBandDress(sections, shape.coreBands or 0))
 	end
 	if isConifer(shape) then
 		add(coniferDress(sections, shape, plan.scale, plan.budget - #sections - detailParts(shape), rng))

@@ -66,6 +66,7 @@ return function(t)
 		Coconut = true,
 		Pod = true,
 		PodStem = true,
+		CoreBand = true,
 	}
 
 	local function build(id, seed, scale, stage)
@@ -296,7 +297,7 @@ return function(t)
 			t.eq(model:GetAttribute("Elder"), false)
 			t.eq(model:GetAttribute("Felled"), false)
 			t.eq(model:GetAttribute("Dormant"), false)
-			t.eq(model:GetAttribute("PlanterId"), 7)
+			t.eq(model:GetAttribute("PlanterId"), nil)
 			t.eq(model:GetAttribute("Uid"), "t1")
 			-- Ground at y = 0: the trunk's foot.
 			local low = math.huge
@@ -408,9 +409,20 @@ return function(t)
 			t.ok(neon(model) >= 2, id .. " glows")
 			t.ok(light(model), id .. " has its light")
 		end
-		for _, id in ipairs({ "oak", "birch", "pine", "maple", "frostwood" }) do
+		for _, id in ipairs({ "oak", "birch", "pine", "maple", "frostwood", "lanternwood" }) do
 			t.eq(neon(build(id, 1, 1)), 0, id .. " has no neon")
 		end
+		local lantern = build("lanternwood", 1, 1)
+		t.ok(not light(lantern), "lanternwood's light is client-only")
+		local bands = 0
+		for _, p in ipairs(parts(lantern)) do
+			if p.Name == "CoreBand" then
+				bands += 1
+				t.eq(p:GetAttribute("NightGlow"), true)
+				t.eq(p.Material, Enum.Material.Wood)
+			end
+		end
+		t.eq(bands, 1, "one thin core band")
 	end)
 
 	t.test("a cut face is a thin plate of the wood's core, proud of the end", function()

@@ -207,6 +207,7 @@ return function(t)
 			emberwood = 42,
 			phantomwood = 44,
 			lumenwood = 40,
+			lanternwood = 48,
 		})
 		local line = {}
 		for _, def in ipairs(woods) do

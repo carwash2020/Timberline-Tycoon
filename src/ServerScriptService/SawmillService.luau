@@ -408,6 +408,24 @@ local function poll(c: Context, now: number)
 	end
 end
 
+-- The owner is online: tell MilestoneService a plank was made. BadgeService
+-- listens there. No per-second scan of loose wood. A missing Players stub
+-- (some specs) is not an error, and an offline owner earns nothing.
+local function notePlank(ownerId: number)
+	local ok, players = pcall(function(): any
+		return game:GetService("Players")
+	end)
+	if not ok or players == nil or type((players :: any).GetPlayerByUserId) ~= "function" then
+		return
+	end
+	local player = (players :: any):GetPlayerByUserId(ownerId)
+	if player == nil then
+		return
+	end
+	local MilestoneService = require(script.Parent.MilestoneService)
+	MilestoneService.Event(player, "plank")
+end
+
 local function emitOne(c: Context, job: Job)
 	local plank = job.planks[job.next]
 	if not plank then
@@ -430,6 +448,7 @@ local function emitOne(c: Context, job: Job)
 	if spawned and spawned.root then
 		spawned.root.AssemblyLinearVelocity = unit(out.LookVector) * GameConfig.ConveyorSpeed
 	end
+	notePlank(job.ownerId)
 	job.next += 1
 	job.nextAt += SawmillService.PlankGap
 	if job.planks[job.next] == nil then

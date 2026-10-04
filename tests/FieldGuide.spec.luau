@@ -234,11 +234,12 @@ return function(t)
 			maple = 2,
 			birch = 3,
 			frostwood = 4,
+			lanternwood = 4,
 			emberwood = 4,
 			phantomwood = 5,
 			lumenwood = 5,
 		}
-		t.eq(#WoodData.All(), 9)
+		t.eq(#WoodData.All(), 10)
 		for _, wood in ipairs(WoodData.All()) do
 			local marks = FieldGuide.HardnessMarks(wood.v2.hardness)
 			t.eq(marks, expect[wood.id], wood.id)
@@ -276,10 +277,11 @@ return function(t)
 				axeLine ..= string.format("; %s: %d", good.displayName, goodHits)
 			end
 			local biome = t.shared("BiomeData").Get(wood.biome)
+			local where = if biome then biome.displayName else wood.biome
 			t.eq(
 				page,
 				table.concat({
-					biome.displayName,
+					where,
 					"hardness " .. FieldGuide.HardnessText(v2.hardness),
 					string.format(
 						"logs %s, planks %s",

@@ -10,6 +10,57 @@
 
 local WoodData = {}
 
+-- Lanternwood (B12), Ferry Island's night-glow timber. W2 adds the
+-- ferryisle biome and places the trees. This row only names that id.
+-- Every number is a named constant. TBD (Designer) unless marked Builder.
+WoodData.LanternId = "lanternwood"
+WoodData.LanternBiome = "ferryisle" -- not palmwood's "island"
+WoodData.LanternLogPrice = 6 -- $/u³. TBD (Designer)
+WoodData.LanternPlanPlank = 60 -- plan $/u³, before ScaledPlank. TBD (Designer)
+WoodData.LanternHardness = 14 -- v2 damage per u². TBD (Designer)
+WoodData.LanternGrowSec = 1500 -- TBD (Designer)
+WoodData.LanternLifespanMin = 3 -- TBD (Designer)
+WoodData.LanternLifespanMax = 6 -- TBD (Designer)
+WoodData.LanternLeaf = "#6E8A4A" -- day leaves. TBD (Designer)
+WoodData.LanternLeafShade = "#5C7640" -- a darker day leaf. TBD (Designer)
+WoodData.LanternLeafLight = "#849E5C" -- a lighter day leaf. TBD (Designer)
+WoodData.LanternBark = "#4A3826" -- day trunk. TBD (Designer)
+WoodData.LanternGlow = "#FFC45C" -- night neon, swapped on the client only. TBD (Designer)
+WoodData.LanternCore = "#C4A574" -- day cut face and planks. TBD (Designer)
+WoodData.LanternCoreBands = 1 -- one thin collar. TBD (Builder)
+-- v1 ladder, between frostwood ($25) and emberwood ($55). TBD (Designer)
+WoodData.LanternV1HP = 650 -- TBD (Designer)
+WoodData.LanternV1Hardness = 30 -- TBD (Designer)
+WoodData.LanternV1Logs = 7 -- TBD (Designer)
+WoodData.LanternV1Price = 30 -- TBD (Designer)
+WoodData.LanternV1Respawn = 300 -- TBD (Designer)
+WoodData.LanternV1Trunk = 12 -- studs. TBD (Builder)
+WoodData.LanternV1Crown = 11 -- studs. TBD (Builder)
+-- Section-tree silhouette. Each value is TBD (Builder).
+WoodData.LanternHeightLo = 20 -- TBD (Builder)
+WoodData.LanternHeightHi = 28 -- TBD (Builder)
+WoodData.LanternTrunkThickness = 1.8 -- TBD (Builder)
+WoodData.LanternTrunkLength = 8 -- TBD (Builder)
+WoodData.LanternTrunkSegments = 2 -- TBD (Builder)
+WoodData.LanternTaper = 0.9 -- TBD (Builder)
+WoodData.LanternMaxDepth = 2 -- TBD (Builder)
+WoodData.LanternSplitFirst = 1.0 -- TBD (Builder)
+WoodData.LanternSplitNext = 0.55 -- TBD (Builder)
+WoodData.LanternMinSplits = 2 -- TBD (Builder)
+WoodData.LanternMaxSplits = 2 -- TBD (Builder)
+WoodData.LanternBranchAngle = 36 -- TBD (Builder)
+WoodData.LanternTwist = 8 -- TBD (Builder)
+WoodData.LanternFirstBranch = 6 -- TBD (Builder)
+WoodData.LanternLengthDecayLo = 0.6 -- TBD (Builder)
+WoodData.LanternLengthDecayHi = 0.8 -- TBD (Builder)
+WoodData.LanternThicknessDecay = 0.62 -- TBD (Builder)
+WoodData.LanternMinThickness = 0.55 -- TBD (Builder)
+WoodData.LanternLeafSize = 6.5 -- TBD (Builder)
+WoodData.LanternClusterLo = 3 -- TBD (Builder)
+WoodData.LanternClusterHi = 4 -- TBD (Builder)
+WoodData.LanternFlares = 3 -- TBD (Builder)
+WoodData.LanternMaxSections = 16 -- TBD (Builder)
+
 -- The v2 core loop's numbers (V2_PLAN.md §2b): prices per cubic timber
 -- unit (GameConfig.WoodUnit studs a side), hardness per u² of cut, how
 -- long a sapling takes to grow up, the core (heartwood and plank) colour
@@ -57,6 +108,7 @@ export type TreeShape = {
 	wisps: number?,
 	pods: number?,
 	veins: number?,
+	coreBands: number?, -- thin heartwood collars (Lanternwood's night band)
 	leafColors: { string },
 	bark: string,
 	accent: string?,
@@ -191,6 +243,21 @@ local woods: { WoodDef } = {
 		foliageSize = 10,
 	},
 	{
+		id = WoodData.LanternId,
+		displayName = "Lanternwood",
+		treeHP = WoodData.LanternV1HP,
+		hardness = WoodData.LanternV1Hardness,
+		logsPerTree = WoodData.LanternV1Logs,
+		pricePerLog = WoodData.LanternV1Price,
+		biome = WoodData.LanternBiome,
+		respawnSec = WoodData.LanternV1Respawn,
+		silhouette = "broadleaf",
+		leafColor = hexColor(WoodData.LanternLeaf),
+		trunkColor = hexColor(WoodData.LanternBark),
+		trunkHeight = WoodData.LanternV1Trunk,
+		foliageSize = WoodData.LanternV1Crown,
+	},
+	{
 		id = "emberwood",
 		displayName = "Emberwood",
 		treeHP = 900,
@@ -258,6 +325,7 @@ WoodData.PlanPlank = {
 	maple = 26.4,
 	palmwood = 32,
 	frostwood = 106,
+	[WoodData.LanternId] = WoodData.LanternPlanPlank,
 	emberwood = 36,
 	phantomwood = 54,
 	lumenwood = 90,
@@ -323,6 +391,15 @@ local V2: { [string]: WoodV2 } = {
 		lifespan = { 3, 6 },
 		core = "#E4F2FA",
 		coreMaterial = "Ice",
+	},
+	[WoodData.LanternId] = {
+		logPrice = WoodData.LanternLogPrice,
+		plankPrice = WoodData.ScaledPlank(WoodData.LanternLogPrice, WoodData.LanternPlanPlank),
+		hardness = WoodData.LanternHardness,
+		growSec = WoodData.LanternGrowSec,
+		lifespan = { WoodData.LanternLifespanMin, WoodData.LanternLifespanMax },
+		core = WoodData.LanternCore,
+		coreMaterial = "Wood",
 	},
 	emberwood = {
 		logPrice = 5.7,
@@ -494,6 +571,32 @@ local SHAPES: { [string]: TreeShape } = {
 		leafColors = { "#3F7FA6", "#4F90B5", "#2F6E96", "#5B9CC0" },
 		bark = "#485462",
 		accent = "#FFFFFF",
+	},
+	-- A short broadleaf. Day-plain; the night neon is client-only. TBD (Builder).
+	[WoodData.LanternId] = {
+		height = { WoodData.LanternHeightLo, WoodData.LanternHeightHi },
+		trunkThickness = WoodData.LanternTrunkThickness,
+		trunkLength = WoodData.LanternTrunkLength,
+		trunkSegments = WoodData.LanternTrunkSegments,
+		taper = WoodData.LanternTaper,
+		maxDepth = WoodData.LanternMaxDepth,
+		splitChance = { WoodData.LanternSplitFirst, WoodData.LanternSplitNext },
+		minSplits = WoodData.LanternMinSplits,
+		maxSplits = WoodData.LanternMaxSplits,
+		branchAngle = WoodData.LanternBranchAngle,
+		twistiness = WoodData.LanternTwist,
+		firstBranchLength = WoodData.LanternFirstBranch,
+		lengthDecay = { WoodData.LanternLengthDecayLo, WoodData.LanternLengthDecayHi },
+		thicknessDecay = WoodData.LanternThicknessDecay,
+		minThickness = WoodData.LanternMinThickness,
+		canopy = "clusters",
+		leafSize = WoodData.LanternLeafSize,
+		clusterParts = { WoodData.LanternClusterLo, WoodData.LanternClusterHi },
+		flares = WoodData.LanternFlares,
+		coreBands = WoodData.LanternCoreBands,
+		maxSections = WoodData.LanternMaxSections,
+		leafColors = { WoodData.LanternLeaf, WoodData.LanternLeafShade, WoodData.LanternLeafLight },
+		bark = WoodData.LanternBark,
 	},
 	-- Crooked and smouldering.
 	emberwood = {

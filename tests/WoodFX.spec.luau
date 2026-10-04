@@ -139,4 +139,33 @@ return function(t)
 		fx.Start()
 		t.eq(connected(), 0)
 	end)
+
+	t.test("Lanternwood glows only at night, and 12 trees on high make at most 8 lights", function()
+		t.eq(WoodFX.GlowRange, 14)
+		t.eq(WoodFX.GlowBrightness, 0.8)
+		t.eq(QualityBudgets.GlowLights, { low = 0, medium = 4, high = 8 })
+		t.eq(QualityBudgets.GlowLightCap("low"), 0)
+		t.eq(QualityBudgets.GlowLightCap("medium"), 4)
+		t.eq(QualityBudgets.GlowLightCap("high"), 8)
+		t.eq(WoodFX.NightGlowOn(19), true)
+		t.eq(WoodFX.NightGlowOn(0), true)
+		t.eq(WoodFX.NightGlowOn(4.9), true)
+		t.eq(WoodFX.NightGlowOn(5), false)
+		t.eq(WoodFX.NightGlowOn(12), false)
+		t.eq(WoodFX.NightGlowOn(18.9), false)
+		local hosts = {}
+		for i = 1, 12 do
+			table.insert(hosts, { id = "tree" .. i, kind = "tree", distance = i })
+		end
+		table.insert(hosts, { id = "plank", kind = "plank", distance = 0.1 })
+		local lit = WoodFX.LitIds(hosts, "high")
+		t.eq(#lit, 8)
+		t.eq(lit[1], "tree1")
+		t.eq(lit[8], "tree8")
+		for _, id in ipairs(lit) do
+			t.ok(id ~= "plank", "a plank never gets a light")
+		end
+		t.eq(WoodFX.LitIds(hosts, "medium"), { "tree1", "tree2", "tree3", "tree4" })
+		t.eq(WoodFX.LitIds(hosts, "low"), {})
+	end)
 end

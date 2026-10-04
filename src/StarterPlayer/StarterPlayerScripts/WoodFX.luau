@@ -20,6 +20,10 @@
 --     sell pad for every piece sold ("Sold").
 --   * Figured pieces (attribute Figure) wear a coloured band
 --     (ForestArt.SectionBand), drawn here only: the server adds no parts.
+--   * Lanternwood (B12): from 19:00 to 05:00 the client turns NightGlow
+--     parts Neon. The nearest trees get a PointLight, capped by
+--     QualityBudgets.GlowLights. Planks get Neon and never a light.
+--     The server builds neither the neon nor the light.
 --   * A tree that just grew (attribute GrewAt) springs up from smaller; a
 --     dead one (Dead, DeadAt) sinks into the ground over DeadSinkSec and
 --     fades. On the low quality tier leaf parts cast no shadow
@@ -35,6 +39,7 @@ local TweenService = game:GetService("TweenService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local TreeLogic = require(ReplicatedStorage.Shared.TreeLogic)
@@ -62,6 +67,170 @@ WoodFX.SpringFrom = 0.72 -- a tree that grew springs up from this much of its si
 WoodFX.SpringTime = 0.9
 WoodFX.SpringWindow = 1.5 -- seconds after GrewAt a tree still springs (it may stream in late)
 WoodFX.BootWait = 120
+-- A Lanternwood tree's night light. TBD (Designer).
+WoodFX.GlowRange = 14 -- TBD (Designer)
+WoodFX.GlowBrightness = 0.8 -- TBD (Designer)
+WoodFX.GlowLightName = "LanternLight"
+
+export type GlowHost = {
+	id: string,
+	kind: string,
+	distance: number,
+}
+
+-- Night glow follows WorldTime.IsNight. Pass an hour to ask; omit it and
+-- Hour() (and a Studio ClockOverride) decides.
+function WoodFX.NightGlowOn(hour: number?): boolean
+	if hour == nil then
+		return WorldTime.IsNight()
+	end
+	return WorldTime.IsNight(hour)
+end
+
+-- How many of `hosts` may carry a light: nearest trees first, never a plank,
+-- and never more than the tier's GlowLights cap.
+function WoodFX.LitIds(hosts: { GlowHost }, tier: string): { string }
+	local trees: { GlowHost } = {}
+	for _, host in ipairs(hosts) do
+		if host.kind == "tree" then
+			table.insert(trees, host)
+		end
+	end
+	table.sort(trees, function(a: GlowHost, b: GlowHost): boolean
+		if a.distance ~= b.distance then
+			return a.distance < b.distance
+		end
+		return a.id < b.id
+	end)
+	local cap = math.min(#trees, QualityBudgets.GlowLightCap(tier))
+	local out: { string } = {}
+	for i = 1, cap do
+		table.insert(out, trees[i].id)
+	end
+	return out
+end
+
+local GLOW = Color3.fromHex(WoodData.LanternGlow)
+
+type DaySurface = { surface: SurfaceAppearance, enabled: boolean }
+
+type DayLook = {
+	color: Color3,
+	material: Enum.Material,
+	surfaces: { DaySurface },
+}
+
+local dayLook: { [BasePart]: DayLook } = {}
+
+local function rememberDay(part: BasePart)
+	if dayLook[part] then
+		return
+	end
+	local surfaces: { DaySurface } = {}
+	for _, child in ipairs(part:GetChildren()) do
+		if child:IsA("SurfaceAppearance") then
+			table.insert(surfaces, { surface = child, enabled = child.Enabled })
+		end
+	end
+	dayLook[part] = { color = part.Color, material = part.Material, surfaces = surfaces }
+end
+
+local function paintGlow(part: BasePart, night: boolean)
+	rememberDay(part)
+	local day = dayLook[part]
+	if not day then
+		return
+	end
+	if night then
+		part.Color = GLOW
+		part.Material = Enum.Material.Neon
+		for _, saved in ipairs(day.surfaces) do
+			if saved.surface.Parent then
+				saved.surface.Enabled = false
+			end
+		end
+	else
+		part.Color = day.color
+		part.Material = day.material
+		for _, saved in ipairs(day.surfaces) do
+			if saved.surface.Parent then
+				saved.surface.Enabled = saved.enabled
+			end
+		end
+	end
+end
+
+local function hostKind(model: Model): string
+	local kind = model:GetAttribute("NightHost")
+	if kind == "tree" or kind == "plank" then
+		return kind
+	end
+	if model:HasTag("Tree") then
+		return "tree"
+	end
+	return "plank"
+end
+
+local function ensureLight(model: Model, on: boolean)
+	local root = model.PrimaryPart
+	if not root then
+		return
+	end
+	local existing = root:FindFirstChild(WoodFX.GlowLightName)
+	if not on then
+		if existing and existing:GetAttribute("ClientGlow") == true then
+			existing:Destroy()
+		end
+		return
+	end
+	local light = existing
+	if not light or not light:IsA("PointLight") then
+		if light then
+			light:Destroy()
+		end
+		local made = Instance.new("PointLight")
+		made.Name = WoodFX.GlowLightName
+		made:SetAttribute("ClientGlow", true)
+		made.Parent = root
+		light = made
+	end
+	if light and light:IsA("PointLight") then
+		light.Color = GLOW
+		light.Range = WoodFX.GlowRange
+		light.Brightness = WoodFX.GlowBrightness
+		light.Shadows = false
+	end
+end
+
+-- Client-only night swap for every tagged Lanternwood model.
+local function refreshLanterns()
+	local night = WoodFX.NightGlowOn()
+	local camera = workspace.CurrentCamera
+	local cam = if camera then camera.CFrame.Position else nil
+	local hosts: { GlowHost } = {}
+	local models: { Model } = {}
+	for _, inst in ipairs(CollectionService:GetTagged("Lanternwood")) do
+		if inst:IsA("Model") then
+			local model = inst
+			local origin = if model.PrimaryPart then model.PrimaryPart.CFrame.Position else model:GetPivot().Position
+			local distance = if cam then (cam - origin).Magnitude else 0
+			table.insert(models, model)
+			table.insert(hosts, { id = model:GetFullName(), kind = hostKind(model), distance = distance })
+		end
+	end
+	local lit: { [string]: boolean } = {}
+	for _, id in ipairs(WoodFX.LitIds(hosts, Quality.Budget().Tier)) do
+		lit[id] = true
+	end
+	for i, model in ipairs(models) do
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and d:GetAttribute("NightGlow") == true then
+				paintGlow(d, night)
+			end
+		end
+		ensureLight(model, night and lit[hosts[i].id] == true)
+	end
+end
 
 local DUST_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 local LEAF_FLAT = CFrame.Angles(0, 0, math.pi / 2)
@@ -784,6 +953,7 @@ function WoodFX.Start()
 			since = 0
 			hideRingIfIdle()
 		end
+		refreshLanterns()
 	end)
 end
 

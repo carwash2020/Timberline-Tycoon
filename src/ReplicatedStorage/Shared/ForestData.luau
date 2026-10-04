@@ -224,8 +224,8 @@ ForestData.Elder = {
 	maxActive = 1, -- on a server at once
 	checkMinSeconds = 8 * 60, -- a grove may wake one every 8-15 minutes
 	checkMaxSeconds = 15 * 60,
-	wakeChanceAtThriving = 0.4, -- per check, at vitality 75 ...
-	wakeChanceAtMax = 1, -- ... rising to this at 100
+	wakeChanceAtThriving = 0.4, -- per check, flat; vitality no longer gates it
+	wakeChanceAtMax = 1, -- unused: the chance does not rise with vitality
 	scale = 1.7, -- size
 	depthBonus = 1, -- v2 section trees: one more branch level on the broadleaves (Shared/TreeGen)
 	maxHeight = 95, -- v2: studs, an Elder's total height at most
@@ -233,7 +233,6 @@ ForestData.Elder = {
 	logMul = 3, -- logs (its size class adds 2x logsPerTree)
 	figures = { "quilted", "burl" }, -- always figured, by these figures' weights
 	helperMinShare = 0.1, -- chopped at least this much of its HP to count
-	helperSeeds = 2, -- unused: helpers are paid in cash only
 	helperShare = 0.1, -- ... and this much of its logs' value
 	fadeSeconds = 15 * 60, -- unfelled, it fades back into the forest (a night-only one at dawn)
 	nightLeftSeconds = 4 * 60, -- a night-only grove wakes one only with this much of the night left
@@ -244,8 +243,9 @@ ForestData.Elder = {
 -- The Skyroot Bloom
 ---------------------------------------------------------------------------
 
+-- A clock (ForestService): on for `seconds`, then off for `restSeconds`.
+-- Grove vitality does not start it.
 ForestData.Bloom = {
-	threshold = 75, -- the groves' average vitality that starts it
 	seconds = 8 * 60,
 	restSeconds = 30 * 60, -- then it rests this long
 }

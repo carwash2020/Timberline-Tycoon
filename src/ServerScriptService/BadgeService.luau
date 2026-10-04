@@ -7,14 +7,13 @@
 -- It also polls, and reports what it finds through that same Event:
 --   * where the player stands (RegionLogic, via BadgeData.AreasAt)
 --   * woods already in the field guide (profile.compendium)
---   * a plank they own (a WoodSection model with Kind "plank")
+-- A first plank is MilestoneService.Event(player, "plank") from the sawmill.
 -- BadgeSync is server -> client. Nothing connects OnServerEvent, and it
 -- has no rate limit. An id of 0 records the earn and never calls AwardBadge.
 -- badgesAwarded is the earn (the panel). badgesSent is set only when
 -- AwardBadge returns true. A live id is sent on the next join if the earn
 -- was recorded while the id was 0.
 
-local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -223,31 +222,9 @@ local function positionOf(player: Player): (number?, number?, number?)
 	return pos.X, pos.Y, pos.Z
 end
 
--- A plank this player owns, sitting in the world. Missing tags (tests, a
--- server with no loose wood) is not an error.
-local function ownsPlank(player: Player): boolean
-	local userId = player.UserId
-	local getTagged = (CollectionService :: any).GetTagged
-	if type(getTagged) ~= "function" then
-		return false
-	end
-	local ok, tagged = pcall(getTagged, CollectionService, "WoodSection")
-	if not ok or type(tagged) ~= "table" then
-		return false
-	end
-	for _, inst in ipairs(tagged :: { any }) do
-		if typeof(inst) == "Instance" then
-			local model = inst.Parent
-			if model ~= nil and model:GetAttribute("Kind") == "plank" and model:GetAttribute("Owner") == userId then
-				return true
-			end
-		end
-	end
-	return false
-end
-
--- One pass: publish once, then report new areas, woods, and a first plank
--- through MilestoneService.Event. Standing still does not repeat a badge.
+-- One pass: publish once, then report new areas and woods through
+-- MilestoneService.Event. Standing still does not repeat a badge. A first
+-- plank is reported by the sawmill, where the plank is made.
 function BadgeService.Poll(player: Player)
 	local profile = ProfileService.GetProfile(player)
 	if not profile then
@@ -288,9 +265,6 @@ function BadgeService.Poll(player: Player)
 				end
 			end
 		end
-	end
-	if earned.FirstPlank ~= true and ownsPlank(player) then
-		MilestoneService.Event(player, "plank", nil)
 	end
 end
 

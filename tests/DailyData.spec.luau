@@ -201,7 +201,7 @@ return function(t)
 				for i = 1, tier do
 					quick = quick or FieldGuide.TrunkHits(ladder[i], wood) <= FieldGuide.UsefulHitsV2
 				end
-				local expected = biome.area ~= nil and not biome.nightOnly and quick
+				local expected = biome ~= nil and biome.area ~= nil and not biome.nightOnly and quick
 				t.eq(table.find(woods, wood.id) ~= nil, expected, "tier " .. tier .. ": " .. wood.id)
 			end
 			for _, id in ipairs(previous) do

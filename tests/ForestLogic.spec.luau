@@ -29,10 +29,12 @@ return function(t)
 		t.eq({ ForestData.Storm.strikeRadius, ForestData.Storm.glowSeconds }, { 60, 120 })
 		local e = ForestData.Elder
 		t.eq({ e.maxActive, e.checkMinSeconds, e.checkMaxSeconds }, { 1, 480, 900 })
-		t.eq({ e.scale, e.hpMul, e.logMul, e.helperMinShare, e.helperSeeds, e.helperShare }, { 1.7, 6, 3, 0.1, 2, 0.1 })
+		t.eq({ e.scale, e.hpMul, e.logMul, e.helperMinShare, e.helperShare }, { 1.7, 6, 3, 0.1, 0.1 })
+		t.eq(e.helperSeeds, nil, "helpers are paid in cash only")
 		t.eq(e.fadeSeconds, 900)
 		t.eq(e.nightLeftSeconds, 4 * 60)
-		t.eq(ForestData.Bloom, { threshold = 75, seconds = 480, restSeconds = 1800 })
+		t.eq(ForestData.Bloom, { seconds = 480, restSeconds = 1800 })
+		t.eq(ForestData.Bloom.threshold, nil, "vitality does not start the bloom")
 	end)
 
 	t.test("figures: weights, values and clues as designed", function()
@@ -336,18 +338,11 @@ return function(t)
 		t.eq(none, nil)
 	end)
 
-	t.test("the Skyroot blooms when the five groves average 75", function()
-		local all = {}
-		for _, id in ipairs(ForestData.Groves) do
-			all[id] = 75
-		end
-		t.ok(ForestLogic.BloomReady(all))
-		all.starter = 74
-		t.ok(not ForestLogic.BloomReady(all), "average 74.8")
-		all.hills = 100
-		t.ok(ForestLogic.BloomReady(all), "one grove's old growth carries a thinner one")
-		t.eq(ForestLogic.AverageVitality({}), 60, "missing groves count as at rest")
-		t.ok(not ForestLogic.BloomReady({}))
+	t.test("the Skyroot bloom is a clock, not a vitality gate", function()
+		t.eq(ForestData.Bloom.seconds, 8 * 60)
+		t.eq(ForestData.Bloom.restSeconds, 30 * 60)
+		t.eq(ForestLogic.BloomReady, nil)
+		t.eq(ForestLogic.AverageVitality, nil)
 	end)
 
 	t.test("v2 (M1.3): the large tree's seed by scale, the planter's share by value", function()

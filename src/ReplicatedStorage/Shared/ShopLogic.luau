@@ -83,7 +83,9 @@ function ShopLogic.FellSummary(axe: AxeDef, maxHits: number?, count: number?): s
 	for i = #woods, 1, -1 do
 		local wood = woods[i]
 		local damage = ItemCatalog.AxeDamage(axe, wood)
-		if damage > 0 then
+		-- A wood whose biome is not in the world yet (Ferry Island, until
+		-- W2) is not a line on the axe card.
+		if damage > 0 and BiomeData.IsOpen(wood.biome) then
 			local hits = math.ceil(wood.treeHP / damage)
 			if hits <= limit then
 				table.insert(parts, 1, string.format("%s in %d", string.lower(wood.displayName), hits))
