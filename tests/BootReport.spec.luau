@@ -116,6 +116,32 @@ return function(t)
 		)
 	end)
 
+	t.test("a throwing stub is warned and the later stubs still start", function()
+		local loader = t.loader()
+		local Report = loader:server("BootReport")
+		local started = {}
+		local lines = Report.StartStubs({
+			{
+				name = "BoomService",
+				init = function()
+					error("fuse")
+				end,
+			},
+			{
+				name = "NextService",
+				init = function()
+					table.insert(started, "NextService")
+				end,
+			},
+		})
+		t.eq(#lines, 1)
+		t.ok(string.find(lines[1], "[BootReport] BoomService failed to start:", 1, true) ~= nil, lines[1])
+		t.ok(string.find(lines[1], "fuse", 1, true) ~= nil, lines[1])
+		t.eq(loader.warnings, lines)
+		t.eq(started, { "NextService" })
+		t.eq(Report.StubWarning("BoxService", "nope"), "[BootReport] BoxService failed to start: nope")
+	end)
+
 	t.test("GameServer still prints the line and also logs the events", function()
 		local fs = require("@lune/fs")
 		local source = fs.readFile("src/ServerScriptService/GameServer.server.luau")

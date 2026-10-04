@@ -94,4 +94,33 @@ function BootReport.Log(world: any, players: { any }, analytics: any): boolean
 	return true
 end
 
+export type StubStart = {
+	name: string,
+	init: () -> (),
+}
+
+-- One line when a reserved service throws during boot. GameServer prints
+-- these and keeps starting the rest.
+function BootReport.StubWarning(name: string, err: any): string
+	return string.format("[BootReport] %s failed to start: %s", name, tostring(err))
+end
+
+-- Runs each stub's init inside its own pcall. A throw is warned and the
+-- later stubs still start. Returns the warning lines, in order.
+function BootReport.StartStubs(stubs: { StubStart }): { string }
+	local warnings: { string } = {}
+	for _, stub in ipairs(stubs) do
+		local ok, err = pcall(function(): any
+			stub.init()
+			return nil
+		end)
+		if not ok then
+			local line = BootReport.StubWarning(stub.name, err)
+			table.insert(warnings, line)
+			warn(line)
+		end
+	end
+	return warnings
+end
+
 return BootReport

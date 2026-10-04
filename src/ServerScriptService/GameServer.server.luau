@@ -19,7 +19,17 @@ local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
 local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
+local BadgeService = require(script.Parent.BadgeService)
+local BlastService = require(script.Parent.BlastService)
 local BootReport = require(script.Parent.BootReport)
+local BoxService = require(script.Parent.BoxService)
+local DialogueService = require(script.Parent.DialogueService)
+local EventService = require(script.Parent.EventService)
+local FerryService = require(script.Parent.FerryService)
+local GateService = require(script.Parent.GateService)
+local HazardService = require(script.Parent.HazardService)
+local LogicService = require(script.Parent.LogicService)
+local PermissionService = require(script.Parent.PermissionService)
 local DailyService = require(script.Parent.DailyService)
 local DevCommands = require(script.Parent.DevCommands)
 local EconomyService = require(script.Parent.EconomyService)
@@ -961,6 +971,98 @@ if CoreLoop.V2() then
 		heldBy = GrabService.HeldBy,
 	})
 end
+
+-- Wave 0 stubs. Each client -> server remote reserved here is connected
+-- once, inside the service that owns it (RateLimiter.Allow, then drop).
+-- if Module.Init is its own pcall: a throw is a BootReport warning and the
+-- later stubs still start. BadgeSync is server -> client, so nothing connects it.
+BootReport.StartStubs({
+	{
+		name = "DialogueService",
+		init = function()
+			if DialogueService.Init then
+				DialogueService.Init(remote.Dialogue)
+			end
+		end,
+	},
+	{
+		name = "BoxService",
+		init = function()
+			if BoxService.Init then
+				BoxService.Init(remote.BoxOpen)
+			end
+		end,
+	},
+	{
+		name = "GateService",
+		init = function()
+			if GateService.Init then
+				GateService.Init(remote.TollPay)
+			end
+		end,
+	},
+	{
+		name = "FerryService",
+		init = function()
+			if FerryService.Init then
+				FerryService.Init(remote.FerryBoard)
+			end
+		end,
+	},
+	{
+		name = "PermissionService",
+		init = function()
+			if PermissionService.Init then
+				PermissionService.Init(remote.SetPermission)
+			end
+		end,
+	},
+	{
+		name = "LogicService",
+		init = function()
+			if LogicService.Init then
+				LogicService.Init(remote.Wire)
+			end
+		end,
+	},
+	{
+		name = "EventService",
+		init = function()
+			if EventService.Init then
+				EventService.Init({
+					ExpandLand = remote.ExpandLand,
+					SpawnPadPress = remote.SpawnPadPress,
+					ChopSawSet = remote.ChopSawSet,
+				})
+			end
+		end,
+	},
+	{
+		name = "BlastService",
+		init = function()
+			if BlastService.Init then
+				BlastService.Init()
+			end
+		end,
+	},
+	{
+		name = "HazardService",
+		init = function()
+			if HazardService.Init then
+				HazardService.Init()
+			end
+		end,
+	},
+	{
+		name = "BadgeService",
+		init = function()
+			if BadgeService.Init then
+				BadgeService.Init()
+			end
+		end,
+	},
+})
+
 -- The pose only. Damage stays on Chop / ChopTree / MineNode, which still
 -- arm the next swing when they arrive (setSwingDue is unchanged). SwingLen
 -- is that axe's cooldown so the clip finishes when the next press is allowed.
@@ -1344,6 +1446,7 @@ local function onPlayerRemoving(player: Player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)
 	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
+	safely("GateService.PlayerRemoving", GateService.PlayerRemoving, player)
 	-- Playtime, the truck's loose wood and left-behind logs. Before the
 	-- release, and again (as a no-op) from the final save if shutdown
 	-- already committed them.

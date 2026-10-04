@@ -35,6 +35,16 @@ Net.RemoteNames = {
 	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)
 	"Swing", -- client -> server: (woodId | "node" | "v1", cancel?) the pose. Damage stays on Chop / ChopTree / MineNode
 	"SawmillSet", -- client -> server: (uid, "x" | "y", 1 | -1) nudge a placed mill's cut (v2 loop: SawmillService)
+	"Dialogue", -- client -> server: ("open", npcId) or ("pick", nodeId, i). The reply is server -> client.
+	"BoxOpen", -- client -> server: (box) open a box you own
+	"SpawnPadPress", -- client -> server: (pad) the button on a vehicle pad
+	"ChopSawSet", -- client -> server: (uid, "x" | "y", 1 | -1) one step of a chop saw's cut
+	"ExpandLand", -- client -> server: (x, z) buy the square that touches yours
+	"SetPermission", -- client -> server: (userId, flag, on)
+	"Wire", -- client -> server: (fromUid, port, toUid, port) or ("cut", uid)
+	"TollPay", -- client -> server: () pay the toll
+	"FerryBoard", -- client -> server: () board the ferry
+	"BadgeSync", -- server -> client: badges already awarded. The client never fires it.
 	"CashChanged", -- server -> client: (cash)
 	"Notify", -- server -> client: (message) short on-screen toast
 	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...

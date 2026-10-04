@@ -3,6 +3,10 @@
 -- can never disagree about a range or a cooldown. Wood and item balance
 -- still lives in WoodData / ItemCatalog.
 
+-- Canonical blasting price. BlastingChargePrice is an alias of DynamitePrice,
+-- so the two cannot drift.
+local DYNAMITE_PRICE = 220
+
 local GameConfig = {
 	-- Economy
 	CashCap = 2_000_000, -- most cash a wallet holds; hardcore players can grind, not run away
@@ -142,7 +146,7 @@ local GameConfig = {
 	TollSeconds = 180,
 	FerryFare = 400,
 	FerryIntervalSec = 360,
-	BlastingChargePrice = 220,
+	BlastingChargePrice = DYNAMITE_PRICE, -- alias of DynamitePrice
 	BoulderRespawnSec = 1200,
 	WaterDamage = 15,
 	WaterTickSec = 1.5,
@@ -158,7 +162,36 @@ local GameConfig = {
 	-- carries onto pieces cut from it. It is not only the final chop.
 	LuxAxeId = "LuxAxe",
 	LuxSellBonus = 1.1, -- 10% more at the pad, once, on the piece's value, before 2x Cash
+
+	-- Wave 0 placeholders. Nothing reads these yet, so play is unchanged.
+	-- DayCycleMinutes stays 20 (a later batch owns the day length). Truck
+	-- respawns keep the existing recall rule, so there is no new key for them.
+	-- TBD (Designer), unread until the shop batch:
+	BoxRespawnSec = 60, -- a bought item's display returns to the rack after this
+	BoxUnpaidDespawnSec = 180, -- an unpaid box left in the world despawns after this
+	ShopHours = { open = 7, close = 19 }, -- ClockTime the counters open and close
+	NightGlowWoodId = "lumenwood", -- wood id whose pieces glow after dark
+	-- Builder, unread until the store batch:
+	StoreDespawnPad = 6,
+	StoreDespawnHeight = 20,
+	DespawnChecks = 2,
+	LoadingPadSize = 14,
+	ShelfAisleMin = 6,
+	CounterPayReach = 10,
+	StorePartBudget = 250,
+	-- Designer, unread until their batch:
+	CounterMaxItems = 3,
+	LimitedStockCount = 3,
+	LimitedRestockSec = 1200,
+	LimitedPerPlayer = 1,
+	LimitedItemPrice = 750,
+	ChopSawPrice = 12200,
+	DynamitePrice = DYNAMITE_PRICE, -- canonical price; BlastingChargePrice aliases this
+	DemandBoost = 0.2,
 }
+
+-- DynamitePrice is the canonical key. BlastingChargePrice is an alias.
+GameConfig.BlastingChargePrice = GameConfig.DynamitePrice
 
 -- "Wood you cut with it sells for 10% more." Tracks LuxSellBonus, so a tune
 -- changes the tooltip with it. At 1.1 this is the Lux Axe pass description.
