@@ -612,7 +612,7 @@ WorldLayout.StripClumpOffRoad = 40 -- TBD (Designer) past the deck's edge
 WorldLayout.StripRoadClear = 20 -- TBD (Builder) extra studs a trunk stays off the deck
 WorldLayout.StripZoneCx = 0 -- TBD (Builder)
 WorldLayout.StripZoneCz = 1750 -- TBD (Builder)
-WorldLayout.StripZoneRadius = 160 -- TBD (Designer)
+WorldLayout.StripZoneRadius = 160
 WorldLayout.StripZoneCap = 40 -- TBD (Designer)
 WorldLayout.StripClumpRadius = 8 -- TBD (Builder)
 WorldLayout.StripTreesPerClump = 5 -- TBD (Designer)
@@ -638,7 +638,7 @@ WorldLayout.LanternwoodAngleStep = 0.42 -- TBD (Designer)
 WorldLayout.PalmMaxRadius = 40 -- TBD (Designer) dry ground inside the disc
 WorldLayout.PalmGridStep = 8 -- TBD (Designer)
 WorldLayout.TreeSpacing = 8 -- TBD (Designer)
-WorldLayout.FogClearance = 60 -- TBD (Designer) from the booth and both docks
+WorldLayout.FogClearance = 60 -- from the booth and both docks
 WorldLayout.FogAtomicMax = 128 -- TBD (Builder) a longer axis needs a Persistent model
 WorldLayout.SecretCaveX = -765 -- TBD (Designer)
 WorldLayout.SecretCaveZ = -655 -- TBD (Designer)
@@ -651,7 +651,7 @@ WorldLayout.SecretCave = {
 WorldLayout.CaveMouthX = -748 -- TBD (Builder)
 WorldLayout.CaveMouthZ = -628 -- TBD (Builder)
 WorldLayout.BackTrailX = -690 -- TBD (Builder)
-WorldLayout.BackTrailZ = -560 -- TBD (Builder)
+WorldLayout.BackTrailZ = -560
 WorldLayout.RidgeBoulderX = -810 -- TBD (Builder)
 WorldLayout.RidgeBoulderZ = -700 -- TBD (Builder)
 WorldLayout.Breakables = {
@@ -671,6 +671,53 @@ WorldLayout.LandingClear = 10 -- TBD (Builder)
 WorldLayout.DeepSeaEdgeInset = 80 -- TBD (Designer) how far inside the rim the deep water starts
 WorldLayout.DeepSeaIslandPad = 12 -- TBD (Builder) shallows kept around Ferry Island
 WorldLayout.ShelfProbeZ = 1499 -- TBD (Builder) last surveyed column; the strip copies its height
+
+-- A Pickup climbs a standstill ramp while Drive's 120 stays ahead of
+-- gravity 196.2. Haul roads stay under 0.2, and so does the spur.
+WorldLayout.PickupClimb = 120 / 196.2 -- TBD (Designer)
+WorldLayout.SpurMaxGrade = 0.2 -- TBD (Designer)
+WorldLayout.TollClearance = 4 -- TBD (Builder) setback and gorge rescue sit this far above the ground
+WorldLayout.SpurMeet = 20 -- TBD (Designer) the last studs, flush with the deck top
+WorldLayout.TollSpurJoinZ = 900 -- TBD (Builder) on Snow Road, where the ground is still gentle
+WorldLayout.TollSpurWestX = -420 -- TBD (Builder) a lane that misses the height grid
+WorldLayout.TollSpurGradeZ = 1132 -- TBD (Builder) the climb starts clear of the wild-tree box
+WorldLayout.TollSpurShelfZ = 1520 -- TBD (Builder) the eastbound leg, north of the height grid
+
+local function snowJoin(): Vector2
+	for _, road in ipairs(WorldLayout.Roads) do
+		if road.name == "SnowRoad" then
+			local a = road.points[#road.points - 1]
+			local b = road.points[#road.points]
+			local t = (WorldLayout.TollSpurJoinZ - a.Y) / (b.Y - a.Y)
+			return a:Lerp(b, t)
+		end
+	end
+	error("SnowRoad missing")
+end
+
+local deckSouth = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
+local flatStart = deckSouth - WorldLayout.SpurMeet
+local westX = WorldLayout.TollSpurWestX
+-- Not a WorldLayout.Roads entry: that list is in the height fingerprint.
+-- TerrainGen grades only the suffix that starts at gradeFrom.
+WorldLayout.TollSpur = {
+	points = {
+		snowJoin(),
+		Vector2.new(westX, WorldLayout.TollSpurJoinZ),
+		Vector2.new(westX, WorldLayout.TollSpurGradeZ),
+		Vector2.new(westX, WorldLayout.TollSpurShelfZ),
+		Vector2.new(WorldLayout.BridgeCenterX, WorldLayout.TollSpurShelfZ),
+		Vector2.new(WorldLayout.BridgeCenterX, flatStart),
+		Vector2.new(WorldLayout.BridgeCenterX, deckSouth),
+	},
+	width = WorldLayout.BridgeWidth,
+	gradeFrom = 3,
+}
+local spurGrade: { Vector2 } = {}
+for i = WorldLayout.TollSpur.gradeFrom, #WorldLayout.TollSpur.points do
+	table.insert(spurGrade, WorldLayout.TollSpur.points[i])
+end
+WorldLayout.TollSpurGrade = spurGrade
 
 -- The Volcano's cone sits on the far side of its biome, away from town. Its
 -- crater (radius `crater`) has a level lava pool (radius `pool`) in the
@@ -1145,9 +1192,19 @@ function WorldLayout.InHeatColumn(x: number, z: number): boolean
 	return dx * dx + dz * dz <= reach * reach
 end
 
+-- On the graded spur (the climb and the run up to the deck). The
+-- approach along existing ground is not included.
+function WorldLayout.OnTollSpur(x: number, z: number): boolean
+	local spur = WorldLayout.TollSpur
+	return WorldLayout.PolylineDistance(Vector2.new(x, z), WorldLayout.TollSpurGrade) <= spur.width / 2
+end
+
 -- Regrowth clearance. Boot forests do not ask this, so their fingerprints
 -- stay put; the gorge and the ferry path are outside those stands.
 function WorldLayout.TreeBlocked(x: number, z: number): boolean
+	if WorldLayout.OnTollSpur(x, z) then
+		return true
+	end
 	if WorldLayout.InGorge(x, z) then
 		return true
 	end

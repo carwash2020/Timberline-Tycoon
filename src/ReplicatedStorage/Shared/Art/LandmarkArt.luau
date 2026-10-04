@@ -496,7 +496,7 @@ local CAVE_DARK = hex("#141216") -- TBD (Builder)
 local LANTERN = hex("#FFC45C") -- TBD (Builder)
 local DEEP = hex("#071018") -- TBD (Builder)
 local HEAT = hex("#FF6A1A") -- TBD (Builder)
-local BOULDER = hex("#6B6560") -- TBD (Builder)
+local BOULDER = hex("#6B6560")
 local PATH = hex("#C4A36A") -- TBD (Builder)
 
 local ARM_THICK = 0.6 -- TBD (Builder)
@@ -758,11 +758,22 @@ end
 -- Every W2 model, parented and standing on the terrain. MapBuilder and the
 -- part-budget spec both call this.
 function LandmarkArt.BuildW2(parent: Instance)
-	local shelf = TerrainGen.HeightAt(WorldLayout.BridgeCenterX, WorldLayout.ShelfProbeZ + 2)
+	local shelf = TerrainGen.HeightAt(WorldLayout.BridgeCenterX, WorldLayout.ShelfProbeZ)
 	local bank = CFrame.new(WorldLayout.BridgeCenterX, shelf, WorldLayout.BridgeCenterZ)
 	local strip = stream(Kit.model("NorthStrip", parent), Enum.ModelStreamingMode.Default)
 	local walls = LandmarkArt.GorgeWalls(shelf)
 	walls.Parent = strip
+	-- A trigger across the whole cut. CanTouch only: it does not hold
+	-- anyone up. GateService sends whoever falls in back to the south bank.
+	local cutY = shelf - WorldLayout.GorgeDepth
+	local gorgeZ = WorldLayout.TollLineZ + WorldLayout.GorgeWidth / 2
+	local spanX = WorldLayout.NorthStripX1 - WorldLayout.NorthStripX0
+	local trigger =
+		solid(strip, "GorgeFloor", V3(spanX, 2, WorldLayout.GorgeWidth), CF(0, cutY + 1, gorgeZ), STONE[2], MAT.Rock)
+	trigger.CanCollide = false
+	trigger.CanQuery = false
+	trigger.CanTouch = true
+	trigger:SetAttribute("GorgeFloor", true)
 	local bridge = stream(LandmarkArt.TollBridge(), Enum.ModelStreamingMode.Default)
 	Kit.placeAt(bridge, bank)
 	bridge.Parent = strip

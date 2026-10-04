@@ -77,7 +77,7 @@ return function(t)
 		t.ok(boothAt.Z < WorldLayout.TollLineZ, "the booth is south of the line")
 	end)
 
-	t.test("W2 parts within 640 studs of spawn stay under 1,500", function()
+	t.test("W2 adds no parts within 640 of spawn", function()
 		t.eq(WorldLayout.SpawnBubble, 640)
 		t.eq(WorldLayout.SpawnPartCap, 1500)
 		local folder = roblox.Instance.new("Folder")
@@ -91,10 +91,7 @@ return function(t)
 			end
 		end
 		t.ok(total > 0, "the count walked real parts")
-		t.ok(
-			near <= WorldLayout.SpawnPartCap,
-			string.format("%d parts inside the bubble (cap %d)", near, WorldLayout.SpawnPartCap)
-		)
+		t.eq(near, 0)
 		local bridge = folder:FindFirstChild("TollBridge", true)
 		local booth = folder:FindFirstChild("TollBooth")
 		local crossing = #partsOf(bridge) + #partsOf(booth)
@@ -253,6 +250,67 @@ return function(t)
 			t.ok(road.name ~= "TollSpur", "the spur is not a graded road")
 		end
 		t.ok(names.SnowRoad and names.VolcanoRoad, "the free routes stay")
+	end)
+
+	t.test("the spur climbs from Snow Road and meets the deck flush", function()
+		local spur = WorldLayout.TollSpur
+		local snow
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == "SnowRoad" then
+				snow = road
+			end
+			t.ok(road.name ~= "TollSpur", "the spur is not a graded road")
+		end
+		local start = spur.points[1]
+		t.ok(WorldLayout.PolylineDistance(start, snow.points) <= snow.width / 2, "the spur does not meet Snow Road")
+		t.ok(WorldLayout.SpurMaxGrade < WorldLayout.PickupClimb, "steeper than a Pickup can climb")
+		local deckSouth = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
+		local last = spur.points[#spur.points]
+		t.eq(last.X, WorldLayout.BridgeCenterX)
+		t.eq(last.Y, deckSouth)
+		local function gradeOf(ax, az, bx, bz)
+			local len = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
+			local steps = math.max(2, math.floor(len / 8))
+			local prev = TerrainGen.HeightAt(ax, az)
+			local maxg = 0
+			for s = 1, steps do
+				local u = s / steps
+				local x = ax + (bx - ax) * u
+				local z = az + (bz - az) * u
+				local h = TerrainGen.HeightAt(x, z)
+				maxg = math.max(maxg, math.abs(h - prev) / (len / steps))
+				prev = h
+			end
+			return maxg
+		end
+		local maxg = 0
+		for i = 1, #spur.points - 1 do
+			local a, b = spur.points[i], spur.points[i + 1]
+			local g = gradeOf(a.X, a.Y, b.X, b.Y)
+			maxg = math.max(maxg, g)
+			t.ok(g < WorldLayout.SpurMaxGrade, string.format("segment %d grade %.3f", i, g))
+		end
+		t.ok(maxg < WorldLayout.SpurMaxGrade, string.format("spur grade %.3f", maxg))
+		local shelf = TerrainGen.HeightAt(0, WorldLayout.ShelfProbeZ)
+		local deckTop = shelf + WorldLayout.BridgeDeckThick
+		local meet = deckSouth - WorldLayout.SpurMeet
+		for z = meet, deckSouth, 2 do
+			local h = TerrainGen.HeightAt(WorldLayout.BridgeCenterX, z)
+			t.ok(math.abs(h - deckTop) < 1e-3, string.format("lip at z %d: ground %.3f, deck top %.3f", z, h, deckTop))
+		end
+		local folder = roblox.Instance.new("Folder")
+		LandmarkArt.BuildW2(folder)
+		local deck = folder:FindFirstChild("TollBridge", true):FindFirstChild("Deck")
+		local builtTop = deck.CFrame.Position.Y + deck.Size.Y / 2
+		local atJoint = TerrainGen.HeightAt(WorldLayout.BridgeCenterX, deckSouth)
+		t.ok(math.abs(builtTop - atJoint) < 1e-3, string.format("deck %.3f vs spur %.3f", builtTop, atJoint))
+		local floor = folder:FindFirstChild("GorgeFloor", true)
+		local half = floor.Size.X / 2
+		t.ok(floor.CFrame.Position.X - half <= WorldLayout.TollLineX0)
+		t.ok(floor.CFrame.Position.X + half >= WorldLayout.TollLineX1)
+		t.eq(floor.Size.Z, WorldLayout.GorgeWidth)
+		t.ok(not floor.CanCollide, "the gorge floor is a trigger")
+		t.ok(floor.CanTouch)
 	end)
 
 	t.test("section 9 names DayCycleMinutes and states no number", function()
