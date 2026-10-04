@@ -22,6 +22,8 @@ return function(t)
 			ownedTrailers = options.trailers or {},
 			equippedTrailer = options.hitched or "",
 			equippedTruck = options.equippedTruck or "Rustbucket",
+			plot = options.plot or { claimed = options.claimed == true, tier = 1, placed = {}, squares = {} },
+			storage = options.storage or {},
 		}
 		local toasts, granted, equipped, quests, switched = {}, {}, {}, {}, {}
 		local humanoid = {
@@ -383,17 +385,25 @@ return function(t)
 		local ItemCatalog = t.shared("ItemCatalog")
 		local pickup = ItemCatalog.GetTruck("Pickup")
 		local pony = ItemCatalog.GetTrailer("PonyTrailer")
-		local truck = setup({ cash = 1000, loop = 2 })
+		local truck = setup({ cash = 1000, loop = 2, claimed = true })
 		truck.buy("Truck", "Pickup")
 		t.eq(truck.profile.cash, 1000 - pickup.v2.price)
-		t.eq(truck.profile.ownedTrucks, { "Rustbucket", "Pickup" })
-		local trailer = setup({ cash = 2000, loop = 2 })
+		t.eq(
+			truck.profile.ownedTrucks,
+			{ "Rustbucket" },
+			"the box is the purchase; the catalog id stays put until the pad"
+		)
+		t.eq(#truck.profile.storage, 1)
+		t.eq(truck.profile.storage[1].itemId, "Pickup")
+		t.eq(truck.profile.storage[1].shop, "Dealership")
+		local trailer = setup({ cash = 2000, loop = 2, claimed = true })
 		trailer.buy("Trailer", "PonyTrailer")
 		t.eq(trailer.profile.cash, 2000 - pony.v2.price)
-		t.eq(trailer.profile.ownedTrailers, { "PonyTrailer" })
+		t.eq(trailer.profile.ownedTrailers, {})
+		t.eq(trailer.profile.storage[1].itemId, "PonyTrailer")
 		-- The Pony Trailer costs more under v2: v1's price doesn't buy it.
 		t.ok(pony.v2.price > pony.priceCash)
-		local short = setup({ cash = pony.priceCash, loop = 2 })
+		local short = setup({ cash = pony.priceCash, loop = 2, claimed = true })
 		short.buy("Trailer", "PonyTrailer")
 		t.eq(short.profile.ownedTrailers, {})
 		t.eq(short.profile.cash, pony.priceCash)
@@ -526,5 +536,72 @@ return function(t)
 		t.eq(s.profile.cash, 1000, "a carried box does not charge")
 		s.buy("Axe", "SteelAxe")
 		t.eq(s.profile.cash, 1000 - 160, "the Tool Shed stays open")
+	end)
+
+	t.test("a full storage refuses a truck box before cash moves", function()
+		local s = setup({ cash = 1000, loop = 2, claimed = true })
+		s.ShopService.Hour = function()
+			return 12
+		end
+		local Schema = s.loader:server("ProfileSchema")
+		for i = 1, Schema.StorageCap do
+			table.insert(s.profile.storage, { uid = "full-" .. i, itemId = "SteelAxe", shop = "ToolShed" })
+		end
+		local before = s.profile.cash
+		s.buy("Truck", "Pickup")
+		t.eq(s.profile.cash, before)
+		t.eq(#s.profile.storage, Schema.StorageCap)
+		t.eq(s.toasts[#s.toasts], "storage is full")
+	end)
+
+	t.test("T1: a truck box with no plot is refused before cash moves", function()
+		local Dialogue = t.loader():server("DialogueService")
+		local DialogueData = t.shared("DialogueData")
+		local s = setup({ cash = 1000, loop = 2 })
+		local before = s.profile.cash
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "box-pickup",
+			kind = "Truck",
+			itemId = "Pickup",
+			shop = "Dealership",
+		})
+		t.eq(ok, false)
+		t.eq(line, "needsPlot")
+		t.eq(s.profile.cash, before)
+		t.eq(#s.profile.storage, 0)
+		t.eq(DialogueData.Line("needsPlot", { shop = "Dealership" }), "You'll need a plot to open this.")
+		local card = DialogueData.Card("needsPlot")
+		t.eq(card.choice, true)
+		t.eq(card.noLabel, "Cancel")
+		Dialogue.Say(s.player, "needsPlot", "Dealership", {
+			uid = "box-pickup",
+			displayName = "Pickup",
+			price = 400,
+		})
+		t.eq(Dialogue.Last.text, "You'll need a plot to open this.")
+		t.eq(Dialogue.Last.choice, true)
+		t.eq(Dialogue.Last.noLabel, "Cancel")
+		local yes = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "box-pickup",
+			kind = "Truck",
+			itemId = "Pickup",
+			shop = "Dealership",
+		})
+		t.eq(yes, false)
+		t.eq(s.profile.cash, before)
+	end)
+
+	t.test("shop hours call ShopHoursLogic.IsOpen(shopId, hour)", function()
+		local fs = require("@lune/fs")
+		local src = fs.readFile("src/ServerScriptService/ShopService.luau")
+		t.ok(string.find(src, 'ShopHoursLogic.IsOpen("Dealership", hour)', 1, true) ~= nil)
+		t.ok(string.find(src, "ShopHoursLogic.IsOpen(shopId, ShopService.Hour())", 1, true) ~= nil)
+		t.eq(string.find(src, 'FindFirstChild("ShopHoursLogic")', 1, true), nil)
+		local hours = fs.readFile("src/ReplicatedStorage/Shared/ShopHoursLogic.luau")
+		for _, name in { "HearthOpen", "HearthClose", "DealerOpen", "DealerClose" } do
+			local line = string.match(hours, name .. " = [^\n]+")
+			t.ok(line ~= nil, name)
+			t.eq(string.find(line :: string, "TBD", 1, true), nil, name)
+		end
 	end)
 end

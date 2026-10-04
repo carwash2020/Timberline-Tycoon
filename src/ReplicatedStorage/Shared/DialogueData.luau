@@ -31,6 +31,7 @@ local LINES: { [string]: { [string]: string } } = {
 		missing = "Did that box slip off the counter?",
 		alreadyOwned = "You already have that one in the shed.",
 		needsLand = "Claim a plot before you haul a sawmill home.",
+		needsPlot = "Claim a plot before you open that box.",
 		thanks = "Paid. Open the box when you want the tool.",
 		locked = "That one isn't for sale from this counter.",
 	},
@@ -42,6 +43,7 @@ local LINES: { [string]: { [string]: string } } = {
 		missing = "I don't see that box on the counter anymore.",
 		alreadyOwned = "You already bought one of those.",
 		needsLand = "You'll want your own plot before this one.",
+		needsPlot = "You'll want a plot of your own before you open that.",
 		thanks = "It's yours. Open it whenever you like.",
 		locked = "I can't sell that from this counter.",
 	},
@@ -53,6 +55,7 @@ local LINES: { [string]: { [string]: string } } = {
 		missing = "That box isn't on the counter. Did it fall off?",
 		alreadyOwned = "You already own that one.",
 		needsLand = "You need a plot of your own for that.",
+		needsPlot = "You'll need a plot to open this.",
 		thanks = "Sold. The box is yours to open.",
 		locked = "I don't have that one for sale.",
 	},
@@ -162,6 +165,18 @@ end
 
 function DialogueData.Shops(): { string }
 	return { "ToolShed", "HearthAndHome", "Dealership" }
+end
+
+export type Card = { choice: boolean, noLabel: string }
+
+-- Yes / Cancel on the no-plot warning. Other choice lines stay Yes / No.
+function DialogueData.Card(line: string): Card
+	if line == "needsPlot" then
+		return { choice = true, noLabel = "Cancel" }
+	elseif line == "offer" then
+		return { choice = true, noLabel = "No" }
+	end
+	return { choice = false, noLabel = "Close" }
 end
 
 return DialogueData

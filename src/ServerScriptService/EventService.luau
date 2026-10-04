@@ -3,16 +3,15 @@
 -- yet. Each remote is connected once. The handler budgets the call and
 -- drops it. A later batch replaces that body and does not connect again.
 --   ExpandLand     buy the next plot square
---   SpawnPadPress  the button on a vehicle pad (respawn reuses truck recall)
--- ChopSawSet lives on ChopSawService. It is not connected here, so a press
--- is not budgeted twice.
+-- SpawnPadPress is VehicleService.BindPad. ChopSawSet lives on
+-- ChopSawService. Neither is connected here, so a press is rate-limited
+-- once.
 
 local RateLimiter = require(script.Parent.RateLimiter)
 
 local EventService = {}
 
 local expandBound = false
-local padBound = false
 
 function EventService.Init(remotes: {
 	ExpandLand: RemoteEvent?,
@@ -35,12 +34,6 @@ function EventService.Init(remotes: {
 			end
 			local PlotService = require(script.Parent.PlotService)
 			PlotService.Expand(player, x, z, expected)
-		end)
-	end
-	if not padBound and remotes.SpawnPadPress ~= nil then
-		padBound = true
-		remotes.SpawnPadPress.OnServerEvent:Connect(function(player: Player)
-			RateLimiter.Allow(player, "SpawnPadPress")
 		end)
 	end
 end

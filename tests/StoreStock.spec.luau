@@ -93,4 +93,25 @@ return function(t)
 		end
 		t.eq(slots, 0, "the dealership board is not a shelf")
 	end)
+
+	t.test("T2: box prices are the catalog v2 prices, with no second table", function()
+		local ItemCatalog = t.shared("ItemCatalog")
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/ReplicatedStorage/Shared/StoreStock.luau")
+		t.eq(string.find(source, "VEHICLES", 1, true), nil)
+		local ids = { "Pickup", "ScoutATV", "Flatbed", "LoggingRig", "PonyTrailer", "RanchTrailer", "HeavyHauler" }
+		for _, id in ipairs(ids) do
+			local truck = ItemCatalog.GetTruck(id)
+			local trailer = ItemCatalog.GetTrailer(id)
+			local item = truck or trailer
+			local kind = if truck then "Truck" else "Trailer"
+			t.eq(StoreStock.UnitPrice(kind, id, false, 2), item.v2.price, id)
+			t.eq(item.v2.price, ItemCatalog.GetTruck(id) and ItemCatalog.GetTruck(id).v2.price or item.v2.price)
+		end
+		t.eq(StoreStock.UnitPrice("Truck", "Pickup", false, 2), 400)
+		t.eq(StoreStock.UnitPrice("Truck", "Flatbed", false, 2), 5000)
+		t.eq(StoreStock.UnitPrice("Truck", "LoggingRig", false, 2), 19000)
+		t.eq(StoreStock.UnitPrice("Truck", "Rustbucket", false, 2), 75)
+		t.eq(StoreStock.ForShop("Dealership"), {})
+	end)
 end

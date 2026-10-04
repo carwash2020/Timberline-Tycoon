@@ -142,6 +142,10 @@ export type Profile = {
 	-- Reconcile; GrantStarterTrucks then gives a truck only to a slot that
 	-- was actually played. A brand-new game is marked true with no truck.
 	starterTruckGranted: boolean,
+	-- False until Migrate mints one storage box per owned truck that is
+	-- not the Rustbucket. The template stays false so Reconcile does not
+	-- mark an old save as already boxed and skip the mint.
+	trucksBoxed: boolean,
 	ownedTrailers: { string },
 	equippedTrailer: string, -- hitched trailer id, "" for none
 	ownedBoats: { string },
@@ -255,6 +259,7 @@ local TEMPLATE: Profile = {
 	ownedTrucks = {},
 	equippedTruck = "",
 	starterTruckGranted = false,
+	trucksBoxed = false,
 	ownedTrailers = {},
 	equippedTrailer = "",
 	ownedBoats = {},
@@ -400,6 +405,13 @@ local function takenIds(record: any): { [string]: boolean }
 			end
 		end
 	end
+	if type(plot) == "table" and type(plot.pads) == "table" then
+		for _, pad in ipairs(plot.pads) do
+			if type(pad) == "table" then
+				keep(pad.uid)
+			end
+		end
+	end
 	return taken
 end
 
@@ -411,6 +423,85 @@ local function freshUid(used: { [string]: boolean }): string
 		end
 	end
 	return Util.guid()
+end
+
+-- Trucks that still need a Dealership box: owned, not the Rustbucket,
+-- and neither stored nor already placed on a pad.
+function ProfileSchema.WaitingTrucks(record: any): { string }
+	local waiting: { string } = {}
+	if type(record) ~= "table" or type(record.ownedTrucks) ~= "table" then
+		return waiting
+	end
+	local have: { [string]: boolean } = {}
+	if type(record.storage) == "table" then
+		for _, box in ipairs(record.storage) do
+			if type(box) == "table" and box.shop == "Dealership" and type(box.itemId) == "string" then
+				have[box.itemId] = true
+			end
+		end
+	end
+	local plot = record.plot
+	if type(plot) == "table" and type(plot.pads) == "table" then
+		for _, pad in ipairs(plot.pads) do
+			if type(pad) == "table" and type(pad.id) == "string" then
+				have[pad.id] = true
+			end
+		end
+	end
+	for _, id in ipairs(record.ownedTrucks) do
+		if type(id) == "string" and id ~= "Rustbucket" and ItemCatalog.GetTruck(id) ~= nil and have[id] ~= true then
+			table.insert(waiting, id)
+		end
+	end
+	return waiting
+end
+
+-- In a mint right now, so a join and a storage retry cannot both insert.
+local minting: { [any]: boolean } = {}
+
+-- Mints Dealership boxes for WaitingTrucks. At StorageCap it stops and
+-- leaves trucksBoxed false. Uids come from takenIds plus boxes already
+-- stored, so a second caller cannot duplicate a box. Never deletes a box.
+function ProfileSchema.MintTruckBoxes(record: any): { string }
+	if type(record) ~= "table" then
+		return {}
+	end
+	if minting[record] then
+		return {}
+	end
+	minting[record] = true
+	if type(record.storage) ~= "table" then
+		record.storage = {}
+	end
+	if record.trucksBoxed ~= true then
+		local identity = takenIds(record)
+		local used: { [string]: boolean } = {}
+		for id in pairs(identity) do
+			used[id] = true
+		end
+		for _, box in ipairs(record.storage) do
+			if type(box) == "table" and type(box.uid) == "string" then
+				used[box.uid] = true
+			end
+		end
+		while #record.storage < ProfileSchema.StorageCap do
+			local nextId = ProfileSchema.WaitingTrucks(record)[1]
+			if nextId == nil then
+				break
+			end
+			local uid = freshUid(used)
+			used[uid] = true
+			table.insert(record.storage, { uid = uid, itemId = nextId, shop = "Dealership" })
+		end
+		if #ProfileSchema.WaitingTrucks(record) == 0 then
+			record.trucksBoxed = true
+		else
+			record.trucksBoxed = false
+		end
+	end
+	local waiting = ProfileSchema.WaitingTrucks(record)
+	minting[record] = nil
+	return waiting
 end
 
 -- Per-slot fields. Missing or wrong-typed fields become the template.
@@ -451,6 +542,10 @@ local function applySlotFields(record: any)
 		end
 	end
 	record.storage = kept
+	-- One box per owned truck that is not the Rustbucket. Trailers are
+	-- not minted. A full storage stops the mint and leaves trucksBoxed
+	-- false, so a later load can finish. Nothing already stored is removed.
+	ProfileSchema.MintTruckBoxes(record)
 end
 
 -- Account-wide fields live on the profile, never inside a slot snapshot.

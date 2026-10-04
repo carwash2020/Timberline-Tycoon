@@ -226,6 +226,45 @@ function StoreStock.UnitPrice(kind: string, itemId: string, limited: boolean, lo
 			end
 		end
 		return if bp then PlotData.Price(bp) else nil
+	elseif kind == "Truck" then
+		-- The catalog's v2 price, through ShopLogic.Price. No second price table.
+		local truck = ItemCatalog.GetTruck(itemId)
+		return if truck then ShopLogic.Price(truck, loop) else nil
+	elseif kind == "Trailer" then
+		local trailer = ItemCatalog.GetTrailer(itemId)
+		return if trailer then ShopLogic.Price(trailer, loop) else nil
+	end
+	return nil
+end
+
+-- A dealership vehicle, for a boxed truck or a migrated storage box.
+-- Not a shelf slot: StoreStock.All and BoxCount stay the interior shops.
+function StoreStock.Vehicle(itemId: string): Slot?
+	local truck = ItemCatalog.GetTruck(itemId)
+	if truck then
+		return {
+			slotId = "dealership-" .. truck.id,
+			shop = "Dealership",
+			itemKind = "Truck",
+			itemId = truck.id,
+			displayName = truck.displayName,
+			respawnSec = GameConfig.BoxRespawnSec,
+			limited = false,
+			color = truck.look.color,
+		}
+	end
+	local trailer = ItemCatalog.GetTrailer(itemId)
+	if trailer then
+		return {
+			slotId = "dealership-" .. trailer.id,
+			shop = "Dealership",
+			itemKind = "Trailer",
+			itemId = trailer.id,
+			displayName = trailer.displayName,
+			respawnSec = GameConfig.BoxRespawnSec,
+			limited = false,
+			color = trailer.look.color,
+		}
 	end
 	return nil
 end

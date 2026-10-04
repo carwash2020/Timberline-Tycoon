@@ -61,11 +61,13 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 		price = if rec then Util.formatCash(rec.price) else nil,
 		hour = DialogueService.Hour(),
 	})
+	local card = DialogueData.Card(line)
 	local payload = {
 		line = line,
 		text = text,
 		boxUid = if rec then rec.uid else nil,
-		choice = line == "offer",
+		choice = card.choice,
+		noLabel = card.noLabel,
 	}
 	DialogueService.Last = payload
 	local event = remote :: any
@@ -79,6 +81,14 @@ local function lineFor(player: Player, rec: any): string
 		return "greet"
 	end
 	local profile = profileOf(player)
+	-- A truck or trailer box with no plot: the warning, before any payment.
+	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
+		local plot = if profile then profile.plot else nil
+		local claimed = type(plot) == "table" and plot.claimed == true
+		if not claimed and rec.itemId ~= "Rustbucket" then
+			return "needsPlot"
+		end
+	end
 	local cash = if profile then profile.cash else 0
 	return CounterLogic.Line({
 		boxUid = rec.uid,

@@ -18,6 +18,9 @@
 -- Uses only datatypes (no services). CFrames are built with fromMatrix,
 -- never lookAt, so Roblox and the Lune tests agree.
 
+local GameConfig = require(script.Parent.GameConfig)
+local ItemCatalog = require(script.Parent.ItemCatalog)
+
 local VehicleLogic = {}
 
 ---------------------------------------------------------------------------
@@ -546,6 +549,227 @@ local DUST: { [string]: Color3 } = {
 -- The dust colour for a ground material's name, or nil for no dust.
 function VehicleLogic.DustColor(materialName: string): Color3?
 	return DUST[materialName]
+end
+
+---------------------------------------------------------------------------
+-- Boxed trucks and spawn pads (B07)
+---------------------------------------------------------------------------
+
+-- A boxed truck is this share of the model's extents, and never smaller
+-- than the minimum.
+VehicleLogic.BoxScale = 0.35
+VehicleLogic.BoxMinX = 4
+VehicleLogic.BoxMinY = 3
+VehicleLogic.BoxMinZ = 4
+-- The pad is the truck's footprint plus this many studs on every side,
+-- and this thick.
+VehicleLogic.PadMargin = 2
+VehicleLogic.PadThick = 0.4
+-- The orange button post, outside the front-left corner.
+VehicleLogic.ButtonX = 2
+VehicleLogic.ButtonY = 1
+VehicleLogic.ButtonZ = 2
+VehicleLogic.ButtonOrange = Color3.fromRGB(230, 120, 30)
+-- The truck's underside sits this far above the pad top and the ground.
+VehicleLogic.SpawnClearance = 0.5
+-- Paint: catalog colour, four extras, and Blossom Pink at 1 in PinkOdds.
+VehicleLogic.CatalogWeight = 60
+VehicleLogic.ExtraWeight = 10
+VehicleLogic.PinkOdds = 500
+VehicleLogic.BlossomPink = "#E7A0B4"
+VehicleLogic.GhostRed = Color3.fromRGB(180, 40, 40) -- TBD (Designer)
+VehicleLogic.GhostOk = Color3.fromRGB(80, 200, 120) -- TBD (Designer)
+
+export type PaintSwatch = { name: string, hex: string }
+
+VehicleLogic.ExtraPaints = {
+	{ name = "Pine", hex = "#3E6B45" }, -- TBD (Designer)
+	{ name = "River", hex = "#3A6E8C" }, -- TBD (Designer)
+	{ name = "Hay", hex = "#C6A15B" }, -- TBD (Designer)
+	{ name = "Barn", hex = "#8C3A32" }, -- TBD (Designer)
+} :: { PaintSwatch }
+
+export type Foot = { x: number, z: number, sx: number, sz: number }
+
+export type PressPlan = {
+	fee: number,
+	despawn: boolean,
+	spawn: boolean,
+	broke: boolean,
+}
+
+-- The Rustbucket stays in the town lot. Everything else in the catalog
+-- can sit on a pad.
+function VehicleLogic.CanHavePad(id: string): boolean
+	if id == "Rustbucket" then
+		return false
+	end
+	return ItemCatalog.GetTruck(id) ~= nil or ItemCatalog.GetTrailer(id) ~= nil
+end
+
+-- Box size from a model's extents: scale, then the minimum.
+function VehicleLogic.BoxSize(extents: Vector3): Vector3
+	local scale = VehicleLogic.BoxScale
+	return Vector3.new(
+		math.max(VehicleLogic.BoxMinX, extents.X * scale),
+		math.max(VehicleLogic.BoxMinY, extents.Y * scale),
+		math.max(VehicleLogic.BoxMinZ, extents.Z * scale)
+	)
+end
+
+-- Pad size (X = width, Y = thickness, Z = length) from the vehicle's
+-- width and length.
+function VehicleLogic.PadSize(length: number, width: number): Vector3
+	local margin = VehicleLogic.PadMargin
+	return Vector3.new(width + 2 * margin, VehicleLogic.PadThick, length + 2 * margin)
+end
+
+-- The slab plus the button, which hangs off the front-left corner
+-- (ButtonX on -X, ButtonZ on -Z). Placement, the ghost, and pad blockers
+-- all use this foot so the button cannot sit off the yard.
+function VehicleLogic.PlaceFoot(x: number, z: number, padSize: Vector3): Foot
+	return {
+		x = x - VehicleLogic.ButtonX / 2,
+		z = z - VehicleLogic.ButtonZ / 2,
+		sx = padSize.X + VehicleLogic.ButtonX,
+		sz = padSize.Z + VehicleLogic.ButtonZ,
+	}
+end
+
+-- Plot-local x, z snapped to the B04 square (GameConfig.PlotSquare).
+function VehicleLogic.Snap(x: number, z: number, square: number): (number, number)
+	local function one(n: number): number
+		if square <= 0 or n ~= n or n == math.huge or n == -math.huge then
+			return 0
+		end
+		return math.floor(n / square + 0.5) * square
+	end
+	return one(x), one(z)
+end
+
+function VehicleLogic.RectsOverlap(a: Foot, b: Foot): boolean
+	local gapX = math.abs(a.x - b.x) - (a.sx + b.sx) / 2
+	local gapZ = math.abs(a.z - b.z) - (a.sz + b.sz) / 2
+	return gapX < -1e-4 and gapZ < -1e-4
+end
+
+function VehicleLogic.OnPlot(foot: Foot, half: number): boolean
+	return math.abs(foot.x) + foot.sx / 2 <= half + 1e-4 and math.abs(foot.z) + foot.sz / 2 <= half + 1e-4
+end
+
+-- Refused when the pad leaves the yard or meets a blueprint or another pad.
+function VehicleLogic.Placement(foot: Foot, blockers: { Foot }, half: number): (boolean, string?)
+	if not VehicleLogic.OnPlot(foot, half) then
+		return false, "edge"
+	end
+	for _, blocker in ipairs(blockers) do
+		if VehicleLogic.RectsOverlap(foot, blocker) then
+			return false, "overlap"
+		end
+	end
+	return true, nil
+end
+
+-- Red when the pad cannot go there.
+function VehicleLogic.GhostTint(ok: boolean): Color3
+	return if ok then VehicleLogic.GhostOk else VehicleLogic.GhostRed
+end
+
+-- The truck's underside: at least SpawnClearance above the pad top, and
+-- the same above the terrain hit. Never inside either.
+function VehicleLogic.SpawnBaseY(padTop: number, terrainY: number): number
+	local clearance = VehicleLogic.SpawnClearance
+	local y = padTop + clearance
+	if terrainY == terrainY and terrainY ~= math.huge and terrainY ~= -math.huge then
+		y = math.max(y, terrainY + clearance)
+	end
+	return y
+end
+
+-- First press is free (presses start at 0, including a migrated box).
+-- After that, round(rate x price). Tow Service waives it.
+function VehicleLogic.PadFee(presses: number, price: number, ownsTow: boolean, rate: number): number
+	if ownsTow or presses < 1 then
+		return 0
+	end
+	if price ~= price or rate ~= rate or price < 0 or rate < 0 then
+		return 0
+	end
+	return math.round(price * rate)
+end
+
+-- Fee first. A short wallet does not despawn or spawn. A refused press
+-- does neither.
+function VehicleLogic.PressPlan(
+	allowed: boolean,
+	presses: number,
+	price: number,
+	cash: number,
+	ownsTow: boolean,
+	rate: number
+): PressPlan
+	if not allowed then
+		return { fee = 0, despawn = false, spawn = false, broke = false }
+	end
+	local fee = VehicleLogic.PadFee(presses, price, ownsTow, rate)
+	local have = if cash == cash then cash else 0
+	if have < fee then
+		return { fee = fee, despawn = false, spawn = false, broke = true }
+	end
+	return { fee = fee, despawn = true, spawn = true, broke = false }
+end
+
+-- Server paint roll. `rng` returns [0, 1). Blossom Pink is the first
+-- draw, exactly 1/PinkOdds. The rest share CatalogWeight and ExtraWeight.
+function VehicleLogic.RollPaint(catalogHex: string, rng: () -> number): string
+	local pink = rng()
+	if pink == pink and pink * VehicleLogic.PinkOdds < 1 then
+		return VehicleLogic.BlossomPink
+	end
+	local extras = VehicleLogic.ExtraPaints
+	local total = VehicleLogic.CatalogWeight + VehicleLogic.ExtraWeight * #extras
+	local roll = rng() * total
+	if roll ~= roll then
+		return catalogHex
+	end
+	if roll < VehicleLogic.CatalogWeight then
+		return catalogHex
+	end
+	local acc = VehicleLogic.CatalogWeight
+	for _, paint in ipairs(extras) do
+		acc += VehicleLogic.ExtraWeight
+		if roll < acc then
+			return paint.hex
+		end
+	end
+	return catalogHex
+end
+
+-- The button's centre in pad space: front (-Z) and left (-X), outside
+-- the slab. Y is up from the pad centre.
+function VehicleLogic.ButtonOffset(padSize: Vector3): Vector3
+	return Vector3.new(
+		-(padSize.X / 2 + VehicleLogic.ButtonX / 2),
+		VehicleLogic.ButtonY / 2 + padSize.Y / 2,
+		-(padSize.Z / 2 + VehicleLogic.ButtonZ / 2)
+	)
+end
+
+-- What a pad press costs for this catalog id under `loop`.
+function VehicleLogic.CatalogPrice(kind: string, id: string, loop: number): number
+	local item = if kind == "Trailer" then ItemCatalog.GetTrailer(id) else ItemCatalog.GetTruck(id)
+	if not item then
+		return 0
+	end
+	local v2 = (item :: any).v2
+	if loop == 2 and type(v2) == "table" and type(v2.price) == "number" then
+		return v2.price
+	end
+	return item.priceCash
+end
+
+function VehicleLogic.RespawnRate(): number
+	return GameConfig.VehicleRespawnFeeRate
 end
 
 return VehicleLogic

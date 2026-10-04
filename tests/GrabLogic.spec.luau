@@ -317,4 +317,12 @@ return function(t)
 		t.eq(GrabLogic.Message("cap", fourth), "You can only carry 3 unpaid boxes.")
 		t.eq(GrabLogic.Message("cap", full), "The shop is full of loose boxes. Put one back and try again.")
 	end)
+
+	t.test("T5: only the pad owner or someone the plot allows can press", function()
+		t.eq(GrabLogic.CanPressPad({ userId = ME, ownerId = ME, plotAllows = false }), true)
+		t.eq(GrabLogic.CanPressPad({ userId = ME, ownerId = ME }), true)
+		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME, plotAllows = true }), true)
+		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME, plotAllows = false }), false)
+		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME }), false)
+	end)
 end

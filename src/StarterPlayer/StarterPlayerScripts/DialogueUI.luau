@@ -134,7 +134,8 @@ function DialogueUI.Start()
 		choosing = payload.choice == true
 		boxUid = if type(payload.boxUid) == "string" then payload.boxUid else nil
 		yes.Visible = choosing
-		no.Text = if choosing then "No" else "Close"
+		local cancel = if type(payload.noLabel) == "string" then payload.noLabel else "No"
+		no.Text = if choosing then cancel else "Close"
 		no.Position = if choosing then UDim2.fromOffset(BUTTON_W + 12, 52) else UDim2.fromOffset(90, 52)
 		holder.Visible = true
 		bind()
