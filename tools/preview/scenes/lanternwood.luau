@@ -67,9 +67,10 @@ return {
 					night = true,
 				},
 				{
-					-- The wall faces -X. Stand 12 studs in front of it, at eye
-					-- height, looking square at the boards.
-					pos = { dock.x - 40, dockY + 5, dock.z },
+					-- The wall faces -X. Stand 20 studs in front of it, at the
+					-- same eye height, so the whole wall fits with ground and
+					-- night around it.
+					pos = { dock.x - 48, dockY + 5, dock.z },
 					target = { dock.x - 28, dockY + 5, dock.z },
 					label = "a wall of Lanternwood planks at 22:00",
 					fov = 40,

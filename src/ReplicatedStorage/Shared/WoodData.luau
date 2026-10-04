@@ -25,7 +25,7 @@ WoodData.LanternLeaf = "#6E8A4A" -- day leaves. TBD (Designer)
 WoodData.LanternLeafShade = "#5C7640" -- a darker day leaf. TBD (Designer)
 WoodData.LanternLeafLight = "#849E5C" -- a lighter day leaf. TBD (Designer)
 WoodData.LanternBark = "#4A3826" -- day trunk. TBD (Designer)
-WoodData.LanternGlow = "#FFC45C" -- night neon, swapped on the client only. TBD (Designer)
+WoodData.LanternGlow = "#FFC45C" -- night neon, swapped on the client only.
 WoodData.LanternCore = "#C4A574" -- day cut face and planks. TBD (Designer)
 WoodData.LanternCoreBands = 1 -- one thin collar. TBD (Builder)
 -- v1 ladder, between frostwood ($25) and emberwood ($55). TBD (Designer)
