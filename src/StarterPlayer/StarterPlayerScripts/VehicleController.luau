@@ -27,6 +27,7 @@ local RunService = game:GetService("RunService")
 
 local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
+local DriveStart = require(ReplicatedStorage.Shared.DriveStart)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local Handling = require(ReplicatedStorage.Shared.Handling)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -58,12 +59,15 @@ type Session = {
 	speed: number,
 	facing: Vector3, -- flat unit vector the truck is steering toward
 	up: Vector3, -- the ground's up under the truck, smoothed
+	holding: boolean, -- parked facing, until the first throttle or steer
 	corners: { Vector3 }, -- chassis-local ray starts (VehicleLogic.CornerOffsets)
 	rayParams: RaycastParams,
 }
 
 local session: Session? = nil
 local callButton: UITheme.Button? = nil
+-- AutoRotate saved while we sit, so exit and Seated(false) can put it back.
+local seatLock: DriveStart.SeatLock = { saved = nil }
 
 local function startDriving(seat: VehicleSeat)
 	local truck = seat.Parent
@@ -95,6 +99,8 @@ local function startDriving(seat: VehicleSeat)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { truck, player.Character :: Instance }
 	params.RespectCanCollide = true
+	-- The chassis as it sits, not the camera. Held until the driver steers.
+	local parked = DriveStart.Seed(chassis.CFrame)
 	session = {
 		truck = truck,
 		seat = seat,
@@ -106,8 +112,9 @@ local function startDriving(seat: VehicleSeat)
 		minRadius = minRadius,
 		feel = feel,
 		speed = 0,
-		facing = VehicleLogic.FlatFacing(chassis.CFrame.LookVector),
-		up = chassis.CFrame.UpVector,
+		facing = VehicleLogic.FlatFacing(parked.LookVector),
+		up = parked.UpVector,
+		holding = true,
 		corners = VehicleLogic.CornerOffsets(chassis.Size.X, chassis.Size.Z),
 		rayParams = params,
 	}
@@ -139,12 +146,20 @@ local function step(dt: number)
 		return
 	end
 	local velocity = s.chassis.AssemblyLinearVelocity
+	local throttle = s.seat.ThrottleFloat
+	local steer = s.seat.SteerFloat
 	local actual = Vector3.new(velocity.X, 0, velocity.Z):Dot(s.facing)
-	s.speed = Handling.Speed(s.speed, s.seat.ThrottleFloat, s.topSpeed, dt, actual, s.feel)
-	local turn = Handling.Turn(s.speed, s.seat.SteerFloat, s.turnRate, dt, s.minRadius, s.feel, s.topSpeed)
-	s.facing = VehicleLogic.FlatFacing(CFrame.Angles(0, turn, 0):VectorToWorldSpace(s.facing))
+	s.speed = Handling.Speed(s.speed, throttle, s.topSpeed, dt, actual, s.feel)
+	local turn = Handling.Turn(s.speed, steer, s.turnRate, dt, s.minRadius, s.feel, s.topSpeed)
+	local turned = VehicleLogic.FlatFacing(CFrame.Angles(0, turn, 0):VectorToWorldSpace(s.facing))
+	-- Parked heading until the first real input, so a camera-facing tug
+	-- on the chassis does not become the steer target.
+	local facing, locked = DriveStart.Facing(s.holding, s.facing, throttle, steer, turned)
+	s.facing = facing
+	s.holding = locked
 
 	-- Lean with the ground, pulled upright by this truck's tip resistance.
+	-- Yaw stays the truck's; pitch and roll follow these rays, clamped.
 	local target = Handling.Lean(groundUp(s), s.feel.tipResist, MAX_TILT)
 	local alpha = 1 - math.exp(-s.feel.suspension * dt)
 	s.up = s.up:Lerp(target, alpha)
@@ -152,7 +167,7 @@ local function step(dt: number)
 		s.up = s.up.Unit
 	end
 	s.heading.CFrame = VehicleLogic.HeadingCFrame(s.facing, s.up)
-	local move = s.facing * s.speed
+	local move = DriveStart.Velocity(s.facing, s.speed)
 	s.drive.PlaneVelocity = Vector2.new(move.X, move.Z)
 end
 
@@ -229,14 +244,19 @@ end
 
 local function watchCharacter(char: Model)
 	session = nil
+	seatLock.saved = nil -- the previous body is gone; this one has its own AutoRotate
 	local humanoid = char:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
 		return
 	end
 	humanoid.Seated:Connect(function(active: boolean, seatPart: BasePart?)
-		if active and seatPart and seatPart:IsA("VehicleSeat") then
+		-- Off while sitting, so AutoRotate (and shift lock / first person,
+		-- which face the camera) cannot twist the seat weld and the truck.
+		local vehicle = active and seatPart ~= nil and seatPart:IsA("VehicleSeat")
+		DriveStart.OnSeated(seatLock, humanoid, active, vehicle == true)
+		if vehicle then
 			if GameConfig.VehiclePhysics then
-				startDriving(seatPart)
+				startDriving(seatPart :: VehicleSeat)
 			end
 		else
 			session = nil

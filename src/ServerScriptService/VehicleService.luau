@@ -70,6 +70,7 @@ local RunService = game:GetService("RunService")
 local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DriveMath = require(ReplicatedStorage.Shared.DriveMath)
+local DriveStart = require(ReplicatedStorage.Shared.DriveStart)
 local Handling = require(ReplicatedStorage.Shared.Handling)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
@@ -608,14 +609,20 @@ local function settle(rec: TruckRecord)
 end
 
 -- The owner sat down: physics goes to their device, sized to the truck.
+-- Heading is armed while the chassis is still anchored. Unanchoring first
+-- left it disabled until the deferred step, and in that gap AutoRotate
+-- (shift lock, first person) turned the welded root toward the camera
+-- and dragged the truck with it.
 local function startDriving(rec: TruckRecord, driver: Player)
 	rec.settleToken += 1 -- a settle in progress stops here
+	DriveStart.Arm(rec.chassis, rec.heading, rec.def.id)
 	rec.chassis.Anchored = false
 	rec.chassis:SetNetworkOwner(driver) -- the driver's device simulates it: smooth, no lag
 	rec.lastGood = rec.model:GetPivot()
 	rec.lastGoodAt = os.clock()
 	rec.lastCheck = os.clock()
 	-- Size the forces to the truck plus its driver once the seat weld is in.
+	-- Do not read the chassis orientation again: it may already have been tugged.
 	task.defer(function()
 		if rec.driver == nil or not rec.model.Parent then
 			return
@@ -624,7 +631,6 @@ local function startDriving(rec: TruckRecord, driver: Player)
 		local feel = Handling.For(rec.def.id)
 		rec.drive.MaxForce = mass * Handling.DriveForce(feel)
 		rec.heading.MaxTorque = mass * Handling.HoldTorque(feel)
-		rec.heading.CFrame = rec.chassis.CFrame.Rotation
 		rec.drive.PlaneVelocity = Vector2.zero
 		rec.drive.Enabled = true
 		rec.heading.Enabled = true
