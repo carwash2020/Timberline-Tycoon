@@ -28,7 +28,7 @@ return function(t)
 		"CameraShake",
 		"TreeFX",
 		"WoodFX",
-		"ForestUI",
+		-- ForestUI only listens for events. It has no per-frame loop.
 		"NPCController",
 		"TreeCosmetics",
 		"LuxFX",

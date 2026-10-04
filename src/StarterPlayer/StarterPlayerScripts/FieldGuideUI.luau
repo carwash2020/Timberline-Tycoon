@@ -77,7 +77,7 @@ local function woodsPage(): ShopUI.Shop
 					name = "The Hidden Grain",
 					own = string.format("· %d of %d revealed", n, total),
 					detail = "Some trees hide figured wood that sells for far more. Learn to read the bark.",
-					color = ForestArt.HeartseedColor,
+					color = ForestArt.FreshLime,
 					ring = UITheme.Colors.Amber,
 					dim = false,
 					button = "Open",

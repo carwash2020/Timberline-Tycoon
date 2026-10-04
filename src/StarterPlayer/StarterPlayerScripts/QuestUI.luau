@@ -7,8 +7,7 @@
 --     touch controls: there it sits in the thumbstick's corner, so it lets
 --     touches through and just fades after a while.
 --   * A beacon: a bouncing arrow over what to do next (the nearest tree or
---     log, your truck, the sell pad, a stump to plant in or else a tree to
---     fell for one, the Tool Shed), with its distance. It never picks an
+--     log, your truck, the sell pad, the Tool Shed), with its distance. It never picks an
 --     Elder (QuestUI.TutorialTree).
 -- The server owns progress: it sets the TutorialStep (0 = done) and
 -- TutorialProgress attributes, and this redraws from them.
@@ -269,9 +268,8 @@ local function standing(model: Model): boolean
 end
 
 -- A tree the tutorial may point you at: standing, and not an Elder. An
--- Elder is a co-op giant that's gone for good once felled, so it leaves
--- no stump to plant in (the plant step), and it's no first tree for a new
--- player. Elders carry the Elder attribute; `elderUid` (the workspace's
+-- Elder is a co-op giant that's gone for good once felled, so it's no
+-- first tree for a new player. Elders carry the Elder attribute; `elderUid` (the workspace's
 -- ElderUid, "" when none is awake) names the one awake too, in case that
 -- attribute hasn't reached this client yet.
 function QuestUI.TutorialTree(model: Model, elderUid: unknown): boolean
@@ -317,13 +315,6 @@ function QuestUI.BedPart(truck: Model): BasePart?
 		return bed
 	end
 	return truck.PrimaryPart
-end
-
--- How many Heartseeds of this tree's or stump's wood you hold.
-local function seedsFor(model: Model): number
-	local wood = model:GetAttribute("WoodId")
-	local seeds = if type(wood) == "string" then player:GetAttribute("Seeds_" .. wood) else nil
-	return if type(seeds) == "number" then seeds else 0
 end
 
 -- The part the beacon should hang over for this step, if it's around.
@@ -402,21 +393,8 @@ local function beaconTarget(step: Step, from: Vector3): BasePart?
 			return model:GetAttribute("OwnerId") == player.UserId
 		end)
 	elseif target == "stump" then
-		-- The nearest stump you hold a Heartseed for (hidden Gloam Hollow
-		-- stumps and ones already sprouting don't count).
-		local stump = nearestTagged("Stump", from, function(model, pp)
-			return seedsFor(model) > 0 and pp.Transparency < 1 and model:GetAttribute("Sprouting") ~= true
-		end)
-		if stump then
-			return stump
-		end
-		-- None around (it grew back, or it's out of view): a tree to fell for
-		-- a fresh stump, one of a wood you hold seeds for if there is one,
-		-- else any (felling it drops its own seed). Never the Elder: it
-		-- leaves no stump to plant in.
-		return nearestTagged("Tree", from, function(model)
-			return choppable(model) and seedsFor(model) > 0
-		end) or nearestTagged("Tree", from, choppable)
+		-- No step points here anymore. A tree, if one is left in an old save.
+		return nearestTagged("Tree", from, choppable)
 	elseif target == "sellPad" and CoreLoop.V2() then
 		-- The v2 loop with nothing of yours to sell (none on the bed, none
 		-- lying about): a tree to fell first, as for the bed.

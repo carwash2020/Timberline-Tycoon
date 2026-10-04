@@ -1,7 +1,7 @@
 --!nocheck
 -- The Living Forest (GAME_DESIGN §16): a tree wearing each bark clue, a
 -- planted tree with its name stake, an Elder in its aura, a storm-struck
--- tree, Heartseeds sprouting on a birch, a pine and a small oak's stump,
+-- tree, seeds sprouting on a birch, a pine and a small oak's stump,
 -- and a figured log of each figure.
 local Common = require("./_common")
 
@@ -101,7 +101,7 @@ return {
 		local orb = ForestArt.SeedOrb()
 		orb.CFrame = CF.new(126, 4, 47)
 		orb.Parent = root
-		label("Heartseed sprouting", V3.new(122, 1.5, 40))
+		label("Seed sprouting", V3.new(122, 1.5, 40))
 
 		-- Row 3: a figured log of each figure, then a plain one.
 		for i, f in ipairs(ForestData.Figures) do

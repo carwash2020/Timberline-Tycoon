@@ -12,9 +12,8 @@
 --    adds ground cover: grass patches, wildflowers, low bushes, fern
 --    clumps and mushroom clusters (low keeps its phone budget).
 --    Cells load within ~200 studs and unload past ~260, a couple per
---    frame; models are pooled and the live count is capped. Thriving
---    groves (workspace "Vitality_<biome>") grow more flowers: when a
---    grove changes tier, its cells re-scatter.
+--    frame; models are pooled and the live count is capped. Flowers use a
+--    steady Healthy mood: the grove meter is gone.
 -- 2. Critters (Shared/Art/CritterArt), at most EnvironmentData.MaxCritters
 --    animated models at once, chosen by EnvironmentData.CritterPlan:
 --    flocks circling over the woods that scatter when you come close,
@@ -75,9 +74,8 @@ local function focusPoint(): Vector3
 	return if camera then camera.Focus.Position else Vector3.zero
 end
 
-local function vitalityOf(biomeId: string): number
-	local v = workspace:GetAttribute("Vitality_" .. biomeId)
-	return if type(v) == "number" then v else EnvironmentData.DefaultVitality
+local function vitalityOf(_biomeId: string): number
+	return EnvironmentData.DefaultVitality
 end
 
 local function flat(v: Vector3): Vector3
@@ -440,25 +438,6 @@ local function removeTree(tree: Instance)
 			bin[tree] = nil
 		end
 		treeAt[tree] = nil
-	end
-end
-
-local lastTier: { [string]: string } = {}
-
-local function onVitalityChanged(attribute: string)
-	local biomeId = string.match(attribute, "^Vitality_(.+)$")
-	if not biomeId then
-		return
-	end
-	local tier = EnvironmentData.VitalityTier(vitalityOf(biomeId))
-	if lastTier[biomeId] == tier then
-		return
-	end
-	lastTier[biomeId] = tier
-	for key, cell in pairs(cells) do
-		if cell.biomes[biomeId] then
-			dirty[key] = true
-		end
 	end
 end
 
@@ -1544,10 +1523,6 @@ function AmbientLife.Start()
 	end
 	CollectionService:GetInstanceAddedSignal("Tree"):Connect(addTree)
 	CollectionService:GetInstanceRemovedSignal("Tree"):Connect(removeTree)
-	workspace.AttributeChanged:Connect(onVitalityChanged)
-	for name in pairs(workspace:GetAttributes()) do
-		onVitalityChanged(name)
-	end
 
 	local sinceScan = math.huge
 	local sincePlan = 0

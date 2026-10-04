@@ -222,13 +222,6 @@ return function(t)
 			-- Init draws the first Elder check's wait before UseV2 grows the trees.
 			table.insert(s.rolls, 1, 0.5)
 			s.Forest.Init({
-				PlantSeed = {
-					OnServerEvent = {
-						Connect = function(_, fn)
-							s.plant = fn
-						end,
-					},
-				},
 				WorldFX = {
 					FireAllClients = function(_, kind, payload)
 						table.insert(s.fxAll, { kind = kind, payload = payload })
@@ -298,74 +291,45 @@ return function(t)
 		t.eq(struckPiece.figure, "stormgrain")
 	end)
 
-	t.test("felling: seeds to the feller, a large-scale tree's extra one, the grove thins", function()
+	t.test("felling grants no seeds, large tree or not", function()
 		local s = setup()
 		local big = s.tree("oak", { scale = 1.15 })
 		local small = s.tree("oak", { scale = 0.85, seed = 9 })
 		s.start()
 		local p = s.player(1, "Ada")
 		s.fell(p, small)
-		t.eq(s.profiles[p].heartseeds.oak, s.ForestData.Seeds.perTree)
 		s.fell(p, big)
-		t.eq(s.profiles[p].heartseeds.oak, s.ForestData.Seeds.perTree * 2 + s.ForestData.Seeds.largeBonus)
-		t.ok(s.workspace:GetAttribute("Vitality_starter") < 60, "the grove thins")
+		t.eq(s.profiles[p].heartseeds, nil)
+		t.eq(s.plant, nil)
 	end)
 
-	t.test("the planter's share: 15% of the base value of what others freed, paid at the felling", function()
+	t.test("a marked planter is not paid a share when someone else fells the tree", function()
 		local s = setup()
 		local rec = s.tree("oak", { planterId = 1 })
 		s.start()
 		local a = s.player(1, "Ada")
 		local b = s.player(2, "Bo")
-		s.free(a, rec, 10) -- Ada limbing her own tree: no share for that
 		s.free(b, rec, 4)
 		s.fell(b, rec, 22)
-		local expected = s.ForestLogic.RoyaltyByValue((4 + 22) * 1.5)
-		t.eq(s.profiles[a].cash, expected)
-		t.eq(s.fxOne[#s.fxOne].kind, "Royalty")
+		t.eq(s.profiles[a].cash, 0)
 		t.eq(s.profiles[b].cash, 0)
-		-- Her own felling of her own tree pays nothing.
-		local own = s.tree("oak", { planterId = 1, seed = 4 })
-		s.fell(a, own, 22)
-		t.eq(s.profiles[a].cash, expected, "no share from yourself")
+		local kinds = {}
+		for _, e in ipairs(s.fxOne) do
+			table.insert(kinds, e.kind)
+		end
+		t.ok(not table.find(kinds, "Royalty"), "no planter payout")
 	end)
 
-	t.test("planting a Heartseed in a stub: the sprout sits on the stub's top, then the tree is back mature", function()
+	t.test("there is nothing to plant in a stub; the tree stays felled", function()
 		local s = setup()
 		local rec = s.tree("oak")
 		s.start()
 		local a = s.player(1, "Ada")
 		s.fell(a, rec)
-		t.eq(s.profiles[a].heartseeds.oak, 1)
-		s.plant(a, rec.uid)
-		local sprout
-		for _, e in ipairs(s.fxAll) do
-			if e.kind == "Sprout" then
-				sprout = e.payload
-			end
-		end
-		t.ok(sprout, "a Sprout")
-		local topY = -math.huge
-		local width
-		for _, d in ipairs(rec.model:GetChildren()) do
-			if d:IsA("BasePart") and d.Name == "Section" then
-				local y = (d.CFrame * CFrame.new(0, d.Size.Y / 2, 0)).Position.Y
-				if y > topY then
-					topY, width = y, d.Size.X
-				end
-			end
-		end
-		t.ok(math.abs(sprout.pos.Y - topY) < 1e-4, "on the stub's top section")
-		t.ok(math.abs(sprout.diameter - width) < 1e-6, "sized to it")
-		t.eq(sprout.seconds, s.ForestData.SproutSeconds)
-		s.runDelays()
-		t.eq(#s.regrows, 1)
-		t.eq(s.regrows[1].planterId, 1)
-		t.eq(s.regrows[1].opts, { stage = 1 }, "mature at once")
-		t.ok(not rec.felled)
-		t.eq(rec.planterId, 1)
-		local stake = s.workspace.TimberlineMap:FindFirstChild("ForestMarks")
-		t.ok(stake and #stake:GetChildren() == 1, "your stake")
+		t.eq(s.profiles[a].heartseeds, nil)
+		t.eq(s.plant, nil)
+		t.eq(rec.felled, true)
+		t.eq(#s.regrows, 0)
 	end)
 
 	t.test("an Elder: helpers who did 10% of the damage share 10% of the value freed from it", function()
@@ -387,6 +351,6 @@ return function(t)
 		local bonus = s.ForestLogic.HelperBonus(freedValue)
 		t.eq(s.profiles[b].cash, bonus, "Bo helped")
 		t.eq(s.profiles[c].cash, 0, "Cy did 5%")
-		t.eq(s.profiles[b].heartseeds[rec.def.id], s.ForestData.Elder.helperSeeds)
+		t.eq(s.profiles[b].heartseeds, nil, "helpers are paid in cash")
 	end)
 end

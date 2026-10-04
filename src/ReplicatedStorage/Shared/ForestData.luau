@@ -8,7 +8,7 @@
 local ForestData = {}
 
 ---------------------------------------------------------------------------
--- Heartseeds
+-- Seed drops (the live loop does not grant or plant these)
 ---------------------------------------------------------------------------
 
 ForestData.Seeds = {
@@ -53,7 +53,7 @@ ForestData.Vitality = {
 	max = 100,
 	fellWild = -1.5, -- felling a tree that grew back on its own
 	fellPlanted = -0.5, -- felling a tree someone planted
-	plant = 4, -- planting a Heartseed
+	plant = 4, -- planting used to add this
 }
 
 -- The groves with a vitality meter: the ground biomes (the Aether Isles
@@ -63,7 +63,7 @@ ForestData.Groves = { "starter", "hills", "snow", "volcano", "grove" }
 export type TierId = "Thinning" | "Healthy" | "Thriving" | "OldGrowth"
 
 export type Tier = {
-	id: TierId, -- the VitalityTier_<biome> workspace attribute
+	id: TierId, -- the grove tier name
 	displayName: string,
 	min: number, -- vitality at or above this (and below the next tier's)
 	figureMul: number, -- figure chance multiplier for trees growing here
@@ -81,7 +81,7 @@ ForestData.Tiers = {
 		figureMul = 0.5,
 		alive = false,
 		blurb = "the grove is thinning: replant to bring it back",
-		became = "%s is thinning. Plant Heartseeds in its stumps to bring it back.",
+		became = "%s is thinning.",
 	},
 	{
 		id = "Healthy",
@@ -233,7 +233,7 @@ ForestData.Elder = {
 	logMul = 3, -- logs (its size class adds 2x logsPerTree)
 	figures = { "quilted", "burl" }, -- always figured, by these figures' weights
 	helperMinShare = 0.1, -- chopped at least this much of its HP to count
-	helperSeeds = 2, -- each helper gets these Heartseeds ...
+	helperSeeds = 2, -- unused: helpers are paid in cash only
 	helperShare = 0.1, -- ... and this much of its logs' value
 	fadeSeconds = 15 * 60, -- unfelled, it fades back into the forest (a night-only one at dawn)
 	nightLeftSeconds = 4 * 60, -- a night-only grove wakes one only with this much of the night left

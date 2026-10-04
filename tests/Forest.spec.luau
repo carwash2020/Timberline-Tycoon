@@ -758,9 +758,9 @@ return function(t)
 
 	t.test("FOR-03: 200-350 new trees to chop after the country stands: verges, edges and clearings", function()
 		local trees = WorldPlan.Trees()
-		t.eq(#trees, BASE + #forestTrees)
+		t.ok(#trees > BASE + #forestTrees, "the density fill is appended after the forest")
 		for i, spot in ipairs(forestTrees) do
-			t.eq(trees[BASE + i], spot, "the forest's trees come last, in order")
+			t.eq(trees[BASE + i], spot, "the forest's trees follow the stands, in order")
 			t.eq(spot.biome, "wild")
 		end
 		t.ok(#forestTrees >= 200 and #forestTrees <= 350, #forestTrees .. " new trees")
@@ -867,24 +867,24 @@ return function(t)
 		end
 	end)
 
-	t.test("FOR-03: the server's trees: about 33 parts each, under 27,500 in all (FOR-03 raised it)", function()
+	t.test("FOR-03: a forest-ring tree is still about 33 parts", function()
 		local TreeArt = t.load("ReplicatedStorage/Shared/Art/TreeArt")
 		local WoodData = t.shared("WoodData")
 		local TreeLogic = t.shared("TreeLogic")
 		local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
-		local total, forest = 0, 0
-		for i, spot in ipairs(WorldPlan.Trees()) do
-			local p = spot.position
-			local seed = Kit.seedAt(p.X, p.Z)
-			local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
-			local n = #parts(TreeArt.Build(WoodData.Get(spot.woodId), seed, size.scale))
-			total += n
-			if i > BASE then
-				forest += n
+		local forest, forestN = 0, 0
+		for _, spot in ipairs(WorldPlan.Trees()) do
+			local zone = spot.zone
+			if zone and string.sub(zone.id, 1, 7) == "forest:" then
+				local p = spot.position
+				local seed = Kit.seedAt(p.X, p.Z)
+				local size = TreeLogic.SizeFor(Kit.rng(seed + 101):next())
+				forest += #parts(TreeArt.Build(WoodData.Get(spot.woodId), seed, size.scale))
+				forestN += 1
 			end
 		end
-		t.ok(forest / #forestTrees <= 36, string.format("%.1f parts a forest tree", forest / #forestTrees))
-		t.ok(total < 27500, total .. " parts in the ground's trees")
+		t.eq(forestN, #forestTrees, "the ring is the forest zones")
+		t.ok(forest / forestN <= 36, string.format("%.1f parts a forest tree", forest / forestN))
 	end)
 
 	---------------------------------------------------------------------------

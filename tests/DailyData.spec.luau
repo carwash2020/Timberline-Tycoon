@@ -60,27 +60,33 @@ return function(t)
 		end
 	end)
 
-	t.test("the Living Forest's goals: plant Heartseeds, sell figured logs", function()
+	t.test("the Living Forest's goal is figured logs; a saved plant goal is replaced alone", function()
 		local seen = {}
 		for day = 1, 200 do
 			for _, goal in ipairs(DailyData.Roll(4242, day, 2)) do
 				seen[goal.kind] = true
-				if goal.kind == "plant" then
-					t.eq(goal.target, DailyData.Tiers[2].seeds)
-				elseif goal.kind == "sellFigured" then
+				t.ok(goal.kind ~= "plant", "plant is not rolled")
+				if goal.kind == "sellFigured" then
 					t.eq(goal.target, DailyData.Tiers[2].figured)
 				end
 			end
 		end
-		t.ok(seen.plant and seen.sellFigured, "both come up")
-		-- About one figured tree's logs of the tier's wood; never more seeds
-		-- than a few trees' worth.
+		t.ok(seen.sellFigured, "figured logs come up")
 		for _, tier in ipairs(DailyData.Tiers) do
 			t.ok(tier.figured >= 3 and tier.figured <= 10, "figured target")
-			t.ok(tier.seeds >= 1 and tier.seeds <= tier.trees, "seeds target")
 		end
-		local goals = { { kind = "plant", target = 3, progress = 1, reward = 30, done = false } }
-		t.eq(DailyData.Decode(DailyData.Encode(goals)), goals, "the new kinds survive the attribute")
+		local fell = { kind = "fell", target = 4, progress = 2, reward = 15, done = false }
+		local plant = { kind = "plant", target = 3, progress = 1, reward = 30, done = false }
+		local goals = { fell, plant }
+		t.eq(DailyData.ReplaceRetired(goals, 4242, 3, 2, nil), true)
+		t.eq(goals[1], fell, "the other goal stays, progress and all")
+		t.ok(
+			goals[2].kind ~= "plant" and table.find(DailyData.Kinds, goals[2].kind),
+			"the plant goal became a live kind"
+		)
+		t.eq(goals[2].progress, 0)
+		t.eq(goals[2].reward, 30, "its pay stays")
+		t.eq(DailyData.ReplaceRetired(goals, 4242, 3, 2, nil), false, "a second pass leaves them")
 	end)
 
 	t.test("streak bonus grows to 2x at 5 days, then stays", function()
@@ -114,8 +120,6 @@ return function(t)
 		t.eq(DailyData.GoalText({ kind = "fell", target = 4 }), "Fell 4 trees")
 		t.eq(DailyData.GoalText({ kind = "earn", target = 1500 }), "Earn $1,500 selling logs")
 		t.eq(DailyData.GoalText({ kind = "sellWood", target = 9, wood = "birch" }), "Sell 9 birch logs")
-		t.eq(DailyData.GoalText({ kind = "plant", target = 3 }), "Plant 3 Heartseeds in stumps")
-		t.eq(DailyData.GoalText({ kind = "plant", target = 1 }), "Plant a Heartseed in a stump")
 		t.eq(DailyData.GoalText({ kind = "sellFigured", target = 4 }), "Sell 4 figured logs (read the bark!)")
 	end)
 
@@ -269,7 +273,7 @@ return function(t)
 		end
 		t.eq(count("fellTrees", "treeFelled"), 1, "one tree")
 		t.eq(count("fellTrees", "treeFelled", 2), 2)
-		t.eq(count("plantSeeds", "seedPlanted"), 1)
+		t.eq(count("plantSeeds", "treeFelled"), 0, "a retired kind counts nothing")
 		t.eq(count("sellVolume", "woodSold", nil, sale), 26.5, "u³")
 		t.eq(count("earnCash", "woodSold", nil, sale), 39, "$")
 		t.eq(count("sellWoodVolume", "woodSold", nil, sale, "birch"), 6.5, "that wood's u³")
@@ -333,8 +337,6 @@ return function(t)
 		t.eq(DailyData.GoalText(g("earnCash", 1000)), "Earn " .. C(1000) .. " selling wood")
 		t.eq(DailyData.GoalText(g("sellWoodVolume", 20, 0, "birch")), "Sell " .. V(20) .. " of birch")
 		t.eq(DailyData.GoalText(g("sellPieces", 6)), "Sell 6 logs of " .. V(DailyData.MinPieceVolumeV2) .. " or more")
-		t.eq(DailyData.GoalText(g("plantSeeds", 3)), "Plant 3 Heartseeds in stumps")
-		t.eq(DailyData.GoalText(g("plantSeeds", 1)), "Plant a Heartseed in a stump")
 		t.eq(DailyData.GoalText(g("sellFiguredVolume", 10)), "Sell " .. V(10) .. " of figured wood (read the bark!)")
 		t.eq(DailyData.ProgressText(g("sellVolume", 40, 12.8)), "(12/40 u³)")
 		t.eq(DailyData.ProgressText(g("earnCash", 60, 23.5)), "(" .. C(23.5) .. "/" .. C(60) .. ")")

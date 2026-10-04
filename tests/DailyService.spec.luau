@@ -75,29 +75,34 @@ return function(t)
 		end
 	end
 
-	t.test("the Living Forest's goals: planting Heartseeds and selling figured logs", function()
-		local planters, figured = 0, 0
-		for userId = 1, 80 do
+	t.test("figured logs still count, and a saved plant goal is replaced without touching the streak", function()
+		local figured = 0
+		for userId = 1, 40 do
 			local s = setup({ userId = userId })
 			for _, goal in ipairs(s.profile.daily.goals) do
-				if goal.kind == "plant" then
-					planters += 1
-					s.Daily.Event(s.player, "logsSold", 5, {}, 0)
-					t.eq(goal.progress, 0, "selling doesn't count as planting")
-					s.Daily.Event(s.player, "seedPlanted", 1)
-					t.eq(goal.progress, 1)
-					t.eq(goal.target, s.DailyData.Tiers[1].seeds)
-				elseif goal.kind == "sellFigured" then
+				t.ok(goal.kind ~= "plant", "plant is not rolled")
+				if goal.kind == "sellFigured" then
 					figured += 1
 					s.Daily.Event(s.player, "logsSold", 5, {}, 0)
 					t.eq(goal.progress, 0, "plain logs don't count")
 					s.Daily.Event(s.player, "figuredSold", 2)
 					t.eq(goal.progress, 2)
-					t.eq(goal.target, s.DailyData.Tiers[1].figured)
 				end
 			end
 		end
-		t.ok(planters > 0 and figured > 0, "both kinds come up across 80 players")
+		t.ok(figured > 0, "figured logs come up")
+		local s = setup({ userId = 7 })
+		s.profile.daily.streak = 4
+		local kept = s.profile.daily.goals[1]
+		s.profile.daily.goals[2] = { kind = "plant", target = 3, progress = 1, reward = 30, done = false }
+		s.profile.daily.goals[3] = { kind = "sell", target = 12, progress = 4, reward = 15, done = false }
+		local sell = s.profile.daily.goals[3]
+		s.Daily.Start(s.player, s.profile)
+		t.eq(s.profile.daily.streak, 4, "the streak stays")
+		t.eq(s.profile.daily.goals[1].kind, kept.kind)
+		t.eq(s.profile.daily.goals[1].progress, kept.progress)
+		t.ok(s.profile.daily.goals[2].kind ~= "plant")
+		t.eq(s.profile.daily.goals[3], sell, "the other goal is the same goal")
 	end)
 
 	t.test("joining rolls today's goals and publishes them", function()

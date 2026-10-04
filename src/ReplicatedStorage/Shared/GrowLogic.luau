@@ -8,8 +8,11 @@
 --     sprouted: 0 (a sapling, not cuttable) for the first 1/GrowStages of
 --     growSec, then 0.25, 0.5, 0.75 and 1 (mature) at each quarter.
 --     StageStartsAt is when a stage begins.
---   * Lifespan(def, seed, growth): how long a tree lives (the wood's
---     lifespan, multiples of growSec), a new roll for each growth.
+--   * Lifespan(def, seed, growth): how long a tree lives. It takes growSec
+--     to reach mature, then stands another 20 to 40 minutes. A new roll
+--     each growth.
+--   * RespawnDelay(respawnSec, roll): the wait before an open slot grows
+--     back, respawnSec times 0.7 to 1.3.
 --   * PhaseAt(age, life): "alive", "preDead" (its leaves have dropped, from
 --     PreDeadAt of its life) or "dead".
 --   * BootAge(def, seed, life): how old a site's tree is when the server
@@ -86,14 +89,19 @@ function GrowLogic.NextStage(stage: number, stages: number?): number?
 	return math.min(1, k / n)
 end
 
--- How long a tree of `def` lives, in seconds: its lifespan (multiples of
--- growSec) rolled from the site's seed and how many times it has grown.
+-- How long a tree of `def` lives, in seconds: growSec until it is mature,
+-- then 20 to 40 minutes standing. Rolled from the site's seed and how
+-- many times it has grown.
 function GrowLogic.Lifespan(def: WoodDef, seed: number, growth: number): number
-	local v2 = def.v2
-	local span = if v2 then v2.lifespan else GrowLogic.DefaultLifespan
-	local lo, hi = span[1] or 3, span[2] or span[1] or 6
 	local rng = Kit.rng(seed * 31 + growth * 7 + 404)
-	return GrowLogic.GrowSec(def) * rng:range(math.min(lo, hi), math.max(lo, hi))
+	return GrowLogic.GrowSec(def) + rng:range(20 * 60, 40 * 60)
+end
+
+-- Seconds until an open slot grows back: the wood's respawnSec, times a
+-- roll from 0.7 to 1.3 (`roll` is 0 to 1).
+function GrowLogic.RespawnDelay(respawnSec: number, roll: number): number
+	local u = if type(roll) == "number" and roll == roll then math.clamp(roll, 0, 1) else 0
+	return respawnSec * (0.7 + 0.6 * u)
 end
 
 -- Where a tree `age` seconds old with `life` seconds to live is.

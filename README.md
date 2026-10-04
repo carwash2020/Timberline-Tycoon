@@ -116,8 +116,7 @@ measure the economy model against your real play (saved in
     back and growing plots
   - `MapBuilder` + `TerrainBuilder`: build the world at start-up (terrain,
     town, trees, the Skyroot and isles)
-  - `ForestService`: the Living Forest (Heartseeds, planting, the planter's
-    share, grove vitality, figured wood, storm strikes, Elders, the Bloom)
+  - `ForestService`: the Living Forest (figures, storm strikes, Elders, the Skyroot Bloom)
   - `WeatherService`: the weather and lightning; `NPCService`: the townsfolk
 - `src/ReplicatedStorage/Shared`: code and data both sides use
   - `WoodData`, `ItemCatalog`, `BiomeData`: balance tables (tune here, not in code)

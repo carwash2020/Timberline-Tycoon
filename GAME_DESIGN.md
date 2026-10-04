@@ -455,7 +455,7 @@ game.
 
 ## 11. New player experience (first 10 minutes)
 
-> **v2:** Murph's steps keep their ids, in this order (`TutorialData.StepsV2`): fell a tree, drag a log, sell it at his cart, claim a free plot, buy the Rustbucket, load the bed, sell at the mill, plant a Heartseed, sell $120 more ($25 from Murph), buy the Steel Axe ($160). A save from the old plot-first order is remapped by index (`TutorialData.ApplyOrder`). A new player starts with $20.
+> **v2:** Murph's steps keep their ids, in this order (`TutorialData.StepsV2`): fell a tree, drag a log, sell it at his cart, claim a free plot, buy the Rustbucket, load the bed, sell at the mill, sell $120 more ($25 from Murph), buy the Steel Axe ($160). A save from an older step list is remapped by index (`TutorialData.ApplyOrder`). A new player starts with $20.
 
 A mentor NPC — **Murph**, a retired lumberjack — teaches by doing, not by
 dialogue walls. One objective at a time in a quest tracker, beacon guidance,
@@ -808,64 +808,28 @@ Playtest in Studio, checklist passes, zero console errors, commit as
 
 ## 16. The Living Forest (the twist; added October 2026)
 
-> **v2:** the same rules on section trees (ForestService.UseV2): every piece freed from a figured tree carries its figure, seeds drop by tree size, a Heartseed planted in a stub grows back mature, and the planter's 15% share is paid once when the tree is felled.
+> **v2:** the same rules on section trees (ForestService.UseV2): every piece freed from a figured tree carries its figure. A felled tree's slot opens when nothing rooted is left (or a dead tree has sunk) and the tree grows back in its zone after `respawnSec` times a 0.7–1.3 roll. Planting and the planter's share are gone.
 
-**Built (October 2026):** everything in this section except "Next" is in
-the game (ForestData holds every number below; ForestLogic the rules;
-ForestService, ForestUI and ForestArt the rest). The numbers are a first
-pass for playtesting.
+**Built (October 2026):** figures, storms, Elders and the Skyroot Bloom are in
+the game (ForestData holds the numbers; ForestLogic the rules; ForestService,
+ForestUI and ForestArt the rest). Planting and the grove meter are not.
 
 Research (REDESIGN.md) found that weather mutations with multipliers are
-saturated, including in our own genre (*Chop Your Tree*). What no lumber
-game does is make the forest **respond to you**. Timberline's twist: you
-don't just harvest the forest, you tend it, and it remembers.
+saturated, including in our own genre (*Chop Your Tree*). Timberline's twist
+is the hidden grain: read the bark, fell the tree, and it grows back somewhere
+else in its stand.
 
-**The loop it adds:** fell a tree → Heartseeds pop out → plant one in a
-stump (the tree grows back early, wearing your name) → anyone who later
-fells it pays you the planter's share → replanted groves thrive → thriving
-groves grow more figured wood and wake Elder giants. Every felled tree is
-now three decisions: which tree (read the bark), when, and where its seed
-goes.
+**Regrowth:** a ground cut frees the whole rooted section. The slot waits
+`respawnSec` × a roll from 0.7 to 1.3, then the same tree id grows back at a
+new spot in its zone (at least 10 studs from the old base), as a sapling.
+Sky trees stay on their island spots. A dead tree sinks, then its slot opens.
 
-### Heartseeds
-- Every felled tree drops **1** Heartseed of its wood (+1 for a large tree,
-  +1 on a 15% roll, +1 for a storm-struck tree). Elders drop more (below).
-  Seeds fly to the feller (a glowing pop and a counter tick).
-- Seeds are saved per wood (`profile.heartseeds`), at most 50 of a wood and
-  200 in all.
-- **Planting:** stand at a stump (within 12 studs) holding a seed of that
-  wood and press "Plant Heartseed". A sapling sprouts on the stump and the
-  tree is standing again **8 seconds** later, long before its natural
-  regrowth (woods outside the ground groves keep their rarity: a planted
-  Lumenwood sprouts for half its regrowth, about 7.5 minutes; palmwood
-  75 s). It's marked as yours (a little name stake at its foot).
-- **The planter's share:** when anyone else fells a tree you planted, you
-  earn **15% of its logs' base value**, paid by the game (the feller loses
-  nothing), if you're on the server. Felling your own planted tree gives
-  +1 Heartseed instead (the steward's bonus) once it has stood 10 minutes;
-  felling it sooner gives no bonus and takes back the vitality its planting
-  gave, so nobody can pump a grove alone by planting and refelling one
-  tree. Either way the tree grows back wild unless someone replants it.
-- **Who felled it:** a felling (its logs' pickup window, its Heartseeds,
-  the tutorial and daily credit) counts for whoever chopped the most of
-  it, not whoever landed the last swing.
-
-### Grove Vitality
-- Each ground biome has a vitality meter, 0–100, shared by the server
-  (workspace attribute `Vitality_<biome>`). It starts at 60 and drifts back
-  toward 60 by 1 point a minute.
-- Felling a wild tree −1.5; felling a planted tree −0.5; planting +4.
-- Tiers: **Thinning** under 35, **Healthy** 35–74, **Thriving** 75–89,
-  **Old Growth** 90+. The biome banner shows the tier.
-- Thriving and Old Growth groves come alive (more flowers, butterflies,
-  birdsong, deer, fireflies at night), grow more figured wood (below) and
-  can wake an Elder. Clear-cutting never punishes anyone's own progress:
-  a thinning grove just has fewer surprises in it.
+**Who felled it:** a felling (its logs, the tutorial and daily credit) counts
+for whoever chopped the most of it, not whoever landed the last swing.
 
 ### The Hidden Grain (figured wood)
 - When a tree grows (spawns or regrows), it may hide a **figure**. Chance:
-  6%, ×0.5 / ×1 / ×1.5 / ×2 by the grove's tier, +4% if planted, ×2 during
-  a Skyroot Bloom.
+  a flat 6% (the Healthy rate), ×2 during a Skyroot Bloom.
 - Figures, with their weights and what each log sells for:
   | Figure | Weight | Value | Bark clue |
   |---|---|---|---|
@@ -886,31 +850,30 @@ goes.
 - In a storm (WeatherService), lightning strikes now and then. A strike
   near a tree marks it **storm-struck** for 2 minutes: glowing cracks,
   sparks, a toast for everyone nearby. Fell it in time and its logs are
-  Stormgrain (+1 Heartseed). Weather is an input to the forest, never a
+  Stormgrain. Weather is an input to the forest, never a
   flat multiplier.
 
 ### Elder trees
-- At most one Elder on a server at a time. Every 8–15 minutes a Thriving or
-  Old Growth grove may wake one (more likely the higher its vitality): a
-  giant of that grove's wood (1.7× size, 6× HP, 3× logs, always figured:
-  Quilted or Burl), glowing, announced server-wide.
-- **Co-op:** everyone who chopped at least 10% of it counts: they all get
-  2 Heartseeds and a helper's bonus of 10% of its logs' value, and its
-  logs are free to grab at once. An Elder nobody fells fades after 15
-  minutes (a Phantom Grove Elder fades at dawn, and only wakes with at
-  least 5 minutes of night left). Elders never regrow (the grove has to
-  earn the next one).
+- At most one Elder on a server at a time. Every 8–15 minutes a grove may
+  wake one (each grove equally likely): a giant of that grove's wood
+  (1.7× size, 6× HP, 3× logs, always figured: Quilted or Burl), glowing,
+  announced server-wide.
+- **Co-op:** everyone who chopped at least 10% of it counts: each gets a
+  helper's bonus of 10% of its logs' value, and its logs are free to grab
+  at once. An Elder nobody fells fades after 15 minutes (a Phantom Grove
+  Elder fades at dawn, and only wakes with at least 5 minutes of night
+  left). Elders never regrow (the next check can wake another).
 - A tree that grows back, wakes or appears where a truck or a player
   stands comes up as a ghost (no collisions) until the spot is clear.
 
 ### The Skyroot Bloom
-- When the five ground groves average 75 vitality or more, the Skyroot
-  blooms for 8 minutes (workspace attribute `SkyrootBloom`): golden motes
-  pour off it, figure chances double everywhere. Then it rests for 30
-  minutes. Servers that replant together see it more.
+- The Skyroot blooms for 8 minutes on a clock (workspace attribute
+  `SkyrootBloom`), then rests for 30 minutes. It is not gated on a grove
+  meter. Golden motes pour off it, and figure chances double everywhere
+  while it lasts.
 
 ### Next (designed, not built)
-- **Genes and breeding** on plot Sapling Plots: a Heartseed carries a small
+- **Genes and breeding** on plot Sapling Plots: a sapling carries a small
   genome (girth, height, hue, density, figure, vigor); neighbouring plot
   trees cross-pollinate at dawn; the first player to grow a new cultivar
   names it in the Field Guide registry (generated names only). Sapling

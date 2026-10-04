@@ -28,20 +28,22 @@
 --     from (TreeArt.Notch). Once a cut is through, the section splits: its
 --     bottom stays (resized, anchored, a cut face on top) and everything
 --     above it becomes one loose piece (WoodService.Adopt), owned by
---     whoever did most of that cut (SectionLogic.Owner). Through a trunk
---     section the tree is felled: it tips away from the cutter, and the
---     stub left standing is the tree's model, tagged Stump (ForestUI's
---     planting prompt) until the site regrows after the wood's respawnSec
---     (HoldRegrow and StumpHold as TreeService has them). Cutting only
---     limbs ("limbing") never fells it.
+--     whoever did most of that cut (SectionLogic.Owner). A cut through the
+--     root (depth 0) frees that whole section and everything on it: no
+--     sliver, no stump. Through a trunk section the tree is felled
+--     (OnFelled once). The rooted base, if any is left, stays cuttable.
+--     When nothing rooted is left the record is an open slot and grows
+--     back later at a new spot in its zone. Cutting only limbs ("limbing")
+--     never fells it.
 --   * Felled = the first cut through a trunk section: OnFelled(feller,
---     rec, pieceUids, fallDir) fires once. The feller (and the owner of
---     every piece it frees) is the tree's claimer: the first cut claims a
---     tree, and nobody else may cut it while the claimer is in the server
---     and has hit it within GameConfig.TreeClaimSec (SectionLogic
---     .ClaimBlocks). An Elder is everyone's: its feller is ForestLogic
---     .Feller over its damageBy, a piece's owner whoever did most of that
---     cut (SectionLogic.Owner).
+--     rec, pieceUids, fallDir) fires once. The loose piece falls; the
+--     standing model is not tagged Stump and is not marked Felled, so the
+--     base can still be cut. The first cut claims a tree, and nobody else
+--     may cut it while the claimer is in the server and has hit it within
+--     GameConfig.TreeClaimSec (SectionLogic.ClaimBlocks). A felling clears
+--     the claim. An Elder is everyone's: its feller is ForestLogic.Feller
+--     over its damageBy, a piece's owner whoever did most of that cut
+--     (SectionLogic.Owner). An Elder leaves no slot.
 --   * Night-only woods (the Gloam Hollow): SetBiomeDormant hides a biome's
 --     trees and stubs by day (a half-cut tree is whole again tomorrow
 --     night) and brings them back at night (WorldClock).
@@ -55,8 +57,8 @@
 -- top of its trunk, where the crown rocks about), Sapling (true while a
 -- sapling), GrewAt (server time it last grew: the regrow spring),
 -- PreDead, Dead and DeadAt (server time: the death sink), HP (1 while it
--- can be cut, else 0), and after a felling the Stump tag with TreeUid,
--- FellAt and FallDir.
+-- can be cut, else 0). A loose piece carries FellAt and FallDir; the
+-- standing model is not tagged Stump.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -77,6 +79,9 @@ local Tune = require(ReplicatedStorage.Shared.Tune)
 local Util = require(ReplicatedStorage.Shared.Util)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
+local TreeFill = require(ReplicatedStorage.Shared.World.TreeFill)
+local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local GrabService = require(script.Parent.GrabService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local WoodService = require(script.Parent.WoodService)
@@ -149,6 +154,9 @@ export type TreeRecord = {
 	dead: boolean, -- dead and sinking
 	deadUntil: number?, -- when its sinking model goes
 	builds: number, -- how many models it has had (names)
+	zone: WorldPlan.TreeZone?, -- where it may grow back
+	cap: number?, -- boot count for this zone (and wood, except Wild)
+	slot: boolean, -- nothing rooted is left: waiting on regrowAt
 }
 
 export type SpawnOptions = {
@@ -158,9 +166,11 @@ export type SpawnOptions = {
 	temporary: boolean?,
 	boot: boolean?, -- a site planted at server start: GrowLogic.BootAge
 	stage: number?, -- start at this stage (0 sapling ... 1 mature; default mature)
+	zone: WorldPlan.TreeZone?,
+	cap: number?,
 }
 
-export type RegrowOptions = { stage: number? } -- 1: back mature at once (a planted Heartseed)
+export type RegrowOptions = { stage: number? } -- 1: back mature at once
 
 -- What GameServer gives it (seams the specs fill in).
 export type Deps = {
@@ -181,6 +191,23 @@ local deps: Deps? = nil
 local clock: () -> number = os.clock
 local started = false
 local makeSolid: (rec: TreeRecord) -> ()
+local openSlot: (rec: TreeRecord, now: number) -> ()
+local tryRegrow: (rec: TreeRecord, now: number) -> ()
+
+-- Specs set this to a 0..1 roll. Live servers use math.random.
+SectionTrees._roll = nil :: (() -> number)?
+
+-- A missed regrow (no legal spot, or the zone is over its cap) waits this
+-- long instead of trying again on the next tick.
+SectionTrees.RetrySec = 30
+
+local function unit(): number
+	local roll = SectionTrees._roll
+	if roll then
+		return roll()
+	end
+	return math.random()
+end
 
 -- Hooks, assigned like TreeService's (the forest systems, QuestService,
 -- GameServer).
@@ -384,8 +411,25 @@ makeSolid = function(rec: TreeRecord)
 	task.delay(SectionTrees.GhostRetry, retry)
 end
 
+-- A section still parented to the standing model is rooted.
+local function rootedLeft(rec: TreeRecord): boolean
+	for _, part in pairs(rec.sections) do
+		if part.Parent ~= nil then
+			return true
+		end
+	end
+	return false
+end
+
+-- Felled is fine while a rooted base is still there. Dying trees are not.
 local function canBeCut(rec: TreeRecord): boolean
-	return not rec.felled and not rec.dormant and not rec.dead and rec.stage > 0
+	if rec.dormant or rec.dead or rec.slot or rec.stage <= 0 then
+		return false
+	end
+	if rec.felled and not rootedLeft(rec) then
+		return false
+	end
+	return true
 end
 
 -- The model's HP attribute mirrors it, 1 or 0, for code that finds a
@@ -518,7 +562,9 @@ local function rebuild(rec: TreeRecord, grew: boolean)
 	model.Parent = getFolder("Trees")
 	if old and old ~= model then
 		byModel[old] = nil
-		old:Destroy()
+		if old.Parent ~= nil then
+			old:Destroy()
+		end
 	end
 	refreshAlive(rec)
 	if not rec.dormant and rec.stage > 0 then
@@ -536,7 +582,7 @@ end
 
 -- Plants a site's tree on the ground at `cframe` (its position is the
 -- ground point under the trunk). See SpawnOptions. Returns its Model.
-function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOptions?): Model
+function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOptions?): Model?
 	local def = WoodData.Get(woodId)
 	assert(def, "[SectionTrees] Unknown wood: " .. tostring(woodId))
 	local opts: SpawnOptions = options or {}
@@ -607,9 +653,20 @@ function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOp
 		dead = false,
 		deadUntil = nil,
 		builds = 0,
+		zone = opts.zone,
+		cap = opts.cap or (if opts.zone then opts.zone.cap else nil),
+		slot = false,
 	}
 	trees[uid] = rec
 	rebuild(rec, false)
+	-- A trunk whose saved spot sits in a widened haul road keeps that index
+	-- and does not stand there. The first regrow is due now; a miss waits
+	-- RetrySec.
+	if opts.boot and TreeFill.InHaulLane(pos.X, pos.Z) then
+		openSlot(rec, now)
+		rec.regrowAt = now
+		return nil
+	end
 	return rec.model
 end
 
@@ -748,11 +805,11 @@ function SectionTrees.Forget(uid: string, inst: Instance)
 	rec.effects[inst] = nil
 end
 
--- Keeps a felled tree's stub at least `seconds` more (at most MaxHold)
--- before the site regrows on its own; never sooner. As TreeService's.
+-- Keeps an open slot at least `seconds` more (at most MaxHold) before it
+-- grows back; never sooner.
 function SectionTrees.HoldRegrow(uid: string, seconds: number)
 	local rec = trees[uid]
-	local at = if rec and rec.felled and not rec.temporary then rec.regrowAt else nil
+	local at = if rec and rec.slot then rec.regrowAt else nil
 	if not rec or not at or seconds ~= seconds then
 		return
 	end
@@ -761,35 +818,13 @@ function SectionTrees.HoldRegrow(uid: string, seconds: number)
 	rec.regrowAt = math.max(at, untilAt)
 end
 
--- Brings a felled site back: a sapling that grows up over the wood's
--- growSec, or (opts.stage = 1, a planted Heartseed) mature at once.
--- `planterId` marks who planted it (nil = it grew back wild).
-function SectionTrees.Regrow(uid: string, planterId: number?, opts: RegrowOptions?)
+-- Grows an open slot back, at a new spot in its zone. See tryRegrow.
+function SectionTrees.Regrow(uid: string, _planterId: number?, _opts: RegrowOptions?)
 	local rec = trees[uid]
-	if not rec or not rec.felled then
+	if not rec or not rec.slot then
 		return
 	end
-	local stage = math.clamp(if opts and opts.stage then opts.stage else 0, 0, 1)
-	rec.planterId = planterId
-	rec.felled = false
-	rec.regrowAt = nil
-	rec.heldUntil = nil
-	rec.damageBy = {}
-	setClaim(rec, nil)
-	rec.cut = false
-	rec.preDead = false
-	rec.dead = false
-	rec.deadUntil = nil
-	rec.ghost = false
-	local growSec = GrowLogic.GrowSec(rec.def)
-	rec.life = GrowLogic.Lifespan(rec.def, rec.seed, rec.growth)
-	rec.stage = GrowLogic.StageAt(GrowLogic.StageStartsAt(stage, growSec), growSec)
-	rec.bornAt = clock() - GrowLogic.StageStartsAt(rec.stage, growSec)
-	rebuild(rec, true)
-	local onRegrown = SectionTrees.OnRegrown
-	if onRegrown then
-		task.spawn(onRegrown, rec)
-	end
+	tryRegrow(rec, clock())
 end
 
 -- Hides (or brings back) every tree of a biome, e.g. the Gloam Hollow by
@@ -800,7 +835,7 @@ function SectionTrees.SetBiomeDormant(biomeId: string, dormant: boolean)
 			rec.dormant = dormant
 			rec.model:SetAttribute("Dormant", dormant)
 			if dormant then
-				if not rec.felled and not rec.dead then
+				if not rec.slot and not rec.dead then
 					for id in pairs(rec.cuts) do
 						WoodService.ClearCuts(rec, id)
 					end
@@ -811,7 +846,7 @@ function SectionTrees.SetBiomeDormant(biomeId: string, dormant: boolean)
 				setVisible(rec, false)
 			else
 				setVisible(rec, true)
-				if not rec.felled and not rec.dead and rec.stage > 0 then
+				if not rec.slot and not rec.dead and rec.stage > 0 and rootedLeft(rec) then
 					makeSolid(rec) -- a truck may have parked on its spot by day
 				end
 			end
@@ -834,11 +869,11 @@ function SectionTrees.AllTrees(): { [string]: TreeRecord }
 	return trees
 end
 
--- Seconds until a felled site grows back on its own (nil if it isn't
--- down, or never will: an Elder).
+-- Seconds until an open slot grows back (nil if the tree is still
+-- rooted, or never will: an Elder).
 function SectionTrees.RegrowsIn(uid: string): number?
 	local rec = trees[uid]
-	local at = if rec and rec.felled then rec.regrowAt else nil
+	local at = if rec and rec.slot then rec.regrowAt else nil
 	return if at then math.max(0, at - clock()) else nil
 end
 
@@ -872,43 +907,25 @@ end
 -- Cutting
 ---------------------------------------------------------------------------
 
+-- The first trunk cut. The loose piece falls on its own; the standing
+-- model stays (cuttable, no Stump tag) until nothing rooted is left.
+-- An Elder is removed on a timer and never becomes a slot.
 local function fall(rec: TreeRecord, swinger: Player, dir: Vector3, pieceUid: string): Player
-	setAlive(rec, false)
 	rec.felled = true
 	rec.ghost = false
-	rec.growth += 1
 	local claim = if rec.elder then nil else rec.claim
 	local most = if claim then claim.userId else ForestLogic.Feller(rec.damageBy, swinger.UserId, isHere)
 	local feller = Players:GetPlayerByUserId(most) or swinger
-	setClaim(rec, nil) -- it's down: the wood is the feller's now
-	local model = rec.model
-	model:SetAttribute("Felled", true)
-	model:SetAttribute("FellAt", serverTime())
-	model:SetAttribute("FallDir", dir)
-	model:SetAttribute("TreeUid", rec.uid)
-	CollectionService:AddTag(model, SectionTrees.StumpTag)
-	rec.stump = model
-	rec.stumpParts = rec.parts
+	setClaim(rec, nil)
+	refreshAlive(rec)
 	if rec.temporary then
 		rec.regrowAt = nil
 		local growth = rec.growth
 		task.delay(SectionTrees.ElderStubSec, function()
-			if trees[rec.uid] == rec and rec.growth == growth then
+			if trees[rec.uid] == rec and rec.growth == growth and not rec.slot then
 				SectionTrees.Remove(rec.uid)
 			end
 		end)
-	else
-		rec.regrowAt = clock() + rec.def.respawnSec
-		rec.heldUntil = nil
-		local hold = SectionTrees.StumpHold
-		if hold then
-			local ok, seconds = pcall(hold, feller)
-			if ok and type(seconds) == "number" and seconds > 0 then
-				SectionTrees.HoldRegrow(rec.uid, seconds)
-			elseif not ok then
-				warn("[SectionTrees] StumpHold failed: " .. tostring(seconds))
-			end
-		end
 	end
 	local onFelled = SectionTrees.OnFelled
 	if onFelled then
@@ -935,26 +952,37 @@ local function split(
 	local part = rec.sections[sid]
 	local depth = rec.depth[sid] or 0
 	local felled = depth < rec.trunkSegments
-	local newId = rec.nextId
-	rec.nextId += 1
+	local rootCut = depth == 0
 	WoodService.ClearCuts(rec, sid)
-	local high = WoodService.SplitPart(part, hit.height, newId)
-	-- Links: the new part takes the cut section's children.
-	local node = rec.nodes[sid]
-	local children = node.children
-	node.children = {}
-	rec.nodes[newId] = { parent = nil, children = children }
-	for _, c in ipairs(children) do
-		local child = rec.nodes[c]
-		if child then
-			child.parent = newId
+	local high: BasePart
+	local ids: { [number]: boolean }
+	local stubFace: BasePart? = nil
+	if rootCut then
+		-- The whole rooted section leaves. No bottom sliver, no stub.
+		high = part
+		ids = WoodService.Reach(rec.nodes, sid)
+		TreeArt.CutFace(def, high, false)
+	else
+		local newId = rec.nextId
+		rec.nextId += 1
+		high = WoodService.SplitPart(part, hit.height, newId)
+		-- Links: the new part takes the cut section's children.
+		local node = rec.nodes[sid]
+		local children = node.children
+		node.children = {}
+		rec.nodes[newId] = { parent = nil, children = children }
+		for _, c in ipairs(children) do
+			local child = rec.nodes[c]
+			if child then
+				child.parent = newId
+			end
 		end
+		rec.sections[newId] = high
+		rec.depth[newId] = depth
+		ids = WoodService.Reach(rec.nodes, newId)
+		stubFace = TreeArt.CutFace(def, part, true)
+		TreeArt.CutFace(def, high, false)
 	end
-	rec.sections[newId] = high
-	rec.depth[newId] = depth
-	local ids = WoodService.Reach(rec.nodes, newId)
-	local stubFace = TreeArt.CutFace(def, part, true)
-	TreeArt.CutFace(def, high, false)
 	local pieceModel = WoodService.NewModel()
 	WoodService.MoveSections(rec.model, pieceModel, ids)
 	local nodes: { [number]: WoodService.Node } = {}
@@ -983,7 +1011,9 @@ local function split(
 		end
 		rec.effects[d] = nil
 	end
-	rec.parts[stubFace] = { transparency = stubFace.Transparency, collide = false, query = false }
+	if stubFace then
+		rec.parts[stubFace] = { transparency = stubFace.Transparency, collide = false, query = false }
+	end
 	-- Which way it goes: a trunk away from the cutter, a limb away from the tree.
 	local char = player.Character
 	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
@@ -1037,7 +1067,16 @@ local function split(
 		end
 	end
 	local feller: Player? = nil
-	if felled then
+	if rootCut then
+		if not rec.felled then
+			feller = fall(rec, player, dir, piece.uid)
+		end
+		if rec.temporary then
+			SectionTrees.Remove(rec.uid)
+		elseif trees[rec.uid] == rec then
+			openSlot(rec, clock())
+		end
+	elseif felled then
 		feller = fall(rec, player, dir, piece.uid)
 	end
 	return piece, feller
@@ -1286,26 +1325,166 @@ end
 -- Growth
 ---------------------------------------------------------------------------
 
+local TREE_GAP = 10
+
+local function liveBaseNear(rec: TreeRecord, x: number, z: number): boolean
+	local g2 = TREE_GAP * TREE_GAP
+	for _, other in pairs(trees) do
+		if other ~= rec and not other.slot and not other.dead and other.model.Parent ~= nil then
+			local dx, dz = other.base.X - x, other.base.Z - z
+			if dx * dx + dz * dz < g2 then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- A new ground point for `rec`, or nil when this tick found nothing.
+-- No zone (the specs' trees): twelve studs off the old base, so a regrow
+-- still happens without a world disc. Fixed zones (Sky Lumenwood) stay.
+local function pickSpot(rec: TreeRecord): Vector3?
+	local base = rec.base
+	local zone = rec.zone
+	if not zone then
+		return Vector3.new(base.X + 12, base.Y, base.Z)
+	end
+	if zone.fixed then
+		return base
+	end
+	local n = 0
+	local x, z = ForestLogic.FindSpot(zone.cx, zone.cz, zone.radius, 48, function()
+		n += 1
+		return (unit() + n * 0.173) % 1
+	end, function(px: number, pz: number): boolean
+		local dx, dz = px - base.X, pz - base.Z
+		if dx * dx + dz * dz < TREE_GAP * TREE_GAP then
+			return false
+		end
+		if not TreeFill.Ground(px, pz) then
+			return false
+		end
+		return not liveBaseNear(rec, px, pz)
+	end)
+	if not x or not z then
+		return nil
+	end
+	return Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+end
+
+local function zoneFull(rec: TreeRecord): boolean
+	local cap = rec.cap
+	local zone = rec.zone
+	if not cap or not zone then
+		return false
+	end
+	local n = 0
+	for _, other in pairs(trees) do
+		local otherZone = other.zone
+		-- Open slots are not rooted, so they do not hold the cap shut.
+		if otherZone and otherZone.id == zone.id and not other.temporary and not other.slot then
+			if zone.id == "wild" or other.def.id == rec.def.id then
+				n += 1
+			end
+		end
+	end
+	-- The record waiting to regrow is itself a slot, so it is not in n.
+	-- A zone already at its cap of rooted trees is full.
+	return n >= cap
+end
+
+-- Nothing rooted is left (or a dead tree has sunk). The record waits
+-- out respawnSec times 0.7 to 1.3, then grows back.
+openSlot = function(rec: TreeRecord, now: number)
+	if rec.temporary or trees[rec.uid] ~= rec or rec.slot then
+		return
+	end
+	rec.slot = true
+	rec.felled = true
+	rec.dead = false
+	rec.deadUntil = nil
+	rec.alive = false
+	rec.stump = nil
+	rec.stumpParts = nil
+	rec.ghost = false
+	setClaim(rec, nil)
+	local model = rec.model
+	if model then
+		model:SetAttribute("HP", 0)
+		CollectionService:RemoveTag(model, SectionTrees.StumpTag)
+		byModel[model] = nil
+		model:Destroy()
+	end
+	rec.parts, rec.effects = {}, {}
+	rec.sections, rec.nodes, rec.depth = {}, {}, {}
+	rec.cuts, rec.marks = {}, {}
+	rec.regrowAt = now + GrowLogic.RespawnDelay(rec.def.respawnSec, unit())
+	rec.heldUntil = nil
+end
+
+tryRegrow = function(rec: TreeRecord, now: number)
+	if trees[rec.uid] ~= rec or not rec.slot then
+		return
+	end
+	if zoneFull(rec) then
+		rec.regrowAt = now + SectionTrees.RetrySec
+		return
+	end
+	local pos = pickSpot(rec)
+	if not pos then
+		rec.regrowAt = now + SectionTrees.RetrySec
+		return
+	end
+	local salt = rec.growth + 1
+	local seed = Kit.seedAt(pos.X + salt * 13.1, pos.Z - salt * 7.7)
+	local _, sizeName, scale, yaw = GrowLogic.Site(pos, seed)
+	rec.growth = salt
+	rec.seed = seed
+	rec.scale = scale
+	rec.size = sizeClass(sizeName, scale)
+	rec.skel = TreeGen.Skeleton(rec.def.id, seed, scale, { elder = rec.elder })
+	rec.base = pos
+	rec.homeCf = CFrame.new(pos) * CFrame.Angles(0, yaw, 0)
+	rec.planterId = nil
+	rec.felled = false
+	rec.slot = false
+	rec.regrowAt = nil
+	rec.heldUntil = nil
+	rec.damageBy = {}
+	setClaim(rec, nil)
+	rec.cut = false
+	rec.preDead = false
+	rec.dead = false
+	rec.deadUntil = nil
+	rec.ghost = false
+	rec.life = GrowLogic.Lifespan(rec.def, seed, rec.growth)
+	rec.stage = 0
+	rec.bornAt = now
+	rebuild(rec, true)
+	local onRegrown = SectionTrees.OnRegrown
+	if onRegrown then
+		task.spawn(onRegrown, rec)
+	end
+end
+
 -- When `rec` next changes, or nil if nothing is coming.
 local function nextChange(rec: TreeRecord): number?
 	if rec.dormant then
 		return nil
 	end
+	if rec.slot then
+		return rec.regrowAt
+	end
 	if rec.dead then
 		return rec.deadUntil
-	end
-	if rec.felled then
-		if rec.temporary then
-			return nil
-		end
-		return rec.regrowAt
 	end
 	if rec.temporary then
 		return nil
 	end
+	-- A felled base still ages on the life clock. The slot opens when it sinks.
 	local growSec = GrowLogic.GrowSec(rec.def)
 	local candidates: { number } = {}
-	if not rec.cut then
+	if not rec.cut and not rec.felled then
 		local nextStage = GrowLogic.NextStage(rec.stage)
 		if nextStage then
 			table.insert(candidates, rec.bornAt + GrowLogic.StageStartsAt(nextStage, growSec))
@@ -1324,30 +1503,18 @@ local function nextChange(rec: TreeRecord): number?
 	return soonest
 end
 
--- Moves one tree on: regrows a stub, grows a stage, drops leaves, dies,
--- or clears a sunk tree away.
+-- Moves one tree on: grows a slot back, grows a stage, drops leaves,
+-- dies, or opens a slot once a dead tree has sunk.
 local function advance(rec: TreeRecord, now: number)
-	if rec.dead then
-		if rec.deadUntil and now >= rec.deadUntil then
-			-- Sunk: the site is empty until it regrows.
-			rec.deadUntil = nil
-			byModel[rec.model] = nil
-			rec.model:Destroy() -- kept as the record's model (no parent) until it regrows
-			rec.parts, rec.effects = {}, {}
-			rec.sections, rec.nodes, rec.depth = {}, {}, {}
-			rec.dead = false
-			rec.felled = true
-			rec.alive = false
-			rec.stump, rec.stumpParts = nil, nil
-			rec.growth += 1
-			rec.regrowAt = now + rec.def.respawnSec
-			rec.heldUntil = nil
+	if rec.slot then
+		if rec.regrowAt and now >= rec.regrowAt then
+			tryRegrow(rec, now)
 		end
 		return
 	end
-	if rec.felled then
-		if rec.regrowAt and now >= rec.regrowAt then
-			SectionTrees.Regrow(rec.uid)
+	if rec.dead then
+		if rec.deadUntil and now >= rec.deadUntil then
+			openSlot(rec, now)
 		end
 		return
 	end
@@ -1360,7 +1527,7 @@ local function advance(rec: TreeRecord, now: number)
 		die(rec)
 		return
 	end
-	if not rec.cut then
+	if not rec.cut and not rec.felled then
 		local stage = GrowLogic.StageAt(age, GrowLogic.GrowSec(rec.def))
 		if stage > rec.stage then
 			rec.stage = stage
@@ -1409,7 +1576,7 @@ function SectionTrees.Counts(): (number, number)
 	local sites, standing = 0, 0
 	for _, rec in pairs(trees) do
 		sites += 1
-		if not rec.felled and not rec.dead then
+		if rec.model.Parent ~= nil and not rec.dead and not rec.slot then
 			standing += 1
 		end
 	end
@@ -1463,6 +1630,7 @@ function SectionTrees._reset()
 	SectionTrees.OnPieceFreed = nil
 	SectionTrees.OnRebuilt = nil
 	SectionTrees.Hooks = {}
+	SectionTrees._roll = nil
 end
 
 return SectionTrees

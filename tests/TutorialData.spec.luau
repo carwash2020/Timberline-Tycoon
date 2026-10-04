@@ -25,31 +25,14 @@ return function(t)
 		dealership = true,
 	}
 
-	t.test("right after the first sale, Murph teaches planting a Heartseed", function()
+	t.test("the mill is followed by the sell-more loads; there is no plant step", function()
 		local ids = {}
 		for i, step in ipairs(TutorialData.Steps) do
 			ids[step.id] = i
 		end
-		t.ok(ids.plant ~= nil, "there's a planting beat")
+		t.eq(ids.plant, nil)
 		t.eq(ids.mill, ids.load + 1, "the sawmill is the trip after the truck")
-		t.eq(ids.plant, ids.mill + 1, "planting comes right after that haul")
-		local plant = TutorialData.Steps[ids.plant]
-		t.eq(plant.event, "seedPlanted")
-		t.eq(plant.count, 1)
-		t.eq(plant.objective, "Fell a tree, then plant its Heartseed in the stump")
-		t.eq(plant.murph, "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.")
-	end)
-
-	t.test("seeds wait for the plant step; stumps felled until then are held", function()
-		local plant = TutorialData.PlantStep
-		t.eq(TutorialData.Steps[plant].id, "plant")
-		for i = 1, #TutorialData.Steps do
-			t.eq(TutorialData.CanPlant(i), i >= plant, "step " .. i)
-			t.eq(TutorialData.StumpHold(i), if i <= plant then 240 else 0, "hold at step " .. i)
-		end
-		t.ok(TutorialData.CanPlant(0), "finished or skipped: plant any time")
-		t.eq(TutorialData.StumpHold(0), 0, "and no held stumps")
-		t.eq(TutorialData.StumpHoldSeconds, 240)
+		t.eq(ids.loads, ids.mill + 1, "the next load follows that haul")
 	end)
 
 	t.test("every step is well formed", function()
@@ -70,7 +53,8 @@ return function(t)
 		end
 		t.eq(order.truck, order.sell + 1, "the Rustbucket is the step right after the first sale")
 		t.eq(order.fell, order.plot + 1, "then chop")
-		t.ok(order.load and order.mill and order.plant and order.loads and order.steel, "the old lessons stay")
+		t.ok(order.load and order.mill and order.loads and order.steel, "the old lessons stay")
+		t.eq(order.plant, nil, "planting is not a step")
 	end)
 
 	t.test("Murph's device words ({click}) expand on every device; the tracker lines have none", function()
@@ -246,7 +230,6 @@ return function(t)
 			"truck",
 			"load",
 			"mill",
-			"plant",
 			"loads",
 			"loads2",
 			"loads3",
@@ -306,13 +289,18 @@ return function(t)
 		t.eq(#TutorialData.EventsV2, #V2)
 	end)
 
-	t.test("v2: the plant step sits where v1's does, so the seed and stump rules hold for both", function()
-		local plant = TutorialData.PlantStep
-		t.eq(V2[plant].id, "plant")
-		t.eq(V2[plant].event, "seedPlanted")
-		t.eq(V2[plant].objective, TutorialData.Steps[plant].objective, "unchanged")
-		t.eq(V2[plant].murph, TutorialData.Steps[plant].murph, "unchanged")
-		t.eq(V2[plant - 1].id, "mill", "right after the haul to the mill")
+	t.test("v2: the mill is followed by the sell-more loads in both lists", function()
+		local function at(steps, id)
+			for i, step in ipairs(steps) do
+				if step.id == id then
+					return i
+				end
+			end
+			return nil
+		end
+		t.eq(at(V2, "loads"), at(V2, "mill") + 1)
+		t.eq(at(TutorialData.Steps, "loads"), at(TutorialData.Steps, "mill") + 1)
+		t.eq(at(V2, "plant"), nil)
 	end)
 
 	t.test("v2: Murph's device words expand everywhere; the drag beat says how to put the axe away", function()
@@ -446,11 +434,7 @@ return function(t)
 				table.insert(kept, step.id)
 			end
 		end
-		t.eq(
-			kept,
-			{ "plot", "fell", "truck", "plant", "steel" },
-			"pickup, load, the cart, the mill and the loads start again"
-		)
+		t.eq(kept, { "plot", "fell", "truck", "steel" }, "pickup, load, the cart, the mill and the loads start again")
 		t.eq(TutorialData.KeepsProgressV2(0), false)
 		t.eq(TutorialData.KeepsProgressV2(#V2 + 1), false)
 	end)
@@ -527,8 +511,6 @@ return function(t)
 		Quest.Event(player, "woodLoaded")
 		t.eq(at(), "mill")
 		Quest.Event(player, "woodSold", 2)
-		t.eq(at(), "plant")
-		Quest.Event(player, "seedPlanted")
 		t.eq(at(), "loads")
 		local loads = V2[profile.tutorialStep]
 		local cash = profile.cash
@@ -556,10 +538,11 @@ return function(t)
 
 	t.test("v2: old index to step name, then that name's new index, for every step", function()
 		local old = TutorialData.OrderV2Previous
-		t.eq(#old, #V2)
+		t.eq(#old, #V2 + 1, "the retired plant step is the extra name")
 		for index, name in ipairs(old) do
 			local at = TutorialData.RemapV2Step(index)
-			t.eq(V2[at].id, name, string.format("old %d %s", index, name))
+			local expect = if name == "plant" then "loads" else name
+			t.eq(V2[at].id, expect, string.format("old %d %s", index, name))
 		end
 		t.eq(TutorialData.RemapV2Step(0), 0)
 		t.eq(TutorialData.RemapV2Step(#old + 1), #old + 1)
@@ -581,7 +564,8 @@ return function(t)
 				t.eq(V2[record.tutorialStep].id, "fell", "still on the old first step: the new order starts by felling")
 				t.eq(record.tutorialProgress, 0)
 			else
-				t.eq(V2[record.tutorialStep].id, name, name)
+				local expect = if name == "plant" then "loads" else name
+				t.eq(V2[record.tutorialStep].id, expect, name)
 				t.eq(record.tutorialProgress, 3, name .. " keeps its count")
 			end
 			-- A second pass leaves the step where the first put it. Index 2 is

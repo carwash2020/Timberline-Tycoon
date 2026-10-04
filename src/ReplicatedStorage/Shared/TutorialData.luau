@@ -23,7 +23,6 @@
 
 local FieldGuide = require(script.Parent.FieldGuide)
 local ItemCatalog = require(script.Parent.ItemCatalog)
-local PlotData = require(script.Parent.PlotData)
 local ShopLogic = require(script.Parent.ShopLogic)
 local WoodData = require(script.Parent.WoodData)
 
@@ -45,10 +44,10 @@ export type TutorialEvent =
 	| "plotClaimed"
 	| "truckBought"
 
--- What the beacon points at (QuestUI finds it in the world; "stump" is a
--- stump you hold a Heartseed for, which ForestUI also marks). v2 adds
+-- What the beacon points at (QuestUI finds it in the world). v2 adds
 -- "wood" (your nearest loose piece, tag Wood) and "truckBed" (your
 -- truck's bed). "murphCart" is the tutorial cart; "plotSign" is plot 1.
+-- "stump" stays in the type for older saves; no current step points there.
 export type BeaconTarget =
 	"tree"
 	| "log"
@@ -82,22 +81,11 @@ export type Step = {
 	also: TutorialEvent?, -- a second event; both must happen (progress stores the two bits)
 }
 
--- A blueprint named SaplingPlot is the planting half of the plot step.
-function TutorialData.SaplingsExist(): boolean
-	for _, bp in ipairs(PlotData.Blueprints) do
-		if bp.id == "SaplingPlot" then
-			return true
-		end
-	end
-	return false
-end
-
 local starterAxe = ItemCatalog.AxeLadder()[1]
 local steelAxe = ItemCatalog.AxeLadder()[2] -- AlreadyDone's tier 2
 local oak = WoodData.Get("oak") :: WoodData.WoodDef
 local birch = WoodData.Get("birch") :: WoodData.WoodDef
 local rustbucket = ItemCatalog.GetTruck("Rustbucket") :: ItemCatalog.TruckDef
-local saplings = TutorialData.SaplingsExist()
 
 local function logLoad(id: string, reward: number, murph: string): Step
 	return {
@@ -129,23 +117,15 @@ end
 local function plotStep(afterSale: boolean?): Step
 	-- v1 claims the plot before any sale, so the thank-you stays off that
 	-- line. v2 says it here, the step right after the cart sale.
-	local claim = if saplings
-		then "Every lumberjack needs land, and this one's free. Claim one, follow the arrow, then plant a sapling on it."
-		else "Every lumberjack needs land, and this one's free. Claim one, follow the arrow."
+	local claim = "Every lumberjack needs land, and this one's free. Claim one, follow the arrow."
 	local thanks = "That sale's yours, and a little extra from me. "
-	-- The sapling sentence plus the thank-you is too long for one bubble,
-	-- so that variant drops the "needs land" clause.
-	local after = if saplings
-		then thanks .. "Claim one, follow the arrow, then plant a sapling on it."
-		else thanks .. claim
 	return {
 		id = "plot",
-		objective = if saplings then "Claim a free plot and plant a sapling" else "Claim a free plot",
-		murph = if afterSale then after else claim,
+		objective = "Claim a free plot",
+		murph = if afterSale then thanks .. claim else claim,
 		event = "plotClaimed",
 		count = 1,
 		beacon = "plotSign",
-		also = if saplings then "seedPlanted" :: TutorialEvent else nil,
 	}
 end
 
@@ -215,18 +195,10 @@ TutorialData.Steps = {
 		count = 1,
 		beacon = "sellPad",
 	},
-	{
-		id = "plant",
-		objective = "Fell a tree, then plant its Heartseed in the stump",
-		murph = "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.",
-		event = "seedPlanted",
-		count = 1,
-		beacon = "stump",
-	},
 	logLoad(
 		"loads",
 		8,
-		"See it grow? That tree's yours. That Rusty Axe won't cut it in the hills. Sell another load and I'll chip in for a Steel Axe."
+		"That Rusty Axe won't cut it in the hills. Sell another load and I'll chip in for a Steel Axe."
 	),
 	logLoad("loads2", 8, "Another load at the mill. You're getting the hang of the haul."),
 	logLoad("loads3", 9, "One more load at the mill, and I'll chip in for that axe."),
@@ -302,19 +274,11 @@ TutorialData.StepsV2 = {
 		count = 1,
 		beacon = "sellPad",
 	},
-	{
-		id = "plant",
-		objective = "Fell a tree, then plant its Heartseed in the stump",
-		murph = "Cut one, plant one, kid. Plant that seed in the stump and the forest'll thank you.",
-		event = "seedPlanted",
-		count = 1,
-		beacon = "stump",
-	},
 	cashLoad(
 		"loads",
 		8,
 		string.format(
-			"See it grow? That tree's yours. That %s takes %d hits a cut on birch. Sell another load and I'll chip in for a %s.",
+			"That %s takes %d hits a cut on birch. Sell another load and I'll chip in for a %s.",
 			starterAxe.displayName,
 			FieldGuide.TrunkHits(starterAxe, birch),
 			steelAxe.displayName
@@ -458,18 +422,6 @@ function TutorialData.KeepsProgressV2(index: number): boolean
 	return false
 end
 
--- The Heartseed beat's place in the steps (found by id, so it follows the
--- step wherever it sits).
-local function indexOf(id: string): number
-	for i, step in ipairs(TutorialData.Steps) do
-		if step.id == id then
-			return i
-		end
-	end
-	error("[TutorialData] no step " .. id)
-end
-TutorialData.PlantStep = indexOf("plant")
-
 -- A save that came into the v2 loop with the tutorial finished gets a
 -- refresher (ProfileSchema.MigrateV2, QuestService): StepsV2 up to and
 -- including the first sale, the steps whose mechanics changed. Then it's
@@ -512,9 +464,10 @@ function TutorialData.Beacon(step: Step, cash: number?): BeaconTarget?
 	return step.beacon
 end
 
--- The v2 order before this list (plot led). A saved tutorialStep from that
--- order is a position here. ApplyOrder turns it into the new position.
-TutorialData.OrderV2 = 2
+-- Order 1 (and 0): plot led. Order 2: fell led, and still had a plant step.
+-- Order 3: that step is gone. ApplyOrder turns a saved index into this list.
+TutorialData.OrderV2 = 3
+-- The plot-first list (order 0 and 1).
 TutorialData.OrderV2Previous = {
 	"plot",
 	"fell",
@@ -529,14 +482,32 @@ TutorialData.OrderV2Previous = {
 	"loads3",
 	"steel",
 }
+-- The fell-first list that still included plant (order 2).
+TutorialData.OrderV2WithPlant = {
+	"fell",
+	"pickup",
+	"sell",
+	"plot",
+	"truck",
+	"load",
+	"mill",
+	"plant",
+	"loads",
+	"loads2",
+	"loads3",
+	"steel",
+}
 
--- Old v2 index to the step's name, then that name's index in StepsV2.
--- An index this list doesn't have is returned as it is.
-function TutorialData.RemapV2Step(oldIndex: number): number
-	local name = TutorialData.OrderV2Previous[oldIndex]
+-- The plant step is gone. A save that was on it, or named it, lands on the
+-- sell-more load that followed it.
+local RETIRED_STEP: { [string]: string } = { plant = "loads" }
+
+local function remapFrom(list: { string }, oldIndex: number): number
+	local name = list[oldIndex]
 	if type(name) ~= "string" then
 		return oldIndex
 	end
+	name = RETIRED_STEP[name] or name
 	for i, step in ipairs(TutorialData.StepsV2) do
 		if step.id == name then
 			return i
@@ -545,9 +516,16 @@ function TutorialData.RemapV2Step(oldIndex: number): number
 	return oldIndex
 end
 
+-- A plot-first index to the step's name, then that name's index in StepsV2.
+-- An index this list doesn't have is returned as it is. "plant" lands on loads.
+function TutorialData.RemapV2Step(oldIndex: number): number
+	return remapFrom(TutorialData.OrderV2Previous, oldIndex)
+end
+
 -- One profile or slot, once. A save still on the old first step (plot)
 -- starts the new order at fell: jumping it to the plot's new index would
--- skip the chop and the cart. Any later index keeps that step by name.
+-- skip the chop and the cart. A save already on the fell-first list (order
+-- 2) keeps each step by name, and the removed plant step becomes loads.
 -- A finished tutorial only gets the version stamp. Never touches the plot.
 function TutorialData.ApplyOrder(record: any)
 	if type(record) ~= "table" then
@@ -559,7 +537,10 @@ function TutorialData.ApplyOrder(record: any)
 	if record.tutorialDone ~= true then
 		local raw = tonumber(record.tutorialStep)
 		local step = if type(raw) ~= "number" or raw ~= raw then 1 else math.floor(raw)
-		if step > 1 then
+		local order = tonumber(record.tutorialOrder) or 0
+		if order >= 2 then
+			record.tutorialStep = remapFrom(TutorialData.OrderV2WithPlant, step)
+		elseif step > 1 then
 			record.tutorialStep = TutorialData.RemapV2Step(step)
 		else
 			record.tutorialStep = 1
@@ -567,25 +548,6 @@ function TutorialData.ApplyOrder(record: any)
 		end
 	end
 	record.tutorialOrder = TutorialData.OrderV2
-end
-
--- How long a stump felled on the way to the plant step waits before its
--- tree grows back on its own (TreeService.HoldRegrow): long enough to haul
--- and sell a load and come back to plant in it.
-TutorialData.StumpHoldSeconds = 240
-
--- Whether a player on tutorial step `step` (the TutorialStep attribute: 0
--- once it's finished or skipped) may plant a Heartseed. Before the plant
--- step they keep their seed: Murph shows them where.
-function TutorialData.CanPlant(step: number): boolean
-	return step <= 0 or step >= TutorialData.PlantStep
-end
-
--- Seconds a tree felled by a player on step `step` keeps its stump (0 =
--- the usual regrowth): anyone still on the way to the plant step, so the
--- stump is there when Murph asks for it.
-function TutorialData.StumpHold(step: number): number
-	return if step > 0 and step <= TutorialData.PlantStep then TutorialData.StumpHoldSeconds else 0
 end
 
 -- Whether a player who's already past this step (from their save) should

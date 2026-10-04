@@ -314,7 +314,7 @@ return function(t)
 		t.ok(big.scale > 1.5, "a monitor gets bigger text")
 	end)
 
-	t.test("4 to 6 short tips about chopping, hauling, selling and Heartseeds, rotating", function()
+	t.test("4 to 6 short tips about chopping, hauling, selling and figures, rotating", function()
 		local s = run({}) -- never ready: the full 30 s
 		local seen, order = {}, {}
 		local changes, last = 0, nil
@@ -333,7 +333,7 @@ return function(t)
 		t.ok(#order >= 4 and #order <= 6, #order .. " different tips")
 		t.ok(changes <= 7, "a tip stays up for seconds, not frames")
 		local all = string.lower(table.concat(order, " "))
-		for _, word in ipairs({ "tree", "truck", "sell", "heartseed" }) do
+		for _, word in ipairs({ "tree", "truck", "sell", "figured" }) do
 			t.ok(string.find(all, word, 1, true), "a tip mentions " .. word)
 		end
 		for _, tip in ipairs(order) do

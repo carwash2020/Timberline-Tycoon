@@ -32,7 +32,6 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	UpgradePlot = 1,
 	ClaimPlot = 4, -- the join picker: next and previous stay on the client
 	PlotPass = 2, -- close the picker, or let the timer assign one
-	PlantSeed = 3,
 	SaveSetting = 4,
 	Grab = 6, -- v2 loop (V2_PLAN.md §12)
 	Release = 6,

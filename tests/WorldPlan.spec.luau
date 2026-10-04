@@ -2073,7 +2073,11 @@ return function(t)
 		-- 322 original trees plus 160 country stands. Scattering the homesteads
 		-- gave the open country its stands back (the one lawn had left 171).
 		-- One stand sits off the spawn's line to the lighthouse.
-		t.eq(#WorldPlan.Trees() - #WorldPlan.ForestTrees(), 482)
+		-- 322 tuned trees + 160 stand trees, then the forest, then the density fill.
+		local trees = WorldPlan.Trees()
+		local forest = WorldPlan.ForestTrees()
+		t.eq(trees[483], forest[1], "the forest still starts after the 482")
+		t.ok(#trees > 482 + #forest, "the density fill is appended after the forest")
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2282,8 +2286,9 @@ return function(t)
 				t.eq(spot.biome, "wild")
 			end
 		end
-		-- Then the forest's (FOR-03), last of all.
-		t.eq(#trees, i + #WorldPlan.ForestTrees())
+		-- Then the forest's (FOR-03), then the density fill.
+		t.eq(trees[i + 1], WorldPlan.ForestTrees()[1], "the forest follows the stands")
+		t.ok(#trees > i + #WorldPlan.ForestTrees(), "the density fill follows the forest")
 		local added = i - FIRST
 		t.ok(added >= 150 and added <= 200, added .. " new trees")
 		t.ok(#stands >= 20, #stands .. " stands")

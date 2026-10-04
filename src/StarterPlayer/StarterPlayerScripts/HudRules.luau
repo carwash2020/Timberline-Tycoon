@@ -7,8 +7,6 @@
 --     NPCController has it).
 --   * DailyButton() (DailyUI): Daily Goals waits until the tutorial's done;
 --     DailyLabel() is what its button says.
---   * Pouch() (ForestUI): the Heartseed pouch shows from the tutorial's
---     plant step on, and after it, once you hold a seed.
 --   * SendHome() (VehicleController): "Send truck home" only while you're
 --     on foot, away from your truck, and it's away from its parking spot.
 --   * DropAxe() (AxeController): "Drop axe" only while you hold an axe and
@@ -19,7 +17,6 @@
 --     beside the hint.
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
 --   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
---   * SeedToast() (ForestUI): what Heartseeds landing in your pouch say.
 --   * ClockText() (WorldUI): the corner clock, "Day 14:05" / "Night 22:10".
 --   * PadKeys, PadShortcut() (HUD.PadShortcut): the D-pad opens Daily
 --     Goals, the Field Guide and Settings, only while nothing else has the
@@ -39,7 +36,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local FieldGuide = require(ReplicatedStorage.Shared.FieldGuide)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local TruckHome = require(ReplicatedStorage.Shared.TruckHome)
-local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
@@ -81,12 +77,6 @@ function HudRules.DailyLabel(done: number, total: number, streak: number, phone:
 	end
 	local name = if phone then "DAILY " else "DAILY GOALS  "
 	return string.format("%s%d/%d  ·  %d-day streak", name, done, total, days)
-end
-
--- The Heartseed pouch: you hold `seeds`, and the tutorial has reached its
--- plant step (TutorialData.PlantStep, found by its id) or is over.
-function HudRules.Pouch(step: unknown, seeds: number): boolean
-	return seeds > 0 and type(step) == "number" and (step == 0 or step >= TutorialData.PlantStep)
 end
 
 -- "Send truck home": `onFoot` (you have a character and aren't driving),
@@ -228,39 +218,6 @@ function HudRules.ToastSeconds(message: string, seconds: number?): number
 	end
 	local length = utf8.len(plain) or #plain -- characters ("·" is one), or bytes if it isn't UTF-8
 	return math.clamp(1.6 + 0.045 * length, HudRules.ToastMinSeconds, HudRules.ToastMaxSeconds)
-end
-
--- The toast for `seeds` Heartseeds of `wood` (its name) landing in your
--- pouch (ForestUI), or nil for none. `reasons` are the server's words for
--- any extras ("lucky", "big tree", "Elder", "storm-struck", "steward's
--- bonus"): they go in brackets. A plain drop gets no toast (the flying
--- seed and the pouch say it), except your very first seeds
--- (`firstSeeds`), which also say what to do with them, extras or not:
--- keep them for now while the tutorial hasn't reached its plant step
--- (`mayPlant` false: TutorialData.CanPlant), else plant them in a stump.
-function HudRules.SeedToast(
-	seeds: number,
-	wood: string,
-	reasons: { string },
-	firstSeeds: boolean,
-	mayPlant: boolean
-): string?
-	if #reasons == 0 and not firstSeeds then
-		return nil
-	end
-	local one = seeds == 1
-	local text = string.format("+%d %s Heartseed%s", seeds, wood, if one then "" else "s")
-	if #reasons > 0 then
-		text ..= " (" .. table.concat(reasons, ", ") .. ")"
-	end
-	if firstSeeds then
-		if mayPlant then
-			text ..= if one then ": plant it in a stump" else ": plant them in stumps"
-		else
-			text ..= if one then ": keep it for now" else ": keep them for now"
-		end
-	end
-	return text
 end
 
 -- The corner clock (WorldUI) for `clockTime`, an hour from 0 to 24

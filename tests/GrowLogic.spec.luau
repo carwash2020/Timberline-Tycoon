@@ -26,10 +26,10 @@ return function(t)
 		t.eq(GrowLogic.NextStage(1), nil)
 	end)
 
-	t.test("each wood lives its lifespan (multiples of growSec), a new roll each growth", function()
+	t.test("each wood lives growSec plus 20 to 40 minutes, a new roll each growth", function()
 		for _, def in ipairs(WoodData.All()) do
-			local v2 = def.v2
-			local lo, hi = v2.lifespan[1] * v2.growSec, v2.lifespan[2] * v2.growSec
+			local growSec = def.v2.growSec
+			local lo, hi = growSec + 20 * 60, growSec + 40 * 60
 			local seen = {}
 			for growth = 0, 4 do
 				local life = GrowLogic.Lifespan(def, 17, growth)
@@ -42,6 +42,17 @@ return function(t)
 			end
 			t.ok(n >= 2, def.id .. ": regrowths roll new lifespans")
 		end
+	end)
+
+	t.test("a slot waits respawnSec times a roll from 0.7 to 1.3", function()
+		local function near(actual, expected)
+			t.ok(math.abs(actual - expected) < 1e-6, string.format("%s ~ %s", tostring(actual), tostring(expected)))
+		end
+		near(GrowLogic.RespawnDelay(100, 0), 70)
+		near(GrowLogic.RespawnDelay(100, 0.5), 100)
+		near(GrowLogic.RespawnDelay(100, 1), 130)
+		near(GrowLogic.RespawnDelay(45, -2), 31.5)
+		near(GrowLogic.RespawnDelay(45, 4), 58.5)
 	end)
 
 	t.test("phases: alive, the leaves drop at PreDeadAt, dead at the end", function()

@@ -9,15 +9,6 @@ return function(t)
 	local HudRules = t.load("StarterPlayer/StarterPlayerScripts/HudRules")
 	local TutorialData = t.shared("TutorialData")
 
-	local function stepIndex(id)
-		for i, step in ipairs(TutorialData.Steps) do
-			if step.id == id then
-				return i
-			end
-		end
-		error("no tutorial step " .. id)
-	end
-
 	t.test("the tutorial runs while TutorialStep > 0, and while the save loads (nil)", function()
 		t.eq(HudRules.TutorialRunning(nil), true)
 		t.eq(HudRules.TutorialRunning(1), true)
@@ -54,30 +45,6 @@ return function(t)
 		t.eq(HudRules.DailyMark(0 / 0, 3), "0/3", "NaN done")
 		t.eq(HudRules.DailyMark(2, 0 / 0), "2/0", "NaN total")
 		t.eq(HudRules.DailyMark(1.9, 3.2), "1/3", "whole numbers")
-	end)
-
-	t.test("the pouch: from the plant step on, once you hold a seed", function()
-		local plant = stepIndex("plant")
-		t.ok(plant > 1, "the plant step comes after the first")
-		for step = 1, plant - 1 do
-			t.eq(HudRules.Pouch(step, 4), false, "step " .. step .. " (" .. TutorialData.Steps[step].id .. ")")
-		end
-		for step = plant, #TutorialData.Steps do
-			t.eq(HudRules.Pouch(step, 4), true, "step " .. step)
-			t.eq(HudRules.Pouch(step, 0), false, "no seeds, no pouch")
-		end
-		t.eq(HudRules.Pouch(0, 1), true, "after the tutorial")
-		t.eq(HudRules.Pouch(0, 0), false)
-		t.eq(HudRules.Pouch(nil, 4), false, "loading")
-	end)
-
-	t.test("the pouch waits for TutorialData.PlantStep, the step the server lets you plant from", function()
-		t.eq(TutorialData.PlantStep, stepIndex("plant"))
-		t.eq(HudRules.Pouch(TutorialData.PlantStep - 1, 4), false)
-		t.eq(HudRules.Pouch(TutorialData.PlantStep, 4), TutorialData.CanPlant(TutorialData.PlantStep))
-		local fs = require("@lune/fs")
-		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HudRules.luau")
-		t.ok(not string.find(source, "PLANT_STEP", 1, true), "no copy of the plant step of its own")
 	end)
 
 	t.test("Send truck home: on foot, away from the truck, and the truck away from its spot", function()
@@ -248,45 +215,6 @@ return function(t)
 		t.eq(HudRules.ToastSeconds("Hi", 0), 1, "never under 1 s")
 		t.eq(HudRules.ToastSeconds("Hi", 1e9), 15, "nor over 15 s")
 		t.eq(HudRules.ToastSeconds("Hi", 0 / 0), 2.5, "NaN: by its length")
-	end)
-
-	-- PLAY-03: the first seeds say to keep them during the tutorial, even
-	-- when they come with an extra.
-	t.test("Heartseed toasts: none for a plain drop, extras in brackets", function()
-		t.eq(HudRules.SeedToast(1, "Oak", {}, false, true), nil, "the flying seed and the pouch say it")
-		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, false, true), "+2 Oak Heartseeds (lucky)")
-		t.eq(
-			HudRules.SeedToast(3, "Pine", { "big tree", "lucky" }, false, false),
-			"+3 Pine Heartseeds (big tree, lucky)",
-			"not the first: no instructions, in the tutorial or not"
-		)
-	end)
-
-	t.test("the first Heartseeds say what to do: keep them in the tutorial, extras or not", function()
-		t.eq(HudRules.SeedToast(1, "Oak", {}, true, false), "+1 Oak Heartseed: keep it for now")
-		t.eq(HudRules.SeedToast(2, "Oak", {}, true, false), "+2 Oak Heartseeds: keep them for now")
-		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, true, false), "+2 Oak Heartseeds (lucky): keep them for now")
-		t.eq(
-			HudRules.SeedToast(3, "Birch", { "big tree" }, true, false),
-			"+3 Birch Heartseeds (big tree): keep them for now"
-		)
-		t.eq(
-			HudRules.SeedToast(4, "Birch", { "big tree", "lucky" }, true, false),
-			"+4 Birch Heartseeds (big tree, lucky): keep them for now"
-		)
-		-- Once planting's allowed (the plant step, or no tutorial).
-		t.eq(HudRules.SeedToast(1, "Oak", {}, true, true), "+1 Oak Heartseed: plant it in a stump")
-		t.eq(HudRules.SeedToast(2, "Oak", {}, true, true), "+2 Oak Heartseeds: plant them in stumps")
-		t.eq(HudRules.SeedToast(2, "Oak", { "lucky" }, true, true), "+2 Oak Heartseeds (lucky): plant them in stumps")
-	end)
-
-	t.test("the seed toast's planting word follows TutorialData.CanPlant through the steps", function()
-		for step = 1, #TutorialData.Steps do
-			local text = HudRules.SeedToast(2, "Oak", { "lucky" }, true, TutorialData.CanPlant(step))
-			local keep = step < stepIndex("plant")
-			t.eq(string.find(text, "keep them for now", 1, true) ~= nil, keep, "step " .. step)
-			t.eq(string.find(text, "plant them in stumps", 1, true) ~= nil, not keep, "step " .. step)
-		end
 	end)
 
 	t.test("the corner clock: Day or Night and the hour, as it always read", function()

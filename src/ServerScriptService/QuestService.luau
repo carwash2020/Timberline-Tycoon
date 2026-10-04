@@ -11,10 +11,7 @@
 --   * Each step reached is logged once as a "Tutorial" analytics funnel
 --     (which also lets saves made before a new step was inserted find
 --     their place again).
---   * ForestService reports "seedPlanted" for the Heartseed beat. Until
---     then a player keeps their seeds (ForestService refuses planting,
---     TutorialData.CanPlant), and the stumps they fell wait for them
---     (TreeService.StumpHold, TutorialData.StumpHold).
+--   * Trees regrow on their own timer. Stumps are not held for a plant step.
 --   * The steps are TutorialData.ForLoop(loop), for the core loop that
 --     runs (GameServer passes CoreLoop.Active() to Init; 1, the v1 steps,
 --     when not given). The v2 loop's steps (StepsV2: fell, drag, sell,
@@ -23,7 +20,6 @@
 --       woodGrabbed   GameServer, from GrabService.Hooks.onGrab
 --       woodSold      QuestService.WoodSold (SellService's onSold): pieces
 --       woodSoldCash  the same sale's whole dollars credited, right after
---       seedPlanted   ForestService, as today
 --       axeBought     ShopService, as today
 --       treeFelled    today the v1 chop path (GameServer); with section
 --                     trees (M1.3) SectionTrees' OnFelled must call
@@ -287,10 +283,18 @@ end
 -- sell step counts the pieces (woodSold), the dollars step the whole
 -- dollars (woodSoldCash), in that order: the first sale moves the sell
 -- step on, and its cash doesn't count toward the "more wood" step after
--- the Heartseed beat.
+-- the loads that follow the mill.
 function QuestService.WoodSold(player: Player, pieces: number, credited: number)
+	local profile = ProfileService.GetProfile(player)
+	local before = if profile then profile.tutorialStep else nil
 	if type(pieces) == "number" and pieces >= 1 then
 		QuestService.Event(player, "woodSold", math.floor(pieces))
+	end
+	-- A sale that just finished a step doesn't also pay the next one.
+	-- The mill used to be followed by a plant step, which ate this gap.
+	local after = if profile then profile.tutorialStep else nil
+	if before ~= after then
+		return
 	end
 	local dollars = if type(credited) == "number" and credited == credited then math.floor(credited) else 0
 	if dollars >= 1 and dollars ~= math.huge then
@@ -298,15 +302,10 @@ function QuestService.WoodSold(player: Player, pieces: number, credited: number)
 	end
 end
 
--- How long a stump this player has just felled keeps before its tree grows
--- back on its own (TreeService.StumpHold): up to the plant step, long
--- enough to come back and plant in it; 0 otherwise (or skipped, or done).
-function QuestService.StumpHoldFor(player: Player): number
-	local profile = ProfileService.GetProfile(player)
-	if not profile or profile.tutorialDone then
-		return 0
-	end
-	return TutorialData.StumpHold(profile.tutorialStep)
+-- Trees regrow on their own timer. The hook stays so TreeService can ask;
+-- nothing holds a stump.
+function QuestService.StumpHoldFor(_player: Player): number
+	return 0
 end
 
 -- Settings → Reset tutorial. A player who already owns a better axe would

@@ -108,8 +108,7 @@ local function setTargets(env: LightingController.Environment)
 			or env.weather == "Wind"
 		then env.intensity
 		else 0
-	local vitality = workspace:GetAttribute("Vitality_" .. (if biome == "" then "starter" else biome))
-	local life = EnvironmentData.LifeFactor(if type(vitality) == "number" then vitality else 60)
+	local life = EnvironmentData.LifeFactor(EnvironmentData.DefaultVitality)
 	local day = env.daylight
 
 	local birds = beds.BirdsDay

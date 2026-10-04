@@ -21,10 +21,10 @@
 --   * ElderAura(radius, color?): an Elder's ring of glowing stones, rising
 --     motes and a pillar of light (ground at y = 0); PrimaryPart "AuraCore"
 --     (holds the light and the "ElderMotes" emitter).
---   * Sprout(def, seed, stumpDiameter?): a Heartseed sprouting in a mound
+--   * Sprout(def, seed, stumpDiameter?): a seed sprouting in a mound
 --     (ground at y = 0), sized to the stump it's on; PrimaryPart "Mound".
 --     SproutScale(u) is how big it's drawn as it grows (at most 1).
---   * SeedOrb(): the glowing Heartseed that pops out and flies to you,
+--   * SeedOrb(): the glowing seed that used to fly to you,
 --     with a trail and a sparkle burst; LaunchSeedOrb / SeedOrbPop /
 --     RestSeedOrb are its flight's start, landing and rest in a pool.
 --   * FigureBand(logPart, figure): the coloured band round a figured log,
@@ -41,7 +41,7 @@ type Rng = Kit.Rng
 
 local ForestArt = {}
 
-ForestArt.HeartseedColor = Color3.fromRGB(206, 238, 112) -- a fresh lime gold
+ForestArt.FreshLime = Color3.fromRGB(206, 238, 112) -- a fresh lime gold
 ForestArt.ElderColor = Color3.fromRGB(255, 226, 140)
 ForestArt.StormColor = Color3.fromRGB(108, 206, 255)
 
@@ -442,7 +442,7 @@ function ForestArt.NameStake(name: string, seed: number): Model
 	Kit.decor(board, false)
 	local label = string.sub(name, 1, 18)
 	Kit.signText(board, label, Color3.fromRGB(70, 44, 24), { Enum.NormalId.Front, Enum.NormalId.Back })
-	-- Twine, and a sprout on top (a Heartseed's mark).
+	-- Twine, and a sprout on top.
 	Kit.decor(
 		Kit.cylinder(
 			model,
@@ -455,7 +455,7 @@ function ForestArt.NameStake(name: string, seed: number): Model
 		),
 		false
 	)
-	local leaf = ForestArt.HeartseedColor:Lerp(Color3.fromRGB(96, 170, 70), 0.55)
+	local leaf = ForestArt.FreshLime:Lerp(Color3.fromRGB(96, 170, 70), 0.55)
 	for _, side in ipairs({ -1, 1 }) do
 		Kit.decor(
 			Kit.wedge(
@@ -469,10 +469,7 @@ function ForestArt.NameStake(name: string, seed: number): Model
 			false
 		)
 	end
-	Kit.decor(
-		Kit.ball(model, "Seed", 0.26, CFrame.new(0, 2.66, 0), ForestArt.HeartseedColor, Enum.Material.Neon),
-		false
-	)
+	Kit.decor(Kit.ball(model, "Seed", 0.26, CFrame.new(0, 2.66, 0), ForestArt.FreshLime, Enum.Material.Neon), false)
 	return model
 end
 
@@ -552,10 +549,10 @@ function ForestArt.ElderAura(radius: number, color: Color3?): Model
 end
 
 ---------------------------------------------------------------------------
--- Heartseeds: the sprout and the orb
+-- Sprouts and seed orbs
 ---------------------------------------------------------------------------
 
--- A Heartseed sprouting: a mound of fresh soil, the glowing seed and a
+-- A seed sprouting: a mound of fresh soil, the glowing seed and a
 -- sapling of the wood. Ground at y = 0 (the stump's cut). Given the
 -- stump's diameter, the mound (0.8 of it) and a thin glowing ring round
 -- the cut (0.95 of it) stay on the stump, so nothing hangs in mid-air
@@ -583,7 +580,7 @@ function ForestArt.Sprout(def: WoodDef, seed: number, stumpDiameter: number?): M
 		if d then 0.04 else 0.05,
 		if d then d * 0.95 else 3.6,
 		CFrame.new(0, if d then 0.12 else 0.08, 0) * CFrame.Angles(0, 0, math.pi / 2),
-		ForestArt.HeartseedColor,
+		ForestArt.FreshLime,
 		Enum.Material.Neon
 	)
 	halo.Transparency = 0.6
@@ -594,10 +591,10 @@ function ForestArt.Sprout(def: WoodDef, seed: number, stumpDiameter: number?): M
 	local heartAt = if d
 		then CFrame.new(d * 0.2 * 0.857, 0.25 + heartSize * 0.2, -d * 0.2 * 0.514)
 		else CFrame.new(0.5, 0.42, -0.3)
-	local heart = Kit.ball(model, "Heartseed", heartSize, heartAt, ForestArt.HeartseedColor, Enum.Material.Neon)
+	local heart = Kit.ball(model, "SeedGem", heartSize, heartAt, ForestArt.FreshLime, Enum.Material.Neon)
 	Kit.decor(heart, false)
 	local light = Instance.new("PointLight")
-	light.Color = ForestArt.HeartseedColor
+	light.Color = ForestArt.FreshLime
 	light.Range = 10
 	light.Brightness = 1.5
 	light.Shadows = false
@@ -634,17 +631,17 @@ ForestArt.SeedSparkleTexture = "rbxasset://textures/particles/smoke_main.dds"
 
 function ForestArt.SeedOrb(): Part
 	local orb = Instance.new("Part")
-	orb.Name = "HeartseedOrb"
+	orb.Name = "SeedOrbPart"
 	orb.Shape = Enum.PartType.Ball
 	orb.Size = Vector3.one * ForestArt.SeedOrbSize
-	orb.Color = ForestArt.HeartseedColor
+	orb.Color = ForestArt.FreshLime
 	orb.Material = Enum.Material.Neon
 	orb.Anchored = true
 	orb.TopSurface = Enum.SurfaceType.Smooth
 	orb.BottomSurface = Enum.SurfaceType.Smooth
 	Kit.decor(orb, false)
 	local light = Instance.new("PointLight")
-	light.Color = ForestArt.HeartseedColor
+	light.Color = ForestArt.FreshLime
 	light.Range = 7
 	light.Brightness = 1.6
 	light.Shadows = false
@@ -664,7 +661,7 @@ function ForestArt.SeedOrb(): Part
 	trail.Attachment0 = top
 	trail.Attachment1 = bottom
 	trail.Lifetime = 0.35
-	trail.Color = ColorSequence.new(ForestArt.HeartseedColor)
+	trail.Color = ColorSequence.new(ForestArt.FreshLime)
 	trail.Transparency = NumberSequence.new(0.1, 1)
 	trail.WidthScale = NumberSequence.new(1, 0.3)
 	trail.LightEmission = 1
@@ -675,7 +672,7 @@ function ForestArt.SeedOrb(): Part
 	local sparkle = Instance.new("ParticleEmitter")
 	sparkle.Name = "SeedSparkle"
 	sparkle.Texture = ForestArt.SeedSparkleTexture
-	sparkle.Color = ColorSequence.new(Color3.fromRGB(246, 255, 214), ForestArt.HeartseedColor)
+	sparkle.Color = ColorSequence.new(Color3.fromRGB(246, 255, 214), ForestArt.FreshLime)
 	sparkle.LightEmission = 1
 	sparkle.LightInfluence = 0
 	sparkle.Rate = 0 -- bursts only (Emit)

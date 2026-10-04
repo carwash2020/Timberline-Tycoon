@@ -130,7 +130,7 @@ NPCData.List = {
 		greetings = { "Well, look who it is!", "Mornin', kid!", "Howdy, partner." },
 		lines = {
 			"Back in my day we felled trees uphill. Both ways.",
-			"Plant a Heartseed in a fresh stump and the forest remembers who you are.",
+			"Fell a tree and it grows back somewhere else in the stand. Give it room.",
 			"The Gloam Hollow only shows itself after dark. Bring a lantern. And your nerve.",
 			"Curly bark, dimpled bark, lumpy bark... that's figure hidin' in the grain. Don't sell it cheap.",
 			"See that giant up yonder? The Skyroot. Been growin' since before I was a sapling.",
@@ -492,7 +492,7 @@ NPCData.List = {
 		greetings = { "Hi hi hi!", "Whoa, is that YOUR axe?", "Hey! Wanna see my tree?" },
 		lines = {
 			"When I grow up I'm gonna fell an Elder tree. With everybody!",
-			"Murph says if you plant a Heartseed, the tree knows your name.",
+			"Murph says the forest grows a new tree when you fell one. I named mine Gerald.",
 			"I'm growing this one myself. Its name is Gerald.",
 			"Did you know trees hit by lightning glow? I saw one! Kinda.",
 			"Millie says I can work the saw when I'm taller. I'm almost taller!",

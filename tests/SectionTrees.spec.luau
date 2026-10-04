@@ -1,14 +1,14 @@
 --!nocheck
 -- SectionTrees (V2_PLAN.md M1.3): the v2 loop's standing trees. The Chop
 -- remote's checks and their reasons (cooldown, far, noLOS, tooHard), a
--- felling (OnFelled once, the stub stays anchored and becomes the Stump,
--- the trunk a loose piece), limbing, the regrow from a sapling through the
+-- felling (OnFelled once, a ground cut leaves nothing, a high cut leaves
+-- a cuttable base), limbing, the regrow from a sapling through the
 -- growth stages, death, the Gloam Hollow's dormancy and the ghost-until-
 -- clear. The engine's queries (Raycast, GetPartBoundsInBox), players,
 -- physics and timers are faked; WoodService and GrabService are real.
 return function(t)
 	local roblox = t.roblox
-	local Vector3, CFrame, Instance = roblox.Vector3, roblox.CFrame, roblox.Instance
+	local Vector2, Vector3, CFrame, Instance = roblox.Vector2, roblox.Vector3, roblox.CFrame, roblox.Instance
 
 	local function setup()
 		local s = {
@@ -272,6 +272,8 @@ return function(t)
 				size = s.TreeLogic.Sizes[2],
 				stage = opts.stage or 1,
 				planterId = opts.planterId,
+				zone = opts.zone,
+				cap = opts.cap,
 			})
 			return s.Trees.GetTree(model:GetAttribute("Uid"))
 		end
@@ -359,61 +361,83 @@ return function(t)
 		return s
 	end
 
-	t.test(
-		"16 swings of the Rusty Axe at an oak's knee fell it: OnFelled once, a loose trunk, an anchored stub",
-		function()
-			local s = setup()
-			local rec = s.tree("oak")
-			local p = s.player(1)
-			local felled = {}
-			s.Trees.OnFelled = function(feller, r, uids, dir)
-				table.insert(felled, { feller = feller, rec = r, uids = uids, dir = dir })
-			end
-			local fellCredit
-			s.Trees.Hooks.onFelled = function(feller)
-				fellCredit = feller
-			end
-			local base = rec.sections[1]
-			t.eq(rec.model:GetAttribute("HP"), 1, "a standing tree reads as standing")
-			local hits = s.SectionLogic.HitsToCut(2, base.Size.X, 0.2)
-			t.eq(hits, 16, "the plan's oak: 16 hits with the hatchet")
-			local n, ok, _, result = s.cutThrough(p, base)
-			t.ok(ok, "every swing accepted")
-			t.eq(n, 16)
-			t.eq(#felled, 1, "OnFelled fires once")
-			t.eq(felled[1].feller, p)
-			t.eq(fellCredit, p)
-			t.ok(rec.felled and not rec.alive, "down")
-			t.eq(rec.model:GetAttribute("HP"), 0, "HP mirrors it (QuestUI finds standing trees that way)")
-			t.eq(#result.freed, 1)
-			local piece = result.freed[1]
-			t.eq(felled[1].uids, { piece.uid })
-			t.ok(piece.model.Parent == s.Wood.Folder(), "the piece lies in TimberlineMap/Wood")
-			t.ok(piece.model:HasTag("Wood"), "tagged Wood")
-			t.eq(piece.ownerId, 1, "it's the cutter's")
-			t.eq(piece.treeUid, rec.uid)
-			for _, d in ipairs(piece.model:GetDescendants()) do
-				if d:IsA("BasePart") then
-					t.ok(not d.Anchored, d.Name .. " is loose")
-				end
-			end
-			-- The stub: the tree's own model, anchored, tagged Stump, a cut face on top.
-			t.ok(rec.stump == rec.model and rec.model:HasTag("Stump"), "the stub is the Stump")
-			t.eq(rec.model:GetAttribute("TreeUid"), rec.uid)
-			t.eq(rec.model:GetAttribute("Felled"), true)
-			for _, part in ipairs(s.sectionsOf(rec.model)) do
-				t.ok(part.Anchored, "the stub stays anchored")
-			end
-			t.ok(rec.model:FindFirstChild("CutFace"), "a cut face on the stub")
-			-- It tips away from the cutter (who stands at +X).
-			t.ok(felled[1].dir.X < 0, "away from the cutter")
-			-- And nothing more to cut there: the stub isn't a target.
-			local again, why = s.swing(p, base)
-			t.eq(again, false)
-			t.eq(why, "gone")
-			t.eq(#felled, 1, "still once")
+	t.test("16 swings of the Rusty Axe through an oak's base remove the whole tree", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		local felled = {}
+		s.Trees.OnFelled = function(feller, r, uids, dir)
+			table.insert(felled, { feller = feller, rec = r, uids = uids, dir = dir })
 		end
-	)
+		local fellCredit
+		s.Trees.Hooks.onFelled = function(feller)
+			fellCredit = feller
+		end
+		local base = rec.sections[1]
+		t.eq(rec.model:GetAttribute("HP"), 1, "a standing tree reads as standing")
+		local hits = s.SectionLogic.HitsToCut(2, base.Size.X, 0.2)
+		t.eq(hits, 16, "the plan's oak: 16 hits with the hatchet")
+		local n, ok, _, result = s.cutThrough(p, base)
+		t.ok(ok, "every swing accepted")
+		t.eq(n, 16)
+		t.eq(#felled, 1, "OnFelled fires once")
+		t.eq(felled[1].feller, p)
+		t.eq(fellCredit, p)
+		t.ok(rec.felled and rec.slot and not rec.alive, "the site is an open slot")
+		t.eq(rec.stump, nil, "no stump")
+		t.eq(rec.model.Parent, nil, "nothing left standing")
+		t.eq(next(rec.sections), nil, "no rooted section")
+		t.eq(#result.freed, 1)
+		local piece = result.freed[1]
+		t.eq(felled[1].uids, { piece.uid })
+		t.ok(piece.model.Parent == s.Wood.Folder(), "the piece lies in TimberlineMap/Wood")
+		t.ok(piece.model:HasTag("Wood"), "tagged Wood")
+		t.eq(piece.ownerId, 1, "it's the cutter's")
+		t.eq(piece.treeUid, rec.uid)
+		t.ok(base:IsDescendantOf(piece.model), "the whole base went with the piece")
+		t.ok(piece.model:FindFirstChild("CutFace", true) ~= nil, "a cut face on the freed log")
+		for _, d in ipairs(piece.model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				t.ok(not d.Anchored, d.Name .. " is loose")
+			end
+		end
+		t.ok(felled[1].dir.X < 0, "away from the cutter")
+		t.eq(#felled, 1, "still once")
+	end)
+
+	t.test("a high cut leaves a cuttable base; a second ground cut removes it", function()
+		local s = setup()
+		local rec = s.tree("oak")
+		local p = s.player(1)
+		local felled = 0
+		s.Trees.OnFelled = function()
+			felled += 1
+		end
+		local high: BasePart? = nil
+		for id, part in pairs(rec.sections) do
+			local depth = rec.depth[id] or 0
+			if depth > 0 and depth < rec.trunkSegments then
+				high = part
+				break
+			end
+		end
+		t.ok(high, "an oak has a trunk section above the root")
+		local _, ok = s.cutThrough(p, high)
+		t.ok(ok)
+		t.eq(felled, 1, "OnFelled once, on the first trunk cut")
+		t.ok(rec.felled and rec.alive and not rec.slot, "the base is still a tree")
+		t.eq(rec.regrowAt, nil, "the slot is not open yet")
+		t.ok(not rec.model:HasTag("Stump"))
+		t.eq(rec.model:GetAttribute("Felled"), false, "the base does not play the fall")
+		t.eq(rec.model:GetAttribute("HP"), 1)
+		local base = rec.sections[1]
+		t.ok(base and base.Parent == rec.model, "the root is still rooted")
+		s.cutThrough(p, base)
+		t.eq(felled, 1, "the second cut does not fell it again")
+		t.ok(rec.slot and not rec.alive)
+		t.eq(rec.model.Parent, nil)
+		t.eq(next(rec.sections), nil)
+	end)
 
 	t.test("wood on someone's truck bed, or anyone's while they're here, is theirs to cut", function()
 		local s = setup()
@@ -460,7 +484,8 @@ return function(t)
 		t.ok(okA, "the claimer carries on")
 		t.eq(result.feller, a)
 		t.eq(result.freed[1].ownerId, 1, "what falls is theirs")
-		t.eq(rec.model:GetAttribute("ClaimedBy"), 0, "down: the claim is over")
+		t.eq(rec.claim, nil, "down: the claim is over")
+		t.eq(rec.model.Parent, nil, "and the tree is gone")
 	end)
 
 	t.test(
@@ -679,32 +704,36 @@ return function(t)
 		t.ok(after < sectionsBefore + 1, "the freed sections left the tree")
 	end)
 
-	t.test("regrow: the stub waits respawnSec, then a sapling grows in four stages over growSec", function()
+	t.test("an open slot waits respawnSec times 0.7 to 1.3, then a sapling grows through four stages", function()
 		local s = setup()
+		s.Trees._roll = function()
+			return 0.5
+		end
 		local rec = s.tree("oak")
+		local old = rec.base
 		local p = s.player(1)
 		local regrown = 0
 		s.Trees.OnRegrown = function()
 			regrown += 1
 		end
 		s.cutThrough(p, rec.sections[1])
-		t.ok(rec.felled)
+		t.ok(rec.slot)
 		local def = s.WoodData.Get("oak")
-		t.eq(math.floor(s.Trees.RegrowsIn(rec.uid) + 0.5), def.respawnSec)
+		t.eq(math.floor((s.Trees.RegrowsIn(rec.uid) or 0) + 0.5), def.respawnSec, "the midpoint roll is 1x")
 		s.Trees.GrowTick(s.now + def.respawnSec - 1)
-		t.ok(rec.felled, "not yet")
+		t.ok(rec.slot, "not yet")
 		s.now += def.respawnSec
 		s.Trees.GrowTick(s.now)
-		t.ok(not rec.felled, "back")
+		t.ok(not rec.slot and not rec.felled, "back")
 		t.eq(regrown, 1)
 		t.eq(rec.stage, 0, "a sapling first")
 		t.eq(rec.model:GetAttribute("Sapling"), true)
 		t.ok(not rec.alive, "a sapling can't be cut")
-		t.ok(not rec.model:HasTag("Stump"), "the stub is gone")
+		t.ok((rec.base - old).Magnitude >= 10, "a new spot, not the old base")
 		t.ok(type(rec.model:GetAttribute("GrewAt")) == "number", "the clients' regrow spring")
 		local growSec = def.v2.growSec
 		local stages = {}
-		for k = 1, 4 do
+		for _ = 1, 4 do
 			s.now += growSec / 4
 			s.Trees.GrowTick(s.now)
 			table.insert(stages, rec.stage)
@@ -714,34 +743,63 @@ return function(t)
 		t.eq(#s.sectionsOf(rec.model) > 1, true)
 	end)
 
-	t.test("HoldRegrow keeps a stub (the tutorial), planting brings it back mature at once", function()
+	t.test("the respawn roll is 0.7x at 0 and 1.3x at 1; a blocked spot retries", function()
 		local s = setup()
 		local rec = s.tree("oak")
 		local p = s.player(1)
-		s.Trees.StumpHold = function()
-			return 120
+		local def = s.WoodData.Get("oak")
+		s.Trees._roll = function()
+			return 0
 		end
 		s.cutThrough(p, rec.sections[1])
-		t.ok(s.Trees.RegrowsIn(rec.uid) >= 119, "held")
-		s.now += 60
+		local low = s.Trees.RegrowsIn(rec.uid) or 0
+		t.ok(math.abs(low - def.respawnSec * 0.7) < 0.01, "0.7x")
+		s.now += low
 		s.Trees.GrowTick(s.now)
-		t.ok(rec.felled, "still a stub")
-		s.Trees.Regrow(rec.uid, 1, { stage = 1 })
-		t.eq(rec.stage, 1, "mature at once")
-		t.eq(rec.planterId, 1)
-		t.eq(rec.model:GetAttribute("PlanterId"), 1)
-		t.ok(rec.alive)
+		t.ok(not rec.slot, "it came back")
+		s.now += def.v2.growSec
+		s.Trees.GrowTick(s.now)
+		t.ok(rec.sections[1], "mature enough to cut again")
+		p.root.Position = rec.base + Vector3.new(4, 3, 0)
+		s.Trees._roll = function()
+			return 1
+		end
+		s.cutThrough(p, rec.sections[1])
+		local high = s.Trees.RegrowsIn(rec.uid) or 0
+		t.ok(math.abs(high - def.respawnSec * 1.3) < 0.01, "1.3x")
+		s.Trees.GrowTick(s.now + def.respawnSec)
+		t.ok(rec.slot, "1x is not enough for a 1.3 roll")
+		-- A zone smaller than the 10-stud gap never yields a spot, so the slot retries.
+		local stuck = s.tree("oak", Vector3.new(400, 0, 400), {
+			seed = 3,
+			zone = { id = "tiny", cx = 400, cz = 400, radius = 4, cap = 1 },
+			cap = 1,
+		})
+		local q = s.player(9, Vector3.new(404, 3, 400))
+		s.Trees._roll = function()
+			return 0
+		end
+		s.cutThrough(q, stuck.sections[1])
+		t.ok(stuck.slot)
+		local due = stuck.regrowAt
+		s.now = (due or s.now) + 1
+		s.Trees.GrowTick(s.now)
+		t.ok(stuck.slot, "no legal spot yet")
+		t.eq(stuck.regrowAt, s.now + s.Trees.RetrySec, "a miss waits about 30s")
 	end)
 
 	t.test(
 		"a tree lives its lifespan: its leaves drop at PreDeadAt, then it dies, sinks and the site regrows",
 		function()
 			local s = setup()
+			s.Trees._roll = function()
+				return 0.5
+			end
 			local rec = s.tree("oak")
 			s.player(1) -- near enough to be sent the LeafFall
 			local def = s.WoodData.Get("oak")
-			local lo, hi = def.v2.lifespan[1] * def.v2.growSec, def.v2.lifespan[2] * def.v2.growSec
-			t.ok(rec.life >= lo and rec.life <= hi, "inside the wood's lifespan")
+			local growSec = def.v2.growSec
+			t.ok(rec.life >= growSec + 20 * 60 and rec.life <= growSec + 40 * 60, "mature, then 20 to 40 minutes")
 			s.now = rec.bornAt + rec.life * s.GameConfig.PreDeadAt + 1
 			s.Trees.GrowTick(s.now)
 			t.ok(rec.preDead)
@@ -758,12 +816,53 @@ return function(t)
 			s.now += s.GameConfig.DeadSinkSec + 1
 			s.Trees.GrowTick(s.now)
 			t.eq(model.Parent, nil, "sunk and gone")
-			t.ok(rec.felled and rec.stump == nil, "an empty site (no stub to plant in)")
+			t.ok(rec.slot and rec.stump == nil, "an open slot once it has sunk")
 			s.now += def.respawnSec + 1
 			s.Trees.GrowTick(s.now)
 			t.eq(rec.stage, 0, "a new sapling")
 		end
 	)
+
+	t.test("a zone never grows past its cap across 50 regrows", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0
+		end
+		local zone = { id = "pen", cx = 0, cz = 0, radius = 0, fixed = true, cap = 3 }
+		local recs = {}
+		for i = 1, 3 do
+			recs[i] = s.tree("oak", Vector3.new((i - 1) * 40, 0, 0), { seed = i, zone = zone, cap = 3 })
+		end
+		local wildZone = { id = "wild", cx = 200, cz = 0, radius = 0, fixed = true, cap = 2 }
+		local wild = {}
+		for i = 1, 2 do
+			wild[i] = s.tree("birch", Vector3.new(200, 0, i * 40), { seed = 20 + i, zone = wildZone, cap = 2 })
+		end
+		local p = s.player(1)
+		local growSec = s.WoodData.Get("oak").v2.growSec
+		for cycle = 1, 50 do
+			for _, rec in ipairs(recs) do
+				p.root.Position = rec.base + Vector3.new(4, 3, 0)
+				local _, ok = s.cutThrough(p, rec.sections[1])
+				t.ok(ok, "cycle " .. cycle)
+				s.now = (rec.regrowAt or s.now)
+				s.Trees.GrowTick(s.now)
+				s.now += growSec
+				s.Trees.GrowTick(s.now)
+			end
+			local n, w = 0, 0
+			for _, rec in pairs(s.Trees.AllTrees()) do
+				local id = if rec.zone then rec.zone.id else ""
+				if id == "pen" then
+					n += 1
+				elseif id == "wild" then
+					w += 1
+				end
+			end
+			t.eq(n, 3, "oak cap, cycle " .. cycle)
+			t.eq(w, 2, "wild cap, cycle " .. cycle)
+		end
+	end)
 
 	t.test("the growth tick changes at most TreesPerGrowTick trees, the most overdue first", function()
 		local s = setup()
@@ -803,9 +902,13 @@ return function(t)
 				local s = setup()
 				local rec = s.tree("oak")
 				local p = s.player(1)
+				s.Trees._roll = function()
+					return 0.5
+				end
 				s.cutThrough(p, rec.sections[1])
-				t.ok(rec.felled, tag .. " felled")
-				local blocker = s.blocker(tag, CFrame.new(0, 6, 0), Vector3.new(24, 24, 24))
+				t.ok(rec.slot, tag .. " felled")
+				-- The slot grows back 12 studs off the old base.
+				local blocker = s.blocker(tag, CFrame.new(12, 6, 0), Vector3.new(24, 24, 24))
 				local def = s.WoodData.Get("oak")
 				s.now += def.respawnSec
 				s.Trees.GrowTick(s.now)
@@ -1009,5 +1112,158 @@ return function(t)
 		t.eq(result.freed[1].volume, plainResult.freed[1].volume)
 		t.eq(result.freed[1].value, plainResult.freed[1].value)
 		MeshKit.Reset()
+	end)
+
+	t.test("a boot tree standing in a haul road regrows off it within one tick", function()
+		local s = setup()
+		-- SectionTrees loads WorldPlan, which binds this loader's TreeFill.
+		local WorldLayout = s.loader:load("ReplicatedStorage/Shared/World/WorldLayout")
+		local TreeFill = s.loader:load("ReplicatedStorage/Shared/World/TreeFill")
+		local TerrainGen = s.loader:load("ReplicatedStorage/Shared/World/TerrainGen")
+		local haul = { HillsRoad = true, SnowRoad = true, VolcanoRoad = true, SkyrootRoad = true }
+		local spot = nil
+		for _, road in ipairs(WorldLayout.Roads) do
+			if haul[road.name] and not spot then
+				local pts = road.points
+				for i = 1, #pts - 1 do
+					if spot then
+						break
+					end
+					local mid = pts[i]:Lerp(pts[i + 1], 0.5)
+					if TreeFill.InHaulLane(mid.X, mid.Y) then
+						local along = pts[i + 1] - pts[i]
+						local len = along.Magnitude
+						if len > 1 then
+							local side = Vector2.new(-along.Y / len, along.X / len)
+							for _, reach in ipairs({ 28, 36, 48 }) do
+								for _, sign in ipairs({ 1, -1 }) do
+									local q = mid + side * (sign * reach)
+									if TreeFill.Ground(q.X, q.Y) then
+										spot = {
+											x = mid.X,
+											z = mid.Y,
+											qx = q.X,
+											qz = q.Y,
+											radius = reach + 16,
+										}
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		t.ok(spot ~= nil, "a haul road has ground beside it")
+		local here = spot :: { x: number, z: number, qx: number, qz: number, radius: number }
+		local y = TerrainGen.HeightAt(here.x, here.z) - 0.3
+		local model = s.Trees.SpawnTree("oak", CFrame.new(here.x, y, here.z), {
+			boot = true,
+			seed = 11,
+			zone = { id = "road", cx = here.x, cz = here.z, radius = here.radius },
+		})
+		-- The first FindSpot sample lands on the ground beside the road.
+		local dx, dz = here.qx - here.x, here.qz - here.z
+		local angle = math.atan2(dz, dx)
+		if angle < 0 then
+			angle += math.pi * 2
+		end
+		local reach = math.sqrt(dx * dx + dz * dz)
+		local want = { angle / (math.pi * 2), (reach / here.radius) ^ 2 }
+		local n = 0
+		s.Trees._roll = function()
+			n += 1
+			local target = want[n] or 0
+			return (target - n * 0.173) % 1
+		end
+		t.eq(model, nil, "it does not stand in the lane")
+		local rec = nil
+		for _, tree in pairs(s.Trees.AllTrees()) do
+			if tree.zone and tree.zone.id == "road" then
+				rec = tree
+			end
+		end
+		t.ok(rec ~= nil and rec.slot and rec.regrowAt == s.now, "the first regrow is due now")
+		s.Trees.GrowTick(s.now)
+		t.ok(rec ~= nil and not rec.slot and rec.model ~= nil and rec.model.Parent ~= nil, "standing after one tick")
+		t.ok(not TreeFill.InHaulLane(rec.base.X, rec.base.Z), "off the road")
+		t.ok(TreeFill.Ground(rec.base.X, rec.base.Z), "on legal ground")
+	end)
+
+	t.test("a haul-road boot tree that cannot move waits RetrySec", function()
+		local s = setup()
+		local WorldLayout = s.loader:load("ReplicatedStorage/Shared/World/WorldLayout")
+		local TreeFill = s.loader:load("ReplicatedStorage/Shared/World/TreeFill")
+		local TerrainGen = s.loader:load("ReplicatedStorage/Shared/World/TerrainGen")
+		local mid = nil
+		for _, road in ipairs(WorldLayout.Roads) do
+			if road.name == "HillsRoad" then
+				mid = road.points[1]:Lerp(road.points[2], 0.5)
+			end
+		end
+		t.ok(mid ~= nil and TreeFill.InHaulLane(mid.X, mid.Y), "the road sample is in the lane")
+		local y = TerrainGen.HeightAt(mid.X, mid.Y) - 0.3
+		s.Trees.SpawnTree("oak", CFrame.new(mid.X, y, mid.Y), {
+			boot = true,
+			seed = 12,
+			zone = { id = "stuckroad", cx = mid.X, cz = mid.Y, radius = 4 },
+		})
+		local rec = nil
+		for _, tree in pairs(s.Trees.AllTrees()) do
+			if tree.zone and tree.zone.id == "stuckroad" then
+				rec = tree
+			end
+		end
+		t.ok(rec ~= nil and rec.slot)
+		s.Trees.GrowTick(s.now)
+		t.ok(rec.slot, "the disc is smaller than the gap from the old spot")
+		t.eq(rec.regrowAt, s.now + s.Trees.RetrySec)
+	end)
+
+	t.test("rooted trees over the cap hold a regrow for RetrySec", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0
+		end
+		local zone = { id = "packed", cx = 500, cz = 500, radius = 80, cap = 1 }
+		local recs = {}
+		for i = 1, 3 do
+			recs[i] = s.tree("oak", Vector3.new(500 + (i - 1) * 30, 0, 500), { seed = i, zone = zone, cap = 1 })
+		end
+		local p = s.player(1, recs[1].base + Vector3.new(4, 3, 0))
+		local _, ok = s.cutThrough(p, recs[1].sections[1])
+		t.ok(ok)
+		t.ok(recs[1].slot)
+		s.now = recs[1].regrowAt or s.now
+		s.Trees.GrowTick(s.now)
+		t.ok(recs[1].slot, "two rooted trees still fill a cap of 1")
+		t.eq(recs[1].regrowAt, s.now + s.Trees.RetrySec)
+	end)
+
+	t.test("a zone at its cap of rooted trees holds the open slot for RetrySec", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0
+		end
+		local cap = 2
+		local zone = { id = "full", cx = 800, cz = 800, radius = 80, cap = cap }
+		local recs = {}
+		for i = 1, cap + 1 do
+			recs[i] = s.tree("oak", Vector3.new(800 + (i - 1) * 30, 0, 800), { seed = i, zone = zone, cap = cap })
+		end
+		local p = s.player(1, recs[1].base + Vector3.new(4, 3, 0))
+		local _, ok = s.cutThrough(p, recs[1].sections[1])
+		t.ok(ok)
+		t.ok(recs[1].slot)
+		local rooted = 0
+		for i = 2, cap + 1 do
+			t.ok(not recs[i].slot)
+			rooted += 1
+		end
+		t.eq(rooted, cap, "the zone is exactly at its cap")
+		s.now = recs[1].regrowAt or s.now
+		s.Trees.GrowTick(s.now)
+		t.ok(recs[1].slot, "tryRegrow leaves the slot open")
+		t.eq(recs[1].regrowAt, s.now + s.Trees.RetrySec)
 	end)
 end

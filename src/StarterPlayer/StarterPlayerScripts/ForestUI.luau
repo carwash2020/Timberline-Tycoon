@@ -1,46 +1,29 @@
 --!strict
 -- ForestUI: the Living Forest on screen (GAME_DESIGN §16). The server
 -- (ForestService) owns everything; this draws it.
---   * The Heartseed pouch: a small chip left of the Daily Goals button
---     (HUD.UnderCash) with your seed count; tap it for the count of each
---     wood (one of the corner's popups). It bumps when seeds arrive. It
---     shows from the tutorial's plant step on (HudRules.Pouch).
---   * "Plant Heartseed (n)" on every stump you hold that wood's seed for
---     (tag "Stump", attributes WoodId / TreeUid; F or Y), and a little
---     glowing seed over the nearest plantable stumps so you can find them.
---   * Seeds popping out of a felled tree in a burst of sparkles and flying
---     to whoever felled it on a short trail, with a pop as they reach you,
---     a sapling sprouting where someone planted, the sawmill's figure
---     reveal (a big colour-coded stamp per figure, rarer ones stay longer).
---   * Toasts: your planted tree harvested (the planter's share), lightning
---     striking a tree near you, Elders waking, falling and fading (with a
---     marker over the Elder you can see from afar), the Skyroot Bloom
---     (golden motes pouring off the Skyroot while it lasts).
--- Everything 3D is local, pooled and culled by distance; the streamed
--- world is only read through tags and attributes.
+--   * The sawmill's figure reveal (a big colour-coded stamp per figure,
+--     rarer ones stay longer).
+--   * Toasts: lightning striking a tree near you, Elders waking, falling
+--     and fading (with a marker over the Elder you can see from afar), the
+--     Skyroot Bloom (golden motes pouring off the Skyroot while it lasts).
+-- Everything 3D is local and culled by distance; the streamed world is
+-- only read through tags and attributes.
 
-local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local ForestData = require(ReplicatedStorage.Shared.ForestData)
-local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
-local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
-local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local CameraShake = require(script.Parent.CameraShake)
 local HUD = require(script.Parent.HUD)
-local Quality = require(script.Parent.Quality)
-local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
 type FigureDef = ForestData.FigureDef
@@ -52,20 +35,10 @@ local F = UITheme.Fonts
 
 local player = Players.LocalPlayer
 
-local FX_RANGE = 180 -- studs from the camera: seed pops and sprouts farther away aren't drawn
 local STRIKE_TOAST_RANGE = 260 -- lightning this close to you gets a toast
-local MAX_ORBS = 16
-local ORB_SECONDS = 0.95
-local MARKERS = 3 -- plantable stumps marked at once
-local MARKER_RANGE = 70
 local LOOP_SECONDS = 0.4
 
 local fxFolder: Folder? = nil
-local pouchSlot: Frame? = nil -- the chip's place in the corner's line (the chip bumps inside it)
-local pouchLabel: TextLabel? = nil
-local pouchBump: UIScale? = nil
-local pouchPopup: Frame? = nil
-local pouchPopupText: TextLabel? = nil
 local revealGui: ScreenGui? = nil
 
 local function fx(): Folder
@@ -86,566 +59,15 @@ local function rootPosition(): Vector3?
 	return if hrp then hrp.Position else nil
 end
 
-local function nearCamera(point: Vector3, range: number): boolean
-	local camera = workspace.CurrentCamera
-	return camera ~= nil and (camera.CFrame.Position - point).Magnitude <= range
-end
-
 local function woodName(woodId: string): string
 	local def = WoodData.Get(woodId)
 	return if def then def.displayName else woodId
-end
-
-local function seedsOf(woodId: string): number
-	local n = player:GetAttribute("Seeds_" .. woodId)
-	return if type(n) == "number" then n else 0
 end
 
 -- Ink on light colours, cream on dark ones.
 local function inkFor(color: Color3): Color3
 	local luminance = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
 	return if luminance > 0.55 then C.Ink else C.Cream
-end
-
----------------------------------------------------------------------------
--- The Heartseed pouch
----------------------------------------------------------------------------
-
-local function refreshPouchPopup()
-	local text = pouchPopupText
-	if not text then
-		return
-	end
-	local lines: { string } = {}
-	for _, wood in ipairs(WoodData.All()) do
-		local n = seedsOf(wood.id)
-		if n > 0 then
-			table.insert(
-				lines,
-				string.format(
-					'<font color="#%s">●</font> %s  <b>%d</b>',
-					wood.leafColor:ToHex(),
-					UITheme.escape(wood.displayName),
-					n
-				)
-			)
-		end
-	end
-	if #lines == 0 then
-		table.insert(lines, "No seeds yet. Fell a tree!")
-	end
-	local s = ForestData.Seeds
-	table.insert(lines, string.format('<font size="11">Holds %d of a wood, %d in all</font>', s.maxPerWood, s.maxTotal))
-	text.Text = table.concat(lines, "\n")
-end
-
-local popupToken = 0
-local function showPouchPopup(show: boolean)
-	local popup = pouchPopup
-	if not popup then
-		return
-	end
-	popupToken += 1
-	popup.Visible = show
-	if show then
-		refreshPouchPopup()
-		local token = popupToken
-		task.delay(6, function()
-			if popupToken == token and popup.Visible then
-				popup.Visible = false
-			end
-		end)
-	end
-end
-
-local lastTotal = 0
-local function refreshPouch()
-	local slot, label = pouchSlot, pouchLabel
-	if not slot or not label then
-		return
-	end
-	local total = player:GetAttribute("Heartseeds")
-	local n = if type(total) == "number" then total else 0
-	slot.Visible = HudRules.Pouch(player:GetAttribute("TutorialStep"), n)
-	label.Text = tostring(n)
-	local bump = pouchBump
-	if bump and n > lastTotal then
-		bump.Scale = 1.3
-		TweenService:Create(bump, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
-			:Play()
-	end
-	lastTotal = n
-	local popup = pouchPopup
-	if popup and popup.Visible then
-		if n > 0 then
-			refreshPouchPopup()
-		else
-			popup.Visible = false
-		end
-	end
-end
-
-local function buildPouch()
-	-- The list's screen: over the side buttons (it can drop over them),
-	-- under the shop.
-	local gui = UITheme.Screen("HeartseedPouch", 3)
-	-- In the corner's second line, left of the Daily Goals button. The
-	-- slot keeps the line still while the chip bumps inside it. A corner
-	-- pill: on a phone 36 tall, with a fingertip-tall hit area round it.
-	local spec = UITheme.Sized("Pouch")
-	local size = spec.size or Vector2.new(84, 26)
-	local slot = Instance.new("Frame")
-	slot.Name = "Pouch"
-	slot.LayoutOrder = 5
-	slot.Size = UDim2.fromOffset(size.X, size.Y)
-	slot.BackgroundTransparency = 1
-	slot.Visible = false
-	local chip = Instance.new("TextButton")
-	chip.Name = "Chip"
-	chip.AnchorPoint = Vector2.new(0.5, 0.5) -- bumps from its centre
-	chip.Position = UDim2.fromScale(0.5, 0.5)
-	chip.Size = UDim2.fromScale(1, 1)
-	chip.BackgroundColor3 = C.Bark
-	chip.AutoButtonColor = true
-	chip.Text = ""
-	chip.Parent = slot
-	UITheme.Clicks(chip)
-	UITheme.corner(chip, size.Y / 2)
-	UITheme.stroke(chip, C.Ink, 2)
-	local bump = Instance.new("UIScale")
-	bump.Parent = chip
-
-	local seed = Instance.new("Frame")
-	seed.Name = "Seed"
-	seed.AnchorPoint = Vector2.new(0, 0.5)
-	seed.Position = UDim2.new(0, 8, 0.5, 1)
-	seed.Size = UDim2.fromOffset(15, 15)
-	seed.BackgroundColor3 = ForestArt.HeartseedColor
-	UITheme.corner(seed, 8)
-	UITheme.stroke(seed, C.Ink, 1.5)
-	seed.Parent = chip
-	local leaf = Instance.new("Frame")
-	leaf.Name = "Leaf"
-	leaf.Position = UDim2.fromOffset(9, -6)
-	leaf.Size = UDim2.fromOffset(6, 9)
-	leaf.Rotation = 35
-	leaf.BackgroundColor3 = Color3.fromRGB(96, 170, 70)
-	UITheme.corner(leaf, 3)
-	leaf.Parent = seed
-
-	local label = UITheme.label(chip, "0", F.Black, spec.text, C.Cream)
-	label.Position = UDim2.fromOffset(28, 0)
-	label.Size = UDim2.new(1, -34, 1, 0)
-	label.TextXAlignment = Enum.TextXAlignment.Left
-
-	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true, "Panel")
-	card.outer.Name = "PouchList"
-	card.outer.Visible = false
-	UITheme.padding(card.face, 6, 10, 6, 10)
-	local text = UITheme.label(card.face, "", F.Bold, UITheme.Sized("PouchList").text, C.Ink)
-	text.RichText = true
-	text.AutomaticSize = Enum.AutomaticSize.XY
-	text.LineHeight = 1.15
-	card.outer.Parent = gui
-	HUD.Popup(card.outer)
-
-	slot.Parent = HUD.UnderCash() or gui
-	local function toggle()
-		showPouchPopup(not card.outer.Visible)
-	end
-	chip.Activated:Connect(toggle)
-	if spec.hit then
-		UITheme.HitPad(slot, spec.hit).Activated:Connect(toggle) -- under the chip: it still bumps and darkens
-	end
-	gui.Parent = player:WaitForChild("PlayerGui")
-
-	pouchSlot, pouchLabel, pouchBump, pouchPopup, pouchPopupText = slot, label, bump, card.outer, text
-	player:GetAttributeChangedSignal("Heartseeds"):Connect(refreshPouch)
-	player:GetAttributeChangedSignal("TutorialStep"):Connect(refreshPouch)
-	local total = player:GetAttribute("Heartseeds")
-	lastTotal = if type(total) == "number" then total else 0
-	refreshPouch()
-end
-
----------------------------------------------------------------------------
--- Stumps: the planting prompt and the "plant here" markers
----------------------------------------------------------------------------
-
-type StumpEntry = { model: Model, part: BasePart, prompt: ProximityPrompt, woodId: string, uid: string }
-
-local stumps: { [Model]: StumpEntry } = {}
-local sproutingUntil: { [string]: number } = {} -- tree uid -> os.clock() its sprout ends
-
--- Murph's tutorial: no planting before its plant step (the server refuses
--- it too). TutorialStep is 0 (or not set yet) without a tutorial.
-local function tutorialAllowsPlanting(): boolean
-	local step = player:GetAttribute("TutorialStep")
-	return TutorialData.CanPlant(if type(step) == "number" then step else 0)
-end
-
-local function plantable(entry: StumpEntry): boolean
-	local busy = sproutingUntil[entry.uid]
-	return seedsOf(entry.woodId) > 0
-		and tutorialAllowsPlanting()
-		and entry.part.Parent ~= nil
-		and entry.part.Transparency < 1 -- hidden stumps (the Gloam Hollow by day)
-		and entry.model:GetAttribute("Sprouting") ~= true -- planted before you came by (slow woods take minutes)
-		and not (busy and os.clock() < busy)
-end
-
-local function refreshPrompt(entry: StumpEntry)
-	local text = string.format("Plant Heartseed (%d)", seedsOf(entry.woodId))
-	if entry.prompt.ActionText ~= text then
-		entry.prompt.ActionText = text
-	end
-	local on = plantable(entry)
-	if entry.prompt.Enabled ~= on then
-		entry.prompt.Enabled = on
-	end
-end
-
-local function refreshPrompts()
-	for _, entry in pairs(stumps) do
-		refreshPrompt(entry)
-	end
-end
-
-local function addStump(inst: Instance)
-	if not inst:IsA("Model") or stumps[inst] then
-		return
-	end
-	local model = inst
-	local woodId = model:GetAttribute("WoodId")
-	local uid = model:GetAttribute("TreeUid")
-	if type(woodId) ~= "string" or type(uid) ~= "string" then
-		return
-	end
-	local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-	if not part then
-		-- Atomic models stream in whole, but be patient with a slow one.
-		model.ChildAdded:Once(function()
-			addStump(model)
-		end)
-		return
-	end
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "PlantHeartseed"
-	prompt.ObjectText = woodName(woodId) .. " stump"
-	prompt.KeyboardKeyCode = Enum.KeyCode.F
-	prompt.GamepadKeyCode = Enum.KeyCode.ButtonY
-	prompt.HoldDuration = 0.35
-	prompt.MaxActivationDistance = ForestData.PlantRange - 2 -- the server allows a little more
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = part
-	local entry: StumpEntry = { model = model, part = part, prompt = prompt, woodId = woodId, uid = uid }
-	prompt.Triggered:Connect(function()
-		Net.Remote("PlantSeed"):FireServer(uid)
-	end)
-	stumps[model] = entry
-	refreshPrompt(entry)
-end
-
-local function removeStump(inst: Instance)
-	local entry = if inst:IsA("Model") then stumps[inst] else nil
-	if entry then
-		stumps[inst :: Model] = nil
-		entry.prompt:Destroy()
-	end
-end
-
--- Little glowing seeds bobbing over the nearest stumps you can plant in.
-type Marker = { part: Part, gui: BillboardGui }
-local markers: { Marker } = {}
-
-local function buildMarkers()
-	for i = 1, MARKERS do
-		local part = Instance.new("Part")
-		part.Name = "PlantMarker" .. i
-		part.Anchored = true
-		part.Transparency = 1
-		part.Size = Vector3.new(0.2, 0.2, 0.2)
-		Kit.decor(part, false)
-		part.Parent = fx()
-		local gui = Instance.new("BillboardGui")
-		gui.Name = "PlantHere"
-		gui.Size = UDim2.fromOffset(34, 34)
-		gui.LightInfluence = 0
-		gui.AlwaysOnTop = true
-		gui.MaxDistance = MARKER_RANGE
-		gui.Enabled = false
-		gui.Adornee = part
-		gui.Parent = part
-		local holder = Instance.new("Frame")
-		holder.Size = UDim2.fromScale(1, 1)
-		holder.BackgroundTransparency = 1
-		holder.Parent = gui
-		local seed = Instance.new("Frame")
-		seed.Name = "Seed"
-		seed.AnchorPoint = Vector2.new(0.5, 0.5)
-		seed.Position = UDim2.fromScale(0.5, 0.6)
-		seed.Size = UDim2.fromOffset(18, 18)
-		seed.BackgroundColor3 = ForestArt.HeartseedColor
-		UITheme.corner(seed, 9)
-		UITheme.stroke(seed, C.Ink, 2)
-		seed.Parent = holder
-		local leaf = Instance.new("Frame")
-		leaf.Position = UDim2.fromOffset(11, -7)
-		leaf.Size = UDim2.fromOffset(7, 11)
-		leaf.Rotation = 35
-		leaf.BackgroundColor3 = Color3.fromRGB(96, 170, 70)
-		UITheme.corner(leaf, 3)
-		leaf.Parent = seed
-		-- A gentle bob, forever (one tween per marker, made once).
-		TweenService:Create(
-			seed,
-			TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-			{ Position = UDim2.fromScale(0.5, 0.35) }
-		):Play()
-		table.insert(markers, { part = part, gui = gui })
-	end
-end
-
-local function updateMarkers()
-	local from = rootPosition()
-	local best: { { entry: StumpEntry, d: number } } = {}
-	if from then
-		for _, entry in pairs(stumps) do
-			if entry.prompt.Enabled then
-				local d = (entry.part.Position - from).Magnitude
-				if d <= MARKER_RANGE then
-					table.insert(best, { entry = entry, d = d })
-				end
-			end
-		end
-		table.sort(best, function(a, b)
-			return a.d < b.d
-		end)
-	end
-	for i, marker in ipairs(markers) do
-		local pick = best[i]
-		if pick then
-			local p = pick.entry.part
-			marker.part.CFrame = CFrame.new(p.Position + Vector3.new(0, p.Size.X / 2 + 2.6, 0))
-			-- Close enough to see the prompt: the prompt says it all.
-			marker.gui.Enabled = pick.d > ForestData.PlantRange - 2
-		else
-			marker.gui.Enabled = false
-		end
-	end
-end
-
----------------------------------------------------------------------------
--- Seeds flying to the feller
----------------------------------------------------------------------------
-
-type Orb = {
-	part: Part,
-	from: Vector3,
-	mid: Vector3,
-	target: Player?,
-	t: number, -- seconds since it set off (under 0: waiting its turn)
-	duration: number,
-	last: boolean,
-	mine: boolean,
-	landed: boolean, -- reached you: popping
-}
-
-local orbPool: { Part } = {}
-local orbs: { Orb } = {}
-local orbCount = 0 -- orbs that exist (pooled or flying)
-local orbConn: RBXScriptConnection? = nil
-
-local function targetOf(target: Player?): Vector3?
-	local char = if target then target.Character else nil
-	local hrp = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-	return if hrp then hrp.Position + Vector3.new(0, 1, 0) else nil
-end
-
-local sinceOrbs = 0
-local function stepOrbs(dt: number)
-	sinceOrbs += dt
-	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceOrbs) then
-		return
-	end
-	local step = sinceOrbs
-	sinceOrbs = 0
-	for i = #orbs, 1, -1 do
-		local o = orbs[i]
-		o.t += step
-		local to = targetOf(o.target) or o.mid
-		if o.t < o.duration then
-			local u = math.clamp(o.t / o.duration, 0, 1)
-			local e = u * u * (3 - 2 * u) -- ease in and out
-			local a = o.from:Lerp(o.mid, e)
-			local b = o.mid:Lerp(to, e)
-			o.part.CFrame = CFrame.new(a:Lerp(b, e))
-			continue
-		end
-		-- Arrived: a quick pop on you (it swells and fades), then back to the pool.
-		if not o.landed then
-			o.landed = true
-			if o.mine and o.last then
-				SoundData.Play("SeedPop")
-			end
-		end
-		local u = (o.t - o.duration) / ForestArt.SeedPopSeconds
-		local scale, fade = ForestArt.SeedOrbPop(u)
-		o.part.CFrame = CFrame.new(to)
-		o.part.Size = Vector3.one * (ForestArt.SeedOrbSize * scale)
-		o.part.Transparency = fade
-		if u >= 1 then
-			ForestArt.RestSeedOrb(o.part)
-			o.part.Parent = nil
-			table.insert(orbPool, o.part)
-			table.remove(orbs, i)
-		end
-	end
-	local conn = orbConn
-	if #orbs == 0 and conn then
-		conn:Disconnect()
-		orbConn = nil
-	end
-end
-
-local function takeOrb(): Part?
-	local part = table.remove(orbPool)
-	if part then
-		return part
-	end
-	if orbCount >= MAX_ORBS then
-		return nil
-	end
-	orbCount += 1
-	return ForestArt.SeedOrb()
-end
-
-local function popSeeds(from: Vector3, target: Player?, count: number, mine: boolean)
-	local n = math.clamp(count, 1, 5)
-	for i = 1, n do
-		local part = takeOrb()
-		if not part then
-			break
-		end
-		local angle = math.random() * math.pi * 2
-		local spread = 2 + math.random() * 2
-		local start = from + Vector3.new(0, 1.5, 0)
-		part.Parent = fx()
-		-- In the world first, then reset there: a pooled orb's trail starts
-		-- afresh, not from where its last flight ended.
-		ForestArt.LaunchSeedOrb(part, CFrame.new(start))
-		if i == 1 then
-			-- One burst of sparkles as the seeds pop out of the tree.
-			local sparkle = part:FindFirstChild("SeedSparkle")
-			if sparkle and sparkle:IsA("ParticleEmitter") then
-				sparkle:Emit(ForestArt.SeedSparkles)
-			end
-		end
-		table.insert(orbs, {
-			part = part,
-			from = start,
-			mid = start + Vector3.new(math.cos(angle) * spread, 7 + math.random() * 2, math.sin(angle) * spread),
-			target = target,
-			t = -(i - 1) * 0.09, -- one after another
-			duration = ORB_SECONDS,
-			last = i == n,
-			mine = mine,
-			landed = false,
-		})
-	end
-	if #orbs > 0 and not orbConn then
-		orbConn = RunService.Heartbeat:Connect(stepOrbs)
-	end
-end
-
-local function onSeedPop(payload: { [string]: any })
-	local pos, userId, woodId, count = payload.pos, payload.userId, payload.woodId, payload.count
-	if typeof(pos) ~= "Vector3" or type(userId) ~= "number" or type(woodId) ~= "string" or type(count) ~= "number" then
-		return
-	end
-	local mine = userId == player.UserId
-	if nearCamera(pos, FX_RANGE) then
-		popSeeds(pos, Players:GetPlayerByUserId(userId), count, mine)
-	elseif mine then
-		SoundData.Play("SeedPop")
-	end
-	if mine then
-		local reasons = payload.reasons
-		local words: { string } = {}
-		if type(reasons) == "table" then
-			for _, r in ipairs(reasons) do
-				if type(r) == "string" then
-					table.insert(words, r)
-				end
-			end
-		end
-		-- The flying seed and the pouch say it for a plain drop; toast the
-		-- extras, and the very first seeds (so new players learn what they
-		-- are: in the tutorial, keep them until Murph shows where, even
-		-- with a lucky or big-tree extra).
-		local firstSeeds = lastTotal <= count
-		local text = HudRules.SeedToast(count, woodName(woodId), words, firstSeeds, tutorialAllowsPlanting())
-		if text then
-			HUD.Toast(text)
-		end
-	end
-end
-
----------------------------------------------------------------------------
--- A sapling sprouting on a stump
----------------------------------------------------------------------------
-
-local function onSprout(payload: { [string]: any })
-	local pos, woodId, uid, seconds = payload.pos, payload.woodId, payload.uid, payload.seconds
-	if typeof(pos) ~= "Vector3" or type(woodId) ~= "string" or type(uid) ~= "string" or type(seconds) ~= "number" then
-		return
-	end
-	sproutingUntil[uid] = os.clock() + seconds + 0.5
-	refreshPrompts()
-	task.delay(seconds + 0.6, function()
-		sproutingUntil[uid] = nil
-	end)
-	local def = WoodData.Get(woodId)
-	if not def or not nearCamera(pos, FX_RANGE) then
-		return
-	end
-	if seconds > ForestData.ShownSproutSeconds then
-		SoundData.PlayAt("Plant", pos) -- the server puts the sapling on the stump
-		return
-	end
-	local seed = if type(payload.seed) == "number" then payload.seed else 1
-	-- The stump's diameter (a server without it: the old fixed-size mound).
-	local diameter = payload.diameter
-	local sprout = ForestArt.Sprout(def, seed, if type(diameter) == "number" then diameter else nil)
-	Kit.placeAt(sprout, CFrame.new(pos))
-	sprout:ScaleTo(ForestArt.SproutScale(0)) -- a seedling first
-	sprout.Parent = fx()
-	SoundData.PlayAt("Plant", pos)
-	local heart = sprout:FindFirstChild("Heartseed")
-	if heart and heart:IsA("BasePart") then
-		local burst = Instance.new("ParticleEmitter")
-		burst.Color = ColorSequence.new(ForestArt.HeartseedColor)
-		burst.LightEmission = 1
-		burst.LightInfluence = 0
-		burst.Rate = 0
-		burst.Lifetime = NumberRange.new(0.8, 1.6)
-		burst.Speed = NumberRange.new(3, 6)
-		burst.SpreadAngle = Vector2.new(60, 60)
-		burst.EmissionDirection = Enum.NormalId.Top
-		burst.Acceleration = Vector3.new(0, 2, 0)
-		burst.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
-		burst.Parent = heart
-		burst:Emit(24)
-	end
-	-- Grows from a seedling to a sapling (full size, 1, fits the stump),
-	-- then the tree itself takes over.
-	task.spawn(function()
-		local t = 0
-		while t < seconds and sprout.Parent do
-			sprout:ScaleTo(ForestArt.SproutScale(t / seconds))
-			t += task.wait(0.05)
-		end
-		sprout:Destroy()
-	end)
 end
 
 ---------------------------------------------------------------------------
@@ -915,34 +337,11 @@ local function onElderFaded(payload: { [string]: any })
 end
 
 local function onElderShare(payload: { [string]: any })
-	local woodId, amount, seeds = payload.woodId, payload.amount, payload.seeds
+	local woodId, amount = payload.woodId, payload.amount
 	if type(woodId) ~= "string" or type(amount) ~= "number" then
 		return
 	end
-	HUD.Toast(
-		string.format(
-			"You helped fell the Elder %s: +%s and %d Heartseeds!",
-			woodName(woodId),
-			Util.formatCash(amount),
-			if type(seeds) == "number" then seeds else 0
-		)
-	)
-end
-
-local function onRoyalty(payload: { [string]: any })
-	local woodId, feller, amount = payload.woodId, payload.feller, payload.amount
-	if type(woodId) ~= "string" or type(feller) ~= "string" or type(amount) ~= "number" then
-		return
-	end
-	SoundData.Play("Sell")
-	HUD.Toast(
-		string.format(
-			"Your %s was harvested by %s: +%s",
-			string.lower(woodName(woodId)),
-			feller,
-			Util.formatCash(amount)
-		)
-	)
+	HUD.Toast(string.format("You helped fell the Elder %s: +%s", woodName(woodId), Util.formatCash(amount)))
 end
 
 -- Golden motes pouring off the Skyroot while it blooms.
@@ -1018,7 +417,7 @@ local function refreshBloom(announce: boolean)
 				)
 			)
 		else
-			HUD.Toast("The Skyroot's bloom has faded. Keep replanting and it'll bloom again.")
+			HUD.Toast("The Skyroot's bloom has faded.")
 		end
 	end
 	blooming = on
@@ -1029,24 +428,19 @@ end
 ---------------------------------------------------------------------------
 
 local handlers: { [string]: ({ [string]: any }) -> () } = {
-	SeedPop = onSeedPop,
-	Sprout = onSprout,
 	Reveal = onReveal,
 	Struck = onStruck,
 	Elder = onElder,
 	ElderFallen = onElderFallen,
 	ElderFaded = onElderFaded,
 	ElderShare = onElderShare,
-	Royalty = onRoyalty,
 }
 
 function ForestUI.Start()
 	local playerGui = player:WaitForChild("PlayerGui")
-	buildPouch()
 	local reveal = UITheme.Screen("FigureReveal", 12, "device") -- centred in the safe area, clear of a notch
 	reveal.Parent = playerGui
 	revealGui = reveal
-	buildMarkers()
 	buildBloom()
 
 	-- Other kinds (lightning bolts, ...) belong to other controllers.
@@ -1057,22 +451,6 @@ function ForestUI.Start()
 		end
 	end)
 
-	for _, inst in ipairs(CollectionService:GetTagged("Stump")) do
-		addStump(inst)
-	end
-	CollectionService:GetInstanceAddedSignal("Stump"):Connect(addStump)
-	CollectionService:GetInstanceRemovedSignal("Stump"):Connect(removeStump) -- regrown, or streamed out
-
-	for _, wood in ipairs(WoodData.All()) do
-		player:GetAttributeChangedSignal("Seeds_" .. wood.id):Connect(function()
-			for _, entry in pairs(stumps) do
-				if entry.woodId == wood.id then
-					refreshPrompt(entry)
-				end
-			end
-		end)
-	end
-
 	workspace:GetAttributeChangedSignal("ElderPos"):Connect(refreshElderMarker)
 	workspace:GetAttributeChangedSignal("ElderWood"):Connect(refreshElderMarker)
 	refreshElderMarker()
@@ -1081,13 +459,9 @@ function ForestUI.Start()
 	end)
 	refreshBloom(false)
 
-	-- A slow loop for what can wait: markers, prompts (sprouts ending,
-	-- stumps hiding), the Elder's distance.
 	task.spawn(function()
 		while true do
 			task.wait(LOOP_SECONDS)
-			refreshPrompts()
-			updateMarkers()
 			updateElderDistance()
 		end
 	end)

@@ -45,9 +45,9 @@ local TIPS = {
 	"Swing low on a trunk and keep hitting the same spot. Watch the notch grow until it falls.",
 	"Put your axe away, then click and hold a log to drag it onto your truck's bed.",
 	"Back your truck onto the green pad by the sawmill: the wood sells itself, by volume.",
-	"Felled trees drop Heartseeds. Plant one in a stump to grow a tree with your name on it.",
-	"When someone else fells a tree you planted, you earn a planter's share.",
+	"A felled tree grows back somewhere else in its stand, smaller at first.",
 	"Odd-looking bark can hide figured wood. The sawmill pays extra for it.",
+	"Elders are giants. Anyone who chops a share of one is paid when it falls.",
 }
 
 local started = os.clock()

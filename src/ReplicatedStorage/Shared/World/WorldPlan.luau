@@ -21,7 +21,23 @@ local WorldLayout = require(script.Parent.WorldLayout)
 
 local WorldPlan = {}
 
-export type TreeSpot = { woodId: string, position: Vector3, biome: string } -- biome "wild": a meadow grove
+-- Where a felled tree may grow back (SectionTrees). `fixed` keeps the
+-- spot (Sky Lumenwood). `cap` is the boot count for that zone (the Wild
+-- zone's is 120, not per wood).
+export type TreeZone = {
+	id: string,
+	cx: number,
+	cz: number,
+	radius: number,
+	fixed: boolean?,
+	cap: number?,
+}
+export type TreeSpot = {
+	woodId: string,
+	position: Vector3,
+	biome: string, -- "wild": a meadow grove, a country stand, or the forest ring
+	zone: TreeZone?,
+}
 export type Placement = { name: string, cframe: CFrame, seed: number }
 export type Sign = { text: string, cframe: CFrame, lit: boolean? } -- lit: gooseneck lamps (TWN-07)
 export type Fence = { length: number, cframe: CFrame }
@@ -77,6 +93,25 @@ local cachedTrees: { TreeSpot }? = nil
 local WILD_GROVES = 22 -- stands of trees in the open country
 local WILD_NEAREST = 300 -- studs from the sawmill (the Starter Forest is 190)
 
+-- The first 322 were placed from these counts. BiomeData.trees is the
+-- live boot target (denser); new trees are appended, so these never move.
+local LEGACY_TREES: { [string]: { [string]: number } } = {
+	starter = { oak = 40, birch = 15 },
+	hills = { pine = 40, maple = 25 },
+	snow = { frostwood = 35 },
+	volcano = { emberwood = 30 },
+	grove = { phantomwood = 15 },
+}
+
+export type GroveDisc = { cx: number, cz: number, radius: number, count: number }
+local groveDiscs: { GroveDisc } = {}
+local firstTrees: () -> { TreeSpot }
+
+function WorldPlan.GroveDiscs(): { GroveDisc }
+	firstTrees()
+	return groveDiscs
+end
+
 -- The woods of a wild grove at `c`, by the nearest biome: pine and maple
 -- toward the Hills, pine and birch toward the Snowfields and the Volcano,
 -- oak and birch everywhere else. (Repeats weight the pick.)
@@ -105,7 +140,7 @@ end
 -- (BiomeData counts), then the wild groves between them. Never change
 -- what this returns; new trees go after it (WorldPlan.Trees).
 local cachedFirst: { TreeSpot }? = nil
-local function firstTrees(): { TreeSpot }
+function firstTrees(): { TreeSpot }
 	if cachedFirst then
 		return cachedFirst
 	end
@@ -119,7 +154,7 @@ local function firstTrees(): { TreeSpot }
 	local function build(): any
 		for _, biome in ipairs(BiomeData.All()) do
 			local area = biome.area
-			local counts = biome.trees
+			local counts = LEGACY_TREES[biome.id]
 			if area and area.y == nil and counts then
 				local rng = Kit.rng(hashString(biome.id))
 				local woodIds: { string } = {}
@@ -148,7 +183,17 @@ local function firstTrees(): { TreeSpot }
 						if ok then
 							local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
 							table.insert(taken, p)
-							table.insert(out, { woodId = woodId, position = p, biome = biome.id })
+							table.insert(out, {
+								woodId = woodId,
+								position = p,
+								biome = biome.id,
+								zone = {
+									id = biome.id,
+									cx = area.x,
+									cz = area.z,
+									radius = area.radius - 6,
+								},
+							})
 							placed += 1
 						end
 					end
@@ -196,10 +241,16 @@ local function firstTrees(): { TreeSpot }
 				table.insert(centers, Vector2.new(x, z))
 			end
 		end
-		for _, c in ipairs(centers) do
+		for index, c in ipairs(centers) do
 			local woods = wildWoodsNear(c)
 			local want = wildRng:int(4, 8)
 			local placed, attempts = 0, 0
+			local groveZone: TreeZone = {
+				id = "grove:" .. index,
+				cx = c.X,
+				cz = c.Y,
+				radius = 26,
+			}
 			while placed < want and attempts < want * 30 do
 				attempts += 1
 				local angle = wildRng:range(0, math.pi * 2)
@@ -219,10 +270,11 @@ local function firstTrees(): { TreeSpot }
 					local woodId = wildRng:pick(woods)
 					local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
 					table.insert(taken, p)
-					table.insert(out, { woodId = woodId, position = p, biome = "wild" })
+					table.insert(out, { woodId = woodId, position = p, biome = "wild", zone = groveZone })
 					placed += 1
 				end
 			end
+			table.insert(groveDiscs, { cx = c.X, cz = c.Y, radius = 26, count = placed })
 		end
 		return nil
 	end
@@ -447,6 +499,15 @@ function WorldPlan.CountryStands(): { Stand }
 		planted += #trees
 		local stand: Stand = { center = c, radius = radius, road = if road then road.name else nil, trees = trees }
 		table.insert(stands, stand)
+		local zone: TreeZone = {
+			id = "stand:" .. tostring(#stands),
+			cx = c.X,
+			cz = c.Y,
+			radius = radius,
+		}
+		for _, spot in ipairs(trees) do
+			spot.zone = zone
+		end
 		return stand
 	end
 
@@ -558,6 +619,12 @@ function WorldPlan.Trees(): { TreeSpot }
 	for _, spot in ipairs(WorldPlan.ForestTrees()) do
 		table.insert(out, spot)
 	end
+	-- Denser biomes, groves and stands, then the wild clumps. Appended, so
+	-- every tree above keeps its X and Z.
+	local TreeFill = require(script.Parent.TreeFill)
+	for _, spot in ipairs(TreeFill.Extra(out)) do
+		table.insert(out, spot)
+	end
 	cachedTrees = out
 	return out
 end
@@ -588,7 +655,8 @@ function WorldPlan.ReachTrees(): { TreeSpot }
 	local rng = Kit.rng(hashString("petrified reach"))
 	local placed: { Vector2 } = {}
 	local tries = 0
-	while #out < 4 and tries < 500 do
+	local reachCap = 6 -- 1.5x the original 4, rounded down
+	while #out < reachCap and tries < 800 do
 		tries += 1
 		local ang = rng:range(0, math.pi * 2)
 		local rad = math.sqrt(rng:next()) * math.max(radius - 6, 8)
@@ -606,6 +674,12 @@ function WorldPlan.ReachTrees(): { TreeSpot }
 				woodId = "phantomwood",
 				position = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z),
 				biome = "reach",
+				zone = {
+					id = "reach",
+					cx = cx,
+					cz = cz,
+					radius = math.max(radius - 6, 8),
+				},
 			})
 		end
 	end
@@ -3937,6 +4011,46 @@ local FOREST_CLEAR = 10 -- studs a forest tree keeps off a scenery piece, cluste
 
 local cachedForestTrees: { TreeSpot }? = nil
 
+-- Discs a new trunk stays out of: the footbridge (and its sign's rocks),
+-- the docks and their signs. Same reach the forest ring already uses, so
+-- those trees do not move.
+local cachedLandmarkDiscs: { { number } }? = nil
+local function landmarkDiscs(): { { number } }
+	if cachedLandmarkDiscs then
+		return cachedLandmarkDiscs
+	end
+	local discs: { { number } } = {}
+	local bridge = WorldPlan.Footbridge()
+	if bridge then
+		local a, along = bridge.cframe.Position, bridge.cframe.LookVector
+		for s = -10, bridge.span + 10, 4 do
+			local p = a + along * s
+			table.insert(discs, { p.X, p.Z, bridge.width / 2 + FOREST_CLEAR })
+		end
+		local sign = bridge.sign
+		if sign then
+			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
+		end
+	end
+	for _, dock in ipairs(WorldPlan.Docks()) do
+		local a, along = dock.cframe.Position, dock.cframe.LookVector
+		for s = -8, dock.length + 4, 4 do
+			local p = a + along * s
+			table.insert(discs, { p.X, p.Z, dock.width / 2 + FOREST_CLEAR })
+		end
+		local sign = dock.sign
+		if sign then
+			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
+		end
+	end
+	cachedLandmarkDiscs = discs
+	return discs
+end
+
+function WorldPlan.LandmarkDiscs(): { { number } }
+	return landmarkDiscs()
+end
+
 function WorldPlan.ForestTrees(): { TreeSpot }
 	if cachedForestTrees then
 		return cachedForestTrees
@@ -3966,28 +4080,8 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 	for _, c in ipairs(WorldPlan.BoulderClusters()) do
 		table.insert(discs, { c.center.X, c.center.Z, c.radius + FOREST_CLEAR })
 	end
-	local bridge = WorldPlan.Footbridge()
-	if bridge then
-		local a, along = bridge.cframe.Position, bridge.cframe.LookVector
-		for s = -10, bridge.span + 10, 4 do
-			local p = a + along * s
-			table.insert(discs, { p.X, p.Z, bridge.width / 2 + FOREST_CLEAR })
-		end
-		local sign = bridge.sign
-		if sign then
-			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
-		end
-	end
-	for _, dock in ipairs(WorldPlan.Docks()) do
-		local a, along = dock.cframe.Position, dock.cframe.LookVector
-		for s = -8, dock.length + 4, 4 do
-			local p = a + along * s
-			table.insert(discs, { p.X, p.Z, dock.width / 2 + FOREST_CLEAR })
-		end
-		local sign = dock.sign
-		if sign then
-			table.insert(discs, { sign.X, sign.Z, SIGN_POST + FOREST_CLEAR })
-		end
+	for _, d in ipairs(landmarkDiscs()) do
+		table.insert(discs, d)
 	end
 	local biomes: { { number } } = {}
 	for _, biome in ipairs(BiomeData.All()) do
@@ -4082,7 +4176,12 @@ function WorldPlan.ForestTrees(): { TreeSpot }
 			woods = { "oak", "oak", "birch" }
 		end
 		local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
-		table.insert(out, { woodId = rng:pick(woods), position = p, biome = "wild" })
+		table.insert(out, {
+			woodId = rng:pick(woods),
+			position = p,
+			biome = "wild",
+			zone = { id = "forest:" .. tostring(#out + 1), cx = x, cz = z, radius = 40 },
+		})
 		addTree(p)
 		return true
 	end
@@ -4847,5 +4946,19 @@ function WorldPlan.FillerPlanAround(
 	end
 	return out
 end
+
+local TreeFill = require(script.Parent.TreeFill)
+TreeFill.Bind({
+	GoodGround = WorldPlan.GoodGround,
+	Town = WorldPlan.Town,
+	Scenery = WorldPlan.Scenery,
+	GroveDiscs = WorldPlan.GroveDiscs,
+	CountryStands = WorldPlan.CountryStands,
+	Boulders = WorldPlan.Boulders,
+	MeadowBoulders = WorldPlan.MeadowBoulders,
+	RoadSigns = WorldPlan.RoadSigns,
+	GateSigns = WorldPlan.GateSigns,
+	LandmarkDiscs = WorldPlan.LandmarkDiscs,
+})
 
 return WorldPlan
