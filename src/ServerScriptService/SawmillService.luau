@@ -1,10 +1,10 @@
 --!strict
--- SawmillService: loose logs go in a placed sawmill and come out as planks
--- (V2_PLAN.md §7). The server decides everything. A client only asks to
--- nudge the cut (SawmillSet: owner, in range, one step).
+-- SawmillService: loose logs and planks go in a placed sawmill and come
+-- out as planks (V2_PLAN.md §7). The server decides everything. A client
+-- only asks to nudge the cut (SawmillSet: owner, in range, one step).
 --
 -- Every GameConfig.SellPollSec each mill's Intake is one box query over
--- the Wood folder. A log that has rested there for Settle seconds, that
+-- the Wood folder. A piece that has rested there for Settle seconds, that
 -- SawmillLogic will take, and whose WoodWatch verdict is good, is anchored,
 -- snapped onto the conveyor (length along the belt, centred so it misses
 -- the walls) and slid to the outfeed over 1-3 s. The belt's own
@@ -13,6 +13,12 @@
 -- grabbed, sold or milled twice. Then it is destroyed and its volume comes
 -- back as planks (the log's wood, owner, figure and boost), one at a time,
 -- on the ground just past the Output attachment, shoved along the outfeed.
+--
+-- A plank fed back in is cut again to the panel's current X by Y. The
+-- volume, wood, owner, figure and boost carry, and the result is still
+-- planks. The sizes used here are the parts at intake time. A piece
+-- WoodWatch has not cleared, or one that teleported or is still flying,
+-- is left alone. A piece that won't fit raises the BLOCKAGE board.
 --
 -- Planks are ordinary loose wood after that: drag them, load them, and the
 -- sell pad pays the plank price.
@@ -24,6 +30,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local GrabService = require(script.Parent.GrabService)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -106,15 +113,30 @@ local function viewOf(piece: Piece): SawmillLogic.PieceView
 	return { kind = piece.kind, sections = sections }
 end
 
-local function volumeOf(piece: Piece, view: SawmillLogic.PieceView): number
-	if piece.volume > 0 then
-		return piece.volume
+local function speedOf(piece: Piece): number
+	-- A part that has never been given a velocity (a spec double) is at rest.
+	-- Reading the property before anyone writes it errors outside Roblox.
+	local ok, vel = pcall(function()
+		return piece.root.AssemblyLinearVelocity
+	end)
+	if not ok or typeof(vel) ~= "Vector3" then
+		return 0
 	end
-	local v = 0
-	for _, section in ipairs(view.sections) do
-		v += SawmillLogic.SectionVolume(section)
+	return vel.Magnitude
+end
+
+-- WoodWatch's last accepted place against where the part is now. A
+-- teleport that the watch hasn't judged yet still fails this. Pieces with
+-- no watch record (a spec double) are not treated as a jump.
+local function jumped(piece: Piece, now: number): boolean
+	local record = piece :: any
+	local last = record.lastGood
+	local at = record.lastGoodAt
+	if typeof(last) ~= "CFrame" or type(at) ~= "number" then
+		return false
 	end
-	return v
+	local verdict = VehicleLogic.JudgeMove(last.Position, piece.root.CFrame.Position, now - at, GameConfig.WoodMaxSpeed)
+	return verdict == "tooFar"
 end
 
 local function settingsOf(model: Model, mill: ItemCatalog.SawmillDef): SawmillLogic.Settings
@@ -232,11 +254,8 @@ local function tell(userId: number, text: string)
 	end
 end
 
-local function refuse(piece: Piece, why: string)
-	if why == "plank" then
-		return
-	end
-	local text = SawmillLogic.RefuseText[why]
+local function refuse(piece: Piece, why: string, mill: ItemCatalog.SawmillDef)
+	local text = SawmillLogic.Toast(why, mill)
 	if not text or piece.model:GetAttribute("MillNote") == why then
 		return
 	end
@@ -258,10 +277,15 @@ end
 
 local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCatalog.SawmillDef, now: number)
 	local view = viewOf(piece)
-	local volume = volumeOf(piece, view)
+	-- The parts now, not the record and not anything a client sent.
+	local volume = SawmillLogic.MeasuredVolume(view)
+	if volume < 0 or not SawmillLogic.VolumeMatches(piece.volume, volume) then
+		refuse(piece, "size", millDef)
+		return
+	end
 	local planks = SawmillLogic.Cut(volume, settingsOf(mill, millDef), millDef)
 	if #planks == 0 then
-		refuse(piece, "small")
+		refuse(piece, "small", millDef)
 		return
 	end
 	c.release(piece.model, "mill")
@@ -301,7 +325,14 @@ local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCata
 	}
 end
 
-local function consider(c: Context, mill: Model, piece: Piece, now: number, inside: { [Model]: boolean })
+local function consider(
+	c: Context,
+	mill: Model,
+	piece: Piece,
+	now: number,
+	inside: { [Model]: boolean },
+	blocked: { [Model]: boolean }
+)
 	inside[piece.model] = true
 	if piece.selling or piece.dead or piece.shopItem or not piece.verdictOk then
 		return
@@ -309,15 +340,29 @@ local function consider(c: Context, mill: Model, piece: Piece, now: number, insi
 	if piece.root.Parent == nil then
 		return
 	end
+	-- A teleport or a fling. Don't start the settle clock while it's moving.
+	if jumped(piece, now) or not SawmillLogic.Rested(speedOf(piece)) then
+		firstSeen[piece.model] = nil
+		return
+	end
 	local millId = mill:GetAttribute("MillId")
 	local millDef = if type(millId) == "string" then ItemCatalog.GetSawmill(millId) else nil
 	if not millDef then
 		return
 	end
-	local ok, why = SawmillLogic.Accepts(viewOf(piece), millDef)
+	local view = viewOf(piece)
+	local measured = SawmillLogic.MeasuredVolume(view)
+	local ok, why = SawmillLogic.Accepts(view, millDef)
+	if ok and not SawmillLogic.VolumeMatches(piece.volume, measured) then
+		ok = false
+		why = "size"
+	end
 	if not ok then
 		if why then
-			refuse(piece, why)
+			refuse(piece, why, millDef)
+			if SawmillLogic.ShowsBlockage(why) then
+				blocked[mill] = true
+			end
 		end
 		return
 	end
@@ -334,6 +379,7 @@ end
 
 local function poll(c: Context, now: number)
 	local inside: { [Model]: boolean } = {}
+	local blocked: { [Model]: boolean } = {}
 	for _, mill in ipairs(c.mills()) do
 		if jobs[mill] or mill.Parent == nil then
 			continue
@@ -347,12 +393,13 @@ local function poll(c: Context, now: number)
 			local piece = c.pieceOf(part)
 			if piece and not touched[piece] then
 				touched[piece] = true
-				consider(c, mill, piece, now, inside)
+				consider(c, mill, piece, now, inside, blocked)
 				if jobs[mill] then
 					break
 				end
 			end
 		end
+		MachineArt.SetBlockage(mill, blocked[mill] == true)
 	end
 	for model in pairs(firstSeen) do
 		if not inside[model] then

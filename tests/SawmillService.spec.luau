@@ -5,6 +5,7 @@ return function(t)
 	local CFrame = t.roblox.CFrame
 	local Instance = t.roblox.Instance
 	local owner = nil
+	local toastPlayer = nil
 	local profile = { plot = { placed = {} } }
 	local loader = t.loader({
 		services = {
@@ -12,7 +13,10 @@ return function(t)
 				GetPlayers = function()
 					return {}
 				end,
-				GetPlayerByUserId = function()
+				GetPlayerByUserId = function(_, id)
+					if toastPlayer and toastPlayer.UserId == id then
+						return toastPlayer
+					end
 					return nil
 				end,
 			},
@@ -36,6 +40,7 @@ return function(t)
 	local Logic = loader:shared("SawmillLogic")
 	local Sell = loader:shared("SellLogic")
 	local Catalog = loader:shared("ItemCatalog")
+	local Config = loader:shared("GameConfig")
 
 	local function logPart(size, cf)
 		local part = Instance.new("Part")
@@ -48,7 +53,7 @@ return function(t)
 		return model, part
 	end
 
-	t.test("a rested oak log becomes planks of the same volume, and a plank does not", function()
+	t.test("a rested oak log becomes planks of the same volume, and those planks mill again", function()
 		local mill = MachineArt.Build("SawmillRickety", false)
 		mill.Parent = Instance.new("Folder")
 		local intake = mill:FindFirstChild("Intake")
@@ -143,14 +148,39 @@ return function(t)
 			back += Sell.VolumeU3(info.size.X, info.size.Y, info.size.Z)
 		end
 		t.ok(math.abs(back - volume) < 1e-3, "the planks add up to the log")
+		-- Those planks, fed back at a smaller cut, come out thinner. The
+		-- volume is the same and they are still planks (the spawn path).
 		piece.kind = "plank"
 		piece.dead = nil
 		piece.selling = nil
+		part.Anchored = false
+		mill:SetAttribute("CutX", 0.6)
+		mill:SetAttribute("CutY", 0.4)
+		local before = #spawned
 		now += 5
 		Sawmill.Tick()
-		now += 5
+		t.eq(#spawned, before, "a plank rests before the second cut")
+		now += 1
 		Sawmill.Tick()
-		t.eq(#spawned, #expect, "a plank is not milled again")
+		t.eq(piece.selling, true, "the plank is taken")
+		now += Logic.ProcessSeconds(volume)
+		local again = Logic.Cut(volume, { x = 0.6, y = 0.4 }, Catalog.GetSawmill("SawmillRickety"))
+		for _ = 1, #again + 2 do
+			Sawmill.Tick()
+			now += Sawmill.PlankGap
+		end
+		t.eq(#spawned, before + #again, "the plank was cut again")
+		local back2 = 0
+		for i = before + 1, #spawned do
+			local info = spawned[i]
+			t.eq(info.woodId, "oak")
+			t.eq(info.figure, "curly")
+			t.eq(info.boost, 1.2)
+			t.ok(math.abs(info.size.X - 0.6 * Config.WoodUnit) < 1e-6, "thinner across X")
+			t.ok(math.abs(info.size.Z - 0.4 * Config.WoodUnit) < 1e-6, "thinner across Y")
+			back2 += Sell.VolumeU3(info.size.X, info.size.Y, info.size.Z)
+		end
+		t.ok(math.abs(back2 - volume) < 1e-3, "re-milling loses no volume")
 		mill:Destroy()
 		Sawmill._reset()
 	end)
@@ -199,6 +229,224 @@ return function(t)
 		t.eq(mill:GetAttribute("CutX"), 1.2, "only one step, on x or y")
 		mill:Destroy()
 		owner = nil
+		Sawmill._reset()
+	end)
+
+	local function useMill(mill, piece, part, nowFn)
+		local notes = {}
+		Sawmill._use({
+			notify = function(_, text)
+				table.insert(notes, text)
+			end,
+			now = nowFn,
+			partsIn = function()
+				return if part.Parent then { part } else {}
+			end,
+			pieceOf = function()
+				return piece
+			end,
+			mills = function()
+				return { mill }
+			end,
+			release = function() end,
+			remove = function(p)
+				p.dead = true
+			end,
+			spawn = function()
+				return nil
+			end,
+			moved = function() end,
+		})
+		return notes
+	end
+
+	t.test("a pine base is refused with the blockage board and a toast that names the width", function()
+		local mill = MachineArt.Build("SawmillRickety", false)
+		mill.Parent = Instance.new("Folder")
+		local intake = mill:FindFirstChild("Intake")
+		local size = V3.new(2.6, 9, 2.6)
+		local model, part = logPart(size, intake.CFrame)
+		model.Parent = Instance.new("Folder")
+		local piece = {
+			model = model,
+			root = part,
+			kind = "log",
+			woodId = "pine",
+			parts = { [1] = part },
+			nodes = { [1] = { parent = nil, children = {} } },
+			volume = Sell.VolumeU3(size.X, size.Y, size.Z),
+			ownerId = 7,
+			boost = 1,
+			verdictOk = true,
+			selling = nil,
+			dead = nil,
+			shopItem = nil,
+		}
+		toastPlayer = { UserId = 7 }
+		local now = 0
+		local notes = useMill(mill, piece, part, function()
+			return now
+		end)
+		local sign = mill:FindFirstChild("Blockage", true)
+		t.eq(sign.Transparency, 1, "the board starts hidden")
+		Sawmill.Tick()
+		t.eq(piece.selling, nil, "a pine base is not taken")
+		t.eq(sign.Transparency, 0, "BLOCKAGE shows")
+		t.eq(sign:FindFirstChildWhichIsA("SurfaceGui").Enabled, true)
+		t.eq(sign:FindFirstChildWhichIsA("TextLabel", true).Text, "BLOCKAGE")
+		t.eq(notes, { "Too big for this mill (max 1.4 u wide)" })
+		now = 5
+		Sawmill.Tick()
+		t.eq(#notes, 1, "the toast is once")
+		part.Parent = nil
+		Sawmill.Tick()
+		t.eq(sign.Transparency, 1, "the board drops when the log leaves")
+		mill:Destroy()
+		toastPlayer = nil
+		Sawmill._reset()
+	end)
+
+	t.test("a teleported log and a flung log are refused", function()
+		local mill = MachineArt.Build("SawmillRickety", false)
+		mill.Parent = Instance.new("Folder")
+		local intake = mill:FindFirstChild("Intake")
+		local size = V3.new(2, 9, 2)
+		local model, part = logPart(size, intake.CFrame)
+		model.Parent = Instance.new("Folder")
+		local volume = Sell.VolumeU3(size.X, size.Y, size.Z)
+		local piece = {
+			model = model,
+			root = part,
+			kind = "log",
+			woodId = "oak",
+			parts = { [1] = part },
+			nodes = { [1] = { parent = nil, children = {} } },
+			volume = volume,
+			ownerId = 7,
+			boost = 1,
+			verdictOk = false,
+			selling = nil,
+			dead = nil,
+			shopItem = nil,
+			lastGood = intake.CFrame,
+			lastGoodAt = 0,
+		}
+		local spawned = 0
+		local now = 0
+		Sawmill._use({
+			notify = function() end,
+			now = function()
+				return now
+			end,
+			partsIn = function()
+				return { part }
+			end,
+			pieceOf = function()
+				return piece
+			end,
+			mills = function()
+				return { mill }
+			end,
+			release = function() end,
+			remove = function(p)
+				p.dead = true
+			end,
+			spawn = function()
+				spawned += 1
+				return nil
+			end,
+			moved = function() end,
+		})
+		now = Sawmill.Settle + 1
+		Sawmill.Tick()
+		Sawmill.Tick()
+		t.eq(piece.selling, nil, "WoodWatch said no")
+		t.eq(spawned, 0)
+		piece.verdictOk = true
+		piece.lastGood = CFrame.new(0, 0, 400)
+		piece.lastGoodAt = now
+		now += 1
+		Sawmill.Tick()
+		now += 2
+		Sawmill.Tick()
+		t.eq(piece.selling, nil, "it appeared far from where it was last accepted")
+		piece.lastGood = part.CFrame
+		piece.lastGoodAt = now
+		part.AssemblyLinearVelocity = V3.new(0, 0, 200)
+		now += 1
+		Sawmill.Tick()
+		now += 2
+		Sawmill.Tick()
+		t.eq(piece.selling, nil, "still flying")
+		t.eq(spawned, 0)
+		part.AssemblyLinearVelocity = V3.zero
+		piece.lastGood = part.CFrame
+		piece.lastGoodAt = now
+		Sawmill.Tick()
+		t.eq(piece.selling, nil, "it has to rest after the fling")
+		now += 1
+		Sawmill.Tick()
+		t.eq(piece.selling, true, "once it has actually rested, the mill takes it")
+		mill:Destroy()
+		Sawmill._reset()
+	end)
+
+	t.test("the mill cuts the parts it measured, not a larger recorded volume", function()
+		local mill = MachineArt.Build("SawmillRickety", false)
+		mill.Parent = Instance.new("Folder")
+		local intake = mill:FindFirstChild("Intake")
+		local size = V3.new(2, 9, 2)
+		local model, part = logPart(size, intake.CFrame)
+		model.Parent = Instance.new("Folder")
+		local piece = {
+			model = model,
+			root = part,
+			kind = "log",
+			woodId = "oak",
+			parts = { [1] = part },
+			nodes = { [1] = { parent = nil, children = {} } },
+			volume = 80,
+			ownerId = 7,
+			boost = 1,
+			verdictOk = true,
+			selling = nil,
+			dead = nil,
+			shopItem = nil,
+		}
+		toastPlayer = { UserId = 7 }
+		local notes = {}
+		local now = 0
+		Sawmill._use({
+			notify = function(_, text)
+				table.insert(notes, text)
+			end,
+			now = function()
+				return now
+			end,
+			partsIn = function()
+				return { part }
+			end,
+			pieceOf = function()
+				return piece
+			end,
+			mills = function()
+				return { mill }
+			end,
+			release = function() end,
+			remove = function() end,
+			spawn = function()
+				return nil
+			end,
+			moved = function() end,
+		})
+		now = Sawmill.Settle
+		Sawmill.Tick()
+		now += 1
+		Sawmill.Tick()
+		t.eq(piece.selling, nil)
+		t.eq(notes, { "That piece isn't the size the mill measured." })
+		mill:Destroy()
+		toastPlayer = nil
 		Sawmill._reset()
 	end)
 end

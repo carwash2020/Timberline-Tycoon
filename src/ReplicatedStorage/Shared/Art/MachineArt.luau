@@ -20,8 +20,10 @@
 local CollectionService = game:GetService("CollectionService")
 
 local GameConfig = require(script.Parent.Parent.GameConfig)
+local InputKit = require(script.Parent.Parent.InputKit)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
+local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
 
 local MachineArt = {}
 
@@ -68,20 +70,44 @@ local function part(
 	return p
 end
 
+-- Offset pixels on the surface canvas. 48 px is past a 44 px fingertip
+-- even before the screen panel (SawmillLogic.PanelFacePx) is open.
 local function button(parent: Instance, name: string, text: string, x: number, axis: string, dir: number)
+	local px = SawmillLogic.SurfaceButtonPx
 	local b = Instance.new("TextButton")
 	b.Name = name
-	b.Size = UDim2.fromScale(0.22, 0.42)
-	b.Position = UDim2.fromScale(x, 0.5)
+	b.Size = UDim2.fromOffset(px, px)
+	b.Position = UDim2.fromOffset(x, 52)
 	b.BackgroundColor3 = Kit.hex("#C4A574")
 	b.TextColor3 = Kit.hex("#2C241C")
 	b.Font = Enum.Font.GothamBold
+	b.TextSize = SawmillLogic.PanelTextPx
 	b.TextScaled = true
 	b.Text = text
 	b.AutoButtonColor = true
+	b.Active = true
+	b.Selectable = true
 	b:SetAttribute("Axis", axis)
 	b:SetAttribute("Dir", dir)
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = SawmillLogic.PanelTextPx
+	fit.MinTextSize = 14
+	fit.Parent = b
 	b.Parent = parent
+end
+
+-- The BLOCKAGE board. Hidden until a piece won't fit the opening.
+function MachineArt.SetBlockage(model: Model, on: boolean)
+	local sign = model:FindFirstChild("Blockage", true)
+	if not sign or not sign:IsA("BasePart") then
+		return
+	end
+	sign.Transparency = if on then 0 else 1
+	for _, d in ipairs(sign:GetChildren()) do
+		if d:IsA("SurfaceGui") then
+			d.Enabled = on
+		end
+	end
 end
 
 -- The cut readout, "1.0 × 0.6 u".
@@ -281,12 +307,13 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 
 	if not preview then
 		-- Front is the big face (size X by Y). LookVector points out the +X side
-		-- so the buttons face someone standing beside the mill.
+		-- so the buttons face someone standing beside the mill. At
+		-- SurfacePixelsPerStud the face holds four 48 px buttons and the readout.
 		local panel = part(
 			model,
 			"Panel",
-			Vector3.new(3.2, 2.2, 0.25),
-			CFrame.lookAt(Vector3.new(w / 2 + 0.3, 3.1, 0.2), Vector3.new(w / 2 + 8, 3.1, 0.2)),
+			Vector3.new(5.6, 2.8, 0.25),
+			CFrame.lookAt(Vector3.new(w / 2 + 0.3, 3.4, 0.2), Vector3.new(w / 2 + 8, 3.4, 0.2)),
 			PANEL,
 			Enum.Material.Wood,
 			false,
@@ -298,22 +325,60 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 		gui.Name = "PanelGui"
 		gui.Face = Enum.NormalId.Front
 		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = 36
+		gui.PixelsPerStud = SawmillLogic.SurfacePixelsPerStud
 		gui.Parent = panel
 		local readout = Instance.new("TextLabel")
 		readout.Name = "CutReadout"
-		readout.Size = UDim2.fromScale(0.92, 0.32)
-		readout.Position = UDim2.fromScale(0.04, 0.06)
+		readout.Size = UDim2.fromOffset(208, 40)
+		readout.Position = UDim2.fromOffset(8, 6)
 		readout.BackgroundTransparency = 1
 		readout.Font = Enum.Font.GothamBold
+		readout.TextSize = SawmillLogic.PanelTextPx
 		readout.TextScaled = true
 		readout.TextColor3 = Kit.hex("#F3E6C8")
 		readout.Text = "1.0 × 0.6 u"
 		readout.Parent = gui
-		button(gui, "XMinus", "X-", 0.04, "x", -1)
-		button(gui, "XPlus", "X+", 0.28, "x", 1)
-		button(gui, "YMinus", "Y-", 0.52, "y", -1)
-		button(gui, "YPlus", "Y+", 0.76, "y", 1)
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = SawmillLogic.PanelTextPx
+		fit.MinTextSize = 14
+		fit.Parent = readout
+		-- 48 px buttons, 6 px apart, inside a 5.6-stud face at 40 px/stud.
+		button(gui, "XMinus", "X-", 8, "x", -1)
+		button(gui, "XPlus", "X+", 62, "x", 1)
+		button(gui, "YMinus", "Y-", 116, "y", -1)
+		button(gui, "YPlus", "Y+", 170, "y", 1)
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "CutPrompt"
+		prompt.ActionText = "Set the cut"
+		prompt.ObjectText = mill.displayName
+		prompt.MaxActivationDistance = SawmillLogic.PromptRange
+		prompt.HoldDuration = 0
+		prompt.ClickablePrompt = true
+		prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+		InputKit.PromptDefaults(prompt, "Interact")
+		prompt.Parent = panel
+		-- Above the roof, facing the infeed and the outfeed. Hidden until
+		-- a piece won't fit; the text stays off with the board.
+		local sign = part(
+			model,
+			"Blockage",
+			Vector3.new(3.6, 1.15, 0.2),
+			CFrame.new(0, roofBottom + 1.05, 0),
+			Kit.hex("#7A2A22"),
+			Enum.Material.Wood,
+			false,
+			false
+		)
+		Kit.decor(sign)
+		sign.Transparency = 1
+		sign.CastShadow = false
+		local labels = Kit.signText(sign, SawmillLogic.BlockageLabel, Kit.hex("#F4E2C2"))
+		for _, label in ipairs(labels) do
+			local board = label.Parent
+			if board and board:IsA("SurfaceGui") then
+				board.Enabled = false
+			end
+		end
 		CollectionService:AddTag(model, "Sawmill")
 	end
 
