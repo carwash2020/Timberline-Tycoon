@@ -94,6 +94,21 @@ return function(t)
 		t.eq(Night.GlowColor(part), Night.LanternColor)
 	end)
 
+	t.test("a Lanternwood NightGlow part takes the wood's night colour", function()
+		local WoodData = t.shared("WoodData")
+		local part = roblox.Instance.new("Part")
+		part.Name = "Leaves"
+		part.Material = roblox.Enum.Material.SmoothPlastic
+		part.Color = roblox.Color3.fromHex(WoodData.LanternLeaf)
+		part:SetAttribute("NightGlow", true)
+		t.eq(Night.WoodGlow, string.sub(WoodData.LanternGlow, 2))
+		t.eq(Night.GlowColor(part), Night.WoodGlow)
+		local plain = roblox.Instance.new("Part")
+		plain.Name = "Section"
+		plain.Material = roblox.Enum.Material.Wood
+		t.eq(Night.GlowColor(plain), nil, "a log section without NightGlow stays dark")
+	end)
+
 	t.test("lights in a StreetLamp model count; other lights don't", function()
 		local lampModel = roblox.Instance.new("Model")
 		lampModel:AddTag("StreetLamp")

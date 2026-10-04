@@ -503,22 +503,4 @@ function ForestLogic.FindSpot(
 	return nil, nil
 end
 
----------------------------------------------------------------------------
--- The Skyroot Bloom
----------------------------------------------------------------------------
-
--- The groves' average vitality (missing ones count as at rest).
-function ForestLogic.AverageVitality(vitality: { [string]: number }): number
-	local sum = 0
-	for _, id in ipairs(ForestData.Groves) do
-		sum += vitality[id] or ForestData.Vitality.rest
-	end
-	return sum / #ForestData.Groves
-end
-
--- True when the groves together are vital enough to make the Skyroot bloom.
-function ForestLogic.BloomReady(vitality: { [string]: number }): boolean
-	return ForestLogic.AverageVitality(vitality) >= ForestData.Bloom.threshold
-end
-
 return ForestLogic

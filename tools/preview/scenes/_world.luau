@@ -310,6 +310,14 @@ function World.build(ctx, opts)
 	for i, pos in ipairs(WorldPlan.IslandPalms()) do
 		place(TreeArt.Build(palm, 3000 + i, 0.9 + (i % 3) * 0.1), CF.new(pos))
 	end
+	-- The six Lanternwood facing the mainland dock. v1 Build marks NightGlow;
+	-- a night camera turns those parts neon (tools/preview/night.luau).
+	local lantern = WoodData.Get("lanternwood")
+	if lantern then
+		for i, spot in ipairs(WorldPlan.Lanternwood()) do
+			place(TreeArt.Build(lantern, 4000 + i, 1), CF.new(spot.position))
+		end
+	end
 	-- The lava filling the volcano crater's pool, with its glow.
 	local pool, poolRadius = WorldPlan.Crater()
 	local lava = Kit.decor(

@@ -132,7 +132,18 @@ local function verdict(value: number, lo: number, hi: number): string
 		else string.format("⚠️ %.1f× too slow", value / hi)
 end
 
-local WOODS = WoodData.All()
+-- Ferry Island is not on the buying path (W2 owns the biome). Leaving
+-- lanternwood out holds the published headlines. TBD (Designer).
+local function economyWoods()
+	local list = {}
+	for _, wood in ipairs(WoodData.All()) do
+		if wood.biome ~= WoodData.LanternBiome then
+			table.insert(list, wood)
+		end
+	end
+	return list
+end
+local WOODS = economyWoods()
 local SIZE_WEIGHTS = { { TreeGen.SizeLo, 0.25 }, { 1, 0.5 }, { TreeGen.SizeHi, 0.25 } }
 
 ---------------------------------------------------------------------------

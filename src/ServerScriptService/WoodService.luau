@@ -139,7 +139,6 @@ export type Piece = {
 	figure: string?,
 	boost: number,
 	lux: boolean, -- a Lux swing tagged this piece, or the piece it was cut from (SellLogic.InheritLux)
-	planterId: number?,
 	treeUid: string?,
 	createdAt: number, -- os.clock() it was cut free (GrabLogic's grace)
 	lastInteracted: number,
@@ -178,7 +177,6 @@ export type Info = {
 	figure: string?,
 	boost: number?,
 	lux: boolean?,
-	planterId: number?,
 	treeUid: string?,
 	createdAt: number?,
 	elder: boolean?,
@@ -504,6 +502,19 @@ local function publish(p: Piece)
 	if m:GetAttribute("HeldBy") == nil then
 		m:SetAttribute("HeldBy", 0)
 	end
+	-- Lanternwood planks glow on the client. Logs stay plain, and a plank
+	-- never gets a light (WoodFX).
+	if p.kind == "plank" and p.woodId == WoodData.LanternId then
+		if not m:HasTag("Lanternwood") then
+			m:AddTag("Lanternwood")
+		end
+		m:SetAttribute("NightHost", "plank")
+		for _, d in ipairs(m:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Section" then
+				d:SetAttribute("NightGlow", true)
+			end
+		end
+	end
 end
 WoodService.Publish = publish
 
@@ -591,7 +602,6 @@ local function makeRecord(model: Model, info: Info): Piece
 		figure = info.figure,
 		boost = math.max(1, info.boost or 1),
 		lux = info.lux == true,
-		planterId = info.planterId,
 		treeUid = info.treeUid,
 		createdAt = info.createdAt or now,
 		lastInteracted = now,
@@ -1389,7 +1399,6 @@ function WoodService.SplitPiece(p: Piece, sid: number, h: number, swingLux: bool
 			figure = p.figure,
 			boost = p.boost,
 			lux = p.lux,
-			planterId = p.planterId,
 			treeUid = p.treeUid,
 			createdAt = p.createdAt,
 			elder = p.elder,

@@ -27,7 +27,7 @@
 -- Tree model contract (TreeFX, TreeUI, ChopController, QuestUI): tag "Tree";
 -- PrimaryPart "Trunk" (its CFrame = the HomePivot attribute, at mid-trunk);
 -- attributes WoodId, MaxHP, HP, Uid, BarOffset, HomePivot, Size, Dormant,
--- Felled, FallDir, FellAt (and PlanterId for planted trees).
+-- Felled, FallDir, FellAt.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -81,7 +81,6 @@ export type TreeRecord = {
 	regrowAt: number?, -- os.clock() its natural regrowth is due, while it's down
 	heldUntil: number?, -- os.clock() a hold on its stump ends (HoldRegrow), while it's down
 	seed: number,
-	planterId: number?, -- who planted it (the Living Forest), if anyone
 	damageBy: { [number]: number }, -- HP each player has chopped off this growth (co-op credit)
 	temporary: boolean, -- removed after it's felled instead of regrowing (Elder trees)
 	growth: number, -- counts fellings: a timer from an earlier felling checks it and gives up
@@ -174,11 +173,10 @@ end
 
 -- Builds a tree on the ground at `cframe` (its position is the ground point
 -- under the trunk). options.seed fixes its look, options.size its size
--- class, options.planterId who planted it. Returns the Model.
+-- class. Returns the Model.
 export type SpawnOptions = {
 	seed: number?,
 	size: TreeLogic.SizeClass?,
-	planterId: number?,
 	temporary: boolean?, -- gone for good once felled (Elder trees)
 }
 function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOptions?): Model
@@ -211,9 +209,6 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 	model:SetAttribute("HomePivot", pivot) -- clients shake and fell the tree around this
 	model:SetAttribute("TrunkRadius", radius) -- ChopController measures reach from the bark
 	model:SetAttribute("Felled", false)
-	if opts.planterId then
-		model:SetAttribute("PlanterId", opts.planterId)
-	end
 	CollectionService:AddTag(model, TREE_TAG)
 	model.Parent = getFolder("Trees")
 
@@ -239,7 +234,6 @@ function TreeService.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOpt
 		regrowAt = nil,
 		heldUntil = nil,
 		seed = seed,
-		planterId = opts.planterId,
 		damageBy = {},
 		temporary = opts.temporary == true,
 		growth = 0,
@@ -665,14 +659,12 @@ function TreeService.HoldRegrow(uid: string, seconds: number)
 end
 
 -- Brings a felled tree back: whole HP, stump gone, standing again (clients
--- play it growing). `planterId` is unused by the live loop (nil = it grew back wild).
-function TreeService.Regrow(uid: string, planterId: number?)
+-- play it growing). It grows back wild.
+function TreeService.Regrow(uid: string)
 	local rec = trees[uid]
 	if not rec or not rec.felled then
 		return
 	end
-	rec.planterId = planterId
-	rec.model:SetAttribute("PlanterId", planterId)
 	removeStump(rec)
 	rec.hp = rec.maxHp
 	rec.damageBy = {}

@@ -35,7 +35,6 @@ export type TutorialEvent =
 	| "logPickedUp"
 	| "logsLoaded"
 	| "logsSold"
-	| "seedPlanted"
 	| "axeBought"
 	| "woodGrabbed"
 	| "woodLoaded"
@@ -47,13 +46,11 @@ export type TutorialEvent =
 -- What the beacon points at (QuestUI finds it in the world). v2 adds
 -- "wood" (your nearest loose piece, tag Wood) and "truckBed" (your
 -- truck's bed). "murphCart" is the tutorial cart; "plotSign" is plot 1.
--- "stump" stays in the type for older saves; no current step points there.
 export type BeaconTarget =
 	"tree"
 	| "log"
 	| "truck"
 	| "sellPad"
-	| "stump"
 	| "toolShed"
 	| "wood"
 	| "truckBed"

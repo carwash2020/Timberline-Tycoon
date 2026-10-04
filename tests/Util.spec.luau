@@ -55,6 +55,7 @@ return function(t)
 			emberwood = "an emberwood",
 			gloamwood = "a gloamwood",
 			lumenwood = "a lumenwood",
+			lanternwood = "a lanternwood",
 		}
 		local checked = 0
 		for _, wood in ipairs(WoodData.All()) do
@@ -64,7 +65,7 @@ return function(t)
 				checked += 1
 			end
 		end
-		t.ok(checked >= 9, "the nine woods are still there")
+		t.ok(checked >= 10, "the woods are still there")
 		t.eq(Util.article(ItemCatalog.GetGear("InsulatedCoat").displayName), "an Insulated Coat")
 		t.eq(Util.article(ItemCatalog.GetGear("Lantern").displayName), "a Lantern")
 		for _, tier in ipairs(PlotData.Tiers) do

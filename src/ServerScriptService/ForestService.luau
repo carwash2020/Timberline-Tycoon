@@ -45,6 +45,7 @@ local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
+local TreeFill = require(ReplicatedStorage.Shared.World.TreeFill)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local DailyService = require(script.Parent.DailyService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -69,7 +70,6 @@ export type Remotes = { WorldFX: RemoteEvent }
 -- loop GameServer passes SectionTrees and WoodService.SetFigure.
 export type Options = {
 	clock: (() -> number)?,
-	serverTime: (() -> number)?, -- the day and night clock (workspace:GetServerTimeNow())
 	random: (() -> number)?,
 	manual: boolean?, -- no background loop: call ForestService.Tick(dt)
 	sectionTrees: any?, -- v2: SectionTrees (TreeService's API and record shape)
@@ -84,16 +84,12 @@ type Elder = { uid: string, woodId: string, biome: string, wokeAt: number, aura:
 
 local remotes: Remotes? = nil
 local clock: () -> number = os.clock
-local serverTime: () -> number = function(): number
-	return workspace:GetServerTimeNow()
-end
 local random: () -> number = math.random
 
 local figureOf: { [string]: string } = {} -- the figure each standing tree hides
 local clueOf: { [string]: Instance } = {} -- its bark clue
 local stakeOf: { [string]: Model } = {} -- name stakes still in the world (none are added)
 local struck: { [string]: Struck } = {}
-local vitality: { [string]: number } = {}
 local elder: Elder? = nil
 local nextElderCheck = 0
 local bloomUntil = 0 -- clock time the bloom ends; 0 = not blooming
@@ -173,7 +169,7 @@ local function tierFor(biomeId: string): string?
 	if not ForestLogic.IsGrove(biomeId) then
 		return nil
 	end
-	return ForestLogic.TierFor(vitality[biomeId] or ForestData.Vitality.rest).id
+	return ForestLogic.TierFor(ForestData.Vitality.rest).id
 end
 
 ---------------------------------------------------------------------------
@@ -222,7 +218,7 @@ end
 
 -- Rolls the hidden figure of a tree that has just grown.
 local function rollFigure(rec: TreeRecord): string?
-	local chance = ForestLogic.FigureChance(tierFor(rec.def.biome), rec.planterId ~= nil, isBlooming())
+	local chance = ForestLogic.FigureChance(tierFor(rec.def.biome), false, isBlooming())
 	return ForestLogic.RollFigure(rec.def.id, chance, random(), random(), random())
 end
 
@@ -257,10 +253,11 @@ local function clearElder()
 	setElderAttributes(nil, nil)
 end
 
--- A spot an Elder may grow on: WorldPlan's test for trees, a little
--- stricter for a giant (further from roads, flatter).
+-- A spot an Elder may grow on: WorldPlan's test for a giant (further from
+-- roads, flatter) and the same ground boot and regrowth use, so it never
+-- lands on a pad or a homestead square.
 local function goodGround(x: number, z: number): boolean
-	return WorldPlan.GoodGround(x, z, 9, 0.6)
+	return WorldPlan.GoodGround(x, z, 9, 0.6) and TreeFill.Ground(x, z)
 end
 
 -- One of a grove's woods, weighted by how many of each it grows.
@@ -350,13 +347,13 @@ local function elderInterval(): number
 	return e.checkMinSeconds + (e.checkMaxSeconds - e.checkMinSeconds) * random()
 end
 
--- Seconds of the night left (0 by day, or while WorldClock still says day).
+-- Seconds of the night left. WorldTime.IsNight() with no argument reads
+-- Hour(), so a Studio ClockOverride counts. The IsNight attribute does not.
 local function nightLeft(): number
-	local now = serverTime()
-	if workspace:GetAttribute("IsNight") ~= true or not WorldTime.IsNight(WorldTime.ClockTime(now)) then
+	if not WorldTime.IsNight() then
 		return 0
 	end
-	return WorldTime.SecondsUntilChange(now)
+	return WorldTime.SecondsBetween(WorldTime.Hour(), GameConfig.NightEndsAt)
 end
 
 local function checkElder()
@@ -370,7 +367,7 @@ local function checkElder()
 		-- enough of it left to fell it (it fades at dawn).
 		local awake = biome ~= nil and (not biome.nightOnly or nightLeft() >= ForestData.Elder.nightLeftSeconds)
 		if biome and biome.area and biome.trees and awake then
-			table.insert(groves, { biome = id, vitality = vitality[id] or ForestData.Vitality.rest })
+			table.insert(groves, { biome = id, vitality = ForestData.Vitality.rest })
 		end
 	end
 	local pick = ForestLogic.PickElderGrove(groves, random(), random())
@@ -565,11 +562,7 @@ function ForestService.Init(r: Remotes, _notifyFn: (Player, string) -> (), optio
 	local opts: Options = options or {}
 	remotes = r
 	clock = opts.clock or os.clock
-	serverTime = opts.serverTime or serverTime
 	random = opts.random or math.random
-	for _, id in ipairs(ForestData.Groves) do
-		vitality[id] = ForestData.Vitality.start
-	end
 	workspace:SetAttribute("SkyrootBloom", false)
 	bloomRestUntil = clock() + ForestData.Bloom.restSeconds
 	setElderAttributes(nil, nil)
@@ -708,9 +701,14 @@ function ForestService.Strike(position: Vector3): string?
 	return uid
 end
 
--- For other systems (AmbientLife, tests): a grove's vitality, the Elder.
-function ForestService.Vitality(biomeId: string): number
-	return vitality[biomeId] or ForestData.Vitality.rest
+-- Grove vitality is no longer tracked. Callers still read the resting value.
+function ForestService.Vitality(_biomeId: string): number
+	return ForestData.Vitality.rest
+end
+
+-- The ground test wakeElder uses (tests).
+function ForestService.ElderGround(x: number, z: number): boolean
+	return goodGround(x, z)
 end
 
 function ForestService.ElderUid(): string?

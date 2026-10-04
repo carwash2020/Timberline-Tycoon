@@ -39,6 +39,23 @@ return function(t)
 		map.Parent = workspace
 		s.workspace = workspace
 		s.map = map
+		-- A Lune Model rejects new methods, so the clock is a table that
+		-- forwards attributes and the map folder to the Model. nightLeft
+		-- reads WorldTime.Hour(), which asks GetServerTimeNow.
+		local clockWorkspace = {
+			GetServerTimeNow = function()
+				return s.serverNow
+			end,
+			GetAttribute = function(_, name)
+				return workspace:GetAttribute(name)
+			end,
+			SetAttribute = function(_, name, value)
+				workspace:SetAttribute(name, value)
+			end,
+			FindFirstChild = function(_, name, recursive)
+				return workspace:FindFirstChild(name, recursive)
+			end,
+		}
 
 		-- Fake TreeService: records like the real one's.
 		local trees, logs = {}, {}
@@ -176,13 +193,16 @@ return function(t)
 				},
 			},
 			services = { Players = Players },
-			globals = { workspace = workspace, task = fakeTask },
+			globals = { workspace = clockWorkspace, task = fakeTask },
 		})
 		s.Forest = loader:server("ForestService")
 		s.ForestData = loader:shared("ForestData")
 		s.ForestLogic = loader:shared("ForestLogic")
 		s.GameConfig = loader:shared("GameConfig")
 		s.WorldTime = loader:shared("WorldTime")
+		-- Noon, so a grove that only wakes at night stays asleep until a
+		-- test sets the clock. Hour 0 would be midnight.
+		s.serverNow = s.WorldTime.SecondsFromMidnight(12)
 		s.WoodData = WoodData
 		s.TreeLogic = TreeLogic
 
@@ -589,5 +609,13 @@ return function(t)
 		s.Forest.Tick(0)
 		t.ok(s.Forest.ElderUid() ~= nil, "an Elder wakes at dusk")
 		t.eq(s.attr("ElderBiome"), "grove")
+	end)
+
+	t.test("an Elder never stands on a homestead square", function()
+		local s = setup()
+		s.start()
+		local PlotData = t.shared("PlotData")
+		local home = PlotData.Homes[1]
+		t.ok(not s.Forest.ElderGround(home.x, home.z), home.id)
 	end)
 end

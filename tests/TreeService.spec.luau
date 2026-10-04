@@ -368,13 +368,14 @@ return function(t)
 		s.chop(a, rec, 20)
 		s.run(s.TreeLogic.FallTime + 1)
 		s.clock += 120
-		s.Trees.Regrow(rec.uid, 1) -- grown back early
+		s.Trees.Regrow(rec.uid) -- grown back wild
 		t.ok(rec.alive and not rec.felled)
-		t.eq(rec.planterId, 1)
+		t.eq(rec.planterId, nil)
+		t.eq(rec.model:GetAttribute("PlanterId"), nil)
 		s.clock += 200
 		s.run()
 		t.ok(rec.alive and not rec.felled, "still standing")
-		t.eq(rec.planterId, 1, "and still the planter's")
+		t.eq(rec.model:GetAttribute("PlanterId"), nil, "still nobody's planting")
 		t.eq(#s.delays, 0)
 	end)
 

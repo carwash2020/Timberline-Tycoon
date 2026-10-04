@@ -105,6 +105,15 @@ local PALETTES: { [string]: Palette } = {
 		glow = hex("#FFE7A0"),
 		accent = hex("#FFD36A"),
 	},
+	lanternwood = {
+		-- Day only. The night neon is WoodData.LanternGlow, swapped on the client.
+		leaves = {
+			hex(WoodData.LanternLeaf),
+			hex(WoodData.LanternLeafShade),
+			hex(WoodData.LanternLeafLight),
+		},
+		heart = hex(WoodData.LanternCore),
+	},
 }
 
 -- The one detail you can name from the road. The part that carries it has
@@ -119,6 +128,7 @@ TreeArt.Signatures = {
 	emberwood = "ember-vein", -- neon cracks in the charred bark
 	phantomwood = "wisp-shard", -- a glowing pod under a glass shard
 	lumenwood = "light-plate", -- a golden vein, and flat crystal plates
+	lanternwood = "heart-band", -- a thin collar that goes neon at night, on the client
 } :: { [string]: string }
 
 function TreeArt.Palette(def: WoodDef): Palette
@@ -208,6 +218,8 @@ local DUST: { [string]: Color3 } = {
 	volcano = Color3.fromRGB(118, 112, 108),
 	grove = Color3.fromRGB(150, 138, 168),
 	sky = Color3.fromRGB(236, 228, 198),
+	-- Ferry shore, not the palm coast's sand and not the forest's earth. TBD (Builder).
+	ferryisle = Color3.fromRGB(214, 196, 150), -- TBD (Builder)
 }
 
 function TreeArt.DustColor(def: WoodDef): Color3
@@ -806,6 +818,51 @@ builders.lumenwood = function(model, def, pal, H, F, rng)
 	particles(lower[1], glow, 4, 0.8, 1.2, 0.35)
 end
 
+-- Lanternwood's v1 silhouette. TBD (Builder).
+local LANTERN_TRUNK = 0.18 -- trunk diameter over its height
+local LANTERN_CROWN_LIFT = 0.28 -- of the crown size, above the trunk
+local LANTERN_CROWN_Y = 0.7 -- crown height over its width
+local LANTERN_LEAF_PARTS = 8 -- TBD (Builder)
+local LANTERN_FLARES = 4 -- TBD (Builder)
+
+-- Lanternwood: a plain broadleaf by day. Leaves and a thin core band are
+-- marked for the client to turn neon at night. No server light, no Neon.
+builders.lanternwood = function(model, def, pal, H, F, rng)
+	local D = LANTERN_TRUNK * H
+	trunk(model, def, H, D)
+	rootFlares(model, def.trunkColor, D, LANTERN_FLARES, rng)
+	local leaves = canopy(
+		model,
+		CFrame.new(0, H + F * LANTERN_CROWN_LIFT, 0),
+		Vector3.new(F, F * LANTERN_CROWN_Y, F),
+		LANTERN_LEAF_PARTS,
+		rng,
+		pal.leaves,
+		def.id
+	)
+	for _, leaf in ipairs(leaves) do
+		leaf:SetAttribute("NightGlow", true)
+	end
+	local thin = math.max(TreeGen.CoreBandMin, D * TreeGen.CoreBandThin)
+	local band = Kit.decor(
+		Kit.cylinder(
+			model,
+			"CoreBand",
+			thin,
+			D * TreeGen.CoreBandOver,
+			CFrame.new(0, H * TreeGen.CoreBandAlong, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			def.trunkColor,
+			Enum.Material.Wood
+		),
+		false
+	)
+	band:SetAttribute("Signature", TreeArt.Signatures.lanternwood)
+	band:SetAttribute("NightGlow", true)
+	model:AddTag("Lanternwood")
+	model:SetAttribute("NightHost", "tree")
+	model:SetAttribute("WoodId", def.id)
+end
+
 -- Fallback for a wood without its own builder: by silhouette.
 local function fallback(model: Model, def: WoodDef, pal: Palette, H: number, F: number, rng: Rng)
 	if def.silhouette == "pine" then
@@ -992,15 +1049,15 @@ end
 --     queryable, untouchable, in collision group "Wood".
 --   * Everything else is dress: parts named Leaves, Frond or Facet (inside
 --     "Tier" models too: WindSway and CanopyFade find those names), Root,
---     BarkMark, Crack, Vein, PalmRing, Coconut, Pod, PodStem. Every dress
+--     BarkMark, Crack, Vein, CoreBand, PalmRing, Coconut, Pod, PodStem. Every dress
 --     part has attribute Section (the section it rides on), never collides
 --     or fires touches, can be queried (pointing at leaves finds the tree),
 --     and sits in collision group "Leaves". The server's sight ray is in
 --     group Wood, so the crown doesn't block it; the client's pointer ray
 --     is not, so a click on the crown still finds this tree.
 --   * Model attributes: WoodId, Seed, Stage, Scale, Elder, Felled, Dormant,
---     PlanterId, and Uid when given; the service adds HomePivot once the
---     tree is placed.
+--     and Uid when given; the service adds HomePivot once the tree is placed.
+--     Lanternwood also carries tag Lanternwood and NightHost "tree".
 --   * The wood's core (WoodData v2.core and coreMaterial) shows only on cut
 --     faces (CutFace) and in notches (Notch).
 
@@ -1343,6 +1400,11 @@ local function buildDress(model: Model, def: WoodDef, paint: Paint, d: Dress): {
 			-- One facet glows through the cuts (never a whole crown).
 			parts[1].Material = Enum.Material.Neon
 			parts[1].Color = glow
+		elseif def.id == WoodData.LanternId then
+			-- Day colour stays. The client swaps these to neon at night.
+			for _, leaf in ipairs(parts) do
+				leaf:SetAttribute("NightGlow", true)
+			end
 		end
 		return parts
 	elseif kind == "wisp" then
@@ -1426,13 +1488,18 @@ local function buildDress(model: Model, def: WoodDef, paint: Paint, d: Dress): {
 		local strip = Kit.part(model, "Vein", d.size, d.cf, vein, Enum.Material.Neon)
 		strip:SetAttribute("Signature", TreeArt.Signatures.lumenwood)
 		return { asDress(strip, d.section) }
+	elseif kind == "coreband" then
+		-- Day bark colour and Wood. The client turns it neon at night.
+		local band = Kit.cylinder(model, "CoreBand", d.size.X, d.size.Y, d.cf, paint.bark, Enum.Material.Wood)
+		band:SetAttribute("Signature", TreeArt.Signatures.lanternwood)
+		band:SetAttribute("NightGlow", true)
+		return { asDress(band, d.section) }
 	end
 	return {}
 end
 
 export type SkeletonOptions = {
 	uid: string?,
-	planterId: number?,
 	only: { [number]: boolean }?, -- build just these sections (a piece) and their dress
 }
 
@@ -1454,7 +1521,10 @@ function TreeArt.FromSkeleton(def: WoodDef, skel: Skeleton, opts: SkeletonOption
 	model:SetAttribute("Elder", skel.elder)
 	model:SetAttribute("Felled", false)
 	model:SetAttribute("Dormant", false)
-	model:SetAttribute("PlanterId", o.planterId or 0)
+	if def.id == WoodData.LanternId then
+		model:AddTag("Lanternwood")
+		model:SetAttribute("NightHost", "tree")
+	end
 	if o.uid then
 		model:SetAttribute("Uid", o.uid)
 	end

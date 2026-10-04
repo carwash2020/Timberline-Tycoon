@@ -56,6 +56,26 @@ return function(t)
 		t.eq(ShopLogic.FellSummary(axe("RustyAxe"), 3), "Too weak for any tree")
 	end)
 
+	t.test("lanternwood is on no axe card while Ferry Island is boat-only", function()
+		local BiomeData = t.shared("BiomeData")
+		local WoodData = t.shared("WoodData")
+		local lantern = WoodData.Get("lanternwood")
+		local biome = BiomeData.Get(lantern.biome)
+		t.eq(biome.access, "boat")
+		t.ok(BiomeData.IsOpen(lantern.biome), "the island is placed, just not reachable")
+		for _, a in ipairs(ItemCatalog.AxeLadder()) do
+			t.ok(string.find(ShopLogic.FellSummary(a), "lanternwood", 1, true) == nil, a.id .. " fell line")
+			t.ok(string.find(ShopLogic.CutSummary(a), "lanternwood", 1, true) == nil, a.id .. " cut line")
+			t.ok(string.find(ShopLogic.AxeDetail(a, 1), "lanternwood", 1, true) == nil, a.id .. " v1 card")
+			t.ok(string.find(ShopLogic.AxeDetail(a, 2), "lanternwood", 1, true) == nil, a.id .. " v2 card")
+		end
+		-- The reference pick (CutSummary's extras, after oak) never names it,
+		-- even with room for every wood and no hit cap.
+		local wide = ShopLogic.CutSummary(axe("StarfallAxe"), 1000, 20)
+		t.eq(string.sub(wide, 1, 17), "Cuts an oak trunk")
+		t.ok(string.find(wide, "lanternwood", 1, true) == nil, wide)
+	end)
+
 	t.test("DamageText names biome bonuses by their wood", function()
 		t.eq(ShopLogic.DamageText(axe("SteelAxe")), "12 damage")
 		t.eq(ShopLogic.DamageText(axe("InfernoAxe")), "150 damage (200 vs. emberwood)")
@@ -234,9 +254,11 @@ return function(t)
 			if #order < 2 then
 				-- Room left: no open wood it cuts at pace was left out.
 				for _, w in ipairs(WoodData.All()) do
+					local home = BiomeData.Get(w.biome)
 					if
 						w ~= oak
 						and BiomeData.IsOpen(w.biome)
+						and (home == nil or home.access ~= "boat")
 						and FieldGuide.TrunkHits(a, w) <= FieldGuide.UsefulHitsV2
 					then
 						t.ok(listed[w.id], a.id .. ": " .. w.id .. " left out")

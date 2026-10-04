@@ -139,4 +139,123 @@ return function(t)
 		fx.Start()
 		t.eq(connected(), 0)
 	end)
+
+	t.test("Lanternwood glows only at night, and 12 trees on high make at most 8 lights", function()
+		t.eq(WoodFX.GlowRange, 14)
+		t.eq(WoodFX.GlowBrightness, 0.8)
+		t.eq(QualityBudgets.GlowLights, { low = 0, medium = 4, high = 8 })
+		t.eq(QualityBudgets.GlowLightCap("low"), 0)
+		t.eq(QualityBudgets.GlowLightCap("medium"), 4)
+		t.eq(QualityBudgets.GlowLightCap("high"), 8)
+		t.eq(WoodFX.NightGlowOn(19), true)
+		t.eq(WoodFX.NightGlowOn(0), true)
+		t.eq(WoodFX.NightGlowOn(4.9), true)
+		t.eq(WoodFX.NightGlowOn(5), false)
+		t.eq(WoodFX.NightGlowOn(12), false)
+		t.eq(WoodFX.NightGlowOn(18.9), false)
+		local hosts = {}
+		for i = 1, 12 do
+			table.insert(hosts, { id = "tree" .. i, kind = "tree", distance = i })
+		end
+		table.insert(hosts, { id = "plank", kind = "plank", distance = 0.1 })
+		local lit = WoodFX.LitIds(hosts, "high")
+		t.eq(#lit, 8)
+		t.eq(lit[1], "tree1")
+		t.eq(lit[8], "tree8")
+		for _, id in ipairs(lit) do
+			t.ok(id ~= "plank", "a plank never gets a light")
+		end
+		t.eq(WoodFX.LitIds(hosts, "medium"), { "tree1", "tree2", "tree3", "tree4" })
+		t.eq(WoodFX.LitIds(hosts, "low"), {})
+	end)
+
+	local function lantern(parent, name, at, color)
+		local model = Instance.new("Model")
+		model.Name = name
+		model.Parent = parent
+		model:SetAttribute("NightHost", "tree")
+		local part = Instance.new("Part")
+		part.Name = "Leaves"
+		part.Material = roblox.Enum.Material.Wood
+		part.Color = color
+		part.CFrame = CFrame.new(at)
+		part:SetAttribute("NightGlow", true)
+		part.Parent = model
+		model.PrimaryPart = part
+		return model, part
+	end
+
+	t.test("a lantern repaint happens only on a day/night flip", function()
+		WoodFX.ResetLanterns()
+		local folder = Instance.new("Folder")
+		local day = roblox.Color3.fromRGB(110, 138, 74)
+		local model, part = lantern(folder, "Tree_lanternwood", Vector3.new(0, 0, 10), day)
+		local eye = Vector3.new(0, 0, 0)
+		t.eq(WoodFX.TrackLantern(model, false), 1, "a new model is painted once")
+		t.eq(part.Material, roblox.Enum.Material.Wood)
+		t.eq(part.Color, day)
+		t.eq(WoodFX.StepLanterns(false, 0, "high", eye), 0)
+		t.eq(WoodFX.StepLanterns(false, 0.25, "high", eye), 0, "still day")
+		t.eq(WoodFX.TrackLantern(model, false), 0, "tracking the same model again does not repaint")
+		t.eq(WoodFX.StepLanterns(true, 1, "high", eye), 1, "dusk")
+		t.eq(part.Material, roblox.Enum.Material.Neon)
+		t.eq(part.Color, roblox.Color3.fromHex(WoodData.LanternGlow))
+		t.eq(WoodFX.StepLanterns(true, 1.25, "high", eye), 0, "still night")
+		t.eq(WoodFX.StepLanterns(true, 30, "high", eye), 0, "a later night tick does not repaint")
+		local added = Instance.new("Part")
+		added.Name = "LeavesLate"
+		added:SetAttribute("NightGlow", true)
+		added.Material = roblox.Enum.Material.Wood
+		added.Color = day
+		added.Parent = model
+		t.eq(WoodFX.StepLanterns(false, 31, "high", eye), 1, "dawn repaints the cached part only")
+		t.eq(part.Material, roblox.Enum.Material.Wood)
+		t.eq(part.Color, day)
+		t.eq(added.Material, roblox.Enum.Material.Wood, "a part added after the tag was cached stays as it was")
+		local other, otherPart = lantern(folder, "Tree_lanternwood", Vector3.new(0, 0, 20), day)
+		t.eq(WoodFX.TrackLantern(other, false), 1, "a new model paints without a flip")
+		t.eq(otherPart.Material, roblox.Enum.Material.Wood)
+		t.eq(WoodFX.StepLanterns(false, 31.2, "high", eye), 0, "the first model is not painted again")
+	end)
+
+	t.test("two Lanternwood models with the same name are tracked separately", function()
+		WoodFX.ResetLanterns()
+		local folder = Instance.new("Folder")
+		local eye = Vector3.new(0, 0, 0)
+		local models = {}
+		local colors = {}
+		for i = 1, 9 do
+			local color = roblox.Color3.fromRGB(i * 20, 40, 10)
+			local model, part = lantern(folder, "Tree_lanternwood", Vector3.new(0, 0, i * 10), color)
+			colors[i] = color
+			models[i] = { model = model, part = part }
+			WoodFX.TrackLantern(model, false)
+		end
+		t.eq(models[1].model.Name, models[9].model.Name)
+		t.eq(models[1].model.Parent, models[9].model.Parent)
+		t.eq(models[1].model:GetFullName(), models[9].model:GetFullName())
+		t.eq(WoodFX.StepLanterns(true, 0, "high", eye), 9, "dusk paints each model, not one shared name")
+		for i = 1, 9 do
+			t.eq(models[i].part.Material, roblox.Enum.Material.Neon)
+		end
+		t.eq(WoodFX.StepLanterns(false, 1, "high", eye), 9)
+		for i = 1, 9 do
+			t.eq(models[i].part.Color, colors[i], "day colour " .. i .. " is its own")
+			t.eq(models[i].part.Material, roblox.Enum.Material.Wood)
+		end
+		WoodFX.ResetLanterns()
+		for i = 1, 9 do
+			WoodFX.TrackLantern(models[i].model, true)
+		end
+		t.eq(WoodFX.StepLanterns(true, 0, "high", eye), 0)
+		local lights = 0
+		for i = 1, 9 do
+			local light = models[i].model.PrimaryPart:FindFirstChild(WoodFX.GlowLightName)
+			if light then
+				lights += 1
+			end
+			t.eq(light ~= nil, i <= 8, "tree " .. i)
+		end
+		t.eq(lights, 8, "the cap is per model, so the ninth same-named tree stays dark")
+	end)
 end

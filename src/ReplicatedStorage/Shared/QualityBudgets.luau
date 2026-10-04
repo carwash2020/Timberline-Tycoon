@@ -202,6 +202,23 @@ function QualityBudgets.TierFor(savedLevel: string?, touchOnly: boolean): Tier
 	return if touchOnly then "low" else "high"
 end
 
+-- Lanternwood PointLights on screen at once. Planks never take one.
+-- TBD (Designer): 0 on low, 4 on medium, 8 on high.
+QualityBudgets.GlowLights = table.freeze({
+	low = 0, -- TBD (Designer)
+	medium = 4, -- TBD (Designer)
+	high = 8, -- TBD (Designer)
+} :: { [string]: number })
+
+-- How many Lanternwood trees may carry a light on this tier.
+function QualityBudgets.GlowLightCap(tier: string): number
+	local n = QualityBudgets.GlowLights[tier]
+	if type(n) == "number" then
+		return n
+	end
+	return QualityBudgets.GlowLights.high
+end
+
 -- Particles named Glint (the Lux Axe) per second. Low turns them off.
 function QualityBudgets.GlintRate(tier: string): number
 	if tier == "high" then
