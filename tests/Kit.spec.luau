@@ -54,7 +54,9 @@ return function(t)
 		-- The sawmill's and the shops' big name boards ("Sign", phase 12) take
 		-- fewer pixels a stud, by their height, so their letters can fill them
 		-- (Roblox stops TextScaled at 100 px; BuildingArt.spec checks them):
-		-- still sized to the face, never stretched.
+		-- still sized to the face, never stretched. The hours board is 4 x 2
+		-- at its own pixels-per-stud, so a 200 x 100 canvas matches the face.
+		local Hours = t.shared("ShopHoursLogic")
 		local named = { Sawmill = true, ToolShed = true, Dealership = true, HearthAndHome = true }
 		local guis = 0
 		for _, model in ipairs(models) do
@@ -63,6 +65,9 @@ return function(t)
 					guis += 1
 					local sized = if named[model.Name] and d.Parent.Name == "Sign"
 						then d.SizingMode == Enum.SurfaceGuiSizingMode.PixelsPerStud and d.PixelsPerStud <= 40
+						elseif d.Parent.Name == "HoursBoard" then d.SizingMode
+								== Enum.SurfaceGuiSizingMode.PixelsPerStud
+							and d.PixelsPerStud == Hours.SignPixelsPerStud
 						else sizedToFace(d)
 					t.ok(sized, string.format("%s's %s text is stretched", model.Name, d.Parent.Name))
 				end
