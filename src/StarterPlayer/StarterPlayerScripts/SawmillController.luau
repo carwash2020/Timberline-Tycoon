@@ -211,19 +211,26 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	return { gui = gui, root = root, readout = readout, buttons = buttons, close = close }
 end
 
--- Top-left of the core-UI inset. HUD's screen ignores the inset, so a
--- modal box in full-screen pixels starts here. ScreenGui.AbsolutePosition
--- can read (0, 0) for an inset screen; GetGuiInset is the same edge
--- UITheme.TopBar already reads.
+-- Top-left of the core-UI inset, in screen pixels. Y is the top bar
+-- (GetGuiInset). X is the notch: GetGuiInset does not report it, so it
+-- comes from the same DeviceSafeInsets probe HUD uses (HUD.LeftSafe).
+-- ScreenGui.AbsolutePosition can read (0, 0) for an inset screen.
 local function insetOrigin(): Vector2
-	local topLeft = Vector2.zero
+	local y = 0
 	local ok, inset = pcall(function()
 		return GuiService:GetGuiInset()
 	end)
 	if ok and typeof(inset) == "Vector2" then
-		topLeft = inset
+		y = inset.Y
 	end
-	return topLeft
+	local x = 0
+	local safeOk, left = pcall(function()
+		return HUD.LeftSafe()
+	end)
+	if safeOk and type(left) == "number" then
+		x = left
+	end
+	return Vector2.new(x, y)
 end
 
 -- The card lives in a CoreUISafeInsets screen. Its AbsolutePosition is
@@ -265,7 +272,15 @@ local function placeCard(root: Frame, tenFoot: boolean)
 	pcall(function()
 		hotbar = UITheme.Bottom()
 	end)
-	local column = { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
+	-- The column is in screen pixels. This gui is already inside the inset,
+	-- so the avoid box is that column minus the same origin modalRect adds.
+	local origin = insetOrigin()
+	local column = {
+		left = margin - origin.X,
+		top = 48 - origin.Y,
+		right = margin + 280 - origin.X,
+		bottom = 48 + 180 - origin.Y,
+	}
 	local box = SawmillLogic.PlaceCard(size.X, size.Y, sw, sh, column, size.Y - hotbar)
 	root.AnchorPoint = Vector2.new(0, 0)
 	root.Position = UDim2.fromOffset(box.left, box.top)

@@ -5,8 +5,9 @@ return function(t)
 	local Enum = t.roblox.Enum
 	local Vector2 = t.roblox.Vector2
 	local modalLog = {}
-	-- GetGuiInset's top left. ScreenGui.AbsolutePosition is not this.
+	-- GetGuiInset's top left. It has no notch. ScreenGui.AbsolutePosition is neither.
 	local guiInset = Vector2.zero
+	local leftSafe = 0
 	local loader = t.loader({
 		services = {
 			GuiService = {
@@ -25,6 +26,9 @@ return function(t)
 			HUD = {
 				SetModal = function(rect)
 					table.insert(modalLog, { rect = rect })
+				end,
+				LeftSafe = function()
+					return leftSafe
 				end,
 			},
 		},
@@ -107,8 +111,9 @@ return function(t)
 	t.test("opening sets the modal from the card, and the card clears the column and the hotbar", function()
 		local panel = Controller.BuildPanel(false)
 		-- A decoy: the engine can report this as (0, 0), and either way it
-		-- is not the inset. GetGuiInset is.
+		-- is not the inset. Y is GetGuiInset; X is the notch probe.
 		guiInset = Vector2.zero
+		leftSafe = 0
 		panel.gui.AbsolutePosition = Vector2.new(400, 250)
 		panel.root.AbsolutePosition = Vector2.new(300, 90)
 		panel.root.AbsoluteSize = Vector2.new(240, 200)
@@ -122,21 +127,41 @@ return function(t)
 		Controller._close()
 		t.eq(modalLog[#modalLog].rect, nil)
 
-		-- A 58 px top inset from GetGuiInset. The card's position is inside
-		-- the safe screen, and the rect HUD gets is that box on the full screen.
+		-- GetGuiInset is (0, 58): the top bar, not the notch. leftSafe is 44.
+		-- The card's position is inside the safe screen, and the rect HUD
+		-- gets is that box plus this origin on the full screen.
 		local inset = 58
+		local notch = 44
 		guiInset = Vector2.new(0, inset)
+		leftSafe = notch
 		panel.gui.AbsolutePosition = Vector2.new(0, 0)
+		panel.gui.AbsoluteSize = Vector2.new(667, 317)
 		panel.root.AbsolutePosition = Vector2.new(120, 40)
 		panel.root.AbsoluteSize = Vector2.new(200, 160)
 		Controller._open(panel)
 		local shifted = modalLog[#modalLog].rect
-		t.eq(shifted.left, 120)
+		t.eq(shifted.left, 120 + notch)
 		t.eq(shifted.top, 40 + inset)
-		t.eq(shifted.right, 320)
+		t.eq(shifted.right, 120 + notch + 200)
 		t.eq(shifted.bottom, 200 + inset)
 
 		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		-- Origin (44, 58). The column {12, 48, 292, 228} is screen space.
+		-- The card is placed in the inset gui, so adding the origin back
+		-- must still miss that column. Sitting further right than the
+		-- unshifted beside-slot would mean the notch was not subtracted.
+		local placedScale = UITheme.ScaleFor(panel.gui.AbsoluteSize, false, false)
+		local placedW, placedH = Logic.CardSize(false)
+		local screenBox = {
+			left = panel.root.Position.X.Offset + notch,
+			top = panel.root.Position.Y.Offset + inset,
+			right = panel.root.Position.X.Offset + notch + placedW * placedScale,
+			bottom = panel.root.Position.Y.Offset + inset + placedH * placedScale,
+		}
+		local realColumn = { left = 12, top = 48, right = 292, bottom = 228 }
+		t.eq(Logic.Overlaps(screenBox, realColumn), false, "screen column")
+		t.ok(screenBox.left <= realColumn.right + 8, "against the shifted column")
+
 		local function column(margin)
 			return { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
 		end
