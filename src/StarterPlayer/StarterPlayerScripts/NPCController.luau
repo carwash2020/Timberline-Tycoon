@@ -17,24 +17,28 @@
 --     a short onboarding tip.
 --   * Walkers stroll their loop (NPCData.RouteState from the shared server
 --     clock, so everyone sees them in the same place) and pause at their
---     waypoints. The server never moves them.
+--     waypoints. The root stays anchored. NPCWalk eases it toward the
+--     clock every rendered frame, and samples the ground once at bind
+--     (a ray down the route, then HeightAt if the ray misses). The server
+--     never moves them.
 --   * The nearest NPC within TALK_RANGE says a line in a speech bubble
 --     every so often (NPCDialogue: the hour, the weather, a first sale, a
 --     better axe, a sawmill, or a general line). Talk (F, or a tap on the
 --     prompt) asks for one sooner. Murph keeps quiet while your tutorial
 --     runs (QuestUI owns his button); he still looks, waves, and gives
 --     that one tip.
---   * Bubbles sit beside the head, cap their width, and fade past a short
---     distance. On a phone they're smaller and drop lower if the head is
---     up in the money plaque's band. A compact screen (a dense phone, a
---     short window) uses that same phone layout.
---   * Beyond ANIMATE_RANGE they're left alone (joints reset), walkers just
---     keep their place on the route. Who to look at is refreshed a few
---     times a second, not every frame.
---   * The pose loop follows Quality.Budget().CosmeticHz: every frame on
+--   * The bubble is adorned to the head, so it follows the walk every
+--     frame. Its tail sits BubbleClearance (1.5 studs) above TopOffset,
+--     the hat top CharacterArt measured from the head centre. A phone
+--     and a desktop use that same lift. Near the money plaque it steps
+--     aside; it never drops into the hat.
+--   * Beyond ANIMATE_RANGE they're left alone (joints reset). Walkers
+--     still keep their place on the route. Who to look at is refreshed
+--     a few times a second, not every frame.
+--   * Idle poses follow Quality.Budget().CosmeticHz: every frame on
 --     high, about 20 times a second on medium, about twice a second on
---     low. Poses, routes and lines are read from the clock, so a slower
---     tier is coarser motion, not a different place or a skipped line.
+--     low. The walk and its legs do not: those run every rendered frame,
+--     so a low tier is coarser blinking, not a teleport.
 -- Streaming-tolerant: NPCs are found by the "NPC" tag as they stream in
 -- and dropped as they stream out. Binding gives up after a few tries.
 
@@ -49,7 +53,9 @@ local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
+local NPCWalk = require(ReplicatedStorage.Shared.NPCWalk)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local UITheme = require(script.Parent.UITheme)
@@ -93,7 +99,11 @@ type Rig = {
 	speed: number,
 	offset: number,
 	rootHeight: number,
-	groundY: number,
+	ground: NPCWalk.Profile?,
+	visual: NPCWalk.Pose?,
+	moving: boolean,
+	walked: number,
+	phase: number,
 	homeYaw: number, -- the way it faces when nobody's near (its spot's)
 	bodyYaw: number, -- the way it faces now
 	scale: number,
@@ -248,22 +258,25 @@ local function closeBubble(rig: Rig, instant: boolean?)
 	end)
 end
 
--- Drop the bubble if the head is up in the money plaque's band.
+-- The tail's bottom is the billboard centre. Y is TopOffset plus the
+-- clearance, from the head centre, on a phone and a desktop. Near the
+-- money plaque the tail steps aside; the nudge never lowers it.
 local function placeBubble(rig: Rig)
 	local gui = rig.bubble
-	local camera = workspace.CurrentCamera
-	if not gui or not camera then
+	if not gui then
 		return
 	end
-	local offset = phoneLayout.studsOffset
-	local screen, visible = camera:WorldToViewportPoint(rig.head.Position)
-	local top = if phoneLayout.phone then 100 else 78
-	-- Near the top of the screen, nudge aside. Don't drop into the head:
-	-- the tail is the offset, and the scalp is about 0.6 studs up.
-	if visible and screen.Y < top then
-		offset = Vector3.new(offset.X + 0.45, math.max(1.45, offset.Y - 0.35), 0)
+	local nudge = false
+	local camera = workspace.CurrentCamera
+	if camera then
+		local screen, visible = camera:WorldToViewportPoint(rig.head.CFrame.Position)
+		local band = if phoneLayout.phone then 100 else 78
+		if visible and screen.Y < band then
+			nudge = true
+		end
 	end
-	gui.StudsOffset = offset
+	gui.StudsOffset = NPCDialogue.BubbleStudsOffset(rig.topOffset, phoneLayout.studsOffset.X, nudge)
+	gui.StudsOffsetWorldSpace = Vector3.zero
 end
 
 local function say(rig: Rig, text: string, now: number)
@@ -272,21 +285,21 @@ local function say(rig: Rig, text: string, now: number)
 	local layout = phoneLayout
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "SpeechBubble"
-	-- Tall, with the tail at the centre (the studs offset, above the head).
-	-- The card grows upward from there. The lower half is empty, so even
-	-- when that empty space crosses the head the words do not.
+	-- The billboard centre is the tail's bottom. The card grows upward
+	-- from there, so nothing we draw hangs below TopOffset + clearance.
 	gui.Size = UDim2.fromOffset(layout.width + 28, 220)
-	gui.StudsOffset = layout.studsOffset
 	gui.SizeOffset = Vector2.new(0, 0)
 	gui.MaxDistance = layout.maxDistance
 	gui.AlwaysOnTop = false
 	gui.LightInfluence = 0
 	gui.Adornee = rig.head
+	gui.StudsOffset = Vector3.new(layout.studsOffset.X, rig.topOffset + NPCDialogue.BubbleClearance, 0)
+	gui.StudsOffsetWorldSpace = Vector3.zero
 
 	local card = Instance.new("Frame")
 	card.Name = "Card"
 	card.AnchorPoint = Vector2.new(0.5, 1)
-	card.Position = UDim2.fromScale(0.5, 0.5)
+	card.Position = UDim2.new(0.5, 0, 0.5, -14)
 	card.Size = UDim2.fromOffset(0, 0)
 	card.AutomaticSize = Enum.AutomaticSize.XY
 	card.BackgroundColor3 = CREAM
@@ -324,8 +337,8 @@ local function say(rig: Rig, text: string, now: number)
 	local tail = Instance.new("TextLabel")
 	tail.Name = "Tail"
 	tail.BackgroundTransparency = 1
-	tail.AnchorPoint = Vector2.new(0.5, 0)
-	tail.Position = UDim2.new(0.5, 0, 0.5, -2)
+	tail.AnchorPoint = Vector2.new(0.5, 1)
+	tail.Position = UDim2.fromScale(0.5, 0.5)
 	tail.Size = UDim2.fromOffset(24, 18)
 	tail.Font = Enum.Font.GothamBlack
 	tail.TextSize = 20
@@ -452,6 +465,39 @@ local function motorIn(parent: Instance?, name: string): Motor6D?
 	return if m and m:IsA("Motor6D") then m else nil
 end
 
+-- One ray per waypoint and per 4 studs along the route. NPCs, Wood, and
+-- vehicles are excluded; a miss uses the terrain height.
+local function sampleGround(route: { NPCData.Waypoint }): NPCWalk.Profile
+	local map = workspace:FindFirstChild("TimberlineMap")
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude: { Instance } = {}
+	if map then
+		for _, name in ipairs({ "Townsfolk", "Wood", "Murph" }) do
+			local child = map:FindFirstChild(name)
+			if child then
+				table.insert(exclude, child)
+			end
+		end
+	end
+	for _, inst in ipairs(CollectionService:GetTagged("NPC")) do
+		table.insert(exclude, inst)
+	end
+	for _, inst in ipairs(CollectionService:GetTagged("Truck")) do
+		table.insert(exclude, inst)
+	end
+	params.FilterDescendantsInstances = exclude
+	local function probe(x: number, z: number): number?
+		local from = TerrainGen.HeightAt(x, z) + 8
+		local hit = workspace:Raycast(Vector3.new(x, from, z), Vector3.new(0, -16, 0), params)
+		if hit and NPCWalk.MapGround(hit.Instance, map) then
+			return hit.Position.Y
+		end
+		return nil
+	end
+	return NPCWalk.Sample(route, probe, TerrainGen.HeightAt)
+end
+
 local function bind(model: Instance, tries: number?)
 	if not model:IsA("Model") or rigs[model] then
 		return
@@ -489,7 +535,8 @@ local function bind(model: Instance, tries: number?)
 		end
 	end
 	local routeText = model:GetAttribute("Route")
-	local route = if type(routeText) == "string" then NPCData.DecodeRoute(routeText) else nil
+	local decoded = if type(routeText) == "string" then NPCData.DecodeRoute(routeText) else nil
+	local route = if decoded and #decoded >= 2 then decoded else nil
 	local rootHeight = model:GetAttribute("RootHeight")
 	local rh = if type(rootHeight) == "number" then rootHeight else 3
 	local scaleAttr = model:GetAttribute("Scale")
@@ -517,11 +564,15 @@ local function bind(model: Instance, tries: number?)
 		rightHip = motorIn(torso, "RightHip"),
 		eyes = eyes,
 		tag = nameTag,
-		route = if route and #route >= 2 then route else nil,
+		route = route,
 		speed = if type(speed) == "number" then speed else 4,
 		offset = if type(offset) == "number" then offset else 0,
 		rootHeight = rh,
-		groundY = root.Position.Y - rh,
+		ground = if route then sampleGround(route) else nil,
+		visual = nil,
+		moving = false,
+		walked = 0,
+		phase = 0,
 		homeYaw = NPCData.YawOf(root.CFrame.LookVector.X, root.CFrame.LookVector.Z),
 		bodyYaw = NPCData.YawOf(root.CFrame.LookVector.X, root.CFrame.LookVector.Z),
 		scale = if type(scaleAttr) == "number" then scaleAttr else 1,
@@ -608,23 +659,12 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	local s = rig.scale
 	local npc = rig.npc
 
-	-- Walking: the route from the shared clock.
-	-- (and turning to face you when you're close and they're standing).
-	local moving, walked = false, 0
+	-- Walkers are placed every frame in presentWalkers (the clock, eased).
+	-- Standing townsfolk still turn here, on the cosmetic tick.
+	local moving = false
 	local route = rig.route
 	if route then
-		local x, z, heading, isMoving, dist =
-			NPCData.RouteState(route, rig.speed, workspace:GetServerTimeNow() + rig.offset)
-		local at = Vector3.new(x, rig.groundY + rig.rootHeight, z)
-		if isMoving then
-			-- Back onto the path quickly (a turn, not a snap) if they were facing you.
-			rig.bodyYaw = NPCData.TurnToward(rig.bodyYaw, heading, NPCData.TurnRate * 4 * dt)
-		else
-			local want = NPCData.FaceYaw(heading, at, focus, NPCData.FaceRange)
-			rig.bodyYaw = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
-		end
-		rig.root.CFrame = CFrame.new(at) * CFrame.Angles(0, rig.bodyYaw, 0)
-		moving, walked = isMoving, dist
+		moving = rig.moving
 	else
 		local want = NPCData.FaceYaw(rig.homeYaw, rig.root.Position, focus, NPCData.FaceRange)
 		local turned = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
@@ -633,10 +673,11 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 			rig.root.CFrame = CFrame.new(rig.root.Position) * CFrame.Angles(0, turned, 0)
 		end
 	end
-	rig.walkBlend = approach(rig.walkBlend, if moving then 1 else 0, 8, dt)
+	if not route then
+		rig.walkBlend = approach(rig.walkBlend, if moving then 1 else 0, 8, dt)
+	end
 	local w = rig.walkBlend
-	local stride = 4.2 * s
-	local phase = walked / stride * math.pi * 2
+	local phase = if route then rig.phase else 0
 
 	-- Breathing (the walk's bob lives in the pose).
 	local breath = math.sin(now * 1.7 + rig.seed % 7)
@@ -794,8 +835,11 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	)
 	setTransform(rig.leftShoulder, left)
 	setTransform(rig.rightShoulder, right)
-	setTransform(rig.leftHip, CFrame.Angles(sample.leftHip, 0, 0))
-	setTransform(rig.rightHip, CFrame.Angles(sample.rightHip, 0, 0))
+	-- Walker legs are posed every frame in presentWalkers. Idle hips stay here.
+	if not route then
+		setTransform(rig.leftHip, CFrame.Angles(sample.leftHip, 0, 0))
+		setTransform(rig.rightHip, CFrame.Angles(sample.rightHip, 0, 0))
+	end
 
 	-- Blinking.
 	if now >= rig.blinkAt then
@@ -854,79 +898,137 @@ local function nearbyBodies(now: number)
 	end
 end
 
+local function walkerOnScreen(pos: Vector3): boolean
+	local camera = workspace.CurrentCamera
+	if camera == nil then
+		return true
+	end
+	if (pos - camera.CFrame.Position).Magnitude > WALKER_RANGE then
+		return false
+	end
+	local point, visible = camera:WorldToViewportPoint(pos)
+	return visible and point.Z > 0
+end
+
+-- Every rendered frame, ahead of the cosmetic gate: the shared-clock pose,
+-- eased, on the sampled ground. Legs swing with it so a 2 Hz cosmetic
+-- tier does not teleport the stride.
+local function presentWalkers(dt: number)
+	nearbyBodies(os.clock())
+	for model, rig in pairs(rigs) do
+		local route = rig.route
+		local ground = rig.ground
+		if not route or not ground or not model.Parent then
+			continue
+		end
+		local x, z, heading, isMoving, walked =
+			NPCData.RouteState(route, rig.speed, workspace:GetServerTimeNow() + rig.offset)
+		local feet = NPCWalk.FeetAt(ground, route, x, z)
+		local target: NPCWalk.Pose = {
+			x = x,
+			y = NPCWalk.RootY(feet, rig.rootHeight),
+			z = z,
+			yaw = heading,
+			moving = isMoving,
+			walked = walked,
+		}
+		local visual, snapped = NPCWalk.Follow(rig.visual, target, dt, rig.speed, walkerOnScreen(rig.root.Position))
+		rig.visual = visual
+		if snapped then
+			rig.bodyYaw = visual.yaw
+		end
+		local yaw = visual.yaw
+		if isMoving then
+			rig.bodyYaw = visual.yaw
+		else
+			local at = Vector3.new(visual.x, visual.y, visual.z)
+			local index = NPCData.NearestIndex(at, bodies, NPCData.FaceRange)
+			local focus = if index then bodies[index] else nil
+			local want = NPCData.FaceYaw(visual.yaw, at, focus, NPCData.FaceRange)
+			rig.bodyYaw = NPCData.TurnToward(rig.bodyYaw, want, NPCData.TurnRate * dt)
+			yaw = rig.bodyYaw
+		end
+		rig.root.CFrame = CFrame.new(visual.x, visual.y, visual.z) * CFrame.Angles(0, yaw, 0)
+		rig.moving = isMoving
+		rig.walked = visual.walked
+		rig.walkBlend = approach(rig.walkBlend, if isMoving then 1 else 0, 8, dt)
+		rig.phase = NPCWalk.Phase(visual.walked, rig.scale)
+		if isMoving or rig.walkBlend > 0.01 then
+			local leftHip, rightHip = NPCAnim.Walk(rig.phase, rig.walkBlend)
+			setTransform(rig.leftHip, CFrame.Angles(leftHip, 0, 0))
+			setTransform(rig.rightHip, CFrame.Angles(rightHip, 0, 0))
+		end
+	end
+end
+
 local sinceCosmetic = 0
 local function step(dt: number)
 	sinceCosmetic += dt
-	if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
-		return
-	end
 	local elapsed = sinceCosmetic
-	sinceCosmetic = 0
-	local now = os.clock()
-	refreshLayout(now)
-	nearbyBodies(now)
-	local char = player.Character
-	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
-	local mine: Vector3? = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
-	local camera = workspace.CurrentCamera
-	local eye = mine or (if camera then camera.CFrame.Position else Vector3.zero)
+	local cosmetic = QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic)
+	if cosmetic then
+		sinceCosmetic = 0
+		local now = os.clock()
+		refreshLayout(now)
+		nearbyBodies(now)
+		local char = player.Character
+		local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
+		local mine: Vector3? = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
+		local camera = workspace.CurrentCamera
+		local eye = mine or (if camera then camera.CFrame.Position else Vector3.zero)
 
-	-- Who gets to chat: the nearest NPC within TALK_RANGE of you.
-	local speaker: Rig? = nil
-	local speakerDist = TALK_RANGE
-	for model, rig in pairs(rigs) do
-		if not model.Parent then
-			if rig.promptConn then
-				rig.promptConn:Disconnect()
-			end
-			rigs[model] = nil
-			continue
-		end
-		local d = (rig.root.Position - eye).Magnitude
-		if d > ANIMATE_RANGE then
-			if rig.active then
-				rig.active = false
-				rest(rig)
-			end
-			-- Far walkers keep their place on the route (cheap).
-			local route = rig.route
-			if route and d < WALKER_RANGE then
-				local x, z, heading = NPCData.RouteState(route, rig.speed, workspace:GetServerTimeNow() + rig.offset)
-				rig.root.CFrame = CFrame.new(x, rig.groundY + rig.rootHeight, z) * CFrame.Angles(0, heading, 0)
-			end
-			continue
-		end
-		local index = NPCData.NearestIndex(rig.root.Position, bodies, LOOK_RANGE)
-		local focus = if index then bodies[index] else nil
-		local focusHead = if index then bodyHeads[index] else nil
-		rig.active = true
-		animate(rig, now, elapsed, focus, focusHead, d)
-		if rig.bubble then
-			placeBubble(rig)
-		end
-		local wantsTip = rig.npc ~= nil and rig.npc.tips ~= nil and not rig.met
-		if d < speakerDist and (wantsTip or not quiet(rig)) then
-			speaker, speakerDist = rig, d
-		end
-	end
-
-	local who = speaker
-	if who and not who.bubble and now >= who.nextLine then
-		local wantsTip = who.npc ~= nil and who.npc.tips ~= nil and not who.met
-		if wantsTip or not quiet(who) then
-			local loaded = player:GetAttribute("ProfileLoaded") == true
-			if wantsTip and not loaded then
-				who.nextLine = now + 1 -- the save isn't here yet; don't burn the tip
-			else
-				local line, kind = takeLine(who, true)
-				if line and (kind == "tip" or not quiet(who)) then
-					say(who, line, now)
+		-- Who gets to chat: the nearest NPC within TALK_RANGE of you.
+		local speaker: Rig? = nil
+		local speakerDist = TALK_RANGE
+		for model, rig in pairs(rigs) do
+			if not model.Parent then
+				if rig.promptConn then
+					rig.promptConn:Disconnect()
 				end
-				local gap = NPCDialogue.AmbientGap
-				who.nextLine = now + who.rng:NextNumber(gap[1], gap[2])
+				rigs[model] = nil
+				continue
+			end
+			local d = (rig.root.Position - eye).Magnitude
+			if d > ANIMATE_RANGE then
+				if rig.active then
+					rig.active = false
+					rest(rig)
+				end
+				continue
+			end
+			local index = NPCData.NearestIndex(rig.root.Position, bodies, LOOK_RANGE)
+			local focus = if index then bodies[index] else nil
+			local focusHead = if index then bodyHeads[index] else nil
+			rig.active = true
+			animate(rig, now, elapsed, focus, focusHead, d)
+			if rig.bubble then
+				placeBubble(rig)
+			end
+			local wantsTip = rig.npc ~= nil and rig.npc.tips ~= nil and not rig.met
+			if d < speakerDist and (wantsTip or not quiet(rig)) then
+				speaker, speakerDist = rig, d
+			end
+		end
+
+		local who = speaker
+		if who and not who.bubble and now >= who.nextLine then
+			local wantsTip = who.npc ~= nil and who.npc.tips ~= nil and not who.met
+			if wantsTip or not quiet(who) then
+				local loaded = player:GetAttribute("ProfileLoaded") == true
+				if wantsTip and not loaded then
+					who.nextLine = now + 1 -- the save isn't here yet; don't burn the tip
+				else
+					local line, kind = takeLine(who, true)
+					if line and (kind == "tip" or not quiet(who)) then
+						say(who, line, now)
+					end
+					local gap = NPCDialogue.AmbientGap
+					who.nextLine = now + who.rng:NextNumber(gap[1], gap[2])
+				end
 			end
 		end
 	end
+	presentWalkers(dt)
 end
 
 function NPCController.Start()

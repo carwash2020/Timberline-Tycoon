@@ -257,7 +257,7 @@ return function(t)
 		t.eq(NPCDialogue.Draw({}, {}, rng), nil)
 	end)
 
-	t.test("phone bubbles are smaller, lower, and don't reach across the plaza", function()
+	t.test("phone bubbles are smaller and don't reach across the plaza", function()
 		t.eq(NPCDialogue.IsPhone(true, false, 800), true)
 		t.eq(NPCDialogue.IsPhone(true, false, 900), false)
 		t.eq(NPCDialogue.IsPhone(true, true, 400), false)
@@ -272,9 +272,9 @@ return function(t)
 		t.eq(phone.textSize, 14)
 		t.ok(phone.width <= 200, "phone bubble width")
 		t.ok(phone.maxDistance <= 40, "phone bubble distance")
-		t.ok(phone.studsOffset.Y > 1.4, "the phone bubble clears the head")
-		t.ok(desk.studsOffset.Y > 1.4, "the desktop bubble clears the head")
-		t.ok(phone.studsOffset.Y < desk.studsOffset.Y, "the phone bubble sits lower")
+		t.eq(NPCDialogue.BubbleClearance, 1.5)
+		t.ok(phone.studsOffset.X > 0, "the phone bubble sits beside the head")
+		t.ok(desk.studsOffset.X > phone.studsOffset.X, "desktop sits a little further aside")
 		t.eq(desk.tagDistance, 60)
 		t.eq(desk.tagSize, Vector2.new(220, 50))
 		t.ok(phone.width < desk.width, "desktop keeps the wider bubble")
@@ -282,5 +282,166 @@ return function(t)
 		t.ok(NPCDialogue.BubbleSeconds(string.rep("a", 200)) <= 6.5, "a long line is capped")
 		t.ok(NPCDialogue.PromptCooldown >= 3, "Talk is rate limited")
 		t.ok(NPCDialogue.AmbientGap[1] >= 8, "ambient chatter is rate limited")
+	end)
+
+	t.test("the bubble clears every hat, stays on screen, and follows the walk", function()
+		local fs = require("@lune/fs")
+		local Vector3 = t.roblox.Vector3
+		local CharacterArt = t.load("ReplicatedStorage/Shared/Art/CharacterArt")
+		local NPCWalk = t.shared("NPCWalk")
+		local QualityBudgets = t.shared("QualityBudgets")
+		local controller = fs.readFile("src/StarterPlayer/StarterPlayerScripts/NPCController.luau")
+
+		local function between(src, from, to)
+			local a = string.find(src, from, 1, true)
+			local b = string.find(src, to, a, true)
+			return string.sub(src, a, b)
+		end
+
+		t.eq(string.find(controller, "TextChatService", 1, true), nil, "NPC lines are not TextChatService bubbles")
+		t.ok(string.find(controller, "gui.Adornee = rig.head", 1, true) ~= nil, "the bubble is adorned to the head")
+		t.eq(string.find(controller, "gui.Adornee = rig.root", 1, true), nil)
+		t.eq(string.find(controller, "gui.Adornee = rig.torso", 1, true), nil)
+
+		local sayBody = between(controller, "local function say", "local function hasPlacedSawmill")
+		t.ok(
+			string.find(sayBody, "rig.topOffset + NPCDialogue.BubbleClearance", 1, true) ~= nil,
+			"say lifts the tail by TopOffset plus the clearance"
+		)
+		local placeBody = between(controller, "local function placeBubble", "local function say")
+		t.ok(string.find(placeBody, "BubbleStudsOffset(rig.topOffset", 1, true) ~= nil, "placeBubble uses TopOffset")
+		t.eq(string.find(placeBody, "1.45", 1, true), nil, "the top-of-screen nudge does not drop the tail")
+		t.eq(string.find(placeBody, "offset.Y -", 1, true), nil, "placeBubble never lowers Y")
+		t.eq(string.find(controller, "HeadTopY", 1, true), nil)
+
+		-- The walk root moves every rendered frame, outside the cosmetic
+		-- gate, and the bubble is adorned to the head on that rig. A 2 Hz
+		-- cosmetic tick must not freeze the tail.
+		local stepBody = between(controller, "local function step", "function NPCController.Start")
+		local dueAt = string.find(stepBody, "CosmeticDue", 1, true)
+		local walkAt = string.find(stepBody, "presentWalkers(dt)", 1, true)
+		t.ok(dueAt ~= nil and walkAt ~= nil and walkAt > dueAt, "the walk is not inside the cosmetic gate")
+
+		local function partTop(head, part)
+			local localCf = head.CFrame:ToObjectSpace(part.CFrame)
+			local hx, hy, hz = part.Size.X / 2, part.Size.Y / 2, part.Size.Z / 2
+			local maxY = -math.huge
+			for _, sx in ipairs({ -1, 1 }) do
+				for _, sy in ipairs({ -1, 1 }) do
+					for _, sz in ipairs({ -1, 1 }) do
+						local corner = localCf * Vector3.new(sx * hx, sy * hy, sz * hz)
+						maxY = math.max(maxY, corner.Y)
+					end
+				end
+			end
+			return maxY
+		end
+
+		-- Head, anything hung on it, and hat parts welded to it (those are
+		-- parented on the model, not under the head).
+		local function hatTop(model, head)
+			local maxY = partTop(head, head)
+			local function consider(part)
+				if part:IsA("BasePart") then
+					maxY = math.max(maxY, partTop(head, part))
+				end
+			end
+			for _, d in ipairs(head:GetDescendants()) do
+				consider(d)
+			end
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("Weld") and d.Part0 == head and d.Part1 and d.Part1:IsA("BasePart") then
+					consider(d.Part1)
+					for _, sub in ipairs(d.Part1:GetDescendants()) do
+						consider(sub)
+					end
+				end
+			end
+			return maxY
+		end
+
+		-- A talk at the edge of talk range. The head sits a little below
+		-- centre, which is how a standing NPC reads when you face them.
+		-- The card above the tail is the label cap, its padding, and the
+		-- gap under the card. Nudge is on, so the tail is further aside.
+		local TALK_DISTANCE = 16
+		local CARD_ABOVE = 14 + 96 + 14
+		local views = { { 375, 667 }, { 667, 375 } }
+
+		for _, npc in ipairs(NPCData.All()) do
+			local model = CharacterArt.Build(npc.look)
+			local head = model:FindFirstChild("Head")
+			t.ok(head and head:IsA("BasePart"), npc.id .. " has a head")
+			local topOffset = model:GetAttribute("TopOffset")
+			t.eq(type(topOffset), "number", npc.id .. " publishes TopOffset")
+			local bounds = hatTop(model, head)
+			for _, phone in ipairs({ false, true }) do
+				local layout = NPCDialogue.LayoutFor(phone)
+				local still = NPCDialogue.BubbleStudsOffset(topOffset, layout.studsOffset.X, false)
+				local offset = NPCDialogue.BubbleStudsOffset(topOffset, layout.studsOffset.X, true)
+				local where = npc.id .. (if phone then " phone" else " desktop")
+				t.ok(
+					offset.Y >= topOffset + NPCDialogue.BubbleClearance - 1e-4,
+					string.format("%s offset %.2f is under TopOffset + 1.5", where, offset.Y)
+				)
+				t.eq(offset.Y, still.Y, where .. " nudge does not change Y")
+				t.ok(offset.X > still.X, where .. " nudge steps aside")
+				t.ok(
+					offset.Y > bounds - 1e-3,
+					string.format("%s tail %.2f is inside the hat (top %.2f)", where, offset.Y, bounds)
+				)
+				for _, view in ipairs(views) do
+					local viewW, viewH = view[1], view[2]
+					local headX, headY = viewW / 2, viewH * 0.62
+					t.ok(
+						NPCDialogue.TailOnScreen(viewW, viewH, headX, headY, offset, TALK_DISTANCE),
+						string.format("%s tail leaves %dx%d", where, viewW, viewH)
+					)
+					local tailX, tailY = NPCDialogue.TailScreen(headX, headY, offset, viewH, TALK_DISTANCE)
+					local half = layout.width / 2
+					t.ok(tailY - CARD_ABOVE >= 0, string.format("%s card clips the top of %dx%d", where, viewW, viewH))
+					t.ok(tailY <= viewH, string.format("%s card leaves the bottom of %dx%d", where, viewW, viewH))
+					t.ok(
+						tailX - half >= 0 and tailX + half <= viewW,
+						string.format("%s card leaves %dx%d", where, viewW, viewH)
+					)
+				end
+			end
+		end
+
+		local rosa = NPCData.Get("Rosa")
+		local rosaModel = CharacterArt.Build(rosa.look)
+		local lift = rosaModel:GetAttribute("TopOffset") + NPCDialogue.BubbleClearance
+		local hz = QualityBudgets.For("low").CosmeticHz
+		t.eq(hz, 2)
+		local since, time = 0, 0.4
+		local visual, prev = nil, nil
+		local movedOffTick = 0
+		for _ = 1, 120 do
+			local dt = 1 / 60
+			since += dt
+			local cosmetic = QualityBudgets.CosmeticDue(hz, since)
+			if cosmetic then
+				since = 0
+			end
+			time += dt
+			local x, z, yaw, moving, walked = NPCData.RouteState(rosa.route, rosa.speed, time)
+			local target = { x = x, y = 0, z = z, yaw = yaw, moving = moving, walked = walked }
+			visual = NPCWalk.Follow(visual, target, dt, rosa.speed, true)
+			-- The tail is the head (which rides the root) plus the lift.
+			-- That lift does not wait for the cosmetic tick.
+			local tailY = visual.y + lift
+			t.ok(math.abs(tailY - (visual.y + rosaModel:GetAttribute("TopOffset") + 1.5)) < 1e-6, "lift stays put")
+			if prev and visual.moving and not cosmetic then
+				local dx, dz = visual.x - prev.x, visual.z - prev.z
+				local step = math.sqrt(dx * dx + dz * dz)
+				if step > 1e-3 then
+					movedOffTick += 1
+					t.ok(step <= rosa.speed * dt + NPCWalk.Slack + 1e-6, "the tail jumps between cosmetic ticks")
+				end
+			end
+			prev = { x = visual.x, z = visual.z }
+		end
+		t.ok(movedOffTick >= 30, "the tail kept up between cosmetic ticks: " .. movedOffTick)
 	end)
 end

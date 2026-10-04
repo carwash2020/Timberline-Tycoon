@@ -3,8 +3,11 @@
 -- name tag are. Pure, so the client (NPCController) and the tests share
 -- it. The client reads the clock, the weather, and the player's attributes
 -- and passes them in. Lines stay short enough to wrap in a phone bubble
--- without covering the top HUD: the bubble sits beside the head, not
--- above the hat, and fades out past a few dozen studs.
+-- without covering the top HUD. The bubble's tail sits BubbleClearance
+-- studs above TopOffset (head centre to the hat top, already rig-scaled)
+-- and fades out past a few dozen studs. A fixed 1.7 or 1.9 from the head
+-- centre lands inside a tall hat; lowering it near the top of the screen
+-- made that worse.
 
 local NPCData = require(script.Parent.NPCData)
 local TutorialData = require(script.Parent.TutorialData)
@@ -18,6 +21,13 @@ NPCDialogue.AmbientGap = { 10, 16 } -- seconds between a chatter line
 -- When the weather, the hour, or the player's progress has something to
 -- say, how often that wins over a general line.
 NPCDialogue.ContextChance = 0.62
+-- Studs of air between the hat top (CharacterArt's TopOffset) and the
+-- bubble tail. The same on a phone and a desktop: the phone used to sit
+-- lower, which put the tail in the hat.
+NPCDialogue.BubbleClearance = 1.5
+-- Sideways only, when the head is up in the money plaque's band. Never a
+-- drop in Y.
+NPCDialogue.BubbleNudge = 0.45
 
 export type Band = "morning" | "day" | "evening" | "night"
 
@@ -237,6 +247,51 @@ function NPCDialogue.BubbleSeconds(text: string): number
 	return math.clamp(2.2 + #text * 0.04, 2.4, 6.5)
 end
 
+-- Where the tail sits relative to the head centre. Y is always the hat
+-- top plus the clearance, nudge or not. `nudge` adds BubbleNudge to X.
+function NPCDialogue.BubbleStudsOffset(topOffset: number, side: number, nudge: boolean): Vector3
+	local x = side
+	if nudge then
+		x += NPCDialogue.BubbleNudge
+	end
+	return Vector3.new(x, topOffset + NPCDialogue.BubbleClearance, 0)
+end
+
+-- Default camera, so a stud offset can be checked against a phone viewport.
+NPCDialogue.BubbleFov = 70
+
+-- Screen pixels per stud at `distance`, for a viewport `viewH` tall.
+function NPCDialogue.StudsToPixels(viewH: number, distance: number): number
+	local half = math.tan(math.rad(NPCDialogue.BubbleFov / 2))
+	local visible = 2 * math.max(distance, 0.1) * half
+	return viewH / visible
+end
+
+-- The tail's screen point. Screen Y grows downward; a positive studs Y
+-- moves the tail up the screen.
+function NPCDialogue.TailScreen(
+	headX: number,
+	headY: number,
+	offset: Vector3,
+	viewH: number,
+	distance: number
+): (number, number)
+	local px = NPCDialogue.StudsToPixels(viewH, distance)
+	return headX + offset.X * px, headY - offset.Y * px
+end
+
+function NPCDialogue.TailOnScreen(
+	viewW: number,
+	viewH: number,
+	headX: number,
+	headY: number,
+	offset: Vector3,
+	distance: number
+): boolean
+	local x, y = NPCDialogue.TailScreen(headX, headY, offset, viewH, distance)
+	return x >= 0 and x <= viewW and y >= 0 and y <= viewH
+end
+
 -- A phone is a touch screen with no keyboard and a narrow viewport. The
 -- same rule the name tags and bubbles use (a wide tablet keeps the
 -- desktop sizes).
@@ -244,12 +299,11 @@ function NPCDialogue.IsPhone(touch: boolean, keyboard: boolean, viewportX: numbe
 	return touch and not keyboard and viewportX < 900
 end
 
--- Phone: a short bubble beside and above the head, a small tag, and a
--- short draw distance so three NPCs don't fill the screen. Desktop tags
--- stay the size CharacterArt builds. The offset is where the tail sits
--- (NPCController grows the card upward from it). Head centre is the
--- adornee; the scalp is about 0.6 studs up, so both stay clear of it.
--- The phone sits a little lower than the desktop, still above the head.
+-- Phone: a short bubble, a small tag, and a short draw distance so three
+-- NPCs don't fill the screen. Desktop tags stay the size CharacterArt
+-- builds. studsOffset.X is how far beside the head the tail sits.
+-- studsOffset.Y is the old fixed lift and is not used: the tail's Y is
+-- TopOffset + BubbleClearance, on a phone and a desktop alike.
 function NPCDialogue.LayoutFor(phone: boolean): Layout
 	if phone then
 		return {
