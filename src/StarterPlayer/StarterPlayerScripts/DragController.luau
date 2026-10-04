@@ -59,6 +59,7 @@ local DragController = {}
 local player = Players.LocalPlayer
 
 local WOOD_TAG = "Wood"
+local SHOP_TAG = "ShopBox"
 local BALL_COLOR = Color3.fromRGB(70, 160, 255)
 local BALL_SIZE = 0.45
 local RENDER_STEP = "DragControllerHold"
@@ -146,7 +147,9 @@ local function pieceOf(inst: Instance): Model?
 		if node == nil or node == workspace then
 			return nil
 		end
-		if node:IsA("Model") and CollectionService:HasTag(node, WOOD_TAG) then
+		if
+			node:IsA("Model") and (CollectionService:HasTag(node, WOOD_TAG) or CollectionService:HasTag(node, SHOP_TAG))
+		then
 			return node
 		end
 		node = node.Parent
@@ -810,11 +813,15 @@ function DragController.Start()
 	buildButtons()
 	buildReticle()
 
-	for _, inst in ipairs(CollectionService:GetTagged(WOOD_TAG)) do
-		watchPiece(inst)
+	local function watchTag(tag: string)
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			watchPiece(inst)
+		end
+		CollectionService:GetInstanceAddedSignal(tag):Connect(watchPiece)
+		CollectionService:GetInstanceRemovedSignal(tag):Connect(unwatchPiece)
 	end
-	CollectionService:GetInstanceAddedSignal(WOOD_TAG):Connect(watchPiece)
-	CollectionService:GetInstanceRemovedSignal(WOOD_TAG):Connect(unwatchPiece)
+	watchTag(WOOD_TAG)
+	watchTag(SHOP_TAG)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		if processed then

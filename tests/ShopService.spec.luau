@@ -36,6 +36,7 @@ return function(t)
 		end
 		local player = {
 			Name = "Tester",
+			UserId = options.userId or 1,
 			Character = character,
 			SetAttribute = function() end,
 		}
@@ -55,7 +56,13 @@ return function(t)
 			mocks = {
 				ProfileService = {
 					GetProfile = function(p)
-						return if p == player then profile else nil
+						if p == player then
+							return profile
+						end
+						if options.profileFor then
+							return options.profileFor(p)
+						end
+						return nil
 					end,
 				},
 				AxeService = {
@@ -123,6 +130,9 @@ return function(t)
 			granted = granted,
 			equipped = equipped,
 			quests = quests,
+			ShopService = ShopService,
+			player = player,
+			loader = loader,
 		}
 	end
 
@@ -404,5 +414,93 @@ return function(t)
 		local far = setup({ cash = 99999, loop = 2, at = COUNTER + Vector3.new(0, 0, -40) })
 		far.buy("Axe", "SteelAxe")
 		t.eq(far.profile.cash, 99999)
+	end)
+
+	t.test("a boxed steel axe charges $160 once when pay is fired ten times", function()
+		local s = setup({ cash = 1000, loop = 2, bestTier = 1 })
+		local box = { uid = "box-steel", kind = "Axe", itemId = "SteelAxe", limited = false }
+		local oks = 0
+		for _ = 1, 10 do
+			local ok, line = s.ShopService.ChargeAndGrant(s.player, box)
+			if ok then
+				oks += 1
+				t.eq(line, "thanks")
+			end
+		end
+		t.eq(oks, 1)
+		t.eq(s.profile.cash, 1000 - 160)
+		t.eq(s.granted, { "SteelAxe" })
+		t.eq(#s.equipped, 1)
+	end)
+
+	t.test("a boxed axe with too little cash is refused and not charged", function()
+		local s = setup({ cash = 100, loop = 2, bestTier = 1 })
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "box-short",
+			kind = "Axe",
+			itemId = "SteelAxe",
+			limited = false,
+		})
+		t.eq(ok, false)
+		t.eq(line, "broke")
+		t.eq(s.profile.cash, 100)
+		t.eq(s.granted, {})
+	end)
+
+	t.test("the lamp post is always $750, once a player, and the last one sells once", function()
+		local other = { Name = "Other", UserId = 9, cash = 2000, SetAttribute = function() end }
+		local s = setup({
+			cash = 2000,
+			loop = 2,
+			userId = 8,
+			profileFor = function(p)
+				return if p.UserId == 9 then other else nil
+			end,
+		})
+		local StoreStock = s.loader:shared("StoreStock")
+		StoreStock.Reset(0)
+		local ok1, line1 = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "lamp-a",
+			kind = "Cosmetic",
+			itemId = "LampPost",
+			limited = true,
+		}, 0)
+		t.eq(ok1, true)
+		t.eq(line1, "thanks")
+		t.eq(s.profile.cash, 2000 - 750)
+		t.eq(s.profile.materials.LampPost, 1)
+		local ok2, line2 = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "lamp-b",
+			kind = "Cosmetic",
+			itemId = "LampPost",
+			limited = true,
+		}, 0)
+		t.eq(ok2, false)
+		t.eq(line2, "alreadyOwned")
+		t.eq(s.profile.cash, 1250)
+		t.eq(StoreStock.Left(), 2)
+
+		StoreStock.Reset(0)
+		t.eq(StoreStock.TryClaim(1, 0), true)
+		t.eq(StoreStock.TryClaim(2, 0), true)
+		t.eq(StoreStock.Left(), 1)
+		s.profile.cash = 2000
+		local aOk = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "lamp-last-a",
+			kind = "Cosmetic",
+			itemId = "LampPost",
+			limited = true,
+		}, 0)
+		local bOk = s.ShopService.ChargeAndGrant(other, {
+			uid = "lamp-last-b",
+			kind = "Cosmetic",
+			itemId = "LampPost",
+			limited = true,
+		}, 0)
+		t.eq(aOk, true)
+		t.eq(bOk, false)
+		t.eq(other.cash, 2000, "the loser is not charged")
+		t.eq(s.profile.cash, 2000 - 750)
+		t.eq(StoreStock.Left(), 0)
 	end)
 end

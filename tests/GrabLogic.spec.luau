@@ -287,4 +287,34 @@ return function(t)
 		end
 		t.eq(GrabLogic.AxeHint("desktop"), "Put your axe away (press 1) to drag")
 	end)
+
+	t.test("a shop box: unpaid until someone has it, then only the buyer, and the cap", function()
+		local BoxLogic = t.shared("BoxLogic")
+		local function box(over)
+			local f = facts({ shopBox = true, ownerId = 0 })
+			for k, v in pairs(over or {}) do
+				f[k] = v
+			end
+			return f
+		end
+		local open = box({})
+		t.eq({ GrabLogic.CanGrab(open) }, { true })
+		t.eq(GrabLogic.NewOwner(open), 0, "grabbing a box does not make it yours")
+		local claimed = box({ claimUserId = OTHER, claimUntil = NOW + 1 })
+		t.eq({ GrabLogic.CanGrab(claimed) }, { false, "claim" })
+		local expired = box({ claimUserId = OTHER, claimUntil = NOW })
+		t.eq({ GrabLogic.CanGrab(expired) }, { true }, "the claim ends on its clock")
+		local mine = box({ paid = true, buyerId = ME })
+		t.eq({ GrabLogic.CanGrab(mine) }, { true })
+		local theirs = box({ paid = true, buyerId = OTHER })
+		t.eq({ GrabLogic.CanGrab(theirs) }, { false, "owned" })
+		local fourth = box({ taking = true, unpaidByPlayer = BoxLogic.MaxUnpaidPerPlayer, unpaidOnServer = 0 })
+		t.eq({ GrabLogic.CanGrab(fourth) }, { false, "cap" })
+		local full = box({ taking = true, unpaidByPlayer = 0, unpaidOnServer = BoxLogic.MaxUnpaidPerServer })
+		t.eq({ GrabLogic.CanGrab(full) }, { false, "cap" })
+		local holding = box({ taking = false, unpaidByPlayer = 5, unpaidOnServer = 40 })
+		t.eq({ GrabLogic.CanGrab(holding) }, { true }, "a box already off the shelf is not a new take")
+		t.eq(GrabLogic.Message("cap", fourth), "You can only carry 3 unpaid boxes.")
+		t.eq(GrabLogic.Message("cap", full), "The shop is full of loose boxes. Put one back and try again.")
+	end)
 end

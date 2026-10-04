@@ -405,6 +405,13 @@ function ShopLogic.TruckDetailFor(truck: TruckDef, loop: number): string
 	return if loop == 2 then ShopLogic.TruckDetailV2(truck) else ShopLogic.TruckDetail(truck)
 end
 
+-- Tool Shed and Hearth & Home menus hide when boxed shelves are on.
+-- Missing means on (the rollback is GameConfig.BoxedStores = false).
+function ShopLogic.ShelfMenusHidden(): boolean
+	local flag = (GameConfig :: any).BoxedStores
+	return flag ~= false
+end
+
 function ShopLogic.TrailerDetailFor(trailer: TrailerDef, loop: number): string
 	return if loop == 2 then ShopLogic.TrailerDetailV2(trailer) else ShopLogic.TrailerDetail(trailer)
 end

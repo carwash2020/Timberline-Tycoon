@@ -27,6 +27,7 @@
 --     DragController's input maths: where the held point is pulled to,
 --     rotation steps, which key does what, tap-and-hold on a touch screen.
 
+local BoxLogic = require(script.Parent.BoxLogic)
 local GameConfig = require(script.Parent.GameConfig)
 
 local GrabLogic = {}
@@ -35,7 +36,7 @@ local GrabLogic = {}
 -- Who may grab what
 ---------------------------------------------------------------------------
 
-export type Reason = "dead" | "selling" | "held" | "bed" | "plot" | "owned" | "grace" | "far"
+export type Reason = "dead" | "selling" | "held" | "bed" | "plot" | "owned" | "grace" | "far" | "claim" | "cap"
 
 -- What the server knows about one grab request.
 export type Facts = {
@@ -48,6 +49,14 @@ export type Facts = {
 	selling: boolean?, -- being sold right now
 	elder: boolean?, -- an Elder's wood: anyone may grab it at once
 	shopItem: boolean?, -- a shop's display item (M2)
+	shopBox: boolean?, -- a boxed store item (shelf box)
+	claimUserId: number?, -- who claimed an unpaid shop box, 0 = nobody
+	claimUntil: number?, -- server clock: the claim lasts until this
+	paid: boolean?, -- a shop box someone has paid for
+	buyerId: number?, -- who paid, when paid
+	unpaidByPlayer: number?, -- unpaid boxes this player already has off the shelf
+	unpaidOnServer: number?, -- unpaid boxes off the shelf, whole server
+	taking: boolean?, -- this grab would lift a shop box off its shelf
 	bedOwnerId: number?, -- resting on this player's truck bed (M1.6), nil = not on a bed
 	ownerHere: boolean?, -- whether the owner is in the server (nil: count them as here)
 	plotAllows: boolean?, -- plot permissions (M3): false = the plot's owner says no
@@ -77,6 +86,20 @@ function GrabLogic.CanGrab(facts: Facts): (boolean, Reason?)
 		return false, "selling"
 	elseif facts.heldBy ~= 0 and facts.heldBy ~= facts.userId then
 		return false, "held"
+	elseif facts.shopBox then
+		local ok, why = BoxLogic.CanGrab({
+			userId = facts.userId,
+			now = facts.now,
+			heldBy = facts.heldBy,
+			paid = facts.paid,
+			buyerId = facts.buyerId,
+			claimUserId = facts.claimUserId,
+			claimUntil = facts.claimUntil,
+			unpaidByPlayer = facts.unpaidByPlayer,
+			unpaidOnServer = facts.unpaidOnServer,
+			taking = facts.taking,
+		})
+		return ok, why :: Reason?
 	elseif facts.shopItem then
 		return true, nil
 	elseif facts.bedOwnerId ~= nil and facts.bedOwnerId ~= facts.userId then
@@ -97,6 +120,9 @@ end
 -- becomes theirs; anyone else's stays theirs (moving wood never changes
 -- who is paid for it).
 function GrabLogic.NewOwner(facts: Facts): number
+	if facts.shopBox then
+		return facts.ownerId
+	end
 	if facts.ownerId == 0 and not facts.shopItem then
 		return facts.userId
 	end
@@ -115,6 +141,13 @@ function GrabLogic.Message(reason: string?, facts: Facts?, name: string?): strin
 		return string.format("That's %s's wood.", name or "someone else")
 	elseif reason == "plot" then
 		return "That's on someone's land. Ask them to let you."
+	elseif reason == "claim" then
+		return "Someone else just picked that up."
+	elseif reason == "cap" then
+		return BoxLogic.CapMessage(
+			if facts then facts.unpaidByPlayer or 0 else 0,
+			if facts then facts.unpaidOnServer or 0 else 0
+		)
 	elseif reason == "far" then
 		return "Too far away. Walk closer to grab it."
 	elseif reason == "grace" and facts then

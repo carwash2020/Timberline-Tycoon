@@ -29,6 +29,7 @@ local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local AxeService = require(script.Parent.AxeService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -551,6 +552,197 @@ function ShopService.Init(
 			end
 		end
 	end
+end
+
+-- A boxed purchase. The price, the owner and the stock are read here; the
+-- client never supplies them. The uid is claimed before any cash moves, so
+-- ten pays in one frame charge once. Nothing in this function yields, so
+-- the limited shelf cannot sell its last unit twice.
+export type BoxGrant = {
+	uid: string,
+	kind: string,
+	itemId: string,
+	limited: boolean?,
+}
+
+local settled: { [string]: string } = {}
+
+function ShopService.Loop(): number
+	return loop
+end
+
+function ShopService.ResetGrants()
+	table.clear(settled)
+end
+
+local function hasLand(profile: ProfileService.Profile): boolean
+	local plot = (profile :: any).plot
+	return type(plot) == "table" and plot.claimed == true
+end
+
+local function listed(ids: any, itemId: string): boolean
+	if type(ids) ~= "table" then
+		return false
+	end
+	for _, id in ipairs(ids) do
+		if id == itemId then
+			return true
+		end
+	end
+	return false
+end
+
+function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?): (boolean, string, string?)
+	local uid = box.uid
+	if type(uid) ~= "string" or uid == "" then
+		return false, "missing", nil
+	end
+	local state = settled[uid]
+	if state == "granted" or state == "settling" then
+		return false, "thanks", nil
+	end
+	settled[uid] = "settling"
+	local function fail(line: string): (boolean, string, string?)
+		settled[uid] = nil
+		return false, line, nil
+	end
+
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return fail("missing")
+	end
+	local limited = box.limited == true or (box.kind == "Cosmetic" and box.itemId == "LampPost")
+	local price = StoreStock.UnitPrice(box.kind, box.itemId, limited, loop)
+	if price == nil then
+		return fail("locked")
+	end
+
+	local axe: ItemCatalog.AxeDef? = nil
+	if box.kind == "Axe" then
+		axe = ItemCatalog.GetAxe(box.itemId)
+		if not axe then
+			return fail("locked")
+		end
+		local counts, total = AxeService.OwnedCounts(player)
+		local best = (profile :: any).bestAxeTier or 1
+		local status = ShopLogic.StatusOf(axe, best, counts[axe.id] or 0, total)
+		if not ShopLogic.CanPurchase(status) then
+			notify(player, ShopLogic.WhyNot(status, axe, best))
+			return fail("locked")
+		end
+	elseif box.kind == "Gear" then
+		local gear = ItemCatalog.GetGear(box.itemId)
+		if not gear then
+			return fail("locked")
+		end
+		if listed(profile.gear, gear.id) then
+			return fail("alreadyOwned")
+		end
+		local owned: { [string]: boolean } = {}
+		if type(profile.gear) == "table" then
+			for _, id in ipairs(profile.gear) do
+				owned[id] = true
+			end
+		end
+		if ShopLogic.GearStatusOf(gear, owned) == "soon" then
+			return fail("locked")
+		end
+	elseif box.kind == "Sawmill" then
+		if loop ~= 2 or not ItemCatalog.GetSawmill(box.itemId) then
+			return fail("locked")
+		end
+		if not hasLand(profile) then
+			return fail("needsLand")
+		end
+	elseif box.kind == "Blueprint" then
+		local bp = PlotLogic.Blueprint(box.itemId)
+		if not bp or bp.unlock ~= true then
+			return fail("locked")
+		end
+		if not hasLand(profile) then
+			return fail("needsLand")
+		end
+		local have = profile.furnitureBlueprints
+		if type(have) == "table" and have[bp.id] == true then
+			return fail("alreadyOwned")
+		end
+	elseif box.kind ~= "Cosmetic" then
+		return fail("locked")
+	end
+
+	if profile.cash < price then
+		return fail("broke")
+	end
+
+	local took = false
+	if limited then
+		local claimed, why = StoreStock.TryClaim(player.UserId, now or os.clock())
+		if not claimed then
+			return fail(if why == "alreadyOwned" then "alreadyOwned" else "missing")
+		end
+		took = true
+	end
+	if not EconomyService.SpendCash(player, price, "bought " .. box.itemId, box.itemId) then
+		if took then
+			StoreStock.Refund(player.UserId)
+		end
+		return fail("broke")
+	end
+	settled[uid] = "granted"
+
+	local axeUid: string? = nil
+	if box.kind == "Axe" and axe then
+		local item, tool = AxeService.Grant(player, axe.id)
+		axeUid = if item then item.uid else nil
+		local char = player.Character
+		local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+		if tool and humanoid then
+			humanoid:EquipTool(tool)
+		end
+		notify(player, string.format("Bought the %s! It's in your hotbar.", axe.displayName))
+		MilestoneService.Mark(player, "First upgrade bought")
+		QuestService.Event(player, "axeBought")
+		QuestService.RefreshNextGoal(player)
+	elseif box.kind == "Gear" then
+		local gear = ItemCatalog.GetGear(box.itemId)
+		if gear then
+			if type(profile.gear) ~= "table" then
+				profile.gear = {}
+			end
+			table.insert(profile.gear, gear.id)
+			publishGear(player, profile)
+			notify(player, string.format("Bought the %s. It's yours for good.", gear.displayName))
+		end
+	elseif box.kind == "Sawmill" then
+		local mill = ItemCatalog.GetSawmill(box.itemId)
+		if mill then
+			if type(profile.sawmillStock) ~= "table" then
+				profile.sawmillStock = {}
+			end
+			table.insert(profile.sawmillStock, mill.id)
+			publishStock(player, profile)
+			notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", mill.displayName))
+		end
+	elseif box.kind == "Blueprint" then
+		local bp = PlotLogic.Blueprint(box.itemId)
+		if bp then
+			if type(profile.furnitureBlueprints) ~= "table" then
+				profile.furnitureBlueprints = {}
+			end
+			profile.furnitureBlueprints[bp.id] = true
+			publishBlueprints(player, profile)
+			notify(player, string.format("Bought the %s blueprint. Place it from BUILD on your plot.", bp.displayName))
+		end
+	else
+		local materials = (profile :: any).materials
+		if type(materials) ~= "table" then
+			materials = {}
+			(profile :: any).materials = materials
+		end
+		materials[box.itemId] = (materials[box.itemId] or 0) + 1
+		notify(player, string.format("Bought the %s.", StoreStock.DisplayName(box.kind, box.itemId)))
+	end
+	return true, "thanks", axeUid
 end
 
 return ShopService
