@@ -26,24 +26,23 @@ ShopHoursLogic.DealerClose = 20
 ShopHoursLogic.FallbackHour = 12
 
 -- Hours board on the door frame, in studs, drawn at this many pixels a stud.
--- TBD (Builder).
 ShopHoursLogic.SignWidthStuds = 4
 ShopHoursLogic.SignHeightStuds = 2
 ShopHoursLogic.SignDepthStuds = 0.3
 ShopHoursLogic.SignPixelsPerStud = 50
--- The board's bottom stays above the walk path. TBD (Builder).
+-- The board's bottom stays above the walk path.
 ShopHoursLogic.SignClearY = 6.2
 
 -- Zzz sits this many studs above the counter top, and fades out past this
--- distance. TBD (Builder).
+-- distance.
 ShopHoursLogic.ZzzAbove = 3
 ShopHoursLogic.ZzzMaxDistance = 40
--- Zzz glyph size in pixels, over the 14 px tag minimum. TBD (Builder).
+-- Zzz glyph size in pixels, over the 14 px tag minimum.
 ShopHoursLogic.ZzzTextPx = 18
--- Billboard width, in glyphs, and the padding under the glyph. TBD (Builder).
+-- Billboard width, in glyphs, and the padding under the glyph.
 ShopHoursLogic.ZzzWidthGlyphs = 3
 ShopHoursLogic.ZzzPad = 8
--- Zzz ink, 0-255. TBD (Builder).
+-- Zzz ink, 0-255.
 ShopHoursLogic.ZzzRed = 245
 ShopHoursLogic.ZzzGreen = 235
 ShopHoursLogic.ZzzBlue = 215

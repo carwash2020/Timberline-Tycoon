@@ -43,6 +43,18 @@ return {
 		)
 		Kit.signText(card, "Spawn\nE  ·  X", C3.fromRGB(245, 235, 215))
 
+		-- A refused placement: the ghost is the pad plus the button that
+		-- hangs off the front-left corner, tinted red.
+		local ghost = Kit.part(
+			root,
+			"PadGhost",
+			V3.new(16, VehicleLogic.PadThick, 22),
+			CF.new(-48, 1, -6),
+			VehicleLogic.GhostRed,
+			Enum.Material.Neon
+		)
+		ghost.Transparency = 0.45
+
 		return {
 			root = root,
 			shadowRadius = 80,
@@ -51,6 +63,7 @@ return {
 				{ pos = { -18, 28, -6 }, target = { -28, 1, 2 }, label = "Pickup pad" },
 				{ pos = { 48, 36, 0 }, target = { 28, 1, 10 }, label = "Rig pad" },
 				{ pos = { -28, 4.2, -14 }, target = { -28, 3.5, -8 }, label = "prompt" },
+				{ pos = { -56, 18, -18 }, target = { -48, 1, -6 }, label = "red ghost" },
 			},
 		}
 	end,

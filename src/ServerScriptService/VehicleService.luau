@@ -87,6 +87,7 @@ local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local EconomyService = require(script.Parent.EconomyService)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
+local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
@@ -200,6 +201,8 @@ export type Hooks = {
 	freeRecall: ((player: Player) -> boolean)?,
 	-- 2x Cash, for the Classic's dash estimate (GameServer).
 	saleMultiplier: ((player: Player) -> number)?,
+	-- Tests send toasts here when Init has not installed GameServer's notify.
+	notify: ((Player, string) -> ())?,
 }
 VehicleService.Hooks = {} :: Hooks
 
@@ -1912,8 +1915,12 @@ local builtPads: { [string]: Model } = {}
 VehicleService.PadPresses = 0
 
 local function toast(player: Player, message: string)
-	if notify then
-		notify(player, message)
+	local fn: ((Player, string) -> ())? = notify
+	if fn == nil then
+		fn = VehicleService.Hooks.notify
+	end
+	if fn then
+		fn(player, message)
 	end
 end
 
@@ -2017,7 +2024,7 @@ local function blockersOf(plot: any): { VehicleLogic.Foot }
 			if type(pad) == "table" and type(pad.x) == "number" and type(pad.z) == "number" then
 				local width, length = vehicleSpan(if type(pad.kind) == "string" then pad.kind else "Truck", pad.id)
 				local size = VehicleLogic.PadSize(length, width)
-				table.insert(out, { x = pad.x, z = pad.z, sx = size.X, sz = size.Z })
+				table.insert(out, VehicleLogic.PlaceFoot(pad.x, pad.z, size))
 			end
 		end
 	end
@@ -2138,6 +2145,25 @@ local function buildPadModel(player: Player, home: Vector2, pad: any): Model?
 	return model
 end
 
+-- After a load: trucks with no stored or placed box, while storage is
+-- full, are waiting. No new save field. Also finishes a mint if a slot
+-- opened since the last join.
+function VehicleService.AnnounceWaiting(player: Player, profile: any)
+	if type(profile) ~= "table" then
+		return
+	end
+	ProfileSchema.MintTruckBoxes(profile)
+	local storage = profile.storage
+	if type(storage) ~= "table" or #storage < ProfileSchema.StorageCap then
+		return
+	end
+	for _, id in ipairs(ProfileSchema.WaitingTrucks(profile)) do
+		local truck = ItemCatalog.GetTruck(id)
+		local name = if truck then truck.displayName else id
+		toast(player, string.format("Your %s is waiting. Free a storage slot to get its box.", name))
+	end
+end
+
 function VehicleService.RestorePads(player: Player, profile: any)
 	local plot = plotOf(profile)
 	local home = homeOf(player)
@@ -2176,11 +2202,12 @@ function VehicleService.TryPlaceFromBox(player: Player, rec: any): boolean
 	local snappedX, snappedZ = VehicleLogic.Snap(localX, localZ, GameConfig.PlotSquare)
 	local width, length = vehicleSpan(kind, id)
 	local size = VehicleLogic.PadSize(length, width)
-	local foot: VehicleLogic.Foot = { x = snappedX, z = snappedZ, sx = size.X, sz = size.Z }
+	local foot = VehicleLogic.PlaceFoot(snappedX, snappedZ, size)
 	local okPlace = VehicleLogic.Placement(foot, blockersOf(plot), yardHalf(plot))
 	local cf = worldPad(home, snappedX, snappedZ, size.Y)
 	if not okPlace then
-		showGhost(cf, size, false)
+		local ghostCf = cf * CFrame.new(-VehicleLogic.ButtonX / 2, 0, -VehicleLogic.ButtonZ / 2)
+		showGhost(ghostCf, Vector3.new(foot.sx, size.Y, foot.sz), false)
 		toast(player, "That spot is taken. The pad would sit on something, or off your land.")
 		return false
 	end

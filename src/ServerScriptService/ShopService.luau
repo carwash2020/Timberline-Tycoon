@@ -36,6 +36,7 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local AxeService = require(script.Parent.AxeService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
+local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -294,6 +295,12 @@ local function buyVehicleBox(
 		notify(player, DialogueData.Sleepy("Dealership", hour))
 		return false
 	end
+	local storage = (profile :: any).storage
+	local stored = if type(storage) == "table" then #storage else 0
+	if stored >= ProfileSchema.StorageCap then
+		notify(player, "storage is full")
+		return false
+	end
 	if profile.cash < price then
 		notify(
 			player,
@@ -304,7 +311,6 @@ local function buyVehicleBox(
 	if not EconomyService.SpendCash(player, price, "bought " .. displayName, itemId) then
 		return false
 	end
-	local storage = (profile :: any).storage
 	if type(storage) ~= "table" then
 		storage = {}
 		(profile :: any).storage = storage
@@ -628,6 +634,9 @@ function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profil
 	publishBlueprints(player, profile)
 	player:SetAttribute("OwnsTruck", #profile.ownedTrucks > 0)
 	VehicleService.RestorePads(player, profile)
+	if type((VehicleService :: any).AnnounceWaiting) == "function" then
+		(VehicleService :: any).AnnounceWaiting(player, profile)
+	end
 end
 
 -- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's

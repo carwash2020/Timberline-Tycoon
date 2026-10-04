@@ -556,27 +556,27 @@ end
 ---------------------------------------------------------------------------
 
 -- A boxed truck is this share of the model's extents, and never smaller
--- than the minimum. TBD (Builder).
-VehicleLogic.BoxScale = 0.35 -- TBD (Builder)
-VehicleLogic.BoxMinX = 4 -- TBD (Builder)
-VehicleLogic.BoxMinY = 3 -- TBD (Builder)
-VehicleLogic.BoxMinZ = 4 -- TBD (Builder)
+-- than the minimum.
+VehicleLogic.BoxScale = 0.35
+VehicleLogic.BoxMinX = 4
+VehicleLogic.BoxMinY = 3
+VehicleLogic.BoxMinZ = 4
 -- The pad is the truck's footprint plus this many studs on every side,
--- and this thick. TBD (Builder).
-VehicleLogic.PadMargin = 2 -- TBD (Builder)
-VehicleLogic.PadThick = 0.4 -- TBD (Builder)
--- The orange button post, outside the front-left corner. TBD (Builder).
-VehicleLogic.ButtonX = 2 -- TBD (Builder)
-VehicleLogic.ButtonY = 1 -- TBD (Builder)
-VehicleLogic.ButtonZ = 2 -- TBD (Builder)
-VehicleLogic.ButtonOrange = Color3.fromRGB(230, 120, 30) -- TBD (Builder)
+-- and this thick.
+VehicleLogic.PadMargin = 2
+VehicleLogic.PadThick = 0.4
+-- The orange button post, outside the front-left corner.
+VehicleLogic.ButtonX = 2
+VehicleLogic.ButtonY = 1
+VehicleLogic.ButtonZ = 2
+VehicleLogic.ButtonOrange = Color3.fromRGB(230, 120, 30)
 -- The truck's underside sits this far above the pad top and the ground.
-VehicleLogic.SpawnClearance = 0.5 -- TBD (Builder)
+VehicleLogic.SpawnClearance = 0.5
 -- Paint: catalog colour, four extras, and Blossom Pink at 1 in PinkOdds.
-VehicleLogic.CatalogWeight = 60 -- TBD (Designer)
-VehicleLogic.ExtraWeight = 10 -- TBD (Designer)
-VehicleLogic.PinkOdds = 500 -- TBD (Designer)
-VehicleLogic.BlossomPink = "#E7A0B4" -- TBD (Designer)
+VehicleLogic.CatalogWeight = 60
+VehicleLogic.ExtraWeight = 10
+VehicleLogic.PinkOdds = 500
+VehicleLogic.BlossomPink = "#E7A0B4"
 VehicleLogic.GhostRed = Color3.fromRGB(180, 40, 40) -- TBD (Designer)
 VehicleLogic.GhostOk = Color3.fromRGB(80, 200, 120) -- TBD (Designer)
 
@@ -622,6 +622,18 @@ end
 function VehicleLogic.PadSize(length: number, width: number): Vector3
 	local margin = VehicleLogic.PadMargin
 	return Vector3.new(width + 2 * margin, VehicleLogic.PadThick, length + 2 * margin)
+end
+
+-- The slab plus the button, which hangs off the front-left corner
+-- (ButtonX on -X, ButtonZ on -Z). Placement, the ghost, and pad blockers
+-- all use this foot so the button cannot sit off the yard.
+function VehicleLogic.PlaceFoot(x: number, z: number, padSize: Vector3): Foot
+	return {
+		x = x - VehicleLogic.ButtonX / 2,
+		z = z - VehicleLogic.ButtonZ / 2,
+		sx = padSize.X + VehicleLogic.ButtonX,
+		sz = padSize.Z + VehicleLogic.ButtonZ,
+	}
 end
 
 -- Plot-local x, z snapped to the B04 square (GameConfig.PlotSquare).

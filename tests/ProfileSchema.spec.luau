@@ -787,6 +787,82 @@ return function(t)
 		t.eq(data.ownedTrucks, { "Pickup", "Rustbucket", "Flatbed" })
 	end)
 
+	t.test("a full storage is not trimmed to mint a truck box", function()
+		local Schema, data = fresh()
+		data.ownedTrucks = { "Flatbed" }
+		data.trucksBoxed = false
+		data.storage = {}
+		local kept = {}
+		for i = 1, Schema.StorageCap do
+			local box = { uid = "keep-" .. i, itemId = "SteelAxe", shop = "ToolShed" }
+			table.insert(data.storage, box)
+			table.insert(kept, box.uid)
+		end
+		Schema.Migrate(data)
+		t.eq(#data.storage, Schema.StorageCap)
+		for i, uid in ipairs(kept) do
+			t.eq(data.storage[i].uid, uid)
+			t.eq(data.storage[i].itemId, "SteelAxe")
+		end
+		t.eq(data.trucksBoxed, false)
+		t.eq(table.find(data.ownedTrucks, "Flatbed") ~= nil, true)
+		table.remove(data.storage, 1)
+		Schema.Migrate(data)
+		local flatbeds = 0
+		for _, box in ipairs(data.storage) do
+			if box.itemId == "Flatbed" and box.shop == "Dealership" then
+				flatbeds += 1
+			end
+		end
+		t.eq(flatbeds, 1)
+		t.eq(#data.storage, Schema.StorageCap)
+		t.eq(data.trucksBoxed, true)
+	end)
+
+	t.test("retrying a mint, including beside a load, adds one box", function()
+		local Schema, data = fresh()
+		data.ownedTrucks = { "Flatbed" }
+		data.trucksBoxed = false
+		data.storage = {}
+		for i = 1, Schema.StorageCap - 1 do
+			table.insert(data.storage, { uid = "keep-" .. i, itemId = "SteelAxe", shop = "ToolShed" })
+		end
+		Schema.MintTruckBoxes(data)
+		Schema.MintTruckBoxes(data)
+		local function flatbeds(record)
+			local n = 0
+			for _, box in ipairs(record.storage) do
+				if box.itemId == "Flatbed" and box.shop == "Dealership" then
+					n += 1
+				end
+			end
+			return n
+		end
+		t.eq(flatbeds(data), 1)
+		t.eq(data.trucksBoxed, true)
+		local function openSlot()
+			local _, record = fresh()
+			record.ownedTrucks = { "Flatbed" }
+			record.trucksBoxed = false
+			record.storage = {}
+			for i = 1, Schema.StorageCap - 1 do
+				table.insert(record.storage, { uid = "race-" .. i, itemId = "SteelAxe", shop = "ToolShed" })
+			end
+			return record
+		end
+		-- Retry and a join (Migrate) on the same record. Either order, and
+		-- both together, leave one box: the mint holds the record until the
+		-- insert is visible to takenIds and WaitingTrucks.
+		local retryFirst = openSlot()
+		Schema.MintTruckBoxes(retryFirst)
+		Schema.Migrate(retryFirst)
+		t.eq(flatbeds(retryFirst), 1)
+		local loadFirst = openSlot()
+		Schema.Migrate(loadFirst)
+		Schema.MintTruckBoxes(loadFirst)
+		t.eq(flatbeds(loadFirst), 1)
+	end)
+
 	t.test("T7: ownedTrucks stays catalog ids and truckPaint is unchanged", function()
 		local fs = require("@lune/fs")
 		local Schema, data = fresh()

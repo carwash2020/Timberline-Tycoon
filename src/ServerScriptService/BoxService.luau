@@ -847,6 +847,8 @@ local function dropStorage(player: Player, uid: string)
 		end
 	end
 	profile.storage = kept
+	-- A freed slot can hold a truck that was waiting because storage was full.
+	ProfileSchema.MintTruckBoxes(profile)
 end
 
 local function findTool(player: Player, axeUid: string?): Tool?

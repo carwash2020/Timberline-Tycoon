@@ -538,6 +538,22 @@ return function(t)
 		t.eq(s.profile.cash, 1000 - 160, "the Tool Shed stays open")
 	end)
 
+	t.test("a full storage refuses a truck box before cash moves", function()
+		local s = setup({ cash = 1000, loop = 2, claimed = true })
+		s.ShopService.Hour = function()
+			return 12
+		end
+		local Schema = s.loader:server("ProfileSchema")
+		for i = 1, Schema.StorageCap do
+			table.insert(s.profile.storage, { uid = "full-" .. i, itemId = "SteelAxe", shop = "ToolShed" })
+		end
+		local before = s.profile.cash
+		s.buy("Truck", "Pickup")
+		t.eq(s.profile.cash, before)
+		t.eq(#s.profile.storage, Schema.StorageCap)
+		t.eq(s.toasts[#s.toasts], "storage is full")
+	end)
+
 	t.test("T1: a truck box with no plot is refused before cash moves", function()
 		local Dialogue = t.loader():server("DialogueService")
 		local DialogueData = t.shared("DialogueData")
