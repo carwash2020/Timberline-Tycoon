@@ -83,6 +83,7 @@ export type Piece = {
 	selling: boolean?,
 	elder: boolean?,
 	shopItem: boolean?,
+	shopBox: boolean?,
 }
 
 -- Hooks for later slices. bedOwner: the player whose truck bed the piece
@@ -91,12 +92,23 @@ export type Piece = {
 -- just before the piece's physics goes to the holder (TruckLoad lets go
 -- of a piece it welded to a bed); onGrab / onRelease: tutorial and quest
 -- events.
+export type ShopGrab = {
+	claimUserId: number?,
+	claimUntil: number?,
+	paid: boolean?,
+	buyerId: number?,
+	unpaidByPlayer: number?,
+	unpaidOnServer: number?,
+	taking: boolean?,
+}
+
 export type Hooks = {
 	bedOwner: ((Piece) -> Player?)?,
 	permission: ((Player, Piece) -> boolean?)?,
 	beforeHold: ((Player, Piece) -> ())?,
 	onGrab: ((Player, Piece) -> ())?,
 	onRelease: ((Player, Piece, string) -> ())?,
+	shopFacts: ((Player, Piece) -> ShopGrab?)?,
 }
 GrabService.Hooks = {} :: Hooks
 
@@ -176,6 +188,20 @@ local resolve: (BasePart) -> Piece? = registered
 -- back the default (pieces registered here).
 function GrabService.SetResolver(fn: ((BasePart) -> Piece?)?)
 	resolve = fn or registered
+end
+
+-- Look here before the current resolver. A later SetResolver replaces
+-- both, so call this after that (BoxService does, once the wood resolver
+-- is installed).
+function GrabService.ChainResolver(fn: (BasePart) -> Piece?)
+	local inner = resolve
+	resolve = function(part: BasePart): Piece?
+		local found = fn(part)
+		if found then
+			return found
+		end
+		return inner(part)
+	end
 end
 
 -- The piece `part` belongs to, through the current resolver (SellService
@@ -420,10 +446,23 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 		selling = piece.selling,
 		elder = piece.elder,
 		shopItem = piece.shopItem,
+		shopBox = piece.shopBox,
 		bedOwnerId = if bedOwner then bedOwner.UserId else nil,
 		ownerHere = ownerPlayer ~= nil,
 		plotAllows = if hooks.permission then hooks.permission(player, piece) else nil,
 	}
+	if piece.shopBox and hooks.shopFacts then
+		local extra = hooks.shopFacts(player, piece)
+		if extra then
+			facts.claimUserId = extra.claimUserId
+			facts.claimUntil = extra.claimUntil
+			facts.paid = extra.paid
+			facts.buyerId = extra.buyerId
+			facts.unpaidByPlayer = extra.unpaidByPlayer
+			facts.unpaidOnServer = extra.unpaidOnServer
+			facts.taking = extra.taking
+		end
+	end
 	local ok, reason = GrabLogic.CanGrab(facts)
 	if not ok then
 		local who = if reason == "bed" then bedOwner elseif reason == "owned" then ownerPlayer else nil

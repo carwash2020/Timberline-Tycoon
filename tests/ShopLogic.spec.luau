@@ -292,4 +292,12 @@ return function(t)
 		t.eq(ShopLogic.CanPurchase("robux"), false)
 		t.ok(string.find(ShopLogic.WhyNot("robux", lux, 1), "Robux exclusive") ~= nil)
 	end)
+
+	t.test("shelf menus hide unless boxed stores are turned off", function()
+		t.eq(ShopLogic.ShelfMenusHidden(), true)
+		GameConfig.BoxedStores = false
+		t.eq(ShopLogic.ShelfMenusHidden(), false)
+		GameConfig.BoxedStores = nil
+		t.eq(ShopLogic.ShelfMenusHidden(), true)
+	end)
 end

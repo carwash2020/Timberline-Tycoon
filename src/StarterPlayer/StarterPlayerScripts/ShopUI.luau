@@ -87,6 +87,7 @@ export type Shop = {
 	subtitle: string, -- 40 characters at most (ShopUI.SubtitleMax): two lines on a phone
 	ids: () -> { string },
 	view: (id: string) -> RowView,
+	shelf: boolean?, -- axes, saws and the general store: the shelves sell these
 }
 
 type Row = {
@@ -142,6 +143,7 @@ end
 
 local AXES: Shop = {
 	building = "ToolShed",
+	shelf = true,
 	promptText = "Browse axes",
 	title = "Tool Shed",
 	subtitle = "Sharper axes, fewer swings.",
@@ -401,6 +403,7 @@ end
 -- the axe ladder (the Lux Axe still opens the Robux store), and trinkets.
 local GEAR: Shop = {
 	building = "HearthAndHome",
+	shelf = true,
 	promptText = "Browse the store",
 	title = "General Store",
 	subtitle = "Blueprints, axes and trinkets.",
@@ -445,6 +448,7 @@ local GEAR: Shop = {
 -- Tool Shed: sawmills. Buying puts one in stock; BUILD on your plot places it.
 local SAWS: Shop = {
 	building = "ToolShed",
+	shelf = true,
 	promptOffset = Vector2.new(0, 70),
 	promptText = "Browse saws",
 	title = "Saws",
@@ -909,6 +913,12 @@ local function whenChild(parent: Instance, name: string, fn: (Instance) -> ())
 	end)
 end
 
+-- Shelves replace these menus while boxed stores are on. The Dealership
+-- board stays. The server BuyItem path stays too, for a one-line rollback.
+local function shelfMenu(shop: Shop): boolean
+	return shop.shelf == true and ShopLogic.ShelfMenusHidden()
+end
+
 local function setupPrompt(shop: Shop, building: Instance)
 	if points[shop] then
 		return
@@ -971,7 +981,7 @@ function ShopUI.Start()
 	local function watchMap(map: Instance)
 		for _, shop in ipairs(SHOPS) do
 			local buildingName = shop.building
-			if buildingName then
+			if buildingName and not shelfMenu(shop) then
 				whenChild(map, buildingName, function(building: Instance)
 					setupPrompt(shop, building)
 				end)

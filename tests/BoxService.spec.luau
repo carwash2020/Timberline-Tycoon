@@ -1,0 +1,330 @@
+--!nocheck
+-- Paying, opening, putting an unpaid box back, and keeping a paid one.
+return function(t)
+	local GameConfig = t.shared("GameConfig")
+	local Instance = t.roblox.Instance
+	local CFrame = t.roblox.CFrame
+	local Vector3 = t.roblox.Vector3
+	local Enum = t.roblox.Enum
+
+	local function boot(grant)
+		local charges = {}
+		local profile = {
+			cash = 1000,
+			storage = {},
+			axes = { { uid = "owned", id = "SteelAxe" } },
+			materials = {},
+		}
+		local loader = t.loader({
+			mocks = {
+				ShopService = {
+					Loop = function()
+						return 2
+					end,
+					ChargeAndGrant = grant or function(_player, box)
+						table.insert(charges, box.uid)
+						return true, "thanks", "axe-1"
+					end,
+				},
+				ProfileService = {
+					GetProfile = function(p)
+						return if p and p.UserId == 7 then profile else nil
+					end,
+				},
+			},
+		})
+		return loader, loader:server("BoxService"), charges, profile
+	end
+
+	local function counterPart()
+		local counter = Instance.new("Part")
+		counter.Name = "Counter"
+		counter.Size = Vector3.new(10, 2, 6)
+		counter.CFrame = CFrame.new(0, 3, 0)
+		return counter
+	end
+
+	local function person(at, userId)
+		local hrp = Instance.new("Part")
+		hrp.Name = "HumanoidRootPart"
+		hrp.CFrame = CFrame.new(at)
+		local char = Instance.new("Model")
+		hrp.Parent = char
+		return {
+			Name = "Tester",
+			UserId = userId or 7,
+			Character = char,
+			FindFirstChild = function()
+				return nil
+			end,
+		}
+	end
+
+	local function place(Box, at, counter)
+		return Box.Make({
+			uid = "box-1",
+			shop = "ToolShed",
+			itemKind = "Axe",
+			itemId = "SteelAxe",
+			displayName = "Steel Axe",
+			cf = CFrame.new(at),
+			counter = counter,
+			zoneCf = CFrame.new(),
+			zoneSize = Vector3.new(18, 1, 14),
+			onShelf = true,
+		})
+	end
+
+	t.test("a shelf box is anchored, tagged, priced, and paid from the counter", function()
+		local _, Box, charges = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		t.eq(rec.part.Anchored, true)
+		t.eq(rec.model:HasTag("ShopBox"), true)
+		t.eq(rec.part.CollisionGroup, "Boxes")
+		local parts, marks = 0, 0
+		for _, d in ipairs(rec.model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				parts += 1
+			end
+			if d.Name == "ItemMark" then
+				marks += 1
+			end
+		end
+		t.eq(parts, 1)
+		t.eq(marks, 2)
+		local tag = rec.part:FindFirstChild("PriceTag")
+		t.eq(tag.MaxDistance, 20)
+		t.eq(tag.AlwaysOnTop, false)
+		local label = tag:FindFirstChild("Price")
+		t.eq(label.Text, "$160")
+		t.ok(label.TextSize >= 14)
+		t.eq(label.TextTruncate, Enum.TextTruncate.None)
+		local buy = rec.part:FindFirstChild("BuyPrompt")
+		t.eq(buy.Enabled, true)
+		t.eq(buy.MaxActivationDistance, GameConfig.CounterPayReach)
+		t.eq(buy.KeyboardKeyCode, Enum.KeyCode.E)
+		t.eq(buy.GamepadKeyCode, Enum.KeyCode.ButtonX)
+		t.eq(buy:GetAttribute("TapPx"), 44)
+		local player = person(Vector3.new(0, 4.5, 0))
+		for _ = 1, 10 do
+			Box.Pay(player, rec.uid)
+		end
+		t.eq(#charges, 1)
+		t.eq(rec.paid, true)
+		t.eq(rec.buyerId, 7)
+		local open = rec.part:FindFirstChild("OpenPrompt")
+		t.eq(open.Enabled, true)
+		t.eq(open.MaxActivationDistance, 12)
+		t.eq(open.KeyboardKeyCode, Enum.KeyCode.F)
+		t.eq(open.GamepadKeyCode, Enum.KeyCode.ButtonY)
+		t.eq(buy.Enabled, false)
+	end)
+
+	t.test("off the counter, or short, nothing is charged", function()
+		local _, Box, charges = boot(function()
+			return false, "broke", nil
+		end)
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 40, 0), counter)
+		local player = person(Vector3.new(0, 40, 0))
+		local ok, line = Box.Pay(player, rec.uid)
+		t.eq(ok, false)
+		t.eq(line, "missing")
+		t.eq(#charges, 0)
+		t.eq(rec.paid, false)
+		rec.part.CFrame = CFrame.new(0, 4.5, 0)
+		player.Character:FindFirstChild("HumanoidRootPart").CFrame = CFrame.new(0, 4.5, 0)
+		Box.RefreshPrompts()
+		local broke, why = Box.Pay(player, rec.uid)
+		t.eq(broke, false)
+		t.eq(why, "broke")
+		t.eq(rec.paid, false)
+	end)
+
+	t.test("an unpaid box outside for two watches goes back; one stud inside the door does not", function()
+		local _, Box = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local home = rec.home.Position
+		rec.onShelf = false
+		rec.part.CFrame = CFrame.new(0, 1, -100)
+		Box.Judge(1)
+		t.eq(rec.onShelf, false)
+		t.ok((rec.part.CFrame.Position - Vector3.new(0, 1, -100)).Magnitude < 1e-3)
+		Box.Judge(2)
+		t.eq(rec.onShelf, true)
+		t.ok((rec.part.CFrame.Position - home).Magnitude < 1e-3, "back on its shelf")
+
+		rec.onShelf = false
+		rec.outsideStreak = 1
+		local z = -rec.zoneSize.Z / 2 + 1
+		rec.part.CFrame = rec.zoneCf * CFrame.new(0, 1, z)
+		Box.Judge(3)
+		Box.Judge(4)
+		t.eq(rec.onShelf, false)
+		t.eq(rec.outsideStreak, 0)
+	end)
+
+	t.test("opening delivers once, only to the buyer, only up close", function()
+		local _, Box, charges, profile = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local player = person(rec.part.CFrame.Position)
+		local unpaid, whyUnpaid = Box.TryOpen(player, rec.uid)
+		t.eq(unpaid, false)
+		t.eq(whyUnpaid, "unpaid")
+		rec.paid = true
+		rec.buyerId = 7
+		rec.axeUid = "axe-1"
+		local far = person(rec.part.CFrame.Position + Vector3.new(12.01, 0, 0))
+		local tooFar, whyFar = Box.TryOpen(far, rec.uid)
+		t.eq(tooFar, false)
+		t.eq(whyFar, "far")
+		local other = person(rec.part.CFrame.Position, 8)
+		local stolen, whyStolen = Box.TryOpen(other, rec.uid)
+		t.eq(stolen, false)
+		t.eq(whyStolen, "owner")
+		rec.part:SetAttribute("BoxUid", "nope")
+		local mismatch, whyUid = Box.TryOpen(player, rec.uid)
+		t.eq(mismatch, false)
+		t.eq(whyUid, "uid")
+		rec.part:SetAttribute("BoxUid", rec.uid)
+		local near = person(rec.part.CFrame.Position + Vector3.new(12, 0, 0))
+		t.eq(Box.TryOpen(near, rec.uid), true)
+		t.eq(Box.TryOpen(near, rec.uid), false)
+		t.eq(#charges, 0, "opening does not grant a second copy")
+		t.eq(#profile.axes, 1)
+	end)
+
+	t.test("leaving with a paid box keeps it, and coming back shows it once", function()
+		local _, Box, charges, profile = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local uid = rec.uid
+		rec.paid = true
+		rec.buyerId = 7
+		rec.onShelf = false
+		local player = person(Vector3.new(0, 4.5, 0))
+		Box.Commit(player)
+		t.eq(#profile.storage, 1)
+		t.eq(profile.storage[1].uid, uid)
+		t.eq(profile.storage[1].itemId, "SteelAxe")
+		t.eq(#profile.axes, 1)
+		t.eq(Box.Get(uid), nil)
+		Box.RememberShop("ToolShed", {
+			counter = counter,
+			zoneCf = CFrame.new(),
+			zoneSize = Vector3.new(18, 1, 14),
+		})
+		Box.Restore(player, profile)
+		Box.Restore(player, profile)
+		local shown = 0
+		local back = nil
+		for _, item in ipairs(Box.Each()) do
+			if item.paid and item.buyerId == 7 then
+				shown += 1
+				back = item
+			end
+		end
+		t.eq(shown, 1)
+		local opener = person(back.part.CFrame.Position)
+		t.eq(Box.TryOpen(opener, back.uid), true)
+		t.eq(#profile.storage, 0)
+		t.eq(#profile.axes, 1)
+		t.eq(#charges, 0)
+	end)
+
+	t.test("a bought slot refills on its timer, and picking one up does not start it", function()
+		local _, Box = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local player = person(rec.part.CFrame.Position)
+		Box.NoteGrab(player, { model = rec.model })
+		t.eq(rec.onShelf, false)
+		t.eq(rec.claimUserId, 7)
+		t.eq(Box.RespawnDue(100000), {})
+		Box.NoteSold(rec.slotId, 50)
+		t.eq(Box.RespawnDue(50 + GameConfig.BoxRespawnSec - 0.1), {})
+		t.eq(Box.RespawnDue(50 + GameConfig.BoxRespawnSec), { rec.slotId })
+		Box.NoteSold("hearth-LampPost", 50)
+		t.eq(Box.RespawnDue(50 + GameConfig.BoxRespawnSec), { rec.slotId }, "the lamp uses its own pool")
+	end)
+
+	t.test("BoxOpen is budgeted, and boxes do not shove players", function()
+		local handlers = {}
+		local remote = {
+			OnServerEvent = {
+				Connect = function(_, fn)
+					table.insert(handlers, fn)
+					return { Disconnect = function() end }
+				end,
+			},
+			Fire = function(_, player, action)
+				for _, fn in ipairs(handlers) do
+					fn(player, action)
+				end
+			end,
+		}
+		local loader, Box = boot()
+		Box.Init(remote)
+		Box.Init(remote)
+		t.eq(#handlers, 1)
+		local who = { Name = "Tester", UserId = 3 }
+		for _ = 1, 4 do
+			remote.Fire(remote, who, "no-such-box")
+		end
+		local RateLimiter = loader:server("RateLimiter")
+		t.eq(RateLimiter.Allow(who, "BoxOpen"), false)
+
+		local calls = {}
+		local registered = {}
+		local physics = t.loader({
+			services = {
+				PhysicsService = {
+					IsCollisionGroupRegistered = function(_, name)
+						return registered[name] == true
+					end,
+					RegisterCollisionGroup = function(_, name)
+						registered[name] = true
+					end,
+					CollisionGroupSetCollidable = function(_, a, b, on)
+						table.insert(calls, { a, b, on })
+					end,
+				},
+			},
+		})
+		local Boxes = physics:server("BoxService")
+		Boxes.Init(remote)
+		t.eq(registered.Boxes, true)
+		t.eq(calls[1], { "Boxes", "Players", false })
+	end)
+
+	t.test("the keeper offers the box on the counter by name and price", function()
+		local loader, Box, _charges, profile = boot()
+		profile.cash = 1000
+		local counter = counterPart()
+		place(Box, Vector3.new(0, 4.5, 0), counter)
+		local sent = {}
+		local handler
+		local remote = {
+			OnServerEvent = {
+				Connect = function(_, fn)
+					handler = fn
+					return { Disconnect = function() end }
+				end,
+			},
+			FireClient = function(_, _player, payload)
+				table.insert(sent, payload)
+			end,
+		}
+		local Dialogue = loader:server("DialogueService")
+		Dialogue.Init(remote)
+		local player = person(Vector3.new(0, 4.5, 0))
+		handler(player, "open", "ToolShed")
+		t.eq(sent[1].line, "offer")
+		t.eq(sent[1].choice, true)
+		t.ok(string.find(sent[1].text, "Steel Axe", 1, true) ~= nil, sent[1].text)
+		t.ok(string.find(sent[1].text, "$160", 1, true) ~= nil, sent[1].text)
+	end)
+end

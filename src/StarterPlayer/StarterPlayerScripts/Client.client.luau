@@ -30,6 +30,7 @@ local MODULES = {
 	"ChopController",
 	"CutController",
 	"DailyUI",
+	"DialogueUI",
 	"DoorAnim",
 	"DragController",
 	"FaceTarget",
@@ -219,6 +220,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "DailyUI",
 		get = function()
 			return require(script.Parent.DailyUI)
+		end,
+	},
+	{
+		name = "DialogueUI",
+		get = function()
+			return require(script.Parent.DialogueUI)
 		end,
 	},
 	{

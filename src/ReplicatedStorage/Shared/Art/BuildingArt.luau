@@ -24,6 +24,7 @@
 -- what stands on it, keeps its size: people still lean on it.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local StoreStock = require(script.Parent.Parent.StoreStock)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 local PropArt = require(script.Parent.PropArt)
@@ -1502,6 +1503,38 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	end
 end
 
+-- Shelf slots are attachments on the counter (they are not parts, so the
+-- shop stays inside its part budget). The store zone is attributes in
+-- build space; BoxService turns them into a world volume with the pivot
+-- the model had while it still sat at the origin.
+local function placeShelfSlots(model: Model, kind: string, scale: number)
+	local host = model:FindFirstChild("Counter")
+	if not host or not host:IsA("BasePart") then
+		return
+	end
+	for _, place in ipairs(StoreStock.Placements(kind)) do
+		local at = Vector3.new(place.x * scale, place.y * scale, place.z * scale)
+		local att = Instance.new("Attachment")
+		att.Name = "ShelfSlot"
+		att:SetAttribute("SlotId", place.slotId)
+		att.Position = host.CFrame:PointToObjectSpace(at)
+		att.Parent = host
+	end
+	local zone = StoreStock.Zone(kind)
+	local pivot = model:GetPivot().Position
+	model:SetAttribute("BuildPivotX", pivot.X)
+	model:SetAttribute("BuildPivotY", pivot.Y)
+	model:SetAttribute("BuildPivotZ", pivot.Z)
+	if zone then
+		model:SetAttribute("ZoneCenterX", zone.center.X)
+		model:SetAttribute("ZoneCenterY", zone.center.Y)
+		model:SetAttribute("ZoneCenterZ", zone.center.Z)
+		model:SetAttribute("ZoneSizeX", zone.size.X * scale)
+		model:SetAttribute("ZoneSizeY", zone.size.Y)
+		model:SetAttribute("ZoneSizeZ", zone.size.Z * scale)
+	end
+end
+
 -- A shop: about 18 x 14 studs, its front (-Z) open on the counter. `kind`
 -- is "ToolShed", "Dealership" or "HearthAndHome" (anything else builds a
 -- Hearth & Home style store); `title` goes on the sign; `accent` is the
@@ -1554,6 +1587,9 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	end
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
 	TownMeshes.Dress(model, TownModels.ShopAsset(kind))
+	if kind == "ToolShed" or kind == "HearthAndHome" then
+		placeShelfSlots(model, kind, s)
+	end
 	return model
 end
 
