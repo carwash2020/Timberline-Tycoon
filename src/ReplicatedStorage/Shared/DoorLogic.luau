@@ -32,8 +32,15 @@ local TOP: { [string]: number } = {
 	FenceGate4 = 3,
 }
 
-function DoorLogic.MayToggle(ownerId: number, playerId: number, now: number, last: number?): (boolean, string?)
-	if playerId ~= ownerId then
+-- `allowed` is a plot permission (interact). The owner does not need it.
+function DoorLogic.MayToggle(
+	ownerId: number,
+	playerId: number,
+	now: number,
+	last: number?,
+	allowed: boolean?
+): (boolean, string?)
+	if playerId ~= ownerId and allowed ~= true then
 		return false, "owner"
 	end
 	if last and now - last < DoorLogic.Cooldown then

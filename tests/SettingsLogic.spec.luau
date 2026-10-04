@@ -27,5 +27,8 @@ return function(t)
 		t.eq(SettingsLogic.ScaleMultiplier("small"), 0.85)
 		t.eq(SettingsLogic.ScaleMultiplier("large"), 1.15)
 		t.eq(SettingsLogic.ScaleMultiplier("normal"), 1)
+		t.ok(SettingsLogic.HasTab("game"))
+		t.ok(SettingsLogic.HasTab("visitors"))
+		t.ok(not SettingsLogic.HasTab("land"))
 	end)
 end

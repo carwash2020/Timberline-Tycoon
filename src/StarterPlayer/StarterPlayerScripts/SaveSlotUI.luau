@@ -1,13 +1,17 @@
 --!strict
 -- SaveSlotUI: three save slots (SaveSlotLogic). A side button opens a
--- panel: each slot's cash, axe and when you last played it, a load button,
--- and Redo on the one you're playing. Load and Redo both ask you to
--- confirm. The server still checks the cooldown and pulls wood out of the
--- world before it swaps, so this screen can't duplicate cash or logs.
+-- panel: each slot's name, cash, axe and when it was last saved, a load
+-- button, and Redo on the one you're playing. Load and Redo both ask you
+-- to confirm, because the save you're playing is put away first. The
+-- server still checks the cooldown and pulls wood out of the world before
+-- it swaps, so this screen can't duplicate cash or logs. Esc and B close it.
 
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -21,16 +25,19 @@ type Summary = SaveSlotLogic.Summary
 local C = UITheme.Colors
 local player = Players.LocalPlayer
 
+local SAVES_CLOSE = "SaveSlotClose"
+
 local panel: Frame? = nil
-local list: Frame? = nil
+local list: ScrollingFrame? = nil
 local confirm: Frame? = nil
 local confirmText: TextLabel? = nil
 local cooldownLabel: TextLabel? = nil
 local pending: { action: string, index: number }? = nil
 local summaries: { Summary } = {}
+local firstPick: GuiButton? = nil
 
-local function send(action: string, index: number, confirmed: boolean)
-	Net.Remote("SlotAction"):FireServer(action, index, confirmed)
+local function send(action: string, index: number, extra: boolean | string)
+	Net.Remote("SlotAction"):FireServer(action, index, extra)
 end
 
 local function hideConfirm()
@@ -66,6 +73,9 @@ local function rowButton(parent: Instance, text: string, style: string, order: n
 	button.root.LayoutOrder = order
 	button.root.Parent = parent
 	button.face.Activated:Connect(fn)
+	if firstPick == nil then
+		firstPick = button.face
+	end
 	return button
 end
 
@@ -79,6 +89,7 @@ local function fill()
 			child:Destroy()
 		end
 	end
+	firstPick = nil
 	local now = os.time()
 	local untilAt = player:GetAttribute("SlotCooldownUntil")
 	local cooling = type(untilAt) == "number" and os.time() < untilAt
@@ -94,23 +105,35 @@ local function fill()
 		local card = Instance.new("Frame")
 		card.Name = "Slot" .. slot.index
 		card.LayoutOrder = slot.index
-		card.Size = UDim2.new(1, 0, 0, 96)
+		card.Size = UDim2.new(1, 0, 0, 148)
 		card.BackgroundColor3 = if slot.active then C.PaperDark else C.Paper
 		card.BorderSizePixel = 0
 		UITheme.corner(card, 10)
 		UITheme.stroke(card, if slot.active then C.GreenEdge else C.Bark, 2)
 		card.Parent = holder
 
-		local title = Instance.new("TextLabel")
-		title.BackgroundTransparency = 1
-		title.Font = UITheme.Fonts.Heading
-		title.TextSize = 18
-		title.TextXAlignment = Enum.TextXAlignment.Left
-		title.TextColor3 = C.Ink
-		title.Size = UDim2.new(1, -16, 0, 22)
-		title.Position = UDim2.fromOffset(8, 6)
-		title.Text = string.format("Save %d%s", slot.index, if slot.active then "  ·  playing" else "")
-		title.Parent = card
+		local nameBox = Instance.new("TextBox")
+		nameBox.Name = "Name"
+		nameBox.BackgroundColor3 = C.Cream
+		nameBox.BorderSizePixel = 0
+		nameBox.Font = UITheme.Fonts.Heading
+		nameBox.TextSize = 16
+		nameBox.TextColor3 = C.Ink
+		nameBox.ClearTextOnFocus = false
+		nameBox.TextXAlignment = Enum.TextXAlignment.Left
+		nameBox.Size = UDim2.new(1, -16, 0, 44)
+		nameBox.Position = UDim2.fromOffset(8, 6)
+		nameBox.Text = slot.name
+		nameBox.PlaceholderText = SaveSlotLogic.DefaultName(slot.index)
+		UITheme.corner(nameBox, 8)
+		UITheme.padding(nameBox, 8, 8, 4, 4)
+		nameBox.Parent = card
+		local slotIndex = slot.index
+		nameBox.FocusLost:Connect(function()
+			if nameBox.Text ~= slot.name then
+				send("rename", slotIndex, nameBox.Text)
+			end
+		end)
 
 		local detail = Instance.new("TextLabel")
 		detail.BackgroundTransparency = 1
@@ -119,23 +142,19 @@ local function fill()
 		detail.TextXAlignment = Enum.TextXAlignment.Left
 		detail.TextColor3 = C.Ink
 		detail.Size = UDim2.new(1, -16, 0, 20)
-		detail.Position = UDim2.fromOffset(8, 30)
+		detail.Position = UDim2.fromOffset(8, 52)
+		local saved = SaveSlotLogic.SavedText(slot.lastPlayed, now)
 		if slot.fresh then
-			detail.Text = "Empty  ·  a new game"
+			detail.Text = "Empty  ·  " .. saved
 		else
-			detail.Text = string.format(
-				"%s  ·  %s  ·  %s",
-				Util.formatCash(slot.cash),
-				slot.axeName,
-				SaveSlotLogic.PlayedText(slot.lastPlayed, now)
-			)
+			detail.Text = string.format("%s  ·  %s  ·  %s", Util.formatCash(slot.cash), slot.axeName, saved)
 		end
 		detail.Parent = card
 
 		local buttons = Instance.new("Frame")
 		buttons.BackgroundTransparency = 1
 		buttons.Size = UDim2.new(1, -16, 0, 44)
-		buttons.Position = UDim2.fromOffset(8, 50)
+		buttons.Position = UDim2.fromOffset(8, 96)
 		UITheme.list(buttons, 8, true)
 		buttons.Parent = card
 
@@ -154,9 +173,9 @@ local function fill()
 					"load",
 					slot.index,
 					string.format(
-						"%s save %d? This save is kept. Wood on the ground comes with you, it is not copied.",
+						"%s %s? The save you're playing is put away first. Wood on the ground comes with you. It is not copied.",
 						what,
-						slot.index
+						slot.name
 					)
 				)
 			end)
@@ -174,8 +193,35 @@ local function setOpen(on: boolean)
 	p.Visible = on
 	if not on then
 		hideConfirm()
+		ContextActionService:UnbindAction(SAVES_CLOSE)
+		local selected = GuiService.SelectedObject
+		if selected and selected:IsDescendantOf(p) then
+			GuiService.SelectedObject = nil
+		end
 	else
 		fill()
+		ContextActionService:BindActionAtPriority(
+			SAVES_CLOSE,
+			function(_name, state)
+				if state ~= Enum.UserInputState.Begin then
+					return Enum.ContextActionResult.Pass
+				end
+				if confirm and confirm.Visible then
+					hideConfirm()
+				else
+					setOpen(false)
+				end
+				return Enum.ContextActionResult.Sink
+			end,
+			false,
+			Enum.ContextActionPriority.High.Value + 20,
+			InputKit.Actions.Cancel.keyboard,
+			InputKit.Actions.Cancel.gamepad
+		)
+		local pick = firstPick
+		if pick and UITheme.Device() == "console" then
+			GuiService.SelectedObject = pick
+		end
 	end
 end
 
@@ -199,7 +245,7 @@ function SaveSlotUI.Start()
 	outer.Name = "Saves"
 	outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.fromOffset(360, 460)
+	outer.Size = UDim2.fromOffset(360, 300)
 	outer.BackgroundColor3 = C.Paper
 	outer.BorderSizePixel = 0
 	outer.Visible = false
@@ -240,11 +286,17 @@ function SaveSlotUI.Start()
 	note.Parent = outer
 	cooldownLabel = note
 
-	local rows = Instance.new("Frame")
+	local rows = Instance.new("ScrollingFrame")
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
-	rows.Position = UDim2.fromOffset(12, 90)
-	rows.Size = UDim2.new(1, -24, 1, -102)
+	rows.BorderSizePixel = 0
+	rows.Position = UDim2.fromOffset(12, 88)
+	rows.Size = UDim2.new(1, -24, 1, -100)
+	rows.CanvasSize = UDim2.fromOffset(0, 0)
+	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	rows.ScrollBarThickness = 6
+	rows.ScrollingDirection = Enum.ScrollingDirection.Y
+	rows.Selectable = false
 	UITheme.list(rows, 8)
 	rows.Parent = outer
 	list = rows

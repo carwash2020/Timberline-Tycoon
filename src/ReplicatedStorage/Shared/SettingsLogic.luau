@@ -6,6 +6,14 @@
 
 local SettingsLogic = {}
 
+-- The Settings card. "visitors" is the plot permission list. B on that
+-- tab returns to "game"; B again closes the card.
+SettingsLogic.Tabs = { "game", "visitors" }
+
+function SettingsLogic.HasTab(name: string): boolean
+	return table.find(SettingsLogic.Tabs, name) ~= nil
+end
+
 export type Graphics = "auto" | "low" | "medium" | "high"
 export type UIScale = "small" | "normal" | "large"
 

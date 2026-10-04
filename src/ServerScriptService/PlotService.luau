@@ -33,6 +33,8 @@ local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
@@ -75,6 +77,7 @@ type Slot = {
 	items: Folder,
 	signLabels: { TextLabel }, -- both faces of the sign
 	claim: ProximityPrompt,
+	office: ProximityPrompt, -- Land office: buy the next yard square
 	spawn: SpawnLocation,
 	delivery: CFrame, -- where a bought truck is dropped (GetDeliveryPad)
 	owner: Player?,
@@ -178,7 +181,7 @@ end
 -- outside the north edge, off to the west, so a driveway up the middle
 -- stays clear. Rails and corner posts show even when the plot is free:
 -- a faint pad alone was easy to miss, and easy to drive through.
-local function drawBounds(slot: Slot, size: number, claimed: boolean)
+local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquares: { string }?)
 	slot.pad.Size = Vector3.new(size, 0.2, size)
 	slot.pad.Transparency = if claimed then 0 else 0.25
 	local signAt = slot.cframe * CFrame.new(-10, 0, size / 2 + 3)
@@ -190,6 +193,25 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean)
 		slot.post.Transparency = 1
 	end
 	slot.border:ClearAllChildren()
+	local squares = if claimed then ownedSquares else nil
+	if squares then
+		for _, key in ipairs(squares) do
+			local ix, iz = PlotLogic.ParseKey(key)
+			if ix and iz and not PlotLogic.SquareInsideTier(ix, iz, size) then
+				local x0, x1, z0, z1 = PlotLogic.SquareBox(ix, iz)
+				local tile = part(
+					"Square",
+					Vector3.new(GameConfig.PlotSquare - 1, 0.15, GameConfig.PlotSquare - 1),
+					slot.cframe * CFrame.new((x0 + x1) / 2, 0.2, (z0 + z1) / 2),
+					Color3.fromRGB(196, 164, 110),
+					Enum.Material.Sand,
+					slot.border
+				)
+				tile.CanCollide = false
+				tile.CanQuery = false
+			end
+		end
+	end
 	local half = size / 2
 	local rail = if claimed then Color3.fromRGB(130, 90, 50) else Color3.fromRGB(196, 168, 120)
 	local postColor = Color3.fromRGB(90, 62, 36)
@@ -275,6 +297,7 @@ local function refreshSign(slot: Slot)
 		label.Text = text
 	end
 	slot.claim.Enabled = owner == nil
+	slot.office.Enabled = owner ~= nil
 end
 
 local function buildSlot(index: number, center: Vector2, parent: Instance, onClaim: (Player, Slot) -> ()): Slot
@@ -341,6 +364,15 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	claim.HoldDuration = 0.5
 	claim.RequiresLineOfSight = false
 	claim.Parent = board
+	local office = Instance.new("ProximityPrompt")
+	office.Name = "LandOffice"
+	office.ActionText = "Land office"
+	office.ObjectText = "Your yard"
+	office.MaxActivationDistance = 12
+	office.HoldDuration = 0
+	office.Enabled = false
+	InputKit.PromptDefaults(office, "Interact")
+	office.Parent = board
 
 	-- Not Neutral: only the player whose RespawnLocation this is wakes up
 	-- here. Everyone else still uses the town spawn.
@@ -382,6 +414,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		items = items,
 		signLabels = labels,
 		claim = claim,
+		office = office,
 		spawn = plotSpawn,
 		delivery = delivery,
 		owner = nil,
@@ -481,13 +514,33 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		prompt.ObjectText = bp.displayName
 		prompt.MaxActivationDistance = 10
 		prompt.RequiresLineOfSight = false
+		InputKit.PromptDefaults(prompt, "Interact")
 		prompt.Parent = host
 		prompt.Triggered:Connect(function(who: Player)
-			local profile = ProfileService.GetProfile(who)
-			if not profile then
+			local hostOwner = slot.owner
+			if not hostOwner then
 				return
 			end
-			local _, hint = PlotDoors.Toggle(who, model, item, profile.plot.placed, slot.cframe, slot.items, os.clock())
+			local ownerProfile = ProfileService.GetProfile(hostOwner)
+			if not ownerProfile then
+				return
+			end
+			local allowed = who.UserId == hostOwner.UserId
+				or PermissionLogic.Allows(ownerProfile.permissions, who.UserId, "interact")
+			if not allowed then
+				notify(who, "The owner hasn't let you use that.")
+				return
+			end
+			local _, hint = PlotDoors.Toggle(
+				who,
+				model,
+				item,
+				ownerProfile.plot.placed,
+				slot.cframe,
+				slot.items,
+				os.clock(),
+				allowed
+			)
 			if hint then
 				notify(who, hint)
 			end
@@ -495,6 +548,12 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	end
 	CollectionService:AddTag(model, "PlacedItem")
 	model.Parent = slot.items
+end
+
+local function mirrorPlot(player: Player, profile: Profile)
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	player:SetAttribute("PlotSquares", table.concat(squares, ";"))
+	player:SetAttribute("PlotPermissions", PermissionLogic.Encode(profile.permissions))
 end
 
 local function assign(player: Player, slot: Slot, profile: Profile)
@@ -506,7 +565,9 @@ local function assign(player: Player, slot: Slot, profile: Profile)
 	player:SetAttribute("PlotSlot", slot.index)
 	player:SetAttribute("PlotTier", profile.plot.tier)
 	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
-	drawBounds(slot, tier.size, true)
+	local owned = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	drawBounds(slot, tier.size, true, owned)
+	mirrorPlot(player, profile)
 	for _, item in ipairs(profile.plot.placed) do
 		buildItem(slot, player, item)
 	end
@@ -761,18 +822,120 @@ local function onClaim(player: Player, slot: Slot)
 	tryGrant(player, slot.index, false, "It's yours! Stand on your plot and press BUILD to start building.")
 end
 
+local function actorOn(player: Player, slot: Slot, profile: Profile): boolean
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not root then
+		return false
+	end
+	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local reach = PlotLogic.Extent(tier.size, squares) / 2 + BUILD_REACH
+	local localPos = slot.cframe:PointToObjectSpace(root.Position)
+	return math.abs(localPos.X) <= reach and math.abs(localPos.Z) <= reach
+end
+
 -- The player's slot, if they stand on (or next to) their plot.
 local function nearOwnPlot(player: Player, profile: Profile): Slot?
 	local slot = slotOf[player]
-	local char = player.Character
-	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-	if not slot or not root then
+	if not slot or not actorOn(player, slot, profile) then
 		return nil
 	end
+	return slot
+end
+
+-- (slot, host profile, host owner, denied). Denied means they are standing
+-- on someone else's yard without `flag`.
+local function hostFor(player: Player, flag: string): (Slot?, Profile?, Player?, boolean)
+	local mine = slotOf[player]
+	local mineProfile = ProfileService.GetProfile(player)
+	if mine and mineProfile and actorOn(player, mine, mineProfile) then
+		return mine, mineProfile, player, false
+	end
+	local denied = false
+	for _, slot in ipairs(slots) do
+		local owner = slot.owner
+		if owner and owner ~= player then
+			local profile = ProfileService.GetProfile(owner)
+			if profile and actorOn(player, slot, profile) then
+				if PermissionLogic.Allows(profile.permissions, player.UserId, flag) then
+					return slot, profile, owner, false
+				end
+				denied = true
+			end
+		end
+	end
+	return nil, nil, nil, denied
+end
+
+local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
+	local char = visitor.Character
+	if not char then
+		return
+	end
+	local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	local humanoid = if type((char :: any).FindFirstChildOfClass) == "function"
+		then (char :: any):FindFirstChildOfClass("Humanoid")
+		else nil
+	if humanoid and humanoid.SeatPart ~= nil then
+		humanoid.Sit = false
+	end
 	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
-	local localPos = slot.cframe:PointToObjectSpace(root.Position)
-	local reach = tier.size / 2 + BUILD_REACH
-	return if math.abs(localPos.X) <= reach and math.abs(localPos.Z) <= reach then slot else nil
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local lx, lz = PlotLogic.EjectLocal(tier.size, squares)
+	local cf = slot.cframe * CFrame.new(lx, 4, lz)
+	root.CFrame = cf
+	root.Position = cf.Position
+end
+
+local lastVisitAt = -math.huge
+local VISIT_EVERY = 0.5
+-- One expand at a time per player. A second tap while the first is in
+-- flight does not spend, and a tap that still quotes the old square count
+-- does not spend either.
+local expanding: { [Player]: boolean } = {}
+
+local function onlinePlayers(): { Player }
+	local ok, service = pcall(function()
+		return game:GetService("Players")
+	end)
+	if not ok or service == nil or type(service.GetPlayers) ~= "function" then
+		return {}
+	end
+	return service:GetPlayers()
+end
+
+-- Visitors with visit off are set down just north of the yard.
+function PlotService.VisitStep(list: { Player }?)
+	local now = os.clock()
+	if list == nil then
+		if now - lastVisitAt < VISIT_EVERY then
+			return
+		end
+		lastVisitAt = now
+	end
+	local everyone: { Player } = if list ~= nil then list else onlinePlayers()
+	for _, slot in ipairs(slots) do
+		local owner = slot.owner
+		if owner then
+			local profile = ProfileService.GetProfile(owner)
+			if profile then
+				for _, visitor in ipairs(everyone) do
+					if
+						visitor ~= owner
+						and PermissionLogic.MustLeave(profile.permissions, visitor.UserId, owner.UserId)
+					then
+						if actorOn(visitor, slot, profile) then
+							nudgeOff(visitor, slot, profile)
+						end
+					end
+				end
+			end
+		end
+	end
 end
 
 local function findPlaced(profile: Profile, uid: string): (PlotLogic.Placed?, number)
@@ -802,19 +965,23 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	then
 		return
 	end
-	local profile = ProfileService.GetProfile(player)
 	local bp = PlotLogic.Blueprint(blueprintId)
-	if not profile or not bp then
+	if not bp then
 		return
 	end
-	local slot = nearOwnPlot(player, profile)
-	if not slot then
-		notify(player, "Stand on your plot to build.")
+	local slot, profile, owner, denied = hostFor(player, "build")
+	if not slot or not profile or not owner then
+		notify(player, if denied then "You can't build on this plot." else "Stand on your plot to build.")
+		return
+	end
+	local payer = if player == owner then profile else ProfileService.GetProfile(player)
+	if not payer then
 		return
 	end
 	local px, pz = PlotLogic.Snap(x :: number), PlotLogic.Snap(z :: number)
 	local py = if isNumber(y) then PlotLogic.SnapY(y :: number) else 0
-	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, nil, py)
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, nil, py, squares)
 	if not ok then
 		if why ~= "bad" then -- only a tampered client sends nonsense
 			notify(player, (why or "Can't build there") .. ".")
@@ -824,21 +991,21 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	-- A sawmill bought at the Tool Shed is already paid for: placing takes
 	-- one out of stock. Otherwise you pay here, the same as a blueprint.
 	-- Stock is spent only after the cash check, so a refused place leaves it.
-	local stock = if type(profile.sawmillStock) == "table" then profile.sawmillStock else nil
+	local stock = if type(payer.sawmillStock) == "table" then payer.sawmillStock else nil
 	local stockAt = if ItemCatalog.GetSawmill(bp.id) and stock then table.find(stock, bp.id) else nil
 	local fromStock = stockAt ~= nil
 	local unlocked = bp.unlock == true
-		and type(profile.furnitureBlueprints) == "table"
-		and profile.furnitureBlueprints[bp.id] == true
+		and type(payer.furnitureBlueprints) == "table"
+		and payer.furnitureBlueprints[bp.id] == true
 	if bp.unlock == true and not unlocked and not fromStock then
 		notify(player, string.format("Buy the %s at the General Store first.", bp.displayName))
 		return
 	end
 	local price = if fromStock or unlocked then 0 else PlotData.Price(bp)
-	if profile.cash < price then
+	if payer.cash < price then
 		notify(
 			player,
-			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), bp.displayName)
+			string.format("You need %s more for the %s.", Util.formatCash(price - payer.cash), bp.displayName)
 		)
 		return
 	end
@@ -863,7 +1030,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	end
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
-	buildItem(slot, player, item)
+	buildItem(slot, owner, item)
 	if fromStock then
 		notify(player, string.format("Placed your %s.", bp.displayName))
 	end
@@ -879,9 +1046,11 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	then
 		return
 	end
-	local profile = ProfileService.GetProfile(player)
-	local slot = if profile then nearOwnPlot(player, profile) else nil
+	local slot, profile, _owner, denied = hostFor(player, "build")
 	if not profile or not slot then
+		if denied then
+			notify(player, "You can't build on this plot.")
+		end
 		return
 	end
 	local item = findPlaced(profile, uid :: string)
@@ -895,7 +1064,9 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	end
 	local px, pz = PlotLogic.Snap(x :: number), PlotLogic.Snap(z :: number)
 	local py = if isNumber(y) then PlotLogic.SnapY(y :: number) else (item.y or 0)
-	local ok, why = PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, item.uid, py)
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local ok, why =
+		PlotLogic.Check(bp, px, pz, rot :: number, profile.plot.tier, profile.plot.placed, item.uid, py, squares)
 	if not ok then
 		if why ~= "bad" then
 			notify(player, (why or "Can't move it there") .. ".")
@@ -981,9 +1152,11 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if type(uid) ~= "string" or not RateLimiter.Allow(player, "SellPlaced") then
 		return
 	end
-	local profile = ProfileService.GetProfile(player)
-	local slot = if profile then nearOwnPlot(player, profile) else nil
-	if not profile or not slot then
+	local slot, profile, owner, denied = hostFor(player, "destroy")
+	if not profile or not slot or not owner then
+		if denied then
+			notify(player, "You can't take that apart.")
+		end
 		return
 	end
 	local item, index = findPlaced(profile, uid)
@@ -993,10 +1166,15 @@ function PlotService.Sell(player: Player, uid: unknown)
 	end
 	local refund, planks, woodId = sellPlan(item, bp)
 	if refund > 0 and profile.cash + refund > GameConfig.CashCap then
-		notify(player, "Your wallet is too full to sell that. Spend some first.")
+		notify(
+			player,
+			if owner == player
+				then "Your wallet is too full to sell that. Spend some first."
+				else "The owner's wallet is too full for that."
+		)
 		return
 	end
-	if planks > 0 and not givePlanks(player, slot, item, planks, woodId) then
+	if planks > 0 and not givePlanks(owner, slot, item, planks, woodId) then
 		notify(player, "Those planks had nowhere to go. Try again in a moment.")
 		return
 	end
@@ -1007,7 +1185,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 		model:Destroy()
 	end
 	if refund > 0 then
-		EconomyService.Refund(player, refund, "sold " .. bp.displayName, bp.id)
+		EconomyService.Refund(owner, refund, "sold " .. bp.displayName, bp.id)
 	end
 	local full = if bp.kit then (item.paid or PlotData.Price(bp)) else bp.priceCash
 	if bp.unlock then
@@ -1193,12 +1371,96 @@ function PlotService.Upgrade(player: Player)
 	profile.plot.tier += 1
 	slot.model:SetAttribute("Tier", profile.plot.tier)
 	player:SetAttribute("PlotTier", profile.plot.tier)
-	drawBounds(slot, nextTier.size, true)
+	local grown = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	drawBounds(slot, nextTier.size, true, grown)
 	refreshSign(slot)
 	notify(player, string.format("Your plot is now a %s (%d × %d)!", nextTier.name, nextTier.size, nextTier.size))
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "PlotTier", profile.plot.tier)
 	end)
+end
+
+-- Buy one yard square. The rate limit lives on the ExpandLand handler.
+-- `expected` is how many squares the button was drawn for. Check, spend,
+-- then grant, with no yield: a failed spend leaves the yard and the wallet
+-- as they were. A second call for that same count buys nothing.
+function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: unknown)
+	if expanding[player] then
+		return
+	end
+	expanding[player] = true
+	local ok, err = pcall(function(): any
+		if
+			type(x) ~= "number"
+			or type(z) ~= "number"
+			or x ~= x
+			or z ~= z
+			or x ~= math.floor(x)
+			or z ~= math.floor(z)
+		then
+			return nil
+		end
+		if type(expected) ~= "number" or expected ~= expected or expected ~= math.floor(expected) or expected < 0 then
+			return nil
+		end
+		local profile = ProfileService.GetProfile(player)
+		if not profile or not profile.plot then
+			return nil
+		end
+		if type(profile.plot.squares) ~= "table" then
+			profile.plot.squares = {}
+		end
+		if #profile.plot.squares ~= expected then
+			notify(player, "That price changed. Look again.")
+			return nil
+		end
+		local slot = nearOwnPlot(player, profile)
+		if not slot then
+			notify(player, "Stand on your plot to expand it.")
+			return nil
+		end
+		local before = profile.cash
+		local bought, why, price = PlotLogic.TryExpand(profile.plot, x, z, {
+			cash = function()
+				return profile.cash
+			end,
+			spend = function(amount: number)
+				return EconomyService.SpendCash(player, amount, "expanded the yard", "PlotSquare")
+			end,
+			refund = function(amount: number)
+				EconomyService.Refund(player, amount, "yard expansion returned", "PlotSquare")
+			end,
+		})
+		if not bought then
+			local message = PlotLogic.ExpansionMessage(why, price)
+			if message then
+				notify(player, message)
+			end
+			return nil
+		end
+		local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+		drawBounds(slot, tier.size, true, profile.plot.squares)
+		mirrorPlot(player, profile)
+		local paid = price or (before - profile.cash)
+		local nextPrice = PlotLogic.ExpansionPrice(#profile.plot.squares)
+		if nextPrice then
+			notify(
+				player,
+				string.format(
+					"That square is yours for %s. The next one is %s.",
+					Util.formatCash(paid),
+					Util.formatCash(nextPrice)
+				)
+			)
+		else
+			notify(player, string.format("That square is yours for %s.", Util.formatCash(paid)))
+		end
+		return nil
+	end)
+	expanding[player] = nil
+	if not ok then
+		error(err)
+	end
 end
 
 -- Call once the save has loaded. Opens the picker; nothing is assigned
@@ -1234,6 +1496,9 @@ end
 
 function PlotService.PlayerJoined(player: Player, profile: Profile)
 	watchSpawn(player)
+	if profile.plot then
+		mirrorPlot(player, profile)
+	end
 	if slotOf[player] or not PlotPickerLogic.ShouldPick(slotOf[player] ~= nil) then
 		return
 	end
@@ -1302,7 +1567,9 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 	slot.model:SetAttribute("Tier", profile.plot.tier)
 	player:SetAttribute("PlotTier", profile.plot.tier)
 	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
-	drawBounds(slot, tier.size, true)
+	local owned = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	drawBounds(slot, tier.size, true, owned)
+	mirrorPlot(player, profile)
 	for _, item in ipairs(profile.plot.placed) do
 		buildItem(slot, player, item)
 	end
@@ -1318,6 +1585,7 @@ function PlotService.PlayerRemoving(player: Player)
 	watching[player] = nil
 	undoStacks[player] = nil
 	forgetFill(player)
+	expanding[player] = nil
 	release(player)
 end
 
@@ -1382,6 +1650,7 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 		heartbeat:Connect(function()
 			PlotService.Sweep()
 			PlotService.FillStep()
+			PlotService.VisitStep()
 		end)
 	end
 	watchReleases()

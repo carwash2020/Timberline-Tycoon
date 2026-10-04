@@ -11,9 +11,13 @@
 -- Everything only sends intents; the server checks and answers with toasts.
 
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
@@ -39,6 +43,10 @@ local PLOT_ROW = "_plot"
 local building = false
 local buildButton: UITheme.Button? = nil
 local modeBar: Frame? = nil
+local landPanel: Frame? = nil
+local landPrice: TextLabel? = nil
+local landGrid: ScrollingFrame? = nil
+local landOpen = false
 local itemPrompts: { [Instance]: { ProximityPrompt } } = {}
 -- Client-only. SetAttribute on a server model is rejected, so a flag
 -- attribute would throw and the prompts would never appear.
@@ -356,6 +364,194 @@ function PlotUI.Refresh()
 end
 
 ---------------------------------------------------------------------------
+-- Land office. The sign prompt opens it. The price on the card is the
+-- price the server charges (PlotLogic.ExpansionPrice). Esc and B close it.
+---------------------------------------------------------------------------
+
+local LAND_ACTION = "LandOfficeClose"
+
+local function ownedSquares(): { string }
+	local raw = player:GetAttribute("PlotSquares")
+	local out: { string } = {}
+	if type(raw) ~= "string" or raw == "" then
+		return out
+	end
+	for key in string.gmatch(raw, "[^;]+") do
+		table.insert(out, key)
+	end
+	return out
+end
+
+local function rebuildLand()
+	local grid = landGrid
+	local label = landPrice
+	if not grid or not label then
+		return
+	end
+	for _, child in ipairs(grid:GetChildren()) do
+		if child:IsA("GuiObject") and child.Name ~= "Layout" then
+			child:Destroy()
+		end
+	end
+	local squares = ownedSquares()
+	local price = PlotLogic.ExpansionPrice(#squares)
+	local half = PlotLogic.GridHalf()
+	local span = half * 2 + 1
+	local forSale = 0
+	local firstBuy: GuiButton? = nil
+	for iz = half, -half, -1 do
+		for ix = -half, half do
+			local key, why = PlotLogic.ExpansionBlock(tier(), squares, ix, iz)
+			local inside = PlotLogic.SquareInsideTier(ix, iz, (PlotData.Tier(tier()) or PlotData.Tiers[1]).size)
+			local mine = PlotLogic.Owns(squares, ix, iz)
+			local text = if key then "Buy" elseif inside or mine then "Yours" else ""
+			local tap = PlotLogic.LandTap
+			local button = UITheme.Button({
+				name = PlotLogic.Key(ix, iz),
+				text = text,
+				size = Vector2.new(tap, tap),
+				style = if key then "buy" elseif mine or inside then "bark" else "skip",
+				textSize = 14,
+			})
+			button.root.LayoutOrder = (half - iz) * span + (ix + half)
+			button.root.Parent = grid
+			local buyKey = key
+			local blocked = why
+			local expected = #squares
+			button.face.Activated:Connect(function()
+				if buyKey then
+					Net.Remote("ExpandLand"):FireServer(ix, iz, expected)
+				elseif blocked == "away" then
+					HUD.Toast("Buy a square that touches your yard.")
+				elseif blocked == "yours" or blocked == "owned" then
+					HUD.Toast("That ground is already yours.")
+				end
+			end)
+			if buyKey then
+				forSale += 1
+				if firstBuy == nil then
+					firstBuy = button.face
+				end
+			end
+		end
+	end
+	if forSale == 0 or not price then
+		label.Text = "Your yard already covers every square."
+	else
+		label.Text = "Next square costs " .. Util.formatCash(price)
+	end
+	if landOpen and firstBuy and UITheme.Device() == "console" then
+		GuiService.SelectedObject = firstBuy
+	end
+end
+
+local function setLand(on: boolean)
+	local panel = landPanel
+	if not panel then
+		return
+	end
+	landOpen = on
+	panel.Visible = on
+	if on then
+		rebuildLand()
+		ContextActionService:BindActionAtPriority(
+			LAND_ACTION,
+			function(_name, state)
+				if state ~= Enum.UserInputState.Begin then
+					return Enum.ContextActionResult.Pass
+				end
+				setLand(false)
+				return Enum.ContextActionResult.Sink
+			end,
+			false,
+			Enum.ContextActionPriority.High.Value + 20,
+			InputKit.Actions.Cancel.keyboard,
+			InputKit.Actions.Cancel.gamepad
+		)
+	else
+		ContextActionService:UnbindAction(LAND_ACTION)
+		local selected = GuiService.SelectedObject
+		if selected and selected:IsDescendantOf(panel) then
+			GuiService.SelectedObject = nil
+		end
+	end
+end
+
+local function mountLand(gui: ScreenGui)
+	local panel = Instance.new("Frame")
+	panel.Name = "LandOffice"
+	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	panel.Position = UDim2.fromScale(0.5, 0.5)
+	panel.Size = UDim2.fromOffset(300, 300)
+	panel.BackgroundColor3 = C.Paper
+	panel.BorderSizePixel = 0
+	panel.Visible = false
+	panel.Active = true
+	UITheme.corner(panel, 14)
+	UITheme.stroke(panel, C.Bark, 3)
+	panel.Parent = gui
+	landPanel = panel
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Font = UITheme.Fonts.Heading
+	title.TextSize = 22
+	title.TextColor3 = C.Ink
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Size = UDim2.new(1, -64, 0, 32)
+	title.Position = UDim2.fromOffset(14, 10)
+	title.Text = "Land office"
+	title.Parent = panel
+
+	local close = UITheme.Button({
+		text = "X",
+		size = Vector2.new(PlotLogic.LandTap, PlotLogic.LandTap),
+		style = "skip",
+		textSize = 18,
+	})
+	close.root.Position = UDim2.new(1, -(PlotLogic.LandTap + 8), 0, 8)
+	close.root.Parent = panel
+	close.face.Activated:Connect(function()
+		setLand(false)
+	end)
+
+	local price = Instance.new("TextLabel")
+	price.Name = "Price"
+	price.BackgroundTransparency = 1
+	price.Font = UITheme.Fonts.Body
+	price.TextSize = 16
+	price.TextColor3 = C.Ink
+	price.TextWrapped = true
+	price.TextXAlignment = Enum.TextXAlignment.Left
+	price.TextYAlignment = Enum.TextYAlignment.Top
+	price.Size = UDim2.new(1, -28, 0, 40)
+	price.Position = UDim2.fromOffset(14, 52)
+	price.Text = ""
+	price.Parent = panel
+	landPrice = price
+
+	local grid = Instance.new("ScrollingFrame")
+	grid.Name = "Grid"
+	grid.BackgroundTransparency = 1
+	grid.BorderSizePixel = 0
+	grid.Position = UDim2.fromOffset(12, 96)
+	grid.Size = UDim2.new(1, -24, 1, -108)
+	grid.CanvasSize = UDim2.fromOffset(0, 0)
+	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	grid.ScrollBarThickness = 6
+	grid.ScrollingDirection = Enum.ScrollingDirection.Y
+	grid.Selectable = true
+	local layout = Instance.new("UIGridLayout")
+	layout.Name = "Layout"
+	layout.CellSize = UDim2.fromOffset(PlotLogic.LandTap, PlotLogic.LandTap)
+	layout.CellPadding = UDim2.fromOffset(6, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = grid
+	grid.Parent = panel
+	landGrid = grid
+end
+
+---------------------------------------------------------------------------
 -- Screen
 ---------------------------------------------------------------------------
 
@@ -374,20 +570,38 @@ function PlotUI.Start()
 
 	local bar = UITheme.Bar(gui, "BuildMode") -- where BlueprintPlacer's bar goes
 	bar.label.Text = "BUILD MODE · walk up to something to move or sell it"
-	local blueprints = UITheme.Button({ text = "BLUEPRINTS", size = Vector2.new(150, 36), style = "buy" })
+	local blueprints =
+		UITheme.Button({ text = "BLUEPRINTS", size = Vector2.new(150, PlotLogic.LandTap), style = "buy" })
 	blueprints.root.LayoutOrder = 1
 	blueprints.root.Parent = bar.row
 	blueprints.face.Activated:Connect(function()
 		ShopUI.OpenCustom(STORE)
 	end)
-	local done = UITheme.Button({ text = "DONE", size = Vector2.new(98, 36), style = "skip" })
-	done.root.LayoutOrder = 2
+	local land = UITheme.Button({
+		text = "LAND",
+		size = Vector2.new(96, PlotLogic.LandTap),
+		style = "buy",
+		textSize = 15,
+	})
+	land.root.LayoutOrder = 2
+	land.root.Parent = bar.row
+	land.face.Activated:Connect(function()
+		setLand(not landOpen)
+	end)
+	local done = UITheme.Button({ text = "DONE", size = Vector2.new(98, PlotLogic.LandTap), style = "skip" })
+	done.root.LayoutOrder = 3
 	done.root.Parent = bar.row
 	done.face.Activated:Connect(function()
 		setBuilding(false)
 	end)
 	modeBar = bar.outer
+	mountLand(gui)
 	gui.Parent = player:WaitForChild("PlayerGui")
+	ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
+		if who == player and prompt.Name == "LandOffice" then
+			setLand(not landOpen)
+		end
+	end)
 
 	CollectionService:GetInstanceAddedSignal("PlacedItem"):Connect(function(model: Instance)
 		if building then
@@ -396,10 +610,13 @@ function PlotUI.Start()
 		end
 	end)
 	CollectionService:GetInstanceRemovedSignal("PlacedItem"):Connect(removePrompts)
-	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash", "SawmillStock" }) do
+	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash", "SawmillStock", "PlotSquares" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			ShopUI.Refresh()
 			PlotUI.Refresh()
+			if landOpen then
+				rebuildLand()
+			end
 		end)
 	end
 	-- Walked off your plot? Build mode ends.

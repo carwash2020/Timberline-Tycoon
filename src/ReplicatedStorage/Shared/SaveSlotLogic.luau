@@ -1,5 +1,5 @@
 --!strict
--- SaveSlotLogic: three save slots inside the one profile (LT2-style).
+-- SaveSlotLogic: three save slots inside the one profile.
 -- The live profile fields ARE the slot you're playing. The other two sit
 -- in `slots`. Robux state stays on the profile and is never copied into a
 -- slot or replaced by a load or a reset: purchase receipts, 2x Wood, Instant
@@ -79,6 +79,7 @@ end
 
 export type Summary = {
 	index: number,
+	name: string,
 	fresh: boolean,
 	cash: number,
 	axeId: string,
@@ -86,6 +87,65 @@ export type Summary = {
 	lastPlayed: number,
 	active: boolean,
 }
+
+-- TBD (Designer): how long a save's name may be.
+SaveSlotLogic.NameLimit = 16
+
+function SaveSlotLogic.DefaultName(index: number): string
+	return "Save " .. tostring(index)
+end
+
+function SaveSlotLogic.CleanName(raw: unknown): string?
+	if type(raw) ~= "string" then
+		return nil
+	end
+	local trimmed = string.gsub(raw, "^%s+", "")
+	trimmed = string.gsub(trimmed, "%s+$", "")
+	if string.find(trimmed, "[%c]") ~= nil then
+		return nil
+	end
+	local len = utf8.len(trimmed)
+	if not len or len < 1 or len > SaveSlotLogic.NameLimit then
+		return nil
+	end
+	return trimmed
+end
+
+function SaveSlotLogic.NameOf(slot: any, index: number): string
+	local cleaned = if type(slot) == "table" then SaveSlotLogic.CleanName(slot.name) else nil
+	return cleaned or SaveSlotLogic.DefaultName(index)
+end
+
+-- The name other players may see. `filtered` is the broadcast text from
+-- TextService, or nil when that call failed. A failure never keeps what
+-- was typed: the slot falls back to its default name.
+function SaveSlotLogic.VisibleName(index: number, raw: unknown, filtered: string?): (string?, string?)
+	if type(index) ~= "number" or index ~= math.floor(index) or index < 1 or index > SaveSlotLogic.Count then
+		return nil, "bad"
+	end
+	if not SaveSlotLogic.CleanName(raw) then
+		return nil, string.format("Use 1 to %d letters.", SaveSlotLogic.NameLimit)
+	end
+	if type(filtered) ~= "string" then
+		return SaveSlotLogic.DefaultName(index), nil
+	end
+	return SaveSlotLogic.CleanName(filtered) or SaveSlotLogic.DefaultName(index), nil
+end
+
+function SaveSlotLogic.SetName(data: any, index: number, raw: unknown): (boolean, string?)
+	if type(index) ~= "number" or index ~= math.floor(index) or index < 1 or index > SaveSlotLogic.Count then
+		return false, "bad"
+	end
+	local name = SaveSlotLogic.CleanName(raw)
+	if not name then
+		return false, string.format("Use 1 to %d letters.", SaveSlotLogic.NameLimit)
+	end
+	if type(data.slots) ~= "table" or type(data.slots[index]) ~= "table" then
+		return false, "bad"
+	end
+	data.slots[index].name = name
+	return true, nil
+end
 
 local function copy(value: any): any
 	return Util.deepCopy(value)
@@ -130,6 +190,7 @@ function SaveSlotLogic.Summary(data: any): { Summary }
 		local played = if type(slot) == "table" and type(slot.lastPlayed) == "number" then slot.lastPlayed else 0
 		table.insert(out, {
 			index = i,
+			name = SaveSlotLogic.NameOf(slot, i),
 			fresh = fresh,
 			cash = math.max(0, math.floor(cash)),
 			axeId = if fresh then "" else axeId,
@@ -159,12 +220,35 @@ function SaveSlotLogic.PlayedText(lastPlayed: number, now: number): string
 	return os.date("%b %d", lastPlayed) :: string
 end
 
+-- "Saved 3 min ago". `now` and `lastPlayed` are unix time.
+function SaveSlotLogic.SavedText(lastPlayed: number, now: number): string
+	if lastPlayed <= 0 then
+		return "Not saved"
+	end
+	local age = math.max(0, now - lastPlayed)
+	if age < 60 then
+		return "Saved just now"
+	elseif age < 3600 then
+		return string.format("Saved %d min ago", math.floor(age / 60))
+	elseif age < 86400 then
+		return string.format("Saved %d hr ago", math.floor(age / 3600))
+	elseif age < 86400 * 14 then
+		return string.format("Saved %d days ago", math.floor(age / 86400))
+	end
+	return "Saved " .. (os.date("%b %d", lastPlayed) :: string)
+end
+
 local function capture(data: any, now: number): { [string]: any }
+	local prev = if type(data.slots) == "table" then data.slots[data.activeSlot] else nil
 	local snap: { [string]: any } = { lastPlayed = now, fresh = false }
 	for key, value in pairs(data) do
 		if not ACCOUNT[key] then
 			snap[key] = copy(value)
 		end
+	end
+	local name = if type(prev) == "table" then SaveSlotLogic.CleanName(prev.name) else nil
+	if name then
+		snap.name = name
 	end
 	return snap
 end

@@ -3,6 +3,7 @@
 -- server (which decides) and the client's ghost preview (which shows green
 -- or red) agree, and tests can run it.
 
+local GameConfig = require(script.Parent.GameConfig)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local SawmillLogic = require(script.Parent.SawmillLogic)
@@ -224,6 +225,236 @@ function PlotLogic.InBounds(rect: Rect, plotSize: number): boolean
 	return math.abs(rect.x) + rect.w / 2 <= half and math.abs(rect.z) + rect.d / 2 <= half
 end
 
+---------------------------------------------------------------------------
+-- Yard squares. The five tiers stay the base. Beyond that base, a 5×5
+-- grid of PlotSquare studs is bought one square at a time, outward, each
+-- one pricier than the last. The first square is FirstPlotPrice. Square
+-- k after that costs ExpansionPriceStep × k. Check, spend, then grant,
+-- with no yield in between: money never leaves without the square.
+---------------------------------------------------------------------------
+
+-- Phone land-office cells and the buy control are at least this tall.
+PlotLogic.LandTap = 48
+
+-- Studs past the north edge where a visitor with visit off is set down.
+PlotLogic.EjectGap = 8
+
+export type Purse = {
+	cash: () -> number,
+	spend: (number) -> boolean,
+	refund: (number) -> (),
+}
+
+function PlotLogic.GridHalf(): number
+	return math.floor((GameConfig.PlotGrid - 1) / 2)
+end
+
+function PlotLogic.Key(ix: number, iz: number): string
+	return string.format("%d,%d", ix, iz)
+end
+
+function PlotLogic.ParseKey(key: string): (number?, number?)
+	local xs, zs = string.match(key, "^(%-?%d+),(%-?%d+)$")
+	if not xs or not zs then
+		return nil, nil
+	end
+	return tonumber(xs), tonumber(zs)
+end
+
+function PlotLogic.InGrid(ix: number, iz: number): boolean
+	if ix ~= math.floor(ix) or iz ~= math.floor(iz) then
+		return false
+	end
+	local half = PlotLogic.GridHalf()
+	return math.abs(ix) <= half and math.abs(iz) <= half
+end
+
+-- Plot-local edges of square (ix, iz): min x, max x, min z, max z.
+function PlotLogic.SquareBox(ix: number, iz: number): (number, number, number, number)
+	local s = GameConfig.PlotSquare
+	return ix * s - s / 2, ix * s + s / 2, iz * s - s / 2, iz * s + s / 2
+end
+
+function PlotLogic.Owns(squares: { string }, ix: number, iz: number): boolean
+	return table.find(squares, PlotLogic.Key(ix, iz)) ~= nil
+end
+
+function PlotLogic.SquareInsideTier(ix: number, iz: number, tierSize: number): boolean
+	local x0, x1, z0, z1 = PlotLogic.SquareBox(ix, iz)
+	local half = tierSize / 2
+	return x0 >= -half - 1e-3 and x1 <= half + 1e-3 and z0 >= -half - 1e-3 and z1 <= half + 1e-3
+end
+
+-- How wide the yard is, counting the tier and every bought square.
+function PlotLogic.Extent(tierSize: number, squares: { string }): number
+	local half = tierSize / 2
+	for _, key in ipairs(squares) do
+		local ix, iz = PlotLogic.ParseKey(key)
+		if ix and iz then
+			local x0, x1, z0, z1 = PlotLogic.SquareBox(ix, iz)
+			half = math.max(half, math.abs(x0), math.abs(x1), math.abs(z0), math.abs(z1))
+		end
+	end
+	return half * 2
+end
+
+-- Plot-local spot just north of the yard.
+function PlotLogic.EjectLocal(tierSize: number, squares: { string }): (number, number)
+	local half = PlotLogic.Extent(tierSize, squares) / 2
+	return 0, half + PlotLogic.EjectGap
+end
+
+local NEIGHBOR = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+function PlotLogic.TouchesLand(ix: number, iz: number, tierSize: number, squares: { string }): boolean
+	for _, step in ipairs(NEIGHBOR) do
+		local jx, jz = ix + step[1], iz + step[2]
+		if PlotLogic.InGrid(jx, jz) then
+			if PlotLogic.SquareInsideTier(jx, jz, tierSize) or PlotLogic.Owns(squares, jx, jz) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Price of the next square when `bought` are already owned. Nil when the
+-- grid is full. The first is FirstPlotPrice; later ones step up by
+-- ExpansionPriceStep, so the number on the button is the number spent.
+function PlotLogic.ExpansionPrice(bought: number): number?
+	local cap = GameConfig.PlotGrid * GameConfig.PlotGrid
+	if bought < 0 or bought ~= math.floor(bought) or bought >= cap then
+		return nil
+	end
+	if bought == 0 then
+		return GameConfig.FirstPlotPrice
+	end
+	return GameConfig.ExpansionPriceStep * bought
+end
+
+-- (key, nil) when (ix, iz) can be bought, else (nil, reason).
+function PlotLogic.ExpansionBlock(tier: number, squares: { string }, ix: number, iz: number): (string?, string?)
+	if ix ~= ix or iz ~= iz or not PlotLogic.InGrid(ix, iz) then
+		return nil, "bad"
+	end
+	local tierDef = PlotData.Tier(tier)
+	if not tierDef then
+		return nil, "bad"
+	end
+	if PlotLogic.SquareInsideTier(ix, iz, tierDef.size) then
+		return nil, "yours"
+	end
+	if PlotLogic.Owns(squares, ix, iz) then
+		return nil, "owned"
+	end
+	if not PlotLogic.ExpansionPrice(#squares) then
+		return nil, "full"
+	end
+	if not PlotLogic.TouchesLand(ix, iz, tierDef.size, squares) then
+		return nil, "away"
+	end
+	return PlotLogic.Key(ix, iz), nil
+end
+
+function PlotLogic.ExpansionMessage(why: string?, _price: number?): string?
+	if why == "cash" then
+		return "You don't have enough for that square."
+	elseif why == "yours" then
+		return "That ground is already part of your yard."
+	elseif why == "owned" then
+		return "You already bought that square."
+	elseif why == "away" then
+		return "Buy a square that touches your yard."
+	elseif why == "full" then
+		return "Your yard already covers every square."
+	end
+	return nil
+end
+
+local function overlapArea(a0: number, a1: number, b0: number, b1: number): number
+	return math.min(a1, b1) - math.max(a0, b0)
+end
+
+-- True when the footprint sits on the tier, on bought squares, or both.
+function PlotLogic.OnLand(rect: Rect, tierSize: number, squares: { string }): boolean
+	local half = tierSize / 2
+	local x0, x1 = rect.x - rect.w / 2, rect.x + rect.w / 2
+	local z0, z1 = rect.z - rect.d / 2, rect.z + rect.d / 2
+	if x0 >= -half - 1e-3 and x1 <= half + 1e-3 and z0 >= -half - 1e-3 and z1 <= half + 1e-3 then
+		return true
+	end
+	local gridHalf = PlotLogic.GridHalf()
+	local edge = (gridHalf + 0.5) * GameConfig.PlotSquare
+	if x0 < -edge - 1e-3 or x1 > edge + 1e-3 or z0 < -edge - 1e-3 or z1 > edge + 1e-3 then
+		return false
+	end
+	for ix = -gridHalf, gridHalf do
+		for iz = -gridHalf, gridHalf do
+			local sx0, sx1, sz0, sz1 = PlotLogic.SquareBox(ix, iz)
+			local ox = overlapArea(x0, x1, sx0, sx1)
+			local oz = overlapArea(z0, z1, sz0, sz1)
+			if ox > 1e-3 and oz > 1e-3 then
+				local ix0, ix1 = math.max(x0, sx0), math.min(x1, sx1)
+				local iz0, iz1 = math.max(z0, sz0), math.min(z1, sz1)
+				local inTier = ix0 >= -half - 1e-3 and ix1 <= half + 1e-3 and iz0 >= -half - 1e-3 and iz1 <= half + 1e-3
+				if not inTier and not PlotLogic.Owns(squares, ix, iz) then
+					return false
+				end
+			end
+		end
+	end
+	return true
+end
+
+local function dropKey(squares: { string }, key: string)
+	local at = table.find(squares, key)
+	if at then
+		table.remove(squares, at)
+	end
+end
+
+-- Check, then spend, then grant, in this call. A spend that fails or throws
+-- after taking cash is refunded, and the square is not added.
+function PlotLogic.TryExpand(
+	plot: { tier: number, squares: { string } },
+	ix: number,
+	iz: number,
+	purse: Purse
+): (boolean, string?, number?)
+	if type(plot.squares) ~= "table" then
+		plot.squares = {}
+	end
+	local key, why = PlotLogic.ExpansionBlock(plot.tier, plot.squares, ix, iz)
+	if not key then
+		return false, why, nil
+	end
+	local price = PlotLogic.ExpansionPrice(#plot.squares)
+	if not price or price <= 0 then
+		return false, "bad", nil
+	end
+	local before = purse.cash()
+	if before < price then
+		return false, "cash", price
+	end
+	local paidOk, paid = pcall(function()
+		return purse.spend(price)
+	end)
+	if not paidOk or paid ~= true then
+		local now = purse.cash()
+		if now < before then
+			purse.refund(before - now)
+		end
+		return false, "cash", price
+	end
+	table.insert(plot.squares, key)
+	if not PlotLogic.Owns(plot.squares, ix, iz) then
+		dropKey(plot.squares, key)
+		purse.refund(price)
+		return false, "grant", price
+	end
+	return true, nil, price
+end
+
 -- Whether `bp` may go at (x, y, z, rot) on a plot of `tier` holding `placed`
 -- (ignoring the item `ignoreUid`, for moves). `y` defaults to the ground.
 -- Returns (ok, reason). Touching is allowed; overlapping is not. Pieces may
@@ -236,7 +467,8 @@ function PlotLogic.Check(
 	tier: number,
 	placed: { Placed },
 	ignoreUid: string?,
-	y: number?
+	y: number?,
+	squares: { string }?
 ): (boolean, string?)
 	local py = y or 0
 	if rot ~= math.floor(rot) or rot < 0 or rot > 3 or x ~= x or z ~= z or not PlotLogic.HeightOk(py) then
@@ -271,7 +503,10 @@ function PlotLogic.Check(
 		end
 	end
 	local rect = PlotLogic.RectOf(bp, x, z, rot)
-	if not PlotLogic.InBounds(rect, tierDef.size) then
+	local onYard = if squares
+		then PlotLogic.OnLand(rect, tierDef.size, squares)
+		else PlotLogic.InBounds(rect, tierDef.size)
+	if not onYard then
 		return false, "Outside your plot"
 	end
 	if bp.fits and not PlotLogic.InSlot(bp, x, py, z, rot, placed, ignoreUid) then

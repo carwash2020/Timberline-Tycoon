@@ -413,4 +413,102 @@ return function(t)
 		t.eq(PlotLogic.SellValue(PlotData.Blueprint("Cabin")), 1000)
 		t.eq(PlotLogic.SellValue({ priceCash = 45 }), 22)
 	end)
+
+	t.test("yard squares step up in price and stop at 25", function()
+		local GameConfig = t.shared("GameConfig")
+		t.eq(PlotLogic.ExpansionPrice(0), GameConfig.FirstPlotPrice)
+		t.eq(PlotLogic.ExpansionPrice(1), GameConfig.ExpansionPriceStep)
+		t.eq(PlotLogic.ExpansionPrice(24), GameConfig.ExpansionPriceStep * 24)
+		t.eq(PlotLogic.ExpansionPrice(25), nil)
+		local sum = 0
+		for bought = 0, 24 do
+			sum += PlotLogic.ExpansionPrice(bought)
+		end
+		local sumK = 24 * 25 / 2
+		t.eq(sum, GameConfig.FirstPlotPrice + GameConfig.ExpansionPriceStep * sumK)
+		t.eq(sum, 684100)
+		-- The campsite already covers the middle. Only a square that touches it is for sale.
+		t.eq({ PlotLogic.ExpansionBlock(1, {}, 0, 0) }, { nil, "yours" })
+		t.eq({ PlotLogic.ExpansionBlock(1, {}, 2, 2) }, { nil, "away" })
+		t.eq(PlotLogic.ExpansionBlock(1, {}, 2, 0), "2,0")
+		t.eq({ PlotLogic.ExpansionBlock(#PlotData.Tiers, {}, 2, 0) }, { nil, "yours" })
+		t.eq(PlotLogic.EjectLocal(120, {}), 0)
+		local _, north = PlotLogic.EjectLocal(120, {})
+		t.eq(north, 68)
+	end)
+
+	t.test("a footprint may sit on a bought square, and not on the square beside it", function()
+		local bench = PlotData.Blueprint("Bench")
+		local owned = { "2,0" }
+		t.eq({ PlotLogic.Check(bench, 80, 0, 0, 1, {}) }, { false, "Outside your plot" })
+		t.ok((PlotLogic.Check(bench, 80, 0, 0, 1, {}, nil, 0, owned)))
+		t.eq({ PlotLogic.Check(bench, 80, 40, 0, 1, {}, nil, 0, owned) }, { false, "Outside your plot" })
+	end)
+
+	t.test("expansion takes the cash only when the square is granted", function()
+		local function purse(start)
+			local cash = start
+			local spent = 0
+			local api = {}
+			function api.cash()
+				return cash
+			end
+			function api.spend(amount)
+				spent += 1
+				cash -= amount
+				return true
+			end
+			function api.refund(amount)
+				cash += amount
+			end
+			function api.read()
+				return cash, spent
+			end
+			return api
+		end
+
+		local GameConfig = t.shared("GameConfig")
+		local step = GameConfig.ExpansionPriceStep
+		local short = purse(50)
+		local plot = { tier = 1, squares = {} }
+		local ok, why, price = PlotLogic.TryExpand(plot, 2, 0, short)
+		t.eq(ok, false)
+		t.eq(why, "cash")
+		t.eq(price, 100)
+		t.eq({ short.read() }, { 50, 0 })
+		t.eq(plot.squares, {})
+
+		local paid = purse(100)
+		ok, why, price = PlotLogic.TryExpand(plot, 2, 0, paid)
+		t.eq(ok, true)
+		t.eq(why, nil)
+		t.eq(price, 100)
+		t.eq({ paid.read() }, { 0, 1 })
+		t.eq(plot.squares, { "2,0" })
+		-- The button price is the next deduction.
+		t.eq(PlotLogic.ExpansionPrice(#plot.squares), step)
+
+		local threw = purse(step)
+		local take = threw.spend
+		function threw.spend(amount)
+			take(amount)
+			error("spend failed after taking the cash")
+		end
+		local before = #plot.squares
+		ok = PlotLogic.TryExpand(plot, 2, 1, threw)
+		t.eq(ok, false)
+		t.eq(#plot.squares, before)
+		t.eq(threw.cash(), step)
+
+		local refused = purse(step)
+		local deduct = refused.spend
+		function refused.spend(amount)
+			deduct(amount)
+			return false
+		end
+		ok = PlotLogic.TryExpand(plot, 2, 1, refused)
+		t.eq(ok, false)
+		t.eq(#plot.squares, before)
+		t.eq(refused.cash(), step)
+	end)
 end

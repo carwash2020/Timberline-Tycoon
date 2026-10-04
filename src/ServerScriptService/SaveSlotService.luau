@@ -37,6 +37,34 @@ local hooks: Hooks = {
 local stateRemote: RemoteEvent? = nil
 local armedUntil: { [Player]: number } = {}
 
+-- Text other players can read. PublicChat is the broadcast context.
+-- A failure returns nil so the caller stores the default name instead.
+local function broadcastName(fromUserId: number, text: string): string?
+	local ok, service = pcall(function()
+		return game:GetService("TextService")
+	end)
+	if not ok or (typeof(service) ~= "Instance" and type(service) ~= "table") then
+		return nil
+	end
+	local filter = (service :: any).FilterStringAsync
+	if type(filter) ~= "function" then
+		return nil
+	end
+	local filteredOk, result = pcall(function()
+		return filter(service, text, fromUserId, Enum.TextFilterContext.PublicChat)
+	end)
+	if not filteredOk or result == nil or type(result.GetNonChatStringForBroadcastAsync) ~= "function" then
+		return nil
+	end
+	local readOk, publicText = pcall(function()
+		return result:GetNonChatStringForBroadcastAsync()
+	end)
+	if not readOk or type(publicText) ~= "string" then
+		return nil
+	end
+	return publicText
+end
+
 local function publish(player: Player)
 	local profile = ProfileService.GetProfile(player)
 	local remote = stateRemote
@@ -80,7 +108,7 @@ local function perform(player: Player, action: string, index: number): boolean
 	return true
 end
 
-local function onAction(player: Player, action: unknown, index: unknown, confirm: unknown)
+local function onAction(player: Player, action: unknown, index: unknown, extra: unknown)
 	if not RateLimiter.Allow(player, "SlotAction") then
 		return
 	end
@@ -88,7 +116,39 @@ local function onAction(player: Player, action: unknown, index: unknown, confirm
 		armedUntil[player] = os.clock() + ARM_SECONDS
 		return
 	end
-	if confirm ~= true or (action ~= "load" and action ~= "reset") then
+	if action == "rename" then
+		if type(index) ~= "number" then
+			return
+		end
+		-- Filter before the name is stored or sent. The yield is inside
+		-- the filter, so nothing is published until it comes back.
+		local cleaned = SaveSlotLogic.CleanName(extra)
+		local publicText = if cleaned then broadcastName(player.UserId, cleaned) else nil
+		local profile = ProfileService.GetProfile(player)
+		if not profile then
+			return
+		end
+		local name, why = SaveSlotLogic.VisibleName(index, extra, publicText)
+		if not name then
+			if why and why ~= "bad" then
+				notify(player, why)
+			end
+			return
+		end
+		local named, setWhy = SaveSlotLogic.SetName(profile, index, name)
+		if not named then
+			if setWhy and setWhy ~= "bad" then
+				notify(player, setWhy)
+			end
+			return
+		end
+		if cleaned and name == SaveSlotLogic.DefaultName(index) and cleaned ~= name then
+			notify(player, "That name couldn't be shown, so this slot keeps a plain name.")
+		end
+		publish(player)
+		return
+	end
+	if extra ~= true or (action ~= "load" and action ~= "reset") then
 		return
 	end
 	if action == "reset" and os.clock() > (armedUntil[player] or 0) then
