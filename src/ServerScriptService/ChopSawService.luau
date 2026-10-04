@@ -10,6 +10,7 @@
 -- hits. Cut pieces keep the wood's owner and its kind.
 
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
@@ -59,7 +60,10 @@ type Context = {
 	saws: () -> { Model },
 	split: (Piece, number, number) -> { Piece },
 	mayUse: (Player, Model) -> boolean,
-	save: (Player, string, number) -> (),
+	-- Writes the length onto the owner's profile. `profile` is how a spec
+	-- hands that profile in; the live game looks the owner up itself.
+	save: (number, string, number) -> (),
+	profile: ((number) -> any)?,
 	byUserId: (number) -> Player?,
 	near: (Player, Model) -> boolean,
 }
@@ -380,7 +384,10 @@ function ChopSawService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 	lastSet[player.UserId] = now
 	model:SetAttribute("CutU", nextCut)
 	MachineArt.SetLength(model, nextCut)
-	c.save(player, uid, nextCut)
+	local ownerId = model:GetAttribute("OwnerId")
+	if type(ownerId) == "number" then
+		c.save(ownerId, uid, nextCut)
+	end
 end
 
 local function liveMayUse(player: Player, model: Model): boolean
@@ -388,10 +395,9 @@ local function liveMayUse(player: Player, model: Model): boolean
 	if type(ownerId) ~= "number" then
 		return false
 	end
-	if player.UserId == ownerId or ownerId == 0 then
+	if player.UserId == ownerId then
 		return true
 	end
-	local Players = game:GetService("Players")
 	local owner = Players:GetPlayerByUserId(ownerId)
 	if not owner then
 		return false
@@ -404,18 +410,30 @@ local function liveMayUse(player: Player, model: Model): boolean
 	return ChopSawLogic.MayUse(player.UserId, ownerId, profile.permissions)
 end
 
-local function liveSave(player: Player, uid: string, cut: number)
-	local ProfileService = require(script.Parent.ProfileService)
-	local profile = ProfileService.GetProfile(player)
-	if not profile then
+-- The owner's placed saw stores the length. Other placed items are left alone.
+local function persist(profile: any, uid: string, cut: number)
+	if type(profile) ~= "table" then
 		return
 	end
-	for _, item in ipairs(profile.plot.placed) do
-		if item.uid == uid then
+	local plot = profile.plot
+	if type(plot) ~= "table" or type(plot.placed) ~= "table" then
+		return
+	end
+	for _, item in ipairs(plot.placed) do
+		if type(item) == "table" and item.uid == uid then
 			item.data = { x = cut, y = 0 }
-			break
+			return
 		end
 	end
+end
+
+local function liveSave(ownerId: number, uid: string, cut: number)
+	local owner = Players:GetPlayerByUserId(ownerId)
+	if not owner then
+		return
+	end
+	local ProfileService = require(script.Parent.ProfileService)
+	persist(ProfileService.GetProfile(owner), uid, cut)
 end
 
 local function liveContext(notifyFn: (Player, string) -> ()): Context
@@ -430,7 +448,6 @@ local function liveContext(notifyFn: (Player, string) -> ()): Context
 			return workspace:GetPartBoundsInBox(intake.CFrame, intake.Size, params)
 		end,
 		bodies = function(guard: BasePart): { Body }
-			local Players = game:GetService("Players")
 			local out: { Body } = {}
 			for _, player in ipairs(Players:GetPlayers()) do
 				local char = player.Character
@@ -485,6 +502,9 @@ function ChopSawService.Init(notifyFn: (Player, string) -> (), remote: RemoteEve
 		remote.OnServerEvent:Connect(function(player: Player, uid: unknown, axis: unknown, dir: unknown)
 			ChopSawService.Set(player, uid, axis, dir)
 		end)
+		Players.PlayerRemoving:Connect(function(player: Player)
+			ChopSawService.PlayerRemoving(player)
+		end)
 	end
 	if running then
 		return
@@ -502,6 +522,11 @@ function ChopSawService.Init(notifyFn: (Player, string) -> (), remote: RemoteEve
 			end
 		end
 	end)
+end
+
+function ChopSawService.PlayerRemoving(player: Player)
+	lastHit[player.UserId] = nil
+	lastSet[player.UserId] = nil
 end
 
 function ChopSawService._reset()
@@ -524,7 +549,8 @@ function ChopSawService._use(partial: {
 	saws: (() -> { Model })?,
 	split: ((Piece, number, number) -> { Piece })?,
 	mayUse: ((Player, Model) -> boolean)?,
-	save: ((Player, string, number) -> ())?,
+	save: ((number, string, number) -> ())?,
+	profile: ((number) -> any)?,
 	byUserId: ((number) -> Player?)?,
 	near: ((Player, Model) -> boolean)?,
 })
@@ -551,7 +577,13 @@ function ChopSawService._use(partial: {
 			end
 			return ChopSawLogic.MayUse(player.UserId, ownerId, nil)
 		end,
-		save = partial.save or function(_player: Player, _uid: string, _cut: number) end,
+		profile = partial.profile,
+		save = partial.save or function(ownerId: number, uid: string, cut: number)
+			local current = ctx
+			if current and current.profile then
+				persist(current.profile(ownerId), uid, cut)
+			end
+		end,
 		byUserId = partial.byUserId or function(_userId: number): Player?
 			return nil
 		end,

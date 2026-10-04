@@ -36,7 +36,8 @@ return function(t)
 			end
 		end
 		t.eq(listed, false)
-		t.eq(Config.ChopSawPrice, 12200, "the unread placeholder stays")
+		local config = fs.readFile("src/ReplicatedStorage/Shared/GameConfig.luau")
+		t.eq(string.find(config, "ChopSawPrice", 1, true), nil)
 		local econ = fs.readFile("tools/economy.luau")
 		t.eq(string.find(econ, "ChopSaw", 1, true), nil)
 		t.eq(string.find(econ, "Machines", 1, true), nil)
@@ -75,7 +76,9 @@ return function(t)
 		t.eq(Logic.MayUse(4, 4, nil), true)
 		t.eq(Logic.MayUse(9, 4, nil), false)
 		t.eq(Logic.MayUse(9, 4, { anyone = { interact = true } }), true)
-		t.eq(Logic.MayUse(9, 0, nil), true)
+		t.eq(Logic.MayUse(0, 0, nil), true, "user 0 is the owner of a 0 saw")
+		t.eq(Logic.MayUse(9, 0, nil), false, "owner 0 is not a free pass")
+		t.eq(Logic.MayUse(1, 0, nil), false)
 	end)
 
 	t.test("a 20 u pine set to 10 comes out as 10 u pieces that keep the volume and fit the Millmaster 100", function()
@@ -180,12 +183,76 @@ return function(t)
 		t.eq(find(saw, "Run", "BoolValue").Value, true)
 	end)
 
-	t.test("the phone panel stays clear of the jump button", function()
+	t.test("the card stays clear of the left column, the hotbar and the jump button", function()
+		local Vector2 = t.roblox.Vector2
 		t.eq(Logic.PanelFace(false), 48)
 		t.eq(Input.TouchOk(Logic.PanelFace(false)), true)
-		t.eq(Logic.ClearsJump(), true)
 		t.eq(Input.PlacerSafe(Logic.PanelBinds, true), true)
 		local net = fs.readFile("src/ReplicatedStorage/Shared/Net.luau")
 		t.ok(string.find(net, '"ChopSawSet", -- client -> server: (uid, "x" | "y", 1 | -1)', 1, true))
+		local plot = fs.readFile("src/ServerScriptService/PlotService.luau")
+		t.ok(string.find(plot, "ChopSawLogic.Blueprint(item.blueprintId)", 1, true))
+		t.eq(string.find(plot, "ItemCatalog.GetMachine(item.blueprintId)", 1, true), nil)
+		local logic = fs.readFile("src/ReplicatedStorage/Shared/ChopSawLogic.luau")
+		t.eq(string.find(logic, "ownerId == 0", 1, true), nil)
+
+		-- UITheme.Bottom is 12 + 58 on a phone (viewport height under 600) and
+		-- 12 + 70 otherwise. ScaleFor is the screen's UIScale. The left column
+		-- is 280 offsets wide at the 12 px margin (QuestUI). During the
+		-- tutorial it is the tracker (92) plus Murph's card (106). Its top is
+		-- max(top bar, 36) + 8, in screen pixels.
+		local function theme(w, h, handheld)
+			return t.loader({
+				services = {
+					GuiService = {
+						IsTenFootInterface = function()
+							return false
+						end,
+						TopbarInset = t.roblox.Rect.new(0, 0, 0, 0),
+						GetGuiInset = function()
+							return Vector2.zero, Vector2.zero
+						end,
+					},
+					Players = { LocalPlayer = {} },
+					TextChatService = {},
+					UserInputService = { TouchEnabled = handheld, KeyboardEnabled = not handheld },
+				},
+				globals = {
+					workspace = { CurrentCamera = { ViewportSize = Vector2.new(w, h) } },
+				},
+			}):load("StarterPlayer/StarterPlayerScripts/UITheme")
+		end
+		local TRACKER, SPEECH = 92, 106
+		local cases = {
+			{ "667 x 375", 667, 375, true },
+			{ "375 x 667", 375, 667, true },
+			{ "1920 x 1080", 1920, 1080, false },
+		}
+		for _, case in ipairs(cases) do
+			local name, w, h, handheld = case[1], case[2], case[3], case[4]
+			local UITheme = theme(w, h, handheld)
+			local screen = Vector2.new(w, h)
+			local scale = UITheme.ScaleFor(screen, handheld, false)
+			local hotbar = UITheme.Bottom()
+			local phone = handheld and h < 600
+			t.eq(hotbar, 12 + (if phone then 58 else 70), name .. ": UITheme.Bottom")
+			local jump = if handheld then Logic.JumpRect(screen) else nil
+			local card = Logic.PanelRect(screen, scale, hotbar, jump, false)
+			local columnTop = math.max(36, 58) + 8
+			local column = {
+				left = 12 * scale,
+				top = columnTop,
+				right = (12 + 280) * scale,
+				bottom = columnTop + (TRACKER + SPEECH) * scale,
+			}
+			local band = { left = 0, top = h - hotbar * scale, right = w, bottom = h }
+			local obstacles = { column, band }
+			if jump then
+				table.insert(obstacles, jump)
+			end
+			t.eq(Logic.Clears(card, obstacles), true, name)
+			t.ok(card.left >= 0 and card.top >= 0 and card.right <= w and card.bottom <= h, name .. ": on screen")
+			t.ok(card.bottom <= band.top, name .. ": above the hotbar")
+		end
 	end)
 end

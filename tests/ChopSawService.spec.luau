@@ -6,6 +6,16 @@ return function(t)
 	local Instance = t.roblox.Instance
 	local allows = 0
 	local loader = t.loader({
+		services = {
+			Players = {
+				GetPlayerByUserId = function()
+					return nil
+				end,
+				PlayerRemoving = {
+					Connect = function() end,
+				},
+			},
+		},
 		mocks = {
 			RateLimiter = {
 				Allow = function()
@@ -257,6 +267,122 @@ return function(t)
 		now = 30
 		Saw.Tick()
 		t.eq(health, 50, "a stopped saw does not hit")
+	end)
+
+	t.test("a friend stepping the length saves onto the owner's placed saw", function()
+		local saw = rig()
+		local friend = stand(saw, 99)
+		local placed = {
+			{ uid = "saw-1", blueprintId = "ChopSaw", data = { x = 8, y = 0 } },
+			{ uid = "mill", blueprintId = "SawmillRickety", data = { x = 1.4, y = 0.8 } },
+		}
+		local ownerProfile = { plot = { placed = placed } }
+		local friendProfile = { plot = { placed = { { uid = "saw-1", data = { x = 1, y = 9 } } } } }
+		Saw._use({
+			notify = function() end,
+			saws = function()
+				return { saw }
+			end,
+			mayUse = function(player, model)
+				return Logic.MayUse(player.UserId, model:GetAttribute("OwnerId"), { anyone = { interact = true } })
+			end,
+			profile = function(ownerId)
+				if ownerId == 7 then
+					return ownerProfile
+				elseif ownerId == 99 then
+					return friendProfile
+				end
+				return nil
+			end,
+		})
+		Saw.Set(friend, "saw-1", "x", 1)
+		t.eq(saw:GetAttribute("CutU"), 9)
+		t.eq(placed[1].data.x, 9)
+		t.eq(placed[1].data.y, 0)
+		t.eq(placed[2].data.x, 1.4, "the mill beside it is left alone")
+		t.eq(placed[2].data.y, 0.8)
+		t.eq(friendProfile.plot.placed[1].data.x, 1, "the friend's profile is not the save")
+	end)
+
+	t.test("a saw with OwnerId 0 refuses everyone who is not that owner", function()
+		local saw = rig()
+		saw:SetAttribute("OwnerId", 0)
+		local stranger = stand(saw, 4)
+		local owner = stand(saw, 0)
+		local saved = {}
+		Saw._use({
+			notify = function() end,
+			saws = function()
+				return { saw }
+			end,
+			save = function(ownerId, _uid, cut)
+				table.insert(saved, { ownerId, cut })
+			end,
+		})
+		Saw.Set(stranger, "saw-1", "x", 1)
+		t.eq(saw:GetAttribute("CutU"), 8)
+		t.eq(#saved, 0)
+		Saw.Set(owner, "saw-1", "x", 1)
+		t.eq(saw:GetAttribute("CutU"), 9)
+		t.eq(saved[1][1], 0)
+		t.eq(saved[1][2], 9)
+		local src = fs.readFile("src/ServerScriptService/ChopSawService.luau")
+		t.eq(string.find(src, "ownerId == 0", 1, true), nil)
+	end)
+
+	t.test("leaving clears that player's blade cooldown and length cooldown", function()
+		local saw = rig()
+		local guard = saw:FindFirstChild("BladeGuard", true)
+		local root = Instance.new("Part")
+		root.CFrame = guard.CFrame
+		local health = 20
+		local hits = 0
+		local now = 0
+		local owner = stand(saw, 7)
+		Saw._use({
+			notify = function() end,
+			now = function()
+				return now
+			end,
+			saws = function()
+				return { saw }
+			end,
+			bodies = function()
+				return {
+					{
+						userId = 3,
+						health = function()
+							return health
+						end,
+						setHealth = function(n)
+							health = n
+							hits += 1
+						end,
+						root = root,
+					},
+				}
+			end,
+		})
+		Saw.Tick()
+		t.eq(hits, 1)
+		now = 0.4
+		Saw.Tick()
+		t.eq(hits, 1, "still inside the second")
+		Saw.PlayerRemoving({ UserId = 3 })
+		Saw.Tick()
+		t.eq(hits, 2, "leaving clears the blade cooldown")
+
+		now = 10
+		Saw.Set(owner, "saw-1", "x", 1)
+		t.eq(saw:GetAttribute("CutU"), 9)
+		now = 10.4
+		Saw.Set(owner, "saw-1", "x", 1)
+		t.eq(saw:GetAttribute("CutU"), 9, "still inside the second")
+		Saw.PlayerRemoving(owner)
+		Saw.Set(owner, "saw-1", "x", 1)
+		t.eq(saw:GetAttribute("CutU"), 10, "leaving clears the length cooldown")
+		local src = fs.readFile("src/ServerScriptService/ChopSawService.luau")
+		t.ok(string.find(src, "Players.PlayerRemoving:Connect", 1, true))
 	end)
 
 	t.test("phantomwood is refused with a message and is not cut", function()

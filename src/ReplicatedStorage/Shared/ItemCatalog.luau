@@ -649,9 +649,8 @@ function ItemCatalog.SawmillList(): { SawmillDef }
 	return sawmillList
 end
 
--- Plot machines that are not sawmills. The chop saw's price replaces the
--- unread GameConfig.ChopSawPrice. tools/economy does not read this table,
--- so the saw is not on the economy ladder.
+-- Plot machines that are not sawmills. The chop saw's price lives here.
+-- tools/economy does not read this table, so the saw is not on the economy ladder.
 export type MachineDef = {
 	id: string,
 	displayName: string,

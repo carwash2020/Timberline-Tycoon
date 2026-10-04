@@ -5,7 +5,6 @@
 -- Length is timber units ("u"). The remote only steps X by one unit.
 
 local GameConfig = require(script.Parent.GameConfig)
-local InputKit = require(script.Parent.InputKit)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PermissionLogic = require(script.Parent.PermissionLogic)
 local PlotData = require(script.Parent.PlotData)
@@ -79,19 +78,20 @@ ChopSawLogic.SignH = 0.9
 ChopSawLogic.SignLift = 1.7
 ChopSawLogic.SurfacePixels = 40
 
--- Screen panel. Phone face is also the board's button. The card is anchored
--- at the top-left, clear of the jump button on a 667×375 phone.
+-- Screen panel. Phone face is also the board's button. The card is
+-- bottom-centre, AboveHotbarPx above the hotbar band (UITheme.Bottom).
 -- TBD (Builder)
 ChopSawLogic.PanelFacePx = 48
 ChopSawLogic.PanelFaceTvPx = 96
 ChopSawLogic.PanelTextPx = 20
-ChopSawLogic.PanelMarginPx = 16
-ChopSawLogic.PanelTopPx = 72
 ChopSawLogic.PanelGapPx = 8
+ChopSawLogic.AboveHotbarPx = 8
 ChopSawLogic.ReadoutPx = 96
 ChopSawLogic.HintPx = 36
--- Where the jump button sits on a 667-wide phone, in offset pixels. TBD (Builder)
-ChopSawLogic.JumpLeftPx = 560
+-- Roblox's touch jump button, in screen pixels: 70 wide, its left edge this
+-- far in from the right, its top this far up from the bottom. TBD (Builder)
+ChopSawLogic.JumpFromRightPx = 95
+ChopSawLogic.JumpFromBottomPx = 90
 ChopSawLogic.JumpSizePx = 70
 
 -- How far the "Set the length" prompt reaches. TBD (Builder)
@@ -129,9 +129,7 @@ function ChopSawLogic.PanelFace(tenFoot: boolean): number
 	return if tenFoot then ChopSawLogic.PanelFaceTvPx else ChopSawLogic.PanelFacePx
 end
 
-function ChopSawLogic.PanelOrigin(): Vector2
-	return Vector2.new(ChopSawLogic.PanelMarginPx, ChopSawLogic.PanelTopPx)
-end
+export type Rect = { left: number, top: number, right: number, bottom: number }
 
 -- Shorter, readout, longer, Cut, Close, then a hint line.
 function ChopSawLogic.PanelCardSize(tenFoot: boolean): Vector2
@@ -142,13 +140,46 @@ function ChopSawLogic.PanelCardSize(tenFoot: boolean): Vector2
 	return Vector2.new(w, h)
 end
 
--- True when the phone card stays left of the jump button and above it.
-function ChopSawLogic.ClearsJump(): boolean
-	local origin = ChopSawLogic.PanelOrigin()
-	local card = ChopSawLogic.PanelCardSize(false)
-	local right = origin.X + card.X
-	local bottom = origin.Y + card.Y
-	return right < ChopSawLogic.JumpLeftPx and bottom < InputKit.PhoneHeight - ChopSawLogic.JumpSizePx
+-- True when the boxes share any area. Edges that only touch do not overlap.
+function ChopSawLogic.Overlaps(a: Rect, b: Rect): boolean
+	return a.left < b.right and b.left < a.right and a.top < b.bottom and b.top < a.bottom
+end
+
+-- Roblox's touch jump button on a `screen`-sized viewport (HudLayout).
+function ChopSawLogic.JumpRect(screen: Vector2): Rect
+	local left = screen.X - ChopSawLogic.JumpFromRightPx
+	local top = screen.Y - ChopSawLogic.JumpFromBottomPx
+	local size = ChopSawLogic.JumpSizePx
+	return { left = left, top = top, right = left + size, bottom = top + size }
+end
+
+-- The card in screen pixels. `scale` is UITheme.ScaleFor for that viewport
+-- and `hotbar` is UITheme.Bottom (offsets; the UIScale turns them into
+-- pixels). Bottom-centre, AboveHotbarPx above the hotbar. When that box
+-- would cross `jump`, the card lifts until it sits the same gap above the
+-- jump. `jump` is nil on a computer.
+function ChopSawLogic.PanelRect(screen: Vector2, scale: number, hotbar: number, jump: Rect?, tenFoot: boolean): Rect
+	local card = ChopSawLogic.PanelCardSize(tenFoot)
+	local width = card.X * scale
+	local height = card.Y * scale
+	local bottom = screen.Y - (hotbar + ChopSawLogic.AboveHotbarPx) * scale
+	local left = (screen.X - width) / 2
+	local rect: Rect = { left = left, top = bottom - height, right = left + width, bottom = bottom }
+	if jump and ChopSawLogic.Overlaps(rect, jump) then
+		local lifted = jump.top - ChopSawLogic.AboveHotbarPx * scale
+		rect = { left = left, top = lifted - height, right = left + width, bottom = lifted }
+	end
+	return rect
+end
+
+-- True when `rect` shares no area with any box in `obstacles`.
+function ChopSawLogic.Clears(rect: Rect, obstacles: { Rect }): boolean
+	for _, box in ipairs(obstacles) do
+		if ChopSawLogic.Overlaps(rect, box) then
+			return false
+		end
+	end
+	return true
 end
 
 function ChopSawLogic.PadStep(key: Enum.KeyCode): (string?, number?)
@@ -258,13 +289,13 @@ function ChopSawLogic.IsRunning(attr: any, boolValue: boolean?): boolean
 	return true
 end
 
--- The owner always may. An unowned saw (owner 0) may. Anyone else needs
--- the plot's interact flag.
+-- The owner always may (the same user id, including 0). Anyone else needs
+-- the plot's interact flag. Owner id 0 is that user, not a free pass.
 function ChopSawLogic.MayUse(userId: number, ownerId: number, permissions: any): boolean
 	if type(userId) ~= "number" or type(ownerId) ~= "number" then
 		return false
 	end
-	if userId == ownerId or ownerId == 0 then
+	if userId == ownerId then
 		return true
 	end
 	if type(permissions) ~= "table" then

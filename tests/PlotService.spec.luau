@@ -201,8 +201,16 @@ return function(t)
 						model.PrimaryPart = root
 						return model
 					end,
+					BuildChopSaw = function()
+						local model = Instance.new("Model")
+						model.Name = "ChopSaw"
+						return model
+					end,
 					SetCut = function(model, x, y)
 						model:SetAttribute("CutShown", string.format("%.1f %.1f", x, y))
+					end,
+					SetLength = function(model, cut)
+						model:SetAttribute("LengthShown", cut)
 					end,
 				},
 				WoodService = options.wood,
@@ -477,6 +485,32 @@ return function(t)
 		t.eq(model:GetAttribute("CutY"), 0.8)
 		t.eq(model:GetAttribute("CutShown"), "1.4 0.8")
 		t.eq(profile.plot.placed[1].data, { x = 1.4, y = 0.8 })
+	end)
+
+	t.test("a saved chop saw length comes back, and the mill beside it keeps its cut", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
+		profile.plot.placed = {
+			{ uid = "saw", blueprintId = "ChopSaw", x = 0, z = 0, rot = 0, data = { x = 12, y = 0 } },
+			{ uid = "mill", blueprintId = "SawmillRickety", x = 8, z = 0, rot = 0, data = { x = 1.4, y = 0.8 } },
+		}
+		s.P.PlayerJoined(ann, profile)
+		s.P.Pass(ann)
+		local saw, mill
+		for _, item in ipairs(s.items(1)) do
+			if item.Name == "saw" then
+				saw = item
+			elseif item.Name == "mill" then
+				mill = item
+			end
+		end
+		t.eq(saw:GetAttribute("CutU"), 12)
+		t.eq(saw:GetAttribute("LengthShown"), 12)
+		t.eq(profile.plot.placed[1].data, { x = 12, y = 0 })
+		t.eq(mill:GetAttribute("CutX"), 1.4)
+		t.eq(mill:GetAttribute("CutY"), 0.8)
+		t.eq(profile.plot.placed[2].data, { x = 1.4, y = 0.8 })
 	end)
 
 	t.test("a sawmill on someone else's plot stays in stock", function()

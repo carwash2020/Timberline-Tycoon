@@ -4,11 +4,13 @@
 --
 -- The board on the saw has ± buttons (mouse and touch, and they repeat
 -- while held). A prompt opens a screen panel: the same buttons, at least
--- 44 px, anchored clear of the jump button. D-pad left and right change
--- the length, A cuts, B or Esc closes. The D-pad literals live in
--- ChopSawLogic so this file doesn't bind them beside the HUD shortcuts.
--- While the panel is open, GuiService.SelectedObject is the plus button,
--- which drops those shortcuts.
+-- 44 px, bottom-centre and AboveHotbarPx above the hotbar
+-- (screenY - UITheme.Bottom() - 8). Opening tells the HUD the card's box
+-- (HUD.SetModal) so toasts move inside it; closing clears that. D-pad left
+-- and right change the length, A cuts, B or Esc closes. The D-pad literals
+-- live in ChopSawLogic so this file doesn't bind them beside the HUD
+-- shortcuts. While the panel is open, GuiService.SelectedObject is the
+-- plus button, which drops those shortcuts. B clears SelectedObject.
 --
 -- The neon cut line is created here. The server model does not have it.
 
@@ -23,6 +25,8 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local Net = require(ReplicatedStorage.Shared.Net)
+local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local ChopSawController = {}
 
@@ -109,24 +113,45 @@ export type Panel = {
 	close: TextButton,
 }
 
+-- Bottom-centre, AboveHotbarPx above the hotbar. With a camera, the same
+-- box ChopSawLogic.PanelRect describes (it lifts clear of the jump button
+-- on a narrow phone). Offsets are before the screen's UIScale.
+local function placeCard(root: Frame, tenFoot: boolean)
+	root.AnchorPoint = Vector2.new(0.5, 1)
+	local inset = UITheme.Bottom() + ChopSawLogic.AboveHotbarPx
+	local ok, camera = pcall(function(): any
+		return (workspace :: any).CurrentCamera
+	end)
+	if ok and typeof(camera) == "Instance" then
+		local viewport = (camera :: Camera).ViewportSize
+		if viewport.X > 0 and viewport.Y > 0 then
+			local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+			local ten = GuiService:IsTenFootInterface()
+			local scale = UITheme.ScaleFor(viewport, handheld, ten)
+			if scale > 0 then
+				local jump = if handheld then ChopSawLogic.JumpRect(viewport) else nil
+				local rect = ChopSawLogic.PanelRect(viewport, scale, UITheme.Bottom(), jump, tenFoot)
+				inset = (viewport.Y - rect.bottom) / scale
+			end
+		end
+	end
+	root.Position = UDim2.new(0.5, 0, 1, -inset)
+end
+
+local function modalRect(root: Frame): { left: number, top: number, right: number, bottom: number }
+	local at, size = root.AbsolutePosition, root.AbsoluteSize
+	return { left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y }
+end
+
 function ChopSawController.BuildPanel(tenFoot: boolean): Panel
 	local face = ChopSawLogic.PanelFace(tenFoot)
-	local origin = ChopSawLogic.PanelOrigin()
 	local card = ChopSawLogic.PanelCardSize(tenFoot)
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "ChopSawCut"
-	gui.ResetOnSpawn = false
+	local gui = UITheme.Screen("ChopSawCut", 6)
 	gui.Enabled = false
-	gui.DisplayOrder = 6
-	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.IgnoreGuiInset = false
-	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
-	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 
 	local root = Instance.new("Frame")
 	root.Name = "Card"
-	root.AnchorPoint = Vector2.zero
-	root.Position = UDim2.fromOffset(origin.X, origin.Y)
+	placeCard(root, tenFoot)
 	root.Size = UDim2.fromOffset(card.X, card.Y)
 	root.BackgroundColor3 = BARK
 	root.BorderSizePixel = 0
@@ -208,6 +233,7 @@ local function closePanel()
 	if gui then
 		gui.Enabled = false
 	end
+	HUD.SetModal(nil)
 	if selected and GuiService.SelectedObject == selected then
 		GuiService.SelectedObject = nil
 	end
@@ -232,6 +258,7 @@ function ChopSawController._open(saw: Model?, panel: Panel?)
 		MachineArt.PreviewLine(saw, n)
 	end
 	panel.gui.Enabled = true
+	HUD.SetModal(modalRect(panel.root))
 	selected = panel.plus
 	GuiService.SelectedObject = panel.plus
 end
@@ -328,6 +355,16 @@ function ChopSawController.Start()
 		panel.gui.Parent = pg
 		built = panel
 		panelGui = panel.gui
+		UITheme.WatchLayout(function()
+			local open = built
+			if not open then
+				return
+			end
+			placeCard(open.root, GuiService:IsTenFootInterface())
+			if open.gui.Enabled then
+				HUD.SetModal(modalRect(open.root))
+			end
+		end)
 		bindHold(panel.minus, function()
 			local saw = openSaw
 			if saw then

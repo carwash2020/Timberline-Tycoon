@@ -191,7 +191,6 @@ local GameConfig = {
 	LimitedRestockSec = 1200,
 	LimitedPerPlayer = 1,
 	LimitedItemPrice = 750,
-	ChopSawPrice = 12200,
 	DynamitePrice = DYNAMITE_PRICE, -- canonical price; BlastingChargePrice aliases this
 	DemandBoost = 0.2,
 }

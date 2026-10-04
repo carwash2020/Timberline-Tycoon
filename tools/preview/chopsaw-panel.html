@@ -4,38 +4,76 @@
 <meta charset="utf-8" />
 <title>Chop saw panel</title>
 <style>
-  :root { --face: 48px; --gap: 8px; --read: 96px; --ink: #3c2814; --cream: #f5ebd7; --bark: #583a22; --plus: #e2b93b; }
-  @media (min-width: 1000px) {
-    :root { --face: 96px; --gap: 12px; --read: 160px; }
-  }
-  html, body { margin: 0; height: 100%; background: #7d9a62; font-family: "Trebuchet MS", sans-serif; }
+  html, body { margin: 0; height: 100%; background: #7d9a62; font-family: "Trebuchet MS", sans-serif; overflow: hidden; }
   .yard { position: absolute; inset: 0; background:
-    linear-gradient(#8eaf72, #6d8d58 40%, #c4b08c 40%, #b89a6e); }
+    linear-gradient(#8eaf72, #6d8d58 42%, #c4b08c 42%, #b89a6e); }
+  /* Left column: Field Guide, then the tutorial tracker. */
+  .column {
+    position: absolute; left: 12px; top: 66px; width: 220px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .guide, .tracker {
+    background: #f0e1c3; color: #3c2814; border-radius: 10px;
+    border: 2px solid #583a22; font-weight: 700;
+  }
+  .guide { height: 44px; display: flex; align-items: center; padding: 0 12px; }
+  .tracker { padding: 8px 10px 10px; }
+  .tracker small { display: block; color: #583a22; letter-spacing: .04em; font-size: 11px; }
+  .tracker p { margin: 4px 0 0; font-size: 14px; }
+  /* Toast, firing while the panel is open, beside the column and above the card. */
+  .toast {
+    position: absolute; left: 268px; top: 108px; width: 240px;
+    background: #f5ebd7; color: #3c2814; border-radius: 12px;
+    border: 2px solid #583a22; padding: 10px 14px; font-weight: 700;
+    box-shadow: 0 6px 16px rgba(0,0,0,.25);
+  }
   .card {
-    position: absolute; left: 16px; top: 72px;
-    background: var(--bark); color: var(--cream);
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: 78px; /* phone: UITheme.Bottom 70 + 8 */
+    background: #583a22; color: #f5ebd7;
     border-radius: 14px; padding: 8px 10px 6px;
     box-shadow: 0 8px 18px rgba(0,0,0,.28);
   }
-  .row { display: flex; gap: var(--gap); align-items: center; }
+  .row { display: flex; gap: 8px; align-items: center; }
   button, .read {
-    height: var(--face); border: 0; border-radius: 10px;
-    font-weight: 700; font-size: 20px; color: var(--ink);
+    height: 48px; border: 0; border-radius: 10px;
+    font-weight: 700; font-size: 20px; color: #3c2814;
   }
-  button { width: var(--face); background: #f0e1c3; }
-  button.plus { background: var(--plus); outline: 3px solid #fff4c4; }
-  button.wide { width: auto; padding: 0 10px; min-width: var(--face); }
-  .read { width: var(--read); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  button { width: 48px; background: #f0e1c3; }
+  button.plus { background: #e2b93b; outline: 3px solid #fff4c4; }
+  button.wide { width: auto; padding: 0 10px; min-width: 48px; }
+  .read { width: 96px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
   .hint { margin: 8px 0 0; font-size: 16px; text-align: center; }
+  .hotbar {
+    position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    display: flex; gap: 6px;
+  }
+  .slot {
+    width: 52px; height: 52px; border-radius: 8px;
+    background: rgba(20, 16, 12, .55); border: 2px solid rgba(245, 235, 215, .7);
+  }
   .jump {
-    position: absolute; right: 20px; bottom: 18px;
+    position: absolute; right: 25px; bottom: 20px;
     width: 70px; height: 70px; border-radius: 16px;
     background: #f4f4f4; color: #222; border: 0; font-weight: 700;
+  }
+  @media (min-width: 1000px) {
+    .card { bottom: 90px; } /* desktop: UITheme.Bottom 82 + 8 */
+    .toast { left: 360px; top: 96px; width: 320px; }
+    .column { width: 280px; }
   }
 </style>
 </head>
 <body>
   <div class="yard"></div>
+  <div class="column">
+    <div class="guide">Field Guide</div>
+    <div class="tracker">
+      <small>TUTORIAL</small>
+      <p>Set the chop saw, then run a log through.</p>
+    </div>
+  </div>
+  <div class="toast">The chop saw won't cut Gloamwood.</div>
   <div class="card">
     <div class="row">
       <button type="button" aria-label="shorter">−</button>
@@ -45,6 +83,9 @@
       <button class="wide" type="button">Close</button>
     </div>
     <p class="hint">D-pad changes the length. A cuts. B closes.</p>
+  </div>
+  <div class="hotbar" aria-hidden="true">
+    <div class="slot"></div><div class="slot"></div><div class="slot"></div>
   </div>
   <button class="jump" type="button">Jump</button>
 </body>

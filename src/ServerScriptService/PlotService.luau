@@ -491,7 +491,7 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		model:SetAttribute("CutY", settings.y)
 		MachineArt.SetCut(model, settings.x, settings.y)
 	end
-	if ItemCatalog.GetMachine(item.blueprintId) then
+	if ChopSawLogic.Blueprint(item.blueprintId) then
 		local saved = item.data
 		local cut = ChopSawLogic.Clamp(if saved and type(saved.x) == "number" then saved.x else ChopSawLogic.DefaultCut)
 		item.data = { x = cut, y = 0 }
