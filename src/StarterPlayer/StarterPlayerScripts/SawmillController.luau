@@ -30,6 +30,7 @@ local openMill: Model? = nil
 local panelGui: ScreenGui? = nil
 local selected: GuiObject? = nil
 local listening = false
+local columnFrame: Frame? = nil
 
 local INK = Color3.fromRGB(60, 40, 20)
 local CREAM = Color3.fromRGB(245, 235, 215)
@@ -272,23 +273,43 @@ local function placeCard(root: Frame, tenFoot: boolean)
 	pcall(function()
 		hotbar = UITheme.Bottom()
 	end)
-	-- The column is in screen pixels. This gui is already inside the inset,
-	-- so the avoid box is that column minus the same origin modalRect adds.
-	local origin = insetOrigin()
-	local column = {
-		left = margin - origin.X,
-		top = 48 - origin.Y,
-		right = margin + 280 - origin.X,
-		bottom = 48 + 180 - origin.Y,
-	}
+	-- LeftColumn and this gui are both CoreUISafeInsets, so the column's
+	-- AbsolutePosition is already in this space. {12, 48, 292, 228} is only
+	-- the stand-in before that frame exists (64 on a TV). No origin math.
+	local column = { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
+	local frame = columnFrame
+	if frame then
+		local posOk, pos = pcall(function()
+			return frame.AbsolutePosition
+		end)
+		local sizeOk, frameSize = pcall(function()
+			return frame.AbsoluteSize
+		end)
+		if
+			posOk
+			and sizeOk
+			and typeof(pos) == "Vector2"
+			and typeof(frameSize) == "Vector2"
+			and frameSize.X > 0
+			and frameSize.Y > 0
+		then
+			column = {
+				left = pos.X,
+				top = pos.Y,
+				right = pos.X + frameSize.X,
+				bottom = pos.Y + frameSize.Y,
+			}
+		end
+	end
 	local box = SawmillLogic.PlaceCard(size.X, size.Y, sw, sh, column, size.Y - hotbar)
 	root.AnchorPoint = Vector2.new(0, 0)
 	root.Position = UDim2.fromOffset(box.left, box.top)
 end
 
 local built: Panel? = nil
+local columnWatched = false
 
--- The open card, again, after the inset screen changes size.
+-- The open card, again, after its screen or the left column changes.
 local function refreshCard()
 	local panel = built
 	if not panel or not panel.gui.Enabled then
@@ -448,6 +469,16 @@ function SawmillController.Start()
 		end
 		panel.close.Activated:Connect(closePanel)
 		panel.gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshCard)
+	end
+	if not columnWatched then
+		columnWatched = true
+		-- The column grows as rows are added. An open card moves with it.
+		UITheme.WatchLeftColumn(function(column: Frame)
+			columnFrame = column
+			column:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshCard)
+			column:GetPropertyChangedSignal("AbsolutePosition"):Connect(refreshCard)
+			refreshCard()
+		end)
 	end
 	if not listening then
 		listening = true

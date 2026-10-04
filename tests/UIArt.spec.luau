@@ -36,9 +36,11 @@ return function(t)
 		return ev
 	end
 	-- Remembered so a spec can fire the safe probe's AbsoluteSize and
-	-- re-place the row the way a real layout change does.
-	local watched = {}
-	roblox.implementMethod("Frame", "GetPropertyChangedSignal", function(self, prop)
+	-- re-place the row the way a real layout change does. Shared: the
+	-- method can only be registered once, and the sawmill spec fires it too.
+	local watched = _G.__frameSignals or {}
+	_G.__frameSignals = watched
+	pcall(roblox.implementMethod, "Frame", "GetPropertyChangedSignal", function(self, prop)
 		local ev = signal()
 		watched[self] = watched[self] or {}
 		watched[self][prop] = ev

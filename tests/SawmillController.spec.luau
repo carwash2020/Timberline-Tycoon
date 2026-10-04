@@ -146,22 +146,6 @@ return function(t)
 		t.eq(shifted.bottom, 200 + inset)
 
 		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
-		-- Origin (44, 58). The column {12, 48, 292, 228} is screen space.
-		-- The card is placed in the inset gui, so adding the origin back
-		-- must still miss that column. Sitting further right than the
-		-- unshifted beside-slot would mean the notch was not subtracted.
-		local placedScale = UITheme.ScaleFor(panel.gui.AbsoluteSize, false, false)
-		local placedW, placedH = Logic.CardSize(false)
-		local screenBox = {
-			left = panel.root.Position.X.Offset + notch,
-			top = panel.root.Position.Y.Offset + inset,
-			right = panel.root.Position.X.Offset + notch + placedW * placedScale,
-			bottom = panel.root.Position.Y.Offset + inset + placedH * placedScale,
-		}
-		local realColumn = { left = 12, top = 48, right = 292, bottom = 228 }
-		t.eq(Logic.Overlaps(screenBox, realColumn), false, "screen column")
-		t.ok(screenBox.left <= realColumn.right + 8, "against the shifted column")
-
 		local function column(margin)
 			return { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
 		end
@@ -300,5 +284,164 @@ return function(t)
 			onScreenBottom <= hotbar + 1e-4,
 			"on-screen bottom " .. tostring(onScreenBottom) .. " hotbar " .. tostring(hotbar)
 		)
+	end)
+
+	t.test("the live left column is the avoid box, unshifted, and a taller column still clears", function()
+		local roblox = t.roblox
+		local Instance = roblox.Instance
+		local frameSignals = _G.__frameSignals
+		if not frameSignals then
+			frameSignals = {}
+			_G.__frameSignals = frameSignals
+			pcall(roblox.implementMethod, "Frame", "GetPropertyChangedSignal", function(self, prop)
+				local listeners = {}
+				local ev = {
+					Connect = function(_, fn)
+						table.insert(listeners, fn)
+						return { Disconnect = function() end }
+					end,
+					Fire = function()
+						for _, fn in ipairs(listeners) do
+							fn()
+						end
+					end,
+				}
+				frameSignals[self] = frameSignals[self] or {}
+				frameSignals[self][prop] = ev
+				return ev
+			end)
+		end
+		local screenSignals = _G.__screenGuiSignals
+		if not screenSignals then
+			screenSignals = {}
+			_G.__screenGuiSignals = screenSignals
+			pcall(roblox.implementMethod, "ScreenGui", "GetPropertyChangedSignal", function(self, prop)
+				local listeners = {}
+				local ev = {
+					Connect = function(_, fn)
+						table.insert(listeners, fn)
+						return { Disconnect = function() end }
+					end,
+					Fire = function()
+						for _, fn in ipairs(listeners) do
+							fn()
+						end
+					end,
+				}
+				screenSignals[self] = screenSignals[self] or {}
+				screenSignals[self][prop] = ev
+				return ev
+			end)
+		end
+		pcall(roblox.implementProperty, "TextButton", "Activated", function()
+			return {
+				Connect = function()
+					return { Disconnect = function() end }
+				end,
+			}
+		end)
+		local function signal()
+			return {
+				Connect = function()
+					return { Disconnect = function() end }
+				end,
+			}
+		end
+		local player = Instance.new("Folder")
+		local pg = Instance.new("Folder")
+		pg.Name = "PlayerGui"
+		pg.Parent = player
+		local columnLoader = t.loader({
+			services = {
+				GuiService = {
+					IsTenFootInterface = function()
+						return false
+					end,
+					TopbarInset = roblox.Rect.new(0, 0, 0, 0),
+					GetGuiInset = function()
+						return Vector2.new(0, 58)
+					end,
+				},
+				Players = { LocalPlayer = player },
+				UserInputService = {
+					TouchEnabled = false,
+					KeyboardEnabled = true,
+					InputBegan = signal(),
+				},
+				TextChatService = {
+					FindFirstChildOfClass = function()
+						return nil
+					end,
+				},
+				CollectionService = {
+					GetTagged = function()
+						return {}
+					end,
+					GetInstanceAddedSignal = function()
+						return signal()
+					end,
+				},
+			},
+			globals = {
+				workspace = {
+					CurrentCamera = { ViewportSize = Vector2.new(900, 700) },
+					GetAttribute = function(_, name)
+						return if name == "CoreLoopActive" then 2 else nil
+					end,
+				},
+				task = {
+					spawn = function(fn, ...)
+						fn(...)
+					end,
+				},
+			},
+			mocks = {
+				HUD = {
+					SetModal = function() end,
+					LeftSafe = function()
+						return 44
+					end,
+				},
+			},
+		})
+		local Logic = columnLoader:shared("SawmillLogic")
+		local passed = {}
+		local place = Logic.PlaceCard
+		Logic.PlaceCard = function(screenW, screenH, cardW, cardH, column, hotbarTop)
+			table.insert(passed, column)
+			return place(screenW, screenH, cardW, cardH, column, hotbarTop)
+		end
+		local UITheme = columnLoader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		local Controller = columnLoader:load("StarterPlayer/StarterPlayerScripts/SawmillController")
+		Controller.Start()
+		UITheme.LeftColumn(Instance.new("Frame"), 1)
+		local column = pg:FindFirstChild("LeftColumn"):FindFirstChild("Column")
+		t.ok(column, "the column frame")
+		column.AbsolutePosition = Vector2.new(12, 66)
+		column.AbsoluteSize = Vector2.new(280, 180)
+		local gui = pg:FindFirstChild("SawmillCut")
+		local root = gui:FindFirstChild("Card")
+		gui.AbsolutePosition = Vector2.zero
+		gui.AbsoluteSize = Vector2.new(900, 700)
+		root.AbsolutePosition = Vector2.new(0, 0)
+		root.AbsoluteSize = Vector2.new(10, 10)
+		Controller._open()
+		local live = { left = 12, top = 66, right = 292, bottom = 246 }
+		t.eq(passed[#passed], live, "the avoid box is the column, not the origin")
+		local scale = UITheme.ScaleFor(gui.AbsoluteSize, false, false)
+		local cardW, cardH = Logic.CardSize(false)
+		local function cardBox()
+			local left = root.Position.X.Offset
+			local top = root.Position.Y.Offset
+			return { left = left, top = top, right = left + cardW * scale, bottom = top + cardH * scale }
+		end
+		t.eq(Logic.Overlaps(cardBox(), live), false, "the card misses the column")
+		column.AbsoluteSize = Vector2.new(280, 220)
+		local ev = frameSignals[column] and frameSignals[column].AbsoluteSize
+		t.ok(ev, "the open card listens for the column growing")
+		ev:Fire()
+		local grown = { left = 12, top = 66, right = 292, bottom = 286 }
+		t.eq(passed[#passed], grown, "the grown column is the avoid box")
+		t.eq(Logic.Overlaps(cardBox(), grown), false, "the card still clears the grown column")
 	end)
 end
