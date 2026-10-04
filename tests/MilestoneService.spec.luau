@@ -83,4 +83,23 @@ return function(t)
 		v1.WoodSold(v1Player, 10, { oak = 500 })
 		t.eq(v1.CalibrationFor(v1Player), "lune run tools/economy1 --calibrate 200 oak=12", "v1 as before")
 	end)
+
+	t.test("Mark and a wood sale each fire one event", function()
+		local Milestone, player = setup(2)
+		local heard = {}
+		Milestone.Listen(function(_, kind, data)
+			table.insert(heard, { kind = kind, name = data and data.name, woodId = data and data.woodId })
+		end)
+		Milestone.Mark(player, "First sale")
+		Milestone.Mark(player, "First sale")
+		Milestone.WoodSold(player, 1, { oak = 4, pine = 0 / 0, birch = -2 })
+		Milestone.LogsSold(player, { maple = 0, emberwood = 2 })
+		Milestone.Event(player, "plank", nil)
+		t.eq(heard, {
+			{ kind = "mark", name = "First sale" },
+			{ kind = "wood", woodId = "oak" },
+			{ kind = "wood", woodId = "emberwood" },
+			{ kind = "plank" },
+		})
+	end)
 end
