@@ -196,7 +196,7 @@ ItemCatalog.Trucks = {
 		id = "Rustbucket",
 		displayName = "Rustbucket",
 		bedCapacity = 6,
-		priceCash = 0,
+		priceCash = 75,
 		topSpeed = 26,
 		turnRate = 1.4,
 		look = { color = "#964830", width = 8.06, bedLength = 13, bedWalls = true },

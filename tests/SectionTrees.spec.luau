@@ -21,6 +21,7 @@ return function(t)
 			blocked = false,
 			rayHit = nil, -- what the sight line hits (nil: nothing in the way)
 			trucks = {},
+			obstacles = {},
 			attrs = {},
 		}
 		local map = Instance.new("Folder")
@@ -43,8 +44,46 @@ return function(t)
 				s.lastRay = { origin = origin, direction = direction }
 				return s.rayHit
 			end,
-			GetPartBoundsInBox = function()
-				return if s.blocked then { "someone" } else {}
+			GetPartBoundsInBox = function(_, cf, size, params)
+				if s.blocked then
+					return { "someone" }
+				end
+				local include = if params then params.FilterDescendantsInstances else nil
+				if not include then
+					return {}
+				end
+				local function hits(part)
+					if params.RespectCanCollide and part.CanCollide == false then
+						return false
+					end
+					local rel = cf:PointToObjectSpace(part.CFrame.Position)
+					local reach = part.Size.Magnitude / 2
+					local h = size / 2
+					return math.abs(rel.X) <= h.X + reach
+						and math.abs(rel.Y) <= h.Y + reach
+						and math.abs(rel.Z) <= h.Z + reach
+				end
+				local function scan(inst)
+					if typeof(inst) ~= "Instance" then
+						return nil
+					end
+					if inst:IsA("BasePart") and hits(inst) then
+						return inst
+					end
+					for _, d in ipairs(inst:GetDescendants()) do
+						if d:IsA("BasePart") and hits(d) then
+							return d
+						end
+					end
+					return nil
+				end
+				for _, inst in ipairs(include) do
+					local hit = scan(inst)
+					if hit then
+						return { hit }
+					end
+				end
+				return {}
 			end,
 		}
 		local Players = {
@@ -70,7 +109,16 @@ return function(t)
 				inst:RemoveTag(tag)
 			end,
 			GetTagged = function(_, tag)
-				return if tag == "Truck" then s.trucks else {}
+				if tag == "Truck" then
+					return s.trucks
+				end
+				local list = {}
+				for _, model in ipairs(s.obstacles) do
+					if model.Parent ~= nil and model:HasTag(tag) then
+						table.insert(list, model)
+					end
+				end
+				return list
 			end,
 		}
 		local fakeTask = {
@@ -267,6 +315,36 @@ return function(t)
 				end
 			end
 			return out
+		end
+
+		-- A solid model tagged `tag`, sitting on `cf`, big enough to overlap a trunk.
+		function s.blocker(tag, cf, size)
+			local model = Instance.new("Model")
+			model.Name = tag
+			local part = Instance.new("Part")
+			part.Name = "Body"
+			part.Size = size or Vector3.new(16, 16, 16)
+			part.CFrame = cf
+			part.CanCollide = true
+			part.Parent = model
+			model.PrimaryPart = part
+			model:AddTag(tag)
+			model.Parent = s.map
+			if tag == "Truck" then
+				table.insert(s.trucks, model)
+			else
+				table.insert(s.obstacles, model)
+			end
+			return model
+		end
+
+		function s.clearBlocker(model)
+			local list = if model:HasTag("Truck") then s.trucks else s.obstacles
+			local i = table.find(list, model)
+			if i then
+				table.remove(list, i)
+			end
+			model:Destroy()
 		end
 
 		function s.sectionsOf(model)
@@ -717,6 +795,42 @@ return function(t)
 		t.ok(rec.alive)
 		t.ok(part.Transparency < 1 and part.CanCollide)
 	end)
+
+	t.test(
+		"a parked truck, a log or a placed plank on a cut site keeps the regrown tree a ghost until the site is clear",
+		function()
+			local function regrowBlocked(tag)
+				local s = setup()
+				local rec = s.tree("oak")
+				local p = s.player(1)
+				s.cutThrough(p, rec.sections[1])
+				t.ok(rec.felled, tag .. " felled")
+				local blocker = s.blocker(tag, CFrame.new(0, 6, 0), Vector3.new(24, 24, 24))
+				local def = s.WoodData.Get("oak")
+				s.now += def.respawnSec
+				s.Trees.GrowTick(s.now)
+				t.eq(rec.stage, 0, tag .. " sapling first")
+				s.now += def.v2.growSec / 4
+				s.Trees.GrowTick(s.now)
+				t.ok(rec.stage > 0, tag .. " grew a stage on the cut site")
+				t.ok(rec.ghost, tag .. " stays a ghost")
+				for _, part in ipairs(s.sectionsOf(rec.model)) do
+					t.eq(part.CanCollide, false, tag)
+				end
+				s.run()
+				t.ok(rec.ghost, tag .. " still blocked")
+				s.clearBlocker(blocker)
+				s.run()
+				t.ok(not rec.ghost, tag .. " solid once clear")
+				for _, part in ipairs(s.sectionsOf(rec.model)) do
+					t.eq(part.CanCollide, true, tag)
+				end
+			end
+			regrowBlocked("Truck")
+			regrowBlocked("Wood")
+			regrowBlocked("PlacedItem")
+		end
+	)
 
 	t.test("ghost: a tree that grows where someone stands doesn't collide until the spot is clear", function()
 		local s = setup()

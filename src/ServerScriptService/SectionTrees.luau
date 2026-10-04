@@ -46,8 +46,8 @@
 --     trees and stubs by day (a half-cut tree is whole again tomorrow
 --     night) and brings them back at night (WorldClock).
 --   * A tree that comes back solid (regrown, grown a stage, woken) where a
---     truck or someone stands is a ghost (no collisions) until the spot
---     is clear, checked every GhostRetry seconds.
+--     truck, loose Wood, a placed plank, or someone stands is a ghost (no
+--     collisions) until the spot is clear, checked every GhostRetry seconds.
 -- Model contract (CutController, WoodFX, WindSway, CanopyFade, ForestUI):
 -- tag Tree, in TimberlineMap/Trees, Atomic; FromSkeleton's parts and
 -- attributes (WoodId, Seed, Stage, Scale, Elder, Felled, Dormant,
@@ -324,8 +324,9 @@ local function setSolid(rec: TreeRecord, solid: boolean)
 	end
 end
 
--- True when a truck or someone's character is in the way of the tree's
--- solid parts, so making them solid now would trap or fling them.
+-- True when a truck, loose Wood, a placed plank, or someone's character
+-- is in the way of the tree's solid parts, so making them solid now would
+-- trap or fling them.
 local function blocked(rec: TreeRecord): boolean
 	local include: { Instance } = {}
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -333,8 +334,10 @@ local function blocked(rec: TreeRecord): boolean
 			table.insert(include, player.Character)
 		end
 	end
-	for _, truck in ipairs(CollectionService:GetTagged("Truck")) do
-		table.insert(include, truck)
+	for _, tag in ipairs({ "Truck", "Wood", "PlacedItem" }) do
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			table.insert(include, inst)
+		end
 	end
 	if #include == 0 then
 		return false

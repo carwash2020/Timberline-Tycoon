@@ -250,6 +250,28 @@ return function(t)
 		t.ok(near(section.Parent:GetAttribute("GrabPoint"), section.CFrame:PointToObjectSpace(HIT)))
 	end)
 
+	t.test("a grab at 18.5 studs works, one at 19.5 is refused, and a hit off the part is clamped", function()
+		local w = setup()
+		local _, section = w.piece()
+		t.eq(GameConfig.GrabRange, 16)
+		t.eq(GameConfig.RangeTolerance, 3)
+		local function stand(id, dist)
+			return w.player(id, HIT + Vector3.new(0, 0, dist))
+		end
+		local close, hrp = stand(1, 18.5)
+		t.ok(w.GrabService.Grab(close, section, HIT), "18.5 is inside GrabRange + RangeTolerance")
+		w.GrabService.Release(close, section)
+		local far = stand(2, 19.5)
+		t.eq({ w.GrabService.Grab(far, section, HIT) }, { false, "far" })
+		hrp.Position = HIT + Vector3.new(0, 0, 5)
+		local faked = HIT + Vector3.new(0, 1.5, 0)
+		t.ok(w.GrabService.Grab(close, section, faked), "within the hit margin")
+		t.ok(
+			near(section.Parent:GetAttribute("GrabPoint"), section.CFrame:PointToObjectSpace(HIT)),
+			"clamped onto the part"
+		)
+	end)
+
 	t.test("already held by someone else: refused; the holder keeps it", function()
 		local w = setup()
 		local record, section = w.piece()
