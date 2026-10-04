@@ -36,6 +36,12 @@ return function(t)
 					biome.id .. " ground material"
 				)
 			end
+			-- Ferry Island's palms and Lanternwood are WorldPlan sites. A trees
+			-- table here would change the economy supply report (G3).
+			if biome.id == "ferryisle" then
+				t.eq(biome.trees, nil, "ferry sites stay off the economy table")
+				continue
+			end
 			t.ok(biome.trees ~= nil and next(biome.trees) ~= nil, biome.id .. " has no trees")
 			for woodId, count in pairs(biome.trees) do
 				local wood = WoodData.Get(woodId)
@@ -51,6 +57,15 @@ return function(t)
 			if biome.access == "gondola" then
 				continue -- the gondola leaves from town; the ride is what's modelled
 			end
+			if biome.id == "ferryisle" then
+				local d = math.sqrt((biome.area.x - SAWMILL_X) ^ 2 + (biome.area.z - SAWMILL_Z) ^ 2)
+				t.eq(biome.haulStuds, nil, "the v1 haul list stays unchanged")
+				t.ok(
+					math.abs(d - BiomeData.FerryHaulStuds) <= BiomeData.FerryHaulStuds * 0.2,
+					string.format("ferry isle is %d studs away but hauls %d", d, BiomeData.FerryHaulStuds)
+				)
+				continue
+			end
 			local d = math.sqrt((biome.area.x - SAWMILL_X) ^ 2 + (biome.area.z - SAWMILL_Z) ^ 2)
 			t.ok(
 				math.abs(d - biome.haulStuds) <= biome.haulStuds * 0.2,
@@ -64,7 +79,11 @@ return function(t)
 		for i, a in ipairs(list) do
 			local aa = a.area
 			-- 1,500 is the world's edge; leave room for the landmarks around the rim.
-			t.ok(math.abs(aa.x) + aa.radius < 1450 and math.abs(aa.z) + aa.radius < 1450, a.id .. " off the map")
+			-- Ferry Island sits in the shallows past that margin, locked to
+			-- WorldLayout.Island by W2World.spec.
+			if a.id ~= "ferryisle" then
+				t.ok(math.abs(aa.x) + aa.radius < 1450 and math.abs(aa.z) + aa.radius < 1450, a.id .. " off the map")
+			end
 			local toTown = math.sqrt((aa.x - SAWMILL_X) ^ 2 + (aa.z - SAWMILL_Z) ^ 2)
 			t.ok(toTown > aa.radius + 60, a.id .. " covers the town")
 			for j = i + 1, #list do

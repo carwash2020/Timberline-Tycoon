@@ -21,7 +21,9 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ProfileService = require(script.Parent.ProfileService)
 local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldClock = require(script.Parent.WorldClock)
+local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 
 local BiomeService = {}
 
@@ -86,6 +88,9 @@ local function update(player: Player)
 	local pos = root.Position
 	local biome = BiomeData.At(pos.X, pos.Z, pos.Y)
 	local biomeId = if biome then biome.id else ""
+	if biomeId == "" and WorldLayout.InNorthStrip(pos.X, pos.Z) then
+		biomeId = "strip"
+	end
 	-- The named region (a meadow, the beach, the hidden reach) is finer
 	-- than the biome disc. Set it first so the arrival toast names the
 	-- place before any gear warning.
@@ -105,9 +110,13 @@ local function update(player: Player)
 	if math.abs(humanoid.WalkSpeed - speed) > 0.01 then
 		humanoid.WalkSpeed = speed
 	end
-	-- Only feet on the ground burn: riding in a truck or jumping is safe.
+	-- Only feet on the ground burn, and only in the crater column: riding
+	-- in a truck, jumping, or standing elsewhere in the biome is safe.
 	local grounded = humanoid.SeatPart == nil and humanoid.FloorMaterial ~= Enum.Material.Air
-	if rules.burning and grounded then
+	local cone = WorldLayout.VolcanoCone
+	local floorY = TerrainGen.HeightAt(cone.x, cone.z)
+	local inHeat = WorldLayout.InHeatColumn(pos.X, pos.Z) and math.abs(pos.Y - floorY) < WorldLayout.HeatHeight
+	if rules.burning and grounded and inHeat then
 		humanoid:TakeDamage(GameConfig.LavaDamagePerSecond * TICK)
 		if not burningWarned[player] then
 			burningWarned[player] = true

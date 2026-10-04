@@ -367,6 +367,16 @@ EnvironmentData.BiomeOverrides = {
 		set = { atmosphereDensity = 0.2, atmosphereOffset = 0.4, dofFar = 0.08 },
 		add = { saturation = 0.2, bloomIntensity = 0.1, brightness = 0.3, atmosphereGlare = 0.5 },
 	},
+	-- North strip: a dark blue-green, colder than the meadows. TBD (Designer)
+	strip = {
+		mul = { brightness = 0.85 }, -- TBD (Designer)
+		tint = { outdoorAmbient = scale(0.75, 0.9, 0.85) }, -- TBD (Designer)
+	},
+	-- Ferry Island: warm coastal light. TBD (Designer)
+	ferryisle = {
+		add = { saturation = 0.04 }, -- TBD (Designer)
+		tint = { outdoorAmbient = scale(1.05, 1.0, 0.9) }, -- TBD (Designer)
+	},
 } :: { [string]: Override }
 
 EnvironmentData.WeatherOverrides = {
@@ -1006,6 +1016,9 @@ function EnvironmentData.DecorBlocked(x: number, z: number): boolean
 	local cx, cz = x - cone.x, z - cone.z
 	if cx * cx + cz * cz < (cone.radius * 0.55) ^ 2 then
 		return true
+	end
+	if WorldLayout.InNorthStrip(x, z) then
+		return WorldLayout.InGorge(x, z) or WorldLayout.OnBridgeDeck(x, z)
 	end
 	if math.abs(x) > WorldLayout.WorldHalf - 20 or math.abs(z) > WorldLayout.WorldHalf - 20 then
 		return true

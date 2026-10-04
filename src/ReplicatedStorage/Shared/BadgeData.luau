@@ -6,8 +6,9 @@
 --   Creator Hub → your experience → Engagement → Badges → Create → ID
 --
 -- Lanternwood is the night-glow wood, its own id ("lanternwood"). It is
--- not lumenwood. Ferry Island, the Secret Cave, and the North Strip are not
--- built yet: those three ids stay 0, and AreasAt does not earn them.
+-- not lumenwood. Ferry Island and the Secret Cave are not built yet: those
+-- ids stay 0. The North Strip trigger is built; its id stays 0 until the
+-- dashboard has one, and AreasAt still records the visit.
 
 local RegionLogic = require(script.Parent.RegionLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
@@ -71,7 +72,10 @@ BadgeData.Ids = {
 -- Secret Cave interior FogZone past the boulders, the Ferry Island disc,
 -- and the North Strip box x -400 to 400, z 1586 to 1900 (not the booth or
 -- the bridge).
-BadgeData.NotBuilt = { "AreaFerry", "AreaCave", "AreaToll" }
+-- The North Strip trigger is built (x -400..400, z 1586..1900, not the
+-- booth or the bridge deck). Ferry Island and the Secret Cave stay dark
+-- until their own batches remove them.
+BadgeData.NotBuilt = { "AreaFerry", "AreaCave" }
 
 -- A phone tap target (InputKit.MinTouchPx). BadgeUI rows and the open
 -- button are at least this tall.
@@ -323,6 +327,9 @@ function BadgeData.AreasAt(x: number, y: number, z: number): { string }
 	local rx, rz, rr = RegionLogic.ReachCenter()
 	if inside(x, z, rx, rz, rr) then
 		add("AreaCave")
+	end
+	if WorldLayout.InTollBadge(x, z) then
+		add("AreaToll")
 	end
 	return keys
 end

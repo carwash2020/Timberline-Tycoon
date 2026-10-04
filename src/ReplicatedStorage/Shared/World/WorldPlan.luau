@@ -911,16 +911,143 @@ function WorldPlan.GroveMushrooms(): { CFrame }
 	return out
 end
 
--- Palm trees on the offshore island (looks only, until boats).
-function WorldPlan.IslandPalms(): { Vector3 }
-	local island = WorldLayout.Island
-	local out: { Vector3 } = {}
-	local rng = Kit.rng(909)
-	for _ = 1, 7 do
-		local a, r = rng:range(0, math.pi * 2), rng:range(5, island.radius * 0.55)
-		local x, z = island.x + math.cos(a) * r, island.z + math.sin(a) * r
-		table.insert(out, Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z))
+-- Ferry Island sites. Palms and Lanternwood share one zone. They are not
+-- biome.trees, so the economy supply table does not grow a row.
+type FerrySites = { palms: { TreeSpot }, lantern: { TreeSpot } }
+local cachedFerry: FerrySites? = nil
+
+local function ferrySites(): FerrySites
+	local cached = cachedFerry
+	if cached then
+		return cached
 	end
+	local island = WorldLayout.Island
+	local fx, fz = WorldLayout.FerryFacing()
+	local face = math.atan2(fx, fz)
+	local function yOf(x: number, z: number): number
+		return TerrainGen.HeightAt(x, z) - 0.3
+	end
+	local zone: TreeZone = {
+		id = "ferryisle",
+		cx = island.x,
+		cz = island.z,
+		radius = island.radius - WorldLayout.FerryLandingInset,
+		cap = BiomeData.PalmCount + BiomeData.LanternwoodCount,
+	}
+	local lantern: { TreeSpot } = {}
+	local count = BiomeData.LanternwoodCount
+	local mid = (count + 1) / 2
+	local radius = WorldLayout.LanternwoodRadius
+	local gap = WorldLayout.TreeSpacing
+	for i = 1, count do
+		local angle = face + (i - mid) * WorldLayout.LanternwoodAngleStep
+		local x = island.x + math.sin(angle) * radius
+		local z = island.z + math.cos(angle) * radius
+		table.insert(lantern, {
+			woodId = "lanternwood",
+			position = Vector3.new(x, yOf(x, z), z),
+			biome = "ferryisle",
+			zone = zone,
+		})
+	end
+	local palms: { TreeSpot } = {}
+	local step = WorldLayout.PalmGridStep
+	local limit = WorldLayout.PalmMaxRadius
+	local n = math.floor(limit / step)
+	local candidates: { { x: number, z: number } } = {}
+	for ix = -n, n do
+		for iz = -n, n do
+			local x = island.x + ix * step
+			local z = island.z + iz * step
+			local dx, dz = x - island.x, z - island.z
+			if dx * dx + dz * dz <= limit * limit and not WorldLayout.OnFerryPath(x, z) then
+				local clear = true
+				for _, tree in ipairs(lantern) do
+					local qx, qz = x - tree.position.X, z - tree.position.Z
+					if qx * qx + qz * qz < gap * gap then
+						clear = false
+						break
+					end
+				end
+				if clear then
+					table.insert(candidates, { x = x, z = z })
+				end
+			end
+		end
+	end
+	table.sort(candidates, function(a, b)
+		if a.z ~= b.z then
+			return a.z < b.z
+		end
+		return a.x < b.x
+	end)
+	for _, spot in ipairs(candidates) do
+		if #palms >= BiomeData.PalmCount then
+			break
+		end
+		table.insert(palms, {
+			woodId = "palmwood",
+			position = Vector3.new(spot.x, yOf(spot.x, spot.z), spot.z),
+			biome = "ferryisle",
+			zone = zone,
+		})
+	end
+	local made = { palms = palms, lantern = lantern }
+	cachedFerry = made
+	return made
+end
+
+function WorldPlan.FerryPalms(): { TreeSpot }
+	return ferrySites().palms
+end
+
+function WorldPlan.Lanternwood(): { TreeSpot }
+	return ferrySites().lantern
+end
+
+-- The old palm list, now the thirty ferry palms (the preview still calls this).
+function WorldPlan.IslandPalms(): { Vector3 }
+	local out: { Vector3 } = {}
+	for _, spot in ipairs(WorldPlan.FerryPalms()) do
+		table.insert(out, spot.position)
+	end
+	return out
+end
+
+-- Maple and birch on the north strip, in their own regrow zone. Not spruce:
+-- that row is not in WoodData yet, and these stands are not biome.trees.
+local cachedStrip: { TreeSpot }? = nil
+
+function WorldPlan.StripTrees(): { TreeSpot }
+	local cached = cachedStrip
+	if cached then
+		return cached
+	end
+	local zone: TreeZone = {
+		id = "northstrip",
+		cx = WorldLayout.StripZoneCx,
+		cz = WorldLayout.StripZoneCz,
+		radius = WorldLayout.StripZoneRadius,
+		cap = WorldLayout.StripZoneCap,
+	}
+	local out: { TreeSpot } = {}
+	local per = WorldLayout.StripTreesPerClump
+	local ring = WorldLayout.StripClumpRadius
+	for _, clump in ipairs(WorldLayout.StripClumps) do
+		for i = 1, per do
+			local angle = (i - 1) * math.pi * 2 / per
+			local x = clump.x + math.cos(angle) * ring
+			local z = clump.z + math.sin(angle) * ring
+			local woodId = if #out < WorldLayout.StripMapleCount then "maple" else "birch"
+			table.insert(out, {
+				woodId = woodId,
+				position = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z),
+				biome = "northstrip",
+				zone = zone,
+			})
+		end
+	end
+	cachedStrip = out
 	return out
 end
 

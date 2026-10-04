@@ -17,8 +17,10 @@
 
 local Kit = require(script.Parent.Kit)
 local PropArt = require(script.Parent.PropArt)
+local TerrainGen = require(script.Parent.Parent.World.TerrainGen)
 local TownMeshes = require(script.Parent.TownMeshes)
 local TownModels = require(script.Parent.TownModels)
+local WorldLayout = require(script.Parent.Parent.World.WorldLayout)
 
 local LandmarkArt = {}
 
@@ -478,6 +480,362 @@ function LandmarkArt.Lighthouse(): Model
 	end
 	TownMeshes.Dress(model, "Lighthouse")
 	return model
+end
+
+---------------------------------------------------------------------------
+-- W2: toll, gorge, ferry, cave, deep water, heat
+---------------------------------------------------------------------------
+
+local TOLL_TIMBER = hex("#6B4423") -- TBD (Builder)
+local TOLL_PLANK = hex("#A4693E") -- TBD (Builder)
+local TOLL_IRON = hex("#2A2726") -- TBD (Builder)
+local TOLL_BOOTH = hex("#7A4C2B") -- TBD (Builder)
+local DOCK_PLANK = hex("#8C6239") -- TBD (Builder)
+local CAVE_ROCK = hex("#2A2628") -- TBD (Builder)
+local CAVE_DARK = hex("#141216") -- TBD (Builder)
+local LANTERN = hex("#FFC45C") -- TBD (Builder)
+local DEEP = hex("#071018") -- TBD (Builder)
+local HEAT = hex("#FF6A1A") -- TBD (Builder)
+local BOULDER = hex("#6B6560") -- TBD (Builder)
+local PATH = hex("#C4A36A") -- TBD (Builder)
+
+local ARM_THICK = 0.6 -- TBD (Builder)
+local ARM_HIGH = 2.2 -- TBD (Builder) above the deck top
+local RAIL_THICK = 1 -- TBD (Builder)
+local POST = 1.2 -- TBD (Builder)
+local DOCK_W = 16 -- TBD (Builder)
+local DOCK_L = 10 -- TBD (Builder)
+local DOCK_T = 1 -- TBD (Builder)
+local CAVE_W = 36 -- TBD (Builder) every fog axis stays under FogAtomicMax
+local CAVE_H = 14 -- TBD (Builder)
+local CAVE_D = 28 -- TBD (Builder)
+local FOG_W = 24 -- TBD (Builder)
+local FOG_H = 10 -- TBD (Builder)
+local FOG_D = 18 -- TBD (Builder)
+local WATER_T = 6 -- TBD (Builder)
+local HEAT_D = 30 -- TBD (Builder)
+local BOULDER_S = 8 -- TBD (Builder)
+local PATH_W = 6 -- TBD (Builder)
+local PATH_T = 0.4 -- TBD (Builder)
+local LIP_THICK = 4 -- TBD (Builder)
+local WATER_INSET = 12 -- TBD (Builder) deep-water bands sit inside the rim
+local PATH_PLANKS = 4 -- TBD (Builder)
+local BOOTH_W = 10 -- TBD (Builder)
+local BOOTH_D = 8 -- TBD (Builder)
+local BOOTH_H = 7 -- TBD (Builder)
+local WALL_T = 1 -- TBD (Builder)
+local FLOOR_T = 1 -- TBD (Builder)
+local ROOF_T = 1 -- TBD (Builder)
+local ROOF_OVER = 2 -- TBD (Builder)
+local COUNTER_W = 6 -- TBD (Builder)
+local COUNTER_H = 3 -- TBD (Builder)
+local COUNTER_Z = -2 -- TBD (Builder)
+
+local function solid(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material): Part
+	return box(model, name, size, cf, color, mat, true)
+end
+
+local function ghost(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material): Part
+	local part = box(model, name, size, cf, color, mat, false)
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	return part
+end
+
+-- Deck along Z, rails, and a barrier arm across the full width. The arm
+-- does not push. Ground (y = 0) is the bank.
+function LandmarkArt.TollBridge(): Model
+	local model = Kit.model("TollBridge")
+	local thick = WorldLayout.BridgeDeckThick
+	local width = WorldLayout.BridgeWidth
+	local length = WorldLayout.BridgeLength
+	local railH = WorldLayout.BridgeRailHeight
+	solid(model, "Deck", V3(width, thick, length), CF(0, thick / 2, 0), TOLL_PLANK, MAT.WoodPlanks)
+	local railY = thick + railH / 2
+	local railX = width / 2 - RAIL_THICK / 2
+	solid(model, "Rail", V3(RAIL_THICK, railH, length), CF(railX, railY, 0), TOLL_TIMBER, MAT.Wood)
+	solid(model, "Rail", V3(RAIL_THICK, railH, length), CF(-railX, railY, 0), TOLL_TIMBER, MAT.Wood)
+	local armZ = WorldLayout.TollLineZ - WorldLayout.BridgeCenterZ
+	local arm =
+		ghost(model, "BarrierArm", V3(width, ARM_THICK, ARM_THICK), CF(0, thick + ARM_HIGH, armZ), TOLL_IRON, MAT.Metal)
+	arm:SetAttribute("TollGate", true)
+	-- Two piers, so the deck reads as a bridge over the cut.
+	for _, z in ipairs({ -length / 4, length / 4 }) do
+		solid(
+			model,
+			"Pier",
+			V3(POST, WorldLayout.GorgeDepth, POST),
+			CF(0, -WorldLayout.GorgeDepth / 2, z),
+			STONE[1],
+			MAT.Slate
+		)
+	end
+	local deck = model:FindFirstChild("Deck") :: BasePart?
+	if deck then
+		model.PrimaryPart = deck
+	end
+	return model
+end
+
+-- A hut. Its origin is the bank under the floor, front facing -Z.
+function LandmarkArt.TollBooth(): Model
+	local model = Kit.model("TollBooth")
+	solid(model, "Floor", V3(BOOTH_W, FLOOR_T, BOOTH_D), CF(0, FLOOR_T / 2, 0), TOLL_PLANK, MAT.WoodPlanks)
+	local wallY = FLOOR_T + BOOTH_H / 2
+	solid(model, "Wall", V3(BOOTH_W, BOOTH_H, WALL_T), CF(0, wallY, BOOTH_D / 2 - WALL_T / 2), TOLL_BOOTH, MAT.Wood)
+	solid(model, "Wall", V3(WALL_T, BOOTH_H, BOOTH_D), CF(-(BOOTH_W / 2 - WALL_T / 2), wallY, 0), TOLL_BOOTH, MAT.Wood)
+	solid(model, "Wall", V3(WALL_T, BOOTH_H, BOOTH_D), CF(BOOTH_W / 2 - WALL_T / 2, wallY, 0), TOLL_BOOTH, MAT.Wood)
+	solid(
+		model,
+		"Roof",
+		V3(BOOTH_W + ROOF_OVER, ROOF_T, BOOTH_D + ROOF_OVER),
+		CF(0, FLOOR_T + BOOTH_H + ROOF_T / 2, 0),
+		ROOF[1],
+		MAT.Wood
+	)
+	solid(
+		model,
+		"Counter",
+		V3(COUNTER_W, COUNTER_H, WALL_T),
+		CF(0, FLOOR_T + COUNTER_H / 2, COUNTER_Z),
+		TOLL_TIMBER,
+		MAT.Wood
+	)
+	local floor = model:FindFirstChild("Floor") :: BasePart?
+	if floor then
+		model.PrimaryPart = floor
+	end
+	return model
+end
+
+function LandmarkArt.FerryDock(): Model
+	local model = Kit.model("FerryDock")
+	solid(model, "Deck", V3(DOCK_W, DOCK_T, DOCK_L), CF(0, DOCK_T / 2, 0), DOCK_PLANK, MAT.WoodPlanks)
+	local postH = 4 -- TBD (Builder)
+	for _, side in ipairs({ -1, 1 }) do
+		for _, along in ipairs({ -1, 1 }) do
+			solid(
+				model,
+				"Post",
+				V3(POST, postH, POST),
+				CF(side * (DOCK_W / 2 - 1), -postH / 2, along * (DOCK_L / 2 - 1)),
+				TOLL_TIMBER,
+				MAT.Wood
+			)
+		end
+	end
+	local deck = model:FindFirstChild("Deck") :: BasePart?
+	if deck then
+		model.PrimaryPart = deck
+	end
+	return model
+end
+
+-- One part. MapBuilder tags it Breakable.
+function LandmarkArt.CrackedBoulder(): Model
+	local model = Kit.model("BreakableBoulder")
+	local rock =
+		solid(model, "Boulder", V3(BOULDER_S, BOULDER_S, BOULDER_S), CF(0, BOULDER_S / 2, 0), BOULDER, MAT.Slate)
+	model.PrimaryPart = rock
+	return model
+end
+
+-- Dark room. The fog part's longest axis stays under FogAtomicMax so the
+-- cave model can stay Atomic.
+function LandmarkArt.SecretCave(): Model
+	local model = Kit.model("SecretCave")
+	solid(model, "Floor", V3(CAVE_W, 2, CAVE_D), CF(0, 1, 0), CAVE_ROCK, MAT.Slate)
+	solid(model, "Ceiling", V3(CAVE_W, 2, CAVE_D), CF(0, CAVE_H, 0), CAVE_DARK, MAT.Slate)
+	solid(model, "Wall", V3(2, CAVE_H, CAVE_D), CF(-CAVE_W / 2, CAVE_H / 2, 0), CAVE_ROCK, MAT.Slate)
+	solid(model, "Wall", V3(2, CAVE_H, CAVE_D), CF(CAVE_W / 2, CAVE_H / 2, 0), CAVE_ROCK, MAT.Slate)
+	solid(model, "Wall", V3(CAVE_W, CAVE_H, 2), CF(0, CAVE_H / 2, CAVE_D / 2), CAVE_ROCK, MAT.Slate)
+	local fog = solid(model, "Fog", V3(FOG_W, FOG_H, FOG_D), CF(0, FOG_H / 2 + 2, 0), CAVE_DARK, MAT.SmoothPlastic)
+	fog.CanCollide = false
+	fog.CanTouch = false
+	fog.Transparency = 1
+	fog:SetAttribute("FogPreset", "cave")
+	fog:SetAttribute("FogZone", true)
+	local floor = model:FindFirstChild("Floor") :: BasePart?
+	if floor then
+		model.PrimaryPart = floor
+	end
+	local lamp = ghost(model, "Lantern", V3(1.2, 1.6, 1.2), CF(0, 8, -4), LANTERN, MAT.Neon)
+	local light = Instance.new("PointLight")
+	light.Color = LANTERN
+	light.Range = 14 -- TBD (Builder)
+	light.Brightness = 0.8 -- TBD (Builder)
+	light.Shadows = false
+	light.Parent = lamp
+	return model
+end
+
+-- Lips along the gorge with a gap the width of the deck, plus end walls
+-- so the cut has no walkable end. Parts are already in world space.
+function LandmarkArt.GorgeWalls(shelfY: number): Model
+	local model = Kit.model("GorgeWalls")
+	local strip = WorldLayout.NorthStrip
+	local gap = WorldLayout.BridgeWidth
+	local span = (strip.x1 - strip.x0 - gap) / 2
+	local height = WorldLayout.GorgeWallHeight
+	local function lip(x: number, z: number)
+		solid(model, "Lip", V3(span, height, LIP_THICK), CF(x, shelfY + height / 2, z), STONE[2], MAT.Rock)
+	end
+	local z0 = WorldLayout.TollLineZ
+	local z1 = z0 + WorldLayout.GorgeWidth
+	local left = (strip.x0 + (WorldLayout.BridgeCenterX - gap / 2)) / 2
+	local right = ((WorldLayout.BridgeCenterX + gap / 2) + strip.x1) / 2
+	lip(left, z0)
+	lip(right, z0)
+	lip(left, z1)
+	lip(right, z1)
+	local endZ = (z0 + z1) / 2
+	local endH = WorldLayout.GorgeDepth + height
+	local endY = shelfY + (height - WorldLayout.GorgeDepth) / 2
+	solid(model, "End", V3(LIP_THICK, endH, WorldLayout.GorgeWidth), CF(strip.x0, endY, endZ), STONE[1], MAT.Rock)
+	solid(model, "End", V3(LIP_THICK, endH, WorldLayout.GorgeWidth), CF(strip.x1, endY, endZ), STONE[1], MAT.Rock)
+	return model
+end
+
+function LandmarkArt.DeepWater(): Model
+	local model = Kit.model("DeepWater")
+	local y = WorldLayout.SeaLevel - WATER_T / 2
+	local edge = WorldLayout.WorldHalf - WATER_INSET
+	local function band(name: string, size: Vector3, cf: CFrame)
+		local part = ghost(model, name, size, cf, DEEP, MAT.SmoothPlastic)
+		part.Transparency = 0.45
+		part.Color = DEEP
+	end
+	band("East", V3(24, WATER_T, 600), CF(edge, y, 200))
+	band("EastIsle", V3(16, WATER_T, 80), CF(edge, y, WorldLayout.Island.z))
+	band("South", V3(600, WATER_T, 24), CF(0, y, -edge))
+	return model
+end
+
+function LandmarkArt.HeatColumn(): Model
+	local model = Kit.model("HeatColumn")
+	local part = ghost(
+		model,
+		"Heat",
+		V3(HEAT_D, WorldLayout.HeatHeight, HEAT_D),
+		CF(0, WorldLayout.HeatHeight / 2, 0),
+		HEAT,
+		MAT.Neon
+	)
+	part.Transparency = 0.65
+	model.PrimaryPart = part
+	return model
+end
+
+function LandmarkArt.FerryPath(): Model
+	local model = Kit.model("FerryPath")
+	local length = WorldLayout.FerryPathLength
+	local step = length / PATH_PLANKS
+	local anchor = ghost(model, "Anchor", V3(PATH_T, PATH_T, PATH_T), CF(0, 0, 0), PATH, MAT.Sand)
+	model.PrimaryPart = anchor
+	for i = 1, PATH_PLANKS do
+		local fill = 0.8 -- TBD (Builder)
+		ghost(model, "Plank", V3(PATH_W, PATH_T, step * fill), CF(0, PATH_T / 2, -step * (i - 0.5)), PATH, MAT.Sand)
+	end
+	return model
+end
+
+local function tag(part: Instance, name: string)
+	local ok, service = pcall(function()
+		return game:GetService("CollectionService")
+	end)
+	if ok and service then
+		service:AddTag(part, name)
+	end
+	part:SetAttribute(name, true)
+end
+
+local function stream(model: Model, mode: Enum.ModelStreamingMode): Model
+	model.ModelStreamingMode = mode
+	return model
+end
+
+-- Every W2 model, parented and standing on the terrain. MapBuilder and the
+-- part-budget spec both call this.
+function LandmarkArt.BuildW2(parent: Instance)
+	local shelf = TerrainGen.HeightAt(WorldLayout.BridgeCenterX, WorldLayout.ShelfProbeZ + 2)
+	local bank = CFrame.new(WorldLayout.BridgeCenterX, shelf, WorldLayout.BridgeCenterZ)
+	local strip = stream(Kit.model("NorthStrip", parent), Enum.ModelStreamingMode.Default)
+	local walls = LandmarkArt.GorgeWalls(shelf)
+	walls.Parent = strip
+	local bridge = stream(LandmarkArt.TollBridge(), Enum.ModelStreamingMode.Default)
+	Kit.placeAt(bridge, bank)
+	bridge.Parent = strip
+	local arm = bridge:FindFirstChild("BarrierArm")
+	if arm then
+		tag(arm, "TollGate")
+	end
+
+	local booth = stream(LandmarkArt.TollBooth(), Enum.ModelStreamingMode.Atomic)
+	local boothY = TerrainGen.HeightAt(WorldLayout.BoothX, WorldLayout.BoothZ)
+	Kit.placeAt(booth, CFrame.new(WorldLayout.BoothX, boothY, WorldLayout.BoothZ))
+	booth.Parent = parent
+
+	local function dockAt(x: number, z: number): Model
+		local dock = stream(LandmarkArt.FerryDock(), Enum.ModelStreamingMode.Atomic)
+		local y = TerrainGen.HeightAt(x, z)
+		Kit.placeAt(dock, CFrame.new(x, y, z))
+		dock.Parent = parent
+		local deck = dock:FindFirstChild("Deck")
+		if deck then
+			tag(deck, "FerryDock")
+		end
+		return dock
+	end
+	dockAt(WorldLayout.FerryDockX, WorldLayout.FerryDockZ)
+	local lx, lz = WorldLayout.FerryLanding()
+	dockAt(lx, lz)
+
+	local isle = stream(Kit.model("FerryIsland", parent), Enum.ModelStreamingMode.Default)
+	local path = LandmarkArt.FerryPath()
+	local faceX, faceZ = WorldLayout.FerryFacing()
+	local yaw = math.atan2(faceX, faceZ)
+	Kit.placeAt(path, CFrame.new(lx, TerrainGen.HeightAt(lx, lz), lz) * CFrame.Angles(0, yaw, 0))
+	path.Parent = isle
+
+	local cave = stream(LandmarkArt.SecretCave(), Enum.ModelStreamingMode.Atomic)
+	local caveDef = WorldLayout.SecretCave
+	local caveY = TerrainGen.HeightAt(caveDef.x, caveDef.z)
+	Kit.placeAt(cave, CFrame.new(caveDef.x, caveY, caveDef.z))
+	cave.Parent = parent
+	local fog = cave:FindFirstChild("Fog")
+	if fog then
+		tag(fog, "FogZone")
+	end
+
+	for _, spot in ipairs(WorldLayout.Breakables) do
+		local rock = stream(LandmarkArt.CrackedBoulder(), Enum.ModelStreamingMode.Atomic)
+		local y = TerrainGen.HeightAt(spot.x, spot.z)
+		Kit.placeAt(rock, CFrame.new(spot.x, y, spot.z))
+		rock.Parent = parent
+		local part = rock:FindFirstChild("Boulder")
+		if part then
+			tag(part, "Breakable")
+		end
+	end
+
+	local water = stream(LandmarkArt.DeepWater(), Enum.ModelStreamingMode.Persistent)
+	water.Parent = parent
+	for _, part in ipairs(water:GetChildren()) do
+		if part:IsA("BasePart") then
+			tag(part, "HazardWater")
+		end
+	end
+
+	local cone = WorldLayout.VolcanoCone
+	local heat = stream(LandmarkArt.HeatColumn(), Enum.ModelStreamingMode.Atomic)
+	local floorY = TerrainGen.HeightAt(cone.x, cone.z)
+	Kit.placeAt(heat, CFrame.new(cone.x, floorY, cone.z))
+	heat.Parent = parent
+	local heatPart = heat:FindFirstChild("Heat")
+	if heatPart then
+		tag(heatPart, "HeatZone")
+	end
 end
 
 return LandmarkArt

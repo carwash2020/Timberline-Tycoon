@@ -576,8 +576,30 @@ local function spurChord(x: number, z: number): number?
 	return bestH
 end
 
+-- The strip copies the height of the last surveyed column so the entrance
+-- at z = 1500 doesn't grow a cliff, and nothing at z <= 1500 moves.
+local STRIP_SHELF: number? = nil
+local function stripShelf(): number
+	local known = STRIP_SHELF
+	if known then
+		return known
+	end
+	local shelf = groundHeight(0, WorldLayout.ShelfProbeZ)
+	STRIP_SHELF = shelf
+	return shelf
+end
+
 -- Ground height at (x, z), in studs.
 function TerrainGen.HeightAt(x: number, z: number): number
+	-- Only past the square, and only inside the strip. The fingerprint
+	-- grid and every road sample stay on the old heights.
+	if z > WorldLayout.WorldHalf and WorldLayout.InNorthStrip(x, z) then
+		local shelf = stripShelf()
+		if WorldLayout.InGorge(x, z) then
+			return shelf - WorldLayout.GorgeDepth
+		end
+		return shelf
+	end
 	local h = groundHeight(x, z)
 	local bed = water(x, z)
 	if bed then
@@ -592,6 +614,9 @@ end
 
 -- Water surface above (x, z), or nil if the column is dry.
 function TerrainGen.WaterLevelAt(x: number, z: number): number?
+	if z > WorldLayout.WorldHalf and WorldLayout.InNorthStrip(x, z) then
+		return nil
+	end
 	local h = TerrainGen.HeightAt(x, z)
 	local _, surface = water(x, z)
 	if surface and h < surface then

@@ -258,6 +258,27 @@ function TerrainBuilder.Jobs(): { Job }
 			})
 		end
 	end
+	-- The north strip, starting exactly where the square stops so a chunk
+	-- never writes both. Nearest the sawmill first, with the rest.
+	local strip = WorldLayout.NorthStrip
+	local xCols = math.floor((strip.x1 - strip.x0) / VOXEL)
+	local zCols = math.floor((strip.z1 - strip.z0) / VOXEL)
+	local xChunks = math.ceil(xCols / CHUNK)
+	local zChunks = math.ceil(zCols / CHUNK)
+	for cx = 0, xChunks - 1 do
+		for cz = 0, zChunks - 1 do
+			local x0 = strip.x0 + cx * CHUNK * VOXEL
+			local z0 = strip.z0 + cz * CHUNK * VOXEL
+			local mid = Vector3.new(x0 + CHUNK * VOXEL / 2, 0, z0 + CHUNK * VOXEL / 2)
+			table.insert(jobs, {
+				x0 = x0,
+				z0 = z0,
+				nx = math.min(CHUNK, xCols - cx * CHUNK),
+				nz = math.min(CHUNK, zCols - cz * CHUNK),
+				dist = (mid - hub).Magnitude,
+			})
+		end
+	end
 	table.sort(jobs, function(a, b)
 		return a.dist < b.dist
 	end)

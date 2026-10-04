@@ -170,6 +170,17 @@ return function(t)
 		t.eq(s.loaded, { "Waiting" }, "only the player with no character is loaded")
 	end
 
+	-- Palms and the north-strip stands. Lanternwood is planted only once
+	-- WoodData has the row (B12).
+	local function extraTrees(WorldPlan)
+		local WoodData = t.shared("WoodData")
+		local n = #WorldPlan.StripTrees() + #WorldPlan.FerryPalms()
+		if WoodData.Get("lanternwood") then
+			n += #WorldPlan.Lanternwood()
+		end
+		return n
+	end
+
 	local function builtLine(s)
 		for _, line in ipairs(s.prints) do
 			if string.find(line, "World built", 1, true) then
@@ -366,8 +377,12 @@ return function(t)
 		t.ok(string.find(line, "(terrain 1.2s)", 1, true) or string.find(line, "(terrain 1.3s)", 1, true), line)
 		local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local TutorialGrove = t.shared("TutorialGrove")
-		t.eq(s.spawned, #WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees)
-		t.eq(s.workspace:GetAttribute("MapTrees"), #WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees)
+		local extra = extraTrees(WorldPlan)
+		t.eq(s.spawned, #WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees + extra)
+		t.eq(
+			s.workspace:GetAttribute("MapTrees"),
+			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #TutorialGrove.Trees + extra
+		)
 		t.eq(s.workspace:GetAttribute("MapTerrainSeconds"), 1.25)
 		t.eq(s.workspace:GetAttribute("MapBuildFailures"), 0)
 		t.ok(type(s.workspace:GetAttribute("MapBuildSeconds")) == "number", "MapBuildSeconds")
@@ -383,8 +398,8 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.sectionSpawned,
-			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #sky.lumenwood + #TutorialGrove.Trees,
-			"every site, the isles' lumenwood, and the tutorial oaks"
+			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #sky.lumenwood + #TutorialGrove.Trees + extraTrees(WorldPlan),
+			"every site, the isles' lumenwood, the tutorial oaks, and the strip and ferry"
 		)
 		t.eq(s.workspace:GetAttribute("MapTrees"), s.sectionSpawned)
 		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 2)
@@ -411,11 +426,22 @@ return function(t)
 			end
 		end
 		t.ok(birches > 0, "the plan has birches")
+		local stripBirch = 0
+		for _, spot in ipairs(WorldPlan.StripTrees()) do
+			if spot.woodId == "birch" then
+				stripBirch += 1
+			end
+		end
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.sectionSpawned,
-			#WorldPlan.Trees() - birches + #WorldPlan.ReachTrees() + #TutorialGrove.Trees,
-			"every other tree, plus the grove and the reach"
+			#WorldPlan.Trees()
+				- birches
+				+ #WorldPlan.ReachTrees()
+				+ #TutorialGrove.Trees
+				+ extraTrees(WorldPlan)
+				- stripBirch,
+			"every other tree, plus the grove, the reach, and the strip and ferry"
 		)
 		local found = 0
 		for _, line in ipairs(s.allWarnings) do
@@ -608,7 +634,11 @@ return function(t)
 		local TutorialGrove = t.shared("TutorialGrove")
 		t.eq(
 			s.workspace:GetAttribute("MapTrees"),
-			#WorldPlan.Trees() + #WorldPlan.ReachTrees() + #WorldPlan.Sky().lumenwood + #TutorialGrove.Trees
+			#WorldPlan.Trees()
+				+ #WorldPlan.ReachTrees()
+				+ #WorldPlan.Sky().lumenwood
+				+ #TutorialGrove.Trees
+				+ extraTrees(WorldPlan)
 		)
 	end)
 

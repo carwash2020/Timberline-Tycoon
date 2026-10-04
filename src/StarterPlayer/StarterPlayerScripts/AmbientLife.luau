@@ -611,11 +611,19 @@ end
 
 -- Open ground a walker may stand on.
 local function walkable(x: number, z: number): boolean
+	local EDGE_MARGIN = 30 -- TBD (Builder) critters stay off the walls
+	local edge = WorldLayout.WorldHalf - EDGE_MARGIN
+	local inSquare = math.abs(x) < edge and math.abs(z) < edge
+	local strip = WorldLayout.NorthStrip
+	local inStrip = WorldLayout.InNorthStrip(x, z)
+		and z < strip.z1 - EDGE_MARGIN
+		and x > strip.x0 + EDGE_MARGIN
+		and x < strip.x1 - EDGE_MARGIN
+		and not WorldLayout.InGorge(x, z)
 	return WorldLayout.FlatWeight(x, z) <= 0
 		and TerrainGen.WaterLevelAt(x, z) == nil
 		and TerrainGen.RoadClearance(x, z) > 2
-		and math.abs(x) < WorldLayout.WorldHalf - 30
-		and math.abs(z) < WorldLayout.WorldHalf - 30
+		and (inSquare or inStrip)
 end
 
 -- A point around the player, mostly in front of the camera (so critters

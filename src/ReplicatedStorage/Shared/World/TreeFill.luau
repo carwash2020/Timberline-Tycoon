@@ -215,6 +215,9 @@ end
 -- Boot placement and regrowth share this. A point on a widened haul road,
 -- in a loading pad, or on a homestead square is not ground.
 function TreeFill.Ground(x: number, z: number): boolean
+	if WorldLayout.TreeBlocked(x, z) then
+		return false
+	end
 	return world().GoodGround(x, z, ROAD_GAP, 0.75)
 		and TreeFill.Clear(x, z)
 		and sceneryClear(x, z)
