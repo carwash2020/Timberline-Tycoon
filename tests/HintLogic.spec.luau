@@ -272,10 +272,30 @@ return function(t)
 		local WoodData = t.shared("WoodData")
 		local steel = ItemCatalog.GetAxe("SteelAxe")
 		local rusty = ItemCatalog.GetAxe("RustyAxe")
-		t.eq(HintLogic.Underpowered(steel.damage, WoodData.Get("frostwood").hardness), true, "a Steel Axe on frostwood")
+		-- Listed axe damage against the v1 hardness field (the amount taken
+		-- off each hit). v2.hardness is damage per square unit of the cut
+		-- face; a later cleanup must not pass that instead.
+		local frost = WoodData.Get("frostwood")
+		t.ok(frost.hardness ~= frost.v2.hardness, "v1 hardness and v2.hardness differ")
+		t.eq(
+			HintLogic.Underpowered(steel.damage, frost.hardness),
+			true,
+			"Steel's listed damage against frostwood's v1 hardness"
+		)
+		t.eq(
+			HintLogic.Underpowered(steel.damage, frost.v2.hardness),
+			false,
+			"not v2.hardness: Steel's listed damage is not under frostwood's"
+		)
 		t.eq(HintLogic.Underpowered(rusty.damage, WoodData.Get("oak").hardness), false, "the tutorial oak")
 		t.eq(HintLogic.Underpowered(rusty.damage, WoodData.Get("birch").hardness), false, "birch is slow, not too weak")
 		t.eq(HintLogic.Underpowered(0 / 0, 10), false, "not a number: no hint")
+		local fs = require("@lune/fs")
+		local cut = fs.readFile("src/StarterPlayer/StarterPlayerScripts/CutController.luau")
+		local _, calls = string.gsub(cut, "Underpowered%(listedDamage%(axe, wood%.biome%), wood%.hardness%)", "")
+		t.eq(calls, 2, "the HUD and the toast both pass the v1 hardness field")
+		local _, swapped = string.gsub(cut, "Underpowered%(listedDamage%(axe, wood%.biome%), wood%.v2%.hardness%)", "")
+		t.eq(swapped, 0, "neither call passes v2.hardness")
 
 		t.eq(HintLogic.ThickStuds, 2)
 		t.eq(HintLogic.Thicker(2.6, 2.6), true, "a pine base")

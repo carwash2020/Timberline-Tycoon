@@ -193,7 +193,8 @@ end
 --   * holding: dragging a piece: distance and turning.
 --   * tooLong: dragging a piece longer than your truck's bed.
 --   * tooHard: pointing at wood your axe needs too many hits for, or
---     whose listed hardness beats the axe's listed damage.
+--     whose v1 hardness (the amount taken off each hit) beats the axe's
+--     listed damage. That field is wood.hardness, not wood.v2.hardness.
 --   * thick: pointing at a thick face. A face twice as wide takes about
 --     four times the swings.
 --   * backUp: driving with wood on the bed, near the sell pad.
@@ -282,10 +283,13 @@ function HintLogic.TooHard(hits: number): boolean
 	return hits == hits and hits > HintLogic.TooHardHits
 end
 
--- The axe's listed damage doesn't beat the wood's listed hardness, so one
--- hit can't dent it (the same comparison as a v1 swing that deals 0). The
--- v2 swing still lands; the HUD and the toast say to get a better axe.
--- Not a number (NaN) counts as not known: no hint.
+-- Listed axe damage against the wood's v1 `hardness` field: the amount
+-- taken off each hit. One hit can't dent the wood when damage is under
+-- that number (the same comparison as a v1 swing that deals 0). This is
+-- not `v2.hardness`, the damage per square unit of the cut face; swapping
+-- the two would call the tutorial oak too hard. The v2 swing still lands;
+-- the HUD and the toast say to get a better axe. Not a number (NaN)
+-- counts as not known: no hint.
 function HintLogic.Underpowered(damage: number, hardness: number): boolean
 	if damage ~= damage or hardness ~= hardness then
 		return false

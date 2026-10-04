@@ -245,9 +245,17 @@ return function(t)
 			local icons = FieldGuide.HardnessIcons(wood.v2.hardness)
 			t.eq(#icons, 5, wood.id)
 			t.eq(string.sub(icons, 1, marks), string.rep("x", marks), wood.id)
-			t.eq(string.sub(icons, marks + 1), string.rep(".", 5 - marks), wood.id)
-			t.ok(string.find(FieldGuide.FactsV2(wood), "hardness " .. icons, 1, true) ~= nil, wood.id)
+			t.eq(string.sub(icons, marks + 1), string.rep("-", 5 - marks), wood.id)
+			t.eq(FieldGuide.AxeOff, "-")
+			local text = FieldGuide.HardnessText(wood.v2.hardness)
+			t.eq(text, icons .. " " .. tostring(marks) .. "/5", wood.id)
+			t.ok(string.find(FieldGuide.FactsV2(wood), "hardness " .. text, 1, true) ~= nil, wood.id)
 		end
+		t.eq(
+			"hardness " .. FieldGuide.HardnessText(WoodData.Get("birch").v2.hardness),
+			"hardness xxx-- 3/5",
+			"birch is the middle band"
+		)
 		t.eq(FieldGuide.HardnessMarks(0 / 0), 1, "not a number: the softest mark")
 	end)
 
@@ -272,7 +280,7 @@ return function(t)
 				page,
 				table.concat({
 					biome.displayName,
-					"hardness " .. FieldGuide.HardnessIcons(v2.hardness) .. " " .. short(v2.hardness, 2),
+					"hardness " .. FieldGuide.HardnessText(v2.hardness),
 					string.format(
 						"logs %s, planks %s",
 						FieldGuide.PriceText(v2.logPrice),

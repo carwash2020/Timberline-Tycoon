@@ -260,7 +260,8 @@ type Target = {
 }
 
 -- The axe's listed damage against this wood's biome (a biome override
--- wins), the number HintLogic.Underpowered compares with hardness.
+-- wins). HintLogic.Underpowered compares it with the v1 hardness field
+-- (the amount taken off each hit), not v2.hardness.
 local function listedDamage(axe: ItemCatalog.AxeDef, biome: string): number
 	local override = if axe.biomeDamage then axe.biomeDamage[biome] else nil
 	return override or axe.damage
@@ -269,8 +270,9 @@ end
 -- What the HUD's hint needs to know about what the axe is pointing at
 -- (`seen`: the target, or what the pointer found and why it won't do):
 -- whether it's a loose piece (put the axe away to drag it), whether it's
--- wood this axe can't cut, needs too many hits for, or whose hardness
--- beats the axe's damage (HintLogic.TooHard / Underpowered), and whether
+-- wood this axe can't cut, needs too many hits for, or whose v1 hardness
+-- (the amount taken off each hit, not v2.hardness) beats the axe's listed
+-- damage (HintLogic.TooHard / Underpowered), and whether
 -- the face is thick (HintLogic.Thicker: thicker cuts take longer).
 function CutController.PointingFacts(seen: Target?, axe: ItemCatalog.AxeDef?): (boolean, boolean, boolean)
 	if seen == nil or axe == nil or seen.kind == "node" then
@@ -594,8 +596,9 @@ local function deliver(id: number)
 		if current.fromClick then
 			chopNote("fired")
 		end
-		-- The swing still lands. The toast is the "too hard" hint for an
-		-- axe whose listed damage is under the wood's hardness.
+		-- The swing still lands. The toast is the "too hard" hint when
+		-- listed damage is under the wood's v1 hardness (the amount taken
+		-- off each hit), not v2.hardness.
 		local woodId = target.woodId
 		local wood = if type(woodId) == "string" then WoodData.Get(woodId) else nil
 		if wood and HintLogic.Underpowered(listedDamage(axe, wood.biome), wood.hardness) then
