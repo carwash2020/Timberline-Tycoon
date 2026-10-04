@@ -19,8 +19,8 @@ Night.GlowNames = { WindowGlass = true, LampGlow = true, LanternGlow = true, Lam
 -- (255, 200, 110), as hex.
 Night.WindowColor = "FFC46E"
 Night.LanternColor = "FFC86E"
--- WoodData.LanternGlow, without the hash. WoodFX swaps NightGlow parts to
--- this at night; the preview's night cameras do the same. TBD (Designer).
+-- WoodData.LanternGlow, without the hash. Approved. WoodFX swaps NightGlow
+-- parts to this at night, and the preview's night cameras do the same.
 Night.WoodGlow = "FFC45C"
 
 -- The colour (hex, no "#") a part glows at night, or nil when the game

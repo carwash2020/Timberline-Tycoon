@@ -73,6 +73,17 @@ function ShopLogic.WhyNot(status: AxeStatus, axe: AxeDef, bestTier: number): str
 	return ""
 end
 
+-- A closed biome stays off the axe card. A boat biome is on the map but
+-- not reachable yet (FerryService is still the wave 0 stub), so its wood
+-- stays off too, the same way the economy tools leave ferryisle out.
+local function onAxeCard(biomeId: string): boolean
+	if not BiomeData.IsOpen(biomeId) then
+		return false
+	end
+	local biome = BiomeData.Get(biomeId)
+	return biome == nil or biome.access ~= "boat"
+end
+
 -- "Fells oak in 3 · birch in 5 · pine in 13": how the axe does on the
 -- toughest woods it cuts at a useful pace (at most `maxHits` hits, default
 -- 30), up to `count` of them (default 3), weakest wood first.
@@ -83,9 +94,7 @@ function ShopLogic.FellSummary(axe: AxeDef, maxHits: number?, count: number?): s
 	for i = #woods, 1, -1 do
 		local wood = woods[i]
 		local damage = ItemCatalog.AxeDamage(axe, wood)
-		-- A closed biome stays off the axe card. Ferry Island is open, so
-		-- Lanternwood is one of the woods an axe can name.
-		if damage > 0 and BiomeData.IsOpen(wood.biome) then
+		if damage > 0 and onAxeCard(wood.biome) then
 			local hits = math.ceil(wood.treeHP / damage)
 			if hits <= limit then
 				table.insert(parts, 1, string.format("%s in %d", string.lower(wood.displayName), hits))
@@ -338,7 +347,7 @@ function ShopLogic.CutSummary(axe: AxeDef, maxHits: number?, count: number?): st
 	local picked: { [string]: boolean } = {}
 	local woods = WoodData.All()
 	local function pick(wood: WoodData.WoodDef): boolean
-		if room <= 0 or picked[wood.id] or wood.id == reference.id or not BiomeData.IsOpen(wood.biome) then
+		if room <= 0 or picked[wood.id] or wood.id == reference.id or not onAxeCard(wood.biome) then
 			return false
 		end
 		picked[wood.id] = true
