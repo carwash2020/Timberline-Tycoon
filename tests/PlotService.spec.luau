@@ -931,6 +931,8 @@ return function(t)
 		end
 		s.P.FillStep()
 		t.eq(applies, 0)
+		t.eq(placed[1].fill.units, 8, "a built piece keeps the wood it already has")
+		t.eq(placed[#placed].fill.units, 8)
 	end)
 
 	t.test("a plank on the plot is offered; one past the plot plus reach is not", function()
@@ -955,6 +957,7 @@ return function(t)
 		pieces.far = loose(origin, "far", { offset = Vector3.new(0, 0, 500) })
 		s.P.FillStep()
 		t.eq(applies, 1, "only the plank inside the plot plus reach")
+		t.eq(profile.plot.placed[1].fill.units, 0, "the plank past reach did not fill it")
 	end)
 
 	local function clearPieces(pieces)
@@ -985,6 +988,7 @@ return function(t)
 		local n = #s.toasts
 		s.P.FillStep()
 		t.eq(#s.toasts, n, "a plank resting near a built wall")
+		t.eq(profile.plot.placed[1].fill.units, 8, "a built wall takes no more wood")
 
 		s.advance(1)
 		clearPieces(pieces)
@@ -995,6 +999,7 @@ return function(t)
 		s.P.NoteRelease(ann, pieces.held)
 		s.P.FillStep()
 		t.eq(#s.toasts, n, "a held plank near a blueprint")
+		t.eq(profile.plot.placed[1].fill.units, 0, "a held plank does not fill")
 
 		-- The same blueprint, wood that isn't yours, and a log left sitting.
 		s.advance(1)
@@ -1004,6 +1009,7 @@ return function(t)
 		s.P.NoteRelease(ann, pieces.theirs)
 		s.P.FillStep()
 		t.eq(#s.toasts, n, "someone else's wood, and a log left sitting, never toast")
+		t.eq(profile.plot.placed[1].fill.units, 0)
 	end)
 
 	t.test("a just-dropped log or the wrong wood toasts once, and leaving forgets that", function()
@@ -1019,7 +1025,7 @@ return function(t)
 				x = 0,
 				z = 0,
 				rot = 0,
-				fill = { units = 1 },
+				fill = { units = 0 },
 				wood = "birch",
 			},
 		}
@@ -1028,12 +1034,14 @@ return function(t)
 		s.advance(10)
 		s.P.FillStep()
 		t.eq(#s.toasts, n, "resting on the blueprint: no toast")
+		t.eq(profile.plot.placed[1].fill.units, 0, "wrong wood left sitting does not fill")
 
 		s.advance(1)
 		s.P.NoteRelease(ann, pieces.oak)
 		s.P.FillStep()
 		t.eq(s.lastToast(), "This Wall is being built with Birch.")
 		t.eq(#s.toasts, n + 1)
+		t.eq(profile.plot.placed[1].fill.units, 0, "wrong wood does not fill")
 
 		-- Still inside the two seconds, so the same refusal stays quiet.
 		s.advance(0.2)
@@ -1058,5 +1066,6 @@ return function(t)
 		s.P.NoteRelease(ann, pieces.log)
 		s.P.FillStep()
 		t.eq(s.lastToast(), "Saw logs into planks first.")
+		t.eq(profile.plot.placed[1].fill.units, 0, "a log does not fill")
 	end)
 end

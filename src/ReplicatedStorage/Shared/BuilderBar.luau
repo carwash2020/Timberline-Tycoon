@@ -4,8 +4,8 @@
 -- stay at least 48px. Below that, two rows of four stay at 56px (248px
 -- wide). A tall phone has no gap that wide, so the bar sits above the
 -- controls. Buttons never shrink below 44px. The cluster sits 8px above
--- the hint row, which sits on the hotbar (UITheme.Bottom()). The readout
--- sits on top.
+-- the hotbar (UITheme.Bottom()). Build mode hides the hint row, so the
+-- bar does not reserve space for it. The readout sits on top.
 
 local PlotPickerLogic = require(script.Parent.PlotPickerLogic)
 
@@ -23,9 +23,7 @@ BuilderBar.Refuse = { 255, 80, 80 }
 BuilderBar.GhostTransparency = 0.45
 -- UITheme.Bottom() on a phone: the 12px margin plus the 58px tool hotbar.
 BuilderBar.PhoneBottom = 70
--- HUD's BottomRow (the load chip and the hint) is this tall, on that line.
-BuilderBar.HintRow = 30
--- Air between the cluster and that row.
+-- Air between the cluster and the hotbar.
 BuilderBar.Air = 8
 
 local function rowWidth(count: number, button: number, gap: number): number
@@ -85,10 +83,10 @@ function BuilderBar.Layout(screenW: number, screenH: number, bottom: number?): L
 	local clusterH = readout + rows * button + rows * gap
 	local x = (screenW - w) / 2
 	-- Above the hotbar (UITheme.Bottom(); PhoneBottom when the caller
-	-- doesn't pass it) and the hint row that sits on it. A tall phone
-	-- then moves up again so the cluster stays off the controls.
+	-- doesn't pass it). A tall phone then moves up again so the cluster
+	-- stays off the controls.
 	local inset = if type(bottom) == "number" then bottom else BuilderBar.PhoneBottom
-	local y = screenH - inset - BuilderBar.HintRow - clusterH - BuilderBar.Air
+	local y = screenH - inset - clusterH - BuilderBar.Air
 	if lifted then
 		local ceiling = math.min(stick.y, jump.y)
 		if y + clusterH > ceiling then

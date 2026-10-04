@@ -449,25 +449,18 @@ return function(t)
 		t.eq(BuilderBar.Enabled("Move", group), false)
 	end)
 
-	t.test("667 x 375 and 375 x 667: the bar clears the hotbar, the hint row, and the touch controls", function()
+	t.test("667 x 375 and 375 x 667: the bar clears the hotbar and the touch controls", function()
 		local PlotPickerLogic = t.shared("PlotPickerLogic")
-		-- UITheme.Bottom() on a phone is 70. HUD's BottomRow is 30px on that line.
+		-- UITheme.Bottom() on a phone is 70. Build mode hides BottomRow, so
+		-- the bar does not reserve a hint row above the hotbar.
 		t.eq(BuilderBar.PhoneBottom, 70)
-		t.eq(BuilderBar.HintRow, 30)
 		t.eq(BuilderBar.Air, 8)
 		for _, size in ipairs({ { 667, 375 }, { 375, 667 } }) do
 			local w, h = size[1], size[2]
 			local layout = BuilderBar.Layout(w, h)
 			local bar = { x = layout.x, y = layout.y, w = layout.w, h = layout.h }
 			local hotbar = { x = 0, y = h - BuilderBar.PhoneBottom, w = w, h = BuilderBar.PhoneBottom }
-			local bottomRow = {
-				x = 0,
-				y = h - BuilderBar.PhoneBottom - BuilderBar.HintRow,
-				w = w,
-				h = BuilderBar.HintRow,
-			}
 			t.eq(PlotPickerLogic.BoxesOverlap(bar, hotbar), false, w .. "x" .. h .. " hotbar")
-			t.eq(PlotPickerLogic.BoxesOverlap(bar, bottomRow), false, w .. "x" .. h .. " BottomRow")
 			for _, block in ipairs(PlotPickerLogic.TouchBlockers(w, h)) do
 				t.eq(PlotPickerLogic.BoxesOverlap(bar, block), false, w .. "x" .. h .. " controls")
 			end
@@ -475,10 +468,8 @@ return function(t)
 		end
 		local phone = BuilderBar.Layout(667, 375)
 		t.eq(phone.h, 156, "two rows, readout included")
-		t.eq(phone.y, 375 - 70 - 30 - 156 - 8)
-		-- The tall phone uses the same Bottom() offset, then moves up off the thumbstick.
+		t.eq(phone.y, 141, "375 - 70 - 156 - 8")
 		local tall = BuilderBar.Layout(375, 667, 70)
-		t.ok(tall.y + tall.h <= 667 - 70 - 30, "375x667 stays above the hint row")
 		t.ok(tall.button >= 44)
 	end)
 
