@@ -112,24 +112,37 @@ end
 
 local GLOW = Color3.fromHex(WoodData.LanternGlow)
 
-type DaySurface = { surface: SurfaceAppearance, enabled: boolean }
-
 type DayLook = {
 	color: Color3,
 	material: Enum.Material,
-	surfaces: { DaySurface },
+	surfaces: { SurfaceAppearance },
 }
 
 local dayLook: { [BasePart]: DayLook } = {}
+
+-- SurfaceAppearance has no Enabled. Park it in a folder under the part at
+-- night so the neon shows, and so a streaming cleanup still destroys it.
+local HOLD_NAME = "NightGlowHold"
+
+local function holdFolder(part: BasePart): Folder
+	local existing = part:FindFirstChild(HOLD_NAME)
+	if existing and existing:IsA("Folder") then
+		return existing
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = HOLD_NAME
+	folder.Parent = part
+	return folder
+end
 
 local function rememberDay(part: BasePart)
 	if dayLook[part] then
 		return
 	end
-	local surfaces: { DaySurface } = {}
+	local surfaces: { SurfaceAppearance } = {}
 	for _, child in ipairs(part:GetChildren()) do
 		if child:IsA("SurfaceAppearance") then
-			table.insert(surfaces, { surface = child, enabled = child.Enabled })
+			table.insert(surfaces, child)
 		end
 	end
 	dayLook[part] = { color = part.Color, material = part.Material, surfaces = surfaces }
@@ -144,18 +157,23 @@ local function paintGlow(part: BasePart, night: boolean)
 	if night then
 		part.Color = GLOW
 		part.Material = Enum.Material.Neon
-		for _, saved in ipairs(day.surfaces) do
-			if saved.surface.Parent then
-				saved.surface.Enabled = false
+		local hold = if #day.surfaces > 0 then holdFolder(part) else nil
+		for _, surface in ipairs(day.surfaces) do
+			if hold and surface.Parent ~= hold then
+				surface.Parent = hold
 			end
 		end
 	else
 		part.Color = day.color
 		part.Material = day.material
-		for _, saved in ipairs(day.surfaces) do
-			if saved.surface.Parent then
-				saved.surface.Enabled = saved.enabled
+		for _, surface in ipairs(day.surfaces) do
+			if surface.Parent ~= part then
+				surface.Parent = part
 			end
+		end
+		local hold = part:FindFirstChild(HOLD_NAME)
+		if hold and #hold:GetChildren() == 0 then
+			hold:Destroy()
 		end
 	end
 end
