@@ -65,6 +65,7 @@ export type MakeOptions = {
 	zoneCf: CFrame?,
 	zoneSize: Vector3?,
 	onShelf: boolean?,
+	size: Vector3?,
 }
 
 type Home = {
@@ -344,6 +345,27 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 		end)
 	end)
 
+	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
+		local nameFaces = BoxLogic.LargestFaces(part.Size)
+		for _, face in ipairs(nameFaces) do
+			local gui = Instance.new("SurfaceGui")
+			gui.Name = "NameMark"
+			gui.Face = face
+			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			gui.PixelsPerStud = 40
+			gui.Parent = part
+			local nameLabel = Instance.new("TextLabel")
+			nameLabel.Name = "Name"
+			nameLabel.BackgroundTransparency = 1
+			nameLabel.Size = UDim2.fromScale(1, 1)
+			nameLabel.Font = Enum.Font.GothamBold
+			nameLabel.Text = rec.displayName
+			nameLabel.TextScaled = true
+			nameLabel.TextColor3 = Color3.fromRGB(245, 235, 215)
+			nameLabel.Parent = gui
+		end
+	end
+
 	local open = Instance.new("ProximityPrompt")
 	open.Name = "OpenPrompt"
 	open.ActionText = "Open"
@@ -366,6 +388,9 @@ function BoxService.Make(opts: MakeOptions): Record
 	local itemId = opts.itemId or "SteelAxe"
 	local limited = opts.limited == true
 	local slot = if opts.slotId then StoreStock.Get(opts.slotId) else StoreStock.Find(kind, itemId)
+	if slot == nil and (opts.shop == "Dealership" or kind == "Truck" or kind == "Trailer") then
+		slot = StoreStock.Vehicle(itemId)
+	end
 	local uid = opts.uid or Util.guid()
 	local cf = opts.cf or CFrame.new()
 	local price = opts.price
@@ -376,7 +401,7 @@ function BoxService.Make(opts: MakeOptions): Record
 	model.Name = "ShopItem"
 	local part = Instance.new("Part")
 	part.Name = "Box"
-	part.Size = Vector3.new(2, 1.2, 1.6)
+	part.Size = opts.size or Vector3.new(2, 1.2, 1.6)
 	part.Anchored = true
 	part.CanCollide = true
 	part.CFrame = cf
@@ -711,12 +736,58 @@ function BoxService.StockShop(model: Model)
 	end
 end
 
+function BoxService.StockLot(lot: Model, counter: BasePart?)
+	if stocked[lot] then
+		return
+	end
+	stocked[lot] = true
+	if counter then
+		rememberedShops["Dealership"] = {
+			counter = counter,
+			zoneCf = nil,
+			zoneSize = nil,
+			parent = lot,
+		}
+	end
+	if type((lot :: any).GetDescendants) ~= "function" then
+		return
+	end
+	for _, child in ipairs(lot:GetDescendants()) do
+		if child.Name == "BoxSpot" and child:IsA("BasePart") then
+			local itemId = child:GetAttribute("ItemId")
+			local kind = child:GetAttribute("Category")
+			if type(itemId) == "string" and (kind == "Truck" or kind == "Trailer") then
+				local vehicle = StoreStock.Vehicle(itemId)
+				BoxService.Make({
+					slotId = if vehicle then vehicle.slotId else nil,
+					shop = "Dealership",
+					itemKind = if vehicle then vehicle.itemKind else kind,
+					itemId = itemId,
+					displayName = if vehicle then vehicle.displayName else itemId,
+					cf = child.CFrame,
+					size = child.Size,
+					parent = lot,
+					counter = counter,
+					onShelf = true,
+				})
+			end
+		end
+	end
+end
+
 function BoxService.StockMap(map: Instance)
 	for _, name in ipairs({ "ToolShed", "HearthAndHome" }) do
 		local model = map:FindFirstChild(name)
 		if model and model:IsA("Model") then
 			BoxService.StockShop(model)
 		end
+	end
+	local lot = map:FindFirstChild("DealershipLot")
+	if lot and lot:IsA("Model") then
+		local deal = map:FindFirstChild("Dealership")
+		local counterInst = if deal then deal:FindFirstChild("Counter") else nil
+		local counter = if counterInst and counterInst:IsA("BasePart") then counterInst else nil
+		BoxService.StockLot(lot, counter)
 	end
 end
 
@@ -846,6 +917,13 @@ function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 	if not ok or rec == nil then
 		return false, why
 	end
+	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
+		local VehicleService = require(script.Parent.VehicleService)
+		local placed = VehicleService.TryPlaceFromBox(player, rec)
+		if not placed then
+			return false, "plot"
+		end
+	end
 	rec.opened = true
 	dropStorage(player, uid)
 	equipOnce(player, rec)
@@ -923,6 +1001,9 @@ function BoxService.Restore(player: Player, profile: any)
 			local shop = if type(entry.shop) == "string" then entry.shop else "ToolShed"
 			local itemId = if type(entry.itemId) == "string" then entry.itemId else ""
 			local slot = StoreStock.FindInShop(shop, itemId)
+			if slot == nil and shop == "Dealership" then
+				slot = StoreStock.Vehicle(itemId)
+			end
 			local anchor = rememberedShops[shop]
 			local cf = CFrame.new(0, 4, 0)
 			local counter = if anchor then anchor.counter else nil

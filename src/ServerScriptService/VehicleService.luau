@@ -88,6 +88,13 @@ local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local EconomyService = require(script.Parent.EconomyService)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ProfileService = require(script.Parent.ProfileService)
+local RateLimiter = require(script.Parent.RateLimiter)
+local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local DealershipLot = require(ReplicatedStorage.Shared.Art.DealershipLot)
+local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 local TreeService = require(script.Parent.TreeService)
 
@@ -1250,6 +1257,12 @@ end
 function VehicleService.Init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
 	task.spawn(slotDistanceLoop)
+	-- FindFirstChild, never WaitForChild: a missing remote must not hang tests.
+	local folder = ReplicatedStorage:FindFirstChild("Remotes")
+	local remote = if folder then folder:FindFirstChild("SpawnPadPress") else nil
+	if remote and remote:IsA("RemoteEvent") then
+		VehicleService.BindPad(remote)
+	end
 end
 
 local function destroyTruck(rec: TruckRecord)
@@ -1298,7 +1311,14 @@ local function savedSpot(player: Player): Vector3?
 end
 
 -- The plot pad, when GameServer has one for this player. Nil uses a bay.
+-- One spawn parked on a pad instead of the delivery bay. Cleared after.
+local padOverride: { [number]: CFrame } = {}
+
 local function deliveryPad(player: Player): CFrame?
+	local over = padOverride[player.UserId]
+	if over then
+		return over
+	end
 	local ask = VehicleService.Hooks.deliveryCFrame
 	if not ask then
 		return nil
@@ -1879,6 +1899,471 @@ function VehicleService.TakeBedLogs(player: Player): { BedEntry }
 	publishBed(rec)
 	saveBed(rec)
 	return out
+end
+
+---------------------------------------------------------------------------
+-- Spawn pads (B07). One Allow for SpawnPadPress, here. EventService does
+-- not connect that remote.
+---------------------------------------------------------------------------
+
+local padBound = false
+local builtPads: { [string]: Model } = {}
+
+VehicleService.PadPresses = 0
+
+local function toast(player: Player, message: string)
+	if notify then
+		notify(player, message)
+	end
+end
+
+local function onPadPress(player: Player, pad: unknown)
+	if not RateLimiter.Allow(player, "SpawnPadPress") then
+		return
+	end
+	VehicleService.PadPresses += 1
+	VehicleService.Press(player, pad)
+end
+
+function VehicleService.BindPad(remote: any)
+	if padBound or type(remote) ~= "table" then
+		return
+	end
+	local event = remote.OnServerEvent
+	if type(event) ~= "table" or type(event.Connect) ~= "function" then
+		return
+	end
+	padBound = true
+	event:Connect(onPadPress)
+end
+
+local function activeLoop(): number
+	local ok, n = pcall(CoreLoop.Active)
+	if ok and (n == 1 or n == 2) then
+		return n
+	end
+	return if GameConfig.CoreLoop == 2 then 2 else 1
+end
+
+local function vehicleSpan(kind: string, id: string): (number, number)
+	if kind == "Trailer" then
+		local trailer = ItemCatalog.GetTrailer(id)
+		local truck = ItemCatalog.GetTruck("Pickup")
+		if trailer and truck then
+			local lay = TruckLayout.ForTrailer(trailer, TruckLayout.For(truck))
+			return math.max(lay.width, 2 * lay.wheelX + lay.tyreWidth), lay.length
+		end
+	end
+	local def = ItemCatalog.GetTruck(id)
+	if def then
+		local lay = TruckLayout.For(def)
+		return math.max(lay.width, 2 * lay.wheelX + lay.tyreWidth), lay.length
+	end
+	return 8, 16
+end
+
+local function playerAttr(player: Player, name: string): unknown
+	if type((player :: any).GetAttribute) ~= "function" then
+		return nil
+	end
+	return (player :: any):GetAttribute(name)
+end
+
+local function plotOf(profile: any): any
+	local plot = if profile then profile.plot else nil
+	if type(plot) ~= "table" or plot.claimed ~= true then
+		return nil
+	end
+	return plot
+end
+
+local function padList(plot: any): { any }
+	if type(plot.pads) ~= "table" then
+		plot.pads = {}
+	end
+	return plot.pads
+end
+
+local function homeOf(player: Player): Vector2?
+	local index = playerAttr(player, "PlotSlot")
+	if type(index) ~= "number" then
+		return nil
+	end
+	return PlotData.Slots[index]
+end
+
+local function yardHalf(plot: any): number
+	local tier = plot.tier
+	local row = if type(tier) == "number" then PlotData.Tiers[tier] else nil
+	local size = if row then row.size else PlotData.Tiers[1].size
+	return size / 2
+end
+
+local function blockersOf(plot: any): { VehicleLogic.Foot }
+	local out: { VehicleLogic.Foot } = {}
+	if type(plot.placed) == "table" then
+		for _, item in ipairs(plot.placed) do
+			if type(item) == "table" and type(item.blueprintId) == "string" then
+				local bp = PlotData.Blueprint(item.blueprintId)
+				if bp and type(item.x) == "number" and type(item.z) == "number" then
+					local w, d = PlotLogic.Footprint(bp, if type(item.rot) == "number" then item.rot else 0)
+					table.insert(out, { x = item.x, z = item.z, sx = w, sz = d })
+				end
+			end
+		end
+	end
+	if type(plot.pads) == "table" then
+		for _, pad in ipairs(plot.pads) do
+			if type(pad) == "table" and type(pad.x) == "number" and type(pad.z) == "number" then
+				local width, length = vehicleSpan(if type(pad.kind) == "string" then pad.kind else "Truck", pad.id)
+				local size = VehicleLogic.PadSize(length, width)
+				table.insert(out, { x = pad.x, z = pad.z, sx = size.X, sz = size.Z })
+			end
+		end
+	end
+	return out
+end
+
+local function groundY(x: number, z: number): number
+	local ok, hit = pcall(function()
+		return workspace:Raycast(Vector3.new(x, 500, z), Vector3.new(0, -1000, 0))
+	end)
+	if ok and typeof(hit) == "RaycastResult" then
+		return hit.Position.Y
+	end
+	return -math.huge
+end
+
+local function showGhost(cf: CFrame, size: Vector3, okPlace: boolean)
+	local ghost = Instance.new("Part")
+	ghost.Name = "PadGhost"
+	ghost.Anchored = true
+	ghost.CanCollide = false
+	ghost.CanQuery = false
+	ghost.CanTouch = false
+	ghost.Size = size
+	ghost.CFrame = cf
+	ghost.Color = VehicleLogic.GhostTint(okPlace)
+	ghost.Transparency = 0.45
+	ghost.Material = Enum.Material.Neon
+	pcall(function()
+		ghost.Parent = workspace
+	end)
+	pcall(function()
+		task.delay(1.5, function()
+			ghost:Destroy()
+		end)
+	end)
+end
+
+local function paintOf(kind: string, id: string): string
+	if kind == "Trailer" then
+		local trailer = ItemCatalog.GetTrailer(id)
+		return if trailer then trailer.look.color else "#7A5A3A"
+	end
+	local truck = ItemCatalog.GetTruck(id)
+	return if truck then truck.look.color else "#2F6DB5"
+end
+
+local function rollColor(player: Player, kind: string, id: string): string
+	local seed = math.floor(math.abs(player.UserId * 17 + os.clock() * 1000)) % 100000 + 1
+	local rng = Kit.rng(seed)
+	return VehicleLogic.RollPaint(paintOf(kind, id), function()
+		return rng:next()
+	end)
+end
+
+local function worldPad(home: Vector2, x: number, z: number, thick: number): CFrame
+	local y = groundY(home.X + x, home.Y + z)
+	if y == -math.huge then
+		y = 0
+	end
+	return CFrame.new(home.X + x, y + thick / 2, home.Y + z)
+end
+
+local function rememberOwned(profile: any, kind: string, id: string)
+	if kind == "Trailer" then
+		if type(profile.ownedTrailers) ~= "table" then
+			profile.ownedTrailers = {}
+		end
+		if not table.find(profile.ownedTrailers, id) then
+			table.insert(profile.ownedTrailers, id)
+		end
+		return
+	end
+	if type(profile.ownedTrucks) ~= "table" then
+		profile.ownedTrucks = {}
+	end
+	if not table.find(profile.ownedTrucks, id) then
+		table.insert(profile.ownedTrucks, id)
+	end
+end
+
+local function hookPrompt(button: BasePart, padModel: Model)
+	local prompt = button:FindFirstChild("PadPrompt")
+	if prompt and prompt:IsA("ProximityPrompt") then
+		pcall(function()
+			prompt.Triggered:Connect(function(who: Player)
+				onPadPress(who, padModel)
+			end)
+		end)
+	end
+end
+
+local function buildPadModel(player: Player, home: Vector2, pad: any): Model?
+	local uid = pad.uid
+	if type(uid) ~= "string" then
+		return nil
+	end
+	local existing = builtPads[uid]
+	if existing and existing.Parent then
+		return existing
+	end
+	local kind = if type(pad.kind) == "string" then pad.kind else "Truck"
+	local id = pad.id
+	local width, length = vehicleSpan(kind, id)
+	local size = VehicleLogic.PadSize(length, width)
+	local cf = worldPad(home, pad.x, pad.z, size.Y)
+	local color = Kit.hex(if type(pad.color) == "string" then pad.color else paintOf(kind, id))
+	local model = DealershipLot.BuildPad(workspace, cf, color, length, width)
+	model:SetAttribute("PadUid", uid)
+	model:SetAttribute("OwnerId", player.UserId)
+	model:SetAttribute("ItemId", id)
+	model:SetAttribute("Category", kind)
+	local button = model:FindFirstChild("PadButton")
+	if button and button:IsA("BasePart") then
+		hookPrompt(button, model)
+	end
+	builtPads[uid] = model
+	return model
+end
+
+function VehicleService.RestorePads(player: Player, profile: any)
+	local plot = plotOf(profile)
+	local home = homeOf(player)
+	if not plot or not home or type(plot.pads) ~= "table" then
+		return
+	end
+	for _, pad in ipairs(plot.pads) do
+		if type(pad) == "table" then
+			buildPadModel(player, home, pad)
+		end
+	end
+end
+
+-- Places a pad for a paid truck or trailer box. False leaves the box.
+function VehicleService.TryPlaceFromBox(player: Player, rec: any): boolean
+	local kind = rec.itemKind
+	local id = rec.itemId
+	if type(id) ~= "string" or not VehicleLogic.CanHavePad(id) then
+		toast(player, "That one stays in town.")
+		return false
+	end
+	local profile = ProfileService.GetProfile(player)
+	local plot = plotOf(profile)
+	local home = homeOf(player)
+	if not profile or not plot or not home then
+		toast(player, "Open it on your plot.")
+		return false
+	end
+	local part = rec.part
+	local world = if part and typeof(part.CFrame) == "CFrame" then part.CFrame.Position else nil
+	if world == nil then
+		toast(player, "Open it on your plot.")
+		return false
+	end
+	local localX, localZ = world.X - home.X, world.Z - home.Y
+	local snappedX, snappedZ = VehicleLogic.Snap(localX, localZ, GameConfig.PlotSquare)
+	local width, length = vehicleSpan(kind, id)
+	local size = VehicleLogic.PadSize(length, width)
+	local foot: VehicleLogic.Foot = { x = snappedX, z = snappedZ, sx = size.X, sz = size.Z }
+	local okPlace = VehicleLogic.Placement(foot, blockersOf(plot), yardHalf(plot))
+	local cf = worldPad(home, snappedX, snappedZ, size.Y)
+	if not okPlace then
+		showGhost(cf, size, false)
+		toast(player, "That spot is taken. The pad would sit on something, or off your land.")
+		return false
+	end
+	local pads = padList(plot)
+	local record = {
+		uid = rec.uid,
+		id = id,
+		kind = kind,
+		x = snappedX,
+		z = snappedZ,
+		rot = 0,
+		presses = 0,
+		color = rollColor(player, kind, id),
+	}
+	table.insert(pads, record)
+	rememberOwned(profile, kind, id)
+	buildPadModel(player, home, record)
+	toast(player, "The pad is down. Press it to bring the vehicle out.")
+	return true
+end
+
+local function findPadRecord(profile: any, uid: string): any
+	local plot = if profile then profile.plot else nil
+	if type(plot) ~= "table" or type(plot.pads) ~= "table" then
+		return nil
+	end
+	for _, pad in ipairs(plot.pads) do
+		if type(pad) == "table" and pad.uid == uid then
+			return pad
+		end
+	end
+	return nil
+end
+
+local function ownerProfile(player: Player, ownerId: number): any
+	if player.UserId == ownerId then
+		return ProfileService.GetProfile(player)
+	end
+	local ok, players = pcall(function()
+		return game:GetService("Players")
+	end)
+	if not ok or players == nil or type((players :: any).GetPlayerByUserId) ~= "function" then
+		return nil
+	end
+	local owner = (players :: any):GetPlayerByUserId(ownerId)
+	if owner == nil then
+		return nil
+	end
+	return ProfileService.GetProfile(owner)
+end
+
+local function visitorAllowed(player: Player, ownerId: number, padInst: Instance): boolean
+	local grabOk, grab = pcall(function()
+		return require(script.Parent.GrabService)
+	end)
+	if grabOk and grab and type(grab.Hooks) == "table" and type(grab.Hooks.permission) == "function" then
+		local allowed = grab.Hooks.permission(player, padInst :: any)
+		if allowed == true then
+			return true
+		end
+		if allowed == false then
+			return false
+		end
+	end
+	local profile = ownerProfile(player, ownerId)
+	local permissions = if profile then profile.permissions else nil
+	if type(permissions) ~= "table" then
+		return false
+	end
+	return PermissionLogic.Allows(permissions, player.UserId, "interact")
+		or PermissionLogic.Allows(permissions, player.UserId, "drive")
+end
+
+local function ownsTow(player: Player): boolean
+	local free = VehicleService.Hooks.freeRecall
+	if free and free(player) == true then
+		return true
+	end
+	local ok, monetization = pcall(function()
+		return require(script.Parent.MonetizationService)
+	end)
+	if ok and monetization and type(monetization.WaivesRespawn) == "function" then
+		return monetization.WaivesRespawn(player) == true
+	end
+	return false
+end
+
+local function applyPadColor(model: Model, fromHex: string, toHex: string)
+	local from = Kit.hex(fromHex)
+	local to = Kit.hex(toHex)
+	if from == to then
+		model:SetAttribute("PaintHex", toHex)
+		return
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Color == from then
+			d.Color = to
+		end
+	end
+	model:SetAttribute("PaintHex", toHex)
+end
+
+local function liftModel(model: Model, baseY: number)
+	local ok, boxCf, size = pcall(function()
+		return model:GetBoundingBox()
+	end)
+	if not ok or typeof(boxCf) ~= "CFrame" or typeof(size) ~= "Vector3" then
+		return
+	end
+	local bottom = boxCf.Position.Y - size.Y / 2
+	local delta = baseY - bottom
+	if math.abs(delta) > 1e-3 then
+		model:PivotTo(model:GetPivot() + Vector3.new(0, delta, 0))
+	end
+end
+
+function VehicleService.Press(player: Player, padInst: unknown)
+	if typeof(padInst) ~= "Instance" then
+		return
+	end
+	local uid = padInst:GetAttribute("PadUid")
+	local ownerId = padInst:GetAttribute("OwnerId")
+	local itemId = padInst:GetAttribute("ItemId")
+	local kind = padInst:GetAttribute("Category")
+	if type(uid) ~= "string" or type(ownerId) ~= "number" or type(itemId) ~= "string" then
+		return
+	end
+	local kindName = if type(kind) == "string" then kind else "Truck"
+	local allowed = GrabLogic.CanPressPad({
+		userId = player.UserId,
+		ownerId = ownerId,
+		plotAllows = if player.UserId == ownerId then true else visitorAllowed(player, ownerId, padInst),
+	})
+	local profile = ownerProfile(player, ownerId)
+	local record = findPadRecord(profile, uid)
+	local presses = if record and type(record.presses) == "number" then record.presses else 0
+	local price = VehicleLogic.CatalogPrice(kindName, itemId, activeLoop())
+	local cash = 0
+	local payer = ProfileService.GetProfile(player)
+	if payer and type(payer.cash) == "number" then
+		cash = payer.cash
+	end
+	local plan = VehicleLogic.PressPlan(allowed, presses, price, cash, ownsTow(player), VehicleLogic.RespawnRate())
+	if not plan.spawn then
+		if not allowed then
+			toast(player, "That pad isn't yours.")
+		elseif plan.broke then
+			toast(player, string.format("You need %s to bring it back.", Util.formatCash(plan.fee)))
+		end
+		return
+	end
+	if plan.fee > 0 then
+		local spent = EconomyService.SpendCash(player, plan.fee, "respawned " .. itemId, itemId)
+		if not spent then
+			return
+		end
+	end
+	local slab = padInst:FindFirstChild("Slab")
+	local padCf = if slab and slab:IsA("BasePart")
+		then slab.CFrame
+		elseif padInst:IsA("Model") then padInst:GetPivot()
+		else CFrame.new()
+	local padTop = padCf.Position.Y
+		+ (if slab and slab:IsA("BasePart") then slab.Size.Y / 2 else VehicleLogic.PadThick / 2)
+	local baseY = VehicleLogic.SpawnBaseY(padTop, groundY(padCf.Position.X, padCf.Position.Z))
+	if kindName == "Truck" then
+		padOverride[player.UserId] = padCf
+		local model = VehicleService.SpawnTruck(player, itemId, nil, nil)
+		padOverride[player.UserId] = nil
+		if model == nil then
+			if plan.fee > 0 then
+				EconomyService.Refund(player, plan.fee, "refunded a failed respawn", itemId)
+			end
+			return
+		end
+		liftModel(model, baseY)
+		if record and type(record.color) == "string" then
+			applyPadColor(model, paintOf(kindName, itemId), record.color)
+		end
+	end
+	if record then
+		record.presses = presses + 1
+	end
 end
 
 return VehicleService

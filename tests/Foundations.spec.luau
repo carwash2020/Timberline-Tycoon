@@ -244,7 +244,22 @@ return function(t)
 	end)
 
 	t.test("each new client-to-server remote is connected once, budgeted, and dropped", function()
-		local loader = t.loader()
+		local loader = t.loader({
+			mocks = {
+				ProfileService = {
+					GetProfile = function()
+						return nil
+					end,
+				},
+			},
+			services = {
+				Players = {
+					GetPlayers = function()
+						return {}
+					end,
+				},
+			},
+		})
 		local RateLimiter = loader:server("RateLimiter")
 		local Dialogue = loader:server("DialogueService")
 		local Box = loader:server("BoxService")
@@ -302,10 +317,18 @@ return function(t)
 		connectEvent()
 		connectEvent()
 		t.eq(expand.count(), 1, "ExpandLand")
-		t.eq(pad.count(), 1, "SpawnPadPress")
+		t.eq(pad.count(), 0, "EventService does not connect SpawnPadPress")
+		local Vehicle = loader:server("VehicleService")
+		Vehicle.PadPresses = 0
+		Vehicle.BindPad(pad)
+		Vehicle.BindPad(pad)
+		t.eq(pad.count(), 1, "VehicleService.BindPad connects SpawnPadPress once")
 		expand.Fire(expand, who)
 		t.ok(not RateLimiter.Allow(who, "ExpandLand"))
 		pad.Fire(pad, who)
+		t.eq(Vehicle.PadPresses, 1, "one press in the second gets through")
+		pad.Fire(pad, who)
+		t.eq(Vehicle.PadPresses, 1, "a second press in that second is limited")
 		t.ok(not RateLimiter.Allow(who, "SpawnPadPress"))
 
 		local fs = require("@lune/fs")

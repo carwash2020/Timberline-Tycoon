@@ -47,7 +47,14 @@ return function(t)
 				t.eq(child.ModelStreamingMode, t.roblox.Enum.ModelStreamingMode.Atomic, child.Name)
 				local sign = child:FindFirstChild("PriceSign", true)
 				t.ok(sign and sign:IsA("BasePart"), child.Name .. " price sign")
-				t.ok(sign:FindFirstChild("BuyPrompt", true), child.Name .. " buy prompt")
+				t.eq(sign:FindFirstChild("BuyPrompt", true), nil, child.Name .. " is sit-only, no buy prompt")
+				local seat = child:FindFirstChild("DriverSeat", true)
+				if seat and seat:IsA("VehicleSeat") then
+					t.eq(seat.Disabled, false, child.Name .. " can be sat in")
+					t.eq(seat.MaxSpeed, 0, child.Name .. " cannot drive")
+					t.eq(seat.Torque, 0, child.Name .. " has no torque")
+					t.eq(seat.Anchored, true, child.Name .. " stays put")
+				end
 				local id = child:GetAttribute("ItemId")
 				local item = ItemCatalog.GetTruck(id) or ItemCatalog.GetTrailer(id)
 				local price = ShopLogic.Price(item, priceLoop())
@@ -70,6 +77,23 @@ return function(t)
 			end
 		end
 		t.eq(displays, 8, "5 trucks and 3 trailers")
+		t.eq(lot:FindFirstChild("BuyPrompt", true), nil, "the lot has no buy prompt")
+		local spots = {}
+		for _, d in ipairs(lot:GetDescendants()) do
+			if d.Name == "BoxSpot" then
+				table.insert(spots, d)
+				t.ok(d.Size.X >= 4 and d.Size.Y >= 3 and d.Size.Z >= 4, d:GetAttribute("ItemId") .. " box minimum")
+			end
+		end
+		t.eq(#spots, 7, "a box beside every vehicle except the Rustbucket")
+		local rust = false
+		for _, spot in ipairs(spots) do
+			t.ok(spot:GetAttribute("ItemId") ~= "Rustbucket")
+			if spot:GetAttribute("ItemId") == "Rustbucket" then
+				rust = true
+			end
+		end
+		t.eq(rust, false)
 		local facing = nil
 		for _, child in ipairs(lot:GetChildren()) do
 			if child:IsA("Model") and child:GetAttribute("ItemId") then

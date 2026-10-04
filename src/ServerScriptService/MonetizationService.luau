@@ -73,6 +73,17 @@ function MonetizationService.HasPass(player: Player, key: StoreData.PassKey): bo
 	return set ~= nil and set[key] == true
 end
 
+-- Tow Service waives a spawn-pad fee. The live set is checked first; the
+-- save is the backup when the marketplace set has not been copied yet.
+function MonetizationService.WaivesRespawn(player: Player): boolean
+	if MonetizationService.HasPass(player, "TowService") then
+		return true
+	end
+	local profile = ProfileService.GetProfile(player)
+	local passes = if profile then (profile :: any).passes else nil
+	return type(passes) == "table" and passes.TowService == true
+end
+
 -- Multiplier on sale income (2x Cash).
 function MonetizationService.SaleMultiplier(player: Player): number
 	return if MonetizationService.HasPass(player, "DoubleCash") then 2 else 1

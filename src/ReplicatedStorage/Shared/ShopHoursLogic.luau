@@ -14,10 +14,10 @@ local WorldTime = require(script.Parent.WorldTime)
 
 local ShopHoursLogic = {}
 
--- Hearth & Home, 7:00 to 21:00. TBD (Designer).
+-- Hearth & Home, 7:00 to 21:00. Final.
 ShopHoursLogic.HearthOpen = 7
 ShopHoursLogic.HearthClose = 21
--- Dealership opens at DealerOpen and closes at DealerClose. TBD (Designer).
+-- Dealership opens at DealerOpen and closes at DealerClose. Final.
 ShopHoursLogic.DealerOpen = 7
 ShopHoursLogic.DealerClose = 20
 

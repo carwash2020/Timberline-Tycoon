@@ -116,6 +116,21 @@ function GrabLogic.CanGrab(facts: Facts): (boolean, Reason?)
 	return true, nil
 end
 
+export type PadFacts = {
+	userId: number,
+	ownerId: number,
+	plotAllows: boolean?, -- B04: true when the plot owner has allowed this player
+}
+
+-- The pad's owner may always press. Anyone else needs the plot permission
+-- hook (plotAllows == true). A missing or false hook refuses.
+function GrabLogic.CanPressPad(facts: PadFacts): boolean
+	if facts.userId ~= 0 and facts.userId == facts.ownerId then
+		return true
+	end
+	return facts.plotAllows == true
+end
+
 -- Who owns the piece once `facts.userId` has grabbed it: unowned wood
 -- becomes theirs; anyone else's stays theirs (moving wood never changes
 -- who is paid for it).

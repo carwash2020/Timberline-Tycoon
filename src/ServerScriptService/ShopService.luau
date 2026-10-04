@@ -269,6 +269,51 @@ local function hitch(player: Player, profile: ProfileService.Profile, trailerId:
 	return true
 end
 
+local function hasLand(profile: ProfileService.Profile): boolean
+	local plot = (profile :: any).plot
+	return type(plot) == "table" and plot.claimed == true
+end
+
+local NEEDS_PLOT = "You'll need a plot to open this."
+
+-- Loop 2: a truck or trailer is a box you open on your plot. Cash does
+-- not move until the plot check has passed. ownedTrucks stays as it was.
+local function buyVehicleBox(
+	player: Player,
+	profile: ProfileService.Profile,
+	itemId: string,
+	displayName: string,
+	price: number
+): boolean
+	if not hasLand(profile) then
+		notify(player, NEEDS_PLOT)
+		return false
+	end
+	local hour = ShopService.Hour()
+	if not ShopHoursLogic.IsOpen("Dealership", hour) then
+		notify(player, DialogueData.Sleepy("Dealership", hour))
+		return false
+	end
+	if profile.cash < price then
+		notify(
+			player,
+			string.format("You need %s more for the %s.", Util.formatCash(price - profile.cash), displayName)
+		)
+		return false
+	end
+	if not EconomyService.SpendCash(player, price, "bought " .. displayName, itemId) then
+		return false
+	end
+	local storage = (profile :: any).storage
+	if type(storage) ~= "table" then
+		storage = {}
+		(profile :: any).storage = storage
+	end
+	table.insert(storage, { uid = Util.guid(), itemId = itemId, shop = "Dealership" })
+	notify(player, string.format("Bought the %s! Open the box on your plot.", displayName))
+	return true
+end
+
 local function buyTrailer(player: Player, trailerId: string)
 	local profile = ProfileService.GetProfile(player)
 	local trailer = ItemCatalog.GetTrailer(trailerId)
@@ -282,6 +327,10 @@ local function buyTrailer(player: Player, trailerId: string)
 		return
 	end
 	local price = ShopLogic.Price(trailer, loop)
+	if loop == 2 then
+		buyVehicleBox(player, profile, trailer.id, trailer.displayName, price)
+		return
+	end
 	if profile.cash < price then
 		notify(
 			player,
@@ -352,6 +401,15 @@ local function buyTruck(player: Player, truckId: string)
 		return
 	end
 	local price = ShopLogic.Price(truck, loop)
+	-- The Rustbucket stays an instant grant so the old loop still works.
+	-- Every other loop-2 truck is a box.
+	if loop == 2 and truck.id ~= "Rustbucket" then
+		if buyVehicleBox(player, profile, truck.id, truck.displayName, price) then
+			QuestService.Event(player, "truckBought")
+			MilestoneService.Mark(player, "Bought a truck")
+		end
+		return
+	end
 	if profile.cash < price then
 		notify(
 			player,
@@ -569,6 +627,7 @@ function ShopService.PlayerJoined(player: Player, profile: ProfileService.Profil
 	publishStock(player, profile)
 	publishBlueprints(player, profile)
 	player:SetAttribute("OwnsTruck", #profile.ownedTrucks > 0)
+	VehicleService.RestorePads(player, profile)
 end
 
 -- `mapFolder` is TimberlineMap; `notifyFn` shows a toast (GameServer's
@@ -638,11 +697,6 @@ function ShopService.ResetGrants()
 	table.clear(settled)
 end
 
-local function hasLand(profile: ProfileService.Profile): boolean
-	local plot = (profile :: any).plot
-	return type(plot) == "table" and plot.claimed == true
-end
-
 local function listed(ids: any, itemId: string): boolean
 	if type(ids) ~= "table" then
 		return false
@@ -678,6 +732,9 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	if type(shopId) ~= "string" or shopId == "" then
 		local slot = StoreStock.Find(box.kind, box.itemId)
 		shopId = if slot then slot.shop else nil
+	end
+	if (box.kind == "Truck" or box.kind == "Trailer") and (type(shopId) ~= "string" or shopId == "") then
+		shopId = "Dealership"
 	end
 	if type(shopId) == "string" and not ShopHoursLogic.IsOpen(shopId, ShopService.Hour()) then
 		return fail("sleepy")
@@ -740,6 +797,23 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		local have = profile.furnitureBlueprints
 		if type(have) == "table" and have[bp.id] == true then
 			return fail("alreadyOwned")
+		end
+	elseif box.kind == "Truck" then
+		local truck = ItemCatalog.GetTruck(box.itemId)
+		if not truck or truck.id == "Rustbucket" or truck.sold == false or truck.robux == true then
+			return fail("locked")
+		end
+		-- Plot check before any cash moves. Yes on the card still calls
+		-- Pay, and Pay lands here without SpendCash.
+		if not hasLand(profile) then
+			return fail("needsPlot")
+		end
+	elseif box.kind == "Trailer" then
+		if not ItemCatalog.GetTrailer(box.itemId) then
+			return fail("locked")
+		end
+		if not hasLand(profile) then
+			return fail("needsPlot")
 		end
 	elseif box.kind ~= "Cosmetic" then
 		return fail("locked")
@@ -807,6 +881,16 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 			profile.furnitureBlueprints[bp.id] = true
 			publishBlueprints(player, profile)
 			notify(player, string.format("Bought the %s blueprint. Place it from BUILD on your plot.", bp.displayName))
+		end
+	elseif box.kind == "Truck" or box.kind == "Trailer" then
+		local named = if box.kind == "Truck"
+			then ItemCatalog.GetTruck(box.itemId)
+			else ItemCatalog.GetTrailer(box.itemId)
+		local display = if named then named.displayName else box.itemId
+		notify(player, string.format("Bought the %s. Open the box on your plot.", display))
+		if box.kind == "Truck" then
+			QuestService.Event(player, "truckBought")
+			MilestoneService.Mark(player, "Bought a truck")
 		end
 	else
 		local materials = (profile :: any).materials

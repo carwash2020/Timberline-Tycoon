@@ -1,9 +1,9 @@
 --!strict
 -- The dealership's open display lot: all eight trucks and trailers in one
 -- row, facing the path along the south side (-Z). Each model is anchored,
--- has no scripts, streams Atomic, and carries a price sign on its own
--- front plus a buy prompt. MapBuilder places the model; ShopService buys
--- from the ShopDisplay tag.
+-- has no scripts, streams Atomic, and carries a price sign. The seats can
+-- be sat in and cannot be driven. A box sits beside every vehicle except
+-- the Rustbucket. MapBuilder places the model; the boxes are the purchase.
 --
 -- Eight parking bays (about 118 studs before the gaps between them) do not
 -- fit the lawn Job B keeps for this lot (x 184 to 296). The row uses each
@@ -19,6 +19,7 @@ local ShopLogic = require(script.Parent.Parent.ShopLogic)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local Util = require(script.Parent.Parent.Util)
+local VehicleLogic = require(script.Parent.Parent.VehicleLogic)
 
 local DealershipLot = {}
 
@@ -93,8 +94,12 @@ local function prep(model: Model, category: string, id: string)
 	local scripts: { Instance } = {}
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("VehicleSeat") then
-			d.Disabled = true
+			-- Sit-only: the seat works, the drive does not.
+			d.Disabled = false
+			d.MaxSpeed = 0
+			d.Torque = 0
 			d.Anchored = true
+			d.CanTouch = true
 		elseif d:IsA("BasePart") then
 			d.Anchored = true
 		elseif d.ClassName == "Script" or d.ClassName == "LocalScript" then
@@ -106,7 +111,10 @@ local function prep(model: Model, category: string, id: string)
 	end
 	local seat = model:FindFirstChild("DriverSeat", true)
 	if seat and seat:IsA("VehicleSeat") then
-		seat.Disabled = true
+		seat.Disabled = false
+		seat.MaxSpeed = 0
+		seat.Torque = 0
+		seat.CanTouch = true
 	end
 end
 
@@ -125,13 +133,6 @@ local function attachSign(model: Model, priceText: string, length: number)
 	sign.CanCollide = false
 	sign.CanQuery = false
 	Kit.signText(sign, priceText, Color3.fromRGB(245, 235, 215), { Enum.NormalId.Front, Enum.NormalId.Back })
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.Name = "BuyPrompt"
-	prompt.ActionText = "Buy"
-	prompt.ObjectText = priceText
-	prompt.MaxActivationDistance = 14
-	prompt.RequiresLineOfSight = false
-	prompt.Parent = sign
 end
 
 local function priceOf(kind: string, id: string): string
@@ -194,10 +195,76 @@ function DealershipLot.Build(): Model
 			model.Parent = lot
 			model:PivotTo(CFrame.new(cx, 0, bumper + length / 2))
 			attachSign(model, priceOf(entry.kind, entry.id), length)
+			if entry.id ~= "Rustbucket" then
+				local extents = model:GetExtentsSize()
+				local boxSize = VehicleLogic.BoxSize(extents)
+				local spot =
+					Kit.part(lot, "BoxSpot", boxSize, CFrame.new(), Color3.fromRGB(196, 148, 90), Enum.Material.Wood)
+				spot.CFrame = model:GetPivot() * CFrame.new(0, boxSize.Y / 2, length / 2 + boxSize.Z / 2 + 1)
+				spot.CanCollide = false
+				spot.CanQuery = false
+				spot.CanTouch = false
+				spot.Transparency = 1
+				spot:SetAttribute("ItemId", entry.id)
+				spot:SetAttribute("Category", entry.kind)
+			end
 		end
 		x += spans[i] + gap
 	end
 	return lot
+end
+
+-- A spawn pad: the footprint, corner marks in the truck colour, and the
+-- orange button post outside the front-left corner. `cf` is the slab centre.
+function DealershipLot.BuildPad(parent: Instance, cf: CFrame, color: Color3, length: number, width: number): Model
+	local size = VehicleLogic.PadSize(length, width)
+	local pad = Instance.new("Model")
+	pad.Name = "SpawnPad"
+	local slab = Kit.part(pad, "Slab", size, cf, Color3.fromRGB(90, 90, 94), Enum.Material.Concrete)
+	slab.CanCollide = true
+	local mark = 0.6
+	local y = size.Y / 2 + 0.05
+	local hx, hz = size.X / 2 - mark, size.Z / 2 - mark
+	for _, corner in ipairs({
+		Vector3.new(-hx, y, -hz),
+		Vector3.new(hx, y, -hz),
+		Vector3.new(-hx, y, hz),
+		Vector3.new(hx, y, hz),
+	}) do
+		local stud = Kit.part(
+			pad,
+			"CornerMark",
+			Vector3.new(mark, 0.15, mark),
+			cf * CFrame.new(corner),
+			color,
+			Enum.Material.SmoothPlastic
+		)
+		Kit.decor(stud)
+	end
+	local buttonSize = Vector3.new(VehicleLogic.ButtonX, VehicleLogic.ButtonY, VehicleLogic.ButtonZ)
+	local button = Kit.part(
+		pad,
+		"PadButton",
+		buttonSize,
+		cf * CFrame.new(VehicleLogic.ButtonOffset(size)),
+		VehicleLogic.ButtonOrange,
+		Enum.Material.SmoothPlastic
+	)
+	button.CanCollide = false
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "PadPrompt"
+	prompt.ActionText = "Spawn"
+	prompt.ObjectText = "Truck"
+	prompt.MaxActivationDistance = 12
+	prompt.HoldDuration = 0
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("TapPx", 44)
+	local InputKit = require(script.Parent.Parent.InputKit)
+	InputKit.PromptDefaults(prompt, "Interact")
+	prompt.Parent = button
+	pad.PrimaryPart = slab
+	pad.Parent = parent
+	return pad
 end
 
 return DealershipLot

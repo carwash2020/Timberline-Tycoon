@@ -142,6 +142,10 @@ export type Profile = {
 	-- Reconcile; GrantStarterTrucks then gives a truck only to a slot that
 	-- was actually played. A brand-new game is marked true with no truck.
 	starterTruckGranted: boolean,
+	-- False until Migrate mints one storage box per owned truck that is
+	-- not the Rustbucket. The template stays false so Reconcile does not
+	-- mark an old save as already boxed and skip the mint.
+	trucksBoxed: boolean,
 	ownedTrailers: { string },
 	equippedTrailer: string, -- hitched trailer id, "" for none
 	ownedBoats: { string },
@@ -255,6 +259,7 @@ local TEMPLATE: Profile = {
 	ownedTrucks = {},
 	equippedTruck = "",
 	starterTruckGranted = false,
+	trucksBoxed = false,
 	ownedTrailers = {},
 	equippedTrailer = "",
 	ownedBoats = {},
@@ -400,6 +405,13 @@ local function takenIds(record: any): { [string]: boolean }
 			end
 		end
 	end
+	if type(plot) == "table" and type(plot.pads) == "table" then
+		for _, pad in ipairs(plot.pads) do
+			if type(pad) == "table" then
+				keep(pad.uid)
+			end
+		end
+	end
 	return taken
 end
 
@@ -451,6 +463,48 @@ local function applySlotFields(record: any)
 		end
 	end
 	record.storage = kept
+	-- One box per owned truck that is not the Rustbucket. Trailers are
+	-- not minted. ownedTrucks stays a list of catalog ids. A second pass
+	-- sees trucksBoxed and adds nothing. plot.pads is not created here:
+	-- an empty plot keeps the template shape.
+	if record.trucksBoxed ~= true then
+		local have: { [string]: boolean } = {}
+		for _, box in ipairs(record.storage) do
+			if box.shop == "Dealership" then
+				have[box.itemId] = true
+			end
+		end
+		if type(record.ownedTrucks) == "table" then
+			for _, id in ipairs(record.ownedTrucks) do
+				if
+					type(id) == "string"
+					and id ~= "Rustbucket"
+					and ItemCatalog.GetTruck(id) ~= nil
+					and have[id] ~= true
+				then
+					if #record.storage >= ProfileSchema.StorageCap then
+						local dropped = false
+						for i = #record.storage, 1, -1 do
+							local box = record.storage[i]
+							if box.shop ~= "Dealership" then
+								table.remove(record.storage, i)
+								dropped = true
+								break
+							end
+						end
+						if not dropped then
+							break
+						end
+					end
+					local uid = freshUid(used)
+					used[uid] = true
+					table.insert(record.storage, { uid = uid, itemId = id, shop = "Dealership" })
+					have[id] = true
+				end
+			end
+		end
+		record.trucksBoxed = true
+	end
 end
 
 -- Account-wide fields live on the profile, never inside a slot snapshot.
