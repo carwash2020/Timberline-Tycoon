@@ -379,17 +379,20 @@ local function takenIds(record: any): { [string]: boolean }
 			taken[id] = true
 		end
 	end
+	-- Uids only. A catalog id (axe.id, a truck id, blueprintId) is not an
+	-- identity: a boxed Rustbucket is not the truck in the garage.
 	if type(record.axes) == "table" then
 		for _, axe in ipairs(record.axes) do
 			if type(axe) == "table" then
 				keep(axe.uid)
-				keep(axe.id)
 			end
 		end
 	end
 	if type(record.ownedTrucks) == "table" then
-		for _, id in ipairs(record.ownedTrucks) do
-			keep(id)
+		for _, truck in ipairs(record.ownedTrucks) do
+			if type(truck) == "table" then
+				keep(truck.uid)
+			end
 		end
 	end
 	local plot = record.plot
@@ -397,7 +400,6 @@ local function takenIds(record: any): { [string]: boolean }
 		for _, item in ipairs(plot.placed) do
 			if type(item) == "table" then
 				keep(item.uid)
-				keep(item.blueprintId)
 			end
 		end
 	end
@@ -416,7 +418,7 @@ end
 
 -- Per-slot fields. Missing or wrong-typed fields become the template.
 -- storage keeps at most StorageCap boxes, each with a server uid, and
--- drops anything that is also an axe, a truck, or a placed item.
+-- drops a box only when its uid is already an axe, truck, or placed-item uid.
 local function applySlotFields(record: any)
 	if type(record.plot) ~= "table" then
 		record.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
@@ -439,7 +441,7 @@ local function applySlotFields(record: any)
 			end
 			if type(entry) == "table" and type(entry.itemId) == "string" and entry.itemId ~= "" then
 				local uid = if type(entry.uid) == "string" then entry.uid else ""
-				local clashes = identity[entry.itemId] == true or (uid ~= "" and identity[uid] == true)
+				local clashes = uid ~= "" and identity[uid] == true
 				if not clashes then
 					if uid == "" or used[uid] == true then
 						uid = freshUid(used)

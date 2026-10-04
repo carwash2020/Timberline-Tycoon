@@ -557,7 +557,7 @@ return function(t)
 		t.eq(data.areasVisited, {})
 	end)
 
-	t.test("storage keeps 50 server uids and drops axes, trucks, placed items, and junk", function()
+	t.test("storage keeps 50 server uids and drops a box only when its uid is taken", function()
 		local Schema, data = fresh()
 		data.axes = { { uid = "axe-1", id = "SteelAxe" } }
 		data.ownedTrucks = { "Rustbucket" }
@@ -567,6 +567,8 @@ return function(t)
 			{ uid = "axe-1", itemId = "HeatBoots", shop = "ToolShed" },
 			{ uid = "box-truck", itemId = "Rustbucket", shop = "Dealership" },
 			{ uid = "cabin", itemId = "Flashlight", shop = "ToolShed" },
+			{ uid = "cabin-box", itemId = "Cabin", shop = "Hearth" },
+			{ uid = "axe-box", itemId = "SteelAxe", shop = "ToolShed" },
 			{ uid = "keep", itemId = "InsulatedCoat", shop = "ToolShed" },
 			{ itemId = "FeatherfallCloak", shop = 5 },
 			"junk",
@@ -586,10 +588,25 @@ return function(t)
 			t.ok(#box.uid > 0, "server uid")
 			t.ok(not seen[box.uid], "uids are unique")
 			seen[box.uid] = true
-			t.ok(box.uid ~= "axe-1" and box.itemId ~= "SteelAxe", "not an axe")
-			t.ok(box.itemId ~= "Rustbucket", "not a truck")
-			t.ok(box.uid ~= "cabin" and box.itemId ~= "Cabin", "not a placed item")
+			t.ok(box.uid ~= "axe-1", "not an axe uid")
+			t.ok(box.uid ~= "cabin", "a box whose uid matches a placed item is dropped")
 		end
+		local rustbucket, cabin, steel = false, false, false
+		for _, box in ipairs(data.storage) do
+			if box.itemId == "Rustbucket" then
+				rustbucket = true
+				t.eq(box.uid, "box-truck")
+			elseif box.itemId == "Cabin" then
+				cabin = true
+				t.eq(box.uid, "cabin-box")
+			elseif box.itemId == "SteelAxe" then
+				steel = true
+				t.eq(box.uid, "axe-box")
+			end
+		end
+		t.ok(rustbucket, "a Rustbucket box survives while that truck is owned")
+		t.ok(cabin, "a Cabin box survives while a Cabin is placed")
+		t.ok(steel, "a box whose itemId is an axe catalog id survives")
 		-- The duplicate "keep" was given its own uid; the cloak with a bad shop was kept.
 		local cloak = false
 		for _, box in ipairs(data.storage) do
