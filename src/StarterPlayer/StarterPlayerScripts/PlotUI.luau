@@ -174,7 +174,12 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 		detail ..= string.format(" · %d ready to place", stocked)
 	end
 	local mill = ItemCatalog.GetSawmill(bp.id)
-	local swatch = if mill then mill.color elseif bp.boxes[1] then bp.boxes[1].color else "#654321"
+	local machine = ItemCatalog.GetMachine(bp.id)
+	local swatch = if mill
+		then mill.color
+		elseif machine then machine.color
+		elseif bp.boxes[1] then bp.boxes[1].color
+		else "#654321"
 	local button, state
 	if locked then
 		button, state = if needed then needed.name else "Locked", "locked"
@@ -227,6 +232,9 @@ local STORE: ShopUI.Shop = {
 		local ids = { PLOT_ROW }
 		for _, mill in ipairs(ItemCatalog.SawmillList()) do
 			table.insert(ids, mill.id)
+		end
+		for _, machine in ipairs(ItemCatalog.MachineList()) do
+			table.insert(ids, machine.id)
 		end
 		local sorted = table.clone(PlotData.Blueprints)
 		table.sort(sorted, function(a, b)

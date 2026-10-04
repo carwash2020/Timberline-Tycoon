@@ -306,6 +306,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	local opts: Options = options or {}
 	local ghost = if ItemCatalog.GetSawmill(bp.id)
 		then MachineArt.Build(bp.id, true) or BlueprintModels.Build(bp, true)
+		elseif ItemCatalog.GetMachine(bp.id) then MachineArt.BuildChopSaw(true) or BlueprintModels.Build(bp, true)
 		else BlueprintModels.Build(bp, true)
 	ghost.Name = "BlueprintGhost"
 	local highlight = Instance.new("Highlight")

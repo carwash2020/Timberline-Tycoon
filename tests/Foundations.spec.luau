@@ -296,23 +296,18 @@ return function(t)
 			Logic.Init(wire)
 		end, "Wire", 4)
 
-		local expand, pad, saw = fakeRemote(), fakeRemote(), fakeRemote()
+		local expand, pad = fakeRemote(), fakeRemote()
 		local function connectEvent()
-			Event.Init({ ExpandLand = expand, SpawnPadPress = pad, ChopSawSet = saw })
+			Event.Init({ ExpandLand = expand, SpawnPadPress = pad })
 		end
 		connectEvent()
 		connectEvent()
 		t.eq(expand.count(), 1, "ExpandLand")
 		t.eq(pad.count(), 1, "SpawnPadPress")
-		t.eq(saw.count(), 1, "ChopSawSet")
 		expand.Fire(expand, who)
 		t.ok(not RateLimiter.Allow(who, "ExpandLand"))
 		pad.Fire(pad, who)
 		t.ok(not RateLimiter.Allow(who, "SpawnPadPress"))
-		for _ = 1, 6 do
-			saw.Fire(saw, who)
-		end
-		t.ok(not RateLimiter.Allow(who, "ChopSawSet"))
 
 		local fs = require("@lune/fs")
 		local function readTree(dir, out)

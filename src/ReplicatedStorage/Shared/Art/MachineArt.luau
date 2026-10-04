@@ -19,11 +19,13 @@
 
 local CollectionService = game:GetService("CollectionService")
 
+local ChopSawLogic = require(script.Parent.Parent.ChopSawLogic)
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local InputKit = require(script.Parent.Parent.InputKit)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
+local Util = require(script.Parent.Parent.Util)
 
 local MachineArt = {}
 
@@ -383,6 +385,299 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	end
 
 	model:SetAttribute("MillId", mill.id)
+	return model
+end
+
+local YELLOW = Kit.hex("#F5C518")
+local BLACK = Kit.hex("#1A1A1A")
+local CREAM = Kit.hex("#F3E6C8")
+
+local function ghostPart(p: BasePart)
+	p.Transparency = if p.Name == "Root" or p.Name == "Intake" then 1 else 0.45
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+end
+
+-- The cut readout, "8 u".
+function MachineArt.SetLength(model: Model, u: number)
+	local label = model:FindFirstChild("LengthReadout", true)
+	if label and label:IsA("TextLabel") then
+		label.Text = string.format("%d u", u)
+	end
+end
+
+-- Client-only neon line at the cut. The server build does not call this.
+function MachineArt.PreviewLine(model: Model, cutU: number): BasePart?
+	local plane = model:FindFirstChild("BladePlane", true)
+	if not plane or not plane:IsA("Attachment") then
+		return nil
+	end
+	local host = plane.Parent
+	if not host or not host:IsA("BasePart") then
+		return nil
+	end
+	local studs = ChopSawLogic.PreviewStuds(cutU)
+	local cf = host.CFrame * plane.CFrame * CFrame.new(0, 0, -studs)
+	local size = ChopSawLogic.PreviewSize()
+	local existing = model:FindFirstChild("CutPreview", true)
+	local line: BasePart
+	if existing and existing:IsA("BasePart") then
+		line = existing
+	else
+		line = Kit.part(model, "CutPreview", size, cf, YELLOW, Enum.Material.Neon)
+	end
+	line.Size = size
+	line.CFrame = cf
+	line.Material = Enum.Material.Neon
+	line.Color = YELLOW
+	Kit.decor(line)
+	return line
+end
+
+-- `ghost` is the placement preview: nothing collides and there are no buttons.
+function MachineArt.BuildChopSaw(ghost: boolean?): Model?
+	local machine = ItemCatalog.GetMachine("ChopSaw")
+	if not machine then
+		return nil
+	end
+	local preview = ghost == true
+	local model = Kit.model(machine.id)
+	local fp = ChopSawLogic.Footprint()
+	local baseAt = ChopSawLogic.BaseCenter()
+	local bladeAt = ChopSawLogic.BladeCenter()
+	local tableAt = ChopSawLogic.TableCenter()
+
+	local root = Kit.part(
+		model,
+		"Root",
+		Vector3.new(fp.X, ChopSawLogic.RootY, fp.Y),
+		CFrame.new(0, ChopSawLogic.RootY / 2, 0),
+		WOOD,
+		Enum.Material.Wood
+	)
+	root.Transparency = 1
+	root.CanCollide = false
+	root.CanQuery = false
+	root.CanTouch = false
+	model.PrimaryPart = root
+
+	local base = Kit.part(
+		model,
+		"Base",
+		Vector3.new(ChopSawLogic.BaseX, ChopSawLogic.BaseY, ChopSawLogic.BaseZ),
+		CFrame.new(baseAt),
+		Kit.hex(machine.color),
+		Enum.Material.Metal
+	)
+	if preview then
+		ghostPart(base)
+	end
+
+	local infeed = Kit.part(
+		model,
+		"Infeed",
+		Vector3.new(ChopSawLogic.TableWidth, ChopSawLogic.TableThick, ChopSawLogic.TableLength()),
+		CFrame.new(tableAt),
+		WOOD,
+		Enum.Material.Wood
+	)
+	if preview then
+		ghostPart(infeed)
+	end
+
+	local legH = tableAt.Y - ChopSawLogic.TableThick / 2
+	local inset = ChopSawLogic.Leg
+	local halfW = ChopSawLogic.TableWidth / 2 - inset
+	local halfL = ChopSawLogic.TableLength() / 2 - inset
+	for _, x in ipairs({ -halfW, halfW }) do
+		for _, z in ipairs({ -halfL, halfL }) do
+			local leg = Kit.part(
+				model,
+				"Leg",
+				Vector3.new(ChopSawLogic.Leg, legH, ChopSawLogic.Leg),
+				CFrame.new(tableAt.X + x, legH / 2, tableAt.Z + z),
+				WOOD_DARK,
+				Enum.Material.Wood
+			)
+			if preview then
+				ghostPart(leg)
+			end
+		end
+	end
+
+	local intake = Kit.part(
+		model,
+		"Intake",
+		Vector3.new(ChopSawLogic.TableWidth, ChopSawLogic.IntakeHeight, ChopSawLogic.TableLength()),
+		CFrame.new(tableAt.X, tableAt.Y + ChopSawLogic.TableThick / 2 + ChopSawLogic.IntakeHeight / 2, tableAt.Z),
+		WOOD,
+		Enum.Material.SmoothPlastic
+	)
+	intake.Transparency = 1
+	intake.CanCollide = false
+	intake.CanQuery = false
+	intake.CanTouch = false
+	intake.CastShadow = false
+
+	local guard = Kit.part(
+		model,
+		"BladeGuard",
+		Vector3.new(ChopSawLogic.GuardX, ChopSawLogic.GuardY, ChopSawLogic.GuardZ),
+		CFrame.new(bladeAt),
+		YELLOW,
+		Enum.Material.SmoothPlastic
+	)
+	guard.CanCollide = false
+	guard.CanTouch = false
+	if preview then
+		ghostPart(guard)
+	else
+		guard.CanQuery = true
+		guard:SetAttribute("Damage", true)
+	end
+
+	local stripeZ = -ChopSawLogic.GuardZ / 2 - ChopSawLogic.StripeThick / 2
+	for _, y in ipairs({ -ChopSawLogic.GuardY / 4, ChopSawLogic.GuardY / 4 }) do
+		local stripe = Kit.part(
+			model,
+			"Stripe",
+			Vector3.new(
+				ChopSawLogic.GuardX + ChopSawLogic.StripeThick,
+				ChopSawLogic.StripeBand,
+				ChopSawLogic.StripeThick
+			),
+			CFrame.new(bladeAt) * CFrame.new(0, y, stripeZ),
+			BLACK,
+			Enum.Material.SmoothPlastic
+		)
+		Kit.decor(stripe)
+		if preview then
+			stripe.Transparency = 0.45
+		end
+	end
+
+	local blade = Kit.cylinder(
+		model,
+		"SawBlade",
+		ChopSawLogic.BladeThick,
+		ChopSawLogic.BladeDiameter,
+		CFrame.new(bladeAt) * CFrame.Angles(0, math.pi / 2, 0),
+		BLADE,
+		Enum.Material.Metal
+	)
+	if preview then
+		ghostPart(blade)
+	else
+		Kit.decor(blade)
+		CollectionService:AddTag(blade, "SawBlade")
+	end
+
+	local plane = Instance.new("Attachment")
+	plane.Name = "BladePlane"
+	plane.Parent = guard
+
+	local output = Instance.new("Attachment")
+	output.Name = "Output"
+	-- LookVector points out the back of the base (+Z), through the blade.
+	output.CFrame = CFrame.new(0, 0, ChopSawLogic.BaseZ / 2) * CFrame.Angles(0, math.pi, 0)
+	output.Parent = base
+
+	local runIn = Instance.new("Attachment")
+	runIn.Name = "Run"
+	runIn:SetAttribute("LogicInput", ChopSawLogic.RunInput)
+	runIn.Parent = base
+
+	local runFlag = Instance.new("BoolValue")
+	runFlag.Name = "Run"
+	runFlag.Value = true
+	runFlag.Parent = model
+
+	if not preview then
+		local panelCf = CFrame.new(baseAt.X + ChopSawLogic.BaseX / 2 + ChopSawLogic.PanelBoardX / 2, baseAt.Y, baseAt.Z)
+		local panel = Kit.part(
+			model,
+			"Panel",
+			Vector3.new(ChopSawLogic.PanelBoardX, ChopSawLogic.PanelBoardY, ChopSawLogic.PanelBoardZ),
+			panelCf,
+			PANEL,
+			Enum.Material.Wood
+		)
+		panel.CanQuery = true
+		panel.CanTouch = false
+		local gui = Instance.new("SurfaceGui")
+		gui.Name = "PanelGui"
+		gui.Face = Enum.NormalId.Right
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = ChopSawLogic.SurfacePixels
+		gui.Parent = panel
+		local readout = Instance.new("TextLabel")
+		readout.Name = "LengthReadout"
+		readout.Size = UDim2.fromOffset(ChopSawLogic.ReadoutPx, ChopSawLogic.HintPx)
+		readout.Position = UDim2.fromOffset(ChopSawLogic.PanelGapPx, ChopSawLogic.PanelGapPx)
+		readout.BackgroundTransparency = 1
+		readout.Font = Enum.Font.GothamBold
+		readout.TextSize = ChopSawLogic.PanelTextPx
+		readout.TextColor3 = CREAM
+		readout.Text = string.format("%d u", ChopSawLogic.DefaultCut)
+		readout.Parent = gui
+		local px = ChopSawLogic.PanelFacePx
+		local function boardButton(name: string, text: string, x: number, dir: number)
+			local b = Instance.new("TextButton")
+			b.Name = name
+			b.Size = UDim2.fromOffset(px, px)
+			b.Position = UDim2.fromOffset(x, ChopSawLogic.PanelFacePx)
+			b.BackgroundColor3 = Kit.hex("#C4A574")
+			b.TextColor3 = PANEL
+			b.Font = Enum.Font.GothamBold
+			b.TextSize = ChopSawLogic.PanelTextPx
+			b.Text = text
+			b.AutoButtonColor = true
+			b.Active = true
+			b.Selectable = true
+			b:SetAttribute("Axis", "x")
+			b:SetAttribute("Dir", dir)
+			local fit = Instance.new("UITextSizeConstraint")
+			fit.MaxTextSize = ChopSawLogic.PanelTextPx
+			fit.MinTextSize = InputKit.MinTagPx
+			fit.Parent = b
+			b.Parent = gui
+		end
+		local gap = ChopSawLogic.PanelGapPx
+		boardButton("LengthMinus", "-", gap, -1)
+		boardButton("LengthPlus", "+", gap + px + gap, 1)
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "CutPrompt"
+		prompt.ActionText = "Set the length"
+		prompt.ObjectText = machine.displayName
+		prompt.MaxActivationDistance = ChopSawLogic.PromptRange
+		prompt.HoldDuration = 0
+		prompt.ClickablePrompt = true
+		prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+		InputKit.PromptDefaults(prompt, "Interact")
+		prompt.Parent = panel
+
+		local signX = baseAt.X + ChopSawLogic.BaseX / 2 + ChopSawLogic.PanelBoardX / 2
+		local signCf = CFrame.new(signX, baseAt.Y + ChopSawLogic.SignLift, baseAt.Z) * CFrame.Angles(0, -math.pi / 2, 0)
+		local sign = Kit.part(
+			model,
+			"PriceSign",
+			Vector3.new(ChopSawLogic.SignW, ChopSawLogic.SignH, ChopSawLogic.RootY),
+			signCf,
+			PANEL,
+			Enum.Material.Wood
+		)
+		Kit.decor(sign)
+		Kit.signText(sign, Util.formatCash(machine.priceCash), CREAM)
+
+		CollectionService:AddTag(model, "ChopSaw")
+	end
+
+	model:SetAttribute("MachineId", machine.id)
+	model:SetAttribute("Shop", machine.shop)
+	model:SetAttribute("Price", machine.priceCash)
+	model:SetAttribute("CutU", ChopSawLogic.DefaultCut)
+	model:SetAttribute("Run", true)
 	return model
 end
 

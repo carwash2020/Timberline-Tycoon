@@ -39,6 +39,7 @@ local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
 local SaveSlotService = require(script.Parent.SaveSlotService)
+local ChopSawService = require(script.Parent.ChopSawService)
 local SawmillService = require(script.Parent.SawmillService)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SellService = require(script.Parent.SellService)
@@ -788,6 +789,7 @@ if CoreLoop.V2() then
 	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
 	-- Placed sawmills (M2.2): a straight log in the intake comes out as planks.
 	safely("SawmillService.Init", SawmillService.Init, notify, remote.SawmillSet)
+	safely("ChopSawService.Init", ChopSawService.Init, notify, remote.ChopSawSet)
 	safely("DevCommands.Init", DevCommands.Init, notify)
 	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
 	local function saleFx(model: Model)
@@ -1032,7 +1034,6 @@ BootReport.StartStubs({
 				EventService.Init({
 					ExpandLand = remote.ExpandLand,
 					SpawnPadPress = remote.SpawnPadPress,
-					ChopSawSet = remote.ChopSawSet,
 				})
 			end
 		end,

@@ -649,4 +649,48 @@ function ItemCatalog.SawmillList(): { SawmillDef }
 	return sawmillList
 end
 
+-- Plot machines that are not sawmills. The chop saw's price replaces the
+-- unread GameConfig.ChopSawPrice. tools/economy does not read this table,
+-- so the saw is not on the economy ladder.
+export type MachineDef = {
+	id: string,
+	displayName: string,
+	priceCash: number,
+	shop: string,
+	color: string,
+}
+
+-- TBD (Designer): $7,500, replacing the $12,200 placeholder.
+ItemCatalog.ChopSawPrice = 7500
+
+ItemCatalog.Machines = {
+	ChopSaw = {
+		id = "ChopSaw",
+		displayName = "Chop Saw",
+		priceCash = ItemCatalog.ChopSawPrice,
+		shop = "ToolShed",
+		color = "#E2B93B",
+	},
+} :: { [string]: MachineDef }
+
+function ItemCatalog.GetMachine(machineId: string): MachineDef?
+	local machine = ItemCatalog.Machines[machineId]
+	if type(machine) == "table" then
+		return machine
+	end
+	return nil
+end
+
+local machineList: { MachineDef } = {}
+for _, machine in pairs(ItemCatalog.Machines) do
+	table.insert(machineList, machine)
+end
+table.sort(machineList, function(a, b)
+	return a.priceCash < b.priceCash
+end)
+
+function ItemCatalog.MachineList(): { MachineDef }
+	return machineList
+end
+
 return ItemCatalog

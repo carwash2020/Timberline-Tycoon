@@ -4,7 +4,8 @@
 -- drops it. A later batch replaces that body and does not connect again.
 --   ExpandLand     buy the next plot square
 --   SpawnPadPress  the button on a vehicle pad (respawn reuses truck recall)
---   ChopSawSet     one step of a chop saw's cut (same shape as SawmillSet)
+-- ChopSawSet lives on ChopSawService. It is not connected here, so a press
+-- is not budgeted twice.
 
 local RateLimiter = require(script.Parent.RateLimiter)
 
@@ -12,12 +13,10 @@ local EventService = {}
 
 local expandBound = false
 local padBound = false
-local sawBound = false
 
 function EventService.Init(remotes: {
 	ExpandLand: RemoteEvent?,
 	SpawnPadPress: RemoteEvent?,
-	ChopSawSet: RemoteEvent?,
 }?)
 	if remotes == nil then
 		return
@@ -42,12 +41,6 @@ function EventService.Init(remotes: {
 		padBound = true
 		remotes.SpawnPadPress.OnServerEvent:Connect(function(player: Player)
 			RateLimiter.Allow(player, "SpawnPadPress")
-		end)
-	end
-	if not sawBound and remotes.ChopSawSet ~= nil then
-		sawBound = true
-		remotes.ChopSawSet.OnServerEvent:Connect(function(player: Player)
-			RateLimiter.Allow(player, "ChopSawSet")
 		end)
 	end
 end
