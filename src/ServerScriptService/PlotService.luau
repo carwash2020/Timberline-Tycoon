@@ -30,6 +30,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -448,6 +449,7 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	end
 	local model = if SawmillLogic.Blueprint(item.blueprintId)
 		then MachineArt.Build(item.blueprintId, false)
+		elseif ChopSawLogic.Blueprint(item.blueprintId) then MachineArt.BuildChopSaw(false)
 		else BlueprintModels.Build(bp, false)
 	if not model then
 		return
@@ -488,6 +490,13 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		model:SetAttribute("CutX", settings.x)
 		model:SetAttribute("CutY", settings.y)
 		MachineArt.SetCut(model, settings.x, settings.y)
+	end
+	if ChopSawLogic.Blueprint(item.blueprintId) then
+		local saved = item.data
+		local cut = ChopSawLogic.Clamp(if saved and type(saved.x) == "number" then saved.x else ChopSawLogic.DefaultCut)
+		item.data = { x = cut, y = 0 }
+		model:SetAttribute("CutU", cut)
+		MachineArt.SetLength(model, cut)
 	end
 	placeModel(slot, model, item)
 	if bp.kit then

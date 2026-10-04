@@ -226,6 +226,7 @@ return function(t)
 			"AetherService",
 			"AxeService",
 			"BiomeService",
+			"ChopSawService",
 			"DevCommands",
 			"FieldGuideService",
 			"GondolaService",

@@ -3,6 +3,7 @@
 -- server (which decides) and the client's ghost preview (which shows green
 -- or red) agree, and tests can run it.
 
+local ChopSawLogic = require(script.Parent.ChopSawLogic)
 local GameConfig = require(script.Parent.GameConfig)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
@@ -28,9 +29,9 @@ export type Placed = {
 	data: { x: number, y: number }?,
 }
 
--- A decor blueprint, or a sawmill (they place on the same grid).
+-- A decor blueprint, a sawmill, or a chop saw (they place on the same grid).
 function PlotLogic.Blueprint(id: string): Blueprint?
-	return PlotData.Blueprint(id) or SawmillLogic.Blueprint(id)
+	return PlotData.Blueprint(id) or SawmillLogic.Blueprint(id) or ChopSawLogic.Blueprint(id)
 end
 
 export type Rect = { x: number, z: number, w: number, d: number } -- centre + size

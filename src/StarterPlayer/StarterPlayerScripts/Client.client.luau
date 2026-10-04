@@ -28,6 +28,7 @@ local MODULES = {
 	"CarryController",
 	"CarryPose",
 	"ChopController",
+	"ChopSawController",
 	"CutController",
 	"DailyUI",
 	"DialogueUI",
@@ -118,6 +119,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "ChopController",
 		get = function()
 			return require(script.Parent.ChopController)
+		end,
+	},
+	{
+		name = "ChopSawController",
+		get = function()
+			return require(script.Parent.ChopSawController)
 		end,
 	},
 	{
