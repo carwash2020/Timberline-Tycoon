@@ -13,16 +13,20 @@
 -- distance; unlit (LightInfluence 0), not drawn through walls (AlwaysOnTop
 -- off), hidden past MaxDistance.
 -- It fades out within FadeWithin studs of you (checked every Check
--- seconds; walk up to a shop and the shop's own sign takes over) and
+-- seconds, and only on the cosmetic budget's ticks; walk up to a shop
+-- and the shop's own sign takes over) and
 -- while a shop screen is open (ShopUI's ScreenGui is enabled).
 -- The marked parts are in Persistent models that reach a client after it
 -- starts, so each marker is set up when its part appears (ChildAdded, no
 -- WaitForChild): nothing here waits forever or warns.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local Quality = require(script.Parent.Quality)
 local UITheme = require(script.Parent.UITheme)
 
 local C = UITheme.Colors
@@ -483,8 +487,15 @@ function TownMarkers.Start()
 	end)
 
 	local elapsed = 0
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
-		elapsed += dt
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
+		elapsed += step
 		if elapsed < TownMarkers.Check then
 			return
 		end

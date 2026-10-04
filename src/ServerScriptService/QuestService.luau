@@ -17,8 +17,8 @@
 --     (TreeService.StumpHold, TutorialData.StumpHold).
 --   * The steps are TutorialData.ForLoop(loop), for the core loop that
 --     runs (GameServer passes CoreLoop.Active() to Init; 1, the v1 steps,
---     when not given). The v2 loop's steps (StepsV2: the same ids in the
---     same order, so saves carry over) count the v2 events, reported
+--     when not given). The v2 loop's steps (StepsV2: fell, drag, sell,
+--     plot, then the truck) count the v2 events, reported
 --     through QuestService.Event like the v1 ones:
 --       woodGrabbed   GameServer, from GrabService.Hooks.onGrab
 --       woodSold      QuestService.WoodSold (SellService's onSold): pieces
@@ -206,6 +206,13 @@ end
 
 -- Call once the player's save has loaded.
 function QuestService.Start(player: Player, profile: Profile)
+	if loop == 2 then
+		-- Old v2 saves stored a plot-first index. Once tutorialOrder is
+		-- current, the index already names the right step, so the funnel
+		-- realign (which assumes later steps have higher indexes) must not
+		-- pull a player who already claimed back onto the plot step.
+		TutorialData.ApplyOrder(profile)
+	end
 	if profile.tutorialDone then
 		publish(player, profile)
 		refreshNext(player, profile)
@@ -223,7 +230,9 @@ function QuestService.Start(player: Player, profile: Profile)
 		end
 		return
 	end
-	realign(profile)
+	if loop ~= 2 or profile.tutorialOrder ~= TutorialData.OrderV2 then
+		realign(profile)
+	end
 	if
 		profile.tutorialReplay ~= true
 		and profile.bestAxeTier >= 2

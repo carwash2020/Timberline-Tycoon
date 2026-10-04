@@ -293,8 +293,9 @@ return function(t)
 		t.eq(v2.Steps, TutorialData.StepsV2)
 		v2.Quest.Start(v2.player, v2.profile)
 		t.eq(v2.player.attrs.TutorialStep, 1)
-		t.eq(v2.Steps[1].event, "plotClaimed")
-		t.eq(v2.Steps[2].event, "treeFelled")
+		t.eq(v2.Steps[1].event, "treeFelled")
+		t.eq(v2.Steps[1].id, "fell")
+		t.eq(v2.Steps[4].id, "plot")
 		local v1 = setup()
 		t.eq(v1.Steps, TutorialData.Steps)
 	end)
@@ -305,8 +306,6 @@ return function(t)
 			return s.Steps[s.profile.tutorialStep].id
 		end
 		s.Quest.Start(s.player, s.profile)
-		t.eq(at(), "plot")
-		s.event("plotClaimed")
 		t.eq(at(), "fell")
 		s.event("treeFelled") -- the chop path (SectionTrees' OnFelled from M1.3)
 		t.eq(at(), "pickup")
@@ -317,9 +316,11 @@ return function(t)
 		s.event("woodLoaded")
 		t.eq(at(), "sell", "a load doesn't sell the cart")
 		local cash = s.profile.cash
-		s.Quest.WoodSold(s.player, 2, 30)
-		t.eq(at(), "truck", "the first sale moves the cart step on")
+		s.Quest.WoodSold(s.player, 1, 30)
+		t.eq(at(), "plot", "the first piece moves the cart step on")
 		t.eq(s.profile.cash, cash + 25, "Murph's share on that sale")
+		s.event("plotClaimed")
+		t.eq(at(), "truck")
 		t.eq(s.player.attrs.TutorialProgress, 0, "and its cash doesn't count toward the truck")
 		s.event("truckBought")
 		t.eq(at(), "load")
@@ -356,7 +357,6 @@ return function(t)
 	t.test("v2: a sale's junk numbers count for nothing; a sale the wallet cap ate counts its pieces", function()
 		local s = setup(nil, 2)
 		s.Quest.Start(s.player, s.profile)
-		s.event("plotClaimed")
 		for _, event in ipairs({ "treeFelled", "woodGrabbed" }) do
 			s.event(event)
 		end
@@ -364,7 +364,8 @@ return function(t)
 		s.Quest.WoodSold(s.player, 0, 30)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "sell", "no pieces")
 		s.Quest.WoodSold(s.player, 1, 0)
-		t.eq(s.Steps[s.profile.tutorialStep].id, "truck", "nothing credited (a full wallet): still a sale")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "plot", "nothing credited (a full wallet): still a sale")
+		s.event("plotClaimed")
 		s.event("truckBought")
 		s.event("woodLoaded")
 		s.Quest.WoodSold(s.player, 1, 0)
@@ -424,6 +425,7 @@ return function(t)
 		s.Quest.Start(s.player, s.profile)
 		t.ok(not s.profile.tutorialDone, "no bypass for a better axe, no realign from the v1 funnel")
 		t.eq(s.player.attrs.TutorialStep, 1)
+		t.eq(s.Steps[1].id, "fell")
 		t.eq(s.player.attrs.TutorialRefresher, true)
 		s.event("plotClaimed")
 		s.event("treeFelled")
@@ -443,9 +445,9 @@ return function(t)
 	t.test("v2 refresher: Skip ends it; a rejoin mid-way carries on; under v1 it's the normal tutorial", function()
 		local s = setup({ tutorialRefresher = true, bestAxeTier = 4 }, 2)
 		s.Quest.Start(s.player, s.profile)
-		s.event("plotClaimed")
+		s.event("treeFelled")
 		t.eq(s.profile.tutorialStep, 2)
-		t.eq(s.Steps[2].id, "fell")
+		t.eq(s.Steps[2].id, "pickup")
 		s.Quest.Start(s.player, s.profile) -- a rejoin
 		t.eq(s.profile.tutorialStep, 2, "carries on")
 		s.skip()
@@ -458,15 +460,60 @@ return function(t)
 
 	t.test("the refresher's texts: Murph's welcome-back line and the tracker title", function()
 		local TutorialData = t.shared("TutorialData")
-		local plot = TutorialData.StepsV2[1]
+		local fell = TutorialData.StepsV2[1]
+		t.eq(fell.id, "fell")
+		t.eq(TutorialData.MurphLine(fell, false, 0), fell.murph)
+		t.ok(string.find(TutorialData.MurphLine(fell, true), "Welcome back", 1, true) ~= nil)
+		local pickup = TutorialData.StepsV2[2]
+		t.eq(TutorialData.MurphLine(pickup, true), pickup.murph, "no special line: the usual one")
+		local plot = TutorialData.StepsV2[4]
 		t.eq(plot.id, "plot")
 		t.eq(TutorialData.MurphLine(plot, true), plot.murph, "the claim has no welcome-back line")
-		local fell = TutorialData.StepsV2[2]
-		t.eq(TutorialData.MurphLine(fell, false), fell.murph)
-		t.ok(string.find(TutorialData.MurphLine(fell, true), "Welcome back", 1, true) ~= nil)
-		local pickup = TutorialData.StepsV2[3]
-		t.eq(TutorialData.MurphLine(pickup, true), pickup.murph, "no special line: the usual one")
 		t.eq(TutorialData.StepsV2[TutorialData.RefresherLast].id, "sell")
 		t.ok(#TutorialData.FarewellBack > 0)
+	end)
+
+	t.test("v2 S11: a save past plot, or one that already claimed, skips the claim and keeps the plot", function()
+		local function claimed()
+			return { claimed = true, tier = 1, placed = {} }
+		end
+		local past = setup({
+			tutorialStep = 2, -- the old order's fell, already past the claim
+			tutorialProgress = 0,
+			tutorialOrder = 0,
+			plot = claimed(),
+			onboarding = { ["Tutorial:plot"] = true, ["Tutorial:fell"] = true },
+		}, 2)
+		past.Quest.Start(past.player, past.profile)
+		t.eq(past.Steps[past.profile.tutorialStep].id, "fell")
+		t.eq(past.profile.plot.claimed, true)
+		past.event("treeFelled")
+		past.event("woodGrabbed")
+		past.event("woodSold")
+		t.eq(past.Steps[past.profile.tutorialStep].id, "truck", "reaching plot completes it")
+		t.eq(past.profile.plot.claimed, true, "the plot is not released")
+
+		local owned = setup({
+			tutorialStep = 1,
+			tutorialOrder = 0,
+			plot = claimed(),
+		}, 2)
+		owned.Quest.Start(owned.player, owned.profile)
+		t.eq(owned.Steps[owned.profile.tutorialStep].id, "fell")
+		owned.event("treeFelled")
+		owned.event("woodGrabbed")
+		owned.event("woodSold")
+		t.eq(owned.Steps[owned.profile.tutorialStep].id, "truck")
+		t.eq(owned.profile.plot.claimed, true)
+
+		local later = setup({
+			tutorialStep = 5,
+			tutorialOrder = 0,
+			plot = claimed(),
+			onboarding = { ["Tutorial:plot"] = true, ["Tutorial:truck"] = true },
+		}, 2)
+		later.Quest.Start(later.player, later.profile)
+		t.eq(later.Steps[later.profile.tutorialStep].id, "truck", "already past the new plot step")
+		t.eq(later.profile.plot.claimed, true)
 	end)
 end

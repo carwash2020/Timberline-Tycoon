@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
+local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local Quality = require(script.Parent.Quality)
 local LightingController = require(script.Parent.LightingController)
@@ -96,7 +97,14 @@ function LifeFX.Start()
 	end
 
 	local along = 0
+	local sinceCosmetic = 0
 	RunService.Heartbeat:Connect(function(dt: number)
+		sinceCosmetic += dt
+		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
+			return
+		end
+		local step = sinceCosmetic
+		sinceCosmetic = 0
 		local camera = workspace.CurrentCamera
 		if not camera then
 			return
@@ -123,7 +131,7 @@ function LifeFX.Start()
 			end
 			return
 		end
-		along += dt
+		along += step
 		for i = 1, want do
 			local t = (along * 4 + i * 7) % 28
 			local side = (i - 1.5) * 3

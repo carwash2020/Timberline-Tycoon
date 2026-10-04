@@ -328,7 +328,8 @@ end
 
 -- The part the beacon should hang over for this step, if it's around.
 local function beaconTarget(step: Step, from: Vector3): BasePart?
-	local target = step.beacon
+	local cash = player:GetAttribute("Cash")
+	local target = TutorialData.Beacon(step, if type(cash) == "number" then cash else 0)
 	local elderUid = workspace:GetAttribute("ElderUid")
 	local now = workspace:GetServerTimeNow()
 	local function isHere(userId: number): boolean
@@ -519,10 +520,12 @@ local function refresh()
 		end
 	end
 	-- A new step: Murph says his line. (Also on join, as a reminder.)
+	-- Short on the truck or the Steel Axe, he says to sell more first.
 	if index ~= lastStep then
 		if step then
 			lastRefresher = onRefresher()
-			say(TutorialData.MurphLine(step, lastRefresher))
+			local cash = player:GetAttribute("Cash")
+			say(TutorialData.MurphLine(step, lastRefresher, if type(cash) == "number" then cash else 0))
 		elseif lastStep > 0 and not skipped then
 			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
 		end
@@ -861,7 +864,8 @@ local function hookMurph(model: Instance): boolean
 	prompt.Triggered:Connect(function()
 		local _, step = currentStep()
 		if step then
-			say(TutorialData.MurphLine(step, onRefresher()))
+			local cash = player:GetAttribute("Cash")
+			say(TutorialData.MurphLine(step, onRefresher(), if type(cash) == "number" then cash else 0))
 		else
 			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
 		end
