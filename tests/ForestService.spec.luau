@@ -951,16 +951,21 @@ return function(t)
 		end
 		t.ok(s.attr("Vitality_grove") >= 75, "thriving")
 		s.workspace:SetAttribute("IsNight", true)
-		-- Night is 19:00 to 05:00: 500 real seconds from 950 into each 1200 s day.
+		-- Night is 19:00 to 05:00. Ask the clock (a 24-minute day, faster
+		-- after 20:00) for a moment with under five minutes left, and for dusk.
 		local WorldTime = s.WorldTime
-		s.serverNow = 1200 -- midnight: 250 s of night left
-		t.ok(math.abs(WorldTime.SecondsUntilChange(s.serverNow) - 250) < 1e-6)
+		s.serverNow = WorldTime.SecondsFromMidnight(4.5)
+		local left = WorldTime.SecondsUntilChange(s.serverNow)
+		t.ok(WorldTime.IsNight(WorldTime.ClockTime(s.serverNow)), "still night at 04:30")
+		t.ok(left < 5 * 60, "under five minutes to dawn: " .. left)
 		s.now += 20 * 60
 		s.rolls = { 0.5, 0, 0 } -- the next check's interval, then the grove pick and wake rolls
 		s.Forest.Tick(0)
 		t.eq(s.Forest.ElderUid(), nil, "too close to dawn")
-		s.serverNow = 950 -- dusk: the whole night ahead
-		t.ok(math.abs(WorldTime.SecondsUntilChange(s.serverNow) - 500) < 1e-6)
+		s.serverNow = WorldTime.SecondsFromMidnight(19)
+		left = WorldTime.SecondsUntilChange(s.serverNow)
+		t.ok(WorldTime.IsNight(WorldTime.ClockTime(s.serverNow)), "night at 19:00")
+		t.ok(left >= 5 * 60, "the night just started: " .. left)
 		s.now += 20 * 60
 		s.rolls = { 0.5, 0, 0 }
 		golden(s)

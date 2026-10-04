@@ -43,7 +43,7 @@ local GameConfig = {
 	MaxOwnedAxes = 20, -- the shop stops selling past this (keeps hotbars and saves small)
 
 	-- World (biome areas and rules are in BiomeData)
-	DayCycleMinutes = 20, -- one full day and night, real minutes; the same on every server
+	DayCycleMinutes = 24, -- one full day and night, real minutes; the same on every server
 	NightStartsAt = 19, -- in-game hour (ClockTime) the night starts
 	NightEndsAt = 5, -- ... and ends; the Gloam Hollow only exists in between
 	LavaDamagePerSecond = 5, -- on the Volcano without Heat Boots (100 health = 20 s)
@@ -164,7 +164,7 @@ local GameConfig = {
 	LuxSellBonus = 1.1, -- 10% more at the pad, once, on the piece's value, before 2x Cash
 
 	-- Wave 0 placeholders. Nothing reads these yet, so play is unchanged.
-	-- DayCycleMinutes stays 20 (a later batch owns the day length). Truck
+	-- DayCycleMinutes is 24 (the day-length batch). Truck
 	-- respawns keep the existing recall rule, so there is no new key for them.
 	-- TBD (Designer), unread until the shop batch:
 	BoxRespawnSec = 60, -- a bought item's display returns to the rack after this

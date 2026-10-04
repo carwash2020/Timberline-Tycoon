@@ -431,6 +431,14 @@ EnvironmentData.WeatherOverrides = {
 	},
 } :: { [string]: Override }
 
+-- Street lamps and windows come on one by one from 18:42 (about 18:40)
+-- across LampOnSpan hours, and go out from LampOffFrom. These are clock
+-- hours, so a longer day does not move dusk. LightingController reads them.
+EnvironmentData.LampOnFrom = 18.7
+EnvironmentData.LampOnSpan = 0.7
+EnvironmentData.LampOffFrom = 5.4
+EnvironmentData.LampOffSpan = 0.6
+
 -- 0 at night, 1 by day, easing through dawn (5-7) and dusk (17.5-19.5).
 function EnvironmentData.Daylight(clockTime: number): number
 	local h = clockTime % 24
@@ -485,6 +493,33 @@ function EnvironmentData.MistColourWeight(clockTime: number): number
 	return EnvironmentData.MistWeight(clockTime) * (1 - EnvironmentData.Daylight(clockTime))
 end
 
+-- Cave and fog volumes for the world pass to place. Tag a part FogZone
+-- (CanCollide off). Attribute FogPreset is "cave" or "fog"; anything else,
+-- including none, is a cave. LightingController blends the preset while
+-- the local player is inside the part. No particles: it only nudges the
+-- atmosphere the night mist already uses, so a low quality phone does not
+-- grow a new emitter.
+EnvironmentData.FogZoneTag = "FogZone"
+EnvironmentData.FogPresets = {
+	-- Darker than the hour, and thicker. A night in the open is brightness
+	-- 0.8; x0.72 leaves it readable, and +0.18 density sits under a whiteout.
+	cave = {
+		mul = { brightness = 0.72 },
+		add = { atmosphereDensity = 0.18, atmosphereHaze = 1.4 },
+	} :: Override,
+	-- A pocket of the night mist's thickness, without darkening the lamps' light.
+	fog = {
+		add = { atmosphereDensity = 0.16, atmosphereHaze = 1.5 },
+	} :: Override,
+} :: { [string]: Override }
+
+function EnvironmentData.FogPresetName(attribute: unknown): string
+	if attribute == "fog" then
+		return "fog"
+	end
+	return "cave"
+end
+
 local NUMBER_SET: { [string]: boolean } = {}
 for _, k in ipairs(EnvironmentData.NumberKeys) do
 	NUMBER_SET[k] = true
@@ -520,6 +555,9 @@ for name, o in pairs(EnvironmentData.WeatherOverrides) do
 end
 checkOverride("Mist", EnvironmentData.Mist.override)
 checkOverride("Mist colour", EnvironmentData.Mist.colour)
+for name, o in pairs(EnvironmentData.FogPresets) do
+	checkOverride("FogZone " .. name, o)
+end
 
 local function copy(s: LightingState): LightingState
 	return table.clone(s)
@@ -614,8 +652,17 @@ end
 
 -- The full picture: the hour's light and its night fog (and the fog's
 -- colour while it's dark), then the biome you're in ("" or nil = open
--- country), then the weather at `intensity` (0..1).
-function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: string?, intensity: number?): LightingState
+-- country), then the weather at `intensity` (0..1), then a FogZone preset
+-- at `fogWeight` (0..1) when the player is inside one. Omit the last two
+-- and the picture is what it was.
+function EnvironmentData.Blend(
+	clockTime: number,
+	biomeId: string?,
+	weather: string?,
+	intensity: number?,
+	fogPreset: string?,
+	fogWeight: number?
+): LightingState
 	local s = EnvironmentData.TimeOfDay(clockTime)
 	if biomeId ~= "sky" then
 		local mist = EnvironmentData.Mist
@@ -629,6 +676,13 @@ function EnvironmentData.Blend(clockTime: number, biomeId: string?, weather: str
 	local w = if weather then EnvironmentData.WeatherOverrides[weather] else nil
 	if w then
 		EnvironmentData.Apply(s, w, math.clamp(intensity or 1, 0, 1))
+	end
+	local zone = fogWeight or 0
+	if zone > 0 then
+		local preset = EnvironmentData.FogPresets[EnvironmentData.FogPresetName(fogPreset)]
+		if preset then
+			EnvironmentData.Apply(s, preset, math.clamp(zone, 0, 1))
+		end
 	end
 	EnvironmentData.Clamp(s)
 	return s
@@ -647,7 +701,8 @@ EnvironmentData.NumberEpsilon = 1e-3
 EnvironmentData.ColorEpsilon = 1 / 255 -- one 8-bit step in any channel
 -- The sun is written every frame it moves (long shadows at dusk and dawn
 -- step visibly at anything coarser); this only skips frames where the
--- clock stands still. 1e-4 in-game hours is 5 ms of a 20-minute day.
+-- clock stands still. 1e-4 in-game hours is about 6 ms of an even hour
+-- on a 24-minute day (a little less while the night runs fast).
 EnvironmentData.ClockEpsilon = 1e-4
 
 -- Adds a frame's `dt` to the time `pending` since the last write. Returns

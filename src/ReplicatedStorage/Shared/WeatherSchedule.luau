@@ -9,9 +9,10 @@
 --   * A slot's weather eases in over its first 40 s and out over its last
 --     40 s, unless the slot next to it has the same weather (so two rainy
 --     slots in a row are one long shower, not two).
---   * Fog only lies at night and in the early morning (a day is 20 real
---     minutes, so a slot is a fifth of a day): a fog slot is foggy from 21:00 to
+--   * Fog only lies at night and in the early morning (a day is 24 real
+--     minutes, so a slot is a sixth of a day): a fog slot is foggy from 21:00 to
 --     08:30 in-game, burning off with the morning, and clear in between.
+--     Those edges are clock hours, so a faster night does not move them.
 --   * Each biome reads the weather its own way (ForBiome): rain falls as
 --     snow on the Snowfields, storms are blizzards there and ashfall at the
 --     Volcano, and up on the Aether Isles you are above the cloud and the
