@@ -534,7 +534,8 @@ end
 -- The parts QuestUI clones into Murph's portrait. Beard and Beanie are
 -- welded to Head but parented on the model, so a separate clone leaves
 -- the weld pointing at the live Head. FillPortrait retargets any Weld
--- or WeldConstraint onto the cloned part of the same name.
+-- or WeldConstraint onto the cloned part of the same name, or clears it
+-- when the portrait has no such part.
 local PORTRAIT_PARTS = { "Head", "Beard", "Beanie", "Torso", "LeftArm", "RightArm" }
 
 function QuestUI.FillPortrait(view: Instance, murph: Instance)
@@ -552,13 +553,22 @@ function QuestUI.FillPortrait(view: Instance, murph: Instance)
 		if found and found:IsA("BasePart") then
 			return found
 		end
-		return part
+		return nil
 	end
 	for _, d in ipairs(view:GetDescendants()) do
 		if d:IsA("Weld") or d:IsA("WeldConstraint") then
 			local joint = d :: Weld
-			joint.Part0 = match(joint.Part0)
-			joint.Part1 = match(joint.Part1)
+			local p0 = match(joint.Part0)
+			local p1 = match(joint.Part1)
+			-- match returns nil when the portrait has no clone of that part.
+			-- Drop the weld: a cleared Ref is not storable here, and leaving
+			-- it would keep the live figure.
+			if p0 and p1 then
+				joint.Part0 = p0
+				joint.Part1 = p1
+			else
+				joint:Destroy()
+			end
 		end
 	end
 end

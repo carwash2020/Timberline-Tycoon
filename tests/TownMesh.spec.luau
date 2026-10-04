@@ -399,9 +399,16 @@ return function(t)
 				t.eq(part.CanQuery, false, part.Name .. " CanQuery")
 				t.eq(part.CanTouch, false, part.Name .. " CanTouch")
 			end
+			local leg = murph:FindFirstChild("LeftLeg")
+			local outside = roblox.Instance.new("Weld")
+			outside.Name = "Outside"
+			outside.Part0 = leg
+			outside.Part1 = murph.Torso
+			outside.Parent = murph.Torso
 			local view = roblox.Instance.new("Folder")
 			view.Name = "Portrait"
 			QuestUI.FillPortrait(view, murph)
+			t.eq(view.Torso:FindFirstChild("Outside"), nil, "no cloned LeftLeg: the weld does not keep the live part")
 			local function inside(part)
 				return part ~= nil and part:IsDescendantOf(view)
 			end
@@ -586,6 +593,34 @@ return function(t)
 		t.eq(#TownModels.Ids("environment"), 41)
 		t.eq(#TownModels.Ids("building"), 6)
 		t.eq(#TownModels.Ids("npc"), 9)
+	end)
+
+	t.test("I-Budget: props under 300 tris cast no shadow", function()
+		local function everyShadow(model, on)
+			local meshes = visuals(model)
+			t.ok(#meshes > 0, model.Name .. " meshed")
+			for _, part in ipairs(meshes) do
+				t.eq(part.CastShadow, on, model.Name .. " " .. part.Name)
+			end
+		end
+		local mail = TownModels.Get("Mailbox")
+		withMeshes(function()
+			local ok, err = pcall(function()
+				everyShadow(PropArt.Rock(4, 1), false)
+				everyShadow(BuildingArt.Prop("Mailbox", 1), false)
+				everyShadow(BuildingArt.Prop("FlowerBox", 1), false)
+				everyShadow(BuildingArt.Sawmill(), true)
+				everyShadow(PropArt.Windmill(3), true)
+				mail.tris = 480
+				everyShadow(BuildingArt.Prop("Mailbox", 3), true)
+				mail.tris = 120
+				everyShadow(BuildingArt.Prop("Mailbox", 3), false)
+			end)
+			mail.tris = nil
+			if not ok then
+				error(err, 0)
+			end
+		end)
 	end)
 
 	t.test("I-Budget: the meshed map has the same PointLights and SpotLights as main", function()

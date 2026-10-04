@@ -55,6 +55,47 @@ local KEEP = {
 -- Body, Roof, and an NPC Head stay Automatic unless the mesh is tiny.
 -- Glow, signs, counters, doors, hands, feet, and props under 300 tris
 -- are Performance. Unknown tris (nil) does not force the tiny-prop path.
+--
+-- MeshKit.Visual turns CastShadow on. These props are the under-300 band
+-- while the repo has no per-prop count (rocks, mailboxes, flower boxes,
+-- and the same clutter). A recorded count wins: under 300 stays flat,
+-- 300 or more keeps the shadow. Structures are not in this set.
+local FLAT_UNCOUNTED: { [string]: boolean } = {
+	RockGrey = true,
+	RockBrown = true,
+	RockMossy = true,
+	Bush = true,
+	Stump = true,
+	FallenLog = true,
+	GlowMushrooms = true,
+	SawdustPile = true,
+	PathRound = true,
+	ParkingBay = true,
+	LogPile = true,
+	Crate = true,
+	Barrel = true,
+	Bench = true,
+	Cart = true,
+	Mailbox = true,
+	Haybale = true,
+	Wheelbarrow = true,
+	ToolRack = true,
+	Lantern = true,
+	Planter = true,
+	FlowerBox = true,
+	MillBell = true,
+}
+
+local function shadowless(asset: TownModels.Asset): boolean
+	if asset.category ~= "environment" then
+		return false
+	end
+	if asset.tris ~= nil then
+		return asset.tris < 300
+	end
+	return FLAT_UNCOUNTED[asset.id] == true
+end
+
 function TownMeshes.FidelityFor(name: string, tris: number?): Enum.RenderFidelity
 	if tris ~= nil and tris < 300 then
 		return Enum.RenderFidelity.Performance
@@ -154,6 +195,9 @@ local function finishPiece(
 )
 	local name = part.Name
 	MeshKit.Visual(part, meshId)
+	if shadowless(asset) then
+		part.CastShadow = false
+	end
 	MeshKit.Fidelity(part, TownMeshes.FidelityFor(name, asset.tris))
 	part.Anchored = true
 	if GLOW[name] then
@@ -377,6 +421,9 @@ function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boo
 	for i, part in ipairs(made) do
 		place(part, pivot)
 		MeshKit.Visual(part, ids[i])
+		if shadowless(asset) then
+			part.CastShadow = false
+		end
 		MeshKit.Fidelity(part, TownMeshes.FidelityFor(part.Name, asset.tris))
 		part.Anchored = true
 		if GLOW[part.Name] then
