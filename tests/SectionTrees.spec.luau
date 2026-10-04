@@ -1239,4 +1239,31 @@ return function(t)
 		t.ok(recs[1].slot, "two rooted trees still fill a cap of 1")
 		t.eq(recs[1].regrowAt, s.now + s.Trees.RetrySec)
 	end)
+
+	t.test("a zone at its cap of rooted trees holds the open slot for RetrySec", function()
+		local s = setup()
+		s.Trees._roll = function()
+			return 0
+		end
+		local cap = 2
+		local zone = { id = "full", cx = 800, cz = 800, radius = 80, cap = cap }
+		local recs = {}
+		for i = 1, cap + 1 do
+			recs[i] = s.tree("oak", Vector3.new(800 + (i - 1) * 30, 0, 800), { seed = i, zone = zone, cap = cap })
+		end
+		local p = s.player(1, recs[1].base + Vector3.new(4, 3, 0))
+		local _, ok = s.cutThrough(p, recs[1].sections[1])
+		t.ok(ok)
+		t.ok(recs[1].slot)
+		local rooted = 0
+		for i = 2, cap + 1 do
+			t.ok(not recs[i].slot)
+			rooted += 1
+		end
+		t.eq(rooted, cap, "the zone is exactly at its cap")
+		s.now = recs[1].regrowAt or s.now
+		s.Trees.GrowTick(s.now)
+		t.ok(recs[1].slot, "tryRegrow leaves the slot open")
+		t.eq(recs[1].regrowAt, s.now + s.Trees.RetrySec)
+	end)
 end

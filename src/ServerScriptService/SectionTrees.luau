@@ -1388,7 +1388,9 @@ local function zoneFull(rec: TreeRecord): boolean
 			end
 		end
 	end
-	return n > cap
+	-- The record waiting to regrow is itself a slot, so it is not in n.
+	-- A zone already at its cap of rooted trees is full.
+	return n >= cap
 end
 
 -- Nothing rooted is left (or a dead tree has sunk). The record waits
