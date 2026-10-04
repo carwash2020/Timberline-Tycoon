@@ -700,7 +700,7 @@ local function build()
 	UITheme.list(column, 6)
 
 	-- The tracker: kraft paper, a bark rim, an ink edge.
-	local card = UITheme.Card(C.Paper, C.Ink, 3, 12, false)
+	local card = UITheme.Card(C.Paper, C.Ink, 3, 12, false, "Panel")
 	card.outer.Name = "Tracker"
 	card.outer.LayoutOrder = 1
 	card.outer.Size = UDim2.fromOffset(280, 0)
@@ -785,7 +785,7 @@ local function build()
 	holder.BackgroundTransparency = 1
 	holder.Visible = false
 	holder.Parent = column
-	local bubble = UITheme.Card(C.Bark, C.Ink, 3, 12, false)
+	local bubble = UITheme.Card(C.Bark, C.Ink, 3, 12, false, "Panel")
 	bubble.outer.Name = "Card"
 	bubble.outer.Size = UDim2.fromOffset(280, 0)
 	bubble.outer.AutomaticSize = Enum.AutomaticSize.Y

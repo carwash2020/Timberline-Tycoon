@@ -4,7 +4,9 @@
 --   * Colours and fonts (FredokaOne headings, the world signs' face;
 --     Gotham body).
 --   * Card(): a frame with a drop edge (a darker strip under it) instead of
---     a shadow, the spec's "chunky" look.
+--     a shadow, the spec's "chunky" look. An optional skin (UIArt) draws
+--     that frame from the uploaded art instead: sliced, no corner, and
+--     texture() leaves it alone.
 --   * Button(): a chunky button with named styles (buy, cant, starter,
 --     locked, forged, full, use, inuse, bark, blue, amber, skip). Pressed,
 --     it drops onto its edge; on a computer it brightens under the mouse.
@@ -39,6 +41,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
+
+local UIArt = require(script.Parent.UIArt)
 
 local UITheme = {}
 
@@ -546,7 +550,17 @@ function UITheme.stroke(parent: GuiObject, color: Color3, thickness: number): UI
 end
 
 function UITheme.padding(parent: GuiObject, top: number, right: number, bottom: number, left: number): UIPadding
-	local p = Instance.new("UIPadding")
+	-- A skinned face already reserves its slice margin. Callers that pad
+	-- less than that would draw into the bark border, so the margin is a floor.
+	local raw = parent:GetAttribute("SkinInset")
+	if type(raw) == "number" then
+		top = math.max(top, raw)
+		right = math.max(right, raw)
+		bottom = math.max(bottom, raw)
+		left = math.max(left, raw)
+	end
+	local found = parent:FindFirstChildOfClass("UIPadding")
+	local p = if found and found:IsA("UIPadding") then found else Instance.new("UIPadding")
 	p.PaddingTop = UDim.new(0, top)
 	p.PaddingRight = UDim.new(0, right)
 	p.PaddingBottom = UDim.new(0, bottom)
@@ -581,6 +595,11 @@ end
 -- card's face (an ImageLabel, so list layouts in it aren't disturbed), or
 -- as a full-size image behind a plain frame's children.
 function UITheme.texture(surface: GuiObject, kind: "Wood" | "Kraft", radius: number)
+	-- A skinned face already carries its art. A tiled texture would cover
+	-- the flat paper center the digits and prices sit on.
+	if surface:GetAttribute("UIArt") ~= nil then
+		return
+	end
 	local id = UITheme.Textures[kind]
 	if id == "" then
 		return
@@ -608,30 +627,97 @@ end
 
 export type Card = { outer: Frame, face: ImageLabel }
 
+-- A named skin with a real image id, or nil when there isn't one (missing
+-- name, or an empty id): Card then builds the flat card below.
+local function skinArt(name: string?): UIArt.Skin?
+	if name == nil or name == "" then
+		return nil
+	end
+	local art = UIArt.Get(name)
+	if art == nil or art.id == "" then
+		return nil
+	end
+	return art
+end
+
+-- The flat center's inset for `name`, or 0 when that skin isn't in use.
+function UITheme.SkinInset(name: string): number
+	local art = skinArt(name)
+	return if art then UIArt.Inset(art) else 0
+end
+
+-- Puts `skin` on a face: sliced image, transparent background, no corner.
+-- Swapping Button for ButtonPressed (a prompt held down) calls this again.
+function UITheme.ApplySkin(face: ImageLabel, skin: string)
+	local art = skinArt(skin)
+	if not art then
+		return
+	end
+	face:SetAttribute("UIArt", skin)
+	face.Image = art.id
+	face.ScaleType = Enum.ScaleType.Slice
+	face.SliceCenter = art.sliceCenter
+	face.SliceScale = art.sliceScale
+	face.BackgroundTransparency = 1
+	local corner = face:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner:Destroy()
+	end
+end
+
 -- `outer` is the edge colour and `face` sits on it, `edge` px short, so the
 -- edge shows along the bottom. Size and place `outer`; put content in
--- `face`. With `auto`, both grow to fit the face's content.
-function UITheme.Card(fill: Color3, edgeColor: Color3, edge: number, radius: number, auto: boolean?): Card
+-- `face`. With `auto`, both grow to fit the face's content. `skin` (a
+-- UIArt name) draws the face from that art instead: the outer goes fully
+-- transparent, the face is sliced with no corner, and an auto card pads
+-- the face by the slice margin so content stays on the flat center.
+function UITheme.Card(
+	fill: Color3,
+	edgeColor: Color3,
+	edge: number,
+	radius: number,
+	auto: boolean?,
+	skin: string?
+): Card
+	local art = skinArt(skin)
 	local outer = Instance.new("Frame")
 	outer.BackgroundColor3 = edgeColor
 	outer.BorderSizePixel = 0
-	UITheme.corner(outer, radius)
 	local face = Instance.new("ImageLabel") -- an image, so a texture can go on it
 	face.Name = "Face"
-	face.Image = ""
 	face.BackgroundColor3 = fill
 	face.BorderSizePixel = 0
-	UITheme.corner(face, radius)
-	if auto then
-		-- AutomaticSize treats Size as a minimum: start from zero so the
-		-- card is exactly as big as what's in it.
-		outer.Size = UDim2.new()
-		face.Size = UDim2.new()
-		outer.AutomaticSize = Enum.AutomaticSize.XY
-		face.AutomaticSize = Enum.AutomaticSize.XY
-		UITheme.padding(outer, 0, 0, edge, 0)
+	if art and skin then
+		-- The shadow and the border are in the art, so the old drop edge
+		-- would only add an empty gap. The face fills the outer.
+		outer.BackgroundTransparency = 1
+		UITheme.ApplySkin(face, skin)
+		if auto then
+			outer.Size = UDim2.new()
+			face.Size = UDim2.new()
+			outer.AutomaticSize = Enum.AutomaticSize.XY
+			face.AutomaticSize = Enum.AutomaticSize.XY
+			local inset = UIArt.Inset(art)
+			face:SetAttribute("SkinInset", inset)
+			UITheme.padding(face, inset, inset, inset, inset)
+		else
+			face.Size = UDim2.fromScale(1, 1)
+		end
 	else
-		face.Size = UDim2.new(1, 0, 1, -edge)
+		UITheme.corner(outer, radius)
+		face.Image = ""
+		UITheme.corner(face, radius)
+		if auto then
+			-- AutomaticSize treats Size as a minimum: start from zero so the
+			-- card is exactly as big as what's in it.
+			outer.Size = UDim2.new()
+			face.Size = UDim2.new()
+			outer.AutomaticSize = Enum.AutomaticSize.XY
+			face.AutomaticSize = Enum.AutomaticSize.XY
+			UITheme.padding(outer, 0, 0, edge, 0)
+		else
+			face.Size = UDim2.new(1, 0, 1, -edge)
+		end
 	end
 	face.Parent = outer
 	return { outer = outer, face = face }
@@ -849,12 +935,11 @@ export type Bar = { outer: Frame, label: TextLabel, row: Frame }
 -- A bark bar at the bottom centre, just above the control hint: a line of
 -- text and a row of buttons (build mode, placing a blueprint).
 function UITheme.Bar(parent: Instance, name: string): Bar
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 12, true)
+	local card = UITheme.Card(C.Bark, C.Ink, 3, 12, true, "Panel")
 	card.outer.Name = name
 	card.outer.AnchorPoint = Vector2.new(0.5, 1)
 	card.outer.Position = UDim2.new(0.5, 0, 1, -(UITheme.Bottom() + 30 + 8))
 	card.outer.Visible = false
-	UITheme.stroke(card.face, C.Ink, 2)
 	UITheme.padding(card.face, 8, 10, 10, 10)
 	UITheme.list(card.face, 6).HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UITheme.texture(card.face, "Wood", 12)

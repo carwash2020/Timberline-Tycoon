@@ -58,6 +58,7 @@ local MODULES = {
 	"TreeCosmetics",
 	"TreeFX",
 	"TreeUI",
+	"UIArt",
 	"UITheme",
 	"VehicleController",
 	"VehicleFX",

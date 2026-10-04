@@ -238,7 +238,7 @@ local function buildPouch()
 	label.Size = UDim2.new(1, -34, 1, 0)
 	label.TextXAlignment = Enum.TextXAlignment.Left
 
-	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true)
+	local card = UITheme.Card(C.Paper, C.Ink, 2, 12, true, "Panel")
 	card.outer.Name = "PouchList"
 	card.outer.Visible = false
 	UITheme.stroke(card.face, C.Bark, 2)
@@ -694,7 +694,7 @@ local function stamp(gui: ScreenGui, figure: FigureDef, count: number)
 	scale.Parent = group
 
 	local ink = inkFor(figure.color)
-	local card = UITheme.Card(figure.color, Kit.shade(figure.color, -0.35), 6, 20)
+	local card = UITheme.Card(figure.color, Kit.shade(figure.color, -0.35), 6, 20, false, "Panel")
 	card.outer.Name = "Card"
 	card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.outer.Position = UDim2.fromScale(0.5, 0.5)
@@ -832,7 +832,9 @@ local function makeElderMarker(): (Part, TextLabel)
 	gui.MaxDistance = 6000
 	gui.Adornee = part
 	gui.Parent = part
-	local card = UITheme.Card(C.Amber, C.AmberEdge, 3, 12)
+	local card = UITheme.Card(C.Amber, C.AmberEdge, 3, 12, false, "Panel")
+	local inset = UITheme.SkinInset("Panel")
+	UITheme.padding(card.face, inset, inset, inset, inset)
 	card.outer.Size = UDim2.fromScale(1, 1)
 	UITheme.stroke(card.face, C.Ink, 2)
 	card.outer.Parent = gui

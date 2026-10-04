@@ -772,7 +772,7 @@ local function buildPanel()
 	a.Size = UDim2.new(1, -24, 1, -74)
 	a.Parent = g
 
-	local frame = UITheme.Card(C.Bark, C.Ink, 6, 20)
+	local frame = UITheme.Card(C.Bark, C.Ink, 6, 20, false, "Panel")
 	local p = frame.outer
 	p.Name = "Panel"
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -786,8 +786,10 @@ local function buildPanel()
 
 	local paper = Instance.new("Frame")
 	paper.Name = "Paper"
-	paper.Position = UDim2.fromOffset(8, 8)
-	paper.Size = UDim2.new(1, -16, 1, -16)
+	-- On the panel's flat center (the slice margin), where the prices sit.
+	local inset = UITheme.SkinInset("Panel")
+	paper.Position = UDim2.fromOffset(inset, inset)
+	paper.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
 	paper.BackgroundColor3 = C.Paper
 	paper.BorderSizePixel = 0
 	paper.ClipsDescendants = true
