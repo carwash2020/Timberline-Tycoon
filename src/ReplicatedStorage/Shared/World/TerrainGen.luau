@@ -589,10 +589,13 @@ local function stripShelf(): number
 	return shelf
 end
 
--- Height of the graded spur, or nil off it. The last SpurMeet studs sit
--- on the deck top. Nothing past the deck's south end is lifted, so the
--- deck itself stays on the shelf. The approach south of gradeFrom is the
--- existing ground, untouched, which keeps the height fingerprint.
+-- Height of the graded spur, or nil off it. The climb holds SpurCutHeight
+-- at the shelf turn so the cut through the north wall stays under the
+-- skirt beside it, then rises to the deck top and stays there. The last
+-- SpurMeet studs are part of that flat. Nothing past the deck's south end
+-- is lifted, so the deck itself stays on the shelf. The approach south of
+-- gradeFrom is the existing ground, untouched, which keeps the height
+-- fingerprint.
 local SPUR_H0: number? = nil
 local function spurStartHeight(): number
 	local known = SPUR_H0
@@ -604,6 +607,45 @@ local function spurStartHeight(): number
 	local h = groundHeight(p.X, p.Y)
 	SPUR_H0 = h
 	return h
+end
+
+local SPUR_ALONG: { number }? = nil
+local function spurAlong(): { number }
+	local known = SPUR_ALONG
+	if known then
+		return known
+	end
+	local spur = WorldLayout.TollSpur
+	local pts = spur.points
+	local marks: { number } = {}
+	local acc = 0
+	marks[spur.gradeFrom] = 0
+	for i = spur.gradeFrom, #pts - 1 do
+		local a, b = pts[i], pts[i + 1]
+		local dx, dz = b.X - a.X, b.Y - a.Y
+		acc += math.sqrt(dx * dx + dz * dz)
+		marks[i + 1] = acc
+	end
+	SPUR_ALONG = marks
+	return marks
+end
+
+local function spurHeightAt(along: number): number
+	local marks = spurAlong()
+	local spur = WorldLayout.TollSpur
+	local h0 = spurStartHeight()
+	local low = WorldLayout.SpurCutHeight
+	local top = stripShelf() + WorldLayout.BridgeDeckThick
+	local aLow = marks[spur.lowAt]
+	local aTop = marks[spur.topAt]
+	if along >= aTop or aTop - aLow <= 1e-6 then
+		return top
+	elseif along >= aLow then
+		return low + (top - low) * ((along - aLow) / (aTop - aLow))
+	elseif aLow <= 1e-6 then
+		return low
+	end
+	return h0 + (low - h0) * (along / aLow)
 end
 
 local function tollChord(x: number, z: number): number?
@@ -646,15 +688,7 @@ local function tollChord(x: number, z: number): number?
 	if bestD > half * half then
 		return nil
 	end
-	local flatFrom = acc - WorldLayout.SpurMeet
-	local top = stripShelf() + WorldLayout.BridgeDeckThick
-	if bestAlong >= flatFrom then
-		return top
-	end
-	if flatFrom <= 1e-6 then
-		return top
-	end
-	return spurStartHeight() + (top - spurStartHeight()) * (bestAlong / flatFrom)
+	return spurHeightAt(bestAlong)
 end
 
 -- Ground height at (x, z), in studs.

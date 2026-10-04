@@ -679,9 +679,22 @@ WorldLayout.SpurMaxGrade = 0.2 -- TBD (Designer)
 WorldLayout.TollClearance = 4 -- TBD (Builder) setback and gorge rescue sit this far above the ground
 WorldLayout.SpurMeet = 20 -- TBD (Designer) the last studs, flush with the deck top
 WorldLayout.TollSpurJoinZ = 900 -- TBD (Builder) on Snow Road, where the ground is still gentle
-WorldLayout.TollSpurWestX = -420 -- TBD (Builder) a lane that misses the height grid
-WorldLayout.TollSpurGradeZ = 1132 -- TBD (Builder) the climb starts clear of the wild-tree box
-WorldLayout.TollSpurShelfZ = 1520 -- TBD (Builder) the eastbound leg, north of the height grid
+-- Inside the wall gap (x -400..400) and clear of the height grid. The
+-- whole road width has to fit through that gap or the spur dead-ends
+-- on the world wall.
+WorldLayout.TollSpurWestX = -326 -- TBD (Builder)
+-- North of the wild clumps and the boulder-cluster search, so the cut
+-- does not move a rock or a tree. The ground south of here is already
+-- gentle enough to drive.
+WorldLayout.TollSpurGradeZ = 1184 -- TBD (Builder)
+-- The eastbound legs sit north of the height grid. Two of them, a road
+-- width apart, so the climb out to the deck does not fold back on itself.
+WorldLayout.TollSpurShelfZ = 1518 -- TBD (Builder)
+-- Height at the shelf turn. The crossing of the north wall stays under
+-- the skirt run beside the cut (that run bottoms near 44), so the skirt
+-- block owns the trench instead of standing over it.
+WorldLayout.SpurCutHeight = 40 -- TBD (Builder)
+WorldLayout.TollSpurReachX = 180 -- TBD (Builder) where the climb reaches the deck top
 
 local function snowJoin(): Vector2
 	for _, road in ipairs(WorldLayout.Roads) do
@@ -698,20 +711,27 @@ end
 local deckSouth = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
 local flatStart = deckSouth - WorldLayout.SpurMeet
 local westX = WorldLayout.TollSpurWestX
+local reachX = WorldLayout.TollSpurReachX
+local shelfZ = WorldLayout.TollSpurShelfZ
 -- Not a WorldLayout.Roads entry: that list is in the height fingerprint.
--- TerrainGen grades only the suffix that starts at gradeFrom.
+-- TerrainGen grades only the suffix that starts at gradeFrom. lowAt is
+-- the shelf turn (SpurCutHeight); topAt is where the deck top is reached,
+-- and every vertex after that stays there.
 WorldLayout.TollSpur = {
 	points = {
 		snowJoin(),
 		Vector2.new(westX, WorldLayout.TollSpurJoinZ),
 		Vector2.new(westX, WorldLayout.TollSpurGradeZ),
-		Vector2.new(westX, WorldLayout.TollSpurShelfZ),
-		Vector2.new(WorldLayout.BridgeCenterX, WorldLayout.TollSpurShelfZ),
+		Vector2.new(westX, shelfZ),
+		Vector2.new(reachX, shelfZ),
+		Vector2.new(reachX, flatStart),
 		Vector2.new(WorldLayout.BridgeCenterX, flatStart),
 		Vector2.new(WorldLayout.BridgeCenterX, deckSouth),
 	},
 	width = WorldLayout.BridgeWidth,
 	gradeFrom = 3,
+	lowAt = 4,
+	topAt = 5,
 }
 local spurGrade: { Vector2 } = {}
 for i = WorldLayout.TollSpur.gradeFrom, #WorldLayout.TollSpur.points do

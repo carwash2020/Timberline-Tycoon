@@ -264,6 +264,10 @@ return function(t)
 		local start = spur.points[1]
 		t.ok(WorldLayout.PolylineDistance(start, snow.points) <= snow.width / 2, "the spur does not meet Snow Road")
 		t.ok(WorldLayout.SpurMaxGrade < WorldLayout.PickupClimb, "steeper than a Pickup can climb")
+		local lane = WorldLayout.TollSpurWestX
+		local halfW = spur.width / 2
+		t.ok(lane - halfW > WorldLayout.NorthStripX0, "the spur runs into the west wall")
+		t.ok(lane + halfW < WorldLayout.NorthStripX1, "the spur runs into the east wall")
 		local deckSouth = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
 		local last = spur.points[#spur.points]
 		t.eq(last.X, WorldLayout.BridgeCenterX)
