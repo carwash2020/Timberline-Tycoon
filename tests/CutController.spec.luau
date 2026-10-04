@@ -228,16 +228,39 @@ return function(t)
 		local function seen(kind, woodId, problem)
 			return { part = part, model = Instance.new("Model"), kind = kind, woodId = woodId, problem = problem }
 		end
-		t.eq({ CutController.PointingFacts(nil, rusty) }, { false, false }, "nothing")
-		t.eq({ CutController.PointingFacts(seen("node"), rusty) }, { false, false }, "a crystal node")
-		t.eq({ CutController.PointingFacts(seen("tree", "oak"), rusty) }, { false, false }, "an oak the hatchet cuts")
-		t.eq({ CutController.PointingFacts(seen("wood", "oak"), rusty) }, { true, false }, "a loose oak log")
-		t.eq({ CutController.PointingFacts(seen("tree", "frostwood", "hard"), rusty) }, { false, true }, "can't cut it")
+		t.eq({ CutController.PointingFacts(nil, rusty) }, { false, false, false }, "nothing")
+		t.eq({ CutController.PointingFacts(seen("node"), rusty) }, { false, false, false }, "a crystal node")
+		t.eq(
+			{ CutController.PointingFacts(seen("tree", "oak"), rusty) },
+			{ false, false, true },
+			"an oak the hatchet cuts"
+		)
+		t.eq({ CutController.PointingFacts(seen("wood", "oak"), rusty) }, { true, false, true }, "a loose oak log")
+		t.eq(
+			{ CutController.PointingFacts(seen("tree", "frostwood", "hard"), rusty) },
+			{ false, true, true },
+			"can't cut it"
+		)
 		-- A thick lumenwood trunk with the hatchet: far past the useful pace.
 		part.Size = Vector3.new(4, 9, 4)
 		local hits = FieldGuide.CutHits(rusty, "lumenwood", 4, 4)
 		t.ok(HintLogic.TooHard(hits), "lumenwood takes " .. hits .. " hits")
-		t.eq({ CutController.PointingFacts(seen("tree", "lumenwood"), rusty) }, { false, true }, "too many hits")
+		t.eq({ CutController.PointingFacts(seen("tree", "lumenwood"), rusty) }, { false, true, true }, "too many hits")
+		-- A Steel Axe's listed damage is under frostwood's hardness, so the
+		-- hint says too hard even though a v2 swing still lands.
+		local steel = ItemCatalog.GetAxe("SteelAxe")
+		part.Size = Vector3.new(2.2, 10, 2.2)
+		t.eq(
+			{ CutController.PointingFacts(seen("tree", "frostwood"), steel) },
+			{ false, true, true },
+			"a Steel Axe on frostwood"
+		)
+		part.Size = Vector3.new(1.2, 6, 1.2)
+		t.eq(
+			{ CutController.PointingFacts(seen("tree", "pine"), steel) },
+			{ false, false, false },
+			"a thin pine top is not the thick-cut hint"
+		)
 	end)
 
 	-- A live v2 client: tapping a tree fires Chop (not the idle v1 ChopTree),

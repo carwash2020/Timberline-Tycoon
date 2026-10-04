@@ -127,7 +127,7 @@ return function(t)
 	---------------------------------------------------------------------------
 
 	t.test("v2: every device has a line for every v2 context: one line, short on a phone, no tokens", function()
-		t.eq(#HintLogic.ContextsV2, 9)
+		t.eq(#HintLogic.ContextsV2, 10)
 		for _, device in ipairs(HintLogic.Devices) do
 			for _, context in ipairs(HintLogic.ContextsV2) do
 				local line = HintLogic.PickV2(device, context)
@@ -184,6 +184,9 @@ return function(t)
 		t.ok(string.find(HintLogic.PickV2("phone", "tooLong"), "shorter to fit your bed", 1, true))
 		t.ok(string.find(HintLogic.PickV2("console", "backUp"), "sell the bed", 1, true))
 		t.ok(string.find(HintLogic.PickV2("desktop", "tooHard"), "better", 1, true))
+		t.eq(HintLogic.PickV2("phone", "thick"), "Thicker cuts take longer")
+		t.eq(HintLogic.PickV2("desktop", "thick"), "Thicker cuts take longer")
+		t.eq(HintLogic.PickV2("console", "thick"), "Thicker cuts take longer")
 	end)
 
 	t.test("v2: which context wins: driving, then a held piece, then an axe out, else dragging", function()
@@ -194,6 +197,7 @@ return function(t)
 				holding = false,
 				onWood = false,
 				tooHard = false,
+				thick = false,
 				tooLong = false,
 				bedVolume = 0,
 				nearPad = false,
@@ -208,6 +212,21 @@ return function(t)
 		t.eq(HintLogic.ContextForV2(state({ axeOut = true })), "chop")
 		t.eq(HintLogic.ContextForV2(state({ axeOut = true, onWood = true })), "unequip", "an axe out over loose wood")
 		t.eq(HintLogic.ContextForV2(state({ axeOut = true, tooHard = true })), "tooHard")
+		t.eq(
+			HintLogic.ContextForV2(state({ axeOut = true, thick = true })),
+			"thick",
+			"a thick face, an axe that can cut it"
+		)
+		t.eq(
+			HintLogic.ContextForV2(state({ axeOut = true, thick = true, tooHard = true })),
+			"tooHard",
+			"too hard wins over thick"
+		)
+		t.eq(
+			HintLogic.ContextForV2(state({ axeOut = true, onWood = true, thick = true })),
+			"unequip",
+			"a loose piece is dragged, thick or not"
+		)
 		t.eq(
 			HintLogic.ContextForV2(state({ axeOut = true, onWood = true, tooHard = true })),
 			"unequip",
@@ -248,6 +267,41 @@ return function(t)
 		t.eq(HintLogic.TooHard(HintLogic.TooHardHits + 1), true)
 		t.eq(HintLogic.TooHard(math.huge), true, "an axe that can't cut it at all")
 		t.eq(HintLogic.TooHard(0 / 0), false, "not known: no hint")
+
+		local ItemCatalog = t.shared("ItemCatalog")
+		local WoodData = t.shared("WoodData")
+		local steel = ItemCatalog.GetAxe("SteelAxe")
+		local rusty = ItemCatalog.GetAxe("RustyAxe")
+		-- Listed axe damage against the v1 hardness field (the amount taken
+		-- off each hit). v2.hardness is damage per square unit of the cut
+		-- face; a later cleanup must not pass that instead.
+		local frost = WoodData.Get("frostwood")
+		t.ok(frost.hardness ~= frost.v2.hardness, "v1 hardness and v2.hardness differ")
+		t.eq(
+			HintLogic.Underpowered(steel.damage, frost.hardness),
+			true,
+			"Steel's listed damage against frostwood's v1 hardness"
+		)
+		t.eq(
+			HintLogic.Underpowered(steel.damage, frost.v2.hardness),
+			false,
+			"not v2.hardness: Steel's listed damage is not under frostwood's"
+		)
+		t.eq(HintLogic.Underpowered(rusty.damage, WoodData.Get("oak").hardness), false, "the tutorial oak")
+		t.eq(HintLogic.Underpowered(rusty.damage, WoodData.Get("birch").hardness), false, "birch is slow, not too weak")
+		t.eq(HintLogic.Underpowered(0 / 0, 10), false, "not a number: no hint")
+		local fs = require("@lune/fs")
+		local cut = fs.readFile("src/StarterPlayer/StarterPlayerScripts/CutController.luau")
+		local _, calls = string.gsub(cut, "Underpowered%(listedDamage%(axe, wood%.biome%), wood%.hardness%)", "")
+		t.eq(calls, 2, "the HUD and the toast both pass the v1 hardness field")
+		local _, swapped = string.gsub(cut, "Underpowered%(listedDamage%(axe, wood%.biome%), wood%.v2%.hardness%)", "")
+		t.eq(swapped, 0, "neither call passes v2.hardness")
+
+		t.eq(HintLogic.ThickStuds, 2)
+		t.eq(HintLogic.Thicker(2.6, 2.6), true, "a pine base")
+		t.eq(HintLogic.Thicker(1.2, 1.2), false, "a thin top")
+		t.eq(HintLogic.Thicker(2, 4), true, "the narrow side still counts")
+		t.eq(HintLogic.Thicker(0 / 0, 3), false)
 
 		local GameConfig = t.shared("GameConfig")
 		t.eq(HintLogic.NearPad(GameConfig.SellTruckRange), true, "the range itself counts, as the sell prompt's")

@@ -58,7 +58,9 @@ local A = {
 	murphReward = 25, -- paid on the first sale (the tutorial's sell step)
 	murphAfter = 0, -- the bonus lands with that sale, not after a later grind
 	groveTier = "Healthy", -- figured-wood average, as tools/economy
-	plotPrice = 900100, -- a full plot (§2f: $100 + 3000 x (1 + ... + 24))
+	-- First square plus expansions 1..24 (GameConfig). B02 set the step so
+	-- this headline is about 32 h. Tree counts are not the lever.
+	plotPrice = GameConfig.FirstPlotPrice + GameConfig.ExpansionPriceStep * (24 * 25 / 2),
 	sharing = 4, -- players sharing a biome's regrowth (a rare wood's cap on $/h)
 	-- A sawmill you own mills a piece when that pays more than selling the
 	-- log. The blade's own time is SawmillLogic.ProcessSeconds; these are
@@ -648,7 +650,11 @@ line(
 )
 line()
 line(
-	"Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thicker than its maxWidth, bucked to its maxLength) when that pays more per hour than selling the logs. Extra time is the blade plus `millFeedSec` a piece and `millDetourSec` a trip. Plank prices are WoodData's. The first sale and `--calibrate` haul logs only."
+	"Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thicker than its maxWidth, bucked to its maxLength) when that pays more per hour than selling the logs. Extra time is the blade plus `millFeedSec` a piece and `millDetourSec` a trip. Plank $/u³ is the plan price times WoodData.PlankScale ("
+		.. tostring(WoodData.PlankScale)
+		.. "), and at least "
+		.. tostring(WoodData.PlankFloor)
+		.. "× the log price. The first sale and `--calibrate` haul logs only."
 )
 line()
 line("## Headline targets (V2_PLAN §17)")
@@ -668,7 +674,7 @@ target(
 )
 target("First $1k earned", "15-20 min", events.thousand, 900, 1200)
 target("Cobalt Axe ($2,040)", "about 1 h", events.CobaltAxe or math.huge, 2700, 4500)
-target("Full plot ($900,100)", "20-40 h", events.plot, 72000, 144000)
+target("Full plot (" .. money(A.plotPrice) .. ")", "28-36 h", events.plot, 28 * 3600, 36 * 3600)
 line()
 line("## CI ranges")
 line()
@@ -682,7 +688,7 @@ line(string.format("| First sale (E1) | under 3 min (0–180 s) | %.0f s |", eve
 line(string.format("| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | %.0f s |", events.SteelAxe or math.huge))
 line(string.format("| First $1k (E3) | 13–20 min (780–1200 s) | %.0f s |", events.thousand))
 line(string.format("| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | %.0f s |", events.CobaltAxe or math.huge))
-line(string.format("| Full plot (E4) | 20–40 h (72000–144000 s) | %.0f s |", events.plot))
+line(string.format("| Full plot (E4) | 28–36 h (100800–129600 s) | %.0f s |", events.plot))
 line()
 line(
 	string.format(
@@ -923,7 +929,7 @@ local guards = {
 	{ "Steel Axe", events.SteelAxe or math.huge, 300, 480 },
 	{ "First $1k", events.thousand, 780, 1200 },
 	{ "Cobalt Axe", events.CobaltAxe or math.huge, 2700, 4500 },
-	{ "Full plot", events.plot, 72000, 144000 },
+	{ "Full plot", events.plot, 28 * 3600, 36 * 3600 },
 }
 local guardFailed = false
 for _, row in ipairs(guards) do

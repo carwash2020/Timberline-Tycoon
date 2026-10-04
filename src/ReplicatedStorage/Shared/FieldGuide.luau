@@ -180,6 +180,39 @@ end
 -- in this many hits or fewer.
 FieldGuide.UsefulHitsV2 = 20
 
+-- v2 hardness as 1 to 5 axe marks (B02). A mark fills in at each edge, so
+-- the nine woods read: oak and palm 1, pine and maple 2, birch 3, frost
+-- and ember 4, phantom and lumen 5. The page prints the marks and the
+-- band count ("hardness xxx-- 3/5"). `x` and `-` stay in Gotham, the
+-- detail font, at 14 px on a phone.
+FieldGuide.HardnessBands = { 4, 7, 10, 16 }
+FieldGuide.AxeOn = "x"
+FieldGuide.AxeOff = "-"
+
+function FieldGuide.HardnessMarks(hardness: number): number
+	if type(hardness) ~= "number" or hardness ~= hardness then
+		return 1
+	end
+	local marks = 1
+	for _, edge in ipairs(FieldGuide.HardnessBands) do
+		if hardness >= edge then
+			marks += 1
+		end
+	end
+	return math.clamp(marks, 1, 5)
+end
+
+function FieldGuide.HardnessIcons(hardness: number): string
+	local n = FieldGuide.HardnessMarks(hardness)
+	return string.rep(FieldGuide.AxeOn, n) .. string.rep(FieldGuide.AxeOff, 5 - n)
+end
+
+-- Marks plus the band, as the page prints them: "xxx-- 3/5".
+function FieldGuide.HardnessText(hardness: number): string
+	local marks = FieldGuide.HardnessMarks(hardness)
+	return FieldGuide.HardnessIcons(hardness) .. " " .. tostring(marks) .. "/5"
+end
+
 local function finite(n: unknown): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
 end
@@ -343,9 +376,9 @@ local function axeLineV2(wood: WoodDef): string
 	return line
 end
 
--- A found wood's v2 page: "Starter Forest · hardness 2 · logs $1.50/u³,
--- planks $10/u³ · 22-30 studs tall, 2-stud trunk · Rusty Axe: 16 hits a
--- cut". Falls back to the v1 page for a wood without v2 numbers.
+-- A found wood's v2 page: "Starter Forest · hardness x---- 1/5 · logs
+-- $1.50/u³, planks $10/u³ · 22-30 studs tall, 2-stud trunk · Rusty Axe:
+-- 16 hits a cut". Falls back to the v1 page for a wood without v2 numbers.
 function FieldGuide.FactsV2(wood: WoodDef): string
 	local v2 = wood.v2
 	if not v2 then
@@ -353,7 +386,7 @@ function FieldGuide.FactsV2(wood: WoodDef): string
 	end
 	local parts = {
 		biomeName(wood),
-		"hardness " .. short(v2.hardness, 2),
+		"hardness " .. FieldGuide.HardnessText(v2.hardness),
 		string.format("logs %s, planks %s", FieldGuide.PriceText(v2.logPrice), FieldGuide.PriceText(v2.plankPrice)),
 	}
 	local size = FieldGuide.TreeSize(wood)

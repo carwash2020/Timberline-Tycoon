@@ -640,7 +640,8 @@ return function(t)
 	t.test("I-Economy: the five headlines and the tutorial lines are unchanged", function()
 		local fs = require("@lune/fs")
 		local report = fs.readFile("ECONOMY.md")
-		for _, headline in ipairs({ "66 s", "8.0 min", "13.4 min", "53.7 min", "39.4 h" }) do
+		-- B02 moved the full plot from 39.4 h to 32.0 h (the square price).
+		for _, headline in ipairs({ "66 s", "8.0 min", "13.4 min", "53.7 min", "32.0 h" }) do
 			t.ok(string.find(report, headline, 1, true) ~= nil, headline)
 		end
 		t.eq(NPCData.Get("Murph").tips[1], "I'm Murph. Chop a tree, haul the wood, sell it at the mill.")

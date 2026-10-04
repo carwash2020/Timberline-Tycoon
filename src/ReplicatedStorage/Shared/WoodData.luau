@@ -239,14 +239,40 @@ local woods: { WoodDef } = {
 	},
 }
 
+-- Designer knob (B02). A plank's $/u³ is the plan's price (V2_PLAN §2b)
+-- times PlankScale, and never under PlankFloor times the log price,
+-- rounded to a thousandth of a dollar. Scale 0.35 with a 2.5× floor is
+-- the nerf that kept a Rickety mill inside the early headlines: the buying
+-- path is on milled frostwood from the first sawmill, and the first
+-- $1,000 sits about 27 s above its floor, so a higher scale fails
+-- `lune run tools/economy --check`. The 32 h full-plot target is the
+-- square price (GameConfig.ExpansionPriceStep), not this scale.
+WoodData.PlankScale = 0.35
+WoodData.PlankFloor = 2.5
+
+-- Plan plank $/u³ before the scale (V2_PLAN §2b).
+WoodData.PlanPlank = {
+	oak = 10,
+	birch = 15,
+	pine = 18,
+	maple = 26.4,
+	palmwood = 32,
+	frostwood = 106,
+	emberwood = 36,
+	phantomwood = 54,
+	lumenwood = 90,
+} :: { [string]: number }
+
+function WoodData.ScaledPlank(logPrice: number, planPlank: number): number
+	local price = math.max(planPlank * WoodData.PlankScale, logPrice * WoodData.PlankFloor)
+	return math.floor(price * 1000 + 0.5) / 1000
+end
+
 -- v2 rows (V2_PLAN.md §2b; §18 for emberwood and the Gloam pair).
--- Plank prices are the plan's, scaled by 0.35 and never below 2.5× the log
--- price. The full ratios (oak 6.7×, frostwood 11.8×) made a Rickety mill
--- blow the §17 headlines; see ECONOMY.md.
 local V2: { [string]: WoodV2 } = {
 	oak = {
 		logPrice = 1.5,
-		plankPrice = 3.75,
+		plankPrice = WoodData.ScaledPlank(1.5, 10),
 		hardness = 2,
 		growSec = 240,
 		lifespan = { 3, 6 },
@@ -255,7 +281,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	birch = {
 		logPrice = 2.25,
-		plankPrice = 5.625,
+		plankPrice = WoodData.ScaledPlank(2.25, 15),
 		hardness = 7,
 		growSec = 960,
 		lifespan = { 3, 6 },
@@ -264,7 +290,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	pine = {
 		logPrice = 3.2,
-		plankPrice = 8,
+		plankPrice = WoodData.ScaledPlank(3.2, 18),
 		hardness = 5.5,
 		growSec = 600,
 		lifespan = { 3, 6 },
@@ -273,7 +299,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	maple = {
 		logPrice = 2.8,
-		plankPrice = 9.24,
+		plankPrice = WoodData.ScaledPlank(2.8, 26.4),
 		hardness = 6,
 		growSec = 1140,
 		lifespan = { 3, 6 },
@@ -282,7 +308,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	palmwood = {
 		logPrice = 2.9,
-		plankPrice = 11.2,
+		plankPrice = WoodData.ScaledPlank(2.9, 32),
 		hardness = 2.9,
 		growSec = 480,
 		lifespan = { 3, 6 },
@@ -291,7 +317,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	frostwood = {
 		logPrice = 9,
-		plankPrice = 37.1,
+		plankPrice = WoodData.ScaledPlank(9, 106),
 		hardness = 10,
 		growSec = 360,
 		lifespan = { 3, 6 },
@@ -300,7 +326,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	emberwood = {
 		logPrice = 5.7,
-		plankPrice = 14.25,
+		plankPrice = WoodData.ScaledPlank(5.7, 36),
 		hardness = 11,
 		growSec = 1020,
 		lifespan = { 3, 6 },
@@ -309,7 +335,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	phantomwood = {
 		logPrice = 19,
-		plankPrice = 47.5,
+		plankPrice = WoodData.ScaledPlank(19, 54),
 		hardness = 23,
 		growSec = 1200,
 		lifespan = { 3, 6 },
@@ -318,7 +344,7 @@ local V2: { [string]: WoodV2 } = {
 	},
 	lumenwood = {
 		logPrice = 25,
-		plankPrice = 62.5,
+		plankPrice = WoodData.ScaledPlank(25, 90),
 		hardness = 30,
 		growSec = 1800,
 		lifespan = { 3, 6 },
