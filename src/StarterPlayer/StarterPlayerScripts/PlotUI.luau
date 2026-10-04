@@ -22,6 +22,7 @@ local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
+local DragController = require(script.Parent.DragController)
 local HUD = require(script.Parent.HUD)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
@@ -319,6 +320,8 @@ local function setBuilding(on: boolean)
 		return
 	end
 	building = on
+	HUD.SetBuildMode(on)
+	DragController.SetBuildMode(on)
 	if on then
 		for _, model in ipairs(CollectionService:GetTagged("PlacedItem")) do
 			addPrompts(model)

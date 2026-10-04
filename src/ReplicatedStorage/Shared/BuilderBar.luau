@@ -3,7 +3,9 @@
 -- 8px gap. One row stays between the thumbstick and Jump while the buttons
 -- stay at least 48px. Below that, two rows of four stay at 56px (248px
 -- wide). A tall phone has no gap that wide, so the bar sits above the
--- controls. Buttons never shrink below 44px. The readout sits on top.
+-- controls. Buttons never shrink below 44px. The cluster sits 8px above
+-- the hint row, which sits on the hotbar (UITheme.Bottom()). The readout
+-- sits on top.
 
 local PlotPickerLogic = require(script.Parent.PlotPickerLogic)
 
@@ -19,6 +21,12 @@ BuilderBar.RowFloor = 48
 BuilderBar.Names = { "Rotate", "Move", "Shorter", "Longer", "Copy", "Delete", "Undo", "Done" }
 BuilderBar.Refuse = { 255, 80, 80 }
 BuilderBar.GhostTransparency = 0.45
+-- UITheme.Bottom() on a phone: the 12px margin plus the 58px tool hotbar.
+BuilderBar.PhoneBottom = 70
+-- HUD's BottomRow (the load chip and the hint) is this tall, on that line.
+BuilderBar.HintRow = 30
+-- Air between the cluster and that row.
+BuilderBar.Air = 8
 
 local function rowWidth(count: number, button: number, gap: number): number
 	return count * button + (count - 1) * gap
@@ -36,7 +44,7 @@ export type Layout = {
 	rows: number,
 }
 
-function BuilderBar.Layout(screenW: number, screenH: number): Layout
+function BuilderBar.Layout(screenW: number, screenH: number, bottom: number?): Layout
 	local blocks = PlotPickerLogic.TouchBlockers(screenW, screenH)
 	local stick, jump = blocks[1], blocks[2]
 	local left = stick.x + stick.w
@@ -76,11 +84,12 @@ function BuilderBar.Layout(screenW: number, screenH: number): Layout
 	end
 	local clusterH = readout + rows * button + rows * gap
 	local x = (screenW - w) / 2
-	local y: number
+	-- Above the hotbar (UITheme.Bottom(); PhoneBottom when the caller
+	-- doesn't pass it) and the hint row that sits on it. A tall phone
+	-- then moves up again so the cluster stays off the controls.
+	local inset = if type(bottom) == "number" then bottom else BuilderBar.PhoneBottom
+	local y = screenH - inset - BuilderBar.HintRow - clusterH - BuilderBar.Air
 	if lifted then
-		-- 150px up from the bottom is the named spot. The thumbstick starts
-		-- higher than that on a tall phone, so the bar moves up to clear it.
-		y = screenH - 150 - clusterH
 		local ceiling = math.min(stick.y, jump.y)
 		if y + clusterH > ceiling then
 			y = ceiling - clusterH
@@ -98,7 +107,6 @@ function BuilderBar.Layout(screenW: number, screenH: number): Layout
 		if x + w > right - 8 then
 			x = right - 8 - w
 		end
-		y = screenH - clusterH - 10
 	end
 	if y < 0 then
 		y = 0

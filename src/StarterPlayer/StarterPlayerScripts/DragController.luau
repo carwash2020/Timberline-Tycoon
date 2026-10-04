@@ -319,11 +319,27 @@ end
 local function showButtons(show: boolean)
 	local row = buttonRow
 	if row then
-		if show then
+		local on = show and not HUD.BuildOpen()
+		if on then
 			-- Above the hint line, wherever Roblox's hotbar is now.
 			row.Position = UDim2.new(0.5, 0, 1, -(UITheme.Bottom() + 38))
 		end
-		row.Visible = show
+		row.Visible = on
+	end
+end
+
+-- PlotUI: while build mode is open the drag row stays hidden.
+function DragController.SetBuildMode(on: boolean)
+	if on then
+		local row = buttonRow
+		if row then
+			row.Visible = false
+		end
+		return
+	end
+	local h = hold
+	if h and h.device == "touch" then
+		showButtons(true)
 	end
 end
 

@@ -769,6 +769,22 @@ function HUD.SetTips(on: boolean)
 	refreshModal()
 end
 
+-- Build mode (PlotUI): the hint row hides so the builder readout is the
+-- only hint. Safe to call before HUD.Start.
+local buildOpen = false
+
+function HUD.BuildOpen(): boolean
+	return buildOpen
+end
+
+function HUD.SetBuildMode(on: boolean)
+	buildOpen = on
+	local row = bottomRow
+	if row then
+		row.Visible = not on
+	end
+end
+
 -- A panel open over the game (ShopUI: the shops, the Store, the Field
 -- Guide), as its box in screen pixels (AbsolutePosition and
 -- AbsolutePosition + AbsoluteSize), or nil once it's closed. While one is
@@ -1630,6 +1646,7 @@ local function buildBottomRow(gui: ScreenGui)
 	list.VerticalAlignment = Enum.VerticalAlignment.Center
 	buildChip(row)
 	buildHint(row)
+	row.Visible = not buildOpen
 	row.Parent = gui
 	bottomRow = row
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(queueRow)
