@@ -200,17 +200,77 @@ return function(t)
 		t.eq(data.tutorialProgress, 3, "progress resets once")
 	end)
 
-	t.test("MigrateV2 restarts tutorial progress only on steps whose unit changed", function()
+	t.test("MigrateV2 restarts tutorial progress only on steps whose unit changed, and remaps every v2 step", function()
 		local TutorialData = t.loader():shared("TutorialData")
 		for index, step in ipairs(TutorialData.Steps) do
 			local Schema, data = v1Save()
 			data.tutorialStep = index
 			data.tutorialProgress = 2
+			data.tutorialOrder = 0
 			Schema.MigrateV2(data, 20)
 			local keeps = TutorialData.KeepsProgressV2(index)
-			t.eq(data.tutorialProgress, if keeps then 2 else 0, step.id)
-			t.eq(data.tutorialStep, index, "the step itself is kept")
+			local landed = if index <= 1 then 1 else TutorialData.RemapV2Step(index)
+			t.eq(data.tutorialStep, landed, step.id)
+			t.eq(TutorialData.StepsV2[data.tutorialStep].id, if index <= 1 then "fell" else step.id, step.id)
+			if index <= 1 then
+				t.eq(data.tutorialProgress, 0, "the old first step was the plot; the new one is fell")
+			else
+				t.eq(data.tutorialProgress, if keeps then 2 else 0, step.id)
+			end
+			t.eq(data.tutorialOrder, TutorialData.OrderV2)
 		end
+	end)
+
+	t.test("an old v2 save remaps once, including a slot, and a second join leaves the step", function()
+		local TutorialData = t.loader():shared("TutorialData")
+		local Schema, data = v1Save()
+		Schema.MigrateV2(data, 20)
+		data.schema = 2
+		data.tutorialOrder = 0
+		data.tutorialDone = false
+		data.tutorialStep = 4 -- old sell
+		data.tutorialProgress = 0
+		data.slots = {
+			{
+				tutorialDone = false,
+				tutorialStep = 3, -- old pickup
+				tutorialProgress = 1,
+				tutorialOrder = 0,
+				plot = { claimed = true, tier = 1, placed = {} },
+			},
+		}
+		Schema.MigrateV2(data, 20)
+		t.eq(TutorialData.StepsV2[data.tutorialStep].id, "sell")
+		t.eq(data.tutorialOrder, TutorialData.OrderV2)
+		t.eq(TutorialData.StepsV2[data.slots[1].tutorialStep].id, "pickup")
+		t.eq(data.slots[1].plot.claimed, true)
+		t.eq(data.slots[1].tutorialOrder, TutorialData.OrderV2)
+		local step = data.tutorialStep
+		Schema.MigrateV2(data, 20)
+		t.eq(data.tutorialStep, step, "a second join does not remap again")
+	end)
+
+	t.test("UnstickCart opens the cart for a stuck save and leaves a truck owner unchanged", function()
+		local Schema, stuck = fresh()
+		stuck.cash = 50
+		stuck.ownedTrucks = {}
+		stuck.onboarding = { TutorialCart = true }
+		local Util = t.loader():shared("Util")
+		Schema.UnstickCart(stuck)
+		t.eq(stuck.onboarding.cartVolume, 0)
+		t.eq(stuck.onboarding.TutorialCart, true, "the old flag stays; the volume is what opens the cart")
+		-- A later sale is remembered, and the next load must not wipe it.
+		stuck.onboarding.cartVolume = 30
+		Schema.UnstickCart(stuck)
+		t.eq(stuck.onboarding.cartVolume, 30)
+
+		local _, owned = fresh()
+		owned.cash = 20
+		owned.ownedTrucks = { "Rustbucket" }
+		owned.onboarding = { TutorialCart = true }
+		local before = Util.deepCopy(owned)
+		Schema.UnstickCart(owned)
+		t.eq(owned, before, "a save with a truck stays unchanged")
 	end)
 
 	t.test("MigrateV2 reopens a finished tutorial as a refresher of the new steps, once", function()

@@ -3,20 +3,23 @@
 -- QuestService (server) counts progress from game events; QuestUI (client)
 -- shows the objective, Murph's line and a beacon. Tuning = editing this.
 --
--- Order: claim a plot, chop, pick up, sell the first load at Murph's cart
--- (he chips in $25 on that sale), then buy the Rustbucket (delivered to
--- the plot's pad). After that the old lessons stay: load, mill, plant,
--- the three loads, and the Steel Axe. QuestService then keeps one next
--- goal on the tracker (NextGoal).
+-- v1 order: claim a plot, chop, pick up, sell the first load at Murph's
+-- cart (he chips in $25 on that sale), then buy the Rustbucket. After that
+-- the old lessons stay: load, mill, plant, the three loads, and the Steel
+-- Axe. QuestService then keeps one next goal on the tracker (NextGoal).
+--
+-- v2 order: fell, drag, sell at the cart, claim a plot, then the truck,
+-- and the same lessons after it. tutorialStep is an index, so a save from
+-- the plot-first v2 order is remapped by ApplyOrder (old index to the step
+-- name, then that name's new index).
 --
 -- Inserting a step shifts the ones after it: QuestService moves saves
 -- made before the insert to the latest step they had reached (by the
 -- funnel steps they've reached), so keep step ids stable.
 --
 -- The v2 core loop (V2_PLAN.md §13, Shared/CoreLoop) has its own steps,
--- StepsV2: the same ids in the same order (saves carry over), with the
--- v2 loop's words and events. ForLoop(loop) picks the list; Steps is the
--- v1 one.
+-- StepsV2, with the v2 loop's words and events. ForLoop(loop) picks the
+-- list; Steps is the v1 one.
 
 local FieldGuide = require(script.Parent.FieldGuide)
 local ItemCatalog = require(script.Parent.ItemCatalog)
@@ -71,8 +74,11 @@ export type Step = {
 	unit: "cash"?, -- v2: `count` is dollars, so the tracker reads "($23/$40)"
 	rewardCash: number?, -- paid when the step is done
 	murphBack: string?, -- v2: what Murph says instead to a returning player on the refresher (RefresherLast)
+	murphShort: string?, -- said instead while cash is under cashPrice ("sell more first")
 	axeGoal: boolean?, -- the tracker also shows cash toward the Steel Axe
 	axePrice: number?, -- that axe's price in this loop
+	cashItem: string?, -- tracker suffix " · $51 of $75 to Rustbucket"
+	cashPrice: number?, -- that purchase's price; with murphShort, the short line while cash is under it
 	also: TutorialEvent?, -- a second event; both must happen (progress stores the two bits)
 }
 
@@ -125,8 +131,8 @@ local function plotStep(): Step
 		id = "plot",
 		objective = if saplings then "Claim a free plot and plant a sapling" else "Claim a free plot",
 		murph = if saplings
-			then "Every lumberjack needs land, and this one's free. The plot district is east of town, past the lot. Claim one, then plant a sapling on it."
-			else "Every lumberjack needs land, and this one's free. The plot district is east of town, past the lot. Claim one.",
+			then "Every lumberjack needs land, and this one's free. Claim one, follow the arrow, then plant a sapling on it."
+			else "Every lumberjack needs land, and this one's free. Claim one, follow the arrow.",
 		event = "plotClaimed",
 		count = 1,
 		beacon = "plotSign",
@@ -145,9 +151,17 @@ local function truckStep(loop: number): Step
 				price
 			)
 			else "That sale's yours, and a little extra from me. Buy the Rustbucket at the dealership and it shows up on your plot.",
+		murphShort = if price > 0
+			then string.format(
+				"Sell more wood first. The Rustbucket is $%d at the dealership, then it shows up on your plot.",
+				price
+			)
+			else nil,
 		event = "truckBought",
 		count = 1,
 		beacon = "dealership",
+		cashItem = if price > 0 then rustbucket.displayName else nil,
+		cashPrice = if price > 0 then price else nil,
 	}
 end
 
@@ -209,7 +223,7 @@ TutorialData.Steps = {
 	logLoad(
 		"loads",
 		8,
-		"See it grow? That tree's yours now. That Rusty Axe won't cut it in the hills, though. Sell another load at the mill and I'll chip in for a Steel Axe."
+		"See it grow? That tree's yours. That Rusty Axe won't cut it in the hills. Sell another load and I'll chip in for a Steel Axe."
 	),
 	logLoad("loads2", 8, "Another load at the mill. You're getting the hang of the haul."),
 	logLoad("loads3", 9, "One more load at the mill, and I'll chip in for that axe."),
@@ -217,19 +231,25 @@ TutorialData.Steps = {
 		id = "steel",
 		objective = "Buy the Steel Axe at the Tool Shed",
 		murph = "Here's a little somethin' from me. The Tool Shed's just west of the mill. Go get yourself a real axe, kid.",
+		murphShort = string.format(
+			"Sell more wood first. Then get the %s at the Tool Shed, just west of the mill.",
+			steelAxe.displayName
+		),
 		event = "axeBought",
 		count = 1,
 		beacon = "toolShed",
+		cashItem = steelAxe.displayName,
+		cashPrice = ShopLogic.Price(steelAxe, 1),
 	},
 } :: { Step }
 
--- The v2 loop's steps: the same ids in the same order as Steps. Wood is
--- cut where you swing, dragged with your axe put away, carried loose on
--- the bed and sold by volume. The first sale is the cart; the mill is the
+-- The v2 loop's steps. Wood is cut where you swing, dragged with the axe
+-- put away, carried loose on the bed and sold by volume. Order: fell,
+-- drag, sell at the cart, claim a plot, then the truck. The mill is the
 -- trip after the truck. Each step's event is what the v2 services report.
 -- Murph's numbers come from the v2 data: hits from FieldGuide.TrunkHits.
+-- Saves from the plot-first order are remapped by ApplyOrder.
 TutorialData.StepsV2 = {
-	plotStep(),
 	{
 		id = "fell",
 		objective = "Chop down a tree",
@@ -237,7 +257,7 @@ TutorialData.StepsV2 = {
 			"Swing low on a trunk and keep hittin' the same spot: about %d whacks and she tips. {Click}, or hold, to keep swingin'.",
 			FieldGuide.TrunkHits(starterAxe, oak)
 		),
-		murphBack = "Welcome back! The little oaks are just to your left. Things work different now: cut a tree anywhere, drag the wood, and the mill buys it by the cubic unit. Swing low on a trunk and keep hittin' the same spot till she tips. {Click}, or hold, to keep swingin'.",
+		murphBack = "Welcome back! Cut anywhere and drag the wood. The mill buys by the cubic unit. {Click}, or hold, to keep swingin'.",
 		event = "treeFelled",
 		count = 1,
 		beacon = "tree",
@@ -261,11 +281,12 @@ TutorialData.StepsV2 = {
 		beacon = "murphCart",
 		rewardCash = 25,
 	},
+	plotStep(),
 	truckStep(2),
 	{
 		id = "load",
 		objective = "Drag a log onto your truck's bed",
-		murph = "That was the easy one. That's your Rustbucket. She ain't pretty, but she hauls. Drag a log up onto her bed and lay it flat so it rides. Too long for the bed? Cut it to fit.",
+		murph = "That's your Rustbucket. She ain't pretty, but she hauls. Drag a log onto the bed and lay it flat. Too long? Cut it to fit.",
 		event = "woodLoaded",
 		count = 1,
 		beacon = "truckBed",
@@ -273,7 +294,7 @@ TutorialData.StepsV2 = {
 	{
 		id = "mill",
 		objective = "Sell wood at the sawmill",
-		murph = "Hop in and drive to the mill up north. Back her onto the pad that says SELL LOGS HERE and the whole bed sells itself, or push a log onto it by hand. Bigger logs pay more: it's all by the cubic unit, u³. A saw from the Tool Shed turns straight logs into planks, and planks pay more.",
+		murph = "Drive to the mill up north and back onto the SELL LOGS HERE pad. The whole bed sells itself.",
 		event = "woodSold",
 		count = 1,
 		beacon = "sellPad",
@@ -290,7 +311,7 @@ TutorialData.StepsV2 = {
 		"loads",
 		8,
 		string.format(
-			"See it grow? That tree's yours now. That %s of yours takes %d hits a cut on birch, though. Sell another load at the mill and I'll chip in for a %s.",
+			"See it grow? That tree's yours. That %s takes %d hits a cut on birch. Sell another load and I'll chip in for a %s.",
 			starterAxe.displayName,
 			FieldGuide.TrunkHits(starterAxe, birch),
 			steelAxe.displayName
@@ -302,14 +323,20 @@ TutorialData.StepsV2 = {
 		id = "steel",
 		objective = "Buy the Steel Axe at the Tool Shed",
 		murph = string.format(
-			"Here's a little somethin' from me. Tink's Tool Shed is just west of the mill. A %s cuts an oak trunk in %d hits, not %d. Go get yourself a real axe, kid.",
+			"Here's a little from me. Tink's Tool Shed is just west of the mill. A %s cuts an oak in %d hits, not %d. Go get a real axe, kid.",
 			steelAxe.displayName,
 			FieldGuide.TrunkHits(steelAxe, oak),
 			FieldGuide.TrunkHits(starterAxe, oak)
 		),
+		murphShort = string.format(
+			"Sell more wood first. Then get the %s at Tink's Tool Shed, just west of the mill.",
+			steelAxe.displayName
+		),
 		event = "axeBought",
 		count = 1,
 		beacon = "toolShed",
+		cashItem = steelAxe.displayName,
+		cashPrice = ShopLogic.Price(steelAxe, 2),
 	},
 } :: { Step }
 
@@ -329,7 +356,7 @@ end
 
 -- The line Murph says once the last step is done (both loops).
 TutorialData.Farewell =
-	"The plot's yours, and that axe will do. Take my old Field Guide: every new wood you fell goes in it. Pine grows in the hills. And kid, some woods only show at night."
+	"The plot's yours. Take the Field Guide. Bigger logs pay more by the u³, and a saw's planks pay more. Some woods only show at night."
 
 -- What Murph says when a returning player's refresher is done.
 TutorialData.FarewellBack =
@@ -361,7 +388,9 @@ end
 -- The tracker line for a step, with progress: "Sell 6 more logs (4/6)",
 -- or for a step counted in dollars "Sell $40 more wood ($23/$40)". A step
 -- with axeGoal adds " · $20 of $160 to Steel Axe" from `cash` (0 when it
--- isn't passed). A step with `also` reads "(1/2)" from the two bits.
+-- isn't passed). A step with cashItem adds the same line toward that buy
+-- (" · $51 of $75 to Rustbucket"). A step with `also` reads "(1/2)" from
+-- the two bits.
 function TutorialData.ObjectiveText(step: Step, progress: number, cash: number?): string
 	local text = string.gsub(step.objective, "%%d", tostring(step.count))
 	if step.also then
@@ -374,13 +403,15 @@ function TutorialData.ObjectiveText(step: Step, progress: number, cash: number?)
 			text ..= string.format(" (%d/%d)", done, step.count)
 		end
 	end
-	if step.axeGoal and step.axePrice then
+	local item = step.cashItem
+	local itemPrice = step.cashPrice
+	if (item == nil or itemPrice == nil) and step.axeGoal and step.axePrice then
+		item = "Steel Axe"
+		itemPrice = step.axePrice
+	end
+	if item and itemPrice and itemPrice > 0 then
 		local shown = if type(cash) == "number" then cash else 0
-		text ..= string.format(
-			" · %s of %s to Steel Axe",
-			FieldGuide.CashText(shown),
-			FieldGuide.CashText(step.axePrice)
-		)
+		text ..= string.format(" · %s of %s to %s", FieldGuide.CashText(shown), FieldGuide.CashText(itemPrice), item)
 	end
 	return text
 end
@@ -412,8 +443,16 @@ end
 -- Where the event changed (logs picked up, loaded or sold), the old count
 -- means something else, so it starts again.
 function TutorialData.KeepsProgressV2(index: number): boolean
-	local old, new = TutorialData.Steps[index], TutorialData.StepsV2[index]
-	return old ~= nil and new ~= nil and old.event == new.event
+	local old = TutorialData.Steps[index]
+	if not old then
+		return false
+	end
+	for _, new in ipairs(TutorialData.StepsV2) do
+		if new.id == old.id then
+			return old.event == new.event
+		end
+	end
+	return false
 end
 
 -- The Heartseed beat's place in the steps (found by id, so it follows the
@@ -442,10 +481,75 @@ local function indexOfV2(id: string): number
 end
 TutorialData.RefresherLast = indexOfV2("sell")
 
--- What Murph says for `step`: his welcome-back line on the refresher, when
--- the step has one.
-function TutorialData.MurphLine(step: Step, refresher: boolean): string
+-- What Murph says for `step`: the short "sell more first" line while `cash`
+-- is under the step's price, his welcome-back line on the refresher, or
+-- the usual line.
+function TutorialData.MurphLine(step: Step, refresher: boolean, cash: number?): string
+	local price = step.cashPrice
+	if not refresher and step.murphShort and type(price) == "number" and price > 0 then
+		local have = if type(cash) == "number" and cash == cash then cash else 0
+		if have < price then
+			return step.murphShort
+		end
+	end
 	return if refresher and step.murphBack then step.murphBack else step.murph
+end
+
+-- The v2 order before this list (plot led). A saved tutorialStep from that
+-- order is a position here. ApplyOrder turns it into the new position.
+TutorialData.OrderV2 = 2
+TutorialData.OrderV2Previous = {
+	"plot",
+	"fell",
+	"pickup",
+	"sell",
+	"truck",
+	"load",
+	"mill",
+	"plant",
+	"loads",
+	"loads2",
+	"loads3",
+	"steel",
+}
+
+-- Old v2 index to the step's name, then that name's index in StepsV2.
+-- An index this list doesn't have is returned as it is.
+function TutorialData.RemapV2Step(oldIndex: number): number
+	local name = TutorialData.OrderV2Previous[oldIndex]
+	if type(name) ~= "string" then
+		return oldIndex
+	end
+	for i, step in ipairs(TutorialData.StepsV2) do
+		if step.id == name then
+			return i
+		end
+	end
+	return oldIndex
+end
+
+-- One profile or slot, once. A save still on the old first step (plot)
+-- starts the new order at fell: jumping it to the plot's new index would
+-- skip the chop and the cart. Any later index keeps that step by name.
+-- A finished tutorial only gets the version stamp. Never touches the plot.
+function TutorialData.ApplyOrder(record: any)
+	if type(record) ~= "table" then
+		return
+	end
+	if record.tutorialOrder == TutorialData.OrderV2 then
+		return
+	end
+	if record.tutorialDone ~= true then
+		local raw = tonumber(record.tutorialStep)
+		local step = if type(raw) ~= "number" or raw ~= raw then 1 else math.floor(raw)
+		if step > 1 then
+			record.tutorialStep = TutorialData.RemapV2Step(step)
+		else
+			record.tutorialStep = 1
+			record.tutorialProgress = 0
+		end
+	end
+	record.tutorialOrder = TutorialData.OrderV2
 end
 
 -- How long a stump felled on the way to the plant step waits before its

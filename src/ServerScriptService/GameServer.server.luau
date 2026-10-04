@@ -443,6 +443,33 @@ local function completeSale(
 	DailyService.Event(player, "logsSold", count, byWood, credited)
 end
 
+-- Murph's cart. Nil when it buys; a refusal string when it doesn't.
+-- A v2 sale also adds its u³ to onboarding.cartVolume.
+local function cartDecision(profile: ProfileService.Profile, pieces: number, volume: number?, logs: number?): string?
+	local loop = CoreLoop.Active()
+	local list = TutorialData.ForLoop(loop)
+	local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
+	local trucks = profile.ownedTrucks
+	local ok, why = TutorialGrove.Accept({
+		done = profile.tutorialDone == true,
+		stepId = if step then step.id else nil,
+		pieces = pieces,
+		volume = volume,
+		logs = logs,
+		cartVolume = TutorialGrove.SavedVolume(profile.onboarding),
+		cash = profile.cash,
+		ownsTruck = type(trucks) == "table" and #trucks > 0,
+		truckPrice = TutorialGrove.TruckPrice(loop),
+	})
+	if not ok then
+		return why
+	end
+	if type(volume) == "number" then
+		TutorialGrove.Remember(profile.onboarding, volume)
+	end
+	return nil
+end
+
 local function onSellLogs(player: Player)
 	if not RateLimiter.Allow(player, "SellLogs") then
 		return
@@ -453,8 +480,8 @@ local function onSellLogs(player: Player)
 	if not hrp or not profile or not hands then
 		return
 	end
-	-- The tutorial cart buys one small handful, at the mill's prices, and
-	-- only during the sell step (TutorialGrove). The truck bed and the Sky
+	-- The tutorial cart buys small loads, at the mill's prices, during the
+	-- sell, plot and truck steps (TutorialGrove). The truck bed and the Sky
 	-- Bin stay at the mill.
 	if cartZone and Util.pointInPart(cartZone, hrp.Position) then
 		local pieces = 0
@@ -465,17 +492,9 @@ local function onSellLogs(player: Player)
 			notify(player, "Nothing to sell.")
 			return
 		end
-		local list = TutorialData.ForLoop(1)
-		local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
-		local ok, why = TutorialGrove.Accept({
-			done = profile.tutorialDone,
-			stepId = if step then step.id else nil,
-			used = profile.onboarding[TutorialGrove.UsedKey] == true,
-			pieces = pieces,
-			logs = pieces,
-		})
-		if not ok then
-			notify(player, why :: string)
+		local why = cartDecision(profile, pieces, nil, pieces)
+		if why then
+			notify(player, why)
 			return
 		end
 		local total, count = 0, 0
@@ -500,7 +519,6 @@ local function onSellLogs(player: Player)
 			notify(player, "Nothing to sell.")
 			return
 		end
-		profile.onboarding[TutorialGrove.UsedKey] = true
 		completeSale(player, profile, total, count, byWood, figures)
 		return
 	end
@@ -797,20 +815,7 @@ if CoreLoop.V2() then
 					if not profile then
 						return TutorialGrove.RefuseClosed
 					end
-					local list = TutorialData.ForLoop(2)
-					local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
-					local ok, why = TutorialGrove.Accept({
-						done = profile.tutorialDone,
-						stepId = if step then step.id else nil,
-						used = profile.onboarding[TutorialGrove.UsedKey] == true,
-						pieces = pieces,
-						volume = volume,
-					})
-					if ok then
-						profile.onboarding[TutorialGrove.UsedKey] = true
-						return nil
-					end
-					return why
+					return cartDecision(profile, pieces, volume, nil)
 				end,
 			}
 			else nil,

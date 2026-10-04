@@ -9,21 +9,33 @@ return function(t)
 	local SectionLogic = t.shared("SectionLogic")
 
 	local function offer(extra)
-		local base = { done = false, stepId = "sell", used = false, pieces = 1, volume = 10, logs = 1 }
+		local base = {
+			done = false,
+			stepId = "sell",
+			pieces = 1,
+			volume = 10,
+			logs = 1,
+			cartVolume = 0,
+			cash = 20,
+			ownsTruck = false,
+			truckPrice = 75,
+		}
 		for k, v in pairs(extra or {}) do
 			base[k] = v
 		end
 		return base
 	end
 
-	t.test("the cart buys one small load, and only during the sell step", function()
+	t.test("the cart buys small loads during sell, plot and truck", function()
 		local ok, why = TutorialGrove.Accept(offer())
 		t.eq(ok, true)
 		t.eq(why, nil)
 		t.eq(select(1, TutorialGrove.Accept(offer({ pieces = 0 }))), false)
-		t.eq(select(2, TutorialGrove.Accept(offer({ used = true }))), TutorialGrove.RefuseUsed)
+		t.eq(select(1, TutorialGrove.Accept(offer({ stepId = "plot" }))), true, "a sale during the plot step")
+		t.eq(select(1, TutorialGrove.Accept(offer({ stepId = "truck" }))), true)
 		t.eq(select(2, TutorialGrove.Accept(offer({ done = true }))), TutorialGrove.RefuseClosed)
 		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "load" }))), TutorialGrove.RefuseClosed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "fell" }))), TutorialGrove.RefuseClosed)
 		local over = offer()
 		over.stepId = nil -- a finished tutorial has no step
 		t.eq(select(2, TutorialGrove.Accept(over)), TutorialGrove.RefuseClosed)
@@ -31,6 +43,33 @@ return function(t)
 		t.eq(select(2, TutorialGrove.Accept(offer({ volume = TutorialGrove.MaxVolume + 1 }))), TutorialGrove.RefuseBig)
 		t.eq(select(2, TutorialGrove.Accept(offer({ logs = TutorialGrove.MaxLogs + 1 }))), TutorialGrove.RefuseBig)
 		t.eq(select(1, TutorialGrove.Accept(offer({ volume = nil, logs = nil, pieces = 2 }))), true)
+	end)
+
+	t.test("three single-piece sales in a row pass, and a sale past 80 is refused", function()
+		local onboarding = { cartVolume = 0 }
+		for n = 1, 3 do
+			local ok, why = TutorialGrove.Accept(offer({
+				volume = 10,
+				cartVolume = TutorialGrove.SavedVolume(onboarding),
+			}))
+			t.eq(ok, true, why)
+			TutorialGrove.Remember(onboarding, 10)
+			t.eq(onboarding.cartVolume, n * 10)
+		end
+		t.eq(select(1, TutorialGrove.Accept(offer({ volume = 10, cartVolume = 70 }))), true, "80 exactly still fits")
+		t.eq(
+			select(2, TutorialGrove.Accept(offer({ volume = 10, cartVolume = 75 }))),
+			TutorialGrove.RefuseBig,
+			"75 + 10 passes 80"
+		)
+	end)
+
+	t.test("the cart refuses at $75 or with a truck owned", function()
+		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 74 }))), true)
+		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 75 }))), TutorialGrove.RefuseUsed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 200 }))), TutorialGrove.RefuseUsed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ ownsTruck = true, cash = 0 }))), TutorialGrove.RefuseUsed)
+		t.eq(TutorialGrove.TruckPrice(2), 75)
 	end)
 
 	local function spots()

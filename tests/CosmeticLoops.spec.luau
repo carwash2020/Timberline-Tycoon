@@ -30,10 +30,21 @@ return function(t)
 		"WoodFX",
 		"ForestUI",
 		"NPCController",
+		"TreeCosmetics",
+		"LuxFX",
+		"TownMarkers",
+		"LifeFX",
 	}
 
 	-- These loops decide gameplay. Throttling them would change the outcome.
-	local GAMEPLAY = { "VehicleController", "ChopController", "CarryController", "DragController", "GondolaController" }
+	local GAMEPLAY = {
+		"VehicleController",
+		"ChopController",
+		"CarryController",
+		"DragController",
+		"CutController",
+		"GondolaController",
+	}
 
 	t.test("each cosmetic loop reads the quality budget", function()
 		for _, name in ipairs(COSMETIC) do

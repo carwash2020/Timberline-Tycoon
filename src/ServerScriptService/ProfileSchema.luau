@@ -15,6 +15,7 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -164,6 +165,10 @@ export type Profile = {
 	tutorialDone: boolean,
 	tutorialStep: number, -- index into TutorialData.Steps (QuestService)
 	tutorialProgress: number, -- count toward the current step
+	-- Which v2 step list tutorialStep was saved against (TutorialData.OrderV2).
+	-- 0 until ApplyOrder remaps a plot-first save. Not filled by Reconcile
+	-- into a value that hides an old save: 0 means "not remapped yet".
+	tutorialOrder: number,
 	-- A returning player's short run of the v2 tutorial (MigrateV2 sets it
 	-- when the v1 tutorial was finished; QuestService clears it when done).
 	tutorialRefresher: boolean,
@@ -182,7 +187,9 @@ export type Profile = {
 	truckPaint: { [string]: string },
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
 	instantDeliveries: number, -- Instant Delivery uses left
-	onboarding: { [string]: boolean }, -- analytics funnel steps already logged (MilestoneService)
+	-- Funnel flags (MilestoneService), plus cartVolume: u³ Murph's cart has
+	-- already bought (TutorialGrove). Additions only.
+	onboarding: { [string]: boolean | number },
 	heartseeds: { [string]: number }, -- Heartseeds by wood id (ForestService)
 	forest: ForestState,
 	truckBed: { BedLog }, -- what's in your truck bed (VehicleService)
@@ -245,6 +252,7 @@ local TEMPLATE: Profile = {
 	tutorialDone = false,
 	tutorialStep = 1,
 	tutorialProgress = 0,
+	tutorialOrder = 0,
 	tutorialRefresher = false,
 	tutorialReplay = false,
 	seasonId = "spring",
@@ -254,7 +262,7 @@ local TEMPLATE: Profile = {
 	truckPaint = {},
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
-	onboarding = {},
+	onboarding = { cartVolume = 0 },
 	heartseeds = {},
 	forest = { planted = 0, harvested = 0, royalties = 0, figures = {}, elders = 0 },
 	truckBed = {},
@@ -407,6 +415,52 @@ function ProfileSchema.Migrate(data: any)
 	SaveSlotLogic.Migrate(data, TEMPLATE, function()
 		return Util.guid()
 	end, os.time())
+	ProfileSchema.UnstickCart(data)
+end
+
+-- The Rustbucket's v2 price. The cart soft-lock is a v2 save, so the
+-- unstick compares against this even on a v1 load.
+local function rustbucketPrice(): number
+	return TutorialGrove.TruckPrice(2)
+end
+
+-- Old saves set onboarding[TutorialCart] after one piece, which left them
+-- short of the Rustbucket with the cart closed. A save with that flag, no
+-- truck, and less cash than the truck price starts at cartVolume 0 so they
+-- can sell again. A save that already has a truck is left untouched, and a
+-- save that already has a numeric cartVolume is left untouched (so a later
+-- join doesn't wipe what they've sold since).
+function ProfileSchema.UnstickCart(data: any)
+	if type(data) ~= "table" or type(data.onboarding) ~= "table" then
+		return
+	end
+	local onboarding = data.onboarding
+	if onboarding[TutorialGrove.UsedKey] ~= true then
+		return
+	end
+	if type(onboarding.cartVolume) == "number" then
+		return
+	end
+	if type(data.ownedTrucks) == "table" and #data.ownedTrucks > 0 then
+		return
+	end
+	local cash = if type(data.cash) == "number" and data.cash == data.cash then data.cash else 0
+	if cash >= rustbucketPrice() then
+		return
+	end
+	onboarding.cartVolume = 0
+end
+
+local function applyTutorialOrders(data: any)
+	TutorialData.ApplyOrder(data)
+	if type(data.slots) ~= "table" then
+		return
+	end
+	for _, slot in pairs(data.slots) do
+		if type(slot) == "table" then
+			TutorialData.ApplyOrder(slot)
+		end
+	end
 end
 
 -- The v2 loop (V2_PLAN.md §14) ---------------------------------------------
@@ -508,6 +562,7 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 		end
 	end
 	if data.schema >= ProfileSchema.SchemaV2 then
+		applyTutorialOrders(data)
 		return result
 	end
 
@@ -545,6 +600,7 @@ function ProfileSchema.MigrateV2(data: any, startingCash: number?): MigrateV2Res
 	end
 	data.schema = ProfileSchema.SchemaV2
 	result.migrated = true
+	applyTutorialOrders(data)
 	return result
 end
 
