@@ -81,7 +81,16 @@ type Session = {
 	piecesSold: number,
 }
 
+export type EventData = {
+	name: string?,
+	woodId: string?,
+	id: string?,
+}
+
+type Listener = (Player, string, EventData?) -> ()
+
 local sessions: { [Player]: Session } = {}
+local listeners: { Listener } = {}
 local notify: ((Player, string) -> ())? = nil
 local loop = 1 -- the core loop that runs (Init)
 
@@ -248,6 +257,32 @@ function MilestoneService.Mark(player: Player, name: string)
 		stopwatch(player, session, name)
 	end
 	logFunnelStep(player, session, name)
+	-- Badges (and anything else) listen here, so a mark doesn't need a
+	-- second call site in the service that noticed it.
+	MilestoneService.Event(player, "mark", { name = name })
+end
+
+-- `fn` hears every Event, including the "mark" event Mark sends. A listener
+-- that errors is warned and skipped; the others still run.
+function MilestoneService.Listen(fn: Listener)
+	table.insert(listeners, fn)
+end
+
+-- One hook for things that aren't funnel steps (a plank, a wood, an area)
+-- and for the marks above. `kind` is a short name; `data` carries the id.
+-- No session required: a badge can be earned before the stopwatch starts.
+function MilestoneService.Event(player: Player, kind: string, data: EventData?)
+	if type(kind) ~= "string" or kind == "" then
+		return
+	end
+	for _, fn in ipairs(listeners) do
+		local ok, err = pcall(function()
+			fn(player, kind, data)
+		end)
+		if not ok then
+			warn("[MilestoneService] event listener failed: " .. tostring(err))
+		end
+	end
 end
 
 -- Call after cash is added. Tracks session earnings and announces when the
@@ -277,6 +312,9 @@ function MilestoneService.LogsSold(player: Player, byWood: { [string]: number })
 	session.lastSaleAt = os.clock()
 	for woodId, count in pairs(byWood) do
 		session.soldByWood[woodId] = (session.soldByWood[woodId] or 0) + count
+		if type(count) == "number" and count > 0 then
+			MilestoneService.Event(player, "wood", { woodId = woodId })
+		end
 	end
 end
 
@@ -292,6 +330,7 @@ function MilestoneService.WoodSold(player: Player, pieces: number, volumeByWood:
 	for woodId, volume in pairs(volumeByWood) do
 		if type(volume) == "number" and volume == volume and volume > 0 and volume ~= math.huge then
 			session.volumeByWood[woodId] = (session.volumeByWood[woodId] or 0) + volume
+			MilestoneService.Event(player, "wood", { woodId = woodId })
 		end
 	end
 end

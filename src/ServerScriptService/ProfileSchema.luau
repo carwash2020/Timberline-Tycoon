@@ -163,6 +163,7 @@ export type Profile = {
 	permissions: { [string]: any },
 	-- Account-wide (SaveSlotLogic.ACCOUNT): a slot swap does not move these.
 	badgesAwarded: { [string]: boolean },
+	badgesSent: { [string]: boolean }, -- AwardBadge returned true. Account-wide, like badgesAwarded.
 	questAxe: { step: number }, -- per slot. 0 = not started
 	secretsFound: { [string]: boolean },
 	areasVisited: { [string]: boolean },
@@ -266,6 +267,7 @@ local TEMPLATE: Profile = {
 	storage = {},
 	permissions = {},
 	badgesAwarded = {},
+	badgesSent = {},
 	questAxe = { step = 0 },
 	secretsFound = {},
 	areasVisited = {},
@@ -459,6 +461,7 @@ end
 -- Account-wide fields live on the profile, never inside a slot snapshot.
 local function applyAccountFields(data: any)
 	data.badgesAwarded = booleanMap(data.badgesAwarded)
+	data.badgesSent = booleanMap(data.badgesSent)
 	data.secretsFound = booleanMap(data.secretsFound)
 	data.areasVisited = booleanMap(data.areasVisited)
 	data.tollPaidUntil = nil
@@ -466,6 +469,7 @@ end
 
 local function stripAccountFields(slot: any)
 	slot.badgesAwarded = nil
+	slot.badgesSent = nil
 	slot.secretsFound = nil
 	slot.areasVisited = nil
 	slot.tollPaidUntil = nil

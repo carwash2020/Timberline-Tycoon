@@ -20,6 +20,7 @@ local MODULES = {
 	"AmbientLife",
 	"AmbientSound",
 	"AxeController",
+	"BadgeUI",
 	"BlueprintPlacer",
 	"BuilderTools",
 	"CameraShake",
@@ -236,6 +237,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "FieldGuideUI",
 		get = function()
 			return require(script.Parent.FieldGuideUI)
+		end,
+	},
+	{
+		name = "BadgeUI",
+		get = function()
+			return require(script.Parent.BadgeUI)
 		end,
 	},
 	{
