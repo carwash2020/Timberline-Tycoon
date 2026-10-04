@@ -574,4 +574,18 @@ return function(t)
 		t.eq(yes, false)
 		t.eq(s.profile.cash, before)
 	end)
+
+	t.test("shop hours call ShopHoursLogic.IsOpen(shopId, hour)", function()
+		local fs = require("@lune/fs")
+		local src = fs.readFile("src/ServerScriptService/ShopService.luau")
+		t.ok(string.find(src, 'ShopHoursLogic.IsOpen("Dealership", hour)', 1, true) ~= nil)
+		t.ok(string.find(src, "ShopHoursLogic.IsOpen(shopId, ShopService.Hour())", 1, true) ~= nil)
+		t.eq(string.find(src, 'FindFirstChild("ShopHoursLogic")', 1, true), nil)
+		local hours = fs.readFile("src/ReplicatedStorage/Shared/ShopHoursLogic.luau")
+		for _, name in { "HearthOpen", "HearthClose", "DealerOpen", "DealerClose" } do
+			local line = string.match(hours, name .. " = [^\n]+")
+			t.ok(line ~= nil, name)
+			t.eq(string.find(line :: string, "TBD", 1, true), nil, name)
+		end
+	end)
 end
