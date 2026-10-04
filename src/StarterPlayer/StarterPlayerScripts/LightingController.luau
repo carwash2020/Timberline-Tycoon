@@ -2,8 +2,8 @@
 -- LightingController: the sky and the light, drawn on each client
 -- (GAME_DESIGN §13 "Lighting & mood"; REDESIGN.md "an active environment").
 --   * The clock: Lighting.ClockTime doesn't replicate, so it is worked out
---     here from the server's clock (Shared/WorldTime: a 20-minute day), so
---     the sun glides and every player sees the same hour.
+--     here from the server's clock (Shared/WorldTime: a 24-minute day, with
+--     20:00-04:00 faster), so the sun glides and every player sees the same hour.
 --   * WLD-18: the look is eased and written 10 times a second (the frames
 --     between add their dt up), and each property only when it has moved
 --     past its epsilon since the last write (EnvironmentData.WriteTick,
@@ -15,7 +15,11 @@
 --     in (your "Biome" attribute, set by BiomeService) and the weather
 --     (workspace "Weather" / "WeatherIntensity", read for your biome),
 --     eased over ~3 s so walking into the Volcano or the Gloam Hollow
---     crossfades instead of snapping.
+--     crossfades instead of snapping. A part tagged FogZone (a cave, or
+--     FogPreset "fog") replaces the weather while you stand in it and holds
+--     the air to density 0.65 and brightness 0.45. No extra particles, so
+--     Quality low does not grow a new emitter. W2 parents each part to the
+--     cave's Atomic model, or a Persistent model if it is over 128 studs.
 --   * Owns (creates locally) the Atmosphere, Sky, Clouds (under
 --     workspace.Terrain, the only place they render), Bloom, colour
 --     grading, sun rays and a far blur used only on the Aether Isles.
@@ -39,6 +43,7 @@ local RunService = game:GetService("RunService")
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local Util = require(ReplicatedStorage.Shared.Util)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local Quality = require(script.Parent.Quality)
@@ -494,8 +499,8 @@ local function trackGlowPart(part: BasePart)
 		dayColor = if window then WINDOW_DAY else nightColor:Lerp(LANTERN_DAY_MIX, 0.55),
 		nightColor = nightColor,
 		lights = lightsUnder(part),
-		onAt = 18.7 + hashAt(p, 1) * 0.7, -- lamps come on one by one through dusk
-		offAt = 5.4 + hashAt(p, 2) * 0.6,
+		onAt = EnvironmentData.LampOnFrom + hashAt(p, 1) * EnvironmentData.LampOnSpan, -- one by one through dusk
+		offAt = EnvironmentData.LampOffFrom + hashAt(p, 2) * EnvironmentData.LampOffSpan,
 		sleepFrom = nil,
 		sleepTo = nil,
 		lit = nil,
@@ -538,8 +543,8 @@ local function trackLamp(model: Instance)
 		dayColor = LANTERN_NIGHT,
 		nightColor = LANTERN_NIGHT,
 		lights = loose,
-		onAt = 18.7 + hashAt(pivot, 1) * 0.7,
-		offAt = 5.4 + hashAt(pivot, 2) * 0.6,
+		onAt = EnvironmentData.LampOnFrom + hashAt(pivot, 1) * EnvironmentData.LampOnSpan,
+		offAt = EnvironmentData.LampOffFrom + hashAt(pivot, 2) * EnvironmentData.LampOffSpan,
 		sleepFrom = nil,
 		sleepTo = nil,
 		lit = nil,
@@ -597,14 +602,77 @@ local function watchGlows()
 end
 
 ---------------------------------------------------------------------------
+-- Fog zones (caves and fog pockets). W2 places the parts; we only read them.
+---------------------------------------------------------------------------
+
+local fogZones: { BasePart } = {}
+
+local function trackFogZone(inst: Instance)
+	if not inst:IsA("BasePart") then
+		return
+	end
+	for _, part in ipairs(fogZones) do
+		if part == inst then
+			return
+		end
+	end
+	table.insert(fogZones, inst)
+end
+
+local function forgetFogZone(inst: Instance)
+	for i, part in ipairs(fogZones) do
+		if part == inst then
+			table.remove(fogZones, i)
+			return
+		end
+	end
+end
+
+local function watchFogZones()
+	local tag = EnvironmentData.FogZoneTag
+	CollectionService:GetInstanceAddedSignal(tag):Connect(trackFogZone)
+	CollectionService:GetInstanceRemovedSignal(tag):Connect(forgetFogZone)
+	for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+		trackFogZone(inst)
+	end
+end
+
+-- The preset and weight (0 or 1) for the zone the local player is standing
+-- in. Checked on the lighting write, not every frame, and it adds no
+-- particles. Empty until W2 places a volume.
+local function fogZoneHere(): (string?, number)
+	if #fogZones == 0 then
+		return nil, 0
+	end
+	local player = Players.LocalPlayer
+	local character = if player then player.Character else nil
+	local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+	if not (root and root:IsA("BasePart")) then
+		return nil, 0
+	end
+	local pos = root.Position
+	for i = #fogZones, 1, -1 do
+		local part = fogZones[i]
+		if part.Parent == nil then
+			table.remove(fogZones, i)
+		elseif Util.pointInPart(part, pos) then
+			return EnvironmentData.FogPresetName(part:GetAttribute("FogPreset")), 1
+		end
+	end
+	return nil, 0
+end
+
+---------------------------------------------------------------------------
 -- Start
 ---------------------------------------------------------------------------
 
 local function targetLook(env: Environment): LightingState
-	return EnvironmentData.Blend(env.clock, env.biomeId, env.weather, env.intensity)
+	local preset, weight = fogZoneHere()
+	return EnvironmentData.Blend(env.clock, env.biomeId, env.weather, env.intensity, preset, weight)
 end
 
 function LightingController.Start()
+	watchFogZones()
 	local owned = makeOwned()
 	local env = LightingController.Environment()
 	local current = targetLook(env)

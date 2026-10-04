@@ -344,6 +344,67 @@ return function(t)
 		end
 	)
 
+	t.test("lamps still come on at dusk, before the grove wakes", function()
+		local GameConfig = t.shared("GameConfig")
+		local WorldTime = t.shared("WorldTime")
+		-- 18:40 is 18.666...; the first lamp is 18.7 (18:42), then they stagger.
+		t.ok(EnvironmentData.LampOnFrom >= 18 + 40 / 60, "not before 18:40")
+		t.ok(EnvironmentData.LampOnFrom < GameConfig.NightStartsAt, "before the night")
+		t.ok(not WorldTime.IsNight(EnvironmentData.LampOnFrom), "dusk, not night")
+		t.ok(WorldTime.IsNight(GameConfig.NightStartsAt))
+		t.eq(EnvironmentData.LampOnSpan, 0.7)
+		t.eq(EnvironmentData.LampOffFrom, 5.4)
+		t.eq(EnvironmentData.LampOffSpan, 0.6)
+	end)
+
+	t.test("FogZone: a cave is darker and thicker, a fog pocket only thickens, weight 0 changes nothing", function()
+		t.eq(EnvironmentData.FogZoneTag, "FogZone")
+		t.eq(EnvironmentData.FogPresetName(nil), "cave")
+		t.eq(EnvironmentData.FogPresetName("cave"), "cave")
+		t.eq(EnvironmentData.FogPresetName("fog"), "fog")
+		t.eq(EnvironmentData.FogPresetName("nope"), "cave")
+
+		local function lum(c)
+			return (c.R + c.G + c.B) / 3
+		end
+		for _, hour in ipairs({ 1, 13, 22.5 }) do
+			local open = EnvironmentData.Blend(hour, "", "Clear", 0)
+			local none = EnvironmentData.Blend(hour, "", "Clear", 0, "cave", 0)
+			t.ok(maxDiff(none, open) < 1e-9, "weight 0 at " .. hour)
+			local cave = EnvironmentData.Blend(hour, "", "Clear", 0, "cave", 1)
+			local half = EnvironmentData.Blend(hour, "", "Clear", 0, "cave", 0.5)
+			inRange(cave, "cave at " .. hour)
+			t.ok(cave.atmosphereDensity > open.atmosphereDensity + 0.1, "thicker at " .. hour)
+			t.ok(cave.brightness < open.brightness, "darker at " .. hour)
+			t.ok(cave.brightness >= 0.35, "not black at " .. hour)
+			t.ok(half.brightness > cave.brightness and half.brightness < open.brightness, "half weight")
+			local fog = EnvironmentData.Blend(hour, "", "Clear", 0, "fog", 1)
+			inRange(fog, "fog pocket at " .. hour)
+			t.ok(fog.atmosphereDensity > open.atmosphereDensity + 0.1, "fog pocket thickens")
+			t.eq(fog.brightness, open.brightness, "a fog pocket keeps the hour's light")
+			-- Unknown preset names are caves.
+			local unknown = EnvironmentData.Blend(hour, "", "Clear", 0, "shaft", 1)
+			t.ok(maxDiff(unknown, cave) < 1e-9, "unknown preset is a cave")
+		end
+		-- Inside a cave in the grove at night: darker than the grove, still not black.
+		local grove = EnvironmentData.Blend(1, "grove", "Clear", 0)
+		local groveCave = EnvironmentData.Blend(1, "grove", "Clear", 0, "cave", 1)
+		inRange(groveCave, "grove cave")
+		t.ok(groveCave.brightness < grove.brightness)
+		t.ok(groveCave.brightness >= 0.45, "the grove's cave stays at the floor")
+		t.ok(lum(groveCave.outdoorAmbient) > 0.05)
+	end)
+
+	t.test("a FogZone skips the weather and stays inside the density and brightness limits", function()
+		local s = EnvironmentData.Blend(0, "grove", "storm", 1, "cave", 1)
+		t.ok(s.atmosphereDensity <= 0.65, "density")
+		t.ok(s.brightness >= 0.45, "brightness")
+		t.ok(math.abs(s.atmosphereDensity - 0.65) < 1e-6, "the density cap is what holds")
+		t.ok(math.abs(s.brightness - 0.45) < 1e-6, "the brightness floor is what holds")
+		-- The storm would set cloud cover to 0.96. It is not applied in the zone.
+		t.ok(s.cloudCover < 0.9, "weather is not stacked inside a FogZone")
+	end)
+
 	t.test("Lerp and Apply leave their inputs alone", function()
 		local a = EnvironmentData.TimeOfDay(6)
 		local b = EnvironmentData.TimeOfDay(13)
@@ -403,7 +464,7 @@ return function(t)
 		local clock = EnvironmentData.ClockMoved
 		t.ok(clock(nil, 12), "never written: write")
 		t.ok(not clock(12, 12.00005), "under the epsilon (a still clock): skip")
-		t.ok(clock(12, 12 + 1 / 3000), "one 60 fps frame of a 20-minute day: write")
+		t.ok(clock(12, 12 + 1 / 3000), "a small step of the clock: write")
 		t.ok(not clock(23.99995, 0.00004), "across midnight it's 0.00009 h: skip")
 		t.ok(clock(23.9999, 0.0002), "across midnight it's 0.0003 h: write")
 		t.ok(clock(12, 23), "a ClockOverride jump: write")

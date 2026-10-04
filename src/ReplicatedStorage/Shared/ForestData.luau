@@ -236,7 +236,7 @@ ForestData.Elder = {
 	helperSeeds = 2, -- each helper gets these Heartseeds ...
 	helperShare = 0.1, -- ... and this much of its logs' value
 	fadeSeconds = 15 * 60, -- unfelled, it fades back into the forest (a night-only one at dawn)
-	nightLeftSeconds = 5 * 60, -- a night-only grove wakes one only with this much of the night left
+	nightLeftSeconds = 4 * 60, -- a night-only grove wakes one only with this much of the night left
 	minGap = 16, -- studs to the nearest other tree where it wakes
 }
 

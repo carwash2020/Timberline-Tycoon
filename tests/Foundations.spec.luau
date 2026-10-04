@@ -41,8 +41,8 @@ return function(t)
 		return { Name = "Tester", UserId = 7 }
 	end
 
-	t.test("placeholders match the builder and designer numbers and the day is unchanged", function()
-		t.eq(GameConfig.DayCycleMinutes, 20)
+	t.test("placeholders match the builder and designer numbers and the day is 24 minutes", function()
+		t.eq(GameConfig.DayCycleMinutes, 24)
 		t.eq(GameConfig.StoreDespawnPad, 6)
 		t.eq(GameConfig.StoreDespawnHeight, 20)
 		t.eq(GameConfig.DespawnChecks, 2)

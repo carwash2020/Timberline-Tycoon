@@ -6,7 +6,8 @@
 -- It does NOT set Lighting.ClockTime: that property doesn't replicate, and
 -- the sun would only step once a second if it did. Every client works the
 -- clock out from workspace:GetServerTimeNow() each frame
--- (LightingController) with the same WorldTime maths, so everyone sees the
+-- (LightingController) with the same WorldTime maths (a 24-minute day,
+-- with 20:00-04:00 sped by WorldTime.NightSpeed), so everyone sees the
 -- same sky.
 --
 -- In Studio only, the workspace attribute "ClockOverride" (an hour, 0-24)
