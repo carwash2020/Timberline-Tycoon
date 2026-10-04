@@ -67,7 +67,7 @@ TutorialGrove.RefuseBig = "That's more than my cart can take. The sawmill buys a
 
 local OPEN_STEPS: { [string]: boolean } = { sell = true, plot = true, truck = true }
 
--- The Rustbucket's price in `loop` (0 in v1, where it was free).
+-- The Rustbucket's price in `loop` (priceCash in v1, v2.price in v2).
 function TutorialGrove.TruckPrice(loop: number): number
 	local truck = ItemCatalog.GetTruck("Rustbucket")
 	if not truck then

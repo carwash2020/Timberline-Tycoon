@@ -108,20 +108,29 @@ return function(t)
 		local GameConfig = t.shared("GameConfig")
 		local SellLogic = t.shared("SellLogic")
 		local TutorialData = t.shared("TutorialData")
-		local bonus = 0
-		for _, step in ipairs(TutorialData.StepsV2) do
-			if step.id == "sell" then
-				bonus = step.rewardCash or 0
+		local function bonusOf(steps)
+			local bonus = 0
+			for _, step in ipairs(steps) do
+				if step.id == "sell" then
+					bonus = step.rewardCash or 0
+				end
 			end
+			return bonus
 		end
 		-- The same pricing SellService uses (SellLogic.PieceValue, then Payout).
 		local function cartPay(woodId: string): number
 			local gross = SellLogic.PieceValue(woodId, "log", TutorialGrove.MaxVolume, nil, 1, false)
 			return SellLogic.Payout(gross, 1)
 		end
-		local price = TutorialGrove.TruckPrice(2)
-		t.ok(GameConfig.StartingCash + bonus + cartPay("oak") >= price, "oak")
-		t.ok(GameConfig.StartingCash + bonus + cartPay("birch") >= price, "birch")
+		local function covers(loop: number, steps, label: string)
+			local price = TutorialGrove.TruckPrice(loop)
+			local purse = GameConfig.StartingCash + bonusOf(steps)
+			t.ok(purse + cartPay("oak") >= price, label .. " oak")
+			t.ok(purse + cartPay("birch") >= price, label .. " birch")
+		end
+		covers(2, TutorialData.StepsV2, "v2")
+		-- v1 uses TutorialData.Steps' sell reward, not the v2 step's.
+		covers(1, TutorialData.Steps, "v1")
 	end)
 
 	t.test("the cart refuses at $75 or with a truck owned", function()
