@@ -38,6 +38,7 @@ local ACCOUNT: { [string]: boolean } = {
 	-- trade these away. storage, plot.squares, permissions, and questAxe
 	-- stay on the slot.
 	badgesAwarded = true,
+	badgesSent = true,
 	secretsFound = true,
 	areasVisited = true,
 }

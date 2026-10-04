@@ -419,6 +419,7 @@ return function(t)
 
 	t.test("load, reset, and swap keep badges, secrets, and areas, and swap the slot fields", function()
 		t.eq(SaveSlotLogic.IsAccountKey("badgesAwarded"), true)
+		t.eq(SaveSlotLogic.IsAccountKey("badgesSent"), true)
 		t.eq(SaveSlotLogic.IsAccountKey("secretsFound"), true)
 		t.eq(SaveSlotLogic.IsAccountKey("areasVisited"), true)
 		t.eq(SaveSlotLogic.IsAccountKey("storage"), false)
@@ -427,6 +428,7 @@ return function(t)
 
 		local data = fresh()
 		data.badgesAwarded = { FirstTree = true }
+		data.badgesSent = { FirstTree = true }
 		data.secretsFound = { LanternShrine = true }
 		data.areasVisited = { Snow = true }
 		data.storage = { { uid = "box-a", itemId = "Lantern", shop = "ToolShed" } }
@@ -439,6 +441,7 @@ return function(t)
 		data.slots[2].permissions = { visit = false }
 		data.slots[2].questAxe = { step = 4 }
 		data.slots[2].badgesAwarded = { Stolen = true }
+		data.slots[2].badgesSent = { Stolen = true }
 		data.slots[2].secretsFound = { Stolen = true }
 		data.slots[2].areasVisited = { Stolen = true }
 
@@ -447,6 +450,7 @@ return function(t)
 		local ok, why = SaveSlotLogic.Perform(data, "load", 2, 1_000, Schema.Template, guid, world.hooks)
 		t.eq(ok, true, why)
 		t.eq(data.badgesAwarded, { FirstTree = true })
+		t.eq(data.badgesSent, { FirstTree = true })
 		t.eq(data.secretsFound, { LanternShrine = true })
 		t.eq(data.areasVisited, { Snow = true })
 		t.eq(data.storage, { { uid = "box-b", itemId = "HeatBoots", shop = "ToolShed" } })
@@ -458,10 +462,12 @@ return function(t)
 		t.eq(data.slots[1].questAxe, { step = 2 })
 		t.eq(data.slots[1].permissions, { visit = true })
 		t.eq(data.slots[1].badgesAwarded, nil)
+		t.eq(data.slots[1].badgesSent, nil)
 
 		ok, why = SaveSlotLogic.Perform(data, "reset", 2, 1_000 + 120, Schema.Template, guid, world.hooks)
 		t.eq(ok, true, why)
 		t.eq(data.badgesAwarded, { FirstTree = true })
+		t.eq(data.badgesSent, { FirstTree = true })
 		t.eq(data.secretsFound, { LanternShrine = true })
 		t.eq(data.areasVisited, { Snow = true })
 		t.eq(data.storage, {})
@@ -472,6 +478,7 @@ return function(t)
 		ok, why = SaveSlotLogic.Perform(data, "load", 1, 1_000 + 240, Schema.Template, guid, world.hooks)
 		t.eq(ok, true, why)
 		t.eq(data.badgesAwarded, { FirstTree = true })
+		t.eq(data.badgesSent, { FirstTree = true })
 		t.eq(data.secretsFound, { LanternShrine = true })
 		t.eq(data.areasVisited, { Snow = true })
 		t.eq(data.storage, { { uid = "box-a", itemId = "Lantern", shop = "ToolShed" } })

@@ -8,6 +8,7 @@ return function(t)
 	local function setup(award)
 		local profile = {
 			badgesAwarded = {},
+			badgesSent = {},
 			areasVisited = {},
 			compendium = { oak = true },
 			onboarding = {},
@@ -92,6 +93,7 @@ return function(t)
 		s.Milestone.Mark(s.player, "First sale")
 		t.eq(s.calls, {})
 		t.eq(s.profile.badgesAwarded.FirstSale, true)
+		t.eq(s.profile.badgesSent.FirstSale, nil)
 		t.eq(s.attrs.Badges, "FirstSale")
 		t.eq(s.fired[1].payload, "FirstSale")
 		s.Milestone.Stop(s.player)
@@ -107,6 +109,7 @@ return function(t)
 		s.Milestone.Mark(s.player, "First sale")
 		t.eq(s.calls, { { userId = 42, badgeId = 2123456789 } })
 		t.eq(s.profile.badgesAwarded.FirstSale, true)
+		t.eq(s.profile.badgesSent.FirstSale, true)
 		s.Milestone.Stop(s.player)
 		s.Milestone.Start(s.player, s.profile)
 		s.Milestone.Mark(s.player, "First sale")
@@ -207,7 +210,25 @@ return function(t)
 		t.eq(s.calls, {})
 	end)
 
-	t.test("AwardBadge returning false still records the earn and does not retry", function()
+	t.test("an earn at id 0 is sent once on the next join, and not on the one after", function()
+		local s = setup()
+		s.Milestone.Start(s.player, s.profile)
+		s.Milestone.Mark(s.player, "First sale")
+		t.eq(s.calls, {})
+		t.eq(s.profile.badgesAwarded.FirstSale, true)
+		t.eq(s.profile.badgesSent.FirstSale, nil)
+		s.BadgeData.Ids.FirstSale = 2123456789
+		s.BadgeService.Forget(s.player)
+		s.BadgeService.Poll(s.player)
+		t.eq(s.calls, { { userId = 42, badgeId = 2123456789 } })
+		t.eq(s.profile.badgesSent.FirstSale, true)
+		s.BadgeService.Forget(s.player)
+		s.BadgeService.Poll(s.player)
+		t.eq(#s.calls, 1, "a third join makes no call")
+		s.BadgeData.Ids.FirstSale = 0
+	end)
+
+	t.test("AwardBadge returning false leaves badgesSent unset and retries next join", function()
 		local n = 0
 		local s = setup(function()
 			n += 1
@@ -218,6 +239,13 @@ return function(t)
 		t.eq(n, 1)
 		t.eq(#s.pauses, 0)
 		t.eq(s.profile.badgesAwarded.FirstSale, true)
+		t.eq(s.profile.badgesSent.FirstSale, nil)
+		s.BadgeService.Award(s.player, "FirstSale")
+		t.eq(n, 1, "no retry this session")
+		s.BadgeService.Forget(s.player)
+		s.BadgeService.Poll(s.player)
+		t.eq(n, 2, "the next join tries again")
+		t.eq(s.profile.badgesSent.FirstSale, nil)
 		s.BadgeData.Ids.FirstSale = 0
 	end)
 end

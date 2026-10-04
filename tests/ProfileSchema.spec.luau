@@ -488,6 +488,7 @@ return function(t)
 		data.storage = nil
 		data.permissions = nil
 		data.badgesAwarded = nil
+		data.badgesSent = nil
 		data.questAxe = nil
 		data.secretsFound = nil
 		data.areasVisited = nil
@@ -502,6 +503,7 @@ return function(t)
 					slot.permissions = nil
 					slot.questAxe = nil
 					slot.badgesAwarded = nil
+					slot.badgesSent = nil
 					slot.secretsFound = nil
 					slot.areasVisited = nil
 					slot.tollPaidUntil = nil
@@ -528,6 +530,7 @@ return function(t)
 		t.eq(data.plot.squares, {})
 		t.eq(data.permissions, {})
 		t.eq(data.badgesAwarded, {})
+		t.eq(data.badgesSent, {})
 		t.eq(data.questAxe, { step = 0 })
 		t.eq(data.secretsFound, {})
 		t.eq(data.areasVisited, {})
@@ -544,6 +547,7 @@ return function(t)
 		data.plot.squares = 4
 		data.permissions = 1
 		data.badgesAwarded = false
+		data.badgesSent = false
 		data.questAxe = "done"
 		data.secretsFound = 0
 		data.areasVisited = "snow"
@@ -552,9 +556,23 @@ return function(t)
 		t.eq(data.plot.squares, {})
 		t.eq(data.permissions, {})
 		t.eq(data.badgesAwarded, {})
+		t.eq(data.badgesSent, {})
 		t.eq(data.questAxe, { step = 0 })
 		t.eq(data.secretsFound, {})
 		t.eq(data.areasVisited, {})
+	end)
+
+	t.test("badgesSent stays on the account and is stripped out of a slot", function()
+		local Schema, data = fresh()
+		data.badgesSent = { FirstSale = true, bad = 1 }
+		data.slots = { {}, { badgesSent = { Stolen = true } } }
+		data.activeSlot = 1
+		Schema.Migrate(data)
+		t.eq(data.badgesSent, { FirstSale = true })
+		t.eq(Schema.Template.badgesSent, {})
+		for _, slot in ipairs(data.slots) do
+			t.eq(slot.badgesSent, nil)
+		end
 	end)
 
 	t.test("storage keeps 50 server uids and drops a box only when its uid is taken", function()

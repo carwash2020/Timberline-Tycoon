@@ -6,8 +6,8 @@
 --   Creator Hub → your experience → Engagement → Badges → Create → ID
 --
 -- Lanternwood is the night-glow wood, its own id ("lanternwood"). It is
--- not lumenwood. Ferry Island, the Secret Cave, and the toll area are not
--- built yet: those three ids stay 0, and 0 is never sent to Roblox.
+-- not lumenwood. Ferry Island, the Secret Cave, and the North Strip are not
+-- built yet: those three ids stay 0, and AreasAt does not earn them.
 
 local RegionLogic = require(script.Parent.RegionLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
@@ -49,9 +49,9 @@ BadgeData.Ids = {
 	FirstTruck = 0, -- PASTE: Engagement → Badges → First Truck → ID
 	FirstPlank = 0, -- PASTE: Engagement → Badges → First Plank → ID
 	AreaStarter = 0, -- PASTE: Engagement → Badges → Starter Forest → ID
-	AreaHills = 0, -- PASTE: Engagement → Badges → Hills → ID
+	AreaHills = 0, -- PASTE: Engagement → Badges → The Hills → ID
 	AreaSnow = 0, -- PASTE: Engagement → Badges → Snowfields → ID
-	AreaVolcano = 0, -- PASTE: Engagement → Badges → Volcano → ID
+	AreaVolcano = 0, -- PASTE: Engagement → Badges → The Volcano → ID
 	AreaGrove = 0, -- PASTE: Engagement → Badges → Gloam Hollow → ID
 	AreaSky = 0, -- PASTE: Engagement → Badges → Aether Isles → ID
 	-- Not built yet. Leave these at 0. Awarding skips 0.
@@ -65,7 +65,12 @@ BadgeData.Ids = {
 	WoodLanternwood = 0, -- PASTE: Engagement → Badges → Lanternwood → ID
 } :: { [string]: number }
 
--- Places that are not in the world yet. Their ids stay 0.
+-- Places that are not in the world yet. AreasAt skips every key here, so
+-- standing there earns nothing. Their ids stay 0.
+-- W2 and W3 remove a key from NotBuilt when they build its trigger: the
+-- Secret Cave interior FogZone past the boulders, the Ferry Island disc,
+-- and the North Strip box x -400 to 400, z 1586 to 1900 (not the booth or
+-- the bridge).
 BadgeData.NotBuilt = { "AreaFerry", "AreaCave", "AreaToll" }
 
 -- A phone tap target (InputKit.MinTouchPx). BadgeUI rows and the open
@@ -106,7 +111,7 @@ local ALL: { BadgeDef } = {
 	},
 	{
 		key = "AreaHills",
-		name = "Hills",
+		name = "The Hills",
 		detail = "Walk into the Hills.",
 		group = "area",
 		visit = "hills",
@@ -120,7 +125,7 @@ local ALL: { BadgeDef } = {
 	},
 	{
 		key = "AreaVolcano",
-		name = "Volcano",
+		name = "The Volcano",
 		detail = "Walk into the Volcano.",
 		group = "area",
 		visit = "volcano",
@@ -155,8 +160,8 @@ local ALL: { BadgeDef } = {
 	},
 	{
 		key = "AreaToll",
-		name = "Toll",
-		detail = "Cross the toll into the new ground.",
+		name = "North Strip",
+		detail = "Cross Old Tolly's bridge into the North Strip.",
 		group = "area",
 		visit = "toll",
 	},
@@ -296,13 +301,13 @@ end
 
 -- Area badges for a world position (x, y, z). Region discs come from
 -- RegionLogic. Ferry Island is the offshore island. The secret cave is the
--- reach past Gloam Hollow, not the cave on the Volcano. The toll ground is
--- not on the map yet, so no position earns it.
+-- reach past Gloam Hollow, not the cave on the Volcano. Keys in NotBuilt
+-- are skipped until W2 or W3 removes them.
 function BadgeData.AreasAt(x: number, y: number, z: number): { string }
 	local keys: { string } = {}
 	local seen: { [string]: boolean } = {}
 	local function add(key: string?)
-		if key and not seen[key] then
+		if key and not seen[key] and table.find(BadgeData.NotBuilt, key) == nil then
 			seen[key] = true
 			table.insert(keys, key)
 		end

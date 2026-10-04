@@ -9,7 +9,10 @@
 --   * woods already in the field guide (profile.compendium)
 --   * a plank they own (a WoodSection model with Kind "plank")
 -- BadgeSync is server -> client. Nothing connects OnServerEvent, and it
--- has no rate limit. An id of 0 never calls AwardBadge.
+-- has no rate limit. An id of 0 records the earn and never calls AwardBadge.
+-- badgesAwarded is the earn (the panel). badgesSent is set only when
+-- AwardBadge returns true. A live id is sent on the next join if the earn
+-- was recorded while the id was 0.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -55,24 +58,23 @@ local greeted: { [Player]: boolean } = {}
 
 local function defaultAward(userId: number, badgeId: number): boolean
 	local api = game:GetService("BadgeService")
-	api:AwardBadge(userId, badgeId)
-	return true
+	return api:AwardBadge(userId, badgeId)
 end
 
-local function callAward(userId: number, badgeId: number): boolean
+-- true: AwardBadge returned true. false: it returned false (do not retry
+-- this session). nil: every try errored.
+local function callAward(userId: number, badgeId: number): boolean?
 	local fn = awardImpl or defaultAward
 	for attempt = 1, MAX_TRIES do
-		local ok = pcall(fn, userId, badgeId)
+		local ok, result = pcall(fn, userId, badgeId)
 		if ok then
-			-- Awarded, already owned, or the badge is turned off. The call
-			-- itself didn't fail, so don't retry it.
-			return true
+			return result == true
 		end
 		if attempt < MAX_TRIES then
 			pause(RETRY_SEC)
 		end
 	end
-	return false
+	return nil
 end
 
 local function findRemote(): SyncRemote?
@@ -111,6 +113,18 @@ local function bag(map: { [Player]: { [string]: boolean } }, player: Player): { 
 	return inner
 end
 
+local function ensureMaps(profile: Profile)
+	if type(profile.badgesAwarded) ~= "table" then
+		profile.badgesAwarded = {}
+	end
+	if type(profile.badgesSent) ~= "table" then
+		profile.badgesSent = {}
+	end
+	if type(profile.areasVisited) ~= "table" then
+		profile.areasVisited = {}
+	end
+end
+
 local function remember(player: Player, profile: Profile, key: string)
 	profile.badgesAwarded[key] = true
 	local def = BadgeData.Get(key)
@@ -123,7 +137,8 @@ end
 
 -- Records `key` on the profile and, when its Creator Hub id is pasted,
 -- asks Roblox to award it. Id 0 is recorded for the panel and never sent.
--- Already recorded: no second call. Returns true when the earn was recorded
+-- A live id that was already sent does not call again. An earn at id 0 is
+-- sent later, once the id is live. Returns true when the earn was recorded
 -- before this returns. A live id on a real server is sent in the background
 -- and returns false here; the profile updates when Roblox answers.
 function BadgeService.Award(player: Player, key: string): boolean
@@ -135,19 +150,17 @@ function BadgeService.Award(player: Player, key: string): boolean
 	if not def or not profile then
 		return false
 	end
-	if type(profile.badgesAwarded) ~= "table" then
-		profile.badgesAwarded = {}
-	end
-	if type(profile.areasVisited) ~= "table" then
-		profile.areasVisited = {}
-	end
-	if profile.badgesAwarded[key] == true then
-		return false
-	end
+	ensureMaps(profile)
 	local id = BadgeData.RobloxId(key)
 	if not BadgeData.IsLive(id) then
+		if profile.badgesAwarded[key] == true then
+			return false
+		end
 		remember(player, profile, key)
 		return true
+	end
+	if profile.badgesSent[key] == true then
+		return false
 	end
 	if type(player.UserId) ~= "number" then
 		return false
@@ -163,15 +176,19 @@ function BadgeService.Award(player: Player, key: string): boolean
 		-- Stay in-flight for the whole Roblox call. AwardBadge yields, and
 		-- a poll during that wait must not start a second one.
 		local current = ProfileService.GetProfile(player)
-		if current and type(current.badgesAwarded) ~= "table" then
-			current.badgesAwarded = {}
+		if current then
+			ensureMaps(current)
 		end
-		if current and current.badgesAwarded[key] ~= true then
-			if callAward(userId, id) then
-				if type(current.areasVisited) ~= "table" then
-					current.areasVisited = {}
-				end
+		if current and current.badgesSent[key] ~= true then
+			local sent = callAward(userId, id)
+			if sent == true then
 				remember(player, current, key)
+				current.badgesSent[key] = true
+			elseif sent == false then
+				-- The call answered. The earn sticks; Roblox did not take it.
+				-- No retry until the next join.
+				remember(player, current, key)
+				gaveUp[key] = true
 			else
 				gaveUp[key] = true
 				warn(string.format("[BadgeService] could not award %s (%d) to %s", key, id, player.Name))
@@ -236,12 +253,19 @@ function BadgeService.Poll(player: Player)
 	if not profile then
 		return
 	end
-	if type(profile.badgesAwarded) ~= "table" then
-		profile.badgesAwarded = {}
-	end
+	ensureMaps(profile)
 	if not greeted[player] then
 		greeted[player] = true
 		publish(player, profile)
+		-- Earned while the id was 0 (or a false AwardBadge): send once now
+		-- that the id is live. The in-flight guard stops a second call.
+		local awarded = profile.badgesAwarded
+		local sent = profile.badgesSent
+		for badgeKey, on in pairs(awarded) do
+			if on == true and sent[badgeKey] ~= true and BadgeData.IsLive(BadgeData.RobloxId(badgeKey)) then
+				BadgeService.Award(player, badgeKey)
+			end
+		end
 	end
 	local earned = profile.badgesAwarded
 	local x, y, z = positionOf(player)
