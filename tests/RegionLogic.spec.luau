@@ -220,7 +220,7 @@ return function(t)
 		local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
 		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
 		local reach = WorldPlan.ReachTrees()
-		t.ok(#reach >= 3 and #reach <= 4, #reach .. " gloamwood in the reach")
+		t.eq(#reach, 6, #reach .. " gloamwood in the reach")
 		for _, spot in ipairs(reach) do
 			local p = spot.position
 			t.eq(spot.woodId, "phantomwood")
