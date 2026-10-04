@@ -18,9 +18,10 @@
 --   * Walkers stroll their loop (NPCData.RouteState from the shared server
 --     clock, so everyone sees them in the same place) and pause at their
 --     waypoints. The root stays anchored. NPCWalk eases it toward the
---     clock every rendered frame, and samples the ground once at bind
---     (a ray down the route, then HeightAt if the ray misses). The server
---     never moves them.
+--     clock every rendered frame. At bind a ray samples the route; a miss
+--     uses HeightAt and is retried a few times a second while the walker
+--     is within StreamingMinRadius, in case the porch streams in later.
+--     The server never moves them.
 --   * The nearest NPC within TALK_RANGE says a line in a speech bubble
 --     every so often (NPCDialogue: the hour, the weather, a first sale, a
 --     better axe, a sawmill, or a general line). Talk (F, or a tap on the
@@ -466,8 +467,9 @@ local function motorIn(parent: Instance?, name: string): Motor6D?
 end
 
 -- One ray per waypoint and per 4 studs along the route. NPCs, Wood, and
--- vehicles are excluded; a miss uses the terrain height.
-local function sampleGround(route: { NPCData.Waypoint }): NPCWalk.Profile
+-- vehicles are excluded; a miss uses the terrain height. The same probe
+-- retries those misses later, a few rays at a time.
+local function groundProbe(): (number, number) -> number?
 	local map = workspace:FindFirstChild("TimberlineMap")
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
@@ -487,7 +489,7 @@ local function sampleGround(route: { NPCData.Waypoint }): NPCWalk.Profile
 		table.insert(exclude, inst)
 	end
 	params.FilterDescendantsInstances = exclude
-	local function probe(x: number, z: number): number?
+	return function(x: number, z: number): number?
 		local from = TerrainGen.HeightAt(x, z) + 8
 		local hit = workspace:Raycast(Vector3.new(x, from, z), Vector3.new(0, -16, 0), params)
 		if hit and NPCWalk.MapGround(hit.Instance, map) then
@@ -495,7 +497,10 @@ local function sampleGround(route: { NPCData.Waypoint }): NPCWalk.Profile
 		end
 		return nil
 	end
-	return NPCWalk.Sample(route, probe, TerrainGen.HeightAt)
+end
+
+local function sampleGround(route: { NPCData.Waypoint }): NPCWalk.Profile
+	return NPCWalk.Sample(route, groundProbe(), TerrainGen.HeightAt)
 end
 
 local function bind(model: Instance, tries: number?)
@@ -962,6 +967,41 @@ local function presentWalkers(dt: number)
 end
 
 local sinceCosmetic = 0
+
+-- While a walker is inside StreamingMinRadius, give missed ground another
+-- look. One pass a second, a few rays, and never from the per-frame walk.
+local lastGroundRetry = -1e9
+local function retryGround(now: number)
+	if now - lastGroundRetry < NPCWalk.RetryGap then
+		return
+	end
+	local char = player.Character
+	local hrp = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	if not (hrp and hrp:IsA("BasePart")) then
+		return
+	end
+	local mine = hrp.Position
+	local near = false
+	for _, rig in pairs(rigs) do
+		local ground = rig.ground
+		if ground and #ground.misses > 0 and (rig.root.Position - mine).Magnitude <= NPCWalk.RetryRadius then
+			near = true
+			break
+		end
+	end
+	if not near then
+		return
+	end
+	lastGroundRetry = now
+	local probe = groundProbe()
+	for _, rig in pairs(rigs) do
+		local ground = rig.ground
+		if ground and (rig.root.Position - mine).Magnitude <= NPCWalk.RetryRadius then
+			NPCWalk.Retry(ground, probe)
+		end
+	end
+end
+
 local function step(dt: number)
 	sinceCosmetic += dt
 	local elapsed = sinceCosmetic
@@ -1029,6 +1069,7 @@ local function step(dt: number)
 		end
 	end
 	presentWalkers(dt)
+	retryGround(os.clock())
 end
 
 function NPCController.Start()

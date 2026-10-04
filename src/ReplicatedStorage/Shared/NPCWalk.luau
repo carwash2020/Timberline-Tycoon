@@ -4,11 +4,12 @@
 -- shared clock and eases an anchored root toward that pose (NPCController).
 -- Humanoid:MoveTo does not drive these rigs.
 --
--- Ground is sampled once, at bind: down at each waypoint and every
+-- Ground is sampled at bind: down at each waypoint and every
 -- SampleSpacing studs along a segment. FeetAt interpolates those heights.
--- A miss falls back to the caller's terrain height (TerrainGen.HeightAt);
--- the root then sits rootHeight above that. Nothing here raycasts, and
--- FeetAt / Follow never call the probe again.
+-- A miss falls back to the caller's terrain height (TerrainGen.HeightAt)
+-- and is remembered. Retry re-probes those points a few at a time, so a
+-- porch that streams in later can replace the fallback. FeetAt and Follow
+-- never call the probe. The root sits rootHeight above the feet.
 --
 -- Follow snaps only when there is no visual yet (the first frame after
 -- the rig streams in) or the horizontal error is past SnapError and the
@@ -24,6 +25,12 @@ NPCWalk.SnapError = 20
 NPCWalk.Slack = 0.05
 NPCWalk.LegHz = 30
 NPCWalk.Stride = 4.2
+-- StreamingMinRadius. A walker this close can retry ground the ray missed
+-- because the porch or the road had not streamed in yet.
+NPCWalk.RetryRadius = 128
+NPCWalk.RetryGap = 1 -- seconds between passes
+NPCWalk.RetryRays = 4 -- a few rays per pass, never a ray every frame
+NPCWalk.RetryBudget = 8 -- failed retries per point, then HeightAt stands
 
 -- Same shape as NPCData.Waypoint. The extra fields are unused here;
 -- they stay so a route table type-checks without a cast.
@@ -38,11 +45,14 @@ export type Pose = {
 	walked: number,
 }
 
-export type GroundSample = { along: number, feet: number }
+export type GroundSample = { along: number, feet: number, x: number, z: number }
 
 export type LegProfile = { length: number, samples: { GroundSample } }
 
-export type Profile = { legs: { LegProfile } }
+-- A sample that used the terrain fallback. `tries` counts retries.
+export type Miss = { x: number, z: number, tries: number }
+
+export type Profile = { legs: { LegProfile }, misses: { Miss } }
 
 export type RoutePoint = { leg: number, along: number, x: number, z: number }
 
@@ -121,13 +131,16 @@ local function pointKey(x: number, z: number): string
 end
 
 -- One height per sample point. `probe` returns feet Y, or nil on a miss
--- (then `fallback`, the terrain height). Repeated points share one call.
+-- (then `fallback`, the terrain height). A miss is recorded so Retry can
+-- ask again. Repeated points share one call.
 function NPCWalk.Sample(
 	route: { Waypoint },
 	probe: (number, number) -> number?,
 	fallback: (number, number) -> number
 ): Profile
 	local heights: { [string]: number } = {}
+	local seenMiss: { [string]: boolean } = {}
+	local misses: { Miss } = {}
 	local function heightAt(x: number, z: number): number
 		local key = pointKey(x, z)
 		local known = heights[key]
@@ -137,6 +150,10 @@ function NPCWalk.Sample(
 		local hit = probe(x, z)
 		local y = if hit ~= nil then hit else fallback(x, z)
 		heights[key] = y
+		if hit == nil and not seenMiss[key] then
+			seenMiss[key] = true
+			table.insert(misses, { x = x, z = z, tries = 0 })
+		end
 		return y
 	end
 	local legs: { LegProfile } = {}
@@ -146,13 +163,57 @@ function NPCWalk.Sample(
 		local length = 0
 		for _, point in ipairs(NPCWalk.RoutePoints(route)) do
 			if point.leg == i then
-				table.insert(samples, { along = point.along, feet = heightAt(point.x, point.z) })
+				local feet = heightAt(point.x, point.z)
+				table.insert(samples, { along = point.along, feet = feet, x = point.x, z = point.z })
 				length = math.max(length, point.along)
 			end
 		end
 		table.insert(legs, { length = length, samples = samples })
 	end
-	return { legs = legs }
+	return { legs = legs, misses = misses }
+end
+
+local function writeFeet(profile: Profile, x: number, z: number, feet: number)
+	local key = pointKey(x, z)
+	for _, leg in ipairs(profile.legs) do
+		for _, sample in ipairs(leg.samples) do
+			if pointKey(sample.x, sample.z) == key then
+				sample.feet = feet
+			end
+		end
+	end
+end
+
+-- Re-probe recorded misses, at most `rays` of them (default RetryRays).
+-- A hit overwrites every sample on that point and drops the miss. A nil
+-- keeps the fallback height. After RetryBudget nils the point is dropped
+-- and not asked again. Returns how many rays this pass cast.
+function NPCWalk.Retry(profile: Profile, probe: (number, number) -> number?, rays: number?): number
+	local batch = if rays ~= nil then math.max(0, rays) else NPCWalk.RetryRays
+	local made = 0
+	local later: { Miss } = {}
+	local again: { Miss } = {}
+	for _, miss in ipairs(profile.misses) do
+		if miss.tries < NPCWalk.RetryBudget then
+			if made >= batch then
+				table.insert(later, miss)
+			else
+				miss.tries += 1
+				made += 1
+				local hit = probe(miss.x, miss.z)
+				if hit ~= nil then
+					writeFeet(profile, miss.x, miss.z, hit)
+				elseif miss.tries < NPCWalk.RetryBudget then
+					table.insert(again, miss)
+				end
+			end
+		end
+	end
+	for _, miss in ipairs(again) do
+		table.insert(later, miss)
+	end
+	profile.misses = later
+	return made
 end
 
 local function feetAlong(leg: LegProfile, along: number): number

@@ -232,9 +232,13 @@ return function(t)
 		local presentBody = string.sub(src, presentAt, presentEnd)
 		t.ok(string.find(presentBody, "NPCAnim.Walk", 1, true) ~= nil, "legs are posed with the walk")
 		t.eq(string.find(presentBody, "Raycast", 1, true), nil, "no per-frame raycast")
-		local bindAt = string.find(src, "local function sampleGround", 1, true)
-		local bindEnd = string.find(src, "local function bind", bindAt, true)
-		t.ok(string.find(string.sub(src, bindAt, bindEnd), "Raycast", 1, true) ~= nil, "ground is raycast at bind")
+		t.eq(string.find(presentBody, "Retry", 1, true), nil, "retries are not on the per-frame walk")
+		local probeAt = string.find(src, "local function groundProbe", 1, true)
+		local bindEnd = string.find(src, "local function bind", 1, true)
+		t.ok(probeAt ~= nil and bindEnd ~= nil and probeAt < bindEnd, "the ground probe is built at bind")
+		t.ok(string.find(string.sub(src, probeAt, bindEnd), "Raycast", 1, true) ~= nil, "ground is raycast at bind")
+		t.ok(string.find(src, "NPCWalk.RetryRadius", 1, true) ~= nil, "retries stay inside StreamingMinRadius")
+		t.ok(string.find(src, "NPCWalk.RetryGap", 1, true) ~= nil, "retries are at most once a second")
 
 		local hz = QualityBudgets.For("low").CosmeticHz
 		t.eq(hz, 2)
@@ -363,6 +367,52 @@ return function(t)
 		t.ok(not NPCWalk.MapGround(loose, map), "outside the map is a miss")
 		t.ok(not NPCWalk.MapGround(street, nil), "no map is a miss")
 		t.eq(typeof(Vector3.new(0, NPCWalk.RootY(1, 3), 0)), "Vector3")
+	end)
+
+	t.test("a missed ray picks up the streamed part, and a lasting miss stops", function()
+		local route = { { x = 0, z = 0 }, { x = 8, z = 0 } }
+		local hitNow = false
+		local function probe(_x: number, _z: number): number?
+			return if hitNow then 4 else nil
+		end
+		local function fallback(_x: number, _z: number): number
+			return 9
+		end
+		local profile = NPCWalk.Sample(route, probe, fallback)
+		t.ok(#profile.misses > 0, "the miss is recorded")
+		t.ok(math.abs(NPCWalk.FeetAt(profile, route, 0, 0) - 9) < 1e-6, "HeightAt until a hit")
+		t.ok(math.abs(NPCWalk.FeetAt(profile, route, 4, 0) - 9) < 1e-6, "the span uses HeightAt too")
+		hitNow = true
+		local guard = 0
+		while #profile.misses > 0 and guard < 20 do
+			NPCWalk.Retry(profile, probe, NPCWalk.RetryRays)
+			guard += 1
+		end
+		t.eq(#profile.misses, 0, "a hit drops the miss")
+		t.ok(math.abs(NPCWalk.FeetAt(profile, route, 0, 0) - 4) < 1e-4, "FeetAt follows the hit")
+		t.ok(math.abs(NPCWalk.FeetAt(profile, route, 4, 0) - 4) < 1e-4, "the span follows the hit")
+		t.eq(NPCWalk.RetryRadius, 128)
+		t.eq(NPCWalk.RetryGap, 1)
+		t.ok(NPCWalk.RetryRays >= 2 and NPCWalk.RetryRays <= 6, "a few rays per pass")
+
+		local calls = 0
+		local function stayNil(_x: number, _z: number): number?
+			calls += 1
+			return nil
+		end
+		local stuck = NPCWalk.Sample(route, stayNil, fallback)
+		local points = #stuck.misses
+		t.ok(points > 0, "fallback points")
+		local sampled = calls
+		for _ = 1, NPCWalk.RetryBudget + 4 do
+			NPCWalk.Retry(stuck, stayNil, points)
+		end
+		t.eq(calls - sampled, points * NPCWalk.RetryBudget, "each point is retried up to the budget")
+		t.ok(math.abs(NPCWalk.FeetAt(stuck, route, 0, 0) - 9) < 1e-6, "a lasting miss keeps HeightAt")
+		t.eq(#stuck.misses, 0, "the budget retires the point")
+		local frozen = calls
+		t.eq(NPCWalk.Retry(stuck, stayNil, points), 0, "nothing left to probe")
+		t.eq(calls, frozen, "a spent budget casts no more rays")
 	end)
 
 	t.test("Murph and the shop NPCs are not walkers", function()
