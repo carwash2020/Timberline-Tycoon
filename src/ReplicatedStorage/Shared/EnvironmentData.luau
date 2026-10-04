@@ -367,6 +367,16 @@ EnvironmentData.BiomeOverrides = {
 		set = { atmosphereDensity = 0.2, atmosphereOffset = 0.4, dofFar = 0.08 },
 		add = { saturation = 0.2, bloomIntensity = 0.1, brightness = 0.3, atmosphereGlare = 0.5 },
 	},
+	-- North strip: a dark blue-green, colder than the meadows.
+	strip = {
+		mul = { brightness = 0.85 },
+		tint = { outdoorAmbient = scale(0.75, 0.9, 0.85) },
+	},
+	-- Ferry Island: warm coastal light.
+	ferryisle = {
+		add = { saturation = 0.04 },
+		tint = { outdoorAmbient = scale(1.05, 1.0, 0.9) },
+	},
 } :: { [string]: Override }
 
 EnvironmentData.WeatherOverrides = {
@@ -1007,6 +1017,9 @@ function EnvironmentData.DecorBlocked(x: number, z: number): boolean
 	if cx * cx + cz * cz < (cone.radius * 0.55) ^ 2 then
 		return true
 	end
+	if WorldLayout.InNorthStrip(x, z) then
+		return WorldLayout.InGorge(x, z) or WorldLayout.OnBridgeDeck(x, z)
+	end
 	if math.abs(x) > WorldLayout.WorldHalf - 20 or math.abs(z) > WorldLayout.WorldHalf - 20 then
 		return true
 	end
@@ -1121,8 +1134,27 @@ local function scatter(
 				continue
 			end
 			y = TerrainGen.HeightAt(x, z)
-			if y > 100 then
-				continue -- mountain peaks stay bare
+			-- The toll spur cuts through the mountains, so a peak that was
+			-- bare (over 100) would otherwise grow flowers in the trench.
+			-- The lowland approach was already under that line.
+			local roadside = WorldLayout.TollSpur.width / 2 + 6
+			local cut = false
+			if WorldLayout.OnTollSpur(x, z) then
+				for _, step in ipairs({
+					{ roadside, 0 },
+					{ -roadside, 0 },
+					{ 0, roadside },
+					{ 0, -roadside },
+				}) do
+					local ox, oz = x + step[1], z + step[2]
+					if not WorldLayout.OnTollSpur(ox, oz) and TerrainGen.HeightAt(ox, oz) > 100 then
+						cut = true
+						break
+					end
+				end
+			end
+			if y > 100 or cut then
+				continue -- mountain peaks stay bare, and so does the cut through them
 			end
 		end
 		table.insert(out, {

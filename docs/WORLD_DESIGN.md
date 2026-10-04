@@ -184,7 +184,7 @@ The firewood bin at a snow cabin (`V2_PLAN.md` §11) can stay snow dressing. It 
 
 The twist on this map is the board in town, not a grove meter.
 
-Each in-game day (`GameConfig.DayCycleMinutes`, 20 real minutes) the board names one common wood and one far-region wood. Those two sell for `+ GameConfig.DemandBoost` (0.2, so +20%) until the next day. The boost is applied when the wood is sold. The server owns the day's pair. The client does not pick it.
+Each in-game day (`GameConfig.DayCycleMinutes`) the board names one common wood and one far-region wood. Those two sell for `+ GameConfig.DemandBoost` (0.2, so +20%) until the next day. The boost is applied when the wood is sold. The server owns the day's pair. The client does not pick it.
 
 - **Common pool:** oak, birch, pine, maple.
 - **Far-region pool:** frostwood, emberwood, spruce.

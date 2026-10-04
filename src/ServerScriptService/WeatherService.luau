@@ -136,12 +136,23 @@ function WeatherService.StrikePoint(near: Vector3): Vector3?
 		end
 		return nil
 	end
-	local edge = WorldLayout.WorldHalf - 40
+	local EDGE_MARGIN = 40 -- bolts stay off the walls
+	local edge = WorldLayout.WorldHalf - EDGE_MARGIN
+	local strip = WorldLayout.NorthStrip
+	local function inPlay(x: number, z: number): boolean
+		if math.abs(x) < edge and math.abs(z) < edge then
+			return true
+		end
+		return x > strip.x0 + EDGE_MARGIN
+			and x < strip.x1 - EDGE_MARGIN
+			and z > strip.z0 + EDGE_MARGIN
+			and z < strip.z1 - EDGE_MARGIN
+	end
 	for _ = 1, 10 do
 		local a = rand(0, math.pi * 2)
 		local r = rand(radius[1], radius[2])
 		local x, z = near.X + math.cos(a) * r, near.Z + math.sin(a) * r
-		if math.abs(x) < edge and math.abs(z) < edge and WorldLayout.FlatWeight(x, z) <= 0 then
+		if inPlay(x, z) and WorldLayout.FlatWeight(x, z) <= 0 and not WorldLayout.InGorge(x, z) then
 			return Vector3.new(x, TerrainGen.HeightAt(x, z), z)
 		end
 	end

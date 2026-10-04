@@ -50,6 +50,16 @@ export type Rules = {
 	needs: string?, -- the gear id missing, if any
 }
 
+-- Ferry Island. The disc matches WorldLayout.Island; this module does not
+-- require WorldLayout (that require would cycle). A spec locks the two.
+BiomeData.FerryCenterX = 1395
+BiomeData.FerryCenterZ = -760
+BiomeData.FerryRadius = 70
+BiomeData.FerryHaulStuds = 1644 -- sawmill (0, 110) is about 1644 studs away
+BiomeData.PalmCount = 30
+BiomeData.LanternwoodCount = 6
+BiomeData.FerrySand = "#E4C98A"
+
 local biomes: { BiomeDef } = {
 	{
 		id = "starter",
@@ -90,8 +100,24 @@ local biomes: { BiomeDef } = {
 		ground = { color = "#2B2522", material = "Basalt" },
 		trees = { emberwood = 60 },
 	},
-	-- Not in the world yet: needs boats (after V1, see V1_PLAN.md).
+	-- The palm coast stays closed. Ferry Island is its own disc (W2).
 	{ id = "island", displayName = "The Island", access = "boat", haulStuds = 900 },
+	{
+		id = "ferryisle",
+		displayName = "Ferry Island",
+		access = "boat",
+		-- Haul distance is FerryHaulStuds, not haulStuds: economy1 prints every
+		-- haulStuds, and this disc must not change ECONOMY_V1.md.
+		area = {
+			x = BiomeData.FerryCenterX,
+			z = BiomeData.FerryCenterZ,
+			radius = BiomeData.FerryRadius,
+		},
+		ground = { color = BiomeData.FerrySand, material = "Sand" },
+		-- No trees table. Palms and Lanternwood are WorldPlan sites, so the
+		-- economy supply (which walks biome.trees) stays byte-identical.
+		-- B12 adds the Lanternwood row with biome "ferryisle".
+	},
 	{
 		id = "grove",
 		displayName = "Gloam Hollow",

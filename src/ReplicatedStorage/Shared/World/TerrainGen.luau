@@ -576,12 +576,145 @@ local function spurChord(x: number, z: number): number?
 	return bestH
 end
 
+-- The strip copies the height of the last surveyed column so the entrance
+-- at z = 1500 doesn't grow a cliff, and nothing at z <= 1500 moves.
+local STRIP_SHELF: number? = nil
+local function stripShelf(): number
+	local known = STRIP_SHELF
+	if known then
+		return known
+	end
+	local shelf = groundHeight(0, WorldLayout.ShelfProbeZ)
+	STRIP_SHELF = shelf
+	return shelf
+end
+
+-- Height of the graded spur, or nil off it. The climb holds SpurCutHeight
+-- at the shelf turn so the cut through the north wall stays under the
+-- skirt beside it, then rises to the deck top and stays there. The last
+-- SpurMeet studs are part of that flat. Nothing past the deck's south end
+-- is lifted, so the deck itself stays on the shelf. The approach south of
+-- gradeFrom is the existing ground, untouched, which keeps the height
+-- fingerprint.
+local SPUR_H0: number? = nil
+local function spurStartHeight(): number
+	local known = SPUR_H0
+	if known then
+		return known
+	end
+	local spur = WorldLayout.TollSpur
+	local p = spur.points[spur.gradeFrom]
+	local h = groundHeight(p.X, p.Y)
+	SPUR_H0 = h
+	return h
+end
+
+local SPUR_ALONG: { number }? = nil
+local function spurAlong(): { number }
+	local known = SPUR_ALONG
+	if known then
+		return known
+	end
+	local spur = WorldLayout.TollSpur
+	local pts = spur.points
+	local marks: { number } = {}
+	local acc = 0
+	marks[spur.gradeFrom] = 0
+	for i = spur.gradeFrom, #pts - 1 do
+		local a, b = pts[i], pts[i + 1]
+		local dx, dz = b.X - a.X, b.Y - a.Y
+		acc += math.sqrt(dx * dx + dz * dz)
+		marks[i + 1] = acc
+	end
+	SPUR_ALONG = marks
+	return marks
+end
+
+local function spurHeightAt(along: number): number
+	local marks = spurAlong()
+	local spur = WorldLayout.TollSpur
+	local h0 = spurStartHeight()
+	local low = WorldLayout.SpurCutHeight
+	local top = stripShelf() + WorldLayout.BridgeDeckThick
+	local aLow = marks[spur.lowAt]
+	local aTop = marks[spur.topAt]
+	if along >= aTop or aTop - aLow <= 1e-6 then
+		return top
+	elseif along >= aLow then
+		return low + (top - low) * ((along - aLow) / (aTop - aLow))
+	elseif aLow <= 1e-6 then
+		return low
+	end
+	return h0 + (low - h0) * (along / aLow)
+end
+
+local function tollChord(x: number, z: number): number?
+	local spur = WorldLayout.TollSpur
+	local pts = spur.points
+	local i0 = spur.gradeFrom
+	local half = spur.width / 2
+	local south = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
+	if z > south + 1e-3 then
+		return nil
+	end
+	local minX, maxX = math.huge, -math.huge
+	local minZ, maxZ = math.huge, -math.huge
+	for i = i0, #pts do
+		local p = pts[i]
+		minX, maxX = math.min(minX, p.X), math.max(maxX, p.X)
+		minZ, maxZ = math.min(minZ, p.Y), math.max(maxZ, p.Y)
+	end
+	if x < minX - half or x > maxX + half or z < minZ - half or z > maxZ + half then
+		return nil
+	end
+	local bestD = math.huge
+	local bestAlong = 0
+	local acc = 0
+	for i = i0, #pts - 1 do
+		local a, b = pts[i], pts[i + 1]
+		local abx, abz = b.X - a.X, b.Y - a.Y
+		local len2 = abx * abx + abz * abz
+		local len = math.sqrt(len2)
+		local t = if len2 > 1e-6 then math.clamp(((x - a.X) * abx + (z - a.Y) * abz) / len2, 0, 1) else 0
+		local dx = x - (a.X + abx * t)
+		local dz = z - (a.Y + abz * t)
+		local d2 = dx * dx + dz * dz
+		if d2 < bestD then
+			bestD = d2
+			bestAlong = acc + len * t
+		end
+		acc += len
+	end
+	if bestD > half * half then
+		return nil
+	end
+	return spurHeightAt(bestAlong)
+end
+
 -- Ground height at (x, z), in studs.
 function TerrainGen.HeightAt(x: number, z: number): number
+	-- Only past the square, and only inside the strip. The fingerprint
+	-- grid and every road sample stay on the old heights. The spur's
+	-- graded suffix is the one exception, and it misses those samples.
+	if z > WorldLayout.WorldHalf and WorldLayout.InNorthStrip(x, z) then
+		local shelf = stripShelf()
+		if WorldLayout.InGorge(x, z) then
+			return shelf - WorldLayout.GorgeDepth
+		end
+		local spur = tollChord(x, z)
+		if spur then
+			return spur
+		end
+		return shelf
+	end
 	local h = groundHeight(x, z)
 	local bed = water(x, z)
 	if bed then
 		return h
+	end
+	local toll = tollChord(x, z)
+	if toll then
+		return toll
 	end
 	local chord = spurChord(x, z)
 	if chord then
@@ -592,6 +725,9 @@ end
 
 -- Water surface above (x, z), or nil if the column is dry.
 function TerrainGen.WaterLevelAt(x: number, z: number): number?
+	if z > WorldLayout.WorldHalf and WorldLayout.InNorthStrip(x, z) then
+		return nil
+	end
 	local h = TerrainGen.HeightAt(x, z)
 	local _, surface = water(x, z)
 	if surface and h < surface then

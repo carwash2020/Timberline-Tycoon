@@ -122,7 +122,12 @@ local function setTargets(env: LightingController.Environment)
 	end
 
 	local wind = beds.WindHowl
-	local windy = if biome == "snow" then 0.6 elseif biome == "sky" then 0.75 else 0
+	local STRIP_WIND = 0.5
+	local windy = if biome == "snow"
+		then 0.6
+		elseif biome == "sky" then 0.75
+		elseif biome == "strip" then STRIP_WIND
+		else 0
 	wind.target = math.max(windy, stormy)
 	local lava = beds.LavaRumble
 	lava.target = if biome == "volcano" then 1 else 0

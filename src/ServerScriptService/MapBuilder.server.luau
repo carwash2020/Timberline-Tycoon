@@ -40,7 +40,6 @@ local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
-local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
@@ -447,7 +446,7 @@ step("5. The trees", function()
 	-- One tree that fails to build (a bad seed) mustn't take the rest of
 	-- the forest with it: each on its own, one warning for all of them.
 	local failed, firstErr = 0, nil
-	for _, spot in ipairs(WorldPlan.Trees()) do
+	local function plant(spot: WorldPlan.TreeSpot)
 		local ok, err = pcall(function(): any
 			spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
 			return nil
@@ -455,6 +454,22 @@ step("5. The trees", function()
 		if not ok then
 			failed += 1
 			firstErr = firstErr or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
+		end
+	end
+	for _, spot in ipairs(WorldPlan.Trees()) do
+		plant(spot)
+	end
+	-- Strip and ferry sites share this warning, so one bad wood is still
+	-- one line. Lanternwood waits until WoodData has the row (B12).
+	for _, spot in ipairs(WorldPlan.StripTrees()) do
+		plant(spot)
+	end
+	for _, spot in ipairs(WorldPlan.FerryPalms()) do
+		plant(spot)
+	end
+	if WoodData.Get("lanternwood") then
+		for _, spot in ipairs(WorldPlan.Lanternwood()) do
+			plant(spot)
 		end
 	end
 	if failed > 0 then
@@ -597,18 +612,10 @@ step("5. The volcano's crater", function()
 	embers.Parent = lava
 end)
 
--- The palm island offshore: you can see it from the beach, but there are no
--- boats yet (palmwood comes after V1). Looks only but for each palm's
--- trunk, which collides (COL-01), like a town tree's. Never tagged Tree.
-step("5. The palm island", function()
-	local palm = WoodData.Get("palmwood")
-	if palm then
-		for i, pos in ipairs(WorldPlan.IslandPalms()) do
-			local tree = TreeArt.Build(palm, 3000 + i, 0.9 + (i % 3) * 0.1)
-			Kit.decorAll(tree, { Trunk = true })
-			place(atomic(tree), CFrame.new(pos) * CFrame.Angles(0, i * 1.3, 0))
-		end
-	end
+-- Toll bridge, gorge, ferry docks, the secret cave, deep water, and the
+-- heat column. Palms and strip trees are planted with the other sites.
+step("5. The north strip and ferry", function()
+	LandmarkArt.BuildW2(map)
 end)
 
 -- Signposts where the roads arrive: the biome, its woods, the gear it needs
@@ -911,21 +918,37 @@ step("7. The world's edge", function()
 	local half = WorldLayout.WorldHalf
 	local segments = 4
 	local length = half * 2 / segments
-	for _, edge in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+	local function wall(size: Vector3, cf: CFrame)
+		local part = Kit.part(map, "WorldEdge", size, cf, Color3.new(1, 1, 1))
+		part.Transparency = 1
+		part.CastShadow = false
+	end
+	-- East, west, and south. The north side is gapped for the strip.
+	for _, edge in ipairs({ { 1, 0 }, { -1, 0 }, { 0, -1 } }) do
 		local ex, ez = edge[1], edge[2]
 		for i = 0, segments - 1 do
 			local along = -half + length * (i + 0.5)
-			local wall = Kit.part(
-				map,
-				"WorldEdge",
+			wall(
 				Vector3.new(if ex ~= 0 then 4 else length + 4, 900, if ez ~= 0 then 4 else length + 4),
-				CFrame.new(if ex ~= 0 then ex * half else along, 300, if ez ~= 0 then ez * half else along),
-				Color3.new(1, 1, 1)
+				CFrame.new(if ex ~= 0 then ex * half else along, 300, if ez ~= 0 then ez * half else along)
 			)
-			wall.Transparency = 1
-			wall.CastShadow = false
 		end
 	end
+	local strip = WorldLayout.NorthStrip
+	local function span(x0: number, x1: number, z: number)
+		local spanLength = x1 - x0
+		if spanLength <= 0 then
+			return
+		end
+		wall(Vector3.new(spanLength, 900, 4), CFrame.new((x0 + x1) / 2, 300, z))
+	end
+	span(-half, strip.x0, half)
+	span(strip.x1, half, half)
+	local stripLength = strip.z1 - strip.z0
+	local stripMidZ = (strip.z0 + strip.z1) / 2
+	wall(Vector3.new(4, 900, stripLength), CFrame.new(strip.x0, 300, stripMidZ))
+	wall(Vector3.new(4, 900, stripLength), CFrame.new(strip.x1, 300, stripMidZ))
+	span(strip.x0, strip.x1, strip.z1)
 end)
 
 step("7. The day/night clock", function()

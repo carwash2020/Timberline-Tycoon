@@ -577,6 +577,168 @@ WorldLayout.Coast = { shoreX = 1190, beachWidth = 70, northZ = 820 }
 -- An island offshore (the palmwood teaser; boats come after V1).
 WorldLayout.Island = { x = 1395, z = -760, radius = 70, height = 9 }
 
+-- W2. The north strip is a rectangle past the square, not a larger world.
+-- Every tune is named so a playtest can move it without hunting literals.
+WorldLayout.TollLineZ = 1574
+WorldLayout.TollLineX0 = -400
+WorldLayout.TollLineX1 = 400
+WorldLayout.TollPushX = 0
+WorldLayout.TollPushZ = 1566
+WorldLayout.GorgeWidth = 24 -- across, north-south; at least 20
+WorldLayout.GorgeDepth = 16 -- down from the bank; at least 12
+WorldLayout.GorgeWallHeight = 24 -- unclimbable lip
+WorldLayout.BridgeWidth = 28
+WorldLayout.BridgeCenterX = 0
+WorldLayout.BridgeCenterZ = 1580
+WorldLayout.BridgeLength = 52 -- spans the gorge plus bearings
+WorldLayout.BridgeRailHeight = 3
+WorldLayout.BridgeDeckThick = 1
+WorldLayout.NorthStripX0 = -400
+WorldLayout.NorthStripX1 = 400
+WorldLayout.NorthStripZ0 = 1500
+WorldLayout.NorthStripZ1 = 1900
+WorldLayout.NorthStrip = {
+	x0 = WorldLayout.NorthStripX0,
+	x1 = WorldLayout.NorthStripX1,
+	z0 = WorldLayout.NorthStripZ0,
+	z1 = WorldLayout.NorthStripZ1,
+}
+WorldLayout.NorthStripBadgeZ0 = 1586 -- north of the booth and the south lip
+WorldLayout.NorthStripBadgeZ1 = 1900
+WorldLayout.StripTreeCount = 40
+WorldLayout.StripMapleCount = 22
+WorldLayout.StripBirchCount = 18
+WorldLayout.StripClumpOffRoad = 40 -- past the deck's edge
+WorldLayout.StripRoadClear = 20 -- extra studs a trunk stays off the deck
+WorldLayout.StripZoneCx = 0
+WorldLayout.StripZoneCz = 1750
+WorldLayout.StripZoneRadius = 160
+WorldLayout.StripZoneCap = 40
+WorldLayout.StripClumpRadius = 8
+WorldLayout.StripTreesPerClump = 5
+-- Centres sit at least StripClumpOffRoad past the bridge edge.
+WorldLayout.StripClumps = {
+	{ x = 70, z = 1680 },
+	{ x = -70, z = 1680 },
+	{ x = 100, z = 1740 },
+	{ x = -100, z = 1740 },
+	{ x = 70, z = 1800 },
+	{ x = -70, z = 1800 },
+	{ x = 100, z = 1860 },
+	{ x = -100, z = 1860 },
+}
+WorldLayout.FerryDockX = 1180 -- mainland dock, west of the deep water
+WorldLayout.FerryDockZ = -700
+WorldLayout.FerryDock = { x = WorldLayout.FerryDockX, z = WorldLayout.FerryDockZ }
+WorldLayout.FerryLandingInset = 24 -- dock sits on the dry crown, not the shoal
+WorldLayout.FerryPathLength = 20
+WorldLayout.FerryPathHalf = 4
+WorldLayout.LanternwoodRadius = 32 -- facing the mainland dock
+WorldLayout.LanternwoodAngleStep = 0.42
+WorldLayout.PalmMaxRadius = 40 -- dry ground inside the disc
+WorldLayout.PalmGridStep = 8
+WorldLayout.TreeSpacing = 8
+WorldLayout.FogClearance = 60 -- from the booth and both docks
+WorldLayout.FogAtomicMax = 128 -- a longer axis needs a Persistent model
+WorldLayout.SecretCaveX = -765
+WorldLayout.SecretCaveZ = -655
+WorldLayout.SecretCaveRadius = 46
+WorldLayout.SecretCave = {
+	x = WorldLayout.SecretCaveX,
+	z = WorldLayout.SecretCaveZ,
+	radius = WorldLayout.SecretCaveRadius,
+}
+WorldLayout.CaveMouthX = -748
+WorldLayout.CaveMouthZ = -628
+WorldLayout.BackTrailX = -690
+WorldLayout.BackTrailZ = -560
+WorldLayout.RidgeBoulderX = -810
+WorldLayout.RidgeBoulderZ = -700
+WorldLayout.Breakables = {
+	{ x = WorldLayout.CaveMouthX, z = WorldLayout.CaveMouthZ },
+	{ x = WorldLayout.BackTrailX, z = WorldLayout.BackTrailZ },
+	{ x = WorldLayout.RidgeBoulderX, z = WorldLayout.RidgeBoulderZ },
+}
+WorldLayout.HeatHeight = 18
+WorldLayout.HeatPoolPad = 1 -- studs past the lava pool
+WorldLayout.Spawn = Vector3.new(0, 0.5, 40)
+WorldLayout.SpawnBubble = 640
+WorldLayout.SpawnPartCap = 1500
+WorldLayout.BoothX = 22 -- east of the deck
+WorldLayout.BoothZ = 1566 -- south of the toll line, off the deck
+WorldLayout.DockClear = 18
+WorldLayout.LandingClear = 10
+WorldLayout.DeepSeaEdgeInset = 80 -- how far inside the rim the deep water starts
+WorldLayout.DeepSeaIslandPad = 12 -- shallows kept around Ferry Island
+WorldLayout.ShelfProbeZ = 1499 -- last surveyed column; the strip copies its height
+
+-- A Pickup climbs a standstill ramp while Drive's 120 stays ahead of
+-- gravity 196.2. Haul roads stay under 0.2, and so does the spur.
+WorldLayout.PickupClimb = 120 / 196.2
+WorldLayout.SpurMaxGrade = 0.2
+WorldLayout.TollClearance = 4 -- setback and gorge rescue sit this far above the ground
+WorldLayout.SpurMeet = 20 -- the last studs, flush with the deck top
+WorldLayout.TollSpurJoinZ = 900 -- on Snow Road, where the ground is still gentle
+-- Inside the wall gap (x -400..400) and clear of the height grid. This
+-- lane is also where the boot forest's trunks stay put; the decor sample
+-- skips the mountain cut itself (see EnvironmentData).
+WorldLayout.TollSpurWestX = -326
+-- North of the wild clumps and the boulder-cluster search, so the cut
+-- does not move a rock or a tree. The ground south of here is already
+-- gentle enough to drive.
+WorldLayout.TollSpurGradeZ = 1184
+-- The eastbound legs sit north of the height grid. Two of them, a road
+-- width apart, so the climb out to the deck does not fold back on itself.
+WorldLayout.TollSpurShelfZ = 1518
+-- Height at the shelf turn. The crossing of the north wall stays under
+-- the skirt run beside the cut (that run bottoms near 44), so the skirt
+-- block owns the trench instead of standing over it.
+WorldLayout.SpurCutHeight = 40
+WorldLayout.TollSpurReachX = 180 -- where the climb reaches the deck top
+
+local function snowJoin(): Vector2
+	for _, road in ipairs(WorldLayout.Roads) do
+		if road.name == "SnowRoad" then
+			local a = road.points[#road.points - 1]
+			local b = road.points[#road.points]
+			local t = (WorldLayout.TollSpurJoinZ - a.Y) / (b.Y - a.Y)
+			return a:Lerp(b, t)
+		end
+	end
+	error("SnowRoad missing")
+end
+
+local deckSouth = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
+local flatStart = deckSouth - WorldLayout.SpurMeet
+local westX = WorldLayout.TollSpurWestX
+local reachX = WorldLayout.TollSpurReachX
+local shelfZ = WorldLayout.TollSpurShelfZ
+-- Not a WorldLayout.Roads entry: that list is in the height fingerprint.
+-- TerrainGen grades only the suffix that starts at gradeFrom. lowAt is
+-- the shelf turn (SpurCutHeight); topAt is where the deck top is reached,
+-- and every vertex after that stays there.
+WorldLayout.TollSpur = {
+	points = {
+		snowJoin(),
+		Vector2.new(westX, WorldLayout.TollSpurJoinZ),
+		Vector2.new(westX, WorldLayout.TollSpurGradeZ),
+		Vector2.new(westX, shelfZ),
+		Vector2.new(reachX, shelfZ),
+		Vector2.new(reachX, flatStart),
+		Vector2.new(WorldLayout.BridgeCenterX, flatStart),
+		Vector2.new(WorldLayout.BridgeCenterX, deckSouth),
+	},
+	width = WorldLayout.BridgeWidth,
+	gradeFrom = 3,
+	lowAt = 4,
+	topAt = 5,
+}
+local spurGrade: { Vector2 } = {}
+for i = WorldLayout.TollSpur.gradeFrom, #WorldLayout.TollSpur.points do
+	table.insert(spurGrade, WorldLayout.TollSpur.points[i])
+end
+WorldLayout.TollSpurGrade = spurGrade
+
 -- The Volcano's cone sits on the far side of its biome, away from town. Its
 -- crater (radius `crater`) has a level lava pool (radius `pool`) in the
 -- middle of its floor.
@@ -959,6 +1121,133 @@ function WorldLayout.ForestCover(x: number, z: number): (number, number)
 	local k = FOREST.copse
 	local n = noise(x / k.scale, z / k.scale, 17.3) + noise(x / 31, z / 31, 2.1) * 0.25
 	return open * smooth((n - k.from) / k.soft), 0
+end
+
+-- The strip rectangle past the square (z starts at WorldHalf).
+function WorldLayout.InNorthStrip(x: number, z: number): boolean
+	local strip = WorldLayout.NorthStrip
+	return x >= strip.x0 and x <= strip.x1 and z >= strip.z0 and z <= strip.z1
+end
+
+-- The cut. Flat floor, full width of the strip, no ramp at either end.
+function WorldLayout.InGorge(x: number, z: number): boolean
+	if not WorldLayout.InNorthStrip(x, z) then
+		return false
+	end
+	local z0 = WorldLayout.TollLineZ
+	return z >= z0 and z < z0 + WorldLayout.GorgeWidth
+end
+
+function WorldLayout.OnBridgeDeck(x: number, z: number): boolean
+	local halfW = WorldLayout.BridgeWidth / 2
+	local halfL = WorldLayout.BridgeLength / 2
+	return math.abs(x - WorldLayout.BridgeCenterX) <= halfW and math.abs(z - WorldLayout.BridgeCenterZ) <= halfL
+end
+
+-- North of the gorge, and not while you are still standing on the deck.
+function WorldLayout.InTollBadge(x: number, z: number): boolean
+	local strip = WorldLayout.NorthStrip
+	if x < strip.x0 or x > strip.x1 then
+		return false
+	end
+	if z < WorldLayout.NorthStripBadgeZ0 or z > WorldLayout.NorthStripBadgeZ1 then
+		return false
+	end
+	return not WorldLayout.OnBridgeDeck(x, z)
+end
+
+-- Unit XZ from the island centre toward the mainland dock.
+function WorldLayout.FerryFacing(): (number, number)
+	local island = WorldLayout.Island
+	local dock = WorldLayout.FerryDock
+	local dx, dz = dock.x - island.x, dock.z - island.z
+	local len = math.sqrt(dx * dx + dz * dz)
+	return dx / len, dz / len
+end
+
+function WorldLayout.FerryLanding(): (number, number)
+	local island = WorldLayout.Island
+	local fx, fz = WorldLayout.FerryFacing()
+	local reach = island.radius - WorldLayout.FerryLandingInset
+	return island.x + fx * reach, island.z + fz * reach
+end
+
+-- The 20-stud walk inland from the island dock.
+function WorldLayout.OnFerryPath(x: number, z: number): boolean
+	local ax, az = WorldLayout.FerryLanding()
+	local fx, fz = WorldLayout.FerryFacing()
+	local bx = ax - fx * WorldLayout.FerryPathLength
+	local bz = az - fz * WorldLayout.FerryPathLength
+	local abx, abz = bx - ax, bz - az
+	local len2 = abx * abx + abz * abz
+	if len2 < 1e-6 then
+		return false
+	end
+	local t = math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1)
+	local dx = x - (ax + abx * t)
+	local dz = z - (az + abz * t)
+	local half = WorldLayout.FerryPathHalf
+	return dx * dx + dz * dz <= half * half
+end
+
+-- Deep ocean against the map rim. The island's shallows and the ferry
+-- lane (well inside the rim) stay out of it.
+function WorldLayout.InDeepSea(x: number, z: number): boolean
+	local edge = WorldLayout.WorldHalf - WorldLayout.DeepSeaEdgeInset
+	local nearEdge = x > edge or x < -edge or z < -edge
+	if not nearEdge then
+		return false
+	end
+	local island = WorldLayout.Island
+	local dx, dz = x - island.x, z - island.z
+	local keep = island.radius + WorldLayout.DeepSeaIslandPad
+	return dx * dx + dz * dz >= keep * keep
+end
+
+-- The lava column: the pool, a stud past its rim. Height is the caller's.
+function WorldLayout.InHeatColumn(x: number, z: number): boolean
+	local cone = WorldLayout.VolcanoCone
+	local dx, dz = x - cone.x, z - cone.z
+	local reach = cone.pool + WorldLayout.HeatPoolPad
+	return dx * dx + dz * dz <= reach * reach
+end
+
+-- On the graded spur (the climb and the run up to the deck). The
+-- approach along existing ground is not included.
+function WorldLayout.OnTollSpur(x: number, z: number): boolean
+	local spur = WorldLayout.TollSpur
+	return WorldLayout.PolylineDistance(Vector2.new(x, z), WorldLayout.TollSpurGrade) <= spur.width / 2
+end
+
+-- Regrowth clearance. Boot forests do not ask this, so their fingerprints
+-- stay put; the gorge and the ferry path are outside those stands.
+function WorldLayout.TreeBlocked(x: number, z: number): boolean
+	if WorldLayout.OnTollSpur(x, z) then
+		return true
+	end
+	if WorldLayout.InGorge(x, z) then
+		return true
+	end
+	if WorldLayout.InNorthStrip(x, z) then
+		local half = WorldLayout.BridgeWidth / 2 + WorldLayout.StripRoadClear
+		if math.abs(x - WorldLayout.BridgeCenterX) < half then
+			return true
+		end
+	end
+	if WorldLayout.OnFerryPath(x, z) then
+		return true
+	end
+	local dock = WorldLayout.FerryDock
+	local ddx, ddz = x - dock.x, z - dock.z
+	if ddx * ddx + ddz * ddz < WorldLayout.DockClear * WorldLayout.DockClear then
+		return true
+	end
+	local lx, lz = WorldLayout.FerryLanding()
+	local ldx, ldz = x - lx, z - lz
+	if ldx * ldx + ldz * ldz < WorldLayout.LandingClear * WorldLayout.LandingClear then
+		return true
+	end
+	return false
 end
 
 return WorldLayout
