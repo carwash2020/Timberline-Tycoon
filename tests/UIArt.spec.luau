@@ -6,7 +6,8 @@
 -- prompt button doesn't stay pressed.
 return function(t)
 	local roblox = t.roblox
-	local Instance, Vector2, Rect, Enum = roblox.Instance, roblox.Vector2, roblox.Rect, roblox.Enum
+	local Instance, Vector2, Rect, UDim, UDim2, Enum =
+		roblox.Instance, roblox.Vector2, roblox.Rect, roblox.UDim, roblox.UDim2, roblox.Enum
 
 	-- Lune's instances have no property signals. The cash row connects
 	-- them; a no-op signal lets the build run here.
@@ -520,10 +521,15 @@ return function(t)
 		t.eq(face.ScaleType, Enum.ScaleType.Slice)
 		t.eq(face:FindFirstChildOfClass("UICorner"), nil)
 
+		t.eq(face.BackgroundTransparency, 1, "a cached success is skinned before the hold")
+		t.eq(face.ScaleType, Enum.ScaleType.Slice)
 		began:Fire()
 		t.eq(face.Image, UIArt.ButtonPressed.id, "pressed")
+		t.eq(face.BackgroundTransparency, 1, "holding a loaded skin doesn't flash flat")
+		t.eq(face.ScaleType, Enum.ScaleType.Slice)
 		ended:Fire()
 		t.eq(face.Image, UIArt.Button.id, "release puts Button back")
+		t.eq(face.BackgroundTransparency, 1)
 
 		began:Fire()
 		began:Fire()
@@ -596,19 +602,252 @@ return function(t)
 		t.eq(built.row.Position.Y.Offset, built.theme.TopBar() + 4, "under the bar, clear of the notch")
 	end)
 
-	t.test("a failed image load builds today's flat card", function()
-		local loader = client({
-			preload = function(_, _, callback)
-				callback("rbxassetid://1", Enum.AssetFetchStatus.Failure)
+	-- PreloadAsync holds its callback until `finish`, so a card can return
+	-- while the image is still pending. Replaces the old immediate callback.
+	local function holdPreload()
+		local pending = {}
+		return {
+			preload = function(_, ids, callback)
+				local id = ids[1]
+				pending[id] = pending[id] or {}
+				table.insert(pending[id], callback)
 			end,
+			finish = function(id, status)
+				local list = pending[id] or {}
+				pending[id] = nil
+				for _, callback in ipairs(list) do
+					callback(id, status)
+				end
+			end,
+		}
+	end
+
+	t.test("held preload: Card returns at once, then slices on success", function()
+		local held = holdPreload()
+		local loader = client({ preload = held.preload })
+		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		local UIArt = loader:load("StarterPlayer/StarterPlayerScripts/UIArt")
+		t.eq(UIArt.Status(UIArt.Panel.id), "Pending")
+		local card = UITheme.Card(UITheme.Colors.Paper, UITheme.Colors.Bark, 3, 12, false, "Panel")
+		local face = card.face
+		t.eq(face.BackgroundTransparency, 0, "flat until the image arrives")
+		t.eq(face.Image, "")
+		t.eq(face.ScaleType, Enum.ScaleType.Stretch)
+		t.ok(face:FindFirstChildOfClass("UICorner"), "a flat card keeps its corner")
+		t.eq(card.outer.BackgroundTransparency, 0)
+		for _, side in ipairs(paddingOf(face)) do
+			t.ok(side >= 12, "Panel inset from the start")
+		end
+		-- A side already past the inset stays; a short side is raised to it.
+		local pad = face:FindFirstChildOfClass("UIPadding")
+		pad.PaddingTop = UDim.new(0, 2)
+		pad.PaddingLeft = UDim.new(0, 20)
+		held.finish(UIArt.Panel.id, Enum.AssetFetchStatus.Success)
+		t.eq(face.ScaleType, Enum.ScaleType.Slice)
+		t.eq(face.Image, UIArt.Panel.id)
+		t.eq(face.BackgroundTransparency, 1)
+		t.eq(face:FindFirstChildOfClass("UICorner"), nil)
+		t.eq(card.outer.BackgroundTransparency, 1)
+		t.eq(paddingOf(face), { 12, 12, 12, 20 })
+	end)
+
+	t.test("held preload then failure stays flat and opaque", function()
+		local held = holdPreload()
+		local loader = client({ preload = held.preload })
+		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+		local UIArt = loader:load("StarterPlayer/StarterPlayerScripts/UIArt")
+		local card = UITheme.Card(UITheme.Colors.Paper, UITheme.Colors.Bark, 3, 12, true, "Panel")
+		held.finish(UIArt.Panel.id, Enum.AssetFetchStatus.Failure)
+		t.eq(card.face.BackgroundTransparency, 0)
+		t.eq(card.face.Image, "")
+		t.eq(card.face.ScaleType, Enum.ScaleType.Stretch)
+		t.ok(card.face:FindFirstChildOfClass("UICorner"))
+		t.eq(card.outer.BackgroundTransparency, 0)
+		t.eq(card.face:GetAttribute("UIArt"), nil)
+		for _, side in ipairs(paddingOf(card.face)) do
+			t.ok(side >= 12, "still the Panel inset")
+		end
+	end)
+
+	t.test("a Murph bubble keeps its height and padding across the skin swap", function()
+		local function bubbleOf(preload)
+			local loader = client({ preload = preload })
+			local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
+			local UIArt = loader:load("StarterPlayer/StarterPlayerScripts/UIArt")
+			-- QuestUI's speech card: fixed width, height from the words.
+			local bubble = UITheme.Card(UITheme.Colors.Bark, UITheme.Colors.Ink, 3, 12, false, "Panel")
+			bubble.outer.Name = "Card"
+			bubble.outer.Size = UDim2.fromOffset(280, 0)
+			bubble.outer.AutomaticSize = Enum.AutomaticSize.Y
+			bubble.face.Size = UDim2.fromScale(1, 0)
+			bubble.face.AutomaticSize = Enum.AutomaticSize.Y
+			UITheme.padding(bubble.outer, 0, 0, 3, 0)
+			UITheme.padding(bubble.face, 8, 10, 8, 8)
+			bubble.outer.AbsoluteSize = Vector2.new(280, 64)
+			bubble.face.AbsoluteSize = Vector2.new(280, 48)
+			return bubble, UIArt
+		end
+		local function settled(status)
+			local held = holdPreload()
+			local bubble, UIArt = bubbleOf(held.preload)
+			local outer, face = bubble.outer, bubble.face
+			local size, auto = outer.Size, outer.AutomaticSize
+			local faceSize, faceAuto = face.Size, face.AutomaticSize
+			local outerPad, facePad = paddingOf(outer), paddingOf(face)
+			local outerAbs, faceAbs = outer.AbsoluteSize, face.AbsoluteSize
+			t.ok(outerAbs.Y > 0, "the bubble has a height before the image")
+			held.finish(UIArt.Panel.id, status)
+			t.ok(outer.AbsoluteSize.Y > 0, "height stays after " .. tostring(status))
+			t.eq(outer.AbsoluteSize, outerAbs)
+			t.eq(face.AbsoluteSize, faceAbs)
+			t.eq(paddingOf(outer), outerPad, "outer padding")
+			t.eq(paddingOf(face), facePad, "face padding")
+			t.eq(outer.AutomaticSize, auto)
+			t.eq(face.AutomaticSize, faceAuto)
+			t.eq(tostring(outer.Size), tostring(size))
+			t.eq(tostring(face.Size), tostring(faceSize))
+		end
+		settled(Enum.AssetFetchStatus.Success)
+		settled(Enum.AssetFetchStatus.Failure)
+	end)
+
+	t.test("cached success builds the skinned card with no flat step", function()
+		local UITheme, UIArt = theme()
+		t.eq(UIArt.Status(UIArt.Panel.id), "Success")
+		local card = UITheme.Card(UITheme.Colors.Paper, UITheme.Colors.Ink, 3, 12, false, "Panel")
+		t.eq(card.face.Image, UIArt.Panel.id)
+		t.eq(card.face.ScaleType, Enum.ScaleType.Slice)
+		t.eq(card.face.BackgroundTransparency, 1)
+		t.eq(card.face:FindFirstChildOfClass("UICorner"), nil, "never a flat corner")
+		t.eq(card.outer.BackgroundTransparency, 1)
+		t.eq(card.outer:FindFirstChildOfClass("UICorner"), nil)
+	end)
+
+	t.test("a held preload doesn't block the prompt hold swap", function()
+		local held = holdPreload()
+		local player = Instance.new("Folder")
+		local gui = Instance.new("Folder")
+		gui.Name = "PlayerGui"
+		gui.Parent = player
+		local began, ended = signal(), signal()
+		local prompt = {
+			Parent = Instance.new("Part"),
+			ActionText = "Chop",
+			ObjectText = "Oak",
+			HoldDuration = 1,
+			ClickablePrompt = false,
+			KeyboardKeyCode = Enum.KeyCode.E,
+			GamepadKeyCode = Enum.KeyCode.ButtonX,
+			UIOffset = Vector2.zero,
+			PromptButtonHoldBegan = began,
+			PromptButtonHoldEnded = ended,
+			Triggered = signal(),
+			PromptHidden = signal(),
+			Destroying = signal(),
+			GetPropertyChangedSignal = function()
+				return signal()
+			end,
+			InputHoldBegin = function() end,
+			InputHoldEnd = function() end,
+		}
+		local loader = client({
+			player = player,
+			preload = held.preload,
+			tween = {
+				Create = function()
+					return { Play = function() end, Cancel = function() end }
+				end,
+			},
+		})
+		local PromptUI = loader:load("StarterPlayer/StarterPlayerScripts/PromptUI")
+		local UIArt = loader:load("StarterPlayer/StarterPlayerScripts/UIArt")
+		PromptUI.Show(prompt, Enum.ProximityPromptInputType.Keyboard)
+		local face = gui:FindFirstChild("Key", true):FindFirstChild("Face")
+		t.eq(face.BackgroundTransparency, 0, "Show returned before the image")
+		t.eq(face.Image, "")
+		began:Fire()
+		t.eq(face.BackgroundTransparency, 0, "the hold returns without a blank slice")
+		t.eq(face.ScaleType, Enum.ScaleType.Stretch)
+		held.finish(UIArt.Button.id, Enum.AssetFetchStatus.Success)
+		-- The hold asked for ButtonPressed, which is still pending, so the
+		-- resting Button skin must not paint over that request.
+		t.eq(face.Image, "")
+		t.eq(face.BackgroundTransparency, 0)
+		held.finish(UIArt.ButtonPressed.id, Enum.AssetFetchStatus.Success)
+		t.eq(face.Image, UIArt.ButtonPressed.id)
+		t.eq(face.BackgroundTransparency, 1)
+		t.eq(face.ScaleType, Enum.ScaleType.Slice)
+		ended:Fire()
+		t.eq(face.Image, UIArt.Button.id, "release puts Button back")
+		t.eq(face.BackgroundTransparency, 1)
+	end)
+
+	t.test("at 1.5 scale on 1920x1080 the top row position is the layout divided by the scale", function()
+		local w, h = 1920, 1080
+		local player = Instance.new("Folder")
+		local pg = Instance.new("PlayerGui")
+		pg.Parent = player
+		-- 56 px bar and a 42 px right notch: at s = 1.5 the layout's right and
+		-- top land on whole offsets (lune stores UDim offsets as integers).
+		local topbar = Rect.new(160, 0, 1860, 56)
+		local loader = client({
+			player = player,
+			tenFoot = true,
+			topbar = topbar,
+			camera = { ViewportSize = Vector2.new(w, h) },
+			keyboard = true,
+			touch = false,
 		})
 		local UITheme = loader:load("StarterPlayer/StarterPlayerScripts/UITheme")
-		local fill, edge = UITheme.Colors.Paper, UITheme.Colors.Bark
-		for _, auto in ipairs({ true, false }) do
-			local failed = UITheme.Card(fill, edge, 3, 14, auto, "Panel")
-			local plain = UITheme.Card(fill, edge, 3, 14, auto)
-			t.eq(snap(failed), snap(plain), if auto then "auto" else "fixed")
+		local HUD = loader:load("StarterPlayer/StarterPlayerScripts/HUD")
+		local HudLayout = t.load("StarterPlayer/StarterPlayerScripts/HudLayout")
+		UITheme.Start()
+		HUD.BuildCash(pg)
+		local screen = pg:FindFirstChild("TimberlineTop")
+		local row = screen:FindFirstChild("TopRow")
+		local uiScale = screen:FindFirstChildOfClass("UIScale")
+		local s = uiScale.Scale
+		t.eq(s, 1.5)
+		local rightSafe = 42
+		local probe = pg:FindFirstChild("TimberlineSafeProbe"):FindFirstChild("SafeArea")
+		probe.AbsolutePosition = Vector2.zero
+		probe.AbsoluteSize = Vector2.new(w - rightSafe, h)
+		local function place(rowW, rowH)
+			row.AbsoluteSize = Vector2.new(rowW, rowH)
+			local ev = watched[row] and watched[row].AbsoluteSize
+			t.ok(ev, "re-places from the row's size")
+			ev:Fire()
+			local expected = HudLayout.TopRow(
+				Vector2.new(w, h),
+				topbar,
+				Vector2.new(rowW, rowH),
+				26 * s,
+				0,
+				rightSafe,
+				UITheme.TopBar() + 4
+			)
+			local rx = row.Position.X.Offset * s
+			local ry = row.Position.Y.Offset * s
+			t.ok(
+				math.abs(rx - expected.right) < 1e-3,
+				string.format("right %s vs %s", tostring(rx), tostring(expected.right))
+			)
+			t.ok(
+				math.abs(ry - expected.top) < 1e-3,
+				string.format("top %s vs %s", tostring(ry), tostring(expected.top))
+			)
+			t.ok(rx <= w - rightSafe - 12 + 1e-3, "right edge " .. tostring(rx))
+			return expected
 		end
+		-- The $1,999,999 plaque, in screen pixels at this scale, and a short
+		-- row that still fits the bar. Both go through placeTopRow.
+		local plaqueW = (ADVANCE[26] + PAPER_PAD * 2 + 4 * 2) * s
+		local plaqueH = (26 + 8 + 4 * 2) * s
+		t.ok(plaqueW <= w - rightSafe - 12, "the scaled $1,999,999 plaque fits")
+		local fitted = place(plaqueW, plaqueH)
+		t.eq(fitted.inBar, false, "42 px of plaque is 63 px on screen, past the bar")
+		local inBar = place(240, 32)
+		t.eq(inBar.inBar, true, "a short row still sits in the bar")
 	end)
 
 	t.test("every skinned face pads to its inset and has no stroke", function()

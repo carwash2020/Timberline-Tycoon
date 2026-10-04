@@ -1324,8 +1324,13 @@ end
 -- rightSafe is the viewport past the frame's right edge.
 local safeArea: Frame? = nil
 
+-- TimberlineTop's UIScale. Offsets are multiplied by it, so a screen-pixel
+-- place from HudLayout.TopRow is divided back by Scale before it's written.
+local topScale: UIScale? = nil
+
 -- Pins TopRow into the top bar, or just under it (HudLayout.TopRow).
 -- `row.AbsoluteSize` is after the row's UIScale, in screen pixels.
+-- HudLayout.TopRow stays in screen pixels; the position offsets are not.
 local function placeTopRow()
 	local row = HUD.TopRow()
 	if not row then
@@ -1352,8 +1357,9 @@ local function placeTopRow()
 		rightSafe,
 		UITheme.TopBar() + 4
 	)
+	local s = if topScale and topScale.Scale > 0 then topScale.Scale else 1
 	row.AnchorPoint = Vector2.new(1, 0)
-	row.Position = UDim2.fromOffset(place.right, place.top)
+	row.Position = UDim2.fromOffset(place.right / s, place.top / s)
 end
 
 -- The cash row, in its own screen (no insets) parented to `playerGui`.
@@ -1371,6 +1377,7 @@ local function buildCash(playerGui: Instance)
 	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 	local uiScale = Instance.new("UIScale")
 	uiScale.Name = "Scale"
+	topScale = uiScale
 	local function fitScale()
 		uiScale.Scale = math.max(1, UITheme.Scale())
 	end

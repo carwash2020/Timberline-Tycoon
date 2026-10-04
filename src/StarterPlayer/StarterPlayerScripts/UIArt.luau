@@ -44,4 +44,83 @@ function UIArt.Inset(art: Skin): number
 	return math.ceil(art.sliceCenter.Min.X * art.sliceScale - 1e-6)
 end
 
+-- One preload per id, started below and never from a card build. A card
+-- reads Status and returns immediately: Success is already skinned,
+-- Pending stays flat until Listen fires, Failure stays flat.
+export type LoadStatus = "Pending" | "Success" | "Failure"
+
+local loaded: { [string]: LoadStatus } = {}
+local waiters: { [string]: { (LoadStatus) -> () } } = {}
+
+function UIArt.Status(id: string): LoadStatus?
+	return loaded[id]
+end
+
+local function settle(id: string, nextStatus: LoadStatus)
+	local current = loaded[id]
+	if current == "Success" or current == "Failure" then
+		return
+	end
+	loaded[id] = nextStatus
+	local list = waiters[id]
+	waiters[id] = nil
+	if list then
+		for _, fn in ipairs(list) do
+			fn(nextStatus)
+		end
+	end
+end
+
+-- Off the build. `task.spawn` when the runtime has it (the game, and the
+-- specs that stub spawn). A stub that replaces `task` and leaves spawn
+-- out still preloads, inline, so requiring UIArt does not throw there.
+local function later(fn: () -> ())
+	local runner = if type(task) == "table" then task.spawn else nil
+	if runner ~= nil then
+		runner(fn)
+	else
+		fn()
+	end
+end
+
+local function preload(id: string)
+	if id == "" or loaded[id] ~= nil then
+		return
+	end
+	loaded[id] = "Pending"
+	later(function()
+		local ContentProvider = game:GetService("ContentProvider")
+		ContentProvider:PreloadAsync({ id }, function(_contentId: string, fetchStatus: Enum.AssetFetchStatus)
+			local nextStatus: LoadStatus = if fetchStatus == Enum.AssetFetchStatus.Success then "Success" else "Failure"
+			settle(id, nextStatus)
+		end)
+	end)
+end
+
+-- Calls `fn` now when this id has already settled, or once when it does.
+-- A second result is ignored. Pending never calls `fn` before the preload.
+function UIArt.Listen(id: string, fn: (LoadStatus) -> ())
+	local current = loaded[id]
+	if current == "Success" or current == "Failure" then
+		fn(current)
+		return
+	end
+	local list = waiters[id]
+	if list == nil then
+		list = {}
+		waiters[id] = list
+	end
+	table.insert(list, fn)
+	if current == nil then
+		preload(id)
+	end
+end
+
+for _, name in ipairs(UIArt.Names) do
+	local art = skins[name]
+	if art then
+		preload(art.id)
+	end
+end
+
 return UIArt
