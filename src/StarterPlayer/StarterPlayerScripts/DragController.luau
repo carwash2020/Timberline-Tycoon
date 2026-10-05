@@ -15,7 +15,7 @@
 --     ContextActionService action under the thumbstick's, and never in the
 --     thumbstick's corner). Move it to drag; lift it to drop. While holding,
 --     a row of buttons (- + Turn Tip) works with another finger.
---   * Gamepad: hold L2 to grab what the centre dot points at; let go to
+--   * Gamepad: hold R2 to grab what the centre dot points at; let go to
 --     drop. D-pad up/down push and pull, D-pad left/right turn, LB/RB tip.
 --     These are bound over HUD's D-pad shortcuts only while holding.
 -- On a grab the client fires Grab(part, hitPos) and at once adds, on that
@@ -647,6 +647,7 @@ local function grab(device: Device, touch: InputObject?)
 	}
 	hold = h
 	distanceAxis = 0
+	HUD.NoteGrab()
 	ghostBeds(true)
 	Net.Remote("Grab"):FireServer(part, at)
 	h.conn = model:GetAttributeChangedSignal("HeldBy"):Connect(function()
@@ -870,7 +871,7 @@ function DragController.Start()
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			grab("mouse", nil)
-		elseif input.KeyCode == Enum.KeyCode.ButtonL2 then
+		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
 			grab("pad", nil)
 		end
 	end)
@@ -881,7 +882,7 @@ function DragController.Start()
 		end
 		if
 			(input.UserInputType == Enum.UserInputType.MouseButton1 and h.device == "mouse")
-			or (input.KeyCode == Enum.KeyCode.ButtonL2 and h.device == "pad")
+			or (input.KeyCode == Enum.KeyCode.ButtonR2 and h.device == "pad")
 		then
 			drop(true)
 		end

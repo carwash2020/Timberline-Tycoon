@@ -329,7 +329,7 @@ return function(t)
 		t.ok(string.find(drag, "{grab}", 1, true), "how to start a drag, per device")
 		t.ok(string.find(HintLogic.Expand(drag, "desktop"), "(press 1)", 1, true))
 		t.ok(string.find(HintLogic.Expand(drag, "phone"), "tap and hold on a log", 1, true))
-		t.ok(string.find(HintLogic.Expand(drag, "console"), "hold LT on a log", 1, true))
+		t.ok(string.find(HintLogic.Expand(drag, "console"), "hold RT on a log", 1, true))
 		local first = byId("fell").murph
 		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
 		t.ok(not string.find(first, "I'm Murph", 1, true), "Murph's tip already said hello")

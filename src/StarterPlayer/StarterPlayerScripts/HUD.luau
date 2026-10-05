@@ -157,6 +157,9 @@ local modalRect: HudLayout.Rect? = nil -- an open panel (HUD.SetModal), in scree
 local hudGui: ScreenGui? = nil
 local leftColumn: Frame? = nil -- UITheme's left column (the tracker), once it exists
 local hintLabel: TextLabel? = nil
+local hintQuiet = false -- a control you have learned: its hint is not shown
+local hintGrabs = 0 -- grabs this session (HUD.NoteGrab)
+local syncHint: (() -> ())? = nil -- refreshModal, once it exists
 local hintLimit: UISizeConstraint? = nil -- the hint's widest right now (placeRow)
 local bottomRow: Frame? = nil -- the load chip and the hint, side by side
 local rowQueued = false
@@ -640,7 +643,16 @@ local function refreshHint()
 	local text
 	if CoreLoop.V2() then
 		local forced = hintForced :: any -- "build": a context both loops have
-		text = HintLogic.PickV2(UITheme.Device(), forced or HintLogic.ContextForV2(hintStateV2()))
+		local context = forced or HintLogic.ContextForV2(hintStateV2())
+		text = HintLogic.PickV2(UITheme.Device(), context)
+		local quiet = HintLogic.Quiet(context, hintGrabs)
+		if quiet ~= hintQuiet then
+			hintQuiet = quiet
+			local sync = syncHint
+			if sync then
+				sync()
+			end
+		end
 	else
 		text = HintLogic.Pick(UITheme.Device(), hintForced or HintLogic.ContextFor(hintState))
 	end
@@ -760,9 +772,17 @@ local tipsOn = true
 local function refreshModal()
 	local hint = hintLabel
 	if hint then
-		hint.Visible = modalRect == nil and tipsOn
+		hint.Visible = modalRect == nil and tipsOn and not hintQuiet
 	end
 	refreshChip()
+end
+syncHint = refreshModal
+
+-- A piece was picked up (DragController). After a couple, the "how to drag"
+-- hints stop showing.
+function HUD.NoteGrab()
+	hintGrabs += 1
+	refreshHint()
 end
 
 -- Settings: hide the hint line without closing panels.

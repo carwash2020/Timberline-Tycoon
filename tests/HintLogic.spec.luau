@@ -337,13 +337,26 @@ return function(t)
 		t.eq(HintLogic.Expand("{Unequip} first.", "console"), "Press LB + RB first.")
 		t.eq(HintLogic.Expand("Then {grab} on a log.", "desktop"), "Then click and hold on a log.")
 		t.eq(HintLogic.Expand("Then {grab} on a log.", "phone"), "Then tap and hold on a log.")
-		t.eq(HintLogic.Expand("Then {grab} on a log.", "console"), "Then hold LT on a log.")
+		t.eq(HintLogic.Expand("Then {grab} on a log.", "console"), "Then hold RT on a log.")
 		t.eq(HintLogic.Expand("{Grab} on a log.", "phone"), "Tap and hold on a log.")
-		t.eq(HintLogic.Expand("{Grab} on a log.", "console"), "Hold LT on a log.")
+		t.eq(HintLogic.Expand("{Grab} on a log.", "console"), "Hold RT on a log.")
 		for _, device in ipairs(HintLogic.Devices) do
 			t.ok(not HintLogic.HasToken(HintLogic.Expand("{unequip} {Grab}", device)), device)
 		end
 		t.ok(not string.find(HintLogic.Expand("{grab}", "phone"), "click"), "a phone never clicks")
 		t.ok(not string.find(HintLogic.Expand("{unequip}", "desktop"), "tap"), "a computer never taps")
+	end)
+
+	t.test("controls you have learned stop showing their hints; warnings never do", function()
+		local HintLogic = t.shared("HintLogic")
+		t.eq(HintLogic.Quiet("drag", 0), false)
+		t.eq(HintLogic.Quiet("drag", HintLogic.GrabsToLearn - 1), false)
+		for _, context in ipairs({ "drag", "holding", "unequip" }) do
+			t.eq(HintLogic.Quiet(context, HintLogic.GrabsToLearn), true, context)
+		end
+		for _, context in ipairs({ "tooLong", "tooHard", "driving", "build", "chop" }) do
+			t.eq(HintLogic.Quiet(context, 99), false, context)
+		end
+		t.ok(string.find(HintLogic.PickV2("console", "drag"), "RT", 1, true), "the pad grabs with RT")
 	end)
 end

@@ -71,7 +71,7 @@ return function(t)
 				UserInputService = { InputBegan = sig(), InputEnded = sig() },
 			},
 			mocks = {
-				HUD = { Toast = noop },
+				HUD = { Toast = noop, NoteGrab = noop },
 				Net = {
 					Remote = function()
 						return { FireServer = noop }

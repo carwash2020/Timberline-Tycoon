@@ -797,7 +797,6 @@ local function autoAssign(player: Player)
 		notify(player, FULL)
 		return
 	end
-	local slot = slots[index]
 	tryGrant(player, index, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
 end
 

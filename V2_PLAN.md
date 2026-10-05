@@ -600,7 +600,7 @@ New scene `tools/preview/scenes/sections.luau`. Each check is a spec or a render
 
 **Client: `SPS/DragController`**
 - The axe must be put away to drag (LT2's rule). With an axe out, clicking a loose piece chops it, and a hint says "Put your axe away (1) to drag".
-- Mouse: hold the left button on a `Wood` part. Touch: tap and hold for 0.25 s; the input is consumed so the camera doesn't turn. Gamepad: hold L2 at the centre reticle.
+- Mouse: hold the left button on a `Wood` part. Touch: tap and hold for 0.25 s; the input is consumed so the camera doesn't turn. Gamepad: hold R2 (RT) at the centre reticle.
 - On grab:
   - Fire `Grab(part, hitPos)`.
   - Create an Attachment at the hit point plus a local Neon ball.
