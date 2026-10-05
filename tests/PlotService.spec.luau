@@ -417,7 +417,7 @@ return function(t)
 		t.eq(profile.cash, 500)
 		t.eq(ann.attrs.PlotTier, 2)
 		t.eq(s.plot(1):GetAttribute("Tier"), 2)
-		t.eq(s.plot(1):FindFirstChild("Pad").Size.X, 140)
+		t.eq(s.plot(1):FindFirstChild("Pad").Size.X, 110)
 		s.P.Upgrade(ann)
 		t.eq(profile.plot.tier, 2)
 		t.eq(s.lastToast(), "You need $9,500 more for a Lumber Yard.")
@@ -1173,17 +1173,17 @@ return function(t)
 		local GameConfig = t.shared("GameConfig")
 		local Util = t.shared("Util")
 		local step = GameConfig.ExpansionPriceStep
-		s.P.Expand(ann, 2, 0, 0)
+		s.P.Expand(ann, 1, 0, 0)
 		t.eq(profile.cash, 0)
-		t.eq(profile.plot.squares, { "2,0" })
+		t.eq(profile.plot.squares, { "1,0" })
 		t.eq(s.lastToast(), "You expanded your plot for $100. The next square is " .. Util.formatCash(step) .. ".")
-		t.eq(ann.attrs.PlotSquares, "2,0")
-		s.P.Expand(ann, 2, 1, 1)
+		t.eq(ann.attrs.PlotSquares, "1,0")
+		s.P.Expand(ann, 1, 1, 1)
 		t.eq(s.lastToast(), "You don't have enough to expand there.")
 		t.eq(profile.cash, 0)
 		t.eq(#profile.plot.squares, 1)
 		profile.cash = step
-		s.P.Expand(ann, 2, 1, 1)
+		s.P.Expand(ann, 1, 1, 1)
 		t.eq(profile.cash, 0)
 		t.eq(#profile.plot.squares, 2)
 		t.eq(
@@ -1213,23 +1213,23 @@ return function(t)
 			nested += 1
 			if nested == 1 then
 				-- Still inside the first spend: same count, a second square.
-				s.P.Expand(ann, 2, 1, 0)
+				s.P.Expand(ann, 1, 1, 0)
 			end
 		end
 		local ran, err = pcall(function()
-			s.P.Expand(ann, 2, 0, 0)
+			s.P.Expand(ann, 1, 0, 0)
 		end)
 		spendDuring = nil
 		if not ran then
 			error(err)
 		end
 		t.eq(nested, 1)
-		t.eq(profile.plot.squares, { "2,0" })
+		t.eq(profile.plot.squares, { "1,0" })
 		t.eq(profile.cash, 9900)
 		-- The tap after that still quotes the old count.
 		s.P.Expand(ann, 2, 1, 0)
 		t.eq(s.lastToast(), "The price changed. The Land panel shows the new one.")
-		t.eq(profile.plot.squares, { "2,0" })
+		t.eq(profile.plot.squares, { "1,0" })
 		t.eq(profile.cash, 9900)
 	end)
 
@@ -1273,7 +1273,7 @@ return function(t)
 		bob.standOn(1)
 		s.P.VisitStep({ bob, ann })
 		t.eq(bob.root.Position.X, center.X)
-		t.eq(bob.root.Position.Z, center.Y + 68)
+		t.eq(bob.root.Position.Z, center.Y + 48)
 		t.eq(ann.root.Position.X, center.X)
 		t.eq(ann.root.Position.Z, center.Y)
 	end)

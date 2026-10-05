@@ -185,8 +185,11 @@ end
 -- stays clear. Rails and corner posts show even when the plot is free:
 -- a faint pad alone was easy to miss, and easy to drive through.
 local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquares: { string }?)
+	local look = PlotData.Look(slot.index)
 	slot.pad.Size = Vector3.new(size, 0.2, size)
 	slot.pad.Transparency = if claimed then 0 else 0.25
+	slot.pad.Color = Color3.fromRGB(look.ground[1], look.ground[2], look.ground[3])
+	slot.pad.Material = (Enum.Material :: any)[look.material]
 	local signAt = slot.cframe * CFrame.new(-10, 0, size / 2 + 3)
 	slot.post.CFrame = signAt * CFrame.new(0, 3, 0)
 	slot.board.CFrame = signAt * CFrame.new(0, 6.5, 0)
@@ -216,7 +219,9 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 		end
 	end
 	local half = size / 2
-	local rail = if claimed then Color3.fromRGB(130, 90, 50) else Color3.fromRGB(196, 168, 120)
+	local rail = if claimed
+		then Color3.fromRGB(look.rail[1], look.rail[2], look.rail[3])
+		else Color3.fromRGB(196, 168, 120)
 	local postColor = Color3.fromRGB(90, 62, 36)
 	for _, side in ipairs({
 		{ 0, half, size, 0.4 },
@@ -264,7 +269,7 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 		"Apron",
 		Vector3.new(16, 0.15, 10),
 		slot.cframe * CFrame.new(0, 0.12, half + 5),
-		Color3.fromRGB(150, 116, 78),
+		Color3.fromRGB(look.apron[1], look.apron[2], look.apron[3]),
 		Enum.Material.Ground,
 		slot.border
 	)
@@ -319,7 +324,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	local cframe = CFrame.new(center.X, ground, center.Y)
 	local pad = part(
 		"Pad",
-		Vector3.new(120, 0.2, 120),
+		Vector3.new(PlotData.Tiers[1].size, 0.2, PlotData.Tiers[1].size),
 		cframe * CFrame.new(0, 0.1, 0),
 		Color3.fromRGB(210, 190, 150),
 		Enum.Material.Sand,
