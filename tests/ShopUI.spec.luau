@@ -65,6 +65,6 @@ return function(t)
 		local plot = fs.readFile(dir .. "PlotUI.luau")
 		t.eq(string.find(plot, "PLOT_ROW", 1, true), nil, "the palette has no grow-the-plot row")
 		t.ok(string.find(plot, "PlotLogic.Source(", 1, true), "the palette asks the server's own rule")
-		t.ok(string.find(plot, 'name = "GrowPlot"', 1, true), "growing the plot is at the Land Office")
+		t.ok(string.find(plot, 'name = "RaisePlotSize"', 1, true), "raising the plot size is in the Land panel")
 	end)
 end
