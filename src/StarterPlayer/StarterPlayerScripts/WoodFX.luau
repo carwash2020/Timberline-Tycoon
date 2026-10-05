@@ -70,11 +70,11 @@ WoodFX.SpringFrom = 0.72 -- a tree that grew springs up from this much of its si
 WoodFX.SpringTime = 0.9
 WoodFX.SpringWindow = 1.5 -- seconds after GrewAt a tree still springs (it may stream in late)
 WoodFX.BootWait = 120
--- A Lanternwood tree's night light. TBD (Designer).
-WoodFX.GlowRange = 14 -- TBD (Designer)
-WoodFX.GlowBrightness = 0.8 -- TBD (Designer)
+-- A Lanternwood tree's night light. Open to tuning.
+WoodFX.GlowRange = 14 -- open to tuning
+WoodFX.GlowBrightness = 0.8 -- open to tuning
 WoodFX.GlowLightName = "LanternLight"
-WoodFX.GlowLightInterval = 1 -- seconds between light re-sorts. TBD (Builder)
+WoodFX.GlowLightInterval = 1 -- seconds between light re-sorts.
 
 export type GlowHost = {
 	id: string,

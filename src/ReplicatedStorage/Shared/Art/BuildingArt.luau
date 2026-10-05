@@ -109,7 +109,6 @@ BuildingArt.Scale = {
 } :: { [string]: number }
 
 -- A closed door leaf. Colour and transparency only; no new parts.
--- TBD (Builder).
 BuildingArt.LockedDoorRed = 40
 BuildingArt.LockedDoorGreen = 48
 BuildingArt.LockedDoorBlue = 62

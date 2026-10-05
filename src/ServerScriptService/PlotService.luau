@@ -894,23 +894,38 @@ local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
 	end
 	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
 	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	-- B15: the ground at a plot-local spot, found with a raycast that skips
+	-- the visitor and anything you can walk through (decor), so the hit is
+	-- the terrain or a floor. The spot is bad on a road (the town's
+	-- layout) or in the water (the lake and river layout, or a water
+	-- terrain hit). groundY is where the ray landed, so the visitor is put
+	-- on the ground and not inside a hill.
+	local groundY: { [string]: number } = {}
 	local function spotBad(lx: number, lz: number): boolean
 		local world = (slot.cframe * CFrame.new(lx, 0, lz)).Position
 		local materialName = ""
 		local ok, hit = pcall(function()
-			return workspace:Raycast(Vector3.new(world.X, world.Y + 40, world.Z), Vector3.new(0, -80, 0))
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { char }
+			params.RespectCanCollide = true
+			return workspace:Raycast(Vector3.new(world.X, world.Y + 60, world.Z), Vector3.new(0, -120, 0), params)
 		end)
 		if ok and typeof(hit) == "RaycastResult" then
-			local mat = (hit :: RaycastResult).Material
+			local result = hit :: RaycastResult
+			local mat = result.Material
 			if mat then
 				materialName = mat.Name
 			end
+			groundY[lx .. "," .. lz] = result.Position.Y
 		end
 		local wet = PlotLogic.InWater(world.X, world.Z) or materialName == "Water"
 		return PlotLogic.GroundBad(wet, PlotLogic.OnRoad(world.X, world.Z))
 	end
 	local lx, lz = PlotLogic.EjectSpot(tier.size, squares, spotBad)
-	local cf = slot.cframe * CFrame.new(lx, 4, lz)
+	local ground = groundY[lx .. "," .. lz]
+	local lift = if ground then ground - slot.cframe.Position.Y + 4 else 4
+	local cf = slot.cframe * CFrame.new(lx, math.max(lift, 4), lz)
 	root.CFrame = cf
 	root.Position = cf.Position
 end
@@ -976,7 +991,7 @@ end
 ---------------------------------------------------------------------------
 
 local function isNumber(value: unknown): boolean
-	return type(value) == "number" and value == value
+	return type(value) == "number" and value == value and math.abs(value) ~= math.huge
 end
 
 function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)

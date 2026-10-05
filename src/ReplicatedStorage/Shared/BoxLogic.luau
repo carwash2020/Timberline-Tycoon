@@ -9,7 +9,7 @@ local GameConfig = require(script.Parent.GameConfig)
 
 local BoxLogic = {}
 
--- TBD (Designer): how long a grab claim lasts, on the server clock.
+-- Open to tuning: how long a grab claim lasts, on the server clock.
 -- Not a GameConfig key; that file belongs to wave 0.
 BoxLogic.BoxClaimSec = 8
 

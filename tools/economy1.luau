@@ -94,7 +94,7 @@ local TRAILERS = sortedByPrice(ItemCatalog.Trailers)
 local BOATS = sortedByPrice(ItemCatalog.Boats)
 local GEAR = sortedByPrice(ItemCatalog.Gear)
 -- Ferry Island is not on the buying path (W2 owns the biome). Leaving
--- lanternwood out holds the published headlines. TBD (Designer).
+-- lanternwood out holds the published headlines.
 local function economyWoods()
 	local list = {}
 	for _, wood in ipairs(WoodData.All()) do

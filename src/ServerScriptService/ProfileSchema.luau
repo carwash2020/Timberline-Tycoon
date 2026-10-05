@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local EventData = require(ReplicatedStorage.Shared.EventData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
@@ -63,6 +64,10 @@ export type DailyState = {
 	streak: number, -- days in a row with every goal done
 	bestStreak: number,
 	lastCompleteDay: number,
+	-- The daily-return calendar (DailyData.LoginStep; absent in older saves,
+	-- read as 0): the calendar day 1..7 last paid, and the UTC day it paid.
+	loginDay: number?,
+	lastLoginDay: number?,
 }
 
 -- One log riding in your truck bed (saved, so a disconnect never loses a
@@ -168,6 +173,10 @@ export type Profile = {
 	questAxe: { step: number }, -- per slot. 0 = not started
 	secretsFound: { [string]: boolean },
 	areasVisited: { [string]: boolean },
+	-- Cosmetics earned (the Halloween Pumpkin Hat is "pumpkinHat"): account-wide.
+	cosmetics: { [string]: boolean },
+	-- The seasonal event's progress (EventData.State), per slot.
+	event: EventData.State,
 	compendium: { [string]: boolean },
 	materials: { [string]: number }, -- gathered materials by id (Sky Shards, ...)
 	forgeLogs: { [string]: number }, -- logs put into the Starfall forge, by wood id
@@ -272,6 +281,8 @@ local TEMPLATE: Profile = {
 	questAxe = { step = 0 },
 	secretsFound = {},
 	areasVisited = {},
+	cosmetics = {},
+	event = { id = "", day = 0, progress = {}, done = {}, daysDone = 0, lastDoneDay = 0 },
 	compendium = { oak = true },
 	materials = {},
 	forgeLogs = {},
@@ -288,7 +299,7 @@ local TEMPLATE: Profile = {
 	tutorialRefresher = false,
 	tutorialReplay = false,
 	seasonId = "spring",
-	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
+	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0, loginDay = 0, lastLoginDay = 0 },
 	purchaseIds = {},
 	passes = {},
 	truckPaint = {},
@@ -554,6 +565,7 @@ local function applyAccountFields(data: any)
 	data.badgesSent = booleanMap(data.badgesSent)
 	data.secretsFound = booleanMap(data.secretsFound)
 	data.areasVisited = booleanMap(data.areasVisited)
+	data.cosmetics = booleanMap(data.cosmetics)
 	data.tollPaidUntil = nil
 end
 
@@ -562,6 +574,7 @@ local function stripAccountFields(slot: any)
 	slot.badgesSent = nil
 	slot.secretsFound = nil
 	slot.areasVisited = nil
+	slot.cosmetics = nil
 	slot.tollPaidUntil = nil
 end
 

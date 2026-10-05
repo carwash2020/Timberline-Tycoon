@@ -4,8 +4,11 @@
 -- Nothing here is copied from another game.
 --
 -- Land Office, Odds & Ends and Sparkworks have lines only. Their buildings
--- are not in this batch, so they are not in NPCData and nothing here spawns
--- them. The Hermit is in NPCData (the Secret Cave) and speaks HermitLines.
+-- are not built, so they are not in NPCData and nothing here spawns them.
+-- Those three sets are DRAFTS (marked below): placeholder writing for shops
+-- that do not exist, kept so the tests keep every shop's lines complete.
+-- Nobody hears them. Rewrite them when their buildings are built. The
+-- Hermit is in NPCData (the Secret Cave) and speaks HermitLines.
 
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 
@@ -59,6 +62,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Sold. The box is yours to open.",
 		locked = "I don't have that one for sale.",
 	},
+	-- DRAFT: not spoken yet (no Land Office building); rewrite with the building.
 	LandOffice = {
 		greet = "Plots are on the board. Tell me which square you want.",
 		offer = "This %s is %s. Shall I mark it yours?",
@@ -70,6 +74,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Filed. The square is yours.",
 		locked = "That one isn't for sale from this desk.",
 	},
+	-- DRAFT: not spoken yet (no Odds & Ends building); rewrite with the building.
 	OddsAndEnds = {
 		greet = "Odds, ends, and a few things that are both.",
 		offer = "This %s for %s. Want it?",
@@ -81,6 +86,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Yours. Don't ask where I found it.",
 		locked = "Not for sale. Even I have limits.",
 	},
+	-- DRAFT: not spoken yet (no Sparkworks building); rewrite with the building.
 	Sparkworks = {
 		greet = "Mind the sparks. The counter's the safe bit.",
 		offer = "Wire this %s for %s?",

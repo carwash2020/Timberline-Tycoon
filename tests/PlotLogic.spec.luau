@@ -492,6 +492,22 @@ return function(t)
 		end)
 		t.eq(backX, 0)
 		t.eq(backZ, 68)
+		-- B15: more places to try, nearest first, none repeated; a spot past the
+		-- first five is used when those are on a road or in the water.
+		local list = PlotLogic.EjectCandidates(120, {})
+		t.ok(#list > 5, "more than the first five")
+		local seen = {}
+		for _, spot in ipairs(list) do
+			local key = spot[1] .. "," .. spot[2]
+			t.ok(not seen[key], "no repeats: " .. key)
+			seen[key] = true
+		end
+		local firstFive = 0
+		local cornerX, cornerZ = PlotLogic.EjectSpot(120, {}, function(x, z)
+			firstFive += 1
+			return firstFive <= 5
+		end)
+		t.eq({ cornerX, cornerZ }, { list[6][1], list[6][2] })
 		t.eq(PlotLogic.GroundBad(true, false), true)
 		t.eq(PlotLogic.GroundBad(false, true), true)
 		t.eq(PlotLogic.GroundBad(false, false), false)
