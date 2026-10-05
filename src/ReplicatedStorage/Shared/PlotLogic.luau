@@ -340,6 +340,49 @@ function PlotLogic.EjectSpot(tierSize: number, squares: { string }, bad: (number
 	return PlotLogic.EjectLocal(tierSize, squares)
 end
 
+-- Where a visitor is put down on a plot: spots around the plot's spawn pad
+-- (plot-local, 18 studs south of the centre), then a little further in,
+-- every one kept inside the base plot with a margin. The first that is not
+-- bad (water, road, a roof) wins; with none, the pad itself.
+PlotLogic.VisitPad = { 0, -18 }
+PlotLogic.VisitMargin = 4
+
+function PlotLogic.VisitCandidates(tierSize: number): { { number } }
+	local limit = tierSize / 2 - PlotLogic.VisitMargin
+	local px, pz = PlotLogic.VisitPad[1], PlotLogic.VisitPad[2]
+	local offsets = {
+		{ 0, 0 },
+		{ 8, 0 },
+		{ -8, 0 },
+		{ 0, 8 },
+		{ 0, -8 },
+		{ 14, 8 },
+		{ -14, 8 },
+		{ 0, 16 },
+		{ 0, 28 },
+	}
+	local out: { { number } } = {}
+	for _, o in ipairs(offsets) do
+		local x, z = px + o[1], pz + o[2]
+		if math.abs(x) <= limit and math.abs(z) <= limit then
+			table.insert(out, { x, z })
+		end
+	end
+	if #out == 0 then
+		table.insert(out, { px, pz })
+	end
+	return out
+end
+
+function PlotLogic.VisitSpot(tierSize: number, bad: (number, number) -> boolean): (number, number)
+	for _, spot in ipairs(PlotLogic.VisitCandidates(tierSize)) do
+		if not bad(spot[1], spot[2]) then
+			return spot[1], spot[2]
+		end
+	end
+	return PlotLogic.VisitPad[1], PlotLogic.VisitPad[2]
+end
+
 function PlotLogic.OnRoad(x: number, z: number): boolean
 	local p = Vector2.new(x, z)
 	for _, road in ipairs(WorldLayout.Roads) do

@@ -10,9 +10,11 @@
 --     toUid, port) links, ("cut", uid) removes every wire on a piece. It
 --     is rate limited, needs the build permission, and the player must
 --     stand within WireLogic.Reach of each piece it names.
---   * Wires are saved in profile.plot.wires. Switch positions are not: a
---     rebuilt plot starts with every switch off. A lamp nobody wired stays
---     lit. A wired lamp is lit while any of its switches is on. A wired
+--   * Wires are saved in profile.plot.wires and the switches that are on
+--     in profile.plot.switches, so a rebuilt plot (rejoin) puts each lever
+--     back where it was (Restore). A switch model also carries a "Wires"
+--     attribute (its targets' uids, comma joined) so the client can draw
+--     the lines. A lamp nobody wired stays lit. A wired lamp is lit while any of its switches is on. A wired
 --     door opens while any of its switches is on, through PlotDoors, so a
 --     blocked door stays shut and the hint says why.
 -- PlotService calls Bind once, Attach for each built piece, and Sync after
@@ -156,8 +158,17 @@ function LogicService.Refresh(host: Host, profile: Profile, who: Player?)
 	for _, item in ipairs(placed) do
 		if WireLogic.Role(item.blueprintId) == "switch" then
 			local model = modelOf(host, item.uid)
-			if model and model:GetAttribute("On") == true then
-				on[item.uid] = true
+			if model then
+				if model:GetAttribute("On") == true then
+					on[item.uid] = true
+				end
+				local targets: { string } = {}
+				for _, wire in ipairs(wires) do
+					if wire.from == item.uid then
+						table.insert(targets, wire.to)
+					end
+				end
+				model:SetAttribute("Wires", table.concat(targets, ","))
 			end
 		end
 	end
@@ -179,10 +190,21 @@ function LogicService.Refresh(host: Host, profile: Profile, who: Player?)
 	end
 end
 
+-- A plot was just rebuilt from the save: lamps and doors follow the saved
+-- switch positions (set when each switch was attached). `who` is the owner.
+function LogicService.Restore(host: Host, profile: Profile, who: Player?)
+	LogicService.Refresh(host, profile, who)
+end
+
 -- A piece was sold or deleted: forget wires to nothing, refresh the rest.
 function LogicService.Sync(host: Host, profile: Profile, who: Player?)
 	if type(profile.plot.wires) == "table" then
 		profile.plot.wires = WireLogic.Live(profile.plot.wires, profile.plot.placed)
+	end
+	if type(profile.plot.switches) == "table" then
+		profile.plot.switches = WireLogic.LiveSwitches(profile.plot.switches, profile.plot.placed)
+	end
+	if type(profile.plot.wires) == "table" then
 		LogicService.Refresh(host, profile, who)
 	end
 end
@@ -324,7 +346,9 @@ function LogicService.Flip(ctx: Context, who: Player)
 		return
 	end
 	lastFlip[ctx.item.uid] = now
-	tip(ctx.model, ctx.model:GetAttribute("On") ~= true)
+	local on = ctx.model:GetAttribute("On") ~= true
+	tip(ctx.model, on)
+	profile.plot.switches = WireLogic.SetOn(profile.plot.switches, ctx.item.uid, on)
 	LogicService.Refresh(ctx.slot, profile, who)
 end
 
@@ -389,7 +413,8 @@ end
 function LogicService.Attach(ctx: Context)
 	local role = WireLogic.Role(ctx.item.blueprintId)
 	if role == "switch" then
-		tip(ctx.model, false)
+		local _, saved = ctx.ownerOf()
+		tip(ctx.model, saved ~= nil and WireLogic.IsOn(saved.plot.switches, ctx.item.uid))
 		local host: Instance = ctx.model:FindFirstChild("Part" .. LEVER_BOX) or ctx.model
 		local object = nameOf(ctx.item)
 		local flipPrompt = prompt(host, "FlipPrompt", "Flip", object, "Interact", 0)
@@ -405,8 +430,12 @@ function LogicService.Attach(ctx: Context)
 		local lit = true
 		if profile then
 			local wires = WireLogic.Live(profile.plot.wires, profile.plot.placed)
-			local fed = WireLogic.Power(wires, ctx.item.uid, {})
-			lit = WireLogic.LampLit(fed, false)
+			local on: { [string]: boolean } = {}
+			for _, uid in ipairs(WireLogic.CleanSwitches(profile.plot.switches)) do
+				on[uid] = true
+			end
+			local fed, powered = WireLogic.Power(wires, ctx.item.uid, on)
+			lit = WireLogic.LampLit(fed, powered)
 		end
 		setLamp(ctx.model, ctx.item.blueprintId, lit)
 	end

@@ -4,7 +4,9 @@
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
 -- volume stepper; graphics, camera shake, UI scale and tips apply at once
 -- and save (SaveSetting). Reset tutorial asks twice, then ResetTutorial.
--- Visitors is the plot permission list. Leaderboard is the opt-in
+-- Visitors is the plot permission list, with a Visit button for each
+-- player in the server whose plot lets you in (PlotService.Visit checks it
+-- again). Leaderboard is the opt-in
 -- lifetime-earnings board (LeaderboardUI). On a gamepad DPadRight opens
 -- the card, the D-pad moves between the rows, B on Visitors or
 -- Leaderboard returns to the game list, and B or Esc closes the card.
@@ -190,11 +192,43 @@ function SettingsUI.Start()
 		return list
 	end
 
+	-- Players here who own a plot and whose visit flag lets you in. Their
+	-- permissions ride on their own PlotPermissions attribute.
+	local function visitable(): { { userId: number, name: string } }
+		local candidates: { PermissionLogic.Candidate } = {}
+		for _, other in ipairs(Players:GetPlayers()) do
+			if other ~= player then
+				table.insert(candidates, {
+					userId = other.UserId,
+					name = if other.DisplayName ~= "" then other.DisplayName else other.Name,
+					hasPlot = other:GetAttribute("PlotSlot") ~= nil,
+					permissions = PermissionLogic.Decode(other:GetAttribute("PlotPermissions")),
+				})
+			end
+		end
+		return PermissionLogic.VisitList(candidates, player.UserId)
+	end
+
 	local function rebuildVisitors()
 		for _, child in ipairs(visitors:GetChildren()) do
 			if child:IsA("GuiObject") then
 				child:Destroy()
 			end
+		end
+		local visitHead = UITheme.label(visitors, "VISIT A PLOT", F.Black, if tenFoot() then 18 else 14, C.Bark)
+		visitHead.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+		local visits = visitable()
+		if #visits == 0 then
+			local none =
+				UITheme.label(visitors, "No open plots here right now.", F.Bold, if tenFoot() then 18 else 14, C.Ink)
+			none.Size = UDim2.new(1, 0, 0, if tenFoot() then 24 else 18)
+		end
+		for _, entry in ipairs(visits) do
+			local who = entry
+			makeButton(visitors, "Visit" .. who.userId, "Visit " .. who.name, "buy", function()
+				Net.Remote("VisitPlot"):FireServer(who.userId)
+				card.outer.Visible = false
+			end)
 		end
 		local known = false
 		for _, person in ipairs(people()) do
@@ -426,9 +460,26 @@ function SettingsUI.Start()
 	local function refreshPeople()
 		if tabName == "visitors" and card.outer.Visible then
 			rebuildVisitors()
+			local first = visitors:FindFirstChildWhichIsA("GuiButton", true)
+			if first and UITheme.Device() == "console" then
+				GuiService.SelectedObject = first
+			end
 		end
 	end
-	Players.PlayerAdded:Connect(refreshPeople)
+	local function watchPlayer(other: Player)
+		for _, attr in ipairs({ "PlotSlot", "PlotPermissions" }) do
+			other:GetAttributeChangedSignal(attr):Connect(refreshPeople)
+		end
+	end
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other ~= player then
+			watchPlayer(other)
+		end
+	end
+	Players.PlayerAdded:Connect(function(other: Player)
+		watchPlayer(other)
+		refreshPeople()
+	end)
 	Players.PlayerRemoving:Connect(refreshPeople)
 	applyAll()
 

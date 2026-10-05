@@ -46,6 +46,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	ChopSawSet = 6, -- one step of a chop saw's cut; same budget as SawmillSet
 	ExpandLand = 1, -- buy the next plot square
 	SetPermission = 4, -- one flag for one visitor
+	VisitPlot = 1, -- go to a friend's plot (PlotService.Visit)
 	Wire = 4, -- connect a port, or cut a wire
 	TollPay = 1, -- pay the toll
 	FerryBoard = 1, -- board the ferry
