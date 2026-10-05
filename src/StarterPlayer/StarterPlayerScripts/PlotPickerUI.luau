@@ -208,7 +208,7 @@ local function pass()
 end
 
 local function build()
-	local screen = UITheme.Screen("PlotPicker", 80, "device")
+	local screen = UITheme.Screen("PlotPicker", UITheme.Layers.PlotPicker, "device")
 	screen.Enabled = false
 	screen.Parent = player:WaitForChild("PlayerGui")
 	gui = screen

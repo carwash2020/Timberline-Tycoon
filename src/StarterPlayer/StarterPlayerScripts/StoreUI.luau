@@ -329,7 +329,7 @@ local function closeStore()
 end
 
 function StoreUI.Start()
-	local gui = UITheme.Screen("StoreUI", 20)
+	local gui = UITheme.Screen("StoreUI", UITheme.Layers.Store)
 	local spec = UITheme.Sized("Store")
 	local store = UITheme.Button({
 		name = "Store",
@@ -353,7 +353,12 @@ function StoreUI.Start()
 	shell.outer.Name = "StorePanel"
 	shell.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	shell.outer.Position = UDim2.fromScale(0.5, 0.5)
-	shell.outer.Size = UDim2.fromOffset(460, 520)
+	-- 92% of the screen's height up to 520: a 520px panel hangs off a phone
+	-- held sideways (about 435 tall after the scale), with Close off screen.
+	shell.outer.Size = UDim2.new(0, 460, 0.92, 0)
+	local fit = Instance.new("UISizeConstraint")
+	fit.MaxSize = Vector2.new(460, 520)
+	fit.Parent = shell.outer
 	shell.outer.Visible = false
 	panel = shell.outer
 	local head = Instance.new("Frame")
@@ -380,12 +385,12 @@ function StoreUI.Start()
 	local tabs = Instance.new("Frame")
 	tabs.BackgroundTransparency = 1
 	tabs.Position = UDim2.fromOffset(0, 48)
-	tabs.Size = UDim2.new(1, 0, 0, 40)
+	tabs.Size = UDim2.new(1, 0, 0, UITheme.Size.Tap + 4)
 	tabs.Parent = shell.face
 	local function tabButton(name: string, x: number): TextButton
 		local b = Instance.new("TextButton")
 		b.Name = name
-		b.Size = UDim2.fromOffset(140, 36)
+		b.Size = UDim2.fromOffset(140, UITheme.Size.Tap)
 		b.Position = UDim2.fromOffset(x, 0)
 		b.Font = F.Black
 		b.TextSize = 15
@@ -417,8 +422,8 @@ function StoreUI.Start()
 	rows.Name = "Cards"
 	rows.BackgroundTransparency = 1
 	rows.BorderSizePixel = 0
-	rows.Position = UDim2.fromOffset(0, 92)
-	rows.Size = UDim2.new(1, 0, 1, -100)
+	rows.Position = UDim2.fromOffset(0, 100)
+	rows.Size = UDim2.new(1, 0, 1, -108)
 	rows.CanvasSize = UDim2.fromOffset(0, 0)
 	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	rows.ScrollBarThickness = 6

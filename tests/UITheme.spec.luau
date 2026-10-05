@@ -447,5 +447,46 @@ return function(t)
 		local settings = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SettingsUI.luau")
 		t.ok(not string.find(settings, "♪", 1, true), "no glyph left")
 		t.ok(string.find(settings, "UITheme.Speaker(C.Cream).Parent = open", 1, true), "the button draws it")
+		t.test("screens draw in one declared order (UITheme.Layers)", function()
+			local L = theme().Layers
+			t.ok(L.Settings > L.Top and L.Top > L.Hud, "Settings over the cash row over the HUD")
+			t.ok(L.Store > L.Settings and L.Dialogue > L.Store and L.PlotPicker > L.Dialogue, "modals stack up")
+			t.ok(
+				L.BuildBar > L.World and L.SaveSlot > L.BuildBar and L.Hud > L.SaveSlot,
+				"build bar above the world tools"
+			)
+			-- Only these pairs share a number: they never overlap on screen.
+			local allowed = { ["Corner/PlotUI"] = true, ["Badge/FigureReveal"] = true }
+			local names = {}
+			for name in L do
+				table.insert(names, name)
+			end
+			table.sort(names)
+			for i = 1, #names do
+				for j = i + 1, #names do
+					if L[names[i]] == L[names[j]] then
+						t.ok(
+							allowed[names[i] .. "/" .. names[j]] or allowed[names[j] .. "/" .. names[i]],
+							names[i] .. " and " .. names[j] .. " tie at " .. L[names[i]]
+						)
+					end
+				end
+			end
+		end)
+
+		t.test("no screen hard-codes a DisplayOrder", function()
+			local fs = require("@lune/fs")
+			local dir = "src/StarterPlayer/StarterPlayerScripts/"
+			for _, file in ipairs(fs.readDir(dir)) do
+				if string.match(file, "%.luau$") and file ~= "UITheme.luau" then
+					local source = fs.readFile(dir .. file)
+					t.ok(
+						not string.find(source, 'UITheme.Screen%("%w+", %d'),
+						file .. " passes a literal to UITheme.Screen"
+					)
+					t.ok(not string.find(source, "DisplayOrder = [1-9]"), file .. " sets a literal DisplayOrder")
+				end
+			end
+		end)
 	end)
 end

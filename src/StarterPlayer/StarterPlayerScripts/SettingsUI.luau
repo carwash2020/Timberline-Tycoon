@@ -72,7 +72,7 @@ local function percent(n: number): string
 end
 
 function SettingsUI.Start()
-	local gui = UITheme.Screen("SettingsUI", 10)
+	local gui = UITheme.Screen("SettingsUI", UITheme.Layers.Settings)
 	local roundSpec = UITheme.Sized("Settings")
 	local size = roundSpec.size or Vector2.new(38, 38)
 	local open = Instance.new("TextButton")
