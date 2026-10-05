@@ -120,6 +120,7 @@ local function startDriving(seat: VehicleSeat)
 		holding = true,
 		corners = VehicleLogic.CornerOffsets(chassis.Size.X, chassis.Size.Z),
 		rayParams = params,
+		flipped = 0,
 	}
 end
 
