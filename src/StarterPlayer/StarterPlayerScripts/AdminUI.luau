@@ -239,7 +239,9 @@ local function aim(action: string)
 	end
 end
 
-function AdminUI.Start()
+-- Everything below exists only on the owner's client: nothing is built for
+-- anyone else (the attribute only ever arrives on the owner's player).
+local function build()
 	local gui = UITheme.Screen("AdminUI", UITheme.Layers.Admin)
 	gui.Parent = UITheme.PlayerGui()
 
@@ -429,6 +431,18 @@ function AdminUI.Start()
 			toggle()
 		end
 	end)
+end
+
+function AdminUI.Start()
+	local built = false
+	local function ensure()
+		if not built and isOwner() then
+			built = true
+			build()
+		end
+	end
+	player:GetAttributeChangedSignal("IsOwner"):Connect(ensure)
+	ensure()
 end
 
 return AdminUI
