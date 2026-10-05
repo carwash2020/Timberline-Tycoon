@@ -701,7 +701,7 @@ return function(t)
 		t.ok(string.find(mill.murph, "SELL LOGS HERE", 1, true))
 		t.ok(not string.find(mill.murph, "u³", 1, true))
 		t.ok(not string.find(string.lower(mill.murph), "plank"))
-		t.ok(string.find(TutorialData.Farewell, "u³", 1, true))
+		t.ok(not string.find(TutorialData.Farewell, "u³", 1, true), "players never see u³")
 		t.ok(string.find(string.lower(TutorialData.Farewell), "plank"))
 	end)
 

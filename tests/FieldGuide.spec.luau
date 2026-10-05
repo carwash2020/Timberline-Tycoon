@@ -328,12 +328,12 @@ return function(t)
 		end
 		t.eq(FieldGuide.VolumeNumber(41.2), "41")
 		local P = FieldGuide.PriceText
-		t.eq(P(1.5), "$1.50/u³")
-		t.eq(P(9), "$9/u³", "whole dollars without cents")
-		t.eq(P(26.4), "$26.40/u³")
-		t.eq(P(0.1 + 0.2), "$0.30/u³", "float noise rounds away")
-		t.eq(P(1200), "$1,200/u³")
-		t.eq(P(-1), "$0/u³")
+		t.eq(P(1.5), "$1.50")
+		t.eq(P(9), "$9", "whole dollars without cents")
+		t.eq(P(26.4), "$26.40")
+		t.eq(P(0.1 + 0.2), "$0.30", "float noise rounds away")
+		t.eq(P(1200), "$1,200")
+		t.eq(P(-1), "$0")
 		local C = FieldGuide.CashText
 		-- As the sell pad pays a sale: the nearest whole dollar, never $0 for
 		-- wood worth something (M1.7's SellLogic.Payout).
@@ -347,7 +347,7 @@ return function(t)
 		end
 		for _, wood in ipairs(WoodData.All()) do
 			for _, price in ipairs({ wood.v2.logPrice, wood.v2.plankPrice }) do
-				local dollars, cents = string.match(P(price), "^%$([%d,]+)%.?(%d*)/u³$")
+				local dollars, cents = string.match(P(price), "^%$([%d,]+)%.?(%d*)$")
 				local back = tonumber((string.gsub(dollars, ",", "")))
 					+ (if cents ~= "" then tonumber(cents) / 100 else 0)
 				t.ok(math.abs(back - price) < 0.005, wood.id .. ": " .. P(price) .. " reads its price")
