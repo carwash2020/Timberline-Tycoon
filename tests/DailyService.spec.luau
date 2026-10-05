@@ -401,7 +401,7 @@ return function(t)
 				elseif goal.kind == "earnCash" then
 					t.eq(gained, 7)
 				elseif goal.kind == "sellPieces" then
-					t.eq(gained, 2, "pieces of 1 u³ or more")
+					t.eq(gained, 2, "pieces of 1 or more")
 				else
 					t.eq(gained, 0, goal.kind .. ": not this sale's wood, no figure, not a sale")
 				end

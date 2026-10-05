@@ -441,7 +441,7 @@ function DailyData.ProgressText(goal: Goal): string
 	if goal.kind == "earnCash" then
 		return string.format("(%s/%s)", FieldGuide.CashText(done), FieldGuide.CashText(goal.target))
 	elseif goal.kind == "sellVolume" or goal.kind == "sellWoodVolume" or goal.kind == "sellFiguredVolume" then
-		return string.format("(%d/%d u³)", math.floor(done), goal.target)
+		return string.format("(%d/%d)", math.floor(done), goal.target)
 	end
 	return string.format("(%d/%d)", done, goal.target)
 end

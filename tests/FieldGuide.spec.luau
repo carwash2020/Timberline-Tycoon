@@ -313,27 +313,27 @@ return function(t)
 		t.ok(string.find(pine, "; Hardened Axe: 16$") ~= nil, "pine names the first axe at a useful pace: " .. pine)
 	end)
 
-	t.test("v2: how u³, $/u³ and cash read (rounding)", function()
+	t.test("v2: how, $/u³ and cash read (rounding)", function()
 		local V = FieldGuide.VolumeText
-		t.eq(V(26.4), "26 u³")
-		t.eq(V(26.5), "27 u³", "half up")
-		t.eq(V(4.44), "4.4 u³", "one decimal under 10")
-		t.eq(V(3.96), "4 u³", "no trailing .0")
-		t.eq(V(9.94), "9.9 u³")
-		t.eq(V(9.96), "10 u³")
-		t.eq(V(0.04), "0.1 u³", "something is never 0")
-		t.eq(V(1234.5), "1,235 u³")
+		t.eq(V(26.4), "26")
+		t.eq(V(26.5), "27", "half up")
+		t.eq(V(4.44), "4.4", "one decimal under 10")
+		t.eq(V(3.96), "4", "no trailing .0")
+		t.eq(V(9.94), "9.9")
+		t.eq(V(9.96), "10")
+		t.eq(V(0.04), "0.1", "something is never 0")
+		t.eq(V(1234.5), "1,235")
 		for _, junk in ipairs({ 0, -3, 0 / 0, math.huge, "5" }) do
-			t.eq(V(junk), "0 u³", tostring(junk))
+			t.eq(V(junk), "0", tostring(junk))
 		end
 		t.eq(FieldGuide.VolumeNumber(41.2), "41")
 		local P = FieldGuide.PriceText
-		t.eq(P(1.5), "$1.50/u³")
-		t.eq(P(9), "$9/u³", "whole dollars without cents")
-		t.eq(P(26.4), "$26.40/u³")
-		t.eq(P(0.1 + 0.2), "$0.30/u³", "float noise rounds away")
-		t.eq(P(1200), "$1,200/u³")
-		t.eq(P(-1), "$0/u³")
+		t.eq(P(1.5), "$1.50")
+		t.eq(P(9), "$9", "whole dollars without cents")
+		t.eq(P(26.4), "$26.40")
+		t.eq(P(0.1 + 0.2), "$0.30", "float noise rounds away")
+		t.eq(P(1200), "$1,200")
+		t.eq(P(-1), "$0")
 		local C = FieldGuide.CashText
 		-- As the sell pad pays a sale: the nearest whole dollar, never $0 for
 		-- wood worth something (M1.7's SellLogic.Payout).
@@ -347,7 +347,7 @@ return function(t)
 		end
 		for _, wood in ipairs(WoodData.All()) do
 			for _, price in ipairs({ wood.v2.logPrice, wood.v2.plankPrice }) do
-				local dollars, cents = string.match(P(price), "^%$([%d,]+)%.?(%d*)/u³$")
+				local dollars, cents = string.match(P(price), "^%$([%d,]+)%.?(%d*)$")
 				local back = tonumber((string.gsub(dollars, ",", "")))
 					+ (if cents ~= "" then tonumber(cents) / 100 else 0)
 				t.ok(math.abs(back - price) < 0.005, wood.id .. ": " .. P(price) .. " reads its price")

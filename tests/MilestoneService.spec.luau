@@ -38,12 +38,12 @@ return function(t)
 		t.eq(Milestone.CalibrateLine(119, { oak = 24 }, 0, 1), nil, "under 2 minutes")
 	end)
 
-	t.test("v2's calibrate line: the v2 model's, u³ by wood in whole units, from 10 pieces", function()
+	t.test("v2's calibrate line: the v2 model's, by wood in whole units, from 10 pieces", function()
 		local Milestone = setup(2)
 		t.eq(
 			Milestone.CalibrateLine(612, { oak = 26.4, birch = 15.6, pine = 0.2 }, 12, 2),
 			"lune run tools/economy --calibrate 612 birch=16 oak=26",
-			"rounded, and a wood under half a u³ left out"
+			"rounded, and a wood under half a left out"
 		)
 		t.eq(Milestone.CalibrateLine(612, { oak = 260 }, 9, 2), nil, "fewer than 10 pieces")
 		t.eq(Milestone.CalibrateLine(100, { oak = 260 }, 12, 2), nil, "under 2 minutes")
@@ -66,7 +66,7 @@ return function(t)
 		t.eq(v1Profile.onboarding["Could afford an upgrade"], true, "v1: the Steel Axe at its v1 price")
 	end)
 
-	t.test("v2 sales add up pieces and u³ by wood, apart from v1's log counts", function()
+	t.test("v2 sales add up pieces and by wood, apart from v1's log counts", function()
 		local Milestone, player = setup(2)
 		Milestone.Mark(player, "First chop")
 		clock.now += 300

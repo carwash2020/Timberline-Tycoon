@@ -198,7 +198,7 @@ return function(t)
 			return trees[model:GetAttribute("Uid")]
 		end
 
-		-- A piece freed from `rec` by `p`: `volume` u³ (as WoodService's records).
+		-- A piece freed from `rec` by `p`: `volume` (as WoodService's records).
 		local pieceCounter = 0
 		function s.free(p, rec, volume)
 			pieceCounter += 1

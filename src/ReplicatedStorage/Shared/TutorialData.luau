@@ -347,7 +347,7 @@ end
 
 -- The line Murph says once the last step is done (both loops).
 TutorialData.Farewell =
-	"The plot's yours. Take the Field Guide. Bigger logs pay more by the u³, and a saw's planks pay more. Some woods only show at night."
+	"The plot's yours. Take the Field Guide. Bigger logs pay more, and a saw's planks pay more. Some woods only show at night."
 
 -- What Murph says when a returning player's refresher is done.
 TutorialData.FarewellBack =

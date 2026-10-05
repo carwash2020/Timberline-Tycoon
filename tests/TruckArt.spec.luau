@@ -861,7 +861,7 @@ return function(t)
 				t.ok(want.wall <= TruckLayout.BedZoneHeight, label .. " the walls or stakes stand inside it")
 				-- The HUD's numbers.
 				local room = TruckLayout.BedRoomU3(want.length, want.width, want.wall, GameConfig.WoodUnit)
-				t.ok(math.abs(zone:GetAttribute("Room") - room) < eps, label .. " Room is the bed's u³ a trip")
+				t.ok(math.abs(zone:GetAttribute("Room") - room) < eps, label .. " Room is the bed's a trip")
 				t.eq(zone:GetAttribute("Length"), want.length, label .. " Length")
 			end
 			TruckArt.Rig(model)

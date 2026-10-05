@@ -11,7 +11,7 @@
 -- the shop, the daily goals and the HUD read, so they agree: a typical
 -- tree's size (TreeSize), hits to cut a section or a trunk (CutHits,
 -- TrunkHits, by V2_PLAN §2c's formula) and how volumes and prices read
--- (VolumeText "26 u³", PriceText "$1.50/u³", CashText "$39").
+-- (VolumeText "26 u³", PriceText "$1.50", CashText "$39").
 
 local BiomeData = require(script.Parent.BiomeData)
 local ForestData = require(script.Parent.ForestData)
@@ -256,19 +256,19 @@ function FieldGuide.VolumeNumber(volume: unknown): string
 end
 
 function FieldGuide.VolumeText(volume: unknown): string
-	return FieldGuide.VolumeNumber(volume) .. " u³"
+	return FieldGuide.VolumeNumber(volume)
 end
 
--- A price per u³: "$9/u³", "$1.50/u³" (cents only when there are any).
+-- A price (per unit, but players see just the dollars): "$9/u³", "$1.50/u³" (cents only when there are any).
 function FieldGuide.PriceText(price: number): string
 	if not finite(price) or price <= 0 then
-		return "$0/u³"
+		return "$0"
 	end
 	local cents = math.floor(price * 100 + 0.5)
 	if cents % 100 == 0 then
-		return Util.formatCash(cents // 100) .. "/u³"
+		return Util.formatCash(cents // 100)
 	end
-	return string.format("%s.%02d/u³", Util.formatCash(cents // 100), cents % 100)
+	return string.format("%s.%02d", Util.formatCash(cents // 100), cents % 100)
 end
 
 -- Cash as a v2 sale pays it: whole dollars, rounded to the nearest, and

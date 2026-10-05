@@ -183,7 +183,7 @@ return function(t)
 			t.eq(m:GetAttribute("Figure"), "curly")
 			t.eq(m:GetAttribute("HeldBy"), 0)
 			local volume = s.SectionLogic.Volume(2, 8, 2)
-			t.ok(math.abs(p.volume - volume) < 1e-9, "server-computed u³")
+			t.ok(math.abs(p.volume - volume) < 1e-9, "server-computed")
 			t.ok(math.abs(m:GetAttribute("Volume") - math.floor(volume * 100 + 0.5) / 100) < 1e-9)
 			t.ok(math.abs(p.value - volume * 1.5 * 1.5) < 1e-9, "oak log price x Curly 1.5")
 			local welds = 0
