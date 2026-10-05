@@ -17,6 +17,7 @@ local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
+local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -41,6 +42,9 @@ export type PlacedItem = {
 	-- leave it unset.
 	data: { x: number, y: number }?,
 }
+
+-- A wire from a switch to a lamp or door, by placed-item uid (WireLogic).
+export type WireLink = { from: string, to: string }
 
 -- A box the server kept when you left it in the world. uid is server-made.
 -- It is never an axe, a truck, or something already placed on the plot.
@@ -162,6 +166,7 @@ export type Profile = {
 		tier: number, -- PlotData.Tiers index (1 = Campsite)
 		placed: { PlacedItem },
 		squares: { string }, -- owned squares, "x,z" (empty until land expansion)
+		wires: { WireLink }, -- switch to lamp or door links (WireLogic); switch positions are not saved
 	},
 	-- Boxes kept for you, per slot. Capped at StorageCap.
 	storage: { StoredBox },
@@ -273,7 +278,7 @@ local TEMPLATE: Profile = {
 	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
-	plot = { claimed = false, tier = 1, placed = {}, squares = {} },
+	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} },
 	storage = {},
 	permissions = {},
 	badgesAwarded = {},
@@ -520,9 +525,10 @@ end
 -- drops a box only when its uid is already an axe, truck, or placed-item uid.
 local function applySlotFields(record: any)
 	if type(record.plot) ~= "table" then
-		record.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
+		record.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} }
 	end
 	record.plot.squares = squareList(record.plot.squares)
+	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.questAxe = copyQuest(record.questAxe)
 	if type(record.permissions) ~= "table" then
 		record.permissions = {}
@@ -601,7 +607,7 @@ function ProfileSchema.Migrate(data: any)
 	-- form is dropped. NaN or infinite coordinates would break the rebuild
 	-- (PivotTo) and leave the player with no plot for the session.
 	if type(data.plot) ~= "table" then
-		data.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
+		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} }
 	end
 	if data.plot.claimed ~= true then
 		data.plot.claimed = false
@@ -616,6 +622,7 @@ function ProfileSchema.Migrate(data: any)
 		data.plot.tier = 1
 	end
 	data.plot.size = nil
+	data.plot.wires = WireLogic.Clean(data.plot.wires)
 	if type(data.plot.placed) ~= "table" then
 		data.plot.placed = {}
 	end
