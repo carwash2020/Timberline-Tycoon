@@ -520,6 +520,7 @@ UITheme.Layers = {
 	World = 6, -- BlueprintPlacer, ChopSaw, Sawmill
 	BuildBar = 7,
 	SaveSlot = 8,
+	WireTool = 9, -- the wiring mode over the build bar, under the HUD
 	Hud = 10,
 	Top = 11, -- the cash row
 	Badge = 12,
