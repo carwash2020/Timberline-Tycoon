@@ -166,7 +166,7 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local affordable = cash() >= price
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
-		detail ..= " · needs " .. Util.article(needed.name) .. " plot"
+		detail ..= " · grow your plot to " .. needed.name .. " size first"
 	elseif bp.note then
 		detail ..= " · " .. bp.note
 	end
@@ -607,6 +607,12 @@ function PlotUI.Start()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
 		if who == player and prompt.Name == "LandOffice" then
+			-- Only your own sign opens your Land panel.
+			local plot = prompt:FindFirstAncestorOfClass("Model")
+			if plot and plot:GetAttribute("OwnerId") ~= player.UserId then
+				HUD.Toast("That's someone else's plot. Visit your own sign to expand.")
+				return
+			end
 			setLand(not landOpen)
 		end
 	end)

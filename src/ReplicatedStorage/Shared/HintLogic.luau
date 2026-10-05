@@ -73,7 +73,7 @@ local LINES: { [string]: { [string]: string } } = { -- [Context][Device]
 	build = {
 		phone = "Tap where it goes, then PLACE",
 		desktop = "Click to place · R to turn · Q to stop",
-		console = "RT to place · X to turn · B to stop",
+		console = "RT place · D-pad right turn · B stop",
 	},
 }
 
