@@ -635,11 +635,20 @@ function PlotUI.Start()
 	end
 	-- Walked off your plot? Build mode ends.
 	task.spawn(function()
+		local wasOn = false
+		local lastHint = -math.huge
 		while true do
 			task.wait(0.25)
-			if building and not onMyPlot() then
+			local on = onMyPlot()
+			if building and not on then
 				setBuilding(false)
 			end
+			-- The BUILD button hides off your plot; say where it went, once a minute.
+			if wasOn and not on and os.clock() - lastHint > 60 then
+				lastHint = os.clock()
+				HUD.Toast("Walk back to your plot to build.")
+			end
+			wasOn = on
 			PlotUI.Refresh()
 		end
 	end)

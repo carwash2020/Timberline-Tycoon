@@ -706,7 +706,7 @@ return function(t)
 		s.P.PlayerJoined(bob, bobProfile)
 		s.P.Pass(bob)
 		t.eq(bob.attrs.PlotSlot, 2)
-		t.eq(s.lastToast(), s.PlotData.Homes[2].name .. " is yours. You'll wake up here.")
+		t.eq(s.lastToast(), "It's yours! This pad is your spawn. Press BUILD to start building.")
 	end)
 
 	t.test("leaving while the picker is open reserves nothing", function()

@@ -798,7 +798,7 @@ local function autoAssign(player: Player)
 		return
 	end
 	local slot = slots[index]
-	tryGrant(player, index, true, string.format("%s is yours. You'll wake up here.", slot.placeName))
+	tryGrant(player, index, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
 end
 
 -- The sign's board, within the prompt's distance plus the shared slack.

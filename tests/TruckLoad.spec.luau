@@ -382,9 +382,9 @@ return function(t)
 		for _, p in ipairs({ a, b }) do
 			p.model:PivotTo(delta * p.model:GetPivot())
 		end
-		w.tick(0.25)
+		w.tick(0.1)
 		t.eq(w.owners[a.root], dale, "still loose, still his")
-		t.eq(a.root:FindFirstChild("BedWeld"), nil, "half a second, not a quarter")
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "a fifth of a second, not a tenth")
 		-- b slides off the side on a bend, before it can lock.
 		b.model:PivotTo(b.model:GetPivot() + Vector3.new(6, -2, 0))
 		w.tick(0.25)
@@ -485,6 +485,23 @@ return function(t)
 		t.ok(weld and weld:IsA("WeldConstraint"), "resting cargo welds to the parked bed")
 		t.eq(weld.Part0, truck:FindFirstChild("BedFloor"))
 		t.eq(weld.Part1, a.root)
+	end)
+
+	t.test("a flipped truck drops its load, and nothing locks until it is back on its wheels", function()
+		local w = setup()
+		local dale = w.player(1)
+		local truck = w.truck(dale, "Rustbucket")
+		local chassis = truck.PrimaryPart
+		local a = w.piece(w.onBed(truck, "BedFloor", -1), { ownerId = 1 })
+		w.tick()
+		w.tick(1)
+		t.ok(a.root:FindFirstChild("BedWeld"), "locked on the bed")
+		local upright = chassis.CFrame
+		chassis.CFrame = upright * CFrame.Angles(0, 0, math.pi / 2) -- on its side
+		w.tick(1)
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "a flipped truck lets go")
+		w.tick(1)
+		t.eq(a.root:FindFirstChild("BedWeld"), nil, "and stays loose while it is down")
 	end)
 
 	t.test("cargo locks after it rests, on every tier, and a grab breaks the weld first", function()

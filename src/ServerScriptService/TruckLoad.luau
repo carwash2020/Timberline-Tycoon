@@ -74,6 +74,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CargoLock = require(ReplicatedStorage.Shared.CargoLock)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local Handling = require(ReplicatedStorage.Shared.Handling)
 local ClassicGauge = require(ReplicatedStorage.Shared.ClassicGauge)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
@@ -88,7 +89,7 @@ local LeftLoad = require(script.Parent.LeftLoad)
 local TruckLoad = {}
 
 TruckLoad.DrivenPollSec = 0.25 -- a driven truck's load is looked at this often
-TruckLoad.ParkedPollSec = 1 -- any other truck's
+TruckLoad.ParkedPollSec = 0.5 -- any other truck's
 TruckLoad.PublishSec = 1 -- the HUD's numbers, at most this often
 TruckLoad.SaveEverySec = 5 -- profile.truckLoad refreshed at least this often
 TruckLoad.WeldSpeed = 1 -- studs/s relative to the bed: slower counts as resting (BedAutoWeld)
@@ -707,9 +708,18 @@ local function look(t: Truck, now: number)
 			end
 		end
 	end
+	-- On its side or roof the cargo lets go (a flipped truck drops its load),
+	-- and nothing locks until it is back on its wheels.
+	local body = model.PrimaryPart
+	local flipped = body ~= nil and body.CFrame.UpVector.Y <= Handling.FlipUp
+	if flipped then
+		release(t)
+	end
 	-- Lock before any loose piece is handed to the driver, so a weld is
 	-- never created onto a part whose owner was just set.
-	weldPass(t, riding, now)
+	if not flipped then
+		weldPass(t, riding, now)
+	end
 	for m in pairs(riding) do
 		local held = GrabService.HeldBy(m) ~= nil
 		if driver and not held and not t.welds[m] and (t.kept[m] or 0) <= now then
