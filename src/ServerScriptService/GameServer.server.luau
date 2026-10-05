@@ -1000,6 +1000,7 @@ BootReport.StartStubs({
 		init = function()
 			if GateService.Init then
 				GateService.Init(remote.TollPay)
+				GateService.SetupWorld(mapFolder)
 			end
 		end,
 	},
@@ -1008,6 +1009,7 @@ BootReport.StartStubs({
 		init = function()
 			if FerryService.Init then
 				FerryService.Init(remote.FerryBoard)
+				FerryService.SetupWorld(mapFolder, notify)
 			end
 		end,
 	},
@@ -1042,7 +1044,7 @@ BootReport.StartStubs({
 		name = "BlastService",
 		init = function()
 			if BlastService.Init then
-				BlastService.Init()
+				BlastService.Init(notify)
 			end
 		end,
 	},

@@ -48,6 +48,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	Wire = 4, -- connect a port, or cut a wire
 	TollPay = 1, -- pay the toll
 	FerryBoard = 1, -- board the ferry
+	Blast = 1, -- set a blasting charge (BlastService's prompt; not a remote)
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
 	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
 }

@@ -1,12 +1,22 @@
 --!strict
 -- TollLogic: the north-strip line check. Pure. GateService keeps the last
 -- sample per character and per vehicle and asks Crossed before it moves
--- anyone. Payment itself is a later batch; this only decides the crossing.
+-- anyone. Payment is GateService's (cash through EconomyService); this
+-- file holds the pure rules around it: whether a tap is a fresh payment,
+-- how close to the booth counts, and the texts. WORLD_DESIGN §1 and §15.
 
+local GameConfig = require(script.Parent.GameConfig)
 local TerrainGen = require(script.Parent.World.TerrainGen)
+local Util = require(script.Parent.Util)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
 local TollLogic = {}
+
+-- Studs from the booth's counter a payment still counts (the prompt reaches
+-- 12; the rest is the slack a walking player needs between the tap and the
+-- server seeing it).
+TollLogic.PayRange = 16
+TollLogic.PromptRange = 12
 
 -- The south-bank landing. Y is the ground there plus clearance, so a
 -- pushed truck or a body pulled out of the gorge is not left inside it.
@@ -50,6 +60,63 @@ end
 -- A driver in a seat takes the vehicle with them. On foot, only that player.
 function TollLogic.MovesWholeAssembly(seated: boolean): boolean
 	return seated
+end
+
+-- Is a tap a fresh payment? "already" while the window the player paid for
+-- is still live (a second tap never charges, and never stretches it).
+function TollLogic.Quote(now: number, paidUntil: number?): "ok" | "already"
+	if paidUntil ~= nil and paidUntil > now then
+		return "already"
+	end
+	return "ok"
+end
+
+-- When a payment made at `now` runs out.
+function TollLogic.WindowEnd(now: number): number
+	return now + GameConfig.TollSeconds
+end
+
+-- Whether a player at (x, z) is near enough the booth to pay.
+function TollLogic.InPayRange(x: number, z: number, boothX: number?, boothZ: number?): boolean
+	local dx = x - (boothX or WorldLayout.BoothX)
+	local dz = z - (boothZ or WorldLayout.BoothZ)
+	return dx * dx + dz * dz <= TollLogic.PayRange * TollLogic.PayRange
+end
+
+local function clock(seconds: number): string
+	local whole = math.max(0, math.ceil(seconds))
+	return string.format("%d:%02d", whole // 60, whole % 60)
+end
+TollLogic.Clock = clock
+
+-- The toasts. The push-back names Old Tolly and the fee; the short-cash
+-- one is the price alone (they are different toasts, WORLD_DESIGN §15).
+function TollLogic.PushText(): string
+	return string.format(
+		"Old Tolly: the bridge toll is %s for %d minutes. Pay at his booth first.",
+		Util.formatCash(GameConfig.TollFee),
+		GameConfig.TollSeconds // 60
+	)
+end
+
+function TollLogic.ShortText(): string
+	return string.format("The toll costs %s.", Util.formatCash(GameConfig.TollFee))
+end
+
+function TollLogic.PaidText(): string
+	return string.format(
+		"Old Tolly: %s paid. Cross within %d minutes.",
+		Util.formatCash(GameConfig.TollFee),
+		GameConfig.TollSeconds // 60
+	)
+end
+
+function TollLogic.AlreadyText(left: number): string
+	return string.format("You're paid up for another %s. Cross away.", clock(left))
+end
+
+function TollLogic.ActionText(): string
+	return string.format("Pay toll (%s)", Util.formatCash(GameConfig.TollFee))
 end
 
 return TollLogic

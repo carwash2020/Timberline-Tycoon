@@ -210,7 +210,7 @@ return function(t)
 
 	t.test("the north strip has its own trees and the toll badge box", function()
 		t.eq(table.find(BadgeData.NotBuilt, "AreaToll"), nil)
-		t.ok(table.find(BadgeData.NotBuilt, "AreaFerry") ~= nil)
+		t.eq(table.find(BadgeData.NotBuilt, "AreaFerry"), nil, "the ferry reaches the island")
 		t.ok(table.find(BadgeData.NotBuilt, "AreaCave") ~= nil)
 		t.eq(BadgeData.AreasAt(0, 30, 1700), { "AreaToll" })
 		t.eq(BadgeData.AreasAt(0, 30, 1590), {}, "the deck is not the trigger")

@@ -62,6 +62,7 @@ local RIDER_GROUP = "GondolaRider"
 local BOARDING = 0.5 -- seconds the seat weld gets before an empty seat means the rider got out
 local STREAM_SPACING = 120 -- studs between the points streamed in along a route
 local STREAM_TIMEOUT = 10 -- seconds one of those requests may take
+local STATION_RANGE = 20 -- studs from a station's platform a ride can start (its prompt reaches 10)
 
 type Ride = {
 	cabin: Model,
@@ -242,7 +243,11 @@ local function ride(player: Player, path: { Vector3 }, landing: CFrame)
 	end
 	local char = player.Character
 	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
-	if not char or not humanoid or humanoid.Health <= 0 or humanoid.SeatPart then
+	if not char or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	if humanoid.SeatPart then
+		notify(player, "Hop out of your seat first. The gondola has room for you alone.")
 		return
 	end
 	local gondola = sky().gondola
@@ -362,6 +367,13 @@ function GondolaService._setup(map: Instance)
 		return CFrame.new(platform.Position + Vector3.new(0, 4, 0))
 	end
 	local fee = Util.formatCash((sky().gondola :: { rideSec: number, fee: number }).fee)
+	-- The prompt's own reach is checked by Roblox; this is the server's own
+	-- look at where the player really is.
+	local function near(player: Player, platform: BasePart): boolean
+		local char = player.Character
+		local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+		return root ~= nil and root:IsA("BasePart") and (root.Position - platform.Position).Magnitude <= STATION_RANGE
+	end
 	local function addPrompt(platform: BasePart, action: string, go: (Player) -> ())
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.ActionText = action .. " (" .. fee .. ")"
@@ -371,7 +383,11 @@ function GondolaService._setup(map: Instance)
 		prompt.RequiresLineOfSight = false
 		InputKit.PromptDefaults(prompt, "Interact")
 		prompt.Parent = platform
-		prompt.Triggered:Connect(go)
+		prompt.Triggered:Connect(function(player: Player)
+			if near(player, platform) then
+				go(player)
+			end
+		end)
 	end
 	addPrompt(town, "Ride up", function(player)
 		ride(player, townUp, landingOn(top))

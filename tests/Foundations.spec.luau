@@ -356,7 +356,13 @@ return function(t)
 	end)
 
 	t.test("tollPaidUntil is a server table cleared when the player leaves", function()
-		local Gate = t.loader():server("GateService")
+		local Gate = t.loader({
+			mocks = { EconomyService = {
+				SpendCash = function()
+					return false
+				end,
+			} },
+		}):server("GateService")
 		Gate.TollPaidUntil[7] = 5000
 		Gate.TollPaidUntil[8] = 6000
 		Gate.PlayerRemoving({ UserId = 7 })

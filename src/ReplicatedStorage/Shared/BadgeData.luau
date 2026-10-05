@@ -55,10 +55,10 @@ BadgeData.Ids = {
 	AreaVolcano = 0, -- PASTE: Engagement → Badges → The Volcano → ID
 	AreaGrove = 0, -- PASTE: Engagement → Badges → Gloam Hollow → ID
 	AreaSky = 0, -- PASTE: Engagement → Badges → Aether Isles → ID
-	-- Not built yet. Leave these at 0. Awarding skips 0.
-	AreaFerry = 0,
+	AreaFerry = 0, -- PASTE: Engagement → Badges → Ferry Island → ID
+	AreaToll = 0, -- PASTE: Engagement → Badges → North Strip → ID
+	-- Not built yet. Leave this at 0. Awarding skips 0.
 	AreaCave = 0,
-	AreaToll = 0,
 	WoodFrostwood = 0, -- PASTE: Engagement → Badges → Frostwood → ID
 	WoodEmberwood = 0, -- PASTE: Engagement → Badges → Emberwood → ID
 	WoodGloamwood = 0, -- PASTE: Engagement → Badges → Gloamwood → ID
@@ -68,14 +68,12 @@ BadgeData.Ids = {
 
 -- Places that are not in the world yet. AreasAt skips every key here, so
 -- standing there earns nothing. Their ids stay 0.
--- W2 and W3 remove a key from NotBuilt when they build its trigger: the
--- Secret Cave interior FogZone past the boulders, the Ferry Island disc,
--- and the North Strip box x -400 to 400, z 1586 to 1900 (not the booth or
--- the bridge).
--- The North Strip trigger is built (x -400..400, z 1586..1900, not the
--- booth or the bridge deck). Ferry Island and the Secret Cave stay dark
--- until their own batches remove them.
-BadgeData.NotBuilt = { "AreaFerry", "AreaCave" }
+-- A key leaves NotBuilt when its trigger is built. The North Strip box
+-- (x -400..400, z 1586..1900, not the booth or the bridge deck) and the
+-- Ferry Island disc (reached by Cap'n Moss's ferry, FerryService) are
+-- built. Only the Secret Cave stays dark: its interior FogZone past the
+-- boulders is the secrets batch's, so its badge waits for that.
+BadgeData.NotBuilt = { "AreaCave" }
 
 -- A phone tap target (InputKit.MinTouchPx). BadgeUI rows and the open
 -- button are at least this tall.

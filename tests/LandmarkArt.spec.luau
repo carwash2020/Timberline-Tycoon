@@ -285,4 +285,20 @@ return function(t)
 		t.ok(solidTower >= 4, "a banded tower")
 		t.ok(top >= 50 and top <= LandmarkArt.LIGHTHOUSE_TOP + 0.5, string.format("%.1f studs tall", top))
 	end)
+
+	t.test("the ferry boat: one anchored deck to ride, a few parts, rails that hold and a lantern", function()
+		local model = LandmarkArt.FerryBoat()
+		local all = parts(model)
+		t.ok(#all <= 80, #all .. " parts")
+		local deck = model:FindFirstChild("Deck")
+		t.ok(deck, "a Deck")
+		t.eq(model.PrimaryPart, deck)
+		t.ok(deck.Anchored and deck.CanCollide, "anchored, solid")
+		t.eq(deck.Size.X, 14)
+		t.eq(deck.Size.Z, 22)
+		for _, p in ipairs(all) do
+			t.ok(p.Anchored, p.Name .. " anchored (the server moves the whole model)")
+		end
+		t.ok(model:FindFirstChild("LanternGlow", true), "a lantern for the dusk")
+	end)
 end

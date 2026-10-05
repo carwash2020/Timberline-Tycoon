@@ -1365,3 +1365,10 @@ Where it differs from the spec, and why:
       in build mode, Move and Sell stack instead of overlapping
 - [ ] Gamepad: X drops the axe away from prompts, but next to a shop X
       opens the shop instead; Y calls the truck
+
+## W3: the toll, the ferry, the blasting charge (Studio checks)
+- [ ] Toll: walk to Old Tolly's booth (east of the bridge, z 1566). The prompt reads "Pay toll ($100)" (E, gamepad X, tap on a phone). Pay, cross within 3 minutes: you stay north. A second tap says you are paid up and charges nothing. With under $100 the toast is "The toll costs $100." Crossing unpaid pushes you back with Old Tolly's toast. A driver who pays carries the truck and any passenger across.
+- [ ] Ferry: at the dock (1180, -700) the prompt reads "Board ($400)" and its object line counts down. Board: you stand on the boat; nothing is charged until it casts off, then $400 per rider on deck; step off first and you pay nothing. Riders and loose planks ride welded to the deck and are set down on the island dock. A truck on the deck is put back on the dock. The island dock boards the return trip.
+- [ ] Boulders (Gloam Hollow back way, three of them): the prompt is a 1 second hold, "Set a blasting charge ($220)". Fuse 5 seconds, then a harmless blast and the boulder goes. It returns after 20 minutes, never onto a player or a truck (it waits 10 seconds and tries again).
+- [ ] Gondola: with a truck seat you get "Hop out of your seat first".
+- [ ] Nothing here takes Robux. The badges (Ferry Island, North Strip) stay at id 0 until you paste the ids in BadgeData.Ids.
