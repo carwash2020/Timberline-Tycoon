@@ -659,7 +659,7 @@ export type MachineDef = {
 	color: string,
 }
 
--- TBD (Designer): $7,500, replacing the $12,200 placeholder.
+-- $7,500, replacing the $12,200 placeholder.
 ItemCatalog.ChopSawPrice = 7500
 
 ItemCatalog.Machines = {

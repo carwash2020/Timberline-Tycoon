@@ -22,7 +22,7 @@ ShopHoursLogic.DealerOpen = 7
 ShopHoursLogic.DealerClose = 20
 
 -- Used when the server clock cannot be read (the test runner has no
--- workspace). Noon, so every spanned shop is open. TBD (Builder).
+-- workspace). Noon, so every spanned shop is open.
 ShopHoursLogic.FallbackHour = 12
 
 -- Hours board on the door frame, in studs, drawn at this many pixels a stud.
@@ -48,16 +48,16 @@ ShopHoursLogic.ZzzGreen = 235
 ShopHoursLogic.ZzzBlue = 215
 
 -- The lying keeper's top stays this many studs under the counter top.
--- SleepBodyHalf is half the lying body's height. TBD (Builder).
+-- SleepBodyHalf is half the lying body's height.
 ShopHoursLogic.SleepClearance = 1
 ShopHoursLogic.SleepBodyHalf = 1.2
 
 -- How long an inside player can hold a closed door open, in seconds, and how
--- far past the front face still counts as inside. TBD (Builder).
+-- far past the front face still counts as inside.
 ShopHoursLogic.ExitHold = 8
 ShopHoursLogic.OutsidePad = 0.5
 
--- How often the server re-reads the clock. TBD (Builder).
+-- How often the server re-reads the clock.
 ShopHoursLogic.PollSeconds = 15
 
 export type Span = { open: number, close: number }

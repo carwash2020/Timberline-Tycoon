@@ -29,6 +29,7 @@ local TextChatService = game:GetService("TextChatService")
 
 local AxeArt = require(ReplicatedStorage.Shared.Art.AxeArt)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
@@ -395,6 +396,7 @@ function AxeService.Drop(player: Player, uid: unknown)
 	prompt.MaxActivationDistance = GameConfig.PickupPromptRange
 	prompt.HoldDuration = 0
 	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
 	prompt.Parent = handle
 	prompt.Triggered:Connect(function(who: Player)
 		onPickUp(who, uid)

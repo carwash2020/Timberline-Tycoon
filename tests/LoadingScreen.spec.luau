@@ -87,8 +87,14 @@ return function(t)
 			end
 		end
 		snap.backdropTransparency = backdrop and backdrop.BackgroundTransparency
-		local content = backdrop and backdrop:FindFirstChild("Content")
-		snap.contentWidth = content and content.Size.X
+		local inset = backdrop and backdrop:FindFirstChild("TextInset")
+		local content = inset and inset:FindFirstChild("Content")
+		local fraction = (inset and inset.Size.X.Scale or 1) * (content and content.Size.X.Scale or 0)
+		snap.contentWidth = { Scale = fraction }
+		snap.insetX = inset and inset.Position.X.Scale
+		snap.insetY = inset and inset.Position.Y.Scale
+		snap.insetW = inset and inset.Size.X.Scale
+		snap.insetH = inset and inset.Size.Y.Scale
 		return snap
 	end
 
@@ -167,7 +173,7 @@ return function(t)
 			local gui = card()
 			local frame = { at = s.now, shown = gui ~= nil }
 			if gui then
-				local tip = gui.Backdrop.Content.Tip
+				local tip = gui.Backdrop.TextInset.Content.Tip
 				frame.tip = tip.Text
 				frame.tipTransparency = tip.TextTransparency
 				frame.backdropTransparency = gui.Backdrop.BackgroundTransparency
@@ -290,6 +296,11 @@ return function(t)
 		t.ok(count >= 3, "title, kicker and tip")
 		t.ok(snap.labels.Tip.size >= 18, "the tip reads at a glance")
 		t.ok(math.min(snap.contentWidth.Scale * 667, snap.maxWidth) <= 667 - 32, "a margin each side")
+		t.eq(snap.ignoreInset, true, "the backdrop stays full-bleed")
+		t.ok(math.abs(snap.insetX - 0.05) < 1e-4, "inset x")
+		t.ok(math.abs(snap.insetY - 0.05) < 1e-4, "inset y")
+		t.ok(math.abs(snap.insetW - 0.9) < 1e-4, "inset w")
+		t.ok(math.abs(snap.insetH - 0.9) < 1e-4, "inset h")
 	end)
 
 	t.test("bigger screens scale it up, but never past their edges", function()

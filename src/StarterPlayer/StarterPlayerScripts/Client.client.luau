@@ -45,6 +45,7 @@ local MODULES = {
 	"LifeFX",
 	"LightingController",
 	"LuxFX",
+	"MenuPad",
 	"NPCController",
 	"PlotPickerUI",
 	"PlotUI",

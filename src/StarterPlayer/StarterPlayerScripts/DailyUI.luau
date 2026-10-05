@@ -8,8 +8,8 @@
 --     it): progress bars, each goal's reward, the bonus for finishing them
 --     all, and the time until new goals.
 --   * On a gamepad, DPadUp opens and closes it too (HUD.PadShortcut), and
---     a glyph chip left of the button says so; B closes it (HUD.Popup).
---     It has no buttons, so nothing is selected: you can still walk.
+--     a glyph chip left of the button says so; B closes it (HUD.Popup)
+--     and Esc closes it too. Opening selects Close.
 -- The server owns progress: it sets the DailyGoals, DailyStreak and
 -- DailyResetAt attributes, and this redraws from them.
 -- Under the v2 core loop (CoreLoop.Active()) a goal's progress reads in
@@ -18,17 +18,21 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local HudRules = require(script.Parent.HudRules)
+local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
 local DailyUI = {}
 
 local player = Players.LocalPlayer
+local goalsOpen = false
+local focus: GuiObject? = nil
 
 local INK = UITheme.Colors.Ink
 local CREAM = UITheme.Colors.Cream
@@ -43,6 +47,35 @@ type GoalRow = { frame: Frame, text: TextLabel, reward: TextLabel, fill: Frame }
 local button: TextButton? = nil
 local buttonSlot: Frame? = nil -- on a phone, what holds the button and its hit area in the corner
 local panel: Frame? = nil
+
+function DailyUI._open(first: GuiObject?)
+	goalsOpen = true
+	focus = first
+	local card = panel
+	if card then
+		card.Visible = true
+	end
+	MenuPad.Open(first)
+end
+
+function DailyUI._close()
+	goalsOpen = false
+	local card = panel
+	if card then
+		card.Visible = false
+	end
+	MenuPad.Close(card or focus)
+	focus = nil
+end
+
+function DailyUI.ApplyKey(key: Enum.KeyCode): string?
+	if not goalsOpen or not MenuPad.Closes(key) then
+		return nil
+	end
+	DailyUI._close()
+	return "close"
+end
+
 local goalRows: { GoalRow } = {}
 local footer: TextLabel? = nil
 local countdown: TextLabel? = nil
@@ -228,8 +261,28 @@ local function build()
 	layout.Padding = UDim.new(0, 6)
 	layout.Parent = p
 	p.Parent = gui
-	HUD.Popup(p)
 	panel = p
+	local close = Instance.new("TextButton")
+	close.Name = "Close"
+	close.LayoutOrder = 0
+	close.Size = UDim2.fromOffset(44, 44)
+	close.BackgroundColor3 = BARK
+	close.TextColor3 = CREAM
+	close.Font = UITheme.Fonts.Black
+	close.TextSize = 16
+	close.Text = "Close"
+	close.AutoButtonColor = true
+	close.Parent = p
+	close.Activated:Connect(function()
+		DailyUI._close()
+	end)
+	p:GetPropertyChangedSignal("Visible"):Connect(function()
+		if not p.Visible then
+			goalsOpen = false
+			MenuPad.Close(p)
+		end
+	end)
+	HUD.Popup(p, close)
 
 	text(p, "TODAY'S GOALS", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 1).TextColor3 = BARK
 	for i = 1, DailyData.GoalsPerDay do
@@ -276,8 +329,12 @@ local function build()
 	countdown = c
 
 	local function toggle()
-		p.Visible = not p.Visible
-		refresh()
+		if p.Visible then
+			DailyUI._close()
+		else
+			DailyUI._open(close)
+			refresh()
+		end
 	end
 	b.Activated:Connect(toggle)
 	-- The pad's shortcut, and its glyph just left of the button (UI-15).
@@ -298,6 +355,14 @@ end
 
 function DailyUI.Start()
 	build()
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.Escape then
+			DailyUI.ApplyKey(input.KeyCode)
+		end
+	end)
 	for _, attribute in ipairs({ "DailyGoals", "DailyStreak", "DailyResetAt", "BestAxeTier", "TutorialStep" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end

@@ -1342,6 +1342,21 @@ end
 -- rightSafe is the viewport past the frame's right edge.
 local safeArea: Frame? = nil
 
+-- The notch's left inset, in screen pixels. 0 until the probe is parented.
+function HUD.LeftSafe(): number
+	local probe = safeArea
+	if not probe then
+		return 0
+	end
+	local ok, pos = pcall(function()
+		return probe.AbsolutePosition
+	end)
+	if not ok or typeof(pos) ~= "Vector2" then
+		return 0
+	end
+	return pos.X
+end
+
 -- TimberlineTop's UIScale. Offsets are multiplied by it, so a screen-pixel
 -- place from HudLayout.TopRow is divided back by Scale before it's written.
 local topScale: UIScale? = nil

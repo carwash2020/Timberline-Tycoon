@@ -548,7 +548,7 @@ local function mountLand(gui: ScreenGui)
 	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	grid.ScrollBarThickness = 6
 	grid.ScrollingDirection = Enum.ScrollingDirection.Y
-	grid.Selectable = true
+	grid.Selectable = false
 	local layout = Instance.new("UIGridLayout")
 	layout.Name = "Layout"
 	layout.CellSize = UDim2.fromOffset(PlotLogic.LandTap, PlotLogic.LandTap)

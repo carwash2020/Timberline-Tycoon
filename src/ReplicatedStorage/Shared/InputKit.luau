@@ -10,11 +10,10 @@
 -- inside both ranges (OpenForestApart). Two other actions on one key in
 -- the same context fail KeysUnique.
 --
--- The placer's target rotate bind is DPadRight (keyboard R). Today's
--- BlueprintPlacer still rotates on ButtonX; that move is an X2 change.
--- Raise stays on E, and E is world Interact, Talk, and Buy. PlacerSafe
--- rejects a ButtonX bind or a keyboard E bind while world prompts are on.
--- The X2 fix is to turn world prompts off while the placer is active.
+-- The placer rotates on DPadRight (keyboard R) and turns world prompts
+-- off while it is up. Raise stays on E, and E is world Interact, Talk,
+-- and Buy. PlacerSafe rejects a ButtonX bind or a keyboard E bind while
+-- world prompts are on.
 --
 -- The console safe area is ScreenInsets.CoreUISafeInsets. It is not a
 -- fraction of the screen.

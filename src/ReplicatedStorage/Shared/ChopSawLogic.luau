@@ -13,40 +13,36 @@ local WoodData = require(script.Parent.WoodData)
 
 local ChopSawLogic = {}
 
--- Cut length in timber units. The panel steps by CutStep. TBD (Designer)
+-- Cut length in timber units. The panel steps by CutStep.
 ChopSawLogic.MinCut = 1
 ChopSawLogic.MaxCut = 32
 ChopSawLogic.CutStep = 1
 ChopSawLogic.DefaultCut = 8
 
 -- One accepted length step per player. The remote's own budget is wider.
--- TBD (Designer)
 ChopSawLogic.SetGap = 1
 
 -- Blade. Damage never drops a player to 0. One hit per player per gap.
--- TBD (Designer)
 ChopSawLogic.BladeDamage = 10
 ChopSawLogic.BladePush = 12
 ChopSawLogic.BladeHitGap = 1
 
 -- How fast a held ± button asks again. The server still accepts one step
 -- a second; the repeats are what make the next second's step land.
--- TBD (Builder)
 ChopSawLogic.HoldRepeat = 0.2
 
--- Housing, studs. TBD (Builder)
+-- Housing, studs.
 ChopSawLogic.BaseX = 6
 ChopSawLogic.BaseY = 4
 ChopSawLogic.BaseZ = 4
 
 -- The only damage box, studs. Yellow, with a black strip on the infeed face.
--- TBD (Builder)
 ChopSawLogic.GuardX = 3
 ChopSawLogic.GuardY = 4
 ChopSawLogic.GuardZ = 3
 
 -- Infeed table. Its length is MaxCut timber units, so a full-length set
--- still has wood under the mark. TBD (Builder)
+-- still has wood under the mark.
 ChopSawLogic.TableWidth = 4
 ChopSawLogic.TableTop = 1.2
 ChopSawLogic.TableThick = 0.4
@@ -54,22 +50,20 @@ ChopSawLogic.Leg = 0.4
 ChopSawLogic.IntakeHeight = 2.4
 
 -- Client-only neon mark at the cut. The server model never builds it.
--- TBD (Builder)
 ChopSawLogic.PreviewThickness = 0.2
 
 -- Disc in the cut plane. It does not query, so it is not a damage box.
--- TBD (Builder)
 ChopSawLogic.BladeDiameter = 3.2
 ChopSawLogic.BladeThick = 0.16
 
--- Black band on the guard's infeed face. TBD (Builder)
+-- Black band on the guard's infeed face.
 ChopSawLogic.StripeThick = 0.18
 ChopSawLogic.StripeBand = 0.45
 
--- Pivot slab under the footprint. TBD (Builder)
+-- Pivot slab under the footprint.
 ChopSawLogic.RootY = 0.2
 
--- Side board and the price plate. TBD (Builder)
+-- Side board and the price plate.
 ChopSawLogic.PanelBoardX = 0.24
 ChopSawLogic.PanelBoardY = 2.6
 ChopSawLogic.PanelBoardZ = 3.2
@@ -80,7 +74,6 @@ ChopSawLogic.SurfacePixels = 40
 
 -- Screen panel. Phone face is also the board's button. The card is
 -- bottom-centre, AboveHotbarPx above the hotbar band (UITheme.Bottom).
--- TBD (Builder)
 ChopSawLogic.PanelFacePx = 48
 ChopSawLogic.PanelFaceTvPx = 96
 ChopSawLogic.PanelTextPx = 20
@@ -89,20 +82,20 @@ ChopSawLogic.AboveHotbarPx = 8
 ChopSawLogic.ReadoutPx = 96
 ChopSawLogic.HintPx = 36
 -- Roblox's touch jump button, in screen pixels: 70 wide, its left edge this
--- far in from the right, its top this far up from the bottom. TBD (Builder)
+-- far in from the right, its top this far up from the bottom.
 ChopSawLogic.JumpFromRightPx = 95
 ChopSawLogic.JumpFromBottomPx = 90
 ChopSawLogic.JumpSizePx = 70
 
--- How far the "Set the length" prompt reaches. TBD (Builder)
+-- How far the "Set the length" prompt reaches.
 ChopSawLogic.PromptRange = 12
 
 -- A piece rests this long in the intake before the blade takes it, and a
--- piece already at the cut length still passes through. TBD (Builder)
+-- piece already at the cut length still passes through.
 ChopSawLogic.Settle = 0.3
 ChopSawLogic.PassSeconds = 0.4
 
--- Faster than this (studs/s) the piece is still in flight. TBD (Builder)
+-- Faster than this (studs/s) the piece is still in flight.
 ChopSawLogic.RestSpeed = 20
 
 ChopSawLogic.UseFlag = "interact"

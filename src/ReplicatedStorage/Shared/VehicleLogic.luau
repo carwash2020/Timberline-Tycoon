@@ -577,16 +577,16 @@ VehicleLogic.CatalogWeight = 60
 VehicleLogic.ExtraWeight = 10
 VehicleLogic.PinkOdds = 500
 VehicleLogic.BlossomPink = "#E7A0B4"
-VehicleLogic.GhostRed = Color3.fromRGB(180, 40, 40) -- TBD (Designer)
-VehicleLogic.GhostOk = Color3.fromRGB(80, 200, 120) -- TBD (Designer)
+VehicleLogic.GhostRed = Color3.fromRGB(180, 40, 40)
+VehicleLogic.GhostOk = Color3.fromRGB(80, 200, 120)
 
 export type PaintSwatch = { name: string, hex: string }
 
 VehicleLogic.ExtraPaints = {
-	{ name = "Pine", hex = "#3E6B45" }, -- TBD (Designer)
-	{ name = "River", hex = "#3A6E8C" }, -- TBD (Designer)
-	{ name = "Hay", hex = "#C6A15B" }, -- TBD (Designer)
-	{ name = "Barn", hex = "#8C3A32" }, -- TBD (Designer)
+	{ name = "Pine", hex = "#3E6B45" },
+	{ name = "River", hex = "#3A6E8C" },
+	{ name = "Hay", hex = "#C6A15B" },
+	{ name = "Barn", hex = "#8C3A32" },
 } :: { PaintSwatch }
 
 export type Foot = { x: number, z: number, sx: number, sz: number }

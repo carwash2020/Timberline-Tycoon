@@ -56,4 +56,75 @@ return function(t)
 		t.ok(again == part, "a model with no head uses its PrimaryPart")
 		t.eq(lift, nil)
 	end)
+
+	t.test("a gamepad prompt leaves the selection alone", function()
+		local Enum = t.roblox.Enum
+		local guiService = { SelectedObject = nil }
+		local player = Instance.new("Folder")
+		local pg = Instance.new("Folder")
+		pg.Name = "PlayerGui"
+		pg.Parent = player
+		local function signal()
+			local listeners = {}
+			return {
+				Connect = function(_, fn)
+					table.insert(listeners, fn)
+					return { Disconnect = function() end }
+				end,
+				Once = function(_, fn)
+					table.insert(listeners, fn)
+					return { Disconnect = function() end }
+				end,
+				Fire = function(_, ...)
+					for _, fn in ipairs(listeners) do
+						fn(...)
+					end
+				end,
+			}
+		end
+		local loader = t.loader({
+			globals = {
+				workspace = { CurrentCamera = nil },
+			},
+			services = {
+				GuiService = guiService,
+				Players = { LocalPlayer = player },
+				TextChatService = {},
+				UserInputService = { TouchEnabled = false, KeyboardEnabled = true, InputBegan = signal() },
+				ProximityPromptService = {},
+				TweenService = {},
+			},
+		})
+		local PromptUI = loader:load("StarterPlayer/StarterPlayerScripts/PromptUI")
+		local prompt = {
+			Parent = Instance.new("Part"),
+			ActionText = "Talk",
+			ObjectText = "Murph",
+			HoldDuration = 0,
+			ClickablePrompt = false,
+			KeyboardKeyCode = Enum.KeyCode.E,
+			GamepadKeyCode = Enum.KeyCode.ButtonX,
+			UIOffset = Vector2.zero,
+			PromptButtonHoldBegan = signal(),
+			PromptButtonHoldEnded = signal(),
+			Triggered = signal(),
+			PromptHidden = signal(),
+			Destroying = signal(),
+			GetPropertyChangedSignal = function()
+				return signal()
+			end,
+			InputHoldBegin = function() end,
+			InputHoldEnd = function() end,
+		}
+		PromptUI.Show(prompt, Enum.ProximityPromptInputType.Gamepad)
+		t.eq(guiService.SelectedObject, nil)
+		local press = nil
+		for _, d in ipairs(pg:GetDescendants()) do
+			if d.Name == "Press" then
+				press = d
+			end
+		end
+		t.ok(press, "the card still has a Press face")
+		t.eq(press.Selectable, false)
+	end)
 end

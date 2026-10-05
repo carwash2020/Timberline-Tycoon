@@ -36,6 +36,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
@@ -109,6 +110,7 @@ local PANEL_MAX = Vector2.new(560, 540)
 local PANEL_MIN_WIDTH = 400 -- narrower than this beside the cash row, it goes under the row instead
 
 local gui: ScreenGui? = nil
+local focusedFace: GuiObject? = nil
 local area: Frame? = nil -- what the panel is centred in
 local panel: Frame? = nil
 local titleLabel: TextLabel? = nil
@@ -699,7 +701,7 @@ local function open(shop: Shop)
 		prompt.Enabled = false
 	end
 	refresh()
-	ContextActionService:BindAction("CloseShop", onCloseAction, false, Enum.KeyCode.ButtonB)
+	ContextActionService:BindAction("CloseShop", onCloseAction, false, Enum.KeyCode.ButtonB, Enum.KeyCode.Escape)
 	ContextActionService:BindActionAtPriority(
 		"ShopHoldStill",
 		holdStill,
@@ -711,7 +713,7 @@ local function open(shop: Shop)
 		Enum.PlayerActions.CharacterRight,
 		Enum.PlayerActions.CharacterJump
 	)
-	if UserInputService.GamepadEnabled and rows[1] then
+	if rows[1] then
 		-- The first thing you can buy, else the first row.
 		local pick = rows[1].button.face
 		for _, row in ipairs(rows) do
@@ -720,8 +722,15 @@ local function open(shop: Shop)
 				break
 			end
 		end
+		focusedFace = pick
 		GuiService.SelectedObject = pick
+	else
+		focusedFace = nil
 	end
+end
+
+function ShopUI.FirstFace(): GuiObject?
+	return focusedFace
 end
 
 function ShopUI.Close()
@@ -936,6 +945,7 @@ local function setupPrompt(shop: Shop, building: Instance)
 	pp.MaxActivationDistance = GameConfig.ShopPromptRange
 	pp.HoldDuration = 0
 	pp.RequiresLineOfSight = false
+	InputKit.PromptDefaults(pp, "Interact")
 	if shop.promptOffset then
 		pp.UIOffset = shop.promptOffset
 	end

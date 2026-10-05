@@ -101,8 +101,8 @@ return function(t)
 		t.ok(InputKit.PlacerSafe(raise, false))
 	end)
 
-	t.test("today's placer binds fail while prompts are on and pass when they are off", function()
-		-- BlueprintPlacer.luau:360-388. Rotate is still ButtonX. Raise is E.
+	t.test("the pre-X2 placer binds fail while prompts are on and pass when they are off", function()
+		-- Rotate used to be ButtonX. Raise is still E, which is world Interact.
 		local today = {
 			bind("Rotate", Enum.KeyCode.ButtonX, Enum.KeyCode.R),
 			bind("Place", Enum.KeyCode.ButtonR2, nil),

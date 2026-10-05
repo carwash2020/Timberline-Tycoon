@@ -119,11 +119,19 @@ local function build(): Card
 	gradient.Parent = backdrop
 	backdrop.Parent = screen
 
+	-- The backdrop stays full-bleed. The words sit inside a 5% margin.
+	local inset = Instance.new("Frame")
+	inset.Name = "TextInset"
+	inset.BackgroundTransparency = 1
+	inset.Position = UDim2.fromScale(0.05, 0.05)
+	inset.Size = UDim2.fromScale(0.9, 0.9)
+	inset.Parent = backdrop
+
 	local content = Instance.new("Frame")
 	content.Name = "Content"
 	content.AnchorPoint = Vector2.new(0.5, 0.5)
 	content.Position = UDim2.fromScale(0.5, 0.5)
-	content.Size = UDim2.fromScale(0.9, 0)
+	content.Size = UDim2.fromScale(1, 0)
 	content.AutomaticSize = Enum.AutomaticSize.Y
 	content.BackgroundTransparency = 1
 	local maxSize = Instance.new("UISizeConstraint")
@@ -136,7 +144,7 @@ local function build(): Card
 	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	list.Padding = UDim.new(0, 10)
 	list.Parent = content
-	content.Parent = backdrop
+	content.Parent = inset
 
 	local title = textLabel(content, "Title", TITLE, Enum.Font.FredokaOne, 40, CREAM)
 	title.LayoutOrder = 1

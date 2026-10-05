@@ -19,6 +19,8 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local HUD = require(script.Parent.HUD)
+local UITheme = require(script.Parent.UITheme)
 
 local SawmillController = {}
 
@@ -28,6 +30,7 @@ local openMill: Model? = nil
 local panelGui: ScreenGui? = nil
 local selected: GuiObject? = nil
 local listening = false
+local columnFrame: Frame? = nil
 
 local INK = Color3.fromRGB(60, 40, 20)
 local CREAM = Color3.fromRGB(245, 235, 215)
@@ -209,7 +212,112 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	return { gui = gui, root = root, readout = readout, buttons = buttons, close = close }
 end
 
+-- Top-left of the core-UI inset, in screen pixels. Y is the top bar
+-- (GetGuiInset). X is the notch: GetGuiInset does not report it, so it
+-- comes from the same DeviceSafeInsets probe HUD uses (HUD.LeftSafe).
+-- ScreenGui.AbsolutePosition can read (0, 0) for an inset screen.
+local function insetOrigin(): Vector2
+	local y = 0
+	local ok, inset = pcall(function()
+		return GuiService:GetGuiInset()
+	end)
+	if ok and typeof(inset) == "Vector2" then
+		y = inset.Y
+	end
+	local x = 0
+	local safeOk, left = pcall(function()
+		return HUD.LeftSafe()
+	end)
+	if safeOk and type(left) == "number" then
+		x = left
+	end
+	return Vector2.new(x, y)
+end
+
+-- The card lives in a CoreUISafeInsets screen. Its AbsolutePosition is
+-- inside that screen, so the modal box is the card plus the inset origin.
+local function modalRect(root: Frame): { left: number, top: number, right: number, bottom: number }
+	local at, size = root.AbsolutePosition, root.AbsoluteSize
+	local origin = insetOrigin()
+	local x, y = at.X + origin.X, at.Y + origin.Y
+	return { left = x, top = y, right = x + size.X, bottom = y + size.Y }
+end
+
+-- Screen pixels inside the inset SawmillCut gui. Its AbsoluteSize is the
+-- safe rect, not the camera viewport: the hotbar floor from the viewport
+-- sits one inset too low, and the card lands on the hotbar.
+local function placeCard(root: Frame, tenFoot: boolean)
+	local gui = root:FindFirstAncestorOfClass("ScreenGui")
+	if not gui then
+		return
+	end
+	local ok, size = pcall(function()
+		return gui.AbsoluteSize
+	end)
+	if not ok or typeof(size) ~= "Vector2" or size.X <= 0 or size.Y <= 0 then
+		return
+	end
+	local handheld = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+	local ten = false
+	pcall(function()
+		ten = GuiService:IsTenFootInterface() == true
+	end)
+	local scale = UITheme.ScaleFor(size, handheld, ten or tenFoot)
+	if scale <= 0 then
+		return
+	end
+	local cardW, cardH = SawmillLogic.CardSize(tenFoot)
+	local sw, sh = cardW * scale, cardH * scale
+	local margin = if ten or tenFoot then 64 else 12
+	local hotbar = 70
+	pcall(function()
+		hotbar = UITheme.Bottom()
+	end)
+	-- LeftColumn and this gui are both CoreUISafeInsets, so the column's
+	-- AbsolutePosition is already in this space. {12, 48, 292, 228} is only
+	-- the stand-in before that frame exists (64 on a TV). No origin math.
+	local column = { left = margin, top = 48, right = margin + 280, bottom = 48 + 180 }
+	local frame = columnFrame
+	if frame then
+		local posOk, pos = pcall(function()
+			return frame.AbsolutePosition
+		end)
+		local sizeOk, frameSize = pcall(function()
+			return frame.AbsoluteSize
+		end)
+		if
+			posOk
+			and sizeOk
+			and typeof(pos) == "Vector2"
+			and typeof(frameSize) == "Vector2"
+			and frameSize.X > 0
+			and frameSize.Y > 0
+		then
+			column = {
+				left = pos.X,
+				top = pos.Y,
+				right = pos.X + frameSize.X,
+				bottom = pos.Y + frameSize.Y,
+			}
+		end
+	end
+	local box = SawmillLogic.PlaceCard(size.X, size.Y, sw, sh, column, size.Y - hotbar)
+	root.AnchorPoint = Vector2.new(0, 0)
+	root.Position = UDim2.fromOffset(box.left, box.top)
+end
+
 local built: Panel? = nil
+local columnWatched = false
+
+-- The open card, again, after its screen or the left column changes.
+local function refreshCard()
+	local panel = built
+	if not panel or not panel.gui.Enabled then
+		return
+	end
+	placeCard(panel.root, GuiService:IsTenFootInterface())
+	HUD.SetModal(modalRect(panel.root))
+end
 
 local function readoutText(mill: Model): string
 	local x = mill:GetAttribute("CutX")
@@ -230,6 +338,7 @@ local function closePanel()
 		GuiService.SelectedObject = nil
 	end
 	selected = nil
+	HUD.SetModal(nil)
 	if mill and mill.Parent then
 		local prompt = mill:FindFirstChild("CutPrompt", true)
 		local player = Players.LocalPlayer
@@ -256,10 +365,12 @@ local function openPanel(mill: Model)
 	end
 	openMill = mill
 	panel.readout.Text = readoutText(mill)
+	placeCard(panel.root, GuiService:IsTenFootInterface())
 	panel.gui.Enabled = true
 	local first = panel.buttons[1]
 	selected = first
 	GuiService.SelectedObject = first
+	HUD.SetModal(modalRect(panel.root))
 end
 
 local function onInput(input: InputObject, _processed: boolean)
@@ -357,6 +468,17 @@ function SawmillController.Start()
 			end)
 		end
 		panel.close.Activated:Connect(closePanel)
+		panel.gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshCard)
+	end
+	if not columnWatched then
+		columnWatched = true
+		-- The column grows as rows are added. An open card moves with it.
+		UITheme.WatchLeftColumn(function(column: Frame)
+			columnFrame = column
+			column:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshCard)
+			column:GetPropertyChangedSignal("AbsolutePosition"):Connect(refreshCard)
+			refreshCard()
+		end)
 	end
 	if not listening then
 		listening = true
@@ -369,6 +491,18 @@ function SawmillController.Start()
 end
 
 -- Specs and a re-open after close. Not used by Start's callers.
+function SawmillController._open(panel: Panel?)
+	local use = panel or built
+	if not use then
+		return
+	end
+	use.gui.Enabled = true
+	placeCard(use.root, GuiService:IsTenFootInterface())
+	selected = use.buttons[1]
+	GuiService.SelectedObject = use.buttons[1]
+	HUD.SetModal(modalRect(use.root))
+end
+
 function SawmillController._close()
 	closePanel()
 end

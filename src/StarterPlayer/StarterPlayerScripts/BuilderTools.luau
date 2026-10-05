@@ -6,6 +6,7 @@
 -- and they stay quiet while a new blueprint is being placed.
 
 local CollectionService = game:GetService("CollectionService")
+local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -42,6 +43,7 @@ local copyDz = 0
 local copyOk = false
 
 local cluster: Frame? = nil
+local toolsGui: ScreenGui? = nil
 local readoutLabel: TextLabel? = nil
 local buttons: { [string]: TextButton } = {}
 
@@ -195,11 +197,19 @@ end
 
 local function layout()
 	local bar = cluster
-	local camera = workspace.CurrentCamera
-	if not bar or not camera then
+	local gui = toolsGui
+	if not bar or not gui then
 		return
 	end
-	local size = camera.ViewportSize
+	-- The bar's screen is already inside CoreUISafeInsets, so its
+	-- AbsoluteSize is the safe rect, not the full viewport. Laying out
+	-- from the viewport pushes the cluster down by the top inset.
+	local ok, size = pcall(function()
+		return gui.AbsoluteSize
+	end)
+	if not ok or typeof(size) ~= "Vector2" or size.X <= 0 or size.Y <= 0 then
+		return
+	end
 	local place = BuilderBar.Layout(size.X, size.Y, UITheme.Bottom())
 	bar.Position = UDim2.fromOffset(place.x, place.y)
 	bar.Size = UDim2.fromOffset(place.w, place.h)
@@ -488,6 +498,66 @@ local function modelFrom(target: Instance?): Model?
 	return nil
 end
 
+function BuilderTools.Center(viewport: Vector2): (number, number)
+	return viewport.X / 2, viewport.Y / 2
+end
+
+function BuilderTools.PieceFromHit(inst: Instance?): Model?
+	return modelFrom(inst)
+end
+
+-- The piece a screen ray hits. Mouse clicks and the gamepad reticle share it.
+function BuilderTools.Aim(camera: Camera, x: number, y: number): Model?
+	local ray = camera:ViewportPointToRay(x, y)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local char = player.Character
+	if char then
+		params.FilterDescendantsInstances = { char }
+	end
+	local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
+	return if hit then modelFrom(hit.Instance) else nil
+end
+
+function BuilderTools.SelectedCount(): number
+	return #selected
+end
+
+function BuilderTools.PrimarySelected(): Model?
+	local pick = selected[1]
+	return if pick then pick.model else nil
+end
+
+-- ButtonR2: a ray through the middle of the screen, then the same select
+-- (or copy-confirm) path a mouse click uses. Pass unless that ray hits a
+-- placed piece or copy mode is confirming, so an axe swing still sees R2.
+-- A tool in hand always passes: CutController skips the swing when this
+-- bind sinks the button.
+function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
+	if inputState ~= Enum.UserInputState.Begin or BlueprintPlacer.Active() then
+		return Enum.ContextActionResult.Pass
+	end
+	local char = player.Character
+	if typeof(char) == "Instance" and char:FindFirstChildOfClass("Tool") then
+		return Enum.ContextActionResult.Pass
+	end
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return Enum.ContextActionResult.Pass
+	end
+	local x, y = BuilderTools.Center(camera.ViewportSize)
+	if copyMode then
+		confirmCopy()
+		return Enum.ContextActionResult.Sink
+	end
+	local model = BuilderTools.Aim(camera, x, y)
+	if not model then
+		return Enum.ContextActionResult.Pass
+	end
+	toggle(model)
+	return Enum.ContextActionResult.Sink
+end
+
 local function onGround(origin: Vector3, direction: Vector3): Vector3?
 	if direction.Y >= -1e-4 then
 		return nil
@@ -559,7 +629,8 @@ function BuilderTools.Start()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "BuilderTools"
 	gui.ResetOnSpawn = false
-	gui.IgnoreGuiInset = true
+	gui.IgnoreGuiInset = false
+	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 	gui.DisplayOrder = 8
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -608,7 +679,9 @@ function BuilderTools.Start()
 	end
 
 	gui.Parent = player:WaitForChild("PlayerGui")
+	toolsGui = gui
 	layout()
+	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 
 	local camera = workspace.CurrentCamera
 	if camera then
@@ -667,19 +740,31 @@ function BuilderTools.Start()
 		if processed or BlueprintPlacer.Active() then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 and copyMode then
-			confirmCopy()
-			return
-		end
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
 			return
 		end
-		local mouse = player:GetMouse()
-		local model = modelFrom(mouse.Target)
+		local cameraNow = workspace.CurrentCamera
+		if not cameraNow then
+			return
+		end
+		if copyMode then
+			confirmCopy()
+			return
+		end
+		local mouse = UserInputService:GetMouseLocation()
+		local model = BuilderTools.Aim(cameraNow, mouse.X, mouse.Y)
 		if model then
 			toggle(model)
 		end
 	end)
+
+	ContextActionService:BindActionAtPriority(
+		"BuilderSelect",
+		BuilderTools.OnSelect,
+		false,
+		Enum.ContextActionPriority.High.Value,
+		Enum.KeyCode.ButtonR2
+	)
 
 	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processedByUI: boolean)
 		if processedByUI or BlueprintPlacer.Active() then

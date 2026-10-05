@@ -8,9 +8,11 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
+local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
 local PlotPickerUI = {}
@@ -25,6 +27,8 @@ local gui: ScreenGui? = nil
 local titleLabel: TextLabel? = nil
 local detailLabel: TextLabel? = nil
 local claimButton: TextButton? = nil
+local previousButton: TextButton? = nil
+local nextButton: TextButton? = nil
 local plots: { Plot } = {}
 local index = 1
 local open = false
@@ -36,13 +40,23 @@ local function humanoid(): Humanoid?
 	return if char then char:FindFirstChildOfClass("Humanoid") else nil
 end
 
+local function currentCamera(): Camera?
+	local ok, cam = pcall(function()
+		return workspace.CurrentCamera
+	end)
+	if ok and typeof(cam) == "Instance" then
+		return cam :: Camera
+	end
+	return nil
+end
+
 local function lock()
 	local hum = humanoid()
 	if hum and savedSpeed == nil then
 		savedSpeed = hum.WalkSpeed
 		hum.WalkSpeed = 0
 	end
-	local cam = workspace.CurrentCamera
+	local cam = currentCamera()
 	if cam and savedCamera == nil then
 		savedCamera = cam.CameraType
 		cam.CameraType = Enum.CameraType.Scriptable
@@ -55,23 +69,44 @@ local function unlock()
 		hum.WalkSpeed = savedSpeed
 	end
 	savedSpeed = nil
-	local cam = workspace.CurrentCamera
+	local cam = currentCamera()
 	if cam and savedCamera ~= nil then
 		cam.CameraType = savedCamera
 	end
 	savedCamera = nil
 end
 
-local function hide()
-	if not open then
-		return
-	end
-	open = false
+function PlotPickerUI._open(button: GuiObject?)
+	open = true
 	local screen = gui
 	if screen then
-		screen.Enabled = false
+		screen.Enabled = true
 	end
-	unlock()
+	MenuPad.Open(button or claimButton)
+end
+
+function PlotPickerUI._close()
+	if open then
+		open = false
+		local screen = gui
+		if screen then
+			screen.Enabled = false
+		end
+		unlock()
+	end
+	MenuPad.Close(gui)
+end
+
+function PlotPickerUI.ApplyKey(key: Enum.KeyCode): string?
+	if not open or not MenuPad.Closes(key) then
+		return nil
+	end
+	PlotPickerUI._close()
+	return "close"
+end
+
+local function hide()
+	PlotPickerUI._close()
 end
 
 local function frame(plot: Plot)
@@ -147,13 +182,9 @@ local function show(offer: Offer)
 			index = PlotPickerLogic.NextOpen(plots, index)
 		end
 	end
-	open = true
 	lock()
-	local screen = gui
-	if screen then
-		screen.Enabled = true
-	end
 	showCurrent()
+	PlotPickerUI._open(claimButton)
 end
 
 local function step(delta: number)
@@ -245,13 +276,19 @@ local function build()
 		return button
 	end
 
-	choice("Previous", "PREVIOUS", 0, C.Bark, C.Cream, function()
+	previousButton = choice("Previous", "PREVIOUS", 0, C.Bark, C.Cream, function()
 		step(-1)
 	end)
 	claimButton = choice("Claim", "CLAIM", 0.34, C.Green, C.Cream, claim)
-	choice("Next", "NEXT", 0.68, C.Bark, C.Cream, function()
+	nextButton = choice("Next", "NEXT", 0.68, C.Bark, C.Cream, function()
 		step(1)
 	end)
+	if previousButton and claimButton and nextButton then
+		previousButton.NextSelectionRight = claimButton
+		claimButton.NextSelectionLeft = previousButton
+		claimButton.NextSelectionRight = nextButton
+		nextButton.NextSelectionLeft = claimButton
+	end
 
 	local any = Instance.new("TextButton")
 	any.Name = "Any"
@@ -268,6 +305,15 @@ end
 
 function PlotPickerUI.Start()
 	build()
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputState ~= Enum.UserInputState.Begin or not open then
+			return
+		end
+		if MenuPad.Closes(input.KeyCode) then
+			pass()
+			PlotPickerUI.ApplyKey(input.KeyCode)
+		end
+	end)
 	Net.Remote("PlotOffer").OnClientEvent:Connect(function(payload: Offer)
 		show(payload)
 	end)

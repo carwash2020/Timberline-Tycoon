@@ -5,10 +5,11 @@
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, Color3, CFrame = roblox.Instance, roblox.Vector3, roblox.Color3, roblox.CFrame
+	local gui = {}
 	local loader = t.loader({
 		services = {
 			Players = { LocalPlayer = {} },
-			GuiService = {},
+			GuiService = gui,
 			TextChatService = {},
 			TweenService = {},
 			UserInputService = {},
@@ -297,5 +298,17 @@ return function(t)
 		local fs = require("@lune/fs")
 		local art = fs.readFile("src/ReplicatedStorage/Shared/Art/TruckArt.luau")
 		t.ok(string.find(art, 'bedFloor(m, "BedFloor"', 1, true), "TruckArt still names its bed floor BedFloor")
+	end)
+
+	t.test("opening Murph's card selects Dismiss, and B or Esc clears it", function()
+		local button = roblox.Instance.new("TextButton")
+		button.Name = "Dismiss"
+		QuestUI._open(button)
+		t.eq(gui.SelectedObject, button)
+		t.eq(QuestUI.ApplyKey(roblox.Enum.KeyCode.ButtonB), "close")
+		t.eq(gui.SelectedObject, nil)
+		QuestUI._open(button)
+		t.eq(QuestUI.ApplyKey(roblox.Enum.KeyCode.Escape), "close")
+		t.eq(gui.SelectedObject, nil)
 	end)
 end

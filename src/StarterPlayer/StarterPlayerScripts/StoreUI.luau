@@ -11,9 +11,11 @@
 --     on the truck.
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -22,6 +24,7 @@ local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
+local MenuPad = require(script.Parent.MenuPad)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
 
@@ -46,6 +49,45 @@ local panel: Frame? = nil
 local list: ScrollingFrame? = nil
 local passTab: TextButton? = nil
 local productTab: TextButton? = nil
+local storeOpen = false
+local focus: GuiObject? = nil
+
+-- Price tags on the cards: 14 px in hand, 18 px on a TV.
+function StoreUI.PriceTextPx(tenFoot: boolean): number
+	return if tenFoot then 18 else 14
+end
+
+local function tenFoot(): boolean
+	local ok, ten = pcall(function()
+		return GuiService:IsTenFootInterface()
+	end)
+	return ok and ten == true
+end
+
+function StoreUI._open(button: GuiObject?)
+	storeOpen = true
+	focus = button
+	MenuPad.Open(button)
+end
+
+function StoreUI._close()
+	storeOpen = false
+	local frame = panel
+	if frame then
+		frame.Visible = false
+	end
+	MenuPad.Close(frame or focus)
+	focus = nil
+	HUD.SetModal(nil)
+end
+
+function StoreUI.ApplyKey(key: Enum.KeyCode): string?
+	if not storeOpen or not MenuPad.Closes(key) then
+		return nil
+	end
+	StoreUI._close()
+	return "close"
+end
 
 local function robux(price: number?): string
 	return if price then "R$ " .. tostring(price) else "R$ …"
@@ -160,7 +202,7 @@ local function card(
 		text = if owned then "Owned" else buttonText,
 		size = Vector2.new(88, UITheme.Size.Tap),
 		style = if owned then "inuse" else "buy",
-		textSize = 14,
+		textSize = StoreUI.PriceTextPx(tenFoot()),
 	})
 	buy.root.AnchorPoint = Vector2.new(1, 0.5)
 	buy.root.Position = UDim2.new(1, -8, 0.5, 0)
@@ -276,17 +318,14 @@ local function openStore()
 	end
 	frame.Visible = true
 	redraw()
+	StoreUI._open(passTab)
 	task.defer(function()
 		setModal(true)
 	end)
 end
 
 local function closeStore()
-	local frame = panel
-	if frame then
-		frame.Visible = false
-	end
-	setModal(false)
+	StoreUI._close()
 end
 
 function StoreUI.Start()
@@ -363,6 +402,9 @@ function StoreUI.Start()
 	local productsBtn = tabButton("Products", 156)
 	passTab = passesBtn
 	productTab = productsBtn
+	passesBtn.NextSelectionRight = productsBtn
+	productsBtn.NextSelectionLeft = passesBtn
+	close.face.NextSelectionDown = passesBtn
 	passesBtn.Activated:Connect(function()
 		tab = "Passes"
 		redraw()
@@ -424,6 +466,12 @@ function StoreUI.Start()
 			task.wait(1)
 			refreshDelivery()
 		end
+	end)
+	UserInputService.InputBegan:Connect(function(input: InputObject)
+		if input.UserInputState ~= Enum.UserInputState.Begin then
+			return
+		end
+		StoreUI.ApplyKey(input.KeyCode)
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 end

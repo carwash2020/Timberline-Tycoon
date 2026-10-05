@@ -5,6 +5,7 @@
 -- the prompt still works with StreamingEnabled. Pure placement so tests
 -- can check it doesn't stand on a road.
 
+local InputKit = require(script.Parent.InputKit)
 local Kit = require(script.Parent.Art.Kit)
 local StoreData = require(script.Parent.StoreData)
 local TownMeshes = require(script.Parent.Art.TownMeshes)
@@ -41,6 +42,63 @@ function StoreBoard.Overlaps(x0: number, x1: number, z0: number, z1: number): bo
 	return a0 < x1 and a1 > x0 and b0 < z1 and b1 > z0
 end
 
+StoreBoard.TitleTextPx = 16
+StoreBoard.DescTextPx = 14
+StoreBoard.DescLines = 2
+-- Gotham advance as a fraction of TextSize, a little wide of the real face
+-- so a fit here still fits in Studio.
+StoreBoard.Em = 0.58
+
+function StoreBoard.BodyWidth(canvasW: number): number
+	local list = canvasW - 16
+	local card = list - 8
+	return card - 80
+end
+
+function StoreBoard.LineCount(text: string, widthPx: number, textPx: number): number
+	if text == "" then
+		return 1
+	end
+	if widthPx <= 0 then
+		return 99
+	end
+	local lines = 1
+	local used = 0
+	local space = textPx * StoreBoard.Em
+	for word in string.gmatch(text, "%S+") do
+		local w = #word * textPx * StoreBoard.Em
+		if used > 0 and used + space + w > widthPx then
+			lines += 1
+			used = w
+		else
+			used += (if used > 0 then space else 0) + w
+		end
+	end
+	return lines
+end
+
+-- The description, or a prefix plus an ellipsis when it would run past
+-- two lines on this board.
+function StoreBoard.FitText(text: string, widthPx: number, textPx: number, maxLines: number): string
+	if StoreBoard.LineCount(text, widthPx, textPx) <= maxLines then
+		return text
+	end
+	local best = "…"
+	local lo, hi = 1, #text
+	while lo <= hi do
+		local mid = math.floor((lo + hi) / 2)
+		local cut = string.gsub(string.sub(text, 1, mid), "%s+$", "")
+		local trial = cut .. "…"
+		if StoreBoard.LineCount(trial, widthPx, textPx) <= maxLines then
+			best = trial
+			lo = mid + 1
+		else
+			hi = mid - 1
+		end
+	end
+	return best
+end
+
 local function poster(parent: Instance, item: { name: string, description: string, image: number }, order: number)
 	local card = Instance.new("Frame")
 	card.Name = item.name
@@ -68,7 +126,7 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	title.Position = UDim2.fromOffset(72, 6)
 	title.Size = UDim2.new(1, -80, 0, 22)
 	title.Font = Enum.Font.GothamBold
-	title.TextSize = 16
+	title.TextSize = StoreBoard.TitleTextPx
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.TextColor3 = Color3.fromRGB(62, 42, 24)
 	title.Text = item.name
@@ -76,14 +134,22 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	local body = Instance.new("TextLabel")
 	body.BackgroundTransparency = 1
 	body.Position = UDim2.fromOffset(72, 28)
-	body.Size = UDim2.new(1, -80, 0, 38)
+	body.Name = "Description"
+	body.Size = UDim2.new(1, -80, 0, StoreBoard.DescTextPx * StoreBoard.DescLines)
 	body.Font = Enum.Font.Gotham
-	body.TextSize = 12
+	body.TextSize = StoreBoard.DescTextPx
 	body.TextWrapped = true
+	body.TextTruncate = Enum.TextTruncate.AtEnd
 	body.TextXAlignment = Enum.TextXAlignment.Left
 	body.TextYAlignment = Enum.TextYAlignment.Top
 	body.TextColor3 = Color3.fromRGB(90, 64, 40)
-	body.Text = item.description
+	local canvas = 400
+	local gui = parent.Parent
+	if gui and gui:IsA("SurfaceGui") then
+		canvas = gui.CanvasSize.X
+	end
+	body.Text =
+		StoreBoard.FitText(item.description, StoreBoard.BodyWidth(canvas), StoreBoard.DescTextPx, StoreBoard.DescLines)
 	body.Parent = card
 	card.Parent = parent
 end
@@ -160,9 +226,9 @@ function StoreBoard.Build(): Model
 	prompt.Name = "StorePrompt"
 	prompt.ActionText = "Browse"
 	prompt.ObjectText = "Store"
-	prompt.KeyboardKeyCode = Enum.KeyCode.E
-	prompt.RequiresLineOfSight = false
 	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
 	prompt.HoldDuration = 0
 	prompt.Parent = board
 	-- The board's centre is the game's position. The mesh sits 2.3 lower

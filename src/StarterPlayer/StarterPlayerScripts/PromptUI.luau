@@ -201,14 +201,17 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	-- It clicks as the press goes down, not on Activated (the release): a
 	-- prompt it triggers (Pick up, Sell) is often hidden before the finger
 	-- lifts, and that takes the card, and its Activated, with it.
+	-- The key itself is PromptDefaults. This face stays out of the gamepad
+	-- selection, or the thumbstick walks the UI and the D-pad shortcuts drop.
+	local button = Instance.new("TextButton")
+	button.Name = "Press"
+	button.Size = UDim2.fromScale(1, 1)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Selectable = false
+	button.ZIndex = 5
+	button.Parent = card.outer
 	if touch or prompt.ClickablePrompt then
-		local button = Instance.new("TextButton")
-		button.Name = "Press"
-		button.Size = UDim2.fromScale(1, 1)
-		button.BackgroundTransparency = 1
-		button.Text = ""
-		button.ZIndex = 5
-		button.Parent = card.outer
 		on(button.InputBegan, function(input: InputObject)
 			local t = input.UserInputType
 			if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
