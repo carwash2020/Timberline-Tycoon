@@ -49,6 +49,8 @@ Net.RemoteNames = {
 	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...
 	"SlotAction", -- client -> server: ("load" | "reset", index, confirm)
 	"SlotState", -- server -> client: (summary) the three slots
+	"BoardRequest", -- client -> server: () ask for the leaderboard; the server answers from its cache (LeaderboardService)
+	"BoardData", -- server -> client: (payload) the top rows and your own (LeaderboardLogic.ParsePayload)
 	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
 }
 

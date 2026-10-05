@@ -258,7 +258,16 @@ forecast against that, not against gross Robux.
    this ships as the first big update instead.
 6. **Plot + empire**: claim plot, droppers, flume tracks, sawmill shed,
    processing chain (logs → planks → furniture), warehouse, storefront.
-7. **Social**: trading, companies, leaderboard.
+7. **Social**: trading, companies, leaderboard. The leaderboard exists
+   (2026-10-05): an opt-in top 10 of lifetime cash earned, in Settings >
+   Leaderboard, off until a player turns it on (`settings.showOnBoard`).
+   Owner-approved exception to "one DataStore": an OrderedDataStore
+   `Leaderboard_TotalEarned` (`_Studio` in Studio), reached only through
+   `ProfileService.Board*`; `LeaderboardService` owns the rules (one write
+   per player per 120 s and one on leave, one read per server per 60 s,
+   clients answered from the cache; `Shared/LeaderboardLogic`). Opting out
+   stops the writes and removes the entry. Roblox's own player list stays
+   off (`GameConfig.ShowRobloxPlayerList`).
 8. **Monetization**: passes, dev products, private servers.
 9. **Polish & launch**: thumbnail, icon, tutorial, analytics, bug bash.
 

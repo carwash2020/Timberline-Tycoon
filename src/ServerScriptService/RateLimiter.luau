@@ -49,6 +49,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	TollPay = 1, -- pay the toll
 	FerryBoard = 1, -- board the ferry
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
+	BoardRequest = 2, -- the Leaderboard tab; the service also answers one per player per 10 s
 	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
 }
 local ABUSE_MULTIPLIER = 5

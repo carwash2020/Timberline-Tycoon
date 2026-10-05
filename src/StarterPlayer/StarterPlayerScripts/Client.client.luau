@@ -42,6 +42,7 @@ local MODULES = {
 	"HUD",
 	"HudLayout",
 	"HudRules",
+	"LeaderboardUI",
 	"LifeFX",
 	"LightingController",
 	"LuxFX",
