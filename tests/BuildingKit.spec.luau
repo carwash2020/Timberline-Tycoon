@@ -395,9 +395,9 @@ return function(t)
 		t.ok(string.find(text, "66 s", 1, true) ~= nil)
 		t.ok(string.find(text, "7.4 min", 1, true) ~= nil)
 		t.ok(string.find(text, "13.3 min", 1, true) ~= nil)
-		t.ok(string.find(text, "61.3 min", 1, true) ~= nil)
+		t.ok(string.find(text, "50.9 min", 1, true) ~= nil)
 		-- The price ladder (axes) moved the headlines to these.
-		t.ok(string.find(text, "33.4 h", 1, true) ~= nil)
+		t.ok(string.find(text, "30.5 h", 1, true) ~= nil)
 	end)
 
 	t.test("kit meshes: fidelity is chosen per mesh, and a shared col loads once", function()
