@@ -156,8 +156,7 @@ local function card(
 	imageId: number,
 	buttonText: string,
 	owned: boolean,
-	onBuy: () -> (),
-	offSale: boolean?
+	onBuy: () -> ()
 )
 	local row = Instance.new("Frame")
 	row.Name = name
@@ -202,14 +201,14 @@ local function card(
 		name = "Buy",
 		text = if owned then "Owned" else buttonText,
 		size = Vector2.new(88, UITheme.Size.Tap),
-		style = if owned or offSale == true then "inuse" else "buy",
+		style = if owned then "inuse" else "buy",
 		textSize = StoreUI.PriceTextPx(tenFoot()),
 	})
 	buy.root.AnchorPoint = Vector2.new(1, 0.5)
 	buy.root.Position = UDim2.new(1, -8, 0.5, 0)
 	buy.root.Parent = row
 	buy.face.Activated:Connect(function()
-		if not owned and offSale ~= true then
+		if not owned then
 			onBuy()
 		end
 	end)
@@ -237,11 +236,6 @@ local function redraw()
 				card(frame, pass.name, pass.description, pass.image, robux(prices[id]), has, function()
 					Net.Remote("BuyRobuxItem"):FireServer("Pass", pass.key)
 				end)
-			elseif StoreData.IsForSale(pass.id) and passOnSale[id] == false then
-				-- Roblox says it isn't on sale: show it greyed, so the
-				-- board's poster and this list agree.
-				shown += 1
-				card(frame, pass.name, pass.description, pass.image, "Off sale", false, function() end, true)
 			end
 		end
 		if shown == 0 then
