@@ -292,7 +292,7 @@ end
 GrabLogic.RotateStep = math.rad(15) -- one rotate press
 GrabLogic.TouchTurnSteps = 3 -- a touch screen's Turn and Tip buttons turn 45 degrees a press
 GrabLogic.WheelStep = 1 -- studs per scroll-wheel notch
-GrabLogic.DistanceSpeed = 8 -- studs/s while the D-pad or a +/- button is held
+GrabLogic.DistanceSpeed = 14 -- studs/s while the D-pad, a bumper or a +/- button is held
 GrabLogic.TouchHoldSec = 0.25 -- a touch screen grabs after a finger rests this long on a piece
 GrabLogic.TouchSlop = 12 -- pixels: a finger that moves further first is swiping, not grabbing
 GrabLogic.ConfirmBase = 0.5 -- seconds the client waits for the server to say the piece is held
@@ -329,14 +329,42 @@ export type Turn = { kind: "yaw" | "pitch", steps: number }
 -- tips away from you.
 function GrabLogic.Turn(rot: CFrame, turn: Turn, look: Vector3): CFrame
 	local angle = turn.steps * GrabLogic.RotateStep
-	local axis: Vector3
 	if turn.kind == "yaw" then
-		axis = Vector3.new(0, 1, 0)
-	else
-		local right = Vector3.new(-look.Z, 0, look.X) -- look x up, flattened
-		axis = if right.Magnitude > 1e-6 then right.Unit else Vector3.new(1, 0, 0)
+		return GrabLogic.Rotate(rot, angle, 0, look)
 	end
-	return CFrame.fromAxisAngle(axis, angle) * rot.Rotation
+	return GrabLogic.Rotate(rot, 0, angle, look)
+end
+
+-- `rot` turned by `yaw` radians about the world's up and `pitch` radians
+-- about the camera's flat right. The same turns as above, in any amount.
+function GrabLogic.Rotate(rot: CFrame, yaw: number, pitch: number, look: Vector3): CFrame
+	local right = Vector3.new(-look.Z, 0, look.X) -- look x up, flattened
+	local axis = if right.Magnitude > 1e-6 then right.Unit else Vector3.new(1, 0, 0)
+	return CFrame.fromAxisAngle(axis, pitch) * CFrame.fromAxisAngle(Vector3.new(0, 1, 0), yaw) * rot.Rotation
+end
+
+-- The right stick while the left trigger holds a carried piece in the air
+-- (the gamepad's way to turn it): `x`/`y` are the stick (-1..1), `dt` the
+-- frame. Returns (yaw, pitch) in radians for this frame. Stick right turns
+-- it clockwise seen from above, stick up tips its far end up. Inside the
+-- dead zone nothing moves, and the rest of the throw is rescaled from 0 so
+-- it starts gently.
+GrabLogic.StickDeadZone = 0.2
+GrabLogic.StickTurnSpeed = math.rad(150) -- per second at full throw
+function GrabLogic.StickTurn(x: number, y: number, dt: number): (number, number)
+	local function axis(v: number): number
+		if v ~= v or v == math.huge or v == -math.huge then
+			return 0
+		end
+		local m = math.min(math.abs(v), 1)
+		if m <= GrabLogic.StickDeadZone then
+			return 0
+		end
+		local scaled = (m - GrabLogic.StickDeadZone) / (1 - GrabLogic.StickDeadZone)
+		return (if v < 0 then -1 else 1) * scaled
+	end
+	local step = GrabLogic.StickTurnSpeed * math.clamp(dt, 0, 0.1)
+	return -axis(x) * step, -axis(y) * step
 end
 
 -- The rotation a key press asks for while holding, or nil (that key does
@@ -360,21 +388,38 @@ function GrabLogic.KeyAction(keyName: string, shift: boolean): Turn?
 	return nil
 end
 
+-- The right stick as a flick, for the build placer (LT held): a push past
+-- StickFlickAt from a stick that was back inside StickResetAt gives -1 (left or
+-- down) or +1 (right or up) once; holding it over does nothing more.
+-- `was` is the last value this axis reported, `now` this one. Returns
+-- (flick, armed): the flick (0 if none) and whether the next one may fire.
+GrabLogic.StickFlickAt = 0.65
+GrabLogic.StickResetAt = 0.3
+function GrabLogic.StickFlick(was: number, now: number, armed: boolean): (number, boolean)
+	if now ~= now then
+		return 0, armed
+	end
+	local m = math.abs(now)
+	if m < GrabLogic.StickResetAt then
+		return 0, true
+	end
+	if armed and m >= GrabLogic.StickFlickAt and math.abs(was) < GrabLogic.StickFlickAt then
+		return (if now < 0 then -1 else 1), false
+	end
+	return 0, armed
+end
+
 -- A gamepad button while holding: a turn, or a hold-distance direction
--- (+1 further while held, -1 nearer). D-pad left/right turn, LB/RB tip,
--- D-pad up/down push and pull.
+-- (+1 further while held, -1 nearer). D-pad left/right turn, D-pad up/down
+-- and RB/LB push and pull. (Tipping is the right stick, with LT held.)
 function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 	if keyName == "DPadLeft" then
 		return { kind = "yaw", steps = 1 }, nil
 	elseif keyName == "DPadRight" then
 		return { kind = "yaw", steps = -1 }, nil
-	elseif keyName == "ButtonL1" then
-		return { kind = "pitch", steps = 1 }, nil
-	elseif keyName == "ButtonR1" then
-		return { kind = "pitch", steps = -1 }, nil
-	elseif keyName == "DPadUp" then
+	elseif keyName == "DPadUp" or keyName == "ButtonR1" then
 		return nil, 1
-	elseif keyName == "DPadDown" then
+	elseif keyName == "DPadDown" or keyName == "ButtonL1" then
 		return nil, -1
 	end
 	return nil, nil

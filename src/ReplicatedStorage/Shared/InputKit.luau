@@ -86,17 +86,22 @@ InputKit.Target = {
 		{ action = "Rotate", keyboard = Enum.KeyCode.R, gamepad = Enum.KeyCode.DPadRight },
 		{ action = "Place", gamepad = Enum.KeyCode.ButtonR2 },
 		{ action = "Cancel", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
-		{ action = "Raise", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.ButtonR1 },
-		{ action = "Lower", keyboard = Enum.KeyCode.C, gamepad = Enum.KeyCode.ButtonL1 },
+		-- Raise and lower: E and C on a keyboard; on a gamepad LT held and the
+		-- right stick up or down (one stick, listed once).
+		{ action = "Raise", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.Thumbstick2 },
+		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang the ghost; the right stick flicks it round, up and down
+		{ action = "Push", gamepad = Enum.KeyCode.ButtonR1 }, -- slide it further
+		{ action = "Pull", gamepad = Enum.KeyCode.ButtonL1 }, -- and nearer
 	},
 	drag = {
 		{ action = "Grab", gamepad = Enum.KeyCode.ButtonR2 },
 		{ action = "Yaw", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.DPadLeft },
 		{ action = "Yaw", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.DPadRight },
-		{ action = "Pitch", gamepad = Enum.KeyCode.ButtonL1 },
-		{ action = "Pitch", gamepad = Enum.KeyCode.ButtonR1 },
+		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang it in the air; the right stick then turns and tips it
 		{ action = "Further", gamepad = Enum.KeyCode.DPadUp },
+		{ action = "Further", gamepad = Enum.KeyCode.ButtonR1 },
 		{ action = "Nearer", gamepad = Enum.KeyCode.DPadDown },
+		{ action = "Nearer", gamepad = Enum.KeyCode.ButtonL1 },
 	},
 	menu = {
 		{ action = "Cancel", keyboard = Enum.KeyCode.Escape, gamepad = Enum.KeyCode.ButtonB },
