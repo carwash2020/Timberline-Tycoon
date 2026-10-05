@@ -85,11 +85,7 @@ local eventLines: TextLabel? = nil
 local footer: TextLabel? = nil
 local countdown: TextLabel? = nil
 
-local function corner(parent: GuiObject, radius: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, radius)
-	c.Parent = parent
-end
+local corner = UITheme.corner
 
 local function text(parent: Instance, content: string, size: number, font: Enum.Font, order: number): TextLabel
 	local l = Instance.new("TextLabel")
@@ -240,7 +236,7 @@ local function refresh()
 		b.AutomaticSize = if compact then Enum.AutomaticSize.None else Enum.AutomaticSize.X
 		if compact then
 			b.Size = UDim2.fromOffset(52, 36)
-			b.TextSize = 14
+			b.TextSize = UITheme.Size.TextMin
 		else
 			local spec = UITheme.Sized("DailyButton")
 			local size = spec.size or Vector2.new(200, 30)
@@ -294,7 +290,7 @@ end
 local function build()
 	-- The goals panel's screen: over the side buttons (it can drop over
 	-- them), under the shop.
-	local gui = UITheme.Screen("DailyUI", 3)
+	local gui = UITheme.Screen("DailyUI", UITheme.Layers.Daily)
 
 	-- A corner pill: on a phone 36 tall, with a fingertip-tall hit area
 	-- round it (UITheme.HitPad). It grows with its text, so there the pad
@@ -358,13 +354,14 @@ local function build()
 	local close = Instance.new("TextButton")
 	close.Name = "Close"
 	close.LayoutOrder = 0
-	close.Size = UDim2.fromOffset(44, 44)
+	close.Size = UDim2.fromOffset(84, UITheme.Size.Tap) -- wide enough for its word
 	close.BackgroundColor3 = BARK
 	close.TextColor3 = CREAM
 	close.Font = UITheme.Fonts.Black
 	close.TextSize = 16
 	close.Text = "Close"
 	close.AutoButtonColor = true
+	corner(close, 8)
 	close.Parent = p
 	close.Activated:Connect(function()
 		DailyUI._close()
@@ -387,8 +384,8 @@ local function build()
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.new(1, -60, 0, 22)
 		label.BackgroundTransparency = 1
-		label.Font = Enum.Font.Gotham
-		label.TextSize = 14
+		label.Font = UITheme.Fonts.Body
+		label.TextSize = UITheme.Sized("DailyFooter").text
 		label.TextColor3 = INK
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.TextTruncate = Enum.TextTruncate.AtEnd
@@ -398,8 +395,8 @@ local function build()
 		reward.Position = UDim2.fromScale(1, 0)
 		reward.Size = UDim2.fromOffset(60, 22)
 		reward.BackgroundTransparency = 1
-		reward.Font = Enum.Font.GothamBold
-		reward.TextSize = 14
+		reward.Font = UITheme.Fonts.Bold
+		reward.TextSize = UITheme.Sized("DailyFooter").text
 		reward.TextColor3 = GREEN
 		reward.TextXAlignment = Enum.TextXAlignment.Right
 		reward.Parent = row
@@ -446,7 +443,7 @@ local function build()
 		label.Parent = cell
 		table.insert(calendarCells, { frame = cell, label = label })
 	end
-	calendarNote = text(p, "", UITheme.Sized("DailyCountdown").text, Enum.Font.Gotham, 13)
+	calendarNote = text(p, "", UITheme.Sized("DailyCountdown").text, UITheme.Fonts.Body, 13)
 	local heading = text(p, "", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 14)
 	heading.TextColor3 = AMBER
 	heading.Visible = false
@@ -454,7 +451,7 @@ local function build()
 	local lines = text(p, "", UITheme.Sized("DailyFooter").text, Enum.Font.GothamMedium, 15)
 	lines.Visible = false
 	eventLines = lines
-	local c = text(p, "", UITheme.Sized("DailyCountdown").text, Enum.Font.Gotham, 11)
+	local c = text(p, "", UITheme.Sized("DailyCountdown").text, UITheme.Fonts.Body, 11)
 	c.TextColor3 = BARK
 	countdown = c
 

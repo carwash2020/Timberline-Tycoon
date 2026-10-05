@@ -146,7 +146,7 @@ end
 function ChopSawController.BuildPanel(tenFoot: boolean): Panel
 	local face = ChopSawLogic.PanelFace(tenFoot)
 	local card = ChopSawLogic.PanelCardSize(tenFoot)
-	local gui = UITheme.Screen("ChopSawCut", 6)
+	local gui = UITheme.Screen("ChopSawCut", UITheme.Layers.World)
 	gui.Enabled = false
 
 	local root = Instance.new("Frame")

@@ -377,7 +377,7 @@ local function nudge(delta: number)
 end
 
 local function buildButtons()
-	local gui = UITheme.Screen("DragControls", 4)
+	local gui = UITheme.Screen("DragControls", UITheme.Layers.Drag)
 	local row = Instance.new("Frame")
 	row.Name = "Row"
 	row.AnchorPoint = Vector2.new(0.5, 1)

@@ -477,7 +477,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 end
 
 function BlueprintPlacer.Start()
-	local gui = UITheme.Screen("BlueprintPlacer", 6)
+	local gui = UITheme.Screen("BlueprintPlacer", UITheme.Layers.World)
 	local b = UITheme.Bar(gui, "Placing")
 	barLabel = b.label
 	local function add(text: string, style: string, order: number, onClick: () -> ())

@@ -401,7 +401,7 @@ function WireTool.SetBuilding(on: boolean)
 end
 
 function WireTool.Start()
-	local screen = UITheme.Screen("WireTool", 3)
+	local screen = UITheme.Screen("WireTool", UITheme.Layers.WireTool)
 	local f = Instance.new("Folder")
 	f.Name = "WireLines"
 	f.Parent = workspace

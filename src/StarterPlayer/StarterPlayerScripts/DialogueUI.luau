@@ -22,7 +22,7 @@ local BUTTON_W = 168
 function DialogueUI.Start()
 	local player = Players.LocalPlayer
 	local C = UITheme.Colors
-	local gui = UITheme.Screen("ShopTalk", 30)
+	local gui = UITheme.Screen("ShopTalk", UITheme.Layers.Dialogue)
 	local holder = Instance.new("Frame")
 	holder.Name = "Holder"
 	holder.Size = UDim2.fromScale(1, 1)

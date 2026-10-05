@@ -764,7 +764,7 @@ local function buildPanel()
 	-- Over everything but the HUD (10), so the cash and toasts show on top.
 	-- The device's safe area with the top bar's strip in it: the scrim dims
 	-- it, and the panel keeps clear of the bar itself (fitArea).
-	local g = UITheme.Screen("ShopUI", 5, "device")
+	local g = UITheme.Screen("ShopUI", UITheme.Layers.Shop, "device")
 	g.Enabled = false
 
 	-- The scrim: dims the game, blocks taps on it, and closes on a tap.

@@ -103,7 +103,7 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	gui.Name = "SawmillCut"
 	gui.ResetOnSpawn = false
 	gui.Enabled = false
-	gui.DisplayOrder = 6
+	gui.DisplayOrder = UITheme.Layers.World
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	-- Core UI safe area: under the top bar, inside a notch, and inside
 	-- the 10-foot TV margin. The card sits in the middle of that.
