@@ -1,6 +1,10 @@
 --!strict
--- GateService: the toll line. One connection on TollPay (payment is a later
--- batch; this handler only budgets the call). About twice a second the
+-- GateService: Old Tolly's toll. One connection on TollPay: the request
+-- carries nothing, the server checks the player is at the booth, takes
+-- TollFee from them through EconomyService and opens a TollSeconds window
+-- (the booth's prompt does the same through GateService.Pay). A second tap
+-- inside a live window does not charge; short cash does not charge and
+-- toasts the price. About twice a second the
 -- server samples each character and each vehicle. An unpaid move from
 -- south of the line to on or past it, anywhere in x -400..400, is pushed
 -- back to the south bank, onto the ground there. A seated player takes
@@ -17,13 +21,14 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local EconomyService = require(script.Parent.EconomyService)
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local RateLimiter = require(script.Parent.RateLimiter)
 local TollLogic = require(ReplicatedStorage.Shared.TollLogic)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 
 local GateService = {}
-
-local UNPAID_LINE = "The toll booth opens soon."
 
 local tollPaidUntil: { [number]: number } = {}
 GateService.TollPaidUntil = tollPaidUntil
@@ -48,15 +53,15 @@ local gorgeBound = false
 
 local CHECK_SECONDS = 0.5 -- about 2 Hz
 
-local function toast(player: Player)
+local function toast(player: Player, text: string)
 	local notify = GateService.Notify
 	if notify then
-		notify(player, UNPAID_LINE)
+		notify(player, text)
 	end
 	local folder = ReplicatedStorage:FindFirstChild("Remotes")
 	local remote = if folder then folder:FindFirstChild("Notify") else nil
 	if remote and remote:IsA("RemoteEvent") then
-		remote:FireClient(player, UNPAID_LINE)
+		remote:FireClient(player, text)
 	end
 end
 
@@ -70,9 +75,76 @@ function GateService.Init(remoteEvent: RemoteEvent?)
 		return
 	end
 	bound = true
-	remoteEvent.OnServerEvent:Connect(function(player: Player)
-		RateLimiter.Allow(player, "TollPay")
+	remoteEvent.OnServerEvent:Connect(GateService.Request)
+end
+
+-- One budgeted request to pay: the remote and the booth's prompt both come here.
+function GateService.Request(player: Player)
+	if RateLimiter.Allow(player, "TollPay") then
+		GateService.Pay(player)
+	end
+end
+
+-- Where the booth's counter is (set by SetupWorld; the layout's booth spot
+-- until then).
+local boothX = WorldLayout.BoothX
+local boothZ = WorldLayout.BoothZ
+
+-- Takes the toll from `player`. Returns what happened: "paid", "already",
+-- "short" (not enough cash; nothing charged), or "far" / "gone" (not at
+-- the booth, or no live character). Server clock `now` is injectable.
+function GateService.Pay(player: Player, now: number?): string
+	local clock = now or os.clock()
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+	if not (root and root:IsA("BasePart") and humanoid) or humanoid.Health <= 0 then
+		return "gone"
+	end
+	local at = root.CFrame.Position
+	if not TollLogic.InPayRange(at.X, at.Z, boothX, boothZ) then
+		return "far"
+	end
+	local untilAt = tollPaidUntil[player.UserId]
+	if TollLogic.Quote(clock, untilAt) == "already" then
+		toast(player, TollLogic.AlreadyText((untilAt :: number) - clock))
+		return "already"
+	end
+	if not EconomyService.SpendCash(player, GameConfig.TollFee, "toll", "Toll") then
+		toast(player, TollLogic.ShortText())
+		return "short"
+	end
+	tollPaidUntil[player.UserId] = TollLogic.WindowEnd(clock)
+	toast(player, TollLogic.PaidText())
+	return "paid"
+end
+
+-- The prompt on Old Tolly's counter. `map` is TimberlineMap; MapBuilder may
+-- still be building the booth, so this waits for it.
+function GateService.SetupWorld(map: Instance)
+	task.spawn(function()
+		local booth = map:WaitForChild("TollBooth", 30)
+		local counter = if booth then booth:WaitForChild("Counter", 30) else nil
+		if not (counter and counter:IsA("BasePart")) then
+			warn("[GateService] No toll booth counter; the toll cannot be paid")
+			return
+		end
+		GateService.BindCounter(counter)
 	end)
+end
+
+function GateService.BindCounter(counter: BasePart)
+	local at = counter.CFrame.Position
+	boothX, boothZ = at.X, at.Z
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "TollPrompt"
+	prompt.ActionText = TollLogic.ActionText()
+	prompt.ObjectText = "Old Tolly's toll"
+	prompt.MaxActivationDistance = TollLogic.PromptRange
+	prompt.HoldDuration = 0
+	InputKit.PromptDefaults(prompt, "Buy")
+	prompt.Parent = counter
+	prompt.Triggered:Connect(GateService.Request)
 end
 
 function GateService.PlayerRemoving(player: Player)
@@ -233,7 +305,7 @@ function GateService.Step(now: number?)
 			local inCut = WorldLayout.InGorge(vpos.X, vpos.Z) or WorldLayout.InGorge(pos.X, pos.Z)
 			if inCut or (vprev and TollLogic.Crossed(vprev.Z, vpos.Z, vpos.X) and not driverPaid(vehicle, clock)) then
 				if not inCut then
-					toast(player)
+					toast(player, TollLogic.PushText())
 				end
 				placeAtLanding(vehicle, vpos)
 				local landed = vehicle:GetPivot().Position
@@ -254,7 +326,7 @@ function GateService.Step(now: number?)
 			elseif prev and TollLogic.Crossed(prev.Z, pos.Z, pos.X) and not paid(player.UserId, clock) then
 				placeAtLanding(char, pos)
 				charSample[player.UserId] = root.CFrame.Position
-				toast(player)
+				toast(player, TollLogic.PushText())
 			end
 		end
 	end

@@ -59,7 +59,10 @@ return function(t)
 		t.eq(BadgeData.Get("AreaVolcano").name, "The Volcano")
 		t.eq(BadgeData.Get("AreaToll").name, "North Strip")
 		t.eq(BadgeData.Get("AreaToll").detail, "Cross Old Tolly's bridge into the North Strip.")
-		t.eq(BadgeData.NotBuilt, { "AreaFerry" })
+		t.eq(BadgeData.NotBuilt, {})
+		-- Built triggers keep id 0 until the owner pastes the Creator Hub id.
+		t.eq(BadgeData.Ids.AreaFerry, 0)
+		t.eq(BadgeData.Ids.AreaToll, 0)
 		t.eq(BadgeData.Ids.AreaCave, 0, "the cave badge id waits for a PASTE")
 		for _, key in ipairs(BadgeData.NotBuilt) do
 			t.eq(BadgeData.Ids[key], 0, key)
@@ -103,8 +106,9 @@ return function(t)
 		t.eq(BadgeData.AreasAt(1010, 40, 1110), { "AreaVolcano" })
 		-- The Secret Cave room is built, so standing in it records the visit.
 		t.eq(BadgeData.AreasAt(-765, 20, -655), { "AreaCave" })
-		-- Ferry Island earns nothing while it is unbuilt.
-		t.eq(BadgeData.AreasAt(1395, 12, -760), {})
+		-- Ferry Island's disc is built (the ferry reaches it).
+		t.eq(BadgeData.AreasAt(1395, 12, -760), { "AreaFerry" })
+		t.eq(BadgeData.AreasAt(1395 + 80, 12, -760), {}, "past the island's edge")
 		t.eq(BadgeData.AreasAt(9000, 0, 9000), {})
 		-- The North Strip trigger is the box north of the bridge, not the deck.
 		t.eq(BadgeData.AreasAt(0, 40, 1700), { "AreaToll" })

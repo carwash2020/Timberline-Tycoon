@@ -56,9 +56,9 @@ BadgeData.Ids = {
 	AreaGrove = 0, -- PASTE: Engagement → Badges → Gloam Hollow → ID
 	AreaSky = 0, -- PASTE: Engagement → Badges → Aether Isles → ID
 	-- Leave these at 0 until the dashboard has the badge. Awarding skips 0.
-	AreaFerry = 0, -- not built yet
+	AreaFerry = 0, -- PASTE: Engagement → Badges → Ferry Island → ID
 	AreaCave = 0, -- PASTE: Engagement → Badges → Secret Cave → ID
-	AreaToll = 0,
+	AreaToll = 0, -- PASTE: Engagement → Badges → North Strip → ID
 	WoodFrostwood = 0, -- PASTE: Engagement → Badges → Frostwood → ID
 	WoodEmberwood = 0, -- PASTE: Engagement → Badges → Emberwood → ID
 	WoodGloamwood = 0, -- PASTE: Engagement → Badges → Gloamwood → ID
@@ -68,12 +68,12 @@ BadgeData.Ids = {
 
 -- Places that are not in the world yet. AreasAt skips every key here, so
 -- standing there earns nothing. Their ids stay 0.
--- The North Strip trigger is built (x -400..400, z 1586..1900, not the
--- booth or the bridge deck). The Secret Cave trigger is built: standing in
--- the Petrified Reach disc (RegionLogic.ReachCenter, radius 46, which holds
--- the cave room) records the visit. Ferry Island stays dark until its own
--- batch removes it.
-BadgeData.NotBuilt = { "AreaFerry" }
+-- A key leaves NotBuilt when its trigger is built. The North Strip box
+-- (x -400..400, z 1586..1900, not the booth or the bridge deck), the Ferry
+-- Island disc (reached by Cap'n Moss's ferry, FerryService) and the Secret
+-- Cave (standing in the Petrified Reach disc, RegionLogic.ReachCenter,
+-- radius 46, which holds the cave room) are all built.
+BadgeData.NotBuilt = {}
 
 -- A phone tap target (InputKit.MinTouchPx). BadgeUI rows and the open
 -- button are at least this tall.

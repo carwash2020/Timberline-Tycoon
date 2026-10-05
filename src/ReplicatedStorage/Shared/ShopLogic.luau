@@ -73,9 +73,10 @@ function ShopLogic.WhyNot(status: AxeStatus, axe: AxeDef, bestTier: number): str
 	return ""
 end
 
--- A closed biome stays off the axe card. A boat biome is on the map but
--- not reachable yet (FerryService is still the wave 0 stub), so its wood
--- stays off too, the same way the economy tools leave ferryisle out.
+-- A closed biome stays off the axe card. A boat biome (Ferry Island) is
+-- reachable now, by Cap'n Moss's ferry, but its wood is still not part of
+-- the economy (WoodData and the economy tools leave ferryisle out), so it
+-- stays off the card too until Connor brings it in.
 local function onAxeCard(biomeId: string): boolean
 	if not BiomeData.IsOpen(biomeId) then
 		return false
