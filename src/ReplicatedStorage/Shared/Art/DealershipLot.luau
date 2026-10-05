@@ -2,8 +2,8 @@
 -- The dealership's open display lot: all eight trucks and trailers in one
 -- row, facing the path along the south side (-Z). Each model is anchored,
 -- has no scripts, streams Atomic, and carries a price sign. The seats can
--- be sat in and cannot be driven. A box sits beside every vehicle except
--- the Rustbucket. MapBuilder places the model; the boxes are the purchase.
+-- be sat in and cannot be driven. A box sits beside every vehicle (the
+-- Rustbucket too). MapBuilder places the model; the boxes are the purchase.
 --
 -- Eight parking bays (about 118 studs before the gaps between them) do not
 -- fit the lawn Job B keeps for this lot (x 184 to 296). The row uses each
@@ -195,19 +195,17 @@ function DealershipLot.Build(): Model
 			model.Parent = lot
 			model:PivotTo(CFrame.new(cx, 0, bumper + length / 2))
 			attachSign(model, priceOf(entry.kind, entry.id), length)
-			if entry.id ~= "Rustbucket" then
-				local extents = model:GetExtentsSize()
-				local boxSize = VehicleLogic.BoxSize(extents)
-				local spot =
-					Kit.part(lot, "BoxSpot", boxSize, CFrame.new(), Color3.fromRGB(196, 148, 90), Enum.Material.Wood)
-				spot.CFrame = model:GetPivot() * CFrame.new(0, boxSize.Y / 2, length / 2 + boxSize.Z / 2 + 1)
-				spot.CanCollide = false
-				spot.CanQuery = false
-				spot.CanTouch = false
-				spot.Transparency = 1
-				spot:SetAttribute("ItemId", entry.id)
-				spot:SetAttribute("Category", entry.kind)
-			end
+			local extents = model:GetExtentsSize()
+			local boxSize = VehicleLogic.BoxSize(extents)
+			local spot =
+				Kit.part(lot, "BoxSpot", boxSize, CFrame.new(), Color3.fromRGB(196, 148, 90), Enum.Material.Wood)
+			spot.CFrame = model:GetPivot() * CFrame.new(0, boxSize.Y / 2, length / 2 + boxSize.Z / 2 + 1)
+			spot.CanCollide = false
+			spot.CanQuery = false
+			spot.CanTouch = false
+			spot.Transparency = 1
+			spot:SetAttribute("ItemId", entry.id)
+			spot:SetAttribute("Category", entry.kind)
 		end
 		x += spans[i] + gap
 	end

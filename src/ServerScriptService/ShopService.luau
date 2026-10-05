@@ -407,9 +407,9 @@ local function buyTruck(player: Player, truckId: string)
 		return
 	end
 	local price = ShopLogic.Price(truck, loop)
-	-- The Rustbucket stays an instant grant so the old loop still works.
-	-- Every other loop-2 truck is a box.
-	if loop == 2 and truck.id ~= "Rustbucket" then
+	-- Loop 2: every truck, the Rustbucket too, is a box you open on your plot
+	-- (its pad comes in the box). Only the old loop grants one outright.
+	if loop == 2 then
 		if buyVehicleBox(player, profile, truck.id, truck.displayName, price) then
 			QuestService.Event(player, "truckBought")
 			MilestoneService.Mark(player, "Bought a truck")
@@ -610,7 +610,7 @@ local function onBuyItem(player: Player, category: unknown, itemId: unknown)
 end
 
 -- The Timber Classic pass: every slot, including a new game. Doesn't
--- replace a truck they're already driving. Completes the tutorial's truck
+-- replace a truck they're already driving; it comes as a box in storage. Completes the tutorial's truck
 -- step when that step is the current one.
 function ShopService.GrantPassTruck(player: Player)
 	local profile = ProfileService.GetProfile(player)
@@ -620,9 +620,10 @@ function ShopService.GrantPassTruck(player: Player)
 	SaveSlotLogic.GrantPassTrucks(profile)
 	publishTrucks(player, profile)
 	player:SetAttribute("OwnsTruck", #profile.ownedTrucks > 0)
-	if VehicleService.GetVehicle(player) == nil and profile.equippedTruck ~= "" then
-		VehicleService.SpawnTruck(player, profile.equippedTruck, nil, profile.equippedTrailer)
-	end
+	-- A truck only exists on its own pad, and the pad comes in a box: give
+	-- the pass truck its box now (the one-time mint already ran on this save).
+	profile.trucksBoxed = false
+	ProfileSchema.MintTruckBoxes(profile)
 	QuestService.Event(player, "truckBought")
 end
 
@@ -793,7 +794,7 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		end
 	elseif box.kind == "Truck" then
 		local truck = ItemCatalog.GetTruck(box.itemId)
-		if not truck or truck.id == "Rustbucket" or truck.sold == false or truck.robux == true then
+		if not truck or truck.sold == false or truck.robux == true then
 			return fail("locked")
 		end
 		-- Plot check before any cash moves. Yes on the card still calls

@@ -1,7 +1,7 @@
 --!strict
 -- GameServer: bootstrap + remote handlers.
 --   * Creates ReplicatedStorage/Remotes (names listed in Shared/Net).
---   * PlayerAdded: load save -> spawn Rustbucket -> hand over every owned axe
+--   * PlayerAdded: load save -> restore spawn pads (a truck only comes out of its pad) -> hand over every owned axe
 --     (AxeService; axes are items the player can switch, drop and pick up).
 --   * PlayerRemoving: drop carried logs, final save + release the session.
 --   * Every remote is rate-limited and server-validated. The client only
@@ -718,8 +718,13 @@ local activeLoop = CoreLoop.Active()
 safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
 safely("AxeService.Init", AxeService.Init, notify)
 safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify, activeLoop)
-VehicleService.Hooks.deliveryCFrame = function(player: Player): CFrame?
-	return PlotService.DeliveryCFrame(player)
+-- The tutorial's pad steps: the pad went down, the truck rolled out.
+VehicleService.Hooks.padEvent = function(player: Player, event: string)
+	if event == "padPlaced" then
+		QuestService.Event(player, "padPlaced")
+	elseif event == "truckSpawned" then
+		QuestService.Event(player, "truckSpawned")
+	end
 end
 safely("VehicleService.Init", VehicleService.Init, notify)
 safely(
@@ -1177,11 +1182,7 @@ remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	end
 	local ok, why = VehicleService.Recall(player)
 	if ok then
-		if PlotService.DeliveryCFrame(player) then
-			notify(player, "Your truck is back on your plot.")
-		else
-			notify(player, "Your truck is back in your parking spot.")
-		end
+		notify(player, "Your truck is back on its pad.")
 	elseif why then
 		notify(player, why)
 	end
@@ -1344,15 +1345,12 @@ local function onPlayerAdded(player: Player)
 	end
 	-- Before the truck and the left-behind logs come back. A spot on a new
 	-- pad, under the ground, or in the water waits in the town truck lot
-	-- instead of appearing on somebody's yard. Claiming still moves it to
-	-- the delivery pad.
+	-- instead of appearing on somebody's yard. Claiming still moves it onto
+	-- the plot. No truck is built here: a truck only ever exists on its own
+	-- spawn pad, so it comes out when its pad's button is pressed (the pads
+	-- are restored in ShopService.PlayerJoined).
 	joinLap("account set up")
 	safely("PlotService.ParkStrays", PlotService.ParkStrays, profile)
-	if truckId ~= "" then
-		safely("VehicleService.SpawnTruck", function()
-			VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
-		end)
-	end
 	-- Logs left behind (Truck to lot from afar) that were still lying out
 	-- when the player last left: back where they lay, at most MaxLeftLogs
 	-- of them (saves made under the old cap can hold 150).
@@ -1479,9 +1477,6 @@ local function rebuildSlotNow(player: Player)
 		-- No pad yet, so a bad saved spot must not spawn on one.
 		PlotService.ParkStrays(profile)
 		PlotService.PlayerJoined(player, profile)
-	end
-	if truckId ~= "" then
-		VehicleService.SpawnTruck(player, truckId, nil, profile.equippedTrailer)
 	end
 	ShopService.PlayerJoined(player, profile)
 	ForestService.PlayerJoined(player, profile)

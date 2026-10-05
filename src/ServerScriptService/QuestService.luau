@@ -30,6 +30,10 @@
 --       woodLoaded    TruckLoad (M1.6) must call
 --                     QuestService.Event(owner, "woodLoaded") when a piece
 --                     of the owner's comes to rest in their own BedZone
+--       truckBought   ShopService: the truck's box was bought
+--       padPlaced     VehicleService (Hooks.padEvent, set by GameServer):
+--                     the box's pad went down on the plot
+--       truckSpawned  the same hook: a pad's button brought the truck out
 --     Under the v1 loop the v2 events count for nothing (no v1 step
 --     listens to them), and the other way round.
 
@@ -157,6 +161,12 @@ local function hasPlacedItem(profile: Profile): boolean
 	return profile.plot ~= nil and type(profile.plot.placed) == "table" and #profile.plot.placed > 0
 end
 
+-- A spawn pad (from a truck or trailer box) is on the plot.
+local function hasPad(profile: Profile): boolean
+	local plot: any = profile.plot
+	return type(plot) == "table" and type(plot.pads) == "table" and #plot.pads > 0
+end
+
 local function ownsTruck(profile: Profile): boolean
 	return type(profile.ownedTrucks) == "table" and #profile.ownedTrucks > 0
 end
@@ -173,7 +183,8 @@ local function enterStep(player: Player, profile: Profile, index: number)
 			profile.bestAxeTier,
 			claimedPlot(profile),
 			ownsTruck(profile),
-			hasPlacedItem(profile)
+			hasPlacedItem(profile),
+			hasPad(profile)
 		)
 	do
 		index += 1
@@ -261,7 +272,8 @@ function QuestService.Start(player: Player, profile: Profile)
 			profile.bestAxeTier,
 			claimedPlot(profile),
 			ownsTruck(profile),
-			hasPlacedItem(profile)
+			hasPlacedItem(profile),
+			hasPad(profile)
 		)
 	then
 		enterStep(player, profile, if step then profile.tutorialStep + 1 else 1)

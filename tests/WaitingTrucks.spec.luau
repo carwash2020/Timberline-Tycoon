@@ -35,7 +35,10 @@ return function(t)
 			table.insert(profile.storage, { uid = "full-" .. i, itemId = "SteelAxe", shop = "ToolShed" })
 		end
 		Vehicle.AnnounceWaiting({ Name = "Tester", UserId = 3 }, profile)
-		t.eq(toasts, { "Your Flatbed is waiting. Free a storage slot to get its box." })
+		t.eq(toasts, {
+			"Your Flatbed is waiting. Free a storage slot to get its box.",
+			"Your Rustbucket is waiting. Free a storage slot to get its box.",
+		})
 		t.eq(#profile.storage, Schema.StorageCap)
 		t.eq(profile.trucksBoxed, false)
 	end)

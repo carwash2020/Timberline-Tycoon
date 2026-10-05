@@ -104,7 +104,20 @@ return function(t)
 		slot:AddTag("ParkingSlot")
 		slot:SetAttribute("Index", 1)
 		slot.Parent = ws
-		local w = { profile = { truckBed = {}, truckAt = {}, leftLoad = {} } }
+		-- The truck is built on its own pad, so the plot has one.
+		local w = {
+			profile = {
+				truckBed = {},
+				truckAt = {},
+				leftLoad = {},
+				plot = {
+					claimed = true,
+					tier = 1,
+					placed = {},
+					pads = { { uid = "pad-Pickup", id = "Pickup", kind = "Truck", x = 0, z = 0, presses = 0 } },
+				},
+			},
+		}
 		local loader = t.loader({
 			mocks = {
 				ProfileService = {
@@ -184,6 +197,9 @@ return function(t)
 			Name = "Dale",
 			DisplayName = "Dale",
 			SetAttribute = function() end,
+			GetAttribute = function(_, name)
+				return if name == "PlotSlot" then 1 else nil
+			end,
 		}
 		return w
 	end

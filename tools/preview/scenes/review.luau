@@ -95,7 +95,7 @@ return {
 			Enum.Material.Ground
 		)
 		local padCf = plotCf * CF.new(0, 0.16, half + 8)
-		Kit.part(root, "DeliveryPad", V3.new(80, 0.2, 16), padCf, C3.fromRGB(168, 150, 118), Enum.Material.Ground)
+		Kit.part(root, "SpawnPad", V3.new(80, 0.2, 16), padCf, C3.fromRGB(168, 150, 118), Enum.Material.Ground)
 		local sign = Kit.part(
 			root,
 			"PlotSign",

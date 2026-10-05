@@ -826,7 +826,7 @@ return function(t)
 		t.eq(s.plot(5):GetAttribute("OwnerId"), 1)
 	end)
 
-	t.test("a bad saved spot moves onto the delivery pad", function()
+	t.test("a bad saved spot moves onto the plot", function()
 		local s = setup()
 		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
 		local ann, profile = s.newPlayer(1, "Ann")
@@ -840,11 +840,13 @@ return function(t)
 		-- A second log that is fine stays put: checked after, on a fresh profile field.
 		s.P.PlayerJoined(ann, profile)
 		s.P.Claim(ann, 1)
-		local drop = s.P.GetDeliveryPad(ann)
-		t.ok(drop ~= nil)
+		-- There is no road-edge delivery pad any more: a stray spot goes to the
+		-- middle of the plot that was claimed.
+		t.eq(s.P.GetDeliveryPad, nil, "no delivery pad API")
+		t.eq(s.P.DeliveryCFrame, nil, "no delivery pad API")
+		local claimed = s.PlotData.Slots[1]
 		local function nearDrop(x, z)
-			local p = drop.Position
-			return math.abs(x - p.X) < 0.01 and math.abs(z - p.Z) < 0.01
+			return math.abs(x - claimed.X) < 0.01 and math.abs(z - claimed.Y) < 0.01
 		end
 		t.ok(nearDrop(profile.truckAt.x, profile.truckAt.z), "truckAt left the lake")
 		t.ok(nearDrop(profile.leftLoad[1].x, profile.leftLoad[1].z), "leftLoad left the pad")
@@ -855,7 +857,6 @@ return function(t)
 		s.P.Reload(ann, profile)
 		t.eq(profile.truckAt.x, town.x)
 		t.eq(profile.truckAt.z, town.z)
-		t.eq(s.P.GetDeliveryPad(ann).Position.X, drop.Position.X)
 	end)
 
 	t.test("a saved truckAt that sits on a new pad must spawn elsewhere on join", function()
@@ -868,8 +869,9 @@ return function(t)
 		profile.groundLoad = { { g = { pad.X, 3, pad.Y } } }
 		local server = require("@lune/fs").readFile("src/ServerScriptService/GameServer.server.luau")
 		local parkAt = string.find(server, "PlotService.ParkStrays", 1, true)
-		local spawnAt = string.find(server, "VehicleService.SpawnTruck", 1, true)
-		t.ok(parkAt ~= nil and spawnAt ~= nil and parkAt < spawnAt, "the lot pass runs before the truck spawns")
+		local padsAt = string.find(server, "ShopService.PlayerJoined(player, profile)", 1, true)
+		t.ok(parkAt ~= nil and padsAt ~= nil and parkAt < padsAt, "the lot pass runs before the pads come back")
+		t.eq(string.find(server, "VehicleService.SpawnTruck", 1, true), nil, "joining builds no truck: only a pad does")
 		s.P.ParkStrays(profile)
 		t.eq(WorldLayout.OnPlotPad(profile.truckAt.x, profile.truckAt.z), false)
 		local lot = WorldLayout.ParkingLot

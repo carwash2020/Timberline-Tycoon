@@ -598,12 +598,9 @@ export type PressPlan = {
 	broke: boolean,
 }
 
--- The Rustbucket stays in the town lot. Everything else in the catalog
--- can sit on a pad.
+-- Every truck and trailer in the catalog (the Rustbucket too) comes with a
+-- pad: a vehicle never exists without one.
 function VehicleLogic.CanHavePad(id: string): boolean
-	if id == "Rustbucket" then
-		return false
-	end
 	return ItemCatalog.GetTruck(id) ~= nil or ItemCatalog.GetTrailer(id) ~= nil
 end
 

@@ -553,7 +553,10 @@ return function(t)
 		t.eq(data.schema, 5)
 		t.eq(data.cash, 80)
 		t.eq(data.plot.claimed, true)
-		t.eq(data.storage, {})
+		-- A played save's starter Rustbucket now comes as a box (one, once).
+		t.eq(#data.storage, 1)
+		t.eq(data.storage[1].itemId, "Rustbucket")
+		t.eq(data.storage[1].shop, "Dealership")
 		t.eq(data.plot.squares, {})
 		t.eq(data.permissions, {})
 		t.eq(data.badgesAwarded, {})
@@ -776,7 +779,7 @@ return function(t)
 		t.eq(data.schema, 5)
 	end)
 
-	t.test("T6: migration mints one box per non-Rustbucket truck, once, on every slot", function()
+	t.test("T6: migration mints one box per owned truck (the Rustbucket too), once, on every slot", function()
 		local Schema, data = fresh()
 		data.plot.claimed = true
 		data.ownedTrucks = { "Pickup", "Rustbucket", "Flatbed" }
@@ -800,16 +803,16 @@ return function(t)
 			table.sort(ids)
 			return ids
 		end
-		t.eq(dealership(data), { "Flatbed", "Pickup" })
+		t.eq(dealership(data), { "Flatbed", "Pickup", "Rustbucket" })
 		t.eq(data.trucksBoxed, true)
-		t.eq(dealership(data.slots[1]), { "Flatbed", "Pickup" })
+		t.eq(dealership(data.slots[1]), { "Flatbed", "Pickup", "Rustbucket" })
 		t.eq(
 			data.slots[1].storage[1].uid,
 			data.storage[1].uid,
 			"the active slot is the live snapshot, not a second mint"
 		)
 		t.eq(dealership(data.slots[2]), { "ScoutATV" })
-		t.eq(dealership(data.slots[3]), {})
+		t.eq(dealership(data.slots[3]), { "Rustbucket" })
 		t.eq(data.slots[2].trucksBoxed, true)
 		t.eq(data.slots[3].trucksBoxed, true)
 		local function rust(record)
@@ -820,8 +823,8 @@ return function(t)
 			end
 			return false
 		end
-		t.eq(rust(data), false)
-		t.eq(rust(data.slots[3]), false)
+		t.eq(rust(data), true, "the Rustbucket is boxed like every other truck")
+		t.eq(rust(data.slots[3]), true)
 		local seen = {}
 		for _, box in ipairs(data.slots[2].storage) do
 			t.ok(not seen[box.uid])
@@ -833,6 +836,77 @@ return function(t)
 		t.eq(data.slots[2].storage, before.slots[2].storage)
 		t.eq(data.slots[3].storage, before.slots[3].storage)
 		t.eq(data.ownedTrucks, { "Pickup", "Rustbucket", "Flatbed" })
+	end)
+
+	t.test("an old save that owns a Rustbucket with no box and no pad gets a box, once", function()
+		local Schema, data = fresh()
+		-- Boxed before the Rustbucket was a boxed truck: trucksBoxed is already true.
+		data.plot.claimed = true
+		data.ownedTrucks = { "Rustbucket", "Pickup" }
+		data.equippedTruck = "Rustbucket"
+		data.trucksBoxed = true
+		data.rustbucketBoxed = false
+		data.storage = { { uid = "pickup-box", itemId = "Pickup", shop = "Dealership" } }
+		data.plot.pads = {}
+		Schema.Migrate(data)
+		local rustboxes = 0
+		for _, box in ipairs(data.storage) do
+			if box.itemId == "Rustbucket" and box.shop == "Dealership" then
+				rustboxes += 1
+				t.eq(type(box.uid), "string")
+				t.ok(box.uid ~= "pickup-box")
+			end
+		end
+		t.eq(rustboxes, 1, "one Rustbucket box minted")
+		t.eq(#data.storage, 2, "the existing box is untouched")
+		t.eq(data.storage[1].uid, "pickup-box")
+		t.eq(data.rustbucketBoxed, true)
+		t.eq(data.ownedTrucks, { "Rustbucket", "Pickup" }, "nothing owned is removed")
+		-- Idempotent, even when the player then opens (spends) the box.
+		local before = t.loader():shared("Util").deepCopy(data)
+		Schema.Migrate(data)
+		sameClock(before, data)
+		t.eq(data, before)
+		data.storage = { data.storage[1] }
+		data.plot.pads = { { uid = "p1", id = "Rustbucket", kind = "Truck", x = 0, z = 0, rot = 0, presses = 0 } }
+		Schema.Migrate(data)
+		t.eq(#data.storage, 1, "a Rustbucket with a pad is not boxed again")
+	end)
+
+	t.test("a Rustbucket that already has a pad or a box is not boxed again", function()
+		local Schema, data = fresh()
+		data.plot.claimed = true
+		data.ownedTrucks = { "Rustbucket" }
+		data.trucksBoxed = true
+		data.plot.pads = { { uid = "p1", id = "Rustbucket", kind = "Truck", x = 0, z = 0, rot = 0, presses = 0 } }
+		Schema.Migrate(data)
+		t.eq(#data.storage, 0)
+		t.eq(data.rustbucketBoxed, true)
+		local Schema2, other = fresh()
+		other.ownedTrucks = { "Rustbucket" }
+		other.trucksBoxed = true
+		other.storage = { { uid = "have", itemId = "Rustbucket", shop = "Dealership" } }
+		Schema2.Migrate(other)
+		t.eq(#other.storage, 1)
+		t.eq(other.storage[1].uid, "have")
+	end)
+
+	t.test("a Rustbucket box waits for storage room and never trims storage", function()
+		local Schema, data = fresh()
+		data.ownedTrucks = { "Rustbucket" }
+		data.trucksBoxed = true
+		data.storage = {}
+		for i = 1, Schema.StorageCap do
+			table.insert(data.storage, { uid = "keep-" .. i, itemId = "SteelAxe", shop = "ToolShed" })
+		end
+		Schema.Migrate(data)
+		t.eq(#data.storage, Schema.StorageCap)
+		t.eq(data.rustbucketBoxed, false, "still owed")
+		table.remove(data.storage)
+		Schema.MintTruckBoxes(data)
+		t.eq(#data.storage, Schema.StorageCap)
+		t.eq(data.storage[Schema.StorageCap].itemId, "Rustbucket")
+		t.eq(data.rustbucketBoxed, true)
 	end)
 
 	t.test("a full storage is not trimmed to mint a truck box", function()

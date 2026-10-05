@@ -85,15 +85,14 @@ return function(t)
 				t.ok(d.Size.X >= 4 and d.Size.Y >= 3 and d.Size.Z >= 4, d:GetAttribute("ItemId") .. " box minimum")
 			end
 		end
-		t.eq(#spots, 7, "a box beside every vehicle except the Rustbucket")
+		t.eq(#spots, 8, "a box beside every vehicle, the Rustbucket too")
 		local rust = false
 		for _, spot in ipairs(spots) do
-			t.ok(spot:GetAttribute("ItemId") ~= "Rustbucket")
 			if spot:GetAttribute("ItemId") == "Rustbucket" then
 				rust = true
 			end
 		end
-		t.eq(rust, false)
+		t.eq(rust, true, "the Rustbucket is bought as a box like the rest")
 		local facing = nil
 		for _, child in ipairs(lot:GetChildren()) do
 			if child:IsA("Model") and child:GetAttribute("ItemId") then

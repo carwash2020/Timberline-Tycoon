@@ -1,17 +1,13 @@
 --!strict
 -- VehicleService: builds and owns player trucks.
 --   * Every truck is drawn by Shared/Art/TruckArt from its ItemCatalog entry
---     (Shared/TruckLayout says where each piece goes) in the player's own
---     ParkingSlot. The bays come in sizes (WorldPlan.ParkingBays, phase
---     12): each rig takes the smallest free one it fits, centred in it
---     (VehicleLogic.BayChoices), and a rebuild (a recall, a switch at the
---     Dealership) moves it to a better fit when there is one. A rig longer
---     than every free bay parks with its tail at a bay's tail and its nose
---     out over the pull-out; with no bay at all, in an overflow spot.
---     Trucks never spawn inside each other: a truck parked in the way is
---     sent back to its own spot, else the rig takes its next choice that's
---     clear. TruckArt.Rig makes it one rigid body: the
---     invisible chassis is its only massive part, every other part is
+--     (Shared/TruckLayout says where each piece goes). A truck is only ever
+--     built on its own spawn pad (a pad in profile.plot.pads, from the box
+--     the truck was bought in): pressing the pad's button, "Send truck
+--     home", and switching trucks all put it there. A player with no pad
+--     for a truck gets a toast and no truck: there is no road-edge
+--     delivery pad and no public bay. TruckArt.Rig makes it one rigid body:
+--     the invisible chassis is its only massive part, every other part is
 --     massless and welded to it, and each wheel hangs on a Motor6D that
 --     VehicleFX spins and steers on every client.
 --   * Driving, set by GameConfig.VehiclePhysics:
@@ -47,8 +43,8 @@
 --     in town, or waits on the ground where the truck was.
 --   * BedCount / BedCapacity are attributes on the truck AND on the player
 --     (the HUD keeps working while the truck is streamed out).
---   * Recall ("Send truck home") and switching trucks rebuild the truck in the
---     player's slot. The load comes along (when it fits) only if the truck
+--   * Recall ("Send truck home") and switching trucks rebuild the truck on its
+--     pad. The load comes along (when it fits) only if the truck
 --     was already in town (VehicleLogic.InTown); from further out it's
 --     left on the ground where the truck stood, as the player's logs, so
 --     nobody skips the haul home. Left-behind logs still lying out when the
@@ -58,7 +54,7 @@
 --     through three hooks (VehicleService.Hooks, nil under v1): the driver
 --     changing, a truck being rebuilt, and how many pieces ride on a bed.
 --   * TruckSlotDistance on the player: how far their truck is from its own
---     parking spot, in whole studs (Shared/TruckHome), checked twice a
+--     spawn pad, in whole studs (Shared/TruckHome), checked twice a
 --     second and sent only when it moves a couple of studs; nil with no
 --     truck. VehicleController shows "Send truck home" from it.
 
@@ -106,7 +102,6 @@ type TrailerDef = ItemCatalog.TrailerDef
 local VehicleService = {}
 
 local TRUCK_TAG = "Truck"
-local SLOT_TAG = "ParkingSlot"
 local WHEEL_CLEARANCE = TruckLayout.ChassisY -- chassis pivot height above the ground; puts the wheels on it
 local SPEED_CHECK_EVERY = 0.5 -- seconds
 local SETTLE_MAX = 1.5 -- seconds a truck may roll after its driver gets out
@@ -116,7 +111,6 @@ local PARK_TILT = math.rad(30) -- the steepest slope a truck parks on
 local PARK_RAY = 40 -- studs below a tipped truck that parking looks for the ground
 local HOLD_SECONDS = 1 -- a truck the speed check put back stays the server's this long
 local EXIT_GAP = 3.4 -- studs beside the truck where the driver steps out (clear of the wheels: 2 before M1.5, 2.6 before phase 12)
-local OVERFLOW_SEARCH = 31 -- overflow spots tried when every free slot is blocked
 local WORLD_LOG_LENGTH = 3 -- TreeService's world logs (a load left behind)
 local SPILL_RAY = 60 -- studs down from above a truck that a load left behind looks for the ground
 
@@ -140,9 +134,7 @@ type TruckRecord = {
 	heading: AlignOrientation,
 	bed: { BedEntry },
 	bedFolder: Folder,
-	slot: BasePart?,
-	overflowIndex: number?, -- an overflow spot, when every ParkingSlot is taken
-	homeCF: CFrame?, -- the plot delivery pad, when the truck isn't in a public bay
+	homeCF: CFrame, -- where its spawn pad put it: "home" for the Send truck home button
 	conns: { RBXScriptConnection },
 	arcadeSpeed: number,
 	driver: Humanoid?, -- the owner, while they sit in the driver seat
@@ -159,8 +151,6 @@ type TruckRecord = {
 }
 
 local trucks: { [number]: TruckRecord } = {} -- [userId]
-local slotOwner: { [BasePart]: number } = {}
-local overflowUsed: { [number]: boolean } = {}
 local lastRecall: { [number]: number } = {}
 local LEAVE_CONFIRM_SECONDS = 6
 local leaveAsked: { [number]: number } = {} -- [userId] = when Recall warned about leaving the load
@@ -193,11 +183,11 @@ export type Hooks = {
 	-- A truck is about to be destroyed (despawn, slot switch, recall).
 	-- Drop cargo welds first so the load isn't dragged away with it.
 	onDespawn: ((player: Player, truck: Model) -> ())?,
-	-- Where a truck is delivered when the player has a plot (the road-edge
-	-- pad). Nil means the public parking lot, smallest free bay.
-	deliveryCFrame: ((player: Player) -> CFrame?)?,
 	-- Tests: when set, SpawnTruck builds nothing and leaves the old truck.
 	blockSpawn: boolean?,
+	-- The tutorial: a pad went down ("padPlaced") or a pad's button brought
+	-- a truck out ("truckSpawned"). GameServer forwards it to QuestService.
+	padEvent: ((player: Player, event: string) -> ())?,
 	-- Tow Service: true means this recall is free (GameServer).
 	freeRecall: ((player: Player) -> boolean)?,
 	-- 2x Cash, for the Classic's dash estimate (GameServer).
@@ -866,80 +856,13 @@ local function onDrivePrompt(rec: TruckRecord, player: Player)
 end
 
 ---------------------------------------------------------------------------
--- Parking slots
+-- Footprints
 ---------------------------------------------------------------------------
-
--- Every ParkingSlot, in claim order (Index 1, 2, ...).
-local function sortedSlots(): { BasePart }
-	local slots: { BasePart } = {}
-	for _, inst in ipairs(CollectionService:GetTagged(SLOT_TAG)) do
-		if inst:IsA("BasePart") then
-			table.insert(slots, inst)
-		end
-	end
-	table.sort(slots, function(a, b)
-		return ((a:GetAttribute("Index") :: number?) or 0) < ((b:GetAttribute("Index") :: number?) or 0)
-	end)
-	return slots
-end
-
-local function slotIndex(slot: BasePart): number
-	local index = slot:GetAttribute("Index")
-	return if type(index) == "number" then index else 0
-end
-
--- The slots a rig `length` x `width` (TruckLayout.RigSize) should park in,
--- best first (VehicleLogic.BayChoices): the smallest free one it fits,
--- or, with none, the longest it may overhang. `current`, the slot its
--- player holds now, counts as free for them, and stays first while it's
--- as good as any. Slots it can't take aren't listed.
-local function bayChoices(length: number, width: number, current: BasePart?): { BasePart }
-	local infos: { VehicleLogic.BayInfo } = {}
-	local byIndex: { [number]: BasePart } = {}
-	for _, slot in ipairs(sortedSlots()) do
-		if slotOwner[slot] == nil or slot == current then
-			local index = slotIndex(slot)
-			table.insert(infos, { index = index, length = slot.Size.Z, width = slot.Size.X })
-			byIndex[index] = slot
-		end
-	end
-	local out: { BasePart } = {}
-	local currentIndex = if current then slotIndex(current) else nil
-	for _, index in ipairs(VehicleLogic.BayChoices(infos, length, width, currentIndex)) do
-		table.insert(out, byIndex[index])
-	end
-	return out
-end
-
-local function slotCFrame(slot: BasePart?, overflowIndex: number?): CFrame
-	if slot then
-		local ground = slot.Position - Vector3.new(0, slot.Size.Y / 2, 0)
-		-- On the drawn ground if it is above the slot (never parked buried).
-		local y = TerrainBuilder.LiftOnto(ground.X, ground.Y, ground.Z)
-		return CFrame.new(ground.X, y + WHEEL_CLEARANCE, ground.Z) * slot.CFrame.Rotation
-	end
-	local spot = VehicleLogic.OverflowSpot(overflowIndex or 0)
-	return CFrame.new(spot.X, TerrainBuilder.LiftOnto(spot.X, 0, spot.Z) + WHEEL_CLEARANCE, spot.Z)
-end
 
 -- How far forward a rig's pivot (the truck's middle) sits from the rig's
 -- own middle: the trailer is behind it.
 local function rigShiftOf(trailerLayout: TruckLayout.TrailerLayout?): number
 	return if trailerLayout then trailerLayout.length / 2 else 0
-end
-
--- How far forward of its spot's middle a rig's pivot parks: the whole rig
--- (truck + trailer) centred on its bay, or, when the rig is longer than
--- the bay, its tail at the bay's tail and its nose out past the head over
--- the bay's pull-out (VehicleLogic.OverhangShift). An overflow spot has no
--- bay: the rig is centred on it.
-local function homeShift(slot: BasePart?, layout: TruckLayout.Layout, trailerLayout: TruckLayout.TrailerLayout?): number
-	local shift = rigShiftOf(trailerLayout)
-	if slot then
-		local length = TruckLayout.RigSize(layout, trailerLayout)
-		shift += VehicleLogic.OverhangShift(slot.Size.Z, length)
-	end
-	return shift
 end
 
 -- A model's bounding box relative to its pivot, so it can be checked at a
@@ -983,114 +906,6 @@ local function peopleInBox(box: CFrame, size: Vector3): boolean
 	return #workspace:GetPartBoundsInBox(box, size, params) > 0
 end
 
--- Moves a parked, empty truck that's in someone else's way back onto its
--- owner's own spot, when that's clear of trucks and people. True if it
--- moved.
-local function sendHome(other: TruckRecord): boolean
-	if other.seat.Occupant ~= nil or not other.chassis.Anchored or not other.model.Parent then
-		return false
-	end
-	local shift = homeShift(other.slot, other.layout, other.trailerLayout)
-	local home = slotCFrame(other.slot, other.overflowIndex) * CFrame.new(0, 0, -shift)
-	local rel, size = footprint(other.model)
-	if #trucksInBox(home * rel, size, other) > 0 then
-		return false
-	end
-	-- Nobody standing in its home spot, or on the truck itself (loading at
-	-- the tailgate): the move would drop it on them or carry them off.
-	if
-		peopleInBox(home * rel, size + Vector3.new(0, 4, 0))
-		or peopleInBox(other.model:GetPivot() * rel, size + Vector3.new(2, 6, 2))
-	then
-		return false
-	end
-	other.model:PivotTo(home)
-	other.lastGood = home
-	other.lastGoodAt = os.clock()
-	noteSpot(other)
-	tell(
-		other.owner,
-		string.format("Your %s was in someone else's parking spot. It's back in yours.", other.def.displayName)
-	)
-	return true
-end
-
--- Where a new rig goes (`layout`/`trailerLayout`, its footprint
--- `rel`/`size` about its pivot): the first of `choices` (bayChoices: the
--- bays it fits best first, its player's own among them while that's as
--- good as any) with no other truck in the rig's footprint there. A parked,
--- empty truck in the way of the first choice is sent home first. With no
--- choice clear (or none at all: every bay that takes the rig is taken),
--- the player's overflow spot if they hold one, else the first clear
--- overflow spot. Claims what it returns and gives the player's old slot or
--- overflow spot (`oldSlot`, `oldOverflow`) up if it moved.
-local function clearSpot(
-	userId: number,
-	choices: { BasePart },
-	oldSlot: BasePart?,
-	oldOverflow: number?,
-	layout: TruckLayout.Layout,
-	trailerLayout: TruckLayout.TrailerLayout?,
-	rel: CFrame,
-	size: Vector3
-): (BasePart?, number?)
-	local function blocked(s: BasePart?, o: number?): { TruckRecord }
-		local shift = homeShift(s, layout, trailerLayout)
-		return trucksInBox(slotCFrame(s, o) * CFrame.new(0, 0, -shift) * rel, size)
-	end
-	local function take(s: BasePart?, o: number?): (BasePart?, number?)
-		if oldSlot and oldSlot ~= s then
-			slotOwner[oldSlot] = nil
-		end
-		if oldOverflow and oldOverflow ~= o then
-			overflowUsed[oldOverflow] = nil
-		end
-		if s then
-			slotOwner[s] = userId
-		end
-		if o then
-			overflowUsed[o] = true
-		end
-		return s, o
-	end
-	for i, s in ipairs(choices) do
-		local owner = slotOwner[s]
-		if owner ~= nil and owner ~= userId then
-			continue -- someone claimed it meanwhile (a hook yielded)
-		end
-		local inWay = blocked(s, nil)
-		if #inWay > 0 and i == 1 then
-			for _, other in ipairs(inWay) do
-				sendHome(other)
-			end
-			inWay = blocked(s, nil)
-		end
-		if #inWay == 0 then
-			return take(s, nil)
-		end
-	end
-	if #choices == 0 then
-		warn("[VehicleService] No free parking bay fits this rig; parking it in an overflow spot")
-	end
-	if oldOverflow and #blocked(nil, oldOverflow) == 0 then
-		return take(nil, oldOverflow)
-	end
-	for i = 0, OVERFLOW_SEARCH do
-		if not overflowUsed[i] and #blocked(nil, i) == 0 then
-			return take(nil, i)
-		end
-	end
-	warn("[VehicleService] No clear parking spot; building the truck where it was meant to go anyway")
-	local first = choices[1]
-	if first then
-		return take(first, nil)
-	end
-	if oldSlot then
-		return take(oldSlot, nil)
-	end
-	return take(nil, oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
-end
-
 ---------------------------------------------------------------------------
 -- Loads left behind
 ---------------------------------------------------------------------------
@@ -1118,7 +933,7 @@ end
 
 -- True if a rebuild keeps this truck's load: the truck is in town.
 local function keepsLoad(rec: TruckRecord): boolean
-	return inTown(trustedCFrame(rec).Position, slotCFrame(rec.slot, rec.overflowIndex).Position)
+	return inTown(trustedCFrame(rec).Position, rec.homeCF.Position)
 end
 
 -- What a log left on the ground mustn't land on: people, trucks, trees
@@ -1223,17 +1038,10 @@ function VehicleService.RestoreLeftLoad(player: Player, saved: { any }): number
 	return restored
 end
 
--- Mirrors how far this truck is from its own parking spot (where the
--- rig's pivot sits when parked there) on its owner's TruckSlotDistance.
+-- Mirrors how far this truck is from its own spawn pad (where the
+-- rig's pivot sat when it was built there) on its owner's TruckSlotDistance.
 local function publishSlotDistance(rec: TruckRecord)
-	local home: CFrame
-	if rec.homeCF then
-		home = rec.homeCF
-	else
-		local shift = homeShift(rec.slot, rec.layout, rec.trailerLayout)
-		home = slotCFrame(rec.slot, rec.overflowIndex) * CFrame.new(0, 0, -shift)
-	end
-	local distance = TruckHome.Distance(trustedCFrame(rec).Position, home.Position)
+	local distance = TruckHome.Distance(trustedCFrame(rec).Position, rec.homeCF.Position)
 	local userId = rec.owner.UserId
 	if TruckHome.ShouldPublish(slotShown[userId], distance) then
 		slotShown[userId] = distance
@@ -1315,24 +1123,46 @@ local function savedSpot(player: Player): Vector3?
 	return if profile then VehicleLogic.CleanSpot(profile.truckAt) else nil
 end
 
--- The plot pad, when GameServer has one for this player. Nil uses a bay.
--- One spawn parked on a pad instead of the delivery bay. Cleared after.
-local padOverride: { [number]: CFrame } = {}
+-- Where a truck goes: the top of a spawn pad (`cf` its slab, `baseY` where the
+-- wheels' ground sits on it), and the paint the pad's record asks for.
+export type PadSpot = {
+	cf: CFrame,
+	baseY: number,
+	paintFrom: string?,
+	paintTo: string?,
+}
 
-local function deliveryPad(player: Player): CFrame?
-	local over = padOverride[player.UserId]
-	if over then
-		return over
+-- This player's pad for `truckId` (a pad in their plot, from the box the truck
+-- came in), or nil when they have none. Set below, once the pad code exists.
+local padFor: (player: Player, truckId: string) -> PadSpot?
+
+local function applyPadColor(model: Model, fromHex: string, toHex: string)
+	local from = Kit.hex(fromHex)
+	local to = Kit.hex(toHex)
+	if from == to then
+		model:SetAttribute("PaintHex", toHex)
+		return
 	end
-	local ask = VehicleService.Hooks.deliveryCFrame
-	if not ask then
-		return nil
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and d.Color == from then
+			d.Color = to
+		end
 	end
-	local cf = ask(player)
-	if typeof(cf) == "CFrame" then
-		return cf
+	model:SetAttribute("PaintHex", toHex)
+end
+
+local function liftModel(model: Model, baseY: number)
+	local ok, boxCf, size = pcall(function()
+		return model:GetBoundingBox()
+	end)
+	if not ok or typeof(boxCf) ~= "CFrame" or typeof(size) ~= "Vector3" then
+		return
 	end
-	return nil
+	local bottom = boxCf.Position.Y - size.Y / 2
+	local delta = baseY - bottom
+	if math.abs(delta) > 1e-3 then
+		model:PivotTo(model:GetPivot() + Vector3.new(0, delta, 0))
+	end
 end
 
 -- A CFrame on `pad` (its ground), wheels down, nudged along the pad so the
@@ -1408,9 +1238,10 @@ end
 -- SpawnTruck calls it once the function exists.
 local truckExtras: (Player, TruckDef) -> TruckArt.BuildExtras?
 
--- Builds the player's truck (replacing any they have). With a plot it
--- parks on that plot's delivery pad; otherwise in the smallest free
--- public bay. Nothing is built for an id the player doesn't have a
+-- Builds the player's truck (replacing any they have) on its spawn pad: the
+-- `pad` given (a pad button press) or the player's own pad for this truck.
+-- No pad, no truck: nothing is built and nothing replaced, and the caller
+-- says why. Nothing is built for an id the player doesn't have a
 -- catalog entry for (no starter fallback). `load` refills the bed (a
 -- recall or a switch); with no `load`, the bed comes back from the
 -- player's save. Either way the load only comes along if the truck was in
@@ -1420,7 +1251,8 @@ function VehicleService.SpawnTruck(
 	player: Player,
 	truckId: string,
 	load: { BedEntry }?,
-	trailerId: string?
+	trailerId: string?,
+	padSpot: PadSpot?
 ): (Model?, number)
 	if VehicleService.Hooks.blockSpawn then
 		return nil, 0
@@ -1429,27 +1261,18 @@ function VehicleService.SpawnTruck(
 	if not def then
 		return nil, 0
 	end
+	local spot = padSpot or padFor(player, def.id)
+	if not spot then
+		return nil, 0
+	end
+	local pad = spot.cf
 	local layout = TruckLayout.For(def)
 	local trailer = towedTrailer(def, trailerId)
 	local trailerLayout = if trailer then TruckLayout.ForTrailer(trailer, layout) else nil
 
-	-- The bay this rig parks in (phase 12): the smallest free one it fits.
-	-- A rebuild (a recall, a switch at the Dealership) keeps the player's
-	-- bay while it's as good a fit as any, else moves them (clearSpot).
 	local old = trucks[player.UserId]
-	local oldSlot = if old then old.slot else nil
-	local oldOverflow = if old then old.overflowIndex else nil
-	local rigLength, rigWidth = TruckLayout.RigSize(layout, trailerLayout)
-	local choices = bayChoices(rigLength, rigWidth, oldSlot)
-	local pad = deliveryPad(player)
-	-- Where it will most likely park, for a joining player's saved spot.
-	local homeSlot = choices[1] or oldSlot
-	local homeAt = if pad
-		then pad.Position
-		else slotCFrame(
-			homeSlot,
-			if homeSlot then nil else (oldOverflow or VehicleLogic.NextFreeIndex(overflowUsed))
-		).Position
+	-- Where it will park, for a joining player's saved spot.
+	local homeAt = pad.Position
 	-- Where a load out of town is left (the truck's last spot).
 	local leaveAt: CFrame? = nil
 	-- The v2 loop's loose load (TruckLoad): told before the old truck goes,
@@ -1512,39 +1335,16 @@ function VehicleService.SpawnTruck(
 
 	local built = buildTruckModel(def, layout, trailer, trailerLayout, truckExtras(player, def))
 	local model = built.model
-	-- The whole rig (truck + trailer) centred on its bay, or its nose out
-	-- past the head of one it's longer than (homeShift), once no other
-	-- truck is in the way. A plot's delivery pad skips the public bays.
+	-- The whole rig (truck + trailer) on its pad, nudged along it once no
+	-- other truck or person is in the way, and sat on the pad's top.
 	local rel, size = footprint(model)
-	local slot: BasePart? = nil
-	local overflowIndex: number? = nil
-	local homeCF: CFrame? = nil
-	if pad then
-		if oldSlot then
-			slotOwner[oldSlot] = nil
-		end
-		if oldOverflow then
-			overflowUsed[oldOverflow] = nil
-		end
-		local parked = padParking(pad, rel, size)
-		homeCF = parked
-		model:PivotTo(parked)
-	else
-		slot, overflowIndex = clearSpot(player.UserId, choices, oldSlot, oldOverflow, layout, trailerLayout, rel, size)
-		model:PivotTo(slotCFrame(slot, overflowIndex) * CFrame.new(0, 0, -homeShift(slot, layout, trailerLayout)))
+	local parked = padParking(pad, rel, size)
+	model:PivotTo(parked)
+	liftModel(model, spot.baseY)
+	if spot.paintFrom and spot.paintTo then
+		applyPadColor(model, spot.paintFrom, spot.paintTo)
 	end
-	if old and not pad and slot ~= oldSlot then
-		-- Moved to a bay that fits (or out of the lot): say where.
-		tell(
-			player,
-			if slot
-				then string.format("Your %s parks in bay %d now.", def.displayName, slotIndex(slot))
-				else string.format(
-					"Every parking bay that fits your %s is taken: it waits west of the spawn.",
-					def.displayName
-				)
-		)
-	end
+	local homeCF = model:GetPivot()
 	model:SetAttribute("OwnerId", player.UserId)
 	model:SetAttribute("TruckId", def.id)
 	model:SetAttribute("TrailerId", if trailer then trailer.id else "")
@@ -1580,8 +1380,6 @@ function VehicleService.SpawnTruck(
 		heading = built.heading,
 		bed = {},
 		bedFolder = bedFolder,
-		slot = slot,
-		overflowIndex = overflowIndex,
 		homeCF = homeCF,
 		conns = {},
 		arcadeSpeed = 0,
@@ -1646,12 +1444,6 @@ function VehicleService.DespawnTruck(player: Player)
 	end
 	destroyTruck(rec)
 	leaveAsked[player.UserId] = nil
-	if rec.slot then
-		slotOwner[rec.slot] = nil
-	end
-	if rec.overflowIndex then
-		overflowUsed[rec.overflowIndex] = nil
-	end
 	trucks[player.UserId] = nil
 	lastRecall[player.UserId] = nil
 	slotShown[player.UserId] = nil
@@ -1693,7 +1485,9 @@ local function isDriving(player: Player, rec: TruckRecord): boolean
 	return occupant ~= nil and player.Character ~= nil and occupant.Parent == player.Character
 end
 
--- "Send truck home": rebuilds the player's truck in their parking slot. The
+VehicleService.NoPadText = "Open your truck's box on your plot and place its pad first."
+
+-- "Send truck home": rebuilds the player's truck on its own spawn pad. The
 -- load comes along from town only; from further out it's left where the
 -- truck stood (SpawnTruck). Returns false and why not when it can't.
 function VehicleService.Recall(player: Player): (boolean, string?)
@@ -1711,6 +1505,9 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 		if not owns or not def or not profile then
 			return false, "Buy a truck at the dealership"
 		end
+		if padFor(player, def.id) == nil then
+			return false, VehicleService.NoPadText
+		end
 		local paid, why = chargeRespawn(player, def)
 		if not paid then
 			return false, why
@@ -1725,6 +1522,9 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 	end
 	if isDriving(player, rec) then
 		return false, "Hop out first."
+	end
+	if padFor(player, rec.def.id) == nil then
+		return false, VehicleService.NoPadText
 	end
 	-- A load out of town stays where the truck stands: say so, and only go
 	-- ahead on a second press within a few seconds (a stray tap mustn't
@@ -1766,9 +1566,9 @@ end
 VehicleService.UnloadFirstText = "Unload the wood on your truck first (sell it, or drag it off)."
 
 -- Swaps the player's rig (the Dealership): truck `truckId` towing
--- `trailerId` ("" or nil for none). Refuses while they drive, or when the
--- load would come along (the truck is in town) and wouldn't fit the new
--- bed space.
+-- `trailerId` ("" or nil for none), built on that truck's own pad. Refuses
+-- while they drive, with no pad for the truck, or when the load would come
+-- along (the truck is in town) and wouldn't fit the new bed space.
 function VehicleService.Equip(player: Player, truckId: string, trailerId: string?): (boolean, string?)
 	local def = ItemCatalog.GetTruck(truckId)
 	local rec = trucks[player.UserId]
@@ -1777,6 +1577,9 @@ function VehicleService.Equip(player: Player, truckId: string, trailerId: string
 	end
 	if rec and isDriving(player, rec) then
 		return false, "Hop out of your truck first."
+	end
+	if padFor(player, def.id) == nil then
+		return false, VehicleService.NoPadText
 	end
 	if rec and #rec.bed > capacityOf(def, towedTrailer(def, trailerId)) and keepsLoad(rec) then
 		return false, "Sell your load first: it won't fit."
@@ -1793,7 +1596,10 @@ function VehicleService.Equip(player: Player, truckId: string, trailerId: string
 			return false, VehicleService.UnloadFirstText
 		end
 	end
-	VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil, trailerId)
+	local model = VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil, trailerId)
+	if model == nil then
+		return false, nil
+	end
 	return true, nil
 end
 
@@ -1832,16 +1638,6 @@ end
 
 -- The Index of the parking bay this player's rig parks in (painted on the
 -- bay), or nil without a truck or in an overflow spot.
-function VehicleService.GetBayIndex(player: Player): number?
-	local rec = trucks[player.UserId]
-	local slot = if rec then rec.slot else nil
-	return if slot then slotIndex(slot) else nil
-end
-
--- Where this player's truck is, as far as the server can vouch (nil
--- without one). While they drive it, it's judged right now (not just on
--- the half-second check), so a truck teleported onto the sell pad a moment
--- ago is put back and doesn't count.
 function VehicleService.TrustedTruckPosition(player: Player): Vector3?
 	local rec = trucks[player.UserId]
 	if not rec or not rec.model.Parent then
@@ -2230,6 +2026,12 @@ function VehicleService.TryPlaceFromBox(player: Player, rec: any): boolean
 	rememberOwned(profile, kind, id)
 	buildPadModel(player, home, record)
 	toast(player, "The pad is down. Press it to bring the vehicle out.")
+	local report = VehicleService.Hooks.padEvent
+	if report then
+		guarded("padEvent", function()
+			report(player, "padPlaced")
+		end)
+	end
 	return true
 end
 
@@ -2299,33 +2101,57 @@ local function ownsTow(player: Player): boolean
 	return false
 end
 
-local function applyPadColor(model: Model, fromHex: string, toHex: string)
-	local from = Kit.hex(fromHex)
-	local to = Kit.hex(toHex)
-	if from == to then
-		model:SetAttribute("PaintHex", toHex)
-		return
+-- Where a truck goes on a built pad model: its slab, and the ground under it.
+local function padSpotOf(padInst: Instance, color: string?): PadSpot
+	local slab = padInst:FindFirstChild("Slab")
+	local padCf = if slab and slab:IsA("BasePart")
+		then slab.CFrame
+		elseif padInst:IsA("Model") then padInst:GetPivot()
+		else CFrame.new()
+	local padTop = padCf.Position.Y
+		+ (if slab and slab:IsA("BasePart") then slab.Size.Y / 2 else VehicleLogic.PadThick / 2)
+	local kind = padInst:GetAttribute("Category")
+	local id = padInst:GetAttribute("ItemId")
+	local paintFrom: string? = nil
+	if color and type(kind) == "string" and type(id) == "string" then
+		paintFrom = paintOf(kind, id)
 	end
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("BasePart") and d.Color == from then
-			d.Color = to
-		end
-	end
-	model:SetAttribute("PaintHex", toHex)
+	return {
+		cf = padCf,
+		baseY = VehicleLogic.SpawnBaseY(padTop, groundY(padCf.Position.X, padCf.Position.Z)),
+		paintFrom = paintFrom,
+		paintTo = color,
+	}
 end
 
-local function liftModel(model: Model, baseY: number)
-	local ok, boxCf, size = pcall(function()
-		return model:GetBoundingBox()
-	end)
-	if not ok or typeof(boxCf) ~= "CFrame" or typeof(size) ~= "Vector3" then
-		return
+padFor = function(player: Player, truckId: string): PadSpot?
+	local profile = ProfileService.GetProfile(player)
+	local plot = plotOf(profile)
+	if not plot or type(plot.pads) ~= "table" then
+		return nil
 	end
-	local bottom = boxCf.Position.Y - size.Y / 2
-	local delta = baseY - bottom
-	if math.abs(delta) > 1e-3 then
-		model:PivotTo(model:GetPivot() + Vector3.new(0, delta, 0))
+	for _, pad in ipairs(plot.pads) do
+		if type(pad) == "table" and pad.id == truckId and (pad.kind == nil or pad.kind == "Truck") then
+			local color = if type(pad.color) == "string" then pad.color else nil
+			local model = if type(pad.uid) == "string" then builtPads[pad.uid] else nil
+			if model and model.Parent then
+				return padSpotOf(model, color)
+			end
+			local home = homeOf(player)
+			if home and type(pad.x) == "number" and type(pad.z) == "number" then
+				local width, length = vehicleSpan("Truck", truckId)
+				local size = VehicleLogic.PadSize(length, width)
+				local cf = worldPad(home, pad.x, pad.z, size.Y)
+				return {
+					cf = cf,
+					baseY = VehicleLogic.SpawnBaseY(cf.Position.Y + size.Y / 2, groundY(cf.Position.X, cf.Position.Z)),
+					paintFrom = if color then paintOf("Truck", truckId) else nil,
+					paintTo = color,
+				}
+			end
+		end
 	end
+	return nil
 end
 
 function VehicleService.Press(player: Player, padInst: unknown)
@@ -2383,27 +2209,20 @@ function VehicleService.Press(player: Player, padInst: unknown)
 			return
 		end
 	end
-	local slab = padInst:FindFirstChild("Slab")
-	local padCf = if slab and slab:IsA("BasePart")
-		then slab.CFrame
-		elseif padInst:IsA("Model") then padInst:GetPivot()
-		else CFrame.new()
-	local padTop = padCf.Position.Y
-		+ (if slab and slab:IsA("BasePart") then slab.Size.Y / 2 else VehicleLogic.PadThick / 2)
-	local baseY = VehicleLogic.SpawnBaseY(padTop, groundY(padCf.Position.X, padCf.Position.Z))
 	if kindName == "Truck" then
-		padOverride[player.UserId] = padCf
-		local model = VehicleService.SpawnTruck(player, itemId, nil, nil)
-		padOverride[player.UserId] = nil
+		local spot = padSpotOf(padInst, if record and type(record.color) == "string" then record.color else nil)
+		local model = VehicleService.SpawnTruck(player, itemId, nil, nil, spot)
 		if model == nil then
 			if plan.fee > 0 then
 				EconomyService.Refund(player, plan.fee, "refunded a failed respawn", itemId)
 			end
 			return
 		end
-		liftModel(model, baseY)
-		if record and type(record.color) == "string" then
-			applyPadColor(model, paintOf(kindName, itemId), record.color)
+		local report = VehicleService.Hooks.padEvent
+		if report then
+			guarded("padEvent", function()
+				report(player, "truckSpawned")
+			end)
 		end
 	end
 	if record then

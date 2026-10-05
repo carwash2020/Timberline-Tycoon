@@ -151,10 +151,14 @@ export type Profile = {
 	-- Reconcile; GrantStarterTrucks then gives a truck only to a slot that
 	-- was actually played. A brand-new game is marked true with no truck.
 	starterTruckGranted: boolean,
-	-- False until Migrate mints one storage box per owned truck that is
-	-- not the Rustbucket. The template stays false so Reconcile does not
-	-- mark an old save as already boxed and skip the mint.
+	-- False until Migrate mints one storage box per owned truck. The
+	-- template stays false so Reconcile does not mark an old save as already
+	-- boxed and skip the mint.
 	trucksBoxed: boolean,
+	-- False until a save that owned a Rustbucket with no box and no pad has
+	-- been given its box (the Rustbucket used to be handed over unboxed, and
+	-- those saves were boxed without it). One mint, then true.
+	rustbucketBoxed: boolean,
 	ownedTrailers: { string },
 	equippedTrailer: string, -- hitched trailer id, "" for none
 	ownedBoats: { string },
@@ -275,6 +279,7 @@ local TEMPLATE: Profile = {
 	equippedTruck = "",
 	starterTruckGranted = false,
 	trucksBoxed = false,
+	rustbucketBoxed = false,
 	ownedTrailers = {},
 	equippedTrailer = "",
 	ownedBoats = {},
@@ -442,8 +447,8 @@ local function freshUid(used: { [string]: boolean }): string
 	return Util.guid()
 end
 
--- Trucks that still need a Dealership box: owned, not the Rustbucket,
--- and neither stored nor already placed on a pad.
+-- Trucks that still need a Dealership box: owned, and neither stored nor
+-- already placed on a pad (the Rustbucket is a boxed truck like the rest).
 function ProfileSchema.WaitingTrucks(record: any): { string }
 	local waiting: { string } = {}
 	if type(record) ~= "table" or type(record.ownedTrucks) ~= "table" then
@@ -466,7 +471,7 @@ function ProfileSchema.WaitingTrucks(record: any): { string }
 		end
 	end
 	for _, id in ipairs(record.ownedTrucks) do
-		if type(id) == "string" and id ~= "Rustbucket" and ItemCatalog.GetTruck(id) ~= nil and have[id] ~= true then
+		if type(id) == "string" and ItemCatalog.GetTruck(id) ~= nil and have[id] ~= true then
 			table.insert(waiting, id)
 		end
 	end
@@ -516,6 +521,30 @@ function ProfileSchema.MintTruckBoxes(record: any): { string }
 			record.trucksBoxed = false
 		end
 	end
+	-- A save from before the Rustbucket came in a box: it owns one with no
+	-- box and no pad. One box, once (the flag), room permitting; with no
+	-- room the flag stays false and a later join finishes the job.
+	if record.rustbucketBoxed ~= true then
+		local owned = type(record.ownedTrucks) == "table" and table.find(record.ownedTrucks, "Rustbucket") ~= nil
+		local waitingRust = table.find(ProfileSchema.WaitingTrucks(record), "Rustbucket") ~= nil
+		if owned and waitingRust then
+			if #record.storage < ProfileSchema.StorageCap then
+				local used: { [string]: boolean } = {}
+				for id in pairs(takenIds(record)) do
+					used[id] = true
+				end
+				for _, box in ipairs(record.storage) do
+					if type(box) == "table" and type(box.uid) == "string" then
+						used[box.uid] = true
+					end
+				end
+				table.insert(record.storage, { uid = freshUid(used), itemId = "Rustbucket", shop = "Dealership" })
+				record.rustbucketBoxed = true
+			end
+		elseif owned then
+			record.rustbucketBoxed = true -- boxed or padded already
+		end
+	end
 	local waiting = ProfileSchema.WaitingTrucks(record)
 	minting[record] = nil
 	return waiting
@@ -561,7 +590,7 @@ local function applySlotFields(record: any)
 		end
 	end
 	record.storage = kept
-	-- One box per owned truck that is not the Rustbucket. Trailers are
+	-- One box per owned truck. Trailers are
 	-- not minted. A full storage stops the mint and leaves trucksBoxed
 	-- false, so a later load can finish. Nothing already stored is removed.
 	ProfileSchema.MintTruckBoxes(record)
@@ -728,6 +757,16 @@ function ProfileSchema.Migrate(data: any)
 	SaveSlotLogic.Migrate(data, TEMPLATE, function()
 		return Util.guid()
 	end, os.time())
+	-- The starter grant above can give a played slot its Rustbucket after the
+	-- live mint ran: box it now, and mirror the result onto the active slot's
+	-- snapshot so that one box is not minted a second time with another uid.
+	ProfileSchema.MintTruckBoxes(data)
+	local activeSlot = if type(data.slots) == "table" then data.slots[data.activeSlot] else nil
+	if type(activeSlot) == "table" then
+		activeSlot.storage = Util.deepCopy(data.storage)
+		activeSlot.trucksBoxed = data.trucksBoxed
+		activeSlot.rustbucketBoxed = data.rustbucketBoxed
+	end
 	if type(data.slots) == "table" then
 		for _, slot in ipairs(data.slots) do
 			if type(slot) == "table" then
