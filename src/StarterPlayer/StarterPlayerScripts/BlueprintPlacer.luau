@@ -111,6 +111,18 @@ local function tier(): number
 	return (player:GetAttribute("PlotTier") :: number?) or 1
 end
 
+-- The land squares you bought, from the PlotSquares attribute ("x,z;x,z").
+function BlueprintPlacer.MySquares(): { string }
+	local raw = player:GetAttribute("PlotSquares")
+	local out: { string } = {}
+	if type(raw) == "string" then
+		for key in string.gmatch(raw, "[^;]+") do
+			table.insert(out, key)
+		end
+	end
+	return out
+end
+
 -- Everything on your plot, from the placed item models' attributes.
 function BlueprintPlacer.MyPlaced(): { PlotLogic.Placed }
 	local out: { PlotLogic.Placed } = {}
@@ -208,7 +220,17 @@ local function update(s: State)
 		s.x, s.z = PlotLogic.Snap(p.X), PlotLogic.Snap(p.Z)
 	end
 	BlueprintModels.Place(s.ghost, plotCFrame, s.x, s.z, s.rot, s.y)
-	local ok, why = PlotLogic.Check(s.bp, s.x, s.z, s.rot, tier(), BlueprintPlacer.MyPlaced(), s.options.moveUid, s.y)
+	local ok, why = PlotLogic.Check(
+		s.bp,
+		s.x,
+		s.z,
+		s.rot,
+		tier(),
+		BlueprintPlacer.MyPlaced(),
+		s.options.moveUid,
+		s.y,
+		BlueprintPlacer.MySquares()
+	)
 	local price = if s.bp.kit then PlotData.Price(s.bp) else s.bp.priceCash
 	if ok and not s.options.moveUid then
 		local cash = (player:GetAttribute("Cash") :: number?) or 0

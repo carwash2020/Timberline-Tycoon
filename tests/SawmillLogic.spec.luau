@@ -212,7 +212,7 @@ return function(t)
 		t.eq(bp.category, "Sawmill")
 		t.eq(bp.priceCash, 130)
 		t.eq(bp.footprint, t.roblox.Vector2.new(12, 8))
-		t.eq(#bp.boxes, 0)
+		t.eq(#bp.boxes, 1, "one block over the footprint, so it overlaps like any plot item")
 		t.eq(Logic.Blueprint("Bench"), nil)
 	end)
 end

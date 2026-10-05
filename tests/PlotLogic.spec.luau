@@ -657,4 +657,33 @@ return function(t)
 		t.ok(n >= 5, "at least five different looks across the homes")
 		t.ok(PlotData.Look(1).name ~= PlotData.Look(2).name, "neighbours differ")
 	end)
+
+	t.test("a placed mill or chop saw blocks what is placed on it, and what it is placed on", function()
+		local SawmillLogic = t.shared("SawmillLogic")
+		local ChopSawLogic = t.shared("ChopSawLogic")
+		local mill = SawmillLogic.Blueprint("SawmillRickety")
+		local floor = PlotData.Blueprint("Floor")
+		t.ok((PlotLogic.Check(mill, 0, 0, 0, 1, {})), "an empty yard takes it")
+		local placed = { { uid = "m", blueprintId = "SawmillRickety", x = 0, z = 0, rot = 0 } }
+		local okFloor, why = PlotLogic.Check(floor, 0, 0, 0, 1, placed)
+		t.eq(okFloor, false)
+		t.eq(why, "Something's in the way")
+		local okMill = PlotLogic.Check(mill, 2, 0, 0, 1, placed)
+		t.eq(okMill, false, "a second mill can't sit inside the first")
+		t.ok((PlotLogic.Check(floor, 0, 30, 0, 1, placed)), "clear ground is fine")
+		local saw = ChopSawLogic.Blueprint(ChopSawLogic.MachineId or "ChopSaw")
+		if saw then
+			t.eq(
+				(PlotLogic.Check(floor, 0, 0, 0, 1, { { uid = "c", blueprintId = saw.id, x = 0, z = 0, rot = 0 } })),
+				false
+			)
+		end
+	end)
+
+	t.test("a bought square is part of the plot for Check, with its squares passed in", function()
+		local floor = PlotData.Blueprint("Floor")
+		-- Tier 1 is 80 wide (half 40); the square at (1,0) spans x 20..60.
+		t.eq((PlotLogic.Check(floor, 52, 0, 0, 1, {})), false, "outside without the square")
+		t.eq((PlotLogic.Check(floor, 52, 0, 0, 1, {}, nil, 0, { "1,0" })), true, "inside with it")
+	end)
 end
