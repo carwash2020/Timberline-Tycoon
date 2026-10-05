@@ -507,6 +507,30 @@ end
 --     the figure reveal.
 export type Insets = "device"
 
+-- DisplayOrder for every screen, in one place so two never tie by accident.
+-- Higher draws over lower. Screens that share a number never show together
+-- (the three world tools at 6) or never overlap.
+UITheme.Layers = {
+	SideButtons = 1,
+	Corner = 2,
+	PlotUI = 2,
+	Daily = 3,
+	Drag = 4,
+	Shop = 5,
+	World = 6, -- BlueprintPlacer, ChopSaw, Sawmill
+	BuildBar = 7,
+	SaveSlot = 8,
+	WireTool = 9, -- the wiring mode over the build bar, under the HUD
+	Hud = 10,
+	Top = 11, -- the cash row
+	Badge = 12,
+	FigureReveal = 12,
+	Settings = 13, -- a modal: over the HUD and the cash row
+	Store = 20,
+	Dialogue = 30,
+	PlotPicker = 80,
+} :: { [string]: number }
+
 -- A ScreenGui for one of the game's screens, scaled for the device.
 function UITheme.Screen(name: string, displayOrder: number?, insets: Insets?): ScreenGui
 	local gui = Instance.new("ScreenGui")

@@ -84,6 +84,7 @@ return function(t)
 					end,
 				},
 				UITheme = {
+					Layers = { Drag = 4 },
 					Size = { Tap = 44, TextButton = 15 },
 					Fonts = { Heading = Enum.Font.FredokaOne },
 					Colors = { Cream = Color3.new(1, 1, 1), Ink = Color3.new(0, 0, 0) },

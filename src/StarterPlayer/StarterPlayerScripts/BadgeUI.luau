@@ -32,7 +32,7 @@ type RowButton = {
 }
 
 function BadgeUI.Start()
-	local gui = UITheme.Screen("BadgeUI", 12)
+	local gui = UITheme.Screen("BadgeUI", UITheme.Layers.Badge)
 	local tap = BadgeData.MinTapPx
 
 	local open = UITheme.Button({

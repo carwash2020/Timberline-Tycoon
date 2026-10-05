@@ -8,6 +8,19 @@ return function(t)
 		return Schema, Util.deepCopy(Schema.Template)
 	end
 
+	-- Migrate stamps the active slot's lastPlayed with the clock, so two runs a
+	-- second apart differ there. For "migrating again changes nothing" checks,
+	-- carry that stamp across and compare everything else.
+	local function sameClock(before, data)
+		if type(data.slots) == "table" and type(before.slots) == "table" then
+			for key, slot in pairs(data.slots) do
+				if type(before.slots[key]) == "table" then
+					before.slots[key].lastPlayed = slot.lastPlayed
+				end
+			end
+		end
+	end
+
 	t.test("a new save gets one Rusty Axe, equipped by nobody yet", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)
@@ -89,6 +102,7 @@ return function(t)
 		Schema.Migrate(data)
 		local before = t.loader():shared("Util").deepCopy(data)
 		Schema.Migrate(data)
+		sameClock(before, data)
 		t.eq(data, before)
 	end)
 
@@ -551,12 +565,7 @@ return function(t)
 		t.eq(Schema.Template.tollPaidUntil, nil)
 		local before = t.loader():shared("Util").deepCopy(data)
 		Schema.Migrate(data)
-		-- Migrate stamps the active slot's lastPlayed with the clock, so two
-		-- runs a second apart differ there (a flake on the second boundary).
-		-- Everything else must match.
-		for key, slot in pairs(data.slots) do
-			before.slots[key].lastPlayed = slot.lastPlayed
-		end
+		sameClock(before, data)
 		t.eq(data, before)
 	end)
 

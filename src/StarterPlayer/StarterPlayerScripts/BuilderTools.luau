@@ -677,7 +677,7 @@ function BuilderTools.Start()
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
-	gui.DisplayOrder = 8
+	gui.DisplayOrder = UITheme.Layers.BuildBar
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 	local bar = Instance.new("Frame")

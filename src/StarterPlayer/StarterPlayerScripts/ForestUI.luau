@@ -514,7 +514,7 @@ function ForestUI.Start()
 		ForestUI.ApplyKey(input.KeyCode)
 	end)
 	local playerGui = player:WaitForChild("PlayerGui")
-	local reveal = UITheme.Screen("FigureReveal", 12, "device") -- centred in the safe area, clear of a notch
+	local reveal = UITheme.Screen("FigureReveal", UITheme.Layers.FigureReveal, "device") -- centred in the safe area, clear of a notch
 	reveal.Parent = playerGui
 	revealGui = reveal
 	buildBloom()

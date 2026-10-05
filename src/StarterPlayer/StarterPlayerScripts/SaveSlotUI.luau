@@ -226,7 +226,7 @@ local function setOpen(on: boolean)
 end
 
 function SaveSlotUI.Start()
-	local gui = UITheme.Screen("SaveSlotUI", 8)
+	local gui = UITheme.Screen("SaveSlotUI", UITheme.Layers.SaveSlot)
 	gui.Parent = UITheme.PlayerGui()
 
 	local button = HUD.SideButton({

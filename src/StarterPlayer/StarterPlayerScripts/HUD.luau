@@ -1424,7 +1424,7 @@ local function buildCash(playerGui: Instance)
 	gui.Name = "TimberlineTop"
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	gui.DisplayOrder = 11 -- over the HUD (10) and the shop; the Store (20) still covers its panel
+	gui.DisplayOrder = UITheme.Layers.Top -- over the HUD (10) and the shop; the Store (20) still covers its panel
 	gui.IgnoreGuiInset = true
 	gui.ScreenInsets = Enum.ScreenInsets.None
 	gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
@@ -1695,7 +1695,7 @@ local function buildCorner(playerGui: Instance)
 	-- The corner under and left of the cash row, in a layer of its own:
 	-- under the shop panel's scrim, over the side buttons. Two right-aligned
 	-- lines, stacked by a list, so each sits by the real size of the other.
-	local gui = UITheme.Screen("Corner", 2)
+	local gui = UITheme.Screen("Corner", UITheme.Layers.Corner)
 	local frame = Instance.new("Frame")
 	frame.Name = "Shelf"
 	frame.AnchorPoint = Vector2.new(1, 0)
@@ -1770,7 +1770,7 @@ local function buildSideColumn(playerGui: Instance)
 	-- and the corner's popups, and measured from the true screen centre:
 	-- the device's safe area, the top bar's strip included (clear of a
 	-- notch and the home bar).
-	local gui = UITheme.Screen("SideButtons", 1, "device")
+	local gui = UITheme.Screen("SideButtons", UITheme.Layers.SideButtons, "device")
 	local column = Instance.new("Frame")
 	column.Name = "Column"
 	column.AnchorPoint = Vector2.new(1, 1)
@@ -1833,7 +1833,7 @@ function HUD.Start()
 	UITheme.Start()
 	local playerGui = UITheme.PlayerGui()
 	-- Above panels like the shop, so the cash and toasts stay visible.
-	local gui = UITheme.Screen("TimberlineHUD", 10)
+	local gui = UITheme.Screen("TimberlineHUD", UITheme.Layers.Hud)
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, GameConfig.ShowRobloxPlayerList)
 
 	buildCash(playerGui)
