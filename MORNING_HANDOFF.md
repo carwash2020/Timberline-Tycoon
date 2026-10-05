@@ -11,12 +11,16 @@ because the slow specs were fixed (PR #51), down from about 50.
 | #50 | Xbox fixes, W3 (toll, ferry, boulders, gondola checks), W4 (sea warning, Secret Cave, Hermit, Hermit's Maul), plots (Land panel, tutorial steps), B09 furniture, B11 wiring, B13 daily return calendar, B14 Halloween, B15 anti-exploit, B16 text pass, opt-in leaderboard, off-sale passes removed |
 | #51 | Boxed stores everywhere (Dealership, chop saw, build palette is not a shop), gold Robux shelf in the Tool Shed, deeper Tool Shed, Xbox input audit fixes, smooth ferry, Old Tolly and Cap'n Moss NPCs, test speedups |
 
-## In flight when this was written
+## Also landed after that (all merged, CI green)
 
-Three agents were working on follow-ups (each becomes its own PR, merged when
-CI is green): a longer Hearth & Home shelf plus a bigger Robux board and map
-marker; plot visits, a wire tool UI and saved switch positions; a UI cleanup
-pass. Check the PR list for what finished.
+| PR | What |
+|----|------|
+| #52 | This note, plus a fix for a timing flake in `ProfileSchema.spec` (`Migrate` stamps `lastPlayed` with the clock, so two runs a second apart differed) |
+| #53 | UI cleanup: one `UITheme.Layers` table for every screen's DisplayOrder (Settings no longer ties the HUD), Store panel fits a landscape phone, 44 px Store tabs, Daily panel on UITheme styling; a second `ProfileSchema` flake fix |
+| #54 | Plot visits (Settings > Visitors > Visit), wire tool (BUILD > WIRE), saved switch positions (`plot.switches`) |
+| #55 | Hearth & Home shelf long enough to box all 9 furniture and wiring pieces; bigger Robux board with a STORE arch, night lanterns and a map marker |
+
+Nothing from the overnight plan is still open.
 
 ## Decisions only you can make
 
@@ -101,7 +105,6 @@ pass. Check the PR list for what finished.
 
 - No Blender models; Blender is not installed in the cloud container.
 - WoodData still has 46 TBD comments (a locked file, left untouched).
-- No client wiring tool or drawn wires until the in-flight PR lands.
 - The Hermit's Maul has no authored mesh (generic axe shape); carved-mark art
   and a placeable Totem are not built; the frost path is not built.
 - Cap'n Moss stands on the mainland dock; there is no island-side NPC.
@@ -111,5 +114,5 @@ pass. Check the PR list for what finished.
 
 - `./scripts/check.sh` now finishes in about 8 minutes in the cloud container
   (it never finished before). `tests/run` prints each spec's seconds.
-- Worktree branches under `.claude/worktrees/` belong to the overnight agents
-  and are not committed.
+- The overnight agents' working copies lived under `.claude/worktrees/` and are
+  not committed.
