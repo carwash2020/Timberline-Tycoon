@@ -69,4 +69,40 @@ return function(t)
 			t.eq(AdminLogic.BanSeconds(bad), nil, tostring(bad))
 		end
 	end)
+
+	t.test("a menu request becomes a command line, and anything off the list becomes nothing", function()
+		local from = AdminLogic.FromRequest
+		t.eq(from({ action = "give", target = "Bob", amount = 500 }), "/give Bob 500")
+		t.eq(from({ action = "take", target = "Bob_1", amount = 20 }), "/take Bob_1 20")
+		t.eq(from({ action = "setcash", target = "Bob", amount = 0 }), "/setcash Bob 0")
+		t.eq(from({ action = "gift", target = "Bob", kind = "Axe", itemId = "SteelAxe" }), "/gift Bob Axe SteelAxe")
+		t.eq(from({ action = "kick", target = "Bob" }), "/kick Bob")
+		t.eq(from({ action = "goto", target = "Bob" }), "/goto Bob")
+		t.eq(from({ action = "superrun" }), "/superrun")
+		-- Not on the list, or malformed.
+		for _, bad in ipairs({
+			{ action = "ban", target = "Bob" },
+			{ action = "announce", target = "Bob" },
+			{ action = "give", target = "Bob", amount = -5 },
+			{ action = "give", target = "Bob", amount = 0 },
+			{ action = "give", target = "Bob", amount = 1.5 },
+			{ action = "give", target = "Bob", amount = 99999999 },
+			{ action = "give", target = "Bob", amount = 0 / 0 },
+			{ action = "give", target = "Bob", amount = "500" },
+			{ action = "give", amount = 500 },
+			{ action = "give", target = "Bob; /ban Bob", amount = 5 },
+			{ action = "give", target = string.rep("a", 40), amount = 5 },
+			{ action = "gift", target = "Bob", kind = "Truck", itemId = "Pickup" },
+			{ action = "gift", target = "Bob", kind = "Axe", itemId = "x y" },
+			{ action = "kick" },
+			{},
+			{ action = 5 },
+		}) do
+			t.eq(from(bad), nil)
+		end
+		for _, junk in ipairs({ "give", 5, true }) do
+			t.eq(from(junk), nil)
+		end
+		t.eq(from(nil), nil)
+	end)
 end

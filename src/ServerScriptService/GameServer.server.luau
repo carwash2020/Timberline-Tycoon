@@ -1161,6 +1161,11 @@ if not CoreLoop.V2() then
 	remote.SellLogs.OnServerEvent:Connect(onSellLogs)
 end
 remote.DropAxe.OnServerEvent:Connect(AxeService.Drop)
+remote.AdminRun.OnServerEvent:Connect(function(player: Player, request: unknown)
+	if RateLimiter.Allow(player, "AdminRun") then
+		AdminService.RunRequest(player, request)
+	end
+end)
 remote.Sprint.OnServerEvent:Connect(function(player: Player, on: unknown)
 	if RateLimiter.Allow(player, "Sprint") then
 		player:SetAttribute("Sprinting", SprintLogic.Wants(on))

@@ -272,8 +272,35 @@ function AdminService.Run(userId: number, text: string): boolean
 	return true
 end
 
+-- The owner menu's request (a table from a client, any type). Only the
+-- owner gets anything: the speaker's UserId is the remote's own `player`,
+-- checked before the request is even read.
+function AdminService.RunRequest(player: Player, request: unknown): boolean
+	if not AdminService.IsOwner(player.UserId) then
+		warn(string.format("[Admin] refused a menu request from %s (%d): not the owner", player.Name, player.UserId))
+		return false
+	end
+	local line = AdminLogic.FromRequest(request)
+	if not line then
+		return false
+	end
+	return AdminService.Run(player.UserId, line)
+end
+
+-- Tells the owner's own client to show the menu button. Only a convenience:
+-- the server checks the owner again on every request.
+function AdminService.Mark(player: Player)
+	if AdminService.IsOwner(player.UserId) then
+		player:SetAttribute("IsOwner", true)
+	end
+end
+
 function AdminService.Init(notifyFn: (Player, string) -> ())
 	notify = notifyFn
+	Players.PlayerAdded:Connect(AdminService.Mark)
+	for _, player in ipairs(Players:GetPlayers()) do
+		AdminService.Mark(player)
+	end
 	for name in pairs(handlers) do
 		local command = Instance.new("TextChatCommand")
 		command.Name = "Admin_" .. name

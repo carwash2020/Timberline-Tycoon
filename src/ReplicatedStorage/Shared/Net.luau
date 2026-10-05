@@ -15,6 +15,7 @@ Net.RemoteNames = {
 	"BuyItem", -- client -> server: (category, itemId); the result comes back as a Notify toast
 	"SkipTutorial", -- client -> server: ()
 	"EquipItem", -- client -> server: (category, itemId) switch to something you own (a truck)
+	"AdminRun", -- client -> server: (request) the owner menu; the server refuses anyone but the owner (AdminService)
 	"Sprint", -- client -> server: (on) hold to run; the server sets the speed (SprintLogic)
 	"CallTruck", -- client -> server: () send your truck back to your parking slot
 	"BuyRobuxItem", -- client -> server: ("Pass" | "Product", key) the server shows Roblox's prompt

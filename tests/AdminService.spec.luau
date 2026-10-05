@@ -168,11 +168,49 @@ return function(t)
 		t.eq(players.Connor.attrs.SuperRun, nil, "off again")
 	end)
 
+	t.test("the menu's request runs for the owner and for nobody else", function()
+		local Admin, calls, cash, players = boot(false)
+		t.eq(Admin.RunRequest(players.Connor, { action = "give", target = "Bob", amount = 500 }), true)
+		t.eq(cash.Bob, 900)
+		t.eq(Admin.RunRequest(players.Bob, { action = "give", target = "Bob", amount = 500 }), false)
+		t.eq(Admin.RunRequest(players.Eve, { action = "setcash", target = "Eve", amount = 999999 }), false)
+		t.eq(Admin.RunRequest(players.Bob, { action = "kick", target = "Connor" }), false)
+		t.eq(cash, { Connor = 50, Bob = 900, Eve = 10 })
+		t.eq(#calls.kicks, 0)
+		t.eq(Admin.RunRequest(players.Connor, { action = "ban", target = "Bob" }), false, "off the menu's list")
+		t.eq(Admin.RunRequest(players.Connor, "give Bob 5"), false)
+	end)
+
+	t.test("only the owner's client is told to show the menu", function()
+		local Admin, _, _, players = boot(false)
+		Admin.Mark(players.Connor)
+		Admin.Mark(players.Bob)
+		t.eq(players.Connor.attrs.IsOwner, true)
+		t.eq(players.Bob.attrs.IsOwner, nil)
+	end)
+
 	t.test("unknown commands and a player who isn't there do nothing", function()
 		local Admin, calls = boot(false)
 		t.eq(Admin.Run(100, "/nonsense"), false)
 		t.eq(Admin.Run(999, "/give Bob 5"), false, "no such player on the server")
 		Admin.Run(100, "/give Nobody 5")
 		t.eq(#calls.cash, 0)
+	end)
+
+	t.test("the server never trusts the IsOwner attribute, and the free-gift flag is set nowhere else", function()
+		local fs = require("@lune/fs")
+		local dir = "src/ServerScriptService"
+		for _, entry in ipairs(fs.readDir(dir)) do
+			if string.match(entry, "%.luau$") then
+				local source = fs.readFile(dir .. "/" .. entry)
+				t.ok(
+					not string.find(source, 'GetAttribute("IsOwner")', 1, true),
+					entry .. " reads IsOwner: the attribute only shows the menu button"
+				)
+				if entry ~= "AdminService.luau" and entry ~= "ShopService.luau" then
+					t.ok(not string.find(source, "free = true", 1, true), entry .. " passes the free-gift flag")
+				end
+			end
+		end
 	end)
 end
