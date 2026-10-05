@@ -551,6 +551,12 @@ return function(t)
 		t.eq(Schema.Template.tollPaidUntil, nil)
 		local before = t.loader():shared("Util").deepCopy(data)
 		Schema.Migrate(data)
+		-- Migrate stamps the active slot's lastPlayed with the clock, so two
+		-- runs a second apart differ there (a flake on the second boundary).
+		-- Everything else must match.
+		for key, slot in pairs(data.slots) do
+			before.slots[key].lastPlayed = slot.lastPlayed
+		end
 		t.eq(data, before)
 	end)
 
