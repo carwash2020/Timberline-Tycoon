@@ -132,6 +132,7 @@ export type Options = {
 	mocks: { [string]: any }?,
 	services: { [string]: any }?,
 	globals: { [string]: any }?,
+	isolated: boolean?,
 }
 
 local Loader = {}
@@ -142,6 +143,7 @@ Loader.__index = Loader
 -- Folders index their children by name; a missing child is an error, as a
 -- typo in `script.Parent.X` would be in Roblox.
 local nodes: { [string]: any } = {} -- [path] -> folder node
+local pathsByName: { [string]: { string } } = {} -- module name -> its path(s)
 local function scan(dir: string, parent: any?)
 	local node = { __path = dir, Parent = parent }
 	for _, entry in ipairs(fs.readDir(dir)) do
@@ -153,6 +155,12 @@ local function scan(dir: string, parent: any?)
 			local name = string.match(entry, "^([^%.]+)%.luau$")
 			if name then
 				node[name] = { __module = full, Name = name }
+				local same = pathsByName[name]
+				if not same then
+					same = {}
+					pathsByName[name] = same
+				end
+				table.insert(same, full)
 			end
 		end
 	end
@@ -172,6 +180,123 @@ local function scan(dir: string, parent: any?)
 	})
 end
 scan(SRC)
+
+-- Sharing built modules between Loaders.
+--
+-- Building the world is the slow part of most specs (WorldLayout plans
+-- every homestead's lane; WorldPlan places thousands of trees), and a spec
+-- that makes a Loader per test would pay for it each time. So the world's
+-- own modules (SHARED_MODULES) are built once per process and handed to
+-- every Loader that would build them the same way. A Loader takes the
+-- shared one only when all of these hold:
+--   * the module's whole require closure (found from the sources) lies
+--     under ReplicatedStorage/Shared, uses game only as
+--     game:GetService("X") and never calls warn (a Loader keeps its own
+--     warnings), and
+--   * the Loader overrides no globals, gives no service the closure asks
+--     for, and mocks nothing in the closure, so the module sees exactly
+--     what it would see in a fresh Loader.
+-- Nothing else is shared: a spec that sets fields on a module (WorldTime's
+-- NightSpeed, MeshKit.Override) keeps that to its own Loader.
+-- Pass `isolated = true` in the options to build everything fresh.
+local SHARED_ROOT = SRC .. "/ReplicatedStorage/Shared/"
+local FORBIDDEN = { "game", "warn" } -- (workspace, task and the like only matter when a Loader gives globals)
+
+local sourceOf: { [string]: string } = {}
+local function sourceText(path: string): string
+	local cached = sourceOf[path]
+	if cached then
+		return cached
+	end
+	local text = fs.readFile(path)
+	sourceOf[path] = text
+	return text
+end
+
+type Closure = {
+	names: { [string]: boolean },
+	paths: { [string]: boolean },
+	services: { [string]: boolean }, -- game:GetService("X") names the closure asks for
+	ok: boolean,
+	why: string?,
+}
+local closures: { [string]: Closure } = {}
+local function closureOf(root: string): Closure
+	local known = closures[root]
+	if known then
+		return known
+	end
+	local closure: Closure = { names = {}, paths = {}, services = {}, ok = true, why = nil }
+	local queue = { root }
+	closure.paths[root] = true
+	local head = 1
+	while head <= #queue do
+		local path = queue[head]
+		head += 1
+		closure.names[string.match(path, "([^/]+)%.luau$")] = true
+		if string.sub(path, 1, #SHARED_ROOT) ~= SHARED_ROOT then
+			closure.ok = false
+			closure.why = closure.why or ("outside Shared: " .. path)
+			continue
+		end
+		-- Comments out, so a word in one doesn't count.
+		local text = string.gsub(sourceText(path), "%-%-[^\n]*", "")
+		-- game:GetService("X") is fine (the Loader's stubs, unless it is
+		-- given its own X: see canShare); any other use of game is not.
+		local servicePattern = 'game%s*:%s*GetService%s*%(%s*"([%w_]+)"%s*%)'
+		for service in string.gmatch(text, servicePattern) do
+			closure.services[service] = true
+		end
+		text = string.gsub(text, servicePattern, "")
+		for _, word in ipairs(FORBIDDEN) do
+			if string.find(text, "%f[%w_]" .. word .. "%f[^%w_]") then
+				closure.ok = false
+				closure.why = closure.why or (path .. " uses " .. word)
+			end
+		end
+		for target in string.gmatch(text, "require%s*%(([^%)]*)%)") do
+			local name = string.match(target, "([%w_]+)%s*$")
+			local found = name and pathsByName[name]
+			if not found then
+				closure.ok = false
+				continue
+			end
+			for _, dep in ipairs(found) do
+				if not closure.paths[dep] then
+					closure.paths[dep] = true
+					table.insert(queue, dep)
+				end
+			end
+		end
+	end
+	closures[root] = closure
+	return closure
+end
+
+-- The world's modules: pure plans and terrain, built from fixed data.
+local SHARED_MODULES = { "WorldLayout", "TerrainGen", "TreeFill", "WorldPlan" }
+local shareable: { [string]: boolean } = {}
+for _, name in ipairs(SHARED_MODULES) do
+	shareable[SHARED_ROOT .. "World/" .. name .. ".luau"] = true
+end
+
+-- A module that is handed its dependencies (TreeFill.Bind, run by
+-- WorldPlan) is only shared along with the module that binds it: shared
+-- with a WorldPlan this Loader doesn't share, it would end up bound to
+-- the wrong one.
+local binders: { [string]: { string } } = {}
+for path in pairs(shareable) do
+	for target in string.gmatch(sourceText(path), "([%w_]+)%.Bind%s*%(") do
+		for _, bound in ipairs(pathsByName[target] or {}) do
+			if shareable[bound] and bound ~= path then
+				binders[bound] = binders[bound] or {}
+				table.insert(binders[bound], path)
+			end
+		end
+	end
+end
+
+local sharedCache: { [string]: any } = {}
 
 local function ref(path: string)
 	return assert(nodes[path], "[loader] no folder " .. path)
@@ -348,6 +473,39 @@ function Loader:environment(modulePath: string)
 	return env
 end
 
+-- Whether this Loader may take `modulePath` from, and add it to, the shared
+-- cache (see "Sharing built modules between Loaders" above).
+function Loader:canShare(modulePath: string): boolean
+	if not shareable[modulePath] or self.options.isolated or next(self.options.globals or {}) ~= nil then
+		return false
+	end
+	local closure = closureOf(modulePath)
+	if not closure.ok then
+		return false
+	end
+	for name in pairs(self.options.mocks or {}) do
+		if closure.names[name] then
+			return false
+		end
+	end
+	for name in pairs(self.options.services or {}) do
+		if closure.services[name] then
+			return false
+		end
+	end
+	for _, binder in ipairs(binders[modulePath] or {}) do
+		if not self:canShare(binder) then
+			return false
+		end
+	end
+	return true
+end
+
+-- Why a module's closure can't be shared (for debugging), or nil.
+function Loader.whyNot(modulePath: string): string?
+	return closureOf(modulePath).why
+end
+
 function Loader:require(modulePath: string)
 	local name = string.match(modulePath, "([^/]+)%.luau$")
 	local mock = self.options.mocks and self.options.mocks[name]
@@ -358,6 +516,14 @@ function Loader:require(modulePath: string)
 	if cached ~= nil then
 		return cached
 	end
+	local shareable = self:canShare(modulePath)
+	if shareable then
+		local global = sharedCache[modulePath]
+		if global ~= nil then
+			self.cache[modulePath] = global
+			return global
+		end
+	end
 	local chunk = luau.load(fs.readFile(modulePath), {
 		debugName = modulePath,
 		environment = self:environment(modulePath),
@@ -365,6 +531,9 @@ function Loader:require(modulePath: string)
 	})
 	local result = chunk()
 	self.cache[modulePath] = result
+	if shareable then
+		sharedCache[modulePath] = result
+	end
 	return result
 end
 

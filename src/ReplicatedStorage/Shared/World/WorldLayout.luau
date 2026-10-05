@@ -265,34 +265,49 @@ do
 		return dx * dx + dz * dz < reach * reach
 	end
 	-- A straight lane. It has to miss every yard, including its own.
+	local laneHalf = PlotData.LaneWidth / 2
+	local slotReach = half + laneHalf + 1 -- past this a yard can't be within `reach`
+	local slotXs: { number } = {}
+	local slotZs: { number } = {}
+	for i, other in ipairs(PlotData.Slots) do
+		slotXs[i], slotZs[i] = other.X, other.Y
+	end
 	local function laneClear(ax: number, az: number, bx: number, bz: number): boolean
 		local len = math.sqrt((bx - ax) ^ 2 + (bz - az) ^ 2)
 		local steps = math.max(1, math.ceil(len / 8))
-		local reach = PlotData.LaneWidth / 2 - 0.5
-		for _, other in ipairs(PlotData.Slots) do
-			for s = 0, steps do
-				local u = s / steps
-				local x = ax + (bx - ax) * u
-				local z = az + (bz - az) * u
-				if hitsSquare(x, z, other.X, other.Y, reach) then
+		local reach = laneHalf - 0.5
+		-- The lane's body, not only its centreline, stays off the
+		-- dealership lot and the path from the showroom. And off the maple
+		-- past the south pull-outs (a lane up to the lot loop used to pave
+		-- it): the centreline stays clear of its crown.
+		local treeX, treeZ, treeR = 132, -80, 28
+		for s = 0, steps do
+			local u = s / steps
+			local x = ax + (bx - ax) * u
+			local z = az + (bz - az) * u
+			for _, box in ipairs(WorldLayout.Reserved) do
+				local dx = math.max(box.x0 - x, 0, x - box.x1)
+				local dz = math.max(box.z0 - z, 0, z - box.z1)
+				if dx * dx + dz * dz < laneHalf * laneHalf then
 					return false
 				end
-				-- The lane's body, not only its centreline, stays off the
-				-- dealership lot and the path from the showroom.
-				local laneReach = PlotData.LaneWidth / 2
-				for _, box in ipairs(WorldLayout.Reserved) do
-					local dx = math.max(box.x0 - x, 0, x - box.x1)
-					local dz = math.max(box.z0 - z, 0, z - box.z1)
-					if dx * dx + dz * dz < laneReach * laneReach then
+			end
+			local tdx, tdz = x - treeX, z - treeZ
+			if tdx * tdx + tdz * tdz < treeR * treeR then
+				return false
+			end
+		end
+		-- Only yards near the lane's bounding box can be hit.
+		local minX, maxX = math.min(ax, bx) - slotReach, math.max(ax, bx) + slotReach
+		local minZ, maxZ = math.min(az, bz) - slotReach, math.max(az, bz) + slotReach
+		for i = 1, #slotXs do
+			local sx, sz = slotXs[i], slotZs[i]
+			if sx >= minX and sx <= maxX and sz >= minZ and sz <= maxZ then
+				for s = 0, steps do
+					local u = s / steps
+					if hitsSquare(ax + (bx - ax) * u, az + (bz - az) * u, sx, sz, reach) then
 						return false
 					end
-				end
-				-- The maple past the south pull-outs. A lane up to the lot
-				-- loop used to pave it. The centreline stays clear of its crown.
-				local treeX, treeZ, treeR = 132, -80, 28
-				local tdx, tdz = x - treeX, z - treeZ
-				if tdx * tdx + tdz * tdz < treeR * treeR then
-					return false
 				end
 			end
 		end
@@ -848,12 +863,15 @@ function WorldLayout.FlatAt(x: number, z: number): (number, number)
 	for _, zone in ipairs(flatZonesNow()) do
 		local dx = math.max(zone.x0 - x, 0, x - zone.x1)
 		local dz = math.max(zone.z0 - z, 0, z - zone.z1)
-		local outside = math.sqrt(dx * dx + dz * dz)
-		local w = 1 - math.clamp(outside / zone.blend, 0, 1)
-		w = w * w * (3 - 2 * w) -- smoothstep
-		if w > weight then
-			weight = w
-			target = zone.y or 0
+		-- Past the blend on either axis the weight is 0: it can't win.
+		if dx < zone.blend and dz < zone.blend then
+			local outside = math.sqrt(dx * dx + dz * dz)
+			local w = 1 - math.clamp(outside / zone.blend, 0, 1)
+			w = w * w * (3 - 2 * w) -- smoothstep
+			if w > weight then
+				weight = w
+				target = zone.y or 0
+			end
 		end
 	end
 	return weight, target
@@ -1214,8 +1232,24 @@ end
 
 -- On the graded spur (the climb and the run up to the deck). The
 -- approach along existing ground is not included.
+local tollBox: { number }? = nil -- the graded suffix's box (minX, maxX, minZ, maxZ)
 function WorldLayout.OnTollSpur(x: number, z: number): boolean
 	local spur = WorldLayout.TollSpur
+	local box: { number } = tollBox or {}
+	if #box == 0 then
+		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+		for _, p in ipairs(WorldLayout.TollSpurGrade) do
+			minX, maxX = math.min(minX, p.X), math.max(maxX, p.X)
+			minZ, maxZ = math.min(minZ, p.Y), math.max(maxZ, p.Y)
+		end
+		box = { minX, maxX, minZ, maxZ }
+		tollBox = box
+	end
+	-- Farther than half the width (and a stud) from the box: not on it.
+	local reach = spur.width / 2 + 1
+	if x < box[1] - reach or x > box[2] + reach or z < box[3] - reach or z > box[4] + reach then
+		return false
+	end
 	return WorldLayout.PolylineDistance(Vector2.new(x, z), WorldLayout.TollSpurGrade) <= spur.width / 2
 end
 

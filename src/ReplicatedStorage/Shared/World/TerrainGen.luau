@@ -500,7 +500,7 @@ end
 -- Ground height before a homestead lane is graded. A lane is a ramp from
 -- the shelf to the road it meets: the country under it can bump, and a
 -- truck still climbs at the ramp's slope.
-local function groundHeight(x: number, z: number): number
+local function groundHeight(x: number, z: number): (number, number?)
 	local low = lowHeight(x, z)
 	local detail = detailHeight(x, z)
 	local rw = roadWeight(x, z)
@@ -523,10 +523,24 @@ local function groundHeight(x: number, z: number): number
 	if flat > 0 and not (bed and surface) then
 		h = h * (1 - flat) + target * flat
 	end
-	return h
+	return h, bed
 end
 
-type SpurGrade = { points: { Vector2 }, half: number, ha: number, hb: number, total: number }
+type SpurGrade = {
+	points: { Vector2 },
+	half: number,
+	ha: number,
+	hb: number,
+	total: number,
+	-- The same points as plain numbers (x, z, x, z, ...) and their box, so
+	-- the per-sample chord test doesn't read Vector2s (slow) or run when
+	-- the point is nowhere near.
+	flat: { number },
+	minX: number,
+	maxX: number,
+	minZ: number,
+	maxZ: number,
+}
 local SPUR_GRADE: { SpurGrade } = {}
 for _, road in ipairs(WorldLayout.Roads) do
 	if road.name == "PlotSpur" and #road.points >= 2 then
@@ -536,12 +550,25 @@ for _, road in ipairs(WorldLayout.Roads) do
 		end
 		local a, b = road.points[1], road.points[#road.points]
 		if total > 1 then
+			local flat: { number } = {}
+			local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+			for _, p in ipairs(road.points) do
+				table.insert(flat, p.X)
+				table.insert(flat, p.Y)
+				minX, maxX = math.min(minX, p.X), math.max(maxX, p.X)
+				minZ, maxZ = math.min(minZ, p.Y), math.max(maxZ, p.Y)
+			end
 			table.insert(SPUR_GRADE, {
 				points = road.points,
 				half = road.width / 2,
 				ha = groundHeight(a.X, a.Y),
 				hb = groundHeight(b.X, b.Y),
 				total = total,
+				flat = flat,
+				minX = minX,
+				maxX = maxX,
+				minZ = minZ,
+				maxZ = maxZ,
 			})
 		end
 	end
@@ -553,14 +580,19 @@ local function spurChord(x: number, z: number): number?
 	for _, spur in ipairs(SPUR_GRADE) do
 		local along, dist = 0, math.huge
 		local acc = 0
-		local pts = spur.points
-		for i = 1, #pts - 1 do
-			local a, b = pts[i], pts[i + 1]
-			local abx, abz = b.X - a.X, b.Y - a.Y
+		local half = spur.half
+		-- Outside the box grown by half, no point of the spur is within it.
+		if x < spur.minX - half or x > spur.maxX + half or z < spur.minZ - half or z > spur.maxZ + half then
+			continue
+		end
+		local pts = spur.flat
+		for i = 1, #pts - 2, 2 do
+			local ax, az, bx, bz = pts[i], pts[i + 1], pts[i + 2], pts[i + 3]
+			local abx, abz = bx - ax, bz - az
 			local len2 = abx * abx + abz * abz
 			local len = math.sqrt(len2)
-			local t = if len2 > 1e-6 then math.clamp(((x - a.X) * abx + (z - a.Y) * abz) / len2, 0, 1) else 0
-			local dx, dz = x - (a.X + abx * t), z - (a.Y + abz * t)
+			local t = if len2 > 1e-6 then math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1) else 0
+			local dx, dz = x - (ax + abx * t), z - (az + abz * t)
 			local d2 = dx * dx + dz * dz
 			if d2 < dist then
 				dist = d2
@@ -648,36 +680,55 @@ local function spurHeightAt(along: number): number
 	return h0 + (low - h0) * (along / aLow)
 end
 
-local function tollChord(x: number, z: number): number?
+-- The graded suffix of the toll spur as plain numbers (x, z, ...) and its
+-- box, built on first use (the spur never changes once WorldLayout loads).
+local TOLL_FLAT: { number }? = nil
+local TOLL_BOX = { minX = 0, maxX = 0, minZ = 0, maxZ = 0 }
+local function tollFlat(): { number }
+	local known = TOLL_FLAT
+	if known then
+		return known
+	end
 	local spur = WorldLayout.TollSpur
 	local pts = spur.points
-	local i0 = spur.gradeFrom
+	local flat: { number } = {}
+	local minX, maxX = math.huge, -math.huge
+	local minZ, maxZ = math.huge, -math.huge
+	for i = spur.gradeFrom, #pts do
+		local p = pts[i]
+		table.insert(flat, p.X)
+		table.insert(flat, p.Y)
+		minX, maxX = math.min(minX, p.X), math.max(maxX, p.X)
+		minZ, maxZ = math.min(minZ, p.Y), math.max(maxZ, p.Y)
+	end
+	TOLL_BOX = { minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ }
+	TOLL_FLAT = flat
+	return flat
+end
+
+local function tollChord(x: number, z: number): number?
+	local spur = WorldLayout.TollSpur
 	local half = spur.width / 2
 	local south = WorldLayout.BridgeCenterZ - WorldLayout.BridgeLength / 2
 	if z > south + 1e-3 then
 		return nil
 	end
-	local minX, maxX = math.huge, -math.huge
-	local minZ, maxZ = math.huge, -math.huge
-	for i = i0, #pts do
-		local p = pts[i]
-		minX, maxX = math.min(minX, p.X), math.max(maxX, p.X)
-		minZ, maxZ = math.min(minZ, p.Y), math.max(maxZ, p.Y)
-	end
-	if x < minX - half or x > maxX + half or z < minZ - half or z > maxZ + half then
+	local pts = tollFlat()
+	local box = TOLL_BOX
+	if x < box.minX - half or x > box.maxX + half or z < box.minZ - half or z > box.maxZ + half then
 		return nil
 	end
 	local bestD = math.huge
 	local bestAlong = 0
 	local acc = 0
-	for i = i0, #pts - 1 do
-		local a, b = pts[i], pts[i + 1]
-		local abx, abz = b.X - a.X, b.Y - a.Y
+	for i = 1, #pts - 2, 2 do
+		local ax, az, bx, bz = pts[i], pts[i + 1], pts[i + 2], pts[i + 3]
+		local abx, abz = bx - ax, bz - az
 		local len2 = abx * abx + abz * abz
 		local len = math.sqrt(len2)
-		local t = if len2 > 1e-6 then math.clamp(((x - a.X) * abx + (z - a.Y) * abz) / len2, 0, 1) else 0
-		local dx = x - (a.X + abx * t)
-		local dz = z - (a.Y + abz * t)
+		local t = if len2 > 1e-6 then math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1) else 0
+		local dx = x - (ax + abx * t)
+		local dz = z - (az + abz * t)
 		local d2 = dx * dx + dz * dz
 		if d2 < bestD then
 			bestD = d2
@@ -707,8 +758,7 @@ function TerrainGen.HeightAt(x: number, z: number): number
 		end
 		return shelf
 	end
-	local h = groundHeight(x, z)
-	local bed = water(x, z)
+	local h, bed = groundHeight(x, z) -- (its channel bed: water(x, z)'s first value)
 	if bed then
 		return h
 	end
