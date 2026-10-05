@@ -72,10 +72,17 @@ local function traceback(err: any): string
 	return debug.traceback(tostring(err), 2)
 end
 local function step(name: string, build: () -> ())
+	-- A line when a step starts and when it ends, so a stalled world build
+	-- shows which step it is in (the tree planning is silent for a while).
+	print(string.format("[MapBuilder] %s ...", name))
+	local startedAt = os.clock()
 	local ok, err = xpcall(function(): any
 		build()
 		return nil
 	end, traceback)
+	if ok then
+		print(string.format("[MapBuilder] %s done in %.1fs", name, os.clock() - startedAt))
+	end
 	if not ok then
 		failedSteps += 1
 		warn(string.format("[MapBuilder] %s failed, the rest of the world still builds:\n%s", name, tostring(err)))
