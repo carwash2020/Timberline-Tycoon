@@ -71,6 +71,7 @@ local MODULES = {
 	"VehicleFX",
 	"WeatherController",
 	"WindSway",
+	"WireTool",
 	"WoodFX",
 	"WorldUI",
 }
@@ -278,6 +279,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "BuilderTools",
 		get = function()
 			return require(script.Parent.BuilderTools)
+		end,
+	},
+	{
+		name = "WireTool",
+		get = function()
+			return require(script.Parent.WireTool)
 		end,
 	},
 	{

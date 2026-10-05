@@ -1387,9 +1387,24 @@ Wiring (`Shared/WireLogic`, `SSS/LogicService`, saved in `plot.wires`): a
 switch has Flip (E / ButtonX) and Wire (hold F / ButtonY). Wire links the
 nearest free Spark Lamp or Door within 32 studs; press again for the next;
 with none left it clears that switch. A lamp nobody wired stays lit. A wired
-lamp or door follows its switches (any on). Switch positions are not saved.
-The Wire remote carries (fromUid, 1, toUid, 1) or ("cut", uid) for a future
-tool; there is no client wiring UI yet and no drawn wire.
+lamp or door follows its switches (any on). Switch positions are saved
+(`plot.switches`, the uids that are on; Restore puts levers, lamps and
+wired doors back when the plot rebuilds). The Wire remote carries (fromUid,
+1, toUid, 1) or ("cut", uid); the client tool below uses it.
+
+Wiring tool (`StarterPlayerScripts/WireTool`, rules in `Shared/WireToolLogic`):
+BUILD bar > WIRE. Phone tap, PC click, Xbox crosshair + RT pick a piece;
+pick a Wall Switch, then lamps or doors to wire them; CUT (X on Xbox)
+clears the picked piece; B / DONE leaves. World prompts are off while it is
+up. A thin gold line (max 40 Neon parts, reused) joins wired pieces on your
+plot for the whole of BUILD mode; each switch model carries a `Wires`
+attribute (target uids) so the client can draw it.
+
+Plot visits: Settings > Visitors > VISIT A PLOT lists players here who own a
+plot and whose `visit` flag lets you in; Visit sends `VisitPlot (userId)`.
+`PlotService.Visit` re-checks (rate limit, owner online with a plot, not
+you, `PermissionLogic.CanVisit`) and lands you on the first dry, road-free,
+roof-free spot (raycast) around the plot's spawn pad. No cash.
 
 Studio checks
 1. Hearth & Home: 14 boxes, none off the shelf, Table / Chair / Wall Switch /
@@ -1402,9 +1417,18 @@ Studio checks
    lever tips. Flip again: dark. Hold Wire until "Wires cleared.": lamp lit.
 4. Wire a switch to a Door (hosted in a door wall): Flip opens, Flip shuts.
    Put a block in the swing: the door stays shut and says why.
-5. Leave and rejoin: wires are kept, all switches are off, wired lamps dark.
+5. Leave and rejoin: wires are kept and every switch is where you left it
+   (a lamp on an "on" switch is lit, a wired door is open).
 6. Sell the switch: its lamp relights. A visitor without Interact cannot
    flip, without Build cannot wire.
+7. WIRE tool. Phone: BUILD > WIRE, tap the switch (blue box), tap the lamp:
+   "Wired.", a gold line appears; tap CUT: the line goes. Buttons are easy
+   to hit. PC: same with clicks. Xbox: aim the dot at the switch, RT, aim
+   at the lamp, RT, X cuts, B leaves; help text is readable on the TV.
+8. Visit (two players). Settings > Visitors lists your friend; Visit on
+   phone / PC / Xbox (D-pad, A, B closes) puts you on their plot, never in
+   water or on a road. Turn their Visit flag off: the list drops them and a
+   forced Visit says "That plot isn't open to visitors." 
 
 ## Boxed stores, every shop (box on a shelf, carry it, the keeper takes payment)
 

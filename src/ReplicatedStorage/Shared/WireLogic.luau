@@ -5,8 +5,10 @@
 -- A wire joins one switch to one target. Targets are a Spark Lamp or a
 -- Door. A switch can feed several targets and a target can have several
 -- switches (it follows any switch that is on). Wires are saved as
--- { from = switchUid, to = targetUid } in profile.plot.wires. Switch
--- positions are not saved: every switch is off when a plot rebuilds.
+-- { from = switchUid, to = targetUid } in profile.plot.wires. A switch's
+-- position is saved as its uid in profile.plot.switches while it is on
+-- (a switch missing from the list is off), so it keeps its place when the
+-- plot rebuilds.
 
 local WireLogic = {}
 
@@ -26,6 +28,7 @@ WireLogic.Span = 32 -- studs from the switch to its target, along the ground
 WireLogic.MaxWires = 40 -- per plot
 WireLogic.MaxPerSwitch = 6
 WireLogic.FlipCooldown = 0.5 -- seconds between flips of one switch
+WireLogic.MaxSwitches = 40 -- uids kept in plot.switches
 WireLogic.Port = 1 -- the only port a piece has; the Wire remote carries it
 
 local ROLES: { [string]: string } = {
@@ -88,6 +91,61 @@ function WireLogic.Clean(value: any): { Wire }
 					end
 				end
 			end
+		end
+	end
+	return out
+end
+
+-- Saved switch positions: the uids of the switches that are on. Only
+-- non-empty strings, no repeats, at most MaxSwitches.
+function WireLogic.CleanSwitches(value: any): { string }
+	local out: { string } = {}
+	if type(value) ~= "table" then
+		return out
+	end
+	local seen: { [string]: boolean } = {}
+	for _, uid in ipairs(value) do
+		if type(uid) == "string" and uid ~= "" and not seen[uid] then
+			seen[uid] = true
+			table.insert(out, uid)
+			if #out >= WireLogic.MaxSwitches then
+				break
+			end
+		end
+	end
+	return out
+end
+
+-- Is this switch saved as on?
+function WireLogic.IsOn(switches: any, uid: string): boolean
+	return type(switches) == "table" and table.find(switches, uid) ~= nil
+end
+
+-- `switches` with `uid` set on or off. Returns a new list.
+function WireLogic.SetOn(switches: any, uid: string, on: boolean): { string }
+	local out: { string } = {}
+	for _, have in ipairs(WireLogic.CleanSwitches(switches)) do
+		if have ~= uid then
+			table.insert(out, have)
+		end
+	end
+	if on and #out < WireLogic.MaxSwitches then
+		table.insert(out, uid)
+	end
+	return out
+end
+
+-- The saved positions of switches that are still placed.
+function WireLogic.LiveSwitches(switches: any, placed: { Item }): { string }
+	local out: { string } = {}
+	local byUid: { [string]: Item } = {}
+	for _, item in ipairs(placed) do
+		byUid[item.uid] = item
+	end
+	for _, uid in ipairs(WireLogic.CleanSwitches(switches)) do
+		local item = byUid[uid]
+		if item and WireLogic.Role(item.blueprintId) == "switch" then
+			table.insert(out, uid)
 		end
 	end
 	return out

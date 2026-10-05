@@ -65,4 +65,45 @@ return function(t)
 		t.eq(PermissionLogic.Allows(sheet, 9, "grab"), true)
 		t.eq(PermissionLogic.IsFlag("grab"), true)
 	end)
+
+	t.test("CanVisit: never your own plot, and only while the visit flag lets you in", function()
+		t.eq(PermissionLogic.CanVisit({}, 2, 1), true, "visit starts on")
+		t.eq(PermissionLogic.CanVisit({}, 1, 1), false, "not your own")
+		t.eq(PermissionLogic.CanVisit({ anyone = { visit = false } }, 2, 1), false)
+		t.eq(PermissionLogic.CanVisit({ anyone = { visit = false }, ["2"] = { visit = true } }, 2, 1), true)
+		t.eq(PermissionLogic.CanVisit({ ["2"] = { visit = false } }, 2, 1), false)
+		t.eq(PermissionLogic.CanVisit({ ["2"] = { visit = false } }, 3, 1), true)
+		t.eq(PermissionLogic.CanVisit("junk", 2, 1), true, "a bad sheet falls back to the default")
+	end)
+
+	t.test("VisitList: owners of plots who let you in, sorted by name, without you", function()
+		local list = PermissionLogic.VisitList({
+			{ userId = 5, name = "cara", hasPlot = true, permissions = {} },
+			{ userId = 2, name = "Bob", hasPlot = true, permissions = {} },
+			{ userId = 1, name = "Me", hasPlot = true, permissions = {} },
+			{ userId = 3, name = "Dan", hasPlot = false, permissions = {} },
+			{ userId = 4, name = "Eve", hasPlot = true, permissions = { anyone = { visit = false } } },
+			{
+				userId = 6,
+				name = "Fay",
+				hasPlot = true,
+				permissions = { anyone = { visit = false }, ["1"] = { visit = true } },
+			},
+			{ userId = 7, name = "Bob", hasPlot = true, permissions = {} },
+		}, 1)
+		local seen = {}
+		for _, entry in ipairs(list) do
+			table.insert(seen, entry.name .. entry.userId)
+		end
+		t.eq(seen, { "Bob2", "Bob7", "cara5", "Fay6" })
+		t.eq(PermissionLogic.VisitList({}, 1), {})
+	end)
+
+	t.test("VisitTarget takes only a whole user id", function()
+		t.eq(PermissionLogic.VisitTarget(12), 12)
+		for _, bad in ipairs({ "12", 0, -3, 1.5, 0 / 0, math.huge, 2e15, true, {} }) do
+			t.eq(PermissionLogic.VisitTarget(bad), nil, tostring(bad))
+		end
+		t.eq(PermissionLogic.VisitTarget(nil), nil)
+	end)
 end

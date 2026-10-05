@@ -37,6 +37,7 @@ local DragController = require(script.Parent.DragController)
 local HUD = require(script.Parent.HUD)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
+local WireTool = require(script.Parent.WireTool)
 
 local PlotUI = {}
 
@@ -296,6 +297,7 @@ local function setBuilding(on: boolean)
 	end
 	HUD.SetBuildMode(on)
 	DragController.SetBuildMode(on)
+	WireTool.SetBuilding(on)
 	if on then
 		for _, model in ipairs(CollectionService:GetTagged("PlacedItem")) do
 			addPrompts(model)
@@ -320,7 +322,7 @@ function PlotUI.Refresh()
 	end
 	local bar = modeBar
 	if bar then
-		bar.Visible = building and not placing
+		bar.Visible = building and not placing and not WireTool.Active()
 	end
 	for _, list in pairs(itemPrompts) do
 		for _, prompt in ipairs(list) do
@@ -652,8 +654,22 @@ function PlotUI.Start()
 	land.face.Activated:Connect(function()
 		setLand(not landOpen)
 	end)
+	local wire = UITheme.Button({
+		text = "WIRE",
+		size = Vector2.new(96, PlotLogic.LandTap),
+		style = "buy",
+		textSize = 15,
+	})
+	wire.root.LayoutOrder = 3
+	wire.root.Parent = bar.row
+	wire.face.Activated:Connect(function()
+		ShopUI.Close()
+		setLand(false)
+		WireTool.Begin(PlotUI.Refresh)
+		PlotUI.Refresh()
+	end)
 	local done = UITheme.Button({ text = "DONE", size = Vector2.new(98, PlotLogic.LandTap), style = "skip" })
-	done.root.LayoutOrder = 3
+	done.root.LayoutOrder = 4
 	done.root.Parent = bar.row
 	done.face.Activated:Connect(function()
 		setBuilding(false)

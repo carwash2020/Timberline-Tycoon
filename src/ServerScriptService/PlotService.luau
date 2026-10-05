@@ -592,6 +592,7 @@ local function assign(player: Player, slot: Slot, profile: Profile)
 	for _, item in ipairs(profile.plot.placed) do
 		buildItem(slot, player, item)
 	end
+	LogicService.Restore(slot :: any, profile, player)
 	refreshSign(slot)
 end
 
@@ -888,33 +889,33 @@ local function hostFor(player: Player, flag: string): (Slot?, Profile?, Player?,
 	return nil, nil, nil, denied
 end
 
-local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
-	local char = visitor.Character
-	if not char then
-		return
+local function onlinePlayers(): { Player }
+	local ok, service = pcall(function()
+		return game:GetService("Players")
+	end)
+	if not ok or service == nil or type(service.GetPlayers) ~= "function" then
+		return {}
 	end
-	local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		return
-	end
-	local humanoid = if type((char :: any).FindFirstChildOfClass) == "function"
-		then (char :: any):FindFirstChildOfClass("Humanoid")
-		else nil
-	if humanoid and humanoid.SeatPart ~= nil then
-		humanoid.Sit = false
-	end
-	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
-	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
-	-- B15: the ground at a plot-local spot, found with a raycast that skips
-	-- the visitor and anything you can walk through (decor), so the hit is
-	-- the terrain or a floor. The spot is bad on a road (the town's
-	-- layout) or in the water (the lake and river layout, or a water
-	-- terrain hit). groundY is where the ray landed, so the visitor is put
-	-- on the ground and not inside a hill.
+	return service:GetPlayers()
+end
+
+-- B15: the ground at a plot-local spot, found with a raycast that skips
+-- the visitor and anything you can walk through (decor), so the hit is
+-- the terrain or a floor. The spot is bad on a road (the town's
+-- layout) or in the water (the lake and river layout, or a water
+-- terrain hit). groundY is where the ray landed, so the visitor is put
+-- on the ground and not inside a hill. `noRoofs` also calls a spot bad
+-- when the ray lands on a placed piece (a visit never lands on a roof).
+local function groundProbe(
+	slot: Slot,
+	char: Instance,
+	noRoofs: boolean
+): ((number, number) -> boolean, (number, number) -> CFrame)
 	local groundY: { [string]: number } = {}
 	local function spotBad(lx: number, lz: number): boolean
 		local world = (slot.cframe * CFrame.new(lx, 0, lz)).Position
 		local materialName = ""
+		local onPiece = false
 		local ok, hit = pcall(function()
 			local params = RaycastParams.new()
 			params.FilterType = Enum.RaycastFilterType.Exclude
@@ -929,16 +930,102 @@ local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
 				materialName = mat.Name
 			end
 			groundY[lx .. "," .. lz] = result.Position.Y
+			local inst = result.Instance
+			onPiece = noRoofs and inst:IsDescendantOf(slot.items)
 		end
 		local wet = PlotLogic.InWater(world.X, world.Z) or materialName == "Water"
-		return PlotLogic.GroundBad(wet, PlotLogic.OnRoad(world.X, world.Z))
+		return PlotLogic.GroundBad(wet, PlotLogic.OnRoad(world.X, world.Z)) or onPiece
 	end
+	local function cframeAt(lx: number, lz: number): CFrame
+		local ground = groundY[lx .. "," .. lz]
+		local lift = if ground then ground - slot.cframe.Position.Y + 4 else 4
+		return slot.cframe * CFrame.new(lx, math.max(lift, 4), lz)
+	end
+	return spotBad, cframeAt
+end
+
+local function rootOf(player: Player): (Instance?, BasePart?)
+	local char = player.Character
+	if not char then
+		return nil, nil
+	end
+	local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return nil, nil
+	end
+	local humanoid = if type((char :: any).FindFirstChildOfClass) == "function"
+		then (char :: any):FindFirstChildOfClass("Humanoid")
+		else nil
+	if humanoid and humanoid.SeatPart ~= nil then
+		humanoid.Sit = false
+	end
+	return char, root
+end
+
+local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
+	local char, root = rootOf(visitor)
+	if not char or not root then
+		return
+	end
+	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local spotBad, cframeAt = groundProbe(slot, char, false)
 	local lx, lz = PlotLogic.EjectSpot(tier.size, squares, spotBad)
-	local ground = groundY[lx .. "," .. lz]
-	local lift = if ground then ground - slot.cframe.Position.Y + 4 else 4
-	local cf = slot.cframe * CFrame.new(lx, math.max(lift, 4), lz)
+	local cf = cframeAt(lx, lz)
 	root.CFrame = cf
 	root.Position = cf.Position
+end
+
+-- A visit: `visitor` asked to go to `ownerId`'s plot. The server checks it
+-- all again (the Settings list is only a convenience): the owner is in
+-- the server with a plot, is not the visitor, and their visit flag lets
+-- this player in. The landing is a raycast-checked spot on the plot, never
+-- water, a road or a roof. No cash is involved.
+function PlotService.Visit(visitor: Player, ownerIdRaw: unknown): boolean
+	if not RateLimiter.Allow(visitor, "VisitPlot") then
+		return false
+	end
+	local ownerId = PermissionLogic.VisitTarget(ownerIdRaw)
+	if not ownerId then
+		return false
+	end
+	local owner: Player? = nil
+	for _, other in ipairs(onlinePlayers()) do
+		if other.UserId == ownerId then
+			owner = other
+		end
+	end
+	local slot = if owner then slotOf[owner] else nil
+	local profile = if owner then ProfileService.GetProfile(owner) else nil
+	if not owner or not slot or not profile then
+		notify(visitor, "That player has no plot to visit right now.")
+		return false
+	end
+	if owner == visitor then
+		return false
+	end
+	if not PermissionLogic.CanVisit(profile.permissions, visitor.UserId, owner.UserId) then
+		notify(visitor, "That plot isn't open to visitors.")
+		return false
+	end
+	local char, root = rootOf(visitor)
+	if not char or not root then
+		return false
+	end
+	local humanoid = if type((char :: any).FindFirstChildOfClass) == "function"
+		then (char :: any):FindFirstChildOfClass("Humanoid")
+		else nil
+	if humanoid and humanoid.Health <= 0 then
+		return false
+	end
+	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+	local spotBad, cframeAt = groundProbe(slot, char, true)
+	local lx, lz = PlotLogic.VisitSpot(tier.size, spotBad)
+	local cf = cframeAt(lx, lz)
+	root.CFrame = cf
+	root.Position = cf.Position
+	notify(visitor, string.format("Visiting %s's plot.", owner.DisplayName))
+	return true
 end
 
 local lastVisitAt = -math.huge
@@ -947,16 +1034,6 @@ local VISIT_EVERY = 0.5
 -- flight does not spend, and a tap that still quotes the old square count
 -- does not spend either.
 local expanding: { [Player]: boolean } = {}
-
-local function onlinePlayers(): { Player }
-	local ok, service = pcall(function()
-		return game:GetService("Players")
-	end)
-	if not ok or service == nil or type(service.GetPlayers) ~= "function" then
-		return {}
-	end
-	return service:GetPlayers()
-end
 
 -- Visitors with visit off are set down just north of the yard.
 function PlotService.VisitStep(list: { Player }?)
@@ -1636,6 +1713,7 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 	for _, item in ipairs(profile.plot.placed) do
 		buildItem(slot, player, item)
 	end
+	LogicService.Restore(slot :: any, profile, player)
 	refreshSign(slot)
 	rescueProfile(profile, slot.delivery)
 	return true
@@ -1698,6 +1776,11 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 		end)
 	end
 	remotes.UpgradePlot.OnServerEvent:Connect(PlotService.Upgrade)
+	if remotes.VisitPlot then
+		remotes.VisitPlot.OnServerEvent:Connect(function(player: Player, ownerId: unknown)
+			PlotService.Visit(player, ownerId)
+		end)
+	end
 	offerRemote = remotes.PlotOffer
 	if remotes.ClaimPlot then
 		remotes.ClaimPlot.OnServerEvent:Connect(function(player: Player, index: unknown)

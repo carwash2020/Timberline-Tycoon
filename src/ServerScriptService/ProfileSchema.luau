@@ -166,7 +166,8 @@ export type Profile = {
 		tier: number, -- PlotData.Tiers index (1 = Campsite)
 		placed: { PlacedItem },
 		squares: { string }, -- owned squares, "x,z" (empty until land expansion)
-		wires: { WireLink }, -- switch to lamp or door links (WireLogic); switch positions are not saved
+		wires: { WireLink }, -- switch to lamp or door links (WireLogic)
+		switches: { string }, -- uids of the wall switches that are on; a switch not listed is off
 	},
 	-- Boxes kept for you, per slot. Capped at StorageCap.
 	storage: { StoredBox },
@@ -278,7 +279,7 @@ local TEMPLATE: Profile = {
 	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
-	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} },
+	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} },
 	storage = {},
 	permissions = {},
 	badgesAwarded = {},
@@ -525,10 +526,11 @@ end
 -- drops a box only when its uid is already an axe, truck, or placed-item uid.
 local function applySlotFields(record: any)
 	if type(record.plot) ~= "table" then
-		record.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} }
+		record.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
 	record.plot.squares = squareList(record.plot.squares)
 	record.plot.wires = WireLogic.Clean(record.plot.wires)
+	record.plot.switches = WireLogic.CleanSwitches(record.plot.switches)
 	record.questAxe = copyQuest(record.questAxe)
 	if type(record.permissions) ~= "table" then
 		record.permissions = {}
@@ -607,7 +609,7 @@ function ProfileSchema.Migrate(data: any)
 	-- form is dropped. NaN or infinite coordinates would break the rebuild
 	-- (PivotTo) and leave the player with no plot for the session.
 	if type(data.plot) ~= "table" then
-		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} }
+		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
 	if data.plot.claimed ~= true then
 		data.plot.claimed = false
@@ -623,6 +625,7 @@ function ProfileSchema.Migrate(data: any)
 	end
 	data.plot.size = nil
 	data.plot.wires = WireLogic.Clean(data.plot.wires)
+	data.plot.switches = WireLogic.CleanSwitches(data.plot.switches)
 	if type(data.plot.placed) ~= "table" then
 		data.plot.placed = {}
 	end
