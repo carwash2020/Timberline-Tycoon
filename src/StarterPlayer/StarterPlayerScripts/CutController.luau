@@ -43,6 +43,7 @@
 -- amber too far or too hard), checked 30 times a second (15 on low).
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -783,10 +784,13 @@ function CutController.Start()
 		-- A button already took the click. MouseButton1 and the trigger
 		-- also swing here: Tool.Activated does not always arrive (click to
 		-- move, a Studio camera), and that used to be a silent miss.
-		if gameProcessed then
+		-- R2 is no button's click: a bound action marks it handled even when
+		-- it passes it on. Only a menu with the pad selection keeps it.
+		local trigger = input.KeyCode == Enum.KeyCode.ButtonR2
+		if gameProcessed and not (trigger and GuiService.SelectedObject == nil) then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonR2 then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or trigger then
 			clickSwing()
 		end
 	end)

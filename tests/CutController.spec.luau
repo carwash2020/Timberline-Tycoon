@@ -33,6 +33,7 @@ return function(t)
 		local loader = t.loader({
 			services = {
 				Debris = { AddItem = function() end },
+				GuiService = {},
 				Players = { LocalPlayer = { UserId = 1, CharacterAdded = sig } },
 				RunService = { Heartbeat = sig },
 				UserInputService = { InputBegan = sig },
@@ -303,6 +304,7 @@ return function(t)
 			end,
 		}
 		local carried = 0
+		local guiService = {}
 
 		local model = Instance.new("Model")
 		model:AddTag("Tree")
@@ -381,6 +383,7 @@ return function(t)
 		local loader = t.loader({
 			services = {
 				Debris = { AddItem = function() end },
+				GuiService = guiService,
 				Players = { LocalPlayer = player },
 				RunService = { Heartbeat = heartbeat },
 				UserInputService = {
@@ -536,6 +539,7 @@ return function(t)
 				unequipped:Fire()
 			end,
 			humanoid = humanoid,
+			gui = guiService,
 			carry = function(n)
 				carried = n
 			end,
@@ -667,6 +671,31 @@ return function(t)
 		t.eq(#chops, 1)
 		t.ok(chops[1].args[1] == w.section)
 		t.eq(#w.rays, 0, "no pointer")
+	end)
+
+	t.test("ButtonR2 swings an equipped axe even when a bound action marked the press handled", function()
+		local Enum = roblox.Enum
+		local w = swingWorld()
+		w.input("Gamepad1")
+		w.hit(nil)
+		w.radius({ w.section })
+		-- Xbox: BuilderSelect was bound on R2, so the engine reported processed.
+		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, true)
+		t.eq(#named(w.fires, "Swing"), 1, "the swing starts")
+		w.land()
+		t.eq(#named(w.fires, "Chop"), 1)
+	end)
+
+	t.test("ButtonR2 does not swing while a menu holds the pad selection", function()
+		local Enum = roblox.Enum
+		local w = swingWorld()
+		w.input("Gamepad1")
+		w.hit(nil)
+		w.radius({ w.section })
+		w.gui.SelectedObject = {}
+		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, true)
+		w.land()
+		t.eq(#named(w.fires, "Swing"), 0)
 	end)
 
 	t.test("holding chops once per cooldown; a mash inside it does not", function()
