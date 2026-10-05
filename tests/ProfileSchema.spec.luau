@@ -372,7 +372,9 @@ return function(t)
 		local _, mid = v1Save()
 		mid.tutorialStep = 5
 		Schema.MigrateV2(mid, 20)
-		t.eq(mid.tutorialStep, 5)
+		-- Step 5 of the plot-first list is the truck; the build lessons now
+		-- sit before it, so the same step is index 8.
+		t.eq(mid.tutorialStep, 8)
 		t.eq(mid.tutorialRefresher, false)
 	end)
 
