@@ -25,6 +25,7 @@ return function(t)
 		local playerGui = Instance.new("Folder")
 		local loader = t.loader({
 			services = {
+				GuiService = {},
 				CollectionService = {
 					GetTagged = function()
 						return {}

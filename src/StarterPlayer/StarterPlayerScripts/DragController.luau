@@ -41,6 +41,7 @@
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -866,7 +867,11 @@ function DragController.Start()
 	watchTag(SHOP_TAG)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed then
+		-- RT is no button's click: a bound action (the builder's select) marks
+		-- it handled even when it passes it on. Only a menu with the pad
+		-- selection keeps it.
+		local trigger = input.KeyCode == Enum.KeyCode.ButtonR2
+		if processed and not (trigger and GuiService.SelectedObject == nil) then
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
