@@ -513,6 +513,11 @@ return function(t)
 		ben.humanoid.SeatPart = Instance.new("Seat")
 		w.G._ride(ben, townUp, LANDING)
 		t.eq(#w.spent, 1, "not from a truck seat")
+		t.eq(
+			w.toasts[#w.toasts].message,
+			"Hop out of your seat first. The gondola has room for you alone.",
+			"and it says why"
+		)
 		local broke = world({ canPay = false })
 		local cal = player("Cal")
 		broke.G._ride(cal, townUp, LANDING)

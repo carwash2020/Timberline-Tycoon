@@ -43,6 +43,7 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local PlotFill = require(script.Parent.PlotFill)
 local PlotDoors = require(script.Parent.PlotDoors)
+local LogicService = require(script.Parent.LogicService)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
@@ -78,7 +79,7 @@ type Slot = {
 	items: Folder,
 	signLabels: { TextLabel }, -- both faces of the sign
 	claim: ProximityPrompt,
-	office: ProximityPrompt, -- Land office: buy the next yard square
+	office: ProximityPrompt, -- Land panel: plot size and expanding onto squares
 	spawn: SpawnLocation,
 	delivery: CFrame, -- where a bought truck is dropped (GetDeliveryPad)
 	owner: Player?,
@@ -287,7 +288,7 @@ end
 
 local function refreshSign(slot: Slot)
 	local owner = slot.owner
-	local text = string.format("%s\nFREE", string.upper(slot.placeName))
+	local text = string.format("%s\nOPEN PLOT", string.upper(slot.placeName))
 	if owner then
 		local profile = ProfileService.GetProfile(owner)
 		local tier = if profile then PlotData.Tier(profile.plot.tier) else nil
@@ -360,7 +361,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	end
 	local claim = Instance.new("ProximityPrompt")
 	claim.ActionText = "Claim this plot"
-	claim.ObjectText = "Free plot"
+	claim.ObjectText = "Open plot"
 	claim.MaxActivationDistance = CLAIM_RANGE
 	claim.HoldDuration = 0.5
 	claim.RequiresLineOfSight = false
@@ -368,8 +369,8 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	claim.Parent = board
 	local office = Instance.new("ProximityPrompt")
 	office.Name = "LandOffice"
-	office.ActionText = "Land office"
-	office.ObjectText = "Your yard"
+	office.ActionText = "Open Land"
+	office.ObjectText = "Your plot"
 	office.MaxActivationDistance = 12
 	office.HoldDuration = 0
 	office.Enabled = false
@@ -558,6 +559,15 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	end
 	CollectionService:AddTag(model, "PlacedItem")
 	model.Parent = slot.items
+	-- Switches get their prompts and lamps their light (LogicService).
+	LogicService.Attach({
+		slot = slot :: any,
+		model = model,
+		item = item,
+		ownerOf = function()
+			return owner, ProfileService.GetProfile(owner)
+		end,
+	})
 end
 
 local function mirrorPlot(player: Player, profile: Profile)
@@ -797,8 +807,7 @@ local function autoAssign(player: Player)
 		notify(player, FULL)
 		return
 	end
-	local slot = slots[index]
-	tryGrant(player, index, true, string.format("%s is yours. You'll wake up here.", slot.placeName))
+	tryGrant(player, index, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
 end
 
 -- The sign's board, within the prompt's distance plus the shared slack.
@@ -895,23 +904,38 @@ local function nudgeOff(visitor: Player, slot: Slot, profile: Profile)
 	end
 	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
 	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	-- B15: the ground at a plot-local spot, found with a raycast that skips
+	-- the visitor and anything you can walk through (decor), so the hit is
+	-- the terrain or a floor. The spot is bad on a road (the town's
+	-- layout) or in the water (the lake and river layout, or a water
+	-- terrain hit). groundY is where the ray landed, so the visitor is put
+	-- on the ground and not inside a hill.
+	local groundY: { [string]: number } = {}
 	local function spotBad(lx: number, lz: number): boolean
 		local world = (slot.cframe * CFrame.new(lx, 0, lz)).Position
 		local materialName = ""
 		local ok, hit = pcall(function()
-			return workspace:Raycast(Vector3.new(world.X, world.Y + 40, world.Z), Vector3.new(0, -80, 0))
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { char }
+			params.RespectCanCollide = true
+			return workspace:Raycast(Vector3.new(world.X, world.Y + 60, world.Z), Vector3.new(0, -120, 0), params)
 		end)
 		if ok and typeof(hit) == "RaycastResult" then
-			local mat = (hit :: RaycastResult).Material
+			local result = hit :: RaycastResult
+			local mat = result.Material
 			if mat then
 				materialName = mat.Name
 			end
+			groundY[lx .. "," .. lz] = result.Position.Y
 		end
 		local wet = PlotLogic.InWater(world.X, world.Z) or materialName == "Water"
 		return PlotLogic.GroundBad(wet, PlotLogic.OnRoad(world.X, world.Z))
 	end
 	local lx, lz = PlotLogic.EjectSpot(tier.size, squares, spotBad)
-	local cf = slot.cframe * CFrame.new(lx, 4, lz)
+	local ground = groundY[lx .. "," .. lz]
+	local lift = if ground then ground - slot.cframe.Position.Y + 4 else 4
+	local cf = slot.cframe * CFrame.new(lx, math.max(lift, 4), lz)
 	root.CFrame = cf
 	root.Position = cf.Position
 end
@@ -977,7 +1001,7 @@ end
 ---------------------------------------------------------------------------
 
 local function isNumber(value: unknown): boolean
-	return type(value) == "number" and value == value
+	return type(value) == "number" and value == value and math.abs(value) ~= math.huge
 end
 
 function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
@@ -1059,6 +1083,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	if fromStock then
 		notify(player, string.format("Placed your %s.", bp.displayName))
 	end
+	QuestService.Event(player, "itemPlaced")
 end
 
 function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
@@ -1209,6 +1234,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if model then
 		model:Destroy()
 	end
+	LogicService.Sync(slot :: any, profile, player)
 	if refund > 0 then
 		EconomyService.Refund(owner, refund, "sold " .. bp.displayName, bp.id)
 	end
@@ -1359,6 +1385,7 @@ function PlotService.Edit(player: Player, request: unknown)
 		EconomyService.Refund(player, delta, "changed a blueprint", "kit")
 	end
 	syncEdits(slot, player, before, profile.plot.placed)
+	LogicService.Sync(slot :: any, profile, player)
 end
 
 function PlotService.Upgrade(player: Player)
@@ -1371,12 +1398,12 @@ function PlotService.Upgrade(player: Player)
 	end
 	local slot = nearOwnPlot(player, profile)
 	if not slot then
-		notify(player, "Stand on your plot to grow it.")
+		notify(player, "Stand on your plot to raise its size.")
 		return
 	end
 	local nextTier = PlotData.Tier(profile.plot.tier + 1)
 	if not nextTier then
-		notify(player, "Your plot is as big as it gets.")
+		notify(player, "Your plot size is already the biggest.")
 		return
 	end
 	if profile.cash < nextTier.priceCash then
@@ -1399,15 +1426,18 @@ function PlotService.Upgrade(player: Player)
 	local grown = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
 	drawBounds(slot, nextTier.size, true, grown)
 	refreshSign(slot)
-	notify(player, string.format("Your plot is now a %s (%d × %d)!", nextTier.name, nextTier.size, nextTier.size))
+	notify(
+		player,
+		string.format("Plot size up: your plot is now a %s (%d × %d)!", nextTier.name, nextTier.size, nextTier.size)
+	)
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "PlotTier", profile.plot.tier)
 	end)
 end
 
--- Buy one yard square. The rate limit lives on the ExpandLand handler.
+-- Buy one plot square (expand). The rate limit lives on the ExpandLand handler.
 -- `expected` is how many squares the button was drawn for. Check, spend,
--- then grant, with no yield: a failed spend leaves the yard and the wallet
+-- then grant, with no yield: a failed spend leaves the plot and the wallet
 -- as they were. A second call for that same count buys nothing.
 function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: unknown)
 	if expanding[player] then
@@ -1436,7 +1466,7 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 			profile.plot.squares = {}
 		end
 		if #profile.plot.squares ~= expected then
-			notify(player, "That price changed. Look again.")
+			notify(player, "The price changed. The Land panel shows the new one.")
 			return nil
 		end
 		local slot = nearOwnPlot(player, profile)
@@ -1450,10 +1480,10 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 				return profile.cash
 			end,
 			spend = function(amount: number)
-				return EconomyService.SpendCash(player, amount, "expanded the yard", "PlotSquare")
+				return EconomyService.SpendCash(player, amount, "expanded the plot", "PlotSquare")
 			end,
 			refund = function(amount: number)
-				EconomyService.Refund(player, amount, "yard expansion returned", "PlotSquare")
+				EconomyService.Refund(player, amount, "plot expansion returned", "PlotSquare")
 			end,
 		})
 		if not bought then
@@ -1472,13 +1502,13 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 			notify(
 				player,
 				string.format(
-					"That square is yours for %s. The next one is %s.",
+					"You expanded your plot for %s. The next square is %s.",
 					Util.formatCash(paid),
 					Util.formatCash(nextPrice)
 				)
 			)
 		else
-			notify(player, string.format("That square is yours for %s.", Util.formatCash(paid)))
+			notify(player, string.format("You expanded your plot for %s.", Util.formatCash(paid)))
 		end
 		return nil
 	end)
@@ -1643,6 +1673,7 @@ end
 -- SellPlaced and UpgradePlot.
 function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, notifyFn: (Player, string) -> ())
 	notify = notifyFn
+	LogicService.Bind(hostFor :: any, notifyFn)
 	ItemMeshes.LoadAsync()
 	local folder = Instance.new("Folder")
 	folder.Name = "Plots"

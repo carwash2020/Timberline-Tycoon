@@ -8,6 +8,8 @@
 --   * A finished step pays its rewardCash through EconomyService.
 --   * The SkipTutorial remote ends it early, without rewards. Saves from
 --     before the tutorial that already own a better axe skip it.
+--   * TutorialSeen (client -> server, "build" or "land") reports opening
+--     build mode or the Land panel; only the current step's event counts.
 --   * Each step reached is logged once as a "Tutorial" analytics funnel
 --     (which also lets saves made before a new step was inserted find
 --     their place again).
@@ -151,6 +153,10 @@ local function claimedPlot(profile: Profile): boolean
 	return profile.plot ~= nil and profile.plot.claimed == true
 end
 
+local function hasPlacedItem(profile: Profile): boolean
+	return profile.plot ~= nil and type(profile.plot.placed) == "table" and #profile.plot.placed > 0
+end
+
 local function ownsTruck(profile: Profile): boolean
 	return type(profile.ownedTrucks) == "table" and #profile.ownedTrucks > 0
 end
@@ -160,7 +166,16 @@ end
 local function enterStep(player: Player, profile: Profile, index: number)
 	local list = steps()
 	local step: TutorialData.Step? = list[index]
-	while step and TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile), ownsTruck(profile)) do
+	while
+		step
+		and TutorialData.AlreadyDone(
+			step,
+			profile.bestAxeTier,
+			claimedPlot(profile),
+			ownsTruck(profile),
+			hasPlacedItem(profile)
+		)
+	do
 		index += 1
 		step = list[index]
 	end
@@ -239,7 +254,16 @@ function QuestService.Start(player: Player, profile: Profile)
 		return
 	end
 	local step = steps()[profile.tutorialStep]
-	if not step or TutorialData.AlreadyDone(step, profile.bestAxeTier, claimedPlot(profile), ownsTruck(profile)) then
+	if
+		not step
+		or TutorialData.AlreadyDone(
+			step,
+			profile.bestAxeTier,
+			claimedPlot(profile),
+			ownsTruck(profile),
+			hasPlacedItem(profile)
+		)
+	then
 		enterStep(player, profile, if step then profile.tutorialStep + 1 else 1)
 	elseif profile.tutorialStep == 1 and profile.tutorialProgress == 0 then
 		enterStep(player, profile, 1) -- logs the funnel's first step
@@ -327,6 +351,24 @@ function QuestService.Reset(player: Player)
 	notify(player, "Tutorial reset. Murph is waiting by the spawn.")
 end
 
+-- What the client may say it saw, and the tutorial event that is. The
+-- client only knows it opened a panel; the server counts it only for a
+-- player who has claimed a plot, and only when that is the current step.
+local function onSeen(player: Player, what: unknown)
+	if type(what) ~= "string" or not RateLimiter.Allow(player, "TutorialSeen") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not claimedPlot(profile) then
+		return
+	end
+	if what == "build" then
+		QuestService.Event(player, "buildOpened")
+	elseif what == "land" then
+		QuestService.Event(player, "landOpened")
+	end
+end
+
 local function onSkip(player: Player)
 	if not RateLimiter.Allow(player, "SkipTutorial") then
 		return
@@ -344,7 +386,8 @@ function QuestService.Init(
 	skipRemote: RemoteEvent,
 	notifyFn: (Player, string) -> (),
 	activeLoop: number?,
-	resetRemote: RemoteEvent?
+	resetRemote: RemoteEvent?,
+	seenRemote: RemoteEvent?
 )
 	notify = notifyFn
 	loop = if activeLoop == 2 then 2 else 1
@@ -353,6 +396,9 @@ function QuestService.Init(
 		resetRemote.OnServerEvent:Connect(function(player: Player)
 			QuestService.Reset(player)
 		end)
+	end
+	if seenRemote then
+		seenRemote.OnServerEvent:Connect(onSeen)
 	end
 	TreeService.StumpHold = QuestService.StumpHoldFor
 end

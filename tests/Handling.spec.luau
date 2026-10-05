@@ -83,4 +83,28 @@ return function(t)
 			t.ok(width < PlotData.LaneWidth, string.format("%s is %.2f, lane is %d", id, width, PlotData.LaneWidth))
 		end
 	end)
+
+	t.test("a stick is deadzoned and eased; full push and a keyboard come back unchanged", function()
+		local Handling = t.shared("Handling")
+		t.eq(Handling.Stick(0), 0)
+		t.eq(Handling.Stick(0.1), 0, "drift is idle")
+		t.eq(Handling.Stick(-0.1), 0)
+		t.eq(Handling.Stick(1), 1)
+		t.eq(Handling.Stick(-1), -1)
+		local half = Handling.Stick(0.5)
+		t.ok(half > 0 and half < 0.5, "a half push is under half")
+		t.eq(Handling.Stick(-0.5), -half, "the same both ways")
+	end)
+
+	t.test("a truck on its side for 0.8 s is flipped; wheels down resets the clock", function()
+		local Handling = t.shared("Handling")
+		local time = 0
+		for _ = 1, 3 do
+			time = Handling.FlipTime(0.1, 0.2, time)
+		end
+		t.eq(Handling.Flipped(time), false, "0.6 s is not yet")
+		time = Handling.FlipTime(0.1, 0.2, time)
+		t.eq(Handling.Flipped(time), true)
+		t.eq(Handling.FlipTime(0.95, 0.1, time), 0, "back on its wheels")
+	end)
 end

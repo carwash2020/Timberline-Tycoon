@@ -13,7 +13,7 @@ local PermissionLogic = {}
 -- Phone toggles in the Settings tab are at least this tall.
 PermissionLogic.Tap = 44
 
--- Named people besides "anyone". TBD (Designer): a busy plot rarely
+-- Named people besides "anyone". Open to tuning: a busy plot rarely
 -- lists more than the people in the server.
 PermissionLogic.MaxPeople = 24
 
@@ -52,7 +52,7 @@ export type Row = { [string]: boolean }
 
 -- visit starts on so a stranger can walk across until you turn it off.
 -- collisions starts on: that is how the world behaves until the flag is applied.
--- TBD (Designer): both defaults.
+-- Open to tuning: both defaults.
 function PermissionLogic.DefaultRow(): Row
 	return {
 		visit = true,

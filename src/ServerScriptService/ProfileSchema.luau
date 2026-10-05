@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local EventData = require(ReplicatedStorage.Shared.EventData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
@@ -16,6 +17,7 @@ local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
+local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
 
@@ -41,6 +43,9 @@ export type PlacedItem = {
 	data: { x: number, y: number }?,
 }
 
+-- A wire from a switch to a lamp or door, by placed-item uid (WireLogic).
+export type WireLink = { from: string, to: string }
+
 -- A box the server kept when you left it in the world. uid is server-made.
 -- It is never an axe, a truck, or something already placed on the plot.
 export type StoredBox = {
@@ -63,6 +68,10 @@ export type DailyState = {
 	streak: number, -- days in a row with every goal done
 	bestStreak: number,
 	lastCompleteDay: number,
+	-- The daily-return calendar (DailyData.LoginStep; absent in older saves,
+	-- read as 0): the calendar day 1..7 last paid, and the UTC day it paid.
+	loginDay: number?,
+	lastLoginDay: number?,
 }
 
 -- One log riding in your truck bed (saved, so a disconnect never loses a
@@ -157,6 +166,7 @@ export type Profile = {
 		tier: number, -- PlotData.Tiers index (1 = Campsite)
 		placed: { PlacedItem },
 		squares: { string }, -- owned squares, "x,z" (empty until land expansion)
+		wires: { WireLink }, -- switch to lamp or door links (WireLogic); switch positions are not saved
 	},
 	-- Boxes kept for you, per slot. Capped at StorageCap.
 	storage: { StoredBox },
@@ -168,6 +178,10 @@ export type Profile = {
 	questAxe: { step: number }, -- per slot. 0 = not started
 	secretsFound: { [string]: boolean },
 	areasVisited: { [string]: boolean },
+	-- Cosmetics earned (the Halloween Pumpkin Hat is "pumpkinHat"): account-wide.
+	cosmetics: { [string]: boolean },
+	-- The seasonal event's progress (EventData.State), per slot.
+	event: EventData.State,
 	compendium: { [string]: boolean },
 	materials: { [string]: number }, -- gathered materials by id (Sky Shards, ...)
 	forgeLogs: { [string]: number }, -- logs put into the Starfall forge, by wood id
@@ -264,7 +278,7 @@ local TEMPLATE: Profile = {
 	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
-	plot = { claimed = false, tier = 1, placed = {}, squares = {} },
+	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} },
 	storage = {},
 	permissions = {},
 	badgesAwarded = {},
@@ -272,6 +286,8 @@ local TEMPLATE: Profile = {
 	questAxe = { step = 0 },
 	secretsFound = {},
 	areasVisited = {},
+	cosmetics = {},
+	event = { id = "", day = 0, progress = {}, done = {}, daysDone = 0, lastDoneDay = 0 },
 	compendium = { oak = true },
 	materials = {},
 	forgeLogs = {},
@@ -288,7 +304,7 @@ local TEMPLATE: Profile = {
 	tutorialRefresher = false,
 	tutorialReplay = false,
 	seasonId = "spring",
-	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
+	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0, loginDay = 0, lastLoginDay = 0 },
 	purchaseIds = {},
 	passes = {},
 	truckPaint = {},
@@ -509,9 +525,10 @@ end
 -- drops a box only when its uid is already an axe, truck, or placed-item uid.
 local function applySlotFields(record: any)
 	if type(record.plot) ~= "table" then
-		record.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
+		record.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} }
 	end
 	record.plot.squares = squareList(record.plot.squares)
+	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.questAxe = copyQuest(record.questAxe)
 	if type(record.permissions) ~= "table" then
 		record.permissions = {}
@@ -554,6 +571,7 @@ local function applyAccountFields(data: any)
 	data.badgesSent = booleanMap(data.badgesSent)
 	data.secretsFound = booleanMap(data.secretsFound)
 	data.areasVisited = booleanMap(data.areasVisited)
+	data.cosmetics = booleanMap(data.cosmetics)
 	data.tollPaidUntil = nil
 end
 
@@ -562,6 +580,7 @@ local function stripAccountFields(slot: any)
 	slot.badgesSent = nil
 	slot.secretsFound = nil
 	slot.areasVisited = nil
+	slot.cosmetics = nil
 	slot.tollPaidUntil = nil
 end
 
@@ -588,7 +607,7 @@ function ProfileSchema.Migrate(data: any)
 	-- form is dropped. NaN or infinite coordinates would break the rebuild
 	-- (PivotTo) and leave the player with no plot for the session.
 	if type(data.plot) ~= "table" then
-		data.plot = { claimed = false, tier = 1, placed = {}, squares = {} }
+		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} }
 	end
 	if data.plot.claimed ~= true then
 		data.plot.claimed = false
@@ -603,6 +622,7 @@ function ProfileSchema.Migrate(data: any)
 		data.plot.tier = 1
 	end
 	data.plot.size = nil
+	data.plot.wires = WireLogic.Clean(data.plot.wires)
 	if type(data.plot.placed) ~= "table" then
 		data.plot.placed = {}
 	end

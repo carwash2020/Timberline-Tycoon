@@ -98,7 +98,7 @@ local function fill()
 		if type(untilAt) == "number" and os.time() < untilAt then
 			label.Text = string.format("You can change saves in %ds.", math.ceil(untilAt - os.time()))
 		else
-			label.Text = "Loading a save puts this one away. It does not copy your cash or wood."
+			label.Text = "Loading a save puts this one away. Cash, wood, plot and visitor rules stay with each save."
 		end
 	end
 	for _, slot in ipairs(summaries) do
@@ -282,7 +282,7 @@ function SaveSlotUI.Start()
 	note.TextYAlignment = Enum.TextYAlignment.Top
 	note.Size = UDim2.new(1, -24, 0, 36)
 	note.Position = UDim2.fromOffset(12, 48)
-	note.Text = "Loading a save puts this one away. It does not copy your cash or wood."
+	note.Text = "Loading a save puts this one away. Cash, wood, plot and visitor rules stay with each save."
 	note.Parent = outer
 	cooldownLabel = note
 

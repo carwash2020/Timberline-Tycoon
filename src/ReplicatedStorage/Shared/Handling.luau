@@ -16,6 +16,9 @@ local Handling = {}
 
 Handling.TowFactor = 1.12 -- a hitched trailer widens the turning circle a little
 Handling.SwingLimit = 0.45 -- radians: short of a jackknife (~0.5, and far short of folding)
+Handling.StickDeadzone = 0.12 -- a gamepad stick below this is idle (drift)
+Handling.FlipUp = 0.2 -- chassis up.Y at or below this is on its side or roof
+Handling.FlipSeconds = 0.8 -- on its side this long: stand it back up
 Handling.ForceFloor = 100 -- mass * this still climbs the skid ramps (TruckArt)
 
 export type Profile = {
@@ -144,6 +147,31 @@ end
 -- AlignOrientation MaxTorque / mass. A high tipResist holds the truck down.
 function Handling.HoldTorque(feel: Profile): number
 	return 2000 + 5000 * feel.tipResist
+end
+
+-- A seat's throttle or steer (-1..1) after the stick's deadzone, eased so a
+-- small push is a small turn. Full push, and a keyboard's -1, 0 and 1, come
+-- back unchanged.
+function Handling.Stick(value: number): number
+	local size = math.abs(value)
+	if size <= Handling.StickDeadzone then
+		return 0
+	end
+	local scaled = (size - Handling.StickDeadzone) / (1 - Handling.StickDeadzone)
+	return math.sign(value) * math.min(1, scaled * scaled * (3 - 2 * scaled))
+end
+
+-- Seconds on its side so far: grows while the chassis up is at or below
+-- FlipUp, resets the moment it is back on its wheels.
+function Handling.FlipTime(upY: number, dt: number, sofar: number): number
+	if upY <= Handling.FlipUp then
+		return sofar + dt
+	end
+	return 0
+end
+
+function Handling.Flipped(sofar: number): boolean
+	return sofar >= Handling.FlipSeconds
 end
 
 -- The up the truck should lean to: the ground's, pulled back toward the

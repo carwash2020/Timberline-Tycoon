@@ -108,8 +108,8 @@ function HudRules.DropAxe(carried: number, heldId: string?): boolean
 		return false
 	end
 	local def = ItemCatalog.GetAxe(heldId)
-	if def and def.robux then
-		return false -- a pass axe stays in the inventory
+	if def and (def.robux or def.quest) then
+		return false -- a pass or quest axe stays in the inventory
 	end
 	return carried >= 2 or (ItemCatalog.AxeTier(heldId) or 1) > 1
 end

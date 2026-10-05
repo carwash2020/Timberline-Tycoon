@@ -63,6 +63,7 @@ type Session = {
 	holding: boolean, -- parked facing, until the first throttle or steer
 	corners: { Vector3 }, -- chassis-local ray starts (VehicleLogic.CornerOffsets)
 	rayParams: RaycastParams,
+	flipped: number, -- seconds on its side (Handling.FlipTime)
 }
 
 local session: Session? = nil
@@ -119,6 +120,7 @@ local function startDriving(seat: VehicleSeat)
 		holding = true,
 		corners = VehicleLogic.CornerOffsets(chassis.Size.X, chassis.Size.Z),
 		rayParams = params,
+		flipped = 0,
 	}
 end
 
@@ -148,8 +150,22 @@ local function step(dt: number)
 		return
 	end
 	local velocity = s.chassis.AssemblyLinearVelocity
-	local throttle = s.seat.ThrottleFloat
-	local steer = s.seat.SteerFloat
+	-- A gamepad stick drifts and is analog: deadzone and ease it. A keyboard's
+	-- -1, 0 and 1 pass through unchanged.
+	local throttle = Handling.Stick(s.seat.ThrottleFloat)
+	local steer = Handling.Stick(s.seat.SteerFloat)
+	-- On its side or roof (a hard hit at speed): stand it back up where it
+	-- lies, facing the way it was steering, after a moment.
+	s.flipped = Handling.FlipTime(s.chassis.CFrame.UpVector.Y, dt, s.flipped)
+	if Handling.Flipped(s.flipped) then
+		s.flipped = 0
+		s.speed = 0
+		s.up = Vector3.yAxis
+		s.chassis.AssemblyLinearVelocity = Vector3.zero
+		s.chassis.AssemblyAngularVelocity = Vector3.zero
+		s.chassis.CFrame = VehicleLogic.HeadingCFrame(s.facing, Vector3.yAxis)
+			+ (s.chassis.Position + Vector3.new(0, 3, 0))
+	end
 	local actual = Vector3.new(velocity.X, 0, velocity.Z):Dot(s.facing)
 	s.speed = Handling.Speed(s.speed, throttle, s.topSpeed, dt, actual, s.feel)
 	local turn = Handling.Turn(s.speed, steer, s.turnRate, dt, s.minRadius, s.feel, s.topSpeed)

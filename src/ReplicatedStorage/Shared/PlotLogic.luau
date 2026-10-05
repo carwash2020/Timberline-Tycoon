@@ -228,7 +228,7 @@ function PlotLogic.InBounds(rect: Rect, plotSize: number): boolean
 end
 
 ---------------------------------------------------------------------------
--- Yard squares. The five tiers stay the base. Beyond that base, a 5×5
+-- Plot squares. The five tiers stay the base. Beyond that base, a 5×5
 -- grid of PlotSquare studs is bought one square at a time, outward, each
 -- one pricier than the last. The first square is FirstPlotPrice. Square
 -- k after that costs ExpansionPriceStep × k. Check, spend, then grant,
@@ -287,7 +287,7 @@ function PlotLogic.SquareInsideTier(ix: number, iz: number, tierSize: number): b
 	return x0 >= -half - 1e-3 and x1 <= half + 1e-3 and z0 >= -half - 1e-3 and z1 <= half + 1e-3
 end
 
--- How wide the yard is, counting the tier and every bought square.
+-- How wide the plot is, counting the tier and every bought square.
 function PlotLogic.Extent(tierSize: number, squares: { string }): number
 	local half = tierSize / 2
 	for _, key in ipairs(squares) do
@@ -300,14 +300,16 @@ function PlotLogic.Extent(tierSize: number, squares: { string }): number
 	return half * 2
 end
 
--- Plot-local spot just north of the yard.
+-- Plot-local spot just north of the plot.
 function PlotLogic.EjectLocal(tierSize: number, squares: { string }): (number, number)
 	local half = PlotLogic.Extent(tierSize, squares) / 2
 	return 0, half + PlotLogic.EjectGap
 end
 
--- North, east, west, south, then a step further north. The first that
--- isn't on a road or in the water is where a visitor is put down.
+-- North, east, west, south, then a step further north, then further out
+-- on every side and the corners (B15: a plot by the water or a road has
+-- more places to try). The first that isn't on a road or in the water is
+-- where a visitor is put down.
 function PlotLogic.EjectCandidates(tierSize: number, squares: { string }): { { number } }
 	local half = PlotLogic.Extent(tierSize, squares) / 2
 	local gap = PlotLogic.EjectGap
@@ -318,6 +320,13 @@ function PlotLogic.EjectCandidates(tierSize: number, squares: { string }): { { n
 		{ -north, 0 },
 		{ 0, -(half + gap) },
 		{ 0, north + gap },
+		{ north + gap, 0 },
+		{ -(north + gap), 0 },
+		{ 0, -(half + 2 * gap) },
+		{ north, north },
+		{ -north, north },
+		{ north, -north },
+		{ -north, -north },
 	}
 end
 
@@ -411,19 +420,88 @@ function PlotLogic.ExpansionBlock(tier: number, squares: { string }, ix: number,
 	return PlotLogic.Key(ix, iz), nil
 end
 
+-- The toast for a square that can't be bought (the client's tap and the
+-- server's refusal share these words). "plot" is the claimed pad, "plot
+-- size" its level (Tiers), "expand" is buying squares.
 function PlotLogic.ExpansionMessage(why: string?, _price: number?): string?
 	if why == "cash" then
-		return "You don't have enough for that square."
+		return "You don't have enough to expand there."
 	elseif why == "yours" then
-		return "That ground is already part of your yard."
+		return "That ground comes with your plot size. Expand onto a square beyond it."
 	elseif why == "owned" then
-		return "You already bought that square."
+		return "You already expanded onto that square."
 	elseif why == "away" then
-		return "Buy a square that touches your yard."
+		return "Expand onto a square that touches your plot."
 	elseif why == "full" then
-		return "Your yard already covers every square."
+		return "Your plot already covers every square."
+	elseif why == "bad" then
+		return "That square is off the map of land you can expand onto."
 	end
 	return nil
+end
+
+-- What the Land panel's "Plot size" section says for plot size `tierIndex`
+-- with `cash` in hand. Pure, so it can be tested. `next` is nil at the top.
+export type SizeCard = {
+	level: number,
+	levels: number,
+	name: string,
+	size: number,
+	next: {
+		name: string,
+		size: number,
+		price: number,
+		unlocks: string, -- "Unlocks: A, B", or "" when the level adds no blueprint
+		affordable: boolean,
+		short: number, -- cash still needed (0 when affordable)
+	}?,
+}
+
+-- Blueprint names that plot size `tierIndex` unlocks, as "Unlocks: A, B".
+function PlotLogic.UnlocksText(tierIndex: number): string
+	local names: { string } = {}
+	for _, bp in ipairs(PlotData.Blueprints) do
+		if bp.tier == tierIndex then
+			table.insert(names, bp.displayName)
+		end
+	end
+	return if #names > 0 then "Unlocks: " .. table.concat(names, ", ") else ""
+end
+
+function PlotLogic.SizeCard(tierIndex: number, cash: number): SizeCard
+	local level = math.clamp(math.floor(tierIndex), 1, #PlotData.Tiers)
+	local now = PlotData.Tiers[level]
+	local nextTier = PlotData.Tier(level + 1)
+	local card: SizeCard = { level = level, levels = #PlotData.Tiers, name = now.name, size = now.size }
+	if nextTier then
+		card.next = {
+			name = nextTier.name,
+			size = nextTier.size,
+			price = nextTier.priceCash,
+			unlocks = PlotLogic.UnlocksText(level + 1),
+			affordable = cash >= nextTier.priceCash,
+			short = math.max(0, nextTier.priceCash - cash),
+		}
+	end
+	return card
+end
+
+-- How a Land square is drawn: ("Buy", "buy") for sale, ("Yours", "bought")
+-- one you expanded onto, ("Plot", "included") ground that came with your plot
+-- size (not bought), or ("", "far") not reachable yet.
+function PlotLogic.CellLabel(tier: number, squares: { string }, ix: number, iz: number): (string, string)
+	local key = PlotLogic.ExpansionBlock(tier, squares, ix, iz)
+	if key then
+		return "Buy", "buy"
+	end
+	if PlotLogic.Owns(squares, ix, iz) then
+		return "Yours", "bought"
+	end
+	local def = PlotData.Tier(tier) or PlotData.Tiers[1]
+	if PlotLogic.SquareInsideTier(ix, iz, def.size) then
+		return "Plot", "included"
+	end
+	return "", "far"
 end
 
 local function overlapArea(a0: number, a1: number, b0: number, b1: number): number

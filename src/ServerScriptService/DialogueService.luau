@@ -211,6 +211,14 @@ function DialogueService.Init(remoteEvent: RemoteEvent?)
 	bound = true
 	remote = remoteEvent
 	remoteEvent.OnServerEvent:Connect(function(player: Player, action: unknown, a: unknown, b: unknown)
+		-- B15: a remote "open" must name a real shop (the keeper's prompt
+		-- is the usual way in), so a made-up id is never stored.
+		if
+			action == "open"
+			and (type(a) ~= "string" or not table.find({ "ToolShed", "HearthAndHome", "Dealership" }, a))
+		then
+			return
+		end
 		onDialogue(player, action, a, b)
 	end)
 	BoxService.Speaker = function(player: Player, line: string, rec: any)

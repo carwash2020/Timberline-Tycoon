@@ -39,7 +39,7 @@ return function(t)
 	t.test("a new save has an unclaimed Campsite plot", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)
-		t.eq(data.plot, { claimed = false, tier = 1, placed = {}, squares = {} })
+		t.eq(data.plot, { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} })
 	end)
 
 	t.test("saves from before plots lose the old size and any old-format items", function()
@@ -372,7 +372,9 @@ return function(t)
 		local _, mid = v1Save()
 		mid.tutorialStep = 5
 		Schema.MigrateV2(mid, 20)
-		t.eq(mid.tutorialStep, 5)
+		-- Step 5 of the plot-first list is the truck; the build lessons now
+		-- sit before it, so the same step is index 8.
+		t.eq(mid.tutorialStep, 8)
 		t.eq(mid.tutorialRefresher, false)
 	end)
 
@@ -550,6 +552,20 @@ return function(t)
 		local before = t.loader():shared("Util").deepCopy(data)
 		Schema.Migrate(data)
 		t.eq(data, before)
+	end)
+
+	t.test("plot wires: an old save gets an empty list, junk is cleaned, good wires survive", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.plot.wires, {})
+		data.plot.wires = nil
+		Schema.Migrate(data)
+		t.eq(data.plot.wires, {})
+		data.plot.wires = { { from = "a", to = "b" }, { from = "a", to = "b" }, { from = 1 }, "x" }
+		Schema.Migrate(data)
+		t.eq(data.plot.wires, { { from = "a", to = "b" } })
+		data.plot.wires = 7
+		Schema.Migrate(data)
+		t.eq(data.plot.wires, {})
 	end)
 
 	t.test("a wrong-typed foundations field resets to the default and does not error", function()

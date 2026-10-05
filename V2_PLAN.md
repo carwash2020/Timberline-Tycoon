@@ -284,13 +284,13 @@ WoodMaxSpeed = 80, WoodJudgeEvery = 0.5, SellPollSec = 0.25, MaxSavedPieces = 40
 GrowTickSec = 5, GrowStages = 4, TreesPerGrowTick = 12, PreDeadAt = 0.9, DeadSinkSec = 4,
 -- later phases
 PlankYield = 1, PlankStep = 0.2, PlankMinX = 0.6, PlankMinY = 0.4,
-FirstPlotPrice = 100, ExpansionPriceStep = 3000, PlotSquare = 40, PlotGrid = 5, BlueprintPricePerUnit = 10,
+FirstPlotPrice = 100, ExpansionPriceStep = 2280, PlotSquare = 40, PlotGrid = 5, BlueprintPricePerUnit = 10,
 VehicleRespawnFeeRate = 0.02, TollFee = 100, TollSeconds = 180, FerryFare = 400, FerryIntervalSec = 360,
 BlastingChargePrice = 220, BoulderRespawnSec = 1200, WaterDamage = 15, WaterTickSec = 1.5,
 ConveyorSpeed = 4, LogicEvalsPerTick = 200, LogicTickSec = 0.1, MaxConveyorsPerPlot = 150, MaxLogicPerPlot = 200,
 ```
 
-- Expansion k costs 3000 x k for k = 1..24. The full plot totals $900,100.
+- Expansion k costs 2280 x k for k = 1..24. The full plot totals $684,100.
 - These stay as they are: CashCap $2M, the 20-minute day, `SwingCooldown` (crystal nodes and the v1 model only).
 - The wood drag lift limit is about 20 mass. At density 0.15 that is about 130 studs³, so an oak trunk lifts and a whole pine trunk drags along the ground.
 
@@ -600,7 +600,7 @@ New scene `tools/preview/scenes/sections.luau`. Each check is a spec or a render
 
 **Client: `SPS/DragController`**
 - The axe must be put away to drag (LT2's rule). With an axe out, clicking a loose piece chops it, and a hint says "Put your axe away (1) to drag".
-- Mouse: hold the left button on a `Wood` part. Touch: tap and hold for 0.25 s; the input is consumed so the camera doesn't turn. Gamepad: hold L2 at the centre reticle.
+- Mouse: hold the left button on a `Wood` part. Touch: tap and hold for 0.25 s; the input is consumed so the camera doesn't turn. Gamepad: hold R2 (RT) at the centre reticle.
 - On grab:
   - Fire `Grab(part, hitPos)`.
   - Create an Attachment at the hit point plus a local Neon ball.
@@ -779,7 +779,7 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 - Each of the 12 slots holds a 5x5 grid of 40-stud squares around its centre.
 - Saved as `profile.plot.squares = { "0,0", ... }`.
 - The Land Office (Ada, a new building by the plot district) sells the first square for $100, the centre square of a free slot you pick (PlotUI cycles free slots).
-- `ExpandLand(x, z)` must touch a square you own and costs 3000 x k.
+- `ExpandLand(x, z)` must touch a square you own and costs 2280 x k.
 - `PlotLogic.InSquares` replaces `InBounds(size)`.
 - Migration: a Campsite (tier 1) gets the centre 3x3. Higher tiers get the 3x3, plus any ring squares their placed items need, plus a cash refund of the tier prices paid. Existing PlacedItems stay.
 
@@ -1057,6 +1057,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
 ### M6 Gates and hazards
 - Toll bridge, blasting charges, ferry and Island, hazards, the quest, the secrets.
 - Studio: each gate opens only after paying or blasting; the quest gives the Maul once.
+- W4 status: deep-sea telegraph (HazardLogic: warn band, 3 s grace, then the unchanged 15 per 1.5 s), Secret Cave dark toast and the AreaCave trigger (id still 0), the Hermit (HermitService, `DialogueData.HermitLines`), five carved marks, the Carved Totem (`secretsFound.CarvedTotem`) and the Hermit's Maul (`ItemCatalog.HermitsMaul`, `quest = true`, off the ladder, not in the economy model). Not built: the three-shop item chain, the snow trapdoor and hermit plates (the five marks replace them), frost path, Totem as placeable decor.
 
 ### Terrain restyle (land; any time, unflagged)
 - R1: per-biome terrain material colours (TerrainBuilder `SetMaterialColor`, palette per spec §16) and brown cliffs and rock.
@@ -1098,7 +1099,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
 - Steel Axe ($160) in 5-8 minutes.
 - First $1k in 15-20 minutes.
 - Cobalt ($2,040, LT2's best store axe) in about 1 hour.
-- Full plot ($900,100) in 20-40 hours.
+- Full plot ($684,100) in 20-40 hours.
 - Wallet cap far beyond all of that.
 
 **Risk**: until the M6 gates exist, a hatchet player can drive north and cut frostwood (95 hits per cut). Today's gates are distance, bed size, the snow slowdown and the volcano's Heat Boots. If the model says it's too fast, pull the toll bridge forward from M6.

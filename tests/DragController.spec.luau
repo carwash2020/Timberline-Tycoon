@@ -25,6 +25,7 @@ return function(t)
 		local playerGui = Instance.new("Folder")
 		local loader = t.loader({
 			services = {
+				GuiService = {},
 				CollectionService = {
 					GetTagged = function()
 						return {}
@@ -71,7 +72,7 @@ return function(t)
 				UserInputService = { InputBegan = sig(), InputEnded = sig() },
 			},
 			mocks = {
-				HUD = { Toast = noop },
+				HUD = { Toast = noop, NoteGrab = noop },
 				Net = {
 					Remote = function()
 						return { FireServer = noop }

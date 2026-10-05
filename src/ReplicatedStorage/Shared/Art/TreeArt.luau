@@ -218,8 +218,8 @@ local DUST: { [string]: Color3 } = {
 	volcano = Color3.fromRGB(118, 112, 108),
 	grove = Color3.fromRGB(150, 138, 168),
 	sky = Color3.fromRGB(236, 228, 198),
-	-- Ferry shore, not the palm coast's sand and not the forest's earth. TBD (Builder).
-	ferryisle = Color3.fromRGB(214, 196, 150), -- TBD (Builder)
+	-- Ferry shore, not the palm coast's sand and not the forest's earth.
+	ferryisle = Color3.fromRGB(214, 196, 150),
 }
 
 function TreeArt.DustColor(def: WoodDef): Color3
@@ -818,12 +818,12 @@ builders.lumenwood = function(model, def, pal, H, F, rng)
 	particles(lower[1], glow, 4, 0.8, 1.2, 0.35)
 end
 
--- Lanternwood's v1 silhouette. TBD (Builder).
+-- Lanternwood's v1 silhouette.
 local LANTERN_TRUNK = 0.18 -- trunk diameter over its height
 local LANTERN_CROWN_LIFT = 0.28 -- of the crown size, above the trunk
 local LANTERN_CROWN_Y = 0.7 -- crown height over its width
-local LANTERN_LEAF_PARTS = 8 -- TBD (Builder)
-local LANTERN_FLARES = 4 -- TBD (Builder)
+local LANTERN_LEAF_PARTS = 8
+local LANTERN_FLARES = 4
 
 -- Lanternwood: a plain broadleaf by day. Leaves and a thin core band are
 -- marked for the client to turn neon at night. No server light, no Neon.

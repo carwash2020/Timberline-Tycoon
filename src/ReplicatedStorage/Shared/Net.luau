@@ -29,6 +29,7 @@ Net.RemoteNames = {
 	"PlotPass", -- client -> server: () close the picker; the server assigns a free one
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
+	"TutorialSeen", -- client -> server: ("build" | "land") the player opened build mode or the Land panel (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
 	"Release", -- client -> server: (part) let go of it
 	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)
@@ -49,6 +50,8 @@ Net.RemoteNames = {
 	"WorldFX", -- server -> client: (kind, payload) one-off effects: seed pops, figure reveals, lightning...
 	"SlotAction", -- client -> server: ("load" | "reset", index, confirm)
 	"SlotState", -- server -> client: (summary) the three slots
+	"BoardRequest", -- client -> server: () ask for the leaderboard; the server answers from its cache (LeaderboardService)
+	"BoardData", -- server -> client: (payload) the top rows and your own (LeaderboardLogic.ParsePayload)
 	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
 }
 

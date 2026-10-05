@@ -93,6 +93,12 @@ return function(t)
 		end
 		withMeshes(function()
 			for _, def in ipairs(axes) do
+				-- The Hermit's Maul (a quest axe) has no authored mesh yet: it
+				-- stays part-built, which the first loop already checked.
+				if AxeModels.Get(def.id) == nil then
+					t.ok(def.quest, def.id .. " has meshes unless it is a quest axe")
+					continue
+				end
 				local model = AxeArt.Build(def)
 				local handle = model.PrimaryPart
 				t.eq(handle.Name, "Handle")

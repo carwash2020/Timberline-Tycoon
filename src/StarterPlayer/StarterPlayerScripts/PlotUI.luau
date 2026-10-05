@@ -4,9 +4,13 @@
 --     build mode: the Blueprint Store opens (drawn by ShopUI), a bar offers
 --     BLUEPRINTS and DONE, and everything you've placed gets Move (E) and
 --     Sell (F, hold) prompts.
---   * The store's first row grows the plot to its next base tier; the rest
---     are blueprints, locked until your plot's tier allows them. Picking one
---     hands it to BlueprintPlacer (the ghost preview); you pay on placing.
+--   * The Blueprint Store lists blueprints, locked until your plot size
+--     allows them (the message points to LAND). Picking one hands it to
+--     BlueprintPlacer (the ghost preview); you pay on placing.
+--   * The LAND panel has two sections: "Plot size" (level N of 5, what the
+--     next level unlocks and costs) and "Expand" (squares beyond the plot
+--     size). Words: plot = your claimed pad, plot size = its level,
+--     expand = buying squares.
 --   * Walking off your plot ends build mode.
 -- Everything only sends intents; the server checks and answers with toasts.
 
@@ -38,14 +42,16 @@ local player = Players.LocalPlayer
 local C = UITheme.Colors
 
 local REACH = 40 -- studs past your plot's edge that still count as on it (PlotService's BUILD_REACH)
-local PLOT_ROW = "_plot"
 
 local building = false
 local buildButton: UITheme.Button? = nil
 local modeBar: Frame? = nil
 local landPanel: Frame? = nil
 local landPrice: TextLabel? = nil
-local landGrid: ScrollingFrame? = nil
+local landGrid: Frame? = nil
+local landSizeNow: TextLabel? = nil
+local landSizeNext: TextLabel? = nil
+local landGrow: UITheme.Button? = nil
 local landOpen = false
 local itemPrompts: { [Instance]: { ProximityPrompt } } = {}
 -- Client-only. SetAttribute on a server model is rejected, so a flag
@@ -75,65 +81,6 @@ end
 ---------------------------------------------------------------------------
 -- The Blueprint Store
 ---------------------------------------------------------------------------
-
--- Blueprint names a tier unlocks, for the upgrade row.
-local function unlocksAt(tierIndex: number): string
-	local names: { string } = {}
-	for _, bp in ipairs(PlotData.Blueprints) do
-		if bp.tier == tierIndex then
-			table.insert(names, bp.displayName)
-		end
-	end
-	return if #names > 0 then "Unlocks: " .. table.concat(names, ", ") else ""
-end
-
-local function plotRow(): ShopUI.RowView
-	local now = PlotData.Tier(tier()) or PlotData.Tiers[1]
-	local nextTier = PlotData.Tier(tier() + 1)
-	if not nextTier then
-		return {
-			name = now.name,
-			detail = string.format("%d × %d studs: your plot is as big as it gets.", now.size, now.size),
-			color = C.Green,
-			ring = C.Amber,
-			dim = false,
-			button = "Max",
-			state = "inuse",
-			onClick = function() end,
-		}
-	end
-	local affordable = cash() >= nextTier.priceCash
-	return {
-		name = "Grow to " .. nextTier.name,
-		detail = string.format(
-			"%d × %d studs (now %d × %d). %s",
-			nextTier.size,
-			nextTier.size,
-			now.size,
-			now.size,
-			unlocksAt(tier() + 1)
-		),
-		color = C.Blue,
-		dim = false,
-		button = if affordable
-			then "Grow " .. Util.formatCash(nextTier.priceCash)
-			else Util.formatCash(nextTier.priceCash),
-		state = if affordable then "buy" else "cant",
-		onClick = function()
-			if cash() < nextTier.priceCash then
-				HUD.Toast(
-					string.format(
-						"You need %s more for %s.",
-						Util.formatCash(nextTier.priceCash - cash()),
-						Util.article(nextTier.name)
-					)
-				)
-				return
-			end
-			Net.Remote("UpgradePlot"):FireServer()
-		end,
-	}
-end
 
 local function stockCount(id: string): number
 	return SawmillLogic.CountStock(SawmillLogic.DecodeStock((player:GetAttribute("SawmillStock") :: string?) or ""), id)
@@ -166,7 +113,7 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local affordable = cash() >= price
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
-		detail ..= " · needs " .. Util.article(needed.name) .. " plot"
+		detail ..= " · needs plot size " .. needed.name
 	elseif bp.note then
 		detail ..= " · " .. bp.note
 	end
@@ -204,8 +151,8 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 			if bp.tier > tier() then
 				HUD.Toast(
 					string.format(
-						"Grow your plot to %s first.",
-						Util.article(if needed then needed.name else "bigger plot")
+						"Raise your plot size to %s first. You do that in LAND.",
+						if needed then needed.name else "a bigger one"
 					)
 				)
 			elseif atStore then
@@ -227,9 +174,9 @@ local STORE: ShopUI.Shop = {
 	building = nil,
 	promptText = "",
 	title = "Blueprint Store",
-	subtitle = "You pay when you place it. Sold back: half (all of it within a minute).",
+	subtitle = "You pay when you place it. Sold back: half (all of it within a minute). Plot size is in LAND.",
 	ids = function()
-		local ids = { PLOT_ROW }
+		local ids: { string } = {}
 		for _, mill in ipairs(ItemCatalog.SawmillList()) do
 			table.insert(ids, mill.id)
 		end
@@ -249,9 +196,6 @@ local STORE: ShopUI.Shop = {
 		return ids
 	end,
 	view = function(id: string): ShopUI.RowView
-		if id == PLOT_ROW then
-			return plotRow()
-		end
 		return blueprintRow(PlotLogic.Blueprint(id) :: PlotData.Blueprint)
 	end,
 }
@@ -336,6 +280,9 @@ local function setBuilding(on: boolean)
 		return
 	end
 	building = on
+	if on then
+		Net.Remote("TutorialSeen"):FireServer("build")
+	end
 	HUD.SetBuildMode(on)
 	DragController.SetBuildMode(on)
 	if on then
@@ -372,8 +319,10 @@ function PlotUI.Refresh()
 end
 
 ---------------------------------------------------------------------------
--- Land office. The sign prompt opens it. The price on the card is the
--- price the server charges (PlotLogic.ExpansionPrice). Esc and B close it.
+-- Land panel. The LAND button (build bar) or the sign's prompt opens it. Two
+-- sections: "Plot size" (the five levels, PlotData.Tiers) and "Expand"
+-- (squares beyond the plot size). The expand price on the card is the price
+-- the server charges (PlotLogic.ExpansionPrice). Esc and B close it.
 ---------------------------------------------------------------------------
 
 local LAND_ACTION = "LandOfficeClose"
@@ -390,12 +339,45 @@ local function ownedSquares(): { string }
 	return out
 end
 
+-- The "Plot size" section: where you are, what the next level gives, and
+-- the button for it.
+local function rebuildSize()
+	local nowLabel = landSizeNow
+	local nextLabel = landSizeNext
+	local grow = landGrow
+	if not nowLabel or not nextLabel or not grow then
+		return
+	end
+	local card = PlotLogic.SizeCard(tier(), cash())
+	nowLabel.Text =
+		string.format("Level %d of %d: %s (%d × %d studs)", card.level, card.levels, card.name, card.size, card.size)
+	local nextLevel = card.next
+	if not nextLevel then
+		nextLabel.Text = "That's the biggest plot size. You can still expand onto squares below."
+		grow.root.Visible = false
+		return
+	end
+	local unlocks = if nextLevel.unlocks ~= "" then " " .. nextLevel.unlocks .. "." else ""
+	nextLabel.Text = string.format(
+		"Next, level %d: %s, %d × %d studs.%s",
+		card.level + 1,
+		nextLevel.name,
+		nextLevel.size,
+		nextLevel.size,
+		unlocks
+	)
+	grow.root.Visible = true
+	grow.face.Text = "RAISE PLOT SIZE " .. Util.formatCash(nextLevel.price)
+	grow:SetStyle(if nextLevel.affordable then "buy" else "cant")
+end
+
 local function rebuildLand()
 	local grid = landGrid
 	local label = landPrice
 	if not grid or not label then
 		return
 	end
+	rebuildSize()
 	for _, child in ipairs(grid:GetChildren()) do
 		if child:IsA("GuiObject") and child.Name ~= "Layout" then
 			child:Destroy()
@@ -407,18 +389,17 @@ local function rebuildLand()
 	local span = half * 2 + 1
 	local forSale = 0
 	local firstBuy: GuiButton? = nil
+	local styles: { [string]: string } = { buy = "buy", bought = "bark", included = "starter", far = "skip" }
 	for iz = half, -half, -1 do
 		for ix = -half, half do
 			local key, why = PlotLogic.ExpansionBlock(tier(), squares, ix, iz)
-			local inside = PlotLogic.SquareInsideTier(ix, iz, (PlotData.Tier(tier()) or PlotData.Tiers[1]).size)
-			local mine = PlotLogic.Owns(squares, ix, iz)
-			local text = if key then "Buy" elseif inside or mine then "Yours" else ""
+			local text, kind = PlotLogic.CellLabel(tier(), squares, ix, iz)
 			local tap = PlotLogic.LandTap
 			local button = UITheme.Button({
 				name = PlotLogic.Key(ix, iz),
 				text = text,
 				size = Vector2.new(tap, tap),
-				style = if key then "buy" elseif mine or inside then "bark" else "skip",
+				style = styles[kind] or "skip",
 				textSize = 14,
 			})
 			button.root.LayoutOrder = (half - iz) * span + (ix + half)
@@ -429,10 +410,15 @@ local function rebuildLand()
 			button.face.Activated:Connect(function()
 				if buyKey then
 					Net.Remote("ExpandLand"):FireServer(ix, iz, expected)
-				elseif blocked == "away" then
-					HUD.Toast("Buy a square that touches your yard.")
-				elseif blocked == "yours" or blocked == "owned" then
-					HUD.Toast("That ground is already yours.")
+					-- Whatever the server says (a changed price, no cash), the
+					-- panel redraws from the truth a moment later.
+					task.delay(0.6, function()
+						if landOpen then
+							rebuildLand()
+						end
+					end)
+				else
+					HUD.Toast(PlotLogic.ExpansionMessage(blocked) or "You can't expand onto that square.")
 				end
 			end)
 			if buyKey then
@@ -444,12 +430,17 @@ local function rebuildLand()
 		end
 	end
 	if forSale == 0 or not price then
-		label.Text = "Your yard already covers every square."
+		label.Text = "Your plot already covers every square."
 	else
-		label.Text = "Next square costs " .. Util.formatCash(price)
+		label.Text = "Next square costs " .. Util.formatCash(price) .. ". Each one costs more."
 	end
-	if landOpen and firstBuy and UITheme.Device() == "console" then
-		GuiService.SelectedObject = firstBuy
+	if landOpen and UITheme.Device() == "console" then
+		local grow = landGrow
+		if firstBuy then
+			GuiService.SelectedObject = firstBuy
+		elseif grow and grow.root.Visible then
+			GuiService.SelectedObject = grow.face
+		end
 	end
 end
 
@@ -458,10 +449,14 @@ local function setLand(on: boolean)
 	if not panel then
 		return
 	end
+	local opening = on and not landOpen
 	landOpen = on
 	panel.Visible = on
 	if on then
 		rebuildLand()
+		if opening then
+			Net.Remote("TutorialSeen"):FireServer("land")
+		end
 		ContextActionService:BindActionAtPriority(
 			LAND_ACTION,
 			function(_name, state)
@@ -485,18 +480,38 @@ local function setLand(on: boolean)
 	end
 end
 
+local function sectionLabel(parent: Instance, order: number, text: string, header: boolean): TextLabel
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Font = if header then UITheme.Fonts.Heading else UITheme.Fonts.Body
+	label.TextSize = if header then 18 else 16
+	label.TextColor3 = if header then C.Bark else C.Ink
+	label.TextWrapped = true
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Top
+	label.AutomaticSize = Enum.AutomaticSize.Y
+	label.Size = UDim2.new(1, -8, 0, 0)
+	label.LayoutOrder = order
+	label.Text = text
+	label.Parent = parent
+	return label
+end
+
 local function mountLand(gui: ScreenGui)
 	local panel = Instance.new("Frame")
 	panel.Name = "LandOffice"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(300, 300)
+	panel.Size = UDim2.new(0, 330, 0.92, 0)
 	panel.BackgroundColor3 = C.Paper
 	panel.BorderSizePixel = 0
 	panel.Visible = false
 	panel.Active = true
 	UITheme.corner(panel, 14)
 	UITheme.stroke(panel, C.Bark, 3)
+	local limit = Instance.new("UISizeConstraint")
+	limit.MaxSize = Vector2.new(330, 540)
+	limit.Parent = panel
 	panel.Parent = gui
 	landPanel = panel
 
@@ -508,7 +523,7 @@ local function mountLand(gui: ScreenGui)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Size = UDim2.new(1, -64, 0, 32)
 	title.Position = UDim2.fromOffset(14, 10)
-	title.Text = "Land office"
+	title.Text = "Land"
 	title.Parent = panel
 
 	local close = UITheme.Button({
@@ -523,40 +538,70 @@ local function mountLand(gui: ScreenGui)
 		setLand(false)
 	end)
 
-	local price = Instance.new("TextLabel")
-	price.Name = "Price"
-	price.BackgroundTransparency = 1
-	price.Font = UITheme.Fonts.Body
-	price.TextSize = 16
-	price.TextColor3 = C.Ink
-	price.TextWrapped = true
-	price.TextXAlignment = Enum.TextXAlignment.Left
-	price.TextYAlignment = Enum.TextYAlignment.Top
-	price.Size = UDim2.new(1, -28, 0, 40)
-	price.Position = UDim2.fromOffset(14, 52)
-	price.Text = ""
-	price.Parent = panel
-	landPrice = price
+	-- One scrolling column: Plot size, then Expand.
+	local body = Instance.new("ScrollingFrame")
+	body.Name = "Body"
+	body.BackgroundTransparency = 1
+	body.BorderSizePixel = 0
+	body.Position = UDim2.fromOffset(12, 60)
+	body.Size = UDim2.new(1, -24, 1, -70)
+	body.CanvasSize = UDim2.fromOffset(0, 0)
+	body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	body.ScrollBarThickness = 6
+	body.ScrollingDirection = Enum.ScrollingDirection.Y
+	body.Selectable = false
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 8)
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = body
+	body.Parent = panel
 
-	local grid = Instance.new("ScrollingFrame")
-	grid.Name = "Grid"
-	grid.BackgroundTransparency = 1
-	grid.BorderSizePixel = 0
-	grid.Position = UDim2.fromOffset(12, 96)
-	grid.Size = UDim2.new(1, -24, 1, -108)
-	grid.CanvasSize = UDim2.fromOffset(0, 0)
-	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	grid.ScrollBarThickness = 6
-	grid.ScrollingDirection = Enum.ScrollingDirection.Y
-	grid.Selectable = false
+	sectionLabel(body, 1, "PLOT SIZE", true)
+	landSizeNow = sectionLabel(body, 2, "", false)
+	landSizeNext = sectionLabel(body, 3, "", false)
+	local grow = UITheme.Button({
+		name = "RaisePlotSize",
+		text = "RAISE PLOT SIZE",
+		size = Vector2.new(280, PlotLogic.LandTap),
+		style = "buy",
+		textSize = 15,
+	})
+	grow.root.LayoutOrder = 4
+	grow.root.Parent = body
+	grow.face.Activated:Connect(function()
+		local card = PlotLogic.SizeCard(tier(), cash())
+		local nextLevel = card.next
+		if nextLevel and not nextLevel.affordable then
+			HUD.Toast(
+				string.format(
+					"You need %s more to raise your plot size to %s.",
+					Util.formatCash(nextLevel.short),
+					nextLevel.name
+				)
+			)
+			return
+		end
+		Net.Remote("UpgradePlot"):FireServer()
+	end)
+	landGrow = grow
+
+	sectionLabel(body, 5, "EXPAND", true)
+	landPrice = sectionLabel(body, 6, "", false)
+	local holder = Instance.new("Frame")
+	holder.Name = "Grid"
+	holder.BackgroundTransparency = 1
+	holder.BorderSizePixel = 0
+	holder.AutomaticSize = Enum.AutomaticSize.Y
+	holder.Size = UDim2.fromScale(1, 0)
+	holder.LayoutOrder = 7
 	local layout = Instance.new("UIGridLayout")
 	layout.Name = "Layout"
 	layout.CellSize = UDim2.fromOffset(PlotLogic.LandTap, PlotLogic.LandTap)
 	layout.CellPadding = UDim2.fromOffset(6, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = grid
-	grid.Parent = panel
-	landGrid = grid
+	layout.Parent = holder
+	holder.Parent = body
+	landGrid = holder
 end
 
 ---------------------------------------------------------------------------
@@ -607,6 +652,12 @@ function PlotUI.Start()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
 		if who == player and prompt.Name == "LandOffice" then
+			-- Only your own sign opens your Land panel.
+			local plot = prompt:FindFirstAncestorOfClass("Model")
+			if plot and plot:GetAttribute("OwnerId") ~= player.UserId then
+				HUD.Toast("That's someone else's plot. Visit your own sign to expand.")
+				return
+			end
 			setLand(not landOpen)
 		end
 	end)
@@ -629,11 +680,20 @@ function PlotUI.Start()
 	end
 	-- Walked off your plot? Build mode ends.
 	task.spawn(function()
+		local wasOn = false
+		local lastHint = -math.huge
 		while true do
 			task.wait(0.25)
-			if building and not onMyPlot() then
+			local on = onMyPlot()
+			if building and not on then
 				setBuilding(false)
 			end
+			-- The BUILD button hides off your plot; say where it went, once a minute.
+			if wasOn and not on and os.clock() - lastHint > 60 then
+				lastHint = os.clock()
+				HUD.Toast("Walk back to your plot to build.")
+			end
+			wasOn = on
 			PlotUI.Refresh()
 		end
 	end)

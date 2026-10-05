@@ -28,6 +28,7 @@ local EventService = require(script.Parent.EventService)
 local FerryService = require(script.Parent.FerryService)
 local GateService = require(script.Parent.GateService)
 local HazardService = require(script.Parent.HazardService)
+local HermitService = require(script.Parent.HermitService)
 local LogicService = require(script.Parent.LogicService)
 local PermissionService = require(script.Parent.PermissionService)
 local DailyService = require(script.Parent.DailyService)
@@ -38,6 +39,7 @@ local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
+local LeaderboardService = require(script.Parent.LeaderboardService)
 local SaveSlotService = require(script.Parent.SaveSlotService)
 local ChopSawService = require(script.Parent.ChopSawService)
 local SawmillService = require(script.Parent.SawmillService)
@@ -718,8 +720,17 @@ VehicleService.Hooks.deliveryCFrame = function(player: Player): CFrame?
 	return PlotService.DeliveryCFrame(player)
 end
 safely("VehicleService.Init", VehicleService.Init, notify)
-safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify, activeLoop, remote.ResetTutorial)
+safely(
+	"QuestService.Init",
+	QuestService.Init,
+	remote.SkipTutorial,
+	notify,
+	activeLoop,
+	remote.ResetTutorial,
+	remote.TutorialSeen
+)
 safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
+safely("EventService.InitEvent", EventService.InitEvent, notify)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)
 safely("MonetizationService.SetPassListener", MonetizationService.SetPassListener, function(player: Player, key: string)
@@ -740,6 +751,7 @@ safely("FieldGuideService.Init", FieldGuideService.Init, notify)
 safely("NodeService.Init", NodeService.Init, notify)
 safely("AetherService.Init", AetherService.Init, notify)
 safely("GondolaService.Init", GondolaService.Init, mapFolder, notify)
+safely("LeaderboardService.Init", LeaderboardService.Init, remote.BoardRequest, remote.BoardData)
 safely("SaveSlotService.Init", SaveSlotService.Init, remote.SlotAction, remote.SlotState, notify, {
 	commit = function(player: Player)
 		commitSlot(player)
@@ -1000,6 +1012,7 @@ BootReport.StartStubs({
 		init = function()
 			if GateService.Init then
 				GateService.Init(remote.TollPay)
+				GateService.SetupWorld(mapFolder)
 			end
 		end,
 	},
@@ -1008,6 +1021,7 @@ BootReport.StartStubs({
 		init = function()
 			if FerryService.Init then
 				FerryService.Init(remote.FerryBoard)
+				FerryService.SetupWorld(mapFolder, notify)
 			end
 		end,
 	},
@@ -1042,7 +1056,7 @@ BootReport.StartStubs({
 		name = "BlastService",
 		init = function()
 			if BlastService.Init then
-				BlastService.Init()
+				BlastService.Init(notify)
 			end
 		end,
 	},
@@ -1050,8 +1064,32 @@ BootReport.StartStubs({
 		name = "HazardService",
 		init = function()
 			if HazardService.Init then
-				HazardService.Init()
+				HazardService.Init(notify)
 			end
+		end,
+	},
+	{
+		name = "HermitService",
+		init = function()
+			HermitService.Init({
+				profile = function(player: Player): any
+					return ProfileService.GetProfile(player)
+				end,
+				notify = notify,
+				say = function(player: Player, text: string)
+					remote.Dialogue:FireClient(
+						player,
+						{ line = "hermit", text = text, choice = false, noLabel = "Close" }
+					)
+				end,
+				grantAxe = function(player: Player, axeId: string)
+					AxeService.Grant(player, axeId, false)
+				end,
+				ownsAxe = function(player: Player, axeId: string): boolean
+					local counts = AxeService.OwnedCounts(player)
+					return (counts[axeId] or 0) > 0
+				end,
+			}, mapFolder)
 		end,
 	},
 	{
@@ -1151,6 +1189,14 @@ remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, 
 	local attr = SettingsLogic.Attributes[key :: SettingsLogic.Key]
 	if attr then
 		player:SetAttribute(attr, (profile.settings :: any)[key])
+	end
+	if key == "showOnBoard" then
+		safely(
+			"LeaderboardService.SettingChanged",
+			LeaderboardService.SettingChanged,
+			player,
+			profile.settings.showOnBoard
+		)
 	end
 end)
 
@@ -1326,6 +1372,7 @@ local function onPlayerAdded(player: Player)
 	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
 	safely("QuestService.Start", QuestService.Start, player, profile)
 	safely("DailyService.Start", DailyService.Start, player, profile)
+	safely("EventService.Start", EventService.Start, player, profile)
 	safely("ShopService.PlayerJoined", ShopService.PlayerJoined, player, profile)
 	safely("MonetizationService.PlayerJoined", MonetizationService.PlayerJoined, player, profile)
 	safely("FieldGuideService.Refresh", FieldGuideService.Refresh, player)
@@ -1334,6 +1381,7 @@ local function onPlayerAdded(player: Player)
 	safely("PlotService.PlayerJoined", PlotService.PlayerJoined, player, profile)
 	safely("ForestService.PlayerJoined", ForestService.PlayerJoined, player, profile)
 	safely("SaveSlotService.PlayerJoined", SaveSlotService.PlayerJoined, player)
+	safely("LeaderboardService.PlayerJoined", LeaderboardService.PlayerJoined, player, profile.settings.showOnBoard)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -1412,6 +1460,7 @@ local function rebuildSlotNow(player: Player)
 	ShopService.PlayerJoined(player, profile)
 	ForestService.PlayerJoined(player, profile)
 	DailyService.Start(player, profile)
+	safely("EventService.Start", EventService.Start, player, profile)
 	QuestService.Start(player, profile)
 	player:SetAttribute("Cash", profile.cash)
 	remote.CashChanged:FireClient(player, profile.cash)
@@ -1448,6 +1497,7 @@ local function onPlayerRemoving(player: Player)
 	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
 	safely("GateService.PlayerRemoving", GateService.PlayerRemoving, player)
+	safely("LeaderboardService.PlayerRemoving", LeaderboardService.PlayerRemoving, player) -- reads the score now, before the release
 	-- Playtime, the truck's loose wood and left-behind logs. Before the
 	-- release, and again (as a no-op) from the final save if shutdown
 	-- already committed them.

@@ -4,9 +4,10 @@
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
 -- volume stepper; graphics, camera shake, UI scale and tips apply at once
 -- and save (SaveSetting). Reset tutorial asks twice, then ResetTutorial.
--- Visitors is the plot permission list. On a gamepad DPadRight opens the
--- card, the D-pad moves between the rows, B on Visitors returns to the
--- game list, and B or Esc closes the card.
+-- Visitors is the plot permission list. Leaderboard is the opt-in
+-- lifetime-earnings board (LeaderboardUI). On a gamepad DPadRight opens
+-- the card, the D-pad moves between the rows, B on Visitors or
+-- Leaderboard returns to the game list, and B or Esc closes the card.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -14,6 +15,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local LeaderboardLogic = require(ReplicatedStorage.Shared.LeaderboardLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
@@ -21,6 +23,7 @@ local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local CameraShake = require(script.Parent.CameraShake)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
+local LeaderboardUI = require(script.Parent.LeaderboardUI)
 local Quality = require(script.Parent.Quality)
 local UITheme = require(script.Parent.UITheme)
 
@@ -46,6 +49,22 @@ local function cycle(list: { string }, current: string): string
 		end
 	end
 	return list[1]
+end
+
+-- The key B and Esc use to leave a tab: back to "game" from any other
+-- tab, and closing the card from "game" (SettingsUI.BackTarget).
+function SettingsUI.BackTarget(tab: string): string?
+	if tab ~= "game" and SettingsLogic.HasTab(tab) then
+		return "game"
+	end
+	return nil
+end
+
+local function tenFoot(): boolean
+	local ok, ten = pcall(function()
+		return GuiService:IsTenFootInterface()
+	end)
+	return ok and ten == true
 end
 
 local function percent(n: number): string
@@ -142,6 +161,8 @@ function SettingsUI.Start()
 
 	local gameTab: UITheme.Button
 	local visitorTab: UITheme.Button
+	local boardTab: UITheme.Button
+	local boardPanel: LeaderboardUI.Panel
 
 	local function permissions(): { [string]: PermissionLogic.Row }
 		return PermissionLogic.Decode(player:GetAttribute("PlotPermissions"))
@@ -222,13 +243,25 @@ function SettingsUI.Start()
 		end
 		tabName = name
 		local visitorsOn = name == "visitors"
+		local boardOn = name == "board"
 		for _, rowRoot in ipairs(gameRows) do
-			rowRoot.Visible = not visitorsOn
+			rowRoot.Visible = not visitorsOn and not boardOn
 		end
 		visitors.Visible = visitorsOn
-		gameTab:SetStyle(if visitorsOn then "skip" else "buy")
+		boardPanel.root.Visible = boardOn
+		card.outer.Size = UDim2.fromOffset(if boardOn then LeaderboardLogic.CardWidth(tenFoot()) else 280, 300)
+		gameTab:SetStyle(if name == "game" then "buy" else "skip")
 		visitorTab:SetStyle(if visitorsOn then "buy" else "skip")
-		if visitorsOn then
+		boardTab:SetStyle(if boardOn then "buy" else "skip")
+		if not boardOn then
+			boardPanel:Link(boardTab.face)
+		end
+		if boardOn then
+			boardPanel:Show()
+			if UITheme.Device() == "console" then
+				GuiService.SelectedObject = boardPanel:First()
+			end
+		elseif visitorsOn then
 			rebuildVisitors()
 			local first = visitors:FindFirstChildWhichIsA("GuiButton", true)
 			if first and UITheme.Device() == "console" then
@@ -247,6 +280,10 @@ function SettingsUI.Start()
 		showTab("visitors")
 	end)
 	visitorTab.root.LayoutOrder = 2
+	boardTab = makeButton(scroll, "TabBoard", "LEADERBOARD", "skip", function()
+		showTab("board")
+	end)
+	boardTab.root.LayoutOrder = 3
 	firstFace = gameTab.face
 
 	local musicFace: TextButton
@@ -262,6 +299,18 @@ function SettingsUI.Start()
 	local function save(key: string, value: any)
 		Net.Remote("SaveSetting"):FireServer(key, value)
 	end
+
+	-- The board tab. Opting in or out is the same SaveSetting as the
+	-- others; the attribute (mirrored by the server) is what the tab reads.
+	boardPanel = LeaderboardUI.Build(scroll, 60, function(): boolean
+		return player:GetAttribute(SettingsLogic.BoardAttribute) == true
+	end, function(on: boolean)
+		player:SetAttribute(SettingsLogic.BoardAttribute, on) -- the server sets it too; this keeps the toggle snappy
+		save("showOnBoard", on)
+		boardPanel:SetOptIn(on)
+	end)
+	boardPanel:Link(boardTab.face)
+	LeaderboardUI.Listen(boardPanel)
 
 	local function applyAll()
 		Quality.SetOverride((player:GetAttribute("SettingGraphics") :: string?) or "auto")
@@ -296,6 +345,9 @@ function SettingsUI.Start()
 		sfxFace.Text = if SoundData.SfxEnabled then "SOUND FX: ON" else "SOUND FX: OFF"
 		sfxVolFace.Text = "Effects volume  " .. percent(SoundData.SfxVolume) .. "  ±"
 		resetFace.Text = if resetArmed then "TAP AGAIN TO RESET" else "RESET TUTORIAL"
+		if tabName == "board" then
+			boardPanel:SetOptIn(player:GetAttribute(SettingsLogic.BoardAttribute) == true)
+		end
 	end
 
 	musicFace = row("music", "MUSIC: ON", function()
@@ -409,7 +461,7 @@ function SettingsUI.Start()
 				local code = input.KeyCode
 				local back = code == InputKit.Actions.Cancel.gamepad
 				local esc = code == InputKit.Actions.Cancel.keyboard
-				if tabName == "visitors" and back then
+				if back and SettingsUI.BackTarget(tabName) then
 					showTab("game")
 					return Enum.ContextActionResult.Sink
 				end

@@ -50,7 +50,9 @@ local GameConfig = {
 
 	-- HUD
 	-- Roblox's own player list opens top right on computers, right over the
-	-- cash. Off until our own leaderboard (GAME_DESIGN §8 phase 7).
+	-- cash. Stays off: our own opt-in lifetime-earnings leaderboard now
+	-- exists (Settings > Leaderboard; LeaderboardService), so players see
+	-- it there instead.
 	ShowRobloxPlayerList = false,
 	-- World prompts ("Browse axes", "Pick up", ...) in the game's own wood
 	-- look (UI spec 05, PromptUI). false = Roblox's default prompts.
@@ -156,6 +158,14 @@ local GameConfig = {
 	BoulderRespawnSec = 1200,
 	WaterDamage = 15,
 	WaterTickSec = 1.5,
+	-- Deep sea telegraph (HazardLogic). Damage and tick above are unchanged.
+	SeaWarnBand = 40, -- studs before the deep water where a warning shows
+	SeaGraceSec = 3, -- seconds in deep water before the first damage tick
+	-- The Hermit's quest (HermitLogic, W4). Five carvings, one in each
+	-- ground biome: starter, hills, snow, volcano, grove.
+	CarvedMarkCount = 5,
+	CarvedMarkRewardId = "CarvedTotem", -- decor only; never sold or traded
+	QuestAxeId = "HermitsMaul",
 	ConveyorSpeed = 4,
 	LogicEvalsPerTick = 200,
 	LogicTickSec = 0.1,
@@ -172,7 +182,7 @@ local GameConfig = {
 	-- Wave 0 placeholders. Nothing reads these yet, so play is unchanged.
 	-- DayCycleMinutes is 24 (the day-length batch). Truck
 	-- respawns keep the existing recall rule, so there is no new key for them.
-	-- TBD (Designer), unread until the shop batch:
+	-- Open to tuning, unread until the shop batch:
 	BoxRespawnSec = 60, -- a bought item's display returns to the rack after this
 	BoxUnpaidDespawnSec = 180, -- an unpaid box left in the world despawns after this
 	ShopHours = { open = 7, close = 19 }, -- ClockTime the counters open and close

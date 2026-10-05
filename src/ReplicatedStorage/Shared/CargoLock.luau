@@ -9,7 +9,7 @@
 
 local CargoLock = {}
 
-CargoLock.SettleSec = 0.5
+CargoLock.SettleSec = 0.2 -- stuck almost as soon as it is set down
 CargoLock.RestSpeed = 0.6 -- studs/s, in bed space
 CargoLock.ContactGap = 0.45 -- studs the bottom may sit above the surface
 CargoLock.FarStuds = 18 -- a release farther than this from the bed never locks

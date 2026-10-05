@@ -625,6 +625,52 @@ local function keysOpen(): boolean
 	return #selected > 0 and cluster ~= nil and cluster.Visible and not BlueprintPlacer.Active()
 end
 
+-- R2 belongs to the axe while a Tool is in hand. A bound action marks the
+-- press as handled even when it passes it on, and CutController ignores
+-- handled presses, so the select bind exists only while hands are empty.
+local selectBound = false
+
+local function syncSelectBind()
+	local char = player.Character
+	local held = typeof(char) == "Instance" and char:FindFirstChildOfClass("Tool") ~= nil
+	if held and selectBound then
+		selectBound = false
+		ContextActionService:UnbindAction("BuilderSelect")
+	elseif not held and not selectBound then
+		selectBound = true
+		ContextActionService:BindActionAtPriority(
+			"BuilderSelect",
+			BuilderTools.OnSelect,
+			false,
+			Enum.ContextActionPriority.High.Value,
+			Enum.KeyCode.ButtonR2
+		)
+	end
+end
+
+function BuilderTools.SelectBound(): boolean
+	return selectBound
+end
+
+function BuilderTools.WatchTools()
+	syncSelectBind()
+	local function watch(char: Instance)
+		char.ChildAdded:Connect(syncSelectBind)
+		char.ChildRemoved:Connect(syncSelectBind)
+		syncSelectBind()
+	end
+	local ok, added = pcall(function()
+		return player.CharacterAdded
+	end)
+	if not ok or added == nil then
+		return
+	end
+	added:Connect(watch)
+	if typeof(player.Character) == "Instance" then
+		watch(player.Character)
+	end
+end
+
 function BuilderTools.Start()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "BuilderTools"
@@ -758,13 +804,7 @@ function BuilderTools.Start()
 		end
 	end)
 
-	ContextActionService:BindActionAtPriority(
-		"BuilderSelect",
-		BuilderTools.OnSelect,
-		false,
-		Enum.ContextActionPriority.High.Value,
-		Enum.KeyCode.ButtonR2
-	)
+	BuilderTools.WatchTools()
 
 	UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processedByUI: boolean)
 		if processedByUI or BlueprintPlacer.Active() then

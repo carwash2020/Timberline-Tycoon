@@ -3,9 +3,12 @@
 -- own lines. The keys are the cashier's outcomes (CounterLogic.Line).
 -- Nothing here is copied from another game.
 --
--- Land Office, Odds & Ends, Sparkworks and the Hermit have lines only.
--- Their buildings are not in this batch, so they are not in NPCData and
--- nothing here spawns them.
+-- Land Office, Odds & Ends and Sparkworks have lines only. Their buildings
+-- are not built, so they are not in NPCData and nothing here spawns them.
+-- Those three sets are DRAFTS (marked below): placeholder writing for shops
+-- that do not exist, kept so the tests keep every shop's lines complete.
+-- Nobody hears them. Rewrite them when their buildings are built. The
+-- Hermit is in NPCData (the Secret Cave) and speaks HermitLines.
 
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 
@@ -59,6 +62,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Sold. The box is yours to open.",
 		locked = "I don't have that one for sale.",
 	},
+	-- DRAFT: not spoken yet (no Land Office building); rewrite with the building.
 	LandOffice = {
 		greet = "Plots are on the board. Tell me which square you want.",
 		offer = "This %s is %s. Shall I mark it yours?",
@@ -70,6 +74,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Filed. The square is yours.",
 		locked = "That one isn't for sale from this desk.",
 	},
+	-- DRAFT: not spoken yet (no Odds & Ends building); rewrite with the building.
 	OddsAndEnds = {
 		greet = "Odds, ends, and a few things that are both.",
 		offer = "This %s for %s. Want it?",
@@ -81,6 +86,7 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Yours. Don't ask where I found it.",
 		locked = "Not for sale. Even I have limits.",
 	},
+	-- DRAFT: not spoken yet (no Sparkworks building); rewrite with the building.
 	Sparkworks = {
 		greet = "Mind the sparks. The counter's the safe bit.",
 		offer = "Wire this %s for %s?",
@@ -92,16 +98,18 @@ local LINES: { [string]: { [string]: string } } = {
 		thanks = "Paid. Open it somewhere that isn't my bench.",
 		locked = "That circuit isn't on the board.",
 	},
+	-- The Hermit is not a shop. These are the plain keys the counter uses if
+	-- anyone ever asks him one; his real talk is HermitLines below.
 	Hermit = {
-		greet = "You found the cave. Speak softly.",
-		offer = "This %s costs %s. Leave it if you must.",
-		broke = "The mountain doesn't take a short coin.",
-		declined = "Then leave it. The cave keeps it.",
-		missing = "That isn't on the stone.",
-		alreadyOwned = "You already carry that.",
-		needsLand = "A plot in town, before this.",
-		thanks = "Take it. Don't tell the town the way.",
-		locked = "Not mine to sell.",
+		greet = "Oh. A visitor. Mind the dark, and sit if you like.",
+		offer = "Nothing here is for sale, friend. It has to be earned.",
+		broke = "Nothing here is for coin. Come back with the carvings.",
+		declined = "That's all right. The cave isn't going anywhere.",
+		missing = "Hm. Whatever it was, it's gone from the stone.",
+		alreadyOwned = "You've got that one already. Good keeping.",
+		needsLand = "Some other day, friend.",
+		thanks = "There. Take care of it, and mind the dark on your way out.",
+		locked = "That one's not mine to give.",
 	},
 }
 
@@ -113,7 +121,7 @@ local SLEEPY: { [string]: string } = {
 	LandOffice = "Mmf... the office opens at %s...",
 	OddsAndEnds = "Mmf... the shop opens at %s...",
 	Sparkworks = "Mmf... the bench opens at %s...",
-	Hermit = "Mmf... come back at %s...",
+	Hermit = "Zzz... the old man naps till %s...",
 }
 
 local IDLES: { [string]: { string } } = {
@@ -159,6 +167,29 @@ function DialogueData.Line(key: string, vars: Vars?): string
 	local text = shopLines(shop)[key] or LINES.ToolShed[key] or ""
 	if string.find(text, "%s", 1, true) then
 		return string.format(text, name, price)
+	end
+	return text
+end
+
+-- The Hermit's quest talk (HermitLogic.StageOf picks the key). Short and
+-- warm: the card shows about two lines on a phone. `seeking` takes the
+-- number found and the total.
+DialogueData.HermitLines = {
+	intro = "A visitor! Five carvings hide in the wild. Find them all and I'll carve you something.",
+	seeking = "%d of %d carvings found. The rest are waiting out there. No hurry.",
+	ready = "All five! Good eyes. Here, the Maul. Slow, but it bites.",
+	done = "The Maul suits you. Mind the dark when you leave.",
+	regift = "Lost it? Here, I keep a spare for forgetful folk.",
+	totem = "You found all five carvings. The Hermit will want to hear of it.",
+	mark = "You find a carving, worn smooth. %d of %d.",
+	box = "A tin of matches and a note: 'Mind the step. H.'",
+	far = "The Hermit is too far to hear you.",
+} :: { [string]: string }
+
+function DialogueData.HermitLine(key: string, found: number?, total: number?): string
+	local text = DialogueData.HermitLines[key] or DialogueData.HermitLines.intro
+	if string.find(text, "%d", 1, true) then
+		return string.format(text, found or 0, total or 5)
 	end
 	return text
 end

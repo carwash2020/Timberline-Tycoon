@@ -2337,6 +2337,20 @@ function VehicleService.Press(player: Player, padInst: unknown)
 	if type(uid) ~= "string" or type(ownerId) ~= "number" or type(itemId) ~= "string" then
 		return
 	end
+	-- B15: stand at the button. The prompt (12 studs) enforces this for a
+	-- tap, but the remote does not, so check here: the prompt's reach plus
+	-- the server's tolerance. A pad without a button (a test rig) skips it.
+	local button = if padInst:IsA("Model") then padInst:FindFirstChild("PadButton") else nil
+	if button and button:IsA("BasePart") then
+		local char = player.Character
+		local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+		if not root or not root:IsA("BasePart") then
+			return
+		end
+		if (root.Position - button.Position).Magnitude > 12 + GameConfig.RangeTolerance + 4 then
+			return
+		end
+	end
 	local kindName = if type(kind) == "string" then kind else "Truck"
 	local allowed = GrabLogic.CanPressPad({
 		userId = player.UserId,

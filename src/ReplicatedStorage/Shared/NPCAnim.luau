@@ -20,7 +20,7 @@ NPCAnim.SawLength = 2.4 -- a few strokes
 NPCAnim.SweepLength = 2.6 -- one sweep across and back
 
 -- Asleep, the limbs stay tucked. The lie itself is the root CFrame
--- (NPCData.SleepCFrame), not a big root pitch. TBD (Builder).
+-- (NPCData.SleepCFrame), not a big root pitch.
 NPCAnim.SleepArmPitch = 0.15
 NPCAnim.SleepArmRoll = 0.35
 NPCAnim.SleepNeckPitch = 0.25

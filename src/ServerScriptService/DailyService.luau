@@ -13,6 +13,9 @@
 --     TutorialStep attribute is above 0), goals still count and pay, but
 --     their toasts are held back: the first minute has one objective, and
 --     DailyUI hides its button until then too.
+--   * The daily-return calendar (day 1..7, a milestone at 7): the first
+--     time you are seen on a UTC day it pays that day's cash, growing
+--     with consecutive days (DailyData.LoginStep / LoginReward).
 -- All rewards go through EconomyService.AddCash, so the wallet cap holds.
 --
 -- The v2 core loop (V2_PLAN.md, Shared/CoreLoop: GameServer passes
@@ -39,6 +42,24 @@ type Goal = DailyData.Goal
 export type DailyEvent = "treeFelled" | "logsLoaded" | "logsSold" | "figuredSold"
 
 local DailyService = {}
+
+-- Called with (player, "treeFelled" | "piecesSold", amount) for the same
+-- moments the goals count; EventService.InitEvent sets it (the event's
+-- themed goals). Nil when no event listens.
+DailyService.Listener = nil :: ((Player, string, number) -> ())?
+
+local function tell(player: Player, moment: string, amount: number)
+	local listener = DailyService.Listener
+	if listener and amount > 0 then
+		local ok, err = pcall(function(): any
+			listener(player, moment, amount)
+			return nil
+		end)
+		if not ok then
+			warn("[DailyService] listener failed: " .. tostring(err))
+		end
+	end
+end
 
 -- The goal kind each event counts toward, one per tree or log.
 -- ForestService reports figuredSold (figured logs sold).
@@ -74,6 +95,30 @@ local function publish(player: Player, profile: Profile)
 	player:SetAttribute("DailyGoals", DailyData.Encode(daily.goals))
 	player:SetAttribute("DailyStreak", daily.streak)
 	player:SetAttribute("DailyResetAt", DailyData.NextReset(clock()))
+	player:SetAttribute("DailyLoginDay", daily.loginDay or 0) -- the calendar day paid today (1..7)
+end
+
+-- The daily-return calendar (DailyData.LoginStep): the first time a player
+-- is seen on a UTC day, it pays that calendar day's cash (day 7 is the
+-- milestone) through AddCash, so the wallet cap holds. Server-side only:
+-- no remote, nothing to claim twice. Returns true if it paid.
+local function claimLogin(player: Player, profile: Profile): boolean
+	local daily = profile.daily
+	local today = DailyData.Day(clock())
+	local day, pays = DailyData.LoginStep(daily.loginDay, daily.lastLoginDay, today)
+	if not pays then
+		return false
+	end
+	daily.loginDay = day
+	daily.lastLoginDay = today
+	local reward = DailyData.LoginReward(profile.bestAxeTier, day, if loop == 2 then 2 else nil)
+	EconomyService.AddCash(player, reward, string.format("daily return, day %d", day), "daily")
+	local message = if day == DailyData.LoginDays
+		then string.format("Day %d of your daily return: the weekly milestone! +%s", day, Util.formatCash(reward))
+		else string.format("Daily return, day %d of %d: +%s", day, DailyData.LoginDays, Util.formatCash(reward))
+	toast(player, profile, message)
+	analytics(player, "DailyReturn", day)
+	return true
 end
 
 -- Rolls new goals if the day has changed. Returns true if it did.
@@ -130,6 +175,9 @@ end
 local function progress(player: Player, profile: Profile, addFor: (Goal) -> number)
 	local rolled = rollIfNewDay(player, profile)
 	local changed = rolled
+	if rolled and claimLogin(player, profile) then
+		changed = true
+	end
 	for _, goal in ipairs(profile.daily.goals) do
 		if not goal.done then
 			local add = addFor(goal)
@@ -179,6 +227,11 @@ function DailyService.Event(
 	if not profile then
 		return
 	end
+	if event == "treeFelled" then
+		tell(player, "treeFelled", amount)
+	elseif event == "logsSold" and loop ~= 2 then
+		tell(player, "piecesSold", amount)
+	end
 	if loop == 2 then
 		local v2Event: DailyData.EventV2? = if event == "treeFelled" then event else nil
 		progress(player, profile, function(goal: Goal): number
@@ -208,6 +261,13 @@ function DailyService.WoodSold(player: Player, sale: DailyData.SaleV2)
 	if not profile or loop ~= 2 then
 		return
 	end
+	local pieces = 0
+	for _, volume in ipairs(sale.pieces or {}) do
+		if type(volume) == "number" and volume >= DailyData.MinPieceVolumeV2 then
+			pieces += 1
+		end
+	end
+	tell(player, "piecesSold", pieces)
 	progress(player, profile, function(goal: Goal): number
 		return DailyData.CountV2(goal, "woodSold", nil, sale)
 	end)
@@ -225,6 +285,7 @@ function DailyService.Start(player: Player, profile: Profile)
 		profile.daily.day = 0
 	end
 	rollIfNewDay(player, profile)
+	claimLogin(player, profile)
 	publish(player, profile)
 	QuestService.RefreshNextGoal(player)
 end
@@ -235,7 +296,9 @@ local function midnightLoop()
 		task.wait(30)
 		for _, player in ipairs(Players:GetPlayers()) do
 			local profile = ProfileService.GetProfile(player)
-			if profile and rollIfNewDay(player, profile) then
+			local rolled = profile ~= nil and rollIfNewDay(player, profile)
+			local paid = profile ~= nil and claimLogin(player, profile) -- also if an event rolled the day first
+			if profile and (rolled or paid) then
 				publish(player, profile)
 				toast(player, profile, "New daily goals are in!")
 				QuestService.RefreshNextGoal(player)

@@ -152,7 +152,8 @@ return function(t)
 			for i, box in ipairs(bp.boxes) do
 				local part = partNamed(model, "Part" .. i)
 				sameVec(part, box, bp.id)
-				t.eq(part.Transparency, 1, bp.id .. " collider hidden")
+				-- A piece with no mesh data (furniture, wired pieces) keeps its boxes as the look.
+				t.eq(part.Transparency, if ItemMeshData.Count(bp.id) > 0 then 1 else 0, bp.id .. " collider hidden")
 				t.eq(part.CanCollide, true, bp.id .. " still collides")
 			end
 			ItemMeshes.Install(bp.id, nil)

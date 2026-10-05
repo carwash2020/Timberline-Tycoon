@@ -60,6 +60,7 @@ return function(t)
 			SlotState = true,
 			PlotOffer = true,
 			BadgeSync = true,
+			BoardData = true,
 		}
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
@@ -92,6 +93,7 @@ return function(t)
 			Wire = 4,
 			TollPay = 1,
 			FerryBoard = 1,
+			Blast = 1,
 		}
 		for name, limit in pairs(budgets) do
 			t.eq(burst(limiter, fakePlayer(), name, limit + 3), limit, name)

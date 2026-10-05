@@ -15,6 +15,7 @@
 -- (tests/LandmarkArt.spec.luau): Footbridge 110, Dock 60, Rowboat 14,
 -- Lighthouse 75.
 
+local FerryLogic = require(script.Parent.Parent.FerryLogic)
 local Kit = require(script.Parent.Kit)
 local PropArt = require(script.Parent.PropArt)
 local TerrainGen = require(script.Parent.Parent.World.TerrainGen)
@@ -629,6 +630,32 @@ function LandmarkArt.FerryDock(): Model
 	if deck then
 		model.PrimaryPart = deck
 	end
+	return model
+end
+
+-- Cap'n Moss's ferry (FerryService builds it at the mainland berth and
+-- moves it). Its origin is the Deck's centre, the bow toward -Z. The Deck
+-- is FerryLogic.DeckWidth x FerryLogic.DeckLength and the primary part;
+-- riders stand on it. Budget: 80 parts (tests/LandmarkArt.spec.luau).
+function LandmarkArt.FerryBoat(): Model
+	local model = Kit.model("FerryBoat")
+	local w, l = FerryLogic.DeckWidth, FerryLogic.DeckLength
+	local deck = solid(model, "Deck", V3(w, 1, l), CF(0, 0, 0), DOCK_PLANK, MAT.WoodPlanks)
+	local hull = solid(model, "Hull", V3(w - 1, 2, l - 1), CF(0, -1.5, 0), BOAT_PAINT[1], MAT.Wood)
+	hull.CanCollide = false
+	for _, side in ipairs({ -1, 1 }) do
+		solid(model, "Rail", V3(0.6, 2, l - 6), CF(side * (w / 2 - 0.3), 1.5, 2), TOLL_TIMBER, MAT.Wood)
+		solid(model, "Rail", V3(0.6, 2, 3), CF(side * (w / 2 - 0.3), 1.5, -l / 2 + 1.5), TOLL_TIMBER, MAT.Wood)
+	end
+	solid(model, "Stern", V3(w, 2, 0.6), CF(0, 1.5, l / 2 - 0.3), TOLL_TIMBER, MAT.Wood)
+	for _, side in ipairs({ -1, 1 }) do
+		solid(model, "CabinPost", V3(0.6, 5, 0.6), CF(side * (w / 2 - 1.5), 3.5, l / 2 - 3), TOLL_TIMBER, MAT.Wood)
+	end
+	solid(model, "CabinRoof", V3(w - 1, 0.6, 5), CF(0, 6.3, l / 2 - 3), ROOF[1], MAT.Wood)
+	solid(model, "Mast", V3(0.8, 9, 0.8), CF(0, 5, -l / 2 + 4), TOLL_TIMBER, MAT.Wood)
+	local lamp = ghost(model, "Lantern", V3(1.2, 1.2, 1.2), CF(0, 9.8, -l / 2 + 4), LANTERN, MAT.Neon)
+	lamp.Name = "LanternGlow"
+	model.PrimaryPart = deck
 	return model
 end
 

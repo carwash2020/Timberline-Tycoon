@@ -15,7 +15,7 @@
 --     ContextActionService action under the thumbstick's, and never in the
 --     thumbstick's corner). Move it to drag; lift it to drop. While holding,
 --     a row of buttons (- + Turn Tip) works with another finger.
---   * Gamepad: hold L2 to grab what the centre dot points at; let go to
+--   * Gamepad: hold R2 to grab what the centre dot points at; let go to
 --     drop. D-pad up/down push and pull, D-pad left/right turn, LB/RB tip.
 --     These are bound over HUD's D-pad shortcuts only while holding.
 -- On a grab the client fires Grab(part, hitPos) and at once adds, on that
@@ -41,12 +41,14 @@
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local BedGhost = require(ReplicatedStorage.Shared.BedGhost)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -514,6 +516,44 @@ local function unbindHold()
 end
 
 -- Ends the hold: the constraints go, and (`tell`) the server hears.
+---------------------------------------------------------------------------
+-- Truck beds while you hold a piece
+---------------------------------------------------------------------------
+
+-- The sides of nearby truck beds, as they were (collision, local see-through),
+-- put back when you let go. Your client only: the held piece is yours to
+-- simulate, so it passes through the sides here and nowhere else.
+local ghosted: { [BasePart]: boolean } = {}
+
+local function ghostBeds(on: boolean)
+	if not on then
+		for part, wasCollide in pairs(ghosted) do
+			if part.Parent then
+				part.CanCollide = wasCollide
+				part.LocalTransparencyModifier = 0
+			end
+		end
+		table.clear(ghosted)
+		return
+	end
+	local _char, hrp = character()
+	if not hrp then
+		return
+	end
+	for _, truck in ipairs(CollectionService:GetTagged("Truck")) do
+		local root = if truck:IsA("Model") then truck.PrimaryPart else nil
+		if root and BedGhost.Near((root.Position - hrp.Position).Magnitude) then
+			for _, d in ipairs(truck:GetDescendants()) do
+				if d:IsA("BasePart") and BedGhost.IsSide(d.Name) and ghosted[d] == nil then
+					ghosted[d] = d.CanCollide
+					d.CanCollide = false
+					d.LocalTransparencyModifier = BedGhost.Transparency
+				end
+			end
+		end
+	end
+end
+
 local function drop(tell: boolean)
 	local h = hold
 	if not h then
@@ -521,6 +561,7 @@ local function drop(tell: boolean)
 	end
 	hold = nil
 	distanceAxis = 0
+	ghostBeds(false)
 	unbindHold()
 	showButtons(false)
 	hidePrompts(false)
@@ -607,6 +648,8 @@ local function grab(device: Device, touch: InputObject?)
 	}
 	hold = h
 	distanceAxis = 0
+	HUD.NoteGrab()
+	ghostBeds(true)
 	Net.Remote("Grab"):FireServer(part, at)
 	h.conn = model:GetAttributeChangedSignal("HeldBy"):Connect(function()
 		if hold ~= h then
@@ -824,12 +867,16 @@ function DragController.Start()
 	watchTag(SHOP_TAG)
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
-		if processed then
+		-- RT is no button's click: a bound action (the builder's select) marks
+		-- it handled even when it passes it on. Only a menu with the pad
+		-- selection keeps it.
+		local trigger = input.KeyCode == Enum.KeyCode.ButtonR2
+		if processed and not (trigger and GuiService.SelectedObject == nil) then
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			grab("mouse", nil)
-		elseif input.KeyCode == Enum.KeyCode.ButtonL2 then
+		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
 			grab("pad", nil)
 		end
 	end)
@@ -840,7 +887,7 @@ function DragController.Start()
 		end
 		if
 			(input.UserInputType == Enum.UserInputType.MouseButton1 and h.device == "mouse")
-			or (input.KeyCode == Enum.KeyCode.ButtonL2 and h.device == "pad")
+			or (input.KeyCode == Enum.KeyCode.ButtonR2 and h.device == "pad")
 		then
 			drop(true)
 		end

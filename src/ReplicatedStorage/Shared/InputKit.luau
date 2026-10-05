@@ -90,7 +90,7 @@ InputKit.Target = {
 		{ action = "Lower", keyboard = Enum.KeyCode.C, gamepad = Enum.KeyCode.ButtonL1 },
 	},
 	drag = {
-		{ action = "Grab", gamepad = Enum.KeyCode.ButtonL2 },
+		{ action = "Grab", gamepad = Enum.KeyCode.ButtonR2 },
 		{ action = "Yaw", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.DPadLeft },
 		{ action = "Yaw", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.DPadRight },
 		{ action = "Pitch", gamepad = Enum.KeyCode.ButtonL1 },

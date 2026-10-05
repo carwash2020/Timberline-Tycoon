@@ -130,7 +130,8 @@ return function(t)
 		t.eq(zone.name, "Town")
 		for _, npc in ipairs(NPCData.All()) do
 			local p = npc.spot.position or npc.spot.fallback
-			if p then
+			-- The Hermit lives in the Secret Cave, not in town.
+			if p and npc.id ~= "Hermit" then
 				t.ok(p.X > zone.x0 and p.X < zone.x1 and p.Z > zone.z0 and p.Z < zone.z1, npc.id)
 				t.eq(p.Y, 0)
 			end

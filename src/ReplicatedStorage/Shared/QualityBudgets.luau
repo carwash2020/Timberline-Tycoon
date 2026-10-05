@@ -203,11 +203,11 @@ function QualityBudgets.TierFor(savedLevel: string?, touchOnly: boolean): Tier
 end
 
 -- Lanternwood PointLights on screen at once. Planks never take one.
--- TBD (Designer): 0 on low, 4 on medium, 8 on high.
+-- Open to tuning: 0 on low, 4 on medium, 8 on high.
 QualityBudgets.GlowLights = table.freeze({
-	low = 0, -- TBD (Designer)
-	medium = 4, -- TBD (Designer)
-	high = 8, -- TBD (Designer)
+	low = 0, -- open to tuning
+	medium = 4, -- open to tuning
+	high = 8, -- open to tuning
 } :: { [string]: number })
 
 -- How many Lanternwood trees may carry a light on this tier.

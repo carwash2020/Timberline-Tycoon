@@ -152,6 +152,9 @@ return function(t)
 				return { Origin = Vector3.zero, Direction = Vector3.new(0, -1, 0) }
 			end,
 		}
+		pcall(roblox.implementProperty, "Folder", "Character", function()
+			return nil
+		end)
 		local phonePlayer = Instance.new("Folder")
 		local pg = Instance.new("Folder")
 		pg.Name = "PlayerGui"
@@ -220,5 +223,66 @@ return function(t)
 		gui.AbsoluteSize = Vector2.new(667, 375 - inset)
 		watched[gui].AbsoluteSize:Fire()
 		t.eq(inset + bar.Position.Y.Offset, 141)
+	end)
+
+	t.test("the R2 select bind exists only while no tool is held", function()
+		local binds = {}
+		local function signal()
+			return {
+				Connect = function()
+					return { Disconnect = function() end }
+				end,
+			}
+		end
+		for _, event in ipairs({ "ChildAdded", "ChildRemoved" }) do
+			pcall(t.roblox.implementProperty, "Model", event, signal)
+		end
+		local char = Instance.new("Model")
+		local owner = { UserId = 7, Character = char, CharacterAdded = signal() }
+		local l = t.loader({
+			services = {
+				Players = { LocalPlayer = owner },
+				GuiService = {
+					IsTenFootInterface = function()
+						return false
+					end,
+					TopbarInset = t.roblox.Rect.new(0, 0, 0, 0),
+					GetGuiInset = function()
+						return Vector2.zero, Vector2.zero
+					end,
+				},
+				UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
+				TextChatService = {},
+				ContextActionService = {
+					BindActionAtPriority = function(_, name)
+						binds[name] = true
+					end,
+					UnbindAction = function(_, name)
+						binds[name] = nil
+					end,
+				},
+				RunService = {},
+			},
+			globals = { workspace = { CurrentCamera = camera } },
+			mocks = {
+				HUD = { Toast = function() end },
+				BlueprintPlacer = {
+					Active = function()
+						return false
+					end,
+				},
+			},
+		})
+		local B = l:load("StarterPlayer/StarterPlayerScripts/BuilderTools")
+		B.WatchTools()
+		t.ok(binds.BuilderSelect, "build tools open: R2 selects")
+		local tool = Instance.new("Tool")
+		tool.Parent = char
+		B.WatchTools()
+		t.eq(binds.BuilderSelect, nil, "axe in hand: R2 is untouched")
+		t.eq(B.SelectBound(), false)
+		tool.Parent = nil
+		B.WatchTools()
+		t.ok(binds.BuilderSelect, "axe away: R2 selects again")
 	end)
 end

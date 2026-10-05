@@ -20,7 +20,7 @@
 --     empty hands): "press 1" (the starter axe's hotbar key), "tap your
 --     axe" (its hotbar button), "press LB + RB" (the default backpack
 --     unequips on both bumpers). {grab} is starting a drag: "click and
---     hold", "tap and hold", "hold LT". Capitalised ({Click}, {Tap},
+--     hold", "tap and hold", "hold RT". Capitalised ({Click}, {Tap},
 --     {Press}, {Unequip}, {Grab}) at a sentence start.
 -- The v2 loop (V2_PLAN.md §4, Shared/CoreLoop) has its own hints:
 -- PickV2(device, context) and ContextForV2(state), with TooLong and
@@ -73,7 +73,7 @@ local LINES: { [string]: { [string]: string } } = { -- [Context][Device]
 	build = {
 		phone = "Tap where it goes, then PLACE",
 		desktop = "Click to place · R to turn · Q to stop",
-		console = "RT to place · X to turn · B to stop",
+		console = "RT place · D-pad right turn · B stop",
 	},
 }
 
@@ -102,11 +102,11 @@ local UNEQUIP: { [string]: string } = { -- [Device]
 }
 
 -- Starting a drag, per device ({grab}): the main button held down, or on
--- a gamepad the left trigger held at the reticle (V2_PLAN.md §4a).
+-- a gamepad the right trigger held at the reticle (V2_PLAN.md §4a).
 local GRAB: { [string]: string } = { -- [Device]
 	phone = "tap and hold",
 	desktop = "click and hold",
-	console = "hold LT",
+	console = "hold RT",
 }
 
 -- The hint line for `context` on `device` (the chopping one for anything
@@ -231,7 +231,7 @@ local LINES_V2: { [string]: { [string]: string } } = { -- [ContextV2][Device]; o
 	drag = {
 		phone = "Tap and hold wood to drag it",
 		desktop = "Click and hold wood to drag it",
-		console = "Hold LT on wood to drag it",
+		console = "Hold RT on wood to drag it",
 	},
 	unequip = {
 		phone = "Put your axe away to drag: tap it",
@@ -326,6 +326,17 @@ end
 -- no truck or it isn't streamed in).
 function HintLogic.NearPad(truckFromZone: number?): boolean
 	return truckFromZone ~= nil and truckFromZone <= GameConfig.SellTruckRange
+end
+
+-- Hints about controls you have already used stay out of the way: after
+-- this many grabs in a session the drag, holding and unequip lines are not
+-- shown. Warnings (too long, too hard) always are.
+HintLogic.GrabsToLearn = 2
+
+local QUIET_AFTER_GRABS: { [string]: boolean } = { drag = true, holding = true, unequip = true }
+
+function HintLogic.Quiet(context: string, grabs: number): boolean
+	return QUIET_AFTER_GRABS[context] == true and grabs >= HintLogic.GrabsToLearn
 end
 
 -- What the HUD knows about the player under v2.

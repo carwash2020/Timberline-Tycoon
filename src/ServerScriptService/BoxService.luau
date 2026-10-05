@@ -259,6 +259,9 @@ function BoxService.Offered(player: Player, shop: string): string?
 end
 
 function BoxService.Decline(player: Player, uid: string)
+	if records[uid] == nil then
+		return -- B15: only a box that exists; a made-up id would grow the map
+	end
 	local map = skips[player.UserId]
 	if map == nil then
 		map = {}

@@ -414,6 +414,53 @@ return function(t)
 		t.eq(PlotLogic.SellValue({ priceCash = 45 }), 22)
 	end)
 
+	t.test("the Land panel's plot size card names the level, the next size and what it unlocks", function()
+		local first = PlotLogic.SizeCard(1, 0)
+		t.eq(first.level, 1)
+		t.eq(first.levels, #PlotData.Tiers)
+		t.eq(first.size, PlotData.Tiers[1].size)
+		t.ok(first.next ~= nil)
+		t.eq(first.next.name, PlotData.Tiers[2].name)
+		t.eq(first.next.price, PlotData.Tiers[2].priceCash)
+		t.eq(first.next.affordable, false)
+		t.eq(first.next.short, PlotData.Tiers[2].priceCash)
+		t.eq(PlotLogic.SizeCard(1, PlotData.Tiers[2].priceCash).next.affordable, true)
+		t.eq(PlotLogic.SizeCard(1, PlotData.Tiers[2].priceCash).next.short, 0)
+		local top = PlotLogic.SizeCard(#PlotData.Tiers, 0)
+		t.eq(top.next, nil, "nothing past the last level")
+		t.eq(PlotLogic.SizeCard(99, 0).level, #PlotData.Tiers, "clamped")
+		t.eq(PlotLogic.UnlocksText(2) ~= "", true, "tier 2 unlocks blueprints")
+	end)
+
+	t.test("Land cells say whether ground was bought or came with the plot size", function()
+		local half = PlotLogic.GridHalf()
+		local text, kind = PlotLogic.CellLabel(1, {}, 0, 0)
+		t.eq({ text, kind }, { "Plot", "included" }, "the middle comes with the plot size")
+		local buy
+		for ix = -half, half do
+			local key = PlotLogic.ExpansionBlock(1, {}, ix, 0)
+			if key then
+				buy = ix
+				break
+			end
+		end
+		t.ok(buy ~= nil, "some square beside the plot is for sale")
+		text, kind = PlotLogic.CellLabel(1, {}, buy, 0)
+		t.eq({ text, kind }, { "Buy", "buy" })
+		text, kind = PlotLogic.CellLabel(1, { PlotLogic.Key(buy, 0) }, buy, 0)
+		t.eq({ text, kind }, { "Yours", "bought" })
+		text, kind = PlotLogic.CellLabel(1, {}, half, half)
+		t.eq(kind, "far")
+	end)
+
+	t.test("every refusal has words, in plot and expand", function()
+		for _, why in ipairs({ "cash", "yours", "owned", "away", "full", "bad" }) do
+			local message = PlotLogic.ExpansionMessage(why)
+			t.ok(message ~= nil and not string.find(message, "yard"), why)
+		end
+		t.eq(PlotLogic.ExpansionMessage("nope"), nil)
+	end)
+
 	t.test("yard squares step up in price and stop at 25", function()
 		local GameConfig = t.shared("GameConfig")
 		t.eq(PlotLogic.ExpansionPrice(0), GameConfig.FirstPlotPrice)
@@ -445,6 +492,22 @@ return function(t)
 		end)
 		t.eq(backX, 0)
 		t.eq(backZ, 68)
+		-- B15: more places to try, nearest first, none repeated; a spot past the
+		-- first five is used when those are on a road or in the water.
+		local list = PlotLogic.EjectCandidates(120, {})
+		t.ok(#list > 5, "more than the first five")
+		local seen = {}
+		for _, spot in ipairs(list) do
+			local key = spot[1] .. "," .. spot[2]
+			t.ok(not seen[key], "no repeats: " .. key)
+			seen[key] = true
+		end
+		local firstFive = 0
+		local cornerX, cornerZ = PlotLogic.EjectSpot(120, {}, function(x, z)
+			firstFive += 1
+			return firstFive <= 5
+		end)
+		t.eq({ cornerX, cornerZ }, { list[6][1], list[6][2] })
 		t.eq(PlotLogic.GroundBad(true, false), true)
 		t.eq(PlotLogic.GroundBad(false, true), true)
 		t.eq(PlotLogic.GroundBad(false, false), false)

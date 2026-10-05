@@ -352,7 +352,7 @@ function AxeService.Drop(player: Player, uid: unknown)
 	if not item or not def or not tool or not char or not hrp or dropped[uid] then
 		return
 	end
-	if def.robux then
+	if def.robux or def.quest then
 		notify(player, string.format("The %s can't be dropped or sold.", def.displayName))
 		return
 	end

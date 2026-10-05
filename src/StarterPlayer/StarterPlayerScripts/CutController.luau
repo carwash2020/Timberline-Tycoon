@@ -43,6 +43,7 @@
 -- amber too far or too hard), checked 30 times a second (15 on low).
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -421,21 +422,52 @@ local function pointed(hrp: BasePart, axe: ItemCatalog.AxeDef): Target?
 	return CutController.PickSection(owner, ownerKind :: Kind, axe, hrp.Position, result.Position, result.Normal)
 end
 
+-- How good a section is to cut: its distance, plus up to NearAhead studs when
+-- it is behind the camera. `look` is the camera's flat forward, or nil.
+CutController.NearAhead = 6
+
+function CutController.NearScore(offset: Vector3, look: Vector3?): number
+	local d = offset.Magnitude
+	if look == nil then
+		return d
+	end
+	local flat = Vector3.new(offset.X, 0, offset.Z)
+	if flat.Magnitude < 1e-3 or look.Magnitude < 1e-3 then
+		return d
+	end
+	local facing = flat.Unit:Dot(look.Unit) -- 1 ahead, -1 behind
+	return d + (1 - facing) / 2 * CutController.NearAhead
+end
+
 -- The nearest section within the axe's reach (a gamepad, a missed tap).
 local function nearest(hrp: BasePart, axe: ItemCatalog.AxeDef): Target?
 	local range = if axe.v2 then axe.v2.range else GameConfig.ChopRange
 	useOverlapGroup()
 	overlap.FilterDescendantsInstances = { player.Character :: Instance }
 	local parts = workspace:GetPartBoundsInRadius(hrp.Position, range + CutController.NearSlack, overlap)
+	-- With no pointer (a gamepad) the way the camera faces breaks ties: of
+	-- the sections in reach, the one ahead of the camera beats a nearer one
+	-- behind you. Reach is unchanged.
+	local camera = workspace.CurrentCamera
+	local look: Vector3? = nil
+	if camera then
+		local ok, forward = pcall(function()
+			return camera.CFrame.LookVector
+		end)
+		if ok and typeof(forward) == "Vector3" then
+			look = Vector3.new(forward.X, 0, forward.Z)
+		end
+	end
 	local best: Target? = nil
-	local bestD = math.huge
+	local bestScore = math.huge
 	for _, p in ipairs(parts) do
 		local part, model, kind = CutController.TargetOf(p)
 		if part and model and kind and kind ~= "node" then
 			local target = describe(part, model, kind, axe, hrp.Position, nil, nil)
-			local d = (target.hit - hrp.Position).Magnitude
-			if target.problem == nil and d < bestD then
-				best, bestD = target, d
+			local offset = target.hit - hrp.Position
+			local score = CutController.NearScore(offset, look)
+			if target.problem == nil and score < bestScore then
+				best, bestScore = target, score
 			end
 		end
 	end
@@ -783,10 +815,13 @@ function CutController.Start()
 		-- A button already took the click. MouseButton1 and the trigger
 		-- also swing here: Tool.Activated does not always arrive (click to
 		-- move, a Studio camera), and that used to be a silent miss.
-		if gameProcessed then
+		-- R2 is no button's click: a bound action marks it handled even when
+		-- it passes it on. Only a menu with the pad selection keeps it.
+		local trigger = input.KeyCode == Enum.KeyCode.ButtonR2
+		if gameProcessed and not (trigger and GuiService.SelectedObject == nil) then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.KeyCode == Enum.KeyCode.ButtonR2 then
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or trigger then
 			clickSwing()
 		end
 	end)

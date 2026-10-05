@@ -66,7 +66,7 @@ return function(t)
 			t.ok(model:FindFirstChild(product.name, true), product.name)
 			posters += 1
 		end
-		t.eq(posters, 7, "five passes and two cash packs")
+		t.eq(posters, 4, "two passes and two cash packs; off-sale passes are not posted")
 		t.eq(model:FindFirstChild("2x Wood (48 hours)", true), nil)
 		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
 	end)
