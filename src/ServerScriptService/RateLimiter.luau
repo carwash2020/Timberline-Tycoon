@@ -23,6 +23,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	TutorialSeen = 2, -- BUILD or LAND opened, for the tutorial
 	EquipItem = 2,
 	CallTruck = 1,
+	AdminRun = 4, -- the owner menu
 	Sprint = 8, -- Shift or L1 down and up
 	BuyRobuxItem = 2,
 	MineNode = 4,

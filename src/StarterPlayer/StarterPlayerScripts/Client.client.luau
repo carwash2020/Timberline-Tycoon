@@ -17,6 +17,7 @@
 -- together. The list is every module in this folder (Client.spec checks
 -- it).
 local MODULES = {
+	"AdminUI",
 	"AmbientLife",
 	"AmbientSound",
 	"AxeController",
@@ -388,6 +389,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "SprintController",
 		get = function()
 			return require(script.Parent.SprintController)
+		end,
+	},
+	{
+		name = "AdminUI",
+		get = function()
+			return require(script.Parent.AdminUI)
 		end,
 	},
 	{

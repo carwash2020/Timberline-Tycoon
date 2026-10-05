@@ -118,6 +118,61 @@ function AdminLogic.BanSeconds(text: unknown): number?
 	return hours * 3600
 end
 
+-- The owner menu (a controller can't type): a request is a small table, and
+-- the server turns it into the same command line the chat takes, so there is
+-- one set of rules and one lock. `request` is whatever a client sent (any
+-- type); nothing is trusted. Returns the line, or nil for anything off the
+-- list. Names are plain letters, digits and underscores (a Roblox name).
+local function word(value: unknown, max: number): string?
+	if type(value) == "string" and #value >= 1 and #value <= max and string.match(value, "^[%w_]+$") then
+		return value
+	end
+	return nil
+end
+
+AdminLogic.MenuActions = { "give", "take", "setcash", "gift", "kick", "goto", "bring", "superrun" } :: { string }
+
+function AdminLogic.FromRequest(request: unknown): string?
+	if type(request) ~= "table" then
+		return nil
+	end
+	local req = request :: { [unknown]: unknown }
+	local action = req.action
+	if type(action) ~= "string" or table.find(AdminLogic.MenuActions, action) == nil then
+		return nil
+	end
+	if action == "superrun" then
+		return "/superrun"
+	end
+	local target = word(req.target, 20)
+	if not target then
+		return nil
+	end
+	if action == "kick" or action == "goto" or action == "bring" then
+		return string.format("/%s %s", action, target)
+	end
+	if action == "gift" then
+		local kind, itemId = req.kind, word(req.itemId, 40)
+		if not AdminLogic.IsGiftKind(kind) or not itemId then
+			return nil
+		end
+		return string.format("/gift %s %s %s", target, kind :: string, itemId)
+	end
+	-- give, take, setcash: a whole amount (setcash may be 0).
+	local amount = req.amount
+	if type(amount) ~= "number" or amount ~= amount or amount % 1 ~= 0 then
+		return nil
+	end
+	if amount == 0 and action == "setcash" then
+		return string.format("/setcash %s 0", target)
+	end
+	local text = AdminLogic.Amount(string.format("%d", amount))
+	if not text then
+		return nil
+	end
+	return string.format("/%s %s %d", action, target, text)
+end
+
 AdminLogic.Help = {
 	"/give <player> <amount>: add cash",
 	"/take <player> <amount>: remove cash",

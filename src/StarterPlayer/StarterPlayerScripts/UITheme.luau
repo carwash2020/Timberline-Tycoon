@@ -526,6 +526,7 @@ UITheme.Layers = {
 	Badge = 12,
 	FigureReveal = 12,
 	Settings = 13, -- a modal: over the HUD and the cash row
+	Admin = 14, -- the owner menu (AdminUI), over Settings
 	Store = 20,
 	Dialogue = 30,
 	PlotPicker = 80,
