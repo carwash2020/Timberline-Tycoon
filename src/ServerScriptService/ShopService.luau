@@ -666,6 +666,7 @@ export type BoxGrant = {
 	itemId: string,
 	limited: boolean?,
 	shop: string?,
+	free: boolean?, -- AdminService only: the owner's gift, no price and no shop hours
 }
 
 local settled: { [string]: string } = {}
@@ -717,11 +718,15 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	if (box.kind == "Truck" or box.kind == "Trailer") and (type(shopId) ~= "string" or shopId == "") then
 		shopId = "Dealership"
 	end
-	if type(shopId) == "string" and not ShopHoursLogic.IsOpen(shopId, ShopService.Hour()) then
+	local free = box.free == true
+	if not free and type(shopId) == "string" and not ShopHoursLogic.IsOpen(shopId, ShopService.Hour()) then
 		return fail("sleepy")
 	end
-	local limited = box.limited == true or (box.kind == "Cosmetic" and box.itemId == "LampPost")
+	local limited = not free and (box.limited == true or (box.kind == "Cosmetic" and box.itemId == "LampPost"))
 	local price = StoreStock.UnitPrice(box.kind, box.itemId, limited, loop)
+	if free then
+		price = 0
+	end
 	if price == nil then
 		return fail("locked")
 	end
@@ -739,7 +744,7 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		local have: number = if type(ownedCount) == "number" then ownedCount else 0
 		local many: number = if type(total) == "number" then total else 0
 		local status: ShopLogic.AxeStatus = ShopLogic.StatusOf(axe, best, have, many)
-		if not ShopLogic.CanPurchase(status) then
+		if not free and not ShopLogic.CanPurchase(status) then
 			notify(player, ShopLogic.WhyNot(status, axe, best))
 			return fail("locked")
 		end
@@ -819,7 +824,7 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		end
 		took = true
 	end
-	if not EconomyService.SpendCash(player, price, "bought " .. box.itemId, box.itemId) then
+	if price > 0 and not EconomyService.SpendCash(player, price, "bought " .. box.itemId, box.itemId) then
 		if took then
 			StoreStock.Refund(player.UserId)
 		end

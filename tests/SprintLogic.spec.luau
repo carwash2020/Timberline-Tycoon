@@ -14,4 +14,11 @@ return function(t)
 		t.eq(SprintLogic.Wants(1), false)
 		t.eq(SprintLogic.Wants(nil), false)
 	end)
+
+	t.test("the owner's super run beats a plain run, and nothing else changes", function()
+		t.eq(SprintLogic.Speed(16, false, true), 16 * SprintLogic.SuperFactor)
+		t.eq(SprintLogic.Speed(16, true, true), 16 * SprintLogic.SuperFactor)
+		t.eq(SprintLogic.Speed(16, true, false), 16 * SprintLogic.Factor)
+		t.eq(SprintLogic.Speed(16, true), 16 * SprintLogic.Factor)
+	end)
 end
