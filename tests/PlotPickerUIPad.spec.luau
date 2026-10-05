@@ -27,6 +27,6 @@ return function(t)
 		t.eq(Picker.ApplyKey(Enum.KeyCode.Escape), "close")
 		t.eq(gui.SelectedObject, nil)
 		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/PlotUI.luau")
-		t.ok(string.find(src, "grid.Selectable = false", 1, true), "the land grid does not eat the D-pad")
+		t.ok(string.find(src, "body.Selectable = false", 1, true), "the land panel does not eat the D-pad")
 	end)
 end

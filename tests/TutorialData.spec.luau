@@ -227,6 +227,9 @@ return function(t)
 			"pickup",
 			"sell",
 			"plot",
+			"build",
+			"place",
+			"land",
 			"truck",
 			"load",
 			"mill",
@@ -236,13 +239,15 @@ return function(t)
 			"steel",
 		}
 		t.eq(ids(V2), want)
-		t.eq(#V2, #TutorialData.Steps)
+		t.eq(#V2, #TutorialData.Steps + 3, "the three build lessons are v2 only")
 		local v1 = {}
 		for _, step in ipairs(TutorialData.Steps) do
 			v1[step.id] = true
 		end
 		for _, id in ipairs(want) do
-			t.ok(v1[id], id .. " is still a v1 step")
+			if id ~= "build" and id ~= "place" and id ~= "land" then
+				t.ok(v1[id], id .. " is still a v1 step")
+			end
 		end
 	end)
 
@@ -285,7 +290,10 @@ return function(t)
 			order[step.id] = i
 		end
 		t.eq(order.plot, order.sell + 1, "the plot is the step right after the first sale")
-		t.eq(order.truck, order.plot + 1, "then the Rustbucket")
+		t.eq(order.build, order.plot + 1, "then the build lessons")
+		t.eq(order.place, order.build + 1)
+		t.eq(order.land, order.place + 1)
+		t.eq(order.truck, order.land + 1, "then the Rustbucket")
 		t.eq(#TutorialData.EventsV2, #V2)
 	end)
 
@@ -505,6 +513,14 @@ return function(t)
 		t.eq(at(), "plot", "the sell step completes on the first piece")
 		t.eq(profile.cash, 25, "Murph's $25 on that sale")
 		Quest.Event(player, "plotClaimed")
+		t.eq(at(), "build")
+		Quest.Event(player, "itemPlaced")
+		t.eq(at(), "build", "placing waits until BUILD is pressed")
+		Quest.Event(player, "buildOpened")
+		t.eq(at(), "place")
+		Quest.Event(player, "itemPlaced")
+		t.eq(at(), "land")
+		Quest.Event(player, "landOpened")
 		t.eq(at(), "truck")
 		Quest.Event(player, "truckBought")
 		t.eq(at(), "load")
@@ -536,9 +552,33 @@ return function(t)
 		t.eq(marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
 
+	t.test("v2: a save from order 3 (before the build lessons) keeps its step by name", function()
+		local list = TutorialData.OrderV2BeforeBuild
+		for index, name in ipairs(list) do
+			local record = { tutorialStep = index, tutorialProgress = 3, tutorialOrder = 3 }
+			TutorialData.ApplyOrder(record)
+			t.eq(V2[record.tutorialStep].id, name, name)
+			t.eq(record.tutorialOrder, TutorialData.OrderV2)
+			t.eq(record.tutorialProgress, 3, "progress stays")
+		end
+		t.eq(#list, #V2 - 3, "order 3 is the current list without the three lessons")
+	end)
+
+	t.test("v2: the build lessons are skipped by a player who already placed something", function()
+		local place = V2[1]
+		for _, step in ipairs(V2) do
+			if step.id == "place" then
+				place = step
+			end
+		end
+		t.eq(TutorialData.AlreadyDone(place, 1, true, false, true), true)
+		t.eq(TutorialData.AlreadyDone(place, 1, true, false, false), false)
+		t.eq(TutorialData.AlreadyDone(place, 1, true, false, nil), false)
+	end)
+
 	t.test("v2: old index to step name, then that name's new index, for every step", function()
 		local old = TutorialData.OrderV2Previous
-		t.eq(#old, #V2 + 1, "the retired plant step is the extra name")
+		t.eq(#old, #V2 - 3 + 1, "the retired plant step is the extra name, the build lessons are not there yet")
 		for index, name in ipairs(old) do
 			local at = TutorialData.RemapV2Step(index)
 			local expect = if name == "plant" then "loads" else name

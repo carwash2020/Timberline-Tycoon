@@ -718,7 +718,15 @@ VehicleService.Hooks.deliveryCFrame = function(player: Player): CFrame?
 	return PlotService.DeliveryCFrame(player)
 end
 safely("VehicleService.Init", VehicleService.Init, notify)
-safely("QuestService.Init", QuestService.Init, remote.SkipTutorial, notify, activeLoop, remote.ResetTutorial)
+safely(
+	"QuestService.Init",
+	QuestService.Init,
+	remote.SkipTutorial,
+	notify,
+	activeLoop,
+	remote.ResetTutorial,
+	remote.TutorialSeen
+)
 safely("DailyService.Init", DailyService.Init, notify, nil, activeLoop)
 safely("BiomeService.Init", BiomeService.Init, notify)
 safely("MonetizationService.Init", MonetizationService.Init, remote.BuyRobuxItem, notify)

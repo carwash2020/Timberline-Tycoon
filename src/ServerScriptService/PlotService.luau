@@ -78,7 +78,7 @@ type Slot = {
 	items: Folder,
 	signLabels: { TextLabel }, -- both faces of the sign
 	claim: ProximityPrompt,
-	office: ProximityPrompt, -- Land office: buy the next yard square
+	office: ProximityPrompt, -- Land panel: plot size and expanding onto squares
 	spawn: SpawnLocation,
 	delivery: CFrame, -- where a bought truck is dropped (GetDeliveryPad)
 	owner: Player?,
@@ -287,7 +287,7 @@ end
 
 local function refreshSign(slot: Slot)
 	local owner = slot.owner
-	local text = string.format("%s\nFREE", string.upper(slot.placeName))
+	local text = string.format("%s\nOPEN PLOT", string.upper(slot.placeName))
 	if owner then
 		local profile = ProfileService.GetProfile(owner)
 		local tier = if profile then PlotData.Tier(profile.plot.tier) else nil
@@ -360,7 +360,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	end
 	local claim = Instance.new("ProximityPrompt")
 	claim.ActionText = "Claim this plot"
-	claim.ObjectText = "Free plot"
+	claim.ObjectText = "Open plot"
 	claim.MaxActivationDistance = CLAIM_RANGE
 	claim.HoldDuration = 0.5
 	claim.RequiresLineOfSight = false
@@ -368,8 +368,8 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	claim.Parent = board
 	local office = Instance.new("ProximityPrompt")
 	office.Name = "LandOffice"
-	office.ActionText = "Land office"
-	office.ObjectText = "Your yard"
+	office.ActionText = "Open Land"
+	office.ObjectText = "Your plot"
 	office.MaxActivationDistance = 12
 	office.HoldDuration = 0
 	office.Enabled = false
@@ -1059,6 +1059,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	if fromStock then
 		notify(player, string.format("Placed your %s.", bp.displayName))
 	end
+	QuestService.Event(player, "itemPlaced")
 end
 
 function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
@@ -1371,12 +1372,12 @@ function PlotService.Upgrade(player: Player)
 	end
 	local slot = nearOwnPlot(player, profile)
 	if not slot then
-		notify(player, "Stand on your plot to grow it.")
+		notify(player, "Stand on your plot to raise its size.")
 		return
 	end
 	local nextTier = PlotData.Tier(profile.plot.tier + 1)
 	if not nextTier then
-		notify(player, "Your plot is as big as it gets.")
+		notify(player, "Your plot size is already the biggest.")
 		return
 	end
 	if profile.cash < nextTier.priceCash then
@@ -1399,15 +1400,18 @@ function PlotService.Upgrade(player: Player)
 	local grown = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
 	drawBounds(slot, nextTier.size, true, grown)
 	refreshSign(slot)
-	notify(player, string.format("Your plot is now a %s (%d × %d)!", nextTier.name, nextTier.size, nextTier.size))
+	notify(
+		player,
+		string.format("Plot size up: your plot is now a %s (%d × %d)!", nextTier.name, nextTier.size, nextTier.size)
+	)
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, "PlotTier", profile.plot.tier)
 	end)
 end
 
--- Buy one yard square. The rate limit lives on the ExpandLand handler.
+-- Buy one plot square (expand). The rate limit lives on the ExpandLand handler.
 -- `expected` is how many squares the button was drawn for. Check, spend,
--- then grant, with no yield: a failed spend leaves the yard and the wallet
+-- then grant, with no yield: a failed spend leaves the plot and the wallet
 -- as they were. A second call for that same count buys nothing.
 function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: unknown)
 	if expanding[player] then
@@ -1436,7 +1440,7 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 			profile.plot.squares = {}
 		end
 		if #profile.plot.squares ~= expected then
-			notify(player, "That price changed. Look again.")
+			notify(player, "The price changed. The Land panel shows the new one.")
 			return nil
 		end
 		local slot = nearOwnPlot(player, profile)
@@ -1450,10 +1454,10 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 				return profile.cash
 			end,
 			spend = function(amount: number)
-				return EconomyService.SpendCash(player, amount, "expanded the yard", "PlotSquare")
+				return EconomyService.SpendCash(player, amount, "expanded the plot", "PlotSquare")
 			end,
 			refund = function(amount: number)
-				EconomyService.Refund(player, amount, "yard expansion returned", "PlotSquare")
+				EconomyService.Refund(player, amount, "plot expansion returned", "PlotSquare")
 			end,
 		})
 		if not bought then
@@ -1472,13 +1476,13 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 			notify(
 				player,
 				string.format(
-					"That square is yours for %s. The next one is %s.",
+					"You expanded your plot for %s. The next square is %s.",
 					Util.formatCash(paid),
 					Util.formatCash(nextPrice)
 				)
 			)
 		else
-			notify(player, string.format("That square is yours for %s.", Util.formatCash(paid)))
+			notify(player, string.format("You expanded your plot for %s.", Util.formatCash(paid)))
 		end
 		return nil
 	end)

@@ -2,7 +2,7 @@
 -- Murph's tutorial on the server: progress, rewards, skipping.
 return function(t)
 	-- `loop`: the core loop GameServer passes to Init (nil: v1, as before).
-	local function setup(profileOverrides, loop)
+	local function setup(profileOverrides, loop, openLimiter)
 		local loader = t.loader()
 		local Schema = loader:server("ProfileSchema")
 		local profile = loader:shared("Util").deepCopy(Schema.Template)
@@ -31,19 +31,41 @@ return function(t)
 				end,
 			},
 		}
+		if openLimiter then
+			mocks.RateLimiter = {
+				Allow = function()
+					return true
+				end,
+			}
+		end
 		loader = t.loader({ mocks = mocks })
 		local Quest = loader:server("QuestService")
-		local skipHandler
-		Quest.Init({
-			OnServerEvent = {
-				Connect = function(_, fn)
-					skipHandler = fn
-				end,
+		local skipHandler, seenHandler
+		Quest.Init(
+			{
+				OnServerEvent = {
+					Connect = function(_, fn)
+						skipHandler = fn
+					end,
+				},
 			},
-		}, function(_, message)
-			table.insert(toasts, message)
-		end, loop)
+			function(_, message)
+				table.insert(toasts, message)
+			end,
+			loop,
+			nil,
+			{
+				OnServerEvent = {
+					Connect = function(_, fn)
+						seenHandler = fn
+					end,
+				},
+			}
+		)
 		return {
+			seen = function(what)
+				seenHandler(player, what)
+			end,
 			Quest = Quest,
 			Steps = loader:shared("TutorialData").ForLoop(loop or 1),
 			profile = profile,
@@ -310,6 +332,12 @@ return function(t)
 		t.eq(at(), "plot", "the first piece moves the cart step on")
 		t.eq(s.profile.cash, cash + 25, "Murph's share on that sale")
 		s.event("plotClaimed")
+		t.eq(at(), "build")
+		s.event("buildOpened")
+		t.eq(at(), "place")
+		s.event("itemPlaced")
+		t.eq(at(), "land")
+		s.event("landOpened")
 		t.eq(at(), "truck")
 		t.eq(s.player.attrs.TutorialProgress, 0, "and its cash doesn't count toward the truck")
 		s.event("truckBought")
@@ -354,6 +382,9 @@ return function(t)
 		s.Quest.WoodSold(s.player, 1, 0)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "plot", "nothing credited (a full wallet): still a sale")
 		s.event("plotClaimed")
+		s.event("buildOpened")
+		s.event("itemPlaced")
+		s.event("landOpened")
 		s.event("truckBought")
 		s.event("woodLoaded")
 		s.Quest.WoodSold(s.player, 1, 0)
@@ -363,6 +394,46 @@ return function(t)
 		end
 		t.eq(s.profile.tutorialProgress, 0, "no whole dollars")
 		t.eq(s.player.attrs.TutorialProgress, 0)
+	end)
+
+	t.test("v2: BUILD and LAND count when the client reports them, and only on their step", function()
+		local s = setup({ plot = { claimed = true, tier = 1, placed = {}, squares = {} } }, 2, true)
+		s.Quest.Start(s.player, s.profile)
+		local function at()
+			return s.Steps[s.profile.tutorialStep].id
+		end
+		playUntil(s, "build")
+		t.eq(at(), "build")
+		s.seen("land")
+		t.eq(at(), "build", "LAND before its step counts for nothing")
+		s.seen("junk")
+		s.seen(42)
+		s.seen(nil)
+		t.eq(at(), "build")
+		s.seen("build")
+		t.eq(at(), "place")
+		s.seen("build")
+		t.eq(at(), "place", "the same report twice does nothing")
+		s.event("itemPlaced")
+		t.eq(at(), "land")
+		s.seen("land")
+		t.eq(at(), "truck")
+	end)
+
+	t.test("v2: the build lessons need a claimed plot, and a placed item skips the place step", function()
+		local s = setup({ tutorialStep = 5, tutorialOrder = 4 }, 2, true)
+		s.Quest.Start(s.player, s.profile)
+		t.eq(s.Steps[s.profile.tutorialStep].id, "build")
+		s.seen("build")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "build", "no plot, no credit")
+		local placed = setup({
+			tutorialStep = 5,
+			tutorialOrder = 4,
+			plot = { claimed = true, tier = 1, placed = { { uid = "a" } }, squares = {} },
+		}, 2, true)
+		placed.Quest.Start(placed.player, placed.profile)
+		placed.seen("build")
+		t.eq(placed.Steps[placed.profile.tutorialStep].id, "land", "they already placed something")
 	end)
 
 	t.test("v1 is untouched: the v2 events count for nothing under loop 1", function()
@@ -470,7 +541,7 @@ return function(t)
 		past.event("treeFelled")
 		past.event("woodGrabbed")
 		past.event("woodSold")
-		t.eq(past.Steps[past.profile.tutorialStep].id, "truck", "reaching plot completes it")
+		t.eq(past.Steps[past.profile.tutorialStep].id, "build", "reaching plot completes it")
 		t.eq(past.profile.plot.claimed, true, "the plot is not released")
 
 		local owned = setup({
@@ -483,7 +554,7 @@ return function(t)
 		owned.event("treeFelled")
 		owned.event("woodGrabbed")
 		owned.event("woodSold")
-		t.eq(owned.Steps[owned.profile.tutorialStep].id, "truck")
+		t.eq(owned.Steps[owned.profile.tutorialStep].id, "build")
 		t.eq(owned.profile.plot.claimed, true)
 
 		local later = setup({
