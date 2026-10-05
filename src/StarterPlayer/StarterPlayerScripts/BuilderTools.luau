@@ -270,7 +270,8 @@ local function previewCopy()
 			local x, z = item.x + copyDx, item.z + copyDz
 			BlueprintModels.Place(ghost, plot, x, z, item.rot, item.y)
 			local shaped = EditLogic.Shape(bp, item)
-			local ok = PlotLogic.Check(shaped, x, z, item.rot, tier(), working, nil, item.y or 0)
+			local ok =
+				PlotLogic.Check(shaped, x, z, item.rot, tier(), working, nil, item.y or 0, BlueprintPlacer.MySquares())
 			if not ok then
 				copyOk = false
 			else
@@ -369,7 +370,17 @@ local function rotate()
 	end
 	local rot = (item.rot + 1) % 4
 	local shaped = EditLogic.Shape(bp, item)
-	local ok = PlotLogic.Check(shaped, item.x, item.z, rot, tier(), BlueprintPlacer.MyPlaced(), item.uid, item.y or 0)
+	local ok = PlotLogic.Check(
+		shaped,
+		item.x,
+		item.z,
+		rot,
+		tier(),
+		BlueprintPlacer.MyPlaced(),
+		item.uid,
+		item.y or 0,
+		BlueprintPlacer.MySquares()
+	)
 	if not ok then
 		paint(true)
 		HUD.Toast(EditLogic.Message("overlap") or "Something's in the way.")
@@ -403,8 +414,17 @@ local function resize(dir: number)
 		nextItem.lenZ = lenZ
 	end
 	local shaped = EditLogic.Shape(bp, nextItem)
-	local ok =
-		PlotLogic.Check(shaped, item.x, item.z, item.rot, tier(), BlueprintPlacer.MyPlaced(), item.uid, item.y or 0)
+	local ok = PlotLogic.Check(
+		shaped,
+		item.x,
+		item.z,
+		item.rot,
+		tier(),
+		BlueprintPlacer.MyPlaced(),
+		item.uid,
+		item.y or 0,
+		BlueprintPlacer.MySquares()
+	)
 	if not ok then
 		paint(true)
 		HUD.Toast(EditLogic.Message("overlap") or "Something's in the way.")

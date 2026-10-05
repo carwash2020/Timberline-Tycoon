@@ -1444,6 +1444,7 @@ function PlotService.Edit(player: Player, request: unknown)
 		playerId = player.UserId,
 		placed = profile.plot.placed,
 		undo = stack,
+		squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {},
 	}
 	local cashBefore = profile.cash
 	local ok, why = EditLogic.Run(world, request :: { [string]: any }, function()
@@ -1883,7 +1884,14 @@ function PlotService.FillStep()
 						and not woodHeld(piece)
 						and piece.ownerId == player.UserId
 						and piece.ownerId ~= 0
-						and onPlot(slot, tier.size, root.Position)
+						and onPlot(
+							slot,
+							PlotLogic.Extent(
+								tier.size,
+								if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+							),
+							root.Position
+						)
 					then
 						if piece.kind == "plank" then
 							table.insert(planks, { piece = piece, root = root })

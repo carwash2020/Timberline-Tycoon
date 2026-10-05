@@ -640,4 +640,28 @@ return function(t)
 		t.eq(VehicleLogic.CanHavePad("LoggingRig"), true)
 		t.eq(VehicleLogic.CanHavePad("PonyTrailer"), true)
 	end)
+
+	t.test("an 80-stud starting plot still has several places a pad can go, on the 10-stud grid", function()
+		local size = VehicleLogic.PadSize(16, 8.6) -- a Pickup-sized pad
+		local fits = 0
+		for gx = -4, 4 do
+			for gz = -4, 4 do
+				local x, z = VehicleLogic.Snap(gx * 10, gz * 10, 10)
+				if VehicleLogic.Placement(VehicleLogic.PlaceFoot(x, z, size), {}, 40) then
+					fits += 1
+				end
+			end
+		end
+		t.ok(fits >= 9, "pads fit in " .. fits .. " spots")
+		-- The old 40-stud grid left the plot centre as the only spot.
+		local old = 0
+		for gx = -1, 1 do
+			for gz = -1, 1 do
+				if VehicleLogic.Placement(VehicleLogic.PlaceFoot(gx * 40, gz * 40, size), {}, 40) then
+					old += 1
+				end
+			end
+		end
+		t.eq(old, 1)
+	end)
 end

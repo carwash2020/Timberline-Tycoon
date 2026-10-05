@@ -408,7 +408,15 @@ function ChopSawLogic.Blueprint(id: string): PlotData.Blueprint?
 		priceCash = machine.priceCash,
 		tier = 1,
 		footprint = ChopSawLogic.Footprint(),
-		boxes = {},
+		-- One block over the footprint (see SawmillLogic.Blueprint).
+		boxes = {
+			{
+				size = Vector3.new(ChopSawLogic.Footprint().X, 6, ChopSawLogic.Footprint().Y),
+				offset = Vector3.new(0, 3, 0),
+				color = "#8C8680",
+				material = "Wood",
+			},
+		},
 		note = "Cuts a log or a plank to the length on the panel.",
 	}
 end

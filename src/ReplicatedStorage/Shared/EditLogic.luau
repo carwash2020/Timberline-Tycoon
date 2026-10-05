@@ -86,6 +86,7 @@ export type World = {
 	playerId: number,
 	placed: { Item },
 	undo: { Entry },
+	squares: { string }?, -- bought land squares (profile.plot.squares): they count as the plot
 }
 
 export type Entry = {
@@ -180,10 +181,11 @@ local function placeCheck(
 	item: Item,
 	tier: number,
 	placed: { Item },
-	ignore: string?
+	ignore: string?,
+	squares: { string }?
 ): (boolean, string?)
 	local shaped = EditLogic.Shape(bp, item)
-	local ok, why = PlotLogic.Check(shaped, item.x, item.z, item.rot, tier, placed, ignore, item.y or 0)
+	local ok, why = PlotLogic.Check(shaped, item.x, item.z, item.rot, tier, placed, ignore, item.y or 0, squares)
 	return refuseCheck(ok, why)
 end
 
@@ -236,7 +238,7 @@ function EditLogic.Run(world: World, request: { [string]: any }, newUid: () -> s
 		end
 		local nextItem = EditLogic.Snapshot(item)
 		nextItem.rot = rot
-		local ok, code = placeCheck(bp, nextItem, world.tier, world.placed, item.uid)
+		local ok, code = placeCheck(bp, nextItem, world.tier, world.placed, item.uid, world.squares)
 		if not ok then
 			return false, code
 		end
@@ -260,7 +262,7 @@ function EditLogic.Run(world: World, request: { [string]: any }, newUid: () -> s
 		local nextItem = EditLogic.Snapshot(item)
 		nextItem.x, nextItem.z, nextItem.rot = x, z, rot
 		nextItem.y = if y ~= 0 then y else nil
-		local ok, code = placeCheck(bp, nextItem, world.tier, world.placed, item.uid)
+		local ok, code = placeCheck(bp, nextItem, world.tier, world.placed, item.uid, world.squares)
 		if not ok then
 			return false, code
 		end
@@ -298,7 +300,7 @@ function EditLogic.Run(world: World, request: { [string]: any }, newUid: () -> s
 		if delta < 0 and world.cash + delta < -1e-6 then
 			return false, "cash"
 		end
-		local ok, code = placeCheck(bp, nextItem, world.tier, world.placed, item.uid)
+		local ok, code = placeCheck(bp, nextItem, world.tier, world.placed, item.uid, world.squares)
 		if not ok then
 			return false, code
 		end
@@ -364,7 +366,7 @@ function EditLogic.Copy(world: World, request: { [string]: any }, newUid: () -> 
 		local fee = EditLogic.Fee(bp, copy)
 		copy.paid = fee
 		total += fee
-		local ok, code = placeCheck(bp, copy, world.tier, working, nil)
+		local ok, code = placeCheck(bp, copy, world.tier, working, nil, world.squares)
 		if not ok then
 			return false, code
 		end
@@ -424,7 +426,7 @@ function EditLogic.Undo(world: World): (boolean, string?)
 		if not bp then
 			return false, "gone"
 		end
-		local ok, code = placeCheck(bp, before, world.tier, world.placed, nil)
+		local ok, code = placeCheck(bp, before, world.tier, world.placed, nil, world.squares)
 		if not ok then
 			table.insert(world.undo, entry)
 			return false, code
@@ -445,7 +447,7 @@ function EditLogic.Undo(world: World): (boolean, string?)
 	if not bp then
 		return false, "gone"
 	end
-	local ok, code = placeCheck(bp, before, world.tier, world.placed, live.uid)
+	local ok, code = placeCheck(bp, before, world.tier, world.placed, live.uid, world.squares)
 	if not ok then
 		table.insert(world.undo, entry)
 		return false, code

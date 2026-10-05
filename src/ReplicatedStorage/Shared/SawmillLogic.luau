@@ -408,7 +408,17 @@ function SawmillLogic.Blueprint(id: string): PlotData.Blueprint?
 		priceCash = mill.priceCash,
 		tier = 1,
 		footprint = Vector2.new(mill.width, mill.depth),
-		boxes = {},
+		-- One block over the footprint, so a mill overlaps like any other
+		-- plot item (nothing sits inside its intake or output). Tall enough
+		-- to stop floors and walls; decor stacked well above it is fine.
+		boxes = {
+			{
+				size = Vector3.new(mill.width, 6, mill.depth),
+				offset = Vector3.new(0, 3, 0),
+				color = "#8C8680",
+				material = "Wood",
+			},
+		},
 		note = SawmillLogic.LimitText(mill),
 	}
 end

@@ -2201,7 +2201,9 @@ function VehicleService.TryPlaceFromBox(player: Player, rec: any): boolean
 		return false
 	end
 	local localX, localZ = world.X - home.X, world.Z - home.Y
-	local snappedX, snappedZ = VehicleLogic.Snap(localX, localZ, GameConfig.PlotSquare)
+	-- A quarter square (10 studs), not a whole one: on an 80 plot a 40 grid left
+	-- the plot's centre as the only spot a pad could sit.
+	local snappedX, snappedZ = VehicleLogic.Snap(localX, localZ, GameConfig.PlotSquare / 4)
 	local width, length = vehicleSpan(kind, id)
 	local size = VehicleLogic.PadSize(length, width)
 	local foot = VehicleLogic.PlaceFoot(snappedX, snappedZ, size)
