@@ -36,6 +36,7 @@ local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local TownMeshes = require(ReplicatedStorage.Shared.Art.TownMeshes)
@@ -111,6 +112,13 @@ Players.CharacterAutoLoads = false
 -- 3. Terrain.
 local terrainSeconds = 0
 TownMeshes.Enabled = GameConfig.TownMeshes
+print(
+	"[MapBuilder] build check: uploaded town meshes "
+		.. (if GameConfig.TownMeshes then "ON" else "OFF (part-built town)")
+		.. ", starting plot "
+		.. tostring(PlotData.Tiers[1].size)
+		.. " studs"
+)
 
 step("3. Terrain", function()
 	terrainSeconds = TerrainBuilder.Build(function(done: number, total: number)
