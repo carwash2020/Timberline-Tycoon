@@ -44,6 +44,7 @@ return function(t)
 		"DragController",
 		"CutController",
 		"GondolaController",
+		"FerryController",
 	}
 
 	t.test("each cosmetic loop reads the quality budget", function()

@@ -50,6 +50,7 @@ local deckPart: BasePart? = nil
 local weldFolder: Folder? = nil
 local lastLeg: FerryLogic.Leg? = nil
 local textClock = 0
+local moveClock = -math.huge -- the server clock when the boat's copy was last moved
 local bound = false
 local riders: { [Player]: boolean } = {}
 local cargo: { { part: BasePart, rel: CFrame } } = {}
@@ -118,7 +119,7 @@ local function moveBoat(state: FerryLogic.State)
 		return
 	end
 	local x, z, yaw = FerryLogic.Pose(state)
-	local y = WorldLayout.SeaLevel + FerryLogic.DeckRise
+	local y = FerryLogic.DeckY()
 	model:PivotTo(CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0))
 end
 
@@ -266,7 +267,14 @@ function FerryService.Step(now: number?)
 	if departed then
 		depart(departed)
 	end
-	if state.docked == nil or lastLeg ~= state.leg then
+	-- The server's copy of the boat is authoritative for fares, boarding,
+	-- welds and landing, but each client's FerryController draws the boat
+	-- every frame from the same schedule (FerryLogic.PoseAt). So while it
+	-- sails the server only nudges it ~5 Hz (watchers, streaming), and
+	-- lands it exactly on every leg change.
+	local legChanged = lastLeg ~= state.leg
+	if FerryLogic.ShouldServerMove(legChanged, state.docked ~= nil, clock - moveClock) then
+		moveClock = clock
 		moveBoat(state)
 	end
 	local arrived = FerryLogic.Arrived(lastLeg, state.leg)
@@ -381,6 +389,12 @@ function FerryService.Bind(mainDeck: BasePart, islandDeck: BasePart, parent: Ins
 	pcall(function()
 		model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 	end)
+	-- FerryController finds the boat by this tag and drives it only while
+	-- the attribute says the client is the one moving it.
+	pcall(function()
+		CollectionService:AddTag(model, FerryLogic.Tag)
+	end)
+	model:SetAttribute(FerryLogic.DrivenAttribute, FerryLogic.ClientDriven)
 	moveBoat(FerryLogic.State(FerryService.Now()))
 	model.Parent = parent
 	for _, side in pairs(sides) do

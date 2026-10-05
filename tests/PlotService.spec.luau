@@ -245,6 +245,7 @@ return function(t)
 		end
 		return {
 			P = PlotService,
+			config = loader:shared("GameConfig"),
 			PlotData = PlotData,
 			newPlayer = newPlayer,
 			plot = plot,
@@ -453,7 +454,7 @@ return function(t)
 		t.eq(cara.attrs.PlotSlot, nil)
 	end)
 
-	t.test("a sawmill from stock places free, and one you don't own is paid for", function()
+	t.test("a sawmill from stock places free; one you don't own is a box at the Tool Shed", function()
 		local s = setup({ cash = 200 })
 		local ann, profile = s.newPlayer(1, "Ann")
 		profile.sawmillStock = { "SawmillRickety" }
@@ -466,9 +467,41 @@ return function(t)
 		t.eq(profile.plot.placed[1].data, { x = 1, y = 0.6 })
 		t.eq(s.items(1)[1]:GetAttribute("CutX"), 1)
 		t.eq(s.tags[s.items(1)[1]], "PlacedItem")
+		-- The palette is not a shop: with none in stock, nothing is charged
+		-- or placed, and the toast says where the box is.
 		s.P.Place(ann, "SawmillRickety", 0, 20, 0)
+		t.eq(profile.cash, 200)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(s.lastToast(), "Buy the Rickety Sawmill at the Tool Shed first.")
+	end)
+
+	t.test("the chop saw is the same: stock places it free, none in stock is refused", function()
+		local s = setup({ cash = 20000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "ChopSaw", 0, 0, 0)
+		t.eq(profile.cash, 20000, "no charge at the palette")
+		t.eq(#profile.plot.placed, 0)
+		t.eq(s.lastToast(), "Buy the Chop Saw at the Tool Shed first.")
+		profile.sawmillStock = { "ChopSaw" }
+		s.P.Place(ann, "ChopSaw", 0, 0, 0)
+		t.eq(profile.cash, 20000)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.sawmillStock, {})
+		t.eq(ann.attrs.SawmillStock, "")
+	end)
+
+	t.test("with boxed stores off, the old pay-as-you-place comes back (the rollback)", function()
+		local s = setup({ cash = 200 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.config.BoxedStores = false
+		s.P.Place(ann, "SawmillRickety", 0, 20, 0)
+		s.config.BoxedStores = nil
 		t.eq(profile.cash, 70)
-		t.eq(#profile.plot.placed, 2)
+		t.eq(#profile.plot.placed, 1)
 	end)
 
 	t.test("a saved cut comes back on the mill", function()

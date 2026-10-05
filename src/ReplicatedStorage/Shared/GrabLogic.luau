@@ -380,6 +380,17 @@ function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 	return nil, nil
 end
 
+-- Whether the drag hold takes an InputBegan press. A bound action marks
+-- R2 handled even when it passes it on, and a trigger is no button's
+-- click, so a handled trigger still counts unless a menu holds the pad
+-- selection. While the placer is up R2 is its Place bind: no grab.
+function GrabLogic.PadPressAccepted(processed: boolean, trigger: boolean, selecting: boolean, placing: boolean): boolean
+	if trigger and placing then
+		return false
+	end
+	return not processed or (trigger and not selecting)
+end
+
 -- A finger resting on a piece since `startAt` at `startPos` (screen
 -- pixels), now at `pos`: "grab" once it has rested TouchHoldSec without
 -- moving more than TouchSlop, "cancel" once it moves further (a swipe:

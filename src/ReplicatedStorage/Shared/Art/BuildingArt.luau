@@ -24,6 +24,7 @@
 -- what stands on it, keeps its size: people still lean on it.
 
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
 local ShopHoursLogic = require(script.Parent.Parent.ShopHoursLogic)
 local StoreStock = require(script.Parent.Parent.StoreStock)
 local WoodData = require(script.Parent.Parent.WoodData)
@@ -107,6 +108,23 @@ BuildingArt.Scale = {
 	Dealership = 1.5,
 	HearthAndHome = 1.5,
 } :: { [string]: number }
+
+-- The Tool Shed's half depth at design size. It was 7; the aisles and the
+-- Robux table need more floor, so the barn grew backward (the front stays
+-- put). Its uploaded meshes stretch by the same factor along Z only (the
+-- ridge runs that way), see MeshStretch.
+BuildingArt.ToolShedHalfDepth = 9.5
+local TOOL_SHED_OLD_HALF_DEPTH = 7
+
+-- How far a shop's uploaded meshes are stretched past their authored size
+-- (Dress takes a scale). Parts are built to size; the meshes were authored
+-- for the old design, so a shop that grew needs its meshes grown to match.
+function BuildingArt.MeshStretch(kind: string): Vector3
+	if kind == "ToolShed" then
+		return Vector3.new(1, 1, BuildingArt.ToolShedHalfDepth / TOOL_SHED_OLD_HALF_DEPTH)
+	end
+	return Vector3.one
+end
 
 -- A closed door leaf. Colour and transparency only; no new parts.
 BuildingArt.LockedDoorRed = 40
@@ -1126,8 +1144,11 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	local rng = Kit.rng(311)
 	local red = { accent, Kit.shade(accent, 0.07), Kit.shade(accent, -0.07), Kit.vary(accent, rng, 0.05) }
 	local doorRed = Kit.shade(accent, -0.2)
-	local roofStyle: RoofStyle = { colors = BARN_ROOF, deck = ROOF_DECK, trim = TRIM, rowLen = 2.4, pieceLen = 8 }
-	local HX, HZ, FLOOR, TOP = 9, 7, 0.5, 9
+	local roofStyle: RoofStyle = { colors = BARN_ROOF, deck = ROOF_DECK, trim = TRIM, rowLen = 2.4, pieceLen = 11 }
+	-- Deep enough for two display tables with a carried box between them
+	-- and the Robux table at the back: 19 studs (28.5 once scaled), up
+	-- from 14 (BuildingArt.MeshStretch carries the same depth to the mesh).
+	local HX, HZ, FLOOR, TOP = 9, BuildingArt.ToolShedHalfDepth, 0.5, 9
 
 	plinth(model, CF(0, 0, 0), 2 * HX, 2 * HZ, FLOOR, rng, { left = true, right = true, back = true }, 3.2)
 	for _, s in ipairs({ -1, 1 }) do
@@ -1228,16 +1249,21 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		hangingLantern(model, V3(s * 3.8, 7.6, -HZ + 0.1), 0.6, 0.85)
 	end
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
-	hangingLantern(model, V3(0, TOP - 0.8, 3.6), 0.9, 0.9)
+	-- The counter keeps its distance from the front (8.4 studs, as before the
+	-- barn grew backward): the deeper floor is behind it, for the keeper and
+	-- the Robux table.
+	local CZ = 1.4 - (HZ - TOOL_SHED_OLD_HALF_DEPTH)
+	hangingLantern(model, V3(0, TOP - 0.8, CZ + 2.2), 0.9, 0.9)
 
-	-- Inside: the counter, the axe rack, a workbench, a barrel of handles.
-	Kit.part(model, "Counter", V3(9, 3, 2), CF(0, FLOOR + 1.5, 1.4), PLANK_DARK[1], MAT.WoodPlanks)
-	dBox(model, "CounterTop", V3(9.6, 0.3, 2.6), CF(0, FLOOR + 3.15, 1.4), PLANK[4])
+	-- Inside: the counter, the axe rack (the display tables go in once the
+	-- shop is scaled).
+	Kit.part(model, "Counter", V3(9, 3, 2), CF(0, FLOOR + 1.5, CZ), PLANK_DARK[1], MAT.WoodPlanks)
+	dBox(model, "CounterTop", V3(9.6, 0.3, 2.6), CF(0, FLOOR + 3.15, CZ), PLANK[4])
 	for _, x in ipairs({ -3, 0, 3 }) do
-		dBox(model, "CounterTrim", V3(0.3, 2.7, 0.14), CF(x, FLOOR + 1.45, 0.33), PLANK_DARK[3])
+		dBox(model, "CounterTrim", V3(0.3, 2.7, 0.14), CF(x, FLOOR + 1.45, CZ - 1.07), PLANK_DARK[3])
 	end
-	register(model, CF(2.7, FLOOR + 3.3, 1.6))
-	ledger(model, CF(-2.5, FLOOR + 3.3, 1.2))
+	register(model, CF(2.7, FLOOR + 3.3, CZ + 0.2))
+	ledger(model, CF(-2.5, FLOOR + 3.3, CZ - 0.2))
 	dBox(model, "AxeRack", V3(11.6, 4.2, 0.3), CF(0, 5.5, HZ - 0.45), PLANK_DARK[2])
 	dBox(model, "AxeRackRail", V3(11.8, 0.35, 0.45), CF(0, 4.1, HZ - 0.75), TIMBER)
 	local axes = {}
@@ -1256,23 +1282,9 @@ local function toolShed(model: Model, title: string, accent: Color3)
 			material(axe.look.material, MAT.Metal)
 		)
 	end
-	-- The workbench along the west wall: its top and legs collide.
-	Kit.solid(dBox(model, "Workbench", V3(1.9, 0.35, 5.6), CF(-HX + 1.4, FLOOR + 2.9, 2.6), PLANK[2]))
-	for _, z in ipairs({ 0.4, 4.8 }) do
-		Kit.solid(dBox(model, "BenchLeg", V3(1.6, 2.7, 0.35), CF(-HX + 1.4, FLOOR + 1.35, z), TIMBER))
-	end
-	dBox(model, "Vise", V3(0.8, 0.7, 0.6), CF(-HX + 2.1, FLOOR + 3.4, 1.0), IRON, MAT.Metal)
-	dBox(model, "Saw", V3(0.1, 1.0, 3.2), CF(-HX + 0.45, 6.1, 2.6), STEEL, MAT.Metal)
-	barrel(model, CF(-6.3, FLOOR, -4.4), rng, true)
-	for i = 1, 3 do
-		dBox(
-			model,
-			"Handle",
-			V3(0.25, 3, 0.25),
-			CF(-6.3 + (i - 2) * 0.45, FLOOR + 3.2, -4.4 + (i % 2) * 0.3) * ANG(rng:range(-0.2, 0.2), 0, (i - 2) * 0.18),
-			HANDLE
-		)
-	end
+	-- (The workbench and the barrel of handles that stood along the side
+	-- walls are gone: the display tables (displayTables) and the aisle
+	-- between them need that floor.)
 
 	-- Out front: the grindstone and the chopping block; firewood stacked by
 	-- the east wall (all of it solid).
@@ -1521,19 +1533,28 @@ end
 -- Shelf slots are attachments on the counter (they are not parts, so the
 -- shop stays inside its part budget). The store zone is attributes in
 -- build space; BoxService turns them into a world volume with the pivot
--- the model had while it still sat at the origin.
+-- the model had while it still sat at the origin. The Robux shelf's slots
+-- are "RobuxSlot" attachments, so the cash shelves' count stays theirs.
 local function placeShelfSlots(model: Model, kind: string, scale: number)
 	local host = model:FindFirstChild("Counter")
 	if not host or not host:IsA("BasePart") then
 		return
 	end
-	for _, place in ipairs(StoreStock.Placements(kind)) do
-		local at = Vector3.new(place.x * scale, place.y * scale, place.z * scale)
+	local function attach(name: string, slotId: string, x: number, y: number, z: number)
+		local at = Vector3.new(x * scale, y * scale, z * scale)
 		local att = Instance.new("Attachment")
-		att.Name = "ShelfSlot"
-		att:SetAttribute("SlotId", place.slotId)
+		att.Name = name
+		att:SetAttribute("SlotId", slotId)
 		att.Position = host.CFrame:PointToObjectSpace(at)
 		att.Parent = host
+	end
+	for _, place in ipairs(StoreStock.Placements(kind)) do
+		attach("ShelfSlot", place.slotId, place.x, place.y, place.z)
+	end
+	if kind == "ToolShed" then
+		for _, place in ipairs(RobuxShelf.Placements()) do
+			attach("RobuxSlot", place.slotId, place.x, place.y, place.z)
+		end
 	end
 	local zone = StoreStock.Zone(kind)
 	local pivot = model:GetPivot().Position
@@ -1548,6 +1569,65 @@ local function placeShelfSlots(model: Model, kind: string, scale: number)
 		model:SetAttribute("ZoneSizeY", zone.size.Y)
 		model:SetAttribute("ZoneSizeZ", zone.size.Z * scale)
 	end
+end
+
+-- The Tool Shed's display tables: one down each side under the boxes of
+-- the cash shelves, and a gold-trimmed one across the back for the Robux
+-- shelf. Counter height, so a box is lifted off and carried to the
+-- counter without a reach. They are added after the meshes dress the
+-- barn (a collider the mesh swap would hide is not wanted here), so they
+-- are plain parts and show with or without the meshes. Final (scaled)
+-- coordinates; `scale` is the shop's.
+local TOOL_SHED_FLOOR = 0.5
+local GOLD = hex("#E3B73C")
+local GOLD_INK = hex("#6B4A12")
+
+local function displayTables(model: Model, scale: number)
+	local floorTop = TOOL_SHED_FLOOR * scale
+	local topY = RobuxShelf.TableTop * scale
+	local height = topY - floorTop
+	local function makeTable(cx: number, cz: number, w: number, len: number, wood: Color3, name: string, h: number?)
+		local tall = h or height
+		return Kit.part(model, name, V3(w, tall, len), CF(cx, floorTop + tall / 2, cz), wood, MAT.WoodPlanks)
+	end
+	-- Under the cash shelves' columns: each side from its first box to its last.
+	local lo = { [-1] = math.huge, [1] = math.huge }
+	local hi = { [-1] = -math.huge, [1] = -math.huge }
+	local column = { [-1] = 0, [1] = 0 }
+	for _, place in ipairs(StoreStock.Placements("ToolShed")) do
+		local side = if place.x < 0 then -1 else 1
+		lo[side] = math.min(lo[side], place.z)
+		hi[side] = math.max(hi[side], place.z)
+		column[side] = place.x
+	end
+	for _, side in ipairs({ -1, 1 }) do
+		if lo[side] <= hi[side] then
+			local len = (hi[side] - lo[side]) * scale + 2.6
+			local cz = (hi[side] + lo[side]) / 2 * scale
+			makeTable(column[side] * scale, cz, 2.9, len, PLANK[2], "DisplayTable")
+		end
+	end
+	-- The Robux table, gold-topped, across the back, with its name on a
+	-- gold board down the front.
+	local entries = RobuxShelf.List()
+	if #entries == 0 then
+		return
+	end
+	local width = RobuxShelf.RowWidth() * scale
+	local cz = RobuxShelf.TableZ * scale
+	local depth = 3.2
+	makeTable(0, cz, width, depth, PLANK_DARK[1], "GoldTable", height - 0.25)
+	Kit.part(model, "GoldTableTop", V3(width + 0.6, 0.25, depth + 0.6), CF(0, topY - 0.125, cz), GOLD, MAT.Metal)
+	local board = Kit.part(
+		model,
+		"GoldTrim",
+		V3(width + 0.6, 1.3, 0.16),
+		CF(0, topY - 0.95, cz - depth / 2 - 0.09),
+		GOLD,
+		MAT.Metal
+	)
+	Kit.decor(board, false)
+	Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne)
 end
 
 -- Colour and transparency only. The leaf's first colour is remembered so an
@@ -1686,9 +1766,12 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 	end
 	addHoursBoard(model, kind)
 	-- Tool Shed, Dealership, and Hearth & Home meshes are already 1.5x.
-	TownMeshes.Dress(model, TownModels.ShopAsset(kind))
+	TownMeshes.Dress(model, TownModels.ShopAsset(kind), { scale = BuildingArt.MeshStretch(kind) })
 	if kind == "ToolShed" or kind == "HearthAndHome" then
 		placeShelfSlots(model, kind, s)
+	end
+	if kind == "ToolShed" then
+		displayTables(model, s)
 	end
 	return model
 end

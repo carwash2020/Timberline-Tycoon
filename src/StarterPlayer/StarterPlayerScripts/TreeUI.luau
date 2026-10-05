@@ -9,6 +9,7 @@
 
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 
 local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
@@ -25,6 +26,18 @@ TreeUI.Stroke = 2
 type Bar = { gui: BillboardGui, fill: Frame, focus: TextButton, conn: RBXScriptConnection }
 
 local barOpen = false
+
+-- A bar only takes the pad when nothing else has it and no tool is in
+-- hand. Chopping means an axe in hand, and a selected bar would drop the
+-- D-pad shortcuts and the side buttons mid-swing.
+function TreeUI.ShouldFocus(selected: Instance?, toolHeld: boolean): boolean
+	return selected == nil and not toolHeld
+end
+
+local function toolHeld(): boolean
+	local char = Players.LocalPlayer and Players.LocalPlayer.Character
+	return char ~= nil and char:FindFirstChildOfClass("Tool") ~= nil
+end
 
 function TreeUI._open(button: GuiObject?)
 	if GuiService.SelectedObject ~= nil and button and GuiService.SelectedObject ~= button then
@@ -124,7 +137,7 @@ local function refresh(model: Model)
 	end
 	local frac = math.clamp(hp / maxHp, 0, 1)
 	bar.gui.Enabled = frac > 0 and frac < 1
-	if bar.gui.Enabled and not was and GuiService.SelectedObject == nil then
+	if bar.gui.Enabled and not was and TreeUI.ShouldFocus(GuiService.SelectedObject, toolHeld()) then
 		TreeUI._open(bar.focus)
 	elseif not bar.gui.Enabled and was then
 		TreeUI._close(bar.gui)

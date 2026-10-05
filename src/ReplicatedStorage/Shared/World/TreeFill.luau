@@ -105,15 +105,16 @@ local function outsideBox(x: number, z: number, x0: number, z0: number, x1: numb
 end
 
 -- Shop doors, read once. Town() builds the whole square; don't call it per spot.
-local shopDoors: { Vector3 }? = nil
-local function shopDoorsOf(): { Vector3 }
+local shopDoors: { { number } }? = nil -- x, z
+local function shopDoorsOf(): { { number } }
 	if shopDoors then
 		return shopDoors
 	end
-	local list: { Vector3 } = {}
+	local list: { { number } } = {}
 	local town = world().Town() :: { shops: { Shop } }
 	for _, shop in ipairs(town.shops) do
-		table.insert(list, shop.cframe.Position)
+		local p = shop.cframe.Position
+		table.insert(list, { p.X, p.Z })
 	end
 	shopDoors = list
 	return list
@@ -121,10 +122,25 @@ end
 
 -- 12 studs off every plot's biggest footprint, and 20 off the spawn pad
 -- and each shop door. Roads are GoodGround's.
-function TreeFill.Clear(x: number, z: number): boolean
+-- Each plot's biggest footprint (x0, z0, x1, z1), as plain numbers.
+local plotBoxList: { { number } }? = nil
+local function plotBoxes(): { { number } }
+	local cached = plotBoxList
+	if cached then
+		return cached
+	end
 	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+	local built: { { number } } = {}
 	for _, slot in ipairs(PlotData.Slots) do
-		if outsideBox(x, z, slot.X - half, slot.Y - half, slot.X + half, slot.Y + half) < PLOT_GAP then
+		table.insert(built, { slot.X - half, slot.Y - half, slot.X + half, slot.Y + half })
+	end
+	plotBoxList = built
+	return built
+end
+
+function TreeFill.Clear(x: number, z: number): boolean
+	for _, box in ipairs(plotBoxes()) do
+		if outsideBox(x, z, box[1], box[2], box[3], box[4]) < PLOT_GAP then
 			return false
 		end
 	end
@@ -132,17 +148,38 @@ function TreeFill.Clear(x: number, z: number): boolean
 		return false
 	end
 	for _, p in ipairs(shopDoorsOf()) do
-		if dist(x, z, p.X, p.Z) < DOOR_GAP then
+		if dist(x, z, p[1], p[2]) < DOOR_GAP then
 			return false
 		end
 	end
 	return true
 end
 
+-- The lists of taken spots only ever grow, so each keeps its X and Z as
+-- plain numbers (reading a Vector3's fields is slow), extended on use.
+type Flat = { n: number, xs: { number }, zs: { number } }
+local flats: { [{ Vector3 }]: Flat } = setmetatable({}, { __mode = "k" }) :: any
 local function takenNear(taken: { Vector3 }, x: number, z: number, gap: number): boolean
 	local g2 = gap * gap
-	for _, p in ipairs(taken) do
-		local dx, dz = p.X - x, p.Z - z
+	local flat = flats[taken]
+	if not flat then
+		flat = { n = 0, xs = {}, zs = {} }
+		flats[taken] = flat
+	end
+	local xs, zs = flat.xs, flat.zs
+	local count = #taken
+	if flat.n > count then -- (shrunk: start over)
+		table.clear(xs)
+		table.clear(zs)
+		flat.n = 0
+	end
+	for i = flat.n + 1, count do
+		local p = taken[i]
+		xs[i], zs[i] = p.X, p.Z
+	end
+	flat.n = count
+	for i = 1, count do
+		local dx, dz = xs[i] - x, zs[i] - z
 		if dx * dx + dz * dz < g2 then
 			return true
 		end
@@ -166,9 +203,20 @@ local function sceneryList(): { { number } }
 	sceneryPads = built
 	return built
 end
+-- dist(x, z, cx, cz) < r, skipping the square root when a coordinate alone
+-- puts the point past r.
+local function within(x: number, z: number, cx: number, cz: number, r: number): boolean
+	local dx, dz = x - cx, z - cz
+	local far = r + 1e-6
+	if dx > far or dx < -far or dz > far or dz < -far then
+		return false
+	end
+	return math.sqrt(dx * dx + dz * dz) < r
+end
+
 local function sceneryClear(x: number, z: number): boolean
 	for _, pad in ipairs(sceneryList()) do
-		if dist(x, z, pad[1], pad[2]) < pad[3] then
+		if within(x, z, pad[1], pad[2], pad[3]) then
 			return false
 		end
 	end
@@ -188,7 +236,7 @@ end
 
 local function landmarkClear(x: number, z: number, extra: number): boolean
 	for _, pad in ipairs(landmarkList()) do
-		if dist(x, z, pad[1], pad[2]) < pad[3] + extra then
+		if within(x, z, pad[1], pad[2], pad[3] + extra) then
 			return false
 		end
 	end
@@ -218,24 +266,67 @@ function TreeFill.Ground(x: number, z: number): boolean
 	if WorldLayout.TreeBlocked(x, z) then
 		return false
 	end
-	return world().GoodGround(x, z, ROAD_GAP, 0.75)
-		and TreeFill.Clear(x, z)
+	-- Every test is a pure yes or no; the cheap ones go first and the
+	-- terrain's (GoodGround) last, since most points fail something cheap.
+	return TreeFill.Clear(x, z)
 		and sceneryClear(x, z)
 		and landmarkClear(x, z, 0)
 		and yardsClear(x, z)
+		and world().GoodGround(x, z, ROAD_GAP, 0.75)
 end
 
 -- The trunk's plan position sits inside a haul road's paved width.
-function TreeFill.InHaulLane(x: number, z: number): boolean
-	local p = Vector2.new(x, z)
+-- Every haul road's segments with their boxes, so the tests below only
+-- measure (the exact way, with Vector2s) the segments the point is near.
+type HaulSeg = { a: Vector2, b: Vector2, half: number, minX: number, maxX: number, minZ: number, maxZ: number }
+local haulSegs: { HaulSeg }? = nil
+local function haulSegments(): { HaulSeg }
+	local cached = haulSegs
+	if cached then
+		return cached
+	end
+	local built: { HaulSeg } = {}
 	for _, road in ipairs(WorldLayout.Roads) do
 		if HAUL[road.name] then
-			if WorldLayout.PolylineDistance(p, road.points) < road.width / 2 - 1e-3 then
+			for i = 1, #road.points - 1 do
+				local a, b = road.points[i], road.points[i + 1]
+				table.insert(built, {
+					a = a,
+					b = b,
+					half = road.width / 2,
+					minX = math.min(a.X, b.X),
+					maxX = math.max(a.X, b.X),
+					minZ = math.min(a.Y, b.Y),
+					maxZ = math.max(a.Y, b.Y),
+				})
+			end
+		end
+	end
+	haulSegs = built
+	return built
+end
+
+-- Whether (x, z) is within `gap` of a haul road's edge (`gap` nil: inside
+-- its paved width, 1e-3 in). A segment whose box is farther than
+-- half + gap + 1 can't be that close, so only the others are measured.
+local function nearHaul(x: number, z: number, gap: number?): boolean
+	local p: Vector2? = nil
+	for _, seg in ipairs(haulSegments()) do
+		local reach = seg.half + (gap or 0) + 1
+		if x >= seg.minX - reach and x <= seg.maxX + reach and z >= seg.minZ - reach and z <= seg.maxZ + reach then
+			local q = p or Vector2.new(x, z)
+			p = q
+			local d = WorldLayout.SegmentDistance(q, seg.a, seg.b)
+			if if gap then d - seg.half < gap else d < seg.half - 1e-3 then
 				return true
 			end
 		end
 	end
 	return false
+end
+
+function TreeFill.InHaulLane(x: number, z: number): boolean
+	return nearHaul(x, z, nil)
 end
 
 local function placeOne(
@@ -250,7 +341,7 @@ local function placeOne(
 	gap: number
 ): Spot?
 	local function free(px: number, pz: number): boolean
-		return TreeFill.Ground(px, pz) and not takenNear(taken, px, pz, gap)
+		return not takenNear(taken, px, pz, gap) and TreeFill.Ground(px, pz)
 	end
 	local x, z = ForestLogic.FindSpot(cx, cz, radius, 80, function()
 		return rng:next()
@@ -423,21 +514,12 @@ local function quiet(x: number, z: number, pad: number): boolean
 end
 
 local function haulClear(x: number, z: number, gap: number): boolean
-	local p = Vector2.new(x, z)
-	for _, road in ipairs(WorldLayout.Roads) do
-		if HAUL[road.name] then
-			if WorldLayout.PolylineDistance(p, road.points) - road.width / 2 < gap then
-				return false
-			end
-		end
-	end
-	return true
+	return not nearHaul(x, z, gap)
 end
 
 local function plotClear(x: number, z: number, gap: number): boolean
-	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
-	for _, slot in ipairs(PlotData.Slots) do
-		if outsideBox(x, z, slot.X - half, slot.Y - half, slot.X + half, slot.Y + half) < gap then
+	for _, box in ipairs(plotBoxes()) do
+		if outsideBox(x, z, box[1], box[2], box[3], box[4]) < gap then
 			return false
 		end
 	end
@@ -500,7 +582,7 @@ local function obstacleList(): { { number } }
 end
 local function obstacleClear(x: number, z: number): boolean
 	for _, o in ipairs(obstacleList()) do
-		if dist(x, z, o[1], o[2]) < o[3] then
+		if within(x, z, o[1], o[2], o[3]) then
 			return false
 		end
 	end
@@ -551,10 +633,10 @@ local function ring(c: Vector2, n: number, taken: { Vector3 }, rng: any): { Spot
 			local x, z = c.X + math.cos(aa) * rr, c.Y + math.sin(aa) * rr
 			if
 				dist(x, z, c.X, c.Y) <= 16
-				and TreeFill.Ground(x, z)
 				and quiet(x, z, 0)
 				and not takenNear(taken, x, z, TREE_GAP)
 				and not takenNear(reserved, x, z, TREE_GAP)
+				and TreeFill.Ground(x, z)
 			then
 				local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
 				table.insert(reserved, p)

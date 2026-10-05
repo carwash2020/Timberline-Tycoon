@@ -5,6 +5,7 @@
 
 local ChopSawLogic = require(script.Parent.ChopSawLogic)
 local GameConfig = require(script.Parent.GameConfig)
+local ItemCatalog = require(script.Parent.ItemCatalog)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local SawmillLogic = require(script.Parent.SawmillLogic)
@@ -675,6 +676,32 @@ function PlotLogic.SellValue(bp: Blueprint): number
 		return 0 -- copies of a store unlock don't pay cash back
 	end
 	return math.floor(bp.priceCash * PlotData.SellBack)
+end
+
+export type Source = "place" | "toolShed" | "store" | "fee"
+
+-- Where the item behind a blueprint comes from, which is also what the
+-- build palette's row and PlotService.Place agree on:
+--   "place"    you hold it: a sawmill or the chop saw in stock, or a furniture
+--              unlock you bought. Placing is free.
+--   "toolShed" a sawmill or the chop saw you don't hold, with boxed shelves
+--              on: it is a box on the Tool Shed's tables. Not sold here.
+--   "store"    a furniture unlock you haven't bought: the General Store's box.
+--   "fee"      everything else: a kit piece (a fee on every place), or, with
+--              boxed shelves off, a sawmill paid for as it is placed.
+-- `stocked` is how many of this id wait in stock; `unlocked` that the
+-- unlock is bought; `boxed` is ShopLogic.ShelfMenusHidden().
+function PlotLogic.Source(bp: Blueprint, stocked: number, unlocked: boolean, boxed: boolean): Source
+	if stocked > 0 or (bp.unlock == true and unlocked) then
+		return "place"
+	end
+	if ItemCatalog.GetSawmill(bp.id) ~= nil or ItemCatalog.GetMachine(bp.id) ~= nil then
+		return if boxed then "toolShed" else "fee"
+	end
+	if bp.unlock == true then
+		return "store"
+	end
+	return "fee"
 end
 
 -- Cash to place one. An unlock the player already bought is free. An unlock

@@ -604,4 +604,37 @@ return function(t)
 			t.eq(string.find(line :: string, "TBD", 1, true), nil, name)
 		end
 	end)
+
+	t.test("a boxed chop saw goes into stock for $7,500, once a plot is claimed", function()
+		local s = setup({ cash = 8000, loop = 2 })
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, { uid = "saw-1", kind = "Machine", itemId = "ChopSaw" })
+		t.eq(ok, false)
+		t.eq(line, "needsLand", "no plot, nothing charged")
+		t.eq(s.profile.cash, 8000)
+		local owner = setup({ cash = 8000, loop = 2, claimed = true })
+		local paid, said =
+			owner.ShopService.ChargeAndGrant(owner.player, { uid = "saw-2", kind = "Machine", itemId = "ChopSaw" })
+		t.eq(paid, true)
+		t.eq(said, "thanks")
+		t.eq(owner.profile.cash, 500)
+		t.eq(owner.profile.sawmillStock, { "ChopSaw" }, "it waits in the same stock the sawmills do")
+		t.eq(owner.toasts[#owner.toasts], "Bought a Chop Saw! Place it from BUILD on your plot.")
+		local again, again2 =
+			owner.ShopService.ChargeAndGrant(owner.player, { uid = "saw-2", kind = "Machine", itemId = "ChopSaw" })
+		t.eq(again, false)
+		t.eq(again2, "thanks", "the same box never charges twice")
+		t.eq(owner.profile.cash, 500)
+		local poor = setup({ cash = 7499, loop = 2, claimed = true })
+		local no, why =
+			poor.ShopService.ChargeAndGrant(poor.player, { uid = "saw-3", kind = "Machine", itemId = "ChopSaw" })
+		t.eq(no, false)
+		t.eq(why, "broke")
+		t.eq(poor.profile.cash, 7499)
+		local unknown =
+			owner.ShopService.ChargeAndGrant(owner.player, { uid = "saw-4", kind = "Machine", itemId = "Lathe" })
+		t.eq(unknown, false)
+		local v1 = setup({ cash = 8000, loop = 1, claimed = true })
+		local gone = v1.ShopService.ChargeAndGrant(v1.player, { uid = "saw-5", kind = "Machine", itemId = "ChopSaw" })
+		t.eq(gone, false, "the chop saw is a v2 item")
+	end)
 end

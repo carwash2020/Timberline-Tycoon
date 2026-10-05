@@ -167,4 +167,56 @@ return function(t)
 		end
 		t.ok(string.find(FerryLogic.TruckText(), "No trucks", 1, true) ~= nil)
 	end)
+
+	t.test("PoseAt is the schedule's pose: docked at the berths, on the line between, smooth", function()
+		local berths = FerryLogic.Berths()
+		local x0, z0 = FerryLogic.PoseAt(CYCLE)
+		t.ok(math.abs(x0 - berths.main.x) < 1e-6 and math.abs(z0 - berths.main.z) < 1e-6, "main berth at departure")
+		local x1, z1 = FerryLogic.PoseAt(CYCLE + TRAVEL)
+		t.ok(math.abs(x1 - berths.island.x) < 1e-6 and math.abs(z1 - berths.island.z) < 1e-6, "island on arrival")
+		local mx, mz = FerryLogic.PoseAt(CYCLE + TRAVEL / 2)
+		t.ok(math.abs(mx - (berths.main.x + berths.island.x) / 2) < 1e-6, "half way at half the time")
+		t.ok(math.abs(mz - (berths.main.z + berths.island.z) / 2) < 1e-6)
+		local sx, sz, syaw = FerryLogic.Pose(FerryLogic.State(CYCLE + 12.3))
+		local px, pz, pyaw = FerryLogic.PoseAt(CYCLE + 12.3)
+		t.ok(sx == px and sz == pz and syaw == pyaw, "the same as Pose of State")
+		-- Frame to frame at 60 fps the boat never steps more than a stud.
+		local lx, lz = FerryLogic.PoseAt(CYCLE)
+		local worst = 0
+		for i = 1, TRAVEL * 60 do
+			local x, z = FerryLogic.PoseAt(CYCLE + i / 60)
+			worst = math.max(worst, math.sqrt((x - lx) ^ 2 + (z - lz) ^ 2))
+			lx, lz = x, z
+		end
+		t.ok(worst < 0.5, "largest frame step " .. worst)
+		t.eq(FerryLogic.DeckY(), WorldLayout.SeaLevel + FerryLogic.DeckRise)
+	end)
+
+	t.test("the server's low-rate copy: 5 Hz while sailing, exact on a leg change, idle at a dock", function()
+		t.eq(FerryLogic.ClientDriven, true)
+		t.eq(FerryLogic.ServerMoveHz, 5)
+		t.ok(math.abs(FerryLogic.ServerMoveInterval() - 0.2) < 1e-9)
+		t.eq(FerryLogic.ShouldServerMove(true, true, 0), true, "a departure or arrival always lands")
+		t.eq(FerryLogic.ShouldServerMove(false, true, 99), false, "tied up: nothing to move")
+		t.eq(FerryLogic.ShouldServerMove(false, false, 0.05), false, "sailing, too soon")
+		t.eq(FerryLogic.ShouldServerMove(false, false, 0.2), true, "sailing, due")
+		FerryLogic.ClientDriven = false
+		t.eq(FerryLogic.ShouldServerMove(false, false, 0), true, "server-driven: every step")
+		FerryLogic.ClientDriven = true
+	end)
+
+	t.test("SlewOffset follows a clock correction without jumping", function()
+		t.eq(FerryLogic.SlewOffset(10, 10, 1 / 60), 10)
+		local small = FerryLogic.SlewOffset(10, 10.0001, 1 / 60)
+		t.ok(small > 10 and small <= 10.0001)
+		local big = FerryLogic.SlewOffset(10, 15, 1 / 60)
+		t.ok(math.abs(big - 10 - FerryLogic.SlewRate / 60) < 1e-9, "capped at the slew rate")
+		t.ok(FerryLogic.SlewOffset(10, 5, 1 / 60) < 10, "either way")
+		t.eq(FerryLogic.SlewOffset(10, 15, -1), 10, "a negative dt moves nothing")
+		local o = 0
+		for _ = 1, 60 * 200 do
+			o = FerryLogic.SlewOffset(o, 3, 1 / 60)
+		end
+		t.ok(math.abs(o - 3) < 1e-6, "it gets there")
+	end)
 end

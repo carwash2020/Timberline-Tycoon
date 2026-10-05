@@ -9,6 +9,7 @@
 -- centre lands inside a tall hat; lowering it near the top of the screen
 -- made that worse.
 
+local ItemCatalog = require(script.Parent.ItemCatalog)
 local NPCData = require(script.Parent.NPCData)
 local TutorialData = require(script.Parent.TutorialData)
 
@@ -124,8 +125,16 @@ function NPCDialogue.ProgressOf(attrs: {
 	local step = num(attrs.tutorialStep, 1)
 	local refresher = attrs.tutorialRefresher == true
 	local tier = num(attrs.bestAxeTier, 1)
-	local stock = attrs.sawmillStock
-	local stocked = type(stock) == "string" and stock ~= ""
+	-- A sawmill waiting in stock (the chop saw shares the list and is not one).
+	local stocked = false
+	if type(attrs.sawmillStock) == "string" then
+		for id in string.gmatch(attrs.sawmillStock, "[^,]+") do
+			if ItemCatalog.GetSawmill(id) then
+				stocked = true
+				break
+			end
+		end
+	end
 	return {
 		loaded = true,
 		-- TutorialStep 0 is finished. A refresher already played the old loop.
