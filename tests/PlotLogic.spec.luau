@@ -617,4 +617,29 @@ return function(t)
 		-- A stocked mill that is also "unlocked" is still just placed.
 		t.eq(PlotLogic.Source(bp("Wall"), 0, true, true), "fee", "unlocked only means something for an unlock")
 	end)
+
+	t.test("VisitSpot: the spawn pad first, then spots around it, always inside the plot", function()
+		t.eq({ PlotLogic.VisitSpot(120, function()
+			return false
+		end) }, { 0, -18 })
+		local tried = 0
+		local x, z = PlotLogic.VisitSpot(120, function()
+			tried += 1
+			return tried < 3
+		end)
+		t.eq({ x, z }, { -8, -18 }, "the third spot is the first good one")
+		for _, size in ipairs({ 120, 140, 200 }) do
+			for _, spot in ipairs(PlotLogic.VisitCandidates(size)) do
+				t.ok(math.abs(spot[1]) <= size / 2 - PlotLogic.VisitMargin, "x inside at " .. size)
+				t.ok(math.abs(spot[2]) <= size / 2 - PlotLogic.VisitMargin, "z inside at " .. size)
+			end
+		end
+		t.eq(
+			{ PlotLogic.VisitSpot(120, function()
+				return true
+			end) },
+			{ 0, -18 },
+			"everything bad: the pad itself"
+		)
+	end)
 end

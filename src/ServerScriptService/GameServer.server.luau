@@ -768,6 +768,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlotOffer = remote.PlotOffer,
 	ClaimPlot = remote.ClaimPlot,
 	PlotPass = remote.PlotPass,
+	VisitPlot = remote.VisitPlot,
 }, notify)
 safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)

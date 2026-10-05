@@ -139,6 +139,11 @@ return function(t)
 				},
 			},
 			services = {
+				Players = {
+					GetPlayers = function()
+						return players
+					end,
+				},
 				CollectionService = {
 					AddTag = function(_, inst, tag)
 						tags[inst] = tag
@@ -153,7 +158,7 @@ return function(t)
 				},
 				RateLimiter = {
 					Allow = function()
-						return true
+						return options.rate ~= false
 					end,
 				},
 				QuestService = {
@@ -220,7 +225,7 @@ return function(t)
 		local PlotService = loader:server("PlotService")
 		local map = Instance.new("Folder")
 		local remotes = {}
-		for _, name in ipairs({ "PlaceBlueprint", "MoveBlueprint", "SellPlaced", "UpgradePlot" }) do
+		for _, name in ipairs({ "PlaceBlueprint", "MoveBlueprint", "SellPlaced", "UpgradePlot", "VisitPlot" }) do
 			remotes[name] = Instance.new("RemoteEvent")
 		end
 		PlotService.Init(map, remotes, function(_, message)
@@ -1271,5 +1276,85 @@ return function(t)
 		t.eq(bob.root.Position.Z, center.Y + 68)
 		t.eq(ann.root.Position.X, center.X)
 		t.eq(ann.root.Position.Z, center.Y)
+	end)
+
+	-- Plot visits: Settings > Visitors lists the people whose plot lets you
+	-- in, and PlotService.Visit puts you on a safe spot of their plot.
+	local function onPlot(s, spot, i)
+		local c = s.PlotData.Slots[i]
+		return math.abs(spot.X - c.X) <= 56 and math.abs(spot.Z - c.Y) <= 56
+	end
+
+	t.test("a visit lands on the owner's plot, on dry ground off the roads, and costs nothing", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		bob.standOn(nil)
+		local cash = bobProfile.cash
+		t.ok(s.P.Visit(bob, 1))
+		t.ok(onPlot(s, bob.root.Position, 1), "inside the plot")
+		local PlotLogic = t.shared("PlotLogic")
+		t.ok(not PlotLogic.InWater(bob.root.Position.X, bob.root.Position.Z), "not in water")
+		t.ok(not PlotLogic.OnRoad(bob.root.Position.X, bob.root.Position.Z), "not on a road")
+		t.eq(s.lastToast(), "Visiting Ann's plot.")
+		t.eq(bobProfile.cash, cash)
+		t.eq(profile.cash, 100000)
+		-- The bound remote does the same thing.
+		bob.standOn(nil)
+		s.remotes.VisitPlot.OnServerEvent.fn(bob, 1)
+		t.ok(onPlot(s, bob.root.Position, 1))
+	end)
+
+	t.test("a visit is refused: visit off, you in particular, yourself, no plot, junk, or too fast", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		local cat = s.newPlayer(3, "Cat")
+		s.newPlayer(4, "Dan") -- in the server with no plot
+		s.claim(ann, 1)
+		local function away(p)
+			p.standOn(nil)
+			return p.root.Position
+		end
+		profile.permissions = { anyone = { visit = false } }
+		local start = away(bob)
+		t.eq(s.P.Visit(bob, 1), false)
+		t.eq(bob.root.Position, start, "nobody moved")
+		t.eq(s.lastToast(), "That plot isn't open to visitors.")
+		-- One named friend is let in over the closed door.
+		profile.permissions = { anyone = { visit = false }, ["3"] = { visit = true } }
+		t.ok(s.P.Visit(cat, 1))
+		t.eq(s.P.Visit(bob, 1), false)
+		-- A stranger turned away by name.
+		profile.permissions = { ["2"] = { visit = false } }
+		t.eq(s.P.Visit(bob, 1), false)
+		profile.permissions = {}
+		t.eq(s.P.Visit(ann, 1), false, "not your own plot")
+		t.eq(s.P.Visit(bob, 4), false, "Dan has no plot")
+		t.eq(s.lastToast(), "That player has no plot to visit right now.")
+		t.eq(s.P.Visit(bob, 99), false, "not in the server")
+		for _, junk in ipairs({ "1", -1, 0, 1.5, 0 / 0, math.huge, {}, true }) do
+			t.eq(s.P.Visit(bob, junk), false, tostring(junk))
+		end
+		t.eq(bob.root.Position, start)
+		t.ok(s.P.Visit(bob, 1), "and a plain visit still works")
+	end)
+
+	t.test("a visit is rate limited by the RateLimiter and a visitor with no character goes nowhere", function()
+		local s = setup({ rate = false })
+		local ann = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		bob.standOn(nil)
+		local start = bob.root.Position
+		t.eq(s.P.Visit(bob, 1), false)
+		t.eq(bob.root.Position, start)
+		local s2 = setup()
+		local ann2 = s2.newPlayer(1, "Ann")
+		local bob2 = s2.newPlayer(2, "Bob")
+		s2.claim(ann2, 1)
+		bob2.Character = nil
+		t.eq(s2.P.Visit(bob2, 1), false)
 	end)
 end

@@ -39,7 +39,7 @@ return function(t)
 	t.test("a new save has an unclaimed Campsite plot", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)
-		t.eq(data.plot, { claimed = false, tier = 1, placed = {}, squares = {}, wires = {} })
+		t.eq(data.plot, { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} })
 	end)
 
 	t.test("saves from before plots lose the old size and any old-format items", function()
@@ -566,6 +566,23 @@ return function(t)
 		data.plot.wires = 7
 		Schema.Migrate(data)
 		t.eq(data.plot.wires, {})
+	end)
+
+	t.test("plot switches: old saves get an empty list, junk is cleaned, positions survive", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.plot.switches, {})
+		data.plot.switches = nil
+		Schema.Migrate(data)
+		t.eq(data.plot.switches, {})
+		data.plot.switches = { "a", "a", "", 4, "b" }
+		Schema.Migrate(data)
+		t.eq(data.plot.switches, { "a", "b" })
+		data.plot.switches = "on"
+		Schema.Migrate(data)
+		t.eq(data.plot.switches, {})
+		-- Other plot fields are left as they were.
+		t.eq(data.plot.wires, {})
+		t.eq(data.plot.tier, 1)
 	end)
 
 	t.test("a wrong-typed foundations field resets to the default and does not error", function()
