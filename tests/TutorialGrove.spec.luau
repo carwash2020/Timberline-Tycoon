@@ -222,7 +222,7 @@ return function(t)
 				volume += SectionLogic.Volume(section.thickness, section.length, section.thickness)
 			end
 			t.ok(volume > 5, "a real tree")
-			t.ok(volume <= TutorialGrove.MaxVolume, string.format("seed %d is %0.1f u³", seed, volume))
+			t.ok(volume <= TutorialGrove.MaxVolume, string.format("seed %d is %0.1f", seed, volume))
 		end
 	end)
 end

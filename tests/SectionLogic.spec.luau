@@ -208,8 +208,8 @@ return function(t)
 			t.ok((high.cf.Position - (s.cf * Vector3.new(0, h, 0))).Magnitude < 1e-5, "the high half starts at the cut")
 			t.ok((low.cf.Position - s.cf.Position).Magnitude < 1e-9, "the low half's bottom stays")
 		end
-		t.ok(math.abs(SectionLogic.Volume(1.6, 1.6, 1.6) - 1) < 1e-9, "one u³")
-		t.ok(math.abs(SectionLogic.Value(26, 1.5) - 39) < 1e-9, "26 u³ of oak is $39")
+		t.ok(math.abs(SectionLogic.Volume(1.6, 1.6, 1.6) - 1) < 1e-9, "one")
+		t.ok(math.abs(SectionLogic.Value(26, 1.5) - 39) < 1e-9, "26 of oak is $39")
 	end)
 
 	t.test("cutting any section of a tree leaves exactly two pieces", function()

@@ -276,7 +276,7 @@ return function(t)
 		t.eq(count("plantSeeds", "treeFelled"), 0, "a retired kind counts nothing")
 		t.eq(count("sellVolume", "woodSold", nil, sale), 26.5, "u³")
 		t.eq(count("earnCash", "woodSold", nil, sale), 39, "$")
-		t.eq(count("sellWoodVolume", "woodSold", nil, sale, "birch"), 6.5, "that wood's u³")
+		t.eq(count("sellWoodVolume", "woodSold", nil, sale, "birch"), 6.5, "that wood's")
 		t.eq(count("sellWoodVolume", "woodSold", nil, sale, "pine"), 0)
 		t.eq(count("sellPieces", "woodSold", nil, sale), 3, "pieces of MinPieceVolumeV2 or more")
 		t.eq(DailyData.MinPieceVolumeV2, 1)
@@ -326,7 +326,7 @@ return function(t)
 		t.eq(DailyData.Decode(text)[1].wood, "birch")
 	end)
 
-	t.test("v2: goal and progress text in u³, dollars and pieces", function()
+	t.test("v2: goal and progress text in, dollars and pieces", function()
 		local V, C = FieldGuide.VolumeText, FieldGuide.CashText
 		local function g(kind, target, progress, wood)
 			return { kind = kind, target = target, progress = progress or 0, reward = 1, wood = wood, done = false }
@@ -338,7 +338,7 @@ return function(t)
 		t.eq(DailyData.GoalText(g("sellWoodVolume", 20, 0, "birch")), "Sell " .. V(20) .. " of birch")
 		t.eq(DailyData.GoalText(g("sellPieces", 6)), "Sell 6 logs of " .. V(DailyData.MinPieceVolumeV2) .. " or more")
 		t.eq(DailyData.GoalText(g("sellFiguredVolume", 10)), "Sell " .. V(10) .. " of figured wood (read the bark!)")
-		t.eq(DailyData.ProgressText(g("sellVolume", 40, 12.8)), "(12/40 u³)")
+		t.eq(DailyData.ProgressText(g("sellVolume", 40, 12.8)), "(12/40)")
 		t.eq(DailyData.ProgressText(g("earnCash", 60, 23.5)), "(" .. C(23.5) .. "/" .. C(60) .. ")")
 		t.eq(DailyData.ProgressText(g("earnCash", 60, 23)), "($23/$60)")
 		t.eq(DailyData.ProgressText(g("fellTrees", 3, 1)), "(1/3)")
@@ -347,7 +347,7 @@ return function(t)
 		for _, kind in ipairs(DailyData.KindsV2) do
 			local text = DailyData.GoalText(g(kind, 5, 0, "oak"))
 			t.ok(#text > 0 and not string.find(text, "  ", 1, true), kind .. ": " .. text)
-			-- Only the pieces goal counts logs; the rest are u³, dollars, trees, seeds.
+			-- Only the pieces goal counts logs; the rest are, dollars, trees, seeds.
 			t.eq(string.find(text, "logs", 1, true) ~= nil, kind == "sellPieces", kind .. ": " .. text)
 		end
 	end)

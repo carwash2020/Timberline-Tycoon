@@ -166,7 +166,7 @@ return function(t)
 		t.eq(data.schema, 5)
 	end)
 
-	t.test("MigrateV2 converts the forge's lumenwood logs to u³, capped at the recipe, and keeps forgeLogs", function()
+	t.test("MigrateV2 converts the forge's lumenwood logs to, capped at the recipe, and keeps forgeLogs", function()
 		local Schema, data = v1Save()
 		Schema.MigrateV2(data, 20)
 		t.eq(data.forgeWood.lumenwood, 18) -- 12 logs x 1.5

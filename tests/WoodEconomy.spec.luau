@@ -15,7 +15,7 @@ return function(t)
 			t.ok(wood.v2.plankPrice >= wood.v2.logPrice * WoodData.PlankFloor - 1e-9, wood.id .. " floor")
 		end
 		local oak = WoodData.Get("oak").v2
-		-- 10 u³ of oak planks pays the floor multiple of 10 u³ of oak logs.
+		-- 10 of oak planks pays the floor multiple of 10 of oak logs.
 		local logs = SellLogic.PieceValue("oak", "log", 10, nil, 1)
 		local planks = SellLogic.PieceValue("oak", "plank", 10, nil, 1)
 		t.eq(logs, 10 * oak.logPrice)

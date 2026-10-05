@@ -332,7 +332,7 @@ return function(t)
 		for _, z in ipairs(w.TruckArt.BedZones(truck)) do
 			room += z.zone:GetAttribute("Room")
 		end
-		t.ok(math.abs(truck:GetAttribute("BedRoom") - room) < 0.051, "BedRoom: both beds' u³ a trip")
+		t.ok(math.abs(truck:GetAttribute("BedRoom") - room) < 0.051, "BedRoom: both beds' a trip")
 		t.eq(dale:GetAttribute("BedLength"), 13, "the longest bed (Rustbucket 13, Pony 13: phase 12's 1.3x)")
 		-- Sold off the bed: the numbers follow (once a second).
 		b.model:Destroy()

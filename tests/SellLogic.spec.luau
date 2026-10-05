@@ -1,5 +1,5 @@
 --!nocheck
--- SellLogic (V2_PLAN.md §5): wood is worth volume x price per u³ x figure x
+-- SellLogic (V2_PLAN.md §5): wood is worth volume x price per x figure x
 -- boost, a sale pays the owner (or the last holder), and the toast reads well.
 
 return function(t)
@@ -12,9 +12,9 @@ return function(t)
 		t.ok(math.abs(a - b) <= eps, string.format("%s: %.4f vs %.4f", what, a, b))
 	end
 
-	t.test("volume is in timber units: a u-sided cube is 1 u³", function()
+	t.test("volume is in timber units: a u-sided cube is 1", function()
 		local u = GameConfig.WoodUnit
-		near(SellLogic.VolumeU3(u, u, u), 1, 1e-9, "one u³")
+		near(SellLogic.VolumeU3(u, u, u), 1, 1e-9, "one")
 		near(SellLogic.VolumeU3(2 * u, u, 3 * u), 6, 1e-9, "six")
 	end)
 
@@ -73,10 +73,10 @@ return function(t)
 		t.eq(SellLogic.Payee(nil, nil, online), nil)
 	end)
 
-	t.test("the sale toast: pieces, u³ and dollars", function()
-		t.eq(SellLogic.SaleText(3, 41.2, 96), "Sold 3 pieces · 41 u³ · $96")
-		t.eq(SellLogic.SaleText(1, 2.5, 4), "Sold 1 piece · 2.5 u³ · $4")
-		t.eq(SellLogic.SaleText(2, 3, 1234567), "Sold 2 pieces · 3 u³ · $1,234,567")
+	t.test("the sale toast: pieces, and dollars", function()
+		t.eq(SellLogic.SaleText(3, 41.2, 96), "Sold 3 pieces · 41 · $96")
+		t.eq(SellLogic.SaleText(1, 2.5, 4), "Sold 1 piece · 2.5 · $4")
+		t.eq(SellLogic.SaleText(2, 3, 1234567), "Sold 2 pieces · 3 · $1,234,567")
 		t.eq(SellLogic.Money(999), "999")
 		t.eq(SellLogic.Money(1000), "1,000")
 	end)
@@ -84,12 +84,12 @@ return function(t)
 	t.test("a mature-ish oak trunk (2 x 9 x 2 studs) sells for about $10 as a log", function()
 		local u3 = SellLogic.VolumeU3(2, 9, 2)
 		local v = SellLogic.PieceValue("oak", "log", u3, nil, 1)
-		t.ok(v > 7 and v < 15, string.format("$%.2f for %.1f u³", v, u3))
+		t.ok(v > 7 and v < 15, string.format("$%.2f for %.1f", v, u3))
 	end)
 
 	-- M1.7b: the Sky Bin keeps pieces as short entries and pays them as the
 	-- pad would have.
-	t.test("a Sky Bin entry keeps wood, u³, figure, plank and a boost over 1", function()
+	t.test("a Sky Bin entry keeps wood,, figure, plank and a boost over 1", function()
 		t.eq(SellLogic.Entry("oak", "log", 4, nil, 1), { w = "oak", v = 4 })
 		t.eq(SellLogic.Entry("maple", "plank", 2.5, "curly", 2), { w = "maple", v = 2.5, f = "curly", p = true, b = 2 })
 		t.eq(SellLogic.Entry("oak", "log", 4, nil, 0 / 0), { w = "oak", v = 4 }, "a broken boost is 1")
@@ -125,8 +125,8 @@ return function(t)
 		t.ok(SellLogic.Fits(100, 20, 120), "exactly full fits")
 		t.ok(not SellLogic.Fits(100, 20.5, 120))
 		t.ok(SellLogic.Fits(0.1 + 0.2, 119.7, 120), "float noise doesn't refuse")
-		t.eq(SellLogic.BinText(14, 120), "14/120 u³")
-		t.eq(SellLogic.BinText(0, 120), "0/120 u³")
-		t.eq(SellLogic.BinText(4.25, 120), "4.3/120 u³")
+		t.eq(SellLogic.BinText(14, 120), "14/120")
+		t.eq(SellLogic.BinText(0, 120), "0/120")
+		t.eq(SellLogic.BinText(4.25, 120), "4.3/120")
 	end)
 end

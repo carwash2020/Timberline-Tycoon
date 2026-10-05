@@ -153,7 +153,7 @@ function ForgeLogic.MissingV2(recipe: RecipeV2, stock: StockV2): { string }
 	for _, id in ipairs(sortedKeys(recipe.wood)) do
 		local short = ForgeLogic.WoodWanted(recipe, stock, id)
 		if short > 0 then
-			table.insert(out, string.format("%s more u³ of %s", tenthsUp(short), woodName(id)))
+			table.insert(out, string.format("%s more %s", tenthsUp(short), woodName(id)))
 		end
 	end
 	for _, id in ipairs(sortedKeys(recipe.materials)) do
@@ -170,10 +170,7 @@ end
 function ForgeLogic.ProgressV2(recipe: RecipeV2, stock: StockV2): string
 	local parts: { string } = {}
 	for id, need in pairs(recipe.wood) do
-		table.insert(
-			parts,
-			string.format("%s %s/%s u³", woodName(id), tenthsDown(stock.wood[id] or 0), tenthsDown(need))
-		)
+		table.insert(parts, string.format("%s %s/%s", woodName(id), tenthsDown(stock.wood[id] or 0), tenthsDown(need)))
 	end
 	for id, need in pairs(recipe.materials) do
 		local material = ItemCatalog.Materials[id]

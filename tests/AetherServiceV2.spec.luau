@@ -5,10 +5,10 @@
 -- ProximityPrompts (Lune's have no events). Real Lune instances for the
 -- wood and the hoppers. It proves:
 --   * a piece resting in a Cloud Chute's hopper goes down into its payee's
---     Sky Bin as an entry (wood, u³, figure, plank, boost), after the
+--     Sky Bin as an entry (wood,, figure, plank, boost), after the
 --     settle time, released, forgotten and destroyed, with one toast;
 --   * a piece beside the hopper, or that leaves it, isn't taken;
---   * the bin holds 120 u³: a piece that won't fit stays, with a toast at
+--   * the bin holds 120: a piece that won't fit stays, with a toast at
 --     most every few seconds;
 --   * an offline owner's piece goes to its last holder; nobody online, it
 --     stays; a piece already going, dead, a shop's or unknown stays;
@@ -17,7 +17,7 @@
 --     (as a pad sale), empties it, only from beside the bin, rate-limited,
 --     and keeps it while the pad isn't selling;
 --   * the hoppers' boxes fit BuildingArt's chute and forge;
---   * the Starfall Forge takes plain lumenwood's u³ up to the recipe (60)
+--   * the Starfall Forge takes plain lumenwood's up to the recipe (60)
 --     and refuses other woods, figured wood and wood past the recipe;
 --     "Forge" spends forgeWood and never touches forgeLogs;
 --   * wood that falls off the isles is lost to the clouds (one toast to its
@@ -225,7 +225,7 @@ return function(t)
 		local folder = Instance.new("Folder")
 		folder.Name = "Wood"
 		s.folder = folder
-		-- A one-part piece of `woodId`, `volume` u³, whose part (and middle)
+		-- A one-part piece of `woodId`, `volume`, whose part (and middle)
 		-- is at `at` (on top of the chute by default).
 		function s.piece(id, owner, woodId, volume, extra, at)
 			extra = extra or {}
@@ -322,7 +322,7 @@ return function(t)
 		t.eq(s.released, { m })
 		t.eq(s.forgotten, { m })
 		t.eq(s.players[1].attrs.SkyBinVolume, 2.5)
-		t.eq(toastsFor(s, 1), { "Sent 1 piece down the Cloud Chute. Sky Bin 2.5/120 u³." })
+		t.eq(toastsFor(s, 1), { "Sent 1 piece down the Cloud Chute. Sky Bin 2.5/120." })
 		-- A plain log keeps only its wood and volume.
 		s.piece("b", 1, "lumenwood", 12)
 		s.settle()
@@ -350,7 +350,7 @@ return function(t)
 		t.ok(s.gone(m))
 	end)
 
-	t.test("the bin holds 120 u³: a piece that won't fit stays, and says so now and then", function()
+	t.test("the bin holds 120: a piece that won't fit stays, and says so now and then", function()
 		local s = setup()
 		s.profiles[1].skyWood = { { w = "oak", v = 60 }, { w = "pine", v = 40 } }
 		local big = s.piece("a", 1, "lumenwood", 30)
@@ -358,7 +358,7 @@ return function(t)
 		t.ok(not s.gone(big), "left where it is")
 		t.eq(#s.forgotten, 0)
 		t.eq(#s.profiles[1].skyWood, 2)
-		t.eq(toastsFor(s, 1), { "Your Sky Bin is full (120 u³). Sell it at the sawmill." })
+		t.eq(toastsFor(s, 1), { "Your Sky Bin is full (120). Sell it at the sawmill." })
 		s.tick(1)
 		s.tick(1)
 		t.eq(#toastsFor(s, 1), 1, "not every poll")
@@ -373,7 +373,7 @@ return function(t)
 		local s2 = setup()
 		s2.piece("c", 1, "pine", 130)
 		s2.settle()
-		t.eq(toastsFor(s2, 1), { "That piece is too big for the Sky Bin (120 u³). Cut it smaller." })
+		t.eq(toastsFor(s2, 1), { "That piece is too big for the Sky Bin (120). Cut it smaller." })
 	end)
 
 	t.test("an offline owner's piece goes to its last holder; with nobody online it stays", function()
@@ -420,7 +420,7 @@ return function(t)
 		s.chutePrompt.fire(s.player(1))
 		t.eq(
 			toastsFor(s, 1),
-			{ "Lay wood in the Cloud Chute and it goes down to your Sky Bin by the sawmill. Sky Bin 14/120 u³." }
+			{ "Lay wood in the Cloud Chute and it goes down to your Sky Bin by the sawmill. Sky Bin 14/120." }
 		)
 	end)
 
@@ -508,7 +508,7 @@ return function(t)
 		t.ok(not inside(ccf, csize, step.CFrame * Vector3.new(0, step.Size.Y / 2, 0) + UP * 1.3), "on its step")
 	end)
 
-	t.test("the forge takes plain lumenwood's u³ up to 60 and leaves forgeLogs alone", function()
+	t.test("the forge takes plain lumenwood's up to 60 and leaves forgeLogs alone", function()
 		local s = setup()
 		local profile = s.profiles[1]
 		profile.forgeWood = { lumenwood = 50 }
@@ -518,15 +518,12 @@ return function(t)
 		t.ok(s.gone(a), "into the forge")
 		t.eq(profile.forgeWood.lumenwood, 54)
 		t.eq(s.players[1].attrs.ForgeWood, "lumenwood=54")
-		t.eq(toastsFor(s, 1), { "Into the forge: 4 u³. Lumenwood 54/60 u³ · Sky Shards 0/12 · $20,000" })
+		t.eq(toastsFor(s, 1), { "Into the forge: 4. Lumenwood 54/60 · Sky Shards 0/12 · $20,000" })
 		local b = s.piece("b", 1, "lumenwood", 10, nil, s.onHearth)
 		s.settle()
 		t.ok(s.gone(b), "a piece bigger than what's left is used up")
 		t.eq(profile.forgeWood.lumenwood, 60, "never past the recipe")
-		t.eq(
-			toastsFor(s, 1)[2],
-			"Into the forge: 6 u³ (all it needed). Lumenwood 60/60 u³ · Sky Shards 0/12 · $20,000"
-		)
+		t.eq(toastsFor(s, 1)[2], "Into the forge: 6 (all it needed). Lumenwood 60/60 · Sky Shards 0/12 · $20,000")
 		local c = s.piece("c", 1, "lumenwood", 3, nil, s.onHearth)
 		s.settle()
 		t.ok(not s.gone(c), "full: it stays")
@@ -556,7 +553,7 @@ return function(t)
 		end
 	)
 
-	t.test("Forge under v2 spends forgeWood, keeps forgeLogs, and says what's short in u³", function()
+	t.test("Forge under v2 spends forgeWood, keeps forgeLogs, and says what's short in", function()
 		local s = setup()
 		local profile = s.profiles[1]
 		profile.cash = 70000
@@ -566,7 +563,7 @@ return function(t)
 		local forgePrompt = s.byV1["Forge the Starfall Axe"]
 		forgePrompt.fire(s.player(1))
 		t.eq(s.granted, {})
-		t.eq(toastsFor(s, 1), { "The forge needs 12.5 more u³ of Lumenwood." })
+		t.eq(toastsFor(s, 1), { "The forge needs 12.5 more Lumenwood." })
 		t.eq(profile.cash, 70000)
 		profile.forgeWood.lumenwood = 60
 		forgePrompt.fire(s.player(1))
@@ -591,7 +588,7 @@ return function(t)
 		s.profiles[1].materials = { SkyShard = 5 }
 		feed.fire(s.player(1))
 		t.eq(toastsFor(s, 1), {
-			"Lay plain Lumenwood on the forge to feed it. Lumenwood 18/60 u³ · Sky Shards 5/12 · $20,000",
+			"Lay plain Lumenwood on the forge to feed it. Lumenwood 18/60 · Sky Shards 5/12 · $20,000",
 		})
 	end)
 

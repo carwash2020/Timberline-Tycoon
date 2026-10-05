@@ -313,18 +313,18 @@ return function(t)
 		t.ok(string.find(pine, "; Hardened Axe: 16$") ~= nil, "pine names the first axe at a useful pace: " .. pine)
 	end)
 
-	t.test("v2: how u³, $/u³ and cash read (rounding)", function()
+	t.test("v2: how, $/u³ and cash read (rounding)", function()
 		local V = FieldGuide.VolumeText
-		t.eq(V(26.4), "26 u³")
-		t.eq(V(26.5), "27 u³", "half up")
-		t.eq(V(4.44), "4.4 u³", "one decimal under 10")
-		t.eq(V(3.96), "4 u³", "no trailing .0")
-		t.eq(V(9.94), "9.9 u³")
-		t.eq(V(9.96), "10 u³")
-		t.eq(V(0.04), "0.1 u³", "something is never 0")
-		t.eq(V(1234.5), "1,235 u³")
+		t.eq(V(26.4), "26")
+		t.eq(V(26.5), "27", "half up")
+		t.eq(V(4.44), "4.4", "one decimal under 10")
+		t.eq(V(3.96), "4", "no trailing .0")
+		t.eq(V(9.94), "9.9")
+		t.eq(V(9.96), "10")
+		t.eq(V(0.04), "0.1", "something is never 0")
+		t.eq(V(1234.5), "1,235")
 		for _, junk in ipairs({ 0, -3, 0 / 0, math.huge, "5" }) do
-			t.eq(V(junk), "0 u³", tostring(junk))
+			t.eq(V(junk), "0", tostring(junk))
 		end
 		t.eq(FieldGuide.VolumeNumber(41.2), "41")
 		local P = FieldGuide.PriceText

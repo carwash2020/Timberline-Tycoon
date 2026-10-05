@@ -256,7 +256,7 @@ function FieldGuide.VolumeNumber(volume: unknown): string
 end
 
 function FieldGuide.VolumeText(volume: unknown): string
-	return FieldGuide.VolumeNumber(volume) .. " u³"
+	return FieldGuide.VolumeNumber(volume)
 end
 
 -- A price (per unit, but players see just the dollars): "$9/u³", "$1.50/u³" (cents only when there are any).

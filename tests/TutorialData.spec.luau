@@ -685,7 +685,7 @@ return function(t)
 		)
 	end)
 
-	t.test("the plot line names no direction, and the mill's u³ tip moved to the farewell", function()
+	t.test("the plot line names no direction, and the mill's tip moved to the farewell", function()
 		local plot, mill
 		for _, step in ipairs(V2) do
 			if step.id == "plot" then
@@ -701,7 +701,7 @@ return function(t)
 		t.ok(string.find(mill.murph, "SELL LOGS HERE", 1, true))
 		t.ok(not string.find(mill.murph, "u³", 1, true))
 		t.ok(not string.find(string.lower(mill.murph), "plank"))
-		t.ok(not string.find(TutorialData.Farewell, "u³", 1, true), "players never see u³")
+		t.ok(not string.find(TutorialData.Farewell, "u³", 1, true), "players never see")
 		t.ok(string.find(string.lower(TutorialData.Farewell), "plank"))
 	end)
 
