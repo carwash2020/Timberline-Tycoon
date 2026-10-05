@@ -1377,11 +1377,10 @@ Where it differs from the spec, and why:
 
 New pieces, all cash only (no gathered materials): `Shared/DecorData` (Table
 $90, Chair $50, Bookshelf $140, Rug $60, Barrel $70, Crate $60, Fire Pit
-$110) and `Shared/LogicItems` (Wall Switch $100, Spark Lamp $150). Table,
-Chair and the two logic pieces are `unlock` boxes at Hearth & Home (buy once,
-place free). The shelf holds 14 boxes and is now full: more `unlock` pieces
-need a longer shelf (StoreStock layout and BuildingArt). The rest are paid
-per placement from BUILD, like the Bench.
+$110) and `Shared/LogicItems` (Wall Switch $100, Spark Lamp $150). all
+nine are `unlock` boxes at Hearth & Home (buy once, place free; the box
+costs what the piece did). The shelves run 19.6 studs, ten boxes a side (20
+slots, 19 used); only kit pieces (walls, floors) are paid per placement.
 
 Wiring (`Shared/WireLogic`, `SSS/LogicService`, saved in `plot.wires`): a
 switch has Flip (E / ButtonX) and Wire (hold F / ButtonY). Wire links the
@@ -1392,10 +1391,11 @@ The Wire remote carries (fromUid, 1, toUid, 1) or ("cut", uid) for a future
 tool; there is no client wiring UI yet and no drawn wire.
 
 Studio checks
-1. Hearth & Home: 14 boxes, none off the shelf, Table / Chair / Wall Switch /
-   Spark Lamp among them. Buy a Wall Switch, open its box on your plot.
-2. BUILD menu: Bookshelf, Rug, Barrel, Crate, Fire Pit appear, price on the
-   card. Place on phone (tap), PC (click), Xbox (RT, D-pad Right rotates).
+1. Hearth & Home: 19 boxes, ten a side on the long shelves, none floating or
+   through a wall, Bookshelf / Rug / Barrel / Crate / Fire Pit among them.
+   Buy a Wall Switch, open its box on your plot.
+2. BUILD menu: Bookshelf, Rug, Barrel, Crate, Fire Pit say "At the store"
+   until bought, then place free. Place on phone (tap), PC (click), Xbox (RT, D-pad Right rotates).
    Overlap and plot-edge ghosts go red. Fire Pit glows.
 3. Place a switch, a lamp 6 studs away. The lamp is lit. Hold Wire on the
    switch: "Wired to the Spark Lamp.", lamp goes dark. Tap Flip: lamp lights,
@@ -1460,3 +1460,24 @@ What changed:
       clips the Water Tower or the Cart behind it; the loading pad behind it
 - [ ] The Tool Shed mesh in Studio: the baked interior (workbench on the west
       wall) may show through the west table; tell Claude if it clips
+
+## The Robux town board, bigger (arch, banner, marker)
+
+- The board is 5.4 x 7 studs (was 4.6 square) at about (-20.5, 58.3), with
+  a tall post either side, a green STORE banner across the top (readable from
+  both sides) and a lantern on each post that lights at night (`LanternGlow`).
+  It grows up, not out: Murph's camp ring and the street leave 7.6 studs.
+  `StoreBoard.Footprint` covers the arch posts; the banner overhangs them.
+- TownMarkers has a sixth chip, STORE (gold, market-stall icon), 19 studs
+  over the board. On a phone from the spawn it is on screen at eye level and
+  may ride off the top of the tilted camera views; it never lands on another
+  chip. Preview: `bash tools/preview/shoot.sh town 17` (from the spawn) and
+  `18` (close).
+
+### Studio checks
+- [ ] From the spawn walk the STORE banner and the chip over it are easy to
+      spot; the board's lanterns are lit at night and dark by day
+- [ ] Walk up: prompt Browse (E, ButtonX, tap) opens the Store panel; walk
+      round the posts without snagging; Bram's walk and Murph's camp are clear
+- [ ] The posters on the taller board fit with room to spare; the mesh frame
+      (Studio) sits inside the arch posts, not through them

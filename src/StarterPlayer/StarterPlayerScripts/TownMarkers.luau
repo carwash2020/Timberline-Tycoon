@@ -3,7 +3,7 @@
 -- player can tell them apart from the spawn, on a phone too:
 --   SELL LOGS over the sell zone, AXES over the Tool Shed's counter, TRUCKS
 --   over the Dealership's, BLUEPRINTS & GEAR over Hearth & Home's, GONDOLA
---   over the town station's platform.
+--   over the town station's platform, STORE over the Robux store's board.
 -- Each is a BillboardGui (in PlayerGui, adorned to its part): an icon chip
 -- drawn from Frames (no uploaded images) beside its label (over it, for a
 -- two-line label, which keeps it narrow), in the UI's look:
@@ -37,7 +37,7 @@ export type Marker = {
 	name: string,
 	path: { string }, -- from TimberlineMap down to the part it floats over
 	text: string, -- one line, or two ("\n")
-	icon: string, -- "logs", "axe", "truck", "blueprint" or "gondola"
+	icon: string, -- "logs", "axe", "truck", "blueprint", "gondola" or "store"
 	chip: Color3, -- the icon chip's fill (a shop's accent)
 	offset: Vector3, -- StudsOffsetWorldSpace: from the part's middle to the marker's bottom edge
 }
@@ -94,6 +94,18 @@ TownMarkers.Markers = {
 		icon = "gondola",
 		chip = C.Sky,
 		offset = Vector3.new(4, 17.5, 0),
+	},
+	{
+		-- The Robux store's board and arch (Shared/StoreBoard): over the
+		-- board's middle, 19 up (about 22 studs over the ground), above
+		-- the banner and its lanterns, and high enough on a phone from the
+		-- spawn to clear the Tool Shed's and Hearth & Home's chips.
+		name = "Store",
+		path = { "StoreBoard", "Board" },
+		text = "STORE",
+		icon = "store",
+		chip = C.AmberDeep,
+		offset = Vector3.new(0, 19, 0),
 	},
 } :: { Marker }
 
@@ -244,6 +256,20 @@ local ICONS: { [string]: (GuiObject) -> () } = {
 		piece(sheet, "Wall", 0.69, 0.53, 0.04, 0.3, C.Cream)
 		piece(sheet, "Roof", 0.4, 0.3, 0.27, 0.05, C.Cream, -32)
 		piece(sheet, "Roof", 0.6, 0.3, 0.27, 0.05, C.Cream, 32)
+	end,
+	-- A market stall: a striped awning over a counter, a coin on it.
+	store = function(chip)
+		local awning = piece(chip, "Awning", 0.5, 0.3, 0.8, 0.2, C.Cream, 0, 0.2)
+		outline(awning, C.Ink, 1.5)
+		for _, x in ipairs({ 0.25, 0.5, 0.75 }) do
+			piece(awning, "Stripe", x, 0.5, 0.14, 0.9, C.Blue)
+		end
+		for _, x in ipairs({ 0.2, 0.8 }) do
+			piece(chip, "Post", x, 0.62, 0.07, 0.4, C.Ink)
+		end
+		piece(chip, "Counter", 0.5, 0.78, 0.7, 0.16, C.Ink, 0, 0.15)
+		local coin = piece(chip, "Coin", 0.5, 0.6, 0.22, 0.22, C.Amber, 0, 0.5)
+		outline(coin, C.Ink, 1.5)
 	end,
 	-- A cabin hanging from its cable.
 	gondola = function(chip)

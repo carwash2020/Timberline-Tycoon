@@ -9,9 +9,9 @@
 -- Prices stay in the range of the older decor: $50 to $140.
 --
 -- `unlock = true` pieces are bought once, boxed, at Hearth & Home, and then
--- placed free (StoreStock stocks them from this flag). The Hearth & Home
--- shelf holds 14 boxes, so only the two pieces you want many of carry the
--- flag. The rest are paid for each time you place one, like the Bench.
+-- placed free (StoreStock stocks them from this flag). Every piece here
+-- carries it: the Hearth & Home shelves run 20 boxes long. Only kit pieces
+-- (walls, floors) are still paid for each time you place one.
 -- Pieces stay at five boxes or fewer (DecorData.spec holds the budget).
 
 local V2 = Vector2.new
@@ -59,6 +59,7 @@ return {
 		id = "Bookshelf",
 		displayName = "Bookshelf",
 		priceCash = 140,
+		unlock = true,
 		footprint = V2(4, 2),
 		boxes = {
 			{ size = V3(4, 5.6, 0.3), offset = V3(0, 2.8, 0.7), color = WOOD, material = "WoodPlanks" },
@@ -73,6 +74,7 @@ return {
 		id = "Rug",
 		displayName = "Rug",
 		priceCash = 60,
+		unlock = true,
 		footprint = V2(6, 4),
 		boxes = {
 			{ size = V3(6, 0.15, 4), offset = V3(0, 0.075, 0), color = "#8E3B3B", material = "Fabric" },
@@ -83,6 +85,7 @@ return {
 		id = "Barrel",
 		displayName = "Barrel",
 		priceCash = 70,
+		unlock = true,
 		footprint = V2(2, 2),
 		boxes = {
 			{ size = V3(1.6, 2.2, 1.6), offset = V3(0, 1.1, 0), color = WOOD_LIGHT, material = "Wood" },
@@ -93,6 +96,7 @@ return {
 		id = "Crate",
 		displayName = "Crate",
 		priceCash = 60,
+		unlock = true,
 		footprint = V2(2, 2),
 		boxes = {
 			{ size = V3(1.8, 1.8, 1.8), offset = V3(0, 0.9, 0), color = WOOD, material = "WoodPlanks" },
@@ -103,6 +107,7 @@ return {
 		id = "FirePit",
 		displayName = "Fire Pit",
 		priceCash = 110,
+		unlock = true,
 		footprint = V2(4, 4),
 		boxes = {
 			{ size = V3(3.6, 0.6, 3.6), offset = V3(0, 0.3, 0), color = "#8C8680", material = "Slate" },

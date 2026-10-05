@@ -1482,8 +1482,9 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	-- Shelves down each side. The gap between them is the aisle.
 	for _, side in ipairs({ -1, 1 }) do
 		local x = side * 12
+		-- 19.6 long (z -10.5 to 9.1): ten boxes a side, clear of the back ledge.
 		for _, y in ipairs({ 3.2, 6.2 }) do
-			Kit.part(model, "Shelf", V3(3.2, 0.3, 14), CF(x, y, 1), wood, MAT.Wood)
+			Kit.part(model, "Shelf", V3(3.2, 0.3, 19.6), CF(x, y, -0.7), wood, MAT.Wood)
 		end
 	end
 

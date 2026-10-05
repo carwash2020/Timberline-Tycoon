@@ -105,4 +105,76 @@ return function(t)
 			check(product)
 		end
 	end)
+
+	t.test("the board is big and easy to find: a 7 stud tall board, a large heading, and a lit arch", function()
+		local Enum = t.roblox.Enum
+		local size = StoreBoard.BoardSize
+		t.ok(size.X >= 5 and size.Y >= 7, "at least 5 wide and 7 tall (it was 4.6 square)")
+		local model = StoreBoard.Build()
+		local board = model:FindFirstChild("Board")
+		t.ok((board.Size - size).Magnitude < 1e-3)
+		local gui = model:FindFirstChild("Posters", true)
+		t.ok(math.abs(gui.CanvasSize.Y / gui.CanvasSize.X - size.Y / size.X) < 0.01, "the canvas has the face's shape")
+		local heading
+		for _, d in ipairs(gui:GetDescendants()) do
+			if d:IsA("TextLabel") and d.Text == "TIMBERLINE STORE" then
+				heading = d
+			end
+		end
+		t.ok(heading and heading.TextSize >= 30, "the heading is at least 30 px on a 400 px canvas")
+		-- The arch: two collidable posts a board's width out, a banner over the
+		-- board that reads STORE on both faces, and a lantern on each post.
+		local posts = 0
+		for _, d in ipairs(model:GetChildren()) do
+			if d.Name == "ArchPost" then
+				posts += 1
+				t.ok(d.CanCollide, "posts are solid")
+				t.ok(d.Size.Y >= size.Y + 3, "posts stand over the board")
+			end
+		end
+		t.eq(posts, 2)
+		local banner = model:FindFirstChild("Banner")
+		t.ok(banner, "a banner")
+		t.eq(banner.CanCollide, false)
+		t.ok(banner.Size.X > size.X + 2, "wider than the board and its posts")
+		local faces = 0
+		for _, d in ipairs(banner:GetChildren()) do
+			if d:IsA("SurfaceGui") then
+				local label = d:FindFirstChildWhichIsA("TextLabel")
+				t.eq(label.Text, StoreBoard.BannerText)
+				faces += 1
+			end
+		end
+		t.eq(faces, 2, "reads from both sides")
+		local lamps = 0
+		for _, d in ipairs(model:GetChildren()) do
+			if d.Name == "LanternGlow" then
+				lamps += 1
+				t.eq(d.Material, Enum.Material.Neon)
+				t.eq(d.CanCollide, false)
+			end
+		end
+		t.eq(lamps, 2, "LanternGlow, so the night lights switch them")
+		local parts = 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				parts += 1
+			end
+		end
+		t.ok(parts <= 16, "the board stays cheap: " .. parts)
+		local prompt = model:FindFirstChild("StorePrompt", true)
+		t.eq(prompt.ActionText, "Browse")
+		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")
+	end)
+
+	t.test("the footprint covers the arch and stays out of the camp and off the spawn walk", function()
+		local x0, x1, z0, z1 = StoreBoard.Footprint()
+		t.ok(z1 - z0 >= 2 * StoreBoard.ArchHalf, "the arch's posts are inside it")
+		t.ok(z1 <= 62, "south of the street")
+		t.ok(x1 < -15, "west of the spawn walk")
+		-- Murph's camp ring (radius 12 round (-28, 45)).
+		local nearX = math.clamp(-28, x0, x1)
+		local nearZ = math.clamp(45, z0, z1)
+		t.ok((nearX + 28) ^ 2 + (nearZ - 45) ^ 2 > 12 ^ 2, "camp")
+	end)
 end
