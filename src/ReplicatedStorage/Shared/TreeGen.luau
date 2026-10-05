@@ -97,7 +97,7 @@ TreeGen.Budgets = {
 	emberwood = 42,
 	phantomwood = 44,
 	lumenwood = 40,
-	lanternwood = 48, -- tightened after a part-count pass; TBD (Builder)
+	lanternwood = 48, -- tightened after a part-count pass
 } :: { [string]: number }
 TreeGen.DefaultBudget = 48
 
@@ -111,14 +111,14 @@ TreeGen.Stages = { 0.25, 0.5, 0.75, 1 }
 TreeGen.SizeScales = { small = 0.85, normal = 1, large = 1.15 } :: { [string]: number }
 TreeGen.WispSize = 4.2 -- a gloamwood wisp's size at scale 1
 TreeGen.TierOverlap = 0.42 -- of a conifer tier's height, inside the next one up
--- Lanternwood's thin heartwood collar. TBD (Builder).
-TreeGen.CoreBandAlong = 0.42 -- along the first trunk section. TBD (Builder)
-TreeGen.CoreBandStep = 0.16 -- the next collar sits this much further up. TBD (Builder)
-TreeGen.CoreBandAlongLo = 0.2 -- TBD (Builder)
-TreeGen.CoreBandAlongHi = 0.8 -- TBD (Builder)
-TreeGen.CoreBandThin = 0.14 -- of the trunk's thickness, along the trunk. TBD (Builder)
-TreeGen.CoreBandMin = 0.22 -- studs, the collar never thinner than this. TBD (Builder)
-TreeGen.CoreBandOver = 1.08 -- diameter over the trunk, so the collar shows. TBD (Builder)
+-- Lanternwood's thin heartwood collar.
+TreeGen.CoreBandAlong = 0.42 -- along the first trunk section.
+TreeGen.CoreBandStep = 0.16 -- the next collar sits this much further up.
+TreeGen.CoreBandAlongLo = 0.2
+TreeGen.CoreBandAlongHi = 0.8
+TreeGen.CoreBandThin = 0.14 -- of the trunk's thickness, along the trunk.
+TreeGen.CoreBandMin = 0.22 -- studs, the collar never thinner than this.
+TreeGen.CoreBandOver = 1.08 -- diameter over the trunk, so the collar shows.
 
 -- The look of each canopy, beyond the shape data (art tuning, not balance).
 -- A leafy crown is a few leaf masses, each a lumpy blob of parts sized to
@@ -230,21 +230,21 @@ local LOOKS: { [string]: Look } = {
 		rise = 0.08,
 		out = 0.22,
 	},
-	-- Compact broadleaf. TBD (Builder).
+	-- Compact broadleaf.
 	lanternwood = {
-		leafShare = 0.6, -- TBD (Builder)
-		size = 1.1, -- TBD (Builder)
-		clusterY = 0.8, -- TBD (Builder)
-		lift = 0.16, -- TBD (Builder)
-		merge = 0.75, -- TBD (Builder)
-		massParts = 4, -- TBD (Builder)
-		maxParts = 6, -- TBD (Builder)
-		maxGrow = 1.6, -- TBD (Builder)
-		flatten = 0.2, -- TBD (Builder)
-		layers = 0, -- TBD (Builder)
-		fill = 0.7, -- TBD (Builder)
-		rise = 0.28, -- TBD (Builder)
-		out = 0.08, -- TBD (Builder)
+		leafShare = 0.6,
+		size = 1.1,
+		clusterY = 0.8,
+		lift = 0.16,
+		merge = 0.75,
+		massParts = 4,
+		maxParts = 6,
+		maxGrow = 1.6,
+		flatten = 0.2,
+		layers = 0,
+		fill = 0.7,
+		rise = 0.28,
+		out = 0.08,
 	},
 	lumenwood = {
 		leafShare = 0.62,

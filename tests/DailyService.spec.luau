@@ -11,7 +11,16 @@ return function(t)
 			totalEarned = 0,
 			bestAxeTier = options.tier or 1,
 			tutorialDone = options.tutorialDone ~= false, -- most tests: a player past the tutorial
-			daily = options.daily or { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 },
+			-- Most tests start with today's return already paid, so cash counts only goals.
+			daily = options.daily or {
+				day = 0,
+				goals = {},
+				streak = 0,
+				bestStreak = 0,
+				lastCompleteDay = 0,
+				loginDay = 1,
+				lastLoginDay = math.floor(now / DAY),
+			},
 		}
 		local player = {
 			UserId = options.userId or 42,
@@ -268,7 +277,12 @@ return function(t)
 			t.ok(loop ~= nil, "the loop was started")
 			pcall(loop)
 			t.eq(#profile.daily.goals, 3, "new goals either way")
-			t.eq(toasts, if done then { "New daily goals are in!" } else {}, "tutorial done: " .. tostring(done))
+			-- The first sight of the day also pays the daily return (its own toast).
+			t.eq(
+				toasts,
+				if done then { "Daily return, day 1 of 7: +$15", "New daily goals are in!" } else {},
+				"tutorial done: " .. tostring(done)
+			)
 		end
 	end)
 
@@ -440,5 +454,22 @@ return function(t)
 		finishAllV2(s)
 		t.eq(s.toasts, {})
 		t.eq(s.profile.daily.streak, 1)
+	end)
+
+	t.test("the daily-return calendar pays once a day through AddCash, climbs, and restarts after a gap", function()
+		local s = setup({ loop = 2, daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0 } })
+		local reward1 = s.DailyData.LoginReward(1, 1, 2)
+		t.eq(s.profile.cash, reward1, "day 1 paid on join")
+		t.eq(s.profile.daily.loginDay, 1)
+		t.eq(s.player.attrs.DailyLoginDay, 1)
+		s.Daily.Start(s.player, s.profile)
+		t.eq(s.profile.cash, reward1, "not twice the same day")
+		s.clock.now += DAY
+		s.Daily.Start(s.player, s.profile)
+		t.eq(s.profile.daily.loginDay, 2)
+		t.eq(s.profile.cash, reward1 + s.DailyData.LoginReward(1, 2, 2))
+		s.clock.now += 3 * DAY
+		s.Daily.Start(s.player, s.profile)
+		t.eq(s.profile.daily.loginDay, 1, "a missed day restarts the calendar")
 	end)
 end

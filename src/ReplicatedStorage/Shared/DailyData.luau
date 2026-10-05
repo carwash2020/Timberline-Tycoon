@@ -281,6 +281,42 @@ function DailyData.Bonus(tier: number, streak: number, loop: number?): number
 	return math.floor(reward * 2 * DailyData.StreakMultiplier(streak) + 0.5)
 end
 
+-- The daily-return calendar: sign in on consecutive UTC days and the
+-- reward grows from day 1 to day 7 (the milestone), then starts over.
+-- Missing a day starts it at day 1 again. The cash is a multiple of the
+-- tier's one-goal reward (so it stays modest at every stage), through
+-- EconomyService.AddCash like every other payout.
+DailyData.LoginDays = 7
+local LOGIN_MULTIPLIERS = { 1, 1, 2, 2, 3, 3, 5 } -- days 1..7; day 7 is the milestone
+DailyData.LoginMultipliers = LOGIN_MULTIPLIERS
+
+-- Which calendar day signing in on `today` lands on, and whether it pays:
+-- (day 1..7, paid now). `loginDay` and `lastLoginDay` are what the save
+-- holds (0 when never).
+function DailyData.LoginStep(loginDay: number?, lastLoginDay: number?, today: number): (number, boolean)
+	local day = math.floor(loginDay or 0)
+	local last = lastLoginDay or 0
+	if last == today and day >= 1 then
+		return day, false -- already paid today
+	end
+	if last == today - 1 and day >= 1 then
+		return day % DailyData.LoginDays + 1, true
+	end
+	return 1, true
+end
+
+-- The cash for calendar `day` (1..7) at `tier` (v1's or `loop`'s sizes).
+function DailyData.LoginReward(tier: number, day: number, loop: number?): number
+	local reward = if loop == 2 then scaleForV2(tier).reward else scaleFor(tier).reward
+	local index = math.clamp(math.floor(day), 1, DailyData.LoginDays)
+	return reward * LOGIN_MULTIPLIERS[index]
+end
+
+-- "Day 3: $60": one calendar cell's label.
+function DailyData.LoginText(day: number, reward: number): string
+	return string.format("Day %d: %s", day, Util.formatCash(reward))
+end
+
 -- The day number (UTC) for a unix time, and when the next day starts.
 function DailyData.Day(now: number): number
 	return now // DailyData.SecondsPerDay

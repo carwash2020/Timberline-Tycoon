@@ -22,6 +22,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
+local EventData = require(ReplicatedStorage.Shared.EventData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local HudRules = require(script.Parent.HudRules)
@@ -77,6 +78,10 @@ function DailyUI.ApplyKey(key: Enum.KeyCode): string?
 end
 
 local goalRows: { GoalRow } = {}
+local calendarCells: { { frame: Frame, label: TextLabel } } = {}
+local calendarNote: TextLabel? = nil
+local eventHeading: TextLabel? = nil -- the seasonal event's goals (EventGoals / EventInfo), hidden outside one
+local eventLines: TextLabel? = nil
 local footer: TextLabel? = nil
 local countdown: TextLabel? = nil
 
@@ -124,7 +129,95 @@ local function timeLeft(): string
 		else string.format("New goals in %dm", math.max(1, minutes))
 end
 
+-- A short cash label for a calendar cell: $15, $1.2k.
+local function shortCash(amount: number): string
+	if amount >= 1000 then
+		local short = string.gsub(string.format("$%.1fk", amount / 1000), "%.0k", "k")
+		return short
+	end
+	return "$" .. tostring(amount)
+end
+
+-- The daily-return calendar (DailyData.LoginStep): days up to the one
+-- paid today are ticked, today's is green, day 7 is the milestone.
+local function refreshCalendar()
+	local paidDay = (player:GetAttribute("DailyLoginDay") :: number?) or 0
+	local loop = CoreLoop.Active()
+	local tier = bestAxeTier()
+	for day, cell in ipairs(calendarCells) do
+		local reward = DailyData.LoginReward(tier, day, if loop == 2 then 2 else nil)
+		local label =
+			string.format("%s%d\n%s", if day == DailyData.LoginDays then "★" else "", day, shortCash(reward))
+		cell.label.Text = label
+		cell.frame.BackgroundColor3 = if day == paidDay
+			then GREEN
+			elseif day < paidDay then PAPER_DARK
+			elseif day == DailyData.LoginDays then AMBER
+			else PAPER
+		cell.label.TextColor3 = if day == paidDay then CREAM else INK
+	end
+	local note = calendarNote
+	if note then
+		local nextDay = paidDay % DailyData.LoginDays + 1
+		local nextReward = DailyData.LoginReward(tier, nextDay, if loop == 2 then 2 else nil)
+		note.Text = if paidDay == 0
+			then "Come back every day: the reward grows to a day-7 milestone."
+			else string.format(
+				"Daily return: day %d of %d paid. Tomorrow: %s%s. Miss a day and it restarts.",
+				paidDay,
+				DailyData.LoginDays,
+				Util.formatCash(nextReward),
+				if nextDay == DailyData.LoginDays then " (milestone)" else ""
+			)
+	end
+end
+
+-- The seasonal event (EventService): its themed goals, and how many days
+-- toward the cosmetic. Hidden when no event runs.
+local function refreshEvent()
+	local heading, lines = eventHeading, eventLines
+	if not heading or not lines then
+		return
+	end
+	local info = (player:GetAttribute("EventInfo") :: string?) or ""
+	local name, days, needed, cosmetic, owned = string.match(info, "^(.-)|(%d+)|(%d+)|(.-)|(%d)$")
+	heading.Visible = name ~= nil
+	lines.Visible = name ~= nil
+	if not name or not days or not needed or not cosmetic then
+		return
+	end
+	heading.Text = string.upper(name) .. " EVENT"
+	local out: { string } = {}
+	for _, row in ipairs(EventData.DecodeGoals((player:GetAttribute("EventGoals") :: string?) or "")) do
+		table.insert(
+			out,
+			string.format(
+				"%s%s (%d/%d)",
+				if row.progress >= row.target then "✓ " else "",
+				row.text,
+				row.progress,
+				row.target
+			)
+		)
+	end
+	table.insert(
+		out,
+		if owned == "1"
+			then string.format("You earned the %s!", cosmetic)
+			else string.format(
+				"Finish both on %s days to earn the %s (%s/%s). No cash: just for fun.",
+				needed,
+				cosmetic,
+				days,
+				needed
+			)
+	)
+	lines.Text = table.concat(out, "\n")
+end
+
 local function refresh()
+	refreshCalendar()
+	refreshEvent()
 	local list = goals()
 	local done = 0
 	for _, goal in ipairs(list) do
@@ -324,6 +417,43 @@ local function build()
 		table.insert(goalRows, { frame = row, text = label, reward = reward, fill = fill })
 	end
 	footer = text(p, "", UITheme.Sized("DailyFooter").text, Enum.Font.GothamMedium, 10)
+	local calendar = Instance.new("Frame")
+	calendar.Name = "Calendar"
+	calendar.LayoutOrder = 12
+	calendar.Size = UDim2.new(1, 0, 0, 46)
+	calendar.BackgroundTransparency = 1
+	calendar.Parent = p
+	local row = Instance.new("UIListLayout")
+	row.FillDirection = Enum.FillDirection.Horizontal
+	row.SortOrder = Enum.SortOrder.LayoutOrder
+	row.Padding = UDim.new(0, 3)
+	row.Parent = calendar
+	for day = 1, DailyData.LoginDays do
+		local cell = Instance.new("Frame")
+		cell.Name = "Day" .. day
+		cell.LayoutOrder = day
+		cell.Size = UDim2.new(1 / DailyData.LoginDays, -3, 1, 0)
+		cell.BackgroundColor3 = PAPER
+		corner(cell, 6)
+		UITheme.stroke(cell, BARK, 1)
+		cell.Parent = calendar
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = UITheme.Fonts.Black
+		label.TextSize = UITheme.Sized("DailyCountdown").text
+		label.TextColor3 = INK
+		label.Parent = cell
+		table.insert(calendarCells, { frame = cell, label = label })
+	end
+	calendarNote = text(p, "", UITheme.Sized("DailyCountdown").text, Enum.Font.Gotham, 13)
+	local heading = text(p, "", UITheme.Sized("DailyHeading").text, UITheme.Fonts.Black, 14)
+	heading.TextColor3 = AMBER
+	heading.Visible = false
+	eventHeading = heading
+	local lines = text(p, "", UITheme.Sized("DailyFooter").text, Enum.Font.GothamMedium, 15)
+	lines.Visible = false
+	eventLines = lines
 	local c = text(p, "", UITheme.Sized("DailyCountdown").text, Enum.Font.Gotham, 11)
 	c.TextColor3 = BARK
 	countdown = c
@@ -363,7 +493,16 @@ function DailyUI.Start()
 			DailyUI.ApplyKey(input.KeyCode)
 		end
 	end)
-	for _, attribute in ipairs({ "DailyGoals", "DailyStreak", "DailyResetAt", "BestAxeTier", "TutorialStep" }) do
+	for _, attribute in ipairs({
+		"DailyGoals",
+		"DailyStreak",
+		"DailyResetAt",
+		"DailyLoginDay",
+		"EventGoals",
+		"EventInfo",
+		"BestAxeTier",
+		"TutorialStep",
+	}) do
 		player:GetAttributeChangedSignal(attribute):Connect(refresh)
 	end
 	refresh()

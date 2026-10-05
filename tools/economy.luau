@@ -133,7 +133,7 @@ local function verdict(value: number, lo: number, hi: number): string
 end
 
 -- Ferry Island is not on the buying path (W2 owns the biome). Leaving
--- lanternwood out holds the published headlines. TBD (Designer).
+-- lanternwood out holds the published headlines.
 local function economyWoods()
 	local list = {}
 	for _, wood in ipairs(WoodData.All()) do

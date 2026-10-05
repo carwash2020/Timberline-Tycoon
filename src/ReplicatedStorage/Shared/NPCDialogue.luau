@@ -14,7 +14,7 @@ local TutorialData = require(script.Parent.TutorialData)
 
 local NPCDialogue = {}
 
--- Phone role line, in pixels. Meets the 14 px tag minimum. TBD (Builder).
+-- Phone role line, in pixels. Meets the 14 px tag minimum.
 NPCDialogue.PhoneTagRole = 14
 -- Keeper role line on a TV. The desktop tag stays at 14.
 NPCDialogue.TvTagRole = 18

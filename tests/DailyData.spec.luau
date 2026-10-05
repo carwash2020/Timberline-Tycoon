@@ -351,4 +351,35 @@ return function(t)
 			t.eq(string.find(text, "logs", 1, true) ~= nil, kind == "sellPieces", kind .. ": " .. text)
 		end
 	end)
+
+	t.test("the daily-return calendar: consecutive days climb to a day-7 milestone, a gap restarts it", function()
+		local day, pays = DailyData.LoginStep(nil, nil, 100)
+		t.eq({ day, pays }, { 1, true }, "first ever sign-in")
+		day, pays = DailyData.LoginStep(1, 99, 100)
+		t.eq({ day, pays }, { 2, true })
+		day, pays = DailyData.LoginStep(2, 100, 100)
+		t.eq({ day, pays }, { 2, false }, "paid once a day")
+		day, pays = DailyData.LoginStep(7, 99, 100)
+		t.eq({ day, pays }, { 1, true }, "after day 7 it starts over")
+		day, pays = DailyData.LoginStep(5, 90, 100)
+		t.eq({ day, pays }, { 1, true }, "a missed day restarts it")
+	end)
+
+	t.test("the calendar's cash escalates, stays modest, and day 7 is the biggest", function()
+		for _, loop in ipairs({ 1, 2 }) do
+			for tier = 1, #DailyData.Tiers do
+				local previous = 0
+				for day = 1, DailyData.LoginDays do
+					local reward = DailyData.LoginReward(tier, day, loop)
+					t.ok(reward >= previous, "never drops")
+					previous = reward
+				end
+				local one = DailyData.Roll(1, 1, tier, if loop == 2 then 2 else nil)[1].reward
+				t.ok(DailyData.LoginReward(tier, DailyData.LoginDays, loop) <= one * 5, "at most 5 goals' worth")
+				t.ok(DailyData.LoginReward(tier, 7, loop) > DailyData.LoginReward(tier, 6, loop), "milestone")
+			end
+		end
+		t.eq(DailyData.LoginReward(1, 1, 2), 15)
+		t.eq(DailyData.LoginReward(1, 7, 2), 75)
+	end)
 end

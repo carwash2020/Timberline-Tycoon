@@ -172,7 +172,7 @@ local GameConfig = {
 	-- Wave 0 placeholders. Nothing reads these yet, so play is unchanged.
 	-- DayCycleMinutes is 24 (the day-length batch). Truck
 	-- respawns keep the existing recall rule, so there is no new key for them.
-	-- TBD (Designer), unread until the shop batch:
+	-- Open to tuning, unread until the shop batch:
 	BoxRespawnSec = 60, -- a bought item's display returns to the rack after this
 	BoxUnpaidDespawnSec = 180, -- an unpaid box left in the world despawns after this
 	ShopHours = { open = 7, close = 19 }, -- ClockTime the counters open and close

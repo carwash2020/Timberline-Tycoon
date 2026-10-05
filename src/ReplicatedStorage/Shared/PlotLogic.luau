@@ -306,8 +306,10 @@ function PlotLogic.EjectLocal(tierSize: number, squares: { string }): (number, n
 	return 0, half + PlotLogic.EjectGap
 end
 
--- North, east, west, south, then a step further north. The first that
--- isn't on a road or in the water is where a visitor is put down.
+-- North, east, west, south, then a step further north, then further out
+-- on every side and the corners (B15: a plot by the water or a road has
+-- more places to try). The first that isn't on a road or in the water is
+-- where a visitor is put down.
 function PlotLogic.EjectCandidates(tierSize: number, squares: { string }): { { number } }
 	local half = PlotLogic.Extent(tierSize, squares) / 2
 	local gap = PlotLogic.EjectGap
@@ -318,6 +320,13 @@ function PlotLogic.EjectCandidates(tierSize: number, squares: { string }): { { n
 		{ -north, 0 },
 		{ 0, -(half + gap) },
 		{ 0, north + gap },
+		{ north + gap, 0 },
+		{ -(north + gap), 0 },
+		{ 0, -(half + 2 * gap) },
+		{ north, north },
+		{ -north, north },
+		{ north, -north },
+		{ -north, -north },
 	}
 end
 

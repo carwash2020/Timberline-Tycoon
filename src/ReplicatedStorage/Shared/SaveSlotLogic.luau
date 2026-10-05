@@ -41,6 +41,7 @@ local ACCOUNT: { [string]: boolean } = {
 	badgesSent = true,
 	secretsFound = true,
 	areasVisited = true,
+	cosmetics = true, -- event cosmetics (the Halloween Pumpkin Hat)
 }
 
 -- Axes a Robux pass grants. They come back after a reset, on every slot.
@@ -88,7 +89,7 @@ export type Summary = {
 	active: boolean,
 }
 
--- TBD (Designer): how long a save's name may be.
+-- Open to tuning: how long a save's name may be.
 SaveSlotLogic.NameLimit = 16
 
 function SaveSlotLogic.DefaultName(index: number): string
