@@ -21,9 +21,9 @@ StoreData.CreatorIds = {
 	Passes = {
 		DoubleCash = 2005256811, -- PASTE: Monetization → Passes → 2x Cash → ID
 		LuxAxe = 2005226878, -- PASTE: Monetization → Passes → Lux Axe → ID
-		TowService = 2006186967, -- Tow Service
-		TimberClassic = 2006912886, -- Timber Classic
-		PaintShop = 2006456926, -- Paint Shop
+		TowService = 0, -- Tow Service: off sale (was 2006186967); 0 hides it everywhere
+		TimberClassic = 0, -- Timber Classic: off sale (was 2006912886)
+		PaintShop = 0, -- Paint Shop: off sale (was 2006456926)
 	},
 	Products = {
 		Cash1k = 3716312861, -- PASTE: Monetization → Developer Products → $1,000 → ID

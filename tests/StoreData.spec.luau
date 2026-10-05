@@ -46,10 +46,11 @@ return function(t)
 				seen[product.id] = true
 			end
 		end
-		-- Five passes and two cash packs. 2x Wood and Instant Delivery stay hidden.
-		t.eq(forSale, 7)
+		-- Two passes and two cash packs. Tow, Timber Classic and Paint are off sale
+		-- (id 0); 2x Wood and Instant Delivery stay hidden.
+		t.eq(forSale, 4)
 		t.eq(StoreData.AnyForSale(), true)
-		t.eq(#StoreData.ListedPasses(), 5)
+		t.eq(#StoreData.ListedPasses(), 2)
 		t.eq(#StoreData.ListedProducts(), 2)
 		t.eq(StoreData.Product("DoubleWood").id, 0)
 		t.eq(StoreData.Product("InstantDelivery").id, 0)
@@ -60,9 +61,9 @@ return function(t)
 		t.eq(StoreData.Passes[1].key, "DoubleCash", "2x Cash stays first so its test id stays 101")
 		t.eq(StoreData.CreatorIds.Passes.DoubleCash, 2005256811)
 		t.eq(StoreData.CreatorIds.Passes.LuxAxe, 2005226878)
-		t.eq(StoreData.CreatorIds.Passes.TowService, 2006186967)
-		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 2006912886)
-		t.eq(StoreData.CreatorIds.Passes.PaintShop, 2006456926)
+		t.eq(StoreData.CreatorIds.Passes.TowService, 0)
+		t.eq(StoreData.CreatorIds.Passes.TimberClassic, 0)
+		t.eq(StoreData.CreatorIds.Passes.PaintShop, 0)
 		t.eq(StoreData.CreatorIds.Products.Cash1k, 3716312861)
 		t.eq(StoreData.CreatorIds.Products.Cash10k, 3716312899)
 		t.eq(StoreData.Pass("TowService").image, 91282142796474)
