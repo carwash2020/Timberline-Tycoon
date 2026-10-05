@@ -155,6 +155,45 @@ function PermissionLogic.MustLeave(permissions: any, userId: number, ownerId: nu
 	return not PermissionLogic.Allows(permissions, userId, "visit")
 end
 
+-- May `viewerId` walk over to `ownerId`'s plot? Never your own (you have
+-- the spawn pad), and only while the owner's visit flag lets you.
+function PermissionLogic.CanVisit(permissions: any, viewerId: number, ownerId: number): boolean
+	if viewerId == ownerId then
+		return false
+	end
+	return PermissionLogic.Allows(permissions, viewerId, "visit")
+end
+
+export type Candidate = { userId: number, name: string, hasPlot: boolean, permissions: any }
+
+-- The Visit list: players in the server who own a plot and whose
+-- permissions allow `viewerId` in, sorted by name (then user id).
+-- Pure, so the Settings tab and its tests agree with the server's check.
+function PermissionLogic.VisitList(candidates: { Candidate }, viewerId: number): { { userId: number, name: string } }
+	local out: { { userId: number, name: string } } = {}
+	for _, c in ipairs(candidates) do
+		if c.hasPlot and PermissionLogic.CanVisit(c.permissions, viewerId, c.userId) then
+			table.insert(out, { userId = c.userId, name = c.name })
+		end
+	end
+	table.sort(out, function(a, b)
+		local la, lb = string.lower(a.name), string.lower(b.name)
+		if la ~= lb then
+			return la < lb
+		end
+		return a.userId < b.userId
+	end)
+	return out
+end
+
+-- A user id from the VisitPlot remote: a whole number, nothing else.
+function PermissionLogic.VisitTarget(value: unknown): number?
+	if type(value) == "number" and value == math.floor(value) and value >= 1 and value <= 1e15 then
+		return value
+	end
+	return nil
+end
+
 local function people(permissions: { [string]: any }): number
 	local count = 0
 	for key, row in pairs(permissions) do

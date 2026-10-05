@@ -108,6 +108,36 @@ InputKit.Target = {
 	},
 } :: { [string]: { Bind } }
 
+-- The wiring tool (WireTool, BUILD mode). Like the placer it turns world
+-- prompts off while it is up, so X is free to mean Cut there. RT picks what
+-- the crosshair is on (a tap or a click does it on phone and PC), B or Q
+-- leaves. WireSafe checks the list has no key twice.
+InputKit.WireBinds = {
+	{ action = "Pick", gamepad = Enum.KeyCode.ButtonR2 },
+	{ action = "Cut", keyboard = Enum.KeyCode.X, gamepad = Enum.KeyCode.ButtonX },
+	{ action = "Done", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
+} :: { Bind }
+
+function InputKit.WireSafe(binds: { Bind }): boolean
+	local seenPad: { [string]: boolean } = {}
+	local seenKey: { [string]: boolean } = {}
+	for _, bind in ipairs(binds) do
+		if bind.gamepad then
+			if seenPad[bind.gamepad.Name] then
+				return false
+			end
+			seenPad[bind.gamepad.Name] = true
+		end
+		if bind.keyboard then
+			if seenKey[bind.keyboard.Name] then
+				return false
+			end
+			seenKey[bind.keyboard.Name] = true
+		end
+	end
+	return true
+end
+
 function InputKit.IsButtonXAction(name: string): boolean
 	return BUTTON_X[name] == true
 end

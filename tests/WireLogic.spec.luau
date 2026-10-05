@@ -150,4 +150,26 @@ return function(t)
 		end
 		t.eq(WireLogic.Message("nonsense"), nil)
 	end)
+
+	t.test("saved switch positions: cleaned, toggled, and pruned to switches still placed", function()
+		t.eq(WireLogic.CleanSwitches({ "a", "a", "", 4, "b", {} }), { "a", "b" })
+		t.eq(WireLogic.CleanSwitches("on"), {})
+		t.eq(WireLogic.CleanSwitches(nil), {})
+		local many = {}
+		for i = 1, 60 do
+			table.insert(many, "s" .. i)
+		end
+		t.eq(#WireLogic.CleanSwitches(many), WireLogic.MaxSwitches)
+		t.eq(WireLogic.IsOn({ "a" }, "a"), true)
+		t.eq(WireLogic.IsOn({ "a" }, "b"), false)
+		t.eq(WireLogic.IsOn(nil, "a"), false)
+		local list = WireLogic.SetOn({}, "a", true)
+		t.eq(list, { "a" })
+		t.eq(WireLogic.SetOn(list, "a", true), { "a" }, "no repeat")
+		t.eq(WireLogic.SetOn(list, "b", true), { "a", "b" })
+		t.eq(WireLogic.SetOn({ "a", "b" }, "a", false), { "b" })
+		t.eq(list, { "a" }, "the old list is left alone")
+		local placed = { item("a", "SparkSwitch", 0, 0), item("lamp", "SparkLamp", 4, 0) }
+		t.eq(WireLogic.LiveSwitches({ "a", "gone", "lamp" }, placed), { "a" }, "gone and not-a-switch drop out")
+	end)
 end
