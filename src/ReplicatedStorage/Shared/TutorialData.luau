@@ -29,7 +29,9 @@ local WoodData = require(script.Parent.WoodData)
 local TutorialData = {}
 
 -- Game events QuestService listens for (the server reports them). The
--- v2 loop adds wood events; plotClaimed is the free plot.
+-- v2 loop adds wood events; plotClaimed is the open plot. buildOpened,
+-- itemPlaced and landOpened are the build lessons after the claim (the
+-- client reports the first and last through TutorialSeen).
 export type TutorialEvent =
 	"treeFelled"
 	| "logPickedUp"
@@ -42,6 +44,9 @@ export type TutorialEvent =
 	| "woodSoldCash"
 	| "plotClaimed"
 	| "truckBought"
+	| "buildOpened"
+	| "itemPlaced"
+	| "landOpened"
 
 -- What the beacon points at (QuestUI finds it in the world). v2 adds
 -- "wood" (your nearest loose piece, tag Wood) and "truckBed" (your
@@ -114,11 +119,11 @@ end
 local function plotStep(afterSale: boolean?): Step
 	-- v1 claims the plot before any sale, so the thank-you stays off that
 	-- line. v2 says it here, the step right after the cart sale.
-	local claim = "Every lumberjack needs land, and this one's free. Claim one, follow the arrow."
+	local claim = "Every lumberjack needs land, and this one's free. Claim an open plot, follow the arrow."
 	local thanks = "That sale's yours, and a little extra from me. "
 	return {
 		id = "plot",
-		objective = "Claim a free plot",
+		objective = "Claim an open plot",
 		murph = if afterSale then thanks .. claim else claim,
 		event = "plotClaimed",
 		count = 1,
@@ -217,7 +222,8 @@ TutorialData.Steps = {
 
 -- The v2 loop's steps. Wood is cut where you swing, dragged with the axe
 -- put away, carried loose on the bed and sold by volume. Order: fell,
--- drag, sell at the cart, claim a plot, then the truck. The mill is the
+-- drag, sell at the cart, claim a plot, the build lessons (BUILD, place
+-- one item, LAND), then the truck. The mill is the
 -- trip after the truck. Each step's event is what the v2 services report.
 -- Murph's numbers come from the v2 data: hits from FieldGuide.TrunkHits.
 -- Saves from the plot-first order are remapped by ApplyOrder.
@@ -254,6 +260,27 @@ TutorialData.StepsV2 = {
 		rewardCash = 25,
 	},
 	plotStep(true),
+	{
+		id = "build",
+		objective = "Press BUILD on your plot",
+		murph = "That's your plot. Stand on it and press BUILD. That's where you set up mills, benches and the like.",
+		event = "buildOpened",
+		count = 1,
+	},
+	{
+		id = "place",
+		objective = "Place one item from the Blueprint Store",
+		murph = "Pick the cheapest thing in the Blueprint Store and set it down. You pay when you place it, and you get half back if you sell it.",
+		event = "itemPlaced",
+		count = 1,
+	},
+	{
+		id = "land",
+		objective = "Open LAND to see how to grow your plot",
+		murph = "Press LAND on the build bar. Plot size and expanding onto new squares both live there.",
+		event = "landOpened",
+		count = 1,
+	},
 	truckStep(2),
 	{
 		id = "load",
@@ -462,8 +489,9 @@ function TutorialData.Beacon(step: Step, cash: number?): BeaconTarget?
 end
 
 -- Order 1 (and 0): plot led. Order 2: fell led, and still had a plant step.
--- Order 3: that step is gone. ApplyOrder turns a saved index into this list.
-TutorialData.OrderV2 = 3
+-- Order 3: that step is gone. Order 4: build, place and land follow the plot
+-- step. ApplyOrder turns a saved index into this list.
+TutorialData.OrderV2 = 4
 -- The plot-first list (order 0 and 1).
 TutorialData.OrderV2Previous = {
 	"plot",
@@ -489,6 +517,21 @@ TutorialData.OrderV2WithPlant = {
 	"load",
 	"mill",
 	"plant",
+	"loads",
+	"loads2",
+	"loads3",
+	"steel",
+}
+
+-- The list as order 3 had it (no build lessons).
+TutorialData.OrderV2BeforeBuild = {
+	"fell",
+	"pickup",
+	"sell",
+	"plot",
+	"truck",
+	"load",
+	"mill",
 	"loads",
 	"loads2",
 	"loads3",
@@ -535,7 +578,9 @@ function TutorialData.ApplyOrder(record: any)
 		local raw = tonumber(record.tutorialStep)
 		local step = if type(raw) ~= "number" or raw ~= raw then 1 else math.floor(raw)
 		local order = tonumber(record.tutorialOrder) or 0
-		if order >= 2 then
+		if order == 3 then
+			record.tutorialStep = remapFrom(TutorialData.OrderV2BeforeBuild, step)
+		elseif order >= 2 then
 			record.tutorialStep = remapFrom(TutorialData.OrderV2WithPlant, step)
 		elseif step > 1 then
 			record.tutorialStep = TutorialData.RemapV2Step(step)
@@ -550,7 +595,13 @@ end
 -- Whether a player who's already past this step (from their save) should
 -- have it done on the spot: they bought the Steel Axe, or they already
 -- claimed a plot and the step doesn't still need a sapling.
-function TutorialData.AlreadyDone(step: Step, bestAxeTier: number, plotClaimed: boolean?, ownsTruck: boolean?): boolean
+function TutorialData.AlreadyDone(
+	step: Step,
+	bestAxeTier: number,
+	plotClaimed: boolean?,
+	ownsTruck: boolean?,
+	hasPlaced: boolean?
+): boolean
 	if step.event == "axeBought" and bestAxeTier >= 2 then
 		return true
 	end
@@ -558,6 +609,9 @@ function TutorialData.AlreadyDone(step: Step, bestAxeTier: number, plotClaimed: 
 		return true
 	end
 	if step.event == "truckBought" and ownsTruck == true then
+		return true
+	end
+	if step.event == "itemPlaced" and hasPlaced == true then
 		return true
 	end
 	return false

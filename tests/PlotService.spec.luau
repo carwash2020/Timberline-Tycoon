@@ -417,7 +417,7 @@ return function(t)
 		t.eq(s.lastToast(), "You need $9,500 more for a Lumber Yard.")
 		profile.plot.tier = #s.PlotData.Tiers
 		s.P.Upgrade(ann)
-		t.eq(s.lastToast(), "Your plot is as big as it gets.")
+		t.eq(s.lastToast(), "Your plot size is already the biggest.")
 	end)
 
 	t.test("your layout comes back on whichever plot is free when you rejoin", function()
@@ -546,7 +546,7 @@ return function(t)
 		s.P.Upgrade(ann)
 		t.eq(profile.plot.tier, 1)
 		t.eq(profile.cash, 3000)
-		t.eq(s.lastToast(), "Stand on your plot to grow it.")
+		t.eq(s.lastToast(), "Stand on your plot to raise its size.")
 	end)
 
 	t.test("you can only build on your own plot", function()
@@ -1129,7 +1129,7 @@ return function(t)
 		ann.standOn(1)
 		profile.cash = 100
 		s.P.Expand(ann, 2, 2, 0)
-		t.eq(s.lastToast(), "Buy a square that touches your yard.")
+		t.eq(s.lastToast(), "Expand onto a square that touches your plot.")
 		t.eq(profile.plot.squares, {})
 		t.eq(profile.cash, 100)
 		local GameConfig = t.shared("GameConfig")
@@ -1138,10 +1138,10 @@ return function(t)
 		s.P.Expand(ann, 2, 0, 0)
 		t.eq(profile.cash, 0)
 		t.eq(profile.plot.squares, { "2,0" })
-		t.eq(s.lastToast(), "That square is yours for $100. The next one is " .. Util.formatCash(step) .. ".")
+		t.eq(s.lastToast(), "You expanded your plot for $100. The next square is " .. Util.formatCash(step) .. ".")
 		t.eq(ann.attrs.PlotSquares, "2,0")
 		s.P.Expand(ann, 2, 1, 1)
-		t.eq(s.lastToast(), "You don't have enough for that square.")
+		t.eq(s.lastToast(), "You don't have enough to expand there.")
 		t.eq(profile.cash, 0)
 		t.eq(#profile.plot.squares, 1)
 		profile.cash = step
@@ -1150,9 +1150,9 @@ return function(t)
 		t.eq(#profile.plot.squares, 2)
 		t.eq(
 			s.lastToast(),
-			"That square is yours for "
+			"You expanded your plot for "
 				.. Util.formatCash(step)
-				.. ". The next one is "
+				.. ". The next square is "
 				.. Util.formatCash(step * 2)
 				.. "."
 		)
@@ -1190,7 +1190,7 @@ return function(t)
 		t.eq(profile.cash, 9900)
 		-- The tap after that still quotes the old count.
 		s.P.Expand(ann, 2, 1, 0)
-		t.eq(s.lastToast(), "That price changed. Look again.")
+		t.eq(s.lastToast(), "The price changed. The Land panel shows the new one.")
 		t.eq(profile.plot.squares, { "2,0" })
 		t.eq(profile.cash, 9900)
 	end)

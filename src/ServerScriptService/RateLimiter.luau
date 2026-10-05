@@ -20,6 +20,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	BuyItem = 3,
 	SkipTutorial = 1,
 	ResetTutorial = 1,
+	TutorialSeen = 2, -- BUILD or LAND opened, for the tutorial
 	EquipItem = 2,
 	CallTruck = 1,
 	BuyRobuxItem = 2,

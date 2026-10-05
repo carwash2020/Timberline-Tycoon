@@ -151,8 +151,8 @@ local function showCurrent()
 		claim.BackgroundColor3 = C.Muted
 		claim.TextColor3 = C.Ink
 	else
-		detail.Text = string.format("%s\nOpen", plot.region)
-		claim.Text = "CLAIM"
+		detail.Text = string.format("%s\nOpen plot", plot.region)
+		claim.Text = "CLAIM PLOT"
 		claim.BackgroundColor3 = C.Green
 		claim.TextColor3 = C.Cream
 	end
@@ -279,7 +279,7 @@ local function build()
 	previousButton = choice("Previous", "PREVIOUS", 0, C.Bark, C.Cream, function()
 		step(-1)
 	end)
-	claimButton = choice("Claim", "CLAIM", 0.34, C.Green, C.Cream, claim)
+	claimButton = choice("Claim", "CLAIM PLOT", 0.34, C.Green, C.Cream, claim)
 	nextButton = choice("Next", "NEXT", 0.68, C.Bark, C.Cream, function()
 		step(1)
 	end)
