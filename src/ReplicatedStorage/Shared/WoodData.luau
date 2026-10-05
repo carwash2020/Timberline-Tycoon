@@ -331,6 +331,26 @@ WoodData.PlanPlank = {
 	lumenwood = 90,
 } :: { [string]: number }
 
+-- Rarer woods pay more, and so does milling them: the further you go for a
+-- wood, the more a log of it sells for (RareBoost) and the more a plank of
+-- it sells for on top of that (RarePlankBonus). Common woods are unchanged.
+WoodData.RareBoost = {
+	emberwood = 1.25,
+	phantomwood = 1.5,
+	lumenwood = 1.8,
+} :: { [string]: number }
+WoodData.RarePlankBonus = 1.15
+
+local function boosted(id: string, price: number): number
+	local boost = WoodData.RareBoost[id]
+	return if boost then math.floor(price * boost * 1000 + 0.5) / 1000 else price
+end
+
+local function boostedPlan(id: string, plan: number): number
+	local boost = WoodData.RareBoost[id]
+	return if boost then plan * boost * WoodData.RarePlankBonus else plan
+end
+
 function WoodData.ScaledPlank(logPrice: number, planPlank: number): number
 	local price = math.max(planPlank * WoodData.PlankScale, logPrice * WoodData.PlankFloor)
 	return math.floor(price * 1000 + 0.5) / 1000
@@ -366,8 +386,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	maple = {
-		logPrice = 2.8,
-		plankPrice = WoodData.ScaledPlank(2.8, 26.4),
+		logPrice = boosted("maple", 2.8),
+		plankPrice = WoodData.ScaledPlank(boosted("maple", 2.8), boostedPlan("maple", 26.4)),
 		hardness = 6,
 		growSec = 1140,
 		lifespan = { 3, 6 },
@@ -375,8 +395,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	palmwood = {
-		logPrice = 2.9,
-		plankPrice = WoodData.ScaledPlank(2.9, 32),
+		logPrice = boosted("palmwood", 2.9),
+		plankPrice = WoodData.ScaledPlank(boosted("palmwood", 2.9), boostedPlan("palmwood", 32)),
 		hardness = 2.9,
 		growSec = 480,
 		lifespan = { 3, 6 },
@@ -384,8 +404,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	frostwood = {
-		logPrice = 9,
-		plankPrice = WoodData.ScaledPlank(9, 106),
+		logPrice = boosted("frostwood", 9),
+		plankPrice = WoodData.ScaledPlank(boosted("frostwood", 9), boostedPlan("frostwood", 106)),
 		hardness = 10,
 		growSec = 360,
 		lifespan = { 3, 6 },
@@ -393,8 +413,11 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Ice",
 	},
 	[WoodData.LanternId] = {
-		logPrice = WoodData.LanternLogPrice,
-		plankPrice = WoodData.ScaledPlank(WoodData.LanternLogPrice, WoodData.LanternPlanPlank),
+		logPrice = boosted(WoodData.LanternId, WoodData.LanternLogPrice),
+		plankPrice = WoodData.ScaledPlank(
+			boosted(WoodData.LanternId, WoodData.LanternLogPrice),
+			boostedPlan(WoodData.LanternId, WoodData.LanternPlanPlank)
+		),
 		hardness = WoodData.LanternHardness,
 		growSec = WoodData.LanternGrowSec,
 		lifespan = { WoodData.LanternLifespanMin, WoodData.LanternLifespanMax },
@@ -402,8 +425,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Wood",
 	},
 	emberwood = {
-		logPrice = 5.7,
-		plankPrice = WoodData.ScaledPlank(5.7, 36),
+		logPrice = boosted("emberwood", 5.7),
+		plankPrice = WoodData.ScaledPlank(boosted("emberwood", 5.7), boostedPlan("emberwood", 36)),
 		hardness = 11,
 		growSec = 1020,
 		lifespan = { 3, 6 },
@@ -411,8 +434,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "CrackedLava",
 	},
 	phantomwood = {
-		logPrice = 19,
-		plankPrice = WoodData.ScaledPlank(19, 54),
+		logPrice = boosted("phantomwood", 19),
+		plankPrice = WoodData.ScaledPlank(boosted("phantomwood", 19), boostedPlan("phantomwood", 54)),
 		hardness = 23,
 		growSec = 1200,
 		lifespan = { 3, 6 },
@@ -420,8 +443,8 @@ local V2: { [string]: WoodV2 } = {
 		coreMaterial = "Foil",
 	},
 	lumenwood = {
-		logPrice = 25,
-		plankPrice = WoodData.ScaledPlank(25, 90),
+		logPrice = boosted("lumenwood", 25),
+		plankPrice = WoodData.ScaledPlank(boosted("lumenwood", 25), boostedPlan("lumenwood", 90)),
 		hardness = 30,
 		growSec = 1800,
 		lifespan = { 3, 6 },

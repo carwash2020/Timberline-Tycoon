@@ -806,9 +806,9 @@ return function(t)
 		t.ok(string.find(report, "66 s", 1, true) ~= nil)
 		t.ok(string.find(report, "7.4 min", 1, true) ~= nil)
 		t.ok(string.find(report, "13.3 min", 1, true) ~= nil)
-		t.ok(string.find(report, "61.3 min", 1, true) ~= nil)
+		t.ok(string.find(report, "50.9 min", 1, true) ~= nil)
 		-- The price ladder (axes) moved the headlines to these.
 		-- The other four headlines stay.
-		t.ok(string.find(report, "33.4 h", 1, true) ~= nil)
+		t.ok(string.find(report, "30.5 h", 1, true) ~= nil)
 	end)
 end

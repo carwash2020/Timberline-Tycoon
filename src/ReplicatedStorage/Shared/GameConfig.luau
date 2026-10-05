@@ -144,12 +144,11 @@ local GameConfig = {
 	PlankMinY = 0.4, -- u
 	FirstPlotPrice = 100,
 	-- Expansion k costs ExpansionPriceStep × k (k = 1..24). With
-	-- FirstPlotPrice that is the full 5×5 plot. 3000 totalled $900,100 and
-	-- the economy model took 39.4 h. 2280 totals $684,100 and lands on
-	-- about 32 h (acceptance E1: 28–36 h). Wood prices stay put: the buying
-	-- path is on frostwood from the first sawmill, so a price change would
-	-- also move the Steel Axe and the first $1,000.
-	ExpansionPriceStep = 2280,
+	-- FirstPlotPrice that is the full 5×5 plot: 3050 totals $915,100 and
+	-- the economy model takes about 30 h (acceptance E1: 28–36 h). It was
+	-- 2280 ($684,100) before the rarer woods (WoodData.RareBoost) sold for
+	-- more, which shortened the long game; the step grew to put it back.
+	ExpansionPriceStep = 3050,
 	PlotSquare = 40, -- studs
 	PlotGrid = 5,
 	BlueprintPricePerUnit = 10,

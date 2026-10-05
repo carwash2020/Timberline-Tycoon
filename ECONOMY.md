@@ -13,8 +13,8 @@ Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thick
 | First sale | under 3 min | 66 s | ✅ on target |
 | Steel Axe ($120) | 5-8 min | 7.4 min | ✅ on target |
 | First $1k earned | 15-20 min | 13.3 min | ✅ on target |
-| Cobalt Axe ($3,000) | about 1 h | 61.3 min | ✅ on target |
-| Full plot ($684,100) | 28-36 h | 33.4 h | ✅ on target |
+| Cobalt Axe ($3,000) | about 1 h | 50.9 min | ✅ on target |
+| Full plot ($915,100) | 28-36 h | 30.5 h | ✅ on target |
 
 ## CI ranges
 
@@ -25,12 +25,12 @@ Every `lune run tools/economy` (including `--check`) fails the process when a he
 | First sale (E1) | under 3 min (0–180 s) | 66 s |
 | Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 447 s |
 | First $1k (E3) | 13–20 min (780–1200 s) | 797 s |
-| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 3676 s |
-| Full plot (E4) | 28–36 h (100800–129600 s) | 120255 s |
+| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 3055 s |
+| Full plot (E4) | 28–36 h (100800–129600 s) | 109631 s |
 
 The first $1,000 in this model is 13.3 min (797 s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.
 
-End of the buying path: $29,008/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
+End of the buying path: $39,746/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
 
 ## Tree volumes (TreeGen, mean of 50 seeds)
 
@@ -60,9 +60,9 @@ Mean volume × the v2 price per u³ (the figured-wood bonus left out). The plan'
 | Maple | 2.8 | 9.24 | $115 | $378 | $88 / $830 |
 | Palmwood | 2.9 | 11.2 | $52 | $201 | $52 / $570 |
 | Frostwood | 9 | 37.1 | $232 | $955 | $240 / $2,830 |
-| Emberwood | 5.7 | 14.25 | $188 | $470 | $79 / $635 |
-| Gloamwood | 19 | 47.5 | $346 | $864 | $348 / $990 |
-| Lumenwood | 25 | 62.5 | $1,229 | $3,071 | $1,090 / $3,900 |
+| Emberwood | 7.125 | 18.112 | $235 | $597 | $79 / $635 |
+| Gloamwood | 28.5 | 71.25 | $518 | $1,296 | $348 / $990 |
+| Lumenwood | 45 | 112.5 | $2,211 | $5,529 | $1,090 / $3,900 |
 
 ## Hits to cut a mature trunk at its base
 
@@ -109,18 +109,18 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 | 7.4 min | Steel Axe | $120 | $4,652 | $6,581 | Frostwood (Steel Axe) |
 | 11.1 min | Pickup | $400 | $6,581 | $8,761 | Frostwood (Steel Axe) |
 | 13.8 min | Hardened Axe | $400 | $8,761 | $10,031 | Frostwood (Hardened Axe) |
-| 23.2 min | Pony Trailer | $1,800 | $10,031 | $11,905 | Frostwood (Hardened Axe) |
-| 28.6 min | Silver Axe | $1,100 | $11,905 | $13,163 | Frostwood (Silver Axe) |
-| 30.8 min | Insulated Coat | $500 | $13,163 | $13,627 | Frostwood (Silver Axe) |
-| 50.3 min | Flatbed | $5,000 | $13,627 | $15,324 | Frostwood (Silver Axe) |
-| 61.3 min | Cobalt Axe | $3,000 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
-| 81.3 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
-| 2.4 h | Logging Rig | $19,000 | $16,655 | $17,742 | Frostwood (Cobalt Axe) |
-| 2.8 h | Gold Axe | $8,500 | $17,742 | $18,210 | Frostwood (Gold Axe) |
-| 7.1 h | Millmaster 200 Long | $86,500 | $18,210 | $22,968 | Frostwood (Gold Axe) |
-| 7.6 h | Heavy Hauler | $13,000 | $22,968 | $23,549 | Frostwood (Gold Axe) |
-| 8.4 h | Obsidian Axe | $22,000 | $23,549 | $24,014 | Frostwood (Obsidian Axe) |
-| 9.8 h | Inferno Axe | $38,000 | $24,014 | $24,630 | Frostwood (Inferno Axe) |
+| 21.0 min | Pony Trailer | $1,800 | $10,031 | $11,905 | Frostwood (Hardened Axe) |
+| 25.5 min | Silver Axe | $1,100 | $11,905 | $13,163 | Frostwood (Silver Axe) |
+| 27.8 min | Insulated Coat | $500 | $13,163 | $13,627 | Frostwood (Silver Axe) |
+| 42.5 min | Flatbed | $5,000 | $13,627 | $15,324 | Frostwood (Silver Axe) |
+| 50.9 min | Cobalt Axe | $3,000 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
+| 66.2 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
+| 1.9 h | Logging Rig | $19,000 | $16,655 | $17,742 | Frostwood (Cobalt Axe) |
+| 2.2 h | Gold Axe | $8,500 | $17,742 | $18,210 | Frostwood (Gold Axe) |
+| 5.5 h | Millmaster 200 Long | $86,500 | $18,210 | $22,968 | Frostwood (Gold Axe) |
+| 5.8 h | Heavy Hauler | $13,000 | $22,968 | $23,549 | Frostwood (Gold Axe) |
+| 6.4 h | Obsidian Axe | $22,000 | $23,549 | $24,014 | Frostwood (Obsidian Axe) |
+| 7.4 h | Inferno Axe | $38,000 | $24,014 | $24,630 | Frostwood (Inferno Axe) |
 
 ## Supply: how many players a biome feeds
 
@@ -133,9 +133,9 @@ Trees regrow in respawnSec + growSec (stump, then sapling to mature). A real pla
 | The Hills | Maple | 50 | 21.0 min | 143 | 11 | $4,342 |
 | The Hills | Pine | 80 | 11.5 min | 417 | 45 | $15,232 |
 | Snowfields | Frostwood | 70 | 9.0 min | 467 | 73 | $28,677 |
-| The Volcano | Emberwood | 60 | 21.0 min | 171 | - | $8,542 |
-| Gloam Hollow | Gloamwood | 22 | 25.0 min | 53 | - | $4,842 |
-| Aether Isles | Lumenwood | 12 | 45.0 min | 16 | 20 | $5,243 |
+| The Volcano | Emberwood | 60 | 21.0 min | 171 | - | $10,678 |
+| Gloam Hollow | Gloamwood | 22 | 25.0 min | 53 | - | $7,262 |
+| Aether Isles | Lumenwood | 12 | 45.0 min | 16 | 20 | $9,438 |
 
 ## Lux Axe (Robux)
 
@@ -160,7 +160,7 @@ Not on the cash ladder and not in the buying path above. A game pass (StoreData 
 - `millFeedSec` = 15
 - `murphAfter` = 0
 - `murphReward` = 25
-- `plotPrice` = 684100
+- `plotPrice` = 915100
 - `seeds` = 50
 - `sellSec` = 4
 - `sharing` = 4

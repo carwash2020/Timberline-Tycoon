@@ -473,7 +473,7 @@ return function(t)
 		end
 		local sumK = 24 * 25 / 2
 		t.eq(sum, GameConfig.FirstPlotPrice + GameConfig.ExpansionPriceStep * sumK)
-		t.eq(sum, 684100)
+		t.eq(sum, 915100)
 		-- The campsite (one square, 80 wide) covers the middle. Only a square that touches it is for sale.
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 0, 0) }, { nil, "yours" })
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 2, 2) }, { nil, "away" })
