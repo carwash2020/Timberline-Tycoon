@@ -6,8 +6,8 @@
 --   Creator Hub → your experience → Engagement → Badges → Create → ID
 --
 -- Lanternwood is the night-glow wood, its own id ("lanternwood"). It is
--- not lumenwood. Ferry Island and the Secret Cave are not built yet: those
--- ids stay 0. The North Strip trigger is built; its id stays 0 until the
+-- not lumenwood. Ferry Island is not built yet: its id stays 0. The Secret
+-- Cave is built (the Petrified Reach disc); its id stays 0 until pasted. The North Strip trigger is built; its id stays 0 until the
 -- dashboard has one, and AreasAt still records the visit.
 
 local RegionLogic = require(script.Parent.RegionLogic)
@@ -55,9 +55,9 @@ BadgeData.Ids = {
 	AreaVolcano = 0, -- PASTE: Engagement → Badges → The Volcano → ID
 	AreaGrove = 0, -- PASTE: Engagement → Badges → Gloam Hollow → ID
 	AreaSky = 0, -- PASTE: Engagement → Badges → Aether Isles → ID
-	-- Not built yet. Leave these at 0. Awarding skips 0.
-	AreaFerry = 0,
-	AreaCave = 0,
+	-- Leave these at 0 until the dashboard has the badge. Awarding skips 0.
+	AreaFerry = 0, -- not built yet
+	AreaCave = 0, -- PASTE: Engagement → Badges → Secret Cave → ID
 	AreaToll = 0,
 	WoodFrostwood = 0, -- PASTE: Engagement → Badges → Frostwood → ID
 	WoodEmberwood = 0, -- PASTE: Engagement → Badges → Emberwood → ID
@@ -68,14 +68,12 @@ BadgeData.Ids = {
 
 -- Places that are not in the world yet. AreasAt skips every key here, so
 -- standing there earns nothing. Their ids stay 0.
--- W2 and W3 remove a key from NotBuilt when they build its trigger: the
--- Secret Cave interior FogZone past the boulders, the Ferry Island disc,
--- and the North Strip box x -400 to 400, z 1586 to 1900 (not the booth or
--- the bridge).
 -- The North Strip trigger is built (x -400..400, z 1586..1900, not the
--- booth or the bridge deck). Ferry Island and the Secret Cave stay dark
--- until their own batches remove them.
-BadgeData.NotBuilt = { "AreaFerry", "AreaCave" }
+-- booth or the bridge deck). The Secret Cave trigger is built: standing in
+-- the Petrified Reach disc (RegionLogic.ReachCenter, radius 46, which holds
+-- the cave room) records the visit. Ferry Island stays dark until its own
+-- batch removes it.
+BadgeData.NotBuilt = { "AreaFerry" }
 
 -- A phone tap target (InputKit.MinTouchPx). BadgeUI rows and the open
 -- button are at least this tall.

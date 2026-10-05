@@ -59,7 +59,8 @@ return function(t)
 		t.eq(BadgeData.Get("AreaVolcano").name, "The Volcano")
 		t.eq(BadgeData.Get("AreaToll").name, "North Strip")
 		t.eq(BadgeData.Get("AreaToll").detail, "Cross Old Tolly's bridge into the North Strip.")
-		t.eq(BadgeData.NotBuilt, { "AreaFerry", "AreaCave" })
+		t.eq(BadgeData.NotBuilt, { "AreaFerry" })
+		t.eq(BadgeData.Ids.AreaCave, 0, "the cave badge id waits for a PASTE")
 		for _, key in ipairs(BadgeData.NotBuilt) do
 			t.eq(BadgeData.Ids[key], 0, key)
 			t.eq(BadgeData.IsLive(BadgeData.RobloxId(key)), false, key)
@@ -100,8 +101,9 @@ return function(t)
 		t.eq(BadgeData.AreasAt(-1050, 0, 1050), {})
 		-- The cave on the Volcano is Cinder Cave, not the Secret Cave.
 		t.eq(BadgeData.AreasAt(1010, 40, 1110), { "AreaVolcano" })
-		-- Ferry Island and the Secret Cave earn nothing while they are unbuilt.
-		t.eq(BadgeData.AreasAt(-765, 20, -655), {})
+		-- The Secret Cave room is built, so standing in it records the visit.
+		t.eq(BadgeData.AreasAt(-765, 20, -655), { "AreaCave" })
+		-- Ferry Island earns nothing while it is unbuilt.
 		t.eq(BadgeData.AreasAt(1395, 12, -760), {})
 		t.eq(BadgeData.AreasAt(9000, 0, 9000), {})
 		-- The North Strip trigger is the box north of the bridge, not the deck.

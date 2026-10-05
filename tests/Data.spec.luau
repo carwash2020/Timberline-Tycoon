@@ -58,7 +58,7 @@ return function(t)
 
 	t.test("forged axes aren't sold and their recipes use real things", function()
 		for _, axe in pairs(ItemCatalog.Axes) do
-			if axe.sold == false and not axe.robux then
+			if axe.sold == false and not axe.robux and not axe.quest then
 				t.ok(axe.forge ~= nil, axe.id .. " is not sold but has no forge recipe")
 				for woodId in pairs(axe.forge.logs) do
 					t.ok(WoodData.Get(woodId) ~= nil, axe.id .. " recipe wood " .. woodId)

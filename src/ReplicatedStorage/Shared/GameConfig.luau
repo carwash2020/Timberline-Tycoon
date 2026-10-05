@@ -156,6 +156,14 @@ local GameConfig = {
 	BoulderRespawnSec = 1200,
 	WaterDamage = 15,
 	WaterTickSec = 1.5,
+	-- Deep sea telegraph (HazardLogic). Damage and tick above are unchanged.
+	SeaWarnBand = 40, -- studs before the deep water where a warning shows
+	SeaGraceSec = 3, -- seconds in deep water before the first damage tick
+	-- The Hermit's quest (HermitLogic, W4). Five carvings, one in each
+	-- ground biome: starter, hills, snow, volcano, grove.
+	CarvedMarkCount = 5,
+	CarvedMarkRewardId = "CarvedTotem", -- decor only; never sold or traded
+	QuestAxeId = "HermitsMaul",
 	ConveyorSpeed = 4,
 	LogicEvalsPerTick = 200,
 	LogicTickSec = 0.1,

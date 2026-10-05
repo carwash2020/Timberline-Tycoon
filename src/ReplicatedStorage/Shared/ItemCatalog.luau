@@ -41,6 +41,7 @@ export type AxeDef = {
 	look: AxeLook,
 	sold: boolean?, -- false = never in the shop (forged instead); default true
 	robux: boolean?, -- true = a game pass (StoreData), not a rung on the cash ladder
+	quest: boolean?, -- true = a quest reward (the Hermit's Maul): never sold, not a rung
 	forge: ForgeRecipe?,
 	damage: number,
 	-- Optional per-biome damage that replaces `damage` against trees from
@@ -184,6 +185,20 @@ ItemCatalog.Axes = {
 		sold = false,
 		robux = true,
 		damage = 165, -- v1: between Inferno 150 and Starfall 180
+		priceCash = 0,
+	},
+	-- Quest reward from the Hermit (HermitService; five carvings found).
+	-- Never sold, never forged, not a rung: priceCash 0 would tie the Rusty
+	-- Axe, so the ladder skips `quest` axes as it skips `robux` ones, and the
+	-- economy models skip it because `sold` is false. Modest stats: slow and
+	-- heavy, below the Cobalt Axe's swing rate (V2_PLAN §11).
+	HermitsMaul = {
+		id = "HermitsMaul",
+		displayName = "Hermit's Maul",
+		look = { headColor = "#6F7B5C", material = "Slate" },
+		sold = false,
+		quest = true,
+		damage = 50, -- v1 rollback only: between Silver 45 and Cobalt 60
 		priceCash = 0,
 	},
 }
@@ -466,6 +481,10 @@ local AXES_V2: { [string]: AxeV2 } = {
 	-- (6.5 / 16 / 0.35). No `vs` line: the Fire Axe's emberwood 7.5 stays
 	-- its own, and Starfall stays the best general axe.
 	LuxAxe = { price = 0, damage = 5.5, range = 15, cooldown = 0.42 },
+	-- The Hermit's Maul: 3.73 / 9 / 1.25 (V2_PLAN §11). One heavy blow per
+	-- 1.25 s: 3.0 damage a second, under the Cobalt Axe's 3.3, so it is a
+	-- keepsake and not a rung. No `vs` line.
+	HermitsMaul = { price = 0, damage = 3.73, range = 9, cooldown = 1.25 },
 }
 local VEHICLES_V2: { [string]: number } = {
 	Rustbucket = 75,
@@ -521,7 +540,7 @@ end
 -- to one rung above that, so older axes can be re-bought for a collection.
 local axeLadder: { AxeDef } = {}
 for _, axe in pairs(ItemCatalog.Axes) do
-	if not axe.robux then -- a pass axe is not a cash rung
+	if not axe.robux and not axe.quest then -- a pass axe or a quest axe is not a cash rung
 		table.insert(axeLadder, axe)
 	end
 end

@@ -1057,6 +1057,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
 ### M6 Gates and hazards
 - Toll bridge, blasting charges, ferry and Island, hazards, the quest, the secrets.
 - Studio: each gate opens only after paying or blasting; the quest gives the Maul once.
+- W4 status: deep-sea telegraph (HazardLogic: warn band, 3 s grace, then the unchanged 15 per 1.5 s), Secret Cave dark toast and the AreaCave trigger (id still 0), the Hermit (HermitService, `DialogueData.HermitLines`), five carved marks, the Carved Totem (`secretsFound.CarvedTotem`) and the Hermit's Maul (`ItemCatalog.HermitsMaul`, `quest = true`, off the ladder, not in the economy model). Not built: the three-shop item chain, the snow trapdoor and hermit plates (the five marks replace them), frost path, Totem as placeable decor.
 
 ### Terrain restyle (land; any time, unflagged)
 - R1: per-biome terrain material colours (TerrainBuilder `SetMaterialColor`, palette per spec §16) and brown cliffs and rock.

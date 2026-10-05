@@ -28,6 +28,7 @@ local EventService = require(script.Parent.EventService)
 local FerryService = require(script.Parent.FerryService)
 local GateService = require(script.Parent.GateService)
 local HazardService = require(script.Parent.HazardService)
+local HermitService = require(script.Parent.HermitService)
 local LogicService = require(script.Parent.LogicService)
 local PermissionService = require(script.Parent.PermissionService)
 local DailyService = require(script.Parent.DailyService)
@@ -1050,8 +1051,32 @@ BootReport.StartStubs({
 		name = "HazardService",
 		init = function()
 			if HazardService.Init then
-				HazardService.Init()
+				HazardService.Init(notify)
 			end
+		end,
+	},
+	{
+		name = "HermitService",
+		init = function()
+			HermitService.Init({
+				profile = function(player: Player): any
+					return ProfileService.GetProfile(player)
+				end,
+				notify = notify,
+				say = function(player: Player, text: string)
+					remote.Dialogue:FireClient(
+						player,
+						{ line = "hermit", text = text, choice = false, noLabel = "Close" }
+					)
+				end,
+				grantAxe = function(player: Player, axeId: string)
+					AxeService.Grant(player, axeId, false)
+				end,
+				ownsAxe = function(player: Player, axeId: string): boolean
+					local counts = AxeService.OwnedCounts(player)
+					return (counts[axeId] or 0) > 0
+				end,
+			}, mapFolder)
 		end,
 	},
 	{
