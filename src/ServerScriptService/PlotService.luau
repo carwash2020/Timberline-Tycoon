@@ -50,6 +50,7 @@ local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
@@ -1037,20 +1038,27 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 		end
 		return
 	end
-	-- A sawmill bought at the Tool Shed is already paid for: placing takes
-	-- one out of stock. Otherwise you pay here, the same as a blueprint.
-	-- Stock is spent only after the cash check, so a refused place leaves it.
+	-- A sawmill or the chop saw bought at the Tool Shed is already paid for:
+	-- placing takes one out of stock. With boxed shelves on (the default),
+	-- that is the only way to get one: the counter sells them, the build
+	-- palette does not. Stock is spent only after the cash check, so a
+	-- refused place leaves it.
 	local stock = if type(payer.sawmillStock) == "table" then payer.sawmillStock else nil
-	local stockAt = if ItemCatalog.GetSawmill(bp.id) and stock then table.find(stock, bp.id) else nil
+	local fromShop = ItemCatalog.GetSawmill(bp.id) ~= nil or ItemCatalog.GetMachine(bp.id) ~= nil
+	local stockAt = if fromShop and stock then table.find(stock, bp.id) else nil
 	local fromStock = stockAt ~= nil
 	local unlocked = bp.unlock == true
 		and type(payer.furnitureBlueprints) == "table"
 		and payer.furnitureBlueprints[bp.id] == true
-	if bp.unlock == true and not unlocked and not fromStock then
+	local source = PlotLogic.Source(bp, if fromStock then 1 else 0, unlocked, ShopLogic.ShelfMenusHidden())
+	if source == "store" then
 		notify(player, string.format("Buy the %s at the General Store first.", bp.displayName))
 		return
+	elseif source == "toolShed" then
+		notify(player, string.format("Buy the %s at the Tool Shed first.", bp.displayName))
+		return
 	end
-	local price = if fromStock or unlocked then 0 else PlotData.Price(bp)
+	local price = if source == "place" then 0 else PlotData.Price(bp)
 	if payer.cash < price then
 		notify(
 			player,

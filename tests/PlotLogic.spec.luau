@@ -593,4 +593,28 @@ return function(t)
 		t.eq(#plot.squares, before)
 		t.eq(refused.cash(), step)
 	end)
+
+	t.test("Source: where an item behind a blueprint comes from, the palette's and the server's one rule", function()
+		local function bp(id)
+			return PlotLogic.Blueprint(id)
+		end
+		-- In stock, or an unlock you bought: place it free.
+		t.eq(PlotLogic.Source(bp("SawmillRickety"), 1, false, true), "place")
+		t.eq(PlotLogic.Source(bp("ChopSaw"), 2, false, true), "place")
+		t.eq(PlotLogic.Source(bp("Shed"), 0, true, true), "place")
+		-- A sawmill or the chop saw you don't hold is a box at the Tool Shed.
+		t.eq(PlotLogic.Source(bp("SawmillRickety"), 0, false, true), "toolShed")
+		t.eq(PlotLogic.Source(bp("Millmaster200L"), 0, false, true), "toolShed")
+		t.eq(PlotLogic.Source(bp("ChopSaw"), 0, false, true), "toolShed")
+		-- With boxed shelves off it is the old pay-as-you-place.
+		t.eq(PlotLogic.Source(bp("SawmillRickety"), 0, false, false), "fee")
+		t.eq(PlotLogic.Source(bp("ChopSaw"), 0, false, false), "fee")
+		-- A furniture unlock you haven't bought is the General Store's box.
+		t.eq(PlotLogic.Source(bp("Shed"), 0, false, true), "store")
+		-- A kit piece is a placing fee, boxed shelves or not.
+		t.eq(PlotLogic.Source(bp("Wall"), 0, false, true), "fee")
+		t.eq(PlotLogic.Source(bp("Floor"), 0, false, false), "fee")
+		-- A stocked mill that is also "unlocked" is still just placed.
+		t.eq(PlotLogic.Source(bp("Wall"), 0, true, true), "fee", "unlocked only means something for an unlock")
+	end)
 end

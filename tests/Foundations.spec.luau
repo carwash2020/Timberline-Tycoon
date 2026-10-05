@@ -73,7 +73,7 @@ return function(t)
 		unused(WorldLayout.DealershipLoadingPad, "DealershipLoadingPad")
 		unused(WorldLayout.ToolShedLoadingPad, "ToolShedLoadingPad")
 		t.eq(WorldLayout.DealershipLoadingPad, { x0 = 70, x1 = 84, z0 = 100, z1 = 114 })
-		t.eq(WorldLayout.ToolShedLoadingPad, { x0 = -66, x1 = -52, z0 = 122, z1 = 136 })
+		t.eq(WorldLayout.ToolShedLoadingPad, { x0 = -66, x1 = -52, z0 = 129, z1 = 143 })
 		local function absent(list)
 			for _, zone in ipairs(list) do
 				t.ok(zone.name ~= "DealershipLoadingPad" and zone.name ~= "ToolShedLoadingPad", zone.name)

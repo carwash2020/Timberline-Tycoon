@@ -37,6 +37,8 @@ local LINES: { [string]: { [string]: string } } = {
 		needsPlot = "Claim a plot before you open that box.",
 		thanks = "Paid. Open the box when you want the tool.",
 		locked = "That one isn't for sale from this counter.",
+		robuxOffer = "That gold box is %s, a Robux item. Roblox shows the price. Go ahead?",
+		robuxAsk = "Roblox will ask you now. I'll put the box back on the shelf.",
 	},
 	HearthAndHome = {
 		greet = "If it's sitting on the counter, I can sell it.",
@@ -204,7 +206,7 @@ export type Card = { choice: boolean, noLabel: string }
 function DialogueData.Card(line: string): Card
 	if line == "needsPlot" then
 		return { choice = true, noLabel = "Cancel" }
-	elseif line == "offer" then
+	elseif line == "offer" or line == "robuxOffer" then
 		return { choice = true, noLabel = "No" }
 	end
 	return { choice = false, noLabel = "Close" }

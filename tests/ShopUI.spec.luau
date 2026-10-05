@@ -45,4 +45,26 @@ return function(t)
 		t.ok(string.find(daily, "DailyData.ProgressText(goal)", 1, true), "v2 progress in its units")
 		t.ok(string.find(daily, "DailyData.Bonus(bestAxeTier(), nextStreak, if loop == 2 then 2 else nil)", 1, true))
 	end)
+
+	t.test("no shop opens a buy window while boxed stores are on", function()
+		local shop = fs.readFile(dir .. "ShopUI.luau")
+		-- Every shop screen tied to a building is a shelf menu: the three
+		-- shops' windows hide when GameConfig.BoxedStores is on (ShopLogic).
+		local screens, shelves = 0, 0
+		for body in string.gmatch(shop, "\nlocal [A-Z]+: Shop = (%b{})") do
+			if string.find(body, "building = ", 1, true) then
+				screens += 1
+				if string.find(body, "shelf = true", 1, true) then
+					shelves += 1
+				end
+			end
+		end
+		t.eq(screens, 4, "the Tool Shed, the Dealership, Hearth & Home and the saws")
+		t.eq(shelves, 4, "every one of them is a shelf menu")
+		t.ok(string.find(shop, "shop.shelf == true and ShopLogic.ShelfMenusHidden()", 1, true))
+		local plot = fs.readFile(dir .. "PlotUI.luau")
+		t.eq(string.find(plot, "PLOT_ROW", 1, true), nil, "the palette has no grow-the-plot row")
+		t.ok(string.find(plot, "PlotLogic.Source(", 1, true), "the palette asks the server's own rule")
+		t.ok(string.find(plot, 'name = "GrowPlot"', 1, true), "growing the plot is at the Land Office")
+	end)
 end

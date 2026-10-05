@@ -1405,3 +1405,58 @@ Studio checks
 5. Leave and rejoin: wires are kept, all switches are off, wired lamps dark.
 6. Sell the switch: its lamp relights. A visitor without Interact cannot
    flip, without Build cannot wire.
+
+## Boxed stores, every shop (box on a shelf, carry it, the keeper takes payment)
+
+What changed:
+
+- **The Dealership window is gone** (it was the last shop screen that sold
+  with a Buy button). Trucks and trailers are the lot's boxes; the keeper
+  at the counter takes payment. The three shop screens (Tool Shed,
+  Dealership, Hearth & Home, plus the saws) are `shelf = true` menus: they
+  only open if `GameConfig.BoxedStores = false` (the rollback).
+- **The chop saw is a Tool Shed box** ($7,500, `ItemCatalog.ChopSawPrice`,
+  unchanged). It waits in the same stock list as the sawmills
+  (`sawmillStock`) until you place it from BUILD.
+- **The BUILD palette is no longer a shop.** A sawmill, the chop saw or a
+  furniture unlock you haven't bought says where to buy it ("At the Tool
+  Shed" / "At the store"); PlotService refuses to charge for them there
+  (`PlotLogic.Source` is the one rule, client and server). Kit pieces
+  (walls, floors) keep their placing fee. Growing the plot to its next base
+  tier moved to the Land Office panel, with the squares (the sign prompt).
+- **The Robux shelf**: a gold-trimmed table across the back of the Tool
+  Shed, one gold box per pass and pack StoreData lists (`Shared/RobuxShelf`
+  reads StoreData and writes nothing). Carry a gold box to the counter, say
+  Yes, and the client sends the same `BuyRobuxItem` intent the Store screen
+  sends; `MonetizationService` checks it and shows Roblox's own dialog. The
+  box goes back to its shelf. The STORE screen is still there (Instant
+  Delivery's Use button lives in it, and it works from anywhere).
+- **Tool Shed interior**: 28.5 studs deep (was 21), so two display tables
+  and the Robux table fit with a wide aisle; the counter keeps its place
+  from the door. The meshes are stretched 1.36x in depth to match
+  (`BuildingArt.MeshStretch`). Hearth & Home's boxes now sit on its lower
+  shelves' centre line. The Dealership and Hearth & Home keep their
+  footprints (the Dealership has no room east: the loading pad and the mill
+  road are 7 studs off; Hearth & Home is already 48 x 36).
+- Preview: `bash tools/preview/shoot.sh stores` (roofs off, boxes on the
+  shelves, a figure carrying a box down each aisle).
+
+### Playtest checklist
+- [ ] Dealership counter: no "Browse trucks" prompt; a truck box from the lot
+      carried to the counter is offered by Dale, paid, and opens on your plot
+- [ ] Tool Shed: boxes sit on the two side tables (not floating), walk the
+      aisle carrying one (phone tap, PC, gamepad RT), set it on the counter,
+      Tink offers it, Yes pays
+- [ ] The gold ROBUX SHELF at the back: gold boxes with a tag that reads R$
+      and then R$ plus the price once Roblox answers; a gold box on the
+      counter: "Robux item. Go ahead?", Yes opens Roblox's purchase dialog
+      and the box returns to the shelf; No does nothing; an owned pass says
+      you already have it
+- [ ] Chop saw box ($7,500): after paying, BUILD shows Chop Saw as Place;
+      with none in stock the row says "At the Tool Shed" and placing is refused
+- [ ] BUILD palette: no Grow row; the Land Office prompt on your sign has the
+      Grow button above the squares
+- [ ] The Tool Shed from outside: deeper at the back, same front; nothing
+      clips the Water Tower or the Cart behind it; the loading pad behind it
+- [ ] The Tool Shed mesh in Studio: the baked interior (workbench on the west
+      wall) may show through the west table; tell Claude if it clips

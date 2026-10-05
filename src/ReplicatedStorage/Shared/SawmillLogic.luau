@@ -17,7 +17,8 @@
 --     match those parts is refused too.
 --   * Bought mills wait in a stock list (ids, duplicates allowed) until
 --     they're placed. EncodeStock / DecodeStock is that list on a player
---     attribute.
+--     attribute. The chop saw, bought at the same counter, waits in the
+--     same list.
 
 local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
@@ -419,7 +420,7 @@ end
 function SawmillLogic.DecodeStock(text: string): { string }
 	local out: { string } = {}
 	for id in string.gmatch(text, "[^,]+") do
-		if ItemCatalog.GetSawmill(id) then
+		if ItemCatalog.GetSawmill(id) or ItemCatalog.GetMachine(id) then
 			table.insert(out, id)
 		end
 	end

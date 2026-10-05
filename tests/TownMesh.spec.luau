@@ -434,7 +434,11 @@ return function(t)
 				local asset = TownModels.Get(TownModels.ShopAsset(kind))
 				local body = visualNamed(model, "Body")
 				local piece = TownModels.Piece(asset, "Body")
-				t.ok(body and (body.Size - piece.size).Magnitude < 1e-3, kind .. " is not scaled a second time")
+				-- Authored at 1.5 already: only a shop that grew since (the Tool
+				-- Shed's depth) is stretched, by BuildingArt.MeshStretch.
+				local stretch = if kind == "Sawmill" then Vector3.one else BuildingArt.MeshStretch(kind)
+				local want = Vector3.new(piece.size.X * stretch.X, piece.size.Y * stretch.Y, piece.size.Z * stretch.Z)
+				t.ok(body and (body.Size - want).Magnitude < 1e-3, kind .. " is scaled once, by its stretch")
 				if kind ~= "Sawmill" then
 					local counter = model:FindFirstChild("Counter")
 					local mesh = visualNamed(model, "Counter")

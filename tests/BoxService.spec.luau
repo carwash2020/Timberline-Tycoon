@@ -387,4 +387,151 @@ return function(t)
 		handler(person(Vector3.new(0, 4.5, 0)), "open", "ToolShed")
 		t.eq(sent[2].line, "greet", "the Tool Shed still greets at night")
 	end)
+
+	-- The gold Robux shelf: the same box and the same counter, but the
+	-- counter takes no cash. Yes sends the client the item (the same
+	-- BuyRobuxItem intent the Store sends); the box goes back on its shelf.
+	local function robuxBox(Box, counter, at)
+		return Box.Make({
+			uid = "gold-1",
+			shop = "ToolShed",
+			displayName = "2x Cash",
+			robux = { kind = "Pass", key = "DoubleCash" },
+			cf = CFrame.new(at),
+			counter = counter,
+			zoneCf = CFrame.new(),
+			zoneSize = Vector3.new(18, 1, 14),
+			onShelf = true,
+		})
+	end
+
+	t.test("a Robux box is gold, tagged R$, and never charges cash", function()
+		local _, Box, charges, profile = boot()
+		local counter = counterPart()
+		local rec = robuxBox(Box, counter, Vector3.new(0, 4.5, 0))
+		t.eq(rec.itemKind, "Robux")
+		t.eq(rec.price, 0)
+		t.eq(rec.limited, false)
+		t.eq(rec.part.Material, Enum.Material.Metal)
+		t.eq(rec.part.Color, t.roblox.Color3.fromHex("#E3B73C"))
+		t.eq(rec.part:FindFirstChild("PriceTag"):FindFirstChild("Price").Text, "R$", "Roblox sets the price")
+		local said = {}
+		Box.Speaker = function(_player, line, r)
+			table.insert(said, { line = line, robux = r.robux })
+		end
+		local player = person(Vector3.new(0, 4.5, 0))
+		-- Away from the counter nothing happens.
+		rec.part.CFrame = CFrame.new(0, 40, 0)
+		local lost, why = Box.Pay(person(Vector3.new(0, 40, 0)), rec.uid)
+		t.eq(lost, false)
+		t.eq(why, "missing")
+		rec.part.CFrame = CFrame.new(0, 4.5, 0)
+		rec.onShelf = false
+		Box.RefreshPrompts()
+		for _ = 1, 3 do
+			Box.Pay(player, rec.uid)
+		end
+		t.eq(#charges, 0, "ShopService was never asked to charge")
+		t.eq(profile.cash, 1000)
+		t.eq(rec.paid, false)
+		t.eq(#said, 4, "missing once, then robuxAsk three times")
+		t.eq(said[2].line, "robuxAsk")
+		t.eq(said[2].robux, { kind = "Pass", key = "DoubleCash" })
+		t.eq(rec.onShelf, true, "the box went back to its shelf")
+		t.ok((rec.part.CFrame.Position - rec.home.Position).Magnitude < 1e-3)
+	end)
+
+	t.test("a Robux box only forwards an item the shelf lists", function()
+		local _, Box, charges = boot()
+		local counter = counterPart()
+		local rec = Box.Make({
+			uid = "gold-bad",
+			shop = "ToolShed",
+			displayName = "Nope",
+			robux = { kind = "Pass", key = "NotARealPass" },
+			cf = CFrame.new(0, 4.5, 0),
+			counter = counter,
+			zoneCf = CFrame.new(),
+			zoneSize = Vector3.new(18, 1, 14),
+			onShelf = true,
+		})
+		local lines = {}
+		Box.Speaker = function(_player, line)
+			table.insert(lines, line)
+		end
+		local ok, line = Box.Pay(person(Vector3.new(0, 4.5, 0)), rec.uid)
+		t.eq(ok, false)
+		t.eq(line, "locked")
+		t.eq(lines, { "locked" })
+		t.eq(#charges, 0)
+	end)
+
+	t.test("the keeper asks about a Robux box and hands the client the item on Yes", function()
+		local loader, Box = boot()
+		local counter = counterPart()
+		robuxBox(Box, counter, Vector3.new(0, 4.5, 0))
+		local sent = {}
+		local handler
+		local remote = {
+			OnServerEvent = {
+				Connect = function(_, fn)
+					handler = fn
+					return { Disconnect = function() end }
+				end,
+			},
+			FireClient = function(_, _player, payload)
+				table.insert(sent, payload)
+			end,
+		}
+		local Dialogue = loader:server("DialogueService")
+		Dialogue.Init(remote)
+		local player = person(Vector3.new(0, 4.5, 0))
+		handler(player, "open", "ToolShed")
+		t.eq(sent[1].line, "robuxOffer")
+		t.eq(sent[1].choice, true)
+		t.eq(sent[1].noLabel, "No")
+		t.eq(sent[1].robux, nil, "asking carries no purchase")
+		t.ok(string.find(sent[1].text, "2x Cash", 1, true) ~= nil, sent[1].text)
+		handler(player, "pick", "yes", "gold-1")
+		local last = sent[#sent]
+		t.eq(last.line, "robuxAsk")
+		t.eq(last.choice, false)
+		t.eq(last.robux, { kind = "Pass", key = "DoubleCash" })
+		handler(player, "pick", "no", "gold-1")
+		t.eq(sent[#sent].robux, nil, "No sends nothing to Roblox")
+	end)
+
+	t.test("the Tool Shed's gold slots stock gold boxes, and its tables stock cash boxes", function()
+		local loader, Box = boot()
+		local RobuxShelf = loader:shared("RobuxShelf")
+		local StoreStock = loader:shared("StoreStock")
+		local Instance2 = Instance
+		local model = Instance2.new("Model")
+		model.Name = "ToolShed"
+		local counter = counterPart()
+		counter.Parent = model
+		local function slot(name, slotId, x)
+			local att = Instance2.new("Attachment")
+			att.Name = name
+			att:SetAttribute("SlotId", slotId)
+			att.Position = Vector3.new(x, 2, 0)
+			att.Parent = counter
+		end
+		slot("ShelfSlot", "toolshed-SteelAxe", -2)
+		slot("RobuxSlot", RobuxShelf.SlotId("Pass", "DoubleCash"), 1)
+		slot("RobuxSlot", "robux-Pass-NotListed", 2)
+		Box.StockShop(model)
+		local gold, cash = 0, 0
+		for _, rec in ipairs(Box.Each()) do
+			if rec.robux then
+				gold += 1
+				t.eq(rec.slotId, "robux-Pass-DoubleCash")
+			elseif rec.slotId == "toolshed-SteelAxe" then
+				cash += 1
+			end
+		end
+		t.eq(gold, 1, "an unlisted gold slot stocks nothing")
+		t.eq(cash, 1)
+		t.ok(StoreStock.Get("robux-Pass-DoubleCash") == nil, "the gold shelf is not cash stock")
+	end)
 end

@@ -222,6 +222,13 @@ return function(t)
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)
 				local minX, maxX, minZ, maxZ = -12 * s, 12.5 * s, -11.6 * s, 9.2 * s
+				if shop.kind == "ToolShed" then
+					-- Deeper since the display tables went in (19 studs inside): the
+					-- old bounds are 7 studs either side of the middle, plus the
+					-- porch and the sign.
+					minZ = -(BuildingArt.ToolShedHalfDepth + 4.6) * s
+					maxZ = (BuildingArt.ToolShedHalfDepth + 2.2) * s
+				end
 				if shop.kind == "HearthAndHome" then
 					-- 48 x 36 studs once scaled, plus the sign over the door.
 					minX, maxX, minZ, maxZ = -26, 26, -24, 20
@@ -808,8 +815,8 @@ return function(t)
 		local shed = BuildingArt.Shop(SHOPS[1].kind, SHOPS[1].title, SHOPS[1].accent)
 		solid(shed, "GrindTrough", "the Tool Shed's grindstone", 1)
 		solid(shed, "Grindstone", "the Tool Shed's grindstone", 1)
-		solid(shed, "Workbench", "the Tool Shed's workbench", 1)
-		solid(shed, "BenchLeg", "the Tool Shed's workbench", 2)
+		solid(shed, "DisplayTable", "the Tool Shed's display tables", 2)
+		solid(shed, "GoldTable", "the Tool Shed's Robux table", 1)
 		solid(shed, "Log", "the Tool Shed's firewood", 3)
 		solid(shed, "ChoppingBlock", "the Tool Shed's chopping block", 1)
 		local garage = BuildingArt.Shop(SHOPS[2].kind, SHOPS[2].title, SHOPS[2].accent)
@@ -876,6 +883,95 @@ return function(t)
 		t.eq(#one, #two)
 		for i = 1, #one do
 			t.ok(one[i].CFrame == two[i].CFrame and one[i].Color == two[i].Color, "same sawmill every time")
+		end
+	end)
+
+	t.test("shops: the front opening is about 12 studs wide or more, so a carried box walks in", function()
+		local StoreStock = loader:shared("StoreStock")
+		t.ok(StoreStock ~= nil)
+		for _, shop in ipairs(SHOPS) do
+			local model = BuildingArt.Shop(shop.kind, shop.title, shop.accent)
+			local s = BuildingArt.Scale[shop.kind]
+			local front = if shop.kind == "ToolShed"
+				then -BuildingArt.ToolShedHalfDepth * s
+				elseif shop.kind == "Dealership" then -7 * s
+				else -12 * s
+			-- Chest height, in the wall's own line: what a carried box meets.
+			local best, run = 0, 0
+			for i = -80, 80 do
+				local x = i * 0.25
+				local hit = blockers(model, V3.new(x - 0.12, 1.8, front - 0.3), V3.new(x + 0.12, 5.5, front + 0.3))
+				if #hit == 0 then
+					run += 0.25
+					best = math.max(best, run)
+				else
+					run = 0
+				end
+			end
+			t.ok(best >= 11.5, string.format("%s's door is %.2f wide", shop.kind, best))
+		end
+	end)
+
+	t.test("the Tool Shed's boxes stand on its tables, and Hearth & Home's on its lower shelves", function()
+		local StoreStock = loader:shared("StoreStock")
+		local RobuxShelf = loader:shared("RobuxShelf")
+		-- A box (1.2 tall) sits with its bottom on the top, within a hair.
+		local function sits(model, names, x, y, z, label)
+			local bottom = y - 0.6
+			local ok = false
+			for _, p in ipairs(parts(model)) do
+				if names[p.Name] then
+					local lo, hi = bounds(p)
+					if x > lo.X and x < hi.X and z > lo.Z and z < hi.Z and math.abs(hi.Y - bottom) < 0.06 then
+						ok = true
+					end
+				end
+			end
+			t.ok(ok, label .. " rests on a table or shelf top")
+		end
+		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
+		local s = BuildingArt.Scale.ToolShed
+		for _, place in ipairs(StoreStock.Placements("ToolShed")) do
+			sits(shed, { DisplayTable = true }, place.x * s, place.y * s, place.z * s, place.slotId)
+		end
+		for _, place in ipairs(RobuxShelf.Placements()) do
+			sits(shed, { GoldTableTop = true }, place.x * s, place.y * s, place.z * s, place.slotId)
+		end
+		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", C3.fromRGB(122, 90, 60))
+		local h = BuildingArt.Scale.HearthAndHome
+		for _, place in ipairs(StoreStock.Placements("HearthAndHome")) do
+			sits(hearth, { Shelf = true }, place.x * h, place.y * h, place.z * h, place.slotId)
+		end
+	end)
+
+	t.test("the Tool Shed is deeper than it was, and its meshes stretch to match, along Z only", function()
+		t.eq(BuildingArt.ToolShedHalfDepth, 9.5)
+		local stretch = BuildingArt.MeshStretch("ToolShed")
+		t.eq(stretch.X, 1)
+		t.eq(stretch.Y, 1)
+		t.ok(math.abs(stretch.Z - 9.5 / 7) < 1e-6)
+		for _, kind in ipairs({ "Dealership", "HearthAndHome", "Sawmill" }) do
+			t.eq(BuildingArt.MeshStretch(kind), V3.one, kind .. " is not stretched")
+		end
+		-- Nothing has to be rebuilt at the old depth: the walls reach the new back.
+		local model = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
+		local backZ = -math.huge
+		for _, p in ipairs(parts(model)) do
+			if p.Name == "Wall" or p.Name == "Footing" then
+				local _, hi = bounds(p)
+				backZ = math.max(backZ, hi.Z)
+			end
+		end
+		t.ok(backZ >= 9.5 * BuildingArt.Scale.ToolShed - 1e-6, "the back wall is 28.5 studs from the front")
+	end)
+
+	t.test("the gold table carries the shelf's name, and only the Tool Shed has one", function()
+		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
+		t.ok(find(shed, "GoldTable") ~= nil)
+		t.ok(texts(shed)["ROBUX SHELF"], "the board says ROBUX SHELF")
+		for _, kind in ipairs({ "Dealership", "HearthAndHome" }) do
+			local other = BuildingArt.Shop(kind, kind, C3.fromRGB(90, 60, 40))
+			t.eq(find(other, "GoldTable"), nil, kind .. " has no gold table")
 		end
 	end)
 end

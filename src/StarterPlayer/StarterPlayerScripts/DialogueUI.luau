@@ -131,6 +131,12 @@ function DialogueUI.Start()
 			return
 		end
 		line.Text = payload.text
+		-- The Robux shelf's yes: ask Roblox for that pass or pack with the
+		-- intent the Store screen sends. The server checks it again.
+		local robux = payload.robux
+		if type(robux) == "table" and type(robux.kind) == "string" and type(robux.key) == "string" then
+			Net.Remote("BuyRobuxItem"):FireServer(robux.kind, robux.key)
+		end
 		choosing = payload.choice == true
 		boxUid = if type(payload.boxUid) == "string" then payload.boxUid else nil
 		yes.Visible = choosing

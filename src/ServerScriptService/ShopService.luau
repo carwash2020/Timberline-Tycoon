@@ -503,7 +503,7 @@ local function publishStock(player: Player, profile: ProfileService.Profile)
 end
 
 -- A sawmill goes into stock. You place it from BUILD on your plot (that
--- spends the stock; placing without one charges the price there instead).
+-- spends the stock; with boxed shelves on, placing without one is refused).
 local function buySawmill(player: Player, millId: string)
 	if loop ~= 2 then
 		return
@@ -654,34 +654,6 @@ function ShopService.Init(
 	loop = if activeLoop == 2 then 2 else 1
 	buyRemote.OnServerEvent:Connect(onBuyItem)
 	equipRemote.OnServerEvent:Connect(onEquipItem)
-	-- Display models on the dealership lot carry their own BuyPrompt. The
-	-- test map is a plain table with FindFirstChild only, so skip the scan
-	-- when the folder can't walk its descendants.
-	if typeof(mapFolder.GetDescendants) == "function" then
-		for _, inst in ipairs(mapFolder:GetDescendants()) do
-			if inst:IsA("ProximityPrompt") and inst.Name == "BuyPrompt" then
-				inst.Triggered:Connect(function(player: Player)
-					local node: Instance? = inst
-					local category: string? = nil
-					local itemId: string? = nil
-					while node do
-						if node:IsA("Model") then
-							local cat = node:GetAttribute("Category")
-							local id = node:GetAttribute("ItemId")
-							if type(cat) == "string" and type(id) == "string" then
-								category, itemId = cat, id
-								break
-							end
-						end
-						node = node.Parent
-					end
-					if category and itemId then
-						onBuyItem(player, category, itemId)
-					end
-				end)
-			end
-		end
-	end
 end
 
 -- A boxed purchase. The price, the owner and the stock are read here; the
@@ -795,6 +767,13 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		if not hasLand(profile) then
 			return fail("needsLand")
 		end
+	elseif box.kind == "Machine" then
+		if loop ~= 2 or not ItemCatalog.GetMachine(box.itemId) then
+			return fail("locked")
+		end
+		if not hasLand(profile) then
+			return fail("needsLand")
+		end
 	elseif box.kind == "Blueprint" then
 		local bp = PlotLogic.Blueprint(box.itemId)
 		if not bp or bp.unlock ~= true then
@@ -880,6 +859,17 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 			table.insert(profile.sawmillStock, mill.id)
 			publishStock(player, profile)
 			notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", mill.displayName))
+		end
+	elseif box.kind == "Machine" then
+		local machine = ItemCatalog.GetMachine(box.itemId)
+		if machine then
+			-- The same stock list the sawmills wait in; BUILD places it.
+			if type(profile.sawmillStock) ~= "table" then
+				profile.sawmillStock = {}
+			end
+			table.insert(profile.sawmillStock, machine.id)
+			publishStock(player, profile)
+			notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", machine.displayName))
 		end
 	elseif box.kind == "Blueprint" then
 		local bp = PlotLogic.Blueprint(box.itemId)

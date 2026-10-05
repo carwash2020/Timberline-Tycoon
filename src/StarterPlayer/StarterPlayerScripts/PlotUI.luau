@@ -1,12 +1,15 @@
 --!strict
 -- PlotUI: building on your plot (PlotService on the server).
 --   * A BUILD button shows while you stand on your own plot. It starts
---     build mode: the Blueprint Store opens (drawn by ShopUI), a bar offers
+--     build mode: the build palette opens (drawn by ShopUI), a bar offers
 --     BLUEPRINTS and DONE, and everything you've placed gets Move (E) and
 --     Sell (F, hold) prompts.
---   * The Blueprint Store lists blueprints, locked until your plot size
---     allows them (the message points to LAND). Picking one hands it to
---     BlueprintPlacer (the ghost preview); you pay on placing.
+--   * The palette is not a shop. What the shops sell as boxes (sawmills,
+--     the chop saw, the furniture blueprints) shows here only once you own
+--     it, as Place; before that its row says where to buy it. Kit pieces
+--     are made from your own wood and charge a placing fee. Rows are locked
+--     until your plot size allows them (the message points to LAND).
+--     Picking one hands it to BlueprintPlacer (the ghost preview).
 --   * The LAND panel has two sections: "Plot size" (level N of 5, what the
 --     next level unlocks and costs) and "Expand" (squares beyond the plot
 --     size). Words: plot = your claimed pad, plot size = its level,
@@ -79,7 +82,7 @@ local function onMyPlot(): boolean
 end
 
 ---------------------------------------------------------------------------
--- The Blueprint Store
+-- The build palette
 ---------------------------------------------------------------------------
 
 local function stockCount(id: string): number
@@ -108,8 +111,12 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local needed = PlotData.Tier(bp.tier)
 	local stocked = stockCount(bp.id)
 	local unlocked = bp.unlock == true and ownsBlueprint(bp.id)
-	local atStore = bp.unlock == true and not unlocked
-	local price = if stocked > 0 or unlocked then 0 else PlotData.Price(bp)
+	-- The server's own rule (PlotLogic.Source): a box from the Tool Shed or
+	-- the General Store before you own it, a fee for a kit piece.
+	local source = PlotLogic.Source(bp, stocked, unlocked, ShopLogic.ShelfMenusHidden())
+	local atStore = source == "store"
+	local atShed = source == "toolShed"
+	local price = if source == "place" then 0 else PlotData.Price(bp)
 	local affordable = cash() >= price
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
@@ -130,8 +137,10 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local button, state
 	if locked then
 		button, state = if needed then needed.name else "Locked", "locked"
-	elseif stocked > 0 or unlocked then
+	elseif source == "place" then
 		button, state = "Place", "buy"
+	elseif atShed then
+		button, state = "At the Tool Shed", "locked"
 	elseif atStore then
 		button, state = "At the store", "locked"
 	elseif affordable then
@@ -155,6 +164,8 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 						if needed then needed.name else "a bigger one"
 					)
 				)
+			elseif atShed then
+				HUD.Toast(string.format("Buy the %s at the Tool Shed first.", bp.displayName))
 			elseif atStore then
 				HUD.Toast(string.format("Buy the %s at the General Store first.", bp.displayName))
 			elseif cash() < price then
@@ -173,8 +184,8 @@ end
 local STORE: ShopUI.Shop = {
 	building = nil,
 	promptText = "",
-	title = "Blueprint Store",
-	subtitle = "You pay when you place it. Sold back: half (all of it within a minute). Plot size is in LAND.",
+	title = "Build Palette",
+	subtitle = "Boxes from town place free. Kits: a fee. Plot size is in LAND.",
 	ids = function()
 		local ids: { string } = {}
 		for _, mill in ipairs(ItemCatalog.SawmillList()) do
