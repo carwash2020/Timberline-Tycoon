@@ -96,15 +96,9 @@ function SellLogic.Money(dollars: number): string
 	return string.sub(FieldGuide.CashText(dollars), 2)
 end
 
--- The sale toast: "Sold 3 pieces · 41 u³ · $96".
-function SellLogic.SaleText(pieces: number, u3: number, dollars: number): string
-	return string.format(
-		"Sold %d piece%s · %s · %s",
-		pieces,
-		if pieces == 1 then "" else "s",
-		FieldGuide.VolumeText(u3),
-		FieldGuide.CashText(dollars)
-	)
+-- The sale toast: "Sold 3 pieces · $96". Just the pay, not the volume.
+function SellLogic.SaleText(pieces: number, _u3: number, dollars: number): string
+	return string.format("Sold %d piece%s · %s", pieces, if pieces == 1 then "" else "s", FieldGuide.CashText(dollars))
 end
 
 -- The Sky Bin (V2_PLAN.md §5) ---------------------------------------------
