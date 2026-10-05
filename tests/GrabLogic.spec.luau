@@ -325,4 +325,16 @@ return function(t)
 		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME, plotAllows = false }), false)
 		t.eq(GrabLogic.CanPressPad({ userId = OTHER, ownerId = ME }), false)
 	end)
+
+	t.test("PadPressAccepted: a handled R2 still grabs, a handled click does not, the placer owns R2", function()
+		-- processed, trigger, selecting, placing
+		t.eq(GrabLogic.PadPressAccepted(false, true, false, false), true)
+		t.eq(GrabLogic.PadPressAccepted(true, true, false, false), true, "a bound action marked it handled")
+		t.eq(GrabLogic.PadPressAccepted(true, true, true, false), false, "a menu has the pad selection")
+		t.eq(GrabLogic.PadPressAccepted(true, false, false, false), false, "a handled mouse click is a button's")
+		t.eq(GrabLogic.PadPressAccepted(false, false, false, false), true)
+		t.eq(GrabLogic.PadPressAccepted(true, true, false, true), false, "placing: R2 is Place, not Grab")
+		t.eq(GrabLogic.PadPressAccepted(false, true, false, true), false)
+		t.eq(GrabLogic.PadPressAccepted(false, false, false, true), true, "the mouse still grabs")
+	end)
 end
