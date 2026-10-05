@@ -23,7 +23,9 @@
 -- picks among them.
 
 local CharacterArt = require(script.Parent.Art.CharacterArt)
+local FerryLogic = require(script.Parent.FerryLogic)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
+local TollLogic = require(script.Parent.TollLogic)
 
 local NPCData = {}
 
@@ -36,6 +38,7 @@ export type Spot = {
 	offset: Vector3?, -- beside: X past the part's side edge (+/-), Z from its centre
 	turn: number?, -- beside: degrees to turn from the part's front (+ = to the left)
 	fallback: Vector3?, -- where to stand if the model isn't there
+	ground: number?, -- fixed, away from the flat town: stand this far above the terrain at (x, z) (NPCService)
 }
 
 export type Waypoint = {
@@ -606,6 +609,114 @@ NPCData.List = {
 			storm = { "Thunder. The cave hums back. Listen." },
 			morning = { "Morning. I think. It's hard to tell in here." },
 			axe = { "A better axe? Then you'll want to see the Maul." },
+		},
+	},
+	{
+		-- Old Tolly keeps the toll booth east of the bridge (WorldLayout
+		-- BoothX/BoothZ; LandmarkArt.TollBooth). Stands inside it behind the
+		-- counter, on the booth floor, facing the road. His price talk is
+		-- built from TollLogic, so it follows GameConfig.TollFee.
+		id = "OldTolly",
+		name = "Old Tolly",
+		role = "Toll keeper",
+		spot = {
+			kind = "fixed",
+			position = Vector3.new(22, 0, 1566),
+			lookAt = Vector3.new(22, 0, 1500),
+			ground = 1, -- the booth floor's thickness
+		},
+		idle = "clipboard",
+		promptLift = 80, -- above the booth counter's toll prompt
+		look = {
+			name = "Old Tolly",
+			role = "Toll keeper",
+			seed = 211,
+			skin = hex("#D8A47E"),
+			shirt = hex("#8A5A3A"),
+			pants = hex("#4E4A3E"),
+			boots = hex("#3A281C"),
+			hair = hex("#D9D3C8"),
+			hairStyle = "short",
+			beard = "mustache",
+			beardColor = hex("#D9D3C8"),
+			hat = "cap",
+			hatColor = hex("#3E5A44"),
+			hatTrim = hex("#2C4032"),
+			glasses = hex("#5A4630"),
+			vest = hex("#2F4A38"),
+			carry = "clipboard",
+		},
+		greetings = { "Afternoon, traveller.", "Mind the arm, it swings.", "Well met, friend." },
+		lines = {
+			TollLogic.TalkLines()[1],
+			TollLogic.TalkLines()[2],
+			TollLogic.TalkLines()[3],
+			"A driver who pays takes the truck and a passenger across, too.",
+			"The gorge is deep and the bridge is sturdy. Trust the one, mind the other.",
+			"I've kept this booth since before the rails went up. Quiet work, good company.",
+		},
+		react = {
+			morning = { "Early start. The bridge likes the quiet hours." },
+			day = { "Busy day on the road. Booth's open, as ever." },
+			evening = { "Last crossings before dark. Don't dawdle." },
+			night = { "Lantern's lit. I'll be here, same as always." },
+			rain = { "Wet planks, careful feet. Cross slow." },
+			storm = { "Thunder over the gorge. Best wait it out here." },
+			fog = { "Can't see the far bank. It's still there, I promise." },
+		},
+	},
+	{
+		-- Cap'n Moss captains the ferry from the mainland dock (WorldLayout
+		-- FerryDock), at the dock's west end, off the boarding edge, facing
+		-- the water. Fare and timetable talk is built from FerryLogic.
+		id = "CapnMoss",
+		name = "Cap'n Moss",
+		role = "Ferry captain",
+		spot = {
+			kind = "fixed",
+			position = Vector3.new(1177, 0, -697),
+			lookAt = Vector3.new(1260, 0, -697),
+			ground = 1, -- the dock deck's thickness
+		},
+		idle = "lookAround",
+		promptLift = 80, -- above the dock's Board prompt
+		look = {
+			name = "Cap'n Moss",
+			role = "Ferry captain",
+			seed = 223,
+			stout = true,
+			skin = hex("#C98E68"),
+			shirt = hex("#2E4F73"),
+			stripe = hex("#E8E2D4"),
+			pants = hex("#3A3F4A"),
+			boots = hex("#2E2218"),
+			hair = hex("#B8B2A6"),
+			hairStyle = "short",
+			beard = "big",
+			beardColor = hex("#B8B2A6"),
+			hat = "conductor",
+			hatColor = hex("#1F3552"),
+			hatTrim = hex("#D8B04A"),
+			carry = "lantern",
+			accent = hex("#F2C14E"),
+		},
+		greetings = { "Ahoy, landlubber.", "Mind the gap, mate.", "Fair crossing today." },
+		lines = {
+			FerryLogic.TalkLines()[1],
+			FerryLogic.TalkLines()[2],
+			FerryLogic.TalkLines()[3],
+			"No trucks on deck. She's a boat, not a barge.",
+			"Stand on the planks and hold on. The island doesn't move.",
+			"Forty years on this water. Never lost a passenger. Misplaced a plank or two.",
+		},
+		react = {
+			morning = { "Morning tide's kind. Good time to cross." },
+			day = { "Sun on the water. Hard to beat." },
+			evening = { "Last light on the island. Worth the fare." },
+			night = { "Lantern on the bow. I know these waters blind." },
+			rain = { "A little rain never sank a ferry. Come aboard." },
+			storm = { "Swell's up. She'll still sail, mind your feet." },
+			fog = { "Fog on the water. I sail by ear and habit." },
 		},
 	},
 } :: { NPC }
