@@ -297,11 +297,11 @@ local function tooltipText(
 		then string.format("%s %s", wood.displayName, if kind == "plank" then "plank" else "log")
 		else wood.displayName
 	local parts = { name }
-	if withVolume and type(volume) == "number" and volume == volume then
-		table.insert(parts, FieldGuide.VolumeText(volume))
-	end
+	-- One figure: what it's worth. Only a piece with no known worth shows its volume.
 	if type(value) == "number" and value == value then
 		table.insert(parts, FieldGuide.CashText(value))
+	elseif withVolume and type(volume) == "number" and volume == volume then
+		table.insert(parts, FieldGuide.VolumeText(volume))
 	end
 	return table.concat(parts, " · ")
 end
@@ -332,9 +332,8 @@ HudRules.BedChipMaxChars = 21
 -- The v2 bed chip (HUD), from the truck's BedVolume (u³), the bed's room
 -- (u³; nil or 0 when there's no figure for it) and BedValue ($), as read
 -- (any type), and whether a panel is open (`modal`):
---   * "Bed 41 / 96 u³" with a room, "Bed 41 u³" without, then " · $61"
---     once the load is worth anything (CashText: what the pad would pay),
---     unless that would make it longer than BedChipMaxChars;
+--   * "Bed $61": the load's worth (CashText: what the pad would pay); until
+--     it is worth anything, "Bed 41 / 96" with a room, "Bed 41" without;
 --   * amber (`full`) once the load reaches the room;
 --   * hidden while the bed is empty (no noise from minute one, as the v1
 --     chip) and while a panel is open.
@@ -343,15 +342,16 @@ function HudRules.BedChip(volume: unknown, room: unknown, value: unknown, modal:
 		return if type(n) == "number" and n == n and n > 0 and n ~= math.huge then n else 0
 	end
 	local inBed, space, worth = amount(volume), amount(room), amount(value)
-	local text = if space > 0
-		then string.format("Bed %s / %s", FieldGuide.VolumeNumber(inBed), FieldGuide.VolumeText(space))
+	-- One figure: what the load is worth. Its volume only shows while it
+	-- is worth nothing (a piece too small to pay).
+	local text = if worth > 0
+		then "Bed " .. FieldGuide.CashText(worth)
+		elseif space > 0 then string.format(
+			"Bed %s / %s",
+			FieldGuide.VolumeNumber(inBed),
+			FieldGuide.VolumeText(space)
+		)
 		else "Bed " .. FieldGuide.VolumeText(inBed)
-	if worth > 0 then
-		local withValue = text .. " · " .. FieldGuide.CashText(worth)
-		if (utf8.len(withValue) or #withValue) <= HudRules.BedChipMaxChars then
-			text = withValue
-		end
-	end
 	return {
 		shown = not modal and inBed > 0,
 		text = text,

@@ -402,18 +402,14 @@ return function(t)
 	end)
 
 	t.test("v2: the hold tooltip names the wood, its and its worth", function()
-		local V, C = FieldGuide.VolumeText, FieldGuide.CashText
+		local C = FieldGuide.CashText
 		for _, wood in ipairs(WoodData.All()) do
-			t.eq(
-				HudRules.WoodTooltip(wood.id, "log", 26.3, 39.6),
-				wood.displayName .. " log · " .. V(26.3) .. " · " .. C(39.6),
-				wood.id
-			)
+			t.eq(HudRules.WoodTooltip(wood.id, "log", 26.3, 39.6), wood.displayName .. " log · " .. C(39.6), wood.id)
 		end
-		t.eq(HudRules.WoodTooltip("oak", "log", 26.3, 39), "Oak log · 26 · $39", "V2_PLAN's example")
-		t.eq(HudRules.WoodTooltip("maple", "plank", 2, 52.8), "Maple plank · " .. V(2) .. " · " .. C(52.8))
-		t.eq(HudRules.WoodTooltip("oak", nil, 4.4, 6.6), "Oak log · 4.4 · $7", "no Kind yet: a log")
-		t.eq(HudRules.WoodTooltip("oak", "log", 0.2, 0.3), "Oak log · 0.2 · $1", "what selling it alone pays")
+		t.eq(HudRules.WoodTooltip("oak", "log", 26.3, 39), "Oak log · $39", "V2_PLAN's example")
+		t.eq(HudRules.WoodTooltip("maple", "plank", 2, 52.8), "Maple plank · " .. C(52.8))
+		t.eq(HudRules.WoodTooltip("oak", nil, 4.4, 6.6), "Oak log · $7", "no Kind yet: a log")
+		t.eq(HudRules.WoodTooltip("oak", "log", 0.2, 0.3), "Oak log · $1", "what selling it alone pays")
 		t.eq(HudRules.WoodTooltip("oak", "log", nil, 39), "Oak log · $39", "Volume not replicated yet")
 		t.eq(HudRules.WoodTooltip("oak", "log", 26, 0 / 0), "Oak log · 26", "a NaN value is left out")
 		t.eq(HudRules.WoodTooltip("nope", "log", 1, 1), nil, "not a known wood")
@@ -425,9 +421,9 @@ return function(t)
 		local function chip(volume, room, value, modal)
 			return HudRules.BedChip(volume, room, value, modal or false)
 		end
-		t.eq(chip(41.2, 96, 61.2), { shown = true, text = "Bed 41 / 96 · $61", full = false })
-		t.eq(chip(41.2, nil, 61.2), { shown = true, text = "Bed 41 · $61", full = false }, "no room figure")
-		t.eq(chip(4.44, 0, 0.4), { shown = true, text = "Bed 4.4 · $1", full = false }, "the pad pays at least $1")
+		t.eq(chip(41.2, 96, 61.2), { shown = true, text = "Bed $61", full = false })
+		t.eq(chip(41.2, nil, 61.2), { shown = true, text = "Bed $61", full = false }, "no room figure")
+		t.eq(chip(4.44, 0, 0.4), { shown = true, text = "Bed $1", full = false }, "the pad pays at least $1")
 		t.eq(chip(4.44, 0, 0), { shown = true, text = "Bed 4.4", full = false }, "worth nothing: no $0")
 		t.eq(chip(96, 96, 140).full, true, "full at the room")
 		t.eq(chip(120, 96, 140).full, true, "piled over the walls")
@@ -449,7 +445,7 @@ return function(t)
 				end
 			end
 		end
-		t.eq(HudRules.BedChip(41, 96, 4500, false).text, "Bed 41 / 96 · $4,500", "a worth that fits stays")
+		t.eq(HudRules.BedChip(41, 96, 4500, false).text, "Bed $4,500", "a worth that fits stays")
 	end)
 
 	-- M1.8b: what the HUD's chip shows under v2.
@@ -461,20 +457,16 @@ return function(t)
 		local oak = held("oak", "log", 26.3, 39)
 		t.eq(
 			HudRules.LoadChipV2(oak, nil, nil, nil, false, false),
-			{ shown = true, text = "Oak log · 26 · $39", full = false }
+			{ shown = true, text = "Oak log · $39", full = false }
 		)
-		t.eq(
-			HudRules.LoadChipV2(oak, 41.2, 96, 61.2, false, false).text,
-			"Oak log · 26 · $39",
-			"holding wins over the bed"
-		)
+		t.eq(HudRules.LoadChipV2(oak, 41.2, 96, 61.2, false, false).text, "Oak log · $39", "holding wins over the bed")
 		t.eq(HudRules.LoadChipV2(oak, nil, nil, nil, true, false).shown, false, "hidden while a panel is open")
 		t.eq(
 			HudRules.LoadChipV2(nil, 41.2, 96, 61.2, false, false),
 			HudRules.BedChip(41.2, 96, 61.2, false),
 			"empty hands: the bed chip"
 		)
-		t.eq(HudRules.LoadChipV2(nil, 41.2, nil, 61.2, false, true).text, "Bed 41 · $61")
+		t.eq(HudRules.LoadChipV2(nil, 41.2, nil, 61.2, false, true).text, "Bed $61")
 		t.eq(
 			HudRules.LoadChipV2(nil, nil, nil, nil, false, false).shown,
 			false,
@@ -482,7 +474,7 @@ return function(t)
 		)
 		t.eq(
 			HudRules.LoadChipV2(held("nope", "log", 1, 1), 5, nil, 8, false, false).text,
-			"Bed 5 · $8",
+			"Bed $8",
 			"not known wood: the bed instead"
 		)
 		t.eq(HudRules.LoadChipV2(held(nil, nil, nil, nil), nil, nil, nil, false, false).shown, false)
@@ -504,12 +496,12 @@ return function(t)
 	end)
 
 	t.test("v2: on a phone the held tooltip fits the chip's longest, dropping the kind, then the", function()
-		t.eq(HudRules.ChipTooltip(held("oak", "log", 26.3, 39), true), "Oak log · 26 · $39", "fits as it is")
-		t.eq(HudRules.ChipTooltip(held("birch", "log", 7.5, 17), true), "Birch log · 7.5 · $17")
+		t.eq(HudRules.ChipTooltip(held("oak", "log", 26.3, 39), true), "Oak log · $39", "fits as it is")
+		t.eq(HudRules.ChipTooltip(held("birch", "log", 7.5, 17), true), "Birch log · $17")
 		t.eq(HudRules.ChipTooltip(held("frostwood", "plank", 4.4, 470), true), "Frostwood · $470")
 		t.eq(
 			HudRules.ChipTooltip(held("frostwood", "plank", 4.4, 470), false),
-			"Frostwood plank · 4.4 · $470",
+			"Frostwood plank · $470",
 			"a computer or a TV: all of it"
 		)
 		for _, wood in ipairs(WoodData.All()) do
