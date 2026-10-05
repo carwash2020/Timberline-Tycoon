@@ -198,6 +198,11 @@ return function(t)
 	end)
 
 	t.test("stock is a list of mill ids, and a mill places like a blueprint", function()
+		t.eq(
+			Logic.DecodeStock("SawmillRickety,ChopSaw,nope"),
+			{ "SawmillRickety", "ChopSaw" },
+			"the chop saw waits here too"
+		)
 		t.eq(Logic.DecodeStock(Logic.EncodeStock({ "SawmillRickety", "nope", "SawmillRickety" })), {
 			"SawmillRickety",
 			"SawmillRickety",

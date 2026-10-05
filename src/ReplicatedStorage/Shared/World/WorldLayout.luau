@@ -500,7 +500,7 @@ WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 -- reads them yet and the ground does not move.
 export type LoadingPad = { x0: number, x1: number, z0: number, z1: number }
 WorldLayout.DealershipLoadingPad = { x0 = 70, x1 = 84, z0 = 100, z1 = 114 } :: LoadingPad
-WorldLayout.ToolShedLoadingPad = { x0 = -66, x1 = -52, z0 = 122, z1 = 136 } :: LoadingPad
+WorldLayout.ToolShedLoadingPad = { x0 = -66, x1 = -52, z0 = 129, z1 = 143 } :: LoadingPad
 
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
 -- pad, packed dirt for the main street, the shop paths, the spawn walk, the
@@ -542,7 +542,7 @@ WorldLayout.TownPaint = {
 -- a shop floor or hides its front (TER-02). The sawmill stands on the
 -- MillYard. TerrainGen paints these after TownPaint.
 WorldLayout.TownFloors = {
-	{ name = "ToolShedFloor", x0 = -73.5, x1 = -38.5, z0 = 88.5, z1 = 119.5, material = "Ground" },
+	{ name = "ToolShedFloor", x0 = -73.5, x1 = -38.5, z0 = 88.5, z1 = 127, material = "Ground" },
 	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -70, z0 = 94, z1 = 144, material = "Ground" },
 	{ name = "DealershipFloor", x0 = 35, x1 = 69.5, z0 = 89, z1 = 118, material = "Ground" },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },

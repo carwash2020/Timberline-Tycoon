@@ -1803,7 +1803,7 @@ function WorldPlan.Town(): Town
 				kind = "ToolShed",
 				title = "TOOL SHED",
 				accent = Color3.fromRGB(150, 62, 44),
-				cframe = CFrame.new(-57, 0, 105.7),
+				cframe = CFrame.new(-57, 0, 109.45), -- 28.5 deep (it was 21): the front stays at z 95.2
 			},
 			{
 				kind = "Dealership",

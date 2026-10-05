@@ -1,12 +1,14 @@
 --!strict
 -- StoreStock: what each shop keeps on its shelves. The Tool Shed shelves
--- hold axes and sawmills. Hearth & Home shelves hold gear, plot blueprints,
--- and one limited cosmetic (the Timberline Lamp Post). Prices come from
--- the catalogs, except the lamp, which is always GameConfig.LimitedItemPrice.
+-- hold axes, sawmills and the chop saw. Hearth & Home shelves hold gear,
+-- plot blueprints, and one limited cosmetic (the Timberline Lamp Post).
+-- Prices come from the catalogs, except the lamp, which is always
+-- GameConfig.LimitedItemPrice.
 --
 -- Placements are in build space (the shop authored at the origin, before
--- BuildingArt scales it). The two columns leave an aisle of at least
--- ShelfAisleMin studs.
+-- BuildingArt scales it). The two columns sit on the shelves along the
+-- side walls and leave an aisle of at least ShelfAisleMin studs. The
+-- Robux shelf (RobuxShelf) is not stock: it sells nothing for cash.
 
 local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
@@ -81,6 +83,25 @@ local function sawSlots(): { Slot }
 	return out
 end
 
+local function machineSlots(): { Slot }
+	local out: { Slot } = {}
+	for _, machine in ipairs(ItemCatalog.MachineList()) do
+		if machine.shop == "ToolShed" then
+			table.insert(out, {
+				slotId = "toolshed-" .. machine.id,
+				shop = "ToolShed",
+				itemKind = "Machine",
+				itemId = machine.id,
+				displayName = machine.displayName,
+				respawnSec = GameConfig.BoxRespawnSec,
+				limited = false,
+				color = machine.color,
+			})
+		end
+	end
+	return out
+end
+
 local function gearSlots(): { Slot }
 	local list: { ItemCatalog.GearDef } = {}
 	for _, gear in pairs(ItemCatalog.Gear) do
@@ -147,6 +168,9 @@ local function build()
 		table.insert(BY_SHOP.ToolShed, slot)
 	end
 	for _, slot in ipairs(sawSlots()) do
+		table.insert(BY_SHOP.ToolShed, slot)
+	end
+	for _, slot in ipairs(machineSlots()) do
 		table.insert(BY_SHOP.ToolShed, slot)
 	end
 	for _, slot in ipairs(gearSlots()) do
@@ -217,6 +241,9 @@ function StoreStock.UnitPrice(kind: string, itemId: string, limited: boolean, lo
 	elseif kind == "Sawmill" then
 		local mill = ItemCatalog.GetSawmill(itemId)
 		return if mill then mill.priceCash else nil
+	elseif kind == "Machine" then
+		local machine = ItemCatalog.GetMachine(itemId)
+		return if machine then machine.priceCash else nil
 	elseif kind == "Blueprint" then
 		local bp = nil
 		for _, item in ipairs(PlotData.Blueprints) do
@@ -277,10 +304,13 @@ function StoreStock.DisplayName(kind: string, itemId: string): string
 	return itemId
 end
 
--- Two columns. Centre-to-centre gap is the aisle.
+-- Two columns. Centre-to-centre gap is the aisle. The Tool Shed's boxes
+-- stand on a display table down each side (BuildingArt.DisplayTables) at
+-- counter height; Hearth & Home's stand on its lower shelves (the
+-- shelves' centre line, a box's half height over the board's top).
 local LAYOUT = {
-	ToolShed = { left = -6, right = 6, y = 4, z0 = -5, dz = 1.7 },
-	HearthAndHome = { left = -10, right = 10, y = 4, z0 = -4, dz = 1.8 },
+	ToolShed = { left = -6.2, right = 6.2, y = 3.0, z0 = -5.6, dz = 1.7 },
+	HearthAndHome = { left = -12, right = 12, y = 3.75, z0 = -4, dz = 1.8 },
 }
 
 function StoreStock.Placements(shop: string): { Placement }
@@ -318,7 +348,7 @@ end
 -- Floor footprint in build space. The door is the -Z face.
 function StoreStock.Zone(shop: string): Zone?
 	if shop == "ToolShed" then
-		return { center = Vector3.new(0, 0, 0), size = Vector3.new(18, 1, 14) }
+		return { center = Vector3.new(0, 0, 0), size = Vector3.new(18, 1, 19) }
 	elseif shop == "HearthAndHome" then
 		return { center = Vector3.new(0, 0, 0), size = Vector3.new(32, 1, 24) }
 	end

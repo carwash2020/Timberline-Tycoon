@@ -1,12 +1,16 @@
 --!strict
 -- PlotUI: building on your plot (PlotService on the server).
 --   * A BUILD button shows while you stand on your own plot. It starts
---     build mode: the Blueprint Store opens (drawn by ShopUI), a bar offers
+--     build mode: the build palette opens (drawn by ShopUI), a bar offers
 --     BLUEPRINTS and DONE, and everything you've placed gets Move (E) and
 --     Sell (F, hold) prompts.
---   * The store's first row grows the plot to its next base tier; the rest
---     are blueprints, locked until your plot's tier allows them. Picking one
---     hands it to BlueprintPlacer (the ghost preview); you pay on placing.
+--   * The palette is not a shop. What the shops sell as boxes (sawmills,
+--     the chop saw, the furniture blueprints) shows here only once you own
+--     it, as Place; before that its row says where to buy it. Kit pieces
+--     (walls, floors) are made from your own wood and charge a placing fee.
+--     Picking a row hands it to BlueprintPlacer (the ghost preview).
+--   * Growing the plot to its next base tier is at the Land Office, with
+--     the squares (the sign's prompt).
 --   * Walking off your plot ends build mode.
 -- Everything only sends intents; the server checks and answers with toasts.
 
@@ -38,7 +42,6 @@ local player = Players.LocalPlayer
 local C = UITheme.Colors
 
 local REACH = 40 -- studs past your plot's edge that still count as on it (PlotService's BUILD_REACH)
-local PLOT_ROW = "_plot"
 
 local building = false
 local buildButton: UITheme.Button? = nil
@@ -46,6 +49,8 @@ local modeBar: Frame? = nil
 local landPanel: Frame? = nil
 local landPrice: TextLabel? = nil
 local landGrid: ScrollingFrame? = nil
+local growLabel: TextLabel? = nil
+local growButton: UITheme.Button? = nil
 local landOpen = false
 local itemPrompts: { [Instance]: { ProximityPrompt } } = {}
 -- Client-only. SetAttribute on a server model is rejected, so a flag
@@ -73,7 +78,7 @@ local function onMyPlot(): boolean
 end
 
 ---------------------------------------------------------------------------
--- The Blueprint Store
+-- The build palette
 ---------------------------------------------------------------------------
 
 -- Blueprint names a tier unlocks, for the upgrade row.
@@ -161,8 +166,12 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local needed = PlotData.Tier(bp.tier)
 	local stocked = stockCount(bp.id)
 	local unlocked = bp.unlock == true and ownsBlueprint(bp.id)
-	local atStore = bp.unlock == true and not unlocked
-	local price = if stocked > 0 or unlocked then 0 else PlotData.Price(bp)
+	-- The server's own rule (PlotLogic.Source): a box from the Tool Shed or
+	-- the General Store before you own it, a fee for a kit piece.
+	local source = PlotLogic.Source(bp, stocked, unlocked, ShopLogic.ShelfMenusHidden())
+	local atStore = source == "store"
+	local atShed = source == "toolShed"
+	local price = if source == "place" then 0 else PlotData.Price(bp)
 	local affordable = cash() >= price
 	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
 	if locked and needed then
@@ -183,8 +192,10 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 	local button, state
 	if locked then
 		button, state = if needed then needed.name else "Locked", "locked"
-	elseif stocked > 0 or unlocked then
+	elseif source == "place" then
 		button, state = "Place", "buy"
+	elseif atShed then
+		button, state = "At the Tool Shed", "locked"
 	elseif atStore then
 		button, state = "At the store", "locked"
 	elseif affordable then
@@ -208,6 +219,8 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 						Util.article(if needed then needed.name else "bigger plot")
 					)
 				)
+			elseif atShed then
+				HUD.Toast(string.format("Buy the %s at the Tool Shed first.", bp.displayName))
 			elseif atStore then
 				HUD.Toast(string.format("Buy the %s at the General Store first.", bp.displayName))
 			elseif cash() < price then
@@ -226,10 +239,10 @@ end
 local STORE: ShopUI.Shop = {
 	building = nil,
 	promptText = "",
-	title = "Blueprint Store",
-	subtitle = "You pay when you place it. Sold back: half (all of it within a minute).",
+	title = "Build Palette",
+	subtitle = "Boxes from town place free. Kits: a fee.",
 	ids = function()
-		local ids = { PLOT_ROW }
+		local ids: { string } = {}
 		for _, mill in ipairs(ItemCatalog.SawmillList()) do
 			table.insert(ids, mill.id)
 		end
@@ -249,9 +262,6 @@ local STORE: ShopUI.Shop = {
 		return ids
 	end,
 	view = function(id: string): ShopUI.RowView
-		if id == PLOT_ROW then
-			return plotRow()
-		end
 		return blueprintRow(PlotLogic.Blueprint(id) :: PlotData.Blueprint)
 	end,
 }
@@ -396,6 +406,14 @@ local function rebuildLand()
 	if not grid or not label then
 		return
 	end
+	-- The next base tier of the plot (it was a row of the build palette).
+	local growText, growBtn = growLabel, growButton
+	if growText and growBtn then
+		local row = plotRow()
+		growText.Text = row.name
+		growBtn:SetText(row.button)
+		growBtn:SetStyle(row.state)
+	end
 	for _, child in ipairs(grid:GetChildren()) do
 		if child:IsA("GuiObject") and child.Name ~= "Layout" then
 			child:Destroy()
@@ -490,7 +508,7 @@ local function mountLand(gui: ScreenGui)
 	panel.Name = "LandOffice"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(300, 300)
+	panel.Size = UDim2.fromOffset(300, 340)
 	panel.BackgroundColor3 = C.Paper
 	panel.BorderSizePixel = 0
 	panel.Visible = false
@@ -533,17 +551,46 @@ local function mountLand(gui: ScreenGui)
 	price.TextXAlignment = Enum.TextXAlignment.Left
 	price.TextYAlignment = Enum.TextYAlignment.Top
 	price.Size = UDim2.new(1, -28, 0, 40)
-	price.Position = UDim2.fromOffset(14, 52)
+	price.Position = UDim2.fromOffset(14, 48)
 	price.Text = ""
 	price.Parent = panel
 	landPrice = price
+
+	-- Grow the plot to its next base tier: the name, and the button with the
+	-- price the server charges.
+	local grow = Instance.new("TextLabel")
+	grow.Name = "Grow"
+	grow.BackgroundTransparency = 1
+	grow.Font = UITheme.Fonts.Body
+	grow.TextSize = 15
+	grow.TextColor3 = C.Ink
+	grow.TextWrapped = true
+	grow.TextXAlignment = Enum.TextXAlignment.Left
+	grow.Size = UDim2.new(1, -156, 0, PlotLogic.LandTap)
+	grow.Position = UDim2.fromOffset(14, 92)
+	grow.Text = ""
+	grow.Parent = panel
+	growLabel = grow
+	local growBtn = UITheme.Button({
+		name = "GrowPlot",
+		text = "",
+		size = Vector2.new(124, PlotLogic.LandTap),
+		style = "buy",
+		textSize = 15,
+	})
+	growBtn.root.Position = UDim2.new(1, -138, 0, 92)
+	growBtn.root.Parent = panel
+	growBtn.face.Activated:Connect(function()
+		plotRow().onClick()
+	end)
+	growButton = growBtn
 
 	local grid = Instance.new("ScrollingFrame")
 	grid.Name = "Grid"
 	grid.BackgroundTransparency = 1
 	grid.BorderSizePixel = 0
-	grid.Position = UDim2.fromOffset(12, 96)
-	grid.Size = UDim2.new(1, -24, 1, -108)
+	grid.Position = UDim2.fromOffset(12, 150)
+	grid.Size = UDim2.new(1, -24, 1, -162)
 	grid.CanvasSize = UDim2.fromOffset(0, 0)
 	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	grid.ScrollBarThickness = 6

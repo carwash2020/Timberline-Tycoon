@@ -447,4 +447,22 @@ return function(t)
 		end
 		t.ok(movedOffTick >= 30, "the tail kept up between cosmetic ticks: " .. movedOffTick)
 	end)
+
+	t.test("a chop saw waiting in stock is not a sawmill waiting in stock", function()
+		local function mill(stock)
+			return NPCDialogue.ProgressOf({
+				loaded = true,
+				tutorialStep = 0,
+				tutorialRefresher = false,
+				bestAxeTier = 1,
+				sawmillStock = stock,
+				placedSawmill = false,
+			}).sawmill
+		end
+		t.eq(mill("ChopSaw"), false)
+		t.eq(mill("ChopSaw,Millmaster100"), true)
+		t.eq(mill("Millmaster200L"), true)
+		t.eq(mill(""), false)
+		t.eq(mill(nil), false)
+	end)
 end

@@ -114,4 +114,69 @@ return function(t)
 		t.eq(StoreStock.UnitPrice("Truck", "Rustbucket", false, 2), 75)
 		t.eq(StoreStock.ForShop("Dealership"), {})
 	end)
+
+	t.test("the chop saw is a Tool Shed box at its catalog price", function()
+		local ItemCatalog = t.shared("ItemCatalog")
+		local slot = StoreStock.Get("toolshed-ChopSaw")
+		t.ok(slot ~= nil, "a shelf slot")
+		t.eq(slot.shop, "ToolShed")
+		t.eq(slot.itemKind, "Machine")
+		t.eq(slot.itemId, "ChopSaw")
+		t.eq(slot.limited, false)
+		t.eq(StoreStock.UnitPrice("Machine", "ChopSaw", false, 2), ItemCatalog.ChopSawPrice)
+		t.eq(StoreStock.UnitPrice("Machine", "ChopSaw", false, 2), 7500)
+		t.eq(StoreStock.UnitPrice("Machine", "Nope", false, 2), nil)
+		t.ok(StoreStock.FindInShop("ToolShed", "ChopSaw") ~= nil)
+	end)
+
+	t.test("every box stands inside its shop's zone, with room to walk the aisle carrying one", function()
+		local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
+		local RobuxShelf = t.shared("RobuxShelf")
+		-- A person (2 wide) holding a box (2 wide) out in front: 4 studs, and
+		-- a stud either side. The tables (2.9 wide) or shelves (4.8) under
+		-- the boxes take their width off the aisle.
+		local CARRY = 6
+		for shop, tableWidth in pairs({ ToolShed = 2.9, HearthAndHome = 4.8 }) do
+			local zone = StoreStock.Zone(shop)
+			local scale = BuildingArt.Scale[shop]
+			for _, place in ipairs(StoreStock.Placements(shop)) do
+				t.ok(math.abs(place.x) + 1 <= zone.size.X / 2, shop .. " " .. place.slotId .. " in x")
+				t.ok(math.abs(place.z) + 1 <= zone.size.Z / 2, shop .. " " .. place.slotId .. " in z")
+			end
+			local aisle = StoreStock.AisleGap(shop) * scale - tableWidth
+			t.ok(aisle >= CARRY, string.format("%s aisle is %.1f studs between the tables", shop, aisle))
+		end
+		for _, place in ipairs(RobuxShelf.Placements()) do
+			local zone = StoreStock.Zone("ToolShed")
+			t.ok(math.abs(place.x) + 1 <= zone.size.X / 2, place.slotId .. " in x")
+			t.ok(place.z + 1 <= zone.size.Z / 2, place.slotId .. " in z")
+		end
+	end)
+
+	t.test("the Tool Shed's gold slots are their own attachments, and the whole shop stays within 250 parts", function()
+		local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
+		local RobuxShelf = t.shared("RobuxShelf")
+		local model = BuildingArt.Shop("ToolShed", "TOOL SHED", t.roblox.Color3.fromRGB(150, 62, 44))
+		local gold, cash = 0, 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d.Name == "RobuxSlot" then
+				gold += 1
+			elseif d.Name == "ShelfSlot" then
+				cash += 1
+			end
+		end
+		t.eq(gold, #RobuxShelf.List())
+		t.eq(cash, #StoreStock.ForShop("ToolShed"))
+		local parts = 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				parts += 1
+			end
+		end
+		t.ok(parts + boxesOf("ToolShed") + gold <= GameConfig.StorePartBudget, "parts, cash boxes and gold boxes")
+		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", t.roblox.Color3.fromRGB(122, 90, 60))
+		for _, d in ipairs(hearth:GetDescendants()) do
+			t.ok(d.Name ~= "RobuxSlot", "no gold shelf at Hearth & Home")
+		end
+	end)
 end

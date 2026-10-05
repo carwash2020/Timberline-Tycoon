@@ -7,6 +7,10 @@
 --   * Dealership ("Browse trucks"): every truck with its bed size and top
 --     speed, then the trailers. Buy a truck, or switch to one you own (it
 --     waits in your parking spot); buy a trailer, hitch it, or unhitch it.
+--   Under boxed stores (GameConfig.BoxedStores, on unless set to false)
+--     none of these three opens: the shops sell boxes you carry to the
+--     counter, the Dealership sells its lot's boxes, and the screen is
+--     kept only for the rollback.
 --   * Hearth & Home ("Browse gear"): gear for the far biomes, bought once
 --     and worn for good. Gear for a biome that isn't built yet says Soon.
 -- Buying only sends an intent (BuyItem / EquipItem); the server checks
@@ -88,7 +92,7 @@ export type Shop = {
 	subtitle: string, -- 40 characters at most (ShopUI.SubtitleMax): two lines on a phone
 	ids: () -> { string },
 	view: (id: string) -> RowView,
-	shelf: boolean?, -- axes, saws and the general store: the shelves sell these
+	shelf: boolean?, -- axes, saws, the general store and the Dealership: boxes on the shelves and lot sell these
 }
 
 type Row = {
@@ -262,6 +266,7 @@ end
 
 local TRUCKS: Shop = {
 	building = "Dealership",
+	shelf = true,
 	promptText = "Browse trucks",
 	title = "Dealership",
 	subtitle = "Bigger beds haul more wood per trip.",

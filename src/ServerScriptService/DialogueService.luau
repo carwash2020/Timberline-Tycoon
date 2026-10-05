@@ -68,6 +68,13 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 		boxUid = if rec then rec.uid else nil,
 		choice = card.choice,
 		noLabel = card.noLabel,
+		-- The Robux shelf's yes: which pass or pack to ask Roblox about. The
+		-- client sends the same BuyRobuxItem intent the Store screen sends.
+		robux = if line == "robuxAsk"
+				and rec
+				and rec.robux
+			then { kind = rec.robux.kind, key = rec.robux.key }
+			else nil,
 	}
 	DialogueService.Last = payload
 	local event = remote :: any
@@ -79,6 +86,9 @@ end
 local function lineFor(player: Player, rec: any): string
 	if rec == nil then
 		return "greet"
+	end
+	if rec.robux ~= nil then
+		return "robuxOffer"
 	end
 	local profile = profileOf(player)
 	-- A truck or trailer box with no plot: the warning, before any payment.

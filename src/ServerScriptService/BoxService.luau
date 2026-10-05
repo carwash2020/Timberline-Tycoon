@@ -3,6 +3,10 @@
 -- uses the same drag as wood (the model is tagged ShopBox). Paying at the
 -- counter grants the item; opening only unpacks the box you already own.
 -- An unpaid box outside the store for two watches goes back to its shelf.
+-- The Tool Shed's gold Robux shelf uses the same boxes: at the counter,
+-- Yes sends the client the item (the same BuyRobuxItem intent the Store
+-- screen sends; MonetizationService checks it and shows Roblox's prompt)
+-- and the box goes back to its shelf. No cash moves here.
 --
 -- One connection on BoxOpen. The handler budgets the call, then opens.
 
@@ -12,7 +16,9 @@ local BoxLogic = require(ReplicatedStorage.Shared.BoxLogic)
 local CounterLogic = require(ReplicatedStorage.Shared.CounterLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local RobuxShelf = require(ReplicatedStorage.Shared.RobuxShelf)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
+local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local LeaveCommit = require(script.Parent.LeaveCommit)
@@ -42,6 +48,7 @@ export type Record = {
 	noted: boolean,
 	equipped: boolean,
 	axeUid: string?,
+	robux: { kind: string, key: string }?,
 	home: CFrame,
 	zoneCf: CFrame?,
 	zoneSize: Vector3?,
@@ -66,6 +73,7 @@ export type MakeOptions = {
 	zoneSize: Vector3?,
 	onShelf: boolean?,
 	size: Vector3?,
+	robux: { kind: string, key: string }?,
 }
 
 type Home = {
@@ -296,6 +304,66 @@ end
 
 local onBoxOpen: (Player, unknown) -> ()
 
+-- Roblox sets a pass's or pack's price. The server asks once, then the tag
+-- over each Robux box says it (until then, only R$).
+local robuxPrices: { [string]: number } = {}
+local robuxAsked: { [string]: boolean } = {}
+
+function BoxService.RobuxPrice(kind: string, key: string): number?
+	return robuxPrices[kind .. ":" .. key]
+end
+
+local function refreshRobuxTags(kind: string, key: string, price: number)
+	local text = RobuxShelf.Tag(price)
+	local tag = BoxLogic.PriceTag(text)
+	for _, rec in pairs(records) do
+		local part = rec.part
+		if part ~= nil and rec.robux ~= nil and rec.robux.kind == kind and rec.robux.key == key then
+			local board = part:FindFirstChild("PriceTag")
+			if board ~= nil and board:IsA("BillboardGui") then
+				board.Size = UDim2.fromOffset(math.max(80, #tag.text * tag.textSize), tag.textSize + 10)
+				local label = board:FindFirstChild("Price")
+				if label ~= nil and label:IsA("TextLabel") then
+					label.Text = text
+				end
+			end
+		end
+	end
+end
+
+function BoxService.AskRobuxPrice(kind: string, key: string)
+	local cacheKey = kind .. ":" .. key
+	if robuxAsked[cacheKey] then
+		return
+	end
+	robuxAsked[cacheKey] = true
+	local id = 0
+	if kind == "Pass" then
+		local pass = StoreData.Pass(key)
+		id = if pass then pass.id else 0
+	else
+		local product = StoreData.Product(key)
+		id = if product then product.id else 0
+	end
+	if not StoreData.IsForSale(id) then
+		return
+	end
+	-- Not in tests (no Marketplace there) and never a reason to fail a build.
+	pcall(function()
+		task.spawn(function()
+			local ok, info = pcall(function(): any
+				local market = game:GetService("MarketplaceService")
+				local infoType = if kind == "Pass" then Enum.InfoType.GamePass else Enum.InfoType.Product
+				return market:GetProductInfo(id, infoType)
+			end)
+			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
+				robuxPrices[cacheKey] = info.PriceInRobux
+				refreshRobuxTags(kind, key, info.PriceInRobux)
+			end
+		end)
+	end)
+end
+
 local function dress(rec: Record, part: BasePart, tint: Color3)
 	local faces = BoxLogic.LargestFaces(part.Size)
 	for _, face in ipairs(faces) do
@@ -305,7 +373,10 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 		mark.Color3 = tint
 		mark.Parent = part
 	end
-	local tag = BoxLogic.PriceTag(Util.formatCash(rec.price))
+	local tagText = if rec.robux ~= nil
+		then RobuxShelf.Tag(BoxService.RobuxPrice(rec.robux.kind, rec.robux.key))
+		else Util.formatCash(rec.price)
+	local tag = BoxLogic.PriceTag(tagText)
 	local board = Instance.new("BillboardGui")
 	board.Name = "PriceTag"
 	board.AlwaysOnTop = tag.alwaysOnTop
@@ -391,10 +462,30 @@ function BoxService.Make(opts: MakeOptions): Record
 	if slot == nil and (opts.shop == "Dealership" or kind == "Truck" or kind == "Trailer") then
 		slot = StoreStock.Vehicle(itemId)
 	end
+	-- A Robux box is a display: no cash unit, no stock. A shelf-like slot
+	-- stands in for it so it has a home to go back to.
+	local robux = opts.robux
+	if robux ~= nil then
+		kind = "Robux"
+		itemId = robux.key
+		limited = false
+		slot = {
+			slotId = opts.slotId or RobuxShelf.SlotId(robux.kind, robux.key),
+			shop = opts.shop or "ToolShed",
+			itemKind = "Robux",
+			itemId = robux.key,
+			displayName = opts.displayName or robux.key,
+			respawnSec = GameConfig.BoxRespawnSec,
+			limited = false,
+			color = RobuxShelf.Gold,
+		}
+	end
 	local uid = opts.uid or Util.guid()
 	local cf = opts.cf or CFrame.new()
 	local price = opts.price
-	if price == nil then
+	if robux ~= nil then
+		price = 0
+	elseif price == nil then
 		price = unitPrice(kind, itemId, limited or (slot ~= nil and slot.limited))
 	end
 	local model = Instance.new("Model")
@@ -406,6 +497,9 @@ function BoxService.Make(opts: MakeOptions): Record
 	part.CanCollide = true
 	part.CFrame = cf
 	part.Color = colorOf(if slot then slot.color else nil)
+	if robux ~= nil then
+		part.Material = Enum.Material.Metal
+	end
 	part.CollisionGroup = BoxService.Group
 	part.Parent = model
 	model.PrimaryPart = part
@@ -429,6 +523,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		outsideStreak = 0,
 		noted = false,
 		equipped = false,
+		robux = robux,
 		home = cf,
 		zoneCf = opts.zoneCf,
 		zoneSize = opts.zoneSize,
@@ -437,7 +532,10 @@ function BoxService.Make(opts: MakeOptions): Record
 		part = part,
 	}
 	records[uid] = rec
-	dress(rec, part, part.Color)
+	dress(rec, part, if robux ~= nil then colorOf(RobuxShelf.GoldInk) else part.Color)
+	if robux ~= nil then
+		BoxService.AskRobuxPrice(robux.kind, robux.key)
+	end
 	if opts.parent then
 		model.Parent = opts.parent
 	end
@@ -734,6 +832,26 @@ function BoxService.StockShop(model: Model)
 	if signHost then
 		attachSign(counter, signHost)
 	end
+	for _, child in ipairs(counter:GetChildren()) do
+		if child.Name == "RobuxSlot" and child:IsA("Attachment") then
+			local slotId = child:GetAttribute("SlotId")
+			local entry = if type(slotId) == "string" then RobuxShelf.Get(slotId) else nil
+			if entry then
+				BoxService.Make({
+					slotId = entry.slotId,
+					shop = shop,
+					displayName = entry.displayName,
+					robux = { kind = entry.kind, key = entry.key },
+					cf = CFrame.new(counter.CFrame:PointToWorldSpace(child.Position)),
+					parent = model,
+					counter = counter,
+					zoneCf = zoneCf,
+					zoneSize = zoneSize,
+					onShelf = true,
+				})
+			end
+		end
+	end
 end
 
 function BoxService.StockLot(lot: Model, counter: BasePart?)
@@ -811,6 +929,18 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 	if pos == nil or part == nil or (pos - part.CFrame.Position).Magnitude > reach then
 		speak(player, "missing", rec)
 		return false, "missing"
+	end
+	if rec.robux ~= nil then
+		-- Not for cash. Only an item the shelf lists goes on to Roblox; the
+		-- card carries it to the client, which sends BuyRobuxItem, and
+		-- MonetizationService does the rest. The box goes back to its shelf.
+		if RobuxShelf.Find(rec.robux.kind, rec.robux.key) == nil then
+			speak(player, "locked", rec)
+			return false, "locked"
+		end
+		speak(player, "robuxAsk", rec)
+		BoxService.ReturnHome(rec)
+		return true, "robuxAsk"
 	end
 	local shop = require(script.Parent.ShopService)
 	local ok, line, axeUid = shop.ChargeAndGrant(player, {
