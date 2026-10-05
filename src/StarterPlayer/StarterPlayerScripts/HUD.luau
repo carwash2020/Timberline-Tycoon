@@ -159,6 +159,7 @@ local leftColumn: Frame? = nil -- UITheme's left column (the tracker), once it e
 local hintLabel: TextLabel? = nil
 local hintQuiet = false -- a control you have learned: its hint is not shown
 local hintGrabs = 0 -- grabs this session (HUD.NoteGrab)
+local dragHintSince: number? = nil -- when the idle drag line first showed this session
 local syncHint: (() -> ())? = nil -- refreshModal, once it exists
 local hintLimit: UISizeConstraint? = nil -- the hint's widest right now (placeRow)
 local bottomRow: Frame? = nil -- the load chip and the hint, side by side
@@ -645,7 +646,12 @@ local function refreshHint()
 		local forced = hintForced :: any -- "build": a context both loops have
 		local context = forced or HintLogic.ContextForV2(hintStateV2())
 		text = HintLogic.PickV2(UITheme.Device(), context)
-		local quiet = HintLogic.Quiet(context, hintGrabs)
+		if context == "drag" and dragHintSince == nil then
+			dragHintSince = os.clock()
+			task.delay(HintLogic.IdleHintSeconds + 0.1, refreshHint)
+		end
+		local shownFor = if dragHintSince then os.clock() - dragHintSince else nil
+		local quiet = HintLogic.Quiet(context, hintGrabs, shownFor)
 		if quiet ~= hintQuiet then
 			hintQuiet = quiet
 			local sync = syncHint

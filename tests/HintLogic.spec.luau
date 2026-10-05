@@ -358,5 +358,10 @@ return function(t)
 			t.eq(HintLogic.Quiet(context, 99), false, context)
 		end
 		t.ok(string.find(HintLogic.PickV2("console", "drag"), "RT", 1, true), "the pad grabs with RT")
+		-- The idle drag line only lasts its first IdleHintSeconds.
+		t.eq(HintLogic.Quiet("drag", 0, 0), false)
+		t.eq(HintLogic.Quiet("drag", 0, HintLogic.IdleHintSeconds - 1), false)
+		t.eq(HintLogic.Quiet("drag", 0, HintLogic.IdleHintSeconds), true)
+		t.eq(HintLogic.Quiet("tooLong", 0, 999), false, "warnings never go quiet")
 	end)
 end

@@ -1265,7 +1265,17 @@ local function onPlayerAdded(player: Player)
 	CarryService.Start(player)
 	lastNotice[player.UserId] = {}
 
+	-- Timing lines for the join: a stall shows as the first one that never
+	-- prints (the HUD says "Loading your save..." until ProfileLoaded).
+	local joinStart = os.clock()
+	local function joinLap(what: string)
+		print(string.format("[GameServer] %s: %s (%.1fs)", player.Name, what, os.clock() - joinStart))
+	end
+	joinLap("loading the save")
 	local profile, err = ProfileService.LoadProfile(player)
+	if profile then
+		joinLap("save loaded")
+	end
 	if not profile then
 		if err == "failed" then
 			player:Kick("Timberline Tycoon couldn't load your save right now. Your progress is safe. Please rejoin.")
@@ -1323,6 +1333,7 @@ local function onPlayerAdded(player: Player)
 	-- pad, under the ground, or in the water waits in the town truck lot
 	-- instead of appearing on somebody's yard. Claiming still moves it to
 	-- the delivery pad.
+	joinLap("account set up")
 	safely("PlotService.ParkStrays", PlotService.ParkStrays, profile)
 	if truckId ~= "" then
 		safely("VehicleService.SpawnTruck", function()
@@ -1369,6 +1380,7 @@ local function onPlayerAdded(player: Player)
 	end
 
 	player:SetAttribute("ProfileLoaded", true)
+	joinLap("ready (ProfileLoaded)")
 	remote.CashChanged:FireClient(player, profile.cash)
 	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
 	safely("QuestService.Start", QuestService.Start, player, profile)
