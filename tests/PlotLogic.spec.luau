@@ -305,7 +305,7 @@ return function(t)
 
 	t.test("base tiers start free and grow in size and price", function()
 		t.eq(PlotData.Tiers[1].priceCash, 0)
-		t.eq(PlotData.Tiers[1].size, 120) -- GAME_DESIGN §10
+		t.eq(PlotData.Tiers[1].size, 80) -- GAME_DESIGN §10
 		t.eq(MAX, 200)
 		for i = 2, #PlotData.Tiers do
 			local a, b = PlotData.Tiers[i - 1], PlotData.Tiers[i]
@@ -360,12 +360,12 @@ return function(t)
 
 	t.test("things must fit inside the plot", function()
 		local cabin = PlotData.Blueprint("Cabin") -- 12 x 10
-		t.ok((PlotLogic.Check(cabin, 54, 55, 0, 1, {})), "edge to edge with the plot is fine")
-		local ok, why = PlotLogic.Check(cabin, 56, 0, 0, 1, {})
+		t.ok((PlotLogic.Check(cabin, 34, 35, 0, 1, {})), "edge to edge with the plot is fine")
+		local ok, why = PlotLogic.Check(cabin, 36, 0, 0, 1, {})
 		t.ok(not ok)
 		t.eq(why, "Outside your plot")
-		t.ok((PlotLogic.Check(cabin, 64, 0, 0, 2, {})), "a Homestead (140) has room")
-		t.ok(not (PlotLogic.Check(cabin, 0, 56, 1, 1, {})), "turned, it's 12 deep")
+		t.ok((PlotLogic.Check(cabin, 49, 0, 0, 2, {})), "a Homestead (110) has room")
+		t.ok(not (PlotLogic.Check(cabin, 0, 35, 1, 1, {})), "turned, it's 12 deep")
 	end)
 
 	t.test("things can't overlap, but may touch", function()
@@ -474,10 +474,10 @@ return function(t)
 		local sumK = 24 * 25 / 2
 		t.eq(sum, GameConfig.FirstPlotPrice + GameConfig.ExpansionPriceStep * sumK)
 		t.eq(sum, 684100)
-		-- The campsite already covers the middle. Only a square that touches it is for sale.
+		-- The campsite (one square, 80 wide) covers the middle. Only a square that touches it is for sale.
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 0, 0) }, { nil, "yours" })
 		t.eq({ PlotLogic.ExpansionBlock(1, {}, 2, 2) }, { nil, "away" })
-		t.eq(PlotLogic.ExpansionBlock(1, {}, 2, 0), "2,0")
+		t.eq(PlotLogic.ExpansionBlock(1, {}, 1, 0), "1,0")
 		t.eq({ PlotLogic.ExpansionBlock(#PlotData.Tiers, {}, 2, 0) }, { nil, "yours" })
 		t.eq(PlotLogic.EjectLocal(120, {}), 0)
 		local _, north = PlotLogic.EjectLocal(120, {})
@@ -553,7 +553,7 @@ return function(t)
 		local step = GameConfig.ExpansionPriceStep
 		local short = purse(50)
 		local plot = { tier = 1, squares = {} }
-		local ok, why, price = PlotLogic.TryExpand(plot, 2, 0, short)
+		local ok, why, price = PlotLogic.TryExpand(plot, 1, 0, short)
 		t.eq(ok, false)
 		t.eq(why, "cash")
 		t.eq(price, 100)
@@ -561,12 +561,12 @@ return function(t)
 		t.eq(plot.squares, {})
 
 		local paid = purse(100)
-		ok, why, price = PlotLogic.TryExpand(plot, 2, 0, paid)
+		ok, why, price = PlotLogic.TryExpand(plot, 1, 0, paid)
 		t.eq(ok, true)
 		t.eq(why, nil)
 		t.eq(price, 100)
 		t.eq({ paid.read() }, { 0, 1 })
-		t.eq(plot.squares, { "2,0" })
+		t.eq(plot.squares, { "1,0" })
 		-- The button price is the next deduction.
 		t.eq(PlotLogic.ExpansionPrice(#plot.squares), step)
 
@@ -577,7 +577,7 @@ return function(t)
 			error("spend failed after taking the cash")
 		end
 		local before = #plot.squares
-		ok = PlotLogic.TryExpand(plot, 2, 1, threw)
+		ok = PlotLogic.TryExpand(plot, 1, 1, threw)
 		t.eq(ok, false)
 		t.eq(#plot.squares, before)
 		t.eq(threw.cash(), step)
@@ -641,5 +641,20 @@ return function(t)
 			{ 0, -18 },
 			"everything bad: the pad itself"
 		)
+	end)
+
+	t.test("homesteads don't all look alike", function()
+		local seen: { [string]: boolean } = {}
+		for i = 1, #PlotData.Homes do
+			local look = PlotData.Look(i)
+			seen[look.name] = true
+			t.ok(#look.material > 0 and #look.ground == 3 and #look.rail == 3, look.name .. " is complete")
+		end
+		local n = 0
+		for _ in pairs(seen) do
+			n += 1
+		end
+		t.ok(n >= 5, "at least five different looks across the homes")
+		t.ok(PlotData.Look(1).name ~= PlotData.Look(2).name, "neighbours differ")
 	end)
 end

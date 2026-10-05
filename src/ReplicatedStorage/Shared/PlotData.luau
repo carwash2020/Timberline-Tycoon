@@ -98,12 +98,70 @@ export type Tier = {
 
 -- Prices are a first pass for Connor to tune (not in the economy model yet).
 PlotData.Tiers = {
-	{ name = "Campsite", size = 120, priceCash = 0, stone = 0, planks = 0 },
-	{ name = "Homestead", size = 140, priceCash = 2500, stone = 0, planks = 0 },
-	{ name = "Lumber Yard", size = 160, priceCash = 10000, stone = 0, planks = 0 },
-	{ name = "Timber Works", size = 180, priceCash = 30000, stone = 0, planks = 0 },
+	{ name = "Campsite", size = 80, priceCash = 0, stone = 0, planks = 0 },
+	{ name = "Homestead", size = 110, priceCash = 2500, stone = 0, planks = 0 },
+	{ name = "Lumber Yard", size = 140, priceCash = 10000, stone = 0, planks = 0 },
+	{ name = "Timber Works", size = 170, priceCash = 30000, stone = 0, planks = 0 },
 	{ name = "Timber Empire", size = 200, priceCash = 60000, stone = 0, planks = 0 },
 } :: { Tier }
+
+-- How each homestead looks, so no two neighbours match: the ground's colour
+-- and material, the rail and the apron. Home `i` takes Looks[i], wrapping.
+export type Look = {
+	name: string,
+	ground: { number }, -- r, g, b
+	material: string, -- Enum.Material name
+	rail: { number }, -- the rail once claimed (r, g, b)
+	apron: { number },
+}
+PlotData.Looks = {
+	{
+		name = "Meadow",
+		ground = { 150, 176, 104 },
+		material = "Grass",
+		rail = { 130, 90, 50 },
+		apron = { 150, 116, 78 },
+	},
+	{
+		name = "Dry Clearing",
+		ground = { 210, 190, 150 },
+		material = "Sand",
+		rail = { 110, 76, 44 },
+		apron = { 168, 140, 100 },
+	},
+	{
+		name = "Slate Flat",
+		ground = { 128, 130, 126 },
+		material = "Slate",
+		rail = { 82, 84, 88 },
+		apron = { 104, 104, 100 },
+	},
+	{
+		name = "Pine Needles",
+		ground = { 126, 98, 66 },
+		material = "Ground",
+		rail = { 70, 48, 30 },
+		apron = { 96, 76, 52 },
+	},
+	{
+		name = "Clover",
+		ground = { 118, 158, 92 },
+		material = "Grass",
+		rail = { 220, 214, 200 },
+		apron = { 176, 170, 150 },
+	},
+	{
+		name = "Red Earth",
+		ground = { 176, 112, 82 },
+		material = "Mud",
+		rail = { 150, 60, 44 },
+		apron = { 140, 96, 70 },
+	},
+} :: { Look }
+
+function PlotData.Look(index: number): Look
+	return PlotData.Looks[(index - 1) % #PlotData.Looks + 1]
+end
 
 export type Box = {
 	size: Vector3,

@@ -347,10 +347,10 @@ flag):
 
 | Tier | Plot | Unlocks |
 |---|---|---|
-| Campsite (free) | 120×120 | sapling plots, a log pile |
-| Homestead | 140×140 | Warehouse (stores logs + materials), Axe Rack |
-| Lumber Yard | 160×160 | Sawmill Shed (planks), Garage (vehicle upgrades) |
-| Timber Works | 180×180 | Workshop (furniture), Kiln, Apprentice Crew |
+| Campsite (free) | 80×80 | sapling plots, a log pile |
+| Homestead | 110×110 | Warehouse (stores logs + materials), Axe Rack |
+| Lumber Yard | 140×140 | Sawmill Shed (planks), Garage (vehicle upgrades) |
+| Timber Works | 170×170 | Workshop (furniture), Kiln, Apprentice Crew |
 | Timber Empire | 200×200 | Storefront, Forge (the Starfall Axe), crew haul runs |
 
 Tier-ups cost cash + Stone + your own planks. Once you have a Warehouse,
@@ -389,7 +389,7 @@ gone.
 
 Big world, big plots — everything on the feature list needs room to breathe.
 
-**Plots**: base 120×120 studs, expandable to 200×200 (cash upgrades + Master
+**Plots**: base 80×80 studs, expandable to 200×200 (cash upgrades + Master
 Builder pass). Big enough for a full flume line, a dropper farm, machines,
 buildings, and decor without playing inventory tetris.
 
