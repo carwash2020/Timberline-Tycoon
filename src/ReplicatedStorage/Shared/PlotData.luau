@@ -597,6 +597,14 @@ for _, extra in ipairs(KitPieces) do
 	table.insert(PlotData.Blueprints, extra :: Blueprint)
 end
 
+for _, extra in ipairs(require(script.Parent.DecorData) :: { any }) do
+	table.insert(PlotData.Blueprints, extra :: Blueprint)
+end
+
+for _, extra in ipairs(require(script.Parent.LogicItems) :: { any }) do
+	table.insert(PlotData.Blueprints, extra :: Blueprint)
+end
+
 local byId: { [string]: Blueprint } = {}
 for _, bp in ipairs(PlotData.Blueprints) do
 	byId[bp.id] = bp

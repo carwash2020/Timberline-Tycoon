@@ -43,6 +43,7 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local PlotFill = require(script.Parent.PlotFill)
 local PlotDoors = require(script.Parent.PlotDoors)
+local LogicService = require(script.Parent.LogicService)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
@@ -558,6 +559,15 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	end
 	CollectionService:AddTag(model, "PlacedItem")
 	model.Parent = slot.items
+	-- Switches get their prompts and lamps their light (LogicService).
+	LogicService.Attach({
+		slot = slot :: any,
+		model = model,
+		item = item,
+		ownerOf = function()
+			return owner, ProfileService.GetProfile(owner)
+		end,
+	})
 end
 
 local function mirrorPlot(player: Player, profile: Profile)
@@ -1209,6 +1219,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if model then
 		model:Destroy()
 	end
+	LogicService.Sync(slot :: any, profile, player)
 	if refund > 0 then
 		EconomyService.Refund(owner, refund, "sold " .. bp.displayName, bp.id)
 	end
@@ -1359,6 +1370,7 @@ function PlotService.Edit(player: Player, request: unknown)
 		EconomyService.Refund(player, delta, "changed a blueprint", "kit")
 	end
 	syncEdits(slot, player, before, profile.plot.placed)
+	LogicService.Sync(slot :: any, profile, player)
 end
 
 function PlotService.Upgrade(player: Player)
@@ -1643,6 +1655,7 @@ end
 -- SellPlaced and UpgradePlot.
 function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, notifyFn: (Player, string) -> ())
 	notify = notifyFn
+	LogicService.Bind(hostFor :: any, notifyFn)
 	ItemMeshes.LoadAsync()
 	local folder = Instance.new("Folder")
 	folder.Name = "Plots"

@@ -1365,3 +1365,36 @@ Where it differs from the spec, and why:
       in build mode, Move and Sell stack instead of overlapping
 - [ ] Gamepad: X drops the axe away from prompts, but next to a shop X
       opens the shop instead; Y calls the truck
+
+## Furniture and wiring (B09, B11)
+
+New pieces, all cash only (no gathered materials): `Shared/DecorData` (Table
+$90, Chair $50, Bookshelf $140, Rug $60, Barrel $70, Crate $60, Fire Pit
+$110) and `Shared/LogicItems` (Wall Switch $100, Spark Lamp $150). Table,
+Chair and the two logic pieces are `unlock` boxes at Hearth & Home (buy once,
+place free). The shelf holds 14 boxes and is now full: more `unlock` pieces
+need a longer shelf (StoreStock layout and BuildingArt). The rest are paid
+per placement from BUILD, like the Bench.
+
+Wiring (`Shared/WireLogic`, `SSS/LogicService`, saved in `plot.wires`): a
+switch has Flip (E / ButtonX) and Wire (hold F / ButtonY). Wire links the
+nearest free Spark Lamp or Door within 32 studs; press again for the next;
+with none left it clears that switch. A lamp nobody wired stays lit. A wired
+lamp or door follows its switches (any on). Switch positions are not saved.
+The Wire remote carries (fromUid, 1, toUid, 1) or ("cut", uid) for a future
+tool; there is no client wiring UI yet and no drawn wire.
+
+Studio checks
+1. Hearth & Home: 14 boxes, none off the shelf, Table / Chair / Wall Switch /
+   Spark Lamp among them. Buy a Wall Switch, open its box on your plot.
+2. BUILD menu: Bookshelf, Rug, Barrel, Crate, Fire Pit appear, price on the
+   card. Place on phone (tap), PC (click), Xbox (RT, D-pad Right rotates).
+   Overlap and plot-edge ghosts go red. Fire Pit glows.
+3. Place a switch, a lamp 6 studs away. The lamp is lit. Hold Wire on the
+   switch: "Wired to the Spark Lamp.", lamp goes dark. Tap Flip: lamp lights,
+   lever tips. Flip again: dark. Hold Wire until "Wires cleared.": lamp lit.
+4. Wire a switch to a Door (hosted in a door wall): Flip opens, Flip shuts.
+   Put a block in the swing: the door stays shut and says why.
+5. Leave and rejoin: wires are kept, all switches are off, wired lamps dark.
+6. Sell the switch: its lamp relights. A visitor without Interact cannot
+   flip, without Build cannot wire.
