@@ -338,9 +338,9 @@ function StoreUI.Start()
 		style = "buy",
 		textSize = spec.text,
 	})
-	store.root.LayoutOrder = 10
+	store.root.LayoutOrder = 5 -- under the cash, between the clock and Daily Goals
 	store.root.Visible = StoreData.AnyForSale()
-	store.root.Parent = HUD.BesideCash()
+	store.root.Parent = HUD.UnderCash() or HUD.BesideCash()
 	store.face.Activated:Connect(openStore)
 	if spec.hit then
 		UITheme.HitPad(store.root, spec.hit).Activated:Connect(openStore)

@@ -346,8 +346,15 @@ local function wantsAtomic(asset: TownModels.Asset): boolean
 	return asset.category == "building" or asset.category == "npc" or #asset.pieces > 1
 end
 
+-- The switch (MapBuilder sets it from GameConfig.TownMeshes before the town
+-- is built): off, Dress and Adorn leave the part-built buildings as they are.
+TownMeshes.Enabled = true
+
 -- True when the meshes replaced the decoration. False keeps the parts.
 function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boolean
+	if not TownMeshes.Enabled then
+		return false
+	end
 	local asset = TownModels.Get(assetId)
 	if not asset then
 		return false
@@ -403,6 +410,9 @@ end
 -- Visuals parented under `parent` (a parking slot is a part, not a model).
 -- The painted bay stays: lines, the number, and its light are gameplay.
 function TownMeshes.Adorn(parent: Instance, assetId: string, pivot: CFrame): boolean
+	if not TownMeshes.Enabled then
+		return false
+	end
 	local asset = TownModels.Get(assetId)
 	if not asset then
 		return false

@@ -59,6 +59,7 @@ local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
+local SprintLogic = require(ReplicatedStorage.Shared.SprintLogic)
 local RegionWake = require(script.Parent.RegionWake)
 local ShopService = require(script.Parent.ShopService)
 local TreeService = require(script.Parent.TreeService)
@@ -1158,6 +1159,11 @@ if not CoreLoop.V2() then
 	remote.SellLogs.OnServerEvent:Connect(onSellLogs)
 end
 remote.DropAxe.OnServerEvent:Connect(AxeService.Drop)
+remote.Sprint.OnServerEvent:Connect(function(player: Player, on: unknown)
+	if RateLimiter.Allow(player, "Sprint") then
+		player:SetAttribute("Sprinting", SprintLogic.Wants(on))
+	end
+end)
 remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	if not RateLimiter.Allow(player, "CallTruck") then
 		return

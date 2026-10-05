@@ -86,14 +86,11 @@ function HudRules.SendHome(onFoot: boolean, fromYou: number?, slotDistance: unkn
 	return onFoot and (fromYou == nil or fromYou > HudRules.SendHomeNear) and TruckHome.Far(slotDistance)
 end
 
--- Shown on the HUD until the player owns a truck. The words are exact.
-HudRules.NoTruckText = "Buy a truck at the dealership"
-
--- The side button: the buy line when they own nothing, otherwise "Send
--- truck home" while SendHome would show it.
+-- The side button: "Send truck home" while SendHome would show it. With no
+-- truck there is no button (the dealership sign says where to buy one).
 function HudRules.TruckButton(ownsTruck: boolean, sendHome: boolean): (boolean, string)
 	if not ownsTruck then
-		return true, HudRules.NoTruckText
+		return false, "Send truck home"
 	end
 	return sendHome, "Send truck home"
 end

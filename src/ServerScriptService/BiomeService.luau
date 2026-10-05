@@ -20,6 +20,7 @@ local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ProfileService = require(script.Parent.ProfileService)
+local SprintLogic = require(ReplicatedStorage.Shared.SprintLogic)
 local RegionLogic = require(ReplicatedStorage.Shared.RegionLogic)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldClock = require(script.Parent.WorldClock)
@@ -106,7 +107,10 @@ local function update(player: Player)
 
 	local gear = gearSet(player)
 	local rules = BiomeData.Rules(biome, gear)
-	local speed = StarterPlayer.CharacterWalkSpeed * rules.speedFactor
+	local speed = SprintLogic.Speed(
+		StarterPlayer.CharacterWalkSpeed * rules.speedFactor,
+		player:GetAttribute("Sprinting") == true
+	)
 	if math.abs(humanoid.WalkSpeed - speed) > 0.01 then
 		humanoid.WalkSpeed = speed
 	end
