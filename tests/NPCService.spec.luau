@@ -222,4 +222,20 @@ return function(t)
 		local feet = root.CFrame.Position.Y - hazel:GetAttribute("RootHeight")
 		t.ok(math.abs(feet - home.Position.Y) < 1e-2, "she stands up again at open")
 	end)
+
+	t.test("Old Tolly and Cap'n Moss stand on the ground out in the world, not at y = 0", function()
+		local NPCService, NPCData = service()
+		local map = fakeMap()
+		NPCService.Init(map)
+		local TerrainGen = t.shared("World/TerrainGen")
+		for _, id in ipairs({ "OldTolly", "CapnMoss" }) do
+			local npc = NPCData.Get(id)
+			local m = map.Townsfolk:FindFirstChild(id)
+			t.ok(m, id .. " is built")
+			local p = npc.spot.position
+			local feet = m.PrimaryPart.CFrame.Position.Y - m:GetAttribute("RootHeight")
+			t.ok(math.abs(feet - (TerrainGen.HeightAt(p.X, p.Z) + npc.spot.ground)) < 1e-3, id .. "'s feet")
+			t.ok(m:FindFirstChild("Talk"), id .. " has Talk")
+		end
+	end)
 end

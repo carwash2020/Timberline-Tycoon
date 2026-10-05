@@ -90,6 +90,10 @@ return function(t)
 					HasTag = function()
 						return false
 					end,
+					AddTag = function(_, inst, tag)
+						w.boatTags = w.boatTags or {}
+						w.boatTags[inst] = tag
+					end,
 				},
 			},
 			globals = {
@@ -370,5 +374,29 @@ return function(t)
 		local island = w.islandDeck:FindFirstChildOfClass("ProximityPrompt")
 		t.ok(string.find(main.ObjectText, "leaves in", 1, true) ~= nil, main.ObjectText)
 		t.ok(string.find(island.ObjectText, "back in", 1, true) ~= nil, island.ObjectText)
+	end)
+
+	t.test("the boat is tagged for the client, which moves it; the server only nudges it ~5 Hz", function()
+		local w = world()
+		t.eq(w.boatTags[w.boat], FerryLogic.Tag)
+		t.eq(w.boat:GetAttribute(FerryLogic.DrivenAttribute), true)
+		w.F.Step(CYCLE - 1)
+		w.F.Step(CYCLE) -- leaves: lands exactly where the schedule says
+		local function atSchedule(now)
+			local x, z = FerryLogic.PoseAt(now)
+			local p = w.deck.CFrame.Position
+			return math.abs(p.X - x) < 1e-3 and math.abs(p.Z - z) < 1e-3
+		end
+		t.ok(atSchedule(CYCLE), "on the leg change")
+		w.F.Step(CYCLE + 10)
+		t.ok(atSchedule(CYCLE + 10))
+		local before = w.deck.CFrame.Position
+		w.F.Step(CYCLE + 10.05) -- 50 ms later: too soon for another nudge
+		t.eq(w.deck.CFrame.Position, before, "not moved between 5 Hz steps")
+		w.F.Step(CYCLE + 10.25)
+		t.ok(atSchedule(CYCLE + 10.25), "moved once 0.2 s have passed")
+		w.F.Step(CYCLE + TRAVEL + 0.01) -- arrival lands exactly
+		local berths = FerryLogic.Berths()
+		t.ok(math.abs(w.deck.CFrame.Position.X - berths.island.x) < 1e-3, "tied up at the island berth")
 	end)
 end

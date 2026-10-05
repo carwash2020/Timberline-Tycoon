@@ -101,6 +101,72 @@ function FerryLogic.State(now: number): State
 	return { leg = "main", alpha = 0, docked = "main" }
 end
 
+-- The boat's deck centre height: the sea surface plus the rise.
+function FerryLogic.DeckY(): number
+	return WorldLayout.SeaLevel + FerryLogic.DeckRise
+end
+
+-- Where the boat is at server time `now`: world X, Z and yaw. The one
+-- schedule the server and every client's FerryController share, so each
+-- device can draw the boat gliding on its own frames.
+function FerryLogic.PoseAt(now: number): (number, number, number)
+	-- What Cap'n Moss says about the price and the timetable, for his Talk
+	-- bubbles (NPCData). Every number comes from GameConfig and this module.
+	function FerryLogic.TalkLines(): { string }
+		local fare = Util.formatCash(GameConfig.FerryFare)
+		local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)
+		return {
+			string.format("%s a rider, taken when we cast off. Step off first and it's free.", fare),
+			string.format("She leaves each dock every %d minutes, tide or no tide.", minutes),
+			string.format("A crossing takes about %d seconds. %s well spent.", FerryLogic.TravelSec, fare),
+		}
+	end
+
+	return FerryLogic.Pose(FerryLogic.State(now))
+end
+
+-- True when the client moves the boat (FerryController, every frame). The
+-- server then only nudges its own copy a few times a second, for players
+-- the controller has not reached and for streaming. Set false to put the
+-- boat back on the server's Heartbeat (the pre-W3 behaviour).
+FerryLogic.ClientDriven = true
+FerryLogic.ServerMoveHz = 5
+-- The boat model's CollectionService tag and the attribute that tells the
+-- client it is the one moving it.
+FerryLogic.Tag = "FerryBoat"
+FerryLogic.DrivenAttribute = "ClientDriven"
+
+-- How long the server leaves its copy alone while the boat sails, seconds.
+function FerryLogic.ServerMoveInterval(): number
+	if FerryLogic.ClientDriven then
+		return 1 / FerryLogic.ServerMoveHz
+	end
+	return 0
+end
+
+-- Should the server move its copy now? Always when the leg changed (a
+-- departure or an arrival lands the boat exactly where the schedule says),
+-- never while tied up, and while sailing once the interval has passed.
+function FerryLogic.ShouldServerMove(legChanged: boolean, docked: boolean, sinceLastMove: number): boolean
+	if legChanged then
+		return true
+	end
+	if docked then
+		return false
+	end
+	return sinceLastMove >= FerryLogic.ServerMoveInterval()
+end
+
+-- A client's clock offset (server time minus its own os.clock) is read
+-- once and then followed; `SlewOffset` eases it toward a fresh reading no
+-- faster than `maxRate` seconds per second, so a clock correction never
+-- makes the boat jump. Returns the new offset.
+FerryLogic.SlewRate = 0.05
+function FerryLogic.SlewOffset(current: number, target: number, dt: number, maxRate: number?): number
+	local step = (maxRate or FerryLogic.SlewRate) * math.max(dt, 0)
+	return current + math.clamp(target - current, -step, step)
+end
+
 -- Seconds until the boat next leaves `dock`. 0 when it is leaving this
 -- instant.
 function FerryLogic.SecondsToDeparture(now: number, dock: Dock): number
@@ -116,6 +182,18 @@ function FerryLogic.CanBoard(now: number, dock: Dock): boolean
 	if state.docked ~= dock then
 		return false
 	end
+	-- What Cap'n Moss says about the price and the timetable, for his Talk
+	-- bubbles (NPCData). Every number comes from GameConfig and this module.
+	function FerryLogic.TalkLines(): { string }
+		local fare = Util.formatCash(GameConfig.FerryFare)
+		local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)
+		return {
+			string.format("%s a rider, taken when we cast off. Step off first and it's free.", fare),
+			string.format("She leaves each dock every %d minutes, tide or no tide.", minutes),
+			string.format("A crossing takes about %d seconds. %s well spent.", FerryLogic.TravelSec, fare),
+		}
+	end
+
 	return FerryLogic.SecondsToDeparture(now, dock) > FerryLogic.BoardCloseSec
 end
 
@@ -209,6 +287,18 @@ end
 
 function FerryLogic.PaidText(): string
 	return string.format("%s paid. Hold on, the ferry is off.", Util.formatCash(GameConfig.FerryFare))
+end
+
+-- What Cap'n Moss says about the price and the timetable, for his Talk
+-- bubbles (NPCData). Every number comes from GameConfig and this module.
+function FerryLogic.TalkLines(): { string }
+	local fare = Util.formatCash(GameConfig.FerryFare)
+	local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)
+	return {
+		string.format("%s a rider, taken when we cast off. Step off first and it's free.", fare),
+		string.format("She leaves each dock every %d minutes, tide or no tide.", minutes),
+		string.format("A crossing takes about %d seconds. %s well spent.", FerryLogic.TravelSec, fare),
+	}
 end
 
 return FerryLogic

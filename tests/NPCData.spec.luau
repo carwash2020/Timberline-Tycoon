@@ -130,8 +130,9 @@ return function(t)
 		t.eq(zone.name, "Town")
 		for _, npc in ipairs(NPCData.All()) do
 			local p = npc.spot.position or npc.spot.fallback
-			-- The Hermit lives in the Secret Cave, not in town.
-			if p and npc.id ~= "Hermit" then
+			-- The Hermit lives in the Secret Cave; Old Tolly and Cap'n Moss
+			-- keep the toll booth and the ferry dock, out in the world.
+			if p and npc.id ~= "Hermit" and npc.spot.ground == nil then
 				t.ok(p.X > zone.x0 and p.X < zone.x1 and p.Z > zone.z0 and p.Z < zone.z1, npc.id)
 				t.eq(p.Y, 0)
 			end
@@ -340,5 +341,56 @@ return function(t)
 		t.eq(NPCData.NearestIndex(origin, points, 16), 2)
 		t.eq(NPCData.NearestIndex(origin, { Vector3.new(40, 0, 0) }, 16), nil)
 		t.eq(NPCData.NearestIndex(origin, {}, 16), nil)
+	end)
+
+	t.test("Old Tolly stands in the toll booth, Cap'n Moss on the ferry dock", function()
+		local GameConfig = t.shared("GameConfig")
+		local tolly, moss = NPCData.Get("OldTolly"), NPCData.Get("CapnMoss")
+		t.ok(tolly and moss, "both are in the roster")
+		t.eq(tolly.role, "Toll keeper")
+		t.eq(moss.role, "Ferry captain")
+		-- The booth is 10 wide and 8 deep around (BoothX, BoothZ), the dock
+		-- deck 16 by 10 around the mainland dock.
+		local p = tolly.spot.position
+		t.ok(math.abs(p.X - WorldLayout.BoothX) <= 5 and math.abs(p.Z - WorldLayout.BoothZ) <= 4, "inside the booth")
+		t.ok(tolly.spot.ground and tolly.spot.ground > 0, "on the booth floor, not the bare ground")
+		local m = moss.spot.position
+		t.ok(
+			math.abs(m.X - WorldLayout.FerryDockX) <= 8 and math.abs(m.Z - WorldLayout.FerryDockZ) <= 5,
+			"on the dock deck"
+		)
+		-- Clear of the berthed boat (the boat's near end is the deck's east edge).
+		t.ok(m.X < WorldLayout.FerryDockX + 8, "off the boarding edge")
+		t.ok(moss.spot.ground and moss.spot.ground > 0, "on the deck, not the shore")
+		t.eq(tolly.route, nil)
+		t.eq(moss.route, nil)
+		-- Prices are quoted from the game's numbers, never typed in.
+		local fee = "$" .. tostring(GameConfig.TollFee)
+		local fare = "$" .. tostring(GameConfig.FerryFare)
+		local function says(npc, needle)
+			for _, line in ipairs(npc.lines) do
+				if string.find(line, needle, 1, true) then
+					return true
+				end
+			end
+			return false
+		end
+		t.ok(says(tolly, fee), "Tolly quotes the toll")
+		t.ok(says(tolly, tostring(GameConfig.TollSeconds // 60) .. " minutes"), "and the window")
+		t.ok(says(moss, fare), "Moss quotes the fare")
+		t.ok(says(moss, tostring(GameConfig.FerryIntervalSec // 60) .. " minutes"), "and the timetable")
+		-- And they follow GameConfig if it changes.
+		local TollLogic, FerryLogic = t.shared("TollLogic"), t.shared("FerryLogic")
+		local oldFee, oldFare = GameConfig.TollFee, GameConfig.FerryFare
+		GameConfig.TollFee, GameConfig.FerryFare = 777, 888
+		t.ok(string.find(TollLogic.TalkLines()[1], "$777", 1, true) ~= nil, "toll follows GameConfig")
+		t.ok(string.find(FerryLogic.TalkLines()[1], "$888", 1, true) ~= nil, "fare follows GameConfig")
+		GameConfig.TollFee, GameConfig.FerryFare = oldFee, oldFare
+		for _, npc in ipairs({ tolly, moss }) do
+			t.ok(npc.promptLift and npc.promptLift > 0, npc.id .. "'s Talk sits above the shop prompt")
+			for _, line in ipairs(npc.lines) do
+				t.ok(string.find(string.lower(line), "lt2", 1, true) == nil, line)
+			end
+		end
 	end)
 end

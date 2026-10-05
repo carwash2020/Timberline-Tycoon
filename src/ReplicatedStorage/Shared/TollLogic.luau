@@ -119,4 +119,16 @@ function TollLogic.ActionText(): string
 	return string.format("Pay toll (%s)", Util.formatCash(GameConfig.TollFee))
 end
 
+-- What Old Tolly says about the price, for his Talk bubbles (NPCData). Every
+-- number comes from GameConfig, so a change there changes his talk.
+function TollLogic.TalkLines(): { string }
+	local fee = Util.formatCash(GameConfig.TollFee)
+	local minutes = GameConfig.TollSeconds // 60
+	return {
+		string.format("The toll's %s. That buys you %d minutes to cross.", fee, minutes),
+		string.format("Pay at my booth first, friend. %s, then %d minutes to get over.", fee, minutes),
+		string.format("Heading north? %s. Heading home south is always free.", fee),
+	}
+end
+
 return TollLogic

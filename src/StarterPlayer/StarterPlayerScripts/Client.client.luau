@@ -35,6 +35,7 @@ local MODULES = {
 	"DoorAnim",
 	"DragController",
 	"FaceTarget",
+	"FerryController",
 	"FieldGuideUI",
 	"ForestFiller",
 	"ForestUI",
@@ -223,6 +224,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "GondolaController",
 		get = function()
 			return require(script.Parent.GondolaController)
+		end,
+	},
+	{
+		name = "FerryController",
+		get = function()
+			return require(script.Parent.FerryController)
 		end,
 	},
 	{

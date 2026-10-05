@@ -36,6 +36,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
+local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local NPCService = {}
@@ -72,6 +73,14 @@ local function build(npc: NPCData.NPC, find: (string, string) -> (CFrame?, Vecto
 		end
 	end
 	local feet = NPCData.SpotFor(npc, find)
+	-- Out in the world (the toll booth, the ferry dock) the ground is not
+	-- y = 0: stand on the terrain at the spot, plus the booth floor or dock
+	-- deck the spot says it stands on.
+	local rise = spot.ground
+	if rise then
+		local at = feet.Position
+		feet += Vector3.new(0, TerrainGen.HeightAt(at.X, at.Z) + rise - at.Y, 0)
+	end
 	-- Never buried: if the ground is drawn above their feet, stand on it.
 	local p = feet.Position
 	local lifted = TerrainBuilder.LiftOnto(p.X, p.Y, p.Z)
