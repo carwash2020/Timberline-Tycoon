@@ -73,15 +73,16 @@ function WorldPlan.GoodGround(x: number, z: number, roadClearance: number?, maxS
 	if WorldLayout.FlatWeight(x, z) > 0.9 then
 		return false
 	end
-	if TerrainGen.WaterLevelAt(x, z) ~= nil then
+	-- Pure yes or no tests, the cheapest first.
+	local cone = WorldLayout.VolcanoCone
+	local dx, dz = x - cone.x, z - cone.z
+	if dx * dx + dz * dz < (cone.radius * 0.55) ^ 2 then
 		return false
 	end
 	if TerrainGen.RoadClearance(x, z) < (roadClearance or 6) then
 		return false
 	end
-	local cone = WorldLayout.VolcanoCone
-	local dx, dz = x - cone.x, z - cone.z
-	if dx * dx + dz * dz < (cone.radius * 0.55) ^ 2 then
+	if TerrainGen.WaterLevelAt(x, z) ~= nil then
 		return false
 	end
 	return TerrainGen.SlopeAt(x, z) < (maxSlope or 0.75)

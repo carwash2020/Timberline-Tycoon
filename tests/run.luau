@@ -123,6 +123,7 @@ for _, file in ipairs(specs) do
 		return shared:load(path)
 	end
 
+	local specStart = os.clock()
 	local path = "tests/" .. file
 	local ok, err = pcall(function()
 		luau.load(fs.readFile(path), { debugName = path })()(t)
@@ -133,7 +134,11 @@ for _, file in ipairs(specs) do
 		continue
 	end
 	for _, case in ipairs(tests) do
+		local caseStart = os.clock()
 		local caseOk, caseErr = pcall(case.fn)
+		if os.clock() - caseStart > 30 then
+			print(string.format("  slow test (%.0fs): %s", os.clock() - caseStart, case.name))
+		end
 		if caseOk then
 			passed += 1
 		else
@@ -141,7 +146,7 @@ for _, file in ipairs(specs) do
 			table.insert(failures, string.format("%s > %s: %s", file, case.name, tostring(caseErr)))
 		end
 	end
-	print(string.format("%-28s %d tests", file, #tests))
+	print(string.format("%-28s %d tests  %.1fs", file, #tests, os.clock() - specStart))
 end
 
 for _, line in ipairs(failures) do
