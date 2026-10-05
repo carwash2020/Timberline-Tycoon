@@ -74,4 +74,11 @@ return function(t)
 		t.eq(TreeUI.ApplyKey(Enum.KeyCode.Escape), "close")
 		t.eq(gui.SelectedObject, nil)
 	end)
+
+	t.test("a bar leaves the pad alone while a tool is in hand or a menu has it", function()
+		local focus = TreeUI.MakeBar(Vector3.new(0, 2, 0)):FindFirstChild("Focus", true)
+		t.eq(TreeUI.ShouldFocus(nil, false), true)
+		t.eq(TreeUI.ShouldFocus(nil, true), false, "chopping: the D-pad shortcuts and R2 stay free")
+		t.eq(TreeUI.ShouldFocus(focus, false), false, "a menu already has it")
+	end)
 end

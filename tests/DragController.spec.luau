@@ -73,6 +73,11 @@ return function(t)
 			},
 			mocks = {
 				HUD = { Toast = noop, NoteGrab = noop },
+				BlueprintPlacer = {
+					Active = function()
+						return false
+					end,
+				},
 				Net = {
 					Remote = function()
 						return { FireServer = noop }

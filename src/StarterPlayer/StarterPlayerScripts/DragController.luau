@@ -53,6 +53,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Tune = require(ReplicatedStorage.Shared.Tune)
+local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
 
@@ -871,7 +872,14 @@ function DragController.Start()
 		-- it handled even when it passes it on. Only a menu with the pad
 		-- selection keeps it.
 		local trigger = input.KeyCode == Enum.KeyCode.ButtonR2
-		if processed and not (trigger and GuiService.SelectedObject == nil) then
+		if
+			not GrabLogic.PadPressAccepted(
+				processed,
+				trigger,
+				GuiService.SelectedObject ~= nil,
+				BlueprintPlacer.Active()
+			)
+		then
 			return
 		end
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
