@@ -449,20 +449,22 @@ ItemCatalog.Materials = {
 -- v2 rows (V2_PLAN.md §2c, §2d), attached to the definitions above.
 local AXES_V2: { [string]: AxeV2 } = {
 	RustyAxe = { price = 0, damage = 0.2, range = 4.8, cooldown = 0.65 },
-	-- $160, not $90: at $90 the model bought it in 3.3 min (target 5-8).
-	-- The tutorial's loads step is sized so start + that sale + Murph's
-	-- reward still reaches this price.
-	SteelAxe = { price = 160, damage = 0.55, range = 6, cooldown = 0.73 },
-	HardenedAxe = { price = 190, damage = 0.93, range = 8, cooldown = 0.70 },
-	SilverAxe = { price = 550, damage = 1.45, range = 8, cooldown = 0.65 },
-	CobaltAxe = { price = 2040, damage = 1.6, range = 10, cooldown = 0.48 },
-	GoldAxe = { price = 7720, damage = 1.68, range = 10, cooldown = 0.40 },
+	-- The ladder climbs by about 2.5-3x a rung, so each upgrade costs more
+	-- than the last and the strongest axes cost the most: Steel is the cheap
+	-- first step (the model buys it in about 7 min), and the Inferno Axe
+	-- ($38,000) sits under the forged Starfall Axe. The tutorial's loads step
+	-- is sized so start + a sale + Murph's reward reaches the Steel price.
+	SteelAxe = { price = 120, damage = 0.55, range = 6, cooldown = 0.73 },
+	HardenedAxe = { price = 400, damage = 0.93, range = 8, cooldown = 0.70 },
+	SilverAxe = { price = 1100, damage = 1.45, range = 8, cooldown = 0.65 },
+	CobaltAxe = { price = 3000, damage = 1.6, range = 10, cooldown = 0.48 },
+	GoldAxe = { price = 8500, damage = 1.68, range = 10, cooldown = 0.40 },
 	-- Was 10.2 damage: that one-cut almost every trunk and beat the forged
 	-- Starfall Axe. Damage, reach and cooldown now climb the ladder, and
 	-- Starfall is the fastest cut on every wood.
-	ObsidianAxe = { price = 11000, damage = 3.4, range = 12, cooldown = 0.7 },
+	ObsidianAxe = { price = 22000, damage = 3.4, range = 12, cooldown = 0.7 },
 	InfernoAxe = {
-		price = 14400,
+		price = 38000,
 		damage = 4.6,
 		range = 14,
 		cooldown = 0.5,

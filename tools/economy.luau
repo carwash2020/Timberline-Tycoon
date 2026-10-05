@@ -684,7 +684,7 @@ target(
 	480
 )
 target("First $1k earned", "15-20 min", events.thousand, 900, 1200)
-target("Cobalt Axe ($2,040)", "about 1 h", events.CobaltAxe or math.huge, 2700, 4500)
+target("Cobalt Axe ($3,000)", "about 1 h", events.CobaltAxe or math.huge, 2700, 4500)
 target("Full plot (" .. money(A.plotPrice) .. ")", "28-36 h", events.plot, 28 * 3600, 36 * 3600)
 line()
 line("## CI ranges")

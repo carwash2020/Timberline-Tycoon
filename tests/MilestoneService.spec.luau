@@ -53,10 +53,9 @@ return function(t)
 	t.test("could afford the next axe at the loop's price", function()
 		local ItemCatalog = t.shared("ItemCatalog")
 		local steel = ItemCatalog.GetAxe("SteelAxe")
-		-- v2 costs more than v1: the v1 price doesn't buy the v2 axe.
-		t.ok(steel.v2.price > steel.priceCash)
-		local v2Milestone, v2Player, v2Profile = setup(2, steel.priceCash)
-		v2Milestone.CashEarned(v2Player, 10)
+		-- Each loop uses its own price.
+		local v2Milestone, v2Player, v2Profile = setup(2, steel.v2.price - 1)
+		v2Milestone.CashEarned(v2Player, 0.5)
 		t.eq(v2Profile.onboarding["Could afford an upgrade"], nil, "v2: still short of its v2 price")
 		v2Profile.cash = steel.v2.price
 		v2Milestone.CashEarned(v2Player, 10)
