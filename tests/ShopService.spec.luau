@@ -369,16 +369,18 @@ return function(t)
 		t.eq(s.profile.cash, steel.v2.price - 10)
 		t.eq(s.granted, {})
 		t.eq(s.toasts, { "You need $10 more for the Steel Axe." })
-		-- v2 costs more than v1 ($160 vs $150): the v1 price doesn't buy it
-		-- under v2, and the v2 price does buy it under v1, with change.
-		local shortV2 = setup({ cash = steel.priceCash, loop = 2 })
-		shortV2.buy("Axe", "SteelAxe")
-		t.eq(shortV2.granted, {})
-		t.eq(shortV2.profile.cash, steel.priceCash)
-		local v1 = setup({ cash = steel.v2.price, loop = 1 })
+		-- Each loop charges its own price: v2's Steel Axe is $120, v1's $150.
+		local own = setup({ cash = steel.v2.price, loop = 2 })
+		own.buy("Axe", "SteelAxe")
+		t.eq(own.granted, { "SteelAxe" })
+		t.eq(own.profile.cash, 0)
+		local v1Short = setup({ cash = steel.v2.price, loop = 1 })
+		v1Short.buy("Axe", "SteelAxe")
+		t.eq(v1Short.granted, {}, "v1: the v2 price doesn't buy the v1 price's axe")
+		local v1 = setup({ cash = steel.priceCash, loop = 1 })
 		v1.buy("Axe", "SteelAxe")
 		t.eq(v1.granted, { "SteelAxe" })
-		t.eq(v1.profile.cash, steel.v2.price - steel.priceCash)
+		t.eq(v1.profile.cash, 0)
 	end)
 
 	t.test("v2: trucks and trailers cost their v2 prices", function()
@@ -426,7 +428,7 @@ return function(t)
 		t.eq(far.profile.cash, 99999)
 	end)
 
-	t.test("a boxed steel axe charges $160 once when pay is fired ten times", function()
+	t.test("a boxed steel axe charges $120 once when pay is fired ten times", function()
 		local s = setup({ cash = 1000, loop = 2, bestTier = 1 })
 		local box = { uid = "box-steel", kind = "Axe", itemId = "SteelAxe", limited = false }
 		local oks = 0
@@ -438,7 +440,7 @@ return function(t)
 			end
 		end
 		t.eq(oks, 1)
-		t.eq(s.profile.cash, 1000 - 160)
+		t.eq(s.profile.cash, 1000 - 120)
 		t.eq(s.granted, { "SteelAxe" })
 		t.eq(#s.equipped, 1)
 	end)
@@ -535,7 +537,7 @@ return function(t)
 		t.eq(line, "sleepy")
 		t.eq(s.profile.cash, 1000, "a carried box does not charge")
 		s.buy("Axe", "SteelAxe")
-		t.eq(s.profile.cash, 1000 - 160, "the Tool Shed stays open")
+		t.eq(s.profile.cash, 1000 - 120, "the Tool Shed stays open")
 	end)
 
 	t.test("a full storage refuses a truck box before cash moves", function()

@@ -804,11 +804,11 @@ return function(t)
 	t.test("the five economy headlines are the ones already published", function()
 		local report = fs.readFile("ECONOMY.md")
 		t.ok(string.find(report, "66 s", 1, true) ~= nil)
-		t.ok(string.find(report, "8.0 min", 1, true) ~= nil)
-		t.ok(string.find(report, "13.4 min", 1, true) ~= nil)
-		t.ok(string.find(report, "53.7 min", 1, true) ~= nil)
-		-- B02 moved the full plot from 39.4 h to 32.0 h (the square price).
+		t.ok(string.find(report, "7.4 min", 1, true) ~= nil)
+		t.ok(string.find(report, "13.3 min", 1, true) ~= nil)
+		t.ok(string.find(report, "61.3 min", 1, true) ~= nil)
+		-- The price ladder (axes) moved the headlines to these.
 		-- The other four headlines stay.
-		t.ok(string.find(report, "32.0 h", 1, true) ~= nil)
+		t.ok(string.find(report, "33.4 h", 1, true) ~= nil)
 	end)
 end

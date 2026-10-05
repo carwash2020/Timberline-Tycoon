@@ -449,20 +449,364 @@ ItemCatalog.Materials = {
 -- v2 rows (V2_PLAN.md §2c, §2d), attached to the definitions above.
 local AXES_V2: { [string]: AxeV2 } = {
 	RustyAxe = { price = 0, damage = 0.2, range = 4.8, cooldown = 0.65 },
+	-- The ladder climbs by about 2.5-3x a rung, so each upgrade costs more
+	-- than the last and the strongest axes cost the most: Steel is the cheap
+	-- first step (the model buys it in about 7 min), and the Inferno Axe
+	-- ($38,000) sits under the forged Starfall Axe. The tutorial's loads step
+	-- is sized so start + a sale + Murph's reward reaches the Steel price.
+	SteelAxe = {
+		id = "SteelAxe",
+		displayName = "Steel Axe",
+		look = { headColor = "#A7ADB4", material = "Metal" },
+		damage = 12,
+		priceCash = 150,
+	},
+	HardenedAxe = {
+		id = "HardenedAxe",
+		displayName = "Hardened Axe",
+		look = { headColor = "#5E6670", material = "DiamondPlate" },
+		damage = 25,
+		priceCash = 800,
+	},
+	SilverAxe = {
+		id = "SilverAxe",
+		displayName = "Silver Axe",
+		look = { headColor = "#DCE1E6", material = "Foil" },
+		damage = 45,
+		priceCash = 3500,
+	},
+	CobaltAxe = {
+		id = "CobaltAxe",
+		displayName = "Cobalt Axe",
+		look = { headColor = "#3A6FD8", material = "Metal" },
+		damage = 60,
+		priceCash = 7000,
+	},
+	GoldAxe = {
+		id = "GoldAxe",
+		displayName = "Gold Axe",
+		look = { headColor = "#E1B530", material = "Foil" },
+		damage = 80,
+		priceCash = 12000,
+	},
+	ObsidianAxe = {
+		id = "ObsidianAxe",
+		displayName = "Obsidian Axe",
+		look = { headColor = "#1D1A24", material = "Glass" },
+		damage = 120,
+		priceCash = 20000,
+	},
+	InfernoAxe = {
+		id = "InfernoAxe",
+		displayName = "Inferno Axe",
+		look = { headColor = "#FF6A1A", material = "Neon", glow = true },
+		damage = 150,
+		biomeDamage = { volcano = 200 }, -- burns through fire-biome trees
+		priceCash = 45000,
+	},
+	-- V1's final axe. Forged at the top of the Skyroot, never sold. Still
+	-- worse than the Inferno Axe on volcano trees (130 vs 150 after
+	-- hardness), so collectors keep both.
+	StarfallAxe = {
+		id = "StarfallAxe",
+		displayName = "Starfall Axe",
+		look = { headColor = "#BFD8FF", material = "Neon", glow = true },
+		sold = false,
+		forge = { cash = 60000, logs = { lumenwood = 40 }, materials = { SkyShard = 12 } },
+		damage = 180,
+		biomeDamage = { sky = 300 },
+		priceCash = 60000, -- the forge's cash part; also its place on the ladder
+	},
+	-- Robux exclusive (the Lux Axe pass). Not a rung: priceCash 0 would tie
+	-- the Rusty Axe, and a rung would move every tier, daily goal and the
+	-- economy's buying path. Stats sit just above the Inferno (Fire) Axe's
+	-- main row and below the Starfall Axe. No biome override, so the Fire
+	-- Axe stays better on emberwood and Starfall stays best on lumenwood.
+	LuxAxe = {
+		id = "LuxAxe",
+		displayName = "Lux Axe",
+		look = { headColor = "#F2D36B", material = "Metal", glow = true },
+		sold = false,
+		robux = true,
+		damage = 165, -- v1: between Inferno 150 and Starfall 180
+		priceCash = 0,
+	},
+	-- Quest reward from the Hermit (HermitService; five carvings found).
+	-- Never sold, never forged, not a rung: priceCash 0 would tie the Rusty
+	-- Axe, so the ladder skips `quest` axes as it skips `robux` ones, and the
+	-- economy models skip it because `sold` is false. Modest stats: slow and
+	-- heavy, below the Cobalt Axe's swing rate (V2_PLAN §11).
+	HermitsMaul = {
+		id = "HermitsMaul",
+		displayName = "Hermit's Maul",
+		look = { headColor = "#6F7B5C", material = "Slate" },
+		sold = false,
+		quest = true,
+		damage = 50, -- v1 rollback only: between Silver 45 and Cobalt 60
+		priceCash = 0,
+	},
+}
+
+-- Sold at the Dealership; any truck can be bought once you can afford it.
+-- Bigger beds are slower: the Logging Rig hauls the most but is the
+-- slowest, and the Scout ATV carries nothing but is the fastest.
+ItemCatalog.Trucks = {
+	Rustbucket = {
+		id = "Rustbucket",
+		displayName = "Rustbucket",
+		bedCapacity = 6,
+		priceCash = 75,
+		topSpeed = 26,
+		turnRate = 1.4,
+		look = { color = "#964830", width = 8.06, bedLength = 13, bedWalls = true },
+	},
+	Pickup = {
+		id = "Pickup",
+		displayName = "Pickup",
+		bedCapacity = 12,
+		priceCash = 1200,
+		topSpeed = 30,
+		turnRate = 1.4,
+		look = { color = "#2F6DB5", width = 8.58, bedLength = 15.6, bedWalls = true },
+	},
+	ScoutATV = {
+		id = "ScoutATV",
+		displayName = "Scout ATV",
+		bedCapacity = 0,
+		priceCash = 2500,
+		topSpeed = 40,
+		turnRate = 2,
+		look = { color = "#5E8C31", width = 5.98, bedLength = 0, bedWalls = false },
+		note = "Fast recon, no cargo",
+	},
+	Flatbed = {
+		id = "Flatbed",
+		displayName = "Flatbed",
+		bedCapacity = 24,
+		priceCash = 6000,
+		topSpeed = 26,
+		turnRate = 1.2,
+		look = { color = "#E3AE2A", width = 9.36, bedLength = 23.4, bedWalls = false },
+	},
+	LoggingRig = {
+		id = "LoggingRig",
+		displayName = "Logging Rig",
+		bedCapacity = 48,
+		priceCash = 25000,
+		topSpeed = 24,
+		turnRate = 1,
+		look = { color = "#B23A26", width = 10.14, bedLength = 33.8, bedWalls = false },
+	},
+	-- Robux exclusive (the Timber Classic pass). The Pickup's stats, bed and
+	-- handling, with its own paint. Not a cash purchase and not a better truck.
+	TimberClassic = {
+		id = "TimberClassic",
+		displayName = "Timber Classic",
+		bedCapacity = 12,
+		priceCash = 1200,
+		topSpeed = 30,
+		turnRate = 1.4,
+		look = { color = "#C4A46A", width = 8.58, bedLength = 15.6, bedWalls = true },
+		note = "Same stats as the Pickup",
+		robux = true,
+		sold = false,
+		classic = true,
+		v2 = { price = 400 },
+	},
+}
+
+ItemCatalog.Trailers = {
+	PonyTrailer = {
+		id = "PonyTrailer",
+		displayName = "Pony Trailer",
+		extraCapacity = 6,
+		priceCash = 600,
+		look = { color = "#7A5A3A", bedLength = 13 },
+	},
+	RanchTrailer = {
+		id = "RanchTrailer",
+		displayName = "Ranch Trailer",
+		extraCapacity = 12,
+		priceCash = 3000,
+		look = { color = "#6E7F46", bedLength = 18.2 },
+	},
+	HeavyHauler = {
+		id = "HeavyHauler",
+		displayName = "Heavy Hauler",
+		extraCapacity = 24,
+		priceCash = 12000,
+		look = { color = "#4A4F57", bedLength = 26 },
+	},
+}
+
+ItemCatalog.Boats = {
+	Rowboat = { id = "Rowboat", displayName = "Rowboat", hullCapacity = 4, priceCash = 200 },
+	Skiff = { id = "Skiff", displayName = "Skiff", hullCapacity = 8, priceCash = 900 },
+	Motorboat = { id = "Motorboat", displayName = "Motorboat", hullCapacity = 16, priceCash = 4000 },
+	CargoBarge = { id = "CargoBarge", displayName = "Cargo Barge", hullCapacity = 32, priceCash = 18000 },
+}
+
+ItemCatalog.Gear = {
+	Lantern = {
+		id = "Lantern",
+		displayName = "Lantern",
+		effect = "Light to chop by in the Gloam Hollow",
+		priceCash = 120,
+		biome = "grove",
+		color = "#F2C14E",
+	},
+	Flashlight = {
+		id = "Flashlight",
+		displayName = "Flashlight",
+		effect = "A pocket light for camp and the walk back to town",
+		priceCash = 250,
+		biome = "starter",
+		color = "#F4E2A1",
+	},
+	InsulatedCoat = {
+		id = "InsulatedCoat",
+		displayName = "Insulated Coat",
+		effect = "No more slow, cold walking in the Snowfields",
+		priceCash = 500,
+		biome = "snow",
+		color = "#5C87B8",
+	},
+	HeatBoots = {
+		id = "HeatBoots",
+		displayName = "Heat Boots",
+		effect = "Walk and chop on the Volcano without burning",
+		priceCash = 800,
+		biome = "volcano",
+		color = "#B5472A",
+	},
+	FeatherfallCloak = {
+		id = "FeatherfallCloak",
+		displayName = "Featherfall Cloak",
+		effect = "Glide down instead of falling off the Aether Isles",
+		priceCash = 2500,
+		biome = "sky",
+		color = "#BFD8FF",
+	},
+}
+
+-- Sawmills (V2_PLAN.md §2e). Limits are in timber units: a log longer than
+-- maxLength or thicker than maxWidth won't go in, and the cut (x by y) can't
+-- pass maxX / maxY. The Rickety takes an oak trunk (2.0 studs < 2.24) and
+-- not a pine base (2.6). width and depth are the plot footprint in studs.
+export type SawmillDef = {
+	id: string,
+	displayName: string,
+	priceCash: number,
+	maxLength: number,
+	maxWidth: number,
+	maxX: number,
+	maxY: number,
+	width: number,
+	depth: number,
+	color: string, -- the shop swatch and the frame
+}
+
+ItemCatalog.Sawmills = {
+	SawmillRickety = {
+		id = "SawmillRickety",
+		displayName = "Rickety Sawmill",
+		priceCash = 130,
+		maxLength = 10.9,
+		maxWidth = 1.4,
+		maxX = 1.8,
+		maxY = 1.2,
+		width = 12,
+		depth = 8,
+		color = "#8B5A2B",
+	},
+	SawmillSturdy = {
+		id = "SawmillSturdy",
+		displayName = "Sturdy Sawmill",
+		priceCash = 1600,
+		maxLength = 10.9,
+		maxWidth = 1.6,
+		maxX = 2.4,
+		maxY = 1.6,
+		width = 14,
+		depth = 8,
+		color = "#6B4423",
+	},
+	Millmaster100 = {
+		id = "Millmaster100",
+		displayName = "Millmaster 100",
+		priceCash = 11000,
+		maxLength = 10.9,
+		maxWidth = 2.0,
+		maxX = 3.0,
+		maxY = 2.0,
+		width = 16,
+		depth = 10,
+		color = "#A33B32",
+	},
+	Millmaster200 = {
+		id = "Millmaster200",
+		displayName = "Millmaster 200",
+		priceCash = 22500,
+		maxLength = 10.9,
+		maxWidth = 2.6,
+		maxX = 3.0,
+		maxY = 2.6,
+		width = 18,
+		depth = 10,
+		color = "#4A4E57",
+	},
+	Millmaster200L = {
+		id = "Millmaster200L",
+		displayName = "Millmaster 200 Long",
+		priceCash = 86500,
+		maxLength = 18.9,
+		maxWidth = 2.6,
+		maxX = 3.0,
+		maxY = 2.6,
+		width = 26,
+		depth = 10,
+		color = "#3E4A62",
+	},
+} :: { [string]: SawmillDef }
+
+-- Materials: gathered, used in recipes, sellable.
+-- A material's `node` is what you mine it from: `hits` swings of any axe
+-- break one, it gives `yield`, and it comes back after `respawnSec`.
+export type MaterialDef = {
+	id: string,
+	displayName: string,
+	sellPrice: number,
+	source: string,
+	node: { hits: number, yield: number, respawnSec: number, color: string },
+}
+
+ItemCatalog.Materials = {
+	SkyShard = {
+		id = "SkyShard",
+		displayName = "Sky Shard",
+		sellPrice = 150,
+		source = "Crystal nodes on the Aether Isles; mine them with an axe",
+		node = { hits = 12, yield = 1, respawnSec = 600, color = "#9FD4FF" },
+	},
+}
+
+-- v2 rows (V2_PLAN.md §2c, §2d), attached to the definitions above.
+local AXES_V2: { [string]: AxeV2 } = {
+	RustyAxe = { price = 0, damage = 0.2, range = 4.8, cooldown = 0.65 },
 	-- $160, not $90: at $90 the model bought it in 3.3 min (target 5-8).
 	-- The tutorial's loads step is sized so start + that sale + Murph's
 	-- reward still reaches this price.
-	SteelAxe = { price = 160, damage = 0.55, range = 6, cooldown = 0.73 },
-	HardenedAxe = { price = 190, damage = 0.93, range = 8, cooldown = 0.70 },
-	SilverAxe = { price = 550, damage = 1.45, range = 8, cooldown = 0.65 },
-	CobaltAxe = { price = 2040, damage = 1.6, range = 10, cooldown = 0.48 },
-	GoldAxe = { price = 7720, damage = 1.68, range = 10, cooldown = 0.40 },
+	SteelAxe = { price = 120, damage = 0.55, range = 6, cooldown = 0.73 },
+	HardenedAxe = { price = 400, damage = 0.93, range = 8, cooldown = 0.70 },
+	SilverAxe = { price = 1100, damage = 1.45, range = 8, cooldown = 0.65 },
+	CobaltAxe = { price = 3000, damage = 1.6, range = 10, cooldown = 0.48 },
+	GoldAxe = { price = 8500, damage = 1.68, range = 10, cooldown = 0.40 },
 	-- Was 10.2 damage: that one-cut almost every trunk and beat the forged
 	-- Starfall Axe. Damage, reach and cooldown now climb the ladder, and
 	-- Starfall is the fastest cut on every wood.
-	ObsidianAxe = { price = 11000, damage = 3.4, range = 12, cooldown = 0.7 },
+	ObsidianAxe = { price = 22000, damage = 3.4, range = 12, cooldown = 0.7 },
 	InfernoAxe = {
-		price = 14400,
+		price = 38000,
 		damage = 4.6,
 		range = 14,
 		cooldown = 0.5,
@@ -475,7 +819,7 @@ local AXES_V2: { [string]: AxeV2 } = {
 		cooldown = 0.35,
 		vs = { emberwood = { damage = 9.5 }, lumenwood = { damage = 12 } },
 		forgeWood = { lumenwood = 60 }, -- the v1 recipe's 40 logs at ProfileSchema.ForgeU3PerLog (1.5)
-		forgeCash = 20000, -- V2_PLAN §2c
+		forgeCash = 20000, -- V2_PLAN §2c (the 60 lumenwood is the rest of its price)
 	},
 	-- Just above the Fire Axe's main row (4.6 / 14 / 0.5), below Starfall
 	-- (6.5 / 16 / 0.35). No `vs` line: the Fire Axe's emberwood 7.5 stays
