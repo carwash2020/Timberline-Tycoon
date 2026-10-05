@@ -16,7 +16,7 @@ return function(t)
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
 
 	-- Lune's instances lack these; VehicleService only needs them to exist.
-	-- A method registers once a process (VehicleBays.spec adds the same).
+	-- A method registers once a process (DriveStart.spec adds the same).
 	local function stub(class, method, fn)
 		pcall(roblox.implementMethod, class, method, fn)
 	end
@@ -54,7 +54,21 @@ return function(t)
 		slot:AddTag("ParkingSlot")
 		slot:SetAttribute("Index", 1)
 		slot.Parent = ws
-		local w = { profile = { truckBed = {}, truckAt = {}, leftLoad = {} }, toasts = {} }
+		-- Every truck here has its own pad on the plot (a truck is only ever
+		-- built on one); tests that want none empty `profile.plot.pads`.
+		local pads = {}
+		for i, id in ipairs({ "Rustbucket", "Pickup", "Flatbed", "ScoutATV", "LoggingRig" }) do
+			table.insert(pads, { uid = "pad-" .. id, id = id, kind = "Truck", x = (i - 3) * 30, z = 0, presses = 0 })
+		end
+		local w = {
+			profile = {
+				truckBed = {},
+				truckAt = {},
+				leftLoad = {},
+				plot = { claimed = true, tier = 1, placed = {}, pads = pads },
+			},
+			toasts = {},
+		}
 		local loader = t.loader({
 			mocks = {
 				ProfileService = {
@@ -141,6 +155,9 @@ return function(t)
 			Name = "Dale",
 			DisplayName = "Dale",
 			SetAttribute = function() end,
+			GetAttribute = function(_, name)
+				return if name == "PlotSlot" then 1 else nil
+			end,
 		}
 		return w
 	end
@@ -327,5 +344,94 @@ return function(t)
 		t.ok(ok, "recalled from the save")
 		t.eq(VehicleService.GetBedCount(w.player), 1, "the load came back")
 		t.eq(w.profile.truckBed[1].woodId, "oak")
+	end)
+
+	t.test("a truck is only built on its own pad: no pad, no truck, nothing charged", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		w.profile.plot.pads = {}
+		t.eq(VehicleService.SpawnTruck(w.player, "Rustbucket"), nil, "SpawnTruck builds nothing without a pad")
+		t.eq(VehicleService.GetVehicle(w.player), nil)
+		-- Another truck's pad is not this truck's pad.
+		w.profile.plot.pads = { { uid = "p", id = "Pickup", kind = "Truck", x = 0, z = 0, presses = 0 } }
+		t.eq(VehicleService.SpawnTruck(w.player, "Rustbucket"), nil, "a Pickup pad is not a Rustbucket pad")
+		-- A trailer's pad is not a truck's pad.
+		w.profile.plot.pads = { { uid = "p", id = "Rustbucket", kind = "Trailer", x = 0, z = 0, presses = 0 } }
+		t.eq(VehicleService.SpawnTruck(w.player, "Rustbucket"), nil)
+		t.eq(VehicleService.GetVehicle(w.player), nil, "still no truck")
+	end)
+
+	t.test("Recall with no pad for the equipped truck is refused and builds nothing", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		w.profile.ownedTrucks = { "Rustbucket" }
+		w.profile.equippedTruck = "Rustbucket"
+		w.profile.cash = 500
+		w.profile.plot.pads = {}
+		local ok, why = VehicleService.Recall(w.player)
+		t.eq(ok, false)
+		t.eq(why, "Open your truck's box on your plot and place its pad first.")
+		t.eq(VehicleService.GetVehicle(w.player), nil, "no truck was created")
+		t.eq(w.profile.cash, 500, "nothing was charged")
+		-- No plot at all: the same answer.
+		w.profile.plot = nil
+		local ok2, why2 = VehicleService.Recall(w.player)
+		t.eq(ok2, false)
+		t.eq(why2, VehicleService.NoPadText)
+		t.eq(VehicleService.GetVehicle(w.player), nil)
+	end)
+
+	t.test("Equip to a truck with no pad is refused and leaves the current truck alone", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		local truck = VehicleService.SpawnTruck(w.player, "Rustbucket")
+		t.ok(truck ~= nil)
+		for i, pad in ipairs(w.profile.plot.pads) do
+			if pad.id == "Pickup" then
+				table.remove(w.profile.plot.pads, i)
+				break
+			end
+		end
+		local ok, why = VehicleService.Equip(w.player, "Pickup", "")
+		t.eq(ok, false)
+		t.eq(why, VehicleService.NoPadText)
+		t.eq(VehicleService.GetVehicle(w.player), truck, "the Rustbucket is still the one out")
+		-- With no truck out at all, equipping builds none either.
+		VehicleService.DespawnTruck(w.player)
+		local ok2 = VehicleService.Equip(w.player, "Pickup", "")
+		t.eq(ok2, false)
+		t.eq(VehicleService.GetVehicle(w.player), nil)
+	end)
+
+	t.test("Recall and Equip put the truck on that truck's own pad", function()
+		local w = setup()
+		local VehicleService = w.VehicleService
+		local function onPad(model, id)
+			local pad
+			for _, p in ipairs(w.profile.plot.pads) do
+				if p.id == id then
+					pad = p
+				end
+			end
+			local home = roblox.Vector3.new(0, 0, 0)
+			local slot = w.loader:shared("PlotData").Slots[1]
+			home = roblox.Vector3.new(slot.X + pad.x, 0, slot.Y + pad.z)
+			local at = model:GetPivot().Position
+			return math.abs(at.X - home.X) < 1e-3 and math.abs(at.Z - home.Z) < 1e-3
+		end
+		w.profile.ownedTrucks = { "Rustbucket", "Pickup" }
+		w.profile.equippedTruck = "Rustbucket"
+		-- No truck out yet (the join builds none): the recall builds it on its pad.
+		t.eq(VehicleService.GetVehicle(w.player), nil)
+		t.ok(VehicleService.Recall(w.player), "recalled")
+		local first = VehicleService.GetVehicle(w.player)
+		t.ok(onPad(first, "Rustbucket"), "on the Rustbucket's pad")
+		-- Driven off, then switched away and back: on that truck's pad each time.
+		first:PivotTo(CFrame.new(900, 40, -700))
+		-- Switching trucks: the Pickup comes out of the Pickup's pad.
+		t.ok(VehicleService.Equip(w.player, "Pickup", ""))
+		t.ok(onPad(VehicleService.GetVehicle(w.player), "Pickup"), "the Pickup is on its own pad")
+		t.ok(VehicleService.Equip(w.player, "Rustbucket", ""))
+		t.ok(onPad(VehicleService.GetVehicle(w.player), "Rustbucket"), "and back on the Rustbucket's")
 	end)
 end

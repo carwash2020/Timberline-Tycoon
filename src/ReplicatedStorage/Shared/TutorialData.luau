@@ -31,7 +31,10 @@ local TutorialData = {}
 -- Game events QuestService listens for (the server reports them). The
 -- v2 loop adds wood events; plotClaimed is the open plot. buildOpened,
 -- itemPlaced and landOpened are the build lessons after the claim (the
--- client reports the first and last through TutorialSeen).
+-- client reports the first and last through TutorialSeen). v2 trucks come in
+-- a box with their own pad: truckBought is the box bought, padPlaced the pad
+-- put down on the plot, truckSpawned the pad's button pressed (the truck
+-- rolls out; VehicleService reports the last two).
 export type TutorialEvent =
 	"treeFelled"
 	| "logPickedUp"
@@ -44,6 +47,8 @@ export type TutorialEvent =
 	| "woodSoldCash"
 	| "plotClaimed"
 	| "truckBought"
+	| "padPlaced"
+	| "truckSpawned"
 	| "buildOpened"
 	| "itemPlaced"
 	| "landOpened"
@@ -133,11 +138,21 @@ end
 
 local function truckStep(loop: number): Step
 	local price = ShopLogic.Price(rustbucket, loop)
+	local boxed = loop == 2 -- v2: a box with its own pad; v1: handed over
 	return {
 		id = "truck",
-		objective = "Buy the Rustbucket at the dealership",
-		murph = if price > 0
-			then string.format("The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.", price)
+		objective = if boxed
+			then "Buy the Rustbucket box at the dealership"
+			else "Buy the Rustbucket at the dealership",
+		murph = if boxed
+			then string.format(
+				"The Rustbucket is $%d at the dealership. It comes in a box with its own pad. Buy it and carry it to your plot.",
+				price
+			)
+			elseif price > 0 then string.format(
+				"The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.",
+				price
+			)
 			else "That sale's yours, and a little extra from me. Buy the Rustbucket at the dealership and it shows up on your plot.",
 		murphShort = if price > 0
 			then string.format("Sell more wood at my cart first. The Rustbucket is $%d at the dealership.", price)
@@ -282,6 +297,20 @@ TutorialData.StepsV2 = {
 		count = 1,
 	},
 	truckStep(2),
+	{
+		id = "pad",
+		objective = "Open the box on your plot and place its pad",
+		murph = "Carry the box onto your land and open it. The pad's inside: set it down anywhere you like. Your truck comes out of that pad.",
+		event = "padPlaced",
+		count = 1,
+	},
+	{
+		id = "spawn",
+		objective = "Press the pad's button to bring out your truck",
+		murph = "Walk up to the pad and press its button. That's how the Rustbucket rolls out, and how you get her back if she's ever stuck.",
+		event = "truckSpawned",
+		count = 1,
+	},
 	{
 		id = "load",
 		objective = "Drag a log onto your truck's bed",
@@ -490,8 +519,9 @@ end
 
 -- Order 1 (and 0): plot led. Order 2: fell led, and still had a plant step.
 -- Order 3: that step is gone. Order 4: build, place and land follow the plot
--- step. ApplyOrder turns a saved index into this list.
-TutorialData.OrderV2 = 4
+-- step. Order 5: the pad and spawn steps follow the truck. ApplyOrder turns
+-- a saved index into this list.
+TutorialData.OrderV2 = 5
 -- The plot-first list (order 0 and 1).
 TutorialData.OrderV2Previous = {
 	"plot",
@@ -529,6 +559,24 @@ TutorialData.OrderV2BeforeBuild = {
 	"pickup",
 	"sell",
 	"plot",
+	"truck",
+	"load",
+	"mill",
+	"loads",
+	"loads2",
+	"loads3",
+	"steel",
+}
+
+-- The list as order 4 had it (no pad or spawn steps).
+TutorialData.OrderV2BeforePad = {
+	"fell",
+	"pickup",
+	"sell",
+	"plot",
+	"build",
+	"place",
+	"land",
 	"truck",
 	"load",
 	"mill",
@@ -578,7 +626,9 @@ function TutorialData.ApplyOrder(record: any)
 		local raw = tonumber(record.tutorialStep)
 		local step = if type(raw) ~= "number" or raw ~= raw then 1 else math.floor(raw)
 		local order = tonumber(record.tutorialOrder) or 0
-		if order == 3 then
+		if order == 4 then
+			record.tutorialStep = remapFrom(TutorialData.OrderV2BeforePad, step)
+		elseif order == 3 then
 			record.tutorialStep = remapFrom(TutorialData.OrderV2BeforeBuild, step)
 		elseif order >= 2 then
 			record.tutorialStep = remapFrom(TutorialData.OrderV2WithPlant, step)
@@ -600,7 +650,8 @@ function TutorialData.AlreadyDone(
 	bestAxeTier: number,
 	plotClaimed: boolean?,
 	ownsTruck: boolean?,
-	hasPlaced: boolean?
+	hasPlaced: boolean?,
+	hasPad: boolean?
 ): boolean
 	if step.event == "axeBought" and bestAxeTier >= 2 then
 		return true
@@ -609,6 +660,9 @@ function TutorialData.AlreadyDone(
 		return true
 	end
 	if step.event == "truckBought" and ownsTruck == true then
+		return true
+	end
+	if step.event == "padPlaced" and hasPad == true then
 		return true
 	end
 	if step.event == "itemPlaced" and hasPlaced == true then

@@ -493,17 +493,6 @@ do
 	end
 end
 
--- The delivery pad's centre, looking out along the lane. `y` is the shelf.
-function WorldLayout.DeliveryCFrame(index: number, y: number): CFrame?
-	local drive = WorldLayout.Drives[index]
-	if not drive then
-		return nil
-	end
-	local at = Vector3.new(drive.x, y, drive.z)
-	local ahead = at + Vector3.new(drive.ux, 0, drive.uz)
-	return CFrame.lookAt(at, ahead)
-end
-
 -- The parking lot east of the spawn (a gravel lot; MapBuilder paints the
 -- slots on it). M1.5 grew it east (it ended at x 112) for one row of 12
 -- slots 10 wide, 11 apart (WorldPlan.Town), its east rail at x 145. The

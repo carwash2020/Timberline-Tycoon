@@ -95,7 +95,7 @@ local function lineFor(player: Player, rec: any): string
 	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
 		local plot = if profile then profile.plot else nil
 		local claimed = type(plot) == "table" and plot.claimed == true
-		if not claimed and rec.itemId ~= "Rustbucket" then
+		if not claimed then
 			return "needsPlot"
 		end
 	end

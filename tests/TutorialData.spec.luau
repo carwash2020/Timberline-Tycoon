@@ -231,6 +231,8 @@ return function(t)
 			"place",
 			"land",
 			"truck",
+			"pad",
+			"spawn",
 			"load",
 			"mill",
 			"loads",
@@ -239,13 +241,13 @@ return function(t)
 			"steel",
 		}
 		t.eq(ids(V2), want)
-		t.eq(#V2, #TutorialData.Steps + 3, "the three build lessons are v2 only")
+		t.eq(#V2, #TutorialData.Steps + 5, "the three build lessons and the pad and spawn steps are v2 only")
 		local v1 = {}
 		for _, step in ipairs(TutorialData.Steps) do
 			v1[step.id] = true
 		end
 		for _, id in ipairs(want) do
-			if id ~= "build" and id ~= "place" and id ~= "land" then
+			if id ~= "build" and id ~= "place" and id ~= "land" and id ~= "pad" and id ~= "spawn" then
 				t.ok(v1[id], id .. " is still a v1 step")
 			end
 		end
@@ -293,7 +295,12 @@ return function(t)
 		t.eq(order.build, order.plot + 1, "then the build lessons")
 		t.eq(order.place, order.build + 1)
 		t.eq(order.land, order.place + 1)
-		t.eq(order.truck, order.land + 1, "then the Rustbucket")
+		t.eq(order.truck, order.land + 1, "then the Rustbucket's box")
+		t.eq(order.pad, order.truck + 1, "then its pad on the plot")
+		t.eq(order.spawn, order.pad + 1, "then the pad's button")
+		t.eq(order.load, order.spawn + 1, "and only then the truck can be loaded")
+		t.eq(V2[order.pad].event, "padPlaced")
+		t.eq(V2[order.spawn].event, "truckSpawned")
 		t.eq(#TutorialData.EventsV2, #V2)
 	end)
 
@@ -523,7 +530,13 @@ return function(t)
 		Quest.Event(player, "landOpened")
 		t.eq(at(), "truck")
 		Quest.Event(player, "truckBought")
-		t.eq(at(), "load")
+		t.eq(at(), "pad", "the box is bought; its pad comes next")
+		Quest.Event(player, "truckSpawned")
+		t.eq(at(), "pad", "no truck before the pad is down")
+		Quest.Event(player, "padPlaced")
+		t.eq(at(), "spawn")
+		Quest.Event(player, "truckSpawned")
+		t.eq(at(), "load", "the truck is out; load it")
 		Quest.Event(player, "woodLoaded")
 		t.eq(at(), "mill")
 		Quest.Event(player, "woodSold", 2)
@@ -561,7 +574,31 @@ return function(t)
 			t.eq(record.tutorialOrder, TutorialData.OrderV2)
 			t.eq(record.tutorialProgress, 3, "progress stays")
 		end
-		t.eq(#list, #V2 - 3, "order 3 is the current list without the three lessons")
+		t.eq(#list, #V2 - 5, "order 3 is the current list without the build lessons and the pad steps")
+	end)
+
+	t.test("v2: a save from order 4 (before the pad and spawn steps) keeps its step by name", function()
+		local list = TutorialData.OrderV2BeforePad
+		for index, name in ipairs(list) do
+			local record = { tutorialStep = index, tutorialProgress = 3, tutorialOrder = 4 }
+			TutorialData.ApplyOrder(record)
+			t.eq(V2[record.tutorialStep].id, name, name)
+			t.eq(record.tutorialOrder, TutorialData.OrderV2)
+			t.eq(record.tutorialProgress, 3, "progress stays")
+		end
+		t.eq(#list, #V2 - 2, "order 4 is the current list without the pad and spawn steps")
+	end)
+
+	t.test("v2: the pad step is skipped by a player who already has a pad", function()
+		local pad
+		for _, step in ipairs(V2) do
+			if step.id == "pad" then
+				pad = step
+			end
+		end
+		t.eq(TutorialData.AlreadyDone(pad, 1, true, false, false, true), true)
+		t.eq(TutorialData.AlreadyDone(pad, 1, true, false, false, false), false)
+		t.eq(TutorialData.AlreadyDone(pad, 1, true, true, false, nil), false, "owning a truck is not a pad")
 	end)
 
 	t.test("v2: the build lessons are skipped by a player who already placed something", function()
@@ -578,7 +615,7 @@ return function(t)
 
 	t.test("v2: old index to step name, then that name's new index, for every step", function()
 		local old = TutorialData.OrderV2Previous
-		t.eq(#old, #V2 - 3 + 1, "the retired plant step is the extra name, the build lessons are not there yet")
+		t.eq(#old, #V2 - 5 + 1, "the retired plant step is the extra name, the build and pad lessons are not there yet")
 		for index, name in ipairs(old) do
 			local at = TutorialData.RemapV2Step(index)
 			local expect = if name == "plant" then "loads" else name
@@ -629,7 +666,7 @@ return function(t)
 		local truck, steel = byId("truck"), byId("steel")
 		t.eq(
 			TutorialData.ObjectiveText(truck, 0, 51),
-			"Buy the Rustbucket at the dealership · $51 of $75 to Rustbucket"
+			"Buy the Rustbucket box at the dealership · $51 of $75 to Rustbucket"
 		)
 		t.eq(
 			TutorialData.ObjectiveText(steel, 0, 40),
@@ -679,7 +716,7 @@ return function(t)
 		t.eq(
 			truck.murph,
 			string.format(
-				"The Rustbucket is $%d at the dealership. Buy it and it shows up on your plot.",
+				"The Rustbucket is $%d at the dealership. It comes in a box with its own pad. Buy it and carry it to your plot.",
 				truck.cashPrice
 			)
 		)

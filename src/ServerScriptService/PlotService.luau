@@ -82,7 +82,6 @@ type Slot = {
 	claim: ProximityPrompt,
 	office: ProximityPrompt, -- Land panel: plot size and expanding onto squares
 	spawn: SpawnLocation,
-	delivery: CFrame, -- where a bought truck is dropped (GetDeliveryPad)
 	owner: Player?,
 }
 
@@ -275,21 +274,6 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 	)
 	apron.CanCollide = false
 	apron.CanQuery = false
-	-- Road-edge delivery pad: 80 along the road (X), 16 deep. A pad the
-	-- world already placed (DeliveryPad) stays where it is.
-	if not slot.model:FindFirstChild("DeliveryPad") then
-		local delivery = part(
-			"DeliveryPad",
-			Vector3.new(80, 0.2, 16),
-			slot.cframe * CFrame.new(0, 0.16, half + 8),
-			Color3.fromRGB(168, 150, 118),
-			Enum.Material.Ground,
-			slot.model
-		)
-		delivery.CanCollide = false
-		delivery.CanQuery = false
-		delivery.CastShadow = false
-	end
 end
 
 local function refreshSign(slot: Slot)
@@ -397,19 +381,6 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 	plotSpawn.CFrame = cframe * CFrame.new(0, 2, -18) * CFrame.Angles(0, math.pi, 0)
 	plotSpawn.Parent = model
 
-	local delivery = WorldLayout.DeliveryCFrame(index, ground + 1) or (cframe * CFrame.new(0, 1, 0))
-	local drop = part(
-		"DeliveryPad",
-		Vector3.new(PlotData.DeliveryLength, 0.12, PlotData.DeliveryWidth),
-		delivery,
-		Color3.fromRGB(120, 96, 64),
-		Enum.Material.Ground,
-		model
-	)
-	drop.CanCollide = false
-	drop.CanQuery = false
-	drop.Transparency = 0.35
-
 	local slot: Slot = {
 		index = index,
 		cframe = cframe,
@@ -425,7 +396,6 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		claim = claim,
 		office = office,
 		spawn = plotSpawn,
-		delivery = delivery,
 		owner = nil,
 	}
 	claim.Triggered:Connect(function(player: Player)
@@ -708,8 +678,8 @@ local function refreshPickers()
 end
 
 -- A saved world spot that the new ground swallowed, drowned, or built a
--- pad on, moved onto this player's delivery pad. Memory only: no yield.
-local function rescueProfile(profile: Profile, delivery: CFrame)
+-- pad on, moved onto this player's plot (`rescue` is where). Memory only: no yield.
+local function rescueProfile(profile: Profile, rescue: CFrame)
 	local function land(x: number, y: number, z: number): (number, number, number)
 		local move = SpotRescue.ShouldMove(
 			y,
@@ -720,7 +690,7 @@ local function rescueProfile(profile: Profile, delivery: CFrame)
 		if not move then
 			return x, y, z
 		end
-		local p = delivery.Position
+		local p = rescue.Position
 		return p.X, p.Y + 2, p.Z
 	end
 	local truck = profile.truckAt
@@ -759,7 +729,7 @@ local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: bo
 	-- Owner is set here, before any quest, analytics, or save work.
 	assign(player, slot, profile)
 	adoptSpawn(player, slot, moveIfFar)
-	rescueProfile(profile, slot.delivery)
+	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
 	if first then
 		QuestService.Event(player, "plotClaimed")
 		MilestoneService.Mark(player, "Claimed a plot")
@@ -1274,20 +1244,6 @@ local function givePlanks(player: Player, slot: Slot, item: PlotLogic.Placed, un
 	return spawned ~= nil
 end
 
--- Where a bought truck is delivered: the plot's road-edge pad, or nil
--- when this player has no plot (the town lot is the fallback).
-function PlotService.DeliveryCFrame(player: Player): CFrame?
-	local slot = slotOf[player]
-	if not slot then
-		return nil
-	end
-	local pad = slot.model:FindFirstChild("DeliveryPad")
-	if pad and pad:IsA("BasePart") then
-		return pad.CFrame
-	end
-	return nil
-end
-
 function PlotService.Sell(player: Player, uid: unknown)
 	if type(uid) ~= "string" or not RateLimiter.Allow(player, "SellPlaced") then
 		return
@@ -1631,7 +1587,7 @@ end
 
 -- Before the truck and the loose logs spawn. A saved world spot that the
 -- new ground swallowed, drowned, or built a pad on goes to the town truck
--- lot. Claiming still moves a bad spot onto that player's delivery pad.
+-- lot. Claiming still moves a bad spot onto that player's plot.
 function PlotService.ParkStrays(profile: Profile)
 	local lot = WorldLayout.ParkingLot
 	local x = (lot.x0 + lot.x1) / 2
@@ -1676,13 +1632,6 @@ function PlotService.Claim(player: Player, index: unknown)
 	tryGrant(player, slotIndex, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
 end
 
--- Where the town's truck delivery should drop this player's vehicle.
--- Nil until they have a pad this visit.
-function PlotService.GetDeliveryPad(player: Player): CFrame?
-	local slot = slotOf[player]
-	return if slot then slot.delivery else nil
-end
-
 function PlotService.Pass(player: Player)
 	if not RateLimiter.Allow(player, "PlotPass") then
 		return
@@ -1721,7 +1670,7 @@ function PlotService.Reload(player: Player, profile: Profile): boolean
 	end
 	LogicService.Restore(slot :: any, profile, player)
 	refreshSign(slot)
-	rescueProfile(profile, slot.delivery)
+	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
 	return true
 end
 
