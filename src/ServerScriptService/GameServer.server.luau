@@ -39,6 +39,7 @@ local ForestService = require(script.Parent.ForestService)
 local GondolaService = require(script.Parent.GondolaService)
 local GrabService = require(script.Parent.GrabService)
 local SectionTrees = require(script.Parent.SectionTrees)
+local LeaderboardService = require(script.Parent.LeaderboardService)
 local SaveSlotService = require(script.Parent.SaveSlotService)
 local ChopSawService = require(script.Parent.ChopSawService)
 local SawmillService = require(script.Parent.SawmillService)
@@ -750,6 +751,7 @@ safely("FieldGuideService.Init", FieldGuideService.Init, notify)
 safely("NodeService.Init", NodeService.Init, notify)
 safely("AetherService.Init", AetherService.Init, notify)
 safely("GondolaService.Init", GondolaService.Init, mapFolder, notify)
+safely("LeaderboardService.Init", LeaderboardService.Init, remote.BoardRequest, remote.BoardData)
 safely("SaveSlotService.Init", SaveSlotService.Init, remote.SlotAction, remote.SlotState, notify, {
 	commit = function(player: Player)
 		commitSlot(player)
@@ -1188,6 +1190,14 @@ remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, 
 	if attr then
 		player:SetAttribute(attr, (profile.settings :: any)[key])
 	end
+	if key == "showOnBoard" then
+		safely(
+			"LeaderboardService.SettingChanged",
+			LeaderboardService.SettingChanged,
+			player,
+			profile.settings.showOnBoard
+		)
+	end
 end)
 
 -- Player lifecycle --------------------------------------------------------
@@ -1371,6 +1381,7 @@ local function onPlayerAdded(player: Player)
 	safely("PlotService.PlayerJoined", PlotService.PlayerJoined, player, profile)
 	safely("ForestService.PlayerJoined", ForestService.PlayerJoined, player, profile)
 	safely("SaveSlotService.PlayerJoined", SaveSlotService.PlayerJoined, player)
+	safely("LeaderboardService.PlayerJoined", LeaderboardService.PlayerJoined, player, profile.settings.showOnBoard)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -1486,6 +1497,7 @@ local function onPlayerRemoving(player: Player)
 	safely("SaveSlotService.PlayerRemoving", SaveSlotService.PlayerRemoving, player)
 	safely("ForestService.PlayerRemoving", ForestService.PlayerRemoving, player)
 	safely("GateService.PlayerRemoving", GateService.PlayerRemoving, player)
+	safely("LeaderboardService.PlayerRemoving", LeaderboardService.PlayerRemoving, player) -- reads the score now, before the release
 	-- Playtime, the truck's loose wood and left-behind logs. Before the
 	-- release, and again (as a no-op) from the final save if shutdown
 	-- already committed them.

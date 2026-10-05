@@ -53,6 +53,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
 	HermitTalk = 2, -- the Hermit's Talk prompt (HermitService; a prompt, not a remote)
 	SecretPress = 2, -- a carving or the cave box prompt (HermitService)
+	BoardRequest = 2, -- the Leaderboard tab; the service also answers one per player per 10 s
 	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
 }
 local ABUSE_MULTIPLIER = 5

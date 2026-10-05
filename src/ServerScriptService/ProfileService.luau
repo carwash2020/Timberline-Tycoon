@@ -6,9 +6,15 @@
 -- EconomyService is the only module allowed to change profile.cash.
 --
 -- DataStore "PlayerProfiles", key "profile_<UserId>" (GAME_DESIGN §14.2).
+-- The one exception: the opt-in lifetime-earnings leaderboard is an
+-- OrderedDataStore "Leaderboard_TotalEarned" (the Board* functions at the
+-- bottom). Nothing else may call DataStoreService; LeaderboardService
+-- decides when (budgets, opt-in) and these only do the pcall'd access.
+--
 -- In Studio without "Enable Studio Access to API Services", ProfileStore
 -- quietly uses an in-memory mock store, so data won't persist between tests.
 
+local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -154,6 +160,82 @@ function ProfileService.ReleaseProfile(player: Player)
 	if session ~= nil then
 		session:EndSession()
 	end
+end
+
+-- The leaderboard (OrderedDataStore, key = userId, value = lifetime cash
+-- earned). Every call is pcall'd and says whether it worked; callers
+-- (LeaderboardService) own the opt-in rule and the call budgets.
+local BOARD_NAME = if RunService:IsStudio() then "Leaderboard_TotalEarned_Studio" else "Leaderboard_TotalEarned"
+local boardStore: OrderedDataStore? = nil
+
+local function board(): OrderedDataStore?
+	if boardStore == nil then
+		local ok, found = pcall(function()
+			return DataStoreService:GetOrderedDataStore(BOARD_NAME)
+		end)
+		if ok then
+			boardStore = found
+		else
+			warn("[ProfileService] leaderboard store unavailable: " .. tostring(found))
+		end
+	end
+	return boardStore
+end
+
+-- Stores `score` (a whole number) for the user. True if it was saved.
+function ProfileService.BoardSet(userId: number, score: number): boolean
+	local ordered = board()
+	if ordered == nil then
+		return false
+	end
+	local ok, err = pcall(function()
+		ordered:SetAsync(tostring(userId), score)
+	end)
+	if not ok then
+		warn("[ProfileService] leaderboard write failed: " .. tostring(err))
+	end
+	return ok
+end
+
+-- Removes the user's entry (they opted out). True if it worked.
+function ProfileService.BoardRemove(userId: number): boolean
+	local ordered = board()
+	if ordered == nil then
+		return false
+	end
+	local ok, err = pcall(function()
+		ordered:RemoveAsync(tostring(userId))
+	end)
+	if not ok then
+		warn("[ProfileService] leaderboard remove failed: " .. tostring(err))
+	end
+	return ok
+end
+
+-- The top `count` entries, highest first, as { { userId, score } }, or nil
+-- if the read failed.
+function ProfileService.BoardTop(count: number): { { userId: number, score: number } }?
+	local ordered = board()
+	if ordered == nil then
+		return nil
+	end
+	local ok, result = pcall(function()
+		local pages = ordered:GetSortedAsync(false, count)
+		local out: { { userId: number, score: number } } = {}
+		for _, item in ipairs(pages:GetCurrentPage()) do
+			local userId = tonumber(item.key)
+			local score = item.value
+			if userId ~= nil and type(score) == "number" then
+				table.insert(out, { userId = userId, score = score })
+			end
+		end
+		return out
+	end)
+	if not ok then
+		warn("[ProfileService] leaderboard read failed: " .. tostring(result))
+		return nil
+	end
+	return result
 end
 
 return ProfileService

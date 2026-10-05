@@ -6,9 +6,10 @@
 
 local SettingsLogic = {}
 
--- The Settings card. "visitors" is the plot permission list. B on that
--- tab returns to "game"; B again closes the card.
-SettingsLogic.Tabs = { "game", "visitors" }
+-- The Settings card. "visitors" is the plot permission list and "board"
+-- the opt-in lifetime-earnings leaderboard. B on either tab returns to
+-- "game"; B again closes the card.
+SettingsLogic.Tabs = { "game", "visitors", "board" }
 
 function SettingsLogic.HasTab(name: string): boolean
 	return table.find(SettingsLogic.Tabs, name) ~= nil
@@ -26,9 +27,19 @@ export type Settings = {
 	cameraShake: boolean,
 	uiScale: UIScale,
 	showTips: boolean,
+	showOnBoard: boolean, -- opt-in: submit lifetime earnings to the leaderboard (off until the player says so)
 }
 
-export type Key = "music" | "sfx" | "musicVolume" | "sfxVolume" | "graphics" | "cameraShake" | "uiScale" | "showTips"
+export type Key =
+	"music"
+	| "sfx"
+	| "musicVolume"
+	| "sfxVolume"
+	| "graphics"
+	| "cameraShake"
+	| "uiScale"
+	| "showTips"
+	| "showOnBoard"
 
 SettingsLogic.Defaults = {
 	music = true,
@@ -39,7 +50,11 @@ SettingsLogic.Defaults = {
 	cameraShake = true,
 	uiScale = "normal" :: UIScale,
 	showTips = true,
+	showOnBoard = false,
 } :: Settings
+
+-- The attribute for showOnBoard on its own, for the Leaderboard tab.
+SettingsLogic.BoardAttribute = "SettingShowOnBoard"
 
 -- Player attributes the server mirrors so the client applies them on join.
 SettingsLogic.Attributes = {
@@ -51,6 +66,7 @@ SettingsLogic.Attributes = {
 	cameraShake = "SettingCameraShake",
 	uiScale = "SettingUIScale",
 	showTips = "SettingShowTips",
+	showOnBoard = SettingsLogic.BoardAttribute,
 } :: { [Key]: string }
 
 local GRAPHICS: { [string]: boolean } = { auto = true, low = true, medium = true, high = true }
@@ -85,12 +101,14 @@ function SettingsLogic.Sanitize(raw: any): Settings
 		cameraShake = if s.cameraShake == nil then d.cameraShake else s.cameraShake == true,
 		uiScale = ui :: UIScale,
 		showTips = if s.showTips == nil then d.showTips else s.showTips == true,
+		-- Only a real `true` opts in; a missing or odd value is off.
+		showOnBoard = s.showOnBoard == true,
 	}
 end
 
 -- Writes one key if `value` is legal for it. False leaves `settings` as it was.
 function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boolean
-	if key == "music" or key == "sfx" or key == "cameraShake" or key == "showTips" then
+	if key == "music" or key == "sfx" or key == "cameraShake" or key == "showTips" or key == "showOnBoard" then
 		if type(value) ~= "boolean" then
 			return false
 		end
@@ -100,8 +118,10 @@ function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boo
 			settings.sfx = value
 		elseif key == "cameraShake" then
 			settings.cameraShake = value
-		else
+		elseif key == "showTips" then
 			settings.showTips = value
+		else
+			settings.showOnBoard = value
 		end
 		return true
 	elseif key == "musicVolume" or key == "sfxVolume" then

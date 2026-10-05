@@ -60,6 +60,7 @@ return function(t)
 			SlotState = true,
 			PlotOffer = true,
 			BadgeSync = true,
+			BoardData = true,
 		}
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
