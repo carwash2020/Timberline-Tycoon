@@ -47,6 +47,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local BedGhost = require(ReplicatedStorage.Shared.BedGhost)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -514,6 +515,44 @@ local function unbindHold()
 end
 
 -- Ends the hold: the constraints go, and (`tell`) the server hears.
+---------------------------------------------------------------------------
+-- Truck beds while you hold a piece
+---------------------------------------------------------------------------
+
+-- The sides of nearby truck beds, as they were (collision, local see-through),
+-- put back when you let go. Your client only: the held piece is yours to
+-- simulate, so it passes through the sides here and nowhere else.
+local ghosted: { [BasePart]: boolean } = {}
+
+local function ghostBeds(on: boolean)
+	if not on then
+		for part, wasCollide in pairs(ghosted) do
+			if part.Parent then
+				part.CanCollide = wasCollide
+				part.LocalTransparencyModifier = 0
+			end
+		end
+		table.clear(ghosted)
+		return
+	end
+	local _char, hrp = character()
+	if not hrp then
+		return
+	end
+	for _, truck in ipairs(CollectionService:GetTagged("Truck")) do
+		local root = if truck:IsA("Model") then truck.PrimaryPart else nil
+		if root and BedGhost.Near((root.Position - hrp.Position).Magnitude) then
+			for _, d in ipairs(truck:GetDescendants()) do
+				if d:IsA("BasePart") and BedGhost.IsSide(d.Name) and ghosted[d] == nil then
+					ghosted[d] = d.CanCollide
+					d.CanCollide = false
+					d.LocalTransparencyModifier = BedGhost.Transparency
+				end
+			end
+		end
+	end
+end
+
 local function drop(tell: boolean)
 	local h = hold
 	if not h then
@@ -521,6 +560,7 @@ local function drop(tell: boolean)
 	end
 	hold = nil
 	distanceAxis = 0
+	ghostBeds(false)
 	unbindHold()
 	showButtons(false)
 	hidePrompts(false)
@@ -607,6 +647,7 @@ local function grab(device: Device, touch: InputObject?)
 	}
 	hold = h
 	distanceAxis = 0
+	ghostBeds(true)
 	Net.Remote("Grab"):FireServer(part, at)
 	h.conn = model:GetAttributeChangedSignal("HeldBy"):Connect(function()
 		if hold ~= h then
