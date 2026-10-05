@@ -14,7 +14,6 @@
 -- In Studio without "Enable Studio Access to API Services", ProfileStore
 -- quietly uses an in-memory mock store, so data won't persist between tests.
 
-local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -170,8 +169,9 @@ local boardStore: OrderedDataStore? = nil
 
 local function board(): OrderedDataStore?
 	if boardStore == nil then
+		-- Looked up here, not at load: nothing but the leaderboard needs it.
 		local ok, found = pcall(function()
-			return DataStoreService:GetOrderedDataStore(BOARD_NAME)
+			return game:GetService("DataStoreService"):GetOrderedDataStore(BOARD_NAME)
 		end)
 		if ok then
 			boardStore = found
