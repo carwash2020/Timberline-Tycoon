@@ -16,8 +16,11 @@
 --     thumbstick's corner). Move it to drag; lift it to drop. While holding,
 --     a row of buttons (- + Turn Tip) works with another finger.
 --   * Gamepad: hold R2 to grab what the centre dot points at; let go to
---     drop. D-pad up/down push and pull, D-pad left/right turn, LB/RB tip.
---     These are bound over HUD's D-pad shortcuts only while holding.
+--     drop. While holding: RB/LB (or D-pad up/down) push and pull, D-pad
+--     left/right turn, and hold L2 to hang the piece in the air and turn it
+--     with the right stick (left/right spins it, up/down tips it) without
+--     letting go of R2. These are bound over HUD's D-pad shortcuts only
+--     while holding.
 -- On a grab the client fires Grab(part, hitPos) and at once adds, on that
 -- part, an Attachment at the hit point, an AlignPosition pulling it
 -- (force GrabLogic.Force(mass), Responsiveness DragResponsiveness,
@@ -94,7 +97,9 @@ type Pending = { input: InputObject, at: number, pos: Vector2 }
 
 local hold: Hold? = nil
 local pending: Pending? = nil -- a finger resting on a piece, not yet holding it
-local distanceAxis = 0 -- +1 pushing out, -1 pulling in (D-pad, the +/- buttons)
+local distanceAxis = 0 -- +1 pushing out, -1 pulling in (D-pad, bumpers, the +/- buttons)
+local locked = false -- the gamepad's left trigger is down: the piece hangs where it is and the right stick turns it
+local stick = Vector2.zero -- the right stick, read while locked
 local tookKey: { [Enum.KeyCode]: boolean } = {} -- key presses whose Begin we used
 local lastHint = -math.huge
 local promptsWere: boolean? = nil -- ProximityPromptService.Enabled before the hold
@@ -475,6 +480,8 @@ end
 local onKey: (string, Enum.UserInputState, InputObject) -> Enum.ContextActionResult
 local onWheel: (string, Enum.UserInputState, InputObject) -> Enum.ContextActionResult
 local onPad: (string, Enum.UserInputState, InputObject) -> Enum.ContextActionResult
+local onLock: (string, Enum.UserInputState, InputObject) -> Enum.ContextActionResult
+local onStick: (string, Enum.UserInputState, InputObject) -> Enum.ContextActionResult
 local step: (number) -> ()
 
 local function bindHold()
@@ -505,6 +512,10 @@ local function bindHold()
 		Enum.KeyCode.ButtonL1,
 		Enum.KeyCode.ButtonR1
 	)
+	-- LT hangs the piece in the air; the right stick then turns it (and the
+	-- camera ignores that stick meanwhile). Not locked, the stick passes on.
+	ContextActionService:BindActionAtPriority("DragLock", onLock, false, HOLD_PRIORITY, Enum.KeyCode.ButtonL2)
+	ContextActionService:BindActionAtPriority("DragStick", onStick, false, HOLD_PRIORITY, Enum.KeyCode.Thumbstick2)
 	RunService:BindToRenderStep(RENDER_STEP, Enum.RenderPriority.Camera.Value + 1, step)
 end
 
@@ -512,8 +523,12 @@ local function unbindHold()
 	ContextActionService:UnbindAction("DragKeys")
 	ContextActionService:UnbindAction("DragWheel")
 	ContextActionService:UnbindAction("DragPad")
+	ContextActionService:UnbindAction("DragLock")
+	ContextActionService:UnbindAction("DragStick")
 	RunService:UnbindFromRenderStep(RENDER_STEP)
 	table.clear(tookKey)
+	locked = false
+	stick = Vector2.zero
 end
 
 -- Ends the hold: the constraints go, and (`tell`) the server hears.
@@ -690,7 +705,17 @@ step = function(dt: number)
 	if distanceAxis ~= 0 then
 		nudge(distanceAxis * GrabLogic.DistanceSpeed * dt)
 	end
-	local ray = rayFor(h.device, h.touch)
+	if locked then
+		-- Hanging in the air: the target stays where it was, the right stick turns it.
+		local camera = workspace.CurrentCamera
+		if camera then
+			local yaw, pitch = GrabLogic.StickTurn(stick.X, stick.Y, dt)
+			if yaw ~= 0 or pitch ~= 0 then
+				h.rot = GrabLogic.Rotate(h.rot, yaw, pitch, camera.CFrame.LookVector)
+			end
+		end
+	end
+	local ray = if locked then nil else rayFor(h.device, h.touch)
 	if ray then
 		local anchor = anchorOf(char, hrp)
 		local target = GrabLogic.Target(ray.Origin, ray.Direction, anchor, h.distance)
@@ -770,6 +795,27 @@ onPad = function(_name: string, state: Enum.UserInputState, input: InputObject):
 	elseif state ~= Enum.UserInputState.Change and axis and distanceAxis == axis then
 		distanceAxis = 0
 	end
+	return Enum.ContextActionResult.Sink
+end
+
+onLock = function(_name: string, state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
+	if not hold then
+		return Enum.ContextActionResult.Pass
+	end
+	if state == Enum.UserInputState.Begin then
+		locked = true
+	elseif state ~= Enum.UserInputState.Change then
+		locked = false
+		stick = Vector2.zero
+	end
+	return Enum.ContextActionResult.Sink
+end
+
+onStick = function(_name: string, _state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+	if not hold or not locked then
+		return Enum.ContextActionResult.Pass -- the camera's, as always
+	end
+	stick = Vector2.new(input.Position.X, input.Position.Y)
 	return Enum.ContextActionResult.Sink
 end
 

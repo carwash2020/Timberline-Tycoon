@@ -112,10 +112,10 @@ local GameConfig = {
 	BedFriction = 1.0,
 	BedAutoWeld = false, -- fallback if loads jitter on a moving bed
 	-- grab and drag
-	GrabRange = 16, -- studs from the character to start holding a piece
+	GrabRange = 26, -- studs from the character to start holding a piece
 	HoldMin = 3,
-	HoldMax = 18, -- studs: how far in front of the camera a held piece floats
-	ReleaseDistance = 24, -- a held piece further than this lets go
+	HoldMax = 30, -- studs: how far in front of the camera a held piece floats
+	ReleaseDistance = 40, -- a held piece further than this lets go
 	DragForcePerMass = 400,
 	DragForceCap = 4000,
 	DragResponsiveness = 30,

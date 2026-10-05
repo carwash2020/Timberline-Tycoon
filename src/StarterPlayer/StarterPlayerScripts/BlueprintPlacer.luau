@@ -20,6 +20,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local GrabLogic = require(ReplicatedStorage.Shared.GrabLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -38,7 +39,18 @@ local VALID = UITheme.Colors.Green
 local INVALID = Color3.fromRGB(255, 80, 80)
 
 local LEAVE_REACH = 40 -- studs past the plot's edge before placing stops (PlotService's BUILD_REACH)
-local ACTIONS = { "PlacerRotate", "PlacerPlace", "PlacerCancel", "PlacerUp", "PlacerDown" }
+local ACTIONS = {
+	"PlacerRotate",
+	"PlacerPlace",
+	"PlacerCancel",
+	"PlacerUp",
+	"PlacerDown",
+	"PlacerLock",
+	"PlacerStick",
+	"PlacerPush",
+}
+local PUSH_MIN, PUSH_MAX = -25, 40 -- studs the gamepad can slide the ghost nearer or further than the crosshair
+local PUSH_SPEED = 18 -- studs a second while RB or LB is held
 
 export type Options = {
 	moveUid: string?, -- moving this placed item instead of buying a new one
@@ -57,6 +69,13 @@ type State = {
 	valid: boolean,
 	reason: string?,
 	aim: Vector3?, -- the last tapped point in the world (touch)
+	push: number, -- gamepad: studs the ghost is slid along your view (D-pad up/down)
+	pushAxis: number, -- +1 sliding out, -1 in, 0 still
+	lockedAt: Vector3?, -- gamepad: LT is down, the ghost hangs here and the right stick turns and lifts it
+	stickX: number, -- the right stick's last reading, for flicks
+	stickY: number,
+	armedX: boolean,
+	armedY: boolean,
 	hidden: { BasePart }, -- the moved item's own parts, hidden while it moves
 	conns: { RBXScriptConnection },
 }
@@ -166,8 +185,20 @@ local function aimPoint(s: State): Vector3?
 			return s.aim
 		end
 	elseif last == Enum.UserInputType.Gamepad1 then
+		if s.lockedAt then
+			return s.lockedAt
+		end
 		local size = camera.ViewportSize
-		return onGround(camera:ViewportPointToRay(size.X / 2, size.Y / 2))
+		local point = onGround(camera:ViewportPointToRay(size.X / 2, size.Y / 2))
+		if point and s.push ~= 0 then
+			-- Slid along your view, flat: further or nearer than the crosshair.
+			local look = camera.CFrame.LookVector
+			local flat = Vector3.new(look.X, 0, look.Z)
+			if flat.Magnitude > 1e-3 then
+				point += flat.Unit * s.push
+			end
+		end
+		return point
 	else
 		if overBar then
 			return nil -- keep the ghost where it was aimed
@@ -244,6 +275,42 @@ function BlueprintPlacer.Lower()
 		s.y = math.max(0, PlotLogic.SnapY(s.y - PlotData.HeightStep))
 		update(s)
 	end
+end
+
+-- Gamepad: LT hangs the ghost where it is (so it stops following the
+-- crosshair), and the right stick then flicks it: left or right turns it a
+-- quarter, up raises it a step, down lowers it.
+function BlueprintPlacer.Lock(on: boolean)
+	local s = state
+	if not s then
+		return
+	end
+	if on then
+		local point = aimPoint(s)
+		s.lockedAt = point
+	else
+		s.lockedAt = nil
+		s.stickX, s.stickY, s.armedX, s.armedY = 0, 0, true, true
+	end
+end
+
+function BlueprintPlacer.Stick(x: number, y: number)
+	local s = state
+	if not s or not s.lockedAt then
+		return
+	end
+	local flickX, armX = GrabLogic.StickFlick(s.stickX, x, s.armedX)
+	local flickY, armY = GrabLogic.StickFlick(s.stickY, y, s.armedY)
+	s.stickX, s.stickY, s.armedX, s.armedY = x, y, armX, armY
+	if flickX ~= 0 then
+		s.rot = if flickX > 0 then BlueprintPlacer.NextRot(s.rot) else (s.rot + 3) % 4
+	end
+	if flickY > 0 then
+		BlueprintPlacer.Raise()
+	elseif flickY < 0 then
+		BlueprintPlacer.Lower()
+	end
+	update(s)
 end
 
 function BlueprintPlacer.Rotate()
@@ -376,6 +443,13 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		valid = false,
 		reason = nil,
 		aim = nil,
+		push = 0,
+		pushAxis = 0,
+		lockedAt = nil,
+		stickX = 0,
+		stickY = 0,
+		armedX = true,
+		armedY = true,
 		hidden = hidden,
 		conns = {},
 	}
@@ -416,6 +490,56 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		Enum.KeyCode.DPadRight
 	)
 	ContextActionService:BindAction("PlacerPlace", action(BlueprintPlacer.Place), false, Enum.KeyCode.ButtonR2)
+	-- LT hangs the ghost; the right stick flicks it round or up and down
+	-- (and the camera ignores that stick meanwhile). RB and LB slide it
+	-- further or nearer. All gamepad only: they bind to nothing else.
+	ContextActionService:BindActionAtPriority(
+		"PlacerLock",
+		function(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
+			if inputState == Enum.UserInputState.Begin then
+				BlueprintPlacer.Lock(true)
+			elseif inputState ~= Enum.UserInputState.Change then
+				BlueprintPlacer.Lock(false)
+			end
+			return Enum.ContextActionResult.Sink
+		end,
+		false,
+		BlueprintPlacer.RotatePriority(),
+		Enum.KeyCode.ButtonL2
+	)
+	ContextActionService:BindActionAtPriority(
+		"PlacerStick",
+		function(_name: string, _inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+			local current = state
+			if not current or not current.lockedAt then
+				return Enum.ContextActionResult.Pass -- the camera's
+			end
+			BlueprintPlacer.Stick(input.Position.X, input.Position.Y)
+			return Enum.ContextActionResult.Sink
+		end,
+		false,
+		BlueprintPlacer.RotatePriority(),
+		Enum.KeyCode.Thumbstick2
+	)
+	ContextActionService:BindActionAtPriority(
+		"PlacerPush",
+		function(_name: string, inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
+			local current = state
+			if current then
+				local axis = if input.KeyCode == Enum.KeyCode.ButtonR1 then 1 else -1
+				if inputState == Enum.UserInputState.Begin then
+					current.pushAxis = axis
+				elseif inputState ~= Enum.UserInputState.Change and current.pushAxis == axis then
+					current.pushAxis = 0
+				end
+			end
+			return Enum.ContextActionResult.Sink
+		end,
+		false,
+		BlueprintPlacer.RotatePriority(),
+		Enum.KeyCode.ButtonR1,
+		Enum.KeyCode.ButtonL1
+	)
 	ContextActionService:BindAction(
 		"PlacerCancel",
 		action(BlueprintPlacer.Stop),
@@ -423,20 +547,8 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		Enum.KeyCode.Q,
 		Enum.KeyCode.ButtonB
 	)
-	ContextActionService:BindAction(
-		"PlacerUp",
-		action(BlueprintPlacer.Raise),
-		false,
-		Enum.KeyCode.E,
-		Enum.KeyCode.ButtonR1
-	)
-	ContextActionService:BindAction(
-		"PlacerDown",
-		action(BlueprintPlacer.Lower),
-		false,
-		Enum.KeyCode.C,
-		Enum.KeyCode.ButtonL1
-	)
+	ContextActionService:BindAction("PlacerUp", action(BlueprintPlacer.Raise), false, Enum.KeyCode.E)
+	ContextActionService:BindAction("PlacerDown", action(BlueprintPlacer.Lower), false, Enum.KeyCode.C)
 	table.insert(
 		s.conns,
 		UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
@@ -462,8 +574,11 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	)
 	table.insert(
 		s.conns,
-		RunService.RenderStepped:Connect(function()
+		RunService.RenderStepped:Connect(function(dt: number)
 			if state == s then
+				if s.pushAxis ~= 0 then
+					s.push = math.clamp(s.push + s.pushAxis * PUSH_SPEED * dt, PUSH_MIN, PUSH_MAX)
+				end
 				update(s)
 			end
 		end)
