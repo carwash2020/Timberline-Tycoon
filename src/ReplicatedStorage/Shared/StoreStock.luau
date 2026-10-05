@@ -310,7 +310,7 @@ end
 -- shelves' centre line, a box's half height over the board's top).
 local LAYOUT = {
 	ToolShed = { left = -6.2, right = 6.2, y = 3.0, z0 = -5.6, dz = 1.7 },
-	HearthAndHome = { left = -12, right = 12, y = 3.75, z0 = -4, dz = 1.8 },
+	HearthAndHome = { left = -12, right = 12, y = 3.75, z0 = -9.2, dz = 1.8 },
 }
 
 function StoreStock.Placements(shop: string): { Placement }

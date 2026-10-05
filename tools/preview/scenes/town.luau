@@ -91,6 +91,8 @@ return {
 		for _, cf in ipairs(town.pathRounds) do
 			place(BuildingArt.PathRound(), cf)
 		end
+		-- The Robux store board and its arch (MapBuilder step 4).
+		place(ctx.shared("StoreBoard").Build(), ctx.shared("StoreBoard").CFrame)
 
 		return {
 			root = root,
@@ -138,6 +140,9 @@ return {
 				},
 				-- The open display lot, trucks facing the plot road.
 				{ pos = { 169, 34, 32 }, target = { 247, 2, 100 }, fov = 48, label = "dealership display lot" },
+				-- The Robux store board: from the spawn, and close.
+				{ pos = { 2, 6.5, 32 }, target = { -20.5, 7, 58.3 }, fov = 60, label = "store board from the spawn" },
+				{ pos = { -8, 5, 58.3 }, target = { -20.5, 5, 58.3 }, fov = 60, label = "store board close" },
 			},
 		}
 	end,

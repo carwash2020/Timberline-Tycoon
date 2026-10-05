@@ -289,7 +289,7 @@ return function(t)
 			},
 		})
 		local TownMarkers = client:load("StarterPlayer/StarterPlayerScripts/TownMarkers")
-		t.eq(#TownMarkers.Markers, 5)
+		t.eq(#TownMarkers.Markers, 6)
 		for _, marker in ipairs(TownMarkers.Markers) do
 			local at = s.map
 			for _, name in ipairs(marker.path) do

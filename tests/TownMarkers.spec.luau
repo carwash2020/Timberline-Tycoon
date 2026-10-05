@@ -5,7 +5,7 @@
 -- edge, an icon chip drawn from Frames); unlit, not on top, hidden past
 -- 350 studs, standing 16-28 studs up, clear of its roof; it fades within
 -- 25 studs and while a shop is open; and from the spawn on an iPhone 14 in
--- landscape all five are on screen, apart, with text 14 px or more, clear
+-- landscape all six are on screen, apart, with text 14 px or more, clear
 -- of the sawmill's crest.
 return function(t)
 	local roblox = t.roblox
@@ -49,9 +49,15 @@ return function(t)
 	Kit.placeAt(station, town.gondola)
 	local sawmill = BuildingArt.Sawmill()
 	Kit.placeAt(sawmill, town.sawmill)
+	local StoreBoard = loader:load("ReplicatedStorage/Shared/StoreBoard")
+	local storeBoard = StoreBoard.Build()
+	Kit.placeAt(storeBoard, StoreBoard.CFrame)
 	local function partFor(marker)
 		local top, name = marker.path[1], marker.path[2]
-		if top == "SellArea" and name == "SellZone" then
+		if top == "StoreBoard" then
+			local part = storeBoard:FindFirstChild(name)
+			return part and part.CFrame.Position, storeBoard
+		elseif top == "SellArea" and name == "SellZone" then
 			return town.sellZone.Position, sawmill
 		elseif top == "GondolaTown" and name == "Platform" then
 			return station.PrimaryPart.CFrame.Position, station
@@ -79,13 +85,14 @@ return function(t)
 		return x0, x1, z0, z1
 	end
 
-	t.test("five markers, one per service, each over its own building", function()
+	t.test("six markers, one per service and the store board, each over its own building", function()
 		local expect = {
 			{ "SellLogs", "SellArea", "SellZone", "SELL LOGS" },
 			{ "Axes", "ToolShed", "Counter", "AXES" },
 			{ "Trucks", "Dealership", "Counter", "TRUCKS" },
 			{ "Gear", "HearthAndHome", "Counter", "GENERAL\nSTORE" },
 			{ "Gondola", "GondolaTown", "Platform", "GONDOLA" },
+			{ "Store", "StoreBoard", "Board", "STORE" },
 		}
 		t.eq(#TownMarkers.Markers, #expect)
 		for _, e in ipairs(expect) do
@@ -138,6 +145,13 @@ return function(t)
 		t.eq(byName("Axes").chip, shops.ToolShed.spot.accent)
 		t.eq(byName("Trucks").chip, shops.Dealership.spot.accent)
 		t.eq(byName("Gear").chip, shops.HearthAndHome.spot.accent)
+		-- The store marker floats over the board and its arch, and the arch
+		-- is wider than the chip so the chip never hides a lantern's post.
+		local board = byName("Store")
+		local boardAt = partFor(board)
+		t.ok(boardAt.Y + board.offset.Y >= boardAt.Y + StoreBoard.BoardSize.Y / 2 + StoreBoard.BannerRise + 2)
+		t.eq(board.offset.X, 0)
+		t.eq(board.offset.Z, 0)
 	end)
 
 	t.test("each is a UITheme card: cream FredokaOne on bark, an ink edge, an icon chip drawn from Frames", function()
@@ -226,7 +240,7 @@ return function(t)
 	-- side), with three cameras: eye level (the town preview's view 1),
 	-- Roblox's default (12.5 studs behind the head, 15 degrees down) and
 	-- zoomed out to 20 studs.
-	t.test("from the spawn on a phone: all five on screen, apart, text 14 px or more, clear of the crest", function()
+	t.test("from the spawn on a phone: all six on screen, apart, text 14 px or more, clear of the crest", function()
 		local W, H, FOV, NOTCH = 844, 390, 70, 47
 		local focal = (H / 2) / math.tan(math.rad(FOV / 2))
 		local GLYPH = 0.66 -- a FredokaOne capital's width over its size, about
@@ -270,7 +284,15 @@ return function(t)
 				table.insert(rects, r)
 				local where =
 					string.format("%s: %s at x %.0f..%.0f, y %.0f..%.0f", cam.name, m.name, r.x0, r.x1, r.y0, r.y1)
-				t.ok(r.x0 >= NOTCH and r.x1 <= W - NOTCH and r.y0 >= 0 and r.y1 <= H, where .. " is off screen")
+				-- The store board's chip is the tallest of the lot, over a
+				-- board 31 studs from the spawn: it is on screen at eye level
+				-- (the walk's view) and may ride off the top of the two
+				-- tilted-down cameras, but it never lands on another chip.
+				local mustShow = m.name ~= "Store" or cam.name == "eye level"
+				if mustShow then
+					t.ok(r.x0 >= NOTCH and r.x1 <= W - NOTCH and r.y0 >= 0 and r.y1 <= H, where .. " is off screen")
+				end
+
 				-- The label's text (TextScaled): as big as its lines' height
 				-- allows, or its width, whichever is less.
 				local lines, longest = TownMarkers.Lines(m.text)

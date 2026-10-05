@@ -13,7 +13,7 @@ return function(t)
 
 	local MAX_BOXES = 5
 	local MAX_PRICE = 200 -- the dearest older decor (the Flag)
-	local SHELF_SLOTS = 14 -- seven a side on Hearth & Home's 14-stud shelf
+	local SHELF_SLOTS = 20 -- ten a side on Hearth & Home's 19.6-stud shelves
 
 	local function all()
 		local out = {}
@@ -84,22 +84,35 @@ return function(t)
 	t.test("unlock pieces are Hearth & Home boxes, and the shelf still has room", function()
 		local hearth = StoreStock.ForShop("HearthAndHome")
 		t.ok(#hearth <= SHELF_SLOTS, "Hearth & Home has " .. #hearth .. " boxes")
-		for _, id in ipairs({ "Table", "Chair", "SparkSwitch", "SparkLamp" }) do
+		for _, id in ipairs({
+			"Table",
+			"Chair",
+			"Bookshelf",
+			"Rug",
+			"Barrel",
+			"Crate",
+			"FirePit",
+			"SparkSwitch",
+			"SparkLamp",
+		}) do
 			local slot = StoreStock.FindInShop("HearthAndHome", id)
 			t.ok(slot ~= nil, id .. " is on the shelf")
 			t.eq(slot.itemKind, "Blueprint", id)
 		end
 		for _, id in ipairs({ "Bookshelf", "Rug", "Barrel", "Crate", "FirePit" }) do
-			t.eq(StoreStock.FindInShop("HearthAndHome", id), nil, id .. " is paid for when placed")
+			t.eq(StoreStock.UnitPrice("Blueprint", id, false, 2), PlotData.Blueprint(id).priceCash, id)
 		end
+		t.eq(StoreStock.UnitPrice("Blueprint", "Bookshelf", false, 2), 140)
+		t.eq(StoreStock.UnitPrice("Blueprint", "FirePit", false, 2), 110)
 		t.eq(StoreStock.UnitPrice("Blueprint", "Table", false, 2), 90)
 		t.eq(StoreStock.UnitPrice("Blueprint", "SparkLamp", false, 2), 150)
 		t.ok(StoreStock.BoxCount() <= GameConfig.StorePartBudget)
 	end)
 
-	t.test("selling an unlock piece refunds nothing, a plain one half", function()
+	t.test("selling an unlock piece refunds nothing, a kit piece half", function()
 		t.eq(PlotLogic.SellPlan(PlotData.Blueprint("Table"), { uid = "a" }).cash, 0)
-		t.eq(PlotLogic.SellPlan(PlotData.Blueprint("Bookshelf"), { uid = "a" }).cash, 70)
+		t.eq(PlotLogic.SellPlan(PlotData.Blueprint("Bookshelf"), { uid = "a" }).cash, 0)
+		t.eq(PlotLogic.SellPlan(PlotData.Blueprint("Wall"), { uid = "a" }).cash > 0, true, "kit pieces still pay half")
 	end)
 
 	t.test("the models build with one part per box and a light only where authored", function()
