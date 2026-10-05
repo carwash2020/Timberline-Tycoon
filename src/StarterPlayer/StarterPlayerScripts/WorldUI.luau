@@ -165,10 +165,10 @@ local function buildClock()
 		-- (nil while the save loads: hidden on a phone until it's in)
 		local spot = HudLayout.ClockLine(UITheme.IsPhone(), player:GetAttribute("TutorialStep"))
 		local under = HUD.UnderCash()
-		local target = if spot == "under" and under then under else line
+		local target = under or line -- always the line under the audio and cash
 		if label.Parent ~= target then
 			label.Parent = target
-			label.LayoutOrder = if target == line then 20 else 1 -- left of the pouch and Daily Goals
+			label.LayoutOrder = 1 -- left of the Store button, the pouch and Daily Goals
 		end
 		label.Visible = spot ~= "none"
 	end

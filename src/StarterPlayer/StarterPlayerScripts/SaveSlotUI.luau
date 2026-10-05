@@ -233,7 +233,7 @@ function SaveSlotUI.Start()
 		name = "Saves",
 		text = "SAVES",
 		style = "bark",
-		order = 8,
+		order = 0,
 		onPress = function()
 			local p = panel
 			setOpen(not (p ~= nil and p.Visible))

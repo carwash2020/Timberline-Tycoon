@@ -59,6 +59,7 @@ local MODULES = {
 	"SettingsUI",
 	"ShopUI",
 	"StoreUI",
+	"SprintController",
 	"SwingPose",
 	"TownFX",
 	"TownMarkers",
@@ -381,6 +382,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "SettingsUI",
 		get = function()
 			return require(script.Parent.SettingsUI)
+		end,
+	},
+	{
+		name = "SprintController",
+		get = function()
+			return require(script.Parent.SprintController)
 		end,
 	},
 	{

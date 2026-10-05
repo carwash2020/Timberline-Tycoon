@@ -38,6 +38,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local TownMeshes = require(ReplicatedStorage.Shared.Art.TownMeshes)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
@@ -72,10 +73,17 @@ local function traceback(err: any): string
 	return debug.traceback(tostring(err), 2)
 end
 local function step(name: string, build: () -> ())
+	-- A line when a step starts and when it ends, so a stalled world build
+	-- shows which step it is in (the tree planning is silent for a while).
+	print(string.format("[MapBuilder] %s ...", name))
+	local startedAt = os.clock()
 	local ok, err = xpcall(function(): any
 		build()
 		return nil
 	end, traceback)
+	if ok then
+		print(string.format("[MapBuilder] %s done in %.1fs", name, os.clock() - startedAt))
+	end
 	if not ok then
 		failedSteps += 1
 		warn(string.format("[MapBuilder] %s failed, the rest of the world still builds:\n%s", name, tostring(err)))
@@ -102,6 +110,8 @@ Players.CharacterAutoLoads = false
 
 -- 3. Terrain.
 local terrainSeconds = 0
+TownMeshes.Enabled = GameConfig.TownMeshes
+
 step("3. Terrain", function()
 	terrainSeconds = TerrainBuilder.Build(function(done: number, total: number)
 		if done % 24 == 0 or done == total then
@@ -115,6 +125,26 @@ end)
 local function place(model: Model, cf: CFrame, parent: Instance?): Model
 	Kit.placeAt(model, cf)
 	model.Parent = parent or map
+	return model
+end
+
+-- A building never stands under the ground: if the terrain is drawn above
+-- the town's y = 0 anywhere under its footprint (a 3 x 3 grid of rays), the
+-- whole building goes up by that much. Nothing moves when the ground is
+-- where it was written.
+local function standOnGround(model: Model): Model
+	local cf, size = model:GetBoundingBox()
+	local lift = 0
+	for _, fx in ipairs({ -0.45, 0, 0.45 }) do
+		for _, fz in ipairs({ -0.45, 0, 0.45 }) do
+			local at = cf:PointToWorldSpace(Vector3.new(size.X * fx, 0, size.Z * fz))
+			lift = math.max(lift, TerrainBuilder.LiftOnto(at.X, 0, at.Z, 12))
+		end
+	end
+	if lift > 0.15 then
+		print(string.format("[MapBuilder] %s was %.2f studs under the ground: lifted", model.Name, lift))
+		model:PivotTo(model:GetPivot() + Vector3.new(0, lift, 0))
+	end
 	return model
 end
 
@@ -204,7 +234,7 @@ step("4. The town", function()
 		-- (Lookout towers, further out and numerous, use a StreamingMesh
 		-- instead — see the scenery step. The lighthouse is Persistent too.
 		-- Hearth & Home, the town hall, is Persistent with the other shops.)
-		local sawmill = place(persistent(BuildingArt.Sawmill()), town.sawmill)
+		local sawmill = standOnGround(place(persistent(BuildingArt.Sawmill()), town.sawmill))
 		local blade = sawmill:FindFirstChild("SawBlade", true)
 		if blade then
 			CollectionService:AddTag(blade, "SawBlade") -- TownFX spins it
@@ -252,7 +282,7 @@ step("4. The town", function()
 			point.Position = Vector3.new(0, 0, -(counter.Size.Z / 2 + 0.5)) -- the customer's side
 			point.Parent = counter
 			shop.PrimaryPart = counter
-			place(shop, spot.cframe)
+			standOnGround(place(shop, spot.cframe))
 		end
 	end)
 

@@ -86,6 +86,10 @@ local GameConfig = {
 	-- workspace attribute CoreLoop overrides it (Shared/CoreLoop); live
 	-- servers never.
 	CoreLoop = 2,
+	-- The uploaded town meshes (TownMeshes.Dress). Off: the town is the
+	-- part-built art (signs, roofs and floors as designed). Turn on once a
+	-- Studio check shows the meshes sit right (MORNING_HANDOFF.md).
+	TownMeshes = false,
 	WoodUnit = 1.6, -- studs in one timber unit "u"; prices are $/u³, hardness per u² of cut
 	StartingCash = 20, -- v2: a new player's cash
 	-- cutting

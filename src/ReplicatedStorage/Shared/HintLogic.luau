@@ -335,7 +335,15 @@ HintLogic.GrabsToLearn = 2
 
 local QUIET_AFTER_GRABS: { [string]: boolean } = { drag = true, holding = true, unequip = true }
 
-function HintLogic.Quiet(context: string, grabs: number): boolean
+-- The idle "drag" line is not needed all the time: it shows for its first
+-- IdleHintSeconds in a session (`shownFor` is how long it has been up) and
+-- then goes quiet.
+HintLogic.IdleHintSeconds = 12
+
+function HintLogic.Quiet(context: string, grabs: number, shownFor: number?): boolean
+	if context == "drag" and shownFor ~= nil and shownFor >= HintLogic.IdleHintSeconds then
+		return true
+	end
 	return QUIET_AFTER_GRABS[context] == true and grabs >= HintLogic.GrabsToLearn
 end
 
