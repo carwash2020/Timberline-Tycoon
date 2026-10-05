@@ -486,6 +486,7 @@ return function(t)
 			end
 		end
 		return {
+			controller = controller,
 			fires = fires,
 			rays = rays,
 			section = section,
@@ -696,6 +697,17 @@ return function(t)
 		w.press(Enum.UserInputType.Gamepad1, Enum.KeyCode.ButtonR2, true)
 		w.land()
 		t.eq(#named(w.fires, "Swing"), 0)
+	end)
+
+	t.test("a gamepad prefers the section ahead of the camera over a nearer one behind", function()
+		local Vector3 = roblox.Vector3
+		local controller = swingWorld().controller
+		local look = Vector3.new(0, 0, -1)
+		local ahead = controller.NearScore(Vector3.new(0, 0, -6), look)
+		local behind = controller.NearScore(Vector3.new(0, 0, 4), look)
+		t.ok(ahead < behind, "6 studs ahead beats 4 studs behind")
+		t.eq(controller.NearScore(Vector3.new(0, 0, 4), nil), 4, "no camera: plain distance")
+		t.ok(controller.NearScore(Vector3.new(0, 0, -20), look) > behind, "reach still decides when far")
 	end)
 
 	t.test("holding chops once per cooldown; a mash inside it does not", function()
