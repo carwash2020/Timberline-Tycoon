@@ -109,7 +109,8 @@ local function update(player: Player)
 	local rules = BiomeData.Rules(biome, gear)
 	local speed = SprintLogic.Speed(
 		StarterPlayer.CharacterWalkSpeed * rules.speedFactor,
-		player:GetAttribute("Sprinting") == true
+		player:GetAttribute("Sprinting") == true,
+		player:GetAttribute("SuperRun") == true
 	)
 	if math.abs(humanoid.WalkSpeed - speed) > 0.01 then
 		humanoid.WalkSpeed = speed

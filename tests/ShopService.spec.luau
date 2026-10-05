@@ -445,6 +445,28 @@ return function(t)
 		t.eq(#s.equipped, 1)
 	end)
 
+	t.test("the owner's free gift grants the item with no charge, even a rung the player has not reached", function()
+		local s = setup({ cash = 0, loop = 2, bestTier = 1 })
+		local ok = s.ShopService.ChargeAndGrant(s.player, {
+			uid = "admin-1",
+			kind = "Axe",
+			itemId = "SilverAxe",
+			free = true,
+		})
+		t.eq(ok, true)
+		t.eq(s.profile.cash, 0)
+		t.eq(s.granted, { "SilverAxe" })
+		-- Without `free` the same box is refused: the flag is the only way round the price.
+		local paid = setup({ cash = 0, loop = 2, bestTier = 1 })
+		local refused = paid.ShopService.ChargeAndGrant(paid.player, {
+			uid = "box-1",
+			kind = "Axe",
+			itemId = "SilverAxe",
+		})
+		t.eq(refused, false)
+		t.eq(paid.granted, {})
+	end)
+
 	t.test("a boxed axe with too little cash is refused and not charged", function()
 		local s = setup({ cash = 100, loop = 2, bestTier = 1 })
 		local ok, line = s.ShopService.ChargeAndGrant(s.player, {
