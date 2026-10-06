@@ -54,6 +54,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	FerryBoard = 1, -- board the ferry
 	Blast = 1, -- set a blasting charge (BlastService's prompt; not a remote)
 	SlotAction = 2, -- load or reset a save slot (the confirm is a second call)
+	PlotSalesman = 2, -- Old Hank's Talk prompt (PlotService; a prompt, not a remote)
 	HermitTalk = 2, -- the Hermit's Talk prompt (HermitService; a prompt, not a remote)
 	SecretPress = 2, -- a carving or the cave box prompt (HermitService)
 	BoardRequest = 2, -- the Leaderboard tab; the service also answers one per player per 10 s

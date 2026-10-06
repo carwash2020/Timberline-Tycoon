@@ -82,7 +82,7 @@ BadgeData.MinTapPx = 44
 -- Menu binds. Not ButtonX and not keyboard E (those are world prompts).
 -- Close on a gamepad is ButtonB, which HUD.Popup already binds.
 BadgeData.OpenKeyboard = Enum.KeyCode.B
-BadgeData.OpenGamepad = Enum.KeyCode.ButtonL3
+BadgeData.OpenGamepad = Enum.KeyCode.ButtonSelect -- not L3: the left stick click is used for running
 BadgeData.CloseKeyboard = Enum.KeyCode.Escape
 
 local ALL: { BadgeDef } = {

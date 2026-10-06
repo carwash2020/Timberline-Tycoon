@@ -99,6 +99,9 @@ return function(t)
 							error("a bad seed")
 						end
 						s.sectionSpawned = (s.sectionSpawned or 0) + 1
+						if type(opts) == "table" and opts.seed ~= nil then
+							s.tutorialBeforeSellArea = (s.tutorialBeforeSellArea ~= false) and not sellAreaIn()
+						end
 						s.sectionWoods = s.sectionWoods or {}
 						s.sectionWoods[woodId] = (s.sectionWoods[woodId] or 0) + 1
 						-- The tutorial oaks carry a fixed seed and stay mature. A
@@ -107,7 +110,15 @@ return function(t)
 						if not tutorial then
 							s.sectionBoot = (s.sectionBoot ~= false) and opts ~= nil and opts.boot == true
 							s.groupsFirst = (s.groupsFirst ~= false) and s.groups == true
-							s.treeBeforeSellArea = (s.treeBeforeSellArea ~= false) and not sellAreaIn()
+							-- The isles' lumenwood goes in with the sky; every other
+							-- site is planted once SellArea is in (LOAD-01).
+							if woodId == "lumenwood" then
+								s.skyBeforeSellArea = (s.skyBeforeSellArea ~= false) and not sellAreaIn()
+							else
+								s.forestAfterSellArea = (s.forestAfterSellArea ~= false) and sellAreaIn()
+								s.forestOrder = s.forestOrder or {}
+								table.insert(s.forestOrder, _cf.Position)
+							end
 						end
 					end,
 					RegisterGroups = function()
@@ -120,6 +131,10 @@ return function(t)
 					Start = function()
 						s.clockStarted = true
 						s.clockBeforeSellArea = not sellAreaIn()
+					end,
+					Refresh = function()
+						s.clockRefreshed = (s.clockRefreshed or 0) + 1
+						s.refreshedAfterForest = s.sectionSpawned
 					end,
 				},
 			},
@@ -139,6 +154,9 @@ return function(t)
 				task = {
 					spawn = function(fn, ...)
 						fn(...)
+					end,
+					wait = function()
+						s.yields = (s.yields or 0) + 1
 					end,
 				},
 				print = function(...)
@@ -213,7 +231,8 @@ return function(t)
 		end
 		t.ok(s.clockStarted, "the clock started")
 		t.ok(s.clockBeforeSellArea, "the clock (the last build step) starts before SellArea goes in")
-		t.ok(s.treeBeforeSellArea, "every tree spawns before SellArea goes in")
+		t.ok(s.tutorialBeforeSellArea, "the tutorial oaks spawn before SellArea goes in")
+		t.ok(s.forestAfterSellArea, "the forest follows SellArea (LOAD-01)")
 		t.ok(s.baseplate.Parent == nil and s.templateSpawn.Parent == nil, "the template's Baseplate and spawn go")
 		t.ok(s.map:FindFirstChild("SpawnLocation"), "our spawn is built")
 		-- TWN-03: the pad is turned to WorldPlan's spawnFacing (toward the
@@ -405,7 +424,20 @@ return function(t)
 		t.eq(s.workspace:GetAttribute("CoreLoopActive"), 2)
 		t.ok(s.groupsFirst, "the collision groups are registered before the first tree")
 		t.ok(s.sectionBoot, "every site planted at a boot age")
-		t.ok(s.treeBeforeSellArea, "every tree before SellArea goes in")
+		t.ok(s.tutorialBeforeSellArea, "the tutorial oaks stand before SellArea goes in")
+		t.ok(s.skyBeforeSellArea, "the isles' lumenwood stands before SellArea goes in")
+		t.ok(s.forestAfterSellArea, "the forest is planted after SellArea (LOAD-01), so players need not wait for it")
+		t.eq(s.clockRefreshed, 1, "the night-only woods are re-checked once the forest is in")
+		t.ok(s.refreshedAfterForest == s.sectionSpawned, "...after the last tree")
+		-- Nearest the sawmill first: the forest comes in as a spiral out, not in plan order.
+		local hub = t.shared("World/WorldLayout").Sawmill
+		local last, ordered = -1, true
+		for _, p in ipairs(s.forestOrder) do
+			local d = (p.X - hub.X) ^ 2 + (p.Z - hub.Z) ^ 2
+			ordered = ordered and d >= last
+			last = d
+		end
+		t.ok(ordered, "world trees are planted nearest the sawmill first")
 		t.eq(s.sectionWoods.lumenwood >= #sky.lumenwood, true)
 	end)
 

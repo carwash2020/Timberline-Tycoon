@@ -273,6 +273,20 @@ return function(t)
 		t.eq(clue:GetAttribute("Section"), 2, "on the second trunk section (it falls with the trunk)")
 	end)
 
+	t.test(
+		"a tree planted after UseV2 gets its figure through OnPlanted (the forest follows the server, LOAD-01)",
+		function()
+			local s = setup()
+			s.start()
+			t.ok(s.Trees.OnPlanted, "the hook is set")
+			local rec = s.tree("oak", { seed = 5 })
+			s.rolls = { 0.01, 0.95, 0.9 } -- figured: a burl
+			s.Trees.OnPlanted(rec)
+			local clue = rec.model:FindFirstChild("BarkClue")
+			t.ok(clue ~= nil, "the late tree shows its clue")
+		end
+	)
+
 	t.test("every piece freed from a figured tree carries the figure; while struck it's Stormgrain", function()
 		local s = setup()
 		local rec = s.tree("maple")

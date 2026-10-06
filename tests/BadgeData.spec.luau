@@ -131,7 +131,7 @@ return function(t)
 			{ action = "CloseBadges", keyboard = BadgeData.CloseKeyboard, gamepad = Enum.KeyCode.ButtonB },
 		}))
 		t.eq(BadgeData.OpenKeyboard, Enum.KeyCode.B)
-		t.eq(BadgeData.OpenGamepad, Enum.KeyCode.ButtonL3)
+		t.eq(BadgeData.OpenGamepad, Enum.KeyCode.ButtonSelect)
 		t.eq(BadgeData.CloseKeyboard, Enum.KeyCode.Escape)
 	end)
 end

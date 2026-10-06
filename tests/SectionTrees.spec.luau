@@ -1009,6 +1009,22 @@ return function(t)
 		t.eq(other.freed[1].model:GetAttribute("LuxCut"), nil)
 	end)
 
+	t.test(
+		"a boot site tells OnPlanted (the forest is planted after the server is up, LOAD-01); other trees don't",
+		function()
+			local s = setup()
+			local planted = {}
+			s.Trees.OnPlanted = function(rec)
+				table.insert(planted, rec.uid)
+			end
+			local a = s.Trees.SpawnTree("oak", CFrame.new(Vector3.new(120, 0, 40)), { boot = true })
+			t.eq(#planted, 1)
+			t.eq(planted[1], a:GetAttribute("Uid"))
+			s.Trees.SpawnTree("oak", CFrame.new(Vector3.new(160, 0, 40)), {}) -- a regrow or tutorial tree
+			t.eq(#planted, 1, "only boot sites")
+		end
+	)
+
 	t.test("a boot site stands as GrowLogic.BootTree says (the preview's v2 world draws the same forest)", function()
 		local s = setup()
 		local young, n = 0, 0
