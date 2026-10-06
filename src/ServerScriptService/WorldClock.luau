@@ -52,6 +52,20 @@ local function setNight(isNight: boolean)
 	end
 end
 
+-- Trees planted after the clock's first tick (the forest, LOAD-01) missed
+-- the day/night change: apply the current state to the night-only woods
+-- again. A no-op before Start.
+function WorldClock.Refresh()
+	if night == nil then
+		return
+	end
+	for _, biome in ipairs(BiomeData.All()) do
+		if biome.nightOnly and biome.area then
+			setDormant(biome.id, not night)
+		end
+	end
+end
+
 function WorldClock.IsNight(): boolean
 	return night == true
 end

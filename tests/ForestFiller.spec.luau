@@ -13,14 +13,15 @@ return function(t)
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
 	local QualityBudgets = t.shared("QualityBudgets")
 
-	local function world(tier)
-		local w = { clock = 0, heartbeat = {}, tier = tier or "high", builtPerFrame = 0 }
+	local function world(tier, player)
+		local w = { clock = 0, heartbeat = {}, tier = tier or "high", builtPerFrame = 0, player = player }
 		w.workspace = Instance.new("Workspace")
 		w.camera = Instance.new("Camera")
 		w.camera.Parent = w.workspace
 		w.workspace.CurrentCamera = w.camera
 		local loader = t.loader({
 			services = {
+				Players = { LocalPlayer = w.player },
 				RunService = {
 					Heartbeat = {
 						Connect = function(_, fn)
@@ -42,7 +43,11 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
-					wait = function() end,
+					wait = function()
+						if w.onWait then
+							w.onWait()
+						end
+					end,
 				},
 				print = function() end,
 				os = {
@@ -192,6 +197,31 @@ return function(t)
 			t.ok(tufts > 0, tier .. ": " .. tufts .. " tuft parts round you")
 			t.eq(#bad, 0, "parts that aren't decoration: " .. table.concat(bad, ", "))
 		end
+	end)
+
+	t.test("the plan waits for the player to be in the game, so it never delays the load (LOAD-01)", function()
+		local ready, waits = false, 0
+		local player = {
+			Character = {},
+			GetAttribute = function(_, name)
+				return if name == "ProfileLoaded" then ready else nil
+			end,
+		}
+		local w = world("low", player)
+		w.onWait = function()
+			waits += 1
+			if waits == 20 then
+				t.eq(w.folder(), nil, "nothing built while the save is loading")
+				ready = true
+			end
+		end
+		w.look(Vector3.new(800, 8, -600))
+		w.ForestFiller.Start()
+		t.ok(waits >= 20, "it waited")
+		w.onWait = nil
+		w.settle(4000)
+		local near = count(w.folder())
+		t.ok(near > 0, "and then built the forest")
 	end)
 
 	t.test("it spreads the work over frames, nearest cells first", function()

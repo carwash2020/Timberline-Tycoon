@@ -1535,3 +1535,26 @@ What changed:
       the Rustbucket step follows; tapping Buy fast charges once
 - [ ] A returning save (already has a plot) still gets its picker at join,
       free, and "Give me any open plot" works
+
+## Load time (LOAD-01): the world no longer waits for its forest
+
+What changed: the forest (about 1,400 trees: the planning, then a skeleton and
+about 43 Instances each) is planted after the sell area goes in, nearest the
+sawmill first, about 20 ms of work a frame, so GameServer starts and your save
+loads while it grows in. The tutorial grove, the isles' Lumenwood, the town and
+the terrain are still done first. The client's filler-forest plan (one step of
+a second or more that froze the client) now waits until you are in the game.
+The terrain yields by time, not one frame per chunk. Every phase prints a
+`[Load]` line.
+
+### Studio checks
+- [ ] Cold Play: the branded loading card fades into the town noticeably sooner
+      than before; you can move and chop at the tutorial oaks at once
+- [ ] The forest fills in round you in the first ten or so seconds (trees near
+      the sawmill first, far biomes last). Walk to Gloam Hollow (by day: no
+      trees, at night: trees); Output shows `[Load] forest planted: N trees`
+- [ ] A tree chopped early still falls and drops wood; figured bark clues
+      (burl, etc.) still appear on late-planted trees; Murph's steps unchanged
+- [ ] No red/orange Output. `[MapBuilder] build check:` line still there
+- [ ] Copy every `[Load]` line from the server Output (and the client's) and
+      send them: the numbers say where the time goes now

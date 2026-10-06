@@ -171,7 +171,7 @@ return function(t)
 					end,
 				},
 				NodeService = { Spawn = function() end },
-				WorldClock = { Start = function() end },
+				WorldClock = { Start = function() end, Refresh = function() end },
 			},
 			services = {
 				Players = Players,
@@ -190,6 +190,7 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
+					wait = function() end,
 				},
 			},
 		})
