@@ -261,7 +261,7 @@ return function(t)
 			"Enum.KeyCode.DPadRight",
 			"Enum.KeyCode.ButtonR2",
 			"Enum.KeyCode.ButtonL2",
-			"Enum.KeyCode.Thumbstick2",
+			"Enum.KeyCode.Thumbstick1", -- LT + the LEFT stick flicks the ghost; the right stick is the camera's
 			"Enum.KeyCode.ButtonR1",
 			"Enum.KeyCode.ButtonL1",
 			"PlotLogic.Check(",

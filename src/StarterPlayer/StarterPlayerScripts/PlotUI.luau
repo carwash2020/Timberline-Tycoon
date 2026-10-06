@@ -21,7 +21,6 @@
 -- Everything only sends intents; the server checks and answers with toasts.
 
 local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,7 +37,9 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local DragController = require(script.Parent.DragController)
 local HammerController = require(script.Parent.HammerController)
+local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
+local HudNav = require(script.Parent.HudNav)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
 local WireTool = require(script.Parent.WireTool)
@@ -411,9 +412,9 @@ local function rebuildLand()
 	if landOpen and UITheme.Device() == "console" then
 		local grow = landGrow
 		if firstBuy then
-			GuiService.SelectedObject = firstBuy
+			GamepadNav.Focus(firstBuy, landPanel)
 		elseif grow and grow.root.Visible then
-			GuiService.SelectedObject = grow.face
+			GamepadNav.Focus(grow.face, landPanel)
 		end
 	end
 end
@@ -447,10 +448,7 @@ local function setLand(on: boolean)
 		)
 	else
 		ContextActionService:UnbindAction(LAND_ACTION)
-		local selected = GuiService.SelectedObject
-		if selected and selected:IsDescendantOf(panel) then
-			GuiService.SelectedObject = nil
-		end
+		GamepadNav.Restore(panel) -- back to the button that opened it, or to walking
 	end
 end
 
@@ -605,6 +603,7 @@ function PlotUI.Start()
 	blueprints.root.LayoutOrder = 1
 	blueprints.root.Parent = bar.row
 	blueprints.face.Activated:Connect(openPlans)
+	HudNav.Add(blueprints.face, { id = "plans", label = "PLANS", press = openPlans })
 	local land = UITheme.Button({
 		text = "LAND",
 		size = Vector2.new(96, PlotLogic.LandTap),
@@ -616,6 +615,13 @@ function PlotUI.Start()
 	land.face.Activated:Connect(function()
 		setLand(not landOpen)
 	end)
+	HudNav.Add(land.face, {
+		id = "land",
+		label = "LAND",
+		press = function()
+			setLand(not landOpen)
+		end,
+	})
 	local wire = UITheme.Button({
 		text = "WIRE",
 		size = Vector2.new(96, PlotLogic.LandTap),

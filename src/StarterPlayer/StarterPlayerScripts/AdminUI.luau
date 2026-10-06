@@ -1066,7 +1066,7 @@ local function setOpen(on: boolean)
 		return Enum.ContextActionResult.Sink
 	end, false, priority, Enum.KeyCode.ButtonR1)
 	if UITheme.Device() == "console" then
-		MenuPad.Open(objById[headerRows[2][1] or "close"])
+		MenuPad.Open(objById[headerRows[2][1] or "close"], p)
 	end
 end
 

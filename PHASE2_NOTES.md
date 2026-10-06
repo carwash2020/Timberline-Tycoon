@@ -1578,8 +1578,8 @@ What changed:
       A picks, B closes; the Showing row cycles All / Buildings / Decor /
       Machines and keeps the selection on itself
 - [ ] Pick the Wall: the green/red ghost follows your aim. R (D-pad right,
-      ROTATE) turns it; LT locks it and the right stick flicks it round and
-      up/down; RB/LB slide it; it is red with a reason over another piece,
+      ROTATE) turns it; LT locks it and the LEFT stick flicks it round and
+      up/down (the right stick stays the camera); RB/LB slide it; it is red with a reason over another piece,
       off your bought squares, or past the pad grid
 - [ ] Place (click, RT, PLACE): the hammer swings back and strikes; at the hit
       a knock and a puff of dust at the piece; the fee comes out once; the
@@ -2058,6 +2058,82 @@ Delegation checks (owner hub; use two test players, the second one is the delega
 - [ ] Chat: `/delegate Bob helper 1h`, `/delegates`, `/undelegate Bob`; `/delegate Bob tester 1h` only warns until you add `confirm`.
 
 
+## Xbox navigation and rotation (6 October 2026, branch `claude/xbox-nav`)
+
+Connor: "it's really hard to get to boxes like SAVES, STORE" with the Xbox
+menu navigation, and "when rotating things it should be the left stick (the
+movement stick) that rotates, not the right stick".
+
+- **Quick menu (View button).** One always-available gamepad button opens a
+  panel with a big tile for every HUD destination in a grid: SAVES, STORE,
+  BADGES, DAILY GOALS, FIELD GUIDE, SETTINGS, PLANS and LAND (hammer out),
+  HAMMER, SKIP TUTORIAL (while it runs), SEND TRUCK HOME, DROP AXE, SELL HERE,
+  OWNER (owner only) and HUD BUTTONS. The stick or D-pad moves one tile at a
+  time and wraps, A opens it, B (or View again) closes. A tile closes the menu,
+  does what its HUD button does, and the panel it opens hands the selection
+  back to that HUD button when it closes. View was Badges' button; Badges is a
+  tile now (`BadgeData.OpenGamepad` is gone, InputKit lists `QuickMenu` on
+  ButtonSelect). A MENU button with the View glyph shows in the side column on
+  a gamepad. Tiles are whatever HUD buttons register (`HudNav.Add`), so a new
+  HUD button joins by registering. Rules: `Shared/QuickMenuLogic`,
+  `Shared/GamepadNavLogic`; UI: `QuickMenuUI`.
+- **HUD buttons wired for the stick (`HudNav`).** Every persistent HUD button
+  registers; whenever the selection lands on one, the visible ones are linked
+  with NextSelectionUp/Down/Left/Right by where they are on screen now
+  (nearest neighbour inside a cone, wrapping round the edges), and the HUD
+  BUTTONS tile (or `HudNav.Focus`) starts on the first one in reading order.
+  B on a HUD button lets go (walking again). Side buttons are 160 x 48 on a
+  gamepad; the selection ring is a 4 px ink and 4 px amber ring with a soft
+  glow. Roblox's own hotbar is core UI and is not part of this chain.
+- **Panels share one helper (`GamepadNav.Focus / Trap / Restore`, behind
+  `MenuPad` and `HUD.Popup`).** Opening selects the first control, traps the
+  stick in the panel (SelectionGroup, Stop on every side) and remembers the HUD
+  button that opened it; closing goes back to it (or lets go when none). Used by
+  Store, Saves, Field Guide / Plans (ShopUI), Daily, Settings, Badges, Land,
+  the shopkeeper card and the owner menu.
+- **Rotation.** While LT is held, the LEFT stick turns a held piece (left/right
+  spins it, up/down tips it) or flicks the build ghost (left/right a quarter,
+  up/down raise and lower); the right stick stays the camera. The left stick is
+  sunk (CAS, Thumbstick1) and the humanoid held still while LT is down, and the
+  lock lets go the instant LT is up (also polled), the piece is dropped or
+  placed, the tool goes away, you die or sit, a menu opens, or the window loses
+  focus (`GrabLogic.LockStays`). Unchanged: RB/LB push and pull, keyboard R,
+  D-pad right in the placer, D-pad turns while dragging, flick behaviour. Hints
+  now say "LT + left stick: turn".
+
+### Studio checks: Xbox navigation and rotation
+- [ ] Press View on a controller (walking, nothing open): the QUICK MENU opens
+      centred, tiles in a grid, the first tile ringed in amber. Stick and D-pad
+      move one tile at a time and wrap round the edges; A opens the tile; B and
+      View close it. Output: no red lines
+- [ ] Tiles: SAVES, STORE, BADGES, DAILY GOALS (after the tutorial), FIELD GUIDE
+      (once you have it), SETTINGS, HUD BUTTONS; HAMMER on foot; PLANS and LAND
+      with the hammer out on your plot; SEND TRUCK HOME / DROP AXE when they show;
+      OWNER only on Connor's account
+- [ ] SAVES tile: the Saves panel opens with its first slot selected; the stick
+      cannot drift onto the HUD behind it; B closes it and the cursor is on the
+      SAVES side button (B again: back to walking). Same for STORE, BADGES,
+      DAILY, FIELD GUIDE, SETTINGS and the Land panel
+- [ ] HUD BUTTONS tile: the cursor lands on the first HUD button (top left),
+      D-pad / stick walks them in on-screen order, wrapping round; A presses;
+      B lets go and the stick walks you again
+- [ ] A MENU button with the View glyph shows at the top of the side column
+      only on a gamepad (not with mouse or touch)
+- [ ] View does the same while a shop or the Field Guide is open (the menu goes
+      over it; B returns you to it) and not while typing in chat. It does not
+      also open Roblox's player list or menu (report if it does)
+- [ ] Rotation: hold RT on a log, hold LT: the log hangs; the LEFT stick spins
+      it (left/right) and tips it (up/down) and the character does NOT walk; the
+      right stick still turns the camera. Let go of LT: the left stick walks you
+      again at once. Drop the log while LT is down: you can walk
+- [ ] Hammer, pick a Wall: hold LT, flick the LEFT stick left/right: quarter
+      turns; up/down: raise / lower. The character stands still while LT is
+      down; RB/LB still slide the ghost; D-pad right still rotates; R on a
+      keyboard still rotates
+- [ ] Hold LT then: open the quick menu, put the hammer away, die (/kill),
+      alt-tab away and back: you are never stuck unable to walk
+- [ ] The hint line reads "LT + left stick: turn" while dragging and "RT place ·
+      LT+left stick turn · B stop" while placing
 ## NPC heads face the player (claude/npc-heads)
 
 - Heads look at you through `Shared/HeadLook.Aim` (clamped 70 degrees side to

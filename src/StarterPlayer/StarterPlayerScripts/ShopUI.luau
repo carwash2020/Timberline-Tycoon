@@ -32,7 +32,6 @@
 -- and per-hit stats under v2), as ShopService charges.
 
 local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -47,6 +46,7 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
+local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
 local UITheme = require(script.Parent.UITheme)
@@ -735,7 +735,7 @@ local function open(shop: Shop, focusId: string?)
 			end
 		end
 		focusedFace = pick
-		GuiService.SelectedObject = pick
+		GamepadNav.Focus(pick, panel) -- selects it, keeps the stick in the shop, remembers the way back
 	else
 		focusedFace = nil
 	end
@@ -762,9 +762,7 @@ function ShopUI.Close()
 	end
 	ContextActionService:UnbindAction("CloseShop")
 	ContextActionService:UnbindAction("ShopHoldStill")
-	if GuiService.SelectedObject and p and GuiService.SelectedObject:IsDescendantOf(p) then
-		GuiService.SelectedObject = nil
-	end
+	GamepadNav.Restore(p) -- back to the HUD button that opened it, or to walking
 end
 
 local function buildPanel()
