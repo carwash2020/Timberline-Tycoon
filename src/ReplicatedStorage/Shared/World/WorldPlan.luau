@@ -5087,6 +5087,7 @@ TreeFill.Bind({
 	RoadSigns = WorldPlan.RoadSigns,
 	GateSigns = WorldPlan.GateSigns,
 	LandmarkDiscs = WorldPlan.LandmarkDiscs,
+	BoulderClusters = WorldPlan.BoulderClusters,
 })
 
 return WorldPlan

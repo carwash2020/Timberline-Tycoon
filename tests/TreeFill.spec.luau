@@ -398,4 +398,51 @@ return function(t)
 			t.ok(ap / bp <= 1.7, string.format("%s parts %d -> %d", disc.name, bp, ap))
 		end
 	end)
+
+	t.test("trees round each pad: none on a pad or its blend, capped per pad, deterministic", function()
+		local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+		local near = TreeFill.PlotRingNear
+		local perPlot = {}
+		local count, woods = 0, {}
+		for _, spot in ipairs(trees) do
+			local zone = spot.zone
+			if zone and string.sub(zone.id, 1, 5) == "plot:" then
+				count += 1
+				woods[spot.woodId] = (woods[spot.woodId] or 0) + 1
+				local index = tonumber(string.match(zone.id, "^plot:(%d+):"))
+				perPlot[index] = (perPlot[index] or 0) + 1
+				t.ok(COMMON[spot.woodId], "common woods only: " .. spot.woodId)
+				t.ok((zone.cap or 0) >= 1 and zone.radius == TreeFill.PlotRingClusterRadius, "a small zone with a cap")
+				local x, z = spot.position.X, spot.position.Z
+				for _, slot in ipairs(PlotData.Slots) do
+					local dx = math.max(math.abs(x - slot.X) - half, 0)
+					local dz = math.max(math.abs(z - slot.Y) - half, 0)
+					t.ok(math.sqrt(dx * dx + dz * dz) >= near - 0.05, "ring tree inside a pad's blend")
+				end
+			end
+		end
+		for index, n in pairs(perPlot) do
+			t.ok(n <= TreeFill.PlotRingMax, string.format("plot %d has %d ring trees", index, n))
+		end
+		t.ok(count > 0 and count <= TreeFill.PlotRingMax * #PlotData.Slots, "ring trees: " .. count)
+		print(
+			string.format(
+				"plot ring trees: %d oak %d birch %d pine %d maple %d",
+				count,
+				woods.oak or 0,
+				woods.birch or 0,
+				woods.pine or 0,
+				woods.maple or 0
+			)
+		)
+		-- Same seed, same trees.
+		local again = TreeFill.PlotRings({})
+		local second = TreeFill.PlotRings({})
+		t.ok(#second > 0)
+		t.eq(#again, #second)
+		for k = 1, #second do
+			t.eq(again[k].position, second[k].position)
+			t.eq(again[k].woodId, second[k].woodId)
+		end
+	end)
 end

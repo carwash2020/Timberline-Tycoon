@@ -649,6 +649,7 @@ return function(t)
 			local look = PlotData.Look(i)
 			seen[look.name] = true
 			t.ok(#look.material > 0 and #look.ground == 3 and #look.rail == 3, look.name .. " is complete")
+			t.ok(look.material ~= "Grass" and look.material ~= "LeafyGrass", look.name .. " is bare ground, not grass")
 		end
 		local n = 0
 		for _ in pairs(seen) do
