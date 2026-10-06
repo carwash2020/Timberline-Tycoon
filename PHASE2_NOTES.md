@@ -1570,3 +1570,82 @@ falls back to tipping the tool grip.
 - [ ] To use your own fall recording: upload it (Creator Hub, Audio), then set
       `GameConfig.FellSoundId = "rbxassetid://<id>"`; it replaces the layered
       sound and plays at the landing
+## Load time (LOAD-01): the world no longer waits for its forest
+
+What changed: the forest (about 1,400 trees: the planning, then a skeleton and
+about 43 Instances each) is planted after the sell area goes in, nearest the
+sawmill first, about 20 ms of work a frame, so GameServer starts and your save
+loads while it grows in. The tutorial grove, the isles' Lumenwood, the town and
+the terrain are still done first. The client's filler-forest plan (one step of
+a second or more that froze the client) now waits until you are in the game.
+The terrain yields by time, not one frame per chunk. Every phase prints a
+`[Load]` line.
+
+### Studio checks
+- [ ] Cold Play: the branded loading card fades into the town noticeably sooner
+      than before; you can move and chop at the tutorial oaks at once
+- [ ] The forest fills in round you in the first ten or so seconds (trees near
+      the sawmill first, far biomes last). Walk to Gloam Hollow (by day: no
+      trees, at night: trees); Output shows `[Load] forest planted: N trees`
+- [ ] A tree chopped early still falls and drops wood; figured bark clues
+      (burl, etc.) still appear on late-planted trees; Murph's steps unchanged
+- [ ] No red/orange Output. `[MapBuilder] build check:` line still there
+- [ ] Copy every `[Load]` line from the server Output (and the client's) and
+      send them: the numbers say where the time goes now
+## Old Hank, the plot salesman at the Land Office
+
+- An old farmer stands behind the Land Office counter day and night (no shop
+  hours, never sleeps). Data: `Shared/PlotSalesmanData` (his offers and price
+  talk), roster entry `OldHank` in `NPCData`, Talk prompt wired by
+  `PlotService.HookSalesman`. Talk and the counter's "Buy a plot" prompt open
+  the same picker; the server charges `GameConfig.PlotPrice` once. To sell
+  something else through him, add an offer in `PlotSalesmanData.Offers` and a
+  handler in `PlotService`'s `SALESMAN_OFFERS` (steps are in the file header).
+- New: `CharacterArt` hat style `straw` and spec flag `hayStalk`.
+
+### Studio checks
+- [ ] Walk to the Land Office (east of the truck lot): an old man with a
+      straw hat, grey beard, hay stalk in his mouth, plaid shirt and overalls
+      stands behind the counter facing the street; a pitchfork leans on the
+      counter's end and a hay bale sits beside it
+- [ ] He looks around now and then; his bubble names the plot price ($150,
+      one number); wait through a night (or set the clock to 3:00): he is
+      still standing there, no Zzz
+- [ ] Press E / ButtonX / tap on Talk at him: the plot picker opens showing
+      the price; B closes it with nothing charged; buying charges once
+- [ ] The counter's own "Buy a plot" prompt still opens the same picker
+- [ ] A player who already owns a plot talks to him: a toast in his voice, no picker
+- [ ] You can't walk through the counter; he is not shoved and doesn't fall
+      over when you run into him; his prompt and the counter prompt don't overlap badly
+- [ ] The tutorial plot step still shows the amber arrow at the Land Office and pays as before
+## HUD corner, 12-hour clock, owner time tools, dialogue card, sawmill spin
+
+- The corner chips (STORE, the clock) now share the cash row's strip in the
+  top bar when it fits (`HudLayout.CornerInBar`), else sit 4 px under it. The
+  clock reads "Day 5:17 AM" / "Night 10:10 PM" (12-hour; the Day/Night word is
+  the Gloam Hollow's day or night, there is no day counter). Shop hours read
+  "7:00 AM" / "9:00 PM" everywhere (`WorldTime.Format`, `ShopHoursLogic.FormatHour`).
+- Owner time tools (`/timespeed`, `/settime`, `/timereset`, menu rows). Not saved.
+- The shopkeeper card (Yes / Close) sits above the hotbar (`DialogueData.CardBottom`).
+- The sawmill blade and bullwheel turn every frame by dt, slower (3 rad/s).
+
+### Studio checks
+- [ ] PC: STORE and the clock sit in the top bar beside the cash plaque, clear
+      of Roblox's menu and chat buttons; resize narrow: they drop under the bar
+      with no overlap. Phone emulator (with a notch): nothing under the notch
+      or the top bar. Xbox / TV: not off the safe area.
+- [ ] The clock counts 12:00 AM ... 11:59 AM, 12:00 PM ... 11:59 PM, then 12:00 AM.
+      Night/Day word still flips at dusk and dawn. Walk to Hearth & Home before
+      7 AM: the keeper says "opens at 7:00 AM"; the door sign reads "Open 7:00 AM to 9:00 PM".
+- [ ] Owner (you only): `/settime noon`, `/settime 6pm`, `/settime midnight`
+      jump the sky and the corner clock; `/timespeed 60` runs a day in about
+      24 s (sky, lamps, shop doors follow); `/timespeed 1` slows it; `/timereset`
+      returns to real time. Another account typing these gets nothing.
+      Stop and restart the server: time is real again (not saved).
+- [ ] Xbox: open the owner menu (OWNER or L3 + R3); D-pad down to Time speed
+      and Set hour (the panel scrolls), A on SET SPEED / SET HOUR / RESET TIME;
+      B closes. On a phone the panel fits and scrolls.
+- [ ] Knock on a closed shop / talk to a keeper: the card shows ABOVE the axe
+      hotbar on PC, phone and Xbox, Close (and B) works, nothing overlaps the tool bar.
+- [ ] The sawmill blade turns smoothly and slowly, on High and on Low graphics
+      (Settings), in town and on your own plot's sawmill.

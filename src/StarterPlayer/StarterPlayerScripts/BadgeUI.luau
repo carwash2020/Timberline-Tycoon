@@ -4,7 +4,7 @@
 -- and every row are at least BadgeData.MinTapPx tall.
 --   * Phone: tap the button. Rows scroll; a row toasts how to earn it.
 --   * Keyboard: B opens and closes. Esc closes.
---   * Gamepad: left stick click (ButtonL3) opens it. The D-pad moves
+--   * Gamepad: the View button (ButtonSelect) opens it; L3 stays free for running. The D-pad moves
 --     between rows, A toasts the line, B closes it (HUD.Popup).
 -- The server owns the earned set. BadgeSync and the Badges attribute
 -- carry it. This script never fires a remote.

@@ -18,6 +18,7 @@ local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
 local ShopService = require(script.Parent.ShopService)
 local Util = require(ReplicatedStorage.Shared.Util)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
 local AdminService = {}
 
@@ -230,6 +231,53 @@ handlers.superrun = function(owner)
 	owner:SetAttribute("SuperRun", if on then true else nil)
 	log(owner, "superrun " .. if on then "on" else "off")
 	notify(owner, if on then "Super run on." else "Super run off.")
+end
+
+-- Time control. Server memory only: three workspace attributes (see
+-- WorldTime). A restarted server has none, so time is real again. Quiet:
+-- only the owner is told (the sky changes for everyone, which is the point).
+local function writeClock(realNow: number, gameNow: number, speed: number)
+	workspace:SetAttribute(WorldTime.AnchorRealAttribute, realNow)
+	workspace:SetAttribute(WorldTime.AnchorGameAttribute, gameNow)
+	workspace:SetAttribute(WorldTime.SpeedAttribute, speed)
+end
+
+handlers.timespeed = function(owner, args)
+	local speed = AdminLogic.Speed(args[1])
+	if not speed then
+		notify(owner, "Usage: /timespeed <1|4|20|60>")
+		return
+	end
+	-- Re-anchor at "now" so the sky carries on from where it is, then change pace.
+	local real = workspace:GetServerTimeNow()
+	writeClock(real, WorldTime.GameNow(), speed)
+	log(owner, string.format("timespeed %dx", speed))
+	notify(owner, string.format("Time runs at %dx on this server (until it restarts).", speed))
+end
+
+handlers.settime = function(owner, _args, rest)
+	local hour = AdminLogic.TimeOfDay(rest)
+	if hour == nil then
+		notify(owner, "Usage: /settime <6am|noon|6pm|midnight|7:30pm|18:30>")
+		return
+	end
+	local real = workspace:GetServerTimeNow()
+	local speed = workspace:GetAttribute(WorldTime.SpeedAttribute)
+	writeClock(
+		real,
+		WorldTime.GameTimeForHour(WorldTime.GameNow(), hour),
+		if WorldTime.IsSpeed(speed) then speed else 1
+	)
+	log(owner, "settime " .. WorldTime.Format(hour))
+	notify(owner, "It is now " .. WorldTime.Format(hour) .. ".")
+end
+
+handlers.timereset = function(owner)
+	workspace:SetAttribute(WorldTime.AnchorRealAttribute, nil)
+	workspace:SetAttribute(WorldTime.AnchorGameAttribute, nil)
+	workspace:SetAttribute(WorldTime.SpeedAttribute, nil)
+	log(owner, "timereset")
+	notify(owner, "Time is back to normal.")
 end
 
 handlers.announce = function(owner, _args, rest)

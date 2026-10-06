@@ -73,17 +73,30 @@ local failedSteps = 0
 local function traceback(err: any): string
 	return debug.traceback(tostring(err), 2)
 end
+-- [Load] lines (LOAD-01): seconds since this script started, per phase, and
+-- how many Instances a top-level step added, so Output says where a slow
+-- start went. Nested steps skip the count (GetDescendants is not free).
+local stepDepth = 0
+local function loadLine(what: string)
+	print(string.format("[Load] +%.1fs %s", os.clock() - started, what))
+end
 local function step(name: string, build: () -> ())
 	-- A line when a step starts and when it ends, so a stalled world build
 	-- shows which step it is in (the tree planning is silent for a while).
 	print(string.format("[MapBuilder] %s ...", name))
 	local startedAt = os.clock()
+	stepDepth += 1
+	local top = stepDepth == 1
 	local ok, err = xpcall(function(): any
 		build()
 		return nil
 	end, traceback)
+	stepDepth -= 1
 	if ok then
 		print(string.format("[MapBuilder] %s done in %.1fs", name, os.clock() - startedAt))
+	end
+	if top then
+		loadLine(string.format("%s took %.2fs", name, os.clock() - startedAt))
 	end
 	if not ok then
 		failedSteps += 1
@@ -449,6 +462,11 @@ end)
 -- 5. The biomes
 ---------------------------------------------------------------------------
 
+-- Set by step 5: plants the world's trees (see there). Run once, after the
+-- sell area under v2.
+local forestPlanter: ((yielding: boolean) -> ())? = nil
+local FOREST_SLICE = 0.02 -- seconds of planting per frame, so the server keeps its frame rate
+
 step("5. The trees", function()
 	if V2 then
 		SectionTrees.RegisterGroups() -- Wood, WoodFalling, WoodHeld, Leaves, Players
@@ -480,51 +498,89 @@ step("5. The trees", function()
 			warn(string.format("[MapBuilder] tutorial oak %d failed: %s", i, tostring(err)))
 		end
 	end
-	local before = os.clock()
-	-- One tree that fails to build (a bad seed) mustn't take the rest of
-	-- the forest with it: each on its own, one warning for all of them.
-	local failed, firstErr = 0, nil
-	local function plant(spot: WorldPlan.TreeSpot)
-		local ok, err = pcall(function(): any
-			spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
-			return nil
-		end)
-		if not ok then
-			failed += 1
-			firstErr = firstErr or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
+	-- The rest of the world's trees (about 1,400 with the planning) are the
+	-- longest part of the build, and nobody needs them to stand up: the
+	-- tutorial grove above is what a new player first meets. Under v2 they
+	-- are planted AFTER the sell area goes in (so GameServer starts and the
+	-- save loads meanwhile), nearest the sawmill first, a frame's worth at a
+	-- time (LOAD-01). v1 (a rollback) keeps its one synchronous pass.
+	local function plant(yielding: boolean)
+		local before = os.clock()
+		local firstCount = treesSpawned
+		type Entry = { spot: WorldPlan.TreeSpot, reach: boolean, order: number }
+		local entries: { Entry } = {}
+		local function collect(list: { WorldPlan.TreeSpot }, reach: boolean)
+			for _, spot in ipairs(list) do
+				table.insert(entries, { spot = spot, reach = reach, order = #entries })
+			end
 		end
-	end
-	for _, spot in ipairs(WorldPlan.Trees()) do
-		plant(spot)
-	end
-	-- Strip and ferry sites share this warning, so one bad wood is still
-	-- one line. Lanternwood waits until WoodData has the row (B12).
-	for _, spot in ipairs(WorldPlan.StripTrees()) do
-		plant(spot)
-	end
-	for _, spot in ipairs(WorldPlan.FerryPalms()) do
-		plant(spot)
-	end
-	if WoodData.Get("lanternwood") then
-		for _, spot in ipairs(WorldPlan.Lanternwood()) do
-			plant(spot)
+		collect(WorldPlan.Trees(), false)
+		-- Strip and ferry sites share one warning, so one bad wood is still
+		-- one line. Lanternwood waits until WoodData has the row (B12).
+		collect(WorldPlan.StripTrees(), false)
+		collect(WorldPlan.FerryPalms(), false)
+		if WoodData.Get("lanternwood") then
+			collect(WorldPlan.Lanternwood(), false)
 		end
-	end
-	if failed > 0 then
-		warn(string.format("[MapBuilder] %d tree(s) failed to build; the first: %s", failed, tostring(firstErr)))
-	end
-	-- The Petrified Reach, after the fingerprint trees, so none of those move.
-	for _, spot in ipairs(WorldPlan.ReachTrees()) do
-		local ok, err = pcall(function(): any
-			spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
-			return nil
-		end)
-		if not ok then
-			warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
+		-- The Petrified Reach, planned after the fingerprint trees, so none of
+		-- those move.
+		collect(WorldPlan.ReachTrees(), true)
+		loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
+		if yielding then
+			local hub = WorldLayout.Sawmill
+			local function far(e: Entry): number
+				local dx, dz = e.spot.position.X - hub.X, e.spot.position.Z - hub.Z
+				return dx * dx + dz * dz
+			end
+			local keyed: { [Entry]: number } = {}
+			for _, e in ipairs(entries) do
+				keyed[e] = far(e)
+			end
+			table.sort(entries, function(a: Entry, b: Entry): boolean
+				if keyed[a] ~= keyed[b] then
+					return keyed[a] < keyed[b]
+				end
+				return a.order < b.order
+			end)
 		end
+		-- One tree that fails to build (a bad seed) mustn't take the rest of
+		-- the forest with it: each on its own, one warning for all of them.
+		local failed, firstErr = 0, nil
+		local sliceStart = os.clock()
+		for _, e in ipairs(entries) do
+			local spot = e.spot
+			local ok, err = pcall(function(): any
+				spawnTree(spot.woodId, spot.position, spot.biome, spot.zone)
+				return nil
+			end)
+			if not ok then
+				if e.reach then
+					warn(string.format("[MapBuilder] reach tree failed: %s", tostring(err)))
+				else
+					failed += 1
+					firstErr = firstErr
+						or string.format("%s at %s: %s", spot.woodId, tostring(spot.position), tostring(err))
+				end
+			end
+			if yielding and os.clock() - sliceStart > FOREST_SLICE then
+				workspace:SetAttribute("MapTrees", treesSpawned)
+				task.wait()
+				sliceStart = os.clock()
+			end
+		end
+		if failed > 0 then
+			warn(string.format("[MapBuilder] %d tree(s) failed to build; the first: %s", failed, tostring(firstErr)))
+		end
+		workspace:SetAttribute("MapTrees", treesSpawned)
+		if V2 then
+			print(string.format("[MapBuilder] %d section trees in %.1fs", treesSpawned, os.clock() - before))
+		end
+		loadLine(string.format("forest planted: %d trees in %.2fs", treesSpawned - firstCount, os.clock() - before))
 	end
-	if V2 then
-		print(string.format("[MapBuilder] %d section trees in %.1fs", treesSpawned, os.clock() - before))
+	if not V2 then
+		plant(false)
+	else
+		forestPlanter = plant
 	end
 end)
 
@@ -1016,3 +1072,25 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 
 print(string.format("[MapBuilder] World built in %.1fs (terrain %.1fs)", builtSeconds, terrainSeconds))
+loadLine(string.format("world ready for players (terrain %.1fs); the forest plants next", terrainSeconds))
+
+-- The forest, now the players can come in: planned, then planted a frame's
+-- worth at a time, nearest the sawmill first. The night-only woods are
+-- re-checked against the clock once it is in (they were not there when it
+-- first ticked).
+local planter = forestPlanter
+if planter then
+	forestPlanter = nil
+	task.spawn(function()
+		local ok, err = xpcall(function(): any
+			planter(true)
+			return nil
+		end, traceback)
+		if not ok then
+			failedSteps += 1
+			workspace:SetAttribute("MapBuildFailures", failedSteps)
+			warn(string.format("[MapBuilder] the forest failed, the rest of the world is up:\n%s", tostring(err)))
+		end
+		WorldClock.Refresh()
+	end)
+end

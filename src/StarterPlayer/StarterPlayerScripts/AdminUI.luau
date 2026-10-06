@@ -9,12 +9,17 @@
 -- The OWNER side button, or both thumbsticks clicked at once (L3 + R3),
 -- opens it. D-pad moves, A presses, B closes. Pick a player and an amount
 -- and press Give, Take, Set cash, Go to, Bring or Kick (a second press
--- confirms), toggle Super run, or choose an item and Gift it for free.
+-- confirms), toggle Super run, choose an item and Gift it for free, or
+-- speed up the clock (1x / 4x / 20x / 60x), set the hour (6 AM, noon, 6 PM,
+-- midnight) or put time back to normal. The panel scrolls so it fits a phone.
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+
+local AdminLogic = require(ReplicatedStorage.Shared.AdminLogic)
+local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -44,12 +49,16 @@ local targetIndex = 1
 local amountIndex = 2
 local kindIndex = 1
 local itemIndex = 1
+local speedIndex = 2
+local hourIndex = 2
 local armedKick: number? = nil -- os.clock() of the first Kick press
 
 local targetLabel: TextLabel? = nil
 local amountLabel: TextLabel? = nil
 local kindLabel: TextLabel? = nil
 local itemLabel: TextLabel? = nil
+local speedLabel: TextLabel? = nil
+local hourLabel: TextLabel? = nil
 local kickButton: UITheme.Button? = nil
 
 local function isOwner(): boolean
@@ -111,8 +120,17 @@ local function currentItem(): Item?
 	return list[itemIndex]
 end
 
+local HOUR_NAMES: { [string]: string } = { ["6am"] = "6 AM", noon = "Noon", ["6pm"] = "6 PM", midnight = "Midnight" }
+
 local function refresh()
 	local who = target()
+	if speedLabel then
+		speedLabel.Text = string.format("%dx", WorldTime.Speeds[speedIndex])
+	end
+	if hourLabel then
+		local id = AdminLogic.TimePresetOrder[hourIndex]
+		hourLabel.Text = HOUR_NAMES[id] or id
+	end
 	if targetLabel then
 		targetLabel.Text = who or "(nobody)"
 	end
@@ -172,7 +190,7 @@ local function toggle()
 end
 
 -- One row: a caption, ‹ value ›. `step(+1 | -1)` changes it and refreshes.
-local function stepper(parent: Frame, order: number, caption: string, step: (number) -> ()): TextLabel
+local function stepper(parent: GuiObject, order: number, caption: string, step: (number) -> ()): TextLabel
 	local row = Instance.new("Frame")
 	row.Name = caption
 	row.LayoutOrder = order
@@ -206,7 +224,7 @@ local function stepper(parent: Frame, order: number, caption: string, step: (num
 	return value
 end
 
-local function actionRow(parent: Frame, order: number, specs: { { text: string, style: string, run: () -> () } })
+local function actionRow(parent: GuiObject, order: number, specs: { { text: string, style: string, run: () -> () } })
 	local row = Instance.new("Frame")
 	row.Name = "Actions" .. order
 	row.LayoutOrder = order
@@ -249,12 +267,15 @@ local function build()
 	outer.Name = "Owner"
 	outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.fromOffset(392, 420)
+	outer.Size = UDim2.new(0, 392, 0.92, 0)
 	outer.BackgroundColor3 = C.Paper
 	outer.BorderSizePixel = 0
 	outer.Visible = false
 	UITheme.corner(outer, 14)
 	UITheme.stroke(outer, C.Bark, 3)
+	local limit = Instance.new("UISizeConstraint") -- never taller than the rows need, never off a phone
+	limit.MaxSize = Vector2.new(392, 560)
+	limit.Parent = outer
 	outer.Parent = gui
 	panel = outer
 
@@ -269,11 +290,18 @@ local function build()
 		setOpen(false)
 	end)
 
-	local body = Instance.new("Frame")
+	-- A scroll: the rows are taller than a phone's screen, and the pad's
+	-- selection scrolls it along.
+	local body = Instance.new("ScrollingFrame")
 	body.Name = "Body"
 	body.BackgroundTransparency = 1
+	body.BorderSizePixel = 0
 	body.Position = UDim2.fromOffset(16, 56)
 	body.Size = UDim2.new(1, -32, 1, -68)
+	body.CanvasSize = UDim2.new()
+	body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	body.ScrollBarThickness = 6
+	body.ScrollingDirection = Enum.ScrollingDirection.Y
 	body.Parent = outer
 	UITheme.list(body, 6)
 
@@ -390,6 +418,38 @@ local function build()
 			style = "bark",
 			run = function()
 				send({ action = "superrun" })
+			end,
+		},
+	})
+
+	speedLabel = stepper(body, 8, "Time speed", function(d)
+		speedIndex = ((speedIndex - 1 + d) % #WorldTime.Speeds) + 1
+		refresh()
+	end)
+	hourLabel = stepper(body, 9, "Set hour", function(d)
+		hourIndex = ((hourIndex - 1 + d) % #AdminLogic.TimePresetOrder) + 1
+		refresh()
+	end)
+	actionRow(body, 10, {
+		{
+			text = "SET SPEED",
+			style = "buy",
+			run = function()
+				send({ action = "timespeed", speed = WorldTime.Speeds[speedIndex] })
+			end,
+		},
+		{
+			text = "SET HOUR",
+			style = "bark",
+			run = function()
+				send({ action = "settime", time = AdminLogic.TimePresetOrder[hourIndex] })
+			end,
+		},
+		{
+			text = "RESET TIME",
+			style = "skip",
+			run = function()
+				send({ action = "timereset" })
 			end,
 		},
 	})

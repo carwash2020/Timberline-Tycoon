@@ -10,6 +10,10 @@
 -- with 20:00-04:00 sped by WorldTime.NightSpeed), so everyone sees the
 -- same sky.
 --
+-- The owner can speed the clock or set the hour (AdminService /timespeed,
+-- /settime; WorldTime.GameNow reads what it writes). That is server memory
+-- only and ends when the server does.
+--
 -- In Studio only, the workspace attribute "ClockOverride" (an hour, 0-24)
 -- stands in for the clock (Shared/ClockOverride, WLD-06): set it from the
 -- server command bar to test night, clear it to go back.
@@ -52,13 +56,27 @@ local function setNight(isNight: boolean)
 	end
 end
 
+-- Trees planted after the clock's first tick (the forest, LOAD-01) missed
+-- the day/night change: apply the current state to the night-only woods
+-- again. A no-op before Start.
+function WorldClock.Refresh()
+	if night == nil then
+		return
+	end
+	for _, biome in ipairs(BiomeData.All()) do
+		if biome.nightOnly and biome.area then
+			setDormant(biome.id, not night)
+		end
+	end
+end
+
 function WorldClock.IsNight(): boolean
 	return night == true
 end
 
 -- The in-game hour right now (0 to 24), the same number the clients show.
 function WorldClock.ClockTime(): number
-	local clock = WorldTime.ClockTime(workspace:GetServerTimeNow())
+	local clock = WorldTime.ClockTime(WorldTime.GameNow())
 	if IS_STUDIO then
 		return ClockOverride.Apply(clock, workspace:GetAttribute(ClockOverride.Attribute), true)
 	end

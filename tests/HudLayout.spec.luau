@@ -696,4 +696,19 @@ return function(t)
 			t.eq(hidden, HudRules.TutorialRunning(step), "step " .. tostring(step))
 		end
 	end)
+
+	t.test("the corner's first line rides in the top bar with the cash row, and stays default otherwise", function()
+		local inBar = { right = 1000, top = 6, inBar = true }
+		local row, line = v(180, 36), v(420, 36)
+		local spot = HudLayout.CornerInBar(inBar, row, line, 200)
+		t.eq(spot, v(1000, 6), "same strip as the row")
+		-- A taller line is centred on the row (it reaches up, not down).
+		t.eq(HudLayout.CornerInBar(inBar, row, v(420, 44), 200), v(1000, 2))
+		-- Under the bar (a phone, or a bar too small): the default spot.
+		t.eq(HudLayout.CornerInBar({ right = 1000, top = 50, inBar = false }, row, line, 200), nil)
+		-- Roblox's buttons or a notch on the left: it would cross them.
+		t.eq(HudLayout.CornerInBar(inBar, row, line, 700), nil)
+		t.eq(HudLayout.CornerInBar(inBar, row, v(0, 0), 0), nil, "no line yet")
+		t.ok(HudLayout.CornerTopPad < 8, "the default spot is also higher than the old 8 px")
+	end)
 end

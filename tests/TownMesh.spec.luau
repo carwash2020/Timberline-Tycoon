@@ -171,7 +171,7 @@ return function(t)
 					end,
 				},
 				NodeService = { Spawn = function() end },
-				WorldClock = { Start = function() end },
+				WorldClock = { Start = function() end, Refresh = function() end },
 			},
 			services = {
 				Players = Players,
@@ -190,6 +190,7 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
+					wait = function() end,
 				},
 			},
 		})
@@ -501,6 +502,16 @@ return function(t)
 		local spun = TownMotion.Step(cf, "Z", Vector3.zero, 0.4)
 		t.ok((spun.Position - cf.Position).Magnitude < 1e-4, "a centre spin stays put")
 		t.eq(TownMotion.WindmillSpins("low"), false)
+		-- Smooth, slower saw: by frame time, capped on a hitch, never negative or NaN.
+		t.ok(TownMotion.BladeSpeed <= 3, "the blade turns slowly")
+		t.ok(math.abs(TownMotion.Advance(TownMotion.BladeSpeed, 1 / 60) - TownMotion.BladeSpeed / 60) < 1e-9)
+		t.eq(TownMotion.Advance(TownMotion.BladeSpeed, 5), TownMotion.BladeSpeed * TownMotion.MaxFrame)
+		t.eq(TownMotion.Advance(TownMotion.BladeSpeed, -1), 0)
+		t.eq(TownMotion.Advance(TownMotion.BladeSpeed, 0 / 0), 0)
+		local fs = require("@lune/fs")
+		local fx = fs.readFile("src/StarterPlayer/StarterPlayerScripts/TownFX.luau")
+		t.ok(string.find(fx, "TownMotion.Advance(TownMotion.BladeSpeed, dt)", 1, true), "the blade is dt-driven")
+		t.eq(string.find(fx, "BLADE_SPEED", 1, true), nil, "no throttled step any more")
 		t.eq(TownMotion.WindmillSpins("high"), true)
 		t.eq(TownMotion.WindmillSpins("medium"), true)
 		withMeshes(function()

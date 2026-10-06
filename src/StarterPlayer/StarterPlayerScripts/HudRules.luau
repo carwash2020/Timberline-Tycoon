@@ -17,7 +17,7 @@
 --     beside the hint.
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
 --   * ToastSeconds() (HUD.Toast): how long a toast stays, by its length.
---   * ClockText() (WorldUI): the corner clock, "Day 14:05" / "Night 22:10".
+--   * ClockText() (WorldUI): the corner clock, "Day 2:05 PM" / "Night 10:10 PM".
 --   * PadKeys, PadShortcut() (HUD.PadShortcut): the D-pad opens Daily
 --     Goals, the Field Guide and Settings, only while nothing else has the
 --     pad; PadGlyphs() and PadSelects(): their glyph chips show, and a
@@ -218,7 +218,7 @@ function HudRules.ToastSeconds(message: string, seconds: number?): number
 end
 
 -- The corner clock (WorldUI) for `clockTime`, an hour from 0 to 24
--- (Lighting.ClockTime): "Day 14:05", or "Night 22:10" while Gloam
+-- (Lighting.ClockTime): "Day 2:05 PM", or "Night 10:10 PM" while Gloam
 -- Hollow's trees are out (WorldTime.IsNight).
 function HudRules.ClockText(clockTime: number): string
 	return string.format("%s %s", if WorldTime.IsNight(clockTime) then "Night" else "Day", WorldTime.Format(clockTime))

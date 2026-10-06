@@ -219,6 +219,10 @@ SectionTrees.LogMultiplier = nil :: ((Player) -> number)?
 -- stage, a regrow), before it's parented (decorations go on here).
 SectionTrees.OnPieceFreed = nil :: ((cutter: Player, rec: TreeRecord, piece: WoodService.Piece) -> ())?
 SectionTrees.OnRebuilt = nil :: ((rec: TreeRecord) -> ())?
+-- A site's tree was planted at boot (MapBuilder plants the forest after the
+-- server is up, LOAD-01): ForestService gives it its figure, as UseV2 does
+-- for the trees already standing.
+SectionTrees.OnPlanted = nil :: ((rec: TreeRecord) -> ())?
 -- GameServer's: the felling's stats, quest, daily and milestone events, and
 -- every accepted swing.
 export type Hooks = {
@@ -668,10 +672,17 @@ function SectionTrees.SpawnTree(woodId: string, cframe: CFrame, options: SpawnOp
 	-- A trunk whose saved spot sits in a widened haul road keeps that index
 	-- and does not stand there. The first regrow is due now; a miss waits
 	-- RetrySec.
+	local planted = SectionTrees.OnPlanted
 	if opts.boot and TreeFill.InHaulLane(pos.X, pos.Z) then
 		openSlot(rec, now)
 		rec.regrowAt = now
+		if planted then
+			planted(rec)
+		end
 		return nil
+	end
+	if opts.boot and planted then
+		planted(rec)
 	end
 	return rec.model
 end
@@ -1652,6 +1663,7 @@ function SectionTrees._reset()
 	SectionTrees.LogMultiplier = nil
 	SectionTrees.OnPieceFreed = nil
 	SectionTrees.OnRebuilt = nil
+	SectionTrees.OnPlanted = nil
 	SectionTrees.Hooks = {}
 	SectionTrees._roll = nil
 end
