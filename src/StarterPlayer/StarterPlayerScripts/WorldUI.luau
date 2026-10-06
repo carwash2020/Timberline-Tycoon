@@ -93,6 +93,7 @@ end
 
 local player = Players.LocalPlayer
 
+local LOW = { priority = "low" :: "low" } -- ambient news (NoticePolicy)
 local TIER_TOAST_COOLDOWN = 45 -- seconds between tier toasts for one grove (no flicker at a boundary)
 
 -- The grove's tier right now, if this biome has a vitality meter.
@@ -115,7 +116,7 @@ local function onRegionChanged()
 	if line then
 		local biome = BiomeData.Get((player:GetAttribute("Biome") :: string?) or "")
 		local tier = if biome then groveTier(biome) else nil
-		HUD.Toast(if tier then line .. " · " .. tier.blurb else line)
+		HUD.Toast(if tier then line .. " · " .. tier.blurb else line, nil, LOW)
 	end
 end
 
@@ -305,7 +306,7 @@ local function watchGroves()
 				return
 			end
 			lastToast[id] = now
-			HUD.Toast(string.format(tier.became, biome.displayName))
+			HUD.Toast(string.format(tier.became, biome.displayName), nil, LOW)
 		end)
 	end
 end

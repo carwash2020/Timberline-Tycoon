@@ -80,6 +80,8 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
+local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
+local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HudLayout = require(script.Parent.HudLayout)
 local HudRules = require(script.Parent.HudRules)
@@ -112,6 +114,7 @@ local BAR_HEIGHT = 84 -- and its height (label, a row of buttons, padding)
 local REMOTES_WAIT = 5 -- seconds per try for the server's Remotes folder (a timeout: no infinite-yield warning)
 
 type Toast = {
+	id: number?, -- NoticePolicy's id for it
 	outer: Frame,
 	face: ImageLabel,
 	label: TextLabel,
@@ -540,10 +543,8 @@ function HUD.PadGlyph(key: Enum.KeyCode, beside: GuiObject, size: number?): GuiO
 	return glyph
 end
 
--- Shows a short message at the top of the screen for a few seconds: long
--- enough to read it, or `seconds` when given (HudRules.ToastSeconds; a
--- confirm, which asks for a second press, stays 6 s).
-function HUD.Toast(message: string, seconds: number?)
+-- Puts one toast on screen (NoticePolicy has already said yes).
+local function presentToast(message: string, seconds: number?, id: number?)
 	local stack = toastStack
 	if not stack then
 		return
@@ -569,6 +570,7 @@ function HUD.Toast(message: string, seconds: number?)
 	local labelLimit = Instance.new("UISizeConstraint")
 	labelLimit.Parent = label
 	local toast: Toast = {
+		id = id,
 		outer = card.outer,
 		face = card.face,
 		label = label,
@@ -596,6 +598,75 @@ function HUD.Toast(message: string, seconds: number?)
 			removeToast(toast)
 		end
 	end)
+end
+
+-- What gets through (NoticePolicy: priorities, one non-critical at a time,
+-- a cooldown, no repeats, a short queue). During the first-sale flow only
+-- errors show: Murph's card and the arrow are the one objective.
+local policy = NoticePolicy.New()
+local pumping = false
+
+local function flowQuiet(): boolean
+	return CoreLoop.V2() and NoticePolicy.FlowQuiet(player:GetAttribute("TutorialStep"), TutorialData.RefresherLast)
+end
+
+local function applyDecision(decision: NoticePolicy.Decision)
+	for _, id in ipairs(decision.evict) do
+		for _, toast in ipairs(toasts) do
+			if toast.id == id then
+				removeToast(toast)
+				break
+			end
+		end
+	end
+	if decision.action == "show" and decision.text then
+		presentToast(decision.text, decision.seconds, decision.id)
+	end
+end
+
+local function pump()
+	if pumping then
+		return
+	end
+	pumping = true
+	task.spawn(function()
+		while NoticePolicy.Pending(policy) do
+			task.wait(0.25)
+			local decision = NoticePolicy.Tick(policy, os.clock(), flowQuiet())
+			if decision then
+				applyDecision(decision)
+			end
+		end
+		pumping = false
+	end)
+end
+
+-- Shows a short message at the top of the screen for a few seconds: long
+-- enough to read it, or `seconds` when given (HudRules.ToastSeconds; a
+-- confirm, which asks for a second press, stays 6 s). `options` says how
+-- much it matters (NoticePolicy: "critical" errors always show, "low" is
+-- ambient news; unset, it's read from the words) and `key`/`once` show a
+-- repeating tip only once per session.
+function HUD.Toast(
+	message: string,
+	seconds: number?,
+	options: { priority: NoticePolicy.Priority?, key: string?, once: boolean? }?
+)
+	if not toastStack then
+		return
+	end
+	local shown = HudRules.ToastSeconds(message, seconds)
+	local decision = NoticePolicy.Offer(policy, {
+		text = message,
+		priority = if options then options.priority else nil,
+		seconds = shown,
+		key = if options then options.key else nil,
+		once = if options then options.once else nil,
+	}, os.clock(), flowQuiet())
+	applyDecision(decision)
+	if decision.action == "queue" then
+		pump()
+	end
 end
 
 ---------------------------------------------------------------------------
