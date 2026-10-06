@@ -106,7 +106,8 @@ PlotData.Tiers = {
 } :: { Tier }
 
 -- How each homestead looks, so no two neighbours match: the ground's colour
--- and material, the rail and the apron. Home `i` takes Looks[i], wrapping.
+-- and material (bare ground, never Grass: a yard is dirt, the country
+-- outside it keeps the grass), the rail and the apron. Home `i` takes Looks[i], wrapping.
 export type Look = {
 	name: string,
 	ground: { number }, -- r, g, b
@@ -116,9 +117,9 @@ export type Look = {
 }
 PlotData.Looks = {
 	{
-		name = "Meadow",
-		ground = { 150, 176, 104 },
-		material = "Grass",
+		name = "Loam",
+		ground = { 142, 120, 86 },
+		material = "Ground",
 		rail = { 130, 90, 50 },
 		apron = { 150, 116, 78 },
 	},
@@ -144,9 +145,9 @@ PlotData.Looks = {
 		apron = { 96, 76, 52 },
 	},
 	{
-		name = "Clover",
-		ground = { 118, 158, 92 },
-		material = "Grass",
+		name = "Packed Clay",
+		ground = { 160, 134, 102 },
+		material = "Ground",
 		rail = { 220, 214, 200 },
 		apron = { 176, 170, 150 },
 	},

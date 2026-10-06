@@ -1566,6 +1566,33 @@ What changed:
       not neon, in the day and at night
 - [ ] At night in front of the spawn: if a flat saturated blue plane still
       shows at the bottom of the screen, send a screenshot and the Output
+## Plain plot ground (no grass on homestead pads)
+
+- Pad Looks are Loam, Dry Clearing (Sand), Slate Flat, Pine Needles, Packed
+  Clay, Red Earth (Mud): none is Grass. The terrain under every pad (the 200
+  shelf plus a few studs of margin) paints Ground, so Roblox grows no grass
+  blades there; the 56-stud blend outside the pad still fades into the
+  country's grass. Decor (flowers, tufts, bushes) and trees were already
+  blocked on the shelf and blend (`DecorBlocked`), now pinned by a test.
+
+### Studio checks
+- [ ] Walk onto several homestead pads: the yard is brown/sand/slate/red
+      dirt, no grass blades, flowers or tufts on it, each homestead a
+      different shade
+- [ ] At the pad edge the dirt fades into grass over the blend; no hard
+      green rectangle, no bare seams
+- [ ] Rails, corner posts, bought squares, sign, apron and the build ghost
+      still sit flush on the ground; trucks spawn on their pads
+- [ ] Buying a tier or a square still resizes the pad; standing on the
+      ground works (no falling through or floating)
+
+### Trees round the pads
+- [ ] Walk the rim of several homesteads: small clusters of 2-5 trees stand
+      about 60-110 studs outside each pad (past the grass blend), denser on
+      the forest side; none on the pad, the lanes, truck pads or haul roads
+- [ ] Chop one: it behaves like any tree and regrows in its own cluster;
+      plots inside the spawn/meadow/pine phone discs get none by design
+- [ ] No hitch when running between pads (trees build in the usual chunks)
 ## Blender meshes are back on (axes, trees, NPCs, vehicles, plot kit, town)
 
 What was wrong, in order of certainty:
