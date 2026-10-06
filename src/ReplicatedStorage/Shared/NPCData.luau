@@ -174,12 +174,12 @@ NPCData.List = {
 			kind = "beside",
 			model = "SellArea",
 			part = "SellZone",
-			-- The sell station's Weigh House window: from the zone's middle
-			-- (53, 111), 2.3 studs past its east edge and 9 north, so she stands
-			-- at (69.3, 120) facing west across the pad, by the counter.
-			offset = Vector3.new(2.3, 0, 9),
+			-- In front of the Weigh House counter (not inside the house): from the
+			-- zone's middle (53, 111), 4.6 studs past its east edge and 9 north,
+			-- so she stands at (71.6, 120) facing west across the pad.
+			offset = Vector3.new(4.6, 0, 9),
 			turn = 90,
-			fallback = Vector3.new(69.3, 0, 120),
+			fallback = Vector3.new(71.6, 0, 120),
 		},
 		idle = "clipboard",
 		work = "saw",

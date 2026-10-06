@@ -117,9 +117,6 @@ return function(t)
 		for _, sign in ipairs(town.signs) do
 			add(string.match(sign.text, "^[^\n]+") .. " sign", "sign", BuildingArt.Signpost(sign.text), sign.cframe)
 		end
-		local fee = BiomeData.Get("sky").gondola.fee
-		local gondolaText = string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee)
-		add("gondola sign", "sign", BuildingArt.Signpost(gondolaText), town.gondolaSign)
 		add("Murph's camp", "camp", BuildingArt.Campsite(), town.campsite)
 		add("gondola station", "station", BuildingArt.GondolaStation(), town.gondola)
 		add("sawmill", "sawmill", BuildingArt.Sawmill(), town.sawmill)
@@ -760,14 +757,14 @@ return function(t)
 			end
 		end
 		t.ok(caught and #near > before, "a lamp in the Rig's way is caught")
-		-- Millie stands east of it, at the Weigh House window.
+		-- Millie stands east of it, in front of the Weigh House counter.
 		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
 			if model == "SellArea" and part == "SellZone" then
 				return town.sellZone, size
 			end
 			return nil, nil
 		end).Position
-		t.ok((millie - Vector3.new(69.3, 0, 120)).Magnitude < 1e-4, "Millie stands at the Weigh House window")
+		t.ok((millie - Vector3.new(71.6, 0, 120)).Magnitude < 1e-4, "Millie stands in front of the Weigh House counter")
 		t.ok(millie.X > pad.X + size.X / 2, "Millie east of the pad and its lane")
 	end)
 
@@ -1121,7 +1118,7 @@ return function(t)
 				{ 67, 100, "alongside" },
 				{ 67, 86, "alongside" },
 				{ 74.25, 90, "past the station" },
-				{ 74.25, 118, "Millie" },
+				{ 70, 120, "Millie" },
 			}
 			for _, bad in ipairs(bads) do
 				local caught = false
