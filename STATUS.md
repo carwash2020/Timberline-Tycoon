@@ -35,6 +35,7 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 
 ## What has landed (newest first, PR numbers on main)
 
+- Old Hank, the plot salesman (branch claude/plot-salesman, not a PR yet): an old farmer NPC behind the Land Office counter, always there. His offers are data (`Shared/PlotSalesmanData`; today only "Buy a plot" at `GameConfig.PlotPrice`); Talk runs the same `PlotService.Claim` flow. New offers: add to `Offers` and `PlotService`'s `SALESMAN_OFFERS`. Checklist in PHASE2_NOTES.md.
 - Branch `claude/hud-clock-owner` (not yet a PR): corner chips raised into the top bar, 12-hour AM/PM clock everywhere (`WorldTime.Format`, shop-hour lines), owner time tools (`/timespeed`, `/settime`, `/timereset` and the menu; not saved), shopkeeper card above the hotbar, smooth slower sawmill blade (TownFX, per frame).
 - #70 plot bought at $150, Rustbucket $100, respawn fees, economy retuned (in review when this was written).
 - #69 vehicle always has its own pad; Rustbucket boxed. #68/#67 owner menu (Xbox). #66 Xbox carry and build controls. #65 building fixes on the 80 plot (bought squares, collision boxes for mills and the chop saw, 10-stud pad grid). #64 owner chat tools. #63 rare wood and plank prices. #62 axe price ladder. #61/#60 one price, no u³. #59 build-check print at map start. #58 smaller starting plot and homestead looks. #57 HUD corner, run, ground and mesh fixes.

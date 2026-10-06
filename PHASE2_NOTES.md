@@ -1536,6 +1536,32 @@ What changed:
 - [ ] A returning save (already has a plot) still gets its picker at join,
       free, and "Give me any open plot" works
 
+## Old Hank, the plot salesman at the Land Office
+
+- An old farmer stands behind the Land Office counter day and night (no shop
+  hours, never sleeps). Data: `Shared/PlotSalesmanData` (his offers and price
+  talk), roster entry `OldHank` in `NPCData`, Talk prompt wired by
+  `PlotService.HookSalesman`. Talk and the counter's "Buy a plot" prompt open
+  the same picker; the server charges `GameConfig.PlotPrice` once. To sell
+  something else through him, add an offer in `PlotSalesmanData.Offers` and a
+  handler in `PlotService`'s `SALESMAN_OFFERS` (steps are in the file header).
+- New: `CharacterArt` hat style `straw` and spec flag `hayStalk`.
+
+### Studio checks
+- [ ] Walk to the Land Office (east of the truck lot): an old man with a
+      straw hat, grey beard, hay stalk in his mouth, plaid shirt and overalls
+      stands behind the counter facing the street; a pitchfork leans on the
+      counter's end and a hay bale sits beside it
+- [ ] He looks around now and then; his bubble names the plot price ($150,
+      one number); wait through a night (or set the clock to 3:00): he is
+      still standing there, no Zzz
+- [ ] Press E / ButtonX / tap on Talk at him: the plot picker opens showing
+      the price; B closes it with nothing charged; buying charges once
+- [ ] The counter's own "Buy a plot" prompt still opens the same picker
+- [ ] A player who already owns a plot talks to him: a toast in his voice, no picker
+- [ ] You can't walk through the counter; he is not shoved and doesn't fall
+      over when you run into him; his prompt and the counter prompt don't overlap badly
+- [ ] The tutorial plot step still shows the amber arrow at the Land Office and pays as before
 ## HUD corner, 12-hour clock, owner time tools, dialogue card, sawmill spin
 
 - The corner chips (STORE, the clock) now share the cash row's strip in the
