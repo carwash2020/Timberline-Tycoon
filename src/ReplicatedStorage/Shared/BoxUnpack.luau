@@ -9,8 +9,13 @@
 --   "pickup"  small things (axes, gear, a cosmetic, goods) come out as a
 --             physical object on the spot; the buyer picks it up (Interact
 --             again) and it goes to the hotbar or the inventory.
---   "stock"   plot items (sawmills, the chop saw, blueprints) unpack into
+--   "stock"   plot items (the chop saw, the Sky Bin, blueprints) unpack into
 --             the buyer's stock to place with the hammer, as before.
+--   "place"   sawmills, planers and conveyor pieces (Connor, 6 October 2026):
+--             opening the box starts a placement ghost on your plot. The box
+--             stays where it is until you CONFIRM: placing spends it (one-time
+--             use, no stock list, no blueprint book entry); cancelling keeps
+--             it. PlotService.Place checks the box uid and BoxService spends it.
 --   "vehicle" a truck or trailer unpacks onto the buyer's pad on their
 --             plot (the pad rule: vehicles only exist on a pad).
 -- The empty box then folds away (PoofSeconds) and is destroyed.
@@ -21,6 +26,8 @@
 -- owner leaves. A box saved before this change has no `pending` mark: its
 -- item was granted at the counter, so opening it only unpacks it.
 
+local ItemCatalog = require(script.Parent.ItemCatalog)
+
 local BoxUnpack = {}
 
 BoxUnpack.TakeRange = 12 -- studs, buyer to the pickup
@@ -28,13 +35,18 @@ BoxUnpack.PickupSeconds = 300 -- an unclaimed pickup converts to inventory after
 BoxUnpack.PoofSeconds = 0.6 -- how long the empty box takes to fold away
 BoxUnpack.PickupLift = 1.6 -- studs the item floats over where the box stood
 
-export type Mode = "pickup" | "stock" | "vehicle"
+export type Mode = "pickup" | "stock" | "vehicle" | "place"
 
 -- How an item kind comes out of its box.
-function BoxUnpack.Mode(kind: string): Mode
+function BoxUnpack.Mode(kind: string, itemId: string?): Mode
 	if kind == "Truck" or kind == "Trailer" then
 		return "vehicle"
-	elseif kind == "Sawmill" or kind == "Machine" or kind == "Blueprint" then
+	elseif kind == "Sawmill" then
+		return "place"
+	elseif kind == "Machine" then
+		local machine = if itemId then ItemCatalog.GetMachine(itemId) else nil
+		return if machine and machine.placeFromBox == true then "place" else "stock"
+	elseif kind == "Blueprint" then
 		return "stock"
 	end
 	return "pickup"
@@ -87,6 +99,11 @@ function BoxUnpack.OpenedLine(mode: string, name: string): string
 		return string.format("Opened! Pick up the %s.", name)
 	elseif mode == "stock" then
 		return string.format("Unpacked the %s. Place it with your hammer on your plot.", name)
+	elseif mode == "place" then
+		return string.format(
+			"Place the %s on your plot: click to put it down, Q to cancel. The box is used up when you place it.",
+			name
+		)
 	end
 	return string.format("Unpacked the %s.", name)
 end

@@ -213,4 +213,46 @@ return function(t)
 		end
 		t.ok(placed, "and a spot in ShelfLayout")
 	end)
+
+	t.test(
+		"every sawmill and planer box carries its tier on the label, and the whole line fits the Tool Shed",
+		function()
+			local Catalog = t.shared("ItemCatalog")
+			t.eq(StoreStock.TierLabel("Sawmill", "SawmillRickety"), "RICKETY, TIER 1 OF 5")
+			t.eq(StoreStock.TierLabel("Sawmill", "Millmaster100"), "MILL, TIER 3 OF 5")
+			t.eq(StoreStock.TierLabel("Sawmill", "Millmaster200"), "STEAM, TIER 4 OF 5")
+			t.eq(StoreStock.TierLabel("Sawmill", "Millmaster200L"), "INDUSTRIAL, TIER 5 OF 5")
+			t.eq(StoreStock.TierLabel("Machine", "PlanerHand"), "HAND, TIER 1 OF 4")
+			t.eq(StoreStock.TierLabel("Machine", "PlanerIndustrial"), "INDUSTRIAL, TIER 4 OF 4")
+			t.eq(StoreStock.TierLabel("Machine", "ChopSaw"), nil, "no tiers: no label")
+			t.eq(StoreStock.TierLabel("Axe", "SteelAxe"), nil)
+			t.eq(StoreStock.TierLabel("Sawmill", "Nope"), nil)
+			-- Every tier is a slot on the Tool Shed's shelves at its catalog price.
+			for _, mill in ipairs(Catalog.SawmillList()) do
+				local slot = StoreStock.FindInShop("ToolShed", mill.id)
+				t.ok(slot ~= nil, mill.id .. " is on the shelf")
+				t.eq(StoreStock.UnitPrice("Sawmill", mill.id, false, 2), mill.priceCash)
+			end
+			for _, id in ipairs({
+				"PlanerHand",
+				"PlanerBench",
+				"PlanerSteam",
+				"PlanerIndustrial",
+				"ConveyorStraight",
+				"ConveyorTurn",
+				"ConveyorFunnel",
+			}) do
+				t.ok(StoreStock.FindInShop("ToolShed", id) ~= nil, id .. " is on the shelf")
+				t.eq(StoreStock.UnitPrice("Machine", id, false, 2), Catalog.GetMachine(id).priceCash)
+			end
+			t.eq(#StoreStock.Overflow("ToolShed"), 0, "every box has a place")
+			-- Bigger planers are bigger boxes (never smaller than the tier below).
+			local rank = 0
+			for _, id in ipairs({ "PlanerHand", "PlanerBench", "PlanerSteam", "PlanerIndustrial" }) do
+				local size = StoreStock.BoxSizeOf(StoreStock.FindInShop("ToolShed", id))
+				t.ok(size.X >= rank, id .. " box is not smaller than the tier below")
+				rank = size.X
+			end
+		end
+	)
 end

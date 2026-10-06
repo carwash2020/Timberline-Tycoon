@@ -343,6 +343,16 @@ Warehouse, which has a size limit. Saplings stay hands-on: they only grow
 while you tend them. Offline production can be revisited later as a
 retention lever.
 
+**What the first automation slice enforces (6 October 2026, V2_PLAN 10a).**
+Belts (a boxed, one-time-use kit) carry loose logs and planks into a sawmill
+or a planer and take their output away. Belts run only while the owner is
+online; belt-fed wood must be the owner's own and ordinary (Lumenwood,
+Phantomwood, figured wood, Elders and Lux wood stay hand work); a mill or
+planer takes belt-fed pieces at its tier's rate (u³ a minute, in the tier
+tables) while hand-fed pieces are never capped; and belts stop while the
+owner has 60 or more loose planks and boards, which stands in for the
+Warehouse's capacity until the Warehouse stores things.
+
 **Base tiers.** Your plot grows through named tiers that give the freeform
 building a spine, and each tier is visible from the road (sign, gate,
 flag):

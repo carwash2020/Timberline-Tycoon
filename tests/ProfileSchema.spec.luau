@@ -1071,4 +1071,38 @@ return function(t)
 		t.eq(data.skyBin, {})
 		t.eq(data.sawmillStock, {})
 	end)
+
+	t.test(
+		"planks in the Sky Bin and on the truck keep their mill and planer stamps; old saves read as 1.0; migrating is idempotent",
+		function()
+			local Schema, data = fresh()
+			local SellLogic = t.shared("SellLogic")
+			data.skyWood = {
+				{ w = "oak", v = 5, p = true, m = 1.36, d = 1.65 },
+				{ w = "oak", v = 5, p = true }, -- from before mill tiers
+				{ w = "oak", v = 3 }, -- a log
+			}
+			data.plot.placed = {
+				{ uid = "m", blueprintId = "Millmaster100", x = 0, z = 0, rot = 0, data = { x = 1.2, y = 0.8 } },
+				{ uid = "p", blueprintId = "PlanerSteam", x = 20, z = 0, rot = 0, data = { x = 1.5, y = 1 } },
+			}
+			Schema.Migrate(data)
+			t.eq(data.skyWood[1].m, 1.36)
+			t.eq(data.skyWood[1].d, 1.65)
+			t.eq(data.skyWood[2].m, nil)
+			t.eq(#data.skyWood, 3)
+			t.eq(data.plot.placed[1].data, { x = 1.2, y = 0.8 }, "a placed mill keeps its cut")
+			t.eq(data.plot.placed[2].data, { x = 1.5, y = 1 }, "a planer keeps its setting")
+			-- The bin pays the stamped plank more than the old one, and the log never.
+			local value = SellLogic.EntriesValue(data.skyWood)
+			local plain = SellLogic.PieceValue("oak", "plank", 5) * 2 + SellLogic.PieceValue("oak", "log", 3)
+			t.ok(value > plain, "the stamped plank is worth more")
+			local old = SellLogic.EntryValue(data.skyWood[2])
+			t.eq(old, SellLogic.PieceValue("oak", "plank", 5), "an old entry is worth what it always was")
+			-- A second migration changes nothing.
+			local before = { m = data.skyWood[1].m, d = data.skyWood[1].d, n = #data.skyWood }
+			Schema.Migrate(data)
+			t.eq({ m = data.skyWood[1].m, d = data.skyWood[1].d, n = #data.skyWood }, before)
+		end
+	)
 end

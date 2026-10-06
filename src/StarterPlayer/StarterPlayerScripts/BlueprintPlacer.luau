@@ -32,8 +32,9 @@ local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
+local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
-local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
+local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
@@ -62,6 +63,7 @@ local PUSH_SPEED = 18 -- studs a second while RB or LB is held
 
 export type Options = {
 	moveUid: string?, -- moving this placed item instead of buying a new one
+	boxUid: string?, -- placing the item out of this opened box (sawmill, planer, belt): one use, the box is spent on a successful place
 	onStop: (() -> ())?, -- called once placing ends, however it ends
 }
 
@@ -261,6 +263,20 @@ local function setBarText(text: string, ok: boolean)
 	end
 end
 
+-- " (Steam, tier 4 of 5)" for a sawmill or a planer: the tier on the placing bar
+-- (Connor: a tier label in the placement UI). Empty for anything else.
+local function tierWords(id: string): string
+	local mill = ItemCatalog.GetSawmill(id)
+	if mill then
+		return " (" .. SawmillLogic.TierText(mill) .. ")"
+	end
+	local machine = PlanerLogic.Get(id)
+	if machine then
+		return " (" .. PlanerLogic.TierText(machine) .. ")"
+	end
+	return ""
+end
+
 local function update(s: State)
 	local plotCFrame = BlueprintPlacer.PlotCFrame()
 	local root = rootPart()
@@ -271,7 +287,11 @@ local function update(s: State)
 	local size = (PlotData.Tier(tier()) or PlotData.Tiers[1]).size
 	local me = plotCFrame:PointToObjectSpace(root.Position)
 	if math.max(math.abs(me.X), math.abs(me.Z)) > size / 2 + LEAVE_REACH then
-		HUD.Toast("You left your plot.")
+		HUD.Toast(
+			if s.options.boxUid
+				then "Walk onto your plot, then open the box again. It is still yours."
+				else "You left your plot."
+		)
 		BlueprintPlacer.Stop()
 		return
 	end
@@ -292,8 +312,9 @@ local function update(s: State)
 		s.y,
 		BlueprintPlacer.MySquares()
 	)
-	local price = if s.bp.kit then PlotData.Price(s.bp) else s.bp.priceCash
-	if ok and not s.options.moveUid then
+	-- Out of a box the item is already paid for: no price, no cash check.
+	local price = if s.options.boxUid then 0 elseif s.bp.kit then PlotData.Price(s.bp) else s.bp.priceCash
+	if ok and not s.options.moveUid and not s.options.boxUid then
 		local cash = (player:GetAttribute("Cash") :: number?) or 0
 		if cash < price then
 			ok, why = false, string.format("You need %s more", Util.formatCash(price - cash))
@@ -303,11 +324,14 @@ local function update(s: State)
 	s.highlight.FillColor = if ok then VALID else INVALID
 	s.highlight.OutlineColor = s.highlight.FillColor
 	local verb = if s.options.moveUid then "Move" else "Place"
-	local priceText = if s.options.moveUid then "" else " · " .. Util.formatCash(price)
+	local priceText = if s.options.moveUid
+		then ""
+		elseif s.options.boxUid then " · from your box (Q keeps it)"
+		else " · " .. Util.formatCash(price)
 	local height = if s.y ~= 0 then string.format(" · %.1f up", s.y) else ""
 	setBarText(
 		if ok
-			then string.format("%s the %s%s%s", verb, s.bp.displayName, priceText, height)
+			then string.format("%s the %s%s%s%s", verb, s.bp.displayName, tierWords(s.bp.id), priceText, height)
 			else (why or "Can't go here"),
 		ok
 	)
@@ -434,8 +458,12 @@ function BlueprintPlacer.Place()
 		tellPlaced(s)
 		BlueprintPlacer.Stop()
 	else
-		Net.Remote("PlaceBlueprint"):FireServer(s.bp.id, s.x, s.z, s.rot, s.y)
+		Net.Remote("PlaceBlueprint"):FireServer(s.bp.id, s.x, s.z, s.rot, s.y, s.options.boxUid)
 		tellPlaced(s)
+		if s.options.boxUid then
+			-- One use: the box is spent by the server on this place. Nothing to repeat.
+			BlueprintPlacer.Stop()
+		end
 	end
 end
 
@@ -479,11 +507,7 @@ end
 function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	BlueprintPlacer.Stop()
 	local opts: Options = options or {}
-	local ghost = if ItemCatalog.GetSawmill(bp.id)
-		then MachineArt.Build(bp.id, true) or BlueprintModels.Build(bp, true)
-		elseif SkyBinLogic.IsBin(bp.id) then MachineArt.BuildSkyBin(true) or BlueprintModels.Build(bp, true)
-		elseif ItemCatalog.GetMachine(bp.id) then MachineArt.BuildChopSaw(true) or BlueprintModels.Build(bp, true)
-		else BlueprintModels.Build(bp, true)
+	local ghost = MachineArt.BuildAny(bp.id, true) or BlueprintModels.Build(bp, true)
 	ghost.Name = "BlueprintGhost"
 	local highlight = Instance.new("Highlight")
 	highlight.FillTransparency = 0.55
@@ -702,7 +726,25 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	update(s)
 end
 
+-- Opening a sawmill, planer or belt box: the server says which (WorldFX
+-- "PlaceBox") and the ghost starts. Cancelling keeps the box.
+local function onWorldFx(kind: unknown, payload: unknown)
+	if kind ~= "PlaceBox" or type(payload) ~= "table" then
+		return
+	end
+	local data = payload :: { [string]: unknown }
+	local uid, itemId = data.uid, data.itemId
+	if type(uid) ~= "string" or type(itemId) ~= "string" then
+		return
+	end
+	local bp = PlotLogic.Blueprint(itemId)
+	if bp then
+		BlueprintPlacer.Begin(bp, { boxUid = uid })
+	end
+end
+
 function BlueprintPlacer.Start()
+	Net.Remote("WorldFX").OnClientEvent:Connect(onWorldFx)
 	local gui = UITheme.Screen("BlueprintPlacer", UITheme.Layers.World)
 	local b = UITheme.Bar(gui, "Placing")
 	barLabel = b.label

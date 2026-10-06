@@ -23,7 +23,7 @@ Net.RemoteNames = {
 	"BuyRobuxItem", -- client -> server: ("Pass" | "Product", key) the server shows Roblox's prompt
 	"UseInstantDelivery", -- client -> server: () sell the truck bed from anywhere (a Robux product)
 	"MineNode", -- client -> server: (nodeUid) one swing at a crystal node
-	"PlaceBlueprint", -- client -> server: (blueprintId, x, z, rot) build on your plot (plot-local studs)
+	"PlaceBlueprint", -- client -> server: (blueprintId, x, z, rot, y?, boxUid?) build on your plot (plot-local studs); a sawmill, planer or belt names the opened box it comes out of (one use)
 	"MoveBlueprint", -- client -> server: (uid, x, z, rot) move a placed item on your plot
 	"UseBlueprint", -- client -> server: (uid) use the rolled plan in your hand: it is consumed and the building joins your blueprint book
 	"DropBlueprint", -- client -> server: (uid) lay an unused plan on the ground
@@ -41,6 +41,7 @@ Net.RemoteNames = {
 	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)
 	"Swing", -- client -> server: (woodId | "node" | "v1", cancel?) the pose. Damage stays on Chop / ChopTree / MineNode
 	"SawmillSet", -- client -> server: (uid, "x" | "y", 1 | -1) nudge a placed mill's cut (v2 loop: SawmillService)
+	"PlanerSet", -- client -> server: (uid, "x" | "y", 1 | -1) nudge a placed planer's setting (PlanerService)
 	"Dialogue", -- client -> server: ("open", npcId) or ("pick", nodeId, i). The reply is server -> client.
 	"BoxOpen", -- client -> server: (box) open a box you own
 	"SpawnPadPress", -- client -> server: (pad) the button on a vehicle pad

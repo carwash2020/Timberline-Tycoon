@@ -140,6 +140,8 @@ export type Piece = {
 	figure: string?,
 	boost: number,
 	lux: boolean, -- a Lux swing tagged this piece, or the piece it was cut from (SellLogic.InheritLux)
+	mill: number, -- the plankBonus of the sawmill that cut this plank (1 = none: a log, or a plank from before mill tiers)
+	board: number, -- the boardBonus of the planer that finished it (1 = not a finished board)
 	treeUid: string?,
 	createdAt: number, -- os.clock() it was cut free (GrabLogic's grace)
 	lastInteracted: number,
@@ -178,6 +180,8 @@ export type Info = {
 	figure: string?,
 	boost: number?,
 	lux: boolean?,
+	mill: number?,
+	board: number?,
 	treeUid: string?,
 	createdAt: number?,
 	elder: boolean?,
@@ -460,6 +464,18 @@ function WoodService.All(): { [string]: Piece }
 	return pieces
 end
 
+-- How many loose planks and finished boards `ownerId` has in the world
+-- (AutomationLogic.MaxLooseOutputs: the Warehouse stand-in).
+function WoodService.CountOutputs(ownerId: number): number
+	local n = 0
+	for _, p in pairs(pieces) do
+		if p.ownerId == ownerId and p.kind == "plank" and not p.dead and not p.selling then
+			n += 1
+		end
+	end
+	return n
+end
+
 -- WoodWatch's last word: the server simulates it, or its device's last
 -- move was believable. SellService takes only these.
 function WoodService.VerdictOk(piece: Piece): boolean
@@ -472,7 +488,7 @@ local function worth(p: Piece): (number, number)
 	for _, part in pairs(p.parts) do
 		volume += SectionLogic.Volume(part.Size.X, part.Size.Y, part.Size.Z)
 	end
-	return volume, SellLogic.PieceValue(p.woodId, p.kind, volume, p.figure, p.boost, p.lux)
+	return volume, SellLogic.PieceValue(p.woodId, p.kind, volume, p.figure, p.boost, p.lux, p.mill, p.board)
 end
 
 -- The piece's mass by its sections (dress is massless), as the engine
@@ -501,6 +517,9 @@ local function publish(p: Piece)
 	m:SetAttribute("Figure", p.figure)
 	m:SetAttribute("Boost", if p.boost > 1 then p.boost else nil)
 	m:SetAttribute("LuxCut", if p.lux then true else nil)
+	m:SetAttribute("MillBonus", if p.mill > 1 then p.mill else nil)
+	m:SetAttribute("BoardBonus", if p.board > 1 then p.board else nil)
+	m:SetAttribute("Finished", if p.board > 1 then true else nil)
 	m:SetAttribute("Elder", if p.elder then true else nil)
 	m:SetAttribute("LastInteracted", p.lastInteracted)
 	if m:GetAttribute("HeldBy") == nil then
@@ -606,6 +625,8 @@ local function makeRecord(model: Model, info: Info): Piece
 		figure = info.figure,
 		boost = math.max(1, info.boost or 1),
 		lux = info.lux == true,
+		mill = if info.kind == "plank" then SellLogic.Bonus(info.mill) else 1,
+		board = if info.kind == "plank" then SellLogic.Bonus(info.board) else 1,
 		treeUid = info.treeUid,
 		createdAt = info.createdAt or now,
 		lastInteracted = now,
@@ -1022,6 +1043,8 @@ function WoodService.Register(model: Model, info: Info?): Piece
 		figure = i.figure,
 		boost = i.boost,
 		lux = if i.lux ~= nil then i.lux else model:GetAttribute("LuxCut") == true,
+		mill = i.mill or (model:GetAttribute("MillBonus") :: number?),
+		board = i.board or (model:GetAttribute("BoardBonus") :: number?),
 		createdAt = i.createdAt,
 		uid = i.uid or (if type(uidAttr) == "string" and uidAttr ~= "" then uidAttr else nil),
 	})
@@ -1035,6 +1058,8 @@ export type PlankInfo = {
 	figure: string?,
 	boost: number?,
 	lux: boolean?,
+	mill: number?, -- the cutting mill's plankBonus, stamped on the plank
+	board: number?, -- a planer's boardBonus, when a finished board is spawned
 	lastHolderId: number?,
 }
 
@@ -1070,6 +1095,8 @@ function WoodService.SpawnPlank(info: PlankInfo): Piece?
 		figure = info.figure,
 		boost = info.boost,
 		lux = info.lux,
+		mill = info.mill,
+		board = info.board,
 	})
 	weld(model, section)
 	setGroup(model, WoodService.WoodGroup)
@@ -1409,6 +1436,8 @@ function WoodService.SplitPiece(p: Piece, sid: number, h: number, swingLux: bool
 			figure = p.figure,
 			boost = p.boost,
 			lux = p.lux,
+			mill = p.mill,
+			board = p.board,
 			treeUid = p.treeUid,
 			createdAt = p.createdAt,
 			elder = p.elder,

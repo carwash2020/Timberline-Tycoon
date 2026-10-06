@@ -107,6 +107,8 @@ export type SkyWood = {
 	p: boolean?,
 	b: number?,
 	l: boolean?, -- cut with the Lux Axe: +10% at sale
+	m: number?, -- a plank's mill bonus (SellLogic.Bonus); absent means 1.0
+	d: number?, -- a finished board's planer bonus; absent means 1.0
 }
 
 -- One loose piece of wood saved off your truck's beds (the v2 loop,
@@ -123,6 +125,8 @@ export type TruckPiece = {
 	f: string?,
 	x: number?,
 	l: boolean?,
+	m: number?,
+	d: number?,
 	bed: string,
 	at: { number },
 	s: { { number } },

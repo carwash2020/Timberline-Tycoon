@@ -8,9 +8,22 @@ return function(t)
 		for _, kind in ipairs({ "Axe", "Gear", "Cosmetic" }) do
 			t.eq(BoxUnpack.Mode(kind), "pickup", kind)
 		end
-		for _, kind in ipairs({ "Sawmill", "Machine", "Blueprint" }) do
+		for _, kind in ipairs({ "Machine", "Blueprint" }) do
 			t.eq(BoxUnpack.Mode(kind), "stock", kind)
 		end
+		-- Sawmills, planers and belts open into a one-time placement ghost instead.
+		t.eq(BoxUnpack.Mode("Sawmill"), "place")
+		t.eq(BoxUnpack.Mode("Sawmill", "Millmaster100"), "place")
+		t.eq(BoxUnpack.Mode("Machine", "PlanerSteam"), "place")
+		t.eq(BoxUnpack.Mode("Machine", "ConveyorFunnel"), "place")
+		t.eq(BoxUnpack.Mode("Machine", "ChopSaw"), "stock", "the chop saw and the Sky Bin keep the hammer flow")
+		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "stock")
+		t.eq(BoxUnpack.Mode("Machine", "Nope"), "stock")
+		t.ok(string.find(BoxUnpack.OpenedLine("place", "Steam Planer"), "box is used up", 1, true) ~= nil)
+		t.ok(
+			string.find(BoxUnpack.OpenedLine("place", "Steam Planer"), "hammer", 1, true) == nil,
+			"no hammer in the new flow"
+		)
 		t.eq(BoxUnpack.Mode("Truck"), "vehicle")
 		t.eq(BoxUnpack.Mode("Trailer"), "vehicle")
 		t.eq(BoxUnpack.Mode("Whatever"), "pickup")

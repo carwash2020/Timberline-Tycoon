@@ -44,6 +44,8 @@ local SectionTrees = require(script.Parent.SectionTrees)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local SaveSlotService = require(script.Parent.SaveSlotService)
 local ChopSawService = require(script.Parent.ChopSawService)
+local BeltService = require(script.Parent.BeltService)
+local PlanerService = require(script.Parent.PlanerService)
 local SawmillService = require(script.Parent.SawmillService)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SellService = require(script.Parent.SellService)
@@ -729,6 +731,10 @@ if CoreLoop.V2() then
 	safely("GrabService.Init", GrabService.Init, { Grab = remote.Grab, Release = remote.Release }, notify)
 	-- Placed sawmills (M2.2): a straight log in the intake comes out as planks.
 	safely("SawmillService.Init", SawmillService.Init, notify, remote.SawmillSet)
+	-- Planers (a plank in, a finished board out) and the conveyor belts that feed
+	-- and carry from them (V2_PLAN.md §2h, §10).
+	safely("PlanerService.Init", PlanerService.Init, notify, remote.PlanerSet)
+	safely("BeltService.Init", BeltService.Init)
 	safely("ChopSawService.Init", ChopSawService.Init, notify, remote.ChopSawSet)
 	safely("DevCommands.Init", DevCommands.Init, notify)
 	safely("AdminService.Init", AdminService.Init, notify)
@@ -812,6 +818,8 @@ if CoreLoop.V2() then
 					figure = saved.f,
 					boost = saved.x,
 					lux = saved.l == true,
+					mill = saved.m,
+					board = saved.d,
 					createdAt = os.clock() - GameConfig.PickupGraceSec + math.max(0, graceSec),
 				})
 			end
@@ -926,6 +934,10 @@ BootReport.StartStubs({
 		init = function()
 			if BoxService.Init then
 				BoxService.Init(remote.BoxOpen)
+				-- Opening a sawmill, planer or belt box starts the one-time placement ghost.
+				BoxService.OnPlace = function(player: Player, uid: string, itemId: string)
+					remote.WorldFX:FireClient(player, "PlaceBox", { uid = uid, itemId = itemId })
+				end
 			end
 		end,
 	},

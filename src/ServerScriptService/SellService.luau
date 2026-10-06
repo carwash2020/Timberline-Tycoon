@@ -152,7 +152,16 @@ local function price(d: Deps, model: Model): Priced?
 		piece = piece,
 		woodId = woodId,
 		volume = volume,
-		value = SellLogic.PieceValue(woodId, kind, volume, figure, boost, lux),
+		value = SellLogic.PieceValue(
+			woodId,
+			kind,
+			volume,
+			figure,
+			boost,
+			lux,
+			attrNumber(model, "MillBonus"),
+			attrNumber(model, "BoardBonus")
+		),
 		figure = figure,
 	}
 end

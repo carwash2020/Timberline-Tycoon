@@ -8,6 +8,11 @@
 --     log or plank price ($/u³, WoodData[*].v2) x its figure's multiplier
 --     (the Hidden Grain, ForestLogic.Multiplier) x its boost (2x Wood
 --     while it was cut). 2x Cash is applied once per sale, on the total.
+--   * A plank also carries two multipliers it was stamped with when it was
+--     made (V2_PLAN.md §2h): `mill`, the plankBonus of the sawmill that cut
+--     it (1.0 to 1.5), and `board`, the boardBonus of the planer that
+--     finished it (1.2 to 2.0; absent on an unplaned plank). A piece keeps
+--     them for life, like figure and boost; a piece without them is 1.0.
 --   * Wood pays its owner, not whoever pushed it onto the pad; an owner
 --     who has left passes it to the last player who held it; nobody
 --     online gets nothing (the wood still goes).
@@ -47,14 +52,30 @@ function SellLogic.PieceValue(
 	volumeU3: number,
 	figure: string?,
 	boost: number?,
-	lux: boolean?
+	lux: boolean?,
+	mill: number?,
+	board: number?
 ): number
 	local v = math.max(0, volumeU3) * SellLogic.PricePerU3(woodId, kind)
 	v = v * ForestLogic.Multiplier(figure) * math.max(1, boost or 1)
 	if lux then
 		v *= GameConfig.LuxSellBonus
 	end
+	if kind == "plank" then
+		v = v * SellLogic.Bonus(mill) * SellLogic.Bonus(board)
+	end
 	return v
+end
+
+-- A stamped bonus, as it counts: never under 1 (an old piece has none),
+-- never above BonusCap (a save is data), and NaN is 1.
+SellLogic.BonusCap = 3
+
+function SellLogic.Bonus(value: number?): number
+	if type(value) ~= "number" or value ~= value then
+		return 1
+	end
+	return math.clamp(value, 1, SellLogic.BonusCap)
 end
 
 -- The tag a child piece keeps. A Lux chop tags the wood; a later chop never
@@ -106,7 +127,16 @@ end
 -- ProfileSchema.SkyWood): its wood id, volume in u³, figure, true for a
 -- plank, and its boost (nil = 1). Short keys: a save holds a list of them.
 
-export type Entry = { w: string, v: number, f: string?, p: boolean?, b: number?, l: boolean? }
+export type Entry = {
+	w: string,
+	v: number,
+	f: string?,
+	p: boolean?,
+	b: number?,
+	l: boolean?,
+	m: number?, -- the mill bonus a plank was stamped with
+	d: number?, -- the planer's board bonus, on a finished board
+}
 
 local function finite(n: unknown): boolean
 	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
@@ -119,7 +149,9 @@ function SellLogic.Entry(
 	volumeU3: number,
 	figure: string?,
 	boost: number?,
-	lux: boolean?
+	lux: boolean?,
+	mill: number?,
+	board: number?
 ): Entry
 	return {
 		w = woodId,
@@ -128,6 +160,8 @@ function SellLogic.Entry(
 		p = if kind == "plank" then true else nil,
 		b = if finite(boost) and (boost :: number) > 1 then boost else nil,
 		l = if lux then true else nil,
+		m = if finite(mill) and (mill :: number) > 1 then math.min(mill :: number, SellLogic.BonusCap) else nil,
+		d = if finite(board) and (board :: number) > 1 then math.min(board :: number, SellLogic.BonusCap) else nil,
 	}
 end
 
@@ -156,7 +190,9 @@ function SellLogic.EntryValue(entry: Entry): number
 		entry.v,
 		figure,
 		boost,
-		entry.l == true
+		entry.l == true,
+		if finite(entry.m) then entry.m else nil,
+		if finite(entry.d) then entry.d else nil
 	)
 end
 

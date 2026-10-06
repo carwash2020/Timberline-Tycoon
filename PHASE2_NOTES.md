@@ -2341,3 +2341,65 @@ Connor: "remove the skybox that collects dropped wood at the sawmill and make it
 - [ ] Walk to your bin: **Sell Sky Bin** shows only while it has wood; it pays with the usual sale toast; from far away it does nothing ("Walk closer to your Sky Bin."); a friend visiting your plot does not see the prompt, and cannot sell your wood
 - [ ] Old save with wood in the Sky Bin (use a save from before this change, or set `skyWood` in Studio): you join with a Sky Bin in your stock and the wood still in it; place it, sell the wood. Rejoin: still exactly one bin
 - [ ] Preview: `bash tools/preview/shoot.sh town` shows the sell station with nothing in the north-west corner
+
+## Mill and planer tiers, belts, boxes that place once (claude/mill-tiers, 6 October 2026)
+
+Connor: "create different versions of the sawmill ... they progress in cost but also upgrade how much you get from the sold items", the same for a planer, a plank size you can set on both, conveyors "so players can build automated systems (log in -> sawmill -> plank belt -> planer -> board out)", and "an object in a box: you buy the box, open it, and the object is placed down as a one-time use". The tables and the reasoning are in V2_PLAN.md section 2h and 10a; this is what to check in Studio.
+
+**What changed**
+- **Five sawmill tiers** (ids and prices unchanged): Rickety $130 x1.00, Sturdy $1,600 x1.10, Mill (Millmaster 100) $11,000 x1.22, Steam (Millmaster 200) $22,500 x1.36, Industrial (Millmaster 200 Long) $86,500 x1.50. The multiplier is `plankBonus`, stamped on each plank the mill cuts and applied in `SellLogic.PieceValue` (server only; a piece with no stamp is 1.0).
+- **Four planer tiers** (new, `PlanerLogic`, `PlanerService`): Hand $2,500 x1.20, Bench $9,000 x1.40, Steam $30,000 x1.65, Industrial $95,000 x2.00 (`boardBonus`). A plank in, the same piece out as a finished board, planed down to the setting; at most **2 planers per plot**, the owner's only.
+- **A belt kit** (new): Straight Belt $80, Turn Belt $100, Funnel Belt $60, at most 150 belt pieces per plot. Belts carry loose logs and planks into a mill or planer and take their output away.
+- **Size panel on every mill and planer** shows the size AND the limit ("1.00 x 0.60 u / up to 1.8 x 1.2 u, steps of 0.2"); higher tiers have a wider range and finer steps (Industrial steps by 0.05). Plank length is not adjustable.
+- **One-time boxes.** Sawmills, planers and belt pieces: buy the box, OPEN it (the same Interact as every box), and a placement ghost starts on your plot; click or PLACE to put it down (the box is used up), Q or CANCEL keeps the box. No hammer stock, no blueprint book entry. The hammer still moves and turns what you placed and sells it back for half (it is gone, not boxed). Old saves with a sawmill in `sawmillStock` still place it from stock. The chop saw and the Sky Bin are unchanged.
+- **Tier labels**: on the box ("MILL, TIER 3 OF 5"), in the Tool Shed's "Browse saws" list, on the machine's sign, and on the placing bar ("Place the Millmaster 100 (Mill (tier 3 of 5)) from your box").
+- **Automation rules (GAME_DESIGN section 9):** belts run only while you are online; belt-fed wood must be yours and ordinary (no Lumenwood, Phantomwood, figured, Elder or Lux wood: those stay hand work); a mill or planer takes belt-fed pieces at its tier's rate only (Rickety 6 u3/min up to Industrial 110; planers 8 to 80); hand-fed pieces are never capped; belts stop while you have 60 or more loose planks and boards (the Warehouse stand-in) and start again when you clear the floor.
+- **Economy:** the early ladder is untouched. The model does not buy planers or belts and does not model `plankBonus` (modelling it shortens the full plot to 20.8 h, outside 28-36 h; see ECONOMY.md and V2_PLAN 2h). All headline ranges still hold: 68 s / 7.9 min / 13.7 min / 51.4 min / 30.5 h.
+- Tool Shed shelves: the tables run to z 16.8 (the back corners beside the counter) so every new box has a place; planer boxes are sized by tier (S, M, M, M), belt boxes are small (S).
+- Saves: no new profile field. Planks in the Sky Bin and on the truck gain optional short keys `m` (mill bonus) and `d` (planer bonus); old entries read as 1.0. A placed mill keeps its cut (a cut on the 0.2 grid is legal on every finer grid); a planer's saved setting is clamped to its tier on every load.
+
+**Not done (follow-ups):** the logic network (levers, sensors, sorting, wires into belts), the sweeper, tilted belts and switches, a real Warehouse inventory (so the 60-piece cap becomes a capacity), saving loose wood on a plot, belts that cross plots, a planer/mill output bin, adjustable plank length. Nothing here has been seen in Studio.
+
+### Studio checks
+Buying and placing (do each tier you can afford, `/cash` or the owner hub helps)
+- [ ] Tool Shed: boxes for every Rickety to Industrial mill, four planers and three belt pieces are all on the tables, none floating, none overlapping; each mill and planer label has a second line ("RICKETY, TIER 1 OF 5" ... "INDUSTRIAL, TIER 4 OF 4"); the back corners beside the counter now have tables under the boxes
+- [ ] Buy a Sturdy Sawmill: "Paid for the Sturdy Sawmill. Open the box." Open it ON your plot: a see-through mill ghost appears with "Place the Sturdy Sawmill (Sturdy (tier 2 of 5)) · from your box (Q keeps it)"; rotate (R), aim, click: it is built, the box folds away, no cash is taken. Open a box away from your plot: "Walk onto your plot, then open the box again. It is still yours."
+- [ ] Cancel with Q: the box is still there and still opens. Place somewhere blocked: a red ghost with the reason; the box is not spent
+- [ ] Walk off and rejoin with an unopened box: it is back on the Tool Shed counter, still owed, still opens
+- [ ] The hammer on a placed mill/planer/belt: Move and Turn work, Sell pays half and the thing is gone (no box, no stock entry). The hammer's PLANS list no longer lists mills, planers or belts
+- [ ] An old save with a sawmill in stock: it is still in the hammer list under Machines and places for free as before
+- [ ] Planers: buy a Hand Planer and a Bench Planer, place both. Try to buy a third: the counter says "You already have 2 planers (placed or waiting in a box)..." and takes nothing. With two placed and a box in hand, placing the third says "A plot has room for 2 planers. Take one apart first." and keeps the box. A friend with build rights cannot place a planer or a belt on your plot ("Only the plot's owner can put a planer down.")
+- [ ] Belts: place Straight, Turn and Funnel pieces; the 151st is refused ("A plot has room for 150 belt pieces.")
+
+Art (each tier looks different)
+- [ ] Mills: Rickety (plain wood shed) then Sturdy (corner posts), Mill (metal roof and a stack), Steam (a brass boiler with a dome on the roof), Industrial (diamond-plate walls, a yellow gantry with two lamps); every one has its TIER sign on the roof lip. No mill's detail blocks a log or a player
+- [ ] Planers: Hand (wood), Bench (planks and posts), Steam (metal, a brass pipe), Industrial (diamond plate, gantry and lamps); rollers and a cutter head over the belt, a size board on the east side
+- [ ] Belts: a straight trough with rails and legs; the turn bends to the right when you look along it; the funnel has a wide mouth narrowing to a belt
+
+Cut and plane, compare the payout
+- [ ] Cut the same oak with a Rickety (plank x1.00) and a Millmaster 200L (x1.50) at the same cut: sell one plank of each; the Industrial plank pays 1.5 times as much per u3 (hold a plank: the tooltip value shows the bonus)
+- [ ] A Hand Planer at 1.0 x 0.6: put a 1.0 x 0.6 plank in: it rides through and comes out a finished board (pays 1.2 times the plank). Put in a 1.8 x 1.2 plank: it comes out 1.0 x 0.6 (planed down, smaller, same length). Set the planer to 1.4 x 0.8 and put in a 1.0 x 0.6 plank: it stays in the mouth with "That plank is smaller than the planer's setting. Lower the setting."
+- [ ] A finished board fed in again: "That board is already finished." A log: "The planer only takes planks, not logs."
+- [ ] A Sturdy plank (x1.10) through a Hand Planer (x1.20) sells for 1.32 times a plain plank; the same plank through an Industrial Planer, 2.2 times
+- [ ] Sky Bin and truck: send stamped planks down a Cloud Chute and sell the bin: it pays the stamped value; park a truck with stamped planks, rejoin: they are still stamped (the tooltip value is unchanged)
+- [ ] Old save (planks with no stamp in the Sky Bin or on a truck): they sell at the plain plank price, exactly as before
+
+Sizes
+- [ ] The board on a mill shows "1.00 x 0.60 u" and under it "up to 1.8 x 1.2 u, steps of 0.2" (Rickety); the screen panel (E, X, tap) shows the tier name, the size and the limit. X+ / Y+ stop at the limit and X- / Y- at 0.6 / 0.4
+- [ ] The Industrial mill steps by 0.05 (1.00, 1.05, 1.10 ...), the Mill and Steam by 0.1, the others by 0.2. A placed mill from before keeps its cut
+- [ ] A friend cannot change your mill's or planer's size; from far away nothing changes
+
+Belts and automation (build log in -> sawmill -> plank belt -> planer -> board out)
+- [ ] Lay straight belts behind a sawmill (same turn, the belt's far end at the mill's back) and drop an oak log on the near end: it rides into the mill's mouth and is cut. Put a straight belt in front of the mill's outfeed: the planks ride along it
+- [ ] Run the planks round a turn belt and into a planer's back: a finished board comes out of the planer's front and rides the next belt. Try a funnel at the start: logs dropped across its wide mouth are squeezed onto one belt
+- [ ] Hand-feed the same mill quickly several times: it takes every one (no cap). Feed it from the belt: it takes about one log per (volume / rate) minutes; the Rickety is slow, the Industrial is fast; a very big log still goes in and the next one waits
+- [ ] A Lumenwood or figured log on a belt is refused with "Rare and figured wood only goes through by hand."; a log of another player's on your belt: "A belt only feeds its owner's own wood."; dropped by hand into the same mill, either works
+- [ ] Leave the game with a belt running (a second player stays): the belt stops moving wood; rejoin: it runs again. Two players, two plots: each plot's belts follow their own owner
+- [ ] Let 60 planks or boards pile up on the plot: belts stop and the next belt-fed piece is refused ("Your plot is full of planks..."); sell or load some and the line starts again. A belt loop just circulates (it never jams a mill)
+- [ ] Rejoin with machines placed: they come back with their settings; wood lying on belts is not saved (the follow-up)
+
+Sizes, shelves and the placer on phone and Xbox
+- [ ] Phone: the placement ghost, PLACE and CANCEL buttons work for a box; the size panel's buttons are at least 44 px. Xbox: the box opens with X, the ghost with LT/stick as for blueprints, B cancels (the box stays)
+
+### What it would take to make the Sky Bin (merged earlier) one-time boxed too
+Mark it `placeFromBox = true` in `ItemCatalog.Machines` (`BoxUnpack.Mode`, `AutomationLogic.PlacedFromBox` and `PlotService.Place` then do the rest), drop its entries from the stock paths (`ShopService.deliver`, `SkyBinLogic.Migrate` would hand an old owner a pending box in `profile.storage` instead of a stock id), and replace "Take back" (`HammerLogic.PieceActions`, `PlotService.Sell`'s Sky Bin branch, `SkyBinLogic.BackInStockLine`) with the sell-for-half rule. The one real decision: the bin holds wood (`profile.skyWood`), so selling or taking it apart must either be refused while it has wood in it or pay the wood out first (as "Sell Sky Bin" does); and the one-per-player rule (`skyBinOwned`) would count the box, the placed bin and nothing else. Specs to touch: SkyBinLogic, PlotService, ShopService, ProfileSchema, AetherServiceV2.

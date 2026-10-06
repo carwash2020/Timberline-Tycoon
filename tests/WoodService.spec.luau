@@ -591,4 +591,95 @@ return function(t)
 		t.eq(pairs["MillBelt|Wood"], nil)
 		t.eq(pairs["Mill|WoodFalling"], nil, "a falling tree still hits the mill")
 	end)
+
+	t.test(
+		"a plank keeps its mill's bonus and a board its planer's: stamped, shown, in its value, kept by every cut",
+		function()
+			local s = setup()
+			local plain = s.Wood.SpawnPlank({
+				woodId = "oak",
+				size = Vector3.new(1.6, 6, 1),
+				cf = CFrame.new(0, 2, 0),
+				ownerId = 3,
+			})
+			t.eq(plain.mill, 1, "an old-style plank has no bonus")
+			t.eq(plain.board, 1)
+			t.eq(plain.model:GetAttribute("MillBonus"), nil)
+			t.eq(plain.model:GetAttribute("Finished"), nil)
+			local stamped = s.Wood.SpawnPlank({
+				woodId = "oak",
+				size = Vector3.new(1.6, 6, 1),
+				cf = CFrame.new(4, 2, 0),
+				ownerId = 3,
+				mill = 1.36,
+			})
+			t.eq(stamped.mill, 1.36)
+			t.eq(stamped.model:GetAttribute("MillBonus"), 1.36)
+			t.ok(math.abs(stamped.value - plain.value * 1.36) < 1e-6, "the value carries the mill's bonus")
+			-- A finished board.
+			local board = s.Wood.SpawnPlank({
+				woodId = "oak",
+				size = Vector3.new(1.6, 6, 1),
+				cf = CFrame.new(8, 2, 0),
+				ownerId = 3,
+				mill = 1.36,
+				board = 1.65,
+			})
+			t.eq(board.model:GetAttribute("BoardBonus"), 1.65)
+			t.eq(board.model:GetAttribute("Finished"), true)
+			t.ok(math.abs(board.value - plain.value * 1.36 * 1.65) < 1e-6)
+			-- A log never carries one, whatever is passed.
+			local log = s.log(2, 4, 2, nil, { mill = 1.5, board = 2 })
+			t.eq({ log.mill, log.board }, { 1, 1 })
+			-- Cutting a stamped plank in two: both halves keep the stamps.
+			local part = board.parts[1]
+			local result
+			local n = 0
+			repeat
+				n += 1
+				result = s.Wood.CutPiece(s.player(1), board, part, part.CFrame.Position, Vector3.yAxis, 50, false)
+			until #result.pieces > 0 or n > 50
+			t.eq(#result.pieces, 2)
+			for _, q in ipairs(result.pieces) do
+				t.eq({ q.mill, q.board }, { 1.36, 1.65 })
+				t.eq(q.model:GetAttribute("BoardBonus"), 1.65)
+			end
+			-- A junk stamp is 1.0, a huge one is capped.
+			local junk = s.Wood.SpawnPlank({
+				woodId = "oak",
+				size = Vector3.new(1.6, 6, 1),
+				cf = CFrame.new(12, 2, 0),
+				ownerId = 3,
+				mill = 0 / 0,
+				board = 99,
+			})
+			t.eq({ junk.mill, junk.board }, { 1, 3 })
+		end
+	)
+
+	t.test(
+		"a re-registered plank takes its stamps back from its attributes; CountOutputs counts an owner's planks",
+		function()
+			local s = setup()
+			local model = Instance.new("Model")
+			local part = Instance.new("Part")
+			part.Name = "Section"
+			part.Size = Vector3.new(1.6, 6, 1)
+			part:SetAttribute("Section", 1)
+			part.Parent = model
+			model:SetAttribute("Uid", "dev-2")
+			model:SetAttribute("WoodId", "oak")
+			model:SetAttribute("Kind", "plank")
+			model:SetAttribute("MillBonus", 1.22)
+			model:SetAttribute("BoardBonus", 1.4)
+			model.Parent = s.Wood.Folder()
+			local p = s.Wood.Register(model, { woodId = "oak", nodes = {}, parts = {}, ownerId = 4 })
+			t.eq({ p.mill, p.board }, { 1.22, 1.4 })
+			t.eq(s.Wood.CountOutputs(4), 1)
+			t.eq(s.Wood.CountOutputs(5), 0)
+			s.Wood.SpawnPlank({ woodId = "oak", size = Vector3.new(1.6, 6, 1), cf = CFrame.new(0, 2, 0), ownerId = 4 })
+			s.log(2, 4, 2, nil, { ownerId = 4 })
+			t.eq(s.Wood.CountOutputs(4), 2, "logs are not outputs")
+		end
+	)
 end

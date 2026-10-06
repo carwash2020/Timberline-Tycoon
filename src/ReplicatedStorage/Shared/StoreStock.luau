@@ -347,6 +347,41 @@ function StoreStock.Vehicle(itemId: string): Slot?
 	return nil
 end
 
+-- The tier line under a sawmill's or planer's name on its box and shelf
+-- label: "MILL, TIER 3 OF 5" (nil for anything with no tiers). Connor: a tier
+-- label on the box.
+function StoreStock.TierLabel(kind: string, itemId: string): string?
+	if kind == "Sawmill" then
+		local mill = ItemCatalog.GetSawmill(itemId)
+		if mill then
+			return string.format(
+				"%s, TIER %d OF %d",
+				string.upper(mill.tierName),
+				mill.tier,
+				#ItemCatalog.SawmillList()
+			)
+		end
+	elseif kind == "Machine" then
+		local machine = ItemCatalog.GetMachine(itemId)
+		local def = if machine then machine.planer else nil
+		if machine and def then
+			local planers = 0
+			for _, m in ipairs(ItemCatalog.MachineList()) do
+				if m.planer then
+					planers += 1
+				end
+			end
+			return string.format(
+				"%s, TIER %d OF %d",
+				string.upper(machine.tierName or machine.displayName),
+				def.tier,
+				planers
+			)
+		end
+	end
+	return nil
+end
+
 function StoreStock.DisplayName(kind: string, itemId: string): string
 	local slot = StoreStock.Find(kind, itemId)
 	if slot then
@@ -383,7 +418,7 @@ local SHOPS: { [string]: Shop } = {
 				x0 = -13.7,
 				x1 = -5.8,
 				z0 = -21.3,
-				z1 = 10.5,
+				z1 = 16.8, -- the back corners beside the counter (the counter is x -4.8 to 4.8; the gold table starts at z 17.1)
 				y = StoreStock.TableTop,
 				kinds = { "Axe", "Machine" }, -- the Sky Bin's small box rides the axe table's spare room
 			},
@@ -392,7 +427,7 @@ local SHOPS: { [string]: Shop } = {
 				x0 = 5.8,
 				x1 = 13.7,
 				z0 = -21.3,
-				z1 = 10.5,
+				z1 = 16.8, -- the back corners beside the counter (the counter is x -4.8 to 4.8; the gold table starts at z 17.1)
 				y = StoreStock.TableTop,
 				kinds = { "Sawmill", "Machine" },
 			},

@@ -710,6 +710,10 @@ line(
 		.. "× the log price. The first sale and `--calibrate` haul logs only."
 )
 line()
+line(
+	"Not modelled, on purpose: each mill tier's `plankBonus` (1.0 to 1.5 on a plank's sale value), the Planer line and the conveyor kit are late-game sinks (V2_PLAN §2h). The model prices every plank at the plain plan price. Modelling the bonus with the best mill the player owns takes the full plot from about 30 h to about 21 h (tried 6 October 2026), outside the 28–36 h range, so a bonus smaller than about 1.05 at the top tier is the most the model could carry; the shipped bonuses are a Connor decision (see PHASE2_NOTES.md, Mill and planer tiers)."
+)
+line()
 line("## Headline targets (V2_PLAN §17)")
 line()
 line("| Target | Goal | Model | Verdict |")

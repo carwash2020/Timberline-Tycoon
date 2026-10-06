@@ -360,6 +360,11 @@ export type SawmillDef = {
 	width: number,
 	depth: number,
 	color: string, -- the shop swatch and the frame
+	tier: number, -- 1 to 5, the ladder: dearer is better (V2_PLAN.md §2h)
+	tierName: string, -- "Rickety", "Sturdy", "Mill", "Steam", "Industrial": the label on the box and the shelf
+	plankBonus: number, -- x on the sale value of a plank this mill cuts (stamped on the piece, SellLogic.PieceValue)
+	step: number, -- u: the cut's step on the panel (finer on the higher tiers)
+	autoRate: number, -- u³ a minute a belt may feed it (AutomationLogic); hand feeding is not capped
 }
 
 ItemCatalog.Sawmills = {
@@ -374,6 +379,11 @@ ItemCatalog.Sawmills = {
 		width = 12,
 		depth = 8,
 		color = "#8B5A2B",
+		tier = 1,
+		tierName = "Rickety",
+		plankBonus = 1.00,
+		step = 0.2,
+		autoRate = 6,
 	},
 	SawmillSturdy = {
 		id = "SawmillSturdy",
@@ -386,6 +396,11 @@ ItemCatalog.Sawmills = {
 		width = 14,
 		depth = 8,
 		color = "#6B4423",
+		tier = 2,
+		tierName = "Sturdy",
+		plankBonus = 1.10,
+		step = 0.2,
+		autoRate = 14,
 	},
 	Millmaster100 = {
 		id = "Millmaster100",
@@ -398,6 +413,11 @@ ItemCatalog.Sawmills = {
 		width = 16,
 		depth = 10,
 		color = "#A33B32",
+		tier = 3,
+		tierName = "Mill",
+		plankBonus = 1.22,
+		step = 0.1,
+		autoRate = 30,
 	},
 	Millmaster200 = {
 		id = "Millmaster200",
@@ -410,6 +430,11 @@ ItemCatalog.Sawmills = {
 		width = 18,
 		depth = 10,
 		color = "#4A4E57",
+		tier = 4,
+		tierName = "Steam",
+		plankBonus = 1.36,
+		step = 0.1,
+		autoRate = 60,
 	},
 	Millmaster200L = {
 		id = "Millmaster200L",
@@ -422,6 +447,11 @@ ItemCatalog.Sawmills = {
 		width = 26,
 		depth = 10,
 		color = "#3E4A62",
+		tier = 5,
+		tierName = "Industrial",
+		plankBonus = 1.50,
+		step = 0.05,
+		autoRate = 110,
 	},
 } :: { [string]: SawmillDef }
 
@@ -680,6 +710,34 @@ export type MachineDef = {
 	color: string,
 	boxW: number?, -- the box is sized from this footprint (studs) when set (BoxSize)
 	boxD: number?,
+	placeFromBox: boolean?, -- opening the box starts a one-time placement ghost (no hammer stock, no blueprint book)
+	tierName: string?, -- planers: the label on the box and the shelf
+	planer: PlanerDef?, -- the Planer line (Shared/PlanerLogic)
+	belt: BeltDef?, -- the conveyor kit (Shared/AutomationLogic)
+}
+
+-- A Planer tier (V2_PLAN.md §2h): it turns a plank into a finished board.
+-- Limits are in u, like the sawmills'. A plank bigger than the setting is
+-- planed down to it; one smaller is refused.
+export type PlanerDef = {
+	tier: number,
+	boardBonus: number, -- x on the sale value of a plank it finishes (stamped on the piece)
+	maxLength: number, -- u, the longest plank it takes
+	minX: number,
+	maxX: number,
+	minY: number,
+	maxY: number,
+	step: number, -- u
+	autoRate: number, -- u³ a minute a belt may feed it
+	width: number, -- plot footprint, studs
+	depth: number,
+}
+
+-- One piece of the conveyor kit (V2_PLAN.md §10). Footprint in studs.
+export type BeltDef = {
+	shape: string, -- "straight" | "turn" | "funnel"
+	width: number,
+	depth: number,
 }
 
 -- $7,500, replacing the $12,200 placeholder.
@@ -698,6 +756,139 @@ ItemCatalog.Machines = {
 		priceCash = ItemCatalog.ChopSawPrice,
 		shop = "ToolShed",
 		color = "#E2B93B",
+	},
+	-- The Planer line (V2_PLAN.md §2h): a late-game sink, not on the economy
+	-- ladder (tools/economy does not buy it).
+	PlanerHand = {
+		id = "PlanerHand",
+		displayName = "Hand Planer",
+		tierName = "Hand",
+		priceCash = 2500,
+		shop = "ToolShed",
+		color = "#B08A55",
+		placeFromBox = true,
+		boxW = 4, -- the box is sized from this, a step up for each tier (BoxSize)
+		boxD = 5,
+		planer = {
+			tier = 1,
+			boardBonus = 1.20,
+			maxLength = 10.9,
+			minX = 0.6,
+			maxX = 1.8,
+			minY = 0.4,
+			maxY = 1.2,
+			step = 0.2,
+			autoRate = 8,
+			width = 8,
+			depth = 6,
+		},
+	},
+	PlanerBench = {
+		id = "PlanerBench",
+		displayName = "Bench Planer",
+		tierName = "Bench",
+		priceCash = 9000,
+		shop = "ToolShed",
+		color = "#7C6A4F",
+		placeFromBox = true,
+		boxW = 6, -- the box is sized from this, a step up for each tier (BoxSize)
+		boxD = 8,
+		planer = {
+			tier = 2,
+			boardBonus = 1.40,
+			maxLength = 10.9,
+			minX = 0.6,
+			maxX = 2.4,
+			minY = 0.4,
+			maxY = 1.6,
+			step = 0.2,
+			autoRate = 18,
+			width = 10,
+			depth = 6,
+		},
+	},
+	PlanerSteam = {
+		id = "PlanerSteam",
+		displayName = "Steam Planer",
+		tierName = "Steam",
+		priceCash = 30000,
+		shop = "ToolShed",
+		color = "#5A6B73",
+		placeFromBox = true,
+		boxW = 6, -- the box is sized from this, a step up for each tier (BoxSize)
+		boxD = 10,
+		planer = {
+			tier = 3,
+			boardBonus = 1.65,
+			maxLength = 10.9,
+			minX = 0.6,
+			maxX = 3.0,
+			minY = 0.4,
+			maxY = 2.0,
+			step = 0.1,
+			autoRate = 40,
+			width = 12,
+			depth = 8,
+		},
+	},
+	PlanerIndustrial = {
+		id = "PlanerIndustrial",
+		displayName = "Industrial Planer",
+		tierName = "Industrial",
+		priceCash = 95000,
+		shop = "ToolShed",
+		color = "#3B4452",
+		placeFromBox = true,
+		boxW = 6, -- the box is sized from this, a step up for each tier (BoxSize)
+		boxD = 10,
+		planer = {
+			tier = 4,
+			boardBonus = 2.00,
+			maxLength = 18.9,
+			minX = 0.6,
+			maxX = 3.0,
+			minY = 0.4,
+			maxY = 2.6,
+			step = 0.05,
+			autoRate = 80,
+			width = 16,
+			depth = 8,
+		},
+	},
+	-- The conveyor kit (V2_PLAN.md §10 prices: straight 80, tight turn 100,
+	-- funnel 60). One piece to a box.
+	ConveyorStraight = {
+		id = "ConveyorStraight",
+		displayName = "Straight Belt",
+		priceCash = 80,
+		shop = "ToolShed",
+		color = "#6B5B45",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "straight", width = 4, depth = 8 },
+	},
+	ConveyorTurn = {
+		id = "ConveyorTurn",
+		displayName = "Turn Belt",
+		priceCash = 100,
+		shop = "ToolShed",
+		color = "#6B5B45",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "turn", width = 8, depth = 8 },
+	},
+	ConveyorFunnel = {
+		id = "ConveyorFunnel",
+		displayName = "Funnel Belt",
+		priceCash = 60,
+		shop = "ToolShed",
+		color = "#6B5B45",
+		placeFromBox = true,
+		boxW = 4,
+		boxD = 4,
+		belt = { shape = "funnel", width = 8, depth = 8 },
 	},
 	SkyBin = {
 		id = "SkyBin",

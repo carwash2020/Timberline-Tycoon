@@ -17,7 +17,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
@@ -40,7 +42,9 @@ local BARK = Color3.fromRGB(88, 58, 34)
 local function send(mill: Model, axis: string, dir: number)
 	local uid = mill:GetAttribute("Uid")
 	if type(uid) == "string" and (axis == "x" or axis == "y") and (dir == 1 or dir == -1) then
-		Net.Remote("SawmillSet"):FireServer(uid, axis, dir)
+		-- A planer's board is the same panel; its own remote, its own tier limits.
+		local remote = if mill:GetAttribute("PlanerId") ~= nil then "PlanerSet" else "SawmillSet"
+		Net.Remote(remote):FireServer(uid, axis, dir)
 	end
 end
 
@@ -153,7 +157,7 @@ function SawmillController.BuildPanel(tenFoot: boolean): Panel
 	readout.Font = Enum.Font.GothamBold
 	readout.TextSize = SawmillLogic.PanelTextPx
 	readout.TextColor3 = CREAM
-	readout.Text = "1.0 × 0.6 u"
+	readout.Text = "1.00 × 0.60 u"
 	readout.AutomaticSize = Enum.AutomaticSize.XY
 	readout.Parent = root
 
@@ -324,7 +328,23 @@ local function readoutText(mill: Model): string
 	local y = mill:GetAttribute("CutY")
 	local nx = if type(x) == "number" then x else 1
 	local ny = if type(y) == "number" then y else 0.6
-	return string.format("%.1f × %.1f u", nx, ny)
+	local size = SawmillLogic.SizeText({ x = nx, y = ny })
+	-- The tier's name and the limit, so the player sees what this machine can do.
+	local millId = mill:GetAttribute("MillId")
+	local millDef = if type(millId) == "string" then ItemCatalog.GetSawmill(millId) else nil
+	if millDef then
+		return string.format("%s mill\n%s\n%s", millDef.tierName, size, SawmillLogic.RangeText(millDef))
+	end
+	local machine, def = PlanerLogic.Get(mill:GetAttribute("PlanerId"))
+	if machine and def then
+		return string.format(
+			"%s planer\n%s\n%s",
+			machine.tierName or machine.displayName,
+			size,
+			PlanerLogic.RangeText(def)
+		)
+	end
+	return size
 end
 
 local function closePanel()
@@ -484,10 +504,12 @@ function SawmillController.Start()
 		listening = true
 		UserInputService.InputBegan:Connect(onInput)
 	end
-	for _, inst in ipairs(CollectionService:GetTagged("Sawmill")) do
-		hook(inst)
+	for _, tag in ipairs({ "Sawmill", PlanerLogic.Tag }) do
+		for _, inst in ipairs(CollectionService:GetTagged(tag)) do
+			hook(inst)
+		end
+		CollectionService:GetInstanceAddedSignal(tag):Connect(hook)
 	end
-	CollectionService:GetInstanceAddedSignal("Sawmill"):Connect(hook)
 end
 
 -- Specs and a re-open after close. Not used by Start's callers.

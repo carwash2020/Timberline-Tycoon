@@ -46,6 +46,8 @@ end
 --   w    wood id                  k   "log" | "plank"
 --   f    figure id, if figured    x   boost (2 = cut under 2x Wood), if any
 --   l    true when the Lux Axe cut it
+--   m    a plank's mill bonus (1.0 to 1.5, SellLogic.Bonus), if above 1
+--   d    a finished board's planer bonus (up to 2.0), if above 1
 --   bed  the bed it rode: "BedFloor" (the truck's) or "TrailerBed"
 --   at   its root section's CFrame relative to that bed part: { x, y, z,
 --        rx, ry, rz } (studs; radians, CFrame.fromEulerAnglesXYZ)
@@ -58,6 +60,8 @@ export type Piece = {
 	f: string?,
 	x: number?,
 	l: boolean?,
+	m: number?,
+	d: number?,
 	bed: string,
 	at: { number },
 	s: { { number } },
@@ -205,6 +209,8 @@ function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean, beds: { 
 		f = if type(r.f) == "string" and r.f ~= "" then r.f else nil,
 		x = if finite(boost) and (boost :: number) > 1 then math.min(boost :: number, LeftLoad.MaxBoost) else nil,
 		l = if r.l == true then true else nil,
+		m = if r.k == "plank" and finite(r.m) and (r.m :: number) > 1 then math.min(r.m :: number, 3) else nil,
+		d = if r.k == "plank" and finite(r.d) and (r.d :: number) > 1 then math.min(r.d :: number, 3) else nil,
 		bed = r.bed,
 		at = { at[1], at[2], at[3], at[4], at[5], at[6] },
 		s = sections,

@@ -703,4 +703,151 @@ return function(t)
 		t.eq(ok, false)
 		t.eq(line, "alreadyOwned")
 	end)
+
+	local function machineBox(Box, counter, kind, itemId)
+		return Box.Make({
+			uid = "box-" .. itemId,
+			shop = "ToolShed",
+			itemKind = kind,
+			itemId = itemId,
+			displayName = itemId,
+			cf = CFrame.new(Vector3.new(0, 4.5, 0)),
+			counter = counter,
+			zoneCf = CFrame.new(),
+			zoneSize = Vector3.new(18, 1, 14),
+			onShelf = true,
+		})
+	end
+
+	t.test(
+		"opening a sawmill, planer or belt box starts a one-time placement; nothing is granted, the box stays",
+		function()
+			for _, case in ipairs({
+				{ "Sawmill", "SawmillSturdy" },
+				{ "Machine", "PlanerHand" },
+				{ "Machine", "ConveyorStraight" },
+			}) do
+				local _, Box, _, profile, grants = boot()
+				local counter = counterPart()
+				local rec = machineBox(Box, counter, case[1], case[2])
+				local player = person(rec.part.CFrame.Position)
+				local started = {}
+				Box.OnPlace = function(who, uid, itemId)
+					table.insert(started, { who, uid, itemId })
+				end
+				Box.Pay(player, rec.uid)
+				t.eq(rec.pendingGrant, true)
+				-- Opening starts the ghost and nothing else.
+				t.eq(Box.TryOpen(player, rec.uid), true)
+				t.eq(#started, 1)
+				t.eq({ started[1][2], started[1][3] }, { rec.uid, case[2] })
+				t.eq(#grants, 0, "no stock, no hammer: the item is not delivered by opening")
+				t.eq(rec.opened, false, "cancelling keeps the box")
+				t.ok(rec.model ~= nil and rec.model:GetAttribute("Poof") == nil, "the box is still there")
+				t.eq(rec.pendingGrant, true, "and still owed")
+				-- A second open is fine (cancelled, try again).
+				t.eq(Box.TryOpen(player, rec.uid), true)
+				t.eq(#started, 2)
+				-- The placing checks the box, then spends it once.
+				t.eq(Box.ReadyForPlacement(player, rec.uid, case[2]), true)
+				t.eq(Box.ReadyForPlacement(player, rec.uid, "ChopSaw"), false, "a different item is not this box")
+				t.eq(Box.ReadyForPlacement(person(Vector3.zero, 8), rec.uid, case[2]), false, "someone else's box")
+				t.eq(Box.ReadyForPlacement(player, "nope", case[2]), false)
+				t.eq(Box.ReadyForPlacement(player, nil, case[2]), false)
+				t.eq(Box.SpendForPlacement(person(Vector3.zero, 8), rec.uid, case[2]), false)
+				t.eq(rec.opened, false, "a stranger can't spend it")
+				t.eq(Box.SpendForPlacement(player, rec.uid, case[2]), true)
+				t.eq(rec.opened, true)
+				t.eq(rec.pendingGrant, false)
+				t.eq(#profile.storage, 0)
+				t.eq(Box.SpendForPlacement(player, rec.uid, case[2]), false, "one use")
+				t.eq(Box.ReadyForPlacement(player, rec.uid, case[2]), false)
+				t.eq(#grants, 0)
+			end
+		end
+	)
+
+	t.test("an unpaid, an old-save or a hammer-flow box can't start or spend a placement", function()
+		local _, Box, _, profile = boot()
+		local counter = counterPart()
+		local rec = machineBox(Box, counter, "Machine", "PlanerBench")
+		local player = person(rec.part.CFrame.Position)
+		local started = 0
+		Box.OnPlace = function()
+			started += 1
+		end
+		t.eq(Box.ReadyForPlacement(player, rec.uid, "PlanerBench"), false, "unpaid")
+		t.eq(Box.TryOpen(player, rec.uid), false)
+		t.eq(started, 0)
+		-- The chop saw still unpacks into stock (the hammer flow).
+		local saw = machineBox(Box, counter, "Machine", "ChopSaw")
+		Box.Pay(player, saw.uid)
+		t.eq(Box.ReadyForPlacement(player, saw.uid, "ChopSaw"), false, "not a placement box")
+		t.eq(profile.storage, {})
+	end)
+
+	t.test("a paid planer box that is not placed is kept in the save and still places after a reload", function()
+		local _, Box, _, profile = boot()
+		local counter = counterPart()
+		local rec = machineBox(Box, counter, "Machine", "PlanerSteam")
+		local player = person(rec.part.CFrame.Position)
+		Box.Pay(player, rec.uid)
+		t.eq(
+			Box.CountUnopened(7, function(id)
+				return id == "PlanerSteam"
+			end),
+			1
+		)
+		Box.Commit(player)
+		t.eq(profile.storage[1].itemId, "PlanerSteam")
+		t.eq(profile.storage[1].pending, true)
+		Box.RememberShop("ToolShed", { counter = counter, zoneCf = CFrame.new(), zoneSize = Vector3.new(18, 1, 14) })
+		Box.Restore(player, profile)
+		local back = nil
+		for _, item in ipairs(Box.Each()) do
+			if item.paid and item.buyerId == 7 then
+				back = item
+			end
+		end
+		t.ok(back ~= nil)
+		t.eq(Box.ReadyForPlacement(player, back.uid, "PlanerSteam"), true, "owed after the round trip")
+		t.eq(Box.SpendForPlacement(player, back.uid, "PlanerSteam"), true)
+		t.eq(profile.storage, {}, "spent: gone from the save too")
+		t.eq(
+			Box.CountUnopened(7, function()
+				return true
+			end),
+			0
+		)
+	end)
+
+	t.test(
+		"a sawmill box from an older save has nothing owed: opening it folds it away and starts no placement",
+		function()
+			local _, Box, _, profile, grants = boot()
+			local counter = counterPart()
+			profile.storage = { { uid = "old-saw", itemId = "SawmillRickety", shop = "ToolShed" } }
+			Box.RememberShop(
+				"ToolShed",
+				{ counter = counter, zoneCf = CFrame.new(), zoneSize = Vector3.new(18, 1, 14) }
+			)
+			Box.Restore(person(Vector3.new(0, 0, 0)), profile)
+			local back = nil
+			for _, item in ipairs(Box.Each()) do
+				if item.uid == "old-saw" then
+					back = item
+				end
+			end
+			t.ok(back ~= nil)
+			t.eq(back.pendingGrant, false)
+			local started = 0
+			Box.OnPlace = function()
+				started += 1
+			end
+			t.eq(Box.TryOpen(person(back.part.CFrame.Position), "old-saw"), true)
+			t.eq(started, 0, "its mill is already in stock: no ghost")
+			t.eq(#grants, 0)
+			t.eq(Box.ReadyForPlacement(person(Vector3.zero), "old-saw", "SawmillRickety"), false)
+		end
+	)
 end

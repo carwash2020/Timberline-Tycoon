@@ -21,15 +21,26 @@
 -- is left alone. A piece that won't fit raises the BLOCKAGE board.
 --
 -- Planks are ordinary loose wood after that: drag them, load them, and the
--- sell pad pays the plank price.
+-- sell pad pays the plank price. Each plank is stamped with the mill's
+-- plankBonus (a piece keeps the bonus of the mill that cut it; a plank cut
+-- again keeps the higher of the two) and SellLogic applies it on sale.
+--
+-- Belts: a piece nobody has touched for AutomationLogic.HandWindow seconds
+-- came by belt. It enters only if it is the owner's own wood, not rare, the
+-- owner is online and the plot isn't full of planks (AutomationLogic.Refusal),
+-- and only while the mill's throughput bucket (the tier's autoRate in u³ a
+-- minute) has room. Hand-fed pieces skip all of that. Planks leave from the
+-- Output's height, so a belt in front of the mill carries them off.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local GrabService = require(script.Parent.GrabService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -57,6 +68,7 @@ type Job = {
 	figure: string?,
 	boost: number,
 	lux: boolean,
+	plankBonus: number, -- the plank bonus the planks leave with
 	lastHolderId: number?,
 	consumed: boolean,
 	next: number,
@@ -73,11 +85,14 @@ type Context = {
 	remove: (Piece) -> (),
 	spawn: (WoodService.PlankInfo) -> Piece?,
 	moved: (Model) -> (),
+	online: (number) -> boolean, -- is this owner in the game (belts run only then)
+	outputs: (number) -> number, -- loose planks and boards this owner has lying about
 }
 
 local ctx: Context? = nil
 local jobs: { [Model]: Job } = {}
 local firstSeen: { [Model]: number } = {}
+local buckets: { [Model]: AutomationLogic.Bucket } = {}
 local running = false
 
 local function defaultPartsIn(intake: BasePart): { BasePart }
@@ -232,7 +247,7 @@ local function plankCf(out: CFrame, plank: SawmillLogic.Plank, index: number): C
 	local layer = (index - 1) % 4
 	local row = math.floor((index - 1) / 4)
 	local pos = out.Position + look * (plank.sy / 2 + 0.6) + right * (row * (plank.sx + 0.3))
-	pos = Vector3.new(pos.X, 0.05 + plank.sz / 2 + layer * (plank.sz + 0.12), pos.Z)
+	pos = Vector3.new(pos.X, out.Position.Y - 0.7 + plank.sz / 2 + layer * (plank.sz + 0.12), pos.Z)
 	return CFrame.fromMatrix(pos, right, look)
 end
 
@@ -275,18 +290,18 @@ local function abort(job: Job)
 	end
 end
 
-local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCatalog.SawmillDef, now: number)
+local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCatalog.SawmillDef, now: number): boolean
 	local view = viewOf(piece)
 	-- The parts now, not the record and not anything a client sent.
 	local volume = SawmillLogic.MeasuredVolume(view)
 	if volume < 0 or not SawmillLogic.VolumeMatches(piece.volume, volume) then
 		refuse(piece, "size", millDef)
-		return
+		return false
 	end
 	local planks = SawmillLogic.Cut(volume, settingsOf(mill, millDef), millDef)
 	if #planks == 0 then
 		refuse(piece, "small", millDef)
-		return
+		return false
 	end
 	c.release(piece.model, "mill")
 	piece.selling = true
@@ -318,11 +333,13 @@ local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCata
 		figure = piece.figure,
 		boost = piece.boost,
 		lux = piece.lux == true,
+		plankBonus = math.max(SellLogic.Bonus(piece.mill), SellLogic.Bonus(millDef.plankBonus)),
 		lastHolderId = piece.lastHolderId,
 		consumed = false,
 		next = 1,
 		nextAt = 0,
 	}
+	return true
 end
 
 local function consider(
@@ -372,6 +389,44 @@ local function consider(
 		return
 	end
 	if now - seen < SawmillService.Settle then
+		return
+	end
+	-- A belt-fed piece is capped (AutomationLogic); a hand-fed one never is.
+	local machineOwner = mill:GetAttribute("OwnerId")
+	local ownerId = if type(machineOwner) == "number" then machineOwner else 0
+	local touched = piece.lastInteracted
+	local automated = type(touched) == "number" and AutomationLogic.IsAutomated(now - touched)
+	if automated then
+		local reason = AutomationLogic.Refusal({
+			automated = true,
+			woodId = piece.woodId,
+			figure = piece.figure,
+			elder = piece.elder,
+			lux = piece.lux,
+			pieceOwnerId = piece.ownerId,
+			machineOwnerId = ownerId,
+			ownerOnline = c.online(ownerId),
+			looseOutputs = c.outputs(ownerId),
+		})
+		if reason then
+			if reason ~= "offline" and piece.model:GetAttribute("MillNote") ~= reason then
+				piece.model:SetAttribute("MillNote", reason)
+				tell(piece.ownerId, AutomationLogic.RefusalLine(reason))
+			end
+			return
+		end
+		local bucket = buckets[mill]
+		if not bucket then
+			bucket = AutomationLogic.NewBucket(millDef.autoRate, now)
+			buckets[mill] = bucket
+		end
+		if not AutomationLogic.Ready(bucket, now) then
+			return
+		end
+		local started = startJob(c, mill, piece, millDef, now)
+		if started then
+			AutomationLogic.Take(bucket, SawmillLogic.MeasuredVolume(viewOf(piece)), now)
+		end
 		return
 	end
 	startJob(c, mill, piece, millDef, now)
@@ -442,6 +497,7 @@ local function emitOne(c: Context, job: Job)
 		figure = job.figure,
 		boost = job.boost,
 		lux = job.lux,
+		mill = job.plankBonus,
 		lastHolderId = job.lastHolderId,
 	})
 	-- Shove it out along the outfeed. SpawnPlank leaves the plank loose.
@@ -542,7 +598,7 @@ function SawmillService.Set(player: Player, uid: unknown, axis: unknown, dir: un
 	local settings = SawmillLogic.Step(mill, settingsOf(model, mill), stepAxis, stepDir :: number)
 	model:SetAttribute("CutX", settings.x)
 	model:SetAttribute("CutY", settings.y)
-	MachineArt.SetCut(model, settings.x, settings.y)
+	MachineArt.SetCut(model, settings.x, settings.y, SawmillLogic.RangeText(mill))
 	local profile = ProfileService.GetProfile(player)
 	if profile then
 		for _, item in ipairs(profile.plot.placed) do
@@ -569,12 +625,17 @@ local function liveContext(notifyFn: (Player, string) -> ()): Context
 		end,
 		spawn = WoodService.SpawnPlank,
 		moved = WoodService.Moved,
+		online = function(userId: number): boolean
+			return game:GetService("Players"):GetPlayerByUserId(userId) ~= nil
+		end,
+		outputs = WoodService.CountOutputs,
 	}
 end
 
 function SawmillService.Init(notifyFn: (Player, string) -> (), remote: RemoteEvent)
 	ctx = liveContext(notifyFn)
 	table.clear(jobs)
+	table.clear(buckets)
 	table.clear(firstSeen)
 	remote.OnServerEvent:Connect(function(player: Player, uid: unknown, axis: unknown, dir: unknown)
 		SawmillService.Set(player, uid, axis, dir)
@@ -602,6 +663,7 @@ function SawmillService._reset()
 	running = false
 	table.clear(jobs)
 	table.clear(firstSeen)
+	table.clear(buckets)
 end
 
 -- Specs: a context and no polling loop.
@@ -615,6 +677,8 @@ function SawmillService._use(partial: {
 	remove: ((Piece) -> ())?,
 	spawn: ((WoodService.PlankInfo) -> Piece?)?,
 	moved: ((Model) -> ())?,
+	online: ((number) -> boolean)?,
+	outputs: ((number) -> number)?,
 })
 	ctx = {
 		notify = partial.notify,
@@ -630,9 +694,16 @@ function SawmillService._use(partial: {
 		end,
 		spawn = partial.spawn or WoodService.SpawnPlank,
 		moved = partial.moved or function(_model: Model) end,
+		online = partial.online or function(_userId: number): boolean
+			return true
+		end,
+		outputs = partial.outputs or function(_userId: number): number
+			return 0
+		end,
 	}
 	table.clear(jobs)
 	table.clear(firstSeen)
+	table.clear(buckets)
 end
 
 return SawmillService
