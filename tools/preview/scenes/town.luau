@@ -20,7 +20,6 @@ return {
 		local Kit = ctx.art("Kit")
 		local BuildingArt = ctx.art("BuildingArt")
 		local DealershipLot = ctx.art("DealershipLot")
-		local BiomeData = ctx.shared("BiomeData")
 		local WorldPlan = ctx.load("ReplicatedStorage/Shared/World/WorldPlan")
 		local root = roblox.Instance.new("Model")
 
@@ -79,12 +78,6 @@ return {
 		for _, sign in ipairs(town.signs) do
 			place(BuildingArt.Signpost(sign.text, sign.lit), sign.cframe)
 		end
-		local skyBiome = BiomeData.Get("sky")
-		local fee = if skyBiome and skyBiome.gondola then skyBiome.gondola.fee else 250
-		place(
-			BuildingArt.Signpost(string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee)),
-			town.gondolaSign
-		)
 		for _, g in ipairs(town.greenery) do
 			place(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId), g.cframe)
 		end

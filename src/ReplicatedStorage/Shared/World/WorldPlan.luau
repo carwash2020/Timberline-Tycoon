@@ -1447,7 +1447,6 @@ export type Town = {
 	gondola: CFrame,
 	campsite: CFrame,
 	murph: CFrame, -- where Murph stands, facing the spawn
-	gondolaSign: CFrame, -- the "SKYROOT GONDOLA" signpost
 	parkingSlots: { CFrame }, -- in claim order (Index 1, 2, ...)
 	parkingSizes: { Vector3 }, -- each slot's size, in the same order (WorldPlan.ParkingBays)
 	lamps: { CFrame },
@@ -1649,7 +1648,7 @@ function WorldPlan.Town(): Town
 	end
 
 	-- Signs: one by the spawn with every destination, the plots, and SELL
-	-- LOGS HERE by the pad (the gondola's is gondolaSign).
+	-- LOGS HERE by the pad.
 	local distances: { string } = {}
 	for _, id in ipairs({ "starter", "hills", "snow", "volcano" }) do
 		local def = BiomeData.Get(id)
@@ -1827,7 +1826,6 @@ function WorldPlan.Town(): Town
 		gondola = townGondola(),
 		campsite = campsite,
 		murph = campsite * CFrame.new(0, 0, -3),
-		gondolaSign = facing(-36, 128, 0, 80),
 		parkingSlots = slots,
 		parkingSizes = sizes,
 		lamps = lamps,

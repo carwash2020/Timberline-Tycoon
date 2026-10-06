@@ -32,7 +32,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local BuildingArt = require(ReplicatedStorage.Shared.Art.BuildingArt)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -414,14 +413,6 @@ step("4. The town", function()
 		rounds.Parent = map
 		for _, cf in ipairs(town.pathRounds) do
 			place(atomic(BuildingArt.PathRound()), cf, rounds)
-		end
-		do
-			local skyBiome = BiomeData.Get("sky")
-			local fee = if skyBiome and skyBiome.gondola then skyBiome.gondola.fee else 250
-			place(
-				atomic(BuildingArt.Signpost(string.format("SKYROOT GONDOLA\nto the Aether Isles\n$%d a ride", fee))),
-				town.gondolaSign
-			)
 		end
 	end)
 
