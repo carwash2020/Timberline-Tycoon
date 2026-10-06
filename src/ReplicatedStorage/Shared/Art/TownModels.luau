@@ -775,6 +775,13 @@ TownModels.DockLength = 20
 TownModels.RopeSpan = 16
 TownModels.FootSpan = 14.4
 TownModels.NpcHeight = 5.67
+-- The turn (radians, about the vertical) the uploaded NPC meshes need to
+-- put their face on -Z, the front of every rig here. The Blender models face
+-- Blender's front (-Y), which the FBX/glTF export turns into +Z in Roblox:
+-- the face looked away from you and the head turned the wrong way round.
+-- NPCMeshes applies this to every NPC piece; set 0 if a re-export is
+-- authored facing -Z already.
+TownModels.NpcMeshYaw = math.pi
 TownModels.StoreBoardDrop = 2.3
 TownModels.WindmillHub = Vector3.new(0, 12.4, -3.9)
 -- Visible-triangle caps (ticket I). A prop with no recorded tris does not spend the cap.

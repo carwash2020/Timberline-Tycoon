@@ -54,6 +54,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local HeadLook = require(ReplicatedStorage.Shared.HeadLook)
 local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
@@ -734,13 +735,9 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	local wantYaw, wantPitch = 0, 0
 	local neck = rig.neck
 	if focusHead and neck and lookDist < LOOK_RANGE then
-		local pivot = rig.torso.CFrame * neck.C0
-		local rel = pivot:PointToObjectSpace(focusHead)
-		local dx, dy, dz = rel.X, rel.Y - 0.7 * s, rel.Z
-		local yaw = math.atan2(-dx, -dz)
-		if math.abs(yaw) < 1.9 then
-			wantYaw = math.clamp(yaw, -1.15, 1.15)
-			wantPitch = math.clamp(math.atan2(dy, math.sqrt(dx * dx + dz * dz)), -0.45, 0.45)
+		local yaw, pitch, inReach = HeadLook.Aim(rig.torso.CFrame * neck.C0, focusHead, 0.7 * s)
+		if inReach then
+			wantYaw, wantPitch = yaw, pitch
 		end
 	end
 
@@ -802,8 +799,8 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 	elseif kind == "sip" then
 		wantPitch = wantPitch * (1 - f) + 0.22 * f
 	end
-	rig.yaw = approach(rig.yaw, wantYaw, 6, dt)
-	rig.pitch = approach(rig.pitch, wantPitch, 6, dt)
+	rig.yaw = HeadLook.Approach(rig.yaw, wantYaw, dt)
+	rig.pitch = HeadLook.Approach(rig.pitch, wantPitch, dt)
 
 	-- Walk, a held prop, a work clip, and a talking gesture (NPCAnim).
 	-- Flourishes and the wave still win the arms, below.
