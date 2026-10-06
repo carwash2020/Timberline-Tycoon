@@ -16,7 +16,7 @@ works there.
 | `/give <player> <amount>` | add cash (up to the wallet cap) |
 | `/take <player> <amount>` | remove cash (never more than they have) |
 | `/setcash <player> <amount>` | set their cash |
-| `/gift <player> <Axe\|Gear\|Sawmill\|Machine\|Blueprint> <id>` | a free item, any rung, no price |
+| `/gift <player> <Axe\|Gear\|Sawmill\|Machine\|Blueprint> <id>` | a free item, any rung, no price. A `Blueprint` is a rolled plan for any building id (`Cabin`, `Shed`, `Wall`): it lands in their hotbar and teaches the building when they use it with the hammer (BUILD_SYSTEM.md). A building they already know is refused (`alreadyOwned`) |
 | `/kick <player> [reason]` | remove them from this server |
 | `/ban <player> <hours\|perm> [reason]`, `/unban <userId>` | Roblox's ban API, whole experience |
 | `/goto <player>`, `/bring <player>` | teleport |

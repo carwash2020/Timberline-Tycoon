@@ -15,6 +15,8 @@ Last updated 6 October 2026 (branch claude/restore-meshes, on top of PR #70). Ke
 
 The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a rollback until M1.10. Plans: V2_PLAN.md (v2), V1_PLAN.md, GAME_DESIGN.md (§14 spec, §8 milestones, §9 automation rules, §15 materials). Playtest checklists: PHASE1_NOTES.md, PHASE2_NOTES.md.
 
+- **Building is the hammer plus physical blueprints** (branch `claude/hammer-build`, not merged yet; BUILD_SYSTEM.md is the design note and decision list, PHASE2_NOTES.md the Studio checklist). Everyone has a Hammer; a blueprint is a Tool you buy, carry, drop and use once to own that building for good (`profile.blueprintBook`); the hammer opens the list, places, and moves, turns or sells what you built. The BUILD toggle and its HUD button are gone. Everything that was free to place before is in every book from the start, so no price moved.
+
 ### Rules decided by Connor (do not undo without asking)
 
 - **Prices build up.** The more valuable an item, the higher its cost; the first step up the axe ladder is cheap and each next one costs more. One price per item shown to players, never two numbers and never "u³" in player text.
@@ -42,6 +44,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (newest first, PR numbers on main)
 
+- Not on main yet: `claude/hammer-build` (the hammer and physical blueprints, above).
 - `claude/real-stores` (not a PR yet): designed boxes sized by item (BoxSize), bigger Tool Shed and Hearth & Home with real tables, shelves, signs and lamps, real shop doors that shut with the keeper's hours (ShopDoorLogic), the Dealership as a showroom hall on the old lot (vehicles on plinths behind their boxes, nothing outside), and the counter now hands over the BOX that you open (BoxUnpack). Checklist: PHASE2_NOTES.md "Real stores".
 - claude/fix-pumpkins-npcs (branch, no PR yet): pumpkin patches no longer half sunk (PivotTo on a bbox pivot), town decor lifted onto the drawn ground, `FacingLogic` for NPC facing plus a spec, forward walk lean, shorter and muted grass tufts. Night blue ground plane at spawn not reproduced; see PHASE2_NOTES.md.
 - Branch `claude/short-tutorial` (not yet a PR): the v2 tutorial is 8 steps (fell, drag, sell, plot, one build lesson, truck box, pad, spawn; the axe, mill and load steps are retired in `TutorialData.RetiredV2`, saves migrate forward in `ApplyOrder` order 6); `NoticePolicy` governs every toast (priorities, one non-critical at a time, cooldown, dedupe, quiet during the first-sale flow). Economy unchanged. Checks in PHASE2_NOTES.md.
@@ -59,6 +62,9 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## Open items
 
+1. **Studio verification** of everything above (and the hammer build, PHASE2_NOTES.md 'The hammer and physical blueprints'), none of it has been seen in Studio: Land Office purchase, boxed truck and pad flow, free first respawns, Xbox controls, owner menu. Checklists in PHASE2_NOTES.md.
+2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, `TownMeshes = false`, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
+3. **Questions for Connor:** should Cabin, Warehouse and the other pieces that were free to place also need a bought blueprint (they would need prices and a build sink in the economy model)? Should world-found blueprints spawn anywhere yet (the machinery exists)? A real trade window (yes/no)? Lanternwood economy numbers (proposal in MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 (not free) acceptable?
 1. **Studio verification** of everything above, none of it has been seen in Studio: Land Office purchase, boxed truck and pad flow, free first respawns, Xbox controls, owner menu. Checklists in PHASE2_NOTES.md.
 2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, a mesh ground snap, the `TownMeshes` kill switch, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
 3. **Questions for Connor:** a real trade window (yes/no)? Lanternwood economy numbers (proposal in MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 (not free) acceptable?

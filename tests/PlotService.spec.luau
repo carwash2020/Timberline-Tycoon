@@ -232,8 +232,13 @@ return function(t)
 		local PlotService = loader:server("PlotService")
 		local map = Instance.new("Folder")
 		local remotes = {}
-		for _, name in ipairs({ "PlaceBlueprint", "MoveBlueprint", "SellPlaced", "UpgradePlot", "VisitPlot" }) do
+		for _, name in ipairs({ "PlaceBlueprint", "MoveBlueprint", "SellPlaced", "UpgradePlot", "VisitPlot", "WorldFX" }) do
 			remotes[name] = Instance.new("RemoteEvent")
+		end
+		-- The hammer's knock, as told to each nearby player.
+		local fx = {}
+		remotes.WorldFX.FireClient = function(_, target, kind, payload)
+			table.insert(fx, { to = target, kind = kind, payload = payload })
 		end
 		PlotService.Init(map, remotes, function(_, message)
 			table.insert(toasts, message)
@@ -287,6 +292,7 @@ return function(t)
 			items = items,
 			itemFolder = itemFolder,
 			toasts = toasts,
+			fx = fx,
 			questEvents = questEvents,
 			tags = tags,
 			remotes = remotes,
@@ -527,6 +533,108 @@ return function(t)
 		t.eq(profile.sawmillStock, {})
 		t.eq(ann.attrs.SawmillStock, "")
 	end)
+
+	t.test("hammer build: a store unlock is placed only once its blueprint has been used", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Shed", 0, 0, 0)
+		t.eq(s.lastToast(), "Buy the Small Shed at the General Store first.")
+		t.eq(#profile.plot.placed, 0)
+		t.eq(profile.cash, 1000)
+		-- Using the physical blueprint adds it to the book (BlueprintService).
+		table.insert(profile.blueprintBook, "Shed")
+		s.P.Place(ann, "Shed", 0, 0, 0)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.cash, 1000, "an unlock you own places free, as before")
+		-- And every copy after that is free too.
+		s.P.Place(ann, "Shed", 0, 20, 0)
+		t.eq(#profile.plot.placed, 2)
+	end)
+
+	t.test("hammer build: a plan that is not in your book is refused, with the reason, and costs nothing", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.blueprintBook = {}
+		s.P.Place(ann, "Bench", 0, 0, 0)
+		t.eq(s.lastToast(), "You haven't learned the Bench yet. Use its blueprint with your hammer.")
+		t.eq(#profile.plot.placed, 0)
+		t.eq(profile.cash, 1000)
+		table.insert(profile.blueprintBook, "Bench")
+		s.P.Place(ann, "Bench", 0, 0, 0)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.cash, 1000 - 80, "the price is what it was")
+	end)
+
+	t.test("hammer build: a save that has not migrated yet still places what it bought (the legacy set)", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.blueprintBook = {}
+		profile.furnitureBlueprints = { Shed = true }
+		s.P.Place(ann, "Shed", 0, 0, 0)
+		t.eq(#profile.plot.placed, 1)
+	end)
+
+	t.test("hammer build: a kit piece still charges its fee and starts as an empty ghost", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Wall", 0, 0, 0)
+		t.eq(profile.cash, 1000 - 32)
+		local item = profile.plot.placed[1]
+		t.eq(item.paid, 32)
+		t.eq(item.fill, { units = 0 })
+	end)
+
+	t.test("hammer build: a placed piece is told to nearby players as a knock, not to the placer", function()
+		local s = setup({ cash = 1000 })
+		local ann, _ = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		local far = s.newPlayer(3, "Far")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		bob.standOn(1)
+		far.standOn(nil)
+		s.P.Place(ann, "Bench", 10, 0, 0)
+		t.eq(#s.fx, 1, "one knock, to Bob")
+		t.eq(s.fx[1].to, bob)
+		t.eq(s.fx[1].kind, "Hammer")
+		t.eq(s.fx[1].payload.by, 1)
+		t.ok(s.fx[1].payload.pos ~= nil)
+		-- A refused place makes no sound.
+		s.P.Place(ann, "Bench", 10, 0, 0)
+		t.eq(#s.fx, 1)
+		-- Moving it knocks again.
+		local uid = s.profiles[ann].plot.placed[1].uid
+		s.P.Move(ann, uid, 20, 0, 1)
+		t.eq(#s.fx, 2)
+	end)
+
+	t.test(
+		"hammer build: turning a piece in place is a move with the next rot, and a filled kit piece will not turn",
+		function()
+			local s = setup({ cash = 1000 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			s.P.Place(ann, "Bench", 10, 0, 0)
+			local bench = profile.plot.placed[1]
+			s.P.Move(ann, bench.uid, bench.x, bench.z, 1)
+			t.eq(bench.rot, 1)
+			s.P.Place(ann, "Wall", 0, 20, 0)
+			local wall = profile.plot.placed[2]
+			wall.fill = { units = 3 }
+			s.P.Move(ann, wall.uid, wall.x, wall.z, 1)
+			t.eq(wall.rot, 0, "wood is in it: it stays put")
+			t.eq(s.lastToast(), "This piece already has wood in it.")
+		end
+	)
 
 	t.test("with boxed stores off, the old pay-as-you-place comes back (the rollback)", function()
 		local s = setup({ cash = 200 })
@@ -793,7 +901,7 @@ return function(t)
 		s.P.PlayerJoined(bob, bobProfile)
 		s.P.Pass(bob)
 		t.eq(bob.attrs.PlotSlot, 2)
-		t.eq(s.lastToast(), "It's yours! This pad is your spawn. Press BUILD to start building.")
+		t.eq(s.lastToast(), "It's yours! This pad is your spawn. Take out your hammer to start building.")
 		t.eq(profile.cash, cash, "a plot you already own is never charged again")
 	end)
 

@@ -24,6 +24,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
@@ -34,6 +35,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local AxeService = require(script.Parent.AxeService)
+local BlueprintService = require(script.Parent.BlueprintService)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
 local ProfileSchema = require(script.Parent.ProfileSchema)
@@ -502,7 +504,7 @@ local function publishStock(player: Player, profile: ProfileService.Profile)
 	player:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(stock))
 end
 
--- A sawmill goes into stock. You place it from BUILD on your plot (that
+-- A sawmill goes into stock. You place it with your hammer on your plot (that
 -- spends the stock; with boxed shelves on, placing without one is refused).
 local function buySawmill(player: Player, millId: string)
 	if loop ~= 2 then
@@ -532,34 +534,35 @@ local function buySawmill(player: Player, millId: string)
 	end
 	table.insert(profile.sawmillStock, mill.id)
 	publishStock(player, profile)
-	notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", mill.displayName))
+	notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", mill.displayName))
 end
 
-local function publishBlueprints(player: Player, profile: ProfileService.Profile)
-	local ids: { string } = {}
-	local owned = profile.furnitureBlueprints
-	if type(owned) == "table" then
-		for id, on in pairs(owned) do
-			if on == true then
-				table.insert(ids, id)
-			end
-		end
-	end
-	player:SetAttribute("Blueprints", ShopLogic.EncodeSet(ids))
+-- The Blueprints attribute is the whole blueprint book now (BlueprintService).
+local function publishBlueprints(player: Player, _profile: ProfileService.Profile)
+	BlueprintService.Publish(player)
 end
 
--- A blueprint is bought once. Placing copies on your plot is free after that.
+-- A store blueprint is a rolled plan you carry: buying it hands you the
+-- item (BlueprintService.Grant), and using it with your hammer teaches the
+-- building for good. The price is the old one, once.
 local function buyBlueprint(player: Player, blueprintId: string)
 	local profile = ProfileService.GetProfile(player)
 	local bp = PlotLogic.Blueprint(blueprintId)
 	if not profile or not bp or bp.unlock ~= true then
 		return
 	end
-	if type(profile.furnitureBlueprints) ~= "table" then
-		profile.furnitureBlueprints = {}
-	end
-	if profile.furnitureBlueprints[bp.id] == true then
-		notify(player, string.format("You already own the %s blueprint.", bp.displayName))
+	local ok, why = BlueprintService.CanGrant(player, bp.id)
+	if not ok then
+		if why == "known" then
+			notify(player, string.format("You already know the %s blueprint.", bp.displayName))
+		elseif why == "held" then
+			notify(
+				player,
+				string.format("You already carry the %s blueprint. Use it with your hammer.", bp.displayName)
+			)
+		else
+			notify(player, "Your pack is full of blueprints. Use or drop one first.")
+		end
 		return
 	end
 	local price = PlotData.Price(bp)
@@ -573,9 +576,14 @@ local function buyBlueprint(player: Player, blueprintId: string)
 	if not EconomyService.SpendCash(player, price, "bought " .. bp.displayName, bp.id) then
 		return
 	end
-	profile.furnitureBlueprints[bp.id] = true
-	publishBlueprints(player, profile)
-	notify(player, string.format("Bought the %s blueprint. Place it from BUILD on your plot.", bp.displayName))
+	BlueprintService.Grant(player, bp.id)
+	notify(
+		player,
+		string.format(
+			"Bought the %s blueprint. It's in your hotbar: use it to learn the building for good.",
+			bp.displayName
+		)
+	)
 end
 
 local function onBuyItem(player: Player, category: unknown, itemId: unknown)
@@ -730,28 +738,30 @@ local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCat
 			end
 			table.insert(profile.sawmillStock, mill.id)
 			publishStock(player, profile)
-			notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", mill.displayName))
+			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", mill.displayName))
 		end
 	elseif box.kind == "Machine" then
 		local machine = ItemCatalog.GetMachine(box.itemId)
 		if machine then
-			-- The same stock list the sawmills wait in; BUILD places it.
+			-- The same stock list the sawmills wait in; the hammer places it.
 			if type(profile.sawmillStock) ~= "table" then
 				profile.sawmillStock = {}
 			end
 			table.insert(profile.sawmillStock, machine.id)
 			publishStock(player, profile)
-			notify(player, string.format("Bought a %s! Place it from BUILD on your plot.", machine.displayName))
+			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", machine.displayName))
 		end
 	elseif box.kind == "Blueprint" then
 		local bp = PlotLogic.Blueprint(box.itemId)
 		if bp then
-			if type(profile.furnitureBlueprints) ~= "table" then
-				profile.furnitureBlueprints = {}
-			end
-			profile.furnitureBlueprints[bp.id] = true
-			publishBlueprints(player, profile)
-			notify(player, string.format("Bought the %s blueprint. Place it from BUILD on your plot.", bp.displayName))
+			BlueprintService.Grant(player, bp.id)
+			notify(
+				player,
+				string.format(
+					"Bought the %s blueprint. It's in your hotbar: use it to learn the building for good.",
+					bp.displayName
+				)
+			)
 		end
 	elseif box.kind == "Truck" or box.kind == "Trailer" then
 		local named = if box.kind == "Truck"
@@ -894,14 +904,15 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 		end
 	elseif box.kind == "Blueprint" then
 		local bp = PlotLogic.Blueprint(box.itemId)
-		if not bp or bp.unlock ~= true then
+		-- The shelf sells the store unlocks; the owner may gift any plan.
+		if not bp or (bp.unlock ~= true and not (free and BlueprintBook.IsPlan(bp.id))) then
 			return fail("locked")
 		end
-		if not hasLand(profile) then
+		if not hasLand(profile) and not free then
 			return fail("needsLand")
 		end
-		local have = profile.furnitureBlueprints
-		if type(have) == "table" and have[bp.id] == true then
+		-- One you know, one you already carry, or a pack with no room.
+		if not BlueprintService.CanGrant(player, bp.id) then
 			return fail("alreadyOwned")
 		end
 	elseif box.kind == "Truck" then

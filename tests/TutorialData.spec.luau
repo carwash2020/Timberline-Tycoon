@@ -869,4 +869,18 @@ return function(t)
 		t.eq(TutorialData.AlreadyDone(V2[4], 1, true, false, false, false), true)
 		t.eq(TutorialData.AlreadyDone(V2[4], 1, false, false, false, false), false, "no plot: it must be bought")
 	end)
+	t.test("hammer build: the place lesson speaks hammer, and the retired build and land steps stay retired", function()
+		local at = {}
+		for i, step in ipairs(TutorialData.StepsV2) do
+			at[step.id] = i
+		end
+		t.eq(at.build, nil, "build is retired")
+		t.eq(at.land, nil, "land is retired")
+		t.eq(at.place, at.plot + 1)
+		t.eq(TutorialData.StepsV2[at.place].event, "itemPlaced")
+		local step = TutorialData.StepsV2[at.place]
+		t.eq(string.find(step.objective .. step.murph, "BUILD", 1, true), nil, "no longer says BUILD")
+		t.eq(string.find(step.murph, "Blueprint Store", 1, true), nil, "no longer sends you to the Blueprint Store")
+		t.ok(string.find(step.objective, "hammer", 1, true))
+	end)
 end

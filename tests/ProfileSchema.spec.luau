@@ -1045,4 +1045,79 @@ return function(t)
 		t.ok(string.find(src, "data.truckPaint = PaintShop.Sanitize(data.truckPaint)", 1, true) ~= nil)
 		t.eq(data.plot.pads, nil, "pads are not created for an empty plot")
 	end)
+
+	t.test("hammer build: a new save starts with the starter plans, no carried plans, and a hammer", function()
+		local Schema, data = fresh()
+		local Book = t.loader():shared("BlueprintBook")
+		t.eq(Schema.Template.blueprintBook, Book.Starter())
+		t.eq(Schema.Template.blueprintItems, {})
+		t.eq(Schema.Template.hammer, true)
+		Schema.Migrate(data)
+		t.eq(data.blueprintBook, Book.Starter())
+		t.eq(data.hammer, true)
+	end)
+
+	t.test("hammer build: an old save keeps everything it unlocked or paid for, and gets the hammer", function()
+		local Schema, data = fresh()
+		local Book = t.loader():shared("BlueprintBook")
+		-- A save from before the book: no such fields at all.
+		data.blueprintBook = nil
+		data.blueprintItems = nil
+		data.hammer = nil
+		data.furnitureBlueprints = { Shed = true, Table = true }
+		data.sawmillStock = { "ChopSaw" }
+		data.plot.claimed = true
+		data.plot.placed = {
+			{ uid = "m", blueprintId = "SawmillRickety", x = 0, z = 0, rot = 0 },
+			{ uid = "c", blueprintId = "Chair", x = 10, z = 0, rot = 0 },
+		}
+		Schema.Migrate(data)
+		for _, id in ipairs({ "Shed", "Table", "SawmillRickety", "Chair", "ChopSaw" }) do
+			t.ok(Book.Has(data.blueprintBook, id), id)
+		end
+		t.ok(Book.Has(data.blueprintBook, "Wall"), "the starter plans too")
+		t.ok(not Book.Has(data.blueprintBook, "Mailbox"), "an unlock never bought stays unbought")
+		t.eq(data.furnitureBlueprints, { Shed = true, Table = true }, "the legacy set is left for a rollback")
+		t.eq(data.hammer, true)
+		t.eq(data.blueprintItems, {})
+	end)
+
+	t.test("hammer build: migrating the book again changes nothing, and every slot gets one", function()
+		local Schema, data = fresh()
+		data.furnitureBlueprints = { Shed = true }
+		Schema.Migrate(data)
+		local before = t.loader():shared("Util").deepCopy(data)
+		Schema.Migrate(data)
+		sameClock(before, data)
+		t.eq(data, before)
+		t.eq(type(data.slots), "table")
+		for _, slot in ipairs(data.slots) do
+			t.eq(type(slot.blueprintBook), "table")
+			t.eq(slot.hammer, true)
+		end
+	end)
+
+	t.test("hammer build: junk in the book fields is cleaned and a false hammer is set right", function()
+		local Schema, data = fresh()
+		data.blueprintBook = { "Wall", "Nope", 5, "Wall" }
+		data.blueprintItems = { { uid = "a", id = "Shed" }, { uid = "a", id = "Shed" }, { uid = "b", id = "Nope" }, 3 }
+		data.hammer = false
+		Schema.Migrate(data)
+		t.eq(data.blueprintBook[1], "Wall")
+		for _, id in ipairs(data.blueprintBook) do
+			t.eq(type(id), "string")
+			t.ok(t.loader():shared("PlotData").Blueprint(id) ~= nil, id)
+		end
+		t.eq(data.blueprintItems, { { uid = "a", id = "Shed" } })
+		t.eq(data.hammer, true)
+	end)
+
+	t.test("hammer build: the book and carried plans are per slot, not account-wide", function()
+		local Schema, data = fresh()
+		Schema.Migrate(data)
+		data.blueprintItems = { { uid = "keep", id = "Shed" } }
+		local Slots = t.loader():shared("SaveSlotLogic")
+		t.eq(Slots.IsAccountKey("blueprintItems"), false)
+		t.eq(Slots.IsAccountKey("blueprintBook"), false)
+	end)
 end

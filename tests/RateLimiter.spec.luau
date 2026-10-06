@@ -117,6 +117,19 @@ return function(t)
 		t.ok(string.find(limits, "BadgeSync", 1, true) == nil, "no limit line")
 	end)
 
+	t.test("hammer build: using, dropping and picking up a plan each have their own budget", function()
+		local limiter = setup()
+		local budgets =
+			{ UseBlueprint = 3, DropBlueprint = 2, PickUpBlueprint = 4, PlaceBlueprint = 2, MoveBlueprint = 2 }
+		for name, limit in pairs(budgets) do
+			t.eq(burst(limiter, fakePlayer(), name, limit + 3), limit, name)
+		end
+		local Net = t.shared("Net")
+		for _, name in ipairs({ "UseBlueprint", "DropBlueprint" }) do
+			t.ok(table.find(Net.RemoteNames, name) ~= nil, name .. " is a named remote")
+		end
+	end)
+
 	t.test("remotes have separate budgets; unknown remotes are refused", function()
 		local limiter = setup()
 		local player = fakePlayer()

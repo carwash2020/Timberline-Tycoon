@@ -23,6 +23,8 @@ Net.RemoteNames = {
 	"MineNode", -- client -> server: (nodeUid) one swing at a crystal node
 	"PlaceBlueprint", -- client -> server: (blueprintId, x, z, rot) build on your plot (plot-local studs)
 	"MoveBlueprint", -- client -> server: (uid, x, z, rot) move a placed item on your plot
+	"UseBlueprint", -- client -> server: (uid) use the rolled plan in your hand: it is consumed and the building joins your blueprint book
+	"DropBlueprint", -- client -> server: (uid) lay an unused plan on the ground
 	"BlueprintEdit", -- client -> server: (request) rotate, move, resize, copy, delete, or undo an unfilled kit ghost
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
@@ -31,7 +33,7 @@ Net.RemoteNames = {
 	"PlotPass", -- client -> server: () close the picker (a returning owner is given a free pad; a buyer gets nothing)
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
-	"TutorialSeen", -- client -> server: ("build" | "land") the player opened build mode or the Land panel (QuestService)
+	"TutorialSeen", -- client -> server: ("build" | "land") the player opened the hammer's blueprint list or the Land panel (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
 	"Release", -- client -> server: (part) let go of it
 	"Chop", -- client -> server: (part, hitPos, normal) one swing at a section, standing or loose (v2 loop: SectionTrees)

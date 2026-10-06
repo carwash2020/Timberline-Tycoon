@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
@@ -197,7 +198,14 @@ export type Profile = {
 	skyBin: { BedLog }, -- the logs waiting in the Sky Bin at the sawmill (wood, value, figure)
 	forgeWood: { [string]: number }, -- v2: u³ of wood put into the Starfall forge, by wood id
 	skyWood: { SkyWood }, -- v2: the wood waiting in the Sky Bin
-	furnitureBlueprints: { [string]: boolean },
+	furnitureBlueprints: { [string]: boolean }, -- legacy: store unlocks bought before blueprints were items. Read as part of the book; never written now.
+	-- The buildings you own for good, in the order learned (BlueprintBook).
+	-- Per slot. Using a physical blueprint adds to it.
+	blueprintBook: { string },
+	-- Unused rolled plans you carry or have dropped (BlueprintService).
+	blueprintItems: { { uid: string, id: string } },
+	-- Every player has a Hammer (BUILD_SYSTEM.md). Migrate sets it, the loadout reads it.
+	hammer: boolean,
 	npcFriendship: { [string]: number },
 	stats: {
 		treesChopped: number,
@@ -305,6 +313,9 @@ local TEMPLATE: Profile = {
 	forgeWood = {},
 	skyWood = {},
 	furnitureBlueprints = {},
+	blueprintBook = BlueprintBook.Starter(),
+	blueprintItems = {},
+	hammer = true,
 	npcFriendship = { Murph = 0, Millie = 0, Tink = 0 },
 	stats = { treesChopped = 0, logsSold = 0, playtimeMin = 0, volumeSold = 0, cuts = 0 },
 	tutorialDone = false,
@@ -565,6 +576,8 @@ local function applySlotFields(record: any)
 	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.plot.switches = WireLogic.CleanSwitches(record.plot.switches)
 	record.questAxe = copyQuest(record.questAxe)
+	-- The book, carried plans and the hammer. Adds only; safe to repeat.
+	BlueprintBook.Migrate(record)
 	if type(record.permissions) ~= "table" then
 		record.permissions = {}
 	end
