@@ -568,6 +568,76 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"the sell station: a flat pad with marked slots, a clear lane, a scale, a rack, a Weigh House and lights",
+		function()
+			local art = BuildingArt.SellStation(28, 32)
+			local pad = find(art, "SellPad")
+			t.ok(pad, "SellPad")
+			t.ok(near(pad.Size, V3.new(28, 0.2, 32)), "SellPad is w x 0.2 x d")
+			t.ok(not pad.CanCollide, "SellPad CanCollide off")
+			local gui = pad:FindFirstChildOfClass("SurfaceGui")
+			t.ok(gui and gui.Face == roblox.Enum.NormalId.Top, "text on the top face")
+			t.ok(texts(art)["SELL LOGS HERE"], "SELL LOGS HERE")
+			-- Marked slots: three for logs, two for planks, each labelled.
+			local logs, planks, labels = 0, 0, 0
+			for _, p in ipairs(parts(art)) do
+				if p.Name == "SlotLabel" then
+					labels += 1
+					local label = p:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
+					if label.Text == "LOGS" then
+						logs += 1
+					elseif label.Text == "PLANKS" then
+						planks += 1
+					end
+					t.ok(not p.CanCollide, "a slot label is paint")
+				end
+			end
+			t.eq({ labels, logs, planks }, { 5, 3, 2 }, "three LOGS slots and two PLANKS slots")
+			-- Everything the station has: a scale (post + dial), a log rack, a
+			-- Weigh House with its counter and sign, lanterns that glow at night.
+			t.ok(find(art, "ScalePost") and find(art, "ScaleDial"), "the scale")
+			t.ok(find(art, "LogRack") and find(art, "RackLog"), "the log rack")
+			local house = art:FindFirstChild("WeighHouse")
+			t.ok(house and find(house, "HouseCounter") and find(house, "HouseRoof"), "the Weigh House")
+			t.ok(texts(art)["WEIGH HOUSE"], "WEIGH HOUSE sign")
+			local glows = 0
+			for _, p in ipairs(parts(art)) do
+				if p.Name == "LanternGlow" then
+					glows += 1
+					t.ok(p:FindFirstChildOfClass("PointLight") ~= nil, "a lantern has a light")
+				end
+			end
+			t.ok(glows >= 4, "lanterns on the rack and the Weigh House: " .. glows)
+			t.ok(#parts(art) <= 330, "station parts: " .. #parts(art))
+			-- The pad's own paint is flat and walkable; the lane the trucks use
+			-- (6.3 studs either side of the middle) is clear of anything solid
+			-- up to the rack across the back (z 11.5 from the pad's middle).
+			for _, p in ipairs(parts(art)) do
+				local lo, hi = bounds(p)
+				if p.CanCollide then
+					t.ok(
+						not (hi.X > -6.3 and lo.X < 6.3 and lo.Z < 11.5 and hi.Z > -16),
+						p.Name .. " stands in the lane"
+					)
+				elseif p.Name == "SellPad" or p.Name == "PadBorder" or p.Name == "SlotLine" or p.Name == "LaneLine" then
+					t.ok(hi.Y <= 0.3, p.Name .. " is flat paint")
+				end
+			end
+			-- The Weigh House's window faces the pad (west, -X), on the east side.
+			local counter = find(house, "HouseCounter")
+			t.ok(
+				counter.CFrame.X > 14 and counter.CFrame.LookVector:Dot(V3.new(-1, 0, 0)) > 0.99,
+				"its window faces the pad"
+			)
+			-- The 24 x 18 pad is still the old one, for the mesh.
+			t.ok(
+				near(find(BuildingArt.SellPad(24, 18), "SellPad").Size, V3.new(24, 0.2, 18)),
+				"SellPad(24, 18) unchanged"
+			)
+		end
+	)
+
 	t.test("Murph's camp and the campfire: Embers with Fire and light", function()
 		for _, model in ipairs({ BuildingArt.Campfire(), BuildingArt.Campsite() }) do
 			local embers = find(model, "Embers")

@@ -1578,8 +1578,8 @@ What changed:
       A picks, B closes; the Showing row cycles All / Buildings / Decor /
       Machines and keeps the selection on itself
 - [ ] Pick the Wall: the green/red ghost follows your aim. R (D-pad right,
-      ROTATE) turns it; LT locks it and the right stick flicks it round and
-      up/down; RB/LB slide it; it is red with a reason over another piece,
+      ROTATE) turns it; LT locks it and the LEFT stick flicks it round and
+      up/down (the right stick stays the camera); RB/LB slide it; it is red with a reason over another piece,
       off your bought squares, or past the pad grid
 - [ ] Place (click, RT, PLACE): the hammer swings back and strikes; at the hit
       a knock and a puff of dust at the piece; the fee comes out once; the
@@ -2136,3 +2136,181 @@ while the branch was open.
       clean from standing height and from the camera pulled back.
 - [ ] Phone: from the spawn the AXES, GENERAL STORE and GONDOLA markers show
       without overlapping.
+## Owner hub (branch `claude/owner-hub`)
+
+The owner menu is now a hub: PLAYERS / GIVE / WORLD / SELF tabs, a Find-a-tool box, one shared player pick, a status strip, confirmations, and an Xbox order with LB/RB tabs. Chat commands are unchanged and there are new ones (OWNER_TOOLS.md). Paste your UserId into `AdminLogic.OwnerUserIds` first (or test in Studio, where you count as owner).
+
+Studio checklist (PC, then phone emulator, then Xbox/pad if you can):
+
+- [ ] Only you see the OWNER button. With a second test player (Test tab, 2 players) their client has no OWNER button and no AdminUI in PlayerGui.
+- [ ] OWNER opens the hub; X, Esc and B close it; L3 + R3 toggles it. Nothing overlaps at any window size; phone emulator: every button is a fingertip tall and the body scrolls.
+- [ ] PLAYERS: the list shows everyone (you first, "(you)"); tapping a name ticks it; the strip says "Player: <name>". Step with the arrows on PLAYERS and GIVE: the same player stays picked. When that player leaves, the pick falls back to someone else.
+- [ ] GO TO, BRING, HEAL, FREEZE (press again unfreezes), STATS (one line of cash, plot, tutorial, items) each answer in the strip (green when it worked). RESET TUTORIAL restarts their tutorial. KICK and BAN: the first press turns the button amber "SURE? ..." and does nothing; a second press within 4 seconds does it; picking another player first starts over. You cannot kick, ban or freeze yourself (red line).
+- [ ] GIVE: chips pick the amount; typing `10k` in Custom amount overrides them and the label says Amount: $10,000. GIVE CASH and TAKE CASH move the cash (TAKE and SET CASH need a second press). Cash above $2,000,000 stops at the cap. UNLOCK ALL BUILDINGS: they can place any building from the hammer's list.
+- [ ] GIVE, free items: TYPE steps through All, Recent, Axe, Gear, Sawmill, Machine, Blueprint; the search narrows the list as you type; tapping an item ticks it and the GIFT button names it; GIFT puts it in their hotbar (a Blueprint is a rolled plan). The item then shows under TYPE: Recent.
+- [ ] WORLD: the speed chips plus SET CLOCK SPEED, the hour chips plus SET HOUR and RESET TIME change the sky as before (this server only). Type a message and press ANNOUNCE: everyone gets a toast. Tapping a preset fills the box. SHUT DOWN SERVER asks twice, then kicks everyone.
+- [ ] SELF: SUPER RUN, GOD MODE (take fall damage or touch a hazard: no damage; press again to turn off), GO TO SPAWN. LAST ACTIONS lists the last eight results, newest first. Output has an `[Admin] <you> (<id>): ...` line for each.
+- [ ] Find a tool: type `kick`, `teleport`, `restart` in the title box: matching tools show over the tab with the picked player; clearing the box or tapping a tab goes back.
+- [ ] Xbox: D-pad up from the first body button reaches the tabs, then the search/close row; left/right stay in a row; up/down land on the nearest button in the next row; the selected button has the amber ring; the body scrolls so it stays in view (check the end of a long item list); LB/RB change tab; B closes. If scrolling jumps oddly, say so: it is the safety net over Roblox's own scrolling.
+- [ ] Chat still works: `/give Bob 100`, `/god`, `/stats Bob`, `/admin`. Someone who is not you gets nothing from any of them or from the hub (a test player cannot even see it).
+
+Delegation checks (owner hub; use two test players, the second one is the delegate):
+
+- [ ] DELEGATES tab (owner only): pick the second player, role MODERATOR, 1 HOUR, GRANT. Their client now shows a MODERATOR hub titled DELEGATE with only PLAYERS (go to, bring, freeze, stats, kick, ban) and WORLD (announce); no GIVE, no SELF cash tools, no DELEGATES tab. The list shows them with REVOKE.
+- [ ] As the delegate: kick or freeze a third player works; BAN lasts at most 1 hour (FOREVER is refused with a red line); anything aimed at you (the owner) is refused ("You can't use that on the owner"); chat `/give`, `/shutdown`, `/delegate` do nothing for them.
+- [ ] Your audit list (SELF tab, LAST ACTIONS) shows each of their actions with a `>`; Output has `[Admin] DELEGATE ...` lines with both ids.
+- [ ] REVOKE: their hub closes at once and the button goes away; their next request is refused.
+- [ ] Expiry: grant 1 HOUR and use `/settime`-style clock tricks is not possible, so test SESSION: have them leave the server and rejoin, they are no longer a delegate.
+- [ ] CUSTOM: tick only Kick and Heal, GRANT: their hub shows only those. Try ticking cash or shutdown: they are not on the list.
+- [ ] TESTER: choosing it shows a red panel with the warning; GRANT turns amber "SURE? GIVE FULL POWER"; only the second press grants. The 'until the server closes' choice is gone. Their menu shows a red TESTER banner; give cash works; TAKE CASH / BAN / KICK / SHUT DOWN ask twice and pop a toast on YOUR screen. They cannot touch you (kick, ban, cash all refused) and have no DELEGATES tab; typing `/delegate` as them does nothing.
+- [ ] Chat: `/delegate Bob helper 1h`, `/delegates`, `/undelegate Bob`; `/delegate Bob tester 1h` only warns until you add `confirm`.
+
+
+## Sell station beside the mill (claude/sell-pad, 6 October 2026)
+
+Connor: "move the sell logs here pad to the side of the saw mill, and add more to
+it." The sell pad no longer sits in front of the mill (on the spawn walk, in the
+way of the mill's intake). It is now a sell station EAST of the mill's lean-to,
+off the main street's north side and west of the mill road.
+
+- **Where:** pad centre (53, 111), 28 wide x 32 deep (x 39 to 67, z 95 to 127).
+  `WorldPlan.Town()` `sellPad` / `sellZone`; the zone is 28 x 12 x 52 (z 85 to
+  137) so a truck backed in from the street has its whole bed in it. The town,
+  spawn, Murph's camp and the sawmill did not move. The Dealership's loading pad
+  (x 70 to 84) stays clear.
+- **What is on it (`BuildingArt.SellStation`):** a lane for trucks between two
+  painted lines; three marked LOGS slots (west) and two PLANKS slots (east) for
+  hand-dragged logs and plank piles (paint only: the sell logic still sells
+  whatever rests anywhere in the zone); a platform scale with a dial; a log rack
+  across the back (lanterns on its stakes); a Weigh House on the east side with
+  Millie at its window; split rails behind; lamps at the four corners and over
+  the SELL LOGS HERE signpost at the gate (67, 90). The Sky Bin moved into the
+  pad's north-west corner.
+- **Unchanged, server side:** SellService, the Sell remote, truck-bed selling
+  (`SellTruckRange` measures from the zone's middle, now (53, 111)), hand-drag
+  selling, plank sales. The tutorial's `sellPad` beacon, the quest arrow
+  (QuestUI) and the SELL LOGS marker (TownMarkers) all read the SellZone part.
+- **Economy:** the walk from the nearest grove oak to the pad grew from 44 to 97
+  studs. Headlines 61 s / 7.3 min / 13.1 min / 50.7 min / 30.4 h became 68 s /
+  7.9 min / 13.7 min / 51.4 min / 30.5 h (all in the CI ranges; Steel Axe is 7 s
+  under its 8-minute ceiling). ECONOMY.md regenerated, ECONOMY_V1.md unchanged.
+- **Moved to make room:** the street lamp at (58, 92) (now the station's lamps),
+  the crate at (71, 93) to (86, 92.5), the log piles east of the mill from x 39
+  to 35.5, a few bushes, one birch, one maple.
+
+### Studio checks
+- [ ] Spawn and look at the mill: its front (the saw, the ramp) is open and
+      clear now, no pad in front of it. The TIMBERLINE SAWMILL board still reads.
+- [ ] Walk east along the main street: the "SELL LOGS HERE" signpost stands north
+      of the street at x about 67, lit at night, and the SELL LOGS chip floats
+      over the station. The station is the big plank pad east of the mill.
+- [ ] The station has: painted lane, LOGS and PLANKS slots with labels, a scale
+      with a dial, a log rack across the back with two lanterns, the Weigh House
+      (WEIGH HOUSE board, two lanterns) with Millie at its window, rails, the
+      Sky Bin in the north-west corner, a lamp at each corner. At night the
+      lanterns and lamps are lit.
+- [ ] Fresh save: the quest arrow and beacon point at the station (not the old
+      spot), and arrive there after the first oak. Drag the log onto the pad
+      (anywhere on it): it sells, the $25 lands, the plot card follows.
+- [ ] Back a loaded truck (Logging Rig too) in from the street down the lane:
+      stop short of the rack. Press the sell prompt ("Sell logs", over the pad's
+      middle): the whole bed sells. Planks dragged onto a PLANKS slot sell too.
+- [ ] The Sky Bin's "Sell Sky Bin" prompt still works at its new corner.
+- [ ] Nothing blocks the drive in from the street: no lamp or crate in the lane.
+      The Dealership's boxes and the mill road beside the station are not in the
+      way. Walk Millie's side: she stands by the Weigh House window.
+- [ ] Sound and feel: the sell toast, sale FX and figure reveal still show.
+## Xbox navigation and rotation (6 October 2026, branch `claude/xbox-nav`)
+
+Connor: "it's really hard to get to boxes like SAVES, STORE" with the Xbox
+menu navigation, and "when rotating things it should be the left stick (the
+movement stick) that rotates, not the right stick".
+
+- **Quick menu (View button).** One always-available gamepad button opens a
+  panel with a big tile for every HUD destination in a grid: SAVES, STORE,
+  BADGES, DAILY GOALS, FIELD GUIDE, SETTINGS, PLANS and LAND (hammer out),
+  HAMMER, SKIP TUTORIAL (while it runs), SEND TRUCK HOME, DROP AXE, SELL HERE,
+  OWNER (owner only) and HUD BUTTONS. The stick or D-pad moves one tile at a
+  time and wraps, A opens it, B (or View again) closes. A tile closes the menu,
+  does what its HUD button does, and the panel it opens hands the selection
+  back to that HUD button when it closes. View was Badges' button; Badges is a
+  tile now (`BadgeData.OpenGamepad` is gone, InputKit lists `QuickMenu` on
+  ButtonSelect). A MENU button with the View glyph shows in the side column on
+  a gamepad. Tiles are whatever HUD buttons register (`HudNav.Add`), so a new
+  HUD button joins by registering. Rules: `Shared/QuickMenuLogic`,
+  `Shared/GamepadNavLogic`; UI: `QuickMenuUI`.
+- **HUD buttons wired for the stick (`HudNav`).** Every persistent HUD button
+  registers; whenever the selection lands on one, the visible ones are linked
+  with NextSelectionUp/Down/Left/Right by where they are on screen now
+  (nearest neighbour inside a cone, wrapping round the edges), and the HUD
+  BUTTONS tile (or `HudNav.Focus`) starts on the first one in reading order.
+  B on a HUD button lets go (walking again). Side buttons are 160 x 48 on a
+  gamepad; the selection ring is a 4 px ink and 4 px amber ring with a soft
+  glow. Roblox's own hotbar is core UI and is not part of this chain.
+- **Panels share one helper (`GamepadNav.Focus / Trap / Restore`, behind
+  `MenuPad` and `HUD.Popup`).** Opening selects the first control, traps the
+  stick in the panel (SelectionGroup, Stop on every side) and remembers the HUD
+  button that opened it; closing goes back to it (or lets go when none). Used by
+  Store, Saves, Field Guide / Plans (ShopUI), Daily, Settings, Badges, Land,
+  the shopkeeper card and the owner menu.
+- **Rotation.** While LT is held, the LEFT stick turns a held piece (left/right
+  spins it, up/down tips it) or flicks the build ghost (left/right a quarter,
+  up/down raise and lower); the right stick stays the camera. The left stick is
+  sunk (CAS, Thumbstick1) and the humanoid held still while LT is down, and the
+  lock lets go the instant LT is up (also polled), the piece is dropped or
+  placed, the tool goes away, you die or sit, a menu opens, or the window loses
+  focus (`GrabLogic.LockStays`). Unchanged: RB/LB push and pull, keyboard R,
+  D-pad right in the placer, D-pad turns while dragging, flick behaviour. Hints
+  now say "LT + left stick: turn".
+
+### Studio checks: Xbox navigation and rotation
+- [ ] Press View on a controller (walking, nothing open): the QUICK MENU opens
+      centred, tiles in a grid, the first tile ringed in amber. Stick and D-pad
+      move one tile at a time and wrap round the edges; A opens the tile; B and
+      View close it. Output: no red lines
+- [ ] Tiles: SAVES, STORE, BADGES, DAILY GOALS (after the tutorial), FIELD GUIDE
+      (once you have it), SETTINGS, HUD BUTTONS; HAMMER on foot; PLANS and LAND
+      with the hammer out on your plot; SEND TRUCK HOME / DROP AXE when they show;
+      OWNER only on Connor's account
+- [ ] SAVES tile: the Saves panel opens with its first slot selected; the stick
+      cannot drift onto the HUD behind it; B closes it and the cursor is on the
+      SAVES side button (B again: back to walking). Same for STORE, BADGES,
+      DAILY, FIELD GUIDE, SETTINGS and the Land panel
+- [ ] HUD BUTTONS tile: the cursor lands on the first HUD button (top left),
+      D-pad / stick walks them in on-screen order, wrapping round; A presses;
+      B lets go and the stick walks you again
+- [ ] A MENU button with the View glyph shows at the top of the side column
+      only on a gamepad (not with mouse or touch)
+- [ ] View does the same while a shop or the Field Guide is open (the menu goes
+      over it; B returns you to it) and not while typing in chat. It does not
+      also open Roblox's player list or menu (report if it does)
+- [ ] Rotation: hold RT on a log, hold LT: the log hangs; the LEFT stick spins
+      it (left/right) and tips it (up/down) and the character does NOT walk; the
+      right stick still turns the camera. Let go of LT: the left stick walks you
+      again at once. Drop the log while LT is down: you can walk
+- [ ] Hammer, pick a Wall: hold LT, flick the LEFT stick left/right: quarter
+      turns; up/down: raise / lower. The character stands still while LT is
+      down; RB/LB still slide the ghost; D-pad right still rotates; R on a
+      keyboard still rotates
+- [ ] Hold LT then: open the quick menu, put the hammer away, die (/kill),
+      alt-tab away and back: you are never stuck unable to walk
+- [ ] The hint line reads "LT + left stick: turn" while dragging and "RT place ·
+      LT+left stick turn · B stop" while placing
+## NPC heads face the player (claude/npc-heads)
+
+- Heads look at you through `Shared/HeadLook.Aim` (clamped 70 degrees side to
+  side, 35 up and down, eased; behind them they look ahead). Part-built faces
+  are on -Z for every NPC (`tests/HeadLook.spec`). The uploaded NPC meshes are
+  assumed to face +Z, so `NPCMeshes` turns each piece by `TownModels.NpcMeshYaw`
+  (pi). That part is a best inference without the assets: please check it.
+
+### Studio checks
+- [ ] Walk up to Murph, Old Hank, Old Tolly, Cap'n Moss, Gus, a shopkeeper and
+      a walker (Rosa, Pip, Bram): their faces (eyes, nose, beard) look at you,
+      and their heads follow you as you circle, up to about 70 degrees, no snap
+- [ ] Stand behind one: the head settles looking straight ahead, no twist
+- [ ] Walkers still walk face first with the face and the toes on the same side
+- [ ] If the NPCs are Blender meshes and their faces or toes now point AWAY,
+      set `TownModels.NpcMeshYaw = 0` (the meshes were already facing -Z) and
+      tell Claude; if it was backwards before and is right now, nothing to do
+- [ ] Held items (Murph's lantern, Millie's clipboard) are still in the hand

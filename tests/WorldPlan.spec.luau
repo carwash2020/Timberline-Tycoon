@@ -1,6 +1,7 @@
 --!nocheck
 -- WorldPlan: nothing in town that collides stands on (or within 2 studs
 -- of) a road, or on the town's street, plaza, paths, walk or sell pad
+-- (the sell station stands beside the mill, east of its lean-to)
 -- (TWN-08); the town's greenery (TWN-01) keeps off the paint, the lot, the
 -- pad, the pull-outs, the roads, the props, the buildings, the walkers and
 -- the gondola, and has 20-30 trees, none of them oaks; the spawn faces the
@@ -23,6 +24,15 @@ return function(t)
 
 	local town = WorldPlan.Town()
 	local sky = WorldPlan.Sky()
+	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+
+	-- The sell pad with its 0.8-stud border (BuildingArt.SellStation as
+	-- MapBuilder builds it): the ground trucks back onto.
+	local function padRect()
+		local pad = town.sellPad.Position
+		local hw, hd = WorldPlan.SellPadWidth / 2 + 0.8, WorldPlan.SellPadDepth / 2 + 0.8
+		return { name = "SellPad", x0 = pad.X - hw, x1 = pad.X + hw, z0 = pad.Z - hd, z1 = pad.Z + hd }
+	end
 
 	local function placed(model, cf)
 		Kit.placeAt(model, cf)
@@ -114,6 +124,12 @@ return function(t)
 		add("gondola station", "station", BuildingArt.GondolaStation(), town.gondola)
 		add("sawmill", "sawmill", BuildingArt.Sawmill(), town.sawmill)
 		add("Sky Bin", "skyBin", BuildingArt.SkyBin(), town.skyBin * CFrame.new(0, -2, 0))
+		add(
+			"sell station",
+			"sellStation",
+			BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth),
+			town.sellPad
+		)
 		for _, spot in ipairs(town.shops) do
 			add(spot.kind, "shop", BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end
@@ -260,13 +276,15 @@ return function(t)
 	t.test("nothing that collides stands on the street, the plaza, the paths or the walk (TWN-08)", function()
 		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
 		-- The ground you walk and drive (the mill yard is the sawmill's own
-		-- floor), and the sell pad trucks back onto (BuildingArt.SellPad(24,
-		-- 18) with its 0.8-stud border, as MapBuilder builds it). What may
-		-- stand on which, by design: a shop meets the end of its own path
-		-- (porch, ramp, front wall), the gondola path runs into the station,
-		-- and the Sky Bin, the lamps by the sell pad (the corner lamps) and
-		-- the SELL LOGS HERE signpost at the pad's east edge (TWN-04) may
-		-- stand on the plaza, but never on the street through it or the pad.
+		-- floor), and the sell pad trucks back onto (the station's pad with
+		-- its 0.8-stud border, as MapBuilder builds it). What may stand on
+		-- which, by design: a shop meets the end of its own path (porch,
+		-- ramp, front wall), the gondola path runs into the station, the Sky
+		-- Bin may stand on the plaza or, since it moved with the pad, in the
+		-- pad's corner, and the sell station itself stands on its own pad
+		-- (the rack, the scale's post); the lamps and the SELL LOGS HERE
+		-- signpost (TWN-04) may stand on the plaza, but never on the street
+		-- through it or the pad.
 		local CHECKED = {
 			Plaza = true,
 			MainStreet = true,
@@ -280,7 +298,11 @@ return function(t)
 				return area.name == thing.shop .. "Path"
 			elseif thing.kind == "station" then
 				return area.name == "GondolaPath"
-			elseif thing.kind == "skyBin" or thing.kind == "lamp" then
+			elseif thing.kind == "sellStation" then
+				return area.name == "SellPad"
+			elseif thing.kind == "skyBin" then
+				return area.name == "Plaza" or area.name == "SellPad"
+			elseif thing.kind == "lamp" then
 				return area.name == "Plaza"
 			elseif thing.kind == "sign" and thing.label == "SELL LOGS HERE sign" then
 				return area.name == "Plaza"
@@ -298,9 +320,7 @@ return function(t)
 			t.ok(names[name], "TownPaint has a " .. name)
 		end
 		t.ok(#areas >= 7, string.format("only %d paint rectangles checked", #areas))
-		local pad = town.sellPad.Position
-		local sellPad = { name = "SellPad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 }
-		table.insert(areas, sellPad)
+		table.insert(areas, padRect())
 		local function intrusions(thing, model)
 			local out = {}
 			for _, p in ipairs(parts(model)) do
@@ -347,7 +367,7 @@ return function(t)
 			{ "Well", -38, 77, "prop", "MainStreet" },
 			{ "Barrel", -36, 117.5, "prop", "GondolaPath" },
 			{ "LogPile", 28, 98, "prop", "Plaza" },
-			{ "LampPost", -12, 80, "lamp", "SellPad" },
+			{ "LampPost", 46, 100, "lamp", "SellPad" },
 		}
 		for _, spot in ipairs(old) do
 			local name, x, z, kind, where = spot[1], spot[2], spot[3], spot[4], spot[5]
@@ -528,8 +548,7 @@ return function(t)
 	-- on the street, the plaza, the paths, the walk or the sell pad.
 	t.test("the parking bays stay off the roads, the street, the plaza, the paths, the walk and the pad", function()
 		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
-		local pad = town.sellPad.Position
-		local areas = { { name = "SellPad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 } }
+		local areas = { padRect() }
 		for _, paint in ipairs(WorldLayout.TownPaint) do
 			table.insert(areas, paint)
 		end
@@ -594,33 +613,66 @@ return function(t)
 		t.ok(#problems > before, "a trunk in a pull-out is caught")
 	end)
 
-	-- The sell zone (phase 12): 40 deep round its middle (z 82, on the pad,
-	-- where it was since M1.5: Millie, the SELL LOGS marker and the quest
-	-- beacon are placed from it), z 62 to 102, into the mill's front and
-	-- over the street, north of the spawn walk's lamps. Every bed fits it end
-	-- to end; the Logging Rig backed in until it meets the mill (the foot of
-	-- the ramp up to its saw deck, z 97) has its whole 33.8-stud deck in it.
-	-- The way in: the Rig backing onto the pad from the street (its tail from
-	-- z 84 to 96, between the walk's lamps at (+-8, 60)) keeps everything in
-	-- town that collides a stud from what of it collides (chassis, skids,
-	-- deck, stakes) and clear of all of it (tyres, fenders, mirrors, stacks).
-	-- M1.5 checked a box as wide as its wheels and a stud each side; the 1.3x
-	-- Rig's tyres pass those lamps 0.9 clear, its hull 2.2.
+	-- The sell zone: the pad's width and 52 deep round the pad's middle (53,
+	-- 111, east of the mill's lean-to: the sell station), z 85 to 137, just
+	-- north of the street. Every bed fits it end
+	-- to end; the Logging Rig, backed in from the street until it meets the
+	-- station's log rack (the rack's front stakes at z 122.4), has its whole
+	-- 33.8-stud deck in it. The way in: the Rig backing onto the pad from the
+	-- street (its tail from z 84 to 120, down the lane between the painted
+	-- lines) keeps everything in town that collides a stud from what of it
+	-- collides (chassis, skids, deck, stakes) and clear of all of it (tyres,
+	-- fenders, mirrors, stacks).
 	t.test("the sell zone holds every bed, and the Rig backs onto the pad clear of everything", function()
 		local size, zone, pad = WorldPlan.SellZoneSize, town.sellZone.Position, town.sellPad.Position
-		t.ok(size == Vector3.new(24, 12, 40), "24 x 12 x 40")
+		t.ok(size == Vector3.new(28, 12, 52), "28 x 12 x 52")
+		t.ok(size.X == WorldPlan.SellPadWidth, "as wide as the pad")
 		t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
-		t.ok(math.abs(zone.Z - 82) < 1e-6, "its middle at z 82, where it was")
-		t.ok(math.abs(zone.Z + size.Z / 2 - 102) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 62) < 1e-6, "z 62 to 102")
-		t.ok(math.abs(zone.Z - pad.Z) < 9, "its middle on the pad")
+		t.ok(math.abs(zone.X - 53) < 1e-6 and math.abs(zone.Z - 111) < 1e-6, "its middle at (53, 111)")
+		t.ok(math.abs(zone.Z + size.Z / 2 - 137) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 85) < 1e-6, "z 85 to 137")
+		t.ok(math.abs(zone.Z - pad.Z) < 1e-6, "its middle on the pad")
 		t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")
-		-- The pad stays a ghost: nothing of it collides, the pad itself no
-		-- more than 0.25 tall (its trim barely more), so trucks roll over it.
-		for _, p in ipairs(parts(placed(BuildingArt.SellPad(24, 18), town.sellPad))) do
-			t.ok(not p.CanCollide, "the pad's " .. p.Name .. " doesn't collide")
-			local _, hi = boxOf(p)
-			t.ok(hi.Y <= (if p.Name == "SellPad" then 0.25 else 0.3) + 1e-6, "the pad's " .. p.Name .. " is flat")
+		-- Beside the mill, not in front of it: the zone is east of the mill's
+		-- lean-to (x 33) and west of the Dealership's loading pad (x 70).
+		t.ok(zone.X - size.X / 2 > 33, "east of the mill's lean-to")
+		t.ok(zone.X + size.X / 2 <= WorldLayout.DealershipLoadingPad.x0, "west of the Dealership's loading pad")
+		-- The pad stays a ghost: nothing of its paint collides, none of it
+		-- more than 0.3 tall, so trucks roll over it; and what does collide in
+		-- the station stands clear of the lane the trucks use (6.3 studs
+		-- either side of the pad's middle) up to the log rack across the back.
+		local station = placed(BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
+		local flat = {
+			SellPad = true,
+			PadBorder = true,
+			PadCorner = true,
+			Chevron = true,
+			LaneLine = true,
+			SlotLine = true,
+			SlotLabel = true,
+		}
+		local paint, solids = 0, 0
+		for _, p in ipairs(parts(station)) do
+			if flat[p.Name] then
+				paint += 1
+				t.ok(not p.CanCollide, "the pad's " .. p.Name .. " doesn't collide")
+				local _, hi = boxOf(p)
+				t.ok(hi.Y <= 0.3 + 1e-6, "the pad's " .. p.Name .. " is flat")
+			elseif p.CanCollide then
+				solids += 1
+				local lo, hi = boxOf(p)
+				local inLane = hi.X > pad.X - 6.3 and lo.X < pad.X + 6.3 and lo.Z < pad.Z + 11.5 and hi.Z > pad.Z - 17
+				t.ok(
+					not inLane,
+					string.format(
+						"the station's %s at (%.1f, %.1f) is in the trucks' lane",
+						p.Name,
+						p.CFrame.X,
+						p.CFrame.Z
+					)
+				)
+			end
 		end
+		t.ok(paint >= 30 and solids >= 20, string.format("%d painted parts, %d solid", paint, solids))
 		local ItemCatalog = t.shared("ItemCatalog")
 		local TruckLayout = t.shared("TruckLayout")
 		local TruckArt = t.shared("Art/TruckArt")
@@ -650,7 +702,7 @@ return function(t)
 			for _, p in ipairs(parts(thing.model)) do
 				if p.CanCollide then
 					local lo, hi = boxOf(p)
-					if hi.X > pad.X - 20 and lo.X < pad.X + 20 and hi.Z > 20 and lo.Z < 110 then
+					if hi.X > pad.X - 20 and lo.X < pad.X + 20 and hi.Z > 20 and lo.Z < pad.Z + 20 then
 						table.insert(near, { part = p, label = thing.label })
 					end
 				end
@@ -676,7 +728,7 @@ return function(t)
 			return found
 		end
 		local problems = {}
-		for back = 84, 96, 2 do
+		for back = 84, 120, 2 do
 			local dz = back - rig.length / 2
 			local found = hits(body, dz, 0, hits(hull, dz, 1, {}))
 			for what in pairs(found) do
@@ -684,18 +736,17 @@ return function(t)
 			end
 		end
 		t.ok(#problems == 0, "on the Rig's way onto the pad: " .. table.concat(problems, ", "))
-		-- Backed up to the mill (its tail at the ramp's foot, z 97), the whole
-		-- deck is in the zone.
+		-- Backed up to the rack (its tail at z 120), the whole deck is in the
+		-- zone.
 		local deck = model:FindFirstChild("BedFloor")
-		local dz = 97 - rig.length / 2
+		local dz = 120 - rig.length / 2
 		local d0, d1 = deck.CFrame.Z - deck.Size.Z / 2 + dz, deck.CFrame.Z + deck.Size.Z / 2 + dz
 		t.ok(
 			d0 >= zone.Z - size.Z / 2 and d1 <= zone.Z + size.Z / 2,
 			string.format("the Rig's deck (z %.1f to %.1f) lies in the zone", d0, d1)
 		)
-		-- And the check itself: a lamp a stud nearer the walk's middle is in
-		-- the Rig's way.
-		local lamp = placed(BuildingArt.LampPost(), CFrame.new(-6.5, 0, 60))
+		-- And the check itself: a lamp in the lane is in the Rig's way.
+		local lamp = placed(BuildingArt.LampPost(), CFrame.new(pad.X + 4, 0, 100))
 		local before = #near
 		for _, p in ipairs(parts(lamp)) do
 			if p.CanCollide then
@@ -703,21 +754,21 @@ return function(t)
 			end
 		end
 		local caught = false
-		for back = 84, 96, 2 do
+		for back = 84, 120, 2 do
 			for what in pairs(hits(body, back - rig.length / 2, 0, {})) do
 				caught = caught or string.find(what, "a test lamp", 1, true) ~= nil
 			end
 		end
 		t.ok(caught and #near > before, "a lamp in the Rig's way is caught")
-		-- Millie and the SELL LOGS HERE posts stand east of it.
+		-- Millie stands east of it, at the Weigh House window.
 		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
 			if model == "SellArea" and part == "SellZone" then
 				return town.sellZone, size
 			end
 			return nil, nil
 		end).Position
-		t.ok((millie - Vector3.new(14.6, 0, 92.5)).Magnitude < 1e-4, "Millie stands where she always has")
-		t.ok(millie.X > pad.X + 12 + 2, "Millie east of the pad and its lane")
+		t.ok((millie - Vector3.new(69.3, 0, 120)).Magnitude < 1e-4, "Millie stands at the Weigh House window")
+		t.ok(millie.X > pad.X + size.X / 2, "Millie east of the pad and its lane")
 	end)
 
 	-- Every problem a check found, a line each (the first 25).
@@ -741,11 +792,7 @@ return function(t)
 		end
 		local lot = WorldLayout.ParkingLot
 		table.insert(areas, { name = "parking lot", x0 = lot.x0, x1 = lot.x1, z0 = lot.z0, z1 = lot.z1 })
-		local pad = town.sellPad.Position
-		table.insert(
-			areas,
-			{ name = "sell pad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 }
-		)
+		table.insert(areas, padRect())
 		-- Each bay's pull-out: its own lane (a stud wider each side), 26 studs
 		-- on past its head and, for a pull-through bay, past its tail (phase
 		-- 12). A bay faces the forest (-Z) or the street (+Z).
@@ -993,120 +1040,124 @@ return function(t)
 		end
 	)
 
-	t.test("SELL LOGS HERE stands upright by the pad, facing the street, clear of the props (TWN-04)", function()
-		local found = {}
-		for _, sign in ipairs(town.signs) do
-			if sign.text == "SELL LOGS HERE" then
-				table.insert(found, sign)
+	t.test(
+		"SELL LOGS HERE stands upright at the station's gate, facing the street, clear of the props (TWN-04)",
+		function()
+			local found = {}
+			for _, sign in ipairs(town.signs) do
+				if sign.text == "SELL LOGS HERE" then
+					table.insert(found, sign)
+				end
 			end
-		end
-		t.eq(#found, 1, "one SELL LOGS HERE signpost in town.signs")
-		local cf = found[1].cframe
-		t.ok(cf.UpVector.Y > 0.99999, "upright")
-		t.ok(math.abs(cf.Y - TerrainGen.HeightAt(cf.X, cf.Z)) < 1e-6, "on the ground")
-		-- Its front (-Z, where the board's text reads) faces the street, south.
-		t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "facing the street")
-		-- At the pad's east edge (the row's "about (17, 92)"), not by any other
-		-- building: every problem with a spot, or none.
-		local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
-		local plaza, street
-		for _, paint in ipairs(WorldLayout.TownPaint) do
-			if paint.name == "Plaza" then
-				plaza = paint
-			elseif paint.name == "MainStreet" then
-				street = paint
+			t.eq(#found, 1, "one SELL LOGS HERE signpost in town.signs")
+			local cf = found[1].cframe
+			t.ok(cf.UpVector.Y > 0.99999, "upright")
+			t.ok(math.abs(cf.Y - TerrainGen.HeightAt(cf.X, cf.Z)) < 1e-6, "on the ground")
+			-- Its front (-Z, where the board's text reads) faces the street, south.
+			t.ok(cf.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "facing the street")
+			-- At the station's gate, east of the lane and north of the street, not
+			-- by any other building: every problem with a spot, or none.
+			local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
+			local plaza, street
+			for _, paint in ipairs(WorldLayout.TownPaint) do
+				if paint.name == "Plaza" then
+					plaza = paint
+				elseif paint.name == "MainStreet" then
+					street = paint
+				end
 			end
-		end
-		local pad = town.sellPad.Position
-		local padEast, padNorth = pad.X + 12.8, pad.Z + 9.8 -- the pad's edges, its border included
-		local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
-			if model == "SellArea" and part == "SellZone" then
-				return town.sellZone, WorldPlan.SellZoneSize
-			end
-			return nil, nil
-		end).Position
-		local function byThePad(spot)
-			local problems = {}
-			local post = placed(BuildingArt.Signpost("SELL LOGS HERE"), spot)
-			local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
-			for _, p in ipairs(parts(post)) do
-				local lo, hi = boxOf(p)
-				if p.CanCollide then
-					x0, x1 = math.min(x0, lo.X), math.max(x1, hi.X)
-					z0, z1 = math.min(z0, lo.Z), math.max(z1, hi.Z)
-					-- Millie stands beside the pad: the posts keep 2.5 studs from her.
-					local dx = math.max(lo.X - millie.X, 0, millie.X - hi.X)
-					local dz = math.max(lo.Z - millie.Z, 0, millie.Z - hi.Z)
-					if math.sqrt(dx * dx + dz * dz) < 2.5 then
-						table.insert(problems, "a post within 2.5 studs of Millie")
+			local pad = town.sellPad.Position
+			local rect = padRect() -- the pad's edges, its border included
+			local millie = NPCData.SpotFor(NPCData.Get("Millie"), function(model, part)
+				if model == "SellArea" and part == "SellZone" then
+					return town.sellZone, WorldPlan.SellZoneSize
+				end
+				return nil, nil
+			end).Position
+			local function byThePad(spot)
+				local problems = {}
+				local post = placed(BuildingArt.Signpost("SELL LOGS HERE"), spot)
+				local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+				for _, p in ipairs(parts(post)) do
+					local lo, hi = boxOf(p)
+					if p.CanCollide then
+						x0, x1 = math.min(x0, lo.X), math.max(x1, hi.X)
+						z0, z1 = math.min(z0, lo.Z), math.max(z1, hi.Z)
+						-- Millie stands beside the pad: the posts keep 2.5 studs from her.
+						local dx = math.max(lo.X - millie.X, 0, millie.X - hi.X)
+						local dz = math.max(lo.Z - millie.Z, 0, millie.Z - hi.Z)
+						if math.sqrt(dx * dx + dz * dz) < 2.5 then
+							table.insert(problems, "a post within 2.5 studs of Millie")
+						end
+					end
+					-- Not over her head: she isn't under any of it.
+					if millie.X > lo.X - 1 and millie.X < hi.X + 1 and millie.Z > lo.Z - 1 and millie.Z < hi.Z + 1 then
+						table.insert(problems, "its " .. p.Name .. " over Millie")
 					end
 				end
-				-- Not over her head: she isn't under any of it.
-				if millie.X > lo.X - 1 and millie.X < hi.X + 1 and millie.Z > lo.Z - 1 and millie.Z < hi.Z + 1 then
-					table.insert(problems, "its " .. p.Name .. " over Millie")
+				-- East of the trucks' lane in (6.5 studs from the pad's middle line, so
+				-- the Rig's hull clears the near post), its east post within 6 studs of
+				-- the pad's east edge: the station's gate.
+				if x0 < pad.X + 6.5 then
+					table.insert(problems, string.format("near post %.1f studs into the lane", pad.X + 6.5 - x0))
 				end
+				if x1 > rect.x1 + 6 then
+					table.insert(problems, string.format("east post at x %.1f, past the station's gate", x1))
+				end
+				-- In front of the pad, north of the street (4 studs clear), not on
+				-- the pad.
+				if z0 < street.z1 + 4 or z1 > rect.z0 then
+					table.insert(problems, string.format("posts at z %.1f to %.1f, not alongside the gate", z0, z1))
+				end
+				return problems
 			end
-			-- East of the pad, out of the trucks' lane in (1.5 studs off its
-			-- edge), its near post within 4 studs of the edge.
-			if x0 < padEast + 1.5 or x0 > padEast + 4 then
-				table.insert(problems, string.format("near post %.1f studs off the pad's east edge", x0 - padEast))
+			local problems = byThePad(cf)
+			t.ok(#problems == 0, "by the pad: " .. table.concat(problems, "; "))
+			-- The check itself: a spot in the trucks' lane, one on the pad, one by
+			-- the street, one past the gate and one on Millie are each caught, for
+			-- the right reason.
+			local bads = {
+				{ 50, 90, "lane" },
+				{ 67, 100, "alongside" },
+				{ 67, 86, "alongside" },
+				{ 74.25, 90, "past the station" },
+				{ 74.25, 118, "Millie" },
+			}
+			for _, bad in ipairs(bads) do
+				local caught = false
+				for _, why in ipairs(byThePad(CFrame.new(bad[1], 0, bad[2]))) do
+					caught = caught or string.find(why, bad[3], 1, true) ~= nil
+				end
+				t.ok(caught, string.format("a SELL LOGS HERE at (%g, %g) is caught (%s)", bad[1], bad[2], bad[3]))
 			end
-			-- Alongside the pad, north of the street (4 studs clear), and inside
-			-- the plaza's east edge (the lane north, TWN-05, starts there).
-			if z0 < street.z1 + 4 or z1 > padNorth then
-				table.insert(problems, string.format("posts at z %.1f to %.1f, not alongside the pad", z0, z1))
-			end
-			if x1 > plaza.x1 then
-				table.insert(problems, string.format("east post at x %.1f, past the plaza", x1))
-			end
-			return problems
-		end
-		local problems = byThePad(cf)
-		t.ok(#problems == 0, "by the pad: " .. table.concat(problems, "; "))
-		-- The check itself: the spot by the Tool Shed's door, one with its west
-		-- post on the pad, one on Millie, one in the lane north and one by
-		-- the street are each caught, for the right reason.
-		local bads = {
-			{ -32.5, 87, "near post" },
-			{ 17, 92, "near post" },
-			{ 20.5, 92, "Millie" },
-			{ 28, 90, "past the plaza" },
-			{ 20.5, 87, "alongside" },
-		}
-		for _, bad in ipairs(bads) do
-			local caught = false
-			for _, why in ipairs(byThePad(CFrame.new(bad[1], 0, bad[2]))) do
-				caught = caught or string.find(why, bad[3], 1, true) ~= nil
-			end
-			t.ok(caught, string.format("a SELL LOGS HERE at (%g, %g) is caught (%s)", bad[1], bad[2], bad[3]))
-		end
-		-- The spawn sees its front: read from the spawn walk, not edge-on.
-		local toSpawn = Vector3.new(town.spawn.X - cf.X, 0, town.spawn.Z - cf.Z).Unit
-		t.ok(cf.LookVector:Dot(toSpawn) > 0.5, "its board faces the spawn walk")
-		-- Nothing it stands in or on: the whole signpost (decoration too) keeps
-		-- out of every prop, and its posts (what collides) 2 studs from them.
-		local sign = placed(BuildingArt.Signpost(found[1].text), cf)
-		for _, prop in ipairs(town.props) do
-			local model = placed(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
-			for _, p in ipairs(parts(model)) do
-				local lo, hi = boxOf(p)
-				for _, s in ipairs(parts(sign)) do
-					local gap = if s.CanCollide and p.CanCollide then 2 else 0
-					local area = { x0 = lo.X - gap, x1 = hi.X + gap, z0 = lo.Z - gap, z1 = hi.Z + gap }
-					t.ok(
-						reachInto(s.CFrame, s.Size, area) <= 1e-3,
-						string.format(
-							"the signpost's %s runs into the %s at (%g, %g)",
-							s.Name,
-							prop.name,
-							prop.cframe.X,
-							prop.cframe.Z
+			-- The spawn sees its front: read from the spawn walk, not edge-on.
+			local toSpawn = Vector3.new(town.spawn.X - cf.X, 0, town.spawn.Z - cf.Z).Unit
+			t.ok(cf.LookVector:Dot(toSpawn) > 0.5, "its board faces the spawn walk")
+			-- Nothing it stands in or on: the whole signpost (decoration too) keeps
+			-- out of every prop, and its posts (what collides) 2 studs from them.
+			local sign = placed(BuildingArt.Signpost(found[1].text), cf)
+			for _, prop in ipairs(town.props) do
+				local model = placed(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
+				for _, p in ipairs(parts(model)) do
+					local lo, hi = boxOf(p)
+					for _, s in ipairs(parts(sign)) do
+						local gap = if s.CanCollide and p.CanCollide then 2 else 0
+						local area = { x0 = lo.X - gap, x1 = hi.X + gap, z0 = lo.Z - gap, z1 = hi.Z + gap }
+						t.ok(
+							reachInto(s.CFrame, s.Size, area) <= 1e-3,
+							string.format(
+								"the signpost's %s runs into the %s at (%g, %g)",
+								s.Name,
+								prop.name,
+								prop.cframe.X,
+								prop.cframe.Z
+							)
 						)
-					)
+					end
 				end
 			end
 		end
-	end)
+	)
 
 	t.test("the grove gate is a lit sign at the south exit, and the spawn stays open", function()
 		local found = nil
@@ -1187,10 +1238,12 @@ return function(t)
 		local toMill = Vector3.new(mill.X - town.spawn.X, 0, mill.Z - town.spawn.Z).Unit
 		local degrees = math.deg(math.acos(math.clamp(look:Dot(toMill), -1, 1)))
 		t.ok(degrees <= 15, string.format("the spawn looks %.1f degrees off the sawmill", degrees))
-		-- And the sell pad, between the walk's two lamps, is straight ahead.
+		-- And the walk to the mill's front is clear: the sell station stands
+		-- beside the mill, east of its lean-to, not on the line from the spawn.
 		local pad = town.sellPad.Position
+		t.ok(pad.X - WorldPlan.SellPadWidth / 2 > 33, "the sell station is east of the mill, not in front of it")
 		local toPad = Vector3.new(pad.X - town.spawn.X, 0, pad.Z - town.spawn.Z).Unit
-		t.ok(look:Dot(toPad) > math.cos(math.rad(15)), "the sell pad is ahead of the spawn")
+		t.ok(look:Dot(toPad) < math.cos(math.rad(15)), "the sell pad is off to the side of the spawn's view line")
 	end)
 
 	t.test("Murph stands in front of his camp, where NPCData puts him", function()

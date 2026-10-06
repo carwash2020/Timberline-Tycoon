@@ -2149,13 +2149,12 @@ function BuildingArt.Fence(length: number): Model
 	return model
 end
 
--- The painted sell pad (w x d) with a timber border and drive-in chevrons;
--- nothing on it collides or stands taller than 0.25. Named parts:
--- "SellPad" (w x 0.2 x d, CanCollide off) with "SELL LOGS HERE" on its
--- top face. The pad is turned half a turn so the text reads upright from
--- the -Z side (the spawn).
-function BuildingArt.SellPad(w: number, d: number): Model
-	local model = Kit.model("SellPadArt")
+-- The sell pad's plank floor with its timber border, iron corners and
+-- drive-in chevrons (at each x in `chevrons`): flat paint, nothing of it
+-- collides or stands taller than 0.3. Returns "SellPad" (w x 0.2 x d,
+-- CanCollide off) with "SELL LOGS HERE" on its top face; the pad is turned
+-- half a turn so the text reads upright from the -Z side (the street).
+local function sellPadBase(model: Model, w: number, d: number, chevrons: { number }): Part
 	local pad = Kit.part(model, "SellPad", V3(w, 0.2, d), CF(0, 0.1, 0) * ANG(0, PI, 0), PAD, MAT.WoodPlanks)
 	pad.CanCollide = false
 	Kit.signText(pad, "SELL LOGS HERE", PAD_INK, { Enum.NormalId.Top })
@@ -2173,8 +2172,7 @@ function BuildingArt.SellPad(w: number, d: number): Model
 			)
 		end
 	end
-	for i = 0, 2 do
-		local x = (i - 1) * (w / 3.4)
+	for _, x in ipairs(chevrons) do
 		for _, s in ipairs({ -1, 1 }) do
 			dBox(
 				model,
@@ -2186,7 +2184,153 @@ function BuildingArt.SellPad(w: number, d: number): Model
 			)
 		end
 	end
+	return pad
+end
+
+-- The painted sell pad (w x d) with a timber border and drive-in chevrons;
+-- nothing on it collides or stands taller than 0.25. Named parts:
+-- "SellPad" (w x 0.2 x d, CanCollide off) with "SELL LOGS HERE" on its
+-- top face. The pad is turned half a turn so the text reads upright from
+-- the -Z side (the spawn). The town builds BuildingArt.SellStation now (it
+-- uses this pad's floor); the 24 x 18 pad is what the uploaded mesh fits.
+function BuildingArt.SellPad(w: number, d: number): Model
+	local model = Kit.model("SellPadArt")
+	sellPadBase(model, w, d, { -w / 3.4, 0, w / 3.4 })
 	TownMeshes.Dress(model, "SellPad")
+	return model
+end
+
+-- The sell station (Connor: "move the sell logs here pad to the side of the
+-- sawmill, and add more to it"): a w x d sell pad with a clear drive-in
+-- lane down the middle (the Logging Rig and the biggest beds back onto it
+-- from the street, -Z) and marked slots to either side where hand-dragged
+-- logs (LOGS, west) and plank piles (PLANKS, east) can be left, a log rack
+-- across the back, a platform scale, a Weigh House with Millie's window on
+-- the east side, rails behind, and lanterns. Everything on the pad is flat
+-- paint; what collides stands at its edges and along the back (the rack,
+-- the scale's post, the rails, the weigh house), clear of the lane.
+-- Named parts: "SellPad" (as sellPadBase, CanCollide off), "SlotLabel"
+-- (one per slot), "LogRack", "ScalePost", "WeighHouse" (a Model, its
+-- window on the west, toward the pad). The Sky Bin (BuildingArt.SkyBin)
+-- is placed separately inside the pad's north-west corner, WorldPlan
+-- decides where. Built around the pad's middle, ground at y = 0, the
+-- street at -Z.
+function BuildingArt.SellStation(w: number, d: number): Model
+	local model = Kit.model("SellStationArt")
+	local hw, hd = w / 2, d / 2
+	local pad = sellPadBase(model, w, d, { 0 })
+	-- On the big pad the name is painted in the lane's middle, as wide as
+	-- the lane, not across the whole floor over the slots.
+	local name = pad:FindFirstChildOfClass("SurfaceGui")
+	local title = if name then name:FindFirstChildOfClass("TextLabel") else nil
+	if title then
+		title.Size = UDim2.fromScale(0.36, 0.1)
+		title.Position = UDim2.fromScale(0.32, 0.45)
+	end
+
+	-- The lane the trucks use, between two painted lines.
+	for _, s in ipairs({ -1, 1 }) do
+		dBox(model, "LaneLine", V3(0.3, 0.22, d - 5), CF(s * 5.6, 0.11, 0.5), SIGN_INK, MAT.SmoothPlastic)
+	end
+
+	-- Marked slots: a painted box and a label plate each.
+	local function slot(cx: number, cz: number, label: string)
+		local sw, sd = 7, 6.5
+		for _, s in ipairs({ -1, 1 }) do
+			dBox(model, "SlotLine", V3(sw, 0.22, 0.25), CF(cx, 0.11, cz + s * sd / 2), SIGN_INK, MAT.SmoothPlastic)
+			dBox(model, "SlotLine", V3(0.25, 0.22, sd), CF(cx + s * sw / 2, 0.11, cz), SIGN_INK, MAT.SmoothPlastic)
+		end
+		local tag = dBox(
+			model,
+			"SlotLabel",
+			V3(4.4, 0.08, 1.3),
+			CF(cx, 0.24, cz - sd / 2 + 1.2) * ANG(0, PI, 0),
+			PLANK_DARK[1],
+			MAT.WoodPlanks
+		)
+		Kit.signText(tag, label, SIGN_INK, { Enum.NormalId.Top })
+	end
+	for _, z in ipairs({ -10, -2.5, 5 }) do
+		slot(-10.2, z, "LOGS")
+	end
+	for _, z in ipairs({ -10, -2.5 }) do
+		slot(10.2, z, "PLANKS")
+	end
+
+	-- The platform scale in the east column: a steel plate on the pad with a
+	-- post and a dial behind it (the post collides, the plate is flat).
+	local sx, sz = 10.2, 5.5
+	dBox(model, "ScaleRim", V3(5.9, 0.2, 5.3), CF(sx, 0.3, sz), IRON, MAT.Metal)
+	dBox(model, "ScalePlate", V3(5.6, 0.12, 5), CF(sx, 0.46, sz), STEEL_DARK, MAT.Metal)
+	Kit.part(model, "ScalePost", V3(0.5, 4.2, 0.5), CF(sx, 2.3, sz + 2.1), STEEL_DARK, MAT.Metal)
+	dCyl(model, "ScaleDial", 0.3, 2.4, CF(sx, 4.9, sz + 1.85) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+	dCyl(model, "ScaleFace", 0.1, 2, CF(sx, 4.9, sz + 1.68) * ANG(0, PI / 2, 0), PAPER)
+	dBox(model, "ScaleNeedle", V3(0.12, 0.85, 0.08), CF(sx + 0.25, 5.0, sz + 1.6) * ANG(0, 0, -0.55), SOOT)
+
+	-- The log rack across the back: three tiers of logs between stakes,
+	-- stakes lit by lanterns. The logs and stakes collide (it is a wall).
+	local rz, rl = hd - 1.8, 14
+	local rack = Kit.rng(2027)
+	for _, x in ipairs({ -1, 1 }) do
+		for _, z in ipairs({ -1, 1 }) do
+			Kit.part(model, "LogRack", V3(0.6, 4.6, 0.6), CF(x * (rl / 2 + 0.5), 2.5, rz + z * 2.5), TIMBER, MAT.Wood)
+		end
+		Kit.lantern(model, CF(x * (rl / 2 + 0.5), 5.6, rz), 0.9)
+	end
+	local tiers: { { y: number, zs: { number } } } = {
+		{ y = 0.95, zs = { -1.6, 0, 1.6 } },
+		{ y = 2.2, zs = { -0.8, 0.8 } },
+		{ y = 3.45, zs = { 0 } },
+	}
+	for _, tier in ipairs(tiers) do
+		for _, dz in ipairs(tier.zs) do
+			local tone = Kit.vary(BARK, rack, 0.06)
+			Kit.cylinder(model, "RackLog", rl, 1.5, CF(0, tier.y, rz + dz), tone, MAT.Wood)
+			for _, x in ipairs({ -1, 1 }) do
+				dCyl(model, "RackEnd", 0.1, 1.3, CF(x * (rl / 2 + 0.03), tier.y, rz + dz), HEART)
+			end
+		end
+	end
+
+	-- Rails behind the pad (a split-rail fence, as the lot's): across the
+	-- back and a stretch of the west side by the Sky Bin.
+	local function rail(len: number, cf: CFrame)
+		local f = BuildingArt.Fence(len)
+		Kit.placeAt(f, cf)
+		f.Parent = model
+	end
+	rail(w + 3, CF(0, 0, hd + 1.7))
+	rail(8, CF(-(hw + 1.7), 0, hd - 2.3) * ANG(0, PI / 2, 0))
+
+	-- The Weigh House on the east side, its window toward the pad (turned so
+	-- its front faces -X): a counter under a lean-to roof, a name board and
+	-- two lanterns on its front posts.
+	local house = Kit.model("WeighHouse", model)
+	local hc = CF(hw + 5, 0, hd - 7) * ANG(0, PI / 2, 0)
+	local function at(x: number, y: number, z: number): CFrame
+		return hc * CF(x, y, z)
+	end
+	local H0, H1 = 0.5, 6.4
+	Kit.part(house, "HouseFloor", V3(7.6, 0.5, 7.6), at(0, 0.25, 0), STONE[2], MAT.Slate)
+	Kit.part(house, "HouseWall", V3(7, H1 - H0, 0.4), at(0, (H0 + H1) / 2, 3.3), PLANK[1], MAT.WoodPlanks)
+	for i, s in ipairs({ -1, 1 }) do
+		Kit.part(house, "HouseWall", V3(0.4, H1 - H0, 6.2), at(s * 3.3, (H0 + H1) / 2, 0), PLANK[i + 1], MAT.WoodPlanks)
+	end
+	Kit.part(house, "HouseCounter", V3(4.4, 2.9, 0.5), at(-1.1, 1.95, -3.3), PLANK[3], MAT.WoodPlanks)
+	dBox(house, "HouseLedge", V3(4.8, 0.25, 1.1), at(-1.1, 3.5, -3.85), TIMBER_LIGHT)
+	Kit.part(house, "HouseHeader", V3(7.2, 0.6, 0.6), at(0, 6.1, -3.3), TIMBER, MAT.Wood)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(house, "HousePost", V3(0.6, 5.9, 0.6), at(s * 3.3, 3.45, -3.3), TIMBER, MAT.Wood)
+	end
+	Kit.wedge(house, "HouseRoof", V3(8.6, 1.5, 8.8), at(0, H1 + 0.75, 0.2), SHINGLE[1], MAT.Slate)
+	dBox(house, "RoofTrim", V3(8.8, 0.3, 0.4), at(0, H1 + 0.15, -4.25), TIMBER)
+	signBoard(house, "HouseSign", at(0, 5.45, -3.8), 5.6, 0.8, "WEIGH HOUSE", PLANK[2], TIMBER, SIGN_INK, false)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.lantern(house, at(s * 3.3, 4.2, -4.1), 0.9)
+	end
+	dBox(house, "Ledger", V3(1.2, 0.12, 0.9), at(-1.1, 3.69, -3.85), PAPER)
+	dBox(house, "Stool", V3(1.1, 1.4, 1.1), at(1.9, 1.2, 1.4), TIMBER_LIGHT)
+
 	return model
 end
 

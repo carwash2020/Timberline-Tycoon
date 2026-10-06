@@ -44,6 +44,7 @@ return function(t)
 			BuildingArt.Signpost("TO THE WOODS"),
 			BuildingArt.Sawmill(),
 			BuildingArt.SellPad(24, 18),
+			BuildingArt.SellStation(28, 32),
 			BuildingArt.SkyBin(),
 			BuildingArt.GondolaStation(),
 			BuildingArt.Campsite(),

@@ -25,6 +25,7 @@ local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local CameraShake = require(script.Parent.CameraShake)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
+local HudNav = require(script.Parent.HudNav)
 local LeaderboardUI = require(script.Parent.LeaderboardUI)
 local Quality = require(script.Parent.Quality)
 local UITheme = require(script.Parent.UITheme)
@@ -487,6 +488,7 @@ function SettingsUI.Start()
 		card.outer.Visible = not card.outer.Visible
 	end
 	open.Activated:Connect(toggle)
+	HudNav.Add(open, { id = "settings", label = "SETTINGS", press = toggle })
 	UITheme.Clicks(open)
 	if roundSpec.hit then
 		UITheme.HitPad(open, roundSpec.hit).Activated:Connect(toggle)

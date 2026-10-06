@@ -7,7 +7,6 @@
 -- it swaps, so this screen can't duplicate cash or logs. Esc and B close it.
 
 local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,6 +14,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
+local GamepadNav = require(script.Parent.GamepadNav)
 local HUD = require(script.Parent.HUD)
 local UITheme = require(script.Parent.UITheme)
 
@@ -194,10 +194,7 @@ local function setOpen(on: boolean)
 	if not on then
 		hideConfirm()
 		ContextActionService:UnbindAction(SAVES_CLOSE)
-		local selected = GuiService.SelectedObject
-		if selected and selected:IsDescendantOf(p) then
-			GuiService.SelectedObject = nil
-		end
+		GamepadNav.Restore(p) -- back to the HUD button that opened it, or to walking
 	else
 		fill()
 		ContextActionService:BindActionAtPriority(
@@ -220,7 +217,7 @@ local function setOpen(on: boolean)
 		)
 		local pick = firstPick
 		if pick and UITheme.Device() == "console" then
-			GuiService.SelectedObject = pick
+			GamepadNav.Focus(pick, p) -- selects it, keeps the stick in the panel
 		end
 	end
 end

@@ -1463,15 +1463,21 @@ export type Town = {
 
 local FACING_SOUTH = CFrame.Angles(0, 0, 0) -- builders face -Z already
 
--- The sell volume over the pad (MapBuilder's SellZone): the pad's width and
--- 40 deep, z 62 to 102, so a truck backed in from the street until it
--- meets the mill (its front at z 97) has its whole bed in it, the Logging
--- Rig's 33.8-stud deck too (phase 12; M1.5's was 26 deep, z 69 to 95, for
--- a 26-stud deck; the pad's own 18 before that). Its middle stays at z 82,
--- on the pad, where Millie, the SELL LOGS marker and the quest beacon are
--- placed from, so it grew both ways: north into the mill's front, south
--- over the street to the plaza, short of the spawn walk's lamps (z 60).
-WorldPlan.SellZoneSize = Vector3.new(24, 12, 40)
+-- The sell station (Connor: "move the sell logs here pad to the side of the
+-- sawmill, and add more to it"). It stands EAST of the mill, beside the
+-- lean-to, between the mill yard and the mill road, so the spawn walk to
+-- the mill's front is clear and trucks reach it straight off the main
+-- street. The pad is SellPadWidth x SellPadDepth (BuildingArt.SellStation:
+-- three lanes, a weigh house, a log rack, rails and lamps round it). The
+-- sell volume (MapBuilder's SellZone) is the pad's width and 52 deep, z 85
+-- to 137, so a truck backed in from the street up to the log rack has its
+-- whole bed in it, the Logging Rig's 33.8-stud deck too (phase 12). Its
+-- middle is the pad's
+-- middle, (53, 111): Millie, the SELL LOGS marker and the quest beacon are
+-- placed from it.
+WorldPlan.SellPadWidth = 28
+WorldPlan.SellPadDepth = 32
+WorldPlan.SellZoneSize = Vector3.new(28, 12, 52)
 
 -- Parking bays (phase 12; M1.5's were all 10 x 60, so a Rustbucket sat in
 -- a runway): each painted bay (MapBuilder builds a ParkingSlot part this
@@ -1531,13 +1537,17 @@ function WorldPlan.Town(): Town
 	-- The east one sits further south: Old Bram walks the corner, and the
 	-- flower bed sits just east of where a closer lamp would stand.
 	table.insert(lamps, at(-14, 38, math.pi))
-	for _, x in ipairs({ 30, 58 }) do
-		table.insert(lamps, at(x, 92, 0)) -- north side, set back off the street
-	end
+	table.insert(lamps, at(30, 92, 0)) -- north side, set back off the street
 	table.insert(lamps, at(-8, 60, -math.pi / 2))
 	table.insert(lamps, at(8, 60, math.pi / 2))
 	table.insert(lamps, at(-41, 134, -math.pi / 2)) -- west of the gondola path, arm east over it
 	table.insert(lamps, at(36, 124, 0)) -- east of the mill's lean-to
+	-- The sell station's four corner lamps, outside its rails (WorldPlan.spec
+	-- keeps them off the pad, its lane and the roads).
+	-- (The north-west one is the mill yard's lamp at (36, 124), below.)
+	table.insert(lamps, at(36, 95, 0))
+	table.insert(lamps, at(70, 95, 0))
+	table.insert(lamps, at(70, 127, 0))
 	table.insert(lamps, at(147.5, 36, math.pi)) -- south of the wider Plot Road
 	table.insert(lamps, at(147.5, 0, math.pi / 2))
 
@@ -1571,14 +1581,14 @@ function WorldPlan.Town(): Town
 		{ "Barrel", -30.5, 92 },
 		{ "Crate", -30.5, 88.6, 0.3 },
 		{ "Barrel", 32, 93 },
-		{ "Crate", 71, 93, -0.2 },
+		{ "Crate", 86, 92.5, -0.2 }, -- the station's sign took the old spot (71, 93)
 		{ "Crate", 80, 102, 0.5 }, -- clear of the mill road's east leg
 		{ "Planter", -61, 98 },
 		{ "Planter", -103.5, 88 },
 		{ "Mailbox", -121, 94, 0 },
 		{ "FlowerBox", -97, 85.3, 0 },
-		{ "LogPile", 39, 131, 0 }, -- east of the mill, clear of the yard lamp
-		{ "LogPile", 39, 137, 0.1 },
+		{ "LogPile", 35.5, 131, 0 }, -- east of the mill, clear of the yard lamp and the sell station
+		{ "LogPile", 35.5, 137, 0.1 },
 		{ "Wheelbarrow", 20, 93, -0.6 },
 		{ "SawdustPile", 40, 125 }, -- by the lean-to, clear of the yard lamp
 		{ "SawdustPile", -29.5, 91 },
@@ -1647,15 +1657,11 @@ function WorldPlan.Town(): Town
 			table.insert(distances, string.format("%s  %d", def.displayName, def.haulStuds or 0))
 		end
 	end
-	-- SELL LOGS HERE (TWN-04) stands upright at the pad's east edge, facing
-	-- the street, beside Millie (who stands at (14.6, 92.5), just off the
-	-- pad's edge): its west post 2.4 studs east of the pad, out of the
-	-- trucks' lane in from the street, 5 studs north of the street, 2.5
-	-- studs or more from Millie and south of her, so from the spawn she
-	-- shows just left of its board; its east post inside the plaza (x < 26),
-	-- out of the lane north (TWN-05) and clear of the lamp at (30, 86).
-	-- Like the corner lamps, it may stand on the plaza, never on the
-	-- street, the pad or a path (WorldPlan.spec).
+	-- SELL LOGS HERE (TWN-04) stands upright at the station's south-east
+	-- gate, facing the street: its posts east of the trucks' lane in, north
+	-- of the street, clear of Millie and the props, so the main street's
+	-- drivers and walkers read it. Like the corner lamps, it never stands on
+	-- the street, the pad or a path (WorldPlan.spec).
 	local signs: { Sign } = {
 		{ text = "TO THE WOODS\n" .. table.concat(distances, "\n"), cframe = facing(-16, 44, 0, 40) },
 		-- Just north of the truck-lot path (the apron ends at z=70 and the
@@ -1667,7 +1673,7 @@ function WorldPlan.Town(): Town
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
 		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },
-		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
+		{ text = "SELL LOGS HERE", cframe = at(67, 90) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
 		-- The south exit, where the Forest Path leaves town for the Starter
 		-- Forest. West of the road (the lot is to the east), lit, and well
 		-- south of the spawn so the tutorial grove can
@@ -1727,8 +1733,7 @@ function WorldPlan.Town(): Town
 		{ "tree", -62, 6, 1, "birch" },
 		{ "tree", -112, 0, 1.22, "birch" },
 		{ "tree", -72, 232, 1, "birch" },
-		{ "tree", 50, 128, 1, "maple" },
-		{ "tree", 78, 114, 1.22, "birch" },
+		{ "tree", 82, 144, 1.22, "birch" },
 		{ "tree", 78, 136, 1.22, "maple" },
 		{ "tree", 128, 134, 1, "birch" },
 		{ "tree", 124, 150, 1, "maple" },
@@ -1742,10 +1747,10 @@ function WorldPlan.Town(): Town
 		-- Bushes along the shops' sides, the mill's back and the station.
 		{ "bush", -138, 108, 2.8 },
 		{ "bush", -136, 118, 2.4 },
-		{ "bush", 74, 117, 2.6 },
-		{ "bush", 69, 120.5, 3 },
-		{ "bush", 71, 101, 2.8 },
-		{ "bush", 71.5, 106.5, 2.4 },
+		{ "bush", 86, 112, 2.6 }, -- east of the station
+		{ "bush", 86, 131, 3 },
+		{ "bush", 48, 140, 2.8 }, -- behind it
+		{ "bush", 66, 141, 2.6 },
 		{ "bush", -6, 143, 2.6 },
 		{ "bush", 10, 142.5, 2.8 },
 		{ "bush", -51.5, 146, 2.8 },
@@ -1761,7 +1766,7 @@ function WorldPlan.Town(): Town
 		{ "flowers", -57.5, 46, 2.4 },
 		-- Rocks.
 		{ "rock", -55, 150, 1.8 },
-		{ "rock", 73, 112, 2 },
+		{ "rock", 84, 135, 2 },
 		{ "rock", -126, 102, 1.6 },
 		{ "rock", 352, 118, 1.8 },
 	}
@@ -1789,15 +1794,16 @@ function WorldPlan.Town(): Town
 		spawnFacing = spawnFacing,
 		-- The sawmill and the shops are built 1.5x their design size
 		-- (BuildingArt.Scale, TWN-13), placed so their fronts stay where they
-		-- were: the mill's at z 97, behind the sell pad, centred on the
-		-- spawn walk; the shops' on their paths. They grew back and sideways
+		-- were: the mill's at z 97, centred on the spawn walk (the sell
+		-- station is beside it now); the shops' on their paths. They grew back and sideways
 		-- (the Tool Shed and Hearth & Home west, the Dealership east).
 		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
-		-- Its middle at z 82, on the pad (WorldPlan.SellZoneSize: 40 deep,
-		-- z 62 to 102, over the street and the mill's front).
-		sellZone = CFrame.new(mill.X, 6, mill.Z - 28),
-		sellPad = CFrame.new(mill.X, 0, mill.Z - 24),
-		skyBin = CFrame.new(mill.X - 18, 2, mill.Z - 24),
+		-- The sell station beside the mill's east lean-to (WorldPlan.SellZoneSize:
+		-- 28 x 52, z 85 to 137, over the pad's middle). It stays west of the
+		-- Dealership's loading pad (WorldLayout, x 70 to 84).
+		sellZone = CFrame.new(mill.X + 53, 6, mill.Z + 1),
+		sellPad = CFrame.new(mill.X + 53, 0, mill.Z + 1),
+		skyBin = CFrame.new(mill.X + 42, 2, mill.Z + 12), -- the pad's north-west corner, inside its rails
 		shops = {
 			{
 				kind = "ToolShed",

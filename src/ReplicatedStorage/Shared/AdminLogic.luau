@@ -193,7 +193,320 @@ AdminLogic.MenuActions = {
 	"timespeed",
 	"settime",
 	"timereset",
+	"ban",
+	"announce",
+	"god",
+	"heal",
+	"freeze",
+	"stats",
+	"resettutorial",
+	"unlockbp",
+	"tospawn",
+	"shutdown",
+	"delegate",
+	"undelegate",
+	"delegates",
 } :: { string }
+
+-- Requests with no arguments, and requests that take only a player.
+AdminLogic.PlainActions = { "superrun", "timereset", "god", "tospawn", "shutdown", "delegates" } :: { string }
+AdminLogic.TargetActions = {
+	"kick",
+	"goto",
+	"bring",
+	"heal",
+	"freeze",
+	"stats",
+	"resettutorial",
+	"unlockbp",
+} :: { string }
+
+AdminLogic.MaxAnnounce = 120
+
+-- Announcement text: 1 to MaxAnnounce printable characters, no control codes.
+function AdminLogic.AnnounceText(text: unknown): string?
+	if type(text) ~= "string" then
+		return nil
+	end
+	local trimmed = string.match(text, "^%s*(.-)%s*$") or ""
+	if trimmed == "" or #trimmed > AdminLogic.MaxAnnounce or string.find(trimmed, "%c") then
+		return nil
+	end
+	return trimmed
+end
+
+---------------------------------------------------------------------------
+-- Delegation: roles, powers, expiry. The OWNER (IsOwner) is the only one who
+-- can grant or revoke anything; none of this ever applies to the owner. The
+-- server holds the table of grants (AdminService) and asks these functions on
+-- every request; a role named by a client is never read.
+---------------------------------------------------------------------------
+
+-- What a delegate may be given one by one (CUSTOM) or through a role. Cash,
+-- permanent bans, shutdown, super run, profile changes (reset tutorial,
+-- unlock buildings) and delegation itself are not on it.
+AdminLogic.DelegablePowers = {
+	"goto",
+	"bring",
+	"heal",
+	"freeze",
+	"stats",
+	"announce",
+	"kick",
+	"ban",
+	"gift",
+	"settime",
+	"timespeed",
+	"timereset",
+	"tospawn",
+	"god",
+} :: { string }
+
+-- Owner only: no role but TESTER holds the first list, and nobody but the
+-- owner holds the second.
+AdminLogic.NeverDelegable = {
+	"give",
+	"take",
+	"setcash",
+	"superrun",
+	"shutdown",
+	"resettutorial",
+	"unlockbp",
+	"unban",
+} :: { string }
+AdminLogic.OwnerOnly = { "delegate", "undelegate", "delegates" } :: { string }
+
+-- Everything TESTER holds: every owner power except delegation.
+AdminLogic.AllPowers = {
+	"give",
+	"take",
+	"setcash",
+	"gift",
+	"kick",
+	"ban",
+	"unban",
+	"goto",
+	"bring",
+	"superrun",
+	"timespeed",
+	"settime",
+	"timereset",
+	"announce",
+	"god",
+	"heal",
+	"freeze",
+	"stats",
+	"resettutorial",
+	"unlockbp",
+	"tospawn",
+	"shutdown",
+} :: { string }
+
+-- A TESTER's destructive actions need an extra confirmation, and the owner
+-- is shown each one on screen.
+AdminLogic.Destructive = { "ban", "unban", "kick", "shutdown", "take", "setcash", "resettutorial" } :: { string }
+
+AdminLogic.MaxDelegateBanHours = 1
+
+AdminLogic.RoleList = { "HELPER", "MODERATOR", "BUILDER", "TESTER", "CUSTOM" } :: { string }
+
+AdminLogic.Roles = {
+	HELPER = { "goto", "bring", "freeze", "stats", "announce" },
+	MODERATOR = { "goto", "bring", "freeze", "stats", "announce", "kick", "ban" },
+	BUILDER = { "gift", "settime", "timespeed", "timereset", "tospawn", "god" },
+} :: { [string]: { string } }
+
+AdminLogic.RoleHints = {
+	HELPER = "Go to and bring players, freeze, stats, announce.",
+	MODERATOR = "Helper powers plus kick and bans up to 1 hour.",
+	BUILDER = "Free items for themself, the clock, god mode, spawn.",
+	TESTER = "FULL OWNER POWER except delegation: cash, bans, shutdown.",
+	CUSTOM = "Tick the individual powers below.",
+} :: { [string]: string }
+
+-- Expiry words. "session" ends when they leave or the server closes;
+-- "server" is memory only, until the server closes. Nothing is saved.
+AdminLogic.Expiries = { "session", "1h", "24h", "server" } :: { string }
+
+function AdminLogic.ExpirySeconds(expiry: unknown): number?
+	if expiry == "1h" then
+		return 3600
+	elseif expiry == "24h" then
+		return 86400
+	end
+	return nil
+end
+
+-- TESTER may not be 'until the server closes' (it is short on purpose).
+function AdminLogic.ExpiryAllowed(role: unknown, expiry: unknown): boolean
+	if type(expiry) ~= "string" or table.find(AdminLogic.Expiries, expiry) == nil then
+		return false
+	end
+	return not (role == "TESTER" and expiry == "server")
+end
+
+export type Grant = { role: string, powers: { string }, expiresAt: number?, session: boolean? }
+
+function AdminLogic.Expired(grant: Grant, now: number): boolean
+	return grant.expiresAt ~= nil and now >= grant.expiresAt
+end
+
+-- CUSTOM powers: a non-empty list of delegable powers, each once. Returns the
+-- clean list, or nil and what is wrong (the first power that may not be given).
+function AdminLogic.CleanPowers(list: unknown): ({ string }?, string?)
+	if type(list) ~= "table" then
+		return nil, "none"
+	end
+	local out: { string } = {}
+	for _, power in ipairs(list :: { unknown }) do
+		if type(power) ~= "string" or table.find(AdminLogic.DelegablePowers, power) == nil then
+			return nil, tostring(power)
+		end
+		if table.find(out, power) == nil then
+			table.insert(out, power)
+		end
+	end
+	if #out == 0 then
+		return nil, "none"
+	end
+	return out, nil
+end
+
+-- The powers a role carries (TESTER: everything but delegation), or nil.
+function AdminLogic.PowersOf(role: unknown, custom: { string }?): { string }?
+	if role == "TESTER" then
+		return table.clone(AdminLogic.AllPowers)
+	elseif role == "CUSTOM" then
+		return custom
+	elseif type(role) == "string" then
+		return AdminLogic.Roles[role]
+	end
+	return nil
+end
+
+export type Ctx = { selfTarget: boolean?, banHours: number? }
+
+-- May a delegate holding `grant` run `action`? (true, nil) or (false, why).
+-- `ctx.selfTarget`: the target is the delegate themself; `ctx.banHours`: the
+-- ban length in hours, nil for permanent. Never says yes to delegation.
+function AdminLogic.GrantAllows(grant: Grant?, action: unknown, ctx: Ctx?): (boolean, string?)
+	if grant == nil or type(action) ~= "string" then
+		return false, "You have no powers here."
+	end
+	if table.find(AdminLogic.OwnerOnly, action) then
+		return false, "Only the owner can do that."
+	end
+	if action == "admin" then
+		return true, nil
+	end
+	if grant.role == "TESTER" then
+		if table.find(AdminLogic.AllPowers, action) then
+			return true, nil
+		end
+		return false, "That is not a power."
+	end
+	if table.find(AdminLogic.NeverDelegable, action) then
+		return false, "Only the owner can do that."
+	end
+	if table.find(grant.powers, action) == nil then
+		return false, "You were not given that power."
+	end
+	local c: Ctx = ctx or {}
+	if action == "ban" then
+		local hours = c.banHours
+		if hours == nil or hours > AdminLogic.MaxDelegateBanHours then
+			return false, "You can ban for up to " .. AdminLogic.MaxDelegateBanHours .. " hour only."
+		end
+	elseif action == "gift" and c.selfTarget ~= true then
+		return false, "You can only gift to yourself."
+	end
+	return true, nil
+end
+
+-- The menu actions a grant may show (for the delegate's hub). Ban counts as
+-- allowed here; it is limited to the cap when used.
+function AdminLogic.AllowedActions(grant: Grant): { string }
+	local out: { string } = {}
+	for _, action in ipairs(AdminLogic.MenuActions) do
+		local ok = AdminLogic.GrantAllows(grant, action, { selfTarget = true, banHours = 1 })
+		if ok then
+			table.insert(out, action)
+		end
+	end
+	return out
+end
+
+function AdminLogic.IsDestructive(action: unknown): boolean
+	return type(action) == "string" and table.find(AdminLogic.Destructive, action) ~= nil
+end
+
+export type Delegation = {
+	target: string,
+	userId: number?,
+	role: string,
+	powers: { string }?,
+	expiry: string,
+	confirmed: boolean,
+}
+
+-- The words after "/delegate <player|userId> <role> [powers] [expiry]
+-- [confirm]"; powers (comma separated) only for CUSTOM. Returns the parsed
+-- grant, or nil and a reason.
+function AdminLogic.ParseDelegate(args: { string }): (Delegation?, string?)
+	local target, roleWord = args[1], args[2]
+	if not target or not roleWord then
+		return nil,
+			"Usage: /delegate <player|userId> <helper|moderator|builder|tester|custom> [powers] [session|1h|24h|server]"
+	end
+	local role = string.upper(roleWord)
+	if table.find(AdminLogic.RoleList, role) == nil then
+		return nil, "Roles: helper, moderator, builder, tester, custom."
+	end
+	local at = 3
+	local powers: { string }? = nil
+	if role == "CUSTOM" then
+		local list: { string } = {}
+		for power in string.gmatch(string.lower(args[3] or ""), "[^,]+") do
+			table.insert(list, power)
+		end
+		local clean, bad = AdminLogic.CleanPowers(list)
+		if not clean then
+			return nil,
+				if bad == "none"
+					then "Custom needs powers, e.g. kick,goto."
+					else tostring(bad) .. " can't be delegated."
+		end
+		powers = clean
+		at = 4
+	end
+	local expiry = string.lower(args[at] or "session")
+	local confirmed = false
+	if expiry == "confirm" then
+		expiry = "session"
+		confirmed = true
+	elseif string.lower(args[at + 1] or "") == "confirm" then
+		confirmed = true
+	end
+	if not AdminLogic.ExpiryAllowed(role, expiry) then
+		return nil,
+			if role == "TESTER"
+				then "TESTER ends with the session, 1h or 24h."
+				else "Expiry: session, 1h, 24h or server."
+	end
+	local id = if string.match(target, "^%d+$") then tonumber(target) else nil
+	return {
+		target = target,
+		userId = id,
+		role = role,
+		powers = powers,
+		expiry = expiry,
+		confirmed = confirmed,
+	},
+		nil
+end
+
+AdminLogic.TesterWarning =
+	"TESTER has full owner power: cash, bans, save resets, shutdown. Only give it to someone you trust completely."
 
 function AdminLogic.FromRequest(request: unknown): string?
 	if type(request) ~= "table" then
@@ -204,11 +517,12 @@ function AdminLogic.FromRequest(request: unknown): string?
 	if type(action) ~= "string" or table.find(AdminLogic.MenuActions, action) == nil then
 		return nil
 	end
-	if action == "superrun" then
-		return "/superrun"
+	if table.find(AdminLogic.PlainActions, action) then
+		return "/" .. action
 	end
-	if action == "timereset" then
-		return "/timereset"
+	if action == "announce" then
+		local text = AdminLogic.AnnounceText(req.text)
+		return if text then "/announce " .. text else nil
 	end
 	-- Time: a speed off the whitelist, or one of the named hours, never free text.
 	if action == "timespeed" then
@@ -229,8 +543,44 @@ function AdminLogic.FromRequest(request: unknown): string?
 	if not target then
 		return nil
 	end
-	if action == "kick" or action == "goto" or action == "bring" then
+	if action == "undelegate" then
+		return "/undelegate " .. target
+	end
+	if action == "delegate" then
+		local role, expiry = req.role, req.expiry
+		if type(role) ~= "string" or table.find(AdminLogic.RoleList, role) == nil then
+			return nil
+		end
+		if not AdminLogic.ExpiryAllowed(role, expiry) then
+			return nil
+		end
+		local line = string.format("/delegate %s %s", target, string.lower(role))
+		if role == "CUSTOM" then
+			local powers = AdminLogic.CleanPowers(req.powers)
+			if not powers then
+				return nil
+			end
+			line ..= " " .. table.concat(powers, ",")
+		end
+		line ..= " " .. (expiry :: string)
+		if role == "TESTER" and req.confirmed == true then
+			line ..= " confirm"
+		end
+		return line
+	end
+	if table.find(AdminLogic.TargetActions, action) then
 		return string.format("/%s %s", action, target)
+	end
+	if action == "ban" then
+		local hours = req.hours
+		local text = if hours == "perm"
+			then "perm"
+			elseif type(hours) == "number" then string.format("%d", hours)
+			else nil
+		if not text or AdminLogic.BanSeconds(text) == nil or (type(hours) == "number" and hours % 1 ~= 0) then
+			return nil
+		end
+		return string.format("/ban %s %s", target, text)
 	end
 	if action == "gift" then
 		local kind, itemId = req.kind, word(req.itemId, 40)
@@ -267,6 +617,16 @@ AdminLogic.Help = {
 	"/settime <6am|noon|6pm|midnight|7:30pm|18:30>: set the hour",
 	"/timereset: back to normal time",
 	"/announce <text>",
+	"/god: toggle no damage for you",
+	"/heal <player>: full health",
+	"/tospawn: teleport you to spawn",
+	"/freeze <player>: freeze or unfreeze them",
+	"/stats <player>: cash, plot, tutorial, items",
+	"/resettutorial <player>: start their tutorial over",
+	"/unlockbp <player>: every building plan",
+	"/shutdown: kick everyone, this server ends",
+	"/delegate <player|userId> <helper|moderator|builder|tester|custom> [powers] [session|1h|24h|server]",
+	"/undelegate <player|userId>, /delegates",
 } :: { string }
 
 return AdminLogic

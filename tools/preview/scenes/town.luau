@@ -1,7 +1,7 @@
 --!nocheck
 -- The town exactly as MapBuilder builds it (section 4), from
--- WorldPlan.Town(): the sawmill at (0, 110) with the sell pad and Sky Bin in
--- front, the Tool Shed, the Dealership and Hearth & Home along the street,
+-- WorldPlan.Town(): the sawmill at (0, 110) with the sell station (pad, Weigh
+-- House, log rack, Sky Bin) beside it to the east, the Tool Shed, the Dealership and Hearth & Home along the street,
 -- the gondola station behind them, Murph's camp by the spawn, the spawn pad,
 -- the parking lot's slots, lamps, fences, props, signs and the town's
 -- greenery (its ornamental trees, bushes, flower beds and rocks), on the
@@ -49,7 +49,7 @@ return {
 			Enum.Material.Cobblestone
 		)
 		place(BuildingArt.Sawmill(), town.sawmill)
-		place(BuildingArt.SellPad(24, 18), town.sellPad) -- the SellZone over it is invisible
+		place(BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad) -- the SellZone over it is invisible
 		place(BuildingArt.SkyBin(), town.skyBin * CF.new(0, -2, 0)) -- town.skyBin is the bin's centre
 		for _, spot in ipairs(town.shops) do
 			place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
@@ -124,12 +124,17 @@ return {
 				{ pos = { -118, 8.5, 140 }, target = { -102, 8, 172 }, label = "Hearth & Home" },
 				{ pos = { -36, 12, 116 }, target = { -40, 6, 150 }, label = "gondola station" },
 				{ pos = { -10, 6, 30 }, target = { -28, 2, 42 }, label = "Murph's camp" },
-				{ pos = { 14, 5.5, 62 }, target = { 0, 7, 104 }, label = "sell pad + mill" },
+				{ pos = { 36, 6, 70 }, target = { 53, 3, 111 }, label = "sell station + mill" },
 				{ pos = { 80, 14, 24 }, target = { 0, 9, 100 }, label = "from the lot" },
 				{ pos = { 0, 260, 90 }, target = { 0, 0, 91 }, label = "top down" },
 				{ pos = { 2, 6.5, 32 }, target = { 0, 9, 110 }, label = "the spawn walk at night", night = true },
 				{ pos = { 80, 14, 24 }, target = { 40, 0, 30 }, label = "the lot at night", night = true },
-				{ pos = { 20, 7, 62 }, target = { 20, 7, 92 }, label = "the sell sign and pad at night", night = true },
+				{
+					pos = { 52, 7, 66 },
+					target = { 60, 5, 100 },
+					label = "the sell sign and station at night",
+					night = true,
+				},
 				{ pos = { -6, 5.5, -12 }, target = { -22, 4.2, -16 }, label = "south exit, grove gate" },
 				-- Standing in the General Store's doorway, looking in at the counter.
 				{

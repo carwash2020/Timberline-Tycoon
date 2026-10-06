@@ -74,11 +74,11 @@ return {
 			end
 		end
 
-		-- The Logging Rig on the pad: backed in from the street (its nose to
-		-- the street, -Z), its tail a stud short of the ramp's foot (z 97);
-		-- 46.7 long, its nose reaches z 49, between the spawn walk's lamps.
+		-- The Logging Rig on the sell station's lane: backed in from the street
+		-- (its nose to the street, -Z), its tail two studs short of the log
+		-- rack's front stakes (z 122.4); 46.7 long, its nose reaches z 73.
 		local logRig, logLayout = rig("LoggingRig")
-		local tailZ = 96 -- the Rig is built around its middle, its tail length / 2 back
+		local tailZ = 120 -- the Rig is built around its middle, its tail length / 2 back
 		Kit.placeAt(logRig, CF.new(town.sellPad.Position.X, 0, tailZ - logLayout.length / 2))
 		logRig.Parent = root
 		local floor = logRig:FindFirstChild("BedFloor")

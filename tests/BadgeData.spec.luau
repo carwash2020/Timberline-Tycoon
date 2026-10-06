@@ -120,18 +120,26 @@ return function(t)
 		t.eq(BadgeData.MinTapPx, 44)
 		t.ok(InputKit.TouchOk(BadgeData.MinTapPx))
 		t.ok(InputKit.PlacerSafe({
-			{
-				action = "Badges",
-				keyboard = BadgeData.OpenKeyboard,
-				gamepad = BadgeData.OpenGamepad,
-			},
+			{ action = "Badges", keyboard = BadgeData.OpenKeyboard },
 		}, true))
 		t.ok(InputKit.KeysUnique({
-			{ action = "Badges", keyboard = BadgeData.OpenKeyboard, gamepad = BadgeData.OpenGamepad },
+			{ action = "Badges", keyboard = BadgeData.OpenKeyboard },
 			{ action = "CloseBadges", keyboard = BadgeData.CloseKeyboard, gamepad = Enum.KeyCode.ButtonB },
 		}))
 		t.eq(BadgeData.OpenKeyboard, Enum.KeyCode.B)
-		t.eq(BadgeData.OpenGamepad, Enum.KeyCode.ButtonSelect)
 		t.eq(BadgeData.CloseKeyboard, Enum.KeyCode.Escape)
+	end)
+
+	t.test("a gamepad opens Badges from the quick menu, which owns the View button", function()
+		t.eq(BadgeData.OpenGamepad, nil, "no bind of its own: the View button is the quick menu's")
+		local QuickMenuLogic = t.shared("QuickMenuLogic")
+		t.eq(QuickMenuLogic.OpenGamepad, Enum.KeyCode.ButtonSelect)
+		local rank
+		for i, id in ipairs(QuickMenuLogic.Order) do
+			if id == "badges" then
+				rank = i
+			end
+		end
+		t.ok(rank, "Badges is a tile in the quick menu's order")
 	end)
 end

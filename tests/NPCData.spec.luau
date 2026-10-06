@@ -160,7 +160,7 @@ return function(t)
 	t.test("walkers keep off the sell pad, the parking lot and the buildings", function()
 		local pad = town.sellPad.Position
 		local boxes = {
-			{ name = "sell pad", x = pad.X, z = pad.Z, hx = 12 + 2, hz = 9 + 2 },
+			{ name = "sell station", x = pad.X, z = pad.Z, hx = 14 + 2, hz = 16 + 2 },
 			{ name = "sawmill", x = town.sawmill.Position.X, z = town.sawmill.Position.Z, hx = 19, hz = 15 },
 			{ name = "parking", x = 60, z = 25, hx = 48, hz = 40 },
 			{ name = "gondola", x = town.gondola.Position.X, z = town.gondola.Position.Z, hx = 8, hz = 8 },

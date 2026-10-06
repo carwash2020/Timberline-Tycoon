@@ -37,6 +37,7 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
+local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
@@ -156,6 +157,7 @@ local function buildClock()
 	local label = WorldUI.MakeClock(line, size, spec.text)
 	label.LayoutOrder = 20 -- left of HUD's top row (♪ + cash), right of the Store button
 	clockButton = label
+	HudNav.Add(label, { id = "clock" }) -- the HUD's cursor can land on it, but it opens nothing
 
 	-- Which line it's in (or none) for the device and the tutorial.
 	local function place()

@@ -49,8 +49,9 @@ export type Marker = {
 -- own building: nudged east or toward the street (the 1.5x buildings of
 -- TWN-13: over a low part of the roof, and so that from the spawn, on a
 -- phone, the three on the right (gondola, Tool Shed, Hearth & Home) stand
--- side by side), and SELL LOGS sits back over the pad, under the sawmill's
--- crest, not over it (TownMarkers.spec).
+-- side by side), and SELL LOGS floats over the sell station's pad, east of
+-- the mill, above the Weigh House's roof and the log rack's lanterns
+-- (TownMarkers.spec).
 TownMarkers.Markers = {
 	{
 		name = "SellLogs",
@@ -58,9 +59,8 @@ TownMarkers.Markers = {
 		text = "SELL LOGS",
 		icon = "logs",
 		chip = C.Money,
-		-- The zone's middle is 6 up, 4 south of the pad's (M1.5 deepened it
-		-- over the street); back toward the mill, under its crest, at z 95.
-		offset = Vector3.new(0, 16, 13),
+		-- The zone's middle is 6 up, over the pad's middle: 16 above that.
+		offset = Vector3.new(0, 16, 0),
 	},
 	{
 		name = "Axes",

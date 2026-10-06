@@ -337,7 +337,10 @@ return function(t)
 			local shoulder = model:FindFirstChild("LeftShoulder", true)
 			local weld = mesh:FindFirstChild("Weld")
 			t.ok(shoulder and weld and weld.Part0 == arm and weld.Part1 == mesh, "welded to LeftArm")
-			t.ok(mesh.CFrame.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "still faces -Z")
+			-- The uploaded mesh's own front is +Z; it is turned by NpcMeshYaw (a half turn).
+			local authored = mesh.CFrame * CFrame.Angles(0, -TownModels.NpcMeshYaw, 0)
+			t.ok(authored.LookVector:Dot(Vector3.new(0, 0, -1)) > 0.99, "upright, only turned about Y")
+			t.ok(mesh.CFrame.UpVector:Dot(Vector3.new(0, 1, 0)) > 0.99, "still upright")
 			local transform = CFrame.Angles(0.5, 0, 0)
 			local newArm = shoulder.Part0.CFrame * shoulder.C0 * transform * shoulder.C1:Inverse()
 			local newMesh = newArm * weld.C0 * weld.C1:Inverse()
@@ -693,7 +696,7 @@ return function(t)
 		local fs = require("@lune/fs")
 		local report = fs.readFile("ECONOMY.md")
 		-- The price ladder (axes) moved the headlines to these.
-		for _, headline in ipairs({ "61 s", "7.3 min", "13.1 min", "50.7 min", "30.4 h" }) do
+		for _, headline in ipairs({ "68 s", "7.9 min", "13.7 min", "51.4 min", "30.5 h" }) do
 			t.ok(string.find(report, headline, 1, true) ~= nil, headline)
 		end
 		t.eq(NPCData.Get("Murph").tips[1], "I'm Murph. Chop a tree, haul the wood, sell it at the mill.")

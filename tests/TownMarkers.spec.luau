@@ -49,6 +49,9 @@ return function(t)
 	Kit.placeAt(station, town.gondola)
 	local sawmill = BuildingArt.Sawmill()
 	Kit.placeAt(sawmill, town.sawmill)
+	-- The sell station beside the mill: SELL LOGS floats over its pad.
+	local sellStation = BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth)
+	Kit.placeAt(sellStation, town.sellPad)
 	local StoreBoard = loader:load("ReplicatedStorage/Shared/StoreBoard")
 	local storeBoard = StoreBoard.Build()
 	Kit.placeAt(storeBoard, StoreBoard.CFrame)
@@ -58,7 +61,7 @@ return function(t)
 			local part = storeBoard:FindFirstChild(name)
 			return part and part.CFrame.Position, storeBoard
 		elseif top == "SellArea" and name == "SellZone" then
-			return town.sellZone.Position, sawmill
+			return town.sellZone.Position, sellStation
 		elseif top == "GondolaTown" and name == "Platform" then
 			return station.PrimaryPart.CFrame.Position, station
 		elseif shops[top] then
@@ -102,11 +105,15 @@ return function(t)
 			t.eq(m.text, e[4])
 			local at, building = partFor(m)
 			t.ok(at, e[1] .. "'s part exists")
-			-- Floating over the building it names (the sell zone: the pad).
+			-- Floating over the building it names (the sell zone: the station's pad).
 			local over = at + m.offset
-			if building == sawmill then
+			if building == sellStation then
 				local pad = town.sellPad.Position
-				t.ok(math.abs(over.X - pad.X) <= 12 and math.abs(over.Z - pad.Z) <= 9, "SELL LOGS floats over the pad")
+				t.ok(
+					math.abs(over.X - pad.X) <= WorldPlan.SellPadWidth / 2
+						and math.abs(over.Z - pad.Z) <= WorldPlan.SellPadDepth / 2,
+					"SELL LOGS floats over the pad"
+				)
 			else
 				local x0, x1, z0, z1 = footprint(building)
 				t.ok(
@@ -313,7 +320,8 @@ return function(t)
 					t.ok(apart, string.format("%s: %s and %s overlap", cam.name, a.name, b.name))
 				end
 			end
-			-- SELL LOGS keeps the sawmill's crest in view.
+			-- SELL LOGS keeps the sawmill's crest in view (it floats over the
+			-- station, east of the mill, so it is well clear of it).
 			local cx, cy, cz = cam.view(crest.CFrame.Position)
 			local cw, ch = crest.Size.X * focal / cz, crest.Size.Y * focal / cz
 			local sell = rects[1]
