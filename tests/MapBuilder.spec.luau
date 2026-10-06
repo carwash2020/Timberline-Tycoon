@@ -214,19 +214,21 @@ return function(t)
 		lastStepsRan(s)
 		t.ok(s.sellArea:FindFirstChild("SellZone"), "SellZone")
 		t.ok(s.sellArea:FindFirstChild("SellZone"):FindFirstChild("SellPoint"), "SellPoint")
-		-- Phase 12: the zone runs 40 deep round its middle (z 82, where it
-		-- was since M1.5), from the mill's front (z 102) over the street to
-		-- z 62, the pad's width; the prompt stays over the pad's middle
-		-- (z 86), where it always was.
+		-- The sell station beside the mill: the zone is the pad's width (28)
+		-- and 52 deep round the pad's middle (53, 111), z 85 to 137, east of
+		-- the mill's lean-to; the prompt sits over the pad's middle, and the
+		-- station's art (pad, Weigh House, rack) is in the SellArea with it.
 		do
 			local zone = s.sellArea:FindFirstChild("SellZone")
 			local c, size = zone.CFrame.Position, zone.Size
-			t.ok(math.abs(size.X - 24) < 1e-4 and math.abs(size.Z - 40) < 1e-4, "the sell zone is 24 x 40")
-			t.ok(math.abs(c.Z - 82) < 1e-4, "its middle at z 82")
-			t.ok(math.abs(c.Z + size.Z / 2 - 102) < 1e-4 and math.abs(c.Z - size.Z / 2 - 62) < 1e-4, "z 62 to 102")
-			t.ok(math.abs(c.X) < 1e-4, "centred on the spawn walk")
+			t.ok(math.abs(size.X - 28) < 1e-4 and math.abs(size.Z - 52) < 1e-4, "the sell zone is 28 x 52")
+			t.ok(math.abs(c.Z - 111) < 1e-4, "its middle at z 111")
+			t.ok(math.abs(c.Z + size.Z / 2 - 137) < 1e-4 and math.abs(c.Z - size.Z / 2 - 85) < 1e-4, "z 85 to 137")
+			t.ok(math.abs(c.X - 53) < 1e-4, "east of the mill, at x 53")
 			local point = zone.CFrame * zone:FindFirstChild("SellPoint").Position
-			t.ok(math.abs(point.X) < 1e-4 and math.abs(point.Z - 86) < 1e-4, "the prompt over the pad's middle")
+			t.ok(math.abs(point.X - 53) < 1e-4 and math.abs(point.Z - 111) < 1e-4, "the prompt over the pad's middle")
+			t.ok(s.sellArea:FindFirstChild("SellPad", true), "the station's pad is in the sell area")
+			t.ok(s.sellArea:FindFirstChild("WeighHouse", true), "and its Weigh House")
 			t.ok(zone.CanCollide == false and zone.CanQuery == false and zone.Transparency == 1, "a ghost")
 		end
 		t.ok(s.clockStarted, "the clock started")

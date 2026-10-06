@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 6 October 2026, after PR #83. Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 6 October 2026, after PR #85 plus the sell station branch. Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
 
@@ -42,6 +42,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (everything is on main; newest first)
 
+- **Sell station beside the mill** (branch `claude/sell-pad`, not merged yet; PHASE2_NOTES.md has the Studio checks). Connor: "move the sell logs here pad to the side of the saw mill, and add more to it". The pad left the mill's front (the spawn walk now runs clear to the mill) for a bigger station EAST of the mill's lean-to: pad centre (53, 111), 28 x 32, sell zone 28 x 12 x 52 (z 85 to 137, `WorldPlan.SellZoneSize`, `SellPadWidth/Depth`), clear of the Dealership's loading pad (x 70 to 84). `BuildingArt.SellStation`: a truck lane between painted lines, three LOGS slots and two PLANKS slots (paint only, the sell logic still takes the whole zone), a platform scale, a log rack across the back, a Weigh House with Millie at its window, rails, lanterns; four lamps and the SELL LOGS HERE signpost at (67, 90) mark the gate; the Sky Bin moved into the pad's north-west corner. Beacon `sellPad`, the SELL LOGS marker and Millie follow the zone. Economy headlines 68 s / 7.9 min (ceiling is 8) / 13.7 min / 51.4 min / 30.5 h (the walk from the grove oak grew from 44 to 97 studs; `tools/economy.luau` `A.padX/padZ` = 53/111).
 - #83 Murph's cart is gone; the first sale (`sell` step, still step 3 of 8) is at the sawmill's sell pad (beacon `sellPad`). Murph still pays $25 on it, the plot step $175. Economy headlines 61 s / 7.3 min / 13.1 min (the floor is 13) / 50.7 min / 30.4 h.
 - #79 the hammer and physical blueprints replace BUILD mode (BUILD_SYSTEM.md): blueprints are rolled plans you use to learn a building for good (`BlueprintBook`), the Hammer opens the list on click / RT / tap, pieces are placed, filled with wood, and moved/turned/sold with the hammer; saves migrate (`blueprintBook`, `blueprintItems`, `hammer`).
 - #82 real stores: designed boxes sized by item (`BoxSize`), bigger Tool Shed and Hearth & Home, doors that shut on the keeper's hours (`ShopDoorLogic`), the Dealership as an indoor showroom, and buying hands over a box you open (`BoxUnpack`).

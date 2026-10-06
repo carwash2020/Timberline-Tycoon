@@ -2028,3 +2028,58 @@ at the sawmill's sell pad like every later one.
 - [ ] Buy the plot and the Rustbucket box with only sawmill sales.
 - [ ] An old save sitting on the sell step: the arrow now points at the sell pad.
 
+
+## Sell station beside the mill (claude/sell-pad, 6 October 2026)
+
+Connor: "move the sell logs here pad to the side of the saw mill, and add more to
+it." The sell pad no longer sits in front of the mill (on the spawn walk, in the
+way of the mill's intake). It is now a sell station EAST of the mill's lean-to,
+off the main street's north side and west of the mill road.
+
+- **Where:** pad centre (53, 111), 28 wide x 32 deep (x 39 to 67, z 95 to 127).
+  `WorldPlan.Town()` `sellPad` / `sellZone`; the zone is 28 x 12 x 52 (z 85 to
+  137) so a truck backed in from the street has its whole bed in it. The town,
+  spawn, Murph's camp and the sawmill did not move. The Dealership's loading pad
+  (x 70 to 84) stays clear.
+- **What is on it (`BuildingArt.SellStation`):** a lane for trucks between two
+  painted lines; three marked LOGS slots (west) and two PLANKS slots (east) for
+  hand-dragged logs and plank piles (paint only: the sell logic still sells
+  whatever rests anywhere in the zone); a platform scale with a dial; a log rack
+  across the back (lanterns on its stakes); a Weigh House on the east side with
+  Millie at its window; split rails behind; lamps at the four corners and over
+  the SELL LOGS HERE signpost at the gate (67, 90). The Sky Bin moved into the
+  pad's north-west corner.
+- **Unchanged, server side:** SellService, the Sell remote, truck-bed selling
+  (`SellTruckRange` measures from the zone's middle, now (53, 111)), hand-drag
+  selling, plank sales. The tutorial's `sellPad` beacon, the quest arrow
+  (QuestUI) and the SELL LOGS marker (TownMarkers) all read the SellZone part.
+- **Economy:** the walk from the nearest grove oak to the pad grew from 44 to 97
+  studs. Headlines 61 s / 7.3 min / 13.1 min / 50.7 min / 30.4 h became 68 s /
+  7.9 min / 13.7 min / 51.4 min / 30.5 h (all in the CI ranges; Steel Axe is 7 s
+  under its 8-minute ceiling). ECONOMY.md regenerated, ECONOMY_V1.md unchanged.
+- **Moved to make room:** the street lamp at (58, 92) (now the station's lamps),
+  the crate at (71, 93) to (86, 92.5), the log piles east of the mill from x 39
+  to 35.5, a few bushes, one birch, one maple.
+
+### Studio checks
+- [ ] Spawn and look at the mill: its front (the saw, the ramp) is open and
+      clear now, no pad in front of it. The TIMBERLINE SAWMILL board still reads.
+- [ ] Walk east along the main street: the "SELL LOGS HERE" signpost stands north
+      of the street at x about 67, lit at night, and the SELL LOGS chip floats
+      over the station. The station is the big plank pad east of the mill.
+- [ ] The station has: painted lane, LOGS and PLANKS slots with labels, a scale
+      with a dial, a log rack across the back with two lanterns, the Weigh House
+      (WEIGH HOUSE board, two lanterns) with Millie at its window, rails, the
+      Sky Bin in the north-west corner, a lamp at each corner. At night the
+      lanterns and lamps are lit.
+- [ ] Fresh save: the quest arrow and beacon point at the station (not the old
+      spot), and arrive there after the first oak. Drag the log onto the pad
+      (anywhere on it): it sells, the $25 lands, the plot card follows.
+- [ ] Back a loaded truck (Logging Rig too) in from the street down the lane:
+      stop short of the rack. Press the sell prompt ("Sell logs", over the pad's
+      middle): the whole bed sells. Planks dragged onto a PLANKS slot sell too.
+- [ ] The Sky Bin's "Sell Sky Bin" prompt still works at its new corner.
+- [ ] Nothing blocks the drive in from the street: no lamp or crate in the lane.
+      The Dealership's boxes and the mill road beside the station are not in the
+      way. Walk Millie's side: she stands by the Weigh House window.
+- [ ] Sound and feel: the sell toast, sale FX and figure reveal still show.

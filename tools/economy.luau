@@ -64,11 +64,13 @@ local A = {
 	aimSec = 1.5, -- s to walk to and line up each cut after the first
 	tripOverhead = 8, -- s per round trip: get in, park, get out (§17)
 	sellSec = 4, -- s at the pad (§17)
-	-- The first sale is at the sawmill's sell pad (Murph's cart is gone): from
-	-- the nearest tutorial oak to the pad at (0, 86) (WorldPlan.Town().sellPad,
-	-- 24 studs wide), dragging the log, so it is a straight line each way.
-	padX = 0,
-	padZ = 86,
+	-- The first sale is at the sawmill's sell station (Murph's cart is gone):
+	-- from the nearest tutorial oak to the station's pad at (53, 111)
+	-- (WorldPlan.Town().sellPad, 28 x 32, east of the mill's lean-to; it was
+	-- the pad at (0, 86) in front of the mill until 6 October), dragging the
+	-- log, so it is a straight line each way.
+	padX = 53,
+	padZ = 111,
 	murphReward = 25, -- paid on the first sale (the tutorial's sell step)
 	murphAfter = 0, -- the bonus lands with that sale, not after a later grind
 	-- The first plot is bought at the Land Office before the Rustbucket
@@ -503,9 +505,9 @@ end
 local function firstSale()
 	local oak = WoodData.Get("oak")
 	local rusty = ItemCatalog.GetAxe("RustyAxe")
-	-- On foot: one oak, dragged to the sawmill's sell pad. The truck is bought
+	-- On foot: one oak, dragged to the sawmill's sell station. The truck is bought
 	-- after this sale. The walk is the straight line from the nearest grove
-	-- oak to the pad (about 50 studs).
+	-- oak to the station's pad (about 97 studs).
 	local perTree = treeWork(rusty, oak, 0)
 	local nearest = math.huge
 	for _, spot in ipairs(TutorialGrove.Trees) do

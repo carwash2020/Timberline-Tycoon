@@ -341,7 +341,7 @@ function World.build(ctx, opts)
 	-- The town.
 	local town = WorldPlan.Town()
 	place(BuildingArt.Sawmill(), town.sawmill)
-	place(BuildingArt.SellPad(24, 18), town.sellPad)
+	place(BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
 	for _, spot in ipairs(town.shops) do
 		place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe)
 	end
