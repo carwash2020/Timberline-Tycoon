@@ -1,6 +1,7 @@
 # STATUS: read this first in a new session
 
 Last updated 6 October 2026 (branch `claude/short-tutorial`). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 6 October 2026 (branch claude/restore-meshes, on top of PR #70). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
 
@@ -33,18 +34,29 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 
 `lune run tools/economy` (v2) and `lune run tools/economy1` (v1) regenerate ECONOMY.md and ECONOMY_V1.md; commit them with any balance change. The headline times are strict CI ranges: first sale under 3 min, Steel Axe 5–8 min, first $1k 13–20 min, Cobalt 45–75 min, full plot 28–36 h. The headline strings are also pinned in the Builder, BuildingKit and TownMesh specs, and the tutorial's plot reward is pinned in TutorialData.spec. Retired tutorial step ids are save-migration keys: never reuse or reorder them. If a price change breaks a range, retune a reward or price rather than loosening the range. A model that hangs (instead of failing) usually means the simulated player cannot afford the next purchase and earns $0/h (it did when the Rustbucket went to $100 before the plot was priced in).
 
+### Load time (LOAD-01, 6 October 2026)
+
+Connor reported a very long start. Measured in Lune (slower than Roblox, so use the ratios): the world plan for 1,157 forest trees costs about 6.5 s, the terrain is 144+ chunks of heights (about 20 us a height), and ~1,400 section trees are about 43 Instances each (~60k). All of it ran before the sell area, so players waited for every tree. Now the forest is planted after SellArea (near the sawmill first, 20 ms a frame; `MapBuilder` `forestPlanter`, `SectionTrees.OnPlanted` gives late trees their figure, `WorldClock.Refresh` re-applies night-only woods), the client's filler plan waits for the player to be in, and terrain yields by time. `[Load]` lines in Output (server: per MapBuilder step with timings, forest planned/planted, GameServer slow hooks and "can play"; client: module/controller Start times) say where time goes: ask Connor for them. Still serial and unmeasured in Studio: terrain writing (Prebuilt bake in HANDOFF.md removes it), PlotService's 14 pads (small).
+
 ## What has landed (newest first, PR numbers on main)
 
 - Branch `claude/short-tutorial` (not yet a PR): the v2 tutorial is 8 steps (fell, drag, sell, plot, one build lesson, truck box, pad, spawn; the axe, mill and load steps are retired in `TutorialData.RetiredV2`, saves migrate forward in `ApplyOrder` order 6); `NoticePolicy` governs every toast (priorities, one non-critical at a time, cooldown, dedupe, quiet during the first-sale flow). Economy unchanged. Checks in PHASE2_NOTES.md.
+- claude/fix-felling (branch, not merged): trees fall where you cut them (stump stays rooted, only the trunk above the cut falls; was #36's "ground cut frees the whole section"), rigid fall with velocity caps, layered procedural fell sound (`FellSoundId` still overrides), swing pose re-applied pre-render with a tool-grip fallback. Checklist in PHASE2_NOTES.md.
+
+- Old Hank, the plot salesman (branch claude/plot-salesman, not a PR yet): an old farmer NPC behind the Land Office counter, always there. His offers are data (`Shared/PlotSalesmanData`; today only "Buy a plot" at `GameConfig.PlotPrice`); Talk runs the same `PlotService.Claim` flow. New offers: add to `Offers` and `PlotService`'s `SALESMAN_OFFERS`. Checklist in PHASE2_NOTES.md.
 - Branch `claude/hud-clock-owner` (not yet a PR): corner chips raised into the top bar, 12-hour AM/PM clock everywhere (`WorldTime.Format`, shop-hour lines), owner time tools (`/timespeed`, `/settime`, `/timereset` and the menu; not saved), shopkeeper card above the hotbar, smooth slower sawmill blade (TownFX, per frame).
 - #70 plot bought at $150, Rustbucket $100, respawn fees, economy retuned (in review when this was written).
 - #69 vehicle always has its own pad; Rustbucket boxed. #68/#67 owner menu (Xbox). #66 Xbox carry and build controls. #65 building fixes on the 80 plot (bought squares, collision boxes for mills and the chop saw, 10-stud pad grid). #64 owner chat tools. #63 rare wood and plank prices. #62 axe price ladder. #61/#60 one price, no u³. #59 build-check print at map start. #58 smaller starting plot and homestead looks. #57 HUD corner, run, ground and mesh fixes.
 - Before that: boxed stores, plot visits, wire tool, ferry, NPCs, badges, day/night, W1–W4 world work (see `git log`).
 
+## Meshes (Blender models)
+
+`GameConfig.TownMeshes` is **true** again (kill switch: false, or the Studio workspace attribute `TownMeshes`); town meshes are ground-snapped to the part-built art. Axes, trees, NPCs, vehicles and the plot kit all load through `MeshKit.Create`; a failed load falls back to part-built art and now warns with the engine's error, and the `[MapBuilder] build check:` line prints the load totals. The ids belong to creator `Elucidhealer618`: if the Output says meshes failed, fix asset permissions in Creator Hub (steps and ids in PHASE2_NOTES.md, "Blender meshes are back on"). Shelf boxes show no axe model by design (#42/#51).
+
 ## Open items
 
 1. **Studio verification** of everything above, none of it has been seen in Studio: Land Office purchase, boxed truck and pad flow, free first respawns, Xbox controls, owner menu. Checklists in PHASE2_NOTES.md.
-2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, `TownMeshes = false`, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
+2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, a mesh ground snap, the `TownMeshes` kill switch, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
 3. **Questions for Connor:** a real trade window (yes/no)? Lanternwood economy numbers (proposal in MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 (not free) acceptable?
 4. The v1 rollback loop still charges the plot with no Murph payback (ECONOMY_V1.md shows the Steel Axe at 18 min). Fix only if v1 is ever re-enabled.
 5. A tutorial skipper or replayer pays the full $150 with no Murph payback.

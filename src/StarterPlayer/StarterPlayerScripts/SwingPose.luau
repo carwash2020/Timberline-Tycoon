@@ -82,7 +82,10 @@ local function write(held: Held, cf: CFrame)
 	end
 end
 
+local restoreGrip: (Player) -> ()
+
 local function restore(player: Player)
+	restoreGrip(player)
 	local list = heldByPlayer[player]
 	if not list then
 		return
@@ -163,6 +166,19 @@ local function handleLen(character: Model): number
 	return 3.5
 end
 
+local function asHeld(joint: Instance?): Held?
+	if joint and joint:IsA("Motor6D") then
+		return { motor = joint }
+	elseif joint and joint:IsA("AnimationConstraint") then
+		return { constraint = joint }
+	end
+	return nil
+end
+
+-- The joint named `jointName` on the part named `partName` (or, for the
+-- waist and root, on the R15 torso halves). A published avatar can be on
+-- AnimationConstraints or carry its joints under another part, so when the
+-- usual place has nothing the whole character is searched by name.
 local function bind(character: Model, partName: string, jointName: string): Held?
 	local names = { partName }
 	if jointName == "Waist" then
@@ -178,14 +194,13 @@ local function bind(character: Model, partName: string, jointName: string): Held
 			if not joint and jointName == "RootJoint" then
 				joint = part:FindFirstChild("Root Hip")
 			end
-			if joint and joint:IsA("Motor6D") then
-				return { motor = joint }
-			elseif joint and joint:IsA("AnimationConstraint") then
-				return { constraint = joint }
+			local held = asHeld(joint)
+			if held then
+				return held
 			end
 		end
 	end
-	return nil
+	return asHeld(character:FindFirstChild(jointName, true))
 end
 
 local function apply(held: Held, turn: CFrame)
@@ -265,6 +280,42 @@ local function pitchScale(
 	return lo
 end
 
+-- Fallback when no arm joint could be posed: tip the tool in the hand
+-- (Tool.Grip), which needs no joints and no animation assets. Seen on
+-- this client only, which is enough to feel the swing.
+local grips: { [Tool]: CFrame } = {}
+
+local function gripSwing(character: Model, clip: number?)
+	local tool = character:FindFirstChildOfClass("Tool")
+	if not tool then
+		return
+	end
+	local base = grips[tool]
+	if not base then
+		base = tool.Grip
+		grips[tool] = base
+	end
+	if clip then
+		tool.Grip = base * CFrame.Angles(SwingLogic.GripAngle(clip), 0, 0)
+	else
+		tool.Grip = base
+		grips[tool] = nil
+	end
+end
+
+local warnedNoJoints = false
+
+restoreGrip = function(player: Player)
+	local character = player.Character
+	if character then
+		local tool = character:FindFirstChildOfClass("Tool")
+		if tool and grips[tool] then
+			tool.Grip = grips[tool]
+			grips[tool] = nil
+		end
+	end
+end
+
 local function keyOf(held: Held): Instance?
 	return held.motor or held.constraint
 end
@@ -301,6 +352,15 @@ local function pose(player: Player, character: Model, humanoid: Humanoid, clip: 
 			apply(held, spec.turn)
 			table.insert(nextHeld, held)
 		end
+	end
+	if #nextHeld == 0 and player == localPlayer then
+		if not warnedNoJoints then
+			warnedNoJoints = true
+			warn("[SwingPose] no arm joints found on this avatar; swinging the tool grip instead")
+		end
+		gripSwing(character, clip)
+	elseif player == localPlayer then
+		gripSwing(character, nil)
 	end
 	local previous = heldByPlayer[player]
 	if previous then
@@ -377,6 +437,16 @@ end
 
 function SwingPose.Start()
 	everyPhysicsStep(step)
+	-- The last word before a frame is drawn: whatever wrote the joints
+	-- since the physics step (a live avatar's Animate script and Animator,
+	-- which Studio's test rig doesn't run the same way), the swing is
+	-- written again here. Its impact hook only ever fires once per swing.
+	local ok, signal = pcall(function(): RBXScriptSignal
+		return RunService.PreRender
+	end)
+	if ok and signal then
+		signal:Connect(step)
+	end
 end
 
 return SwingPose
