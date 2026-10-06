@@ -25,6 +25,10 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 - **Xbox:** LT hangs a held piece and the right stick turns it; RB/LB push and pull; longer reach. Blueprints use their own scheme (LT lock, stick flicks, RB/LB slide). HudRules forbids extra D-pad binds.
 - **Scope guardrails:** milestones in GAME_DESIGN §8 (the core feels good, then retention such as seasons, festivals and companies, then more content). Gathered materials need a job and a home biome. Wallet cap $2,000,000.
 
+### How plots work
+
+14 pre-built homestead pads (`PlotData.Homes`), one per player slot plus two spares. A player buys one at the Land Office (`PlotService.Claim`, range-checked, charged once, refunded if the build fails). It starts as an 80-stud Campsite and grows through tiers 80/110/140/170/200 ($2,500 / $10,000 / $30,000 / $60,000), plus individually bought 40-stud squares out to a 5x5 grid (square k costs `ExpansionPriceStep` 3050 x k; the first costs `FirstPlotPrice` 100). Builds are saved in plot-local studs so a layout loads on any pad. Limits: 200 prebuilt pieces and 400 kit pieces; selling returns half. Rules live in `PlotData` and `PlotLogic`, the server side in `PlotService`. Tier and square prices are a first pass and are not tuned in the economy model yet.
+
 ### Economy model
 
 `lune run tools/economy` (v2) and `lune run tools/economy1` (v1) regenerate ECONOMY.md and ECONOMY_V1.md; commit them with any balance change. The headline times are strict CI ranges: first sale under 3 min, Steel Axe 5–8 min, first $1k 13–20 min, Cobalt 45–75 min, full plot 28–36 h. The headline strings are also pinned in the Builder, BuildingKit and TownMesh specs, and the tutorial's plot reward is pinned in TutorialData.spec. If a price change breaks a range, retune a reward or price rather than loosening the range. A model that hangs (instead of failing) usually means the simulated player cannot afford the next purchase and earns $0/h (it did when the Rustbucket went to $100 before the plot was priced in).
