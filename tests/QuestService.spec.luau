@@ -332,12 +332,8 @@ return function(t)
 		t.eq(at(), "plot", "the first piece moves the cart step on")
 		t.eq(s.profile.cash, cash + 25, "Murph's share on that sale")
 		s.event("plotClaimed")
-		t.eq(at(), "build")
-		s.event("buildOpened")
-		t.eq(at(), "place")
+		t.eq(at(), "place", "the plot is bought; one build lesson follows")
 		s.event("itemPlaced")
-		t.eq(at(), "land")
-		s.event("landOpened")
 		t.eq(at(), "truck")
 		t.eq(s.player.attrs.TutorialProgress, 0, "and its cash doesn't count toward the truck")
 		s.event("truckBought")
@@ -345,33 +341,11 @@ return function(t)
 		s.event("padPlaced") -- VehicleService, from the box
 		t.eq(at(), "spawn")
 		s.event("truckSpawned") -- VehicleService, the pad's button
-		t.eq(at(), "load")
-		s.event("woodLoaded") -- TruckLoad (M1.6)
-		t.eq(at(), "mill")
-		s.Quest.WoodSold(s.player, 2, 30)
-		t.eq(at(), "loads", "the mill sale, and its cash waits")
-		local loads = s.Steps[s.profile.tutorialStep]
-		t.eq(loads.unit, "cash")
-		local purse = s.profile.cash
-		local partial = loads.count - 30
-		s.Quest.WoodSold(s.player, 3, partial)
-		t.eq(s.player.attrs.TutorialProgress, partial, "dollars, not pieces")
-		t.eq(s.profile.cash, purse, "no reward yet")
-		s.Quest.WoodSold(s.player, 1, 30.7)
-		t.eq(at(), "loads2", string.format("%d + 30 whole dollars passes $%d", partial, loads.count))
-		t.eq(s.profile.cash, purse + loads.rewardCash)
-		t.eq(s.toasts, {
-			"Murph chipped in $25!",
-			string.format("Murph chipped in $%d!", s.Steps[4].rewardCash), -- the plot step: toward the Rustbucket
-			string.format("Murph chipped in $%d!", loads.rewardCash),
-		})
-		s.Quest.WoodSold(s.player, 1, s.Steps[s.profile.tutorialStep].count)
-		s.Quest.WoodSold(s.player, 1, s.Steps[s.profile.tutorialStep].count)
-		t.eq(at(), "steel")
-		s.profile.bestAxeTier = 2
-		s.event("axeBought")
-		t.ok(s.profile.tutorialDone, "the Steel Axe is the last step")
+		t.ok(s.profile.tutorialDone, "the truck rolling out is the last step")
 		t.eq(s.player.attrs.TutorialStep, 0)
+		t.eq(s.toasts, {
+			string.format("Murph chipped in $%d!", s.Steps[4].rewardCash), -- the plot step: toward the Rustbucket
+		}, "the cart sale's thank-you is on the next card, not a second pop-up")
 		t.eq(s.marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
 
@@ -387,60 +361,95 @@ return function(t)
 		s.Quest.WoodSold(s.player, 1, 0)
 		t.eq(s.Steps[s.profile.tutorialStep].id, "plot", "nothing credited (a full wallet): still a sale")
 		s.event("plotClaimed")
-		s.event("buildOpened")
-		s.event("itemPlaced")
-		s.event("landOpened")
-		s.event("truckBought")
-		s.event("padPlaced")
-		s.event("truckSpawned")
-		s.event("woodLoaded")
-		s.Quest.WoodSold(s.player, 1, 0)
-		t.eq(s.Steps[s.profile.tutorialStep].id, "loads")
+		t.eq(s.Steps[s.profile.tutorialStep].id, "place")
 		for _, junk in ipairs({ 0, -5, 0 / 0, math.huge, 0.6 }) do
 			s.Quest.WoodSold(s.player, 1, junk)
 		end
-		t.eq(s.profile.tutorialProgress, 0, "no whole dollars")
+		t.eq(s.profile.tutorialProgress, 0, "no sale counts toward placing")
 		t.eq(s.player.attrs.TutorialProgress, 0)
 	end)
 
-	t.test("v2: BUILD and LAND count when the client reports them, and only on their step", function()
+	t.test("v2: BUILD and LAND are no longer lessons: the client's reports count for nothing", function()
 		local s = setup({ plot = { claimed = true, tier = 1, placed = {}, squares = {} } }, 2, true)
 		s.Quest.Start(s.player, s.profile)
 		local function at()
 			return s.Steps[s.profile.tutorialStep].id
 		end
-		playUntil(s, "build")
-		t.eq(at(), "build")
+		playUntil(s, "place")
+		t.eq(at(), "place")
 		s.seen("land")
-		t.eq(at(), "build", "LAND before its step counts for nothing")
+		s.seen("build")
 		s.seen("junk")
 		s.seen(42)
 		s.seen(nil)
-		t.eq(at(), "build")
-		s.seen("build")
-		t.eq(at(), "place")
-		s.seen("build")
-		t.eq(at(), "place", "the same report twice does nothing")
+		t.eq(at(), "place", "only placing an item counts")
 		s.event("itemPlaced")
-		t.eq(at(), "land")
-		s.seen("land")
 		t.eq(at(), "truck")
 	end)
 
-	t.test("v2: the build lessons need a claimed plot, and a placed item skips the place step", function()
-		local s = setup({ tutorialStep = 5, tutorialOrder = 4 }, 2, true)
-		s.Quest.Start(s.player, s.profile)
-		t.eq(s.Steps[s.profile.tutorialStep].id, "build")
-		s.seen("build")
-		t.eq(s.Steps[s.profile.tutorialStep].id, "build", "no plot, no credit")
+	t.test("v2: a placed item skips the place step", function()
 		local placed = setup({
-			tutorialStep = 5,
-			tutorialOrder = 4,
 			plot = { claimed = true, tier = 1, placed = { { uid = "a" } }, squares = {} },
 		}, 2, true)
 		placed.Quest.Start(placed.player, placed.profile)
-		placed.seen("build")
-		t.eq(placed.Steps[placed.profile.tutorialStep].id, "land", "they already placed something")
+		for _, event in ipairs({ "treeFelled", "woodGrabbed", "woodSold" }) do
+			placed.event(event)
+		end
+		t.eq(placed.Steps[placed.profile.tutorialStep].id, "truck", "plot and place are both already done")
+	end)
+
+	t.test("v2: a save that was midway through a retired step moves forward or finishes", function()
+		local TutorialData = t.shared("TutorialData")
+		local long = TutorialData.OrderV2BeforeShort
+		local function at(name)
+			for i, id in ipairs(long) do
+				if id == name then
+					return i
+				end
+			end
+		end
+		local onBuild = setup({
+			tutorialStep = at("build"),
+			tutorialOrder = 5,
+			plot = { claimed = true, tier = 1, placed = {} },
+		}, 2)
+		onBuild.Quest.Start(onBuild.player, onBuild.profile)
+		t.eq(onBuild.Steps[onBuild.profile.tutorialStep].id, "place", "build is retired: on to the build lesson")
+		local onLand = setup({
+			tutorialStep = at("land"),
+			tutorialOrder = 5,
+			plot = { claimed = true, tier = 1, placed = { { uid = "a" } } },
+		}, 2)
+		onLand.Quest.Start(onLand.player, onLand.profile)
+		t.eq(onLand.Steps[onLand.profile.tutorialStep].id, "truck", "land is retired: on to the truck")
+		for _, name in ipairs({ "load", "mill", "loads", "loads2", "loads3", "steel" }) do
+			local s = setup({ tutorialStep = at(name), tutorialOrder = 5, tutorialProgress = 17 }, 2)
+			s.Quest.Start(s.player, s.profile)
+			t.ok(s.profile.tutorialDone, name .. ": past the truck, the tutorial is done")
+			t.eq(s.player.attrs.TutorialStep, 0)
+			t.eq(s.profile.tutorialProgress, 0)
+			t.eq(s.marks[1], "Finished the tutorial")
+		end
+		-- A save already on the short order is not touched, and finished ones stay finished.
+		local fresh = setup({ tutorialStep = 5, tutorialOrder = TutorialData.OrderV2 }, 2)
+		fresh.Quest.Start(fresh.player, fresh.profile)
+		t.eq(fresh.Steps[fresh.profile.tutorialStep].id, "place")
+		local done = setup({ tutorialDone = true, tutorialStep = 16, tutorialOrder = 5 }, 2)
+		done.Quest.Start(done.player, done.profile)
+		t.ok(done.profile.tutorialDone)
+		t.eq(done.player.attrs.TutorialStep, 0)
+		t.eq(done.marks[1], "Saw a next goal", "no second 'Finished the tutorial'")
+	end)
+
+	t.test("v2: Skip still works on a short step and pays nothing", function()
+		local s = setup(nil, 2, true)
+		s.Quest.Start(s.player, s.profile)
+		s.event("treeFelled")
+		local cash = s.profile.cash
+		s.skip()
+		t.ok(s.profile.tutorialDone)
+		t.eq(s.player.attrs.TutorialStep, 0)
+		t.eq(s.profile.cash, cash)
 	end)
 
 	t.test("v1 is untouched: the v2 events count for nothing under loop 1", function()
@@ -548,7 +557,7 @@ return function(t)
 		past.event("treeFelled")
 		past.event("woodGrabbed")
 		past.event("woodSold")
-		t.eq(past.Steps[past.profile.tutorialStep].id, "build", "reaching plot completes it")
+		t.eq(past.Steps[past.profile.tutorialStep].id, "place", "reaching plot completes it")
 		t.eq(past.profile.plot.claimed, true, "the plot is not released")
 
 		local owned = setup({
@@ -561,7 +570,7 @@ return function(t)
 		owned.event("treeFelled")
 		owned.event("woodGrabbed")
 		owned.event("woodSold")
-		t.eq(owned.Steps[owned.profile.tutorialStep].id, "build")
+		t.eq(owned.Steps[owned.profile.tutorialStep].id, "place")
 		t.eq(owned.profile.plot.claimed, true)
 
 		local later = setup({
