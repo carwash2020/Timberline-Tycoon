@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 6 October 2026 (PR #70). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 6 October 2026 (branch claude/restore-meshes, on top of PR #70). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
 
@@ -47,10 +47,14 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 - #69 vehicle always has its own pad; Rustbucket boxed. #68/#67 owner menu (Xbox). #66 Xbox carry and build controls. #65 building fixes on the 80 plot (bought squares, collision boxes for mills and the chop saw, 10-stud pad grid). #64 owner chat tools. #63 rare wood and plank prices. #62 axe price ladder. #61/#60 one price, no u³. #59 build-check print at map start. #58 smaller starting plot and homestead looks. #57 HUD corner, run, ground and mesh fixes.
 - Before that: boxed stores, plot visits, wire tool, ferry, NPCs, badges, day/night, W1–W4 world work (see `git log`).
 
+## Meshes (Blender models)
+
+`GameConfig.TownMeshes` is **true** again (kill switch: false, or the Studio workspace attribute `TownMeshes`); town meshes are ground-snapped to the part-built art. Axes, trees, NPCs, vehicles and the plot kit all load through `MeshKit.Create`; a failed load falls back to part-built art and now warns with the engine's error, and the `[MapBuilder] build check:` line prints the load totals. The ids belong to creator `Elucidhealer618`: if the Output says meshes failed, fix asset permissions in Creator Hub (steps and ids in PHASE2_NOTES.md, "Blender meshes are back on"). Shelf boxes show no axe model by design (#42/#51).
+
 ## Open items
 
 1. **Studio verification** of everything above, none of it has been seen in Studio: Land Office purchase, boxed truck and pad flow, free first respawns, Xbox controls, owner menu. Checklists in PHASE2_NOTES.md.
-2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, `TownMeshes = false`, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
+2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, a mesh ground snap, the `TownMeshes` kill switch, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
 3. **Questions for Connor:** a real trade window (yes/no)? Lanternwood economy numbers (proposal in MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 (not free) acceptable?
 4. The v1 rollback loop still charges the plot with no Murph payback (ECONOMY_V1.md shows the Steel Axe at 18 min). Fix only if v1 is ever re-enabled.
 5. A tutorial skipper or replayer pays the full $150 with no Murph payback.
