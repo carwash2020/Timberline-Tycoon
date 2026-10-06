@@ -131,6 +131,217 @@ return function(t)
 		t.eq(hour(nil), nil)
 	end)
 
+	t.test("the hub's added powers are whitelisted and validated, nothing else gets through", function()
+		local from = AdminLogic.FromRequest
+		t.eq(from({ action = "god" }), "/god")
+		t.eq(from({ action = "tospawn" }), "/tospawn")
+		t.eq(from({ action = "shutdown" }), "/shutdown")
+		t.eq(from({ action = "heal", target = "Bob" }), "/heal Bob")
+		t.eq(from({ action = "freeze", target = "Bob" }), "/freeze Bob")
+		t.eq(from({ action = "stats", target = "Bob" }), "/stats Bob")
+		t.eq(from({ action = "resettutorial", target = "Bob" }), "/resettutorial Bob")
+		t.eq(from({ action = "unlockbp", target = "Bob" }), "/unlockbp Bob")
+		t.eq(from({ action = "ban", target = "Bob", hours = 24 }), "/ban Bob 24")
+		t.eq(from({ action = "ban", target = "Bob", hours = "perm" }), "/ban Bob perm")
+		t.eq(from({ action = "announce", text = "  server restart soon " }), "/announce server restart soon")
+		for _, bad in ipairs({
+			{ action = "heal" },
+			{ action = "freeze", target = "Bob; /shutdown" },
+			{ action = "stats", target = "a b" },
+			{ action = "unlockbp", target = string.rep("a", 30) },
+			{ action = "ban", target = "Bob" },
+			{ action = "ban", target = "Bob", hours = 0 },
+			{ action = "ban", target = "Bob", hours = 9000 },
+			{ action = "ban", target = "Bob", hours = 1.5 },
+			{ action = "ban", target = "Bob", hours = "forever" },
+			{ action = "ban", target = "Bob", hours = 0 / 0 },
+			{ action = "announce" },
+			{ action = "announce", text = "" },
+			{ action = "announce", text = "   " },
+			{ action = "announce", text = string.rep("x", 121) },
+			{ action = "announce", text = "line\nbreak" },
+			{ action = "announce", text = 5 },
+			{ action = "reset_save", target = "Bob" },
+			{ action = "fly" },
+			{ action = "shutdown2" },
+		}) do
+			t.eq(from(bad), nil)
+		end
+		-- Every action on the list is covered by a plain or a player request or has its own branch above.
+		t.eq(AdminLogic.AnnounceText("ok"), "ok")
+		t.eq(AdminLogic.AnnounceText(nil), nil)
+	end)
+
+	local function grant(role, powers)
+		return { role = role, powers = AdminLogic.PowersOf(role, powers) or {} }
+	end
+
+	t.test("each role holds exactly its powers, and ban and gift are limited", function()
+		local allows = AdminLogic.GrantAllows
+		local helper, mod, builder = grant("HELPER"), grant("MODERATOR"), grant("BUILDER")
+		for _, power in ipairs({ "goto", "bring", "freeze", "stats", "announce" }) do
+			t.eq(allows(helper, power), true, "helper " .. power)
+		end
+		for _, power in ipairs({ "kick", "ban", "gift", "settime", "heal", "god" }) do
+			t.eq(allows(helper, power), false, "helper not " .. power)
+		end
+		t.eq(allows(mod, "kick"), true)
+		t.eq(allows(mod, "ban", { banHours = 1 }), true)
+		t.eq(allows(mod, "ban", { banHours = 2 }), false, "over the hour")
+		t.eq(allows(mod, "ban", { banHours = nil }), false, "never permanent")
+		t.eq(allows(mod, "gift"), false)
+		t.eq(allows(builder, "gift", { selfTarget = true }), true)
+		t.eq(allows(builder, "gift", { selfTarget = false }), false, "only for themself")
+		t.eq(allows(builder, "settime"), true)
+		t.eq(allows(builder, "kick"), false)
+		t.eq(allows(helper, "admin"), true, "the help list is for everyone")
+		t.eq(allows(nil, "goto"), false)
+		t.eq(allows(helper, 5), false)
+	end)
+
+	t.test("the never-delegable powers are the owner's, whatever a role or custom list says", function()
+		for _, power in ipairs(AdminLogic.NeverDelegable) do
+			t.eq(table.find(AdminLogic.DelegablePowers, power), nil, power .. " is not delegable")
+			for _, role in ipairs({ "HELPER", "MODERATOR", "BUILDER" }) do
+				t.eq(AdminLogic.GrantAllows(grant(role), power, { selfTarget = true, banHours = 1 }), false)
+			end
+			-- Even a hand-made grant that lists it.
+			t.eq(AdminLogic.GrantAllows({ role = "CUSTOM", powers = { power } }, power), false, "custom " .. power)
+			local clean, bad = AdminLogic.CleanPowers({ "goto", power })
+			t.eq(clean, nil)
+			t.eq(bad, power)
+		end
+		for _, power in ipairs(AdminLogic.OwnerOnly) do
+			for _, role in ipairs(AdminLogic.RoleList) do
+				t.eq(AdminLogic.GrantAllows(grant(role, { "goto" }), power), false, role .. " can't " .. power)
+			end
+			t.eq(table.find(AdminLogic.AllPowers, power), nil, "TESTER never holds " .. power)
+		end
+		t.eq(AdminLogic.CleanPowers({}), nil)
+		t.eq(AdminLogic.CleanPowers({ "kick", "kick" })[1], "kick")
+		t.eq(#AdminLogic.CleanPowers({ "kick", "kick" }), 1)
+		t.eq(AdminLogic.CleanPowers("kick"), nil)
+	end)
+
+	t.test("TESTER holds every owner power except delegation, and nothing else", function()
+		local tester = grant("TESTER")
+		for _, action in ipairs(AdminLogic.MenuActions) do
+			local ok = AdminLogic.GrantAllows(tester, action, { selfTarget = true, banHours = 5000 })
+			t.eq(ok, table.find(AdminLogic.OwnerOnly, action) == nil, action)
+		end
+		for _, power in ipairs({
+			"give",
+			"take",
+			"setcash",
+			"superrun",
+			"shutdown",
+			"unban",
+			"resettutorial",
+			"unlockbp",
+		}) do
+			t.eq(AdminLogic.GrantAllows(tester, power), true, power)
+		end
+		t.eq(AdminLogic.GrantAllows(tester, "ban", { banHours = nil }), true, "permanent too")
+		t.eq(AdminLogic.GrantAllows(tester, "grant_everything"), false)
+		t.eq(AdminLogic.GrantAllows(tester, "delegate"), false)
+		t.eq(AdminLogic.GrantAllows(tester, "undelegate"), false)
+		t.eq(AdminLogic.GrantAllows(tester, "delegates"), false)
+		for _, action in ipairs({ "ban", "kick", "shutdown", "take", "setcash", "unban", "resettutorial" }) do
+			t.eq(AdminLogic.IsDestructive(action), true, action)
+		end
+		t.eq(AdminLogic.IsDestructive("give"), false)
+	end)
+
+	t.test("expiry: session, 1h, 24h or until the server closes; TESTER never the last", function()
+		t.eq(AdminLogic.ExpirySeconds("1h"), 3600)
+		t.eq(AdminLogic.ExpirySeconds("24h"), 86400)
+		t.eq(AdminLogic.ExpirySeconds("session"), nil)
+		t.eq(AdminLogic.ExpirySeconds("forever"), nil)
+		for _, e in ipairs({ "session", "1h", "24h", "server" }) do
+			t.eq(AdminLogic.ExpiryAllowed("HELPER", e), true, e)
+		end
+		for _, e in ipairs({ "session", "1h", "24h" }) do
+			t.eq(AdminLogic.ExpiryAllowed("TESTER", e), true, e)
+		end
+		for _, bad in ipairs({ "server", "forever", "perm", "", 5 }) do
+			t.eq(AdminLogic.ExpiryAllowed("TESTER", bad), false, tostring(bad))
+		end
+		t.eq(AdminLogic.ExpiryAllowed("HELPER", "perm"), false)
+		local g = { role = "HELPER", powers = {}, expiresAt = 1000 }
+		t.eq(AdminLogic.Expired(g, 999), false)
+		t.eq(AdminLogic.Expired(g, 1000), true)
+		t.eq(
+			AdminLogic.Expired({ role = "HELPER", powers = {} }, 10 ^ 12),
+			false,
+			"no expiry time: until the session or server ends"
+		)
+	end)
+
+	t.test("delegation words parse, and only the confirmed TESTER request carries confirm", function()
+		local parse = AdminLogic.ParseDelegate
+		local p = parse({ "Bob", "moderator", "1h" })
+		t.eq(p.role, "MODERATOR")
+		t.eq(p.expiry, "1h")
+		t.eq(p.confirmed, false)
+		t.eq(parse({ "Bob", "helper" }).expiry, "session", "the default")
+		t.eq(parse({ "123456", "helper", "24h" }).userId, 123456)
+		local c = parse({ "Bob", "custom", "kick,goto", "24h" })
+		t.eq(c.powers, { "kick", "goto" })
+		t.eq(parse({ "Bob", "tester", "1h", "confirm" }).confirmed, true)
+		t.eq(parse({ "Bob", "tester", "confirm" }).confirmed, true)
+		for _, bad in ipairs({
+			{},
+			{ "Bob" },
+			{ "Bob", "boss" },
+			{ "Bob", "custom" },
+			{ "Bob", "custom", "give" },
+			{ "Bob", "custom", "shutdown,goto" },
+			{ "Bob", "helper", "forever" },
+			{ "Bob", "tester", "server" },
+		}) do
+			t.eq(parse(bad), nil, table.concat(bad, " "))
+		end
+		local from = AdminLogic.FromRequest
+		t.eq(from({ action = "delegate", target = "Bob", role = "HELPER", expiry = "1h" }), "/delegate Bob helper 1h")
+		t.eq(
+			from({
+				action = "delegate",
+				target = "Bob",
+				role = "CUSTOM",
+				powers = { "kick", "goto" },
+				expiry = "session",
+			}),
+			"/delegate Bob custom kick,goto session"
+		)
+		t.eq(
+			from({ action = "delegate", target = "Bob", role = "TESTER", expiry = "1h" }),
+			"/delegate Bob tester 1h",
+			"no confirm without it"
+		)
+		t.eq(
+			from({ action = "delegate", target = "Bob", role = "TESTER", expiry = "1h", confirmed = true }),
+			"/delegate Bob tester 1h confirm"
+		)
+		t.eq(from({ action = "undelegate", target = "Bob" }), "/undelegate Bob")
+		t.eq(from({ action = "delegates" }), "/delegates")
+		for _, bad in ipairs({
+			{ action = "delegate", target = "Bob", role = "TESTER", expiry = "server", confirmed = true },
+			{ action = "delegate", target = "Bob", role = "OWNER", expiry = "1h" },
+			{ action = "delegate", target = "Bob", role = "CUSTOM", powers = { "give" }, expiry = "1h" },
+			{ action = "delegate", target = "Bob", role = "CUSTOM", powers = {}, expiry = "1h" },
+			{ action = "delegate", target = "Bob", role = "HELPER", expiry = "forever" },
+			{ action = "delegate", target = "Bob", role = "HELPER" },
+			{ action = "delegate", role = "HELPER", expiry = "1h" },
+			{ action = "delegate", target = "Bob; /shutdown", role = "HELPER", expiry = "1h" },
+			{ action = "undelegate" },
+		}) do
+			t.eq(from(bad), nil)
+		end
+		t.ok(string.find(AdminLogic.TesterWarning, "trust", 1, true))
+		-- A role sent with a request is only a word for the command line: nothing here reads it as a permission.
+		t.eq(from({ action = "give", target = "Bob", amount = 5, role = "TESTER" }), "/give Bob 5")
+	end)
+
 	t.test("the time menu requests become commands, only from the whitelist", function()
 		local from = AdminLogic.FromRequest
 		t.eq(from({ action = "timespeed", speed = 60 }), "/timespeed 60")

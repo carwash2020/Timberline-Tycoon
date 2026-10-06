@@ -61,6 +61,8 @@ return function(t)
 			PlotOffer = true,
 			BadgeSync = true,
 			BoardData = true,
+			AdminResult = true,
+			AdminAccess = true,
 		}
 		for _, name in ipairs(Net.RemoteNames) do
 			if not skip[name] then
