@@ -2057,3 +2057,22 @@ Delegation checks (owner hub; use two test players, the second one is the delega
 - [ ] TESTER: choosing it shows a red panel with the warning; GRANT turns amber "SURE? GIVE FULL POWER"; only the second press grants. The 'until the server closes' choice is gone. Their menu shows a red TESTER banner; give cash works; TAKE CASH / BAN / KICK / SHUT DOWN ask twice and pop a toast on YOUR screen. They cannot touch you (kick, ban, cash all refused) and have no DELEGATES tab; typing `/delegate` as them does nothing.
 - [ ] Chat: `/delegate Bob helper 1h`, `/delegates`, `/undelegate Bob`; `/delegate Bob tester 1h` only warns until you add `confirm`.
 
+
+## NPC heads face the player (claude/npc-heads)
+
+- Heads look at you through `Shared/HeadLook.Aim` (clamped 70 degrees side to
+  side, 35 up and down, eased; behind them they look ahead). Part-built faces
+  are on -Z for every NPC (`tests/HeadLook.spec`). The uploaded NPC meshes are
+  assumed to face +Z, so `NPCMeshes` turns each piece by `TownModels.NpcMeshYaw`
+  (pi). That part is a best inference without the assets: please check it.
+
+### Studio checks
+- [ ] Walk up to Murph, Old Hank, Old Tolly, Cap'n Moss, Gus, a shopkeeper and
+      a walker (Rosa, Pip, Bram): their faces (eyes, nose, beard) look at you,
+      and their heads follow you as you circle, up to about 70 degrees, no snap
+- [ ] Stand behind one: the head settles looking straight ahead, no twist
+- [ ] Walkers still walk face first with the face and the toes on the same side
+- [ ] If the NPCs are Blender meshes and their faces or toes now point AWAY,
+      set `TownModels.NpcMeshYaw = 0` (the meshes were already facing -Z) and
+      tell Claude; if it was backwards before and is right now, nothing to do
+- [ ] Held items (Murph's lantern, Millie's clipboard) are still in the hand
