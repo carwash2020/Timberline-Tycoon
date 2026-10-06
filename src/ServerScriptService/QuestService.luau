@@ -255,6 +255,12 @@ function QuestService.Start(player: Player, profile: Profile)
 	if loop ~= 2 or profile.tutorialOrder ~= TutorialData.OrderV2 then
 		realign(profile)
 	end
+	-- A save that was on a step the short tutorial retired for good
+	-- (TutorialData.ApplyOrder points it one past the end) is done.
+	if loop == 2 and profile.tutorialStep > #steps() then
+		finish(player, profile, "completed")
+		return
+	end
 	if
 		profile.tutorialReplay ~= true
 		and profile.bestAxeTier >= 2
@@ -309,7 +315,11 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 	-- (they already had the first-sale bonus, or never will: it's once).
 	if reward and reward > 0 and not onRefresher(profile) then
 		EconomyService.AddCash(player, reward, "tutorial: " .. step.id, "tutorial")
-		notify(player, string.format("Murph chipped in %s!", Util.formatCash(reward)))
+		-- The next card already says it (the cart sale's thank-you), so a toast
+		-- on top would be a second pop-up for the same thing.
+		if step.rewardToast ~= false then
+			notify(player, string.format("Murph chipped in %s!", Util.formatCash(reward)))
+		end
 	end
 	enterStep(player, profile, profile.tutorialStep + 1)
 end

@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 6 October 2026 (PR #70). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 6 October 2026 (branch `claude/short-tutorial`). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
 
@@ -31,10 +31,11 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 
 ### Economy model
 
-`lune run tools/economy` (v2) and `lune run tools/economy1` (v1) regenerate ECONOMY.md and ECONOMY_V1.md; commit them with any balance change. The headline times are strict CI ranges: first sale under 3 min, Steel Axe 5–8 min, first $1k 13–20 min, Cobalt 45–75 min, full plot 28–36 h. The headline strings are also pinned in the Builder, BuildingKit and TownMesh specs, and the tutorial's plot reward is pinned in TutorialData.spec. If a price change breaks a range, retune a reward or price rather than loosening the range. A model that hangs (instead of failing) usually means the simulated player cannot afford the next purchase and earns $0/h (it did when the Rustbucket went to $100 before the plot was priced in).
+`lune run tools/economy` (v2) and `lune run tools/economy1` (v1) regenerate ECONOMY.md and ECONOMY_V1.md; commit them with any balance change. The headline times are strict CI ranges: first sale under 3 min, Steel Axe 5–8 min, first $1k 13–20 min, Cobalt 45–75 min, full plot 28–36 h. The headline strings are also pinned in the Builder, BuildingKit and TownMesh specs, and the tutorial's plot reward is pinned in TutorialData.spec. Retired tutorial step ids are save-migration keys: never reuse or reorder them. If a price change breaks a range, retune a reward or price rather than loosening the range. A model that hangs (instead of failing) usually means the simulated player cannot afford the next purchase and earns $0/h (it did when the Rustbucket went to $100 before the plot was priced in).
 
 ## What has landed (newest first, PR numbers on main)
 
+- Branch `claude/short-tutorial` (not yet a PR): the v2 tutorial is 8 steps (fell, drag, sell, plot, one build lesson, truck box, pad, spawn; the axe, mill and load steps are retired in `TutorialData.RetiredV2`, saves migrate forward in `ApplyOrder` order 6); `NoticePolicy` governs every toast (priorities, one non-critical at a time, cooldown, dedupe, quiet during the first-sale flow). Economy unchanged. Checks in PHASE2_NOTES.md.
 - Branch `claude/hud-clock-owner` (not yet a PR): corner chips raised into the top bar, 12-hour AM/PM clock everywhere (`WorldTime.Format`, shop-hour lines), owner time tools (`/timespeed`, `/settime`, `/timereset` and the menu; not saved), shopkeeper card above the hotbar, smooth slower sawmill blade (TownFX, per frame).
 - #70 plot bought at $150, Rustbucket $100, respawn fees, economy retuned (in review when this was written).
 - #69 vehicle always has its own pad; Rustbucket boxed. #68/#67 owner menu (Xbox). #66 Xbox carry and build controls. #65 building fixes on the 80 plot (bought squares, collision boxes for mills and the chop saw, 10-stud pad grid). #64 owner chat tools. #63 rare wood and plank prices. #62 axe price ladder. #61/#60 one price, no u³. #59 build-check print at map start. #58 smaller starting plot and homestead looks. #57 HUD corner, run, ground and mesh fixes.

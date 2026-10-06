@@ -4,7 +4,8 @@
 -- In Studio playtests (the stopwatch):
 --   * Prints each milestone the first time it happens this session, with the
 --     time since the save loaded: "[Stopwatch] Connor: First sale at 2:41".
---     The same line pops up as a toast.
+--     It only prints; set MilestoneService.ToastStopwatch = true to also
+--     pop it up as a toast.
 --   * Prints "could afford <next axe>" the moment cash first covers each axe
 --     you don't own yet: that's the pace check from GAME_DESIGN §14.8.
 --   * Once a minute prints cash earned and cash per minute.
@@ -36,6 +37,8 @@ local ProfileService = require(script.Parent.ProfileService)
 type Profile = ProfileService.Profile
 
 local MilestoneService = {}
+
+MilestoneService.ToastStopwatch = false -- Studio stopwatch lines also as toasts (off: they only print)
 
 -- Onboarding funnel, in order. Steps are logged by name via Mark().
 -- Add new steps at the END only: Roblox charts them by their number.
@@ -112,8 +115,10 @@ local function stopwatch(player: Player, session: Session, text: string)
 	end
 	local line = string.format("%s at %s", text, clock(os.clock() - session.startedAt))
 	print(string.format("[Stopwatch] %s: %s", player.Name, line))
+	-- Print only, unless a playtest turns the toast on: a stopwatch pop-up
+	-- for every milestone is a pop-up the player didn't ask for.
 	local send = notify
-	if send then
+	if send and MilestoneService.ToastStopwatch then
 		send(player, "⏱ " .. line)
 	end
 end

@@ -222,35 +222,39 @@ return function(t)
 		return out
 	end
 
-	t.test("v2: the same step ids, with the plot after the first sale", function()
-		local want = {
-			"fell",
-			"pickup",
-			"sell",
-			"plot",
-			"build",
-			"place",
-			"land",
-			"truck",
-			"pad",
-			"spawn",
-			"load",
-			"mill",
-			"loads",
-			"loads2",
-			"loads3",
-			"steel",
-		}
-		t.eq(ids(V2), want)
-		t.eq(#V2, #TutorialData.Steps + 5, "the three build lessons and the pad and spawn steps are v2 only")
-		local v1 = {}
-		for _, step in ipairs(TutorialData.Steps) do
-			v1[step.id] = true
-		end
-		for _, id in ipairs(want) do
-			if id ~= "build" and id ~= "place" and id ~= "land" and id ~= "pad" and id ~= "spawn" then
-				t.ok(v1[id], id .. " is still a v1 step")
+	t.test(
+		"v2: the short list: fell, drag, sell, plot, one build lesson, then the truck, its pad and its button",
+		function()
+			local want = { "fell", "pickup", "sell", "plot", "place", "truck", "pad", "spawn" }
+			t.eq(ids(V2), want)
+			t.ok(#V2 <= 8, "about 6-8 short steps: playtesters found the long one far too long")
+			local v1 = {}
+			for _, step in ipairs(TutorialData.Steps) do
+				v1[step.id] = true
 			end
+			for _, id in ipairs(want) do
+				if id ~= "place" and id ~= "pad" and id ~= "spawn" then
+					t.ok(v1[id], id .. " is still a v1 step")
+				end
+			end
+		end
+	)
+
+	t.test("v2: no step walks the player through an axe, and every cut step is retired, never reused", function()
+		local live = {}
+		for _, step in ipairs(V2) do
+			live[step.id] = true
+			t.ok(step.event ~= "axeBought", step.id .. " must not teach buying an axe")
+			t.eq(step.axeGoal, nil, step.id .. " shows no axe goal")
+			t.eq(step.axePrice, nil)
+			t.ok(not TutorialData.RetiredV2[step.id], step.id .. " is live and retired")
+		end
+		for _, id in ipairs({ "build", "land", "load", "mill", "loads", "loads2", "loads3", "steel", "plant" }) do
+			t.ok(TutorialData.RetiredV2[id], id .. " is retired")
+			t.ok(not live[id], id .. " is gone from StepsV2")
+		end
+		for _, id in ipairs(TutorialData.OrderV2BeforeShort) do
+			t.ok(live[id] or TutorialData.RetiredV2[id], id .. " (a step id from the long list) is live or retired")
 		end
 	end)
 
@@ -287,25 +291,23 @@ return function(t)
 		t.eq(fell.event, "treeFelled")
 		t.eq(fell.beacon, "tree")
 		t.eq(fell.beaconWood, "oak", "Murph points at an oak")
-		t.eq(V2[#V2].event, "axeBought", "the Steel Axe is still a step")
+		t.eq(V2[#V2].event, "truckSpawned", "the truck rolling out is the last lesson")
 		local order = {}
 		for i, step in ipairs(V2) do
 			order[step.id] = i
 		end
 		t.eq(order.plot, order.sell + 1, "the plot is the step right after the first sale")
-		t.eq(order.build, order.plot + 1, "then the build lessons")
-		t.eq(order.place, order.build + 1)
-		t.eq(order.land, order.place + 1)
-		t.eq(order.truck, order.land + 1, "then the Rustbucket's box")
+		t.eq(order.place, order.plot + 1, "then the one build lesson")
+		t.eq(order.truck, order.place + 1, "then the Rustbucket's box")
 		t.eq(order.pad, order.truck + 1, "then its pad on the plot")
 		t.eq(order.spawn, order.pad + 1, "then the pad's button")
-		t.eq(order.load, order.spawn + 1, "and only then the truck can be loaded")
+		t.eq(#V2, order.spawn, "and the tutorial ends with the truck out")
 		t.eq(V2[order.pad].event, "padPlaced")
 		t.eq(V2[order.spawn].event, "truckSpawned")
 		t.eq(#TutorialData.EventsV2, #V2)
 	end)
 
-	t.test("v2: the mill is followed by the sell-more loads in both lists", function()
+	t.test("v1's list is untouched by the short v2 one (the rollback keeps its steps)", function()
 		local function at(steps, id)
 			for i, step in ipairs(steps) do
 				if step.id == id then
@@ -314,8 +316,8 @@ return function(t)
 			end
 			return nil
 		end
-		t.eq(at(V2, "loads"), at(V2, "mill") + 1)
 		t.eq(at(TutorialData.Steps, "loads"), at(TutorialData.Steps, "mill") + 1)
+		t.eq(#TutorialData.Steps, 11)
 		t.eq(at(V2, "plant"), nil)
 	end)
 
@@ -350,8 +352,6 @@ return function(t)
 		t.ok(string.find(HintLogic.Expand(first, "console"), "Press RT, or hold", 1, true), "RT on a gamepad")
 		t.ok(not string.find(first, "I'm Murph", 1, true), "Murph's tip already said hello")
 		t.ok(not string.find(first, "just to your left", 1, true), "the swing line doesn't repeat the tip")
-		t.ok(string.find(byId("load").murph, "Cut it to fit", 1, true), "the load beat: cut it to fit the bed")
-		t.ok(string.find(byId("mill").murph, "SELL LOGS HERE", 1, true), "the mill beat names the pad as it reads")
 	end)
 
 	t.test("v2: every number Murph says comes from the v2 data", function()
@@ -386,57 +386,52 @@ return function(t)
 			return nil
 		end
 		t.ok(has(byId("fell").murph, FieldGuide.TrunkHits(starter, oak)), "hits for the first oak")
-		t.ok(has(byId("loads").murph, FieldGuide.TrunkHits(starter, birch)), "the starter axe on birch")
-		t.ok(
-			string.find(byId("loads").murph, starter.displayName, 1, true)
-				and string.find(byId("loads").murph, steel.displayName, 1, true)
-		)
-		t.ok(has(byId("steel").murph, FieldGuide.TrunkHits(steel, oak)), "the Steel Axe on oak")
-		t.ok(has(byId("steel").murph, FieldGuide.TrunkHits(starter, oak)), "...against the starter's")
-		t.ok(FieldGuide.TrunkHits(steel, oak) < FieldGuide.TrunkHits(starter, oak), "and it's quicker")
+		t.ok(FieldGuide.TrunkHits(steel, oak) < FieldGuide.TrunkHits(starter, oak), "the Steel Axe is quicker")
 	end)
 
-	t.test("v2: the cash path reaches the Steel Axe; Murph's share doesn't buy it", function()
-		local steel = t.shared("ItemCatalog").AxeLadder()[2]
-		local sold = 0
-		for _, step in ipairs(V2) do
-			if step.event == "woodSoldCash" then
-				t.eq(step.unit, "cash", "counted in dollars")
-				t.eq(step.axeGoal, true)
-				sold += step.count
+	t.test(
+		"v2: Murph's share is the first sale's $25 and the plot's payback, and no axe is bought for the player",
+		function()
+			local steel = t.shared("ItemCatalog").AxeLadder()[2]
+			local plotStep
+			for _, step in ipairs(V2) do
+				if step.id == "plot" then
+					plotStep = step
+				end
 			end
+			local reward = TutorialData.TotalReward(2)
+			t.eq(
+				reward,
+				25 + plotStep.rewardCash,
+				"tools/economy reads the first sale's $25 and the plot step's payback"
+			)
+			t.eq(
+				plotStep.rewardCash,
+				GameConfig.PlotPrice + 25,
+				"the plot step hands the plot's price back, plus the truck's $25 over the old price"
+			)
+			t.ok(reward - plotStep.rewardCash < steel.v2.price, "Murph helps, the player earns the axe")
+			t.eq(
+				TutorialData.TotalReward(),
+				TutorialData.TotalReward(1),
+				"no loop: v1's, as the economy model reads it"
+			)
 		end
-		t.eq(sold, 120, "three loads of $40, the old $120 grind")
-		local reward = TutorialData.TotalReward(2)
-		-- The plot step pays Murph's $PlotPrice back toward the Rustbucket (the plot is
-		-- bought first, and tools/economy's headlines only hold if it is). That is
-		-- not axe money: what he gives toward the Steel Axe is everything else.
-		local plotStep
-		for _, step in ipairs(V2) do
-			if step.id == "plot" then
-				plotStep = step
-			end
-		end
-		local gift = reward - plotStep.rewardCash
-		t.ok(reward > 0)
-		t.ok(gift < steel.v2.price, "Murph helps, the player earns it")
-		t.eq(gift, 50, "the three loads' $25 plus Murph's $25 on the first sale")
-		t.eq(
-			plotStep.rewardCash,
-			GameConfig.PlotPrice + 25,
-			"the plot step hands the plot's price back, plus the truck's $25 over the old price"
-		)
-		t.ok(GameConfig.StartingCash + sold + gift >= steel.v2.price, "start + the sold loads + Murph's share")
-		t.eq(TutorialData.TotalReward(), TutorialData.TotalReward(1), "no loop: v1's, as the economy model reads it")
-	end)
+	)
 
 	t.test("v2: the tracker reads a cash step in dollars", function()
-		local loads
-		for _, step in ipairs(V2) do
-			if step.id == "loads" then
-				loads = step
-			end
-		end
+		-- The cash-step support stays in the engine (a retired step's shape);
+		-- exercised here with a step of that shape.
+		local loads = {
+			id = "loads",
+			objective = "Sell $%d more wood",
+			murph = "x",
+			event = "woodSoldCash",
+			count = 40,
+			unit = "cash",
+			axeGoal = true,
+			axePrice = 160,
+		}
 		local Util = t.shared("Util")
 		local function expect(progress)
 			return string.format(
@@ -450,13 +445,7 @@ return function(t)
 		t.eq(TutorialData.ObjectiveText(loads, 23), expect(23))
 		t.eq(TutorialData.ObjectiveText(loads, 23.7), expect(24), "whole dollars, rounded as the pad pays")
 		t.eq(TutorialData.ObjectiveText(loads, loads.count + 40), expect(loads.count), "never past the goal")
-		local fell
-		for _, step in ipairs(V2) do
-			if step.id == "fell" then
-				fell = step
-			end
-		end
-		t.eq(TutorialData.ObjectiveText(fell, 0), "Chop down a tree", "a one-off step shows no count")
+		t.eq(TutorialData.ObjectiveText(V2[1], 0), "Chop down a tree", "a one-off step shows no count")
 	end)
 
 	t.test("v2: progress carries over only where the event is the same in both lists", function()
@@ -466,20 +455,23 @@ return function(t)
 				table.insert(kept, step.id)
 			end
 		end
-		t.eq(kept, { "plot", "fell", "truck", "steel" }, "pickup, load, the cart, the mill and the loads start again")
+		t.eq(
+			kept,
+			{ "plot", "fell", "truck" },
+			"pickup, load, the cart, the mill and the loads start again; the axe step is gone"
+		)
 		t.eq(TutorialData.KeepsProgressV2(0), false)
 		t.eq(TutorialData.KeepsProgressV2(#V2 + 1), false)
 	end)
 
-	t.test("v2: the Steel Axe step counts as done for a player who already has it", function()
-		local steel, plot
+	t.test("an axe-buying step (if one is ever added) counts as done for a player who already has the axe", function()
+		local plot
 		for _, step in ipairs(V2) do
-			if step.id == "steel" then
-				steel = step
-			elseif step.id == "plot" then
+			if step.id == "plot" then
 				plot = step
 			end
 		end
+		local steel = { id = "steel", objective = "x", murph = "x", event = "axeBought", count = 1 }
 		t.ok(TutorialData.AlreadyDone(steel, 2))
 		t.ok(not TutorialData.AlreadyDone(steel, 1))
 		t.ok(not TutorialData.AlreadyDone(V2[1], 5), "felling isn't skipped for a better axe")
@@ -537,14 +529,10 @@ return function(t)
 		t.eq(at(), "plot", "the sell step completes on the first piece")
 		t.eq(profile.cash, 25, "Murph's $25 on that sale")
 		Quest.Event(player, "plotClaimed")
-		t.eq(at(), "build")
-		Quest.Event(player, "itemPlaced")
-		t.eq(at(), "build", "placing waits until BUILD is pressed")
+		t.eq(at(), "place", "the plot is bought; one build lesson follows")
 		Quest.Event(player, "buildOpened")
-		t.eq(at(), "place")
+		t.eq(at(), "place", "BUILD and LAND aren't lessons any more: only placing counts")
 		Quest.Event(player, "itemPlaced")
-		t.eq(at(), "land")
-		Quest.Event(player, "landOpened")
 		t.eq(at(), "truck")
 		Quest.Event(player, "truckBought")
 		t.eq(at(), "pad", "the box is bought; its pad comes next")
@@ -553,58 +541,115 @@ return function(t)
 		Quest.Event(player, "padPlaced")
 		t.eq(at(), "spawn")
 		Quest.Event(player, "truckSpawned")
-		t.eq(at(), "load", "the truck is out; load it")
-		Quest.Event(player, "woodLoaded")
-		t.eq(at(), "mill")
-		Quest.Event(player, "woodSold", 2)
-		t.eq(at(), "loads")
-		local loads = V2[profile.tutorialStep]
-		local cash = profile.cash
-		Quest.Event(player, "woodSold", 4)
-		t.eq(profile.tutorialProgress, 0, "pieces don't count toward dollars")
-		Quest.Event(player, "woodSoldCash", loads.count - 1)
-		t.eq(player.attrs.TutorialProgress, loads.count - 1)
-		t.eq(profile.cash, cash, "no reward yet")
-		Quest.Event(player, "woodSoldCash", 30)
-		t.eq(at(), "loads2")
-		t.eq(profile.cash, cash + loads.rewardCash, "Murph's share")
-		t.eq(toasts, {
-			"Murph chipped in $25!",
-			string.format("Murph chipped in $%d!", V2[4].rewardCash), -- the plot step: toward the Rustbucket
-			string.format("Murph chipped in $%d!", loads.rewardCash),
-		})
-		Quest.Event(player, "woodSoldCash", V2[profile.tutorialStep].count)
-		Quest.Event(player, "woodSoldCash", V2[profile.tutorialStep].count)
-		t.eq(at(), "steel")
-		profile.bestAxeTier = 2
-		Quest.Event(player, "axeBought")
-		t.ok(profile.tutorialDone, "the Steel Axe is the last step")
+		t.ok(profile.tutorialDone, "the truck is out: that's the whole tutorial")
 		t.eq(player.attrs.TutorialStep, 0)
+		t.eq(profile.cash, 25 + V2[4].rewardCash, "Murph's $25 on the sale and the plot's payback")
+		t.eq(toasts, {
+			string.format("Murph chipped in $%d!", V2[4].rewardCash), -- the plot step: toward the Rustbucket
+		}, "the cart sale's thank-you is on the next card, not a second pop-up")
 		t.eq(marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
 
-	t.test("v2: a save from order 3 (before the build lessons) keeps its step by name", function()
-		local list = TutorialData.OrderV2BeforeBuild
-		for index, name in ipairs(list) do
-			local record = { tutorialStep = index, tutorialProgress = 3, tutorialOrder = 3 }
-			TutorialData.ApplyOrder(record)
-			t.eq(V2[record.tutorialStep].id, name, name)
-			t.eq(record.tutorialOrder, TutorialData.OrderV2)
-			t.eq(record.tutorialProgress, 3, "progress stays")
+	-- Where a save on each name of an old list lands now: a live step keeps
+	-- its place by name, a retired one moves on to the next remaining step
+	-- (build to place, land to truck), or past the end (the tutorial is
+	-- over: the truck was already out).
+	local END = #V2 + 1
+	local function landing(name)
+		local to = {
+			plant = END,
+			build = "place",
+			land = "truck",
+			load = END,
+			mill = END,
+			loads = END,
+			loads2 = END,
+			loads3 = END,
+			steel = END,
+		}
+		local target = to[name]
+		if target == nil then
+			for i, step in ipairs(V2) do
+				if step.id == name then
+					return i, false
+				end
+			end
+			error("no step " .. name)
 		end
-		t.eq(#list, #V2 - 5, "order 3 is the current list without the build lessons and the pad steps")
+		if target == END then
+			return END, true
+		end
+		for i, step in ipairs(V2) do
+			if step.id == target then
+				return i, true
+			end
+		end
+		error("no target " .. target)
+	end
+
+	local function walkOrder(order, list)
+		for index, name in ipairs(list) do
+			local record = { tutorialStep = index, tutorialProgress = 3, tutorialOrder = order }
+			TutorialData.ApplyOrder(record)
+			local want, retired = landing(name)
+			t.eq(record.tutorialStep, want, string.format("order %d: %s", order, name))
+			t.eq(record.tutorialOrder, TutorialData.OrderV2)
+			t.eq(
+				record.tutorialProgress,
+				if retired then 0 else 3,
+				name .. ": progress stays, or restarts on a cut step"
+			)
+			-- Idempotent: the version stamp is the one job.
+			local again = record.tutorialStep
+			TutorialData.ApplyOrder(record)
+			t.eq(record.tutorialStep, again, name .. " migrates once")
+		end
+	end
+
+	t.test("v2: a save from order 3 (before the build lessons) keeps its step by name or moves forward", function()
+		walkOrder(3, TutorialData.OrderV2BeforeBuild)
 	end)
 
-	t.test("v2: a save from order 4 (before the pad and spawn steps) keeps its step by name", function()
-		local list = TutorialData.OrderV2BeforePad
-		for index, name in ipairs(list) do
-			local record = { tutorialStep = index, tutorialProgress = 3, tutorialOrder = 4 }
-			TutorialData.ApplyOrder(record)
-			t.eq(V2[record.tutorialStep].id, name, name)
-			t.eq(record.tutorialOrder, TutorialData.OrderV2)
-			t.eq(record.tutorialProgress, 3, "progress stays")
+	t.test(
+		"v2: a save from order 4 (before the pad and spawn steps) keeps its step by name or moves forward",
+		function()
+			walkOrder(4, TutorialData.OrderV2BeforePad)
 		end
-		t.eq(#list, #V2 - 2, "order 4 is the current list without the pad and spawn steps")
+	)
+
+	t.test("v2: a save from order 5 (the long tutorial) moves forward past every cut step", function()
+		walkOrder(5, TutorialData.OrderV2BeforeShort)
+		local long = TutorialData.OrderV2BeforeShort
+		t.eq(#long, 16, "the long list as it shipped")
+		-- Spot checks, in words.
+		local function from(name)
+			for index, id in ipairs(long) do
+				if id == name then
+					local record = { tutorialStep = index, tutorialProgress = 0, tutorialOrder = 5 }
+					TutorialData.ApplyOrder(record)
+					return record.tutorialStep
+				end
+			end
+			error(name)
+		end
+		t.eq(V2[from("build")].id, "place", "mid-build lesson: the one build lesson")
+		t.eq(V2[from("land")].id, "truck", "mid-land lesson: on to the truck")
+		t.eq(V2[from("pad")].id, "pad", "mid-pad: unchanged")
+		t.eq(V2[from("spawn")].id, "spawn")
+		t.eq(from("load"), #V2 + 1, "past the end: done")
+		t.eq(from("steel"), #V2 + 1)
+		t.eq(from("loads2"), #V2 + 1)
+	end)
+
+	t.test("v2: a finished tutorial only gets the stamp; the order is never applied twice", function()
+		local record = { tutorialStep = 16, tutorialProgress = 5, tutorialOrder = 5, tutorialDone = true }
+		TutorialData.ApplyOrder(record)
+		t.eq(record.tutorialStep, 16, "finished stays finished, untouched")
+		t.eq(record.tutorialProgress, 5)
+		t.eq(record.tutorialOrder, TutorialData.OrderV2)
+		local mid = { tutorialStep = 11, tutorialProgress = 2, tutorialOrder = TutorialData.OrderV2 }
+		TutorialData.ApplyOrder(mid)
+		t.eq(mid.tutorialStep, 11, "a save already on the short order is not remapped")
 	end)
 
 	t.test("v2: the pad step is skipped by a player who already has a pad", function()
@@ -633,11 +678,11 @@ return function(t)
 
 	t.test("v2: old index to step name, then that name's new index, for every step", function()
 		local old = TutorialData.OrderV2Previous
-		t.eq(#old, #V2 - 5 + 1, "the retired plant step is the extra name, the build and pad lessons are not there yet")
+		t.eq(#old, 12, "the plot-first list as it shipped, with the plant step")
 		for index, name in ipairs(old) do
 			local at = TutorialData.RemapV2Step(index)
-			local expect = if name == "plant" then "loads" else name
-			t.eq(V2[at].id, expect, string.format("old %d %s", index, name))
+			local want = landing(name)
+			t.eq(at, want, string.format("old %d %s", index, name))
 		end
 		t.eq(TutorialData.RemapV2Step(0), 0)
 		t.eq(TutorialData.RemapV2Step(#old + 1), #old + 1)
@@ -659,9 +704,9 @@ return function(t)
 				t.eq(V2[record.tutorialStep].id, "fell", "still on the old first step: the new order starts by felling")
 				t.eq(record.tutorialProgress, 0)
 			else
-				local expect = if name == "plant" then "loads" else name
-				t.eq(V2[record.tutorialStep].id, expect, name)
-				t.eq(record.tutorialProgress, 3, name .. " keeps its count")
+				local want, retired = landing(name)
+				t.eq(record.tutorialStep, want, name)
+				t.eq(record.tutorialProgress, if retired then 0 else 3, name .. " keeps its count unless it was cut")
 			end
 			-- A second pass leaves the step where the first put it. Index 2 is
 			-- the old "fell"; remapping it again would move it, so a stay
@@ -681,18 +726,23 @@ return function(t)
 			end
 			return nil
 		end
-		local truck, steel = byId("truck"), byId("steel")
+		local truck = byId("truck")
+		local steel = {
+			id = "steel",
+			objective = "Buy the Steel Axe at the Tool Shed",
+			murph = "x",
+			murphShort = "Sell more wood first. Then get the Steel Axe at Tink's Tool Shed, just west of the mill.",
+			event = "axeBought",
+			count = 1,
+			beacon = "toolShed",
+			cashItem = "Steel Axe",
+			cashPrice = 160,
+		}
 		t.eq(
 			TutorialData.ObjectiveText(truck, 0, 51),
 			"Buy the Rustbucket box at the dealership · $51 of $100 to Rustbucket"
 		)
-		t.eq(
-			TutorialData.ObjectiveText(steel, 0, 40),
-			string.format(
-				"Buy the Steel Axe at the Tool Shed · $40 of %s to Steel Axe",
-				t.shared("Util").formatCash(steel.cashPrice)
-			)
-		)
+		t.eq(TutorialData.ObjectiveText(steel, 0, 40), "Buy the Steel Axe at the Tool Shed · $40 of $160 to Steel Axe")
 		t.eq(TutorialData.Beacon(truck, 51), "murphCart")
 		t.ok(string.find(TutorialData.MurphLine(truck, false, 51), "my cart", 1, true))
 		t.eq(
@@ -740,24 +790,21 @@ return function(t)
 		)
 	end)
 
-	t.test("the plot line names no direction, and the mill's tip moved to the farewell", function()
-		local plot, mill
+	t.test("the plot line names no direction, and the mill and axe tips live in the farewell", function()
+		local plot
 		for _, step in ipairs(V2) do
 			if step.id == "plot" then
 				plot = step
-			elseif step.id == "mill" then
-				mill = step
 			end
 		end
 		t.ok(string.find(plot.murph, "follow the arrow", 1, true))
 		for _, word in ipairs({ "east", "west", "north", "south", "left", "right" }) do
 			t.ok(not string.find(string.lower(plot.murph), "%f[%a]" .. word .. "%f[%A]"), "the plot line says " .. word)
 		end
-		t.ok(string.find(mill.murph, "SELL LOGS HERE", 1, true))
-		t.ok(not string.find(mill.murph, "u³", 1, true))
-		t.ok(not string.find(string.lower(mill.murph), "plank"))
 		t.ok(not string.find(TutorialData.Farewell, "u³", 1, true), "players never see")
 		t.ok(string.find(string.lower(TutorialData.Farewell), "plank"))
+		t.ok(string.find(TutorialData.Farewell, "sawmill", 1, true), "the mill trip is one line, not a lesson")
+		t.ok(string.find(TutorialData.Farewell, "Tool Shed", 1, true), "the axe is one non-blocking hint, not a lesson")
 	end)
 
 	t.test("no Murph line is longer than 140 characters", function()
@@ -798,8 +845,8 @@ return function(t)
 		t.ok(not string.find(string.lower(plot.murph), "free"), "nothing is free: " .. plot.murph)
 		t.eq(at.plot, at.sell + 1, "right after the first sale")
 		t.ok(
-			at.plot < at.truck and at.truck < at.pad and at.pad < at.spawn and at.spawn < at.load,
-			"plot, box, pad, truck, load"
+			at.plot < at.place and at.place < at.truck and at.truck < at.pad and at.pad < at.spawn,
+			"plot, build, box, pad, truck"
 		)
 		-- Short of the price: back to the cart, and Murph says sell more.
 		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice - 1), "murphCart")
@@ -812,12 +859,9 @@ return function(t)
 		)
 	end)
 
-	t.test("saves in progress keep their place: the plot step moved nowhere, so nothing is remapped", function()
-		-- Same ids in the same order as the pad lesson's list, so an order-5 save needs no remap.
-		local before = TutorialData.OrderV2BeforePad
-		t.eq(before[1], "fell")
-		t.eq(TutorialData.OrderV2, 5)
-		local record = { tutorialOrder = 5, tutorialStep = 4, tutorialProgress = 0, tutorialDone = false }
+	t.test("saves in progress keep their place: an order-6 save needs no remap", function()
+		t.eq(TutorialData.OrderV2, 6)
+		local record = { tutorialOrder = 6, tutorialStep = 4, tutorialProgress = 0, tutorialDone = false }
 		TutorialData.ApplyOrder(record)
 		t.eq(record.tutorialStep, 4, "still on the plot step")
 		t.eq(V2[record.tutorialStep].id, "plot")

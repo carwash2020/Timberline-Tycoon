@@ -239,7 +239,7 @@ return function(t)
 				end
 			end
 		end
-		t.ok(seen.wood and seen.truckBed, "the drag and load steps point at wood and the bed")
+		t.ok(seen.wood, "the drag step points at wood (the load step is retired; QuestUI still finds a bed)")
 		t.ok(
 			seen.landOffice and seen.tree and seen.murphCart and seen.dealership,
 			"chop, sell at the cart, buy a plot at the Land Office, then buy the truck"
