@@ -42,6 +42,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (everything is on main; newest first)
 
+- (branch `claude/npc-heads`, not merged) NPC heads: `Shared/HeadLook` is the one tested head look-at (70 degree yaw, 35 pitch, smoothed; NPCController uses it). Part-built faces were already on -Z (spec-checked for all 13 NPCs). The Blender NPC meshes are inferred to face +Z (Blender -Y front exports to +Z), so `TownModels.NpcMeshYaw = math.pi` turns every NPC mesh piece half way; unverified in Studio, set it to 0 if the faces then look away.
 - #83 Murph's cart is gone; the first sale (`sell` step, still step 3 of 8) is at the sawmill's sell pad (beacon `sellPad`). Murph still pays $25 on it, the plot step $175. Economy headlines 61 s / 7.3 min / 13.1 min (the floor is 13) / 50.7 min / 30.4 h.
 - #79 the hammer and physical blueprints replace BUILD mode (BUILD_SYSTEM.md): blueprints are rolled plans you use to learn a building for good (`BlueprintBook`), the Hammer opens the list on click / RT / tap, pieces are placed, filled with wood, and moved/turned/sold with the hammer; saves migrate (`blueprintBook`, `blueprintItems`, `hammer`).
 - #82 real stores: designed boxes sized by item (`BoxSize`), bigger Tool Shed and Hearth & Home, doors that shut on the keeper's hours (`ShopDoorLogic`), the Dealership as an indoor showroom, and buying hands over a box you open (`BoxUnpack`).

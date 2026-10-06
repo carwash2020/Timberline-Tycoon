@@ -74,13 +74,18 @@ local function findPart(model: Model, name: string): BasePart?
 	return nil
 end
 
+-- The uploaded meshes' own front is +Z; turn each about its own vertical so
+-- the face is on -Z like the rig (TownModels.NpcMeshYaw). The cursor handed
+-- on to the next piece does not carry the turn.
+local FRONT = CFrame.Angles(0, TownModels.NpcMeshYaw, 0)
+
 -- Hang the mesh from `cursor` (its top, or its import pivot) and return
 -- the cursor at the mesh's bottom, in the same rotation.
 local function placeDown(part: MeshPart, cursor: CFrame): CFrame
 	if part:GetAttribute("MeshPivot") == "authored" then
-		part:PivotTo(cursor)
+		part:PivotTo(cursor * FRONT)
 	else
-		part.CFrame = cursor * CFrame.new(0, -part.Size.Y / 2, 0)
+		part.CFrame = cursor * CFrame.new(0, -part.Size.Y / 2, 0) * FRONT
 	end
 	local bottom = part.CFrame * CFrame.new(0, -part.Size.Y / 2, 0)
 	return CFrame.new(bottom.Position) * cursor.Rotation
@@ -88,9 +93,9 @@ end
 
 local function placeUp(part: MeshPart, cursor: CFrame)
 	if part:GetAttribute("MeshPivot") == "authored" then
-		part:PivotTo(cursor)
+		part:PivotTo(cursor * FRONT)
 	else
-		part.CFrame = cursor * CFrame.new(0, part.Size.Y / 2, 0)
+		part.CFrame = cursor * CFrame.new(0, part.Size.Y / 2, 0) * FRONT
 	end
 end
 
@@ -138,6 +143,11 @@ local function spanOf(byName: { [string]: MeshPart }): number
 		return 0
 	end
 	return maxY - minY
+end
+
+-- The turn each NPC mesh gets about its vertical so its face is on -Z.
+function NPCMeshes.FrontTurn(): number
+	return TownModels.NpcMeshYaw
 end
 
 -- True when every mesh loaded and the part look stepped aside.
