@@ -556,6 +556,18 @@ return function(t)
 		t.ok(total > 60, "the meadows aren't empty: " .. total)
 	end)
 
+	t.test("no grass or flower decor on a homestead pad or its inside edge", function()
+		local PlotData = t.shared("PlotData")
+		local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+		for _, slot in ipairs(PlotData.Slots) do
+			for dx = -half - 4, half + 4, 20 do
+				for dz = -half - 4, half + 4, 20 do
+					t.ok(EnvironmentData.DecorBlocked(slot.X + dx, slot.Y + dz), "decor is blocked on the pad")
+				end
+			end
+		end
+	end)
+
 	t.test("the water's edge: reeds on the bank, lily pads on still water, nothing on the river", function()
 		local kinds = {}
 		local function scan(cx0, cx1, cz0, cz1)

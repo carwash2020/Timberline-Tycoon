@@ -54,6 +54,7 @@ export type Deps = {
 	RoadSigns: (text: (biomeId: string) -> string) -> any,
 	GateSigns: (text: (biomeId: string) -> string) -> any,
 	LandmarkDiscs: () -> any,
+	BoulderClusters: () -> any,
 }
 
 local deps: Deps? = nil
@@ -501,8 +502,24 @@ function TreeFill.Extra(existing: { Spot }): { Spot }
 		table.insert(out, spot)
 		table.insert(taken, spot.position)
 	end
+	-- Last, with their own rng, so nothing above moves: trees round each pad.
+	for _, spot in ipairs(TreeFill.PlotRings(taken)) do
+		table.insert(out, spot)
+		table.insert(taken, spot.position)
+	end
 	return out
 end
+
+-- Trees round each homestead: a few clusters just past the pad's blend
+-- (PlotData.Blend, 56), leaning toward the side with the most forest. They
+-- are ordinary choppable trees of the region's woods, one regrow zone per
+-- cluster, kept off the pad, its blend, lanes and haul roads.
+TreeFill.PlotRingNear = 62 -- studs a ring tree keeps off a pad's edge (blend 56 + 6)
+TreeFill.PlotRingFar = 100 -- and the farthest a cluster's middle stands
+TreeFill.PlotRingMax = 12 -- trees round one pad, all clusters together
+TreeFill.PlotRingClusterRadius = 13
+local RING_CANDIDATES = 20
+local RING_APART = 34
 
 local function quiet(x: number, z: number, pad: number): boolean
 	for _, q in ipairs(QUIET) do
@@ -587,6 +604,114 @@ local function obstacleClear(x: number, z: number): boolean
 		end
 	end
 	return true
+end
+
+-- Up to PlotRingMax trees round each homestead pad, deterministic (its
+-- own Kit.rng). Returns them without touching `taken`.
+-- Ring trees also keep off the boulder clusters (placed against the first
+-- trees, so the rocks can't move: the trees give way).
+local clusterDiscs: { { number } }? = nil
+local function clusterList(): { { number } }
+	local cached = clusterDiscs
+	if cached then
+		return cached
+	end
+	local built: { { number } } = {}
+	local clusters = world().BoulderClusters() :: { { center: Vector3, radius: number } }
+	for _, c in ipairs(clusters) do
+		table.insert(built, { c.center.X, c.center.Z, c.radius + 10 })
+	end
+	clusterDiscs = built
+	return built
+end
+local function clusterClear(x: number, z: number): boolean
+	for _, d in ipairs(clusterList()) do
+		if within(x, z, d[1], d[2], d[3]) then
+			return false
+		end
+	end
+	return true
+end
+
+function TreeFill.PlotRings(taken: { Vector3 }): { Spot }
+	local rng = Kit.rng(hashString("plot rings"))
+	local out: { Spot } = {}
+	local mine: { Vector3 } = {}
+	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
+	local r = TreeFill.PlotRingClusterRadius
+	for index, slot in ipairs(PlotData.Slots) do
+		local cands: { { c: Vector2, score: number } } = {}
+		for _ = 1, RING_CANDIDATES do
+			local a = rng:range(0, math.pi * 2)
+			local dx, dz = math.cos(a), math.sin(a)
+			local reach = half + rng:range(TreeFill.PlotRingNear + r, TreeFill.PlotRingFar)
+			local s = reach / math.max(math.abs(dx), math.abs(dz))
+			local x, z = slot.X + dx * s, slot.Y + dz * s
+			if
+				math.abs(x) <= SCENERY_EDGE
+				and math.abs(z) <= SCENERY_EDGE
+				and quiet(x, z, 0)
+				and plotClear(x, z, TreeFill.PlotRingNear + 4)
+				and haulClear(x, z, 20)
+				and obstacleClear(x, z)
+				and clusterClear(x, z)
+				and TreeFill.Ground(x, z)
+			then
+				local cover = WorldLayout.ForestCover(x, z)
+				table.insert(cands, { c = Vector2.new(x, z), score = 0.3 + cover + rng:next() * 0.3 })
+			end
+		end
+		table.sort(cands, function(a, b)
+			return a.score > b.score
+		end)
+		local left = TreeFill.PlotRingMax
+		local centers: { Vector2 } = {}
+		for _, cand in ipairs(cands) do
+			if left <= 0 or #centers >= 4 then
+				break
+			end
+			local near = false
+			for _, c in ipairs(centers) do
+				if (c - cand.c).Magnitude < RING_APART then
+					near = true
+				end
+			end
+			if not near then
+				table.insert(centers, cand.c)
+				local want = math.min(left, math.clamp(math.floor(1.5 + cand.score * 2.5), 2, 5))
+				local zone: TreeZone = {
+					id = string.format("plot:%d:%d", index, #centers),
+					cx = cand.c.X,
+					cz = cand.c.Y,
+					radius = r,
+					cap = want,
+				}
+				local woods = woodsNear(cand.c)
+				local tries, placed = 0, 0
+				while placed < want and tries < want * 25 do
+					tries += 1
+					local a = rng:range(0, math.pi * 2)
+					local rr = math.sqrt(rng:next()) * r
+					local x, z = cand.c.X + math.cos(a) * rr, cand.c.Y + math.sin(a) * rr
+					if
+						quiet(x, z, 0) -- the phone discs' tree budget (see QUIET)
+						and plotClear(x, z, TreeFill.PlotRingNear)
+						and not takenNear(taken, x, z, TREE_GAP)
+						and clusterClear(x, z)
+						and not takenNear(mine, x, z, TREE_GAP)
+						and TreeFill.Ground(x, z)
+					then
+						local p = Vector3.new(x, TerrainGen.HeightAt(x, z) - 0.3, z)
+						table.insert(mine, p)
+						table.insert(out, { woodId = rng:pick(woods), position = p, biome = "wild", zone = zone })
+						placed += 1
+					end
+				end
+				left -= placed
+			end
+		end
+	end
+	return out
 end
 
 function TreeFill.ClumpCenterOk(x: number, z: number, centers: { Vector2 }): boolean
