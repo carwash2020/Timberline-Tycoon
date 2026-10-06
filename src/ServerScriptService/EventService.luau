@@ -27,6 +27,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EventData = require(ReplicatedStorage.Shared.EventData)
 local RateLimiter = require(script.Parent.RateLimiter)
+local TerrainBuilder = require(script.Parent.TerrainBuilder)
 
 local EventService = {}
 
@@ -74,6 +75,7 @@ function EventService.RefreshDecor()
 		return
 	end
 	local EventArt = require(ReplicatedStorage.Shared.Art.EventArt)
+	local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 	local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 	local folder = Instance.new("Folder")
 	folder.Name = "HalloweenDecor"
@@ -81,7 +83,21 @@ function EventService.RefreshDecor()
 	-- decoration only, so it never blocks a road or a truck).
 	for i, lamp in ipairs(WorldPlan.Town().lamps) do
 		local patch = EventArt.PumpkinPatch(i * 31)
-		patch:PivotTo(lamp * CFrame.new(2.4, 0, 0.8) * CFrame.Angles(0, math.rad(15 * ((i % 5) - 2)), 0))
+		-- placeAt, not PivotTo: a Model's pivot is its bounding box centre, so
+		-- PivotTo put the patch's middle (half a pumpkin up) on the ground.
+		Kit.placeAt(patch, lamp * CFrame.new(2.4, 0, 0.8) * CFrame.Angles(0, math.rad(15 * ((i % 5) - 2)), 0))
+		-- The drawn ground can sit above y = 0 (that sank them half into it):
+		-- probe under both pumpkins and stand the patch on the highest.
+		local lift = 0
+		for _, child in ipairs(patch:GetChildren()) do
+			if child:IsA("Model") then
+				local at = child:GetPivot().Position
+				lift = math.max(lift, TerrainBuilder.LiftOnto(at.X, 0, at.Z, 8))
+			end
+		end
+		if lift > 0.05 then
+			patch:PivotTo(patch:GetPivot() + Vector3.new(0, lift, 0))
+		end
 		patch.Parent = folder
 	end
 	folder.Parent = game:GetService("Workspace")

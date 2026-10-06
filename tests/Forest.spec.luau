@@ -1053,7 +1053,10 @@ return function(t)
 				local reachTop = Vector2.new(top.X, top.Z).Magnitude
 				local reachFoot = Vector2.new(foot.X, foot.Z).Magnitude
 				out += if reachTop > reachFoot then 1 else 0
-				t.ok(foot.Y < 0.05 and top.Y > 0.5, "rooted in the ground, standing up")
+				t.ok(
+					foot.Y < 0.05 and top.Y > 0.3 and top.Y < 1.3,
+					"rooted in the ground, standing up, knee height at most"
+				)
 			end
 			t.ok(out >= #blades - 1, out .. " of " .. #blades .. " blades lean outward")
 		end

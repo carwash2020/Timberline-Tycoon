@@ -514,7 +514,8 @@ end
 -- from one root, the tall middle ones lighter, the two tallest with a
 -- sunlit yellow-green tip (a little wedge over the blade's point, nudged
 -- forward so its faces never fight the blade's). Shadowless decoration.
-local TIP = hex("#E4E28C")
+local TIP = hex("#B9C486") -- muted: the old #E4E28C tips looked neon at night
+local TUFT_SCALE = 0.62 -- blades were up to 1.8 studs, over waist height
 function PropArt.GrassTuft(seed: number, color: Color3): Model
 	local model = Kit.model("GrassTuft")
 	local rng = Kit.rng(seed)
@@ -524,7 +525,7 @@ function PropArt.GrassTuft(seed: number, color: Color3): Model
 	local blades: { { h: number, cf: CFrame, size: Vector3 } } = {}
 	for i = 1, n do
 		local mid = 1 - math.abs(i - (n + 1) / 2) / ((n + 1) / 2) -- 1 in the middle, ~0 at the ends
-		local h = rng:range(0.7, 1.0) + mid * rng:range(0.5, 0.8)
+		local h = (rng:range(0.7, 1.0) + mid * rng:range(0.5, 0.8)) * TUFT_SCALE
 		local a = yaw + (i - (n + 1) / 2) * spread
 		local size = Vector3.new(rng:range(0.1, 0.13), h, rng:range(0.32, 0.46))
 		-- Rooted together, each leaning out along its own side of the fan.
@@ -547,7 +548,7 @@ function PropArt.GrassTuft(seed: number, color: Color3): Model
 			"BladeTip",
 			tip,
 			b.cf * CFrame.new(0, (b.size.Y - tip.Y) / 2, (b.size.Z - tip.Z) / 2 - 0.02),
-			Kit.vary(color:Lerp(TIP, 0.55), rng, 0.04),
+			Kit.vary(color:Lerp(TIP, 0.35), rng, 0.04),
 			Enum.Material.SmoothPlastic
 		)
 	end
@@ -1016,7 +1017,7 @@ export type Tints = {
 
 local TINTS: { [string]: Tints } = {
 	starter = {
-		grass = hex("#7CB850"),
+		grass = hex("#6C9A48"),
 		leaves = { hex("#5DA24A"), hex("#6FB352"), hex("#86BF57") },
 		flowers = { hex("#FFD84D"), hex("#FFFFFF"), hex("#F28AB0"), hex("#A98BE0") },
 		stone = STONE,

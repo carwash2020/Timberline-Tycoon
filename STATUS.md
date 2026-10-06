@@ -40,6 +40,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (newest first, PR numbers on main)
 
+- claude/fix-pumpkins-npcs (branch, no PR yet): pumpkin patches no longer half sunk (PivotTo on a bbox pivot), town decor lifted onto the drawn ground, `FacingLogic` for NPC facing plus a spec, forward walk lean, shorter and muted grass tufts. Night blue ground plane at spawn not reproduced; see PHASE2_NOTES.md.
 - Branch `claude/short-tutorial` (not yet a PR): the v2 tutorial is 8 steps (fell, drag, sell, plot, one build lesson, truck box, pad, spawn; the axe, mill and load steps are retired in `TutorialData.RetiredV2`, saves migrate forward in `ApplyOrder` order 6); `NoticePolicy` governs every toast (priorities, one non-critical at a time, cooldown, dedupe, quiet during the first-sale flow). Economy unchanged. Checks in PHASE2_NOTES.md.
 - claude/fix-felling (branch, not merged): trees fall where you cut them (stump stays rooted, only the trunk above the cut falls; was #36's "ground cut frees the whole section"), rigid fall with velocity caps, layered procedural fell sound (`FellSoundId` still overrides), swing pose re-applied pre-render with a tool-grip fallback. Checklist in PHASE2_NOTES.md.
 
