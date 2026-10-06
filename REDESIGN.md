@@ -118,7 +118,8 @@ when changing art.
   `SkyBin` (SurfaceGuis with a TextLabel each); the rest of the Sky Bin's
   art sits outside SellArea. The sawmill's `SawBlade` spins about its own
   X axis (tag `SawBlade`; its teeth are welded and unanchored: never
-  re-anchor them). Campfire `Flame` parts (tag `Flame`) flicker.
+  re-anchor them). TownFX turns it every frame by dt (TownMotion.BladeSpeed,
+  3 rad/s), not at the quality tier's cosmetic rate. Campfire `Flame` parts (tag `Flame`) flicker.
 - Gondola: models `GondolaTown`/`GondolaBase`/`GondolaTop`, each with a
   `Platform` (10x1x10, top at y 1); stations turn their open back (+Z)
   along the cable. Tags `CloudChute` (the 4x3x4 hopper; its flume runs
@@ -157,7 +158,12 @@ when changing art.
   `FieldGuideFigures`, `SettingMusic`, `SettingSfx`, `BedCount`,
   `BedCapacity`, `SkyBin`, `Biome`.
 - Lighting.ClockTime is set by every client each frame (LightingController,
-  from the server clock); the server never writes it.
+  from the server clock); the server never writes it. Players see the hour as
+  a 12-hour clock ("5:17 AM", `WorldTime.Format`); the clock runs 0-24 inside.
+  The owner's time tools (AdminService) add three workspace attributes,
+  `TimeAnchorReal`, `TimeAnchorGame`, `TimeSpeed` (1, 4, 20 or 60), that
+  `WorldTime.GameNow` / `WorldTime.Scaled` apply on top of the server clock.
+  They are server memory only: absent on a fresh server (real time).
 
 **WorldFX remote kinds** (server to clients; each takes a payload table)
 - Weather: `Lightning` {position, struck} and `LightningWarn` {position,

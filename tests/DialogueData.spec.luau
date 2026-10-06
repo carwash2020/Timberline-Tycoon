@@ -53,4 +53,15 @@ return function(t)
 		local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/DialogueUI.luau")
 		t.ok(string.find(ui, 'Net.Remote("BuyRobuxItem"):FireServer(robux.kind, robux.key)', 1, true) ~= nil)
 	end)
+
+	t.test("the card stands above Roblox's hotbar on every device", function()
+		-- UITheme.Bottom() is 82 (PC), 70 (phone), 106 (TV): the card clears each.
+		for _, bottom in ipairs({ 82, 70, 106 }) do
+			t.ok(DialogueData.CardBottom(bottom) >= bottom + 36, "clear of the hotbar at " .. bottom)
+		end
+		t.eq(DialogueData.CardBottom(-5), DialogueData.CardAboveHotbar, "a bad input never goes under")
+		local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/DialogueUI.luau")
+		t.ok(string.find(ui, "DialogueData.CardBottom(UITheme.Bottom())", 1, true) ~= nil, "the card uses it")
+		t.eq(string.find(ui, "1, -36", 1, true), nil, "the old fixed 36 px offset is gone")
+	end)
 end
