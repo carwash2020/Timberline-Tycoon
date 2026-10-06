@@ -190,18 +190,30 @@ function SawmillLogic.Toast(reason: string, mill: Mill?): string?
 	return nil
 end
 
-local function snap(v: number, lo: number, hi: number): number
-	local step = GameConfig.PlankStep
+-- The cut's step on this mill's panel, in u: the tier's own (finer on the
+-- higher tiers), or GameConfig.PlankStep for a mill without one.
+function SawmillLogic.StepOf(mill: Mill): number
+	local step = (mill :: any).step
+	if type(step) == "number" and step > 0 then
+		return step
+	end
+	return GameConfig.PlankStep
+end
+
+local function snap(v: number, lo: number, hi: number, step: number): number
 	local n = math.floor(v / step + 0.5) * step
 	n = math.floor(n * 1000 + 0.5) / 1000
 	return math.clamp(n, lo, hi)
 end
 
--- x and y in u, on the plank grid, inside this mill's cut.
+-- x and y in u, on this tier's grid, inside this mill's cut. A cut saved
+-- on the old 0.2 grid is still on every finer grid (0.1, 0.05), so a
+-- placed mill keeps its cut.
 function SawmillLogic.ClampSettings(mill: Mill, x: number, y: number): Settings
+	local step = SawmillLogic.StepOf(mill)
 	return {
-		x = snap(x, GameConfig.PlankMinX, mill.maxX),
-		y = snap(y, GameConfig.PlankMinY, mill.maxY),
+		x = snap(x, GameConfig.PlankMinX, mill.maxX, step),
+		y = snap(y, GameConfig.PlankMinY, mill.maxY, step),
 	}
 end
 
@@ -213,10 +225,11 @@ end
 -- One press of an X or Y button: `dir` is +1 or -1.
 function SawmillLogic.Step(mill: Mill, settings: Settings, axis: string, dir: number): Settings
 	local x, y = settings.x, settings.y
+	local step = SawmillLogic.StepOf(mill)
 	if axis == "x" then
-		x += dir * GameConfig.PlankStep
+		x += dir * step
 	elseif axis == "y" then
-		y += dir * GameConfig.PlankStep
+		y += dir * step
 	end
 	return SawmillLogic.ClampSettings(mill, x, y)
 end
@@ -389,8 +402,38 @@ function SawmillLogic.LimitText(mill: Mill): string
 	return string.format("Logs up to %.0f studs long and %.1f thick", mill.maxLength * u, mill.maxWidth * u)
 end
 
+-- "+22%": what this mill adds to a plank's sale value.
+function SawmillLogic.BonusText(mill: Mill): string
+	return string.format("+%d%%", math.floor((SellLogic.Bonus(mill.plankBonus) - 1) * 100 + 0.5))
+end
+
+-- "Mill (tier 3 of 5)": the label on the box, the shelf and the placer.
+function SawmillLogic.TierText(mill: Mill): string
+	return string.format("%s (tier %d of %d)", mill.tierName, mill.tier, #ItemCatalog.SawmillList())
+end
+
+-- "1.00 x 0.60 u": the cut as the panel and the board show it. Two
+-- decimals, because the top tier steps by 0.05.
+function SawmillLogic.SizeText(settings: Settings): string
+	return string.format("%.2f × %.2f u", settings.x, settings.y)
+end
+
+-- "up to 3.0 x 2.0 u in 0.1 steps": the limit beside the size.
+function SawmillLogic.RangeText(mill: Mill): string
+	return string.format("up to %.1f × %.1f u, steps of %s", mill.maxX, mill.maxY, tostring(SawmillLogic.StepOf(mill)))
+end
+
 function SawmillLogic.Detail(mill: Mill): string
-	return SawmillLogic.LimitText(mill) .. "\nPlanks sell for more than logs."
+	return mill.tierName
+		.. " mill. "
+		.. SawmillLogic.LimitText(mill)
+		.. "\nCut "
+		.. SawmillLogic.RangeText(mill)
+		.. (
+			if SellLogic.Bonus(mill.plankBonus) > 1
+				then "\nPlanks sell for " .. SawmillLogic.BonusText(mill) .. " more than a plain plank."
+				else "\nPlanks sell for more than logs."
+		)
 end
 
 -- A PlotLogic blueprint for a mill, so it places, moves and overlaps like
@@ -419,7 +462,7 @@ function SawmillLogic.Blueprint(id: string): PlotData.Blueprint?
 				material = "Wood",
 			},
 		},
-		note = SawmillLogic.LimitText(mill),
+		note = mill.tierName .. " mill. " .. SawmillLogic.LimitText(mill),
 	}
 end
 

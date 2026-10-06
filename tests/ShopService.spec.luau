@@ -850,4 +850,95 @@ return function(t)
 			poor.ShopService.ChargeAndGrant(poor.player, { uid = "bin-5", kind = "Machine", itemId = "SkyBin" })
 		t.eq({ no, why }, { false, "broke" })
 	end)
+
+	t.test(
+		"planers: the price is on the shelf, a box is paid for first and owed when opened, nothing goes to stock",
+		function()
+			local s = setup({ cash = 200000, loop = 2, claimed = true })
+			local want = { PlanerHand = 2500, PlanerBench = 9000, PlanerSteam = 30000, PlanerIndustrial = 95000 }
+			local n = 0
+			for id, price in pairs(want) do
+				n += 1
+				local before = s.profile.cash
+				-- Each is bought on its own profile, so the cap is not what this checks.
+				local fresh = setup({ cash = 200000, loop = 2, claimed = true })
+				local ok, line = fresh.ShopService.ChargeAndGrant(
+					fresh.player,
+					{ uid = "pl-" .. n, kind = "Machine", itemId = id, deferGrant = true }
+				)
+				t.eq({ ok, line }, { true, "thanks" }, id)
+				t.eq(200000 - fresh.profile.cash, price, id .. " costs its price")
+				t.eq(fresh.profile.sawmillStock, nil, "the box is handed over; nothing waits in stock")
+				t.ok(before > 0)
+			end
+		end
+	)
+
+	t.test("the shop refuses a planer box past the plot's cap, with the cash untouched", function()
+		local s = setup({ cash = 200000, loop = 2, claimed = true })
+		table.insert(s.profile.plot.placed, { uid = "p1", blueprintId = "PlanerHand", x = 0, z = 0, rot = 0 })
+		local ok = s.ShopService.ChargeAndGrant(s.player, { uid = "pl-a", kind = "Machine", itemId = "PlanerBench" })
+		t.eq(ok, true, "one placed, room for a second")
+		local cash = s.profile.cash
+		-- Now one placed and one box in hand (counted by BoxService): the cap.
+		s.ShopService.CountBoxes = function(_, test)
+			return if test("PlanerBench") then 1 else 0
+		end
+		local third, why =
+			s.ShopService.ChargeAndGrant(s.player, { uid = "pl-b", kind = "Machine", itemId = "PlanerSteam" })
+		t.eq({ third, why }, { false, "alreadyOwned" })
+		t.eq(s.profile.cash, cash, "nothing charged")
+		t.eq(
+			s.toasts[#s.toasts],
+			"You already have 2 planers (placed or waiting in a box). A plot only has room for that many."
+		)
+		-- Two placed: refused even with no boxes held.
+		local two = setup({ cash = 200000, loop = 2, claimed = true })
+		table.insert(two.profile.plot.placed, { uid = "a", blueprintId = "PlanerHand", x = 0, z = 0, rot = 0 })
+		table.insert(two.profile.plot.placed, { uid = "b", blueprintId = "PlanerSteam", x = 20, z = 0, rot = 0 })
+		local no =
+			two.ShopService.ChargeAndGrant(two.player, { uid = "pl-c", kind = "Machine", itemId = "PlanerIndustrial" })
+		t.eq(no, false)
+		-- A legacy planer sitting in stock counts too; the chop saw and belts are not limited.
+		local stocked = setup({ cash = 200000, loop = 2, claimed = true })
+		stocked.profile.sawmillStock = { "PlanerHand", "PlanerBench" }
+		t.eq(
+			stocked.ShopService.ChargeAndGrant(
+				stocked.player,
+				{ uid = "pl-d", kind = "Machine", itemId = "PlanerHand" }
+			),
+			false
+		)
+		t.eq(
+			stocked.ShopService.ChargeAndGrant(
+				stocked.player,
+				{ uid = "pl-e", kind = "Machine", itemId = "ConveyorStraight" }
+			),
+			true
+		)
+		t.eq(
+			stocked.ShopService.ChargeAndGrant(stocked.player, { uid = "pl-f", kind = "Machine", itemId = "ChopSaw" }),
+			true
+		)
+	end)
+
+	t.test("belts, planers and every sawmill tier are sold at their catalog price and need a plot", function()
+		local Catalog = t.shared("ItemCatalog")
+		for _, mill in ipairs(Catalog.SawmillList()) do
+			local s = setup({ cash = 200000, loop = 2, claimed = true })
+			local ok = s.ShopService.ChargeAndGrant(
+				s.player,
+				{ uid = "m-" .. mill.id, kind = "Sawmill", itemId = mill.id, deferGrant = true }
+			)
+			t.eq(ok, true, mill.id)
+			t.eq(200000 - s.profile.cash, mill.priceCash, mill.id)
+		end
+		local landless = setup({ cash = 200000, loop = 2 })
+		local ok, why = landless.ShopService.ChargeAndGrant(
+			landless.player,
+			{ uid = "x", kind = "Machine", itemId = "ConveyorTurn" }
+		)
+		t.eq({ ok, why }, { false, "needsLand" })
+		t.eq(landless.profile.cash, 200000)
+	end)
 end

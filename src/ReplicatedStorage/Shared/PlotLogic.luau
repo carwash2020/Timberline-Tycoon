@@ -10,6 +10,8 @@ local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local SawmillLogic = require(script.Parent.SawmillLogic)
 local SkyBinLogic = require(script.Parent.SkyBinLogic)
+local PlanerLogic = require(script.Parent.PlanerLogic)
+local AutomationLogic = require(script.Parent.AutomationLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
 type Blueprint = PlotData.Blueprint
@@ -38,6 +40,8 @@ function PlotLogic.Blueprint(id: string): Blueprint?
 		or SawmillLogic.Blueprint(id)
 		or ChopSawLogic.Blueprint(id)
 		or SkyBinLogic.Blueprint(id)
+		or PlanerLogic.Blueprint(id)
+		or AutomationLogic.Blueprint(id)
 end
 
 export type Rect = { x: number, z: number, w: number, d: number } -- centre + size

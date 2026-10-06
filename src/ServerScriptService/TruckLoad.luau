@@ -301,7 +301,9 @@ local function valueOf(model: Model): number
 		volumeOf(model),
 		attrString(model, "Figure"),
 		attrNumber(model, "Boost"),
-		model:GetAttribute("LuxCut") == true
+		model:GetAttribute("LuxCut") == true,
+		attrNumber(model, "MillBonus"),
+		attrNumber(model, "BoardBonus")
 	)
 end
 
@@ -887,6 +889,8 @@ function TruckLoad.SnapshotAt(model: Model, ref: CFrame, bedName: string): Saved
 		f = attrString(model, "Figure"),
 		x = if boost and boost > 1 then boost else nil,
 		l = if model:GetAttribute("LuxCut") == true then true else nil,
+		m = attrNumber(model, "MillBonus"),
+		d = attrNumber(model, "BoardBonus"),
 		bed = bedName,
 		at = LeftLoad.EncodeCFrame(ref:ToObjectSpace(root.CFrame)),
 		s = s,
@@ -1038,7 +1042,7 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 		return nil
 	end
 	local lux = saved.l == true
-	local value = SellLogic.PieceValue(wood.id, kind, volume, saved.f, saved.x, lux)
+	local value = SellLogic.PieceValue(wood.id, kind, volume, saved.f, saved.x, lux, saved.m, saved.d)
 	model:AddTag("Wood")
 	model:SetAttribute("Uid", uid)
 	model:SetAttribute("Owner", owner.UserId)
@@ -1054,6 +1058,12 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 	end
 	if lux then
 		model:SetAttribute("LuxCut", true)
+	end
+	if kind == "plank" and saved.m and saved.m > 1 then
+		model:SetAttribute("MillBonus", SellLogic.Bonus(saved.m))
+	end
+	if kind == "plank" and saved.d and saved.d > 1 then
+		model:SetAttribute("BoardBonus", SellLogic.Bonus(saved.d))
 	end
 	model:SetAttribute("HeldBy", 0)
 	model:PivotTo(cf)

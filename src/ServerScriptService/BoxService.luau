@@ -467,6 +467,13 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 	end)
 end
 
+-- The name on the box's label: the item's, with its tier under it (a sawmill
+-- or a planer, StoreStock.TierLabel).
+local function boxLabel(rec: Record): string
+	local tier = StoreStock.TierLabel(rec.itemKind, rec.itemId)
+	return if tier then rec.displayName .. "\n" .. tier else rec.displayName
+end
+
 function BoxService.Make(opts: MakeOptions): Record
 	local kind = opts.itemKind or "Axe"
 	local itemId = opts.itemId or "SteelAxe"
@@ -562,7 +569,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		relX = cf.Position.X - opts.counter.CFrame.Position.X
 	end
 	BoxArt.Dress(model, part, {
-		name = rec.displayName,
+		name = boxLabel(rec),
 		kind = rec.itemKind,
 		color = itemColor,
 		gold = robux ~= nil,
@@ -1009,7 +1016,7 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 		deferGrant = true, -- the buyer is handed the box; the item comes out when it is opened
 	})
 	if ok then
-		rec.pendingGrant = BoxUnpack.Mode(rec.itemKind) ~= "vehicle"
+		rec.pendingGrant = BoxUnpack.Mode(rec.itemKind, rec.itemId) ~= "vehicle"
 		rec.paid = true
 		rec.buyerId = player.UserId
 		rec.onShelf = false
@@ -1287,7 +1294,17 @@ function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 	if not ok or rec == nil then
 		return false, why
 	end
-	local mode = BoxUnpack.Mode(rec.itemKind)
+	local mode = BoxUnpack.Mode(rec.itemKind, rec.itemId)
+	if mode == "place" and BoxUnpack.Owed(rec.pendingGrant) then
+		-- Sawmills, planers and belts: opening starts a placement ghost on the
+		-- player's plot. The box is NOT spent here: placing spends it
+		-- (BoxService.SpendForPlacement, from PlotService.Place), cancelling
+		-- keeps it. A box from before this flow has nothing owed (its sawmill was
+		-- granted into stock at the counter): it opens as it always did, below.
+		BoxService.OnPlace(player, rec.uid, rec.itemId)
+		BoxService.Toast(player, BoxUnpack.OpenedLine(mode, rec.displayName))
+		return true, nil
+	end
 	if mode == "vehicle" then
 		local VehicleService = require(script.Parent.VehicleService)
 		local placed = VehicleService.TryPlaceFromBox(player, rec)
@@ -1314,6 +1331,55 @@ function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 	end
 	poof(rec)
 	return true, nil
+end
+
+-- How many paid, unopened boxes `userId` holds whose item passes `test`
+-- (the shop counts planer boxes against the per-plot cap with it).
+function BoxService.CountUnopened(userId: number, test: (string) -> boolean): number
+	local n = 0
+	for _, rec in pairs(records) do
+		if rec.paid and not rec.opened and rec.buyerId == userId and test(rec.itemId) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- Tells the buyer's client to start the one-time placement ghost for a box
+-- (GameServer wires this to WorldFX "PlaceBox"). A spec swaps it.
+BoxService.OnPlace = function(_player: Player, _uid: string, _itemId: string) end
+
+-- Whether `uid` is a paid, unopened box of `itemId` that `player` bought and
+-- still holds: what PlotService.Place needs before it builds from a box.
+function BoxService.ReadyForPlacement(player: Player, uid: unknown, itemId: string): boolean
+	if type(uid) ~= "string" then
+		return false
+	end
+	local rec = records[uid]
+	if rec == nil or not rec.paid or rec.opened or rec.buyerId ~= player.UserId then
+		return false
+	end
+	if rec.itemId ~= itemId or not BoxUnpack.Owed(rec.pendingGrant) then
+		return false
+	end
+	return BoxUnpack.Mode(rec.itemKind, rec.itemId) == "place"
+end
+
+-- Spends the box once its item is placed: owed no more, gone from the save's
+-- storage, folded away. Returns false (and spends nothing) if it is not ready.
+function BoxService.SpendForPlacement(player: Player, uid: unknown, itemId: string): boolean
+	if not BoxService.ReadyForPlacement(player, uid, itemId) then
+		return false
+	end
+	local rec = records[uid :: string]
+	if rec == nil then
+		return false
+	end
+	rec.opened = true
+	rec.pendingGrant = false
+	dropStorage(player, rec.uid)
+	poof(rec)
+	return true
 end
 
 function onBoxOpen(player: Player, action: unknown)
@@ -1420,7 +1486,7 @@ function BoxService.Restore(player: Player, profile: any)
 			rec.onShelf = false
 			-- Saved with `pending`: the item is still in the box. Older saves
 			-- have no mark: their item was granted at the counter.
-			rec.pendingGrant = entry.pending == true and BoxUnpack.Mode(rec.itemKind) ~= "vehicle"
+			rec.pendingGrant = entry.pending == true and BoxUnpack.Mode(rec.itemKind, rec.itemId) ~= "vehicle"
 		end
 	end
 	BoxService.RefreshPrompts()
@@ -1617,6 +1683,10 @@ local function wire()
 end
 
 function BoxService.Init(remoteEvent: RemoteEvent?)
+	pcall(function()
+		local shop = require(script.Parent.ShopService)
+		shop.CountBoxes = BoxService.CountUnopened
+	end)
 	if not bound and remoteEvent ~= nil then
 		bound = true
 		remoteEvent.OnServerEvent:Connect(onBoxOpen)

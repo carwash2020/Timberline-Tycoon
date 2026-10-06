@@ -49,6 +49,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	BoxOpen = 4, -- open a box you own
 	BoxTake = 4, -- pick up the item that came out of a box (a prompt, not a remote)
 	SpawnPadPress = 1, -- the button on a vehicle pad
+	PlanerSet = 6, -- one step of a placed planer's size setting (PlanerService); same budget as SawmillSet
 	ChopSawSet = 6, -- one step of a chop saw's cut; same budget as SawmillSet
 	ExpandLand = 1, -- buy the next plot square
 	SetPermission = 4, -- one flag for one visitor

@@ -316,6 +316,39 @@ ConveyorSpeed = 4, LogicEvalsPerTick = 200, LogicTickSec = 0.1, MaxConveyorsPerP
 
 ---
 
+### 2h. Mill tiers, planers and belts (6 October 2026, `claude/mill-tiers`)
+
+Connor: "create different versions of the sawmill ... they progress in cost but also upgrade how much you get from the sold items", then planers, conveyors, and "an object in a box: you buy the box, open it, and the object is placed down as a one-time use".
+
+**Sawmills** (`ItemCatalog.Sawmills`, the ids and prices are unchanged). A mill stamps its `plankBonus` on every plank it cuts (`Piece.mill`, attribute `MillBonus`); `SellLogic.PieceValue` multiplies a plank's value by it, server-side only. A plank cut again keeps the higher of the old and the new stamp. A piece with no stamp (a log, an old plank, an old Sky Bin entry or truck-load piece) is 1.0. Stamps are clamped to 1 to `SellLogic.BonusCap` (3), so a hand-edited save can't print money.
+
+| Tier | id | Label | Price | plankBonus | Cut step (u) | Max cut X by Y (u) | Belt feed (u³/min) |
+|---|---|---|---|---|---|---|---|
+| 1 | SawmillRickety | Rickety | $130 | 1.00 | 0.2 | 1.8 x 1.2 | 6 |
+| 2 | SawmillSturdy | Sturdy | $1,600 | 1.10 | 0.2 | 2.4 x 1.6 | 14 |
+| 3 | Millmaster100 | Mill | $11,000 | 1.22 | 0.1 | 3.0 x 2.0 | 30 |
+| 4 | Millmaster200 | Steam | $22,500 | 1.36 | 0.1 | 3.0 x 2.6 | 60 |
+| 5 | Millmaster200L | Industrial | $86,500 | 1.50 | 0.05 | 3.0 x 2.6 (18.9 u long) | 110 |
+
+**Planers** (`ItemCatalog.Machines`, `Shared/PlanerLogic`, `PlanerService`). A plank in, a finished board out: the SAME piece, planed down to the setting and stamped with `boardBonus` (`Piece.board`, attributes `BoardBonus` and `Finished`). A plank bigger than the setting is planed down (the shavings are lost, so the board is smaller); one smaller than the setting is refused, never grown. A finished board is refused (the bonus never stacks). Sale value = volume x plank price x figure x boost x Lux x `mill` x `board`.
+
+| Tier | id | Label | Price | boardBonus | Step (u) | Setting range X by Y (u) | Longest plank (u) | Belt feed (u³/min) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | PlanerHand | Hand | $2,500 | 1.20 | 0.2 | 0.6-1.8 by 0.4-1.2 | 10.9 | 8 |
+| 2 | PlanerBench | Bench | $9,000 | 1.40 | 0.2 | 0.6-2.4 by 0.4-1.6 | 10.9 | 18 |
+| 3 | PlanerSteam | Steam | $30,000 | 1.65 | 0.1 | 0.6-3.0 by 0.4-2.0 | 10.9 | 40 |
+| 4 | PlanerIndustrial | Industrial | $95,000 | 2.00 | 0.05 | 0.6-3.0 by 0.4-2.6 | 18.9 | 80 |
+
+A top-tier board is worth 1.5 x 2.0 = 3.0 x a plain plank (and a plank is worth 2.5 x the log). Limits per plot: **2 planers**, the owner's only (a plot with more is a factory, not a plot you tend; the shop refuses a box past the cap and the placer refuses a placing past it, whichever comes first) and **150 belt pieces** (`GameConfig.MaxConveyorsPerPlot`).
+
+**Adjustable output size.** Every mill and planer has an X by Y setting in steps of its own tier's step (finer on the higher tiers) and inside its own limits (wider on the higher tiers); the panel (board on the machine and the screen panel) shows the size and the limit ("up to 1.8 x 1.2 u, steps of 0.2"). `SawmillSet` / `PlanerSet` are one step per press, owner only, standing at the machine, rate limited (RateLimiter), clamped on the server and saved in `PlacedItem.data = { x, y }`; a saved setting is clamped again on every load, and a cut saved on the old 0.2 grid is a legal cut on every finer grid. Plank LENGTH is not adjustable: it is the log's, up to the mill's `maxLength` (no design for it yet). A plank's value follows its volume x the tier bonus, so a bigger or smaller cut changes how many planks a log makes, never the price per u³.
+
+**Boxes, one use.** Sawmills, planers and belt pieces are bought as a box at the Tool Shed. Opening the box starts a placement ghost on your plot (`BoxUnpack` mode "place", `BoxService.OnPlace`, WorldFX "PlaceBox"); confirming sends `PlaceBlueprint(id, x, z, rot, y, boxUid)` and `PlotService.Place` checks the box (`BoxService.ReadyForPlacement`: paid, unopened, yours, the right item), runs the usual placing checks, and only then spends it (`SpendForPlacement`: owed no more, gone from `profile.storage`, folded away). Cancelling or a refused placing keeps the box. There is no hammer stock, no blueprint-book entry and no re-boxing. The hammer can still **move and turn** a placed one, and **sell it back for half** (the item is gone, not boxed). Old saves with a sawmill in `sawmillStock` keep working: the stock path is still read by `PlotService.Place` (nothing is migrated or lost). The Sky Bin and the chop saw keep their hammer flow.
+
+**Economy (V2_PLAN §17).** This is a late-game sink and the early ladder is untouched: no price, reward or wood number moved. `tools/economy` does not buy planers or belts and prices every plank at the plain plan price, so the strict ranges hold (first sale 68 s, Steel Axe 7.9 min, first $1k 13.7 min, Cobalt 51.4 min, full plot 30.5 h). I tried modelling the bonus (the best mill owned multiplies plank prices): at 1.0 to 1.5 the full plot falls to 20.8 h (outside 28-36 h), at 1.0 to 1.25 to 24.6 h, at 1.0 to 1.15 to 26.4 h, and only a top bonus of about 1.05 stays in range. So the bonus is NOT modelled and the real endgame is faster than the model says for a player who mills everything on the top mill; whether to lower the bonuses is Connor's call (they are one column in `ItemCatalog.Sawmills` and `.Machines`).
+
+**Automation (what is built).** See §10.
+
 ## 3. Section trees (M1): bigger, remodelled, cut anywhere
 
 ### 3a. Sizes and art spec per wood
@@ -763,7 +796,7 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 
 ## 7. Sawmills and planks (M2.2)
 
-- Bought as a box, placed on your plot as a `PlacedItem { blueprintId = "SawmillRickety", data = { x = 1.0, y = 0.6 } }`. `ProfileSchema.PlacedItem` gains an optional `data`.
+- Bought as a box, opened into a one-time placement ghost (§2h), placed on your plot as a `PlacedItem { blueprintId = "SawmillRickety", data = { x = 1.0, y = 0.6 } }`. `ProfileSchema.PlacedItem` gains an optional `data`.
 - `Art/MachineArt.luau` (new): five sawmill models, each with `Intake` (zone), `Output` (CFrame) and a `Panel` SurfaceGui with X+/X-/Y+/Y- buttons that fire `SawmillSet(uid, axis, dir)` (owner or permitted, in range).
 - `SawmillService` polls each intake every 0.25 s. `SawmillLogic.Accepts(piece, mill)`: a straight chain (every section within 12° of the first; no branches), total length ≤ maxLength x U, thickness ≤ maxWidth x U, volume ≥ one 0.2u plank.
   - It anchors the log and tweens it through over 1-3 s by volume, destroys it, and emits planks one at a time.
@@ -819,6 +852,12 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 - `SSS/LogicService`, a wiring tool, and the Sparkworks shop at the east docks (moving behind the ferry in M6).
 - Caps per plot (§2f). Runs online only (GAME_DESIGN §9).
 
+### 10a. What is built of the conveyors (6 October 2026)
+
+Audit before the work: `GameConfig.ConveyorSpeed` / `MaxConveyorsPerPlot` existed as numbers only; the sawmill's own belt (its `Conveyor` part in the `MillBelt` collision group, aimed by `MachineArt.AimBelt`) and the chop saw's push were the only moving belts. `LogicService`, `WireLogic` and `WireToolLogic` exist (logic items and wires) but nothing connects them to belts. There is no `PlotSave` (loose wood on a plot is not saved; only truck loads are), no sweeper, no Sparkworks shop.
+
+Built: the belt kit (`ConveyorStraight` $80, `ConveyorTurn` $100, `ConveyorFunnel` $60: the §10 prices, boxed one-time placements, `Shared/AutomationLogic`, `MachineArt.BuildBelt`, `BeltService`). Belt parts are anchored troughs named `Conveyor` in the `MillBelt` group with an `AssemblyLinearVelocity` of dir x `ConveyorSpeed` (4 studs/s); each part is aimed along its own front, a turn piece has three. A belt placed against a mill's back (same turn) delivers into its intake; a mill's or planer's outfeed lands on a belt placed in front (planks leave from the Output's height). Rules (`AutomationLogic`, pure): belts run only while the owner is online and the owner has fewer than 60 loose planks and boards (the Warehouse stand-in: the Warehouse is a placeholder building with no storage yet); a belt-fed piece (untouched for 4 s) is refused if it is rare (Lumenwood, Phantomwood), figured, an Elder or Lux, or not the machine owner's; a machine takes belt-fed pieces only while its throughput bucket has room (the tier's `autoRate` in u³/min, long-run exact whatever the piece size); hand-fed pieces are never capped. Not built (M5 follow-up): the logic network (levers, buttons, sensors, sorting, the Wood Detector filter), the sweeper, tilted belts and switches, supports, belts between plots, saving loose wood on a plot, a real Warehouse inventory.
+
 ## 11. Gates, hazards, quest axe (M6)
 
 - **Toll bridge** where the north road crosses the river: $100 for 3 minutes, Old Tolly. It is the gate to the Snowfields and the Volcano. Raising it pushes players and vehicles off.
@@ -838,6 +877,7 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 | Grab / Release | C→S (part, hitPos) / (part) | 6 / 6 | M1.4 |
 | Dialogue | C→S ("open", npcId) or ("pick", nodeId, i); S→C (npcId, node) | 4 | M2.1 |
 | SawmillSet | C→S (uid, "x" or "y", ±1) | 6 | M2.2 |
+| PlanerSet | C→S (uid, "x" or "y", ±1) | 6 | mill tiers (§2h) |
 | BuyLand / ExpandLand | C→S (slot) / (x, z) | 1 / 1 | M3.1 |
 | SetPermission | C→S (userId, flag, on) | 4 | M3.3 |
 | Wire | C→S (fromUid, port, toUid, port) or ("cut", uid) | 4 | M5 |

@@ -32,6 +32,7 @@ local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -799,6 +800,12 @@ end
 -- the box is opened (small things first appear as a pickup, BoxUnpack).
 local delivered: { [string]: boolean } = {}
 
+-- Unopened boxes a player holds whose item passes `test`. BoxService sets this
+-- when it starts (it requires this module, so this module can't require it).
+ShopService.CountBoxes = function(_userId: number, _test: (string) -> boolean): number
+	return 0
+end
+
 function ShopService.ResetDeliveries()
 	table.clear(delivered)
 end
@@ -909,6 +916,21 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 			return fail("locked")
 		end
 		local refusal = ShopLogic.MachineRefusal(box.itemId, SkyBinLogic.Owns(SkyBinLogic.HoldingsOf(profile)))
+		if refusal == nil and PlanerLogic.IsPlaner(box.itemId) then
+			-- A plot holds at most PlanerLogic.MaxPerPlot planers: placed, kept in
+			-- the save, or boxes in hand (this box is not counted yet).
+			local plot = if type(profile.plot) == "table" then profile.plot else nil
+			local boxed = 0
+			boxed = ShopService.CountBoxes(player.UserId, function(id: string): boolean
+				return PlanerLogic.IsPlaner(id)
+			end)
+			refusal = PlanerLogic.ShopRefusal(box.itemId, {
+				placed = if plot then plot.placed else nil,
+				stock = profile.sawmillStock,
+				storage = nil, -- boxes kept in the save are counted by the live boxes once restored
+				boxed = boxed,
+			})
+		end
 		if refusal then
 			notify(player, refusal)
 			return fail("alreadyOwned")

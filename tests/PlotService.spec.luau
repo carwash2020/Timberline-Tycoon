@@ -223,6 +223,16 @@ return function(t)
 						model.Name = "SkyBin"
 						return model
 					end,
+					BuildPlaner = function(id)
+						local model = Instance.new("Model")
+						model.Name = id
+						return model
+					end,
+					BuildBelt = function(id)
+						local model = Instance.new("Model")
+						model.Name = id
+						return model
+					end,
 					SetCut = function(model, x, y)
 						model:SetAttribute("CutShown", string.format("%.1f %.1f", x, y))
 					end,
@@ -1856,4 +1866,173 @@ return function(t)
 		t.eq(ann.attrs.Picking, true)
 		t.eq(s.prompt.ActionText, "Buy a plot")
 	end)
+
+	-- Boxes, as BoxService would answer: a box is ready for one itemId and one buyer, once.
+	local function fakeBoxes(s, boxes)
+		s.P.Boxes = {
+			ready = function(player, uid, itemId)
+				local box = boxes[uid]
+				return box ~= nil and not box.spent and box.buyer == player.UserId and box.itemId == itemId
+			end,
+			spend = function(player, uid, itemId)
+				local box = boxes[uid]
+				if box == nil or box.spent or box.buyer ~= player.UserId or box.itemId ~= itemId then
+					return false
+				end
+				box.spent = true
+				return true
+			end,
+		}
+	end
+
+	t.test("a box: opened, placed and spent in one go: no stock, no cash, the box is gone", function()
+		local s = setup({ cash = 500 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local boxes = {
+			["box-mill"] = { buyer = 1, itemId = "Millmaster100" },
+			["box-planer"] = { buyer = 1, itemId = "PlanerBench" },
+			["box-belt"] = { buyer = 1, itemId = "ConveyorStraight" },
+		}
+		fakeBoxes(s, boxes)
+		-- No box uid: it is a box at the Tool Shed, nothing is placed or charged.
+		s.P.Place(ann, "Millmaster100", 0, 0, 0)
+		t.eq(#profile.plot.placed, 0)
+		t.eq(s.lastToast(), "Buy the Millmaster 100 at the Tool Shed first.")
+		-- A box for a different item doesn't do.
+		s.P.Place(ann, "Millmaster100", 0, 0, 0, nil, "box-planer")
+		t.eq(#profile.plot.placed, 0, "the wrong box")
+		t.eq(boxes["box-planer"].spent, nil)
+		-- The right box places it, free, and is spent.
+		s.P.Place(ann, "Millmaster100", 0, 0, 0, nil, "box-mill")
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.plot.placed[1].blueprintId, "Millmaster100")
+		t.eq(profile.cash, 500, "already paid at the counter")
+		t.eq(boxes["box-mill"].spent, true)
+		t.eq(profile.plot.placed[1].data, { x = 1, y = 0.6 })
+		t.eq(profile.sawmillStock, {}, "no stock list involved")
+		-- The same box again is gone: one use.
+		s.P.Place(ann, "Millmaster100", 0, 20, 0, nil, "box-mill")
+		t.eq(#profile.plot.placed, 1)
+		-- A planer and a belt, the same way, each with their own box.
+		s.P.Place(ann, "PlanerBench", 0, 20, 0, nil, "box-planer")
+		s.P.Place(ann, "ConveyorStraight", 30, 0, 0, nil, "box-belt")
+		t.eq(#profile.plot.placed, 3)
+		t.eq(profile.cash, 500)
+		local planer = profile.plot.placed[2]
+		t.eq(planer.data, { x = 1, y = 0.6 }, "a planer starts at the default setting")
+		t.eq(#s.items(1), 3)
+	end)
+
+	t.test("a refused placing keeps the box: cancelling and blocked spots cost nothing", function()
+		local s = setup({ cash = 500 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local boxes =
+			{ ["box-1"] = { buyer = 1, itemId = "PlanerHand" }, ["box-2"] = { buyer = 1, itemId = "PlanerHand" } }
+		fakeBoxes(s, boxes)
+		s.P.Place(ann, "PlanerHand", 0, 0, 0, nil, "box-1")
+		t.eq(#profile.plot.placed, 1)
+		-- Right on top of it: refused, the second box is not spent.
+		s.P.Place(ann, "PlanerHand", 0, 0, 0, nil, "box-2")
+		t.eq(#profile.plot.placed, 1)
+		t.eq(s.lastToast(), "Something's in the way.")
+		t.eq(boxes["box-2"].spent, nil)
+		-- Off the plot: refused, not spent.
+		s.P.Place(ann, "PlanerHand", 400, 0, 0, nil, "box-2")
+		t.eq(boxes["box-2"].spent, nil)
+		-- Somewhere free: placed, spent.
+		s.P.Place(ann, "PlanerHand", 0, 12, 0, nil, "box-2")
+		t.eq(boxes["box-2"].spent, true)
+	end)
+
+	t.test("planers: two to a plot, the owner's only; the third box is refused and kept", function()
+		local s = setup({ cash = 500 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local boxes = {}
+		for i = 1, 4 do
+			boxes["a" .. i] = { buyer = 1, itemId = "PlanerHand" }
+		end
+		boxes.bob = { buyer = 2, itemId = "PlanerHand" }
+		fakeBoxes(s, boxes)
+		s.P.Place(ann, "PlanerHand", 0, 0, 0, nil, "a1")
+		s.P.Place(ann, "PlanerHand", 0, 12, 0, nil, "a2")
+		t.eq(#profile.plot.placed, 2)
+		s.P.Place(ann, "PlanerHand", 0, 24, 0, nil, "a3")
+		t.eq(#profile.plot.placed, 2, "a plot has room for two planers")
+		t.eq(s.lastToast(), "A plot has room for 2 planers. Take one apart first.")
+		t.eq(boxes.a3.spent, nil, "and the box is kept")
+		-- A visitor with build rights can't put a planer on your plot.
+		profile.permissions = { anyone = { build = true } }
+		bob.standOn(1)
+		s.P.Place(bob, "PlanerHand", 30, 0, 0, nil, "bob")
+		t.eq(#profile.plot.placed, 2)
+		t.eq(s.lastToast(), "Only the plot's owner can put a planer down.")
+		t.eq(boxes.bob.spent, nil)
+		-- Someone else's box id is no good to you.
+		s.P.Place(ann, "PlanerHand", 30, 0, 0, nil, "bob")
+		t.eq(boxes.bob.spent, nil)
+		t.ok(bobProfile ~= nil)
+		-- Taking one apart (selling it back for half) frees the room.
+		local uid = profile.plot.placed[1].uid
+		s.P.Sell(ann, uid)
+		t.eq(#profile.plot.placed, 1)
+		s.P.Place(ann, "PlanerHand", 0, 24, 0, nil, "a3")
+		t.eq(#profile.plot.placed, 2)
+		t.eq(profile.sawmillStock, {}, "a planer never goes back to stock: the box was one use")
+	end)
+
+	t.test("belts: owner only, one box to a piece, capped at MaxConveyorsPerPlot", function()
+		local s = setup({ cash = 500 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local boxes = { b1 = { buyer = 1, itemId = "ConveyorStraight" }, b2 = { buyer = 1, itemId = "ConveyorTurn" } }
+		fakeBoxes(s, boxes)
+		-- A plot already holding the cap's worth of belts takes no more (and keeps the box).
+		for i = 1, s.config.MaxConveyorsPerPlot do
+			table.insert(
+				profile.plot.placed,
+				{ uid = "belt" .. i, blueprintId = "ConveyorStraight", x = -1000, z = 0, rot = 0 }
+			)
+		end
+		s.P.Place(ann, "ConveyorTurn", 0, 0, 0, nil, "b2")
+		t.eq(s.lastToast(), "A plot has room for 150 belt pieces.")
+		t.eq(boxes.b2.spent, nil)
+		t.eq(#profile.plot.placed, s.config.MaxConveyorsPerPlot)
+	end)
+
+	t.test(
+		"an old save with a sawmill in stock still places it from stock (the legacy path), and keeps its cut",
+		function()
+			local s = setup({ cash = 200 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			profile.sawmillStock = { "Millmaster200" }
+			s.claim(ann, 1)
+			ann.standOn(1)
+			fakeBoxes(s, {})
+			s.P.Place(ann, "Millmaster200", 0, 0, 0)
+			t.eq(#profile.plot.placed, 1, "no box needed: the stock is honoured")
+			t.eq(profile.sawmillStock, {})
+			-- A saved cut from before finer steps is kept; a planer's saved setting is clamped to its tier.
+			local old = setup()
+			local bob, bobProfile = old.newPlayer(2, "Bob")
+			bobProfile.plot.claimed = true
+			bobProfile.plot.placed = {
+				{ uid = "m", blueprintId = "Millmaster100", x = 0, z = 0, rot = 0, data = { x = 1.2, y = 0.8 } },
+				{ uid = "p", blueprintId = "PlanerHand", x = 20, z = 0, rot = 0, data = { x = 99, y = -4 } },
+				{ uid = "q", blueprintId = "PlanerBench", x = 40, z = 0, rot = 0 },
+			}
+			old.P.PlayerJoined(bob, bobProfile)
+			old.P.Pass(bob)
+			t.eq(bobProfile.plot.placed[1].data, { x = 1.2, y = 0.8 }, "a placed mill keeps its cut")
+			t.eq(bobProfile.plot.placed[2].data, { x = 1.8, y = 0.4 }, "clamped to the Hand Planer's range")
+			t.eq(bobProfile.plot.placed[3].data, { x = 1, y = 0.6 }, "none saved: the default")
+		end
+	)
 end

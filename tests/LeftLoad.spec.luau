@@ -246,4 +246,21 @@ return function(t)
 			t.eq(model:GetAttribute("Value"), 7, "keeps its saved worth")
 		end
 	end)
+
+	t.test("a plank's mill and planer bonuses survive a save; old pieces and junk stamps read as 1.0", function()
+		local stamped = LeftLoad.CleanPiece(piece(1, { k = "plank", m = 1.36, d = 1.65 }), isWood)
+		t.eq(stamped.m, 1.36)
+		t.eq(stamped.d, 1.65)
+		local old = LeftLoad.CleanPiece(piece(1, { k = "plank" }), isWood)
+		t.eq(old.m, nil, "an old save has no stamp: it is 1.0")
+		t.eq(old.d, nil)
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 1 }), isWood).m, nil, "1.0 is not kept")
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 0.2, d = -4 }), isWood).m, nil)
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 0 / 0 }), isWood).m, nil)
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "plank", m = 99 }), isWood).m, 3, "capped like SellLogic.Bonus")
+		t.eq(LeftLoad.CleanPiece(piece(1, { k = "log", m = 1.5, d = 2 }), isWood).m, nil, "a log has no bonus")
+		-- Cleaning twice changes nothing.
+		local again = LeftLoad.CleanPiece(stamped, isWood)
+		t.eq({ again.m, again.d }, { 1.36, 1.65 })
+	end)
 end

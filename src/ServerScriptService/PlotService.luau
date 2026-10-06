@@ -35,6 +35,7 @@ local RunService = game:GetService("RunService")
 
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
+local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
@@ -45,6 +46,7 @@ local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
+local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local PlotFill = require(script.Parent.PlotFill)
@@ -427,6 +429,8 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		then MachineArt.Build(item.blueprintId, false)
 		elseif ChopSawLogic.Blueprint(item.blueprintId) then MachineArt.BuildChopSaw(false)
 		elseif SkyBinLogic.IsBin(item.blueprintId) then MachineArt.BuildSkyBin(false)
+		elseif PlanerLogic.IsPlaner(item.blueprintId) then MachineArt.BuildPlaner(item.blueprintId, false)
+		elseif AutomationLogic.IsBelt(item.blueprintId) then MachineArt.BuildBelt(item.blueprintId, false)
 		else BlueprintModels.Build(bp, false)
 	if not model then
 		return
@@ -466,7 +470,22 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		item.data = settings
 		model:SetAttribute("CutX", settings.x)
 		model:SetAttribute("CutY", settings.y)
-		MachineArt.SetCut(model, settings.x, settings.y)
+		MachineArt.SetCut(model, settings.x, settings.y, SawmillLogic.RangeText(mill))
+	end
+	local _planerMachine, planer = PlanerLogic.Get(item.blueprintId)
+	if planer then
+		-- A saved setting is clamped to its tier on every load (a hand-edited or
+		-- older save can't exceed the range); none saved means the default.
+		local saved = item.data
+		local settings = if saved
+				and type(saved.x) == "number"
+				and type(saved.y) == "number"
+			then PlanerLogic.Clamp(planer, saved.x, saved.y)
+			else PlanerLogic.Default(planer)
+		item.data = settings
+		model:SetAttribute("CutX", settings.x)
+		model:SetAttribute("CutY", settings.y)
+		MachineArt.SetCut(model, settings.x, settings.y, PlanerLogic.RangeText(planer))
 	end
 	if ChopSawLogic.Blueprint(item.blueprintId) then
 		local saved = item.data
@@ -1184,7 +1203,32 @@ local function tellHammer(slot: Slot, who: Player, item: PlotLogic.Placed)
 	end
 end
 
-function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
+-- Where a box's placing is checked and spent. BoxService by default; a spec
+-- swaps it (PlotService does not require BoxService at load).
+PlotService.Boxes = {
+	ready = function(player: Player, uid: unknown, itemId: string): boolean
+		local ok, boxes = pcall(function(): any
+			return require(script.Parent.BoxService)
+		end)
+		return ok and boxes ~= nil and boxes.ReadyForPlacement(player, uid, itemId) == true
+	end,
+	spend = function(player: Player, uid: unknown, itemId: string): boolean
+		local ok, boxes = pcall(function(): any
+			return require(script.Parent.BoxService)
+		end)
+		return ok and boxes ~= nil and boxes.SpendForPlacement(player, uid, itemId) == true
+	end,
+}
+
+function PlotService.Place(
+	player: Player,
+	blueprintId: unknown,
+	x: unknown,
+	z: unknown,
+	rot: unknown,
+	y: unknown,
+	boxUid: unknown
+)
 	if
 		type(blueprintId) ~= "string"
 		or not isNumber(x)
@@ -1209,6 +1253,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	end
 	-- A Sky Bin is the owner's, one per plot: a visitor can't spend theirs here.
 	local binRefusal = SkyBinLogic.PlaceRefusal(bp.id, player == owner, profile.plot.placed)
+		or AutomationLogic.PlaceRefusal(bp.id, player == owner, profile.plot.placed)
 	if binRefusal then
 		notify(player, binRefusal)
 		return
@@ -1232,15 +1277,24 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	local stock = if type(payer.sawmillStock) == "table" then payer.sawmillStock else nil
 	local fromShop = BlueprintBook.IsBoxed(bp.id)
 	local stockAt = if fromShop and stock then table.find(stock, bp.id) else nil
-	local fromStock = stockAt ~= nil
+	-- A sawmill, planer or belt comes out of the box you opened (boxUid): one
+	-- use, the box is spent below once everything has passed. An old save may
+	-- still hold a sawmill in stock, which places as before (the legacy path).
+	local fromBox = AutomationLogic.PlacedFromBox(bp.id) and PlotService.Boxes.ready(player, boxUid, bp.id)
+	local fromStock = stockAt ~= nil and not fromBox
 	local owned = BlueprintBook.Owns(payer, bp.id)
 	local boxed = ShopLogic.ShelfMenusHidden()
 	local allowed, refusal = BlueprintBook.Allowed(bp.id, owned, if fromStock then 1 else 0, boxed)
+	if fromBox then
+		allowed, refusal = true, nil
+	end
 	if not allowed then
 		notify(player, BlueprintBook.Message(refusal, bp))
 		return
 	end
-	local source = PlotLogic.Source(bp, if fromStock then 1 else 0, bp.unlock == true and owned, boxed)
+	local source = if fromBox
+		then "place"
+		else PlotLogic.Source(bp, if fromStock then 1 else 0, bp.unlock == true and owned, boxed)
 	local price = if source == "place" then 0 else PlotData.Price(bp)
 	if payer.cash < price then
 		notify(
@@ -1250,6 +1304,9 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 		return
 	end
 	if price > 0 and not EconomyService.SpendCash(player, price, "placed " .. bp.displayName, bp.id) then
+		return
+	end
+	if fromBox and not PlotService.Boxes.spend(player, boxUid, bp.id) then
 		return
 	end
 	if fromStock and stock and stockAt then
@@ -1271,7 +1328,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
 	buildItem(slot, owner, item)
-	if fromStock then
+	if fromStock or fromBox then
 		notify(player, string.format("Placed your %s.", bp.displayName))
 	end
 	tellHammer(slot, player, item)
@@ -2157,6 +2214,8 @@ function PlotService.FillStep()
 								figure = piece.figure,
 								boost = piece.boost,
 								lux = piece.lux,
+								mill = piece.mill,
+								board = piece.board,
 							}, player.UserId, api)
 							if changed then
 								local model = slot.items:FindFirstChild(item.uid)

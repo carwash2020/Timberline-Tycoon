@@ -528,4 +528,189 @@ return function(t)
 		mill:Destroy()
 		Sawmill._reset()
 	end)
+
+	-- A log in a mill's intake, rested, ready for the next tick.
+	local function intakeLog(millId, extra)
+		local mill = MachineArt.Build(millId, false)
+		mill.Parent = Instance.new("Folder")
+		mill:SetAttribute("OwnerId", 7)
+		local intake = mill:FindFirstChild("Intake")
+		local size = V3.new(2, 9, 2)
+		local model, part = logPart(size, intake.CFrame)
+		model.Parent = Instance.new("Folder")
+		local piece = {
+			model = model,
+			root = part,
+			kind = "log",
+			woodId = "oak",
+			parts = { [1] = part },
+			nodes = { [1] = { parent = nil, children = {} } },
+			volume = Sell.VolumeU3(size.X, size.Y, size.Z),
+			ownerId = 7,
+			boost = 1,
+			verdictOk = true,
+			selling = nil,
+			dead = nil,
+			shopItem = nil,
+		}
+		for k, v in pairs(extra or {}) do
+			piece[k] = v
+		end
+		return mill, piece, part
+	end
+
+	-- Runs one piece through a mill and returns what it spawned.
+	local function run(millId, extra, ctxExtra)
+		local mill, piece, part = intakeLog(millId, extra)
+		local spawned, now = {}, 0
+		local ctx = {
+			notify = function() end,
+			now = function()
+				return now
+			end,
+			partsIn = function()
+				return if part.Parent and not piece.dead then { part } else {}
+			end,
+			pieceOf = function()
+				return piece
+			end,
+			mills = function()
+				return { mill }
+			end,
+			release = function() end,
+			remove = function(p)
+				p.dead = true
+			end,
+			spawn = function(info)
+				table.insert(spawned, info)
+				return nil
+			end,
+			moved = function() end,
+		}
+		for k, v in pairs(ctxExtra or {}) do
+			ctx[k] = v
+		end
+		Sawmill._use(ctx)
+		return {
+			mill = mill,
+			piece = piece,
+			spawned = spawned,
+			tick = function(at)
+				now = at
+				Sawmill.Tick()
+			end,
+			finish = function()
+				for _ = 1, 40 do
+					now += Sawmill.PlankGap + 0.5
+					Sawmill.Tick()
+				end
+			end,
+		}
+	end
+
+	t.test("every mill stamps its tier's plank bonus on the planks it cuts (a piece keeps its mill's bonus)", function()
+		local last = 0
+		for _, def in ipairs(Catalog.SawmillList()) do
+			t.ok(def.plankBonus >= last, def.id .. " bonus never drops")
+			last = def.plankBonus
+			local r = run(def.id)
+			r.tick(0)
+			r.tick(Sawmill.Settle)
+			r.finish()
+			t.ok(#r.spawned > 0, def.id .. " cut planks")
+			for _, info in ipairs(r.spawned) do
+				t.eq(info.mill, def.plankBonus, def.id .. " stamps its own bonus")
+			end
+			r.mill:Destroy()
+			Sawmill._reset()
+		end
+		-- A plank cut again by a worse mill keeps the better stamp; by a better one, takes it.
+		local r = run("SawmillRickety", { kind = "plank", mill = 1.5 })
+		r.tick(0)
+		r.tick(Sawmill.Settle)
+		r.finish()
+		t.ok(#r.spawned > 0)
+		t.eq(r.spawned[1].mill, 1.5, "a 1.5 plank through a Rickety stays 1.5")
+		r.mill:Destroy()
+		Sawmill._reset()
+		local r2 = run("Millmaster100", { kind = "plank", mill = 1 })
+		r2.tick(0)
+		r2.tick(Sawmill.Settle)
+		r2.finish()
+		t.eq(
+			r2.spawned[1].mill,
+			Catalog.GetSawmill("Millmaster100").plankBonus,
+			"an old plank takes the better mill's bonus"
+		)
+		r2.mill:Destroy()
+		Sawmill._reset()
+	end)
+
+	t.test("a belt-fed log is capped by the tier's rate; a hand-fed one never is", function()
+		-- Hand-fed (touched a moment ago): in at once.
+		local hand = run("SawmillRickety", { lastInteracted = 0 })
+		hand.tick(0)
+		hand.tick(Sawmill.Settle)
+		t.eq(hand.piece.selling, true, "hand-fed goes straight in")
+		hand.mill:Destroy()
+		Sawmill._reset()
+		-- Belt-fed (untouched for ages): the bucket starts full, so the first goes in...
+		local belt = run("SawmillRickety", { lastInteracted = -100 })
+		belt.tick(0)
+		belt.tick(Sawmill.Settle)
+		t.eq(belt.piece.selling, true, "the first belt-fed log goes in")
+		-- ...and leaves the bucket in debt (about 8.8 u³ against a 1 u³ bucket).
+		belt.finish()
+		belt.piece.dead = nil
+		belt.piece.selling = nil
+		local base = 40 * (Sawmill.PlankGap + 0.5) + 1
+		belt.tick(base)
+		belt.tick(base + Sawmill.Settle + 0.1)
+		t.eq(belt.piece.selling, nil, "still in debt half a minute later: the belt waits")
+		-- Minutes later the debt is paid and the next one goes in.
+		belt.tick(base + 200)
+		t.eq(belt.piece.selling, true, "the next one goes in once the bucket has refilled")
+		belt.mill:Destroy()
+		Sawmill._reset()
+	end)
+
+	t.test(
+		"belts refuse rare wood, someone else's wood, an offline owner and a full plot; hand work is fine",
+		function()
+			local function taken(extra, ctx)
+				local r = run("Millmaster200", extra, ctx)
+				r.tick(0)
+				r.tick(Sawmill.Settle)
+				local yes = r.piece.selling == true
+				r.mill:Destroy()
+				Sawmill._reset()
+				return yes
+			end
+			local old = { lastInteracted = -100 }
+			t.eq(taken(old), true, "an ordinary belt-fed log goes in")
+			t.eq(taken({ lastInteracted = -100, woodId = "lumenwood" }), false, "lumenwood stays manual")
+			t.eq(taken({ lastInteracted = -100, figure = "curly" }), false, "figured wood stays manual")
+			t.eq(taken({ lastInteracted = -100, ownerId = 9 }), false, "only the owner's own wood")
+			t.eq(
+				taken(old, {
+					online = function()
+						return false
+					end,
+				}),
+				false,
+				"no production while the owner is away"
+			)
+			t.eq(
+				taken(old, {
+					outputs = function()
+						return 60
+					end,
+				}),
+				false,
+				"a full plot stops the line"
+			)
+			t.eq(taken({ lastInteracted = 0, woodId = "lumenwood" }), true, "hand-fed lumenwood is fine")
+			t.eq(taken({ lastInteracted = 0, ownerId = 9 }), true, "hand-fed, anyone's")
+		end
+	)
 end

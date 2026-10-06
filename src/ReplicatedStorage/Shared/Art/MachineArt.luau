@@ -23,6 +23,8 @@ local ChopSawLogic = require(script.Parent.Parent.ChopSawLogic)
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local InputKit = require(script.Parent.Parent.InputKit)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local AutomationLogic = require(script.Parent.Parent.AutomationLogic)
+local PlanerLogic = require(script.Parent.Parent.PlanerLogic)
 local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
@@ -100,6 +102,260 @@ local function button(parent: Instance, name: string, text: string, x: number, a
 	b.Parent = parent
 end
 
+-- The cut board on the +X side of a sawmill or a planer: the size readout,
+-- the limit under it, four 48 px buttons (X-, X+, Y-, Y+) and the prompt
+-- that opens the screen panel. Front is the big face (5.6 x 2.8 studs).
+function MachineArt.AddPanel(model: Model, w: number, objectText: string, actionText: string, limit: string)
+	local panel = part(
+		model,
+		"Panel",
+		Vector3.new(5.6, 2.8, 0.25),
+		CFrame.lookAt(Vector3.new(w / 2 + 0.3, 3.4, 0.2), Vector3.new(w / 2 + 8, 3.4, 0.2)),
+		PANEL,
+		Enum.Material.Wood,
+		false,
+		false
+	)
+	panel.CanQuery = true
+	panel.CanTouch = false
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "PanelGui"
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = SawmillLogic.SurfacePixelsPerStud
+	gui.Parent = panel
+	local function line(name: string, y: number, h: number, text: string)
+		local label = Instance.new("TextLabel")
+		label.Name = name
+		label.Size = UDim2.fromOffset(208, h)
+		label.Position = UDim2.fromOffset(8, y)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamBold
+		label.TextSize = SawmillLogic.PanelTextPx
+		label.TextScaled = true
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.TextColor3 = Kit.hex("#F3E6C8")
+		label.Text = text
+		label.Parent = gui
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = SawmillLogic.PanelTextPx
+		fit.MinTextSize = if name == "LimitReadout" then 10 else 14
+		fit.Parent = label
+	end
+	line("CutReadout", 2, 26, "1.00 × 0.60 u")
+	line("LimitReadout", 28, 20, limit)
+	-- 48 px buttons, 6 px apart, inside a 5.6-stud face at 40 px/stud.
+	button(gui, "XMinus", "X-", 8, "x", -1)
+	button(gui, "XPlus", "X+", 62, "x", 1)
+	button(gui, "YMinus", "Y-", 116, "y", -1)
+	button(gui, "YPlus", "Y+", 170, "y", 1)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "CutPrompt"
+	prompt.ActionText = actionText
+	prompt.ObjectText = objectText
+	prompt.MaxActivationDistance = SawmillLogic.PromptRange
+	prompt.HoldDuration = 0
+	prompt.ClickablePrompt = true
+	prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+	InputKit.PromptDefaults(prompt, "Interact")
+	prompt.Parent = panel
+end
+
+-- Materials by tier (1 Rickety to 5 Industrial): the roof and walls get
+-- better as the mill does.
+local WALL_MATERIAL = {
+	Enum.Material.Wood,
+	Enum.Material.Wood,
+	Enum.Material.WoodPlanks,
+	Enum.Material.Metal,
+	Enum.Material.DiamondPlate,
+} :: { Enum.Material }
+local ROOF_MATERIAL = {
+	Enum.Material.WoodPlanks,
+	Enum.Material.WoodPlanks,
+	Enum.Material.CorrodedMetal,
+	Enum.Material.Metal,
+	Enum.Material.DiamondPlate,
+} :: { Enum.Material }
+local ROOF_COLOR = {
+	Kit.hex("#8B5A2B"),
+	Kit.hex("#6B4423"),
+	Kit.hex("#7A8F8A"),
+	Kit.hex("#5E7380"),
+	Kit.hex("#3E4A62"),
+} :: { Color3 }
+local BRASS = Kit.hex("#B08A3A")
+local IRON = Kit.hex("#3A3A3A")
+
+local function lookPart(
+	model: Model,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	mat: Enum.Material,
+	ghost: boolean
+): Part
+	return part(model, name, size, cf, color, mat, ghost, false)
+end
+
+-- The detail each tier adds on top of the same shed (more per tier, inside a
+-- part budget MachineArt.Budget(tier)): 2 braces and posts, 3 a stack and a
+-- plate, 4 a boiler with a dome and gauge, 5 a gantry and lamps. Every tier
+-- also carries a TierSign with its name. Looks only; nothing here collides.
+function MachineArt.TierDetail(
+	model: Model,
+	tier: number,
+	w: number,
+	d: number,
+	roofBottom: number,
+	name: string,
+	ghost: boolean
+)
+	local top = roofBottom + 0.28
+	if tier >= 2 then
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				lookPart(
+					model,
+					"Post",
+					Vector3.new(0.55, roofBottom, 0.55),
+					CFrame.new(sx * (w / 2 - 0.3), roofBottom / 2, sz * (d / 2 - 0.45)),
+					WOOD_DARK,
+					Enum.Material.Wood,
+					ghost
+				)
+			end
+		end
+	end
+	if tier >= 3 then
+		local stack = Kit.cylinder(
+			model,
+			"Stack",
+			3,
+			0.9,
+			CFrame.new(w / 4, top + 1.5, -d / 4) * CFrame.Angles(0, 0, math.pi / 2),
+			IRON,
+			Enum.Material.Metal
+		)
+		local cap = Kit.cylinder(
+			model,
+			"StackCap",
+			0.4,
+			1.3,
+			CFrame.new(w / 4, top + 3.1, -d / 4) * CFrame.Angles(0, 0, math.pi / 2),
+			IRON,
+			Enum.Material.Metal
+		)
+		for _, p in ipairs({ stack, cap }) do
+			if ghost then
+				p.Transparency = 0.45
+			end
+			Kit.decor(p)
+		end
+		lookPart(
+			model,
+			"MakerPlate",
+			Vector3.new(1.6, 0.8, 0.12),
+			CFrame.new(0, roofBottom - 0.6, d / 2 - 0.5),
+			BRASS,
+			Enum.Material.Metal,
+			ghost
+		)
+	end
+	if tier >= 4 then
+		local boiler = Kit.cylinder(
+			model,
+			"Boiler",
+			math.max(3, d - 3),
+			1.9,
+			CFrame.new(-w / 4, top + 0.95, 0) * CFrame.Angles(0, math.pi / 2, 0),
+			BRASS,
+			Enum.Material.Metal
+		)
+		local dome = Kit.cylinder(
+			model,
+			"BoilerDome",
+			0.7,
+			1.1,
+			CFrame.new(-w / 4, top + 2.1, 0) * CFrame.Angles(0, 0, math.pi / 2),
+			BRASS,
+			Enum.Material.Metal
+		)
+		for _, p in ipairs({ boiler, dome }) do
+			if ghost then
+				p.Transparency = 0.45
+			end
+			Kit.decor(p)
+		end
+		lookPart(
+			model,
+			"Gauge",
+			Vector3.new(0.5, 0.5, 0.15),
+			CFrame.new(-w / 4, top + 1.0, -(d - 3) / 2 - 0.15),
+			Kit.hex("#F3E6C8"),
+			Enum.Material.SmoothPlastic,
+			ghost
+		)
+	end
+	if tier >= 5 then
+		lookPart(
+			model,
+			"Gantry",
+			Vector3.new(w - 1, 0.5, 0.5),
+			CFrame.new(0, top + 3.3, 0),
+			Kit.hex("#E0A030"),
+			Enum.Material.DiamondPlate,
+			ghost
+		)
+		for _, sx in ipairs({ -1, 1 }) do
+			lookPart(
+				model,
+				"GantryLeg",
+				Vector3.new(0.45, 3.3, 0.45),
+				CFrame.new(sx * (w / 2 - 0.8), top + 1.65, 0),
+				Kit.hex("#E0A030"),
+				Enum.Material.DiamondPlate,
+				ghost
+			)
+			local lamp = lookPart(
+				model,
+				"Lamp",
+				Vector3.new(0.5, 0.5, 0.5),
+				CFrame.new(sx * (w / 2 - 0.8), top + 3.0, 0.6),
+				Kit.hex("#FFE2A0"),
+				Enum.Material.Neon,
+				ghost
+			)
+			if not ghost then
+				local light = Instance.new("PointLight")
+				light.Range = 14
+				light.Brightness = 1.2
+				light.Shadows = false
+				light.Color = Kit.hex("#FFD59A")
+				light.Parent = lamp
+			end
+		end
+	end
+	local sign = lookPart(
+		model,
+		"TierSign",
+		Vector3.new(3.4, 0.9, 0.2),
+		CFrame.new(0, top + 0.5, d / 2 - 0.5),
+		PANEL,
+		Enum.Material.Wood,
+		ghost
+	)
+	if not ghost then
+		Kit.signText(sign, string.upper(name), Kit.hex("#F3E6C8"))
+	end
+end
+
+-- The most parts a machine of this tier may have (specs hold the art to it).
+function MachineArt.Budget(tier: number): number
+	return 20 + 7 * (math.clamp(tier, 1, 5) - 1) + 1
+end
+
 -- The BLOCKAGE board. Hidden until a piece won't fit the opening.
 function MachineArt.SetBlockage(model: Model, on: boolean)
 	local sign = model:FindFirstChild("Blockage", true)
@@ -114,27 +370,36 @@ function MachineArt.SetBlockage(model: Model, on: boolean)
 	end
 end
 
--- The cut readout, "1.0 × 0.6 u".
-function MachineArt.SetCut(model: Model, x: number, y: number)
+-- The cut readout, "1.00 × 0.60 u", and (when given) the limit under it,
+-- "up to 1.8 × 1.2 u, steps of 0.2". Two decimals: the top tier steps by 0.05.
+function MachineArt.SetCut(model: Model, x: number, y: number, limit: string?)
 	local label = model:FindFirstChild("CutReadout", true)
 	if label and label:IsA("TextLabel") then
-		label.Text = string.format("%.1f × %.1f u", x, y)
+		label.Text = string.format("%.2f × %.2f u", x, y)
+	end
+	if limit then
+		local lim = model:FindFirstChild("LimitReadout", true)
+		if lim and lim:IsA("TextLabel") then
+			lim.Text = limit
+		end
 	end
 end
 
--- Points the belt's conveyor velocity out the front (+Z of the belt). A
--- ghost has nothing to push. Safe to call every poll; placement can turn
--- the mill, and the velocity is in world space.
-function MachineArt.AimBelt(model: Model)
-	local belt = model:FindFirstChild("Conveyor", true)
-	if not belt or not belt:IsA("BasePart") or not belt.CanCollide then
-		return
+-- Points every belt part's conveyor velocity along its own front (+Z of the
+-- part; a turn piece has three, each its own way). `speed` is studs a second
+-- (BeltService passes 0 while a belt is off; the default is the sawmill's
+-- ConveyorSpeed). A ghost has nothing to push. Safe to call every poll;
+-- placement can turn the machine, and the velocity is in world space.
+function MachineArt.AimBelt(model: Model, speed: number?)
+	local v = if speed == nil then GameConfig.ConveyorSpeed else speed
+	for _, d in ipairs(model:GetDescendants()) do
+		if d.Name == "Conveyor" and d:IsA("BasePart") and d.CanCollide then
+			local look = d.CFrame.LookVector
+			if look.Magnitude >= 1e-4 then
+				d.AssemblyLinearVelocity = look.Unit * v
+			end
+		end
 	end
-	local look = belt.CFrame.LookVector
-	if look.Magnitude < 1e-4 then
-		return
-	end
-	belt.AssemblyLinearVelocity = look.Unit * GameConfig.ConveyorSpeed
 end
 
 -- `ghost` is the placement preview: nothing collides and there are no buttons.
@@ -192,6 +457,7 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 		MachineArt.AimBelt(model)
 	end
 
+	local tier = math.clamp(mill.tier, 1, 5)
 	local roofBottom = math.max(beltTop + logDia + 2.4, 5.4)
 	local wallH = roofBottom - 0.4
 	local wallY = 0.4 + wallH / 2
@@ -202,7 +468,7 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 			Vector3.new(0.65, wallH, d - 1.2),
 			CFrame.new(side * (w / 2 - 0.5), wallY, 0),
 			frame,
-			Enum.Material.Wood,
+			WALL_MATERIAL[tier],
 			preview,
 			true
 		)
@@ -247,8 +513,8 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 		"Roof",
 		Vector3.new(w, 0.36, d - 0.2),
 		CFrame.new(0, roofBottom + 0.1, 0),
-		frame,
-		Enum.Material.WoodPlanks,
+		if tier >= 3 then ROOF_COLOR[tier] else frame,
+		ROOF_MATERIAL[tier],
 		preview,
 		true
 	)
@@ -310,57 +576,7 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 	output.Parent = root
 
 	if not preview then
-		-- Front is the big face (size X by Y). LookVector points out the +X side
-		-- so the buttons face someone standing beside the mill. At
-		-- SurfacePixelsPerStud the face holds four 48 px buttons and the readout.
-		local panel = part(
-			model,
-			"Panel",
-			Vector3.new(5.6, 2.8, 0.25),
-			CFrame.lookAt(Vector3.new(w / 2 + 0.3, 3.4, 0.2), Vector3.new(w / 2 + 8, 3.4, 0.2)),
-			PANEL,
-			Enum.Material.Wood,
-			false,
-			false
-		)
-		panel.CanQuery = true
-		panel.CanTouch = false
-		local gui = Instance.new("SurfaceGui")
-		gui.Name = "PanelGui"
-		gui.Face = Enum.NormalId.Front
-		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = SawmillLogic.SurfacePixelsPerStud
-		gui.Parent = panel
-		local readout = Instance.new("TextLabel")
-		readout.Name = "CutReadout"
-		readout.Size = UDim2.fromOffset(208, 40)
-		readout.Position = UDim2.fromOffset(8, 6)
-		readout.BackgroundTransparency = 1
-		readout.Font = Enum.Font.GothamBold
-		readout.TextSize = SawmillLogic.PanelTextPx
-		readout.TextScaled = true
-		readout.TextColor3 = Kit.hex("#F3E6C8")
-		readout.Text = "1.0 × 0.6 u"
-		readout.Parent = gui
-		local fit = Instance.new("UITextSizeConstraint")
-		fit.MaxTextSize = SawmillLogic.PanelTextPx
-		fit.MinTextSize = 14
-		fit.Parent = readout
-		-- 48 px buttons, 6 px apart, inside a 5.6-stud face at 40 px/stud.
-		button(gui, "XMinus", "X-", 8, "x", -1)
-		button(gui, "XPlus", "X+", 62, "x", 1)
-		button(gui, "YMinus", "Y-", 116, "y", -1)
-		button(gui, "YPlus", "Y+", 170, "y", 1)
-		local prompt = Instance.new("ProximityPrompt")
-		prompt.Name = "CutPrompt"
-		prompt.ActionText = "Set the cut"
-		prompt.ObjectText = mill.displayName
-		prompt.MaxActivationDistance = SawmillLogic.PromptRange
-		prompt.HoldDuration = 0
-		prompt.ClickablePrompt = true
-		prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
-		InputKit.PromptDefaults(prompt, "Interact")
-		prompt.Parent = panel
+		MachineArt.AddPanel(model, w, mill.displayName, "Set the cut", SawmillLogic.RangeText(mill))
 		-- Above the roof, facing the infeed and the outfeed. Hidden until
 		-- a piece won't fit; the text stays off with the board.
 		local sign = part(
@@ -386,7 +602,10 @@ function MachineArt.Build(millId: string, ghost: boolean?): Model?
 		CollectionService:AddTag(model, "Sawmill")
 	end
 
+	MachineArt.TierDetail(model, tier, w, d, roofBottom, mill.tierName, preview)
 	model:SetAttribute("MillId", mill.id)
+	model:SetAttribute("Tier", mill.tier)
+	model:SetAttribute("TierName", mill.tierName)
 	return model
 end
 
@@ -723,6 +942,416 @@ function MachineArt.BuildSkyBin(ghost: boolean?): Model?
 	model:SetAttribute("Shop", machine.shop)
 	model:SetAttribute("Price", machine.priceCash)
 	return model
+end
+
+-- The planer you place on your plot (PlanerLogic): a low shed over a belt
+-- with a pair of rollers and a cutter head. Plank in at the back (-Z, the
+-- Intake), board out at the front (+Z, the Output), a cut board on the +X
+-- side like the sawmill's. It is tagged "Planer" with PlanerId; the tier adds
+-- detail (more per tier, inside MachineArt.Budget) and a TierSign. `ghost` is
+-- the placement preview.
+local PLANER_BODY = {
+	Kit.hex("#B08A55"),
+	Kit.hex("#7C6A4F"),
+	Kit.hex("#5A6B73"),
+	Kit.hex("#3B4452"),
+} :: { Color3 }
+local PLANER_MATERIAL = {
+	Enum.Material.Wood,
+	Enum.Material.WoodPlanks,
+	Enum.Material.Metal,
+	Enum.Material.DiamondPlate,
+} :: { Enum.Material }
+
+function MachineArt.BuildPlaner(planerId: string, ghost: boolean?): Model?
+	local machine, def = PlanerLogic.Get(planerId)
+	if not machine or not def then
+		return nil
+	end
+	local preview = ghost == true
+	local tier = math.clamp(def.tier, 1, 4)
+	local w, d = def.width, def.depth
+	local frame = PLANER_BODY[tier]
+	local model = Kit.model(machine.id)
+	local u = GameConfig.WoodUnit
+	local widest = math.max(def.maxX, def.maxY) * u
+	local beltTop = 0.72
+	local beltH = 0.32
+	local beltW = widest + 0.55
+	local beltLen = math.max(3, d - 1.2)
+	local hoodBottom = beltTop + widest + 0.8
+
+	local root =
+		part(model, "Root", Vector3.new(w, 0.2, d), CFrame.new(0, 0.1, 0), WOOD, Enum.Material.Wood, true, false)
+	root.Transparency = 1
+	model.PrimaryPart = root
+
+	local deck = part(
+		model,
+		"Deck",
+		Vector3.new(w - 0.4, 0.4, d - 0.4),
+		CFrame.new(0, 0.2, 0),
+		WOOD,
+		Enum.Material.WoodPlanks,
+		preview,
+		true
+	)
+	if not preview then
+		touchless(deck)
+	end
+	local belt = part(
+		model,
+		"Conveyor",
+		Vector3.new(beltW, beltH, beltLen),
+		CFrame.new(0, beltTop - beltH / 2, 0) * CFrame.Angles(0, math.pi, 0),
+		BELT,
+		Enum.Material.Metal,
+		preview,
+		true
+	)
+	if not preview then
+		inGroup(belt, BELT_GROUP)
+		MachineArt.AimBelt(model)
+	end
+	for _, side in ipairs({ -1, 1 }) do
+		local wall = part(
+			model,
+			"Wall",
+			Vector3.new(0.6, hoodBottom + 0.6 - 0.4, d - 1.2),
+			CFrame.new(side * (beltW / 2 + 0.5), 0.4 + (hoodBottom + 0.6 - 0.4) / 2, 0),
+			frame,
+			PLANER_MATERIAL[tier],
+			preview,
+			true
+		)
+		local rail = part(
+			model,
+			"GuardRail",
+			Vector3.new(0.25, 0.9, beltLen - 0.4),
+			CFrame.new(side * (beltW / 2 + 0.1), beltTop + 0.35, 0),
+			WOOD_DARK,
+			Enum.Material.Wood,
+			preview,
+			true
+		)
+		if not preview then
+			touchless(wall)
+			touchless(rail)
+		end
+	end
+	-- The hood over the rollers: players stop at it, a plank on the belt passes under.
+	local hood = part(
+		model,
+		"Roof",
+		Vector3.new(beltW + 2.0, 0.4, d - 1.0),
+		CFrame.new(0, hoodBottom + 0.8, 0),
+		ROOF_COLOR[math.min(tier + 1, 5)],
+		PLANER_MATERIAL[tier],
+		preview,
+		true
+	)
+	if not preview then
+		inGroup(hood, MILL_GROUP)
+	end
+	-- Two feed rollers and the cutter head, axles across the belt (X).
+	for i, z in ipairs({ -d * 0.22, 0, d * 0.22 }) do
+		local roller = Kit.cylinder(
+			model,
+			if i == 2 then "CutterHead" else "Roller",
+			beltW,
+			if i == 2 then 1.1 else 0.8,
+			CFrame.new(0, beltTop + (if i == 2 then widest + 0.45 else widest + 0.3), z),
+			if i == 2 then BLADE else IRON,
+			Enum.Material.Metal
+		)
+		if preview then
+			roller.Transparency = 0.45
+		end
+		Kit.decor(roller)
+	end
+	local gate = part(
+		model,
+		"BladeGuard",
+		Vector3.new(beltW + 1.0, hoodBottom + 0.2, 1.2),
+		CFrame.new(0, (hoodBottom + 0.2) / 2 + 0.4, 0),
+		WOOD,
+		Enum.Material.SmoothPlastic,
+		preview,
+		true
+	)
+	gate.Transparency = 1
+	gate.CastShadow = false
+	if not preview then
+		inGroup(gate, MILL_GROUP)
+	end
+	for _, endZ in ipairs({ -(d / 2 - 0.6), d / 2 - 0.6 }) do
+		local feed = part(
+			model,
+			"FeedGuard",
+			Vector3.new(beltW + 1.6, hoodBottom + 0.8, 0.4),
+			CFrame.new(0, 0.4 + (hoodBottom + 0.8) / 2, endZ),
+			WOOD,
+			Enum.Material.Wood,
+			preview,
+			true
+		)
+		feed.Transparency = 1
+		feed.CastShadow = false
+		if not preview then
+			inGroup(feed, MILL_GROUP)
+		end
+	end
+	local intake = part(
+		model,
+		"Intake",
+		Vector3.new(math.max(3, beltW), 4, 4),
+		CFrame.new(0, 2.2, -d / 2 + 0.4),
+		WOOD,
+		Enum.Material.SmoothPlastic,
+		true,
+		false
+	)
+	intake.Transparency = 1
+	intake.CanCollide = false
+	intake.CanTouch = false
+	intake.CanQuery = false
+	local output = Instance.new("Attachment")
+	output.Name = "Output"
+	output.CFrame = CFrame.lookAt(Vector3.new(0, 1.6, d / 2 + 1), Vector3.new(0, 1.6, d / 2 + 6))
+	output.Parent = root
+
+	-- Tier detail: 2 posts, 3 a steam pipe and a plate, 4 a gantry and lamps.
+	local top = hoodBottom + 1.0
+	if tier >= 2 then
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				lookPart(
+					model,
+					"Post",
+					Vector3.new(0.5, hoodBottom + 0.6, 0.5),
+					CFrame.new(sx * (beltW / 2 + 1.1), (hoodBottom + 0.6) / 2, sz * (d / 2 - 0.4)),
+					WOOD_DARK,
+					Enum.Material.Wood,
+					preview
+				)
+			end
+		end
+	end
+	if tier >= 3 then
+		local pipe = Kit.cylinder(
+			model,
+			"SteamPipe",
+			2.4,
+			0.7,
+			CFrame.new(0, top + 0.6, d / 5) * CFrame.Angles(0, 0, math.pi / 2),
+			BRASS,
+			Enum.Material.Metal
+		)
+		if preview then
+			pipe.Transparency = 0.45
+		end
+		Kit.decor(pipe)
+		lookPart(
+			model,
+			"MakerPlate",
+			Vector3.new(1.4, 0.7, 0.12),
+			CFrame.new(0, hoodBottom + 0.3, d / 2 - 0.45),
+			BRASS,
+			Enum.Material.Metal,
+			preview
+		)
+	end
+	if tier >= 4 then
+		lookPart(
+			model,
+			"Gantry",
+			Vector3.new(beltW + 2.8, 0.45, 0.45),
+			CFrame.new(0, top + 2.6, 0),
+			Kit.hex("#E0A030"),
+			Enum.Material.DiamondPlate,
+			preview
+		)
+		for _, sx in ipairs({ -1, 1 }) do
+			lookPart(
+				model,
+				"GantryLeg",
+				Vector3.new(0.4, 2.6, 0.4),
+				CFrame.new(sx * (beltW / 2 + 1.3), top + 1.3, 0),
+				Kit.hex("#E0A030"),
+				Enum.Material.DiamondPlate,
+				preview
+			)
+			local lamp = lookPart(
+				model,
+				"Lamp",
+				Vector3.new(0.45, 0.45, 0.45),
+				CFrame.new(sx * (beltW / 2 + 1.3), top + 2.3, 0.6),
+				Kit.hex("#FFE2A0"),
+				Enum.Material.Neon,
+				preview
+			)
+			if not preview then
+				local light = Instance.new("PointLight")
+				light.Range = 12
+				light.Brightness = 1.1
+				light.Shadows = false
+				light.Color = Kit.hex("#FFD59A")
+				light.Parent = lamp
+			end
+		end
+	end
+	local sign = lookPart(
+		model,
+		"TierSign",
+		Vector3.new(3.0, 0.8, 0.2),
+		CFrame.new(0, hoodBottom + 1.4, d / 2 - 0.4),
+		PANEL,
+		Enum.Material.Wood,
+		preview
+	)
+	if not preview then
+		Kit.signText(sign, string.upper(machine.tierName or machine.displayName), Kit.hex("#F3E6C8"))
+		MachineArt.AddPanel(model, w, machine.displayName, "Set the planing size", PlanerLogic.RangeText(def))
+		CollectionService:AddTag(model, PlanerLogic.Tag)
+	end
+	model:SetAttribute("PlanerId", machine.id)
+	model:SetAttribute("MachineId", machine.id)
+	model:SetAttribute("Shop", machine.shop)
+	model:SetAttribute("Price", machine.priceCash)
+	model:SetAttribute("Tier", def.tier)
+	model:SetAttribute("TierName", machine.tierName)
+	return model
+end
+
+-- A piece of the conveyor kit (AutomationLogic): straight, turn (a quarter
+-- turn to the right when you look along the belt) and funnel (a wide mouth
+-- narrowing to a belt). Every belt part is named "Conveyor", anchored, in the
+-- MillBelt group (wood rides, players walk through), and aimed along its own
+-- front by BeltService / MachineArt.AimBelt; entry at the back (-Z), exit at
+-- the front (+Z), or +X for a turn. Rails keep wood on. Looks and rails are
+-- the only other parts. `ghost` is the placement preview.
+local BELT_WOOD = Kit.hex("#6B5B45")
+
+function MachineArt.BuildBelt(beltId: string, ghost: boolean?): Model?
+	local machine, def = AutomationLogic.Get(beltId)
+	if not machine or not def then
+		return nil
+	end
+	local preview = ghost == true
+	local w, d = def.width, def.depth
+	local model = Kit.model(machine.id)
+	local beltTop = 0.72
+	local beltH = 0.32
+	local beltY = beltTop - beltH / 2
+	local root =
+		part(model, "Root", Vector3.new(w, 0.2, d), CFrame.new(0, 0.1, 0), BELT_WOOD, Enum.Material.Wood, true, false)
+	root.Transparency = 1
+	model.PrimaryPart = root
+
+	local function band(name: string, size: Vector3, at: Vector3, turn: number)
+		local cf = CFrame.new(at) * CFrame.Angles(0, turn, 0)
+		local b = part(model, name, size, cf, BELT, Enum.Material.Metal, preview, true)
+		if not preview then
+			inGroup(b, BELT_GROUP)
+		end
+		return b
+	end
+	local function rail(size: Vector3, at: Vector3, turn: number)
+		local r = part(
+			model,
+			"GuardRail",
+			size,
+			CFrame.new(at) * CFrame.Angles(0, turn, 0),
+			BELT_WOOD,
+			Enum.Material.Wood,
+			preview,
+			true
+		)
+		if not preview then
+			touchless(r)
+		end
+		return r
+	end
+	local function leg(at: Vector3)
+		lookPart(
+			model,
+			"Leg",
+			Vector3.new(0.35, beltY - 0.15, 0.35),
+			CFrame.new(at.X, (beltY - 0.15) / 2, at.Z),
+			WOOD_DARK,
+			Enum.Material.Wood,
+			preview
+		)
+	end
+	local FRONT = math.pi -- LookVector +Z (see MachineArt.Build)
+	local RIGHT = -math.pi / 2 -- LookVector +X
+	if def.shape == "straight" then
+		local bw = w - 1.0
+		band("Conveyor", Vector3.new(bw, beltH, d - 0.2), Vector3.new(0, beltY, 0), FRONT)
+		for _, side in ipairs({ -1, 1 }) do
+			rail(Vector3.new(0.25, 0.9, d - 0.2), Vector3.new(side * (bw / 2 + 0.12), beltTop + 0.3, 0), 0)
+			leg(Vector3.new(side * (bw / 2), 0, d / 2 - 0.6))
+			leg(Vector3.new(side * (bw / 2), 0, -d / 2 + 0.6))
+		end
+	elseif def.shape == "turn" then
+		-- Entry stub (+Z), the corner square (+X) and the exit stub (+X), 4 x 4.
+		local bw = 3
+		band("Conveyor", Vector3.new(bw, beltH, 0.6), Vector3.new(0, beltY, -w / 2 + 0.3), FRONT)
+		band("Conveyor", Vector3.new(bw, beltH, bw), Vector3.new(0, beltY, 0), RIGHT)
+		band("Conveyor", Vector3.new(bw, beltH, 0.6), Vector3.new(w / 2 - 0.3, beltY, 0), RIGHT)
+		-- Rails: the two outer sides of the bend.
+		rail(Vector3.new(0.25, 0.9, bw + 0.2), Vector3.new(-bw / 2 - 0.12, beltTop + 0.3, 0), 0)
+		rail(Vector3.new(bw + 0.2, 0.9, 0.25), Vector3.new(0, beltTop + 0.3, bw / 2 + 0.12), 0)
+		leg(Vector3.new(-bw / 2, 0, -bw / 2))
+		leg(Vector3.new(bw / 2, 0, bw / 2))
+	else
+		-- Funnel: an 8-wide mouth for the first half, narrowing to 3 over the
+		-- second, with two angled walls that squeeze the wood onto the narrow belt.
+		local mouthLen = d / 2
+		band("Conveyor", Vector3.new(w - 0.6, beltH, mouthLen), Vector3.new(0, beltY, -d / 4), FRONT)
+		band("Conveyor", Vector3.new(3, beltH, d / 2), Vector3.new(0, beltY, d / 4), FRONT)
+		local run = d / 2
+		local across = w / 2 - 0.3 - 1.6
+		local length = math.sqrt(run * run + across * across)
+		local angle = math.atan2(across, run)
+		for _, side in ipairs({ -1, 1 }) do
+			rail(
+				Vector3.new(0.25, 1.1, length),
+				Vector3.new(side * ((w / 2 + 1.5) / 2 - 0.1), beltTop + 0.4, d / 4),
+				-side * angle
+			)
+			rail(Vector3.new(0.25, 0.9, mouthLen), Vector3.new(side * (w / 2 - 0.2), beltTop + 0.3, -d / 4), 0)
+		end
+		leg(Vector3.new(-w / 2 + 0.6, 0, -d / 2 + 0.6))
+		leg(Vector3.new(w / 2 - 0.6, 0, -d / 2 + 0.6))
+	end
+	if not preview then
+		MachineArt.AimBelt(model)
+		CollectionService:AddTag(model, AutomationLogic.Tag)
+	end
+	model:SetAttribute("BeltShape", def.shape)
+	model:SetAttribute("MachineId", machine.id)
+	model:SetAttribute("Shop", machine.shop)
+	model:SetAttribute("Price", machine.priceCash)
+	return model
+end
+
+-- The model for any plot machine by id, or nil: a sawmill, a planer, a belt
+-- piece, the chop saw or the Sky Bin. PlotService builds with it and the
+-- placement ghost shows the same shape.
+function MachineArt.BuildAny(id: string, ghost: boolean?): Model?
+	if ItemCatalog.GetSawmill(id) then
+		return MachineArt.Build(id, ghost)
+	elseif PlanerLogic.IsPlaner(id) then
+		return MachineArt.BuildPlaner(id, ghost)
+	elseif AutomationLogic.IsBelt(id) then
+		return MachineArt.BuildBelt(id, ghost)
+	elseif SkyBinLogic.IsBin(id) then
+		return MachineArt.BuildSkyBin(ghost)
+	elseif ItemCatalog.GetMachine(id) then
+		return MachineArt.BuildChopSaw(ghost)
+	end
+	return nil
 end
 
 return MachineArt

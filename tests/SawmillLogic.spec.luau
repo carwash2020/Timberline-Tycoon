@@ -215,4 +215,72 @@ return function(t)
 		t.eq(#bp.boxes, 1, "one block over the footprint, so it overlaps like any plot item")
 		t.eq(Logic.Blueprint("Bench"), nil)
 	end)
+
+	t.test(
+		"five tiers, each dearer than the last and each worth more per plank, labelled Rickety to Industrial",
+		function()
+			local list = Catalog.SawmillList()
+			t.eq(#list, 5)
+			local labels = { "Rickety", "Sturdy", "Mill", "Steam", "Industrial" }
+			local ids = { "SawmillRickety", "SawmillSturdy", "Millmaster100", "Millmaster200", "Millmaster200L" }
+			local prices = { 130, 1600, 11000, 22500, 86500 }
+			local bonuses = { 1.0, 1.1, 1.22, 1.36, 1.5 }
+			local prev = nil
+			for i, mill in ipairs(list) do
+				t.eq(mill.id, ids[i], "the old ids keep their place")
+				t.eq(mill.priceCash, prices[i], "the old prices are unchanged")
+				t.eq(mill.tier, i)
+				t.eq(mill.tierName, labels[i])
+				t.eq(mill.plankBonus, bonuses[i])
+				if prev then
+					t.ok(mill.priceCash > prev.priceCash, mill.id .. " costs more")
+					t.ok(mill.plankBonus > prev.plankBonus, mill.id .. " pays more per plank")
+					t.ok(
+						mill.maxWidth >= prev.maxWidth and mill.maxX >= prev.maxX and mill.maxY >= prev.maxY,
+						"a wider cut"
+					)
+					t.ok(mill.step <= prev.step, mill.id .. " steps finer")
+					t.ok(mill.autoRate > prev.autoRate, mill.id .. " feeds faster off a belt")
+				end
+				prev = mill
+			end
+			t.eq(list[1].plankBonus, 1, "the cheapest mill adds nothing: the early economy is unchanged")
+			t.ok(list[5].plankBonus <= Sell.BonusCap and list[5].plankBonus <= 1.5)
+		end
+	)
+
+	t.test("each tier's cut steps on its own grid inside its own limits; a saved cut survives a finer grid", function()
+		for _, mill in ipairs(Catalog.SawmillList()) do
+			local step = Logic.StepOf(mill)
+			t.eq(step, mill.step)
+			local d = Logic.DefaultSettings(mill)
+			t.eq(d, { x = 1, y = 0.6 }, mill.id .. " starts at 1.0 x 0.6")
+			local up = Logic.Step(mill, d, "x", 1)
+			t.ok(math.abs(up.x - math.min(1 + step, mill.maxX)) < 1e-9, mill.id .. " one step is its step")
+			local top = { x = mill.maxX, y = mill.maxY }
+			t.eq(Logic.Step(mill, top, "x", 1), top, mill.id .. " x stops at the limit")
+			t.eq(Logic.Step(mill, top, "y", 1), top, mill.id .. " y stops at the limit")
+			t.eq(Logic.ClampSettings(mill, 99, 99), top)
+			t.eq(Logic.ClampSettings(mill, 0, 0), { x = Config.PlankMinX, y = Config.PlankMinY })
+			-- A cut saved on the old 0.2 grid is a legal cut on every tier.
+			t.eq(Logic.ClampSettings(mill, 1.2, 0.8), { x = math.min(1.2, mill.maxX), y = math.min(0.8, mill.maxY) })
+		end
+		-- Higher tiers allow a wider range and finer steps.
+		local sturdy, industrial = Catalog.GetSawmill("SawmillSturdy"), Catalog.GetSawmill("Millmaster200L")
+		t.eq(Logic.ClampSettings(sturdy, 1.04, 0.64), { x = 1, y = 0.6 })
+		t.eq(Logic.ClampSettings(industrial, 1.04, 0.64), { x = 1.05, y = 0.65 })
+		t.ok(Logic.ClampSettings(industrial, 3, 2.6).y > Logic.ClampSettings(rickety, 3, 2.6).y)
+	end)
+
+	t.test("the size and its limit read on the board and the shelf", function()
+		t.eq(Logic.SizeText({ x = 1, y = 0.6 }), "1.00 × 0.60 u")
+		t.eq(Logic.RangeText(rickety), "up to 1.8 × 1.2 u, steps of 0.2")
+		t.eq(Logic.BonusText(Catalog.GetSawmill("Millmaster100")), "+22%")
+		t.ok(string.find(Logic.TierText(Catalog.GetSawmill("Millmaster200")), "Steam", 1, true) ~= nil)
+		t.ok(string.find(Logic.TierText(Catalog.GetSawmill("Millmaster200")), "tier 4 of 5", 1, true) ~= nil)
+		for _, mill in ipairs(Catalog.SawmillList()) do
+			t.ok(string.find(Logic.Detail(mill), mill.tierName, 1, true) ~= nil, mill.id)
+			t.ok(string.find(Logic.Detail(mill), Logic.RangeText(mill), 1, true) ~= nil)
+		end
+	end)
 end

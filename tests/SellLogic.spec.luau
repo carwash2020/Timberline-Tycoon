@@ -129,4 +129,65 @@ return function(t)
 		t.eq(SellLogic.BinText(0, 120), "0/120")
 		t.eq(SellLogic.BinText(4.25, 120), "4.3/120")
 	end)
+
+	t.test("a plank's mill bonus and a board's planer bonus multiply its sale value (planks only)", function()
+		local plain = SellLogic.PieceValue("oak", "plank", 10, nil, 1)
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.22), plain * 1.22, 1e-9, "mill bonus")
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, nil, 1.4), plain * 1.4, 1e-9, "board bonus")
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.22, 1.4), plain * 1.22 * 1.4, 1e-9, "both")
+		-- It stacks with figure, boost and Lux like the rest.
+		local lux = SellLogic.PieceValue("oak", "plank", 10, "curly", 2, true)
+		near(SellLogic.PieceValue("oak", "plank", 10, "curly", 2, true, 1.5, 2), lux * 3, 1e-9, "stacks")
+		-- A log has no bonus whatever is written on it.
+		near(
+			SellLogic.PieceValue("oak", "log", 10, nil, 1, false, 1.5, 2),
+			SellLogic.PieceValue("oak", "log", 10, nil, 1),
+			1e-9,
+			"logs never"
+		)
+		-- Old pieces (nothing stamped) and junk stamps are 1.0; stamps are capped.
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, nil, nil), plain, 1e-9, "old piece")
+		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 0.5, -3), plain, 1e-9, "below 1 is 1")
+		near(
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 0 / 0, math.huge),
+			plain * SellLogic.BonusCap,
+			1e-9,
+			"NaN is 1, infinity is the cap"
+		)
+		t.eq(SellLogic.Bonus(nil), 1)
+		t.eq(SellLogic.Bonus("1.5"), 1)
+		t.eq(SellLogic.Bonus(99), SellLogic.BonusCap)
+	end)
+
+	t.test(
+		"the Sky Bin entry keeps a plank's stamps, an old entry is 1.0, and the bin pays what the pad would",
+		function()
+			local entry = SellLogic.Entry("oak", "plank", 10, "curly", 2, true, 1.36, 1.65)
+			t.eq(entry.m, 1.36)
+			t.eq(entry.d, 1.65)
+			near(
+				SellLogic.EntryValue(entry),
+				SellLogic.PieceValue("oak", "plank", 10, "curly", 2, true, 1.36, 1.65),
+				1e-9,
+				"the bin pays what the pad would"
+			)
+			local old = SellLogic.Entry("oak", "plank", 10)
+			t.eq(old.m, nil)
+			t.eq(old.d, nil)
+			near(
+				SellLogic.EntryValue({ w = "oak", v = 10, p = true }),
+				SellLogic.PieceValue("oak", "plank", 10),
+				1e-9,
+				"a save from before mill tiers"
+			)
+			-- A hand-edited save can't stamp more than the cap or a NaN.
+			near(
+				SellLogic.EntryValue({ w = "oak", v = 10, p = true, m = 99, d = 0 / 0 }),
+				SellLogic.PieceValue("oak", "plank", 10) * SellLogic.BonusCap,
+				1e-9,
+				"capped"
+			)
+			t.eq(SellLogic.Entry("oak", "plank", 10, nil, nil, nil, 1, 1).m, nil, "1.0 is not written")
+		end
+	)
 end
