@@ -23,6 +23,8 @@ Net.RemoteNames = {
 	"MineNode", -- client -> server: (nodeUid) one swing at a crystal node
 	"PlaceBlueprint", -- client -> server: (blueprintId, x, z, rot) build on your plot (plot-local studs)
 	"MoveBlueprint", -- client -> server: (uid, x, z, rot) move a placed item on your plot
+	"UseBlueprint", -- client -> server: (uid) use the rolled plan in your hand: it is consumed and the building joins your blueprint book
+	"DropBlueprint", -- client -> server: (uid) lay an unused plan on the ground
 	"BlueprintEdit", -- client -> server: (request) rotate, move, resize, copy, delete, or undo an unfilled kit ghost
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier

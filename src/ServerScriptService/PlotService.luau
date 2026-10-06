@@ -33,11 +33,13 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local ChopSawLogic = require(ReplicatedStorage.Shared.ChopSawLogic)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
@@ -100,6 +102,7 @@ local officePos: Vector3 = Vector3.zero
 local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
 local offerRemote: RemoteEvent? = nil
+local worldFx: RemoteEvent? = nil -- WorldFX: the hammer's knock (optional)
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
 -- Fill runs at about 5 Hz, not every Heartbeat. A refusal toasts once, and
 -- only for wood this player let go of in the last two seconds.
@@ -752,7 +755,7 @@ local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: bo
 end
 
 local FULL = "This server's plot district is full, so your plot isn't out today. Try another server!"
-local TOLD_PICKER = "It's yours! This pad is your spawn. Press BUILD to start building."
+local TOLD_PICKER = "It's yours! This pad is your spawn. Take out your hammer to start building."
 
 -- The Land Office counter: the player has to be standing at it.
 local function nearOffice(player: Player): boolean
@@ -1117,6 +1120,27 @@ local function isNumber(value: unknown): boolean
 	return type(value) == "number" and value == value and math.abs(value) ~= math.huge
 end
 
+-- The knock and the dust: told to everyone near the piece (the player who
+-- swung already showed theirs the moment they pressed). Nothing here is
+-- trusted by anything else; it is only a picture.
+local function tellHammer(slot: Slot, who: Player, item: PlotLogic.Placed)
+	local remote = worldFx
+	if not remote then
+		return
+	end
+	local pos = (slot.cframe * CFrame.new(item.x, item.y or 0, item.z)).Position
+	for _, other in ipairs(onlinePlayers()) do
+		if other ~= who then
+			-- Not rootOf: that one stands a seated player up.
+			local char = other.Character
+			local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+			if root and HammerLogic.Hears((root.Position - pos).Magnitude) then
+				remote:FireClient(other, "Hammer", { pos = pos, by = who.UserId })
+			end
+		end
+	end
+end
+
 function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: unknown, rot: unknown, y: unknown)
 	if
 		type(blueprintId) ~= "string"
@@ -1152,24 +1176,22 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	end
 	-- A sawmill or the chop saw bought at the Tool Shed is already paid for:
 	-- placing takes one out of stock. With boxed shelves on (the default),
-	-- that is the only way to get one: the counter sells them, the build
-	-- palette does not. Stock is spent only after the cash check, so a
-	-- refused place leaves it.
+	-- that is the only way to get one: the counter sells them, the hammer's
+	-- list does not. Everything else must be in your blueprint book (a
+	-- starter plan, a store unlock you learned from its physical blueprint).
+	-- Stock is spent only after the cash check, so a refused place leaves it.
 	local stock = if type(payer.sawmillStock) == "table" then payer.sawmillStock else nil
-	local fromShop = ItemCatalog.GetSawmill(bp.id) ~= nil or ItemCatalog.GetMachine(bp.id) ~= nil
+	local fromShop = BlueprintBook.IsBoxed(bp.id)
 	local stockAt = if fromShop and stock then table.find(stock, bp.id) else nil
 	local fromStock = stockAt ~= nil
-	local unlocked = bp.unlock == true
-		and type(payer.furnitureBlueprints) == "table"
-		and payer.furnitureBlueprints[bp.id] == true
-	local source = PlotLogic.Source(bp, if fromStock then 1 else 0, unlocked, ShopLogic.ShelfMenusHidden())
-	if source == "store" then
-		notify(player, string.format("Buy the %s at the General Store first.", bp.displayName))
-		return
-	elseif source == "toolShed" then
-		notify(player, string.format("Buy the %s at the Tool Shed first.", bp.displayName))
+	local owned = BlueprintBook.Owns(payer, bp.id)
+	local boxed = ShopLogic.ShelfMenusHidden()
+	local allowed, refusal = BlueprintBook.Allowed(bp.id, owned, if fromStock then 1 else 0, boxed)
+	if not allowed then
+		notify(player, BlueprintBook.Message(refusal, bp))
 		return
 	end
+	local source = PlotLogic.Source(bp, if fromStock then 1 else 0, bp.unlock == true and owned, boxed)
 	local price = if source == "place" then 0 else PlotData.Price(bp)
 	if payer.cash < price then
 		notify(
@@ -1203,6 +1225,7 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	if fromStock then
 		notify(player, string.format("Placed your %s.", bp.displayName))
 	end
+	tellHammer(slot, player, item)
 	QuestService.Event(player, "itemPlaced")
 end
 
@@ -1249,6 +1272,7 @@ function PlotService.Move(player: Player, uid: unknown, x: unknown, z: unknown, 
 	if model and model:IsA("Model") then
 		placeModel(slot, model, item)
 	end
+	tellHammer(slot, player, item)
 end
 
 -- What selling gives back: cash, plank units, and which wood those planks are.
@@ -1873,6 +1897,7 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 		end)
 	end
 	offerRemote = remotes.PlotOffer
+	worldFx = remotes.WorldFX
 	if remotes.ClaimPlot then
 		remotes.ClaimPlot.OnServerEvent:Connect(function(player: Player, index: unknown)
 			PlotService.Claim(player, index)

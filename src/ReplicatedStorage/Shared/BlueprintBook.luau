@@ -245,7 +245,7 @@ function BlueprintBook.Redeem(book: Book, items: { Item }, uid: unknown): (Redee
 end
 
 -- The words a player reads after using a plan.
-function BlueprintBook.RedeemText(result: RedeemResult, id: string?): string
+function BlueprintBook.RedeemText(result: string, id: string?): string
 	local bp = if id then PlotData.Blueprint(id) else nil
 	local name = if bp then bp.displayName else "building"
 	if result == "ok" then

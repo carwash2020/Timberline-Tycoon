@@ -26,6 +26,7 @@ return function(t)
 			storage = options.storage or {},
 		}
 		local toasts, granted, equipped, quests, switched = {}, {}, {}, {}, {}
+		local plans = {} -- rolled plans handed over (BlueprintService.Grant)
 		local humanoid = {
 			EquipTool = function(_, tool)
 				table.insert(equipped, tool)
@@ -74,6 +75,22 @@ return function(t)
 					Grant = function(_, axeId)
 						table.insert(granted, axeId)
 						return { uid = "new", id = axeId }, { Name = axeId .. "Tool" }
+					end,
+				},
+				BlueprintService = {
+					Publish = function() end,
+					CanGrant = function(_, id)
+						if options.knownPlans and options.knownPlans[id] then
+							return false, "known"
+						end
+						if options.heldPlans and options.heldPlans[id] then
+							return false, "held"
+						end
+						return true, nil
+					end,
+					Grant = function(_, id)
+						table.insert(plans, id)
+						return { uid = "plan-" .. #plans, id = id }, nil
 					end,
 				},
 				MilestoneService = { Mark = function() end },
@@ -130,6 +147,7 @@ return function(t)
 			profile = profile,
 			toasts = toasts,
 			granted = granted,
+			plans = plans,
 			equipped = equipped,
 			quests = quests,
 			ShopService = ShopService,
@@ -143,7 +161,7 @@ return function(t)
 		s.buy("Sawmill", "SawmillRickety")
 		t.eq(s.profile.cash, 70)
 		t.eq(s.profile.sawmillStock, { "SawmillRickety" })
-		t.eq(s.toasts, { "Bought a Rickety Sawmill! Place it from BUILD on your plot." })
+		t.eq(s.toasts, { "Bought a Rickety Sawmill! Place it with your hammer on your plot." })
 		local v1 = setup({ cash = 200, loop = 1 })
 		v1.buy("Sawmill", "SawmillRickety")
 		t.eq(v1.profile.cash, 200)
@@ -626,6 +644,97 @@ return function(t)
 		t.eq(s.profile.cash, before)
 	end)
 
+	t.test("hammer build: a store blueprint is a rolled plan you carry, not a flag, and costs what it did", function()
+		local s = setup({ cash = 1000, claimed = true })
+		s.buy("Blueprint", "Shed")
+		t.eq(s.plans, { "Shed" })
+		t.eq(s.profile.cash, 400)
+		t.eq(s.profile.furnitureBlueprints, nil, "the old flag is not written any more")
+		t.ok(string.find(s.toasts[#s.toasts], "use it to learn", 1, true), s.toasts[#s.toasts])
+		-- Bought and not yet used: a second one is refused, and costs nothing.
+		local held = setup({ cash = 1000, claimed = true, heldPlans = { Shed = true } })
+		held.buy("Blueprint", "Shed")
+		t.eq(held.plans, {})
+		t.eq(held.profile.cash, 1000)
+		t.ok(string.find(held.toasts[#held.toasts], "already carry", 1, true))
+		-- Already learned: refused too.
+		local known = setup({ cash = 1000, claimed = true, knownPlans = { Shed = true } })
+		known.buy("Blueprint", "Shed")
+		t.eq(known.plans, {})
+		t.eq(known.profile.cash, 1000)
+		t.ok(string.find(known.toasts[#known.toasts], "already know", 1, true))
+		-- Short of cash: nothing moves.
+		local poor = setup({ cash = 500, claimed = true })
+		poor.buy("Blueprint", "Shed")
+		t.eq(poor.plans, {})
+		t.eq(poor.profile.cash, 500)
+		t.eq(poor.toasts, { "You need $100 more for the Small Shed." })
+		-- Only the store unlocks are sold; a starter plan is not.
+		local starter = setup({ cash = 1000, claimed = true })
+		starter.buy("Blueprint", "Wall")
+		t.eq(starter.plans, {})
+		t.eq(starter.profile.cash, 1000)
+	end)
+
+	t.test("hammer build: paying for a boxed blueprint at the counter hands over the plan", function()
+		local s = setup({ cash = 1000, claimed = true })
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, { uid = "bp-1", kind = "Blueprint", itemId = "Shed" })
+		t.eq(ok, true)
+		t.eq(line, "thanks")
+		t.eq(s.plans, { "Shed" })
+		t.eq(s.profile.cash, 400)
+		local again, said =
+			s.ShopService.ChargeAndGrant(s.player, { uid = "bp-1", kind = "Blueprint", itemId = "Shed" })
+		t.eq(again, false)
+		t.eq(said, "thanks", "the same box never charges twice")
+		t.eq(s.profile.cash, 400)
+	end)
+
+	t.test(
+		"hammer build: a boxed blueprint is refused with no plot, a known plan, or a held one, and charges nothing",
+		function()
+			local noPlot = setup({ cash = 1000 })
+			local ok, line =
+				noPlot.ShopService.ChargeAndGrant(noPlot.player, { uid = "bp-2", kind = "Blueprint", itemId = "Shed" })
+			t.eq(ok, false)
+			t.eq(line, "needsLand")
+			t.eq(noPlot.profile.cash, 1000)
+			local known = setup({ cash = 1000, claimed = true, knownPlans = { Shed = true } })
+			local ok2, line2 =
+				known.ShopService.ChargeAndGrant(known.player, { uid = "bp-3", kind = "Blueprint", itemId = "Shed" })
+			t.eq(ok2, false)
+			t.eq(line2, "alreadyOwned")
+			t.eq(known.profile.cash, 1000)
+			local held = setup({ cash = 1000, claimed = true, heldPlans = { Shed = true } })
+			local ok3, line3 =
+				held.ShopService.ChargeAndGrant(held.player, { uid = "bp-4", kind = "Blueprint", itemId = "Shed" })
+			t.eq(ok3, false)
+			t.eq(line3, "alreadyOwned")
+			t.eq(held.plans, {})
+		end
+	)
+
+	t.test("hammer build: the owner can gift any plan, free, and a non-store plan is refused to a shopper", function()
+		local owner = setup({ cash = 0 })
+		local ok = owner.ShopService.ChargeAndGrant(
+			owner.player,
+			{ uid = "gift-1", kind = "Blueprint", itemId = "Wall", free = true }
+		)
+		t.eq(ok, true)
+		t.eq(owner.plans, { "Wall" })
+		t.eq(owner.profile.cash, 0)
+		local shopper = setup({ cash = 1000, claimed = true })
+		local no, why =
+			shopper.ShopService.ChargeAndGrant(shopper.player, { uid = "bp-5", kind = "Blueprint", itemId = "Wall" })
+		t.eq(no, false)
+		t.eq(why, "locked")
+		local junk = owner.ShopService.ChargeAndGrant(
+			owner.player,
+			{ uid = "gift-2", kind = "Blueprint", itemId = "SawmillRickety", free = true }
+		)
+		t.eq(junk, false, "a sawmill is a box, not a plan")
+	end)
+
 	t.test("shop hours call ShopHoursLogic.IsOpen(shopId, hour)", function()
 		local fs = require("@lune/fs")
 		local src = fs.readFile("src/ServerScriptService/ShopService.luau")
@@ -653,7 +762,7 @@ return function(t)
 		t.eq(said, "thanks")
 		t.eq(owner.profile.cash, 500)
 		t.eq(owner.profile.sawmillStock, { "ChopSaw" }, "it waits in the same stock the sawmills do")
-		t.eq(owner.toasts[#owner.toasts], "Bought a Chop Saw! Place it from BUILD on your plot.")
+		t.eq(owner.toasts[#owner.toasts], "Bought a Chop Saw! Place it with your hammer on your plot.")
 		local again, again2 =
 			owner.ShopService.ChargeAndGrant(owner.player, { uid = "saw-2", kind = "Machine", itemId = "ChopSaw" })
 		t.eq(again, false)
