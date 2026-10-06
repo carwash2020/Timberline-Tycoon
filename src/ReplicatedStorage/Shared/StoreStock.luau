@@ -5,15 +5,21 @@
 -- Prices come from the catalogs, except the lamp, which is always
 -- GameConfig.LimitedItemPrice.
 --
--- Placements are in build space (the shop authored at the origin, before
--- BuildingArt scales it). The two columns sit on the shelves along the
--- side walls and leave an aisle of at least ShelfAisleMin studs. The
--- Robux shelf (RobuxShelf) is not stock: it sells nothing for cash.
+-- Placements are in final studs from the shop's origin (the shop is built
+-- at design size and scaled, but the shelves are added after, at their
+-- real size). Each box is as big as its item (BoxSize) and ShelfLayout
+-- spaces them by their own width, on lanes (tables and shelf boards) that
+-- leave an aisle of at least ShelfAisleMin studs. The Robux shelf
+-- (RobuxShelf) is not stock: it sells nothing for cash.
 
+local BoxLogic = require(script.Parent.BoxLogic)
+local BoxSize = require(script.Parent.BoxSize)
 local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
+local ShelfLayout = require(script.Parent.ShelfLayout)
 local ShopLogic = require(script.Parent.ShopLogic)
+local TruckLayout = require(script.Parent.TruckLayout)
 
 local StoreStock = {}
 
@@ -26,13 +32,17 @@ export type Slot = {
 	respawnSec: number,
 	limited: boolean,
 	color: string,
+	boxClass: string, -- a BoxSize class id, from the item's footprint or price tier
 }
 
 export type Placement = {
 	slotId: string,
 	x: number,
-	y: number,
+	y: number, -- the box's middle
 	z: number,
+	size: Vector3, -- the box
+	count: number, -- boxes in the slot (a limited item shows several, in a row along z)
+	pitch: number, -- centre to centre of those, along z
 }
 
 export type Zone = {
@@ -47,6 +57,10 @@ export type Pool = {
 	restockAt: number,
 }
 
+local function classId(kind: string, price: number?, footprint: Vector2?): string
+	return BoxSize.ClassFor({ kind = kind, price = price, footprint = footprint }).id
+end
+
 local function axeSlots(): { Slot }
 	local out: { Slot } = {}
 	for _, axe in ipairs(ItemCatalog.AxeLadder()) do
@@ -60,6 +74,7 @@ local function axeSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = axe.look.headColor,
+				boxClass = classId("Axe", axe.priceCash),
 			})
 		end
 	end
@@ -78,6 +93,7 @@ local function sawSlots(): { Slot }
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = mill.color,
+			boxClass = classId("Sawmill", mill.priceCash, Vector2.new(mill.width, mill.depth)),
 		})
 	end
 	return out
@@ -96,6 +112,7 @@ local function machineSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = machine.color,
+				boxClass = classId("Machine", machine.priceCash),
 			})
 		end
 	end
@@ -121,6 +138,7 @@ local function gearSlots(): { Slot }
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = gear.color,
+			boxClass = classId("Gear", gear.priceCash),
 		})
 	end
 	return out
@@ -139,6 +157,7 @@ local function blueprintSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = "#8C6A45",
+				boxClass = classId("Blueprint", PlotData.Price(bp), bp.footprint),
 			})
 		end
 	end
@@ -155,6 +174,7 @@ local function lampSlot(): Slot
 		respawnSec = GameConfig.LimitedRestockSec,
 		limited = true,
 		color = "#E6C36A",
+		boxClass = classId("Cosmetic", GameConfig.LimitedItemPrice),
 	}
 end
 
@@ -264,6 +284,31 @@ function StoreStock.UnitPrice(kind: string, itemId: string, limited: boolean, lo
 	return nil
 end
 
+-- A vehicle's floor footprint (width, length), tyres included, from the
+-- same layout the art builds from. The dealership sizes its boxes and its
+-- bays from this.
+function StoreStock.VehicleFootprint(kind: string, itemId: string): Vector2
+	if kind == "Truck" then
+		local def = ItemCatalog.GetTruck(itemId)
+		if def then
+			local lay = TruckLayout.For(def)
+			return Vector2.new(math.max(lay.width, 2 * lay.wheelX + lay.tyreWidth), lay.length)
+		end
+		return Vector2.new(10, 20)
+	end
+	local trailer = ItemCatalog.GetTrailer(itemId)
+	local truck = ItemCatalog.GetTruck("Pickup")
+	if trailer and truck then
+		local lay = TruckLayout.ForTrailer(trailer, TruckLayout.For(truck))
+		return Vector2.new(math.max(lay.width, 2 * lay.wheelX + lay.tyreWidth), lay.length)
+	end
+	return Vector2.new(10, 20)
+end
+
+function StoreStock.VehicleClass(kind: string, itemId: string): string
+	return BoxSize.ClassFor({ kind = kind, footprint = StoreStock.VehicleFootprint(kind, itemId) }).id
+end
+
 -- A dealership vehicle, for a boxed truck or a migrated storage box.
 -- Not a shelf slot: StoreStock.All and BoxCount stay the interior shops.
 function StoreStock.Vehicle(itemId: string): Slot?
@@ -278,6 +323,7 @@ function StoreStock.Vehicle(itemId: string): Slot?
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = truck.look.color,
+			boxClass = StoreStock.VehicleClass("Truck", truck.id),
 		}
 	end
 	local trailer = ItemCatalog.GetTrailer(itemId)
@@ -291,6 +337,7 @@ function StoreStock.Vehicle(itemId: string): Slot?
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = trailer.look.color,
+			boxClass = StoreStock.VehicleClass("Trailer", trailer.id),
 		}
 	end
 	return nil
@@ -304,64 +351,202 @@ function StoreStock.DisplayName(kind: string, itemId: string): string
 	return itemId
 end
 
--- Two columns. Centre-to-centre gap is the aisle. The Tool Shed's boxes
--- stand on a display table down each side (BuildingArt.DisplayTables) at
--- counter height; Hearth & Home's stand on its lower shelves (the
--- shelves' centre line, a box's half height over the board's top).
-local LAYOUT = {
-	ToolShed = { left = -6.2, right = 6.2, y = 3.0, z0 = -5.6, dz = 1.7 },
-	HearthAndHome = { left = -12, right = 12, y = 3.75, z0 = -9.2, dz = 1.8 },
+---------------------------------------------------------------------------
+-- Layout: lanes (tables and shelf boards) in final studs from the shop's
+-- origin, x across (+X is the shop's east), z from the door (-Z) back.
+---------------------------------------------------------------------------
+
+-- The Tool Shed: an axe table down the west side, a table for the sawmills
+-- and the chop saw down the east side (both counter height and wide enough
+-- for two small boxes across), and the Robux table across the back
+-- (RobuxShelf). The counter stands between the two tables, near the door.
+-- Hearth & Home: a shelf unit along each side wall and a free-standing
+-- island each side of the middle, a wide aisle between the islands.
+export type Shop = {
+	lanes: { ShelfLayout.Lane },
+	zone: Zone,
 }
 
-function StoreStock.Placements(shop: string): { Placement }
-	local layout = LAYOUT[shop]
-	local slots = StoreStock.ForShop(shop)
-	if not layout then
-		return {}
-	end
-	local out: { Placement } = {}
-	local count = { L = 0, R = 0 }
-	for i, slot in ipairs(slots) do
-		local side = if i % 2 == 1 then "L" else "R"
-		local n = count[side]
-		count[side] = n + 1
-		local x = if side == "L" then layout.left else layout.right
+StoreStock.TableTop = 3.9 -- counter height: the Tool Shed's tables and the Robux table
+StoreStock.ShelfTop = 3.2 -- Hearth & Home's shelf boards
+
+local SHOPS: { [string]: Shop } = {
+	ToolShed = {
+		lanes = {
+			{
+				name = "AxeTable",
+				x0 = -13.7,
+				x1 = -5.8,
+				z0 = -18,
+				z1 = 13.8,
+				y = StoreStock.TableTop,
+				kinds = { "Axe" },
+			},
+			{
+				name = "MachineTable",
+				x0 = 5.8,
+				x1 = 13.7,
+				z0 = -18,
+				z1 = 13.8,
+				y = StoreStock.TableTop,
+				kinds = { "Sawmill", "Machine" },
+			},
+		},
+		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(19.4, 1, 25.6) },
+	},
+	HearthAndHome = {
+		lanes = {
+			{
+				name = "GearShelf",
+				x0 = -24,
+				x1 = -17.2,
+				z0 = -15.5,
+				z1 = 13,
+				y = StoreStock.ShelfTop,
+				kinds = { "Gear" },
+			},
+			{
+				name = "LampShelf",
+				x0 = 17.2,
+				x1 = 24,
+				z0 = -15.5,
+				z1 = 13,
+				y = StoreStock.ShelfTop,
+				kinds = { "Cosmetic" },
+			},
+			{
+				name = "PlanIslandW",
+				x0 = -13.4,
+				x1 = -7,
+				z0 = -15,
+				z1 = 11,
+				y = StoreStock.ShelfTop,
+				kinds = { "Blueprint" },
+			},
+			{
+				name = "PlanIslandE",
+				x0 = 7,
+				x1 = 13.4,
+				z0 = -15,
+				z1 = 11,
+				y = StoreStock.ShelfTop,
+				kinds = { "Blueprint" },
+			},
+		},
+		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(33, 1, 26) },
+	},
+}
+
+-- The boxes a slot puts on a shelf: one, or LimitedStockCount in a row.
+local function countOf(slot: Slot): number
+	return if slot.limited then GameConfig.LimitedStockCount else 1
+end
+
+function StoreStock.BoxSizeOf(slot: Slot): Vector3
+	return BoxSize.Class(slot.boxClass).size
+end
+
+local function itemsFor(shop: string): { ShelfLayout.Item }
+	local out: { ShelfLayout.Item } = {}
+	for _, slot in ipairs(StoreStock.ForShop(shop)) do
+		local size = StoreStock.BoxSizeOf(slot)
+		local count = countOf(slot)
 		table.insert(out, {
-			slotId = slot.slotId,
-			x = x,
-			y = layout.y,
-			z = layout.z0 + n * layout.dz,
+			id = slot.slotId,
+			kind = slot.itemKind,
+			w = size.X,
+			h = size.Y,
+			d = count * size.Z + (count - 1) * BoxSize.Gap,
 		})
 	end
 	return out
 end
 
--- Distance between the left column and the right column.
+local placementCache: { [string]: { Placement } } = {}
+local overflowCache: { [string]: { ShelfLayout.Item } } = {}
+
+local function layout(shop: string)
+	if placementCache[shop] ~= nil then
+		return
+	end
+	local def = SHOPS[shop]
+	if def == nil then
+		placementCache[shop] = {}
+		overflowCache[shop] = {}
+		return
+	end
+	local spots, overflow = ShelfLayout.Fill(def.lanes, itemsFor(shop))
+	local out: { Placement } = {}
+	for _, spot in ipairs(spots) do
+		local slot = StoreStock.Get(spot.id)
+		local size = if slot then StoreStock.BoxSizeOf(slot) else Vector3.new(spot.w, spot.h, spot.d)
+		table.insert(out, {
+			slotId = spot.id,
+			x = spot.x,
+			y = spot.y,
+			z = spot.z,
+			size = size,
+			count = if slot then countOf(slot) else 1,
+			pitch = BoxSize.Pitch(size.Z),
+		})
+	end
+	placementCache[shop] = out
+	overflowCache[shop] = overflow
+end
+
+function StoreStock.Placements(shop: string): { Placement }
+	layout(shop)
+	return placementCache[shop]
+end
+
+-- Items the shop's lanes had no room for. Always empty (the specs check).
+function StoreStock.Overflow(shop: string): { ShelfLayout.Item }
+	layout(shop)
+	return overflowCache[shop]
+end
+
+function StoreStock.Lanes(shop: string): { ShelfLayout.Lane }
+	local def = SHOPS[shop]
+	return if def then def.lanes else {}
+end
+
+-- The clear walking width between the two sides' shelves (the inner edges
+-- of the lanes nearest the middle). 0 for a shop with none.
 function StoreStock.AisleGap(shop: string): number
-	local layout = LAYOUT[shop]
-	if not layout then
+	local def = SHOPS[shop]
+	if not def then
 		return 0
 	end
-	return layout.right - layout.left
-end
-
--- Floor footprint in build space. The door is the -Z face.
-function StoreStock.Zone(shop: string): Zone?
-	if shop == "ToolShed" then
-		return { center = Vector3.new(0, 0, 0), size = Vector3.new(18, 1, 19) }
-	elseif shop == "HearthAndHome" then
-		return { center = Vector3.new(0, 0, 0), size = Vector3.new(32, 1, 24) }
+	local west = -math.huge
+	local east = math.huge
+	for _, lane in ipairs(def.lanes) do
+		if lane.x1 <= 0 then
+			west = math.max(west, lane.x1)
+		else
+			east = math.min(east, lane.x0)
+		end
 	end
-	return nil
+	if west == -math.huge or east == math.huge then
+		return 0
+	end
+	return east - west
 end
 
--- How many box parts a full stocking uses. One part per box; the lamp
--- shelf shows LimitedStockCount boxes. Shelves themselves are the
--- building. The sum has to stay under StorePartBudget.
+-- Floor footprint in build space (design size; BuildingArt scales it). The
+-- door is the -Z face.
+function StoreStock.Zone(shop: string): Zone?
+	local def = SHOPS[shop]
+	return if def then def.zone else nil
+end
+
+-- How many box parts a full stocking uses: a box is its body and its
+-- packaging (BoxLogic.BoxPartCap parts at most); the lamp shelf shows
+-- LimitedStockCount boxes. Shelves themselves are the building. The sum
+-- has to stay under StorePartBudget.
 function StoreStock.BoxCount(): number
 	local n = 0
 	for _, slot in ipairs(StoreStock.All()) do
-		n += if slot.limited then GameConfig.LimitedStockCount else 1
+		n += (if slot.limited then GameConfig.LimitedStockCount else 1) * BoxLogic.BoxPartCap
 	end
 	return n
 end

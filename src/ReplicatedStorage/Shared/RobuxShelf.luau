@@ -11,9 +11,10 @@
 -- and MonetizationService checks it and shows Roblox's own dialog. The
 -- box goes back to its shelf (it is a display, there is no cash unit).
 --
--- Positions are build space, like StoreStock: a table along the back
--- wall, centred on x = 0.
+-- Positions are final studs from the shop's origin, like StoreStock: a
+-- table along the back wall, centred on x = 0. Its boxes are class S.
 
+local BoxSize = require(script.Parent.BoxSize)
 local StoreData = require(script.Parent.StoreData)
 
 local RobuxShelf = {}
@@ -37,11 +38,13 @@ export type Placement = {
 RobuxShelf.Gold = "#E3B73C"
 RobuxShelf.GoldInk = "#6B4A12"
 
--- The table: where it stands (build space) and how wide a box needs.
-RobuxShelf.TableZ = 7.4
-RobuxShelf.TableTop = 2.6 -- the table top, above the model origin (the counter top height)
-RobuxShelf.Step = 1.6 -- centre to centre along x
-RobuxShelf.BoxHalfHeight = 0.4 -- a box (1.2 tall) at BuildingArt's 1.5 scale
+-- The table: where it stands (final studs) and how wide a box needs.
+RobuxShelf.Class = "S"
+RobuxShelf.TableZ = 16.4
+RobuxShelf.TableDepth = 3.8
+RobuxShelf.TableTop = 3.9 -- the table top, above the model origin (the counter top height)
+RobuxShelf.Step = BoxSize.Class(RobuxShelf.Class).size.X + BoxSize.Gap -- centre to centre along x
+RobuxShelf.BoxHalfHeight = BoxSize.Class(RobuxShelf.Class).size.Y / 2
 
 function RobuxShelf.SlotId(kind: string, key: string): string
 	return "robux-" .. kind .. "-" .. key

@@ -35,6 +35,7 @@ local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
+local ShopDoorLogic = require(ReplicatedStorage.Shared.ShopDoorLogic)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local TerrainBuilder = require(script.Parent.TerrainBuilder)
@@ -175,6 +176,81 @@ local function rootOf(player: Player): BasePart?
 	return nil
 end
 
+-- The shop's real door (ShopDoor art): the blocker collides only while the
+-- shop is locked, the closed sign shows the opening time, and the model
+-- carries DoorLocked / DoorOpen for the clients to tween the leaves from.
+local function playerPoints(): { Vector3 }
+	local out: { Vector3 } = {}
+	local ok, list = pcall(function()
+		return game:GetService("Players"):GetPlayers()
+	end)
+	if not ok or type(list) ~= "table" then
+		return out
+	end
+	for _, player in ipairs(list) do
+		local hrp = rootOf(player)
+		if hrp then
+			table.insert(out, hrp.CFrame.Position)
+		end
+	end
+	return out
+end
+
+local function setDoor(shopModel: Model, shopId: string, locked: boolean, hour: number)
+	shopModel:SetAttribute("DoorLocked", locked)
+	shopModel:SetAttribute("DoorOpen", not locked)
+	local door = shopModel:FindFirstChild("ShopDoor")
+	if door == nil then
+		return
+	end
+	local block = door:FindFirstChild("DoorBlock")
+	if block and block:IsA("BasePart") then
+		block.CanCollide = locked
+	end
+	local sign = door:FindFirstChild("DoorClosedSign")
+	if sign and sign:IsA("BasePart") then
+		sign.Transparency = if locked then 0 else 1
+		local gui = sign:FindFirstChild("ClosedGui")
+		if gui and gui:IsA("SurfaceGui") then
+			gui.Enabled = locked
+			local label = gui:FindFirstChild("ClosedText")
+			if label and label:IsA("TextLabel") then
+				label.Text = ShopDoorLogic.ClosedText(shopId, hour)
+			end
+		end
+	end
+end
+
+local function doorwayOccupied(shopModel: Model): boolean
+	local door = shopModel:FindFirstChild("ShopDoor")
+	local block = if door then door:FindFirstChild("DoorBlock") else nil
+	if block == nil or not block:IsA("BasePart") then
+		return false
+	end
+	return ShopDoorLogic.Occupied(playerPoints(), block.CFrame, block.Size)
+end
+
+-- A player inside who walks up to a closed door touches the inside sensor:
+-- the same hold as the F prompt, so nobody is shut in.
+local function hookSensor(shopModel: Model, shopId: string)
+	local door = shopModel:FindFirstChild("ShopDoor")
+	local sensor = if door then door:FindFirstChild("DoorSensor") else nil
+	if sensor == nil or not sensor:IsA("BasePart") or doorHooked[sensor] then
+		return
+	end
+	doorHooked[sensor] = true
+	pcall(function()
+		sensor.Touched:Connect(function(hit: BasePart)
+			local ok, player = pcall(function()
+				return game:GetService("Players"):GetPlayerFromCharacter(hit.Parent)
+			end)
+			if ok and player then
+				NPCService.OnDoor(player, shopModel, shopId, ShopHoursLogic.Now())
+			end
+		end)
+	end)
+end
+
 function NPCService.OnDoor(player: Player, shopModel: Model, shopId: string, hour: number)
 	local counter = shopModel:FindFirstChild("Counter")
 	if not (counter and counter:IsA("BasePart")) then
@@ -191,7 +267,7 @@ function NPCService.OnDoor(player: Player, shopModel: Model, shopId: string, hou
 	end
 	if not open then
 		shopModel:SetAttribute("DoorHeldUntil", os.clock() + ShopHoursLogic.ExitHold)
-		shopModel:SetAttribute("DoorLocked", false)
+		setDoor(shopModel, shopId, false, hour)
 		BuildingArt.PaintDoor(shopModel, false)
 	end
 end
@@ -272,8 +348,11 @@ function NPCService.Apply(mapFolder: Instance, hour: number)
 		local open = ShopHoursLogic.IsOpen(shopId, hour)
 		local held = shopModel:GetAttribute("DoorHeldUntil")
 		local holding = type(held) == "number" and held > os.clock()
-		local locked = not open and not holding
-		shopModel:SetAttribute("DoorLocked", locked)
+		-- The door shuts only on an empty doorway (ShopDoorLogic.Locked).
+		local locked =
+			ShopDoorLogic.Locked(shopId, hour, holding, not open and not holding and doorwayOccupied(shopModel))
+		setDoor(shopModel, shopId, locked, hour)
+		hookSensor(shopModel, shopId)
 		BuildingArt.PaintDoor(shopModel, locked)
 		ShopHoursLogic.WriteSigns(shopModel, hour)
 		if counter and counter:IsA("BasePart") then

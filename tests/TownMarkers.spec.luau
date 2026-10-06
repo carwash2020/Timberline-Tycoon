@@ -288,7 +288,10 @@ return function(t)
 				-- board 31 studs from the spawn: it is on screen at eye level
 				-- (the walk's view) and may ride off the top of the two
 				-- tilted-down cameras, but it never lands on another chip.
-				local mustShow = m.name ~= "Store" or cam.name == "eye level"
+				-- The showroom hall stands far to the east (x 114 to 262): 60 or
+				-- more degrees off the walk, past the edge of a phone's view, so
+				-- its TRUCKS marker is not asked to be on screen from the spawn.
+				local mustShow = (m.name ~= "Store" or cam.name == "eye level") and m.name ~= "Trucks"
 				if mustShow then
 					t.ok(r.x0 >= NOTCH and r.x1 <= W - NOTCH and r.y0 >= 0 and r.y1 <= H, where .. " is off screen")
 				end

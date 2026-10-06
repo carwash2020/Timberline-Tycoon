@@ -1689,7 +1689,6 @@ function WorldPlan.Town(): Town
 	end
 	rounds(-100) -- General Store
 	rounds(-57) -- Tool Shed
-	rounds(48) -- Dealership
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the
 	-- town (birch and maple round the edges, a pine band behind the mill
@@ -1722,27 +1721,27 @@ function WorldPlan.Town(): Town
 		-- Birch and maple round the edges.
 		{ "tree", -128, 70, 1.22, "maple" },
 		{ "tree", -118, 84, 1, "birch" },
-		{ "tree", -132, 96, 1.22, "birch" },
+		{ "tree", -140, 96, 1.22, "birch" },
 		{ "tree", -146, 128, 1, "maple" },
 		{ "tree", -88, 4, 1, "maple" },
 		{ "tree", -62, 6, 1, "birch" },
 		{ "tree", -112, 0, 1.22, "birch" },
-		{ "tree", -66, 137, 1, "birch" },
+		{ "tree", -80, 150, 1, "birch" },
 		{ "tree", 50, 128, 1, "maple" },
 		{ "tree", 78, 114, 1.22, "birch" },
 		{ "tree", 78, 136, 1.22, "maple" },
-		{ "tree", 130, 98, 1, "birch" },
+		{ "tree", 128, 134, 1, "birch" },
 		{ "tree", 124, 150, 1, "maple" },
 		{ "tree", 136, 168, 1.22, "birch" },
 		{ "tree", 78, 200, 1.22, "maple" },
 		-- By the lot (M1.5: off it and its pull-outs since it grew east): one
 		-- north of the Plot Road's mouth (and of the lighthouse's line from
 		-- the spawn), one past the south pull-outs.
-		{ "tree", 160, 84, 1, "birch" },
+		{ "tree", 274, 100, 1, "birch" },
 		{ "tree", 132, -80, 1.22, "maple" },
 		-- Bushes along the shops' sides, the mill's back and the station.
-		{ "bush", -132, 108, 2.8 },
-		{ "bush", -130, 118, 2.4 },
+		{ "bush", -138, 108, 2.8 },
+		{ "bush", -136, 118, 2.4 },
 		{ "bush", 74, 117, 2.6 },
 		{ "bush", 69, 120.5, 3 },
 		{ "bush", 71, 101, 2.8 },
@@ -1764,7 +1763,7 @@ function WorldPlan.Town(): Town
 		{ "rock", -55, 150, 1.8 },
 		{ "rock", 73, 112, 2 },
 		{ "rock", -114, 95, 1.6 },
-		{ "rock", 146, 88, 1.8 },
+		{ "rock", 272, 112, 1.8 },
 	}
 	for _, g in ipairs(greenSpots) do
 		local kind: string, x: number, z: number, size: number, woodId: string? = g[1], g[2], g[3], g[4], g[5]
@@ -1804,19 +1803,19 @@ function WorldPlan.Town(): Town
 				kind = "ToolShed",
 				title = "TOOL SHED",
 				accent = Color3.fromRGB(150, 62, 44),
-				cframe = CFrame.new(-57, 0, 109.45), -- 28.5 deep (it was 21): the front stays at z 95.2
+				cframe = CFrame.new(-57, 0, 114.4), -- 38.4 deep (it was 21, then 28.5): the front stays at z 95.2
 			},
 			{
 				kind = "Dealership",
 				title = "DEALERSHIP",
 				accent = Color3.fromRGB(47, 109, 181),
-				cframe = CFrame.new(52, 0, 104.7),
+				cframe = CFrame.new(DealershipLot.Hall().cx, 0, DealershipLot.Hall().cz), -- the showroom hall on the old lot
 			},
 			{
 				kind = "HearthAndHome",
 				title = "GENERAL STORE",
 				accent = Color3.fromRGB(122, 90, 60),
-				cframe = CFrame.new(-100, 0, 118),
+				cframe = CFrame.new(-100, 0, 119.5), -- 39 deep (it was 36): the front stays at z 100
 			},
 		},
 		gondola = townGondola(),
@@ -1835,7 +1834,7 @@ function WorldPlan.Town(): Town
 		-- -Z, toward that road. The corner is the zone in WorldLayout.
 		displayLot = CFrame.new(
 			DealershipLot.OriginX + DealershipLot.Size() / 2,
-			0,
+			DealershipLot.FloorY, -- the hall's floor top: the plinths and boxes stand on it
 			DealershipLot.OriginZ + select(2, DealershipLot.Size()) / 2
 		),
 	}
