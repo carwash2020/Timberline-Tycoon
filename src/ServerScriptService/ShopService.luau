@@ -676,6 +676,7 @@ export type BoxGrant = {
 	limited: boolean?,
 	shop: string?,
 	free: boolean?, -- AdminService only: the owner's gift, no price and no shop hours
+	deferGrant: boolean?, -- charge now, hand over the item when the box is opened (GrantItem)
 }
 
 local settled: { [string]: string } = {}
@@ -698,6 +699,119 @@ local function listed(ids: any, itemId: string): boolean
 		end
 	end
 	return false
+end
+
+-- Puts the item in the buyer's hands (the inventory, the hotbar, the stock,
+-- the blueprints), once the money has moved. Returns the axe's uid.
+local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCatalog.AxeDef?): string?
+	local axeUid: string? = nil
+	if box.kind == "Axe" and axe then
+		local item, tool = AxeService.Grant(player, axe.id)
+		axeUid = if item then item.uid else nil
+		local char = player.Character
+		local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+		if tool and humanoid then
+			humanoid:EquipTool(tool)
+		end
+		notify(player, string.format("Bought the %s! It's in your hotbar.", axe.displayName))
+		MilestoneService.Mark(player, "First upgrade bought")
+		QuestService.Event(player, "axeBought")
+		QuestService.RefreshNextGoal(player)
+	elseif box.kind == "Gear" then
+		local gear = ItemCatalog.GetGear(box.itemId)
+		if gear then
+			if type(profile.gear) ~= "table" then
+				profile.gear = {}
+			end
+			if listed(profile.gear, gear.id) then
+				return nil -- two boxes of the same gear: it is yours already
+			end
+			table.insert(profile.gear, gear.id)
+			publishGear(player, profile)
+			notify(player, string.format("Bought the %s. It's yours for good.", gear.displayName))
+		end
+	elseif box.kind == "Sawmill" then
+		local mill = ItemCatalog.GetSawmill(box.itemId)
+		if mill then
+			if type(profile.sawmillStock) ~= "table" then
+				profile.sawmillStock = {}
+			end
+			table.insert(profile.sawmillStock, mill.id)
+			publishStock(player, profile)
+			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", mill.displayName))
+		end
+	elseif box.kind == "Machine" then
+		local machine = ItemCatalog.GetMachine(box.itemId)
+		if machine then
+			-- The same stock list the sawmills wait in; the hammer places it.
+			if type(profile.sawmillStock) ~= "table" then
+				profile.sawmillStock = {}
+			end
+			table.insert(profile.sawmillStock, machine.id)
+			publishStock(player, profile)
+			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", machine.displayName))
+		end
+	elseif box.kind == "Blueprint" then
+		local bp = PlotLogic.Blueprint(box.itemId)
+		if bp then
+			BlueprintService.Grant(player, bp.id)
+			notify(
+				player,
+				string.format(
+					"Bought the %s blueprint. It's in your hotbar: use it to learn the building for good.",
+					bp.displayName
+				)
+			)
+		end
+	elseif box.kind == "Truck" or box.kind == "Trailer" then
+		local named = if box.kind == "Truck"
+			then ItemCatalog.GetTruck(box.itemId)
+			else ItemCatalog.GetTrailer(box.itemId)
+		local display = if named then named.displayName else box.itemId
+		notify(player, string.format("Bought the %s. Open the box on your plot.", display))
+		if box.kind == "Truck" then
+			QuestService.Event(player, "truckBought")
+			MilestoneService.Mark(player, "Bought a truck")
+		end
+	else
+		local materials = (profile :: any).materials
+		if type(materials) ~= "table" then
+			materials = {}
+			(profile :: any).materials = materials
+		end
+		materials[box.itemId] = (materials[box.itemId] or 0) + 1
+		notify(player, string.format("Bought the %s.", StoreStock.DisplayName(box.kind, box.itemId)))
+	end
+	return axeUid
+end
+
+-- What an opened box owes. ChargeAndGrant with `deferGrant` only charges (the
+-- buyer is handed the box); this delivers the item, once per box uid, when
+-- the box is opened (small things first appear as a pickup, BoxUnpack).
+local delivered: { [string]: boolean } = {}
+
+function ShopService.ResetDeliveries()
+	table.clear(delivered)
+end
+
+function ShopService.GrantItem(player: Player, box: BoxGrant): (boolean, string?)
+	local uid = box.uid
+	if type(uid) ~= "string" or uid == "" or delivered[uid] == true then
+		return false, nil
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return false, nil
+	end
+	local axe: ItemCatalog.AxeDef? = nil
+	if box.kind == "Axe" then
+		axe = ItemCatalog.GetAxe(box.itemId)
+		if not axe then
+			return false, nil
+		end
+	end
+	delivered[uid] = true
+	return true, deliver(player, profile, box, axe)
 end
 
 function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?): (boolean, string, string?)
@@ -842,82 +956,12 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	end
 	settled[uid] = "granted"
 
-	local axeUid: string? = nil
-	if box.kind == "Axe" and axe then
-		local item, tool = AxeService.Grant(player, axe.id)
-		axeUid = if item then item.uid else nil
-		local char = player.Character
-		local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
-		if tool and humanoid then
-			humanoid:EquipTool(tool)
-		end
-		notify(player, string.format("Bought the %s! It's in your hotbar.", axe.displayName))
-		MilestoneService.Mark(player, "First upgrade bought")
-		QuestService.Event(player, "axeBought")
-		QuestService.RefreshNextGoal(player)
-	elseif box.kind == "Gear" then
-		local gear = ItemCatalog.GetGear(box.itemId)
-		if gear then
-			if type(profile.gear) ~= "table" then
-				profile.gear = {}
-			end
-			table.insert(profile.gear, gear.id)
-			publishGear(player, profile)
-			notify(player, string.format("Bought the %s. It's yours for good.", gear.displayName))
-		end
-	elseif box.kind == "Sawmill" then
-		local mill = ItemCatalog.GetSawmill(box.itemId)
-		if mill then
-			if type(profile.sawmillStock) ~= "table" then
-				profile.sawmillStock = {}
-			end
-			table.insert(profile.sawmillStock, mill.id)
-			publishStock(player, profile)
-			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", mill.displayName))
-		end
-	elseif box.kind == "Machine" then
-		local machine = ItemCatalog.GetMachine(box.itemId)
-		if machine then
-			-- The same stock list the sawmills wait in; the hammer places it.
-			if type(profile.sawmillStock) ~= "table" then
-				profile.sawmillStock = {}
-			end
-			table.insert(profile.sawmillStock, machine.id)
-			publishStock(player, profile)
-			notify(player, string.format("Bought a %s! Place it with your hammer on your plot.", machine.displayName))
-		end
-	elseif box.kind == "Blueprint" then
-		local bp = PlotLogic.Blueprint(box.itemId)
-		if bp then
-			BlueprintService.Grant(player, bp.id)
-			notify(
-				player,
-				string.format(
-					"Bought the %s blueprint. It's in your hotbar: use it to learn the building for good.",
-					bp.displayName
-				)
-			)
-		end
-	elseif box.kind == "Truck" or box.kind == "Trailer" then
-		local named = if box.kind == "Truck"
-			then ItemCatalog.GetTruck(box.itemId)
-			else ItemCatalog.GetTrailer(box.itemId)
-		local display = if named then named.displayName else box.itemId
-		notify(player, string.format("Bought the %s. Open the box on your plot.", display))
-		if box.kind == "Truck" then
-			QuestService.Event(player, "truckBought")
-			MilestoneService.Mark(player, "Bought a truck")
-		end
-	else
-		local materials = (profile :: any).materials
-		if type(materials) ~= "table" then
-			materials = {}
-			(profile :: any).materials = materials
-		end
-		materials[box.itemId] = (materials[box.itemId] or 0) + 1
-		notify(player, string.format("Bought the %s.", StoreStock.DisplayName(box.kind, box.itemId)))
+	if box.deferGrant == true and box.kind ~= "Truck" and box.kind ~= "Trailer" then
+		-- The buyer is handed the box; the item comes out when it is opened.
+		notify(player, string.format("Paid for the %s. Open the box.", StoreStock.DisplayName(box.kind, box.itemId)))
+		return true, "thanks", nil
 	end
-	return true, "thanks", axeUid
+	return true, "thanks", deliver(player, profile, box, axe)
 end
 
 return ShopService

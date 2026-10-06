@@ -47,6 +47,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SawmillSet = 6, -- v2: one step of a placed mill's cut (SawmillService)
 	Dialogue = 4, -- shop talk: open, or pick a line
 	BoxOpen = 4, -- open a box you own
+	BoxTake = 4, -- pick up the item that came out of a box (a prompt, not a remote)
 	SpawnPadPress = 1, -- the button on a vehicle pad
 	ChopSawSet = 6, -- one step of a chop saw's cut; same budget as SawmillSet
 	ExpandLand = 1, -- buy the next plot square

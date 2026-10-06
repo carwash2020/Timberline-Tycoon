@@ -272,7 +272,6 @@ return function(t)
 			MainStreet = true,
 			HearthAndHomePath = true,
 			ToolShedPath = true,
-			DealershipPath = true,
 			SpawnWalk = true,
 			GondolaPath = true,
 		}
@@ -298,7 +297,7 @@ return function(t)
 		for name in pairs(CHECKED) do
 			t.ok(names[name], "TownPaint has a " .. name)
 		end
-		t.ok(#areas >= 8, string.format("only %d paint rectangles checked", #areas))
+		t.ok(#areas >= 7, string.format("only %d paint rectangles checked", #areas))
 		local pad = town.sellPad.Position
 		local sellPad = { name = "SellPad", x0 = pad.X - 12.8, x1 = pad.X + 12.8, z0 = pad.Z - 9.8, z1 = pad.Z + 9.8 }
 		table.insert(areas, sellPad)
@@ -885,14 +884,14 @@ return function(t)
 		t.ok(#problems == 0, report(problems))
 		-- The check itself: a bush hugging the barrel by the Tool Shed, a
 		-- birch 3 studs from a lamp, and a maple whose crown would run into
-		-- the Dealership's roof are all caught.
+		-- the showroom hall's roof are all caught.
 		local function caught(kind, woodId, x, z)
 			local model = placed(BuildingArt.Greenery(kind, if woodId then 1 else 2.4, 9, woodId), CFrame.new(x, 0, z))
 			return #clashes(kind, kind == "tree", model, {}) > 0
 		end
 		t.ok(caught("bush", nil, -32.5, 89), "a bush by the barrel is caught")
 		t.ok(caught("tree", "birch", -61, 55), "a birch between a lamp and a bench is caught")
-		t.ok(caught("tree", "maple", 45, 113), "a maple against the Dealership's back wall is caught")
+		t.ok(caught("tree", "maple", 200, 126), "a maple against the showroom hall's back wall is caught")
 	end)
 
 	t.test("the townsfolk never walk through the town's greenery (TWN-01)", function()
@@ -1139,7 +1138,7 @@ return function(t)
 			end
 		end
 		t.eq(bell, 1, "one mill bell")
-		t.eq(#town.pathRounds, 9, "three shop paths, three rounds each")
+		t.eq(#town.pathRounds, 6, "two shop paths, three rounds each (the Dealership has no path now)")
 		for _, cf in ipairs(town.pathRounds) do
 			t.ok(not inSpawn(cf.X, cf.Z), "no round on the spawn walk")
 			t.ok(cf.Z > 84, "north of the street, on the shop paths")

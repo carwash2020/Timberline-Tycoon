@@ -145,55 +145,79 @@ return function(t)
 		end
 	end)
 
-	t.test("TWN-13: the sawmill and the shops are built 1.5x, with no more parts; counters stay waist high", function()
-		t.eq(BuildingArt.Scale, { Sawmill = 1.5, ToolShed = 1.5, Dealership = 1.5, HearthAndHome = 1.5 })
-		local function extent(model)
-			local lo, hi
-			for _, p in ipairs(parts(model)) do
-				local a, b = bounds(p)
-				lo = if lo then lo:Min(a) else a
-				hi = if hi then hi:Max(b) else b
+	t.test(
+		"TWN-13: the sawmill and the shops are built 1.5x (the showroom hall at its real size), with no more parts; counters stay waist high",
+		function()
+			t.eq(BuildingArt.Scale, { Sawmill = 1.5, ToolShed = 1.5, Dealership = 1, HearthAndHome = 1.5 })
+			local function extent(model)
+				local lo, hi
+				for _, p in ipairs(parts(model)) do
+					local a, b = bounds(p)
+					lo = if lo then lo:Min(a) else a
+					hi = if hi then hi:Max(b) else b
+				end
+				return hi - lo
 			end
-			return hi - lo
-		end
-		local small, big = BuildingArt.Sawmill(1), BuildingArt.Sawmill()
-		t.eq(#parts(big), #parts(small), "scaling adds no parts")
-		t.ok(near(extent(big), extent(small) * 1.5), "the sawmill is 1.5x in every dimension")
-		local blade, smallBlade = big:FindFirstChild("SawBlade"), small:FindFirstChild("SawBlade")
-		t.ok(math.abs(blade.Size.Y - smallBlade.Size.Y * 1.5) < 1e-3, "the blade grew")
-		for _, p in ipairs(parts(big)) do
-			local weld = p:FindFirstChildOfClass("WeldConstraint")
-			if weld and weld.Part0 == blade then
-				t.ok(weld.Enabled and not p.Anchored, p.Name .. " stays welded and unanchored")
-			end
-		end
-		for _, shop in ipairs(SHOPS) do
-			local s = BuildingArt.Scale[shop.kind]
-			local a = BuildingArt.Shop(shop.kind, shop.title, shop.accent, 1)
-			local b = BuildingArt.Shop(shop.kind, shop.title, shop.accent)
-			t.eq(#parts(b), #parts(a), shop.kind .. ": scaling adds no parts")
-			local ea, eb = extent(a), extent(b)
-			t.ok(math.abs(eb.X - ea.X * s) < 0.05 and math.abs(eb.Z - ea.Z * s) < 0.05, shop.kind .. " is 1.5x across")
-			local ca, cb = a:FindFirstChild("Counter"), b:FindFirstChild("Counter")
-			t.ok(near(cb.Size, ca.Size), shop.kind .. " counter keeps its size")
-			local pa, pb = ca.CFrame.Position, cb.CFrame.Position
-			local bottomA, bottomB = pa.Y - ca.Size.Y / 2, pb.Y - cb.Size.Y / 2
-			t.ok(math.abs(bottomB - bottomA * s) < 1e-3, shop.kind .. " counter stands on the raised floor")
-			t.ok(
-				math.abs(pb.X - pa.X * s) < 1e-3 and math.abs(pb.Z - pa.Z * s) < 1e-3,
-				shop.kind .. " counter moved out"
-			)
-			-- What stands on it came along (the register, the ledger).
-			local onTop = 0
-			for _, p in ipairs(parts(b)) do
-				local lp = cb.CFrame:PointToObjectSpace(p.CFrame.Position)
-				if p ~= cb and math.abs(lp.X) < cb.Size.X / 2 and lp.Y > cb.Size.Y / 2 and lp.Y < cb.Size.Y / 2 + 2 then
-					onTop += 1
+			local small, big = BuildingArt.Sawmill(1), BuildingArt.Sawmill()
+			t.eq(#parts(big), #parts(small), "scaling adds no parts")
+			t.ok(near(extent(big), extent(small) * 1.5), "the sawmill is 1.5x in every dimension")
+			local blade, smallBlade = big:FindFirstChild("SawBlade"), small:FindFirstChild("SawBlade")
+			t.ok(math.abs(blade.Size.Y - smallBlade.Size.Y * 1.5) < 1e-3, "the blade grew")
+			for _, p in ipairs(parts(big)) do
+				local weld = p:FindFirstChildOfClass("WeldConstraint")
+				if weld and weld.Part0 == blade then
+					t.ok(weld.Enabled and not p.Anchored, p.Name .. " stays welded and unanchored")
 				end
 			end
-			t.ok(onTop >= 3, shop.kind .. " keeps its counter top, register and ledger on it: " .. onTop)
+			for _, shop in ipairs(SHOPS) do
+				local s = BuildingArt.Scale[shop.kind]
+				local a = BuildingArt.Shop(shop.kind, shop.title, shop.accent, 1)
+				local b = BuildingArt.Shop(shop.kind, shop.title, shop.accent)
+				t.eq(#parts(b), #parts(a), shop.kind .. ": scaling adds no parts")
+				-- The shell (its walls) is scaled; the interior and the door are added at
+				-- their real size afterwards, so they are not part of this comparison.
+				local function shell(model)
+					local lo, hi
+					for _, p in ipairs(parts(model)) do
+						if p.Name == "Wall" then
+							local c, d = bounds(p)
+							lo = if lo then lo:Min(c) else c
+							hi = if hi then hi:Max(d) else d
+						end
+					end
+					return hi - lo
+				end
+				local ea, eb = shell(a), shell(b)
+				t.ok(
+					math.abs(eb.X - ea.X * s) < 0.05 and math.abs(eb.Z - ea.Z * s) < 0.05,
+					shop.kind .. " walls are scaled across"
+				)
+				local ca, cb = a:FindFirstChild("Counter"), b:FindFirstChild("Counter")
+				t.ok(near(cb.Size, ca.Size), shop.kind .. " counter keeps its size")
+				local pa, pb = ca.CFrame.Position, cb.CFrame.Position
+				local bottomA, bottomB = pa.Y - ca.Size.Y / 2, pb.Y - cb.Size.Y / 2
+				t.ok(math.abs(bottomB - bottomA * s) < 1e-3, shop.kind .. " counter stands on the raised floor")
+				t.ok(
+					math.abs(pb.X - pa.X * s) < 1e-3 and math.abs(pb.Z - pa.Z * s) < 1e-3,
+					shop.kind .. " counter moved out"
+				)
+				-- What stands on it came along (the register, the ledger).
+				local onTop = 0
+				for _, p in ipairs(parts(b)) do
+					local lp = cb.CFrame:PointToObjectSpace(p.CFrame.Position)
+					if
+						p ~= cb
+						and math.abs(lp.X) < cb.Size.X / 2
+						and lp.Y > cb.Size.Y / 2
+						and lp.Y < cb.Size.Y / 2 + 2
+					then
+						onTop += 1
+					end
+				end
+				t.ok(onTop >= 3, shop.kind .. " keeps its counter top, register and ledger on it: " .. onTop)
+			end
 		end
-	end)
+	)
 
 	t.test("shops: a direct-child Counter you can walk up to, under budget", function()
 		for _, shop in ipairs(SHOPS) do
@@ -212,26 +236,34 @@ return function(t)
 			local x = cf.Position.X
 			local s = BuildingArt.Scale[shop.kind]
 			-- The general store's door is further south than the old cottage.
-			local pathStart = if shop.kind == "HearthAndHome" then -18 else -8 * s
+			local pathStart = if shop.kind == "HearthAndHome" then -19 elseif shop.kind == "ToolShed" then -19 else -26
 			local hit = blockers(model, V3.new(x - 1.5, 0.7 * s, pathStart), V3.new(x + 1.5, 6, front - 0.05), counter)
 			t.eq(hit, {}, shop.kind .. " path to the counter")
-			-- 227: 220 plus the two sign goosenecks (3 parts each) the Tool
-			-- Shed and Hearth & Home got in TWN-07, plus the hours board.
-			t.ok(#parts(model) <= 227, shop.kind .. " parts: " .. #parts(model))
+			-- Raised deliberately for the real stores: tables, shelf units, aisle
+			-- signs, ceiling beams and lamps, the door (leaves, blocker, sensor,
+			-- closed sign), and for the Dealership the whole showroom hall.
+			local budget = ({ ToolShed = 330, HearthAndHome = 160, Dealership = 160 })[shop.kind]
+			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
 				local lo, hi = bounds(p)
 				local minX, maxX, minZ, maxZ = -12 * s, 12.5 * s, -11.6 * s, 9.2 * s
 				if shop.kind == "ToolShed" then
-					-- Deeper since the display tables went in (19 studs inside): the
-					-- old bounds are 7 studs either side of the middle, plus the
-					-- porch and the sign.
+					-- 30 x 40.5 studs once scaled, plus the porch, the firewood and the sign.
+					minX, maxX = -23, 23
 					minZ = -(BuildingArt.ToolShedHalfDepth + 4.6) * s
 					maxZ = (BuildingArt.ToolShedHalfDepth + 2.2) * s
 				end
 				if shop.kind == "HearthAndHome" then
-					-- 48 x 36 studs once scaled, plus the sign over the door.
-					minX, maxX, minZ, maxZ = -26, 26, -24, 20
+					-- 49.5 x 39 studs once scaled, plus the sign over the door and
+					-- the two door leaves swung out (built open).
+					minX, maxX, minZ, maxZ = -27, 27, -30, 22
+				end
+				if shop.kind == "Dealership" then
+					-- The showroom hall: its inside, its walls and roof overhang.
+					local hall = loader:load("ReplicatedStorage/Shared/Art/DealershipLot").Hall()
+					minX, maxX = -hall.innerW / 2 - 5, hall.innerW / 2 + 5
+					minZ, maxZ = -hall.innerD / 2 - 6, hall.innerD / 2 + 5
 				end
 				t.ok(
 					lo.X > minX and hi.X < maxX and lo.Z > minZ and hi.Z < maxZ,
@@ -874,7 +906,7 @@ return function(t)
 					return p.Position
 				end)
 				t.ok(not setPosition, model.Name .. " " .. p.Name .. " was placed with .Position")
-				if not p.CanCollide and p.Name ~= "SellPad" then
+				if not p.CanCollide and p.Name ~= "SellPad" and p.Name ~= "DoorSensor" then
 					t.ok(not p.CanQuery and not p.CanTouch, model.Name .. " " .. p.Name .. " decoration can be clicked")
 				end
 			end
@@ -894,12 +926,16 @@ return function(t)
 			local s = BuildingArt.Scale[shop.kind]
 			local front = if shop.kind == "ToolShed"
 				then -BuildingArt.ToolShedHalfDepth * s
-				elseif shop.kind == "Dealership" then -7 * s
-				else -12 * s
+				elseif shop.kind == "Dealership" then -loader
+					:load("ReplicatedStorage/Shared/Art/DealershipLot")
+					.Hall().innerD / 2 - 0.4
+				else -BuildingArt.HearthHalfDepth * s
 			-- Chest height, in the wall's own line: what a carried box meets.
 			local best, run = 0, 0
+			local spec = BuildingArt.DoorSpec(shop.kind, s, shop.accent)
+			local centre = (spec.x0 + spec.x1) / 2
 			for i = -80, 80 do
-				local x = i * 0.25
+				local x = centre + i * 0.25
 				local hit = blockers(model, V3.new(x - 0.12, 1.8, front - 0.3), V3.new(x + 0.12, 5.5, front + 0.3))
 				if #hit == 0 then
 					run += 0.25
@@ -908,48 +944,55 @@ return function(t)
 					run = 0
 				end
 			end
-			t.ok(best >= 11.5, string.format("%s's door is %.2f wide", shop.kind, best))
+			t.ok(best >= 14, string.format("%s's door is %.2f wide", shop.kind, best))
 		end
 	end)
 
-	t.test("the Tool Shed's boxes stand on its tables, and Hearth & Home's on its lower shelves", function()
+	t.test("the Tool Shed's boxes stand on its tables, and Hearth & Home's on its shelves and islands", function()
 		local StoreStock = loader:shared("StoreStock")
 		local RobuxShelf = loader:shared("RobuxShelf")
-		-- A box (1.2 tall) sits with its bottom on the top, within a hair.
-		local function sits(model, names, x, y, z, label)
-			local bottom = y - 0.6
+		-- A box sits with its bottom on the top, within a hair, and wholly on
+		-- it (its footprint inside the board's), so a big box never overhangs.
+		local function sits(model, names, place, size, label)
+			local bottom = place.y - size.Y / 2
 			local ok = false
 			for _, p in ipairs(parts(model)) do
 				if names[p.Name] then
 					local lo, hi = bounds(p)
-					if x > lo.X and x < hi.X and z > lo.Z and z < hi.Z and math.abs(hi.Y - bottom) < 0.06 then
+					if
+						place.x - size.X / 2 >= lo.X - 0.01
+						and place.x + size.X / 2 <= hi.X + 0.01
+						and place.z - size.Z / 2 >= lo.Z - 0.01
+						and place.z + size.Z / 2 <= hi.Z + 0.01
+						and math.abs(hi.Y - bottom) < 0.06
+					then
 						ok = true
 					end
 				end
 			end
-			t.ok(ok, label .. " rests on a table or shelf top")
+			t.ok(ok, label .. " rests wholly on a table or shelf top")
 		end
 		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
-		local s = BuildingArt.Scale.ToolShed
 		for _, place in ipairs(StoreStock.Placements("ToolShed")) do
-			sits(shed, { DisplayTable = true }, place.x * s, place.y * s, place.z * s, place.slotId)
+			sits(shed, { DisplayTableTop = true }, place, place.size, place.slotId)
 		end
+		local robuxSize = loader:shared("BoxSize").Class(RobuxShelf.Class).size
 		for _, place in ipairs(RobuxShelf.Placements()) do
-			sits(shed, { GoldTableTop = true }, place.x * s, place.y * s, place.z * s, place.slotId)
+			sits(shed, { GoldTableTop = true }, place, robuxSize, place.slotId)
 		end
 		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", C3.fromRGB(122, 90, 60))
-		local h = BuildingArt.Scale.HearthAndHome
 		for _, place in ipairs(StoreStock.Placements("HearthAndHome")) do
-			sits(hearth, { Shelf = true }, place.x * h, place.y * h, place.z * h, place.slotId)
+			local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
+			sits(hearth, { ShelfTop = true }, place, V3.new(place.size.X, place.size.Y, depth), place.slotId)
 		end
 	end)
 
 	t.test("the Tool Shed is deeper than it was, and its meshes stretch to match, along Z only", function()
-		t.eq(BuildingArt.ToolShedHalfDepth, 9.5)
+		t.eq(BuildingArt.ToolShedHalfDepth, 12.8)
 		local stretch = BuildingArt.MeshStretch("ToolShed")
 		t.eq(stretch.X, 1)
 		t.eq(stretch.Y, 1)
-		t.ok(math.abs(stretch.Z - 9.5 / 7) < 1e-6)
+		t.ok(math.abs(stretch.Z - 12.8 / 7) < 1e-6)
 		for _, kind in ipairs({ "Dealership", "HearthAndHome", "Sawmill" }) do
 			t.eq(BuildingArt.MeshStretch(kind), V3.one, kind .. " is not stretched")
 		end
@@ -962,13 +1005,14 @@ return function(t)
 				backZ = math.max(backZ, hi.Z)
 			end
 		end
-		t.ok(backZ >= 9.5 * BuildingArt.Scale.ToolShed - 1e-6, "the back wall is 28.5 studs from the front")
+		t.ok(backZ >= 12.8 * BuildingArt.Scale.ToolShed - 1e-6, "the back wall is 38.4 studs from the front")
 	end)
 
 	t.test("the gold table carries the shelf's name, and only the Tool Shed has one", function()
 		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
 		t.ok(find(shed, "GoldTable") ~= nil)
-		t.ok(texts(shed)["ROBUX SHELF"], "the board says ROBUX SHELF")
+		t.ok(texts(shed)["ROBUX SHELF"], "the sign over it says ROBUX SHELF")
+		t.eq(find(shed, "GoldTrim"), nil, "no plinth board in front of the table")
 		for _, kind in ipairs({ "Dealership", "HearthAndHome" }) do
 			local other = BuildingArt.Shop(kind, kind, C3.fromRGB(90, 60, 40))
 			t.eq(find(other, "GoldTable"), nil, kind .. " has no gold table")

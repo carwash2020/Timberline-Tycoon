@@ -1625,6 +1625,87 @@ What changed:
       bound. The hammer is Tool.Activated (RT); the HAMMER side button has no
       pad key; the D-pad is only the placer's rotate (right) and the HUD's
       shortcuts as before
+## Real stores: designed boxes, bigger shops, doors, showroom hall, open-the-box
+
+What changed (branch `claude/real-stores`):
+
+- **Boxes** are packaged goods: a kraft body, tape in the item's colour, a
+  cream name label on the front (and on the side that faces the aisle), a
+  category stripe over the label, a trim round the foot (`Art/BoxArt`, 6 parts
+  at most). The Robux boxes are gold. They are much larger and scale with the
+  item (`Shared/BoxSize`: a documented class table XS..XXXL, a hatchet is S,
+  the chop saw L, a Millmaster XL, vehicles V1..V4, with XXL/XXXL kept free).
+  The class comes from the plot footprint when the item has one, otherwise from
+  its kind and price tier. `Shared/ShelfLayout` spaces boxes by their own
+  width and depth, so a larger class never overlaps its neighbours.
+- **Shops** are bigger and fitted out: Tool Shed 30 x 40.5, Hearth & Home
+  49.5 x 39 (both were smaller), with display tables and shelf units sized to
+  their boxes, an aisle runner, wood floor, ceiling beams, hanging lanterns and
+  aisle signs. The Hearth price boards read their prices from the shop's own
+  data (they were typed in, and one was stale).
+- **Doors**: every shop has a real door (frame, leaves, an invisible blocker, an
+  inside sensor and a closed sign). The one open/closed rule is the keeper's
+  hours (`ShopHoursLogic.IsOpen`, the same clock as the sky and the Studio
+  override). When closed the blocker collides and the sign reads "Closed -
+  opens at 7 AM" (12-hour text lives in one helper, `ShopDoorLogic.FormatClock`).
+  Nobody is shut in: walking up to the door from inside holds it open (the F
+  prompt on the counter still does too), and it never shuts on someone standing
+  in the doorway. Leaves are tweened on the client (`ShopDoorAnim`).
+- **Dealership**: the open lot is gone. The Dealership is now one showroom hall
+  (x 114 to 262, z 76 to 122, on the old approach lawn and lot, inside the same
+  reserved area), a lobby with the counter at the west end and the door facing
+  the road. Every truck and trailer stands on its own plinth in price order,
+  side-on, behind its box, with a name and price sign and a lamp. Nothing is
+  parked outside. The old showroom site at x 35 to 70 is empty lawn (its path and
+  floor patch are gone from the town paint), and so are the old truck-lot path
+  stubs. The hall's east end has a glass band and a glass skylight on purpose:
+  the view from the spawn to the lighthouse crosses it (WorldPlan.spec checks).
+  The TRUCKS marker is over the hall's sign, far east of the spawn, so it is no
+  longer asked to be on screen from the spawn on a phone.
+- **Buying hands you the BOX.** The counter charges once and gives the box; you
+  open it with Interact (E, X on a gamepad, tap on a phone; works while holding
+  it). Axes, gear and the lamp come out as an object you pick up (it goes to the
+  hotbar or inventory); sawmills, the chop saw and blueprints unpack into your
+  BUILD stock; trucks and trailers unpack onto your pad as before (the pad rule is
+  unchanged). The empty box folds away and is destroyed. A paid box you do not
+  open is saved with `pending` so it still owes its item; an unclaimed pickup is
+  converted into your inventory after 5 minutes or when you leave; a box from an
+  older save has no `pending` and only unpacks (its item was granted at the counter).
+- Tutorial step ids are unchanged. The quest events `axeBought` and the "First
+  upgrade bought" milestone now fire when the axe comes out of its box (that is
+  when it is granted).
+
+### Studio checks
+- [ ] Tool Shed and Hearth & Home: walk in. The room feels like a shop: wide
+      aisle, tables and shelves with boxes spaced evenly, nothing overlapping,
+      lanterns lit at night, aisle signs readable from the door. Carry a box
+      down the aisle with room to spare.
+- [ ] Boxes look like cartons: tape stripe, a name label on the front and on the
+      aisle side, a coloured stripe, a dark foot. Hatchet box small, sawmill and
+      chop saw boxes big, vehicle boxes biggest. One price floats over each box.
+- [ ] The Robux shelf: gold table, gold boxes each with a name label and one R$
+      price over it, "ROBUX SHELF" sign hung above, no plinth board in front.
+- [ ] The grindstone, its crank, the chopping block and the firewood stand
+      clear of the walls with no poking through.
+- [ ] Doors: set the clock to 22 (owner menu): Hearth & Home and the Dealership
+      doors close smoothly and block you (barn leaves slide, general store doors
+      swing, showroom shutter rolls down); "Closed - opens at 7 AM" shows. The
+      Tool Shed never shuts. Stand inside when it closes and walk to the door: it
+      opens for you. Stand in the doorway at closing time: it waits for you.
+      Set the clock to 8: everything opens, the sign goes.
+- [ ] Dealership: walk in from the road. Eight bays in price order (Rustbucket
+      first, Logging Rig last), each vehicle in its own paint on a plinth behind
+      a big box, a sign with its name and one price, lit well, nothing parked
+      outside. You cannot sit in or drive them. Carry a box to the counter in the
+      lobby and buy it.
+- [ ] Buy anything: you get the box, not the item. Press E / X (also while
+      holding it): axes and gear come out as an object to pick up (E again; the
+      axe lands in the hotbar), sawmills and blueprints appear in BUILD, a truck
+      box unpacks on your pad. The empty box poofs. Pay twice quickly: charged
+      once. Leave with an unopened box and rejoin: it is back, and still owes its
+      item. Open it at someone else's range or as someone else: refused.
+- [ ] Tutorial: Murph's steps still advance; the Rustbucket step needs the box
+      opened on your plot (as before) at the Dealership (open 7 AM to 8 PM).
 ## Pumpkins on the ground, walkers face forward, calmer grass (claude/fix-pumpkins-npcs)
 
 - Cause of the sunk pumpkins: EventService placed each patch with `PivotTo`,

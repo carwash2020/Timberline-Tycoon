@@ -8,7 +8,8 @@ return function(t)
 	local Enum = t.roblox.Enum
 
 	local function boot(grant, hour)
-		local charges = {}
+		local charges = { delayed = {} }
+		local grants = {}
 		local profile = {
 			cash = 1000,
 			storage = {},
@@ -16,6 +17,14 @@ return function(t)
 			materials = {},
 		}
 		local loader = t.loader({
+			-- The fold-away's delayed destroy is held here, so a test can look at the box first.
+			globals = {
+				task = {
+					delay = function(_, fn)
+						table.insert(charges.delayed, fn)
+					end,
+				},
+			},
 			mocks = {
 				ShopService = {
 					Loop = function()
@@ -28,7 +37,12 @@ return function(t)
 						else nil,
 					ChargeAndGrant = grant or function(_player, box)
 						table.insert(charges, box.uid)
+						charges.deferred = box.deferGrant
 						return true, "thanks", "axe-1"
+					end,
+					GrantItem = function(_player, box)
+						table.insert(grants, box.uid)
+						return true, nil
 					end,
 				},
 				ProfileService = {
@@ -38,7 +52,7 @@ return function(t)
 				},
 			},
 		})
-		return loader, loader:server("BoxService"), charges, profile
+		return loader, loader:server("BoxService"), charges, profile, grants
 	end
 
 	local function counterPart()
@@ -96,7 +110,7 @@ return function(t)
 				marks += 1
 			end
 		end
-		t.eq(parts, 1)
+		t.ok(parts >= 5 and parts <= 6, "the body and its packaging, at most six parts")
 		t.eq(marks, 2)
 		local tag = rec.part:FindFirstChild("PriceTag")
 		t.eq(tag.MaxDistance, 20)
@@ -121,8 +135,9 @@ return function(t)
 		local open = rec.part:FindFirstChild("OpenPrompt")
 		t.eq(open.Enabled, true)
 		t.eq(open.MaxActivationDistance, 12)
-		t.eq(open.KeyboardKeyCode, Enum.KeyCode.F)
-		t.eq(open.GamepadKeyCode, Enum.KeyCode.ButtonY)
+		t.eq(open.KeyboardKeyCode, Enum.KeyCode.E, "Interact: E on a keyboard")
+		t.eq(open.GamepadKeyCode, Enum.KeyCode.ButtonX, "and X on a gamepad")
+		t.eq(open.RequiresLineOfSight, false, "it works while the box is held")
 		t.eq(buy.Enabled, false)
 	end)
 
@@ -533,5 +548,133 @@ return function(t)
 		t.eq(gold, 1, "an unlisted gold slot stocks nothing")
 		t.eq(cash, 1)
 		t.ok(StoreStock.Get("robux-Pass-DoubleCash") == nil, "the gold shelf is not cash stock")
+	end)
+
+	t.test("paying hands over the BOX: the counter charges with the grant deferred", function()
+		local _, Box, charges = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local player = person(rec.part.CFrame.Position)
+		t.eq(Box.Pay(player, rec.uid), true)
+		t.eq(charges.deferred, true, "no item yet: it is still in the box")
+		t.eq(rec.pendingGrant, true)
+		t.eq(rec.model ~= nil, true, "and the box is there to open")
+	end)
+
+	t.test("opening a tool box: it comes out as a pickup, the box folds away, taking it grants once", function()
+		local _, Box, charges, _, grants = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local player = person(rec.part.CFrame.Position)
+		Box.Pay(player, rec.uid)
+		local model = rec.model
+		t.eq(Box.TryOpen(player, rec.uid), true)
+		t.eq(#grants, 0, "nothing is in the inventory until it is picked up")
+		t.eq(model:GetAttribute("Poof"), true, "the empty box folds away")
+		t.eq(#charges.delayed, 1, "and is destroyed a moment later")
+		charges.delayed[1]()
+		t.eq(rec.model, nil)
+		local pickup = Box.Pickups()[rec.uid]
+		t.ok(pickup ~= nil, "the axe came out as a physical object")
+		t.ok(pickup.model:FindFirstChildWhichIsA("ProximityPrompt", true) ~= nil)
+		-- Someone else, or someone far away, cannot take it.
+		local thief = person(Vector3.new(0, 4.5, 0), 8)
+		t.eq(Box.TakePickup(thief, rec.uid), false)
+		local far = person(Vector3.new(100, 4.5, 0))
+		t.eq(Box.TakePickup(far, rec.uid), false)
+		t.eq(#grants, 0)
+		t.eq(Box.TakePickup(player, rec.uid), true)
+		t.eq(grants, { rec.uid }, "granted exactly once")
+		t.eq(Box.TakePickup(player, rec.uid), false, "a second take finds nothing")
+		t.eq(#grants, 1)
+		t.eq(Box.Pickups()[rec.uid], nil)
+	end)
+
+	t.test(
+		"a leaving player, or a pickup nobody takes, converts into the inventory: nothing is lost or doubled",
+		function()
+			local _, Box, _, _, grants = boot()
+			local counter = counterPart()
+			local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+			local player = person(rec.part.CFrame.Position)
+			Box.Pay(player, rec.uid)
+			Box.TryOpen(player, rec.uid)
+			Box.ConvertPickups(nil, os.clock() + 1)
+			t.eq(#grants, 0, "not expired yet")
+			Box.Commit(player)
+			t.eq(#grants, 1, "the owner left: the item is converted")
+			Box.Commit(player)
+			Box.ConvertPickups(nil, os.clock() + 100000)
+			t.eq(#grants, 1, "never twice")
+			t.eq(Box.Pickups()[rec.uid], nil)
+		end
+	)
+
+	t.test("a paid box that is not opened is saved with what it still owes, and restored", function()
+		local _, Box, _, profile, grants = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local player = person(rec.part.CFrame.Position)
+		Box.Pay(player, rec.uid)
+		local uid = rec.uid
+		Box.Commit(player)
+		t.eq(profile.storage[1].pending, true)
+		Box.RememberShop("ToolShed", { counter = counter, zoneCf = CFrame.new(), zoneSize = Vector3.new(18, 1, 14) })
+		Box.Restore(player, profile)
+		local back = nil
+		for _, item in ipairs(Box.Each()) do
+			if item.paid and item.buyerId == 7 then
+				back = item
+			end
+		end
+		t.eq(back.pendingGrant, true, "still owed after the round trip")
+		t.eq(Box.TryOpen(person(back.part.CFrame.Position), back.uid), true)
+		t.eq(#grants, 0)
+		t.ok(Box.Pickups()[back.uid] ~= nil)
+		t.ok(uid ~= nil)
+	end)
+
+	t.test("a box from an older save has nothing owed: opening it only unpacks it", function()
+		local _, Box, _, profile, grants = boot()
+		local counter = counterPart()
+		profile.storage = { { uid = "old-1", itemId = "SteelAxe", shop = "ToolShed" } }
+		Box.RememberShop("ToolShed", { counter = counter, zoneCf = CFrame.new(), zoneSize = Vector3.new(18, 1, 14) })
+		Box.Restore(person(Vector3.new(0, 0, 0)), profile)
+		local back = nil
+		for _, item in ipairs(Box.Each()) do
+			if item.uid == "old-1" then
+				back = item
+			end
+		end
+		t.ok(back ~= nil)
+		t.eq(back.pendingGrant, false)
+		t.eq(Box.TryOpen(person(back.part.CFrame.Position), "old-1"), true)
+		t.eq(#grants, 0, "its item was granted at the counter long ago")
+		t.eq(Box.Pickups()["old-1"], nil)
+	end)
+
+	t.test("two unopened boxes of the same gear cannot both be bought", function()
+		local _, Box = boot()
+		local counter = counterPart()
+		local function gear(uid, x)
+			return Box.Make({
+				uid = uid,
+				shop = "HearthAndHome",
+				itemKind = "Gear",
+				itemId = "Lantern",
+				displayName = "Lantern",
+				cf = CFrame.new(x, 4.5, 0),
+				counter = counter,
+				zoneCf = CFrame.new(),
+				zoneSize = Vector3.new(18, 1, 14),
+				onShelf = true,
+			})
+		end
+		local a, b = gear("g-1", 0), gear("g-2", 0.5)
+		local player = person(a.part.CFrame.Position)
+		t.eq(Box.Pay(player, a.uid), true)
+		local ok, line = Box.Pay(player, b.uid)
+		t.eq(ok, false)
+		t.eq(line, "alreadyOwned")
 	end)
 end

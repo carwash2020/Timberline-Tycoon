@@ -322,6 +322,7 @@ step("4. The town", function()
 		for _, spot in ipairs(town.shops) do
 			local shop = persistent(BuildingArt.Shop(spot.kind, spot.title, spot.accent))
 			shop.Name = spot.kind
+			CollectionService:AddTag(shop, "ShopDoorModel") -- ShopDoorAnim tweens its leaves
 			local counter = shop:FindFirstChild("Counter")
 			assert(counter and counter:IsA("BasePart"), "[MapBuilder] " .. spot.kind .. " has no Counter")
 			local point = Instance.new("Attachment")

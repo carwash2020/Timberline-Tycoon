@@ -225,6 +225,62 @@ return function(t)
 		t.ok(math.abs(feet - home.Position.Y) < 1e-2, "she stands up again at open")
 	end)
 
+	t.test("a closed shop's real door blocks the way in, shows the opening time, and opens at opening time", function()
+		local NPCService = service()
+		local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
+		local map = fakeMap()
+		local doors, counters = {}, {}
+		-- The real shops (their counters are axis-aligned, their doors as built).
+		for _, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome" }) do
+			map[kind]:Destroy()
+			local model = BuildingArt.Shop(kind, kind, Color3.fromRGB(120, 90, 60))
+			model.Name = kind
+			model.Parent = map
+			counters[kind] = model.Counter
+			doors[kind] = model.ShopDoor
+		end
+		NPCService.Init(map)
+		NPCService.Apply(map, 12)
+		for kind, door in pairs(doors) do
+			t.eq(door.DoorBlock.CanCollide, false, kind .. " is open at noon: players walk in")
+			t.eq(map[kind]:GetAttribute("DoorOpen"), true)
+			t.eq(door.DoorClosedSign.Transparency, 1, kind .. " no sign while open")
+		end
+		NPCService.Apply(map, 22)
+		t.eq(doors.HearthAndHome.DoorBlock.CanCollide, true, "Hearth & Home is shut at 10 PM")
+		t.eq(doors.Dealership.DoorBlock.CanCollide, true, "so is the Dealership")
+		t.eq(doors.ToolShed.DoorBlock.CanCollide, false, "the Tool Shed never closes")
+		t.eq(map.HearthAndHome:GetAttribute("DoorOpen"), false)
+		t.eq(map.HearthAndHome:GetAttribute("DoorLocked"), true)
+		local sign = doors.HearthAndHome.DoorClosedSign
+		t.eq(sign.Transparency, 0)
+		t.eq(sign.ClosedGui.Enabled, true)
+		t.eq(sign.ClosedGui.ClosedText.Text, "Closed - opens at 7 AM")
+		-- Someone outside cannot open it; someone inside is let out.
+		local counter = counters.HearthAndHome
+		local look = counter.CFrame.LookVector
+		local function person(at)
+			local hrp = Instance.new("Part")
+			hrp.Name = "HumanoidRootPart"
+			hrp.CFrame = CFrame.new(at)
+			local char = Instance.new("Model")
+			hrp.Parent = char
+			return { Character = char }
+		end
+		local at = counter.CFrame.Position
+		NPCService.OnDoor(person(at + look * 40), map.HearthAndHome, "HearthAndHome", 22)
+		t.eq(doors.HearthAndHome.DoorBlock.CanCollide, true, "outside cannot open it")
+		NPCService.OnDoor(person(at - look * 6), map.HearthAndHome, "HearthAndHome", 22)
+		t.eq(doors.HearthAndHome.DoorBlock.CanCollide, false, "inside, the door lets you out")
+		t.eq(map.HearthAndHome:GetAttribute("DoorOpen"), true)
+		-- At opening time it opens for everyone, and the sign goes.
+		NPCService.Apply(map, 7)
+		t.eq(doors.HearthAndHome.DoorBlock.CanCollide, false)
+		t.eq(sign.Transparency, 1)
+		t.eq(sign.ClosedGui.Enabled, false)
+		t.eq(doors.Dealership.DoorBlock.CanCollide, false, "the Dealership opens at 7 too")
+	end)
+
 	t.test("Old Tolly and Cap'n Moss stand on the ground out in the world, not at y = 0", function()
 		local NPCService, NPCData = service()
 		local map = fakeMap()

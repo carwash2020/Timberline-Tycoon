@@ -53,6 +53,10 @@ export type StoredBox = {
 	uid: string,
 	itemId: string,
 	shop: string,
+	-- true: paid, but the item is still in the box (it is granted when the
+	-- box is opened). Missing: an older box whose item was granted at the
+	-- counter, so opening it only unpacks it.
+	pending: boolean?,
 }
 
 -- One axe the player owns. Axes are items: duplicates are fine, and each
@@ -597,7 +601,12 @@ local function applySlotFields(record: any)
 					end
 					used[uid] = true
 					local shop = if type(entry.shop) == "string" then entry.shop else ""
-					table.insert(kept, { uid = uid, itemId = entry.itemId, shop = shop })
+					table.insert(kept, {
+						uid = uid,
+						itemId = entry.itemId,
+						shop = shop,
+						pending = if entry.pending == true then true else nil,
+					})
 				end
 			end
 		end
