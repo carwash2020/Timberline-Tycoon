@@ -1795,3 +1795,36 @@ and there were way too many pop-ups.
 - [ ] Old save midway (set `tutorialStep` with `tutorialOrder = 5` in a test
       profile): on "build" you land on the place step, on "mill" the tutorial
       is finished, a finished save stays finished.
+
+## Murph's cart removed (6 October 2026)
+
+Connor: the cart was only used once and was clutter after. The first sale is now
+at the sawmill's sell pad like every later one.
+
+- **Gone:** the cart model, its sign board and `CartZone` (MapBuilder), the cart
+  gate in SellService and GameServer, `TutorialGrove`'s cart rules (the module
+  keeps only the three grove oaks), `ProfileSchema.UnstickCart` and the
+  `cartVolume` / `cartUsed` fields (old saves' stray keys are harmless), the
+  `murphCart` beacon. The sawmill pays by volume with no cap and no minimum, so
+  nothing can soft-lock a new player (`tests/TutorialGrove.spec` checks that one
+  small oak plus the $20 start and Murph's $25 and $175 buys the plot and the
+  $100 Rustbucket).
+- **The `sell` step** keeps its id and place (3 of 8): "Sell your first load at
+  the sawmill", beacon `sellPad` (the arrow points at the sell zone; with no wood
+  to sell it still points at a tree first). A short-of-cash arrow for the plot or
+  truck also points at the sell pad. Saves on that step just continue.
+- **Economy:** the model's first sale walks the real distance from the nearest
+  grove oak to the pad (about 50 studs, was 80): first sale 66 to 61 s, Steel Axe
+  7.7 to 7.3 min, first $1k 13.5 to 13.1 min, Cobalt 51.2 to 50.7 min, full plot
+  30.5 to 30.4 h. ECONOMY.md regenerated, ECONOMY_V1.md unchanged.
+
+### Studio checks
+- [ ] Fresh save: chop an oak in the grove, drag the log (axe away); the arrow
+      points at the sawmill's sell pad (SELL LOGS HERE, top of the street).
+- [ ] Set the log on the pad: it sells, no "Sold" toast during the tutorial, and
+      the plot card says "That sale's yours" with the $25 in your wallet.
+- [ ] Walk to Murph's camp and the grove: no cart, no "MURPH BUYS" board, only
+      the three oaks and Murph by his fire. Murph's tips still read fine.
+- [ ] Buy the plot and the Rustbucket box with only sawmill sales.
+- [ ] An old save sitting on the sell step: the arrow now points at the sell pad.
+

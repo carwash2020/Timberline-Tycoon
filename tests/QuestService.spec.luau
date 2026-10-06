@@ -259,7 +259,7 @@ return function(t)
 		end
 		local e = setup({ tutorialStep = 4, tutorialProgress = 0, onboarding = early })
 		e.Quest.Start(e.player, e.profile)
-		t.eq(e.Steps[e.profile.tutorialStep].id, "load", "the truck lesson is later than the cart")
+		t.eq(e.Steps[e.profile.tutorialStep].id, "load", "the truck lesson is later than the first sale")
 		e.event("logsSold", 3)
 		t.eq(e.Steps[e.profile.tutorialStep].id, "load", "a sale doesn't load the truck")
 		e.event("logsLoaded", 1)
@@ -326,10 +326,10 @@ return function(t)
 		s.event("woodGrabbed") -- GrabService.Hooks.onGrab
 		t.eq(at(), "sell")
 		s.event("woodLoaded")
-		t.eq(at(), "sell", "a load doesn't sell the cart")
+		t.eq(at(), "sell", "a load doesn't sell the first load")
 		local cash = s.profile.cash
 		s.Quest.WoodSold(s.player, 1, 30)
-		t.eq(at(), "plot", "the first piece moves the cart step on")
+		t.eq(at(), "plot", "the first piece moves the sell step on")
 		t.eq(s.profile.cash, cash + 25, "Murph's share on that sale")
 		s.event("plotClaimed")
 		t.eq(at(), "place", "the plot is bought; one build lesson follows")
@@ -345,7 +345,7 @@ return function(t)
 		t.eq(s.player.attrs.TutorialStep, 0)
 		t.eq(s.toasts, {
 			string.format("Murph chipped in $%d!", s.Steps[4].rewardCash), -- the plot step: toward the Rustbucket
-		}, "the cart sale's thank-you is on the next card, not a second pop-up")
+		}, "the first sale's thank-you is on the next card, not a second pop-up")
 		t.eq(s.marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
 

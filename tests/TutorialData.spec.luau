@@ -20,7 +20,6 @@ return function(t)
 		sellPad = true,
 		stump = true,
 		toolShed = true,
-		murphCart = true,
 		plotSign = true,
 		dealership = true,
 	}
@@ -208,7 +207,6 @@ return function(t)
 		sellPad = true,
 		stump = true,
 		toolShed = true,
-		murphCart = true,
 		plotSign = true,
 		landOffice = true,
 		dealership = true,
@@ -458,7 +456,7 @@ return function(t)
 		t.eq(
 			kept,
 			{ "plot", "fell", "truck" },
-			"pickup, load, the cart, the mill and the loads start again; the axe step is gone"
+			"pickup, load, the sale, the mill and the loads start again; the axe step is gone"
 		)
 		t.eq(TutorialData.KeepsProgressV2(0), false)
 		t.eq(TutorialData.KeepsProgressV2(#V2 + 1), false)
@@ -518,13 +516,13 @@ return function(t)
 		Quest.Start(player, profile)
 		t.eq(at(), "fell")
 		Quest.Event(player, "plotClaimed")
-		t.eq(at(), "fell", "the claim waits until after the cart")
+		t.eq(at(), "fell", "the claim waits until after the first sale")
 		Quest.Event(player, "treeFelled")
 		t.eq(at(), "pickup")
 		Quest.Event(player, "logPickedUp")
 		t.eq(at(), "pickup", "v1's events count for nothing under v2")
 		Quest.Event(player, "woodGrabbed")
-		t.eq(at(), "sell", "the cart, before the plot")
+		t.eq(at(), "sell", "the first sale, before the plot")
 		Quest.Event(player, "woodSold", 1)
 		t.eq(at(), "plot", "the sell step completes on the first piece")
 		t.eq(profile.cash, 25, "Murph's $25 on that sale")
@@ -546,7 +544,7 @@ return function(t)
 		t.eq(profile.cash, 25 + V2[4].rewardCash, "Murph's $25 on the sale and the plot's payback")
 		t.eq(toasts, {
 			string.format("Murph chipped in $%d!", V2[4].rewardCash), -- the plot step: toward the Rustbucket
-		}, "the cart sale's thank-you is on the next card, not a second pop-up")
+		}, "the first sale's thank-you is on the next card, not a second pop-up")
 		t.eq(marks, { "Finished the tutorial", "Saw a next goal" })
 	end)
 
@@ -743,11 +741,14 @@ return function(t)
 			"Buy the Rustbucket box at the dealership · $51 of $100 to Rustbucket"
 		)
 		t.eq(TutorialData.ObjectiveText(steel, 0, 40), "Buy the Steel Axe at the Tool Shed · $40 of $160 to Steel Axe")
-		t.eq(TutorialData.Beacon(truck, 51), "murphCart")
-		t.ok(string.find(TutorialData.MurphLine(truck, false, 51), "my cart", 1, true))
+		t.eq(TutorialData.Beacon(truck, 51), "sellPad")
+		t.ok(string.find(TutorialData.MurphLine(truck, false, 51), "the sawmill", 1, true))
 		t.eq(
 			TutorialData.MurphLine(truck, false, 51),
-			string.format("Sell more wood at my cart first. The Rustbucket is $%d at the dealership.", truck.cashPrice)
+			string.format(
+				"Sell more wood at the sawmill first. The Rustbucket is $%d at the dealership.",
+				truck.cashPrice
+			)
 		)
 		t.eq(TutorialData.Beacon(truck, 100), "dealership")
 		t.eq(TutorialData.MurphLine(truck, false, 100), truck.murph, "enough cash: the usual line")
@@ -829,7 +830,24 @@ return function(t)
 		end
 	end)
 
-	t.test("v2: the plot is bought at the Land Office, after the cart and before the truck", function()
+	t.test("the first sale is at the sawmill's sell pad (Murph's cart is gone), in both loops", function()
+		for _, list in ipairs({ TutorialData.Steps, V2 }) do
+			local sell
+			for _, step in ipairs(list) do
+				if step.id == "sell" then
+					sell = step
+				end
+			end
+			t.eq(sell.beacon, "sellPad")
+			t.eq(sell.rewardCash, 25, "the first-sale payback still flows")
+			t.ok(string.find(sell.objective, "sawmill", 1, true), sell.objective)
+			t.ok(not string.find(string.lower(sell.murph .. sell.objective), "cart", 1, true), sell.murph)
+		end
+		t.eq(V2[3].id, "sell", "still step 3 of 8")
+		t.eq(#V2, 8)
+	end)
+
+	t.test("v2: the plot is bought at the Land Office, after the first sale and before the truck", function()
 		local byId, at = {}, {}
 		for i, step in ipairs(V2) do
 			byId[step.id] = step
@@ -848,9 +866,9 @@ return function(t)
 			at.plot < at.place and at.place < at.truck and at.truck < at.pad and at.pad < at.spawn,
 			"plot, build, box, pad, truck"
 		)
-		-- Short of the price: back to the cart, and Murph says sell more.
-		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice - 1), "murphCart")
-		t.ok(string.find(TutorialData.MurphLine(plot, false, 10), "my cart", 1, true))
+		-- Short of the price: back to the sawmill, and Murph says sell more.
+		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice - 1), "sellPad")
+		t.ok(string.find(TutorialData.MurphLine(plot, false, 10), "the sawmill", 1, true))
 		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice), "landOffice")
 		t.eq(TutorialData.MurphLine(plot, false, GameConfig.PlotPrice), plot.murph)
 		t.eq(

@@ -16,7 +16,6 @@ local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
-local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -229,11 +228,6 @@ export type Profile = {
 	instantDeliveries: number, -- Instant Delivery uses left
 	-- Funnel flags (MilestoneService). Additions only.
 	onboarding: { [string]: boolean },
-	-- u³ Murph's cart has already bought on this save slot (TutorialGrove).
-	-- Not account-wide: a fresh slot starts at 0.
-	cartVolume: number,
-	-- v1 only: this slot already sold once at the cart. A fresh slot is false.
-	cartUsed: boolean,
 	forest: ForestState,
 	truckBed: { BedLog }, -- what's in your truck bed (VehicleService)
 	-- Where your truck was when its bed last changed or it last moved (x, y,
@@ -317,8 +311,6 @@ local TEMPLATE: Profile = {
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
 	onboarding = {},
-	cartVolume = 0,
-	cartUsed = false,
 	forest = { figures = {}, elders = 0 },
 	truckBed = {},
 	truckAt = {},
@@ -777,99 +769,6 @@ function ProfileSchema.Migrate(data: any)
 	end
 	markFoundationsSchema(data)
 	data.tollPaidUntil = nil
-	ProfileSchema.UnstickCart(data)
-end
-
--- The Rustbucket's v2 price. The cart soft-lock is a v2 save, so the
--- unstick compares against this even on a v1 load.
-local function rustbucketPrice(): number
-	return TutorialGrove.TruckPrice(2)
-end
-
-local function recordCash(record: any): number
-	local cash = record.cash
-	if type(cash) ~= "number" or cash ~= cash then
-		return 0
-	end
-	return cash
-end
-
-local function recordOwnsTruck(record: any): boolean
-	return type(record.ownedTrucks) == "table" and #record.ownedTrucks > 0
-end
-
--- A build of this branch stored the running total on the account. Move it
--- onto the live slot once, then drop the account key.
-local function liftAccountVolume(data: any)
-	local onboarding = data.onboarding
-	if type(onboarding) ~= "table" then
-		return
-	end
-	local legacy = onboarding.cartVolume
-	if type(legacy) ~= "number" or legacy ~= legacy or legacy <= 0 or legacy == math.huge then
-		return
-	end
-	if type(data.cartVolume) ~= "number" or data.cartVolume == 0 then
-		data.cartVolume = legacy
-	end
-	local slots = data.slots
-	local active = data.activeSlot
-	if type(slots) == "table" and type(slots[active]) == "table" then
-		local slot = slots[active]
-		if type(slot.cartVolume) ~= "number" or slot.cartVolume == 0 then
-			slot.cartVolume = legacy
-		end
-	end
-	onboarding.cartVolume = nil
-end
-
--- Old saves set onboarding[TutorialCart] after one piece, which left them
--- short of the Rustbucket with the cart closed. Each slot is checked on
--- its own trucks and cash: one with that flag, no truck, and less cash
--- than the truck price starts at cartVolume 0 so it can sell again, and
--- cartUsed so a v1 rollback still refuses a second sale. A slot that
--- already has a truck is left untouched. A slot that already has a numeric
--- cartVolume keeps it (so a later join doesn't wipe what they've sold).
--- The v1 stamp happens once, so a fresh slot played later is not marked used.
-function ProfileSchema.UnstickCart(data: any)
-	if type(data) ~= "table" then
-		return
-	end
-	liftAccountVolume(data)
-	local onboarding = data.onboarding
-	if type(onboarding) ~= "table" or onboarding[TutorialGrove.UsedKey] ~= true then
-		return
-	end
-	local migrated = onboarding.cartUsedMigrated == true
-	local stamped = false
-	local function one(record: any)
-		if type(record) ~= "table" or record.fresh == true then
-			return
-		end
-		-- A slot that has not bought its plot also needs the plot's price (and the
-		-- build lesson's buffer) before the cart may close on it.
-		local plot = record.plot
-		local bought = type(plot) == "table" and plot.claimed == true
-		if recordOwnsTruck(record) or recordCash(record) >= rustbucketPrice() + TutorialGrove.LandPrice(2, bought) then
-			return
-		end
-		if type(record.cartVolume) ~= "number" then
-			record.cartVolume = 0
-		end
-		if not migrated and record.cartUsed ~= true then
-			record.cartUsed = true
-			stamped = true
-		end
-	end
-	one(data)
-	if type(data.slots) == "table" then
-		for _, slot in pairs(data.slots) do
-			one(slot)
-		end
-	end
-	if stamped then
-		onboarding.cartUsedMigrated = true
-	end
 end
 
 local function applyTutorialOrders(data: any)

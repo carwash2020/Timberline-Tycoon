@@ -1,6 +1,7 @@
 --!nocheck
--- Murph's cart: one small tutorial sale, and a spot that stays off the
--- roads, the street, the spawn walk and the townsfolk.
+-- The tutorial grove: spots that stay off the roads, the street, the spawn
+-- walk and the townsfolk, and a first sale at the sawmill that can fund the
+-- plot and the Rustbucket (Murph's buy cart is gone).
 return function(t)
 	local TutorialGrove = t.shared("TutorialGrove")
 	local WorldLayout = t.shared("World/WorldLayout")
@@ -8,153 +9,8 @@ return function(t)
 	local TreeGen = t.shared("TreeGen")
 	local SectionLogic = t.shared("SectionLogic")
 
-	local function offer(extra)
-		local base = {
-			done = false,
-			stepId = "sell",
-			pieces = 1,
-			volume = 10,
-			logs = 1,
-			cartVolume = 0,
-			cash = 20,
-			ownsTruck = false,
-			truckPrice = 100,
-		}
-		for k, v in pairs(extra or {}) do
-			base[k] = v
-		end
-		return base
-	end
-
-	t.test("the cart buys small loads during sell, plot and truck", function()
-		local ok, why = TutorialGrove.Accept(offer())
-		t.eq(ok, true)
-		t.eq(why, nil)
-		t.eq(select(1, TutorialGrove.Accept(offer({ pieces = 0 }))), false)
-		t.eq(select(1, TutorialGrove.Accept(offer({ stepId = "plot" }))), true, "a sale during the plot step")
-		t.eq(select(1, TutorialGrove.Accept(offer({ stepId = "truck" }))), true)
-		t.eq(select(2, TutorialGrove.Accept(offer({ done = true }))), TutorialGrove.RefuseClosed)
-		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "load" }))), TutorialGrove.RefuseClosed)
-		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "fell" }))), TutorialGrove.RefuseClosed)
-		local over = offer()
-		over.stepId = nil -- a finished tutorial has no step
-		t.eq(select(2, TutorialGrove.Accept(over)), TutorialGrove.RefuseClosed)
-		t.eq(select(2, TutorialGrove.Accept(offer({ pieces = TutorialGrove.MaxPieces + 1 }))), TutorialGrove.RefuseBig)
-		t.eq(select(2, TutorialGrove.Accept(offer({ volume = TutorialGrove.MaxVolume + 1 }))), TutorialGrove.RefuseBig)
-		t.eq(select(2, TutorialGrove.Accept(offer({ logs = TutorialGrove.MaxLogs + 1 }))), TutorialGrove.RefuseBig)
-		t.eq(select(1, TutorialGrove.Accept(offer({ volume = nil, logs = nil, pieces = 2 }))), true)
-	end)
-
-	t.test("three single-piece sales in a row pass, and a sale past 80 is refused", function()
-		local slot = { cartVolume = 0 }
-		for n = 1, 3 do
-			local ok, why = TutorialGrove.Accept(offer({
-				volume = 10,
-				cartVolume = TutorialGrove.SavedVolume(slot),
-			}))
-			t.eq(ok, true, why)
-			TutorialGrove.Remember(slot, 10)
-			t.eq(slot.cartVolume, n * 10)
-		end
-		t.eq(select(1, TutorialGrove.Accept(offer({ volume = 10, cartVolume = 70 }))), true, "80 exactly still fits")
-		t.eq(
-			select(2, TutorialGrove.Accept(offer({ volume = 10, cartVolume = 75 }))),
-			TutorialGrove.RefuseBig,
-			"75 + 10 passes 80"
-		)
-	end)
-
-	t.test("a second v1 cart sale during the truck step is refused", function()
-		local slot = { cartUsed = false }
-		local first = {
-			done = false,
-			stepId = "sell",
-			used = slot.cartUsed,
-			pieces = 1,
-			logs = 2,
-		}
-		t.eq(select(1, TutorialGrove.AcceptV1(first)), true)
-		slot.cartUsed = true -- GameServer sets this on the slot after the sale
-		t.eq(
-			select(
-				2,
-				TutorialGrove.AcceptV1({
-					done = false,
-					stepId = "truck",
-					used = slot.cartUsed,
-					pieces = 1,
-					logs = 2,
-				})
-			),
-			TutorialGrove.RefuseUsed
-		)
-		-- Another slot has not used its cart, so its first sale still stands.
-		t.eq(
-			select(
-				1,
-				TutorialGrove.AcceptV1({
-					done = false,
-					stepId = "sell",
-					used = false,
-					pieces = 1,
-					logs = 2,
-				})
-			),
-			true
-		)
-	end)
-
-	t.test("starting cash, Murph's bonus and a full cart of oak or birch cover the Rustbucket", function()
-		local GameConfig = t.shared("GameConfig")
-		local SellLogic = t.shared("SellLogic")
-		local TutorialData = t.shared("TutorialData")
-		local function bonusOf(steps)
-			local bonus = 0
-			for _, step in ipairs(steps) do
-				if step.id == "sell" then
-					bonus = step.rewardCash or 0
-				end
-			end
-			return bonus
-		end
-		-- The same pricing SellService uses (SellLogic.PieceValue, then Payout).
-		local function cartPay(woodId: string): number
-			local gross = SellLogic.PieceValue(woodId, "log", TutorialGrove.MaxVolume, nil, 1, false)
-			return SellLogic.Payout(gross, 1)
-		end
-		local function covers(loop: number, steps, label: string)
-			local price = TutorialGrove.TruckPrice(loop)
-			local purse = GameConfig.StartingCash + bonusOf(steps)
-			t.ok(purse + cartPay("oak") >= price, label .. " oak")
-			t.ok(purse + cartPay("birch") >= price, label .. " birch")
-		end
-		covers(2, TutorialData.StepsV2, "v2")
-		-- v1 uses TutorialData.Steps' sell reward, not the v2 step's.
-		covers(1, TutorialData.Steps, "v1")
-	end)
-
-	t.test("the cart refuses at $100 or with a truck owned", function()
-		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 99 }))), true)
-		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 100 }))), TutorialGrove.RefuseUsed)
-		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 200 }))), TutorialGrove.RefuseUsed)
-		t.eq(select(2, TutorialGrove.Accept(offer({ ownsTruck = true, cash = 0 }))), TutorialGrove.RefuseUsed)
-		t.eq(TutorialGrove.TruckPrice(2), 100)
-	end)
-
 	local function spots()
-		local out = {}
-		for _, tree in ipairs(TutorialGrove.Trees) do
-			table.insert(out, tree)
-		end
-		local c = TutorialGrove.Cart
-		local half = TutorialGrove.ZoneSize / 2
-		for _, sx in ipairs({ -1, 1 }) do
-			for _, sz in ipairs({ -1, 1 }) do
-				table.insert(out, { x = c.x + sx * half.X, z = c.z + sz * half.Z })
-			end
-		end
-		table.insert(out, c)
-		return out
+		return TutorialGrove.Trees
 	end
 
 	local function segDist(px, pz, ax, az, bx, bz)
@@ -165,7 +21,7 @@ return function(t)
 		return math.sqrt((px - qx) ^ 2 + (pz - qz) ^ 2)
 	end
 
-	t.test("the grove and the cart stay off the roads, the town paint and the walkers", function()
+	t.test("the grove stays off the roads, the town paint and the walkers", function()
 		for _, spot in ipairs(spots()) do
 			t.ok(
 				math.sqrt(spot.x ^ 2 + (spot.z - 40) ^ 2) < 35,
@@ -213,77 +69,40 @@ return function(t)
 		end
 	end)
 
-	t.test("one small oak fits on the cart", function()
-		local scale = TreeGen.ScaleFor("small")
-		for seed = 4100, 4106 do
-			local skel = TreeGen.Skeleton("oak", seed, scale)
-			local volume = 0
-			for _, section in ipairs(skel.sections) do
-				volume += SectionLogic.Volume(section.thickness, section.length, section.thickness)
-			end
-			t.ok(volume > 5, "a real tree")
-			t.ok(volume <= TutorialGrove.MaxVolume, string.format("seed %d is %0.1f", seed, volume))
-		end
-	end)
-
-	t.test("the cart stays open until cash covers the plot and the truck, and through the build lessons", function()
-		local GameConfig = t.shared("GameConfig")
-		local land = TutorialGrove.LandPrice(2, false)
-		local truck = TutorialGrove.TruckPrice(2)
-		t.eq(land, GameConfig.PlotPrice + TutorialGrove.PlaceBuffer, "no plot yet: its price and the placing buffer")
-		t.eq(TutorialGrove.LandPrice(2, true), TutorialGrove.PlaceBuffer, "plot bought: the buffer only")
-		t.eq(TutorialGrove.LandPrice(1, false), 0, "v1 has no plot to pay for here")
-		-- With the truck's price alone the cart used to close; with the plot to buy it stays open.
-		t.eq(select(1, TutorialGrove.Accept(offer({ cash = truck, landPrice = land }))), true)
-		t.eq(select(1, TutorialGrove.Accept(offer({ cash = truck + land - 1, landPrice = land }))), true)
-		t.eq(
-			select(2, TutorialGrove.Accept(offer({ cash = truck + land, landPrice = land }))),
-			TutorialGrove.RefuseUsed
-		)
-		-- The build lessons cost a few dollars, so the cart serves them too.
-		for _, step in ipairs({ "build", "place", "land" }) do
-			t.eq(select(1, TutorialGrove.Accept(offer({ stepId = step }))), true, step)
-		end
-		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "pad" }))), TutorialGrove.RefuseClosed)
-		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "spawn" }))), TutorialGrove.RefuseClosed)
-	end)
-
 	t.test(
-		"no soft-lock: starting cash, Murph's rewards and a full cart of oak or birch buy the plot, then the truck",
+		"no soft-lock: a few small oaks sold at the sawmill buy the plot, and the plot's payback the truck",
 		function()
 			local GameConfig = t.shared("GameConfig")
 			local SellLogic = t.shared("SellLogic")
+			local ItemCatalog = t.shared("ItemCatalog")
+			local ShopLogic = t.shared("ShopLogic")
 			local TutorialData = t.shared("TutorialData")
 			local byId = {}
 			for _, step in ipairs(TutorialData.StepsV2) do
 				byId[step.id] = step
 			end
-			local function cartPay(woodId: string): number
-				local gross = SellLogic.PieceValue(woodId, "log", TutorialGrove.MaxVolume, nil, 1, false)
-				return SellLogic.Payout(gross, 1)
+			local truck = ShopLogic.Price(ItemCatalog.GetTruck("Rustbucket"), 2)
+			-- The sawmill pays by volume with no cap and no minimum (the cart's
+			-- 80 u3 cap is gone), so a player is never refused: the worst case is
+			-- the smallest tutorial oak, sold again and again.
+			local least = math.huge
+			for seed = 4100, 4106 do
+				local skel = TreeGen.Skeleton("oak", seed, TreeGen.ScaleFor("small"))
+				local volume = 0
+				for _, section in ipairs(skel.sections) do
+					volume += SectionLogic.Volume(section.thickness, section.length, section.thickness)
+				end
+				t.ok(volume > 5, "a real tree")
+				least = math.min(least, SellLogic.Payout(SellLogic.PieceValue("oak", "log", volume, nil, 1, false), 1))
 			end
-			-- Cash is what a new player can have by the time each is bought: the cart
-			-- only ever pays up to MaxVolume. The first sale reward lands before the
-			-- plot, the plot's reward right after it, and the placing buffer comes out
-			-- before the truck. Worst case is oak (the cheapest wood).
-			for _, woodId in ipairs({ "oak", "birch" }) do
-				local before = GameConfig.StartingCash + byId.sell.rewardCash
-				local cart = cartPay(woodId)
-				t.ok(before + cart >= GameConfig.PlotPrice, woodId .. ": the cart alone can fund the plot")
-				local total = before + cart + byId.plot.rewardCash
-				local need = GameConfig.PlotPrice + TutorialGrove.TruckPrice(2) + TutorialGrove.PlaceBuffer
-				t.ok(
-					total >= need,
-					string.format("%s: $%d for plot + truck + buffer, $%d to spend", woodId, need, total)
-				)
-			end
+			t.ok(least > 0, "an oak always pays something")
+			local before = GameConfig.StartingCash + byId.sell.rewardCash
+			local oaks = math.ceil((GameConfig.PlotPrice - before) / least)
+			t.ok(oaks <= 8, string.format("%d small oaks ($%0.1f each) to afford the plot", oaks, least))
+			-- Bought, the plot pays Murph's share back: the box is within reach.
+			local after = before + oaks * least - GameConfig.PlotPrice + byId.plot.rewardCash
+			t.ok(after + 8 * least >= truck, "the Rustbucket box follows from the plot's payback and a few more oaks")
 			t.eq(byId.plot.cashPrice, GameConfig.PlotPrice)
-			-- Even at the Rustbucket's $100 (the next price): plot, then the truck, still reachable.
-			local worst = GameConfig.PlotPrice + 100 + TutorialGrove.PlaceBuffer
-			t.ok(
-				GameConfig.StartingCash + byId.sell.rewardCash + cartPay("oak") + byId.plot.rewardCash >= worst,
-				"a $100 truck is still reachable"
-			)
 		end
 	)
 end

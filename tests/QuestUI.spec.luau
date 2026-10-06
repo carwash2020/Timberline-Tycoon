@@ -43,10 +43,6 @@ return function(t)
 			Kit.placeAt(shop, spot.cframe)
 			shop.Parent = map
 		end
-		local grove = Instance.new("Model")
-		grove.Name = "TutorialGrove"
-		Kit.part(grove, "CartZone", Vector3.new(7, 12, 7), CFrame.new(-13, 6, 42), Color3.new(1, 1, 1))
-		grove.Parent = map
 		local plots = Instance.new("Model")
 		plots.Name = "Plots"
 		local plot = Instance.new("Model")
@@ -131,7 +127,7 @@ return function(t)
 		t.eq(
 			QuestUI.TrackerTitle(2, 7, true),
 			string.format("WHAT'S NEW · 2/%d", TutorialData.RefresherLast),
-			"the refresher ends at the cart"
+			"the refresher ends at the first sale"
 		)
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Uid = "a" }), "e"), true, "any other tree while one is awake")
 		t.eq(QuestUI.TutorialTree(tree({ HP = 40, Elder = false, Uid = "a" }), ""), true)
@@ -241,8 +237,8 @@ return function(t)
 		end
 		t.ok(seen.wood, "the drag step points at wood (the load step is retired; QuestUI still finds a bed)")
 		t.ok(
-			seen.landOffice and seen.tree and seen.murphCart and seen.dealership,
-			"chop, sell at the cart, buy a plot at the Land Office, then buy the truck"
+			seen.landOffice and seen.tree and seen.sellPad and seen.dealership and not seen.murphCart,
+			"chop, sell at the sawmill, buy a plot at the Land Office, then buy the truck"
 		)
 		local fs = require("@lune/fs")
 		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")

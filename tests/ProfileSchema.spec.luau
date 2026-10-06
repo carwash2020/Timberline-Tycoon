@@ -274,125 +274,28 @@ return function(t)
 		t.eq(data.tutorialStep, step, "a second join does not remap again")
 	end)
 
-	t.test("UnstickCart counts the plot: cash for the truck alone is not enough for a save with no plot", function()
-		local TutorialGrove = t.loader():shared("TutorialGrove")
-		local GameConfig = t.loader():shared("GameConfig")
-		local truck = TutorialGrove.TruckPrice(2)
-		local function stuckWith(cash, claimed)
+	t.test(
+		"Murph's cart is gone: no cart fields or soft-lock helper, and a save on the sell step keeps its step",
+		function()
 			local Schema, data = fresh()
-			data.cash = cash
-			data.ownedTrucks = {}
-			data.plot.claimed = claimed
-			data.cartUsed = false
-			data.onboarding = { TutorialCart = true }
-			Schema.UnstickCart(data)
-			return data.cartUsed
-		end
-		-- stuck = the save is marked so the old cart flag cannot lock it out.
-		-- No plot yet: the cart must still open for truck money (it is the plot's too).
-		t.eq(stuckWith(truck + 5, false), true, "the truck's price alone leaves a plotless save stuck")
-		t.eq(stuckWith(GameConfig.PlotPrice + truck + TutorialGrove.PlaceBuffer, false), false, "enough for both")
-		-- Plot bought: the truck and the placing buffer are all it needs.
-		t.eq(stuckWith(truck + TutorialGrove.PlaceBuffer - 1, true), true)
-		t.eq(stuckWith(truck + TutorialGrove.PlaceBuffer, true), false)
-	end)
-	t.test("UnstickCart opens the cart for a stuck save and leaves a truck owner unchanged", function()
-		local Schema, stuck = fresh()
-		stuck.cash = 50
-		stuck.ownedTrucks = {}
-		stuck.onboarding = { TutorialCart = true }
-		stuck.slots = {
-			{ fresh = false, cash = 40, ownedTrucks = {}, cartVolume = 12 },
-			{ fresh = true, cash = 0, ownedTrucks = {}, cartVolume = 0, cartUsed = false },
-			{ fresh = false, cash = 10, ownedTrucks = { "Rustbucket" }, cartVolume = 5, cartUsed = false },
-		}
-		local Util = t.loader():shared("Util")
-		Schema.UnstickCart(stuck)
-		t.eq(stuck.cartVolume, 0)
-		t.eq(stuck.cartUsed, true, "v1 still refuses a second sale on this slot")
-		t.eq(stuck.onboarding.TutorialCart, true, "the old flag stays; the volume is what opens the cart")
-		t.eq(stuck.onboarding.cartUsedMigrated, true)
-		t.eq(stuck.slots[1].cartVolume, 12, "a parked slot keeps what it already sold")
-		t.eq(stuck.slots[1].cartUsed, true)
-		t.eq(stuck.slots[2].cartUsed, false, "a fresh slot is not marked used")
-		t.eq(stuck.slots[3].cartVolume, 5, "a slot that already has a truck is not rewritten")
-		t.eq(stuck.slots[3].cartUsed, false)
-		-- A later sale is remembered, and the next load must not wipe it.
-		stuck.cartVolume = 30
-		Schema.UnstickCart(stuck)
-		t.eq(stuck.cartVolume, 30)
-
-		local _, owned = fresh()
-		owned.cash = 20
-		owned.ownedTrucks = { "Rustbucket" }
-		owned.onboarding = { TutorialCart = true }
-		local before = Util.deepCopy(owned)
-		Schema.UnstickCart(owned)
-		t.eq(owned, before, "a save with a truck stays unchanged")
-	end)
-
-	t.test("S13: the cart total is per slot", function()
-		local loader = t.loader()
-		local Schema = loader:server("ProfileSchema")
-		local SaveSlotLogic = loader:shared("SaveSlotLogic")
-		local TutorialGrove = loader:shared("TutorialGrove")
-		local TutorialData = loader:shared("TutorialData")
-		local data = loader:shared("Util").deepCopy(Schema.Template)
-		Schema.Migrate(data)
-		data.cartVolume = TutorialGrove.MaxVolume
-		data.ownedTrucks = {}
-		data.tutorialDone = false
-		local sellAt = 1
-		for i, step in ipairs(TutorialData.StepsV2) do
-			if step.id == "sell" then
-				sellAt = i
+			t.eq(Schema.UnstickCart, nil)
+			t.eq(Schema.Template.cartVolume, nil)
+			t.eq(Schema.Template.cartUsed, nil)
+			local TutorialData = t.loader():shared("TutorialData")
+			local sellAt = 1
+			for i, step in ipairs(TutorialData.StepsV2) do
+				if step.id == "sell" then
+					sellAt = i
+				end
 			end
+			data.tutorialDone = false
+			data.tutorialStep = sellAt
+			data.tutorialOrder = TutorialData.OrderV2
+			data.onboarding = { TutorialCart = true } -- an old save's flag is harmless
+			Schema.Migrate(data)
+			t.eq(TutorialData.StepsV2[data.tutorialStep].id, "sell")
 		end
-		data.tutorialStep = sellAt
-		local n = 0
-		local function guid(): string
-			n += 1
-			return "s13-" .. n
-		end
-		SaveSlotLogic.Migrate(data, Schema.Template, guid, 1)
-		t.eq(data.slots[1].cartVolume, TutorialGrove.MaxVolume)
-		t.eq(data.slots[2].cartVolume, 0)
-		t.eq(data.slots[2].fresh, true)
-		local hooks = {
-			commit = function() end,
-			setCash = function(amount)
-				data.cash = amount
-			end,
-			rebuild = function() end,
-		}
-		local ok, why = SaveSlotLogic.Perform(data, "load", 2, 1000, Schema.Template, guid, hooks)
-		t.eq(ok, true, why)
-		t.eq(data.activeSlot, 2)
-		t.eq(data.cartVolume, 0, "a fresh slot has not sold at the cart")
-		data.tutorialStep = sellAt
-		data.tutorialDone = false
-		local trucks = data.ownedTrucks
-		t.eq(
-			select(
-				1,
-				TutorialGrove.Accept({
-					done = false,
-					stepId = "sell",
-					pieces = 1,
-					volume = 10,
-					cartVolume = TutorialGrove.SavedVolume(data),
-					cash = data.cash,
-					ownsTruck = type(trucks) == "table" and #trucks > 0,
-					truckPrice = TutorialGrove.TruckPrice(2),
-				})
-			),
-			true
-		)
-		local again, whyAgain = SaveSlotLogic.Perform(data, "load", 1, 1000 + 120, Schema.Template, guid, hooks)
-		t.eq(again, true, whyAgain)
-		t.eq(data.cartVolume, TutorialGrove.MaxVolume)
-		t.eq(TutorialGrove.SavedVolume(data), TutorialGrove.MaxVolume)
-	end)
+	)
 
 	t.test("MigrateV2 reopens a finished tutorial as a refresher of the new steps, once", function()
 		local Schema, done = v1Save()

@@ -207,7 +207,7 @@ end
 -- at its old index. The funnel remembers every step a player has reached
 -- (profile.onboarding, by step id). When that index now holds a different
 -- step, move to the latest one they reached, even if its new index is
--- lower (the cart sale sits before the truck). Progress toward it is kept.
+-- lower (the first sale sits before the truck). Progress toward it is kept.
 local function realign(profile: Profile)
 	local list = steps()
 	local latest = 0
@@ -315,7 +315,7 @@ function QuestService.Event(player: Player, event: TutorialEvent, amount: number
 	-- (they already had the first-sale bonus, or never will: it's once).
 	if reward and reward > 0 and not onRefresher(profile) then
 		EconomyService.AddCash(player, reward, "tutorial: " .. step.id, "tutorial")
-		-- The next card already says it (the cart sale's thank-you), so a toast
+		-- The next card already says it (the first sale's thank-you), so a toast
 		-- on top would be a second pop-up for the same thing.
 		if step.rewardToast ~= false then
 			notify(player, string.format("Murph chipped in %s!", Util.formatCash(reward)))

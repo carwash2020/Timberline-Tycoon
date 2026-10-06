@@ -19,9 +19,6 @@ return function(t)
 		end
 		local lot = WorldLayout.ParkingLot
 		t.ok(not overlaps(lot.x0, lot.x1, lot.z0, lot.z1), "parking lot")
-		local half = TutorialGrove.ZoneSize.X / 2
-		local cart = TutorialGrove.Cart
-		t.ok(not overlaps(cart.x - half, cart.x + half, cart.z - half, cart.z + half), "cart")
 		for _, tree in ipairs(TutorialGrove.Trees) do
 			t.ok(not overlaps(tree.x - 2, tree.x + 2, tree.z - 2, tree.z + 2), "grove tree")
 		end

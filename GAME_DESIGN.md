@@ -464,7 +464,7 @@ game.
 
 ## 11. New player experience (first 10 minutes)
 
-> **v2:** Murph's steps keep their ids, in this order (`TutorialData.StepsV2`): fell a tree, drag a log, sell it at his cart, claim a free plot, buy the Rustbucket, load the bed, sell at the mill, sell $120 more ($25 from Murph), buy the Steel Axe ($160). A save from an older step list is remapped by index (`TutorialData.ApplyOrder`). A new player starts with $20.
+> **v2:** Murph's steps keep their ids, in this order (`TutorialData.StepsV2`): fell a tree, drag a log, sell it at the sawmill, claim a free plot, buy the Rustbucket, load the bed, sell at the mill, sell $120 more ($25 from Murph), buy the Steel Axe ($160). A save from an older step list is remapped by index (`TutorialData.ApplyOrder`). A new player starts with $20.
 
 A mentor NPC — **Murph**, a retired lumberjack — teaches by doing, not by
 dialogue walls. One objective at a time in a quest tracker, beacon guidance,

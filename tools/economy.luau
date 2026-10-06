@@ -37,6 +37,7 @@ local SectionLogic = modules:shared("SectionLogic")
 local SawmillLogic = modules:shared("SawmillLogic")
 
 local TutorialData = modules:shared("TutorialData")
+local TutorialGrove = modules:shared("TutorialGrove")
 local PLOT_REWARD = 0
 for _, step in ipairs(TutorialData.StepsV2) do
 	if step.id == "plot" then
@@ -63,12 +64,17 @@ local A = {
 	aimSec = 1.5, -- s to walk to and line up each cut after the first
 	tripOverhead = 8, -- s per round trip: get in, park, get out (§17)
 	sellSec = 4, -- s at the pad (§17)
+	-- The first sale is at the sawmill's sell pad (Murph's cart is gone): from
+	-- the nearest tutorial oak to the pad at (0, 86) (WorldPlan.Town().sellPad,
+	-- 24 studs wide), dragging the log, so it is a straight line each way.
+	padX = 0,
+	padZ = 86,
 	murphReward = 25, -- paid on the first sale (the tutorial's sell step)
 	murphAfter = 0, -- the bonus lands with that sale, not after a later grind
 	-- The first plot is bought at the Land Office before the Rustbucket
 	-- (GameConfig.PlotPrice), and Murph chips in plotReward (TutorialData's
 	-- plot step) once it is bought. Until the truck, a player walks oaks to
-	-- Murph's cart one at a time: each round trip is two walks, the cut and
+	-- the sawmill's sell pad one at a time: each round trip is two walks, the cut and
 	-- the sale (that is the $/h on foot, footRate).
 	firstPlotPrice = GameConfig.PlotPrice,
 	plotReward = PLOT_REWARD,
@@ -497,9 +503,15 @@ end
 local function firstSale()
 	local oak = WoodData.Get("oak")
 	local rusty = ItemCatalog.GetAxe("RustyAxe")
-	-- On foot: one oak, walked to Murph. The truck is bought after this sale.
+	-- On foot: one oak, dragged to the sawmill's sell pad. The truck is bought
+	-- after this sale. The walk is the straight line from the nearest grove
+	-- oak to the pad (about 50 studs).
 	local perTree = treeWork(rusty, oak, 0)
-	local walk = 80 / A.walkSpeed
+	local nearest = math.huge
+	for _, spot in ipairs(TutorialGrove.Trees) do
+		nearest = math.min(nearest, math.sqrt((spot.x - A.padX) ^ 2 + (spot.z - A.padZ) ^ 2))
+	end
+	local walk = nearest / A.walkSpeed
 	local secs = (walk + perTree + A.sellSec) / EFFICIENCY
 	local tree = TREES.oak.mean.volume
 	-- Later oaks cost the walk back as well: $/h on foot, before any truck.
@@ -546,7 +558,7 @@ local function simulate()
 		end
 	end
 
-	-- The plot comes first: save for it on foot at Murph's cart, then buy it.
+	-- The plot comes first: save for it on foot at the sell pad, then buy it.
 	while cash < A.firstPlotPrice do
 		earn(math.min(60, (A.firstPlotPrice - cash) / footRate * 3600 + 1e-6), footRate)
 	end
@@ -594,7 +606,7 @@ local function simulate()
 		while cash < price do
 			local r = bestRate(owned, cash)
 			if r <= 0 then
-				r = footRate -- no truck yet: oaks walked to Murph's cart
+				r = footRate -- no truck yet: oaks walked to the sell pad
 			end
 			earn(math.min(60, (price - cash) / r * 3600 + 1e-6), r)
 		end
