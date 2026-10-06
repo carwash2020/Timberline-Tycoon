@@ -782,6 +782,7 @@ safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, n
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("RegionWake.Init", RegionWake.Init)
 safely("NPCService.Init", NPCService.Init, mapFolder)
+safely("PlotService.HookSalesman", PlotService.HookSalesman, mapFolder) -- Old Hank's Talk opens the plot sale
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
 if CoreLoop.V2() then
