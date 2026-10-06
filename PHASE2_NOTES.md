@@ -1617,6 +1617,36 @@ What changed (branch `claude/real-stores`):
       item. Open it at someone else's range or as someone else: refused.
 - [ ] Tutorial: Murph's steps still advance; the Rustbucket step needs the box
       opened on your plot (as before) at the Dealership (open 7 AM to 8 PM).
+## Pumpkins on the ground, walkers face forward, calmer grass (claude/fix-pumpkins-npcs)
+
+- Cause of the sunk pumpkins: EventService placed each patch with `PivotTo`,
+  but a Model with no PrimaryPart pivots on its bounding-box centre, so the
+  patch's middle sat on y = 0 and half of every pumpkin was underground. It now
+  uses `Kit.placeAt` (origin on the ground) and then probes the drawn terrain
+  under both pumpkins (`TerrainBuilder.LiftOnto`) and lifts the patch onto it.
+  MapBuilder now runs the same `standOnGround` lift over town lamps, fences,
+  props and signposts, so small town decor cannot sink either.
+- `Shared/FacingLogic` (YawOf, Face, Direction, CFrameFacing) is the one place
+  that turns a direction into a yaw for a -Z-front model; `NPCData.YawOf`
+  delegates to it. `tests/FacingLogic.spec` checks that every route walker's
+  look vector points along its motion for its whole loop. The walk lean was
+  tipping walkers backwards (positive root pitch) and is now forward.
+- Grass tufts: blades 0.62x as tall, muted tint and tips (they were bright
+  yellow-green and read as glowing under the night bloom).
+
+### Studio checks
+- [ ] Join during the Halloween event (or set the event override): pumpkin
+      patches beside the town lamps sit on top of the ground, whole, with a
+      little ground showing under the round bottoms, near the spawn too
+- [ ] Hay bales, crates, signs, fences and lamps in town rest on the ground
+- [ ] Watch Rosa, Pip and Bram (and anyone else who strolls) for a full loop:
+      they walk face first, turn at corners and at their pauses, never moonwalk;
+      standing NPCs turn their front toward you when you are close
+- [ ] Walkers lean slightly forward, not back
+- [ ] Grass near the spawn and Murph's camp is knee height and a muted green,
+      not neon, in the day and at night
+- [ ] At night in front of the spawn: if a flat saturated blue plane still
+      shows at the bottom of the screen, send a screenshot and the Output
 ## Plain plot ground (no grass on homestead pads)
 
 - Pad Looks are Loam, Dry Clearing (Sand), Slate Flat, Pine Needles, Packed
@@ -1829,3 +1859,50 @@ The terrain yields by time, not one frame per chunk. Every phase prints a
       hotbar on PC, phone and Xbox, Close (and B) works, nothing overlaps the tool bar.
 - [ ] The sawmill blade turns smoothly and slowly, on High and on Low graphics
       (Settings), in town and on your own plot's sawmill.
+
+## Short tutorial and fewer pop-ups (6 October 2026)
+
+Connor's feedback: the tutorial was far too long (it walked through every axe)
+and there were way too many pop-ups.
+
+- **Eight steps, not sixteen** (`TutorialData.StepsV2`): chop a tree, drag a
+  log, sell it at Murph's cart, buy a plot at the Land Office, place one item
+  from the Blueprint Store, buy the Rustbucket box, place its pad, press the
+  pad's button. The tutorial ends when the truck rolls out. Retired (kept as
+  ids in `TutorialData.RetiredV2`, never reused): build, land, load, mill,
+  loads, loads2, loads3, steel (and the earlier plant).
+- **Saves midway** (`TutorialData.ApplyOrder`, order 6): a save on build goes to
+  place, on land to truck, on load / mill / the sell-more loads / steel the
+  tutorial is simply finished (`QuestService.Start`); finished stays finished.
+  Progress toward a cut step restarts at 0.
+- The next axe is one non-blocking line on the tracker after the tutorial
+  (`NextGoal`: "Buy the Steel Axe ($160)", arrow to the Tool Shed) and Murph's
+  farewell mentions the sawmill and Tink's Tool Shed.
+- **Notice policy** (`Shared/NoticePolicy`, used by `HUD.Toast`): critical
+  errors always show; at most two toasts and one non-critical at a time; a 1 s
+  cooldown; no repeats of the same text within 8 s; a short queue (4) that drops
+  the oldest low-value one first; during the first-sale flow (tutorial step 1
+  to the cart sale, and while the save loads) only errors show. Ambient town
+  chatter (NPC bubbles) is also quiet then; Talk still answers. The Studio
+  stopwatch no longer pops toasts (`MilestoneService.ToastStopwatch`, off). The
+  "put your axe away" toast shows once per session. "Murph chipped in" is not
+  toasted for the cart sale (the plot card says it).
+
+### Studio checks
+- [ ] Fresh save. Count the pop-ups from join to the truck rolling out. Expected:
+      Murph's card and the tracker for each of the 8 steps and the arrow;
+      no toasts while you chop, drag and sell the first log (only errors,
+      e.g. too far away); no "Sold 1 log" or "Murph chipped in $25" toast on
+      that first sale; one "Murph chipped in $175!" toast on the plot; no region
+      names, Field Guide, daily or stopwatch toasts before the tutorial is done.
+- [ ] After the truck rolls out: the tracker shows "Buy the Steel Axe ($160)" with
+      the arrow; Murph's farewell says to sell wood at the sawmill and visit Tink.
+      There is no step about the load, the mill, the sell-more loads or an axe.
+- [ ] Skip tutorial (tap twice) still works on any step and pays nothing.
+- [ ] Mash a chop out of range: "Too far away" still shows (not twice at once).
+      Try to buy something you cannot afford: the toast shows.
+- [ ] Walk through town after the tutorial: at most one non-error toast at a time,
+      a second after the first; walking region to region does not stack names.
+- [ ] Old save midway (set `tutorialStep` with `tutorialOrder = 5` in a test
+      profile): on "build" you land on the place step, on "mill" the tutorial
+      is finished, a finished save stays finished.

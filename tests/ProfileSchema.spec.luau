@@ -226,10 +226,16 @@ return function(t)
 			local landed = if index <= 1 then 1 else TutorialData.RemapV2Step(index)
 			t.eq(data.tutorialStep, landed, step.id)
 			-- Saved indexes are the plot-first list, which still names the
-			-- removed plant step. That one lands on the loads after the mill.
+			-- removed plant step. The steps cut from the short tutorial land on
+			-- the next one that remains, or past the end (done).
 			local from = TutorialData.OrderV2Previous[index]
-			local expectId = if index <= 1 then "fell" elseif from == "plant" then "loads" else from
-			t.eq(TutorialData.StepsV2[data.tutorialStep].id, expectId, step.id)
+			if index <= 1 then
+				t.eq(TutorialData.StepsV2[data.tutorialStep].id, "fell", step.id)
+			elseif TutorialData.RetiredV2[from] and not TutorialData.StepsV2[landed] then
+				t.eq(data.tutorialStep, #TutorialData.StepsV2 + 1, step.id .. ": a cut step past the truck is the end")
+			else
+				t.eq(TutorialData.StepsV2[data.tutorialStep].id, from, step.id)
+			end
 			if index <= 1 then
 				t.eq(data.tutorialProgress, 0, "the old first step was the plot; the new one is fell")
 			else
@@ -408,9 +414,9 @@ return function(t)
 		local _, mid = v1Save()
 		mid.tutorialStep = 5
 		Schema.MigrateV2(mid, 20)
-		-- Step 5 of the plot-first list is the truck; the build lessons now
-		-- sit before it, so the same step is index 8.
-		t.eq(mid.tutorialStep, 8)
+		-- Step 5 of the plot-first list is the truck; the plot and one build
+		-- lesson now sit before it, so the same step is index 6.
+		t.eq(mid.tutorialStep, 6)
 		t.eq(mid.tutorialRefresher, false)
 	end)
 

@@ -177,7 +177,7 @@ end
 -- the town's y = 0 anywhere under its footprint (a 3 x 3 grid of rays), the
 -- whole building goes up by that much. Nothing moves when the ground is
 -- where it was written.
-local function standOnGround(model: Model): Model
+local function standOnGround(model: Model, quiet: boolean?): Model
 	local cf, size = model:GetBoundingBox()
 	local lift = 0
 	for _, fx in ipairs({ -0.45, 0, 0.45 }) do
@@ -187,7 +187,9 @@ local function standOnGround(model: Model): Model
 		end
 	end
 	if lift > 0.15 then
-		print(string.format("[MapBuilder] %s was %.2f studs under the ground: lifted", model.Name, lift))
+		if not quiet then
+			print(string.format("[MapBuilder] %s was %.2f studs under the ground: lifted", model.Name, lift))
+		end
 		model:PivotTo(model:GetPivot() + Vector3.new(0, lift, 0))
 	end
 	return model
@@ -392,16 +394,16 @@ step("4. The town", function()
 		for _, cf in ipairs(town.lamps) do
 			local lamp = BuildingArt.LampPost()
 			CollectionService:AddTag(lamp, "StreetLamp") -- clients light them at night
-			place(atomic(lamp), cf)
+			standOnGround(place(atomic(lamp), cf), true)
 		end
 		for _, fence in ipairs(town.fences) do
-			place(atomic(BuildingArt.Fence(fence.length)), fence.cframe)
+			standOnGround(place(atomic(BuildingArt.Fence(fence.length)), fence.cframe), true)
 		end
 		for _, prop in ipairs(town.props) do
-			place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe)
+			standOnGround(place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe), true)
 		end
 		for _, sign in ipairs(town.signs) do
-			place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe)
+			standOnGround(place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe), true)
 		end
 		-- Saw-cut rounds on the shop paths (looks only). Not on the spawn
 		-- walk: that stretch stays open for the tutorial grove.

@@ -23,6 +23,7 @@
 -- picks among them.
 
 local CharacterArt = require(script.Parent.Art.CharacterArt)
+local FacingLogic = require(script.Parent.FacingLogic)
 local FerryLogic = require(script.Parent.FerryLogic)
 local PlotSalesmanData = require(script.Parent.PlotSalesmanData)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
@@ -926,7 +927,7 @@ end
 -- The yaw (radians) that faces along (dx, dz): CFrame.Angles(0, yaw, 0)
 -- looks that way (0 = -Z).
 function NPCData.YawOf(dx: number, dz: number): number
-	return math.atan2(-dx, -dz)
+	return FacingLogic.YawOf(dx, dz)
 end
 
 -- Turning to face you: within FaceRange studs a standing NPC (and a
