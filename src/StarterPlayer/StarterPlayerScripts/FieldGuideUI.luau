@@ -25,6 +25,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local ForestArt = require(ReplicatedStorage.Shared.Art.ForestArt)
 local HUD = require(script.Parent.HUD)
+local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
@@ -41,8 +42,8 @@ end
 
 function FieldGuideUI._close()
 	guideOpen = false
+	MenuPad.Close(nil) -- the guide's selection goes back to the button that opened it (or is let go)
 	ShopUI.Close()
-	MenuPad.Close(nil)
 end
 
 function FieldGuideUI.ApplyKey(key: Enum.KeyCode): string?
@@ -260,6 +261,13 @@ function FieldGuideUI.Start()
 	b.face.Activated:Connect(function()
 		open(page)
 	end)
+	HudNav.Add(b.face, {
+		id = "guide",
+		label = "FIELD GUIDE",
+		press = function()
+			open(page)
+		end,
+	})
 	-- The pad's shortcut, and its glyph just right of the button (UI-15).
 	HUD.PadShortcut(Enum.KeyCode.DPadLeft, function() -- HudRules.PadKeys.guide
 		return b.root.Visible

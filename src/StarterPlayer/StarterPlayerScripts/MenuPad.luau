@@ -1,12 +1,13 @@
 --!strict
 -- MenuPad: gamepad focus for a menu. Opening selects the first button.
--- B and Esc close it and clear that selection. Callers own when a menu
--- is open; this only moves GuiService.SelectedObject.
+-- B and Esc close it and give the selection back. Callers own when a menu
+-- is open; the selection rules (select, trap in the panel, remember the HUD
+-- button that opened it, return to it) are GamepadNav's.
 
-local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local GamepadNav = require(script.Parent.GamepadNav)
 
 local MenuPad = {}
 
@@ -15,22 +16,19 @@ function MenuPad.Closes(key: Enum.KeyCode): boolean
 	return key == cancel.gamepad or key == cancel.keyboard
 end
 
-function MenuPad.Open(button: GuiObject?)
+-- Selects `button`. Give `root` (the panel) and the selection also stays
+-- inside it until it closes; leave it off for a bar that sits among the HUD.
+function MenuPad.Open(button: GuiObject?, root: GuiObject?)
 	if button then
-		GuiService.SelectedObject = button
+		GamepadNav.Focus(button, root)
 	end
 end
 
--- Clears the selection when it is `root` or inside `root`. A nil root
--- clears whatever is selected.
+-- Gives the selection back when it is `root` or inside `root`: to the button
+-- that opened the menu, else cleared. A nil root lets go of whatever is
+-- selected.
 function MenuPad.Close(root: Instance?)
-	local selected = GuiService.SelectedObject
-	if not selected then
-		return
-	end
-	if root == nil or selected == root or selected:IsDescendantOf(root) then
-		GuiService.SelectedObject = nil
-	end
+	GamepadNav.Restore(root)
 end
 
 return MenuPad

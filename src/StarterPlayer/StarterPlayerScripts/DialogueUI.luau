@@ -7,12 +7,12 @@
 -- D-pad shortcuts, so this card does not bind those keys.
 
 local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local Net = require(ReplicatedStorage.Shared.Net)
+local GamepadNav = require(script.Parent.GamepadNav)
 local UITheme = require(script.Parent.UITheme)
 
 local DialogueUI = {}
@@ -94,10 +94,7 @@ function DialogueUI.Start()
 			ContextActionService:UnbindAction(ACTION)
 			bound = false
 		end
-		local selected = GuiService.SelectedObject
-		if selected == yes or selected == no then
-			GuiService.SelectedObject = nil
-		end
+		GamepadNav.Restore(column) -- the card's own selection goes; walking again
 	end
 
 	local function choose(which: string)
@@ -152,7 +149,7 @@ function DialogueUI.Start()
 		holder.Visible = true
 		bind()
 		if choosing then
-			GuiService.SelectedObject = yes
+			GamepadNav.Focus(yes, column) -- Yes is selected, and the stick stays on the card
 		end
 	end
 

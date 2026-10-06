@@ -80,10 +80,14 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
+local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
+local QuickMenuLogic = require(ReplicatedStorage.Shared.QuickMenuLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
+local GamepadNav = require(script.Parent.GamepadNav)
 local HudLayout = require(script.Parent.HudLayout)
+local HudNav = require(script.Parent.HudNav)
 local HudRules = require(script.Parent.HudRules)
 local UITheme = require(script.Parent.UITheme)
 
@@ -134,6 +138,7 @@ type Chip = {
 type Side = {
 	button: UITheme.Button,
 	key: Enum.KeyCode?,
+	hint: Enum.KeyCode?, -- a button that opens it elsewhere (the quick menu's): only its glyph shows
 	glyph: GuiObject?,
 	onPress: () -> (),
 }
@@ -502,14 +507,13 @@ function HUD.Popup(card: GuiObject, first: GuiObject?)
 		if gui then
 			gui.Enabled = not open
 		end
-		local selected = GuiService.SelectedObject
 		if card.Visible then
 			local pick = popupFirst[card]
 			if pick and HudRules.PadSelects(UITheme.Device()) then
-				GuiService.SelectedObject = pick
+				GamepadNav.Focus(pick, card) -- selects it, keeps the stick in the card, remembers the button
 			end
-		elseif selected and selected:IsDescendantOf(card) then
-			GuiService.SelectedObject = nil -- back to walking
+		else
+			GamepadNav.Restore(card) -- back to the HUD button that opened it, or to walking
 		end
 		if open and not popupCloseBound then
 			popupCloseBound = true
@@ -1161,9 +1165,12 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	local phone = UITheme.IsPhone()
 	local spec = UITheme.Sized("SideButton")
 	local face = spec.size or Vector2.new(110, 40)
-	local console = device == "console" and side.key ~= nil
-	local width = if console then 150 else face.X
-	side.button.root.Size = UDim2.fromOffset(width, face.Y + 3)
+	local console = device == "console" and (side.key ~= nil or side.hint ~= nil)
+	local width, height = face.X, face.Y
+	if device == "console" then
+		width, height = GamepadNavLogic.PadSize(width, height) -- big enough for a stick to land on
+	end
+	side.button.root.Size = UDim2.fromOffset(width, height + 3)
 	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
@@ -1289,6 +1296,8 @@ export type SideOptions = {
 	style: string,
 	order: number, -- top to bottom
 	key: Enum.KeyCode?, -- the gamepad button that presses it
+	glyph: Enum.KeyCode?, -- a button that does the same, bound elsewhere: shows its glyph only
+	tile: boolean?, -- false: no tile for it in the quick menu (the menu's own button)
 	onPress: () -> (),
 }
 
@@ -1315,8 +1324,9 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 		return button
 	end
 	local glyph: GuiObject? = nil
-	if opts.key then
-		local g = UITheme.Glyph(opts.key, 22)
+	local glyphKey = opts.key or opts.glyph
+	if glyphKey then
+		local g = UITheme.Glyph(glyphKey, 22)
 		g.AnchorPoint = Vector2.new(0, 0.5)
 		g.Position = UDim2.new(0, -26, 0.5, 0) -- in the face's left padding
 		g.Parent = button.face
@@ -1324,8 +1334,19 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	end
 	button.root.Parent = column
 	button.face.Activated:Connect(opts.onPress)
-	local side: Side = { button = button, key = opts.key, glyph = glyph, onPress = opts.onPress }
+	local side: Side = { button = button, key = opts.key, hint = opts.glyph, glyph = glyph, onPress = opts.onPress }
 	table.insert(sides, side)
+	-- A gamepad walks the HUD's buttons (HudNav) and the quick menu lists it.
+	local tile = opts.tile ~= false
+	HudNav.Add(button.face, {
+		id = QuickMenuLogic.IdFor(opts.name),
+		labelOf = if tile
+			then function(): string
+				return QuickMenuLogic.Label(button.face.Text)
+			end
+			else nil,
+		press = if tile then opts.onPress else nil,
+	})
 	local device: UITheme.Device = UITheme.Device()
 	layoutSide(side, device)
 	button.root:GetPropertyChangedSignal("Visible"):Connect(queueArrange)

@@ -80,9 +80,10 @@ BadgeData.NotBuilt = {}
 BadgeData.MinTapPx = 44
 
 -- Menu binds. Not ButtonX and not keyboard E (those are world prompts).
--- Close on a gamepad is ButtonB, which HUD.Popup already binds.
+-- Close on a gamepad is ButtonB, which HUD.Popup already binds. A gamepad
+-- has no bind of its own for Badges any more: the View button opens the
+-- quick menu (QuickMenuLogic.OpenGamepad) and Badges is one of its tiles.
 BadgeData.OpenKeyboard = Enum.KeyCode.B
-BadgeData.OpenGamepad = Enum.KeyCode.ButtonSelect -- not L3: the left stick click is used for running
 BadgeData.CloseKeyboard = Enum.KeyCode.Escape
 
 local ALL: { BadgeDef } = {

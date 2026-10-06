@@ -31,7 +31,11 @@ return function(t)
 	t.test("the card and the keeper module never lock walking", function()
 		local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/DialogueUI.luau")
 		local drag = fs.readFile("src/StarterPlayer/StarterPlayerScripts/DragController.luau")
-		t.ok(string.find(ui, "SelectedObject", 1, true) ~= nil)
+		t.ok(
+			string.find(ui, "GamepadNav.Focus(yes, column)", 1, true) ~= nil,
+			"Yes is selected through the shared helper"
+		)
+		t.ok(string.find(ui, "GamepadNav.Restore(column)", 1, true) ~= nil, "and the selection is given back on close")
 		t.ok(string.find(ui, "NextSelectionLeft", 1, true) ~= nil)
 		t.ok(string.find(ui, "NextSelectionRight", 1, true) ~= nil)
 		t.ok(string.find(ui, "ButtonB", 1, true) ~= nil)

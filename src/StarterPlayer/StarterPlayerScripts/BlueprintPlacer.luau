@@ -8,13 +8,18 @@
 --   * Green where PlotLogic.Check allows it (and you can pay), red with the
 --     reason where it doesn't. The server checks again: this is a preview.
 --   * Click or PLACE (R2 on a gamepad) to place; R or ROTATE (D-pad right)
---     for a quarter turn; Q or CANCEL (B) to stop. After placing something new you
+--     for a quarter turn; Q or CANCEL (B) to stop. On a gamepad, hold LT to
+--     lock the ghost and flick the LEFT (movement) stick: left or right
+--     turns it a quarter, up or down raises or lowers it. The left stick
+--     does not walk you while LT is held, and the right stick stays the
+--     camera's. RB/LB slide the ghost further or nearer. After placing something new you
 --     keep placing the same blueprint (fences!) until you cancel. A move
 --     ends after one placement.
 --   * Walking off your plot stops placing.
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -73,8 +78,9 @@ type State = {
 	aim: Vector3?, -- the last tapped point in the world (touch)
 	push: number, -- gamepad: studs the ghost is slid along your view (D-pad up/down)
 	pushAxis: number, -- +1 sliding out, -1 in, 0 still
-	lockedAt: Vector3?, -- gamepad: LT is down, the ghost hangs here and the right stick turns and lifts it
-	stickX: number, -- the right stick's last reading, for flicks
+	lockedAt: Vector3?, -- gamepad: LT is down, the ghost hangs here and the left stick turns and lifts it
+	lockPad: Enum.UserInputType?, -- the gamepad whose LT started the lock
+	stickX: number, -- the left stick's last reading, for flicks
 	stickY: number,
 	armedX: boolean,
 	armedY: boolean,
@@ -323,9 +329,13 @@ function BlueprintPlacer.Lower()
 end
 
 -- Gamepad: LT hangs the ghost where it is (so it stops following the
--- crosshair), and the right stick then flicks it: left or right turns it a
--- quarter, up raises it a step, down lowers it.
-function BlueprintPlacer.Lock(on: boolean)
+-- crosshair), and the LEFT stick then flicks it: left or right turns it a
+-- quarter, up raises it a step, down lowers it. While it hangs, the left
+-- stick does not walk you (PlacerStick sinks it, and the frame step holds
+-- the humanoid still); the lock ends the moment LT is up, a menu opens, the
+-- window loses focus, the hammer goes away or the player dies
+-- (GrabLogic.LockStays), so it can never leave you unable to walk.
+function BlueprintPlacer.Lock(on: boolean, pad: Enum.UserInputType?)
 	local s = state
 	if not s then
 		return
@@ -333,10 +343,30 @@ function BlueprintPlacer.Lock(on: boolean)
 	if on then
 		local point = aimPoint(s)
 		s.lockedAt = point
+		s.lockPad = pad or Enum.UserInputType.Gamepad1
 	else
 		s.lockedAt = nil
+		s.lockPad = nil
 		s.stickX, s.stickY, s.armedX, s.armedY = 0, 0, true, true
 	end
+end
+
+-- Whether the lock should still be on, from what is true right now.
+local function lockStays(s: State): boolean
+	local char = player.Character
+	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+	local tool = if char then char:FindFirstChildOfClass("Tool") else nil
+	local pad = s.lockPad
+	return GrabLogic.LockStays({
+		holding = state == s,
+		triggerDown = pad ~= nil and UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonL2),
+		alive = humanoid ~= nil and humanoid.Health > 0,
+		seated = humanoid ~= nil and humanoid.SeatPart ~= nil,
+		toolOut = tool ~= nil and not isHammer(tool), -- the hammer is what is placing
+		panelOpen = GuiService.SelectedObject ~= nil,
+		typing = UserInputService:GetFocusedTextBox() ~= nil,
+		focused = nil,
+	})
 end
 
 function BlueprintPlacer.Stick(x: number, y: number)
@@ -493,6 +523,7 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		push = 0,
 		pushAxis = 0,
 		lockedAt = nil,
+		lockPad = nil,
 		stickX = 0,
 		stickY = 0,
 		armedX = true,
@@ -548,14 +579,15 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		Enum.KeyCode.DPadRight
 	)
 	ContextActionService:BindAction("PlacerPlace", action(BlueprintPlacer.Place), false, Enum.KeyCode.ButtonR2)
-	-- LT hangs the ghost; the right stick flicks it round or up and down
-	-- (and the camera ignores that stick meanwhile). RB and LB slide it
-	-- further or nearer. All gamepad only: they bind to nothing else.
+	-- LT hangs the ghost; the LEFT (movement) stick flicks it round or up
+	-- and down and, sunk while LT is held, walks nobody; the right stick
+	-- stays the camera's. RB and LB slide it further or nearer. All gamepad
+	-- only: they bind to nothing else.
 	ContextActionService:BindActionAtPriority(
 		"PlacerLock",
-		function(_name: string, inputState: Enum.UserInputState): Enum.ContextActionResult
+		function(_name: string, inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 			if inputState == Enum.UserInputState.Begin then
-				BlueprintPlacer.Lock(true)
+				BlueprintPlacer.Lock(true, input.UserInputType)
 			elseif inputState ~= Enum.UserInputState.Change then
 				BlueprintPlacer.Lock(false)
 			end
@@ -569,15 +601,15 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		"PlacerStick",
 		function(_name: string, _inputState: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 			local current = state
-			if not current or not current.lockedAt then
-				return Enum.ContextActionResult.Pass -- the camera's
+			if not current or GrabLogic.StickWalks(current.lockedAt ~= nil) then
+				return Enum.ContextActionResult.Pass -- not locked: it walks you, as always
 			end
 			BlueprintPlacer.Stick(input.Position.X, input.Position.Y)
-			return Enum.ContextActionResult.Sink
+			return Enum.ContextActionResult.Sink -- locked: it turns the ghost and walks nobody
 		end,
 		false,
 		BlueprintPlacer.RotatePriority(),
-		Enum.KeyCode.Thumbstick2
+		Enum.KeyCode.Thumbstick1
 	)
 	ContextActionService:BindActionAtPriority(
 		"PlacerPush",
@@ -622,6 +654,13 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 			end
 		end)
 	)
+	-- A window that loses focus never reports LT going up.
+	table.insert(
+		s.conns,
+		UserInputService.WindowFocusReleased:Connect(function()
+			BlueprintPlacer.Lock(false)
+		end)
+	)
 	table.insert(
 		s.conns,
 		UserInputService.TouchTapInWorld:Connect(function(position: Vector2, processedByUI: boolean)
@@ -634,6 +673,18 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		s.conns,
 		RunService.RenderStepped:Connect(function(dt: number)
 			if state == s then
+				if s.lockedAt ~= nil then
+					if lockStays(s) then
+						-- Held still here, after the controls' own Move this frame.
+						local body = player.Character
+						local walker = if body then body:FindFirstChildOfClass("Humanoid") else nil
+						if walker then
+							walker:Move(Vector3.zero, false)
+						end
+					else
+						BlueprintPlacer.Lock(false) -- LT is up, or a menu has the pad: walking again
+					end
+				end
 				if s.pushAxis ~= 0 then
 					s.push = math.clamp(s.push + s.pushAxis * PUSH_SPEED * dt, PUSH_MIN, PUSH_MAX)
 				end

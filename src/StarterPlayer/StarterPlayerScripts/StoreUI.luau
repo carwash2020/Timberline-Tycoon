@@ -24,6 +24,7 @@ local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
 local HudLayout = require(script.Parent.HudLayout)
+local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
@@ -67,7 +68,7 @@ end
 function StoreUI._open(button: GuiObject?)
 	storeOpen = true
 	focus = button
-	MenuPad.Open(button)
+	MenuPad.Open(button, panel) -- the stick stays in the store until it closes
 end
 
 function StoreUI._close()
@@ -342,6 +343,7 @@ function StoreUI.Start()
 	store.root.Visible = StoreData.AnyForSale()
 	store.root.Parent = HUD.UnderCash() or HUD.BesideCash()
 	store.face.Activated:Connect(openStore)
+	HudNav.Add(store.face, { id = "store", label = "STORE", press = openStore })
 	if spec.hit then
 		UITheme.HitPad(store.root, spec.hit).Activated:Connect(openStore)
 	end

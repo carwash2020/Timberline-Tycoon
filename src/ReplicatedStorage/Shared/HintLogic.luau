@@ -73,7 +73,7 @@ local LINES: { [string]: { [string]: string } } = { -- [Context][Device]
 	build = {
 		phone = "Tap where it goes, then PLACE",
 		desktop = "Click to place · R to turn · Q to stop",
-		console = "RT place · LT+stick turn · B stop",
+		console = "RT place · LT+left stick turn · B stop",
 	},
 }
 
@@ -241,7 +241,7 @@ local LINES_V2: { [string]: { [string]: string } } = { -- [ContextV2][Device]; o
 	holding = {
 		phone = "+/- for distance · Turn to rotate",
 		desktop = "Scroll for distance · Q/E to turn",
-		console = "LT+right stick: turn · LB/RB: reach",
+		console = "LT + left stick: turn · LB/RB: reach",
 	},
 	tooLong = {
 		phone = "Cut it shorter to fit your bed",
