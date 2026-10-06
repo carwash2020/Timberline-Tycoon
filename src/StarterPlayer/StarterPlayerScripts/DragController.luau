@@ -18,9 +18,13 @@
 --   * Gamepad: hold R2 to grab what the centre dot points at; let go to
 --     drop. While holding: RB/LB (or D-pad up/down) push and pull, D-pad
 --     left/right turn, and hold L2 to hang the piece in the air and turn it
---     with the right stick (left/right spins it, up/down tips it) without
---     letting go of R2. These are bound over HUD's D-pad shortcuts only
---     while holding.
+--     with the LEFT (movement) stick (left/right spins it, up/down tips it)
+--     without letting go of R2; the right stick keeps the camera. While L2
+--     is down the left stick does not walk you (it is sunk, and the
+--     humanoid is held still), and the lock lets go the instant L2 is up,
+--     the piece is dropped, a menu opens or the window loses focus
+--     (GrabLogic.LockStays). These are bound over HUD's D-pad shortcuts
+--     only while holding.
 -- On a grab the client fires Grab(part, hitPos) and at once adds, on that
 -- part, an Attachment at the hit point, an AlignPosition pulling it
 -- (force GrabLogic.Force(mass), Responsiveness DragResponsiveness,
@@ -98,8 +102,10 @@ type Pending = { input: InputObject, at: number, pos: Vector2 }
 local hold: Hold? = nil
 local pending: Pending? = nil -- a finger resting on a piece, not yet holding it
 local distanceAxis = 0 -- +1 pushing out, -1 pulling in (D-pad, bumpers, the +/- buttons)
-local locked = false -- the gamepad's left trigger is down: the piece hangs where it is and the right stick turns it
-local stick = Vector2.zero -- the right stick, read while locked
+local locked = false -- the gamepad's left trigger is down: the piece hangs where it is and the left stick turns it
+local lockPad: Enum.UserInputType? = nil -- the gamepad whose trigger started the lock
+local focusConn: RBXScriptConnection? = nil -- the window losing focus lets go of the lock
+local stick = Vector2.zero -- the left stick, read while locked
 local tookKey: { [Enum.KeyCode]: boolean } = {} -- key presses whose Begin we used
 local lastHint = -math.huge
 local promptsWere: boolean? = nil -- ProximityPromptService.Enabled before the hold
@@ -513,11 +519,20 @@ local function bindHold()
 		Enum.KeyCode.ButtonL1,
 		Enum.KeyCode.ButtonR1
 	)
-	-- LT hangs the piece in the air; the right stick then turns it (and the
-	-- camera ignores that stick meanwhile). Not locked, the stick passes on.
+	-- LT hangs the piece in the air; the LEFT stick then turns it and no
+	-- longer walks you (sunk while locked), and the right stick stays the
+	-- camera's. Not locked, the left stick passes on and walks as always.
 	ContextActionService:BindActionAtPriority("DragLock", onLock, false, HOLD_PRIORITY, Enum.KeyCode.ButtonL2)
-	ContextActionService:BindActionAtPriority("DragStick", onStick, false, HOLD_PRIORITY, Enum.KeyCode.Thumbstick2)
+	ContextActionService:BindActionAtPriority("DragStick", onStick, false, HOLD_PRIORITY, Enum.KeyCode.Thumbstick1)
 	RunService:BindToRenderStep(RENDER_STEP, Enum.RenderPriority.Camera.Value + 1, step)
+	-- A window that loses focus never reports the trigger going up.
+	if focusConn == nil then
+		focusConn = UserInputService.WindowFocusReleased:Connect(function()
+			locked = false
+			lockPad = nil
+			stick = Vector2.zero
+		end)
+	end
 end
 
 local function unbindHold()
@@ -529,7 +544,13 @@ local function unbindHold()
 	RunService:UnbindFromRenderStep(RENDER_STEP)
 	table.clear(tookKey)
 	locked = false
+	lockPad = nil
 	stick = Vector2.zero
+	local conn = focusConn
+	if conn then
+		conn:Disconnect()
+		focusConn = nil
+	end
 end
 
 -- Ends the hold: the constraints go, and (`tell`) the server hears.
@@ -707,7 +728,32 @@ step = function(dt: number)
 		nudge(distanceAxis * GrabLogic.DistanceSpeed * dt)
 	end
 	if locked then
-		-- Hanging in the air: the target stays where it was, the right stick turns it.
+		-- The lock lets go the moment its reasons are gone: LT up (polled, in
+		-- case the release was never reported), a menu open, typing.
+		local pad = lockPad
+		local stays = GrabLogic.LockStays({
+			holding = true,
+			triggerDown = pad ~= nil and UserInputService:IsGamepadButtonDown(pad, Enum.KeyCode.ButtonL2),
+			alive = humanoid.Health > 0,
+			seated = humanoid.SeatPart ~= nil,
+			toolOut = toolOut(char),
+			panelOpen = GuiService.SelectedObject ~= nil,
+			typing = UserInputService:GetFocusedTextBox() ~= nil,
+			focused = nil,
+		})
+		if not stays then
+			locked = false
+			lockPad = nil
+			stick = Vector2.zero
+		end
+	end
+	if locked then
+		-- Hanging in the air: the target stays where it was, the left stick
+		-- turns it. It does not also walk you: Thumbstick1 is sunk, and the
+		-- humanoid is held still here, after the controls' own Move.
+		if not GrabLogic.StickWalks(locked) then
+			humanoid:Move(Vector3.zero, false)
+		end
 		local camera = workspace.CurrentCamera
 		if camera then
 			local yaw, pitch = GrabLogic.StickTurn(stick.X, stick.Y, dt)
@@ -799,25 +845,27 @@ onPad = function(_name: string, state: Enum.UserInputState, input: InputObject):
 	return Enum.ContextActionResult.Sink
 end
 
-onLock = function(_name: string, state: Enum.UserInputState, _input: InputObject): Enum.ContextActionResult
+onLock = function(_name: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 	if not hold then
 		return Enum.ContextActionResult.Pass
 	end
 	if state == Enum.UserInputState.Begin then
 		locked = true
+		lockPad = input.UserInputType
 	elseif state ~= Enum.UserInputState.Change then
-		locked = false
+		locked = false -- LT up (or cancelled): the left stick walks again at once
+		lockPad = nil
 		stick = Vector2.zero
 	end
 	return Enum.ContextActionResult.Sink
 end
 
 onStick = function(_name: string, _state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
-	if not hold or not locked then
-		return Enum.ContextActionResult.Pass -- the camera's, as always
+	if not hold or GrabLogic.StickWalks(locked) then
+		return Enum.ContextActionResult.Pass -- not locked: it walks you, as always
 	end
 	stick = Vector2.new(input.Position.X, input.Position.Y)
-	return Enum.ContextActionResult.Sink
+	return Enum.ContextActionResult.Sink -- locked: it turns the piece and walks nobody
 end
 
 -- Touch: a finger that starts on a piece is ours (sunk), so the camera

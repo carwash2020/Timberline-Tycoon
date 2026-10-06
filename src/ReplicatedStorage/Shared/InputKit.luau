@@ -15,6 +15,14 @@
 -- and Buy. PlacerSafe rejects a ButtonX bind or a keyboard E bind while
 -- world prompts are on.
 --
+-- Turning a held piece or the build ghost on a gamepad is LT held plus the
+-- LEFT (movement) stick, Thumbstick1: the right stick stays the camera's.
+-- While LT is down that stick is sunk, so it never also walks you
+-- (GrabLogic.LockStays and StickWalks).
+--
+-- The View button (ButtonSelect) opens the quick menu in the menu context
+-- (QuickMenuLogic); L3 is running, R3 and L3 together the owner menu.
+--
 -- The console safe area is ScreenInsets.CoreUISafeInsets. It is not a
 -- fraction of the screen.
 
@@ -87,9 +95,11 @@ InputKit.Target = {
 		{ action = "Place", gamepad = Enum.KeyCode.ButtonR2 },
 		{ action = "Cancel", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
 		-- Raise and lower: E and C on a keyboard; on a gamepad LT held and the
-		-- right stick up or down (one stick, listed once).
-		{ action = "Raise", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.Thumbstick2 },
-		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang the ghost; the right stick flicks it round, up and down
+		-- LEFT (movement) stick up or down; the same stick flicks it round
+		-- left or right (one stick, listed once). The right stick stays the
+		-- camera's.
+		{ action = "Raise", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.Thumbstick1 },
+		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang the ghost; the left stick flicks it round, up and down
 		{ action = "Push", gamepad = Enum.KeyCode.ButtonR1 }, -- slide it further
 		{ action = "Pull", gamepad = Enum.KeyCode.ButtonL1 }, -- and nearer
 	},
@@ -97,7 +107,8 @@ InputKit.Target = {
 		{ action = "Grab", gamepad = Enum.KeyCode.ButtonR2 },
 		{ action = "Yaw", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.DPadLeft },
 		{ action = "Yaw", keyboard = Enum.KeyCode.E, gamepad = Enum.KeyCode.DPadRight },
-		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang it in the air; the right stick then turns and tips it
+		{ action = "Lock", gamepad = Enum.KeyCode.ButtonL2 }, -- hang it in the air; the left stick then turns and tips it (and walks nobody)
+		{ action = "Turn", gamepad = Enum.KeyCode.Thumbstick1 }, -- LT held: left/right spins, up/down tips
 		{ action = "Further", gamepad = Enum.KeyCode.DPadUp },
 		{ action = "Further", gamepad = Enum.KeyCode.ButtonR1 },
 		{ action = "Nearer", gamepad = Enum.KeyCode.DPadDown },
@@ -110,6 +121,9 @@ InputKit.Target = {
 		{ action = "Daily", gamepad = Enum.KeyCode.DPadUp },
 		{ action = "DropAxe", keyboard = Enum.KeyCode.Backspace, gamepad = Enum.KeyCode.DPadDown },
 		{ action = "Recall", gamepad = Enum.KeyCode.ButtonY },
+		-- The quick menu (QuickMenuLogic.OpenGamepad): one button to every HUD
+		-- destination, Badges included. Always available; B closes it.
+		{ action = "QuickMenu", gamepad = Enum.KeyCode.ButtonSelect },
 	},
 } :: { [string]: { Bind } }
 

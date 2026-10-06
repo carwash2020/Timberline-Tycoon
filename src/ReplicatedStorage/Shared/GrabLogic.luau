@@ -343,9 +343,9 @@ function GrabLogic.Rotate(rot: CFrame, yaw: number, pitch: number, look: Vector3
 	return CFrame.fromAxisAngle(axis, pitch) * CFrame.fromAxisAngle(Vector3.new(0, 1, 0), yaw) * rot.Rotation
 end
 
--- The right stick while the left trigger holds a carried piece in the air
--- (the gamepad's way to turn it): `x`/`y` are the stick (-1..1), `dt` the
--- frame. Returns (yaw, pitch) in radians for this frame. Stick right turns
+-- The LEFT stick (the movement stick, Thumbstick1) while the left trigger
+-- holds a carried piece in the air (the gamepad's way to turn it); the right
+-- stick keeps the camera. `x`/`y` are the stick (-1..1), `dt` the frame. Returns (yaw, pitch) in radians for this frame. Stick right turns
 -- it clockwise seen from above, stick up tips its far end up. Inside the
 -- dead zone nothing moves, and the rest of the throw is rescaled from 0 so
 -- it starts gently.
@@ -388,7 +388,7 @@ function GrabLogic.KeyAction(keyName: string, shift: boolean): Turn?
 	return nil
 end
 
--- The right stick as a flick, for the build placer (LT held): a push past
+-- The left stick as a flick, for the build placer (LT held): a push past
 -- StickFlickAt from a stick that was back inside StickResetAt gives -1 (left or
 -- down) or +1 (right or up) once; holding it over does nothing more.
 -- `was` is the last value this axis reported, `now` this one. Returns
@@ -409,9 +409,47 @@ function GrabLogic.StickFlick(was: number, now: number, armed: boolean): (number
 	return 0, armed
 end
 
+-- LT hangs a piece (or locks the build ghost) and the LEFT stick then turns
+-- it; the left stick must not also walk the character, and the lock must
+-- never outlive the trigger. These two rules are shared by DragController
+-- and BlueprintPlacer; they only read facts, so a test can drive them.
+--   * StickWalks: whether the left stick moves the character: not while the
+--     lock is on (the controllers sink Thumbstick1 and hold the humanoid
+--     still for as long as this is false).
+--   * LockStays: whether the lock is still on. It ends the moment the
+--     trigger is up (the poll catches a release the input system never
+--     reported, as a lost window does), the piece is gone (dropped, placed,
+--     tool away, seated, dead), a panel has the gamepad (a menu selection)
+--     or the player is typing.
+function GrabLogic.StickWalks(locked: boolean): boolean
+	return not locked
+end
+
+export type LockFacts = {
+	holding: boolean, -- a piece in hand, or a ghost out
+	triggerDown: boolean, -- LT is physically down (polled)
+	alive: boolean,
+	seated: boolean,
+	toolOut: boolean, -- an axe or other tool is in hand (the hammer, for the placer, is not)
+	panelOpen: boolean, -- GuiService.SelectedObject is set: a menu has the pad
+	typing: boolean, -- a text box has focus
+	focused: boolean?, -- the window has focus (nil: not known, counts as yes)
+}
+
+function GrabLogic.LockStays(facts: LockFacts): boolean
+	return facts.holding
+		and facts.triggerDown
+		and facts.alive
+		and not facts.seated
+		and not facts.toolOut
+		and not facts.panelOpen
+		and not facts.typing
+		and facts.focused ~= false
+end
+
 -- A gamepad button while holding: a turn, or a hold-distance direction
 -- (+1 further while held, -1 nearer). D-pad left/right turn, D-pad up/down
--- and RB/LB push and pull. (Tipping is the right stick, with LT held.)
+-- and RB/LB push and pull. (Tipping is the left stick, with LT held.)
 function GrabLogic.PadAction(keyName: string): (Turn?, number?)
 	if keyName == "DPadLeft" then
 		return { kind = "yaw", steps = 1 }, nil

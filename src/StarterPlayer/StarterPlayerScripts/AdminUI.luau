@@ -179,7 +179,7 @@ local function setOpen(on: boolean)
 		InputKit.Actions.Cancel.gamepad
 	)
 	if UITheme.Device() == "console" then
-		MenuPad.Open(firstPick)
+		MenuPad.Open(firstPick, p)
 	end
 end
 

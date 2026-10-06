@@ -4,8 +4,8 @@
 -- and every row are at least BadgeData.MinTapPx tall.
 --   * Phone: tap the button. Rows scroll; a row toasts how to earn it.
 --   * Keyboard: B opens and closes. Esc closes.
---   * Gamepad: the View button (ButtonSelect) opens it; L3 stays free for running. The D-pad moves
---     between rows, A toasts the line, B closes it (HUD.Popup).
+--   * Gamepad: its tile in the quick menu (the View button, QuickMenuUI) opens it; L3 stays free
+--     for running. The D-pad moves between rows, A toasts the line, B closes it (HUD.Popup).
 -- The server owns the earned set. BadgeSync and the Badges attribute
 -- carry it. This script never fires a remote.
 
@@ -17,6 +17,7 @@ local UserInputService = game:GetService("UserInputService")
 local BadgeData = require(ReplicatedStorage.Shared.BadgeData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local HUD = require(script.Parent.HUD)
+local HudNav = require(script.Parent.HudNav)
 local UITheme = require(script.Parent.UITheme)
 
 local BadgeUI = {}
@@ -148,13 +149,8 @@ function BadgeUI.Start()
 	end
 
 	open.face.Activated:Connect(toggle)
-	HUD.PadShortcut(BadgeData.OpenGamepad, function()
-		return open.root.Visible
-	end, toggle)
-	local glyph = HUD.PadGlyph(BadgeData.OpenGamepad, open.root)
-	glyph.AnchorPoint = Vector2.new(0, 0.5)
-	glyph.Position = UDim2.new(1, 6, 0.5, 0)
-	glyph.Parent = open.root
+	-- A gamepad reaches it through the quick menu (View button), a tile here.
+	HudNav.Add(open.face, { id = "badges", label = "BADGES", press = toggle })
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
 		if processed or UserInputService:GetFocusedTextBox() ~= nil then

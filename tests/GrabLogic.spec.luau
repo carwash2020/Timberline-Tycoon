@@ -338,7 +338,7 @@ return function(t)
 		t.eq(GrabLogic.PadPressAccepted(false, false, false, true), true, "the mouse still grabs")
 	end)
 
-	t.test("LT + right stick turns a carried piece: dead zone, rescaled throw, yaw and tip", function()
+	t.test("LT + the LEFT stick turns a carried piece: dead zone, rescaled throw, yaw and tip", function()
 		local yaw, pitch = GrabLogic.StickTurn(0.1, -0.1, 0.016)
 		t.eq({ yaw, pitch }, { 0, 0 }, "inside the dead zone nothing moves")
 		local full = GrabLogic.StickTurn(1, 0, 0.016)
@@ -365,5 +365,89 @@ return function(t)
 		flick, armed = GrabLogic.StickFlick(0.1, -0.8, true)
 		t.eq({ flick, armed }, { -1, false })
 		t.eq({ GrabLogic.StickFlick(0, 0.5, true) }, { 0, true }, "not far enough")
+	end)
+	t.test(
+		"while LT locks a piece the left stick turns it and does not walk; the lock cannot outlive its reasons",
+		function()
+			t.eq(GrabLogic.StickWalks(false), true, "no lock: the left stick walks as always")
+			t.eq(GrabLogic.StickWalks(true), false, "locked: it turns the piece, never the character")
+			local function facts(over)
+				local f = {
+					holding = true,
+					triggerDown = true,
+					alive = true,
+					seated = false,
+					toolOut = false,
+					panelOpen = false,
+					typing = false,
+					focused = nil,
+				}
+				for k, v in pairs(over or {}) do
+					f[k] = v
+				end
+				return f
+			end
+			t.eq(GrabLogic.LockStays(facts()), true)
+			t.eq(GrabLogic.LockStays(facts({ triggerDown = false })), false, "LT up: released at once")
+			t.eq(GrabLogic.LockStays(facts({ holding = false })), false, "dropped or placed")
+			t.eq(GrabLogic.LockStays(facts({ alive = false })), false, "death")
+			t.eq(GrabLogic.LockStays(facts({ seated = true })), false, "sat in a truck")
+			t.eq(GrabLogic.LockStays(facts({ toolOut = true })), false, "a tool taken out")
+			t.eq(GrabLogic.LockStays(facts({ panelOpen = true })), false, "a menu has the pad")
+			t.eq(GrabLogic.LockStays(facts({ typing = true })), false, "typing in chat")
+			t.eq(GrabLogic.LockStays(facts({ focused = false })), false, "the window lost focus")
+			t.eq(GrabLogic.LockStays(facts({ focused = true })), true)
+		end
+	)
+
+	t.test("the controllers turn with the LEFT stick (Thumbstick1) and leave the camera's right stick alone", function()
+		local fs = require("@lune/fs")
+		local Enum = t.roblox.Enum
+		local dir = "src/StarterPlayer/StarterPlayerScripts/"
+		local drag = fs.readFile(dir .. "DragController.luau")
+		local placer = fs.readFile(dir .. "BlueprintPlacer.luau")
+		for name, src in pairs({ DragController = drag, BlueprintPlacer = placer }) do
+			t.eq(string.find(src, "Enum.KeyCode.Thumbstick2", 1, true), nil, name .. " never binds the right stick")
+			t.ok(string.find(src, "Enum.KeyCode.Thumbstick1", 1, true), name .. " binds the left stick")
+			t.ok(string.find(src, "GrabLogic.StickWalks(", 1, true), name .. " asks whether the stick walks")
+			t.ok(string.find(src, "GrabLogic.LockStays(", 1, true), name .. " ends the lock on its own")
+			t.ok(
+				string.find(src, "Move(Vector3.zero, false)", 1, true),
+				name .. " holds the humanoid still while locked"
+			)
+			t.ok(
+				string.find(src, "IsGamepadButtonDown(", 1, true),
+				name .. " polls LT, so a missed release can't stick"
+			)
+			t.ok(string.find(src, "WindowFocusReleased", 1, true), name .. " lets go when the window loses focus")
+		end
+		-- The stick action sinks only while locked and passes otherwise.
+		local onStick = string.match(drag, "onStick = function.-\nend\n")
+		t.ok(onStick and string.find(onStick, "Enum.ContextActionResult.Pass", 1, true))
+		t.ok(onStick and string.find(onStick, "Enum.ContextActionResult.Sink", 1, true))
+		-- Released with the hold, on a drop, a placement or a tool away.
+		local unbind = string.match(drag, "local function unbindHold%(%).-\nend\n")
+		t.ok(unbind and string.find(unbind, "locked = false", 1, true), "the drop clears the lock")
+		t.ok(unbind and string.find(unbind, 'UnbindAction("DragStick")', 1, true), "and gives the stick back")
+		local stop = string.match(placer, "function BlueprintPlacer.Stop%(%).-\nend\n")
+		t.ok(stop and string.find(stop, "UnbindAction(name)", 1, true), "stopping unbinds the placer's stick sink")
+		-- The hint says it the right way round.
+		local HintLogic = t.shared("HintLogic")
+		t.ok(string.find(HintLogic.PickV2("console", "holding"), "left stick", 1, true))
+		t.eq(string.find(HintLogic.PickV2("console", "holding"), "right stick", 1, true), nil)
+		t.ok(string.find(HintLogic.Pick("console", "build"), "left stick", 1, true))
+		-- InputKit's maps name the left stick, once per context.
+		local InputKit = t.shared("InputKit")
+		for _, context in ipairs({ "placer", "drag" }) do
+			local sticks = 0
+			for _, bind in ipairs(InputKit.Target[context]) do
+				t.ok(bind.gamepad ~= Enum.KeyCode.Thumbstick2, context .. " binds no right stick")
+				if bind.gamepad == Enum.KeyCode.Thumbstick1 then
+					sticks += 1
+				end
+			end
+			t.eq(sticks, 1, context .. " lists the left stick once")
+			t.ok(InputKit.KeysUnique(InputKit.Target[context], false), context .. " keeps every key unique")
+		end
 	end)
 end

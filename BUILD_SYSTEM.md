@@ -50,7 +50,7 @@ So nothing a player had unlocked or paid for is lost, and running it twice chang
 |---|---|---|---|
 | PC | left click (Tool.Activated) | R; mouse aims | Q |
 | Phone | tap the world, or the PLANS button on the hammer bar | ROTATE button; tap to aim | CANCEL |
-| Xbox | RT | D-pad right; LT lock plus right stick flick; RB/LB slide | B |
+| Xbox | RT | D-pad right; LT lock plus LEFT stick flick; RB/LB slide | B |
 
 No new binds: Tool.Activated carries RT, click and tap, so `HudRules` and `InputKit` are unchanged. The list is a ShopUI panel (selectable, B closes, nothing else on the D-pad). On Xbox the crosshair is the aim, so the hammer on a piece opens that piece's sheet.
 
