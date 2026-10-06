@@ -840,8 +840,18 @@ local function onWorldFX(kind: string, payload: any)
 			return
 		end
 		chips(def, pos, normal, WoodFX.ChipsPerHit)
-		SoundData.PlayAt(if payload.through == true then "ChopFinal" else "Chop", pos)
 		local part = payload.part
+		if payload.through == true and payload.felled == true and nearCamera(pos) then
+			-- A trunk is coming down: creak, crack and whoosh (the thud is "Felled").
+			local mass = 40
+			if typeof(part) == "Instance" and part:IsA("BasePart") then
+				mass = part.Size.X * part.Size.Y * part.Size.Z
+			end
+			SoundData.PlayAt("ChopFinal", pos)
+			SoundData.PlayFell("start", pos, mass)
+		else
+			SoundData.PlayAt(if payload.through == true then "ChopFinal" else "Chop", pos)
+		end
 		if payload.userId == player.UserId and typeof(part) == "Instance" and part:IsA("BasePart") then
 			local progress = if type(payload.progress) == "number" then payload.progress else 0
 			showRing(part, pos, progress, payload.through == true)
@@ -864,8 +874,9 @@ local function onWorldFX(kind: string, payload: any)
 		if not def or typeof(pos) ~= "Vector3" or type(mass) ~= "number" then
 			return
 		end
-		SoundData.PlayAt("TreeFall", pos)
-		if nearCamera(pos) then
+		SoundData.PlayFell("land", pos, mass)
+		-- Only a trunk lands in a cloud of dust; a limb just thuds.
+		if nearCamera(pos) and payload.trunk ~= false then
 			dust(def, pos, mass)
 		end
 		local camera = workspace.CurrentCamera

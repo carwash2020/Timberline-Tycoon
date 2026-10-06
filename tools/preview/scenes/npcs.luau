@@ -231,6 +231,7 @@ return {
 				-- (0, 0.35, -5.2), looking at the head's centre + 0.05 up (its
 				-- viewport is square, so read the centre square).
 				portrait,
+				cam(at(#npcs) - 2, 5, LZ - 8, at(#npcs), 4, LZ, "Old Hank (straw hat, hay stalk, plaid, overalls)"),
 			},
 		}
 	end,

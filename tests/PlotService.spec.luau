@@ -1624,4 +1624,65 @@ return function(t)
 		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
 		t.eq(ann.attrs.PlotSlot, nil)
 	end)
+	---------------------------------------------------------------------------
+	-- Old Hank, the plot salesman: his Talk prompt runs the same purchase flow
+	---------------------------------------------------------------------------
+
+	-- NPCService builds him after PlotService.Init; fake just his Talk prompt.
+	local function withHank(s)
+		local Instance = fakeInstances()
+		local map = Instance.new("Folder")
+		local folder = Instance.new("Folder")
+		folder.Name = "Townsfolk"
+		folder.Parent = map
+		local hank = Instance.new("Model")
+		hank.Name = "OldHank"
+		hank.Parent = folder
+		local talk = Instance.new("ProximityPrompt")
+		talk.Name = "Talk"
+		talk.Parent = hank
+		s.P.HookSalesman(map)
+		return talk
+	end
+
+	t.test("talking to Old Hank at the counter opens the same picker, with the server's price", function()
+		local s = setup({ cash = 1000 })
+		local talk = withHank(s)
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		talk.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, true)
+		t.eq(s.P.OfferOf(ann).price, s.config.PlotPrice)
+		t.eq(profile.cash, 1000, "talking charges nothing")
+		s.P.Claim(ann, 3)
+		t.eq(ann.attrs.PlotSlot, 3)
+		t.eq(profile.cash, 1000 - s.config.PlotPrice, "charged once, at the one price")
+	end)
+
+	t.test("Old Hank from across the map opens nothing; an owner is told so, nothing opens", function()
+		local s = setup({ cash = 1000 })
+		local talk = withHank(s)
+		local ann, profile = s.newPlayer(1, "Ann")
+		ann.standOn(nil)
+		talk.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, nil)
+		t.eq(profile.cash, 1000)
+		s.claim(ann, 1)
+		local cash = profile.cash
+		s.atOffice(ann)
+		talk.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, nil)
+		t.eq(s.lastToast(), t.shared("PlotSalesmanData").OwnsLine)
+		t.eq(profile.cash, cash)
+	end)
+
+	t.test("the counter's own Buy a plot prompt still works beside Old Hank", function()
+		local s = setup({ cash = 1000 })
+		withHank(s)
+		local ann = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		s.prompt.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, true)
+		t.eq(s.prompt.ActionText, "Buy a plot")
+	end)
 end

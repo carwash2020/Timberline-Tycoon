@@ -49,7 +49,7 @@ local CharacterArt = {}
 
 export type HairStyle = "short" | "bun" | "long" | "curly" | "ponytail" | "bald" | "none"
 export type BeardStyle = "big" | "stubble" | "mustache" | "handlebar" | "goatee" | "none"
-export type HatStyle = "beanie" | "cap" | "capBack" | "hardhat" | "conductor" | "bandana" | "flatcap" | "none"
+export type HatStyle = "beanie" | "cap" | "capBack" | "hardhat" | "conductor" | "bandana" | "flatcap" | "straw" | "none"
 export type Carry = "mug" | "clipboard" | "wrench" | "basket" | "cane" | "scroll" | "lantern" | "sapling" | "none"
 
 export type Spec = {
@@ -85,6 +85,7 @@ export type Spec = {
 	kneePatch: Color3?,
 	carry: Carry?,
 	accent: Color3?, -- the held item's main colour, where it has one
+	hayStalk: boolean?, -- a straw of hay between the lips
 	tag: boolean?, -- false: no name tag
 }
 
@@ -236,6 +237,17 @@ local function face(ctx: Ctx, head: BasePart)
 			Vector3.new(0.1, 0.065, 0.04),
 			CFrame.new(side * 0.16, mouthY + 0.03, mouthZ) * CFrame.Angles(0, 0, side * 0.6),
 			MOUTH
+		)
+	end
+	if spec.hayStalk then
+		-- A long straw from the corner of the mouth, cocked up and out.
+		bit(
+			ctx,
+			head,
+			"HayStalk",
+			Vector3.new(0.05, 0.05, 0.85),
+			CFrame.new(0.2, mouthY, mouthZ - 0.4) * CFrame.Angles(0.35, -0.25, 0),
+			Color3.fromRGB(226, 196, 98)
 		)
 	end
 end
@@ -741,6 +753,44 @@ local function hat(ctx: Ctx, head: BasePart)
 			cap
 		)
 		ctx.top = math.max(ctx.top, top + 0.24)
+	elseif style == "straw" then
+		-- A farmer's straw hat: a wide flat brim, a round crown, a dark band.
+		-- Cylinders lie along X, so each is turned upright (length = thickness).
+		local up = CFrame.Angles(0, 0, math.pi / 2)
+		local brim = bit(
+			ctx,
+			head,
+			"StrawBrim",
+			Vector3.new(0.1, hw + 1.3, 0),
+			CFrame.new(0, top + 0.02, -0.04) * up,
+			c,
+			FABRIC,
+			ctx.model,
+			"cylinder"
+		)
+		bit(
+			ctx,
+			head,
+			"StrawCrown",
+			Vector3.new(0.55, hw + 0.12, 0),
+			CFrame.new(0, top + 0.3, 0) * up,
+			Kit.shade(c, 0.05),
+			FABRIC,
+			brim,
+			"cylinder"
+		)
+		bit(
+			ctx,
+			head,
+			"StrawBand",
+			Vector3.new(0.16, hw + 0.2, 0),
+			CFrame.new(0, top + 0.12, 0) * up,
+			trim,
+			FABRIC,
+			brim,
+			"cylinder"
+		)
+		ctx.top = math.max(ctx.top, top + 0.6)
 	end
 end
 
