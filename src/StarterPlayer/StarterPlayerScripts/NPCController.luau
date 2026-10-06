@@ -53,11 +53,14 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
+local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
 local NPCWalk = require(ReplicatedStorage.Shared.NPCWalk)
+local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
@@ -228,9 +231,18 @@ local function tutorialRunning(): boolean
 	return type(step) ~= "number" or step > 0
 end
 
+-- Nobody chatters in the first-sale flow (NoticePolicy.FlowQuiet): Murph's
+-- card and the arrow are the one thing on screen. Murph is quiet for the
+-- whole tutorial.
 local function quiet(rig: Rig): boolean
 	local npc = rig.npc
-	return npc ~= nil and npc.tutorialQuiet == true and tutorialRunning()
+	if npc == nil then
+		return false
+	end
+	if npc.tutorialQuiet == true and tutorialRunning() then
+		return true
+	end
+	return CoreLoop.V2() and NoticePolicy.FlowQuiet(player:GetAttribute("TutorialStep"), TutorialData.RefresherLast)
 end
 
 ---------------------------------------------------------------------------
@@ -450,9 +462,7 @@ local function onTalk(rig: Rig)
 			return
 		end
 	end
-	if quiet(rig) then
-		return
-	end
+	-- Talk is the player's own ask: it always answers (Murph's is above).
 	local line, _kind = takeLine(rig, true)
 	if not line then
 		return

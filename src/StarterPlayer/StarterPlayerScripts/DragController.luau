@@ -221,7 +221,8 @@ local function hint()
 		return
 	end
 	lastHint = now
-	HUD.Toast(GrabLogic.AxeHint(UITheme.Device()))
+	-- Once per session: the hint line at the bottom says it again.
+	HUD.Toast(GrabLogic.AxeHint(UITheme.Device()), nil, { key = "axeHint", once = true })
 end
 
 ---------------------------------------------------------------------------

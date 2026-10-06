@@ -1,5 +1,6 @@
 # STATUS: read this first in a new session
 
+Last updated 6 October 2026 (branch `claude/short-tutorial`). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 6 October 2026 (branch claude/restore-meshes, on top of PR #70). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
@@ -33,7 +34,7 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 
 ### Economy model
 
-`lune run tools/economy` (v2) and `lune run tools/economy1` (v1) regenerate ECONOMY.md and ECONOMY_V1.md; commit them with any balance change. The headline times are strict CI ranges: first sale under 3 min, Steel Axe 5–8 min, first $1k 13–20 min, Cobalt 45–75 min, full plot 28–36 h. The headline strings are also pinned in the Builder, BuildingKit and TownMesh specs, and the tutorial's plot reward is pinned in TutorialData.spec. If a price change breaks a range, retune a reward or price rather than loosening the range. A model that hangs (instead of failing) usually means the simulated player cannot afford the next purchase and earns $0/h (it did when the Rustbucket went to $100 before the plot was priced in).
+`lune run tools/economy` (v2) and `lune run tools/economy1` (v1) regenerate ECONOMY.md and ECONOMY_V1.md; commit them with any balance change. The headline times are strict CI ranges: first sale under 3 min, Steel Axe 5–8 min, first $1k 13–20 min, Cobalt 45–75 min, full plot 28–36 h. The headline strings are also pinned in the Builder, BuildingKit and TownMesh specs, and the tutorial's plot reward is pinned in TutorialData.spec. Retired tutorial step ids are save-migration keys: never reuse or reorder them. If a price change breaks a range, retune a reward or price rather than loosening the range. A model that hangs (instead of failing) usually means the simulated player cannot afford the next purchase and earns $0/h (it did when the Rustbucket went to $100 before the plot was priced in).
 
 ### Load time (LOAD-01, 6 October 2026)
 
@@ -42,6 +43,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 ## What has landed (newest first, PR numbers on main)
 
 - Not on main yet: `claude/hammer-build` (the hammer and physical blueprints, above).
+- Branch `claude/short-tutorial` (not yet a PR): the v2 tutorial is 8 steps (fell, drag, sell, plot, one build lesson, truck box, pad, spawn; the axe, mill and load steps are retired in `TutorialData.RetiredV2`, saves migrate forward in `ApplyOrder` order 6); `NoticePolicy` governs every toast (priorities, one non-critical at a time, cooldown, dedupe, quiet during the first-sale flow). Economy unchanged. Checks in PHASE2_NOTES.md.
 - claude/fix-felling (branch, not merged): trees fall where you cut them (stump stays rooted, only the trunk above the cut falls; was #36's "ground cut frees the whole section"), rigid fall with velocity caps, layered procedural fell sound (`FellSoundId` still overrides), swing pose re-applied pre-render with a tool-grip fallback. Checklist in PHASE2_NOTES.md.
 
 - Old Hank, the plot salesman (branch claude/plot-salesman, not a PR yet): an old farmer NPC behind the Land Office counter, always there. His offers are data (`Shared/PlotSalesmanData`; today only "Buy a plot" at `GameConfig.PlotPrice`); Talk runs the same `PlotService.Claim` flow. New offers: add to `Offers` and `PlotService`'s `SALESMAN_OFFERS`. Checklist in PHASE2_NOTES.md.

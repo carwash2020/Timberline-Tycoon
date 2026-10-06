@@ -14,6 +14,16 @@
 -- the plot-first v2 order is remapped by ApplyOrder (old index to the step
 -- name, then that name's new index).
 --
+-- Short v2 list (order 6, 6 October 2026): playtesters found the tutorial
+-- far too long, so StepsV2 is the essentials only: fell, drag, sell, plot,
+-- one build lesson (place), then truck, pad, spawn. The steps cut from it
+-- (build, land, load, mill, loads, loads2, loads3, steel) are RETIRED:
+-- their ids stay in the old-order lists below and in RetiredV2, never
+-- reused, and ApplyOrder moves a save that was on one forward to the next
+-- remaining step (or to the end, which finishes the tutorial). The next
+-- axe is one non-blocking line on the tracker afterwards (NextGoal) and
+-- in Murph's Farewell, not a lesson.
+--
 -- Inserting a step shifts the ones after it: QuestService moves saves
 -- made before the insert to the latest step they had reached (by the
 -- funnel steps they've reached), so keep step ids stable.
@@ -83,6 +93,7 @@ export type Step = {
 	grove: boolean?, -- the tree beacon prefers a TutorialGrove oak
 	unit: "cash"?, -- v2: `count` is dollars, so the tracker reads "($23/$40)"
 	rewardCash: number?, -- paid when the step is done
+	rewardToast: boolean?, -- false: no "Murph chipped in" toast (the next card says it)
 	murphBack: string?, -- v2: what Murph says instead to a returning player on the refresher (RefresherLast)
 	murphShort: string?, -- said instead while cash is under cashPrice ("sell more first")
 	axeGoal: boolean?, -- the tracker also shows cash toward the Steel Axe
@@ -95,7 +106,6 @@ export type Step = {
 local starterAxe = ItemCatalog.AxeLadder()[1]
 local steelAxe = ItemCatalog.AxeLadder()[2] -- AlreadyDone's tier 2
 local oak = WoodData.Get("oak") :: WoodData.WoodDef
-local birch = WoodData.Get("birch") :: WoodData.WoodDef
 local rustbucket = ItemCatalog.GetTruck("Rustbucket") :: ItemCatalog.TruckDef
 
 -- Murph chips in when the plot is bought, so the plot and then the
@@ -113,20 +123,6 @@ local function logLoad(id: string, reward: number, murph: string): Step
 		rewardCash = reward,
 		axeGoal = true,
 		axePrice = ShopLogic.Price(steelAxe, 1),
-	}
-end
-
-local function cashLoad(id: string, reward: number, murph: string): Step
-	return {
-		id = id,
-		objective = "Sell $%d more wood",
-		murph = murph,
-		event = "woodSoldCash",
-		count = 40,
-		unit = "cash",
-		rewardCash = reward,
-		axeGoal = true,
-		axePrice = ShopLogic.Price(steelAxe, 2),
 	}
 end
 
@@ -265,8 +261,8 @@ TutorialData.Steps = {
 -- The v2 loop's steps. Wood is cut where you swing, dragged with the axe
 -- put away, carried loose on the bed and sold by volume. Order: fell,
 -- drag, sell at the cart, claim a plot, the build lessons (hammer, place
--- one item, LAND), then the truck. The mill is the
--- trip after the truck. Each step's event is what the v2 services report.
+-- one item), then the truck, its pad and spawning it. Each step's event is
+-- what the v2 services report.
 -- Murph's numbers come from the v2 data: hits from FieldGuide.TrunkHits.
 -- Saves from the plot-first order are remapped by ApplyOrder.
 TutorialData.StepsV2 = {
@@ -300,27 +296,14 @@ TutorialData.StepsV2 = {
 		count = 1,
 		beacon = "murphCart",
 		rewardCash = 25,
+		rewardToast = false, -- the plot step's card opens "That sale's yours, and a little extra from me"
 	},
 	plotStep(true),
-	{
-		id = "build",
-		objective = "Hold your hammer on your plot",
-		murph = "That's your plot. Stand on it, take out your hammer and {click} to open your blueprints: mills, benches and the like.",
-		event = "buildOpened",
-		count = 1,
-	},
 	{
 		id = "place",
 		objective = "Place one blueprint with your hammer",
 		murph = "Pick the cheapest piece in your blueprints and set it down. You pay when you place it, and you get half back if you sell it.",
 		event = "itemPlaced",
-		count = 1,
-	},
-	{
-		id = "land",
-		objective = "Open LAND to see how to grow your plot",
-		murph = "Press LAND on the hammer's bar. Plot size and expanding onto new squares both live there.",
-		event = "landOpened",
 		count = 1,
 	},
 	truckStep(2),
@@ -337,53 +320,6 @@ TutorialData.StepsV2 = {
 		murph = "Walk up to the pad and press its button. That's how the Rustbucket rolls out, and how you get her back if she's ever stuck.",
 		event = "truckSpawned",
 		count = 1,
-	},
-	{
-		id = "load",
-		objective = "Drag a log onto your truck's bed",
-		murph = "That's your Rustbucket. She ain't pretty, but she hauls. Drag a log onto the bed and lay it flat. Too long? Cut it to fit.",
-		event = "woodLoaded",
-		count = 1,
-		beacon = "truckBed",
-	},
-	{
-		id = "mill",
-		objective = "Sell wood at the sawmill",
-		murph = "Drive to the mill up north and back onto the SELL LOGS HERE pad. The whole bed sells itself.",
-		event = "woodSold",
-		count = 1,
-		beacon = "sellPad",
-	},
-	cashLoad(
-		"loads",
-		8,
-		string.format(
-			"That %s takes %d hits a cut on birch. Sell another load and I'll chip in for a %s.",
-			starterAxe.displayName,
-			FieldGuide.TrunkHits(starterAxe, birch),
-			steelAxe.displayName
-		)
-	),
-	cashLoad("loads2", 8, "Another load at the mill. Haul it up north and sell it on the pad."),
-	cashLoad("loads3", 9, "One more load at the mill. Then that axe is yours to buy."),
-	{
-		id = "steel",
-		objective = "Buy the Steel Axe at the Tool Shed",
-		murph = string.format(
-			"Here's a little from me. Tink's Tool Shed is just west of the mill. A %s cuts an oak in %d hits, not %d. Go get a real axe, kid.",
-			steelAxe.displayName,
-			FieldGuide.TrunkHits(steelAxe, oak),
-			FieldGuide.TrunkHits(starterAxe, oak)
-		),
-		murphShort = string.format(
-			"Sell more wood first. Then get the %s at Tink's Tool Shed, just west of the mill.",
-			steelAxe.displayName
-		),
-		event = "axeBought",
-		count = 1,
-		beacon = "toolShed",
-		cashItem = steelAxe.displayName,
-		cashPrice = ShopLogic.Price(steelAxe, 2),
 	},
 } :: { Step }
 
@@ -403,7 +339,7 @@ end
 
 -- The line Murph says once the last step is done (both loops).
 TutorialData.Farewell =
-	"The plot's yours. Take the Field Guide. Bigger logs pay more, and a saw's planks pay more. Some woods only show at night."
+	"That's the lot! Sell wood at the sawmill up north, and grab a better axe at Tink's Tool Shed. Bigger logs and planks pay more."
 
 -- What Murph says when a returning player's refresher is done.
 TutorialData.FarewellBack =
@@ -547,9 +483,10 @@ end
 
 -- Order 1 (and 0): plot led. Order 2: fell led, and still had a plant step.
 -- Order 3: that step is gone. Order 4: build, place and land follow the plot
--- step. Order 5: the pad and spawn steps follow the truck. ApplyOrder turns
--- a saved index into this list.
-TutorialData.OrderV2 = 5
+-- step. Order 5: the pad and spawn steps follow the truck. Order 6: the
+-- short list (RetiredV2 are gone). ApplyOrder turns a saved index into this
+-- list.
+TutorialData.OrderV2 = 6
 -- The plot-first list (order 0 and 1).
 TutorialData.OrderV2Previous = {
 	"plot",
@@ -614,22 +551,79 @@ TutorialData.OrderV2BeforePad = {
 	"steel",
 }
 
--- The plant step is gone. A save that was on it, or named it, lands on the
--- sell-more load that followed it.
-local RETIRED_STEP: { [string]: string } = { plant = "loads" }
+-- The list as order 5 had it (the long tutorial, before the short one).
+TutorialData.OrderV2BeforeShort = {
+	"fell",
+	"pickup",
+	"sell",
+	"plot",
+	"build",
+	"place",
+	"land",
+	"truck",
+	"pad",
+	"spawn",
+	"load",
+	"mill",
+	"loads",
+	"loads2",
+	"loads3",
+	"steel",
+}
+
+-- Where a retired step's save goes. A step name lands on that step (it
+-- must be in StepsV2 or retired itself); END means the tutorial is over.
+-- Never reuse a retired id for a new step. "plant" went first; the later
+-- cuts follow the order 5 list: build and land were lessons before the
+-- truck, so they hand on to the step after them; everything from the
+-- truck's load onward (load, mill, the sell-more loads, the axe) comes
+-- after spawn, so a save on one has done the essentials: END.
+local END = "$end"
+local RETIRED_STEP: { [string]: string } = {
+	plant = "loads",
+	build = "place",
+	land = "truck",
+	load = END,
+	mill = END,
+	loads = END,
+	loads2 = END,
+	loads3 = END,
+	steel = END,
+}
+
+-- The retired v2 ids, for specs and anyone wondering whether an id is free.
+TutorialData.RetiredV2 = {} :: { [string]: boolean }
+for id in pairs(RETIRED_STEP) do
+	TutorialData.RetiredV2[id] = true
+end
+
+-- Resolves a name through RETIRED_STEP to a step index in StepsV2, or one
+-- past the end for END. Nil when the name isn't a step at all.
+local function indexOfName(name: string): number?
+	for _ = 1, 8 do -- a retired step may hand on to another retired one
+		local to = RETIRED_STEP[name]
+		if to == nil then
+			break
+		end
+		name = to
+	end
+	if name == END then
+		return #TutorialData.StepsV2 + 1
+	end
+	for i, step in ipairs(TutorialData.StepsV2) do
+		if step.id == name then
+			return i
+		end
+	end
+	return nil
+end
 
 local function remapFrom(list: { string }, oldIndex: number): number
 	local name = list[oldIndex]
 	if type(name) ~= "string" then
 		return oldIndex
 	end
-	name = RETIRED_STEP[name] or name
-	for i, step in ipairs(TutorialData.StepsV2) do
-		if step.id == name then
-			return i
-		end
-	end
-	return oldIndex
+	return indexOfName(name) or oldIndex
 end
 
 -- A plot-first index to the step's name, then that name's index in StepsV2.
@@ -654,14 +648,24 @@ function TutorialData.ApplyOrder(record: any)
 		local raw = tonumber(record.tutorialStep)
 		local step = if type(raw) ~= "number" or raw ~= raw then 1 else math.floor(raw)
 		local order = tonumber(record.tutorialOrder) or 0
-		if order == 4 then
-			record.tutorialStep = remapFrom(TutorialData.OrderV2BeforePad, step)
+		local list: { string }? = nil
+		if order == 5 then
+			list = TutorialData.OrderV2BeforeShort
+		elseif order == 4 then
+			list = TutorialData.OrderV2BeforePad
 		elseif order == 3 then
-			record.tutorialStep = remapFrom(TutorialData.OrderV2BeforeBuild, step)
+			list = TutorialData.OrderV2BeforeBuild
 		elseif order >= 2 then
-			record.tutorialStep = remapFrom(TutorialData.OrderV2WithPlant, step)
+			list = TutorialData.OrderV2WithPlant
 		elseif step > 1 then
-			record.tutorialStep = TutorialData.RemapV2Step(step)
+			list = TutorialData.OrderV2Previous
+		end
+		if list then
+			local name = list[step]
+			record.tutorialStep = remapFrom(list, step)
+			if type(name) == "string" and RETIRED_STEP[name] ~= nil then
+				record.tutorialProgress = 0 -- progress toward a cut step means nothing on the next one
+			end
 		else
 			record.tutorialStep = 1
 			record.tutorialProgress = 0

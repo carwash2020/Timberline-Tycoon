@@ -1,8 +1,8 @@
 --!nocheck
 -- The plant step is gone. A save from the fell-first list that still had
--- it (tutorialOrder 2) lands on the sell-more loads, and so does the load
--- that used to follow it. Later steps keep their names. A second pass
--- does not move the step again.
+-- it (tutorialOrder 2) lands on the sell-more loads, which the short
+-- tutorial retired, so it ends up past the last step (done). Live steps keep
+-- their names. A second pass does not move the step again.
 return function(t)
 	local TutorialData = t.shared("TutorialData")
 
@@ -21,16 +21,20 @@ return function(t)
 		return TutorialData.StepsV2[record.tutorialStep].id
 	end
 
-	t.test("order 2: the plant step and the load after it both land on loads", function()
+	t.test("order 2: the plant step and the load after it both land past the end (the short tutorial)", function()
+		-- The plant step went to the sell-more loads, which the short
+		-- tutorial then retired: the save has done the essentials, so it
+		-- lands one past the last step and QuestService finishes it.
 		local onPlant = apply(8)
 		local onLoads = apply(9)
-		t.eq(idOf(onPlant), "loads")
-		t.eq(idOf(onLoads), "loads")
-		t.eq(onPlant.tutorialStep, onLoads.tutorialStep)
-		t.eq(onPlant.tutorialProgress, 3, "the count stays")
+		local past = #TutorialData.StepsV2 + 1
+		t.eq(onPlant.tutorialStep, past)
+		t.eq(onLoads.tutorialStep, past)
+		t.eq(onPlant.tutorialProgress, 0, "progress toward a cut step restarts")
 		t.eq(onPlant.tutorialOrder, TutorialData.OrderV2)
-		t.eq(idOf(apply(12)), "steel")
+		t.eq(apply(12).tutorialStep, past, "steel is retired too")
 		t.eq(idOf(apply(1)), "fell")
+		t.eq(idOf(apply(5)), "truck", "a live step keeps its place by name")
 		-- Stamped: editing the step and applying again leaves the edit.
 		onPlant.tutorialStep = 1
 		TutorialData.ApplyOrder(onPlant)
