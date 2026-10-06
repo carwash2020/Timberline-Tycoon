@@ -86,10 +86,12 @@ local GameConfig = {
 	-- workspace attribute CoreLoop overrides it (Shared/CoreLoop); live
 	-- servers never.
 	CoreLoop = 2,
-	-- The uploaded town meshes (TownMeshes.Dress). Off: the town is the
-	-- part-built art (signs, roofs and floors as designed). Turn on once a
-	-- Studio check shows the meshes sit right (MORNING_HANDOFF.md).
-	TownMeshes = false,
+	-- The uploaded town meshes (TownMeshes.Dress). KILL SWITCH: set false and
+	-- republish and the town is the part-built art again (nothing else
+	-- changes). In Studio, set the workspace attribute TownMeshes to
+	-- true/false to try either for one run. Every dressed model is ground-
+	-- snapped to its part-built twin (TownMeshes.Dress), so a mesh cannot sink.
+	TownMeshes = true,
 	WoodUnit = 1.6, -- studs in one timber unit "u"; prices are $/u³, hardness per u² of cut
 	StartingCash = 20, -- v2: a new player's cash
 	-- cutting

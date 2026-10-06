@@ -425,6 +425,41 @@ return function(t)
 		end)
 	end)
 
+	t.test("I-Ground: a mesh that would sink is lifted onto its part-built twin; the switch turns it off", function()
+		local function stump()
+			local model = roblox.Instance.new("Model")
+			local box = roblox.Instance.new("Part")
+			box.Name = "Base"
+			box.Size = Vector3.new(4, 4, 4)
+			box.CFrame = CFrame.new(0, 2, 0)
+			box.Parent = model
+			return model
+		end
+		local function lowest(part)
+			return part.CFrame.Position.Y - part.Size.Y / 2
+		end
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = roblox.Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			-- Pivot at the mesh's own centre: placed on the root it sinks by half its height.
+			part:SetAttribute("MeshPivot", "authored")
+			return part
+		end
+		local model = stump()
+		local ok = TownMeshes.Dress(model, "Stump")
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		t.ok(ok, "dressed")
+		local body = visualNamed(model, "Body")
+		t.ok(body and lowest(body) >= -0.05, "the mesh stands on the ground line, not under it")
+		TownMeshes.Enabled = false
+		local plain = stump()
+		t.eq(TownMeshes.Dress(plain, "Stump"), false, "the kill switch leaves the part-built art")
+		TownMeshes.Enabled = true
+	end)
+
 	t.test("I-Shops: counters, signs, and the authored building scale", function()
 		withMeshes(function()
 			for _, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome", "Sawmill" }) do

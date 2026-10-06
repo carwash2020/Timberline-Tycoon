@@ -39,6 +39,8 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local AxeModels = require(ReplicatedStorage.Shared.Art.AxeModels)
+local MeshKit = require(ReplicatedStorage.Shared.Art.MeshKit)
 local TownMeshes = require(ReplicatedStorage.Shared.Art.TownMeshes)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
@@ -111,10 +113,32 @@ Players.CharacterAutoLoads = false
 
 -- 3. Terrain.
 local terrainSeconds = 0
-TownMeshes.Enabled = GameConfig.TownMeshes
+-- Kill switch for the uploaded town meshes: GameConfig.TownMeshes, and in
+-- Studio the workspace attribute TownMeshes (true/false) wins for one test run.
+local townMeshesOn = GameConfig.TownMeshes
+do
+	local override = workspace:GetAttribute("TownMeshes")
+	if RunService:IsStudio() and type(override) == "boolean" then
+		townMeshesOn = override
+	end
+end
+TownMeshes.Enabled = townMeshesOn
+-- One probe load before anything is built, so a permission problem shows
+-- here (and in MeshKit's warning) instead of as silent part-built art.
+do
+	local rusty = AxeModels.Get("RustyAxe")
+	if rusty then
+		local probe = MeshKit.Create(rusty.Handle.meshId, "Probe", rusty.Handle.size)
+		if probe then
+			probe:Destroy()
+		end
+	end
+end
 print(
 	"[MapBuilder] build check: uploaded town meshes "
-		.. (if GameConfig.TownMeshes then "ON" else "OFF (part-built town)")
+		.. (if townMeshesOn then "ON" else "OFF (part-built town)")
+		.. ", axe/tree/NPC/vehicle/kit meshes: "
+		.. MeshKit.Report()
 		.. ", starting plot "
 		.. tostring(PlotData.Tiers[1].size)
 		.. " studs"
@@ -1016,3 +1040,4 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 
 print(string.format("[MapBuilder] World built in %.1fs (terrain %.1fs)", builtSeconds, terrainSeconds))
+print("[MapBuilder] meshes after the build: " .. MeshKit.Report())

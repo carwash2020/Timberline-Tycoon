@@ -1535,3 +1535,76 @@ What changed:
       the Rustbucket step follows; tapping Buy fast charges once
 - [ ] A returning save (already has a plot) still gets its picker at join,
       free, and "Give me any open plot" works
+
+## Blender meshes are back on (axes, trees, NPCs, vehicles, plot kit, town)
+
+What was wrong, in order of certainty:
+
+1. **The town switch was off.** `GameConfig.TownMeshes = false` (set in #57 as a
+   precaution) kept every building, shop and town prop part-built. It is `true`
+   again. Dressed models are ground-snapped to their part-built twin
+   (`TownMeshes.Dress`: a mesh more than 0.4 studs lower than the part art is
+   lifted onto it, and one more than 8 off drops the dressing), so a mesh
+   cannot sink under the map. Kill switch: `GameConfig.TownMeshes = false` and
+   republish; in Studio set the workspace attribute `TownMeshes` (boolean) to
+   try either for one run.
+2. **Mesh loading failed silently.** Axes, trees, NPCs, vehicles, the plot kit
+   and the town all load through `MeshKit.Create`
+   (`AssetService:CreateMeshPartAsync`). When a load fails the art falls back
+   to the part-built model and nothing said so. There is no flag or test hook
+   that turns the axe, tree, NPC or vehicle meshes off, and none of those
+   files changed after #50, so a load failure is the only way they vanish. That
+   is almost always asset permission: the ids were uploaded by the creator
+   account `Elucidhealer618`, and a mesh only loads for an experience that
+   account allows. MeshKit now retries once, warns with the engine's own error
+   text, counts loads and failures, and stops asking after 8 misses in a row
+   with none loaded (each miss is slow). The `[MapBuilder] build check:` line
+   and a second line after the build print the totals. `ItemMeshes.LoadAsync`
+   (plot kit) now loads through MeshKit too, so it gets the same retry and
+   logging.
+3. **Shelf displays are boxes by design.** Since #42/#51 every shop shelf holds
+   a plain box with a price tag (`BoxService`), not a model of the axe. That is
+   not a mesh failure. The axe model shows in your hand and dropped on the
+   ground; a mesh preview on the box is a stores-art decision.
+
+### What Connor must do in Creator Hub (only if the Output says meshes failed)
+
+Look at the Output when the server starts for `[MapBuilder] build check:` and
+`[MeshKit] mesh <id> did not load (...)`. If it says `0 mesh assets loaded`:
+
+1. Open Studio **signed in as `Elucidhealer618`** (the uploader), or as an
+   account with Team Create edit on this place. Another account cannot load them.
+2. Creator Hub > Creations > Assets (Models and Meshes) > open an asset >
+   Permissions (Sharing). Allow this experience (Timberline Tycoon). Do it for
+   every uploaded asset, or move them to the experience owner (a group-owned
+   experience needs group-owned assets).
+3. Moderation state must be Approved (the data files say they are).
+4. Quick test in the Studio command bar, with the Rusty Axe haft:
+   `print(pcall(function() return game:GetService("AssetService"):CreateMeshPartAsync(Content.fromUri("rbxassetid://125228989315064")) end))`
+   Expect `true  Instance`. A `false  <message>` is the real reason.
+5. Ids to check first (one per kind; the rest follow the same rule): axe haft
+   `125228989315064`, Steel Axe head `139649051325358`, oak trunk section
+   `106240781110764`, oak crown `104687332442263`, plot Wall `85233243499195`.
+   All ids live in `Art/AxeModels`, `Art/TreeModels`, `Art/TownModels`,
+   `Art/NPCMeshes`, `Art/VehicleMeshes`, `KitMeshData` and `ItemMeshData`.
+
+### Studio checks
+- [ ] Output at start: `[MapBuilder] build check: uploaded town meshes ON,
+      axe/tree/NPC/vehicle/kit meshes: N mesh assets loaded, 0 failed` and the
+      same totals after "World built". Any `[MeshKit] mesh ... did not load`
+      lines name the failing id and the reason.
+- [ ] Hold each axe (Rusty to Lux; the Hermit's Maul is part-built): the Blender
+      haft and head show; swing the Lux Axe and see the trail.
+- [ ] Trees of every wood: meshed trunk and crown; chop a section and the log
+      falls as before; the tree stays cuttable above the cut.
+- [ ] Town: sawmill, shops, signs, roofs and floors sit on the ground and signs
+      read. If something looks wrong, set the workspace attribute `TownMeshes`
+      to false (or the config) and tell Claude which model.
+- [ ] Plot kit, the plot sign, corner posts and rails, NPCs and trucks.
+
+### Blender in the cloud session
+Not installed here (`which blender` is empty), but possible: `pip download bpy`
+works through the proxy (bpy 5.0.1 wheel for Python 3.11, about 375 MB) and apt
+lists `blender` 4.0.2. Headless `bpy` can build and export FBX/GLB here; the
+upload to Roblox (Creator Hub or Studio's Asset Manager) has to come from
+Connor's machine because uploads need his login.
