@@ -2306,7 +2306,7 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	-- its front faces -X): a counter under a lean-to roof, a name board and
 	-- two lanterns on its front posts.
 	local house = Kit.model("WeighHouse", model)
-	local hc = CF(hw + 5, 0, hd - 7) * ANG(0, PI / 2, 0)
+	local hc = CF(hw + 9, 0, hd - 7) * ANG(0, PI / 2, 0)
 	local function at(x: number, y: number, z: number): CFrame
 		return hc * CF(x, y, z)
 	end

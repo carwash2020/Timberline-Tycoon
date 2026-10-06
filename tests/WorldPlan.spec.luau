@@ -764,7 +764,7 @@ return function(t)
 			end
 			return nil, nil
 		end).Position
-		t.ok((millie - Vector3.new(67.6, 0, 120)).Magnitude < 1e-4, "Millie stands in front of the Weigh House counter")
+		t.ok((millie - Vector3.new(71.6, 0, 120)).Magnitude < 1e-4, "Millie stands in front of the Weigh House counter")
 		t.ok(millie.X > pad.X + size.X / 2, "Millie east of the pad and its lane")
 	end)
 
@@ -1118,7 +1118,7 @@ return function(t)
 				{ 67, 100, "alongside" },
 				{ 67, 86, "alongside" },
 				{ 74.25, 90, "past the station" },
-				{ 66, 120, "Millie" },
+				{ 70, 120, "Millie" },
 			}
 			for _, bad in ipairs(bads) do
 				local caught = false
