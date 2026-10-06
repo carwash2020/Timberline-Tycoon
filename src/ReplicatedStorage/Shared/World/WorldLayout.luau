@@ -90,7 +90,7 @@ WorldLayout.FlatZones = {
 	-- Blend 1, so it flattens the trucks' ground and does not grow the
 	-- forest hub (the hub names Town only). The homesteads are shelves,
 	-- not this lawn.
-	{ name = "DealershipLot", x0 = 184, x1 = 296, z0 = 64, z1 = 123, blend = 1 },
+	{ name = "DealershipLot", x0 = 178, x1 = 340, z0 = 64, z1 = 166, blend = 1 },
 	-- The lot's east rail and the turnaround (the loop ends at x 172, z 50)
 	-- used to sit on the district lawn. Keep that patch level so the town's
 	-- driveway doesn't climb. It stops short of the dealership display lot
@@ -108,8 +108,8 @@ end
 -- left as the town laid it out.
 export type ReservedBox = { name: string, x0: number, x1: number, z0: number, z1: number }
 WorldLayout.Reserved = {
-	{ name = "DealershipLot", x0 = 184, x1 = 296, z0 = 64, z1 = 123 },
-	{ name = "DealershipApproach", x0 = 69.5, x1 = 184, z0 = 64, z1 = 123 },
+	{ name = "DealershipLot", x0 = 178, x1 = 340, z0 = 64, z1 = 166 },
+	{ name = "DealershipApproach", x0 = 69.5, x1 = 178, z0 = 64, z1 = 123 },
 } :: { ReservedBox }
 
 -- Distance from rectangle (x0, z0)-(x1, z1) to a reserved box. 0 when they
@@ -503,8 +503,8 @@ WorldLayout.ParkingLot = { x0 = 8, x1 = 146, z0 = -18, z1 = 68 }
 -- Named rects only: not a flat zone, a paint, or a reserved box, so nothing
 -- reads them yet and the ground does not move.
 export type LoadingPad = { x0: number, x1: number, z0: number, z1: number }
-WorldLayout.DealershipLoadingPad = { x0 = 70, x1 = 84, z0 = 100, z1 = 114 } :: LoadingPad
-WorldLayout.ToolShedLoadingPad = { x0 = -66, x1 = -52, z0 = 139, z1 = 153 } :: LoadingPad
+WorldLayout.DealershipLoadingPad = { x0 = 160, x1 = 174, z0 = 100, z1 = 114 } :: LoadingPad -- west of the showroom hall, east of the Land Office
+WorldLayout.ToolShedLoadingPad = { x0 = -88, x1 = -74, z0 = 144, z1 = 158 } :: LoadingPad -- behind the Tool Shed, in the lane to the General Store
 
 -- The town's ground (TerrainGen paints it): a cobbled plaza round the sell
 -- pad, packed dirt for the main street, the shop paths, the spawn walk, the
@@ -518,19 +518,23 @@ export type Paint = { name: string, x0: number, x1: number, z0: number, z1: numb
 WorldLayout.TownPaint = {
 	{ name = "Plaza", x0 = -26, x1 = 26, z0 = 64, z1 = 97, material = "Cobblestone" },
 	-- 22 studs wide (was 14): a Logging Rig has room to line up on the sell pad.
-	{ name = "MainStreet", x0 = -104, x1 = 64, z0 = 62, z1 = 84, material = "Ground" },
+	{ name = "MainStreet", x0 = -128, x1 = 64, z0 = 62, z1 = 84, material = "Ground" },
 	-- Where the Forest Path meets the town, wider than the spawn walk.
 	{ name = "ForestMouth", x0 = -18, x1 = 6, z0 = 14, z1 = 36, material = "Ground" },
 	-- Where the Hills Road meets the town, south of Murph's camp.
 	{ name = "HillsMouth", x0 = -42, x1 = 4, z0 = 6, z1 = 34, material = "Ground" },
 	-- The turn off the street's east end onto the way north (the mill road).
 	{ name = "PlazaEastMouth", x0 = 70, x1 = 112, z0 = 68, z1 = 96, material = "Ground" },
-	-- The road along the showroom hall's front (the hall stands at x 114 to
-	-- 258, z 76 to 122, on the old display lot).
-	{ name = "TruckLotPath", x0 = 116, x1 = 296, z0 = 64, z1 = 70, material = "Ground" },
+	-- The road along the showroom's forecourt (the hall stands at x 181 to 336,
+	-- z 96 to 162, behind the Land Office and its sign), and the path up to its door.
+	{ name = "TruckLotPath", x0 = 116, x1 = 340, z0 = 64, z1 = 70, material = "Ground" },
+	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 95.4, material = "Ground" },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
-	{ name = "HearthAndHomePath", x0 = -106, x1 = -94, z0 = 84, z1 = 98, material = "Ground" },
-	{ name = "ToolShedPath", x0 = -63, x1 = -51, z0 = 82, z1 = 93, material = "Ground" },
+	-- The General Store stands behind the Tool Shed (z 165.5 to 209): its path
+	-- runs up the lane west of the Tool Shed, then across to its door.
+	{ name = "HearthAndHomePath", x0 = -119, x1 = -107, z0 = 84, z1 = 163.5, material = "Ground" },
+	{ name = "HearthAndHomePath", x0 = -119, x1 = -92, z0 = 151, z1 = 163.5, material = "Ground" },
+	{ name = "ToolShedPath", x0 = -90, x1 = -78, z0 = 82, z1 = 95, material = "Ground" },
 	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 66, material = "Ground" },
 	{ name = "MillYard", x0 = -32, x1 = 33, z0 = 95, z1 = 140, material = "Ground" },
 	{ name = "GondolaPath", x0 = -37.5, x1 = -33, z0 = 82, z1 = 142, material = "Ground" },
@@ -542,9 +546,9 @@ WorldLayout.TownPaint = {
 -- a shop floor or hides its front (TER-02). The sawmill stands on the
 -- MillYard. TerrainGen paints these after TownPaint.
 WorldLayout.TownFloors = {
-	{ name = "ToolShedFloor", x0 = -73.5, x1 = -38.5, z0 = 88.5, z1 = 136, material = "Ground" },
-	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -70, z0 = 94, z1 = 144, material = "Ground" },
-	{ name = "DealershipFloor", x0 = 113.5, x1 = 262, z0 = 74.5, z1 = 123.5, material = "Ground" },
+	{ name = "ToolShedFloor", x0 = -102, x1 = -62, z0 = 88.5, z1 = 142.5, material = "Ground" },
+	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -72, z0 = 164, z1 = 212, material = "Ground" },
+	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 92, z1 = 164.5, material = "Ground" },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
 } :: { Paint }
 

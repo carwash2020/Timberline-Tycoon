@@ -41,6 +41,7 @@ local AnalyticsService = game:GetService("AnalyticsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local NextGoal = require(ReplicatedStorage.Shared.NextGoal)
+local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
@@ -120,7 +121,10 @@ local function refreshNext(player: Player, profile: Profile)
 	if profile.daily and type(profile.daily.streak) == "number" then
 		streak = profile.daily.streak
 	end
-	local goal = NextGoal.Pick(loop, profile.bestAxeTier or 1, found, streak)
+	local okHour, hour = pcall(function(): number
+		return ShopHoursLogic.Now()
+	end)
+	local goal = NextGoal.Pick(loop, profile.bestAxeTier or 1, found, streak, if okHour then hour else nil)
 	player:SetAttribute("NextGoal", goal.text)
 	player:SetAttribute("NextGoalBeacon", goal.beacon)
 	MilestoneService.Mark(player, "Saw a next goal")

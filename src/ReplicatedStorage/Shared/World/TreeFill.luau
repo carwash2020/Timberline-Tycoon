@@ -261,6 +261,31 @@ local function yardsClear(x: number, z: number): boolean
 	return true
 end
 
+-- Boulder clusters (placed against the first trees, so the rocks cannot move:
+-- every new trunk gives way, in the rings and everywhere else).
+local clusterDiscs: { { number } }? = nil
+local function clusterList(): { { number } }
+	local cached = clusterDiscs
+	if cached then
+		return cached
+	end
+	local built: { { number } } = {}
+	local clusters = world().BoulderClusters() :: { { center: Vector3, radius: number } }
+	for _, c in ipairs(clusters) do
+		table.insert(built, { c.center.X, c.center.Z, c.radius + 10 })
+	end
+	clusterDiscs = built
+	return built
+end
+local function clusterClear(x: number, z: number): boolean
+	for _, d in ipairs(clusterList()) do
+		if within(x, z, d[1], d[2], d[3]) then
+			return false
+		end
+	end
+	return true
+end
+
 -- Boot placement and regrowth share this. A point on a widened haul road,
 -- in a loading pad, or on a homestead square is not ground.
 function TreeFill.Ground(x: number, z: number): boolean
@@ -270,6 +295,7 @@ function TreeFill.Ground(x: number, z: number): boolean
 	-- Every test is a pure yes or no; the cheap ones go first and the
 	-- terrain's (GoodGround) last, since most points fail something cheap.
 	return TreeFill.Clear(x, z)
+		and clusterClear(x, z)
 		and sceneryClear(x, z)
 		and landmarkClear(x, z, 0)
 		and yardsClear(x, z)
@@ -610,29 +636,6 @@ end
 -- own Kit.rng). Returns them without touching `taken`.
 -- Ring trees also keep off the boulder clusters (placed against the first
 -- trees, so the rocks can't move: the trees give way).
-local clusterDiscs: { { number } }? = nil
-local function clusterList(): { { number } }
-	local cached = clusterDiscs
-	if cached then
-		return cached
-	end
-	local built: { { number } } = {}
-	local clusters = world().BoulderClusters() :: { { center: Vector3, radius: number } }
-	for _, c in ipairs(clusters) do
-		table.insert(built, { c.center.X, c.center.Z, c.radius + 10 })
-	end
-	clusterDiscs = built
-	return built
-end
-local function clusterClear(x: number, z: number): boolean
-	for _, d in ipairs(clusterList()) do
-		if within(x, z, d[1], d[2], d[3]) then
-			return false
-		end
-	end
-	return true
-end
-
 function TreeFill.PlotRings(taken: { Vector3 }): { Spot }
 	local rng = Kit.rng(hashString("plot rings"))
 	local out: { Spot } = {}

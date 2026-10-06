@@ -3,7 +3,7 @@
 -- each service (SELL LOGS, AXES, TRUCKS, BLUEPRINTS & GEAR, GONDOLA), each
 -- on its own building; a UITheme card (cream FredokaOne on bark, an ink
 -- edge, an icon chip drawn from Frames); unlit, not on top, hidden past
--- 350 studs, standing 16-28 studs up, clear of its roof; it fades within
+-- 350 studs, standing 16-34 studs up, clear of its roof; it fades within
 -- 25 studs and while a shop is open; and from the spawn on an iPhone 14 in
 -- landscape all six are on screen, apart, with text 14 px or more, clear
 -- of the sawmill's crest.
@@ -206,7 +206,7 @@ return function(t)
 	end)
 
 	t.test(
-		"unlit, not drawn on top, hidden past 350 studs, 16 to 28 studs up, sized in studs with a pixel floor",
+		"unlit, not drawn on top, hidden past 350 studs, 16 to 34 studs up, sized in studs with a pixel floor",
 		function()
 			for _, m in ipairs(TownMarkers.Markers) do
 				local gui = TownMarkers.Build(m, true)
@@ -215,7 +215,7 @@ return function(t)
 				t.eq(gui.MaxDistance, 350)
 				t.eq(gui.ResetOnSpawn, false, "it lives in PlayerGui")
 				t.eq(gui.Enabled, false, "hidden until its part streams in")
-				t.ok(gui.StudsOffsetWorldSpace.Y >= 16 and gui.StudsOffsetWorldSpace.Y <= 28, m.name .. " 16-28 up")
+				t.ok(gui.StudsOffsetWorldSpace.Y >= 16 and gui.StudsOffsetWorldSpace.Y <= 34, m.name .. " 16-34 up")
 				t.eq(gui.SizeOffset, roblox.Vector2.new(0, 0.5), m.name .. " stands on its point (its bottom edge)")
 				local size = gui.Size
 				t.ok(size.X.Scale > 0 and size.Y.Scale > 0, m.name .. " has a size in studs")

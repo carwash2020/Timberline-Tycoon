@@ -49,7 +49,7 @@ return function(t)
 		t.eq(GameConfig.LoadingPadSize, 14)
 		t.eq(GameConfig.ShelfAisleMin, 6)
 		t.eq(GameConfig.CounterPayReach, 10)
-		t.eq(GameConfig.StorePartBudget, 450)
+		t.eq(GameConfig.StorePartBudget, 900)
 		t.eq(GameConfig.CounterMaxItems, 3)
 		t.eq(GameConfig.LimitedStockCount, 3)
 		t.eq(GameConfig.LimitedRestockSec, 1200)
@@ -72,8 +72,8 @@ return function(t)
 		end
 		unused(WorldLayout.DealershipLoadingPad, "DealershipLoadingPad")
 		unused(WorldLayout.ToolShedLoadingPad, "ToolShedLoadingPad")
-		t.eq(WorldLayout.DealershipLoadingPad, { x0 = 70, x1 = 84, z0 = 100, z1 = 114 })
-		t.eq(WorldLayout.ToolShedLoadingPad, { x0 = -66, x1 = -52, z0 = 139, z1 = 153 })
+		t.eq(WorldLayout.DealershipLoadingPad, { x0 = 160, x1 = 174, z0 = 100, z1 = 114 })
+		t.eq(WorldLayout.ToolShedLoadingPad, { x0 = -88, x1 = -74, z0 = 144, z1 = 158 })
 		local function absent(list)
 			for _, zone in ipairs(list) do
 				t.ok(zone.name ~= "DealershipLoadingPad" and zone.name ~= "ToolShedLoadingPad", zone.name)
@@ -210,9 +210,8 @@ return function(t)
 			table.insert(roads, road)
 		end
 		-- 1.5 studs off every floor, path, street, plaza and yard, and 8
-		-- studs off every road. The dealership pad is x 70..84, beside the
-		-- showroom: 0.5 off DealershipFloor and 7 off MillRoad. The gap
-		-- between those two is 21.5 studs, short of 1.5 + 14 + 8.
+		-- studs off every road. The dealership pad is west of the showroom hall
+		-- (x 160..174, z 100..114): 4 off DealershipFloor and clear of MillRoad.
 		local sawFloor, sawMill = false, false
 		for _, pad in ipairs(pads) do
 			for _, rect in ipairs(rects) do

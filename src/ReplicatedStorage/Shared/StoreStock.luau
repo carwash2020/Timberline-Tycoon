@@ -359,7 +359,8 @@ end
 -- The Tool Shed: an axe table down the west side, a table for the sawmills
 -- and the chop saw down the east side (both counter height and wide enough
 -- for two small boxes across), and the Robux table across the back
--- (RobuxShelf). The counter stands between the two tables, near the door.
+-- (RobuxShelf), behind the counter, which stands at the back wall's end of the
+-- aisle between the two tables (customers walk in past the shelves to pay).
 -- Hearth & Home: a shelf unit along each side wall and a free-standing
 -- island each side of the middle, a wide aisle between the islands.
 export type Shop = {
@@ -377,8 +378,8 @@ local SHOPS: { [string]: Shop } = {
 				name = "AxeTable",
 				x0 = -13.7,
 				x1 = -5.8,
-				z0 = -18,
-				z1 = 13.8,
+				z0 = -21.3,
+				z1 = 10.5,
 				y = StoreStock.TableTop,
 				kinds = { "Axe" },
 			},
@@ -386,13 +387,13 @@ local SHOPS: { [string]: Shop } = {
 				name = "MachineTable",
 				x0 = 5.8,
 				x1 = 13.7,
-				z0 = -18,
-				z1 = 13.8,
+				z0 = -21.3,
+				z1 = 10.5,
 				y = StoreStock.TableTop,
 				kinds = { "Sawmill", "Machine" },
 			},
 		},
-		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(19.4, 1, 25.6) },
+		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(19.4, 1, 30) },
 	},
 	HearthAndHome = {
 		lanes = {
@@ -400,8 +401,8 @@ local SHOPS: { [string]: Shop } = {
 				name = "GearShelf",
 				x0 = -24,
 				x1 = -17.2,
-				z0 = -15.5,
-				z1 = 13,
+				z0 = -17.75,
+				z1 = 10.75,
 				y = StoreStock.ShelfTop,
 				kinds = { "Gear" },
 			},
@@ -409,8 +410,8 @@ local SHOPS: { [string]: Shop } = {
 				name = "LampShelf",
 				x0 = 17.2,
 				x1 = 24,
-				z0 = -15.5,
-				z1 = 13,
+				z0 = -17.75,
+				z1 = 10.75,
 				y = StoreStock.ShelfTop,
 				kinds = { "Cosmetic" },
 			},
@@ -418,8 +419,8 @@ local SHOPS: { [string]: Shop } = {
 				name = "PlanIslandW",
 				x0 = -13.4,
 				x1 = -7,
-				z0 = -15,
-				z1 = 11,
+				z0 = -17.25,
+				z1 = 8.75,
 				y = StoreStock.ShelfTop,
 				kinds = { "Blueprint" },
 			},
@@ -427,13 +428,13 @@ local SHOPS: { [string]: Shop } = {
 				name = "PlanIslandE",
 				x0 = 7,
 				x1 = 13.4,
-				z0 = -15,
-				z1 = 11,
+				z0 = -17.25,
+				z1 = 8.75,
 				y = StoreStock.ShelfTop,
 				kinds = { "Blueprint" },
 			},
 		},
-		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(33, 1, 26) },
+		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(33, 1, 29) },
 	},
 }
 

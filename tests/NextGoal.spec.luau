@@ -44,4 +44,13 @@ return function(t)
 		t.eq(NextGoal.Pick(2, 99, all, 0).text, "Finish day 1 of your daily streak")
 		t.eq(NextGoal.Pick(1, 99, all, 3).text, "Daily streak: day 3")
 	end)
+
+	t.test("the axe goal says when the Tool Shed opens while it is shut", function()
+		local open = NextGoal.Pick(2, 1, foundNone(), 0, 12)
+		local shut = NextGoal.Pick(2, 1, foundNone(), 0, 23)
+		t.ok(string.find(open.text, "opens at", 1, true) == nil, open.text)
+		t.ok(string.find(shut.text, "opens at 6:00 AM", 1, true) ~= nil, shut.text)
+		t.eq(shut.beacon, "toolShed")
+		t.eq(NextGoal.Pick(2, 1, foundNone(), 0).text, open.text, "no hour: no note")
+	end)
 end

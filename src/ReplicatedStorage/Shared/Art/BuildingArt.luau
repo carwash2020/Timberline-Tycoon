@@ -31,6 +31,7 @@ local Util = require(script.Parent.Parent.Util)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 local DealershipLot = require(script.Parent.DealershipLot)
+local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
 local ShopDoor = require(script.Parent.ShopDoor)
 local ShopInterior = require(script.Parent.ShopInterior)
@@ -117,7 +118,15 @@ BuildingArt.Scale = {
 -- Robux table need more floor, so the barn grew backward (the front stays
 -- put). Its uploaded meshes stretch by the same factor along Z only (the
 -- ridge runs that way), see MeshStretch.
-BuildingArt.ToolShedHalfDepth = 12.8
+-- A name sign's bottom edge stands at least this far above the roof under it
+-- (design studs; the Tool Shed and Hearth & Home are scaled 1.5x after).
+BuildingArt.SignRise = 3
+-- The Dealership's counter: this far in from the lobby's west wall, and this far
+-- from the back wall (the counter's middle).
+BuildingArt.DealerLobbyCounterX = 13
+BuildingArt.DealerCounterBack = 4.8
+BuildingArt.ToolShedHalfDepth = 15.0
+BuildingArt.ToolShedCounterZ = 13.6 -- the counter's middle, final studs from the shop's middle
 BuildingArt.ToolShedHalfWidth = 9.7
 local TOOL_SHED_OLD_HALF_DEPTH = 7
 
@@ -255,13 +264,6 @@ local function light(part: BasePart, range: number, brightness: number, color: C
 	l.Brightness = brightness
 	l.Shadows = false
 	l.Parent = part
-end
-
-local function material(name: string, fallback: Enum.Material): Enum.Material
-	local ok, m = pcall(function(): Enum.Material
-		return (Enum.Material :: any)[name]
-	end)
-	return if ok and m then m else fallback
 end
 
 ---------------------------------------------------------------------------
@@ -1235,7 +1237,8 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	local signW, signH = 17, 3.8
 	-- (the sign stands where the stretched mesh sign stands: in front of the front wall by the old 0.4, stretched with the barn)
 	local signY, signZ =
-		RY + 1.05 + NAME_FRAME + signH / 2, -HZ * (TOOL_SHED_OLD_HALF_DEPTH + 0.4) / TOOL_SHED_OLD_HALF_DEPTH - 0.4
+		RY + 0.5 + BuildingArt.SignRise + NAME_FRAME + signH / 2,
+		-HZ * (TOOL_SHED_OLD_HALF_DEPTH + 0.4) / TOOL_SHED_OLD_HALF_DEPTH - 0.4
 	nameSign(model, CF(0, signY, signZ), signW, signH, title, accent, TRIM, TRIM, false, 0.7)
 	for _, s in ipairs({ -1, 1 }) do
 		local roofY = RY - (RY - KY) * 4.6 / KX -- the upper roof, 4.6 out from the ridge
@@ -1252,11 +1255,10 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		hangingLantern(model, V3(s * 3.8, 7.6, -HZ + 0.1), 0.6, 0.85)
 	end
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
-	-- The counter keeps its distance from the front (8.4 studs, as before the
-	-- barn grew backward): the deeper floor is behind it, for the keeper and
-	-- the Robux table.
-	local CZ = 1.4 - (HZ - TOOL_SHED_OLD_HALF_DEPTH)
-	hangingLantern(model, V3(0, TOP - 0.8, CZ + 2.2), 0.9, 0.9)
+	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ),
+	-- the keeper behind it and the Robux table behind her, against the far wall.
+	local CZ = BuildingArt.ToolShedCounterZ / BuildingArt.Scale.ToolShed
+	hangingLantern(model, V3(0, TOP - 0.8, CZ - 2.2), 0.9, 0.9)
 
 	-- Inside: the counter, the axe rack (the display tables go in once the
 	-- shop is scaled).
@@ -1267,24 +1269,8 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	end
 	register(model, CF(2.7, FLOOR + 3.3, CZ + 0.2))
 	ledger(model, CF(-2.5, FLOOR + 3.3, CZ - 0.2))
-	dBox(model, "AxeRack", V3(11.6, 4.2, 0.3), CF(0, 5.5, HZ - 0.45), PLANK_DARK[2])
-	dBox(model, "AxeRackRail", V3(11.8, 0.35, 0.45), CF(0, 4.1, HZ - 0.75), TIMBER)
-	local axes = {}
-	for _, axe in ipairs(ItemCatalog.AxeLadder()) do
-		if axe.sold ~= false then
-			table.insert(axes, axe)
-		end
-	end
-	for i, axe in ipairs(axes) do
-		local x = (i - (#axes + 1) / 2) * 1.35
-		rackAxe(
-			model,
-			CF(x + 0.2, 3.7, HZ - 0.85),
-			3.7,
-			hex(axe.look.headColor),
-			material(axe.look.material, MAT.Metal)
-		)
-	end
+	-- (The axe rack on the back wall, with every axe's real model, is built by
+	-- ShopInterior once the shop is scaled.)
 	-- (The workbench and the barrel of handles that stood along the side
 	-- walls are gone: the display tables (displayTables) and the aisle
 	-- between them need that floor.)
@@ -1394,28 +1380,28 @@ local function dealership(model: Model, title: string, accent: Color3)
 	end
 	dBox(model, "Stripe", V3(2 * hx + 2 * T + 0.4, 0.7, 0.3), CF(0, H - 1.6, -hz - T - 0.1), accent, MAT.SmoothPlastic)
 	dBox(model, "Stripe", V3(2 * hx + 2 * T + 0.4, 0.7, 0.3), CF(0, H - 1.6, hz + T + 0.1), accent, MAT.SmoothPlastic)
-	-- Roof: a flat slab (no overhang at the front: the road runs right along
-	-- it). Its east end is a glass skylight: the view from the spawn to the
-	-- lighthouse crosses it.
-	local skylight = 24
+	-- Roof: a flat slab. No skylight: the hall stands north of the spawn's line
+	-- to the lighthouse (z 96 at its front, the line is south of that along its
+	-- whole length), so the roof can be solid.
 	local roofW = 2 * hx + 2 * T + 1
-	Kit.part(
-		model,
-		"Roof",
-		V3(roofW - skylight, 0.8, 2 * hz + 2 * T + 0.2),
-		CF(-skylight / 2, H + 0.4, 0),
-		TIN_ROOF[1],
-		MAT.Metal
-	)
-	glassBand("RoofGlass", V3(skylight, 0.8, 2 * hz + 2 * T + 0.2), CF(roofW / 2 - skylight / 2, H + 0.4, 0))
+	Kit.part(model, "Roof", V3(roofW, 0.8, 2 * hz + 2 * T + 0.2), CF(0, H + 0.4, 0), TIN_ROOF[1], MAT.Metal)
 	-- The name sign over the lobby door, lit by two goosenecks, and a second
 	-- board for the trade over the windows.
 	local signW, signH = 24, 4.2
-	local signY, signZ = H + 0.8 + 0.25 + NAME_FRAME + signH / 2, -hz - T - 0.1
+	-- Raised on posts, its bottom edge SignRise above the roof (ShopSignClearance spec).
+	local signY, signZ = H + 0.8 + BuildingArt.SignRise + NAME_FRAME + signH / 2, -hz - T - 0.1
 	nameSign(model, CF(doorCx + 4, signY, signZ), signW, signH, title, accent, TRIM, TRIM, false)
 	for _, s in ipairs({ -1, 1 }) do
 		gooseneck(model, CF(doorCx + 4 + s * 7, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
-		dBox(model, "SignPost", V3(0.5, 0.5, 0.5), CF(doorCx + 4 + s * 10, H + 1.05, signZ + 0.2), dark, MAT.Metal)
+		local postH = BuildingArt.SignRise + 0.4
+		dBox(
+			model,
+			"SignPost",
+			V3(0.5, postH, 0.5),
+			CF(doorCx + 4 + s * 10, H + 0.8 + postH / 2, signZ + 0.2),
+			dark,
+			MAT.Metal
+		)
 	end
 	signBoard(
 		model,
@@ -1430,34 +1416,34 @@ local function dealership(model: Model, title: string, accent: Color3)
 		false
 	)
 
-	-- The lobby: the counter near the back, facing the door, the paint
-	-- swatches on the back wall, a tool chest and oil drums.
-	local counterX, counterZ = doorCx, hz - 14
+	-- The lobby (the west column): the counter against the back wall, facing
+	-- the door, the keeper behind it, the paint swatches on the wall above.
+	local counterX, counterZ = -hx + BuildingArt.DealerLobbyCounterX, hz - BuildingArt.DealerCounterBack
 	Kit.part(model, "Counter", V3(8, 3, 1.8), CF(counterX, FLOOR + 1.5, counterZ), dark, MAT.WoodPlanks)
 	dBox(model, "CounterTop", V3(8.6, 0.3, 2.3), CF(counterX, FLOOR + 3.15, counterZ), PLANK[4])
-	register(model, CF(counterX + 2.2, FLOOR + 3.3, counterZ + 0.2))
+	register(model, CF(counterX + 2.2, FLOOR + 3.3, counterZ - 0.1))
 	ledger(model, CF(counterX - 2.2, FLOOR + 3.3, counterZ - 0.1))
-	dBox(model, "SwatchBoard", V3(11, 3.2, 0.2), CF(counterX, 6.6, hz - 0.1), SIGN_BOARD)
+	dBox(model, "SwatchBoard", V3(11, 3.2, 0.2), CF(counterX, 7.6, hz - 0.1), SIGN_BOARD)
 	local trucks = ItemCatalog.TruckList()
 	for i, truck in ipairs(trucks) do
 		local sx = counterX + (i - (#trucks + 1) / 2) * 1.8
-		dBox(model, "PaintSwatch", V3(1.4, 1.8, 0.14), CF(sx, 6.6, hz - 0.28), hex(truck.look.color), MAT.SmoothPlastic)
+		dBox(model, "PaintSwatch", V3(1.4, 1.8, 0.14), CF(sx, 7.6, hz - 0.28), hex(truck.look.color), MAT.SmoothPlastic)
 	end
-	Kit.part(model, "ToolChest", V3(2.4, 2.6, 1.3), CF(-hx + 2, FLOOR + 1.3, hz - 2), hex("#C8402F"), MAT.Metal)
+	Kit.part(model, "ToolChest", V3(2.4, 2.6, 1.3), CF(-hx + 2.4, FLOOR + 1.3, hz - 2), hex("#C8402F"), MAT.Metal)
 	for i = 1, 3 do
-		dBox(model, "Drawer", V3(2.2, 0.12, 0.1), CF(-hx + 2, FLOOR + 0.6 * i, hz - 2.7), IRON, MAT.Metal)
+		dBox(model, "Drawer", V3(2.2, 0.12, 0.1), CF(-hx + 2.4, FLOOR + 0.6 * i, hz - 2.7), IRON, MAT.Metal)
 	end
 	local rng = Kit.rng(512)
 	-- A tyre stack (every tyre solid), by the toolchest.
 	for i = 1, 4 do
 		local tyre =
-			Kit.post(model, "Tyre", V3(-hx + 10, FLOOR + (i - 1) * 0.78, hz - 2.4), 0.76, 2.3, TYRE, MAT.Rubber)
+			Kit.post(model, "Tyre", V3(-hx + 22, FLOOR + (i - 1) * 0.78, hz - 2.4), 0.76, 2.3, TYRE, MAT.Rubber)
 		if i > 1 then
 			tyre.CastShadow = false
 		end
 	end
-	barrel(model, CF(-hx + 5.4, FLOOR, hz - 2), rng, true, accent)
-	barrel(model, CF(-hx + 7.4, FLOOR, hz - 2.4), rng, true, hex("#C8402F"))
+	barrel(model, CF(-hx + 19.4, FLOOR, hz - 2), rng, true, accent)
+	barrel(model, CF(-hx + 24.4, FLOOR, hz - 2.4), rng, true, hex("#C8402F"))
 end
 
 -- General Store (still the HearthAndHome model): 33 x 26 at design size,
@@ -1470,7 +1456,8 @@ end
 -- of that item on the ledge under it; its text comes from the shop's own
 -- prices (StoreStock), never typed here.
 BuildingArt.HearthHalfWidth = 16.5
-BuildingArt.HearthHalfDepth = 13
+BuildingArt.HearthHalfDepth = 14.5
+BuildingArt.HearthCounterZ = 15.3 -- the counter's middle, final studs from the shop's middle
 
 local function hearthAndHome(model: Model, title: string, accent: Color3)
 	local plaster = hex("#F0E2C6")
@@ -1509,14 +1496,25 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	-- Above the roof, and no further south than the roof's overhang, so the
 	-- board doesn't hang past the front or sit inside the roof.
 	local signW, signH = 20, 3
-	local signY, signZ = 12.9, -HZ - 0.6
+	local signY, signZ = TOP + 0.65 + BuildingArt.SignRise + NAME_FRAME + signH / 2, -HZ - 0.6
 	nameSign(model, CF(0, signY, signZ), signW, signH, title, hex("#3E6A3A"), wood, TRIM, false)
 	for _, x in ipairs({ -5, 5 }) do
 		gooseneck(model, CF(x, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
+		-- Two posts carry the board up off the roof.
+		local top = signY - signH / 2 - NAME_FRAME
+		local base = TOP + 0.65
+		dBox(
+			model,
+			"SignPost",
+			V3(0.4, top - base + 0.3, 0.4),
+			CF(x * 1.6, (top + base - 0.3) / 2 + 0.3, signZ + 0.1),
+			wood
+		)
 	end
 
-	-- Counter by the door (customer side faces -Z, the entrance).
-	local counterZ = -HZ + 4.8
+	-- The counter stands at the back (customer side faces -Z, the entrance),
+	-- the keeper behind it; the shelf units stop short of it.
+	local counterZ = BuildingArt.HearthCounterZ / BuildingArt.Scale.HearthAndHome
 	Kit.part(model, "Counter", V3(8, 3, 1.8), CF(0, FLOOR + 1.5, counterZ), Kit.shade(accent, -0.1), MAT.WoodPlanks)
 	dBox(model, "CounterTop", V3(8.6, 0.3, 2.3), CF(0, FLOOR + 3.15, counterZ), PLANK[4])
 	register(model, CF(2.2, FLOOR + 3.3, counterZ + 0.2))
@@ -1729,6 +1727,69 @@ function BuildingArt.InteriorFrame(kind: string, s: number): { frame: ShopInteri
 	}
 end
 
+-- The Dealership's bays in the hall's own space (origin at the hall's middle),
+-- for the lights over them and the aisle stripes between the rows.
+function BuildingArt.DealershipBays(): { ShopInterior.Bay }
+	local hall = DealershipLot.Hall()
+	local layout = DealershipLot.Layout()
+	local out: { ShopInterior.Bay } = {}
+	for _, bay in ipairs(layout.bays) do
+		local aisleSide = if bay.row == 1 then 1 else -1
+		table.insert(out, {
+			x = DealershipLot.OriginX + layout.width / 2 + bay.x - hall.cx,
+			z = DealershipLot.OriginZ + bay.vz - hall.cz,
+			row = bay.row,
+			aisleZ = DealershipLot.OriginZ + bay.z + aisleSide * bay.depth / 2 - hall.cz,
+		})
+	end
+	return out
+end
+
+-- What ShopFacade needs to dress a shop's street side, in final studs.
+function BuildingArt.FacadeSpec(kind: string, s: number, accent: Color3): ShopFacade.Spec
+	if kind == "ToolShed" then
+		return {
+			kind = kind,
+			halfW = BuildingArt.ToolShedHalfWidth * s,
+			frontZ = -(BuildingArt.ToolShedHalfDepth * s + 0.45),
+			doorCx = 0,
+			doorHalf = 5 * s,
+			doorTop = 7.1 * s,
+			wallTop = 9 * s,
+			roofTop = 14.8 * s + 0.75,
+			groundY = 0.5 * s,
+			accent = accent,
+		}
+	elseif kind == "Dealership" then
+		local hall = DealershipLot.Hall()
+		local hx, hz = hall.innerW / 2, hall.innerD / 2
+		return {
+			kind = kind,
+			halfW = hx,
+			frontZ = -hz - 0.8,
+			doorCx = -hx + 0.75 + 7.5,
+			doorHalf = 7.5,
+			doorTop = 11.9,
+			wallTop = 15,
+			roofTop = 15.8,
+			groundY = 0.4,
+			accent = accent,
+		}
+	end
+	return {
+		kind = kind,
+		halfW = BuildingArt.HearthHalfWidth * s,
+		frontZ = -(BuildingArt.HearthHalfDepth * s + 0.45),
+		doorCx = 0,
+		doorHalf = 5 * s,
+		doorTop = 7.5 * s,
+		wallTop = 10 * s,
+		roofTop = 10.65 * s,
+		groundY = 0.4 * s,
+		accent = accent,
+	}
+end
+
 -- The front door of a shop in final studs (see ShopDoor.Spec): the opening
 -- is the gap in the front wall, the plane is where the leaves stand.
 function BuildingArt.DoorSpec(kind: string, s: number, accent: Color3): ShopDoor.Spec
@@ -1829,8 +1890,15 @@ function BuildingArt.Shop(kind: string, title: string, accent: Color3, scale: nu
 		placeShelfSlots(model, kind, s)
 	end
 	local frame = BuildingArt.InteriorFrame(kind, s)
-	ShopInterior.Add(model, kind, frame.frame, frame.extra)
+	ShopInterior.Add(
+		model,
+		kind,
+		frame.frame,
+		frame.extra,
+		if kind == "Dealership" then BuildingArt.DealershipBays() else nil
+	)
 	ShopDoor.Add(model, BuildingArt.DoorSpec(kind, s, accent))
+	ShopFacade.Add(model, BuildingArt.FacadeSpec(kind, s, accent))
 	return model
 end
 

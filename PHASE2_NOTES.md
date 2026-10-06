@@ -1690,7 +1690,7 @@ What changed (branch `claude/real-stores`):
 - [ ] Doors: set the clock to 22 (owner menu): Hearth & Home and the Dealership
       doors close smoothly and block you (barn leaves slide, general store doors
       swing, showroom shutter rolls down); "Closed - opens at 7 AM" shows. The
-      Tool Shed never shuts. Stand inside when it closes and walk to the door: it
+      Tool Shed shuts too since store-polish (6 AM to 8 PM; it used to stay open all night). Stand inside when it closes and walk to the door: it
       opens for you. Stand in the doorway at closing time: it waits for you.
       Set the clock to 8: everything opens, the sign goes.
 - [ ] Dealership: walk in from the road. Eight bays in price order (Rustbucket
@@ -2028,6 +2028,114 @@ at the sawmill's sell pad like every later one.
 - [ ] Buy the plot and the Rustbucket box with only sawmill sales.
 - [ ] An old save sitting on the sell step: the arrow now points at the sell pad.
 
+
+## Store polish: counters at the back, bigger spaced-out shops, a bigger showroom (claude/store-polish)
+
+Connor's notes after playing the real stores (#82), plus the follow-ups he sent
+while the branch was open.
+
+- **Counters at the back.** In every shop the counter (and the keeper behind it)
+  is against the far wall, so you walk in past the shelves to pay. Tool Shed:
+  counter 13.6 studs in from the middle, the gold Robux table behind the keeper
+  against the back wall. Hearth & Home: counter 15.3 in. Dealership: in the
+  lobby column, against the back wall. The keeper's spot is still derived from
+  the Counter part (`NPCData.BehindCounter`), the buy prompt, ShopPoint and the
+  CounterLogic zone follow the Counter, so only the fallbacks moved. The
+  tutorial's step ids and beacons are unchanged.
+- **Bigger shops.** The Tool Shed is 45 deep (was 38.4) and Hearth & Home 43.5
+  (was 39); both shelf layouts were shifted back by the extra depth so the front
+  clearance is the same.
+- **The Dealership showroom**: inside 154 x 64 (was 142 x 43), a 26-stud lobby
+  at the west end (door in front, counter at the back wall), then two rows of
+  plinths (front row 5 vehicles, back row 3, price order) with a **clear 14-stud
+  central walkway** between them. Each vehicle box stands ON its plinth at the
+  edge facing the walkway, the vehicle beside it; nothing but a thin price sign
+  stands in the walkway. A ceiling spot over every bay, marble floor, slate
+  border, yellow edge stripes and blue bars down the walkway, banners, brochure
+  racks, reception chairs, plants, flags. Nothing parked outside.
+- **Spaced-out town.** The Tool Shed moved west to x -84 (front still z 95.2,
+  outside the sell pad's keep-out x -60 to 60, z 80 to 140); Hearth & Home moved
+  behind it (z 165.5 to 209, x -124.75 to -75.25) with a 20-stud lane between,
+  its path up the lane west of the Tool Shed; the Dealership hall moved to x 181
+  to 336, z 96 to 162, clear of the Land Office (147, 86) and the PLOT DISTRICT
+  sign (148.5, 76). **The Climb plot moved 55 studs north (z 345)** so the hall's
+  lawn can be 64 deep (PlotLogic.spec keeps a shelf's blend 66 studs off the
+  reserved lawn). Loading pads, TownFloors/TownPaint, the flat zone, shop paths,
+  props, greenery, signs' neighbours, NPC fallbacks and the three markers moved
+  with the shops. The re-laid town: `bash tools/preview/shoot.sh town 11`.
+- **Signs.** Every name board stands on posts at least `BuildingArt.SignRise`
+  (3 design studs, 4.5 on the scaled shops) over its roof; the floating markers
+  (TownMarkers) reach 19 to 32 studs over the counter part and clear the boards
+  and roofs. `tests/StoreLayout.spec` checks the bottoms (2.5 over the roof).
+- **Floors** (`ShopInterior`): Tool Shed warm WoodPlanks with darker planks, a
+  dark border and the red runner; Hearth & Home honey boards with a green border,
+  a runner and a rug; the showroom polished Marble with a slate border, a pale
+  walkway lane with yellow stripes and blue bars. Three non-coplanar layers
+  (0, 0.06, 0.12 over the floor), so nothing z-fights.
+- **Real axes on the Tool Shed rack**: eight `AxeArt.Build` models (the same art
+  as the held tools, uploaded meshes with the part-built fallback), in ladder
+  order, each with a name and one price plate. No glow lights on the rack.
+- **The water tower** stood inside the Tool Shed (the WaterTower prop at
+  (-58, 126) and the Cart at (-71, 124), both inside the lot). Moved out
+  (tower (-56, 188), cart (-66, 200)); `StoreLayout.spec` checks no prop, bush,
+  lamp, sign, camp or station is inside a shop's footprint.
+- **Showroom light** down about 30%: strips 1.0/26 to 0.7/18, plinth lamps
+  1.4/17 to 1.0/12, spots 0.65/20, strip neon dimmed. `ShowroomLight` holds the
+  numbers; the spec pins every showroom Light at or under 1.0 brightness and 22
+  range. The two sign goosenecks are the same on every shop.
+- **Tool Shed hours**: 6 AM to 8 PM (`ShopHoursLogic.ToolShedOpen/Close`). It
+  closes, the keeper sleeps ("Zzz... the shed opens at 6:00 AM..."), the door
+  shuts with "Closed - opens at 6 AM". The post-tutorial goal says "Buy the Steel
+  Axe ($120) - opens at 6:00 AM" while it is shut. `/settime` still works (the
+  clock override feeds `ShopHoursLogic.Now`).
+- **More detail** (all looks only, `ShopFacade` outside, `ShopInterior` inside):
+  windows with frames, sills and flower boxes, awnings or a canopy, doormats,
+  planters, benches, barrels and crates, sandwich boards with the hours,
+  chimneys and roof units; price tags on every shelf item, hanging goods from the
+  beams, pegboards, posters, coat hooks, stools, plants, bins, crate stacks, a
+  back-room door in each shop, and at every counter a bell, a balance scale, a
+  receipt spike, jars and a stool for the keeper. Part budgets raised on purpose:
+  Tool Shed 650, Hearth & Home 340, Dealership 300 parts per shop model
+  (`BuildingArt.spec`), `GameConfig.StorePartBudget` 450 to 900.
+- **Side fixes**: `NPCService.frontAlong` ignores looks-only parts out front when
+  deciding who is outside a closed door; the boulder clusters re-seeded
+  ("boulder clusters 3") and every new tree keeps off them (`TreeFill.Ground`);
+  the Tool Shed sign mesh is no longer stretched with the barn.
+- **Pins re-sampled on purpose** because the town moved and The Climb moved:
+  Terrain height fingerprint, DecorCover, country stands (481 now), TreeFill and
+  FOR-04 hashes, edge-tree count (71).
+
+### Studio checks
+- [ ] Walk into the **Tool Shed** from the street: the barn doors, planter-free
+      yard (grindstone and block), a barrel and crate by the west wall; inside,
+      the tables and shelves to the sides, the red runner down the middle to the
+      **counter at the back** with Tink behind it and the gold Robux shelf
+      behind him; eight real axes on the wall rack, each with a name and a price;
+      a brown back-room door on the east wall near the back. The name board is high
+      over the roof on its posts.
+- [ ] Carry a box to the counter: the buy card appears at the counter only, the
+      keeper asks, pay, open the box. Same at Hearth & Home (counter at the back).
+- [ ] At night (set the clock to 21:00 with `/settime`) the Tool Shed is shut like
+      the others: barn doors closed with "Closed - opens at 6 AM", Tink asleep with
+      Zzz; at 06:00 it opens. The goal line after the tutorial says when it opens.
+- [ ] **General Store**: awning, windows with flower boxes, bench, sandwich board;
+      its path runs up the lane west of the Tool Shed. The marker over it
+      ("GENERAL STORE") is up over the roof, east of the board.
+- [ ] **Dealership**: walk in from the street: lobby, the counter at the back wall
+      with Dale behind it; the vehicles on plinths in two rows with a wide clear
+      aisle; every box sits on its plinth, the price sign by it. Buy a box at the
+      counter, open it: the pad flow is unchanged. Nothing is parked outside.
+- [ ] The **Land Office** counter, Old Hank and the PLOT DISTRICT sign are in front
+      of the showroom lawn, clear and visible; the way from the road to every door
+      is open (the path to the showroom door, the lane to the General Store).
+- [ ] At night the showroom is noticeably calmer than before and similar to the
+      other shops; the vehicles still read.
+- [ ] The sell pad beside the sawmill (x -60 to 60) has nothing built on it.
+- [ ] No water tower or cart inside the Tool Shed; they stand behind the shops.
+- [ ] Floors: no flicker or z-fighting on any floor; planks, borders and runners look
+      clean from standing height and from the camera pulled back.
+- [ ] Phone: from the spawn the AXES, GENERAL STORE and GONDOLA markers show
+      without overlapping.
 ## Owner hub (branch `claude/owner-hub`)
 
 The owner menu is now a hub: PLAYERS / GIVE / WORLD / SELF tabs, a Find-a-tool box, one shared player pick, a status strip, confirmations, and an Xbox order with LB/RB tabs. Chat commands are unchanged and there are new ones (OWNER_TOOLS.md). Paste your UserId into `AdminLogic.OwnerUserIds` first (or test in Studio, where you count as owner).

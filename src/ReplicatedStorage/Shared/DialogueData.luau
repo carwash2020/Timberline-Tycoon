@@ -122,7 +122,7 @@ local LINES: { [string]: { [string]: string } } = {
 
 -- One %s, filled with the formatted next-open hour.
 local SLEEPY: { [string]: string } = {
-	ToolShed = "The shed's still open. I don't sleep.",
+	ToolShed = "Zzz... the shed opens at %s...",
 	HearthAndHome = "Mmf... the hearth opens at %s...",
 	Dealership = "Mmf... the lot opens at %s...",
 	LandOffice = "Mmf... the office opens at %s...",

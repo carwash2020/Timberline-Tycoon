@@ -2128,8 +2128,8 @@ return function(t)
 		-- 322 tuned trees + 160 stand trees, then the forest, then the density fill.
 		local trees = WorldPlan.Trees()
 		local forest = WorldPlan.ForestTrees()
-		t.eq(trees[483], forest[1], "the forest still starts after the 482")
-		t.ok(#trees > 482 + #forest, "the density fill is appended after the forest")
+		t.eq(trees[482], forest[1], "the forest still starts after the 481")
+		t.ok(#trees > 481 + #forest, "the density fill is appended after the forest")
 	end)
 
 	t.test("scenery keeps off the roads, water, trees, boulders, signs, town, plots, biomes and gondola", function()
@@ -2349,9 +2349,9 @@ return function(t)
 	t.test("country stands never move: same woods, places and order as before the forest (FOR-03)", function()
 		local trees = WorldPlan.Trees()
 		-- A fingerprint of the country stands (trees 323 to 482: index, wood,
-		-- biome, x, z). Re-sampled when the shelves moved apart. The first
+		-- biome, x, z). Re-sampled when the shelves moved apart, and again when The Climb moved 55 studs north for the showroom hall (store polish). The first
 		-- 322 were not.
-		local lastStand = 482
+		local lastStand = 481
 		local h = 7
 		for i = FIRST + 1, lastStand do
 			local tree = trees[i]
@@ -2360,10 +2360,13 @@ return function(t)
 				h = (h * 31 + string.byte(s, k)) % 1000000007
 			end
 		end
-		t.eq(h, 825862283, "the country stands moved, changed wood or changed order")
+		t.eq(h, 459520806, "the country stands moved, changed wood or changed order")
 		t.eq(trees[FIRST + 1].woodId, "oak")
 		t.ok((trees[FIRST + 1].position - Vector3.new(89.8205, -1.1982, 433.2526)).Magnitude < 0.01, "tree 323")
-		t.ok((trees[lastStand].position - Vector3.new(-339.2624, 11.7967, 338.8768)).Magnitude < 0.01, "the last stand")
+		t.ok(
+			(trees[lastStand].position - Vector3.new(-483.75803, -4.0118666, -997.43835)).Magnitude < 0.01,
+			"the last stand"
+		)
 	end)
 
 	t.test("country stands: the wild groves' woods, Starter Forest spacing, round their middles", function()

@@ -17,13 +17,14 @@ return function(t)
 	-- were added, and the cliff rings and hollow pools changed the shape.
 	-- The volcano ring was then raised to 24 so its one gap stays one gap.
 	-- Re-sampled again when the one plot lawn became 14 homestead shelves,
-	-- and once more for the dealership display lot's flat patch. The shelves
+	-- and once more for the dealership display lot's flat patch (and again when the showroom hall grew: its patch is x 178 to 340, z 64 to 166, and The Climb
+	-- moved 55 studs north, so its lane is a little shorter). The shelves
 	-- are flat at their own height, and each lane is a sample.
 	local HEIGHT_FINGERPRINT = {
-		n = 7467,
-		sum = 91507.958874459785875,
-		wsum = -314.994143459616794,
-		sq = 9517163.260794047266245,
+		n = 7452,
+		sum = 91540.457826682541054,
+		wsum = -263.176912142538754,
+		sq = 9517106.587789362296462,
 		lo = -13.781769507273463,
 		hi = 205.783118277429935,
 	}

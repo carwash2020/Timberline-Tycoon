@@ -65,28 +65,40 @@ return {
 
 		local hx, hz = hall.innerW / 2, hall.innerD / 2
 		local lobbyX = -hx + 8
+		local bays = BuildingArt.DealershipBays()
+		local first, back = bays[1], bays[#bays]
 		local cameras = {
-			{ pos = { 0, 170, -30 }, target = { 0, 0, 2 }, label = "1 the showroom from above", fov = 60 },
+			{ pos = { 0, 200, -22 }, target = { 0, 0, 0 }, label = "1 the showroom from above", fov = 62 },
 			{
-				pos = { lobbyX + 2, 9, -hz + 3 },
-				target = { 10, 3, -hz + 20 },
-				label = "2 from the lobby, down the front row",
+				pos = { lobbyX + 2, 9, -hz + 4 },
+				target = { 10, 3, 0 },
+				label = "2 from the lobby door, down the clear central walkway",
 				fov = 75,
 			},
 			{
-				pos = { -26, 12, -hz + 2.5 },
-				target = { -22, 3, -hz + 24 },
-				label = "3 a bay close up: the box, the vehicle behind it",
+				pos = { first.x + 10, 8, first.aisleZ + 9 },
+				target = { first.x, 3, first.z },
+				label = "3 a bay close up: the box on the plinth, the vehicle beside it",
 				fov = 70,
 			},
-			{ pos = { 0, 22, 4 }, target = { 20, 3, 18 }, label = "4 the back row", fov = 70 },
+			{
+				pos = { back.x - 18, 9, back.aisleZ - 10 },
+				target = { back.x, 3, back.z },
+				label = "4 the back row from the aisle",
+				fov = 70,
+			},
 			{
 				pos = { lobbyX, 7, -hz - 20 },
 				target = { lobbyX, 5, -hz },
 				label = "5 the lobby door from outside",
 				fov = 70,
 			},
-			{ pos = { lobbyX, 10, 4 }, target = { lobbyX, 3, hz - 6 }, label = "6 the lobby and counter", fov = 75 },
+			{
+				pos = { lobbyX + 2, 10, -hz + 16 },
+				target = { lobbyX, 3, hz - 4 },
+				label = "6 the lobby and counter",
+				fov = 75,
+			},
 		}
 		return { root = root, shadowRadius = 260, cameras = cameras }
 	end,

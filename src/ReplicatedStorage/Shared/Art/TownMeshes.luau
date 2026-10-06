@@ -462,7 +462,7 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 	for _, piece in ipairs(TownModels.Visual(asset)) do
 		-- A counter keeps its size whatever the building does (BuildingArt
 		-- keeps the part counter's size too): people still lean on it.
-		local size = if piece.name == "Counter" then piece.size else scaled(piece.size, scale)
+		local size = if piece.name == "Counter" or piece.name == "Sign" then piece.size else scaled(piece.size, scale)
 		local part = MeshKit.Create(piece.meshId, piece.name, size)
 		if not part then
 			for _, old in ipairs(made) do

@@ -24,6 +24,7 @@ local GameConfig = require(script.Parent.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local Kit = require(script.Parent.Kit)
 local ShopLogic = require(script.Parent.Parent.ShopLogic)
+local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
 local StoreStock = require(script.Parent.Parent.StoreStock)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
@@ -32,26 +33,31 @@ local VehicleLogic = require(script.Parent.Parent.VehicleLogic)
 
 local DealershipLot = {}
 
--- Southwest corner of the lot, inside the reserved lawn (WorldLayout.Reserved
--- DealershipLot). The path occupies z 64 to 70; the bays start at z 70.
-DealershipLot.OriginX = 132
-DealershipLot.OriginZ = 77.0
+-- Southwest corner of the rows' floor (the hall's lobby is west of it), inside
+-- the reserved lawn (WorldLayout.Reserved DealershipLot). The hall's front wall
+-- stands at z 96 (outside face), north of the Land Office and its sign, so the
+-- hall stays clear of them and of the spawn's line to the lighthouse.
+DealershipLot.OriginX = 207
+DealershipLot.OriginZ = 96.8
 
 -- The hall round the bays (BuildingArt's Dealership): a lobby this wide at
--- the west end with the counter and the door, the bays beside it.
-DealershipLot.Lobby = 15.5
+-- the west end with the counter at the back and the door in front, the rows
+-- of bays beside it.
+DealershipLot.Lobby = 26
 DealershipLot.HallWallThick = 0.8
 DealershipLot.FloorY = 0.4 -- the hall floor's top (BuildingArt's slab)
 
 -- Studs. A plinth is this much wider than its vehicle on every side, the
 -- gap between neighbouring plinths, the walk space at the ends, and so on.
+-- The box stands ON its plinth, at the edge facing the central aisle, with
+-- the vehicle behind it; the aisle between the two rows stays clear.
 DealershipLot.PlinthMargin = 0.4
 DealershipLot.BayGap = 1.5
-DealershipLot.SideMargin = 2
-DealershipLot.FrontMargin = 0.6
-DealershipLot.BoxGap = 0.6 -- between a box and the plinth behind it
-DealershipLot.BackMargin = 0
-DealershipLot.RowGap = 0.3
+DealershipLot.SideMargin = 3
+DealershipLot.FrontMargin = 3.5
+DealershipLot.BackMargin = 3.5
+DealershipLot.BoxGap = 0.6 -- between a box and the plinth's edge, and the vehicle
+DealershipLot.Aisle = 14 -- the clear central walkway between the rows' plinths
 DealershipLot.PlinthHeight = 1.2
 
 local ORDER = {
@@ -113,8 +119,9 @@ export type Bay = {
 	depth: number, -- plinth depth (along z)
 	length: number, -- the vehicle, nose to tail
 	span: number, -- the vehicle, side to side
-	box: Vector3, -- the box standing in front
+	box: Vector3, -- the box standing on the plinth, aisle side
 	boxZ: number, -- the box's centre, lot space
+	vz: number, -- the vehicle's middle line, lot space
 	boxClass: string,
 }
 
@@ -175,29 +182,47 @@ function DealershipLot.Layout(): Layout
 			maxBox = math.max(maxBox, entries[i].box.Z)
 			maxSpan = math.max(maxSpan, entries[i].span)
 		end
-		local plinthDepth = maxSpan + 2 * DealershipLot.PlinthMargin
-		local rowDepth = maxBox + DealershipLot.BoxGap + plinthDepth + DealershipLot.BackMargin
+		local carDepth = maxSpan + 2 * DealershipLot.PlinthMargin
+		local strip = maxBox + 2 * DealershipLot.BoxGap
+		local plinthDepth = carDepth + strip
+		local pz0 = zCursor
 		local x = -rowWidth(range[1], range[2]) / 2
 		for i = range[1], range[2] do
 			local e = entries[i]
+			-- Row 1 (front, by the street) has its aisle side at +Z: the
+			-- vehicle is at the front of the plinth and the box behind it.
+			-- Row 2 mirrors it: its aisle is at -Z.
+			local vz, boxZ
+			if rowIndex == 1 then
+				vz = pz0 + DealershipLot.PlinthMargin + maxSpan / 2
+				boxZ = pz0 + plinthDepth - DealershipLot.BoxGap - e.box.Z / 2
+			else
+				vz = pz0 + plinthDepth - DealershipLot.PlinthMargin - maxSpan / 2
+				boxZ = pz0 + DealershipLot.BoxGap + e.box.Z / 2
+			end
 			table.insert(bays, {
 				kind = e.kind,
 				id = e.id,
 				row = rowIndex,
 				x = x + e.bay / 2,
-				z = zCursor + maxBox + DealershipLot.BoxGap + plinthDepth / 2,
+				z = pz0 + plinthDepth / 2,
 				width = e.bay,
 				depth = plinthDepth,
 				length = e.length,
 				span = e.span,
 				box = e.box,
-				boxZ = zCursor + e.box.Z / 2,
+				boxZ = boxZ,
+				vz = vz,
 				boxClass = e.boxClass,
 			})
 			x += e.bay + DealershipLot.BayGap
 		end
-		zCursor += rowDepth + DealershipLot.RowGap
-		depth = zCursor - DealershipLot.RowGap
+		zCursor = pz0 + plinthDepth
+		if rowIndex == 1 then
+			zCursor += DealershipLot.Aisle
+		else
+			depth = zCursor + DealershipLot.BackMargin
+		end
 	end
 	local result: Layout = { bays = bays, width = width, depth = depth }
 	cached = result
@@ -358,16 +383,17 @@ function DealershipLot.Build(): Model
 			Enum.Material.Concrete
 		)
 		slab:SetAttribute("ItemId", bay.id)
+		local aisleSide = if bay.row == 1 then 1 else -1 -- +Z or -Z: toward the central aisle
 		local stripe = Kit.part(
 			lot,
 			"PlinthStripe",
 			Vector3.new(bay.width - 0.6, 0.12, 0.6),
-			CFrame.new(cx, top + 0.06, cz - bay.depth / 2 + 0.5),
+			CFrame.new(cx, top + 0.06, cz + aisleSide * (bay.depth / 2 - 0.5)),
 			color,
 			Enum.Material.SmoothPlastic
 		)
 		Kit.decor(stripe, false)
-		local postX, postZ = cx - bay.width / 2 + 0.7, cz + bay.depth / 2 - 0.7
+		local postX, postZ = cx - bay.width / 2 + 0.7, cz - aisleSide * (bay.depth / 2 - 0.7)
 		Kit.decor(
 			Kit.part(
 				lot,
@@ -379,7 +405,13 @@ function DealershipLot.Build(): Model
 			),
 			false
 		)
-		Kit.lantern(lot, CFrame.new(postX, top + 7.8, postZ), 1.2)
+		local glow = Kit.lantern(lot, CFrame.new(postX, top + 7.8, postZ), 1.2)
+		for _, d in ipairs(glow:GetChildren()) do
+			if d:IsA("PointLight") then
+				d.Brightness = ShowroomLight.LanternBrightness
+				d.Range = ShowroomLight.LanternRange
+			end
+		end
 
 		local model = modelOf(bay.kind, bay.id)
 		if model then
@@ -388,14 +420,16 @@ function DealershipLot.Build(): Model
 			-- measured middle over the plinth's middle, its feet on the top.
 			local m = measureVehicle(bay.kind, bay.id)
 			model:PivotTo(
-				CFrame.new(cx, top + m.feet, cz) * CFrame.Angles(0, math.pi / 2, 0) * CFrame.new(-m.cx, 0, -m.cz)
+				CFrame.new(cx, top + m.feet, oz + bay.vz)
+					* CFrame.Angles(0, math.pi / 2, 0)
+					* CFrame.new(-m.cx, 0, -m.cz)
 			)
-			-- The sign at the plinth's front-right corner, in front of the vehicle.
+			-- The sign stands at the plinth's aisle edge, at its east end.
 			local sign = Kit.part(
 				model,
 				"PriceSign",
 				Vector3.new(4.2, 2.2, 0.3),
-				CFrame.new(cx + bay.width / 2 - 2.6, top + 1.3, cz - bay.depth / 2 + 1.4),
+				CFrame.new(cx + bay.width / 2 - 2.6, 1.3, cz + aisleSide * (bay.depth / 2 + 0.5)),
 				Color3.fromRGB(62, 42, 24),
 				Enum.Material.Wood
 			)
@@ -408,13 +442,13 @@ function DealershipLot.Build(): Model
 			)
 		end
 
-		-- The box: what you pick up and carry to the counter. In front of
-		-- the vehicle, on the ground.
+		-- The box: what you pick up and carry to the counter. On the plinth at
+		-- the aisle edge, the vehicle beside it, so nothing stands in the aisle.
 		local spot = Kit.part(
 			lot,
 			"BoxSpot",
 			bay.box,
-			CFrame.new(cx, bay.box.Y / 2, oz + bay.boxZ),
+			CFrame.new(cx, top + bay.box.Y / 2, oz + bay.boxZ),
 			Color3.fromRGB(196, 148, 90),
 			Enum.Material.Wood
 		)

@@ -1569,11 +1569,11 @@ function WorldPlan.Town(): Town
 	local lantern = campsite * Vector3.new(9, 0, 2)
 
 	local propSpots: { { any } } = { -- { name, x, z, yaw? }
-		{ "Haybale", -118, 198, 0.3 },
-		{ "Haybale", -112, 196, -0.5 },
-		{ "Haybale", -124, 197, 1.2 },
-		{ "Cart", -71, 124, -0.4 },
-		{ "WaterTower", -58, 126 },
+		{ "Haybale", -142, 200, 0.3 },
+		{ "Haybale", -137, 198, -0.5 },
+		{ "Haybale", -147, 197, 1.2 },
+		{ "Cart", -66, 200, -0.4 },
+		{ "WaterTower", -56, 188 }, -- it stood inside the Tool Shed
 		{ "ToolRack", 34.4, 100, math.pi / 2 }, -- between the mill and the Dealership
 		{ "Well", -49, 54 }, -- on the green south of the widened street, between the benches
 		{ "Bench", -58, 56, math.pi },
@@ -1583,10 +1583,10 @@ function WorldPlan.Town(): Town
 		{ "Barrel", 32, 93 },
 		{ "Crate", 86, 92.5, -0.2 }, -- the station's sign took the old spot (71, 93)
 		{ "Crate", 80, 102, 0.5 }, -- clear of the mill road's east leg
-		{ "Planter", -67, 87 },
-		{ "Planter", -109, 86.2 },
-		{ "Mailbox", -114, 90, 0 },
-		{ "FlowerBox", -84.5, 87.5, 0 },
+		{ "Planter", -61, 98 },
+		{ "Planter", -103.5, 88 },
+		{ "Mailbox", -121, 94, 0 },
+		{ "FlowerBox", -97, 85.3, 0 },
 		{ "LogPile", 35.5, 131, 0 }, -- east of the mill, clear of the yard lamp and the sell station
 		{ "LogPile", 35.5, 137, 0.1 },
 		{ "Wheelbarrow", 20, 93, -0.6 },
@@ -1693,8 +1693,8 @@ function WorldPlan.Town(): Town
 			table.insert(pathRounds, CFrame.new(x, 0, z))
 		end
 	end
-	rounds(-100) -- General Store
-	rounds(-57) -- Tool Shed
+	rounds(-110) -- General Store path (the lane west of the Tool Shed)
+	rounds(-84) -- Tool Shed
 
 	-- Greenery (TWN-01): ornamental trees seated in stone rings, framing the
 	-- town (birch and maple round the edges, a pine band behind the mill
@@ -1719,20 +1719,20 @@ function WorldPlan.Town(): Town
 		{ "tree", -20, 164, 1, "pine" },
 		{ "tree", -30, 184, 1.22, "pine" },
 		{ "tree", -44, 177, 1, "pine" },
-		{ "tree", -58, 196, 1.22, "pine" },
-		{ "tree", -62, 147, 1, "pine" },
-		{ "tree", -80, 163, 1.22, "pine" },
-		{ "tree", -95, 153, 1, "pine" },
-		{ "tree", -106, 174, 1.22, "pine" },
+		{ "tree", -26, 196, 1, "pine" },
+		{ "tree", -150, 160, 1, "pine" },
+		{ "tree", -40, 198, 1.22, "pine" },
+		{ "tree", -134, 150, 1, "pine" },
+		{ "tree", -146, 176, 1.22, "pine" },
 		-- Birch and maple round the edges.
-		{ "tree", -128, 70, 1.22, "maple" },
-		{ "tree", -118, 84, 1, "birch" },
+		{ "tree", -148, 80, 1.22, "maple" },
+		{ "tree", -132, 112, 1, "birch" },
 		{ "tree", -140, 96, 1.22, "birch" },
 		{ "tree", -146, 128, 1, "maple" },
 		{ "tree", -88, 4, 1, "maple" },
 		{ "tree", -62, 6, 1, "birch" },
 		{ "tree", -112, 0, 1.22, "birch" },
-		{ "tree", -80, 150, 1, "birch" },
+		{ "tree", -72, 232, 1, "birch" },
 		{ "tree", 82, 144, 1.22, "birch" },
 		{ "tree", 78, 136, 1.22, "maple" },
 		{ "tree", 128, 134, 1, "birch" },
@@ -1742,7 +1742,7 @@ function WorldPlan.Town(): Town
 		-- By the lot (M1.5: off it and its pull-outs since it grew east): one
 		-- north of the Plot Road's mouth (and of the lighthouse's line from
 		-- the spawn), one past the south pull-outs.
-		{ "tree", 274, 100, 1, "birch" },
+		{ "tree", 346, 128, 1, "birch" },
 		{ "tree", 132, -80, 1.22, "maple" },
 		-- Bushes along the shops' sides, the mill's back and the station.
 		{ "bush", -138, 108, 2.8 },
@@ -1761,14 +1761,14 @@ function WorldPlan.Town(): Town
 		-- the townsfolk walk: NPCData's routes pass 3 studs or more away.)
 		{ "flowers", -108, 54, 2.4 },
 		{ "flowers", -8.4, 44, 2 },
-		{ "flowers", -88, 86, 2.2 },
-		{ "flowers", -122, 78, 1.8 },
+		{ "flowers", -61.5, 90, 2.2 },
+		{ "flowers", -123, 90, 1.8 },
 		{ "flowers", -57.5, 46, 2.4 },
 		-- Rocks.
 		{ "rock", -55, 150, 1.8 },
 		{ "rock", 84, 135, 2 },
-		{ "rock", -114, 95, 1.6 },
-		{ "rock", 272, 112, 1.8 },
+		{ "rock", -126, 102, 1.6 },
+		{ "rock", 352, 118, 1.8 },
 	}
 	for _, g in ipairs(greenSpots) do
 		local kind: string, x: number, z: number, size: number, woodId: string? = g[1], g[2], g[3], g[4], g[5]
@@ -1809,7 +1809,7 @@ function WorldPlan.Town(): Town
 				kind = "ToolShed",
 				title = "TOOL SHED",
 				accent = Color3.fromRGB(150, 62, 44),
-				cframe = CFrame.new(-57, 0, 114.4), -- 38.4 deep (it was 21, then 28.5): the front stays at z 95.2
+				cframe = CFrame.new(-84, 0, 117.7), -- 45 deep (it was 38.4): the front stays at z 95.2, west of the sell pad keep-out (x -60 to 60)
 			},
 			{
 				kind = "Dealership",
@@ -1821,7 +1821,7 @@ function WorldPlan.Town(): Town
 				kind = "HearthAndHome",
 				title = "GENERAL STORE",
 				accent = Color3.fromRGB(122, 90, 60),
-				cframe = CFrame.new(-100, 0, 119.5), -- 39 deep (it was 36): the front stays at z 100
+				cframe = CFrame.new(-100, 0, 187.5), -- 43.5 deep, behind the Tool Shed with a 20-stud lane between (its path runs up the lane west of the shed)
 			},
 		},
 		gondola = townGondola(),
@@ -3421,7 +3421,7 @@ function WorldPlan.BoulderClusters(): { BoulderCluster }
 		return cachedClusters
 	end
 	local out: { BoulderCluster } = {}
-	local rng = Kit.rng(hashString("boulder clusters"))
+	local rng = Kit.rng(hashString("boulder clusters 3"))
 	local coast = WorldLayout.Coast
 	local beachX = coast.shoreX - coast.beachWidth - 40
 	local edge = WorldPlan.ClusterEdge

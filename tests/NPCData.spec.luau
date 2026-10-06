@@ -133,7 +133,13 @@ return function(t)
 			-- The Hermit lives in the Secret Cave; Old Tolly and Cap'n Moss
 			-- keep the toll booth and the ferry dock, out in the world.
 			if p and npc.id ~= "Hermit" and npc.spot.ground == nil then
-				t.ok(p.X > zone.x0 and p.X < zone.x1 and p.Z > zone.z0 and p.Z < zone.z1, npc.id)
+				-- (The Dealership's keeper stands in the showroom hall, on the hall's own
+				-- flat zone east of the town's.)
+				t.ok(
+					(p.X > zone.x0 and p.X < zone.x1 and p.Z > zone.z0 and p.Z < zone.z1)
+						or WorldLayout.FlatWeight(p.X, p.Z) >= 1,
+					npc.id
+				)
 				t.eq(p.Y, 0)
 			end
 		end

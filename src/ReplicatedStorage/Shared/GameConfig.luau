@@ -206,7 +206,7 @@ local GameConfig = {
 	LoadingPadSize = 14,
 	ShelfAisleMin = 6,
 	CounterPayReach = 10,
-	StorePartBudget = 450, -- a shop model plus its boxes at BoxLogic.BoxPartCap parts each (was 250 for plain one-part boxes)
+	StorePartBudget = 900, -- a shop model plus its boxes at BoxLogic.BoxPartCap parts each (250 for plain one-part boxes, 450 with packaging, 900 with store polish: facades, floors, price tags, hanging goods, the Tool Shed axe rack of real models)
 	-- Designer, unread until their batch:
 	CounterMaxItems = 3,
 	LimitedStockCount = 3,
