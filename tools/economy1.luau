@@ -272,6 +272,14 @@ local function simulate(biomes: { [string]: boolean }?)
 		earned += dt * rate / 3600
 	end
 
+	-- The first plot is bought at the Land Office (GameConfig.PlotPrice), not
+	-- given: it comes out of the first dollars, before any upgrade.
+	local earlyRate = bestRate(owned, biomes) * EFFICIENCY
+	if cash < GameConfig.PlotPrice and earlyRate > 0 then
+		advance((GameConfig.PlotPrice - cash) / earlyRate * 3600, earlyRate)
+	end
+	cash -= GameConfig.PlotPrice
+
 	for _ = 1, 40 do
 		local done = true
 		for id in pairs(GOALS) do
@@ -949,6 +957,12 @@ line(
 	string.format(
 		"- Murph's tutorial pays %s (TutorialData), counted toward the first purchase.",
 		money(TutorialData.TotalReward())
+	)
+)
+line(
+	string.format(
+		"- The first plot costs %s (GameConfig.PlotPrice, the Land Office) and is bought before the first upgrade; v1 has no Murph reward toward it.",
+		money(GameConfig.PlotPrice)
 	)
 )
 do

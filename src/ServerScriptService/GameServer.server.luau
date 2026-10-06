@@ -493,6 +493,7 @@ local function cartDecision(profile: ProfileService.Profile, pieces: number, vol
 		cash = profile.cash,
 		ownsTruck = type(trucks) == "table" and #trucks > 0,
 		truckPrice = TutorialGrove.TruckPrice(loop),
+		landPrice = TutorialGrove.LandPrice(loop, profile.plot ~= nil and profile.plot.claimed == true),
 	})
 	if not ok then
 		return why

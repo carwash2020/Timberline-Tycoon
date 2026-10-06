@@ -226,7 +226,7 @@ return function(t)
 	t.test("v2: the Rustbucket is a boxed purchase like every other truck, not a free grant", function()
 		local s = setup({ cash = 200, trucks = {}, equippedTruck = "", loop = 2, claimed = true })
 		s.buy("Truck", "Rustbucket")
-		t.eq(s.profile.cash, 125, "$75, charged")
+		t.eq(s.profile.cash, 100, "$100, charged")
 		t.eq(s.profile.ownedTrucks, {}, "owned only once its pad is placed")
 		t.eq(s.profile.equippedTruck, "")
 		t.eq(s.switched, {}, "nothing is built: a truck only comes out of its pad")
@@ -601,7 +601,10 @@ return function(t)
 		t.eq(line, "needsPlot")
 		t.eq(s.profile.cash, before)
 		t.eq(#s.profile.storage, 0)
-		t.eq(DialogueData.Line("needsPlot", { shop = "Dealership" }), "You'll need a plot to open this.")
+		t.eq(
+			DialogueData.Line("needsPlot", { shop = "Dealership" }),
+			"Buy a plot at the Land Office first, then open this."
+		)
 		local card = DialogueData.Card("needsPlot")
 		t.eq(card.choice, true)
 		t.eq(card.noLabel, "Cancel")
@@ -610,7 +613,7 @@ return function(t)
 			displayName = "Pickup",
 			price = 400,
 		})
-		t.eq(Dialogue.Last.text, "You'll need a plot to open this.")
+		t.eq(Dialogue.Last.text, "Buy a plot at the Land Office first, then open this.")
 		t.eq(Dialogue.Last.choice, true)
 		t.eq(Dialogue.Last.noLabel, "Cancel")
 		local yes = s.ShopService.ChargeAndGrant(s.player, {

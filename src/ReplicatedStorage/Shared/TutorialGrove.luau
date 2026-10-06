@@ -2,13 +2,14 @@
 -- TutorialGrove: the first-sale grove and Murph's buy cart.
 -- A few small oaks stand just west of the spawn, and a cart beside them
 -- buys small loads at the mill's own price. On the v2 loop that lasts
--- through the sell, plot and truck steps, up to MaxVolume on this save
+-- through the sell, plot, build and truck steps, up to MaxVolume on this save
 -- slot (profile.cartVolume). On the v1 loop it buys one load, during the
 -- sell step only, and then profile.cartUsed refuses the rest. It also
 -- stops once the player owns a truck or can afford the Rustbucket, so it
 -- is not a second sawmill. The spots stay off the roads, the spawn walk,
 -- the street and the lot (tests/TutorialGrove.spec).
 
+local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local ShopLogic = require(script.Parent.ShopLogic)
 
@@ -58,6 +59,7 @@ export type Offer = {
 	cash: number?,
 	ownsTruck: boolean?,
 	truckPrice: number?,
+	landPrice: number?, -- the plot still to buy and the placing buffer (LandPrice): the cart stays open until cash covers them as well as the truck
 }
 
 TutorialGrove.RefuseUsed = "My cart's just to get you to a truck. The sawmill up north buys the rest."
@@ -65,7 +67,31 @@ TutorialGrove.RefuseClosed =
 	"Murph's cart only buys a new lumberjack's first small loads. The sawmill up north buys the rest."
 TutorialGrove.RefuseBig = "That's more than my cart can take. The sawmill buys a full load."
 
-local OPEN_STEPS: { [string]: boolean } = { sell = true, plot = true, truck = true }
+-- The cart stays open from the sell through the plot, the build lessons
+-- (placing a piece costs a few dollars) and the truck, so a new player can
+-- always sell enough to buy the plot and then the Rustbucket box.
+local OPEN_STEPS: { [string]: boolean } = {
+	sell = true,
+	plot = true,
+	build = true,
+	place = true,
+	land = true,
+	truck = true,
+}
+
+-- A few dollars for the build lesson's first piece (the kit costs
+-- PlotData.KitCashPerUnit a unit), kept in the purse before the cart closes.
+TutorialGrove.PlaceBuffer = 20
+
+-- What the cart keeps open for besides the truck (offer.landPrice): the
+-- plot while it is unbought, and a few dollars for the build lesson.
+-- Nothing on the v1 loop. `plotBought` is profile.plot.claimed.
+function TutorialGrove.LandPrice(loop: number, plotBought: boolean): number
+	if loop ~= 2 then
+		return 0
+	end
+	return TutorialGrove.PlaceBuffer + if plotBought then 0 else GameConfig.PlotPrice
+end
 
 -- The Rustbucket's price in `loop` (priceCash in v1, v2.price in v2).
 function TutorialGrove.TruckPrice(loop: number): number
@@ -147,6 +173,9 @@ function TutorialGrove.Accept(offer: Offer): (boolean, string?)
 	end
 	local price = offer.truckPrice
 	local cash = offer.cash
+	if type(price) == "number" and price > 0 and type(offer.landPrice) == "number" and offer.landPrice > 0 then
+		price += offer.landPrice
+	end
 	if type(price) == "number" and price > 0 and type(cash) == "number" and cash == cash and cash >= price then
 		return false, TutorialGrove.RefuseUsed
 	end

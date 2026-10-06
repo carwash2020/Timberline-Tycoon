@@ -362,6 +362,7 @@ return function(t)
 		t.eq(s.profile.cash, purse + loads.rewardCash)
 		t.eq(s.toasts, {
 			"Murph chipped in $25!",
+			string.format("Murph chipped in $%d!", s.Steps[4].rewardCash), -- the plot step: toward the Rustbucket
 			string.format("Murph chipped in $%d!", loads.rewardCash),
 		})
 		s.Quest.WoodSold(s.player, 1, s.Steps[s.profile.tutorialStep].count)

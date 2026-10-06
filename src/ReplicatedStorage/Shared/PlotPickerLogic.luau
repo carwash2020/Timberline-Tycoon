@@ -2,11 +2,14 @@
 -- PlotPickerLogic: choosing a homestead when you join (LT2-style).
 -- Pure. PlotService applies it; the picker UI only shows what an offer says.
 --
--- Builds are saved in plot-local studs, so a rejoin picks again from
--- whatever is still open. A save-slot swap while you already stand on a
--- pad keeps that pad. Two claims of one pad in the same breath: the first
--- one in TryClaim wins, and the other is "taken". Closing the picker or
--- letting it time out takes the first open pad.
+-- Nobody is given a plot. A player who has never owned one buys the first
+-- at the Land Office in town (GameConfig.PlotPrice); the picker opens from
+-- that counter and shows the price. A player whose save already has a plot
+-- (profile.plot.claimed) picks a pad again for free when they join, as
+-- before, and only that player's timeout takes the first open pad. Builds
+-- are saved in plot-local studs, so a rejoin picks again from whatever is
+-- still open. Two claims of one pad in the same breath: the first one in
+-- TryClaim wins, and the other is "taken".
 
 local PlotPickerLogic = {}
 
@@ -33,6 +36,7 @@ export type OfferPlot = {
 
 export type Offer = {
 	timeout: number,
+	price: number, -- what the claim costs this player (0: they already own a plot in their save)
 	plots: { OfferPlot },
 	notice: string?, -- "taken" when the claim you just sent lost
 }
@@ -41,6 +45,69 @@ export type Offer = {
 -- pad this session (a save-slot swap) does not pick again.
 function PlotPickerLogic.ShouldPick(hasPlot: boolean): boolean
 	return not hasPlot
+end
+
+-- What claiming costs: nothing for a save that already had a plot, the
+-- first-plot price for everyone else.
+function PlotPickerLogic.Price(ownedBefore: boolean, plotPrice: number): number
+	if ownedBefore then
+		return 0
+	end
+	return plotPrice
+end
+
+-- The server's verdict on one claim, in the order it checks. `inRange` is
+-- the Land Office check (a returning player's join picker has none).
+-- Returns "ok", "owned", "range", "taken" or "cash", and the dollars short.
+function PlotPickerLogic.Decide(
+	hasPlot: boolean,
+	inRange: boolean,
+	taken: boolean,
+	price: number,
+	cash: number
+): (string, number)
+	if hasPlot then
+		return "owned", 0
+	end
+	if not inRange then
+		return "range", 0
+	end
+	if taken then
+		return "taken", 0
+	end
+	if cash < price then
+		return "cash", math.ceil(price - cash)
+	end
+	return "ok", 0
+end
+
+-- The picker's words. The price is on the button and the detail line, so
+-- what you see is what the server charges.
+function PlotPickerLogic.ClaimLabel(price: number): string
+	if price > 0 then
+		return string.format("BUY PLOT $%d", price)
+	end
+	return "CLAIM PLOT"
+end
+
+function PlotPickerLogic.OpenText(region: string, price: number): string
+	if price > 0 then
+		return string.format("%s\nOpen plot · $%d", region, price)
+	end
+	return string.format("%s\nOpen plot", region)
+end
+
+-- The line under the buttons: a buyer can leave, an owner takes any pad.
+function PlotPickerLogic.AnyText(price: number): string
+	if price > 0 then
+		return "Not now"
+	end
+	return "Give me any open plot"
+end
+
+-- The refusal toast for a short purse.
+function PlotPickerLogic.ShortText(short: number): string
+	return string.format("You need $%d more for a plot.", short)
 end
 
 -- Next/Previous, including pads that are already taken (the screen says so).

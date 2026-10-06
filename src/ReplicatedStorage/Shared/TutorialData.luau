@@ -8,8 +8,9 @@
 -- the old lessons stay: load, mill, plant, the three loads, and the Steel
 -- Axe. QuestService then keeps one next goal on the tracker (NextGoal).
 --
--- v2 order: fell, drag, sell at the cart, claim a plot, then the truck,
--- and the same lessons after it. tutorialStep is an index, so a save from
+-- v2 order: fell, drag, sell at the cart, buy a plot at the Land Office
+-- (nobody is given one: GameConfig.PlotPrice), the build lessons, then the
+-- Rustbucket box, its pad and the truck, and the same lessons after it. tutorialStep is an index, so a save from
 -- the plot-first v2 order is remapped by ApplyOrder (old index to the step
 -- name, then that name's new index).
 --
@@ -22,6 +23,7 @@
 -- list; Steps is the v1 one.
 
 local FieldGuide = require(script.Parent.FieldGuide)
+local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local ShopLogic = require(script.Parent.ShopLogic)
 local WoodData = require(script.Parent.WoodData)
@@ -55,7 +57,8 @@ export type TutorialEvent =
 
 -- What the beacon points at (QuestUI finds it in the world). v2 adds
 -- "wood" (your nearest loose piece, tag Wood) and "truckBed" (your
--- truck's bed). "murphCart" is the tutorial cart; "plotSign" is plot 1.
+-- truck's bed). "murphCart" is the tutorial cart; "plotSign" is plot 1;
+-- "landOffice" is the counter that sells the first plot.
 export type BeaconTarget =
 	"tree"
 	| "log"
@@ -66,6 +69,7 @@ export type BeaconTarget =
 	| "truckBed"
 	| "murphCart"
 	| "plotSign"
+	| "landOffice"
 	| "dealership"
 
 export type Step = {
@@ -94,6 +98,11 @@ local oak = WoodData.Get("oak") :: WoodData.WoodDef
 local birch = WoodData.Get("birch") :: WoodData.WoodDef
 local rustbucket = ItemCatalog.GetTruck("Rustbucket") :: ItemCatalog.TruckDef
 
+-- Murph chips in when the plot is bought, so the plot and then the
+-- Rustbucket box are both within reach of what the cart pays (tools/economy
+-- models it; tests/TutorialGrove.spec checks the cart can cover both).
+local PLOT_REWARD = 175
+
 local function logLoad(id: string, reward: number, murph: string): Step
 	return {
 		id = id,
@@ -121,18 +130,36 @@ local function cashLoad(id: string, reward: number, murph: string): Step
 	}
 end
 
+-- The first plot is bought, not given (v2: the step right after the cart
+-- sale). The event is still plotClaimed: the server reports it when the
+-- purchase goes through (PlotService). The v1 order keeps its free-plot
+-- wording for a rollback, with the same event.
 local function plotStep(afterSale: boolean?): Step
-	-- v1 claims the plot before any sale, so the thank-you stays off that
-	-- line. v2 says it here, the step right after the cart sale.
-	local claim = "Every lumberjack needs land, and this one's free. Claim an open plot, follow the arrow."
-	local thanks = "That sale's yours, and a little extra from me. "
+	if not afterSale then
+		return {
+			id = "plot",
+			objective = "Claim an open plot",
+			murph = "Every lumberjack needs land. Claim an open plot, follow the arrow.",
+			event = "plotClaimed",
+			count = 1,
+			beacon = "plotSign",
+		}
+	end
+	local price = GameConfig.PlotPrice
 	return {
 		id = "plot",
-		objective = "Claim an open plot",
-		murph = if afterSale then thanks .. claim else claim,
+		objective = "Buy a plot at the Land Office",
+		murph = string.format(
+			"That sale's yours, and a little extra from me. A plot is $%d at the Land Office in town. Buy one, follow the arrow.",
+			price
+		),
+		murphShort = string.format("Sell more wood at my cart first. A plot is $%d at the Land Office in town.", price),
 		event = "plotClaimed",
 		count = 1,
-		beacon = "plotSign",
+		beacon = "landOffice",
+		cashItem = "a plot",
+		cashPrice = price,
+		rewardCash = PLOT_REWARD,
 	}
 end
 
@@ -503,12 +530,13 @@ function TutorialData.MurphLine(step: Step, refresher: boolean, cash: number?): 
 	return if refresher and step.murphBack then step.murphBack else step.murph
 end
 
--- Where the arrow points. The truck step sends a player who can't afford
--- it back to Murph's cart; once they can, it points at the dealership.
+-- Where the arrow points. The plot and truck steps send a player who can't
+-- afford them back to Murph's cart; once they can, it points at the Land
+-- Office or the dealership.
 -- Every other step uses its own beacon.
 function TutorialData.Beacon(step: Step, cash: number?): BeaconTarget?
 	local price = step.cashPrice
-	if step.id == "truck" and type(price) == "number" and price > 0 then
+	if (step.id == "truck" or step.id == "plot") and type(price) == "number" and price > 0 then
 		local have = if type(cash) == "number" and cash == cash then cash else 0
 		if have < price then
 			return "murphCart"

@@ -111,7 +111,7 @@ return function(t)
 		t.eq(StoreStock.UnitPrice("Truck", "Pickup", false, 2), 400)
 		t.eq(StoreStock.UnitPrice("Truck", "Flatbed", false, 2), 5000)
 		t.eq(StoreStock.UnitPrice("Truck", "LoggingRig", false, 2), 19000)
-		t.eq(StoreStock.UnitPrice("Truck", "Rustbucket", false, 2), 75)
+		t.eq(StoreStock.UnitPrice("Truck", "Rustbucket", false, 2), 100)
 		t.eq(StoreStock.ForShop("Dealership"), {})
 	end)
 

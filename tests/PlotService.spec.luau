@@ -4,6 +4,7 @@
 return function(t)
 	local Vector2, Vector3 = t.roblox.Vector2, t.roblox.Vector3
 	local spendDuring: (() -> ())? = nil
+	local explode = false
 
 	-- Just enough of Roblox's Instance for PlotService: properties, children,
 	-- attributes, and events that record their handler.
@@ -167,6 +168,9 @@ return function(t)
 					end,
 				},
 				EconomyService = {
+					GetCash = function(player)
+						return profiles[player].cash
+					end,
 					SpendCash = function(player, amount)
 						local profile = profiles[player]
 						if profile.cash < amount then
@@ -185,6 +189,9 @@ return function(t)
 				},
 				BlueprintModels = {
 					Build = function(bp)
+						if explode then
+							error("the plot would not build")
+						end
 						local model = Instance.new("Model")
 						model.Name = bp.id
 						return model
@@ -236,10 +243,22 @@ return function(t)
 		local function plot(i)
 			return plots:FindFirstChild("Plot_" .. i)
 		end
+		local office = map:FindFirstChild("LandOffice")
+		local counter = office:FindFirstChild("Counter")
+		local prompt = counter:FindFirstChild("LandOfficePrompt")
+		local function atOffice(player)
+			player.root.Position = counter.CFrame.Position
+		end
+		-- Buys plot i the real way (stand at the Land Office, ClaimPlot). The
+		-- price is topped up first, so a test's cash arithmetic is its own;
+		-- the charge itself is tested where cash is the point.
 		local function claim(player, i)
-			local board = plot(i):FindFirstChild("Sign")
-			player.root.Position = board.CFrame.Position
-			board:FindFirstChild("ProximityPrompt").Triggered.fn(player)
+			local profile = profiles[player]
+			if profile.plot.claimed ~= true then
+				profile.cash += loader:shared("GameConfig").PlotPrice
+			end
+			atOffice(player)
+			PlotService.Claim(player, i)
 		end
 		-- Placed models live beside the plot shell (PlotItems_N), not inside it.
 		local function itemFolder(i)
@@ -255,6 +274,16 @@ return function(t)
 			newPlayer = newPlayer,
 			plot = plot,
 			claim = claim,
+			atOffice = atOffice,
+			spendDuring = function(fn)
+				spendDuring = fn
+			end,
+			explodeOnBuild = function(on)
+				explode = on
+			end,
+			prompt = prompt,
+			counter = counter,
+			profiles = profiles,
 			items = items,
 			itemFolder = itemFolder,
 			toasts = toasts,
@@ -270,11 +299,14 @@ return function(t)
 		}
 	end
 
-	t.test("the district has a free plot per slot, each with a claim sign", function()
+	t.test("the district has an open plot per slot, each with a sign, and one Land Office that sells them", function()
 		local s = setup()
+		t.ok(s.prompt ~= nil, "the Land Office has its prompt")
+		t.eq(s.prompt.ActionText, "Buy a plot")
 		for i = 1, #s.PlotData.Slots do
 			local sign = s.plot(i):FindFirstChild("Sign")
-			t.ok(sign:FindFirstChild("ProximityPrompt").Enabled, "plot " .. i .. " can be claimed")
+			t.eq(sign:FindFirstChild("ProximityPrompt"), nil, "no plot is claimable at its own sign: nothing is free")
+			t.eq(s.plot(i):GetAttribute("OwnerId"), nil)
 			for _, gui in ipairs(sign:GetChildren()) do
 				if gui.ClassName == "SurfaceGui" then -- sized to the board, so its text isn't stretched
 					t.eq(gui.SizingMode, t.roblox.Enum.SurfaceGuiSizingMode.PixelsPerStud)
@@ -296,7 +328,6 @@ return function(t)
 		t.eq(ann.attrs.PlotSlot, 3)
 		t.eq(ann.attrs.PlotTier, 1)
 		t.eq(s.plot(3):GetAttribute("OwnerId"), 1)
-		t.ok(not s.plot(3):FindFirstChild("Sign"):FindFirstChild("ProximityPrompt").Enabled)
 		s.claim(ann, 4)
 		t.eq(s.lastToast(), "You already have a plot here.")
 		t.eq(s.plot(4):GetAttribute("OwnerId"), nil)
@@ -451,12 +482,12 @@ return function(t)
 		s.P.PlayerRemoving(ann)
 		t.eq(#s.items(2), 0)
 		t.eq(s.plot(2):GetAttribute("OwnerId"), nil)
-		t.ok(s.plot(2):FindFirstChild("Sign"):FindFirstChild("ProximityPrompt").Enabled)
 		t.eq(#profile.plot.placed, 2, "leaving keeps the save")
 
 		local cara, fresh = s.newPlayer(3, "Cara")
-		s.P.PlayerJoined(cara, fresh) -- never claimed: no plot yet
+		s.P.PlayerJoined(cara, fresh) -- never bought: no plot, and no picker either
 		t.eq(cara.attrs.PlotSlot, nil)
+		t.eq(cara.attrs.Picking, nil)
 	end)
 
 	t.test("a sawmill from stock places free; one you don't own is a box at the Tool Shed", function()
@@ -566,14 +597,23 @@ return function(t)
 		t.eq(s.lastToast(), "You can't build on this plot.")
 	end)
 
-	t.test("claiming only works at the sign", function()
+	t.test("buying only works at the Land Office", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
 		ann.standOn(nil)
-		s.plot(1):FindFirstChild("Sign"):FindFirstChild("ProximityPrompt").Triggered.fn(ann)
+		local cash = profile.cash
+		s.prompt.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, nil, "the prompt from across the map opens nothing")
+		t.eq(s.lastToast(), "Walk up to the Land Office counter to buy a plot.")
+		s.P.Claim(ann, 1)
 		t.eq(profile.plot.claimed, false)
 		t.eq(ann.attrs.PlotSlot, nil)
-		t.eq(s.lastToast(), "Walk up to the sign to claim this plot.")
+		t.eq(profile.cash, cash, "out of range: nothing charged")
+		t.eq(s.lastToast(), "Walk up to the Land Office in town to buy a plot.")
+		s.atOffice(ann)
+		s.P.Claim(ann, 1)
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(profile.cash, cash - s.config.PlotPrice)
 	end)
 
 	t.test("growing only works while you stand on your plot", function()
@@ -675,6 +715,8 @@ return function(t)
 		for i = 1, 12 do
 			local player, profile = s.newPlayer(i, "P" .. i)
 			s.P.PlayerJoined(player, profile)
+			s.atOffice(player)
+			s.prompt.Triggered.fn(player)
 			if i == 12 then
 				lastOffer = s.P.OfferOf(player)
 				local free = 0
@@ -685,7 +727,7 @@ return function(t)
 				end
 				t.eq(free, 3, "the last player still has a choice")
 			end
-			s.P.Claim(player, i)
+			s.claim(player, i)
 			t.eq(player.attrs.PlotSlot, i)
 		end
 		local free = 0
@@ -705,8 +747,12 @@ return function(t)
 		bobProfile.plot.placed = { { uid = "bob", blueprintId = "Flag", x = 4, z = 4, rot = 0 } }
 		s.P.PlayerJoined(ann, annProfile)
 		s.P.PlayerJoined(bob, bobProfile)
-		s.P.Claim(ann, 4)
-		s.P.Claim(bob, 4)
+		for _, who in ipairs({ ann, bob }) do
+			s.atOffice(who)
+			s.prompt.Triggered.fn(who)
+		end
+		s.claim(ann, 4)
+		s.claim(bob, 4)
 		t.eq(ann.attrs.PlotSlot, 4)
 		t.eq(bob.attrs.PlotSlot, nil)
 		t.eq(s.plot(4):GetAttribute("OwnerId"), 1)
@@ -718,15 +764,17 @@ return function(t)
 		t.eq(offer.plots[4].taken, true)
 		local jump = t.shared("PlotPickerLogic").NextOpen(offer.plots, 4)
 		t.ok(jump ~= 4 and offer.plots[jump].taken ~= true, "the picker moves on")
-		s.P.Claim(bob, jump)
+		s.claim(bob, jump)
 		t.eq(bob.attrs.PlotSlot, jump)
 		t.eq(#s.items(jump), 1)
 		t.eq(s.items(jump)[1].Name, "bob")
 	end)
 
-	t.test("closing the picker or letting it time out assigns a free plot", function()
+	t.test("a returning owner's picker: closing it or letting it time out takes a free pad, free", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
+		local cash = profile.cash
 		profile.plot.placed = { { uid = "a", blueprintId = "Bench", x = 2, z = 2, rot = 0 } }
 		s.P.PlayerJoined(ann, profile)
 		t.eq(ann.attrs.PlotSlot, nil)
@@ -741,15 +789,18 @@ return function(t)
 		t.eq(ann.attrs.Picking, nil)
 
 		local bob, bobProfile = s.newPlayer(2, "Bob")
+		bobProfile.plot.claimed = true
 		s.P.PlayerJoined(bob, bobProfile)
 		s.P.Pass(bob)
 		t.eq(bob.attrs.PlotSlot, 2)
 		t.eq(s.lastToast(), "It's yours! This pad is your spawn. Press BUILD to start building.")
+		t.eq(profile.cash, cash, "a plot you already own is never charged again")
 	end)
 
 	t.test("leaving while the picker is open reserves nothing", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
 		s.P.PlayerJoined(ann, profile)
 		t.eq(ann.attrs.Picking, true)
 		s.P.PlayerRemoving(ann)
@@ -766,8 +817,10 @@ return function(t)
 	t.test("looking through the picker does not reserve a pad", function()
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
 		s.P.PlayerJoined(ann, profile)
 		local offer = s.P.OfferOf(ann)
+		t.eq(offer.price, 0, "a save that owns a plot sees no price")
 		t.eq(#offer.plots, #s.PlotData.Slots)
 		t.eq(offer.plots[1].name, "Birch Side")
 		t.eq(offer.plots[1].region, "Starter Forest")
@@ -795,7 +848,7 @@ return function(t)
 			ann.CharacterAdded.fn()
 		end
 		t.eq(landed, nil, "still the town spawn")
-		s.P.Claim(ann, 3)
+		s.claim(ann, 3)
 		t.ok(ann.RespawnLocation == s.plot(3):FindFirstChild("PlotSpawn"))
 		t.eq(ann.attrs.PlotSlot, 3)
 		landed = nil
@@ -809,7 +862,7 @@ return function(t)
 		profile.plot.tier = 1
 		profile.plot.placed = { { uid = "old", blueprintId = "Bench", x = 2, z = 2, rot = 0 } }
 		s.P.PlayerJoined(ann, profile)
-		s.P.Claim(ann, 5)
+		s.claim(ann, 5)
 		local other = {
 			plot = {
 				claimed = true,
@@ -839,7 +892,7 @@ return function(t)
 		local town = { x = 0, y = 4, z = 40 }
 		-- A second log that is fine stays put: checked after, on a fresh profile field.
 		s.P.PlayerJoined(ann, profile)
-		s.P.Claim(ann, 1)
+		s.claim(ann, 1)
 		-- There is no road-edge delivery pad any more: a stray spot goes to the
 		-- middle of the plot that was claimed.
 		t.eq(s.P.GetDeliveryPad, nil, "no delivery pad API")
@@ -889,13 +942,13 @@ return function(t)
 			{ uid = "flag", blueprintId = "Flag", x = -4, z = 8, rot = 2 },
 		}
 		s.P.PlayerJoined(ann, profile)
-		s.P.Claim(ann, 2)
+		s.claim(ann, 2)
 		t.eq(#s.items(2), 2)
 		s.P.PlayerRemoving(ann)
 		t.eq(#s.items(2), 0, "the old pad is clear")
 		t.eq(s.plot(2):GetAttribute("OwnerId"), nil)
 		s.P.PlayerJoined(ann, profile)
-		s.P.Claim(ann, 5)
+		s.claim(ann, 5)
 		t.eq(#s.items(2), 0, "nothing left on the first pad")
 		t.eq(#s.items(5), 2)
 		local found = {}
@@ -910,13 +963,13 @@ return function(t)
 		local s = setup()
 		local ann, profile = s.newPlayer(1, "Ann")
 		s.P.PlayerJoined(ann, profile)
-		s.P.Claim(ann, 1.5)
-		s.P.Claim(ann, 0)
-		s.P.Claim(ann, #s.PlotData.Slots + 1)
-		s.P.Claim(ann, "nope")
+		s.claim(ann, 1.5)
+		s.claim(ann, 0)
+		s.claim(ann, #s.PlotData.Slots + 1)
+		s.claim(ann, "nope")
 		t.eq(ann.attrs.PlotSlot, nil)
-		s.P.Claim(ann, 2)
-		s.P.Claim(ann, 3)
+		s.claim(ann, 2)
+		s.claim(ann, 3)
 		t.eq(ann.attrs.PlotSlot, 2)
 		t.eq(s.plot(3):GetAttribute("OwnerId"), nil)
 		t.eq(s.lastToast(), "You already have a plot here.")
@@ -1155,11 +1208,10 @@ return function(t)
 		t.eq(office.GamepadKeyCode, t.roblox.Enum.KeyCode.ButtonX)
 		t.eq(office.KeyboardKeyCode, t.roblox.Enum.KeyCode.E)
 		t.eq(office.Enabled, false)
-		t.ok(sign:FindFirstChild("ProximityPrompt").Enabled, "the claim prompt is still the unnamed one")
+		t.eq(sign:FindFirstChild("ProximityPrompt"), nil, "the sign no longer claims anything")
 		local ann = s.newPlayer(1, "Ann")
 		s.claim(ann, 1)
 		t.eq(office.Enabled, true)
-		t.eq(sign:FindFirstChild("ProximityPrompt").Enabled, false)
 	end)
 
 	t.test("expanding deducts the shown price, and too little cash buys nothing", function()
@@ -1358,5 +1410,218 @@ return function(t)
 		s2.claim(ann2, 1)
 		bob2.Character = nil
 		t.eq(s2.P.Visit(bob2, 1), false)
+	end)
+
+	---------------------------------------------------------------------------
+	-- Nobody is given a plot: the Land Office sells the first (GameConfig.PlotPrice)
+	---------------------------------------------------------------------------
+
+	t.test("the plot price is real, and the picker shows the price the server charges", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		t.ok(s.config.PlotPrice >= 100, "a plot costs real money")
+		s.atOffice(ann)
+		s.prompt.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, true)
+		local offer = s.P.OfferOf(ann)
+		t.eq(offer.price, s.config.PlotPrice)
+		s.P.Claim(ann, 2)
+		t.eq(profile.cash, 1000 - offer.price, "exactly the shown price")
+		t.eq(ann.attrs.PlotSlot, 2)
+		t.eq(ann.attrs.Picking, nil)
+		t.eq(s.questEvents, { "plotClaimed" })
+	end)
+
+	t.test("buying with enough cash assigns and charges exactly once, even ten rapid fires", function()
+		local s = setup({ cash = 5000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		for _ = 1, 10 do
+			s.P.Claim(ann, 1)
+		end
+		t.eq(profile.cash, 5000 - s.config.PlotPrice)
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(s.questEvents, { "plotClaimed" })
+		-- Ten more, naming other pads: still one plot, one charge.
+		for i = 2, 11 do
+			s.P.Claim(ann, i)
+		end
+		t.eq(profile.cash, 5000 - s.config.PlotPrice)
+		for i = 2, 11 do
+			t.eq(s.plot(i):GetAttribute("OwnerId"), nil)
+		end
+		t.eq(s.lastToast(), "You already have a plot here.")
+	end)
+
+	t.test("a fire that lands while the charge is going through cannot buy a second plot", function()
+		local s = setup({ cash = 5000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		local again = 0
+		-- The purse call is the one place the claim could be re-entered.
+		s.spendDuring(function()
+			again += 1
+			s.P.Claim(ann, 2)
+		end)
+		s.P.Claim(ann, 1)
+		s.spendDuring(nil)
+		t.eq(again, 1)
+		t.eq(profile.cash, 5000 - s.config.PlotPrice)
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(s.plot(2):GetAttribute("OwnerId"), nil)
+	end)
+
+	t.test("too little cash refuses, charges nothing and says how much is missing", function()
+		local s = setup({ cash = 100 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		s.P.Claim(ann, 1)
+		t.eq(profile.cash, 100)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(profile.plot.claimed, false)
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
+		t.eq(s.lastToast(), string.format("You need $%d more for a plot.", s.config.PlotPrice - 100))
+		t.eq(s.questEvents, {})
+		-- One dollar short is still short; the exact price is enough.
+		profile.cash = s.config.PlotPrice - 1
+		s.P.Claim(ann, 1)
+		t.eq(s.lastToast(), "You need $1 more for a plot.")
+		t.eq(ann.attrs.PlotSlot, nil)
+		profile.cash = s.config.PlotPrice
+		s.P.Claim(ann, 1)
+		t.eq(ann.attrs.PlotSlot, 1)
+		t.eq(profile.cash, 0)
+	end)
+
+	t.test("out of range of the Land Office refuses with nothing charged", function()
+		local s = setup({ cash = 5000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		ann.standOn(nil)
+		s.P.Claim(ann, 1)
+		t.eq(profile.cash, 5000)
+		t.eq(ann.attrs.PlotSlot, nil)
+		-- Standing on a plot's own sign is not the Land Office either.
+		ann.standAtSign(1)
+		s.P.Claim(ann, 1)
+		t.eq(profile.cash, 5000)
+		t.eq(ann.attrs.PlotSlot, nil)
+	end)
+
+	t.test("an owner cannot buy twice, and a junk index buys nothing", function()
+		local s = setup({ cash = 5000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		for _, junk in ipairs({ "1", 0, -1, 1.5, 0 / 0, math.huge, {}, true, 9999 }) do
+			s.P.Claim(ann, junk)
+			t.eq(profile.cash, 5000, tostring(junk))
+			t.eq(ann.attrs.PlotSlot, nil)
+		end
+		s.P.Claim(ann, 3)
+		local after = profile.cash
+		s.prompt.Triggered.fn(ann)
+		t.eq(s.lastToast(), "You already have a plot. Plots are bought here, one each.")
+		s.P.Claim(ann, 4)
+		t.eq(profile.cash, after)
+		t.eq(ann.attrs.PlotSlot, 3)
+		t.eq(s.plot(4):GetAttribute("OwnerId"), nil)
+	end)
+
+	t.test("a taken pad refuses before any charge", function()
+		local s = setup({ cash = 5000 })
+		local ann = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 3)
+		s.atOffice(bob)
+		s.P.Claim(bob, 3)
+		t.eq(bobProfile.cash, 5000)
+		t.eq(bob.attrs.PlotSlot, nil)
+		t.eq(s.lastToast(), "Someone else claimed that plot. Pick another.")
+	end)
+
+	t.test("the claim is rate limited", function()
+		local s = setup({ cash = 5000, rate = false })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.atOffice(ann)
+		s.P.Claim(ann, 1)
+		t.eq(profile.cash, 5000)
+		t.eq(ann.attrs.PlotSlot, nil)
+	end)
+
+	t.test("no free plot at join or on a timeout, for a save that never bought one", function()
+		local s = setup()
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(ann.attrs.Picking, nil, "no picker at join")
+		t.eq(s.P.OfferOf(ann), nil)
+		s.advance(600)
+		s.P.Sweep()
+		s.P.Pass(ann)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(profile.plot.claimed, false)
+		for i = 1, #s.PlotData.Slots do
+			t.eq(s.plot(i):GetAttribute("OwnerId"), nil)
+		end
+		-- The Land Office's picker has no timer and Close hands nothing out.
+		s.atOffice(ann)
+		s.prompt.Triggered.fn(ann)
+		t.eq(ann.attrs.Picking, true)
+		s.advance(600)
+		s.P.Sweep()
+		t.eq(ann.attrs.PlotSlot, nil)
+		s.P.Pass(ann)
+		t.eq(ann.attrs.Picking, nil)
+		t.eq(ann.attrs.PlotSlot, nil, "closing the picker is not a free plot")
+		t.eq(profile.cash, 100000)
+	end)
+
+	t.test("returning players are unaffected: their pad comes back free, saved layout and all", function()
+		local s = setup({ cash = 40 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
+		profile.plot.placed = { { uid = "a", blueprintId = "Bench", x = 4, z = 4, rot = 0 } }
+		s.P.PlayerJoined(ann, profile)
+		t.eq(ann.attrs.Picking, true)
+		t.eq(s.P.OfferOf(ann).price, 0)
+		-- Even broke and far from the office, they pick a pad from the join picker.
+		ann.standOn(nil)
+		s.P.Claim(ann, 2)
+		t.eq(ann.attrs.PlotSlot, 2)
+		t.eq(profile.cash, 40, "nothing charged")
+		t.eq(#s.items(2), 1)
+	end)
+
+	t.test("a returning owner is never charged, at the Land Office either", function()
+		local s = setup({ cash = 5000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.claimed = true
+		s.atOffice(ann)
+		s.P.Claim(ann, 4)
+		t.eq(ann.attrs.PlotSlot, 4)
+		t.eq(profile.cash, 5000)
+	end)
+
+	t.test("another save that never bought a plot does not inherit the pad", function()
+		local s = setup()
+		local ann = s.newPlayer(1, "Ann")
+		s.claim(ann, 5)
+		local fresh = { plot = { claimed = false, tier = 1, placed = {} } }
+		t.eq(s.P.Reload(ann, fresh), false)
+		t.eq(ann.attrs.PlotSlot, nil)
+		t.eq(s.plot(5):GetAttribute("OwnerId"), nil)
+	end)
+
+	t.test("a purchase that fails to build the plot is refunded and the pad stays free", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		profile.plot.placed = { { uid = "x", blueprintId = "Bench", x = 1, z = 1, rot = 0 } }
+		s.atOffice(ann)
+		s.explodeOnBuild(true)
+		local ok = pcall(s.P.Claim, ann, 1)
+		s.explodeOnBuild(false)
+		t.eq(ok, false)
+		t.eq(profile.cash, 1000, "refunded")
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
+		t.eq(ann.attrs.PlotSlot, nil)
 	end)
 end

@@ -151,13 +151,15 @@ function ShopLogic.TruckStatusOf(truck: TruckDef, owned: { [string]: boolean }, 
 	return "buy"
 end
 
--- Bringing a stuck truck back: 2% of its price in this loop, at least $2.
--- The Rustbucket is free. Tow Service (ownsTow) makes every recall free.
+-- Bringing a truck back (a respawn, a recall, a switch): 5% of its price in
+-- this loop, at least $5, the Rustbucket included. Tow Service (ownsTow)
+-- makes every recall free. VehicleService makes each truck's first two
+-- spawns free on top of this (VehicleLogic.FreeSpawns).
 function ShopLogic.RespawnFee(truck: TruckDef, loop: number): number
-	if truck.id == "Rustbucket" then
-		return 0
-	end
-	return math.max(2, math.floor(ShopLogic.Price(truck, loop) * 0.02))
+	return math.max(
+		GameConfig.VehicleRespawnMinFee,
+		math.floor(ShopLogic.Price(truck, loop) * GameConfig.VehicleRespawnFeeRate + 0.5)
+	)
 end
 
 function ShopLogic.RecallFee(truck: TruckDef, loop: number, ownsTow: boolean?): number

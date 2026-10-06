@@ -93,9 +93,9 @@ return function(t)
 		end
 	end)
 
-	t.test("vehicles: the Rustbucket costs $75 and every truck is buildable", function()
+	t.test("vehicles: the Rustbucket costs $100 in v2 ($75 in v1) and every truck is buildable", function()
 		t.eq(ItemCatalog.GetTruck("Rustbucket").priceCash, 75)
-		t.eq(ItemCatalog.GetTruck("Rustbucket").v2.price, 75)
+		t.eq(ItemCatalog.GetTruck("Rustbucket").v2.price, 100)
 		for key, truck in pairs(ItemCatalog.Trucks) do
 			t.eq(truck.id, key)
 			t.ok(truck.bedCapacity >= 0, key)

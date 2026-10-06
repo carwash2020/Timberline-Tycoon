@@ -1,5 +1,9 @@
 # Timberline Tycoon: notes for Claude
 
+**Start with STATUS.md**: what has landed, Connor's standing decisions, the
+open items and the goals. Keep it current in the same PR as any change that
+moves them.
+
 Roblox game, Rojo + Luau. Design spec: GAME_DESIGN.md (§14 is the
 implementation spec; ask Connor before deviating from its data values or
 architecture). Since 2 October 2026 the live core loop is v2

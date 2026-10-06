@@ -45,7 +45,7 @@ return function(t)
 			t.eq(ShopLogic.RecallFee(ItemCatalog.GetTruck(id), 1, true), 0, id .. " v1")
 			t.eq(ShopLogic.RecallFee(ItemCatalog.GetTruck(id), 2, true), 0, id .. " v2")
 		end
-		t.eq(ShopLogic.RecallFee(ItemCatalog.GetTruck("Rustbucket"), 2, false), 0, "Rustbucket stays free")
+		t.eq(ShopLogic.RecallFee(ItemCatalog.GetTruck("Rustbucket"), 2, false), 5, "the Rustbucket pays the minimum")
 		t.eq(ShopLogic.TruckForCash(classic), false, "the Classic is not a cash purchase")
 		t.eq(ShopLogic.TruckForCash(pickup), true)
 		local bare = SellLogic.PieceValue("oak", "log", 10, nil, 1, false)

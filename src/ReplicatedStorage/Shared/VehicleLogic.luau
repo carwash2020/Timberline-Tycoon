@@ -685,14 +685,19 @@ end
 
 -- First press is free (presses start at 0, including a migrated box).
 -- After that, round(rate x price). Tow Service waives it.
+-- Each vehicle's first spawn and its first respawn are free (`presses` counts
+-- the spawns so far): a player who has just spent their last dollar on a
+-- truck can always bring it back once, so nobody is stuck.
+VehicleLogic.FreeSpawns = 2
+
 function VehicleLogic.PadFee(presses: number, price: number, ownsTow: boolean, rate: number): number
-	if ownsTow or presses < 1 then
+	if ownsTow or presses < VehicleLogic.FreeSpawns then
 		return 0
 	end
 	if price ~= price or rate ~= rate or price < 0 or rate < 0 then
 		return 0
 	end
-	return math.round(price * rate)
+	return math.max(GameConfig.VehicleRespawnMinFee, math.round(price * rate))
 end
 
 -- Fee first. A short wallet does not despawn or spawn. A refused press

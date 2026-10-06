@@ -1,3 +1,5 @@
+> New session? Read STATUS.md first.
+
 # Morning handoff (5 October 2026)
 
 Written overnight while Connor slept. Everything below is merged to `main`

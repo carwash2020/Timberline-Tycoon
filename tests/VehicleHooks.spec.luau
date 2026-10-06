@@ -314,15 +314,20 @@ return function(t)
 		w.profile.totalEarned = 0
 		w.profile.ownedTrucks = { "Pickup" }
 		w.profile.equippedTruck = "Pickup"
+		for _, pad in ipairs(w.profile.plot.pads) do
+			if pad.id == "Pickup" then
+				pad.presses = 2 -- past its two free spawns
+			end
+		end
 		w.VehicleService.Hooks.blockSpawn = true
 		local ok = w.VehicleService.Recall(w.player)
 		t.eq(ok, false, "the truck never appeared")
-		t.eq(w.profile.cash, 100, "the 2% fee is refunded")
+		t.eq(w.profile.cash, 100, "the fee is refunded")
 		t.eq(w.profile.totalEarned, 0)
 		t.eq(w.VehicleService.GetVehicle(w.player), nil, "nothing was left behind")
 		w.VehicleService.Hooks.blockSpawn = false
 		t.ok(w.VehicleService.Recall(w.player), "a later recall works")
-		t.eq(w.profile.cash, 92, "Pickup is 2% of $400, and at least $2")
+		t.eq(w.profile.cash, 80, "Pickup is 5% of $400")
 	end)
 
 	t.test("despawn keeps the saved load, and a recall with no truck puts it back", function()
@@ -434,4 +439,33 @@ return function(t)
 		t.ok(VehicleService.Equip(w.player, "Rustbucket", ""))
 		t.ok(onPad(VehicleService.GetVehicle(w.player), "Rustbucket"), "and back on the Rustbucket's")
 	end)
+
+	t.test(
+		"each truck's first two spawns are free, the third costs 5% of its price, and swapping is not free",
+		function()
+			local w = setup()
+			local CoreLoop = w.loader:shared("CoreLoop")
+			w.world:SetAttribute(CoreLoop.ActiveAttribute, 2)
+			w.loader:shared("GameConfig").TruckRecallCooldown = 0
+			w.profile.cash = 1000
+			w.profile.ownedTrucks = { "Pickup", "Rustbucket" }
+			w.profile.equippedTruck = "Pickup"
+			local function presses(id)
+				for _, pad in ipairs(w.profile.plot.pads) do
+					if pad.id == id then
+						return pad.presses
+					end
+				end
+				return nil
+			end
+			-- The first recall (spawn) and the second are free.
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(w.profile.cash, 1000)
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(w.profile.cash, 1000, "the first respawn is free")
+			t.eq(presses("Pickup"), 2)
+			t.ok(w.VehicleService.Recall(w.player))
+			t.eq(w.profile.cash, 980, "the third spawn costs $20: 5% of $400")
+		end
+	)
 end

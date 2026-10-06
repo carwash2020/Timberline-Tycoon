@@ -489,7 +489,7 @@ local AXES_V2: { [string]: AxeV2 } = {
 	HermitsMaul = { price = 0, damage = 3.73, range = 9, cooldown = 1.25 },
 }
 local VEHICLES_V2: { [string]: number } = {
-	Rustbucket = 75,
+	Rustbucket = 100,
 	Pickup = 400,
 	ScoutATV = 2500,
 	Flatbed = 5000,

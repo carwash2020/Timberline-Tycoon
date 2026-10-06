@@ -1,3 +1,5 @@
+> New session? Read STATUS.md first.
+
 # HANDOFF: where we are, where we want to be
 
 ## 1. Read this first
