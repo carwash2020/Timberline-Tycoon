@@ -93,10 +93,9 @@ local function items(kind: string): { Item }
 			table.insert(out, { id = machine.id, name = machine.displayName })
 		end
 	else
+		-- Any building: the gift is a rolled plan the player uses with their hammer.
 		for _, bp in ipairs(PlotData.Blueprints) do
-			if bp.unlock == true then
-				table.insert(out, { id = bp.id, name = bp.displayName })
-			end
+			table.insert(out, { id = bp.id, name = bp.displayName })
 		end
 	end
 	return out

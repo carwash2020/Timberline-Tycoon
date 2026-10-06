@@ -9,7 +9,7 @@
 --   * The SkipTutorial remote ends it early, without rewards. Saves from
 --     before the tutorial that already own a better axe skip it.
 --   * TutorialSeen (client -> server, "build" or "land") reports opening
---     build mode or the Land panel; only the current step's event counts.
+--     the hammer's blueprint list or the Land panel; only the current step's event counts.
 --   * Each step reached is logged once as a "Tutorial" analytics funnel
 --     (which also lets saves made before a new step was inserted find
 --     their place again).

@@ -10,7 +10,10 @@
 -- click, D-pad down on a gamepad (when no prompt is using it) and
 -- Backspace on a keyboard. The server lays it on the ground, where a "Pick
 -- up" prompt brings it back, and refuses to drop your last axe. Dropped
--- axes stay yours (AxeService).
+-- axes stay yours (AxeService). The same button drops a rolled plan you are
+-- holding ("Drop plan", the DropBlueprint remote, BlueprintService): a plan
+-- is an item like an axe, so it goes the same way, two presses, and stays
+-- yours.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,6 +29,7 @@ local AxeController = {}
 local player = Players.LocalPlayer
 
 local LABEL = "Drop axe"
+local PLAN_LABEL = "Drop plan"
 local CONFIRM_LABEL = "Confirm drop"
 local STYLE = "bark"
 local CONFIRM_STYLE = "amber"
@@ -39,6 +43,13 @@ local function heldAxe(): Tool?
 	local char = player.Character
 	local tool = if char then char:FindFirstChildOfClass("Tool") else nil
 	return if tool and type(tool:GetAttribute("AxeUid")) == "string" then tool else nil
+end
+
+-- A rolled plan in hand (BlueprintService's Tool).
+local function heldPlan(): Tool?
+	local char = player.Character
+	local tool = if char then char:FindFirstChildOfClass("Tool") else nil
+	return if tool and type(tool:GetAttribute("BlueprintUid")) == "string" then tool else nil
 end
 
 local function axesIn(container: Instance?): number
@@ -66,16 +77,17 @@ local function disarm()
 	armToken += 1
 	local b = button
 	if b then
-		b:SetText(LABEL)
+		b:SetText(if heldPlan() then PLAN_LABEL else LABEL)
 		b:SetStyle(STYLE)
 	end
 end
 
 -- One press, from any input: the first one waits for a second, which drops.
 local function press()
-	local tool = heldAxe()
-	local uid = if tool then tool:GetAttribute("AxeUid") else nil
-	if not tool or type(uid) ~= "string" or not canDrop(tool) then
+	local plan = heldPlan()
+	local tool = plan or heldAxe()
+	local uid = if plan then plan:GetAttribute("BlueprintUid") elseif tool then tool:GetAttribute("AxeUid") else nil
+	if not tool or type(uid) ~= "string" or (not plan and not canDrop(tool)) then
 		disarm()
 		return
 	end
@@ -83,7 +95,7 @@ local function press()
 	local drop, at = HudRules.DropPress(waiting, os.clock())
 	if drop then
 		disarm()
-		Net.Remote("DropAxe"):FireServer(uid)
+		Net.Remote(if plan then "DropBlueprint" else "DropAxe"):FireServer(uid)
 	elseif at ~= waiting then
 		-- A new wait: say so on the button, and give up after a while.
 		armedAt, armedUid = at, uid
@@ -103,14 +115,19 @@ local function press()
 end
 
 local function refresh()
-	local tool = heldAxe()
-	local shown = canDrop(tool)
+	local plan = heldPlan()
+	local tool = plan or heldAxe()
+	local shown = plan ~= nil or canDrop(tool)
 	local b = button
 	if b then
 		b.root.Visible = shown
+		if armedUid == nil then
+			b:SetText(if plan then PLAN_LABEL else LABEL)
+		end
 	end
-	-- Switching axes (or putting it away) ends a wait for the old one.
-	if armedUid ~= nil and (not shown or not tool or tool:GetAttribute("AxeUid") ~= armedUid) then
+	-- Switching items (or putting it away) ends a wait for the old one.
+	local heldUid = if plan then plan:GetAttribute("BlueprintUid") elseif tool then tool:GetAttribute("AxeUid") else nil
+	if armedUid ~= nil and (not shown or not tool or heldUid ~= armedUid) then
 		disarm()
 	end
 end

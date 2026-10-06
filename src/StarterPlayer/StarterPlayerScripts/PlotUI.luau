@@ -1,29 +1,32 @@
 --!strict
--- PlotUI: building on your plot (PlotService on the server).
---   * A BUILD button shows while you stand on your own plot. It starts
---     build mode: the build palette opens (drawn by ShopUI), a bar offers
---     BLUEPRINTS and DONE, and everything you've placed gets Move (E) and
---     Sell (F, hold) prompts.
---   * The palette is not a shop. What the shops sell as boxes (sawmills,
---     the chop saw, the furniture blueprints) shows here only once you own
---     it, as Place; before that its row says where to buy it. Kit pieces
---     are made from your own wood and charge a placing fee. Rows are locked
---     until your plot size allows them (the message points to LAND).
---     Picking one hands it to BlueprintPlacer (the ghost preview).
+-- PlotUI: building on your plot (PlotService on the server; BUILD_SYSTEM.md).
+--   * Building is the hammer (HammerController). While the hammer is in your
+--     hand on your own plot, a bar offers PLANS, LAND, WIRE and DONE, and the
+--     lines of any wiring show. Using the hammer (click, RT, tap) or PLANS
+--     opens your blueprint list, drawn by ShopUI.
+--   * The list is the book of buildings you own for good (BlueprintBook): a
+--     row each, with its size and what it needs (planks of one wood, a fee,
+--     a box from the Tool Shed). A sawmill or the chop saw you hold shows with
+--     its count, and goes down free; a kit piece goes down as an empty ghost
+--     for a fee, then takes planks. Rows are locked until your plot size
+--     allows them (the message points to LAND). A filter row cycles the
+--     groups. Picking a row hands the blueprint to BlueprintPlacer.
+--   * Aiming the hammer at something you built opens its sheet instead
+--     (Move, Turn, Sell: HammerController).
 --   * The LAND panel has two sections: "Plot size" (level N of 5, what the
 --     next level unlocks and costs) and "Expand" (squares beyond the plot
 --     size). Words: plot = your claimed pad, plot size = its level,
 --     expand = buying squares.
---   * Walking off your plot ends build mode.
+--   * Walking off your plot, or putting the hammer away, ends it.
 -- Everything only sends intents; the server checks and answers with toasts.
 
-local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -34,6 +37,7 @@ local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local DragController = require(script.Parent.DragController)
+local HammerController = require(script.Parent.HammerController)
 local HUD = require(script.Parent.HUD)
 local ShopUI = require(script.Parent.ShopUI)
 local UITheme = require(script.Parent.UITheme)
@@ -47,8 +51,8 @@ local C = UITheme.Colors
 
 local REACH = 40 -- studs past your plot's edge that still count as on it (PlotService's BUILD_REACH)
 
-local building = false
-local buildButton: UITheme.Button? = nil
+local building = false -- the hammer is in your hand, on your own plot
+local hammerButton: UITheme.Button? = nil
 local modeBar: Frame? = nil
 local landPanel: Frame? = nil
 local landPrice: TextLabel? = nil
@@ -57,10 +61,8 @@ local landSizeNow: TextLabel? = nil
 local landSizeNext: TextLabel? = nil
 local landGrow: UITheme.Button? = nil
 local landOpen = false
-local itemPrompts: { [Instance]: { ProximityPrompt } } = {}
--- Client-only. SetAttribute on a server model is rejected, so a flag
--- attribute would throw and the prompts would never appear.
-local promptWait: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local openLandPanel: () -> () = function() end -- set once the Land panel exists
+local filter = "All" -- the list's group filter (BlueprintBook.Filters)
 
 local function cash(): number
 	return (player:GetAttribute("Cash") :: number?) or 0
@@ -83,23 +85,44 @@ local function onMyPlot(): boolean
 end
 
 ---------------------------------------------------------------------------
--- The build palette
+-- The blueprint list
 ---------------------------------------------------------------------------
 
-local function stockCount(id: string): number
-	return SawmillLogic.CountStock(SawmillLogic.DecodeStock((player:GetAttribute("SawmillStock") :: string?) or ""), id)
+local FILTER_ROW = "#filter"
+local LAND_ROW = "#land"
+
+-- Boxes you hold (sawmills and the chop saw), by id.
+local function myStock(): BlueprintBook.Stock
+	local stock: BlueprintBook.Stock = {}
+	for _, id in ipairs(SawmillLogic.DecodeStock((player:GetAttribute("SawmillStock") :: string?) or "")) do
+		stock[id] = (stock[id] or 0) + 1
+	end
+	return stock
+end
+
+-- Your book, as the server publishes it (the Blueprints attribute).
+local function myBook(): BlueprintBook.Book
+	local ids: BlueprintBook.Book = {}
+	for id in pairs(ShopLogic.DecodeSet((player:GetAttribute("Blueprints") :: string?) or "")) do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	return ids
 end
 
 local function ownsBlueprint(id: string): boolean
-	local owned = ShopLogic.DecodeSet((player:GetAttribute("Blueprints") :: string?) or "")
-	return owned[id] == true
+	return table.find(myBook(), id) ~= nil
 end
 
--- A sawmill you already bought, or an unlock blueprint you own, places for
--- free. The table the placer sees has price 0 so the ghost doesn't ask for
--- cash the server won't charge.
-local function forPlacer(bp: PlotData.Blueprint): PlotData.Blueprint
-	if stockCount(bp.id) > 0 or (bp.unlock == true and ownsBlueprint(bp.id)) then
+local function entries(): { BlueprintBook.Entry }
+	return BlueprintBook.Filter(BlueprintBook.Entries(myBook(), myStock()), filter)
+end
+
+-- A box in stock, or a store unlock you learned, places for free. The table
+-- the placer sees has price 0 so the ghost doesn't ask for cash the server
+-- won't charge.
+local function forPlacer(bp: PlotData.Blueprint, stocked: number): PlotData.Blueprint
+	if stocked > 0 or (bp.unlock == true and ownsBlueprint(bp.id)) then
 		local copy = table.clone(bp)
 		copy.priceCash = 0
 		return copy
@@ -107,27 +130,10 @@ local function forPlacer(bp: PlotData.Blueprint): PlotData.Blueprint
 	return bp
 end
 
-local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
-	local locked = bp.tier > tier()
-	local needed = PlotData.Tier(bp.tier)
-	local stocked = stockCount(bp.id)
-	local unlocked = bp.unlock == true and ownsBlueprint(bp.id)
-	-- The server's own rule (PlotLogic.Source): a box from the Tool Shed or
-	-- the General Store before you own it, a fee for a kit piece.
-	local source = PlotLogic.Source(bp, stocked, unlocked, ShopLogic.ShelfMenusHidden())
-	local atStore = source == "store"
-	local atShed = source == "toolShed"
-	local price = if source == "place" then 0 else PlotData.Price(bp)
-	local affordable = cash() >= price
-	local detail = string.format("%s · %d × %d", bp.category, bp.footprint.X, bp.footprint.Y)
-	if locked and needed then
-		detail ..= " · needs plot size " .. needed.name
-	elseif bp.note then
-		detail ..= " · " .. bp.note
-	end
-	if stocked > 0 then
-		detail ..= string.format(" · %d ready to place", stocked)
-	end
+local function planRow(entry: BlueprintBook.Entry): ShopUI.RowView
+	local ctx: BlueprintBook.Context = { tier = tier(), cash = cash(), boxed = ShopLogic.ShelfMenusHidden() }
+	local row = BlueprintBook.Row(entry, ctx)
+	local bp = entry.bp
 	local mill = ItemCatalog.GetSawmill(bp.id)
 	local machine = ItemCatalog.GetMachine(bp.id)
 	local swatch = if mill
@@ -135,180 +141,139 @@ local function blueprintRow(bp: PlotData.Blueprint): ShopUI.RowView
 		elseif machine then machine.color
 		elseif bp.boxes[1] then bp.boxes[1].color
 		else "#654321"
-	local button, state
-	if locked then
-		button, state = if needed then needed.name else "Locked", "locked"
-	elseif source == "place" then
-		button, state = "Place", "buy"
-	elseif atShed then
-		button, state = "At the Tool Shed", "locked"
-	elseif atStore then
-		button, state = "At the store", "locked"
-	elseif affordable then
-		button, state = "Build " .. Util.formatCash(price), "buy"
-	else
-		button, state = Util.formatCash(price), "cant"
-	end
 	return {
-		name = bp.displayName,
-		own = if stocked > 0 then "· in stock" else nil,
-		detail = detail,
+		name = row.name,
+		own = row.own,
+		detail = row.detail,
 		color = Color3.fromHex(swatch),
-		dim = locked,
-		button = button,
-		state = state,
+		dim = row.state == "locked",
+		button = row.button,
+		state = row.state,
 		onClick = function()
-			if bp.tier > tier() then
-				HUD.Toast(
-					string.format(
-						"Raise your plot size to %s first. You do that in LAND.",
-						if needed then needed.name else "a bigger one"
-					)
-				)
-			elseif atShed then
-				HUD.Toast(string.format("Buy the %s at the Tool Shed first.", bp.displayName))
-			elseif atStore then
-				HUD.Toast(string.format("Buy the %s at the General Store first.", bp.displayName))
-			elseif cash() < price then
-				HUD.Toast(
-					string.format("You need %s more for the %s.", Util.formatCash(price - cash()), bp.displayName)
-				)
-			else
-				ShopUI.Close()
-				BlueprintPlacer.Begin(forPlacer(bp), { onStop = PlotUI.Refresh })
-				PlotUI.Refresh()
+			if not row.ready then
+				HUD.Toast(row.message or "You can't place that yet.")
+				return
 			end
+			if not onMyPlot() then
+				HUD.Toast("Walk onto your plot to build.")
+				return
+			end
+			-- The server's own rule, asked first so the ghost never shows
+			-- for something it will refuse.
+			local ok, why =
+				BlueprintBook.Allowed(bp.id, ownsBlueprint(bp.id), entry.stock, ShopLogic.ShelfMenusHidden())
+			if not ok then
+				HUD.Toast(BlueprintBook.Message(why, bp))
+				return
+			end
+			ShopUI.Close()
+			BlueprintPlacer.Begin(forPlacer(bp, entry.stock), { onStop = PlotUI.Refresh })
+			PlotUI.Refresh()
 		end,
 	}
 end
 
-local STORE: ShopUI.Shop = {
+local STORE: ShopUI.Shop
+
+local function filterRow(): ShopUI.RowView
+	return {
+		name = "Showing: " .. filter,
+		own = nil,
+		detail = "Switch between " .. table.concat(BlueprintBook.Filters, ", ") .. ".",
+		color = Color3.fromHex("#583A22"),
+		dim = false,
+		button = "Next",
+		state = "use",
+		onClick = function()
+			filter = BlueprintBook.NextFilter(filter)
+			ShopUI.OpenCustom(STORE, FILTER_ROW)
+		end,
+	}
+end
+
+local function landRow(): ShopUI.RowView
+	return {
+		name = "Land",
+		own = nil,
+		detail = "Plot size and new squares to expand onto.",
+		color = Color3.fromHex("#4C8C40"),
+		dim = false,
+		button = "Open",
+		state = "use",
+		onClick = function()
+			ShopUI.Close()
+			openLandPanel()
+		end,
+	}
+end
+
+STORE = {
 	building = nil,
 	promptText = "",
-	title = "Build Palette",
-	subtitle = "Boxes from town place free. Kits: a fee. Plot size is in LAND.",
+	title = "Blueprints",
+	subtitle = "Your plans, yours for good.",
 	ids = function()
-		local ids: { string } = {}
-		for _, mill in ipairs(ItemCatalog.SawmillList()) do
-			table.insert(ids, mill.id)
-		end
-		for _, machine in ipairs(ItemCatalog.MachineList()) do
-			table.insert(ids, machine.id)
-		end
-		local sorted = table.clone(PlotData.Blueprints)
-		table.sort(sorted, function(a, b)
-			if a.tier ~= b.tier then
-				return a.tier < b.tier
-			end
-			return PlotData.Price(a) < PlotData.Price(b)
-		end)
-		for _, bp in ipairs(sorted) do
-			table.insert(ids, bp.id)
+		local ids: { string } = { FILTER_ROW, LAND_ROW }
+		for _, entry in ipairs(entries()) do
+			table.insert(ids, entry.id)
 		end
 		return ids
 	end,
 	view = function(id: string): ShopUI.RowView
-		return blueprintRow(PlotLogic.Blueprint(id) :: PlotData.Blueprint)
+		if id == FILTER_ROW then
+			return filterRow()
+		elseif id == LAND_ROW then
+			return landRow()
+		end
+		for _, entry in ipairs(entries()) do
+			if entry.id == id then
+				return planRow(entry)
+			end
+		end
+		-- A box you just placed: its row stays until the list is reopened.
+		local bp = PlotLogic.Blueprint(id)
+		return {
+			name = if bp then bp.displayName else id,
+			own = nil,
+			detail = "None left. Reopen the list.",
+			color = Color3.fromHex("#A09178"),
+			dim = true,
+			button = "Gone",
+			state = "cant",
+			onClick = function() end,
+		}
 	end,
 }
 
----------------------------------------------------------------------------
--- Build mode: prompts on your placed things
----------------------------------------------------------------------------
-
-local function removePrompts(model: Instance)
-	local list = itemPrompts[model]
-	itemPrompts[model] = nil
-	if list then
-		for _, prompt in ipairs(list) do
-			prompt:Destroy()
-		end
-	end
+-- The list as a ShopUI screen (tests read it; ShopUI draws it).
+function PlotUI.Plans(): ShopUI.Shop
+	return STORE
 end
 
-local function addPrompts(model: Instance)
-	if itemPrompts[model] or model:GetAttribute("OwnerId") ~= player.UserId then
-		return
+-- Opens the list (the hammer's use, or PLANS). The tutorial counts it when
+-- you do it on your own plot.
+local function openPlans()
+	if building then
+		Net.Remote("TutorialSeen"):FireServer("build")
 	end
-	local uid = model:GetAttribute("Uid") :: string?
-	local bp = PlotLogic.Blueprint((model:GetAttribute("BlueprintId") :: string?) or "")
-	local root = model:FindFirstChild("Root")
-	if not uid or not bp or not root then
-		-- An Atomic model arrives whole. One that streamed in pieces (or
-		-- whose Root is a frame behind the tag) still gets its prompts.
-		if uid and bp and not root and not promptWait[model] then
-			promptWait[model] = true
-			task.spawn(function()
-				local found = model:WaitForChild("Root", 8)
-				if found and found.Parent and building then
-					addPrompts(model)
-					PlotUI.Refresh()
-				end
-			end)
-		end
-		return
-	end
-	local reach = math.max(10, math.max(bp.footprint.X, bp.footprint.Y) / 2 + 6)
-	local function prompt(
-		action: string,
-		key: Enum.KeyCode,
-		pad: Enum.KeyCode,
-		hold: number,
-		dy: number
-	): ProximityPrompt
-		local p = Instance.new("ProximityPrompt")
-		p.ActionText = action
-		p.ObjectText = bp.displayName
-		p.KeyboardKeyCode = key
-		p.GamepadKeyCode = pad
-		p.HoldDuration = hold
-		p.MaxActivationDistance = reach
-		p.RequiresLineOfSight = false
-		p.UIOffset = Vector2.new(0, dy) -- the two stack, Move over Sell
-		p.Parent = root
-		return p
-	end
-	local move = prompt("Move", Enum.KeyCode.E, Enum.KeyCode.ButtonX, 0, -36)
-	move.Triggered:Connect(function()
-		ShopUI.Close()
-		BlueprintPlacer.Begin(bp, { moveUid = uid, onStop = PlotUI.Refresh })
-		PlotUI.Refresh()
-	end)
-	local sell = prompt(
-		"Sell (+" .. Util.formatCash(PlotLogic.SellValue(bp)) .. ")",
-		Enum.KeyCode.F,
-		Enum.KeyCode.ButtonY,
-		0.6,
-		36
-	)
-	sell.Triggered:Connect(function()
-		Net.Remote("SellPlaced"):FireServer(uid)
-	end)
-	itemPrompts[model] = { move, sell }
+	ShopUI.OpenCustom(STORE)
 end
+
+---------------------------------------------------------------------------
+-- The hammer in hand
+---------------------------------------------------------------------------
 
 local function setBuilding(on: boolean)
 	if building == on then
 		return
 	end
 	building = on
-	if on then
-		Net.Remote("TutorialSeen"):FireServer("build")
-	end
 	HUD.SetBuildMode(on)
 	DragController.SetBuildMode(on)
 	WireTool.SetBuilding(on)
-	if on then
-		for _, model in ipairs(CollectionService:GetTagged("PlacedItem")) do
-			addPrompts(model)
-		end
-		ShopUI.OpenCustom(STORE)
-	else
+	if not on then
 		BlueprintPlacer.Stop()
 		ShopUI.Close()
-		for model in pairs(itemPrompts) do
-			removePrompts(model)
-		end
 	end
 	PlotUI.Refresh()
 end
@@ -316,18 +281,14 @@ end
 -- Shows the right buttons for where you are and what you're doing.
 function PlotUI.Refresh()
 	local placing = BlueprintPlacer.Active()
-	local b = buildButton
+	local b = hammerButton
 	if b then
-		b.root.Visible = not building and onMyPlot()
+		-- A phone has no number keys: a button takes the hammer out on your plot.
+		b.root.Visible = UITheme.Device() == "phone" and not HammerController.Held() and onMyPlot()
 	end
 	local bar = modeBar
 	if bar then
 		bar.Visible = building and not placing and not WireTool.Active()
-	end
-	for _, list in pairs(itemPrompts) do
-		for _, prompt in ipairs(list) do
-			prompt.Enabled = not placing
-		end
 	end
 end
 
@@ -624,25 +585,26 @@ end
 function PlotUI.Start()
 	local gui = UITheme.Screen("PlotUI", UITheme.Layers.PlotUI) -- its bar draws over any side button spilling that far
 
-	buildButton = HUD.SideButton({
-		name = "Build",
-		text = "BUILD",
+	-- On a phone: take the hammer out (the hotbar's number keys are not there).
+	hammerButton = HUD.SideButton({
+		name = "Hammer",
+		text = "HAMMER",
 		style = "buy",
 		order = 1,
-		onPress = function()
-			setBuilding(true)
-		end,
+		onPress = HammerController.Equip,
 	})
 
 	local bar = UITheme.Bar(gui, "BuildMode") -- where BlueprintPlacer's bar goes
-	bar.label.Text = "BUILD MODE · walk up to something to move or sell it"
-	local blueprints =
-		UITheme.Button({ text = "BLUEPRINTS", size = Vector2.new(150, PlotLogic.LandTap), style = "buy" })
+	bar.label.Text = "HAMMER · aim at a piece to move, turn or sell it"
+	local blueprints = UITheme.Button({
+		name = "Plans",
+		text = "PLANS",
+		size = Vector2.new(150, PlotLogic.LandTap),
+		style = "buy",
+	})
 	blueprints.root.LayoutOrder = 1
 	blueprints.root.Parent = bar.row
-	blueprints.face.Activated:Connect(function()
-		ShopUI.OpenCustom(STORE)
-	end)
+	blueprints.face.Activated:Connect(openPlans)
 	local land = UITheme.Button({
 		text = "LAND",
 		size = Vector2.new(96, PlotLogic.LandTap),
@@ -672,10 +634,14 @@ function PlotUI.Start()
 	done.root.LayoutOrder = 4
 	done.root.Parent = bar.row
 	done.face.Activated:Connect(function()
-		setBuilding(false)
+		setLand(false)
+		HammerController.PutAway()
 	end)
 	modeBar = bar.outer
 	mountLand(gui)
+	openLandPanel = function()
+		setLand(true)
+	end
 	gui.Parent = player:WaitForChild("PlayerGui")
 	ProximityPromptService.PromptTriggered:Connect(function(prompt: ProximityPrompt, who: Player)
 		if who == player and prompt.Name == "LandOffice" then
@@ -689,14 +655,15 @@ function PlotUI.Start()
 		end
 	end)
 
-	CollectionService:GetInstanceAddedSignal("PlacedItem"):Connect(function(model: Instance)
-		if building then
-			addPrompts(model)
-			PlotUI.Refresh()
-		end
+	-- The hammer: using it opens the list, and the Land panel keeps the click.
+	HammerController.SetOpener(openPlans)
+	HammerController.SetPanelCheck(function()
+		return landOpen
 	end)
-	CollectionService:GetInstanceRemovedSignal("PlacedItem"):Connect(removePrompts)
-	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash", "SawmillStock", "PlotSquares" }) do
+	HammerController.OnHeldChanged(function(on: boolean)
+		setBuilding(on and onMyPlot())
+	end)
+	for _, attribute in ipairs({ "PlotSlot", "PlotTier", "Cash", "SawmillStock", "PlotSquares", "Blueprints" }) do
 		player:GetAttributeChangedSignal(attribute):Connect(function()
 			ShopUI.Refresh()
 			PlotUI.Refresh()
@@ -705,18 +672,17 @@ function PlotUI.Start()
 			end
 		end)
 	end
-	-- Walked off your plot? Build mode ends.
+	-- The hammer is in hand on your plot: the bar is up. Walk off, or put it
+	-- away, and it ends.
 	task.spawn(function()
 		local wasOn = false
 		local lastHint = -math.huge
 		while true do
 			task.wait(0.25)
-			local on = onMyPlot()
-			if building and not on then
-				setBuilding(false)
-			end
-			-- The BUILD button hides off your plot; say where it went, once a minute.
-			if wasOn and not on and os.clock() - lastHint > 60 then
+			local on = HammerController.Held() and onMyPlot()
+			setBuilding(on)
+			-- The bar goes off your plot; say where it went, once a minute.
+			if wasOn and not on and HammerController.Held() and os.clock() - lastHint > 60 then
 				lastHint = os.clock()
 				HUD.Toast("Walk back to your plot to build.")
 			end

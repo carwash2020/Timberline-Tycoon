@@ -825,4 +825,48 @@ return function(t)
 		t.eq(TutorialData.AlreadyDone(V2[4], 1, true, false, false, false), true)
 		t.eq(TutorialData.AlreadyDone(V2[4], 1, false, false, false, false), false, "no plot: it must be bought")
 	end)
+	t.test(
+		"hammer build: the build, place and land steps keep their ids, order and events; only the words moved to the hammer",
+		function()
+			local at = {}
+			for i, step in ipairs(TutorialData.StepsV2) do
+				at[step.id] = i
+			end
+			-- Saved tutorial steps are indexes into this list, and the ids are
+			-- migration keys: the three lessons stay in place, one after the other.
+			t.eq(at.build, at.plot + 1)
+			t.eq(at.place, at.build + 1)
+			t.eq(at.land, at.place + 1)
+			t.eq(TutorialData.StepsV2[at.build].event, "buildOpened")
+			t.eq(TutorialData.StepsV2[at.place].event, "itemPlaced")
+			t.eq(TutorialData.StepsV2[at.land].event, "landOpened")
+			for _, id in ipairs({ "build", "place", "land" }) do
+				local step = TutorialData.StepsV2[at[id]]
+				t.eq(string.find(step.objective .. step.murph, "BUILD", 1, true), nil, id .. " no longer says BUILD")
+				t.eq(
+					string.find(step.murph, "Blueprint Store", 1, true),
+					nil,
+					id .. " no longer sends you to the Blueprint Store"
+				)
+			end
+			t.ok(string.find(TutorialData.StepsV2[at.build].murph, "hammer", 1, true))
+			t.ok(
+				string.find(TutorialData.StepsV2[at.build].murph, "{click}", 1, true),
+				"the device's own word for the use"
+			)
+			t.ok(string.find(TutorialData.StepsV2[at.place].objective, "hammer", 1, true))
+			t.ok(string.find(TutorialData.StepsV2[at.land].murph, "LAND", 1, true))
+			-- The order lists that remap old saves still name the three in the same places.
+			for _, list in ipairs({ TutorialData.OrderV2BeforePad, TutorialData.OrderV2BeforeBuild }) do
+				local seen = {}
+				for i, id in ipairs(list) do
+					seen[id] = i
+				end
+				if seen.build then
+					t.eq(seen.place, seen.build + 1)
+					t.eq(seen.land, seen.place + 1)
+				end
+			end
+		end
+	)
 end

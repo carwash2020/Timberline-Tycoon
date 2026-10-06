@@ -14,7 +14,7 @@ Last updated 6 October 2026 (PR #70). Keep this file current: update it in the s
 
 The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a rollback until M1.10. Plans: V2_PLAN.md (v2), V1_PLAN.md, GAME_DESIGN.md (§14 spec, §8 milestones, §9 automation rules, §15 materials). Playtest checklists: PHASE1_NOTES.md, PHASE2_NOTES.md.
 
-- **Building is the hammer plus physical blueprints** (branch `claude/hammer-build`, not merged yet): BUILD_SYSTEM.md is the design note and decision list.
+- **Building is the hammer plus physical blueprints** (branch `claude/hammer-build`, not merged yet; BUILD_SYSTEM.md is the design note and decision list, PHASE2_NOTES.md the Studio checklist). Everyone has a Hammer; a blueprint is a Tool you buy, carry, drop and use once to own that building for good (`profile.blueprintBook`); the hammer opens the list, places, and moves, turns or sells what you built. The BUILD toggle and its HUD button are gone. Everything that was free to place before is in every book from the start, so no price moved.
 
 ### Rules decided by Connor (do not undo without asking)
 
@@ -37,15 +37,16 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 
 ## What has landed (newest first, PR numbers on main)
 
+- Not on main yet: `claude/hammer-build` (the hammer and physical blueprints, above).
 - #70 plot bought at $150, Rustbucket $100, respawn fees, economy retuned (in review when this was written).
 - #69 vehicle always has its own pad; Rustbucket boxed. #68/#67 owner menu (Xbox). #66 Xbox carry and build controls. #65 building fixes on the 80 plot (bought squares, collision boxes for mills and the chop saw, 10-stud pad grid). #64 owner chat tools. #63 rare wood and plank prices. #62 axe price ladder. #61/#60 one price, no u³. #59 build-check print at map start. #58 smaller starting plot and homestead looks. #57 HUD corner, run, ground and mesh fixes.
 - Before that: boxed stores, plot visits, wire tool, ferry, NPCs, badges, day/night, W1–W4 world work (see `git log`).
 
 ## Open items
 
-1. **Studio verification** of everything above, none of it has been seen in Studio: Land Office purchase, boxed truck and pad flow, free first respawns, Xbox controls, owner menu. Checklists in PHASE2_NOTES.md.
+1. **Studio verification** of everything above (and the hammer build, PHASE2_NOTES.md 'The hammer and physical blueprints'), none of it has been seen in Studio: Land Office purchase, boxed truck and pad flow, free first respawns, Xbox controls, owner menu. Checklists in PHASE2_NOTES.md.
 2. **Not reproduced without Studio:** signs, roof and buildings sinking under the map. Mitigations shipped (`standOnGround` lift, `TownMeshes = false`, a build-check print). Connor should send the `[MapBuilder] build check:` Output line, screenshots, and any red/orange Output.
-3. **Questions for Connor:** a real trade window (yes/no)? Lanternwood economy numbers (proposal in MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 (not free) acceptable?
+3. **Questions for Connor:** should Cabin, Warehouse and the other pieces that were free to place also need a bought blueprint (they would need prices and a build sink in the economy model)? Should world-found blueprints spawn anywhere yet (the machinery exists)? A real trade window (yes/no)? Lanternwood economy numbers (proposal in MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 (not free) acceptable?
 4. The v1 rollback loop still charges the plot with no Murph payback (ECONOMY_V1.md shows the Steel Axe at 18 min). Fix only if v1 is ever re-enabled.
 5. A tutorial skipper or replayer pays the full $150 with no Murph payback.
 

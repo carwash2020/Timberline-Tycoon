@@ -118,6 +118,22 @@ function HammerLogic.Swing(u: number): number
 end
 
 ---------------------------------------------------------------------------
+-- The dust
+---------------------------------------------------------------------------
+
+HammerLogic.DustMin = 4
+HammerLogic.DustMax = 14
+
+-- Puffs per knock. `chips` is the device's chip budget (Quality.Budget()):
+-- a phone on low still gets a few, a strong machine never more than the max.
+function HammerLogic.DustCount(chips: number): number
+	if chips ~= chips then
+		return HammerLogic.DustMin
+	end
+	return math.clamp(math.floor(chips / 2), HammerLogic.DustMin, HammerLogic.DustMax)
+end
+
+---------------------------------------------------------------------------
 -- Who sees it
 ---------------------------------------------------------------------------
 

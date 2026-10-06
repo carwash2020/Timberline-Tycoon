@@ -59,13 +59,13 @@ No new binds: Tool.Activated carries RT, click and tap, so `HudRules` and `Input
 - `PlaceBlueprint(blueprintId, x, z, rot, y)`: new check first, the blueprint must be in your book (or a boxed machine in stock). Everything else is as before.
 - `UseBlueprint(uid)`: you hold that item, it is removed, the book gains the id (`BlueprintBook.Redeem`).
 - `DropBlueprint(uid)`: the item leaves your hands and lies in the world with a pick-up prompt; only its owner can pick it up.
-- Hammer FX: `PlotService` sends `WorldFX("Hammer", { pos })` to players within 150 studs after a successful place or move. The local player also swings at once (client only).
+- Hammer FX: after a successful place or move `PlotService` sends `WorldFX("Hammer", { pos, by })` to every other player within 150 studs (`HammerLogic.FxRange`). The placer swings, knocks and dusts at once on their own client. Only the arm swing (the Tool's grip) is local; others hear and see the knock and dust.
 - Rate limits and `Net.RemoteNames` entries for each new remote.
 
 ## UI
 
 - The BUILD button is gone. Holding the hammer on your own plot shows the **hammer bar**: PLANS, LAND, WIRE, PUT AWAY. (WIRE and LAND lived on the build bar and still need a home.)
-- The list has a filter row (All, Buildings, Decor, Machines) that cycles, and a LAND row. A row shows name, size, and what it needs: `8 u³ of planks · fee $32`, `$150 to place`, or `Box from the Tool Shed`.
+- The list has a filter row (All, Buildings, Decor, Machines) that cycles (categories instead of free-text search, which is awkward on Xbox), and a LAND row. A row shows name, size, and what it needs: `8 u³ of planks · fee $32`, `$150 to place`, or `Box from the Tool Shed`.
 - The tutorial steps `build`, `place`, `land` keep their ids and order (save keys); only their text changes. `buildOpened` fires when the hammer list opens on your plot.
 
 ## Decisions I made (open for Connor)
@@ -75,3 +75,12 @@ No new binds: Tool.Activated carries RT, click and tap, so `HudRules` and `Input
 3. **Hammer is not droppable.** It is `profile.hammer`, regranted every spawn.
 4. **No world-found blueprints yet**, only the machinery for them.
 5. **LAND and WIRE live on the hammer bar**, because they were on the build bar and there is no other home for them.
+
+## Where the code is
+
+- Rules, pure and tested: `Shared/BlueprintBook` (book, items, Redeem, Allowed, list order, filter, rows, Migrate), `Shared/HammerLogic` (what a use does, the piece sheet, the swing, dust, FX range).
+- Server: `BlueprintService` (hammer, plan items, use, drop, pick up, `Spawn`), `PlotService.Place` (book check, knock), `ShopService` (store blueprints and `/gift` hand over the item), `ProfileSchema` (`blueprintBook`, `blueprintItems`, `hammer`).
+- Client: `HammerController` (use, sheet, swing, knock, plan use), `PlotUI` (hammer bar, list), `BlueprintPlacer` (keeps the hammer, `OnPlaced`), `BuilderTools` (`SelectModel`, quiet toast with the hammer), `AxeController` (Drop plan), `ShopUI` (`IsOpen`, focus row).
+- Art: `Shared/Art/HammerArt`, `Shared/Art/BlueprintArt`, preview scene `tools/preview/scenes/hammer.luau`.
+- The shelf boxes in the General Store still look like crates (store art is another branch's work); only the item you receive is a rolled plan.
+- Not touched: store builders, HUD layout beyond one side button, economy tables (no number moved).

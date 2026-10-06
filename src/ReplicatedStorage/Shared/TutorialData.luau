@@ -264,7 +264,7 @@ TutorialData.Steps = {
 
 -- The v2 loop's steps. Wood is cut where you swing, dragged with the axe
 -- put away, carried loose on the bed and sold by volume. Order: fell,
--- drag, sell at the cart, claim a plot, the build lessons (BUILD, place
+-- drag, sell at the cart, claim a plot, the build lessons (hammer, place
 -- one item, LAND), then the truck. The mill is the
 -- trip after the truck. Each step's event is what the v2 services report.
 -- Murph's numbers come from the v2 data: hits from FieldGuide.TrunkHits.
@@ -304,22 +304,22 @@ TutorialData.StepsV2 = {
 	plotStep(true),
 	{
 		id = "build",
-		objective = "Press BUILD on your plot",
-		murph = "That's your plot. Stand on it and press BUILD. That's where you set up mills, benches and the like.",
+		objective = "Hold your hammer on your plot",
+		murph = "That's your plot. Stand on it, take out your hammer and {click} to open your blueprints: mills, benches and the like.",
 		event = "buildOpened",
 		count = 1,
 	},
 	{
 		id = "place",
-		objective = "Place one item from the Blueprint Store",
-		murph = "Pick the cheapest thing in the Blueprint Store and set it down. You pay when you place it, and you get half back if you sell it.",
+		objective = "Place one blueprint with your hammer",
+		murph = "Pick the cheapest piece in your blueprints and set it down. You pay when you place it, and you get half back if you sell it.",
 		event = "itemPlaced",
 		count = 1,
 	},
 	{
 		id = "land",
 		objective = "Open LAND to see how to grow your plot",
-		murph = "Press LAND on the build bar. Plot size and expanding onto new squares both live there.",
+		murph = "Press LAND on the hammer's bar. Plot size and expanding onto new squares both live there.",
 		event = "landOpened",
 		count = 1,
 	},

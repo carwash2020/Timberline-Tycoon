@@ -677,7 +677,7 @@ local function reportModal()
 	HUD.SetModal({ left = at.X, top = at.Y, right = at.X + size.X, bottom = at.Y + size.Y })
 end
 
-local function open(shop: Shop)
+local function open(shop: Shop, focusId: string?)
 	local g, p, scroll = gui, panel, list
 	if not g or not p or not scroll then
 		return
@@ -719,10 +719,17 @@ local function open(shop: Shop)
 		Enum.PlayerActions.CharacterJump
 	)
 	if rows[1] then
-		-- The first thing you can buy, else the first row.
+		-- The row asked for, else the first thing you can buy, else the first row.
 		local pick = rows[1].button.face
+		local wanted = false
 		for _, row in ipairs(rows) do
-			if row.button.style == "buy" then
+			if focusId ~= nil and row.id == focusId then
+				pick, wanted = row.button.face, true
+				break
+			end
+		end
+		for _, row in ipairs(rows) do
+			if not wanted and row.button.style == "buy" then
 				pick = row.button.face
 				break
 			end
@@ -961,9 +968,16 @@ local function setupPrompt(shop: Shop, building: Instance)
 	prompts[shop] = pp
 end
 
--- Opens a screen that isn't tied to a building (the Robux Store).
-function ShopUI.OpenCustom(shop: Shop)
-	open(shop)
+-- Opens a screen that isn't tied to a building (the Robux Store, the
+-- hammer's blueprint list). `focusId` is the row a gamepad's selection
+-- starts on.
+function ShopUI.OpenCustom(shop: Shop, focusId: string?)
+	open(shop, focusId)
+end
+
+-- Whether a shop screen is up.
+function ShopUI.IsOpen(): boolean
+	return openShop ~= nil
 end
 
 -- Redraws the open screen (e.g. once prices have loaded).

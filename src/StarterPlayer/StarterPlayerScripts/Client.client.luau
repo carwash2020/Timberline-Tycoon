@@ -42,6 +42,7 @@ local MODULES = {
 	"ForestUI",
 	"GondolaController",
 	"HUD",
+	"HammerController",
 	"HudLayout",
 	"HudRules",
 	"LeaderboardUI",
@@ -287,6 +288,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "WireTool",
 		get = function()
 			return require(script.Parent.WireTool)
+		end,
+	},
+	{
+		name = "HammerController",
+		get = function()
+			return require(script.Parent.HammerController)
 		end,
 	},
 	{

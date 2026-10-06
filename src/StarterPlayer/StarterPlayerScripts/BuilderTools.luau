@@ -477,9 +477,19 @@ local function done()
 	refresh()
 end
 
+-- The hammer in hand: a click on a built piece opens the hammer's sheet
+-- (HammerController), so the "already has wood" toast stays quiet.
+local function hammerHeld(): boolean
+	local char = player.Character
+	local tool = if typeof(char) == "Instance" then char:FindFirstChildOfClass("Tool") else nil
+	return tool ~= nil and tool:GetAttribute("Hammer") == true
+end
+
 local function toggle(model: Model)
 	if model:GetAttribute("Kit") ~= true or model:GetAttribute("FillUnits") ~= 0 then
-		HUD.Toast(EditLogic.Message("filled") or "This piece already has wood in it.")
+		if not hammerHeld() then
+			HUD.Toast(EditLogic.Message("filled") or "This piece already has wood in it.")
+		end
 		return
 	end
 	if model:GetAttribute("OwnerId") ~= player.UserId then
@@ -516,6 +526,12 @@ local function modelFrom(target: Instance?): Model?
 		inst = inst.Parent
 	end
 	return nil
+end
+
+-- Selects (or deselects) an unfilled kit ghost: what a click does. The hammer
+-- calls it for RT, which this module does not hear with a tool in hand.
+function BuilderTools.SelectModel(model: Model)
+	toggle(model)
 end
 
 function BuilderTools.Center(viewport: Vector2): (number, number)
