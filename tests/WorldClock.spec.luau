@@ -77,6 +77,17 @@ return function(t)
 		end
 	)
 
+	t.test("Refresh puts the night-only grove's state on trees planted after the first tick (LOAD-01)", function()
+		local WorldClock, _, _, _, _, _, sectionDormant = setup(BASE + cycle / 2, true) -- noon
+		WorldClock.Refresh() -- before Start: nothing to apply
+		t.eq(sectionDormant.grove, nil)
+		WorldClock.Start()
+		t.eq(sectionDormant.grove, true)
+		sectionDormant.grove = nil -- trees planted later missed that call
+		WorldClock.Refresh()
+		t.eq(sectionDormant.grove, true, "asleep by day, again")
+	end)
+
 	t.test("never writes Lighting.ClockTime", function()
 		local WorldClock, writes = setup(BASE + cycle / 2)
 		WorldClock.Start()
