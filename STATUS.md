@@ -14,6 +14,8 @@ Last updated 6 October 2026 (PR #70). Keep this file current: update it in the s
 
 The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a rollback until M1.10. Plans: V2_PLAN.md (v2), V1_PLAN.md, GAME_DESIGN.md (§14 spec, §8 milestones, §9 automation rules, §15 materials). Playtest checklists: PHASE1_NOTES.md, PHASE2_NOTES.md.
 
+- **Building is the hammer plus physical blueprints** (branch `claude/hammer-build`, not merged yet): BUILD_SYSTEM.md is the design note and decision list.
+
 ### Rules decided by Connor (do not undo without asking)
 
 - **Prices build up.** The more valuable an item, the higher its cost; the first step up the axe ladder is cheap and each next one costs more. One price per item shown to players, never two numbers and never "u³" in player text.
