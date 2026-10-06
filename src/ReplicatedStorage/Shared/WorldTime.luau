@@ -137,6 +137,54 @@ function WorldTime.ClockTime(now: number): number
 	return 0
 end
 
+-- Owner time control (AdminService). The clock normally reads the real server
+-- time. The owner can speed it up or set the hour: the server then writes three
+-- workspace attributes, and every clock reader (the sky, shop hours, night,
+-- the corner clock) works the "game time" out from them. They live in server
+-- memory only: a new server starts without them, so time is real again after
+-- a restart (nothing is saved to the profile or a DataStore).
+--   TimeAnchorReal: the server time (GetServerTimeNow) when it was last set
+--   TimeAnchorGame: the game time that moment showed
+--   TimeSpeed: one of WorldTime.Speeds
+WorldTime.Speeds = { 1, 4, 20, 60 } :: { number }
+WorldTime.AnchorRealAttribute = "TimeAnchorReal"
+WorldTime.AnchorGameAttribute = "TimeAnchorGame"
+WorldTime.SpeedAttribute = "TimeSpeed"
+
+local function finite(n: unknown): boolean
+	return type(n) == "number" and n == n and n > -1e12 and n < 1e12
+end
+
+function WorldTime.IsSpeed(speed: unknown): boolean
+	return type(speed) == "number" and table.find(WorldTime.Speeds, speed) ~= nil
+end
+
+-- Game time at real time `realNow`, given the anchors and speed as read off
+-- the workspace (any type). Anything missing or off the list is real time.
+function WorldTime.Scaled(realNow: number, anchorReal: unknown, anchorGame: unknown, speed: unknown): number
+	if not (finite(anchorReal) and finite(anchorGame) and WorldTime.IsSpeed(speed)) then
+		return realNow
+	end
+	return (anchorGame :: number) + (realNow - (anchorReal :: number)) * (speed :: number)
+end
+
+-- The game time (unix-like seconds) the sky is on right now.
+function WorldTime.GameNow(): number
+	local real = workspace:GetServerTimeNow()
+	return WorldTime.Scaled(
+		real,
+		workspace:GetAttribute(WorldTime.AnchorRealAttribute),
+		workspace:GetAttribute(WorldTime.AnchorGameAttribute),
+		workspace:GetAttribute(WorldTime.SpeedAttribute)
+	)
+end
+
+-- The game time that shows `hour` (0..24) on the day `gameNow` is in.
+function WorldTime.GameTimeForHour(gameNow: number, hour: number): number
+	local cycle = cycleSeconds()
+	return math.floor(gameNow / cycle) * cycle + WorldTime.SecondsFromMidnight(hour % 24)
+end
+
 -- The hour the sky shows right now. Pass a unix time to ask about that
 -- moment (tests, the weather). Omit it to read the server clock, which is
 -- what shop hours, night glow and dailies want. In Studio the workspace
@@ -145,7 +193,7 @@ function WorldTime.Hour(now: number?): number
 	if now ~= nil then
 		return WorldTime.ClockTime(now)
 	end
-	local clock = WorldTime.ClockTime(workspace:GetServerTimeNow())
+	local clock = WorldTime.ClockTime(WorldTime.GameNow())
 	if game:GetService("RunService"):IsStudio() then
 		return ClockOverride.Apply(clock, workspace:GetAttribute(ClockOverride.Attribute), true)
 	end
@@ -199,10 +247,24 @@ function WorldTime.SecondsUntilChange(now: number): number
 	return WorldTime.SecondsBetween(clock, target)
 end
 
--- "14:05"
+-- The one way the game writes an hour to a player: a 12-hour clock,
+-- 12:00 AM through 11:59 PM, then 12:00 AM again. The clock itself still
+-- runs 0 to 24 inside; only the words change. 0 -> "12:00 AM",
+-- 14.5 -> "2:30 PM", 12 -> "12:00 PM". No leading zero on the hour.
 function WorldTime.Format(clockTime: number): string
 	local minutes = math.floor(clockTime * 60) % (24 * 60)
-	return string.format("%02d:%02d", minutes // 60, minutes % 60)
+	return WorldTime.FormatMinutes(minutes)
+end
+
+-- Same, from whole minutes since midnight (wraps at 24 h).
+function WorldTime.FormatMinutes(totalMinutes: number): string
+	local minutes = math.floor(totalMinutes) % (24 * 60)
+	local h24 = minutes // 60
+	local h12 = h24 % 12
+	if h12 == 0 then
+		h12 = 12
+	end
+	return string.format("%d:%02d %s", h12, minutes % 60, if h24 < 12 then "AM" else "PM")
 end
 
 return WorldTime

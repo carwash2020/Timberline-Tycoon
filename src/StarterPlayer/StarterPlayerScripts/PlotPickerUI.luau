@@ -237,8 +237,8 @@ local function build()
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.BackgroundTransparency = 1
-	title.Position = UDim2.fromOffset(16, 10)
-	title.Size = UDim2.new(1, -32, 0, 28)
+	title.Position = UDim2.fromOffset(16, 6)
+	title.Size = UDim2.new(1, -32, 0, 24)
 	title.Font = UITheme.Fonts.Heading
 	title.TextSize = 20
 	title.TextXAlignment = Enum.TextXAlignment.Left
@@ -250,10 +250,10 @@ local function build()
 	local detail = Instance.new("TextLabel")
 	detail.Name = "Detail"
 	detail.BackgroundTransparency = 1
-	detail.Position = UDim2.fromOffset(16, 28)
+	detail.Position = UDim2.fromOffset(16, 32)
 	detail.Size = UDim2.new(1, -32, 0, 36)
 	detail.Font = UITheme.Fonts.Body
-	detail.TextSize = 16
+	detail.TextSize = 15
 	detail.TextXAlignment = Enum.TextXAlignment.Left
 	detail.TextYAlignment = Enum.TextYAlignment.Top
 	detail.TextColor3 = C.Bark
@@ -264,7 +264,7 @@ local function build()
 	local row = Instance.new("Frame")
 	row.Name = "Choices"
 	row.BackgroundTransparency = 1
-	row.Position = UDim2.fromOffset(12, 68)
+	row.Position = UDim2.fromOffset(12, 74)
 	row.Size = UDim2.new(1, -24, 0, 44)
 	row.Parent = panel
 
@@ -302,7 +302,7 @@ local function build()
 	local any = Instance.new("TextButton")
 	any.Name = "Any"
 	any.BackgroundTransparency = 1
-	any.Position = UDim2.fromOffset(12, 112)
+	any.Position = UDim2.fromOffset(12, 122)
 	any.Size = UDim2.new(1, -24, 0, 18)
 	any.Font = UITheme.Fonts.Bold
 	any.TextSize = 16
