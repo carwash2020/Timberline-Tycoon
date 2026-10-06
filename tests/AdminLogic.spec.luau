@@ -105,4 +105,51 @@ return function(t)
 		end
 		t.eq(from(nil), nil)
 	end)
+
+	t.test("time speeds are the whitelist, and hours parse from names, 12-hour and 24-hour text", function()
+		for _, ok in ipairs({ "1", "4", "20", "60", "20x" }) do
+			t.ok(AdminLogic.Speed(ok) ~= nil, ok)
+		end
+		for _, bad in ipairs({ "0", "2", "61", "1000", "-4", "4.5", "fast", "", 20 }) do
+			t.eq(AdminLogic.Speed(bad), nil, tostring(bad))
+		end
+		t.eq(AdminLogic.Speed(nil), nil)
+		local hour = AdminLogic.TimeOfDay
+		t.eq(hour("midnight"), 0)
+		t.eq(hour("noon"), 12)
+		t.eq(hour("6am"), 6)
+		t.eq(hour("6pm"), 18)
+		t.eq(hour("12am"), 0)
+		t.eq(hour("12pm"), 12)
+		t.eq(hour("7:30 PM"), 19.5)
+		t.eq(hour("18:30"), 18.5)
+		t.eq(hour("18"), 18)
+		t.eq(hour("0"), 0)
+		for _, bad in ipairs({ "24", "25:00", "13pm", "0am", "6:75", "6:5", "soon", "", "6xm", string.rep("1", 20), 6 }) do
+			t.eq(hour(bad), nil, tostring(bad))
+		end
+		t.eq(hour(nil), nil)
+	end)
+
+	t.test("the time menu requests become commands, only from the whitelist", function()
+		local from = AdminLogic.FromRequest
+		t.eq(from({ action = "timespeed", speed = 60 }), "/timespeed 60")
+		t.eq(from({ action = "timespeed", speed = 1 }), "/timespeed 1")
+		t.eq(from({ action = "timereset" }), "/timereset")
+		for _, name in ipairs(AdminLogic.TimePresetOrder) do
+			t.eq(from({ action = "settime", time = name }), "/settime " .. name)
+		end
+		for _, bad in ipairs({
+			{ action = "timespeed", speed = 7 },
+			{ action = "timespeed", speed = "60" },
+			{ action = "timespeed", speed = 0 / 0 },
+			{ action = "timespeed" },
+			{ action = "settime", time = "9pm" },
+			{ action = "settime", time = "noon; /kick Bob" },
+			{ action = "settime", time = 12 },
+			{ action = "settime" },
+		}) do
+			t.eq(from(bad), nil)
+		end
+	end)
 end

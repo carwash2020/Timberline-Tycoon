@@ -89,6 +89,30 @@ function SwingLogic.ClipAt(cooldown: number, elapsed: number): number
 	return SwingLogic.Impact + (1 - SwingLogic.Impact) * ((elapsed - impactT) / span)
 end
 
+-- The fallback swing, for a character whose arm joints can't be found (an
+-- unusual avatar rig): the tool alone tips about its handle's X axis.
+-- Radians, 0 at the start and the end of the clip; negative is back over
+-- the shoulder, positive is down through the cut. No assets, no joints.
+SwingLogic.GripBack = math.rad(70)
+SwingLogic.GripThrough = math.rad(55)
+
+function SwingLogic.GripAngle(clip: number): number
+	local c = math.clamp(clip, 0, 1)
+	local function ease(x: number): number
+		local u = math.clamp(x, 0, 1)
+		return u * u * (3 - 2 * u)
+	end
+	if c < SwingLogic.Apex then
+		return -SwingLogic.GripBack * ease(c / SwingLogic.Apex)
+	elseif c < SwingLogic.Impact then
+		local u = ease((c - SwingLogic.Apex) / (SwingLogic.Impact - SwingLogic.Apex))
+		return -SwingLogic.GripBack + (SwingLogic.GripBack + SwingLogic.GripThrough) * u
+	elseif c < SwingLogic.FollowEnd then
+		return SwingLogic.GripThrough
+	end
+	return SwingLogic.GripThrough * (1 - ease((c - SwingLogic.FollowEnd) / (1 - SwingLogic.FollowEnd)))
+end
+
 function SwingLogic.Phase(clip: number): PhaseName
 	if clip < SwingLogic.Impact then
 		return "windup"

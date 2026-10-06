@@ -45,6 +45,57 @@ AdminLogic.MaxAmount = 2_000_000
 -- What can be gifted for free, by kind (the shop's own kinds).
 AdminLogic.GiftKinds = { "Axe", "Gear", "Sawmill", "Machine", "Blueprint" } :: { string }
 
+-- Time control. Speeds are WorldTime.Speeds (1, 4, 20, 60). The menu offers
+-- these hours by name (TimePresets, id -> hour); chat also takes "6:30pm",
+-- "18:30", "7am" or a bare hour 0-23.
+AdminLogic.TimePresets = { midnight = 0, ["6am"] = 6, noon = 12, ["6pm"] = 18 } :: { [string]: number }
+AdminLogic.TimePresetOrder = { "6am", "noon", "6pm", "midnight" } :: { string }
+
+-- "1", "4", "20" or "60" (an optional trailing x: "20x"), as a number, or nil.
+function AdminLogic.Speed(text: unknown): number?
+	local WorldTime = require(script.Parent.WorldTime)
+	local raw = if type(text) == "string" then string.match(text, "^(%d+)x?$") else nil
+	local n = if raw then tonumber(raw) else nil
+	if n ~= nil and WorldTime.IsSpeed(n) then
+		return n
+	end
+	return nil
+end
+
+-- A time of day as an hour 0 to under 24 (minutes as a fraction), or nil.
+-- "midnight", "noon", "6am", "6:30 pm", "18:30", "18". 12am is 0, 12pm is 12.
+function AdminLogic.TimeOfDay(text: unknown): number?
+	if type(text) ~= "string" or #text > 12 then
+		return nil
+	end
+	local squeezed = string.gsub(text, "%s+", "")
+	local lower = string.lower(squeezed)
+	local preset = AdminLogic.TimePresets[lower]
+	if preset then
+		return preset
+	end
+	local h, m, suffix = string.match(lower, "^(%d%d?):?(%d?%d?)([ap]?m?)$")
+	if not h then
+		return nil
+	end
+	local hour = tonumber(h) :: number
+	local minute = if m == "" then 0 else tonumber(m) :: number
+	if minute > 59 or (m ~= "" and #(m :: string) ~= 2) then
+		return nil
+	end
+	if suffix == "am" or suffix == "pm" then
+		if hour < 1 or hour > 12 then
+			return nil
+		end
+		hour = hour % 12 + (if suffix == "pm" then 12 else 0)
+	elseif suffix ~= "" then
+		return nil
+	elseif hour > 23 then
+		return nil
+	end
+	return hour + minute / 60
+end
+
 export type Command = { name: string, args: { string }, rest: string }
 
 -- "/give Bob 500" -> { name = "give", args = { "Bob", "500" }, rest = "Bob 500" }.
@@ -130,7 +181,19 @@ local function word(value: unknown, max: number): string?
 	return nil
 end
 
-AdminLogic.MenuActions = { "give", "take", "setcash", "gift", "kick", "goto", "bring", "superrun" } :: { string }
+AdminLogic.MenuActions = {
+	"give",
+	"take",
+	"setcash",
+	"gift",
+	"kick",
+	"goto",
+	"bring",
+	"superrun",
+	"timespeed",
+	"settime",
+	"timereset",
+} :: { string }
 
 function AdminLogic.FromRequest(request: unknown): string?
 	if type(request) ~= "table" then
@@ -143,6 +206,24 @@ function AdminLogic.FromRequest(request: unknown): string?
 	end
 	if action == "superrun" then
 		return "/superrun"
+	end
+	if action == "timereset" then
+		return "/timereset"
+	end
+	-- Time: a speed off the whitelist, or one of the named hours, never free text.
+	if action == "timespeed" then
+		local speed = req.speed
+		if type(speed) ~= "number" or not require(script.Parent.WorldTime).IsSpeed(speed) then
+			return nil
+		end
+		return string.format("/timespeed %d", speed)
+	end
+	if action == "settime" then
+		local at = req.time
+		if type(at) ~= "string" or AdminLogic.TimePresets[at] == nil then
+			return nil
+		end
+		return "/settime " .. at
 	end
 	local target = word(req.target, 20)
 	if not target then
@@ -182,6 +263,9 @@ AdminLogic.Help = {
 	"/ban <player> <hours|perm> [reason], /unban <userId>",
 	"/goto <player>, /bring <player>",
 	"/superrun: toggle your own super run",
+	"/timespeed <1|4|20|60>: speed up the clock (this server only)",
+	"/settime <6am|noon|6pm|midnight|7:30pm|18:30>: set the hour",
+	"/timereset: back to normal time",
 	"/announce <text>",
 } :: { string }
 

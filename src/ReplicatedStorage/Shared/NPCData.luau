@@ -25,6 +25,7 @@
 local CharacterArt = require(script.Parent.Art.CharacterArt)
 local FacingLogic = require(script.Parent.FacingLogic)
 local FerryLogic = require(script.Parent.FerryLogic)
+local PlotSalesmanData = require(script.Parent.PlotSalesmanData)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 local TollLogic = require(script.Parent.TollLogic)
 
@@ -718,6 +719,61 @@ NPCData.List = {
 			rain = { "A little rain never sank a ferry. Come aboard." },
 			storm = { "Swell's up. She'll still sail, mind your feet." },
 			fog = { "Fog on the water. I sail by ear and habit." },
+		},
+	},
+	{
+		-- Old Hank, an old farmer, runs the Land Office counter beside the
+		-- plot district's sign (PlotService builds the counter at
+		-- LandOfficeAt, east of the flat town). He stands behind it day and
+		-- night: no `shop`, so ShopHoursLogic never closes him and he never
+		-- sleeps. His Talk prompt opens the plot purchase (PlotService
+		-- hooks it); what he sells, and his price talk, is PlotSalesmanData.
+		id = PlotSalesmanData.Id,
+		name = PlotSalesmanData.Name,
+		role = PlotSalesmanData.Role,
+		spot = {
+			kind = "counter",
+			model = "LandOffice",
+			-- Only if the counter is missing; the Land Office is outside the
+			-- flat town, so `ground` also stands him on the terrain there.
+			fallback = Vector3.new(149.4, 0, 86.7),
+			ground = 0,
+		},
+		idle = "lookAround",
+		promptLift = 70, -- clear of the counter's own Buy a plot prompt
+		look = {
+			name = PlotSalesmanData.Name,
+			role = PlotSalesmanData.Role,
+			seed = 241,
+			skin = hex("#C99370"),
+			shirt = hex("#B24A3A"),
+			stripe = hex("#5B1F1A"), -- red plaid
+			pants = hex("#46628F"),
+			overalls = hex("#46628F"),
+			boots = hex("#4A3020"),
+			hair = hex("#D8D4CC"),
+			hairStyle = "short",
+			brows = hex("#E4E0D8"),
+			beard = "big",
+			beardColor = hex("#DDD9D1"),
+			hat = "straw",
+			hatColor = hex("#D9B865"),
+			hatTrim = hex("#7A3E22"),
+			hayStalk = true,
+			rolledSleeves = true,
+		},
+		greetings = PlotSalesmanData.Greetings(),
+		lines = PlotSalesmanData.Lines(),
+		react = {
+			morning = { "Up with the sun, same as the hay. Plots are open." },
+			day = { "Good day for a deed. Come see about a plot." },
+			evening = { "Sun's going down. Counter's open all the same." },
+			night = { "Never close. Land doesn't sleep, and neither do I." },
+			rain = { "Good for the crops. Step under the roof and talk plots." },
+			storm = { "Storm's coming in. A homestead has a roof, you know." },
+			fog = { "Foggy as a barn at dawn. The counter's right here." },
+			unsold = { "Sell some wood first, then come see me about land." },
+			sale = { "Wood money in your pocket? A plot is a fine way to spend it." },
 		},
 	},
 } :: { NPC }

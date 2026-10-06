@@ -1566,3 +1566,188 @@ What changed:
       not neon, in the day and at night
 - [ ] At night in front of the spawn: if a flat saturated blue plane still
       shows at the bottom of the screen, send a screenshot and the Output
+## Blender meshes are back on (axes, trees, NPCs, vehicles, plot kit, town)
+
+What was wrong, in order of certainty:
+
+1. **The town switch was off.** `GameConfig.TownMeshes = false` (set in #57 as a
+   precaution) kept every building, shop and town prop part-built. It is `true`
+   again. Dressed models are ground-snapped to their part-built twin
+   (`TownMeshes.Dress`: a mesh more than 0.4 studs lower than the part art is
+   lifted onto it, and one more than 8 off drops the dressing), so a mesh
+   cannot sink under the map. Kill switch: `GameConfig.TownMeshes = false` and
+   republish; in Studio set the workspace attribute `TownMeshes` (boolean) to
+   try either for one run.
+2. **Mesh loading failed silently.** Axes, trees, NPCs, vehicles, the plot kit
+   and the town all load through `MeshKit.Create`
+   (`AssetService:CreateMeshPartAsync`). When a load fails the art falls back
+   to the part-built model and nothing said so. There is no flag or test hook
+   that turns the axe, tree, NPC or vehicle meshes off, and none of those
+   files changed after #50, so a load failure is the only way they vanish. That
+   is almost always asset permission: the ids were uploaded by the creator
+   account `Elucidhealer618`, and a mesh only loads for an experience that
+   account allows. MeshKit now retries once, warns with the engine's own error
+   text, counts loads and failures, and stops asking after 8 misses in a row
+   with none loaded (each miss is slow). The `[MapBuilder] build check:` line
+   and a second line after the build print the totals. `ItemMeshes.LoadAsync`
+   (plot kit) now loads through MeshKit too, so it gets the same retry and
+   logging.
+3. **Shelf displays are boxes by design.** Since #42/#51 every shop shelf holds
+   a plain box with a price tag (`BoxService`), not a model of the axe. That is
+   not a mesh failure. The axe model shows in your hand and dropped on the
+   ground; a mesh preview on the box is a stores-art decision.
+
+### What Connor must do in Creator Hub (only if the Output says meshes failed)
+
+Look at the Output when the server starts for `[MapBuilder] build check:` and
+`[MeshKit] mesh <id> did not load (...)`. If it says `0 mesh assets loaded`:
+
+1. Open Studio **signed in as `Elucidhealer618`** (the uploader), or as an
+   account with Team Create edit on this place. Another account cannot load them.
+2. Creator Hub > Creations > Assets (Models and Meshes) > open an asset >
+   Permissions (Sharing). Allow this experience (Timberline Tycoon). Do it for
+   every uploaded asset, or move them to the experience owner (a group-owned
+   experience needs group-owned assets).
+3. Moderation state must be Approved (the data files say they are).
+4. Quick test in the Studio command bar, with the Rusty Axe haft:
+   `print(pcall(function() return game:GetService("AssetService"):CreateMeshPartAsync(Content.fromUri("rbxassetid://125228989315064")) end))`
+   Expect `true  Instance`. A `false  <message>` is the real reason.
+5. Ids to check first (one per kind; the rest follow the same rule): axe haft
+   `125228989315064`, Steel Axe head `139649051325358`, oak trunk section
+   `106240781110764`, oak crown `104687332442263`, plot Wall `85233243499195`.
+   All ids live in `Art/AxeModels`, `Art/TreeModels`, `Art/TownModels`,
+   `Art/NPCMeshes`, `Art/VehicleMeshes`, `KitMeshData` and `ItemMeshData`.
+
+### Studio checks
+- [ ] Output at start: `[MapBuilder] build check: uploaded town meshes ON,
+      axe/tree/NPC/vehicle/kit meshes: N mesh assets loaded, 0 failed` and the
+      same totals after "World built". Any `[MeshKit] mesh ... did not load`
+      lines name the failing id and the reason.
+- [ ] Hold each axe (Rusty to Lux; the Hermit's Maul is part-built): the Blender
+      haft and head show; swing the Lux Axe and see the trail.
+- [ ] Trees of every wood: meshed trunk and crown; chop a section and the log
+      falls as before; the tree stays cuttable above the cut.
+- [ ] Town: sawmill, shops, signs, roofs and floors sit on the ground and signs
+      read. If something looks wrong, set the workspace attribute `TownMeshes`
+      to false (or the config) and tell Claude which model.
+- [ ] Plot kit, the plot sign, corner posts and rails, NPCs and trucks.
+
+### Blender in the cloud session
+Not installed here (`which blender` is empty), but possible: `pip download bpy`
+works through the proxy (bpy 5.0.1 wheel for Python 3.11, about 375 MB) and apt
+lists `blender` 4.0.2. Headless `bpy` can build and export FBX/GLB here; the
+upload to Roblox (Creator Hub or Studio's Asset Manager) has to come from
+Connor's machine because uploads need his login.
+## Felling fix: the cut decides where the tree falls (claude/fix-felling)
+
+Cause: #36 made a cut through the ground section free the whole rooted
+section ("no sliver, no stump"), so any cut on the lowest trunk section pulled
+the entire trunk out of the ground. Now the first cut through the root splits
+it at the hit like any section: the stump stays anchored and rooted, only what
+is above the cut falls and gives logs. The stump times out after the wood's
+`respawnSec` (0.7 to 1.3x) and the site regrows at a new spot in its zone;
+cutting the stump through takes it at once. Also in this change: a felled
+trunk is one rigid body (speeds capped by `FallLogic`, no self-collision
+between pieces freed together, starts a hair above its stump), dust only for a
+trunk landing (a limb just thuds), a layered procedural fall sound
+(`FellSound`), and a swing pose that is re-applied just before each frame and
+falls back to tipping the tool grip.
+
+### Studio checks
+- [ ] Chop an oak low (ground section): a stump about knee high stays in the
+      ground with a cut face; the trunk above falls away from you and gives logs
+- [ ] Chop higher (aim at the upper trunk): the stump is taller, the top falls
+- [ ] Chop the stump again: it goes, and the site regrows after the respawn time
+- [ ] Try a birch, a pine, a Skyroot or Lumenwood, a small tree and a big one
+- [ ] A tree on your plot and a tree in a dense forest: same behaviour, and the
+      falling trunk does not push or fling neighbours
+- [ ] The trunk topples as one piece, no pieces flying apart, logs stay together
+- [ ] Sound at your ears: a creak, a crack and a whoosh as it goes, a heavy thud
+      with dust when it lands; 3D (louder close, quieter far); a falling limb
+      thuds but throws no dust cloud
+- [ ] The axe swing plays on the published game (not only in Studio); if it
+      cannot pose your arms, Output shows "[SwingPose] no arm joints found" and
+      the axe itself tips in the hand
+- [ ] No smoke puffs where the cursor or aim point is while you chop
+- [ ] To use your own fall recording: upload it (Creator Hub, Audio), then set
+      `GameConfig.FellSoundId = "rbxassetid://<id>"`; it replaces the layered
+      sound and plays at the landing
+## Load time (LOAD-01): the world no longer waits for its forest
+
+What changed: the forest (about 1,400 trees: the planning, then a skeleton and
+about 43 Instances each) is planted after the sell area goes in, nearest the
+sawmill first, about 20 ms of work a frame, so GameServer starts and your save
+loads while it grows in. The tutorial grove, the isles' Lumenwood, the town and
+the terrain are still done first. The client's filler-forest plan (one step of
+a second or more that froze the client) now waits until you are in the game.
+The terrain yields by time, not one frame per chunk. Every phase prints a
+`[Load]` line.
+
+### Studio checks
+- [ ] Cold Play: the branded loading card fades into the town noticeably sooner
+      than before; you can move and chop at the tutorial oaks at once
+- [ ] The forest fills in round you in the first ten or so seconds (trees near
+      the sawmill first, far biomes last). Walk to Gloam Hollow (by day: no
+      trees, at night: trees); Output shows `[Load] forest planted: N trees`
+- [ ] A tree chopped early still falls and drops wood; figured bark clues
+      (burl, etc.) still appear on late-planted trees; Murph's steps unchanged
+- [ ] No red/orange Output. `[MapBuilder] build check:` line still there
+- [ ] Copy every `[Load]` line from the server Output (and the client's) and
+      send them: the numbers say where the time goes now
+## Old Hank, the plot salesman at the Land Office
+
+- An old farmer stands behind the Land Office counter day and night (no shop
+  hours, never sleeps). Data: `Shared/PlotSalesmanData` (his offers and price
+  talk), roster entry `OldHank` in `NPCData`, Talk prompt wired by
+  `PlotService.HookSalesman`. Talk and the counter's "Buy a plot" prompt open
+  the same picker; the server charges `GameConfig.PlotPrice` once. To sell
+  something else through him, add an offer in `PlotSalesmanData.Offers` and a
+  handler in `PlotService`'s `SALESMAN_OFFERS` (steps are in the file header).
+- New: `CharacterArt` hat style `straw` and spec flag `hayStalk`.
+
+### Studio checks
+- [ ] Walk to the Land Office (east of the truck lot): an old man with a
+      straw hat, grey beard, hay stalk in his mouth, plaid shirt and overalls
+      stands behind the counter facing the street; a pitchfork leans on the
+      counter's end and a hay bale sits beside it
+- [ ] He looks around now and then; his bubble names the plot price ($150,
+      one number); wait through a night (or set the clock to 3:00): he is
+      still standing there, no Zzz
+- [ ] Press E / ButtonX / tap on Talk at him: the plot picker opens showing
+      the price; B closes it with nothing charged; buying charges once
+- [ ] The counter's own "Buy a plot" prompt still opens the same picker
+- [ ] A player who already owns a plot talks to him: a toast in his voice, no picker
+- [ ] You can't walk through the counter; he is not shoved and doesn't fall
+      over when you run into him; his prompt and the counter prompt don't overlap badly
+- [ ] The tutorial plot step still shows the amber arrow at the Land Office and pays as before
+## HUD corner, 12-hour clock, owner time tools, dialogue card, sawmill spin
+
+- The corner chips (STORE, the clock) now share the cash row's strip in the
+  top bar when it fits (`HudLayout.CornerInBar`), else sit 4 px under it. The
+  clock reads "Day 5:17 AM" / "Night 10:10 PM" (12-hour; the Day/Night word is
+  the Gloam Hollow's day or night, there is no day counter). Shop hours read
+  "7:00 AM" / "9:00 PM" everywhere (`WorldTime.Format`, `ShopHoursLogic.FormatHour`).
+- Owner time tools (`/timespeed`, `/settime`, `/timereset`, menu rows). Not saved.
+- The shopkeeper card (Yes / Close) sits above the hotbar (`DialogueData.CardBottom`).
+- The sawmill blade and bullwheel turn every frame by dt, slower (3 rad/s).
+
+### Studio checks
+- [ ] PC: STORE and the clock sit in the top bar beside the cash plaque, clear
+      of Roblox's menu and chat buttons; resize narrow: they drop under the bar
+      with no overlap. Phone emulator (with a notch): nothing under the notch
+      or the top bar. Xbox / TV: not off the safe area.
+- [ ] The clock counts 12:00 AM ... 11:59 AM, 12:00 PM ... 11:59 PM, then 12:00 AM.
+      Night/Day word still flips at dusk and dawn. Walk to Hearth & Home before
+      7 AM: the keeper says "opens at 7:00 AM"; the door sign reads "Open 7:00 AM to 9:00 PM".
+- [ ] Owner (you only): `/settime noon`, `/settime 6pm`, `/settime midnight`
+      jump the sky and the corner clock; `/timespeed 60` runs a day in about
+      24 s (sky, lamps, shop doors follow); `/timespeed 1` slows it; `/timereset`
+      returns to real time. Another account typing these gets nothing.
+      Stop and restart the server: time is real again (not saved).
+- [ ] Xbox: open the owner menu (OWNER or L3 + R3); D-pad down to Time speed
+      and Set hour (the panel scrolls), A on SET SPEED / SET HOUR / RESET TIME;
+      B closes. On a phone the panel fits and scrolls.
+- [ ] Knock on a closed shop / talk to a keeper: the card shows ABOVE the axe
+      hotbar on PC, phone and Xbox, Close (and B) works, nothing overlaps the tool bar.
+- [ ] The sawmill blade turns smoothly and slowly, on High and on Low graphics
+      (Settings), in town and on your own plot's sawmill.

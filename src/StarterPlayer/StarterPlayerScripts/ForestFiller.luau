@@ -26,6 +26,7 @@
 --     after the trees round you and before the stand-ins.
 -- Everything lives in the workspace folder "ForestFiller".
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -384,8 +385,29 @@ local function fade()
 	faded = now
 end
 
+-- Working the plan out has one step (WorldPlan.Trees, a second or more) that
+-- cannot be split, and it freezes the client while it runs. It is decoration,
+-- so it waits until the player is in the game (the loading card is gone) and
+-- never delays the load (LOAD-01). At most WAIT_READY seconds.
+local WAIT_READY = 40
+local function waitUntilPlaying()
+	local player = Players.LocalPlayer
+	if player == nil then
+		return
+	end
+	local startedWaiting = os.clock()
+	while os.clock() - startedWaiting < WAIT_READY do
+		if player:GetAttribute("ProfileLoaded") == true and player.Character ~= nil then
+			break
+		end
+		task.wait(0.25)
+	end
+	task.wait(1) -- the loading card's fade
+end
+
 function ForestFiller.Start()
 	task.spawn(function()
+		waitUntilPlaying()
 		-- WorldPlan's plan, a step a frame (each is cached for the next).
 		local started = os.clock()
 		for i, step in ipairs(WorldPlan.FillerSteps) do
@@ -398,6 +420,9 @@ function ForestFiller.Start()
 		end
 		makeLooks()
 		print(string.format("[ForestFiller] plan ready in %.1f s", os.clock() - started))
+		print(
+			string.format("[Load] client ForestFiller plan took %.1fs (after the player was in)", os.clock() - started)
+		)
 		local sinceScan, sinceFade = math.huge, 0
 		local sinceCosmetic = 0
 		RunService.Heartbeat:Connect(function(dt: number)

@@ -21,7 +21,10 @@ local Quality = require(script.Parent.Quality)
 
 local TownFX = {}
 
-local BLADE_SPEED = 7 -- radians per second
+-- The blade, bullwheel and sails turn by TownMotion's speeds, advanced by the
+-- real frame time every frame (not at the quality tier's cosmetic rate: a
+-- throttled step of a spinning disc looks like lag). Flames and smoke still
+-- follow CosmeticHz.
 -- Only within Quality.Budget().TownFxNear studs of the camera (260, 120 on
 -- low quality; Shared/QualityBudgets).
 
@@ -144,6 +147,30 @@ function TownFX.Start()
 	local t = 0
 	local sinceCosmetic = 0
 	RunService.RenderStepped:Connect(function(dt: number)
+		-- Smooth motion: every frame, only what is near the camera.
+		local view = workspace.CurrentCamera
+		if view then
+			local where = view.CFrame.Position
+			local reach = Quality.Budget().TownFxNear
+			local spinsSails = TownMotion.WindmillSpins(Quality.Budget().Tier)
+			for blade in pairs(blades) do
+				if blade.Parent and (blade.Position - where).Magnitude < reach then
+					spin(blade, TownMotion.Advance(TownMotion.BladeSpeed, dt))
+				end
+			end
+			for wheel in pairs(wheels) do
+				if wheel.Parent and (wheel.Position - where).Magnitude < reach then
+					spin(wheel, TownMotion.Advance(TownMotion.WheelSpeed, dt))
+				end
+			end
+			if spinsSails then
+				for sail in pairs(sails) do
+					if sail.Parent and (sail.Position - where).Magnitude < reach then
+						spin(sail, TownMotion.Advance(TownMotion.SailSpeed, dt))
+					end
+				end
+			end
+		end
 		sinceCosmetic += dt
 		if not QualityBudgets.CosmeticDue(Quality.Budget().CosmeticHz, sinceCosmetic) then
 			return
@@ -169,23 +196,6 @@ function TownFX.Start()
 			if part.Parent then
 				local close = (part.Position - eye).Magnitude < near
 				emitter.Rate = if close then chimneyRate else 0
-			end
-		end
-		for blade in pairs(blades) do
-			if blade.Parent and (blade.Position - eye).Magnitude < near then
-				spin(blade, BLADE_SPEED * step)
-			end
-		end
-		for wheel in pairs(wheels) do
-			if wheel.Parent and (wheel.Position - eye).Magnitude < near then
-				spin(wheel, BLADE_SPEED * 0.35 * step)
-			end
-		end
-		if TownMotion.WindmillSpins(budget.Tier) then
-			for sail in pairs(sails) do
-				if sail.Parent and (sail.Position - eye).Magnitude < near then
-					spin(sail, 0.6 * step)
-				end
 			end
 		end
 		for part, flame in pairs(flames) do
