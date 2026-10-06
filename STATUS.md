@@ -39,6 +39,8 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (newest first, PR numbers on main)
 
+- claude/fix-felling (branch, not merged): trees fall where you cut them (stump stays rooted, only the trunk above the cut falls; was #36's "ground cut frees the whole section"), rigid fall with velocity caps, layered procedural fell sound (`FellSoundId` still overrides), swing pose re-applied pre-render with a tool-grip fallback. Checklist in PHASE2_NOTES.md.
+
 - Old Hank, the plot salesman (branch claude/plot-salesman, not a PR yet): an old farmer NPC behind the Land Office counter, always there. His offers are data (`Shared/PlotSalesmanData`; today only "Buy a plot" at `GameConfig.PlotPrice`); Talk runs the same `PlotService.Claim` flow. New offers: add to `Offers` and `PlotService`'s `SALESMAN_OFFERS`. Checklist in PHASE2_NOTES.md.
 - Branch `claude/hud-clock-owner` (not yet a PR): corner chips raised into the top bar, 12-hour AM/PM clock everywhere (`WorldTime.Format`, shop-hour lines), owner time tools (`/timespeed`, `/settime`, `/timereset` and the menu; not saved), shopkeeper card above the hotbar, smooth slower sawmill blade (TownFX, per frame).
 - #70 plot bought at $150, Rustbucket $100, respawn fees, economy retuned (in review when this was written).
