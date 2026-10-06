@@ -1535,3 +1535,35 @@ What changed:
       the Rustbucket step follows; tapping Buy fast charges once
 - [ ] A returning save (already has a plot) still gets its picker at join,
       free, and "Give me any open plot" works
+
+## HUD corner, 12-hour clock, owner time tools, dialogue card, sawmill spin
+
+- The corner chips (STORE, the clock) now share the cash row's strip in the
+  top bar when it fits (`HudLayout.CornerInBar`), else sit 4 px under it. The
+  clock reads "Day 5:17 AM" / "Night 10:10 PM" (12-hour; the Day/Night word is
+  the Gloam Hollow's day or night, there is no day counter). Shop hours read
+  "7:00 AM" / "9:00 PM" everywhere (`WorldTime.Format`, `ShopHoursLogic.FormatHour`).
+- Owner time tools (`/timespeed`, `/settime`, `/timereset`, menu rows). Not saved.
+- The shopkeeper card (Yes / Close) sits above the hotbar (`DialogueData.CardBottom`).
+- The sawmill blade and bullwheel turn every frame by dt, slower (3 rad/s).
+
+### Studio checks
+- [ ] PC: STORE and the clock sit in the top bar beside the cash plaque, clear
+      of Roblox's menu and chat buttons; resize narrow: they drop under the bar
+      with no overlap. Phone emulator (with a notch): nothing under the notch
+      or the top bar. Xbox / TV: not off the safe area.
+- [ ] The clock counts 12:00 AM ... 11:59 AM, 12:00 PM ... 11:59 PM, then 12:00 AM.
+      Night/Day word still flips at dusk and dawn. Walk to Hearth & Home before
+      7 AM: the keeper says "opens at 7:00 AM"; the door sign reads "Open 7:00 AM to 9:00 PM".
+- [ ] Owner (you only): `/settime noon`, `/settime 6pm`, `/settime midnight`
+      jump the sky and the corner clock; `/timespeed 60` runs a day in about
+      24 s (sky, lamps, shop doors follow); `/timespeed 1` slows it; `/timereset`
+      returns to real time. Another account typing these gets nothing.
+      Stop and restart the server: time is real again (not saved).
+- [ ] Xbox: open the owner menu (OWNER or L3 + R3); D-pad down to Time speed
+      and Set hour (the panel scrolls), A on SET SPEED / SET HOUR / RESET TIME;
+      B closes. On a phone the panel fits and scrolls.
+- [ ] Knock on a closed shop / talk to a keeper: the card shows ABOVE the axe
+      hotbar on PC, phone and Xbox, Close (and B) works, nothing overlaps the tool bar.
+- [ ] The sawmill blade turns smoothly and slowly, on High and on Low graphics
+      (Settings), in town and on your own plot's sawmill.

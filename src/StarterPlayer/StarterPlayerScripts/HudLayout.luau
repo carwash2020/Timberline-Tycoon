@@ -15,6 +15,8 @@
 --   * BottomRow(): the load chip and the hint, side by side above the
 --     hotbar, clear of a phone's jump button.
 --   * ClockLine(): which corner line the clock goes in.
+--   * CornerInBar(): where the corner's first line (STORE, the clock) goes
+--     when the cash row sits in the top bar, so they share its row.
 --   * TopRow(): where the cash row sits, in screen pixels (its screen is
 --     not scaled), in the top bar or just under it.
 -- Everything else is in a screen's offsets (UIScale units), y down.
@@ -404,6 +406,25 @@ function HudLayout.TopRow(
 	end
 	local top = topbar.Min.Y + (barH - row.Y) / 2
 	return { right = right, top = top, inBar = true }
+end
+
+-- The corner's shelf (STORE, clock, pouch, Daily Goals) normally hangs
+-- `CornerTopPad` px under the top bar. When the cash row is in the bar
+-- (`place.inBar`), the shelf's first line, which already holds a gap the
+-- size of the cash row, is lifted so it shares the row's strip: its top-right
+-- corner returns in screen px. `row` is the cash row's size and `line` the
+-- first line's size (screen px, the gap included). nil when the row is under
+-- the bar (the shelf stays at its default), or when the line would reach left
+-- of `barLeft` (the free part of the bar: Roblox's buttons and any notch).
+HudLayout.CornerTopPad = 4
+function HudLayout.CornerInBar(place: TopRowPlace, row: Vector2, line: Vector2, barLeft: number): Vector2?
+	if not place.inBar or line.X <= 0 or line.Y <= 0 then
+		return nil
+	end
+	if place.right - line.X < barLeft then
+		return nil
+	end
+	return Vector2.new(place.right, place.top + (row.Y - line.Y) / 2)
 end
 
 return HudLayout
