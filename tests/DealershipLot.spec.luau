@@ -111,9 +111,10 @@ return function(t)
 	end)
 
 	t.test(
-		"a box stands in front of every vehicle, sized by the vehicle, and the vehicle is behind it on a plinth",
+		"a box stands on every plinth at the aisle edge, sized by the vehicle, with the vehicle beside it, and the aisle stays clear",
 		function()
 			local lot = DealershipLot.Build()
+			local layout = DealershipLot.Layout()
 			local spots = {}
 			for _, d in ipairs(lot:GetDescendants()) do
 				if d.Name == "BoxSpot" then
@@ -126,6 +127,22 @@ return function(t)
 					plinths[d:GetAttribute("ItemId")] = d
 				end
 			end
+			-- The clear central walkway: from the front row's aisle edge to the back row's.
+			local aisleLo, aisleHi = -math.huge, math.huge
+			for _, bay in ipairs(layout.bays) do
+				local p = plinths[bay.id]
+				local _, _, _, _, pz0, pz1 = aabb(p)
+				if bay.row == 1 then
+					aisleLo = math.max(aisleLo, pz1)
+				else
+					aisleHi = math.min(aisleHi, pz0)
+				end
+			end
+			t.ok(
+				aisleHi - aisleLo >= DealershipLot.Aisle - 0.01,
+				"a central walkway at least " .. DealershipLot.Aisle .. " wide"
+			)
+			t.ok(aisleHi - aisleLo >= 12, "and never narrower than 12 studs")
 			for _, child in ipairs(displays(lot)) do
 				local id = child:GetAttribute("ItemId")
 				local kind = child:GetAttribute("Category")
@@ -134,12 +151,23 @@ return function(t)
 				local class = BoxSize.Class(StoreStock.VehicleClass(kind, id))
 				t.ok((spot.Size - class.size).Magnitude < 0.01, id .. " box is its class")
 				t.ok(class.vehicle and class.size.X >= 9, id .. " vehicle boxes are the biggest")
-				-- In front (toward -Z, the path) of the vehicle and of its plinth.
-				local sx0, sx1, _, sy1, sz0, sz1 = aabb(spot)
+				local sx0, sx1, sy0, sy1, sz0, sz1 = aabb(spot)
 				local px0, px1, py0, py1, pz0, pz1 = aabb(plinth)
-				t.ok(sz1 <= pz0 + 0.01, id .. " box is in front of the plinth")
+				-- On the plinth, within it, and out of the aisle.
 				t.ok(sx0 >= px0 - 0.01 and sx1 <= px1 + 0.01, id .. " box is within the plinth's width")
-				t.ok(math.abs(sy1 - class.size.Y) < 0.01 and sx0 < sx1, id .. " box stands on the ground")
+				t.ok(sz0 >= pz0 - 0.01 and sz1 <= pz1 + 0.01, id .. " box is within the plinth's depth")
+				t.ok(math.abs(sy0 - py1) < 0.01, id .. " box stands on the plinth")
+				local row = 1
+				for _, bay in ipairs(layout.bays) do
+					if bay.id == id then
+						row = bay.row
+					end
+				end
+				if row == 1 then
+					t.ok(sz1 <= aisleLo + 0.01, id .. " box is out of the walking aisle (front row)")
+				else
+					t.ok(sz0 >= aisleHi - 0.01, id .. " box is out of the walking aisle (back row)")
+				end
 				-- The vehicle sits on the plinth, wholly over it.
 				local vx0, vx1, vy0, vy1, vz0, vz1 = math.huge, -math.huge, math.huge, -math.huge, math.huge, -math.huge
 				for _, d in ipairs(parts(child)) do
@@ -152,7 +180,15 @@ return function(t)
 				t.ok(vy0 >= py1 - 0.3, id .. " rests on the plinth: " .. vy0 .. " vs " .. py1)
 				t.ok(vx0 >= px0 - 0.5 and vx1 <= px1 + 0.5, id .. " is within its plinth in x")
 				t.ok(vz0 >= pz0 - 0.5 and vz1 <= pz1 + 0.5, id .. " is within its plinth in z")
-				t.ok(vz0 > sz1 - 0.01, id .. " is behind its box")
+				-- Beside the box (behind it from the aisle): no overlap in z.
+				t.ok(vz1 <= sz0 + 0.05 or vz0 >= sz1 - 0.05, id .. " is beside its box, not under it")
+			end
+			-- Nothing but a price sign (a thin board at a plinth's edge) stands in the aisle.
+			for _, p in ipairs(parts(lot)) do
+				if p.Name ~= "PriceSign" and p.Name ~= "BoxSpot" then
+					local _, _, _, _, z0, z1 = aabb(p)
+					t.ok(z1 <= aisleLo + 0.01 or z0 >= aisleHi - 0.01, p.Name .. " keeps out of the aisle")
+				end
 			end
 		end
 	)

@@ -400,7 +400,8 @@ return function(t)
 		t.eq(sent[1].choice, false)
 		t.ok(string.find(sent[1].text, "7:00", 1, true) ~= nil, sent[1].text)
 		handler(person(Vector3.new(0, 4.5, 0)), "open", "ToolShed")
-		t.eq(sent[2].line, "greet", "the Tool Shed still greets at night")
+		t.eq(sent[2].line, "sleepy", "the Tool Shed shuts at night too (6 AM to 8 PM)")
+		t.ok(string.find(sent[2].text, "6:00", 1, true) ~= nil, sent[2].text)
 	end)
 
 	-- The gold Robux shelf: the same box and the same counter, but the

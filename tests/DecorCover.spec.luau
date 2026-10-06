@@ -27,12 +27,13 @@ return function(t)
 	-- draws per candidate are unchanged, and the wider roads, junction
 	-- flares and hollow pools reject a few of those candidates. Re-sampled
 	-- again when the homesteads scattered, and again for the display lot:
-	-- flowers still skip the shelves and that patch.
+	-- flowers still skip the shelves and that patch; and once more for the bigger
+	-- showroom lawn and the town re-laid with its shops spaced out.
 	t.test("the first layer places exactly what it did before the cover layer", function()
 		local want = {
-			[20] = { 1557, 102900845, 825287505 },
-			[60] = { 1953, 96732441, 643137331 },
-			[85] = { 2428, 37091171, 981016911 },
+			[20] = { 1547, 94876266, 762690791 },
+			[60] = { 1940, 86165282, 640746976 },
+			[85] = { 2412, 24405130, 738578852 },
 		}
 		for v, w in pairs(want) do
 			local n, sx, sk = 0, 0, 0

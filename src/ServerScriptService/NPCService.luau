@@ -144,6 +144,11 @@ local function frontAlong(model: Instance, counter: BasePart): number
 	local origin = counter.CFrame.Position
 	local doorAt = -math.huge
 	local function consider(part: BasePart)
+		-- Looks-only dressing out front (awnings, planters, signs, the doormat)
+		-- is not the front face; the door's own block still counts.
+		if not part.CanCollide and part.Name ~= "DoorBlock" and part ~= counter then
+			return
+		end
 		local along = (part.CFrame.Position - origin):Dot(look)
 		local extent = math.abs(part.CFrame.RightVector:Dot(look)) * part.Size.X / 2
 			+ math.abs(part.CFrame.UpVector:Dot(look)) * part.Size.Y / 2

@@ -54,7 +54,7 @@ PlotData.Homes = {
 	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 248, z = -380 },
 	-- Ten studs north of the old spot, so the blend clears the display
 	-- lot's north edge (z 123) by more than 10 studs.
-	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 290 },
+	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 345 },
 	{ id = "north", name = "North Bend", region = "the north road", x = -190, z = 530 },
 	-- East of the display lot (x 184-296). The shelf and its blend stay
 	-- south of the lot and the path from the showroom.

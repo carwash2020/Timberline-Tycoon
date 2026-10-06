@@ -6,6 +6,7 @@
 
 local FieldGuide = require(script.Parent.FieldGuide)
 local ItemCatalog = require(script.Parent.ItemCatalog)
+local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 local ShopLogic = require(script.Parent.ShopLogic)
 local WoodData = require(script.Parent.WoodData)
 
@@ -17,9 +18,25 @@ export type Goal = {
 	beacon: string?, -- a QuestUI beacon name, when pointing helps
 }
 
+-- " - the shed opens at 6 AM" while the shop is shut, else nothing.
+function NextGoal.ClosedNote(shopId: string, hour: number?): string
+	if hour == nil or ShopHoursLogic.IsOpen(shopId, hour) then
+		return ""
+	end
+	return string.format(" - opens at %s", ShopHoursLogic.FormatHour(ShopHoursLogic.NextOpen(shopId, hour)))
+end
+
 -- `found` is profile.compendium (wood id -> true). `streak` is
--- profile.daily.streak (0 until the first day is finished).
-function NextGoal.Pick(loop: number, bestAxeTier: number, found: { [string]: boolean }, streak: number): Goal
+-- profile.daily.streak (0 until the first day is finished). `hour` (the game
+-- clock, optional) lets the axe goal say when the Tool Shed opens while it is
+-- shut at night.
+function NextGoal.Pick(
+	loop: number,
+	bestAxeTier: number,
+	found: { [string]: boolean },
+	streak: number,
+	hour: number?
+): Goal
 	local ladder = ItemCatalog.AxeLadder()
 	local tier = math.max(0, math.floor(bestAxeTier))
 	local nextAxe = ladder[tier + 1]
@@ -28,7 +45,8 @@ function NextGoal.Pick(loop: number, bestAxeTier: number, found: { [string]: boo
 		if price > 0 then
 			return {
 				kind = "axe",
-				text = string.format("Buy the %s (%s)", nextAxe.displayName, FieldGuide.CashText(price)),
+				text = string.format("Buy the %s (%s)", nextAxe.displayName, FieldGuide.CashText(price))
+					.. NextGoal.ClosedNote("ToolShed", hour),
 				beacon = "toolShed",
 			}
 		end

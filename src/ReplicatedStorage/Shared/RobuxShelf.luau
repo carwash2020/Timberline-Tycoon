@@ -40,7 +40,7 @@ RobuxShelf.GoldInk = "#6B4A12"
 
 -- The table: where it stands (final studs) and how wide a box needs.
 RobuxShelf.Class = "S"
-RobuxShelf.TableZ = 16.4
+RobuxShelf.TableZ = 19.0 -- behind the counter and its keeper, against the back wall
 RobuxShelf.TableDepth = 3.8
 RobuxShelf.TableTop = 3.9 -- the table top, above the model origin (the counter top height)
 RobuxShelf.Step = BoxSize.Class(RobuxShelf.Class).size.X + BoxSize.Gap -- centre to centre along x

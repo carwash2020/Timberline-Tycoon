@@ -4,16 +4,20 @@
 -- hour the door next unlocks. Callers pass WorldTime.Hour() (no argument), so
 -- Studio's ClockOverride on workspace flows through the same clock as the sky.
 --
--- Hours (Designer, 06:22 MT): Tool Shed never closes. Hearth & Home is open
+-- Hours: the Tool Shed is open from ToolShedOpen until ToolShedClose (6 AM to
+-- 8 PM since store-polish; it used to never close). Hearth & Home is open
 -- from HearthOpen until HearthClose. The Dealership is open from DealerOpen
 -- until DealerClose. The interval is half-open: open at the first minute,
--- closed at the last. A shop with no span (the Tool Shed, or an id this
--- module does not know) stays open, so a typo cannot lock a counter.
+-- closed at the last. A shop with no span (an id this module does not know)
+-- stays open, so a typo cannot lock a counter.
 
 local WorldTime = require(script.Parent.WorldTime)
 
 local ShopHoursLogic = {}
 
+-- The Tool Shed, 6:00 to 20:00.
+ShopHoursLogic.ToolShedOpen = 6
+ShopHoursLogic.ToolShedClose = 20
 -- Hearth & Home, 7:00 to 21:00. Final.
 ShopHoursLogic.HearthOpen = 7
 ShopHoursLogic.HearthClose = 21
@@ -63,6 +67,7 @@ ShopHoursLogic.PollSeconds = 15
 export type Span = { open: number, close: number }
 
 local SPANS: { [string]: Span } = {
+	ToolShed = { open = ShopHoursLogic.ToolShedOpen, close = ShopHoursLogic.ToolShedClose },
 	HearthAndHome = { open = ShopHoursLogic.HearthOpen, close = ShopHoursLogic.HearthClose },
 	Dealership = { open = ShopHoursLogic.DealerOpen, close = ShopHoursLogic.DealerClose },
 }

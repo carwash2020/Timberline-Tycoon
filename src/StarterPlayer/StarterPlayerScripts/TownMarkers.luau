@@ -67,7 +67,9 @@ TownMarkers.Markers = {
 		text = "AXES",
 		icon = "axe",
 		chip = Color3.fromRGB(150, 62, 44),
-		offset = Vector3.new(15.5, 19, -15.5),
+		-- The counter is at the shed's back now (13.6 studs in from its middle): the
+		-- chip floats east of the name board, past the shed side (the log stack), 25 studs forward of it.
+		offset = Vector3.new(17.6, 22, -25.6),
 	},
 	{
 		name = "Trucks",
@@ -77,7 +79,7 @@ TownMarkers.Markers = {
 		chip = Color3.fromRGB(47, 109, 181),
 		-- Over the showroom hall's name sign (the hall stands east of the
 		-- spawn's view; its marker shows once you walk that way).
-		offset = Vector3.new(16, 21.5, 0),
+		offset = Vector3.new(19, 22, -53.9), -- the counter is at the back wall; this is over the front roof, east of the name board
 	},
 	{
 		name = "Gear",
@@ -87,7 +89,7 @@ TownMarkers.Markers = {
 		chip = Color3.fromRGB(122, 90, 60),
 		-- East of the name sign, over the roof's low east edge, so the
 		-- board and its lamps don't eat the chip, and it stays on a phone.
-		offset = Vector3.new(22, 18.3, 2),
+		offset = Vector3.new(21, 32, -29.3), -- the counter is at the back wall; over the front roof, east of the name board
 	},
 	{
 		name = "Gondola",

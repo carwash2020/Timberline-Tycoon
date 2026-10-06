@@ -608,7 +608,7 @@ return function(t)
 		t.eq(line, "sleepy")
 		t.eq(s.profile.cash, 1000, "a carried box does not charge")
 		s.buy("Axe", "SteelAxe")
-		t.eq(s.profile.cash, 1000 - 120, "the Tool Shed stays open")
+		t.eq(s.profile.cash, 1000, "the Tool Shed is shut at 10 PM too (open 6 AM to 8 PM)")
 	end)
 
 	t.test("a full storage refuses a truck box before cash moves", function()

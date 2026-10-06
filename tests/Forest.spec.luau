@@ -67,7 +67,10 @@ return function(t)
 		open(town.spawn.X, town.spawn.Z, "the spawn")
 		open(town.sawmill.X, town.sawmill.Z, "the sawmill")
 		for _, shop in ipairs(town.shops) do
-			open(shop.cframe.X, shop.cframe.Z, shop.kind)
+			-- (The showroom hall stands on its own flat zone, where no tree grows.)
+			if WorldLayout.FlatWeight(shop.cframe.X, shop.cframe.Z) <= 0 then
+				open(shop.cframe.X, shop.cframe.Z, shop.kind)
+			end
 		end
 		for i, cf in ipairs(town.parkingSlots) do
 			open(cf.X, cf.Z, "parking slot " .. i)
@@ -531,8 +534,8 @@ return function(t)
 			end
 		end
 		-- The ring wraps the town only, so these two rectangles hold a shorter edge.
-		-- Lanes out to the shelves take a few of those edge trees (82 left).
-		t.ok(area > 20000 and trees >= 75, string.format("%d sq studs of edge, %d trees in it", area, trees))
+		-- Lanes out to the shelves take a few of those edge trees (71 left since The Climb moved north for the showroom hall).
+		t.ok(area > 20000 and trees >= 65, string.format("%d sq studs of edge, %d trees in it", area, trees))
 		local perEdge = area / trees
 		-- Lanes cross the edge band, so it is only a little denser than the deep cells.
 		t.ok(
@@ -743,7 +746,7 @@ return function(t)
 	-- FOR-03: more trees to chop where the forest is
 	---------------------------------------------------------------------------
 
-	local BASE = 482 -- the first 322 and the country stands (WorldPlan.spec pins both)
+	local BASE = 481 -- the first 322 and the country stands (WorldPlan.spec pins both)
 	local forestTrees = WorldPlan.ForestTrees()
 
 	-- Which kind of place a forest tree stands in.
@@ -971,7 +974,7 @@ return function(t)
 			-- Re-sampled when the homesteads left the one lawn, and again when the
 			-- lighthouse moved to (1203, 236). The searches still read the grass
 			-- under each rock; the shelves moved a few clusters.
-			t.eq(h, 713830729, "a cluster or landmark moved")
+			t.eq(h, 901717980, "a cluster or landmark moved")
 		end
 	)
 
