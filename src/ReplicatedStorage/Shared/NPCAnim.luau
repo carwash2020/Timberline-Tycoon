@@ -185,7 +185,7 @@ function NPCAnim.Sample(input: SampleInput): Pose
 	p.leftPitch = leftArm
 	p.rightPitch = rightArm
 	p.bob = bob
-	p.rootPitch = 0.04 * walk
+	p.rootPitch = -0.04 * walk -- a walker leans forward (a positive pitch tips the top toward +Z, the back)
 	local idle = 1 - walk
 	p.leftRoll = -0.03 * input.breath * idle
 	p.rightRoll = 0.03 * input.breath * idle
