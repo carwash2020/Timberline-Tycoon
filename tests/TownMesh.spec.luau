@@ -171,7 +171,7 @@ return function(t)
 					end,
 				},
 				NodeService = { Spawn = function() end },
-				WorldClock = { Start = function() end },
+				WorldClock = { Start = function() end, Refresh = function() end },
 			},
 			services = {
 				Players = Players,
@@ -190,6 +190,7 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
+					wait = function() end,
 				},
 			},
 		})
@@ -426,6 +427,41 @@ return function(t)
 		end)
 	end)
 
+	t.test("I-Ground: a mesh that would sink is lifted onto its part-built twin; the switch turns it off", function()
+		local function stump()
+			local model = roblox.Instance.new("Model")
+			local box = roblox.Instance.new("Part")
+			box.Name = "Base"
+			box.Size = Vector3.new(4, 4, 4)
+			box.CFrame = CFrame.new(0, 2, 0)
+			box.Parent = model
+			return model
+		end
+		local function lowest(part)
+			return part.CFrame.Position.Y - part.Size.Y / 2
+		end
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = roblox.Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			-- Pivot at the mesh's own centre: placed on the root it sinks by half its height.
+			part:SetAttribute("MeshPivot", "authored")
+			return part
+		end
+		local model = stump()
+		local ok = TownMeshes.Dress(model, "Stump")
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		t.ok(ok, "dressed")
+		local body = visualNamed(model, "Body")
+		t.ok(body and lowest(body) >= -0.05, "the mesh stands on the ground line, not under it")
+		TownMeshes.Enabled = false
+		local plain = stump()
+		t.eq(TownMeshes.Dress(plain, "Stump"), false, "the kill switch leaves the part-built art")
+		TownMeshes.Enabled = true
+	end)
+
 	t.test("I-Shops: counters, signs, and the authored building scale", function()
 		withMeshes(function()
 			for _, kind in ipairs({ "ToolShed", "HearthAndHome", "Sawmill" }) do
@@ -502,6 +538,16 @@ return function(t)
 		local spun = TownMotion.Step(cf, "Z", Vector3.zero, 0.4)
 		t.ok((spun.Position - cf.Position).Magnitude < 1e-4, "a centre spin stays put")
 		t.eq(TownMotion.WindmillSpins("low"), false)
+		-- Smooth, slower saw: by frame time, capped on a hitch, never negative or NaN.
+		t.ok(TownMotion.BladeSpeed <= 3, "the blade turns slowly")
+		t.ok(math.abs(TownMotion.Advance(TownMotion.BladeSpeed, 1 / 60) - TownMotion.BladeSpeed / 60) < 1e-9)
+		t.eq(TownMotion.Advance(TownMotion.BladeSpeed, 5), TownMotion.BladeSpeed * TownMotion.MaxFrame)
+		t.eq(TownMotion.Advance(TownMotion.BladeSpeed, -1), 0)
+		t.eq(TownMotion.Advance(TownMotion.BladeSpeed, 0 / 0), 0)
+		local fs = require("@lune/fs")
+		local fx = fs.readFile("src/StarterPlayer/StarterPlayerScripts/TownFX.luau")
+		t.ok(string.find(fx, "TownMotion.Advance(TownMotion.BladeSpeed, dt)", 1, true), "the blade is dt-driven")
+		t.eq(string.find(fx, "BLADE_SPEED", 1, true), nil, "no throttled step any more")
 		t.eq(TownMotion.WindmillSpins("high"), true)
 		t.eq(TownMotion.WindmillSpins("medium"), true)
 		withMeshes(function()

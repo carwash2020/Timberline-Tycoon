@@ -17,6 +17,11 @@ local DialogueData = {}
 -- Yes / No on a phone. The face is this many pixels on a side, over the
 -- 44 px fingertip minimum, and the row sits at the bottom centre.
 DialogueData.ButtonPx = 48
+-- The card's bottom edge sits this many px above UITheme.Bottom() (the top
+-- of Roblox's tool hotbar plus the margin), so the hotbar, which draws over
+-- every ScreenGui, never covers its Yes / Close buttons. 52 also clears the
+-- control-hint line (DragController: Bottom + 38) on phone, PC and Xbox.
+DialogueData.CardAboveHotbar = 52
 
 export type Vars = {
 	name: string?,
@@ -146,6 +151,12 @@ local IDLES: { [string]: { string } } = {
 
 local function shopLines(shop: string?): { [string]: string }
 	return LINES[shop or ""] or LINES.ToolShed
+end
+
+-- The card's bottom offset from the screen's bottom edge, in px, given
+-- UITheme.Bottom(). Always above the hotbar.
+function DialogueData.CardBottom(hotbarBottom: number): number
+	return math.max(0, hotbarBottom) + DialogueData.CardAboveHotbar
 end
 
 function DialogueData.Sleepy(shop: string?, hour: number): string

@@ -368,6 +368,9 @@ function TerrainBuilder.SettleTown(
 	return best.shift, best.error, tries, done
 end
 
+-- How long Build writes chunks before it yields a frame.
+TerrainBuilder.SliceSeconds = 0.03
+
 -- Builds the whole world's terrain. `onProgress(done, total)` is called
 -- after each chunk. Returns how many seconds it took.
 function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
@@ -402,6 +405,7 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
 		)
 	)
 	workspace:SetAttribute("TerrainShift", math.floor(shift * 100 + 0.5) / 100)
+	local sliceStart = os.clock()
 	for index, job in ipairs(jobs) do
 		if not done[job] then
 			local ok, err = pcall(function(): any
@@ -411,7 +415,13 @@ function TerrainBuilder.Build(onProgress: ((number, number) -> ())?): number
 			if not ok then
 				warn(string.format("[TerrainBuilder] chunk at (%d, %d) failed: %s", job.x0, job.z0, tostring(err)))
 			end
-			task.wait()
+			-- A frame's worth of chunks, then a yield (the server stays alive),
+			-- not a frame per chunk: a chunk takes less than a frame to write
+			-- on a fast machine, and the idle frames were pure waiting (LOAD-01).
+			if os.clock() - sliceStart >= TerrainBuilder.SliceSeconds then
+				task.wait()
+				sliceStart = os.clock()
+			end
 		end
 		if onProgress then
 			onProgress(index, #jobs)

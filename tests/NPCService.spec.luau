@@ -24,7 +24,7 @@ return function(t)
 		local map = Instance.new("Folder")
 		map.Name = "TimberlineMap"
 		local counters = {}
-		for i, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome" }) do
+		for i, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome", "LandOffice" }) do
 			if kind ~= skip then
 				local shop = Instance.new("Model")
 				shop.Name = kind
@@ -97,7 +97,9 @@ return function(t)
 				t.ok(rel.Z > counter.Size.Z / 2 + 0.5, npc.id .. " isn't behind the counter")
 				t.ok(math.abs(rel.X) < 1e-3, npc.id .. " isn't centred on the counter")
 				local feet = root.Position.Y - m:GetAttribute("RootHeight")
-				t.ok(math.abs(feet - (counter.CFrame.Position.Y - counter.Size.Y / 2)) < 1e-3, npc.id .. "'s feet")
+				if npc.spot.ground == nil then -- the Land Office is out on the terrain, not y = 0
+					t.ok(math.abs(feet - (counter.CFrame.Position.Y - counter.Size.Y / 2)) < 1e-3, npc.id .. "'s feet")
+				end
 				t.ok(
 					(root.LookVector - counter.CFrame.LookVector).Magnitude < 1e-3,
 					npc.id .. " faces away from the shop's front"
