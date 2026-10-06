@@ -614,6 +614,13 @@ function ForestService.UseV2(trees: any, figureFn: ((piece: any, figure: string?
 	trees.OnRegrown = onRegrown
 	trees.OnPieceFreed = onPieceFreed
 	trees.OnRebuilt = onRebuilt
+	-- The forest is planted after this (MapBuilder, LOAD-01): each new
+	-- site's tree gets its figure as it goes in.
+	trees.OnPlanted = function(rec: TreeRecord)
+		if not rec.felled and not rec.temporary then
+			grow(rec)
+		end
+	end
 	for _, rec in pairs(Trees.AllTrees()) do
 		if not rec.felled and not rec.temporary then
 			grow(rec)

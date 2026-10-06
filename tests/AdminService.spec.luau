@@ -43,7 +43,21 @@ return function(t)
 			end,
 		}
 		local cash = { Connor = 50, Bob = 400, Eve = 10 }
+		local wsAttrs = {}
+		local fakeWorkspace = {
+			clock = 1790000000,
+			GetServerTimeNow = function(self)
+				return self.clock
+			end,
+			GetAttribute = function(_, k)
+				return wsAttrs[k]
+			end,
+			SetAttribute = function(_, k, v)
+				wsAttrs[k] = v
+			end,
+		}
 		local loader = t.loader({
+			globals = { workspace = fakeWorkspace },
 			services = {
 				Players = Players,
 				RunService = {
@@ -101,7 +115,7 @@ return function(t)
 		add(100, "Connor")
 		add(200, "Bob")
 		add(300, "Eve")
-		return Admin, calls, cash, players
+		return Admin, calls, cash, players, wsAttrs, fakeWorkspace
 	end
 
 	t.test("the owner's commands move cash and gift items", function()
@@ -183,6 +197,65 @@ return function(t)
 		t.eq(#calls.kicks, 0)
 		t.eq(Admin.RunRequest(players.Connor, { action = "ban", target = "Bob" }), false, "off the menu's list")
 		t.eq(Admin.RunRequest(players.Connor, "give Bob 5"), false)
+	end)
+
+	t.test("time control: speed, set hour and reset are the owner's, quiet, and live in memory only", function()
+		local Admin, calls, _, players, ws, workspace = boot(false)
+		local WorldTime = t.shared("WorldTime")
+		-- Someone else gets nothing.
+		t.eq(Admin.Run(200, "/timespeed 60"), false)
+		t.eq(Admin.RunRequest(players.Bob, { action = "timespeed", speed = 60 }), false)
+		t.eq(ws.TimeSpeed, nil)
+		-- The owner: a whitelisted speed, anchored at "now" so the sky carries on.
+		local before = WorldTime.ClockTime(workspace.clock)
+		t.eq(Admin.Run(100, "/timespeed 20"), true)
+		t.eq(ws.TimeSpeed, 20)
+		workspace.clock += 60 -- a real minute later it is twenty game minutes on
+		t.eq(
+			WorldTime.Scaled(workspace.clock, ws.TimeAnchorReal, ws.TimeAnchorGame, ws.TimeSpeed),
+			1790000000 + 20 * 60
+		)
+		t.ok(math.abs(before - WorldTime.ClockTime(ws.TimeAnchorGame)) < 1e-6, "no jump when the speed changed")
+		-- Off the list: nothing changes.
+		Admin.Run(100, "/timespeed 7")
+		Admin.Run(100, "/timespeed 1000")
+		Admin.Run(100, "/timespeed abc")
+		t.eq(ws.TimeSpeed, 20)
+		-- Set the hour, keeping the speed.
+		t.eq(Admin.Run(100, "/settime noon"), true)
+		t.ok(math.abs(WorldTime.ClockTime(ws.TimeAnchorGame) - 12) < 1e-6)
+		t.eq(ws.TimeSpeed, 20)
+		Admin.Run(100, "/settime 6:30pm")
+		t.ok(math.abs(WorldTime.ClockTime(ws.TimeAnchorGame) - 18.5) < 1e-6)
+		local anchor = ws.TimeAnchorGame
+		Admin.Run(100, "/settime 25:00")
+		Admin.Run(100, "/settime later")
+		t.eq(ws.TimeAnchorGame, anchor, "a bad hour changes nothing")
+		-- Reset clears all of it: real time again.
+		t.eq(Admin.Run(100, "/timereset"), true)
+		t.eq({ ws.TimeSpeed, ws.TimeAnchorReal, ws.TimeAnchorGame }, {})
+		-- Quiet: only the owner was told anything.
+		for _, toast in ipairs(calls.toasts) do
+			t.eq(toast[1], "Connor")
+		end
+		-- The menu reaches the same handlers, from presets only.
+		t.eq(Admin.RunRequest(players.Connor, { action = "timespeed", speed = 4 }), true)
+		t.eq(ws.TimeSpeed, 4)
+		t.eq(Admin.RunRequest(players.Connor, { action = "settime", time = "midnight" }), true)
+		t.ok(math.abs(WorldTime.ClockTime(ws.TimeAnchorGame)) < 1e-6)
+		t.eq(Admin.RunRequest(players.Connor, { action = "settime", time = "9:15pm" }), false)
+		t.eq(Admin.RunRequest(players.Connor, { action = "timespeed", speed = 5 }), false)
+		t.eq(Admin.RunRequest(players.Connor, { action = "timereset" }), true)
+		t.eq(ws.TimeSpeed, nil)
+	end)
+
+	t.test("time speed is never saved: AdminService only writes workspace attributes", function()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/ServerScriptService/AdminService.luau")
+		local block = string.match(source, "local function writeClock.-handlers%.announce")
+		t.ok(block, "the time handlers moved")
+		t.eq(string.find(block, "Profile", 1, true), nil)
+		t.eq(string.find(block, "DataStore", 1, true), nil)
 	end)
 
 	t.test("only the owner's client is told to show the menu", function()

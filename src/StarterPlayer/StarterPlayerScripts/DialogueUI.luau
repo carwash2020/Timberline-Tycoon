@@ -1,5 +1,6 @@
 --!strict
--- DialogueUI: the shopkeeper's card, along the bottom of the safe area.
+-- DialogueUI: the shopkeeper's card, bottom-centre and ABOVE Roblox's tool
+-- hotbar (DialogueData.CardBottom), so Yes / Close are never under the axes.
 -- Yes and No are fingertip sized. On a gamepad the selection links move
 -- between them, ButtonX confirms Yes, and ButtonB or Escape cancels. The
 -- card never changes how the character walks. The HUD already owns the
@@ -33,7 +34,11 @@ function DialogueUI.Start()
 	local column = Instance.new("Frame")
 	column.Name = "Card"
 	column.AnchorPoint = Vector2.new(0.5, 1)
-	column.Position = UDim2.new(0.5, 0, 1, -36)
+	local function place()
+		column.Position = UDim2.new(0.5, 0, 1, -DialogueData.CardBottom(UITheme.Bottom()))
+	end
+	place()
+	UITheme.WatchLayout(place)
 	column.Size = UDim2.fromOffset(BUTTON_W * 2 + 12, 108)
 	column.BackgroundColor3 = C.Bark
 	column.BorderSizePixel = 0
@@ -143,6 +148,7 @@ function DialogueUI.Start()
 		local cancel = if type(payload.noLabel) == "string" then payload.noLabel else "No"
 		no.Text = if choosing then cancel else "Close"
 		no.Position = if choosing then UDim2.fromOffset(BUTTON_W + 12, 52) else UDim2.fromOffset(90, 52)
+		place() -- the hotbar or window may have changed since the last card
 		holder.Visible = true
 		bind()
 		if choosing then

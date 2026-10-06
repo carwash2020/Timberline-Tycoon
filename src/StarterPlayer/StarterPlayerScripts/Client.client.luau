@@ -422,6 +422,7 @@ local function start(name: string, module: Controller?)
 	if module == nil then
 		return -- it failed to load (warned above)
 	end
+	local startedAt = os.clock()
 	local ok, err = xpcall(function(): any
 		module.Start()
 		return nil
@@ -429,14 +430,21 @@ local function start(name: string, module: Controller?)
 	if not ok then
 		warn(string.format("[Client] %s failed to start:\n%s", name, tostring(err)))
 	end
+	local took = os.clock() - startedAt
+	if took >= 0.1 then
+		print(string.format("[Load] client %s Start took %.2fs", name, took))
+	end
 end
 
 -- Every module loads before anything starts, in this order, as it always
 -- has (only now one that fails is skipped instead of stopping the rest).
 local loaded: { { name: string, module: Controller? } } = {}
+local clientStart = os.clock()
 for _, c in ipairs(controllers) do
 	table.insert(loaded, { name = c.name, module = load(c.name, c.get) })
 end
+
+print(string.format("[Load] client: %d modules required in %.2fs", #loaded, os.clock() - clientStart))
 
 -- First, and waited for (it starts UITheme), so toasts and side buttons
 -- work for everything after it.
@@ -446,4 +454,5 @@ for _, c in ipairs(loaded) do
 	task.spawn(start, c.name, c.module)
 end
 
+print(string.format("[Load] client controllers started in %.2fs", os.clock() - clientStart))
 print("[Client] Timberline Tycoon client started.")

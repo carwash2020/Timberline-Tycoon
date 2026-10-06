@@ -164,7 +164,7 @@ return function(t)
 			pants = Color3.new(0.2, 0.2, 0.4),
 		}
 		local options = {
-			hat = { "beanie", "cap", "capBack", "hardhat", "conductor", "bandana", "flatcap", "none" },
+			hat = { "beanie", "cap", "capBack", "hardhat", "conductor", "bandana", "flatcap", "straw", "none" },
 			beard = { "big", "stubble", "mustache", "handlebar", "goatee", "none" },
 			hairStyle = { "short", "bun", "long", "curly", "ponytail", "bald", "none" },
 			carry = { "mug", "clipboard", "wrench", "basket", "cane", "scroll", "lantern", "sapling", "none" },

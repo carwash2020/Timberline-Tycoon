@@ -305,6 +305,96 @@ local function nestedMesh(part: BasePart, model: Model): boolean
 	return false
 end
 
+-- Pieces that were snapped onto their part-built host (a sign onto its
+-- board, the counter, the saw blade...). The ground snap leaves them be.
+local SNAPPED: { [string]: boolean } = {
+	Counter = true,
+	Sign = true,
+	OfficeSign = true,
+	CampSign = true,
+	SkyBin = true,
+	SellPad = true,
+	Board = true,
+	SawBlade = true,
+	Bullwheel = true,
+	Sails = true,
+}
+
+-- How far a mesh may sit below the part-built art's lowest visible point
+-- before it is lifted back onto it (a sunk building); and the most it may
+-- be off before the mesh dressing is judged wrong and dropped. A mesh that
+-- sits higher is left alone: part-built piles and footings reach deeper
+-- than a mesh's feet by design (the dock).
+TownMeshes.SinkTolerance = 0.4
+TownMeshes.MaxSnap = 8
+
+local function lowestY(part: BasePart): number
+	local cf, size = part.CFrame, part.Size
+	local hx, hy, hz = size.X / 2, size.Y / 2, size.Z / 2
+	local low = math.huge
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sy in ipairs({ -1, 1 }) do
+			for _, sz in ipairs({ -1, 1 }) do
+				low = math.min(low, (cf * Vector3.new(sx * hx, sy * hy, sz * hz)).Y)
+			end
+		end
+	end
+	return low
+end
+
+-- The lowest point of the part-built art that is drawn (not a hidden
+-- collider and not a mesh already on a child model).
+local function partBuiltFloor(model: Model): number?
+	local low: number? = nil
+	for _, d in ipairs(model:GetDescendants()) do
+		if
+			d:IsA("BasePart")
+			and d.Transparency < 1
+			and d:GetAttribute("VisualMesh") ~= true
+			and not nestedMesh(d, model)
+		then
+			local y = lowestY(d)
+			if low == nil or y < low then
+				low = y
+			end
+		end
+	end
+	return low
+end
+
+-- Keeps the mesh dressing on the same ground line as the part-built art it
+-- replaces: lifts a sunk mesh. Returns false when the
+-- meshes are so far off that the part-built art should stay.
+local function groundSnap(made: { MeshPart }, floorY: number?): boolean
+	if floorY == nil then
+		return true
+	end
+	local meshLow: number? = nil
+	for _, part in ipairs(made) do
+		if not SNAPPED[part.Name] then
+			local y = lowestY(part)
+			if meshLow == nil or y < meshLow then
+				meshLow = y
+			end
+		end
+	end
+	if meshLow == nil then
+		return true
+	end
+	local dy = floorY - meshLow
+	if dy > TownMeshes.SinkTolerance then
+		if dy > TownMeshes.MaxSnap then
+			return false
+		end
+		for _, part in ipairs(made) do
+			if not SNAPPED[part.Name] then
+				part.CFrame += Vector3.new(0, dy, 0)
+			end
+		end
+	end
+	return true
+end
+
 local function retire(model: Model, fresh: { [BasePart]: boolean })
 	local snapshot = model:GetDescendants()
 	for _, d in ipairs(snapshot) do
@@ -387,6 +477,7 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 		return false
 	end
 	local lifted = withoutNestedMeshes(model)
+	local floorY = partBuiltFloor(model)
 	local locked = model:GetPivot()
 	for _, item in ipairs(lifted) do
 		item.part.Parent = item.parent
@@ -398,6 +489,13 @@ function TownMeshes.Dress(model: Model, assetId: string, options: Options?): boo
 		part.Parent = model
 		fresh[part] = true
 		finishPiece(part, asset, hosts, root, ids[i])
+	end
+	if not groundSnap(made, floorY) then
+		for _, part in ipairs(made) do
+			part:Destroy()
+		end
+		warn(string.format("[TownMeshes] %s is too far off its part-built twin; keeping the parts", assetId))
+		return false
 	end
 	pcall(function()
 		model.WorldPivot = locked

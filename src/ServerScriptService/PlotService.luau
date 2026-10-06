@@ -52,6 +52,7 @@ local PlotDoors = require(script.Parent.PlotDoors)
 local LogicService = require(script.Parent.LogicService)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
+local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
@@ -879,6 +880,46 @@ local function onOfficeOpened(player: Player)
 	pickingUntil[player] = nil -- no timer: this picker waits for you
 	player:SetAttribute("Picking", true)
 	fireOffer(player)
+end
+
+-- What Old Hank can do for a player, by offer id (PlotSalesmanData.Offers).
+-- Each handler is the real server-validated flow: it checks range and
+-- ownership itself, and the charge happens only in tryClaim, at the price
+-- from GameConfig. To sell something new through him, add its handler here.
+local SALESMAN_OFFERS: { [string]: (Player) -> () } = {
+	buyPlot = function(player: Player)
+		onOfficeOpened(player)
+	end,
+}
+
+-- Talking to Old Hank (his Talk prompt, or the counter's, both end up in
+-- the same place). Rate-limited like the other prompts' handlers; the
+-- client names nothing, so there is no price or offer to spoof.
+local function onSalesmanTalk(player: Player)
+	if not RateLimiter.Allow(player, "PlotSalesman") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not profile.plot then
+		return
+	end
+	local choice = PlotSalesmanData.Choose({
+		ownsPlot = slotOf[player] ~= nil,
+		full = freeSlot() == nil,
+	})
+	local offer = choice.offer
+	if not offer then
+		notify(player, choice.line)
+		return
+	end
+	if not nearOffice(player) then
+		notify(player, PlotSalesmanData.FarLine)
+		return
+	end
+	local handler = SALESMAN_OFFERS[offer.id]
+	if handler then
+		handler(player)
+	end
 end
 
 local function actorOn(player: Player, slot: Slot, profile: Profile): boolean
@@ -1866,7 +1907,62 @@ local function buildLandOffice(parent: Instance)
 	InputKit.PromptDefaults(prompt, "Interact")
 	prompt.Parent = counter
 	prompt.Triggered:Connect(onOfficeOpened)
+	-- Old Hank's props: a pitchfork leaning on the counter's end and a hay
+	-- bale beside it. The fork is not solid; the bale is, so it also keeps
+	-- people from cutting round the counter's end.
+	local steel = Color3.fromRGB(150, 150, 156)
+	local haft = part(
+		"Pitchfork",
+		Vector3.new(0.25, 6.2, 0.25),
+		facing * CFrame.new(-4.4, 3.0, 0.3) * CFrame.Angles(0, 0, math.rad(-8)),
+		Color3.fromRGB(140, 100, 58),
+		Enum.Material.Wood,
+		model
+	)
+	haft.CanCollide = false
+	for _, x in ipairs({ -0.35, 0, 0.35 }) do
+		local tine = part(
+			"Tine",
+			Vector3.new(0.1, 1.1, 0.1),
+			haft.CFrame * CFrame.new(x, 3.6, 0),
+			steel,
+			Enum.Material.Metal,
+			model
+		)
+		tine.CanCollide = false
+	end
+	local bar = part(
+		"TineBar",
+		Vector3.new(0.85, 0.12, 0.12),
+		haft.CFrame * CFrame.new(0, 3.1, 0),
+		steel,
+		Enum.Material.Metal,
+		model
+	)
+	bar.CanCollide = false
+	part(
+		"HayBale",
+		Vector3.new(2.6, 1.8, 1.6),
+		facing * CFrame.new(-5.4, 0.9, 1.2) * CFrame.Angles(0, math.rad(12), 0),
+		Color3.fromRGB(214, 183, 92),
+		Enum.Material.Fabric,
+		model
+	)
 	model.Parent = parent
+end
+
+-- Wire Old Hank's Talk prompt to the sales flow. NPCService builds him after
+-- PlotService.Init, so GameServer calls this once both have run. He is in
+-- the Townsfolk folder (Atomic), found by his id.
+function PlotService.HookSalesman(map: Instance)
+	local folder = map:FindFirstChild("Townsfolk")
+	local model = if folder then folder:FindFirstChild(PlotSalesmanData.Id) else nil
+	local talk = if model then model:FindFirstChild("Talk") else nil
+	if not (talk and talk:IsA("ProximityPrompt")) then
+		warn("[PlotService] Old Hank's Talk prompt is missing; talking to him won't open the plot sale")
+		return
+	end
+	talk.Triggered:Connect(onSalesmanTalk)
 end
 
 -- `map` is TimberlineMap; the remotes are PlaceBlueprint, MoveBlueprint,

@@ -27,6 +27,25 @@ function TownMotion.Step(cf: CFrame, axis: string, hinge: Vector3, angle: number
 	return pivot * spin * pivot:Inverse() * cf
 end
 
+-- Turning speeds, radians per second. The saw blade is slow enough to read
+-- as a spinning disc (about half a turn a second), the bullwheel a little over
+-- a third of that. They are advanced EVERY frame by dt (TownFX), never in
+-- quality-throttled steps: a 2 or 20 Hz step of a fast spin looks like lag.
+TownMotion.BladeSpeed = 3
+TownMotion.WheelSpeed = TownMotion.BladeSpeed * 0.35
+TownMotion.SailSpeed = 0.6
+-- A frame longer than this (a hitch, a tab switch) turns no further than
+-- this, so the blade never leaps.
+TownMotion.MaxFrame = 0.1
+
+-- The angle a part at `speed` rad/s turns in a frame of `dt` seconds.
+function TownMotion.Advance(speed: number, dt: number): number
+	if dt ~= dt or dt <= 0 then
+		return 0
+	end
+	return speed * math.min(dt, TownMotion.MaxFrame)
+end
+
 -- Low quality stops the windmill. The saw and the bullwheel still turn.
 function TownMotion.WindmillSpins(tier: string): boolean
 	return tier ~= "low"

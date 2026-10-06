@@ -21,6 +21,9 @@ works there.
 | `/ban <player> <hours\|perm> [reason]`, `/unban <userId>` | Roblox's ban API, whole experience |
 | `/goto <player>`, `/bring <player>` | teleport |
 | `/superrun` | toggle your own super run (4x walk speed) |
+| `/timespeed <1\|4\|20\|60>` | run the in-game clock faster (this server only) |
+| `/settime <6am\|noon\|6pm\|midnight\|7:30pm\|18:30>` | jump to an hour (keeps the speed) |
+| `/timereset` | real time again |
 | `/announce <text>` | a toast for everyone |
 | `/admin` | the list, as toasts |
 
@@ -34,7 +37,20 @@ A pad can't type commands, so the owner also gets a menu: the **OWNER** side
 button, or click both thumbsticks (L3 + R3). D-pad moves, A presses, B closes.
 Pick a player and an amount, then Give, Take, Set cash, Go to, Bring or Kick
 (press twice to confirm); pick an item type and an item and Gift it free;
-toggle Super run. (Bans and announcements stay chat-only.)
+toggle Super run; set Time speed (1x, 4x, 20x, 60x) and Set hour (6 AM, Noon,
+6 PM, Midnight) or Reset time. The panel scrolls, so a phone can reach it all.
+(Bans and announcements stay chat-only.)
+
+**Time tools.** The server keeps three workspace attributes (`TimeAnchorReal`,
+`TimeAnchorGame`, `TimeSpeed`) and every clock reader (the sky, shop hours,
+night, the corner clock) works from them (`WorldTime.GameNow`). Speeds are
+whitelisted (1, 4, 20, 60) and the menu's hours are four named presets; chat
+also takes `7:30pm` or `18:30`. Changing the speed carries on from the current
+hour, and a set hour keeps the speed. **Nothing is saved**: it lives in server
+memory, so a restart (or a new server) is back on real time, and `/timereset`
+clears it at once. It is quiet: only the owner gets a toast (everyone sees the
+sky move, which is the point). Weather slots and the Gloam grove's countdown
+still run on real time.
 
 It is only a way to ask. The menu shows up for the owner's client alone
 (the server sets `IsOwner` on that player), but the real lock is the server:

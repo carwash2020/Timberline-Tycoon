@@ -14,6 +14,7 @@
 local SoundService = game:GetService("SoundService")
 local Debris = game:GetService("Debris")
 
+local FellSound = require(script.Parent.FellSound)
 local GameConfig = require(script.Parent.GameConfig)
 
 local SoundData = {}
@@ -168,6 +169,78 @@ function SoundData.PlayAt(name: string, position: Vector3)
 	s.Parent = holder
 	s:Play()
 	removeWhenDone(s, holder)
+end
+
+-- True when Connor has uploaded his own fell sound (GameConfig.FellSoundId):
+-- it then replaces the procedural layers and plays once at the landing.
+function SoundData.FellOverridden(): boolean
+	return GameConfig.FellSoundId ~= ""
+end
+
+local function playLayer(layer: FellSound.Layer, position: Vector3)
+	local s = Instance.new("Sound")
+	s.Name = layer.name
+	s.SoundId = layer.id
+	s.Volume = layer.volume * SoundData.SfxVolume
+	s.PlaybackSpeed = layer.speed
+	-- 3D, positional, from the tree.
+	s.RollOffMode = Enum.RollOffMode.InverseTapered
+	s.RollOffMinDistance = 10
+	s.RollOffMaxDistance = layer.rolloff
+	local eq = layer.eq
+	if eq then
+		local e = Instance.new("EqualizerSoundEffect")
+		e.LowGain, e.MidGain, e.HighGain = eq.low, eq.mid, eq.high
+		e.Parent = s
+	end
+	if layer.octave then
+		local pitch = Instance.new("PitchShiftSoundEffect")
+		pitch.Octave = layer.octave
+		pitch.Parent = s
+	end
+	local reverb = layer.reverb
+	if reverb then
+		local r = Instance.new("ReverbSoundEffect")
+		r.DecayTime = reverb.decay
+		r.WetLevel = reverb.wet
+		r.Parent = s
+	end
+	local holder = Instance.new("Attachment")
+	holder.Name = "Sound_" .. layer.name
+	holder.WorldPosition = position
+	holder.Parent = workspace.Terrain
+	s.Parent = holder
+	s:Play()
+	local length = layer.maxSec or 3
+	Debris:AddItem(holder, length + 1.5)
+	task.delay(length, function()
+		if s.Parent then
+			s:Stop()
+		end
+	end)
+end
+
+-- Plays a stage of the layered tree-fall ("start": the cut goes through;
+-- "land": it hits the ground) at `position`. With FellSoundId set, that
+-- one sound plays at the landing and nothing at the start.
+function SoundData.PlayFell(stage: "start" | "land", position: Vector3, mass: number, fallSec: number?)
+	if not SoundData.SfxEnabled then
+		return
+	end
+	if SoundData.FellOverridden() then
+		if stage == "land" then
+			SoundData.PlayAt("TreeFall", position)
+		end
+		return
+	end
+	local layers = if stage == "start" then FellSound.Start(mass, fallSec) else FellSound.Land(mass)
+	for _, layer in ipairs(layers) do
+		if layer.at <= 0 then
+			playLayer(layer, position)
+		else
+			task.delay(layer.at, playLayer, layer, position)
+		end
+	end
 end
 
 -- Plays a one-shot sound in the player's ears (UI, rewards).

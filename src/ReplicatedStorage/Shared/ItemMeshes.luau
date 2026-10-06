@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ItemMeshData = require(script.Parent.ItemMeshData)
+local MeshKit = require(script.Parent.Art.MeshKit)
 
 export type ShellOpts = {
 	scaleX: number?, -- stretch a rail along its length
@@ -197,6 +198,7 @@ function ItemMeshes.LoadAsync()
 	if not ok or service == nil or type((service :: any).CreateMeshPartAsync) ~= "function" then
 		return
 	end
+	-- A mesh the template cannot get leaves the pieces part-built.
 	local box = folder()
 	if not box then
 		local created = Instance.new("Folder")
@@ -212,24 +214,14 @@ function ItemMeshes.LoadAsync()
 		model.Name = id
 		local good = true
 		for _, def in ipairs(defs) do
-			local createdOk, part = pcall(function()
-				-- MeshId cannot be assigned on a live MeshPart. CreateMeshPartAsync
-				-- is the supported way; the string overload is the one this
-				-- toolchain's types still describe.
-				local asset = service :: any
-				return asset:CreateMeshPartAsync(
-					def.meshId,
-					Enum.CollisionFidelity.Box,
-					Enum.RenderFidelity.Performance
-				)
-			end)
-			if not createdOk or typeof(part) ~= "Instance" then
+			-- MeshKit does the loading: both CreateMeshPartAsync forms, a
+			-- retry, and a warning with the engine's error when it fails.
+			local numeric = tonumber(string.match(def.meshId, "%d+"))
+			local mesh = if numeric then MeshKit.Create(numeric, def.name, def.size) else nil
+			if not mesh then
 				good = false
 				break
 			end
-			local mesh = part :: MeshPart
-			mesh.Name = def.name
-			mesh.Size = def.size
 			mesh.Parent = model
 		end
 		if good and #model:GetChildren() > 0 then

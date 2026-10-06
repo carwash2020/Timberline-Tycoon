@@ -394,7 +394,7 @@ end
 
 local function playerContext(): NPCDialogue.Context
 	local hour = ClockOverride.Apply(
-		WorldTime.ClockTime(workspace:GetServerTimeNow()),
+		WorldTime.ClockTime(WorldTime.GameNow()),
 		workspace:GetAttribute(ClockOverride.Attribute),
 		RunService:IsStudio()
 	)

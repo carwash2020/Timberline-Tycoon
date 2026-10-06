@@ -86,8 +86,11 @@ local Util = require(ReplicatedStorage.Shared.Util)
 local commitSlot: (Player) -> () = function(_player: Player) end
 local rebuildSlot: (Player) -> () = function(_player: Player) end
 
+local SLOW_STEP = 0.1 -- a service hook slower than this prints a [Load] line
+
 local function safely(name: string, fn: (...any) -> ...any, ...: any)
 	local args = table.pack(...)
+	local startedAt = os.clock()
 	local ok, err = xpcall(function(): any
 		fn(table.unpack(args, 1, args.n))
 		return nil
@@ -96,6 +99,10 @@ local function safely(name: string, fn: (...any) -> ...any, ...: any)
 	end)
 	if not ok then
 		warn(string.format("[GameServer] %s failed:\n%s", name, tostring(err)))
+	end
+	local took = os.clock() - startedAt
+	if took >= SLOW_STEP then
+		print(string.format("[Load] GameServer %s took %.2fs", name, took))
 	end
 end
 
@@ -110,7 +117,11 @@ end)
 -- seconds to a minute) and adds the SellArea last, once everything exists.
 local mapFolder = workspace:WaitForChild("TimberlineMap", 60)
 assert(mapFolder, "[GameServer] TimberlineMap was not built (MapBuilder failed?)")
+local waitedFor = os.clock()
+local initStart = os.clock() -- the [Load] lines time the services from here
 local sellArea = mapFolder:WaitForChild("SellArea", 600)
+print(string.format("[Load] GameServer waited %.1fs for the world (SellArea)", os.clock() - waitedFor))
+initStart = os.clock()
 assert(sellArea, "[GameServer] SellArea missing")
 local sellZoneInst = sellArea:WaitForChild("SellZone", 30)
 assert(sellZoneInst and sellZoneInst:IsA("BasePart"), "[GameServer] SellZone missing")
@@ -787,6 +798,7 @@ safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, n
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("RegionWake.Init", RegionWake.Init)
 safely("NPCService.Init", NPCService.Init, mapFolder)
+safely("PlotService.HookSalesman", PlotService.HookSalesman, mapFolder) -- Old Hank's Talk opens the plot sale
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
 if CoreLoop.V2() then
@@ -1399,6 +1411,14 @@ local function onPlayerAdded(player: Player)
 
 	player:SetAttribute("ProfileLoaded", true)
 	joinLap("ready (ProfileLoaded)")
+	print(
+		string.format(
+			"[Load] %s can play: %.1fs after joining, server up %.0fs",
+			player.Name,
+			os.clock() - joinStart,
+			workspace.DistributedGameTime
+		)
+	)
 	remote.CashChanged:FireClient(player, profile.cash)
 	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
 	safely("QuestService.Start", QuestService.Start, player, profile)
@@ -1551,6 +1571,12 @@ end
 -- The boot report (PLAY-01): how long the world took, trees, players.
 -- The same timings go to Creator Hub as custom events. LogCustomEvent
 -- needs a player, so if the server is still empty they ride the first join.
+print(
+	string.format(
+		"[Load] GameServer init done in %.1fs (all services started, listening for players)",
+		os.clock() - initStart
+	)
+)
 print(BootReport.Line(workspace, #Players:GetPlayers()))
 if not BootReport.Log(workspace, Players:GetPlayers(), AnalyticsService) then
 	local bootConn: RBXScriptConnection? = nil
