@@ -118,7 +118,7 @@ function ShopHoursLogic.NextOpen(shopId: string, hour: number): number
 	return ShopHoursLogic.NextOpenAt(span.open, span.close, h)
 end
 
--- 7 -> "7:00", 7.5 -> "7:30". No leading zero on the hour.
+-- 7 -> "7:00 AM", 7.5 -> "7:30 AM", 21 -> "9:00 PM" (the game's 12-hour clock).
 function ShopHoursLogic.FormatHour(hour: number): string
 	local h = wrap(hour)
 	local whole = math.floor(h + 1e-6)
@@ -127,8 +127,7 @@ function ShopHoursLogic.FormatHour(hour: number): string
 		whole += 1
 		minutes = 0
 	end
-	whole = whole % 24
-	return string.format("%d:%02d", whole, minutes)
+	return WorldTime.FormatMinutes((whole % 24) * 60 + minutes)
 end
 
 function ShopHoursLogic.SignText(shopId: string, hour: number): string

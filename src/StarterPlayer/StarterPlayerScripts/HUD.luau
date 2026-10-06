@@ -1419,6 +1419,34 @@ local function placeTopRow()
 	local s = if topScale and topScale.Scale > 0 then topScale.Scale else 1
 	row.AnchorPoint = Vector2.new(1, 0)
 	row.Position = UDim2.fromOffset(place.right / s, place.top / s)
+
+	-- STORE and the clock share the cash row's strip when it is in the top bar
+	-- (HudLayout.CornerInBar); otherwise the shelf keeps its default spot.
+	local frame, line = shelf, besideCash
+	local gui = if frame then frame.Parent else nil
+	if frame and line and gui and gui:IsA("ScreenGui") then
+		local scale = math.max(UITheme.Scale(), 0.01)
+		local lifted = HudLayout.CornerInBar(
+			place,
+			row.AbsoluteSize,
+			line.AbsoluteSize,
+			math.max(GuiService.TopbarInset.Min.X, leftSafe)
+		)
+		local want = if lifted
+			then UDim2.fromOffset(
+				(lifted.X - gui.AbsolutePosition.X) / scale,
+				(lifted.Y - gui.AbsolutePosition.Y) / scale
+			)
+			else UDim2.new(1, -UITheme.Margin(), 0, HudLayout.CornerTopPad)
+		local have = frame.Position
+		if
+			math.abs(have.X.Offset - want.X.Offset) > 0.5
+			or math.abs(have.Y.Offset - want.Y.Offset) > 0.5
+			or have.X.Scale ~= want.X.Scale
+		then
+			frame.Position = want
+		end
+	end
 end
 
 -- The cash row, in its own screen (no insets) parented to `playerGui`.
@@ -1705,7 +1733,7 @@ local function buildCorner(playerGui: Instance)
 	local frame = Instance.new("Frame")
 	frame.Name = "Shelf"
 	frame.AnchorPoint = Vector2.new(1, 0)
-	frame.Position = UDim2.new(1, -UITheme.Margin(), 0, 8) -- the cash row's spot
+	frame.Position = UDim2.new(1, -UITheme.Margin(), 0, HudLayout.CornerTopPad) -- the cash row's spot
 	frame.Size = UDim2.new()
 	frame.AutomaticSize = Enum.AutomaticSize.XY
 	frame.BackgroundTransparency = 1
@@ -1743,6 +1771,8 @@ local function buildCorner(playerGui: Instance)
 		fit()
 	end
 	besideCash, underCash, shelf = beside, line("UnderCash", 2), frame
+	beside:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeTopRow) -- STORE or the clock appearing
+	task.defer(placeTopRow)
 	local function moved()
 		placePopups()
 		queueArrange()

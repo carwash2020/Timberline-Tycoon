@@ -113,8 +113,30 @@ return function(t)
 	end)
 
 	t.test("Format", function()
-		t.eq(WorldTime.Format(0), "00:00")
-		t.eq(WorldTime.Format(14.5), "14:30")
-		t.eq(WorldTime.Format(23.99), "23:59")
+		t.eq(WorldTime.Format(0), "12:00 AM")
+		t.eq(WorldTime.Format(14.5), "2:30 PM")
+		t.eq(WorldTime.Format(23.99), "11:59 PM")
+		t.eq(WorldTime.Format(12), "12:00 PM")
+		t.eq(WorldTime.Format(0.5), "12:30 AM")
+		t.eq(WorldTime.Format(24), "12:00 AM", "24 wraps to midnight")
+		t.eq(WorldTime.Format(11.99), "11:59 AM")
+	end)
+
+	t.test("owner time control: scaled game time, speeds and hour setting", function()
+		local base = 1790000000
+		t.eq(WorldTime.Scaled(base, nil, nil, nil), base, "no attributes: real time")
+		t.eq(WorldTime.Scaled(base, base - 10, base, 20), base + 200, "20x since the anchor")
+		t.eq(WorldTime.Scaled(base + 5, base, base + 1000, 1), base + 1005, "1x keeps a set hour")
+		for _, bad in ipairs({ 0, 2, -4, 1000, "20", 0 / 0 }) do
+			t.eq(WorldTime.Scaled(base, base - 10, base, bad), base, "bad speed " .. tostring(bad))
+		end
+		t.eq(WorldTime.Scaled(base, "x", base, 20), base, "bad anchor")
+		t.eq(WorldTime.Scaled(base, base, 0 / 0, 20), base, "NaN anchor")
+		t.eq(WorldTime.Speeds, { 1, 4, 20, 60 })
+		for _, hour in ipairs({ 0, 0.5, 6, 12, 18, 19.25, 23.99 }) do
+			local game = WorldTime.GameTimeForHour(base, hour)
+			t.ok(math.abs(WorldTime.ClockTime(game) - hour) < 1e-6, "hour " .. hour)
+			t.ok(math.abs(game - base) <= GameConfig.DayCycleMinutes * 60, "stays within the day")
+		end
 	end)
 end

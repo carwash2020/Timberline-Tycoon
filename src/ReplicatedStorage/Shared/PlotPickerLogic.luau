@@ -17,8 +17,8 @@ PlotPickerLogic.TimeoutSeconds = 60
 
 -- The join panel, in pixels. PlotPickerUI uses these same numbers, and the
 -- spec checks the cluster stays off the thumbstick and the jump button.
-PlotPickerLogic.PanelTop = 4
-PlotPickerLogic.PanelHeight = 132
+PlotPickerLogic.PanelTop = 8
+PlotPickerLogic.PanelHeight = 148
 PlotPickerLogic.PanelWidthScale = 0.7
 
 export type Box = { x: number, y: number, w: number, h: number }

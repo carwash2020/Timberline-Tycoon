@@ -60,7 +60,14 @@ local IS_STUDIO = RunService:IsStudio()
 -- The hour to show at `serverTime`: the shared clock, or Studio's
 -- ClockOverride when it is set.
 local function clockAt(serverTime: number): number
-	local clock = WorldTime.ClockTime(serverTime)
+	local clock = WorldTime.ClockTime(
+		WorldTime.Scaled(
+			serverTime,
+			workspace:GetAttribute(WorldTime.AnchorRealAttribute),
+			workspace:GetAttribute(WorldTime.AnchorGameAttribute),
+			workspace:GetAttribute(WorldTime.SpeedAttribute)
+		)
+	)
 	if IS_STUDIO then
 		return ClockOverride.Apply(clock, workspace:GetAttribute(ClockOverride.Attribute), true)
 	end
