@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 6 October 2026, after PR #83. Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 6 October 2026, after PR #85 plus the sell station branch. Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
 
@@ -44,6 +44,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (everything is on main; newest first)
 
+- **Sell station beside the mill** (branch `claude/sell-pad`, not merged yet; PHASE2_NOTES.md has the Studio checks). Connor: "move the sell logs here pad to the side of the saw mill, and add more to it". The pad left the mill's front (the spawn walk now runs clear to the mill) for a bigger station EAST of the mill's lean-to: pad centre (53, 111), 28 x 32, sell zone 28 x 12 x 52 (z 85 to 137, `WorldPlan.SellZoneSize`, `SellPadWidth/Depth`), clear of the Dealership's loading pad (x 70 to 84). `BuildingArt.SellStation`: a truck lane between painted lines, three LOGS slots and two PLANKS slots (paint only, the sell logic still takes the whole zone), a platform scale, a log rack across the back, a Weigh House with Millie at its window, rails, lanterns; four lamps and the SELL LOGS HERE signpost at (67, 90) mark the gate; the Sky Bin moved into the pad's north-west corner. Beacon `sellPad`, the SELL LOGS marker and Millie follow the zone. Economy headlines 68 s / 7.9 min (ceiling is 8) / 13.7 min / 51.4 min / 30.5 h (the walk from the grove oak grew from 44 to 97 studs; `tools/economy.luau` `A.padX/padZ` = 53/111).
 - Branch `claude/xbox-nav` (not merged): Xbox navigation and rotation. View button = quick menu (`QuickMenuUI`, `Shared/QuickMenuLogic`), HUD buttons wired for the stick (`HudNav`, `Shared/GamepadNavLogic`), panels use `GamepadNav`; LT + LEFT stick turns a held piece or the build ghost and the left stick is sunk while LT is down. Studio checklist: PHASE2_NOTES.md, "Xbox navigation and rotation".
 
 - (branch `claude/npc-heads`, not merged) NPC heads: `Shared/HeadLook` is the one tested head look-at (70 degree yaw, 35 pitch, smoothed; NPCController uses it). Part-built faces were already on -Z (spec-checked for all 13 NPCs). The Blender NPC meshes are inferred to face +Z (Blender -Y front exports to +Z), so `TownModels.NpcMeshYaw = math.pi` turns every NPC mesh piece half way; unverified in Studio, set it to 0 if the faces then look away.

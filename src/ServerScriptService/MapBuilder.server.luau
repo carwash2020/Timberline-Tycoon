@@ -240,7 +240,8 @@ local function spawnTree(woodId: string, at: Vector3, region: string, zone: Worl
 	return model
 end
 
--- The sell area in front of the sawmill. SellArea is Persistent so every
+-- The sell area beside the sawmill, east of its lean-to (the sell station).
+-- SellArea is Persistent so every
 -- client always has the sell zone (CarryController's prompt). It is made
 -- here so the last steps can always parent it (last of all: GameServer
 -- starts once it appears, so the whole world must exist by then); the
@@ -288,9 +289,10 @@ step("4. The town", function()
 		end
 	end)
 
-	-- The zone reaches over the street and into the mill's front (40 deep
-	-- round the pad's middle, phase 12), so a big truck backed in has its
-	-- whole bed in it; the prompt stays over the pad's middle.
+	-- The zone is the pad's width and 52 deep round its middle (WorldPlan.
+	-- SellZoneSize), so a big truck backed in from the street has its whole
+	-- bed in it; the prompt stays over the pad's middle. The station is the
+	-- pad, its slots, rack, scale, Weigh House and rails.
 	step("4. The sell area", function()
 		local sellZone = Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, Color3.new(1, 1, 1))
 		ghost(sellZone, 1)
@@ -300,7 +302,7 @@ step("4. The town", function()
 		sellPoint.Position = Vector3.new(padMiddle.X, -2.5, padMiddle.Z)
 		sellPoint.Parent = sellZone
 
-		local padArt = BuildingArt.SellPad(24, 18)
+		local padArt = BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth)
 		place(padArt, town.sellPad, sellArea)
 	end)
 

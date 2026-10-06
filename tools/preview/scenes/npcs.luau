@@ -119,7 +119,7 @@ return {
 			return model
 		end
 		place(BuildingArt.Sawmill(), town.sawmill)
-		place(BuildingArt.SellPad(24, 18), town.sellPad)
+		place(BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth), town.sellPad)
 		local sellArea = roblox.Instance.new("Model")
 		sellArea.Name = "SellArea"
 		local zone = Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, C3.new(1, 1, 1))

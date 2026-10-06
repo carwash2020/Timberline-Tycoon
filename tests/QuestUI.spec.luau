@@ -33,7 +33,7 @@ return function(t)
 		local sellArea = Instance.new("Model")
 		sellArea.Name = "SellArea"
 		Kit.part(sellArea, "SellZone", WorldPlan.SellZoneSize, town.sellZone, Color3.new(1, 1, 1))
-		local pad = BuildingArt.SellPad(24, 18)
+		local pad = BuildingArt.SellStation(WorldPlan.SellPadWidth, WorldPlan.SellPadDepth)
 		Kit.placeAt(pad, town.sellPad)
 		pad.Parent = sellArea
 		sellArea.Parent = map
@@ -80,12 +80,15 @@ return function(t)
 		t.eq(map.SellArea:FindFirstChild("SellPad"), nil)
 		local pad = map.SellArea:FindFirstChild("SellPad", true)
 		t.ok(pad, "the pad is in the sell area")
-		-- Over the pad: the zone's middle is on it, 4 studs south of the pad's
-		-- own since M1.5 deepened the zone south over the street (z 69 to 95;
-		-- 40 deep round that middle since phase 12, z 62 to 102).
+		-- Over the sell station's pad: the zone's middle is the pad's middle,
+		-- beside the mill (53, 111), so the arrow points at the new place.
 		local a, b = pad.CFrame.Position, part.CFrame.Position
 		t.ok(math.abs(a.X - b.X) < 0.01, "right over it, across")
-		t.ok(math.abs(a.Z - b.Z) <= 4 + 0.01 and math.abs(b.Z - a.Z) < pad.Size.Z / 2, "over the pad, along")
+		t.ok(math.abs(a.Z - b.Z) < 0.01, "over the pad, along")
+		t.ok(
+			math.abs(b.X - 53) < 0.01 and math.abs(b.Z - 111) < 0.01,
+			"the beacon is at the station, not the mill's front"
+		)
 	end)
 
 	t.test("the Tool Shed beacon is its counter", function()
