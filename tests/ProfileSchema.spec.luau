@@ -268,6 +268,28 @@ return function(t)
 		t.eq(data.tutorialStep, step, "a second join does not remap again")
 	end)
 
+	t.test("UnstickCart counts the plot: cash for the truck alone is not enough for a save with no plot", function()
+		local TutorialGrove = t.loader():shared("TutorialGrove")
+		local GameConfig = t.loader():shared("GameConfig")
+		local truck = TutorialGrove.TruckPrice(2)
+		local function stuckWith(cash, claimed)
+			local Schema, data = fresh()
+			data.cash = cash
+			data.ownedTrucks = {}
+			data.plot.claimed = claimed
+			data.cartUsed = false
+			data.onboarding = { TutorialCart = true }
+			Schema.UnstickCart(data)
+			return data.cartUsed
+		end
+		-- stuck = the save is marked so the old cart flag cannot lock it out.
+		-- No plot yet: the cart must still open for truck money (it is the plot's too).
+		t.eq(stuckWith(truck + 5, false), true, "the truck's price alone leaves a plotless save stuck")
+		t.eq(stuckWith(GameConfig.PlotPrice + truck + TutorialGrove.PlaceBuffer, false), false, "enough for both")
+		-- Plot bought: the truck and the placing buffer are all it needs.
+		t.eq(stuckWith(truck + TutorialGrove.PlaceBuffer - 1, true), true)
+		t.eq(stuckWith(truck + TutorialGrove.PlaceBuffer, true), false)
+	end)
 	t.test("UnstickCart opens the cart for a stuck save and leaves a truck owner unchanged", function()
 		local Schema, stuck = fresh()
 		stuck.cash = 50

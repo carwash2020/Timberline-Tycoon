@@ -55,4 +55,31 @@ return function(t)
 			t.eq(Logic.ControlsClear(screen[1], screen[2]), true, screen[1] .. "x" .. screen[2])
 		end
 	end)
+
+	t.test("a plot is bought, not given: only a save that already owns one picks free", function()
+		t.eq(Logic.Price(false, 200), 200)
+		t.eq(Logic.Price(true, 200), 0)
+		t.eq(Logic.Price(false, t.shared("GameConfig").PlotPrice), t.shared("GameConfig").PlotPrice)
+	end)
+
+	t.test("the server's verdict on a claim, in the order it checks", function()
+		-- hasPlot, inRange, taken, price, cash
+		t.eq({ Logic.Decide(true, true, false, 200, 999) }, { "owned", 0 })
+		t.eq({ Logic.Decide(false, false, false, 200, 999) }, { "range", 0 })
+		t.eq({ Logic.Decide(false, true, true, 200, 999) }, { "taken", 0 })
+		t.eq({ Logic.Decide(false, true, false, 200, 150) }, { "cash", 50 })
+		t.eq({ Logic.Decide(false, true, false, 200, 199) }, { "cash", 1 })
+		t.eq({ Logic.Decide(false, true, false, 200, 200) }, { "ok", 0 })
+		t.eq({ Logic.Decide(false, true, false, 0, 0) }, { "ok", 0 }, "a free pick needs no cash")
+		t.eq(Logic.ShortText(50), "You need $50 more for a plot.")
+	end)
+
+	t.test("the picker's words carry the price the server charges", function()
+		t.eq(Logic.ClaimLabel(200), "BUY PLOT $200")
+		t.eq(Logic.ClaimLabel(0), "CLAIM PLOT")
+		t.eq(Logic.OpenText("Hills", 200), "Hills\nOpen plot · $200")
+		t.eq(Logic.OpenText("Hills", 0), "Hills\nOpen plot")
+		t.eq(Logic.AnyText(200), "Not now", "a buyer is never handed a pad")
+		t.eq(Logic.AnyText(0), "Give me any open plot")
+	end)
 end

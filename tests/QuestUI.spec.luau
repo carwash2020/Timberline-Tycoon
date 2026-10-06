@@ -54,6 +54,11 @@ return function(t)
 		plot.Parent = plots
 		Kit.part(plot, "Sign", Vector3.new(8, 3.5, 0.4), CFrame.new(), Color3.new(1, 1, 1))
 		plots.Parent = map
+		-- PlotService's Land Office counter (it sells the first plot).
+		local office = Instance.new("Model")
+		office.Name = "LandOffice"
+		Kit.part(office, "Counter", Vector3.new(7, 3.4, 2.6), CFrame.new(147, 1.7, 86), Color3.new(1, 1, 1))
+		office.Parent = map
 		return map
 	end
 
@@ -236,8 +241,8 @@ return function(t)
 		end
 		t.ok(seen.wood and seen.truckBed, "the drag and load steps point at wood and the bed")
 		t.ok(
-			seen.plotSign and seen.tree and seen.murphCart and seen.dealership,
-			"claim a plot, chop, sell at the cart, then buy the truck"
+			seen.landOffice and seen.tree and seen.murphCart and seen.dealership,
+			"chop, sell at the cart, buy a plot at the Land Office, then buy the truck"
 		)
 		local fs = require("@lune/fs")
 		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")

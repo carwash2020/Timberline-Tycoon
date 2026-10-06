@@ -1505,3 +1505,33 @@ What changed:
       round the posts without snagging; Bram's walk and Murph's camp are clear
 - [ ] The posters on the taller board fit with room to spare; the mesh frame
       (Studio) sits inside the arch posts, not through them
+
+## Plots are bought at the Land Office (nothing is free)
+
+- `GameConfig.PlotPrice` ($150) is the first plot. A new player is not given
+  one: no picker at join, no timeout grant, the pad signs no longer claim. A
+  Land Office counter in town (PlotService, beside the PLOT DISTRICT sign at
+  about (147, 86)) has a "Buy a plot" prompt that opens the picker with the
+  price. `ClaimPlot` names a pad; the server checks range to the counter and
+  the pad, then `EconomyService.SpendCash`, then assigns (one claim, one
+  charge). A short purse gets "You need $X more for a plot." and nothing moves.
+- A save whose `profile.plot.claimed` is already true is untouched: it gets
+  the free join picker (and its timeout) as before and is never charged. Loading
+  another save that never bought a plot releases the pad.
+- Price vs the economy (tools/economy): the plot is bought on foot before the
+  Rustbucket, so the headlines hold only if Murph's plot step pays $150 toward
+  the truck (`plot` step `rewardCash`). Unfunded, an unfunded plot pushes the
+  Steel Axe past 8 minutes (a $200 one to 15.5 min). Cart soft-lock: the cart now stays open through
+  the plot, build lessons and truck until cash covers plot + truck + $20.
+
+### Studio checks
+- [ ] Fresh save: spawn in town, no picker; Murph walks you through chop,
+      drag, sell at the cart; the arrow then points at the Land Office
+- [ ] Land Office counter (east of the truck lot, by the PLOT DISTRICT sign):
+      the sign reads, E / A / tap on "Buy a plot" opens the picker showing
+      "BUY PLOT $150"; Next/Previous walk the pads; B or "Not now" closes with
+      no plot; a short purse toasts "You need $X more for a plot."
+- [ ] Buy: cash drops by $150 once, you land on the pad, Murph pays $150 and
+      the Rustbucket step follows; tapping Buy fast charges once
+- [ ] A returning save (already has a plot) still gets its picker at join,
+      free, and "Give me any open plot" works

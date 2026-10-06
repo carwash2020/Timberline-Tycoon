@@ -26,9 +26,9 @@ Net.RemoteNames = {
 	"BlueprintEdit", -- client -> server: (request) rotate, move, resize, copy, delete, or undo an unfilled kit ghost
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
-	"PlotOffer", -- server -> client: (offer) the open homesteads, for the join picker
-	"ClaimPlot", -- client -> server: (index) claim that homestead (no range check)
-	"PlotPass", -- client -> server: () close the picker; the server assigns a free one
+	"PlotOffer", -- server -> client: (offer) the open homesteads and the price, for the Land Office (or a returning owner's join) picker
+	"ClaimPlot", -- client -> server: (index) buy that homestead; the server checks the Land Office range, the pad and the price, then charges
+	"PlotPass", -- client -> server: () close the picker (a returning owner is given a free pad; a buyer gets nothing)
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
 	"TutorialSeen", -- client -> server: ("build" | "land") the player opened build mode or the Land panel (QuestService)
