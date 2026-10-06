@@ -10,11 +10,11 @@ Planks: a sawmill mills the part of a tree it can take (trunk and limbs no thick
 
 | Target | Goal | Model | Verdict |
 |---|---|---|---|
-| First sale | under 3 min | 66 s | ✅ on target |
-| Steel Axe ($120) | 5-8 min | 7.7 min | ✅ on target |
-| First $1k earned | 15-20 min | 13.5 min | ✅ on target |
-| Cobalt Axe ($3,000) | about 1 h | 51.2 min | ✅ on target |
-| Full plot ($915,100) | 28-36 h | 30.5 h | ✅ on target |
+| First sale | under 3 min | 61 s | ✅ on target |
+| Steel Axe ($120) | 5-8 min | 7.3 min | ✅ on target |
+| First $1k earned | 15-20 min | 13.1 min | ✅ on target |
+| Cobalt Axe ($3,000) | about 1 h | 50.7 min | ✅ on target |
+| Full plot ($915,100) | 28-36 h | 30.4 h | ✅ on target |
 
 ## CI ranges
 
@@ -22,15 +22,15 @@ Every `lune run tools/economy` (including `--check`) fails the process when a he
 
 | Target | Strict range | This model |
 |---|---|---|
-| First sale (E1) | under 3 min (0–180 s) | 66 s |
-| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 461 s |
-| First $1k (E3) | 13–20 min (780–1200 s) | 812 s |
-| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 3070 s |
-| Full plot (E4) | 28–36 h (100800–129600 s) | 109645 s |
+| First sale (E1) | under 3 min (0–180 s) | 61 s |
+| Steel Axe (E2) | 5–8 min inclusive (300–480 s) | 436 s |
+| First $1k (E3) | 13–20 min (780–1200 s) | 786 s |
+| Cobalt Axe (E4) | 45–75 min (2700–4500 s) | 3044 s |
+| Full plot (E4) | 28–36 h (100800–129600 s) | 109620 s |
 
-The first $1,000 in this model is 13.5 min (812 s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.
+The first $1,000 in this model is 13.1 min (786 s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.
 
-The first plot ($150 at the Land Office, before the Rustbucket) is bought at 4.1 min on foot, then Murph chips in $175 toward the truck. It has no CI range of its own: it has to leave the rows above where they are, which is what sets $150 and Murph's $175.
+The first plot ($150 at the Land Office, before the Rustbucket) is bought at 3.7 min on foot, then Murph chips in $175 toward the truck. It has no CI range of its own: it has to leave the rows above where they are, which is what sets $150 and Murph's $175.
 
 End of the buying path: $39,746/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
 
@@ -106,17 +106,17 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 
 | At | Buys | Price | $/h before | $/h after | Then cuts |
 |---|---|---|---|---|---|
-| 4.1 min | Rustbucket | $100 | $0 | $1,610 | Maple (Rusty Axe) |
-| 6.1 min | Rickety Sawmill | $130 | $1,610 | $4,652 | Frostwood (Rusty Axe) |
-| 7.7 min | Steel Axe | $120 | $4,652 | $6,581 | Frostwood (Steel Axe) |
-| 11.3 min | Pickup | $400 | $6,581 | $8,761 | Frostwood (Steel Axe) |
-| 14.1 min | Hardened Axe | $400 | $8,761 | $10,031 | Frostwood (Hardened Axe) |
-| 21.2 min | Pony Trailer | $1,800 | $10,031 | $11,905 | Frostwood (Hardened Axe) |
-| 25.8 min | Silver Axe | $1,100 | $11,905 | $13,163 | Frostwood (Silver Axe) |
-| 28.1 min | Insulated Coat | $500 | $13,163 | $13,627 | Frostwood (Silver Axe) |
-| 42.7 min | Flatbed | $5,000 | $13,627 | $15,324 | Frostwood (Silver Axe) |
-| 51.2 min | Cobalt Axe | $3,000 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
-| 66.4 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
+| 3.7 min | Rustbucket | $100 | $0 | $1,610 | Maple (Rusty Axe) |
+| 5.7 min | Rickety Sawmill | $130 | $1,610 | $4,652 | Frostwood (Rusty Axe) |
+| 7.3 min | Steel Axe | $120 | $4,652 | $6,581 | Frostwood (Steel Axe) |
+| 10.9 min | Pickup | $400 | $6,581 | $8,761 | Frostwood (Steel Axe) |
+| 13.6 min | Hardened Axe | $400 | $8,761 | $10,031 | Frostwood (Hardened Axe) |
+| 20.8 min | Pony Trailer | $1,800 | $10,031 | $11,905 | Frostwood (Hardened Axe) |
+| 25.4 min | Silver Axe | $1,100 | $11,905 | $13,163 | Frostwood (Silver Axe) |
+| 27.6 min | Insulated Coat | $500 | $13,163 | $13,627 | Frostwood (Silver Axe) |
+| 42.3 min | Flatbed | $5,000 | $13,627 | $15,324 | Frostwood (Silver Axe) |
+| 50.7 min | Cobalt Axe | $3,000 | $15,324 | $16,026 | Frostwood (Cobalt Axe) |
+| 66.0 min | Ranch Trailer | $6,000 | $16,026 | $16,655 | Frostwood (Cobalt Axe) |
 | 1.9 h | Logging Rig | $19,000 | $16,655 | $17,742 | Frostwood (Cobalt Axe) |
 | 2.2 h | Gold Axe | $8,500 | $17,742 | $18,210 | Frostwood (Gold Axe) |
 | 5.5 h | Millmaster 200 Long | $86,500 | $18,210 | $22,968 | Frostwood (Gold Axe) |
@@ -163,6 +163,8 @@ Not on the cash ladder and not in the buying path above. A game pass (StoreData 
 - `millFeedSec` = 15
 - `murphAfter` = 0
 - `murphReward` = 25
+- `padX` = 0
+- `padZ` = 86
 - `plotPrice` = 915100
 - `plotReward` = 175
 - `seeds` = 50

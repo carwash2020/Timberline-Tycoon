@@ -139,7 +139,7 @@ function NPCDialogue.ProgressOf(attrs: {
 		loaded = true,
 		-- TutorialStep 0 is finished. A refresher already played the old loop.
 		newPlayer = step > 0 and not refresher,
-		-- The cart is the sell step. Finishing it advances past RefresherLast.
+		-- The first sale is the sell step. Finishing it advances past RefresherLast.
 		sold = step == 0 or step > TutorialData.RefresherLast or refresher,
 		upgradedAxe = tier >= 2,
 		sawmill = stocked or attrs.placedSawmill == true,

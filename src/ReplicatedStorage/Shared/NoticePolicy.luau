@@ -77,7 +77,7 @@ export type Decision = {
 	evict: { number }, -- ids of toasts to take down now to make room
 }
 
--- The first-sale chopping flow: TutorialStep 1 through the cart sale (the
+-- The first-sale chopping flow: TutorialStep 1 through the first sale (the
 -- step index of `sell`), on the tutorial's first minutes. Murph's card and
 -- the arrow are the one objective; nothing but errors should add to it.
 -- `step` is the TutorialStep attribute as read (any type); `lastStep` the

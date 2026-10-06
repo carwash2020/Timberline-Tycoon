@@ -272,7 +272,6 @@ QuestUI.SkipArmed = "{Press} again to skip"
 QuestUI.BeaconPaths = {
 	sellPad = { "SellArea", "SellZone" },
 	toolShed = { "ToolShed", "Counter" },
-	murphCart = { "TutorialGrove", "CartZone" },
 	plotSign = { "Plots", "Plot_1", "Sign" },
 	landOffice = { "LandOffice", "Counter" },
 	dealership = { "Dealership", "Counter" },

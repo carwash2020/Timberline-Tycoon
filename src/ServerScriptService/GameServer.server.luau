@@ -74,8 +74,6 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
-local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
-local TutorialGrove = require(ReplicatedStorage.Shared.TutorialGrove)
 local Util = require(ReplicatedStorage.Shared.Util)
 
 -- Runs one service's Init, join or leave hook on its own: an error in one
@@ -126,12 +124,6 @@ assert(sellArea, "[GameServer] SellArea missing")
 local sellZoneInst = sellArea:WaitForChild("SellZone", 30)
 assert(sellZoneInst and sellZoneInst:IsA("BasePart"), "[GameServer] SellZone missing")
 local sellZone = sellZoneInst :: BasePart
--- Murph's cart, beside the tutorial oaks. Missing (a failed map step)
--- just means the first sale is the mill, as before.
-local groveFolder = mapFolder:FindFirstChild("TutorialGrove")
-local cartInst = if groveFolder then groveFolder:FindFirstChild("CartZone") else nil
-local cartZone = if cartInst and cartInst:IsA("BasePart") then cartInst :: BasePart else nil
-
 -- Remotes -----------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
@@ -470,52 +462,6 @@ local function completeSale(
 	DailyService.Event(player, "logsSold", count, byWood, credited)
 end
 
--- Murph's cart. Nil when it buys; a refusal string when it doesn't.
--- v1 (loop 1, onSellLogs passes volume nil): one sale is allowed. cartUsed
--- is set by onSellLogs only after a log is actually taken, so a despawned
--- handful does not use the cart up. v2 adds the sale's u³ to this slot's
--- cartVolume.
-local function cartDecision(profile: ProfileService.Profile, pieces: number, volume: number?, logs: number?): string?
-	local loop = CoreLoop.Active()
-	local list = TutorialData.ForLoop(loop)
-	local step = if profile.tutorialDone then nil else list[profile.tutorialStep]
-	local stepId = if step then step.id else nil
-	if loop == 1 then
-		local ok, why = TutorialGrove.AcceptV1({
-			done = profile.tutorialDone == true,
-			stepId = stepId,
-			used = profile.cartUsed == true,
-			pieces = pieces,
-			volume = volume,
-			logs = logs,
-		})
-		if not ok then
-			return why
-		end
-		return nil
-	end
-	local trucks = profile.ownedTrucks
-	local ok, why = TutorialGrove.Accept({
-		done = profile.tutorialDone == true,
-		stepId = stepId,
-		pieces = pieces,
-		volume = volume,
-		logs = logs,
-		cartVolume = TutorialGrove.SavedVolume(profile),
-		cash = profile.cash,
-		ownsTruck = type(trucks) == "table" and #trucks > 0,
-		truckPrice = TutorialGrove.TruckPrice(loop),
-		landPrice = TutorialGrove.LandPrice(loop, profile.plot ~= nil and profile.plot.claimed == true),
-	})
-	if not ok then
-		return why
-	end
-	if type(volume) == "number" then
-		TutorialGrove.Remember(profile, volume)
-	end
-	return nil
-end
-
 local function onSellLogs(player: Player)
 	if not RateLimiter.Allow(player, "SellLogs") then
 		return
@@ -524,51 +470,6 @@ local function onSellLogs(player: Player)
 	local profile = ProfileService.GetProfile(player)
 	local hands = CarryService.Hands(player)
 	if not hrp or not profile or not hands then
-		return
-	end
-	-- The tutorial cart buys small loads, at the mill's prices, during the
-	-- sell, plot and truck steps (TutorialGrove). The truck bed and the Sky
-	-- Bin stay at the mill.
-	if cartZone and Util.pointInPart(cartZone, hrp.Position) then
-		local pieces = 0
-		for _ in pairs(hands) do
-			pieces += 1
-		end
-		if pieces < 1 then
-			notify(player, "Nothing to sell.")
-			return
-		end
-		local why = cartDecision(profile, pieces, nil, pieces)
-		if why then
-			notify(player, why)
-			return
-		end
-		local total, count = 0, 0
-		local byWood: { [string]: number } = {}
-		local figures: { [string]: number } = {}
-		for uid in pairs(hands) do
-			local log = TreeService.TakeLog(uid)
-			if log then
-				total += log.value
-				count += 1
-				byWood[log.def.id] = (byWood[log.def.id] or 0) + 1
-				local figure = log.tags.figure
-				if type(figure) == "string" then
-					figures[figure] = (figures[figure] or 0) + 1
-				end
-				log.model:Destroy()
-			end
-		end
-		table.clear(hands)
-		player:SetAttribute("CarriedLogs", 0)
-		if count == 0 then
-			notify(player, "Nothing to sell.")
-			return
-		end
-		-- Only a sale that took a log uses up the v1 cart. A handful that
-		-- despawned before TakeLog still leaves the sell step open.
-		profile.cartUsed = true
-		completeSale(player, profile, total, count, byWood, figures)
 		return
 	end
 	if not Util.pointInPart(sellZone, hrp.Position) then
@@ -879,18 +780,6 @@ if CoreLoop.V2() then
 			local profile = ProfileService.GetProfile(player)
 			return if profile then GameConfig.CashCap - profile.cash else 0
 		end,
-		gate = if cartZone
-			then {
-				zone = cartZone,
-				accept = function(player: Player, pieces: number, volume: number): string?
-					local profile = ProfileService.GetProfile(player)
-					if not profile then
-						return TutorialGrove.RefuseClosed
-					end
-					return cartDecision(profile, pieces, volume, nil)
-				end,
-			}
-			else nil,
 	})
 	-- Loose wood rides on the truck beds (M1.6): by friction, simulated by
 	-- the driver's device while they drive, saved in profile.truckLoad.

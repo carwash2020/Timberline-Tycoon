@@ -72,8 +72,8 @@ return function(t)
 		t.eq(newbie.sold, false)
 		t.eq(newbie.upgradedAxe, false)
 		t.eq(newbie.sawmill, false)
-		-- The cart is the sell step. Standing on it hasn't sold yet.
-		local onCart = NPCDialogue.ProgressOf({
+		-- The first sale is the sell step. Standing on the step hasn't sold yet.
+		local onSellStep = NPCDialogue.ProgressOf({
 			loaded = true,
 			tutorialStep = TutorialData.RefresherLast,
 			tutorialRefresher = false,
@@ -81,7 +81,7 @@ return function(t)
 			sawmillStock = nil,
 			placedSawmill = false,
 		})
-		t.eq(onCart.sold, false)
+		t.eq(onSellStep.sold, false)
 		local sold = NPCDialogue.ProgressOf({
 			loaded = true,
 			tutorialStep = TutorialData.RefresherLast + 1,

@@ -1124,7 +1124,7 @@ return function(t)
 		t.ok(found.cframe.X < -12, "west of the Forest Path")
 		t.ok(found.cframe.LookVector.X > 0.9, "the board faces the path")
 		-- The spawn stretch (the walk and the ground just south of it) has
-		-- none of the new pieces: a tutorial grove and Murph's cart land there.
+		-- none of the new pieces: the tutorial grove lands there.
 		local function inSpawn(x, z)
 			return math.abs(x) < 16 and z > 18 and z < 58
 		end

@@ -851,7 +851,7 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 
 ## 13. Murph's tutorial v2
 
-`TutorialData.StepsV2` uses the same ids as v1. The v2 order is fell, drag, sell at the cart, claim a plot, then the truck (`TutorialData.ApplyOrder` remaps a plot-first save). `TutorialData.ForLoop(loop)` picks the list.
+`TutorialData.StepsV2` uses the same ids as v1. The v2 order is fell, drag, sell at the sawmill, claim a plot, then the truck (`TutorialData.ApplyOrder` remaps a plot-first save). `TutorialData.ForLoop(loop)` picks the list.
 
 | id | Objective | Event (count) | Murph | Beacon |
 |---|---|---|---|---|

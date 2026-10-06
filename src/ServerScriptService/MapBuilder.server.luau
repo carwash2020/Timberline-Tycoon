@@ -436,46 +436,6 @@ step("4. The town", function()
 			place(atomic(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId)), g.cframe, folder)
 		end
 	end)
-
-	-- A few small oaks and Murph's buy cart, west of the spawn. The cart
-	-- buys one small load (SellService's gate / the v1 sell handler). The
-	-- zone is a ghost: the beacon and the server read its box, and it
-	-- doesn't stand on the street or Bram's walk.
-	step("4. The tutorial grove", function()
-		local model = Instance.new("Model")
-		model.Name = "TutorialGrove"
-		model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-		local spot = TutorialGrove.Cart
-		place(atomic(BuildingArt.Prop("Cart", 7)), CFrame.new(spot.x, 0, spot.z), model)
-		local zone =
-			Kit.part(model, "CartZone", TutorialGrove.ZoneSize, TutorialGrove.CartCFrame(), Color3.new(1, 1, 1))
-		ghost(zone, 1)
-		local board = Kit.part(
-			model,
-			"Board",
-			Vector3.new(4.2, 1.8, 0.2),
-			CFrame.new(spot.x, 4.4, spot.z),
-			Color3.fromRGB(101, 67, 33),
-			Enum.Material.Wood
-		)
-		board.CanCollide = false
-		board.CanQuery = false
-		board.CastShadow = false
-		for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
-			local gui = Instance.new("SurfaceGui")
-			gui.Face = face
-			gui.Parent = board
-			local label = Instance.new("TextLabel")
-			label.Size = UDim2.fromScale(1, 1)
-			label.BackgroundTransparency = 1
-			label.Text = "MURPH BUYS\nFirst load"
-			label.TextScaled = true
-			label.Font = Enum.Font.GothamBold
-			label.TextColor3 = Color3.fromRGB(255, 244, 220)
-			label.Parent = gui
-		end
-		model.Parent = map
-	end)
 end)
 
 -- The Robux store's bulletin board, off the roads and Bram's walk.

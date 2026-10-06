@@ -1670,7 +1670,7 @@ function WorldPlan.Town(): Town
 		{ text = "SELL LOGS HERE", cframe = at(20.5, 89.5) * FACING_SOUTH, lit = true }, -- lamps over its face (TWN-07)
 		-- The south exit, where the Forest Path leaves town for the Starter
 		-- Forest. West of the road (the lot is to the east), lit, and well
-		-- south of the spawn so the tutorial grove and Murph's cart can
+		-- south of the spawn so the tutorial grove can
 		-- still land there. The board faces the path.
 		{
 			text = "SAWMILL\nnorth, back to town\n\nFIRST GROVE\nsouth, down this road",

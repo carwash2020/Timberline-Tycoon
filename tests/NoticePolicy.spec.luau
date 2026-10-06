@@ -172,7 +172,7 @@ return function(t)
 		t.eq(#q.queue, 0)
 	end)
 
-	t.test("FlowQuiet: quiet from the first chop to the cart sale and while the save loads, not after", function()
+	t.test("FlowQuiet: quiet from the first chop to the first sale and while the save loads, not after", function()
 		local last = TutorialData.RefresherLast
 		t.eq(NoticePolicy.FlowQuiet(nil, last), true, "the save is loading")
 		t.eq(NoticePolicy.FlowQuiet("1", last), true, "not a number: unknown counts as quiet")
