@@ -659,6 +659,23 @@ return function(t)
 		end
 	end)
 
+	t.test("storage keeps the pending mark of a paid box that is not opened, and drops anything else", function()
+		local Schema, data = fresh()
+		data.storage = {
+			{ uid = "a", itemId = "SteelAxe", shop = "ToolShed", pending = true },
+			{ uid = "b", itemId = "SteelAxe", shop = "ToolShed" },
+			{ uid = "c", itemId = "SteelAxe", shop = "ToolShed", pending = "yes" },
+		}
+		Schema.Migrate(data)
+		local byUid = {}
+		for _, box in ipairs(data.storage) do
+			byUid[box.uid] = box
+		end
+		t.eq(byUid.a.pending, true, "the item is still owed")
+		t.eq(byUid.b.pending, nil, "an older box: its item was granted at the counter")
+		t.eq(byUid.c.pending, nil, "only a real true counts")
+	end)
+
 	t.test("storage keeps 50 server uids and drops a box only when its uid is taken", function()
 		local Schema, data = fresh()
 		data.axes = { { uid = "axe-1", id = "SteelAxe" } }

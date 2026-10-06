@@ -23,6 +23,7 @@ local MODULES = {
 	"AxeController",
 	"BadgeUI",
 	"BlueprintPlacer",
+	"BoxPoof",
 	"BuilderTools",
 	"CameraShake",
 	"CanopyFade",
@@ -58,6 +59,7 @@ local MODULES = {
 	"SaveSlotUI",
 	"SawmillController",
 	"SettingsUI",
+	"ShopDoorAnim",
 	"ShopUI",
 	"StoreUI",
 	"SprintController",
@@ -167,6 +169,18 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "DoorAnim",
 		get = function()
 			return require(script.Parent.DoorAnim)
+		end,
+	},
+	{
+		name = "BoxPoof",
+		get = function()
+			return require(script.Parent.BoxPoof)
+		end,
+	},
+	{
+		name = "ShopDoorAnim",
+		get = function()
+			return require(script.Parent.ShopDoorAnim)
 		end,
 	},
 	{

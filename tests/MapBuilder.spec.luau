@@ -906,7 +906,7 @@ return function(t)
 		t.eq(s.map:FindFirstChild("HearthAndHome").ModelStreamingMode, Persistent, "the town hall is Persistent")
 		t.eq(s.map:FindFirstChild("Lighthouse", true).ModelStreamingMode, Persistent, "the lighthouse is Persistent")
 		local rounds = s.map:FindFirstChild("PathRounds")
-		t.ok(rounds and #rounds:GetChildren() == 9, "three rounds on each shop path")
+		t.ok(rounds and #rounds:GetChildren() == 6, "three rounds on each of the two shop paths")
 		for _, model in ipairs(rounds:GetChildren()) do
 			t.eq(model.Name, "PathRound")
 			for _, d in ipairs(model:GetDescendants()) do

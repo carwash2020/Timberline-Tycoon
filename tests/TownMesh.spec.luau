@@ -269,7 +269,8 @@ return function(t)
 			"log pickup still uses PickupPromptRange"
 		)
 		withMeshes(function()
-			for _, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome" }) do
+			-- (The showroom hall is parts only: no uploaded mesh to dress it.)
+			for _, kind in ipairs({ "ToolShed", "HearthAndHome" }) do
 				local shop = BuildingArt.Shop(kind, kind, roblox.Color3.fromRGB(120, 70, 40))
 				local counter = shop:FindFirstChild("Counter")
 				t.ok(counter and counter:IsA("BasePart"), kind .. " counter")
@@ -427,7 +428,7 @@ return function(t)
 
 	t.test("I-Shops: counters, signs, and the authored building scale", function()
 		withMeshes(function()
-			for _, kind in ipairs({ "ToolShed", "Dealership", "HearthAndHome", "Sawmill" }) do
+			for _, kind in ipairs({ "ToolShed", "HearthAndHome", "Sawmill" }) do
 				local model = if kind == "Sawmill"
 					then BuildingArt.Sawmill()
 					else BuildingArt.Shop(kind, kind, roblox.Color3.fromRGB(90, 60, 40))

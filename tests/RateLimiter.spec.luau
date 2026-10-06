@@ -86,6 +86,7 @@ return function(t)
 		local budgets = {
 			Dialogue = 4,
 			BoxOpen = 4,
+			BoxTake = 4,
 			SpawnPadPress = 1,
 			ChopSawSet = 6,
 			ExpandLand = 1,
