@@ -25,6 +25,7 @@ local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local HudNav = require(script.Parent.HudNav)
 local HudRules = require(script.Parent.HudRules)
 local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
@@ -56,7 +57,7 @@ function DailyUI._open(first: GuiObject?)
 	if card then
 		card.Visible = true
 	end
-	MenuPad.Open(first)
+	MenuPad.Open(first, card)
 end
 
 function DailyUI._close()
@@ -464,6 +465,7 @@ local function build()
 		end
 	end
 	b.Activated:Connect(toggle)
+	HudNav.Add(b, { id = "daily", label = "DAILY GOALS", press = toggle })
 	-- The pad's shortcut, and its glyph just left of the button (UI-15).
 	HUD.PadShortcut(Enum.KeyCode.DPadUp, function() -- HudRules.PadKeys.daily
 		return b.Visible

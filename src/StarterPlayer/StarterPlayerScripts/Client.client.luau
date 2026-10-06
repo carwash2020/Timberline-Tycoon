@@ -41,10 +41,12 @@ local MODULES = {
 	"FieldGuideUI",
 	"ForestFiller",
 	"ForestUI",
+	"GamepadNav",
 	"GondolaController",
 	"HUD",
 	"HammerController",
 	"HudLayout",
+	"HudNav",
 	"HudRules",
 	"LeaderboardUI",
 	"LifeFX",
@@ -57,6 +59,7 @@ local MODULES = {
 	"PromptUI",
 	"Quality",
 	"QuestUI",
+	"QuickMenuUI",
 	"SaveSlotUI",
 	"SawmillController",
 	"SettingsUI",
@@ -416,6 +419,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "AdminUI",
 		get = function()
 			return require(script.Parent.AdminUI)
+		end,
+	},
+	{
+		name = "QuickMenuUI", -- the gamepad's menu of every HUD button
+		get = function()
+			return require(script.Parent.QuickMenuUI)
 		end,
 	},
 	{

@@ -36,6 +36,7 @@ local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
+local HudNav = require(script.Parent.HudNav)
 local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
 
@@ -794,6 +795,14 @@ local function build()
 		end)
 	end
 	skip.face.Activated:Connect(onSkip)
+	HudNav.Add(skip.face, {
+		id = "tutorial",
+		label = "SKIP TUTORIAL",
+		press = function()
+			GuiService.SelectedObject = skip.face -- the confirming press is right there
+			onSkip()
+		end,
+	})
 	if skipSpec.hit then
 		UITheme.HitPad(skip.root, skipSpec.hit).Activated:Connect(onSkip)
 	end

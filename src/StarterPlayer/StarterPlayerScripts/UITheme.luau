@@ -527,6 +527,7 @@ UITheme.Layers = {
 	FigureReveal = 12,
 	Settings = 13, -- a modal: over the HUD and the cash row
 	Admin = 14, -- the owner menu (AdminUI), over Settings
+	QuickMenu = 15, -- the gamepad's quick menu (QuickMenuUI), over the owner menu
 	Store = 20,
 	Dialogue = 30,
 	PlotPicker = 80,
@@ -1194,24 +1195,37 @@ function UITheme.escape(text: string): string
 	)
 end
 
--- The gamepad selection ring: 3 px ink, then 3 px amber (the spec's
--- SelectionImageObject), used for every selected button.
+-- The gamepad selection ring, used for every selected button: a soft amber
+-- glow, then 4 px ink and 4 px amber round the button (the spec's
+-- SelectionImageObject, thickened so it reads from a couch).
 local function selectionRing(): Frame
 	local ring = Instance.new("Frame")
 	ring.Name = "SelectionRing"
 	ring.BackgroundTransparency = 1
 	ring.Size = UDim2.fromScale(1, 1)
 	UITheme.corner(ring, 12)
-	UITheme.stroke(ring, C.Ink, 3)
+	UITheme.stroke(ring, C.Ink, 4)
 	local outer = Instance.new("Frame")
+	outer.Name = "Outer"
 	outer.BackgroundTransparency = 1
 	outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.new(1, 6, 1, 6)
-	UITheme.corner(outer, 14)
-	local amber = UITheme.stroke(outer, C.Amber, 3)
+	outer.Size = UDim2.new(1, 8, 1, 8)
+	UITheme.corner(outer, 15)
+	local amber = UITheme.stroke(outer, C.Amber, 4)
 	amber.Transparency = 0
 	outer.Parent = ring
+	local glow = Instance.new("Frame")
+	glow.Name = "Glow"
+	glow.BackgroundColor3 = C.Amber
+	glow.BackgroundTransparency = 0.8
+	glow.BorderSizePixel = 0
+	glow.AnchorPoint = Vector2.new(0.5, 0.5)
+	glow.Position = UDim2.fromScale(0.5, 0.5)
+	glow.Size = UDim2.new(1, 20, 1, 20)
+	glow.ZIndex = 0
+	UITheme.corner(glow, 20)
+	glow.Parent = ring
 	return ring
 end
 
