@@ -905,9 +905,11 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 				return floor.material
 			end
 		end
-		-- A homestead's pad is a grass yard, whichever region it sits in.
+		-- A homestead's pad is bare ground, whichever region it sits in
+		-- (flat over 0.85 reaches a few studs past the pad). Terrain Ground
+		-- grows no grass blades; the blend outside keeps the country's.
 		if flat > 0.85 and WorldLayout.OnPlotPad(x, z) then
-			return "Grass"
+			return "Ground"
 		end
 	end
 	if onRoad > 0 then
