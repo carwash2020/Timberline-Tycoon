@@ -1608,6 +1608,40 @@ works through the proxy (bpy 5.0.1 wheel for Python 3.11, about 375 MB) and apt
 lists `blender` 4.0.2. Headless `bpy` can build and export FBX/GLB here; the
 upload to Roblox (Creator Hub or Studio's Asset Manager) has to come from
 Connor's machine because uploads need his login.
+## Felling fix: the cut decides where the tree falls (claude/fix-felling)
+
+Cause: #36 made a cut through the ground section free the whole rooted
+section ("no sliver, no stump"), so any cut on the lowest trunk section pulled
+the entire trunk out of the ground. Now the first cut through the root splits
+it at the hit like any section: the stump stays anchored and rooted, only what
+is above the cut falls and gives logs. The stump times out after the wood's
+`respawnSec` (0.7 to 1.3x) and the site regrows at a new spot in its zone;
+cutting the stump through takes it at once. Also in this change: a felled
+trunk is one rigid body (speeds capped by `FallLogic`, no self-collision
+between pieces freed together, starts a hair above its stump), dust only for a
+trunk landing (a limb just thuds), a layered procedural fall sound
+(`FellSound`), and a swing pose that is re-applied just before each frame and
+falls back to tipping the tool grip.
+
+### Studio checks
+- [ ] Chop an oak low (ground section): a stump about knee high stays in the
+      ground with a cut face; the trunk above falls away from you and gives logs
+- [ ] Chop higher (aim at the upper trunk): the stump is taller, the top falls
+- [ ] Chop the stump again: it goes, and the site regrows after the respawn time
+- [ ] Try a birch, a pine, a Skyroot or Lumenwood, a small tree and a big one
+- [ ] A tree on your plot and a tree in a dense forest: same behaviour, and the
+      falling trunk does not push or fling neighbours
+- [ ] The trunk topples as one piece, no pieces flying apart, logs stay together
+- [ ] Sound at your ears: a creak, a crack and a whoosh as it goes, a heavy thud
+      with dust when it lands; 3D (louder close, quieter far); a falling limb
+      thuds but throws no dust cloud
+- [ ] The axe swing plays on the published game (not only in Studio); if it
+      cannot pose your arms, Output shows "[SwingPose] no arm joints found" and
+      the axe itself tips in the hand
+- [ ] No smoke puffs where the cursor or aim point is while you chop
+- [ ] To use your own fall recording: upload it (Creator Hub, Audio), then set
+      `GameConfig.FellSoundId = "rbxassetid://<id>"`; it replaces the layered
+      sound and plays at the landing
 ## Load time (LOAD-01): the world no longer waits for its forest
 
 What changed: the forest (about 1,400 trees: the planning, then a skeleton and
