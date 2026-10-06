@@ -222,7 +222,11 @@ return function(t)
 		end
 		-- The big panels trap the stick: a root is passed to Focus or MenuPad.Open.
 		t.ok(string.find(fs.readFile(dir .. "StoreUI.luau"), "MenuPad.Open(button, panel)", 1, true))
-		t.ok(string.find(fs.readFile(dir .. "AdminUI.luau"), "MenuPad.Open(firstPick, p)", 1, true))
+		t.ok(
+			string.find(fs.readFile(dir .. "AdminUI.luau"), "MenuPad.Open(objById[", 1, true),
+			"the hub opens through MenuPad with its panel"
+		)
+		t.ok(string.find(fs.readFile(dir .. "AdminUI.luau"), "], p)", 1, true))
 		t.ok(string.find(fs.readFile(dir .. "DailyUI.luau"), "MenuPad.Open(first, card)", 1, true))
 		t.ok(string.find(fs.readFile(dir .. "ShopUI.luau"), "GamepadNav.Focus(pick, panel)", 1, true))
 	end)

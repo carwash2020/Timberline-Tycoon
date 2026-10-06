@@ -16,6 +16,8 @@ Net.RemoteNames = {
 	"SkipTutorial", -- client -> server: ()
 	"EquipItem", -- client -> server: (category, itemId) switch to something you own (a truck)
 	"AdminRun", -- client -> server: (request) the owner menu; the server refuses anyone but the owner (AdminService)
+	"AdminResult", -- server -> client: (ok, text) what the owner menu request did or why it was refused (AdminService)
+	"AdminAccess", -- server -> client: (payload) what this player's owner hub may show (owner, delegate, revoked) and the audit lines; the client never fires it (AdminService)
 	"Sprint", -- client -> server: (on) hold to run; the server sets the speed (SprintLogic)
 	"CallTruck", -- client -> server: () send your truck back to your parking slot
 	"BuyRobuxItem", -- client -> server: ("Pass" | "Product", key) the server shows Roblox's prompt
