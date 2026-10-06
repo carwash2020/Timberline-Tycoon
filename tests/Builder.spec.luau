@@ -664,6 +664,9 @@ return function(t)
 					Event = function() end,
 				},
 				EconomyService = {
+					GetCash = function(player)
+						return profiles[player].cash
+					end,
 					SpendCash = function(player, amount)
 						local profile = profiles[player]
 						if profile.cash < amount then
@@ -707,10 +710,14 @@ return function(t)
 			table.insert(toasts, message)
 		end)
 		local plots = map:FindFirstChild("Plots")
+		-- Buys plot i at the Land Office (the price is topped up first, so the
+		-- test's cash arithmetic is its own).
 		local function claim(player, i)
-			local board = plots:FindFirstChild("Plot_" .. i):FindFirstChild("Sign")
-			player.root.Position = board.CFrame.Position
-			board:FindFirstChild("ProximityPrompt").Triggered.fn(player)
+			local profile = profiles[player]
+			profile.cash += loader:shared("GameConfig").PlotPrice
+			local counter = map:FindFirstChild("LandOffice"):FindFirstChild("Counter")
+			player.root.Position = counter.CFrame.Position
+			PlotService.Claim(player, i)
 		end
 		return {
 			P = PlotService,
@@ -804,9 +811,9 @@ return function(t)
 	t.test("the five economy headlines are the ones already published", function()
 		local report = fs.readFile("ECONOMY.md")
 		t.ok(string.find(report, "66 s", 1, true) ~= nil)
-		t.ok(string.find(report, "7.4 min", 1, true) ~= nil)
-		t.ok(string.find(report, "13.3 min", 1, true) ~= nil)
-		t.ok(string.find(report, "50.9 min", 1, true) ~= nil)
+		t.ok(string.find(report, "7.7 min", 1, true) ~= nil)
+		t.ok(string.find(report, "13.5 min", 1, true) ~= nil)
+		t.ok(string.find(report, "51.2 min", 1, true) ~= nil)
 		-- The price ladder (axes) moved the headlines to these.
 		-- The other four headlines stay.
 		t.ok(string.find(report, "30.5 h", 1, true) ~= nil)

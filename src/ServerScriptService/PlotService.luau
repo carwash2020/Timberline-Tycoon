@@ -2,8 +2,12 @@
 -- PlotService: plots and building on them (data in Shared/PlotData, rules
 -- in Shared/PlotLogic, GAME_DESIGN §9).
 --   * Builds the plot district: one pad and signpost per PlotData slot.
---   * A new player claims a free plot at its sign ("Claim this plot"). From
---     then on, each time they join they get a free slot and their saved
+--   * Nobody is given a plot. A new player buys the first at the Land
+--     Office (a counter in town, next to the plot district's sign): its
+--     prompt opens the picker with the price, ClaimPlot names a pad, and
+--     the server takes GameConfig.PlotPrice (EconomyService.SpendCash)
+--     before it assigns. From then on, each time they join they pick a
+--     free pad again (free: the save already owns a plot) and their saved
 --     layout (profile.plot) is rebuilt there. Leaving frees the slot.
 --   * PlaceBlueprint(blueprintId, x, z, rot): on your own plot, PlotLogic
 --     checks it, EconomyService takes the price, the item is built and saved.
@@ -63,7 +67,7 @@ type Profile = ProfileService.Profile
 local PlotService = {}
 
 local BUILD_REACH = 40 -- studs past your plot's edge you can still build from
-local CLAIM_RANGE = 10 -- studs from the sign; the prompt uses the same distance
+local LAND_OFFICE_RANGE = 12 -- studs from the Land Office counter; its prompt uses the same distance
 local UNDO_SECONDS = 60 -- selling something this soon after placing it refunds it all
 PlotService.UndoSeconds = UNDO_SECONDS
 
@@ -79,7 +83,6 @@ type Slot = {
 	border: Folder,
 	items: Folder,
 	signLabels: { TextLabel }, -- both faces of the sign
-	claim: ProximityPrompt,
 	office: ProximityPrompt, -- Land panel: plot size and expanding onto squares
 	spawn: SpawnLocation,
 	owner: Player?,
@@ -90,7 +93,10 @@ local slotOf: { [Player]: Slot } = {}
 local placedAt: { [string]: number } = {} -- uid -> os.clock() when placed this session
 -- Last 10 blueprint edits, per player. Memory only: leaving clears it.
 local undoStacks: { [Player]: { EditLogic.Entry } } = {}
-local pickingUntil: { [Player]: number } = {}
+local pickingUntil: { [Player]: number } = {} -- a returning owner's join picker (a timeout takes a free pad)
+local buying: { [Player]: boolean } = {} -- the Land Office picker is open (no timeout: nothing is given away)
+local claiming: { [Player]: boolean } = {} -- a claim is being charged and assigned right now
+local officePos: Vector3 = Vector3.zero
 local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
 local offerRemote: RemoteEvent? = nil
@@ -288,11 +294,10 @@ local function refreshSign(slot: Slot)
 	for _, label in ipairs(slot.signLabels) do
 		label.Text = text
 	end
-	slot.claim.Enabled = owner == nil
 	slot.office.Enabled = owner ~= nil
 end
 
-local function buildSlot(index: number, center: Vector2, parent: Instance, onClaim: (Player, Slot) -> ()): Slot
+local function buildSlot(index: number, center: Vector2, parent: Instance): Slot
 	local home = PlotData.Home(index)
 	local placeName = if home then home.name else ("Plot " .. index)
 	local region = if home then home.region else ""
@@ -349,14 +354,6 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		l.Parent = sg
 		table.insert(labels, l)
 	end
-	local claim = Instance.new("ProximityPrompt")
-	claim.ActionText = "Claim this plot"
-	claim.ObjectText = "Open plot"
-	claim.MaxActivationDistance = CLAIM_RANGE
-	claim.HoldDuration = 0.5
-	claim.RequiresLineOfSight = false
-	InputKit.PromptDefaults(claim, "Interact")
-	claim.Parent = board
 	local office = Instance.new("ProximityPrompt")
 	office.Name = "LandOffice"
 	office.ActionText = "Open Land"
@@ -393,14 +390,10 @@ local function buildSlot(index: number, center: Vector2, parent: Instance, onCla
 		border = border,
 		items = items,
 		signLabels = labels,
-		claim = claim,
 		office = office,
 		spawn = plotSpawn,
 		owner = nil,
 	}
-	claim.Triggered:Connect(function(player: Player)
-		onClaim(player, slot)
-	end)
 	drawBounds(slot, PlotData.Tiers[1].size, false)
 	refreshSign(slot)
 	model.Parent = parent
@@ -643,7 +636,16 @@ local function takenFlags(): { boolean }
 	return flags
 end
 
-local function offerFor(_player: Player): PlotPickerLogic.Offer
+-- A save that already owns a plot picks a pad for free; a new player pays.
+local function ownedBefore(profile: Profile?): boolean
+	return profile ~= nil and profile.plot ~= nil and profile.plot.claimed == true
+end
+
+local function priceFor(profile: Profile?): number
+	return PlotPickerLogic.Price(ownedBefore(profile), GameConfig.PlotPrice)
+end
+
+local function offerFor(player: Player): PlotPickerLogic.Offer
 	local plots: { PlotPickerLogic.OfferPlot } = {}
 	for _, slot in ipairs(slots) do
 		local owner = slot.owner
@@ -658,7 +660,11 @@ local function offerFor(_player: Player): PlotPickerLogic.Offer
 			owner = if owner then owner.DisplayName else "",
 		})
 	end
-	return { timeout = PlotPickerLogic.TimeoutSeconds, plots = plots }
+	return {
+		timeout = PlotPickerLogic.TimeoutSeconds,
+		price = priceFor(ProfileService.GetProfile(player)),
+		plots = plots,
+	}
 end
 
 local function fireOffer(player: Player, notice: string?)
@@ -673,6 +679,9 @@ end
 
 local function refreshPickers()
 	for player in pairs(pickingUntil) do
+		fireOffer(player)
+	end
+	for player in pairs(buying) do
 		fireOffer(player)
 	end
 end
@@ -722,6 +731,7 @@ end
 
 local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: boolean, told: string)
 	pickingUntil[player] = nil
+	buying[player] = nil
 	lastOffer[player] = nil
 	player:SetAttribute("Picking", nil)
 	local first = profile.plot.claimed ~= true
@@ -741,11 +751,27 @@ local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: bo
 	refreshPickers()
 end
 
--- The server's decision. No yield between the check and assign, so two
--- players claiming one pad can't both win.
-local function tryGrant(player: Player, index: number, moveIfFar: boolean, told: string): boolean
-	if slotOf[player] then
-		notify(player, "You already have a plot here.")
+local FULL = "This server's plot district is full, so your plot isn't out today. Try another server!"
+local TOLD_PICKER = "It's yours! This pad is your spawn. Press BUILD to start building."
+
+-- The Land Office counter: the player has to be standing at it.
+local function nearOffice(player: Player): boolean
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not root then
+		return false
+	end
+	return (root.Position - officePos).Magnitude <= LAND_OFFICE_RANGE + GameConfig.RangeTolerance
+end
+
+-- The server's decision on one ClaimPlot. A new player pays GameConfig.PlotPrice
+-- (EconomyService.SpendCash) and only then gets the pad; the check, the
+-- charge and the assign share one breath, and `claiming` keeps a second
+-- fire from this player out until the first has finished, so one claim is
+-- one charge. A save that already owned a plot picks a pad for free from
+-- its join picker (pickingUntil), with no range check.
+local function tryClaim(player: Player, index: number): boolean
+	if claiming[player] then
 		return false
 	end
 	local profile = ProfileService.GetProfile(player)
@@ -753,27 +779,57 @@ local function tryGrant(player: Player, index: number, moveIfFar: boolean, told:
 	if not profile or not profile.plot or not slot then
 		return false
 	end
-	-- owner == nil and the assign below are the same breath: nothing here yields.
-	if slot.owner ~= nil then
+	local returning = ownedBefore(profile)
+	local price = priceFor(profile)
+	local inRange = (returning and pickingUntil[player] ~= nil) or nearOffice(player)
+	local cash = if price > 0 then EconomyService.GetCash(player) else 0
+	local verdict, short = PlotPickerLogic.Decide(slotOf[player] ~= nil, inRange, slot.owner ~= nil, price, cash)
+	if verdict == "owned" then
+		notify(player, "You already have a plot here.")
+		return false
+	elseif verdict == "range" then
+		notify(player, "Walk up to the Land Office in town to buy a plot.")
+		return false
+	elseif verdict == "taken" then
 		notify(player, "Someone else claimed that plot. Pick another.")
-		if pickingUntil[player] then
+		if pickingUntil[player] or buying[player] then
 			fireOffer(player, "taken")
 		end
 		return false
+	elseif verdict == "cash" then
+		notify(player, PlotPickerLogic.ShortText(short))
+		return false
 	end
-	slot.owner = player
-	grant(player, slot, profile, moveIfFar, told)
+	claiming[player] = true
+	slot.owner = player -- reserved: nobody else can take this pad while we charge
+	if price > 0 and not EconomyService.SpendCash(player, price, "bought a plot", "PlotPurchase") then
+		slot.owner = nil
+		claiming[player] = nil
+		notify(player, PlotPickerLogic.ShortText(math.max(1, price - EconomyService.GetCash(player))))
+		return false
+	end
+	local ok, err: any = (pcall :: any)(grant, player, slot, profile, true, TOLD_PICKER)
+	claiming[player] = nil
+	if not ok then
+		-- The plot did not build: undo the pad and give the money back.
+		release(player)
+		slot.owner = nil
+		if price > 0 then
+			EconomyService.Refund(player, price, "plot purchase failed", "PlotPurchase")
+		end
+		error(err)
+	end
 	return true
 end
 
-local FULL = "This server's plot district is full, so your plot isn't out today. Try another server!"
-
+-- A returning owner's join picker timed out, or they asked for any pad:
+-- the first free one, no charge. Anyone else gets nothing here.
 local function autoAssign(player: Player)
 	if slotOf[player] then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	if not profile then
+	if not profile or not ownedBefore(profile) then
 		return
 	end
 	pickingUntil[player] = nil
@@ -784,38 +840,42 @@ local function autoAssign(player: Player)
 		notify(player, FULL)
 		return
 	end
-	tryGrant(player, index, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
-end
-
--- The sign's board, within the prompt's distance plus the shared slack.
--- The engine also checks the prompt; this is the same rule the other
--- remotes use, so a trigger from across the map does not claim.
-local function nearSign(player: Player, slot: Slot): boolean
-	local char = player.Character
-	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
-	if not root then
-		return false
-	end
-	return (root.Position - slot.board.CFrame.Position).Magnitude <= CLAIM_RANGE + GameConfig.RangeTolerance
-end
-
-local function onClaim(player: Player, slot: Slot)
-	local profile = ProfileService.GetProfile(player)
-	if not profile then
+	if claiming[player] then
 		return
 	end
+	claiming[player] = true
+	local slot = slots[index]
+	slot.owner = player
+	local ok, err: any = (pcall :: any)(grant, player, slot, profile, true, TOLD_PICKER)
+	claiming[player] = nil
+	if not ok then
+		error(err)
+	end
+end
+
+-- The Land Office prompt: opens the picker with the price. Nothing is
+-- charged or assigned here.
+local function onOfficeOpened(player: Player)
 	if slotOf[player] then
-		notify(player, "You already have a plot here.")
+		notify(player, "You already have a plot. Plots are bought here, one each.")
 		return
 	end
-	if slot.owner then
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not profile.plot then
 		return
 	end
-	if not nearSign(player, slot) then
-		notify(player, "Walk up to the sign to claim this plot.")
+	if not nearOffice(player) then
+		notify(player, "Walk up to the Land Office counter to buy a plot.")
 		return
 	end
-	tryGrant(player, slot.index, false, "It's yours! Stand on your plot and press BUILD to start building.")
+	if not freeSlot() then
+		notify(player, FULL)
+		return
+	end
+	buying[player] = true
+	pickingUntil[player] = nil -- no timer: this picker waits for you
+	player:SetAttribute("Picking", true)
+	fireOffer(player)
 end
 
 local function actorOn(player: Player, slot: Slot, profile: Profile): boolean
@@ -1565,9 +1625,11 @@ function PlotService.Expand(player: Player, x: unknown, z: unknown, expected: un
 	end
 end
 
--- Call once the save has loaded. Opens the picker; nothing is assigned
--- until they claim, close it, or the timer runs out. A pad they already
--- hold this session (a save-slot swap) is left alone — call Reload.
+-- Call once the save has loaded. A save that already owns a plot gets the
+-- free picker (nothing is assigned until they pick, close it, or the timer
+-- runs out). A save that never bought one gets nothing: no picker, no
+-- plot, until it buys one at the Land Office. A pad they already hold this
+-- session (a save-slot swap) is left alone: call Reload.
 local function watchSpawn(player: Player)
 	if watching[player] then
 		return
@@ -1604,8 +1666,15 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 	if slotOf[player] or not PlotPickerLogic.ShouldPick(slotOf[player] ~= nil) then
 		return
 	end
+	buying[player] = nil
+	-- Never bought a plot: no free pad. They spawn in town; the Land Office sells one.
+	if profile.plot == nil or not ownedBefore(profile) then
+		pickingUntil[player] = nil
+		player:SetAttribute("Picking", nil)
+		return
+	end
 	-- profile is the save that will load onto whichever pad they pick.
-	if profile.plot == nil or not freeSlot() then
+	if not freeSlot() then
 		warn("[PlotService] No free plot for " .. player.Name .. "; add slots in PlotData")
 		notify(player, FULL)
 		player:SetAttribute("Picking", nil)
@@ -1628,12 +1697,20 @@ function PlotService.Claim(player: Player, index: unknown)
 	if not slotIndex then
 		return
 	end
-	-- No range check: the picker claims from the camera, not from the sign.
-	tryGrant(player, slotIndex, true, "It's yours! This pad is your spawn. Press BUILD to start building.")
+	-- Range and price are checked inside: the client only names a pad.
+	tryClaim(player, slotIndex)
 end
 
+-- Closes the picker. A returning owner's join picker takes a free pad (as
+-- it always did); a Land Office picker just closes, and nothing is given.
 function PlotService.Pass(player: Player)
 	if not RateLimiter.Allow(player, "PlotPass") then
+		return
+	end
+	if buying[player] then
+		buying[player] = nil
+		lastOffer[player] = nil
+		player:SetAttribute("Picking", nil)
 		return
 	end
 	autoAssign(player)
@@ -1653,6 +1730,11 @@ end
 function PlotService.Reload(player: Player, profile: Profile): boolean
 	local slot = slotOf[player]
 	if not slot or not profile.plot then
+		return false
+	end
+	-- Another save that never bought a plot does not inherit this pad.
+	if not ownedBefore(profile) then
+		release(player)
 		return false
 	end
 	for _, model in ipairs(slot.items:GetChildren()) do
@@ -1677,6 +1759,8 @@ end
 function PlotService.PlayerRemoving(player: Player)
 	-- Drop the timer first, so a timeout can't assign a pad after they leave.
 	pickingUntil[player] = nil
+	buying[player] = nil
+	claiming[player] = nil
 	lastOffer[player] = nil
 	watching[player] = nil
 	undoStacks[player] = nil
@@ -1710,6 +1794,57 @@ local function watchReleases()
 	end
 end
 
+-- The Land Office: a counter in town, beside the plot district's sign (see
+-- WorldPlan.Town signs). Its prompt opens the picker; the server charges.
+PlotService.LandOfficeAt = Vector2.new(147, 86)
+
+local function buildLandOffice(parent: Instance)
+	local at = PlotService.LandOfficeAt
+	local ground = TerrainGen.HeightAt(at.X, at.Y)
+	officePos = Vector3.new(at.X, ground + 2, at.Y)
+	-- Front (-Z) toward the town spawn, like the sign beside it.
+	local facing = CFrame.lookAt(Vector3.new(at.X, ground, at.Y), Vector3.new(0, ground, 40))
+	local model = Instance.new("Model")
+	model.Name = "LandOffice"
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	local wood = Color3.fromRGB(101, 67, 33)
+	local dark = Color3.fromRGB(70, 45, 22)
+	local counter =
+		part("Counter", Vector3.new(7, 3.4, 2.6), facing * CFrame.new(0, 1.7, 0), wood, Enum.Material.Wood, model)
+	model.PrimaryPart = counter
+	for _, x in ipairs({ -3.2, 3.2 }) do
+		part("Post", Vector3.new(0.6, 8, 0.6), facing * CFrame.new(x, 4, 1.4), dark, Enum.Material.Wood, model)
+	end
+	part("Roof", Vector3.new(8.4, 0.5, 4.2), facing * CFrame.new(0, 8.2, 0.6), dark, Enum.Material.Wood, model)
+	local board =
+		part("Sign", Vector3.new(7.4, 2, 0.3), facing * CFrame.new(0, 6.6, -1.5), wood, Enum.Material.Wood, model)
+	board.CanCollide = false
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Front
+	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sg.PixelsPerStud = 40
+	sg.Parent = board
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.Fantasy
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(245, 235, 215)
+	label.Text = string.format("LAND OFFICE\nPlots $%d", GameConfig.PlotPrice)
+	label.Parent = sg
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "LandOfficePrompt"
+	prompt.ActionText = "Buy a plot"
+	prompt.ObjectText = "Land Office"
+	prompt.MaxActivationDistance = LAND_OFFICE_RANGE
+	prompt.HoldDuration = 0
+	prompt.RequiresLineOfSight = false
+	InputKit.PromptDefaults(prompt, "Interact")
+	prompt.Parent = counter
+	prompt.Triggered:Connect(onOfficeOpened)
+	model.Parent = parent
+end
+
 -- `map` is TimberlineMap; the remotes are PlaceBlueprint, MoveBlueprint,
 -- SellPlaced and UpgradePlot.
 function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, notifyFn: (Player, string) -> ())
@@ -1720,8 +1855,9 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 	folder.Name = "Plots"
 	folder.Parent = map
 	for i, center in ipairs(PlotData.Slots) do
-		table.insert(slots, buildSlot(i, center, folder, onClaim))
+		table.insert(slots, buildSlot(i, center, folder))
 	end
+	buildLandOffice(map)
 	remotes.PlaceBlueprint.OnServerEvent:Connect(PlotService.Place)
 	remotes.MoveBlueprint.OnServerEvent:Connect(PlotService.Move)
 	remotes.SellPlaced.OnServerEvent:Connect(PlotService.Sell)

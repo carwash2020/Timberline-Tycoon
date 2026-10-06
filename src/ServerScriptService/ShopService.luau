@@ -275,7 +275,7 @@ local function hasLand(profile: ProfileService.Profile): boolean
 	return type(plot) == "table" and plot.claimed == true
 end
 
-local NEEDS_PLOT = "You'll need a plot to open this."
+local NEEDS_PLOT = "Buy a plot at the Land Office first, then open this."
 
 -- Loop 2: a truck or trailer is a box you open on your plot. Cash does
 -- not move until the plot check has passed. ownedTrucks stays as it was.

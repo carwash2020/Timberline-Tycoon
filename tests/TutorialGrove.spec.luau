@@ -225,4 +225,61 @@ return function(t)
 			t.ok(volume <= TutorialGrove.MaxVolume, string.format("seed %d is %0.1f", seed, volume))
 		end
 	end)
+
+	t.test("the cart stays open until cash covers the plot and the truck, and through the build lessons", function()
+		local GameConfig = t.shared("GameConfig")
+		local land = TutorialGrove.LandPrice(2, false)
+		t.eq(land, GameConfig.PlotPrice + TutorialGrove.PlaceBuffer, "no plot yet: its price and the placing buffer")
+		t.eq(TutorialGrove.LandPrice(2, true), TutorialGrove.PlaceBuffer, "plot bought: the buffer only")
+		t.eq(TutorialGrove.LandPrice(1, false), 0, "v1 has no plot to pay for here")
+		-- With $75 for the truck alone the cart used to close; with the plot to buy it stays open.
+		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 75, landPrice = land }))), true)
+		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 75 + land - 1, landPrice = land }))), true)
+		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 75 + land, landPrice = land }))), TutorialGrove.RefuseUsed)
+		-- The build lessons cost a few dollars, so the cart serves them too.
+		for _, step in ipairs({ "build", "place", "land" }) do
+			t.eq(select(1, TutorialGrove.Accept(offer({ stepId = step }))), true, step)
+		end
+		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "pad" }))), TutorialGrove.RefuseClosed)
+		t.eq(select(2, TutorialGrove.Accept(offer({ stepId = "spawn" }))), TutorialGrove.RefuseClosed)
+	end)
+
+	t.test(
+		"no soft-lock: starting cash, Murph's rewards and a full cart of oak or birch buy the plot, then the truck",
+		function()
+			local GameConfig = t.shared("GameConfig")
+			local SellLogic = t.shared("SellLogic")
+			local TutorialData = t.shared("TutorialData")
+			local byId = {}
+			for _, step in ipairs(TutorialData.StepsV2) do
+				byId[step.id] = step
+			end
+			local function cartPay(woodId: string): number
+				local gross = SellLogic.PieceValue(woodId, "log", TutorialGrove.MaxVolume, nil, 1, false)
+				return SellLogic.Payout(gross, 1)
+			end
+			-- Cash is what a new player can have by the time each is bought: the cart
+			-- only ever pays up to MaxVolume. The first sale reward lands before the
+			-- plot, the plot's reward right after it, and the placing buffer comes out
+			-- before the truck. Worst case is oak (the cheapest wood).
+			for _, woodId in ipairs({ "oak", "birch" }) do
+				local before = GameConfig.StartingCash + byId.sell.rewardCash
+				local cart = cartPay(woodId)
+				t.ok(before + cart >= GameConfig.PlotPrice, woodId .. ": the cart alone can fund the plot")
+				local total = before + cart + byId.plot.rewardCash
+				local need = GameConfig.PlotPrice + TutorialGrove.TruckPrice(2) + TutorialGrove.PlaceBuffer
+				t.ok(
+					total >= need,
+					string.format("%s: $%d for plot + truck + buffer, $%d to spend", woodId, need, total)
+				)
+			end
+			t.eq(byId.plot.cashPrice, GameConfig.PlotPrice)
+			-- Even at the Rustbucket's $100 (the next price): plot, then the truck, still reachable.
+			local worst = GameConfig.PlotPrice + 100 + TutorialGrove.PlaceBuffer
+			t.ok(
+				GameConfig.StartingCash + byId.sell.rewardCash + cartPay("oak") + byId.plot.rewardCash >= worst,
+				"a $100 truck is still reachable"
+			)
+		end
+	)
 end

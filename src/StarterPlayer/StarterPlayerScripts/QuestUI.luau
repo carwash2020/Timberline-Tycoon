@@ -274,6 +274,7 @@ QuestUI.BeaconPaths = {
 	toolShed = { "ToolShed", "Counter" },
 	murphCart = { "TutorialGrove", "CartZone" },
 	plotSign = { "Plots", "Plot_1", "Sign" },
+	landOffice = { "LandOffice", "Counter" },
 	dealership = { "Dealership", "Counter" },
 } :: { [string]: { string } }
 

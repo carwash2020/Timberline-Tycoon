@@ -1663,7 +1663,7 @@ function WorldPlan.Town(): Town
 		-- facing the plot road (M1.5: it stood at (124, 64), then on the
 		-- apron at (148.5, 67)). Clear of that apron, the next headland is
 		-- in sight, so the lighthouse stands at (1203, 236).
-		{ text = "PLOT DISTRICT\nClaim a free plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
+		{ text = "PLOT DISTRICT\nLand Office: buy a plot\nand build on it", cframe = standing(148.5, 76, 0, 40) },
 		-- The turn off the street's east end, just north of PlazaEastMouth,
 		-- facing back down the path to the truck lot.
 		{ text = "TRUCK LOT", cframe = standing(82, 100, 82, 70) },

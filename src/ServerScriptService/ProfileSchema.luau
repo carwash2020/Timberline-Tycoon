@@ -846,7 +846,11 @@ function ProfileSchema.UnstickCart(data: any)
 		if type(record) ~= "table" or record.fresh == true then
 			return
 		end
-		if recordOwnsTruck(record) or recordCash(record) >= rustbucketPrice() then
+		-- A slot that has not bought its plot also needs the plot's price (and the
+		-- build lesson's buffer) before the cart may close on it.
+		local plot = record.plot
+		local bought = type(plot) == "table" and plot.claimed == true
+		if recordOwnsTruck(record) or recordCash(record) >= rustbucketPrice() + TutorialGrove.LandPrice(2, bought) then
 			return
 		end
 		if type(record.cartVolume) ~= "number" then

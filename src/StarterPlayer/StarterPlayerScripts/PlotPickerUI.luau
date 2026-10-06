@@ -1,7 +1,10 @@
 --!strict
--- PlotPickerUI: pick a homestead when you join. Next and Previous walk
--- the pads (taken ones included, labelled taken). Claim asks the server.
--- Give me one, or closing the panel, lets the server assign a free pad.
+-- PlotPickerUI: pick a homestead. It opens from the Land Office counter
+-- (the server sends the offer with the price) or, for a save that already
+-- owns a plot, when you join. Next and Previous walk the pads (taken ones
+-- included, labelled taken). Claim names a pad; the server charges the
+-- price and assigns, or says why not. A buyer's Close (or B) just closes;
+-- a returning owner's "any open plot" and Close take a free pad.
 -- The camera frames the pad you're looking at. Buttons stay fingertip
 -- sized, and nothing here depends on a mouse hover.
 
@@ -34,6 +37,8 @@ local index = 1
 local open = false
 local savedSpeed: number? = nil
 local savedCamera: Enum.CameraType? = nil
+local price = 0 -- this player's price for a plot (0: a save that already owns one)
+local anyButton: TextButton? = nil
 
 local function humanoid(): Humanoid?
 	local char = player.Character
@@ -151,8 +156,8 @@ local function showCurrent()
 		claim.BackgroundColor3 = C.Muted
 		claim.TextColor3 = C.Ink
 	else
-		detail.Text = string.format("%s\nOpen plot", plot.region)
-		claim.Text = "CLAIM PLOT"
+		detail.Text = PlotPickerLogic.OpenText(plot.region, price)
+		claim.Text = PlotPickerLogic.ClaimLabel(price)
 		claim.BackgroundColor3 = C.Green
 		claim.TextColor3 = C.Cream
 	end
@@ -163,6 +168,10 @@ local function show(offer: Offer)
 	local previous = plots[index]
 	local lost = offer.notice == "taken"
 	plots = offer.plots
+	price = if type(offer.price) == "number" then offer.price else 0
+	if anyButton then
+		anyButton.Text = PlotPickerLogic.AnyText(price)
+	end
 	if #plots == 0 then
 		hide()
 		return
@@ -279,7 +288,7 @@ local function build()
 	previousButton = choice("Previous", "PREVIOUS", 0, C.Bark, C.Cream, function()
 		step(-1)
 	end)
-	claimButton = choice("Claim", "CLAIM PLOT", 0.34, C.Green, C.Cream, claim)
+	claimButton = choice("Claim", PlotPickerLogic.ClaimLabel(price), 0.34, C.Green, C.Cream, claim)
 	nextButton = choice("Next", "NEXT", 0.68, C.Bark, C.Cream, function()
 		step(1)
 	end)
@@ -298,7 +307,8 @@ local function build()
 	any.Font = UITheme.Fonts.Bold
 	any.TextSize = 16
 	any.TextColor3 = C.Blue
-	any.Text = "Give me any open plot"
+	any.Text = PlotPickerLogic.AnyText(price)
+	anyButton = any
 	any.Parent = panel
 	any.Activated:Connect(pass)
 end

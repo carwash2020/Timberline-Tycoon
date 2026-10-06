@@ -36,6 +36,14 @@ local TreeGen = modules:shared("TreeGen")
 local SectionLogic = modules:shared("SectionLogic")
 local SawmillLogic = modules:shared("SawmillLogic")
 
+local TutorialData = modules:shared("TutorialData")
+local PLOT_REWARD = 0
+for _, step in ipairs(TutorialData.StepsV2) do
+	if step.id == "plot" then
+		PLOT_REWARD = step.rewardCash or 0
+	end
+end
+
 local CALIBRATION_FILE = "tools/calibration.json"
 local calibration = if fs.isFile(CALIBRATION_FILE) then serde.decode("json", fs.readFile(CALIBRATION_FILE)) else nil
 local EFFICIENCY = if calibration then calibration.efficiency else 0.5
@@ -57,6 +65,13 @@ local A = {
 	sellSec = 4, -- s at the pad (§17)
 	murphReward = 25, -- paid on the first sale (the tutorial's sell step)
 	murphAfter = 0, -- the bonus lands with that sale, not after a later grind
+	-- The first plot is bought at the Land Office before the Rustbucket
+	-- (GameConfig.PlotPrice), and Murph chips in plotReward (TutorialData's
+	-- plot step) once it is bought. Until the truck, a player walks oaks to
+	-- Murph's cart one at a time: each round trip is two walks, the cut and
+	-- the sale (that is the $/h on foot, footRate).
+	firstPlotPrice = GameConfig.PlotPrice,
+	plotReward = PLOT_REWARD,
 	groveTier = "Healthy", -- figured-wood average, as tools/economy
 	-- First square plus expansions 1..24 (GameConfig). B02 set the step so
 	-- this headline is about 32 h. Tree counts are not the lever.
@@ -487,7 +502,9 @@ local function firstSale()
 	local walk = 80 / A.walkSpeed
 	local secs = (walk + perTree + A.sellSec) / EFFICIENCY
 	local tree = TREES.oak.mean.volume
-	return secs, tree * oak.v2.logPrice
+	-- Later oaks cost the walk back as well: $/h on foot, before any truck.
+	local roundTrip = (2 * walk + perTree + A.sellSec) / EFFICIENCY
+	return secs, tree * oak.v2.logPrice, tree * oak.v2.logPrice / roundTrip * 3600
 end
 
 local function priceOf(item): number
@@ -499,7 +516,7 @@ end
 
 local function simulate()
 	local owned = { RustyAxe = true }
-	local t, value = firstSale()
+	local t, value, footRate = firstSale()
 	local cash = GameConfig.StartingCash + value + A.murphReward
 	local earned = value
 	local murphPaid = true
@@ -528,6 +545,14 @@ local function simulate()
 			events.thousand = t - dt + need
 		end
 	end
+
+	-- The plot comes first: save for it on foot at Murph's cart, then buy it.
+	while cash < A.firstPlotPrice do
+		earn(math.min(60, (A.firstPlotPrice - cash) / footRate * 3600 + 1e-6), footRate)
+	end
+	cash -= A.firstPlotPrice
+	cash += A.plotReward
+	events.firstPlot = t
 	for _ = 1, 30 do
 		local rate = bestRate(owned, cash)
 		-- The next axe on the ladder (forged ones aren't sold), or any
@@ -568,7 +593,10 @@ local function simulate()
 		-- gondola's fee).
 		while cash < price do
 			local r = bestRate(owned, cash)
-			earn(math.min(60, (price - cash) / math.max(r, 1e-9) * 3600 + 1e-6), r)
+			if r <= 0 then
+				r = footRate -- no truck yet: oaks walked to Murph's cart
+			end
+			earn(math.min(60, (price - cash) / r * 3600 + 1e-6), r)
 		end
 		cash -= price
 		owned[pick.id] = true
@@ -706,6 +734,17 @@ line(
 		"The first $1,000 in this model is %s (%.0f s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.",
 		duration(events.thousand),
 		events.thousand
+	)
+)
+line()
+line(
+	string.format(
+		"The first plot (%s at the Land Office, before the Rustbucket) is bought at %.1f min on foot, then Murph chips in %s toward the truck. It has no CI range of its own: it has to leave the rows above where they are, which is what sets %s and Murph's %s.",
+		money(A.firstPlotPrice),
+		events.firstPlot / 60,
+		money(A.plotReward),
+		money(A.firstPlotPrice),
+		money(A.plotReward)
 	)
 )
 line()

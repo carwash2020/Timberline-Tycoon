@@ -142,6 +142,10 @@ local GameConfig = {
 	PlankStep = 0.2, -- u
 	PlankMinX = 0.6, -- u
 	PlankMinY = 0.4, -- u
+	-- The first plot itself, bought at the Land Office in town (nobody is
+	-- given one). Not FirstPlotPrice, which is the first expansion square.
+	-- It comes before the Rustbucket in the economy model (tools/economy).
+	PlotPrice = 150,
 	FirstPlotPrice = 100,
 	-- Expansion k costs ExpansionPriceStep × k (k = 1..24). With
 	-- FirstPlotPrice that is the full 5×5 plot: 3050 totals $915,100 and

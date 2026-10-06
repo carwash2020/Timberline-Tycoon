@@ -210,6 +210,7 @@ return function(t)
 		toolShed = true,
 		murphCart = true,
 		plotSign = true,
+		landOffice = true,
 		dealership = true,
 	}
 
@@ -362,6 +363,7 @@ return function(t)
 			[FieldGuide.TrunkHits(starter, birch)] = true,
 			[FieldGuide.TrunkHits(steel, oak)] = true,
 			[t.shared("ShopLogic").Price(t.shared("ItemCatalog").GetTruck("Rustbucket"), 2)] = true,
+			[GameConfig.PlotPrice] = true,
 		}
 		for _, step in ipairs(V2) do
 			for _, line in ipairs({ step.murph, step.murphShort }) do
@@ -406,10 +408,21 @@ return function(t)
 		end
 		t.eq(sold, 120, "three loads of $40, the old $120 grind")
 		local reward = TutorialData.TotalReward(2)
+		-- The plot step pays Murph's $PlotPrice back toward the Rustbucket (the plot is
+		-- bought first, and tools/economy's headlines only hold if it is). That is
+		-- not axe money: what he gives toward the Steel Axe is everything else.
+		local plotStep
+		for _, step in ipairs(V2) do
+			if step.id == "plot" then
+				plotStep = step
+			end
+		end
+		local gift = reward - plotStep.rewardCash
 		t.ok(reward > 0)
-		t.ok(reward < steel.v2.price, "Murph helps, the player earns it")
-		t.eq(reward, 50, "the three loads' $25 plus Murph's $25 on the first sale")
-		t.ok(GameConfig.StartingCash + sold + reward >= steel.v2.price, "start + the sold loads + Murph's share")
+		t.ok(gift < steel.v2.price, "Murph helps, the player earns it")
+		t.eq(gift, 50, "the three loads' $25 plus Murph's $25 on the first sale")
+		t.eq(plotStep.rewardCash, GameConfig.PlotPrice, "the plot step hands the plot's price back, toward the truck")
+		t.ok(GameConfig.StartingCash + sold + gift >= steel.v2.price, "start + the sold loads + Murph's share")
 		t.eq(TutorialData.TotalReward(), TutorialData.TotalReward(1), "no loop: v1's, as the economy model reads it")
 	end)
 
@@ -553,6 +566,7 @@ return function(t)
 		t.eq(profile.cash, cash + loads.rewardCash, "Murph's share")
 		t.eq(toasts, {
 			"Murph chipped in $25!",
+			string.format("Murph chipped in $%d!", V2[4].rewardCash), -- the plot step: toward the Rustbucket
 			string.format("Murph chipped in $%d!", loads.rewardCash),
 		})
 		Quest.Event(player, "woodSoldCash", V2[profile.tutorialStep].count)
@@ -762,5 +776,49 @@ return function(t)
 				t.ok(#said <= 140, string.format("%d chars: %s", #said, said))
 			end
 		end
+	end)
+
+	t.test("v2: the plot is bought at the Land Office, after the cart and before the truck", function()
+		local byId, at = {}, {}
+		for i, step in ipairs(V2) do
+			byId[step.id] = step
+			at[step.id] = i
+		end
+		local plot = byId.plot
+		t.eq(plot.event, "plotClaimed", "the server reports the purchase under the old event")
+		t.eq(plot.beacon, "landOffice")
+		t.ok(string.find(plot.objective, "Buy a plot", 1, true), plot.objective)
+		t.eq(plot.cashPrice, GameConfig.PlotPrice, "Murph quotes the price the server charges")
+		t.ok(string.find(plot.murph, "$" .. GameConfig.PlotPrice, 1, true), plot.murph)
+		t.ok(string.find(plot.murph, "Land Office", 1, true), plot.murph)
+		t.ok(not string.find(string.lower(plot.murph), "free"), "nothing is free: " .. plot.murph)
+		t.eq(at.plot, at.sell + 1, "right after the first sale")
+		t.ok(
+			at.plot < at.truck and at.truck < at.pad and at.pad < at.spawn and at.spawn < at.load,
+			"plot, box, pad, truck, load"
+		)
+		-- Short of the price: back to the cart, and Murph says sell more.
+		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice - 1), "murphCart")
+		t.ok(string.find(TutorialData.MurphLine(plot, false, 10), "my cart", 1, true))
+		t.eq(TutorialData.Beacon(plot, GameConfig.PlotPrice), "landOffice")
+		t.eq(TutorialData.MurphLine(plot, false, GameConfig.PlotPrice), plot.murph)
+		t.eq(
+			TutorialData.ObjectiveText(plot, 0, 40),
+			string.format("Buy a plot at the Land Office · $40 of $%d to a plot", GameConfig.PlotPrice)
+		)
+	end)
+
+	t.test("saves in progress keep their place: the plot step moved nowhere, so nothing is remapped", function()
+		-- Same ids in the same order as the pad lesson's list, so an order-5 save needs no remap.
+		local before = TutorialData.OrderV2BeforePad
+		t.eq(before[1], "fell")
+		t.eq(TutorialData.OrderV2, 5)
+		local record = { tutorialOrder = 5, tutorialStep = 4, tutorialProgress = 0, tutorialDone = false }
+		TutorialData.ApplyOrder(record)
+		t.eq(record.tutorialStep, 4, "still on the plot step")
+		t.eq(V2[record.tutorialStep].id, "plot")
+		-- A save that is mid-way through (truck bought, no plot) is covered by AlreadyDone: a claimed plot skips the step.
+		t.eq(TutorialData.AlreadyDone(V2[4], 1, true, false, false, false), true)
+		t.eq(TutorialData.AlreadyDone(V2[4], 1, false, false, false, false), false, "no plot: it must be bought")
 	end)
 end
