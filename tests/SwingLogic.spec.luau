@@ -236,4 +236,19 @@ return function(t)
 		t.eq(SwingLogic.InFirstPerson(Vector3.new(0, 5, 0), Vector3.new(0, 5.2, 0)), true)
 		t.eq(SwingLogic.InFirstPerson(Vector3.new(0, 5, 0), Vector3.new(0, 8, 0)), false)
 	end)
+
+	t.test("the grip fallback swings back, through, and returns to rest", function()
+		t.ok(near(SwingLogic.GripAngle(0), 0))
+		t.ok(near(SwingLogic.GripAngle(1), 0, 1e-9))
+		t.ok(SwingLogic.GripAngle(SwingLogic.Apex) < -1, "back over the shoulder at the apex")
+		t.ok(near(SwingLogic.GripAngle(SwingLogic.Impact), SwingLogic.GripThrough), "down through the cut at impact")
+		t.ok(SwingLogic.GripAngle(0.9) > 0 and SwingLogic.GripAngle(0.9) < SwingLogic.GripThrough, "easing home")
+		t.ok(near(SwingLogic.GripAngle(-5), 0) and near(SwingLogic.GripAngle(7), 0, 1e-9), "clamped")
+		local last = SwingLogic.GripAngle(0.22)
+		for i = 23, 40 do
+			local a = SwingLogic.GripAngle(i / 100)
+			t.ok(a >= last - 1e-9, "never backs up between the apex and the impact")
+			last = a
+		end
+	end)
 end

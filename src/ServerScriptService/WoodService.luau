@@ -57,6 +57,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local FallLogic = require(ReplicatedStorage.Shared.FallLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local SectionLogic = require(ReplicatedStorage.Shared.SectionLogic)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
@@ -237,6 +238,7 @@ type Watching = {
 	peak: number,
 	reach: number, -- studs from the root to its far end (angular speed to tip speed)
 	landed: boolean,
+	trunk: boolean, -- a felled trunk (a limb lands without dust)
 }
 
 local pieces: { [string]: Piece } = {}
@@ -381,6 +383,8 @@ function WoodService.RegisterGroups(): boolean
 			end
 		end
 		PhysicsService:CollisionGroupSetCollidable(WoodService.FallingGroup, WoodService.PlayersGroup, false)
+		-- Pieces freed together never push each other apart.
+		PhysicsService:CollisionGroupSetCollidable(WoodService.FallingGroup, WoodService.FallingGroup, false)
 		PhysicsService:CollisionGroupSetCollidable(WoodService.HeldGroup, WoodService.PlayersGroup, false)
 		PhysicsService:CollisionGroupSetCollidable(WoodService.LeavesGroup, WoodService.WoodGroup, false)
 		-- The cage (roof, end guards, blade guard) stops players. A loose or
@@ -832,7 +836,7 @@ local function startFall(p: Piece, fall: Fall)
 	local reach = reachOf(p)
 	if fall.felled then
 		local axis = Vector3.new(0, 1, 0):Cross(dir)
-		local spin = (Tune.Get("FellImpulse") :: number) / reach
+		local spin = FallLogic.StartSpin(Tune.Get("FellImpulse") :: number, reach)
 		WoodService.Physics.SetVelocity(root, Vector3.zero, axis * spin)
 	else
 		WoodService.Physics.SetVelocity(root, dir * WoodService.LimbPush, Vector3.zero)
@@ -867,7 +871,10 @@ local function startFall(p: Piece, fall: Fall)
 			dropLeaves(p)
 		end
 	end)
-	table.insert(falls, { piece = p, startAt = now, peak = 0, reach = reach, landed = false })
+	table.insert(
+		falls,
+		{ piece = p, startAt = now, peak = 0, reach = reach, landed = false, trunk = fall.felled == true }
+	)
 end
 
 -- An empty model in the Wood folder for a new piece's parts: they move
@@ -900,7 +907,10 @@ function WoodService.Adopt(model: Model, info: Info): Piece
 			local half = math.min(root.Size.X, root.Size.Z) / 2
 			local edge = fall.pivot + dir * half
 			local axis = Vector3.new(0, 1, 0):Cross(dir)
-			local turn = CFrame.new(edge) * CFrame.fromAxisAngle(axis, WoodService.FellTilt) * CFrame.new(-edge)
+			local turn = CFrame.new(0, FallLogic.LiftGap, 0)
+				* CFrame.new(edge)
+				* CFrame.fromAxisAngle(axis, WoodService.FellTilt)
+				* CFrame.new(-edge)
 			for _, d in ipairs(model:GetDescendants()) do
 				if d:IsA("BasePart") then
 					d.CFrame = turn * d.CFrame
@@ -1425,6 +1435,14 @@ function WoodService.StepFalls(now: number)
 			table.remove(falls, i)
 			continue
 		end
+		-- One rigid trunk: nothing may launch it (a depenetration kick, a bounce).
+		if now - f.startAt < FallLogic.CapSec then
+			local lin, ang = WoodService.Physics.GetVelocity(p.root)
+			local capL, capA = FallLogic.Capped(lin, ang)
+			if capL and capA then
+				WoodService.Physics.SetVelocity(p.root, capL, capA)
+			end
+		end
 		local linear, angular = WoodService.Physics.Speed(p.root)
 		local speed = linear + angular * f.reach
 		f.peak = math.max(f.peak, speed)
@@ -1438,6 +1456,7 @@ function WoodService.StepFalls(now: number)
 				mass = WoodService.MassOf(p),
 				woodId = p.woodId,
 				uid = p.uid,
+				trunk = f.trunk,
 			})
 			continue
 		end
