@@ -1535,3 +1535,34 @@ What changed:
       the Rustbucket step follows; tapping Buy fast charges once
 - [ ] A returning save (already has a plot) still gets its picker at join,
       free, and "Give me any open plot" works
+
+## Pumpkins on the ground, walkers face forward, calmer grass (claude/fix-pumpkins-npcs)
+
+- Cause of the sunk pumpkins: EventService placed each patch with `PivotTo`,
+  but a Model with no PrimaryPart pivots on its bounding-box centre, so the
+  patch's middle sat on y = 0 and half of every pumpkin was underground. It now
+  uses `Kit.placeAt` (origin on the ground) and then probes the drawn terrain
+  under both pumpkins (`TerrainBuilder.LiftOnto`) and lifts the patch onto it.
+  MapBuilder now runs the same `standOnGround` lift over town lamps, fences,
+  props and signposts, so small town decor cannot sink either.
+- `Shared/FacingLogic` (YawOf, Face, Direction, CFrameFacing) is the one place
+  that turns a direction into a yaw for a -Z-front model; `NPCData.YawOf`
+  delegates to it. `tests/FacingLogic.spec` checks that every route walker's
+  look vector points along its motion for its whole loop. The walk lean was
+  tipping walkers backwards (positive root pitch) and is now forward.
+- Grass tufts: blades 0.62x as tall, muted tint and tips (they were bright
+  yellow-green and read as glowing under the night bloom).
+
+### Studio checks
+- [ ] Join during the Halloween event (or set the event override): pumpkin
+      patches beside the town lamps sit on top of the ground, whole, with a
+      little ground showing under the round bottoms, near the spawn too
+- [ ] Hay bales, crates, signs, fences and lamps in town rest on the ground
+- [ ] Watch Rosa, Pip and Bram (and anyone else who strolls) for a full loop:
+      they walk face first, turn at corners and at their pauses, never moonwalk;
+      standing NPCs turn their front toward you when you are close
+- [ ] Walkers lean slightly forward, not back
+- [ ] Grass near the spawn and Murph's camp is knee height and a muted green,
+      not neon, in the day and at night
+- [ ] At night in front of the spawn: if a flat saturated blue plane still
+      shows at the bottom of the screen, send a screenshot and the Output

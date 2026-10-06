@@ -35,6 +35,7 @@ The live core loop is v2 (`GameConfig.CoreLoop = 2`). The v1 code stays for a ro
 
 ## What has landed (newest first, PR numbers on main)
 
+- claude/fix-pumpkins-npcs (branch, no PR yet): pumpkin patches no longer half sunk (PivotTo on a bbox pivot), town decor lifted onto the drawn ground, `FacingLogic` for NPC facing plus a spec, forward walk lean, shorter and muted grass tufts. Night blue ground plane at spawn not reproduced; see PHASE2_NOTES.md.
 - #70 plot bought at $150, Rustbucket $100, respawn fees, economy retuned (in review when this was written).
 - #69 vehicle always has its own pad; Rustbucket boxed. #68/#67 owner menu (Xbox). #66 Xbox carry and build controls. #65 building fixes on the 80 plot (bought squares, collision boxes for mills and the chop saw, 10-stud pad grid). #64 owner chat tools. #63 rare wood and plank prices. #62 axe price ladder. #61/#60 one price, no u³. #59 build-check print at map start. #58 smaller starting plot and homestead looks. #57 HUD corner, run, ground and mesh fixes.
 - Before that: boxed stores, plot visits, wire tool, ferry, NPCs, badges, day/night, W1–W4 world work (see `git log`).
