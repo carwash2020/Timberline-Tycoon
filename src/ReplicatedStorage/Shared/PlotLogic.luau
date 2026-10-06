@@ -9,6 +9,7 @@ local ItemCatalog = require(script.Parent.ItemCatalog)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local SawmillLogic = require(script.Parent.SawmillLogic)
+local SkyBinLogic = require(script.Parent.SkyBinLogic)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
 type Blueprint = PlotData.Blueprint
@@ -31,9 +32,12 @@ export type Placed = {
 	data: { x: number, y: number }?,
 }
 
--- A decor blueprint, a sawmill, or a chop saw (they place on the same grid).
+-- A decor blueprint, a sawmill, a chop saw or a Sky Bin (they place on the same grid).
 function PlotLogic.Blueprint(id: string): Blueprint?
-	return PlotData.Blueprint(id) or SawmillLogic.Blueprint(id) or ChopSawLogic.Blueprint(id)
+	return PlotData.Blueprint(id)
+		or SawmillLogic.Blueprint(id)
+		or ChopSawLogic.Blueprint(id)
+		or SkyBinLogic.Blueprint(id)
 end
 
 export type Rect = { x: number, z: number, w: number, d: number } -- centre + size
@@ -217,8 +221,8 @@ function PlotLogic.SellPlan(bp: Blueprint, item: Placed): SellPlan
 		local basis = item.paid or PlotData.LegacyPrice(bp)
 		return { cash = math.floor(basis * PlotData.SellBack), planks = 0, wood = nil }
 	end
-	if bp.unlock then
-		return { cash = 0, planks = 0, wood = nil }
+	if bp.unlock or SkyBinLogic.IsBin(bp.id) then
+		return { cash = 0, planks = 0, wood = nil } -- a Sky Bin goes back to stock, never for cash
 	end
 	return { cash = math.floor(bp.priceCash * PlotData.SellBack), planks = 0, wood = nil }
 end
@@ -715,7 +719,7 @@ end
 
 -- What selling a placed item pays back.
 function PlotLogic.SellValue(bp: Blueprint): number
-	if bp.unlock then
+	if bp.unlock or SkyBinLogic.IsBin(bp.id) then
 		return 0 -- copies of a store unlock don't pay cash back
 	end
 	return math.floor(bp.priceCash * PlotData.SellBack)

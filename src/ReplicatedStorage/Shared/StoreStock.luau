@@ -112,7 +112,11 @@ local function machineSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = machine.color,
-				boxClass = classId("Machine", machine.priceCash),
+				boxClass = classId(
+					"Machine",
+					machine.priceCash,
+					if machine.boxW and machine.boxD then Vector2.new(machine.boxW, machine.boxD) else nil
+				),
 			})
 		end
 	end
@@ -356,7 +360,7 @@ end
 -- origin, x across (+X is the shop's east), z from the door (-Z) back.
 ---------------------------------------------------------------------------
 
--- The Tool Shed: an axe table down the west side, a table for the sawmills
+-- The Tool Shed: an axe table down the west side (the Sky Bin box rides its spare room), a table for the sawmills
 -- and the chop saw down the east side (both counter height and wide enough
 -- for two small boxes across), and the Robux table across the back
 -- (RobuxShelf), behind the counter, which stands at the back wall's end of the
@@ -381,7 +385,7 @@ local SHOPS: { [string]: Shop } = {
 				z0 = -21.3,
 				z1 = 10.5,
 				y = StoreStock.TableTop,
-				kinds = { "Axe" },
+				kinds = { "Axe", "Machine" }, -- the Sky Bin's small box rides the axe table's spare room
 			},
 			{
 				name = "MachineTable",

@@ -61,7 +61,7 @@ Shared reasons, once the matching batch lands: trees regrow in random spots (the
 
 - **Wood.** Oak and birch. `BiomeData` plants 40 oak and 15 birch. Town is the hub, not a grove.
 - **Way in.** Free. Spawn is in town. `ForestPath` (16 wide) runs south into the starter disc. Haul 190.
-- **Landmarks.** The sawmill at (0, 110), the sell pad and the Sky Bin, the Tool Shed, Dealership, and Hearth & Home, the gondola station, Murph's camp by the spawn, the parking lot, and the signposts (`BuildingArt.nameSign`), including "TO THE WOODS" and "SELL LOGS HERE". The Skyroot is on the northern horizon. The Wood Demand board stands in town, where a seller can read today's two woods.
+- **Landmarks.** The sawmill at (0, 110), the sell pad, the Tool Shed, Dealership, and Hearth & Home, the gondola station, Murph's camp by the spawn, the parking lot, and the signposts (`BuildingArt.nameSign`), including "TO THE WOODS" and "SELL LOGS HERE". The Skyroot is on the northern horizon. The Wood Demand board stands in town, where a seller can read today's two woods.
 - **Come back for.** Selling, the demand board, the shops, the limited shelf (B01), regrowth, Halloween trees, dailies, and the town badge.
 - **Air and sound.** Starter air is the warm green nudge. Night mist is the grey-blue that thickens from 22:00 and lifts by 09:30. `BirdsDay` by day. `CricketsNight` and `Owl` at night.
 

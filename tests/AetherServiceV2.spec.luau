@@ -13,9 +13,14 @@
 --   * an offline owner's piece goes to its last holder; nobody online, it
 --     stays; a piece already going, dead, a shop's or unknown stays;
 --   * the chute's prompt says "Check Sky Bin" under v2;
---   * "Sell Sky Bin" by the pad pays the bin through SellService.PayEntries
---     (as a pad sale), empties it, only from beside the bin, rate-limited,
---     and keeps it while the pad isn't selling;
+--   * the Sky Bin is an item (SkyBinLogic): the chute is LOCKED until its
+--     payee has a bin placed on their plot; a locked chute takes nothing
+--     (the piece stays), toasts the reason now and then, and works the
+--     moment the bin is placed;
+--   * "Sell Sky Bin" on the placed bin pays the bin through
+--     SellService.PayEntries (as a pad sale), empties it, only for the
+--     bin's owner standing beside it, rate-limited, and keeps it while the
+--     pad isn't selling;
 --   * the hoppers' boxes fit BuildingArt's chute and forge;
 --   * the Starfall Forge takes plain lumenwood's up to the recipe (60)
 --     and refuses other woods, figured wood and wood past the recipe;
@@ -36,7 +41,7 @@ return function(t)
 	end
 
 	local CHUTE_AT = CFrame.new(100, 1.5, 0) -- the hopper box's centre (4 x 3 x 4: its top at y 3)
-	local BIN_AT = CFrame.new(-18, 2, 86) -- the Sky Bin by the pad (WorldPlan town.skyBin)
+	local BIN_AT = CFrame.new(-18, 2, 86) -- player 1's Sky Bin, placed on their plot
 	local ON_TOP = Vector3.new(100, 4.3, 0) -- a 2.6-thick log lying on it
 	-- The forge, turned a quarter, off on its own.
 	local FORGE_AT = CFrame.new(300, 0, 0) * CFrame.Angles(0, math.pi / 2, 0)
@@ -96,6 +101,15 @@ return function(t)
 				p.hrp = hrp
 				s.players[id] = p
 				local profile = Util.deepCopy(Schema.Template)
+				-- Player 1 has a Sky Bin placed on the plot (the item), unless the
+				-- test says otherwise: noBin (never bought), owned (in stock, unplaced).
+				if id == 1 and not options.noBin and not options.owned then
+					table.insert(profile.plot.placed, { uid = "bin", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 })
+					profile.skyBinOwned = true
+				elseif id == 1 and options.owned then
+					profile.skyBinOwned = true
+					table.insert(profile.sawmillStock, "SkyBin")
+				end
 				s.profiles[id] = profile
 			end
 			return p
@@ -117,7 +131,18 @@ return function(t)
 		s.hearth = forge:FindFirstChild("ForgeHearth")
 		-- A 2.6-thick log lying on the hearth.
 		s.onHearth = s.hearth.CFrame * Vector3.new(0, s.hearth.Size.Y / 2, 0) + UP * 1.3
-		local tagged = { CloudChute = { chute }, StarfallForge = { s.anvil } }
+		-- The placed Sky Bin (PlotService builds the model, MachineArt tags it).
+		local binModel = Instance.new("Model")
+		binModel.Name = "bin"
+		binModel:SetAttribute("OwnerId", 1)
+		local bin = Instance.new("Part")
+		bin.Name = "SkyBin"
+		bin.Size = Vector3.new(4, 4, 4)
+		bin.CFrame = BIN_AT
+		bin.Parent = binModel
+		s.bin = bin
+		s.binModel = binModel
+		local tagged = { CloudChute = { chute }, StarfallForge = { s.anvil }, PlacedSkyBin = { binModel } }
 		s.granted = {}
 
 		loader = t.loader({
@@ -206,11 +231,6 @@ return function(t)
 				table.insert(s.sold, sale)
 			end,
 		})
-		local bin = Instance.new("Part")
-		bin.Name = "SkyBin"
-		bin.Size = Vector3.new(4, 4, 4)
-		bin.CFrame = BIN_AT
-		s.bin = bin
 		Aether.Init(function(p, message)
 			table.insert(s.toasts, { id = p.UserId, text = message })
 		end)
@@ -250,7 +270,6 @@ return function(t)
 		end
 		Aether.InitV2({
 			woodFolder = folder,
-			skyBin = if options.noBin then nil else bin,
 			heldBy = function(model)
 				return s.held[model]
 			end,
@@ -358,7 +377,7 @@ return function(t)
 		t.ok(not s.gone(big), "left where it is")
 		t.eq(#s.forgotten, 0)
 		t.eq(#s.profiles[1].skyWood, 2)
-		t.eq(toastsFor(s, 1), { "Your Sky Bin is full (120). Sell it at the sawmill." })
+		t.eq(toastsFor(s, 1), { "Your Sky Bin is full (120). Sell it from the bin on your plot." })
 		s.tick(1)
 		s.tick(1)
 		t.eq(#toastsFor(s, 1), 1, "not every poll")
@@ -378,6 +397,7 @@ return function(t)
 
 	t.test("an offline owner's piece goes to its last holder; with nobody online it stays", function()
 		local s = setup()
+		table.insert(s.profiles[2].plot.placed, { uid = "bin2", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 })
 		local mine = s.piece("a", 1, "oak", 4, { holder = 2 })
 		local left = s.piece("b", 9, "oak", 5, { holder = 2 })
 		local nobody = s.piece("c", 9, "oak", 6, { holder = 8 })
@@ -420,7 +440,7 @@ return function(t)
 		s.chutePrompt.fire(s.player(1))
 		t.eq(
 			toastsFor(s, 1),
-			{ "Lay wood in the Cloud Chute and it goes down to your Sky Bin by the sawmill. Sky Bin 14/120." }
+			{ "Lay wood in the Cloud Chute and it goes down to your Sky Bin on your plot. Sky Bin 14/120." }
 		)
 	end)
 
@@ -455,16 +475,39 @@ return function(t)
 		s.binPrompt.fire(p1)
 		t.eq(#s.paid, 0, "too far from the bin")
 		t.eq(s.profiles[1].skyWood, { entry })
+		t.eq(toastsFor(s, 1), { "Walk closer to your Sky Bin." })
+		-- Somebody else's bin: not theirs to sell from, even standing beside it.
 		local p2 = s.player(2)
+		s.profiles[2].skyWood = { { w = "pine", v = 7 } }
 		s.binPrompt.fire(p2)
-		t.eq(toastsFor(s, 2), {
-			"Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it.",
-		})
+		t.eq(#s.paid, 0, "not player 2's bin")
+		t.eq(s.profiles[2].skyWood, { { w = "pine", v = 7 } }, "their own wood untouched")
+		t.eq(toastsFor(s, 2), { "That isn't your Sky Bin." })
 		p1.hrp.CFrame = BIN_AT * CFrame.new(0, 1, -6)
 		s.Sell._reset()
 		s.binPrompt.fire(p1)
 		t.eq(s.profiles[1].skyWood, { entry }, "kept for later")
 		t.eq(#s.paid, 0)
+	end)
+
+	t.test("Sell Sky Bin says when it's empty", function()
+		local s = setup()
+		s.binPrompt.fire(s.player(1))
+		t.eq(toastsFor(s, 1), {
+			"Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it.",
+		})
+		t.eq(#s.paid, 0)
+	end)
+
+	t.test("Sell Sky Bin: a bin that has left the world, or isn't a part, sells nothing", function()
+		local s = setup()
+		s.profiles[1].skyWood = { { w = "oak", v = 10 } }
+		s.A.SellSkyBin(s.player(1), nil)
+		s.A.SellSkyBin(s.player(1), s.binModel) -- a Model, not the bin part
+		s.bin.Parent = nil
+		s.A.SellSkyBin(s.player(1), s.bin)
+		t.eq(#s.paid, 0)
+		t.eq(s.profiles[1].skyWood, { { w = "oak", v = 10 } }, "kept")
 	end)
 
 	t.test("Sell Sky Bin is rate-limited", function()
@@ -478,10 +521,57 @@ return function(t)
 		t.eq(#s.profiles[1].skyWood, 1, "the third press waited")
 	end)
 
-	t.test("without a Sky Bin part there's no sale prompt, and a warning", function()
+	t.test("no Sky Bin: the chute is locked, the piece stays, the toast says where to buy one", function()
 		local s = setup({ noBin = true })
-		t.eq(s.binPrompt, nil)
-		t.ok(string.find(s.loader.warnings[1] or "", "No Sky Bin", 1, true) ~= nil, "warned")
+		local m = s.piece("a", 1, "oak", 4)
+		s.settle()
+		t.ok(not s.gone(m), "nothing is lost: the piece stays where it lies")
+		t.eq(#s.forgotten, 0)
+		t.eq(s.profiles[1].skyWood, {})
+		local lines = toastsFor(s, 1)
+		t.eq(#lines, 1)
+		t.ok(string.find(lines[1], "Tool Shed", 1, true) ~= nil, "buy one at the Tool Shed")
+		t.ok(string.find(lines[1], "$400", 1, true) ~= nil)
+		s.tick(1)
+		s.tick(1)
+		t.eq(#toastsFor(s, 1), 1, "not every poll")
+		s.tick(3)
+		t.eq(#toastsFor(s, 1), 2, "again after a few seconds")
+		-- Buying and placing it unlocks the chute at once.
+		table.insert(s.profiles[1].plot.placed, { uid = "bin", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 })
+		s.tick(0.5)
+		t.ok(s.gone(m), "the same piece goes down now")
+		t.eq(s.profiles[1].skyWood, { { w = "oak", v = 4 } })
+	end)
+
+	t.test("a bin in its box or in stock, not placed, still locks the chute, and says to place it", function()
+		local s = setup({ owned = true })
+		local m = s.piece("a", 1, "oak", 4)
+		s.settle()
+		t.ok(not s.gone(m))
+		local lines = toastsFor(s, 1)
+		t.eq(#lines, 1)
+		t.ok(string.find(lines[1], "on your plot", 1, true) ~= nil)
+		t.ok(string.find(lines[1], "Tool Shed", 1, true) == nil, "you already bought it")
+	end)
+
+	t.test("the lock is the payee's: a piece goes down for an owner with a bin, not for one without", function()
+		local s = setup()
+		local mine = s.piece("a", 1, "oak", 4)
+		local theirs = s.piece("b", 2, "oak", 5) -- player 2 has no bin
+		s.settle()
+		t.ok(s.gone(mine))
+		t.ok(not s.gone(theirs))
+		t.eq(s.profiles[2].skyWood, {})
+		t.eq(#toastsFor(s, 2), 1, "they are told")
+	end)
+
+	t.test("the chute prompt under v2 says it is locked without a bin", function()
+		local s = setup({ noBin = true })
+		s.chutePrompt.fire(s.player(1))
+		local lines = toastsFor(s, 1)
+		t.eq(#lines, 1)
+		t.ok(string.find(lines[1], "Tool Shed", 1, true) ~= nil)
 	end)
 
 	t.test("the hoppers' boxes fit the art: wood laid on them is in, wood on the ground beside isn't", function()

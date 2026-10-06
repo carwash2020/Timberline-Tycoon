@@ -192,4 +192,25 @@ return function(t)
 			end
 		end
 	)
+
+	t.test("the Sky Bin is a Tool Shed box at $400, small enough to ride the axe table", function()
+		local slot = StoreStock.Get("toolshed-SkyBin")
+		t.ok(slot ~= nil, "a shelf slot")
+		t.eq(slot.shop, "ToolShed")
+		t.eq(slot.itemKind, "Machine")
+		t.eq(slot.itemId, "SkyBin")
+		t.eq(slot.displayName, "Sky Bin")
+		t.eq(slot.limited, false)
+		t.eq(slot.boxClass, "S", "sized from its 4 x 4 footprint")
+		t.eq(StoreStock.UnitPrice("Machine", "SkyBin", false, 2), 400)
+		t.ok(StoreStock.FindInShop("ToolShed", "SkyBin") ~= nil)
+		t.eq(#StoreStock.Overflow("ToolShed"), 0, "it has a place on the shelves")
+		local placed = false
+		for _, p in ipairs(StoreStock.Placements("ToolShed")) do
+			if p.slotId == "toolshed-SkyBin" then
+				placed = true
+			end
+		end
+		t.ok(placed, "and a spot in ShelfLayout")
+	end)
 end

@@ -678,4 +678,29 @@ return function(t)
 		t.eq(ok, false)
 		t.eq(line, "alreadyOwned")
 	end)
+
+	t.test("two unopened Sky Bin boxes cannot both be bought (one per player), other machines can", function()
+		local _, Box = boot()
+		local counter = counterPart()
+		local function machine(uid, itemId, x)
+			return Box.Make({
+				uid = uid,
+				shop = "ToolShed",
+				itemKind = "Machine",
+				itemId = itemId,
+				displayName = itemId,
+				cf = CFrame.new(x, 4.5, 0),
+				counter = counter,
+				zoneCf = CFrame.new(),
+				zoneSize = Vector3.new(18, 1, 14),
+				onShelf = true,
+			})
+		end
+		local a, b = machine("sb-1", "SkyBin", 0), machine("sb-2", "SkyBin", 0.5)
+		local player = person(a.part.CFrame.Position)
+		t.eq(Box.Pay(player, a.uid), true)
+		local ok, line = Box.Pay(player, b.uid)
+		t.eq(ok, false)
+		t.eq(line, "alreadyOwned")
+	end)
 end

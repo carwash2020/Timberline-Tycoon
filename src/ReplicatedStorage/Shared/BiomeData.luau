@@ -25,7 +25,7 @@ export type BiomeDef = {
 	slowdown: { amount: number, removedBy: string }?,
 	nightOnly: boolean?,
 	-- Sky biome: gondola up and down, logs sent down the Cloud Chute into
-	-- the player's Sky Bin at the sawmill.
+	-- the player's Sky Bin (an item from the Tool Shed, placed on their plot).
 	gondola: { rideSec: number, fee: number }?,
 	skyBinCapacity: number?, -- logs (the v1 loop)
 	skyBinVolume: number?, -- u³ (the v2 loop, V2_PLAN.md §5)

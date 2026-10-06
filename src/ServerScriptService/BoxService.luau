@@ -982,7 +982,7 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 		BoxService.ReturnHome(rec)
 		return true, "robuxAsk"
 	end
-	if BoxUnpack.OneAtATime(rec.itemKind) then
+	if BoxUnpack.OneAtATime(rec.itemKind, rec.itemId) then
 		-- Two unopened boxes of the same gear or blueprint would grant it twice.
 		for _, other in pairs(records) do
 			if

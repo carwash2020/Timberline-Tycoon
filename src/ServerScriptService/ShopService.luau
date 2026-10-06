@@ -32,6 +32,7 @@ local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local StoreStock = require(ReplicatedStorage.Shared.StoreStock)
 local Util = require(ReplicatedStorage.Shared.Util)
 local AxeService = require(script.Parent.AxeService)
@@ -743,6 +744,14 @@ local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCat
 	elseif box.kind == "Machine" then
 		local machine = ItemCatalog.GetMachine(box.itemId)
 		if machine then
+			if SkyBinLogic.IsBin(machine.id) then
+				-- One per player: a second box (bought before the first was opened)
+				-- is yours already, as with gear. The flag is what the save keeps.
+				if SkyBinLogic.Owns(SkyBinLogic.HoldingsOf(profile)) then
+					return nil
+				end
+				profile.skyBinOwned = true
+			end
 			-- The same stock list the sawmills wait in; the hammer places it.
 			if type(profile.sawmillStock) ~= "table" then
 				profile.sawmillStock = {}
@@ -898,6 +907,11 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 	elseif box.kind == "Machine" then
 		if loop ~= 2 or not ItemCatalog.GetMachine(box.itemId) then
 			return fail("locked")
+		end
+		local refusal = ShopLogic.MachineRefusal(box.itemId, SkyBinLogic.Owns(SkyBinLogic.HoldingsOf(profile)))
+		if refusal then
+			notify(player, refusal)
+			return fail("alreadyOwned")
 		end
 		if not hasLand(profile) then
 			return fail("needsLand")

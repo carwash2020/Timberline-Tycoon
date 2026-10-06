@@ -121,14 +121,12 @@ return function(t)
 		t.eq(rails, 2, "front rail and east rail")
 	end)
 
-	t.test("the sawmill leaves the sell pad and the Sky Bin clear", function()
+	t.test("the sawmill leaves the sell pad clear", function()
 		-- Its design-size numbers, scaled (BuildingArt.Scale, TWN-13); and at
 		-- its design size too.
 		for _, s in ipairs({ BuildingArt.Scale.Sawmill, 1 }) do
 			local mill = BuildingArt.Sawmill(s)
 			local front = -13.05 * s
-			-- The Sky Bin (4 x 4 x 4) stands 8 to 14 studs in front of it, 18 west.
-			t.eq(blockers(mill, V3.new(-21, 0, front - 14), V3.new(-15, 6, front - 8)), {}, "Sky Bin spot")
 			-- The pad (24 x 18) starts at its front; only things over 8 studs
 			-- up (lanterns, the crest sign) reach over it.
 			for _, p in ipairs(parts(mill)) do

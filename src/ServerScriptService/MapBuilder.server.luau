@@ -305,18 +305,6 @@ step("4. The town", function()
 		place(padArt, town.sellPad, sellArea)
 	end)
 
-	-- The Sky Bin: logs sent down the Cloud Chute wait here (WorldUI rewrites
-	-- its labels with each player's own count). The bin part itself goes into
-	-- SellArea (the contract); the flume and cloud behind it stay in the map.
-	step("4. The Sky Bin", function()
-		local binArt = BuildingArt.SkyBin()
-		place(atomic(binArt), town.skyBin * CFrame.new(0, -2, 0)) -- town.skyBin is the bin's centre
-		local bin = binArt:FindFirstChild("SkyBin")
-		if bin then
-			bin.Parent = sellArea
-		end
-	end)
-
 	-- Shops: Persistent, with a Counter whose ShopPoint is where the client's
 	-- "Browse" prompt appears and what ShopService measures range from.
 	step("4. The shops", function()

@@ -126,7 +126,6 @@ return {
 		zone.Transparency = 1
 		sellArea.Parent = root
 		built.SellArea = sellArea
-		Kit.part(sellArea, "SkyBin", V3.new(4, 4, 4), town.skyBin, C3.fromRGB(130, 96, 60), Enum.Material.WoodPlanks)
 		for _, spot in ipairs(town.shops) do
 			place(BuildingArt.Shop(spot.kind, spot.title, spot.accent), spot.cframe, spot.kind)
 		end

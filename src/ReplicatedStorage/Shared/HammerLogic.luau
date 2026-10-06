@@ -14,6 +14,7 @@
 local EditLogic = require(script.Parent.EditLogic)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
+local SkyBinLogic = require(script.Parent.SkyBinLogic)
 local Util = require(script.Parent.Util)
 
 local HammerLogic = {}
@@ -72,7 +73,9 @@ function HammerLogic.PieceActions(bp: PlotData.Blueprint, item: PlotLogic.Placed
 	local why = if fixed then EditLogic.Message("filled") else nil
 	local plan = PlotLogic.SellPlan(bp, item)
 	local sell = "Sell"
-	if plan.planks > 0 then
+	if SkyBinLogic.IsBin(bp.id) then
+		sell = "Take back" -- into your stock, free; the wood in it waits
+	elseif plan.planks > 0 then
 		sell = "Take apart (planks back)"
 	elseif plan.cash > 0 then
 		sell = "Sell +" .. Util.formatCash(plan.cash)

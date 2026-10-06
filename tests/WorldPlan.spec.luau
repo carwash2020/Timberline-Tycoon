@@ -120,7 +120,6 @@ return function(t)
 		add("Murph's camp", "camp", BuildingArt.Campsite(), town.campsite)
 		add("gondola station", "station", BuildingArt.GondolaStation(), town.gondola)
 		add("sawmill", "sawmill", BuildingArt.Sawmill(), town.sawmill)
-		add("Sky Bin", "skyBin", BuildingArt.SkyBin(), town.skyBin * CFrame.new(0, -2, 0))
 		add(
 			"sell station",
 			"sellStation",
@@ -297,8 +296,6 @@ return function(t)
 				return area.name == "GondolaPath"
 			elseif thing.kind == "sellStation" then
 				return area.name == "SellPad"
-			elseif thing.kind == "skyBin" then
-				return area.name == "Plaza" or area.name == "SellPad"
 			elseif thing.kind == "lamp" then
 				return area.name == "Plaza"
 			elseif thing.kind == "sign" and thing.label == "SELL LOGS HERE sign" then
@@ -861,7 +858,7 @@ return function(t)
 
 	t.test("the town's greenery keeps 4 studs from the props and out of the buildings (TWN-01)", function()
 		local GAP = 4
-		local PROPS = { lamp = true, fence = true, prop = true, sign = true, camp = true, skyBin = true }
+		local PROPS = { lamp = true, fence = true, prop = true, sign = true, camp = true }
 		-- Ground level: what you'd walk or drive into (a canopy is higher).
 		local GROUND = 3
 		local obstacles = {}

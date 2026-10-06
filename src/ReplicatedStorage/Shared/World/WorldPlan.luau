@@ -1442,7 +1442,6 @@ export type Town = {
 	sawmill: CFrame,
 	sellZone: CFrame, -- centre of the sell volume (WorldPlan.SellZoneSize)
 	sellPad: CFrame,
-	skyBin: CFrame,
 	shops: { ShopSpot },
 	gondola: CFrame,
 	campsite: CFrame,
@@ -1802,7 +1801,6 @@ function WorldPlan.Town(): Town
 		-- Dealership's loading pad (WorldLayout, x 70 to 84).
 		sellZone = CFrame.new(mill.X + 53, 6, mill.Z + 1),
 		sellPad = CFrame.new(mill.X + 53, 0, mill.Z + 1),
-		skyBin = CFrame.new(mill.X + 42, 2, mill.Z + 12), -- the pad's north-west corner, inside its rails
 		shops = {
 			{
 				kind = "ToolShed",

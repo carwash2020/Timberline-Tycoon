@@ -356,7 +356,8 @@ flag):
 | Timber Empire | 200×200 | Storefront, Forge (the Starfall Axe), crew haul runs |
 
 Tier-ups cost cash + Stone + your own planks. Once you have a Warehouse,
-the Sky Bin (§10) can deliver there instead of the sawmill.
+the Sky Bin (§10) can deliver there instead of the sawmill. (The Sky Bin is
+now an item you place on your plot, so a Warehouse delivery is a later idea.)
 
 **Tracks — Log Flumes (the signature system)**
 Lumber mills moved logs by water flume — so tracks are flumes, not sci-fi
@@ -436,8 +437,10 @@ corner from minute one, and its canopy hides floating islands of glowing
   rope bridges.
 - **Getting logs down:** the **Cloud Chute**. Drop logs in at the edge and
   they ride a flume spiralling down the Skyroot, across the map, into your
-  personal **Sky Bin** at the sawmill (30 logs; bigger bins are an upgrade
-  later). Sell from the bin when you come down. It's the flume system's
+  personal **Sky Bin**: an item you buy boxed at the Tool Shed ($400, one per
+  player) and place on your own plot with the hammer (30 logs under v1, 120 u³
+  under v2; bigger bins are an upgrade later). Without one the chute is
+  locked and nothing is lost. Sell from the bin on your plot when you come down. It's the flume system's
   first appearance before plots get their own (§9).
 - **Lumenwood:** 2,000 HP, hardness 120, 10 glowing logs at $120, rare and
   slow to regrow (15 min), so it's worth trading. Only the Inferno Axe can
@@ -454,8 +457,8 @@ corner from minute one, and its canopy hides floating islands of glowing
   a sky-themed plot decoration blueprint.
 - **Built (2026-09-30):** the Skyroot stands in the far north-west corner
   (x -1050, z 1050), the isles float above it at ~700 studs. The gondola
-  runs from a station by the sawmill (so the Sky Bin is a short walk from
-  where you get off, as the economy model assumes) and from one at the
+  runs from a station by the sawmill (the Sky Bin was once a short walk from
+  where you get off, as the economy model assumes; it now stands on your plot) and from one at the
   Skyroot's foot, for anyone who fell. The Starfall Forge is on the main
   isle for V1 (the Timber Empire plot Forge can come with plots). Sky
   Shards aren't sellable yet; wind and lightning aren't in yet.
@@ -913,7 +916,7 @@ does.
 
 **The world** (about 3,000 studs square, `Shared/World`):
 - The **town** sits flat at the centre: the sawmill at (0, 110) with the
-  sell pad and Sky Bin in front, the Tool Shed, Dealership and Hearth &
+  sell pad in front, the Tool Shed, Dealership and Hearth &
   Home along a dirt main street, the gondola station behind, Murph's camp
   by the spawn at (0, 40), the parking lot to the east and the plot
   district beyond it.

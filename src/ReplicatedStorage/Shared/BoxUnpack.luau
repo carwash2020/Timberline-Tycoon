@@ -99,9 +99,10 @@ function BoxUnpack.StoredEntry(uid: string, itemId: string, shop: string, owed: 
 end
 
 -- Kinds that may only be bought once while a copy is still in a box: two
--- unopened boxes of the same gear or blueprint would grant it twice.
-function BoxUnpack.OneAtATime(kind: string): boolean
-	return kind == "Gear" or kind == "Blueprint"
+-- unopened boxes of the same gear or blueprint would grant it twice. So
+-- would two Sky Bins (one per player); the other machines are not limited.
+function BoxUnpack.OneAtATime(kind: string, itemId: string?): boolean
+	return kind == "Gear" or kind == "Blueprint" or (kind == "Machine" and itemId == "SkyBin")
 end
 
 return BoxUnpack

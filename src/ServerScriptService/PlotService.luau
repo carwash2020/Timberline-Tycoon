@@ -58,6 +58,7 @@ local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
 local MilestoneService = require(script.Parent.MilestoneService)
@@ -425,6 +426,7 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 	local model = if SawmillLogic.Blueprint(item.blueprintId)
 		then MachineArt.Build(item.blueprintId, false)
 		elseif ChopSawLogic.Blueprint(item.blueprintId) then MachineArt.BuildChopSaw(false)
+		elseif SkyBinLogic.IsBin(item.blueprintId) then MachineArt.BuildSkyBin(false)
 		else BlueprintModels.Build(bp, false)
 	if not model then
 		return
@@ -1205,6 +1207,12 @@ function PlotService.Place(player: Player, blueprintId: unknown, x: unknown, z: 
 	if not payer then
 		return
 	end
+	-- A Sky Bin is the owner's, one per plot: a visitor can't spend theirs here.
+	local binRefusal = SkyBinLogic.PlaceRefusal(bp.id, player == owner, profile.plot.placed)
+	if binRefusal then
+		notify(player, binRefusal)
+		return
+	end
 	local px, pz = PlotLogic.Snap(x :: number), PlotLogic.Snap(z :: number)
 	local py = if isNumber(y) then PlotLogic.SnapY(y :: number) else 0
 	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
@@ -1383,6 +1391,23 @@ function PlotService.Sell(player: Player, uid: unknown)
 	local item, index = findPlaced(profile, uid)
 	local bp = if item then PlotLogic.Blueprint(item.blueprintId) else nil
 	if not item or not bp then
+		return
+	end
+	if SkyBinLogic.IsBin(item.blueprintId) then
+		-- Taking the bin back: it returns to stock, no cash either way. What is
+		-- in it stays in the save (profile.skyWood) and waits for the next placing.
+		if type(profile.sawmillStock) ~= "table" then
+			profile.sawmillStock = {}
+		end
+		table.insert(profile.sawmillStock, item.blueprintId)
+		table.remove(profile.plot.placed, index)
+		placedAt[item.uid] = nil
+		local binModel = slot.items:FindFirstChild(item.uid)
+		if binModel then
+			binModel:Destroy()
+		end
+		owner:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(profile.sawmillStock))
+		notify(player, SkyBinLogic.BackInStockLine)
 		return
 	end
 	local refund, planks, woodId = sellPlan(item, bp)

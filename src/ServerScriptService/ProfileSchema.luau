@@ -15,6 +15,7 @@ local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
+local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
@@ -197,6 +198,7 @@ export type Profile = {
 	skyBin: { BedLog }, -- the logs waiting in the Sky Bin at the sawmill (wood, value, figure)
 	forgeWood: { [string]: number }, -- v2: u³ of wood put into the Starfall forge, by wood id
 	skyWood: { SkyWood }, -- v2: the wood waiting in the Sky Bin
+	skyBinOwned: boolean, -- the Sky Bin item (Tool Shed, $400, one per player) is yours: boxed, in stock, or on your plot (SkyBinLogic.Migrate)
 	furnitureBlueprints: { [string]: boolean }, -- legacy: store unlocks bought before blueprints were items. Read as part of the book; never written now.
 	-- The buildings you own for good, in the order learned (BlueprintBook).
 	-- Per slot. Using a physical blueprint adds to it.
@@ -306,6 +308,7 @@ local TEMPLATE: Profile = {
 	skyBin = {},
 	forgeWood = {},
 	skyWood = {},
+	skyBinOwned = false,
 	furnitureBlueprints = {},
 	blueprintBook = BlueprintBook.Starter(),
 	blueprintItems = {},
@@ -750,6 +753,8 @@ function ProfileSchema.Migrate(data: any)
 			data.skyBin[i] = { woodId = entry, value = if wood then wood.pricePerLog else 0 }
 		end
 	end
+	-- The Sky Bin became an item: a save with wood in it (or a bin) owns one.
+	SkyBinLogic.Migrate(data)
 	-- Reconcile fills a missing settings table, not keys added inside it.
 	data.settings = SettingsLogic.Sanitize(data.settings)
 	if type(data.passes) ~= "table" then
