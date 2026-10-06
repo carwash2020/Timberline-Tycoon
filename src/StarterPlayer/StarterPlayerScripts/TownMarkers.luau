@@ -67,7 +67,7 @@ TownMarkers.Markers = {
 		text = "AXES",
 		icon = "axe",
 		chip = Color3.fromRGB(150, 62, 44),
-		offset = Vector3.new(14, 19, -14),
+		offset = Vector3.new(15.5, 19, -15.5),
 	},
 	{
 		name = "Trucks",
@@ -75,7 +75,9 @@ TownMarkers.Markers = {
 		text = "TRUCKS",
 		icon = "truck",
 		chip = Color3.fromRGB(47, 109, 181),
-		offset = Vector3.new(16, 16, 0),
+		-- Over the showroom hall's name sign (the hall stands east of the
+		-- spawn's view; its marker shows once you walk that way).
+		offset = Vector3.new(16, 21.5, 0),
 	},
 	{
 		name = "Gear",

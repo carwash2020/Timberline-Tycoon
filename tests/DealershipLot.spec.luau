@@ -1,6 +1,7 @@
 --!nocheck
--- Display models on the dealership lot: anchored, no scripts, a price that
--- matches the server, and off the street, plaza and shop paths.
+-- The dealership's showroom: every vehicle on its own plinth inside the hall,
+-- behind its box, looks only, priced like the server, ordered by price, and
+-- nothing parked outside.
 return function(t)
 	local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
@@ -10,6 +11,8 @@ return function(t)
 	local Util = t.shared("Util")
 	local GameConfig = t.shared("GameConfig")
 	local CoreLoop = t.shared("CoreLoop")
+	local BoxSize = t.shared("BoxSize")
+	local StoreStock = t.shared("StoreStock")
 
 	-- Same rule as DealershipLot's signs: the published loop when MapBuilder
 	-- has set it, otherwise the configured one (tests have no workspace).
@@ -38,79 +41,201 @@ return function(t)
 		return out
 	end
 
-	t.test("every display is anchored, scriptless, and priced like the server", function()
+	local function aabb(part)
+		local cf, size = part.CFrame, part.Size
+		local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+		local hx = (math.abs(r.X) * size.X + math.abs(u.X) * size.Y + math.abs(l.X) * size.Z) / 2
+		local hy = (math.abs(r.Y) * size.X + math.abs(u.Y) * size.Y + math.abs(l.Y) * size.Z) / 2
+		local hz = (math.abs(r.Z) * size.X + math.abs(u.Z) * size.Y + math.abs(l.Z) * size.Z) / 2
+		local p = cf.Position
+		return p.X - hx, p.X + hx, p.Y - hy, p.Y + hy, p.Z - hz, p.Z + hz
+	end
+
+	local function displays(lot)
+		local out = {}
+		for _, child in ipairs(lot:GetChildren()) do
+			if child:IsA("Model") and child:GetAttribute("ItemId") then
+				table.insert(out, child)
+			end
+		end
+		return out
+	end
+
+	t.test("every display is the real vehicle, anchored, scriptless, looks only, priced like the server", function()
 		local lot = DealershipLot.Build()
-		local displays = 0
-		for _, child in ipairs(lot:GetChildren()) do
-			if child:IsA("Model") and child:GetAttribute("ItemId") then
-				displays += 1
-				t.eq(child.ModelStreamingMode, t.roblox.Enum.ModelStreamingMode.Atomic, child.Name)
-				local sign = child:FindFirstChild("PriceSign", true)
-				t.ok(sign and sign:IsA("BasePart"), child.Name .. " price sign")
-				t.eq(sign:FindFirstChild("BuyPrompt", true), nil, child.Name .. " is sit-only, no buy prompt")
-				local seat = child:FindFirstChild("DriverSeat", true)
-				if seat and seat:IsA("VehicleSeat") then
-					t.eq(seat.Disabled, false, child.Name .. " can be sat in")
-					t.eq(seat.MaxSpeed, 0, child.Name .. " cannot drive")
-					t.eq(seat.Torque, 0, child.Name .. " has no torque")
-					t.eq(seat.Anchored, true, child.Name .. " stays put")
+		local list = displays(lot)
+		t.eq(#list, 8, "5 trucks and 3 trailers")
+		for _, child in ipairs(list) do
+			t.eq(child.ModelStreamingMode, t.roblox.Enum.ModelStreamingMode.Atomic, child.Name)
+			local id = child:GetAttribute("ItemId")
+			local item = ItemCatalog.GetTruck(id) or ItemCatalog.GetTrailer(id)
+			for _, d in ipairs(child:GetDescendants()) do
+				if d:IsA("BasePart") then
+					t.eq(d.Anchored, true, child.Name .. " " .. d.Name .. " anchored")
+					t.eq(d.CanCollide, false, child.Name .. " " .. d.Name .. " is decoration")
+					t.eq(d.CanQuery, false, child.Name .. " " .. d.Name .. " cannot be clicked")
+					t.eq(d.CanTouch, false, child.Name .. " " .. d.Name .. " cannot be touched")
 				end
-				local id = child:GetAttribute("ItemId")
-				local item = ItemCatalog.GetTruck(id) or ItemCatalog.GetTrailer(id)
-				local price = ShopLogic.Price(item, priceLoop())
-				local text = nil
-				for _, d in ipairs(sign:GetDescendants()) do
-					if d:IsA("TextLabel") then
-						text = d.Text
-					end
-				end
-				t.ok(
-					text and string.find(text, Util.formatCash(price), 1, true),
-					child.Name .. " tag " .. Util.formatCash(price)
-				)
-				for _, d in ipairs(child:GetDescendants()) do
-					if d:IsA("BasePart") then
-						t.eq(d.Anchored, true, child.Name .. " " .. d.Name)
-					end
-					t.eq(d.ClassName == "Script" or d.ClassName == "LocalScript", false, child.Name)
+				t.eq(d.ClassName == "Script" or d.ClassName == "LocalScript", false, child.Name)
+				if d:IsA("VehicleSeat") or d:IsA("Seat") then
+					t.eq(d.Disabled, true, child.Name .. " cannot be sat in or driven")
 				end
 			end
+			-- Correct paint: the body carries the vehicle's own colour.
+			local painted = false
+			for _, d in ipairs(child:GetDescendants()) do
+				if d:IsA("BasePart") and d.Color == t.roblox.Color3.fromHex(item.look.color) then
+					painted = true
+				end
+			end
+			t.ok(painted, child.Name .. " wears its own paint")
+			local sign = child:FindFirstChild("PriceSign", true)
+			t.ok(sign and sign:IsA("BasePart"), child.Name .. " price sign")
+			t.eq(sign:FindFirstChild("BuyPrompt", true), nil, child.Name .. " has no buy prompt")
+			local price = ShopLogic.Price(item, priceLoop())
+			local text = nil
+			for _, d in ipairs(sign:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					text = d.Text
+				end
+			end
+			t.ok(
+				text and string.find(text, Util.formatCash(price), 1, true),
+				child.Name .. " tag " .. Util.formatCash(price)
+			)
+			t.ok(string.find(text, item.displayName, 1, true), child.Name .. " tag names it")
+			-- One price on the tag: the cash price and nothing in cubed units.
+			t.eq(string.find(text, "u" .. utf8.char(179), 1, true), nil, "no u3 in player text")
 		end
-		t.eq(displays, 8, "5 trucks and 3 trailers")
 		t.eq(lot:FindFirstChild("BuyPrompt", true), nil, "the lot has no buy prompt")
-		local spots = {}
-		for _, d in ipairs(lot:GetDescendants()) do
-			if d.Name == "BoxSpot" then
-				table.insert(spots, d)
-				t.ok(d.Size.X >= 4 and d.Size.Y >= 3 and d.Size.Z >= 4, d:GetAttribute("ItemId") .. " box minimum")
-			end
-		end
-		t.eq(#spots, 8, "a box beside every vehicle, the Rustbucket too")
-		local rust = false
-		for _, spot in ipairs(spots) do
-			if spot:GetAttribute("ItemId") == "Rustbucket" then
-				rust = true
-			end
-		end
-		t.eq(rust, true, "the Rustbucket is bought as a box like the rest")
-		local facing = nil
-		for _, child in ipairs(lot:GetChildren()) do
-			if child:IsA("Model") and child:GetAttribute("ItemId") then
-				local look = child:GetPivot().LookVector
-				if facing == nil then
-					facing = look
-				else
-					t.ok(look:Dot(facing) > 0.99, child.Name .. " faces with the row")
+	end)
+
+	t.test(
+		"a box stands in front of every vehicle, sized by the vehicle, and the vehicle is behind it on a plinth",
+		function()
+			local lot = DealershipLot.Build()
+			local spots = {}
+			for _, d in ipairs(lot:GetDescendants()) do
+				if d.Name == "BoxSpot" then
+					spots[d:GetAttribute("ItemId")] = d
 				end
-				local sign = child:FindFirstChild("PriceSign", true)
-				local localPos = child:GetPivot():PointToObjectSpace(sign.CFrame.Position)
-				t.ok(localPos.Z < -1, child.Name .. " price sign is in front of the model")
-				t.ok(math.abs(localPos.X) < 3, child.Name .. " price sign is on this model, not an empty spot")
 			end
+			local plinths = {}
+			for _, d in ipairs(lot:GetChildren()) do
+				if d.Name == "Plinth" then
+					plinths[d:GetAttribute("ItemId")] = d
+				end
+			end
+			for _, child in ipairs(displays(lot)) do
+				local id = child:GetAttribute("ItemId")
+				local kind = child:GetAttribute("Category")
+				local spot, plinth = spots[id], plinths[id]
+				t.ok(spot and plinth, id .. " has a box spot and a plinth")
+				local class = BoxSize.Class(StoreStock.VehicleClass(kind, id))
+				t.ok((spot.Size - class.size).Magnitude < 0.01, id .. " box is its class")
+				t.ok(class.vehicle and class.size.X >= 9, id .. " vehicle boxes are the biggest")
+				-- In front (toward -Z, the path) of the vehicle and of its plinth.
+				local sx0, sx1, _, sy1, sz0, sz1 = aabb(spot)
+				local px0, px1, py0, py1, pz0, pz1 = aabb(plinth)
+				t.ok(sz1 <= pz0 + 0.01, id .. " box is in front of the plinth")
+				t.ok(sx0 >= px0 - 0.01 and sx1 <= px1 + 0.01, id .. " box is within the plinth's width")
+				t.ok(math.abs(sy1 - class.size.Y) < 0.01 and sx0 < sx1, id .. " box stands on the ground")
+				-- The vehicle sits on the plinth, wholly over it.
+				local vx0, vx1, vy0, vy1, vz0, vz1 = math.huge, -math.huge, math.huge, -math.huge, math.huge, -math.huge
+				for _, d in ipairs(parts(child)) do
+					if d.Name ~= "PriceSign" then
+						local a, b, c, e, f, g = aabb(d)
+						vx0, vx1, vy0, vy1 = math.min(vx0, a), math.max(vx1, b), math.min(vy0, c), math.max(vy1, e)
+						vz0, vz1 = math.min(vz0, f), math.max(vz1, g)
+					end
+				end
+				t.ok(vy0 >= py1 - 0.3, id .. " rests on the plinth: " .. vy0 .. " vs " .. py1)
+				t.ok(vx0 >= px0 - 0.5 and vx1 <= px1 + 0.5, id .. " is within its plinth in x")
+				t.ok(vz0 >= pz0 - 0.5 and vz1 <= pz1 + 0.5, id .. " is within its plinth in z")
+				t.ok(vz0 > sz1 - 0.01, id .. " is behind its box")
+			end
+		end
+	)
+
+	t.test("bays are ordered by price, left to right, front row then back row, and never overlap", function()
+		local layout = DealershipLot.Layout()
+		local last = -1
+		for _, bay in ipairs(layout.bays) do
+			local item = ItemCatalog.GetTruck(bay.id) or ItemCatalog.GetTrailer(bay.id)
+			local price = item.v2.price
+			t.ok(price > last, bay.id .. " is dearer than the one before")
+			last = price
+		end
+		t.eq(#layout.bays, 8)
+		t.eq(layout.bays[1].id, "Rustbucket", "the cheapest first")
+		t.eq(layout.bays[#layout.bays].id, "LoggingRig", "the dearest last")
+		for i, a in ipairs(layout.bays) do
+			for j = i + 1, #layout.bays do
+				local b = layout.bays[j]
+				local dx = math.abs(a.x - b.x) - (a.width + b.width) / 2
+				local dz = math.abs(a.z - b.z) - (a.depth + b.depth) / 2
+				t.ok(dx >= 0.5 - 1e-6 or dz >= 0.5 - 1e-6, a.id .. " and " .. b.id .. " plinths keep a gap")
+				local bdx = math.abs(a.x - b.x) - (a.box.X + b.box.X) / 2
+				local bdz = math.abs(a.boxZ - b.boxZ) - (a.box.Z + b.box.Z) / 2
+				t.ok(bdx >= 0 or bdz >= 0, a.id .. " and " .. b.id .. " boxes do not overlap")
+			end
+			t.ok(
+				a.x - a.width / 2 >= -layout.width / 2 and a.x + a.width / 2 <= layout.width / 2,
+				a.id .. " inside the lot in x"
+			)
+			t.ok(a.z + a.depth / 2 <= layout.depth + 1e-6, a.id .. " inside the lot in z")
 		end
 	end)
 
-	t.test("the store and the dealership lot stay off the street, plaza and paths", function()
+	t.test(
+		"nothing is parked outside: the vehicles and boxes are all inside the hall, which sits in the reserved lawn",
+		function()
+			local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
+			local town = WorldPlan.Town()
+			local hall = DealershipLot.Hall()
+			local spot = nil
+			for _, s in ipairs(town.shops) do
+				if s.kind == "Dealership" then
+					spot = s
+				end
+			end
+			t.ok(spot ~= nil, "the town has a Dealership")
+			t.ok(
+				math.abs(spot.cframe.Position.X - hall.cx) < 1e-3 and math.abs(spot.cframe.Position.Z - hall.cz) < 1e-3
+			)
+			local lot = DealershipLot.Build()
+			Kit.placeAt(lot, town.displayLot)
+			local x0, x1 = hall.cx - hall.innerW / 2, hall.cx + hall.innerW / 2
+			local z0, z1 = hall.cz - hall.innerD / 2, hall.cz + hall.innerD / 2
+			for _, p in ipairs(parts(lot)) do
+				local a, b, _, _, c, d = aabb(p)
+				t.ok(
+					a >= x0 - 0.01 and b <= x1 + 0.01 and c >= z0 - 0.01 and d <= z1 + 0.01,
+					p.Name .. " is inside the hall"
+				)
+			end
+			-- The hall (walls included) is inside the lawn the layout reserves for it.
+			-- (the hall spans the old approach lawn and the lot: both are reserved)
+			local reserved = { x0 = math.huge, x1 = -math.huge, z0 = math.huge, z1 = -math.huge }
+			for _, box in ipairs(WorldLayout.Reserved) do
+				if box.name == "DealershipLot" or box.name == "DealershipApproach" then
+					reserved.x0, reserved.x1 = math.min(reserved.x0, box.x0), math.max(reserved.x1, box.x1)
+					reserved.z0, reserved.z1 = math.min(reserved.z0, box.z0), math.max(reserved.z1, box.z1)
+				end
+			end
+			local wall = DealershipLot.HallWallThick
+			t.ok(
+				x0 - wall >= reserved.x0 - 0.01 and x1 + wall <= reserved.x1,
+				"the hall is inside the reserved lawn in x"
+			)
+			t.ok(
+				z0 - wall >= reserved.z0 + 6 - 0.01 and z1 + wall <= reserved.z1,
+				"and in z, clear of the road along its front"
+			)
+		end
+	)
+
+	t.test("the hall and the lot stay off the street, plaza and paths", function()
 		local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 		local BuildingArt = t.load("ReplicatedStorage/Shared/Art/BuildingArt")
 		local town = WorldPlan.Town()
@@ -145,12 +270,7 @@ return function(t)
 				if part.CanCollide then
 					for _, area in ipairs(WorldLayout.TownPaint) do
 						if banned[area.name] then
-							-- The showroom meets the end of its own path (the
-							-- ramp). The lot and the store stay off every one.
-							local ownPath = model.Name == "Dealership" and area.name == "DealershipPath"
-							if not ownPath then
-								t.eq(hits(part, area), false, model.Name .. " " .. part.Name .. " on " .. area.name)
-							end
+							t.eq(hits(part, area), false, model.Name .. " " .. part.Name .. " on " .. area.name)
 						end
 					end
 				end

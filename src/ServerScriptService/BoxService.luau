@@ -12,10 +12,15 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AxeArt = require(ReplicatedStorage.Shared.Art.AxeArt)
+local BoxArt = require(ReplicatedStorage.Shared.Art.BoxArt)
 local BoxLogic = require(ReplicatedStorage.Shared.BoxLogic)
+local BoxSize = require(ReplicatedStorage.Shared.BoxSize)
+local BoxUnpack = require(ReplicatedStorage.Shared.BoxUnpack)
 local CounterLogic = require(ReplicatedStorage.Shared.CounterLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local RobuxShelf = require(ReplicatedStorage.Shared.RobuxShelf)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
@@ -26,6 +31,16 @@ local ProfileSchema = require(script.Parent.ProfileSchema)
 local RateLimiter = require(script.Parent.RateLimiter)
 
 local BoxService = {}
+
+type BoxGrant = {
+	uid: string,
+	kind: string,
+	itemId: string,
+	limited: boolean?,
+	shop: string?,
+	free: boolean?,
+	deferGrant: boolean?,
+}
 
 BoxService.Group = "Boxes"
 
@@ -48,6 +63,7 @@ export type Record = {
 	noted: boolean,
 	equipped: boolean,
 	axeUid: string?,
+	pendingGrant: boolean?, -- paid, but the item is still in the box (BoxUnpack)
 	robux: { kind: string, key: string }?,
 	home: CFrame,
 	zoneCf: CFrame?,
@@ -94,6 +110,20 @@ type ShopAnchor = {
 }
 
 local records: { [string]: Record } = {}
+
+-- An item that has come out of its box and waits to be picked up.
+type Pickup = {
+	uid: string,
+	model: Model,
+	buyerId: number,
+	kind: string,
+	itemId: string,
+	shop: string,
+	limited: boolean,
+	madeAt: number,
+	taken: boolean,
+}
+local pickups: { [string]: Pickup } = {}
 local entered: { [string]: { string } } = {}
 local respawnAt: { [string]: number } = {}
 local homes: { [string]: Home } = {}
@@ -385,7 +415,7 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 	board.AlwaysOnTop = tag.alwaysOnTop
 	board.MaxDistance = tag.maxDistance
 	board.Size = UDim2.fromOffset(math.max(80, #tag.text * tag.textSize), tag.textSize + 10)
-	board.StudsOffset = Vector3.new(0, 1.4, 0)
+	board.StudsOffset = Vector3.new(0, part.Size.Y / 2 + 1.2, 0)
 	board.Parent = part
 	local label = Instance.new("TextLabel")
 	label.Name = "Price"
@@ -419,27 +449,6 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 		end)
 	end)
 
-	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
-		local nameFaces = BoxLogic.LargestFaces(part.Size)
-		for _, face in ipairs(nameFaces) do
-			local gui = Instance.new("SurfaceGui")
-			gui.Name = "NameMark"
-			gui.Face = face
-			gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-			gui.PixelsPerStud = 40
-			gui.Parent = part
-			local nameLabel = Instance.new("TextLabel")
-			nameLabel.Name = "Name"
-			nameLabel.BackgroundTransparency = 1
-			nameLabel.Size = UDim2.fromScale(1, 1)
-			nameLabel.Font = Enum.Font.GothamBold
-			nameLabel.Text = rec.displayName
-			nameLabel.TextScaled = true
-			nameLabel.TextColor3 = Color3.fromRGB(245, 235, 215)
-			nameLabel.Parent = gui
-		end
-	end
-
 	local open = Instance.new("ProximityPrompt")
 	open.Name = "OpenPrompt"
 	open.ActionText = "Open"
@@ -448,7 +457,8 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 	open.HoldDuration = 0
 	open.Enabled = false
 	open.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
-	InputKit.PromptDefaults(open, "Open")
+	InputKit.PromptDefaults(open, "Interact")
+	open.RequiresLineOfSight = false
 	open.Parent = part
 	pcall(function()
 		open.Triggered:Connect(function(player: Player)
@@ -481,6 +491,7 @@ function BoxService.Make(opts: MakeOptions): Record
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = RobuxShelf.Gold,
+			boxClass = RobuxShelf.Class,
 		}
 	end
 	local uid = opts.uid or Util.guid()
@@ -495,14 +506,22 @@ function BoxService.Make(opts: MakeOptions): Record
 	model.Name = "ShopItem"
 	local part = Instance.new("Part")
 	part.Name = "Box"
-	part.Size = opts.size or Vector3.new(2, 1.2, 1.6)
+	local boxSize = opts.size
+	if boxSize == nil then
+		if robux ~= nil then
+			boxSize = BoxSize.Class(RobuxShelf.Class).size
+		elseif slot ~= nil then
+			boxSize = StoreStock.BoxSizeOf(slot)
+		else
+			boxSize = BoxSize.Class(BoxSize.DefaultClass).size
+		end
+	end
+	part.Size = boxSize :: Vector3
 	part.Anchored = true
 	part.CanCollide = true
 	part.CFrame = cf
-	part.Color = colorOf(if slot then slot.color else nil)
-	if robux ~= nil then
-		part.Material = Enum.Material.Metal
-	end
+	local itemColor = colorOf(if slot then slot.color else nil)
+	part.Color = itemColor
 	part.CollisionGroup = BoxService.Group
 	part.Parent = model
 	model.PrimaryPart = part
@@ -535,7 +554,25 @@ function BoxService.Make(opts: MakeOptions): Record
 		part = part,
 	}
 	records[uid] = rec
-	dress(rec, part, if robux ~= nil then colorOf(RobuxShelf.GoldInk) else part.Color)
+	dress(rec, part, if robux ~= nil then colorOf(RobuxShelf.GoldInk) else itemColor)
+	-- The packaging: kraft body, tape in the item's colour, a label with its
+	-- name, the category stripe, trim, and a label on the aisle side.
+	local relX: number? = nil
+	if opts.counter ~= nil then
+		relX = cf.Position.X - opts.counter.CFrame.Position.X
+	end
+	BoxArt.Dress(model, part, {
+		name = rec.displayName,
+		kind = rec.itemKind,
+		color = itemColor,
+		gold = robux ~= nil,
+		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
+	})
+	for _, d in ipairs(model:GetChildren()) do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = BoxService.Group
+		end
+	end
 	if robux ~= nil then
 		BoxService.AskRobuxPrice(robux.kind, robux.key)
 	end
@@ -809,7 +846,7 @@ function BoxService.StockShop(model: Model)
 				local count = if slot.limited then GameConfig.LimitedStockCount else 1
 				for i = 1, count do
 					local base = counter.CFrame:PointToWorldSpace(child.Position)
-					local along = (i - (count + 1) / 2) * 1.3
+					local along = (i - (count + 1) / 2) * BoxSize.Pitch(StoreStock.BoxSizeOf(slot).Z)
 					local shift = counter.CFrame:VectorToWorldSpace(Vector3.new(0, 0, along))
 					BoxService.Make({
 						slotId = slot.slotId,
@@ -945,6 +982,23 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 		BoxService.ReturnHome(rec)
 		return true, "robuxAsk"
 	end
+	if BoxUnpack.OneAtATime(rec.itemKind) then
+		-- Two unopened boxes of the same gear or blueprint would grant it twice.
+		for _, other in pairs(records) do
+			if
+				other ~= rec
+				and other.paid
+				and not other.opened
+				and other.pendingGrant == true
+				and other.buyerId == player.UserId
+				and other.itemKind == rec.itemKind
+				and other.itemId == rec.itemId
+			then
+				speak(player, "alreadyOwned", rec)
+				return false, "alreadyOwned"
+			end
+		end
+	end
 	local shop = require(script.Parent.ShopService)
 	local ok, line, axeUid = shop.ChargeAndGrant(player, {
 		uid = rec.uid,
@@ -952,8 +1006,10 @@ function BoxService.Pay(player: Player, uid: string): (boolean, string)
 		itemId = rec.itemId,
 		limited = rec.limited,
 		shop = rec.shop,
+		deferGrant = true, -- the buyer is handed the box; the item comes out when it is opened
 	})
 	if ok then
+		rec.pendingGrant = BoxUnpack.Mode(rec.itemKind) ~= "vehicle"
 		rec.paid = true
 		rec.buyerId = player.UserId
 		rec.onShelf = false
@@ -1024,6 +1080,185 @@ local function equipOnce(player: Player, rec: Record)
 	end
 end
 
+-- The empty box folds away: the Poof attribute starts the clients' fold,
+-- the prompts go, and the model is destroyed PoofSeconds later.
+local function poof(rec: Record)
+	local model = rec.model
+	rec.model = nil
+	rec.part = nil
+	if model == nil then
+		return
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			d.Enabled = false
+		end
+	end
+	model:SetAttribute("Poof", true)
+	local ok = pcall(function()
+		task.delay(BoxUnpack.PoofSeconds, function()
+			model:Destroy()
+		end)
+	end)
+	if not ok then
+		model:Destroy()
+	end
+end
+
+local function grantBox(rec: Record): BoxGrant
+	return {
+		uid = rec.uid,
+		kind = rec.itemKind,
+		itemId = rec.itemId,
+		limited = rec.limited,
+		shop = rec.shop,
+	}
+end
+
+-- The item as a physical object where the box stood: an axe lying there, or
+-- a small parcel of goods. The buyer takes it with Interact.
+local function pickupModel(rec: Record, at: Vector3): Model
+	local model: Model
+	local axe = if rec.itemKind == "Axe" then ItemCatalog.GetAxe(rec.itemId) else nil
+	if axe then
+		model = AxeArt.Dropped(axe)
+		model:PivotTo(CFrame.new(at + Vector3.new(0, BoxUnpack.PickupLift, 0)))
+	else
+		model = Instance.new("Model")
+		local item = Instance.new("Part")
+		item.Name = "Item"
+		item.Size = Vector3.new(1.6, 1.6, 1.6)
+		item.Anchored = true
+		item.CanCollide = false
+		item.CFrame = CFrame.new(at + Vector3.new(0, BoxUnpack.PickupLift, 0)) * CFrame.Angles(0.4, 0.6, 0)
+		item.Color = colorOf(if rec.itemKind == "Gear" or rec.itemKind == "Cosmetic" then "#E6C36A" else "#C8A06B")
+		item.Material = Enum.Material.SmoothPlastic
+		item.Parent = model
+		model.PrimaryPart = item
+	end
+	model.Name = "BoxPickup"
+	return model
+end
+
+local function spawnPickup(player: Player, rec: Record, at: Vector3)
+	local model = pickupModel(rec, at)
+	local anchor = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+	model:SetAttribute("PickupUid", rec.uid)
+	model:SetAttribute("BuyerId", player.UserId)
+	if anchor then
+		local prompt = Instance.new("ProximityPrompt")
+		prompt.Name = "TakePrompt"
+		prompt.ActionText = "Pick up"
+		prompt.ObjectText = rec.displayName
+		prompt.MaxActivationDistance = BoxUnpack.TakeRange
+		prompt.HoldDuration = 0
+		prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
+		prompt:SetAttribute("TapPx", BoxLogic.PayTapPx)
+		InputKit.PromptDefaults(prompt, "Interact")
+		prompt.Parent = anchor
+		local uid = rec.uid
+		pcall(function()
+			prompt.Triggered:Connect(function(who: Player)
+				BoxService.TakePickup(who, uid)
+			end)
+		end)
+	end
+	model.Parent = if rec.counter ~= nil and rec.counter.Parent ~= nil then rec.counter.Parent else workspace
+	pickups[rec.uid] = {
+		uid = rec.uid,
+		model = model,
+		buyerId = player.UserId,
+		kind = rec.itemKind,
+		itemId = rec.itemId,
+		shop = rec.shop,
+		limited = rec.limited,
+		madeAt = os.clock(),
+		taken = false,
+	}
+end
+
+-- Hands the pickup's item over (once) and removes the object. `who` is the
+-- player to give it to; nil converts it for an owner who is gone.
+local function finishPickup(pickup: Pickup, who: Player?)
+	if pickup.taken then
+		return
+	end
+	pickup.taken = true
+	pickups[pickup.uid] = nil
+	local target = who
+	if target ~= nil then
+		local shop = require(script.Parent.ShopService)
+		shop.GrantItem(target, {
+			uid = pickup.uid,
+			kind = pickup.kind,
+			itemId = pickup.itemId,
+			limited = pickup.limited,
+			shop = pickup.shop,
+		})
+	end
+	if pickup.model then
+		pickup.model:Destroy()
+	end
+end
+
+-- The buyer takes the item: validated here (owner, range, rate), granted once.
+function BoxService.TakePickup(player: Player, uid: string): (boolean, string?)
+	if not RateLimiter.Allow(player, "BoxTake") then
+		return false, "rate"
+	end
+	local pickup = pickups[uid]
+	if pickup == nil then
+		return false, "gone"
+	end
+	local distance = math.huge
+	local pos = rootPosition(player)
+	local anchor = pickup.model.PrimaryPart or pickup.model:FindFirstChildWhichIsA("BasePart")
+	if pos ~= nil and anchor ~= nil then
+		distance = (pos - anchor.CFrame.Position).Magnitude
+	end
+	local ok, why = BoxUnpack.CanTake({
+		userId = player.UserId,
+		buyerId = pickup.buyerId,
+		distance = distance,
+		taken = pickup.taken,
+	})
+	if not ok then
+		local message = BoxUnpack.TakeMessage(why)
+		if message then
+			BoxService.Toast(player, message)
+		end
+		return false, why
+	end
+	finishPickup(pickup, player)
+	return true, nil
+end
+
+function BoxService.Pickups(): { [string]: Pickup }
+	return pickups
+end
+
+-- A player leaves, or a pickup goes unclaimed: the item is converted into
+-- the inventory so nothing is lost. Called with the pickup's owner if there.
+function BoxService.ConvertPickups(userId: number?, now: number?, owner: Player?)
+	local list: { Pickup } = {}
+	for _, pickup in pairs(pickups) do
+		local mine = userId ~= nil and pickup.buyerId == userId
+		local stale = userId == nil and now ~= nil and BoxUnpack.Expired(now, pickup.madeAt)
+		if mine or stale then
+			table.insert(list, pickup)
+		end
+	end
+	for _, pickup in ipairs(list) do
+		local who: Player? = owner
+		if who == nil then
+			pcall(function()
+				who = game:GetService("Players"):GetPlayerByUserId(pickup.buyerId)
+			end)
+		end
+		finishPickup(pickup, who)
+	end
+end
+
 function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 	local rec = records[uid]
 	local promptUid: string? = nil
@@ -1052,21 +1287,32 @@ function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 	if not ok or rec == nil then
 		return false, why
 	end
-	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
+	local mode = BoxUnpack.Mode(rec.itemKind)
+	if mode == "vehicle" then
 		local VehicleService = require(script.Parent.VehicleService)
 		local placed = VehicleService.TryPlaceFromBox(player, rec)
 		if not placed then
 			return false, "plot"
 		end
 	end
+	local at = if rec.part then rec.part.CFrame.Position else Vector3.zero
 	rec.opened = true
 	dropStorage(player, uid)
-	equipOnce(player, rec)
-	if rec.model then
-		rec.model:Destroy()
-		rec.model = nil
-		rec.part = nil
+	if BoxUnpack.Owed(rec.pendingGrant) then
+		rec.pendingGrant = false
+		if mode == "stock" then
+			-- Plot items unpack straight into the buyer's stock (BUILD places them).
+			local shop = require(script.Parent.ShopService)
+			shop.GrantItem(player, grantBox(rec))
+		elseif mode == "pickup" then
+			spawnPickup(player, rec, at)
+		end
+		BoxService.Toast(player, BoxUnpack.OpenedLine(mode, rec.displayName))
+	else
+		-- A box paid for before this change: its item was granted at the counter.
+		equipOnce(player, rec)
 	end
+	poof(rec)
 	return true, nil
 end
 
@@ -1105,13 +1351,22 @@ function BoxService.Commit(player: Player)
 		profile.storage = {}
 	end
 	local leaving: { string } = {}
+	BoxService.ConvertPickups(player.UserId, nil, player)
 	for uid, rec in pairs(records) do
 		if not rec.paid and rec.claimUserId == player.UserId then
 			BoxService.ReturnHome(rec)
 		elseif rec.paid and not rec.opened and rec.buyerId == player.UserId then
 			if profile ~= nil and type(profile.storage) == "table" and not hasStored(profile.storage, uid) then
 				if #profile.storage < ProfileSchema.StorageCap then
-					table.insert(profile.storage, { uid = uid, itemId = rec.itemId, shop = rec.shop })
+					table.insert(
+						profile.storage,
+						BoxUnpack.StoredEntry(uid, rec.itemId, rec.shop, BoxUnpack.Owed(rec.pendingGrant))
+					)
+				elseif BoxUnpack.Owed(rec.pendingGrant) then
+					-- No room to keep the box: hand the item over instead of losing it.
+					rec.pendingGrant = false
+					local shop = require(script.Parent.ShopService)
+					shop.GrantItem(player, grantBox(rec))
 				end
 			end
 			table.insert(leaving, uid)
@@ -1163,6 +1418,9 @@ function BoxService.Restore(player: Player, profile: any)
 			rec.paid = true
 			rec.buyerId = player.UserId
 			rec.onShelf = false
+			-- Saved with `pending`: the item is still in the box. Older saves
+			-- have no mark: their item was granted at the counter.
+			rec.pendingGrant = entry.pending == true and BoxUnpack.Mode(rec.itemKind) ~= "vehicle"
 		end
 	end
 	BoxService.RefreshPrompts()
@@ -1242,6 +1500,7 @@ function BoxService.Tick(dt: number)
 	acc = 0
 	local now = os.clock()
 	BoxService.Judge(now)
+	BoxService.ConvertPickups(nil, now)
 	BoxService.Refill(now)
 	BoxService.ScanProfiles()
 end
@@ -1254,6 +1513,12 @@ function BoxService.Reset()
 	for _, uid in ipairs(uids) do
 		BoxService.DestroyRecord(uid)
 	end
+	for _, pickup in pairs(pickups) do
+		if pickup.model then
+			pickup.model:Destroy()
+		end
+	end
+	table.clear(pickups)
 	table.clear(entered)
 	table.clear(respawnAt)
 	table.clear(homes)
