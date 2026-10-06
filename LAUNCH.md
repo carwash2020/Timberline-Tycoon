@@ -118,7 +118,7 @@ The Robux STORE is on screen: several passes and the two cash packs have real id
 | Dealership: buy the Pickup, then press it again | You own it and can drive it. The second press does not charge you. |
 | Hearth & Home | The price you pay matches the card. Each piece of gear is bought once. |
 | Rest a log and a plank on the mill pad | Both sell. The plank pays the plank price. |
-| Sky Bin by the pad | Its sell prompt shows only while the bin has wood. |
+| Sky Bin on your plot | Its sell prompt shows only to its owner, and only while the bin has wood. |
 | Instant Delivery, if the save already has a use | It sells the bed from anywhere, and refuses when none are left. No Store row for it, and no side button unless a use is already owned. |
 | Fill the server (12), have one leave, rejoin on a save that already claimed | One plot each. Leaving frees the slot. A full server tells you the district is full and keeps the save. |
 | Drive far enough that the plot streams out, then come back | The sign and the buildings return together. Move and Sell are on what you placed. |

@@ -1023,4 +1023,52 @@ return function(t)
 		t.eq(Slots.IsAccountKey("blueprintItems"), false)
 		t.eq(Slots.IsAccountKey("blueprintBook"), false)
 	end)
+
+	t.test("the Sky Bin item: a new save owns none, and the field is in the template", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.skyBinOwned, false)
+		Schema.Migrate(data)
+		t.eq(data.skyBinOwned, false)
+		t.eq(data.sawmillStock, {})
+	end)
+
+	t.test(
+		"the Sky Bin item: an old save with wood in its bin is given a bin, keeps the wood, and migrates once",
+		function()
+			local Schema, data = fresh()
+			data.skyBinOwned = nil -- a save from before the field
+			data.skyWood = { { w = "oak", v = 12 }, { w = "maple", v = 3, p = true } }
+			Schema.Migrate(data)
+			t.eq(data.skyBinOwned, true)
+			t.eq(data.sawmillStock, { "SkyBin" }, "a bin to place, free")
+			t.eq(#data.skyWood, 2, "the wood stays")
+			local before = t.loader():shared("Util").deepCopy(data)
+			Schema.Migrate(data)
+			sameClock(before, data)
+			t.eq(data, before, "migrating again changes nothing, and never hands over a second bin")
+			-- And under the v2 path (every join): still one, still the wood.
+			Schema.MigrateV2(data)
+			Schema.MigrateV2(data)
+			t.eq(data.sawmillStock, { "SkyBin" })
+			t.eq(#data.skyWood, 2)
+			-- Placed on the plot, the Migrate neither adds nor removes one.
+			data.sawmillStock = {}
+			data.plot.claimed = true
+			data.plot.placed = { { uid = "b", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 } }
+			Schema.Migrate(data)
+			t.eq(data.sawmillStock, {})
+			t.eq(#data.plot.placed, 1, "the plot keeps the Sky Bin through the clean-up")
+		end
+	)
+
+	t.test("the Sky Bin item: v1 logs in the old bin are still bought back, not given a bin", function()
+		local Schema, data = fresh()
+		data.skyBin = { { woodId = "oak", value = 7 } }
+		Schema.Migrate(data)
+		t.eq(data.skyBinOwned, false)
+		local result = Schema.MigrateV2(data)
+		t.eq(result.boughtBack, 7)
+		t.eq(data.skyBin, {})
+		t.eq(data.sawmillStock, {})
+	end)
 end

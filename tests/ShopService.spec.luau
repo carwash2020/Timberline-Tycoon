@@ -804,4 +804,50 @@ return function(t)
 		local gone = v1.ShopService.ChargeAndGrant(v1.player, { uid = "saw-5", kind = "Machine", itemId = "ChopSaw" })
 		t.eq(gone, false, "the chop saw is a v2 item")
 	end)
+
+	t.test("the Sky Bin: $400 at the Tool Shed, one per player, the item owed when the box opens", function()
+		local s = setup({ cash = 1000, loop = 2, claimed = true })
+		-- Paid at the counter with the box handed over: nothing is owed until it opens.
+		local ok, line = s.ShopService.ChargeAndGrant(
+			s.player,
+			{ uid = "bin-1", kind = "Machine", itemId = "SkyBin", deferGrant = true }
+		)
+		t.eq(ok, true)
+		t.eq(line, "thanks")
+		t.eq(s.profile.cash, 600, "$400")
+		t.eq(s.profile.sawmillStock, nil, "still in its box")
+		t.ok(s.ShopService.GrantItem(s.player, { uid = "bin-1", kind = "Machine", itemId = "SkyBin" }))
+		t.eq(s.profile.sawmillStock, { "SkyBin" })
+		t.eq(s.profile.skyBinOwned, true)
+		-- A second one is refused, and nothing is charged.
+		local again, why =
+			s.ShopService.ChargeAndGrant(s.player, { uid = "bin-2", kind = "Machine", itemId = "SkyBin" })
+		t.eq(again, false)
+		t.eq(why, "alreadyOwned")
+		t.eq(s.profile.cash, 600)
+		t.eq(s.toasts[#s.toasts], "You already own a Sky Bin.")
+		-- Not even when the first one is placed on the plot, or the stock is empty.
+		s.profile.sawmillStock = {}
+		table.insert(s.profile.plot.placed, { uid = "p", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 })
+		local third, why3 =
+			s.ShopService.ChargeAndGrant(s.player, { uid = "bin-3", kind = "Machine", itemId = "SkyBin" })
+		t.eq({ third, why3 }, { false, "alreadyOwned" })
+		-- Another box that was bought before the first one was opened: owned, no second bin.
+		local late = setup({ cash = 1000, loop = 2, claimed = true })
+		late.profile.skyBinOwned = true
+		late.profile.sawmillStock = { "SkyBin" }
+		late.ShopService.GrantItem(late.player, { uid = "late-1", kind = "Machine", itemId = "SkyBin" })
+		t.eq(late.profile.sawmillStock, { "SkyBin" }, "never two")
+	end)
+
+	t.test("the Sky Bin needs a plot to carry it home, and the price is $400", function()
+		local s = setup({ cash = 1000, loop = 2 })
+		local ok, line = s.ShopService.ChargeAndGrant(s.player, { uid = "bin-4", kind = "Machine", itemId = "SkyBin" })
+		t.eq({ ok, line }, { false, "needsLand" })
+		t.eq(s.profile.cash, 1000)
+		local poor = setup({ cash = 399, loop = 2, claimed = true })
+		local no, why =
+			poor.ShopService.ChargeAndGrant(poor.player, { uid = "bin-5", kind = "Machine", itemId = "SkyBin" })
+		t.eq({ no, why }, { false, "broke" })
+	end)
 end

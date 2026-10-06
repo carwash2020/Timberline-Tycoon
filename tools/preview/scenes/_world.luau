@@ -356,7 +356,6 @@ function World.build(ctx, opts)
 	for _, prop in ipairs(town.props) do
 		place(BuildingArt.Prop(prop.name, prop.seed), prop.cframe)
 	end
-	place(BuildingArt.SkyBin(), town.skyBin * CF.new(0, -2, 0))
 	for _, sign in ipairs(town.signs) do
 		place(BuildingArt.Signpost(sign.text, sign.lit), sign.cframe)
 	end

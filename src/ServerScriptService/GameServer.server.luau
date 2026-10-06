@@ -508,7 +508,8 @@ local function onSellLogs(player: Player)
 			end
 		end
 	end
-	-- The Sky Bin sits by the pad: logs sent down the Cloud Chute.
+	-- The v1 loop's Sky Bin logs (a rollback only: under v2 the bin is an item
+	-- on your plot, sold from its own prompt) sell with the pad.
 	for _, entry in ipairs(AetherService.TakeSkyBin(player)) do
 		total += entry.value
 		count += 1
@@ -883,10 +884,9 @@ if CoreLoop.V2() then
 		end
 	end)
 	-- The isles take loose wood (M1.7b): the Cloud Chutes and the Starfall
-	-- Forge are hoppers found the way the pad finds pieces, the Sky Bin by
-	-- the pad sells through SellService.PayEntries, and wood that falls off
-	-- the isles is lost.
-	local skyBinPart = sellArea:FindFirstChild("SkyBin")
+	-- Forge are hoppers found the way the pad finds pieces, the Sky Bin you
+	-- place on your plot (a tagged model, AetherService) sells through
+	-- SellService.PayEntries, and wood that falls off the isles is lost.
 	safely("AetherService.InitV2", AetherService.InitV2, {
 		woodFolder = woodFolder :: Instance,
 		resolve = function(model: Model): SellService.Piece?
@@ -904,7 +904,6 @@ if CoreLoop.V2() then
 			WoodService.Forget(model)
 			GrabService.Unregister(model)
 		end,
-		skyBin = if skyBinPart and skyBinPart:IsA("BasePart") then skyBinPart else nil,
 		heldBy = GrabService.HeldBy,
 	})
 end

@@ -2,9 +2,10 @@
 -- AetherService: the Aether Isles (GAME_DESIGN §10), apart from the gondola
 -- (GondolaService) and the crystal nodes (NodeService).
 --   * Cloud Chutes on the outer isles: "Send logs down" moves the logs in
---     your hands into your Sky Bin at the sawmill (profile.skyBin, up to
---     BiomeData sky.skyBinCapacity). Selling on the sawmill pad sells the
---     bin too (GameServer calls TakeSkyBin).
+--     your hands into your Sky Bin (profile.skyBin, up to BiomeData
+--     sky.skyBinCapacity). Selling on the sawmill pad sells the bin too
+--     (GameServer calls TakeSkyBin). That is the v1 loop, kept for a rollback
+--     until M1.10; it knows nothing of the bin item below.
 --   * The Starfall Forge on the main isle: "Add lumenwood" puts carried
 --     logs into it (profile.forgeLogs); "Forge" takes the recipe's cash and
 --     Sky Shards and makes a Starfall Axe (ItemCatalog forge recipe,
@@ -24,13 +25,17 @@
 -- (SellLogic.Payee: the owner, else the last holder, online) as a
 -- profile.skyWood entry (SellLogic.Entry: wood, u³, figure, plank, boost),
 -- up to the sky's skyBinVolume u³. A piece that won't fit is left where
--- it is, with a toast now and then. The chute's prompt only says how it
+-- it is, with a toast now and then. The Sky Bin is an item (SkyBinLogic):
+-- the chute is LOCKED until the payee has one placed on their plot; a
+-- locked chute takes nothing (the piece stays where it lies) and a toast
+-- says to buy one at the Tool Shed, or to place it. The chute's prompt only says how it
 -- works and how full the bin is. Taking a piece is the pad's: the record
 -- marked selling, let go of, forgotten, destroyed. Mirrored on the
 -- SkyBinVolume attribute (u³ in the bin).
---   * The Sky Bin by the sell pad gets a "Sell Sky Bin" prompt (from
---     beside it, RateLimiter "SellSkyBin"): SellService.PayEntries pays the
---     entries as the pad pays pieces, and the bin empties.
+--   * A placed Sky Bin (the model PlotService builds, tagged
+--     SkyBinLogic.Tag) gets a "Sell Sky Bin" prompt (from beside it, only
+--     for its owner, RateLimiter "SellSkyBin"): SellService.PayEntries pays
+--     the entries as the pad pays pieces, and the bin empties.
 --   * The Starfall Forge is a hopper too (the anvil and the hearth behind
 --     it): plain lumenwood laid there adds its u³ to its payee's
 --     profile.forgeWood, up to the recipe (ItemCatalog StarfallAxe
@@ -58,6 +63,7 @@ local ForgeLogic = require(ReplicatedStorage.Shared.ForgeLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local WoodData = require(ReplicatedStorage.Shared.WoodData)
 local AxeService = require(script.Parent.AxeService)
 local CarryService = require(script.Parent.CarryService)
@@ -78,7 +84,6 @@ export type V2Deps = {
 	resolve: (Model) -> Piece?, -- a piece's record (as SellService's resolve)
 	release: (Model) -> (), -- lets go of a held piece before it goes
 	forget: (Model) -> (), -- drops it from the registries
-	skyBin: BasePart?, -- SellArea's SkyBin by the pad: its "Sell Sky Bin" prompt
 	heldBy: ((Model) -> Player?)?, -- who's dragging a piece (a cloak wearer glides down with it)
 	-- Seams for the specs: what's in a box, the clock, who's online.
 	partsInBox: ((CFrame, Vector3, Instance) -> { BasePart })?,
@@ -417,13 +422,22 @@ local function chuteTick(h: Hopper, d: V2Deps, now: number)
 		if not f then
 			continue
 		end
+		-- No Sky Bin on the payee's plot: the chute is locked. The piece stays.
+		local lock = SkyBinLogic.ChuteLock(SkyBinLogic.HoldingsOf(f.profile))
+		if lock then
+			refuse(f.payee, SkyBinLogic.LockLine(lock), now)
+			continue
+		end
 		if not SellLogic.Fits(binUsed(f.profile), f.volume, cap) then
 			local text = if f.volume > cap
 				then string.format(
 					"That piece is too big for the Sky Bin (%s). Cut it smaller.",
 					SellLogic.VolumeText(cap)
 				)
-				else string.format("Your Sky Bin is full (%s). Sell it at the sawmill.", SellLogic.VolumeText(cap))
+				else string.format(
+					"Your Sky Bin is full (%s). Sell it from the bin on your plot.",
+					SellLogic.VolumeText(cap)
+				)
 			refuse(f.payee, text, now)
 			continue
 		end
@@ -536,8 +550,8 @@ function AetherService.ChuteInfo(player: Player)
 	end
 	notify(
 		player,
-		string.format(
-			"Lay wood in the Cloud Chute and it goes down to your Sky Bin by the sawmill. Sky Bin %s.",
+		SkyBinLogic.ChuteInfo(
+			SkyBinLogic.ChuteLock(SkyBinLogic.HoldingsOf(profile)),
 			SellLogic.BinText(binUsed(profile), binVolume())
 		)
 	)
@@ -564,28 +578,40 @@ function AetherService.ForgeInfo(player: Player)
 	)
 end
 
--- The Sky Bin's prompt by the sell pad (v2): sells what the chutes sent
--- down through SellService.PayEntries (paid, toasted and counted as a pad
--- sale), from beside the bin. The entries leave the save before the sale
--- and come back only if the pad isn't selling yet.
-function AetherService.SellSkyBin(player: Player)
+-- The placed Sky Bin's prompt (v2): sells what the chutes sent down through
+-- SellService.PayEntries (paid, toasted and counted as a pad sale), from
+-- beside YOUR bin: it must be the bin placed on your plot (OwnerId) and you
+-- must be within reach. The entries leave the save before the sale and come
+-- back only if the pad isn't selling yet.
+function AetherService.SellSkyBin(player: Player, bin: Instance?)
 	local d = v2
 	if not d or not RateLimiter.Allow(player, "SellSkyBin") then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
-	local bin = d.skyBin
 	local char = player.Character
 	local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
-	if not profile or not bin or not root or not root:IsA("BasePart") then
+	if not profile or not bin or not bin:IsA("BasePart") or bin.Parent == nil then
 		return
 	end
-	local reach = PROMPT_RANGE + GameConfig.RangeTolerance
-	if (root.CFrame.Position - bin.CFrame.Position).Magnitude > reach then
+	local model = bin:FindFirstAncestorOfClass("Model")
+	local owner = if model then model:GetAttribute("OwnerId") else nil
+	local distance: number? = nil
+	if root and root:IsA("BasePart") then
+		distance = (root.CFrame.Position - bin.CFrame.Position).Magnitude
+	end
+	local ok, why = SkyBinLogic.CanSell({
+		binOwnerId = if type(owner) == "number" then owner else nil,
+		userId = player.UserId,
+		distance = distance,
+		reach = PROMPT_RANGE + GameConfig.RangeTolerance,
+	})
+	if not ok then
+		notify(player, SkyBinLogic.SellRefusalLine(why))
 		return
 	end
 	if #profile.skyWood == 0 then
-		notify(player, "Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it.")
+		notify(player, SkyBinLogic.EmptyLine)
 		return
 	end
 	local entries = profile.skyWood
@@ -923,6 +949,18 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 		end)
 		addHopper(part, "chute")
 	end)
+	-- A Sky Bin placed on a plot (PlotService builds it, MachineArt tags it):
+	-- its prompt sells the bin's wood, for its owner only (SellSkyBin checks).
+	onTagged(SkyBinLogic.Tag, function(model)
+		local bin = model:FindFirstChild("SkyBin")
+		if not bin or not bin:IsA("BasePart") or bin:FindFirstChild("SellSkyBin") then
+			return
+		end
+		local prompt = addPrompt(bin, "Sell Sky Bin", "Sky Bin", 0, function(player: Player)
+			AetherService.SellSkyBin(player, bin)
+		end)
+		prompt.Name = "SellSkyBin" -- WorldUI shows it only while your bin has wood in it
+	end)
 	onTagged("StarfallForge", function(part)
 		loopPrompt(part, "Add lumenwood", "Check the forge", "Starfall Forge", function(player: Player)
 			if v2 then
@@ -974,19 +1012,12 @@ function AetherService.Init(notifyFn: (Player, string) -> ())
 end
 
 -- The v2 loop's hoppers (GameServer, under CoreLoop.V2(), after Init).
--- The chutes' and forge's prompts turn informational; the Sky Bin gets
--- its prompt.
+-- The chutes' and forge's prompts turn informational (the Sky Bin's prompt
+-- is added to each placed bin by Init).
 function AetherService.InitV2(deps: V2Deps)
 	v2 = deps
 	for _, entry in ipairs(relabel) do
 		entry.prompt.ActionText = entry.v2
-	end
-	local bin = deps.skyBin
-	if bin then
-		local prompt = addPrompt(bin, "Sell Sky Bin", "Sky Bin", 0, AetherService.SellSkyBin)
-		prompt.Name = "SellSkyBin" -- WorldUI shows it only while your bin has wood in it
-	else
-		warn("[AetherService] No Sky Bin by the sell pad: it can't be sold")
 	end
 	for _, player in ipairs(Players:GetPlayers()) do
 		local profile = ProfileService.GetProfile(player)

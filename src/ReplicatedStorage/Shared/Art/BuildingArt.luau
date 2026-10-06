@@ -2211,9 +2211,9 @@ end
 -- the scale's post, the rails, the weigh house), clear of the lane.
 -- Named parts: "SellPad" (as sellPadBase, CanCollide off), "SlotLabel"
 -- (one per slot), "LogRack", "ScalePost", "WeighHouse" (a Model, its
--- window on the west, toward the pad). The Sky Bin (BuildingArt.SkyBin)
--- is placed separately inside the pad's north-west corner, WorldPlan
--- decides where. Built around the pad's middle, ground at y = 0, the
+-- window on the west, toward the pad). There is no Sky Bin here any more: it
+-- is an item you place on your plot (BuildingArt.SkyBin is its art, built by
+-- MachineArt.BuildSkyBin). Built around the pad's middle, ground at y = 0, the
 -- street at -Z.
 function BuildingArt.SellStation(w: number, d: number): Model
 	local model = Kit.model("SellStationArt")
@@ -2293,7 +2293,7 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	end
 
 	-- Rails behind the pad (a split-rail fence, as the lot's): across the
-	-- back and a stretch of the west side by the Sky Bin.
+	-- back and a stretch of the west side.
 	local function rail(len: number, cf: CFrame)
 		local f = BuildingArt.Fence(len)
 		Kit.placeAt(f, cf)
@@ -2858,10 +2858,9 @@ function BuildingArt.Greenery(kind: string, size: number, seed: number, woodId: 
 	return PropArt.Bush(size, seed, LEAF)
 end
 
--- The Sky Bin by the sell pad, where logs sent down the Cloud Chute land
--- (each player sees their own count): a sky-blue banded bin under the end
--- of a flume that drops out of a puff of cloud behind it (+Z). Optional:
--- MapBuilder can build this instead of its plain box. Named parts:
+-- The Sky Bin item's art (MachineArt.BuildSkyBin wraps it for the plot),
+-- where wood sent down the Cloud Chute lands: a sky-blue banded bin under
+-- the end of a flume that drops out of a puff of cloud behind it (+Z). Named parts:
 -- "SkyBin" (4 x 4 x 4 centred at y = 2, collides; "SKY BIN" on SurfaceGuis
 -- on its front and back, each with a TextLabel clients may rewrite).
 function BuildingArt.SkyBin(): Model

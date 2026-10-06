@@ -2314,3 +2314,30 @@ movement stick) that rotates, not the right stick".
       set `TownModels.NpcMeshYaw = 0` (the meshes were already facing -Z) and
       tell Claude; if it was backwards before and is right now, nothing to do
 - [ ] Held items (Murph's lantern, Millie's clipboard) are still in the hand
+
+## The Sky Bin is an item (claude/sky-bin-item, 6 October 2026)
+
+Connor: "remove the skybox that collects dropped wood at the sawmill and make it an item sold with a box."
+
+- The fixed Sky Bin is gone from the sell station (art placement, `town.skyBin`, MapBuilder step, the sell prompt on it, the preview scenes). `BuildingArt.SkyBin` is kept as the item's art.
+- It is a boxed Tool Shed machine, **$400, one per player** (`ItemCatalog.Machines.SkyBin`, `Shared/SkyBinLogic`). Buying hands over a box; opening it puts the bin in your stock (`sawmillStock`, like the chop saw) and sets `profile.skyBinOwned`; the hammer places it on **your** plot (`MachineArt.BuildSkyBin`, 8 x 8 footprint, owner only, **one per plot**). The hammer sheet says **Take back** (free, back to stock; what is inside stays in the save).
+- **The Cloud Chute is locked until a bin is placed on your plot.** A locked chute takes nothing (the piece stays where it lies, so nothing is lost) and toasts "...Buy one at the Tool Shed ($400)..." or, if you own one that is not placed yet, "...place it with your hammer".
+- "Sell Sky Bin" is a prompt on the placed bin: only its owner, from beside it (`SkyBinLogic.CanSell`, RateLimiter `SellSkyBin`), paid through `SellService.PayEntries` as before. Capacity is still `BiomeData sky.skyBinVolume` (120 u³).
+- **Old saves:** `ProfileSchema.Migrate` (`SkyBinLogic.Migrate`, idempotent) sets `skyBinOwned` for any save with wood in `skyWood` (or a bin already in stock or on the plot) and, if no bin exists anywhere, hands over one **free in stock** to place. Nothing is paid out and no wood is lost. (v1 logs in the old `skyBin` list are still bought back into `v2Credit` by `MigrateV2`, as before.) The v1 rollback loop is untouched and knows nothing of the bin item.
+- Economy: `tools/economy` and `tools/economy1` regenerated, no change (the $400 is not modelled; the ranges hold).
+- Tool Shed shelf: the bin's box is a small one (sized from a 4 x 4 footprint), riding the axe table's spare room (`StoreStock` lane kinds).
+
+### Studio checks
+- [ ] The sell station beside the mill has no blue Sky Bin or flume any more; selling logs on the pad is unchanged
+- [ ] Tool Shed (open 6 AM to 8 PM): a small blue-ish box "Sky Bin" on the shelves, $400. Put it on the counter: "Buy this Sky Bin for $400?" Pay: "Paid for the Sky Bin. Open the box."
+- [ ] Try to buy a second one while the first box is unopened, then after opening it, then after placing it: "You already have that one..." at the counter and "You already own a Sky Bin." toast each time, nothing charged
+- [ ] Open the box on your plot: it unpacks to your stock ("Unpacked the Sky Bin. Place it with your hammer...")
+- [ ] Hammer, PLANS: the Sky Bin is listed under Machines ("Box from the Tool Shed" until you hold one). Place it: a blue bin with a flume and a cloud, "SKY BIN 0/120 u3" on its faces
+- [ ] A second place attempt (another box via /gift Machine SkyBin or the second bin of a friend): "You already have a Sky Bin on your plot..."; a friend with build rights cannot place one on your plot
+- [ ] Hammer on the bin: Move, Turn, **Take back**. Take back returns it to stock (no cash); place it again; any wood in it is still there
+- [ ] With NO bin (new save): on the Aether Isles lay wood in a Cloud Chute: it stays on the chute, a toast says to buy a Sky Bin at the Tool Shed; the "Check Sky Bin" prompt says the same
+- [ ] With a bought but unplaced bin: the toast says to place it on your plot instead
+- [ ] With the bin placed: the same wood goes down after a moment, "Sent 1 piece down the Cloud Chute. Sky Bin X/120 u3."; the bin's label updates; a full bin refuses with "Sell it from the bin on your plot."
+- [ ] Walk to your bin: **Sell Sky Bin** shows only while it has wood; it pays with the usual sale toast; from far away it does nothing ("Walk closer to your Sky Bin."); a friend visiting your plot does not see the prompt, and cannot sell your wood
+- [ ] Old save with wood in the Sky Bin (use a save from before this change, or set `skyWood` in Studio): you join with a Sky Bin in your stock and the wood still in it; place it, sell the wood. Rejoin: still exactly one bin
+- [ ] Preview: `bash tools/preview/shoot.sh town` shows the sell station with nothing in the north-west corner

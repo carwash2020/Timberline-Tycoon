@@ -729,7 +729,7 @@ Drive and Heading, the speed check, settle and parking are not touched. Loose ca
 - Per owner, per tick: `EconomyService.AddCash(owner, total * SaleMultiplier, "sold wood", "wood")`, one toast ("Sold 3 pieces · 41 u³ · $96"), WorldFX `Sold {pos, amount}` for the "+$" pops, `ForestService.OnSale(figures)`, and Quest, Daily and Milestone events (pieces, u³, $, by wood).
 - **Instant Delivery** (Robux): `SellService.SellBed(player)` sells the pieces in your BedZones from anywhere, with the same wallet-room check as today.
 - **2x Wood** (Robux): wood you cut while it's active carries `boost = 2`. 2x Cash stays at sale.
-- **Sky Bin**: wood dropped in a Cloud Chute hopper (AetherService) becomes `skyWood` entries `{w, v (u³), f?, p?}`, capped at `skyBinVolume` = 120 u³ in BiomeData. A "Sell Sky Bin" prompt by the pad pays it out through `SellService.PayEntries`.
+- **Sky Bin**: wood dropped in a Cloud Chute hopper (AetherService) becomes `skyWood` entries `{w, v (u³), f?, p?}`, capped at `skyBinVolume` = 120 u³ in BiomeData. The Sky Bin is an item (6 October 2026, `Shared/SkyBinLogic`): a boxed Tool Shed machine, $400, one per player, placed on your plot with the hammer, one per plot. Without a placed bin the chute is locked (the piece stays, nothing is lost). A "Sell Sky Bin" prompt on the placed bin (its owner only, from beside it) pays it out through `SellService.PayEntries`. Saves with wood in the old fixed bin are given a bin by `ProfileSchema.Migrate` (`skyBinOwned`).
 - **Forge**: lumenwood dropped in its hopper adds to `forgeWood`. `ForgeLogic` checks 60 u³.
 
 ---
@@ -1000,7 +1000,7 @@ Until M1.9, `CoreLoop = 1` keeps live servers on today's game.
   2. Back a loaded truck onto the pad: the whole bed sells.
   3. A friend's log on your bed pays them.
   4. A figured log reveals its figure.
-  5. Chute a lumenwood piece, then sell the Sky Bin at the mill.
+  5. Chute a lumenwood piece, then sell the Sky Bin from your plot (it is an item now; see §5).
 - Risks: the zone catching wood while it's being dragged through (intended).
 
 **M1.8 Murph, HUD, dailies, guide, shop text** (economy-ui)

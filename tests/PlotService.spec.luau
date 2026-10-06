@@ -218,6 +218,11 @@ return function(t)
 						model.Name = "ChopSaw"
 						return model
 					end,
+					BuildSkyBin = function()
+						local model = Instance.new("Model")
+						model.Name = "SkyBin"
+						return model
+					end,
 					SetCut = function(model, x, y)
 						model:SetAttribute("CutShown", string.format("%.1f %.1f", x, y))
 					end,
@@ -532,6 +537,64 @@ return function(t)
 		t.eq(#profile.plot.placed, 1)
 		t.eq(profile.sawmillStock, {})
 		t.eq(ann.attrs.SawmillStock, "")
+	end)
+
+	t.test("the Sky Bin: bought boxed, placed from stock on your plot, one per plot", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		t.eq(#profile.plot.placed, 0, "none in stock: refused")
+		t.eq(s.lastToast(), "Buy the Sky Bin at the Tool Shed first.")
+		profile.sawmillStock = { "SkyBin" }
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.cash, 1000, "bought at the counter, free to place")
+		t.eq(profile.sawmillStock, {})
+		t.eq(profile.plot.placed[1].blueprintId, "SkyBin")
+		-- A second one (a gift, a bug, a hacked client) has no room.
+		profile.sawmillStock = { "SkyBin" }
+		s.P.Place(ann, "SkyBin", 20, 0, 0)
+		t.eq(#profile.plot.placed, 1, "one per plot")
+		t.eq(s.lastToast(), "You already have a Sky Bin on your plot. There's only room for one.")
+		t.eq(profile.sawmillStock, { "SkyBin" }, "and the box is not spent")
+	end)
+
+	t.test("the Sky Bin is the owner's: a visitor with build rights can't put theirs on your plot", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob, bobProfile = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.permissions = { anyone = { build = true } }
+		bobProfile.sawmillStock = { "SkyBin" }
+		bob.standOn(1)
+		s.P.Place(bob, "SkyBin", 0, 0, 0)
+		t.eq(#profile.plot.placed, 0)
+		t.eq(s.lastToast(), "Only the plot's owner can put a Sky Bin down.")
+		t.eq(bobProfile.sawmillStock, { "SkyBin" }, "Bob keeps his box")
+	end)
+
+	t.test("taking the Sky Bin back returns it to stock for free, and what is in it waits", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.sawmillStock = { "SkyBin" }
+		profile.skyWood = { { w = "oak", v = 10 } }
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		local uid = profile.plot.placed[1].uid
+		s.P.Sell(ann, uid)
+		t.eq(#profile.plot.placed, 0)
+		t.eq(profile.sawmillStock, { "SkyBin" })
+		t.eq(ann.attrs.SawmillStock, "SkyBin")
+		t.eq(profile.cash, 1000, "no cash either way")
+		t.eq(profile.skyWood, { { w = "oak", v = 10 } }, "the wood is safe in the save")
+		t.eq(#s.items(1), 0)
+		-- It can be placed again.
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		t.eq(#profile.plot.placed, 1)
 	end)
 
 	t.test("hammer build: a store unlock is placed only once its blueprint has been used", function()

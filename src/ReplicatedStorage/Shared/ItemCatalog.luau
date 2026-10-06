@@ -678,10 +678,18 @@ export type MachineDef = {
 	priceCash: number,
 	shop: string,
 	color: string,
+	boxW: number?, -- the box is sized from this footprint (studs) when set (BoxSize)
+	boxD: number?,
 }
 
 -- $7,500, replacing the $12,200 placeholder.
 ItemCatalog.ChopSawPrice = 7500
+
+-- The Sky Bin (Connor, 6 October 2026): an item, one per player, boxed at the
+-- Tool Shed and placed on your plot. Wood sent down the Cloud Chute lands in
+-- it and you sell it from the bin's prompt (Shared/SkyBinLogic). Not on the
+-- economy ladder: tools/economy does not buy it.
+ItemCatalog.SkyBinPrice = 400
 
 ItemCatalog.Machines = {
 	ChopSaw = {
@@ -690,6 +698,15 @@ ItemCatalog.Machines = {
 		priceCash = ItemCatalog.ChopSawPrice,
 		shop = "ToolShed",
 		color = "#E2B93B",
+	},
+	SkyBin = {
+		id = "SkyBin",
+		displayName = "Sky Bin",
+		priceCash = ItemCatalog.SkyBinPrice,
+		shop = "ToolShed",
+		color = "#5D86B8",
+		boxW = 4, -- a small bin, a small box: two fit across the machine table
+		boxD = 4,
 	},
 } :: { [string]: MachineDef }
 

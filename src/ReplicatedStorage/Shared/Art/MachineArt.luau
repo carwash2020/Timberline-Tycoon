@@ -23,8 +23,10 @@ local ChopSawLogic = require(script.Parent.Parent.ChopSawLogic)
 local GameConfig = require(script.Parent.Parent.GameConfig)
 local InputKit = require(script.Parent.Parent.InputKit)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local BuildingArt = require(script.Parent.BuildingArt)
 local Kit = require(script.Parent.Kit)
 local SawmillLogic = require(script.Parent.Parent.SawmillLogic)
+local SkyBinLogic = require(script.Parent.Parent.SkyBinLogic)
 local Util = require(script.Parent.Parent.Util)
 
 local MachineArt = {}
@@ -678,6 +680,48 @@ function MachineArt.BuildChopSaw(ghost: boolean?): Model?
 	model:SetAttribute("Price", machine.priceCash)
 	model:SetAttribute("CutU", ChopSawLogic.DefaultCut)
 	model:SetAttribute("Run", true)
+	return model
+end
+
+-- The Sky Bin you place on your plot (SkyBinLogic): BuildingArt's bin, with
+-- its flume and cloud behind (+Z), on an invisible pivot slab the size of
+-- its footprint. The bin part keeps its name "SkyBin" (AetherService hangs
+-- the "Sell Sky Bin" prompt on it, WorldUI labels its SurfaceGuis) and the
+-- model is tagged SkyBinLogic.Tag. `ghost` is the placement preview.
+function MachineArt.BuildSkyBin(ghost: boolean?): Model?
+	local machine = ItemCatalog.GetMachine(SkyBinLogic.Id)
+	if not machine then
+		return nil
+	end
+	local preview = ghost == true
+	local model = BuildingArt.SkyBin()
+	model.Name = machine.id
+	local fp = SkyBinLogic.Footprint()
+	local root = Kit.part(
+		model,
+		"Root",
+		Vector3.new(fp.X, ChopSawLogic.RootY, fp.Y),
+		CFrame.new(0, ChopSawLogic.RootY / 2, 0),
+		WOOD,
+		Enum.Material.Wood
+	)
+	root.Transparency = 1
+	root.CanCollide = false
+	root.CanQuery = false
+	root.CanTouch = false
+	model.PrimaryPart = root
+	if preview then
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				ghostPart(d)
+			end
+		end
+	else
+		CollectionService:AddTag(model, SkyBinLogic.Tag)
+	end
+	model:SetAttribute("MachineId", machine.id)
+	model:SetAttribute("Shop", machine.shop)
+	model:SetAttribute("Price", machine.priceCash)
 	return model
 end
 

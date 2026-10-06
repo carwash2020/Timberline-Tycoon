@@ -398,7 +398,7 @@ end
 
 function ChopSawLogic.Blueprint(id: string): PlotData.Blueprint?
 	local machine = ItemCatalog.GetMachine(id)
-	if not machine then
+	if not machine or id ~= "ChopSaw" then
 		return nil
 	end
 	return {

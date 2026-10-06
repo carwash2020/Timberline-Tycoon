@@ -9,16 +9,18 @@
 --     the Gloam Hollow's trees come out). On a phone it's in the corner's
 --     second line instead, and hidden during the tutorial and while the
 --     save loads (HudLayout.ClockLine).
---   * The Sky Bin by the sell pad shows your own count ("SKY BIN 12/30"),
---     or under the v2 loop the u³ in it ("SKY BIN 14/120 u³", from the
---     SkyBinVolume attribute); its "Sell Sky Bin" prompt (the server's)
---     shows only while there's wood in it.
+--   * Your Sky Bin, the item you place on your plot (SkyBinLogic), shows
+--     your own count ("SKY BIN 12/30"), or under the v2 loop the u³ in it
+--     ("SKY BIN 14/120 u³", from the SkyBinVolume attribute); its "Sell
+--     Sky Bin" prompt (the server's) shows only to its owner, and only
+--     while there's wood in it. Somebody else's bin just says SKY BIN.
 -- The server sets the Biome and OwnedGear attributes and the
 -- VitalityTier_<biome> workspace attributes (ForestService). The clock
 -- reads Lighting.ClockTime, the hour the sky shows: LightingController
 -- sets it every frame from the server's clock (WorldTime), or in Studio
 -- from the ClockOverride attribute.
 
+local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -33,6 +35,7 @@ local ForestLogic = require(ReplicatedStorage.Shared.ForestLogic)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
+local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
 local HUD = require(script.Parent.HUD)
@@ -203,9 +206,9 @@ local function buildClock()
 end
 
 -- Calls `fn` with the named child now, and when a later one arrives.
--- SellArea is parented at the end of the map build, and the Sky Bin's
--- sell prompt is added after that. A bare WaitForChild warns during boot
--- and would hang forever on a part that had streamed out.
+-- The Sky Bin's sell prompt is added by the server after the bin appears.
+-- A bare WaitForChild warns during boot and would hang forever on a part
+-- that had streamed out.
 local function whenChild(parent: Instance, name: string, fn: (Instance) -> ())
 	local found = parent:FindFirstChild(name)
 	if found then
@@ -218,7 +221,7 @@ local function whenChild(parent: Instance, name: string, fn: (Instance) -> ())
 	end)
 end
 
-local function bindSkyBin(bin: Instance)
+local function bindSkyBin(bin: Instance, mine: boolean)
 	local labels: { TextLabel } = {}
 	for _, gui in ipairs(bin:GetChildren()) do
 		local label = if gui:IsA("SurfaceGui") then gui:FindFirstChildOfClass("TextLabel") else nil
@@ -231,6 +234,13 @@ local function bindSkyBin(bin: Instance)
 	local volumeCap = if sky then sky.skyBinVolume or 120 else 120
 	local sellPrompt: ProximityPrompt? = nil
 	local function refresh()
+		if not mine then
+			local theirs = sellPrompt
+			if theirs then
+				theirs.Enabled = false -- only the owner sells from their bin
+			end
+			return
+		end
 		local text: string
 		if CoreLoop.V2() then
 			local used = player:GetAttribute("SkyBinVolume")
@@ -271,26 +281,20 @@ local function bindSkyBin(bin: Instance)
 	armPrompt()
 end
 
--- The Sky Bin by the sell pad shows this player's own count.
-local function watchSkyBinOn(map: Instance)
-	whenChild(map, "SellArea", function(area: Instance)
-		whenChild(area, "SkyBin", function(bin: Instance)
-			bindSkyBin(bin)
-		end)
-	end)
-end
-
+-- A placed Sky Bin (tagged SkyBinLogic.Tag) shows its owner's own count.
 local function watchSkyBin()
-	local map = workspace:FindFirstChild("TimberlineMap")
-	if map then
-		watchSkyBinOn(map)
-		return
-	end
-	workspace.ChildAdded:Connect(function(child: Instance)
-		if child.Name == "TimberlineMap" then
-			watchSkyBinOn(child)
+	local function hook(model: Instance)
+		if not model:IsA("Model") then
+			return
 		end
-	end)
+		whenChild(model, "SkyBin", function(bin: Instance)
+			bindSkyBin(bin, model:GetAttribute("OwnerId") == player.UserId)
+		end)
+	end
+	for _, inst in ipairs(CollectionService:GetTagged(SkyBinLogic.Tag)) do
+		hook(inst)
+	end
+	CollectionService:GetInstanceAddedSignal(SkyBinLogic.Tag):Connect(hook)
 end
 
 -- A toast when the grove you're standing in changes tier.

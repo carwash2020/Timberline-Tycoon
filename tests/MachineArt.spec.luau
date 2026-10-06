@@ -104,4 +104,27 @@ return function(t)
 		end
 		t.eq(MachineArt.Build("NotAMill", false), nil)
 	end)
+
+	t.test(
+		"the Sky Bin: BuildingArt's bin on a footprint-sized pivot, tagged for its prompt; a ghost is see-through",
+		function()
+			local SkyBinLogic = loader:shared("SkyBinLogic")
+			local bin = MachineArt.BuildSkyBin(false)
+			t.eq(bin.Name, "SkyBin")
+			t.eq(bin.PrimaryPart, find(bin, "Root", "BasePart"))
+			local fp = SkyBinLogic.Footprint()
+			t.eq({ bin.PrimaryPart.Size.X, bin.PrimaryPart.Size.Z }, { fp.X, fp.Y })
+			local part = find(bin, "SkyBin", "BasePart")
+			t.ok(part and part.CanCollide, "the bin part collides: the prompt goes on it")
+			t.ok(bin:HasTag(SkyBinLogic.Tag), "tagged for AetherService and WorldUI")
+			t.eq(bin:GetAttribute("MachineId"), "SkyBin")
+			local ghost = MachineArt.BuildSkyBin(true)
+			t.ok(not ghost:HasTag(SkyBinLogic.Tag), "a ghost is not a bin")
+			for _, d in ipairs(ghost:GetDescendants()) do
+				if d:IsA("BasePart") then
+					t.eq(d.CanCollide, false, d.Name)
+				end
+			end
+		end
+	)
 end

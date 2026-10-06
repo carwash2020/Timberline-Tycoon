@@ -209,7 +209,7 @@ NPCData.List = {
 			"Logs on the pad, cash in your pocket. That's the Millie guarantee.",
 			"Birdseye, quilted, curly... the saw never lies about what's inside a log.",
 			"Mind the blade, sweetie. It's hungry today.",
-			"Wood you lay in a Cloud Chute waits for you in the Sky Bin, right over there.",
+			"A Sky Bin from the Tool Shed, set on your plot, catches wood from the Cloud Chute.",
 			"Replant a stump and it grows back for you. Anybody fells it, you get a share!",
 			"Sawdust in my hair, sawdust in my tea. Wouldn't have it any other way.",
 			"Rare wood's worth more at the mill. Lumenwood glows right through the till.",
@@ -401,7 +401,7 @@ NPCData.List = {
 			"Lumenwood glows up there. Pretty as a sunrise, heavy as regret.",
 			"Fall off an isle? The clouds are soft. The ground is not.",
 			"The Skyroot hums at night. I swear it's singing.",
-			"Logs from the isles go down a Cloud Chute. Millie catches 'em in the Sky Bin.",
+			"Wood from the isles goes down a Cloud Chute into your Sky Bin. Get one at the Tool Shed.",
 			"Sky Shards up top feed the Starfall Forge. Bring a strong axe.",
 		},
 		react = {

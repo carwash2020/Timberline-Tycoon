@@ -247,6 +247,28 @@ function ShopLogic.GearDetail(gear: GearDef): string
 end
 
 ---------------------------------------------------------------------------
+-- The Sky Bin (Tool Shed): one per player
+---------------------------------------------------------------------------
+
+-- "buy": not owned yet. "owned": you already have one (in a box, in stock,
+-- or on your plot), so a second is refused and the shelf greys it.
+export type SkyBinStatus = "buy" | "owned"
+
+ShopLogic.SkyBinOwnedLine = "You already own a Sky Bin."
+
+function ShopLogic.SkyBinStatusOf(owned: boolean): SkyBinStatus
+	return if owned then "owned" else "buy"
+end
+
+-- Why a boxed machine can't be bought, or nil. Only the Sky Bin is limited.
+function ShopLogic.MachineRefusal(machineId: string, owned: boolean): string?
+	if machineId == "SkyBin" and owned then
+		return ShopLogic.SkyBinOwnedLine
+	end
+	return nil
+end
+
+---------------------------------------------------------------------------
 -- Attributes
 ---------------------------------------------------------------------------
 
