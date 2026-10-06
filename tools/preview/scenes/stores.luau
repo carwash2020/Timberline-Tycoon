@@ -6,7 +6,9 @@
 -- box and the aisle can be judged at a glance. Views: 1 Tool Shed from
 -- above, 2 Tool Shed from the door, 3 Hearth & Home from above, 4 Hearth &
 -- Home from the door, 5 Dealership from above, 6 Tool Shed close on the
--- tables, 7 Hearth & Home close on a shelf.
+-- tables, 7 Hearth & Home close on a shelf, 8 the Tool Shed's counter and
+-- axe rack at the back, 9 Hearth & Home's counter at the back, 10 the
+-- showroom lobby and its counter.
 local Common = require("./_common")
 
 return {
@@ -131,23 +133,41 @@ return {
 		shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44), 0, 0)
 		walker(0, -12)
 		walker(-1.5, 14)
-		table.insert(cameras, { pos = { 0, 78, -30 }, target = { 0, 0, 2 }, label = "1 Tool Shed from above" })
-		table.insert(cameras, { pos = { 0, 12, -34 }, target = { 0, 3, 8 }, label = "2 Tool Shed from the door" })
+		table.insert(cameras, { pos = { 0, 100, -34 }, target = { 0, 0, 2 }, label = "1 Tool Shed from above" })
+		table.insert(
+			cameras,
+			{ pos = { 0, 9, -36 }, target = { 0, 4, 14 }, label = "2 Tool Shed from the door", fov = 80 }
+		)
 
 		shop("HearthAndHome", "GENERAL STORE", C3.fromRGB(122, 90, 60), 90, 0)
 		walker(90, -12)
-		table.insert(cameras, { pos = { 90, 62, -36 }, target = { 90, 2, 6 }, label = "3 Hearth & Home from above" })
+		table.insert(cameras, { pos = { 90, 92, -30 }, target = { 90, 0, 2 }, label = "3 Hearth & Home from above" })
 		table.insert(
 			cameras,
-			{ pos = { 90, 9, -30 }, target = { 90, 5, 8 }, label = "4 Hearth & Home from the door", fov = 85 }
+			{ pos = { 90, 8, -34 }, target = { 90, 5, 16 }, label = "4 Hearth & Home from the door", fov = 85 }
 		)
 
-		shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181), 160, 0)
-		table.insert(cameras, { pos = { 160, 62, -34 }, target = { 160, 0, 1 }, label = "5 Dealership from above" })
+		shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181), 240, 0)
+		table.insert(
+			cameras,
+			{ pos = { 240, 200, -22 }, target = { 240, 0, 0 }, label = "5 Dealership from above", fov = 65 }
+		)
 		table.insert(cameras, { pos = { 14, 14, -12 }, target = { 6, 3, 2 }, label = "6 Tool Shed tables, close" })
 		table.insert(
 			cameras,
 			{ pos = { 70, 10, -4 }, target = { 68, 3, 6 }, label = "7 Hearth & Home gear shelf, close", fov = 80 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { 0, 8, 4 }, target = { 0, 6, 22 }, label = "8 Tool Shed counter and axe rack", fov = 75 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { 90, 8, 5 }, target = { 90, 5, 20 }, label = "9 Hearth & Home counter", fov = 75 }
+		)
+		table.insert(
+			cameras,
+			{ pos = { 176, 8, -6 }, target = { 176, 4, 28 }, label = "10 the showroom lobby and counter", fov = 70 }
 		)
 
 		return {

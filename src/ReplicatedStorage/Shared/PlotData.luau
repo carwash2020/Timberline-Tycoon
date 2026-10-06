@@ -52,11 +52,12 @@ PlotData.Homes = {
 	-- South of East Meadow, and far enough west that the two shelves
 	-- don't meet. About (230, -350); a little further so the gap holds.
 	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 248, z = -380 },
-	-- Ten studs north of the old spot, so the blend clears the display
-	-- lot's north edge (z 123) by more than 10 studs.
+	-- 65 studs north of its first spot (z 290 to 345), so the blend clears the
+	-- showroom lawn's north edge (z 166, the hall is 64 deep) by more than 10
+	-- studs: PlotLogic.spec asks 66 between a shelf's blend and a reserved box.
 	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 345 },
 	{ id = "north", name = "North Bend", region = "the north road", x = -190, z = 530 },
-	-- East of the display lot (x 184-296). The shelf and its blend stay
+	-- East of the display lot (x 178-340). The shelf and its blend stay
 	-- south of the lot and the path from the showroom.
 	{ id = "mill", name = "East Meadow", region = "east of town", x = 450, z = -130 },
 	{ id = "meadow", name = "North Meadow", region = "the north road", x = 130, z = 680 },

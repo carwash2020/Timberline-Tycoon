@@ -229,7 +229,7 @@ NPCData.List = {
 		name = "Tink",
 		role = "Axe smith",
 		shop = "ToolShed",
-		spot = { kind = "counter", model = "ToolShed", fallback = Vector3.new(-57, 0, 110) },
+		spot = { kind = "counter", model = "ToolShed", fallback = Vector3.new(-84, 0, 133.55) },
 		idle = "glasses",
 		work = "chop",
 		promptLift = 150,
@@ -278,7 +278,7 @@ NPCData.List = {
 		name = "Dale",
 		role = "Truck dealer",
 		shop = "Dealership",
-		spot = { kind = "counter", model = "Dealership", fallback = Vector3.new(48, 0, 110.4) },
+		spot = { kind = "counter", model = "Dealership", fallback = Vector3.new(194, 0, 158.43) },
 		idle = "wipe",
 		promptLift = 80,
 		look = {
@@ -324,7 +324,7 @@ NPCData.List = {
 		name = "Hazel",
 		role = "Gear keeper",
 		shop = "HearthAndHome",
-		spot = { kind = "counter", model = "HearthAndHome", fallback = Vector3.new(-93.5, 0, 110.3) },
+		spot = { kind = "counter", model = "HearthAndHome", fallback = Vector3.new(-100, 0, 204.95) },
 		idle = "lookAround",
 		work = "sweep",
 		promptLift = 80,
@@ -424,7 +424,7 @@ NPCData.List = {
 		route = {
 			{ x = -32, z = 58 },
 			{ x = -50, z = 66 },
-			{ x = -78, z = 84, pause = 4, face = 180 }, -- window-shopping at Hearth & Home
+			{ x = -78, z = 84, pause = 4, face = 180 }, -- window-shopping at the Tool Shed lane
 			{ x = -60, z = 82 },
 			{ x = -45, z = 84, pause = 3, face = 180 }, -- and at the Tool Shed
 			{ x = -38, z = 85 }, -- round the well

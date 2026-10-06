@@ -43,7 +43,8 @@ export type Marker = {
 }
 
 -- The shops' chips are their accents (WorldPlan.Town().shops). Each
--- stands on a point 16-19 studs over its part (its bottom edge there:
+-- stands on a point 19-32 studs over its part (the counters are at the back
+-- of the shops now, so the offsets reach forward over the front roofs) (its bottom edge there:
 -- SizeOffset), clear of its building's roof whatever its size, over its
 -- own building: nudged east or toward the street (the 1.5x buildings of
 -- TWN-13: over a low part of the roof, and so that from the spawn, on a

@@ -97,7 +97,7 @@ return {
 		return {
 			root = root,
 			-- East edge covers the display lot (x about 188 to 294).
-			terrain = Common.terrain(ctx, -190, -70, 310, 250, 4),
+			terrain = Common.terrain(ctx, -190, -70, 360, 260, 4),
 			shadowRadius = 200,
 			fov = 50,
 			lighting = {
@@ -119,9 +119,9 @@ return {
 			cameras = {
 				{ pos = { 2, 6.5, 32 }, target = { 0, 9, 110 }, label = "from the spawn" },
 				{ pos = { -95, 105, -20 }, target = { -10, 0, 100 }, label = "aerial" },
-				{ pos = { -57, 7, 56 }, target = { -57, 8, 104 }, label = "Tool Shed, up its path" },
-				{ pos = { 40, 8.5, 64 }, target = { 52, 8, 104 }, label = "Dealership" },
-				{ pos = { -83, 8.5, 62 }, target = { -93.5, 8, 104 }, label = "Hearth & Home" },
+				{ pos = { -84, 7, 56 }, target = { -84, 8, 104 }, label = "Tool Shed, up its path" },
+				{ pos = { 190, 9, 62 }, target = { 205, 8, 104 }, label = "Dealership" },
+				{ pos = { -118, 8.5, 140 }, target = { -102, 8, 172 }, label = "Hearth & Home" },
 				{ pos = { -36, 12, 116 }, target = { -40, 6, 150 }, label = "gondola station" },
 				{ pos = { -10, 6, 30 }, target = { -28, 2, 42 }, label = "Murph's camp" },
 				{ pos = { 14, 5.5, 62 }, target = { 0, 7, 104 }, label = "sell pad + mill" },
@@ -133,13 +133,13 @@ return {
 				{ pos = { -6, 5.5, -12 }, target = { -22, 4.2, -16 }, label = "south exit, grove gate" },
 				-- Standing in the General Store's doorway, looking in at the counter.
 				{
-					pos = { -100, 6.2, 97.5 },
-					target = { -100, 4.5, 122 },
+					pos = { -100, 6.2, 163 },
+					target = { -100, 4.5, 195 },
 					fov = 62,
 					label = "store interior from the door",
 				},
 				-- The open display lot, trucks facing the plot road.
-				{ pos = { 169, 34, 32 }, target = { 247, 2, 100 }, fov = 48, label = "dealership display lot" },
+				{ pos = { 235, 62, 40 }, target = { 262, 0, 125 }, fov = 55, label = "dealership display lot" },
 				-- The Robux store board: from the spawn, and close.
 				{ pos = { 2, 6.5, 32 }, target = { -20.5, 7, 58.3 }, fov = 60, label = "store board from the spawn" },
 				{ pos = { -8, 5, 58.3 }, target = { -20.5, 5, 58.3 }, fov = 60, label = "store board close" },

@@ -4,7 +4,7 @@
 -- (as built) and CLOSED (the closed pose, with the "Closed - opens at 7 AM"
 -- sign the server writes). Views: 1 Hearth & Home open, 2 Hearth & Home
 -- closed, 3 Tool Shed open, 4 Tool Shed closed, 5 showroom open, 6 showroom
--- closed.
+-- closed, 7 to 9 each shop three-quarters from the street.
 local Common = require("./_common")
 
 return {
@@ -47,7 +47,7 @@ return {
 		shop("HearthAndHome", "GENERAL STORE", C3.fromRGB(122, 90, 60), 0, false, "HearthAndHome")
 		shop("HearthAndHome", "GENERAL STORE", C3.fromRGB(122, 90, 60), 80, true, "HearthAndHome")
 		shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44), 160, false, "ToolShed")
-		shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44), 200, true, "Dealership")
+		shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44), 200, true, "ToolShed")
 		local showroom = BuildingArt.Shop("Dealership", "DEALERSHIP", C3.fromRGB(47, 109, 181))
 		Kit.placeAt(showroom, CF.new(400, 0, 0))
 		showroom.Parent = root
@@ -76,6 +76,21 @@ return {
 					target = { 400 + lobby, 6, 90 - hall.innerD / 2 },
 					label = "6 showroom, closed",
 					fov = 70,
+				},
+				-- The shops' street sides, roof on, from three-quarters: the facades,
+				-- awnings, windows, raised name boards and the doors.
+				{
+					pos = { 160 - 40, 22, -62 },
+					target = { 160, 10, -14 },
+					label = "7 Tool Shed, three-quarter",
+					fov = 62,
+				},
+				{ pos = { -50, 22, -62 }, target = { 0, 8, -14 }, label = "8 Hearth & Home, three-quarter", fov = 62 },
+				{
+					pos = { 400 + lobby - 40, 24, -hall.innerD / 2 - 62 },
+					target = { 400 + lobby + 10, 8, -hall.innerD / 2 },
+					label = "9 showroom, three-quarter",
+					fov = 62,
 				},
 			},
 		}

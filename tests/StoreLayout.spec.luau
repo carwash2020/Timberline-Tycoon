@@ -13,6 +13,7 @@ return function(t)
 	local DealershipLot = t.load("ReplicatedStorage/Shared/Art/DealershipLot")
 	local Kit = t.load("ReplicatedStorage/Shared/Art/Kit")
 	local ShowroomLight = t.shared("ShowroomLight")
+	local ShopFacadeClear = t.load("ReplicatedStorage/Shared/Art/ShopFacade").DoorClear
 	local town = WorldPlan.Town()
 
 	local function parts(model)
@@ -175,6 +176,60 @@ return function(t)
 			end
 		end
 	)
+
+	t.test("the facades are looks only and leave every door's opening and the walk to it clear", function()
+		local FACADE = {
+			WindowFrame = true,
+			WindowSill = true,
+			WindowGlass = true,
+			WindowBar = true,
+			FlowerBox = true,
+			Flowers = true,
+			Planter = true,
+			PlanterBand = true,
+			PlanterLeaves = true,
+			Barrel = true,
+			BarrelHoop = true,
+			Crate = true,
+			CrateBand = true,
+			BenchSeat = true,
+			BenchBack = true,
+			BenchLeg = true,
+			SandwichBoard = true,
+			Doormat = true,
+			Chimney = true,
+			ChimneyCap = true,
+			AwningStripe = true,
+			AwningPost = true,
+			FlagPole = true,
+			FlagCloth = true,
+			RoofUnit = true,
+			RoofUnitFan = true,
+		}
+		for kind, entry in pairs(placed) do
+			local spec = BuildingArt.FacadeSpec(kind, BuildingArt.Scale[kind] or 1, Color3.fromRGB(100, 100, 100))
+			local origin = entry.spot.cframe.Position
+			local n = 0
+			for _, p in ipairs(parts(entry.model)) do
+				-- (Crate and Barrel names are also used inside by the interior's own looks-only
+				-- crates and by the Tool Shed's solid firewood, so only parts out front count.)
+				local x0, x1, y0, y1, z0, z1 = aabb(p)
+				local outside = z1 < origin.Z + spec.frontZ + 0.2
+				if FACADE[p.Name] and outside then
+					n += 1
+					t.eq(p.CanCollide, false, kind .. "'s " .. p.Name .. " is looks only")
+					-- Out of the door's opening (and 0.8 each side of it) below the lintel.
+					local doorX0 = origin.X + spec.doorCx - spec.doorHalf - ShopFacadeClear
+					local doorX1 = origin.X + spec.doorCx + spec.doorHalf + ShopFacadeClear
+					local overDoor = x1 > doorX0 and x0 < doorX1
+					if overDoor and p.Name ~= "Doormat" and p.Name ~= "AwningStripe" and p.Name ~= "Chimney" then
+						t.ok(y0 > spec.doorTop - 0.2 or y1 < 0.3, kind .. "'s " .. p.Name .. " stands in the doorway")
+					end
+				end
+			end
+			t.ok(n >= 6, kind .. " has a dressed facade: " .. n .. " parts out front")
+		end
+	end)
 
 	---------------------------------------------------------------------------
 	-- The showroom's light

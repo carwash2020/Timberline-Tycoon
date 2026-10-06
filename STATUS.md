@@ -1,6 +1,6 @@
 # STATUS: read this first in a new session
 
-Last updated 6 October 2026, after PR #83. Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 6 October 2026, after PR #83 plus the claude/store-polish branch (not merged yet). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 ## Who and how
 
@@ -42,6 +42,8 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## What has landed (everything is on main; newest first)
 
+- **claude/store-polish (branch, not merged):** counters at the back of every shop, bigger spaced-out shops (Tool Shed x -84, General Store behind it, showroom hall x 181 to 336 north of the Land Office; the sell pad's keep-out x -60 to 60, z 80 to 140 stays empty), a showroom with a clear 14-stud walkway and boxes on the plinths, raised name boards, new floors, real axe models on the Tool Shed rack, the water tower out of the shop, the showroom light down 30% (`ShowroomLight`), the Tool Shed open 6 AM to 8 PM, and more shop detail (`ShopFacade`, `ShopInterior`). **The Climb plot moved to z 345.** Notes and Studio checks: PHASE2_NOTES.md "Store polish".
+
 - #83 Murph's cart is gone; the first sale (`sell` step, still step 3 of 8) is at the sawmill's sell pad (beacon `sellPad`). Murph still pays $25 on it, the plot step $175. Economy headlines 61 s / 7.3 min / 13.1 min (the floor is 13) / 50.7 min / 30.4 h.
 - #79 the hammer and physical blueprints replace BUILD mode (BUILD_SYSTEM.md): blueprints are rolled plans you use to learn a building for good (`BlueprintBook`), the Hammer opens the list on click / RT / tap, pieces are placed, filled with wood, and moved/turned/sold with the hammer; saves migrate (`blueprintBook`, `blueprintItems`, `hammer`).
 - #82 real stores: designed boxes sized by item (`BoxSize`), bigger Tool Shed and Hearth & Home, doors that shut on the keeper's hours (`ShopDoorLogic`), the Dealership as an indoor showroom, and buying hands over a box you open (`BoxUnpack`).
@@ -60,7 +62,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 3. **If axes or trees still show as plain parts:** send the `[MapBuilder] build check:` and `[MeshKit]` Output lines; the likely fix is asset permissions in Creator Hub (PHASE2_NOTES.md, "Blender meshes are back on"). Send the `[Load]` lines if loading is still slow (next win: terrain prebake, HANDOFF.md section 12).
 4. **Not reproduced without Studio:** signs/roof/buildings sinking (build-check print and ground snap shipped), backward-walking NPCs, the flat blue ground at night near spawn, smoke at the cursor.
 5. **Questions for Connor:** should Cabin, Warehouse and the other free-to-place pieces become bought blueprints? Should blueprints spawn in the world? A real trade window? Lanternwood economy numbers (MORNING_HANDOFF.md)? Badge IDs? Is the Rustbucket recall fee of $5 OK? A real day counter, and weather following game time? Should region/grove toasts wait for the tutorial to end? More trees near plots? Install Blender here (uploads still need Connor's account)?
-6. The v1 rollback loop still charges the plot with no Murph payback. A tutorial skipper or replayer pays the full $150 with no payback. The Dealership moved about 70 studs east; an unclaimed pickup lives in memory for 5 minutes.
+6. The v1 rollback loop still charges the plot with no Murph payback. A tutorial skipper or replayer pays the full $150 with no payback. The Dealership hall now stands at x 181 to 336, z 96 to 162 (store-polish); an unclaimed pickup lives in memory for 5 minutes.
 
 ## Tooling notes
 

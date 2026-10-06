@@ -503,18 +503,17 @@ local function toolShed(model: Model, frame: Frame)
 			TIMBER,
 			GOLD
 		)
-		hangSign(
+		-- The gold shelf's name on a board across the table's front (a hanging
+		-- sign here would hide the axes on the rack behind).
+		local board = dBox(
 			model,
-			0,
-			frame.ceilY - 3.7,
-			cz - depth / 2 - 0.2,
-			8.4,
-			1.6,
-			frame.ceilY - 0.9,
-			"ROBUX SHELF",
+			"RobuxSign",
+			V3(math.max(8.4, width - 1), 1.1, 0.12),
+			CF(0, RobuxShelf.TableTop - 0.9, cz - depth / 2 - 0.1),
 			GOLD,
-			GOLD_INK
+			MAT.SmoothPlastic
 		)
+		Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
 	end
 	axeRack(model, frame)
 	counterDetail(model, frame)
@@ -771,14 +770,14 @@ local function dealership(model: Model, frame: Frame, west: number, east: number
 	banner(model, west + 3, ceil - 5, zf + 12, hex("#2F6DB5"), "NEW\nRIGS")
 	banner(model, west + 23, ceil - 5, zf + 12, hex("#C8402F"), "SALE")
 	banner(model, west + 3, ceil - 5, zf + 30, hex("#E3B73C"), "TRUCKS")
-	for i, x in ipairs({ west + 8.5, west + 12 }) do
-		dBox(model, "BrochureRack", V3(2.4, 4.2, 0.8), CF(x, fy + 2.1, zf + 24), TABLE, MAT.Wood)
+	for i, x in ipairs({ west + 1.5, west + 1.5 }) do
+		dBox(model, "BrochureRack", V3(2.4, 4.2, 0.8), CF(x, fy + 2.1, zf + 22 + (i - 1) * 3.5), TABLE, MAT.Wood)
 		for r = 1, 3 do
 			dBox(
 				model,
 				"Brochure",
 				V3(1.9, 0.9, 0.12),
-				CF(x, fy + 0.9 + r * 0.95, zf + 23.55),
+				CF(x, fy + 0.9 + r * 0.95, zf + 21.55 + (i - 1) * 3.5),
 				if (i + r) % 2 == 0 then PAPER else hex("#7FA3C8"),
 				MAT.SmoothPlastic
 			)
