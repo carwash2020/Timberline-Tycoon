@@ -1135,6 +1135,9 @@ export type PadSpot = {
 -- This player's pad for `truckId` (a pad in their plot, from the box the truck
 -- came in), or nil when they have none. Set below, once the pad code exists.
 local padFor: (player: Player, truckId: string) -> PadSpot?
+-- The saved record of that pad (profile.plot.pads), where `presses` counts how
+-- many times its vehicle has been spawned. Set below with padFor.
+local padRecordFor: (player: Player, truckId: string) -> any?
 
 local function applyPadColor(model: Model, fromHex: string, toHex: string)
 	local from = Kit.hex(fromHex)
@@ -1193,6 +1196,12 @@ end
 -- The recall fee for this player: Tow Service makes it 0. The same number
 -- is what a failed spawn refunds, so a free recall never pays cash back.
 local function respawnFee(player: Player, def: TruckDef): number
+	-- The first spawn and the first respawn of each truck are free.
+	local record = padRecordFor(player, def.id)
+	local spawns = if record and type(record.presses) == "number" then record.presses else 0
+	if spawns < VehicleLogic.FreeSpawns then
+		return 0
+	end
 	local ownsTow = false
 	local free = VehicleService.Hooks.freeRecall
 	if free then
@@ -1201,7 +1210,8 @@ local function respawnFee(player: Player, def: TruckDef): number
 	return ShopLogic.RecallFee(def, CoreLoop.Active(), ownsTow)
 end
 
--- 2% to bring a stuck truck back (Rustbucket free; Tow Service free). A
+-- 5% of its price to bring a truck back (the first two spawns free; Tow Service
+-- free). A
 -- profile with no wallet (tests) is not charged. Returns false when the
 -- wallet is short.
 local function chargeRespawn(player: Player, def: TruckDef): (boolean, string?)
@@ -1487,6 +1497,14 @@ end
 
 VehicleService.NoPadText = "Open your truck's box on your plot and place its pad first."
 
+-- A spawn happened for this truck's pad: the next one is closer to costing.
+local function noteSpawn(player: Player, truckId: string)
+	local record = padRecordFor(player, truckId)
+	if record then
+		record.presses = (if type(record.presses) == "number" then record.presses else 0) + 1
+	end
+end
+
 -- "Send truck home": rebuilds the player's truck on its own spawn pad. The
 -- load comes along from town only; from further out it's left where the
 -- truck stood (SpawnTruck). Returns false and why not when it can't.
@@ -1517,6 +1535,7 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 			refundRespawn(player, def)
 			return false, nil
 		end
+		noteSpawn(player, def.id)
 		lastRecall[player.UserId] = now
 		return true, nil
 	end
@@ -1559,6 +1578,7 @@ function VehicleService.Recall(player: Player): (boolean, string?)
 		refundRespawn(player, rec.def)
 		return false, nil
 	end
+	noteSpawn(player, rec.def.id)
 	lastRecall[player.UserId] = now
 	return true, nil
 end
@@ -1596,10 +1616,18 @@ function VehicleService.Equip(player: Player, truckId: string, trailerId: string
 			return false, VehicleService.UnloadFirstText
 		end
 	end
+	-- Swapping to another truck is a spawn like any other: it costs that
+	-- truck's respawn fee after its first two (so swapping about is not free).
+	local paid, why = chargeRespawn(player, def)
+	if not paid then
+		return false, why
+	end
 	local model = VehicleService.SpawnTruck(player, def.id, if rec then rec.bed else nil, trailerId)
 	if model == nil then
+		refundRespawn(player, def)
 		return false, nil
 	end
+	noteSpawn(player, def.id)
 	return true, nil
 end
 
@@ -2122,6 +2150,20 @@ local function padSpotOf(padInst: Instance, color: string?): PadSpot
 		paintFrom = paintFrom,
 		paintTo = color,
 	}
+end
+
+padRecordFor = function(player: Player, truckId: string): any?
+	local profile = ProfileService.GetProfile(player)
+	local plot = plotOf(profile)
+	if not plot or type(plot.pads) ~= "table" then
+		return nil
+	end
+	for _, pad in ipairs(plot.pads) do
+		if type(pad) == "table" and pad.id == truckId and (pad.kind == nil or pad.kind == "Truck") then
+			return pad
+		end
+	end
+	return nil
 end
 
 padFor = function(player: Player, truckId: string): PadSpot?

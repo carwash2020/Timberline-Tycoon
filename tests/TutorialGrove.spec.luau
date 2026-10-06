@@ -18,7 +18,7 @@ return function(t)
 			cartVolume = 0,
 			cash = 20,
 			ownsTruck = false,
-			truckPrice = 75,
+			truckPrice = 100,
 		}
 		for k, v in pairs(extra or {}) do
 			base[k] = v
@@ -133,12 +133,12 @@ return function(t)
 		covers(1, TutorialData.Steps, "v1")
 	end)
 
-	t.test("the cart refuses at $75 or with a truck owned", function()
-		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 74 }))), true)
-		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 75 }))), TutorialGrove.RefuseUsed)
+	t.test("the cart refuses at $100 or with a truck owned", function()
+		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 99 }))), true)
+		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 100 }))), TutorialGrove.RefuseUsed)
 		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 200 }))), TutorialGrove.RefuseUsed)
 		t.eq(select(2, TutorialGrove.Accept(offer({ ownsTruck = true, cash = 0 }))), TutorialGrove.RefuseUsed)
-		t.eq(TutorialGrove.TruckPrice(2), 75)
+		t.eq(TutorialGrove.TruckPrice(2), 100)
 	end)
 
 	local function spots()

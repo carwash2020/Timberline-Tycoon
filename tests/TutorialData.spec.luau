@@ -666,7 +666,7 @@ return function(t)
 		local truck, steel = byId("truck"), byId("steel")
 		t.eq(
 			TutorialData.ObjectiveText(truck, 0, 51),
-			"Buy the Rustbucket box at the dealership · $51 of $75 to Rustbucket"
+			"Buy the Rustbucket box at the dealership · $51 of $100 to Rustbucket"
 		)
 		t.eq(
 			TutorialData.ObjectiveText(steel, 0, 40),
@@ -681,8 +681,8 @@ return function(t)
 			TutorialData.MurphLine(truck, false, 51),
 			string.format("Sell more wood at my cart first. The Rustbucket is $%d at the dealership.", truck.cashPrice)
 		)
-		t.eq(TutorialData.Beacon(truck, 75), "dealership")
-		t.eq(TutorialData.MurphLine(truck, false, 75), truck.murph, "enough cash: the usual line")
+		t.eq(TutorialData.Beacon(truck, 100), "dealership")
+		t.eq(TutorialData.MurphLine(truck, false, 100), truck.murph, "enough cash: the usual line")
 		t.ok(string.find(TutorialData.MurphLine(steel, false, 0), "Sell more wood first", 1, true))
 		t.eq(TutorialData.Beacon(steel, 0), steel.beacon, "the Steel Axe still points at the shed")
 		t.eq(TutorialData.MurphLine(steel, false, steel.cashPrice), steel.murph)
