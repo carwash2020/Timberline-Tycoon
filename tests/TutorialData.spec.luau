@@ -421,7 +421,11 @@ return function(t)
 		t.ok(reward > 0)
 		t.ok(gift < steel.v2.price, "Murph helps, the player earns it")
 		t.eq(gift, 50, "the three loads' $25 plus Murph's $25 on the first sale")
-		t.eq(plotStep.rewardCash, GameConfig.PlotPrice, "the plot step hands the plot's price back, toward the truck")
+		t.eq(
+			plotStep.rewardCash,
+			GameConfig.PlotPrice + 25,
+			"the plot step hands the plot's price back, plus the truck's $25 over the old price"
+		)
 		t.ok(GameConfig.StartingCash + sold + gift >= steel.v2.price, "start + the sold loads + Murph's share")
 		t.eq(TutorialData.TotalReward(), TutorialData.TotalReward(1), "no loop: v1's, as the economy model reads it")
 	end)

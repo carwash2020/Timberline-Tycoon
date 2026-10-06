@@ -229,13 +229,17 @@ return function(t)
 	t.test("the cart stays open until cash covers the plot and the truck, and through the build lessons", function()
 		local GameConfig = t.shared("GameConfig")
 		local land = TutorialGrove.LandPrice(2, false)
+		local truck = TutorialGrove.TruckPrice(2)
 		t.eq(land, GameConfig.PlotPrice + TutorialGrove.PlaceBuffer, "no plot yet: its price and the placing buffer")
 		t.eq(TutorialGrove.LandPrice(2, true), TutorialGrove.PlaceBuffer, "plot bought: the buffer only")
 		t.eq(TutorialGrove.LandPrice(1, false), 0, "v1 has no plot to pay for here")
-		-- With $75 for the truck alone the cart used to close; with the plot to buy it stays open.
-		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 75, landPrice = land }))), true)
-		t.eq(select(1, TutorialGrove.Accept(offer({ cash = 75 + land - 1, landPrice = land }))), true)
-		t.eq(select(2, TutorialGrove.Accept(offer({ cash = 75 + land, landPrice = land }))), TutorialGrove.RefuseUsed)
+		-- With the truck's price alone the cart used to close; with the plot to buy it stays open.
+		t.eq(select(1, TutorialGrove.Accept(offer({ cash = truck, landPrice = land }))), true)
+		t.eq(select(1, TutorialGrove.Accept(offer({ cash = truck + land - 1, landPrice = land }))), true)
+		t.eq(
+			select(2, TutorialGrove.Accept(offer({ cash = truck + land, landPrice = land }))),
+			TutorialGrove.RefuseUsed
+		)
 		-- The build lessons cost a few dollars, so the cart serves them too.
 		for _, step in ipairs({ "build", "place", "land" }) do
 			t.eq(select(1, TutorialGrove.Accept(offer({ stepId = step }))), true, step)

@@ -101,7 +101,7 @@ local rustbucket = ItemCatalog.GetTruck("Rustbucket") :: ItemCatalog.TruckDef
 -- Murph chips in when the plot is bought, so the plot and then the
 -- Rustbucket box are both within reach of what the cart pays (tools/economy
 -- models it; tests/TutorialGrove.spec checks the cart can cover both).
-local PLOT_REWARD = 150
+local PLOT_REWARD = 175
 
 local function logLoad(id: string, reward: number, murph: string): Step
 	return {

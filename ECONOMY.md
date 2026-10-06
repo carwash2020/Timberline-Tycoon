@@ -30,7 +30,7 @@ Every `lune run tools/economy` (including `--check`) fails the process when a he
 
 The first $1,000 in this model is 13.5 min (812 s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.
 
-The first plot ($150 at the Land Office, before the Rustbucket) is bought at 4.1 min on foot, then Murph chips in $150 toward the truck. It has no CI range of its own: it has to leave the rows above where they are, which is what sets $150 and Murph's $150.
+The first plot ($150 at the Land Office, before the Rustbucket) is bought at 4.1 min on foot, then Murph chips in $175 toward the truck. It has no CI range of its own: it has to leave the rows above where they are, which is what sets $150 and Murph's $175.
 
 End of the buying path: $39,746/h on Frostwood with the Inferno Axe and the Logging Rig + Heavy Hauler.
 
@@ -92,7 +92,7 @@ u³ a trip = length × width × (walls + 2 studs piled) × 0.4 packing / u³ (§
 |---|---|---|---|---|
 | Scout ATV | rack only | 0.0 | $0 | $2,500 |
 | Pony Trailer | 13 × 7.41, walls 1.56 | 33.5 | $50 | $1,800 |
-| Rustbucket | 13 × 7.28, walls 1.82 | 35.3 | $53 | $75 |
+| Rustbucket | 13 × 7.28, walls 1.82 | 35.3 | $53 | $100 |
 | Timber Classic | 15.6 × 7.8, walls 2.08 | 48.5 | $73 | $400 |
 | Pickup | 15.6 × 7.8, walls 2.08 | 48.5 | $73 | $400 |
 | Ranch Trailer | 18.2 × 7.384, walls 2.6 | 60.4 | $91 | $6,000 |
@@ -106,7 +106,7 @@ Each step buys what pays for itself fastest (axes in ladder order). $/h is a rea
 
 | At | Buys | Price | $/h before | $/h after | Then cuts |
 |---|---|---|---|---|---|
-| 4.1 min | Rustbucket | $75 | $0 | $1,610 | Maple (Rusty Axe) |
+| 4.1 min | Rustbucket | $100 | $0 | $1,610 | Maple (Rusty Axe) |
 | 6.1 min | Rickety Sawmill | $130 | $1,610 | $4,652 | Frostwood (Rusty Axe) |
 | 7.7 min | Steel Axe | $120 | $4,652 | $6,581 | Frostwood (Steel Axe) |
 | 11.3 min | Pickup | $400 | $6,581 | $8,761 | Frostwood (Steel Axe) |
@@ -164,7 +164,7 @@ Not on the cash ladder and not in the buying path above. A game pass (StoreData 
 - `murphAfter` = 0
 - `murphReward` = 25
 - `plotPrice` = 915100
-- `plotReward` = 150
+- `plotReward` = 175
 - `seeds` = 50
 - `sellSec` = 4
 - `sharing` = 4
