@@ -130,6 +130,9 @@ return function(t)
 		t.eq(cash.Bob, 0)
 		t.eq(Admin.Run(100, "/gift Bob Axe SteelAxe"), true)
 		t.eq(calls.gifts[1], { "Bob", "Axe", "SteelAxe", true })
+		-- A blueprint is a rolled plan the player carries (ShopService hands it over).
+		t.eq(Admin.Run(100, "/gift Bob Blueprint Wall"), true)
+		t.eq(calls.gifts[2], { "Bob", "Blueprint", "Wall", true })
 	end)
 
 	t.test("nobody else can do any of it: not a player, not a guess, not Studio's absence", function()
@@ -139,6 +142,7 @@ return function(t)
 			"/give Eve 500",
 			"/setcash Eve 999999",
 			"/gift Eve Axe StarfallAxe",
+			"/gift Eve Blueprint Cabin",
 			"/kick Connor",
 			"/ban Connor perm",
 			"/announce hi",

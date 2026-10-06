@@ -36,6 +36,9 @@ SoundData.Sounds = {
 	ChopTooHard = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.5, speed = { 2.4, 2.6 }, rolloff = 60 },
 	TreeCreak = { id = "", volume = 0.6, rolloff = 120 },
 	TreeFall = { id = "rbxasset://sounds/impact_explosion_03.mp3", volume = 0.35, speed = { 0.5, 0.6 }, rolloff = 160 },
+	-- The hammer's knock when a piece goes down (HammerController): a dull
+	-- thud, a touch higher than a chop so it reads as wood on wood.
+	HammerKnock = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.7, speed = { 0.95, 1.1 }, rolloff = 90 },
 	-- Logs, trucks, selling
 	LogPickup = { id = "rbxasset://sounds/action_jump.mp3", volume = 0.45, speed = { 0.75, 0.85 }, rolloff = 50 },
 	LogLoad = { id = "rbxasset://sounds/action_jump_land.mp3", volume = 0.6, speed = { 0.8, 0.9 }, rolloff = 60 },

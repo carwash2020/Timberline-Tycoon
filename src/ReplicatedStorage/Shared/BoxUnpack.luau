@@ -10,7 +10,7 @@
 --             physical object on the spot; the buyer picks it up (Interact
 --             again) and it goes to the hotbar or the inventory.
 --   "stock"   plot items (sawmills, the chop saw, blueprints) unpack into
---             the buyer's stock to place from BUILD, as before.
+--             the buyer's stock to place with the hammer, as before.
 --   "vehicle" a truck or trailer unpacks onto the buyer's pad on their
 --             plot (the pad rule: vehicles only exist on a pad).
 -- The empty box then folds away (PoofSeconds) and is destroyed.
@@ -86,7 +86,7 @@ function BoxUnpack.OpenedLine(mode: string, name: string): string
 	if mode == "pickup" then
 		return string.format("Opened! Pick up the %s.", name)
 	elseif mode == "stock" then
-		return string.format("Unpacked the %s. Place it from BUILD on your plot.", name)
+		return string.format("Unpacked the %s. Place it with your hammer on your plot.", name)
 	end
 	return string.format("Unpacked the %s.", name)
 end

@@ -285,10 +285,12 @@ forecast against that, not against gross Robux.
 ## 9. Empire building (blueprint-placed, not buy-buttons)
 
 Your plot is a working lumber empire — but nothing is a buy-pad. Every
-structure comes as a **blueprint**: buy it from the Blueprint Store, get a
-ghost preview, rotate and snap it anywhere on your plot (grid snap, collision
-and plot-bounds checked, all placement validated server-side). Move or sell
-placed items freely. Freeform base-building, LT2-style, not a linear pad
+structure is a **blueprint**, a physical rolled plan you buy, find, carry and
+drop. Using one teaches you that building for good (your blueprint book). You
+build with a **hammer** every player carries: it opens your book, a ghost
+preview follows you, rotate and snap it anywhere on your plot (grid snap,
+collision and plot-bounds checked, all placement validated server-side). Move,
+turn or sell placed items with the same hammer (BUILD_SYSTEM.md). Freeform base-building, LT2-style, not a linear pad
 ladder. Categories: Droppers, Machines, Flumes, Buildings, Decor.
 
 **Droppers come in two kinds with genuinely different jobs:**

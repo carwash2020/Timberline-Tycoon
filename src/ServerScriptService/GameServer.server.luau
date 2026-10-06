@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AetherService = require(script.Parent.AetherService)
 local AxeService = require(script.Parent.AxeService)
+local BlueprintService = require(script.Parent.BlueprintService)
 local CarryService = require(script.Parent.CarryService)
 local BiomeService = require(script.Parent.BiomeService)
 local BadgeService = require(script.Parent.BadgeService)
@@ -630,6 +631,10 @@ end
 local activeLoop = CoreLoop.Active()
 safely("MilestoneService.Init", MilestoneService.Init, notify, activeLoop)
 safely("AxeService.Init", AxeService.Init, notify)
+safely("BlueprintService.Init", BlueprintService.Init, notify, {
+	UseBlueprint = remote.UseBlueprint,
+	DropBlueprint = remote.DropBlueprint,
+})
 safely("ShopService.Init", ShopService.Init, mapFolder, remote.BuyItem, remote.EquipItem, notify, activeLoop)
 -- The tutorial's pad steps: the pad went down, the truck rolled out.
 VehicleService.Hooks.padEvent = function(player: Player, event: string)
@@ -1149,6 +1154,7 @@ local function onCharacterAdded(player: Player, character: Model)
 	end)
 	if player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10) then
 		AxeService.GiveLoadout(player, character)
+		BlueprintService.GiveLoadout(player, character) -- the Hammer, then any plans you carry
 	end
 end
 
@@ -1380,6 +1386,7 @@ local function rebuildSlotNow(player: Player)
 	player:SetAttribute("OwnsTruck", truckId ~= "")
 	player:SetAttribute("EquippedTruck", truckId)
 	AxeService.PlayerRemoving(player)
+	BlueprintService.PlayerRemoving(player)
 	VehicleService.DespawnTruck(player)
 	-- A different save, same pad: the buildings are pad-relative, and they
 	-- already picked a homestead this visit.
@@ -1422,6 +1429,7 @@ local function onPlayerRemoving(player: Player)
 	joining[player] = nil
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
+	safely("BlueprintService.PlayerRemoving", BlueprintService.PlayerRemoving, player) -- dropped plans stay in the save too
 	safely("MonetizationService.PlayerRemoving", MonetizationService.PlayerRemoving, player)
 	safely("PaintService.PlayerRemoving", PaintService.PlayerRemoving, player)
 	safely("PlotService.PlayerRemoving", PlotService.PlayerRemoving, player)

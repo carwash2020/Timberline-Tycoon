@@ -262,7 +262,7 @@ TutorialData.Steps = {
 
 -- The v2 loop's steps. Wood is cut where you swing, dragged with the axe
 -- put away, carried loose on the bed and sold by volume. Order: fell,
--- drag, sell at the sawmill, claim a plot, the build lessons (BUILD, place
+-- drag, sell at the sawmill, claim a plot, the build lessons (hammer, place
 -- one item), then the truck, its pad and spawning it. Each step's event is
 -- what the v2 services report.
 -- Murph's numbers come from the v2 data: hits from FieldGuide.TrunkHits.
@@ -303,8 +303,8 @@ TutorialData.StepsV2 = {
 	plotStep(true),
 	{
 		id = "place",
-		objective = "Place one item from the Blueprint Store",
-		murph = "Pick the cheapest thing in the Blueprint Store and set it down. You pay when you place it, and you get half back if you sell it.",
+		objective = "Place one blueprint with your hammer",
+		murph = "Pick the cheapest piece in your blueprints and set it down. You pay when you place it, and you get half back if you sell it.",
 		event = "itemPlaced",
 		count = 1,
 	},

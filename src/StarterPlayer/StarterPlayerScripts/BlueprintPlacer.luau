@@ -1,5 +1,7 @@
 --!strict
--- BlueprintPlacer: placing a blueprint on your plot (GAME_DESIGN §9).
+-- BlueprintPlacer: placing a blueprint on your plot (GAME_DESIGN §9). The
+-- hammer starts it (HammerController, PlotUI's list) and stays in your hand
+-- while it runs; putting the hammer away or taking out anything else ends it.
 --   * A ghost of the blueprint (Shared/BlueprintModels, the same model the
 --     server builds) follows the mouse, the last tap on a touch screen, or
 --     the middle of the screen on a gamepad, snapped to PlotData.Grid.
@@ -81,6 +83,7 @@ type State = {
 }
 
 local state: State? = nil
+local placedListeners: { (Vector3) -> () } = {}
 local promptsWere: boolean? = nil -- ProximityPromptService.Enabled before placing
 local bar: Frame? = nil
 local barLabel: TextLabel? = nil
@@ -90,6 +93,26 @@ local overBar = false
 
 function BlueprintPlacer.Active(): boolean
 	return state ~= nil
+end
+
+-- `fn(worldPos)` runs each time a place or a move is sent (the hammer swings).
+function BlueprintPlacer.OnPlaced(fn: (Vector3) -> ())
+	table.insert(placedListeners, fn)
+end
+
+local function tellPlaced(s: State)
+	local plot = BlueprintPlacer.PlotCFrame()
+	if not plot then
+		return
+	end
+	local pos = plot:PointToWorldSpace(Vector3.new(s.x, s.y, s.z))
+	for _, fn in ipairs(placedListeners) do
+		fn(pos)
+	end
+end
+
+local function isHammer(inst: Instance): boolean
+	return inst:IsA("Tool") and inst:GetAttribute("Hammer") == true
 end
 
 -- Above the HUD's D-pad shortcuts (they bind at High). Returning Sink
@@ -377,9 +400,11 @@ function BlueprintPlacer.Place()
 		else
 			Net.Remote("MoveBlueprint"):FireServer(moveUid, s.x, s.z, s.rot, s.y)
 		end
+		tellPlaced(s)
 		BlueprintPlacer.Stop()
 	else
 		Net.Remote("PlaceBlueprint"):FireServer(s.bp.id, s.x, s.z, s.rot, s.y)
+		tellPlaced(s)
 	end
 end
 
@@ -477,10 +502,12 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 	}
 	state = s
 
-	-- An axe in hand would swing at every click.
+	-- An axe in hand would swing at every click. The hammer stays: it is what
+	-- is placing, and it ignores clicks while a ghost is out.
 	local char = player.Character
 	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
-	if humanoid then
+	local inHand = if char then char:FindFirstChildOfClass("Tool") else nil
+	if humanoid and not (inHand and isHammer(inHand)) then
 		humanoid:UnequipTools()
 	end
 	hidePrompts()
@@ -496,7 +523,16 @@ function BlueprintPlacer.Begin(bp: PlotData.Blueprint, options: Options?)
 		table.insert(
 			s.conns,
 			char.ChildAdded:Connect(function(child: Instance)
-				if child:IsA("Tool") then
+				if child:IsA("Tool") and not isHammer(child) then
+					BlueprintPlacer.Stop()
+				end
+			end)
+		)
+		-- Putting the hammer away ends placing too.
+		table.insert(
+			s.conns,
+			char.ChildRemoved:Connect(function(child: Instance)
+				if isHammer(child) and child.Parent ~= char then
 					BlueprintPlacer.Stop()
 				end
 			end)

@@ -1301,7 +1301,7 @@ function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 	if BoxUnpack.Owed(rec.pendingGrant) then
 		rec.pendingGrant = false
 		if mode == "stock" then
-			-- Plot items unpack straight into the buyer's stock (BUILD places them).
+			-- Plot items unpack straight into the buyer's stock (the hammer places them).
 			local shop = require(script.Parent.ShopService)
 			shop.GrantItem(player, grantBox(rec))
 		elseif mode == "pickup" then

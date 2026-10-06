@@ -1195,6 +1195,11 @@ Quick test with a Studio test axe: `/giveaxe inferno` or `/giveaxe starfall`.
 
 ## Plots (V1_PLAN §6, first slices)
 
+> The BUILD button, build mode and the Blueprint Store palette below were
+> replaced by the hammer and physical blueprints (see the last section, "The
+> hammer and physical blueprints"). The rest of this section (claiming,
+> growing, what's there) still stands.
+
 The **plot district** is east of the parking lot: 12 plots, 3 columns by
 4 rows (one per player on a full server). The north road stays on the
 town's mouth. Lanes between the pads are wide enough for a Logging Rig,
@@ -1238,7 +1243,7 @@ is told the district is full and keeps their save until a plot frees.
 - [ ] Claim a plot: the sign reads PLOT n, CAMPSITE and your name; rails
       and corner posts mark the edge (they're there on free plots too);
       claiming a second one says you already have one
-- [ ] BUILD shows only on your plot; walking off ends build mode
+- [ ] (replaced by the hammer: its bar shows only on your plot; walking off ends it)
 - [ ] Place a fence: the ghost snaps, turns with R, goes red over another
       fence or past the edge (with the reason), green where it fits;
       placing takes the price
@@ -1536,6 +1541,90 @@ What changed:
 - [ ] A returning save (already has a plot) still gets its picker at join,
       free, and "Give me any open plot" works
 
+## The hammer and physical blueprints (replaces BUILD; BUILD_SYSTEM.md)
+
+- Building is the **Hammer**, a Tool every player always has (second hotbar
+  slot, after the axes). A **blueprint** is a rolled plan you buy, carry, drop
+  and pick up like an axe. Using one (click, RT, tap) consumes it and adds
+  that building to your **blueprint book** for good. Using the hammer opens
+  the book as a list; pick a row, a ghost follows your aim, place it (the
+  hammer swings, knocks, dust), then fill a kit piece with planks as before.
+  Aiming the hammer at something you built opens Move, Turn and Sell.
+- The BUILD button, the old build palette and the Move/Sell prompts on every
+  piece are gone. Holding the hammer on your own plot shows a bar:
+  PLANS, LAND, WIRE, DONE (DONE puts the hammer away). On a phone a HAMMER
+  button in the side column takes it out.
+- Saved per slot: `blueprintBook`, `blueprintItems` (unused plans you carry),
+  `hammer`. Existing saves are migrated on load, once and safely repeatable:
+  every plan that was free to place before, every store blueprint already
+  bought, everything already on the plot (a placed sawmill too), every box in
+  stock.
+- Prices, fees and refunds are as before. Sawmills and the chop saw are still
+  Tool Shed boxes, spent on placing.
+
+### Studio checks: the hammer
+- [ ] New save, buy a plot, spawn on it: the hotbar has the **Axe then the
+      Hammer** (slot 2). No BUILD button anywhere on the HUD
+- [ ] Take out the hammer on your plot: the bar appears (PLANS, LAND, WIRE,
+      DONE) and the hammer sits in the hand like a carpenter's hammer (steel
+      head, claw behind, wrapped grip). Walk off your plot: the bar goes and
+      one toast says to walk back; walk back on: it returns
+- [ ] **PC:** click with the hammer: the blueprint list opens (Showing: All,
+      Land, then Buildings, Decor). **Xbox:** RT does the same. **Phone:** tap
+      the world with the hammer out, or tap PLANS; the HAMMER side button
+      takes the hammer out when it is not in hand
+- [ ] The list shows each piece's name, size and what it needs: "8 × 1 studs ·
+      8 u³ of planks, one wood · fee $32". D-pad / stick moves between rows,
+      A picks, B closes; the Showing row cycles All / Buildings / Decor /
+      Machines and keeps the selection on itself
+- [ ] Pick the Wall: the green/red ghost follows your aim. R (D-pad right,
+      ROTATE) turns it; LT locks it and the right stick flicks it round and
+      up/down; RB/LB slide it; it is red with a reason over another piece,
+      off your bought squares, or past the pad grid
+- [ ] Place (click, RT, PLACE): the hammer swings back and strikes; at the hit
+      a knock and a puff of dust at the piece; the fee comes out once; the
+      piece is an empty ghost. Click again keeps placing walls. Q / B ends
+- [ ] Another player near you hears the knock and sees the dust when you place
+- [ ] Drop planks into the ghost wall: it fills as before (fill hints), the
+      wood locks it, and it builds when full
+- [ ] Aim the hammer at a built piece (crosshair on Xbox): the sheet shows
+      Move, Turn, Sell. Move picks it up as a ghost; Turn is a quarter turn
+      in place (red toast if blocked); Sell pays back and the piece goes
+- [ ] A kit piece with wood in it: Move and Turn are greyed and say so; Sell
+      says "Take apart (planks back)" and the planks drop on the ground
+- [ ] Putting the hammer away, or taking out an axe, while a ghost is out
+      ends placing. The axe still chops as before; the hammer never chops
+- [ ] LAND on the bar, the Land row in the list and the sign's prompt all
+      open the Land panel
+
+### Studio checks: blueprints as items
+- [ ] Buy a Small Shed blueprint at the General Store (box to the counter):
+      the price is what it was, and a rolled plan (cream roll, blue wax seal)
+      appears in your hotbar named "Small Shed Blueprint"
+- [ ] Hold it and click (RT, tap): it vanishes, a toast says you learned it,
+      and the Small Shed is now in the hammer list and places free
+- [ ] Buying it again before you use it, or after: refused, nothing charged
+- [ ] Hold a plan and press Drop (Backspace, D-pad down, or the Drop plan
+      button, two presses): it lies on the ground with a Pick up prompt; only
+      you can pick it up; rejoin and it is back in your hotbar
+- [ ] A plan you already know can still be held; using it says so and keeps it
+- [ ] As the owner, `/gift <name> Blueprint Cabin` puts a Cabin plan in
+      their hotbar (a non-owner typing it gets nothing)
+- [ ] Sawmill / Chop Saw bought at the Tool Shed: the list shows "Rickety
+      Sawmill · 1 in stock", places free; none in stock, no row
+
+### Studio checks: old saves and the tutorial
+- [ ] A save from before this change: join; the hotbar has a Hammer, the list
+      has every piece the player used to be able to place, every unlock they
+      had bought (check the Shed, Table, ...), and any sawmill already on
+      the plot does not vanish. Join again: nothing changes
+- [ ] New save tutorial: after the plot step Murph says to take out your
+      hammer and click; opening the list moves it on; placing a piece moves
+      it on; opening LAND moves it on. The three steps keep their order
+- [ ] The Xbox audit (docs/qa/input-audit-2026-10-04.md): no new button is
+      bound. The hammer is Tool.Activated (RT); the HAMMER side button has no
+      pad key; the D-pad is only the placer's rotate (right) and the HUD's
+      shortcuts as before
 ## Real stores: designed boxes, bigger shops, doors, showroom hall, open-the-box
 
 What changed (branch `claude/real-stores`):
