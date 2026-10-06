@@ -91,7 +91,9 @@ local GameConfig = {
 	-- changes). In Studio, set the workspace attribute TownMeshes to
 	-- true/false to try either for one run. Every dressed model is ground-
 	-- snapped to its part-built twin (TownMeshes.Dress), so a mesh cannot sink.
-	TownMeshes = true,
+	-- OFF again (6 Oct): with the meshes on, signs and buildings sank under the
+	-- ground in Studio. Turn on only after the cause is found (STATUS.md).
+	TownMeshes = false,
 	WoodUnit = 1.6, -- studs in one timber unit "u"; prices are $/u³, hardness per u² of cut
 	StartingCash = 20, -- v2: a new player's cash
 	-- cutting

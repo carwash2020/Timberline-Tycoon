@@ -51,7 +51,7 @@ Connor reported a very long start. Measured in Lune (slower than Roblox, so use 
 
 ## Meshes (Blender models)
 
-`GameConfig.TownMeshes` is **true** again (kill switch: false, or the Studio workspace attribute `TownMeshes`); town meshes are ground-snapped to the part-built art. Axes, trees, NPCs, vehicles and the plot kit all load through `MeshKit.Create`; a failed load falls back to part-built art and now warns with the engine's error, and the `[MapBuilder] build check:` line prints the load totals. The ids belong to creator `Elucidhealer618`: if the Output says meshes failed, fix asset permissions in Creator Hub (steps and ids in PHASE2_NOTES.md, "Blender meshes are back on"). Shelf boxes show no axe model by design (#42/#51).
+`GameConfig.TownMeshes` is **false** again (6 Oct: signs and buildings sank under the ground with it on, even with the ground snap; the cause is not found yet; try it per run with the Studio workspace attribute `TownMeshes`). Axes, trees, NPCs, vehicles and plot kit meshes are separate and stay on. Axes, trees, NPCs, vehicles and the plot kit all load through `MeshKit.Create`; a failed load falls back to part-built art and now warns with the engine's error, and the `[MapBuilder] build check:` line prints the load totals. The ids belong to creator `Elucidhealer618`: if the Output says meshes failed, fix asset permissions in Creator Hub (steps and ids in PHASE2_NOTES.md, "Blender meshes are back on"). Shelf boxes show no axe model by design (#42/#51).
 
 ## Open items
 
