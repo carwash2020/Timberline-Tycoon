@@ -2028,6 +2028,35 @@ at the sawmill's sell pad like every later one.
 - [ ] Buy the plot and the Rustbucket box with only sawmill sales.
 - [ ] An old save sitting on the sell step: the arrow now points at the sell pad.
 
+## Owner hub (branch `claude/owner-hub`)
+
+The owner menu is now a hub: PLAYERS / GIVE / WORLD / SELF tabs, a Find-a-tool box, one shared player pick, a status strip, confirmations, and an Xbox order with LB/RB tabs. Chat commands are unchanged and there are new ones (OWNER_TOOLS.md). Paste your UserId into `AdminLogic.OwnerUserIds` first (or test in Studio, where you count as owner).
+
+Studio checklist (PC, then phone emulator, then Xbox/pad if you can):
+
+- [ ] Only you see the OWNER button. With a second test player (Test tab, 2 players) their client has no OWNER button and no AdminUI in PlayerGui.
+- [ ] OWNER opens the hub; X, Esc and B close it; L3 + R3 toggles it. Nothing overlaps at any window size; phone emulator: every button is a fingertip tall and the body scrolls.
+- [ ] PLAYERS: the list shows everyone (you first, "(you)"); tapping a name ticks it; the strip says "Player: <name>". Step with the arrows on PLAYERS and GIVE: the same player stays picked. When that player leaves, the pick falls back to someone else.
+- [ ] GO TO, BRING, HEAL, FREEZE (press again unfreezes), STATS (one line of cash, plot, tutorial, items) each answer in the strip (green when it worked). RESET TUTORIAL restarts their tutorial. KICK and BAN: the first press turns the button amber "SURE? ..." and does nothing; a second press within 4 seconds does it; picking another player first starts over. You cannot kick, ban or freeze yourself (red line).
+- [ ] GIVE: chips pick the amount; typing `10k` in Custom amount overrides them and the label says Amount: $10,000. GIVE CASH and TAKE CASH move the cash (TAKE and SET CASH need a second press). Cash above $2,000,000 stops at the cap. UNLOCK ALL BUILDINGS: they can place any building from the hammer's list.
+- [ ] GIVE, free items: TYPE steps through All, Recent, Axe, Gear, Sawmill, Machine, Blueprint; the search narrows the list as you type; tapping an item ticks it and the GIFT button names it; GIFT puts it in their hotbar (a Blueprint is a rolled plan). The item then shows under TYPE: Recent.
+- [ ] WORLD: the speed chips plus SET CLOCK SPEED, the hour chips plus SET HOUR and RESET TIME change the sky as before (this server only). Type a message and press ANNOUNCE: everyone gets a toast. Tapping a preset fills the box. SHUT DOWN SERVER asks twice, then kicks everyone.
+- [ ] SELF: SUPER RUN, GOD MODE (take fall damage or touch a hazard: no damage; press again to turn off), GO TO SPAWN. LAST ACTIONS lists the last eight results, newest first. Output has an `[Admin] <you> (<id>): ...` line for each.
+- [ ] Find a tool: type `kick`, `teleport`, `restart` in the title box: matching tools show over the tab with the picked player; clearing the box or tapping a tab goes back.
+- [ ] Xbox: D-pad up from the first body button reaches the tabs, then the search/close row; left/right stay in a row; up/down land on the nearest button in the next row; the selected button has the amber ring; the body scrolls so it stays in view (check the end of a long item list); LB/RB change tab; B closes. If scrolling jumps oddly, say so: it is the safety net over Roblox's own scrolling.
+- [ ] Chat still works: `/give Bob 100`, `/god`, `/stats Bob`, `/admin`. Someone who is not you gets nothing from any of them or from the hub (a test player cannot even see it).
+
+Delegation checks (owner hub; use two test players, the second one is the delegate):
+
+- [ ] DELEGATES tab (owner only): pick the second player, role MODERATOR, 1 HOUR, GRANT. Their client now shows a MODERATOR hub titled DELEGATE with only PLAYERS (go to, bring, freeze, stats, kick, ban) and WORLD (announce); no GIVE, no SELF cash tools, no DELEGATES tab. The list shows them with REVOKE.
+- [ ] As the delegate: kick or freeze a third player works; BAN lasts at most 1 hour (FOREVER is refused with a red line); anything aimed at you (the owner) is refused ("You can't use that on the owner"); chat `/give`, `/shutdown`, `/delegate` do nothing for them.
+- [ ] Your audit list (SELF tab, LAST ACTIONS) shows each of their actions with a `>`; Output has `[Admin] DELEGATE ...` lines with both ids.
+- [ ] REVOKE: their hub closes at once and the button goes away; their next request is refused.
+- [ ] Expiry: grant 1 HOUR and use `/settime`-style clock tricks is not possible, so test SESSION: have them leave the server and rejoin, they are no longer a delegate.
+- [ ] CUSTOM: tick only Kick and Heal, GRANT: their hub shows only those. Try ticking cash or shutdown: they are not on the list.
+- [ ] TESTER: choosing it shows a red panel with the warning; GRANT turns amber "SURE? GIVE FULL POWER"; only the second press grants. The 'until the server closes' choice is gone. Their menu shows a red TESTER banner; give cash works; TAKE CASH / BAN / KICK / SHUT DOWN ask twice and pop a toast on YOUR screen. They cannot touch you (kick, ban, cash all refused) and have no DELEGATES tab; typing `/delegate` as them does nothing.
+- [ ] Chat: `/delegate Bob helper 1h`, `/delegates`, `/undelegate Bob`; `/delegate Bob tester 1h` only warns until you add `confirm`.
+
 
 ## Sell station beside the mill (claude/sell-pad, 6 October 2026)
 

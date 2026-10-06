@@ -731,6 +731,13 @@ if CoreLoop.V2() then
 	safely("ChopSawService.Init", ChopSawService.Init, notify, remote.ChopSawSet)
 	safely("DevCommands.Init", DevCommands.Init, notify)
 	safely("AdminService.Init", AdminService.Init, notify)
+	AdminService.SetReply(function(owner: Player, ok: boolean, text: string)
+		remote.AdminResult:FireClient(owner, ok, text)
+	end)
+	AdminService.SetAccessSend(function(who: Player, payload: { [string]: any })
+		remote.AdminAccess:FireClient(who, payload)
+	end)
+	AdminService.SetHooks({ resetTutorial = QuestService.Reset, publishBlueprints = BlueprintService.Publish })
 	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
 	local function saleFx(model: Model)
 		local piece = WoodService.FromModel(model)
