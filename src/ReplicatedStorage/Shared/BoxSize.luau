@@ -40,8 +40,13 @@ export type Fit = {
 }
 
 -- Clear studs between neighbouring boxes on a shelf, and between a box and
--- the edge of the shelf.
-BoxSize.Gap = 1
+-- the edge of the shelf. Connor (7 October 2026, on the window boxes: "space
+-- them out more"): at least 1.5 studs between boxes side by side (Gap) and
+-- about 2.5 between rows (RowGap), so a box with its glass window, accent
+-- plinth (a quarter stud bigger all round) and name strip reads on its own and
+-- a player can aim at one without the cursor landing on the next.
+BoxSize.Gap = 1.5
+BoxSize.RowGap = 2.5
 BoxSize.EdgeGap = 0.6
 
 -- Margin round the item: each side (x, z) and over the top, and the floor
@@ -144,9 +149,10 @@ function BoxSize.ItemOffset(box: Vector3, inner: Vector3): Vector3
 	return Vector3.new(0, floorY + inner.Y / 2, 0)
 end
 
--- The distance one box needs along an axis: its own length plus the gap.
+-- The distance one box needs along z (front to back): its own length plus the
+-- row gap. (Boxes stacked along z are rows, however they are shown.)
 function BoxSize.Pitch(length: number): number
-	return length + BoxSize.Gap
+	return length + BoxSize.RowGap
 end
 
 -- Every fixed class in rank order.

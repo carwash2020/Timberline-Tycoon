@@ -42,8 +42,33 @@ return function(t)
 			end,
 		})
 		c.input = { TouchEnabled = touch, KeyboardEnabled = keyboard }
+		-- The player's saved graphics choice, as the server mirrors it on SettingQuality.
+		c.choice = opts.choice
+		c.choiceListeners = {}
+		function c.setChoice(value)
+			c.choice = value
+			for _, fn in ipairs(c.choiceListeners) do
+				fn()
+			end
+		end
+		local fakePlayer = {
+			GetAttribute = function(_, name)
+				if name == "SettingQuality" then
+					return c.choice
+				end
+				return nil
+			end,
+			GetAttributeChangedSignal = function(_, name)
+				assert(name == "SettingQuality", name)
+				return {
+					Connect = function(_, fn)
+						table.insert(c.choiceListeners, fn)
+					end,
+				}
+			end,
+		}
 		local loader = t.loader({
-			services = { UserInputService = c.input },
+			services = { UserInputService = c.input, Players = { LocalPlayer = fakePlayer } },
 			globals = {
 				UserSettings = function()
 					return { GameSettings = settings }
@@ -161,6 +186,53 @@ return function(t)
 		t.eq(c.Quality.Tier(), "low")
 		c.Quality.SetOverride("auto")
 		t.eq(c.Quality.Tier(), "high")
+	end)
+
+	t.test("the player's choice caps the device: Lower is low anywhere, Higher is the device's tier", function()
+		-- Lower on a PC at the top graphics level
+		local pc = client("QualityLevel10", false, true, { choice = "low" })
+		t.eq(pc.Quality.Tier(), "low")
+		t.eq(pc.Quality.Budget().BoxContents, false)
+		t.eq(pc.prints, { "[Quality] low (QualityLevel10, chose low)" })
+		-- Higher on a PC: as high as the device says, never more
+		t.eq(client("QualityLevel10", false, true, { choice = "high" }).Quality.Tier(), "high")
+		t.eq(
+			client("QualityLevel6", false, true, { choice = "high" }).Quality.Tier(),
+			"medium",
+			"never above the device"
+		)
+		-- Higher on a phone (touch Automatic reads low) or on level 1-4: allowed, as medium (the high world, calm motion)
+		local phone = client("Automatic", true, false, { choice = "high" })
+		t.eq(phone.Quality.Tier(), "medium")
+		t.eq(phone.Quality.Budget().BoxContents, true, "the boxes show their items")
+		t.eq(client("QualityLevel2", false, true, { choice = "high" }).Quality.Tier(), "medium")
+		-- Not chosen yet: exactly the device, as before
+		t.eq(client("Automatic", true, false, { choice = "unset" }).Quality.Tier(), "low")
+		t.eq(client("Automatic", false, true).Quality.Tier(), "high")
+		-- A bad attribute (nothing the server sends) counts as unset.
+		t.eq(client("QualityLevel9", false, true, { choice = "ultra" }).Quality.Tier(), "high")
+	end)
+
+	t.test("choosing while playing switches the tier at once, and tells the listeners", function()
+		local c = client("Automatic", true, false)
+		c.Quality.Start()
+		t.eq(c.Quality.Tier(), "low")
+		local heard = {}
+		c.Quality.OnChange(function(budget)
+			table.insert(heard, budget.Tier)
+		end)
+		c.setChoice("high")
+		t.eq(c.Quality.Tier(), "medium", "the signal re-reads it")
+		c.setChoice("high") -- the server's mirror of the same value: nothing new
+		c.setChoice("low")
+		t.eq(c.Quality.Tier(), "low")
+		-- A change the client made itself (the picker, the Settings row) can ask for a re-read.
+		c.choice = "high"
+		t.eq(c.Quality.Refresh().Tier, "medium")
+		t.eq(heard, { "medium", "low", "medium" }, "once per change")
+		t.eq(#c.choiceListeners, 1, "watches SettingQuality")
+		t.eq(c.Quality.TouchOnly(), true, "the picker's recommendation reads the device")
+		t.eq(client("Automatic", false, true).Quality.TouchOnly(), false)
 	end)
 
 	t.test("no UserSettings and no UserInputService at all (a test loader): high, no errors", function()

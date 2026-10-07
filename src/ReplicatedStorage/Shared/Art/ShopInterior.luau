@@ -466,6 +466,10 @@ end
 -- name plate on it. The price is not printed: aiming at an axe shows it in a
 -- tag (Shared/HoverTag).
 local RACK_STEP = 0.22 -- each axe's step is this much higher than the last
+local RACK_BLOCK = 2.4 -- the tier-colour block behind each axe (and its step) is this wide (an axe's head and handle show up to 2.4 wide)
+ShopInterior.RackGap = 1.5 -- clear studs between one axe's block and the next (it was 0.3)
+local RACK_AXE_SHIFT = 0.4 -- the axes' heads stick out to -x, so the pivot stands this far toward +x to centre one on its block
+local RACK_PLATE = 3.0 -- the name plate: wider than the block, still 0.9 clear of the next
 local RACK_BASE = 7.5 -- the first step's top
 local RACK_PANEL_Y = 9.7
 local RACK_PANEL_H = 6.8
@@ -479,8 +483,10 @@ local function axeRack(model: Model, frame: Frame)
 	if #axes == 0 then
 		return
 	end
-	local pitch = 3.1
-	local width = #axes * pitch + 1.4
+	-- Each axe has its own block, ShopInterior.RackGap from the next, so a plate, a
+	-- block and an axe read as one item and not as one strip.
+	local pitch = RACK_BLOCK + ShopInterior.RackGap
+	local width = (#axes - 1) * pitch + RACK_BLOCK + 1.4
 	local wallZ = frame.halfD
 	dBox(model, "AxeRack", V3(width, RACK_PANEL_H, 0.3), CF(0, RACK_PANEL_Y, wallZ - 0.2), TABLE)
 	for _, y in ipairs({ RACK_PANEL_Y - RACK_PANEL_H / 2, RACK_PANEL_Y + RACK_PANEL_H / 2 }) do
@@ -500,7 +506,7 @@ local function axeRack(model: Model, frame: Frame)
 		local block = dBox(
 			model,
 			"AxeBlock",
-			V3(pitch - 0.3, blockH, 0.2),
+			V3(RACK_BLOCK, blockH, 0.2),
 			CF(x, blockLo + blockH / 2, wallZ - 0.45),
 			accent,
 			MAT.SmoothPlastic
@@ -509,13 +515,13 @@ local function axeRack(model: Model, frame: Frame)
 		dBox(
 			model,
 			"AxeStep",
-			V3(pitch - 0.3, 0.3, 1.5),
+			V3(RACK_BLOCK, 0.3, 1.5),
 			CF(x, stepY - 0.15, wallZ - 1.3),
 			Kit.shade(accent, -0.45),
 			MAT.SmoothPlastic
 		)
 		-- Foot on the step, head up, blade toward -X so the side shows.
-		art:PivotTo(CF(x, stepY + len / 2, wallZ - 1.3) * CFrame.Angles(0, math.pi / 2, 0))
+		art:PivotTo(CF(x + RACK_AXE_SHIFT, stepY + len / 2, wallZ - 1.3) * CFrame.Angles(0, math.pi / 2, 0))
 		art.Name = "RackAxe"
 		art:SetAttribute("ItemId", axe.id)
 		for _, d in ipairs(art:GetDescendants()) do
@@ -531,7 +537,7 @@ local function axeRack(model: Model, frame: Frame)
 		local plate = dBox(
 			model,
 			"AxePlate",
-			V3(pitch - 0.7, 1.3, 0.15),
+			V3(RACK_PLATE, 1.3, 0.15),
 			CF(x, stepY - 1.0, wallZ - 0.62),
 			PAPER,
 			MAT.SmoothPlastic
@@ -554,6 +560,8 @@ end
 
 local function toolShed(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
+	-- The middle of each table (the lamps and the hanging signs are over it).
+	local LANE_MIDDLE = 11.05
 	ShopInterior.SteppedUnit(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
 	-- The Robux table: the same table as the cash shelves with a gold top, along
 	-- the back wall behind the counter and its keeper. Its boxes are the gold
@@ -600,13 +608,13 @@ local function toolShed(model: Model, frame: Frame)
 		beam(model, y - 0.45, z, 2 * frame.halfW - 0.6)
 	end
 	for _, z in ipairs({ -17.5, -5.5, 6.5 }) do
-		for _, x in ipairs({ -9.6, 9.6 }) do
+		for _, x in ipairs({ -LANE_MIDDLE, LANE_MIDDLE }) do
 			lamp(model, x, y - 3.1, z, y - 0.9)
 		end
 	end
 	lamp(model, 0, y - 3.1, 17, y - 0.9)
-	hangSign(model, -9.6, y - 3.7, -19.7, 7.8, 1.6, y - 0.9, "AXES", hex("#8E3B2B"), PAPER)
-	hangSign(model, 9.6, y - 3.7, -19.7, 7.8, 1.6, y - 0.9, "SAWMILLS & MACHINES", hex("#3E4A62"), PAPER)
+	hangSign(model, -LANE_MIDDLE, y - 3.7, -19.7, 7.8, 1.6, y - 0.9, "AXES", hex("#8E3B2B"), PAPER)
+	hangSign(model, LANE_MIDDLE, y - 3.7, -19.7, 7.8, 1.6, y - 0.9, "SAWMILLS & MACHINES", hex("#3E4A62"), PAPER)
 	-- Hanging goods on the beams: rope coils, lanterns, a row of tools.
 	for i, x in ipairs({ -3.4, 0, 3.4 }) do
 		hangGoods(model, x, -5.5, y - 1.6, i)

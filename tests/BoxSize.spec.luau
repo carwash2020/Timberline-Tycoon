@@ -238,7 +238,7 @@ return function(t)
 	t.test("fixed classes remain for a box with no model, and an unknown id falls back", function()
 		t.eq(BoxSize.Class("S").size, Vector3.new(2.8, 2.2, 2.2))
 		t.eq(BoxSize.Class("not-a-class").id, BoxSize.DefaultClass)
-		t.eq(BoxSize.Pitch(3), 3 + BoxSize.Gap)
+		t.eq(BoxSize.Pitch(3), 3 + BoxSize.RowGap, "boxes stacked along z are rows")
 		t.ok(#BoxSize.All() >= 1)
 	end)
 end

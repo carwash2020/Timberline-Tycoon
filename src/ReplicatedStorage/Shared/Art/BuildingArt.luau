@@ -127,7 +127,7 @@ BuildingArt.DealerLobbyCounterX = 13
 BuildingArt.DealerCounterBack = 4.8
 BuildingArt.ToolShedHalfDepth = 15.0
 BuildingArt.ToolShedCounterZ = 13.6 -- the counter's middle, final studs from the shop's middle
-BuildingArt.ToolShedHalfWidth = 9.7
+BuildingArt.ToolShedHalfWidth = 11.9 -- was 9.7 (29.1 wide, 35.7 now): each table is 12.1 wide, so two boxes stand side by side with room between (Connor: space the boxes out)
 local TOOL_SHED_OLD_HALF_DEPTH = 7
 
 -- How far a shop's uploaded meshes are stretched past their authored size
@@ -1149,7 +1149,7 @@ end
 -- The Tool Shed: a red barn workshop with a gambrel roof, its barn doors
 -- slid open on the counter, the axe ladder on the back wall (every axe the
 -- shop sells, from ItemCatalog), a grindstone and a chopping block out
--- front, logs stacked by the east wall.
+-- front, logs stacked by the west wall (the east side faces the sell station keep-out).
 local function toolShed(model: Model, title: string, accent: Color3)
 	local rng = Kit.rng(311)
 	local red = { accent, Kit.shade(accent, 0.07), Kit.shade(accent, -0.07), Kit.vary(accent, rng, 0.05) }
@@ -1187,7 +1187,7 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	end
 
 	-- The gambrel roof: steep lower slopes, shallow upper ones.
-	local KX, KY, RY = 5.6, 13, 14.8
+	local KX, KY, RY = HX - 4.1, 13, 14.8 -- (the knee keeps the lower slope's 4.1 run as the barn grew wider)
 	local length = 2 * HZ + 2
 	local ridge = V3(0, RY, 0)
 	for _, s in ipairs({ -1, 1 }) do
@@ -1280,13 +1280,13 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	-- between them need that floor.)
 
 	-- Out front: the grindstone and the chopping block; firewood stacked by
-	-- the east wall (all of it solid).
+	-- the west wall (all of it solid; it was the east wall until the shed grew wider).
 	grindstone(model, CF(-7.6, 0, -HZ - 2.2))
 	choppingBlock(model, CF(7.6, 0, -HZ - 2.2), rng)
 	for row = 0, 1 do
 		for i = 0, 1 - row do
 			local z = -2 + (i - (1 - row) / 2) * 1.55
-			log(model, CF(HX + 1.25, 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true)
+			log(model, CF(-(HX + 1.25), 0.75 + row * 1.32, z), 2, 1.5, rng, 1, true)
 		end
 	end
 end

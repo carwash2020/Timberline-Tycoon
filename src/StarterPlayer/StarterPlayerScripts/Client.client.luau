@@ -59,6 +59,8 @@ local MODULES = {
 	"PlotUI",
 	"PromptUI",
 	"Quality",
+	"QualityDressing",
+	"QualityPickerUI",
 	"QuestUI",
 	"QuickMenuUI",
 	"SaveSlotUI",
@@ -120,6 +122,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "Quality",
 		get = function()
 			return require(script.Parent.Quality)
+		end,
+	},
+	{
+		name = "QualityDressing", -- the shop boxes' windows and lights for the Lower / Higher choice
+		get = function()
+			return require(script.Parent.QualityDressing)
 		end,
 	},
 	{
@@ -408,6 +416,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "PromptUI",
 		get = function()
 			return require(script.Parent.PromptUI)
+		end,
+	},
+	{
+		name = "QualityPickerUI", -- the join screen: Lower or Higher quality, once per account
+		get = function()
+			return require(script.Parent.QualityPickerUI)
 		end,
 	},
 	{

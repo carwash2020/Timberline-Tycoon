@@ -89,7 +89,8 @@ local NPCController = {}
 
 local player = Players.LocalPlayer
 
-local ANIMATE_RANGE = 120
+-- How far townsfolk animate: Quality.Budget().NpcAnimateRange (120 on Higher, 70 on Lower).
+local ANIMATE_RANGE = 120 -- the Higher value (QualityBudgets.High.NpcAnimateRange)
 local WALKER_RANGE = 300 -- walkers keep their place on the route this far out
 local LOOK_RANGE = 22
 local WAVE_RANGE = 14
@@ -1222,7 +1223,7 @@ local function step(dt: number)
 				continue
 			end
 			local d = (rig.root.Position - eye).Magnitude
-			if d > ANIMATE_RANGE then
+			if d > math.min(ANIMATE_RANGE, Quality.Budget().NpcAnimateRange) then
 				if rig.active then
 					rig.active = false
 					rest(rig)
