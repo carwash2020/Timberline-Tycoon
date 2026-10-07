@@ -68,7 +68,15 @@ local folder: Folder? = nil
 
 function Net.Remote(name: string): RemoteEvent
 	if folder == nil then
-		folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder
+		-- The server makes the folder once the world is built, which on a new
+		-- server takes a while and now holds every controller waiting here:
+		-- short tries (a bare WaitForChild warns "infinite yield" after 5 s,
+		-- once per controller).
+		local found = ReplicatedStorage:FindFirstChild("Remotes")
+		while found == nil do
+			found = ReplicatedStorage:WaitForChild("Remotes", 5)
+		end
+		folder = found :: Folder
 	end
 	return (folder :: Folder):WaitForChild(name) :: RemoteEvent
 end

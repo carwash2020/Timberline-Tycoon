@@ -163,6 +163,42 @@ local trailers: { [string]: { [string]: { [string]: Piece } } } = {
 	},
 }
 
+-- Every truck and trailer piece as { meshId, wheel } (a wheel loads with
+-- Hull collision, the rest with Box), for MeshManifest's preload. Each
+-- (id, wheel) pair once, in a fixed order.
+function VehicleModels.AllPieces(): { { meshId: number, wheel: boolean } }
+	local out: { { meshId: number, wheel: boolean } } = {}
+	local seen: { [string]: boolean } = {}
+	local function sortedKeys(map: { [string]: any }): { string }
+		local keys: { string } = {}
+		for key in pairs(map) do
+			table.insert(keys, key)
+		end
+		table.sort(keys)
+		return keys
+	end
+	local function add(spec: { [string]: Piece })
+		for _, role in ipairs(sortedKeys(spec)) do
+			local piece = spec[role]
+			local wheel = role == "Wheel"
+			local key = tostring(piece.meshId) .. (if wheel then "w" else "")
+			if piece.meshId ~= 0 and not seen[key] then
+				seen[key] = true
+				table.insert(out, { meshId = piece.meshId, wheel = wheel })
+			end
+		end
+	end
+	for _, id in ipairs(sortedKeys(trucks)) do
+		add(trucks[id])
+	end
+	for _, id in ipairs(sortedKeys(trailers)) do
+		for _, truckId in ipairs(sortedKeys(trailers[id])) do
+			add(trailers[id][truckId])
+		end
+	end
+	return out
+end
+
 function VehicleModels.Truck(id: string): { [string]: Piece }?
 	return trucks[id]
 end

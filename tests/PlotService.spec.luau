@@ -128,7 +128,7 @@ return function(t)
 			globals = {
 				Instance = Instance,
 				task = {
-					spawn = function(fn)
+					spawn = options.spawn or function(fn)
 						fn()
 					end,
 				},
@@ -242,6 +242,7 @@ return function(t)
 				},
 				WoodService = options.wood,
 				PlotFill = options.plotFill,
+				ItemMeshes = options.itemMeshes,
 			},
 		})
 		local PlotService = loader:server("PlotService")
@@ -257,7 +258,7 @@ return function(t)
 		end
 		PlotService.Init(map, remotes, function(_, message)
 			table.insert(toasts, message)
-		end)
+		end, if options.gates then { gates = options.gates } else nil)
 		local plots = map:FindFirstChild("Plots")
 
 		local function plot(i)
@@ -319,6 +320,84 @@ return function(t)
 			end,
 		}
 	end
+
+	-- LOAD-02: the plot kit's meshes load in the background. Studio's log of
+	-- 7 October 2026 had PlotService.Init take 10.7 s, one mesh load after
+	-- another. Init never waits on an asset fetch: it gives the meshes a short
+	-- bounded wait, builds the pads part-built if they are late and dresses
+	-- them when the meshes land.
+	t.test("the plot kit's meshes in time: the pads are drawn once, with the meshes, and the gate opens", function()
+		local ReadyGates = t.shared("ReadyGates")
+		local gates = ReadyGates.new()
+		local attached = 0
+		setup({
+			gates = gates,
+			itemMeshes = {
+				LoadAsync = function() end,
+				AttachTo = function()
+					attached += 1
+					return false
+				end,
+				Attach = function()
+					return 0
+				end,
+				Template = function()
+					return nil
+				end,
+			},
+		})
+		t.eq(gates.IsReady("itemMeshes"), true, "the gate is open once the meshes are loaded")
+		local perPad = attached / #t.shared("PlotData").Slots
+		t.eq(perPad, 9, "one sign, four rails and four corners: drawn once per pad")
+	end)
+
+	t.test(
+		"the plot kit's meshes late: Init does not wait for them, then the pads are dressed when they land",
+		function()
+			local ReadyGates = t.shared("ReadyGates")
+			local now = 0
+			local gates = ReadyGates.new({
+				clock = function()
+					now += 1 -- every look at the clock is a second: the 3 s wait runs out at once
+					return now
+				end,
+				wait = function() end,
+			})
+			local threads = {}
+			local attached = 0
+			local env = setup({
+				gates = gates,
+				spawn = function(fn)
+					local co = coroutine.create(fn)
+					table.insert(threads, co)
+					assert(coroutine.resume(co))
+				end,
+				itemMeshes = {
+					LoadAsync = function()
+						coroutine.yield() -- the mesh fetch: nothing lands until the test says so
+					end,
+					AttachTo = function()
+						attached += 1
+						return false
+					end,
+					Attach = function()
+						return 0
+					end,
+					Template = function()
+						return nil
+					end,
+				},
+			})
+			t.eq(gates.IsReady("itemMeshes"), false, "Init returned with the meshes still loading")
+			local drawnBefore = attached
+			t.ok(drawnBefore > 0, "the pads were built (part-built) without waiting")
+			t.ok(env.plot(1), "plot 1 is there")
+			-- The meshes land.
+			assert(coroutine.resume(threads[1]))
+			t.eq(gates.IsReady("itemMeshes"), true)
+			t.eq(attached, drawnBefore * 2, "every pad was drawn again, now with the meshes")
+		end
+	)
 
 	t.test("the district has an open plot per slot, each with a sign, and one Land Office that sells them", function()
 		local s = setup()

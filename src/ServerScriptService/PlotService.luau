@@ -58,6 +58,7 @@ local SampleBuilds = require(ReplicatedStorage.Shared.SampleBuilds)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
+local ReadyGates = require(ReplicatedStorage.Shared.ReadyGates)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local WorldLayout = require(ReplicatedStorage.Shared.World.WorldLayout)
@@ -2179,10 +2180,51 @@ end
 
 -- `map` is TimberlineMap; the remotes are PlaceBlueprint, MoveBlueprint,
 -- SellPlaced and UpgradePlot.
-function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, notifyFn: (Player, string) -> ())
+-- Draws a pad's platform, rails and sign again from its owner's save (or as a
+-- free pad). Used when the plot kit's meshes land after the pads were built.
+local function redrawSlot(slot: Slot)
+	local owner = slot.owner
+	local profile = if owner then ProfileService.GetProfile(owner) else nil
+	if owner and profile and profile.plot then
+		local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+		local owned = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+		drawBounds(slot, tier.size, true, owned)
+	else
+		drawBounds(slot, PlotData.Tiers[1].size, false)
+	end
+end
+
+-- `options.gates` (GameServer passes LoadState.Gates) gets "itemMeshes" when
+-- the plot kit's meshes are in.
+function PlotService.Init(
+	map: Instance,
+	remotes: { [string]: RemoteEvent },
+	notifyFn: (Player, string) -> (),
+	options: { gates: ReadyGates.Gates? }?
+)
 	notify = notifyFn
 	LogicService.Bind(hostFor :: any, notifyFn)
-	ItemMeshes.LoadAsync()
+	-- The kit's meshes load side by side in the background (Studio, 7 October
+	-- 2026: loading them one at a time held this Init for 10.7 s). With the
+	-- start-up preload they are already cached and this is instant. If they
+	-- are late the pads are built part-built after a short bounded wait and
+	-- dressed when the meshes land: the server never waits on an asset fetch.
+	local gates = (options and options.gates) or ReadyGates.new()
+	local lateShells = false
+	task.spawn(function()
+		ItemMeshes.LoadAsync()
+		gates.Set("itemMeshes")
+		if lateShells then
+			for _, slot in ipairs(slots) do
+				redrawSlot(slot)
+			end
+			print("[Load] PlotService: the plot kit's meshes landed late; the pads were dressed")
+		end
+	end)
+	if not gates.Wait("itemMeshes", 3) then
+		lateShells = true
+		print("[Load] PlotService: the plot kit's meshes are not in after 3 s; the pads are built part-built for now")
+	end
 	local folder = Instance.new("Folder")
 	folder.Name = "Plots"
 	folder.Parent = map
