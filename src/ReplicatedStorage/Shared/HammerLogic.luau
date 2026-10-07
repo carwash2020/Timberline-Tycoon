@@ -6,12 +6,14 @@
 --     list, or the sheet for a piece you aimed at, or hands an unfilled kit
 --     ghost to the BuilderTools bar, or does nothing while a ghost or a
 --     panel already has the player's attention.
---   * PieceActions: the sheet for a placed piece (Move, Turn, Sell), with
---     the same locks the server enforces (a filled kit piece cannot move).
+--   * PieceActions: the sheet for a placed piece (Move, Turn, Paint, Sell),
+--     with the same locks the server enforces (a filled kit piece cannot move).
+--     Paint is only on kit pieces and is never locked: it is cosmetic.
 --   * Swing: the head's pitch through one swing, and when it lands.
 --   * FX: who sees and hears a swing.
 
 local EditLogic = require(script.Parent.EditLogic)
+local KitPaint = require(script.Parent.KitPaint)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
 local SkyBinLogic = require(script.Parent.SkyBinLogic)
@@ -52,7 +54,7 @@ end
 ---------------------------------------------------------------------------
 
 export type Action = {
-	id: string, -- "move" | "turn" | "sell"
+	id: string, -- "move" | "turn" | "paint" | "sell"
 	label: string,
 	enabled: boolean,
 	why: string?, -- what to tell the player when it is greyed out
@@ -80,11 +82,17 @@ function HammerLogic.PieceActions(bp: PlotData.Blueprint, item: PlotLogic.Placed
 	elseif plan.cash > 0 then
 		sell = "Sell +" .. Util.formatCash(plan.cash)
 	end
-	return {
+	local actions: { Action } = {
 		{ id = "move", label = "Move", enabled = not fixed, why = why },
 		{ id = "turn", label = "Turn", enabled = not fixed, why = why },
-		{ id = "sell", label = sell, enabled = true, why = nil },
 	}
+	-- Paint is cosmetic, so a filled piece (which cannot move) can still be
+	-- painted. Only kit pieces take it (KitPaint).
+	if KitPaint.CanPaint(bp) then
+		table.insert(actions, { id = "paint", label = "Paint", enabled = true, why = nil })
+	end
+	table.insert(actions, { id = "sell", label = sell, enabled = true, why = nil })
+	return actions
 end
 
 ---------------------------------------------------------------------------

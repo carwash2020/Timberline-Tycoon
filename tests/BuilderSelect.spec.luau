@@ -16,11 +16,32 @@ return function(t)
 	local part = Instance.new("Part")
 	part.Parent = model
 
+	-- A glass wall in front of things: x 150 has the piece behind the glass, x 160 only the glass.
+	local glassModel = Instance.new("Model")
+	glassModel:AddTag("PlacedItem")
+	glassModel:SetAttribute("Uid", "glass-1")
+	glassModel:SetAttribute("OwnerId", 7)
+	local pane = Instance.new("Part")
+	pane:SetAttribute("Role", "Glass")
+	pane.Parent = glassModel
+
 	local seen = {}
-	local function raycast(_, origin, _direction)
+	local function raycast(_, origin, _direction, params)
 		table.insert(seen, tostring(typeof(origin)) .. ":" .. tostring(origin))
 		if origin and origin.X == 100 and origin.Y == 50 then
 			return { Instance = part }
+		end
+		if origin and (origin.X == 150 or origin.X == 160) and origin.Y == 50 then
+			local skipped = false
+			for _, inst in ipairs(params and params.FilterDescendantsInstances or {}) do
+				if inst == pane then
+					skipped = true
+				end
+			end
+			if not skipped then
+				return { Instance = pane }
+			end
+			return if origin.X == 150 then { Instance = part } else nil
 		end
 		return nil
 	end
@@ -104,6 +125,12 @@ return function(t)
 		t.ok(string.find(src, "UITheme.Bottom()", 1, true))
 		t.ok(string.find(src, "BuilderBar.Layout", 1, true))
 		t.ok(string.find(src, "Enum.KeyCode.ButtonR2", 1, true))
+	end)
+
+	t.test("glass does not block the aim: the piece behind it is aimed at, else the glass wall itself", function()
+		player.Character = nil
+		t.eq(Tools.Aim(camera, 150, 50), model, "a ghost wall seen through a glass wall")
+		t.eq(Tools.Aim(camera, 160, 50), glassModel, "nothing behind it: the glass wall")
 	end)
 
 	t.test("a 58 px top inset keeps the build bar's on-screen top at 141 on a 667x375 phone", function()

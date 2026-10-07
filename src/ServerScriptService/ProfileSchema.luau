@@ -11,6 +11,7 @@ local DailyData = require(ReplicatedStorage.Shared.DailyData)
 local EventData = require(ReplicatedStorage.Shared.EventData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
@@ -34,6 +35,7 @@ export type PlacedItem = {
 	rot: number,
 	y: number?, -- base height; missing means the ground
 	wood: string?, -- filled wood; missing means the authored look
+	paint: string?, -- a KitPaint id (kit pieces only); missing means natural
 	fill: { units: number }?, -- kit blueprint still taking planks; missing means built
 	paid: number?, -- fee charged to place a kit piece; missing means the legacy price
 	len: number?, -- resized length; missing means the base. woodUnits is not saved
@@ -707,6 +709,9 @@ function ProfileSchema.Migrate(data: any)
 				item.wood = nil
 			end
 			local bp = if type(item.blueprintId) == "string" then PlotData.Blueprint(item.blueprintId) else nil
+			-- Paint is a palette id on a kit piece; anything else (an old save has
+			-- none, a hand-edited one may have junk) becomes natural.
+			item.paint = if bp and bp.kit == true then KitPaint.Clean(item.paint) else nil
 			if not bp or bp.kit ~= true then
 				item.fill = nil
 				item.paid = nil

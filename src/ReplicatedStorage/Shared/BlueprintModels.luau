@@ -11,6 +11,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local EditLogic = require(script.Parent.EditLogic)
 local ItemMeshes = require(script.Parent.ItemMeshes)
+local KitPaint = require(script.Parent.KitPaint)
 local KitMeshes = require(script.Parent.KitMeshes)
 local PlotData = require(script.Parent.PlotData)
 local TreeArt = require(script.Parent.Art.TreeArt)
@@ -207,6 +208,27 @@ function BlueprintModels.ApplyWood(model: Model, woodId: string?)
 					child:SetAttribute("NightGlow", true)
 				end
 			end
+		end
+	end
+end
+
+-- Covers a kit piece's wood, door and trim parts with a palette colour
+-- (KitPaint). Glass and glow are left alone, and so is a piece with no paint:
+-- it keeps the wood it was filled with. Run it after ApplyWood so paint wins.
+-- Cosmetic only: it sets Color and Material and nothing else.
+function BlueprintModels.ApplyPaint(model: Model, paintId: string?)
+	local swatch = KitPaint.Get(paintId)
+	if swatch == nil or swatch.id == KitPaint.Natural then
+		return
+	end
+	local color = Color3.fromHex(swatch.color)
+	local material = materialOf(KitPaint.Material)
+	for _, child in ipairs(model:GetDescendants()) do
+		if child:IsA("BasePart") and KitPaint.TakesPaint(child:GetAttribute("Role")) then
+			child.Color = color
+			child.Material = material
+			child:SetAttribute("NightGlow", nil) -- paint covers a Lanternwood glow
+			child:SetAttribute("Painted", true)
 		end
 	end
 end

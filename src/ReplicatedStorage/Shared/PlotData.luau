@@ -175,6 +175,7 @@ export type Box = {
 	leaf: boolean?, -- the part that swings; posts and jambs do not
 	light: boolean?, -- a warm PointLight in it
 	smoke: boolean?, -- a chimney: the client puffs smoke here (not on Low)
+	look: boolean?, -- the overlap test skips it (an end post that cannot be trimmed back from a wall's end)
 }
 
 export type Blueprint = {
@@ -195,6 +196,10 @@ export type Blueprint = {
 	opens: boolean?, -- a door or a gate: the owner toggles it
 	hinge: number?, -- local X the leaf swings around (toward +Z)
 	slot: { size: Vector3, offset: Vector3 }?, -- the opening a Door or Window must sit inside
+	overhang: number?, -- roof: how far it sticks out past the footprint (visual; overlap ignores it). Default RoofOverhang
+	storePrice: number?, -- a store plan's shelf price when it is not the placing fee (a kit piece's fee is small)
+	gated: boolean?, -- not a starter plan: learned from another plan's `family` (BlueprintBook)
+	family: { string }?, -- a store plan that teaches all of these at once, itself included
 }
 
 -- What placing charges now. A kit piece is KitCashPerUnit per wood unit.
@@ -209,6 +214,15 @@ function PlotData.Price(bp: Blueprint): number
 		return bp.woodUnits * 10
 	end
 	return bp.priceCash
+end
+
+-- What the General Store shelf asks for a plan: `storePrice` when it has
+-- one, else what placing costs.
+function PlotData.StorePrice(bp: Blueprint): number
+	if type(bp.storePrice) == "number" then
+		return bp.storePrice
+	end
+	return PlotData.Price(bp)
 end
 
 -- The price a save from before `paid` sells against (half of this).
@@ -654,6 +668,10 @@ PlotData.Blueprints = {
 
 local KitPieces = require(script.Parent.KitPieces) :: { any }
 for _, extra in ipairs(KitPieces) do
+	table.insert(PlotData.Blueprints, extra :: Blueprint)
+end
+
+for _, extra in ipairs(require(script.Parent.ModernKit).Pieces :: { any }) do
 	table.insert(PlotData.Blueprints, extra :: Blueprint)
 end
 

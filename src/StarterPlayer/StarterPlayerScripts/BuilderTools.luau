@@ -542,17 +542,38 @@ function BuilderTools.PieceFromHit(inst: Instance?): Model?
 	return modelFrom(inst)
 end
 
--- The piece a screen ray hits. Mouse clicks and the gamepad reticle share it.
+-- The piece a screen ray hits. Mouse clicks, taps and the gamepad reticle share
+-- it. Glass does not block the aim: a ray that meets a glass pane goes on
+-- through it (up to GLASS_LOOKS panes) and returns the piece behind, say a
+-- ghost wall inside a glass shop. If nothing placed is behind the glass, the
+-- glass piece itself is what was aimed at (the pane is still a wall).
+local GLASS_LOOKS = 3
+
 function BuilderTools.Aim(camera: Camera, x: number, y: number): Model?
 	local ray = camera:ViewportPointToRay(x, y)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
+	local skip: { Instance } = {}
 	local char = player.Character
 	if char then
-		params.FilterDescendantsInstances = { char }
+		table.insert(skip, char)
 	end
-	local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
-	return if hit then modelFrom(hit.Instance) else nil
+	local glassPiece: Model? = nil
+	for _ = 1, GLASS_LOOKS + 1 do
+		params.FilterDescendantsInstances = skip
+		local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
+		if not hit then
+			break
+		end
+		local model = modelFrom(hit.Instance)
+		if hit.Instance:GetAttribute("Role") == "Glass" then
+			glassPiece = glassPiece or model
+			table.insert(skip, hit.Instance)
+		else
+			return model or glassPiece
+		end
+	end
+	return glassPiece
 end
 
 function BuilderTools.SelectedCount(): number
@@ -854,15 +875,7 @@ function BuilderTools.Start()
 		if not cameraNow then
 			return
 		end
-		local ray = cameraNow:ViewportPointToRay(position.X, position.Y)
-		local params = RaycastParams.new()
-		params.FilterType = Enum.RaycastFilterType.Exclude
-		local char = player.Character
-		if char then
-			params.FilterDescendantsInstances = { char }
-		end
-		local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
-		local model = if hit then modelFrom(hit.Instance) else nil
+		local model = BuilderTools.Aim(cameraNow, position.X, position.Y)
 		if model then
 			toggle(model)
 		end

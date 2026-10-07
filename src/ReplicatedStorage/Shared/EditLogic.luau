@@ -140,6 +140,7 @@ function EditLogic.Snapshot(item: Item): Item
 		rot = item.rot,
 		y = item.y,
 		wood = item.wood,
+		paint = item.paint,
 		fill = if item.fill then { units = item.fill.units } else nil,
 		paid = item.paid,
 		len = item.len,

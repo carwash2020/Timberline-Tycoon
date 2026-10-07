@@ -378,7 +378,7 @@ local function blueprintView(id: string): RowView
 	local cash = (player:GetAttribute("Cash") :: number?) or 0
 	local owned = ShopLogic.DecodeSet((player:GetAttribute("Blueprints") :: string?) or "")
 	local have = owned[id] == true
-	local price = if bp then PlotData.Price(bp) else 0
+	local price = if bp then PlotData.StorePrice(bp) else 0
 	local name = if bp then bp.displayName else id
 	local button, state
 	if have then

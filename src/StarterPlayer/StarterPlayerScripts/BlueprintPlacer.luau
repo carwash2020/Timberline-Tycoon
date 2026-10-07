@@ -188,6 +188,7 @@ function BlueprintPlacer.MyPlaced(): { PlotLogic.Placed }
 			local len = inst:GetAttribute("Len")
 			local lenX = inst:GetAttribute("LenX")
 			local lenZ = inst:GetAttribute("LenZ")
+			local paint = inst:GetAttribute("Paint")
 			if uid and id and x and z and rot then
 				table.insert(out, {
 					uid = uid,
@@ -200,6 +201,7 @@ function BlueprintPlacer.MyPlaced(): { PlotLogic.Placed }
 					len = if type(len) == "number" then len else nil,
 					lenX = if type(lenX) == "number" then lenX else nil,
 					lenZ = if type(lenZ) == "number" then lenZ else nil,
+					paint = if type(paint) == "string" then paint else nil,
 				})
 			end
 		end

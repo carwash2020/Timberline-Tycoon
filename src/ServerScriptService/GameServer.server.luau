@@ -692,6 +692,7 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlaceBlueprint = remote.PlaceBlueprint,
 	MoveBlueprint = remote.MoveBlueprint,
 	SellPlaced = remote.SellPlaced,
+	PaintPiece = remote.PaintPiece,
 	UpgradePlot = remote.UpgradePlot,
 	PlotOffer = remote.PlotOffer,
 	ClaimPlot = remote.ClaimPlot,
@@ -744,7 +745,12 @@ if CoreLoop.V2() then
 	AdminService.SetAccessSend(function(who: Player, payload: { [string]: any })
 		remote.AdminAccess:FireClient(who, payload)
 	end)
-	AdminService.SetHooks({ resetTutorial = QuestService.Reset, publishBlueprints = BlueprintService.Publish })
+	AdminService.SetHooks({
+		resetTutorial = QuestService.Reset,
+		publishBlueprints = BlueprintService.Publish,
+		placeSample = PlotService.PlaceSample,
+		clearSamples = PlotService.ClearSamples,
+	})
 	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
 	local function saleFx(model: Model)
 		local piece = WoodService.FromModel(model)

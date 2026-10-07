@@ -29,7 +29,12 @@ local deliver: (Player, string) -> () = function(_player: Player, _message: stri
 local reply: (Player, boolean, string) -> () = function(_player: Player, _ok: boolean, _text: string) end
 
 -- Services that GameServer wires in (no require cycle).
-export type Hooks = { resetTutorial: ((Player) -> ())?, publishBlueprints: ((Player) -> ())? }
+export type Hooks = {
+	resetTutorial: ((Player) -> ())?,
+	publishBlueprints: ((Player) -> ())?,
+	placeSample: ((Player, string) -> (boolean, string))?, -- PlotService.PlaceSample
+	clearSamples: ((Player) -> number)?, -- PlotService.ClearSamples
+}
 local hooks: Hooks = {}
 
 -- While a menu request runs, what the owner would be told is collected for
@@ -693,6 +698,43 @@ handlers.unlockbp = function(owner, args)
 	end
 	log(owner, string.format("unlockbp %s (+%d)", who.Name, added))
 	notify(owner, string.format("%s now knows every building (%d new).", who.Name, added))
+end
+
+-- A free test building on the owner's own plot, at the spot they face
+-- (SampleBuilds). Only the owner: AdminLogic.NeverDelegable keeps every
+-- delegate role (TESTER too) out before this runs, and this checks the
+-- speaker's role again. `/sample clear` takes every sample piece down.
+handlers.sample = function(owner, args)
+	if actor.role ~= "owner" then
+		refuse(owner, "Only the owner can do that.")
+		return
+	end
+	local place, clear = hooks.placeSample, hooks.clearSamples
+	if not place or not clear then
+		refuse(owner, "Samples aren't available here.")
+		return
+	end
+	local name = args[1]
+	if name == nil then
+		notify(owner, "Usage: /sample <modern|shop|barn>, or /sample clear")
+		return
+	end
+	if string.lower(name) == "clear" then
+		local n = clear(owner)
+		log(owner, string.format("sample clear (%d)", n))
+		notify(
+			owner,
+			if n > 0 then string.format("Took down %d sample pieces.", n) else "No sample pieces on your plot."
+		)
+		return
+	end
+	local ok, text = place(owner, name)
+	log(owner, string.format("sample %s: %s", name, if ok then "placed" else text))
+	if ok then
+		notify(owner, text)
+	else
+		refuse(owner, text)
+	end
 end
 
 -- Kicks everyone (the owner too): the server is gone once the last leaves.

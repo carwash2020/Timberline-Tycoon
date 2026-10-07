@@ -161,7 +161,7 @@ local function blueprintSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = "#8C6A45",
-				boxClass = classId("Blueprint", PlotData.Price(bp), bp.footprint),
+				boxClass = classId("Blueprint", PlotData.StorePrice(bp), bp.footprint),
 			})
 		end
 	end
@@ -276,7 +276,7 @@ function StoreStock.UnitPrice(kind: string, itemId: string, limited: boolean, lo
 				break
 			end
 		end
-		return if bp then PlotData.Price(bp) else nil
+		return if bp then PlotData.StorePrice(bp) else nil
 	elseif kind == "Truck" then
 		-- The catalog's v2 price, through ShopLogic.Price. No second price table.
 		local truck = ItemCatalog.GetTruck(itemId)

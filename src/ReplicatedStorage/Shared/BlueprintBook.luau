@@ -53,7 +53,19 @@ end
 -- A blueprint that could be placed for a fee before blueprints were items
 -- (not a store unlock, not a boxed machine). Everyone starts with these.
 function BlueprintBook.IsStarter(bp: PlotData.Blueprint): boolean
-	return bp.unlock ~= true and not BlueprintBook.IsBoxed(bp.id)
+	return bp.unlock ~= true and bp.gated ~= true and not BlueprintBook.IsBoxed(bp.id)
+end
+
+-- The store plan that teaches `id` as part of its `family` (the glass pieces
+-- are learned together from one plan). Nil for anything else, and for the
+-- plan itself: it is its own source.
+function BlueprintBook.KeyOf(id: string): PlotData.Blueprint?
+	for _, bp in ipairs(PlotData.Blueprints) do
+		if bp.family and bp.id ~= id and table.find(bp.family, id) then
+			return bp
+		end
+	end
+	return nil
 end
 
 -- Every id you may start with, in PlotData's order.
@@ -92,6 +104,19 @@ function BlueprintBook.Learn(book: Book, id: unknown): boolean
 	end
 	table.insert(book, id)
 	return true
+end
+
+-- Learns `id` and, when it is a plan with a `family`, every piece of the
+-- family. True when the book gained anything.
+function BlueprintBook.LearnWithFamily(book: Book, id: unknown): boolean
+	local gained = BlueprintBook.Learn(book, id)
+	local bp = if type(id) == "string" then PlotData.Blueprint(id) else nil
+	if bp and bp.family then
+		for _, member in ipairs(bp.family) do
+			gained = BlueprintBook.Learn(book, member) or gained
+		end
+	end
+	return gained
 end
 
 -- Anything saved or sent in as a book, made safe: strings that name a real
@@ -184,6 +209,16 @@ function BlueprintBook.Migrate(record: any)
 			BlueprintBook.Learn(book, id)
 		end
 	end
+	-- A plan that teaches a family gives the whole family, also to a book
+	-- that learned the plan before the family grew.
+	for _, id in ipairs(table.clone(book)) do
+		local bp = PlotData.Blueprint(id)
+		if bp and bp.family then
+			for _, member in ipairs(bp.family) do
+				BlueprintBook.Learn(book, member)
+			end
+		end
+	end
 	record.blueprintBook = book
 	record.blueprintItems = BlueprintBook.CleanItems(record.blueprintItems)
 	record.hammer = true
@@ -240,7 +275,7 @@ function BlueprintBook.Redeem(book: Book, items: { Item }, uid: unknown): (Redee
 		return "known", item.id
 	end
 	table.remove(items, index)
-	BlueprintBook.Learn(book, item.id)
+	BlueprintBook.LearnWithFamily(book, item.id)
 	return "ok", item.id
 end
 
@@ -249,6 +284,13 @@ function BlueprintBook.RedeemText(result: string, id: string?): string
 	local bp = if id then PlotData.Blueprint(id) else nil
 	local name = if bp then bp.displayName else "building"
 	if result == "ok" then
+		if bp and bp.family and #bp.family > 1 then
+			return string.format(
+				"You learned the %s and %d more glass and shop pieces. They're in your hammer's list for good.",
+				name,
+				#bp.family - 1
+			)
+		end
 		return string.format("You learned the %s. It's in your hammer's list for good.", name)
 	elseif result == "known" then
 		return string.format("You already know the %s. Keep this plan for someone else.", name)
@@ -280,12 +322,16 @@ function BlueprintBook.Allowed(id: string, owned: boolean, stocked: number, boxe
 	if owned then
 		return true, nil
 	end
-	return false, if bp.unlock == true then "store" else "notOwned"
+	return false, if bp.unlock == true or BlueprintBook.KeyOf(id) ~= nil then "store" else "notOwned"
 end
 
 function BlueprintBook.Message(reason: string?, bp: PlotData.Blueprint?): string
 	local name = if bp then bp.displayName else "piece"
 	if reason == "store" then
+		local key = if bp then BlueprintBook.KeyOf(bp.id) else nil
+		if key then
+			return string.format("Buy the %s plan at the General Store first.", key.displayName)
+		end
 		return string.format("Buy the %s at the General Store first.", name)
 	elseif reason == "toolShed" then
 		return string.format("Buy the %s at the Tool Shed first.", name)
@@ -437,7 +483,7 @@ function BlueprintBook.Row(entry: Entry, ctx: Context): Row
 	if bp.note then
 		row.detail ..= " · " .. bp.note
 	end
-	local price = if entry.stock > 0 or bp.unlock == true then 0 else PlotData.Price(bp)
+	local price = if entry.stock > 0 or PlotLogic.FreeToPlace(bp) then 0 else PlotData.Price(bp)
 	if price > ctx.cash then
 		row.button, row.state, row.ready = Util.formatCash(price), "cant", false
 		row.message = string.format("You need %s more for the %s.", Util.formatCash(price - ctx.cash), bp.displayName)

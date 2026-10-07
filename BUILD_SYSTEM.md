@@ -84,3 +84,7 @@ No new binds: Tool.Activated carries RT, click and tap, so `HudRules` and `Input
 - Art: `Shared/Art/HammerArt`, `Shared/Art/BlueprintArt`, preview scene `tools/preview/scenes/hammer.luau`.
 - The shelf boxes in the General Store still look like crates (store art is another branch's work); only the item you receive is a rolled plan.
 - Not touched: store builders, HUD layout beyond one side button, economy tables (no number moved).
+
+## Modern kit addendum (claude/kit-modern)
+
+Paint, glass, overhang roofs, stairs, balcony and the sample buildings are described in PHASE2_NOTES.md ("Modern kit"). Rules to know: a store plan may carry a `family` (using it teaches every piece in it; `gated` pieces are not starter plans), and a kit piece sold as a plan still pays its kit fee on every place (`PlotLogic.FreeToPlace` is false for kit pieces). `storePrice` is the shelf price when it differs from the placing fee. Paint is the `paint` field on a placed kit piece; the hammer sheet gains Paint on kit pieces and `PlotService.Paint` checks permission, reach, palette id and rate.
