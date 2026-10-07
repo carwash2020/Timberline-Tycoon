@@ -94,6 +94,8 @@ type Hold = {
 	device: Device,
 	touch: InputObject?, -- the finger holding it
 	confirmed: boolean, -- the server said it's ours (HeldBy)
+	mass: number, -- what the pull is sized by (GrabLogic.PullMass); re-read when the piece's assembly changes
+	assemblyMass: number, -- part.AssemblyMass when the pull was last sized
 	conn: RBXScriptConnection?, -- HeldBy changes
 }
 
@@ -615,6 +617,25 @@ local function drop(tell: boolean)
 	refreshBall(h.model)
 end
 
+-- What the pull is sized by: the larger of the assembly's mass and the sum of
+-- the piece's parts (an anchored shelf box reports an assembly mass of 0).
+local function massOf(model: Model, part: BasePart): number
+	local masses: { number } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			table.insert(masses, d:GetMass())
+		end
+	end
+	return GrabLogic.PullMass(part.AssemblyMass, masses)
+end
+
+-- Sizes the pull and the turn to `h.mass`.
+local function sizePull(h: Hold)
+	local force = GrabLogic.Force(h.mass, tune("DragForcePerMass"), tune("DragForceCap"))
+	h.pull.MaxForce = force
+	h.turn.MaxTorque = GrabLogic.Torque(force)
+end
+
 -- Starts holding what `device` points at (see the header).
 local function grab(device: Device, touch: InputObject?)
 	if hold then
@@ -645,7 +666,8 @@ local function grab(device: Device, touch: InputObject?)
 		HUD.Toast(GrabLogic.Message("held") :: string)
 		return
 	end
-	local force = GrabLogic.Force(part.AssemblyMass, tune("DragForcePerMass"), tune("DragForceCap"))
+	local mass = massOf(model, part)
+	local force = GrabLogic.Force(mass, tune("DragForcePerMass"), tune("DragForceCap"))
 	local grip = Instance.new("Attachment")
 	grip.Name = "DragGrip"
 	grip.CFrame = CFrame.new(part.CFrame:PointToObjectSpace(at))
@@ -682,6 +704,8 @@ local function grab(device: Device, touch: InputObject?)
 		device = device,
 		touch = touch,
 		confirmed = false,
+		mass = mass,
+		assemblyMass = part.AssemblyMass,
 		conn = nil,
 	}
 	hold = h
@@ -726,6 +750,14 @@ step = function(dt: number)
 	end
 	if distanceAxis ~= 0 then
 		nudge(distanceAxis * GrabLogic.DistanceSpeed * dt)
+	end
+	-- The server freeing a shelf box (it was anchored) changes its assembly:
+	-- size the pull again, so the first grab moves it.
+	local assembly = h.part.AssemblyMass
+	if assembly ~= h.assemblyMass then
+		h.assemblyMass = assembly
+		h.mass = massOf(h.model, h.part)
+		sizePull(h)
 	end
 	if locked then
 		-- The lock lets go the moment its reasons are gone: LT up (polled, in

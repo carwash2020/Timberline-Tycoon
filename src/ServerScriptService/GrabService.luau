@@ -108,6 +108,7 @@ export type Hooks = {
 	beforeHold: ((Player, Piece) -> ())?,
 	onGrab: ((Player, Piece) -> ())?,
 	onRelease: ((Player, Piece, string) -> ())?,
+	onRefused: ((Player, Piece, string) -> ())?, -- a grab that passed every check but could not take the piece's physics
 	shopFacts: ((Player, Piece) -> ShopGrab?)?,
 }
 GrabService.Hooks = {} :: Hooks
@@ -488,6 +489,13 @@ function GrabService.Grab(player: Player, part: unknown, hitPos: unknown): (bool
 		beforeHold(player, piece)
 	end
 	if root.Anchored or not GrabService.Physics.SetOwner(root, player) then
+		-- beforeHold may already have freed the piece (a shop box off its
+		-- shelf): the owner of that hook puts things back, and nothing here
+		-- was recorded as held.
+		local onRefused = hooks.onRefused
+		if onRefused then
+			onRefused(player, piece, "stuck")
+		end
 		return false, "stuck"
 	end
 	loose[model] = nil

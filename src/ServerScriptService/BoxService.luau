@@ -57,6 +57,7 @@ export type Record = {
 	buyerId: number,
 	opened: boolean,
 	onShelf: boolean,
+	heldBy: number, -- the UserId holding it now (GrabService), 0 = nobody
 	claimUserId: number,
 	claimUntil: number,
 	outsideStreak: number,
@@ -243,17 +244,14 @@ function BoxService.Each(): { Record }
 	return out
 end
 
+-- (what `userId` holds, unpaid boxes off their shelves on the whole server):
+-- the numbers behind the carry cap (BoxLogic.CountUnpaid).
 function BoxService.UnpaidOffShelf(userId: number): (number, number)
-	local mine, all = 0, 0
+	local boxes: { BoxLogic.Counted } = {}
 	for _, rec in pairs(records) do
-		if not rec.paid and not rec.onShelf and not rec.opened then
-			all += 1
-			if rec.claimUserId == userId then
-				mine += 1
-			end
-		end
+		table.insert(boxes, rec)
 	end
-	return mine, all
+	return BoxLogic.CountUnpaid(boxes, userId)
 end
 
 function BoxService.InCounter(rec: Record): boolean
@@ -346,18 +344,16 @@ function BoxService.RobuxPrice(kind: string, key: string): number?
 	return robuxPrices[kind .. ":" .. key]
 end
 
+-- A Robux box's price line, once Roblox has said it: the one price on the
+-- box, on its label.
 local function refreshRobuxTags(kind: string, key: string, price: number)
 	local text = RobuxShelf.Tag(price)
-	local tag = BoxLogic.PriceTag(text)
 	for _, rec in pairs(records) do
-		local part = rec.part
-		if part ~= nil and rec.robux ~= nil and rec.robux.kind == kind and rec.robux.key == key then
-			local board = part:FindFirstChild("PriceTag")
-			if board ~= nil and board:IsA("BillboardGui") then
-				board.Size = UDim2.fromOffset(math.max(80, #tag.text * tag.textSize), tag.textSize + 10)
-				local label = board:FindFirstChild("Price")
-				if label ~= nil and label:IsA("TextLabel") then
-					label.Text = text
+		local model = rec.model
+		if model ~= nil and rec.robux ~= nil and rec.robux.kind == kind and rec.robux.key == key then
+			for _, d in ipairs(model:GetDescendants()) do
+				if d.Name == "Price" and d:IsA("TextLabel") then
+					d.Text = text
 				end
 			end
 		end
@@ -397,6 +393,19 @@ function BoxService.AskRobuxPrice(kind: string, key: string)
 	end)
 end
 
+-- The one price on a shop box (its label's second line), or nil where the
+-- price is shown somewhere else: a vehicle's box stands by its showroom
+-- price sign, so it carries none.
+local function priceText(rec: Record): string?
+	if rec.robux ~= nil then
+		return RobuxShelf.Tag(BoxService.RobuxPrice(rec.robux.kind, rec.robux.key))
+	end
+	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
+		return nil
+	end
+	return Util.formatCash(rec.price)
+end
+
 local function dress(rec: Record, part: BasePart, tint: Color3)
 	local faces = BoxLogic.LargestFaces(part.Size)
 	for _, face in ipairs(faces) do
@@ -406,30 +415,6 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 		mark.Color3 = tint
 		mark.Parent = part
 	end
-	local tagText = if rec.robux ~= nil
-		then RobuxShelf.Tag(BoxService.RobuxPrice(rec.robux.kind, rec.robux.key))
-		else Util.formatCash(rec.price)
-	local tag = BoxLogic.PriceTag(tagText)
-	local board = Instance.new("BillboardGui")
-	board.Name = "PriceTag"
-	board.AlwaysOnTop = tag.alwaysOnTop
-	board.MaxDistance = tag.maxDistance
-	board.Size = UDim2.fromOffset(math.max(80, #tag.text * tag.textSize), tag.textSize + 10)
-	board.StudsOffset = Vector3.new(0, part.Size.Y / 2 + 1.2, 0)
-	board.Parent = part
-	local label = Instance.new("TextLabel")
-	label.Name = "Price"
-	label.BackgroundTransparency = 1
-	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.GothamBold
-	label.Text = tag.text
-	label.TextSize = tag.textSize
-	label.TextColor3 = Color3.fromRGB(245, 235, 215)
-	label.TextScaled = false
-	label.TextWrapped = false
-	label.TextTruncate = Enum.TextTruncate.None
-	label.Parent = board
-
 	local buy = Instance.new("ProximityPrompt")
 	buy.Name = "BuyPrompt"
 	buy.ActionText = "Buy"
@@ -547,6 +532,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		buyerId = 0,
 		opened = false,
 		onShelf = opts.onShelf ~= false,
+		heldBy = 0,
 		claimUserId = 0,
 		claimUntil = 0,
 		outsideStreak = 0,
@@ -574,6 +560,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		color = itemColor,
 		gold = robux ~= nil,
 		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
+		price = priceText(rec),
 	})
 	for _, d in ipairs(model:GetChildren()) do
 		if d:IsA("BasePart") then
@@ -653,6 +640,7 @@ function BoxService.ReturnHome(rec: Record)
 		end)
 	end
 	rec.onShelf = true
+	rec.heldBy = 0
 	rec.claimUserId = 0
 	rec.claimUntil = 0
 	rec.outsideStreak = 0
@@ -1537,9 +1525,49 @@ function BoxService.NoteGrab(player: Player, piece: { model: Model })
 		return
 	end
 	rec.onShelf = false
+	rec.heldBy = player.UserId
 	if not rec.paid then
 		rec.claimUserId = player.UserId
 		rec.claimUntil = BoxLogic.ClaimUntil(os.clock())
+	end
+end
+
+-- A box was let go. It is no longer in anyone's hand (so it stops counting
+-- toward the holder's carry cap), and an unpaid one let go back at its shelf
+-- spot goes onto the shelf again.
+function BoxService.NoteRelease(player: Player, piece: { model: Model }, _reason: string?)
+	local rec = recordByModel(piece.model)
+	if rec == nil then
+		return
+	end
+	if rec.heldBy == player.UserId then
+		rec.heldBy = 0
+	end
+	local part = rec.part
+	if not rec.paid and not rec.onShelf and not rec.opened and part ~= nil and rec.robux == nil then
+		if BoxLogic.PutBack(part.CFrame.Position, rec.home.Position) then
+			BoxService.ReturnHome(rec)
+		end
+	end
+end
+
+-- A grab the server refused after the box was freed for it (GrabService could
+-- not hand over its physics): the box goes back anchored on its shelf, and
+-- nothing about it counts. The client's pull then has nothing to drag.
+function BoxService.NoteRefused(_player: Player, piece: { model: Model }, _reason: string?)
+	local rec = recordByModel(piece.model)
+	if rec == nil or rec.paid or rec.heldBy ~= 0 then
+		return
+	end
+	if rec.onShelf then
+		local part = rec.part
+		if part then
+			part.Anchored = true
+			part.CFrame = rec.home
+		end
+		if rec.model then
+			rec.model:PivotTo(rec.home)
+		end
 	end
 end
 
@@ -1644,6 +1672,24 @@ local function wire()
 			end
 			GrabService.Hooks.shopFacts = function(player: Player, piece: any)
 				return BoxService.Facts(player, piece)
+			end
+			local prevRelease = GrabService.Hooks.onRelease
+			GrabService.Hooks.onRelease = function(player: Player, piece: any, reason: string)
+				if piece.shopBox then
+					BoxService.NoteRelease(player, piece, reason)
+				end
+				if prevRelease then
+					prevRelease(player, piece, reason)
+				end
+			end
+			local prevRefused = GrabService.Hooks.onRefused
+			GrabService.Hooks.onRefused = function(player: Player, piece: any, reason: string)
+				if piece.shopBox then
+					BoxService.NoteRefused(player, piece, reason)
+				end
+				if prevRefused then
+					prevRefused(player, piece, reason)
+				end
 			end
 			chained = true
 		end

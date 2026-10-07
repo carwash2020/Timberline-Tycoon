@@ -112,13 +112,20 @@ return function(t)
 		end
 		t.ok(parts >= 5 and parts <= 6, "the body and its packaging, at most six parts")
 		t.eq(marks, 2)
-		local tag = rec.part:FindFirstChild("PriceTag")
-		t.eq(tag.MaxDistance, 20)
-		t.eq(tag.AlwaysOnTop, false)
-		local label = tag:FindFirstChild("Price")
+		-- The one price is on the box's label: world-space text, never a floating tag.
+		t.eq(rec.part:FindFirstChild("PriceTag"), nil, "no floating price tag")
+		local label
+		for _, d in ipairs(rec.model:GetDescendants()) do
+			t.ok(not d:IsA("BillboardGui"), "no billboard on a shelf box")
+			if d.Name == "Price" and d:IsA("TextLabel") then
+				t.eq(label, nil, "one price label only")
+				label = d
+			end
+		end
 		t.eq(label.Text, "$120")
-		t.ok(label.TextSize >= 14)
-		t.eq(label.TextTruncate, Enum.TextTruncate.None)
+		t.eq(label.TextTruncate, Enum.TextTruncate.None, "the whole price shows")
+		t.eq(label.Parent.Name, "NameMark")
+		t.eq(label.Parent.Parent.Name, "Label", "on the front label")
 		local buy = rec.part:FindFirstChild("BuyPrompt")
 		t.eq(buy.Enabled, true)
 		t.eq(buy.MaxActivationDistance, GameConfig.CounterPayReach)
@@ -269,6 +276,141 @@ return function(t)
 		t.eq(Box.RespawnDue(50 + GameConfig.BoxRespawnSec), { rec.slotId })
 		Box.NoteSold("hearth-LampPost", 50)
 		t.eq(Box.RespawnDue(50 + GameConfig.BoxRespawnSec), { rec.slotId }, "the lamp uses its own pool")
+	end)
+
+	-- The cap sequence from the playtest: take a box, let it go, take another...
+	-- then try to pick up ONE and be told "you can only carry 3 unpaid boxes".
+	t.test("the carry cap counts only boxes in your hands: loose, put-back and refused ones never do", function()
+		local BoxLogic = t.shared("BoxLogic")
+		local GrabLogic = t.shared("GrabLogic")
+		local _, Box = boot()
+		local counter = counterPart()
+		local boxes = {}
+		for i = 1, 5 do
+			boxes[i] = Box.Make({
+				uid = "cap-" .. i,
+				shop = "ToolShed",
+				itemKind = "Axe",
+				itemId = "SteelAxe",
+				displayName = "Steel Axe",
+				cf = CFrame.new(i * 6, 4.5, 0),
+				counter = counter,
+				zoneCf = CFrame.new(),
+				zoneSize = Vector3.new(60, 1, 14),
+				onShelf = true,
+			})
+		end
+		local player = person(Vector3.new(0, 4.5, 0))
+		local other = person(Vector3.new(0, 4.5, 0), 9)
+		local function canTake(rec, who)
+			who = who or player
+			local facts = Box.Facts(who, { model = rec.model })
+			facts.shopBox = true
+			facts.userId = who.UserId
+			facts.now = os.clock()
+			facts.heldBy = 0
+			return GrabLogic.CanGrab(facts)
+		end
+
+		-- Nothing taken: the first pickup is allowed and the numbers are zero.
+		local mine, all = Box.UnpaidOffShelf(7)
+		t.eq({ mine, all }, { 0, 0 })
+		t.eq({ canTake(boxes[1]) }, { true })
+
+		-- Take three, one after another, and drop each on the floor of the shop.
+		for i = 1, 3 do
+			t.eq({ canTake(boxes[i]) }, { true }, "box " .. i .. " may be taken")
+			Box.NoteGrab(player, { model = boxes[i].model })
+			mine, all = Box.UnpaidOffShelf(7)
+			t.eq({ mine, all }, { 1, i }, "one in hand, " .. i .. " off the shelves")
+			boxes[i].part.CFrame = CFrame.new(i * 6, 1, 30) -- the floor, far from its shelf spot
+			Box.NoteRelease(player, { model = boxes[i].model }, "released")
+			t.eq(boxes[i].onShelf, false, "a dropped box stays loose where it fell")
+			mine, all = Box.UnpaidOffShelf(7)
+			t.eq({ mine, all }, { 0, i }, "nothing in hand")
+		end
+
+		-- The fourth pickup used to be refused (three stale claims); now it is fine.
+		t.eq({ canTake(boxes[4]) }, { true }, "a fourth box can be picked up with empty hands")
+		t.eq(BoxLogic.CapMessage(0, 3), nil, "no cap message when you hold nothing")
+		t.eq(BoxLogic.CapMessage(1, 3), nil, "or one box")
+		t.eq(BoxLogic.CapMessage(3, 3), "You can only carry 3 unpaid boxes.", "only when you really hold three")
+
+		-- Other people's boxes are not yours.
+		t.eq({ canTake(boxes[5], other) }, { true })
+		Box.NoteGrab(other, { model = boxes[5].model })
+		mine = Box.UnpaidOffShelf(7)
+		t.eq(mine, 0, "someone else's box is not counted against you")
+		t.eq(select(1, Box.UnpaidOffShelf(9)), 1)
+
+		-- Holding one and reaching for a second: 1 is below the cap.
+		Box.NoteGrab(player, { model = boxes[4].model })
+		t.eq(select(1, Box.UnpaidOffShelf(7)), 1)
+		t.eq({ canTake(boxes[1]) }, { true }, "re-taking a loose box is never capped")
+		-- Holding three at once (a future multi-hold) does hit the cap.
+		for i = 1, 3 do
+			boxes[i].heldBy = 7
+		end
+		boxes[4].heldBy = 0
+		t.eq(select(1, Box.UnpaidOffShelf(7)), 3)
+		boxes[4].onShelf = true
+		boxes[4].claimUserId = 0
+		t.eq({ canTake(boxes[4]) }, { false, "cap" }, "a real fourth in hand is refused")
+		t.eq(
+			GrabLogic.Message("cap", Box.Facts(player, { model = boxes[4].model })),
+			"You can only carry 3 unpaid boxes."
+		)
+	end)
+
+	t.test("a box let go back at its shelf spot goes back on the shelf, and stops counting", function()
+		local _, Box = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local home = rec.home.Position
+		local player = person(home)
+		Box.NoteGrab(player, { model = rec.model })
+		t.eq(rec.onShelf, false)
+		t.eq(rec.heldBy, 7)
+		rec.part.Anchored = false
+		-- Let go 1 stud off its spot, a little above it.
+		rec.part.CFrame = CFrame.new(home + Vector3.new(1, 0.8, 0))
+		Box.NoteRelease(player, { model = rec.model }, "released")
+		t.eq(rec.onShelf, true, "back on its shelf")
+		t.eq(rec.heldBy, 0)
+		t.eq(rec.claimUserId, 0)
+		t.eq(rec.part.Anchored, true)
+		t.ok((rec.part.CFrame.Position - home).Magnitude < 1e-3, "exactly on its spot")
+		t.eq({ Box.UnpaidOffShelf(7) }, { 0, 0 })
+		-- A paid box is never snapped anywhere.
+		rec.onShelf = false
+		rec.paid = true
+		rec.buyerId = 7
+		rec.part.CFrame = CFrame.new(home + Vector3.new(1, 0, 0))
+		Box.NoteRelease(player, { model = rec.model }, "released")
+		t.eq(rec.onShelf, false)
+		t.ok((rec.part.CFrame.Position - (home + Vector3.new(1, 0, 0))).Magnitude < 1e-3)
+	end)
+
+	t.test("a grab the server refuses after freeing the box leaves nothing counted and the box on its shelf", function()
+		local _, Box = boot()
+		local counter = counterPart()
+		local rec = place(Box, Vector3.new(0, 4.5, 0), counter)
+		local player = person(rec.home.Position)
+		-- GrabService unanchored it for the grab, then could not hand over its physics.
+		rec.part.Anchored = false
+		rec.part.CFrame = CFrame.new(rec.home.Position + Vector3.new(0, -0.4, 0.3))
+		Box.NoteRefused(player, { model = rec.model }, "stuck")
+		t.eq(rec.part.Anchored, true, "anchored again")
+		t.ok((rec.part.CFrame.Position - rec.home.Position).Magnitude < 1e-3, "and back where it stood")
+		t.eq(rec.onShelf, true)
+		t.eq(rec.heldBy, 0)
+		t.eq({ Box.UnpaidOffShelf(7) }, { 0, 0 }, "no ghost")
+		-- A box someone really holds is left alone.
+		Box.NoteGrab(player, { model = rec.model })
+		rec.part.Anchored = false
+		Box.NoteRefused(player, { model = rec.model }, "stuck")
+		t.eq(rec.part.Anchored, false)
+		t.eq(rec.heldBy, 7)
 	end)
 
 	t.test("BoxOpen is budgeted, and boxes do not shove players", function()
@@ -430,7 +572,13 @@ return function(t)
 		t.eq(rec.limited, false)
 		t.eq(rec.part.Material, Enum.Material.Metal)
 		t.eq(rec.part.Color, t.roblox.Color3.fromHex("#E3B73C"))
-		t.eq(rec.part:FindFirstChild("PriceTag"):FindFirstChild("Price").Text, "R$", "Roblox sets the price")
+		local priceLabels = {}
+		for _, d in ipairs(rec.model:GetDescendants()) do
+			if d.Name == "Price" and d:IsA("TextLabel") then
+				table.insert(priceLabels, d.Text)
+			end
+		end
+		t.eq(priceLabels, { "R$" }, "one price line on the label; Roblox sets the number")
 		local said = {}
 		Box.Speaker = function(_player, line, r)
 			table.insert(said, { line = line, robux = r.robux })

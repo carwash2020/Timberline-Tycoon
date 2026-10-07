@@ -16,8 +16,8 @@ BoxLogic.BoxClaimSec = 8
 BoxLogic.OpenRange = 12 -- studs, buyer to the box
 BoxLogic.MaxUnpaidPerPlayer = 3 -- the 4th take is refused
 BoxLogic.MaxUnpaidPerServer = 30 -- the 31st take is refused
-BoxLogic.PriceTagMinPx = 14
-BoxLogic.PriceTagMaxDistance = 20
+BoxLogic.PutBackRadius = 3.5 -- studs: an unpaid box let go this close (across) to its shelf spot goes back on it
+BoxLogic.PutBackHeight = 3 -- studs: and no higher or lower than this from it
 BoxLogic.BoxPartCap = 6
 BoxLogic.PayTapPx = 44
 BoxLogic.DespawnHz = 2
@@ -35,6 +35,14 @@ export type GrabFacts = {
 	taking: boolean?, -- this grab lifts it off the shelf
 }
 
+-- What the carry cap needs to know of a box.
+export type Counted = {
+	paid: boolean,
+	opened: boolean,
+	onShelf: boolean,
+	heldBy: number, -- the UserId whose hand it is in right now, 0 = nobody's
+}
+
 export type GrabReason = "held" | "owned" | "claim" | "cap"
 
 export type OpenFacts = {
@@ -48,14 +56,6 @@ export type OpenFacts = {
 }
 
 export type OpenReason = "owner" | "far" | "unpaid" | "opened" | "uid"
-
-export type Tag = {
-	text: string,
-	textSize: number,
-	maxDistance: number,
-	alwaysOnTop: boolean,
-	truncate: boolean,
-}
 
 function BoxLogic.ClaimUntil(now: number): number
 	return now + BoxLogic.BoxClaimSec
@@ -89,6 +89,32 @@ function BoxLogic.CanGrab(facts: GrabFacts): (boolean, GrabReason?)
 		end
 	end
 	return true, nil
+end
+
+-- The two numbers the carry cap reads: how many unpaid boxes `userId` HOLDS
+-- right now, and how many unpaid boxes are off their shelves, whoever has
+-- them. A box counts for a player only while it is in their hands: one they
+-- let go of, put back, paid for or never lifted (a grab the server refused)
+-- is never counted against them, so the cap cannot fire on a first pickup.
+function BoxLogic.CountUnpaid(boxes: { Counted }, userId: number): (number, number)
+	local mine, all = 0, 0
+	for _, box in ipairs(boxes) do
+		if not box.paid and not box.opened and not box.onShelf then
+			all += 1
+			if box.heldBy == userId and userId ~= 0 then
+				mine += 1
+			end
+		end
+	end
+	return mine, all
+end
+
+-- Whether an unpaid box let go at `at` was put back on its shelf spot `home`
+-- (close across, and not far above or below), so it sits there again instead
+-- of staying a loose box.
+function BoxLogic.PutBack(at: Vector3, home: Vector3): boolean
+	local across = Vector3.new(at.X - home.X, 0, at.Z - home.Z).Magnitude
+	return across <= BoxLogic.PutBackRadius and math.abs(at.Y - home.Y) <= BoxLogic.PutBackHeight
 end
 
 function BoxLogic.CapMessage(byPlayer: number, onServer: number): string?
@@ -175,17 +201,6 @@ function BoxLogic.LargestFaces(size: Vector3): { Enum.NormalId }
 		return { Enum.NormalId.Top, Enum.NormalId.Bottom }
 	end
 	return { Enum.NormalId.Front, Enum.NormalId.Back }
-end
-
--- A price tag that shows the whole string. The cashier reads the same text.
-function BoxLogic.PriceTag(text: string): Tag
-	return {
-		text = text,
-		textSize = BoxLogic.PriceTagMinPx,
-		maxDistance = BoxLogic.PriceTagMaxDistance,
-		alwaysOnTop = false,
-		truncate = false,
-	}
 end
 
 return BoxLogic

@@ -325,37 +325,10 @@ local function hangGoods(parent: Instance, x: number, z: number, y: number, kind
 	end
 end
 
--- A price tag on the aisle face of a lane's table or shelf, under each box.
-local function priceTags(parent: Instance, kind: string)
-	for _, place in ipairs(StoreStock.Placements(kind)) do
-		local slot = StoreStock.Get(place.slotId)
-		if slot then
-			local price = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
-			local text = if price and price > 0 then Util.formatCash(price) else "FREE"
-			local lane: ShelfLayout.Lane? = nil
-			for _, l in ipairs(StoreStock.Lanes(kind)) do
-				if place.x >= l.x0 and place.x <= l.x1 and place.z >= l.z0 and place.z <= l.z1 then
-					lane = l
-				end
-			end
-			if lane then
-				local westLane = (lane.x0 + lane.x1) / 2 < 0
-				local edgeX = if westLane then lane.x1 else lane.x0
-				-- Only the lanes with an aisle face (the middle islands and the side tables).
-				local sign = if westLane then 1 else -1
-				local tag = dBox(
-					parent,
-					"PriceTag",
-					V3(math.min(2.4, place.size.X), 0.8, 0.08),
-					CF(edgeX + sign * 0.06, lane.y - 0.75, place.z) * CFrame.Angles(0, -sign * math.pi / 2, 0),
-					PAPER,
-					MAT.SmoothPlastic
-				)
-				Kit.signText(tag, text, TIMBER, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-			end
-		end
-	end
-end
+-- (No price plaques on the tables and shelves: a box's one price is on its
+-- own label, BoxArt. A plaque on the aisle face could only ever speak for the
+-- box nearest the aisle, and two boxes side by side drew theirs on top of each
+-- other.)
 
 local function laneFurniture(parent: Instance, kind: string, frame: Frame, name: string, body: Color3, top: Color3)
 	local spots = spotsOf(kind)
@@ -414,18 +387,25 @@ end
 -- A door to the back room on a wall (looks only; nothing opens): `onZ` for the
 -- back wall (+Z, facing -Z), else a side wall at x with `side` +1 (east) or -1.
 local function backDoor(model: Model, frame: Frame, x: number, z: number, onZ: boolean, side: number)
+	-- The frame is three bars AROUND the leaf, standing a tenth proud: no
+	-- frame face lies on the leaf's plane, so there is never a second texture
+	-- to fight with the door's (the specs scan for it).
 	local size = if onZ then V3(3.2, 8, 0.3) else V3(0.3, 8, 3.2)
-	local at = CF(x, frame.floorTop + 4, z)
+	local cy = frame.floorTop + 4
+	local at = CF(x, cy, z)
 	dBox(model, "BackRoomDoor", size, at, hex("#6E4A2E"), MAT.Wood)
-	local frameSize = if onZ then V3(4, 8.6, 0.2) else V3(0.2, 8.6, 4)
-	dBox(
-		model,
-		"BackRoomDoorFrame",
-		frameSize,
-		at * CF(0, 0.3, 0) * CF(if onZ then 0 else -side * 0.05, 0, if onZ then -0.05 else 0),
-		TRIM,
-		MAT.Wood
-	)
+	-- The room is on the -Z side of the back wall and on the -side side of a side wall.
+	local depth = 0.3
+	local shift = CF(if onZ then 0 else -side * 0.1, 0, if onZ then -0.1 else 0)
+	local function bar(name: string, w: number, h: number, dx: number, dy: number)
+		local barSize = if onZ then V3(w, h, depth) else V3(depth, h, w)
+		local offset = if onZ then CF(dx, dy, 0) else CF(0, dy, dx)
+		dBox(model, name, barSize, at * shift * offset, TRIM, MAT.Wood)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		bar("BackRoomDoorFrame", 0.4, 8, s * 1.8, 0)
+	end
+	bar("BackRoomDoorFrame", 4, 0.6, 0, 4.3)
 	local knob = if onZ then CF(1.2, -0.2, -0.25) else CF(-side * 0.25, -0.2, 1.2)
 	Kit.decor(Kit.ball(model, "BackRoomKnob", 0.35, at * knob, hex("#C9A24A"), MAT.Metal), false)
 end
@@ -482,10 +462,9 @@ end
 local function toolShed(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
 	laneFurniture(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
-	priceTags(model, "ToolShed")
 	-- The Robux table: the same table as the cash shelves with a gold top, along
 	-- the back wall behind the counter and its keeper. Its boxes are the gold
-	-- boxes, one name label and one price tag each.
+	-- boxes, one label each (name and price).
 	local entries = RobuxShelf.List()
 	if #entries > 0 then
 		local width = RobuxShelf.RowWidth()
@@ -584,7 +563,6 @@ local function hearth(model: Model, frame: Frame)
 			end
 		end
 	end
-	priceTags(model, "HearthAndHome")
 	counterDetail(model, frame)
 	backDoor(model, frame, -frame.halfW + 0.3, 18.5, false, -1)
 	plankFloor(model, frame, hex("#C8995F"), { hex("#B3874F"), hex("#D8AB72"), hex("#A57A47") }, 2.8, rng)
