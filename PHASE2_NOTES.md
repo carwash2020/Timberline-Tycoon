@@ -2737,3 +2737,24 @@ How a grant works: `MonetizationService.OwnerGrant` runs the same effects as a p
 - [ ] PC: PLAYERS: type part of a name in "Find a player": the list narrows; a star marks players you used lately and they sit at the top. GIFTS: recent gifts have a star and sit first in All. LOG: type `ban` in "Find a command".
 - [ ] The tool search (title box) still finds tools across tabs, now including paid items and unban; a delegate only finds what they may use.
 - [ ] Everything old still works: GO TO, BRING, HEAL, FREEZE, STATS, RESET TUTORIAL (now asks twice), KICK, BAN, GIVE/TAKE/SET CASH, UNLOCK ALL BUILDINGS, GIFT, the clock tools, ANNOUNCE, SHUT DOWN, SUPER RUN, GOD MODE, GO TO SPAWN, GRANT/REVOKE roles (REVOKE now asks twice).
+
+## Plot picker: you can see which pad you are choosing (branch `claude/plot-picker-view`, 7 October 2026)
+
+Connor, after the join race fix: "when I load it's not showing me which plot it's selecting, it's just letting me pick one and then teleports me when it loads."
+
+Not one guessed cause; the picker now has three independent ways to show the choice, and a fade for the claim:
+- **Camera held every frame** (`PlotPickerUI`): while the picker is open a render-step (`BindToRenderStep`, priority just after Camera) sets the camera Scriptable and glides it to the pad's shot each frame, so a respawn, the default camera script or another screen cannot take it back (this was the likely cause of seeing only your spawn). Unbound on close; the camera type goes back to Custom (never left Scriptable).
+- **Streaming**: `RequestStreamAroundAsync` now waits up to 12 s per request (in its own thread), is asked again every 5 s, and the panel shows "Loading view..." until it returns. Previous / Next / Claim never wait on it.
+- **Map card** (`Shared/PlotPickerMap`, spec `PlotPickerMap.spec`): a 112 px card inside the panel with every pad from the offer's x / z (north up): chosen pad big and gold, open pads green, taken pads grey. Needs no streaming. Tapping the card picks the nearest pad.
+- **In-world marker**: a client-only tall translucent neon pillar with an always-on-top outline and a name tag ("Pine Ridge", "(taken)" when taken) at the offer's coordinates. Moves with Next / Previous, destroyed on close. Needs no real pad.
+- **Claim fade**: when PlotSlot is set while the picker is open, the screen fades to black over 0.2 s showing "Claimed <pad>!", the picker closes behind the black (camera back on your character), holds 0.4 s, fades back over 0.2 s.
+No new remotes, no server change, no economy change.
+
+### Studio checks (Connor), plot picker view
+- [ ] Join (or Old Hank / Land Office): the picker opens and the camera swings from your spawn to the chosen pad, looking at it from up and behind; the panel's map card shows 14 dots, the chosen one big and gold.
+- [ ] A tall coloured pillar with the pad's name stands on that pad and shows through trees and buildings. Green for open, grey for taken (name says "(taken)").
+- [ ] Next / Previous: the camera glides to the next pad, the pillar jumps there, the gold dot moves, the title and the price update together. Tap a dot on the card (phone, mouse): it selects that pad.
+- [ ] A far pad: "Loading view..." shows under the panel until the ground is there; the buttons work the whole time. If the ground never fills in, the card and pillar still tell you which pad.
+- [ ] Respawn or reset while the picker is open: the camera stays on the pad shot.
+- [ ] Claim: the screen fades to black with "Claimed <pad>!", then fades into your plot (no hard cut). "Not now" / B closes with no fade and the camera returns to your character.
+- [ ] Phone: the card does not touch the thumbstick or jump corners; Xbox: D-pad still walks Previous / Claim / Next (the card is not selectable).
