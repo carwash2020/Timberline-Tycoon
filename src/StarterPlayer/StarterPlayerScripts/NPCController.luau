@@ -22,18 +22,30 @@
 --     uses HeightAt and is retried a few times a second while the walker
 --     is within StreamingMinRadius, in case the porch streams in later.
 --     The server never moves them.
---   * The nearest NPC within TALK_RANGE says a line in a speech bubble
+--   * The nearest NPC within TALK_RANGE says a line in a small speech bubble
 --     every so often (NPCDialogue: the hour, the weather, a first sale, a
---     better axe, a sawmill, or a general line). Talk (E, or a tap on the
---     prompt) asks for one sooner. A sleeping keeper says the server's
---     SleepLine and is not stood back up. Murph keeps quiet while your tutorial
---     runs (QuestUI owns his button); he still looks, waves, and gives
---     that one tip.
+--     better axe, a sawmill, or a general line), and waves hello with a
+--     greeting (Murph's first hello is a tip). Those stay bubbles
+--     (NPCDialogue.AutoBubbles). Talk (E, X, or a tap on the prompt) is a
+--     conversation the player started: it opens the dialogue box (DialogueUI)
+--     with a greeting and a line, one press each, and that NPC says no
+--     bubbles while it is up. A keeper's counter talk and the Hermit's quest
+--     are sent by the server to the same box; a sleeping keeper's SleepLine
+--     is one of those. Murph keeps quiet while your tutorial runs (QuestUI
+--     owns his button, and opens the same box); he still looks, waves, and
+--     gives that one tip.
 --   * The bubble is adorned to the head, so it follows the walk every
 --     frame. Its tail sits BubbleClearance (1.5 studs) above TopOffset,
 --     the hat top CharacterArt measured from the head centre. A phone
 --     and a desktop use that same lift. Near the money plaque it steps
 --     aside; it never drops into the hat.
+--   * Text never sits in a wall (Shared/TextAnchor): four times a second a
+--     ray from the camera to the head, one up from it, and one to the
+--     bubble's side. A wall in the way hides the bubble and the name tag
+--     (back after two clear checks); a low ceiling (a shop) brings the tail
+--     and the name tag down so the card is not clipped by the roof, and a
+--     bubble with no room at all stays off; a wall beside it puts it
+--     straight above the head.
 --   * Beyond ANIMATE_RANGE they're left alone (joints reset). Walkers
 --     still keep their place on the route. Who to look at is refreshed
 --     a few times a second, not every frame.
@@ -54,17 +66,21 @@ local UserInputService = game:GetService("UserInputService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local DialogueFlow = require(ReplicatedStorage.Shared.DialogueFlow)
 local HeadLook = require(ReplicatedStorage.Shared.HeadLook)
 local NPCAnim = require(ReplicatedStorage.Shared.NPCAnim)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local NPCDialogue = require(ReplicatedStorage.Shared.NPCDialogue)
 local NPCWalk = require(ReplicatedStorage.Shared.NPCWalk)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
+local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
+local DialogueUI = require(script.Parent.DialogueUI)
 local UITheme = require(script.Parent.UITheme)
 
 local Quality = require(script.Parent.Quality)
@@ -102,6 +118,14 @@ type Rig = {
 	rightHip: Motor6D?,
 	eyes: { { part: BasePart, size: Vector3, shine: BasePart? } },
 	tag: BillboardGui?,
+	tagBaseY: number, -- the name tag's own StudsOffset Y, before a ceiling lowers it
+	hidden: boolean, -- a wall is between the camera and the text: bubble and tag are off
+	clear: number, -- clear checks in a row (TextAnchor.NextHidden)
+	textAt: number, -- when the next wall check is due
+	headroom: number?, -- studs from the head centre up to a ceiling, nil under open sky
+	sideBlocked: boolean, -- a wall on the bubble's side: it sits straight above the head
+	crowded: boolean, -- no room under the ceiling for the bubble's card: it stays off
+	cardPx: number, -- the bubble's estimated height in px (TextAnchor.CardPx)
 	route: { NPCData.Waypoint }?,
 	speed: number,
 	offset: number,
@@ -250,15 +274,26 @@ end
 -- Speech bubbles
 ---------------------------------------------------------------------------
 
+-- Text over a head is on only while no wall hides it (checkText) and, for a
+-- bubble, while there is room for its card under the ceiling (placeBubble).
+local function showText(rig: Rig)
+	local tag = rig.tag
+	if tag then
+		tag.Enabled = rig.bubble == nil and not rig.hidden
+	end
+	local gui = rig.bubble
+	if gui then
+		gui.Enabled = not rig.hidden and not rig.crowded
+	end
+end
+
 local function closeBubble(rig: Rig, instant: boolean?)
 	local gui = rig.bubble
 	if not gui then
 		return
 	end
 	rig.bubble = nil
-	if rig.tag then
-		rig.tag.Enabled = true
-	end
+	showText(rig)
 	if instant then
 		gui:Destroy()
 		return
@@ -278,9 +313,75 @@ local function closeBubble(rig: Rig, instant: boolean?)
 	end)
 end
 
+-- Rays that skip the townsfolk and your own character, and anything that
+-- cannot be walked into (leaf, awning): what is left is a wall, a roof, the
+-- ground. Rebuilt about once a second.
+local textParams: RaycastParams? = nil
+local textParamsAt = -10
+
+local function rayParams(now: number): RaycastParams
+	local cached = textParams
+	if cached and now - textParamsAt < 1 then
+		return cached
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	local skip: { Instance } = {}
+	for _, inst in ipairs(CollectionService:GetTagged("NPC")) do
+		table.insert(skip, inst)
+	end
+	local char = player.Character
+	if char then
+		table.insert(skip, char)
+	end
+	params.FilterDescendantsInstances = skip
+	textParams = params
+	textParamsAt = now
+	return params
+end
+
+-- A few times a second per NPC (TextAnchor.CheckSeconds): is a wall between
+-- the camera and this NPC's text, and is there a ceiling over their head?
+-- Hidden text comes back after a couple of clear checks. The name tag comes
+-- down under a low ceiling so it is not clipped by the roof.
+local function checkText(rig: Rig, now: number)
+	rig.textAt = now + TextAnchor.CheckSeconds
+	local camera = workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
+	local params = rayParams(now)
+	local head = rig.head.Position
+	local above = head + Vector3.new(0, rig.topOffset + 0.2, 0)
+	local from = camera.CFrame.Position
+	local blocked = workspace:Raycast(from, above - from, params) ~= nil
+	rig.hidden, rig.clear = TextAnchor.NextHidden(rig.hidden, blocked, rig.clear)
+	local reach = rig.topOffset + NPCDialogue.BubbleClearance + TextAnchor.ProbeExtra
+	local up = workspace:Raycast(head, Vector3.new(0, reach, 0), params)
+	rig.headroom = if up then up.Distance else nil
+	if rig.bubble then
+		-- StudsOffset X is camera space: look the way it would shift the bubble.
+		local side = phoneLayout.studsOffset.X + NPCDialogue.BubbleNudge
+		local wall = workspace:Raycast(above, camera.CFrame.RightVector * (side + TextAnchor.SideProbe), params)
+		rig.sideBlocked = wall ~= nil
+	end
+	local tag = rig.tag
+	if tag then
+		local distance = (from - head).Magnitude
+		local half = TextAnchor.CardStuds(tag.Size.Y.Offset / 2, distance, camera.ViewportSize.Y)
+		local lift = TextAnchor.Lift(rig.topOffset, rig.tagBaseY - rig.topOffset, rig.headroom, half)
+		tag.StudsOffset = Vector3.new(0, lift, 0)
+	end
+	showText(rig)
+end
+
 -- The tail's bottom is the billboard centre. Y is TopOffset plus the
--- clearance, from the head centre, on a phone and a desktop. Near the
--- money plaque the tail steps aside; the nudge never lowers it.
+-- clearance, from the head centre, on a phone and a desktop; under a low
+-- ceiling (a shop) it comes down far enough that the whole card fits, never
+-- into the hat, and with no room at all the bubble stays off. Near the
+-- money plaque the tail steps aside; the nudge never lowers it. A wall on
+-- that side puts it straight above the head.
 local function placeBubble(rig: Rig)
 	local gui = rig.bubble
 	if not gui then
@@ -295,11 +396,31 @@ local function placeBubble(rig: Rig)
 			nudge = true
 		end
 	end
-	gui.StudsOffset = NPCDialogue.BubbleStudsOffset(rig.topOffset, phoneLayout.studsOffset.X, nudge)
+	local side = TextAnchor.Side(phoneLayout.studsOffset.X, rig.sideBlocked)
+	local offset = NPCDialogue.BubbleStudsOffset(rig.topOffset, side, nudge and not rig.sideBlocked)
+	local lift = offset.Y
+	local crowded = false
+	if camera then
+		local distance = (camera.CFrame.Position - rig.head.Position).Magnitude
+		local card = TextAnchor.CardStuds(rig.cardPx, distance, camera.ViewportSize.Y)
+		local fits: boolean
+		lift, fits = TextAnchor.Lift(rig.topOffset, NPCDialogue.BubbleClearance, rig.headroom, card)
+		crowded = not fits
+	end
+	gui.StudsOffset = Vector3.new(offset.X, lift, offset.Z)
 	gui.StudsOffsetWorldSpace = Vector3.zero
+	if crowded ~= rig.crowded then
+		rig.crowded = crowded
+		showText(rig)
+	end
 end
 
 local function say(rig: Rig, text: string, now: number)
+	-- While the dialogue box is open for this NPC they have no bubble lines.
+	-- No bubble behind a wall either (checkText).
+	if DialogueUI.IsTalkingTo(rig.model) or rig.hidden then
+		return
+	end
 	closeBubble(rig, true)
 	refreshLayout(now)
 	local layout = phoneLayout
@@ -375,14 +496,22 @@ local function say(rig: Rig, text: string, now: number)
 	TweenService:Create(scale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
 		:Play()
 
-	if rig.tag then
-		rig.tag.Enabled = false
-	end
 	rig.bubble = gui
+	rig.cardPx = TextAnchor.CardPx(#text, layout.width, layout.textSize)
+	showText(rig) -- the name tag steps aside for the bubble
 	rig.bubbleLength = NPCDialogue.BubbleSeconds(text)
 	rig.bubbleUntil = now + rig.bubbleLength
 	placeBubble(rig)
 	SoundData.PlayAt("NPCChatter", rig.head.Position)
+end
+
+-- A line nobody asked for: the wave hello, the first tip, the chatter as you
+-- stand near. These stay small bubbles (NPCDialogue.AutoBubbles); a talk the
+-- player starts is the dialogue box instead.
+local function autoSay(rig: Rig, text: string, now: number)
+	if NPCDialogue.AutoBubbles then
+		say(rig, text, now)
+	end
 end
 
 local function hasPlacedSawmill(): boolean
@@ -445,30 +574,50 @@ local function takeLine(rig: Rig, firstMeet: boolean): (string?, string)
 	return line, pool.kind
 end
 
--- Talk on the model. Murph's button belongs to QuestUI (it repeats the lesson).
+-- Talk on the model (E, X or a tap on the prompt): the dialogue box opens
+-- (DialogueUI) with their greeting and one more line, a press for each.
+-- Murph's button belongs to QuestUI (it opens the same box with his tutorial
+-- line). A keeper's counter talk and the Hermit's quest are the server's
+-- (DialogueService sends the box its line), and Old Hank, with no plot yet,
+-- opens the plot picker instead: none of those build a conversation here.
 local function onTalk(rig: Rig)
 	local npc = rig.npc
 	if not npc or npc.tutorialQuiet then
+		return
+	end
+	if DialogueFlow.ServerSpoken(npc.shop, npc.id) then
+		return
+	end
+	if npc.id == PlotSalesmanData.Id and player:GetAttribute("PlotSlot") == nil then
 		return
 	end
 	local now = os.clock()
 	if now < rig.lastPrompt + NPCDialogue.PromptCooldown then
 		return
 	end
-	if rig.model:GetAttribute("Asleep") == true then
-		local sleep = rig.model:GetAttribute("SleepLine")
-		if type(sleep) == "string" and sleep ~= "" then
-			say(rig, sleep, now)
-			rig.lastPrompt = now
-			return
-		end
+	-- Talk is the player's own ask: it always answers.
+	local lines: { string } = {}
+	if #npc.greetings > 0 then
+		table.insert(lines, npc.greetings[rig.rng:NextInteger(1, #npc.greetings)])
 	end
-	-- Talk is the player's own ask: it always answers (Murph's is above).
 	local line, _kind = takeLine(rig, true)
-	if not line then
+	if line then
+		table.insert(lines, line)
+	end
+	closeBubble(rig, true)
+	local opened = DialogueUI.Talk({
+		id = npc.id,
+		name = npc.name,
+		role = npc.role,
+		lines = lines,
+		model = rig.model,
+		onClose = function()
+			rig.lastPrompt = os.clock() -- the cooldown counts from the end of the talk
+		end,
+	})
+	if not opened then
 		return
 	end
-	say(rig, line, now)
 	rig.lastPrompt = now
 	local gap = NPCDialogue.AmbientGap
 	rig.nextLine = now + rig.rng:NextNumber(gap[1], gap[2])
@@ -594,6 +743,14 @@ local function bind(model: Instance, tries: number?)
 		rightHip = motorIn(torso, "RightHip"),
 		eyes = eyes,
 		tag = nameTag,
+		tagBaseY = if nameTag then nameTag.StudsOffset.Y else (if type(topAttr) == "number" then topAttr else 1) + 1,
+		hidden = false,
+		clear = 0,
+		textAt = 0,
+		headroom = nil,
+		sideBlocked = false,
+		crowded = false,
+		cardPx = 60,
 		route = route,
 		speed = if type(speed) == "number" then speed else 4,
 		offset = if type(offset) == "number" then offset else 0,
@@ -756,13 +913,13 @@ local function animate(rig: Rig, now: number, dt: number, focus: Vector3?, focus
 		if npc and npc.tips and not rig.met and progress.loaded and progress.newPlayer then
 			local line, kind = takeLine(rig, true)
 			if kind == "tip" and line then
-				say(rig, line, now)
+				autoSay(rig, line, now)
 				rig.nextLine = math.max(rig.nextLine, now + 6)
 				tipped = true
 			end
 		end
 		if not tipped and npc and not quiet(rig) and #npc.greetings > 0 then
-			say(rig, npc.greetings[rig.rng:NextInteger(1, #npc.greetings)], now)
+			autoSay(rig, npc.greetings[rig.rng:NextInteger(1, #npc.greetings)], now)
 			rig.nextLine = math.max(rig.nextLine, now + 4.5)
 		end
 	end
@@ -1077,6 +1234,9 @@ local function step(dt: number)
 			local focusHead = if index then bodyHeads[index] else nil
 			rig.active = true
 			animate(rig, now, elapsed, focus, focusHead, d)
+			if now >= rig.textAt and (rig.bubble or rig.tag) and d < phoneLayout.tagDistance then
+				checkText(rig, now)
+			end
 			if rig.bubble then
 				placeBubble(rig)
 			end
@@ -1096,7 +1256,7 @@ local function step(dt: number)
 				else
 					local line, kind = takeLine(who, true)
 					if line and (kind == "tip" or not quiet(who)) then
-						say(who, line, now)
+						autoSay(who, line, now)
 					end
 					local gap = NPCDialogue.AmbientGap
 					who.nextLine = now + who.rng:NextNumber(gap[1], gap[2])

@@ -549,9 +549,9 @@ WorldLayout.TownFloors = {
 	{ name = "ToolShedFloor", x0 = -102, x1 = -62, z0 = 88.5, z1 = 142.5, material = "Ground" },
 	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -72, z0 = 164, z1 = 212, material = "Ground" },
 	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 92, z1 = 164.5, material = "Ground" },
-	-- The sell station (pad x 39 to 67, z 95 to 127, Weigh House to x 80): the
+	-- The sell station (pad x 39 to 67, z 95 to 127, Weigh House to x 83): the
 	-- MillYard stops at x 33, so without this the grass grew over the pad.
-	{ name = "SellStationFloor", x0 = 31, x1 = 84, z0 = 84, z1 = 139, material = "Ground" },
+	{ name = "SellStationFloor", x0 = 31, x1 = 87, z0 = 84, z1 = 139, material = "Ground" },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
 } :: { Paint }
 

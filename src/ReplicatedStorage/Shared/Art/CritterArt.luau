@@ -216,23 +216,54 @@ end
 -- Rabbits
 ---------------------------------------------------------------------------
 
--- A rabbit sitting on y = 0, about 1.5 studs tall to the ear tips.
--- `snowy` makes it a white winter hare. Named parts: Body, Haunch, Head,
--- EarL, EarR, Tail, EyeL, EyeR, Nose, Paw.
-function CritterArt.Rabbit(seed: number, snowy: boolean?): Model
+-- How much bigger a rabbit is than its first, loaf-sized draft (Connor,
+-- 7 October: "the bunnies are super small", next to a 5-stud player). Every
+-- measure below is multiplied by it, so the ears, tail, eyes and hinges
+-- grow together; AmbientLife scales the hop with RabbitHop.
+CritterArt.RabbitScale = 2.25
+
+-- One hop for a rabbit. The arc grows with the body, and the stride with
+-- its square root (a rabbit twice the size is not twice as fast), so a
+-- bigger rabbit still bounds away at a believable pace, slower than a
+-- deer's 20 studs a second. `fleeing` hops are long and quick. Studs and
+-- seconds.
+export type Hop = { seconds: number, length: number, lift: number }
+
+function CritterArt.RabbitHop(fleeing: boolean, scale: number?): Hop
+	local s = scale or CritterArt.RabbitScale
+	local stride = math.sqrt(s)
+	return {
+		seconds = (if fleeing then 0.3 else 0.36) * stride,
+		length = (if fleeing then 4.2 else 1.5) * stride,
+		lift = (if fleeing then 1.1 else 0.55) * s,
+	}
+end
+
+-- A rabbit sitting on y = 0, about 1.7 studs tall to the ear tips at scale 1
+-- (RabbitScale times that in the game). `snowy` makes it a white winter
+-- hare. Named parts: Body, Haunch, Head, EarL, EarR, Tail, EyeL, EyeR, Nose,
+-- Paw.
+function CritterArt.Rabbit(seed: number, snowy: boolean?, scale: number?): Model
+	local s = scale or CritterArt.RabbitScale
+	local function v(x: number, y: number, z: number): Vector3
+		return Vector3.new(x, y, z) * s
+	end
+	local function at(x: number, y: number, z: number): CFrame
+		return CFrame.new(v(x, y, z))
+	end
 	local rng = Kit.rng(seed)
 	local coat = if snowy then hex("#F4F2EE") else rng:pick({ hex("#9A7A5A"), hex("#8A8580"), hex("#A88A68") })
 	local model = critter("Rabbit")
-	blob(model, "Body", Vector3.new(0.9, 0.8, 1.15), CFrame.new(0, 0.48, 0.05), coat)
-	blob(model, "Haunch", Vector3.new(0.86, 0.72, 0.62), CFrame.new(0, 0.4, 0.36), Kit.shade(coat, -0.05))
-	local hinge = Vector3.new(0, 0.8, -0.3)
-	anim(blob(model, "Head", Vector3.new(0.6, 0.55, 0.62), CFrame.new(0, 0.9, -0.5), coat), "Head", hinge)
+	blob(model, "Body", v(0.9, 0.8, 1.15), at(0, 0.48, 0.05), coat)
+	blob(model, "Haunch", v(0.86, 0.72, 0.62), at(0, 0.4, 0.36), Kit.shade(coat, -0.05))
+	local hinge = v(0, 0.8, -0.3)
+	anim(blob(model, "Head", v(0.6, 0.55, 0.62), at(0, 0.9, -0.5), coat), "Head", hinge)
 	for _, side in ipairs({ -1, 1 }) do
 		local ear = blob(
 			model,
 			if side < 0 then "EarL" else "EarR",
-			Vector3.new(0.15, 0.62, 0.24),
-			CFrame.new(side * 0.13, 1.38, -0.4) * CFrame.Angles(math.rad(-12), 0, math.rad(side * 10)),
+			v(0.15, 0.62, 0.24),
+			at(side * 0.13, 1.38, -0.4) * CFrame.Angles(math.rad(-12), 0, math.rad(side * 10)),
 			coat
 		)
 		anim(ear, "Head", hinge)
@@ -240,22 +271,22 @@ function CritterArt.Rabbit(seed: number, snowy: boolean?): Model
 			blob(
 				model,
 				"EarInner",
-				Vector3.new(0.08, 0.46, 0.12),
-				CFrame.new(side * 0.13, 1.4, -0.47) * CFrame.Angles(math.rad(-12), 0, math.rad(side * 10)),
+				v(0.08, 0.46, 0.12),
+				at(side * 0.13, 1.4, -0.47) * CFrame.Angles(math.rad(-12), 0, math.rad(side * 10)),
 				hex("#E8A8A8")
 			),
 			"Head",
 			hinge
 		)
 		anim(
-			bead(model, if side < 0 then "EyeL" else "EyeR", 0.09, Vector3.new(side * 0.26, 1.0, -0.58), BLACK),
+			bead(model, if side < 0 then "EyeL" else "EyeR", 0.09 * s, v(side * 0.26, 1.0, -0.58), BLACK),
 			"Head",
 			hinge
 		)
-		blob(model, "Paw", Vector3.new(0.18, 0.14, 0.32), CFrame.new(side * 0.18, 0.07, -0.32), Kit.shade(coat, 0.1))
+		blob(model, "Paw", v(0.18, 0.14, 0.32), at(side * 0.18, 0.07, -0.32), Kit.shade(coat, 0.1))
 	end
-	anim(bead(model, "Nose", 0.09, Vector3.new(0, 0.88, -0.82), hex("#E07A8A")), "Head", hinge)
-	bead(model, "Tail", 0.32, Vector3.new(0, 0.58, 0.64), hex("#FAF8F4"))
+	anim(bead(model, "Nose", 0.09 * s, v(0, 0.88, -0.82), hex("#E07A8A")), "Head", hinge)
+	bead(model, "Tail", 0.32 * s, v(0, 0.58, 0.64), hex("#FAF8F4"))
 	return model
 end
 

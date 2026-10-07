@@ -21,7 +21,11 @@ NPCDialogue.PhoneTagRole = 14
 NPCDialogue.TvTagRole = 18
 NPCDialogue.MaxLine = 110 -- the old cap; a bubble wraps past it into a speech
 NPCDialogue.ReactMax = 90 -- contextual lines and onboarding tips
-NPCDialogue.PromptCooldown = 4.5 -- seconds between Talk presses
+NPCDialogue.PromptCooldown = 1 -- seconds after a talk ends before the next Talk opens (the box needs a press to go, so it cannot be spammed)
+-- The lines nobody asked for (the wave hello, Murph's first tip, the chatter
+-- as you stand near) stay small bubbles. A talk the player starts is the
+-- dialogue box (DialogueFlow, DialogueUI). false silences those bubbles.
+NPCDialogue.AutoBubbles = true
 NPCDialogue.AmbientGap = { 10, 16 } -- seconds between a chatter line
 -- When the weather, the hour, or the player's progress has something to
 -- say, how often that wins over a general line.

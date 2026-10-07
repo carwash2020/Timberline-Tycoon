@@ -1013,7 +1013,7 @@ BootReport.StartStubs({
 				say = function(player: Player, text: string)
 					remote.Dialogue:FireClient(
 						player,
-						{ line = "hermit", text = text, choice = false, noLabel = "Close" }
+						{ line = "hermit", text = text, speaker = "Hermit", choice = false, noLabel = "Close" }
 					)
 				end,
 				grantAxe = function(player: Player, axeId: string)

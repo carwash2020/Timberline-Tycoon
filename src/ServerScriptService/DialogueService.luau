@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CounterLogic = require(ReplicatedStorage.Shared.CounterLogic)
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
+local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local BoxService = require(script.Parent.BoxService)
@@ -62,9 +63,13 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 		hour = DialogueService.Hour(),
 	})
 	local card = DialogueData.Card(line)
+	local keeper = NPCData.ForShop(shop)
 	local payload = {
 		line = line,
 		text = text,
+		-- Who is speaking, for the box's name and role (the client trusts
+		-- nothing else from it: the id only picks a name tag).
+		speaker = if keeper then keeper.id else nil,
 		boxUid = if rec then rec.uid else nil,
 		choice = card.choice,
 		noLabel = card.noLabel,

@@ -984,16 +984,17 @@ local function stepRabbit(c: Critter, dt: number, ctx: Ctx): boolean
 		return true
 	end
 	-- Hopping: each hop an arc; fleeing hops are long and quick.
-	local hopTime = if d.fleeing then 0.3 else 0.36
-	local hopLen = if d.fleeing then 4.2 else 1.5
+	-- The hop grows with the rabbit (CritterArt.RabbitHop).
+	local hop = CritterArt.RabbitHop(d.fleeing == true)
+	local hopTime = hop.seconds
 	d.hopT += dt / hopTime
-	local moved = walk(c, d.dir, hopLen * dt / hopTime)
+	local moved = walk(c, d.dir, hop.length * dt / hopTime)
 	if not moved then
 		local a = math.random() * TAU
 		d.dir = Vector3.new(math.cos(a), 0, math.sin(a))
 	end
 	local phase = d.hopT % 1
-	local lift = math.sin(phase * math.pi) * (if d.fleeing then 1.1 else 0.55)
+	local lift = math.sin(phase * math.pi) * hop.lift
 	pose.head = 0
 	body.root = facing(c.pos + Vector3.new(0, lift, 0), d.dir) * CFrame.Angles(math.rad(10 - phase * 20), 0, 0)
 	if d.hopT >= 1 and not d.fleeing then

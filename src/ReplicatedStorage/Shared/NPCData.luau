@@ -175,11 +175,11 @@ NPCData.List = {
 			model = "SellArea",
 			part = "SellZone",
 			-- In front of the Weigh House counter (not inside the house): from the
-			-- zone's middle (53, 111), 4.6 studs past its east edge and 9 north,
-			-- so she stands at (71.6, 120) facing west across the pad.
-			offset = Vector3.new(4.6, 0, 9),
+			-- zone's middle (53, 111), 4.4 studs past its east edge and 9 north,
+			-- so she stands at (71.4, 120) facing west across the pad.
+			offset = Vector3.new(4.4, 0, 9),
 			turn = 90,
-			fallback = Vector3.new(71.6, 0, 120),
+			fallback = Vector3.new(71.4, 0, 120),
 		},
 		idle = "clipboard",
 		work = "saw",
@@ -786,6 +786,20 @@ end
 
 function NPCData.Get(id: string): NPC?
 	return byId[id]
+end
+
+-- The keeper who runs a shop (their `shop` id), or nil. The dialogue box
+-- names the speaker of a server line by this.
+function NPCData.ForShop(shop: string?): NPC?
+	if shop == nil then
+		return nil
+	end
+	for _, npc in ipairs(NPCData.List) do
+		if npc.shop == shop then
+			return npc
+		end
+	end
+	return nil
 end
 
 function NPCData.All(): { NPC }
