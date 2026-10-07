@@ -22,6 +22,8 @@ return function(t)
 				UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
 				ProximityPromptService = {},
 				TweenService = {},
+				CollectionService = {},
+				RunService = {},
 			},
 		})
 		return loader:load("StarterPlayer/StarterPlayerScripts/PromptUI")
@@ -93,6 +95,8 @@ return function(t)
 				UserInputService = { TouchEnabled = false, KeyboardEnabled = true, InputBegan = signal() },
 				ProximityPromptService = {},
 				TweenService = {},
+				CollectionService = {},
+				RunService = {},
 			},
 		})
 		local PromptUI = loader:load("StarterPlayer/StarterPlayerScripts/PromptUI")

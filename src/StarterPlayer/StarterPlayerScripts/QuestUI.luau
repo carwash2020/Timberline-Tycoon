@@ -900,12 +900,25 @@ local function hookMurph(model: Instance): boolean
 	murphHooked = true
 	prompt.Triggered:Connect(function()
 		local _, step = currentStep()
+		local line: string
 		if step then
 			local cash = player:GetAttribute("Cash")
-			say(TutorialData.MurphLine(step, onRefresher(), if type(cash) == "number" then cash else 0))
+			line = TutorialData.MurphLine(step, onRefresher(), if type(cash) == "number" then cash else 0)
 		else
-			say(if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell)
+			line = if lastRefresher then TutorialData.FarewellBack else TutorialData.Farewell
 		end
+		-- Murph's line from a Talk press is the dialogue box (a press to
+		-- close), not his step card: the card would be saying the same thing
+		-- above it. The card itself still shows when a step starts (say).
+		hideSpeech(false)
+		-- Required here, not at the top: the box builds on services a tutorial
+		-- card does not need (the specs that load QuestUI stub none of them).
+		local DialogueUI = require(script.Parent.DialogueUI)
+		DialogueUI.Talk({
+			id = "Murph",
+			lines = { HintLogic.Expand(line, UITheme.Device()) },
+			model = model,
+		})
 	end)
 	return true
 end

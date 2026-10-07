@@ -11,12 +11,15 @@
 -- The engine still decides when a prompt shows and handles keys and
 -- buttons; touch and clicks go through InputHoldBegin / InputHoldEnd.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
 local UITheme = require(script.Parent.UITheme)
 
 local PromptUI = {}
@@ -27,6 +30,61 @@ local F = UITheme.Fonts
 local player = Players.LocalPlayer
 
 local WIDTH, HEIGHT = 360, 72 -- the billboard; the card sits in its middle
+
+-- Cards over a person's head (a Talk prompt): drawn in the scene, not on top
+-- of it, so a wall hides them (a keeper behind a shop's wall, an NPC down a
+-- hall), a ray from the camera at 4 Hz hides one a wall is in front of, and
+-- a low ceiling brings its tail down so the roof does not clip it
+-- (Shared/TextAnchor). Cards on a counter or a box stay on top: their anchor
+-- is the object's own middle, which the object would hide.
+type Watched = { gui: BillboardGui, head: BasePart, hidden: boolean, clear: number }
+local watched: { [BillboardGui]: Watched } = {}
+local sinceCheck = 0
+local rayParams: RaycastParams? = nil
+local rayParamsAt = -10
+
+local function paramsNow(now: number): RaycastParams
+	local cached = rayParams
+	if cached and now - rayParamsAt < 1 then
+		return cached
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	local skip: { Instance } = {}
+	for _, inst in ipairs(CollectionService:GetTagged("NPC")) do
+		table.insert(skip, inst)
+	end
+	local char = player.Character
+	if char then
+		table.insert(skip, char)
+	end
+	params.FilterDescendantsInstances = skip
+	rayParams = params
+	rayParamsAt = now
+	return params
+end
+
+local function checkWatched()
+	local camera = workspace.CurrentCamera
+	if camera == nil then
+		return
+	end
+	local now = os.clock()
+	local params = paramsNow(now)
+	local from = camera.CFrame.Position
+	for gui, w in pairs(watched) do
+		local head = w.head.Position
+		local above = head + Vector3.new(0, 1.0, 0)
+		local blocked = workspace:Raycast(from, above - from, params) ~= nil
+		w.hidden, w.clear = TextAnchor.NextHidden(w.hidden, blocked, w.clear)
+		local up = workspace:Raycast(head, Vector3.new(0, PromptUI.HeadLift + TextAnchor.ProbeExtra, 0), params)
+		local card = TextAnchor.CardStuds(HEIGHT, (from - head).Magnitude, camera.ViewportSize.Y)
+		local lift = TextAnchor.Lift(0, PromptUI.HeadLift, if up then up.Distance else nil, card)
+		gui.StudsOffset = Vector3.new(0, lift, 0)
+		gui.Enabled = not w.hidden
+	end
+end
 
 -- How far above a Head (its centre) a Talk card's tail sits. The card
 -- grows upward from there, so it clears the scalp instead of sitting on
@@ -66,7 +124,7 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Prompt"
 	billboard.Adornee = adornee
-	billboard.AlwaysOnTop = true
+	billboard.AlwaysOnTop = TextAnchor.OnTop(studs ~= nil)
 	billboard.Active = true
 	billboard.LightInfluence = 0
 	billboard.ResetOnSpawn = false
@@ -228,6 +286,9 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 	end
 
 	billboard.Parent = player:WaitForChild("PlayerGui")
+	if studs and adornee:IsA("BasePart") then
+		watched[billboard] = { gui = billboard, head = adornee, hidden = false, clear = 0 }
+	end
 
 	local gone = false
 	local function cleanup()
@@ -235,6 +296,7 @@ function PromptUI.Show(prompt: ProximityPrompt, inputType: Enum.ProximityPromptI
 			return
 		end
 		gone = true
+		watched[billboard] = nil
 		for _, conn in ipairs(conns) do
 			conn:Disconnect()
 		end
@@ -258,6 +320,16 @@ function PromptUI.Start()
 		restyle(inst)
 	end
 	workspace.DescendantAdded:Connect(restyle)
+	RunService.Heartbeat:Connect(function(dt: number)
+		if next(watched) == nil then
+			return
+		end
+		sinceCheck += dt
+		if sinceCheck >= TextAnchor.CheckSeconds then
+			sinceCheck = 0
+			checkWatched()
+		end
+	end)
 	ProximityPromptService.PromptShown:Connect(
 		function(prompt: ProximityPrompt, inputType: Enum.ProximityPromptInputType)
 			if prompt.Style == Enum.ProximityPromptStyle.Custom then

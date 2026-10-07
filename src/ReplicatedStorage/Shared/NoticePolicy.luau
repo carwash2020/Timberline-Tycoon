@@ -21,6 +21,10 @@
 --     (a tip that repeats: "put your axe away").
 --   * `quiet` (the first-sale chopping flow, FlowQuiet) drops everything
 --     that isn't critical, queued or not.
+--   * `hold` (the dialogue box is open, DialogueFlow): only critical ones
+--     show. A normal one waits in the queue until the box closes (a stale one
+--     goes as usual), and a low one is dropped: ambient news must not pile up
+--     under someone's words.
 -- Classify(text) gives the priority of a message that arrives as plain
 -- text (the server's Notify), by what it says; a caller that knows better
 -- passes a priority.
@@ -327,8 +331,9 @@ end
 
 -- A notice arrives at `now` (seconds). `quiet` is FlowQuiet's answer. The
 -- decision says to show it (with the ids to take down first), queue it, or
--- drop it (reason). Showing marks its text and once-key.
-function NoticePolicy.Offer(state: State, notice: Notice, now: number, quiet: boolean?): Decision
+-- drop it (reason). Showing marks its text and once-key. `hold` is true
+-- while the dialogue box is open (see the header).
+function NoticePolicy.Offer(state: State, notice: Notice, now: number, quiet: boolean?, hold: boolean?): Decision
 	expire(state, now)
 	local text = notice.text
 	if type(text) ~= "string" or text == "" then
@@ -341,6 +346,9 @@ function NoticePolicy.Offer(state: State, notice: Notice, now: number, quiet: bo
 	end
 	if quiet and not critical then
 		return dropped("quiet")
+	end
+	if hold and priority == "low" then
+		return dropped("dialogue")
 	end
 	local last = state.lastText[text]
 	if last and now - last < dedupeWindow(priority) then
@@ -373,7 +381,8 @@ function NoticePolicy.Offer(state: State, notice: Notice, now: number, quiet: bo
 		return show(state, entry, now)
 	end
 	if
-		nonCriticalVisible(state) >= NoticePolicy.MaxVisibleNonCritical
+		hold == true
+		or nonCriticalVisible(state) >= NoticePolicy.MaxVisibleNonCritical
 		or #state.visible >= NoticePolicy.MaxVisible
 		or now - state.lastShown < NoticePolicy.Cooldown
 	then
@@ -386,11 +395,15 @@ function NoticePolicy.Offer(state: State, notice: Notice, now: number, quiet: bo
 end
 
 -- Call a few times a second: the next queued notice, when one may show.
--- `quiet` drops what's queued (everything queued is non-critical).
-function NoticePolicy.Tick(state: State, now: number, quiet: boolean?): Decision?
+-- `quiet` drops what's queued (everything queued is non-critical); `hold`
+-- keeps it queued, showing nothing, until the dialogue box closes.
+function NoticePolicy.Tick(state: State, now: number, quiet: boolean?, hold: boolean?): Decision?
 	expire(state, now)
 	if quiet then
 		state.queue = {}
+		return nil
+	end
+	if hold then
 		return nil
 	end
 	local first = state.queue[1]

@@ -788,6 +788,20 @@ function NPCData.Get(id: string): NPC?
 	return byId[id]
 end
 
+-- The keeper who runs a shop (their `shop` id), or nil. The dialogue box
+-- names the speaker of a server line by this.
+function NPCData.ForShop(shop: string?): NPC?
+	if shop == nil then
+		return nil
+	end
+	for _, npc in ipairs(NPCData.List) do
+		if npc.shop == shop then
+			return npc
+		end
+	end
+	return nil
+end
+
 function NPCData.All(): { NPC }
 	return NPCData.List
 end
