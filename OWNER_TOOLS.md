@@ -32,6 +32,9 @@ works there.
 | `/stats <player>` | read-only: cash, plot, tutorial step, axes, blueprints |
 | `/resettutorial <player>` | start their tutorial over |
 | `/unlockbp <player>` | every building plan in their blueprint book |
+| `/paidlist <player>` | every paid item (with its id) and whether they own it |
+| `/paidgive <player> <item id> [hours]` | give a paid item (Gifts power: themself only) |
+| `/paidrevoke <player> <item id>` | take an owner grant back (owner only) |
 | `/shutdown` | kick everyone, you too: this server ends |
 | `/delegate <player\|userId> <helper\|moderator\|builder\|tester\|custom> [powers] [session\|1h\|24h\|server] [confirm]` | give someone a role (owner only, see Delegation) |
 | `/undelegate <player\|userId>` | take every power back at once (owner only) |
@@ -48,8 +51,27 @@ Open it with the **OWNER** side button, or click both thumbsticks (L3 + R3).
 Close it with the **X**, **B** or **Esc**. Every tool is also a chat command
 (above), so nothing is menu-only.
 
+**Tabs, since "Owner hub 2" (PHASE2_NOTES.md): PLAYERS, GIFTS, PAID ITEMS, WORLD,
+ROLES, LOG.** The table below keeps its old names: GIVE is now GIFTS, SELF's
+tools sit in PLAYERS under ON YOURSELF, DELEGATES is ROLES, and LOG holds the
+last actions and every chat command (with a search). A header that stays put
+says who you are and your role. B or Esc go back one level (cancel a
+confirmation, clear a search, leave a paid item) before they close the hub;
+LB / RB and LT / RT change tab; on a phone the tabs wrap onto two rows.
+
+**Paid items** (owner, or a CUSTOM role with the Gifts power, themself only):
+the list is built from `Shared/StoreData`, so a store item added later is in
+it. Pick a player in the bar, tap an item (what they own is shown), then GIVE
+or REVOKE (both ask twice). Chat: `/paidlist <player>` shows the ids,
+`/paidgive <player> <id> [hours]`, `/paidrevoke <player> <id>` (owner only).
+A grant uses the same effects as a purchase with no Robux; a pass grant is
+saved in `profile.ownerGrants` so it survives rejoining, and a revoke only
+removes a grant (a pass they bought stays; Timber Classic and cash can't be
+taken back here; a 2x Wood revoke ends the boost). The last 30 are kept in
+`profile.ownerGrantLog`. TESTER does not hold paid items.
+
 Layout: a title bar with a **Find a tool** box (type "kick", "teleport",
-"restart"...), four tabs, a scrolling body and a status strip at the bottom.
+"restart"...), tabs, a scrolling body and a status strip at the bottom.
 The strip shows who is picked and what just happened, or why the server
 refused (green: done, red: refused). Each tool is a big button with a one
 line hint under it.

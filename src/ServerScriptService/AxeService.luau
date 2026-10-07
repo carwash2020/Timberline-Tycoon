@@ -32,6 +32,8 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
+local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local ProfileService = require(script.Parent.ProfileService)
@@ -245,8 +247,10 @@ function AxeService.GiveLoadout(player: Player, character: Model)
 	-- A pass axe comes back on every spawn, from the save (and the attribute
 	-- the ownership check sets). Ensure won't add a second copy.
 	local passes = profile.passes
+	-- (an owner grant counts: PaidItems.SaveHasPass reads passes and ownerGrants)
 	if
 		(passes and passes[GameConfig.LuxAxeId] == true)
+		or PaidItems.SaveHasPass(profile, GameConfig.LuxAxeId)
 		or player:GetAttribute("Pass_" .. GameConfig.LuxAxeId) == true
 	then
 		AxeService.Ensure(player, GameConfig.LuxAxeId)
@@ -299,6 +303,47 @@ function AxeService.Grant(player: Player, axeId: string, isTemporary: boolean?):
 	local item: AxeItem = { uid = Util.guid(), id = axeId }
 	addItem(player, item, isTemporary == true)
 	return item, giveTool(player, item)
+end
+
+-- Takes every copy of a pass axe away (the owner hub revoking a granted
+-- pass): from the save, the account list, the parked slots, the Backpack and
+-- the ground. A player is never left without an axe: if that was their last,
+-- they get a Rusty Axe. Returns how many saved copies went.
+function AxeService.RemoveAll(player: Player, axeId: string): number
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return 0
+	end
+	local uids: { string } = {}
+	for _, item in ipairs(allItems(player)) do
+		if item.id == axeId then
+			table.insert(uids, item.uid)
+		end
+	end
+	for _, uid in ipairs(uids) do
+		removeDropped(uid)
+		local tool = findTool(player, uid)
+		if tool then
+			tool:Destroy()
+		end
+		if profile.equippedAxe == uid then
+			profile.equippedAxe = ""
+		end
+	end
+	local list = temporary[player]
+	if list then
+		for i = #list, 1, -1 do
+			if list[i].id == axeId then
+				table.remove(list, i)
+			end
+		end
+	end
+	local removed = SaveSlotLogic.ForgetAccountAxe(profile, axeId)
+	if #profile.axes == 0 then
+		AxeService.Grant(player, "RustyAxe", false)
+	end
+	publishOwned(player)
+	return removed
 end
 
 -- How many saved axes the player owns: per axe id, and in total.

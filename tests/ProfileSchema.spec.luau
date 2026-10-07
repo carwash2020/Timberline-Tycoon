@@ -1143,4 +1143,33 @@ return function(t)
 			t.eq({ m = data.skyWood[1].m, d = data.skyWood[1].d, n = #data.skyWood }, before)
 		end
 	)
+
+	t.test("owner grants: a new save has none, a bad record is cleaned, migrating twice changes nothing", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.ownerGrants, {})
+		t.eq(Schema.Template.ownerGrantLog, {})
+		Schema.Migrate(data)
+		t.eq(data.ownerGrants, {})
+		t.eq(data.ownerGrantLog, {})
+		-- An old save without the fields, and one with junk in them.
+		local old = select(2, fresh())
+		old.ownerGrants = nil
+		old.ownerGrantLog = nil
+		Schema.Migrate(old)
+		t.eq(old.ownerGrants, {})
+		t.eq(old.ownerGrantLog, {})
+		local junk = select(2, fresh())
+		junk.ownerGrants = { LuxAxe = { at = 5, by = 7, byName = "Connor" }, Broken = "x", Worse = { at = "no" } }
+		junk.ownerGrantLog = {
+			{ at = 5, by = 7, byName = "Connor", action = "give", item = "pass_LuxAxe", name = "Lux Axe" },
+			"junk",
+			{ at = "x" },
+		}
+		Schema.Migrate(junk)
+		t.eq(junk.ownerGrants, { LuxAxe = { at = 5, by = 7, byName = "Connor" } })
+		t.eq(#junk.ownerGrantLog, 1)
+		local snapshot = { grants = junk.ownerGrants.LuxAxe.at, log = #junk.ownerGrantLog }
+		Schema.Migrate(junk)
+		t.eq({ grants = junk.ownerGrants.LuxAxe.at, log = #junk.ownerGrantLog }, snapshot)
+	end)
 end

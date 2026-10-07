@@ -77,6 +77,7 @@ local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -671,6 +672,16 @@ safely("MonetizationService.SetPassListener", MonetizationService.SetPassListene
 		ShopService.GrantPassTruck(player)
 	end
 end)
+-- An owner revoke of a granted pass that is an axe takes the axe back too.
+safely(
+	"MonetizationService.SetPassRevokedListener",
+	MonetizationService.SetPassRevokedListener,
+	function(player: Player, key: string)
+		if ItemCatalog.GetAxe(key) then
+			AxeService.RemoveAll(player, key)
+		end
+	end
+)
 VehicleService.Hooks.freeRecall = function(player: Player): boolean
 	return MonetizationService.HasPass(player, "TowService")
 end
@@ -766,6 +777,10 @@ if CoreLoop.V2() then
 		publishBlueprints = BlueprintService.Publish,
 		placeSample = PlotService.PlaceSample,
 		clearSamples = PlotService.ClearSamples,
+		-- Paid items given or taken back from the owner hub: the same effects as a purchase, no Robux.
+		paidGrant = MonetizationService.OwnerGrant,
+		paidRevoke = MonetizationService.OwnerRevoke,
+		paidState = MonetizationService.OwnerState,
 	})
 	-- A sold piece's "+$" pop on the pad: what its payee is paid for it.
 	local function saleFx(model: Model)
@@ -1461,6 +1476,9 @@ local function rebuildSlotNow(player: Player)
 				player:SetAttribute("Pass_" .. key, true)
 			end
 		end
+	end
+	for key in pairs(PaidItems.CleanGrants(profile.ownerGrants)) do
+		player:SetAttribute("Pass_" .. key, true) -- passes the owner granted
 	end
 	player:SetAttribute("DoubleWoodUntil", profile.doubleWoodUntil)
 	player:SetAttribute("InstantDeliveries", profile.instantDeliveries)

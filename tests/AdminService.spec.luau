@@ -702,4 +702,203 @@ return function(t)
 		t.eq(Admin.Run(100, "/sample modern"), true)
 		t.eq(calls.toasts[#calls.toasts][2], "Samples aren't available here.")
 	end)
+
+	---------------------------------------------------------------------------
+	-- Paid items: give, revoke and list, through the wired hooks
+	---------------------------------------------------------------------------
+
+	local function paidHooks()
+		local seen = { gave = {}, revoked = {}, listed = {} }
+		return seen,
+			{
+				paidGrant = function(who, itemId, by, hours)
+					table.insert(seen.gave, { who.Name, itemId, by.userId, by.name, hours })
+					return true, "Gave " .. itemId .. " to " .. who.Name .. "."
+				end,
+				paidRevoke = function(who, itemId, by)
+					table.insert(seen.revoked, { who.Name, itemId, by.userId })
+					return true, "Took " .. itemId .. " back from " .. who.Name .. "."
+				end,
+				paidState = function(who)
+					table.insert(seen.listed, who.Name)
+					return { pass_LuxAxe = { label = "OWNED (granted)", owned = true, granted = true } }
+				end,
+			}
+	end
+
+	t.test("the owner gives and takes back paid items, and sees what the player owns", function()
+		local Admin, calls, _, players = boot(false)
+		local seen, hooks = paidHooks()
+		Admin.SetHooks(hooks)
+		local owner = players.Connor
+		t.eq(Admin.RunRequest(owner, { action = "paidgive", target = "Bob", itemId = "pass_LuxAxe" }), true)
+		t.eq(seen.gave[1], { "Bob", "pass_LuxAxe", 100, "Connor", nil })
+		local last = calls.results[#calls.results]
+		t.eq({ last[1], last[2], last[3] }, { "Connor", true, "Gave pass_LuxAxe to Bob." })
+		-- The hub is sent what Bob owns right after, to the owner only.
+		local state = lastAccess(calls, "Connor", "paidstate")
+		t.eq(state.target, "Bob")
+		t.eq(state.rows.pass_LuxAxe.label, "OWNED (granted)")
+		-- A boost length goes through.
+		t.eq(
+			Admin.RunRequest(owner, { action = "paidgive", target = "Eve", itemId = "product_DoubleWood", hours = 24 }),
+			true
+		)
+		t.eq(seen.gave[2], { "Eve", "product_DoubleWood", 100, "Connor", 24 })
+		-- To themself too.
+		t.eq(Admin.RunRequest(owner, { action = "paidgive", target = "Connor", itemId = "pass_DoubleCash" }), true)
+		t.eq(seen.gave[3][1], "Connor")
+		t.eq(Admin.RunRequest(owner, { action = "paidrevoke", target = "Bob", itemId = "pass_LuxAxe" }), true)
+		t.eq(seen.revoked[1], { "Bob", "pass_LuxAxe", 100 })
+		t.eq(Admin.RunRequest(owner, { action = "paidlist", target = "Bob" }), true)
+		t.eq(seen.listed[#seen.listed], "Bob")
+		-- The same by chat.
+		t.eq(Admin.Run(100, "/paidgive Eve pass_TowService"), true)
+		t.eq(seen.gave[4][2], "pass_TowService")
+	end)
+
+	t.test("a paid item that is not in the store data, or a bad length, is refused before anything is given", function()
+		local Admin, calls, _, players = boot(false)
+		local seen, hooks = paidHooks()
+		Admin.SetHooks(hooks)
+		local owner = players.Connor
+		t.eq(
+			Admin.RunRequest(owner, { action = "paidgive", target = "Bob", itemId = "pass_Nope" }),
+			true,
+			"ran, refused"
+		)
+		t.eq(calls.results[#calls.results][2], false)
+		t.ok(
+			string.find(calls.results[#calls.results][3], "not a paid item", 1, true),
+			calls.results[#calls.results][3]
+		)
+		t.eq(Admin.RunRequest(owner, { action = "paidgive", target = "Nobody", itemId = "pass_LuxAxe" }), true)
+		t.eq(calls.results[#calls.results][2], false)
+		t.eq(Admin.Run(100, "/paidgive Bob product_DoubleWood 0"), true)
+		t.eq(Admin.Run(100, "/paidgive Bob product_DoubleWood 9999"), true)
+		t.eq(Admin.Run(100, "/paidgive Bob product_DoubleWood x"), true)
+		t.eq(
+			Admin.RunRequest(owner, { action = "paidgive", target = "Bob", itemId = "pass LuxAxe" }),
+			false,
+			"off the whitelist"
+		)
+		t.eq(#seen.gave + #seen.revoked, 0, "no hook ran for any of them")
+		-- Not wired (a server without the v2 loop): a plain refusal.
+		Admin.SetHooks({})
+		t.eq(Admin.RunRequest(owner, { action = "paidgive", target = "Bob", itemId = "pass_LuxAxe" }), true)
+		t.eq(calls.results[#calls.results][2], false)
+		t.ok(string.find(calls.results[#calls.results][3], "not wired", 1, true))
+	end)
+
+	t.test(
+		"nobody but the owner gives paid items: not a stranger, not a helper, moderator, builder or TESTER",
+		function()
+			local Admin, calls, _, players = boot(false)
+			local seen, hooks = paidHooks()
+			Admin.SetHooks(hooks)
+			local line = "/paidgive Bob pass_LuxAxe"
+			-- A stranger gets nothing, by chat or the hub, and no answer.
+			t.eq(Admin.Run(200, line), false)
+			t.eq(Admin.RunRequest(players.Bob, { action = "paidgive", target = "Bob", itemId = "pass_LuxAxe" }), false)
+			t.eq(
+				Admin.RunRequest(players.Bob, { action = "paidrevoke", target = "Bob", itemId = "pass_LuxAxe" }),
+				false
+			)
+			t.eq(Admin.RunRequest(players.Bob, { action = "paidlist", target = "Bob" }), false)
+			t.eq(#calls.results, 0)
+			-- Delegates by role.
+			for _, role in ipairs({ "helper", "moderator", "builder" }) do
+				Admin.Run(100, "/delegate Eve " .. role .. " 1h")
+				t.eq(Admin.Run(300, "/paidgive Eve pass_LuxAxe"), false, role)
+				t.eq(Admin.Run(300, "/paidlist Eve"), false, role)
+				Admin.Run(100, "/undelegate Eve")
+			end
+			-- TESTER has full owner power except this.
+			Admin.Run(100, "/delegate Eve tester 1h confirm")
+			t.eq(Admin.Run(300, "/paidgive Eve pass_LuxAxe"), false)
+			t.eq(Admin.Run(300, "/paidrevoke Eve pass_LuxAxe"), false)
+			t.eq(Admin.Run(300, "/paidlist Eve"), false)
+			t.eq(Admin.RunRequest(players.Eve, { action = "paidgive", target = "Eve", itemId = "pass_LuxAxe" }), false)
+			t.eq(
+				lastAccess(calls, "Eve", "access").actions ~= nil
+					and table.find(lastAccess(calls, "Eve", "access").actions, "paidgive"),
+				nil
+			)
+			Admin.Run(100, "/undelegate Eve")
+			t.eq(#seen.gave + #seen.revoked + #seen.listed, 0, "nothing was given, taken or even read")
+		end
+	)
+
+	t.test(
+		"a Gifts delegate gives paid items to themself only, can't revoke, and shows on the owner's audit",
+		function()
+			local Admin, calls, _, players = boot(false)
+			local seen, hooks = paidHooks()
+			Admin.SetHooks(hooks)
+			Admin.Run(100, "/delegate Bob custom paidgive 1h")
+			local access = lastAccess(calls, "Bob", "access")
+			t.ok(table.find(access.actions, "paidgive") and table.find(access.actions, "paidlist"))
+			t.eq(table.find(access.actions, "paidrevoke"), nil, "the hub shows no revoke")
+			t.eq(Admin.RunRequest(players.Bob, { action = "paidgive", target = "Bob", itemId = "pass_LuxAxe" }), true)
+			t.eq(seen.gave[1], { "Bob", "pass_LuxAxe", 200, "Bob", nil })
+			t.eq(Admin.RunRequest(players.Bob, { action = "paidlist", target = "Bob" }), true)
+			-- Not to another player, not at all to the owner, never a revoke.
+			t.eq(Admin.RunRequest(players.Bob, { action = "paidgive", target = "Eve", itemId = "pass_LuxAxe" }), false)
+			t.eq(Admin.RunRequest(players.Bob, { action = "paidlist", target = "Eve" }), false)
+			t.eq(
+				Admin.RunRequest(players.Bob, { action = "paidgive", target = "Connor", itemId = "pass_LuxAxe" }),
+				false
+			)
+			t.eq(
+				Admin.RunRequest(players.Bob, { action = "paidrevoke", target = "Bob", itemId = "pass_LuxAxe" }),
+				false
+			)
+			t.eq(Admin.Run(200, "/paidrevoke Bob pass_LuxAxe"), false)
+			t.eq(#seen.gave, 1)
+			t.eq(#seen.revoked, 0)
+			-- A role the client claims means nothing.
+			t.eq(
+				Admin.RunRequest(
+					players.Eve,
+					{ action = "paidgive", target = "Eve", itemId = "pass_LuxAxe", role = "CUSTOM", confirmed = true }
+				),
+				false
+			)
+			-- The owner sees it, with both ids in the text.
+			local audit = lastAccess(calls, "Connor", "audit")
+			t.ok(
+				audit and string.find(audit.text, "paidgive", 1, true) and string.find(audit.text, "Bob", 1, true),
+				audit and audit.text
+			)
+		end
+	)
+
+	t.test("a delegate's paid requests are rate limited, and the owner's go through the hub's own limit", function()
+		local Admin, _, _, players = boot(false)
+		local seen, hooks = paidHooks()
+		Admin.SetHooks(hooks)
+		Admin.Run(100, "/delegate Bob custom paidgive 1h")
+		Admin.SetThrottle(60) -- a request every minute: the second one is "Slow down"
+		t.eq(Admin.RunRequest(players.Bob, { action = "paidgive", target = "Bob", itemId = "pass_LuxAxe" }), true)
+		t.eq(Admin.RunRequest(players.Bob, { action = "paidgive", target = "Bob", itemId = "pass_DoubleCash" }), false)
+		t.eq(Admin.RunRequest(players.Bob, { action = "paidlist", target = "Bob" }), false)
+		t.eq(#seen.gave, 1)
+	end)
+
+	t.test("the hub's gift line names the item, and unban is the owner's", function()
+		local Admin, calls, _, players = boot(false)
+		t.eq(
+			Admin.RunRequest(players.Connor, { action = "gift", target = "Bob", kind = "Axe", itemId = "SteelAxe" }),
+			true
+		)
+		t.eq(calls.results[#calls.results][3], "Gave Steel Axe to Bob.")
+		t.eq(Admin.RunRequest(players.Bob, { action = "unban", userId = 5 }), false)
+		Admin.Run(100, "/delegate Bob moderator 1h")
+		t.eq(Admin.RunRequest(players.Bob, { action = "unban", userId = 5 }), false, "never delegable")
+		t.eq(
+			Admin.RunRequest(players.Connor, { action = "unban", userId = 5 }),
+			true,
+			"the owner's ran (the mock refuses the call)"
+		)
+	end)
 end

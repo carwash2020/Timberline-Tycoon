@@ -7,6 +7,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
 local ProfileService = require(script.Parent.ProfileService)
 local RateLimiter = require(script.Parent.RateLimiter)
@@ -25,7 +26,7 @@ function PaintService.Try(player: Player, truckId: unknown, color: unknown, now:
 	local id = if type(truckId) == "string" then truckId else ""
 	local clock = if type(now) == "number" then now else os.clock()
 	local owns = type(profile.ownedTrucks) == "table" and table.find(profile.ownedTrucks, id) ~= nil
-	local pass = type(profile.passes) == "table" and profile.passes.PaintShop == true
+	local pass = PaidItems.SaveHasPass(profile, "PaintShop") -- bought, or granted by the owner
 	local ok, result = PaintShop.Decide({
 		ownsPass = pass,
 		ownsTruck = owns,

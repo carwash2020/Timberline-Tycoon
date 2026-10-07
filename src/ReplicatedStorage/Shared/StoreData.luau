@@ -39,6 +39,12 @@ export type Pass = {
 	image: number, -- PASTE a decal asset id; 0 = styled placeholder
 	name: string,
 	description: string,
+	-- Optional, for the owner hub's Paid items list (Shared/PaidItems works
+	-- both out when they are left off): "pass", "tool" or "cosmetic", and
+	-- whether an owner grant may be taken back (false when granting it
+	-- changes the save for good, like the Timber Classic truck).
+	kind: string?,
+	revocable: boolean?,
 }
 
 export type Product = {
@@ -47,6 +53,7 @@ export type Product = {
 	image: number, -- PASTE a decal asset id; 0 = styled placeholder
 	name: string,
 	description: string,
+	kind: string?, -- optional: "consumable" or "booster" (PaidItems works it out if left off)
 	cash: number?, -- cash packs: how much it adds (checked against the wallet cap first)
 	boostHours: number?, -- timed boosts: how long
 }
@@ -79,6 +86,7 @@ StoreData.Passes = {
 		image = 79037897236948,
 		name = "Timber Classic",
 		description = "Unlocks the Timber Classic, an old-school pickup with the same stats as the Pickup. Its dashboard gauge shows what your load is worth, as an estimate at the Wood Dropoff. Your display name is painted on both doors.",
+		revocable = false, -- an owner grant adds the truck to every slot's save for good
 	},
 	{
 		key = "PaintShop",
@@ -86,6 +94,7 @@ StoreData.Passes = {
 		image = 71028498113750,
 		name = "Paint Shop",
 		description = "Paint your trucks in any color from the Paint Shop palette. Paint is cosmetic only and stays on after you rejoin.",
+		kind = "cosmetic",
 	},
 } :: { Pass }
 

@@ -203,10 +203,24 @@ AdminLogic.MenuActions = {
 	"unlockbp",
 	"tospawn",
 	"shutdown",
+	"unban",
+	"paidgive",
+	"paidrevoke",
+	"paidlist",
 	"delegate",
 	"undelegate",
 	"delegates",
 } :: { string }
+
+-- The paid-item powers (Shared/PaidItems, the hub's Paid items tab).
+-- paidgive gives a paid item (a delegate holding the Gifts power may give
+-- to themself only), paidlist reads what a player owns (it needs the same
+-- power), paidrevoke takes a grant back (owner only, never delegable).
+AdminLogic.PaidActions = { "paidgive", "paidrevoke", "paidlist" } :: { string }
+-- A request that is allowed by holding another power.
+AdminLogic.PowerAlias = { paidlist = "paidgive" } :: { [string]: string }
+-- The longest boost an owner grant may run, in hours (PaidItems.MaxHours).
+AdminLogic.MaxPaidHours = 720
 
 -- Requests with no arguments, and requests that take only a player.
 AdminLogic.PlainActions = { "superrun", "timereset", "god", "tospawn", "shutdown", "delegates" } :: { string }
@@ -260,6 +274,7 @@ AdminLogic.DelegablePowers = {
 	"timereset",
 	"tospawn",
 	"god",
+	"paidgive", -- "Gifts": paid items for themself only (TESTER does not hold it, see GrantAllows)
 } :: { string }
 
 -- Owner only: no role (TESTER too) holds the first list, and nobody but the
@@ -275,6 +290,7 @@ AdminLogic.NeverDelegable = {
 	"unlockbp",
 	"unban",
 	"sample",
+	"paidrevoke",
 } :: { string }
 AdminLogic.OwnerOnly = { "delegate", "undelegate", "delegates" } :: { string }
 
@@ -322,7 +338,7 @@ AdminLogic.RoleHints = {
 	HELPER = "Go to and bring players, freeze, stats, announce.",
 	MODERATOR = "Helper powers plus kick and bans up to 1 hour.",
 	BUILDER = "Free items for themself, the clock, god mode, spawn.",
-	TESTER = "FULL OWNER POWER except delegation: cash, bans, shutdown.",
+	TESTER = "FULL OWNER POWER except delegation and paid items: cash, bans, shutdown.",
 	CUSTOM = "Tick the individual powers below.",
 } :: { [string]: string }
 
@@ -405,12 +421,16 @@ function AdminLogic.GrantAllows(grant: Grant?, action: unknown, ctx: Ctx?): (boo
 		if table.find(AdminLogic.AllPowers, action) then
 			return true, nil
 		end
+		if table.find(AdminLogic.PaidActions, action) then
+			return false, "Paid items are for the owner, or a helper given the Gifts power. TESTER does not have it."
+		end
 		return false, "That is not a power."
 	end
 	if table.find(AdminLogic.NeverDelegable, action) then
 		return false, "Only the owner can do that."
 	end
-	if table.find(grant.powers, action) == nil then
+	local needed = AdminLogic.PowerAlias[action] or action
+	if table.find(grant.powers, needed) == nil then
 		return false, "You were not given that power."
 	end
 	local c: Ctx = ctx or {}
@@ -419,7 +439,7 @@ function AdminLogic.GrantAllows(grant: Grant?, action: unknown, ctx: Ctx?): (boo
 		if hours == nil or hours > AdminLogic.MaxDelegateBanHours then
 			return false, "You can ban for up to " .. AdminLogic.MaxDelegateBanHours .. " hour only."
 		end
-	elseif action == "gift" and c.selfTarget ~= true then
+	elseif (action == "gift" or action == "paidgive" or action == "paidlist") and c.selfTarget ~= true then
 		return false, "You can only gift to yourself."
 	end
 	return true, nil
@@ -541,9 +561,40 @@ function AdminLogic.FromRequest(request: unknown): string?
 		end
 		return "/settime " .. at
 	end
+	if action == "unban" then
+		local id = req.userId
+		if type(id) ~= "number" or id ~= id or id <= 0 or id % 1 ~= 0 or id > 2 ^ 52 then
+			return nil
+		end
+		return string.format("/unban %d", id)
+	end
 	local target = word(req.target, 20)
 	if not target then
 		return nil
+	end
+	if action == "paidgive" or action == "paidrevoke" then
+		local itemId = word(req.itemId, 48)
+		if not itemId then
+			return nil
+		end
+		local line = string.format("/%s %s %s", action, target, itemId)
+		local hours = req.hours
+		if action == "paidgive" and hours ~= nil then
+			if
+				type(hours) ~= "number"
+				or hours ~= hours
+				or hours % 1 ~= 0
+				or hours < 1
+				or hours > AdminLogic.MaxPaidHours
+			then
+				return nil
+			end
+			line ..= string.format(" %d", hours)
+		end
+		return line
+	end
+	if action == "paidlist" then
+		return "/paidlist " .. target
 	end
 	if action == "undelegate" then
 		return "/undelegate " .. target
@@ -626,6 +677,8 @@ AdminLogic.Help = {
 	"/stats <player>: cash, plot, tutorial, items",
 	"/resettutorial <player>: start their tutorial over",
 	"/unlockbp <player>: every building plan",
+	"/paidgive <player> <item> [hours]: give a paid item (ids are in /paidlist); /paidrevoke <player> <item> takes an owner grant back",
+	"/paidlist <player>: every paid item and whether they own it",
 	"/sample <modern|shop|barn>: a free test building on your plot, in front of you. /sample clear takes them down",
 	"/shutdown: kick everyone, this server ends",
 	"/delegate <player|userId> <helper|moderator|builder|tester|custom> [powers] [session|1h|24h|server]",
