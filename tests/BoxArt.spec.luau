@@ -111,7 +111,7 @@ return function(t)
 		t.eq(BoxArt.CategoryColor("???"), BoxArt.DefaultCategory)
 	end)
 
-	t.test("BoxService boxes carry the packaging, size by class, and a price tag above the lid", function()
+	t.test("BoxService boxes carry the packaging, size by class, and ONE price on the label (no billboard)", function()
 		local loader = t.loader({
 			mocks = {
 				ShopService = {
@@ -156,8 +156,16 @@ return function(t)
 				end
 			end
 			t.ok(n >= 5 and n <= BoxLogic.BoxPartCap, "five or six parts, " .. n)
-			local tag = rec.part:FindFirstChild("PriceTag")
-			t.ok(tag.StudsOffset.Y >= rec.part.Size.Y / 2 + 1, "the price floats above the lid, not inside the box")
+			local prices, billboards = 0, 0
+			for _, d in ipairs(rec.model:GetDescendants()) do
+				if d.Name == "Price" and d:IsA("TextLabel") then
+					prices += 1
+				elseif d:IsA("BillboardGui") then
+					billboards += 1
+				end
+			end
+			t.eq(prices, 1, "one price on the box")
+			t.eq(billboards, 0, "and nothing floating over it")
 		end
 		t.ok(small.model:FindFirstChild("SideLabel") ~= nil, "a west-side box shows a label to the aisle")
 	end)

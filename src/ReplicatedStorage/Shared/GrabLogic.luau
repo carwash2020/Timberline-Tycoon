@@ -199,6 +199,23 @@ function GrabLogic.Force(mass: number, perMass: number?, cap: number?): number
 	return math.clamp(mass * per, 0, math.max(0, most))
 end
 
+-- The mass a hold's pull is sized by. A piece that is still anchored (a shop
+-- box on its shelf, until the server lets it go) reports an assembly mass of
+-- 0, and a pull sized from that alone has no force: the first grab would
+-- take the box off the shelf and move nothing. So it is the larger of the
+-- assembly's mass and the sum of its parts' masses (each only if finite and
+-- positive).
+function GrabLogic.PullMass(assemblyMass: number, partMasses: { number }): number
+	local best = if finite(assemblyMass) and assemblyMass > 0 then assemblyMass else 0
+	local sum = 0
+	for _, m in ipairs(partMasses) do
+		if finite(m) and m > 0 then
+			sum += m
+		end
+	end
+	return math.max(best, sum)
+end
+
 -- The most torque the hold turns a piece with, from its pull.
 function GrabLogic.Torque(force: number): number
 	if not finite(force) or force <= 0 then

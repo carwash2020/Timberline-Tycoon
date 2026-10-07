@@ -19,6 +19,7 @@ return {
 		local BuildingArt = ctx.art("BuildingArt")
 		local BoxArt = ctx.art("BoxArt")
 		local StoreStock = ctx.shared("StoreStock")
+		local Util = ctx.shared("Util")
 		local BoxSize = ctx.shared("BoxSize")
 		local RobuxShelf = ctx.shared("RobuxShelf")
 		local root = roblox.Instance.new("Model")
@@ -44,6 +45,7 @@ return {
 				color = color,
 				gold = gold,
 				side = BoxArt.AisleSide(at.X - (model:GetAttribute("shopX") or 0)),
+				price = "$1,100",
 			})
 			model.Parent = root
 			return model
@@ -78,6 +80,7 @@ return {
 							color = C3.fromHex(RobuxShelf.Gold),
 							gold = true,
 							side = BoxArt.AisleSide(rel.X),
+							price = "R$",
 						})
 						m.Parent = root
 					else
@@ -103,6 +106,9 @@ return {
 									kind = slot.itemKind,
 									color = C3.fromHex(slot.color),
 									side = BoxArt.AisleSide(at.X - shopX),
+									price = Util.formatCash(
+										StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2) or 0
+									),
 								})
 								m.Parent = root
 							end

@@ -35,6 +35,8 @@ export type Spec = {
 }
 
 ShopDoor.BlockThick = 1.4
+ShopDoor.LeafStep = 0.16 -- studs: the east barn leaf stands this much further out than the west one
+ShopDoor.LeafHeightCut = 0.08 -- studs: the west barn leaf is this much shorter
 
 local V3, CF = Vector3.new, CFrame.new
 local MAT = Enum.Material
@@ -51,45 +53,57 @@ local function addLeaf(parent: Model, reference: CFrame, defs: { PartDef }, clos
 	end
 end
 
+-- Faces that look the same way are at least ShopDoor.FaceStep apart, so the
+-- engine never has two textures to pick between on one plane (the specs
+-- scan for it): the trim is one ring of four pieces that only touch edge to
+-- edge, and the two braces stand proud of it at different depths.
+ShopDoor.FaceStep = 0.03
+
 local function slideDefs(w: number, h: number, color: Color3, trim: Color3): { PartDef }
+	local bar = 0.45
 	local defs: { PartDef } = {
 		{ name = "BarnDoor", size = V3(w, h, 0.4), offset = CF(), color = color, material = MAT.WoodPlanks },
 		{
 			name = "DoorTrim",
-			size = V3(w, 0.45, 0.2),
-			offset = CF(0, h / 2 - 0.22, -0.3),
+			size = V3(w - 2 * bar, bar, 0.2),
+			offset = CF(0, h / 2 - bar / 2, -0.3),
 			color = trim,
 			material = MAT.Wood,
 		},
 		{
 			name = "DoorTrim",
-			size = V3(w, 0.45, 0.2),
-			offset = CF(0, -h / 2 + 0.22, -0.3),
+			size = V3(w - 2 * bar, bar, 0.2),
+			offset = CF(0, -h / 2 + bar / 2, -0.3),
 			color = trim,
 			material = MAT.Wood,
 		},
 		{
 			name = "DoorTrim",
-			size = V3(0.45, h, 0.2),
-			offset = CF(-w / 2 + 0.22, 0, -0.3),
+			size = V3(bar, h, 0.2),
+			offset = CF(-w / 2 + bar / 2, 0, -0.3),
 			color = trim,
 			material = MAT.Wood,
 		},
 		{
 			name = "DoorTrim",
-			size = V3(0.45, h, 0.2),
-			offset = CF(w / 2 - 0.22, 0, -0.3),
+			size = V3(bar, h, 0.2),
+			offset = CF(w / 2 - bar / 2, 0, -0.3),
 			color = trim,
 			material = MAT.Wood,
 		},
 	}
 	local diag = math.sqrt((w - 0.9) ^ 2 + (h - 0.9) ^ 2)
 	local tilt = math.atan2(h - 0.9, w - 0.9)
-	for _, k in ipairs({ -1, 1 }) do
+	for i, k in ipairs({ -1, 1 }) do
+		-- Each brace is a layer deeper than the last: its face stands proud
+		-- of the trim's (-0.4) by FaceStep, then twice that, and its back
+		-- sinks into the board on a plane of its own.
+		local front = 0.4 + i * ShopDoor.FaceStep
+		local back = 0.17 - (i - 1) * ShopDoor.FaceStep
 		table.insert(defs, {
 			name = "DoorBrace",
-			size = V3(diag, 0.4, 0.2),
-			offset = CF(0, 0, -0.3) * CFrame.Angles(0, 0, k * tilt),
+			size = V3(diag, 0.4, front - back),
+			offset = CF(0, 0, -(front + back) / 2) * CFrame.Angles(0, 0, k * tilt),
 			color = trim,
 			material = MAT.Wood,
 		})
@@ -148,10 +162,17 @@ function ShopDoor.Add(model: Model, spec: Spec): Model?
 	if spec.style == "slide" then
 		local w = width / 2 + 0.3
 		local h = height - 0.3
-		local defs = slideDefs(w, h, spec.color, spec.trim)
 		for _, side in ipairs({ -1, 1 }) do
-			local closed = CF(cx + side * (width / 4 - 0.15), spec.y0 + h / 2 + 0.05, z)
-			local open = CF(cx + side * (width * 3 / 4 + 0.05), spec.y0 + h / 2 + 0.05, z)
+			-- The two leaves overlap 0.6 stud when shut, so the east one stands
+			-- LeafStep further out (never further in: the wall's windows are
+			-- behind the open leaves) and the west one is a hair shorter (top
+			-- and bottom planes differ too): their boards and trims never
+			-- share a plane.
+			local lz = if side == 1 then z - ShopDoor.LeafStep else z
+			local lh = if side == -1 then h - ShopDoor.LeafHeightCut else h
+			local defs = slideDefs(w, lh, spec.color, spec.trim)
+			local closed = CF(cx + side * (width / 4 - 0.15), spec.y0 + h / 2 + 0.05, lz)
+			local open = CF(cx + side * (width * 3 / 4 + 0.05), spec.y0 + h / 2 + 0.05, lz)
 			addLeaf(door, reference, defs, closed, open)
 		end
 	elseif spec.style == "swing" then
@@ -177,13 +198,13 @@ function ShopDoor.Add(model: Model, spec: Spec): Model?
 			local defs: { PartDef } = {
 				{
 					name = "ShutterSlat",
-					size = V3(width - 0.3, slat - 0.06, 0.3),
+					size = V3(width - 0.3 - 2 * (i - 1) * ShopDoor.FaceStep, slat - 0.06, 0.3), -- each a step narrower: the stack's end caps never share a plane
 					offset = CF(),
 					color = Kit.shade(spec.color, ((i % 2) - 0.5) * 0.08),
 					material = MAT.Metal,
 				},
 			}
-			addLeaf(door, reference, defs, CF(cx, closedY, z), CF(cx, openY, z + (i - 1) * 0.01))
+			addLeaf(door, reference, defs, CF(cx, closedY, z), CF(cx, openY, z + (i - 1) * ShopDoor.FaceStep))
 		end
 	end
 

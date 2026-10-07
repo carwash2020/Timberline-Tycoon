@@ -28,6 +28,36 @@ return function(t)
 		t.eq({ BoxLogic.CanGrab(grab({ taking = false, unpaidByPlayer = 3, unpaidOnServer = 30 })) }, { true })
 	end)
 
+	t.test("the cap counts the unpaid boxes in your hands, not stale ones", function()
+		local function box(over)
+			local b = { paid = false, opened = false, onShelf = false, heldBy = 0 }
+			for k, v in pairs(over or {}) do
+				b[k] = v
+			end
+			return b
+		end
+		t.eq({ BoxLogic.CountUnpaid({}, 1) }, { 0, 0 })
+		-- Three loose boxes someone dropped, one on a shelf, a paid one, an opened one.
+		local floor =
+			{ box(), box(), box(), box({ onShelf = true }), box({ paid = true, heldBy = 1 }), box({ opened = true }) }
+		t.eq({ BoxLogic.CountUnpaid(floor, 1) }, { 0, 3 }, "dropped boxes are loose, not carried")
+		table.insert(floor, box({ heldBy = 1 }))
+		t.eq({ BoxLogic.CountUnpaid(floor, 1) }, { 1, 4 }, "one in hand")
+		t.eq({ BoxLogic.CountUnpaid(floor, 2) }, { 0, 4 }, "another player's box is not yours")
+		t.eq({ BoxLogic.CountUnpaid(floor, 0) }, { 0, 4 }, "nobody is not a holder")
+		t.eq({ BoxLogic.CanGrab(grab({ taking = true, unpaidByPlayer = 1, unpaidOnServer = 4 })) }, { true })
+	end)
+
+	t.test("a box let go over its shelf spot is put back; one let go elsewhere is not", function()
+		local home = Vector3.new(10, 4, 20)
+		t.eq(BoxLogic.PutBack(home, home), true)
+		t.eq(BoxLogic.PutBack(home + Vector3.new(BoxLogic.PutBackRadius, 1, 0), home), true)
+		t.eq(BoxLogic.PutBack(home + Vector3.new(BoxLogic.PutBackRadius + 0.1, 0, 0), home), false)
+		t.eq(BoxLogic.PutBack(home + Vector3.new(0, BoxLogic.PutBackHeight + 0.1, 0), home), false, "too high")
+		t.eq(BoxLogic.PutBack(home + Vector3.new(0, -BoxLogic.PutBackHeight - 0.1, 0), home), false, "too low")
+		t.eq(BoxLogic.PutBack(Vector3.new(0, 1, 0), home), false, "across the shop")
+	end)
+
 	t.test("only the buyer, close enough, with the matching box, may open it", function()
 		local function open(over)
 			local f = { userId = 1, buyerId = 1, paid = true, distance = 12, uid = "a", promptUid = "a" }
@@ -66,13 +96,7 @@ return function(t)
 		t.eq(BoxLogic.DespawnHz, 2)
 	end)
 
-	t.test("the price tag shows the whole string at 14 px, out to 20 studs", function()
-		local tag = BoxLogic.PriceTag("$160")
-		t.eq(tag.text, "$160")
-		t.ok(tag.textSize >= 14)
-		t.eq(tag.maxDistance, 20)
-		t.eq(tag.alwaysOnTop, false)
-		t.eq(tag.truncate, false)
+	t.test("the box part cap, the pay tap and the lid faces", function()
 		t.eq(BoxLogic.BoxPartCap, 6)
 		t.ok(BoxLogic.PayTapPx >= 44)
 		local faces = BoxLogic.LargestFaces(Vector3.new(2, 1.2, 1.6))

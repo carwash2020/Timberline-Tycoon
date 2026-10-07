@@ -403,7 +403,17 @@ return function(t)
 		local stuck = setup({ stuck = true })
 		local record, stuckSection = stuck.piece()
 		local p = stuck.player(1)
+		local refused, grabbed = {}, {}
+		stuck.GrabService.Hooks.onRefused = function(_, piece, reason)
+			table.insert(refused, { piece.model, reason })
+		end
+		stuck.GrabService.Hooks.onGrab = function()
+			table.insert(grabbed, true)
+		end
 		t.eq({ stuck.GrabService.Grab(p, stuckSection, HIT) }, { false, "stuck" })
+		t.eq(#refused, 1, "the refusal is reported so a freed shop box can be put back")
+		t.eq(refused[1][2], "stuck")
+		t.eq(#grabbed, 0, "and it never counts as a grab")
 		t.eq(record.model:GetAttribute("HeldBy"), 0)
 		t.eq(stuckSection.CollisionGroup, "Default")
 		-- The engine refuses an anchored part. That false does not flip true.

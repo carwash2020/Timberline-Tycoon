@@ -123,6 +123,23 @@ return function(t)
 		t.eq(GrabLogic.Message(nil), nil)
 	end)
 
+	t.test(
+		"an anchored piece still gets a pull: the mass comes from its parts when the assembly reports none",
+		function()
+			-- A shelf box is anchored until the server frees it; the client sizes the pull
+			-- at the grab, so an assembly mass of 0 must not mean no force (the first grab
+			-- did nothing and the second, on the freed box, worked).
+			t.eq(GrabLogic.Force(0), 0)
+			t.eq(GrabLogic.PullMass(0, { 8, 4, 0 }), 12)
+			t.eq(GrabLogic.Force(GrabLogic.PullMass(0, { 8, 4, 0 })), 4000, "a 12-mass box is lifted at full pull")
+			t.ok(GrabLogic.CanLift(GrabLogic.PullMass(0, { 10 })), "and can be lifted")
+			t.eq(GrabLogic.PullMass(20, { 8, 4 }), 20, "a real assembly mass wins when it is larger")
+			t.eq(GrabLogic.PullMass(5, { 8, 4 }), 12, "the parts win when they are larger")
+			t.eq(GrabLogic.PullMass(0, {}), 0, "nothing to pull")
+			t.eq(GrabLogic.PullMass(0 / 0, { -3, math.huge, 2 }), 2, "nonsense is ignored")
+		end
+	)
+
 	t.test("the pull: mass x DragForcePerMass, capped at DragForceCap; nonsense pulls nothing", function()
 		t.eq(GameConfig.DragForcePerMass, 400)
 		t.eq(GameConfig.DragForceCap, 4000)

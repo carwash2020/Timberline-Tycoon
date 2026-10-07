@@ -560,9 +560,11 @@ end
 local function door(parent: Instance, cf: CFrame, w: number, h: number, color: Color3, frame: Color3)
 	local leaf = dBox(parent, "Door", V3(w, h, 0.25), cf * CF(0, h / 2, -0.1), color, MAT.WoodPlanks)
 	markHoursLeaf(leaf)
-	dBox(parent, "DoorFrame", V3(w + 0.7, 0.35, 0.4), cf * CF(0, h + 0.15, -0.15), frame)
+	-- The frame is a head and two jambs AROUND the leaf, touching it edge to
+	-- edge: none of its faces lies on the leaf's planes (the specs scan for it).
+	dBox(parent, "DoorFrame", V3(w + 0.7, 0.35, 0.4), cf * CF(0, h + 0.175, -0.15), frame)
 	for _, s in ipairs({ -1, 1 }) do
-		dBox(parent, "DoorFrame", V3(0.35, h, 0.4), cf * CF(s * (w / 2 + 0.15), h / 2, -0.15), frame)
+		dBox(parent, "DoorFrame", V3(0.35, h, 0.4), cf * CF(s * (w / 2 + 0.175), h / 2, -0.15), frame)
 	end
 	dBox(parent, "DoorBrace", V3(w - 0.3, 0.3, 0.1), cf * CF(0, h * 0.3, -0.27), Kit.shade(color, -0.12))
 	dBox(parent, "DoorBrace", V3(w - 0.3, 0.3, 0.1), cf * CF(0, h * 0.75, -0.27), Kit.shade(color, -0.12))
@@ -1226,7 +1228,9 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	dBox(model, "DoorTrack", V3(2 * HX + 0.6, 0.3, 0.3), CF(0, 7.9, -HZ - 0.5), IRON, MAT.Metal)
 	markHoursLeaf(dBox(model, "DoorHeader", V3(11, 0.5, 0.9), CF(0, 7.35, -HZ - 0.1), TRIM))
 	for _, s in ipairs({ -1, 1 }) do
-		dBox(model, "DoorJamb", V3(0.5, 7.1, 0.9), CF(s * 5.25, FLOOR + 3.55, -HZ - 0.1), TRIM)
+		-- Up to the header's underside (not its top), and 0.05 into the opening
+		-- so its inner face is not on the wall's.
+		dBox(model, "DoorJamb", V3(0.5, 7.1 - FLOOR, 0.9), CF(s * 5.2, (FLOOR + 7.1) / 2, -HZ - 0.1), TRIM)
 	end
 
 	-- The name sign up on the ridge (phase 12): a big board in the barn's
@@ -1252,7 +1256,7 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	dBox(model, "Hook", V3(0.35, 0.35, 0.35), CF(0, 11.75, -HZ - 2.55), IRON, MAT.Metal)
 	for _, s in ipairs({ -1, 1 }) do
 		window(model, CF(s * (HX + 0.3), 5.2, 0) * ANG(0, -s * PI / 2, 0), 2.6, 2.6, TRIM, nil, nil)
-		hangingLantern(model, V3(s * 3.8, 7.6, -HZ + 0.1), 0.6, 0.85)
+		hangingLantern(model, V3(s * 3.8, 7.56, -HZ + 0.1), 0.6, 0.85) -- off the header's top plane (7.6)
 	end
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
 	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ),
@@ -1358,8 +1362,8 @@ local function dealership(model: Model, title: string, accent: Color3)
 		dBox(
 			model,
 			"DoorJamb",
-			V3(0.7, OPEN - FLOOR, 1.1),
-			CF(x, (OPEN + FLOOR) / 2, -hz - T / 2 - 0.2),
+			V3(0.7, OPEN - 0.5 - FLOOR, 1.1), -- up to the header's underside, not level with its top
+			CF(x, (OPEN - 0.5 + FLOOR) / 2, -hz - T / 2 - 0.2),
 			dark,
 			MAT.Metal
 		)
@@ -1481,13 +1485,14 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	wall(CF(-(DOOR_HALF + sideW / 2), mid, -HZ), sideW, wallH)
 	wall(CF(DOOR_HALF + sideW / 2, mid, -HZ), sideW, wallH)
 	wall(CF(0, (DOOR_H + TOP) / 2, -HZ), 2 * DOOR_HALF, TOP - DOOR_H)
-	markHoursLeaf(dBox(model, "DoorHeader", V3(2 * DOOR_HALF + 1, 0.5, 0.9), CF(0, DOOR_H - 0.25, -HZ - 0.15), TRIM))
+	-- (1.0 deep, its back 0.1 proud of the wall's inside face: not level with it)
+	markHoursLeaf(dBox(model, "DoorHeader", V3(2 * DOOR_HALF + 1, 0.5, 1.0), CF(0, DOOR_H - 0.25, -HZ - 0.1), TRIM))
 	for _, s in ipairs({ -1, 1 }) do
 		dBox(
 			model,
 			"DoorJamb",
-			V3(0.5, DOOR_H - FLOOR, 0.9),
-			CF(s * (DOOR_HALF + 0.25), (DOOR_H + FLOOR) / 2, -HZ - 0.15),
+			V3(0.5, DOOR_H - 0.5 - FLOOR, 1.0),
+			CF(s * (DOOR_HALF + 0.2), (DOOR_H - 0.5 + FLOOR) / 2, -HZ - 0.1),
 			TRIM
 		)
 	end

@@ -214,7 +214,28 @@ local function export(name: string, def)
 		elseif inst:IsA("SurfaceGui") or inst:IsA("BillboardGui") then
 			local part = inst.Parent
 			local label = inst:FindFirstChildWhichIsA("TextLabel", true)
-			if part and part:IsA("BasePart") and label and label.Text ~= "" then
+			-- A gui with several text lines (a box label's name, then its price)
+			-- previews as one block, top line first.
+			local text = if label then label.Text else ""
+			if label then
+				local lines = {}
+				for _, d in ipairs(inst:GetDescendants()) do
+					if d:IsA("TextLabel") and d.Text ~= "" then
+						table.insert(lines, d)
+					end
+				end
+				if #lines > 1 then
+					table.sort(lines, function(a, b)
+						return a.Position.Y.Scale < b.Position.Y.Scale
+					end)
+					local parts = {}
+					for _, d in ipairs(lines) do
+						table.insert(parts, d.Text)
+					end
+					text = table.concat(parts, "\n")
+				end
+			end
+			if part and part:IsA("BasePart") and label and text ~= "" then
 				local cf, w, h
 				if inst:IsA("SurfaceGui") then
 					local face = inst.Face.Name
@@ -250,7 +271,7 @@ local function export(name: string, def)
 					c[10],
 					c[11],
 					c[12],
-					label.Text,
+					text,
 					hex(label.TextColor3),
 				})
 			end
