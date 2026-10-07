@@ -237,13 +237,13 @@ return function(t)
 		end
 	end)
 
-	t.test("each homestead shelf is bare Ground (no grass); the town plaza keeps its paint", function()
+	t.test("each homestead shelf is plain Grass (the platform stands on it); the town plaza keeps its paint", function()
 		for _, zone in ipairs(WorldLayout.FlatZones) do
 			if zone.name == "Plot" then
 				for x = zone.x0 + 16, zone.x1 - 16, 20 do
 					for z = zone.z0 + 16, zone.z1 - 16, 20 do
 						local m = materialAt(x, z)
-						t.eq(m, "Ground", string.format("plot (%d, %d) is %s", x, z, m))
+						t.eq(m, "Grass", string.format("plot (%d, %d) is %s", x, z, m))
 					end
 				end
 			end

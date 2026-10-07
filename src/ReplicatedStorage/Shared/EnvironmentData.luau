@@ -235,11 +235,13 @@ EnvironmentData.Keyframes = {
 		shift = rgb(40, 38, 34),
 		density = 0.28,
 		offset = 0.2,
+		-- 7 October 2026 (Lumber Tycoon 2 look): a little more saturation, so
+		-- the vivid grass reads vivid at noon (the air stays its pale blue).
 		color = rgb(200, 212, 222),
 		decay = rgb(106, 122, 142),
 		glare = 0.2,
 		haze = 1,
-		saturation = 0.12,
+		saturation = 0.2,
 		tint = rgb(255, 255, 255),
 		rays = 0.05,
 		spread = 0.5,
@@ -998,7 +1000,9 @@ local skyArea = (function()
 end)()
 
 -- True where nothing should be scattered: buildings, roads, water, the
--- Skyroot's foot, the volcano's cone, high mountains.
+-- Skyroot's foot, the volcano's cone, high mountains, and every homestead's
+-- shelf and its blend (flat weight over 0): the build platform, its ramps
+-- and the lawn round it stay clear of tufts, flowers and rocks.
 function EnvironmentData.DecorBlocked(x: number, z: number): boolean
 	if WorldLayout.FlatWeight(x, z) > 0 then
 		return true
