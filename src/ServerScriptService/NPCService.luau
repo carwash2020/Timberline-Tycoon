@@ -397,6 +397,7 @@ function NPCService.Init(mapFolder: Instance)
 	folder.Name = "Townsfolk"
 	folder.Parent = mapFolder
 	for _, npc in ipairs(NPCData.All()) do
+		local builtAt = os.clock()
 		local ok, err = pcall(function()
 			local model = build(npc, find)
 			if npc.id == "Murph" then
@@ -409,6 +410,11 @@ function NPCService.Init(mapFolder: Instance)
 		end)
 		if not ok then
 			warn(string.format("[NPCService] couldn't build %s: %s", npc.id, tostring(err)))
+		end
+		-- Studio's 7 October log showed NPCService.Init taking 60 s; this says
+		-- which NPC (its meshes load inside build) holds the server up.
+		if os.clock() - builtAt >= 2 then
+			print(string.format("[Load] NPCService built %s in %.1fs", npc.id, os.clock() - builtAt))
 		end
 	end
 	NPCService.Apply(mapFolder, ShopHoursLogic.Now())
