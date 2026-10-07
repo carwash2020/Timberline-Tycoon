@@ -335,8 +335,14 @@ return function(t)
 				)
 				t.ok(string.match(box.color, "^#%x%x%x%x%x%x$") ~= nil, where .. " color")
 				-- Inside the footprint (a roof may overhang by a stud).
-				t.ok(math.abs(box.offset.X) + box.size.X / 2 <= bp.footprint.X / 2 + 1, where .. " sticks out in x")
-				t.ok(math.abs(box.offset.Z) + box.size.Z / 2 <= bp.footprint.Y / 2 + 1, where .. " sticks out in z")
+				t.ok(
+					math.abs(box.offset.X) + box.size.X / 2 <= bp.footprint.X / 2 + (bp.overhang or 1),
+					where .. " sticks out in x"
+				)
+				t.ok(
+					math.abs(box.offset.Z) + box.size.Z / 2 <= bp.footprint.Y / 2 + (bp.overhang or 1),
+					where .. " sticks out in z"
+				)
 				t.ok(box.offset.Y - box.size.Y / 2 >= -0.01, where .. " is under the ground")
 			end
 		end

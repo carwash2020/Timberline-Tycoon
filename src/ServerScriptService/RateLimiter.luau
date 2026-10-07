@@ -35,6 +35,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	MoveBlueprint = 2,
 	BlueprintEdit = 5, -- rotate, move, resize, copy, delete, undo
 	SellPlaced = 4,
+	PaintPiece = 6, -- the palette stays open while a player tries colours
 	UpgradePlot = 1,
 	ClaimPlot = 4, -- the join picker: next and previous stay on the client
 	PlotPass = 2, -- close the picker, or let the timer assign one

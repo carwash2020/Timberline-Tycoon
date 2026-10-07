@@ -42,6 +42,7 @@ local FillLogic = require(ReplicatedStorage.Shared.FillLogic)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
 local ItemMeshes = require(ReplicatedStorage.Shared.ItemMeshes)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
@@ -53,6 +54,7 @@ local PlotFill = require(script.Parent.PlotFill)
 local PlotDoors = require(script.Parent.PlotDoors)
 local LogicService = require(script.Parent.LogicService)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local SampleBuilds = require(ReplicatedStorage.Shared.SampleBuilds)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
@@ -478,6 +480,12 @@ local function buildItem(slot: Slot, owner: Player, item: PlotLogic.Placed)
 		local fade = (BlueprintModels :: any).SetFaded
 		if type(apply) == "function" then
 			apply(model, item.wood)
+		end
+		if item.paint ~= nil then
+			model:SetAttribute("Paint", item.paint)
+			if type(BlueprintModels.ApplyPaint) == "function" then
+				BlueprintModels.ApplyPaint(model, item.paint)
+			end
 		end
 		if type(fade) == "function" and not PlotLogic.IsBuilt(bp, item) then
 			fade(model, true)
@@ -1373,11 +1381,11 @@ local function sellPlan(item: PlotLogic.Placed, bp: PlotData.Blueprint): (number
 	end
 	local at = placedAt[item.uid]
 	if at and os.clock() - at <= UNDO_SECONDS then
-		if bp.unlock then
-			return 0, 0, nil
-		end
 		if bp.kit then
 			return item.paid or PlotData.Price(bp), 0, nil
+		end
+		if bp.unlock then
+			return 0, 0, nil
 		end
 		return bp.priceCash, 0, nil
 	end
@@ -1483,7 +1491,7 @@ function PlotService.Sell(player: Player, uid: unknown)
 		EconomyService.Refund(owner, refund, "sold " .. bp.displayName, bp.id)
 	end
 	local full = if bp.kit then (item.paid or PlotData.Price(bp)) else bp.priceCash
-	if bp.unlock then
+	if bp.unlock and not bp.kit then
 		full = 0
 	end
 	local text = if planks > 0
@@ -1497,6 +1505,135 @@ function PlotService.Sell(player: Player, uid: unknown)
 	notify(player, text)
 end
 
+-- /sample: one of SampleBuilds' test buildings on the OWNER's plot, free, at the
+-- spot the owner faces (in front of their character, turned to face them).
+-- AdminService has already checked the speaker is the owner; this checks the
+-- plot and the fit. All or nothing: every piece must pass PlotLogic.Check (in
+-- order, with the plot's caps and the pieces already there), else nothing is
+-- placed. The pieces are built, painted and cost nothing, and `paid` is 0, so
+-- they also sell for nothing; their uids start "sample-" so ClearSamples can
+-- take them down. Returns (ok, the line to tell the owner).
+function PlotService.PlaceSample(player: Player, name: unknown): (boolean, string)
+	local sample = SampleBuilds.Get(name)
+	if not sample then
+		return false, "No such sample. Try: " .. table.concat(SampleBuilds.List, ", ") .. "."
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not profile.plot.claimed then
+		return false, "Claim a plot first."
+	end
+	local slot = nearOwnPlot(player, profile)
+	if not slot or slot.owner ~= player then
+		return false, "Stand on your own plot."
+	end
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not root then
+		return false, "No character to aim from."
+	end
+	local here = slot.cframe:PointToObjectSpace(root.Position)
+	local look = slot.cframe:VectorToObjectSpace(root.CFrame.LookVector)
+	local flat = math.sqrt(look.X * look.X + look.Z * look.Z)
+	local dx, dz = 0, 1
+	if flat > 1e-3 then
+		dx, dz = look.X / flat, look.Z / flat
+	end
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local items, why = SampleBuilds.Find(
+		sample,
+		SampleBuilds.FacingRot(dx, dz),
+		here.X + dx * sample.reach,
+		here.Z + dz * sample.reach,
+		profile.plot.tier,
+		profile.plot.placed,
+		squares,
+		function(i: number): string
+			return SampleBuilds.UidPrefix .. tostring(i)
+		end
+	)
+	if not items then
+		return false,
+			string.format("The %s doesn't fit there (%s). Face open ground.", sample.displayName, why or "no room")
+	end
+	for _, item in ipairs(items) do
+		item.uid = SampleBuilds.UidPrefix .. Util.guid()
+		table.insert(profile.plot.placed, item)
+		buildItem(slot, player, item)
+	end
+	LogicService.Sync(slot :: any, profile, player)
+	return true, string.format("Built the %s (%d pieces, free).", sample.displayName, #items)
+end
+
+-- Takes down every sample piece on the owner's plot. Free, and they were free.
+function PlotService.ClearSamples(player: Player): number
+	local profile = ProfileService.GetProfile(player)
+	local slot = slotOf[player]
+	if not profile or not slot then
+		return 0
+	end
+	local removed = 0
+	for i = #profile.plot.placed, 1, -1 do
+		local item = profile.plot.placed[i]
+		if SampleBuilds.IsSampleUid(item.uid) then
+			table.remove(profile.plot.placed, i)
+			placedAt[item.uid] = nil
+			local model = slot.items:FindFirstChild(item.uid)
+			if model then
+				model:Destroy()
+			end
+			removed += 1
+		end
+	end
+	if removed > 0 then
+		LogicService.Sync(slot :: any, profile, player)
+	end
+	return removed
+end
+
+-- Paints a placed kit piece. Cosmetic and free: no cash moves, and the fee
+-- paid, the planks in it, its size, its hit points and what it sells for stay
+-- exactly as they were. Whoever may build on the plot may paint it (the owner,
+-- or a visitor with the `build` permission), standing within KitPaint.Reach.
+-- The piece is rebuilt from its saved data, so natural brings the wood back.
+function PlotService.Paint(player: Player, uid: unknown, paintId: unknown)
+	if type(uid) ~= "string" or type(paintId) ~= "string" or not RateLimiter.Allow(player, "PaintPiece") then
+		return
+	end
+	local slot, profile, owner, denied = hostFor(player, "build")
+	if not slot or not profile or not owner then
+		if denied then
+			notify(player, "You can't build on this plot.")
+		end
+		return
+	end
+	local item = findPlaced(profile, uid)
+	local bp = if item then PlotLogic.Blueprint(item.blueprintId) else nil
+	if not item or not bp then
+		return
+	end
+	local char = player.Character
+	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+	if not root then
+		return
+	end
+	local spot = (slot.cframe * CFrame.new(item.x, item.y or 0, item.z)).Position
+	local ok, why = KitPaint.Check(bp, item.paint, paintId, (root.Position - spot).Magnitude)
+	if not ok then
+		local text = KitPaint.Message(why)
+		if text then
+			notify(player, text)
+		end
+		return
+	end
+	item.paint = KitPaint.Clean(paintId)
+	local old = slot.items:FindFirstChild(item.uid)
+	if old then
+		old:Destroy()
+	end
+	buildItem(slot, owner, item)
+	LogicService.Sync(slot :: any, profile, owner)
+end
+
 local function samePiece(a: PlotLogic.Placed, b: PlotLogic.Placed): boolean
 	return a.x == b.x
 		and a.z == b.z
@@ -1506,6 +1643,7 @@ local function samePiece(a: PlotLogic.Placed, b: PlotLogic.Placed): boolean
 		and a.lenX == b.lenX
 		and a.lenZ == b.lenZ
 		and a.paid == b.paid
+		and a.paint == b.paint
 end
 
 local function syncEdits(
@@ -1589,6 +1727,7 @@ function PlotService.Edit(player: Player, request: unknown)
 			lenX = item.lenX,
 			lenZ = item.lenZ,
 			paid = item.paid,
+			paint = item.paint,
 		}
 	end
 	local world: EditLogic.World = {
@@ -2054,6 +2193,11 @@ function PlotService.Init(map: Instance, remotes: { [string]: RemoteEvent }, not
 	remotes.PlaceBlueprint.OnServerEvent:Connect(PlotService.Place)
 	remotes.MoveBlueprint.OnServerEvent:Connect(PlotService.Move)
 	remotes.SellPlaced.OnServerEvent:Connect(PlotService.Sell)
+	if remotes.PaintPiece then
+		remotes.PaintPiece.OnServerEvent:Connect(function(player: Player, uid: unknown, paintId: unknown)
+			PlotService.Paint(player, uid, paintId)
+		end)
+	end
 	if remotes.BlueprintEdit then
 		remotes.BlueprintEdit.OnServerEvent:Connect(function(player: Player, request: unknown)
 			PlotService.Edit(player, request)
@@ -2212,6 +2356,7 @@ function PlotService.FillStep()
 								local model = slot.items:FindFirstChild(item.uid)
 								if model and model:IsA("Model") and type(BlueprintModels.ApplyWood) == "function" then
 									BlueprintModels.ApplyWood(model, item.wood)
+									BlueprintModels.ApplyPaint(model, item.paint)
 									BlueprintModels.SetFaded(model, not PlotLogic.IsBuilt(bp, item))
 								end
 							elseif type(why) == "string" and type(piece.uid) == "string" then

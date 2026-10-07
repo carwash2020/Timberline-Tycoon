@@ -27,6 +27,7 @@ local UserInputService = game:GetService("UserInputService")
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local HammerArt = require(ReplicatedStorage.Shared.Art.HammerArt)
 local HammerLogic = require(ReplicatedStorage.Shared.HammerLogic)
+local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
@@ -310,6 +311,51 @@ local function turn(bp: PlotData.Blueprint, item: PlotLogic.Placed)
 	HammerController.Swing(worldSpot(item))
 end
 
+-- The palette: one row per colour (KitPaint.Palette), the gamepad selection
+-- starting on the colour the piece wears. Picking one tells the server, which
+-- checks the owner, the reach and the colour again; the palette stays open so
+-- a few colours can be tried, and shows the one just picked straight away.
+local function openPaint(bp: PlotData.Blueprint, uid: string, wearing: string)
+	local shown = wearing
+	local shop: ShopUI.Shop = {
+		building = nil,
+		promptText = "",
+		title = "Paint",
+		subtitle = bp.displayName,
+		ids = function()
+			local ids: { string } = {}
+			for _, swatch in ipairs(KitPaint.Palette) do
+				table.insert(ids, swatch.id)
+			end
+			return ids
+		end,
+		view = function(paintId: string): ShopUI.RowView
+			local swatch = KitPaint.Get(paintId) :: KitPaint.Swatch
+			local on = paintId == shown
+			return {
+				name = swatch.name,
+				own = if on then "· on it" else nil,
+				detail = if paintId == KitPaint.Natural
+					then "The wood you filled it with. Free."
+					else "Looks only. Free. The wood and what it sells for stay.",
+				color = if swatch.color ~= "" then Color3.fromHex(swatch.color) else WOOD,
+				dim = false,
+				button = if on then "On it" else "Paint",
+				state = if on then "inuse" else "buy",
+				onClick = function()
+					if paintId == shown then
+						return
+					end
+					shown = paintId
+					Net.Remote("PaintPiece"):FireServer(uid, paintId)
+					ShopUI.Refresh()
+				end,
+			}
+		end,
+	}
+	ShopUI.OpenCustom(shop, wearing)
+end
+
 local function openSheet(model: Model)
 	local uid = model:GetAttribute("Uid")
 	local id = model:GetAttribute("BlueprintId")
@@ -335,6 +381,7 @@ local function openSheet(model: Model)
 	local details: { [string]: string } = {
 		move = "Pick it up and set it down somewhere else. Free.",
 		turn = "A quarter turn where it stands. Free.",
+		paint = "Pick a colour for it. Free; the look only.",
 		sell = "Take it off your plot for what it gives back.",
 	}
 	local shop: ShopUI.Shop = {
@@ -343,7 +390,11 @@ local function openSheet(model: Model)
 		title = bp.displayName,
 		subtitle = "Your hammer",
 		ids = function()
-			return { "move", "turn", "sell" }
+			local ids: { string } = {}
+			for _, a in ipairs(HammerLogic.PieceActions(bp, current())) do
+				table.insert(ids, a.id)
+			end
+			return ids
 		end,
 		view = function(actionId: string): ShopUI.RowView
 			local a = action(actionId)
@@ -353,7 +404,11 @@ local function openSheet(model: Model)
 				detail = if ready or not a.why then details[actionId] or "" else a.why,
 				color = WOOD,
 				dim = not ready,
-				button = if actionId == "sell" then "Sell" elseif actionId == "turn" then "Turn" else "Move",
+				button = if actionId == "sell"
+					then "Sell"
+					elseif actionId == "turn" then "Turn"
+					elseif actionId == "paint" then "Paint"
+					else "Move",
 				state = if not ready then "locked" elseif actionId == "sell" then "bark" else "buy",
 				onClick = function()
 					local now = action(actionId)
@@ -367,6 +422,8 @@ local function openSheet(model: Model)
 						BlueprintPlacer.Begin(bp, { moveUid = uid })
 					elseif actionId == "turn" then
 						turn(bp, live)
+					elseif actionId == "paint" then
+						openPaint(bp, uid, KitPaint.Of(live))
 					else
 						Net.Remote("SellPlaced"):FireServer(uid)
 						HammerController.Swing(worldSpot(live))

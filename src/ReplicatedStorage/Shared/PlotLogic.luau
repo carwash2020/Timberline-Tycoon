@@ -26,6 +26,7 @@ export type Placed = {
 	rot: number,
 	y: number?, -- base height; missing means the ground (0)
 	wood: string?, -- the wood it shows; missing means the authored look
+	paint: string?, -- a KitPaint id; missing means natural (the wood shows). Kit pieces only
 	fill: { units: number }?, -- kit only; missing means already built
 	paid: number?, -- the fee charged to place it; missing on a kit piece means the legacy price
 	len: number?, -- resized length along local X; missing means the base length
@@ -104,7 +105,7 @@ export type Volume = {
 function PlotLogic.OverlapBox(bp: Blueprint, box: PlotData.Box): Volume
 	local sx, sy, sz = box.size.X, box.size.Y, box.size.Z
 	if bp.roof then
-		local hang = PlotData.RoofOverhang
+		local hang = bp.overhang or PlotData.RoofOverhang
 		sx = math.max(0.05, sx - hang * 2)
 		sz = math.max(0.05, sz - hang * 2)
 	end
@@ -153,6 +154,10 @@ local function contained(outer: { number }, inner: { number }): boolean
 		and inside(outer[3], outer[6], inner[3], inner[6])
 end
 
+-- The walls that have an opening a Door (or a Window) may hang in.
+PlotLogic.DoorHosts = { DoorWall8 = true, GlassDoorWall8 = true, ShopFront12 = true } :: { [string]: boolean }
+PlotLogic.WindowHosts = { WindowWall8 = true } :: { [string]: boolean }
+
 -- True when every solid of `bp` sits inside some placed opening of kind `fits`.
 function PlotLogic.InSlot(
 	bp: Blueprint,
@@ -167,9 +172,9 @@ function PlotLogic.InSlot(
 	if kind ~= "Door" and kind ~= "Window" then
 		return true
 	end
-	local want = if kind == "Door" then "DoorWall8" else "WindowWall8"
+	local hosts = if kind == "Door" then PlotLogic.DoorHosts else PlotLogic.WindowHosts
 	for _, item in ipairs(placed) do
-		if item.uid ~= ignoreUid and item.blueprintId == want and item.rot == rot then
+		if item.uid ~= ignoreUid and hosts[item.blueprintId] == true and item.rot == rot then
 			local host = PlotLogic.Blueprint(item.blueprintId)
 			local slot = if host then host.slot else nil
 			if host and slot then
@@ -699,7 +704,9 @@ function PlotLogic.Check(
 	end
 	local mine = {}
 	for _, box in ipairs(bp.boxes) do
-		table.insert(mine, { worldBox(x, py, z, rot, PlotLogic.OverlapBox(bp, box)) })
+		if box.look ~= true then
+			table.insert(mine, { worldBox(x, py, z, rot, PlotLogic.OverlapBox(bp, box)) })
+		end
 	end
 	for _, item in ipairs(placed) do
 		if item.uid ~= ignoreUid then
@@ -707,11 +714,13 @@ function PlotLogic.Check(
 			if other then
 				local shaped = PieceSize.Shape(other, item)
 				for _, box in ipairs(shaped.boxes) do
-					local theirs =
-						{ worldBox(item.x, itemY(item), item.z, item.rot, PlotLogic.OverlapBox(shaped, box)) }
-					for _, mineBox in ipairs(mine) do
-						if boxesHit(mineBox, theirs) then
-							return false, "Something's in the way"
+					if box.look ~= true then
+						local theirs =
+							{ worldBox(item.x, itemY(item), item.z, item.rot, PlotLogic.OverlapBox(shaped, box)) }
+						for _, mineBox in ipairs(mine) do
+							if boxesHit(mineBox, theirs) then
+								return false, "Something's in the way"
+							end
 						end
 					end
 				end
@@ -723,13 +732,19 @@ end
 
 -- What selling a placed item pays back.
 function PlotLogic.SellValue(bp: Blueprint): number
-	if bp.unlock then
+	if PlotLogic.FreeToPlace(bp) then
 		return 0 -- copies of a store unlock don't pay cash back
 	end
 	return math.floor(bp.priceCash * PlotData.SellBack)
 end
 
 export type Source = "place" | "toolShed" | "store" | "fee"
+
+-- A store unlock whose copies place for nothing once you own the plan. A kit
+-- piece sold as a plan (the glass family) still pays its fee every time.
+function PlotLogic.FreeToPlace(bp: Blueprint): boolean
+	return bp.unlock == true and bp.kit ~= true
+end
 
 -- Where the item behind a blueprint comes from, which is also what the
 -- build palette's row and PlotService.Place agree on:
@@ -743,13 +758,13 @@ export type Source = "place" | "toolShed" | "store" | "fee"
 -- `stocked` is how many of this id wait in stock; `unlocked` that the
 -- unlock is bought; `boxed` is ShopLogic.ShelfMenusHidden().
 function PlotLogic.Source(bp: Blueprint, stocked: number, unlocked: boolean, boxed: boolean): Source
-	if stocked > 0 or (bp.unlock == true and unlocked) then
+	if stocked > 0 or (PlotLogic.FreeToPlace(bp) and unlocked) then
 		return "place"
 	end
 	if ItemCatalog.GetSawmill(bp.id) ~= nil or ItemCatalog.GetMachine(bp.id) ~= nil then
 		return if boxed then "toolShed" else "fee"
 	end
-	if bp.unlock == true then
+	if bp.unlock == true and not (bp.kit == true and unlocked) then
 		return "store"
 	end
 	return "fee"
@@ -759,6 +774,9 @@ end
 -- they haven't bought can't be placed from here (the store sells it once).
 function PlotLogic.PlacePrice(bp: Blueprint, unlocked: boolean): number?
 	if bp.unlock then
+		if bp.kit == true then
+			return if unlocked then PlotData.Price(bp) else nil -- a glass plan: bought once, the kit fee on every place
+		end
 		return if unlocked then 0 else nil
 	end
 	return PlotData.Price(bp)

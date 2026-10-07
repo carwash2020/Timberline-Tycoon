@@ -567,7 +567,7 @@ local function buyBlueprint(player: Player, blueprintId: string)
 		end
 		return
 	end
-	local price = PlotData.Price(bp)
+	local price = PlotData.StorePrice(bp)
 	if profile.cash < price then
 		notify(
 			player,

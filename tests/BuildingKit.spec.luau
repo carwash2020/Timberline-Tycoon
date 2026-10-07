@@ -8,6 +8,7 @@ return function(t)
 	local FillLogic = t.shared("FillLogic")
 	local DoorLogic = t.shared("DoorLogic")
 	local KitMeshData = t.shared("KitMeshData")
+	local ModernKit = t.shared("ModernKit")
 	local BlueprintModels = t.shared("BlueprintModels")
 	local MeshKit = t.shared("Art/MeshKit")
 	local PlotFill = t.server("PlotFill")
@@ -37,9 +38,12 @@ return function(t)
 		for _, piece in ipairs(PlotData.Blueprints) do
 			if piece.kit then
 				seen += 1
-				t.eq(piece.unlock, nil, piece.id .. " is not a store unlock")
+				-- Only the glass plan is sold (ModernKit): it still pays the kit fee.
+				t.eq(piece.unlock, if piece.family then true else nil, piece.id .. " store unlock")
 				t.eq(PlotData.Price(piece), piece.woodUnits * 4, piece.id)
-				t.ok(KitMeshData.Get(piece.id) ~= nil, piece.id .. " has a mesh entry")
+				if not ModernKit.ById[piece.id] then
+					t.ok(KitMeshData.Get(piece.id) ~= nil, piece.id .. " has a mesh entry")
+				end
 				local ok = if piece.fits
 					then PlotLogic.Check(piece, 0, 0, 0, 1, {
 						{
@@ -54,7 +58,7 @@ return function(t)
 				t.eq(ok, true, piece.id .. " places")
 			end
 		end
-		t.eq(seen, 24)
+		t.eq(seen, 24 + #ModernKit.Pieces)
 		t.eq(PlotData.Price(bp("Wall")), 32)
 		t.eq(bp("Wall").priceCash, 80, "the old wall price stays for saves with no paid")
 		t.eq(PlotData.LegacyPrice(bp("Wall")), 80)

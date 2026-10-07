@@ -659,4 +659,47 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("/sample builds on the owner's plot only: not a player, not a delegate, not even a TESTER", function()
+		local Admin, calls, _, players = boot(false)
+		local placed, cleared = {}, {}
+		Admin.SetHooks({
+			placeSample = function(player, name)
+				table.insert(placed, { player.Name, name })
+				return true, "Built the " .. name .. "."
+			end,
+			clearSamples = function(player)
+				table.insert(cleared, player.Name)
+				return 3
+			end,
+		})
+		t.eq(Admin.Run(100, "/sample modern"), true)
+		t.eq(placed, { { "Connor", "modern" } })
+		t.eq(calls.toasts[#calls.toasts][2], "Built the modern.")
+		t.eq(Admin.Run(100, "/sample clear"), true)
+		t.eq(cleared, { "Connor" })
+		t.eq(calls.toasts[#calls.toasts][2], "Took down 3 sample pieces.")
+		Admin.Run(100, "/sample")
+		t.eq(#placed, 1, "no name places nothing")
+		-- A stranger gets nothing at all.
+		t.eq(Admin.Run(200, "/sample modern"), false)
+		t.eq(Admin.Run(300, "/sample clear"), false)
+		-- A delegate with every power a role can hold, and a TESTER, are refused.
+		t.eq(Admin.Run(100, "/delegate Bob builder 1h"), true)
+		t.eq(Admin.Run(200, "/sample modern"), false, "BUILDER")
+		t.eq(Admin.Run(100, "/delegate Eve tester 1h confirm"), true)
+		t.eq(Admin.Delegates()[300].role, "TESTER")
+		t.eq(Admin.Run(300, "/sample modern"), false, "TESTER")
+		t.eq(Admin.Run(300, "/sample clear"), false, "TESTER")
+		t.eq(#placed, 1)
+		t.eq(#cleared, 1)
+		_ = players
+	end)
+
+	t.test("/sample without its hooks refuses politely", function()
+		local Admin, calls = boot(false)
+		Admin.SetHooks({})
+		t.eq(Admin.Run(100, "/sample modern"), true)
+		t.eq(calls.toasts[#calls.toasts][2], "Samples aren't available here.")
+	end)
 end

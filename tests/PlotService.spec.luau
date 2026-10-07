@@ -2203,4 +2203,140 @@ return function(t)
 			t.eq(bobProfile.plot.placed[3].data, { x = 1, y = 0.6 }, "none saved: the default")
 		end
 	)
+
+	-- Paint and the sample buildings (modern kit).
+	local function placeWall(s, ann, profile)
+		s.claim(ann, 1)
+		ann.standOn(1)
+		s.P.Place(ann, "Wall", 0, 0, 0)
+		return profile.plot.placed[1]
+	end
+
+	t.test("paint: free, saved on the piece, rebuilt from it, and the fee and sell value stay", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local item = placeWall(s, ann, profile)
+		local cash = profile.cash
+		t.eq(item.paint, nil)
+		s.P.Paint(ann, item.uid, "charcoal")
+		t.eq(item.paint, "charcoal")
+		t.eq(profile.cash, cash, "painting is free")
+		t.eq(item.paid, 32, "the fee paid is untouched")
+		t.eq(item.fill, { units = 0 })
+		local models = s.items(1)
+		t.eq(#models, 1, "rebuilt: one model, not two")
+		t.eq(models[1].Name, item.uid)
+		t.eq(models[1]:GetAttribute("Paint"), "charcoal")
+		s.P.Paint(ann, item.uid, "natural")
+		t.eq(item.paint, nil, "natural brings the wood back")
+		t.eq(s.items(1)[1]:GetAttribute("Paint"), nil)
+		s.P.Paint(ann, item.uid, "white")
+		s.P.Sell(ann, item.uid)
+		t.eq(profile.cash, cash + 32, "an empty painted piece still returns the whole fee")
+	end)
+
+	t.test(
+		"paint: a bad colour, a prebuilt piece, a stranger, too far, a missing piece and the rate limit do nothing",
+		function()
+			local s = setup({ cash = 1000 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			local item = placeWall(s, ann, profile)
+			s.P.Paint(ann, item.uid, "hot-pink")
+			s.P.Paint(ann, item.uid, 5)
+			s.P.Paint(ann, 7, "white")
+			s.P.Paint(ann, "nope", "white")
+			t.eq(item.paint, nil)
+			s.P.Place(ann, "Bench", 20, 20, 0)
+			local bench = profile.plot.placed[2]
+			s.P.Paint(ann, bench.uid, "white")
+			t.eq(bench.paint, nil, "a Bench is not painted")
+			t.ok(s.lastToast() ~= nil)
+			-- A stranger on the plot without the build permission.
+			local bob = s.newPlayer(2, "Bob")
+			bob.standOn(1)
+			s.P.Paint(bob, item.uid, "white")
+			t.eq(item.paint, nil, "not Bob's plot")
+			t.eq(s.lastToast(), "You can't build on this plot.")
+			-- Allowed with the permission.
+			profile.permissions = { anyone = { build = true } }
+			s.P.Paint(bob, item.uid, "white")
+			t.eq(item.paint, "white", "a visitor who may build may paint")
+			profile.permissions = {}
+			-- Too far from the piece (still on the plot).
+			ann.standOn(1)
+			ann.root.Position = ann.root.Position + Vector3.new(60, 0, 0)
+			s.P.Paint(ann, item.uid, "black")
+			t.eq(item.paint, "white", "out of the brush's reach")
+			-- Off the plot entirely.
+			ann.standOn(nil)
+			s.P.Paint(ann, item.uid, "black")
+			t.eq(item.paint, "white")
+		end
+	)
+
+	t.test("paint: the rate limit applies", function()
+		local s = setup({ cash = 1000, rate = false })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.plot.placed = { { uid = "w", blueprintId = "Wall", x = 0, z = 0, rot = 0, paid = 32 } }
+		s.P.Paint(ann, "w", "white")
+		t.eq(profile.plot.placed[1].paint, nil)
+	end)
+
+	t.test(
+		"sample: a free test building on the owner's plot, all or nothing, and /sample clear takes it down",
+		function()
+			local s = setup({ cash = 1000 })
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			t.eq(({ s.P.PlaceSample(ann, "castle") })[1], false)
+			ann.standOn(nil)
+			local ok, text = s.P.PlaceSample(ann, "shop")
+			t.eq(ok, false)
+			t.eq(text, "Stand on your own plot.")
+			ann.standOn(1)
+			ann.root.CFrame = t.roblox.CFrame.new(ann.root.Position)
+			local cash = profile.cash
+			local good, line = s.P.PlaceSample(ann, "shop")
+			t.ok(good, tostring(line))
+			t.eq(profile.cash, cash, "free")
+			t.eq(#profile.plot.placed, 10)
+			for _, item in ipairs(profile.plot.placed) do
+				t.eq(string.sub(item.uid, 1, 7), "sample-")
+				if item.paid ~= nil then
+					t.eq(item.paid, 0)
+					t.eq(item.fill, nil)
+				end
+			end
+			t.eq(#s.items(1), 10, "built in the world")
+			-- A second one on top of the first finds another spot or refuses; never a half building.
+			local before = #profile.plot.placed
+			local again = s.P.PlaceSample(ann, "shop")
+			t.ok(#profile.plot.placed == before or #profile.plot.placed == before + 10, "all or nothing")
+			-- A plain piece is not touched by clear.
+			s.P.Place(ann, "Bench", -30, -30, 0)
+			local removed = s.P.ClearSamples(ann)
+			t.ok(removed >= 10)
+			t.eq(#profile.plot.placed, 1)
+			t.eq(profile.plot.placed[1].blueprintId, "Bench")
+			t.eq(#s.items(1), 1)
+			t.eq(s.P.ClearSamples(ann), 0)
+			_ = again
+		end
+	)
+
+	t.test("sample: not on someone else's plot", function()
+		local s = setup({ cash = 1000 })
+		local ann = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		s.claim(bob, 2)
+		bob.standOn(1)
+		bob.root.CFrame = t.roblox.CFrame.new(bob.root.Position)
+		local ok, text = s.P.PlaceSample(bob, "modern")
+		t.eq(ok, false)
+		t.eq(text, "Stand on your own plot.")
+		t.eq(#s.items(1), 0)
+	end)
 end

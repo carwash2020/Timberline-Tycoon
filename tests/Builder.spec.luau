@@ -102,7 +102,7 @@ return function(t)
 				end
 			end
 		end
-		t.eq(seen, 11, "walls, half wall, floors, beam, fence, railing")
+		t.eq(seen, 12, "walls, half wall, floors, beam, fence, railing, roof edge")
 		local wall = bp("Wall")
 		local expect = { [4] = 4, [8] = 8, [12] = 12, [16] = 16 }
 		for len, units in pairs(expect) do

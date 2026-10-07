@@ -123,7 +123,7 @@ end
 -- the placer sees has price 0 so the ghost doesn't ask for cash the server
 -- won't charge.
 local function forPlacer(bp: PlotData.Blueprint, stocked: number): PlotData.Blueprint
-	if stocked > 0 or (bp.unlock == true and ownsBlueprint(bp.id)) then
+	if stocked > 0 or (PlotLogic.FreeToPlace(bp) and ownsBlueprint(bp.id)) then
 		local copy = table.clone(bp)
 		copy.priceCash = 0
 		return copy

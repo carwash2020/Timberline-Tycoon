@@ -24,6 +24,7 @@ local MODE: { [string]: string } = {
 	Beam8 = "x",
 	Fence = "x",
 	Railing8 = "x",
+	Fascia8 = "x",
 	Floor = "xz",
 	Floor4 = "xz",
 }

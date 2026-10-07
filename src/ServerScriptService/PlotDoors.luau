@@ -48,7 +48,7 @@ local function hostWall(item: PlotLogic.Placed, placed: { PlotLogic.Placed }): P
 	end
 	for _, other in ipairs(placed) do
 		if
-			other.blueprintId == "DoorWall8"
+			PlotLogic.DoorHosts[other.blueprintId] == true
 			and other.x == item.x
 			and other.z == item.z
 			and other.rot == item.rot

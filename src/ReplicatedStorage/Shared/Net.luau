@@ -29,6 +29,7 @@ Net.RemoteNames = {
 	"DropBlueprint", -- client -> server: (uid) lay an unused plan on the ground
 	"BlueprintEdit", -- client -> server: (request) rotate, move, resize, copy, delete, or undo an unfilled kit ghost
 	"SellPlaced", -- client -> server: (uid) sell a placed item back (PlotData.SellBack)
+	"PaintPiece", -- client -> server: (uid, paintId) paint a placed kit piece a KitPaint colour (cosmetic, free)
 	"UpgradePlot", -- client -> server: () grow your plot to the next base tier
 	"PlotOffer", -- server -> client: (offer) the open homesteads and the price, for the Land Office (or a returning owner's join) picker
 	"ClaimPlot", -- client -> server: (index) buy that homestead; the server checks the Land Office range, the pad and the price, then charges

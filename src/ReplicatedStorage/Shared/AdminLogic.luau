@@ -262,8 +262,9 @@ AdminLogic.DelegablePowers = {
 	"god",
 } :: { string }
 
--- Owner only: no role but TESTER holds the first list, and nobody but the
--- owner holds the second.
+-- Owner only: no role (TESTER too) holds the first list, and nobody but the
+-- owner holds the second. "sample" builds free test buildings on the owner's
+-- own plot (SampleBuilds); it is not a power anyone can be given.
 AdminLogic.NeverDelegable = {
 	"give",
 	"take",
@@ -273,6 +274,7 @@ AdminLogic.NeverDelegable = {
 	"resettutorial",
 	"unlockbp",
 	"unban",
+	"sample",
 } :: { string }
 AdminLogic.OwnerOnly = { "delegate", "undelegate", "delegates" } :: { string }
 
@@ -624,6 +626,7 @@ AdminLogic.Help = {
 	"/stats <player>: cash, plot, tutorial, items",
 	"/resettutorial <player>: start their tutorial over",
 	"/unlockbp <player>: every building plan",
+	"/sample <modern|shop|barn>: a free test building on your plot, in front of you. /sample clear takes them down",
 	"/shutdown: kick everyone, this server ends",
 	"/delegate <player|userId> <helper|moderator|builder|tester|custom> [powers] [session|1h|24h|server]",
 	"/undelegate <player|userId>, /delegates",
