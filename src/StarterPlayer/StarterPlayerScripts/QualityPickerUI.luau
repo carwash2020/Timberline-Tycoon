@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
+local PickerSequence = require(ReplicatedStorage.Shared.PickerSequence)
 local QualityProfile = require(ReplicatedStorage.Shared.QualityProfile)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local GamepadNav = require(script.Parent.GamepadNav)
@@ -42,6 +43,7 @@ local cards: { [string]: TextButton } = {}
 local open = false
 local shownOnce = false -- once the player has chosen, the screen is done for this session
 local controlsOff = false
+local sequence = PickerSequence.Shared() -- the quality screen goes before the plot picker
 
 -- What this device would pick.
 function QualityPickerUI.Recommended(): QualityProfile.Choice
@@ -88,6 +90,7 @@ local function close()
 	end
 	setControls(true)
 	GamepadNav.Restore(panel)
+	sequence.Done("quality") -- the plot picker (if it is waiting) opens now
 end
 
 -- A choice was made: save it and let the world follow.
@@ -253,6 +256,7 @@ local function show()
 		return
 	end
 	open = true
+	sequence.Request("quality")
 	markRecommended()
 	screen.Enabled = true
 	setControls(false)
@@ -287,6 +291,15 @@ function QualityPickerUI.Start()
 			GamepadNav.Focus(cards[QualityPickerUI.Recommended()], panel)
 		end
 	end)
+	-- A respawn can never leave the controls off while the screen is closed.
+	local added = (player :: any).CharacterAdded
+	if added ~= nil then
+		added:Connect(function()
+			if not open and controlsOff then
+				setControls(true)
+			end
+		end)
+	end
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(consider)
 	player:GetAttributeChangedSignal(ATTRIBUTE):Connect(consider)
 	consider()

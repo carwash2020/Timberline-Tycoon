@@ -3,7 +3,9 @@
 -- GameServer and the services that build late.
 --
 --   * Gates (Shared/ReadyGates): "meshes", "terrain", "town", "world",
---     "services", "firstPlayer", "npcs", "deferred". A system opens its gate
+--     "services", "plots" (the pads and the Land Office), "murph",
+--     "firstPlayer", "npcs", "deferred". The first player is not let in until
+--     every gate in Shared/JoinFlow.FirstPlayerGates is open. A system opens its gate
 --     when it is usable; anything that needs it waits on, or is refused by,
 --     the gate instead of assuming.
 --   * Queue (Shared/LoadQueue): the deferred build. Anything nobody needs in
@@ -41,7 +43,18 @@ function LoadState.Line(what: string)
 end
 
 LoadState.Gates = ReadyGates.new()
-for _, name in ipairs({ "meshes", "terrain", "town", "world", "services", "firstPlayer", "npcs", "deferred" }) do
+for _, name in ipairs({
+	"meshes",
+	"terrain",
+	"town",
+	"world",
+	"services",
+	"plots",
+	"murph",
+	"firstPlayer",
+	"npcs",
+	"deferred",
+}) do
 	LoadState.Gates.Define(name)
 end
 

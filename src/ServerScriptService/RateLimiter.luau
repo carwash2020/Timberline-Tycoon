@@ -41,6 +41,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PlotPass = 2, -- close the picker, or let the timer assign one
 	SaveSetting = 4,
 	SetQuality = 2, -- the join screen's choice, or the Settings row (QualityService)
+	ClientReady = 2, -- the client's join handshake: once, with a retry (JoinSync)
 	Grab = 6, -- v2 loop (V2_PLAN.md §12)
 	Release = 6,
 	Chop = 6, -- v2 loop: a swing at a section (SectionTrees; the axe's cooldown is checked too)

@@ -34,6 +34,25 @@ return function(t)
 		end
 		s.sellAreaIn = sellAreaIn
 
+		-- What stood when the world gate opened (the deferred build comes after).
+		local function snapshot()
+			local map = ws:FindFirstChild("TimberlineMap")
+			local function count(name)
+				local folder = map and map:FindFirstChild(name)
+				return if folder then #folder:GetChildren() else 0
+			end
+			s.atReady = {
+				boulders = count("Boulders"),
+				scenery = count("Scenery"),
+				greenery = count("TownGreenery"),
+				pointsOfInterest = count("PointsOfInterest"),
+				backdrop = if map and map:FindFirstChild("Backdrop") then 1 else 0,
+				shops = if map and map:FindFirstChild("ToolShed") then 1 else 0,
+				stations = if map and map:FindFirstChild("GondolaTop") then 1 else 0,
+				parking = if map and map:FindFirstChild("ParkingSlot_1") then 1 else 0,
+			}
+		end
+
 		-- Two players: one already has a character, one is waiting.
 		local function player(name, hasCharacter)
 			local p = { Name = name, Character = if hasCharacter then {} else nil }
@@ -58,24 +77,6 @@ return function(t)
 				assert(key == "CharacterAutoLoads", "unexpected Players." .. tostring(key))
 				s.autoLoads = value
 				table.insert(s.order, { autoLoads = value, sellAreaIn = sellAreaIn() })
-				-- What stood when everyone was let in (the deferred build comes after).
-				if value == true then
-					local map = ws:FindFirstChild("TimberlineMap")
-					local function count(name)
-						local folder = map and map:FindFirstChild(name)
-						return if folder then #folder:GetChildren() else 0
-					end
-					s.atReady = {
-						boulders = count("Boulders"),
-						scenery = count("Scenery"),
-						greenery = count("TownGreenery"),
-						pointsOfInterest = count("PointsOfInterest"),
-						backdrop = if map and map:FindFirstChild("Backdrop") then 1 else 0,
-						shops = if map and map:FindFirstChild("ToolShed") then 1 else 0,
-						stations = if map and map:FindFirstChild("GondolaTop") then 1 else 0,
-						parking = if map and map:FindFirstChild("ParkingSlot_1") then 1 else 0,
-					}
-				end
 			end,
 		})
 
@@ -182,6 +183,8 @@ return function(t)
 				end,
 			},
 		})
+		local LoadState = loader:load("ServerScriptService/LoadState")
+		LoadState.Gates.OnReady("world", snapshot)
 		loader:run("ServerScriptService/MapBuilder.server")
 		s.warnings = {}
 		for _, line in ipairs(loader.warnings) do
@@ -199,11 +202,13 @@ return function(t)
 	local function lastStepsRan(s)
 		t.ok(s.map, "TimberlineMap is built")
 		t.ok(s.sellArea and s.sellArea.Parent == s.map, "SellArea is parented to TimberlineMap")
-		t.eq(s.autoLoads, true, "CharacterAutoLoads ends true")
-		-- Off first (nobody spawns before the ground), then on, with SellArea
-		-- already in.
-		t.eq(s.order, { { autoLoads = false, sellAreaIn = false }, { autoLoads = true, sellAreaIn = true } })
-		t.eq(s.loaded, { "Waiting" }, "only the player with no character is loaded")
+		-- Join race fix: MapBuilder turns CharacterAutoLoads off before the
+		-- ground exists and never back on, and loads nobody. GameServer's join
+		-- flow (Shared/JoinFlow) spawns each player once the first-player
+		-- gates are open, their save is loaded and the spawn area is streamed.
+		t.eq(s.autoLoads, false, "CharacterAutoLoads stays off: the join flow owns spawning")
+		t.eq(s.order, { { autoLoads = false, sellAreaIn = false } }, "off before the ground, and nothing turns it on")
+		t.eq(s.loaded, {}, "MapBuilder loads no character (it used to, at +6.5 s, before the save and the pads)")
 	end
 
 	-- Palms and the north-strip stands. Lanternwood is planted only once

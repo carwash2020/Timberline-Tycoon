@@ -2678,6 +2678,41 @@ Copy the whole `[Load]` output (server and client) and compare with the table ab
 - [ ] No red lines in Output; `[MapBuilder] ... failed` lines, if any, name the step (a deferred step's failure is warned once, with a traceback, and the rest still builds)
 
 
+### Join race fix (branch `claude/join-race-fix`, 7 October 2026)
+
+Connor, after the faster-load merge (#103): "Now it loads the player so fast it glitches and won't let you move, but loads the plot and won't let you select one." His Output (fresh server): world ready +6.4 s, the deferred build starts +6.6 s, `GameServer init done`, `Elucidhealer618: loading the save`, ten client controllers each `Start took 6.35s`, save loaded +8.4 s, `first player can play`, `joined (cash $83)`, deferred steps run to +11.9 s.
+
+**Root causes (read from the code; not reproduced, there is no Studio here):**
+
+1. `MapBuilder.server.luau` (the end of the script, `Players.CharacterAutoLoads = true` and the `LoadCharacter` loop) let every player in the instant the terrain and town were built (+6.5 s). That was before GameServer had started its services (`services` at +6.8 s), before the save had loaded (+8.4 s), before `PlotService.Init` made the 14 pads and the Land Office, before Murph, and just as the deferred build began to fill the town around the spawn. Nothing asked the client to stream the spawn area in (`StreamingEnabled`, `PauseOutsideLoadedArea`, radius 640; only the gondola, vehicles and the plot picker ever call `RequestStreamAroundAsync`). So the character stood in a half-streamed, still-changing world (a paused or jittering character) and the loading card stayed until the save arrived. Before #103 the whole world existed before anyone spawned, which hid this.
+2. The client controllers now start at +0.2 s (`Client.client`), but most block in `Net.Remote` until the server makes `Remotes` (+6.6 s). Nothing told the server that they were listening. The server fires one-shots (the plot offer, the save slots, cash) and sets `ProfileLoaded`; any fired before a handler was connected is lost for good, and the client never asked again. `PlotPickerUI` is driven only by the `PlotOffer` event.
+3. The quality picker and the plot picker opened together on a first join of an old save (every save starts `SettingQuality = "unset"`, and a returning owner gets the plot picker at join): `QualityPickerUI` (layer 90, full-screen backdrop that eats input, `controls:Disable()`) sat over `PlotPickerUI` (layer 80, `WalkSpeed = 0`, scriptable camera). The plot picker was drawn but its buttons were under the quality backdrop, and two movement locks were held at once. `PlotPickerUI.unlock` also restored whatever speed it had saved, with no guard against a saved zero.
+4. `PlotService`'s late-mesh redraw (`redrawSlot` over all 14 pads) calls `drawBounds`, which `ClearAllChildren`s the pad's platform slabs and ramps and rebuilds them: a player standing on a pad when the plot kit's meshes land late falls through it for a frame. (Not seen in his Output, which has no "meshes landed late" line, but it is the same kind of race.)
+
+**Fixes:**
+
+- `Shared/JoinFlow` (pure, `tests/JoinFlow.spec`): the order a player is let in. `MapBuilder` now never turns `CharacterAutoLoads` on and loads nobody. `GameServer`'s `enterWorld` (called after the save is loaded and the account is set up) waits for `JoinFlow.FirstPlayerGates` = terrain, town, world, services, plots, murph (`LoadState.Gates.WaitAll`, 90 s at most), asks the client to stream the spawn (`RequestStreamAroundAsync`, 8 s at most), loads the character, waits until it has stood on the ground for 0.3 s (4 s at most, `JoinFlow.Settled`), then waits for the client's `ClientReady` (12 s at most). Only then `ProfileLoaded` is set and `LoadState.PlayerCanPlay` runs. Every wait is bounded and a failure still loads the character. GameServer respawns the dead itself (`JoinFlow.RespawnDelay`, `Players.RespawnTime`), because auto-loading stays off.
+- New gates `plots` (the pads, Land Office counter and picker data, set after `PlotService.Init`) and `murph` (set after `NPCService.Init`, which builds him before it returns). The rest of the townsfolk (Old Hank included), the decor, the scenery and the sky stay deferred.
+- Handshake: new remote `ClientReady` (client to server, budget 2/s). `Client.client` fires it once every controller's `Start` has returned (or after 20 s), repeating every 3 s until the save is in. `ServerScriptService/JoinSync` records it and resends state through registered resends (cash, `PlotService.Resend` for a waiting picker, the save slots); the resend also runs right after the release. Each is state the client applies, so hearing it twice is harmless.
+- `Shared/PickerSequence`: quality screen first, plot picker second, never both. `QualityPickerUI` and `PlotPickerUI` ask for their turn and give it back; the plot picker keeps the newest offer while it waits (`pendingOffer`) and opens when the quality screen is done. `PlotPickerLogic.SafeSpeed` stops a saved zero ever being restored; the picker waits for the humanoid on a new character; the quality screen gives the controls back on any respawn.
+- `Shared/PlotRedraw` + `PlotService.RedrawLate`: a pad with a player within 90 studs is not redrawn; it is tried again every 2 s.
+- Output lines kept; new: `[Load] +Xs character spawned at +Xs for <name> (world ready, area streamed, standing on the ground)` (server), `[Load] +Xs client ready handshake from <name> (Ns after it joined)` (server), `[Load] client ready handshake Ns after the client started (N/N controllers started)` (client), `[Load] <name>: state sent again to the client (N resends)`, `[GameServer] <name>: world gates open / spawn area streamed / client ready` laps.
+- Expected: the first player can play at about +10 s (world ready ~6.5 s, then the save ~1.7 s, a stream and a landing under a second), not 97 s. No economy change (`lune run tools/economy` and `economy1` are unchanged).
+
+### Studio checks (Connor), join race fix
+Copy the `[Load]` lines (server and client) if anything is off.
+- [ ] Fresh server: join and move at once (WASD, Xbox stick, phone thumbstick, jump): the character walks normally the first moment the loading card goes. Output has `character spawned at +X s ... (world ready, area streamed, standing on the ground)`, then `client ready handshake`, then `first player ... can play`, and `ready for play at +X s` is near 10 s.
+- [ ] No falling, no teleport or jitter in the first second; the ground, the sawmill, Murph's camp and the Land Office are there when you can move.
+- [ ] First join of a save that never chose a quality: the Lower / Higher screen shows alone, you can choose; right after, the plot picker (if your save owns a plot) opens on its own with all 14 pads, and pressing BUY / CLAIM claims the plot you are looking at; Next and Previous work; you can then walk.
+- [ ] Choose Lower, then plot; rejoin and choose Higher, then plot; a save that already chose (rejoin): no quality screen, the plot picker opens at once.
+- [ ] Pass ("Not now" / B) on the plot picker: it closes, you can walk.
+- [ ] A save with no plot: walk to the Land Office counter (or talk to Old Hank once he appears): the picker opens and BUY PLOT works.
+- [ ] Two players (Test, Clients and Servers): both can move and claim; the second join prints its own `character spawned` and `client ready handshake` lines.
+- [ ] Leave and rejoin during the deferred build (while `[Load] deferred ...` lines are still printing): you can move at once, the picker opens, nothing is missing at the end.
+- [ ] Die (reset character): you respawn after about five seconds, with your axe and hammer.
+- [ ] If Output says `still waiting on ... after 90s; letting them in anyway` or `no ClientReady after 12s`, send those lines: they name the gate or the client that never answered.
+
+
 ## Owner hub 2: Paid items, and a calmer panel (branch `claude/owner-panel-2`, 7 October 2026)
 
 Connor: "the owner panel needs more refinement, and a way for me to give them paid items such as 2x and lux axe, plus any future ones we create."
