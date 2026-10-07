@@ -12,6 +12,7 @@ return function(t)
 			UserInputService = { TouchEnabled = false, KeyboardEnabled = true },
 			TextChatService = {},
 			TweenService = {},
+			RunService = {},
 		},
 	})
 	local Picker = loader:load("StarterPlayer/StarterPlayerScripts/PlotPickerUI")
