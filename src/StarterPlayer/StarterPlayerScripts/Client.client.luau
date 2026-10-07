@@ -479,6 +479,15 @@ print(string.format("[Load] client: %d modules required in %.2fs", #loaded, os.c
 -- First, and waited for (it starts UITheme), so toasts and side buttons
 -- work for everything after it.
 start("HUD", HUD)
+-- HUD.Start returns once the HUD and its loading card are drawn (the wait for
+-- the server's Remotes runs in its own thread), so everything below starts at
+-- once; it used to wait here for the whole world build (34.8 s, 7 October).
+print(
+	string.format(
+		"[Load] client: HUD drawn %.2fs after the client started; the controllers start now",
+		os.clock() - clientStart
+	)
+)
 
 for _, c in ipairs(loaded) do
 	task.spawn(start, c.name, c.module)

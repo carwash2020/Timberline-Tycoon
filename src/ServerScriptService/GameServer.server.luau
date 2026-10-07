@@ -57,6 +57,7 @@ local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
 local PickupGrace = require(script.Parent.PickupGrace)
+local LoadState = require(script.Parent.LoadState)
 local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
 local ProfileSchema = require(script.Parent.ProfileSchema)
@@ -72,6 +73,7 @@ local VehicleService = require(script.Parent.VehicleService)
 local WeatherService = require(script.Parent.WeatherService)
 local WoodService = require(script.Parent.WoodService)
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
+local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -698,12 +700,25 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	ClaimPlot = remote.ClaimPlot,
 	PlotPass = remote.PlotPass,
 	VisitPlot = remote.VisitPlot,
-}, notify)
+}, notify, { gates = LoadState.Gates })
 safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("RegionWake.Init", RegionWake.Init)
-safely("NPCService.Init", NPCService.Init, mapFolder)
-safely("PlotService.HookSalesman", PlotService.HookSalesman, mapFolder) -- Old Hank's Talk opens the plot sale
+-- Murph is built now (the tutorial starts at his camp); every other
+-- townsperson is a step of the deferred build, nearest the player first, once
+-- their meshes are in (NPCService, LoadState.Queue). Old Hank's Talk prompt
+-- opens the plot sale, so it is hooked when the last one is built.
+safely("NPCService.Init", NPCService.Init, mapFolder, {
+	defer = LoadState.Queue.Add,
+	onBuilt = function(id: string)
+		if id == PlotSalesmanData.Id then
+			safely("PlotService.HookSalesman", PlotService.HookSalesman, mapFolder)
+		end
+	end,
+	onDone = function()
+		LoadState.Gates.Set("npcs")
+	end,
+})
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
 if CoreLoop.V2() then
@@ -1324,6 +1339,7 @@ local function onPlayerAdded(player: Player)
 
 	player:SetAttribute("ProfileLoaded", true)
 	joinLap("ready (ProfileLoaded)")
+	LoadState.PlayerCanPlay(player.Name)
 	print(
 		string.format(
 			"[Load] %s can play: %.1fs after joining, server up %.0fs",
@@ -1474,6 +1490,10 @@ local function onPlayerRemoving(player: Player)
 	print(string.format("[GameServer] %s left (saving)", player.Name))
 end
 
+-- Every service that a player's first minute needs has started; the rest of
+-- the world (the townsfolk, the scenery, the sky) builds in the background.
+LoadState.Gates.Set("services")
+LoadState.Stage("services")
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 -- Catch players who joined before this script ran.
@@ -1490,6 +1510,7 @@ print(
 		os.clock() - initStart
 	)
 )
+LoadState.Seal() -- "fully built" can now be declared once the queue and forest are done
 print(BootReport.Line(workspace, #Players:GetPlayers()))
 if not BootReport.Log(workspace, Players:GetPlayers(), AnalyticsService) then
 	local bootConn: RBXScriptConnection? = nil

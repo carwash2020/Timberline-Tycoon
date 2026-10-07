@@ -206,6 +206,19 @@ function ItemMeshes.LoadAsync()
 		created.Parent = ReplicatedStorage
 		box = created
 	end
+	-- Every mesh at once first (MeshKit.Preload): one at a time they cost
+	-- PlotService.Init 10.7 s in Studio (7 October 2026). With MapBuilder's
+	-- start-up preload they are cached already and this returns at once.
+	local wanted: { MeshKit.Entry } = {}
+	for _, defs in pairs(ItemMeshData.Items) do
+		for _, def in ipairs(defs) do
+			local numeric = tonumber(string.match(def.meshId, "%d+"))
+			if numeric then
+				table.insert(wanted, { id = numeric, hull = false })
+			end
+		end
+	end
+	MeshKit.Preload(wanted, { timeout = 20 })
 	for id, defs in pairs(ItemMeshData.Items) do
 		if ItemMeshes.Template(id) then
 			continue

@@ -33,6 +33,7 @@ local RunService = game:GetService("RunService")
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
+local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 local Quality = require(script.Parent.Quality)
 
@@ -390,6 +391,7 @@ end
 -- so it waits until the player is in the game (the loading card is gone) and
 -- never delays the load (LOAD-01). At most WAIT_READY seconds.
 local WAIT_READY = 40
+local PLAN_SLICE = 0.008 -- seconds of planning per frame
 local function waitUntilPlaying()
 	local player = Players.LocalPlayer
 	if player == nil then
@@ -410,8 +412,19 @@ function ForestFiller.Start()
 		waitUntilPlaying()
 		-- WorldPlan's plan, a step a frame (each is cached for the next).
 		local started = os.clock()
+		-- WorldPlan.Trees alone is seconds of work: it pauses on a time slice
+		-- (8 ms a frame) so the client keeps drawing while it plans. The other
+		-- steps are short and get a frame each.
+		local planSlice = TimeSlice.new({ budget = PLAN_SLICE })
 		for i, step in ipairs(WorldPlan.FillerSteps) do
-			local ok, err = pcall(step)
+			local ok, err = pcall(function(): any
+				if step == WorldPlan.Trees then
+					WorldPlan.Trees(planSlice.step)
+				else
+					step()
+				end
+				return nil
+			end)
 			if not ok then
 				warn(string.format("[ForestFiller] plan step %d failed, no filler forest: %s", i, tostring(err)))
 				return

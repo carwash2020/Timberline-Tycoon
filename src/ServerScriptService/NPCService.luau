@@ -34,6 +34,8 @@ local CharacterArt = require(ReplicatedStorage.Shared.Art.CharacterArt)
 local DialogueData = require(ReplicatedStorage.Shared.DialogueData)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
+local MeshKit = require(ReplicatedStorage.Shared.Art.MeshKit)
+local MeshManifest = require(ReplicatedStorage.Shared.Art.MeshManifest)
 local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local ShopDoorLogic = require(ReplicatedStorage.Shared.ShopDoorLogic)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
@@ -391,12 +393,54 @@ function NPCService.Apply(mapFolder: Instance, hour: number)
 	end
 end
 
-function NPCService.Init(mapFolder: Instance)
+export type DeferStep = {
+	name: string,
+	tier: number?,
+	at: { x: number, z: number }?,
+	run: (slice: () -> boolean) -> (),
+}
+
+export type InitOptions = {
+	-- GameServer hands in the deferred queue's Add: Murph is built now (the
+	-- tutorial starts at his camp) and everyone else becomes a queue step,
+	-- nearest the player first. Without it (the specs) everyone is built now.
+	defer: ((step: DeferStep) -> ())?,
+	-- Called once the last townsperson is in.
+	onDone: (() -> ())?,
+	-- Called with a townsperson's id as soon as their model is in the world
+	-- (GameServer wires Old Hank's Talk prompt then).
+	onBuilt: ((id: string) -> ())?,
+}
+
+-- The TownModels id of an NPC's uploaded meshes (CharacterArt.Build uses the
+-- same: the look's name without spaces).
+local function assetIdOf(npc: NPCData.NPC): string
+	return (npc.look.name:gsub("%s+", ""))
+end
+
+-- Loads the meshes of `npcs` side by side before anyone is built. Studio's
+-- 7 October log: NPCService.Init took 60.00 s because CharacterArt.Build ->
+-- NPCMeshes.Dress asked MeshKit.Create for each of the nine townsfolk's 17
+-- pieces (153 meshes) one after another, a CreateMeshPartAsync yield each,
+-- about 0.4 s apiece. MapBuilder already starts loading every mesh when the
+-- server starts, so this is normally instant; it is the bounded safety net.
+local function preloadMeshes(npcs: { NPCData.NPC }, timeout: number): number
+	local ids: { string } = {}
+	for _, npc in ipairs(npcs) do
+		table.insert(ids, assetIdOf(npc))
+	end
+	local result = MeshKit.Preload(MeshManifest.ForNpcs(ids), { timeout = timeout })
+	return result.seconds
+end
+
+function NPCService.Init(mapFolder: Instance, options: InitOptions?)
 	local find = finder(mapFolder)
 	local folder = Instance.new("Folder")
 	folder.Name = "Townsfolk"
 	folder.Parent = mapFolder
-	for _, npc in ipairs(NPCData.All()) do
+	local startedAt = os.clock()
+	local onBuilt = if options then options.onBuilt else nil
+	local function buildOne(npc: NPCData.NPC)
 		local builtAt = os.clock()
 		local ok, err = pcall(function()
 			local model = build(npc, find)
@@ -410,6 +454,8 @@ function NPCService.Init(mapFolder: Instance)
 		end)
 		if not ok then
 			warn(string.format("[NPCService] couldn't build %s: %s", npc.id, tostring(err)))
+		elseif onBuilt then
+			onBuilt(npc.id)
 		end
 		-- Studio's 7 October log showed NPCService.Init taking 60 s; this says
 		-- which NPC (its meshes load inside build) holds the server up.
@@ -417,14 +463,105 @@ function NPCService.Init(mapFolder: Instance)
 			print(string.format("[Load] NPCService built %s in %.1fs", npc.id, os.clock() - builtAt))
 		end
 	end
+	local function startClock()
+		if type(RunService.IsRunning) == "function" and RunService:IsRunning() then
+			task.spawn(function()
+				while RunService:IsRunning() do
+					task.wait(ShopHoursLogic.PollSeconds)
+					NPCService.Apply(mapFolder, ShopHoursLogic.Now())
+				end
+			end)
+		end
+	end
+	local all = NPCData.All()
+	local defer = if options then options.defer else nil
+	local onDone = if options then options.onDone else nil
+
+	if defer == nil then
+		local waited = preloadMeshes(all, 40)
+		for _, npc in ipairs(all) do
+			buildOne(npc)
+		end
+		print(
+			string.format(
+				"[Load] NPCService built %d townsfolk in %.1fs (meshes %.1fs)",
+				#all,
+				os.clock() - startedAt,
+				waited
+			)
+		)
+		NPCService.Apply(mapFolder, ShopHoursLogic.Now())
+		startClock()
+		if onDone then
+			onDone()
+		end
+		return
+	end
+
+	-- Murph now: his camp is the tutorial's first stop and QuestUI waits for him.
+	local rest: { NPCData.NPC } = {}
+	local murph: NPCData.NPC? = nil
+	for _, npc in ipairs(all) do
+		if npc.id == "Murph" then
+			murph = npc
+		else
+			table.insert(rest, npc)
+		end
+	end
+	if murph then
+		preloadMeshes({ murph }, 6)
+		buildOne(murph)
+	end
+	-- Shop doors, hours signs and the clock do not wait for the townsfolk.
 	NPCService.Apply(mapFolder, ShopHoursLogic.Now())
-	if type(RunService.IsRunning) == "function" and RunService:IsRunning() then
-		task.spawn(function()
-			while RunService:IsRunning() do
-				task.wait(ShopHoursLogic.PollSeconds)
-				NPCService.Apply(mapFolder, ShopHoursLogic.Now())
-			end
-		end)
+	startClock()
+	print(
+		string.format(
+			"[Load] NPCService.Init built Murph in %.2fs; %d townsfolk follow in the background",
+			os.clock() - startedAt,
+			#rest
+		)
+	)
+	local remaining = #rest
+	if remaining == 0 then
+		if onDone then
+			onDone()
+		end
+		return
+	end
+	local preloaded = false
+	for _, npc in ipairs(rest) do
+		local at: { x: number, z: number }? = nil
+		local okSpot, feet = pcall(NPCData.SpotFor, npc, find)
+		if okSpot and typeof(feet) == "CFrame" then
+			at = { x = feet.Position.X, z = feet.Position.Z }
+		end
+		defer({
+			name = "NPC " .. npc.id,
+			tier = 1,
+			at = at,
+			run = function(_slice: () -> boolean)
+				if not preloaded then
+					preloaded = true
+					local seconds = preloadMeshes(rest, 40)
+					print(string.format("[Load] NPCService meshes for %d townsfolk ready in %.1fs", #rest, seconds))
+				end
+				buildOne(npc)
+				remaining -= 1
+				if remaining == 0 then
+					NPCService.Apply(mapFolder, ShopHoursLogic.Now())
+					print(
+						string.format(
+							"[Load] NPCService: all townsfolk built %.1fs after Init started",
+							os.clock() - startedAt
+						)
+					)
+					if onDone then
+						onDone()
+					end
+				end
+			end,
+		})
 	end
 end
 

@@ -2575,3 +2575,64 @@ Connor sent two Lumber Tycoon 2 pictures: "Look at the Boxes in this image, I wa
 - [ ] Drive a boxed truck or carry a box onto a truck bed and off again; leave the game with a paid box (it is kept in storage) and rejoin: it comes back dark with its item in it and opens normally.
 - [ ] Performance in the busiest shop (the Tool Shed with 21 boxes, the rack and a few players, on a phone at Low): the frame rate is no worse than before the change (about 500 more parts than the cardboard boxes).
 - [ ] If an item looks wrong in its window (a model with stray parts, upside down, too small to read), send me the box's name: each item's look is one entry in `ItemModel` (turn, crop, part budget).
+
+## Load time 2 (LOAD-02, 7 October 2026): meshes side by side, a deferred build, a loading bar
+
+Connor: "loading is still very slow too so try to speed that up."
+
+**Before (his Studio Output of 7 October, a fresh server, Studio, no DataStore). Compare your next run to these:**
+
+| Where | Before |
+|---|---|
+| `[MapBuilder] World built in` | 35.6 s (terrain 13.3 s; the town 13.81 s of which the shops 4.8 s and trees 1.6 s; points of interest 2.5 s; Skyroot and isles 3.07 s of which the Lumenwood 3.0 s) |
+| `[Load] GameServer waited ... for the world (SellArea)` | 35.5 s |
+| `PlotService.Init` | 10.71 s |
+| `NPCService.Init` | **60.00 s** |
+| `[Load] GameServer init done in` | 70.8 s |
+| First player could play | server up 97 s |
+| Client `HUD Start took` | 34.81 s (it waited for the world, and held every other controller) |
+| Client `ForestFiller plan` | 11.5 s on the main thread after joining, then 1,322 section trees planted in 23 s |
+
+**The 60 s was not a timer. It was 153 mesh loads, one after another.** `NPCMeshes.Dress` (called from `CharacterArt.Build`) asks `MeshKit.Create` for every piece of each townsperson (17 pieces for each of the nine uploaded NPCs, 153 pieces, 146 distinct mesh ids), and `MeshKit` loaded each with `AssetService:CreateMeshPartAsync`, a network yield of about 0.4 s, serially. 153 x 0.4 s = 60 s. `PlotService.Init`'s 10.7 s was the same thing: `ItemMeshes.LoadAsync` loading the plot kit's 32 meshes one at a time (about 0.33 s each), not building the 14 pads. The "61 loaded" in the build check were the ones loaded by then (axes, trees, vehicles). The meshes always loaded fine; they were just never loaded side by side.
+
+**What changed, and the expected saving:**
+
+| # | Change | Expected saving |
+|---|---|---|
+| 1 | `MeshKit.Preload` + `Art/MeshManifest`: at the first line of `MapBuilder` every uploaded mesh the server will ask for (356 distinct ids: vehicles, axes, NPCs, the plot kit, trees, the building kit; plus the 105 town meshes only if `TownMeshes` is on) starts loading 24 at a time in a background thread (`Shared/WorkPool`, a join barrier), while the terrain is written (network time and CPU overlap). A `Create` for an id that is being loaded waits for that load instead of loading twice. A wheel or Hull kit piece keeps its collision (the manifest carries it). | NPCService.Init 60 s to under 1 s (everything is cached by then); PlotService.Init -10 s; the dealership lot, axes on the racks, Lumenwood and the first trees stop loading meshes one at a time inside the town and sky build: most of the 3 s Lumenwood and a good part of the town's 13.8 s |
+| 2 | `NPCService.Init(map, { defer, onBuilt, onDone })`: Murph is built at once (his camp is the tutorial's first stop), every other townsperson is a tier-1 step of the deferred queue, nearest the player first; shop doors, hours signs and the hours clock do not wait for them. Old Hank's Talk prompt is hooked the moment he is built (`onBuilt`), not after all of them. | Init 60 s to about 0 s; the townsfolk appear within the first seconds after joining |
+| 3 | `PlotService.Init` no longer waits on the plot kit's meshes: they load in a background thread, Init waits at most 3 s on the `itemMeshes` gate, builds the pads part-built if they are late and dresses them (redraws every pad) when the meshes land | 10.7 s to about 0 s (the preload has them cached) |
+| 4 | Deferred build (`Shared/LoadQueue`, `ServerScriptService/LoadState`, `MapBuilder`): after SellArea goes in, the town's lamps, fences, props, signs, path rounds, greenery and dealership lot (tier 1), the boulders, mushrooms, points of interest, trails, road signs, scenery, boulder clusters, landmarks and backdrop (tier 2, split into 400 to 500-stud cells), the volcano's crater and the whole sky (tier 3) are built a time slice at a time (12 ms a frame), lower tier first, nearest the players first (asked again before every step). The shops, parking lot, gondola stations, the tutorial grove, the north strip, the edge walls and the clock stay in the ready path. | World built about 35.6 s to roughly terrain 13 s + sawmill, shops, sell area, lot and camp about 6 s; the 2.5 s of points of interest, 3 s of Lumenwood and isles, 1 to 3 s of scenery, the greenery, props, boulders and the rest move behind the player |
+| 5 | The forest plan (`WorldPlan.Trees`, 6.7 s of one block in Lune, the 11.5 s on Connor's client) takes a `pause`: `TreeFill.Extra` offers the frame back after every placement attempt (same trees, spec-checked). The server's planter and the client's ForestFiller pass a time slice (12 ms and 8 ms a frame). The planner calls that are still one block (`Scenery`, about 1.2 s in Lune) are their own queue steps. | No more 5 to 11 s freeze right when the player joins, on the server or the client |
+| 6 | Client: `HUD.Start` returns as soon as the HUD is drawn (the wait for the server's `Remotes` runs in its own thread), so every other controller starts at once instead of 35 s late; `Net.Remote` waits in short tries (no "infinite yield" warning per controller). The loading card has a bar and a line driven by the server's milestones (`workspace.LoadStage`: starting, terrain, town, world, services; then "Loading your save..."), e.g. "Shaping the land... 40%". The "Loading your save..." card and the tutorial are unchanged. | The client shows progress from the first second and its lighting, wind, ambient, NPC and town controllers run during the wait |
+| 7 | One summary line and per-step lines (below) | - |
+
+**Not changed, on purpose:** terrain writing (13.3 s). It is CPU on one thread (a chunk's heights, materials and `WriteVoxels`), the terrain and the town cannot overlap in a single Luau VM, and the town's ground check needs the chunks. The terrain prebake (HANDOFF.md section 12) is still the next win and is Connor's one manual step; it was not done here because it needs Studio. The shops (4.8 s) stay in the ready path, because ShopService, NPCService and the doors read them at Init; most of their time was mesh loading (now overlapped). Nothing was moved out of the terrain pass, so a player is never in a world without ground. Plot pads are not built lazily: by the mesh numbers above the pads were not the cost, and every slot is looked up by index all over `PlotService`.
+
+**Readiness gates** (`Shared/ReadyGates`, one instance in `LoadState.Gates`): `meshes` (the start-up preload is done), `terrain`, `town`, `world` (SellArea in; GameServer starts), `services` (every service Init has run, GameServer listens for players), `firstPlayer` (a save is loaded and someone can play), `npcs` (the last townsperson is in), `itemMeshes` (PlotService's kit meshes; PlotService.Init waits at most 3 s, then builds part-built and dresses the pads when it opens), `deferred` (the queue and every tracked job are done). Remotes: no deferred system has a remote. Every handler connected before `Players.PlayerAdded` already refuses a player without a loaded profile, and `PlayerAdded` is connected only after `services`, so a remote before the services are up is refused, never an error. `ReadyGates.Guard(name, fn, onRefuse)` is the refuse-while-shut wrapper for any future handler of a deferred system (spec'd).
+
+**Output lines.** Every old `[Load]` line is kept. New: `[Load] +Xs stage terrain|town|world|services` (the loading bar's milestones), `[Load] +Xs meshes: N of M loaded, F failed in Ts`, `[Load] +Xs deferred build starts: N steps queued`, one `[Load] deferred <step> took Ts (done at +Xs)` for each step (many small steps of one job, such as the boulder cells, print one `deferred <job>: N steps took Ts in all` line), `[Load] NPCService.Init built Murph ...` and `all townsfolk built ...`, `[Load] PlotService: ...` if the kit meshes were late, `[Load] +Xs first player <name> can play`, `[Load] +Xs everything is built: N deferred steps (F failed) in Ts of work`, and the one to read first:
+
+`[Load] ready for play at +X s; fully built at +Y s`
+
+X is the first player's `can play` (their save loaded); Y is when the deferred queue and the forest are both done. Both count from the server scripts' start.
+
+**What I could not measure** (no Studio here): the real numbers. Expected on a cold Studio Play, from the figures above: terrain 13 s, the ready path done at about 20 to 22 s (was 35.5), NPC and Plot Init about 1 s each (were 70.7 together), the first player able to play near 25 s instead of 97 s, and everything built (townsfolk, forest, scenery, isles) a minute or so later. If `CreateMeshPartAsync` turns out to be serialised by the engine, the preload will not be 24 wide and the numbers will say so (`meshes: ... in Ts`); the server is still never blocked by it.
+
+### Studio checks (Connor)
+Copy the whole `[Load]` output (server and client) and compare with the table above.
+- [ ] Cold Play in Studio: Output has `[Load] ready for play at +X s; fully built at +Y s`. X is far under the old 97 s. Note X and Y
+- [ ] `[Load] +Xs meshes: N of M loaded, F failed`: F is 0 (it was 0 before). `NPCService.Init built Murph` and `PlotService.Init` are each under about 2 s in the `[Load] GameServer ... took` lines
+- [ ] On a phone (or Device Emulator) the card shows a bar and "Shaping the land..." then "Building the town..." then "Loading your save...", not a frozen "Building the world..."; note the time from tap to first playable frame on Studio and on the phone
+- [ ] First minute in the town: Murph is at his camp at once; the other townsfolk (Millie, Old Hank, the keepers, the walkers) appear one by one within a few seconds (nearest you first); shop doors, signs and the hours still work; talk to Old Hank at the Land Office: he opens the plot sale
+- [ ] The frame rate stays smooth while the deferred build runs (you can walk, chop and sell from the first second); no hitch of a second or more when the forest plan runs (it was 6 to 11 s)
+- [ ] After the deferred steps finish (Y), nothing is missing compared with the old build: all three shops with their keepers, every NPC, the lamps, fences, props, signs and greenery, the dealership lot, boulders, scenery, points of interest (lookout, cabin, cave), trails, the lighthouse, docks and footbridge, the backdrop mountains and the volcano's crater, the Skyroot with its isles, bridges, clouds and Lumenwood, the Sky Shards, the Cloud Chutes and the forge, the waterfall, the gondola cable, trees everywhere, 14 plots with signs, platforms and rails
+- [ ] Walk or run toward a far biome in the first minute (the volcano, the isles): its decor is built nearer first as you go (the queue follows the player); nothing is missing at the end
+- [ ] Gondola: stand at the town station right after joining and press Ride: it works (the stations are in the first build; the cable comes later)
+- [ ] Join with a saved game (a plot with buildings): the plot loads with its meshes; the sign, rails and corner posts have their meshes (if Output says `PlotService: the plot kit's meshes landed late`, the pads were dressed afterwards and your placed pieces may be part-built until you rejoin: tell me)
+- [ ] Join with two players (Test, Clients and Servers): both can play; the second one's join is not slower; both see the townsfolk, Murph, the isles
+- [ ] Leave and rejoin the same server: your save, plot and truck are back; no errors
+- [ ] Sell and buy right after joining: sell logs at the pad, buy an axe at the Tool Shed in the first minute; the keeper serves
+- [ ] The plot picker right after joining (Old Hank, or the Land Office counter, or a returning owner's picker): it opens, all 14 pads are listed and claimable; claiming works
+- [ ] The tutorial: Murph's steps still run in order, the "Loading your save..." line is shown while the save loads and then goes, and no tutorial step waits on the deferred build
+- [ ] No red lines in Output; `[MapBuilder] ... failed` lines, if any, name the step (a deferred step's failure is warned once, with a traceback, and the rest still builds)

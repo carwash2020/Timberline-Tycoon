@@ -83,6 +83,22 @@ function AxeModels.Get(axeId: string): AxeMesh?
 	return axes[axeId]
 end
 
+-- Every mesh id an axe spawns (the invisible Trail guide is never loaded),
+-- for MeshManifest's preload.
+function AxeModels.MeshIds(): { number }
+	local ids: { number } = {}
+	for _, axe in pairs(axes) do
+		for _, key in ipairs({ "Handle", "Head", "Glow" }) do
+			local piece = (axe :: any)[key] :: Piece?
+			if piece and piece.meshId ~= 0 then
+				table.insert(ids, piece.meshId)
+			end
+		end
+	end
+	table.sort(ids)
+	return ids
+end
+
 -- 0 keeps the current part-built axe. Shipped ids are not 0.
 function AxeModels.UsesMesh(meshId: number): boolean
 	return type(meshId) == "number" and meshId ~= 0
