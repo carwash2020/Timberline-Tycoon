@@ -478,6 +478,85 @@ return function(t)
 		t.eq(s.lastToast(), "Your plot size is already the biggest.")
 	end)
 
+	t.test(
+		"the build platform: a collidable slab 1 stud over the grass that grows with the tier and squares",
+		function()
+			local PlotPlatform = t.shared("PlotPlatform")
+			local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+			local s = setup({ cash = 20000 })
+			local center = s.PlotData.Slots[1]
+			local ground = TerrainGen.HeightAt(center.X, center.Y)
+			local function count(folder, name)
+				local n = 0
+				for _, child in ipairs(folder:GetChildren()) do
+					if child.Name == name then
+						n += 1
+					end
+				end
+				return n
+			end
+			-- An open plot already shows its platform: the Campsite's 80 studs, opaque.
+			local plot = s.plot(1)
+			local pad = plot:FindFirstChild("Pad")
+			t.eq(pad.Size.X, 80)
+			t.eq(pad.Size.Y, s.PlotData.PlatformThick)
+			t.eq(pad.CanCollide, true, "you stand on it")
+			t.ok(pad.Transparency == nil or pad.Transparency == 0, "a solid slab, never a faint paint")
+			t.ok(
+				math.abs(pad.CFrame.Position.Y + pad.Size.Y / 2 - (ground + 1)) < 1e-6,
+				"its top is 1 stud over the grass"
+			)
+			t.eq(plot.PrimaryPart, pad)
+			local folder = plot:FindFirstChild("Platform")
+			t.eq(count(folder, "Ramp"), 4)
+			t.eq(count(folder, "Land"), 0)
+			for _, ramp in ipairs(folder:GetChildren()) do
+				t.eq(ramp.ClassName, "WedgePart")
+				t.eq(ramp.CanCollide, true)
+			end
+			-- Plot-local y = 0 is the platform's top: a saved piece at (0, 0) stands on it.
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			s.P.Place(ann, "Flag", 0, 0, 0)
+			t.ok(
+				math.abs(s.items(1)[1].placedWorld.Y - (ground + 1)) < 1e-6,
+				"a piece at plot-local y 0 is on the platform top"
+			)
+			-- A bought square past the tier is a Land slab and its own ramps.
+			s.P.Expand(ann, 1, 0, 0) -- square "1,0": x 20..60, 20 studs of it past the Campsite's edge at 40
+			local squares = profile.plot.squares
+			t.eq(squares, { "1,0" })
+			local layout = PlotPlatform.Layout(80, squares)
+			t.eq(#layout.land, 1)
+			t.eq(count(folder, "Land"), 1)
+			t.eq(count(folder, "Ramp"), #layout.ramps)
+			-- The tier grows the slab; the square's slab shrinks to what the tier leaves.
+			profile.cash = 20000
+			s.P.Upgrade(ann)
+			t.eq(plot:FindFirstChild("Pad").Size.X, 110)
+			t.ok(math.abs(pad.CFrame.Position.Y + pad.Size.Y / 2 - (ground + 1)) < 1e-6, "still 1 stud up")
+			layout = PlotPlatform.Layout(110, squares)
+			t.eq(count(folder, "Land"), #layout.land)
+			t.eq(count(folder, "Ramp"), #layout.ramps)
+			-- The sign stands on the grass past the ramps, nothing flat shares a plane with the platform.
+			local top = ground + 1
+			for _, marker in ipairs(plot:FindFirstChild("Border"):GetChildren()) do
+				t.ok(marker.Name ~= "Square" and marker.Name ~= "Apron", "no old paint pads: the platform is the yard")
+				local bottom = marker.CFrame.Position.Y - marker.Size.Y / 2
+				t.ok(
+					math.abs(bottom - top) >= s.PlotData.PlatformEdgeClear,
+					marker.Name .. " is not coplanar with the top"
+				)
+			end
+			local sign = plot:FindFirstChild("Sign")
+			t.ok(
+				sign.CFrame.Position.Z - center.Y >= layout.extent / 2 + s.PlotData.PlatformRamp,
+				"the sign is past the ramps"
+			)
+		end
+	)
+
 	t.test("your layout comes back on whichever plot is free when you rejoin", function()
 		local s = setup()
 		local bob = s.newPlayer(2, "Bob")

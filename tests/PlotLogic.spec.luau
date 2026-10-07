@@ -648,8 +648,10 @@ return function(t)
 		for i = 1, #PlotData.Homes do
 			local look = PlotData.Look(i)
 			seen[look.name] = true
-			t.ok(#look.material > 0 and #look.ground == 3 and #look.rail == 3, look.name .. " is complete")
-			t.ok(look.material ~= "Grass" and look.material ~= "LeafyGrass", look.name .. " is bare ground, not grass")
+			t.ok(#look.top == 3 and #look.edge == 3 and #look.rail == 3, look.name .. " is complete")
+			-- The ground round a plot is grass for every home; what differs is the
+			-- dark grey platform's tone and the rail (PlotPlatform.spec checks them).
+			t.ok(look.top[1] < 120 and look.top[2] < 120 and look.top[3] < 120, look.name .. " is a dark grey platform")
 		end
 		local n = 0
 		for _ in pairs(seen) do
