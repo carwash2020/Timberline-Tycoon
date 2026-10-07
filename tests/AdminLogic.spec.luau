@@ -227,7 +227,16 @@ return function(t)
 		local tester = grant("TESTER")
 		for _, action in ipairs(AdminLogic.MenuActions) do
 			local ok = AdminLogic.GrantAllows(tester, action, { selfTarget = true, banHours = 5000 })
-			t.eq(ok, table.find(AdminLogic.OwnerOnly, action) == nil, action)
+			-- Not delegation, and (deliberately) not the paid items: those are the
+			-- owner's, or a CUSTOM role's Gifts power, never TESTER's.
+			local held = table.find(AdminLogic.OwnerOnly, action) == nil
+				and table.find(AdminLogic.PaidActions, action) == nil
+			t.eq(ok, held, action)
+		end
+		for _, action in ipairs(AdminLogic.PaidActions) do
+			local ok, why = AdminLogic.GrantAllows(tester, action, { selfTarget = true })
+			t.eq(ok, false, "TESTER " .. action)
+			t.ok(string.find(why, "Gifts power", 1, true), why)
 		end
 		for _, power in ipairs({
 			"give",
@@ -250,6 +259,78 @@ return function(t)
 			t.eq(AdminLogic.IsDestructive(action), true, action)
 		end
 		t.eq(AdminLogic.IsDestructive("give"), false)
+	end)
+
+	t.test(
+		"paid items: the owner's, or a custom role's Gifts power for themself; never TESTER, never revoke",
+		function()
+			local allows = AdminLogic.GrantAllows
+			-- The Gifts power is delegable, paidrevoke never is, and a hand-made grant can't carry it.
+			t.ok(table.find(AdminLogic.DelegablePowers, "paidgive"))
+			t.eq(table.find(AdminLogic.DelegablePowers, "paidrevoke"), nil)
+			t.ok(table.find(AdminLogic.NeverDelegable, "paidrevoke"))
+			t.eq(AdminLogic.CleanPowers({ "paidrevoke" }), nil)
+			t.eq(AdminLogic.CleanPowers({ "paidlist" }), nil, "reading is part of the Gifts power, not its own")
+			local gifts = grant("CUSTOM", { "paidgive" })
+			t.eq(allows(gifts, "paidgive", { selfTarget = true }), true)
+			t.eq(allows(gifts, "paidlist", { selfTarget = true }), true, "what they own comes with it")
+			t.eq(allows(gifts, "paidgive", { selfTarget = false }), false, "only to themself")
+			t.eq(allows(gifts, "paidlist", { selfTarget = false }), false)
+			t.eq(allows(gifts, "paidrevoke", { selfTarget = true }), false)
+			t.eq(allows({ role = "CUSTOM", powers = { "paidrevoke" } }, "paidrevoke"), false, "even a hand-made grant")
+			-- Every other role has none of it.
+			for _, role in ipairs({ "HELPER", "MODERATOR", "BUILDER" }) do
+				for _, action in ipairs(AdminLogic.PaidActions) do
+					t.eq(allows(grant(role), action, { selfTarget = true }), false, role .. " " .. action)
+				end
+			end
+			-- The hub is built from what the grant may show.
+			local shown = AdminLogic.AllowedActions(gifts)
+			t.ok(table.find(shown, "paidgive") and table.find(shown, "paidlist"))
+			t.eq(table.find(shown, "paidrevoke"), nil)
+			t.eq(table.find(AdminLogic.AllowedActions(grant("HELPER")), "paidgive"), nil)
+			t.eq(table.find(AdminLogic.AllowedActions(grant("TESTER")), "paidgive"), nil)
+			t.eq(table.find(AdminLogic.AllowedActions(grant("TESTER")), "paidlist"), nil)
+			-- Unban is the owner's, and the hub has it now.
+			t.ok(table.find(AdminLogic.MenuActions, "unban"))
+			t.eq(table.find(AdminLogic.AllowedActions(grant("MODERATOR")), "unban"), nil)
+		end
+	)
+
+	t.test("paid and unban requests become command lines, only from the whitelist", function()
+		local from = AdminLogic.FromRequest
+		t.eq(from({ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe" }), "/paidgive Bob pass_LuxAxe")
+		t.eq(
+			from({ action = "paidgive", target = "Bob", itemId = "product_DoubleWood", hours = 24 }),
+			"/paidgive Bob product_DoubleWood 24"
+		)
+		t.eq(from({ action = "paidrevoke", target = "Bob", itemId = "pass_LuxAxe" }), "/paidrevoke Bob pass_LuxAxe")
+		t.eq(from({ action = "paidlist", target = "Bob" }), "/paidlist Bob")
+		t.eq(from({ action = "unban", userId = 12345 }), "/unban 12345")
+		for _, bad in ipairs({
+			{ action = "paidgive", target = "Bob" },
+			{ action = "paidgive", itemId = "pass_LuxAxe" },
+			{ action = "paidgive", target = "Bob", itemId = "pass LuxAxe" },
+			{ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe; /shutdown" },
+			{ action = "paidgive", target = "Bob", itemId = string.rep("a", 60) },
+			{ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe", hours = 0 },
+			{ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe", hours = 721 },
+			{ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe", hours = 1.5 },
+			{ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe", hours = "5" },
+			{ action = "paidgive", target = "Bob", itemId = "pass_LuxAxe", hours = 0 / 0 },
+			{ action = "paidrevoke", target = "Bob" },
+			{ action = "paidlist" },
+			{ action = "paidlist", target = "a b" },
+			{ action = "unban" },
+			{ action = "unban", userId = 0 },
+			{ action = "unban", userId = -5 },
+			{ action = "unban", userId = 1.5 },
+			{ action = "unban", userId = "123" },
+			{ action = "unban", userId = 2 ^ 60 },
+			{ action = "unban", userId = 0 / 0 },
+		}) do
+			t.eq(from(bad), nil, tostring(bad.action) .. " " .. tostring(bad.itemId or bad.userId))
+		end
 	end)
 
 	t.test("expiry: session, 1h, 24h or until the server closes; TESTER never the last", function()

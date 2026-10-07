@@ -561,4 +561,40 @@ return function(t)
 		t.eq(data.slots[2].name, "Mill")
 		t.eq(SaveSlotLogic.NameOf(data.slots[1], 1), "North Yard")
 	end)
+
+	t.test("owner grants stay on the account across a slot load, like passes", function()
+		local data = fresh()
+		data.ownerGrants = { LuxAxe = { at = 5, by = 7, byName = "Connor" } }
+		data.ownerGrantLog =
+			{ { at = 5, by = 7, byName = "Connor", action = "give", item = "pass_LuxAxe", name = "Lux Axe" } }
+		data.slots[1] = nil
+		Schema.Migrate(data)
+		t.eq(data.slots[1].ownerGrants, nil, "not copied into a slot")
+		t.eq(data.slots[1].ownerGrantLog, nil)
+		local world = worldFor(data)
+		t.eq(SaveSlotLogic.Perform(data, "load", 2, 2_000, Schema.Template, guidFactory(), world.hooks), true)
+		t.eq(data.ownerGrants.LuxAxe.by, 7)
+		t.eq(#data.ownerGrantLog, 1)
+		t.eq(SaveSlotLogic.IsAccountKey("ownerGrants"), true)
+		t.eq(SaveSlotLogic.IsAccountKey("ownerGrantLog"), true)
+	end)
+
+	t.test("forgetting a pass axe takes it off the live axes, the account list and every parked slot", function()
+		local data = fresh()
+		data.axes = { { uid = "r", id = "RustyAxe" }, { uid = "lux", id = "LuxAxe" } }
+		data.accountAxes = { "LuxAxe" }
+		data.slots[2].axes = { { uid = "lux2", id = "LuxAxe" }, { uid = "s", id = "SteelAxe" } }
+		t.eq(SaveSlotLogic.ForgetAccountAxe(data, "LuxAxe"), 1)
+		t.eq(#data.axes, 1)
+		t.eq(data.axes[1].id, "RustyAxe")
+		t.eq(data.accountAxes, {})
+		t.eq(#data.slots[2].axes, 1)
+		t.eq(data.slots[2].axes[1].id, "SteelAxe")
+		-- The sync that brings account axes back finds none.
+		SaveSlotLogic.SyncAccountAxes(data, guidFactory())
+		for _, item in ipairs(data.axes) do
+			t.ok(item.id ~= "LuxAxe", "it is not back")
+		end
+		t.eq(SaveSlotLogic.ForgetAccountAxe(data, "LuxAxe"), 0, "twice is the same")
+	end)
 end

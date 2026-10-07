@@ -10,6 +10,14 @@
 --       - Cash packs: only offered when the cash fits under the wallet cap.
 --       - 2x Wood: trees drop twice the logs for 48 h; buying again extends it.
 --       - Instant Delivery: sell your truck bed once, from anywhere.
+--   * Owner grants (the hub's Paid items tab, via AdminService): OwnerGrant,
+--     OwnerRevoke and OwnerState give or take back any item in
+--     Shared/PaidItems (built from StoreData) through the same effects a
+--     purchase has (setPass and its listener, the boost and delivery
+--     helpers below), but with no Robux prompt, no receipt, no purchase
+--     analytics. A pass is saved in profile.ownerGrants (not `passes`), so
+--     the join check ORs it in and a revoke never touches a real purchase.
+--     Every grant and revoke is also written to profile.ownerGrantLog.
 --   * BuyRobuxItem (client -> server): the server checks the item is set up
 --     (and that a cash pack fits), then shows Roblox's purchase prompt.
 
@@ -18,6 +26,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local StoreData = require(ReplicatedStorage.Shared.StoreData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local EconomyService = require(script.Parent.EconomyService)
@@ -33,25 +42,32 @@ local clock: () -> number = os.time -- tests replace this
 local owned: { [Player]: { [string]: boolean } } = {} -- passes, per player
 -- GameServer wires this to grant the Lux Axe without a require cycle.
 local onPass: ((Player, string) -> ())? = nil
+-- GameServer wires this to take the Lux Axe back after an owner revoke.
+local onPassRevoked: ((Player, string) -> ())? = nil
 
--- `persist` false only seeds the in-memory cache from a save. A real grant
--- (a purchase, or Roblox confirming ownership) writes profile.passes so a
--- later join still has the pass if UserOwnsGamePassAsync fails. Never
--- clears a pass: a false or a failed check leaves the backup in place.
-local function setPass(player: Player, key: string, persist: boolean?)
+-- `mode` "seed" only copies a saved pass into the live set (join, no hook).
+-- "purchase" (the default) is a real grant (a purchase, or Roblox confirming
+-- ownership): it writes profile.passes so a later join still has the pass if
+-- UserOwnsGamePassAsync fails. "grant" is the owner's: it switches the pass
+-- on and runs the same listener but writes nothing to `passes` (OwnerGrant
+-- saves it in profile.ownerGrants). Never clears a pass: a false or a failed
+-- check leaves the backup in place.
+local function setPass(player: Player, key: string, mode: string?)
 	local set = owned[player] or {}
 	owned[player] = set
 	set[key] = true
 	player:SetAttribute("Pass_" .. key, true)
-	if persist == false then
+	if mode == "seed" then
 		return
 	end
-	local profile = ProfileService.GetProfile(player)
-	if profile then
-		if type(profile.passes) ~= "table" then
-			profile.passes = {}
+	if mode ~= "grant" then
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			if type(profile.passes) ~= "table" then
+				profile.passes = {}
+			end
+			profile.passes[key] = true
 		end
-		profile.passes[key] = true
 	end
 	local hook = onPass
 	if hook then
@@ -61,6 +77,10 @@ end
 
 function MonetizationService.SetPassListener(fn: (Player, string) -> ())
 	onPass = fn
+end
+
+function MonetizationService.SetPassRevokedListener(fn: (Player, string) -> ())
+	onPassRevoked = fn
 end
 
 local function publishBoosts(player: Player, profile: Profile)
@@ -106,9 +126,21 @@ function MonetizationService.UseInstantDelivery(player: Player): boolean
 	return true
 end
 
+-- The effects of a boost and of an Instant Delivery, for a purchase and for
+-- an owner grant alike.
+local function startBoost(profile: Profile, hours: number)
+	profile.doubleWoodUntil = math.max(clock(), profile.doubleWoodUntil) + hours * 3600
+end
+
+local function addInstantDelivery(profile: Profile)
+	profile.instantDeliveries += 1
+end
+
 local function grantProduct(player: Player, profile: Profile, product: StoreData.Product)
-	if product.cash then
-		local credited, banked = EconomyService.AddPaidCash(player, product.cash, "robux: " .. product.key, product.key)
+	local effect = PaidItems.EffectOf(product)
+	if effect == "cash" then
+		local cash = product.cash :: number
+		local credited, banked = EconomyService.AddPaidCash(player, cash, "robux: " .. product.key, product.key)
 		if banked > 0 then
 			notify(
 				player,
@@ -119,13 +151,13 @@ local function grantProduct(player: Player, profile: Profile, product: StoreData
 				)
 			)
 		else
-			notify(player, string.format("Thanks! +%s", Util.formatCash(product.cash)))
+			notify(player, string.format("Thanks! +%s", Util.formatCash(cash)))
 		end
-	elseif product.boostHours then
-		profile.doubleWoodUntil = math.max(clock(), profile.doubleWoodUntil) + product.boostHours * 3600
+	elseif effect == "boost" then
+		startBoost(profile, product.boostHours :: number)
 		notify(player, string.format("Thanks! %s is on: trees drop twice the logs.", product.name))
-	elseif product.key == "InstantDelivery" then
-		profile.instantDeliveries += 1
+	elseif effect == "counter" then
+		addInstantDelivery(profile)
 		notify(player, "Thanks! Use Instant Delivery to sell your truckload from anywhere.")
 	end
 	publishBoosts(player, profile)
@@ -213,6 +245,185 @@ local function onBuy(player: Player, kind: unknown, key: unknown)
 	end
 end
 
+---------------------------------------------------------------------------
+-- Owner grants: the hub's Paid items tab (AdminService calls these). Same
+-- effects as a purchase, no Robux, no receipt, no purchase analytics. The
+-- caller has already checked WHO may ask; the rules about the item (unknown
+-- id, already owned, wallet room, boost running, not revocable) are here, so
+-- they hold whoever calls.
+---------------------------------------------------------------------------
+
+export type By = { userId: number, name: string }
+
+local function ownerLog(profile: Profile, by: By, action: string, item: PaidItems.Item, detail: string?)
+	local list = PaidItems.CleanLog(profile.ownerGrantLog)
+	PaidItems.PushLog(list, {
+		at = clock(),
+		by = by.userId,
+		byName = by.name,
+		action = action,
+		item = item.id,
+		name = item.name,
+		detail = detail,
+	})
+	profile.ownerGrantLog = list
+end
+
+local function stateOf(player: Player, profile: Profile, item: PaidItems.Item): PaidItems.State
+	return PaidItems.StateOf(item, profile, MonetizationService.HasPass(player, item.key :: any), clock())
+end
+
+-- Gives `itemId` (a PaidItems id) to `player`. `hours` is only for a timed
+-- booster (nil: the item's own length). Returns (ok, text): the text is a
+-- sentence for the owner either way. The player is told by `notify`.
+function MonetizationService.OwnerGrant(player: Player, itemId: unknown, by: By, hours: unknown): (boolean, string)
+	local profile = ProfileService.GetProfile(player)
+	local item = PaidItems.Find(PaidItems.All(), itemId)
+	if not item then
+		return false, "That is not a paid item."
+	end
+	if not profile then
+		return false, player.Name .. " has no loaded save."
+	end
+	local log = PaidItems.CleanLog(profile.ownerGrantLog)
+	if PaidItems.IsRepeat(log, "give", item.id, clock()) then
+		return false, string.format("Just gave %s to %s. Wait a moment before doing it again.", item.name, player.Name)
+	end
+	local st = stateOf(player, profile, item)
+	local ok, why = PaidItems.CanGrant(item, st, { cash = profile.cash, cap = GameConfig.CashCap })
+	if not ok then
+		return false, why or "Can't give that."
+	end
+	local length: number? = nil
+	local detail: string? = nil
+	if item.effect == "boost" then
+		length = PaidItems.CleanHours(item, hours)
+		if not length then
+			return false, string.format("Pick a boost length from 1 to %d hours.", PaidItems.MaxHours)
+		end
+		detail = string.format("%d h", length)
+	end
+	local told: string
+	if item.effect == "pass" then
+		if type(profile.ownerGrants) ~= "table" then
+			profile.ownerGrants = {}
+		end
+		profile.ownerGrants[item.key] = { at = clock(), by = by.userId, byName = by.name }
+		setPass(player, item.key, "grant")
+		told = string.format("The owner gave you %s.", item.name)
+	elseif item.effect == "cash" then
+		local credited = EconomyService.AddCash(player, item.cash :: number, "owner grant: " .. item.key, item.key)
+		detail = Util.formatCash(credited)
+		told = string.format("The owner gave you %s.", Util.formatCash(credited))
+	elseif item.effect == "boost" then
+		startBoost(profile, length :: number)
+		told = string.format(
+			"The owner turned on %s for %d hours: trees drop twice the logs.",
+			item.name,
+			length :: number
+		)
+	else -- counter
+		addInstantDelivery(profile)
+		told = "The owner gave you an Instant Delivery."
+	end
+	publishBoosts(player, profile)
+	ownerLog(profile, by, "give", item, detail)
+	if player.UserId ~= by.userId then
+		notify(player, told)
+	end
+	local text = string.format("Gave %s to %s.", item.name, player.Name)
+	if item.effect == "boost" and length then
+		text = string.format("Gave %s for %d hours to %s.", item.name, length, player.Name)
+	end
+	return true, text
+end
+
+-- Takes back an owner grant (a pass), ends a booster, or removes one
+-- Instant Delivery. A pass the player bought stays: only the grant goes.
+function MonetizationService.OwnerRevoke(player: Player, itemId: unknown, by: By): (boolean, string)
+	local profile = ProfileService.GetProfile(player)
+	local item = PaidItems.Find(PaidItems.All(), itemId)
+	if not item then
+		return false, "That is not a paid item."
+	end
+	if not profile then
+		return false, player.Name .. " has no loaded save."
+	end
+	local log = PaidItems.CleanLog(profile.ownerGrantLog)
+	if PaidItems.IsRepeat(log, "revoke", item.id, clock()) then
+		return false, string.format("Just revoked %s from %s.", item.name, player.Name)
+	end
+	local st = stateOf(player, profile, item)
+	local ok, why = PaidItems.CanRevoke(item, st)
+	if not ok then
+		return false, why or "Can't take that back."
+	end
+	local detail: string? = nil
+	if item.effect == "pass" then
+		profile.ownerGrants[item.key] = nil
+		local stillBought = type(profile.passes) == "table" and profile.passes[item.key] == true
+		if stillBought then
+			detail = "grant removed, purchase kept"
+		else
+			local set = owned[player]
+			if set then
+				set[item.key] = nil
+			end
+			player:SetAttribute("Pass_" .. item.key, nil)
+			local hook = onPassRevoked
+			if hook then
+				hook(player, item.key)
+			end
+		end
+	elseif item.effect == "boost" then
+		profile.doubleWoodUntil = 0
+	else -- counter
+		profile.instantDeliveries = math.max(0, profile.instantDeliveries - 1)
+	end
+	publishBoosts(player, profile)
+	ownerLog(profile, by, "revoke", item, detail)
+	if player.UserId ~= by.userId then
+		notify(player, string.format("The owner took %s back.", item.name))
+	end
+	local text = string.format("Took %s back from %s.", item.name, player.Name)
+	if detail then
+		text =
+			string.format("Removed the grant of %s from %s; they still own it from a purchase.", item.name, player.Name)
+	end
+	return true, text
+end
+
+-- What `player` owns of every paid item, for the hub: id -> row.
+export type StateRow = {
+	label: string,
+	owned: boolean,
+	granted: boolean,
+	bought: boolean,
+	count: number,
+	hoursLeft: number,
+}
+
+function MonetizationService.OwnerState(player: Player): { [string]: StateRow }
+	local rows: { [string]: StateRow } = {}
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return rows
+	end
+	local now = clock()
+	for _, item in ipairs(PaidItems.All()) do
+		local st = stateOf(player, profile, item)
+		rows[item.id] = {
+			label = st.label,
+			owned = st.owned,
+			granted = st.granted,
+			bought = st.bought,
+			count = st.count,
+			hoursLeft = if st.untilAt > now then math.ceil((st.untilAt - now) / 3600) else 0,
+		}
+	end
+	return rows
+end
+
 -- Call once the player's save has loaded.
 function MonetizationService.PlayerJoined(player: Player, profile: Profile)
 	publishBoosts(player, profile)
@@ -222,8 +433,16 @@ function MonetizationService.PlayerJoined(player: Player, profile: Profile)
 	if type(profile.passes) == "table" then
 		for key, on in pairs(profile.passes) do
 			if on == true and StoreData.Pass(key) then
-				setPass(player, key, false)
+				setPass(player, key, "seed")
 			end
+		end
+	end
+	-- Owner grants (the hub's Paid items tab) are ORed in the same way: the
+	-- ownership check below never decides about them, so a granted pass is
+	-- never stripped because Roblox says the account didn't buy it.
+	for key in pairs(PaidItems.CleanGrants(profile.ownerGrants)) do
+		if StoreData.Pass(key) then
+			setPass(player, key, "seed")
 		end
 	end
 	for _, pass in ipairs(StoreData.Passes) do

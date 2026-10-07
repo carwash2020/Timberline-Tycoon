@@ -5,20 +5,20 @@ return function(t)
 	local Hub = t.shared("AdminHubLogic")
 	local AdminLogic = t.shared("AdminLogic")
 
-	t.test("the tabs are PLAYERS, GIVE, WORLD, SELF and DELEGATES, and every tool sits in one of them", function()
+	t.test("the tabs run PLAYERS, GIFTS, PAID ITEMS, WORLD, ROLES, LOG, and every tool sits in one of them", function()
 		local ids = {}
 		for _, tab in ipairs(Hub.Tabs) do
 			table.insert(ids, tab.id)
 			t.ok(#tab.hint > 0, tab.id .. " has a hint")
-			t.ok(#Hub.ToolsFor(tab.id) > 0, tab.id .. " has tools")
+			t.ok(#Hub.ToolsFor(tab.id) > 0 or tab.always, tab.id .. " has tools (or is the always-there log)")
 		end
-		t.eq(ids, { "players", "give", "world", "self", "delegates" })
+		t.eq(ids, { "players", "gifts", "paid", "world", "roles", "log" })
 		for _, tool in ipairs(Hub.Tools) do
 			t.ok(table.find(ids, tool.tab) ~= nil, tool.id .. " is in a real tab")
 			t.ok(#tool.hint > 0 and #tool.label > 0, tool.id .. " has a label and a hint")
 		end
-		t.eq(Hub.TabStep(1, -1), 5)
-		t.eq(Hub.TabStep(5, 1), 1)
+		t.eq(Hub.TabStep(1, -1), 6)
+		t.eq(Hub.TabStep(6, 1), 1)
 		t.eq(Hub.TabStep(1, -1, 3), 3, "fewer tabs for a delegate")
 		t.eq(Hub.TabStep(2, 1), 3)
 	end)
@@ -35,6 +35,9 @@ return function(t)
 			text = "hello",
 			role = "HELPER",
 			expiry = "1h",
+			paidId = "pass_LuxAxe",
+			paidHours = 24,
+			userId = 123456,
 		}
 		local seen = {}
 		for _, tool in ipairs(Hub.Tools) do
@@ -67,10 +70,21 @@ return function(t)
 	end)
 
 	t.test("kick, ban, take cash, set cash and shut down need a second press for the same target", function()
-		for _, id in ipairs({ "kick", "ban", "take", "setcash", "shutdown" }) do
+		for _, id in ipairs({
+			"kick",
+			"ban",
+			"take",
+			"setcash",
+			"shutdown",
+			"resettutorial",
+			"undelegate",
+			"unban",
+			"paidgive",
+			"paidrevoke",
+		}) do
 			t.eq(Hub.NeedsConfirm(id), true, id)
 		end
-		for _, id in ipairs({ "give", "gift", "goto", "bring", "superrun", "stats", "timereset" }) do
+		for _, id in ipairs({ "give", "gift", "goto", "bring", "superrun", "stats", "timereset", "paidlist" }) do
 			t.eq(Hub.NeedsConfirm(id), false, id)
 		end
 		local fire, pending = Hub.Press("kick", "kick:Bob", 10, nil)
@@ -189,6 +203,28 @@ return function(t)
 		t.eq(wide.y.up, "t3")
 	end)
 
+	t.test("a phone's two rows of tabs are one focus chain: stick down goes row to row, then into the body", function()
+		local nav = Hub.NavGrid({
+			{ "search", "close" },
+			{ "tab1", "tab2", "tab3" },
+			{ "tab4", "tab5", "tab6" },
+			{ "search_paid" },
+			{ "paiditem1" },
+			{ "paiditem2" },
+			{ "tool_paidlist" },
+		})
+		t.eq(nav.tab1.up, "search")
+		t.eq(nav.tab1.down, "tab4")
+		t.eq(nav.tab6.up, "tab3")
+		t.eq(nav.tab5.down, "search_paid")
+		t.eq(nav.search_paid.up, "tab5", "back to the middle of the tab row above")
+		t.eq(nav.search_paid.down, "paiditem1")
+		t.eq(nav.paiditem2.down, "tool_paidlist")
+		t.eq(nav.tool_paidlist.down, nil, "no wrap: the stick stops at the end")
+		t.eq(nav.tab2.left, "tab1")
+		t.eq(nav.tab3.right, nil)
+	end)
+
 	t.test("scrolling follows the selection and stays inside the canvas", function()
 		-- In view: no change.
 		t.eq(Hub.ScrollTarget(100, 300, 150, 40, 10), 100)
@@ -210,8 +246,8 @@ return function(t)
 		for _, tab in ipairs(Hub.VisibleTabs(helper)) do
 			table.insert(tabs, tab.id)
 		end
-		t.eq(tabs, { "players", "world" }, "helper: players (go to, bring...) and world (announce)")
-		t.eq(#Hub.VisibleTabs(nil), 5, "the owner sees everything")
+		t.eq(tabs, { "players", "world", "log" }, "helper: players (go to, bring...), world (announce), the log")
+		t.eq(#Hub.VisibleTabs(nil), 6, "the owner sees everything")
 		t.eq(Hub.Allows(helper, "kick"), false)
 		t.eq(Hub.Allows(helper, "goto"), true)
 		t.eq(Hub.Allows(helper, "delegate"), false)
@@ -226,7 +262,22 @@ return function(t)
 		end
 		t.eq(tester.shutdown, true)
 		t.eq(tester.delegate, nil)
-		t.eq(#Hub.VisibleTabs(tester), 4, "TESTER has no DELEGATES tab")
+		t.eq(#Hub.VisibleTabs(tester), 4, "TESTER has no ROLES tab and no PAID ITEMS tab")
+		for _, tab in ipairs(Hub.VisibleTabs(tester)) do
+			t.ok(tab.id ~= "paid" and tab.id ~= "roles", tab.id)
+		end
+		-- A CUSTOM role with the Gifts power sees the PAID ITEMS tab, but cannot revoke there.
+		local gifts = {}
+		for _, action in ipairs(AdminLogic.AllowedActions({ role = "CUSTOM", powers = { "paidgive" } })) do
+			gifts[action] = true
+		end
+		local giftTabs = {}
+		for _, tab in ipairs(Hub.VisibleTabs(gifts)) do
+			table.insert(giftTabs, tab.id)
+		end
+		t.eq(giftTabs, { "paid", "log" })
+		t.eq(Hub.Allows(gifts, "paidgive"), true)
+		t.eq(Hub.Allows(gifts, "paidrevoke"), false)
 	end)
 
 	t.test(
@@ -263,6 +314,197 @@ return function(t)
 			)
 		end
 	)
+
+	t.test("B goes back one level at a time and closes only when there is nothing left", function()
+		local function back(state)
+			state.toolQuery = state.toolQuery or ""
+			return Hub.Back(state)
+		end
+		t.eq(back({ pending = true, toolQuery = "kick", detail = "pass_LuxAxe", listQuery = "x" }), "cancel")
+		t.eq(back({ pending = false, toolQuery = "kick", detail = "pass_LuxAxe", listQuery = "x" }), "clearSearch")
+		t.eq(back({ pending = false, toolQuery = "", detail = "pass_LuxAxe", listQuery = "x" }), "leaveDetail")
+		t.eq(back({ pending = false, toolQuery = "", detail = nil, listQuery = "x" }), "clearFilter")
+		t.eq(back({ pending = false, toolQuery = "", detail = nil, listQuery = "" }), "close")
+		t.eq(back({ pending = false, toolQuery = "", detail = nil, listQuery = nil }), "close")
+	end)
+
+	t.test("the header says who you are, your role and how long it lasts", function()
+		t.eq(Hub.WhoText("Connor", "OWNER"), "Connor  |  OWNER")
+		t.eq(Hub.WhoText("Bob", "DELEGATE", "MODERATOR", 600), "Bob  |  DELEGATE (MODERATOR)  |  10 min left")
+		t.eq(Hub.WhoText("Eve", "TESTER (full power)", "TESTER", nil), "Eve  |  TESTER (full power)")
+	end)
+
+	t.test("rows are bigger on a pad and a phone, and a narrow panel wraps its tabs instead of scrolling", function()
+		t.ok(Hub.RowHeight("console") >= 60)
+		t.ok(Hub.RowHeight("console") > Hub.RowHeight("phone"))
+		t.ok(Hub.RowHeight("phone") > Hub.RowHeight("desktop"))
+		t.ok(Hub.RowHeight("desktop") >= Hub.Layout.MinTouch)
+		t.ok(Hub.HintSize("console") > Hub.HintSize("desktop"))
+		t.ok(Hub.HintSize("phone") >= 12)
+		t.eq(Hub.TabColumns(560, 6), 6, "a roomy panel: one row")
+		t.eq(Hub.TabRows(560, 6), 1)
+		t.eq(Hub.TabColumns(340, 6), 3, "a phone: two rows of three")
+		t.eq(Hub.TabRows(340, 6), 2)
+		t.eq(Hub.TabColumns(340, 3), 3, "a delegate's few tabs stay in one row")
+		t.eq(Hub.TabColumns(340, 5), 3)
+		t.eq(Hub.TabRows(340, 5), 2)
+		t.eq(Hub.TabColumns(340, 0), 1)
+		-- Every tab button still has room for a thumb: at least 44 wide at the narrowest panel.
+		local narrow = 320 - 2 * Hub.Layout.Pad
+		t.ok((narrow - Hub.Layout.Gap * (Hub.TabColumns(320, 6) - 1)) / Hub.TabColumns(320, 6) >= 60)
+	end)
+
+	t.test("the player list: recents first, search narrows, you first among the rest", function()
+		local names = { "bob", "Connor", "Alice", "Dale" }
+		local list = Hub.PlayerList(names, "Connor", {}, "")
+		local out = {}
+		for _, row in ipairs(list) do
+			table.insert(out, row.name)
+		end
+		t.eq(out, { "Connor", "Alice", "bob", "Dale" })
+		list = Hub.PlayerList(names, "Connor", { "Dale", "gone", "Connor", "bob" }, "")
+		out = {}
+		for _, row in ipairs(list) do
+			table.insert(out, row.name .. (row.recent and "*" or ""))
+		end
+		t.eq(out, { "Dale*", "bob*", "Connor", "Alice" }, "recents (online, not you) come first")
+		list = Hub.PlayerList(names, "Connor", { "Dale" }, "ALI")
+		t.eq(#list, 1)
+		t.eq(list[1].name, "Alice")
+		t.eq(list[1].recent, false, "a search is one flat list")
+		t.eq(#Hub.PlayerList(names, "Connor", {}, "zzz"), 0)
+		-- Recents keep the newest first, once each, and are capped.
+		local recents = {}
+		for _, n in ipairs({ "a", "b", "c", "a", "d", "e", "f" }) do
+			recents = Hub.PushName(recents, n)
+		end
+		t.eq(recents[1], "f")
+		t.eq(#recents, Hub.RecentPlayerCap)
+		t.eq(Hub.PushName({ "x", "y" }, "y"), { "y", "x" })
+	end)
+
+	t.test("any list of lines narrows by every typed word, and recents move to the front once", function()
+		local lines = { "/give <player> <amount>", "/kick <player>", "/timespeed <1|4|20|60>" }
+		t.eq(#Hub.FilterLines(lines, ""), 3)
+		t.eq(Hub.FilterLines(lines, "PLAYER kick"), { "/kick <player>" })
+		t.eq(#Hub.FilterLines(lines, "nothing"), 0)
+		t.eq(#Hub.FilterLines(lines, nil), 3)
+		local items = {
+			{ id = "a", name = "A", kind = "Axe" },
+			{ id = "b", name = "B", kind = "Axe" },
+			{ id = "c", name = "C", kind = "Gear" },
+		}
+		local ordered, n = Hub.RecentsFirst(items, { items[3], items[1] })
+		t.eq({ ordered[1].id, ordered[2].id, ordered[3].id }, { "c", "a", "b" })
+		t.eq(n, 2)
+		ordered, n = Hub.RecentsFirst(items, {})
+		t.eq({ ordered[1].id, ordered[3].id }, { "a", "c" })
+		t.eq(n, 0)
+	end)
+
+	t.test("the paid list is the store's, searchable, with recent items first", function()
+		local PaidItems = t.shared("PaidItems")
+		local all = PaidItems.All()
+		local list, n = Hub.PaidList(all, "", {})
+		t.eq(#list, #all)
+		t.eq(n, 0)
+		list, n = Hub.PaidList(all, "", { "product_Cash1k", "pass_LuxAxe", "pass_Gone" })
+		t.eq(list[1].id, "product_Cash1k")
+		t.eq(list[2].id, "pass_LuxAxe")
+		t.eq(n, 2)
+		t.eq(#list, #all, "none twice")
+		list, n = Hub.PaidList(all, "lux", { "product_Cash1k" })
+		t.eq(#list, 1)
+		t.eq(n, 0, "a search is one flat list")
+		t.eq(Hub.PushPaidRecent({ "a", "b" }, "b"), { "b", "a" })
+		local recents = {}
+		for i = 1, 9 do
+			recents = Hub.PushPaidRecent(recents, "x" .. i)
+		end
+		t.eq(#recents, Hub.PaidRecentCap)
+	end)
+
+	t.test("a paid button that can't go says why, with the same reasons the server gives", function()
+		local PaidItems = t.shared("PaidItems")
+		local all = PaidItems.All()
+		local function item(id)
+			return PaidItems.Find(all, id)
+		end
+		local lux = item("pass_LuxAxe")
+		local none = { owned = false, bought = false, granted = false, count = 0, label = "NOT OWNED" }
+		local granted = { owned = true, bought = false, granted = true, count = 0, label = "OWNED (granted)" }
+		local bought = { owned = true, bought = true, granted = false, count = 0, label = "OWNED (bought)" }
+		t.eq(Hub.PaidDisabled(lux, none, "Bob", "Connor", false, false), nil)
+		t.eq(Hub.PaidDisabled(lux, none, nil, "Connor", false, false), "Pick a player first.")
+		t.eq(Hub.PaidDisabled(lux, nil, "Bob", "Connor", false, false), "Loading what Bob owns...")
+		t.eq(
+			Hub.PaidDisabled(lux, granted, "Bob", "Connor", false, false),
+			"They already have Lux Axe from an owner grant."
+		)
+		t.eq(Hub.PaidDisabled(lux, bought, "Bob", "Connor", false, false), "They already own Lux Axe.")
+		t.eq(Hub.PaidDisabled(lux, none, "Bob", "Connor", true, false), "They don't have Lux Axe.")
+		t.eq(Hub.PaidDisabled(lux, granted, "Bob", "Connor", true, false), nil)
+		t.ok(string.find(Hub.PaidDisabled(lux, bought, "Bob", "Connor", true, false), "purchase", 1, true))
+		-- A Gifts-power delegate may only pick themself.
+		t.ok(string.find(Hub.PaidDisabled(lux, none, "Bob", "Connor", false, true), "only gives to you", 1, true))
+		t.eq(Hub.PaidDisabled(lux, none, "Connor", "Connor", false, true), nil)
+		t.eq(
+			Hub.PaidDisabled(item("pass_TimberClassic"), granted, "Bob", "Connor", true, false) ~= nil,
+			true,
+			"no revoke"
+		)
+		-- The row from the server becomes the same state.
+		t.eq(Hub.PaidState(nil), nil)
+		t.eq(Hub.PaidState({ owned = true, granted = true, label = "x", count = 3 }).count, 3)
+	end)
+
+	t.test("a tool that can't go says why before it is pressed", function()
+		local ctx = { who = "Bob", amount = 500, hours = 24, speed = 20, hour = "noon", text = "hi" }
+		t.eq(Hub.ToolDisabled("give", ctx, "Connor"), nil)
+		t.eq(Hub.ToolDisabled("give", { who = nil, amount = 5 }, "Connor"), "Pick a player first.")
+		t.eq(Hub.ToolDisabled("kick", { who = "Connor" }, "Connor"), "You can't do that to yourself.")
+		t.eq(Hub.ToolDisabled("announce", { text = "" }, "Connor") ~= nil, true)
+		t.eq(
+			Hub.ToolDisabled("unban", { userId = nil }, "Connor"),
+			"Type the UserId (a number) of the account to unban."
+		)
+		t.eq(Hub.ToolDisabled("unban", { userId = 99 }, "Connor"), nil)
+		t.eq(Hub.ToolDisabled("paidgive", { who = "Bob", paidId = nil }, "Connor"), "Pick a paid item first.")
+		t.eq(Hub.ToolDisabled("paidgive", { who = "Bob", paidId = "pass_LuxAxe" }, "Connor"), nil)
+		t.ok(
+			string.find(
+				Hub.ToolDisabled("paidgive", { who = "Bob", paidId = "pass_LuxAxe" }, "Connor", true),
+				"Gifts",
+				1,
+				true
+			)
+		)
+		t.eq(Hub.ToolDisabled("nope", ctx, "Connor"), "That tool does not exist.")
+	end)
+
+	t.test("every delegable power has a name and a help line, and the paid tools have hints and words", function()
+		for _, power in ipairs(AdminLogic.DelegablePowers) do
+			t.ok(Hub.PowerLabels[power], power .. " has a name")
+			t.ok(Hub.PowerHelp[power] and #Hub.PowerHelp[power] > 0, power .. " has a help line")
+		end
+		for _, id in ipairs({ "paidgive", "paidrevoke", "paidlist", "unban" }) do
+			local tool = Hub.Tool(id)
+			t.ok(tool and #tool.hint > 0, id)
+		end
+		t.eq(Hub.Tool("paidgive").tab, "paid")
+		t.eq(Hub.Tool("unban").tab, "players")
+		t.eq(Hub.Tool("superrun").tab, "players", "your own tools sit with the players now")
+		t.ok(table.find(
+			(function()
+				local out = {}
+				for _, tool in ipairs(Hub.FilterTools("robux")) do
+					table.insert(out, tool.id)
+				end
+				return out
+			end)(),
+			"paidgive"
+		))
+	end)
 
 	t.test("everything you tap is at least 44 tall, and hint text is never tiny", function()
 		local L = Hub.Layout

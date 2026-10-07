@@ -10,6 +10,7 @@
 -- it. `Check` here only gives the owner a friendly reason before sending.
 
 local AdminLogic = require(script.Parent.AdminLogic)
+local PaidItems = require(script.Parent.PaidItems)
 local WorldTime = require(script.Parent.WorldTime)
 
 local Hub = {}
@@ -29,24 +30,71 @@ Hub.Layout = {
 	PanelMaxH = 660,
 	HintText = 13, -- the 'what is this' line (a phone never reads below 12)
 	MaxListRows = 40, -- item rows drawn at once; narrow the search for the rest
+	PhoneWidth = 520, -- a panel narrower than this wraps its tabs onto two rows
+	ConsoleRow = 64, -- a row on a pad: big enough to land on with a stick
+	PhoneRow = 56, -- a row on a phone: a thumb
+	ConsoleHint = 16,
 }
+
+-- How tall a list row is on this device ("console", "phone" or "desktop").
+function Hub.RowHeight(device: string): number
+	if device == "console" then
+		return Hub.Layout.ConsoleRow
+	elseif device == "phone" then
+		return Hub.Layout.PhoneRow
+	end
+	return Hub.Layout.Row
+end
+
+function Hub.HintSize(device: string): number
+	return if device == "console" then Hub.Layout.ConsoleHint else Hub.Layout.HintText
+end
+
+-- Tab buttons per row: all in one row on a roomy panel, two rows on a narrow
+-- one, so the tabs never scroll sideways and never shrink below a thumb.
+function Hub.TabColumns(panelWidth: number, count: number): number
+	if count <= 0 then
+		return 1
+	end
+	if panelWidth >= Hub.Layout.PhoneWidth or count <= 3 then
+		return count
+	end
+	return math.ceil(count / 2)
+end
+
+function Hub.TabRows(panelWidth: number, count: number): number
+	local cols = Hub.TabColumns(panelWidth, count)
+	return math.ceil(math.max(count, 1) / cols)
+end
 
 ---------------------------------------------------------------------------
 -- Tabs and tools
 ---------------------------------------------------------------------------
 
-export type Tab = { id: string, label: string, hint: string }
+export type Tab = { id: string, label: string, hint: string, always: boolean? }
 
+-- The order is the owner's: who, what to give them, the world, who else may
+-- help, then the log. LB / RB (and LT / RT) step through it.
 Hub.Tabs = {
 	{
 		id = "players",
 		label = "PLAYERS",
-		hint = "Pick a player, then go to them, bring them, heal, freeze, kick or ban.",
+		hint = "Pick a player, then go to them, bring them, heal, freeze, kick or ban. Your own tools are here too.",
 	},
-	{ id = "give", label = "GIVE", hint = "Cash and free items for the player you picked." },
+	{ id = "gifts", label = "GIFTS", hint = "Cash and free items for the player you picked." },
+	{
+		id = "paid",
+		label = "PAID ITEMS",
+		hint = "Give or take back the things the Robux store sells: passes, boosters, the Lux Axe.",
+	},
 	{ id = "world", label = "WORLD", hint = "The clock, announcements and the server." },
-	{ id = "self", label = "SELF", hint = "Things that only change you." },
-	{ id = "delegates", label = "DELEGATES", hint = "Give other people some powers, and take them back." },
+	{ id = "roles", label = "ROLES", hint = "Give other people some powers, and take them back." },
+	{
+		id = "log",
+		label = "LOG",
+		hint = "What was done, and every chat command.",
+		always = true,
+	},
 } :: { Tab }
 
 export type Tool = {
@@ -110,9 +158,9 @@ Hub.Tools = {
 		"resettutorial",
 		"players",
 		"RESET TUTORIAL",
-		"Start their tutorial over.",
+		"Start their tutorial over. They lose their place in it.",
 		"bark",
-		false,
+		true,
 		"murph quest",
 		true
 	),
@@ -138,7 +186,7 @@ Hub.Tools = {
 	),
 	tool(
 		"give",
-		"give",
+		"gifts",
 		"GIVE CASH",
 		"Add the amount to their wallet (the wallet cap still applies).",
 		"buy",
@@ -148,7 +196,7 @@ Hub.Tools = {
 	),
 	tool(
 		"take",
-		"give",
+		"gifts",
 		"TAKE CASH",
 		"Remove the amount, never more than they have.",
 		"skip",
@@ -158,7 +206,7 @@ Hub.Tools = {
 	),
 	tool(
 		"setcash",
-		"give",
+		"gifts",
 		"SET CASH",
 		"Replace their wallet with exactly the amount.",
 		"skip",
@@ -168,7 +216,7 @@ Hub.Tools = {
 	),
 	tool(
 		"unlockbp",
-		"give",
+		"gifts",
 		"UNLOCK ALL BUILDINGS",
 		"Teach them every building plan for good.",
 		"bark",
@@ -178,7 +226,7 @@ Hub.Tools = {
 	),
 	tool(
 		"gift",
-		"give",
+		"gifts",
 		"GIFT ITEM",
 		"Hand over the picked item for free.",
 		"buy",
@@ -229,7 +277,7 @@ Hub.Tools = {
 	),
 	tool(
 		"delegate",
-		"delegates",
+		"roles",
 		"GRANT",
 		"Give the picked player the role for the time you chose. Only you can do this.",
 		"buy",
@@ -239,17 +287,17 @@ Hub.Tools = {
 	),
 	tool(
 		"undelegate",
-		"delegates",
+		"roles",
 		"REVOKE",
 		"Take every power back from the picked player at once.",
 		"skip",
-		false,
+		true,
 		"remove role",
 		true
 	),
 	tool(
 		"delegates",
-		"delegates",
+		"roles",
 		"LIST DELEGATES",
 		"Show who has powers and how long they last.",
 		"blue",
@@ -257,9 +305,58 @@ Hub.Tools = {
 		"roles",
 		false
 	),
-	tool("superrun", "self", "SUPER RUN", "Toggle 4x walk speed for you.", "buy", false, "speed fast", false),
-	tool("god", "self", "GOD MODE", "Toggle no damage for you.", "bark", false, "invincible health", false),
-	tool("tospawn", "self", "GO TO SPAWN", "Teleport you to the spawn point.", "bark", false, "teleport home", false),
+	tool("superrun", "players", "SUPER RUN", "Toggle 4x walk speed for you.", "buy", false, "speed fast self", false),
+	tool("god", "players", "GOD MODE", "Toggle no damage for you.", "bark", false, "invincible health self", false),
+	tool(
+		"tospawn",
+		"players",
+		"GO TO SPAWN",
+		"Teleport you to the spawn point.",
+		"bark",
+		false,
+		"teleport home self",
+		false
+	),
+	tool(
+		"unban",
+		"players",
+		"UNBAN",
+		"Let a banned account back in. Type their numeric UserId.",
+		"bark",
+		true,
+		"ban pardon userid",
+		false
+	),
+	tool(
+		"paidgive",
+		"paid",
+		"GIVE",
+		"Give the picked paid item to the picked player. No Robux, no receipt.",
+		"buy",
+		true,
+		"robux gamepass pass product 2x lux axe booster grant",
+		true
+	),
+	tool(
+		"paidrevoke",
+		"paid",
+		"REVOKE",
+		"Take an owner grant back (or end a booster). A pass they bought stays.",
+		"skip",
+		true,
+		"robux remove take back",
+		true
+	),
+	tool(
+		"paidlist",
+		"paid",
+		"REFRESH WHAT THEY OWN",
+		"Read which paid items the picked player has. Changes nothing.",
+		"blue",
+		false,
+		"owns inventory robux",
+		true
+	),
 } :: { Tool }
 
 function Hub.Tool(id: string): Tool?
@@ -296,6 +393,10 @@ end
 function Hub.VisibleTabs(allowed: { [string]: boolean }?): { Tab }
 	local out: { Tab } = {}
 	for _, tab in ipairs(Hub.Tabs) do
+		if tab.always then
+			table.insert(out, tab)
+			continue
+		end
 		for _, t in ipairs(Hub.ToolsFor(tab.id)) do
 			if Hub.Allows(allowed, t.id) then
 				table.insert(out, tab)
@@ -509,11 +610,31 @@ Hub.PowerLabels = {
 	kick = "Kick",
 	ban = "Ban (up to 1 hour)",
 	gift = "Free items for themself",
+	paidgive = "Gifts: paid items for themself",
 	settime = "Set the hour",
 	timespeed = "Clock speed",
 	timereset = "Reset time",
 	tospawn = "Go to spawn",
 	god = "God mode",
+} :: { [string]: string }
+
+-- One line of help under each power tick (the CUSTOM role's list).
+Hub.PowerHelp = {
+	["goto"] = "Teleport next to a player.",
+	bring = "Teleport a player next to them.",
+	heal = "Give a player full health.",
+	freeze = "Hold a player in place, or let go.",
+	stats = "Read a player's cash, plot and items.",
+	announce = "Show a message to everyone on the server.",
+	kick = "Remove a player from this server.",
+	ban = "Keep a player out for up to 1 hour.",
+	gift = "Hand themself any free item from the shop.",
+	paidgive = "Give themself any Robux-store item (Lux Axe, 2x Cash...). Never to others. Never take back.",
+	settime = "Jump the clock to a named hour (this server).",
+	timespeed = "Run the clock faster (this server).",
+	timereset = "Put the clock back to real time.",
+	tospawn = "Teleport themself to spawn.",
+	god = "No damage for themself.",
 } :: { [string]: string }
 
 Hub.HourNames = { ["6am"] = "6 AM", noon = "Noon", ["6pm"] = "6 PM", midnight = "Midnight" } :: { [string]: string }
@@ -534,6 +655,9 @@ export type Context = {
 	role: string?,
 	powers: { string }?,
 	expiry: string?,
+	paidId: string?, -- a PaidItems id
+	paidHours: number?, -- a boost's length in hours (nil: the item's own)
+	userId: number?, -- unban
 }
 
 -- The request a tool sends for what is picked (the server whitelists it again).
@@ -563,6 +687,13 @@ function Hub.Request(id: string, ctx: Context): { [string]: any }?
 		req.role = ctx.role
 		req.powers = ctx.powers
 		req.expiry = ctx.expiry
+	elseif id == "paidgive" or id == "paidrevoke" then
+		req.itemId = ctx.paidId
+		if id == "paidgive" then
+			req.hours = ctx.paidHours
+		end
+	elseif id == "unban" then
+		req.userId = ctx.userId
 	end
 	return req
 end
@@ -632,6 +763,23 @@ function Hub.Check(req: { [string]: any }, selfName: string): string?
 	elseif action == "announce" then
 		if AdminLogic.AnnounceText(req.text) == nil then
 			return "Type a message first (up to " .. AdminLogic.MaxAnnounce .. " letters)."
+		end
+	elseif action == "paidgive" or action == "paidrevoke" then
+		if type(req.itemId) ~= "string" or req.itemId == "" then
+			return "Pick a paid item first."
+		end
+		local hours = req.hours
+		if
+			action == "paidgive"
+			and hours ~= nil
+			and (type(hours) ~= "number" or hours % 1 ~= 0 or hours < 1 or hours > AdminLogic.MaxPaidHours)
+		then
+			return "Pick a boost length from 1 to " .. AdminLogic.MaxPaidHours .. " hours."
+		end
+	elseif action == "unban" then
+		local id = req.userId
+		if type(id) ~= "number" or id <= 0 or id % 1 ~= 0 or id > 2 ^ 52 then
+			return "Type the UserId (a number) of the account to unban."
 		end
 	end
 	return nil
@@ -728,6 +876,246 @@ function Hub.PushRecent(recents: { Item }, item: Item): { Item }
 		end
 	end
 	return out
+end
+
+---------------------------------------------------------------------------
+-- Who you are, back one level, why a button is off
+---------------------------------------------------------------------------
+
+-- The persistent header line: your name and role, and how long it lasts.
+-- `label` is the server's word ("OWNER", "TESTER (full power)", "DELEGATE").
+function Hub.WhoText(name: string, label: string, grantRole: string?, secondsLeft: number?): string
+	local text = string.format("%s  |  %s", name, label)
+	if grantRole and grantRole ~= "" and not string.find(label, grantRole, 1, true) then
+		text ..= " (" .. grantRole .. ")"
+	end
+	if secondsLeft then
+		text ..= string.format("  |  %d min left", math.ceil(secondsLeft / 60))
+	end
+	return text
+end
+
+export type BackState = { pending: boolean, toolQuery: string, detail: string?, listQuery: string? }
+
+-- What B (or Esc) does: one level back, and only when there is none left,
+-- close. "cancel" drops a pending confirmation, "clearSearch" empties the
+-- tool search, "leaveDetail" goes from an item back to its list, "clearFilter"
+-- empties a list's filter, "close" shuts the hub.
+function Hub.Back(state: BackState): string
+	if state.pending then
+		return "cancel"
+	elseif state.toolQuery ~= "" then
+		return "clearSearch"
+	elseif state.detail ~= nil then
+		return "leaveDetail"
+	elseif state.listQuery ~= nil and state.listQuery ~= "" then
+		return "clearFilter"
+	end
+	return "close"
+end
+
+-- Why a tool can't go right now (the button shows it), or nil. It is the
+-- same check as before sending, so the reason is the one the server would
+-- give. `selfOnly` (a delegate with the Gifts power): paid items only to you.
+function Hub.ToolDisabled(id: string, ctx: Context, selfName: string, selfOnly: boolean?): string?
+	local req = Hub.Request(id, ctx)
+	if not req then
+		return "That tool does not exist."
+	end
+	if selfOnly and (id == "paidgive" or id == "paidlist") and req.target ~= selfName then
+		return "Your Gifts power only gives to you. Pick yourself."
+	end
+	return Hub.Check(req, selfName)
+end
+
+---------------------------------------------------------------------------
+-- The player list: filter, recents first
+---------------------------------------------------------------------------
+
+Hub.RecentPlayerCap = 4
+
+-- Adds a name to the recents (newest first, once each, capped).
+function Hub.PushName(list: { string }, name: string): { string }
+	local out: { string } = { name }
+	for _, other in ipairs(list) do
+		if other ~= name and #out < Hub.RecentPlayerCap then
+			table.insert(out, other)
+		end
+	end
+	return out
+end
+
+local function words(query: unknown): { string }
+	local out: { string } = {}
+	if type(query) == "string" then
+		for w in string.gmatch(string.lower(query), "%S+") do
+			table.insert(out, w)
+		end
+	end
+	return out
+end
+
+local function matchesAll(hay: string, ws: { string }): boolean
+	local lower = string.lower(hay)
+	for _, w in ipairs(ws) do
+		if not string.find(lower, w, 1, true) then
+			return false
+		end
+	end
+	return true
+end
+
+export type PlayerRow = { name: string, recent: boolean }
+
+-- Who the list shows: recents (still online, not you) first, then everyone
+-- else, you first among them (SortNames). `query` filters by name. With a
+-- query the recents are not set apart: a search is one flat list.
+function Hub.PlayerList(names: { string }, selfName: string, recents: { string }, query: unknown): { PlayerRow }
+	local sorted = Hub.SortNames(names, selfName)
+	local ws = words(query)
+	local out: { PlayerRow } = {}
+	local used: { [string]: boolean } = {}
+	if #ws == 0 then
+		for _, name in ipairs(recents) do
+			if table.find(sorted, name) and name ~= selfName and not used[name] then
+				used[name] = true
+				table.insert(out, { name = name, recent = true })
+			end
+		end
+	end
+	for _, name in ipairs(sorted) do
+		if not used[name] and matchesAll(name, ws) then
+			table.insert(out, { name = name, recent = false })
+		end
+	end
+	return out
+end
+
+-- Any list of lines (the chat commands) narrowed by every typed word.
+function Hub.FilterLines(lines: { string }, query: unknown): { string }
+	local ws = words(query)
+	local out: { string } = {}
+	for _, line in ipairs(lines) do
+		if matchesAll(line, ws) then
+			table.insert(out, line)
+		end
+	end
+	return out
+end
+
+-- `list` with the recents moved to the front (their own order), the rest
+-- after, none twice. Returns the new list and how many are recents.
+function Hub.RecentsFirst(list: { Item }, recents: { Item }): ({ Item }, number)
+	local out: { Item } = {}
+	local used: { [string]: boolean } = {}
+	for _, r in ipairs(recents) do
+		for _, item in ipairs(list) do
+			if item.kind == r.kind and item.id == r.id and not used[key(item)] then
+				used[key(item)] = true
+				table.insert(out, item)
+			end
+		end
+	end
+	local n = #out
+	for _, item in ipairs(list) do
+		if not used[key(item)] then
+			table.insert(out, item)
+		end
+	end
+	return out, n
+end
+
+---------------------------------------------------------------------------
+-- Paid items: the hub's list, recents, and what the server says they own
+---------------------------------------------------------------------------
+
+Hub.PaidRecentCap = 4
+
+function Hub.PushPaidRecent(list: { string }, id: string): { string }
+	local out: { string } = { id }
+	for _, other in ipairs(list) do
+		if other ~= id and #out < Hub.PaidRecentCap then
+			table.insert(out, other)
+		end
+	end
+	return out
+end
+
+-- The paid items to list: filtered by the typed words, with the recents
+-- (only when nothing is typed) first. Returns (items, how many are recents).
+function Hub.PaidList(all: { PaidItems.Item }, query: unknown, recents: { string }): ({ PaidItems.Item }, number)
+	local found = PaidItems.Filter(all, query)
+	local ws = words(query)
+	if #ws > 0 then
+		return found, 0
+	end
+	local out: { PaidItems.Item } = {}
+	local used: { [string]: boolean } = {}
+	for _, id in ipairs(recents) do
+		for _, item in ipairs(found) do
+			if item.id == id and not used[id] then
+				used[id] = true
+				table.insert(out, item)
+			end
+		end
+	end
+	local n = #out
+	for _, item in ipairs(found) do
+		if not used[item.id] then
+			table.insert(out, item)
+		end
+	end
+	return out, n
+end
+
+-- What the server sent for one item (a row of the paidstate payload) as a
+-- PaidItems.State, or nil when it has not arrived yet.
+function Hub.PaidState(row: unknown): PaidItems.State?
+	if type(row) ~= "table" then
+		return nil
+	end
+	local r = row :: { [string]: any }
+	return {
+		owned = r.owned == true,
+		bought = r.bought == true,
+		granted = r.granted == true,
+		count = if type(r.count) == "number" then r.count else 0,
+		untilAt = 0,
+		label = if type(r.label) == "string" then r.label else "",
+	}
+end
+
+-- Why GIVE or REVOKE is off for this item and what they own, or nil when it
+-- may go. `row` is what the server sent (nil while it is still coming).
+-- `isRevoke` picks the action; `selfOnly` is a delegate's Gifts power.
+function Hub.PaidDisabled(
+	item: PaidItems.Item,
+	row: unknown,
+	who: string?,
+	selfName: string,
+	isRevoke: boolean,
+	selfOnly: boolean?
+): string?
+	if who == nil or who == "" then
+		return "Pick a player first."
+	end
+	if selfOnly and not isRevoke and who ~= selfName then
+		return "Your Gifts power only gives to you. Pick yourself."
+	end
+	local st = Hub.PaidState(row)
+	if not st then
+		return "Loading what " .. who .. " owns..."
+	end
+	local ok, why
+	if isRevoke then
+		ok, why = PaidItems.CanRevoke(item, st)
+	else
+		ok, why = PaidItems.CanGrant(item, st, nil)
+	end
+	if ok then
+		return nil
+	end
+	return why
 end
 
 ---------------------------------------------------------------------------

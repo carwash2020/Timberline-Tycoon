@@ -1,29 +1,38 @@
 --!strict
--- AdminUI: the owner hub. Only the owner sees it: the server sets the
--- IsOwner attribute on the owner's player, and this module builds nothing
--- without it. That is a convenience, not the lock: every press fires the
--- AdminRun remote with a small request, and AdminService refuses it unless
--- the sender is the owner (and AdminLogic.FromRequest whitelists the
+-- AdminUI: the owner hub. Only the owner (and anyone the owner delegated
+-- powers to) sees it: the server sets the IsOwner attribute on the owner's
+-- player and sends a delegate their grant, and this module builds nothing
+-- without one of them. That is a convenience, not the lock: every press
+-- fires the AdminRun remote with a small request, and AdminService refuses it
+-- unless the sender holds the power (and AdminLogic.FromRequest whitelists the
 -- request). A modified client gets nothing and is not even answered.
 --
 -- Open it with the OWNER side button, or click both thumbsticks (L3 + R3).
--- Close it with the X, B or Esc.
+-- B / Esc go back ONE level (cancel a confirmation, clear a search, leave an
+-- item for its list) and close the hub only when there is nothing left to go
+-- back from. The X closes at once. LB / RB (and LT / RT) change tab.
 --
---   PLAYERS  pick a player once (the bar at the top of every tab), then go
---            to them, bring them, heal, freeze, stats, reset tutorial, kick, ban
---   GIVE     cash (give / take / set), unlock every building, free items
---            (type, search, picked item, recents)
---   WORLD    clock speed, set hour, reset time, announce, shut down server
---   SELF     super run, god mode, go to spawn, and the last actions
+-- A header that never scrolls away says who you are and your role.
+--   PLAYERS      pick a player (search, recents first), go to them, bring
+--                them, heal, freeze, stats, reset tutorial, kick, ban, unban;
+--                your own tools (super run, god mode, go to spawn)
+--   GIFTS        cash (give / take / set), unlock every building, free items
+--                (type, search, recents first)
+--   PAID ITEMS   everything the Robux store sells (Shared/PaidItems, built
+--                from StoreData, so a new store item shows up by itself):
+--                what the picked player owns, GIVE, REVOKE, a boost's length
+--   WORLD        clock speed, set hour, reset time, announce, shut down server
+--   ROLES        give other people some powers, and take them back
+--   LOG          what was done, and every chat command (with a search)
 --
--- The search box in the title finds any tool by name. Every tool has a one
--- line hint under it. Kick, ban, take cash, set cash and shut down need a
--- second press. The strip at the bottom says what just happened or why the
--- server refused. On a pad: D-pad / stick move in the order AdminHubLogic.NavGrid
--- lays out, A presses, LB / RB change tab, and the list scrolls to keep the
--- selected row in view.
--- All rules (tabs, confirmations, filters, navigation) live in
--- Shared/AdminHubLogic, which is tested.
+-- The search box in the header finds any tool by name. Every tool has a one
+-- line hint, and a button that can't go says why under it. Kick, ban, take
+-- cash, set cash, revoke, reset tutorial, giving paid items and shut down all
+-- need a second press. The strip at the bottom says exactly what just
+-- happened or why the server refused. On a pad: D-pad / stick move in the
+-- order AdminHubLogic.NavGrid lays out, A presses, rows are big, and the list
+-- scrolls to keep the selected row in view. All rules (tabs, confirmations,
+-- filters, back, navigation) live in Shared/AdminHubLogic, which is tested.
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -36,6 +45,7 @@ local AdminLogic = require(ReplicatedStorage.Shared.AdminLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
@@ -60,6 +70,8 @@ local state = {
 	expiryIndex = 2,
 	powers = {} :: { [string]: boolean },
 	who = nil :: string?,
+	recentPlayers = {} :: { string },
+	playerQuery = "",
 	amountIndex = 2,
 	custom = "",
 	banIndex = 2,
@@ -72,13 +84,26 @@ local state = {
 	announce = "",
 	toolQuery = "",
 	audit = {} :: { string },
+	unban = "",
+	cmdQuery = "",
+	paidQuery = "",
+	paidId = nil :: string?, -- the paid item opened (its detail level), nil on the list
+	paidRecents = {} :: { string },
+	paidHourIndex = 3,
 }
+
+-- What the server last said the picked player owns (AdminAccess "paidstate").
+local paidState: { target: string?, rows: { [string]: any } } = { target = nil, rows = {} }
+local paidAskedAt: { [string]: number } = {}
 
 local panel: Frame? = nil
 local body: ScrollingFrame? = nil
+local tabsFrame: Frame? = nil
 local sideButton: UITheme.Button? = nil
 local statusLabel: TextLabel? = nil
 local pickedLabel: TextLabel? = nil
+local whoLabel: TextLabel? = nil
+local whoStrip: Frame? = nil
 local auditLabel: TextLabel? = nil
 local amountLabel: TextLabel? = nil
 local tabButtons: { UITheme.Button } = {}
@@ -86,8 +111,6 @@ local objById: { [string]: GuiObject } = {}
 local idOf: { [GuiObject]: string } = {}
 local rows: { { string } } = {}
 local headerRows: { { string } } = { { "search", "close" }, { "tab1", "tab2", "tab3", "tab4" } }
-local listHolder: Frame? = nil
-local listRowStart = 0
 local pending: Hub.Pending? = nil
 local statusOk: boolean? = nil
 local statusText = ""
@@ -154,6 +177,20 @@ local function currentTab(): Hub.Tab
 	return tabs[1] or Hub.Tabs[1]
 end
 
+-- A delegate with the Gifts power gives paid items to themself only.
+local function selfOnly(): boolean
+	return access.allowed ~= nil
+end
+
+local function device(): string
+	return UITheme.Device()
+end
+
+-- A list row's height on this device (a pad gets big rows), plus the 3px edge.
+local function rh(): number
+	return Hub.RowHeight(device()) + 3
+end
+
 ---------------------------------------------------------------------------
 -- Data
 ---------------------------------------------------------------------------
@@ -212,6 +249,31 @@ local function chosenExpiry(): string
 	return choices[math.clamp(state.expiryIndex, 1, #choices)].id
 end
 
+-- The paid items, built fresh from the store data each time they are read.
+local function paidItems(): { PaidItems.Item }
+	return PaidItems.All()
+end
+
+local function paidItem(id: string?): PaidItems.Item?
+	return PaidItems.Find(paidItems(), id)
+end
+
+-- The boost length picked for a paid item (nil: the item's own).
+local function chosenHours(item: PaidItems.Item?): number?
+	if item == nil or item.effect ~= "boost" then
+		return nil
+	end
+	return PaidItems.HourChoices[math.clamp(state.paidHourIndex, 1, #PaidItems.HourChoices)]
+end
+
+local function unbanId(): number?
+	local n = tonumber(state.unban)
+	if n and n > 0 and n % 1 == 0 and n <= 2 ^ 52 then
+		return n
+	end
+	return nil
+end
+
 local function context(): Hub.Context
 	local item = state.item
 	return {
@@ -226,11 +288,14 @@ local function context(): Hub.Context
 		role = AdminLogic.RoleList[state.roleIndex],
 		powers = chosenPowers(),
 		expiry = chosenExpiry(),
+		paidId = state.paidId,
+		paidHours = chosenHours(paidItem(state.paidId)),
+		userId = unbanId(),
 	}
 end
 
 ---------------------------------------------------------------------------
--- Status strip and sending
+-- Status strip, header and sending
 ---------------------------------------------------------------------------
 
 local function paintStatus()
@@ -242,6 +307,28 @@ local function paintStatus()
 	local picked = pickedLabel
 	if picked then
 		picked.Text = "Player: " .. (currentWho() or "nobody")
+	end
+end
+
+-- The persistent "who am I" line: your name, your role, how long it lasts.
+local function paintWho()
+	local label, strip = whoLabel, whoStrip
+	if label then
+		label.Text = Hub.WhoText(
+			player.Name,
+			if access.role == "delegate" then access.label else "OWNER",
+			if access.role == "delegate" then access.grantRole else nil,
+			if access.role == "delegate" then access.secondsLeft else nil
+		)
+	end
+	if strip then
+		strip.BackgroundColor3 = if access.tester
+			then C.Danger
+			elseif access.role == "delegate" then C.Bark
+			else C.PaperDark
+		if label then
+			label.TextColor3 = if access.role == "delegate" then C.Cream else C.Ink
+		end
 	end
 end
 
@@ -260,13 +347,36 @@ local function toolKey(id: string): string
 	if not req then
 		return id
 	end
-	return string.format(
-		"%s:%s:%s:%s",
+	return table.concat({
 		id,
 		tostring(req.target),
 		tostring(req.amount or req.hours or ""),
-		tostring(req.role or "")
-	)
+		tostring(req.role or ""),
+		tostring(req.itemId or ""),
+		tostring(req.userId or ""),
+	}, ":")
+end
+
+-- Presses with a second-press confirmation: the first press arms it (the
+-- button turns amber and says SURE?), a second press for the same thing
+-- within the window fires. `force` asks for the second press even for a tool
+-- that does not always need it.
+local function armOrFire(id: string, key: string, force: boolean, prompt: string, fire: () -> ())
+	local go, nextPending = Hub.Press(id, key, os.clock(), pending, force)
+	pending = nextPending
+	if go then
+		fire()
+		return
+	end
+	setStatus(nil, prompt)
+	render(nil)
+	local mine = nextPending
+	task.delay(Hub.ConfirmWindow + 0.1, function()
+		if pending == mine and mine ~= nil then
+			pending = nil
+			render(nil)
+		end
+	end)
 end
 
 local function runTool(id: string)
@@ -274,7 +384,7 @@ local function runTool(id: string)
 	if not req then
 		return
 	end
-	local reason = Hub.Check(req, player.Name)
+	local reason = Hub.ToolDisabled(id, context(), player.Name, selfOnly())
 	if reason then
 		pending = nil
 		setStatus(false, reason)
@@ -282,34 +392,56 @@ local function runTool(id: string)
 		return
 	end
 	local needsTwo = Hub.NeedsConfirmFor(id, req, access.tester)
-	local fire, nextPending = Hub.Press(id, toolKey(id), os.clock(), pending, needsTwo)
-	pending = nextPending
-	if not fire then
-		local tool = Hub.Tool(id)
-		if id == "delegate" and req.role == "TESTER" then
-			setStatus(false, AdminLogic.TesterWarning .. " Press again to confirm.")
-		else
-			setStatus(nil, "Press again within a few seconds to confirm: " .. (if tool then tool.label else id) .. ".")
+	local tool = Hub.Tool(id)
+	local prompt = "Press again within a few seconds to confirm: " .. (if tool then tool.label else id) .. "."
+	if id == "delegate" and req.role == "TESTER" then
+		prompt = AdminLogic.TesterWarning .. " Press again to confirm."
+	elseif (id == "paidgive" or id == "paidrevoke") and tool then
+		local item = paidItem(state.paidId)
+		prompt = string.format(
+			"%s %s %s %s? Press again to confirm.",
+			if id == "paidgive" then "Give" else "Take back",
+			if item then item.name else "this",
+			if id == "paidgive" then "to" else "from",
+			currentWho() or "them"
+		)
+	end
+	armOrFire(id, toolKey(id), needsTwo, prompt, function()
+		if id == "gift" and state.item then
+			state.recents = Hub.PushRecent(state.recents, state.item)
 		end
+		if tool and tool.needsPlayer and req.target then
+			state.recentPlayers = Hub.PushName(state.recentPlayers, req.target)
+		end
+		if (id == "paidgive" or id == "paidrevoke") and state.paidId then
+			state.paidRecents = Hub.PushPaidRecent(state.paidRecents, state.paidId)
+		end
+		if needsTwo then
+			req.confirmed = true -- "I pressed twice": the server asks for it from a TESTER, never as a permission
+		end
+		setStatus(nil, "Sending...")
+		send(req)
 		render(nil)
-		local mine = nextPending
-		task.delay(Hub.ConfirmWindow + 0.1, function()
-			if pending == mine and mine ~= nil then
-				pending = nil
-				render(nil)
-			end
-		end)
+	end)
+end
+
+-- Asks the server what the picked player owns (the Paid items tab), at most
+-- every couple of seconds per player. The answer arrives as a "paidstate".
+local function askPaid(force: boolean?)
+	if not allowedNow("paidlist") then
 		return
 	end
-	if id == "gift" and state.item then
-		state.recents = Hub.PushRecent(state.recents, state.item)
+	local who = currentWho()
+	if not who or (selfOnly() and who ~= player.Name) then
+		return -- a Gifts delegate reads only their own
 	end
-	if needsTwo then
-		req.confirmed = true -- "I pressed twice": the server asks for it from a TESTER, never as a permission
+	local now = os.clock()
+	local last = paidAskedAt[who]
+	if not force and last and now - last < 2 then
+		return
 	end
-	setStatus(nil, "Sending...")
-	send(req)
-	render(nil)
+	paidAskedAt[who] = now
+	send({ action = "paidlist", target = who })
 end
 
 ---------------------------------------------------------------------------
@@ -356,8 +488,8 @@ local function container(height: number?): Frame
 	return f
 end
 
-local function hintLabel(parent: Instance, text: string)
-	local h = UITheme.label(parent, text, UITheme.Fonts.Body, L.HintText, C.Bark)
+local function hintLabel(parent: Instance, text: string): TextLabel
+	local h = UITheme.label(parent, text, UITheme.Fonts.Body, Hub.HintSize(device()), C.Bark)
 	h.Size = UDim2.fromScale(1, 0)
 	h.AutomaticSize = Enum.AutomaticSize.Y
 	h.TextWrapped = true
@@ -377,7 +509,9 @@ local function section(text: string, hint: string?)
 	f.Parent = body
 end
 
--- One tool: a full-width button with its hint under it.
+-- One tool: a full-width button with its hint under it. When the tool can't
+-- go right now, the button is dim and the reason is under it (pressing it
+-- shows the same reason in the strip).
 local function toolBlock(toolId: string, labelOverride: string?)
 	local tool = Hub.Tool(toolId)
 	if not tool or not allowedNow(toolId) then
@@ -386,30 +520,43 @@ local function toolBlock(toolId: string, labelOverride: string?)
 	local f = container(nil)
 	UITheme.list(f, 4)
 	local text = labelOverride or tool.label
-	if pending and pending.key == toolKey(toolId) and Hub.StillPending(pending, os.clock()) then
+	local armed = pending ~= nil and pending.key == toolKey(toolId) and Hub.StillPending(pending, os.clock())
+	if armed then
 		text = if toolId == "delegate" then "SURE? GIVE FULL POWER" else Hub.SureText(toolId, currentWho())
 	end
+	local why = if armed then nil else Hub.ToolDisabled(toolId, context(), player.Name, selfOnly())
 	local style = tool.style
-	if text ~= (labelOverride or tool.label) then
+	if armed then
 		style = "amber"
+	elseif why then
+		style = "skip"
 	end
-	local b = makeButton(f, "tool_" .. toolId, text, style, UDim2.new(1, 0, 0, L.Row + 3), function()
+	local b = makeButton(f, "tool_" .. toolId, text, style, UDim2.new(1, 0, 0, rh()), function()
 		runTool(toolId)
 	end)
 	b.root.LayoutOrder = 1
-	hintLabel(f, tool.hint).LayoutOrder = 2
+	if why then
+		b.face.TextTransparency = 0.45
+	end
+	local line = hintLabel(f, tool.hint)
+	line.LayoutOrder = 2
+	if why then
+		local reason = hintLabel(f, "Can't yet: " .. why)
+		reason.TextColor3 = C.Danger
+		reason.LayoutOrder = 3
+	end
 	f.Parent = body
 	table.insert(rows, { "tool_" .. toolId })
 end
 
--- caption  ‹ value ›
+-- caption  < value >
 local function stepper(id: string, caption: string, value: string, onStep: (number) -> ())
-	local f = container(L.Row + 3)
+	local f = container(rh())
 	UITheme.list(f, L.Gap, true)
 	local cap = UITheme.label(f, caption, UITheme.Fonts.Black, 15, C.Ink)
 	cap.Size = UDim2.new(0, 64, 1, -3)
 	cap.LayoutOrder = 1
-	local left = makeButton(f, id .. "_prev", "‹", "bark", UDim2.fromOffset(L.Chip + 8, L.Row + 3), function()
+	local left = makeButton(f, id .. "_prev", "‹", "bark", UDim2.fromOffset(L.Chip + 8, rh()), function()
 		onStep(-1)
 	end)
 	left.root.LayoutOrder = 2
@@ -418,7 +565,7 @@ local function stepper(id: string, caption: string, value: string, onStep: (numb
 	v.TextXAlignment = Enum.TextXAlignment.Center
 	v.TextTruncate = Enum.TextTruncate.AtEnd
 	v.LayoutOrder = 3
-	local right = makeButton(f, id .. "_next", "›", "bark", UDim2.fromOffset(L.Chip + 8, L.Row + 3), function()
+	local right = makeButton(f, id .. "_next", "›", "bark", UDim2.fromOffset(L.Chip + 8, rh()), function()
 		onStep(1)
 	end)
 	right.root.LayoutOrder = 4
@@ -426,12 +573,33 @@ local function stepper(id: string, caption: string, value: string, onStep: (numb
 	table.insert(rows, { id .. "_prev", id .. "_next" })
 end
 
--- A row of choices; the chosen one is green.
+-- The width the panel has, in the units the layout uses (the screen's scale removed).
+local function panelWidth(): number
+	local p = panel
+	if not p then
+		return L.PanelMaxW
+	end
+	local ui = p:FindFirstAncestorOfClass("ScreenGui")
+	local scaleObj = if ui then ui:FindFirstChildOfClass("UIScale") else nil
+	local scale = if scaleObj and scaleObj.Scale > 0 then scaleObj.Scale else 1
+	local w = p.AbsoluteSize.X / scale
+	return if w > 0 then w else L.PanelMaxW
+end
+
+-- A row of choices; the chosen one is green. On a narrow panel a long row
+-- wraps onto a second line instead of scrolling sideways.
 local function chips(prefix: string, labels: { string }, selected: number, onPick: (number) -> ())
-	local f = container(L.Chip + 3)
-	UITheme.list(f, L.Gap, true)
 	local n = #labels
-	local ids: { string } = {}
+	local cols = Hub.TabColumns(panelWidth(), n)
+	local nrows = math.ceil(n / cols)
+	local chipH = L.Chip + 3
+	local f = container(nrows * chipH + (nrows - 1) * L.Gap)
+	local grid = Instance.new("UIGridLayout")
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.CellSize = UDim2.new(1 / cols, -math.ceil(L.Gap * (cols - 1) / cols), 0, chipH)
+	grid.CellPadding = UDim2.fromOffset(L.Gap, L.Gap)
+	grid.Parent = f
+	local lines: { { string } } = {}
 	for i, label in ipairs(labels) do
 		local id = prefix .. i
 		local b = makeButton(
@@ -439,20 +607,24 @@ local function chips(prefix: string, labels: { string }, selected: number, onPic
 			id,
 			label,
 			if i == selected then "buy" else "skip",
-			UDim2.new(1 / n, -math.ceil(L.Gap * (n - 1) / n), 0, L.Chip + 3),
+			UDim2.fromOffset(60, chipH),
 			function()
 				onPick(i)
 			end
 		)
 		b.root.LayoutOrder = i
-		table.insert(ids, id)
+		local line = math.ceil(i / cols)
+		lines[line] = lines[line] or {}
+		table.insert(lines[line], id)
 	end
 	f.Parent = body
-	table.insert(rows, ids)
+	for _, ids in ipairs(lines) do
+		table.insert(rows, ids)
+	end
 end
 
 local function textBox(id: string, placeholder: string, text: string, onChanged: (string) -> ()): TextBox
-	local f = container(L.Row)
+	local f = container(Hub.RowHeight(device()))
 	local box = Instance.new("TextBox")
 	box.Name = id
 	box.Size = UDim2.fromScale(1, 1)
@@ -526,6 +698,37 @@ local function followSelection()
 	end
 end
 
+-- A list that re-draws itself while its search box is being typed in (the
+-- box itself is not rebuilt, so it keeps the keyboard). `build` draws the
+-- rows into `holder` and calls `add` with the ids of each row of buttons.
+local function liveList(build: (holder: Frame, add: ({ string }) -> ()) -> ())
+	local holder = container(nil)
+	UITheme.list(holder, 6)
+	holder.Parent = body
+	local startIndex = #rows + 1
+	local count = 0
+	local function refill()
+		for _, child in ipairs(holder:GetChildren()) do
+			if not child:IsA("UIListLayout") then
+				child:Destroy()
+			end
+		end
+		for _ = 1, count do
+			table.remove(rows, startIndex)
+		end
+		count = 0
+		local at = startIndex
+		build(holder, function(ids: { string })
+			table.insert(rows, at, ids)
+			at += 1
+			count += 1
+		end)
+		applyNav()
+	end
+	refill()
+	return refill
+end
+
 ---------------------------------------------------------------------------
 -- Tabs
 ---------------------------------------------------------------------------
@@ -573,79 +776,52 @@ local function amountSection()
 	amountLabel = label
 end
 
-local function fillList()
-	local holder = listHolder
-	if not holder then
-		return
-	end
-	for _, child in ipairs(holder:GetChildren()) do
-		if not child:IsA("UIListLayout") then
-			child:Destroy()
-		end
-	end
-	-- Everything after the fixed rows is the list, so drop its old rows.
-	while #rows >= listRowStart do
-		table.remove(rows)
-	end
-	local found = Hub.Filter(allItems(), state.query, state.category, state.recents)
-	local shown, more = Hub.Limit(found, L.MaxListRows)
-	if #shown == 0 then
-		local none = hintLabel(
-			holder,
-			if state.category == "Recent"
-				then "Nothing gifted yet this session."
-				else "No items match. Clear the search or change the type."
-		)
-		none.LayoutOrder = 1
-	end
-	for i, item in ipairs(shown) do
-		local picked = state.item ~= nil and state.item.id == item.id and state.item.kind == item.kind
-		local id = "item" .. i
-		local b = makeButton(
-			holder,
-			id,
-			(if picked then "✓ " else "") .. item.name .. "  (" .. item.kind .. ")",
-			if picked then "buy" else "skip",
-			UDim2.new(1, 0, 0, L.Row + 3),
-			function()
-				state.item = item
-				setStatus(nil, "Picked " .. item.name .. ". Press GIFT to hand it over.")
-				render(id)
-			end
-		)
-		b.root.LayoutOrder = i + 1
-		table.insert(rows, { id })
-	end
-	if more > 0 then
-		local label = hintLabel(holder, string.format("%d more. Type in the search box to narrow it down.", more))
-		label.LayoutOrder = #shown + 2
-	end
-	applyNav()
+local function pickPlayer(name: string)
+	state.who = name
+	state.recentPlayers = Hub.PushName(state.recentPlayers, name)
+	pending = nil
 end
 
 local function playersTab()
-	section("PLAYERS ON THIS SERVER", "Tap a name to pick them. The pick is kept on every tab.")
-	local list = names()
-	for i, name in ipairs(Hub.SortNames(list, player.Name)) do
-		local id = "player" .. i
-		local f = container(L.Row + 3)
-		local picked = name == state.who
-		local label = name .. (if name == player.Name then " (you)" else "")
-		makeButton(
-			f,
-			id,
-			(if picked then "✓ " else "") .. label,
-			if picked then "buy" else "skip",
-			UDim2.fromScale(1, 1),
-			function()
-				state.who = name
-				pending = nil
-				render(id)
-			end
-		)
-		f.Parent = body
-		table.insert(rows, { id })
-	end
+	section(
+		"PLAYERS ON THIS SERVER",
+		"Tap a name to pick them. The pick is kept on every tab. Recent picks come first."
+	)
+	local refill: (() -> ())? = nil
+	textBox("search_players", "Find a player", state.playerQuery, function(text)
+		state.playerQuery = text
+		local fn = refill
+		if fn then
+			fn()
+		end
+	end)
+	refill = liveList(function(holder, add)
+		local list = Hub.PlayerList(names(), player.Name, state.recentPlayers, state.playerQuery)
+		if #list == 0 then
+			hintLabel(holder, "Nobody here matches. Clear the search.").LayoutOrder = 1
+		end
+		for i, entry in ipairs(list) do
+			local id = "player" .. i
+			local name = entry.name
+			local picked = name == state.who
+			local label = (if entry.recent then "★ " else "")
+				.. name
+				.. (if name == player.Name then " (you)" else "")
+			local b = makeButton(
+				holder,
+				id,
+				(if picked then "✓ " else "") .. label,
+				if picked then "buy" else "skip",
+				UDim2.new(1, 0, 0, rh()),
+				function()
+					pickPlayer(name)
+					render(id)
+				end
+			)
+			b.root.LayoutOrder = i
+			add({ id })
+		end
+	end)
 	local actionIds = { "goto", "bring", "heal", "freeze", "stats", "resettutorial" }
 	if anyAllowed(actionIds) then
 		section("ACTIONS ON " .. string.upper(state.who or "NOBODY"))
@@ -653,10 +829,16 @@ local function playersTab()
 			toolBlock(id)
 		end
 	end
-	if allowedNow("kick") then
-		section("DANGEROUS", "These need a second press.")
-		toolBlock("kick")
+	if anyAllowed({ "superrun", "god", "tospawn" }) then
+		section("ON YOURSELF", "These only change you.")
+		toolBlock("superrun")
+		toolBlock("god")
+		toolBlock("tospawn")
 	end
+	if anyAllowed({ "kick", "ban", "unban" }) then
+		section("DANGEROUS", "These need a second press.")
+	end
+	toolBlock("kick")
 	if allowedNow("ban") then
 		section("BAN LENGTH")
 		local labels: { string } = {}
@@ -670,9 +852,17 @@ local function playersTab()
 		end)
 		toolBlock("ban")
 	end
+	if allowedNow("unban") then
+		section("UNBAN", "Their numeric UserId (it is in the ban line in Output, or on their Roblox profile link).")
+		textBox("unban_id", "UserId to unban", state.unban, function(text)
+			state.unban = string.match(text, "^%s*(.-)%s*$") or ""
+			pending = nil
+		end)
+		toolBlock("unban")
+	end
 end
 
-local function giveTab()
+local function giftsTab()
 	if allowedNow("give") or allowedNow("take") or allowedNow("setcash") then
 		amountSection()
 		section("CASH", "Cash only moves through the economy, so the wallet cap still applies.")
@@ -684,23 +874,208 @@ local function giveTab()
 	if not allowedNow("gift") then
 		return
 	end
-	section("FREE ITEMS", "Pick a type, search, pick an item, then press GIFT.")
+	section("FREE ITEMS", "Pick a type, search, pick an item, then press GIFT. Items you gave lately come first.")
 	stepper("kind", "TYPE", state.category, function(d)
 		state.category = Hub.NextCategory(state.category, d)
 		render("kind_" .. (if d < 0 then "prev" else "next"))
 	end)
+	local refill: (() -> ())? = nil
 	textBox("search_items", "Search items", state.query, function(text)
 		state.query = text
-		fillList()
+		local fn = refill
+		if fn then
+			fn()
+		end
 	end)
 	local item = state.item
 	toolBlock("gift", if item then "GIFT: " .. string.upper(item.name) else nil)
-	local holder = container(nil)
-	UITheme.list(holder, 6)
-	holder.Parent = body
-	listHolder = holder
-	listRowStart = #rows + 1
-	fillList()
+	refill = liveList(function(holder, add)
+		local found = Hub.Filter(allItems(), state.query, state.category, state.recents)
+		local nRecent = 0
+		if state.category == "All" and state.query == "" then
+			found, nRecent = Hub.RecentsFirst(found, state.recents)
+		end
+		local shown, more = Hub.Limit(found, L.MaxListRows)
+		if #shown == 0 then
+			hintLabel(
+				holder,
+				if state.category == "Recent"
+					then "Nothing gifted yet this session."
+					else "No items match. Clear the search or change the type."
+			).LayoutOrder =
+				1
+		end
+		for i, entry in ipairs(shown) do
+			local picked = state.item ~= nil and state.item.id == entry.id and state.item.kind == entry.kind
+			local id = "item" .. i
+			local b = makeButton(
+				holder,
+				id,
+				(if picked then "✓ " elseif i <= nRecent then "★ " else "")
+					.. entry.name
+					.. "  ("
+					.. entry.kind
+					.. ")",
+				if picked then "buy" else "skip",
+				UDim2.new(1, 0, 0, rh()),
+				function()
+					state.item = entry
+					setStatus(nil, "Picked " .. entry.name .. ". Press GIFT to hand it over.")
+					render(id)
+				end
+			)
+			b.root.LayoutOrder = i + 1
+			add({ id })
+		end
+		if more > 0 then
+			hintLabel(holder, string.format("%d more. Type in the search box to narrow it down.", more)).LayoutOrder = #shown
+				+ 2
+		end
+	end)
+end
+
+-- The detail of one paid item: what it is, what the picked player owns of
+-- it, and the two buttons. B (back) returns to the list.
+local function paidDetail(item: PaidItems.Item)
+	local who = currentWho()
+	local row = if paidState.target == who then paidState.rows[item.id] else nil
+	section(
+		string.upper(item.name),
+		(PaidItems.KindLabels[item.kind] or item.kind) .. (if item.forSale then "" else "  |  OFF SALE in the store")
+	)
+	local owns = hintLabel(
+		body :: ScrollingFrame,
+		(who or "Nobody")
+			.. ": "
+			.. (if type(row) == "table" and type(row.label) == "string" then row.label else "loading...")
+	)
+	owns.Font = UITheme.Fonts.Bold
+	owns.TextColor3 = if type(row) == "table" and row.owned == true then C.Money else C.Ink
+	owns.TextSize = 16
+	owns.LayoutOrder = nextOrder()
+	local what = hintLabel(body :: ScrollingFrame, item.description)
+	what.LayoutOrder = nextOrder()
+	local how = hintLabel(body :: ScrollingFrame, "How it is given: " .. item.how)
+	how.LayoutOrder = nextOrder()
+	if item.effect == "boost" then
+		section("BOOST LENGTH", "How long it runs. A purchase gives " .. tostring(item.hours or 0) .. " hours.")
+		local labels: { string } = {}
+		for _, h in ipairs(PaidItems.HourChoices) do
+			table.insert(labels, if h % 24 == 0 then string.format("%d DAYS", h / 24) else string.format("%d HOUR", h))
+		end
+		chips("hours", labels, state.paidHourIndex, function(i)
+			state.paidHourIndex = i
+			pending = nil
+			render("hours" .. i)
+		end)
+	end
+	local giveWhy = Hub.PaidDisabled(item, row, who, player.Name, false, selfOnly())
+	local revokeWhy = Hub.PaidDisabled(item, row, who, player.Name, true, selfOnly())
+	local function block(id: string, label: string, why: string?, hint: string)
+		if not allowedNow(id) then
+			return
+		end
+		local f = container(nil)
+		UITheme.list(f, 4)
+		local armed = pending ~= nil and pending.key == toolKey(id) and Hub.StillPending(pending, os.clock())
+		local text = if armed then "SURE? " .. label else label
+		local tool = Hub.Tool(id)
+		local style = if armed then "amber" elseif why then "skip" elseif tool then tool.style else "skip"
+		local b = makeButton(f, "tool_" .. id, text, style, UDim2.new(1, 0, 0, rh()), function()
+			if why then
+				pending = nil
+				setStatus(false, why)
+				render(nil)
+			else
+				runTool(id)
+			end
+		end)
+		b.root.LayoutOrder = 1
+		if why and not armed then
+			b.face.TextTransparency = 0.45
+		end
+		hintLabel(f, hint).LayoutOrder = 2
+		if why and not armed then
+			local reason = hintLabel(f, "Can't yet: " .. why)
+			reason.TextColor3 = C.Danger
+			reason.LayoutOrder = 3
+		end
+		f.Parent = body
+		table.insert(rows, { "tool_" .. id })
+	end
+	local target = (who or "nobody")
+	block(
+		"paidgive",
+		"GIVE " .. string.upper(item.name) .. " TO " .. string.upper(target),
+		giveWhy,
+		"Needs a second press."
+	)
+	block("paidrevoke", "REVOKE FROM " .. string.upper(target), revokeWhy, item.revokeHow)
+	local back = container(rh())
+	makeButton(back, "paid_back", "BACK TO THE LIST", "bark", UDim2.fromScale(1, 1), function()
+		state.paidId = nil
+		pending = nil
+		render("search_paid")
+	end)
+	back.Parent = body
+	table.insert(rows, { "paid_back" })
+end
+
+local function paidTab()
+	if not allowedNow("paidgive") then
+		return
+	end
+	askPaid(false)
+	local item = paidItem(state.paidId)
+	if state.paidId ~= nil and item == nil then
+		state.paidId = nil -- it left the store data
+	end
+	if item then
+		paidDetail(item)
+		return
+	end
+	local who = currentWho() or "nobody"
+	section(
+		"WHAT " .. string.upper(who) .. " OWNS",
+		"Every item the Robux store sells, from the store data: a new item shows up here by itself. Tap one to give it or take it back. Recent items come first."
+	)
+	local refill: (() -> ())? = nil
+	textBox("search_paid", "Find a paid item", state.paidQuery, function(text)
+		state.paidQuery = text
+		local fn = refill
+		if fn then
+			fn()
+		end
+	end)
+	refill = liveList(function(holder, add)
+		local list, nRecent = Hub.PaidList(paidItems(), state.paidQuery, state.paidRecents)
+		if #list == 0 then
+			hintLabel(holder, "No paid item matches. Clear the search.").LayoutOrder = 1
+		end
+		local theirs = if paidState.target == currentWho() then paidState.rows else {}
+		for i, entry in ipairs(list) do
+			local id = "paiditem" .. i
+			local row = theirs[entry.id]
+			local label = if type(row) == "table" and type(row.label) == "string" then row.label else "..."
+			local owned = type(row) == "table" and row.owned == true
+			local b = makeButton(
+				holder,
+				id,
+				(if i <= nRecent then "★ " else "") .. entry.name .. "  |  " .. label,
+				if owned then "buy" else "skip",
+				UDim2.new(1, 0, 0, rh()),
+				function()
+					state.paidId = entry.id
+					state.paidRecents = Hub.PushPaidRecent(state.paidRecents, entry.id)
+					pending = nil
+					render("tool_paidgive")
+				end
+			)
+			b.root.LayoutOrder = i
+			add({ id })
+		end
+	end)
+	toolBlock("paidlist")
 end
 
 local function worldTab()
@@ -737,7 +1112,7 @@ local function worldTab()
 		end)
 		for i, preset in ipairs(Hub.AnnouncePresets) do
 			local id = "preset" .. i
-			local f = container(L.Row + 3)
+			local f = container(rh())
 			makeButton(f, id, preset, "skip", UDim2.fromScale(1, 1), function()
 				state.announce = preset
 				box.Text = preset
@@ -754,52 +1129,58 @@ local function worldTab()
 	end
 end
 
-local function selfTab()
-	toolBlock("superrun")
-	toolBlock("god")
-	toolBlock("tospawn")
+-- Whether a chat command line (AdminLogic.Help) is one this viewer may run.
+local function commandShown(line: string): boolean
 	if access.allowed == nil then
-		-- The owner's own list: what they did, and what their delegates did.
-		section("LAST ACTIONS", "Newest first. The server also logs each one with both ids in Output.")
-		local audit =
-			UITheme.label(body :: ScrollingFrame, table.concat(state.audit, "\n"), UITheme.Fonts.Body, 14, C.Ink)
-		audit.Size = UDim2.fromScale(1, 0)
-		audit.AutomaticSize = Enum.AutomaticSize.Y
-		audit.TextWrapped = true
-		audit.LayoutOrder = nextOrder()
-		if #state.audit == 0 then
-			audit.Text = "Nothing yet."
-		end
-		auditLabel = audit
+		return true
 	end
-	section("CHAT COMMANDS", "Type /admin in chat for the whole list.")
+	local name = string.match(line, "^/(%a+)")
+	return name == "admin" or (name ~= nil and access.allowed[name] == true)
 end
 
--- A coloured banner: who you are here, and for how long.
-local function accessBanner()
-	if access.role ~= "delegate" then
-		return
+local function logTab()
+	-- The owner's list: what they did, and what their delegates did.
+	section("LAST ACTIONS", "Newest first. The server also logs each one with both ids in Output.")
+	local audit = UITheme.label(body :: ScrollingFrame, table.concat(state.audit, "\n"), UITheme.Fonts.Body, 14, C.Ink)
+	audit.Size = UDim2.fromScale(1, 0)
+	audit.AutomaticSize = Enum.AutomaticSize.Y
+	audit.TextWrapped = true
+	audit.LayoutOrder = nextOrder()
+	if #state.audit == 0 then
+		audit.Text = "Nothing yet."
 	end
-	local f = container(nil)
-	f.BackgroundTransparency = 0
-	f.BackgroundColor3 = if access.tester then C.Danger else C.Bark
-	UITheme.corner(f, 10)
-	UITheme.padding(f, 6, 10, 6, 10)
-	local text = if access.tester then "TESTER (full power)" else "DELEGATE: " .. access.grantRole
-	local left = access.secondsLeft
-	if left then
-		text ..= string.format("  |  %d min left", math.ceil(left / 60))
-	end
-	local label = hintLabel(f, text)
-	label.TextColor3 = C.Cream
-	label.Font = UITheme.Fonts.Black
-	label.TextSize = 15
-	f.Parent = body
+	auditLabel = audit
+	section("CHAT COMMANDS", "Type /admin in chat for the same list. Search to narrow it.")
+	local refill: (() -> ())? = nil
+	textBox("search_cmds", "Find a command", state.cmdQuery, function(text)
+		state.cmdQuery = text
+		local fn = refill
+		if fn then
+			fn()
+		end
+	end)
+	refill = liveList(function(holder, _add)
+		local shown: { string } = {}
+		for _, line in ipairs(AdminLogic.Help) do
+			if commandShown(line) then
+				table.insert(shown, line)
+			end
+		end
+		local found = Hub.FilterLines(shown, state.cmdQuery)
+		if #found == 0 then
+			hintLabel(holder, "No command matches.").LayoutOrder = 1
+		end
+		for i, line in ipairs(found) do
+			local label = hintLabel(holder, line)
+			label.LayoutOrder = i
+			label.TextColor3 = C.Ink
+		end
+	end)
 end
 
 local function delegateRow(i: number, row: { [string]: any })
 	local id = "revoke" .. i
-	local f = container(L.Row + 3)
+	local f = container(rh())
 	UITheme.list(f, L.Gap, true)
 	local left = row.secondsLeft
 	local lasts = if type(left) == "number"
@@ -813,19 +1194,37 @@ local function delegateRow(i: number, row: { [string]: any })
 		14,
 		C.Ink
 	)
-	info.Size = UDim2.new(1, -(110 + L.Gap), 1, -3)
+	info.Size = UDim2.new(1, -(130 + L.Gap), 1, -3)
 	info.TextWrapped = true
 	info.LayoutOrder = 1
-	local b = makeButton(f, id, "REVOKE", "skip", UDim2.fromOffset(110, L.Row + 3), function()
-		setStatus(nil, "Sending...")
-		send({ action = "undelegate", target = tostring(row.name) })
-	end)
+	local key = "undelegate:" .. tostring(row.name)
+	local armed = pending ~= nil and pending.key == key and Hub.StillPending(pending, os.clock())
+	local b = makeButton(
+		f,
+		id,
+		if armed then "SURE?" else "REVOKE",
+		if armed then "amber" else "skip",
+		UDim2.fromOffset(130, rh()),
+		function()
+			armOrFire(
+				"undelegate",
+				key,
+				true,
+				"Press again within a few seconds to take every power back from " .. tostring(row.name) .. ".",
+				function()
+					setStatus(nil, "Sending...")
+					send({ action = "undelegate", target = tostring(row.name) })
+					render(nil)
+				end
+			)
+		end
+	)
 	b.root.LayoutOrder = 2
 	f.Parent = body
 	table.insert(rows, { id })
 end
 
-local function delegatesTab()
+local function rolesTab()
 	local role = AdminLogic.RoleList[state.roleIndex]
 	section("ROLE", AdminLogic.RoleHints[role])
 	chips("role", AdminLogic.RoleList, state.roleIndex, function(i)
@@ -847,24 +1246,30 @@ local function delegatesTab()
 	elseif role == "CUSTOM" then
 		section(
 			"POWERS",
-			"Tick what they may do. Cash, shutdown, super run, saves and delegation are never on this list."
+			"Tick what they may do. Cash, shutdown, super run, saves, revoking paid items and delegation are never on this list."
 		)
 		for _, power in ipairs(AdminLogic.DelegablePowers) do
 			local id = "power_" .. power
 			local on = state.powers[power] == true
-			local f = container(L.Row + 3)
-			makeButton(
+			local f = container(nil)
+			UITheme.list(f, 2)
+			local b = makeButton(
 				f,
 				id,
 				(if on then "✓ " else "") .. (Hub.PowerLabels[power] or power),
 				if on then "buy" else "skip",
-				UDim2.fromScale(1, 1),
+				UDim2.new(1, 0, 0, rh()),
 				function()
 					state.powers[power] = (if on then nil else true) :: any
 					pending = nil
 					render(id)
 				end
 			)
+			b.root.LayoutOrder = 1
+			local help = Hub.PowerHelp[power]
+			if help then
+				hintLabel(f, help).LayoutOrder = 2
+			end
 			f.Parent = body
 			table.insert(rows, { id })
 		end
@@ -883,7 +1288,7 @@ local function delegatesTab()
 	end)
 	toolBlock("delegate", "GRANT " .. role .. " TO " .. string.upper(currentWho() or "NOBODY"))
 	toolBlock("undelegate")
-	section("CURRENT DELEGATES", "Tap REVOKE to take every power back at once.")
+	section("CURRENT DELEGATES", "Tap REVOKE twice to take every power back at once.")
 	if #access.delegates == 0 then
 		hintLabel(body :: ScrollingFrame, "Nobody has powers right now.").LayoutOrder = nextOrder()
 	end
@@ -912,6 +1317,30 @@ local function currentFocusId(): string?
 	return if sel then idOf[sel] else nil
 end
 
+-- Sizes the tab block (one or two rows, by the panel's width) and puts the
+-- scrolling body under it.
+local function relayout()
+	local tabs, scroll, p = tabsFrame, body, panel
+	if not tabs or not scroll or not p then
+		return
+	end
+	local count = #visibleTabs()
+	local cols = Hub.TabColumns(panelWidth(), count)
+	local nrows = Hub.TabRows(panelWidth(), count)
+	local tabH = if device() == "console" then Hub.RowHeight("console") - 8 else L.TabHeight
+	local grid = tabs:FindFirstChildOfClass("UIGridLayout")
+	if grid then
+		grid.CellSize = UDim2.new(1 / cols, -math.ceil(L.Gap * (cols - 1) / cols), 0, tabH + 3)
+	end
+	local tabsTop = 8 + L.Row + L.Gap + 30 + L.Gap
+	local tabsH = nrows * (tabH + 3) + (nrows - 1) * L.Gap
+	tabs.Position = UDim2.fromOffset(L.Pad, tabsTop)
+	tabs.Size = UDim2.new(1, -2 * L.Pad, 0, tabsH)
+	local top = tabsTop + tabsH + L.Gap
+	scroll.Position = UDim2.fromOffset(L.Pad, top)
+	scroll.Size = UDim2.new(1, -2 * L.Pad, 1, -(top + 60 + 16))
+end
+
 render = function(focus: string?)
 	local b = body
 	if not b then
@@ -932,7 +1361,6 @@ render = function(focus: string?)
 	end
 	rows = {}
 	order = 0
-	listHolder = nil
 	amountLabel = nil
 	auditLabel = nil
 	local tabs = visibleTabs()
@@ -950,29 +1378,42 @@ render = function(focus: string?)
 		button.root.Visible = shown
 		if shown then
 			table.insert(tabIds, "tab" .. i)
-			button.root.Size = UDim2.new(1 / #tabs, -math.ceil(L.Gap * (#tabs - 1) / #tabs), 0, L.TabHeight + 3)
 		end
 		button:SetStyle(if def.id == tab.id and state.toolQuery == "" then "amber" else "bark")
 	end
-	headerRows[2] = tabIds
-	accessBanner()
+	-- Tab ids for the pad, one list per row of tabs (two rows on a phone).
+	local cols = Hub.TabColumns(panelWidth(), #tabIds)
+	local tabRows: { { string } } = {}
+	for i, id in ipairs(tabIds) do
+		local line = math.ceil(i / cols)
+		tabRows[line] = tabRows[line] or {}
+		table.insert(tabRows[line], id)
+	end
+	headerRows = { { "search", "close" } }
+	for _, line in ipairs(tabRows) do
+		table.insert(headerRows, line)
+	end
+	relayout()
+	paintWho()
 	if state.toolQuery ~= "" then
 		playerBar()
 		searchResults()
 	else
-		if tab.id ~= "world" and tab.id ~= "self" then
+		if tab.id ~= "world" and tab.id ~= "log" then
 			playerBar()
 		end
 		if tab.id == "players" then
 			playersTab()
-		elseif tab.id == "give" then
-			giveTab()
+		elseif tab.id == "gifts" then
+			giftsTab()
+		elseif tab.id == "paid" then
+			paidTab()
 		elseif tab.id == "world" then
 			worldTab()
-		elseif tab.id == "delegates" then
-			delegatesTab()
+		elseif tab.id == "roles" then
+			rolesTab()
 		else
-			selfTab()
+			logTab()
 		end
 	end
 	applyNav()
@@ -1002,16 +1443,23 @@ local function setTab(id: string)
 	pending = nil
 	statusText = ""
 	statusOk = nil
+	if id ~= "paid" then
+		state.paidId = nil
+	end
 	local searchBox = objById["search"]
 	if searchBox and searchBox:IsA("TextBox") then
 		searchBox.Text = ""
+	end
+	-- A delegate's Gifts power is for themself: start on themself.
+	if id == "paid" and selfOnly() then
+		state.who = player.Name
 	end
 	render(nil)
 	local b = body
 	if b then
 		b.CanvasPosition = Vector2.new(0, 0)
 	end
-	if id == "delegates" and access.allowed == nil then
+	if id == "roles" and access.allowed == nil then
 		send({ action = "delegates" }) -- refresh the list (the owner only; the server ignores anyone else)
 	end
 end
@@ -1027,7 +1475,64 @@ local function stepTab(dir: number)
 	setTab(tabs[Hub.TabStep(at, dir, #tabs)].id)
 end
 
-local function setOpen(on: boolean)
+local setOpen: (boolean) -> ()
+
+-- The filter of the list on the tab in front (what B clears first).
+local function activeListQuery(): string?
+	local id = state.tabId
+	if id == "players" then
+		return state.playerQuery
+	elseif id == "gifts" then
+		return state.query
+	elseif id == "paid" then
+		return state.paidQuery
+	elseif id == "log" then
+		return state.cmdQuery
+	end
+	return nil
+end
+
+-- B / Esc: one level back; close only when there is none left.
+local function goBack()
+	local armed = pending ~= nil and Hub.StillPending(pending, os.clock())
+	local step = Hub.Back({
+		pending = armed,
+		toolQuery = state.toolQuery,
+		detail = if state.tabId == "paid" then state.paidId else nil,
+		listQuery = activeListQuery(),
+	})
+	if step == "cancel" then
+		pending = nil
+		setStatus(nil, "Cancelled. Nothing was done.")
+		render(nil)
+	elseif step == "clearSearch" then
+		local box = objById["search"]
+		state.toolQuery = ""
+		if box and box:IsA("TextBox") then
+			box.Text = ""
+		end
+		render(nil)
+	elseif step == "leaveDetail" then
+		state.paidId = nil
+		render("search_paid")
+	elseif step == "clearFilter" then
+		local id = state.tabId
+		if id == "players" then
+			state.playerQuery = ""
+		elseif id == "gifts" then
+			state.query = ""
+		elseif id == "paid" then
+			state.paidQuery = ""
+		elseif id == "log" then
+			state.cmdQuery = ""
+		end
+		render(nil)
+	else
+		setOpen(false)
+	end
+end
+
+setOpen = function(on: boolean)
 	local p = panel
 	if not p then
 		return
@@ -1050,7 +1555,7 @@ local function setOpen(on: boolean)
 		if inputState ~= Enum.UserInputState.Begin then
 			return Enum.ContextActionResult.Pass
 		end
-		setOpen(false)
+		goBack()
 		return Enum.ContextActionResult.Sink
 	end, false, priority, InputKit.Actions.Cancel.keyboard, InputKit.Actions.Cancel.gamepad)
 	ContextActionService:BindActionAtPriority(TAB_PREV, function(_name, inputState)
@@ -1058,13 +1563,13 @@ local function setOpen(on: boolean)
 			stepTab(-1)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, priority, Enum.KeyCode.ButtonL1)
+	end, false, priority, Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonL2)
 	ContextActionService:BindActionAtPriority(TAB_NEXT, function(_name, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			stepTab(1)
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, priority, Enum.KeyCode.ButtonR1)
+	end, false, priority, Enum.KeyCode.ButtonR1, Enum.KeyCode.ButtonR2)
 	if UITheme.Device() == "console" then
 		MenuPad.Open(objById[headerRows[2][1] or "close"], p)
 	end
@@ -1155,14 +1660,35 @@ local function build()
 		setOpen(false)
 	end)
 
-	-- Tabs.
+	-- Who you are: stays put whatever tab is open.
+	local who = Instance.new("Frame")
+	who.Name = "Who"
+	who.Position = UDim2.fromOffset(L.Pad, 8 + L.Row + L.Gap)
+	who.Size = UDim2.new(1, -2 * L.Pad, 0, 30)
+	who.BackgroundColor3 = C.PaperDark
+	who.BorderSizePixel = 0
+	UITheme.corner(who, 8)
+	UITheme.padding(who, 0, 10, 0, 10)
+	who.Parent = outer
+	whoStrip = who
+	local whoText = UITheme.label(who, "", UITheme.Fonts.Black, 15, C.Ink)
+	whoText.Size = UDim2.fromScale(1, 1)
+	whoText.TextTruncate = Enum.TextTruncate.AtEnd
+	whoLabel = whoText
+
+	-- Tabs: one row on a roomy panel, two on a phone.
 	local tabs = Instance.new("Frame")
 	tabs.Name = "Tabs"
 	tabs.BackgroundTransparency = 1
-	tabs.Position = UDim2.fromOffset(L.Pad, 8 + L.Row + L.Gap)
+	tabs.Position = UDim2.fromOffset(L.Pad, 8 + L.Row + L.Gap + 30 + L.Gap)
 	tabs.Size = UDim2.new(1, -2 * L.Pad, 0, L.TabHeight + 3)
 	tabs.Parent = outer
-	UITheme.list(tabs, L.Gap, true)
+	local tabGrid = Instance.new("UIGridLayout")
+	tabGrid.SortOrder = Enum.SortOrder.LayoutOrder
+	tabGrid.CellSize = UDim2.new(1 / #Hub.Tabs, 0, 0, L.TabHeight + 3)
+	tabGrid.CellPadding = UDim2.fromOffset(L.Gap, L.Gap)
+	tabGrid.Parent = tabs
+	tabsFrame = tabs
 	for i, tab in ipairs(Hub.Tabs) do
 		local b = UITheme.Button({
 			text = tab.label,
@@ -1171,7 +1697,6 @@ local function build()
 			textSize = 15,
 			name = "Tab" .. tab.id,
 		})
-		b.root.Size = UDim2.new(1 / #Hub.Tabs, -math.ceil(L.Gap * (#Hub.Tabs - 1) / #Hub.Tabs), 0, L.TabHeight + 3)
 		b.root.LayoutOrder = i
 		b.root.Parent = tabs
 		register("tab" .. i, b.face)
@@ -1203,14 +1728,14 @@ local function build()
 	status.TextTruncate = Enum.TextTruncate.AtEnd
 	statusLabel = status
 
-	-- The scrolling body; the pad's selection scrolls it along.
-	local top = 8 + L.Row + L.Gap + L.TabHeight + 3 + L.Gap
+	-- The scrolling body; the pad's selection scrolls it along. Its place
+	-- under the tabs is set by relayout().
 	local scroll = Instance.new("ScrollingFrame")
 	scroll.Name = "Body"
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
-	scroll.Position = UDim2.fromOffset(L.Pad, top)
-	scroll.Size = UDim2.new(1, -2 * L.Pad, 1, -(top + 60 + 16))
+	scroll.Position = UDim2.fromOffset(L.Pad, 120)
+	scroll.Size = UDim2.new(1, -2 * L.Pad, 1, -200)
 	scroll.CanvasSize = UDim2.new()
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.ScrollBarThickness = 8
@@ -1222,6 +1747,13 @@ local function build()
 	body = scroll
 
 	GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(followSelection)
+
+	-- A rotated phone or a resized window can change the tab rows.
+	outer:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		if outer.Visible then
+			render(nil)
+		end
+	end)
 
 	Players.PlayerAdded:Connect(function()
 		if outer.Visible then
@@ -1273,9 +1805,9 @@ local function build()
 end
 
 -- The server's word on what this player's hub may show (AdminAccess): an
--- owner's list of delegates, a delegate's grant, the audit lines, or the end
--- of a grant (the hub closes at once). It only shapes the UI; every request is
--- re-checked on the server.
+-- owner's list of delegates, a delegate's grant, the audit lines, what a
+-- player owns of the paid items, or the end of a grant (the hub closes at
+-- once). It only shapes the UI; every request is re-checked on the server.
 local built = false
 local function ensureBuilt()
 	if not built and hasHub() then
@@ -1296,6 +1828,7 @@ syncHub = function()
 		title.Text = if access.role == "delegate" then (if access.tester then "TESTER" else "DELEGATE") else "OWNER"
 		title.TextColor3 = if access.tester then C.Danger else C.Ink
 	end
+	paintWho()
 	if not can then
 		setOpen(false)
 	end
@@ -1312,6 +1845,16 @@ local function onAccess(payload: unknown)
 			local label = auditLabel
 			if label then
 				label.Text = table.concat(state.audit, "\n")
+			end
+		end
+		return
+	end
+	if p.kind == "paidstate" then
+		if type(p.target) == "string" and type(p.rows) == "table" then
+			paidState = { target = p.target, rows = p.rows }
+			local panelNow = panel
+			if panelNow and panelNow.Visible and state.tabId == "paid" then
+				render(nil)
 			end
 		end
 		return

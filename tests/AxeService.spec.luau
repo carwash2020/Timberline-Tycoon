@@ -213,4 +213,32 @@ return function(t)
 		t.eq(#s.profile.axes, 2)
 		t.ok(string.find(s.toasts[1], "can't be dropped") ~= nil)
 	end)
+
+	t.test(
+		"taking a pass axe away removes it everywhere, never leaves the player without an axe, and keeps the rest",
+		function()
+			local s = setup({ { uid = "lux", id = "LuxAxe" }, { uid = "steel", id = "SteelAxe" } })
+			s.profile.accountAxes = { "LuxAxe" }
+			s.profile.slots = {}
+			s.profile.equippedAxe = "lux"
+			t.eq(s.AxeService.RemoveAll(s.player, "LuxAxe"), 1)
+			t.eq(#s.profile.axes, 1)
+			t.eq(s.profile.axes[1].id, "SteelAxe")
+			t.eq(s.tools.lux.destroyed, true, "its tool is gone from the hand")
+			t.eq(s.tools.steel.destroyed, false)
+			t.eq(s.profile.accountAxes, {})
+			t.eq(s.profile.equippedAxe, "")
+			t.eq(s.AxeService.RemoveAll(s.player, "LuxAxe"), 0, "twice is the same")
+			-- If it was the only axe, they get the Rusty Axe, never nothing.
+			local only = setup({ { uid = "lux", id = "LuxAxe" } })
+			only.profile.accountAxes = { "LuxAxe" }
+			only.profile.slots = {}
+			only.player.FindFirstChildOfClass = function()
+				return nil -- no Backpack right now (mid-respawn): the Rusty Axe is saved, its tool comes at the next spawn
+			end
+			t.eq(only.AxeService.RemoveAll(only.player, "LuxAxe"), 1)
+			t.eq(#only.profile.axes, 1)
+			t.eq(only.profile.axes[1].id, "RustyAxe")
+		end
+	)
 end

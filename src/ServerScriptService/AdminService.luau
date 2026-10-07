@@ -18,6 +18,8 @@ local EconomyService = require(script.Parent.EconomyService)
 local ProfileService = require(script.Parent.ProfileService)
 local ShopService = require(script.Parent.ShopService)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
+local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WorldTime = require(ReplicatedStorage.Shared.WorldTime)
@@ -34,6 +36,10 @@ export type Hooks = {
 	publishBlueprints: ((Player) -> ())?,
 	placeSample: ((Player, string) -> (boolean, string))?, -- PlotService.PlaceSample
 	clearSamples: ((Player) -> number)?, -- PlotService.ClearSamples
+	-- The paid-item hooks (MonetizationService.OwnerGrant, OwnerRevoke, OwnerState).
+	paidGrant: ((Player, string, { userId: number, name: string }, number?) -> (boolean, string))?,
+	paidRevoke: ((Player, string, { userId: number, name: string }) -> (boolean, string))?,
+	paidState: ((Player) -> { [string]: any })?,
 }
 local hooks: Hooks = {}
 
@@ -150,6 +156,9 @@ local aimsAtPlayer: { [string]: boolean } = {
 	take = true,
 	setcash = true,
 	gift = true,
+	paidgive = true,
+	paidrevoke = true,
+	paidlist = true,
 }
 
 function AdminService.SetClock(fn: () -> number)
@@ -373,6 +382,28 @@ handlers.setcash = function(owner, args)
 	end
 end
 
+-- An item's own name ("Steel Axe") for the toast, else its id.
+local function giftName(kind: string, itemId: string): string
+	local def: any = nil
+	if kind == "Axe" then
+		def = ItemCatalog.GetAxe(itemId)
+	elseif kind == "Gear" then
+		def = ItemCatalog.GetGear(itemId)
+	elseif kind == "Sawmill" then
+		def = ItemCatalog.GetSawmill(itemId)
+	elseif kind == "Machine" then
+		def = ItemCatalog.GetMachine(itemId)
+	elseif kind == "Blueprint" then
+		for _, bp in ipairs(PlotData.Blueprints) do
+			if bp.id == itemId then
+				def = bp
+				break
+			end
+		end
+	end
+	return if def and type(def.displayName) == "string" then def.displayName else itemId
+end
+
 handlers.gift = function(owner, args)
 	local who = target(owner, args[1])
 	local kind, itemId = args[2], args[3]
@@ -391,10 +422,103 @@ handlers.gift = function(owner, args)
 	})
 	log(owner, string.format("gift %s %s to %s: %s", kind, itemId, who.Name, line))
 	if ok then
-		notify(owner, string.format("Gave %s the %s %s.", who.Name, string.lower(kind), itemId))
+		notify(owner, string.format("Gave %s to %s.", giftName(kind, itemId), who.Name))
 	else
 		refuse(owner, string.format("Couldn't gift %s (%s).", itemId, line))
 	end
+end
+
+-- Paid items (the hub's Paid items tab, or /paidgive, /paidrevoke, /paidlist).
+-- The effects are MonetizationService's (OwnerGrant, OwnerRevoke): the same
+-- ones a purchase has, with no Robux. Here: who may ask (AdminLogic.GrantAllows
+-- ran in Run; paidrevoke checks the role again), which player, which item.
+local function paidItem(owner: Player, word: string?): PaidItems.Item?
+	local item = PaidItems.Find(PaidItems.All(), word)
+	if not item then
+		refuse(owner, "That is not a paid item. /paidlist <player> shows the ids.")
+	end
+	return item
+end
+
+-- Tells `to`'s hub what `who` owns (a payload the hub draws on the Paid items tab).
+local function sendPaidState(to: Player, who: Player)
+	local fn = hooks.paidState
+	if fn then
+		accessSend(to, { kind = "paidstate", target = who.Name, rows = fn(who) })
+	end
+end
+
+handlers.paidgive = function(owner, args)
+	local who = target(owner, args[1])
+	if not who then
+		return
+	end
+	local item = paidItem(owner, args[2])
+	if not item then
+		return
+	end
+	local hours: number? = nil
+	if args[3] ~= nil then
+		hours = tonumber(args[3])
+		if hours == nil or hours ~= hours or hours % 1 ~= 0 or hours < 1 or hours > AdminLogic.MaxPaidHours then
+			refuse(owner, "Hours must be a whole number from 1 to " .. AdminLogic.MaxPaidHours .. ".")
+			return
+		end
+	end
+	local fn = hooks.paidGrant
+	if not fn then
+		refuse(owner, "Paid items are not wired on this server.")
+		return
+	end
+	local ok, text = fn(who, item.id, { userId = owner.UserId, name = owner.Name }, hours)
+	log(owner, string.format("paidgive %s to %s (%d): %s", item.id, who.Name, who.UserId, text))
+	if ok then
+		notify(owner, text)
+	else
+		refuse(owner, text)
+	end
+	sendPaidState(owner, who)
+end
+
+handlers.paidrevoke = function(owner, args)
+	if actor.role ~= "owner" then
+		refuse(owner, "Only the owner can do that.")
+		return
+	end
+	local who = target(owner, args[1])
+	if not who then
+		return
+	end
+	local item = paidItem(owner, args[2])
+	if not item then
+		return
+	end
+	local fn = hooks.paidRevoke
+	if not fn then
+		refuse(owner, "Paid items are not wired on this server.")
+		return
+	end
+	local ok, text = fn(who, item.id, { userId = owner.UserId, name = owner.Name })
+	log(owner, string.format("paidrevoke %s from %s (%d): %s", item.id, who.Name, who.UserId, text))
+	if ok then
+		notify(owner, text)
+	else
+		refuse(owner, text)
+	end
+	sendPaidState(owner, who)
+end
+
+handlers.paidlist = function(owner, args)
+	local who = target(owner, args[1])
+	if not who then
+		return
+	end
+	if not hooks.paidState then
+		refuse(owner, "Paid items are not wired on this server.")
+		return
+	end
+	sendPaidState(owner, who)
+	notify(owner, "Showing what " .. who.Name .. " owns.")
 end
 
 handlers.kick = function(owner, args, rest)

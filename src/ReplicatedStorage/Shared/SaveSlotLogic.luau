@@ -34,6 +34,8 @@ local ACCOUNT: { [string]: boolean } = {
 	accountAxes = true,
 	slots = true,
 	passes = true,
+	ownerGrants = true, -- passes the owner granted (PaidItems): account-wide like passes
+	ownerGrantLog = true,
 	-- Account-wide progress (wave 0). A load, reset, or swap must not
 	-- trade these away. storage, plot.squares, permissions, and questAxe
 	-- stay on the slot.
@@ -413,7 +415,8 @@ function SaveSlotLogic.GrantPassTrucks(data: any)
 end
 
 local function grantOwnedPassTruck(data: any)
-	if type(data.passes) == "table" and data.passes[SaveSlotLogic.PassTruckId] == true then
+	local granted = type(data.ownerGrants) == "table" and data.ownerGrants[SaveSlotLogic.PassTruckId] ~= nil
+	if granted or (type(data.passes) == "table" and data.passes[SaveSlotLogic.PassTruckId] == true) then
 		SaveSlotLogic.GrantPassTrucks(data)
 	end
 end
@@ -489,6 +492,37 @@ function SaveSlotLogic.SyncAccountAxes(data: any, guid: () -> string)
 			data.bestAxeTier = math.max(tonumber(data.bestAxeTier) or 1, tier)
 		end
 	end
+end
+
+-- Takes a pass axe off the account: the live axes, the account list and
+-- every parked slot, so SyncAccountAxes can't bring it back. For the owner
+-- hub's revoke of a granted pass (an axe the player never bought). Returns
+-- how many copies were removed from the live axes.
+function SaveSlotLogic.ForgetAccountAxe(data: any, id: string): number
+	local function strip(list: any): number
+		local removed = 0
+		if type(list) ~= "table" then
+			return 0
+		end
+		for i = #list, 1, -1 do
+			local item = list[i]
+			if item == id or (type(item) == "table" and item.id == id) then
+				table.remove(list, i)
+				removed += 1
+			end
+		end
+		return removed
+	end
+	strip(data.accountAxes)
+	local live = strip(data.axes)
+	if type(data.slots) == "table" then
+		for _, slot in ipairs(data.slots) do
+			if type(slot) == "table" then
+				strip(slot.axes)
+			end
+		end
+	end
+	return live
 end
 
 -- Old single-save profiles become slot 1. Live fields stay as they are, so

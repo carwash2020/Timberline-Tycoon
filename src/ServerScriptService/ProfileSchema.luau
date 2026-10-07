@@ -13,6 +13,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local KitPaint = require(ReplicatedStorage.Shared.KitPaint)
 local PaintShop = require(ReplicatedStorage.Shared.PaintShop)
+local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
@@ -242,6 +243,13 @@ export type Profile = {
 	-- UserOwnsGamePassAsync: once true, a failed ownership check on rejoin
 	-- does not take the pass away.
 	passes: { [string]: boolean },
+	-- Passes the owner granted from the hub (PaidItems, MonetizationService.
+	-- OwnerGrant): pass key -> who and when. Kept apart from `passes` so the
+	-- join check ORs them in and a revoke only ever takes a grant away, never
+	-- a purchase. Account-wide, like `passes`.
+	ownerGrants: { [string]: { at: number, by: number, byName: string } },
+	-- The last few owner grants and revokes (PaidItems.LogCap), oldest first.
+	ownerGrantLog: { PaidItems.LogEntry },
 	-- Paint Shop colors, per truck id, on this slot. Cosmetic only.
 	truckPaint: { [string]: string },
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
@@ -331,6 +339,8 @@ local TEMPLATE: Profile = {
 	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0, loginDay = 0, lastLoginDay = 0 },
 	purchaseIds = {},
 	passes = {},
+	ownerGrants = {},
+	ownerGrantLog = {},
 	truckPaint = {},
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
@@ -769,6 +779,10 @@ function ProfileSchema.Migrate(data: any)
 	if type(data.passes) ~= "table" then
 		data.passes = {}
 	end
+	-- Owner grants and their log: cleaned each load, so a bad entry never
+	-- reaches the join check (idempotent).
+	data.ownerGrants = PaidItems.CleanGrants(data.ownerGrants)
+	data.ownerGrantLog = PaidItems.CleanLog(data.ownerGrantLog)
 	-- Per slot, with the truck. Anything that isn't a palette color on a
 	-- real truck is dropped.
 	data.truckPaint = PaintShop.Sanitize(data.truckPaint)
