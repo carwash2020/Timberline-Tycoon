@@ -614,6 +614,12 @@ local function flowQuiet(): boolean
 	return CoreLoop.V2() and NoticePolicy.FlowQuiet(player:GetAttribute("TutorialStep"), TutorialData.RefresherLast)
 end
 
+-- The dialogue box is up (DialogueUI sets TalkOpen): only errors show, the
+-- rest wait for it to close (NoticePolicy hold).
+local function talkHeld(): boolean
+	return player:GetAttribute("TalkOpen") == true
+end
+
 local function applyDecision(decision: NoticePolicy.Decision)
 	for _, id in ipairs(decision.evict) do
 		for _, toast in ipairs(toasts) do
@@ -636,7 +642,7 @@ local function pump()
 	task.spawn(function()
 		while NoticePolicy.Pending(policy) do
 			task.wait(0.25)
-			local decision = NoticePolicy.Tick(policy, os.clock(), flowQuiet())
+			local decision = NoticePolicy.Tick(policy, os.clock(), flowQuiet(), talkHeld())
 			if decision then
 				applyDecision(decision)
 			end
@@ -666,7 +672,7 @@ function HUD.Toast(
 		seconds = shown,
 		key = if options then options.key else nil,
 		once = if options then options.once else nil,
-	}, os.clock(), flowQuiet())
+	}, os.clock(), flowQuiet(), talkHeld())
 	applyDecision(decision)
 	if decision.action == "queue" then
 		pump()

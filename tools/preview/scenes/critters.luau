@@ -61,10 +61,10 @@ return {
 
 		-- Rabbits and a winter hare.
 		for i = 1, 3 do
-			put(CritterArt.Rabbit(i), CF.new(0 + (i - 1) * 2.2, 0, -6) * CF.Angles(0, math.rad(-30 + i * 25), 0))
+			put(CritterArt.Rabbit(i), CF.new(-1 + (i - 1) * 3.6, 0, -6) * CF.Angles(0, math.rad(-30 + i * 25), 0))
 		end
-		put(CritterArt.Rabbit(9, true), CF.new(7, 0, -6) * CF.Angles(0, math.rad(40), 0))
-		label("RABBITS", 3.5, -10)
+		put(CritterArt.Rabbit(9, true), CF.new(9, 0, -6) * CF.Angles(0, math.rad(40), 0))
+		label("RABBITS", 4.5, -10)
 
 		-- A doe and a buck.
 		put(CritterArt.Deer(2), CF.new(16, 0, -4) * CF.Angles(0, math.rad(-35), 0))

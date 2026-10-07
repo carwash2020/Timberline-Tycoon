@@ -220,4 +220,42 @@ return function(t)
 		t.ok(peak <= 1, "only one non-critical at a time: " .. peak)
 		t.ok(shown <= 2, "a cooldown and one slot: " .. shown)
 	end)
+
+	t.test("hold (the dialogue box is open): errors show, a sale waits, ambient news is dropped", function()
+		local state = NoticePolicy.New()
+		-- Critical: always, held or not.
+		local err =
+			NoticePolicy.Offer(state, { text = "Too far away. Walk closer to chop.", seconds = 3 }, 10, false, true)
+		t.eq(err.action, "show")
+		-- Normal: queued, not shown on top of someone's words.
+		local sale = NoticePolicy.Offer(state, { text = "Sold 3 logs for $120.", seconds = 3 }, 10.1, false, true)
+		t.eq(sale.action, "queue")
+		t.eq(#state.queue, 1)
+		-- Low: dropped, the dialogue is why.
+		local news =
+			NoticePolicy.Offer(state, { text = "New in your Field Guide: Oak.", seconds = 3 }, 10.2, false, true)
+		t.eq(news.action, "drop")
+		t.eq(news.reason, "dialogue")
+		-- The queue is not released while it is held...
+		t.eq(NoticePolicy.Tick(state, 12, false, true), nil)
+		t.eq(#state.queue, 1, "still waiting")
+		-- ...and comes out when the box closes (if it is not stale yet).
+		local out = NoticePolicy.Tick(state, 13, false, false)
+		t.ok(out ~= nil and out.action == "show" and out.text == "Sold 3 logs for $120.", "shown after the box closes")
+	end)
+
+	t.test("a nil hold is no hold", function()
+		local state = NoticePolicy.New()
+		local d = NoticePolicy.Offer(state, { text = "Sold 3 logs for $120.", seconds = 3 }, 1, false, false)
+		t.eq(d.action, "show")
+		local again = NoticePolicy.Offer(state, { text = "Bought a Steel Axe.", seconds = 3 }, 5, false, nil)
+		t.eq(again.action, "show")
+	end)
+
+	t.test("a notice held past MaxWait is stale when the box closes", function()
+		local state = NoticePolicy.New()
+		NoticePolicy.Offer(state, { text = "Sold 3 logs for $120.", seconds = 3 }, 1, false, true)
+		t.eq(NoticePolicy.Tick(state, 1 + NoticePolicy.MaxWait + 1, false, false), nil)
+		t.eq(NoticePolicy.Pending(state), false)
+	end)
 end
