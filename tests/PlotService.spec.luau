@@ -478,6 +478,85 @@ return function(t)
 		t.eq(s.lastToast(), "Your plot size is already the biggest.")
 	end)
 
+	t.test(
+		"the build platform: a collidable slab 1 stud over the grass that grows with the tier and squares",
+		function()
+			local PlotPlatform = t.shared("PlotPlatform")
+			local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+			local s = setup({ cash = 20000 })
+			local center = s.PlotData.Slots[1]
+			local ground = TerrainGen.HeightAt(center.X, center.Y)
+			local function count(folder, name)
+				local n = 0
+				for _, child in ipairs(folder:GetChildren()) do
+					if child.Name == name then
+						n += 1
+					end
+				end
+				return n
+			end
+			-- An open plot already shows its platform: the Campsite's 80 studs, opaque.
+			local plot = s.plot(1)
+			local pad = plot:FindFirstChild("Pad")
+			t.eq(pad.Size.X, 80)
+			t.eq(pad.Size.Y, s.PlotData.PlatformThick)
+			t.eq(pad.CanCollide, true, "you stand on it")
+			t.ok(pad.Transparency == nil or pad.Transparency == 0, "a solid slab, never a faint paint")
+			t.ok(
+				math.abs(pad.CFrame.Position.Y + pad.Size.Y / 2 - (ground + 1)) < 1e-6,
+				"its top is 1 stud over the grass"
+			)
+			t.eq(plot.PrimaryPart, pad)
+			local folder = plot:FindFirstChild("Platform")
+			t.eq(count(folder, "Ramp"), 4)
+			t.eq(count(folder, "Land"), 0)
+			for _, ramp in ipairs(folder:GetChildren()) do
+				t.eq(ramp.ClassName, "WedgePart")
+				t.eq(ramp.CanCollide, true)
+			end
+			-- Plot-local y = 0 is the platform's top: a saved piece at (0, 0) stands on it.
+			local ann, profile = s.newPlayer(1, "Ann")
+			s.claim(ann, 1)
+			ann.standOn(1)
+			s.P.Place(ann, "Flag", 0, 0, 0)
+			t.ok(
+				math.abs(s.items(1)[1].placedWorld.Y - (ground + 1)) < 1e-6,
+				"a piece at plot-local y 0 is on the platform top"
+			)
+			-- A bought square past the tier is a Land slab and its own ramps.
+			s.P.Expand(ann, 1, 0, 0) -- square "1,0": x 20..60, 20 studs of it past the Campsite's edge at 40
+			local squares = profile.plot.squares
+			t.eq(squares, { "1,0" })
+			local layout = PlotPlatform.Layout(80, squares)
+			t.eq(#layout.land, 1)
+			t.eq(count(folder, "Land"), 1)
+			t.eq(count(folder, "Ramp"), #layout.ramps)
+			-- The tier grows the slab; the square's slab shrinks to what the tier leaves.
+			profile.cash = 20000
+			s.P.Upgrade(ann)
+			t.eq(plot:FindFirstChild("Pad").Size.X, 110)
+			t.ok(math.abs(pad.CFrame.Position.Y + pad.Size.Y / 2 - (ground + 1)) < 1e-6, "still 1 stud up")
+			layout = PlotPlatform.Layout(110, squares)
+			t.eq(count(folder, "Land"), #layout.land)
+			t.eq(count(folder, "Ramp"), #layout.ramps)
+			-- The sign stands on the grass past the ramps, nothing flat shares a plane with the platform.
+			local top = ground + 1
+			for _, marker in ipairs(plot:FindFirstChild("Border"):GetChildren()) do
+				t.ok(marker.Name ~= "Square" and marker.Name ~= "Apron", "no old paint pads: the platform is the yard")
+				local bottom = marker.CFrame.Position.Y - marker.Size.Y / 2
+				t.ok(
+					math.abs(bottom - top) >= s.PlotData.PlatformEdgeClear,
+					marker.Name .. " is not coplanar with the top"
+				)
+			end
+			local sign = plot:FindFirstChild("Sign")
+			t.ok(
+				sign.CFrame.Position.Z - center.Y >= layout.extent / 2 + s.PlotData.PlatformRamp,
+				"the sign is past the ramps"
+			)
+		end
+	)
+
 	t.test("your layout comes back on whichever plot is free when you rejoin", function()
 		local s = setup()
 		local bob = s.newPlayer(2, "Bob")
@@ -586,7 +665,28 @@ return function(t)
 		t.eq(bobProfile.sawmillStock, { "SkyBin" }, "Bob keeps his box")
 	end)
 
-	t.test("taking the Sky Bin back returns it to stock for free, and what is in it waits", function()
+	t.test("the Sky Bin sells back for half like a mill; no stock, no re-boxing, no free copy later", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.sawmillStock = { "SkyBin" }
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		t.eq(profile.skyBinOwned, true)
+		local uid = profile.plot.placed[1].uid
+		s.P.SkyBinPayout = function()
+			return true -- empty bin
+		end
+		s.advance(120) -- past the one-minute undo window
+		s.P.Sell(ann, uid)
+		t.eq(#profile.plot.placed, 0)
+		t.eq(profile.sawmillStock, {}, "not back in stock")
+		t.eq(profile.cash, 1200, "half of $400")
+		t.eq(profile.skyBinOwned, false, "gone for good: the next load will not hand one over")
+		t.eq(#s.items(1), 0)
+	end)
+
+	t.test("selling a Sky Bin with wood in it pays the wood out first, then removes the bin", function()
 		local s = setup({ cash = 1000 })
 		local ann, profile = s.newPlayer(1, "Ann")
 		s.claim(ann, 1)
@@ -595,16 +695,61 @@ return function(t)
 		profile.skyWood = { { w = "oak", v = 10 } }
 		s.P.Place(ann, "SkyBin", 0, 0, 0)
 		local uid = profile.plot.placed[1].uid
+		s.advance(120)
+		local order = {}
+		s.P.SkyBinPayout = function(owner, extra)
+			table.insert(order, "payout")
+			t.eq(owner, ann)
+			t.eq(extra, 200, "the wallet must also have room for the sell-back")
+			t.eq(#profile.plot.placed, 1, "the bin is still there while the wood is paid")
+			profile.skyWood = {}
+			profile.cash += 77
+			return true
+		end
 		s.P.Sell(ann, uid)
+		t.eq(order, { "payout" })
 		t.eq(#profile.plot.placed, 0)
-		t.eq(profile.sawmillStock, { "SkyBin" })
-		t.eq(ann.attrs.SawmillStock, "SkyBin")
-		t.eq(profile.cash, 1000, "no cash either way")
-		t.eq(profile.skyWood, { { w = "oak", v = 10 } }, "the wood is safe in the save")
-		t.eq(#s.items(1), 0)
-		-- It can be placed again.
+		t.eq(profile.skyWood, {})
+		t.eq(profile.cash, 1000 + 77 + 200)
+	end)
+
+	t.test("if the wood can't be paid out the Sky Bin stays and nothing is lost", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.sawmillStock = { "SkyBin" }
+		profile.skyWood = { { w = "oak", v = 10 } }
 		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		local uid = profile.plot.placed[1].uid
+		s.advance(120)
+		s.P.SkyBinPayout = function()
+			return false
+		end
+		s.P.Sell(ann, uid)
+		t.eq(#profile.plot.placed, 1, "still placed")
+		t.eq(profile.skyWood, { { w = "oak", v = 10 } }, "the wood is untouched")
+		t.eq(profile.cash, 1000)
+		t.eq(profile.skyBinOwned, true)
+		t.eq(s.lastToast(), t.shared("SkyBinLogic").WoodStaysLine)
+	end)
+
+	t.test("only the owner sells the Sky Bin, even a visitor with destroy rights", function()
+		local s = setup({ cash = 1000 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		local bob = s.newPlayer(2, "Bob")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		profile.sawmillStock = { "SkyBin" }
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		profile.permissions = { anyone = { build = true, destroy = true } }
+		bob.standOn(1)
+		s.P.SkyBinPayout = function()
+			error("must not be asked")
+		end
+		s.P.Sell(bob, profile.plot.placed[1].uid)
 		t.eq(#profile.plot.placed, 1)
+		t.eq(s.lastToast(), t.shared("SkyBinLogic").OnlyOwnerSellLine)
 	end)
 
 	t.test("hammer build: a store unlock is placed only once its blueprint has been used", function()
@@ -1923,6 +2068,29 @@ return function(t)
 		local planer = profile.plot.placed[2]
 		t.eq(planer.data, { x = 1, y = 0.6 }, "a planer starts at the default setting")
 		t.eq(#s.items(1), 3)
+	end)
+
+	t.test("the Sky Bin: open and place from its box once; cancelling keeps the box; one per plot", function()
+		local s = setup({ cash = 500 })
+		local ann, profile = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		ann.standOn(1)
+		local boxes = { ["bin-1"] = { buyer = 1, itemId = "SkyBin" }, ["bin-2"] = { buyer = 1, itemId = "SkyBin" } }
+		fakeBoxes(s, boxes)
+		s.P.Place(ann, "SkyBin", 0, 0, 0)
+		t.eq(#profile.plot.placed, 0, "no box, no stock: refused")
+		s.P.Place(ann, "SkyBin", 400, 0, 0, nil, "bin-1")
+		t.eq(boxes["bin-1"].spent, nil, "off the plot keeps the box")
+		s.P.Place(ann, "SkyBin", 0, 0, 0, nil, "bin-1")
+		t.eq(#profile.plot.placed, 1)
+		t.eq(profile.cash, 500)
+		t.eq(boxes["bin-1"].spent, true)
+		t.eq(profile.sawmillStock, {})
+		t.eq(profile.skyBinOwned, true)
+		s.P.Place(ann, "SkyBin", 20, 0, 0, nil, "bin-2")
+		t.eq(#profile.plot.placed, 1)
+		t.eq(boxes["bin-2"].spent, nil, "a second bin is refused and its box kept")
+		t.eq(s.lastToast(), "You already have a Sky Bin on your plot. There's only room for one.")
 	end)
 
 	t.test("a refused placing keeps the box: cancelling and blocked spots cost nothing", function()

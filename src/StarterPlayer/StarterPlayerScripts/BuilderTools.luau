@@ -615,11 +615,14 @@ function BuilderTools.OnSelect(_name: string, inputState: Enum.UserInputState): 
 	return Enum.ContextActionResult.Sink
 end
 
+-- Where a ray meets the plane of your plot's platform top (not world y = 0:
+-- the homesteads' ground runs from -3 to +7).
 local function onGround(origin: Vector3, direction: Vector3): Vector3?
 	if direction.Y >= -1e-4 then
 		return nil
 	end
-	local t = -origin.Y / direction.Y
+	local plot = BlueprintPlacer.PlotCFrame()
+	local t = ((if plot then plot.Position.Y else 0) - origin.Y) / direction.Y
 	if t <= 0 or t > 2000 then
 		return nil
 	end

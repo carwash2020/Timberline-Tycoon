@@ -13,6 +13,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AxeArt = require(ReplicatedStorage.Shared.Art.AxeArt)
+local HoverTag = require(ReplicatedStorage.Shared.HoverTag)
 local BoxArt = require(ReplicatedStorage.Shared.Art.BoxArt)
 local BoxLogic = require(ReplicatedStorage.Shared.BoxLogic)
 local BoxSize = require(ReplicatedStorage.Shared.BoxSize)
@@ -344,18 +345,14 @@ function BoxService.RobuxPrice(kind: string, key: string): number?
 	return robuxPrices[kind .. ":" .. key]
 end
 
--- A Robux box's price line, once Roblox has said it: the one price on the
--- box, on its label.
+-- A Robux box's price, once Roblox has said it: the hover tag over the box
+-- reads it from the box's HoverRobux attribute (nothing is printed on the box).
 local function refreshRobuxTags(kind: string, key: string, price: number)
 	local text = RobuxShelf.Tag(price)
 	for _, rec in pairs(records) do
 		local model = rec.model
 		if model ~= nil and rec.robux ~= nil and rec.robux.kind == kind and rec.robux.key == key then
-			for _, d in ipairs(model:GetDescendants()) do
-				if d.Name == "Price" and d:IsA("TextLabel") then
-					d.Text = text
-				end
-			end
+			model:SetAttribute("HoverRobux", text)
 		end
 	end
 end
@@ -391,19 +388,6 @@ function BoxService.AskRobuxPrice(kind: string, key: string)
 			end
 		end)
 	end)
-end
-
--- The one price on a shop box (its label's second line), or nil where the
--- price is shown somewhere else: a vehicle's box stands by its showroom
--- price sign, so it carries none.
-local function priceText(rec: Record): string?
-	if rec.robux ~= nil then
-		return RobuxShelf.Tag(BoxService.RobuxPrice(rec.robux.kind, rec.robux.key))
-	end
-	if rec.itemKind == "Truck" or rec.itemKind == "Trailer" then
-		return nil
-	end
-	return Util.formatCash(rec.price)
 end
 
 local function dress(rec: Record, part: BasePart, tint: Color3)
@@ -560,8 +544,19 @@ function BoxService.Make(opts: MakeOptions): Record
 		color = itemColor,
 		gold = robux ~= nil,
 		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
-		price = priceText(rec),
 	})
+	-- The price shows in a tag when a player aims at the box (Shared/HoverTag),
+	-- never printed on it. A Robux box carries Roblox's R$ text instead.
+	HoverTag.Mark(model, {
+		key = "Box:" .. uid,
+		name = rec.displayName,
+		kind = rec.itemKind,
+		itemId = rec.itemId,
+		shop = rec.shop,
+		limited = rec.limited,
+		robux = if robux ~= nil then RobuxShelf.Tag(BoxService.RobuxPrice(robux.kind, robux.key)) else nil,
+	})
+	model:SetAttribute("ForSale", true)
 	for _, d in ipairs(model:GetChildren()) do
 		if d:IsA("BasePart") then
 			d.CollisionGroup = BoxService.Group
@@ -611,6 +606,12 @@ function BoxService.RefreshPrompts()
 		end
 		local buy = part:FindFirstChild("BuyPrompt")
 		local openPrompt = part:FindFirstChild("OpenPrompt")
+		-- What the hover tag reads: a paid or opened box has no price to show;
+		-- a box off its shelf spot (someone is holding it) is not "in stock".
+		if rec.model ~= nil then
+			rec.model:SetAttribute("ForSale", not rec.paid and not rec.opened)
+			rec.model:SetAttribute("OnShelf", rec.onShelf and not rec.paid)
+		end
 		if buy and buy:IsA("ProximityPrompt") then
 			local open = ShopHoursLogic.IsOpen(rec.shop, hour)
 			buy.Enabled = not rec.paid and not rec.opened and BoxService.InCounter(rec) and open

@@ -816,6 +816,8 @@ return function(t)
 		t.eq(line, "thanks")
 		t.eq(s.profile.cash, 600, "$400")
 		t.eq(s.profile.sawmillStock, nil, "still in its box")
+		t.eq(s.profile.skyBinOwned, true, "the box counts as owning one")
+		-- The legacy fallback (an owner gift, a full storage) still lands in stock.
 		t.ok(s.ShopService.GrantItem(s.player, { uid = "bin-1", kind = "Machine", itemId = "SkyBin" }))
 		t.eq(s.profile.sawmillStock, { "SkyBin" })
 		t.eq(s.profile.skyBinOwned, true)

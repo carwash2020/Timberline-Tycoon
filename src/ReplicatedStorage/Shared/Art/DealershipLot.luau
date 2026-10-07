@@ -19,16 +19,13 @@
 local CollectionService = game:GetService("CollectionService")
 
 local BoxSize = require(script.Parent.Parent.BoxSize)
-local CoreLoop = require(script.Parent.Parent.CoreLoop)
-local GameConfig = require(script.Parent.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
+local HoverTag = require(script.Parent.Parent.HoverTag)
 local Kit = require(script.Parent.Kit)
-local ShopLogic = require(script.Parent.Parent.ShopLogic)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
 local StoreStock = require(script.Parent.Parent.StoreStock)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
-local Util = require(script.Parent.Parent.Util)
 local VehicleLogic = require(script.Parent.Parent.VehicleLogic)
 
 local DealershipLot = {}
@@ -70,23 +67,6 @@ local ORDER = {
 	{ kind = "Trailer", id = "RanchTrailer" },
 	{ kind = "Trailer", id = "HeavyHauler" },
 }
-
--- The loop the price signs use. MapBuilder publishes CoreLoopActive before
--- it builds the lot, so a Studio override shows here. Tests have no
--- workspace; the configured loop (GameConfig.CoreLoop) is the price then.
-local function priceLoop(): number
-	local ok, n = pcall(CoreLoop.Active)
-	if ok and (n == 1 or n == 2) then
-		local published = false
-		pcall(function()
-			published = workspace:GetAttribute(CoreLoop.ActiveAttribute) ~= nil
-		end)
-		if published then
-			return n
-		end
-	end
-	return if GameConfig.CoreLoop == 2 then 2 else 1
-end
 
 local function itemOf(kind: string, id: string): any
 	return if kind == "Truck" then ItemCatalog.GetTruck(id) else ItemCatalog.GetTrailer(id)
@@ -287,12 +267,12 @@ local function prep(model: Model, category: string, id: string)
 	end
 end
 
-local function priceOf(kind: string, id: string): string
+-- The vehicle's name, which the sign beside it shows. Its price is not
+-- printed: aiming at the vehicle, its plinth or its box shows the price in a
+-- tag (Shared/HoverTag).
+local function nameOf(kind: string, id: string): string
 	local item = itemOf(kind, id)
-	if not item then
-		return id
-	end
-	return item.displayName .. "\n" .. Util.formatCash(ShopLogic.Price(item, priceLoop()))
+	return if item then item.displayName else id
 end
 
 local function placeTruck(id: string): Model?
@@ -427,7 +407,7 @@ function DealershipLot.Build(): Model
 			-- The sign stands at the plinth's aisle edge, at its east end.
 			local sign = Kit.part(
 				model,
-				"PriceSign",
+				"NameSign",
 				Vector3.new(4.2, 2.2, 0.3),
 				CFrame.new(cx + bay.width / 2 - 2.6, 1.3, cz + aisleSide * (bay.depth / 2 + 0.5)),
 				Color3.fromRGB(62, 42, 24),
@@ -436,7 +416,7 @@ function DealershipLot.Build(): Model
 			Kit.decor(sign, false)
 			Kit.signText(
 				sign,
-				priceOf(bay.kind, bay.id),
+				nameOf(bay.kind, bay.id),
 				Color3.fromRGB(245, 235, 215),
 				{ Enum.NormalId.Front, Enum.NormalId.Back }
 			)
@@ -458,6 +438,24 @@ function DealershipLot.Build(): Model
 		spot.Transparency = 1
 		spot:SetAttribute("ItemId", bay.id)
 		spot:SetAttribute("Category", bay.kind)
+		-- The vehicle, its plinth and its box are one item for the hover tag
+		-- (the tag sits over the vehicle).
+		local hover: HoverTag.Spec = {
+			key = "Vehicle:" .. bay.kind .. ":" .. bay.id,
+			name = nameOf(bay.kind, bay.id),
+			kind = bay.kind,
+			itemId = bay.id,
+			shop = "Dealership",
+		}
+		HoverTag.Mark(slab, hover)
+		HoverTag.Mark(spot, hover)
+		if model then
+			hover.anchor = true
+			HoverTag.Mark(model, hover)
+		else
+			hover.anchor = true
+			HoverTag.Mark(slab, hover)
+		end
 	end
 	return lot
 end

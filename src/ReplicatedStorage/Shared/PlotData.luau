@@ -106,59 +106,33 @@ PlotData.Tiers = {
 	{ name = "Timber Empire", size = 200, priceCash = 60000, stone = 0, planks = 0 },
 } :: { Tier }
 
--- How each homestead looks, so no two neighbours match: the ground's colour
--- and material (bare ground, never Grass: a yard is dirt, the country
--- outside it keeps the grass), the rail and the apron. Home `i` takes Looks[i], wrapping.
+-- The build platform (Shared/PlotPlatform): a flat dark grey slab, the
+-- buildable area exactly, PlatformHeight above the grass all round it.
+-- Plot-local y = 0 is its top, so saved layouts (plot-local studs) load
+-- unchanged. The ramps are the bevel and the way up for Humanoids and
+-- trucks: PlatformHeight over PlatformRamp studs, about 9.5 degrees.
+PlotData.PlatformHeight = 1 -- studs: the top above the surrounding grass (Connor: "like 1 stud")
+PlotData.PlatformThick = 3 -- studs: a slab's own height; all but PlatformHeight sinks into the ground
+PlotData.PlatformRamp = 6 -- studs: how far each ramp reaches out from the edge
+PlotData.PlatformEdgeClear = 0.03 -- studs: nothing flat sits closer than this to a platform face (z-fighting)
+
+-- How each homestead looks, so no two neighbours match: the platform's top
+-- and edge greys (all dark; the slab is concrete) and the rail's colour once
+-- claimed. The ground round a plot is plain Grass for every one. Home `i`
+-- takes Looks[i], wrapping.
 export type Look = {
 	name: string,
-	ground: { number }, -- r, g, b
-	material: string, -- Enum.Material name
+	top: { number }, -- r, g, b: the platform's top
+	edge: { number }, -- r, g, b: the ramps, a step darker
 	rail: { number }, -- the rail once claimed (r, g, b)
-	apron: { number },
 }
 PlotData.Looks = {
-	{
-		name = "Loam",
-		ground = { 142, 120, 86 },
-		material = "Ground",
-		rail = { 130, 90, 50 },
-		apron = { 150, 116, 78 },
-	},
-	{
-		name = "Dry Clearing",
-		ground = { 210, 190, 150 },
-		material = "Sand",
-		rail = { 110, 76, 44 },
-		apron = { 168, 140, 100 },
-	},
-	{
-		name = "Slate Flat",
-		ground = { 128, 130, 126 },
-		material = "Slate",
-		rail = { 82, 84, 88 },
-		apron = { 104, 104, 100 },
-	},
-	{
-		name = "Pine Needles",
-		ground = { 126, 98, 66 },
-		material = "Ground",
-		rail = { 70, 48, 30 },
-		apron = { 96, 76, 52 },
-	},
-	{
-		name = "Packed Clay",
-		ground = { 160, 134, 102 },
-		material = "Ground",
-		rail = { 220, 214, 200 },
-		apron = { 176, 170, 150 },
-	},
-	{
-		name = "Red Earth",
-		ground = { 176, 112, 82 },
-		material = "Mud",
-		rail = { 150, 60, 44 },
-		apron = { 140, 96, 70 },
-	},
+	{ name = "Charcoal", top = { 86, 88, 92 }, edge = { 68, 70, 74 }, rail = { 130, 90, 50 } },
+	{ name = "Slate", top = { 92, 96, 100 }, edge = { 72, 76, 82 }, rail = { 110, 76, 44 } },
+	{ name = "Graphite", top = { 78, 80, 82 }, edge = { 60, 62, 64 }, rail = { 82, 84, 88 } },
+	{ name = "Iron", top = { 90, 90, 94 }, edge = { 70, 70, 74 }, rail = { 70, 48, 30 } },
+	{ name = "Basalt", top = { 82, 84, 88 }, edge = { 64, 66, 70 }, rail = { 220, 214, 200 } },
+	{ name = "Ash", top = { 96, 96, 98 }, edge = { 76, 76, 78 }, rail = { 150, 60, 44 } },
 } :: { Look }
 
 function PlotData.Look(index: number): Look

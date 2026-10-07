@@ -34,6 +34,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
+local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
@@ -151,11 +152,12 @@ local function restorePrompts()
 	ProximityPromptService.Enabled = previous
 end
 
--- Your plot's centre, if you have one.
+-- Your plot's centre on the platform's top (plot-local y = 0), if you have
+-- one: the same origin PlotService builds on. It used to sit at world y = 0,
+-- which is only the ground on a plot that happens to be level with the sea.
 function BlueprintPlacer.PlotCFrame(): CFrame?
 	local index = player:GetAttribute("PlotSlot") :: number?
-	local center = if index then PlotData.Slots[index] else nil
-	return if center then CFrame.new(center.X, 0, center.Y) else nil
+	return if index then PlotPlatform.Origin(index) else nil
 end
 
 local function tier(): number
@@ -214,12 +216,17 @@ local function rootPart(): BasePart?
 	return if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 end
 
--- Where a ray hits the ground plane (y = 0), where every plot sits.
+-- Where a ray hits the plane of your plot's platform top (plot-local y = 0).
+-- It used to be the world plane y = 0, which is only right on a plot whose
+-- ground happens to be level with it, so the ghost slid sideways with the
+-- camera angle on every other homestead.
 local function onGround(ray: Ray): Vector3?
 	if ray.Direction.Y >= -1e-3 then
 		return nil
 	end
-	local t = -ray.Origin.Y / ray.Direction.Y
+	local plot = BlueprintPlacer.PlotCFrame()
+	local planeY = if plot then plot.Position.Y else 0
+	local t = (planeY - ray.Origin.Y) / ray.Direction.Y
 	return if t > 0 and t < 1000 then ray.Origin + ray.Direction * t else nil
 end
 

@@ -56,6 +56,7 @@ local LogicService = require(script.Parent.LogicService)
 local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SampleBuilds = require(ReplicatedStorage.Shared.SampleBuilds)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
+local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
 local TerrainGen = require(ReplicatedStorage.Shared.World.TerrainGen)
@@ -81,7 +82,7 @@ PlotService.UndoSeconds = UNDO_SECONDS
 
 type Slot = {
 	index: number,
-	cframe: CFrame, -- the plot's centre on the ground
+	cframe: CFrame, -- the plot's centre on the platform's top (plot-local y = 0), PlatformHeight above the grass
 	placeName: string,
 	region: string,
 	model: Model,
@@ -89,6 +90,7 @@ type Slot = {
 	post: Part,
 	board: Part,
 	border: Folder,
+	platform: Folder, -- the Land slabs and the ramps (the Pad is the model's PrimaryPart)
 	items: Folder,
 	signLabels: { TextLabel }, -- both faces of the sign
 	office: ProximityPrompt, -- Land panel: plot size and expanding onto squares
@@ -194,17 +196,24 @@ local function part(
 	return p
 end
 
--- Pad, rails and sign for the plot's current size. The sign stands just
--- outside the north edge, off to the west, so a driveway up the middle
--- stays clear. Rails and corner posts show even when the plot is free:
--- a faint pad alone was easy to miss, and easy to drive through.
+-- Platform, rails and sign for the plot's current size and squares. The
+-- build platform is the buildable area exactly (Shared/PlotPlatform): the
+-- tier's Pad slab, a Land slab for each bought square past the tier, and a
+-- ramp along every exposed edge. `slot.cframe` is the platform's top, so a
+-- saved piece at plot-local y = 0 sits on it. The sign stands past the
+-- ramps, on the grass, off to the west so a driveway up the middle stays
+-- clear. Rails and corner posts show even when the plot is free: a bare
+-- platform alone was easy to miss, and easy to drive through.
 local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquares: { string }?)
 	local look = PlotData.Look(slot.index)
-	slot.pad.Size = Vector3.new(size, 0.2, size)
-	slot.pad.Transparency = if claimed then 0 else 0.25
-	slot.pad.Color = Color3.fromRGB(look.ground[1], look.ground[2], look.ground[3])
-	slot.pad.Material = (Enum.Material :: any)[look.material]
-	local signAt = slot.cframe * CFrame.new(-10, 0, size / 2 + 3)
+	local squares = if claimed then ownedSquares else nil
+	local layout = PlotPlatform.Layout(size, squares)
+	PlotPlatform.FitPad(slot.pad, layout, slot.cframe, look)
+	slot.platform:ClearAllChildren()
+	PlotPlatform.BuildEdges(slot.platform, layout, slot.cframe, look)
+	-- Past the farthest ramp, standing on the grass (the mesh's pivot is on the ground).
+	local reach = layout.extent / 2 + PlotData.PlatformRamp + 2
+	local signAt = slot.cframe * CFrame.new(-10, -PlotData.PlatformHeight, reach)
 	slot.post.CFrame = signAt * CFrame.new(0, 3, 0)
 	slot.board.CFrame = signAt * CFrame.new(0, 6.5, 0)
 	-- One mesh for the post and the board, pivot on the ground at the sign.
@@ -213,30 +222,14 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 		slot.post.Transparency = 1
 	end
 	slot.border:ClearAllChildren()
-	local squares = if claimed then ownedSquares else nil
-	if squares then
-		for _, key in ipairs(squares) do
-			local ix, iz = PlotLogic.ParseKey(key)
-			if ix and iz and not PlotLogic.SquareInsideTier(ix, iz, size) then
-				local x0, x1, z0, z1 = PlotLogic.SquareBox(ix, iz)
-				local tile = part(
-					"Square",
-					Vector3.new(GameConfig.PlotSquare - 1, 0.15, GameConfig.PlotSquare - 1),
-					slot.cframe * CFrame.new((x0 + x1) / 2, 0.2, (z0 + z1) / 2),
-					Color3.fromRGB(196, 164, 110),
-					Enum.Material.Sand,
-					slot.border
-				)
-				tile.CanCollide = false
-				tile.CanQuery = false
-			end
-		end
-	end
 	local half = size / 2
 	local rail = if claimed
 		then Color3.fromRGB(look.rail[1], look.rail[2], look.rail[3])
 		else Color3.fromRGB(196, 168, 120)
 	local postColor = Color3.fromRGB(90, 62, 36)
+	-- Rails mark the base yard (the tier) a hair above the platform's top,
+	-- never on its face: PlatformEdgeClear studs of air under them.
+	local lift = 0.5
 	for _, side in ipairs({
 		{ 0, half, size, 0.4 },
 		{ 0, -half, size, 0.4 },
@@ -247,7 +240,7 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 		local fence = part(
 			"Rail",
 			Vector3.new(w, 0.35, d),
-			slot.cframe * CFrame.new(x, 0.5, z),
+			slot.cframe * CFrame.new(x, lift, z),
 			rail,
 			Enum.Material.Wood,
 			slot.border
@@ -258,7 +251,7 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 			scaleX = if alongZ then d else w,
 			yaw = if alongZ then math.pi / 2 else 0,
 			color = rail,
-			hostOffset = CFrame.new(0, -0.5, 0),
+			hostOffset = CFrame.new(0, -lift, 0),
 		})
 	end
 	for _, corner in ipairs({
@@ -270,25 +263,14 @@ local function drawBounds(slot: Slot, size: number, claimed: boolean, ownedSquar
 		local post = part(
 			"Corner",
 			Vector3.new(0.8, 3.2, 0.8),
-			slot.cframe * CFrame.new(corner[1], 1.6, corner[2]),
+			slot.cframe * CFrame.new(corner[1], 1.5, corner[2]), -- sunk 0.1 into the platform: no flat face on its top
 			postColor,
 			Enum.Material.Wood,
 			slot.border
 		)
 		post.CanCollide = false
-		ItemMeshes.AttachTo(post, "PlotCorner", { hostOffset = CFrame.new(0, -1.6, 0) })
+		ItemMeshes.AttachTo(post, "PlotCorner", { hostOffset = CFrame.new(0, -1.5, 0) })
 	end
-	-- A short gravel apron off the north edge, toward the lane or the road.
-	local apron = part(
-		"Apron",
-		Vector3.new(16, 0.15, 10),
-		slot.cframe * CFrame.new(0, 0.12, half + 5),
-		Color3.fromRGB(look.apron[1], look.apron[2], look.apron[3]),
-		Enum.Material.Ground,
-		slot.border
-	)
-	apron.CanCollide = false
-	apron.CanQuery = false
 end
 
 local function refreshSign(slot: Slot)
@@ -318,29 +300,24 @@ local function buildSlot(index: number, center: Vector2, parent: Instance): Slot
 	-- Before anything is parented into the world: an Atomic model only
 	-- streams its initial descendants together.
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	local ground = TerrainGen.HeightAt(center.X, center.Y)
-	local cframe = CFrame.new(center.X, ground, center.Y)
-	local pad = part(
-		"Pad",
-		Vector3.new(PlotData.Tiers[1].size, 0.2, PlotData.Tiers[1].size),
-		cframe * CFrame.new(0, 0.1, 0),
-		Color3.fromRGB(210, 190, 150),
-		Enum.Material.Sand,
-		model
-	)
-	pad.CanCollide = false -- paint on the ground
-	pad.CanQuery = false
+	-- The platform's top: the grass under the pad plus PlatformHeight.
+	local cframe = CFrame.new(center.X, TerrainGen.HeightAt(center.X, center.Y) + PlotData.PlatformHeight, center.Y)
+	local pad = PlotPlatform.NewPad(PlotPlatform.Layout(PlotData.Tiers[1].size, nil), cframe, PlotData.Look(index))
+	pad.Parent = model -- collides: it is the floor of the plot
 	model.PrimaryPart = pad
 	local border = Instance.new("Folder")
 	border.Name = "Border"
 	border.Parent = model
+	local platform = Instance.new("Folder")
+	platform.Name = "Platform"
+	platform.Parent = model
 	-- Beside the shell, not inside it: items are built when someone claims
 	-- or places, after the shell has already streamed to whoever is nearby.
 	local items = Instance.new("Folder")
 	items.Name = "PlotItems_" .. index
 	items.Parent = parent
 
-	-- The signpost (drawBounds puts it at the north edge).
+	-- The signpost (drawBounds puts it past the ramps on the north side).
 	local post =
 		part("SignPost", Vector3.new(0.6, 6, 0.6), cframe, Color3.fromRGB(70, 45, 22), Enum.Material.Wood, model)
 	post.CanCollide = false
@@ -397,6 +374,7 @@ local function buildSlot(index: number, center: Vector2, parent: Instance): Slot
 		post = post,
 		board = board,
 		border = border,
+		platform = platform,
 		items = items,
 		signLabels = labels,
 		office = office,
@@ -1335,6 +1313,10 @@ function PlotService.Place(
 	end
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
+	if SkyBinLogic.IsBin(bp.id) then
+		profile.skyBinOwned = true -- one per player, whichever way it came out
+		owner:SetAttribute("SkyBinOwned", true)
+	end
 	buildItem(slot, owner, item)
 	if fromStock or fromBox then
 		notify(player, string.format("Placed your %s.", bp.displayName))
@@ -1442,6 +1424,16 @@ local function givePlanks(player: Player, slot: Slot, item: PlotLogic.Placed, un
 	return spawned ~= nil
 end
 
+-- Pays out a Sky Bin's wood before the bin is sold: true when the bin is
+-- empty or its wood was paid in full (AetherService.PayOutBin; the wallet must
+-- have room for it plus `extra`). A spec swaps it.
+PlotService.SkyBinPayout = function(owner: Player, extra: number): boolean
+	local ok, aether = pcall(function(): any
+		return require(script.Parent.AetherService)
+	end)
+	return ok and aether ~= nil and aether.PayOutBin(owner, extra) == true
+end
+
 function PlotService.Sell(player: Player, uid: unknown)
 	if type(uid) ~= "string" or not RateLimiter.Allow(player, "SellPlaced") then
 		return
@@ -1458,21 +1450,9 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if not item or not bp then
 		return
 	end
-	if SkyBinLogic.IsBin(item.blueprintId) then
-		-- Taking the bin back: it returns to stock, no cash either way. What is
-		-- in it stays in the save (profile.skyWood) and waits for the next placing.
-		if type(profile.sawmillStock) ~= "table" then
-			profile.sawmillStock = {}
-		end
-		table.insert(profile.sawmillStock, item.blueprintId)
-		table.remove(profile.plot.placed, index)
-		placedAt[item.uid] = nil
-		local binModel = slot.items:FindFirstChild(item.uid)
-		if binModel then
-			binModel:Destroy()
-		end
-		owner:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(profile.sawmillStock))
-		notify(player, SkyBinLogic.BackInStockLine)
+	local isBin = SkyBinLogic.IsBin(item.blueprintId)
+	if isBin and player ~= owner then
+		notify(player, SkyBinLogic.OnlyOwnerSellLine)
 		return
 	end
 	local refund, planks, woodId = sellPlan(item, bp)
@@ -1488,6 +1468,17 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if planks > 0 and not givePlanks(owner, slot, item, planks, woodId) then
 		notify(player, "Those planks had nowhere to go. Try again in a moment.")
 		return
+	end
+	if isBin then
+		-- The wood inside is paid out first (the "Sell Sky Bin" sale) and only
+		-- then is the bin removed. If the wood can't be paid in full the bin
+		-- stays and nothing is lost.
+		if not PlotService.SkyBinPayout(owner, refund) then
+			notify(player, SkyBinLogic.WoodStaysLine)
+			return
+		end
+		profile.skyBinOwned = false -- gone for good: no re-boxing, no free copy at the next load
+		owner:SetAttribute("SkyBinOwned", false)
 	end
 	table.remove(profile.plot.placed, index)
 	placedAt[item.uid] = nil

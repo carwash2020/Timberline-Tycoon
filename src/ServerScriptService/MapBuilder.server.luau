@@ -621,7 +621,7 @@ step("5. The trails", function()
 	local folder = Instance.new("Folder")
 	folder.Name = "Trails"
 	folder.Parent = map
-	local dirt = Color3.fromRGB(150, 116, 78)
+	local dirt = Color3.fromRGB(156, 94, 64) -- TerrainGen.MaterialColors.Ground, so a trail matches the earth round it
 	for _, slab in ipairs(WorldPlan.TrailSlabs()) do
 		local part = Kit.part(folder, slab.name, Vector3.new(3.2, 0.25, 7), slab.cframe, dirt, Enum.Material.Ground)
 		Kit.decor(part, false)

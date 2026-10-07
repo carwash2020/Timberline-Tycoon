@@ -1040,7 +1040,10 @@ return function(t)
 			data.skyWood = { { w = "oak", v = 12 }, { w = "maple", v = 3, p = true } }
 			Schema.Migrate(data)
 			t.eq(data.skyBinOwned, true)
-			t.eq(data.sawmillStock, { "SkyBin" }, "a bin to place, free")
+			t.eq(data.sawmillStock, {}, "not into stock")
+			t.eq(#data.storage, 1, "a boxed bin to open and place, free")
+			t.eq(data.storage[1].itemId, "SkyBin")
+			t.eq(data.storage[1].pending, true)
 			t.eq(#data.skyWood, 2, "the wood stays")
 			local before = t.loader():shared("Util").deepCopy(data)
 			Schema.Migrate(data)
@@ -1049,14 +1052,17 @@ return function(t)
 			-- And under the v2 path (every join): still one, still the wood.
 			Schema.MigrateV2(data)
 			Schema.MigrateV2(data)
-			t.eq(data.sawmillStock, { "SkyBin" })
+			t.eq(data.sawmillStock, {})
+			t.eq(#data.storage, 1)
 			t.eq(#data.skyWood, 2)
 			-- Placed on the plot, the Migrate neither adds nor removes one.
 			data.sawmillStock = {}
+			data.storage = {}
 			data.plot.claimed = true
 			data.plot.placed = { { uid = "b", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 } }
 			Schema.Migrate(data)
 			t.eq(data.sawmillStock, {})
+			t.eq(data.storage, {})
 			t.eq(#data.plot.placed, 1, "the plot keeps the Sky Bin through the clean-up")
 		end
 	)
@@ -1070,6 +1076,7 @@ return function(t)
 		t.eq(result.boughtBack, 7)
 		t.eq(data.skyBin, {})
 		t.eq(data.sawmillStock, {})
+		t.eq(data.storage, {})
 	end)
 
 	t.test(

@@ -898,6 +898,7 @@ ItemCatalog.Machines = {
 		color = "#5D86B8",
 		boxW = 4, -- a small bin, a small box: two fit across the machine table
 		boxD = 4,
+		placeFromBox = true, -- open the box and place it once (like the mills)
 	},
 } :: { [string]: MachineDef }
 

@@ -2,6 +2,7 @@
 -- Paying, opening, putting an unpaid box back, and keeping a paid one.
 return function(t)
 	local GameConfig = t.shared("GameConfig")
+	local HoverTag = t.shared("HoverTag")
 	local Instance = t.roblox.Instance
 	local CFrame = t.roblox.CFrame
 	local Vector3 = t.roblox.Vector3
@@ -112,20 +113,22 @@ return function(t)
 		end
 		t.ok(parts >= 5 and parts <= 6, "the body and its packaging, at most six parts")
 		t.eq(marks, 2)
-		-- The one price is on the box's label: world-space text, never a floating tag.
+		-- No price is printed on the box and nothing floats over it: the price shows
+		-- in a hover tag when a player aims at it (Shared/HoverTag), read from the
+		-- box's own attributes.
 		t.eq(rec.part:FindFirstChild("PriceTag"), nil, "no floating price tag")
-		local label
 		for _, d in ipairs(rec.model:GetDescendants()) do
 			t.ok(not d:IsA("BillboardGui"), "no billboard on a shelf box")
-			if d.Name == "Price" and d:IsA("TextLabel") then
-				t.eq(label, nil, "one price label only")
-				label = d
-			end
+			t.ok(not (d:IsA("TextLabel") and d.Name == "Price"), "no price line on the label")
 		end
-		t.eq(label.Text, "$120")
-		t.eq(label.TextTruncate, Enum.TextTruncate.None, "the whole price shows")
-		t.eq(label.Parent.Name, "NameMark")
-		t.eq(label.Parent.Parent.Name, "Label", "on the front label")
+		local spec = HoverTag.SpecOf(rec.model)
+		t.ok(spec ~= nil, "the box is aimable")
+		t.eq(spec.key, "Box:" .. rec.uid)
+		t.eq(spec.name, rec.displayName)
+		t.eq(HoverTag.Price(spec, 2), 120, "the tag's price is what the box charges")
+		t.eq(HoverTag.Price(spec, 2), rec.price)
+		t.eq(rec.model:GetAttribute("ForSale"), true)
+		t.eq(rec.model:GetAttribute("OnShelf"), true)
 		local buy = rec.part:FindFirstChild("BuyPrompt")
 		t.eq(buy.Enabled, true)
 		t.eq(buy.MaxActivationDistance, GameConfig.CounterPayReach)
@@ -572,13 +575,12 @@ return function(t)
 		t.eq(rec.limited, false)
 		t.eq(rec.part.Material, Enum.Material.Metal)
 		t.eq(rec.part.Color, t.roblox.Color3.fromHex("#E3B73C"))
-		local priceLabels = {}
 		for _, d in ipairs(rec.model:GetDescendants()) do
-			if d.Name == "Price" and d:IsA("TextLabel") then
-				table.insert(priceLabels, d.Text)
-			end
+			t.ok(not (d.Name == "Price" and d:IsA("TextLabel")), "no price printed on a Robux box")
 		end
-		t.eq(priceLabels, { "R$" }, "one price line on the label; Roblox sets the number")
+		local spec = HoverTag.SpecOf(rec.model)
+		t.eq(spec.robux, "R$", "the tag says R$ until Roblox has told the number")
+		t.eq(HoverTag.Lines(spec, { hour = 12, loop = 2 }), "2x Cash")
 		local said = {}
 		Box.Speaker = function(_player, line, r)
 			table.insert(said, { line = line, robux = r.robux })
@@ -868,12 +870,13 @@ return function(t)
 	end
 
 	t.test(
-		"opening a sawmill, planer or belt box starts a one-time placement; nothing is granted, the box stays",
+		"opening a sawmill, planer, belt or Sky Bin box starts a one-time placement; nothing is granted, the box stays",
 		function()
 			for _, case in ipairs({
 				{ "Sawmill", "SawmillSturdy" },
 				{ "Machine", "PlanerHand" },
 				{ "Machine", "ConveyorStraight" },
+				{ "Machine", "SkyBin" },
 			}) do
 				local _, Box, _, profile, grants = boot()
 				local counter = counterPart()

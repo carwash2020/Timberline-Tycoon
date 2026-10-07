@@ -34,13 +34,13 @@ return function(t)
 		t.eq({ Logic.Get("ConveyorTurn") ~= nil, select(2, Logic.Get("ConveyorTurn")).shape }, { true, "turn" })
 		t.eq(Logic.IsBelt("ChopSaw"), false)
 		t.eq(Logic.IsBelt(nil), false)
-		-- Sawmills and planers come out of a box the same way; the Sky Bin and chop saw do not.
+		-- Sawmills, planers and the Sky Bin come out of a box the same way; the chop saw does not.
 		t.eq(Logic.PlacedFromBox("SawmillRickety"), true)
 		t.eq(Logic.PlacedFromBox("PlanerHand"), true)
-		t.eq(Logic.PlacedFromBox("SkyBin"), false)
+		t.eq(Logic.PlacedFromBox("SkyBin"), true)
 		t.eq(Logic.PlacedFromBox("ChopSaw"), false)
 		t.eq(BoxUnpack.Mode("Sawmill", "SawmillSturdy"), "place")
-		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "stock", "the Sky Bin keeps its hammer flow")
+		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "place", "the Sky Bin opens and places once, like the mills")
 		t.eq(BoxUnpack.Mode("Machine", "ChopSaw"), "stock")
 		-- A belt box is small; the shelf can hold the whole kit.
 		t.ok(BoxSize.ClassFor({ kind = "Machine", price = 80, footprint = Vector2.new(4, 4) }).rank <= 4)

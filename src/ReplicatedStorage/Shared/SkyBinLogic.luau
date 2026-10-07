@@ -5,16 +5,21 @@
 --
 --   * It is a boxed machine of the Tool Shed ($400, ItemCatalog.Machines),
 --     one per player: a second box is refused (ShopLogic.SkyBinOwnedLine).
---   * Opening the box puts it in your stock; the hammer places it on YOUR
---     plot, one per plot (PlotService.Place; the owner only).
+--   * Like the sawmills, planers and belts it is a ONE-TIME box (Connor,
+--     7 October 2026: "open and place"): opening the box starts a placement
+--     ghost on YOUR plot, placing spends the box, cancelling keeps it. One
+--     bin per plot (PlotService.Place; the owner only).
 --   * Wood sent down a Cloud Chute lands in it (profile.skyWood, capacity
 --     BiomeData sky.skyBinVolume). Without a placed bin the chute is LOCKED:
 --     the piece stays where it lies and a toast says what to do.
 --   * You sell its contents from the "Sell Sky Bin" prompt on the placed
 --     bin, standing near YOUR bin (CanSell).
---   * Taking the bin back with the hammer returns it to stock for free (the
---     contents stay in the save, waiting for the next placing): nobody can
---     lose wood or the item.
+--   * The hammer moves and turns it, and sells it back for half like any
+--     machine (no re-boxing). The wood inside is paid out FIRST (the same
+--     sale as the prompt) and only then is the bin removed; if that payout
+--     is impossible the sale is refused, so wood is never destroyed.
+--   * Old saves: a bin in stock still places from stock; an owner whose bin
+--     is nowhere is handed a boxed one (Migrate).
 
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
@@ -91,6 +96,7 @@ end
 export type Holdings = {
 	skyBinOwned: unknown?,
 	sawmillStock: unknown?,
+	storage: unknown?, -- boxes kept in the save (profile.storage)
 	placed: { any }?,
 }
 
@@ -100,6 +106,7 @@ function SkyBinLogic.HoldingsOf(profile: any): Holdings
 	return {
 		skyBinOwned = profile.skyBinOwned,
 		sawmillStock = profile.sawmillStock,
+		storage = profile.storage,
 		placed = if plot and type(plot.placed) == "table" then plot.placed else nil,
 	}
 end
@@ -121,9 +128,9 @@ function SkyBinLogic.Owns(h: Holdings): boolean
 	return SkyBinLogic.HasPlaced(h.placed)
 end
 
--- Whether a Sky Bin physically exists for this save: waiting in stock, or
--- placed on the plot.
-function SkyBinLogic.Exists(h: Holdings): boolean
+-- Whether a bin is waiting in the save's stock list (an old save, or a
+-- fallback grant).
+local function inStock(h: Holdings): boolean
 	if type(h.sawmillStock) == "table" then
 		for _, id in ipairs(h.sawmillStock :: { any }) do
 			if SkyBinLogic.IsBin(id) then
@@ -131,32 +138,70 @@ function SkyBinLogic.Exists(h: Holdings): boolean
 			end
 		end
 	end
-	return SkyBinLogic.HasPlaced(h.placed)
+	return false
+end
+
+-- Whether a Sky Bin box is kept in the save (bought, not opened yet).
+local function inStorage(h: Holdings): boolean
+	if type(h.storage) == "table" then
+		for _, entry in ipairs(h.storage :: { any }) do
+			if type(entry) == "table" and SkyBinLogic.IsBin(entry.itemId) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Whether a Sky Bin physically exists for this save: in a kept box, waiting
+-- in stock (old saves), or placed on the plot.
+function SkyBinLogic.Exists(h: Holdings): boolean
+	return inStorage(h) or inStock(h) or SkyBinLogic.HasPlaced(h.placed)
 end
 
 -- The save migration (ProfileSchema.Migrate; idempotent, never takes
 -- anything away). Saves from before the bin was an item may hold wood in it
 -- (profile.skyWood, the v2 loop) with no bin to sell it from, so:
---   1. wood waiting, or a bin already in stock or on the plot, means the
---      player owns one: skyBinOwned = true;
---   2. an owner whose bin is nowhere (not in stock, not placed) is handed
---      one in stock, free, to place with the hammer.
--- Nothing is paid out: the wood stays where it is. (v1 logs in the old
--- skyBin list are bought back by ProfileSchema.MigrateV2 as before.)
+--   1. wood waiting, or a bin already in a box, in stock or on the plot,
+--      means the player owns one: skyBinOwned = true;
+--   2. an owner whose bin is nowhere (not in a kept box, not in stock, not
+--      placed) is handed a boxed one in `storage` (pending, free), to open
+--      and place like any machine. A full storage falls back to the stock
+--      list (which still places), so nothing is ever lost.
+-- Nothing is paid out: the wood stays where it is. `newUid` mints the box's
+-- uid (Util.guid on the server). (v1 logs in the old skyBin list are bought
+-- back by ProfileSchema.MigrateV2 as before.)
 -- Returns "granted" when step 2 handed a bin over, else nil.
-function SkyBinLogic.Migrate(data: any): string?
+function SkyBinLogic.Migrate(data: any, newUid: (() -> string)?, storageCap: number?): string?
 	local plot = if type(data.plot) == "table" then data.plot else nil
 	local placed = if plot and type(plot.placed) == "table" then plot.placed else nil
-	local holdings: Holdings = { skyBinOwned = data.skyBinOwned, sawmillStock = data.sawmillStock, placed = placed }
+	local holdings: Holdings = {
+		skyBinOwned = data.skyBinOwned,
+		sawmillStock = data.sawmillStock,
+		storage = data.storage,
+		placed = placed,
+	}
 	local waiting = type(data.skyWood) == "table" and #data.skyWood > 0
 	if data.skyBinOwned ~= true then
 		data.skyBinOwned = waiting or SkyBinLogic.Exists(holdings)
 	end
 	if data.skyBinOwned == true and not SkyBinLogic.Exists(holdings) then
-		if type(data.sawmillStock) ~= "table" then
-			data.sawmillStock = {}
+		if type(data.storage) ~= "table" then
+			data.storage = {}
 		end
-		table.insert(data.sawmillStock, SkyBinLogic.Id)
+		if newUid ~= nil and #data.storage < (storageCap or 50) then
+			table.insert(data.storage, {
+				uid = newUid(),
+				itemId = SkyBinLogic.Id,
+				shop = "ToolShed",
+				pending = true,
+			})
+		else
+			if type(data.sawmillStock) ~= "table" then
+				data.sawmillStock = {}
+			end
+			table.insert(data.sawmillStock, SkyBinLogic.Id)
+		end
 		return "granted"
 	end
 	return nil
@@ -184,7 +229,7 @@ function SkyBinLogic.LockLine(lock: string): string
 			ItemCatalog.SkyBinPrice
 		)
 	end
-	return "The Cloud Chute can't take wood until your Sky Bin is on your plot. Place it with your hammer; nothing is lost."
+	return "The Cloud Chute can't take wood until your Sky Bin is on your plot. Open its box and place it; nothing is lost."
 end
 
 -- The chute prompt's line under v2: how it works, with the lock first.
@@ -229,7 +274,9 @@ end
 SkyBinLogic.EmptyLine = "Your Sky Bin is empty. Lay wood in a Cloud Chute on the Aether Isles to fill it."
 SkyBinLogic.OnlyOwnerLine = "Only the plot's owner can put a Sky Bin down."
 SkyBinLogic.OnePerPlotLine = "You already have a Sky Bin on your plot. There's only room for one."
-SkyBinLogic.BackInStockLine = "Took the Sky Bin back. The wood in it is safe: place it again to sell it."
+SkyBinLogic.OnlyOwnerSellLine = "Only the plot's owner can sell the Sky Bin."
+SkyBinLogic.WoodStaysLine =
+	"Your Sky Bin can't be sold yet: the wood in it couldn't be paid out (is your wallet full?). Nothing is lost."
 
 -- Whether a placing is refused because the plot already has a bin.
 function SkyBinLogic.PlaceRefusal(blueprintId: string, isOwner: boolean, placed: { any }?): string?

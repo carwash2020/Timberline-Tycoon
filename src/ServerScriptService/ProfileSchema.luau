@@ -763,7 +763,7 @@ function ProfileSchema.Migrate(data: any)
 		end
 	end
 	-- The Sky Bin became an item: a save with wood in it (or a bin) owns one.
-	SkyBinLogic.Migrate(data)
+	SkyBinLogic.Migrate(data, Util.guid, ProfileSchema.StorageCap)
 	-- Reconcile fills a missing settings table, not keys added inside it.
 	data.settings = SettingsLogic.Sanitize(data.settings)
 	if type(data.passes) ~= "table" then

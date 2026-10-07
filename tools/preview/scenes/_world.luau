@@ -300,7 +300,7 @@ function World.build(ctx, opts)
 				slab.name,
 				V3.new(3.2, 0.25, 7),
 				slab.cframe,
-				C3.fromRGB(150, 116, 78),
+				C3.fromRGB(156, 94, 64),
 				roblox.Enum.Material.Ground
 			),
 			false
