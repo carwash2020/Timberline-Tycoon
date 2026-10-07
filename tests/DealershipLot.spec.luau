@@ -7,6 +7,7 @@ return function(t)
 	local WorldPlan = t.load("ReplicatedStorage/Shared/World/WorldPlan")
 	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
 	local ShopLogic = t.shared("ShopLogic")
+	local HoverTag = t.shared("HoverTag")
 	local ItemCatalog = t.shared("ItemCatalog")
 	local Util = t.shared("Util")
 	local GameConfig = t.shared("GameConfig")
@@ -61,54 +62,64 @@ return function(t)
 		return out
 	end
 
-	t.test("every display is the real vehicle, anchored, scriptless, looks only, priced like the server", function()
-		local lot = DealershipLot.Build()
-		local list = displays(lot)
-		t.eq(#list, 8, "5 trucks and 3 trailers")
-		for _, child in ipairs(list) do
-			t.eq(child.ModelStreamingMode, t.roblox.Enum.ModelStreamingMode.Atomic, child.Name)
-			local id = child:GetAttribute("ItemId")
-			local item = ItemCatalog.GetTruck(id) or ItemCatalog.GetTrailer(id)
-			for _, d in ipairs(child:GetDescendants()) do
-				if d:IsA("BasePart") then
-					t.eq(d.Anchored, true, child.Name .. " " .. d.Name .. " anchored")
-					t.eq(d.CanCollide, false, child.Name .. " " .. d.Name .. " is decoration")
-					t.eq(d.CanQuery, false, child.Name .. " " .. d.Name .. " cannot be clicked")
-					t.eq(d.CanTouch, false, child.Name .. " " .. d.Name .. " cannot be touched")
+	t.test(
+		"every display is the real vehicle, anchored, scriptless, looks only, named, with the real price one aim away",
+		function()
+			local lot = DealershipLot.Build()
+			local list = displays(lot)
+			t.eq(#list, 8, "5 trucks and 3 trailers")
+			for _, child in ipairs(list) do
+				t.eq(child.ModelStreamingMode, t.roblox.Enum.ModelStreamingMode.Atomic, child.Name)
+				local id = child:GetAttribute("ItemId")
+				local item = ItemCatalog.GetTruck(id) or ItemCatalog.GetTrailer(id)
+				for _, d in ipairs(child:GetDescendants()) do
+					if d:IsA("BasePart") then
+						t.eq(d.Anchored, true, child.Name .. " " .. d.Name .. " anchored")
+						t.eq(d.CanCollide, false, child.Name .. " " .. d.Name .. " is decoration")
+						t.eq(d.CanQuery, false, child.Name .. " " .. d.Name .. " cannot be clicked")
+						t.eq(d.CanTouch, false, child.Name .. " " .. d.Name .. " cannot be touched")
+					end
+					t.eq(d.ClassName == "Script" or d.ClassName == "LocalScript", false, child.Name)
+					if d:IsA("VehicleSeat") or d:IsA("Seat") then
+						t.eq(d.Disabled, true, child.Name .. " cannot be sat in or driven")
+					end
 				end
-				t.eq(d.ClassName == "Script" or d.ClassName == "LocalScript", false, child.Name)
-				if d:IsA("VehicleSeat") or d:IsA("Seat") then
-					t.eq(d.Disabled, true, child.Name .. " cannot be sat in or driven")
+				-- Correct paint: the body carries the vehicle's own colour.
+				local painted = false
+				for _, d in ipairs(child:GetDescendants()) do
+					if d:IsA("BasePart") and d.Color == t.roblox.Color3.fromHex(item.look.color) then
+						painted = true
+					end
 				end
+				t.ok(painted, child.Name .. " wears its own paint")
+				-- The sign beside it names the vehicle; the price is NOT printed (Connor:
+				-- prices show when you aim at an item). The tag's price is the server's.
+				local sign = child:FindFirstChild("NameSign", true)
+				t.ok(sign and sign:IsA("BasePart"), child.Name .. " name sign")
+				t.eq(child:FindFirstChild("PriceSign", true), nil, child.Name .. " has no price sign")
+				t.eq(sign:FindFirstChild("BuyPrompt", true), nil, child.Name .. " has no buy prompt")
+				local text = nil
+				for _, d in ipairs(sign:GetDescendants()) do
+					if d:IsA("TextLabel") then
+						text = d.Text
+					end
+				end
+				t.ok(text and string.find(text, item.displayName, 1, true), child.Name .. " sign names it")
+				t.eq(string.find(text, "$", 1, true), nil, child.Name .. " sign has no price")
+				local spec = HoverTag.SpecOf(child)
+				t.ok(spec ~= nil, child.Name .. " is aimable")
+				t.eq(spec.shop, "Dealership")
+				t.eq(spec.itemId, id)
+				t.eq(spec.name, item.displayName)
+				t.eq(
+					HoverTag.Price(spec, priceLoop()),
+					ShopLogic.Price(item, priceLoop()),
+					child.Name .. " tag price is real"
+				)
 			end
-			-- Correct paint: the body carries the vehicle's own colour.
-			local painted = false
-			for _, d in ipairs(child:GetDescendants()) do
-				if d:IsA("BasePart") and d.Color == t.roblox.Color3.fromHex(item.look.color) then
-					painted = true
-				end
-			end
-			t.ok(painted, child.Name .. " wears its own paint")
-			local sign = child:FindFirstChild("PriceSign", true)
-			t.ok(sign and sign:IsA("BasePart"), child.Name .. " price sign")
-			t.eq(sign:FindFirstChild("BuyPrompt", true), nil, child.Name .. " has no buy prompt")
-			local price = ShopLogic.Price(item, priceLoop())
-			local text = nil
-			for _, d in ipairs(sign:GetDescendants()) do
-				if d:IsA("TextLabel") then
-					text = d.Text
-				end
-			end
-			t.ok(
-				text and string.find(text, Util.formatCash(price), 1, true),
-				child.Name .. " tag " .. Util.formatCash(price)
-			)
-			t.ok(string.find(text, item.displayName, 1, true), child.Name .. " tag names it")
-			-- One price on the tag: the cash price and nothing in cubed units.
-			t.eq(string.find(text, "u" .. utf8.char(179), 1, true), nil, "no u3 in player text")
+			t.eq(lot:FindFirstChild("BuyPrompt", true), nil, "the lot has no buy prompt")
 		end
-		t.eq(lot:FindFirstChild("BuyPrompt", true), nil, "the lot has no buy prompt")
-	end)
+	)
 
 	t.test(
 		"a box stands on every plinth at the aisle edge, sized by the vehicle, with the vehicle beside it, and the aisle stays clear",
@@ -171,7 +182,7 @@ return function(t)
 				-- The vehicle sits on the plinth, wholly over it.
 				local vx0, vx1, vy0, vy1, vz0, vz1 = math.huge, -math.huge, math.huge, -math.huge, math.huge, -math.huge
 				for _, d in ipairs(parts(child)) do
-					if d.Name ~= "PriceSign" then
+					if d.Name ~= "NameSign" then
 						local a, b, c, e, f, g = aabb(d)
 						vx0, vx1, vy0, vy1 = math.min(vx0, a), math.max(vx1, b), math.min(vy0, c), math.max(vy1, e)
 						vz0, vz1 = math.min(vz0, f), math.max(vz1, g)
@@ -183,9 +194,9 @@ return function(t)
 				-- Beside the box (behind it from the aisle): no overlap in z.
 				t.ok(vz1 <= sz0 + 0.05 or vz0 >= sz1 - 0.05, id .. " is beside its box, not under it")
 			end
-			-- Nothing but a price sign (a thin board at a plinth's edge) stands in the aisle.
+			-- Nothing but a name sign (a thin board at a plinth's edge) stands in the aisle.
 			for _, p in ipairs(parts(lot)) do
-				if p.Name ~= "PriceSign" and p.Name ~= "BoxSpot" then
+				if p.Name ~= "NameSign" and p.Name ~= "BoxSpot" then
 					local _, _, _, _, z0, z1 = aabb(p)
 					t.ok(z1 <= aisleLo + 0.01 or z0 >= aisleHi - 0.01, p.Name .. " keeps out of the aisle")
 				end

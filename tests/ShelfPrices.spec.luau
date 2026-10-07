@@ -1,9 +1,11 @@
 --!nocheck
--- One price per shelf item. A shop box shows its price once, on its own label
--- (BoxArt); there is no floating billboard over it and no plaque on the table
--- or shelf under it, because two prices for one item (or two items' prices
--- drawn on the same plaque, which is what side-by-side boxes did) read as
--- "$520 over $320". The price shown is the item's real price.
+-- No price is printed on the world any more (Connor, 7 October 2026: "not lose
+-- prices, just show prices when hovering over an item"). A shop box's label,
+-- the Tool Shed's axe-rack plates and the General Store's offer boards carry
+-- NAMES only; the price appears in a tag when a player aims at the item
+-- (Shared/HoverTag, drawn by the client's HoverTagUI, one tag at a time). The
+-- price the tag shows is the item's real one: the same StoreStock.UnitPrice
+-- the server charges with.
 return function(t)
 	local roblox = t.roblox
 	local Instance, Vector3, CFrame = roblox.Instance, roblox.Vector3, roblox.CFrame
@@ -28,12 +30,13 @@ return function(t)
 	local Box = loader:server("BoxService")
 	local StoreStock = loader:shared("StoreStock")
 	local GameConfig = loader:shared("GameConfig")
+	local HoverTag = loader:shared("HoverTag")
 	local Util = loader:shared("Util")
 	local BoxArt = loader:shared("Art/BoxArt")
 	local BuildingArt = loader:load("ReplicatedStorage/Shared/Art/BuildingArt")
 
-	local function isPriceText(text)
-		return string.match(text, "^%$[%d,]+$") ~= nil or text == "FREE"
+	local function printsPrice(text)
+		return string.find(text, "$", 1, true) ~= nil or string.find(text, "FREE", 1, true) ~= nil
 	end
 
 	local function labelsOf(model)
@@ -76,43 +79,36 @@ return function(t)
 		return out
 	end
 
-	t.test("every shelf box shows exactly one price, the item's real one, and nothing floats over it", function()
+	t.test("no shelf box prints a price or floats a tag; the hover tag has the item's real one", function()
 		local seen = 0
 		for _, shop in ipairs({ "ToolShed", "HearthAndHome" }) do
 			for _, entry in ipairs(boxesOf(shop)) do
 				seen += 1
 				local slot, rec = entry.slot, entry.rec
-				local prices = {}
 				for _, label in ipairs(labelsOf(rec.model)) do
-					if label.Name == "Price" then
-						table.insert(prices, label.Text)
-					end
+					t.ok(label.Name ~= "Price", slot.slotId .. " has a price line")
+					t.ok(not printsPrice(label.Text), slot.slotId .. " prints a price: " .. label.Text)
 				end
-				local expected = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
-				t.ok(expected ~= nil and expected > 0, slot.slotId .. " has a price")
-				t.eq(prices, { Util.formatCash(expected) }, slot.slotId .. " shows its real price once")
-				t.eq(rec.price, expected, slot.slotId .. " charges what it shows")
 				for _, d in ipairs(rec.model:GetDescendants()) do
 					t.ok(not d:IsA("BillboardGui"), slot.slotId .. " has no floating tag")
 				end
-				-- The price line sits under the name on the same panel: no overlap.
-				local name, price
+				-- The name is still on the label.
+				local named = false
 				for _, label in ipairs(labelsOf(rec.model)) do
-					if label.Parent.Name == "NameMark" and label.Parent.Parent.Name == "Label" then
-						if label.Name == "Name" then
-							name = label
-						elseif label.Name == "Price" then
-							price = label
-						end
+					if label.Name == "Name" and string.find(label.Text, slot.displayName, 1, true) then
+						named = true
 					end
 				end
-				t.ok(name ~= nil and price ~= nil, slot.slotId .. " has a name line and a price line")
-				local nameBottom = name.Position.Y.Scale + name.Size.Y.Scale
-				t.ok(nameBottom <= price.Position.Y.Scale + 1e-6, slot.slotId .. " name and price do not overlap")
-				t.ok(
-					price.Position.Y.Scale + price.Size.Y.Scale <= 1 + 1e-6,
-					slot.slotId .. " price stays on the panel"
-				)
+				t.ok(named, slot.slotId .. " keeps its name on the label")
+				-- The tag: the real price, from the same function the counter charges with.
+				local expected = StoreStock.UnitPrice(slot.itemKind, slot.itemId, slot.limited, 2)
+				t.ok(expected ~= nil and expected > 0, slot.slotId .. " has a price")
+				local spec = HoverTag.SpecOf(rec.model)
+				t.ok(spec ~= nil, slot.slotId .. " can be aimed at")
+				local name, line = HoverTag.Lines(spec, { hour = spec.shop == "ToolShed" and 12 or 12, loop = 2 })
+				t.eq(name, slot.displayName)
+				t.eq(line, Util.formatCash(expected), slot.slotId .. " tag shows its real price")
+				t.eq(rec.price, expected, slot.slotId .. " charges what the tag shows")
 			end
 		end
 		t.ok(seen >= 35, "checked every box on both shops' shelves: " .. seen)
@@ -151,7 +147,7 @@ return function(t)
 		end
 	end)
 
-	t.test("the tables and shelves carry no price plaques of their own", function()
+	t.test("the tables, shelves, axe rack and offer boards print no prices, only names", function()
 		local shops = {
 			{ kind = "ToolShed", title = "TOOL SHED", accent = roblox.Color3.fromRGB(150, 62, 44) },
 			{ kind = "HearthAndHome", title = "HEARTH & HOME", accent = roblox.Color3.fromRGB(122, 90, 60) },
@@ -159,12 +155,76 @@ return function(t)
 		for _, shop in ipairs(shops) do
 			local model = BuildingArt.Shop(shop.kind, shop.title, shop.accent)
 			for _, label in ipairs(labelsOf(model)) do
-				t.ok(not isPriceText(label.Text), shop.kind .. " has a stand-alone price plaque: " .. label.Text)
+				t.ok(not printsPrice(label.Text), shop.kind .. " prints a price: " .. label.Text)
 			end
 		end
 	end)
 
-	t.test("a vehicle's box carries no price: the showroom's price sign is its one price", function()
+	t.test("the Tool Shed's axe rack: a name plate per axe, and each axe tags its real price", function()
+		local ItemCatalog = loader:shared("ItemCatalog")
+		local model = BuildingArt.Shop("ToolShed", "TOOL SHED", roblox.Color3.fromRGB(150, 62, 44))
+		local racks, plates = {}, {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d.Name == "RackAxe" then
+				racks[d:GetAttribute("ItemId")] = d
+			elseif d.Name == "AxePlate" then
+				table.insert(plates, d)
+			end
+		end
+		local n = 0
+		for _, axe in ipairs(ItemCatalog.AxeLadder()) do
+			if axe.sold ~= false then
+				n += 1
+				local rack = racks[axe.id]
+				t.ok(rack ~= nil, axe.id .. " hangs on the rack")
+				local spec = HoverTag.SpecOf(rack)
+				t.eq(spec.shop, "ToolShed")
+				t.eq(spec.name, axe.displayName)
+				t.eq(spec.anchor, true, "the tag sits over the axe, not its plate")
+				t.eq(HoverTag.Price(spec, 2), StoreStock.UnitPrice("Axe", axe.id, false, 2), axe.id .. " real price")
+			end
+		end
+		t.eq(#plates, n, "a plate per axe")
+		for _, plate in ipairs(plates) do
+			local texts = {}
+			for _, label in ipairs(labelsOf(plate)) do
+				table.insert(texts, label.Text)
+			end
+			t.eq(#texts >= 1, true)
+			t.ok(not printsPrice(table.concat(texts, " ")), "the plate names the axe only")
+			t.ok(HoverTag.SpecOf(plate) ~= nil, "aiming at the plate shows the tag too")
+		end
+	end)
+
+	t.test("the General Store's offer boards name the item; the tag has its real price", function()
+		local model = BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", roblox.Color3.fromRGB(122, 90, 60))
+		local boards = {}
+		for _, d in ipairs(model:GetDescendants()) do
+			if d.Name == "PriceTag" and d:IsA("BasePart") then
+				table.insert(boards, d)
+			end
+		end
+		t.eq(#boards, 4, "four offer boards")
+		for _, board in ipairs(boards) do
+			local spec = HoverTag.SpecOf(board)
+			t.ok(spec ~= nil, "a board can be aimed at")
+			t.eq(spec.shop, "HearthAndHome")
+			t.eq(spec.anchor, true)
+			local slot = StoreStock.Find(spec.kind, spec.itemId)
+			t.eq(spec.name, slot.displayName)
+			t.eq(
+				HoverTag.Price(spec, 2),
+				StoreStock.UnitPrice(spec.kind, spec.itemId, slot.limited, 2),
+				spec.itemId .. " real price"
+			)
+			for _, label in ipairs(labelsOf(board)) do
+				t.ok(string.find(label.Text, string.upper(slot.displayName), 1, true) ~= nil, "the board names it")
+				t.ok(not printsPrice(label.Text), "and prints no price")
+			end
+		end
+	end)
+
+	t.test("a vehicle's box carries no price either; it tags the real vehicle price when aimed at", function()
 		local counter = Instance.new("Part")
 		counter.Name = "Counter"
 		counter.Size = Vector3.new(10, 2, 6)
@@ -181,7 +241,11 @@ return function(t)
 		})
 		for _, label in ipairs(labelsOf(rec.model)) do
 			t.ok(label.Name ~= "Price", "no price line on a vehicle box")
+			t.ok(not printsPrice(label.Text), "no price text on a vehicle box")
 		end
+		local spec = HoverTag.SpecOf(rec.model)
+		t.eq(spec.shop, "Dealership")
+		t.eq(HoverTag.Price(spec, 2), StoreStock.UnitPrice("Truck", "Rustbucket", false, 2))
 		t.ok(BoxArt ~= nil and GameConfig ~= nil)
 	end)
 end

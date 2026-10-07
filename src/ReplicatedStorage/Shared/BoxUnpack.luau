@@ -9,9 +9,9 @@
 --   "pickup"  small things (axes, gear, a cosmetic, goods) come out as a
 --             physical object on the spot; the buyer picks it up (Interact
 --             again) and it goes to the hotbar or the inventory.
---   "stock"   plot items (the chop saw, the Sky Bin, blueprints) unpack into
+--   "stock"   plot items (the chop saw, blueprints) unpack into
 --             the buyer's stock to place with the hammer, as before.
---   "place"   sawmills, planers and conveyor pieces (Connor, 6 October 2026):
+--   "place"   sawmills, planers, conveyor pieces and the Sky Bin (Connor, 6 October 2026):
 --             opening the box starts a placement ghost on your plot. The box
 --             stays where it is until you CONFIRM: placing spends it (one-time
 --             use, no stock list, no blueprint book entry); cancelling keeps

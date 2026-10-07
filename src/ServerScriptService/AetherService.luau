@@ -147,6 +147,7 @@ end
 
 local function publish(player: Player, profile: Profile)
 	player:SetAttribute("SkyBin", #profile.skyBin)
+	player:SetAttribute("SkyBinOwned", SkyBinLogic.Owns(SkyBinLogic.HoldingsOf(profile))) -- the Tool Shed's hover tag
 	player:SetAttribute("ForgeLogs", ShopLogic.EncodeOwned(profile.forgeLogs))
 	if v2 then
 		player:SetAttribute("SkyBinVolume", round2(binUsed(profile)))
@@ -627,6 +628,33 @@ function AetherService.SellSkyBin(player: Player, bin: Instance?)
 		profile.skyWood = entries
 	end
 	publish(player, profile)
+end
+
+-- Pays out everything in the player's Sky Bin before the placed bin is sold
+-- (PlotService.Sell): the same sale as the "Sell Sky Bin" prompt, but it
+-- refuses (returns false, nothing paid or taken) when the wood could not be
+-- paid in full: the wallet has no room for it plus `extra` dollars, or the
+-- sale service is not running. An empty bin is "ok" with nothing paid. Wood is
+-- never destroyed: the entries leave the save only for a sale that happens.
+function AetherService.PayOutBin(player: Player, extra: number?): boolean
+	local profile = ProfileService.GetProfile(player)
+	if not profile then
+		return false
+	end
+	local entries = profile.skyWood
+	if type(entries) ~= "table" or #entries == 0 then
+		return true
+	end
+	if not SellService.CanPayEntries(player, entries, extra) then
+		return false
+	end
+	profile.skyWood = {}
+	if not SellService.PayEntries(player, entries) then
+		profile.skyWood = entries
+		return false
+	end
+	publish(player, profile)
+	return true
 end
 
 -- Puts the lumenwood in the player's hands into the forge (up to the recipe).

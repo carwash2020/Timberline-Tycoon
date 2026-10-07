@@ -746,12 +746,15 @@ local function deliver(player: Player, profile: any, box: BoxGrant, axe: ItemCat
 		local machine = ItemCatalog.GetMachine(box.itemId)
 		if machine then
 			if SkyBinLogic.IsBin(machine.id) then
-				-- One per player: a second box (bought before the first was opened)
-				-- is yours already, as with gear. The flag is what the save keeps.
-				if SkyBinLogic.Owns(SkyBinLogic.HoldingsOf(profile)) then
+				-- Only a fallback now (the Sky Bin comes out of its box with a
+				-- placement ghost, like the mills; this runs for an owner gift or a
+				-- full storage): a bin that physically exists is yours already, so a
+				-- second grant is dropped. The flag is what the save keeps.
+				if SkyBinLogic.Exists(SkyBinLogic.HoldingsOf(profile)) then
 					return nil
 				end
 				profile.skyBinOwned = true
+				player:SetAttribute("SkyBinOwned", true)
 			end
 			-- The same stock list the sawmills wait in; the hammer places it.
 			if type(profile.sawmillStock) ~= "table" then
@@ -994,6 +997,10 @@ function ShopService.ChargeAndGrant(player: Player, box: BoxGrant, now: number?)
 
 	if box.deferGrant == true and box.kind ~= "Truck" and box.kind ~= "Trailer" then
 		-- The buyer is handed the box; the item comes out when it is opened.
+		if box.kind == "Machine" and SkyBinLogic.IsBin(box.itemId) then
+			profile.skyBinOwned = true -- the box counts as owning one (the chute lock says "place it")
+			player:SetAttribute("SkyBinOwned", true)
+		end
 		notify(player, string.format("Paid for the %s. Open the box.", StoreStock.DisplayName(box.kind, box.itemId)))
 		return true, "thanks", nil
 	end

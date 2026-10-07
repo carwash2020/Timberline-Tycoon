@@ -111,62 +111,68 @@ return function(t)
 		t.eq(BoxArt.CategoryColor("???"), BoxArt.DefaultCategory)
 	end)
 
-	t.test("BoxService boxes carry the packaging, size by class, and ONE price on the label (no billboard)", function()
-		local loader = t.loader({
-			mocks = {
-				ShopService = {
-					Loop = function()
-						return 2
-					end,
-					ChargeAndGrant = function()
-						return true, "thanks", nil
-					end,
+	t.test(
+		"BoxService boxes carry the packaging, size by class, and no price printed on the label (the price is a hover tag)",
+		function()
+			local loader = t.loader({
+				mocks = {
+					ShopService = {
+						Loop = function()
+							return 2
+						end,
+						ChargeAndGrant = function()
+							return true, "thanks", nil
+						end,
+					},
+					ProfileService = {
+						GetProfile = function()
+							return nil
+						end,
+					},
 				},
-				ProfileService = {
-					GetProfile = function()
-						return nil
-					end,
-				},
-			},
-		})
-		local Box = loader:server("BoxService")
-		local StoreStock = loader:shared("StoreStock")
-		local counter = Instance.new("Part")
-		counter.Name = "Counter"
-		counter.Size = Vector3.new(10, 2, 6)
-		counter.CFrame = CFrame.new(0, 3, 0)
-		local small = Box.Make({ slotId = "toolshed-SteelAxe", cf = CFrame.new(-8, 5, 0), counter = counter })
-		local big = Box.Make({ slotId = "toolshed-Millmaster200L", cf = CFrame.new(8, 6, 0), counter = counter })
-		local function near(a, b)
-			return math.abs(a.X - b.X) < 0.01 and math.abs(a.Y - b.Y) < 0.01 and math.abs(a.Z - b.Z) < 0.01
-		end
-		t.ok(near(small.part.Size, StoreStock.BoxSizeOf(StoreStock.Get("toolshed-SteelAxe"))))
-		t.ok(near(big.part.Size, StoreStock.BoxSizeOf(StoreStock.Get("toolshed-Millmaster200L"))))
-		t.ok(
-			big.part.Size.X * big.part.Size.Y * big.part.Size.Z
-				> 3 * small.part.Size.X * small.part.Size.Y * small.part.Size.Z,
-			"the sawmill box is much bigger than the hatchet box"
-		)
-		for _, rec in ipairs({ small, big }) do
-			local n = 0
-			for _, d in ipairs(rec.model:GetDescendants()) do
-				if d:IsA("BasePart") then
-					n += 1
-					t.eq(d.CollisionGroup, "Boxes")
-				end
+			})
+			local Box = loader:server("BoxService")
+			local StoreStock = loader:shared("StoreStock")
+			local counter = Instance.new("Part")
+			counter.Name = "Counter"
+			counter.Size = Vector3.new(10, 2, 6)
+			counter.CFrame = CFrame.new(0, 3, 0)
+			local small = Box.Make({ slotId = "toolshed-SteelAxe", cf = CFrame.new(-8, 5, 0), counter = counter })
+			local big = Box.Make({ slotId = "toolshed-Millmaster200L", cf = CFrame.new(8, 6, 0), counter = counter })
+			local function near(a, b)
+				return math.abs(a.X - b.X) < 0.01 and math.abs(a.Y - b.Y) < 0.01 and math.abs(a.Z - b.Z) < 0.01
 			end
-			t.ok(n >= 5 and n <= BoxLogic.BoxPartCap, "five or six parts, " .. n)
-			local prices, billboards = 0, 0
-			for _, d in ipairs(rec.model:GetDescendants()) do
-				if d.Name == "Price" and d:IsA("TextLabel") then
-					prices += 1
-				elseif d:IsA("BillboardGui") then
-					billboards += 1
+			t.ok(near(small.part.Size, StoreStock.BoxSizeOf(StoreStock.Get("toolshed-SteelAxe"))))
+			t.ok(near(big.part.Size, StoreStock.BoxSizeOf(StoreStock.Get("toolshed-Millmaster200L"))))
+			t.ok(
+				big.part.Size.X * big.part.Size.Y * big.part.Size.Z
+					> 3 * small.part.Size.X * small.part.Size.Y * small.part.Size.Z,
+				"the sawmill box is much bigger than the hatchet box"
+			)
+			for _, rec in ipairs({ small, big }) do
+				local n = 0
+				for _, d in ipairs(rec.model:GetDescendants()) do
+					if d:IsA("BasePart") then
+						n += 1
+						t.eq(d.CollisionGroup, "Boxes")
+					end
 				end
+				t.ok(n >= 5 and n <= BoxLogic.BoxPartCap, "five or six parts, " .. n)
+				local prices, billboards, texts = 0, 0, 0
+				for _, d in ipairs(rec.model:GetDescendants()) do
+					if d.Name == "Price" and d:IsA("TextLabel") then
+						prices += 1
+					elseif d:IsA("BillboardGui") then
+						billboards += 1
+					elseif d:IsA("TextLabel") and string.find(d.Text, "$", 1, true) then
+						texts += 1
+					end
+				end
+				t.eq(prices, 0, "no price on the box")
+				t.eq(texts, 0, "no dollar amount anywhere on it")
+				t.eq(billboards, 0, "and nothing floating over it")
 			end
-			t.eq(prices, 1, "one price on the box")
-			t.eq(billboards, 0, "and nothing floating over it")
+			t.ok(small.model:FindFirstChild("SideLabel") ~= nil, "a west-side box shows a label to the aisle")
 		end
-		t.ok(small.model:FindFirstChild("SideLabel") ~= nil, "a west-side box shows a label to the aisle")
-	end)
+	)
 end

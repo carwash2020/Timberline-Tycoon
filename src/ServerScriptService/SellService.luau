@@ -382,6 +382,26 @@ end
 -- (SellLogic.ValidEntry) are worth nothing. Returns the sale (0 pieces,
 -- nothing paid or said, when none counts), or nil before Init: the
 -- caller keeps its entries.
+-- Whether PayEntries would pay `entries` in full: the service is running and
+-- the wallet has room for the sale plus `extra` dollars more (the Sky Bin's
+-- sell-back, paid right after). Nothing is paid or said. Used where the wood
+-- must never be lost to the wallet cap (PlotService.Sell of a placed bin).
+function SellService.CanPayEntries(player: Player, entries: { SellLogic.Entry }, extra: number?): boolean
+	local d = deps
+	if not d then
+		return false
+	end
+	local value = 0
+	for _, entry in ipairs(entries) do
+		if SellLogic.ValidEntry(entry) then
+			value += SellLogic.EntryValue(entry)
+		end
+	end
+	local paid = if value > 0 then SellLogic.Payout(value, d.saleMultiplier(player)) else 0
+	local room = if d.walletRoom then d.walletRoom(player) else math.huge
+	return paid + (extra or 0) <= room
+end
+
 function SellService.PayEntries(player: Player, entries: { SellLogic.Entry }): Sale?
 	local d = deps
 	if not d then

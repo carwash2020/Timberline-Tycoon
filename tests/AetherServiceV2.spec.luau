@@ -499,6 +499,55 @@ return function(t)
 		t.eq(#s.paid, 0)
 	end)
 
+	t.test("PayOutBin (selling the placed bin): pays the wood in full, or refuses and loses nothing", function()
+		local s = setup()
+		local SellLogic = t.shared("SellLogic")
+		local p1 = s.player(1)
+		t.eq(s.A.PayOutBin(p1, 200), true, "an empty bin: nothing to pay")
+		t.eq(#s.paid, 0)
+		local entries = { SellLogic.Entry("oak", "log", 10, nil, 1) }
+		s.profiles[1].skyWood = entries
+		local worth = SellLogic.Payout(SellLogic.EntriesValue(entries), 1)
+		-- A wallet with room for the wood but not for the wood plus the sell-back.
+		local room = worth + 100
+		local function deps(walletRoom)
+			s.Sell._use({
+				zone = Instance.new("Part"),
+				woodFolder = Instance.new("Folder"),
+				resolve = function()
+					return nil
+				end,
+				addCash = function(p, amount, reason, sku)
+					table.insert(s.paid, { id = p.UserId, amount = amount, reason = reason, sku = sku })
+					return nil
+				end,
+				saleMultiplier = function()
+					return 1
+				end,
+				notify = function() end,
+				release = function() end,
+				forget = function() end,
+				walletRoom = function()
+					return walletRoom
+				end,
+			})
+		end
+		deps(room)
+		t.eq(s.A.PayOutBin(p1, 200), false, "no room for the wood plus the sell-back")
+		t.eq(s.profiles[1].skyWood, entries, "the wood is untouched")
+		t.eq(#s.paid, 0)
+		t.eq(s.A.PayOutBin(p1, 50), true)
+		t.eq(#s.paid, 1)
+		t.eq(s.paid[1].amount, worth)
+		t.eq(s.profiles[1].skyWood, {})
+		t.eq(s.players[1].attrs.SkyBinVolume, 0)
+		-- The sale service not running: refuse, keep the wood.
+		s.profiles[1].skyWood = entries
+		s.Sell._reset()
+		t.eq(s.A.PayOutBin(p1, 0), false)
+		t.eq(s.profiles[1].skyWood, entries)
+	end)
+
 	t.test("Sell Sky Bin: a bin that has left the world, or isn't a part, sells nothing", function()
 		local s = setup()
 		s.profiles[1].skyWood = { { w = "oak", v = 10 } }
