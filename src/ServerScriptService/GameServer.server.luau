@@ -57,6 +57,7 @@ local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
 local PickupGrace = require(script.Parent.PickupGrace)
+local JoinSync = require(script.Parent.JoinSync)
 local LoadState = require(script.Parent.LoadState)
 local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
@@ -78,6 +79,7 @@ local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
+local JoinFlow = require(ReplicatedStorage.Shared.JoinFlow)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -713,6 +715,9 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlotPass = remote.PlotPass,
 	VisitPlot = remote.VisitPlot,
 }, notify, { gates = LoadState.Gates })
+-- The pads, the Land Office counter and the plot picker's data exist now (or
+-- Init failed and warned: nothing will make them appear, so do not wait).
+LoadState.Gates.Set("plots")
 safely("ForestService.Init", ForestService.Init, { WorldFX = remote.WorldFX }, notify)
 safely("WeatherService.Init", WeatherService.Init, remote.WorldFX)
 safely("RegionWake.Init", RegionWake.Init)
@@ -731,6 +736,9 @@ safely("NPCService.Init", NPCService.Init, mapFolder, {
 		LoadState.Gates.Set("npcs")
 	end,
 })
+-- Murph is built before Init returns (the rest of the townsfolk follow in the
+-- deferred build), and the tutorial's first stop is his camp.
+LoadState.Gates.Set("murph")
 -- The v2 core loop (V2_PLAN.md M1.4), dormant on live (CoreLoop 1): grab
 -- and drag loose wood, and Studio's /spawnwood to try it.
 if CoreLoop.V2() then
@@ -1183,6 +1191,54 @@ remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, 
 	end
 end)
 
+-- The client's join handshake (JoinSync) ------------------------------------
+-- The client fires ClientReady once its controllers have started and their
+-- handlers are connected. The join flow waits for it before releasing a
+-- player, and every one-shot the client may have missed is sent again here
+-- (and once more right after the release). Each resend is state the client
+-- applies, so hearing it twice is harmless.
+JoinSync.Register("cash", function(player: Player)
+	local profile = ProfileService.GetProfile(player)
+	if profile then
+		remote.CashChanged:FireClient(player, profile.cash)
+	end
+end)
+JoinSync.Register("plotOffer", function(player: Player)
+	PlotService.Resend(player)
+end)
+JoinSync.Register("saveSlots", function(player: Player)
+	SaveSlotService.PlayerJoined(player)
+end)
+
+local function resendState(player: Player)
+	if player:GetAttribute("ProfileLoaded") ~= true then
+		return -- nothing to send yet; the release runs the resends
+	end
+	local good = JoinSync.Run(player, function(name: string, err: any)
+		warn(string.format("[GameServer] resend %s for %s failed: %s", name, player.Name, tostring(err)))
+	end)
+	print(string.format("[Load] %s: state sent again to the client (%d resends)", player.Name, good))
+end
+
+local joinedAt: { [Player]: number } = {}
+
+remote.ClientReady.OnServerEvent:Connect(function(player: Player)
+	if not RateLimiter.Allow(player, "ClientReady") then
+		return
+	end
+	if JoinSync.MarkReady(player, LoadState.Since()) then
+		local since = joinedAt[player]
+		LoadState.Line(
+			string.format(
+				"client ready handshake from %s%s",
+				player.Name,
+				if since then string.format(" (%.1fs after it joined)", os.clock() - since) else ""
+			)
+		)
+	end
+	resendState(player)
+end)
+
 -- Player lifecycle --------------------------------------------------------
 
 -- PlayerAdded and the "already here" loop can both see the same player
@@ -1212,6 +1268,16 @@ local function onCharacterAdded(player: Player, character: Model)
 	end
 	humanoid.Died:Connect(function()
 		dropCarriedLogs(player)
+		-- MapBuilder turned CharacterAutoLoads off (nobody spawns before the
+		-- world is ready) and the join flow owns spawning, so it owns
+		-- respawning too.
+		task.delay(JoinFlow.RespawnDelay(Players.RespawnTime), function()
+			if player.Parent == Players and player.Character == character then
+				pcall(function()
+					player:LoadCharacterAsync()
+				end)
+			end
+		end)
 	end)
 	if player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 10) then
 		AxeService.GiveLoadout(player, character)
@@ -1238,6 +1304,123 @@ local function ownedEquipped(profile: ProfileSchema.Profile): string
 	return ""
 end
 
+-- Hooks a player's characters once (the loadout, the drop on death, the
+-- respawn) and runs it for one that already exists.
+local hooked: { [Player]: boolean } = {}
+local function hookCharacter(player: Player)
+	if hooked[player] then
+		return
+	end
+	hooked[player] = true
+	player.CharacterAdded:Connect(function(char)
+		onCharacterAdded(player, char)
+	end)
+	local existing = player.Character
+	if existing then
+		task.spawn(onCharacterAdded, player, existing)
+	end
+end
+
+-- Lets one player into the world (Shared/JoinFlow has the order and the
+-- reasons). The save is loaded; this waits for what the first minute needs
+-- (JoinFlow.FirstPlayerGates), has the client stream the spawn area in,
+-- loads the character, waits until it stands on the ground, then waits for
+-- the client's ClientReady. Every wait is bounded, and any failure still
+-- loads the character: a broken step must never keep a player out.
+local function enterWorld(player: Player, joinLap: (string) -> ())
+	local gates = LoadState.Gates
+	local worldOk = gates.WaitAll(JoinFlow.FirstPlayerGates, JoinFlow.GateWaitSeconds)
+	if not worldOk then
+		warn(
+			string.format(
+				"[GameServer] %s: still waiting on %s after %ds; letting them in anyway",
+				player.Name,
+				table.concat(
+					JoinFlow.Missing(function(name: string): boolean
+						return gates.IsReady(name)
+					end),
+					", "
+				),
+				JoinFlow.GateWaitSeconds
+			)
+		)
+	end
+	joinLap("world gates open")
+	if player.Parent ~= Players then
+		return
+	end
+
+	-- Stream the spawn area in before the character exists.
+	local spawnPart = mapFolder:FindFirstChild("SpawnLocation")
+	local spawnPos = if spawnPart and spawnPart:IsA("BasePart")
+		then spawnPart.Position + Vector3.new(0, JoinFlow.StreamLift, 0)
+		else Vector3.new(0, 10, 0)
+	local ask = (player :: any).RequestStreamAroundAsync
+	if type(ask) == "function" then
+		local ok, err = pcall(function()
+			ask(player, spawnPos, JoinFlow.StreamSeconds)
+		end)
+		if not ok then
+			warn(string.format("[GameServer] %s: streaming the spawn area failed: %s", player.Name, tostring(err)))
+		end
+	end
+	joinLap("spawn area streamed")
+	if player.Parent ~= Players then
+		return
+	end
+
+	-- The loadout hook first, then the character.
+	hookCharacter(player)
+	local loaded, loadErr = pcall(function()
+		player:LoadCharacterAsync()
+	end)
+	if not loaded then
+		warn(string.format("[GameServer] %s: LoadCharacter failed: %s", player.Name, tostring(loadErr)))
+	end
+
+	-- Standing on the ground for a moment (not falling, not sliding).
+	local settled = JoinFlow.Settled()
+	local landedAt = os.clock()
+	local grounded = false
+	while player.Parent == Players and os.clock() - landedAt < JoinFlow.GroundSeconds do
+		local char = player.Character
+		local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
+		local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
+		if humanoid and root then
+			local onFloor = humanoid.FloorMaterial ~= Enum.Material.Air
+			if settled.Update(os.clock(), onFloor, root.AssemblyLinearVelocity.Y) then
+				grounded = true
+				break
+			end
+		end
+		task.wait(0.05)
+	end
+	LoadState.Line(
+		string.format(
+			"character spawned at +%.1fs for %s (world ready, area streamed%s)",
+			LoadState.Since(),
+			player.Name,
+			if grounded then ", standing on the ground" else ", ground not confirmed"
+		)
+	)
+
+	-- The client's handlers are connected (ClientReady), or the wait ran out.
+	while player.Parent == Players and not JoinSync.IsReady(player) do
+		if os.clock() - landedAt >= JoinFlow.ClientWaitSeconds then
+			warn(
+				string.format(
+					"[GameServer] %s: no ClientReady after %ds; releasing them",
+					player.Name,
+					JoinFlow.ClientWaitSeconds
+				)
+			)
+			break
+		end
+		task.wait(0.1)
+	end
+	joinLap("client ready")
+end
+
 local function onPlayerAdded(player: Player)
 	if joining[player] then
 		return
@@ -1251,6 +1434,7 @@ local function onPlayerAdded(player: Player)
 	-- Timing lines for the join: a stall shows as the first one that never
 	-- prints (the HUD says "Loading your save..." until ProfileLoaded).
 	local joinStart = os.clock()
+	joinedAt[player] = joinStart
 	local function joinLap(what: string)
 		print(string.format("[GameServer] %s: %s (%.1fs)", player.Name, what, os.clock() - joinStart))
 	end
@@ -1351,13 +1535,21 @@ local function onPlayerAdded(player: Player)
 		end)
 	end
 
-	player.CharacterAdded:Connect(function(char)
-		onCharacterAdded(player, char)
-	end)
-	local existing = player.Character
-	if existing then
-		task.spawn(onCharacterAdded, player, existing)
+	-- The world, the spawn area and the client are ready; then the character
+	-- (enterWorld), and only then "can play" (ProfileLoaded).
+	local entered = pcall(enterWorld, player, joinLap)
+	if not entered or player.Parent ~= Players then
+		if player.Parent ~= Players then
+			return -- they left while waiting; PlayerRemoving releases the save
+		end
+		warn("[GameServer] " .. player.Name .. ": the join flow failed; loading the character anyway")
+		if player.Character == nil then
+			pcall(function()
+				player:LoadCharacterAsync()
+			end)
+		end
 	end
+	hookCharacter(player) -- (a no-op when enterWorld already did)
 
 	player:SetAttribute("ProfileLoaded", true)
 	joinLap("ready (ProfileLoaded)")
@@ -1384,6 +1576,9 @@ local function onPlayerAdded(player: Player)
 	safely("ForestService.PlayerJoined", ForestService.PlayerJoined, player, profile)
 	safely("SaveSlotService.PlayerJoined", SaveSlotService.PlayerJoined, player)
 	safely("LeaderboardService.PlayerJoined", LeaderboardService.PlayerJoined, player, profile.settings.showOnBoard)
+	-- Everything the services just sent, once more, now the client is surely
+	-- listening (a no-op until it has said ClientReady, which enterWorld waited for).
+	safely("JoinSync.Run", resendState, player)
 	print(string.format("[GameServer] %s joined (cash $%d)", player.Name, profile.cash))
 end
 
@@ -1492,6 +1687,9 @@ rebuildSlot = rebuildSlotNow
 
 local function onPlayerRemoving(player: Player)
 	joining[player] = nil
+	hooked[player] = nil
+	joinedAt[player] = nil
+	JoinSync.Forget(player)
 	safely("dropCarriedLogs", dropCarriedLogs, player) -- back into the world for others, before the character goes
 	safely("AxeService.PlayerRemoving", AxeService.PlayerRemoving, player) -- world models go; the axes stay in the save
 	safely("BlueprintService.PlayerRemoving", BlueprintService.PlayerRemoving, player) -- dropped plans stay in the save too

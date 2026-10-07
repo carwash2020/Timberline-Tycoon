@@ -100,6 +100,10 @@ do
 	end
 end
 
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Net = require(ReplicatedStorage.Shared.Net)
+
 type Controller = { Start: () -> () }
 
 -- Requires one module (`get` does the require), protected: a module whose
@@ -462,8 +466,12 @@ local controllers: { { name: string, get: () -> any } } = {
 	},
 }
 
+local startedCount = 0 -- controllers whose Start has returned (or that had nothing to start)
+local totalStarts = 0
+
 local function start(name: string, module: Controller?)
 	if module == nil then
+		startedCount += 1
 		return -- it failed to load (warned above)
 	end
 	local startedAt = os.clock()
@@ -475,6 +483,7 @@ local function start(name: string, module: Controller?)
 		warn(string.format("[Client] %s failed to start:\n%s", name, tostring(err)))
 	end
 	local took = os.clock() - startedAt
+	startedCount += 1
 	if took >= 0.1 then
 		print(string.format("[Load] client %s Start took %.2fs", name, took))
 	end
@@ -503,9 +512,53 @@ print(
 	)
 )
 
+totalStarts = #loaded
 for _, c in ipairs(loaded) do
 	task.spawn(start, c.name, c.module)
 end
+
+-- The join handshake. The controllers now start at +0.2 s, long before the
+-- server has made its remotes, and each connects its handlers when its Start
+-- gets past the wait for them. A one-shot the server fires before a handler
+-- is connected is lost (the plot offer, the save slots, the cash). So once
+-- every Start has returned (or CLIENT_READY_WAIT seconds, for one that waits
+-- on something that never streams in), the client tells the server
+-- ClientReady; the server holds the player's release until it hears it and
+-- sends its state again (ServerScriptService/JoinSync), and every handler
+-- applies state, so hearing it twice is harmless. The fire is repeated every
+-- few seconds until the save is in, in case the server had not connected
+-- its listener yet.
+task.spawn(function()
+	local waitStart = os.clock()
+	local CLIENT_READY_WAIT = 20
+	while startedCount < totalStarts and os.clock() - waitStart < CLIENT_READY_WAIT do
+		task.wait(0.1)
+	end
+	local ok, remote = pcall(function(): RemoteEvent
+		return Net.Remote("ClientReady")
+	end)
+	if not ok then
+		warn("[Client] ClientReady remote not found: " .. tostring(remote))
+		return
+	end
+	local localPlayer = Players.LocalPlayer
+	local firedAt = os.clock()
+	print(
+		string.format(
+			"[Load] client ready handshake %.2fs after the client started (%d/%d controllers started)",
+			firedAt - clientStart,
+			startedCount,
+			totalStarts
+		)
+	)
+	for _ = 1, 6 do
+		remote:FireServer()
+		task.wait(3)
+		if localPlayer:GetAttribute("ProfileLoaded") == true then
+			return
+		end
+	end
+end)
 
 print(string.format("[Load] client controllers started in %.2fs", os.clock() - clientStart))
 print("[Client] Timberline Tycoon client started.")

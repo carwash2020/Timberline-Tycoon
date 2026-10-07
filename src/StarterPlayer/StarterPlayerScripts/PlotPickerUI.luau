@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
+local PickerSequence = require(ReplicatedStorage.Shared.PickerSequence)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local MenuPad = require(script.Parent.MenuPad)
 local UITheme = require(script.Parent.UITheme)
@@ -39,6 +40,8 @@ local savedSpeed: number? = nil
 local savedCamera: Enum.CameraType? = nil
 local price = 0 -- this player's price for a plot (0: a save that already owns one)
 local anyButton: TextButton? = nil
+local pendingOffer: Offer? = nil -- the newest offer, held while the quality screen has its turn
+local sequence = PickerSequence.Shared()
 
 local function humanoid(): Humanoid?
 	local char = player.Character
@@ -71,7 +74,8 @@ end
 local function unlock()
 	local hum = humanoid()
 	if hum and savedSpeed ~= nil then
-		hum.WalkSpeed = savedSpeed
+		-- Never a stuck zero (PlotPickerLogic.SafeSpeed).
+		hum.WalkSpeed = PlotPickerLogic.SafeSpeed(savedSpeed)
 	end
 	savedSpeed = nil
 	local cam = currentCamera()
@@ -91,6 +95,8 @@ function PlotPickerUI._open(button: GuiObject?)
 end
 
 function PlotPickerUI._close()
+	pendingOffer = nil
+	sequence.Done("plot") -- the next screen in line (if any) may open
 	if open then
 		open = false
 		local screen = gui
@@ -164,7 +170,7 @@ local function showCurrent()
 	frame(plot)
 end
 
-local function show(offer: Offer)
+local function apply(offer: Offer)
 	local previous = plots[index]
 	local lost = offer.notice == "taken"
 	plots = offer.plots
@@ -194,6 +200,18 @@ local function show(offer: Offer)
 	lock()
 	showCurrent()
 	PlotPickerUI._open(claimButton)
+end
+
+-- An offer arrived (or arrived again: the server sends it once the save has
+-- loaded and once more when the client says ClientReady). It is kept as the
+-- newest, and shown when it is the plot picker's turn: the quality screen
+-- (QualityPickerUI) goes first on a first join, so the two never stack.
+local function show(offer: Offer)
+	pendingOffer = offer
+	if not sequence.Request("plot") then
+		return -- waiting for its turn; the sequence's OnChange applies it
+	end
+	apply(offer)
 end
 
 local function step(delta: number)
@@ -334,9 +352,17 @@ function PlotPickerUI.Start()
 	end
 	player:GetAttributeChangedSignal("Picking"):Connect(considerClose)
 	player:GetAttributeChangedSignal("PlotSlot"):Connect(considerClose)
-	player.CharacterAdded:Connect(function()
+	sequence.OnChange(function(active: string?)
+		local offer = pendingOffer
+		if active == "plot" and offer ~= nil and not open then
+			apply(offer)
+		end
+	end)
+	player.CharacterAdded:Connect(function(char: Model)
 		if open then
 			savedSpeed = nil
+			-- The humanoid can arrive a moment after the character.
+			char:WaitForChild("Humanoid", 5)
 			lock()
 			local plot = plots[index]
 			if plot then

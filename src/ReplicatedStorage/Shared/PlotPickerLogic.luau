@@ -118,6 +118,19 @@ function PlotPickerLogic.Step(index: number, count: number, delta: number): numb
 	return ((index - 1 + delta) % count + count) % count + 1
 end
 
+-- The walk speed the picker gives back when it closes. The picker holds the
+-- character still (WalkSpeed 0) while it is open; what it saved must never
+-- be a stuck zero (a second lock that read the first one's 0, a save made
+-- as the character respawned), or the player could not move again.
+PlotPickerLogic.DefaultWalkSpeed = 16
+
+function PlotPickerLogic.SafeSpeed(saved: unknown): number
+	if type(saved) ~= "number" or saved ~= saved or saved <= 0 or saved == math.huge then
+		return PlotPickerLogic.DefaultWalkSpeed
+	end
+	return saved
+end
+
 -- Claim is only for an open pad. Taken ones stay on the list so you can
 -- see who has them.
 function PlotPickerLogic.CanClaim(taken: boolean): boolean

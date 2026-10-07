@@ -5,9 +5,23 @@ return function(t)
 	-- Runs Client.client with every controller faked: `failing` names the
 	-- ones whose Start errors. Returns who started, the warnings and the
 	-- prints, in order.
+	local lastFired = 0
+	local lastOrder = {}
 	local function run(failing, failingLoad)
 		failingLoad = failingLoad or {}
 		local started, prints = {}, {}
+		local fired = 0
+		local fakeNet = {
+			Remote = function(name)
+				return {
+					FireServer = function()
+						fired += 1
+						table.insert(lastOrder, name .. " after " .. #started .. " starts")
+					end,
+				}
+			end,
+		}
+		lastOrder = {}
 		local function fake(name)
 			return {
 				Start = function()
@@ -24,6 +38,9 @@ return function(t)
 				if name == "Client.client" then
 					return nil -- the script under test
 				end
+				if name == "Net" then
+					return fakeNet
+				end
 				if failingLoad[name] then
 					error(name .. " broke at load") -- its top level errors
 				end
@@ -33,6 +50,15 @@ return function(t)
 		})
 		local loader = t.loader({
 			mocks = mocks,
+			services = {
+				Players = {
+					LocalPlayer = {
+						GetAttribute = function()
+							return true -- the save is in: the handshake stops after one fire
+						end,
+					},
+				},
+			},
 			globals = {
 				debug = debug,
 				print = function(...)
@@ -42,10 +68,12 @@ return function(t)
 					spawn = function(fn, ...)
 						fn(...)
 					end,
+					wait = function() end,
 				},
 			},
 		})
 		loader:load("StarterPlayer/StarterPlayerScripts/Client.client")
+		lastFired = fired
 		return started, loader.warnings, prints, fakes
 	end
 
@@ -71,6 +99,22 @@ return function(t)
 		t.ok(count > 20, "the real controller list")
 		t.eq(#warnings, 0)
 		t.eq(prints[#prints], "[Client] Timberline Tycoon client started.")
+	end)
+
+	-- Join race fix: the controllers start before the server has made its
+	-- remotes, so the server waits for the client to say its handlers are in.
+	t.test("the client says ClientReady once every controller has started, even if one broke", function()
+		local started = run({ QuestUI = true })
+		t.eq(lastFired, 1, "one handshake (the save was already in, so no repeats)")
+		t.eq(lastOrder, { "ClientReady after " .. #started .. " starts" }, "after every Start returned")
+		local _, _, prints = run({})
+		local found = false
+		for _, line in ipairs(prints) do
+			if string.find(line, "[Load] client ready handshake", 1, true) then
+				found = true
+			end
+		end
+		t.ok(found, "the [Load] client ready handshake line")
 	end)
 
 	t.test("a HUD that fails to start warns, and every other controller still starts", function()

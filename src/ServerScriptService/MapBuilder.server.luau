@@ -23,9 +23,10 @@
 --   7. The backdrop beyond the world's edge (mountains, sea, the volcano's
 --      impostor), walls at the edge, the day/night clock, then characters.
 -- Each part of 3-7 runs on its own (step() below): an error in one is
--- warned with a traceback and the rest still builds. The last three steps
--- (SellArea in, CharacterAutoLoads back on, load anyone waiting) always
--- run, so one broken builder can never stop players spawning.
+-- warned with a traceback and the rest still builds. The last step (SellArea
+-- in, which starts GameServer) always runs, so one broken builder can never
+-- stop players spawning. Characters are loaded by GameServer's join flow
+-- (Shared/JoinFlow), not here: CharacterAutoLoads stays false.
 --
 -- LOAD-02 (7 October 2026): only what a player needs to stand and play is
 -- built before SellArea goes in (terrain, the town's buildings, the shops,
@@ -135,7 +136,8 @@ local map = Instance.new("Folder")
 map.Name = "TimberlineMap"
 map.Parent = workspace
 
--- 2. Nobody spawns until the ground exists.
+-- 2. Nobody spawns until GameServer's join flow says so (the world, the save and
+-- the streamed spawn area are all ready). The flow also respawns the dead.
 Players.CharacterAutoLoads = false
 
 -- 3. Terrain.
@@ -1322,7 +1324,7 @@ workspace:SetAttribute("MapTerrainSeconds", terrainSeconds)
 workspace:SetAttribute("MapTrees", treesSpawned)
 workspace:SetAttribute("MapBuildFailures", failedSteps)
 
--- The last three steps run whatever failed above.
+-- The last step runs whatever failed above.
 -- The forest is background work the summary line waits for (see LoadState).
 local planter = forestPlanter
 if planter then
@@ -1334,15 +1336,14 @@ LoadState.Gates.Set("world")
 LoadState.Stage("world")
 sellArea.Parent = map
 
--- The ground is in: let everyone spawn.
-Players.CharacterAutoLoads = true
-for _, player in ipairs(Players:GetPlayers()) do
-	if not player.Character then
-		task.spawn(function()
-			player:LoadCharacter()
-		end)
-	end
-end
+-- The ground is in, but nobody spawns yet. CharacterAutoLoads stays off: this
+-- used to turn it on and load everyone waiting here, at +6.5 s, before
+-- GameServer had started its services, before the save was loaded, before the
+-- plot pads and Murph existed and before the client had streamed the spawn
+-- area in (Studio, 7 October: the character glitched and could not move, and
+-- the plot picker could not be used). GameServer's join flow (Shared/JoinFlow)
+-- loads each player's character once the first-player gates are open, the
+-- spawn area is streamed in and their save is loaded, and respawns them.
 
 print(string.format("[MapBuilder] World built in %.1fs (terrain %.1fs)", builtSeconds, terrainSeconds))
 print("[MapBuilder] meshes after the build: " .. MeshKit.Report())

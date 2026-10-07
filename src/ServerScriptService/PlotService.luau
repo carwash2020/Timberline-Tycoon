@@ -57,6 +57,7 @@ local PlotLogic = require(ReplicatedStorage.Shared.PlotLogic)
 local SampleBuilds = require(ReplicatedStorage.Shared.SampleBuilds)
 local PlotPickerLogic = require(ReplicatedStorage.Shared.PlotPickerLogic)
 local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
+local PlotRedraw = require(ReplicatedStorage.Shared.PlotRedraw)
 local PlotSalesmanData = require(ReplicatedStorage.Shared.PlotSalesmanData)
 local ReadyGates = require(ReplicatedStorage.Shared.ReadyGates)
 local SpotRescue = require(ReplicatedStorage.Shared.SpotRescue)
@@ -1963,6 +1964,15 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 	fireOffer(player)
 end
 
+-- Sends the picker's offer again (JoinSync, when the client says ClientReady):
+-- only to a player whose picker is still waiting, and freshly built, so the
+-- taken pads are current.
+function PlotService.Resend(player: Player)
+	if pickingUntil[player] ~= nil or buying[player] then
+		fireOffer(player)
+	end
+end
+
 function PlotService.OfferOf(player: Player): PlotPickerLogic.Offer?
 	return lastOffer[player]
 end
@@ -2194,6 +2204,51 @@ local function redrawSlot(slot: Slot)
 	end
 end
 
+-- The plot kit's meshes landed after the pads were built (PlotService.Init
+-- gave up waiting): dress every pad now. A redraw clears and rebuilds the
+-- pad's platform slabs and ramps, which drops a player standing on them, so
+-- a pad with a player near it waits (PlotRedraw) and is tried again.
+function PlotService.RedrawLate()
+	local pending: { number } = {}
+	for _, slot in ipairs(slots) do
+		table.insert(pending, slot.index)
+	end
+	local tries = 0
+	while #pending > 0 and tries < PlotRedraw.MaxRetries do
+		tries += 1
+		local pads: { PlotRedraw.Pad } = {}
+		for _, index in ipairs(pending) do
+			local at = slots[index].cframe.Position
+			table.insert(pads, { index = index, x = at.X, z = at.Z })
+		end
+		local players: { PlotRedraw.Point } = {}
+		for _, who in ipairs(game:GetService("Players"):GetPlayers()) do
+			local char = who.Character
+			local root = if char then char:FindFirstChild("HumanoidRootPart") else nil
+			if root and root:IsA("BasePart") then
+				table.insert(players, { x = root.Position.X, z = root.Position.Z })
+			end
+		end
+		local now, later = PlotRedraw.Split(pads, players)
+		for _, index in ipairs(now) do
+			local ok, err = (pcall :: any)(redrawSlot, slots[index])
+			if not ok then
+				warn(string.format("[PlotService] redrawing plot %d failed: %s", index, tostring(err)))
+			end
+		end
+		pending = later
+		if #pending > 0 then
+			task.wait(PlotRedraw.RetrySeconds)
+		end
+	end
+	print(
+		string.format(
+			"[Load] PlotService: the plot kit's meshes landed late; the pads were dressed (%d held back for a player)",
+			#pending
+		)
+	)
+end
+
 -- `options.gates` (GameServer passes LoadState.Gates) gets "itemMeshes" when
 -- the plot kit's meshes are in.
 function PlotService.Init(
@@ -2215,10 +2270,7 @@ function PlotService.Init(
 		ItemMeshes.LoadAsync()
 		gates.Set("itemMeshes")
 		if lateShells then
-			for _, slot in ipairs(slots) do
-				redrawSlot(slot)
-			end
-			print("[Load] PlotService: the plot kit's meshes landed late; the pads were dressed")
+			PlotService.RedrawLate()
 		end
 	end)
 	if not gates.Wait("itemMeshes", 3) then
