@@ -55,6 +55,7 @@ return {
 				body.CanCollide = false
 				BoxArt.Dress(m, body, {
 					name = slot.displayName,
+					itemId = id,
 					kind = kind,
 					color = C3.fromHex(slot.color),
 				})

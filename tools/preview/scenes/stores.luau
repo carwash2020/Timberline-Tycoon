@@ -33,13 +33,14 @@ return {
 			end
 		end
 
-		local function box(at, size, name, kind, color, gold)
+		local function box(at, size, name, kind, color, gold, itemId)
 			local model = roblox.Instance.new("Model")
 			model.Name = "ShopItem"
 			local body = Kit.part(model, "Box", size, CF.new(at), color, roblox.Enum.Material.SmoothPlastic)
 			body.CanCollide = false
 			BoxArt.Dress(model, body, {
 				name = name,
+				itemId = itemId,
 				kind = kind,
 				color = color,
 				gold = gold,
@@ -100,6 +101,8 @@ return {
 								body.CanCollide = false
 								BoxArt.Dress(m, body, {
 									name = slot.displayName,
+									tier = StoreStock.TierLabel(slot.itemKind, slot.itemId),
+									itemId = slot.itemId,
 									kind = slot.itemKind,
 									color = C3.fromHex(slot.color),
 									side = BoxArt.AisleSide(at.X - shopX),
@@ -117,7 +120,16 @@ return {
 			local m = BoxSize.Class("M").size
 			Kit.part(root, "Person", V3.new(2, 5, 1), CF.new(x, 2.5 + 0.75, z), C3.fromRGB(60, 90, 160))
 			Kit.part(root, "Head", V3.new(1.4, 1.4, 1.4), CF.new(x, 6.1, z), C3.fromRGB(235, 200, 160))
-			box(V3.new(x, 4.4, z + 1 + m.Z / 2), m, "Cobalt Axe", "Axe", C3.fromRGB(60, 90, 160))
+			local size = StoreStock.BoxSizeOf(StoreStock.Get("toolshed-CobaltAxe"))
+			box(
+				V3.new(x, 4.4, z + 1 + size.Z / 2),
+				size,
+				"Cobalt Axe",
+				"Axe",
+				C3.fromRGB(60, 90, 160),
+				false,
+				"CobaltAxe"
+			)
 		end
 
 		local cameras = {}
@@ -155,7 +167,7 @@ return {
 		table.insert(cameras, { pos = { 14, 14, -12 }, target = { 6, 3, 2 }, label = "6 Tool Shed tables, close" })
 		table.insert(
 			cameras,
-			{ pos = { 70, 10, -4 }, target = { 68, 3, 6 }, label = "7 Hearth & Home gear shelf, close", fov = 80 }
+			{ pos = { 82, 9, -20 }, target = { 69, 5, -10 }, label = "7 Hearth & Home gear shelf, close", fov = 70 }
 		)
 		table.insert(
 			cameras,

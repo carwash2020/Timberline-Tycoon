@@ -390,15 +390,9 @@ function BoxService.AskRobuxPrice(kind: string, key: string)
 	end)
 end
 
-local function dress(rec: Record, part: BasePart, tint: Color3)
-	local faces = BoxLogic.LargestFaces(part.Size)
-	for _, face in ipairs(faces) do
-		local mark = Instance.new("Decal")
-		mark.Name = "ItemMark"
-		mark.Face = face
-		mark.Color3 = tint
-		mark.Parent = part
-	end
+-- The box's prompts (Buy at the counter, Open once it is paid for). The
+-- look is BoxArt's: a dark window box showing the item.
+local function dress(rec: Record, part: BasePart)
 	local buy = Instance.new("ProximityPrompt")
 	buy.Name = "BuyPrompt"
 	buy.ActionText = "Buy"
@@ -436,18 +430,15 @@ local function dress(rec: Record, part: BasePart, tint: Color3)
 	end)
 end
 
--- The name on the box's label: the item's, with its tier under it (a sawmill
--- or a planer, StoreStock.TierLabel).
-local function boxLabel(rec: Record): string
-	local tier = StoreStock.TierLabel(rec.itemKind, rec.itemId)
-	return if tier then rec.displayName .. "\n" .. tier else rec.displayName
-end
-
 function BoxService.Make(opts: MakeOptions): Record
 	local kind = opts.itemKind or "Axe"
 	local itemId = opts.itemId or "SteelAxe"
 	local limited = opts.limited == true
 	local slot = if opts.slotId then StoreStock.Get(opts.slotId) else StoreStock.Find(kind, itemId)
+	if slot ~= nil and opts.slotId ~= nil and opts.itemKind == nil and opts.itemId == nil then
+		-- Made from a shelf slot alone: the slot says what is in the box.
+		kind, itemId = slot.itemKind, slot.itemId
+	end
 	if slot == nil and (opts.shop == "Dealership" or kind == "Truck" or kind == "Trailer") then
 		slot = StoreStock.Vehicle(itemId)
 	end
@@ -467,7 +458,6 @@ function BoxService.Make(opts: MakeOptions): Record
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = RobuxShelf.Gold,
-			boxClass = RobuxShelf.Class,
 		}
 	end
 	local uid = opts.uid or Util.guid()
@@ -531,16 +521,21 @@ function BoxService.Make(opts: MakeOptions): Record
 		part = part,
 	}
 	records[uid] = rec
-	dress(rec, part, if robux ~= nil then colorOf(RobuxShelf.GoldInk) else itemColor)
-	-- The packaging: kraft body, tape in the item's colour, a label with its
-	-- name, the category stripe, trim, and a label on the aisle side.
+	dress(rec, part)
+	-- The look: a dark box with a glass window on the front, top and aisle
+	-- side showing the real item, an accent band with its name, and the tier
+	-- line under it (BoxArt). Nothing but the window, walls and strip is
+	-- solid; the item inside weighs nothing and is never aimed at.
 	local relX: number? = nil
-	if opts.counter ~= nil then
+	if opts.counter ~= nil and rec.shop ~= "Dealership" then
+		-- (The showroom's boxes are turned to face their aisle instead.)
 		relX = cf.Position.X - opts.counter.CFrame.Position.X
 	end
 	BoxArt.Dress(model, part, {
-		name = boxLabel(rec),
+		name = rec.displayName,
+		tier = StoreStock.TierLabel(rec.itemKind, rec.itemId),
 		kind = rec.itemKind,
+		itemId = if robux ~= nil then nil else rec.itemId,
 		color = itemColor,
 		gold = robux ~= nil,
 		side = if relX ~= nil then BoxArt.AisleSide(relX) else nil,
@@ -557,7 +552,7 @@ function BoxService.Make(opts: MakeOptions): Record
 		robux = if robux ~= nil then RobuxShelf.Tag(BoxService.RobuxPrice(robux.kind, robux.key)) else nil,
 	})
 	model:SetAttribute("ForSale", true)
-	for _, d in ipairs(model:GetChildren()) do
+	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
 			d.CollisionGroup = BoxService.Group
 		end
@@ -1290,6 +1285,9 @@ function BoxService.TryOpen(player: Player, uid: string): (boolean, string?)
 		-- (BoxService.SpendForPlacement, from PlotService.Place), cancelling
 		-- keeps it. A box from before this flow has nothing owed (its sawmill was
 		-- granted into stock at the counter): it opens as it always did, below.
+		if rec.model ~= nil then
+			BoxArt.Open(rec.model) -- the window and the item are gone: an open box
+		end
 		BoxService.OnPlace(player, rec.uid, rec.itemId)
 		BoxService.Toast(player, BoxUnpack.OpenedLine(mode, rec.displayName))
 		return true, nil

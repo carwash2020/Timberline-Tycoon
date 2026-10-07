@@ -15,10 +15,12 @@ return function(t)
 		return n
 	end
 
-	local function boxesOf(shop)
+	-- Every part of every box a full shelf carries: the dark shell and the
+	-- item's low-detail copy in its window (the lamp shelf shows three boxes).
+	local function boxParts(shop)
 		local n = 0
 		for _, slot in ipairs(StoreStock.ForShop(shop)) do
-			n += if slot.limited then GameConfig.LimitedStockCount else 1
+			n += (if slot.limited then GameConfig.LimitedStockCount else 1) * StoreStock.PartsOf(slot)
 		end
 		return n
 	end
@@ -63,36 +65,39 @@ return function(t)
 		t.eq(StoreStock.TryClaim(3, 1200), true, "the per-player mark cleared")
 	end)
 
-	t.test("shelves are attachments, and shelves plus boxes (six parts each) stay within the budget", function()
-		local BuildingArt = t.shared("Art/BuildingArt")
-		local Color3 = t.roblox.Color3
-		for _, shop in ipairs({ "ToolShed", "HearthAndHome" }) do
-			local model = BuildingArt.Shop(shop, shop, Color3.fromRGB(90, 60, 40))
-			local rx, ry, rz = model:GetPivot():ToOrientation()
-			t.ok(math.abs(rx) < 1e-3 and math.abs(ry) < 1e-3 and math.abs(rz) < 1e-3, shop .. " pivot")
+	t.test(
+		"shelves are attachments, and shelves plus boxes (a dark shell and the item each) stay within the budget",
+		function()
+			local BuildingArt = t.shared("Art/BuildingArt")
+			local Color3 = t.roblox.Color3
+			for _, shop in ipairs({ "ToolShed", "HearthAndHome" }) do
+				local model = BuildingArt.Shop(shop, shop, Color3.fromRGB(90, 60, 40))
+				local rx, ry, rz = model:GetPivot():ToOrientation()
+				t.ok(math.abs(rx) < 1e-3 and math.abs(ry) < 1e-3 and math.abs(rz) < 1e-3, shop .. " pivot")
+				local slots = 0
+				for _, d in ipairs(model:GetDescendants()) do
+					if d.Name == "ShelfSlot" then
+						slots += 1
+					end
+				end
+				t.eq(slots, #StoreStock.ForShop(shop), shop)
+				local zone = StoreStock.Zone(shop)
+				local scale = BuildingArt.Scale[shop]
+				t.eq(model:GetAttribute("ZoneSizeX"), zone.size.X * scale)
+				t.eq(model:GetAttribute("ZoneSizeZ"), zone.size.Z * scale)
+				t.ok(partsOf(model) + boxParts(shop) <= GameConfig.StorePartBudget, shop .. " shelves plus boxes")
+				t.ok(BoxLogic.BoxPartCap <= 42, "a box in the hand stays light")
+			end
+			local lot = BuildingArt.Shop("Dealership", "Dale", Color3.fromRGB(40, 70, 110))
 			local slots = 0
-			for _, d in ipairs(model:GetDescendants()) do
+			for _, d in ipairs(lot:GetDescendants()) do
 				if d.Name == "ShelfSlot" then
 					slots += 1
 				end
 			end
-			t.eq(slots, #StoreStock.ForShop(shop), shop)
-			local zone = StoreStock.Zone(shop)
-			local scale = BuildingArt.Scale[shop]
-			t.eq(model:GetAttribute("ZoneSizeX"), zone.size.X * scale)
-			t.eq(model:GetAttribute("ZoneSizeZ"), zone.size.Z * scale)
-			t.ok(partsOf(model) + boxesOf(shop) * BoxLogic.BoxPartCap <= GameConfig.StorePartBudget, shop)
-			t.ok(BoxLogic.BoxPartCap <= 6)
+			t.eq(slots, 0, "the dealership board is not a shelf")
 		end
-		local lot = BuildingArt.Shop("Dealership", "Dale", Color3.fromRGB(40, 70, 110))
-		local slots = 0
-		for _, d in ipairs(lot:GetDescendants()) do
-			if d.Name == "ShelfSlot" then
-				slots += 1
-			end
-		end
-		t.eq(slots, 0, "the dealership board is not a shelf")
-	end)
+	)
 
 	t.test("T2: box prices are the catalog v2 prices, with no second table", function()
 		local ItemCatalog = t.shared("ItemCatalog")
@@ -182,9 +187,10 @@ return function(t)
 					parts += 1
 				end
 			end
+			-- A gold box is the dark shell and three coins.
 			t.ok(
-				parts + (boxesOf("ToolShed") + gold) * BoxLogic.BoxPartCap <= GameConfig.StorePartBudget,
-				"parts, cash boxes and gold boxes at six parts each"
+				parts + boxParts("ToolShed") + gold * (BoxLogic.ShellPartCap + 3) <= GameConfig.StorePartBudget,
+				"parts, cash boxes and gold boxes"
 			)
 			local hearth = BuildingArt.Shop("HearthAndHome", "STORE", t.roblox.Color3.fromRGB(122, 90, 60))
 			for _, d in ipairs(hearth:GetDescendants()) do
@@ -201,7 +207,8 @@ return function(t)
 		t.eq(slot.itemId, "SkyBin")
 		t.eq(slot.displayName, "Sky Bin")
 		t.eq(slot.limited, false)
-		t.eq(slot.boxClass, "S", "sized from its 4 x 4 footprint")
+		local box = StoreStock.BoxSizeOf(slot)
+		t.ok(box.Y > box.X and box.X <= 3.5, "small and tall, as its model is")
 		t.eq(StoreStock.UnitPrice("Machine", "SkyBin", false, 2), 400)
 		t.ok(StoreStock.FindInShop("ToolShed", "SkyBin") ~= nil)
 		t.eq(#StoreStock.Overflow("ToolShed"), 0, "it has a place on the shelves")

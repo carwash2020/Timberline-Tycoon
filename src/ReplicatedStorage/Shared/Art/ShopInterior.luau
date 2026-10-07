@@ -14,10 +14,10 @@ local Kit = require(script.Parent.Kit)
 local AxeArt = require(script.Parent.AxeArt)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
-local ShelfLayout = require(script.Parent.Parent.ShelfLayout)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
 local StoreStock = require(script.Parent.Parent.StoreStock)
 local HoverTag = require(script.Parent.Parent.HoverTag)
+local BoxLook = require(script.Parent.Parent.BoxLook)
 
 local ShopInterior = {}
 
@@ -52,48 +52,6 @@ local function dBox(parent: Instance, name: string, size: Vector3, cf: CFrame, c
 	return decor(Kit.part(parent, name, size, cf, color, mat or MAT.Wood))
 end
 
--- The floor rectangle a lane's boxes actually cover, grown a little.
-function ShopInterior.LaneRect(lane: ShelfLayout.Lane, spots: { ShelfLayout.Spot }): (number?, number?)
-	local lo, hi = math.huge, -math.huge
-	for _, spot in ipairs(spots) do
-		if spot.lane == lane.name then
-			lo = math.min(lo, spot.z - spot.d / 2)
-			hi = math.max(hi, spot.z + spot.d / 2)
-		end
-	end
-	if lo > hi then
-		return nil
-	end
-	return math.max(lane.z0, lo - 0.8), math.min(lane.z1, hi + 0.8)
-end
-
--- The spots of a shop as ShelfLayout.Spot (for the table extents).
-local function spotsOf(kind: string): { ShelfLayout.Spot }
-	local out: { ShelfLayout.Spot } = {}
-	local lanes = StoreStock.Lanes(kind)
-	for _, place in ipairs(StoreStock.Placements(kind)) do
-		local laneName = ""
-		for _, lane in ipairs(lanes) do
-			if place.x >= lane.x0 and place.x <= lane.x1 and place.z >= lane.z0 and place.z <= lane.z1 then
-				laneName = lane.name
-				break
-			end
-		end
-		local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
-		table.insert(out, {
-			id = place.slotId,
-			lane = laneName,
-			x = place.x,
-			y = place.y,
-			z = place.z,
-			w = place.size.X,
-			h = place.size.Y,
-			d = depth,
-		})
-	end
-	return out
-end
-
 -- A table: legs and apron (a body, solid), a top board that overhangs a
 -- little, and a trim along its front edge. `topY` is the surface.
 local function furniture(
@@ -115,6 +73,105 @@ local function furniture(
 	local board = Kit.part(parent, name .. "Top", V3(w, 0.3, d), CF(cx, topY - 0.15, cz), top, MAT.Wood)
 	board.CanQuery = false
 	dBox(parent, name .. "Trim", V3(w + 0.1, 0.5, 0.18), CF(cx, topY - 0.5, z0 - 0.04), TIMBER)
+end
+
+-- What one placement covers along z: its box, or the whole row of boxes a
+-- limited item shows.
+local function placeDepth(place: StoreStock.Placement): number
+	return place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
+end
+
+local STEP_SLAB = 0.3 -- the thinnest a step is: the top board
+local STEP_GAP = 0.45 -- a step reaches this far past its boxes toward the next row
+local STEP_END = 0.8 -- and this far past the first and last rows
+
+-- The display unit a lane is: a solid table body (legs and apron) up to just
+-- under the lowest step, and on it a STEP per row of boxes, each a little
+-- higher than the one in front of it (StoreStock.RowStep), so the rows behind
+-- show over the rows in front. Each box stands on a PLINTH, a solid block in
+-- the item's accent colour (BoxLook: the colour of its band and its edge),
+-- the way Lumber Tycoon 2's display case stands each item on a colour block.
+-- Steps are the walls' height and never move: the plinths' tops are exactly
+-- where StoreStock puts the boxes' feet. Returns the z extent of each lane.
+function ShopInterior.SteppedUnit(
+	parent: Instance,
+	shop: string,
+	frame: Frame,
+	name: string,
+	body: Color3,
+	top: Color3
+): { [string]: { lo: number, hi: number } }
+	local out: { [string]: { lo: number, hi: number } } = {}
+	local placements = StoreStock.Placements(shop)
+	for _, lane in ipairs(StoreStock.Lanes(shop)) do
+		local rows: { [number]: { lo: number, hi: number, surface: number } } = {}
+		local last = 0
+		for _, place in ipairs(placements) do
+			if place.lane == lane.name then
+				local half = placeDepth(place) / 2
+				local row = rows[place.row]
+				if row == nil then
+					row = { lo = place.z - half, hi = place.z + half, surface = place.surface }
+					rows[place.row] = row
+				else
+					row.lo = math.min(row.lo, place.z - half)
+					row.hi = math.max(row.hi, place.z + half)
+				end
+				last = math.max(last, place.row)
+				-- The plinth: a block in the accent colour, a little bigger than the box.
+				local slot = StoreStock.Get(place.slotId)
+				local accent = if slot then BoxLook.Accent(slot.itemKind, slot.itemId) else BoxLook.Default
+				local m = StoreStock.PlinthMargin
+				dBox(
+					parent,
+					"Plinth",
+					V3(place.size.X + 2 * m, StoreStock.PlinthHeight, 2 * half + 2 * m),
+					CF(place.x, place.surface + StoreStock.PlinthHeight / 2, place.z),
+					accent,
+					MAT.SmoothPlastic
+				)
+			end
+		end
+		if last == 0 then
+			continue
+		end
+		local lo = math.max(lane.z0, rows[1].lo - STEP_END)
+		local hi = math.min(lane.z1, rows[last].hi + STEP_END)
+		out[lane.name] = { lo = lo, hi = hi }
+		local w = lane.x1 - lane.x0
+		local cx = (lane.x0 + lane.x1) / 2
+		local bodyH = lane.y - STEP_SLAB - frame.floorTop
+		Kit.part(
+			parent,
+			name,
+			V3(w - 0.4, bodyH, hi - lo - 0.4),
+			CF(cx, frame.floorTop + bodyH / 2, (lo + hi) / 2),
+			body,
+			MAT.WoodPlanks
+		)
+		for r = 1, last do
+			local row = rows[r]
+			if row == nil then
+				continue
+			end
+			local z0 = if r == 1 then lo else row.lo - STEP_GAP
+			local z1 = if r == last then hi else row.hi + STEP_GAP
+			local base = lane.y - STEP_SLAB
+			local thick = row.surface - base
+			local step = Kit.part(
+				parent,
+				name .. "Step",
+				V3(w, thick, z1 - z0),
+				CF(cx, base + thick / 2, (z0 + z1) / 2),
+				top,
+				MAT.Wood
+			)
+			step.CanQuery = false
+		end
+		-- The front edge of the first step: a trim board, as the tables had.
+		dBox(parent, name .. "Trim", V3(w + 0.1, 0.5, 0.18), CF(cx, lane.y - 0.5, lo - 0.04), TIMBER)
+	end
+	return out
 end
 
 -- A board hung on two chains from the ceiling, facing -Z, with `text` on
@@ -330,16 +387,6 @@ end
 -- box nearest the aisle, and two boxes side by side drew theirs on top of each
 -- other.)
 
-local function laneFurniture(parent: Instance, kind: string, frame: Frame, name: string, body: Color3, top: Color3)
-	local spots = spotsOf(kind)
-	for _, lane in ipairs(StoreStock.Lanes(kind)) do
-		local lo, hi = ShopInterior.LaneRect(lane, spots)
-		if lo and hi then
-			furniture(parent, name, lane.x0, lane.x1, lo, hi, frame.floorTop, lane.y, body, top)
-		end
-	end
-end
-
 ---------------------------------------------------------------------------
 -- The Tool Shed
 ---------------------------------------------------------------------------
@@ -410,11 +457,18 @@ local function backDoor(model: Model, frame: Frame, x: number, z: number, onZ: b
 	Kit.decor(Kit.ball(model, "BackRoomKnob", 0.35, at * knob, hex("#C9A24A"), MAT.Metal), false)
 end
 
--- The axe rack on the back wall: every axe the shop sells (ItemCatalog's
--- ladder, in order), each its real AxeArt model (the part-built or mesh art the
--- held tools use; AxeArt falls back to parts if a mesh fails), hung head up on a
--- plank rack, with a name plate under it. The price is not printed: aiming at
--- an axe shows it in a tag (Shared/HoverTag).
+-- The axe rack on the back wall, as Lumber Tycoon 2 shows its axes: every axe
+-- the shop sells (ItemCatalog's ladder, in order), each its real AxeArt model
+-- (the part-built or mesh art the held tools use; AxeArt falls back to parts
+-- if a mesh fails), standing whole on its own STEP of a stepped wall shelf,
+-- each step a little higher than the one before (the ladder climbs), in front
+-- of a solid backing block in the axe's tier colour (BoxLook.AxeTiers) with its
+-- name plate on it. The price is not printed: aiming at an axe shows it in a
+-- tag (Shared/HoverTag).
+local RACK_STEP = 0.22 -- each axe's step is this much higher than the last
+local RACK_BASE = 7.5 -- the first step's top
+local RACK_PANEL_Y = 9.7
+local RACK_PANEL_H = 6.8
 local function axeRack(model: Model, frame: Frame)
 	local axes: { ItemCatalog.AxeDef } = {}
 	for _, axe in ipairs(ItemCatalog.AxeLadder()) do
@@ -428,18 +482,40 @@ local function axeRack(model: Model, frame: Frame)
 	local pitch = 3.1
 	local width = #axes * pitch + 1.4
 	local wallZ = frame.halfD
-	local panelY = 9.4
-	dBox(model, "AxeRack", V3(width, 6.6, 0.3), CF(0, panelY, wallZ - 0.2), TABLE)
-	for _, y in ipairs({ panelY - 3.3, panelY + 3.3 }) do
+	dBox(model, "AxeRack", V3(width, RACK_PANEL_H, 0.3), CF(0, RACK_PANEL_Y, wallZ - 0.2), TABLE)
+	for _, y in ipairs({ RACK_PANEL_Y - RACK_PANEL_H / 2, RACK_PANEL_Y + RACK_PANEL_H / 2 }) do
 		dBox(model, "AxeRackRail", V3(width + 0.3, 0.35, 0.5), CF(0, y, wallZ - 0.4), TIMBER)
 	end
 	for i, axe in ipairs(axes) do
 		local x = (i - (#axes + 1) / 2) * pitch
+		local stepY = RACK_BASE + (i - 1) * RACK_STEP -- the top of this axe's step
+		local accent = BoxLook.Accent("Axe", axe.id)
 		local art = AxeArt.Build(axe)
 		local handle = art.PrimaryPart
 		local len = if handle then handle.Size.Y else 3.3
-		-- Foot on the lower hanger, head up, blade toward -X so the side shows.
-		art:PivotTo(CF(x, 8.3 + len / 2, wallZ - 0.75) * CFrame.Angles(0, math.pi / 2, 0))
+		-- The backing block: a solid panel in the tier colour behind the axe
+		-- and its plate, standing a hair off the rack.
+		local blockLo = stepY - 1.7
+		local blockH = len + 1.9
+		local block = dBox(
+			model,
+			"AxeBlock",
+			V3(pitch - 0.3, blockH, 0.2),
+			CF(x, blockLo + blockH / 2, wallZ - 0.45),
+			accent,
+			MAT.SmoothPlastic
+		)
+		-- The step the axe stands on: a ledge out of the block, darker.
+		dBox(
+			model,
+			"AxeStep",
+			V3(pitch - 0.3, 0.3, 1.5),
+			CF(x, stepY - 0.15, wallZ - 1.3),
+			Kit.shade(accent, -0.45),
+			MAT.SmoothPlastic
+		)
+		-- Foot on the step, head up, blade toward -X so the side shows.
+		art:PivotTo(CF(x, stepY + len / 2, wallZ - 1.3) * CFrame.Angles(0, math.pi / 2, 0))
 		art.Name = "RackAxe"
 		art:SetAttribute("ItemId", axe.id)
 		for _, d in ipairs(art:GetDescendants()) do
@@ -452,10 +528,16 @@ local function axeRack(model: Model, frame: Frame)
 			end
 		end
 		art.Parent = model
-		dBox(model, "AxePeg", V3(0.5, 0.3, 0.5), CF(x, 8.15, wallZ - 0.75), IRON, MAT.Metal)
-		local plate = dBox(model, "AxePlate", V3(2.8, 1.5, 0.15), CF(x, 7.1, wallZ - 0.5), PAPER, MAT.SmoothPlastic)
+		local plate = dBox(
+			model,
+			"AxePlate",
+			V3(pitch - 0.7, 1.3, 0.15),
+			CF(x, stepY - 1.0, wallZ - 0.62),
+			PAPER,
+			MAT.SmoothPlastic
+		)
 		Kit.signText(plate, axe.displayName, TIMBER, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-		-- The axe and its plate tag as one item: the tag sits over the axe.
+		-- The axe, its block and its plate tag as one item: the tag sits over the axe.
 		local hover: HoverTag.Spec = {
 			key = "Rack:" .. axe.id,
 			name = axe.displayName,
@@ -464,6 +546,7 @@ local function axeRack(model: Model, frame: Frame)
 			shop = "ToolShed",
 		}
 		HoverTag.Mark(plate, hover)
+		HoverTag.Mark(block, hover)
 		hover.anchor = true
 		HoverTag.Mark(art, hover)
 	end
@@ -471,7 +554,7 @@ end
 
 local function toolShed(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
-	laneFurniture(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
+	ShopInterior.SteppedUnit(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
 	-- The Robux table: the same table as the cash shelves with a gold top, along
 	-- the back wall behind the counter and its keeper. Its boxes are the gold
 	-- boxes, one label each (its name; the R$ price shows when you aim).
@@ -550,26 +633,24 @@ end
 
 local function hearth(model: Model, frame: Frame)
 	local rng = Kit.rng(2605)
-	local spots = spotsOf("HearthAndHome")
+	local extents = ShopInterior.SteppedUnit(model, "HearthAndHome", frame, "Shelf", TABLE, TABLE_TOP)
 	for _, lane in ipairs(StoreStock.Lanes("HearthAndHome")) do
-		local lo, hi = ShopInterior.LaneRect(lane, spots)
-		if lo and hi then
-			furniture(model, "Shelf", lane.x0, lane.x1, lo, hi, frame.floorTop, lane.y, TABLE, TABLE_TOP)
-			if lane.name == "GearShelf" or lane.name == "LampShelf" then
-				-- Tall back shelving on the wall behind the unit: an upright
-				-- panel and two boards, looks only.
-				local wallX = if lane.x0 < 0 then -frame.halfW + 0.3 else frame.halfW - 0.3
-				local cz = (lo + hi) / 2
-				dBox(model, "ShelfBack", V3(0.3, 9.5, hi - lo), CF(wallX, frame.floorTop + 4.75 + 0.3, cz), TABLE)
-				for _, y in ipairs({ 6.6, 9.6 }) do
-					dBox(
-						model,
-						"WallShelf",
-						V3(1.6, 0.25, hi - lo),
-						CF(wallX + (if lane.x0 < 0 then 0.8 else -0.8), y, cz),
-						TABLE_TOP
-					)
-				end
+		local ext = extents[lane.name]
+		if ext and (lane.name == "GearShelf" or lane.name == "LampShelf") then
+			local lo, hi = ext.lo, ext.hi
+			-- Tall back shelving on the wall behind the unit: an upright
+			-- panel and two boards, looks only.
+			local wallX = if lane.x0 < 0 then -frame.halfW + 0.3 else frame.halfW - 0.3
+			local cz = (lo + hi) / 2
+			dBox(model, "ShelfBack", V3(0.3, 9.5, hi - lo), CF(wallX, frame.floorTop + 4.75 + 0.3, cz), TABLE)
+			for _, y in ipairs({ 6.6, 9.6 }) do
+				dBox(
+					model,
+					"WallShelf",
+					V3(1.6, 0.25, hi - lo),
+					CF(wallX + (if lane.x0 < 0 then 0.8 else -0.8), y, cz),
+					TABLE_TOP
+				)
 			end
 		end
 	end

@@ -14,6 +14,7 @@
 
 local BoxLogic = require(script.Parent.BoxLogic)
 local BoxSize = require(script.Parent.BoxSize)
+local ItemBox = require(script.Parent.ItemBox)
 local GameConfig = require(script.Parent.GameConfig)
 local ItemCatalog = require(script.Parent.ItemCatalog)
 local PlotData = require(script.Parent.PlotData)
@@ -32,13 +33,15 @@ export type Slot = {
 	respawnSec: number,
 	limited: boolean,
 	color: string,
-	boxClass: string, -- a BoxSize class id, from the item's footprint or price tier
 }
 
 export type Placement = {
 	slotId: string,
+	lane: string, -- the ShelfLayout lane it stands in
+	row: number, -- 1 = the front row of that lane (each row is a step higher)
 	x: number,
-	y: number, -- the box's middle
+	y: number, -- the box's middle (it stands on its plinth)
+	surface: number, -- the top of the step under the plinth
 	z: number,
 	size: Vector3, -- the box
 	count: number, -- boxes in the slot (a limited item shows several, in a row along z)
@@ -57,10 +60,6 @@ export type Pool = {
 	restockAt: number,
 }
 
-local function classId(kind: string, price: number?, footprint: Vector2?): string
-	return BoxSize.ClassFor({ kind = kind, price = price, footprint = footprint }).id
-end
-
 local function axeSlots(): { Slot }
 	local out: { Slot } = {}
 	for _, axe in ipairs(ItemCatalog.AxeLadder()) do
@@ -74,7 +73,6 @@ local function axeSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = axe.look.headColor,
-				boxClass = classId("Axe", axe.priceCash),
 			})
 		end
 	end
@@ -93,7 +91,6 @@ local function sawSlots(): { Slot }
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = mill.color,
-			boxClass = classId("Sawmill", mill.priceCash, Vector2.new(mill.width, mill.depth)),
 		})
 	end
 	return out
@@ -112,11 +109,6 @@ local function machineSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = machine.color,
-				boxClass = classId(
-					"Machine",
-					machine.priceCash,
-					if machine.boxW and machine.boxD then Vector2.new(machine.boxW, machine.boxD) else nil
-				),
 			})
 		end
 	end
@@ -142,7 +134,6 @@ local function gearSlots(): { Slot }
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = gear.color,
-			boxClass = classId("Gear", gear.priceCash),
 		})
 	end
 	return out
@@ -161,7 +152,6 @@ local function blueprintSlots(): { Slot }
 				respawnSec = GameConfig.BoxRespawnSec,
 				limited = false,
 				color = "#8C6A45",
-				boxClass = classId("Blueprint", PlotData.StorePrice(bp), bp.footprint),
 			})
 		end
 	end
@@ -178,7 +168,6 @@ local function lampSlot(): Slot
 		respawnSec = GameConfig.LimitedRestockSec,
 		limited = true,
 		color = "#E6C36A",
-		boxClass = classId("Cosmetic", GameConfig.LimitedItemPrice),
 	}
 end
 
@@ -309,10 +298,6 @@ function StoreStock.VehicleFootprint(kind: string, itemId: string): Vector2
 	return Vector2.new(10, 20)
 end
 
-function StoreStock.VehicleClass(kind: string, itemId: string): string
-	return BoxSize.ClassFor({ kind = kind, footprint = StoreStock.VehicleFootprint(kind, itemId) }).id
-end
-
 -- A dealership vehicle, for a boxed truck or a migrated storage box.
 -- Not a shelf slot: StoreStock.All and BoxCount stay the interior shops.
 function StoreStock.Vehicle(itemId: string): Slot?
@@ -327,7 +312,6 @@ function StoreStock.Vehicle(itemId: string): Slot?
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = truck.look.color,
-			boxClass = StoreStock.VehicleClass("Truck", truck.id),
 		}
 	end
 	local trailer = ItemCatalog.GetTrailer(itemId)
@@ -341,7 +325,6 @@ function StoreStock.Vehicle(itemId: string): Slot?
 			respawnSec = GameConfig.BoxRespawnSec,
 			limited = false,
 			color = trailer.look.color,
-			boxClass = StoreStock.VehicleClass("Trailer", trailer.id),
 		}
 	end
 	return nil
@@ -409,6 +392,10 @@ export type Shop = {
 
 StoreStock.TableTop = 3.9 -- counter height: the Tool Shed's tables and the Robux table
 StoreStock.ShelfTop = 3.2 -- Hearth & Home's shelf boards
+StoreStock.RowStep = 0.22 -- each row of boxes stands this much higher than the one in front (stepped display)
+StoreStock.MaxRise = 1.3 -- and the back rows rise no more than this over the front row
+StoreStock.PlinthHeight = 0.3 -- the coloured backing block a box stands on
+StoreStock.PlinthMargin = 0.25 -- the block is this much bigger than the box all round
 
 local SHOPS: { [string]: Shop } = {
 	ToolShed = {
@@ -416,19 +403,23 @@ local SHOPS: { [string]: Shop } = {
 			{
 				name = "AxeTable",
 				x0 = -13.7,
-				x1 = -5.8,
+				x1 = -5.0,
 				z0 = -21.3,
 				z1 = 16.8, -- the back corners beside the counter (the counter is x -4.8 to 4.8; the gold table starts at z 17.1)
 				y = StoreStock.TableTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
 				kinds = { "Axe", "Machine" }, -- the Sky Bin's small box rides the axe table's spare room
 			},
 			{
 				name = "MachineTable",
-				x0 = 5.8,
+				x0 = 5.0,
 				x1 = 13.7,
 				z0 = -21.3,
 				z1 = 16.8, -- the back corners beside the counter (the counter is x -4.8 to 4.8; the gold table starts at z 17.1)
 				y = StoreStock.TableTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
 				kinds = { "Sawmill", "Machine" },
 			},
 		},
@@ -443,6 +434,8 @@ local SHOPS: { [string]: Shop } = {
 				z0 = -17.75,
 				z1 = 10.75,
 				y = StoreStock.ShelfTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
 				kinds = { "Gear" },
 			},
 			{
@@ -452,24 +445,30 @@ local SHOPS: { [string]: Shop } = {
 				z0 = -17.75,
 				z1 = 10.75,
 				y = StoreStock.ShelfTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
 				kinds = { "Cosmetic" },
 			},
 			{
 				name = "PlanIslandW",
-				x0 = -13.4,
-				x1 = -7,
+				x0 = -13.6,
+				x1 = -5.0,
 				z0 = -17.25,
 				z1 = 8.75,
 				y = StoreStock.ShelfTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
 				kinds = { "Blueprint" },
 			},
 			{
 				name = "PlanIslandE",
-				x0 = 7,
-				x1 = 13.4,
+				x0 = 5.0,
+				x1 = 13.6,
 				z0 = -17.25,
 				z1 = 8.75,
 				y = StoreStock.ShelfTop,
+				step = StoreStock.RowStep,
+				maxRise = StoreStock.MaxRise,
 				kinds = { "Blueprint" },
 			},
 		},
@@ -482,8 +481,9 @@ local function countOf(slot: Slot): number
 	return if slot.limited then GameConfig.LimitedStockCount else 1
 end
 
+-- The box for a slot's item: its real bounding box plus the margin (BoxSize.Fit).
 function StoreStock.BoxSizeOf(slot: Slot): Vector3
-	return BoxSize.Class(slot.boxClass).size
+	return ItemBox.Size(slot.itemKind, slot.itemId)
 end
 
 local function itemsFor(shop: string): { ShelfLayout.Item }
@@ -522,8 +522,11 @@ local function layout(shop: string)
 		local size = if slot then StoreStock.BoxSizeOf(slot) else Vector3.new(spot.w, spot.h, spot.d)
 		table.insert(out, {
 			slotId = spot.id,
+			lane = spot.lane,
+			row = spot.row,
 			x = spot.x,
-			y = spot.y,
+			y = spot.y + StoreStock.PlinthHeight,
+			surface = spot.y - spot.h / 2,
 			z = spot.z,
 			size = size,
 			count = if slot then countOf(slot) else 1,
@@ -579,14 +582,19 @@ function StoreStock.Zone(shop: string): Zone?
 	return if def then def.zone else nil
 end
 
--- How many box parts a full stocking uses: a box is its body and its
--- packaging (BoxLogic.BoxPartCap parts at most); the lamp shelf shows
--- LimitedStockCount boxes. Shelves themselves are the building. The sum
--- has to stay under StorePartBudget.
+-- The parts of one box of a slot: the dark shell (BoxLogic.ShellPartCap at
+-- most) and the display copy of its item (ItemModel.ModelBudget by kind).
+function StoreStock.PartsOf(slot: Slot): number
+	return BoxLogic.ShellPartCap + ItemBox.For(slot.itemKind, slot.itemId).parts
+end
+
+-- How many box parts a full stocking uses: every box's shell and window copy
+-- (PartsOf); the lamp shelf shows LimitedStockCount boxes. Shelves themselves
+-- are the building. The sum has to stay under StorePartBudget.
 function StoreStock.BoxCount(): number
 	local n = 0
 	for _, slot in ipairs(StoreStock.All()) do
-		n += (if slot.limited then GameConfig.LimitedStockCount else 1) * BoxLogic.BoxPartCap
+		n += (if slot.limited then GameConfig.LimitedStockCount else 1) * StoreStock.PartsOf(slot)
 	end
 	return n
 end

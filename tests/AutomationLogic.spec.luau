@@ -43,7 +43,11 @@ return function(t)
 		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "place", "the Sky Bin opens and places once, like the mills")
 		t.eq(BoxUnpack.Mode("Machine", "ChopSaw"), "stock")
 		-- A belt box is small; the shelf can hold the whole kit.
-		t.ok(BoxSize.ClassFor({ kind = "Machine", price = 80, footprint = Vector2.new(4, 4) }).rank <= 4)
+		local ItemBox = t.shared("ItemBox")
+		for _, id in ipairs({ "ConveyorStraight", "ConveyorTurn", "ConveyorFunnel" }) do
+			t.ok(ItemBox.Size("Machine", id).X <= BoxSize.MaxFor("Machine").X, id .. " is a shelf-sized box")
+		end
+		t.eq(#t.shared("StoreStock").Overflow("ToolShed"), 0, "the shelf holds the whole kit")
 	end)
 
 	t.test("the plot holds at most MaxConveyorsPerPlot belt pieces, and they are the owner's", function()

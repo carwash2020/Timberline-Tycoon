@@ -14,6 +14,7 @@ return function(t)
 	local CoreLoop = t.shared("CoreLoop")
 	local BoxSize = t.shared("BoxSize")
 	local StoreStock = t.shared("StoreStock")
+	local ItemBox = t.shared("ItemBox")
 
 	-- Same rule as DealershipLot's signs: the published loop when MapBuilder
 	-- has set it, otherwise the configured one (tests have no workspace).
@@ -159,15 +160,27 @@ return function(t)
 				local kind = child:GetAttribute("Category")
 				local spot, plinth = spots[id], plinths[id]
 				t.ok(spot and plinth, id .. " has a box spot and a plinth")
-				local class = BoxSize.Class(StoreStock.VehicleClass(kind, id))
-				t.ok((spot.Size - class.size).Magnitude < 0.01, id .. " box is its class")
-				t.ok(class.vehicle and class.size.X >= 9, id .. " vehicle boxes are the biggest")
+				local fit = ItemBox.For(kind, id)
+				t.ok((spot.Size - fit.size).Magnitude < 0.01, id .. " box is sized from the vehicle's real bounds")
+				t.ok(fit.vehicle and fit.size.X >= 4 and fit.size.X <= BoxSize.VehicleMax.X, id .. " is a vehicle box")
+				t.ok(fit.size.X > fit.size.Z, id .. " the long side is the width, as the vehicle lies")
+				local block = nil
+				for _, d in ipairs(lot:GetChildren()) do
+					if d.Name == "BoxBlock" and math.abs(d.CFrame.Position.X - spot.CFrame.Position.X) < 0.01 then
+						block = d
+					end
+				end
+				t.ok(block ~= nil, id .. " box stands on a coloured block")
+				t.eq(block.Color, t.shared("BoxLook").Accent(kind, id), id .. " the block is the vehicle's accent")
 				local sx0, sx1, sy0, sy1, sz0, sz1 = aabb(spot)
 				local px0, px1, py0, py1, pz0, pz1 = aabb(plinth)
 				-- On the plinth, within it, and out of the aisle.
 				t.ok(sx0 >= px0 - 0.01 and sx1 <= px1 + 0.01, id .. " box is within the plinth's width")
 				t.ok(sz0 >= pz0 - 0.01 and sz1 <= pz1 + 0.01, id .. " box is within the plinth's depth")
-				t.ok(math.abs(sy0 - py1) < 0.01, id .. " box stands on the plinth")
+				t.ok(
+					math.abs(sy0 - (py1 + DealershipLot.BlockHeight)) < 0.01,
+					id .. " box stands on its block, on the plinth"
+				)
 				local row = 1
 				for _, bay in ipairs(layout.bays) do
 					if bay.id == id then
@@ -196,7 +209,7 @@ return function(t)
 			end
 			-- Nothing but a name sign (a thin board at a plinth's edge) stands in the aisle.
 			for _, p in ipairs(parts(lot)) do
-				if p.Name ~= "NameSign" and p.Name ~= "BoxSpot" then
+				if p.Name ~= "NameSign" and p.Name ~= "BoxSpot" and p.Name ~= "BoxBlock" then
 					local _, _, _, _, z0, z1 = aabb(p)
 					t.ok(z1 <= aisleLo + 0.01 or z0 >= aisleHi - 0.01, p.Name .. " keeps out of the aisle")
 				end

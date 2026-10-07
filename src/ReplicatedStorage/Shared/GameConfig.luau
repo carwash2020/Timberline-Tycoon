@@ -206,7 +206,7 @@ local GameConfig = {
 	LoadingPadSize = 14,
 	ShelfAisleMin = 6,
 	CounterPayReach = 10,
-	StorePartBudget = 900, -- a shop model plus its boxes at BoxLogic.BoxPartCap parts each (250 for plain one-part boxes, 450 with packaging, 900 with store polish: facades, floors, price tags, hanging goods, the Tool Shed axe rack of real models)
+	StorePartBudget = 1200, -- a shop model plus its boxes: each box is a 9-part dark shell and a low-detail copy of its item (StoreStock.PartsOf; 450 before the window boxes, 900 with store polish: facades, floors, hanging goods, the Tool Shed axe rack of real models). Raised to 1200 on 7 October 2026 for the window boxes: the Tool Shed shows 21 real items through glass (about 465 parts) plus the stepped shelves and plinths, and totals about 1130
 	-- Designer, unread until their batch:
 	CounterMaxItems = 3,
 	LimitedStockCount = 3,
