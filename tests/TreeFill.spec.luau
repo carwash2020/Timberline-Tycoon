@@ -402,6 +402,11 @@ return function(t)
 	t.test("trees round each pad: none on a pad or its blend, capped per pad, deterministic", function()
 		local half = PlotData.Tiers[#PlotData.Tiers].size / 2
 		local near = TreeFill.PlotRingNear
+		-- The raised platform's ramps (6 studs past the biggest pad at most) and
+		-- the grass lawn round it (40 studs, its dithered edge 6 more) are the
+		-- plot's own ground: a ring tree stands past both, on the country's side.
+		local TerrainGen = t.load("ReplicatedStorage/Shared/World/TerrainGen")
+		t.ok(near > PlotData.PlatformRamp + TerrainGen.PlotLawn + 6, "ring trees start past the ramps and the lawn")
 		local perPlot = {}
 		local count, woods = 0, {}
 		for _, spot in ipairs(trees) do

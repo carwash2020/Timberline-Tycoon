@@ -67,7 +67,7 @@ local biomes: { BiomeDef } = {
 		access = "truck",
 		haulStuds = 190,
 		area = { x = 0, z = -110, radius = 90 }, -- south of spawn
-		ground = { color = "#5B9B48", material = "Grass" },
+		ground = { color = "#64B838", material = "Grass" },
 		trees = { oak = 70, birch = 26 },
 	},
 	{
@@ -76,7 +76,7 @@ local biomes: { BiomeDef } = {
 		access = "truck",
 		haulStuds = 400,
 		area = { x = -420, z = 110, radius = 170 }, -- west
-		ground = { color = "#4F8A3C", material = "LeafyGrass" },
+		ground = { color = "#529E30", material = "LeafyGrass" },
 		trees = { pine = 80, maple = 50 },
 	},
 	{

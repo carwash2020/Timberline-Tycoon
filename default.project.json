@@ -44,7 +44,7 @@
       "Terrain": {
         "$ignoreUnknownInstances": true,
         "$properties": {
-          "Decoration": true,
+          "Decoration": false,
           "GrassLength": 0.5
         }
       }

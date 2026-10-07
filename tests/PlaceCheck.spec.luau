@@ -26,7 +26,7 @@ return function(t)
 				StreamingMinRadius = 128,
 				StreamingIntegrityMode = Enum.StreamingIntegrityMode.PauseOutsideLoadedArea,
 			},
-			Terrain = { Decoration = true },
+			Terrain = { Decoration = false },
 			Lighting = { LightingStyle = Enum.LightingStyle.Realistic, PrioritizeLightingQuality = false },
 			Players = { MaxPlayers = 12 },
 		}
@@ -139,16 +139,16 @@ return function(t)
 		place.Workspace.StreamingIntegrityMode = Enum.StreamingIntegrityMode.Default
 		place.Lighting.LightingStyle = Enum.LightingStyle.Soft
 		place.Lighting.PrioritizeLightingQuality = true
-		place.Terrain.Decoration = false
+		place.Terrain.Decoration = true
 		local s = run({ place = place })
 		t.eq(#s.warnings, 5)
 		t.ok(has(s.warnings, "Workspace.StreamingTargetRadius is 512, expected 640."))
 		t.ok(has(s.warnings, "Workspace.StreamingIntegrityMode is Default, expected PauseOutsideLoadedArea."))
 		t.ok(has(s.warnings, "Lighting.LightingStyle is Soft, expected Realistic."))
 		t.ok(has(s.warnings, "Lighting.PrioritizeLightingQuality is true, expected false."))
-		t.ok(has(s.warnings, "Workspace.Terrain.Decoration is false, expected true."))
-		t.ok(has(s.warnings, "set Workspace.Terrain.Decoration = false") == false, "the fix names the wanted value")
-		t.ok(has(s.warnings, "set Workspace.Terrain.Decoration = true"))
+		t.ok(has(s.warnings, "Workspace.Terrain.Decoration is true, expected false."))
+		t.ok(has(s.warnings, "set Workspace.Terrain.Decoration = true") == false, "the fix names the wanted value")
+		t.ok(has(s.warnings, "set Workspace.Terrain.Decoration = false"))
 	end)
 
 	t.test("PrioritizeLightingQuality left on warns once, with the Properties fix (PLAY-08)", function()
@@ -166,7 +166,7 @@ return function(t)
 		local s = run({
 			unreadable = {
 				Workspace = { StreamingTargetRadius = true, StreamingIntegrityMode = true },
-				Terrain = { Decoration = true },
+				Terrain = { Decoration = true }, -- true = "unreadable" here, not the setting
 			},
 		})
 		t.eq(s.warnings, {})
@@ -174,7 +174,7 @@ return function(t)
 		t.eq(
 			s.prints[1],
 			"[PlaceCheck] can't check Workspace.StreamingTargetRadius = 640, "
-				.. "Workspace.StreamingIntegrityMode = PauseOutsideLoadedArea, Workspace.Terrain.Decoration = true "
+				.. "Workspace.StreamingIntegrityMode = PauseOutsideLoadedArea, Workspace.Terrain.Decoration = false "
 				.. "from a script: look in Studio's Properties panel."
 		)
 		t.eq(s.prints[2], "[PlaceCheck] OK")

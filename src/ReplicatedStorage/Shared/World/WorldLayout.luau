@@ -515,30 +515,34 @@ WorldLayout.ToolShedLoadingPad = { x0 = -88, x1 = -74, z0 = 144, z1 = 158 } :: L
 -- by a stud or two: edge noise can pull both back, and a seam would grow
 -- a strip of grass between them.
 export type Paint = { name: string, x0: number, x1: number, z0: number, z1: number, material: string }
+-- Every road, path and street is light grey gravel (TerrainGen.GravelMaterial
+-- is this); only the shop floors below stay packed earth.
+local ROAD = "Asphalt"
+WorldLayout.RoadMaterial = ROAD
 WorldLayout.TownPaint = {
 	{ name = "Plaza", x0 = -26, x1 = 26, z0 = 64, z1 = 97, material = "Cobblestone" },
 	-- 22 studs wide (was 14): a Logging Rig has room to line up on the sell pad.
-	{ name = "MainStreet", x0 = -128, x1 = 64, z0 = 62, z1 = 84, material = "Ground" },
+	{ name = "MainStreet", x0 = -128, x1 = 64, z0 = 62, z1 = 84, material = ROAD },
 	-- Where the Forest Path meets the town, wider than the spawn walk.
-	{ name = "ForestMouth", x0 = -18, x1 = 6, z0 = 14, z1 = 36, material = "Ground" },
+	{ name = "ForestMouth", x0 = -18, x1 = 6, z0 = 14, z1 = 36, material = ROAD },
 	-- Where the Hills Road meets the town, south of Murph's camp.
-	{ name = "HillsMouth", x0 = -42, x1 = 4, z0 = 6, z1 = 34, material = "Ground" },
+	{ name = "HillsMouth", x0 = -42, x1 = 4, z0 = 6, z1 = 34, material = ROAD },
 	-- The turn off the street's east end onto the way north (the mill road).
-	{ name = "PlazaEastMouth", x0 = 70, x1 = 112, z0 = 68, z1 = 96, material = "Ground" },
+	{ name = "PlazaEastMouth", x0 = 70, x1 = 112, z0 = 68, z1 = 96, material = ROAD },
 	-- The road along the showroom's forecourt (the hall stands at x 181 to 336,
 	-- z 96 to 162, behind the Land Office and its sign), and the path up to its door.
-	{ name = "TruckLotPath", x0 = 116, x1 = 340, z0 = 64, z1 = 70, material = "Ground" },
-	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 95.4, material = "Ground" },
+	{ name = "TruckLotPath", x0 = 116, x1 = 340, z0 = 64, z1 = 70, material = ROAD },
+	{ name = "DealershipPath", x0 = 182, x1 = 196.5, z0 = 69.5, z1 = 95.4, material = ROAD },
 	-- The shop paths lead to each counter (TWN-13: the shops grew 1.5x).
 	-- The General Store stands behind the Tool Shed (z 165.5 to 209): its path
 	-- runs up the lane west of the Tool Shed, then across to its door.
-	{ name = "HearthAndHomePath", x0 = -119, x1 = -107, z0 = 84, z1 = 163.5, material = "Ground" },
-	{ name = "HearthAndHomePath", x0 = -119, x1 = -92, z0 = 151, z1 = 163.5, material = "Ground" },
-	{ name = "ToolShedPath", x0 = -90, x1 = -78, z0 = 82, z1 = 95, material = "Ground" },
-	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 66, material = "Ground" },
-	{ name = "MillYard", x0 = -32, x1 = 33, z0 = 95, z1 = 140, material = "Ground" },
-	{ name = "GondolaPath", x0 = -37.5, x1 = -33, z0 = 82, z1 = 142, material = "Ground" },
-	{ name = "GondolaPath", x0 = -46, x1 = -33, z0 = 136, z1 = 142, material = "Ground" },
+	{ name = "HearthAndHomePath", x0 = -119, x1 = -107, z0 = 84, z1 = 163.5, material = ROAD },
+	{ name = "HearthAndHomePath", x0 = -119, x1 = -92, z0 = 151, z1 = 163.5, material = ROAD },
+	{ name = "ToolShedPath", x0 = -90, x1 = -78, z0 = 82, z1 = 95, material = ROAD },
+	{ name = "SpawnWalk", x0 = -6, x1 = 6, z0 = 34, z1 = 66, material = ROAD },
+	{ name = "MillYard", x0 = -32, x1 = 33, z0 = 95, z1 = 140, material = ROAD },
+	{ name = "GondolaPath", x0 = -37.5, x1 = -33, z0 = 82, z1 = 142, material = ROAD },
+	{ name = "GondolaPath", x0 = -46, x1 = -33, z0 = 136, z1 = 142, material = ROAD },
 } :: { Paint }
 
 -- Packed dirt under each building, a stud or two past its walls, so the
@@ -551,7 +555,8 @@ WorldLayout.TownFloors = {
 	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 92, z1 = 164.5, material = "Ground" },
 	-- The sell station (pad x 39 to 67, z 95 to 127, Weigh House to x 83): the
 	-- MillYard stops at x 33, so without this the grass grew over the pad.
-	{ name = "SellStationFloor", x0 = 31, x1 = 87, z0 = 84, z1 = 139, material = "Ground" },
+	-- Gravel like the yard beside it: a truck yard, not a shop floor.
+	{ name = "SellStationFloor", x0 = 31, x1 = 87, z0 = 84, z1 = 139, material = ROAD },
 	{ name = "GondolaStationFloor", x0 = -50.5, x1 = -29, z0 = 139, z1 = 160.5, material = "Ground" },
 } :: { Paint }
 
@@ -882,6 +887,21 @@ function WorldLayout.OnPlotPad(x: number, z: number): boolean
 	local half = PlotData.Tiers[#PlotData.Tiers].size / 2
 	for _, slot in ipairs(PlotData.Slots) do
 		if math.abs(x - slot.X) <= half and math.abs(z - slot.Y) <= half then
+			return true
+		end
+	end
+	return false
+end
+
+-- Within `margin` studs of a homestead's biggest pad (0 is OnPlotPad's own
+-- square, the corners included).
+function WorldLayout.NearPlotPad(x: number, z: number, margin: number): boolean
+	if legacyLayout then
+		return false
+	end
+	local reach = PlotData.Tiers[#PlotData.Tiers].size / 2 + margin
+	for _, slot in ipairs(PlotData.Slots) do
+		if math.abs(x - slot.X) <= reach and math.abs(z - slot.Y) <= reach then
 			return true
 		end
 	end

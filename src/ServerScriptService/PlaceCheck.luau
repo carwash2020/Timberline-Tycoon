@@ -60,7 +60,9 @@ PlaceCheck.Expected = {
 	{ service = "Lighting", property = "LightingStyle", value = Enum.LightingStyle.Realistic },
 	-- Off, so phones keep their frame rate in town at night (PLAY-08).
 	{ service = "Lighting", property = "PrioritizeLightingQuality", value = false },
-	{ service = "Terrain", property = "Decoration", value = true },
+	-- Off: the engine's grass blades made the ground look tall and dull, and
+	-- the Lumber Tycoon 2 look is a flat, smooth meadow (7 October 2026).
+	{ service = "Terrain", property = "Decoration", value = false },
 	{
 		service = "Players",
 		property = "MaxPlayers",

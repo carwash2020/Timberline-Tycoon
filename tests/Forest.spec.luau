@@ -978,25 +978,31 @@ return function(t)
 		end
 	)
 
-	t.test("FOR-04: the project's grass: blades on, GrassLength 0.45-0.6; streaming out far content", function()
-		local serde = require("@lune/serde")
-		local tree = serde.decode("json", fs.readFile("default.project.json")).tree
-		local terrain = tree.Workspace.Terrain["$properties"]
-		t.eq(terrain.Decoration, true, "grass blades on (they grow on Grass only)")
-		t.ok(terrain.GrassLength >= 0.45 and terrain.GrassLength <= 0.6, "GrassLength " .. terrain.GrassLength)
-		local workspace = tree.Workspace["$properties"]
-		t.eq(workspace.StreamOutBehavior, "Opportunistic", "far server content streams out on any device")
-		t.ok(
-			QualityBudgets.High.FillerFar < workspace.StreamingTargetRadius,
-			"stand-ins never outreach the streamed terrain"
-		)
-		t.ok(
-			QualityBudgets.Low.FillerFar < workspace.StreamingTargetRadius,
-			"a phone's stand-ins stay inside the streamed terrain too"
-		)
-		t.eq(workspace.StreamingTargetRadius, 640, "phones stream a 640-stud disc, not 1024")
-		t.eq(workspace.StreamingMinRadius, 128, "the pause bubble is 128 studs")
-	end)
+	t.test(
+		"FOR-04: the project's grass: blades off (flat LT2 meadow), GrassLength kept short; streaming out far content",
+		function()
+			local serde = require("@lune/serde")
+			local tree = serde.decode("json", fs.readFile("default.project.json")).tree
+			local terrain = tree.Workspace.Terrain["$properties"]
+			-- Blades were on until 7 October 2026: Connor wants the Lumber Tycoon 2
+			-- ground, flat and smooth, and blades also poke through the plots'
+			-- 1-stud build platform. GrassLength stays short in case they come back.
+			t.eq(terrain.Decoration, false, "grass blades off: a flat, smooth meadow")
+			t.ok(terrain.GrassLength >= 0.45 and terrain.GrassLength <= 0.6, "GrassLength " .. terrain.GrassLength)
+			local workspace = tree.Workspace["$properties"]
+			t.eq(workspace.StreamOutBehavior, "Opportunistic", "far server content streams out on any device")
+			t.ok(
+				QualityBudgets.High.FillerFar < workspace.StreamingTargetRadius,
+				"stand-ins never outreach the streamed terrain"
+			)
+			t.ok(
+				QualityBudgets.Low.FillerFar < workspace.StreamingTargetRadius,
+				"a phone's stand-ins stay inside the streamed terrain too"
+			)
+			t.eq(workspace.StreamingTargetRadius, 640, "phones stream a 640-stud disc, not 1024")
+			t.eq(workspace.StreamingMinRadius, 128, "the pause bubble is 128 studs")
+		end
+	)
 
 	t.test("FOR-04: Timber ground MaterialVariants are in MaterialService, off until checked in Studio", function()
 		local serde = require("@lune/serde")

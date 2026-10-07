@@ -416,54 +416,14 @@ local function roadWeight(x: number, z: number): (number, number)
 	return best, onRoad
 end
 
--- The haul roads (STY-02): out in the country each haul road is pale grey
--- road its whole width (TerrainGen.GravelMaterial, a terrain material
--- nothing else uses; phase 12 widened phase 10's gravel crown to the whole
--- road), its edge fraying into dirt for GRAVEL_EDGE studs or so at most.
--- In town and the plot district every road stays dirt: the pale road frays
--- into it where the town's flat ground begins. The plot road and lanes and
--- the forest path are dirt too. Material only: no height reads it.
-TerrainGen.HaulRoads = { "HillsRoad", "SnowRoad", "VolcanoRoad", "SkyrootRoad" }
-TerrainGen.GravelMaterial = "Pavement"
-local GRAVEL_EDGE = 1 -- studs in from a haul road's edge where its pale surface ends (dirt beyond)
-TerrainGen.GravelEdge = GRAVEL_EDGE
-local HAUL: { FastRoad } = {}
-local LEGACY_HAUL: { FastRoad } = {}
-for _, road in ipairs(WorldLayout.Roads) do
-	if table.find(TerrainGen.HaulRoads, road.name) then
-		table.insert(HAUL, { line = WorldLayout.FastLine(road.points), half = road.width / 2 })
-		local legacy = LEGACY_WIDTH[road.name]
-		if legacy then
-			table.insert(LEGACY_HAUL, { line = WorldLayout.FastLine(road.points), half = legacy / 2 })
-		end
-	end
-end
-
--- Whether (x, z) is on a haul road's pale surface (its edge frayed a
--- little, as the road's own is). Junction flares count, the same way.
-local function onGravel(x: number, z: number): boolean
-	local haul: { FastRoad } = if legacyLayout then LEGACY_HAUL else HAUL
-	for _, road in ipairs(haul) do
-		local half = road.half - GRAVEL_EDGE
-		local d = WorldLayout.FastDistance(road.line, x, z, half + 1)
-		if d < half + noise(x / 7, z / 7, 8.2) * 0.8 then
-			return true
-		end
-	end
-	if not legacyLayout then
-		for _, junction in ipairs(WorldLayout.Junctions) do
-			if junction.haul then
-				local dx, dz = x - junction.at.X, z - junction.at.Y
-				local d = sqrt(dx * dx + dz * dz)
-				local half = junction.radius - GRAVEL_EDGE
-				if d < half + noise(x / 7, z / 7, 8.2) * 0.8 then
-					return true
-				end
-			end
-		end
-	end
-	return false
-end
+-- Every road, path and street is light grey gravel its whole width (the
+-- Lumber Tycoon 2 look Connor asked for, 7 October 2026: grey speckled
+-- gravel, never brown dirt). GravelMaterial is a terrain material of its
+-- own that nothing else uses, so its colour (MaterialColors) belongs to
+-- the roads alone. Asphalt, not Pavement: its fine, flecked grain reads as
+-- gravel where Pavement reads as slabs. It is one name to change if Studio
+-- shows it too dark. Material only: no height reads it.
+TerrainGen.GravelMaterial = WorldLayout.RoadMaterial
 
 -- How far (x, z) is from the edge of the nearest road (negative = on it).
 function TerrainGen.RoadClearance(x: number, z: number): number
@@ -792,6 +752,10 @@ function TerrainGen.WaterLevelAt(x: number, z: number): number?
 	return nil
 end
 
+-- Studs of plain Grass past a homestead's pad (see SurfaceMaterial).
+local PLOT_LAWN = 40
+TerrainGen.PlotLawn = PLOT_LAWN
+
 -- Surface materials. This runs once per 4-stud column of the whole map
 -- (about 560,000 times a build), so it stays cheap: a few math.noise calls,
 -- no allocation. Heights never depend on it.
@@ -891,7 +855,7 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 
 	local _, onRoad = roadWeight(x, z)
 	local flat = WorldLayout.FlatWeight(x, z)
-	-- Town: the plaza, street and paths (WorldLayout.TownPaint), then dirt
+	-- Town: the plaza, street and paths (WorldLayout.TownPaint), then gravel
 	-- on every road.
 	if flat > 0.5 then
 		local wobble = noise(x / 6, z / 6, 1.1) * 1.5
@@ -905,26 +869,24 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 				return floor.material
 			end
 		end
-		-- A homestead's pad is bare ground, whichever region it sits in
-		-- (flat over 0.85 reaches a few studs past the pad). Terrain Ground
-		-- grows no grass blades; the blend outside keeps the country's.
+		-- A homestead's pad is plain Grass, whichever region it sits in (flat
+		-- over 0.85 reaches a few studs past the pad). The raised dark grey
+		-- build platform (PlotService, Art/PlotPlatform) stands on it.
 		if flat > 0.85 and WorldLayout.OnPlotPad(x, z) then
-			return "Ground"
+			return "Grass"
 		end
 	end
 	if onRoad > 0 then
-		-- Out in the country a haul road is pale road its whole width
-		-- (STY-02), fraying into dirt where the town's flat ground begins.
-		-- A homestead's blend can reach a haul road. Pale road holds until
-		-- the ground is mostly a shelf or the town (those stay dirt).
-		if flat < 0.55 and onGravel(x, z) then
-			return TerrainGen.GravelMaterial
-		end
-		return "Ground"
+		return TerrainGen.GravelMaterial
 	end
 	local lot = WorldLayout.ParkingLot
 	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then
-		return "Ground"
+		return TerrainGen.GravelMaterial
+	end
+	-- The lawn round every homestead: plain Grass for PlotLawn studs past
+	-- the pad (its edge dithered), whatever the biome. Not on a cliff.
+	if slope <= 0.6 and WorldLayout.NearPlotPad(x, z, PLOT_LAWN + dither(x, z) * 6) then
+		return "Grass"
 	end
 
 	-- Cliff rings: brown rock round the Snowfields, dark stone round the
@@ -1041,32 +1003,32 @@ function TerrainGen.Voxel(h: number, surface: number?, bottom: number): (string,
 	return "air", 0
 end
 
--- Colours for each terrain material in the cozy palette (GAME_DESIGN §13).
--- TerrainBuilder applies them with Terrain:SetMaterialColor; the preview
--- tool paints with them. STY-01 (phase 10) moved the land a little toward
--- the classic lumber-game look: a deeper meadow green (Grass was 116,170,74 and
--- LeafyGrass 86,140,62) and brown rock for the mountains, cliffs and
--- snowline (Rock was a grey 128,122,114). Phase 12 (ATMOS) took the meadow
--- on to a dark, muted green (Grass was 100,152,64 and LeafyGrass 76,126,54;
--- both about 17% darker and a little less saturated now, the same hue) and
--- the rock a touch darker (it was 122,98,78), so the cliffs still read
--- against the darker grass.
+-- Colours for each terrain material. TerrainBuilder applies them with
+-- Terrain:SetMaterialColor; the preview tool paints with them.
+-- 7 October 2026 (Connor, from Lumber Tycoon 2 screenshots): the ground
+-- reads as LT2's. A flat, vivid, almost cartoon-bright mid-green meadow
+-- (phase 12's dark, muted green is gone: Grass was 84,125,55 and LeafyGrass
+-- 66,104,46), the forest floor only a step darker, roads and paths in light
+-- grey speckled gravel (GravelMaterial), and every earth, cliff and hill
+-- face in warm red-brown (Ground was a yellow-brown 150,116,78, Rock a dull
+-- 114,92,74). Terrain textures darken their colour in game, so these are
+-- brighter than the green they should look. Snow, the volcano, the sand and
+-- the Gloam Hollow keep their own colours.
 TerrainGen.MaterialColors = {
-	Grass = Color3.fromRGB(84, 125, 55),
-	LeafyGrass = Color3.fromRGB(66, 104, 46),
-	Ground = Color3.fromRGB(150, 116, 78),
+	Grass = Color3.fromRGB(100, 184, 56),
+	LeafyGrass = Color3.fromRGB(82, 158, 48),
+	Ground = Color3.fromRGB(156, 94, 64),
 	Mud = Color3.fromRGB(64, 50, 72), -- the Gloam Hollow's violet floor
 	Sand = Color3.fromRGB(226, 205, 150),
-	Rock = Color3.fromRGB(114, 92, 74),
+	Rock = Color3.fromRGB(128, 86, 64),
 	Snow = Color3.fromRGB(238, 244, 250),
 	Glacier = Color3.fromRGB(172, 214, 236),
 	Basalt = Color3.fromRGB(52, 46, 44),
 	Slate = Color3.fromRGB(74, 66, 62),
 	CrackedLava = Color3.fromRGB(255, 108, 30),
 	Cobblestone = Color3.fromRGB(170, 160, 146),
-	-- The haul roads' pale road (GravelMaterial, STY-02): a light, cool grey
-	-- (phase 12; it was a beige 182,174,158).
-	Pavement = Color3.fromRGB(170, 169, 165),
+	-- Every road, path and street (GravelMaterial): a light, neutral grey.
+	Asphalt = Color3.fromRGB(176, 176, 172),
 } :: { [string]: Color3 }
 
 -- What lies under a surface material (cliff faces, the voxels below).
