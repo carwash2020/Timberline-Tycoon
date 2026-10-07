@@ -7,6 +7,11 @@
 -- holds more of them. A box that does not fit goes to the next lane that
 -- takes its kind. Coordinates are final studs, relative to the shop's
 -- origin; boxes face -Z like the shop.
+--
+-- A lane may be a STEPPED display (Lane.step): every row stands a little
+-- higher than the one in front of it (to the back, +Z), up to Lane.maxRise,
+-- so the rows behind show over the rows in front. Spot.y is the box's middle
+-- on its own step.
 
 local BoxSize = require(script.Parent.BoxSize)
 
@@ -18,8 +23,10 @@ export type Lane = {
 	x1: number,
 	z0: number,
 	z1: number,
-	y: number, -- the surface the boxes stand on
+	y: number, -- the surface the first row's boxes stand on
 	kinds: { string }?, -- item kinds this lane takes (nil: any)
+	step: number?, -- each row stands this much higher than the one in front (nil: flat)
+	maxRise: number?, -- the most the back rows rise over the first (nil: no limit)
 }
 
 export type Item = {
@@ -33,8 +40,9 @@ export type Item = {
 export type Spot = {
 	id: string,
 	lane: string,
+	row: number, -- 1 = the front row of its lane
 	x: number,
-	y: number, -- the box's middle
+	y: number, -- the box's middle, on its row's step
 	z: number,
 	w: number,
 	h: number,
@@ -54,6 +62,16 @@ local function takes(lane: Lane, kind: string): boolean
 		return true
 	end
 	return table.find(kinds, kind) ~= nil
+end
+
+-- How high row `row` (1 = front) stands over the lane's first row.
+function ShelfLayout.Rise(lane: Lane, row: number): number
+	local rise = (lane.step or 0) * (row - 1)
+	local cap = lane.maxRise
+	if cap ~= nil then
+		rise = math.min(rise, cap)
+	end
+	return rise
 end
 
 -- The room a lane has for a row: its width less the edge gap at each side.
@@ -106,14 +124,16 @@ function ShelfLayout.Fill(lanes: { Lane }, items: { Item }): ({ Spot }, { Item }
 	for _, state in ipairs(states) do
 		local lane = state.lane
 		local cx = (lane.x0 + lane.x1) / 2
-		for _, row in ipairs(state.rows) do
+		for rowIndex, row in ipairs(state.rows) do
 			local x = cx - row.width / 2
+			local rise = ShelfLayout.Rise(lane, rowIndex)
 			for _, item in ipairs(row.items) do
 				table.insert(spots, {
 					id = item.id,
 					lane = lane.name,
+					row = rowIndex,
 					x = x + item.w / 2,
-					y = lane.y + item.h / 2,
+					y = lane.y + rise + item.h / 2,
 					z = lane.z0 + row.start + row.depth / 2,
 					w = item.w,
 					h = item.h,

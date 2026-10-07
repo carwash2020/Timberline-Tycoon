@@ -111,8 +111,12 @@ return function(t)
 				marks += 1
 			end
 		end
-		t.ok(parts >= 5 and parts <= 6, "the body and its packaging, at most six parts")
-		t.eq(marks, 2)
+		t.ok(
+			parts >= 9 and parts <= t.shared("BoxLogic").BoxPartCap,
+			"the dark box and the item in its window, " .. parts .. " parts"
+		)
+		t.eq(marks, 0, "no flat marks: the look is the window")
+		t.ok(rec.model:FindFirstChild("Window") ~= nil and rec.model:FindFirstChild("Contents") ~= nil)
 		-- No price is printed on the box and nothing floats over it: the price shows
 		-- in a hover tag when a player aims at it (Shared/HoverTag), read from the
 		-- box's own attributes.
@@ -573,8 +577,9 @@ return function(t)
 		t.eq(rec.itemKind, "Robux")
 		t.eq(rec.price, 0)
 		t.eq(rec.limited, false)
-		t.eq(rec.part.Material, Enum.Material.Metal)
-		t.eq(rec.part.Color, t.roblox.Color3.fromHex("#E3B73C"))
+		t.eq(rec.model:FindFirstChild("Strip").Color, t.roblox.Color3.fromHex("#E3B73C"), "a gold name strip")
+		t.eq(rec.model:FindFirstChild("Base").Color, t.roblox.Color3.fromHex("#E3B73C"), "and a gold edge")
+		t.eq(#rec.model:FindFirstChild("Contents"):GetChildren(), 3, "gold coins in the window")
 		for _, d in ipairs(rec.model:GetDescendants()) do
 			t.ok(not (d.Name == "Price" and d:IsA("TextLabel")), "no price printed on a Robux box")
 		end
@@ -895,6 +900,12 @@ return function(t)
 				t.eq(#grants, 0, "no stock, no hammer: the item is not delivered by opening")
 				t.eq(rec.opened, false, "cancelling keeps the box")
 				t.ok(rec.model ~= nil and rec.model:GetAttribute("Poof") == nil, "the box is still there")
+				t.eq(rec.model:FindFirstChild("Contents"), nil, "but the item has left its window")
+				t.eq(rec.model:FindFirstChild("Window"), nil, "and the window is gone: an open box")
+				t.ok(
+					rec.model:FindFirstChild("Back") ~= nil and rec.model:FindFirstChild("Strip") ~= nil,
+					"the dark box stays"
+				)
 				t.eq(rec.pendingGrant, true, "and still owed")
 				-- A second open is fine (cancelled, try again).
 				t.eq(Box.TryOpen(player, rec.uid), true)

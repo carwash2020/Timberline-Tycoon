@@ -1,51 +1,42 @@
 --!strict
--- BoxSize: how big a shop box is. Pure. The size follows the item inside
--- (a hatchet is small, a sawmill or the chop saw is big, a vehicle is
--- biggest) from data the item already has: its plot footprint when it has
--- one, otherwise its kind and price tier. Nothing here is a second price
--- table: prices are only read to pick a step, never shown.
+-- BoxSize: how big a shop box is. Pure.
 --
--- THE SIZE CLASS TABLE (studs, final, width x height x depth; a box's front
--- faces -Z like the shop). Add a class by inserting a row in rank order:
--- ShelfLayout spaces boxes by the width and depth they have, so a bigger
--- class never overlaps its neighbours, and the specs measure that.
+-- THE RULE (Connor, 7 October 2026: "keep the box size accurate to the item
+-- inside"): a box is the item's real bounding box plus a fixed margin. The
+-- item is measured from the model the box shows (Art/ItemModel.Extent), never
+-- guessed from a size class or a price.
 --
---   id     size (W x H x D)    plot footprint area (studs^2)   used by now
---   XS     2.2 x 1.8 x 1.8     up to 6                         lanterns, small gear, a chair
---   S      2.8 x 2.2 x 2.2     up to 24                        hatchet-class axes, Robux boxes
---   M      3.6 x 2.9 x 2.9     up to 64                        better axes, a small shed kit
---   L      4.6 x 3.7 x 3.7     up to 130                       cheaper sawmills, the chop saw
---   XL     5.8 x 4.5 x 4.6     up to 270                       the Millmasters
---   XXL    7.4 x 5.6 x 5.8     up to 520                       (free: the first Large item)
---   XXXL   9.4 x 7.0 x 7.4     bigger                          (free)
+--   inner  = extent * scale              the item as shown in the window
+--   width  = inner.X + 2 * Margin        (x), and the same for depth (z)
+--   height = inner.Y + Margin + Floor    Floor under the item, Margin above it
+--   box    = max(Min, those)             so the name strip stays readable
 --
--- Vehicles use their own, bigger, wide and low crate classes (a vehicle box
--- is always the biggest thing in the store; the long side is the width, the
--- front label's side), picked by the vehicle's floor area (width x length):
+-- `scale` is 1 for anything that fits. An item bigger than the box may be
+-- (a sawmill is 26 studs long, a logging rig 47) is shrunk uniformly, never
+-- squashed, until it fits inside Max (a shelf box) or VehicleMax (a vehicle,
+-- the biggest thing in a store). So an axe is long and thin, a truck is long
+-- and wide, a sawmill keeps its real footprint's shape, the Sky Bin is small
+-- and tall, and nothing is a different shape from what is inside it.
 --
---   V1     9.0 x 4.4 x 5.0     up to 200                       Scout ATV, Pony Trailer
---   V2     11.0 x 5.0 x 5.6    up to 300                       Rustbucket, Ranch Trailer
---   V3     13.0 x 5.8 x 6.2    up to 400                       Pickup, Heavy Hauler
---   V4     15.5 x 6.6 x 6.8    bigger                          Flatbed, Logging Rig
+-- ShelfLayout spaces boxes by the width and depth they have (Gap between
+-- them), so a bigger box never overlaps its neighbours; the specs measure
+-- every shop item against this rule.
 --
--- Anything that has no footprint (axes, gear, a cosmetic, a Robux pass)
--- starts at its kind's base rank and steps up one rank for each PriceStep
--- it reaches, never past the kind's cap.
+-- A box with no model of its own (the Robux boxes, an unknown id) uses the
+-- fixed stock sizes below.
 
 local BoxSize = {}
 
 export type Class = {
 	id: string,
 	rank: number,
-	size: Vector3,
-	maxArea: number, -- footprint area (studs^2) this class takes, inclusive
-	vehicle: boolean,
+	size: Vector3, -- width x height x depth; the front faces -Z
 }
 
-export type Spec = {
-	kind: string, -- "Axe" | "Gear" | "Sawmill" | "Machine" | "Blueprint" | "Cosmetic" | "Robux" | "Truck" | "Trailer"
-	price: number?, -- cash price, only to pick a tier
-	footprint: Vector2?, -- width (x) and depth (z) in studs, when the item has one
+export type Fit = {
+	size: Vector3, -- the box
+	scale: number, -- the item's scale in the window (1 = real size)
+	inner: Vector3, -- the item as shown: extent * scale
 }
 
 -- Clear studs between neighbouring boxes on a shelf, and between a box and
@@ -53,55 +44,45 @@ export type Spec = {
 BoxSize.Gap = 1
 BoxSize.EdgeGap = 0.6
 
+-- Margin round the item: each side (x, z) and over the top, and the floor
+-- the item stands on.
+BoxSize.Margin = 0.6
+BoxSize.Floor = 0.3
+
+-- Never smaller than this (width x height x depth), so the name strip reads.
+BoxSize.Min = Vector3.new(2.4, 1.9, 1.7)
+
+-- Never bigger than this on a shelf (width x height x depth). A shelf row
+-- is 7.2 to 7.5 studs wide, so two boxes of 3.1 stand side by side; a bigger
+-- thing is shrunk to a tile of its shape (a sawmill is 12 to 26 studs long,
+-- so a shelf box can only ever be a miniature of it). The carry rules (a
+-- person holding a box, an aisle at least 7.6 wide) and the truck bed were
+-- all set for boxes about this size.
+BoxSize.Max = Vector3.new(3.1, 4.6, 3.6)
+
+-- Axes are long and thin: the same shelf may take them unscaled, one to a
+-- row (an axe is 3.3 to 4 studs long and under half a stud thick).
+BoxSize.KindMax = {
+	Axe = Vector3.new(5.2, 4.6, 2.6),
+	Sawmill = Vector3.new(6.4, 4.8, 4.8),
+	Machine = Vector3.new(5.2, 4.6, 4.4),
+} :: { [string]: Vector3 }
+
+-- A vehicle's box (the dealership's plinths have room for it).
+BoxSize.VehicleMax = Vector3.new(15.5, 7.4, 8.4)
+
+-- Fixed sizes for a box with no model of its own.
 BoxSize.Classes = {
-	{ id = "XS", rank = 1, size = Vector3.new(2.2, 1.8, 1.8), maxArea = 6, vehicle = false },
-	{ id = "S", rank = 2, size = Vector3.new(2.8, 2.2, 2.2), maxArea = 24, vehicle = false },
-	{ id = "M", rank = 3, size = Vector3.new(3.6, 2.9, 2.9), maxArea = 64, vehicle = false },
-	{ id = "L", rank = 4, size = Vector3.new(4.6, 3.7, 3.7), maxArea = 130, vehicle = false },
-	{ id = "XL", rank = 5, size = Vector3.new(5.8, 4.5, 4.6), maxArea = 270, vehicle = false },
-	{ id = "XXL", rank = 6, size = Vector3.new(7.4, 5.6, 5.8), maxArea = 520, vehicle = false },
-	{ id = "XXXL", rank = 7, size = Vector3.new(9.4, 7, 7.4), maxArea = math.huge, vehicle = false },
+	{ id = "XS", rank = 1, size = Vector3.new(2.4, 2, 2) },
+	{ id = "S", rank = 2, size = Vector3.new(2.8, 2.2, 2.2) },
+	{ id = "M", rank = 3, size = Vector3.new(3.6, 2.9, 2.9) },
 } :: { Class }
 
-BoxSize.VehicleClasses = {
-	{ id = "V1", rank = 11, size = Vector3.new(9, 4.4, 5), maxArea = 200, vehicle = true },
-	{ id = "V2", rank = 12, size = Vector3.new(11, 5, 5.6), maxArea = 300, vehicle = true },
-	{ id = "V3", rank = 13, size = Vector3.new(13, 5.8, 6.2), maxArea = 400, vehicle = true },
-	{ id = "V4", rank = 14, size = Vector3.new(15.5, 6.6, 6.8), maxArea = math.huge, vehicle = true },
-} :: { Class }
-
--- Item kinds with no footprint: the class they start at, the biggest class
--- they may reach, and the price steps that move them up.
-BoxSize.KindBase = {
-	Axe = "S",
-	Gear = "XS",
-	Cosmetic = "S",
-	Robux = "S",
-	Blueprint = "XS",
-	Sawmill = "L",
-	Machine = "L",
-} :: { [string]: string }
-
-BoxSize.KindCap = {
-	Axe = "M",
-	Gear = "S",
-	Cosmetic = "S",
-	Robux = "S",
-	Blueprint = "L",
-	Sawmill = "XL",
-	Machine = "L",
-} :: { [string]: string }
-
-BoxSize.PriceSteps = { 1000, 10000 }
-
--- The class a plain item falls back to when its kind is not in the tables.
+-- The class a box with no model falls back to.
 BoxSize.DefaultClass = "S"
 
 local byId: { [string]: Class } = {}
 for _, class in ipairs(BoxSize.Classes) do
-	byId[class.id] = class
-end
-for _, class in ipairs(BoxSize.VehicleClasses) do
 	byId[class.id] = class
 end
 
@@ -117,56 +98,50 @@ function BoxSize.IsVehicleKind(kind: string): boolean
 	return kind == "Truck" or kind == "Trailer"
 end
 
-local function byArea(list: { Class }, area: number): Class
-	for _, class in ipairs(list) do
-		if area <= class.maxArea then
-			return class
-		end
+-- The biggest box allowed for a kind of item.
+function BoxSize.MaxFor(kind: string): Vector3
+	if BoxSize.IsVehicleKind(kind) then
+		return BoxSize.VehicleMax
 	end
-	return list[#list]
+	return BoxSize.KindMax[kind] or BoxSize.Max
 end
 
-local function steps(price: number): number
-	local n = 0
-	for _, step in ipairs(BoxSize.PriceSteps) do
-		if price >= step then
-			n += 1
-		end
+-- The box for an item of bounding box `extent` (studs, display orientation:
+-- x across the front, y up, z deep) of kind `kind`. `groupScale` (ItemBox)
+-- shows a whole family at one scale. See the header.
+function BoxSize.Fit(extent: Vector3, kind: string, groupScale: number?): Fit
+	local max = BoxSize.MaxFor(kind)
+	local roomX = max.X - 2 * BoxSize.Margin
+	local roomY = max.Y - BoxSize.Margin - BoxSize.Floor
+	local roomZ = max.Z - 2 * BoxSize.Margin
+	local scale = 1
+	if extent.X > 0 then
+		scale = math.min(scale, roomX / extent.X)
 	end
-	return n
+	if extent.Y > 0 then
+		scale = math.min(scale, roomY / extent.Y)
+	end
+	if extent.Z > 0 then
+		scale = math.min(scale, roomZ / extent.Z)
+	end
+	if groupScale ~= nil then
+		scale = math.min(scale, groupScale)
+	end
+	local inner = extent * scale
+	local min = BoxSize.Min
+	local size = Vector3.new(
+		math.max(min.X, inner.X + 2 * BoxSize.Margin),
+		math.max(min.Y, inner.Y + BoxSize.Margin + BoxSize.Floor),
+		math.max(min.Z, inner.Z + 2 * BoxSize.Margin)
+	)
+	return { size = size, scale = scale, inner = inner }
 end
 
-local function shifted(baseId: string, up: number, capId: string): Class
-	local base = BoxSize.Class(baseId)
-	local cap = BoxSize.Class(capId)
-	local rank = math.min(base.rank + up, cap.rank)
-	for _, class in ipairs(BoxSize.Classes) do
-		if class.rank == rank then
-			return class
-		end
-	end
-	return base
-end
-
--- The class for an item. A vehicle is picked by floor area (its footprint,
--- width x length); anything else with a footprint by that area; the rest by
--- kind and price tier.
-function BoxSize.ClassFor(spec: Spec): Class
-	local fp = spec.footprint
-	if BoxSize.IsVehicleKind(spec.kind) then
-		local area = if fp then math.abs(fp.X * fp.Y) else 0
-		return byArea(BoxSize.VehicleClasses, area)
-	end
-	if fp ~= nil then
-		return byArea(BoxSize.Classes, math.abs(fp.X * fp.Y))
-	end
-	local baseId = BoxSize.KindBase[spec.kind] or BoxSize.DefaultClass
-	local capId = BoxSize.KindCap[spec.kind] or baseId
-	return shifted(baseId, steps(spec.price or 0), capId)
-end
-
-function BoxSize.SizeFor(spec: Spec): Vector3
-	return BoxSize.ClassFor(spec).size
+-- Where the item's middle goes in its box, from the box's middle: centred
+-- across and deep, standing on the floor.
+function BoxSize.ItemOffset(box: Vector3, inner: Vector3): Vector3
+	local floorY = -box.Y / 2 + BoxSize.Floor
+	return Vector3.new(0, floorY + inner.Y / 2, 0)
 end
 
 -- The distance one box needs along an axis: its own length plus the gap.
@@ -174,13 +149,10 @@ function BoxSize.Pitch(length: number): number
 	return length + BoxSize.Gap
 end
 
--- Every class in rank order, the shop classes then the vehicle classes.
+-- Every fixed class in rank order.
 function BoxSize.All(): { Class }
 	local out: { Class } = {}
 	for _, class in ipairs(BoxSize.Classes) do
-		table.insert(out, class)
-	end
-	for _, class in ipairs(BoxSize.VehicleClasses) do
 		table.insert(out, class)
 	end
 	return out

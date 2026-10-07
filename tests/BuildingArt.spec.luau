@@ -935,7 +935,8 @@ return function(t)
 		for _, p in ipairs(parts(store)) do
 			if p.Name == "Shelf" and p.CanCollide then
 				aisle += 1
-				t.ok(math.abs(p.CFrame.Position.X) >= 10, "shelves stay out of the centre aisle")
+				-- (The islands' inner edges stand 5 studs either side of the middle: a 10-stud aisle.)
+				t.ok(math.abs(p.CFrame.Position.X) - p.Size.X / 2 >= 5 - 1e-6, "shelves stay out of the centre aisle")
 			end
 		end
 		t.eq(aisle, 4, "two shelves each side")
@@ -1047,9 +1048,16 @@ return function(t)
 			end
 			t.ok(ok, label .. " rests wholly on a table or shelf top")
 		end
+		-- A shelf box stands on a PLINTH (a block in its accent colour) which stands
+		-- on its row's STEP of the stepped display unit.
+		local function standsOnPlinth(model, steps, place, size, label)
+			sits(model, { Plinth = true }, place, size, label .. " (box on plinth)")
+			local plinthPlace = { x = place.x, z = place.z, y = place.y - StoreStock.PlinthHeight }
+			sits(model, steps, plinthPlace, size, label .. " (plinth on step)")
+		end
 		local shed = BuildingArt.Shop("ToolShed", "TOOL SHED", C3.fromRGB(150, 62, 44))
 		for _, place in ipairs(StoreStock.Placements("ToolShed")) do
-			sits(shed, { DisplayTableTop = true }, place, place.size, place.slotId)
+			standsOnPlinth(shed, { DisplayTableStep = true }, place, place.size, place.slotId)
 		end
 		local robuxSize = loader:shared("BoxSize").Class(RobuxShelf.Class).size
 		for _, place in ipairs(RobuxShelf.Placements()) do
@@ -1058,7 +1066,7 @@ return function(t)
 		local hearth = BuildingArt.Shop("HearthAndHome", "STORE", C3.fromRGB(122, 90, 60))
 		for _, place in ipairs(StoreStock.Placements("HearthAndHome")) do
 			local depth = place.count * place.size.Z + (place.count - 1) * (place.pitch - place.size.Z)
-			sits(hearth, { ShelfTop = true }, place, V3.new(place.size.X, place.size.Y, depth), place.slotId)
+			standsOnPlinth(hearth, { ShelfStep = true }, place, V3.new(place.size.X, place.size.Y, depth), place.slotId)
 		end
 	end)
 

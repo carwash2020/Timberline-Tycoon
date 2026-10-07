@@ -10,7 +10,8 @@
 -- plinth gives the name and the one price. Bays are ordered by price, left
 -- to right: the cheap rigs on the front row, the dear ones on the back.
 -- MapBuilder places the model; the boxes are the purchase (BoxSpot parts,
--- sized by BoxSize from the vehicle's footprint).
+-- sized by ItemBox from the vehicle's real bounds, the vehicle seen through the
+-- box's window, on a block in the vehicle's accent colour).
 --
 -- Two rows side-on need more width than the old single row of eight, so
 -- the lot (and the reserved lawn in WorldLayout) is wider: it keeps the
@@ -18,12 +19,12 @@
 
 local CollectionService = game:GetService("CollectionService")
 
-local BoxSize = require(script.Parent.Parent.BoxSize)
+local BoxLook = require(script.Parent.Parent.BoxLook)
+local ItemBox = require(script.Parent.Parent.ItemBox)
 local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local Kit = require(script.Parent.Kit)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
-local StoreStock = require(script.Parent.Parent.StoreStock)
 local TruckArt = require(script.Parent.TruckArt)
 local TruckLayout = require(script.Parent.Parent.TruckLayout)
 local VehicleLogic = require(script.Parent.Parent.VehicleLogic)
@@ -56,17 +57,11 @@ DealershipLot.BackMargin = 3.5
 DealershipLot.BoxGap = 0.6 -- between a box and the plinth's edge, and the vehicle
 DealershipLot.Aisle = 14 -- the clear central walkway between the rows' plinths
 DealershipLot.PlinthHeight = 1.2
+DealershipLot.BlockHeight = 0.3 -- the accent-coloured block a vehicle's box stands on
+DealershipLot.BlockMargin = 0.25 -- the block is this much bigger than the box all round
 
-local ORDER = {
-	{ kind = "Truck", id = "Rustbucket" },
-	{ kind = "Truck", id = "Pickup" },
-	{ kind = "Truck", id = "ScoutATV" },
-	{ kind = "Truck", id = "Flatbed" },
-	{ kind = "Truck", id = "LoggingRig" },
-	{ kind = "Trailer", id = "PonyTrailer" },
-	{ kind = "Trailer", id = "RanchTrailer" },
-	{ kind = "Trailer", id = "HeavyHauler" },
-}
+-- The vehicles on show: ItemBox.Showroom, the one list.
+local ORDER = ItemBox.Showroom
 
 local function itemOf(kind: string, id: string): any
 	return if kind == "Truck" then ItemCatalog.GetTruck(id) else ItemCatalog.GetTrailer(id)
@@ -102,7 +97,6 @@ export type Bay = {
 	box: Vector3, -- the box standing on the plinth, aisle side
 	boxZ: number, -- the box's centre, lot space
 	vz: number, -- the vehicle's middle line, lot space
-	boxClass: string,
 }
 
 export type Layout = { bays: { Bay }, width: number, depth: number }
@@ -121,17 +115,15 @@ function DealershipLot.Layout(): Layout
 	end)
 	local entries = {}
 	for _, entry in ipairs(sorted) do
-		local fp = StoreStock.VehicleFootprint(entry.kind, entry.id)
-		local class = BoxSize.ClassFor({ kind = entry.kind, footprint = fp })
+		local fit = ItemBox.For(entry.kind, entry.id)
 		local m = measureVehicle(entry.kind, entry.id)
 		table.insert(entries, {
 			kind = entry.kind,
 			id = entry.id,
 			length = m.length,
 			span = m.span,
-			box = class.size,
-			boxClass = class.id,
-			bay = math.max(m.length, class.size.X) + 2 * DealershipLot.PlinthMargin,
+			box = fit.size,
+			bay = math.max(m.length, fit.size.X) + 2 * DealershipLot.PlinthMargin,
 		})
 	end
 	local function rowWidth(from: number, to: number): number
@@ -193,7 +185,6 @@ function DealershipLot.Layout(): Layout
 				box = e.box,
 				boxZ = boxZ,
 				vz = vz,
-				boxClass = e.boxClass,
 			})
 			x += e.bay + DealershipLot.BayGap
 		end
@@ -424,11 +415,27 @@ function DealershipLot.Build(): Model
 
 		-- The box: what you pick up and carry to the counter. On the plinth at
 		-- the aisle edge, the vehicle beside it, so nothing stands in the aisle.
+		-- Its front (the name strip and the big window) faces the aisle: the
+		-- front row's aisle is at +Z, so those boxes are turned half way round.
+		local block = DealershipLot.BlockHeight
+		local blockMargin = DealershipLot.BlockMargin
+		Kit.decor(
+			Kit.part(
+				lot,
+				"BoxBlock",
+				Vector3.new(bay.box.X + 2 * blockMargin, block, bay.box.Z + 2 * blockMargin),
+				CFrame.new(cx, top + block / 2, oz + bay.boxZ),
+				BoxLook.Accent(bay.kind, bay.id),
+				Enum.Material.SmoothPlastic
+			),
+			false
+		)
 		local spot = Kit.part(
 			lot,
 			"BoxSpot",
 			bay.box,
-			CFrame.new(cx, top + bay.box.Y / 2, oz + bay.boxZ),
+			CFrame.new(cx, top + block + bay.box.Y / 2, oz + bay.boxZ)
+				* CFrame.Angles(0, if bay.row == 1 then math.pi else 0, 0),
 			Color3.fromRGB(196, 148, 90),
 			Enum.Material.Wood
 		)
