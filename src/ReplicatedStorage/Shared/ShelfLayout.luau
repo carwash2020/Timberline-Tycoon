@@ -2,9 +2,9 @@
 -- ShelfLayout: where boxes stand on a shop's tables and shelves. Pure.
 -- A lane is a flat strip (a table top, a shelf board). Boxes go on it in
 -- rows from the front (-Z) backward, in the order they are handed in, and
--- every box is spaced by its OWN width and depth plus BoxSize.Gap, so a
--- large box never overlaps its neighbours and a lane with small boxes
--- holds more of them. A box that does not fit goes to the next lane that
+-- every box is spaced by its OWN width plus BoxSize.Gap (side by side) and
+-- its row's depth plus BoxSize.RowGap (row to row), so a large box never
+-- overlaps its neighbours and a lane with small boxes holds more of them. A box that does not fit goes to the next lane that
 -- takes its kind. Coordinates are final studs, relative to the shop's
 -- origin; boxes face -Z like the shop.
 --
@@ -109,7 +109,7 @@ function ShelfLayout.Fill(lanes: { Lane }, items: { Item }): ({ Spot }, { Item }
 					break
 				end
 			end
-			local start = if last then last.start + last.depth + BoxSize.Gap else BoxSize.EdgeGap
+			local start = if last then last.start + last.depth + BoxSize.RowGap else BoxSize.EdgeGap
 			if start + item.d <= length(lane) + 1e-6 then
 				table.insert(state.rows, { start = start, items = { item }, width = item.w, depth = item.d })
 				placed = true
@@ -146,12 +146,26 @@ function ShelfLayout.Fill(lanes: { Lane }, items: { Item }): ({ Spot }, { Item }
 	return spots, overflow
 end
 
--- Whether two spots overlap on the floor plan (their gap is under `gap`).
+-- Whether two spots overlap on the floor plan (their gap is under `gap` on
+-- both axes). Boxes in a row are `Gap` apart across, rows `RowGap` apart
+-- front to back: see ShelfLayout.Apart for the shelf's own rule.
 function ShelfLayout.Overlap(a: Spot, b: Spot, gap: number?): boolean
 	local g = gap or 0
 	local dx = math.abs(a.x - b.x) - (a.w + b.w) / 2
 	local dz = math.abs(a.z - b.z) - (a.d + b.d) / 2
 	return dx < g - 1e-6 and dz < g - 1e-6
+end
+
+-- The shelf's spacing rule between two spots: in the same row of a lane at
+-- least BoxSize.Gap across, in different rows at least BoxSize.RowGap along z.
+function ShelfLayout.Apart(a: Spot, b: Spot): boolean
+	if a.lane ~= b.lane then
+		return true
+	end
+	if a.row == b.row then
+		return math.abs(a.x - b.x) - (a.w + b.w) / 2 >= BoxSize.Gap - 1e-6
+	end
+	return math.abs(a.z - b.z) - (a.d + b.d) / 2 >= BoxSize.RowGap - 1e-6
 end
 
 return ShelfLayout

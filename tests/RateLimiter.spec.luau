@@ -47,6 +47,11 @@ return function(t)
 		t.eq(burst(limiter, fakePlayer(), "Chop", 10), 6)
 	end)
 
+	t.test("the quality choice remote is limited to two a second", function()
+		local limiter = setup()
+		t.eq(burst(limiter, fakePlayer(), "SetQuality", 10), 2)
+	end)
+
 	t.test("every client-to-server remote in Net has a budget", function()
 		local limiter = setup()
 		local Net = t.shared("Net")

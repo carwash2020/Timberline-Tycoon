@@ -531,6 +531,7 @@ UITheme.Layers = {
 	Store = 20,
 	Dialogue = 30,
 	PlotPicker = 80,
+	QualityPicker = 90, -- the join screen's Lower / Higher quality choice (QualityPickerUI), over everything
 } :: { [string]: number }
 
 -- A ScreenGui for one of the game's screens, scaled for the device.
