@@ -1591,7 +1591,7 @@ function WorldPlan.Town(): Town
 		{ "Crate", 86, 92.5, -0.2 }, -- the station's sign took the old spot (71, 93)
 		{ "Crate", 80, 102, 0.5 }, -- clear of the mill road's east leg
 		{ "Planter", -61, 98 },
-		{ "Planter", -103.5, 88 },
+		{ "Planter", -105, 85.5 }, -- (was -103.5, 88: the Tool Shed grew 6.6 wider, its west wall now reaches it)
 		{ "Mailbox", -121, 94, 0 },
 		{ "FlowerBox", -97, 85.3, 0 },
 		{ "LogPile", 35.5, 131, 0 }, -- east of the mill, clear of the yard lamp and the sell station

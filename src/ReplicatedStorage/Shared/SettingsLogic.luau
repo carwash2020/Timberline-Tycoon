@@ -17,13 +17,17 @@ end
 
 export type Graphics = "auto" | "low" | "medium" | "high"
 export type UIScale = "small" | "normal" | "large"
+-- The player's graphics choice (Shared/QualityProfile): "unset" until they
+-- pick on the join screen (so an old save is asked once), then "low" or "high".
+export type Quality = "unset" | "low" | "high"
 
 export type Settings = {
 	music: boolean,
 	sfx: boolean,
 	musicVolume: number,
 	sfxVolume: number,
-	graphics: Graphics,
+	graphics: Graphics, -- the old four-way tier override: kept so old saves load, no longer shown or used (quality replaced it)
+	quality: Quality,
 	cameraShake: boolean,
 	uiScale: UIScale,
 	showTips: boolean,
@@ -36,6 +40,7 @@ export type Key =
 	| "musicVolume"
 	| "sfxVolume"
 	| "graphics"
+	| "quality"
 	| "cameraShake"
 	| "uiScale"
 	| "showTips"
@@ -47,11 +52,15 @@ SettingsLogic.Defaults = {
 	musicVolume = 1,
 	sfxVolume = 1,
 	graphics = "auto" :: Graphics,
+	quality = "unset" :: Quality,
 	cameraShake = true,
 	uiScale = "normal" :: UIScale,
 	showTips = true,
 	showOnBoard = false,
 } :: Settings
+
+-- The attribute for the Lower / Higher quality choice on its own (QualityProfile).
+SettingsLogic.QualityAttribute = "SettingQuality"
 
 -- The attribute for showOnBoard on its own, for the Leaderboard tab.
 SettingsLogic.BoardAttribute = "SettingShowOnBoard"
@@ -63,6 +72,7 @@ SettingsLogic.Attributes = {
 	musicVolume = "SettingMusicVolume",
 	sfxVolume = "SettingSfxVolume",
 	graphics = "SettingGraphics",
+	quality = SettingsLogic.QualityAttribute,
 	cameraShake = "SettingCameraShake",
 	uiScale = "SettingUIScale",
 	showTips = "SettingShowTips",
@@ -71,6 +81,7 @@ SettingsLogic.Attributes = {
 
 local GRAPHICS: { [string]: boolean } = { auto = true, low = true, medium = true, high = true }
 local SCALES: { [string]: boolean } = { small = true, normal = true, large = true }
+local QUALITIES: { [string]: boolean } = { unset = true, low = true, high = true }
 
 local function volume(n: unknown, fallback: number): number
 	if type(n) ~= "number" or n ~= n or n == math.huge or n == -math.huge or n < 0 or n > 1 then
@@ -92,12 +103,19 @@ function SettingsLogic.Sanitize(raw: any): Settings
 	if type(ui) ~= "string" or not SCALES[ui] then
 		ui = d.uiScale
 	end
+	-- Anything but a real choice (a save from before the picker, a bad value) is
+	-- "unset": the join screen asks once.
+	local quality = s.quality
+	if type(quality) ~= "string" or not QUALITIES[quality] then
+		quality = d.quality
+	end
 	return {
 		music = if s.music == nil then d.music else s.music == true,
 		sfx = if s.sfx == nil then d.sfx else s.sfx == true,
 		musicVolume = volume(s.musicVolume, d.musicVolume),
 		sfxVolume = volume(s.sfxVolume, d.sfxVolume),
 		graphics = graphics :: Graphics,
+		quality = quality :: Quality,
 		cameraShake = if s.cameraShake == nil then d.cameraShake else s.cameraShake == true,
 		uiScale = ui :: UIScale,
 		showTips = if s.showTips == nil then d.showTips else s.showTips == true,
@@ -139,6 +157,13 @@ function SettingsLogic.Set(settings: Settings, key: string, value: unknown): boo
 			return false
 		end
 		settings.graphics = value :: Graphics
+		return true
+	elseif key == "quality" then
+		-- A player only ever CHOOSES low or high. "unset" is what the save starts as.
+		if value ~= "low" and value ~= "high" then
+			return false
+		end
+		settings.quality = value :: Quality
 		return true
 	elseif key == "uiScale" then
 		if type(value) ~= "string" or not SCALES[value] then

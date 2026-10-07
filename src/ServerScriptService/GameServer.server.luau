@@ -62,6 +62,7 @@ local PlaceCheck = require(script.Parent.PlaceCheck)
 local PlotService = require(script.Parent.PlotService)
 local ProfileSchema = require(script.Parent.ProfileSchema)
 local ProfileService = require(script.Parent.ProfileService)
+local QualityService = require(script.Parent.QualityService)
 local QuestService = require(script.Parent.QuestService)
 local RateLimiter = require(script.Parent.RateLimiter)
 local SprintLogic = require(ReplicatedStorage.Shared.SprintLogic)
@@ -1147,6 +1148,12 @@ remote.CallTruck.OnServerEvent:Connect(function(player: Player)
 	elseif why then
 		notify(player, why)
 	end
+end)
+
+-- The Lower / Higher graphics choice (QualityService: rate limited, "low" or
+-- "high" only, mirrored on the SettingQuality attribute).
+remote.SetQuality.OnServerEvent:Connect(function(player: Player, value: unknown)
+	QualityService.Set(player, value)
 end)
 
 -- Settings (SettingsLogic), mirrored on player attributes so the client

@@ -21,6 +21,37 @@ return function(t)
 		end
 	end
 
+	t.test(
+		"the Lower / Higher quality choice: in the template, every old save is asked once, and migrating is idempotent",
+		function()
+			local Schema, data = fresh()
+			t.eq(Schema.Template.settings.quality, "unset", "the template starts unchosen")
+			-- An old save (settings from before the picker): filled in, to be asked.
+			data.settings = { music = false, graphics = "low" }
+			Schema.Migrate(data)
+			t.eq(data.settings.quality, "unset", "an existing save is shown the screen once")
+			t.eq(data.settings.music, false, "its other settings are kept")
+			t.eq(data.settings.graphics, "low")
+			-- A saved choice survives every migration, and a second one changes nothing.
+			data.settings.quality = "high"
+			Schema.Migrate(data)
+			t.eq(data.settings.quality, "high")
+			local before = t.loader():shared("Util").deepCopy(data)
+			Schema.Migrate(data)
+			sameClock(before, data)
+			t.eq(data, before, "migrating again changes nothing")
+			-- A save with no settings table at all, and one with a bad value.
+			local _, bare = fresh()
+			bare.settings = nil
+			Schema.Migrate(bare)
+			t.eq(bare.settings.quality, "unset")
+			local _, bad = fresh()
+			bad.settings = { quality = "ultra" }
+			Schema.Migrate(bad)
+			t.eq(bad.settings.quality, "unset")
+		end
+	)
+
 	t.test("a new save gets one Rusty Axe, equipped by nobody yet", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)

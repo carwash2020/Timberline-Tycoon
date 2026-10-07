@@ -402,28 +402,28 @@ local SHOPS: { [string]: Shop } = {
 		lanes = {
 			{
 				name = "AxeTable",
-				x0 = -13.7,
+				x0 = -17.1, -- 12.1 wide: two boxes stand side by side with the gap between them
 				x1 = -5.0,
 				z0 = -21.3,
 				z1 = 16.8, -- the back corners beside the counter (the counter is x -4.8 to 4.8; the gold table starts at z 17.1)
 				y = StoreStock.TableTop,
 				step = StoreStock.RowStep,
 				maxRise = StoreStock.MaxRise,
-				kinds = { "Axe", "Machine" }, -- the Sky Bin's small box rides the axe table's spare room
+				kinds = { "Axe", "Fitting" }, -- the belt kit and the Sky Bin ride the axe table's spare room (laneKind)
 			},
 			{
 				name = "MachineTable",
 				x0 = 5.0,
-				x1 = 13.7,
+				x1 = 17.1,
 				z0 = -21.3,
 				z1 = 16.8, -- the back corners beside the counter (the counter is x -4.8 to 4.8; the gold table starts at z 17.1)
 				y = StoreStock.TableTop,
 				step = StoreStock.RowStep,
 				maxRise = StoreStock.MaxRise,
-				kinds = { "Sawmill", "Machine" },
+				kinds = { "Sawmill", "Machine" }, -- the chop saw and the planers
 			},
 		},
-		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(19.4, 1, 30) },
+		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(23.8, 1, 30) }, -- design size: 35.7 x 45 once scaled
 	},
 	HearthAndHome = {
 		lanes = {
@@ -451,25 +451,25 @@ local SHOPS: { [string]: Shop } = {
 			},
 			{
 				name = "PlanIslandW",
-				x0 = -13.6,
+				x0 = -14.0,
 				x1 = -5.0,
 				z0 = -17.25,
 				z1 = 8.75,
 				y = StoreStock.ShelfTop,
 				step = StoreStock.RowStep,
 				maxRise = StoreStock.MaxRise,
-				kinds = { "Blueprint" },
+				kinds = { "BlueprintW" },
 			},
 			{
 				name = "PlanIslandE",
 				x0 = 5.0,
-				x1 = 13.6,
+				x1 = 14.0,
 				z0 = -17.25,
 				z1 = 8.75,
 				y = StoreStock.ShelfTop,
 				step = StoreStock.RowStep,
 				maxRise = StoreStock.MaxRise,
-				kinds = { "Blueprint" },
+				kinds = { "BlueprintE" },
 			},
 		},
 		zone = { center = Vector3.new(0, 0, 0), size = Vector3.new(33, 1, 29) },
@@ -486,17 +486,48 @@ function StoreStock.BoxSizeOf(slot: Slot): Vector3
 	return ItemBox.Size(slot.itemKind, slot.itemId)
 end
 
+-- The lane kind a slot asks for. The plans are split between the two islands
+-- (the first half on the west one, the rest on the east one) so neither is a
+-- long thin shelf and the other nearly bare.
+local function laneKind(shop: string, slot: Slot, index: number): string
+	if slot.itemKind == "Machine" then
+		-- The belt kit and the Sky Bin are small fittings: they stand with the axes, and
+		-- the sawmills and planers (the big machines) have the other table, so the two
+		-- tables are about as long.
+		local machine = ItemCatalog.GetMachine(slot.itemId)
+		if machine ~= nil and (machine.belt ~= nil or slot.itemId == "SkyBin") then
+			return "Fitting"
+		end
+		return slot.itemKind
+	elseif slot.itemKind ~= "Blueprint" then
+		return slot.itemKind
+	end
+	local plans = 0
+	for _, other in ipairs(StoreStock.ForShop(shop)) do
+		if other.itemKind == "Blueprint" then
+			plans += 1
+		end
+	end
+	local before = 0
+	for i = 1, index - 1 do
+		if StoreStock.ForShop(shop)[i].itemKind == "Blueprint" then
+			before += 1
+		end
+	end
+	return if before < math.ceil(plans / 2) then "BlueprintW" else "BlueprintE"
+end
+
 local function itemsFor(shop: string): { ShelfLayout.Item }
 	local out: { ShelfLayout.Item } = {}
-	for _, slot in ipairs(StoreStock.ForShop(shop)) do
+	for index, slot in ipairs(StoreStock.ForShop(shop)) do
 		local size = StoreStock.BoxSizeOf(slot)
 		local count = countOf(slot)
 		table.insert(out, {
 			id = slot.slotId,
-			kind = slot.itemKind,
+			kind = laneKind(shop, slot, index),
 			w = size.X,
 			h = size.Y,
-			d = count * size.Z + (count - 1) * BoxSize.Gap,
+			d = count * size.Z + (count - 1) * BoxSize.RowGap,
 		})
 	end
 	return out

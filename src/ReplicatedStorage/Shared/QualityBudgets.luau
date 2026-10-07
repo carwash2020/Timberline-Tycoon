@@ -14,6 +14,12 @@
 --     rain, snow and ash; no sun rays or far blur; softer bloom; the
 --     sawmill blade and campfires animate only close by. Cosmetic loops
 --     run about twice a second (nearly off).
+--   * The player's own choice (Lower or Higher, Shared/QualityProfile) picks
+--     the tier, with the device's detection as its cap: Lower is always "low",
+--     Higher is the device's tier (a device that reports "low" gets "medium").
+--     The same budgets answer: low shows no item copies in shop box windows
+--     (BoxContents), lights in shops reach 60% as far (LightScale) and
+--     townsfolk animate only within NpcAnimateRange.
 --   * Both: the forest ring's filler trees (ForestFiller, FOR-02), real
 --     trees out to FillerNear and stand-in blocks out to FillerFar, built
 --     FillerBuildMs a frame at most (closer and cheaper on low).
@@ -55,6 +61,10 @@ export type Budget = {
 	-- canopy fade, filler builds, truck dust). 60 or more: every frame.
 	-- Lower: that many times a second. The loops read CosmeticDue.
 	CosmeticHz: number,
+	-- The shop boxes (Shared/BoxWindows) and the town
+	BoxContents: boolean, -- false: the player's client takes the item copy out of every shop box window
+	LightScale: number, -- multiplies the range of every light inside a shop (and turns shop light shadows off below 1)
+	NpcAnimateRange: number, -- studs: townsfolk and keepers animate within this (talking range is unchanged)
 }
 
 QualityBudgets.High = table.freeze({
@@ -85,6 +95,9 @@ QualityBudgets.High = table.freeze({
 	LeafPool = 64,
 	LeafShadows = true,
 	CosmeticHz = 60,
+	BoxContents = true,
+	LightScale = 1,
+	NpcAnimateRange = 120, -- NPCController ANIMATE_RANGE
 }) :: Budget
 
 -- PLAY-05's acceptance: on low, the workspace.AmbientLife folder holds 160
@@ -126,6 +139,9 @@ QualityBudgets.Low = table.freeze({
 	LeafPool = 32,
 	LeafShadows = false,
 	CosmeticHz = 2,
+	BoxContents = false, -- a flat accent-tinted window and the name strip instead of the item
+	LightScale = 0.6,
+	NpcAnimateRange = 70,
 }) :: Budget
 
 -- Between the two: high's world, cheaper motion. Graphics levels 5-7.
@@ -151,6 +167,9 @@ QualityBudgets.Medium = table.freeze({
 	LeafPool = 48,
 	LeafShadows = true,
 	CosmeticHz = 20,
+	BoxContents = true,
+	LightScale = 0.85,
+	NpcAnimateRange = 120,
 }) :: Budget
 
 -- The budget for a tier. Anything that isn't "low" or "medium" is "high".

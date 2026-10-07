@@ -550,7 +550,7 @@ WorldLayout.TownPaint = {
 -- a shop floor or hides its front (TER-02). The sawmill stands on the
 -- MillYard. TerrainGen paints these after TownPaint.
 WorldLayout.TownFloors = {
-	{ name = "ToolShedFloor", x0 = -102, x1 = -62, z0 = 88.5, z1 = 142.5, material = "Ground" },
+	{ name = "ToolShedFloor", x0 = -106.5, x1 = -62, z0 = 88.5, z1 = 142.5, material = "Ground" },
 	{ name = "HearthAndHomeFloor", x0 = -128, x1 = -72, z0 = 164, z1 = 212, material = "Ground" },
 	{ name = "DealershipFloor", x0 = 178, x1 = 338.5, z0 = 92, z1 = 164.5, material = "Ground" },
 	-- The sell station (pad x 39 to 67, z 95 to 127, Weigh House to x 83): the

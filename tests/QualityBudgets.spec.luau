@@ -33,6 +33,9 @@ return function(t)
 		"LeafPool",
 		"LeafShadows",
 		"CosmeticHz",
+		"BoxContents",
+		"LightScale",
+		"NpcAnimateRange",
 	}
 
 	t.test("high is today's look", function()
@@ -61,6 +64,10 @@ return function(t)
 			LeafPool = 64,
 			LeafShadows = true,
 			CosmeticHz = 60, -- cosmetic loops run every frame
+			-- The player's quality choice (QualityProfile): high shows every box's item, full light, NPCs as before.
+			BoxContents = true,
+			LightScale = 1,
+			NpcAnimateRange = 120, -- NPCController's ANIMATE_RANGE
 		})
 		t.eq(QualityBudgets.High.MaxCritters, EnvironmentData.MaxCritters, "the same cap the critter plan was made for")
 	end)
@@ -89,6 +96,10 @@ return function(t)
 			LeafPool = 32,
 			LeafShadows = false,
 			CosmeticHz = 2, -- cosmetic loops nearly off
+			-- The Lower choice: no item copies in shop box windows, shop lights reach 60%, townsfolk animate nearer.
+			BoxContents = false,
+			LightScale = 0.6,
+			NpcAnimateRange = 70,
 		})
 	end)
 
@@ -459,6 +470,8 @@ return function(t)
 			TownFX = { "TownFxNear" },
 			ForestFiller = { "FillerNear", "FillerFar", "FillerBuildMs", "TuftNear" },
 			WoodFX = { "ChipCount", "LeafPool", "LeafShadows" }, -- the v2 loop (M1.3)
+			QualityDressing = { "BoxContents", "LightScale" }, -- the shop boxes' windows and the shop lights (the Lower and Higher choice)
+			NPCController = { "NpcAnimateRange" },
 		}
 		local gone = {
 			AmbientLife = {

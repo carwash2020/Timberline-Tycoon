@@ -2,8 +2,9 @@
 -- SettingsUI: a round button left of the cash plaque (HUD.TopRow) opens a
 -- cream-and-wood card (HUD.Popup, under the corner, never over the plaque
 -- or Roblox's top-left menu). Music and sound effects have a mute and a
--- volume stepper; graphics, camera shake, UI scale and tips apply at once
--- and save (SaveSetting). Reset tutorial asks twice, then ResetTutorial.
+-- volume stepper; graphics (Lower or Higher quality, the same choice the join
+-- screen asks for: QualityPickerUI), camera shake, UI scale and tips apply at once
+-- and save (SaveSetting, and SetQuality for the graphics choice). Reset tutorial asks twice, then ResetTutorial.
 -- Visitors is the plot permission list, with a Visit button for each
 -- player in the server whose plot lets you in (PlotService.Visit checks it
 -- again). Leaderboard is the opt-in
@@ -20,6 +21,7 @@ local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local LeaderboardLogic = require(ReplicatedStorage.Shared.LeaderboardLogic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PermissionLogic = require(ReplicatedStorage.Shared.PermissionLogic)
+local QualityProfile = require(ReplicatedStorage.Shared.QualityProfile)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local SoundData = require(ReplicatedStorage.Shared.SoundData)
 local CameraShake = require(script.Parent.CameraShake)
@@ -42,7 +44,6 @@ local player = Players.LocalPlayer
 local C = UITheme.Colors
 local F = UITheme.Fonts
 
-local GRAPHICS = { "auto", "low", "medium", "high" }
 local SCALES = { "small", "normal", "large" }
 
 local function cycle(list: { string }, current: string): string
@@ -335,6 +336,11 @@ function SettingsUI.Start()
 		Net.Remote("SaveSetting"):FireServer(key, value)
 	end
 
+	-- What this device would pick (a touch-only screen: Lower; a console or a PC: Higher).
+	local function recommended(): QualityProfile.Choice
+		return QualityProfile.Recommended(Quality.TouchOnly(), player:GetAttribute("SettingGraphics"))
+	end
+
 	-- The board tab. Opting in or out is the same SaveSetting as the
 	-- others; the attribute (mirrored by the server) is what the tab reads.
 	boardPanel = LeaderboardUI.Build(scroll, 60, function(): boolean
@@ -348,7 +354,7 @@ function SettingsUI.Start()
 	LeaderboardUI.Listen(boardPanel)
 
 	local function applyAll()
-		Quality.SetOverride((player:GetAttribute("SettingGraphics") :: string?) or "auto")
+		Quality.Refresh()
 		local shake = player:GetAttribute("SettingCameraShake")
 		CameraShake.SetEnabled(shake ~= false)
 		local scaleName = (player:GetAttribute("SettingUIScale") :: string?) or "normal"
@@ -371,7 +377,7 @@ function SettingsUI.Start()
 		if type(sv) == "number" then
 			SoundData.SfxVolume = sv
 		end
-		graphicsFace.Text = "Graphics  " .. string.upper((player:GetAttribute("SettingGraphics") :: string?) or "auto")
+		graphicsFace.Text = QualityProfile.RowText(player:GetAttribute(SettingsLogic.QualityAttribute), recommended())
 		shakeFace.Text = if shake == false then "CAMERA SHAKE: OFF" else "CAMERA SHAKE: ON"
 		scaleFace.Text = "UI scale  " .. string.upper(scaleName)
 		tipsFace.Text = if tips == false then "TIPS: OFF" else "TIPS: ON"
@@ -407,11 +413,15 @@ function SettingsUI.Start()
 		save("sfxVolume", SoundData.SfxVolume)
 		applyAll()
 	end)
-	graphicsFace = row("graphics", "Graphics  AUTO", function()
-		local current = (player:GetAttribute("SettingGraphics") :: string?) or "auto"
-		local nextName = cycle(GRAPHICS, current)
-		Quality.SetOverride(nextName)
-		save("graphics", nextName)
+	-- Graphics: Lower / Higher. One press switches to the other and saves it
+	-- (SetQuality: validated and rate limited on the server); the world follows at once.
+	graphicsFace = row("graphics", "Graphics: Higher", function()
+		local current: QualityProfile.Choice =
+			QualityProfile.Resolve(player:GetAttribute(SettingsLogic.QualityAttribute), recommended())
+		local nextChoice = QualityProfile.Other(current)
+		player:SetAttribute(SettingsLogic.QualityAttribute, nextChoice) -- the server sets it too; this keeps the row snappy
+		Net.Remote("SetQuality"):FireServer(nextChoice)
+		Quality.Refresh()
 		applyAll()
 	end)
 	shakeFace = row("shake", "CAMERA SHAKE: ON", function()

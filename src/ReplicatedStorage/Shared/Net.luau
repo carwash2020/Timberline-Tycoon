@@ -35,6 +35,7 @@ Net.RemoteNames = {
 	"ClaimPlot", -- client -> server: (index) buy that homestead; the server checks the Land Office range, the pad and the price, then charges
 	"PlotPass", -- client -> server: () close the picker (a returning owner is given a free pad; a buyer gets nothing)
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
+	"SetQuality", -- client -> server: ("low" | "high") the Lower / Higher graphics choice, from the join screen or Settings (QualityService)
 	"ResetTutorial", -- client -> server: () start the tutorial over (QuestService)
 	"TutorialSeen", -- client -> server: ("build" | "land") the player opened the hammer's blueprint list or the Land panel (QuestService)
 	"Grab", -- client -> server: (part, hitPos) take hold of a loose piece of wood (v2 loop: GrabService)
