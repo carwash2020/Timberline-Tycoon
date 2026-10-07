@@ -2449,6 +2449,46 @@ Studio checks (nothing here has been seen in Studio)
 - [ ] **Text in walls**: stand inside the Tool Shed, Hearth and Home and the Dealership hall and watch the keeper: no half-hidden line in a wall or the ceiling (a bubble either shows whole, lower under the roof, or not at all); the name tag is above the hat, not in the roof. Walk round the outside of the shop: the keeper's name tag, bubble and the Talk card go when the wall is between you and them, and come back when it is not. A NPC at the counter next to a side wall: the bubble sits straight above the head
 - [ ] **Rabbits**: they are about the height of your hip next to your character, not a loaf. They hop, sit and nibble as before, with ears, tail and eyes in proportion; they flee when you get near (the same distance as before) and none appears on top of you. Winter hare too (snow biome)
 
+## The Sky Bin opens and places once; prices show when you aim (branch `claude/hover-prices-skybin`, 7 October 2026)
+
+Two decisions from Connor. **A, the Sky Bin:** "open and place", a one-time box exactly like the sawmills, planers and belts. **B, prices:** "not lose prices, just show prices when hovering over an item".
+
+What changed (A)
+- `ItemCatalog.Machines.SkyBin.placeFromBox = true`: buying hands over a box; opening it starts the placement ghost on your plot (WorldFX `PlaceBox`); placing spends the box (`PlotService.Place` takes the box uid, spends it only after every check passed); cancelling keeps the box. No stock, no hammer list entry. One bin per player (a second box is refused at the counter, one unopened box at a time) and one per plot (owner only), as before. A bin already in `sawmillStock` (an old save) still places from stock.
+- `profile.skyBinOwned` is set when the box is paid for and when the bin is placed, and cleared when the placed bin is sold; `SkyBinLogic.Owns/Exists` also count a bin box kept in `profile.storage`.
+- **Old saves** (`SkyBinLogic.Migrate`, idempotent): wood waiting or a flag with no bin anywhere hands over a **pending Sky Bin box in `profile.storage`** (free; falls back to the stock list if storage is full). A stocked or placed bin, or a kept box, is left alone: nothing lost, no free duplicate.
+- **Hammer:** the sheet is the mills': Move, Turn, **Sell +$200** (half of $400; the full $400 inside the one-minute undo window). "Take back" (`SkyBinLogic.BackInStockLine`, the Sky Bin branch of `PlotService.Sell`) is gone: no re-boxing.
+- **The wood inside:** selling the placed bin pays `profile.skyWood` out FIRST (`AetherService.PayOutBin`, the same sale as the "Sell Sky Bin" prompt, through `SellService.PayEntries`) and only then removes the bin. If the payout is impossible (the wallet has no room for the wood plus the sell-back, `SellService.CanPayEntries`, or the sale service is not running) the sale is refused with a toast and the bin and its wood stay. Only the plot's owner may sell the bin. The "Sell Sky Bin" prompt and the chute lock without a placed bin are unchanged.
+- `ShopService.deliver` keeps the old stock path for a Sky Bin only as the fallback (an owner gift or a full storage), guarded by `SkyBinLogic.Exists`.
+
+What changed (B)
+- **Nothing prints a price any more:** shelf box labels (`BoxArt` has no price line), the Tool Shed axe-rack plates, the General Store offer boards (names only), and, by Connor's follow-up, the **showroom price signs beside the vehicles** (the sign is now a name sign, `NameSign`; the vehicle boxes carry no price either). Keeper offers in the shop UI still show prices.
+- **The hover tag** (`Shared/HoverTag` rules, `HoverTagUI` client): everything that can be priced is marked (`HoverTag.Mark`: `HoverKind`, `HoverId`, `HoverShop`, `HoverName`, tag `HoverItem`). One small wood card with the name and the price in amber follows the item you aim at: **mouse** the item under the cursor; **gamepad** the item under the screen-centre aim within 12 studs; **touch** the item you last tapped for 4 seconds, else the nearest item within 6 studs in front of you. States: `Closed, opens ...` (the shop's hours), `You already own this` (gear, blueprints, the Sky Bin), `Out of stock` (a showroom vehicle whose box is off its plinth). Robux boxes show `R$` (the number once Roblox has said it). Only one tag exists at a time; a new target waits 0.08 s, a lost one lingers 0.3 s, pressing E / X or clicking on the item hides its tag for 1.5 s.
+- **The price shown is the real one:** `HoverTag.Price` is `StoreStock.UnitPrice` (the function the counter charges with; `ShopLogic.Price` for axes, vehicles and gear).
+- **Walls:** the tag is a depth-tested BillboardGui (never AlwaysOnTop); the aim tests the item's bounding box and then a real ray, so a wall in front of an item stops it from being targeted; a 4 Hz ray from the camera hides the tag when a wall is between (`TextAnchor.NextHidden`), and a low ceiling lowers it (`TextAnchor.Lift`). A tag on a box with a Buy / Open card sits 52 px higher so the two never overlap.
+- Specs: `tests/HoverTag.spec.luau` (target per device, text per state, one at a time, cooldown, the ray test), `tests/ShelfPrices.spec.luau` (no printed price on boxes, rack plates, offer boards, tables; the tag's price equals the real price for every shelf item), BoxArt, BoxService, DealershipLot, TownMesh. The stores preview scene no longer prints prices.
+- Left as it is: the price sign on a PLACED chop saw on your plot (`MachineArt` `PriceSign`). It is not a shop item; say if it should go too.
+
+### Studio checks (nothing here has been seen in Studio)
+Sky Bin
+- [ ] Tool Shed: buy the Sky Bin box ($400), pay at the counter, "Paid for the Sky Bin. Open the box." Buying a second one is refused
+- [ ] Open the box on your plot (E / X / tap): a placement ghost starts ("Place the Sky Bin on your plot: click to put it down, Q to cancel. The box is used up when you place it."); the box stays where it is
+- [ ] Cancel (Q / B): the box is still there and can be opened again. Put the ghost somewhere blocked: refused, the box is kept. Place it: the bin appears, the box folds away, no hammer stock, no charge
+- [ ] A second box (owner gift) placed on the same plot: "You already have a Sky Bin on your plot", box kept. A friend with build rights cannot place or sell it
+- [ ] Hammer on the bin: Move, Turn, Sell +$200 (no "Take back"). Sell it empty: $200 and it is gone, you can buy a new box
+- [ ] Fill it from a Cloud Chute, then hammer-Sell it: the wood is paid out first (the sale toast and the cash), then the bin goes and the $200 comes. Fill your wallet to the cap first: the sale is refused with a toast, the bin and wood are still there
+- [ ] Old save with wood in the bin and no bin (or `skyBinOwned` with none): on join a boxed Sky Bin is waiting (open it as above); join again: no second one. An old save with a bin in stock still places it from the hammer's list; one with a bin on the plot keeps it
+- [ ] The Cloud Chute with no placed bin: locked, "...Open its box and place it..." if you hold the box
+Hover tags (check on a PC, an Xbox pad and a phone)
+- [ ] Tool Shed: no price on any box label, none on the axe-rack plates (names only). Mouse over a shelf box: ONE card with its name and price; over a rack axe: its name and price; move to another box: the card moves, never two at once
+- [ ] The price on the card equals what the counter asks for that box (Steel Axe, a sawmill, the Sky Bin, a gold R$ box shows R$)
+- [ ] General Store: the four offer boards on the back wall name the item; aiming at a board or the sample under it shows the price. Gear/blueprint you own: "You already own this"
+- [ ] Dealership: the signs beside the vehicles show only names; aim at a vehicle, its plinth or its box: the card shows its price. Take a box off its plinth: aiming at the vehicle says "Out of stock" until the box comes back
+- [ ] Shop closed (set the clock outside its hours): the card says "Closed, opens ..." instead of a price
+- [ ] Walls: aim at a box from outside a shop through the wall or window frame: nothing; walk so a shelf or wall comes between the camera and a tag: it hides and returns without flicker; under the Tool Shed's low roof the card sits under the ceiling
+- [ ] Xbox: aim the centre dot at a box within about 12 studs: the card; look away: it goes after a moment. Press X on it (buy / open): it steps aside for a second and a half
+- [ ] Phone: tap a box: the card stays about 4 seconds; with no tap, walk up to a box (within 6 studs, facing it): its card; a box behind you or past a wall shows none
+- [ ] A Buy / Open prompt card on a box and its price card do not overlap
 ## LT2 ground and plot platforms (claude/lt2-ground, 7 October 2026)
 
 Connor, with Lumber Tycoon 2 screenshots: "I mean the actual ground, look at this with LT2, then for plots make it normal grass with a raised dark grey platform for players to build on, very slightly raised like 1 stud." Nothing here has been seen in Studio; the Lune preview (`bash tools/preview/shoot.sh plot`, `terrain`, `town`) shows colours and shapes only, not terrain textures.

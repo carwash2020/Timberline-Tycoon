@@ -27,7 +27,7 @@ local ItemCatalog = require(script.Parent.Parent.ItemCatalog)
 local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
 local ShopHoursLogic = require(script.Parent.Parent.ShopHoursLogic)
 local StoreStock = require(script.Parent.Parent.StoreStock)
-local Util = require(script.Parent.Parent.Util)
+local HoverTag = require(script.Parent.Parent.HoverTag)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
 local DealershipLot = require(script.Parent.DealershipLot)
@@ -1525,8 +1525,10 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	register(model, CF(2.2, FLOOR + 3.3, counterZ + 0.2))
 	ledger(model, CF(-2.2, FLOOR + 3.3, counterZ - 0.1))
 
-	-- Prices hang on the back wall, facing the door, each above a sample
-	-- of that item on the ledge. Wide enough to read from the entrance.
+	-- Name boards hang on the back wall, facing the door, each above a sample
+	-- of that item on the ledge. No price is printed: aiming at a board or its
+	-- sample shows the item's price in a tag (Shared/HoverTag).
+	local shown: { BasePart } = {}
 	local function sample(x: number, y: number, z: number, kind: string)
 		local top = y + 0.16
 		local function show(size: Vector3, cf: CFrame, color: Color3, surface: Enum.Material)
@@ -1534,6 +1536,7 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 			p.CanCollide = false
 			p.CanQuery = false
 			p.CanTouch = false
+			table.insert(shown, p)
 		end
 		if kind == "fence" then
 			show(V3(0.35, 1.2, 0.35), CF(x - 0.5, top + 0.6, z), wood, MAT.Wood)
@@ -1551,19 +1554,15 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	end
 	local ledge = Kit.part(model, "Ledge", V3(30, 0.22, 1.5), CF(0, 3.35, HZ - 1.45), wood, MAT.Wood)
 	ledge.CanQuery = false
-	local function offerText(kind: string, itemId: string): string
+	local function offerName(kind: string, itemId: string): string
 		local slot = StoreStock.Find(kind, itemId)
-		if slot == nil then
-			return string.upper(itemId)
-		end
-		local price = StoreStock.UnitPrice(kind, itemId, slot.limited, 2)
-		return string.upper(slot.displayName) .. "\n" .. (if price then Util.formatCash(price) else "")
+		return string.upper(if slot then slot.displayName else itemId)
 	end
 	local offers = {
-		{ x = -11.4, label = offerText("Blueprint", "WoodSign"), kind = "fence" },
-		{ x = -3.8, label = offerText("Blueprint", "Shed"), kind = "shed" },
-		{ x = 3.8, label = offerText("Gear", "Lantern"), kind = "lantern" },
-		{ x = 11.4, label = offerText("Gear", "Flashlight"), kind = "axe" },
+		{ x = -11.4, kind = "fence", item = "Blueprint", id = "WoodSign" },
+		{ x = -3.8, kind = "shed", item = "Blueprint", id = "Shed" },
+		{ x = 3.8, kind = "lantern", item = "Gear", id = "Lantern" },
+		{ x = 11.4, kind = "axe", item = "Gear", id = "Flashlight" },
 	}
 	for _, offer in ipairs(offers) do
 		local board =
@@ -1571,8 +1570,25 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 		board.CanCollide = false
 		board.CanQuery = false
 		board.CanTouch = false
-		Kit.signText(board, offer.label, TRIM, { Enum.NormalId.Front, Enum.NormalId.Back })
+		Kit.signText(board, offerName(offer.item, offer.id), TRIM, { Enum.NormalId.Front, Enum.NormalId.Back })
+		table.clear(shown)
 		sample(offer.x, 3.35, HZ - 1.65, offer.kind)
+		-- The board and its sample are one item for the hover tag, which sits
+		-- over the board.
+		local slot = StoreStock.Find(offer.item, offer.id)
+		local hover: HoverTag.Spec = {
+			key = "Offer:" .. offer.item .. ":" .. offer.id,
+			name = if slot then slot.displayName else offer.id,
+			kind = offer.item,
+			itemId = offer.id,
+			shop = "HearthAndHome",
+			limited = slot ~= nil and slot.limited,
+		}
+		for _, part in ipairs(shown) do
+			HoverTag.Mark(part, hover)
+		end
+		hover.anchor = true
+		HoverTag.Mark(board, hover)
 	end
 end
 

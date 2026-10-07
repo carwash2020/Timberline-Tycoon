@@ -1305,6 +1305,10 @@ function PlotService.Place(
 	end
 	table.insert(profile.plot.placed, item)
 	placedAt[item.uid] = os.clock()
+	if SkyBinLogic.IsBin(bp.id) then
+		profile.skyBinOwned = true -- one per player, whichever way it came out
+		owner:SetAttribute("SkyBinOwned", true)
+	end
 	buildItem(slot, owner, item)
 	if fromStock or fromBox then
 		notify(player, string.format("Placed your %s.", bp.displayName))
@@ -1412,6 +1416,16 @@ local function givePlanks(player: Player, slot: Slot, item: PlotLogic.Placed, un
 	return spawned ~= nil
 end
 
+-- Pays out a Sky Bin's wood before the bin is sold: true when the bin is
+-- empty or its wood was paid in full (AetherService.PayOutBin; the wallet must
+-- have room for it plus `extra`). A spec swaps it.
+PlotService.SkyBinPayout = function(owner: Player, extra: number): boolean
+	local ok, aether = pcall(function(): any
+		return require(script.Parent.AetherService)
+	end)
+	return ok and aether ~= nil and aether.PayOutBin(owner, extra) == true
+end
+
 function PlotService.Sell(player: Player, uid: unknown)
 	if type(uid) ~= "string" or not RateLimiter.Allow(player, "SellPlaced") then
 		return
@@ -1428,21 +1442,9 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if not item or not bp then
 		return
 	end
-	if SkyBinLogic.IsBin(item.blueprintId) then
-		-- Taking the bin back: it returns to stock, no cash either way. What is
-		-- in it stays in the save (profile.skyWood) and waits for the next placing.
-		if type(profile.sawmillStock) ~= "table" then
-			profile.sawmillStock = {}
-		end
-		table.insert(profile.sawmillStock, item.blueprintId)
-		table.remove(profile.plot.placed, index)
-		placedAt[item.uid] = nil
-		local binModel = slot.items:FindFirstChild(item.uid)
-		if binModel then
-			binModel:Destroy()
-		end
-		owner:SetAttribute("SawmillStock", SawmillLogic.EncodeStock(profile.sawmillStock))
-		notify(player, SkyBinLogic.BackInStockLine)
+	local isBin = SkyBinLogic.IsBin(item.blueprintId)
+	if isBin and player ~= owner then
+		notify(player, SkyBinLogic.OnlyOwnerSellLine)
 		return
 	end
 	local refund, planks, woodId = sellPlan(item, bp)
@@ -1458,6 +1460,17 @@ function PlotService.Sell(player: Player, uid: unknown)
 	if planks > 0 and not givePlanks(owner, slot, item, planks, woodId) then
 		notify(player, "Those planks had nowhere to go. Try again in a moment.")
 		return
+	end
+	if isBin then
+		-- The wood inside is paid out first (the "Sell Sky Bin" sale) and only
+		-- then is the bin removed. If the wood can't be paid in full the bin
+		-- stays and nothing is lost.
+		if not PlotService.SkyBinPayout(owner, refund) then
+			notify(player, SkyBinLogic.WoodStaysLine)
+			return
+		end
+		profile.skyBinOwned = false -- gone for good: no re-boxing, no free copy at the next load
+		owner:SetAttribute("SkyBinOwned", false)
 	end
 	table.remove(profile.plot.placed, index)
 	placedAt[item.uid] = nil

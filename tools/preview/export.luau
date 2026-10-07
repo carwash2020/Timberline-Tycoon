@@ -214,7 +214,7 @@ local function export(name: string, def)
 		elseif inst:IsA("SurfaceGui") or inst:IsA("BillboardGui") then
 			local part = inst.Parent
 			local label = inst:FindFirstChildWhichIsA("TextLabel", true)
-			-- A gui with several text lines (a box label's name, then its price)
+			-- A gui with several text lines
 			-- previews as one block, top line first.
 			local text = if label then label.Text else ""
 			if label then

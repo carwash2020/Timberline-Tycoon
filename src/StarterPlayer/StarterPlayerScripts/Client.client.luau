@@ -45,6 +45,7 @@ local MODULES = {
 	"GondolaController",
 	"HUD",
 	"HammerController",
+	"HoverTagUI",
 	"HudLayout",
 	"HudNav",
 	"HudRules",
@@ -275,6 +276,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "StoreUI",
 		get = function()
 			return require(script.Parent.StoreUI)
+		end,
+	},
+	{
+		name = "HoverTagUI",
+		get = function()
+			return require(script.Parent.HoverTagUI)
 		end,
 	},
 	{

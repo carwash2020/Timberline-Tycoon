@@ -225,8 +225,8 @@ function PlotLogic.SellPlan(bp: Blueprint, item: Placed): SellPlan
 		local basis = item.paid or PlotData.LegacyPrice(bp)
 		return { cash = math.floor(basis * PlotData.SellBack), planks = 0, wood = nil }
 	end
-	if bp.unlock or SkyBinLogic.IsBin(bp.id) then
-		return { cash = 0, planks = 0, wood = nil } -- a Sky Bin goes back to stock, never for cash
+	if bp.unlock then
+		return { cash = 0, planks = 0, wood = nil }
 	end
 	return { cash = math.floor(bp.priceCash * PlotData.SellBack), planks = 0, wood = nil }
 end
@@ -723,7 +723,7 @@ end
 
 -- What selling a placed item pays back.
 function PlotLogic.SellValue(bp: Blueprint): number
-	if bp.unlock or SkyBinLogic.IsBin(bp.id) then
+	if bp.unlock then
 		return 0 -- copies of a store unlock don't pay cash back
 	end
 	return math.floor(bp.priceCash * PlotData.SellBack)

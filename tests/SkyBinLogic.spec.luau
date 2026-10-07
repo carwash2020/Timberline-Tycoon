@@ -11,6 +11,10 @@ return function(t)
 	local ShopLogic = t.shared("ShopLogic")
 	local BoxUnpack = t.shared("BoxUnpack")
 	local HammerLogic = t.shared("HammerLogic")
+	local AutomationLogic = t.shared("AutomationLogic")
+	local function uid()
+		return "box-1"
+	end
 
 	local PLACED = { { uid = "a", blueprintId = "Chair" }, { uid = "b", blueprintId = "SkyBin" } }
 
@@ -99,45 +103,44 @@ return function(t)
 		t.eq(BoxUnpack.OneAtATime("Machine", "SkyBin"), true)
 		t.eq(BoxUnpack.OneAtATime("Machine", "ChopSaw"), false)
 		t.eq(BoxUnpack.OneAtATime("Machine"), false)
-		t.eq(BoxUnpack.Mode("Machine"), "stock", "opening the box puts it in your stock")
+		t.eq(BoxUnpack.Mode("Machine"), "stock")
+		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "place", "open the box and place it, once")
+		t.eq(AutomationLogic.PlacedFromBox("SkyBin"), true)
 	end)
 
-	t.test("the hammer's sheet calls it Take back, and it never pays cash", function()
+	t.test("the hammer's sheet is the mills': move, turn, sell back for half (no re-boxing)", function()
 		local bp = PlotLogic.Blueprint("SkyBin")
 		local item = { uid = "x", blueprintId = "SkyBin", x = 0, z = 0, rot = 0 }
-		t.eq(PlotLogic.SellPlan(bp, item), { cash = 0, planks = 0, wood = nil })
-		t.eq(PlotLogic.SellValue(bp), 0)
+		t.eq(PlotLogic.SellPlan(bp, item), { cash = 200, planks = 0, wood = nil })
+		t.eq(PlotLogic.SellValue(bp), 200)
 		local sheet = HammerLogic.PieceActions(bp, item)
+		t.eq(sheet[1].id, "move")
+		t.eq(sheet[1].enabled, true)
+		t.eq(sheet[2].id, "turn")
 		t.eq(sheet[3].id, "sell")
-		t.eq(sheet[3].label, "Take back")
-		-- The chop saw still sells for half.
-		local saw = PlotLogic.Blueprint("ChopSaw")
-		t.ok(
-			string.find(
-				HammerLogic.PieceActions(saw, { uid = "y", blueprintId = "ChopSaw" })[3].label,
-				"Sell +",
-				1,
-				true
-			) ~= nil
-		)
+		t.eq(sheet[3].label, "Sell +$200")
+		t.eq(Logic.BackInStockLine, nil, "no 'take back' any more")
 	end)
 
 	t.test("Migrate: wood waiting in a bin that is no longer a place gives the owner a bin", function()
 		-- v2 save: wood in the bin, no bin item.
 		local data = { skyWood = { { w = "oak", v = 5 } }, sawmillStock = {}, plot = { placed = {} } }
-		t.eq(Logic.Migrate(data), "granted")
+		t.eq(Logic.Migrate(data, uid), "granted")
 		t.eq(data.skyBinOwned, true)
-		t.eq(data.sawmillStock, { "SkyBin" }, "a free bin, to place with the hammer")
+		t.eq(data.sawmillStock, {}, "not the stock list")
+		t.eq(#data.storage, 1, "a boxed bin, free, to open and place")
+		t.eq(data.storage[1].itemId, "SkyBin")
+		t.eq(data.storage[1].pending, true)
 		t.eq(data.skyWood, { { w = "oak", v = 5 } }, "the wood is untouched, nothing is paid out")
 		-- Idempotent: again changes nothing, and never a second bin.
-		local before = { skyBinOwned = true, sawmillStock = { "SkyBin" } }
-		t.eq(Logic.Migrate(data), nil)
-		t.eq(data.sawmillStock, { "SkyBin" })
-		t.eq(before.skyBinOwned, data.skyBinOwned)
+		t.eq(Logic.Migrate(data, uid), nil)
+		t.eq(#data.storage, 1, "the box in storage counts: never a second")
+		t.eq(data.sawmillStock, {})
 		-- Once placed it stays one bin.
-		data.sawmillStock = {}
+		data.storage = {}
 		data.plot.placed = { { uid = "b", blueprintId = "SkyBin" } }
-		t.eq(Logic.Migrate(data), nil)
+		t.eq(Logic.Migrate(data, uid), nil)
+		t.eq(data.storage, {})
 		t.eq(data.sawmillStock, {})
 	end)
 
@@ -156,13 +159,23 @@ return function(t)
 		"Migrate: an owner whose bin is nowhere (a wiped plot) is given one back; a bin on the plot counts",
 		function()
 			local lost = { skyBinOwned = true, sawmillStock = {}, plot = { placed = {} } }
-			t.eq(Logic.Migrate(lost), "granted")
-			t.eq(lost.sawmillStock, { "SkyBin" })
+			t.eq(Logic.Migrate(lost, uid), "granted")
+			t.eq(lost.storage, { { uid = "box-1", itemId = "SkyBin", shop = "ToolShed", pending = true } })
+			t.eq(lost.sawmillStock, {})
+			-- Storage full (or no uid minted): the stock list still places, nothing is lost.
+			local full = { skyBinOwned = true, sawmillStock = {}, storage = { 1, 2 }, plot = { placed = {} } }
+			t.eq(Logic.Migrate(full, uid, 2), "granted")
+			t.eq(full.sawmillStock, { "SkyBin" })
+			t.eq(#full.storage, 2)
+			local bare2 = { skyBinOwned = true, plot = { placed = {} } }
+			t.eq(Logic.Migrate(bare2), "granted")
+			t.eq(bare2.sawmillStock, { "SkyBin" })
 			local placed = { sawmillStock = {}, plot = { placed = PLACED } }
 			t.eq(Logic.Migrate(placed), nil)
 			t.eq(placed.skyBinOwned, true, "a bin on the plot means an owner")
 			local stocked = { sawmillStock = { "SkyBin" }, plot = { placed = {} } }
-			t.eq(Logic.Migrate(stocked), nil)
+			t.eq(Logic.Migrate(stocked, uid), nil)
+			t.eq(stocked.storage, nil, "an old stocked bin keeps working: nothing added")
 			t.eq(stocked.skyBinOwned, true)
 		end
 	)

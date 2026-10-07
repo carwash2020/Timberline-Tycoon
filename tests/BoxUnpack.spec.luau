@@ -11,13 +11,14 @@ return function(t)
 		for _, kind in ipairs({ "Machine", "Blueprint" }) do
 			t.eq(BoxUnpack.Mode(kind), "stock", kind)
 		end
+		t.eq(BoxUnpack.OneAtATime("Machine", "SkyBin"), true, "one Sky Bin box at a time")
 		-- Sawmills, planers and belts open into a one-time placement ghost instead.
 		t.eq(BoxUnpack.Mode("Sawmill"), "place")
 		t.eq(BoxUnpack.Mode("Sawmill", "Millmaster100"), "place")
 		t.eq(BoxUnpack.Mode("Machine", "PlanerSteam"), "place")
 		t.eq(BoxUnpack.Mode("Machine", "ConveyorFunnel"), "place")
-		t.eq(BoxUnpack.Mode("Machine", "ChopSaw"), "stock", "the chop saw and the Sky Bin keep the hammer flow")
-		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "stock")
+		t.eq(BoxUnpack.Mode("Machine", "ChopSaw"), "stock", "the chop saw keeps the hammer flow")
+		t.eq(BoxUnpack.Mode("Machine", "SkyBin"), "place", "the Sky Bin is open-and-place, once")
 		t.eq(BoxUnpack.Mode("Machine", "Nope"), "stock")
 		t.ok(string.find(BoxUnpack.OpenedLine("place", "Steam Planer"), "box is used up", 1, true) ~= nil)
 		t.ok(

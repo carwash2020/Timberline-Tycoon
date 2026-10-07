@@ -17,7 +17,7 @@ local RobuxShelf = require(script.Parent.Parent.RobuxShelf)
 local ShelfLayout = require(script.Parent.Parent.ShelfLayout)
 local ShowroomLight = require(script.Parent.Parent.ShowroomLight)
 local StoreStock = require(script.Parent.Parent.StoreStock)
-local Util = require(script.Parent.Parent.Util)
+local HoverTag = require(script.Parent.Parent.HoverTag)
 
 local ShopInterior = {}
 
@@ -413,7 +413,8 @@ end
 -- The axe rack on the back wall: every axe the shop sells (ItemCatalog's
 -- ladder, in order), each its real AxeArt model (the part-built or mesh art the
 -- held tools use; AxeArt falls back to parts if a mesh fails), hung head up on a
--- plank rack, with a name and one price plate under it.
+-- plank rack, with a name plate under it. The price is not printed: aiming at
+-- an axe shows it in a tag (Shared/HoverTag).
 local function axeRack(model: Model, frame: Frame)
 	local axes: { ItemCatalog.AxeDef } = {}
 	for _, axe in ipairs(ItemCatalog.AxeLadder()) do
@@ -452,10 +453,19 @@ local function axeRack(model: Model, frame: Frame)
 		end
 		art.Parent = model
 		dBox(model, "AxePeg", V3(0.5, 0.3, 0.5), CF(x, 8.15, wallZ - 0.75), IRON, MAT.Metal)
-		local price = StoreStock.UnitPrice("Axe", axe.id, false, 2)
 		local plate = dBox(model, "AxePlate", V3(2.8, 1.5, 0.15), CF(x, 7.1, wallZ - 0.5), PAPER, MAT.SmoothPlastic)
-		local label = axe.displayName .. "\n" .. (if price and price > 0 then Util.formatCash(price) else "FREE")
-		Kit.signText(plate, label, TIMBER, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+		Kit.signText(plate, axe.displayName, TIMBER, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+		-- The axe and its plate tag as one item: the tag sits over the axe.
+		local hover: HoverTag.Spec = {
+			key = "Rack:" .. axe.id,
+			name = axe.displayName,
+			kind = "Axe",
+			itemId = axe.id,
+			shop = "ToolShed",
+		}
+		HoverTag.Mark(plate, hover)
+		hover.anchor = true
+		HoverTag.Mark(art, hover)
 	end
 end
 
@@ -464,7 +474,7 @@ local function toolShed(model: Model, frame: Frame)
 	laneFurniture(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
 	-- The Robux table: the same table as the cash shelves with a gold top, along
 	-- the back wall behind the counter and its keeper. Its boxes are the gold
-	-- boxes, one label each (name and price).
+	-- boxes, one label each (its name; the R$ price shows when you aim).
 	local entries = RobuxShelf.List()
 	if #entries > 0 then
 		local width = RobuxShelf.RowWidth()

@@ -7,18 +7,14 @@
 --   Box        the body (BoxService makes it: kraft, or gold for a Robux box)
 --   Tape       a band over the top and down the front and back, in the
 --              item's own colour, so a box reads at a distance
---   Label      a cream paper panel on the front with the item's name and,
---              under it, its PRICE (the one price of a shop box: no
---              billboard, no plaque on the shelf; vehicles show theirs on
---              the showroom's price sign instead)
+--   Label      a cream paper panel on the front with the item's name. No
+--              price is printed on a box: the price shows in a tag when you
+--              aim at the box (Shared/HoverTag, the client's HoverTagUI)
 --   Stripe     a band across the top of the label in the category colour
 --   Trim       a dark rim round the foot (the corner and edge trim)
---   SideLabel  the name again on the side that faces the aisle (optional,
---              never a second price)
+--   SideLabel  the name again on the side that faces the aisle (optional)
 -- Everything but the body is Kit.decor (no collision, no queries) welded to
--- the body, so a carried box moves as one. Front faces -Z. The price is
--- world-space text on the label, so it can never overlap a neighbour's the
--- way a screen-space tag does, and it moves with the box.
+-- the body, so a carried box moves as one. Front faces -Z.
 
 local Kit = require(script.Parent.Kit)
 
@@ -30,7 +26,6 @@ export type Spec = {
 	color: Color3, -- the item's colour, for the tape
 	gold: boolean?, -- a Robux box: gold body and gold trim
 	side: string?, -- "Left" | "Right": which side also gets a label (the aisle side)
-	price: string?, -- the price line under the name on the front label (nil: none)
 }
 
 BoxArt.Kraft = Color3.fromRGB(200, 160, 107)
@@ -60,11 +55,8 @@ BoxArt.Layout = {
 	tapeWidth = 0.16, -- of W
 	tapeProud = 0.04, -- studs the tape stands off the body
 	labelW = 0.64, -- of W (or D on a side)
-	labelH = 0.42, -- of H (a label with no price)
+	labelH = 0.42, -- of H
 	labelY = -0.08, -- of H, from the middle
-	pricedLabelH = 0.56, -- of H, when the label also carries the price
-	pricedLabelY = -0.12, -- of H, from the middle
-	priceShare = 0.4, -- of the priced label's height: the price line
 	labelThick = 0.06, -- studs
 	stripeH = 0.1, -- of H
 	trimH = 0.1, -- of H
@@ -96,7 +88,7 @@ local function plate(
 	return p
 end
 
-local function writeName(part: BasePart, face: Enum.NormalId, text: string, ink: Color3, price: string?)
+local function writeName(part: BasePart, face: Enum.NormalId, text: string, ink: Color3)
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = "NameMark"
 	gui.Face = face
@@ -104,11 +96,10 @@ local function writeName(part: BasePart, face: Enum.NormalId, text: string, ink:
 	gui.PixelsPerStud = BoxArt.Layout.pixelsPerStud
 	gui.LightInfluence = 0.6
 	gui.Parent = part
-	local share = if price ~= nil then 1 - BoxArt.Layout.priceShare else 1
 	local label = Instance.new("TextLabel")
 	label.Name = "Name"
 	label.BackgroundTransparency = 1
-	label.Size = UDim2.fromScale(1, share)
+	label.Size = UDim2.fromScale(1, 1)
 	label.Font = Enum.Font.FredokaOne
 	label.Text = text
 	label.TextScaled = true
@@ -121,27 +112,6 @@ local function writeName(part: BasePart, face: Enum.NormalId, text: string, ink:
 	pad.PaddingTop = UDim.new(0.06, 0)
 	pad.PaddingBottom = UDim.new(0.06, 0)
 	pad.Parent = label
-	if price ~= nil then
-		-- The price: the box's one price, on its own line under the name.
-		local line = Instance.new("TextLabel")
-		line.Name = "Price"
-		line.BackgroundTransparency = 1
-		line.Position = UDim2.fromScale(0, share)
-		line.Size = UDim2.fromScale(1, 1 - share)
-		line.Font = Enum.Font.GothamBlack
-		line.Text = price
-		line.TextScaled = true
-		line.TextWrapped = false
-		line.TextTruncate = Enum.TextTruncate.None
-		line.TextColor3 = ink
-		line.Parent = gui
-		local linePad = Instance.new("UIPadding")
-		linePad.PaddingLeft = UDim.new(0.05, 0)
-		linePad.PaddingRight = UDim.new(0.05, 0)
-		linePad.PaddingTop = UDim.new(0.04, 0)
-		linePad.PaddingBottom = UDim.new(0.1, 0)
-		linePad.Parent = line
-	end
 end
 
 -- Dresses `body` (a Part whose size is the box) in the packaging. Returns
@@ -169,10 +139,9 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { Part }
 	)
 	table.insert(added, tape)
 
-	local priced = spec.price ~= nil
 	local labelW = size.X * L.labelW
-	local labelH = size.Y * (if priced then L.pricedLabelH else L.labelH)
-	local labelY = size.Y * (if priced then L.pricedLabelY else L.labelY)
+	local labelH = size.Y * L.labelH
+	local labelY = size.Y * L.labelY
 	local frontZ = -(size.Z / 2 + L.tapeProud + L.labelThick / 2)
 	local label = plate(
 		parent,
@@ -183,7 +152,7 @@ function BoxArt.Dress(parent: Instance, body: BasePart, spec: Spec): { Part }
 		BoxArt.Paper,
 		Enum.Material.SmoothPlastic
 	)
-	writeName(label, Enum.NormalId.Front, spec.name, ink, spec.price)
+	writeName(label, Enum.NormalId.Front, spec.name, ink)
 	table.insert(added, label)
 
 	local stripeH = size.Y * L.stripeH
