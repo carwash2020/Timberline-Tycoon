@@ -79,6 +79,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local HintLogic = require(ReplicatedStorage.Shared.HintLogic)
+local LoadStages = require(ReplicatedStorage.Shared.LoadStages)
 local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNavLogic = require(ReplicatedStorage.Shared.GamepadNavLogic)
 local NoticePolicy = require(ReplicatedStorage.Shared.NoticePolicy)
@@ -206,6 +207,7 @@ local padBound = false -- whether they're bound right now (not while a menu has 
 
 local loadingCard: Frame? = nil
 local loadingLabel: TextLabel? = nil
+local loadingFill: Frame? = nil -- the loading card's bar (Shared/LoadStages)
 local shownPrompts: { [ProximityPrompt]: boolean } = {}
 
 ---------------------------------------------------------------------------
@@ -1927,10 +1929,21 @@ local function refreshLoading()
 		return
 	end
 	local remotes = ReplicatedStorage:FindFirstChild("Remotes") ~= nil
-	local text = HudRules.LoadingText(remotes, player:GetAttribute("ProfileLoaded"))
+	local loaded = player:GetAttribute("ProfileLoaded")
+	local text = HudRules.LoadingText(remotes, loaded)
 	card.Visible = text ~= nil
-	if text and label.Text ~= text then
-		label.Text = text
+	if text then
+		-- The server's milestone (LoadStage) drives the line and the bar, so
+		-- the wait reads as progress ("Shaping the land... 40%"), not a freeze.
+		local fill, stageText = LoadStages.Describe(workspace:GetAttribute("LoadStage"), remotes, loaded)
+		local shown = string.format("%s %s", stageText or text, LoadStages.Percent(fill))
+		if label.Text ~= shown then
+			label.Text = shown
+		end
+		local bar = loadingFill
+		if bar then
+			bar.Size = UDim2.fromScale(math.min(1, math.max(0, fill)), 1)
+		end
 	end
 end
 
@@ -1943,9 +1956,26 @@ local function buildLoading(gui: ScreenGui)
 	local label = UITheme.label(card.face, "", F.Heading, 24, C.Cream)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
+	-- The progress bar under the line: a dark track and a cream fill.
+	local track = Instance.new("Frame")
+	track.Name = "LoadBar"
+	track.Position = UDim2.new(0, 0, 1, 4) -- right under the line, in the card's bottom padding
+	track.Size = UDim2.new(1, 0, 0, 6)
+	track.BackgroundColor3 = C.Ink
+	track.BackgroundTransparency = 0.4
+	track.BorderSizePixel = 0
+	track.Parent = label
+	local fillBar = Instance.new("Frame")
+	fillBar.Name = "Fill"
+	fillBar.Size = UDim2.fromScale(0, 1)
+	fillBar.BackgroundColor3 = C.Cream
+	fillBar.BorderSizePixel = 0
+	fillBar.Parent = track
+	loadingFill = fillBar
 	card.outer.Parent = gui
 	loadingCard, loadingLabel = card.outer, label
 	player:GetAttributeChangedSignal("ProfileLoaded"):Connect(refreshLoading)
+	workspace:GetAttributeChangedSignal("LoadStage"):Connect(refreshLoading)
 	refreshLoading()
 end
 
@@ -2027,20 +2057,25 @@ function HUD.Start()
 	player:GetAttributeChangedSignal("Cash"):Connect(function()
 		setCash((player:GetAttribute("Cash") :: number?) or 0)
 	end)
-	-- Last, as it can take the whole world build: the card says so meanwhile.
-	-- (Client.client starts the other controllers once this returns, so
-	-- theirs are there too by then.)
-	waitForRemotes()
-	-- MapBuilder published the core loop before the server made its
-	-- remotes: the v2 loop's chip and hint sources start now, if it's v2
-	-- (or whenever the attribute lands, should it come late).
-	workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(watchV2)
-	watchV2()
-	Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
-	Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown, seconds: unknown)
-		if type(message) == "string" then
-			HUD.Toast(message, if type(seconds) == "number" then seconds else nil)
-		end
+	-- Last, in its own thread: the server's remotes can take the whole world
+	-- build (35 s on a new server in Studio, 7 October 2026), and Start
+	-- returning at once lets Client.client start every other controller now
+	-- instead of after that wait. The card's bar and line (LoadStages) say
+	-- what the server is doing meanwhile; the controllers that need a remote
+	-- wait for it themselves (Net.Remote).
+	task.spawn(function()
+		waitForRemotes()
+		-- MapBuilder published the core loop before the server made its
+		-- remotes: the v2 loop's chip and hint sources start now, if it's v2
+		-- (or whenever the attribute lands, should it come late).
+		workspace:GetAttributeChangedSignal(CoreLoop.ActiveAttribute):Connect(watchV2)
+		watchV2()
+		Net.Remote("CashChanged").OnClientEvent:Connect(setCash)
+		Net.Remote("Notify").OnClientEvent:Connect(function(message: unknown, seconds: unknown)
+			if type(message) == "string" then
+				HUD.Toast(message, if type(seconds) == "number" then seconds else nil)
+			end
+		end)
 	end)
 end
 

@@ -58,6 +58,24 @@ return function(t)
 				assert(key == "CharacterAutoLoads", "unexpected Players." .. tostring(key))
 				s.autoLoads = value
 				table.insert(s.order, { autoLoads = value, sellAreaIn = sellAreaIn() })
+				-- What stood when everyone was let in (the deferred build comes after).
+				if value == true then
+					local map = ws:FindFirstChild("TimberlineMap")
+					local function count(name)
+						local folder = map and map:FindFirstChild(name)
+						return if folder then #folder:GetChildren() else 0
+					end
+					s.atReady = {
+						boulders = count("Boulders"),
+						scenery = count("Scenery"),
+						greenery = count("TownGreenery"),
+						pointsOfInterest = count("PointsOfInterest"),
+						backdrop = if map and map:FindFirstChild("Backdrop") then 1 else 0,
+						shops = if map and map:FindFirstChild("ToolShed") then 1 else 0,
+						stations = if map and map:FindFirstChild("GondolaTop") then 1 else 0,
+						parking = if map and map:FindFirstChild("ParkingSlot_1") then 1 else 0,
+					}
+				end
 			end,
 		})
 
@@ -199,6 +217,17 @@ return function(t)
 		return n
 	end
 
+	-- The deferred build makes scenery pieces and boulder clusters nearest the
+	-- players first, so a folder's children are not in plan order: each model
+	-- carries its PlanIndex.
+	local function inPlanOrder(folder)
+		local models = folder:GetChildren()
+		table.sort(models, function(a, b)
+			return a:GetAttribute("PlanIndex") < b:GetAttribute("PlanIndex")
+		end)
+		return models
+	end
+
 	local function builtLine(s)
 		for _, line in ipairs(s.prints) do
 			if string.find(line, "World built", 1, true) then
@@ -246,6 +275,44 @@ return function(t)
 		t.ok(spawn.CFrame.UpVector.Y > 0.99999, "the spawn pad lies flat")
 		t.ok(spawn.Size == roblox.Vector3.new(6, 1, 6), "the spawn pad stays 6 x 1 x 6")
 		t.eq(spawn.Neutral, true)
+	end)
+
+	t.test("LOAD-02: at the moment everyone is let in only the essentials stand; the decor follows", function()
+		local s = build({ sky = true })
+		-- What a player needs to stand and play was built first.
+		t.eq(s.atReady.shops, 1, "the shops")
+		t.eq(s.atReady.parking, 1, "the parking lot (VehicleService reads its slots)")
+		t.eq(s.atReady.stations, 1, "the gondola stations GondolaService waits for")
+		-- Everything else is a deferred step, built after SellArea.
+		t.eq(s.atReady.boulders, 0, "no boulders yet")
+		t.eq(s.atReady.scenery, 0, "no scenery yet")
+		t.eq(s.atReady.greenery, 0, "no greenery yet")
+		t.eq(s.atReady.pointsOfInterest, 0, "no points of interest yet")
+		t.eq(s.atReady.backdrop, 0, "no backdrop yet")
+		-- ...and all of it is there once the queue has run.
+		t.ok(#s.map.Boulders:GetChildren() > 0, "the boulders came")
+		t.ok(#s.map.Scenery:GetChildren() > 0, "the scenery came")
+		t.ok(#s.map.TownGreenery:GetChildren() > 0, "the greenery came")
+		t.ok(#s.map.PointsOfInterest:GetChildren() > 0, "the points of interest came")
+		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop came")
+		t.ok(s.map:FindFirstChild("AetherIsles"), "the isles came")
+		-- A [Load] line says each deferred step's cost, and the queue says when it starts.
+		local deferred, started = 0, false
+		for _, line in ipairs(s.prints) do
+			if string.find(line, "[Load] deferred ", 1, true) then
+				deferred += 1
+			end
+			if string.find(line, "deferred build starts", 1, true) then
+				started = true
+			end
+		end
+		t.ok(started, "the start of the deferred build is printed")
+		t.ok(deferred >= 10, deferred .. " [Load] deferred lines")
+	end)
+
+	t.test("the milestones the client's loading bar reads: the world is the last one before the services", function()
+		local s = build()
+		t.eq(s.workspace:GetAttribute("LoadStage"), "world")
 	end)
 
 	t.test(
@@ -427,10 +494,13 @@ return function(t)
 		t.ok(s.groupsFirst, "the collision groups are registered before the first tree")
 		t.ok(s.sectionBoot, "every site planted at a boot age")
 		t.ok(s.tutorialBeforeSellArea, "the tutorial oaks stand before SellArea goes in")
-		t.ok(s.skyBeforeSellArea, "the isles' lumenwood stands before SellArea goes in")
+		t.ok(not s.skyBeforeSellArea, "the isles' lumenwood is a deferred step: it stands after SellArea goes in")
 		t.ok(s.forestAfterSellArea, "the forest is planted after SellArea (LOAD-01), so players need not wait for it")
 		t.eq(s.clockRefreshed, 1, "the night-only woods are re-checked once the forest is in")
-		t.ok(s.refreshedAfterForest == s.sectionSpawned, "...after the last tree")
+		t.ok(
+			s.refreshedAfterForest == s.sectionSpawned - #sky.lumenwood,
+			"...after the last tree of the forest (the isles' lumenwood is planted later, by the deferred sky)"
+		)
 		-- Nearest the sawmill first: the forest comes in as a spiral out, not in plan order.
 		local hub = t.shared("World/WorldLayout").Sawmill
 		local last, ordered = -1, true
@@ -524,7 +594,7 @@ return function(t)
 			},
 		})
 		t.eq(#s.warnings, 1)
-		t.ok(string.find(s.warnings[1], "4. Lamps, fences, props and signs", 1, true), s.warnings[1])
+		t.ok(string.find(s.warnings[1], "4. Lamps", 1, true), s.warnings[1])
 		lastStepsRan(s)
 	end)
 
@@ -742,7 +812,7 @@ return function(t)
 			local folder = s.map:FindFirstChild("Scenery")
 			t.ok(folder and folder:IsA("Folder"), "a Scenery folder in TimberlineMap")
 			local spots = WorldPlan.Scenery()
-			local models = folder:GetChildren()
+			local models = inPlanOrder(folder)
 			t.eq(#models, #spots)
 			-- What collides in each kind of piece (its builders' big bodies), and
 			-- one thing each kind always has that stops you.
@@ -823,7 +893,7 @@ return function(t)
 			},
 		})
 		t.eq(#s.warnings, 1)
-		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The scenery failed", 1, true), s.warnings[1])
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The scenery (plan) failed", 1, true), s.warnings[1])
 		lastStepsRan(s)
 		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
 		t.ok(s.map:FindFirstChild("Backdrop"), "the backdrop still built")
@@ -838,7 +908,7 @@ return function(t)
 		local folder = s.map:FindFirstChild("BoulderClusters")
 		t.ok(folder and folder:IsA("Folder"), "a BoulderClusters folder in TimberlineMap")
 		local spots = WorldPlan.BoulderClusters()
-		local models = folder:GetChildren()
+		local models = inPlanOrder(folder)
 		t.eq(#models, #spots)
 		for i, model in ipairs(models) do
 			t.ok(model:IsA("Model"), "a Model")
@@ -989,7 +1059,7 @@ return function(t)
 			},
 		})
 		t.eq(#s.warnings, 1)
-		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The boulder clusters failed", 1, true), s.warnings[1])
+		t.ok(string.find(s.warnings[1], "[MapBuilder] 5. The boulder clusters (plan) failed", 1, true), s.warnings[1])
 		lastStepsRan(s)
 		t.ok(s.map:FindFirstChild("Boulders"), "the boulders still built")
 		t.ok(s.map:FindFirstChild("Scenery"), "the scenery still built")

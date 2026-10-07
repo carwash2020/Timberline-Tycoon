@@ -14,9 +14,18 @@
 -- (each miss is slow) and says so once.
 --
 -- Each meshId is loaded once per server. Later uses clone that MeshPart.
+-- Loads run side by side: MeshKit.Preload takes a list of ids and loads them
+-- a couple of dozen at a time (Shared/WorkPool), and a Create for an id that
+-- is being loaded waits for that load instead of starting another. One
+-- CreateMeshPartAsync costs about a third of a second of network time, so
+-- loading the NPCs' 150 pieces and the plot kit's pieces one after another
+-- held server start for 70 s in Studio (7 October 2026); never load serially
+-- on the start path.
 -- A failed id is remembered and not tried again; the caller keeps the
 -- part-built model. Collision is Box unless the caller passes Hull
 -- (a wheel, or any shape a box would misrepresent).
+
+local WorkPool = require(script.Parent.Parent.WorkPool)
 
 local MeshKit = {}
 
@@ -27,6 +36,7 @@ MeshKit.Override = nil :: OverrideFn?
 -- One loaded MeshPart per meshId, and ids that already failed.
 local masters: { [number]: MeshPart } = {}
 local failed: { [number]: boolean } = {}
+local inflight: { [number]: boolean } = {} -- ids being loaded right now (a second asker waits)
 
 -- Lune has no AssetService. Remember that so every tree doesn't pay for the miss.
 local noAssetService = false
@@ -140,6 +150,7 @@ function MeshKit.Reset()
 	end
 	table.clear(masters)
 	table.clear(failed)
+	table.clear(inflight)
 	loadedCount = 0
 	failedCount = 0
 	failStreak = 0
@@ -269,6 +280,33 @@ local function remember(meshId: number, part: MeshPart)
 	masters[meshId] = part
 end
 
+-- Makes sure `meshId`'s master is cached: true if it is (now), false if the
+-- load failed. Safe to call from many threads at once: the first one loads,
+-- the others wait for it.
+local function ensure(meshId: number, fidelity: Enum.CollisionFidelity): boolean
+	if masters[meshId] then
+		return true
+	end
+	if failed[meshId] then
+		return false
+	end
+	if inflight[meshId] then
+		while inflight[meshId] do
+			task.wait()
+		end
+		return (masters[meshId] :: MeshPart?) ~= nil
+	end
+	inflight[meshId] = true
+	local okLoad, made = pcall(load, meshId, fidelity)
+	inflight[meshId] = nil
+	if okLoad and made then
+		remember(meshId, made)
+		return true
+	end
+	failed[meshId] = true
+	return false
+end
+
 -- A MeshPart named `name` at `size`, or nil. Never throws.
 -- `collision` defaults to Box. Pass Hull for a shape a box would get wrong.
 function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: Enum.CollisionFidelity?): MeshPart?
@@ -300,13 +338,84 @@ function MeshKit.Create(meshId: number, name: string, size: Vector3, collision: 
 
 	-- The engine's import pivot (CreateMeshPartAsync) beats a template,
 	-- which only has the mesh id. The template is the fallback.
-	local made = load(meshId, fidelity)
-	if not made then
-		failed[meshId] = true
+	if not ensure(meshId, fidelity) then
 		return nil
 	end
-	remember(meshId, made)
-	return finish(made:Clone(), name, size, fidelity)
+	local loaded = masters[meshId]
+	if not loaded then
+		return nil
+	end
+	return finish(loaded:Clone(), name, size, fidelity)
+end
+
+export type Entry = { id: number, hull: boolean? }
+
+export type PreloadResult = {
+	total: number,
+	loaded: number, -- ids cached when it ended (already cached ones too)
+	failed: number,
+	timedOut: boolean,
+	seconds: number,
+}
+
+MeshKit.PreloadConcurrency = 24
+MeshKit.PreloadTimeout = 40 -- seconds the join waits at most; stragglers go on by themselves
+
+-- Loads every id at once-ish (MeshKit.PreloadConcurrency at a time) and
+-- returns when all are cached or failed, or the timeout passes. Ids that are
+-- already cached cost nothing. Never throws. With an Override (tests) it
+-- asks the override for each id once.
+function MeshKit.Preload(entries: { Entry }, options: { concurrency: number?, timeout: number? }?): PreloadResult
+	local startedAt = os.clock()
+	local wanted: { Entry } = {}
+	local seen: { [number]: boolean } = {}
+	for _, entry in ipairs(entries) do
+		local id = entry.id
+		if type(id) == "number" and id ~= 0 and id == id and not seen[id] and not masters[id] and not failed[id] then
+			seen[id] = true
+			table.insert(wanted, entry)
+		end
+	end
+	local result = WorkPool.Run(wanted, function(entry: Entry)
+		local fidelity = if entry.hull then Enum.CollisionFidelity.Hull else Enum.CollisionFidelity.Box
+		if MeshKit.Override then
+			local part = MeshKit.Create(entry.id, "Preload", Vector3.new(1, 1, 1), fidelity)
+			if part then
+				part:Destroy()
+			end
+			return
+		end
+		ensure(entry.id, fidelity)
+	end, {
+		concurrency = (options and options.concurrency) or MeshKit.PreloadConcurrency,
+		timeout = (options and options.timeout) or MeshKit.PreloadTimeout,
+	})
+	local have, missed, distinct = 0, 0, 0
+	local counted: { [number]: boolean } = {}
+	for _, entry in ipairs(entries) do
+		local id = entry.id
+		if type(id) == "number" and id ~= 0 and not counted[id] then
+			counted[id] = true
+			distinct += 1
+			if masters[id] then
+				have += 1
+			elseif failed[id] then
+				missed += 1
+			end
+		end
+	end
+	return {
+		total = distinct,
+		loaded = have,
+		failed = missed,
+		timedOut = result.timedOut,
+		seconds = os.clock() - startedAt,
+	}
+end
+
+-- True when `meshId` is cached (a clone is instant).
+function MeshKit.Has(meshId: number): boolean
+	return (masters[meshId] :: MeshPart?) ~= nil
 end
 
 return MeshKit

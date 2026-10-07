@@ -428,7 +428,16 @@ local function countOf(spots: { Spot }, zoneId: string, woodId: string?): number
 end
 
 -- Extra biome, grove and stand trees, then the 120 wild clumps.
-function TreeFill.Extra(existing: { Spot }): { Spot }
+-- `pause` (optional) is called after every placement attempt: a caller that
+-- must not freeze a frame (the server planting the forest after players are
+-- in, the client's filler plan) passes a time slice that yields when its
+-- budget is spent. It changes nothing about the result.
+function TreeFill.Extra(existing: { Spot }, pause: (() -> ())?): { Spot }
+	local function tick()
+		if pause then
+			pause()
+		end
+	end
 	local out: { Spot } = {}
 	local taken: { Vector3 } = {}
 	for _, s in ipairs(existing) do
@@ -467,6 +476,7 @@ function TreeFill.Extra(existing: { Spot }): { Spot }
 				local tries = 0
 				while left > 0 and tries < left * 40 do
 					tries += 1
+					tick()
 					local spot = placeOne(area.x, area.z, area.radius - 6, woodId, biome.id, zone, taken, rng, TREE_GAP)
 					if spot then
 						table.insert(out, spot)
@@ -487,6 +497,7 @@ function TreeFill.Extra(existing: { Spot }): { Spot }
 		local tries = 0
 		while left > 0 and tries < left * 40 do
 			tries += 1
+			tick()
 			local woodId = rng:pick(woodsNear(Vector2.new(disc.cx, disc.cz)))
 			local spot = placeOne(disc.cx, disc.cz, disc.radius, woodId, "wild", zone, taken, rng, TREE_GAP)
 			if spot then
@@ -512,6 +523,7 @@ function TreeFill.Extra(existing: { Spot }): { Spot }
 			local tries = 0
 			while left > 0 and tries < left * 40 do
 				tries += 1
+				tick()
 				local woodId = rng:pick(woodsNear(stand.center))
 				local spot =
 					placeOne(stand.center.X, stand.center.Y, stand.radius, woodId, "wild", zone, taken, rng, TREE_GAP)
@@ -523,13 +535,13 @@ function TreeFill.Extra(existing: { Spot }): { Spot }
 		end
 	end
 
-	local clumps = TreeFill.Clumps(taken, rng)
+	local clumps = TreeFill.Clumps(taken, rng, pause)
 	for _, spot in ipairs(clumps) do
 		table.insert(out, spot)
 		table.insert(taken, spot.position)
 	end
 	-- Last, with their own rng, so nothing above moves: trees round each pad.
-	for _, spot in ipairs(TreeFill.PlotRings(taken)) do
+	for _, spot in ipairs(TreeFill.PlotRings(taken, pause)) do
 		table.insert(out, spot)
 		table.insert(taken, spot.position)
 	end
@@ -636,7 +648,7 @@ end
 -- own Kit.rng). Returns them without touching `taken`.
 -- Ring trees also keep off the boulder clusters (placed against the first
 -- trees, so the rocks can't move: the trees give way).
-function TreeFill.PlotRings(taken: { Vector3 }): { Spot }
+function TreeFill.PlotRings(taken: { Vector3 }, pause: (() -> ())?): { Spot }
 	local rng = Kit.rng(hashString("plot rings"))
 	local out: { Spot } = {}
 	local mine: { Vector3 } = {}
@@ -645,6 +657,9 @@ function TreeFill.PlotRings(taken: { Vector3 }): { Spot }
 	for index, slot in ipairs(PlotData.Slots) do
 		local cands: { { c: Vector2, score: number } } = {}
 		for _ = 1, RING_CANDIDATES do
+			if pause then
+				pause()
+			end
 			local a = rng:range(0, math.pi * 2)
 			local dx, dz = math.cos(a), math.sin(a)
 			local reach = half + rng:range(TreeFill.PlotRingNear + r, TreeFill.PlotRingFar)
@@ -693,6 +708,9 @@ function TreeFill.PlotRings(taken: { Vector3 }): { Spot }
 				local tries, placed = 0, 0
 				while placed < want and tries < want * 25 do
 					tries += 1
+					if pause then
+						pause()
+					end
 					local a = rng:range(0, math.pi * 2)
 					local rr = math.sqrt(rng:next()) * r
 					local x, z = cand.c.X + math.cos(a) * rr, cand.c.Y + math.sin(a) * rr
@@ -786,7 +804,7 @@ local function ring(c: Vector2, n: number, taken: { Vector3 }, rng: any): { Spot
 end
 
 -- Exactly 120 trees: 10 clumps of 3, 10 of 4 and 10 of 5.
-function TreeFill.Clumps(taken: { Vector3 }, rng: any): { Spot }
+function TreeFill.Clumps(taken: { Vector3 }, rng: any, pause: (() -> ())?): { Spot }
 	local sizes: { number } = {}
 	for _ = 1, 10 do
 		table.insert(sizes, 3)
@@ -800,6 +818,9 @@ function TreeFill.Clumps(taken: { Vector3 }, rng: any): { Spot }
 	local nextSize = 1
 	while #out < 120 and nextSize <= #sizes and guard < 25000 do
 		guard += 1
+		if pause then
+			pause()
+		end
 		local x, z = rng:range(-half, half), rng:range(-half, half)
 		if TreeFill.ClumpCenterOk(x, z, centers) then
 			local c = Vector2.new(x, z)

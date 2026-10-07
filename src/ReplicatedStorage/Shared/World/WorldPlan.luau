@@ -612,7 +612,12 @@ end
 -- Every tree on the ground, in spawn order: the first 322 (each biome's
 -- trees, then the wild groves), then the country stands', then the
 -- forest's (WorldPlan.ForestTrees; the sky's Lumenwood is in WorldPlan.Sky).
-function WorldPlan.Trees(): { TreeSpot }
+-- This is the one planner that costs seconds (about 6 s in Lune, 11 s in
+-- Studio's client): a caller that is not allowed to freeze a frame (the
+-- server planting after players are in, the client's filler) passes `pause`,
+-- a time slice's step, called after every placement attempt. The trees are
+-- the same with or without it.
+function WorldPlan.Trees(pause: (() -> ())?): { TreeSpot }
 	if cachedTrees then
 		return cachedTrees
 	end
@@ -623,8 +628,12 @@ function WorldPlan.Trees(): { TreeSpot }
 	-- Denser biomes, groves and stands, then the wild clumps. Appended, so
 	-- every tree above keeps its X and Z.
 	local TreeFill = require(script.Parent.TreeFill)
-	for _, spot in ipairs(TreeFill.Extra(out)) do
+	for _, spot in ipairs(TreeFill.Extra(out, pause)) do
 		table.insert(out, spot)
+	end
+	-- Another caller may have finished while this one was paused: keep theirs.
+	if cachedTrees then
+		return cachedTrees
 	end
 	cachedTrees = out
 	return out

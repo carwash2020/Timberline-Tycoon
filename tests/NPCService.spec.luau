@@ -296,4 +296,106 @@ return function(t)
 			t.ok(m:FindFirstChild("Talk"), id .. " has Talk")
 		end
 	end)
+
+	-- LOAD-02. Studio's log of 7 October 2026: NPCService.Init took 60.00 s,
+	-- because every townsperson's meshes (nine of them, 17 pieces each) were
+	-- loaded one at a time inside the build. Now the meshes load side by side
+	-- up front, Murph is built at once and the rest are steps of the deferred
+	-- build, so the server's Init never waits on them.
+	t.test("with a deferred queue: Murph now, everyone else as a tier-1 step with a position", function()
+		local NPCService, NPCData = service()
+		local map = fakeMap()
+		local steps, built, done = {}, {}, 0
+		NPCService.Init(map, {
+			defer = function(step)
+				table.insert(steps, step)
+			end,
+			onBuilt = function(id)
+				table.insert(built, id)
+			end,
+			onDone = function()
+				done += 1
+			end,
+		})
+		t.ok(map:FindFirstChild("Murph"), "Murph is in at once")
+		t.eq(built, { "Murph" })
+		t.eq(done, 0, "not done: the others are still queued")
+		t.eq(#steps, #NPCData.All() - 1, "one step per other townsperson")
+		local folder = map:FindFirstChild("Townsfolk")
+		t.eq(#folder:GetChildren(), 0, "nobody else yet")
+		for _, step in ipairs(steps) do
+			t.eq(step.tier, 1, step.name .. " is tier 1 (seen soon)")
+			t.ok(step.at and type(step.at.x) == "number" and type(step.at.z) == "number", step.name .. " has a spot")
+			t.eq(string.find(step.name, "NPC ", 1, true), 1)
+		end
+		-- Run the steps in a different order than they were given: all get built.
+		for i = #steps, 1, -1 do
+			steps[i].run(function()
+				return false
+			end)
+		end
+		t.eq(done, 1, "onDone fires once, after the last")
+		t.eq(#built, #NPCData.All())
+		for _, npc in ipairs(NPCData.All()) do
+			if npc.id ~= "Murph" then
+				local m = folder:FindFirstChild(npc.id)
+				t.ok(m, npc.id .. " was built by its step")
+				t.eq(m.ModelStreamingMode, Enum.ModelStreamingMode.Atomic)
+				t.ok(m:FindFirstChild("Talk"), npc.id .. " has Talk")
+			end
+		end
+	end)
+
+	t.test("every mesh is asked for once, side by side up front: building the townsfolk finds them cached", function()
+		local NPCService, _, loader = service()
+		local MeshKit = loader:shared("Art/MeshKit")
+		local asked = {}
+		MeshKit.Reset()
+		MeshKit.Override = function(id)
+			asked[id] = (asked[id] or 0) + 1
+			return roblox.Instance.new("MeshPart")
+		end
+		local map = fakeMap()
+		NPCService.Init(map)
+		MeshKit.Override = nil
+		local count, twice = 0, 0
+		for _, n in pairs(asked) do
+			count += 1
+			if n > 1 then
+				twice += 1
+			end
+		end
+		t.ok(count >= 100, count .. " distinct NPC meshes were loaded")
+		t.eq(twice, 0, "no mesh was loaded twice")
+		MeshKit.Reset()
+	end)
+
+	t.test("a townsperson built late (Old Hank) is reported the moment he is in", function()
+		local NPCService, NPCData = service()
+		local map = fakeMap()
+		local steps, built = {}, {}
+		NPCService.Init(map, {
+			defer = function(step)
+				table.insert(steps, step)
+			end,
+			onBuilt = function(id)
+				table.insert(built, id)
+			end,
+		})
+		local PlotSalesmanData = t.shared("PlotSalesmanData")
+		t.ok(NPCData.Get(PlotSalesmanData.Id), "the salesman is a townsperson")
+		local hank
+		for _, step in ipairs(steps) do
+			if step.name == "NPC " .. PlotSalesmanData.Id then
+				hank = step
+			end
+		end
+		t.ok(hank, "Old Hank has his own step")
+		t.eq(built, { "Murph" })
+		hank.run(function()
+			return false
+		end)
+		t.eq(built, { "Murph", PlotSalesmanData.Id }, "GameServer hooks his Talk prompt on this")
+		t.ok(map.Townsfolk:FindFirstChild(PlotSalesmanData.Id):FindFirstChild("Talk"))
+	end)
 end

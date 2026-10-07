@@ -26,6 +26,17 @@
 -- warned with a traceback and the rest still builds. The last three steps
 -- (SellArea in, CharacterAutoLoads back on, load anyone waiting) always
 -- run, so one broken builder can never stop players spawning.
+--
+-- LOAD-02 (7 October 2026): only what a player needs to stand and play is
+-- built before SellArea goes in (terrain, the town's buildings, the shops,
+-- the parking lot, the gondola stations, the tutorial grove, the north
+-- strip, the edge walls, the clock). Everything else is a step of the
+-- deferred build (defer / deferCells below, LoadState.Queue): the town's
+-- dressing and the townsfolk first, then the country (boulders, scenery,
+-- points of interest, trails, landmarks, backdrop), then the sky, each
+-- nearest the players first and a time slice at a time, after the first
+-- player can play. Every mesh starts loading when this script starts
+-- (MeshKit.Preload) so no builder waits on one.
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -40,6 +51,10 @@ local IsleArt = require(ReplicatedStorage.Shared.Art.IsleArt)
 local Kit = require(ReplicatedStorage.Shared.Art.Kit)
 local AxeModels = require(ReplicatedStorage.Shared.Art.AxeModels)
 local MeshKit = require(ReplicatedStorage.Shared.Art.MeshKit)
+local MeshManifest = require(ReplicatedStorage.Shared.Art.MeshManifest)
+local LoadQueue = require(ReplicatedStorage.Shared.LoadQueue)
+local TimeSlice = require(ReplicatedStorage.Shared.TimeSlice)
+local LoadState = require(script.Parent.LoadState)
 local TownMeshes = require(ReplicatedStorage.Shared.Art.TownMeshes)
 local LandmarkArt = require(ReplicatedStorage.Shared.Art.LandmarkArt)
 local PropArt = require(ReplicatedStorage.Shared.Art.PropArt)
@@ -146,6 +161,27 @@ do
 		end
 	end
 end
+-- Every uploaded mesh the server will ask for starts loading NOW, a couple of
+-- dozen at a time, while the terrain below is written (a mesh load is network
+-- time, the terrain is CPU, so they overlap). Studio's log of 7 October 2026:
+-- the same loads, one after another inside NPCService.Init and
+-- PlotService.Init, cost 60 s and 11 s. The builders find every mesh cached.
+LoadState.Stage("starting")
+task.spawn(function()
+	local entries = MeshManifest.Flat(townMeshesOn)
+	local result = MeshKit.Preload(entries)
+	LoadState.Gates.Set("meshes")
+	LoadState.Line(
+		string.format(
+			"meshes: %d of %d loaded, %d failed in %.1fs%s",
+			result.loaded,
+			result.total,
+			result.failed,
+			result.seconds,
+			if result.timedOut then " (timed out, the rest keep loading)" else ""
+		)
+	)
+end)
 print(
 	"[MapBuilder] build check: uploaded town meshes "
 		.. (if townMeshesOn then "ON" else "OFF (part-built town)")
@@ -163,6 +199,8 @@ step("3. Terrain", function()
 		end
 	end)
 end)
+LoadState.Gates.Set("terrain")
+LoadState.Stage("terrain")
 
 -- Helpers ------------------------------------------------------------------
 
@@ -237,6 +275,82 @@ local function spawnTree(woodId: string, at: Vector3, region: string, zone: Worl
 	end
 	treesSpawned += 1
 	return model
+end
+
+-- The deferred build. Steps nobody needs in the first minute (scenery,
+-- boulders, points of interest, the town's greenery, the isles...) are queued
+-- on LoadState.Queue and built AFTER the world is ready, tier 1 (soon seen)
+-- before tier 2 (decor) before tier 3 (far or high up), nearest the players
+-- first, a time slice at a time (Shared/LoadQueue, Shared/TimeSlice), so the
+-- server keeps its frame rate while players are already in. A step that fails
+-- warns once with a traceback and is counted, like a build step.
+local function guarded(name: string, build: (slice: () -> boolean) -> ()): (slice: () -> boolean) -> ()
+	return function(slice: () -> boolean)
+		local ok, err = xpcall(function(): any
+			build(slice)
+			return nil
+		end, traceback)
+		if not ok then
+			failedSteps += 1
+			workspace:SetAttribute("MapBuildFailures", failedSteps)
+			warn(string.format("[MapBuilder] %s failed, the rest of the world still builds:\n%s", name, tostring(err)))
+		end
+	end
+end
+
+local function defer(name: string, tier: number, at: Vector3?, build: (slice: () -> boolean) -> ())
+	LoadState.Queue.Add({
+		name = name,
+		tier = tier,
+		at = if at then { x = at.X, z = at.Z } else nil,
+		run = guarded(name, build),
+	})
+end
+
+-- A scattered list as one queue step per square cell of `size` studs, so the
+-- cells near a player are built first.
+local function deferCells<T>(
+	name: string,
+	tier: number,
+	items: { T },
+	positionOf: (item: T) -> Vector3,
+	size: number,
+	build: (cell: { T }, slice: () -> boolean) -> ()
+)
+	local cells = LoadQueue.Cells(items, function(item: T): LoadQueue.Point
+		local p = positionOf(item)
+		return { x = p.X, z = p.Z }
+	end, size)
+	for i, cell in ipairs(cells) do
+		local label = string.format("%s %d/%d (%d)", name, i, #cells, #cell.items)
+		LoadState.Queue.Add({
+			name = label,
+			tier = tier,
+			at = cell.at,
+			group = name,
+			groupSize = #cells,
+			run = guarded(label, function(slice: () -> boolean)
+				build(cell.items, slice)
+			end),
+		})
+	end
+end
+
+-- The same, for a list that costs time to work out (WorldPlan.Scenery takes
+-- over a second): one step plans it (tier 1 lower so it runs first of its
+-- tier, and it is its own step so the server breathes after it), and the
+-- cells it finds are added to the queue then.
+local function deferPlanned<T>(
+	name: string,
+	tier: number,
+	plan: () -> { T },
+	positionOf: (item: T) -> Vector3,
+	size: number,
+	build: (cell: { T }, slice: () -> boolean) -> ()
+)
+	defer(name .. " (plan)", tier, nil, function(_slice)
+		deferCells(name, tier, plan(), positionOf, size, build)
+	end)
 end
 
 -- The sell area beside the sawmill, east of its lean-to (the sell station).
@@ -324,7 +438,8 @@ step("4. The town", function()
 	end)
 
 	-- Display lot: every truck and trailer, anchored, bought from its sign.
-	step("4. The dealership lot", function()
+	-- Deferred (tier 1): nothing reads it, and it builds every truck.
+	defer("4. The dealership lot", 1, town.displayLot.Position, function(_slice)
 		local DealershipLot = require(ReplicatedStorage.Shared.Art.DealershipLot)
 		local lot = DealershipLot.Build()
 		lot.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
@@ -378,45 +493,69 @@ step("4. The town", function()
 		end
 	end)
 
-	-- Lamps, props, signs.
-	step("4. Lamps, fences, props and signs", function()
-		for _, cf in ipairs(town.lamps) do
-			local lamp = BuildingArt.LampPost()
-			CollectionService:AddTag(lamp, "StreetLamp") -- clients light them at night
-			standOnGround(place(atomic(lamp), cf), true)
+	-- Lamps, props, signs. Deferred (tier 1, nearest the player first): the
+	-- town stands without them and they are only looks, but they are what you
+	-- see first, so they come before any decor out in the country.
+	local rounds = Instance.new("Folder")
+	rounds.Name = "PathRounds"
+	rounds.Parent = map
+	do
+		local function around(x: number, z: number): Vector3
+			return Vector3.new(x, 0, z)
 		end
-		for _, fence in ipairs(town.fences) do
-			standOnGround(place(atomic(BuildingArt.Fence(fence.length)), fence.cframe), true)
-		end
-		for _, prop in ipairs(town.props) do
-			standOnGround(place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe), true)
-		end
-		for _, sign in ipairs(town.signs) do
-			standOnGround(place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe), true)
-		end
+		defer("4. Lamps", 1, around(0, 60), function(slice)
+			for _, cf in ipairs(town.lamps) do
+				local lamp = BuildingArt.LampPost()
+				CollectionService:AddTag(lamp, "StreetLamp") -- clients light them at night
+				standOnGround(place(atomic(lamp), cf), true)
+				slice()
+			end
+		end)
+		defer("4. Fences", 1, around(0, 60), function(slice)
+			for _, fence in ipairs(town.fences) do
+				standOnGround(place(atomic(BuildingArt.Fence(fence.length)), fence.cframe), true)
+				slice()
+			end
+		end)
+		defer("4. Props", 1, around(0, 60), function(slice)
+			for _, prop in ipairs(town.props) do
+				standOnGround(place(atomic(BuildingArt.Prop(prop.name, prop.seed)), prop.cframe), true)
+				slice()
+			end
+		end)
+		defer("4. Town signs", 1, around(0, 60), function(slice)
+			for _, sign in ipairs(town.signs) do
+				standOnGround(place(atomic(BuildingArt.Signpost(sign.text, sign.lit)), sign.cframe), true)
+				slice()
+			end
+		end)
 		-- Saw-cut rounds on the shop paths (looks only). Not on the spawn
 		-- walk: that stretch stays open for the tutorial grove.
-		local rounds = Instance.new("Folder")
-		rounds.Name = "PathRounds"
-		rounds.Parent = map
-		for _, cf in ipairs(town.pathRounds) do
-			place(atomic(BuildingArt.PathRound()), cf, rounds)
-		end
-	end)
+		defer("4. Path rounds", 1, around(0, 60), function(slice)
+			for _, cf in ipairs(town.pathRounds) do
+				place(atomic(BuildingArt.PathRound()), cf, rounds)
+				slice()
+			end
+		end)
+	end
 
 	-- The town's greenery: ornamental trees in stone rings, bushes, flower
 	-- beds and rocks, each Atomic, in their own folder. Decoration but for
 	-- the trees' trunks (BuildingArt.Greenery). Never tagged Tree and never
 	-- in the Trees folder, so nobody can chop them, and WindSway and
 	-- CanopyFade leave them be.
-	step("4. Greenery", function()
+	do
 		local folder = Instance.new("Folder")
 		folder.Name = "TownGreenery"
 		folder.Parent = map
-		for _, g in ipairs(town.greenery) do
-			place(atomic(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId)), g.cframe, folder)
-		end
-	end)
+		-- Deferred (tier 1), in plan order (a spec reads the folder by index).
+		defer("4. Greenery", 1, Vector3.new(0, 0, 60), function(slice)
+			for _, g in ipairs(town.greenery) do
+				place(atomic(BuildingArt.Greenery(g.kind, g.size, g.seed, g.woodId)), g.cframe, folder)
+				slice()
+			end
+		end)
+	end
 end)
 
 -- The Robux store's bulletin board, off the roads and Bram's walk.
@@ -425,6 +564,8 @@ step("4. The store board", function()
 	local model = persistent(StoreBoard.Build())
 	place(model, StoreBoard.CFrame)
 end)
+LoadState.Gates.Set("town")
+LoadState.Stage("town")
 
 ---------------------------------------------------------------------------
 -- 5. The biomes
@@ -433,7 +574,7 @@ end)
 -- Set by step 5: plants the world's trees (see there). Run once, after the
 -- sell area under v2.
 local forestPlanter: ((yielding: boolean) -> ())? = nil
-local FOREST_SLICE = 0.02 -- seconds of planting per frame, so the server keeps its frame rate
+local FOREST_SLICE = 0.012 -- seconds of planting per frame; the deferred queue takes as much again (LoadState.Queue), so the server keeps its frame rate
 
 step("5. The trees", function()
 	if V2 then
@@ -482,17 +623,31 @@ step("5. The trees", function()
 				table.insert(entries, { spot = spot, reach = reach, order = #entries })
 			end
 		end
-		collect(WorldPlan.Trees(), false)
+		-- Each planner is one block of CPU the engine cannot split, so the
+		-- server gets a frame between them when it is planting after the
+		-- players are in (a player's physics and remotes run in those frames).
+		local function breathe()
+			if yielding then
+				task.wait()
+			end
+		end
+		-- WorldPlan.Trees is the planner that costs seconds: it pauses on the
+		-- time slice, so the server keeps its frames while it works.
+		local planSlice = TimeSlice.new({ budget = FOREST_SLICE })
+		collect(WorldPlan.Trees(if yielding then planSlice.step else nil), false)
+		breathe()
 		-- Strip and ferry sites share one warning, so one bad wood is still
 		-- one line. Lanternwood waits until WoodData has the row (B12).
 		collect(WorldPlan.StripTrees(), false)
 		collect(WorldPlan.FerryPalms(), false)
+		breathe()
 		if WoodData.Get("lanternwood") then
 			collect(WorldPlan.Lanternwood(), false)
 		end
 		-- The Petrified Reach, planned after the fingerprint trees, so none of
 		-- those move.
 		collect(WorldPlan.ReachTrees(), true)
+		breathe()
 		loadLine(string.format("forest planned: %d sites in %.2fs", #entries, os.clock() - before))
 		if yielding then
 			local hub = WorldLayout.Sawmill
@@ -553,7 +708,7 @@ step("5. The trees", function()
 end)
 
 -- Boulders: something to drive around and climb on.
-step("5. The boulders", function()
+do
 	local rocks = Instance.new("Folder")
 	rocks.Name = "Boulders"
 	rocks.Parent = map
@@ -569,110 +724,174 @@ step("5. The boulders", function()
 			rocks
 		)
 	end
-	for _, b in ipairs(WorldPlan.Boulders()) do
-		placeRock(b)
-	end
-	for _, b in ipairs(WorldPlan.MeadowBoulders()) do
-		placeRock(b)
-	end
-end)
+	deferPlanned(
+		"5. The boulders",
+		2,
+		function(): { WorldPlan.Boulder }
+			local boulders: { WorldPlan.Boulder } = {}
+			for _, b in ipairs(WorldPlan.Boulders()) do
+				table.insert(boulders, b)
+			end
+			for _, b in ipairs(WorldPlan.MeadowBoulders()) do
+				table.insert(boulders, b)
+			end
+			return boulders
+		end,
+		function(b: WorldPlan.Boulder): Vector3
+			return b.position
+		end,
+		400,
+		function(cell, slice)
+			for _, b in ipairs(cell) do
+				placeRock(b)
+				slice()
+			end
+		end
+	)
+end
 
 -- The Gloam Hollow's glowing mushrooms (its tell at night).
-step("5. The grove's mushrooms", function()
-	for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
-		place(atomic(PropArt.Mushroom(i, true)), cf)
-	end
-end)
+do
+	deferPlanned(
+		"5. The grove's mushrooms",
+		2,
+		function(): { { i: number, cf: CFrame } }
+			local indexed: { { i: number, cf: CFrame } } = {}
+			for i, cf in ipairs(WorldPlan.GroveMushrooms()) do
+				table.insert(indexed, { i = i, cf = cf })
+			end
+			return indexed
+		end,
+		function(m): Vector3
+			return m.cf.Position
+		end,
+		400,
+		function(cell, slice)
+			for _, m in ipairs(cell) do
+				place(atomic(PropArt.Mushroom(m.i, true)), m.cf)
+				slice()
+			end
+		end
+	)
+end
 
 -- Named places worth the walk: a lookout, the old ranger cabin, a cave
 -- mouth, the pale cache, and the falls. Decor and a few things you can
 -- stand on. Secrets live on the Secret attribute for anyone who looks.
-step("5. Points of interest", function()
+do
 	local folder = Instance.new("Folder")
 	folder.Name = "PointsOfInterest"
 	folder.Parent = map
 	local DARK = { Color3.fromRGB(42, 36, 34), Color3.fromRGB(28, 24, 24), Color3.fromRGB(58, 48, 46) }
-	for _, poi in ipairs(WorldPlan.PointsOfInterest()) do
-		local model: Model
-		if poi.kind == "LookoutTower" then
-			model = PropArt.LookoutTower(poi.seed)
-		elseif poi.kind == "RuinedCabin" then
-			model = PropArt.RuinedCabin(poi.seed)
-		elseif poi.kind == "Cave" then
-			model = PropArt.Outcrop(poi.seed, DARK)
-		elseif poi.kind == "Crystal" then
-			model = PropArt.Crystal(poi.seed, Color3.fromRGB(186, 230, 255), 2.4)
-		else
-			model = BuildingArt.Signpost(poi.text or poi.name, false, true)
+	deferPlanned(
+		"5. Points of interest",
+		2,
+		WorldPlan.PointsOfInterest,
+		function(poi: WorldPlan.PointOfInterest): Vector3
+			return poi.cframe.Position
+		end,
+		500,
+		function(cell, slice)
+			for _, poi in ipairs(cell) do
+				local model: Model
+				if poi.kind == "LookoutTower" then
+					model = PropArt.LookoutTower(poi.seed)
+				elseif poi.kind == "RuinedCabin" then
+					model = PropArt.RuinedCabin(poi.seed)
+				elseif poi.kind == "Cave" then
+					model = PropArt.Outcrop(poi.seed, DARK)
+				elseif poi.kind == "Crystal" then
+					model = PropArt.Crystal(poi.seed, Color3.fromRGB(186, 230, 255), 2.4)
+				else
+					model = BuildingArt.Signpost(poi.text or poi.name, false, true)
+				end
+				model.Name = poi.id
+				model:SetAttribute("PointOfInterest", poi.name)
+				model:SetAttribute("Region", poi.region)
+				if poi.secret then
+					model:SetAttribute("Secret", poi.secret)
+				end
+				place(atomic(model), poi.cframe, folder)
+				slice()
+			end
 		end
-		model.Name = poi.id
-		model:SetAttribute("PointOfInterest", poi.name)
-		model:SetAttribute("Region", poi.region)
-		if poi.secret then
-			model:SetAttribute("Secret", poi.secret)
-		end
-		place(atomic(model), poi.cframe, folder)
-	end
-end)
+	)
+end
 
 -- Footpaths: a short run of worn slabs. Not roads, so the haul roads and
 -- the tree rules are unchanged.
-step("5. The trails", function()
+do
 	local folder = Instance.new("Folder")
 	folder.Name = "Trails"
 	folder.Parent = map
 	local dirt = Color3.fromRGB(156, 94, 64) -- TerrainGen.MaterialColors.Ground, so a trail matches the earth round it
-	for _, slab in ipairs(WorldPlan.TrailSlabs()) do
-		local part = Kit.part(folder, slab.name, Vector3.new(3.2, 0.25, 7), slab.cframe, dirt, Enum.Material.Ground)
-		Kit.decor(part, false)
-	end
-end)
+	deferPlanned(
+		"5. The trails",
+		2,
+		WorldPlan.TrailSlabs,
+		function(slab: WorldPlan.TrailSlab): Vector3
+			return slab.cframe.Position
+		end,
+		500,
+		function(cell, slice)
+			for _, slab in ipairs(cell) do
+				local part =
+					Kit.part(folder, slab.name, Vector3.new(3.2, 0.25, 7), slab.cframe, dirt, Enum.Material.Ground)
+				Kit.decor(part, false)
+				slice()
+			end
+		end
+	)
+end
 
 -- The volcano's crater: glowing lava filling the level pool on its floor,
 -- smoke rising, a light the whole valley sees at night.
-step("5. The volcano's crater", function()
+do
 	local pool, radius = WorldPlan.Crater()
-	local lava = Kit.cylinder(
-		map,
-		"CraterLava",
-		1,
-		radius * 2,
-		CFrame.new(pool + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.pi / 2),
-		Color3.fromRGB(255, 106, 26),
-		Enum.Material.Neon
-	)
-	Kit.decor(lava, false)
-	local glow = Instance.new("PointLight")
-	glow.Color = Color3.fromRGB(255, 120, 40)
-	glow.Range = 60
-	glow.Brightness = 4
-	glow.Parent = lava
-	local smoke = Instance.new("ParticleEmitter")
-	smoke.Name = "VolcanoSmoke"
-	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	smoke.Color = ColorSequence.new(Color3.fromRGB(70, 64, 62), Color3.fromRGB(150, 140, 136))
-	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 12), NumberSequenceKeypoint.new(1, 45) })
-	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
-	smoke.Lifetime = NumberRange.new(8, 14)
-	smoke.Rate = 4
-	smoke.Speed = NumberRange.new(10, 18)
-	smoke.SpreadAngle = Vector2.new(15, 15)
-	smoke.Acceleration = Vector3.new(3, 2, 1)
-	smoke.LightInfluence = 0.6
-	smoke.Parent = lava
-	local embers = Instance.new("ParticleEmitter")
-	embers.Name = "VolcanoEmbers"
-	embers.Color = ColorSequence.new(Color3.fromRGB(255, 160, 60))
-	embers.LightEmission = 1
-	embers.LightInfluence = 0
-	embers.Size = NumberSequence.new(0.6)
-	embers.Lifetime = NumberRange.new(2, 4)
-	embers.Rate = 12
-	embers.Speed = NumberRange.new(20, 34)
-	embers.SpreadAngle = Vector2.new(30, 30)
-	embers.Acceleration = Vector3.new(0, -14, 0)
-	embers.Parent = lava
-end)
+	defer("5. The volcano's crater", 3, pool, function(_slice)
+		local lava = Kit.cylinder(
+			map,
+			"CraterLava",
+			1,
+			radius * 2,
+			CFrame.new(pool + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+			Color3.fromRGB(255, 106, 26),
+			Enum.Material.Neon
+		)
+		Kit.decor(lava, false)
+		local glow = Instance.new("PointLight")
+		glow.Color = Color3.fromRGB(255, 120, 40)
+		glow.Range = 60
+		glow.Brightness = 4
+		glow.Parent = lava
+		local smoke = Instance.new("ParticleEmitter")
+		smoke.Name = "VolcanoSmoke"
+		smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		smoke.Color = ColorSequence.new(Color3.fromRGB(70, 64, 62), Color3.fromRGB(150, 140, 136))
+		smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 12), NumberSequenceKeypoint.new(1, 45) })
+		smoke.Transparency =
+			NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+		smoke.Lifetime = NumberRange.new(8, 14)
+		smoke.Rate = 4
+		smoke.Speed = NumberRange.new(10, 18)
+		smoke.SpreadAngle = Vector2.new(15, 15)
+		smoke.Acceleration = Vector3.new(3, 2, 1)
+		smoke.LightInfluence = 0.6
+		smoke.Parent = lava
+		local embers = Instance.new("ParticleEmitter")
+		embers.Name = "VolcanoEmbers"
+		embers.Color = ColorSequence.new(Color3.fromRGB(255, 160, 60))
+		embers.LightEmission = 1
+		embers.LightInfluence = 0
+		embers.Size = NumberSequence.new(0.6)
+		embers.Lifetime = NumberRange.new(2, 4)
+		embers.Rate = 12
+		embers.Speed = NumberRange.new(20, 34)
+		embers.SpreadAngle = Vector2.new(30, 30)
+		embers.Acceleration = Vector3.new(0, -14, 0)
+		embers.Parent = lava
+	end)
+end
 
 -- Toll bridge, gorge, ferry docks, the secret cave, deep water, and the
 -- heat column. Palms and strip trees are planted with the other sites.
@@ -683,14 +902,32 @@ end)
 -- Signposts where the roads arrive: the biome, its woods, the gear it needs
 -- (WorldPlan.BiomeSignText, which the world preview shows too). Their
 -- boards collide (COL-01), 2+ studs off the road.
-step("5. The road signs", function()
-	for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
-		place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
-	end
-	for _, sign in ipairs(WorldPlan.GateSigns(WorldPlan.BiomeSignText)) do
-		place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
-	end
-end)
+do
+	deferPlanned(
+		"5. The road signs",
+		2,
+		function(): { { text: string, cframe: CFrame } }
+			local signs: { { text: string, cframe: CFrame } } = {}
+			for _, sign in ipairs(WorldPlan.RoadSigns(WorldPlan.BiomeSignText)) do
+				table.insert(signs, sign)
+			end
+			for _, sign in ipairs(WorldPlan.GateSigns(WorldPlan.BiomeSignText)) do
+				table.insert(signs, sign)
+			end
+			return signs
+		end,
+		function(sign): Vector3
+			return sign.cframe.Position
+		end,
+		500,
+		function(cell, slice)
+			for _, sign in ipairs(cell) do
+				place(atomic(BuildingArt.Signpost(sign.text, false, true)), sign.cframe)
+				slice()
+			end
+		end
+	)
+end
 
 -- Open-country scenery (WLD-01): outcrops, log piles, fence and hay lines,
 -- ruined cabins, windmills and lookout towers between the biomes and along
@@ -699,44 +936,64 @@ end)
 -- the stones, walls, posts, towers, fence posts and rails, bales and logs,
 -- all of it 4+ studs off the roads); the rest is looks only. Nothing in it
 -- is touched, and parts under a stud cast no shadow.
-step("5. The scenery", function()
+do
 	local folder = Instance.new("Folder")
 	folder.Name = "Scenery"
 	folder.Parent = map
-	for _, spot in ipairs(WorldPlan.Scenery()) do
-		local piece = Kit.model(spot.kind)
-		for _, item in ipairs(spot.items) do
-			local model: Model?
-			if item.builder == "Fence" then
-				model = BuildingArt.Fence(item.size)
-			elseif item.builder == "LogPile" or item.builder == "Haybale" then
-				model = BuildingArt.Prop(item.builder, item.seed)
-			else
-				model = PropArt.SetPiece(item.builder, item.seed)
+	deferPlanned(
+		"5. The scenery",
+		2,
+		function(): { { spot: WorldPlan.ScenerySpot, index: number } }
+			local out: { { spot: WorldPlan.ScenerySpot, index: number } } = {}
+			for index, spot in ipairs(WorldPlan.Scenery()) do
+				table.insert(out, { spot = spot, index = index })
 			end
-			if model then
-				Kit.placeAt(model, item.cframe)
-				model.Parent = piece
+			return out
+		end,
+		function(entry): Vector3
+			return entry.spot.center
+		end,
+		400,
+		function(cell, slice)
+			for _, entry in ipairs(cell) do
+				local spot = entry.spot
+				local piece = Kit.model(spot.kind)
+				piece:SetAttribute("PlanIndex", entry.index) -- cells build nearest first, not in plan order
+				for _, item in ipairs(spot.items) do
+					local model: Model?
+					if item.builder == "Fence" then
+						model = BuildingArt.Fence(item.size)
+					elseif item.builder == "LogPile" or item.builder == "Haybale" then
+						model = BuildingArt.Prop(item.builder, item.seed)
+					else
+						model = PropArt.SetPiece(item.builder, item.seed)
+					end
+					if model then
+						Kit.placeAt(model, item.cframe)
+						model.Parent = piece
+					end
+				end
+				for _, d in ipairs(piece:GetDescendants()) do
+					if d:IsA("BasePart") then
+						local size = d.Size
+						if math.max(size.X, size.Y, size.Z) < 1 then
+							d.CastShadow = false
+						end
+						d.CanTouch = false -- nothing listens for a set piece's touches
+						if not d.CanCollide then
+							Kit.decor(d) -- looks only: no clicks either
+						end
+					end
+				end
+				-- Lookout towers stay Atomic (they stream in whole when you're
+				-- close). LevelOfDetail is plugin-only: a game script cannot set
+				-- StreamingMesh, and trying to threw away the rest of this step.
+				atomic(piece).Parent = folder
+				slice()
 			end
 		end
-		for _, d in ipairs(piece:GetDescendants()) do
-			if d:IsA("BasePart") then
-				local size = d.Size
-				if math.max(size.X, size.Y, size.Z) < 1 then
-					d.CastShadow = false
-				end
-				d.CanTouch = false -- nothing listens for a set piece's touches
-				if not d.CanCollide then
-					Kit.decor(d) -- looks only: no clicks either
-				end
-			end
-		end
-		-- Lookout towers stay Atomic (they stream in whole when you're
-		-- close). LevelOfDetail is plugin-only: a game script cannot set
-		-- StreamingMesh, and trying to threw away the rest of this step.
-		atomic(piece).Parent = folder
-	end
-end)
+	)
+end
 
 -- The landscape, a little toward the classic lumber-game look (phase 10, STY-03,
 -- STY-04): brown boulder clusters over the open grass
@@ -748,25 +1005,43 @@ end)
 -- the horizon; its "LampGlow" lights at dusk). Rocks, decks, posts, rails
 -- and the tower collide; the rowboats are looks only. Each part of this
 -- step runs on its own.
-step("5. The landmarks", function()
-	step("5. The boulder clusters", function()
-		local folder = Instance.new("Folder")
-		folder.Name = "BoulderClusters"
-		folder.Parent = map
-		for _, spot in ipairs(WorldPlan.BoulderClusters()) do
-			local cluster = Kit.model("BoulderCluster")
-			for _, r in ipairs(spot.rocks) do
-				local rock = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
-				Kit.placeAt(rock, CFrame.new(r.position) * CFrame.Angles(0, r.yaw, 0))
-				rock.Parent = cluster
+do
+	local clusterFolder = Instance.new("Folder")
+	clusterFolder.Name = "BoulderClusters"
+	clusterFolder.Parent = map
+	deferPlanned(
+		"5. The boulder clusters",
+		2,
+		function(): { { spot: WorldPlan.BoulderCluster, index: number } }
+			local out: { { spot: WorldPlan.BoulderCluster, index: number } } = {}
+			for index, spot in ipairs(WorldPlan.BoulderClusters()) do
+				table.insert(out, { spot = spot, index = index })
 			end
-			atomic(cluster).Parent = folder
+			return out
+		end,
+		function(entry): Vector3
+			return entry.spot.center
+		end,
+		400,
+		function(cell, slice)
+			for _, entry in ipairs(cell) do
+				local spot = entry.spot
+				local cluster = Kit.model("BoulderCluster")
+				cluster:SetAttribute("PlanIndex", entry.index) -- cells build nearest first, not in plan order
+				for _, r in ipairs(spot.rocks) do
+					local rock = LandmarkArt.BrownRock(r.size, r.seed, spot.tone, r.mossy)
+					Kit.placeAt(rock, CFrame.new(r.position) * CFrame.Angles(0, r.yaw, 0))
+					rock.Parent = cluster
+				end
+				atomic(cluster).Parent = clusterFolder
+				slice()
+			end
 		end
-	end)
+	)
 	local landmarks = Instance.new("Folder")
 	landmarks.Name = "Landmarks"
 	landmarks.Parent = map
-	step("5. The footbridge", function()
+	defer("5. The footbridge", 2, nil, function(_slice)
 		local bridge = WorldPlan.Footbridge()
 		if bridge then
 			local model = LandmarkArt.Footbridge(bridge.span, bridge.drop, bridge.width, bridge.rise, bridge.beds)
@@ -776,7 +1051,7 @@ step("5. The landmarks", function()
 			end
 		end
 	end)
-	step("5. The docks", function()
+	defer("5. The docks", 2, nil, function(_slice)
 		for i, dock in ipairs(WorldPlan.Docks()) do
 			local model = LandmarkArt.Dock(dock.length, dock.width, dock.deck, dock.water, dock.beds)
 			place(atomic(model), dock.cframe, landmarks)
@@ -786,157 +1061,178 @@ step("5. The landmarks", function()
 			end
 		end
 	end)
-	step("5. The lighthouse", function()
+	defer("5. The lighthouse", 2, nil, function(_slice)
 		local lighthouse = WorldPlan.Lighthouse()
 		if lighthouse then
 			place(persistent(LandmarkArt.Lighthouse()), lighthouse.cframe, landmarks)
 		end
 	end)
-end)
+end
 
 ---------------------------------------------------------------------------
 -- 6. The Skyroot and the Aether Isles
 ---------------------------------------------------------------------------
 
-step("6. The Skyroot and the Aether Isles", function()
+-- The whole sky is deferred (tier 3: far and high up, and the gondola's
+-- stations are only waited for, by GondolaService, never needed at once).
+-- It is split into steps of its own so the queue can interleave them with
+-- the rest, and the Lumenwood plants a tree per slice.
+do
 	local sky = WorldPlan.Sky()
-	if not sky then
-		return
+	if sky then
+		local fall = sky.waterfall
+		local fromRoot = WorldPlan.IslesFromRoot(sky)
+
+		-- The Skyroot: seen from anywhere, so Persistent. Its limbs reach up
+		-- into each isle, its hollow faces the gondola, it parts round the fall.
+		defer("6. The Skyroot", 3, sky.root, function(_slice)
+			place(
+				persistent(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root)),
+				CFrame.new(sky.root)
+			)
+		end)
+
+		local islesFolder = Instance.new("Folder")
+		islesFolder.Name = "AetherIsles"
+		islesFolder.Parent = map
+		defer("6. The isles", 3, sky.root, function(slice)
+			local mainIsle =
+				IsleArt.Isle(sky.main.radius, 1, { clear = WorldPlan.IsleClearPoints(sky, sky.main.center) })
+			mainIsle.Name = "MainIsle"
+			place(persistent(mainIsle), CFrame.new(sky.main.center), islesFolder)
+			for i, isle in ipairs(sky.isles) do
+				local options: IsleArt.IsleOptions = {
+					clear = WorldPlan.IsleClearPoints(sky, isle.center),
+					spout = if i == fall.isle then fall.dir else nil, -- the spring that feeds the waterfall
+				}
+				local model = IsleArt.Isle(isle.radius, i + 1, options)
+				model.Name = "Isle" .. i
+				place(persistent(model), CFrame.new(isle.center), islesFolder)
+				slice()
+			end
+		end)
+		defer("6. The bridges", 3, sky.root, function(slice)
+			for _, bridge in ipairs(sky.bridges) do
+				local model = BuildingArt.Bridge(bridge.a, bridge.b, 6)
+				model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+				model.Parent = islesFolder
+				-- A lantern at each bridge head.
+				for k, at in ipairs({ bridge.a, bridge.b }) do
+					local along = (bridge.b - bridge.a).Unit * (if k == 1 then 1 else -1)
+					local side = Vector3.new(-along.Z, 0, along.X)
+					place(
+						atomic(IsleArt.LanternPost(k)),
+						CFrame.lookAt(at - along * 2 + side * 4.2, at + along),
+						islesFolder
+					)
+				end
+				slice()
+			end
+		end)
+
+		-- Cloud banks drifting round the Skyroot's crown.
+		defer("6. The cloud banks", 3, sky.root, function(_slice)
+			local clouds = Instance.new("Folder")
+			clouds.Name = "CloudBanks"
+			clouds.Parent = map
+			for i, spot in ipairs(IsleArt.CloudSpots(fromRoot, sky.trunkHeight, 99, sky.main.dir)) do
+				place(persistent(IsleArt.CloudBank(spot.size, i)), CFrame.new(sky.root) * spot.cframe, clouds)
+			end
+		end)
+		defer("6. The Lumenwood", 3, sky.root, function(slice)
+			for _, pos in ipairs(sky.lumenwood) do
+				spawnTree("lumenwood", pos, "sky", {
+					id = "sky",
+					cx = pos.X,
+					cz = pos.Z,
+					radius = 0,
+					fixed = true,
+					cap = 12,
+				})
+				slice()
+			end
+			workspace:SetAttribute("MapTrees", treesSpawned) -- the boot report counts the isles' trees too
+		end)
+		defer("6. The Sky Shards", 3, sky.root, function(slice)
+			for _, pos in ipairs(sky.shards) do
+				NodeService.Spawn("SkyShard", pos, map)
+				slice()
+			end
+		end)
+		defer("6. The Cloud Chutes", 3, sky.root, function(_slice)
+			for _, cf in ipairs(sky.chutes) do
+				local chute = BuildingArt.CloudChute()
+				local box = chute:FindFirstChild("CloudChute")
+				place(atomic(chute), cf)
+				if box then
+					CollectionService:AddTag(box, "CloudChute")
+				end
+				-- The flume carries on from the chute's lip (its +Z end), out off
+				-- the isle and down into the clouds (WorldPlan.ChuteFlume, which
+				-- the previews draw too).
+				local from, to = WorldPlan.ChuteFlume(cf)
+				Kit.decor(
+					Kit.beam(map, "Flume", from, to, 2.4, 1.2, Color3.fromRGB(90, 62, 38), Enum.Material.WoodPlanks)
+				)
+			end
+		end)
+		defer("6. The Starfall Forge", 3, sky.root, function(_slice)
+			local forge = BuildingArt.StarfallForge()
+			local anvil = forge:FindFirstChild("StarfallForge")
+			place(atomic(forge), sky.forge)
+			if anvil then
+				CollectionService:AddTag(anvil, "StarfallForge")
+			end
+		end)
+
+		-- The gondola: from town and from the Skyroot's foot up to the top
+		-- station on the main isle's town-facing edge. The cable runs 8.5 studs
+		-- above the cabins' route (WorldPlan.GondolaPath), one rod per stretch.
+		-- The two stations GondolaService waits for stay in the ready path (they
+		-- are small); only the cable between them is deferred.
+		local top: Model? = nil
+		local base: Model? = nil
+		step("6. The gondola stations", function()
+			top = station("GondolaTop", sky.gondolaTop)
+			base = station("GondolaBase", sky.gondolaBase)
+		end)
+		defer("6. The gondola", 3, sky.root, function(_slice)
+			local topStation, baseStation = top, base
+			if not topStation or not baseStation then
+				error("the gondola's stations were not built")
+			end
+			local function cableFrom(model: Model)
+				local platform = model.PrimaryPart :: BasePart
+				local to = (topStation.PrimaryPart :: BasePart).Position
+				local path = WorldPlan.GondolaPath(sky, platform.Position, platform.CFrame.ZVector, to)
+				for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
+					local cable = Kit.rod(
+						map,
+						"GondolaCable",
+						piece[1],
+						piece[2],
+						0.4,
+						Color3.fromRGB(70, 70, 75),
+						Enum.Material.Metal
+					)
+					Kit.decor(cable, false)
+				end
+			end
+			if townStation then
+				cableFrom(townStation)
+			end
+			cableFrom(baseStation)
+		end)
+
+		-- The waterfall pouring off an outer isle into the river's spring.
+		defer("6. The waterfall", 3, sky.root, function(_slice)
+			place(
+				persistent(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10)),
+				CFrame.lookAt(fall.top, fall.top + fall.dir) -- its -Z away from the isle
+			)
+		end)
 	end
-	local fall = sky.waterfall
-	local fromRoot = WorldPlan.IslesFromRoot(sky)
-
-	-- The Skyroot: seen from anywhere, so Persistent. Its limbs reach up
-	-- into each isle, its hollow faces the gondola, it parts round the fall.
-	step("6. The Skyroot", function()
-		place(
-			persistent(IsleArt.Skyroot(sky.trunkHeight, fromRoot, sky.main.dir, fall.top - sky.root)),
-			CFrame.new(sky.root)
-		)
-	end)
-
-	local islesFolder = Instance.new("Folder")
-	islesFolder.Name = "AetherIsles"
-	islesFolder.Parent = map
-	step("6. The isles", function()
-		local mainIsle = IsleArt.Isle(sky.main.radius, 1, { clear = WorldPlan.IsleClearPoints(sky, sky.main.center) })
-		mainIsle.Name = "MainIsle"
-		place(persistent(mainIsle), CFrame.new(sky.main.center), islesFolder)
-		for i, isle in ipairs(sky.isles) do
-			local options: IsleArt.IsleOptions = {
-				clear = WorldPlan.IsleClearPoints(sky, isle.center),
-				spout = if i == fall.isle then fall.dir else nil, -- the spring that feeds the waterfall
-			}
-			local model = IsleArt.Isle(isle.radius, i + 1, options)
-			model.Name = "Isle" .. i
-			place(persistent(model), CFrame.new(isle.center), islesFolder)
-		end
-	end)
-	step("6. The bridges", function()
-		for _, bridge in ipairs(sky.bridges) do
-			local model = BuildingArt.Bridge(bridge.a, bridge.b, 6)
-			model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-			model.Parent = islesFolder
-			-- A lantern at each bridge head.
-			for k, at in ipairs({ bridge.a, bridge.b }) do
-				local along = (bridge.b - bridge.a).Unit * (if k == 1 then 1 else -1)
-				local side = Vector3.new(-along.Z, 0, along.X)
-				place(
-					atomic(IsleArt.LanternPost(k)),
-					CFrame.lookAt(at - along * 2 + side * 4.2, at + along),
-					islesFolder
-				)
-			end
-		end
-	end)
-
-	-- Cloud banks drifting round the Skyroot's crown.
-	step("6. The cloud banks", function()
-		local clouds = Instance.new("Folder")
-		clouds.Name = "CloudBanks"
-		clouds.Parent = map
-		for i, spot in ipairs(IsleArt.CloudSpots(fromRoot, sky.trunkHeight, 99, sky.main.dir)) do
-			place(persistent(IsleArt.CloudBank(spot.size, i)), CFrame.new(sky.root) * spot.cframe, clouds)
-		end
-	end)
-	step("6. The Lumenwood", function()
-		for _, pos in ipairs(sky.lumenwood) do
-			spawnTree("lumenwood", pos, "sky", {
-				id = "sky",
-				cx = pos.X,
-				cz = pos.Z,
-				radius = 0,
-				fixed = true,
-				cap = 12,
-			})
-		end
-	end)
-	step("6. The Sky Shards", function()
-		for _, pos in ipairs(sky.shards) do
-			NodeService.Spawn("SkyShard", pos, map)
-		end
-	end)
-	step("6. The Cloud Chutes", function()
-		for _, cf in ipairs(sky.chutes) do
-			local chute = BuildingArt.CloudChute()
-			local box = chute:FindFirstChild("CloudChute")
-			place(atomic(chute), cf)
-			if box then
-				CollectionService:AddTag(box, "CloudChute")
-			end
-			-- The flume carries on from the chute's lip (its +Z end), out off
-			-- the isle and down into the clouds (WorldPlan.ChuteFlume, which
-			-- the previews draw too).
-			local from, to = WorldPlan.ChuteFlume(cf)
-			Kit.decor(Kit.beam(map, "Flume", from, to, 2.4, 1.2, Color3.fromRGB(90, 62, 38), Enum.Material.WoodPlanks))
-		end
-	end)
-	step("6. The Starfall Forge", function()
-		local forge = BuildingArt.StarfallForge()
-		local anvil = forge:FindFirstChild("StarfallForge")
-		place(atomic(forge), sky.forge)
-		if anvil then
-			CollectionService:AddTag(anvil, "StarfallForge")
-		end
-	end)
-
-	-- The gondola: from town and from the Skyroot's foot up to the top
-	-- station on the main isle's town-facing edge. The cable runs 8.5 studs
-	-- above the cabins' route (WorldPlan.GondolaPath), one rod per stretch.
-	step("6. The gondola", function()
-		local top = station("GondolaTop", sky.gondolaTop)
-		local base = station("GondolaBase", sky.gondolaBase)
-		local function cableFrom(model: Model)
-			local platform = model.PrimaryPart :: BasePart
-			local to = (top.PrimaryPart :: BasePart).Position
-			local path = WorldPlan.GondolaPath(sky, platform.Position, platform.CFrame.ZVector, to)
-			for _, piece in ipairs(WorldPlan.GondolaCable(path, platform.CFrame.ZVector)) do
-				local cable = Kit.rod(
-					map,
-					"GondolaCable",
-					piece[1],
-					piece[2],
-					0.4,
-					Color3.fromRGB(70, 70, 75),
-					Enum.Material.Metal
-				)
-				Kit.decor(cable, false)
-			end
-		end
-		if townStation then
-			cableFrom(townStation)
-		end
-		cableFrom(base)
-	end)
-
-	-- The waterfall pouring off an outer isle into the river's spring.
-	step("6. The waterfall", function()
-		place(
-			persistent(IsleArt.Waterfall(fall.top.Y - fall.bottom.Y, 10)),
-			CFrame.lookAt(fall.top, fall.top + fall.dir) -- its -Z away from the isle
-		)
-	end)
-end)
+end
 
 ---------------------------------------------------------------------------
 -- 7. The edge of the world, the clock, and in you come
@@ -947,7 +1243,7 @@ end)
 -- Persistent, so every client always has the horizon however little of
 -- the terrain it has streamed in; looks only, so nothing collides, is
 -- clicked or touched, or casts a shadow.
-step("7. The backdrop", function()
+defer("7. The backdrop", 2, nil, function(slice)
 	local backdrop = Instance.new("Model")
 	backdrop.Name = "Backdrop"
 	backdrop.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
@@ -970,6 +1266,7 @@ step("7. The backdrop", function()
 		end
 		part.Transparency = piece.transparency
 		Kit.decor(part, false)
+		slice()
 	end
 	backdrop.Parent = map
 end)
@@ -1026,7 +1323,15 @@ workspace:SetAttribute("MapTrees", treesSpawned)
 workspace:SetAttribute("MapBuildFailures", failedSteps)
 
 -- The last three steps run whatever failed above.
+-- The forest is background work the summary line waits for (see LoadState).
+local planter = forestPlanter
+if planter then
+	LoadState.Track("forest")
+end
+
 -- The world is ready: GameServer starts when the sell area appears.
+LoadState.Gates.Set("world")
+LoadState.Stage("world")
 sellArea.Parent = map
 
 -- The ground is in: let everyone spawn.
@@ -1047,7 +1352,6 @@ loadLine(string.format("world ready for players (terrain %.1fs); the forest plan
 -- worth at a time, nearest the sawmill first. The night-only woods are
 -- re-checked against the clock once it is in (they were not there when it
 -- first ticked).
-local planter = forestPlanter
 if planter then
 	forestPlanter = nil
 	task.spawn(function()
@@ -1061,5 +1365,13 @@ if planter then
 			warn(string.format("[MapBuilder] the forest failed, the rest of the world is up:\n%s", tostring(err)))
 		end
 		WorldClock.Refresh()
+		LoadState.Finish("forest")
 	end)
 end
+
+-- The deferred build starts now, after the players can come in: NPCs and the
+-- town's dressing first, then the country, then the sky, each nearest the
+-- players first (LoadState.Queue; the `[Load] deferred ...` lines say what
+-- each step cost). GameServer adds the townsfolk to it as it starts.
+loadLine(string.format("deferred build starts: %d steps queued", LoadState.Queue.Pending()))
+LoadState.Queue.Start()

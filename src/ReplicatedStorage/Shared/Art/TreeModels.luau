@@ -101,6 +101,34 @@ function TreeModels.Crown(woodId: string): { CrownPiece }
 	return crowns[woodId] or {}
 end
 
+-- Every section and crown mesh id (MeshManifest's preload), sections first.
+function TreeModels.MeshIds(): { number }
+	local ids: { number } = {}
+	local seen: { [number]: boolean } = {}
+	local function add(id: number)
+		if id ~= 0 and not seen[id] then
+			seen[id] = true
+			table.insert(ids, id)
+		end
+	end
+	local woods: { string } = {}
+	for wood in pairs(sections) do
+		table.insert(woods, wood)
+	end
+	table.sort(woods)
+	for _, wood in ipairs(woods) do
+		for _, id in ipairs(sections[wood]) do
+			add(id)
+		end
+	end
+	for _, wood in ipairs(woods) do
+		for _, piece in ipairs(crowns[wood] or {}) do
+			add(piece.meshId)
+		end
+	end
+	return ids
+end
+
 function TreeModels.UsesMesh(meshId: number): boolean
 	return meshId ~= 0
 end
