@@ -29,6 +29,29 @@ local PAPER = "#F4ECD8"
 
 local METAL = "#3C3C41" -- the shipped switch post
 
+-- The same hexes as UITheme.Colors. Lane U owns that module, so the plate
+-- and the strips quote the tokens instead of requiring it.
+local INK = "#3C2814" -- Ink
+local CREAM = "#F5EBD7" -- Cream
+local ACCENT = {
+	GateAnd = "#4C8C40", -- Green
+	GateOr = "#FFB840", -- Amber
+	GateXor = "#2F6DB5", -- Blue
+	GateNot = "#C0503A", -- Danger
+	Delay = "#8FD3F2", -- Sky
+	Sustain = "#D08F1F", -- AmberDeep
+	Clock = "#BFE8FF", -- Ice
+}
+local MARK = {
+	GateAnd = "AND",
+	GateOr = "OR",
+	GateXor = "XOR",
+	GateNot = "NOT",
+	Delay = "DLY",
+	Sustain = "HOLD",
+	Clock = "CLK",
+}
+
 type Box = {
 	size: Vector3,
 	offset: Vector3,
@@ -37,6 +60,15 @@ type Box = {
 	light: boolean?,
 	leaf: boolean?,
 }
+
+local function strip(color: string, z: number, width: number?): Box
+	return {
+		size = V3(width or 1.4, 0.14, 0.16),
+		offset = V3(0, 0.22, z),
+		color = color,
+		material = "SmoothPlastic",
+	}
+end
 
 type Item = {
 	id: string,
@@ -149,7 +181,7 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = IRON, material = "Metal" },
+			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = INK, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(-0.45, 1.15, 0.4), color = STEEL, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(0.45, 1.15, 0.4), color = STEEL, material = "Metal" },
 			{
@@ -159,6 +191,7 @@ local items: { Item } = {
 				material = "Neon",
 				light = true,
 			},
+			strip(ACCENT.GateAnd, 0.64),
 		},
 		note = "On only when both inputs are on",
 	},
@@ -171,7 +204,7 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = IRON, material = "Metal" },
+			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = INK, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(-0.45, 1.15, 0.4), color = BRASS, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(0.45, 1.15, 0.4), color = BRASS, material = "Metal" },
 			{
@@ -181,6 +214,7 @@ local items: { Item } = {
 				material = "Neon",
 				light = true,
 			},
+			strip(ACCENT.GateOr, 0.64),
 		},
 		note = "On when either input is on",
 	},
@@ -193,7 +227,7 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = IRON, material = "Metal" },
+			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = INK, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(-0.45, 1.15, 0.4), color = BRICK, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(0.45, 1.15, 0.4), color = BRICK, material = "Metal" },
 			{
@@ -203,6 +237,7 @@ local items: { Item } = {
 				material = "Neon",
 				light = true,
 			},
+			strip(ACCENT.GateXor, 0.64),
 		},
 		note = "On when the inputs disagree",
 	},
@@ -215,7 +250,7 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = IRON, material = "Metal" },
+			{ size = V3(1.4, 1, 1.4), offset = V3(0, 0.5, 0), color = INK, material = "Metal" },
 			{ size = V3(0.3, 0.3, 0.3), offset = V3(0, 1.15, 0.4), color = STEEL, material = "Metal" },
 			{
 				size = V3(0.35, 0.35, 0.35),
@@ -224,6 +259,7 @@ local items: { Item } = {
 				material = "Neon",
 				light = true,
 			},
+			strip(ACCENT.GateNot, 0.64),
 		},
 		note = "On when its input is off",
 	},
@@ -236,8 +272,8 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.5, 1.1, 1.2), offset = V3(0, 0.55, 0), color = TIMBER, material = "Wood" },
-			{ size = V3(0.9, 0.7, 0.2), offset = V3(0, 0.9, -0.55), color = PAPER, material = "SmoothPlastic" },
+			{ size = V3(1.5, 1.1, 1.2), offset = V3(0, 0.55, 0), color = INK, material = "Wood" },
+			strip(ACCENT.Delay, 0.58, 1.5),
 			{
 				size = V3(0.35, 0.35, 0.35),
 				offset = V3(0.55, 1.25, 0),
@@ -257,8 +293,8 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.5, 1.1, 1.2), offset = V3(0, 0.55, 0), color = TIMBER, material = "Wood" },
-			{ size = V3(0.9, 0.7, 0.2), offset = V3(0, 0.9, -0.55), color = BRASS, material = "Metal" },
+			{ size = V3(1.5, 1.1, 1.2), offset = V3(0, 0.55, 0), color = INK, material = "Wood" },
+			strip(ACCENT.Sustain, 0.58, 1.5),
 			{
 				size = V3(0.35, 0.35, 0.35),
 				offset = V3(0.55, 1.25, 0),
@@ -278,11 +314,11 @@ local items: { Item } = {
 		tier = 1,
 		footprint = V2(2, 2),
 		boxes = {
-			{ size = V3(1.4, 1.4, 0.4), offset = V3(0, 0.9, 0), color = ANVIL, material = "Metal" },
-			{ size = V3(0.9, 0.9, 0.15), offset = V3(0, 0.9, -0.25), color = PAPER, material = "SmoothPlastic" },
+			{ size = V3(1.4, 0.8, 1.4), offset = V3(0, 0.4, 0), color = INK, material = "Metal" },
+			strip(ACCENT.Clock, 0.64),
 			{
 				size = V3(0.35, 0.35, 0.3),
-				offset = V3(0, 1.7, 0),
+				offset = V3(0, 1.05, 0),
 				color = GLOW,
 				material = "Neon",
 				light = true,
@@ -333,5 +369,39 @@ local items: { Item } = {
 		note = "A floor door that opens while it is on",
 	},
 }
+
+-- A readable name on the dark top of a gate, in cream GothamBold.
+-- BlueprintModels calls this for every build, ghost included.
+local function dress(model: Model, id: string)
+	local text = MARK[id]
+	if text == nil then
+		return
+	end
+	local host = model:FindFirstChild("Part1")
+	if host == nil or not host:IsA("BasePart") then
+		return
+	end
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "Mark"
+	gui.Face = Enum.NormalId.Top
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 70
+	gui.LightInfluence = 0
+	gui.Parent = host
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromHex(CREAM)
+	label.Text = text
+	label.Parent = gui
+end
+
+local api = items :: any
+api.Dress = dress
+api.Mark = MARK
+api.Accent = ACCENT
 
 return items
