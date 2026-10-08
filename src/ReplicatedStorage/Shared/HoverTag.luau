@@ -21,6 +21,8 @@
 --   * Step: one tag at a time, with a short hold so the tag does not flicker
 --     as the aim crosses a gap, and a cooldown after a dismissal.
 
+local OreData = require(script.Parent.Mining.OreData)
+local PickaxeData = require(script.Parent.Mining.PickaxeData)
 local ShopHoursLogic = require(script.Parent.ShopHoursLogic)
 local StoreStock = require(script.Parent.StoreStock)
 local Util = require(script.Parent.Util)
@@ -64,6 +66,8 @@ export type Spec = {
 	limited: boolean?,
 	robux: string?, -- a Robux item's price text; the cash price is then not shown
 	anchor: boolean?, -- of several things marked with one key, the one the tag sits over
+	tier: number?, -- ore rocks: the mine tier
+	need: number?, -- ore rocks: the pick level required (the same for everyone)
 }
 
 -- Writes the spec on `inst` as attributes and tags it. (Server and art code;
@@ -77,8 +81,31 @@ function HoverTag.Mark(inst: Instance, spec: Spec)
 	inst:SetAttribute("HoverLimited", if spec.limited == true then true else nil)
 	inst:SetAttribute("HoverRobux", spec.robux)
 	inst:SetAttribute("HoverAnchor", if spec.anchor == true then true else nil)
+	if spec.tier ~= nil then
+		inst:SetAttribute("HoverTier", spec.tier)
+	end
+	if spec.need ~= nil then
+		inst:SetAttribute("HoverNeed", spec.need)
+	end
 	pcall(function()
 		game:GetService("CollectionService"):AddTag(inst, HoverTag.Tag)
+	end)
+end
+
+-- Drops the mark so a broken node cannot keep a label. The tag goes too.
+function HoverTag.Clear(inst: Instance)
+	inst:SetAttribute("HoverKey", nil)
+	inst:SetAttribute("HoverName", nil)
+	inst:SetAttribute("HoverKind", nil)
+	inst:SetAttribute("HoverId", nil)
+	inst:SetAttribute("HoverShop", nil)
+	inst:SetAttribute("HoverLimited", nil)
+	inst:SetAttribute("HoverRobux", nil)
+	inst:SetAttribute("HoverAnchor", nil)
+	inst:SetAttribute("HoverTier", nil)
+	inst:SetAttribute("HoverNeed", nil)
+	pcall(function()
+		game:GetService("CollectionService"):RemoveTag(inst, HoverTag.Tag)
 	end)
 end
 
@@ -93,6 +120,8 @@ function HoverTag.SpecOf(inst: Instance): Spec?
 	end
 	local shop = inst:GetAttribute("HoverShop")
 	local robux = inst:GetAttribute("HoverRobux")
+	local tier = inst:GetAttribute("HoverTier")
+	local need = inst:GetAttribute("HoverNeed")
 	return {
 		key = key,
 		name = name,
@@ -102,6 +131,8 @@ function HoverTag.SpecOf(inst: Instance): Spec?
 		limited = inst:GetAttribute("HoverLimited") == true,
 		robux = if type(robux) == "string" then robux else nil,
 		anchor = inst:GetAttribute("HoverAnchor") == true,
+		tier = if type(tier) == "number" then tier else nil,
+		need = if type(need) == "number" then need else nil,
 	}
 end
 
@@ -153,6 +184,12 @@ export type Facts = {
 	loop: number, -- the core loop's number (CoreLoop.Active())
 	owned: boolean?, -- you already have this item
 	inStock: boolean?, -- false: nothing of it is on the shelf right now (nil: unknown, counts as in stock)
+	pickLevel: number?, -- best owned pickaxe level (player attribute PickLevel)
+}
+
+export type OreStyle = {
+	needs: boolean,
+	nameColor: Color3?,
 }
 
 export type State = "closed" | "owned" | "soldOut" | "price"
@@ -171,8 +208,30 @@ function HoverTag.StateOf(spec: Spec, facts: Facts): State
 	return "price"
 end
 
+-- Ore rocks: the name, the tier, and the pick the rock requires. "Needs
+-- <Pick>" when this player's best owned level is below that. No price.
+function HoverTag.OreLines(spec: Spec, facts: Facts): (string, string, OreStyle)
+	local ore = OreData.Get(spec.itemId)
+	local need = if type(spec.need) == "number" then spec.need else if ore then ore.hardness else 1
+	local tier = if type(spec.tier) == "number" then spec.tier else if ore then ore.tier else 1
+	local pickName = PickaxeData.NameForLevel(need)
+	local level = if type(facts.pickLevel) == "number" then facts.pickLevel else 0
+	local weak = level < need
+	local line = if weak
+		then string.format("Tier %d · Needs %s", tier, pickName)
+		else string.format("Tier %d · %s", tier, pickName)
+	return spec.name, line, {
+		needs = weak,
+		nameColor = if ore then ore.color else nil,
+	}
+end
+
 -- The tag's two lines: the name, and under it the price or the state.
-function HoverTag.Lines(spec: Spec, facts: Facts): (string, string)
+-- Ore rocks return a third value (colour and the needs flag) and never a price.
+function HoverTag.Lines(spec: Spec, facts: Facts): (string, string, OreStyle?)
+	if spec.kind == "Ore" then
+		return HoverTag.OreLines(spec, facts)
+	end
 	local state = HoverTag.StateOf(spec, facts)
 	if state == "closed" then
 		return spec.name, ShopHoursLogic.SignText(spec.shop :: string, facts.hour)

@@ -27,6 +27,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local HoverTag = require(ReplicatedStorage.Shared.HoverTag)
+local PickaxeData = require(ReplicatedStorage.Shared.Mining.PickaxeData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
@@ -360,21 +361,28 @@ local function show(key: string)
 		return
 	end
 	local g = ensureGui()
+	local levelAttr = player:GetAttribute(PickaxeData.LevelAttribute)
 	local facts: HoverTag.Facts = {
 		hour = ShopHoursLogic.Now(),
 		loop = CoreLoop.Active(),
 		owned = ownedFacts(spec),
 		inStock = vehicleInStock(spec),
+		pickLevel = if type(levelAttr) == "number" then levelAttr else 0,
 	}
-	local name, line = HoverTag.Lines(spec, facts)
+	local name, line, oreStyle = HoverTag.Lines(spec, facts)
 	local state = HoverTag.StateOf(spec, facts)
 	if nameLabel then
 		nameLabel.Text = name
+		nameLabel.TextColor3 = if oreStyle ~= nil and oreStyle.nameColor ~= nil then oreStyle.nameColor else C.Cream
 	end
 	if lineLabel then
 		lineLabel.Text = line
 		lineLabel.Visible = line ~= ""
-		lineLabel.TextColor3 = if state == "price" then C.Amber else C.Cream
+		if oreStyle ~= nil then
+			lineLabel.TextColor3 = if oreStyle.needs then C.Danger else C.Cream
+		else
+			lineLabel.TextColor3 = if state == "price" then C.Amber else C.Cream
+		end
 	end
 	if shownKey ~= key then
 		hidden = false

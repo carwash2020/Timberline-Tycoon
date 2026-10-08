@@ -2,6 +2,20 @@
 
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
+## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
+
+Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the wood supply cap at each stage (`MINING.md`). The Lux Pickaxe is not for sale.
+
+**Awaiting Connor**
+
+- Lux Pickaxe: a new pass, or a bundle with the Lux Axe pass (`StoreData` Lux Axe id 2005226878), and the price. `passId` stays 0. No StoreData row. Nothing is on sale. Do not run a purchase test until Connor says yes.
+- Tier 3 values were cut so a deep chamber stays under 0.8× Gloamwood $7,262 (tuned 0.71×, $5,160/h). Proposal was Timber Opal $150/$400 and Heartstone $400/$1,050, which came out at 4.64×. Tuned is $36/$70 and $80/$140. Confirm the cut, or name a higher comparison wood.
+- Whether the crafted Miner's Lamp should also count as the Lantern for Gloam. Default: no. It does light tier 3 mining.
+- Furniture (Copper Lamp Post, Gold-banded Chest) stays "Coming soon" until lane F can grant a placed piece.
+- No texture or mesh uploads. Rocks, picks, the furnace and the gear are part-built.
+
+Studio checks: PHASE2_NOTES.md, "Mining and crafting".
+
 Last updated 8 October 2026 (choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
