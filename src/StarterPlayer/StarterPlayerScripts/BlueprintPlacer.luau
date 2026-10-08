@@ -21,7 +21,6 @@ local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -38,6 +37,7 @@ local PlotPlatform = require(ReplicatedStorage.Shared.PlotPlatform)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
 local HUD = require(script.Parent.HUD)
+local PromptSwitch = require(script.Parent.PromptSwitch)
 local UITheme = require(script.Parent.UITheme)
 
 local BlueprintPlacer = {}
@@ -94,7 +94,6 @@ type State = {
 
 local state: State? = nil
 local placedListeners: { (Vector3) -> () } = {}
-local promptsWere: boolean? = nil -- ProximityPromptService.Enabled before placing
 local bar: Frame? = nil
 local barLabel: TextLabel? = nil
 -- The mouse is over the build bar: don't drag the ghost under the buttons
@@ -136,20 +135,13 @@ function BlueprintPlacer.NextRot(rot: number): number
 end
 
 local function hidePrompts()
-	if promptsWere == nil then
-		promptsWere = ProximityPromptService.Enabled
-	end
-	ProximityPromptService.Enabled = false
+	PromptSwitch.Hold("placer")
 end
 
--- Puts back the value saved in hidePrompts. Never forces Enabled on.
+-- Lets go of this placer's hold (PromptSwitch brings prompts back when nobody
+-- else holds them off: a dialogue box or a held piece still does).
 local function restorePrompts()
-	if promptsWere == nil then
-		return
-	end
-	local previous = promptsWere
-	promptsWere = nil
-	ProximityPromptService.Enabled = previous
+	PromptSwitch.Release("placer")
 end
 
 -- Your plot's centre on the platform's top (plot-local y = 0), if you have

@@ -15,7 +15,6 @@ local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
@@ -26,6 +25,7 @@ local WireLogic = require(ReplicatedStorage.Shared.WireLogic)
 local WireToolLogic = require(ReplicatedStorage.Shared.WireToolLogic)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
+local PromptSwitch = require(script.Parent.PromptSwitch)
 local UITheme = require(script.Parent.UITheme)
 
 local WireTool = {}
@@ -40,7 +40,6 @@ local ACTIONS = { "WirePick", "WireCut", "WireDone" }
 local active = false
 local building = false
 local picked: string? = nil
-local promptsWere: boolean? = nil
 local conns: { RBXScriptConnection } = {}
 local selection: SelectionBox? = nil
 local folder: Folder? = nil
@@ -279,10 +278,7 @@ function WireTool.Stop()
 	for _, name in ipairs(ACTIONS) do
 		ContextActionService:UnbindAction(name)
 	end
-	if promptsWere ~= nil then
-		ProximityPromptService.Enabled = promptsWere
-		promptsWere = nil
-	end
+	PromptSwitch.Release("wire")
 	if selection then
 		selection:Destroy()
 		selection = nil
@@ -318,10 +314,7 @@ function WireTool.Begin(stopped: (() -> ())?)
 	active = true
 	picked = nil
 	onStop = stopped
-	if promptsWere == nil then
-		promptsWere = ProximityPromptService.Enabled
-	end
-	ProximityPromptService.Enabled = false
+	PromptSwitch.Hold("wire")
 	local char = player.Character
 	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
 	if humanoid then

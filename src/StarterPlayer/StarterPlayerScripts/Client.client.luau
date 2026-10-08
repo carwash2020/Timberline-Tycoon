@@ -57,6 +57,7 @@ local MODULES = {
 	"NPCController",
 	"PlotPickerUI",
 	"PlotUI",
+	"PromptSwitch",
 	"PromptUI",
 	"Quality",
 	"QualityDressing",

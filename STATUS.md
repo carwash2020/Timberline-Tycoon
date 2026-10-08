@@ -4,6 +4,8 @@ Last updated 8 October 2026 (NPC talk lock, branch `claude/npc-talk-lock` on top
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
+- **Hotfix `claude/fix-shop-talk-buy` (8 October 2026, not merged):** Talk and Buy prompts went dead after #107-#111 (the global prompt switch was saved and restored by four scripts that overlap); now `PromptGate` / `PromptSwitch` hold it by name. Open until Connor confirms on Xbox: see PHASE2_NOTES.md "Hotfix: Talk and Buy prompts". Output tags to send back: `[Talk]`, `[PromptSwitch]`, `[Drag]`.
+
 ## Who and how
 
 - Owner: Connor. A beginner on Windows PowerShell (also has a Mac): give commands one per line, never chained with `&&`, and never print secrets.

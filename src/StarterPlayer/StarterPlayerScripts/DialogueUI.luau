@@ -25,7 +25,6 @@
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
@@ -35,6 +34,7 @@ local NPCData = require(ReplicatedStorage.Shared.NPCData)
 local Net = require(ReplicatedStorage.Shared.Net)
 local GamepadNav = require(script.Parent.GamepadNav)
 local HudRules = require(script.Parent.HudRules)
+local PromptSwitch = require(script.Parent.PromptSwitch)
 local UITheme = require(script.Parent.UITheme)
 
 local DialogueUI = {}
@@ -323,7 +323,7 @@ function DialogueUI.Start()
 		end)
 	end
 
-	local function hide()
+	local function hide(why: string?)
 		local was = state ~= nil
 		local spoke = if state then state.speaker else ""
 		holder.Visible = false
@@ -335,18 +335,26 @@ function DialogueUI.Start()
 			ContextActionService:UnbindAction(ACTION)
 			bound = false
 		end
-		GamepadNav.Restore(column) -- the box's own selection goes; the HUD button it came from gets it back
 		if was then
+			print(string.format("[Talk] box closed: %s (%s)", spoke, why or "dismissed"))
 			player:SetAttribute("TalkOpen", false)
 			-- Every other prompt comes back a moment later, so the press that
-			-- closed the box does not also fire one.
+			-- closed the box does not also fire one. Scheduled before anything
+			-- below that could throw: prompts must never stay off.
 			promptToken += 1
 			local token = promptToken
 			task.delay(DialogueFlow.ReenableDelay, function()
 				if promptToken == token then
-					ProximityPromptService.Enabled = true
+					PromptSwitch.Release("dialogue")
 				end
 			end)
+		end
+		-- The box's own selection goes; the HUD button it came from gets it back.
+		local restored, restoreErr = (pcall :: any)(function()
+			GamepadNav.Restore(column)
+		end)
+		if not restored then
+			warn("[Talk] GamepadNav.Restore failed: " .. tostring(restoreErr))
 		end
 		if was then
 			sendEnd(spoke)
@@ -358,10 +366,10 @@ function DialogueUI.Start()
 		end
 	end
 
-	local function choose(which: string)
+	local function choose(which: string, why: string?)
 		local uid = boxUid
 		local offer = choosing
-		hide()
+		hide(why or which)
 		if offer and uid ~= nil then
 			Net.Remote("Dialogue"):FireServer("pick", which, uid)
 		end
@@ -427,6 +435,16 @@ function DialogueUI.Start()
 		)
 	end
 
+	-- Whether the plot picker is really on this screen. The server's Picking
+	-- attribute says a picker was offered; it is only a reason to close this
+	-- box while the picker itself is up (a Picking left set must not make
+	-- every box close the moment it opens).
+	local function pickerShowing(): boolean
+		local playerGui = player:FindFirstChild("PlayerGui")
+		local picker = if playerGui then playerGui:FindFirstChild("PlotPicker") else nil
+		return picker ~= nil and picker:IsA("ScreenGui") and picker.Enabled
+	end
+
 	-- Close when the talk is over by walking: a few times a second.
 	local function watch()
 		if watching then
@@ -454,14 +472,14 @@ function DialogueUI.Start()
 					gone = model ~= nil and not model:IsDescendantOf(workspace),
 					asleep = model ~= nil and not asleepAtOpen and model:GetAttribute("Asleep") == true,
 					playerDown = hrp == nil or (humanoid ~= nil and humanoid.Health <= 0),
-					panelOpen = player:GetAttribute("Picking") == true,
+					panelOpen = player:GetAttribute("Picking") == true and pickerShowing(),
 					openFor = os.clock() - openedAt,
 				})
 				if reason ~= nil then
 					if choosing then
-						choose("no") -- walked away from an offer: a No, and the box is put back
+						choose("no", reason) -- walked away from an offer: a No, and the box is put back
 					else
-						hide()
+						hide(reason)
 					end
 				end
 			end
@@ -479,6 +497,15 @@ function DialogueUI.Start()
 		if state ~= nil and state.speaker ~= convo.speaker then
 			sendEnd(state.speaker) -- and its speaker is let go
 		end
+		print(
+			string.format(
+				"[Talk] box open: %s (%d page%s%s)",
+				convo.speaker,
+				#convo.pages,
+				if #convo.pages == 1 then "" else "s",
+				if isChoice then ", offer" else ""
+			)
+		)
 		state = convo
 		choosing = isChoice
 		boxUid = uid
@@ -490,8 +517,8 @@ function DialogueUI.Start()
 		place() -- the hotbar or window may have changed since the last box
 		holder.Visible = true
 		player:SetAttribute("TalkOpen", true)
-		promptToken += 1 -- a pending re-enable from the last box must not undo this
-		ProximityPromptService.Enabled = false
+		promptToken += 1 -- a pending release from the last box must not undo this
+		PromptSwitch.Hold("dialogue")
 		bind()
 		watch()
 		if HudRules.PadSelects(UITheme.Device()) then
