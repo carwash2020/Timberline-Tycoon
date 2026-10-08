@@ -52,6 +52,7 @@ local MODULES = {
 	"LeaderboardUI",
 	"LifeFX",
 	"LightingController",
+	"LogicPanelUI",
 	"LuxFX",
 	"MenuPad",
 	"NPCController",
