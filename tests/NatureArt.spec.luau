@@ -717,6 +717,55 @@ return function(t)
 		end
 	end)
 
+	t.test("with the uploaded ids nothing falls back and nothing is told as missing", function()
+		local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+		local Instance = t.roblox.Instance
+		local loader = t.loader()
+		local Fresh = loader:load("ReplicatedStorage/Shared/Art/NatureArt")
+		local FreshKit = loader:load("ReplicatedStorage/Shared/Art/MeshKit")
+		FreshKit.Reset()
+		FreshKit.Override = function(_id, name, size)
+			local part = Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local RockModels = loader:load("ReplicatedStorage/Shared/Art/RockModels")
+		local models = {}
+		for _, kind in ipairs(RockModels.Shapes) do
+			for seed = 0, 3 do
+				for _, look in ipairs(Fresh.RockLooks) do
+					for _, size in ipairs(Fresh.Sizes) do
+						table.insert(models, Fresh.Build(kind, seed, size, look))
+					end
+				end
+			end
+			table.insert(models, Fresh.OreRock(kind, "mid", Color3.fromRGB(255, 0, 0), Enum.Material.Metal, false))
+		end
+		for _, shape in ipairs({ "boulder", "split", "standing", "slab", "mossy", "pebbles" }) do
+			for _, ore in ipairs({ "coal", "copper", "iron", "silver", "gold", "opal", "heartstone" }) do
+				table.insert(
+					models,
+					Fresh.OreRock(shape, "large", Color3.fromRGB(0, 0, 0), Enum.Material.Slate, false, ore)
+				)
+			end
+		end
+		table.insert(models, Fresh.CaveMouth())
+		local meshed = 0
+		for _, m in ipairs(models) do
+			t.eq(m:GetAttribute("MeshFallback"), nil, "no fallback on " .. m.Name)
+			if m:GetAttribute("RockMesh") == true then
+				meshed += 1
+			end
+		end
+		t.eq(meshed, #models, "every rock, ore rock and the cave mouth is meshed")
+		for _, line in ipairs(loader.warnings) do
+			t.ok(string.find(line, "mesh is missing", 1, true) == nil, line)
+		end
+		FreshKit.Override = nil
+		MeshKit.Reset()
+	end)
+
 	t.test("the cave mouth is meshed with a hidden collider, or part-built with a light", function()
 		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
 		local spec = RockModels.Scenery("CaveMouth")

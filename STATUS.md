@@ -22,6 +22,8 @@ Rocks are six families (`Boulder`, `CrackedBoulder`, `Spire`, `Slab`, `PebbleClu
 
 The preview renderer multiplies a mesh by its part colour only when the manifest entry says `"tint": true` (the rock vertex colours are greyscale shading, so without it the rocks draw white); `tools/preview/viewer.html` and `export.luau` carry that opt-in and nothing else changed there. A mossy ore rock's moss cap uses the meadow cap green, not the ore host's grey, so it reads as moss.
 
+`src/ReplicatedStorage/MeshTemplates/<meshId>.model.json` now exists for all 84 rock, cave and rubble ids (the same MeshPart format as the other templates), so MeshKit finds each piece in Studio and no rock falls back. `tests/RockModels.spec` checks that every id `RockModels.MeshIds()` returns has a template, and `tests/NatureArt.spec` builds every kind, variant, look, size, ore shape and the cave mouth and asserts no `MeshFallback` attribute and no "mesh is missing" warning. The fallback code stays for an id of 0 or a missing template.
+
 Cave mouth placement is not wired here: B's `UndergroundData.MineMouth` does not exist on this branch (see the PR's cross-lane requests).
 
 **Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.

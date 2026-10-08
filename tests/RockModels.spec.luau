@@ -251,4 +251,17 @@ return function(t)
 		near(tunnel.pieces.Collision.size, { 16, 12, 6 }, "tunnel blocker size")
 		t.eq(RockModels.Scenery("Nope"), nil)
 	end)
+
+	t.test("every id RockModels.MeshIds() returns has a MeshTemplates file", function()
+		local fs = require("@lune/fs")
+		local ids = RockModels.MeshIds()
+		t.eq(#ids, 84)
+		for _, id in ipairs(ids) do
+			local path = "src/ReplicatedStorage/MeshTemplates/" .. tostring(id) .. ".model.json"
+			t.ok(fs.isFile(path), "missing template " .. path)
+			local text = fs.readFile(path)
+			t.ok(string.find(text, '"className": "MeshPart"', 1, true) ~= nil, path .. " is a MeshPart")
+			t.ok(string.find(text, "rbxassetid://" .. tostring(id) .. '"', 1, true) ~= nil, path .. " names its own id")
+		end
+	end)
 end
