@@ -5,6 +5,7 @@
 -- empty and pays its own fee. Resizing changes only the fee difference.
 -- woodUnits is never saved; it is worked out from the size.
 
+local GameConfig = require(script.Parent.GameConfig)
 local PieceSize = require(script.Parent.PieceSize)
 local PlotData = require(script.Parent.PlotData)
 local PlotLogic = require(script.Parent.PlotLogic)
@@ -26,6 +27,7 @@ EditLogic.Reasons = {
 	"overlap",
 	"bounds",
 	"cap",
+	"placed",
 	"cash",
 	"group",
 	"gone",
@@ -63,6 +65,8 @@ function EditLogic.Message(reason: string?): string?
 		return "That's outside your plot."
 	elseif reason == "cap" then
 		return string.format("Your plot holds %d kit pieces at most.", PlotData.MaxKit)
+	elseif reason == "placed" then
+		return string.format("Your plot holds %d placed pieces at most.", GameConfig.PlacedCap)
 	elseif reason == "cash" then
 		return "You don't have enough for that."
 	elseif reason == "group" then
@@ -173,6 +177,9 @@ local function refuseCheck(ok: boolean, why: string?): (boolean, string?)
 	end
 	if type(why) == "string" and string.find(why, "kit pieces", 1, true) then
 		return false, "cap"
+	end
+	if type(why) == "string" and string.find(why, "placed pieces", 1, true) then
+		return false, "placed"
 	end
 	return false, "overlap"
 end

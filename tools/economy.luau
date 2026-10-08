@@ -35,6 +35,7 @@ local ForestLogic = modules:shared("ForestLogic")
 local TreeGen = modules:shared("TreeGen")
 local SectionLogic = modules:shared("SectionLogic")
 local SawmillLogic = modules:shared("SawmillLogic")
+local SellLogic = modules:shared("SellLogic")
 
 local TutorialData = modules:shared("TutorialData")
 local TutorialGrove = modules:shared("TutorialGrove")
@@ -379,10 +380,31 @@ local function milledShare(mill, wood): number
 	return math.clamp((trunk + limbs) / tree.volume, 0, 1)
 end
 
+-- The best planer owned, by boardBonus. Nil until the player buys one.
+local function bestPlaner(owned)
+	local best = nil
+	for _, machine in pairs(ItemCatalog.Machines) do
+		local planer = machine.planer
+		if planer and owned[machine.id] then
+			if not best or planer.boardBonus > best.boardBonus then
+				best = planer
+			end
+		end
+	end
+	return best
+end
+
 -- $/u³ this load actually sells for, and the share of it that was milled.
-local function unitPrice(wood, mill): (number, number)
+-- A log is price × t. A plank is price × min(BonusCap, mill × board × t).
+-- t stays 1 until a Prosperous axe is something the player can buy.
+local function unitPrice(wood, mill, planer): (number, number)
 	local share = milledShare(mill, wood)
-	return wood.v2.logPrice * (1 - share) + wood.v2.plankPrice * share, share
+	local temper = 1
+	local log = wood.v2.logPrice * SellLogic.Temper(temper)
+	local millBonus = if mill then mill.plankBonus else 1
+	local boardBonus = if planer then planer.boardBonus else 1
+	local plank = wood.v2.plankPrice * SellLogic.Stack(millBonus, boardBonus, temper)
+	return log * (1 - share) + plank * share, share
 end
 
 -- One load of `wood`: (seconds, cash, $/u³) for a perfect player, or nil.
@@ -390,7 +412,16 @@ end
 -- extra time still pays. Milled pieces are bucked down to the mill's length.
 local function loadCycle(axe, wood, owned, cash: number?)
 	local b = BiomeData.Get(wood.biome)
-	if b.nightOnly or (b.requiresGear and not owned[b.requiresGear]) then
+	if b.requiresGear and not owned[b.requiresGear] then
+		return nil
+	end
+	-- Frostwood needs the coat. The snow only slows you without it; the
+	-- model will not cut frostwood until the coat is owned.
+	if wood.id == "frostwood" and not owned.InsulatedCoat then
+		return nil
+	end
+	-- The Sky Pass is a $30,000 quest turn-in (GondolaPass), not a shelf price.
+	if b.access == "gondola" and not owned.GondolaPass then
 		return nil
 	end
 	local cap, tripSec, fee, _, bedLen = haulFor(b, owned)
@@ -411,7 +442,7 @@ local function loadCycle(axe, wood, owned, cash: number?)
 	end
 	local secs, earned, price = trip(bedLen, wood.v2.logPrice, 0)
 	local mill = bestMill(owned)
-	local plankPrice, share = unitPrice(wood, mill)
+	local plankPrice, share = unitPrice(wood, mill, bestPlaner(owned))
 	if mill and share > 0 and secs then
 		local fitLen = math.min(bedLen, mill.maxLength * U)
 		local _, pieces = treeWork(axe, wood, fitLen)
@@ -421,6 +452,10 @@ local function loadCycle(axe, wood, owned, cash: number?)
 		if mSecs and mEarned and mEarned / mSecs > earned / secs then
 			secs, earned, price = mSecs, mEarned, mPrice
 		end
+	end
+	-- Gloam is up 10 hours of the day. The rate over a full day is 10/24.
+	if b.nightOnly and secs then
+		secs *= 24 / 10
 	end
 	return secs, earned, price
 end
@@ -537,11 +572,25 @@ local function simulate()
 	local events = { firstSale = t }
 	local steps = {}
 	local candidates = {}
-	for _, list in ipairs({ ItemCatalog.Trucks, ItemCatalog.Trailers, ItemCatalog.Gear, ItemCatalog.Sawmills }) do
+	for _, list in ipairs({
+		ItemCatalog.Trucks,
+		ItemCatalog.Trailers,
+		ItemCatalog.Gear,
+		ItemCatalog.Sawmills,
+		ItemCatalog.Machines,
+	}) do
 		for _, item in pairs(list) do
-			table.insert(candidates, item)
+			if item.quest ~= true then
+				table.insert(candidates, item)
+			end
 		end
 	end
+	table.insert(candidates, {
+		id = "GondolaPass",
+		displayName = "Sky Pass",
+		priceCash = 30000,
+		v2 = { price = 30000 },
+	})
 	table.sort(candidates, function(a, b)
 		return a.id < b.id
 	end)
@@ -711,7 +760,7 @@ line(
 )
 line()
 line(
-	"Not modelled, on purpose: each mill tier's `plankBonus` (1.0 to 1.5 on a plank's sale value), the Planer line and the conveyor kit are late-game sinks (V2_PLAN §2h). The model prices every plank at the plain plan price. Modelling the bonus with the best mill the player owns takes the full plot from about 30 h to about 21 h (tried 6 October 2026), outside the 28–36 h range, so a bonus smaller than about 1.05 at the top tier is the most the model could carry; the shipped bonuses are a Connor decision (see PHASE2_NOTES.md, Mill and planer tiers)."
+	"Modelled: the sawmill `plankBonus` and the planer `boardBonus` the player owns, capped together with temper `t` (SellLogic.Stack; `t` is 1 until Prosperous is a purchase). Gloam earns 10/24 of its night rate. Frostwood waits for the Insulated Coat. The Sky Pass is a $30,000 turn-in before lumenwood. Conveyor belts are bought only when they raise the rate, which this model does not give them."
 )
 line()
 line("## Headline targets (V2_PLAN §17)")
@@ -730,7 +779,13 @@ target(
 	480
 )
 target("First $1k earned", "15-20 min", events.thousand, 900, 1200)
-target("Cobalt Axe ($3,000)", "about 1 h", events.CobaltAxe or math.huge, 2700, 4500)
+target(
+	"Cobalt Axe (" .. money(ItemCatalog.GetAxe("CobaltAxe").v2.price) .. ")",
+	"about 1 h",
+	events.CobaltAxe or math.huge,
+	2700,
+	4500
+)
 target("Full plot (" .. money(A.plotPrice) .. ")", "28-36 h", events.plot, 28 * 3600, 36 * 3600)
 line()
 line("## CI ranges")
@@ -749,7 +804,7 @@ line(string.format("| Full plot (E4) | 28–36 h (100800–129600 s) | %.0f s |"
 line()
 line(
 	string.format(
-		"The first $1,000 in this model is %s (%.0f s). That is under the original 15-minute floor in the table above. The CI floor for that row is 13 minutes (780 s) so today's model passes; the headline verdict still scores 15–20 min with the report's slack.",
+		"The first $1,000 in this model is %s (%.0f s). The CI range is 13–20 min (780–1200 s). The headline verdict above scores 15–20 min.",
 		duration(events.thousand),
 		events.thousand
 	)

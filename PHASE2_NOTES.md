@@ -8,6 +8,10 @@ passes (formatter, linter, strict types against the Roblox API, 351 unit
 tests, ECONOMY.md current); GitHub runs it on every push.
 
 What's here, each with its own checklist below:
+
+15. **V1 economy core** (8 October 2026, branch `phase-2/v1-a1-economy-core`): climate damage, the Prosperous stamp, prices, and the save contract
+
+
 1. **The redesign (October 2026):** every model rebuilt, the world on
    terrain, a living environment, the Living Forest twist, feel and fixes
 2. **Axe shop**: the Tool Shed
@@ -34,6 +38,18 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## V1 economy core (8 October 2026, branch `phase-2/v1-a1-economy-core`)
+
+Not seen in Studio. The model (ECONOMY.md) is 68 s / 5.4 min / 17.9 min / 66.3 min / 33.5 h. Lane B, after this merges, edits only BiomeData haul distances and possibly `GameConfig.ExpansionPriceStep`, then reruns `lune run tools/economy`.
+
+**Snow and the volcano.** Stand in the Snowfields with no coat. The player attribute `Exposure` climbs from 0 to 1 over 8 seconds and `ClimateKind` is `snow`; health does not drop until the meter is full, then about 4 per second. Sit in a vehicle seat: `Exposure` stops where it is. Step back to the forest, equip the Insulated Coat, or respawn: `Exposure` goes to 0 and the damage stops. On the volcano, outside the crater, the same meter fills over 6 seconds and then health drops about 6 per second; Heat Boots clear it. Inside the crater the old lava burn stays (5 per second) and `ClimateKind` stays empty.
+
+**Prosperous (`t`).** Fell with an axe whose temper is Prosperous I, II or III. The log's attribute `t` is 1.04, 1.07 or 1.10. Run it through a sawmill and a planer: the plank still has that `t`. Load it, unload it, leave and rejoin: `t` is still there. Sell it. A log pays its price times `t`. A plank pays its price times min(3, mill bonus × board bonus × `t`). An axe with no Prosperous temper has no `t`. Truck paint is unchanged.
+
+**Prices and the pass.** The Tool Shed shows the Steel Axe at $110 and the Cobalt Axe at $2,500. The Sky Pass is not on a shelf. With under $5, recalling a truck is free; with $5 or more it is the usual fee (5%, at least $5), and Tow Service is still free. A new plot's expansion squares use the $7,600 step.
+
+**Saves.** A brand-new profile's `worldVersion` is 1. Nothing here moves a parked truck; that waits until the map's version goes to 2. An old save keeps its cash, axes, trucks, placed pieces and the sections on its truck and on the ground. The shop prices that moved are the Steel Axe ($110, was $120), the Cobalt Axe ($2,500, was $3,000), frostwood planks (plan 120, plank scale 0.40) and the expansion step ($7,600, was $3,050). There is no trade window.
 
 ## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
 

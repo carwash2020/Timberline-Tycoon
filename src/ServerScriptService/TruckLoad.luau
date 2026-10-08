@@ -303,7 +303,8 @@ local function valueOf(model: Model): number
 		attrNumber(model, "Boost"),
 		model:GetAttribute("LuxCut") == true,
 		attrNumber(model, "MillBonus"),
-		attrNumber(model, "BoardBonus")
+		attrNumber(model, "BoardBonus"),
+		attrNumber(model, "t")
 	)
 end
 
@@ -883,6 +884,7 @@ function TruckLoad.SnapshotAt(model: Model, ref: CFrame, bedName: string): Saved
 		table.insert(s, LeftLoad.EncodeSection(part.Size, root.CFrame:ToObjectSpace(part.CFrame), facesOn(part, faces)))
 	end
 	local boost = attrNumber(model, "Boost")
+	local stamp = SellLogic.Temper(attrNumber(model, "t"))
 	return {
 		w = woodId,
 		k = if model:GetAttribute("Kind") == "plank" then "plank" else "log",
@@ -891,6 +893,7 @@ function TruckLoad.SnapshotAt(model: Model, ref: CFrame, bedName: string): Saved
 		l = if model:GetAttribute("LuxCut") == true then true else nil,
 		m = attrNumber(model, "MillBonus"),
 		d = attrNumber(model, "BoardBonus"),
+		t = if stamp > 1 then stamp else nil,
 		bed = bedName,
 		at = LeftLoad.EncodeCFrame(ref:ToObjectSpace(root.CFrame)),
 		s = s,
@@ -1042,7 +1045,7 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 		return nil
 	end
 	local lux = saved.l == true
-	local value = SellLogic.PieceValue(wood.id, kind, volume, saved.f, saved.x, lux, saved.m, saved.d)
+	local value = SellLogic.PieceValue(wood.id, kind, volume, saved.f, saved.x, lux, saved.m, saved.d, saved.t)
 	model:AddTag("Wood")
 	model:SetAttribute("Uid", uid)
 	model:SetAttribute("Owner", owner.UserId)
@@ -1064,6 +1067,10 @@ function TruckLoad.Build(saved: SavedPiece, owner: Player, cf: CFrame, graceSec:
 	end
 	if kind == "plank" and saved.d and saved.d > 1 then
 		model:SetAttribute("BoardBonus", SellLogic.Bonus(saved.d))
+	end
+	local stamp = SellLogic.Temper(saved.t)
+	if stamp > 1 then
+		model:SetAttribute("t", stamp)
 	end
 	model:SetAttribute("HeldBy", 0)
 	model:PivotTo(cf)

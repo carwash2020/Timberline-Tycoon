@@ -2515,6 +2515,7 @@ function PlotService.FillStep()
 								lux = piece.lux,
 								mill = piece.mill,
 								board = piece.board,
+								temper = piece.temper,
 							}, player.UserId, api)
 							if changed then
 								local model = slot.items:FindFirstChild(item.uid)
