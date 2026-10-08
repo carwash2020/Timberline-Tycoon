@@ -1176,7 +1176,7 @@ function BuildingArt.Sawmill(scale: number?): Model
 	sawdust(model, CF(15.4, 0, -11), 2.8, rng)
 	-- The office yard's stack sits behind the cabin. The ground in front of
 	-- the office door stays clear for the foreman.
-	lumberStack(model, CF(-19.4, 0, 12.2) * ANG(0, PI / 2, 0), 5.4, 2.2, 3, 2, rng)
+	lumberStack(model, CF(-19.4, 0, 12.2) * ANG(0, PI / 2, 0), 4.4, 2.2, 3, 2, rng)
 	barrel(model, CF(-9.5, 0, 11.0), rng, true)
 	crate(model, CF(-12.2, 0, 12.2) * ANG(0, 0.2, 0), 1.8, rng, true)
 	crate(model, CF(-12.1, 1.8, 12.3) * ANG(0, -0.25, 0), 1.3, rng, true)
