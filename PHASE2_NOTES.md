@@ -42,7 +42,7 @@ tutorial).
 
 ## Sparkworks logic sandbox (8 October 2026, branch `phase-2/v1-s-sparkworks`)
 
-Connor wants Sparkworks in V1, and he wants to see the pieces before they merge. Renders (names only, no prices on the models): `previews/v1-s/pieces.png` (two rows, 3/4 view), `previews/v1-s/wired.png` (lever and button into AND into a lamp, unlit beside lit), `previews/v1-s/settings-panel-phone.png` (667x375) and `previews/v1-s/settings-panel-desktop.png` (1920x1080, the selection ring on minus). Panel colors are UITheme's. `SparkworksTheme.Layer = 16` is local until Lane U adds it.
+Connor wants Sparkworks in V1, and he wants to see the pieces before they merge. Renders (names only, no prices on the models): `previews/v1-s/pieces-1.png` through `previews/v1-s/pieces-4.png` (at most four pieces, 3/4 from about 12 studs, name on a ground plaque), `previews/v1-s/wired.png` (lever and button into AND into a lamp, unlit beside lit, straight wires), `previews/v1-s/settings-panel-phone.png` (667x375) and `previews/v1-s/settings-panel-desktop.png` (1920x1080, the selection ring on minus). Panel colors are UITheme's. `SparkworksTheme.Layer = 16` is local until Lane U adds it.
 
 What shipped: Button $320, Lever $520, Pressure Plate $640, Wall Switch $100, AND/OR/XOR $260, NOT $200, Delay $520, Sustain $520, Clock $902, Spark Lamp $150, Glow Wire $720, Hatch $830. A Door you already own can be wired. Bought once, then placed free. The Wall Switch and Spark Lamp stay on Hearth & Home until Lane F stocks Sparkworks from `SparkworksStock` (anyone who already owns one keeps it). Laser, Detector and Wood Detector are not in this pass (V1.1).
 
