@@ -24,6 +24,8 @@ What's here, each with its own checklist below:
 
 14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
 
+15. **V1 buildings, shops, props and palette** (8 October 2026, branch `phase-2/v1-c-buildings`): one style for the town buildings, shops at 250 parts or fewer, new small buildings, renders in `previews/v1-c/`
+
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
 
 Where the redesign changed something an older section describes (the
@@ -33,6 +35,30 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## V1 buildings, shops, props and palette (8 October 2026, branch `phase-2/v1-c-buildings`)
+
+One upgraded look for the town buildings. Shops keep the pinned footprints (Tool Shed half-depth 15 and half-width 11.9, Hearth 16.5 by 14.5, Dealership hall x 181 to 336). The axe rack is still a stepped shelf with a tier-colour block per axe; each rack axe is a two-part silhouette so the whole Tool Shed stays at or under 250 parts. Prices are not printed on the models. The live Land Office in the world is still `PlotService`'s own model (this lane only adds `BuildingArt.LandOffice`, with no price on the sign). Renders for Connor: every path under `previews/v1-c/` listed in STATUS.md.
+
+**PC**
+
+- Walk the spawn road to the sawmill, the Tool Shed, Hearth and Home, and the Dealership. Each reads as the same timber-and-slate style: stone-coloured base, honey plank walls, a roof, a porch, a lit sign.
+- Tool Shed: blue sign (#3A6FD8). Step in. The counter top is at the same height as before. The axe rack is on the back wall, blades to the left, stepped, one colour block per axe. Buy an axe; the box still comes off the shelf.
+- Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
+- Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
+- Weigh House: red metal roof, a round scale on the side. No new price text.
+- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage, sky forge court (anvil, order board, four relic sockets).
+
+**Phone emulator**
+
+- Same walk. Shops should stay readable and not hitch when you enter (Tool Shed 241 parts, Hearth and Home 195, Dealership 215, sawmill 398).
+- Signs stay readable at the door. Windows and the porch lantern are the only small lights on the shop fronts.
+
+**Xbox**
+
+- Same walk with the stick. Door prompts still appear in range. Talk to the keeper; the counter does not block the prompt. Aim at an axe on the rack: the hover tag still shows the name and price (nothing on the model itself).
+
+Good: one family of colours, no dollar signs on buildings, doors and counters where they were, rack still stepped. Bad: a shop over 250 parts, a price painted on a sign, the Tool Shed rack missing a sold axe, grass under the Hearth porch, or the Dealership porch lamp brighter than the showroom.
 
 ## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
 

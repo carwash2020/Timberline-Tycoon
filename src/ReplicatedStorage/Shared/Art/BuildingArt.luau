@@ -30,6 +30,8 @@ local StoreStock = require(script.Parent.Parent.StoreStock)
 local HoverTag = require(script.Parent.Parent.HoverTag)
 local WoodData = require(script.Parent.Parent.WoodData)
 local Kit = require(script.Parent.Kit)
+local Palette = require(script.Parent.Palette)
+local SpecBuild = require(script.Parent.SpecBuild)
 local DealershipLot = require(script.Parent.DealershipLot)
 local ShopFacade = require(script.Parent.ShopFacade)
 local PropArt = require(script.Parent.PropArt)
@@ -57,44 +59,70 @@ end
 -- Palette (warm, toy-like; see concept-art/sawmill-vista)
 ---------------------------------------------------------------------------
 
-local PLANK = { hex("#A4693E"), hex("#B07548"), hex("#985F37"), hex("#BC804D") }
-local PLANK_DARK = { hex("#7E502E"), hex("#885731"), hex("#724828") }
-local CABIN = { hex("#9A5733"), hex("#A6623A"), hex("#8C4F2E"), hex("#B06B40") }
-local TIMBER = hex("#5B3920")
-local TIMBER_LIGHT = hex("#7A4C2B")
-local STONE = { hex("#9C968D"), hex("#ABA498"), hex("#89837B"), hex("#B4AB9D") }
-local MORTAR = hex("#6F6A63")
-local SHINGLE = { hex("#8B4831"), hex("#9A5338"), hex("#7E402C"), hex("#A65E3D") }
-local BARN_ROOF = { hex("#5E4B45"), hex("#6A5650"), hex("#54433E"), hex("#715C55") }
-local SLATE_ROOF = { hex("#5D6B7C"), hex("#687889"), hex("#53606F"), hex("#72839A") }
-local TIN_ROOF = { hex("#8D99A3"), hex("#97A3AD"), hex("#83909A") }
-local ROOF_DECK = hex("#4E3220")
-local TRIM = hex("#F2E7CF")
-local IRON = hex("#3B3634")
-local STEEL = hex("#C9CED3")
-local STEEL_DARK = hex("#8E959C")
-local BRICK = hex("#A8553D")
-local BRICK_DARK = hex("#8A4532")
-local SOOT = hex("#3F3633")
-local BARK = hex("#76492A")
-local HEART = hex("#E4BD83")
-local LUMBER = hex("#D9AE72")
-local SAWDUST = { hex("#EAC686"), hex("#DFB670"), hex("#F3D79D") }
-local CANVAS = hex("#E8D9B8")
-local CANVAS_DARK = hex("#CDBB97")
-local SOIL = hex("#5C3F2E")
-local LEAF = { hex("#5DA24A"), hex("#6FB352"), hex("#4C8F3E") }
+local PLANK = {
+	Palette.PlankHoney,
+	Kit.shade(Palette.PlankHoney, -0.08),
+	Palette.WeatheredPlank,
+	Kit.shade(Palette.WeatheredPlank, 0.08),
+}
+local PLANK_DARK = {
+	Palette.TimberBrown,
+	Kit.shade(Palette.TimberBrown, -0.08),
+	Kit.shade(Palette.TimberBrown, 0.12),
+}
+local CABIN = {
+	Palette.WeatheredPlank,
+	Kit.shade(Palette.PlankHoney, -0.12),
+	Palette.TimberBrown,
+	Kit.shade(Palette.WeatheredPlank, 0.1),
+}
+local TIMBER = Palette.TimberBrown
+local TIMBER_LIGHT = Kit.shade(Palette.TimberBrown, 0.22)
+local STONE = {
+	Palette.StoneBase,
+	Kit.shade(Palette.StoneBase, 0.08),
+	Kit.shade(Palette.StoneBase, -0.1),
+	Palette.TownCobble,
+}
+local MORTAR = Kit.shade(Palette.StoneBase, -0.22)
+local SHINGLE = {
+	Palette.RoofSlate,
+	Kit.shade(Palette.RoofSlate, 0.08),
+	Kit.shade(Palette.RoofSlate, -0.1),
+	Palette.QuarrySlate,
+}
+local BARN_ROOF = SHINGLE
+local SLATE_ROOF = SHINGLE
+local ROOF_DECK = Kit.shade(Palette.TimberBrown, -0.2)
+local TRIM = Palette.SignCream
+local IRON = Palette.IronBlack
+local STEEL = Kit.shade(Palette.IronBlack, 0.72)
+local STEEL_DARK = Kit.shade(Palette.IronBlack, 0.45)
+local BRICK = Palette.BarnRed
+local BRICK_DARK = Kit.shade(Palette.BarnRed, -0.15)
+local SOOT = Palette.AshBasalt
+local BARK = Palette.TimberBrown
+local HEART = Palette.PlankHoney
+local LUMBER = Kit.shade(Palette.PlankHoney, 0.12)
+local SAWDUST = {
+	Kit.shade(Palette.PlankHoney, 0.2),
+	Palette.PlankHoney,
+	Kit.shade(Palette.WeatheredPlank, 0.15),
+}
+local CANVAS = Kit.shade(Palette.SignCream, -0.06)
+local CANVAS_DARK = Palette.WeatheredPlank
+local SOIL = Palette.TrailDirt
+local LEAF = { Palette.MeadowGrass, Palette.DeepMeadow, Palette.PineTrim }
 local FLOWERS = { hex("#F2728C"), hex("#FFD256"), hex("#8FB8F2"), hex("#FFF3E6"), hex("#E85A4F"), hex("#C58BF2") }
 local GLOW = hex("#FFC872")
 local EMBER = hex("#FF7A2E")
-local FLAME = { hex("#FFD35A"), hex("#FF8A2A"), hex("#FF6A1A") }
-local SIGN_BOARD = hex("#4A2D1A")
-local SIGN_INK = hex("#F8E7C5")
+local SIGN_BOARD = Palette.SignInk
+local SIGN_INK = Palette.SignCream
 local DOOR = hex("#6E4426")
 local SHUTTER = hex("#4E7A4C")
 local HANDLE = hex("#A0703F")
 local ROPE = hex("#B89A6A")
-local BRASS = hex("#C9A24A")
+local BRASS = Palette.Brass
 local PAPER = hex("#F4ECD8")
 local CONCRETE = hex("#B3ABA0")
 local TYRE = hex("#2E2B2B")
@@ -807,6 +835,21 @@ local function ledger(parent: Instance, cf: CFrame)
 	end
 end
 
+-- The shared shop counter. Body bottom is y = 0 so Kit.scaleModel's rigid
+-- shift (anchor * (s - 1), anchor at the bottom) leaves the top at 3.9
+-- at every scale. PlankHoney body, TimberBrown top, IronBlack kick.
+local COUNTER_TOP = 3.9
+local function placeCounter(model: Model, x: number, z: number)
+	local h = COUNTER_TOP
+	Kit.part(model, "Counter", V3(10, h, 2.5), CF(x, h / 2, z), Palette.PlankHoney, MAT.WoodPlanks)
+	dBox(model, "CounterTop", V3(10.4, 0.25, 2.9), CF(x, COUNTER_TOP + 0.125, z), Palette.TimberBrown, MAT.Wood)
+	dBox(model, "CounterKick", V3(10, 0.3, 2.3), CF(x, 0.15, z), Palette.IronBlack, MAT.Metal)
+	dBox(model, "Till", V3(1.2, 0.8, 1), CF(x + 3.2, COUNTER_TOP + 0.65, z + 0.3), Palette.TimberBrown, MAT.Wood)
+	dBall(model, "CounterBell", 0.4, CF(x - 3.2, COUNTER_TOP + 0.45, z - 0.4), Palette.Brass, MAT.Metal)
+	register(model, CF(x + 1.2, COUNTER_TOP + 0.25, z + 0.15))
+	ledger(model, CF(x - 1.2, COUNTER_TOP + 0.25, z - 0.1))
+end
+
 -- A grindstone: a stone wheel turning in a trough on splayed legs. The
 -- trough and the wheel collide (the legs stand under them).
 local function grindstone(parent: Instance, cf: CFrame)
@@ -1152,28 +1195,40 @@ end
 -- front, logs stacked by the west wall (the east side faces the sell station keep-out).
 local function toolShed(model: Model, title: string, accent: Color3)
 	local rng = Kit.rng(311)
-	local red = { accent, Kit.shade(accent, 0.07), Kit.shade(accent, -0.07), Kit.vary(accent, rng, 0.05) }
-	local roofStyle: RoofStyle = { colors = BARN_ROOF, deck = ROOF_DECK, trim = TRIM, rowLen = 2.4, pieceLen = 11 }
+	local boards = {
+		Palette.PlankHoney,
+		Kit.shade(Palette.PlankHoney, -0.06),
+		Palette.WeatheredPlank,
+		Kit.shade(Palette.WeatheredPlank, 0.05),
+	}
+	-- Few, long shingles: the gambrel reads as slate without a shingle per board.
+	local roofStyle: RoofStyle = {
+		colors = BARN_ROOF,
+		deck = ROOF_DECK,
+		trim = TRIM,
+		rowLen = 40,
+		pieceLen = 80,
+	}
 	-- Deep enough for two display tables with a carried box between them
 	-- and the Robux table at the back: 25.6 studs (38.4 once scaled), up
 	-- from 14 (BuildingArt.MeshStretch carries the same depth to the mesh),
 	-- and 19.4 wide (29.1 scaled) so the tables take the bigger boxes.
 	local HX, HZ, FLOOR, TOP = BuildingArt.ToolShedHalfWidth, BuildingArt.ToolShedHalfDepth, 0.5, 9
 
-	plinth(model, CF(0, 0, 0), 2 * HX, 2 * HZ, FLOOR, rng, { left = true, right = true, back = true }, 3.2)
-	for _, s in ipairs({ -1, 1 }) do
-		stones(model, CF(s * 7, 0, -HZ), 4, FLOOR, 0.7, rng, 1.3, 2.3)
-	end
+	-- One footing. Stone courses on the faces blew the part budget; the
+	-- footing is the stone base, recoloured, and stays at the floor line.
+	plinth(model, CF(0, 0, 0), 2 * HX, 2 * HZ, FLOOR, rng, {}, 3.2)
 	Kit.wedge(model, "Ramp", V3(10, FLOOR, 1.2), CF(0, FLOOR / 2, -HZ - 0.6), PLANK_DARK[1], MAT.WoodPlanks)
 
-	-- Walls: red boards; the front opens on a 10-wide barn door.
-	panel(model, CF(-HX, 0, 0) * ANG(0, PI / 2, 0), -HZ, HZ, FLOOR, TOP, 0.6, rng, red, 1.7)
-	panel(model, CF(HX, 0, 0) * ANG(0, -PI / 2, 0), -HZ, HZ, FLOOR, TOP, 0.6, rng, red, 1.7)
-	panel(model, CF(0, 0, HZ) * ANG(0, PI, 0), -HX, HX, FLOOR, TOP, 0.6, rng, red, 1.7)
+	-- Walls: one honey plank course each, so the barn stays under the part cap.
+	-- The front opens on a 10-wide barn door.
+	panel(model, CF(-HX, 0, 0) * ANG(0, PI / 2, 0), -HZ, HZ, FLOOR, TOP, 0.6, rng, boards, 12)
+	panel(model, CF(HX, 0, 0) * ANG(0, -PI / 2, 0), -HZ, HZ, FLOOR, TOP, 0.6, rng, boards, 12)
+	panel(model, CF(0, 0, HZ) * ANG(0, PI, 0), -HX, HX, FLOOR, TOP, 0.6, rng, boards, 12)
 	local front = CF(0, 0, -HZ)
-	panel(model, front, -HX, -5, FLOOR, TOP, 0.6, rng, red, 1.7)
-	panel(model, front, 5, HX, FLOOR, TOP, 0.6, rng, red, 1.7)
-	panel(model, front, -5, 5, 7.6, TOP, 0.6, rng, red, 1.7)
+	panel(model, front, -HX, -5, FLOOR, TOP, 0.6, rng, boards, 12)
+	panel(model, front, 5, HX, FLOOR, TOP, 0.6, rng, boards, 12)
+	panel(model, front, -5, 5, 7.6, TOP, 0.6, rng, boards, 12)
 	for _, sx in ipairs({ -1, 1 }) do
 		for _, sz in ipairs({ -1, 1 }) do
 			dBox(
@@ -1193,7 +1248,17 @@ local function toolShed(model: Model, title: string, accent: Color3)
 	for _, s in ipairs({ -1, 1 }) do
 		local knee = V3(s * KX, KY, 0)
 		local eave = V3(s * (HX + 0.3), TOP, 0)
-		roofPlane(model, knee, Vector3.zAxis, (eave - knee).Unit, length, (eave - knee).Magnitude + 0.9, rng, roofStyle)
+		roofPlane(
+			model,
+			knee,
+			Vector3.zAxis,
+			(eave - knee).Unit,
+			length,
+			(eave - knee).Magnitude + 0.9,
+			rng,
+			roofStyle,
+			0
+		)
 		roofPlane(
 			model,
 			ridge,
@@ -1202,24 +1267,25 @@ local function toolShed(model: Model, title: string, accent: Color3)
 			length,
 			(knee - ridge).Magnitude + 0.35,
 			rng,
-			roofStyle
+			roofStyle,
+			0
 		)
 	end
 	dBox(model, "RidgeCap", V3(0.75, 0.75, length + 0.3), CF(0, RY + 0.12, 0) * ANG(0, 0, PI / 4), TRIM)
 	for _, z in ipairs({ -HZ, HZ }) do
 		local wall = CF(0, 0, z) * (if z > 0 then ANG(0, PI, 0) else CFrame.identity)
-		panel(model, wall, -KX, KX, TOP, KY, 0.6, rng, red, 1.7)
+		panel(model, wall, -KX, KX, TOP, KY, 0.6, rng, boards, 12)
 		for _, s in ipairs({ -1, 1 }) do
 			Kit.wedge(
 				model,
 				"Gable",
 				V3(0.6, KY - TOP, HX - KX),
 				wall * CF(s * (KX + (HX - KX) / 2), (TOP + KY) / 2, 0) * ANG(0, -s * PI / 2, 0),
-				red[2],
+				Palette.PlankHoney,
 				MAT.WoodPlanks
 			)
 		end
-		gable(model, wall * CF(0, KY, 0), 2 * KX, RY - KY, 0.6, red[1])
+		gable(model, wall * CF(0, KY, 0), 2 * KX, RY - KY, 0.6, Palette.WeatheredPlank)
 	end
 
 	-- The doorway: a header beam (the leaf the shop hours recolour) and the
@@ -1250,29 +1316,16 @@ local function toolShed(model: Model, title: string, accent: Color3)
 		dBox(model, "SignPost", V3(0.5, h, 0.5), CF(s * 4.6, roofY - 0.5 + h / 2, signZ + 0.5), TIMBER)
 		gooseneck(model, CF(s * 5.2, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 	end
-	dBox(model, "HoistBeam", V3(0.7, 0.7, 2.8), CF(0, 13.45, -HZ - 1.1), TIMBER)
-	dCyl(model, "Pulley", 0.3, 0.8, CF(0, 12.85, -HZ - 2.2), IRON, MAT.Metal)
-	dBox(model, "Rope", V3(0.12, 0.7, 0.12), CF(0, 12.2, -HZ - 2.55), ROPE, MAT.Fabric)
-	dBox(model, "Hook", V3(0.35, 0.35, 0.35), CF(0, 11.75, -HZ - 2.55), IRON, MAT.Metal)
+	-- Porch: two posts flanking the opening, one lantern on the east post.
+	-- Clear of the grindstone (x ±7.6) and of the door-width scan at the wall.
 	for _, s in ipairs({ -1, 1 }) do
-		window(model, CF(s * (HX + 0.3), 5.2, 0) * ANG(0, -s * PI / 2, 0), 2.6, 2.6, TRIM, nil, nil)
-		hangingLantern(model, V3(s * 3.8, 7.56, -HZ + 0.1), 0.6, 0.85) -- off the header's top plane (7.6)
+		Kit.part(model, "PorchPost", V3(0.45, 6.4, 0.45), CF(s * 6.2, 3.2, -HZ - 1.15), TIMBER, MAT.Wood)
 	end
+	Kit.lantern(model, CF(6.2, 5.8, -HZ - 1.15), 0.75)
 	dBox(model, "TieBeam", V3(2 * HX - 0.6, 0.8, 0.8), CF(0, TOP - 0.4, 3.6), TIMBER)
-	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ),
-	-- the keeper behind it and the Robux table behind her, against the far wall.
+	-- The counter stands at the back (final studs: BuildingArt.ToolShedCounterZ).
 	local CZ = BuildingArt.ToolShedCounterZ / BuildingArt.Scale.ToolShed
-	hangingLantern(model, V3(0, TOP - 0.8, CZ - 2.2), 0.9, 0.9)
-
-	-- Inside: the counter, the axe rack (the display tables go in once the
-	-- shop is scaled).
-	Kit.part(model, "Counter", V3(9, 3, 2), CF(0, FLOOR + 1.5, CZ), PLANK_DARK[1], MAT.WoodPlanks)
-	dBox(model, "CounterTop", V3(9.6, 0.3, 2.6), CF(0, FLOOR + 3.15, CZ), PLANK[4])
-	for _, x in ipairs({ -3, 0, 3 }) do
-		dBox(model, "CounterTrim", V3(0.3, 2.7, 0.14), CF(x, FLOOR + 1.45, CZ - 1.07), PLANK_DARK[3])
-	end
-	register(model, CF(2.7, FLOOR + 3.3, CZ + 0.2))
-	ledger(model, CF(-2.5, FLOOR + 3.3, CZ - 0.2))
+	placeCounter(model, 0, CZ)
 	-- (The axe rack on the back wall, with every axe's real model, is built by
 	-- ShopInterior once the shop is scaled.)
 	-- (The workbench and the barrel of handles that stood along the side
@@ -1301,7 +1354,7 @@ end
 local function dealership(model: Model, title: string, accent: Color3)
 	local hall = DealershipLot.Hall()
 	local hx, hz = hall.innerW / 2, hall.innerD / 2
-	local cream = hex("#EEDFC3")
+	local cream = Palette.PlankHoney
 	local dark = Kit.shade(accent, -0.35)
 	local FLOOR, H, T = 0.4, 15, 0.8
 	local doorX0 = -hx + 0.75
@@ -1311,10 +1364,17 @@ local function dealership(model: Model, title: string, accent: Color3)
 
 	Kit.part(model, "Slab", V3(2 * hx + 2 * T, FLOOR, 2 * hz + 2 * T), CF(0, FLOOR / 2, 0), CONCRETE, MAT.Concrete)
 	local function wall(name: string, x0: number, x1: number, y0: number, y1: number, z: number)
-		return Kit.part(model, name, V3(x1 - x0, y1 - y0, T), CF((x0 + x1) / 2, (y0 + y1) / 2, z), cream, MAT.Plaster)
+		return Kit.part(
+			model,
+			name,
+			V3(x1 - x0, y1 - y0, T),
+			CF((x0 + x1) / 2, (y0 + y1) / 2, z),
+			cream,
+			MAT.WoodPlanks
+		)
 	end
 	local function side(name: string, x: number)
-		return Kit.part(model, name, V3(T, H - FLOOR, 2 * hz + T), CF(x, (H + FLOOR) / 2, 0), cream, MAT.Plaster)
+		return Kit.part(model, name, V3(T, H - FLOOR, 2 * hz + T), CF(x, (H + FLOOR) / 2, 0), cream, MAT.WoodPlanks)
 	end
 	side("Wall", -hx - T / 2)
 	-- A glass band (y 6 to 14.4) runs along the front and down the east wall:
@@ -1336,9 +1396,9 @@ local function dealership(model: Model, title: string, accent: Color3)
 		V3(T, GLASS_LO - FLOOR, eastLen),
 		CF(hx + T / 2, (GLASS_LO + FLOOR) / 2, 0),
 		cream,
-		MAT.Plaster
+		MAT.WoodPlanks
 	)
-	Kit.part(model, "Wall", V3(T, H - GLASS_HI, eastLen), CF(hx + T / 2, (H + GLASS_HI) / 2, 0), cream, MAT.Plaster)
+	Kit.part(model, "Wall", V3(T, H - GLASS_HI, eastLen), CF(hx + T / 2, (H + GLASS_HI) / 2, 0), cream, MAT.WoodPlanks)
 	glassBand(
 		"ShowroomGlass",
 		V3(T, GLASS_HI - GLASS_LO, eastLen),
@@ -1388,7 +1448,7 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- to the lighthouse (z 96 at its front, the line is south of that along its
 	-- whole length), so the roof can be solid.
 	local roofW = 2 * hx + 2 * T + 1
-	Kit.part(model, "Roof", V3(roofW, 0.8, 2 * hz + 2 * T + 0.2), CF(0, H + 0.4, 0), TIN_ROOF[1], MAT.Metal)
+	Kit.part(model, "Roof", V3(roofW, 0.8, 2 * hz + 2 * T + 0.2), CF(0, H + 0.4, 0), Palette.RoofSlate, MAT.Metal)
 	-- The name sign over the lobby door, lit by two goosenecks, and a second
 	-- board for the trade over the windows.
 	local signW, signH = 24, 4.2
@@ -1423,10 +1483,17 @@ local function dealership(model: Model, title: string, accent: Color3)
 	-- The lobby (the west column): the counter against the back wall, facing
 	-- the door, the keeper behind it, the paint swatches on the wall above.
 	local counterX, counterZ = -hx + BuildingArt.DealerLobbyCounterX, hz - BuildingArt.DealerCounterBack
-	Kit.part(model, "Counter", V3(8, 3, 1.8), CF(counterX, FLOOR + 1.5, counterZ), dark, MAT.WoodPlanks)
-	dBox(model, "CounterTop", V3(8.6, 0.3, 2.3), CF(counterX, FLOOR + 3.15, counterZ), PLANK[4])
-	register(model, CF(counterX + 2.2, FLOOR + 3.3, counterZ - 0.1))
-	ledger(model, CF(counterX - 2.2, FLOOR + 3.3, counterZ - 0.1))
+	placeCounter(model, counterX, counterZ)
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "PorchPost", V3(0.5, 8, 0.5), CF(doorCx + s * (7.5 + 1.4), 4, -hz - T - 2.2), TIMBER, MAT.Wood)
+	end
+	local porchGlow = Kit.lantern(model, CF(doorCx + 7.5 + 1.4, 7.2, -hz - T - 2.2), 0.8)
+	local porchLight = porchGlow:FindFirstChildOfClass("PointLight")
+	if porchLight then
+		porchLight.Brightness = 1
+		porchLight.Range = 12
+		porchLight.Shadows = false
+	end
 	dBox(model, "SwatchBoard", V3(11, 3.2, 0.2), CF(counterX, 7.6, hz - 0.1), SIGN_BOARD)
 	local trucks = ItemCatalog.TruckList()
 	for i, truck in ipairs(trucks) do
@@ -1464,7 +1531,7 @@ BuildingArt.HearthHalfDepth = 14.5
 BuildingArt.HearthCounterZ = 15.3 -- the counter's middle, final studs from the shop's middle
 
 local function hearthAndHome(model: Model, title: string, accent: Color3)
-	local plaster = hex("#F0E2C6")
+	local plaster = Palette.PlankHoney
 	local wood = Kit.shade(accent, -0.32)
 	local HX, HZ, FLOOR, TOP = BuildingArt.HearthHalfWidth, BuildingArt.HearthHalfDepth, 0.4, 10
 	local mid = (FLOOR + TOP) / 2
@@ -1473,7 +1540,7 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 
 	Kit.part(model, "Floor", V3(2 * HX, FLOOR, 2 * HZ), CF(0, FLOOR / 2, 0), PLANK[2], MAT.WoodPlanks)
 	local function wall(cf: CFrame, w: number, h: number): Part
-		return Kit.part(model, "Wall", V3(w, h, 0.6), cf, plaster, MAT.Plaster)
+		return Kit.part(model, "Wall", V3(w, h, 0.6), cf, plaster, MAT.WoodPlanks)
 	end
 	wall(CF(-HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
 	wall(CF(HX, mid, 0) * ANG(0, PI / 2, 0), 2 * HZ, wallH)
@@ -1496,13 +1563,13 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 			TRIM
 		)
 	end
-	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), SLATE_ROOF[1], MAT.Slate)
+	Kit.part(model, "Roof", V3(2 * HX + 2, 0.5, 2 * HZ + 2), CF(0, TOP + 0.4, 0), Palette.PineTrim, MAT.WoodPlanks)
 
 	-- Above the roof, and no further south than the roof's overhang, so the
 	-- board doesn't hang past the front or sit inside the roof.
 	local signW, signH = 20, 3
 	local signY, signZ = TOP + 0.65 + BuildingArt.SignRise + NAME_FRAME + signH / 2, -HZ - 0.6
-	nameSign(model, CF(0, signY, signZ), signW, signH, title, hex("#3E6A3A"), wood, TRIM, false)
+	nameSign(model, CF(0, signY, signZ), signW, signH, title, accent, wood, TRIM, false)
 	for _, x in ipairs({ -5, 5 }) do
 		gooseneck(model, CF(x, signY + (signH + NAME_FRAME) / 2, signZ - 0.2))
 		-- Two posts carry the board up off the roof.
@@ -1520,10 +1587,13 @@ local function hearthAndHome(model: Model, title: string, accent: Color3)
 	-- The counter stands at the back (customer side faces -Z, the entrance),
 	-- the keeper behind it; the shelf units stop short of it.
 	local counterZ = BuildingArt.HearthCounterZ / BuildingArt.Scale.HearthAndHome
-	Kit.part(model, "Counter", V3(8, 3, 1.8), CF(0, FLOOR + 1.5, counterZ), Kit.shade(accent, -0.1), MAT.WoodPlanks)
-	dBox(model, "CounterTop", V3(8.6, 0.3, 2.3), CF(0, FLOOR + 3.15, counterZ), PLANK[4])
-	register(model, CF(2.2, FLOOR + 3.3, counterZ + 0.2))
-	ledger(model, CF(-2.2, FLOOR + 3.3, counterZ - 0.1))
+	placeCounter(model, 0, counterZ)
+	-- Inside the front wall, over the shop's own pad. Posts in front of the
+	-- pad sit on grass, and the terrain test rejects that.
+	for _, s in ipairs({ -1, 1 }) do
+		Kit.part(model, "PorchPost", V3(0.45, 6.2, 0.45), CF(s * 7.2, 3.1, -HZ + 0.85), TIMBER, MAT.Wood)
+	end
+	Kit.lantern(model, CF(7.2, 5.5, -HZ + 0.85), 0.75)
 
 	-- Name boards hang on the back wall, facing the door, each above a sample
 	-- of that item on the ledge. No price is printed: aiming at a board or its
@@ -2118,15 +2188,17 @@ end
 -- lantern's neon glass, with the PointLight), 8.4 up and 2.3 out (-Z).
 function BuildingArt.LampPost(): Model
 	local model = Kit.model("LampPost")
-	Kit.part(model, "Footing", V3(1.6, 0.7, 1.6), CF(0, 0.35, 0), STONE[1], MAT.Slate)
-	dBox(model, "Footing", V3(1.9, 0.25, 1.9), CF(0, 0.15, 0), STONE[3], MAT.Slate)
-	Kit.part(model, "Post", V3(0.7, 9.6, 0.7), CF(0, 5.5, 0), TIMBER, MAT.Wood)
-	dBox(model, "PostCap", V3(1, 0.35, 1), CF(0, 10.45, 0), TIMBER_LIGHT)
-	dBox(model, "Arm", V3(0.35, 0.35, 2.7), CF(0, 9.8, -1.25), IRON, MAT.Metal)
-	dBeam(model, "Brace", V3(0, 8.3, -0.35), V3(0, 9.7, -1.7), 0.22, 0.22, IRON, MAT.Metal)
-	dBox(model, "Chain", V3(0.12, 0.4, 0.12), CF(0, 9.43, -2.3), IRON, MAT.Metal)
-	local glow = Kit.lantern(model, CF(0, 8.4, -2.3), 1.1)
+	Kit.part(model, "Footing", V3(1.4, 0.5, 1.4), CF(0, 0.25, 0), STONE[1], MAT.Slate)
+	Kit.part(model, "Post", V3(0.6, 12, 0.6), CF(0, 6, 0), TIMBER, MAT.Wood)
+	dBox(model, "Arm", V3(0.3, 0.3, 2.5), CF(0, 11.4, -1.15), IRON, MAT.Metal)
+	local glow = Kit.lantern(model, CF(0, 10.6, -2.3), 0.9)
 	glow.Name = "LampGlow"
+	local lampLight = glow:FindFirstChildOfClass("PointLight")
+	if lampLight then
+		lampLight.Range = 24
+		lampLight.Brightness = 1.2
+		lampLight.Shadows = false
+	end
 	TownMeshes.Dress(model, "LampPost")
 	return model
 end
@@ -2135,34 +2207,17 @@ end
 -- collide).
 function BuildingArt.Fence(length: number): Model
 	local model = Kit.model("Fence")
-	local rng = Kit.rng(math.floor(length * 10) + 3)
-	local posts = math.max(2, math.floor(length / 6) + 1)
+	local posts = math.max(2, math.floor(length / 8) + 1)
 	local step = length / (posts - 1)
 	for i = 0, posts - 1 do
 		local x = -length / 2 + i * step
-		local h = 3.3 + rng:range(-0.15, 0.15)
-		Kit.part(
-			model,
-			"Post",
-			V3(0.55, h, 0.55),
-			CF(x, h / 2, 0) * ANG(0, rng:range(-0.15, 0.15), rng:range(-0.03, 0.03)),
-			Kit.vary(TIMBER_LIGHT, rng, 0.05),
-			MAT.Wood
-		)
+		Kit.part(model, "Post", V3(0.6, 3.6, 0.6), CF(x, 1.8, 0), TIMBER, MAT.Wood)
 	end
 	for i = 0, posts - 2 do
-		local x0 = -length / 2 + i * step
-		for _, y in ipairs({ 1.15, 2.4 }) do
-			local rail = beam(
-				model,
-				"Rail",
-				V3(x0 - 0.15, y + rng:range(-0.1, 0.1), -0.32),
-				V3(x0 + step + 0.15, y + rng:range(-0.1, 0.1), -0.32),
-				0.24,
-				0.34,
-				Kit.vary(PLANK[3], rng, 0.05),
-				MAT.Wood
-			)
+		local x = -length / 2 + (i + 0.5) * step
+		local railLen = math.min(8.2, step + 0.2)
+		for _, y in ipairs({ 1.4, 2.8 }) do
+			local rail = Kit.part(model, "Rail", V3(railLen, 0.35, 0.25), CF(x, y, 0), PLANK[3], MAT.Wood)
 			rail.CastShadow = true
 		end
 	end
@@ -2284,8 +2339,8 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	dBox(model, "ScaleRim", V3(5.9, 0.2, 5.3), CF(sx, 0.3, sz), IRON, MAT.Metal)
 	dBox(model, "ScalePlate", V3(5.6, 0.12, 5), CF(sx, 0.46, sz), STEEL_DARK, MAT.Metal)
 	Kit.part(model, "ScalePost", V3(0.5, 4.2, 0.5), CF(sx, 2.3, sz + 2.1), STEEL_DARK, MAT.Metal)
-	dCyl(model, "ScaleDial", 0.3, 2.4, CF(sx, 4.9, sz + 1.85) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
-	dCyl(model, "ScaleFace", 0.1, 2, CF(sx, 4.9, sz + 1.68) * ANG(0, PI / 2, 0), PAPER)
+	dCyl(model, "ScaleDial", 0.3, 6, CF(sx, 4.9, sz + 1.85) * ANG(0, PI / 2, 0), IRON, MAT.Metal)
+	dCyl(model, "ScaleFace", 0.1, 5.2, CF(sx, 4.9, sz + 1.68) * ANG(0, PI / 2, 0), PAPER)
 	dBox(model, "ScaleNeedle", V3(0.12, 0.85, 0.08), CF(sx + 0.25, 5.0, sz + 1.6) * ANG(0, 0, -0.55), SOOT)
 
 	-- The log rack across the back: three tiers of logs between stakes,
@@ -2343,7 +2398,7 @@ function BuildingArt.SellStation(w: number, d: number): Model
 	for _, s in ipairs({ -1, 1 }) do
 		Kit.part(house, "HousePost", V3(0.6, 5.9, 0.6), at(s * 3.3, 3.45, -3.3), TIMBER, MAT.Wood)
 	end
-	Kit.wedge(house, "HouseRoof", V3(8.6, 1.5, 8.8), at(0, H1 + 0.75, 0.2), SHINGLE[1], MAT.Slate)
+	Kit.wedge(house, "HouseRoof", V3(8.6, 1.5, 8.8), at(0, H1 + 0.75, 0.2), Palette.BarnRed, MAT.Metal)
 	dBox(house, "RoofTrim", V3(8.8, 0.3, 0.4), at(0, H1 + 0.15, -4.25), TIMBER)
 	signBoard(house, "HouseSign", at(0, 5.45, -3.8), 5.6, 0.8, "WEIGH HOUSE", PLANK[2], TIMBER, SIGN_INK, false)
 	for _, s in ipairs({ -1, 1 }) do
@@ -2377,14 +2432,14 @@ function BuildingArt.Campfire(dress: boolean?): Model
 		)
 	end
 	dec(Kit.post(model, "Ash", V3(0, 0, 0), 0.1, 2.8, hex("#4A4440"), MAT.Slate))
-	for i = 1, 4 do
-		local a = i / 4 * PI * 2 + 0.4
+	for i = 1, 3 do
+		local a = i / 3 * PI * 2
 		dRod(
 			model,
 			"FireLog",
-			V3(math.cos(a) * 1.3, 0.2, math.sin(a) * 1.3),
-			V3(math.cos(a) * 0.15, 1.35, math.sin(a) * 0.15),
-			0.45,
+			V3(math.cos(a) * 1.2, 0.28, math.sin(a) * 1.2),
+			V3(-math.cos(a) * 1.2, 0.42, -math.sin(a) * 1.2),
+			0.4,
 			Kit.vary(BARK, rng, 0.06)
 		)
 	end
@@ -2397,7 +2452,7 @@ function BuildingArt.Campfire(dress: boolean?): Model
 			"Flame",
 			V3(f[4], f[4], f[4]),
 			CF(f[1], f[2], f[3]) * ANG(0, i * 0.6, 0) * corner,
-			FLAME[if i == 2 then 1 else i % 2 + 2],
+			if i % 2 == 0 then hex("#FF9A33") else hex("#FF6A1E"),
 			MAT.Neon
 		)
 		Kit.decor(p, false)
@@ -2406,7 +2461,7 @@ function BuildingArt.Campfire(dress: boolean?): Model
 	fire.Size = 3
 	fire.Heat = 6
 	fire.Parent = embers
-	light(embers, 18, 1.6, Color3.fromRGB(255, 160, 80))
+	light(embers, 14, 1.5, hex("#FFB070"))
 	if dress ~= false then
 		TownMeshes.Dress(model, "Campfire")
 	end
@@ -3160,6 +3215,253 @@ function BuildingArt.Bridge(a: Vector3, b: Vector3, width: number): Model
 		pivot = frame * CF(0, -0.75, 0),
 		scale = V3(1, 1, span / TownModels.RopeSpan),
 	})
+	return model
+end
+
+---------------------------------------------------------------------------
+-- V1 set: kiosk, shops that are not on the town grid yet, the sky court
+---------------------------------------------------------------------------
+
+local function faceGui(part: BasePart, name: string)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = name
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.Parent = part
+end
+
+local function spot(parent: BasePart, name: string, cf: CFrame?): Attachment
+	local att = Instance.new("Attachment")
+	att.Name = name
+	if cf then
+		att.CFrame = cf
+	end
+	att.Parent = parent
+	return att
+end
+
+function BuildingArt.GateKiosk(accent: Color3): Model
+	local model = Kit.model("GateKiosk")
+	SpecBuild.Build(model, {
+		{
+			name = "Floor",
+			kind = "part",
+			size = V3(8, 0.6, 6),
+			at = CF(0, 0.3, 0),
+			color = "StoneBase",
+			mat = MAT.Cobblestone,
+		},
+		{
+			name = "Back",
+			kind = "part",
+			size = V3(6, 7, 0.5),
+			at = CF(0, 4.1, 2.6),
+			color = "PlankHoney",
+			mat = MAT.WoodPlanks,
+		},
+		{
+			name = "Side",
+			kind = "part",
+			size = V3(0.5, 7, 4.5),
+			at = CF(-3.6, 4.1, 0.4),
+			color = "PlankHoney",
+			mat = MAT.WoodPlanks,
+		},
+		{
+			name = "Side",
+			kind = "part",
+			size = V3(0.5, 7, 4.5),
+			at = CF(3.6, 4.1, 0.4),
+			color = "PlankHoney",
+			mat = MAT.WoodPlanks,
+		},
+		{
+			name = "Counter",
+			kind = "part",
+			size = V3(6, 3.6, 0.8),
+			at = CF(0, 2.4, 0.6),
+			color = "TimberBrown",
+			mat = MAT.Wood,
+		},
+		{
+			name = "Roof",
+			kind = "wedge",
+			size = V3(7, 1.4, 6),
+			at = CF(0, 8.3, 0),
+			color = "RoofSlate",
+			mat = MAT.Slate,
+		},
+	}, CFrame.identity)
+	local strip = Kit.part(model, "GlowStrip", V3(6, 0.15, 0.1), CF(0, 7.2, -2.2), accent, MAT.Neon)
+	Kit.decor(strip, false)
+	return model
+end
+
+function BuildingArt.OddsAndEnds(): Model
+	local model = Kit.model("OddsAndEnds")
+	local rng = Kit.rng(813)
+	Kit.part(model, "Pad", V3(20, 0.2, 16), CF(0, 0.1, 0), Palette.TrailDirt, MAT.Ground)
+	local lean = ANG(0, 0.08, 0.04)
+	Kit.part(model, "Wall", V3(12, 8, 0.4), CF(0, 4.2, 4) * lean, Palette.WeatheredPlank, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.4, 8, 9), CF(-5.8, 4.1, 0) * ANG(0, 0, -0.03), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(
+		model,
+		"Wall",
+		V3(0.4, 7.4, 8.5),
+		CF(5.6, 3.9, 0.2) * ANG(0, 0.05, 0.05),
+		Palette.TimberBrown,
+		MAT.WoodPlanks
+	)
+	Kit.part(model, "Roof", V3(13, 0.2, 10), CF(0.3, 8.5, 0.2) * ANG(0.08, 0.05, -0.04), Palette.RoofSlate, MAT.Metal)
+	Kit.part(
+		model,
+		"RoofPatch",
+		V3(4, 0.16, 3),
+		CF(-2, 8.7, -1) * ANG(0.1, 0.4, 0.08),
+		Palette.IronBlack,
+		MAT.CorrodedMetal
+	)
+	local function junkCrate(cf: CFrame)
+		Kit.part(model, "Crate", V3(3, 3, 3), cf * CF(0, 1.5, 0), Palette.WeatheredPlank, MAT.Wood)
+		for _, corner in ipairs({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } }) do
+			dBox(model, "CratePost", V3(0.25, 3, 0.25), cf * CF(corner[1] * 1.3, 1.5, corner[2] * 1.3), TIMBER)
+		end
+		for _, y in ipairs({ 0.6, 2.4 }) do
+			dBox(model, "CrateBand", V3(3.05, 0.15, 3.05), cf * CF(0, y, 0), TIMBER)
+		end
+		for i = 1, 6 do
+			dBox(model, "CrateSlat", V3(2.4, 0.18, 0.12), cf * CF(0, 0.45 + i * 0.35, -1.52), Palette.PlankHoney)
+		end
+	end
+	junkCrate(CF(-6.2, 0.2, -4))
+	junkCrate(CF(6.4, 0.2, -3.2) * ANG(0, 0.2, 0))
+	barrel(model, CF(3.2, 0.2, -5.5), rng, false, Palette.TrailDirt)
+	local sign = dBox(model, "Sign", V3(4.2, 1.4, 0.2), CF(0, 6.2, -4.4), Palette.TrailDirt, MAT.Wood)
+	Kit.signText(sign, "CHARGES", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	return model
+end
+
+function BuildingArt.Sparkworks(): Model
+	local model = Kit.model("Sparkworks")
+	Kit.part(model, "Pad", V3(20, 0.2, 16), CF(0, 0.1, 0), Palette.TownCobble, MAT.Cobblestone)
+	Kit.part(model, "Floor", V3(14, 0.3, 12), CF(0, 0.35, 0), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(14, 9, 0.4), CF(0, 5, 5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.4, 9, 12), CF(-6.8, 5, 0), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.4, 9, 12), CF(6.8, 5, 0), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(6, 9, 0.4), CF(-4, 5, -5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(6, 9, 0.4), CF(4, 5, -5.8), Palette.WeatheredPlank, MAT.WoodPlanks)
+	Kit.part(model, "Roof", V3(15, 0.25, 13), CF(0, 9.8, 0), Palette.RoofSlate, MAT.Metal)
+	Kit.part(model, "Counter", V3(8, 3.2, 2.2), CF(-2, 1.8, 3.2), Palette.TimberBrown, MAT.Wood)
+	for i = 1, 4 do
+		local lampBit = dBox(model, "Lamp", V3(0.5, 0.7, 0.3), CF(5.4, 3 + i * 1.1, 2), Palette.LumenGlow, MAT.Neon)
+		dBox(model, "Switch", V3(0.35, 0.45, 0.15), CF(5.4, 3 + i * 1.1, 0.4), Palette.IronBlack, MAT.Metal)
+		lampBit.CastShadow = false
+	end
+	dCyl(model, "Wire", 2.4, 0.35, CF(4.2, 2.2, 3.4) * ANG(0, 0, PI / 2), Palette.IronBlack, MAT.Metal)
+	local glow = dBox(model, "GlowStrip", V3(4, 0.12, 0.1), CF(0, 8.6, -5.5), Palette.SparkTeal, MAT.Neon)
+	glow.CastShadow = false
+	local board = Kit.part(model, "DemoBoard", V3(6, 4, 0.2), CF(0, 5, 5.5), Palette.SignInk, MAT.SmoothPlastic)
+	board.CanCollide = false
+	board.CanQuery = false
+	board.CanTouch = false
+	return model
+end
+
+function BuildingArt.SkyMarket(): Model
+	local model = Kit.model("SkyMarket")
+	Kit.part(model, "Pad", V3(10, 0.2, 8), CF(0, 0.1, 0), Palette.TownCobble, MAT.Cobblestone)
+	Kit.part(model, "Stall", V3(8, 5, 0.3), CF(0, 2.7, 2), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Post", V3(0.4, 6, 0.4), CF(-3.6, 3, -1.5), TIMBER, MAT.Wood)
+	Kit.part(model, "Post", V3(0.4, 6, 0.4), CF(3.6, 3, -1.5), TIMBER, MAT.Wood)
+	Kit.part(model, "Awning", V3(8.4, 0.15, 3.2), CF(0, 6.2, -0.4) * ANG(-0.25, 0, 0), Palette.LumenGlow, MAT.Fabric)
+	Kit.part(model, "Awning", V3(8.4, 0.12, 1.4), CF(0, 5.7, -2.2) * ANG(-0.25, 0, 0), Palette.SignCream, MAT.Fabric)
+	Kit.part(model, "Pedestal", V3(1.6, 2.4, 1.6), CF(0, 1.4, 0.4), hex("#E8E2D0"), MAT.Marble)
+	for i, color in ipairs({ Palette.FrostGlow, Palette.EmberGlow, Palette.GloamGlow }) do
+		local jar =
+			dCyl(model, "ShardJar", 0.9, 0.7, CF(-2.2 + (i - 1) * 1.6, 1.2, -0.8) * ANG(0, 0, PI / 2), color, MAT.Glass)
+		jar.Transparency = 0.35
+	end
+	return model
+end
+
+function BuildingArt.SkyTurnstile(): Model
+	local model = Kit.model("SkyTurnstile")
+	Kit.part(model, "Post", V3(1, 3.5, 1), CF(-1.2, 1.75, 0), Palette.IronBlack, MAT.Metal)
+	Kit.part(model, "Post", V3(1, 3.5, 1), CF(1.2, 1.75, 0), Palette.IronBlack, MAT.Metal)
+	dBox(model, "Bar", V3(2.2, 0.3, 0.3), CF(0, 2.4, 0), Palette.IronBlack, MAT.Metal)
+	local sign = Kit.part(model, "Sign", V3(4, 2, 0.2), CF(0, 4.2, -0.2), Palette.SignInk, MAT.Wood)
+	Kit.signText(sign, "Gondola Pass", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	sign.CanCollide = false
+	sign.CanQuery = false
+	sign.CanTouch = false
+	return model
+end
+
+function BuildingArt.PlotMapBoard(): Model
+	local model = Kit.model("PlotMapBoard")
+	Kit.part(model, "Post", V3(0.5, 5, 0.5), CF(-4.2, 2.5, 0), TIMBER, MAT.Wood)
+	Kit.part(model, "Post", V3(0.5, 5, 0.5), CF(4.2, 2.5, 0), TIMBER, MAT.Wood)
+	local board = Kit.part(model, "Board", V3(10, 6, 0.3), CF(0, 5.2, 0), Palette.SignInk, MAT.Wood)
+	faceGui(board, "Map")
+	Kit.signText(board, "PLOT MAP", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	return model
+end
+
+function BuildingArt.ArrivalArch(): Model
+	local model = Kit.model("ArrivalArch")
+	Kit.part(model, "Pillar", V3(2, 12, 2), CF(-5, 6, 0), hex("#E8E2D0"), MAT.Marble)
+	Kit.part(model, "Pillar", V3(2, 12, 2), CF(5, 6, 0), hex("#E8E2D0"), MAT.Marble)
+	Kit.part(model, "Lintel", V3(12, 1.2, 2), CF(0, 12.4, 0), hex("#E8E2D0"), MAT.Marble)
+	local band = Kit.part(model, "Band", V3(8, 0.2, 0.3), CF(0, 11.5, -1.05), Palette.StarfallGlow, MAT.Neon)
+	Kit.decor(band, false)
+	return model
+end
+
+function BuildingArt.LandOffice(): Model
+	local model = Kit.model("LandOffice")
+	Kit.part(model, "Floor", V3(18, 0.4, 14), CF(0, 0.2, 0), Palette.StoneBase, MAT.Cobblestone)
+	Kit.part(model, "Wall", V3(18, 8, 0.5), CF(0, 4.4, 6.75), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.5, 8, 14), CF(-8.75, 4.4, 0), Palette.WeatheredPlank, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.5, 8, 14), CF(8.75, 4.4, 0), Palette.WeatheredPlank, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(6, 8, 0.5), CF(-6, 4.4, -6.75), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(6, 8, 0.5), CF(6, 4.4, -6.75), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Roof", V3(19, 0.4, 15), CF(0, 8.8, 0), Palette.RoofSlate, MAT.Slate)
+	local sign = dBox(model, "Sign", V3(8, 1.6, 0.2), CF(0, 6.4, -7.1), Palette.Brass, MAT.Wood)
+	Kit.signText(sign, "LAND OFFICE", Palette.SignInk, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	return model
+end
+
+function BuildingArt.SkyForgeCourt(): Model
+	local model = Kit.model("SkyForgeCourt")
+	local floor = Kit.part(model, "Floor", V3(30, 0.8, 24), CF(0, 0.4, 0), Palette.StoneBase, MAT.Slate)
+	Kit.part(model, "Wall", V3(0.6, 8, 20), CF(-14.5, 4.8, 1), Palette.AshBasalt, MAT.Slate)
+	Kit.part(model, "Wall", V3(0.6, 8, 20), CF(14.5, 4.8, 1), Palette.AshBasalt, MAT.Slate)
+	Kit.part(model, "Wall", V3(30, 8, 0.6), CF(0, 4.8, 11.5), Palette.AshBasalt, MAT.Slate)
+	Kit.part(model, "Furnace", V3(8, 10, 6), CF(-8, 5.8, 7), Palette.IronBlack, MAT.Metal)
+	local mouth = Kit.part(model, "FurnaceMouth", V3(3, 3, 0.2), CF(-8, 4.2, 3.9), hex("#FF9A33"), MAT.Neon)
+	Kit.decor(mouth, false)
+	Kit.part(model, "Chimney", V3(2, 8, 2), CF(-8, 14, 8), Palette.AshBasalt, MAT.Slate)
+	light(mouth, 20, 2, hex("#FFB070"))
+	Kit.part(model, "Stump", V3(2.2, 1.4, 2.2), CF(0, 1.5, 2), TIMBER, MAT.Wood)
+	local anvil = Kit.part(model, "Anvil", V3(3, 2.6, 1.4), CF(0, 3.5, 2), Palette.IronBlack, MAT.Metal)
+	spot(anvil, "TemperSpot")
+	Kit.part(model, "Altar", V3(4, 3, 4), CF(8, 2.3, 6), hex("#E8E2D0"), MAT.Marble)
+	local sockets: { { name: string, color: Color3, x: number } } = {
+		{ name = "Socket_FrostRelic", color = Palette.FrostGlow, x = -1.2 },
+		{ name = "Socket_EmberRelic", color = Palette.EmberGlow, x = -0.4 },
+		{ name = "Socket_GloamRelic", color = Palette.GloamGlow, x = 0.4 },
+		{ name = "Socket_LumenRelic", color = Palette.LumenGlow, x = 1.2 },
+	}
+	for _, socket in ipairs(sockets) do
+		local gem = dBox(model, "RelicGem", V3(0.45, 0.45, 0.45), CF(8 + socket.x, 4, 6), socket.color, MAT.Neon)
+		spot(gem, socket.name)
+	end
+	local orders = Kit.part(model, "OrderBoard", V3(6, 4, 0.3), CF(12, 5, 8), Palette.SignInk, MAT.Wood)
+	faceGui(orders, "OrderBoard")
+	Kit.signText(orders, "ORDERS", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+	Kit.part(model, "Trough", V3(6, 1.6, 2), CF(8, 1.6, -2), Palette.IronBlack, MAT.Metal)
+	spot(floor, "KeeperSpot", CF(0, 1, -6))
 	return model
 end
 

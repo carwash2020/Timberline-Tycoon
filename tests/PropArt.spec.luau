@@ -493,4 +493,30 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("scenes: fishing, campfire, lookout and bench, each with a StandSpot, under 15 parts", function()
+		for _, kind in ipairs({ "fishing", "campfire", "lookout", "bench" }) do
+			local model = PropArt.Scene(kind)
+			local n = 0
+			local stand = false
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("BasePart") then
+					n += 1
+				elseif d.Name == "StandSpot" then
+					stand = true
+				end
+			end
+			t.ok(n > 0 and n <= 15, kind .. " parts " .. n)
+			t.ok(stand, kind .. " StandSpot")
+		end
+		local rod = nil
+		for _, d in ipairs(PropArt.Scene("fishing"):GetDescendants()) do
+			if d.Name == "Rod" then
+				rod = d
+			end
+		end
+		t.ok(rod, "a rod")
+		local tilt = math.deg(math.acos(math.clamp(rod.CFrame.UpVector.Y, -1, 1)))
+		t.ok(math.abs(tilt - 35) < 8, "the rod leans about 35 degrees: " .. tilt)
+	end)
 end

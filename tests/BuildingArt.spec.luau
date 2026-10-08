@@ -247,7 +247,7 @@ return function(t)
 			-- again for store polish: floors, facades (windows, awnings, planters),
 			-- price tags, hanging goods, the cash desk's furnishings, and the Tool
 			-- Shed's rack of eight real axe models (about 20 parts each).
-			local budget = ({ ToolShed = 650, HearthAndHome = 340, Dealership = 300 })[shop.kind]
+			local budget = ({ ToolShed = 250, HearthAndHome = 250, Dealership = 250 })[shop.kind]
 			t.ok(#parts(model) <= budget, shop.kind .. " parts: " .. #parts(model))
 			t.ok(texts(model)[shop.title], shop.kind .. " sign shows its title")
 			for _, p in ipairs(parts(model)) do
@@ -1100,5 +1100,86 @@ return function(t)
 			local other = BuildingArt.Shop(kind, kind, C3.fromRGB(90, 60, 40))
 			t.eq(find(other, "GoldTable"), nil, kind .. " has no gold table")
 		end
+	end)
+
+	t.test("new buildings: signatures, footprints, named bits, no prices", function()
+		local function extent(model)
+			local lo, hi
+			for _, p in ipairs(parts(model)) do
+				local a, b = bounds(p)
+				lo = if lo then lo:Min(a) else a
+				hi = if hi then hi:Max(b) else b
+			end
+			return lo, hi
+		end
+		local function noPrice(model)
+			for text in pairs(texts(model)) do
+				t.ok(string.find(text, "%$", 1, true) == nil, model.Name .. " prints a price: " .. text)
+			end
+		end
+		local kiosk = BuildingArt.GateKiosk(C3.fromRGB(58, 111, 216))
+		local lo, hi = extent(kiosk)
+		t.ok(hi.X - lo.X <= 8.2 and hi.Z - lo.Z <= 6.2, "gate kiosk is 8 x 6")
+		t.ok(lo.Y >= -0.01, "feet on the ground")
+		t.ok(#parts(kiosk) <= 40, "kiosk parts")
+		noPrice(kiosk)
+		local odds = BuildingArt.OddsAndEnds()
+		lo, hi = extent(odds)
+		t.ok(hi.X - lo.X <= 20.4 and hi.Z - lo.Z <= 16.4, "odds and ends lot")
+		t.ok(texts(odds)["CHARGES"], "charges sign")
+		local crates = 0
+		for _, p in ipairs(parts(odds)) do
+			if p.Name == "Crate" or p.Name == "CratePost" or p.Name == "CrateBand" or p.Name == "CrateSlat" then
+				crates += 1
+			end
+		end
+		t.eq(crates, 26, "two 13-part crates")
+		noPrice(odds)
+		local spark = BuildingArt.Sparkworks()
+		local board = find(spark, "DemoBoard")
+		t.ok(board and math.abs(board.Size.X - 6) < 0.01 and math.abs(board.Size.Y - 4) < 0.01, "DemoBoard 6 x 4")
+		t.eq(board:FindFirstChildOfClass("SurfaceGui"), nil, "the demo board is empty")
+		lo, hi = extent(spark)
+		t.ok(hi.X - lo.X <= 20.4 and hi.Z - lo.Z <= 16.4, "sparkworks lot")
+		t.ok(#parts(BuildingArt.SkyForgeCourt()) < 300, "forge court budget")
+		local court = BuildingArt.SkyForgeCourt()
+		t.ok(find(court, "Anvil"):FindFirstChild("TemperSpot"), "TemperSpot")
+		t.ok(find(court, "OrderBoard"):FindFirstChild("OrderBoard"), "OrderBoard gui")
+		local keeper = nil
+		for _, d in ipairs(court:GetDescendants()) do
+			if d.Name == "KeeperSpot" then
+				keeper = d
+			end
+		end
+		t.ok(keeper and keeper:IsA("Attachment"), "KeeperSpot")
+		-- Lune attachments have no WorldCFrame; the parent part is axis-aligned.
+		local world = (keeper.Parent :: BasePart).CFrame * keeper.CFrame
+		t.ok(world.LookVector:Dot(V3.new(0, 0, -1)) > 0.99, "KeeperSpot faces -Z")
+		for _, name in ipairs({ "Socket_FrostRelic", "Socket_EmberRelic", "Socket_GloamRelic", "Socket_LumenRelic" }) do
+			local found = false
+			for _, d in ipairs(court:GetDescendants()) do
+				if d.Name == name then
+					found = true
+				end
+			end
+			t.ok(found, name)
+		end
+		local map = BuildingArt.PlotMapBoard()
+		t.ok(find(map, "Board"):FindFirstChild("Map"), "Map gui")
+		lo, hi = extent(map)
+		t.ok(hi.X - lo.X <= 10.2 and hi.Y - lo.Y >= 6, "plot map 10 wide")
+		local arch = BuildingArt.ArrivalArch()
+		lo, hi = extent(arch)
+		t.ok(math.abs((hi.X - lo.X) - 12) < 0.2, "arch is 12 wide")
+		local turn = BuildingArt.SkyTurnstile()
+		t.ok(texts(turn)["Gondola Pass"], "gondola pass sign")
+		lo, hi = extent(turn)
+		t.ok(hi.X - lo.X <= 4.2 and hi.Z - lo.Z <= 2.2, "turnstile 4 x 2")
+		local market = BuildingArt.SkyMarket()
+		lo, hi = extent(market)
+		t.ok(hi.X - lo.X <= 10.2 and hi.Z - lo.Z <= 8.2, "sky market 10 x 8")
+		noPrice(court)
+		noPrice(BuildingArt.LandOffice())
+		t.ok(texts(BuildingArt.LandOffice())["LAND OFFICE"], "land office sign")
 	end)
 end

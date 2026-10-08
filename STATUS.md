@@ -2,12 +2,63 @@
 
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
-Last updated 8 October 2026 (choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
+Last updated 8 October 2026 (V1 building remake, branch `phase-2/v1-c-buildings`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
 - **No floating speech bubbles (`claude/remove-bubbles`, 8 October 2026, not merged):** Connor: with the pop-up dialogue box, remove the floating chat bubbles. Gone: the wave hello, idle chatter, Murph's first-tip bubble, and every NPC's bubble code (`NPCController`, `NPCDialogue.AutoBubbles` and the Bubble* helpers, `TextAnchor.CardPx`/`Side`). Kept: name tags (wall-safe through `TextAnchor`), the Talk prompt, the box, the wave and talking gestures (the talking gesture now plays while the box is open), the murmur sound (plays as the box opens). Murph's three onboarding tips now open in the box the first time a new player talks to him on step one (`QuestUI`). Ferry fare, toll fee and shop prices still arrive through the prompts' own text (`Board ($x)`, `Pay toll ($x)`), the keepers' box lines and the toasts. Studio checklist in PHASE2_NOTES.md.
 - **Hotfix `claude/fix-shop-talk-buy` (8 October 2026, not merged):** Talk and Buy prompts went dead after #107-#111 (the global prompt switch was saved and restored by four scripts that overlap); now `PromptGate` / `PromptSwitch` hold it by name. Open until Connor confirms on Xbox: see PHASE2_NOTES.md "Hotfix: Talk and Buy prompts". Output tags to send back: `[Talk]`, `[PromptSwitch]`, `[Drag]`.
+
+## Lane C previews (branch `phase-2/v1-c-buildings`)
+
+Connor (8 October 2026): every design is rendered as soon as it exists, before merge, so he can see it and send tweaks. Renders live in `previews/v1-c/` (the `preview/` folder stays gitignored). Studio checklist: PHASE2_NOTES.md, "V1 buildings, shops, props and palette". Economy headlines are unchanged (no price, recipe, or walk-time edit).
+
+Part counts, whole model, Lune (shop cap 250, including the interior):
+
+| Model | Before | After |
+| --- | --- | --- |
+| Tool Shed | 626 | 241 |
+| Hearth and Home | 311 | 195 |
+| Dealership | 245 | 215 |
+| Sawmill | 398 | 398 |
+| Gate kiosk | — | 7 |
+| Odds and Ends | — | 37 |
+| Sparkworks | — | 20 |
+| Sky Market | — | 10 |
+| Sky turnstile | — | 4 |
+| Plot map | — | 3 |
+| Arrival arch | — | 4 |
+| Land Office (art only) | — | 8 |
+| Sky forge court | — | 16 |
+
+Paths:
+
+- `previews/v1-c/town-overview.png`
+- `previews/v1-c/sawmill-front.png`
+- `previews/v1-c/toolshed-front.png`
+- `previews/v1-c/hearth-front.png`
+- `previews/v1-c/dealership-front.png`
+- `previews/v1-c/floor-toolshed.png`
+- `previews/v1-c/floor-hearth.png`
+- `previews/v1-c/floor-dealership.png`
+- `previews/v1-c/weigh-house.png`
+- `previews/v1-c/gate-kiosk.png`
+- `previews/v1-c/odds-and-ends.png`
+- `previews/v1-c/sparkworks.png`
+- `previews/v1-c/sky-market.png`
+- `previews/v1-c/sky-turnstile.png`
+- `previews/v1-c/plot-map.png`
+- `previews/v1-c/arrival-arch.png`
+- `previews/v1-c/land-office.png`
+- `previews/v1-c/sky-forge-court.png`
+- `previews/v1-c/campfire.png`
+- `previews/v1-c/fence.png`
+- `previews/v1-c/lamp-post.png`
+- `previews/v1-c/scene-fishing.png`
+- `previews/v1-c/scene-campfire.png`
+- `previews/v1-c/scene-lookout.png`
+- `previews/v1-c/scene-bench.png`
+- `previews/v1-c/machine-sawmill.png`
 
 ## Who and how
 

@@ -1926,4 +1926,109 @@ function PropArt.FillerTree(kind: string, variant: number): Model
 	return model
 end
 
+-- A small staged prop for a keeper or a vista. Each one has a StandSpot
+-- and stays under 15 parts. Built at the origin, feet at y = 0, front -Z.
+function PropArt.Scene(kind: string): Model
+	local model = Kit.model(kind)
+	local function stand(part: BasePart)
+		local att = Instance.new("Attachment")
+		att.Name = "StandSpot"
+		att.Parent = part
+	end
+	if kind == "fishing" then
+		local deck = Kit.part(
+			model,
+			"Deck",
+			Vector3.new(3, 0.3, 12),
+			CFrame.new(0, 0.5, -4),
+			hex("#8C6239"),
+			Enum.Material.WoodPlanks
+		)
+		Kit.decor(deck, false)
+		Kit.decor(Kit.part(model, "Pile", Vector3.new(0.4, 2, 0.4), CFrame.new(-1.2, 0, -1), hex("#5A3E26")), false)
+		Kit.decor(Kit.part(model, "Pile", Vector3.new(0.4, 2, 0.4), CFrame.new(1.2, 0, -8), hex("#5A3E26")), false)
+		Kit.decor(Kit.part(model, "Stool", Vector3.new(1.1, 0.2, 1.1), CFrame.new(0.8, 1.1, -2), hex("#C49A63")), false)
+		local fishingRod = Kit.part(
+			model,
+			"Rod",
+			Vector3.new(0.12, 3.2, 0.12),
+			CFrame.new(-0.4, 2.2, -3) * CFrame.Angles(math.rad(35), 0, 0.2),
+			hex("#7A5230")
+		)
+		Kit.decor(fishingRod, false)
+		Kit.decor(
+			Kit.part(model, "Bucket", Vector3.new(0.8, 0.7, 0.8), CFrame.new(1.1, 0.7, -1.2), hex("#2B2B2E")),
+			false
+		)
+		stand(deck)
+	elseif kind == "campfire" then
+		for i = 1, 6 do
+			local a = i / 6 * math.pi * 2
+			Kit.decor(
+				Kit.part(
+					model,
+					"Stone",
+					Vector3.new(0.7, 0.4, 0.55),
+					CFrame.new(math.cos(a) * 1.4, 0.2, math.sin(a) * 1.4),
+					hex("#7E766C"),
+					Enum.Material.Slate
+				),
+				false
+			)
+		end
+		local embers = Kit.part(
+			model,
+			"Embers",
+			Vector3.new(1.2, 0.2, 1.2),
+			CFrame.new(0, 0.2, 0),
+			hex("#FF7A1A"),
+			Enum.Material.Neon
+		)
+		Kit.decor(embers, false)
+		Kit.decor(
+			Kit.part(model, "Seat", Vector3.new(2.2, 0.35, 0.7), CFrame.new(-2.2, 0.45, 0.2), hex("#7A5230")),
+			false
+		)
+		Kit.decor(
+			Kit.part(model, "Seat", Vector3.new(2.2, 0.35, 0.7), CFrame.new(2.2, 0.45, -0.2), hex("#7A5230")),
+			false
+		)
+		Kit.decor(
+			Kit.part(
+				model,
+				"Kettle",
+				Vector3.new(0.7, 0.55, 0.7),
+				CFrame.new(0.2, 1.3, 0.1),
+				hex("#2B2B2E"),
+				Enum.Material.Metal
+			),
+			false
+		)
+		stand(embers)
+	elseif kind == "lookout" then
+		local ledge =
+			Kit.part(model, "Ledge", Vector3.new(6, 1.2, 3), CFrame.new(0, 0.6, 0), hex("#8C877E"), Enum.Material.Slate)
+		Kit.decor(
+			Kit.part(model, "BenchSeat", Vector3.new(3.2, 0.25, 1), CFrame.new(0, 1.85, 0.2), hex("#C49A63")),
+			false
+		)
+		Kit.decor(
+			Kit.part(model, "BenchBack", Vector3.new(3.2, 0.9, 0.18), CFrame.new(0, 2.4, 0.7), hex("#7A5230")),
+			false
+		)
+		stand(ledge)
+	elseif kind == "bench" then
+		local seat =
+			Kit.part(model, "Seat", Vector3.new(4, 0.3, 1.4), CFrame.new(0, 1.6, 0), hex("#C49A63"), Enum.Material.Wood)
+		Kit.decor(Kit.part(model, "Leg", Vector3.new(0.3, 1.6, 1.1), CFrame.new(-1.6, 0.8, 0), hex("#7A5230")), false)
+		Kit.decor(Kit.part(model, "Leg", Vector3.new(0.3, 1.6, 1.1), CFrame.new(1.6, 0.8, 0), hex("#7A5230")), false)
+		Kit.decor(
+			Kit.part(model, "Basket", Vector3.new(0.9, 0.6, 0.9), CFrame.new(2.4, 0.5, 0.6), hex("#8E6C4A")),
+			false
+		)
+		stand(seat)
+	end
+	return model
+end
+
 return PropArt
