@@ -350,6 +350,233 @@ return function(t)
 		t.ok(bright(heart) >= 0.8, "heartstone carries its light")
 	end)
 
+	t.test("a missing rock mesh keeps the part build and says so once", function()
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		t.eq(RockModels.UsesMesh(0), false)
+		t.eq(#RockModels.MeshIds(), 0, "nothing is uploaded yet")
+		for _, shape in ipairs(NatureArt.RockShapes) do
+			local spec = RockModels.Get(shape)
+			t.eq(spec.Host.meshId, 0, shape)
+			t.eq(spec.Glow.meshId, 0, shape .. " glow")
+		end
+		local rock = NatureArt.Build("Boulder", 4, "mid", "meadow")
+		t.ok(rock:FindFirstChild("Core"), "the part-built core stays")
+		t.eq(rock:FindFirstChild("MeshHost"), nil)
+		t.eq(rock:GetAttribute("MeshFallback"), "host")
+		t.eq(rock:GetAttribute("RockMesh"), nil)
+		local fern = NatureArt.Build("Fern", 1)
+		t.eq(fern:GetAttribute("MeshFallback"), nil, "plants are not rock meshes")
+		local ore = NatureArt.OreRock("Spire", "mid", Color3.fromRGB(255, 0, 0), Enum.Material.Metal, false)
+		t.ok(ore:FindFirstChild("Vein"))
+		t.eq(ore:GetAttribute("OreId"), "")
+		t.eq(ore:GetAttribute("MeshFallback"), "host")
+	end)
+
+	t.test("an ore id tints the part build from OreData", function()
+		local OreData = t.load("ReplicatedStorage/Shared/OreData")
+		local coal = OreData.Get("coal")
+		local red = Color3.fromRGB(255, 0, 0)
+		local model = NatureArt.OreRock("Boulder", "mid", red, Enum.Material.Metal, false, "coal")
+		t.eq(model:GetAttribute("OreId"), "coal")
+		t.eq(model:FindFirstChild("Vein").Color, coal.color)
+		t.eq(model:FindFirstChild("Vein").Material, coal.material)
+		local heart = NatureArt.OreRock("Boulder", "mid", red, Enum.Material.Slate, false, "heartstone")
+		t.eq(heart:GetAttribute("OreId"), "heartstone")
+		local light = 0
+		for _, d in ipairs(heart:GetDescendants()) do
+			if d:IsA("PointLight") then
+				light += 1
+				t.eq(d.Shadows, false)
+				t.eq(d.Color, OreData.Get("heartstone").color)
+			end
+		end
+		t.eq(light, 1, "heartstone glows even when the caller passed glow = false")
+		local unknown = NatureArt.OreRock("Boulder", "mid", red, Enum.Material.Metal, false, "nope")
+		t.eq(unknown:GetAttribute("OreId"), "")
+		t.eq(unknown:FindFirstChild("Vein").Color, red)
+	end)
+
+	t.test("uploaded slots replace the part build and leave the other looks alone", function()
+		local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		local OreData = t.load("ReplicatedStorage/Shared/OreData")
+		local Instance = t.roblox.Instance
+		local saved = {}
+		local n = 0
+		for _, shape in ipairs(NatureArt.RockShapes) do
+			local spec = RockModels.Get(shape)
+			saved[shape] = {}
+			for _, key in ipairs({ "Host", "Moss", "Snow", "Vein1", "Vein2", "Glow" }) do
+				n += 1
+				saved[shape][key] = spec[key].meshId
+				spec[key].meshId = 800000 + n
+			end
+		end
+		local function restore()
+			for shape, slots in pairs(saved) do
+				local spec = RockModels.Get(shape)
+				for key, meshId in pairs(slots) do
+					spec[key].meshId = meshId
+				end
+			end
+			MeshKit.Override = nil
+			MeshKit.Reset()
+		end
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local ok, err = pcall(function()
+			local function parts(model)
+				local list = {}
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") then
+						table.insert(list, d)
+					end
+				end
+				return list
+			end
+			local meadow = NatureArt.Build("Boulder", 4, "mid", "meadow")
+			local host = meadow:FindFirstChild("MeshHost")
+			local moss = meadow:FindFirstChild("MeshMoss")
+			t.ok(host and moss, "meadow is host plus moss")
+			t.eq(meadow:FindFirstChild("MeshSnow"), nil)
+			t.eq(meadow:FindFirstChild("Core"), nil, "the part build is dropped")
+			t.eq(meadow:GetAttribute("RockMesh"), true)
+			t.eq(meadow:GetAttribute("MeshFallback"), nil)
+			t.eq(moss.Material, Enum.Material.Grass)
+			t.eq(host:GetAttribute("VisualMesh"), true)
+			t.eq(host.Anchored, true)
+			t.eq(host.CanQuery, false)
+			t.eq(host.CastShadow, false)
+			local spec = RockModels.Get("Boulder")
+			t.ok((host.Size - spec.Host.size).Magnitude < 1e-3, "mid host uses the slot size")
+			local snow = NatureArt.Build("CrackedBoulder", 4, "large", "snow")
+			t.ok(snow:FindFirstChild("MeshSnow"))
+			t.eq(snow:FindFirstChild("MeshMoss"), nil)
+			t.eq(snow.MeshSnow.Material, Enum.Material.Snow)
+			local shore = NatureArt.Build("Slab", 4, "small", "shore")
+			t.ok(shore:FindFirstChild("MeshHost"))
+			t.eq(shore:FindFirstChild("MeshMoss"), nil)
+			t.eq(shore:FindFirstChild("MeshSnow"), nil)
+			t.eq(#parts(shore), 1, "a shore rock is only the host mesh")
+			local red = Color3.fromRGB(255, 0, 0)
+			local coal = NatureArt.OreRock("Boulder", "mid", red, Enum.Material.Neon, true, "coal")
+			t.eq(coal:GetAttribute("OreId"), "coal")
+			t.eq(coal:FindFirstChild("MeshGlow"), nil, "coal has no glow mesh")
+			t.eq(coal:FindFirstChild("Glow", true), nil, "coal has no light")
+			local vein = coal:FindFirstChild("MeshVein1")
+			t.ok(vein and coal:FindFirstChild("MeshVein2"))
+			t.eq(vein.Color, OreData.Get("coal").color)
+			t.eq(vein.Material, OreData.Get("coal").material)
+			local heart = NatureArt.OreRock("Outcrop", "mid", red, Enum.Material.Slate, false, "heartstone")
+			local glow = heart:FindFirstChild("MeshGlow")
+			t.ok(glow, "heartstone glow slot")
+			t.eq(glow.Material, Enum.Material.Neon)
+			t.eq(glow.Color, OreData.Get("heartstone").color)
+			local lamp = heart:FindFirstChild("Glow", true)
+			t.ok(lamp and lamp:IsA("PointLight") and lamp.Parent == glow)
+			t.eq(lamp.Shadows, false)
+			local opal = NatureArt.OreRock("Boulder", "mid", red, Enum.Material.Slate, false, "opal")
+			t.eq(opal:FindFirstChild("MeshGlow"), nil, "opal is a light, not a glow mesh")
+			local opalLamp = opal:FindFirstChild("Glow", true)
+			t.ok(opalLamp and opalLamp.Parent == opal:FindFirstChild("MeshVein1"))
+			t.ok(opalLamp.Brightness < 0.5, "opal stays dim")
+		end)
+		restore()
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
+	t.test("a mesh that fails to load keeps the part build", function()
+		local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		local spec = RockModels.Get("Boulder")
+		local savedHost, savedMoss = spec.Host.meshId, spec.Moss.meshId
+		spec.Host.meshId = 770001
+		spec.Moss.meshId = 770002
+		MeshKit.Reset()
+		MeshKit.Override = function()
+			return nil
+		end
+		local ok, err = pcall(function()
+			local model = NatureArt.Build("Boulder", 4, "mid", "meadow")
+			t.ok(model:FindFirstChild("Core"))
+			t.eq(model:FindFirstChild("MeshHost"), nil)
+			t.eq(model:GetAttribute("MeshFallback"), "host")
+		end)
+		spec.Host.meshId = savedHost
+		spec.Moss.meshId = savedMoss
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
+	t.test("only an uploaded host is required when the look has no cap", function()
+		local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		local Instance = t.roblox.Instance
+		local spec = RockModels.Get("Boulder")
+		local saved = spec.Host.meshId
+		spec.Host.meshId = 770011
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local ok, err = pcall(function()
+			local shore = NatureArt.Build("Boulder", 4, "mid", "shore")
+			t.ok(shore:FindFirstChild("MeshHost"))
+			t.eq(shore:FindFirstChild("Core"), nil)
+			local meadow = NatureArt.Build("Boulder", 4, "mid", "meadow")
+			t.ok(meadow:FindFirstChild("Core"), "moss is still required for a meadow rock")
+			t.eq(meadow:GetAttribute("MeshFallback"), "moss")
+		end)
+		spec.Host.meshId = saved
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
+	t.test("a real rock mesh id joins the preload list", function()
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		local MeshManifest = t.load("ReplicatedStorage/Shared/Art/MeshManifest")
+		local spec = RockModels.Get("Spire")
+		local saved = spec.Host.meshId
+		spec.Host.meshId = 424242
+		local ok, err = pcall(function()
+			local found = false
+			for _, id in ipairs(RockModels.MeshIds()) do
+				if id == 424242 then
+					found = true
+				end
+			end
+			t.eq(found, true)
+			local listed = false
+			for _, entry in ipairs(MeshManifest.Flat(false)) do
+				if entry.id == 424242 then
+					listed = true
+					t.eq(entry.hull, false)
+				end
+			end
+			t.eq(listed, true, "MeshManifest preloads rock meshes")
+		end)
+		spec.Host.meshId = saved
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
 	t.test("rain streaks are thin parts and a shelter skips the middle", function()
 		local blobs = NatureArt.RainField("blobs", "high", false)
 		local streaks = NatureArt.RainField("streaks", "high", false)
