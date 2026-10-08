@@ -19,9 +19,9 @@ return {
 			meadow = { C3.fromRGB(116, 170, 74), Enum.Material.Grass },
 			snow = { C3.fromRGB(214, 222, 230), Enum.Material.Sand },
 			shore = { C3.fromRGB(196, 176, 130), Enum.Material.Sand },
-			volcano = { C3.fromRGB(72, 64, 60), Enum.Material.Slate },
+			volcano = { C3.fromRGB(128, 116, 106), Enum.Material.Slate },
 			gloam = { C3.fromRGB(58, 52, 72), Enum.Material.Slate },
-			cave = { C3.fromRGB(42, 40, 46), Enum.Material.Slate },
+			cave = { C3.fromRGB(118, 114, 124), Enum.Material.Slate },
 		}
 
 		local function bounds(model)

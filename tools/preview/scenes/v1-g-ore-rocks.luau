@@ -43,7 +43,7 @@ return {
 			local board = Kit.part(
 				root,
 				"Plaque",
-				V3.new(7.2, 0.12, 1.85),
+				V3.new(4.0, 0.12, 1.15),
 				CF.new(x, 0.07, z) * CF.Angles(0, math.pi + YAW, 0),
 				C3.fromRGB(98, 68, 42),
 				Enum.Material.Wood
@@ -71,6 +71,16 @@ return {
 				end
 			end
 			if not best then
+				-- Meshed rock: the first vein sits off the host's centre, turn
+				-- that side to the camera.
+				local host = model:FindFirstChild("MeshHost")
+				local vein = model:FindFirstChild("MeshVein1")
+				if host and vein then
+					local d = vein.CFrame.Position - host.CFrame.Position
+					if math.sqrt(d.X * d.X + d.Z * d.Z) > 0.05 then
+						return math.atan2(d.X, d.Z)
+					end
+				end
 				return nil
 			end
 			return math.atan2(best.X, best.Z)
@@ -107,22 +117,24 @@ return {
 			}
 		end
 
+		-- OreData shapes (what Lane M passes) and ids, so the colours, materials
+		-- and glow come from OreData and the mesh variant from RockModels.KindFor.
 		local ores = {
 			{ "HOST", nil },
-			{ "COAL", { "Boulder", C3.fromRGB(12, 12, 14), Enum.Material.Slate, false } },
-			{ "COPPER", { "CrackedBoulder", C3.fromRGB(232, 120, 36), Enum.Material.Metal, false } },
-			{ "IRON", { "Spire", C3.fromRGB(176, 64, 42), Enum.Material.CorrodedMetal, false } },
-			{ "SILVER", { "Slab", C3.fromRGB(232, 236, 242), Enum.Material.Foil, false } },
-			{ "GOLD", { "Outcrop", C3.fromRGB(250, 198, 28), Enum.Material.Metal, false } },
-			{ "OPAL", { "Boulder", C3.fromRGB(214, 206, 230), Enum.Material.SmoothPlastic, true } },
-			{ "HEARTSTONE", { "CrackedBoulder", C3.fromRGB(255, 70, 118), Enum.Material.Neon, true } },
+			{ "COAL", { "boulder", C3.fromRGB(12, 12, 14), Enum.Material.Slate, false, "coal" } },
+			{ "COPPER", { "split", C3.fromRGB(232, 120, 36), Enum.Material.Metal, false, "copper" } },
+			{ "IRON", { "standing", C3.fromRGB(176, 64, 42), Enum.Material.CorrodedMetal, false, "iron" } },
+			{ "SILVER", { "slab", C3.fromRGB(232, 236, 242), Enum.Material.Foil, false, "silver" } },
+			{ "GOLD", { "pebbles", C3.fromRGB(250, 198, 28), Enum.Material.Metal, false, "gold" } },
+			{ "OPAL", { "mossy", C3.fromRGB(214, 206, 230), Enum.Material.SmoothPlastic, true, "opal" } },
+			{ "HEARTSTONE", { "split", C3.fromRGB(255, 70, 118), Enum.Material.Neon, true, "heartstone" } },
 		}
 
 		local function makeOre(spec, seed)
 			if not spec then
 				return NatureArt.Build("Boulder", seed, "mid", "host")
 			end
-			return NatureArt.OreRock(spec[1], "mid", spec[2], spec[3], spec[4])
+			return NatureArt.OreRock(spec[1], "mid", spec[2], spec[3], spec[4], spec[5])
 		end
 
 		local cameras = {}
@@ -140,9 +152,9 @@ return {
 			local bottom = math.max(minY, 0)
 			local visH = math.max(maxY - bottom, 0.5)
 			local visW = math.max(maxX - minX, maxZ - minZ)
-			local reach = visW * 0.7 + 1.25
+			local reach = visW * 0.5 + 1.0
 			plaque(ore[1], cx - math.sin(YAW) * reach, cz - math.cos(YAW) * reach)
-			local lookY = bottom + visH * 0.38
+			local lookY = bottom + visH * 0.05
 			local cam = frameOne(cx, lookY, cz, visH, visW)
 			cam.label = string.lower(ore[1])
 			table.insert(cameras, cam)

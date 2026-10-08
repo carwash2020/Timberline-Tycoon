@@ -1201,7 +1201,8 @@ function NatureArt.OreRock(
 		m:SetAttribute("OreId", "")
 	end
 	local s = scaleOf(sizeName)
-	local kind, variant, moss = RockModels.KindFor(shape)
+	local kind, variantRaw, moss = RockModels.KindFor(shape)
+	local variant: RockModels.Variant = variantRaw :: any
 	local body = BODIES[kind] or BODIES.Boulder
 	local hostLook = oreHost(color)
 	body(m, s, hostLook)
