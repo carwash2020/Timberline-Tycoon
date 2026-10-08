@@ -11,7 +11,7 @@
 --     person).
 --   * Every NPC model is tagged "NPC" with attributes NPCId (and, from
 --     CharacterArt, RootHeight). NPCController animates them on each
---     client (breathing, blinking, looking at you, waving, speech bubbles).
+--     client (breathing, blinking, looking at you, waving).
 --   * Walkers: the server never moves them. They start at their route's
 --     first waypoint; attributes Route (NPCData.EncodeRoute), Speed and
 --     RouteOffset let every client place them from the shared server clock
@@ -20,7 +20,7 @@
 --     block like a person would.
 --   * Every NPC carries a Talk prompt on the model (E / ButtonX, clickable,
 --     no line-of-sight check) so it arrives with the Atomic or Persistent
---     model. The client never WaitForChilds it. Animation and bubbles stay
+--     model. The client never WaitForChilds it. Animation stays
 --     on the client. Shop hours are applied here: a closed keeper lies
 --     behind the counter, the door leaf changes colour, and the hours
 --     sign is rewritten. The server decides the lock.

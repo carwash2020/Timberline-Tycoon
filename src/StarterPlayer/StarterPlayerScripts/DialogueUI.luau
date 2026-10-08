@@ -81,8 +81,8 @@ function DialogueUI.IsOpen(): boolean
 	return isOpen ~= nil and isOpen()
 end
 
--- Whether the box is open with this model as the speaker: its bubbles stay
--- quiet meanwhile.
+-- Whether the box is open with this model as the speaker (NPCController
+-- turns them to you and plays the talking gesture meanwhile).
 function DialogueUI.IsTalkingTo(model: Instance?): boolean
 	local f = impl.talkingTo
 	return f ~= nil and f(model)

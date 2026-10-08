@@ -232,7 +232,7 @@ return function(t)
 		t.eq(string.find(ui, "WalkSpeed", 1, true), nil, "walking is never locked")
 	end)
 
-	t.test("NPCController opens the box for a Talk press and keeps that NPC quiet meanwhile", function()
+	t.test("NPCController opens the box for a Talk press, and nothing floats over any NPC's head", function()
 		local controller = fs.readFile("src/StarterPlayer/StarterPlayerScripts/NPCController.luau")
 		local from = string.find(controller, "local function onTalk", 1, true)
 		local to = string.find(controller, "-- Binding to models as they stream in", 1, true)
@@ -241,15 +241,21 @@ return function(t)
 		t.eq(string.find(body, "say(rig", 1, true), nil, "and no bubble")
 		t.ok(string.find(body, "DialogueFlow.ServerSpoken(npc.shop, npc.id)", 1, true) ~= nil, "keepers: the server's")
 		t.ok(string.find(body, "PlotSalesmanData.Id", 1, true) ~= nil, "Old Hank's picker is his talk")
-		local say = string.sub(controller, string.find(controller, "local function say", 1, true), from)
-		t.ok(string.find(say, "DialogueUI.IsTalkingTo(rig.model)", 1, true) ~= nil, "no new bubble while it is up")
-		-- The three automatic bubbles go through autoSay (NPCDialogue.AutoBubbles).
-		local _, autos = string.gsub(controller, "autoSay%(", "")
-		t.ok(autos >= 4, "the declaration and three call sites: " .. autos)
+		-- The floating speech bubbles are gone: the wave hello, Murph's first tip
+		-- and the chatter. No billboard text but the name tag.
+		t.eq(string.find(controller, "SpeechBubble", 1, true), nil, "no speech bubble gui")
+		t.eq(string.find(controller, "autoSay", 1, true), nil, "no automatic lines")
+		t.eq(string.find(controller, 'Instance.new("BillboardGui")', 1, true), nil, "no billboard built here")
+		t.eq(string.find(controller, "AutoBubbles", 1, true), nil)
+		-- The talking gesture plays while the box is open for them.
+		t.ok(string.find(controller, "DialogueUI.IsTalkingTo(rig.model)", 1, true) ~= nil)
 		-- Murph's Talk press is the same box, with his tutorial line.
 		local quest = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QuestUI.luau")
 		t.ok(string.find(quest, "DialogueUI.Talk({", 1, true) ~= nil)
 		t.ok(string.find(quest, 'id = "Murph"', 1, true) ~= nil)
+		-- His onboarding tips used to be a bubble on the first hello: now the
+		-- first talk on step one opens them in the box ahead of the step line.
+		t.ok(string.find(quest, "murph.tips", 1, true) ~= nil, "the tips reach the player by talking to him")
 	end)
 
 	t.test("the server's lines name their speaker for the box", function()
