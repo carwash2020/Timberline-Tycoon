@@ -100,9 +100,12 @@ function QualityPickerUI.Choose(choice: QualityProfile.Choice)
 	end
 	shownOnce = true
 	player:SetAttribute(ATTRIBUTE, choice) -- the server sets it too; this lets the world follow at once
+	-- Closed first: the screen holds the movement controls off, and nothing
+	-- after this (a remote that is slow to arrive, a refresh that throws) may
+	-- leave it up.
+	close()
 	Net.Remote("SetQuality"):FireServer(choice)
 	Quality.Refresh()
-	close()
 end
 
 local function card(parent: Frame, choice: QualityProfile.Choice, recommended: boolean, order: number): TextButton

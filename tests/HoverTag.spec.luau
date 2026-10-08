@@ -221,4 +221,12 @@ return function(t)
 		-- From inside the box the distance is 0.
 		t.eq(HoverTag.RayBox(Vector3.new(0, 5, 10), Vector3.new(0, 0, 1), cf, size, 0), 0)
 	end)
+
+	-- Final pass: the tag's placement ran on an Adornee the item's removal could have cleared.
+	t.test("the tag placement tolerates an item destroyed since the last aim check", function()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/HoverTagUI.luau")
+		t.ok(string.find(source, "g.Adornee :: BasePart", 1, true) == nil, "no blind cast of a maybe-nil Adornee")
+		t.ok(string.find(source, 'adornee:IsA("BasePart")', 1, true), "the Adornee is checked first")
+	end)
 end

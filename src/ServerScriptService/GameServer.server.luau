@@ -1261,6 +1261,22 @@ local function dropCarriedLogs(player: Player)
 	player:SetAttribute("CarriedLogs", 0)
 end
 
+-- LoadCharacterAsync with a few tries (JoinFlow.LoadWithRetry): one failure
+-- (a busy avatar service) must not leave a player with no character.
+local function loadCharacter(player: Player): boolean
+	local ok, err = JoinFlow.LoadWithRetry(function()
+		player:LoadCharacterAsync()
+	end, function(): boolean
+		return player.Parent == Players
+	end, function(seconds: number)
+		task.wait(seconds)
+	end)
+	if not ok and player.Parent == Players then
+		warn(string.format("[GameServer] %s: LoadCharacter failed: %s", player.Name, tostring(err)))
+	end
+	return ok
+end
+
 local function onCharacterAdded(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not humanoid or not humanoid:IsA("Humanoid") then
@@ -1273,9 +1289,7 @@ local function onCharacterAdded(player: Player, character: Model)
 		-- respawning too.
 		task.delay(JoinFlow.RespawnDelay(Players.RespawnTime), function()
 			if player.Parent == Players and player.Character == character then
-				pcall(function()
-					player:LoadCharacterAsync()
-				end)
+				loadCharacter(player)
 			end
 		end)
 	end)
@@ -1371,12 +1385,7 @@ local function enterWorld(player: Player, joinLap: (string) -> ())
 
 	-- The loadout hook first, then the character.
 	hookCharacter(player)
-	local loaded, loadErr = pcall(function()
-		player:LoadCharacterAsync()
-	end)
-	if not loaded then
-		warn(string.format("[GameServer] %s: LoadCharacter failed: %s", player.Name, tostring(loadErr)))
-	end
+	loadCharacter(player)
 
 	-- Standing on the ground for a moment (not falling, not sliding).
 	local settled = JoinFlow.Settled()
@@ -1544,9 +1553,7 @@ local function onPlayerAdded(player: Player)
 		end
 		warn("[GameServer] " .. player.Name .. ": the join flow failed; loading the character anyway")
 		if player.Character == nil then
-			pcall(function()
-				player:LoadCharacterAsync()
-			end)
+			loadCharacter(player)
 		end
 	end
 	hookCharacter(player) -- (a no-op when enterWorld already did)
@@ -1677,9 +1684,7 @@ local function rebuildSlotNow(player: Player)
 	end
 	player:SetAttribute("DoubleWoodUntil", profile.doubleWoodUntil)
 	player:SetAttribute("InstantDeliveries", profile.instantDeliveries)
-	pcall(function()
-		player:LoadCharacterAsync()
-	end)
+	loadCharacter(player)
 end
 
 commitSlot = commitSlotNow

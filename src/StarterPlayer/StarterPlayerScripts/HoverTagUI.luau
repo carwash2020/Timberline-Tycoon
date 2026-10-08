@@ -409,7 +409,10 @@ local function placeTag()
 	if camera == nil or cf == nil or size == nil then
 		return
 	end
-	local adornee = g.Adornee :: BasePart
+	local adornee = g.Adornee :: Instance?
+	if adornee == nil or not adornee:IsA("BasePart") then
+		return -- the item was destroyed since the last aim check; the next one hides the tag
+	end
 	-- The tail sits just over the item's top; a low roof brings it down so the
 	-- card is not clipped, never lower than just above the item.
 	local base = cf.Position + Vector3.new(0, size.Y / 2, 0)

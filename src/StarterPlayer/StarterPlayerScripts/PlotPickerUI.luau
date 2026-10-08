@@ -611,6 +611,12 @@ local function build()
 		button.Font = UITheme.Fonts.Black
 		button.TextSize = 18
 		button.Text = text
+		-- A phone's panel is narrow: "CLAIM FOR $2,500" shrinks to fit, never spills over its neighbours.
+		button.TextScaled = true
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = 18
+		fit.MinTextSize = 10
+		fit.Parent = button
 		button.AutoButtonColor = true
 		UITheme.corner(button, 8)
 		button.Parent = row
@@ -716,6 +722,9 @@ function PlotPickerUI.Start()
 			savedSpeed = nil
 			-- The humanoid can arrive a moment after the character.
 			char:WaitForChild("Humanoid", 5)
+			if not open then
+				return -- closed while the humanoid was coming: locking now would never be undone
+			end
 			lock()
 			local plot = plots[index]
 			if plot then

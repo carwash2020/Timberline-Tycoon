@@ -138,4 +138,60 @@ return function(t)
 		t.ok(string.find(game, "player:LoadCharacterAsync()", 1, true), "GameServer loads the character")
 		t.ok(string.find(game, "JoinFlow.RespawnDelay", 1, true), "and respawns it after a death")
 	end)
+
+	-- Final pass (7 October 2026).
+	t.test("LoadCharacterAsync is tried again after a failure, and stops when the player is gone", function()
+		local calls, waits = 0, {}
+		local ok, err = JoinFlow.LoadWithRetry(function()
+			calls += 1
+			if calls < 3 then
+				error("busy")
+			end
+		end, function()
+			return true
+		end, function(seconds)
+			table.insert(waits, seconds)
+		end)
+		t.ok(ok, "the third try worked")
+		t.eq(err, nil)
+		t.eq(calls, 3)
+		t.eq(waits, { JoinFlow.LoadRetrySeconds, JoinFlow.LoadRetrySeconds })
+
+		calls = 0
+		local failed, why = JoinFlow.LoadWithRetry(function()
+			calls += 1
+			error("down")
+		end, function()
+			return true
+		end, function() end)
+		t.ok(not failed)
+		t.eq(calls, JoinFlow.LoadAttempts, "bounded: never an endless loop")
+		t.ok(string.find(tostring(why), "down", 1, true), "the last error comes back")
+
+		calls = 0
+		local gone = JoinFlow.LoadWithRetry(function()
+			calls += 1
+		end, function()
+			return false
+		end, function() end)
+		t.ok(not gone)
+		t.eq(calls, 0, "a player who left is never loaded")
+	end)
+
+	t.test("the client keeps saying ClientReady for longer than the server waits for its gates", function()
+		t.ok(
+			JoinFlow.ClientReadyEvery * JoinFlow.ClientReadyTries >= JoinFlow.GateWaitSeconds,
+			"the server may only start listening after a long init: the fires must outlast it"
+		)
+		local client = fs.readFile("src/StarterPlayer/StarterPlayerScripts/Client.client.luau")
+		t.ok(string.find(client, "JoinFlow.ClientReadyTries", 1, true), "the client uses the shared window")
+		t.ok(string.find(client, "for _ = 1, 6 do", 1, true) == nil, "not the old fixed six fires")
+	end)
+
+	t.test("GameServer never loads a character with a bare pcall that swallows the failure", function()
+		local game = fs.readFile("src/ServerScriptService/GameServer.server.luau")
+		local _, count = string.gsub(game, "player:LoadCharacterAsync%(%)", "")
+		t.eq(count, 1, "one call, inside loadCharacter (JoinFlow.LoadWithRetry)")
+		t.ok(string.find(game, "JoinFlow.LoadWithRetry", 1, true))
+	end)
 end
