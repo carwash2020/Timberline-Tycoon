@@ -10,7 +10,7 @@ Axes (part-built; uploaded meshes still replace them when they load):
 2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
 3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
 
-Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Swift, Keen or Prosperous until lane A2 wires it. The pictures are `previews/v1-d/temper-*.png`. Stats do not move.
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The pictures are `previews/v1-d/temper-*.png`. Stats do not move.
 
 Boxes (the window crate; shell stays at 9 parts, a full box at 42):
 

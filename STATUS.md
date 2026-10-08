@@ -27,14 +27,14 @@ The lane is done on this branch. Axes, temper colours, the stepped shelf unit, w
 - `previews/v1-d/axe-starfall.png`
 - `previews/v1-d/axe-lux.png`
 - `previews/v1-d/axe-hermits-maul.png`
-- `previews/v1-d/tempers-lineup.png` — Swift, Keen and Prosperous, tiers 1 to 3, on a Steel Axe.
+- `previews/v1-d/tempers-lineup.png` — Keen (speed, sky blue wind), Heavy (damage, white sheen) and Prosperous (coin gold), tiers 1 to 3, on a Steel Axe.
 - `previews/v1-d/tempers-tier-3.png` — the three families at tier 3, close, so the band and the edge read.
-- `previews/v1-d/temper-swift-1.png`
-- `previews/v1-d/temper-swift-2.png`
-- `previews/v1-d/temper-swift-3.png`
 - `previews/v1-d/temper-keen-1.png`
 - `previews/v1-d/temper-keen-2.png`
 - `previews/v1-d/temper-keen-3.png`
+- `previews/v1-d/temper-heavy-1.png`
+- `previews/v1-d/temper-heavy-2.png`
+- `previews/v1-d/temper-heavy-3.png`
 - `previews/v1-d/temper-prosperous-1.png`
 - `previews/v1-d/temper-prosperous-2.png`
 - `previews/v1-d/temper-prosperous-3.png`

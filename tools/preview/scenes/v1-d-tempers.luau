@@ -1,6 +1,6 @@
 --!nocheck
 -- Lane D: temper colours on a Steel Axe. The lineup is every tier. The
--- last camera is Swift, Keen and Prosperous at tier 3, side by side,
+-- last camera is Keen, Heavy and Prosperous at tier 3, side by side,
 -- close enough that the band and the neon edge read.
 
 return {
@@ -14,7 +14,7 @@ return {
 		local root = roblox.Instance.new("Model")
 
 		local steel = ItemCatalog.GetAxe("SteelAxe")
-		local families = { "Swift", "Keen", "Prosperous" }
+		local families = { "Keen", "Heavy", "Prosperous" }
 		local roman = { "I", "II", "III" }
 		local GAP = 3.6
 		local turn = CF.Angles(0, math.pi / 2, 0)
@@ -174,7 +174,7 @@ return {
 		for _, row in ipairs(grid) do
 			table.insert(cameras, frame({ row.axe, row.sign }, row.family .. " " .. roman[row.tier], 1.45))
 		end
-		table.insert(cameras, frame(trio, "Swift, Keen and Prosperous at tier 3", 1.2))
+		table.insert(cameras, frame(trio, "Keen, Heavy and Prosperous at tier 3", 1.2))
 		return {
 			root = root,
 			shadowRadius = 80,

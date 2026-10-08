@@ -1,6 +1,8 @@
 --!strict
 -- TemperLook: the colour of an axe temper prefix. Look only, no stats.
--- A2's prefixes are Swift, Keen and Prosperous, tiers 1 to 3.
+-- The names come from TemperLogic. Keen is the speed temper (sky blue
+-- wind). Heavy is the damage temper (a white edge sheen). Prosperous
+-- stays coin gold. Tiers are 1 to 3.
 -- Tier 1 is trim. Tier 2 adds a thin Neon edge (glow > 0). Tier 3 names a
 -- client particle. An unknown prefix returns nil, and nothing is applied.
 
@@ -12,14 +14,23 @@ export type Look = {
 	particle: string?,
 }
 
-local PREFIXES: { [string]: { color: string, particle: string } } = {
-	Swift = { color = "#6FB7E8", particle = "Wind" }, -- SkyBlue, wind streaks
-	Keen = { color = "#FFFFFF", particle = "Sheen" }, -- white edge sheen
+local ROWS: { [string]: { color: string, particle: string } } = {
+	Keen = { color = "#6FB7E8", particle = "Wind" }, -- SkyBlue, the speed temper
+	Heavy = { color = "#FFFFFF", particle = "Sheen" }, -- white edge sheen, the damage temper
 	Prosperous = { color = "#F2C14E", particle = "Sparkle" }, -- CoinGold sparkles
 }
 
+function TemperLook.Prefixes(): { string }
+	local out: { string } = {}
+	for prefix in pairs(ROWS) do
+		table.insert(out, prefix)
+	end
+	table.sort(out)
+	return out
+end
+
 function TemperLook.For(prefix: string, tier: number): Look?
-	local row = PREFIXES[prefix]
+	local row = ROWS[prefix]
 	if row == nil or (tier ~= 1 and tier ~= 2 and tier ~= 3) then
 		return nil
 	end
@@ -32,7 +43,7 @@ function TemperLook.For(prefix: string, tier: number): Look?
 end
 
 function TemperLook.Known(prefix: string): boolean
-	return PREFIXES[prefix] ~= nil
+	return ROWS[prefix] ~= nil
 end
 
 return TemperLook

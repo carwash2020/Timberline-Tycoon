@@ -287,16 +287,16 @@ return function(t)
 		AxeArt.ApplyTemper(m, "Bogus", 2)
 		t.eq(m:FindFirstChild("TemperTrim", true), nil)
 
-		AxeArt.ApplyTemper(m, "Swift", 1)
+		AxeArt.ApplyTemper(m, "Keen", 1)
 		local trim = m:FindFirstChild("TemperTrim")
 		t.ok(trim and trim:IsA("BasePart"), "tier 1 trim")
-		t.ok(nearHex(trim.Color, "#6FB7E8"), "SkyBlue trim")
+		t.ok(nearHex(trim.Color, "#6FB7E8"), "SkyBlue speed trim")
 		t.eq(m:FindFirstChild("TemperEdge", true), nil, "tier 1 has no edge")
 		t.eq(m:FindFirstChild("TemperFx", true), nil, "tier 1 has no particle")
 		local weld = trim:FindFirstChild("Weld")
 		t.ok(weld and weld.Part0 == m.PrimaryPart and weld.Part1 == trim, "trim welded to the Handle")
 
-		AxeArt.ApplyTemper(m, "Keen", 2)
+		AxeArt.ApplyTemper(m, "Heavy", 2)
 		local trims = 0
 		for _, d in ipairs(m:GetDescendants()) do
 			if d.Name == "TemperTrim" then
