@@ -5,8 +5,9 @@
 -- A rock is one of six families, 7 parts (8 for a pebble cluster), tilted
 -- 8 to 20 degrees and sunk 20 to 30 percent. Meadow moss and a snow cap
 -- are two thin wedges on the crown, at most 0.3 studs proud. No block is
--- taller than 1.5 times its width. An ore rock is the body plus 2 or 3
--- vein wedges, 8 parts at most. Plants and cave pieces are 2 to 6. A
+-- taller than 1.5 times its width. An ore rock is the body plus 2 vein
+-- wedges, each about a fifth of its face, 8 parts at most. Plants and
+-- cave pieces are 2 to 6. A
 -- PointLight never casts shadows.
 
 local CollectionService = game:GetService("CollectionService")
@@ -568,51 +569,62 @@ local CROWNS: { [string]: (Model, number, RockLook) -> () } = {
 	end,
 }
 
-type VeinSite = { origin: Vector3, normal: Vector3, reach: number }
+-- About a fifth of the face the wedge sits on. Two veins, so the rock
+-- stays at or under 8 parts (the pebble body is already 5).
+local VEIN_SHARE = 0.2
 
--- Thin wedges set into the faces, half buried so the ore reads at a distance.
-local function embedVeins(parent: Model, shape: string, s: number, color: Color3, material: Enum.Material)
-	local sites: { VeinSite } = {}
-	local function push(x: number, y: number, z: number, nx: number, ny: number, nz: number, reach: number)
-		table.insert(sites, {
-			origin = Vector3.new(x, y, z) * s,
-			normal = Vector3.new(nx, ny, nz),
-			reach = reach * s,
-		})
+local function embedVeins(parent: Model, shape: string, color: Color3, material: Enum.Material)
+	local function onFace(partName: string, axis: string, sign: number, shift: Vector3?)
+		local host = parent:FindFirstChild(partName)
+		if not (host and host:IsA("BasePart")) then
+			return
+		end
+		local size = host.Size
+		local normal: Vector3
+		local faceW: number
+		local faceH: number
+		local half: number
+		if axis == "X" then
+			normal = host.CFrame.XVector * sign
+			faceW, faceH, half = size.Y, size.Z, size.X * 0.5
+		elseif axis == "Y" then
+			normal = host.CFrame.YVector * sign
+			faceW, faceH, half = size.X, size.Z, size.Y * 0.5
+		else
+			normal = host.CFrame.ZVector * sign
+			faceW, faceH, half = size.X, size.Y, size.Z * 0.5
+		end
+		local area = faceW * faceH * VEIN_SHARE
+		local wide = math.sqrt(area * 1.6)
+		local deep = area / wide
+		local thick = math.min(wide, deep) * 0.18
+		local inset = math.min(thick * 0.5, half * 0.4)
+		local cf = host.CFrame
+		local center = cf.Position + normal * (half - inset)
+		if shift then
+			center += cf.XVector * shift.X + cf.YVector * shift.Y + cf.ZVector * shift.Z
+		end
+		wedge(parent, "Vein", Vector3.new(wide, thick, deep), faceCf(center, normal, 0), color, material)
 	end
-	if shape == "Spire" then
-		push(0, 1.05, 0, 1, 0.1, 0.15, 0.52)
-		push(0, 1.5, 0, -0.2, 0.15, 1, 0.42)
-		push(0, 0.5, 0, -1, 0.05, -0.2, 0.72)
+	-- Faces the 3/4 camera sees, kept off a neighbour that would swallow them.
+	if shape == "CrackedBoulder" then
+		onFace("Core", "X", -1, Vector3.new(0, 0.15, 0))
+		onFace("Lobe", "Z", -1, Vector3.new(0, 0.12, 0))
+	elseif shape == "Spire" then
+		onFace("Core", "Z", -1, Vector3.new(0, 0.08, 0))
+		onFace("Head", "X", -1, nil)
 	elseif shape == "Slab" then
-		push(0, 0.28, 0, 0.05, 1, 0.02, 0.12)
-		push(0, 0.25, 0.7, 0.1, 0.2, 1, 0.28)
-		push(1.0, 0.25, 0, 1, 0.1, 0, 0.42)
+		onFace("Core", "Y", 1, Vector3.new(0, 0, -0.45))
+		onFace("Core", "Z", -1, nil)
 	elseif shape == "PebbleCluster" then
-		push(0, 0.38, 0, 0.55, 0.75, 0.25, 0.4)
-		push(0.55, 0.28, 0.18, 1, 0.25, 0.2, 0.28)
+		onFace("Core", "X", -1, Vector3.new(0, 0.08, 0))
+		onFace("Core", "Z", 1, Vector3.new(0, 0.06, 0))
 	elseif shape == "Outcrop" then
-		push(0.1, 0.45, 0.05, 0.15, 1, 0.1, 0.18)
-		push(0.7, 0.32, 0.15, 1, 0.12, 0.15, 0.4)
-		push(-0.15, 0.28, 0.55, 0.05, 0.15, 1, 0.32)
-	elseif shape == "CrackedBoulder" then
-		push(-0.48, 0.62, 0, -1, 0.2, 0.1, 0.72)
-		push(0.55, 0.55, 0.08, 1, 0.15, 0.05, 0.62)
-		push(0, 0.7, 0.2, 0.1, 0.35, 1, 0.34)
+		onFace("Core", "Y", 1, Vector3.new(0.35, 0, -0.2))
+		onFace("Core", "Z", -1, nil)
 	else
-		push(0, 0.82, 0, 1, 0.12, 0.2, 1.12)
-		push(0, 0.82, 0, -0.35, 0.15, 1, 1.06)
-		push(0, 0.82, 0, 0.12, 1, 0.05, 1.12)
-	end
-	for _, site in ipairs(sites) do
-		wedge(
-			parent,
-			"Vein",
-			Vector3.new(0.78, 0.18, 0.4) * s,
-			faceCf(site.origin, site.normal, site.reach),
-			color,
-			material
-		)
+		onFace("Core", "X", -1, Vector3.new(0, 0.2, 0))
+		onFace("Core", "Z", -1, Vector3.new(0, 0.15, 0))
 	end
 end
 
@@ -869,10 +881,55 @@ local function oreSeed(shape: string, sizeName: string): number
 	return n + #sizeName * 17
 end
 
--- A rock with ore showing. `shape` is one of RockShapes. Veins are 2 or 3
--- thin wedges set into the faces. The whole model is 8 parts or fewer.
--- `OreId` is left blank for Lane M's hover label. Neon and a PointLight
--- are added only when `glow` is true, and that light casts no shadow.
+local function luminance(color: Color3): number
+	return color.R * 0.299 + color.G * 0.587 + color.B * 0.114
+end
+
+-- The host is chosen so the vein reads: black ore on light grey, bright
+-- ore on dark stone, the middle ores on a mid grey.
+local HOST_LIGHT: RockLook = {
+	stone = hex("#C9CDD4"),
+	dark = hex("#AEB3BC"),
+	light = hex("#E2E6EC"),
+	cap = hex("#B7BCC4"),
+	stoneMat = ROCK,
+	bandMat = SLATE,
+	capMat = SLATE,
+}
+local HOST_MID: RockLook = {
+	stone = hex("#8A8680"),
+	dark = hex("#6A6662"),
+	light = hex("#A8A39C"),
+	cap = hex("#7A766F"),
+	stoneMat = ROCK,
+	bandMat = SLATE,
+	capMat = SLATE,
+}
+local HOST_DARK: RockLook = {
+	stone = hex("#3C3A38"),
+	dark = hex("#2A2826"),
+	light = hex("#5C5854"),
+	cap = hex("#454240"),
+	stoneMat = ROCK,
+	bandMat = SLATE,
+	capMat = SLATE,
+}
+
+local function oreHost(oreColor: Color3): RockLook
+	local lum = luminance(oreColor)
+	if lum < 0.22 then
+		return HOST_LIGHT
+	elseif lum > 0.62 then
+		return HOST_DARK
+	end
+	return HOST_MID
+end
+
+-- A rock with ore showing. `shape` is one of RockShapes. Veins are 2 thin
+-- wedges, each about a fifth of the face they sit on. The whole model is
+-- 8 parts or fewer. `OreId` is left blank for Lane M's hover label. Neon
+-- and a PointLight are added only when `glow` is true, and that light
+-- casts no shadow. A pale vein gets a dim light; a saturated one shines.
 function NatureArt.OreRock(
 	shape: string,
 	sizeName: string,
@@ -885,16 +942,17 @@ function NatureArt.OreRock(
 	CollectionService:AddTag(m, "OreRockArt")
 	local s = scaleOf(sizeName)
 	local body = BODIES[shape] or BODIES.Boulder
-	body(m, s, palette("cave"))
-	embedVeins(m, shape, s, oreColor, veinMaterial(oreMaterial, glow))
+	body(m, s, oreHost(oreColor))
+	embedVeins(m, shape, oreColor, veinMaterial(oreMaterial, glow))
 	if glow == true then
 		local host = m:FindFirstChild("Vein")
 		if host and host:IsA("BasePart") then
+			local pale = luminance(oreColor) > 0.7
 			local lamp = Instance.new("PointLight")
 			lamp.Name = "Glow"
 			lamp.Color = oreColor
-			lamp.Range = 7
-			lamp.Brightness = 0.55
+			lamp.Range = if pale then 6 else 11
+			lamp.Brightness = if pale then 0.22 else 1
 			lamp.Shadows = false
 			lamp.Parent = host
 		end

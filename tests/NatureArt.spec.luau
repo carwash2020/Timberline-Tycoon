@@ -250,6 +250,106 @@ return function(t)
 		end
 	end)
 
+	local function lumOf(color)
+		return color.R * 0.299 + color.G * 0.587 + color.B * 0.114
+	end
+
+	local function faceArea(part, normal)
+		local ax = math.abs(normal:Dot(part.CFrame.XVector))
+		local ay = math.abs(normal:Dot(part.CFrame.YVector))
+		local az = math.abs(normal:Dot(part.CFrame.ZVector))
+		local size = part.Size
+		if ax >= ay and ax >= az then
+			return size.Y * size.Z
+		elseif ay >= ax and ay >= az then
+			return size.X * size.Z
+		end
+		return size.X * size.Y
+	end
+
+	local function thinNormal(part)
+		local size = part.Size
+		if size.X <= size.Y and size.X <= size.Z then
+			return part.CFrame.XVector
+		elseif size.Y <= size.Z then
+			return part.CFrame.YVector
+		end
+		return part.CFrame.ZVector
+	end
+
+	local function overlapVol(a, b)
+		local a0, a1, a2, a3, a4, a5 = worldBox(a)
+		local b0, b1, b2, b3, b4, b5 = worldBox(b)
+		local dx = math.min(a3, b3) - math.max(a0, b0)
+		local dy = math.min(a4, b4) - math.max(a1, b1)
+		local dz = math.min(a5, b5) - math.max(a2, b2)
+		if dx <= 0 or dy <= 0 or dz <= 0 then
+			return 0
+		end
+		return dx * dy * dz
+	end
+
+	t.test("each vein covers about a fifth of the face it sits on", function()
+		for _, shape in ipairs(NatureArt.RockShapes) do
+			for _, sizeName in ipairs(NatureArt.Sizes) do
+				local model = NatureArt.OreRock(shape, sizeName, Color3.fromRGB(20, 20, 22), Enum.Material.Slate, false)
+				local veins, body = {}, {}
+				for _, p in ipairs(blockParts(model)) do
+					if p.Name == "Vein" then
+						table.insert(veins, p)
+					else
+						table.insert(body, p)
+					end
+				end
+				for _, vein in ipairs(veins) do
+					local host, best = nil, 0
+					for _, part in ipairs(body) do
+						local vol = overlapVol(vein, part)
+						if vol > best then
+							host, best = part, vol
+						end
+					end
+					t.ok(host, shape .. " vein meets a face")
+					if host then
+						local size = vein.Size
+						local dims = { size.X, size.Y, size.Z }
+						table.sort(dims)
+						local ratio = (dims[2] * dims[3]) / faceArea(host, thinNormal(vein))
+						t.ok(ratio >= 0.15 and ratio <= 0.25, shape .. " " .. sizeName .. " vein share " .. ratio)
+					end
+				end
+			end
+		end
+	end)
+
+	t.test("dark ore sits on light stone and bright ore on dark stone", function()
+		local coal = NatureArt.OreRock("Boulder", "mid", Color3.fromRGB(12, 12, 14), Enum.Material.Slate, false)
+		local silver = NatureArt.OreRock("Slab", "mid", Color3.fromRGB(232, 236, 242), Enum.Material.Metal, false)
+		local function coreLum(model)
+			return lumOf(model:FindFirstChild("Core").Color)
+		end
+		local function veinLum(model)
+			return lumOf(model:FindFirstChild("Vein").Color)
+		end
+		t.ok(coreLum(coal) > veinLum(coal) + 0.35, "coal is matte black on light grey")
+		t.ok(veinLum(silver) > coreLum(silver) + 0.35, "silver is bright on dark stone")
+	end)
+
+	t.test("a pale glow is quieter than a saturated one", function()
+		local opal = NatureArt.OreRock("Outcrop", "mid", Color3.fromRGB(214, 206, 230), Enum.Material.Neon, true)
+		local heart = NatureArt.OreRock("Boulder", "mid", Color3.fromRGB(255, 70, 118), Enum.Material.Neon, true)
+		local function bright(model)
+			for _, d in ipairs(model:GetDescendants()) do
+				if d:IsA("PointLight") then
+					return d.Brightness
+				end
+			end
+			return 0
+		end
+		t.ok(bright(opal) < bright(heart), "opal stays subtle")
+		t.ok(bright(heart) >= 0.8, "heartstone carries its light")
+	end)
+
 	t.test("rain streaks are thin parts and a shelter skips the middle", function()
 		local blobs = NatureArt.RainField("blobs", "high", false)
 		local streaks = NatureArt.RainField("streaks", "high", false)
