@@ -22,6 +22,8 @@ What's here, each with its own checklist below:
 11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
 12. **The new look**: every screen restyled from the Claude Design UI spec
 
+14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
+
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
 
 Where the redesign changed something an older section describes (the
@@ -31,6 +33,123 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
+
+Connor: "We need more choppable trees in the spawn area too, near the pad, by
+the dealership. All over, it's a lumberjack game." The town used to have no
+choppable tree at all: its pines, birches and maples are ornamental (in a
+stone ring, `WorldPlan.Town().greenery`), and the real forest starts 190+
+studs south. Now 54 real felling trees stand in and round it.
+
+**What they are.** Ordinary section trees (`SectionTrees`): the same chopping,
+the stump stays, the tree grows back. Woods follow the region
+(`TreeFill.woodsNear`: oak and birch round the town, pine, maple and oak on
+the Hills side), biome 'wild'. Each cluster is a small disc and its own regrow
+zone `town:<site>` with a cap of its size (radius 16 at most), like the plot
+rings. They are **not in BiomeData's counts**, so the economy model does not
+see them: `lune run tools/economy` and `tools/economy1` are unchanged and
+ECONOMY.md / ECONOMY_V1.md were not regenerated.
+
+**Where (54 trees, 16 clusters; `Shared/TownTreeData.Sites` has each centre).**
+
+| Where | Trees | Sites |
+|---|---|---|
+| South-west of the spawn pad, west of the Forest Path (45 to 95 studs from the pad, in sight down the path) | 7 | padSW1, padSW3 |
+| Round the showroom hall and Land Office: the strip west of the hall past the Land Office and loading pad, two in front of the hall at its east end, behind it, east of it | 20 | strip1, strip2, forecourt, back1, back2, east1 |
+| The town's west edge, by the Tool Shed, the General Store and the Hills Road | 10 | west1, west2, west4 |
+| North: behind the sawmill, along the Snow Road, north of the General Store and the gondola station | 14 | mill, north1, north2, snowE |
+| South of the plot road, east of the lot | 3 | roadS |
+
+Woods: oak 27, birch 15, maple 6, pine 6. The Medium and High tiers add 20 and
+31 more trees (see below); they are not planted. No tree stands in front of the
+showroom's door or along its forecourt west of x 290: the lighthouse lamp has to
+stay in view from the pad (WorldPlan.spec keeps every trunk 10 studs off that
+line, and it runs along the front of the hall), and the Land Office, its queue,
+the door path and the loading pad take the rest of the west wall.
+
+**The layout rules** (`TreeFill.TownBlocker` / `TownWhy` / `TownGround`, the
+numbers in `TownTreeData`). A town tree never stands: in the sell area
+(x -60 to 60, z 80 to 140, hard empty); in the spawn lane (x -18 to 18, z 8 to
+100) or within 22 of the pad; within 11 studs of a road's edge (every road,
+including the Hills, Snow, Mill and Lot Loop roads and the homestead lanes);
+within 7 of a TownPaint rect (street, plaza, paths, spawn walk, mill yard) or a
+town floor; within 9 of a building (Tool Shed, General Store, showroom hall,
+mill, sell station, gondola station, Land Office) or 14 of Murph's camp; within
+12 of the parking lot or 8 of its pull-out lanes, 12 of a loading pad; within 12
+of a shop door (and a clear apron in front of each door); in the Land Office queue; under the gondola's first 280 studs
+(22 either side); within 11 of the line from the spawn pad to the lighthouse lamp; within 7 of a townsperson's walk or 11 of where one stands;
+within 11 of an ornamental tree, 9 of a prop, 12 of a sign, 6 of a lamp; within
+30 of a plot; on water or ground steeper than 0.5; on a boulder cluster, scenery
+piece or landmark's disc. Trunks keep 12 studs apart (the forest's gap is 10)
+and from every other tree, so a player or a truck passes between them.
+
+**Regrow.** A "town:" zone's regrow spot is picked with `TreeFill.GroundFor`,
+which is `TownGround` for a town zone and the old `Ground` for every other: the
+general rule refuses the whole flat town (`GoodGround`), so without it a felled
+town tree would never grow back. The same rules apply, so a tree never grows
+back onto a road, a path, a door or the sell area. `SectionTrees.pickSpot`
+calls it; nothing else about growing changed.
+
+**Quality tiers.** `TownTreeData.Tiers` are `QualityBudgets`' names: low 54
+trees, medium 74, high 85 (`Count`, held under `Budget` 60 / 90 / 100 by
+spec). Trees are shared by every player on a server, so one list ships:
+`ShippedTier = "low"`, a phone's. Medium and High are the same sites in
+priority order plus more; `TreeFill.TownRings(taken, pause, tier)` plants any
+of them and the spec pins that a lower tier's trees are exactly a subset of a
+higher one's. Changing the shipped tier is one word (and a look at the phone
+discs below). A fuller town only for Higher players would need a per-player
+(client) tree layer, which is not built.
+
+**Phone budget.** The three phone discs (640 studs round the spawn, the meadow
+and the pines) were held to 1.7x the first trees in trees and parts. The fill
+still is (the test now leaves the town's trees out of that); with the town's 54:
+spawn 189 trees -> 314 with the fill (1.66x) -> 368 with the town (1.95x), and 7454 parts -> 12490 -> 14512 (1.95x), the
+meadow 1.91x and the pines 1.78x, held under `TownTreeData.PhoneDiscMax` = 2.0.
+Each tree is about 43 Instances (the section tree), so the town adds about 2,300.
+
+**Load time** (Lune, same machine, three runs each; Roblox is slower, so use the
+ratio). `WorldPlan.Trees()`: 1,225 trees in 8.7 / 8.8 / 9.0 s before, 1,279 in
+8.7 / 8.9 / 8.8 s after. The town planner itself is about 40 ms warm (60 to 85 ms with
+the obstacle tables built). The work stays inside the deferred forest planter
+(`MapBuilder` `forestPlanter`, after the sell area, 12 ms slices, nearest the
+sawmill first), so nothing was added before "world ready for players" and the
+town's trees plant first. No new mesh, wood or budget: no change to
+MeshKit.Preload, the section-tree builder or the WindSway budgets (nearest 16 /
+24 / 32 trees). The `[Load] forest planned: N sites in X s` and `forest planted`
+lines in Output show it in Studio; N goes up by 54.
+
+**Look.** `bash tools/preview/shoot.sh spawn-trees [view]` (new scene: the town
+plus every tree in x -300..520, z -140..380 as they plant at boot). Before
+`preview/spawn-trees-before-N.png`, after `preview/spawn-trees-N.png` (gitignored,
+render again to see them): 1 from the spawn pad, 2 the pad looking south down the
+Forest Path, 3 the pad from the west, 4 the dealership door, 5 the dealership
+and Land Office from the lot, 6 from the lot, 7 and 8 top down, 9 aerial,
+10 the General Store. The window held 98 trees before and 154 after.
+
+**Studio checks (Connor).**
+1. Join. Stand on the spawn pad: the walk north to the mill, the sell area and
+   the plaza are as before (no new tree in the lane, none by the sell pad).
+2. Turn round and walk south down the Forest Path: choppable trees now line its
+   west side, 45 to 95 studs from the pad. Chop one: the same swing, fall and
+   stump as the forest. After a few minutes it grows back nearby (inside the
+   cluster, never on the path).
+3. Walk to the Dealership: trees west of the hall past the Land Office counter
+   (55 to 70 studs from its door), one or two in front of the hall's east end, more
+   behind it and to its east. The door, its path and the forecourt stay open. You can walk to the door and the Land Office counter and the loading pad
+   with room to spare; a truck can drive the forecourt path and pull in.
+4. Drive a rig out of the lot (north to the street and south to the Lot Loop),
+   along the Mill Road and the Snow Road: no trunk in the way, trees stand back
+   from the road edge. Rosa, Pip and Bram still walk their loops.
+5. Stand in the gondola station queue and ride: no trunk or crown touches the
+   cabin or its cable on the way out of town.
+6. Fell every tree in a cluster and wait: each grows back after its wood's
+   respawn time (45 s for oak to 3 minutes, with the 0.7 to 1.3 roll), never past the
+   cluster's count.
+7. A phone (Lower quality): the town looks fuller and still plays smoothly;
+   send the `[Load] ready for play` and `forest planted` lines.
+8. If a tree looks wrong (on a path, on a shop floor, in a queue), send its
+   position: each site is one line in `TownTreeData.Sites`.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 
