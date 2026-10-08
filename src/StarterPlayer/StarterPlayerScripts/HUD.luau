@@ -38,7 +38,7 @@
 --     HintLogic.ContextForV2 for what's known so far: driving (backing up
 --     to the pad once the bed has a volume), dragging, an axe in hand
 --     (an AxeId tool in the character), else how to drag.
---   * The side buttons: a column on the right (Drop axe, Truck to lot, ...)
+--   * The side buttons: a column on the right (Truck to lot, Hammer, ...)
 --     that other controllers add to with HUD.SideButton. It ends above a
 --     phone's jump button and grows up to just under the corner's second
 --     line (the Daily Goals button); what doesn't fit there starts another
@@ -906,6 +906,21 @@ function HUD.SetModal(rect: HudLayout.Rect?)
 	modalRect = if rect then table.clone(rect) else nil
 	refreshModal()
 	queueToasts()
+end
+
+-- Whether a panel is open over the game: a shop, the Store or the Field
+-- Guide (HUD.SetModal), or one of the corner's popups (HUD.Popup). The
+-- drop keys (DropControls) stay out of its way.
+function HUD.Overlay(): boolean
+	if modalRect ~= nil then
+		return true
+	end
+	for _, p in ipairs(popups) do
+		if p.Visible then
+			return true
+		end
+	end
+	return false
 end
 
 -- Fits the bottom row between the left margin and a phone's jump button

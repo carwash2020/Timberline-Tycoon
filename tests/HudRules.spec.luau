@@ -2,7 +2,7 @@
 -- When the HUD's optional pieces show (StarterPlayerScripts/HudRules): the
 -- first minute has one objective, so Daily Goals and the pouch wait for
 -- the tutorial, "Send truck home" waits until the truck is away, and
--- "Drop axe" waits until you have an axe to spare and takes two presses;
+-- dropping the axe waits until you have an axe to spare and takes two presses;
 -- the load chip says what's in your hands and your truck's bed; the
 -- HUD's loading card says what the wait is for.
 return function(t)
@@ -62,7 +62,7 @@ return function(t)
 		t.eq(HudRules.SendHome(true, 43, 43), true, "just past both lines")
 	end)
 
-	t.test("Drop axe: never for a new player's lone Rusty Axe", function()
+	t.test("dropping an axe: never for a new player's lone Rusty Axe", function()
 		local ItemCatalog = t.shared("ItemCatalog")
 		local starter = ItemCatalog.AxeLadder()[1].id
 		t.eq(starter, "RustyAxe")
@@ -76,7 +76,7 @@ return function(t)
 		t.eq(HudRules.DropAxe(3, "HermitsMaul"), false, "a quest axe never offers Drop")
 	end)
 
-	t.test("Drop axe takes two presses, 0.3 to 3 s apart", function()
+	t.test("dropping takes two presses, 0.3 to 3 s apart", function()
 		-- One press only waits.
 		local drop, at = HudRules.DropPress(nil, 10)
 		t.eq(drop, false, "one tap doesn't drop it")
@@ -251,10 +251,9 @@ return function(t)
 		daily = { key = "DPadUp", file = "DailyUI" },
 		guide = { key = "DPadLeft", file = "FieldGuideUI" },
 		settings = { key = "DPadRight", file = "SettingsUI" },
-		dropAxe = { key = "DPadDown", file = "AxeController" },
 	}
 
-	t.test("the D-pad: Up Daily Goals, Left the Field Guide, Right Settings, Down Drop axe", function()
+	t.test("the D-pad: Up Daily Goals, Left the Field Guide, Right Settings", function()
 		local seen = {}
 		local count = 0
 		for name, key in pairs(HudRules.PadKeys) do
@@ -264,7 +263,7 @@ return function(t)
 			t.ok(not seen[key], key .. " used twice")
 			seen[key] = true
 		end
-		t.eq(count, 4)
+		t.eq(count, 3)
 	end)
 
 	-- The one exception: while you hold a piece of wood (the v2 loop's

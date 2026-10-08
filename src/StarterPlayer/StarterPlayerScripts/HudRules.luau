@@ -9,10 +9,11 @@
 --     DailyLabel() is what its button says.
 --   * SendHome() (VehicleController): "Send truck home" only while you're
 --     on foot, away from your truck, and it's away from its parking spot.
---   * DropAxe() (AxeController): "Drop axe" only while you hold an axe and
---     either carry another or hold one better than the starter.
---   * DropPress(): dropping takes two presses (a tap, a click, the pad's
---     button or Backspace), the second 0.3 to 3 s after the first.
+--   * DropAxe() (AxeController): the axe in hand may be dropped only while
+--     you carry another or hold one better than the starter.
+--   * DropPress(): dropping takes two presses (B, Q or Backspace, or a long
+--     press on a phone's hotbar: Shared/DropControls), the second 0.3 to
+--     3 s after the first.
 --   * LoadChip() (HUD): the logs in your hands and in your truck's bed,
 --     beside the hint.
 --   * LoadingText() (HUD): what the HUD's loading card says while you wait.
@@ -95,11 +96,12 @@ function HudRules.TruckButton(ownsTruck: boolean, sendHome: boolean): (boolean, 
 	return sendHome, "Send truck home"
 end
 
--- "Drop axe": you hold an axe (`heldId`, nil if you don't) and carry
+-- Whether the axe in hand may be dropped (B / Q / a long press on a phone,
+-- DropControls): you hold an axe (`heldId`, nil if you don't) and carry
 -- `carried` axes in all (in hand and in the Backpack, so not counting any
 -- lying on the ground): two or more, or the one in hand isn't the starter
--- (the ladder's first rung). A new player with just the Rusty Axe never
--- sees it. The server refuses to drop your last axe either way.
+-- (the ladder's first rung). A new player with just the Rusty Axe
+-- can't drop it. The server refuses to drop your last axe either way.
 function HudRules.DropAxe(carried: number, heldId: string?): boolean
 	if heldId == nil then
 		return false
@@ -111,7 +113,7 @@ function HudRules.DropAxe(carried: number, heldId: string?): boolean
 	return carried >= 2 or (ItemCatalog.AxeTier(heldId) or 1) > 1
 end
 
--- A press of "Drop axe" when the first press was at `armedAt` (nil: none
+-- A press of the drop when the first press was at `armedAt` (nil: none
 -- waiting) and it's `now` (os.clock). Returns whether to drop, and when
 -- the press waiting for a second one was made (nil once it's dropped):
 --   * no press waiting, or it's too old: this one waits ("Confirm drop");
@@ -225,15 +227,13 @@ function HudRules.ClockText(clockTime: number): string
 end
 
 -- The gamepad's D-pad shortcuts (KeyCode names), one direction each.
--- DPadDown is "Drop axe" (AxeController's side button, UI-06). None of
--- them is a button anything else binds: ButtonA/B/X/Y, the shoulders,
+-- None of them is a button anything else binds: ButtonA/B/X/Y, the shoulders,
 -- the triggers and the thumbsticks belong to Roblox's controls, the world
 -- prompts, the shops (B closes), the placer and the truck.
 HudRules.PadKeys = {
 	daily = "DPadUp", -- Daily Goals (DailyUI)
 	guide = "DPadLeft", -- the Field Guide (FieldGuideUI), once you have it
 	settings = "DPadRight", -- Settings (SettingsUI)
-	dropAxe = "DPadDown", -- Drop axe (AxeController)
 }
 
 -- What's going on when a D-pad shortcut is pressed.

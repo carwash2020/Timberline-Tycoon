@@ -151,4 +151,14 @@ return function(t)
 			InputKit.PromptDefaults(prompt, "Honk")
 		end, "unknown action")
 	end)
+
+	t.test("the drop is B and Q, in no context list, and the D-pad Drop action is gone", function()
+		t.eq(InputKit.DropBind.gamepad, Enum.KeyCode.ButtonB)
+		t.eq(InputKit.DropBind.keyboard, Enum.KeyCode.Q)
+		for _, name in ipairs(InputKit.ContextNames) do
+			for _, b in ipairs(InputKit.Target[name]) do
+				t.ok(b.action ~= "DropAxe" and b.action ~= "Drop", name .. " lists " .. b.action)
+			end
+		end
+	end)
 end

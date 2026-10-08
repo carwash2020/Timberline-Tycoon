@@ -46,7 +46,7 @@ Studio playtest proves the loop feels right. See "First playtest" below.
 - **CarryController**: "Load logs" prompt on your tailgate, "Sell logs"
   prompt on the sell pad, shown only when they apply.
 - **HUD**: cash, device-aware hint, toasts, "Loading your save…".
-- **AxeController**: "Drop axe" button (and Backspace) while holding an axe.
+- **AxeController**: drop the held axe with B (pad), Q or Backspace (keyboard) or a long press on the hotbar (phone); no button.
 
 ## How to play
 1. Spawn by the forest with the Rusty Axe in hand.
@@ -75,7 +75,7 @@ Axes as items:
 - [ ] Rusty Axe is in the hotbar and in hand on spawn
 - [ ] Chat `/giveaxe inferno` and `/giveaxe gold`: both appear in the hotbar;
       switch with number keys or taps; chopping uses the one in hand
-- [ ] Drop (Backspace / button): the axe lies on the ground; "Pick up"
+- [ ] Drop (Q / Backspace / B / phone long press): the axe lies on the ground; "Pick up"
       brings it back; a second player sees "That's <name>'s axe"
 - [ ] Die, then respawn: every axe is back (except ones lying on the ground)
 

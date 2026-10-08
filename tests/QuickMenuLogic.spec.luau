@@ -103,7 +103,7 @@ return function(t)
 			t.ok(have[id], id)
 		end
 		t.eq(Menu.IdFor("Saves"), "saves")
-		t.eq(Menu.IdFor("DropAxe"), "dropaxe")
+		t.eq(Menu.IdFor("Plans"), "plans")
 		t.eq(Menu.IdFor("Call Truck!"), "calltruck")
 	end)
 

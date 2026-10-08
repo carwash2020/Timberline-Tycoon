@@ -475,10 +475,9 @@ UI-11/17, PLAY-06 sounds (needs your ids), PLAY-12, PLAY-16, TWN-09/10/
   (progress still counts), the Heartseed pouch only from step 5. "Truck to
   lot" is now **Send truck home** and only shows when your truck is more
   than 20 studs from its slot and you're 40+ studs from it.
-- **UI-06** Drop axe shows only with a spare or better axe, needs two
-  presses ("Confirm drop" in amber), and sits on D-pad down (not X). The
-  server keeps your last axe ("You need an axe to chop!"). On a gamepad:
-  check D-pad down doesn't open a Roblox menu.
+- **UI-06** Dropping an axe needs a spare or better axe and two presses; the
+  server keeps your last axe ("You need an axe to chop!"). (Superseded: the
+  on-screen Drop axe button is gone; see "Drop axe controls" at the end.)
 - **ACT-02** (early, from Phase 2) A swing turns you to the tree when it's
   off to the side. Not while seated.
 - **ACT-03** (early, from Phase 2) Trucks turn about the rear axle. Hold
@@ -950,7 +949,7 @@ test account), progress starts fresh each Play session.
 - **Tutorial tracker, left**: high up on a phone (its chat is a button), a
   third of the way down on a computer, under Roblox's chat window.
 - **Side buttons, right**: BUILD (on your own plot), Sell here (Instant
-  Delivery), Drop axe, Truck to lot, stacked so the bottom one always ends
+  Delivery), Truck to lot, stacked so the bottom one always ends
   above a phone's jump button.
 - **Toasts, top centre**, newest on top. **Control hint, bottom centre.**
 - Roblox's own **player list is off** (it opens top right on computers,
@@ -1604,8 +1603,8 @@ What changed:
 - [ ] Hold it and click (RT, tap): it vanishes, a toast says you learned it,
       and the Small Shed is now in the hammer list and places free
 - [ ] Buying it again before you use it, or after: refused, nothing charged
-- [ ] Hold a plan and press Drop (Backspace, D-pad down, or the Drop plan
-      button, two presses): it lies on the ground with a Pick up prompt; only
+- [ ] Hold a plan and press Drop (Q, Backspace, B on a pad, or a long
+      press on the hotbar on a phone; two presses): it lies on the ground with a Pick up prompt; only
       you can pick it up; rejoin and it is back in your hotbar
 - [ ] A plan you already know can still be held; using it says so and keeps it
 - [ ] As the owner, `/gift <name> Blueprint Cabin` puts a Cabin plan in
@@ -2838,3 +2837,26 @@ Connor, Xbox: "talking to most shop NPCs is broken" and "can't buy anything". Bo
 - [ ] Carry a shop box to the counter, say Yes: it is bought. Grab a shelf box while a keeper's box is still up, close the box, drop the box: Talk and Buy prompts are still there.
 - [ ] Talk to Millie, Gus, Pip and Old Hank: box opens, no stuck prompts afterwards.
 - [ ] If it still fails, send the Output lines tagged `[Talk]`, `[PromptSwitch]`, `[Drag]`, `[BootReport]` and any red error text, plus what you pressed.
+## Drop axe controls (branch `claude/drop-axe-controls`, 8 October 2026)
+
+Connor: "why is there a drop axe button, just make it B on Xbox and a similar button on PC and however you wanna do it on phone."
+
+**What changed.** The "Drop axe" / "Drop plan" side button is removed. `Shared/DropControls` (pure, `tests/DropControls.spec.luau`) holds the rules; `AxeController` binds them:
+- Xbox: **B**. PC: **Q**, and **Backspace** still works. Phone: **long press on the hotbar strip** (bottom centre, clear of the thumbstick and jump button). Roblox's hotbar is CoreGui, so a per-slot button or menu is not possible; a tap on the equipped slot still puts the item away (Roblox does that), and the long press drops what is in hand. A long press also toggles that slot, so a phone press counts an item put away in the last 3 s (`DropControls.RecentSeconds`).
+- Same conditions as the button: an axe only with a spare or better one (`HudRules.DropAxe`; never the lone Rusty Axe, pass and quest axes), any rolled plan, two presses 0.3 to 3 s apart (`HudRules.DropPress`), server ownership check, `RateLimiter` `DropAxe`/`DropBlueprint`, server keeps your last axe. The first press says "Press B again to drop the Steel Axe." in a toast (it was the amber "Confirm drop" button).
+- The first time you hold something you may drop, one toast says how ("Press B twice to drop it", Q, or "Long-press its slot twice to drop it").
+- Removed: D-pad Down as a drop (and its `HudRules.PadKeys.dropAxe`), the quick-menu "dropaxe" tile, `InputKit.Target.menu` DropAxe. Added `InputKit.DropBind`.
+
+**B audit.** B is also Cancel/back in: `HUD.Popup` (High, sinks), `QuickMenuUI` close (High+201, sinks) and HUD back (High+10), `DialogueUI` (High, sinks), `SettingsUI` nav (High+20, sinks), `PlotUI` land panel (High+20), `SaveSlotUI` (High), `AdminUI`, `ShopUI` CloseShop (plain BindAction), `BlueprintPlacer` PlacerCancel (Q and B, plain), `WireTool` WireDone (High+100, Q and B), `DragController` (Q is yaw while a piece is held; HOLD_PRIORITY), and `MenuPad.Closes` through plain `InputBegan` in Daily, Forest, Store, World, Quest, PlotPicker, FieldGuide, Tree. The drop is a CAS action at `ContextActionPriority.Low` (1000), under every one of those, and the handler passes (never sinks) unless `DropControls.Decide` says drop. The `InputBegan` closers do not sink, so Decide also refuses while: `GuiService.SelectedObject` or `SelectedCoreObject` is set (every pad menu selects a control through `MenuPad`/`GamepadNav`), `GuiService.MenuIsOpen`, `UserInputService.ModalEnabled`, `HUD.Overlay()` (shop/store/guide modal rect, corner popups), `DialogueUI.IsOpen()`, the placer or wiring tool is up, `DragController.Holding()`, seated, or typing. Because CAS runs before `InputBegan`, a B that closes a panel finds it open and does not drop; the next B drops. `AxeController` has no `InputBegan` handler, so nothing handles a press twice. `tests/DropControls.spec.luau` scans the source: nothing else binds B below the drop, and the old button is gone.
+**Residual.** On a keyboard, Q while the Land, Saves, Badges or Plot picker panel is open (no pad selection, not in `HUD.Overlay`) would still start the two-press drop; Escape closes those and Q does nothing else there.
+
+### Studio checks (Connor), drop axe controls
+- [ ] No Drop axe / Drop plan button on screen on PC, phone emulator or Xbox; the right-hand column has no gap where it was.
+- [ ] Xbox: hold a Steel Axe (or any axe with a spare in the hotbar): B once shows "Press B again to drop the Steel Axe."; B again within 3 s lays it on the ground with a Pick up prompt. A lone Rusty Axe: B does nothing.
+- [ ] Xbox: open Settings, Daily Goals, a shop, the Store, the quick menu (View), a Murph/NPC dialogue, the plot picker, the Land panel with an axe in hand: B only closes each; the axe is never dropped by that press. Close, then B twice drops it.
+- [ ] Xbox: with a hammer-placer or wiring tool up, B stops it and does not drop; while holding a log (RT grab) B does not drop; sitting in a truck B does nothing.
+- [ ] Xbox: D-pad Down no longer drops anything (while holding a log it still pulls it nearer).
+- [ ] PC: Q twice (and Backspace twice) drops the axe; Q in the placer still cancels; Q/E turns a held log; typing "q" in chat drops nothing; Q with a panel open does not drop.
+- [ ] Hold a rolled plan: B / Q twice drops it, server still says only you can pick it up.
+- [ ] Phone (device emulator or a phone): long-press the hotbar twice, about a second apart, with an axe equipped: it lands on the ground. A long press up in the world, or on the thumbstick or jump button, does nothing. A tap on the equipped slot still puts it away. Watch whether the first long press also unequips it (expected; the second press still drops it).
+- [ ] The one-time hint appears the first time you hold a droppable axe, with the right control for the device.

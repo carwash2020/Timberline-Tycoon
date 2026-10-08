@@ -271,10 +271,10 @@ return function(t)
 		end
 	end)
 
-	t.test("the drop button also drops a plan", function()
+	t.test("the drop keys also drop a plan", function()
 		local src = fs.readFile(dir .. "AxeController.luau")
 		t.ok(string.find(src, '"DropBlueprint"', 1, true))
-		t.ok(string.find(src, "Drop plan", 1, true))
+		t.ok(string.find(src, "heldPlan()", 1, true))
 		t.ok(string.find(src, "HudRules.DropPress", 1, true), "still two presses")
 	end)
 
