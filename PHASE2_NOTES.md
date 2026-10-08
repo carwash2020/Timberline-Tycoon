@@ -7,6 +7,27 @@ Everything after the Phase 1 vertical slice. It's all on `main` now
 passes (formatter, linter, strict types against the Roblox API, 351 unit
 tests, ECONOMY.md current); GitHub runs it on every push.
 
+## V1 UI (lane U, branch `phase-2/v1-u-ui`)
+
+Mockups (phone 667x375 and PC 1920x1080): `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png`, `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png`, `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png`, `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png`.
+
+Look: walnut panels, cream text, amber prices and edges, green confirm, red danger, muted locked. GothamBold for titles and buttons, Gotham for body. Radius 8, stroke 2, selection ring #FFF4C2 at 4px. Uploaded UIArt skins (cash plaque, prompts) still cover the flat colours once those images load; until then the flat theme shows.
+
+What's new in V1: once per save after the tutorial, stored as `onboarding["News:V1"]` (no new save field). Settings has WHAT'S NEW. Close or B skips it.
+
+Controller, first selected button:
+- Owner menu: PLAYERS tab
+- Quick menu: first tile
+- Settings: GAME tab
+- What's new: Close
+
+B closes those panels. None of them binds ButtonR2 (RT still chops and places, as before).
+
+Studio checks:
+- PC: loading card uses the new colours and rotates tips without repeating until the list ends. HUD buttons match the sheet. Owner menu (if you are the owner) is walnut with a cream title. Settings, WHAT'S NEW, Close. Cash still reads.
+- Phone (667x375 landscape): the same panels fit, buttons stay fingertip-tall, the jump button and the left thumbstick zone are not covered by a panel.
+- Xbox: open each panel above. The cream ring is on the first button immediately. D-pad and the left stick reach every button. A activates. B closes and returns to the HUD button that opened it. RT still swings the axe and does not change owner-menu tabs.
+
 What's here, each with its own checklist below:
 1. **The redesign (October 2026):** every model rebuilt, the world on
    terrain, a living environment, the Living Forest twist, feel and fixes

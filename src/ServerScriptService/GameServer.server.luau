@@ -53,6 +53,7 @@ local LeaveCommit = require(script.Parent.LeaveCommit)
 local LeftLoad = require(script.Parent.LeftLoad)
 local MilestoneService = require(script.Parent.MilestoneService)
 local MonetizationService = require(script.Parent.MonetizationService)
+local NewsService = require(script.Parent.NewsService)
 local PaintService = require(script.Parent.PaintService)
 local NodeService = require(script.Parent.NodeService)
 local NPCService = require(script.Parent.NPCService)
@@ -1207,6 +1208,13 @@ end)
 
 -- Settings (SettingsLogic), mirrored on player attributes so the client
 -- applies them when the save loads.
+remote.NewsSeen.OnServerEvent:Connect(function(player: Player)
+	if not RateLimiter.Allow(player, "NewsSeen") then
+		return
+	end
+	NewsService.Seen(player)
+end)
+
 remote.SaveSetting.OnServerEvent:Connect(function(player: Player, key: unknown, value: unknown)
 	if not RateLimiter.Allow(player, "SaveSetting") then
 		return
@@ -1613,6 +1621,7 @@ local function onPlayerAdded(player: Player)
 	remote.CashChanged:FireClient(player, profile.cash)
 	safely("MilestoneService.Start", MilestoneService.Start, player, profile)
 	safely("QuestService.Start", QuestService.Start, player, profile)
+	safely("NewsService.Start", NewsService.Start, player, profile)
 	safely("DailyService.Start", DailyService.Start, player, profile)
 	safely("EventService.Start", EventService.Start, player, profile)
 	safely("ShopService.PlayerJoined", ShopService.PlayerJoined, player, profile)
@@ -1711,6 +1720,7 @@ local function rebuildSlotNow(player: Player)
 	DailyService.Start(player, profile)
 	safely("EventService.Start", EventService.Start, player, profile)
 	QuestService.Start(player, profile)
+	NewsService.Start(player, profile)
 	player:SetAttribute("Cash", profile.cash)
 	remote.CashChanged:FireClient(player, profile.cash)
 	-- Settings and the Robux passes live on the account. A slot swap does

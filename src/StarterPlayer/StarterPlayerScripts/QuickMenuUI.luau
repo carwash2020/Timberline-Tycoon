@@ -125,10 +125,10 @@ local function build(entries: { HudNav.Entry }): GuiObject?
 		local button = UITheme.Button({
 			name = entry.id,
 			text = entry.label,
-			size = Vector2.new(rect.w, rect.h - 3),
+			size = Vector2.new(rect.w, rect.h - UITheme.ButtonDrop),
 			style = style,
 			textSize = 20,
-			radius = 14,
+			radius = UITheme.Radius,
 		})
 		button.root.Position = UDim2.fromOffset(rect.x, rect.y)
 		button.root.Parent = holder
@@ -275,7 +275,7 @@ local function buildPanel()
 	local dim = Instance.new("TextButton")
 	dim.Name = "Scrim"
 	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = C.Ink
+	dim.BackgroundColor3 = C.PanelAlt
 	dim.BackgroundTransparency = 0.5
 	dim.AutoButtonColor = false
 	dim.Text = ""
@@ -286,16 +286,16 @@ local function buildPanel()
 	end)
 	dim.Parent = screen
 
-	local shell = UITheme.Card(C.Paper, C.Bark, 4, 18, false)
+	local shell = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
 	shell.outer.Name = "Panel"
 	shell.outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	shell.outer.Position = UDim2.fromScale(0.5, 0.5)
 	shell.outer.Size = UDim2.fromOffset(480, 300)
-	UITheme.stroke(shell.outer, C.Bark, 3)
+	UITheme.stroke(shell.outer, C.AmberEdge, UITheme.Stroke)
 	shell.outer.Parent = screen
 	panel = shell.outer
 
-	local title = UITheme.label(shell.face, QuickMenuLogic.Title, F.Heading, 26, C.Bark)
+	local title = UITheme.label(shell.face, QuickMenuLogic.Title, F.Heading, 26, C.Cream)
 	title.Name = "Title"
 	title.Position = UDim2.fromOffset(PAD, 10)
 	title.Size = UDim2.new(1, -2 * PAD, 0, TITLE_H)
@@ -310,7 +310,7 @@ local function buildPanel()
 	holder.Parent = shell.face
 	gridHolder = holder
 
-	local footer = UITheme.label(shell.face, QuickMenuLogic.Footer, F.Bold, 16, C.Bark)
+	local footer = UITheme.label(shell.face, QuickMenuLogic.Footer, F.Bold, 16, C.Muted)
 	footer.Name = "Footer"
 	footer.AnchorPoint = Vector2.new(0, 1)
 	footer.Position = UDim2.new(0, PAD, 1, -(PAD / 2 + 3))

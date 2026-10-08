@@ -363,7 +363,7 @@ function TownMarkers.Build(marker: Marker, phone: boolean): BillboardGui
 		label.Size = UDim2.fromScale(1 - across(PAD + CHIP + PAD + PAD), CHIP)
 		label.TextXAlignment = Enum.TextXAlignment.Left
 	end
-	label.Font = Enum.Font.FredokaOne -- the world signs' face (Kit.signText)
+	label.Font = UITheme.Fonts.Heading
 	label.Text = marker.text
 	label.TextColor3 = C.Cream
 	label.TextScaled = true

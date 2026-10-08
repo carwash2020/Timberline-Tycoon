@@ -71,6 +71,7 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	SecretPress = 2, -- a carving or the cave box prompt (HermitService)
 	BoardRequest = 2, -- the Leaderboard tab; the service also answers one per player per 10 s
 	PaintTruck = 1, -- Paint Shop: one request a second; the palette rule also waits 2s
+	NewsSeen = 2, -- What's new closed (NewsService); a second press in the same second is dropped
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

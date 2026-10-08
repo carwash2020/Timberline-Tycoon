@@ -66,6 +66,7 @@ Net.RemoteNames = {
 	"BoardRequest", -- client -> server: () ask for the leaderboard; the server answers from its cache (LeaderboardService)
 	"BoardData", -- server -> client: (payload) the top rows and your own (LeaderboardLogic.ParsePayload)
 	"PaintTruck", -- client -> server: (truckId, color) Paint Shop; the server clamps it
+	"NewsSeen", -- client -> server: () the player closed What's new; stored as onboarding["News:V1"]
 }
 
 local folder: Folder? = nil

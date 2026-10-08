@@ -110,12 +110,12 @@ return function(t)
 		t.ok(seen[2] == column)
 	end)
 
-	t.test("the theme's danger colour is #C0503A", function()
+	t.test("the theme's danger colour is #D9534F", function()
 		local UITheme = theme({})
 		local danger = UITheme.Colors.Danger
 		t.eq(
 			{ math.floor(danger.R * 255 + 0.5), math.floor(danger.G * 255 + 0.5), math.floor(danger.B * 255 + 0.5) },
-			{ 192, 80, 58 }
+			{ 217, 83, 79 }
 		)
 	end)
 
@@ -136,7 +136,7 @@ return function(t)
 		t.eq(UITheme.Device(), "console")
 		t.eq(UITheme.IsPhone(), false)
 		t.eq(select(1, UITheme.Margin()), 64, "inside a TV's safe area")
-		t.ok(UITheme.Sized("DailyButton") == UITheme.Sizes.desktop.DailyButton)
+		t.ok(UITheme.Sized("Clock") == UITheme.Sizes.desktop.Clock)
 		t.ok(UITheme.Sized("SettingsToggle") == UITheme.Sizes.desktop.SettingsToggle)
 	end)
 
@@ -164,10 +164,10 @@ return function(t)
 		t.eq({ P.ShopBuy.size.X, P.ShopBuy.size.Y }, { 96, 44 }, "a shop row's Buy 96 x 44")
 		t.eq(P.ShopClose.size.Y, 48, "the shop's X 48")
 		t.eq(P.Skip.hit, 44, "Skip: a 44 px hit area round a smaller face")
-		for _, pill in ipairs({ "Store", "Clock", "Pouch", "DailyButton" }) do
+		for _, pill in ipairs({ "Store", "Clock", "Pouch" }) do
 			t.eq(P[pill].size.Y, 36, pill .. ": corner pills 36 tall")
 		end
-		for _, pill in ipairs({ "Settings", "Store", "Pouch", "DailyButton" }) do
+		for _, pill in ipairs({ "Settings", "Store", "Pouch" }) do
 			t.eq(P[pill].hit, 44, pill .. ": with a 44 px hit area")
 		end
 	end)
@@ -203,7 +203,6 @@ return function(t)
 			Store = { w = 90, h = 30, text = 14 },
 			Clock = { w = 100, h = 30, text = 13 },
 			Pouch = { w = 84, h = 26, text = 14 },
-			DailyButton = { w = 200, h = 30, text = 13 },
 			DailyHeading = { text = 13 },
 			DailyFooter = { text = 13 },
 			DailyCountdown = { text = 12 },
@@ -388,11 +387,14 @@ return function(t)
 	end)
 	-- UI-12: one display face, the world signs' (Kit.signText), and a
 	-- speaker drawn from frames instead of the ♪ glyph.
-	t.test("headings use FredokaOne, the signs' face; Gotham stays for body text", function()
+	t.test("headings use GothamBold; Gotham stays for body text; signs keep FredokaOne", function()
 		local UITheme = theme({})
-		t.eq(UITheme.Fonts.Heading, roblox.Enum.Font.FredokaOne)
-		t.eq(UITheme.Fonts.Black, roblox.Enum.Font.GothamBlack)
+		t.eq(UITheme.Fonts.Title, roblox.Enum.Font.GothamBold)
+		t.eq(UITheme.Fonts.Button, roblox.Enum.Font.GothamBold)
+		t.eq(UITheme.Fonts.Heading, UITheme.Fonts.Title, "Heading is an alias")
+		t.eq(UITheme.Fonts.Black, UITheme.Fonts.Button, "Black is an alias")
 		t.eq(UITheme.Fonts.Bold, roblox.Enum.Font.GothamBold)
+		t.eq(UITheme.Fonts.Body, roblox.Enum.Font.Gotham)
 		local fs = require("@lune/fs")
 		local kit = fs.readFile("src/ReplicatedStorage/Shared/Art/Kit.luau")
 		t.ok(string.find(kit, "label.Font = font or Enum.Font.FredokaOne", 1, true), "the signs' default face")
@@ -488,5 +490,56 @@ return function(t)
 				end
 			end
 		end)
+	end)
+
+	t.test("body text is at least 4.5:1 and a button label at least 3:1", function()
+		local UITheme = theme({})
+		local C = UITheme.Colors
+		local function lin(c)
+			return if c <= 0.04045 then c / 12.92 else ((c + 0.055) / 1.055) ^ 2.4
+		end
+		local function lum(color)
+			return 0.2126 * lin(color.R) + 0.7152 * lin(color.G) + 0.0722 * lin(color.B)
+		end
+		local function ratio(a, b)
+			local hi, lo = lum(a), lum(b)
+			if hi < lo then
+				hi, lo = lo, hi
+			end
+			return (hi + 0.05) / (lo + 0.05)
+		end
+		t.ok(ratio(C.Cream, C.Panel) >= 4.5, "cream on panel")
+		t.ok(ratio(C.Cream, C.PanelAlt) >= 4.5, "cream on panel alt")
+		t.ok(ratio(C.Muted, C.Panel) >= 4.5, "muted on panel")
+		t.ok(ratio(C.Muted, C.MutedFill) >= 4.5, "muted on the muted button")
+		t.ok(ratio(C.Cream, C.Danger) >= 3, "cream on danger")
+		t.ok(ratio(C.ConfirmInk, C.Confirm) >= 3, "ink on confirm")
+		t.ok(ratio(C.ConfirmInk, C.Amber) >= 3, "ink on amber")
+		t.eq(UITheme.Radius, 8)
+		t.eq(UITheme.Stroke, 2)
+		t.eq(UITheme.Ring, 4)
+		t.eq(UITheme.ButtonDrop, 0)
+	end)
+
+	t.test("every button style rests on its fill and carries the selection ring", function()
+		local UITheme = theme({})
+		local C = UITheme.Colors
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/UITheme.luau")
+		t.eq(UITheme.Styles.primary.fill, C.Amber)
+		t.eq(UITheme.Styles.primary.ink, C.ConfirmInk)
+		t.eq(UITheme.Styles.confirm.fill, C.Confirm)
+		t.eq(UITheme.Styles.confirm.ink, C.ConfirmInk)
+		t.eq(UITheme.Styles.danger.fill, C.Danger)
+		t.eq(UITheme.Styles.danger.ink, C.Cream)
+		t.eq(UITheme.Styles.muted.fill, C.MutedFill)
+		t.eq(UITheme.Styles.locked.fill, C.MutedFill)
+		t.eq(UITheme.Styles.cant.fill, C.MutedFill)
+		t.ok(string.find(source, "face.SelectionImageObject = selectionRing()", 1, true), "each button sets the ring")
+		t.ok(
+			string.find(source, "UITheme.stroke(ring, C.Selection, UITheme.Ring)", 1, true),
+			"the ring is the selection colour, Ring px"
+		)
+		t.eq(string.find(source, "brighten(style.fill, 0.11)", 1, true), nil, "the resting fill is not lifted")
 	end)
 end

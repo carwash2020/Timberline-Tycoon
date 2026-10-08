@@ -240,7 +240,7 @@ local function popDelta(delta: number)
 	end
 	local gain = delta > 0
 	local text = (if gain then "+" else "-") .. Util.formatCash(math.abs(delta))
-	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Money else C.Ink)
+	local pop = UITheme.label(spot, text, F.Heading, if gain then 24 else 20, if gain then C.Amber else C.Ink)
 	pop.Name = "CashPop"
 	pop.AnchorPoint = Vector2.new(1, 0.5)
 	pop.AutomaticSize = Enum.AutomaticSize.XY
@@ -248,7 +248,7 @@ local function popDelta(delta: number)
 	pop.TextXAlignment = Enum.TextXAlignment.Right
 	local start = UDim2.fromOffset(-4, 0)
 	pop.Position = start
-	local stroke = UITheme.stroke(pop, C.Cream, 2)
+	local stroke = UITheme.stroke(pop, if gain then C.Ink else C.Cream, 2)
 	local rise = TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(pop, rise, { Position = start + UDim2.fromOffset(0, if gain then -16 else 16) }):Play()
 	local fade = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.In, 0, false, 0.75)
@@ -559,15 +559,15 @@ local function presentToast(message: string, seconds: number?, id: number?)
 		removeToast(toasts[#toasts])
 	end
 	toastOrder += 1
-	local card = UITheme.Card(C.Paper, C.Ink, 2, 16, true)
+	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true)
 	card.outer.Name = "Toast"
 	card.outer.LayoutOrder = -toastOrder -- newest on top
 	local limit = Instance.new("UISizeConstraint")
 	limit.MinSize = Vector2.new(0, 34)
 	limit.Parent = card.outer
-	local stroke = UITheme.stroke(card.face, C.Bark, 2)
+	local stroke = UITheme.stroke(card.face, C.AmberEdge, UITheme.Stroke)
 	UITheme.padding(card.face, 7, 14, 7, 14)
-	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Ink)
+	local label = UITheme.label(card.face, "", F.Bold, UITheme.Sized("Toast").text, C.Cream)
 	label.Size = UDim2.new()
 	label.AutomaticSize = Enum.AutomaticSize.XY
 	label.TextWrapped = true
@@ -1193,7 +1193,7 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	if device == "console" then
 		width, height = GamepadNavLogic.PadSize(width, height) -- big enough for a stick to land on
 	end
-	side.button.root.Size = UDim2.fromOffset(width, height + 3)
+	side.button.root.Size = UDim2.fromOffset(width, height + UITheme.ButtonDrop)
 	side.button.face.TextSize = spec.text
 	local fit = side.button.face:FindFirstChildOfClass("UITextSizeConstraint")
 	if fit then
@@ -1419,6 +1419,11 @@ local function syncPad()
 end
 
 function HUD.PadShortcut(key: Enum.KeyCode, available: () -> boolean, onPress: () -> ())
+	-- The Daily Goals pill used the up direction. That button is gone; ignore
+	-- the bind so the pill's script can stay until its own lane removes it.
+	if key.Name == "DPadUp" then
+		return
+	end
 	local took = false -- this press's Begin was ours: so is its End
 	local function handle(_name: string, state: Enum.UserInputState, input: InputObject): Enum.ContextActionResult
 		if state ~= Enum.UserInputState.Begin then
@@ -1605,7 +1610,7 @@ local function buildCash(playerGui: Instance)
 	safeArea = probe
 
 	local border = UITheme.SkinInset("Plaque")
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 14, true, "Plaque")
+	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true, "Plaque")
 	card.outer.Name = "CashPlaque"
 	card.outer.LayoutOrder = 10
 	-- The top-right row (HUD.TopRow): [pops][other buttons][plaque].

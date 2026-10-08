@@ -1,8 +1,9 @@
 --!strict
 -- UITheme: the game's look, from the UI spec ("Timberline Tycoon UI",
 -- Claude Design). Every screen builds from these parts so they match.
---   * Colours and fonts (FredokaOne headings, the world signs' face;
---     Gotham body).
+--   * Colours and fonts (GothamBold titles and buttons, Gotham body;
+--     Heading, Black and Bold are aliases of those, so older screens
+--     keep compiling).
 --   * Card(): a frame with a drop edge (a darker strip under it) instead of
 --     a shadow, the spec's "chunky" look. An optional skin (UIArt) draws
 --     that frame from the uploaded art once its image has loaded: sliced,
@@ -50,36 +51,56 @@ local UITheme = {}
 local player = Players.LocalPlayer
 
 UITheme.Colors = {
-	Ink = Color3.fromHex("#3C2814"),
-	Cream = Color3.fromHex("#F5EBD7"),
-	Paper = Color3.fromHex("#F0E1C3"),
-	PaperDark = Color3.fromHex("#E2CFAA"),
-	Bark = Color3.fromHex("#583A22"),
-	Green = Color3.fromHex("#4C8C40"),
-	GreenEdge = Color3.fromHex("#36672D"),
-	Blue = Color3.fromHex("#2F6DB5"),
-	BlueEdge = Color3.fromHex("#214E85"),
-	Muted = Color3.fromHex("#A09178"),
-	MutedEdge = Color3.fromHex("#7E7159"),
-	Amber = Color3.fromHex("#FFB840"),
-	AmberEdge = Color3.fromHex("#C98A1E"),
-	AmberDeep = Color3.fromHex("#D08F1F"),
-	Sky = Color3.fromHex("#8FD3F2"),
-	SkyEdge = Color3.fromHex("#4E9CC4"),
-	Ice = Color3.fromHex("#BFE8FF"),
-	Locked = Color3.fromHex("#CDBA93"),
-	LockedEdge = Color3.fromHex("#A89670"),
-	Money = Color3.fromHex("#3F7A34"),
-	Danger = Color3.fromHex("#C0503A"), -- can't (a blueprint that won't fit, a tree's last HP)
+	-- The timber palette. Owned screens read these by name.
+	Panel = Color3.fromHex("#2A1F17"),
+	PanelAlt = Color3.fromHex("#1E1B18"),
+	Cream = Color3.fromHex("#F3E7C9"),
+	Muted = Color3.fromHex("#CDBFA3"),
+	Amber = Color3.fromHex("#F2C14E"),
+	AmberEdge = Color3.fromHex("#C9A24A"),
+	Confirm = Color3.fromHex("#4CC36A"),
+	ConfirmEdge = Color3.fromHex("#2F8A48"),
+	ConfirmInk = Color3.fromHex("#14240F"),
+	Danger = Color3.fromHex("#D9534F"),
+	DangerEdge = Color3.fromHex("#A43A36"),
+	MutedFill = Color3.fromHex("#5A4A3E"),
+	Selection = Color3.fromHex("#FFF4C2"),
+	-- Older names, kept as light or dark so screens this pass does not
+	-- own stay readable (a light card still gets dark ink).
+	Ink = Color3.fromHex("#1E1B18"),
+	Paper = Color3.fromHex("#F3E7C9"),
+	PaperDark = Color3.fromHex("#E4D2AE"),
+	Bark = Color3.fromHex("#3E2E22"),
+	Green = Color3.fromHex("#2F8A48"),
+	GreenEdge = Color3.fromHex("#1E5C30"),
+	Blue = Color3.fromHex("#6E5420"),
+	BlueEdge = Color3.fromHex("#4A3814"),
+	MutedEdge = Color3.fromHex("#3E342C"),
+	AmberDeep = Color3.fromHex("#C9A24A"),
+	Sky = Color3.fromHex("#1E1B18"),
+	SkyEdge = Color3.fromHex("#C9A24A"),
+	Ice = Color3.fromHex("#F3E7C9"),
+	Locked = Color3.fromHex("#5A4A3E"),
+	LockedEdge = Color3.fromHex("#3E342C"),
+	Money = Color3.fromHex("#2F8A48"),
 }
 local C = UITheme.Colors
 
 UITheme.Fonts = {
-	Heading = Enum.Font.FredokaOne, -- titles, names, cash: the signs' face (Kit.signText)
-	Black = Enum.Font.GothamBlack, -- buttons, objectives, stencil-style tags
-	Bold = Enum.Font.GothamBold,
-	Body = Enum.Font.GothamMedium, -- details and hints (the spec's SemiBold)
+	Title = Enum.Font.GothamBold, -- titles, names, cash
+	Button = Enum.Font.GothamBold,
+	Body = Enum.Font.Gotham, -- details and hints
+	Heading = Enum.Font.GothamBold, -- alias of Title
+	Black = Enum.Font.GothamBold, -- alias of Button (GothamBlack has left the buttons)
+	Bold = Enum.Font.GothamBold, -- alias of Title
 }
+
+-- Shared shape. A chip (a small pill) uses ChipRadius.
+UITheme.Radius = 8
+UITheme.ChipRadius = 6
+UITheme.Stroke = 2
+UITheme.Ring = 4 -- the gamepad selection outline, in px
+UITheme.ButtonDrop = 0 -- the old 3px drop edge is the stroke now
 
 -- Tiled texture image ids (rbxassetid://...). Empty = flat colour.
 UITheme.Textures = {
@@ -89,19 +110,25 @@ UITheme.Textures = {
 
 export type Style = { fill: Color3, edge: Color3?, ink: Color3, outline: Color3? }
 
+-- primary: amber. confirm: green. danger: red. muted / locked / cant: the
+-- dim fill. Older style names point at those four.
 UITheme.Styles = {
-	buy = { fill = C.Green, edge = C.GreenEdge, ink = C.Cream },
-	cant = { fill = C.Muted, edge = C.MutedEdge, ink = C.Ink },
-	starter = { fill = C.Paper, edge = nil, ink = C.Bark, outline = C.Muted },
-	locked = { fill = C.Locked, edge = C.LockedEdge, ink = C.Bark },
-	forged = { fill = C.Sky, edge = C.SkyEdge, ink = C.Ink },
-	full = { fill = C.Bark, edge = C.Ink, ink = C.PaperDark },
-	use = { fill = C.Blue, edge = C.BlueEdge, ink = C.Cream },
-	inuse = { fill = C.Muted, edge = C.MutedEdge, ink = C.Ink },
-	bark = { fill = C.Bark, edge = C.Ink, ink = C.Cream },
-	blue = { fill = C.Blue, edge = C.BlueEdge, ink = C.Cream },
-	amber = { fill = C.Amber, edge = C.AmberEdge, ink = C.Ink },
-	skip = { fill = C.PaperDark, edge = C.Muted, ink = C.Ink },
+	primary = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
+	confirm = { fill = C.Confirm, edge = C.ConfirmEdge, ink = C.ConfirmInk },
+	danger = { fill = C.Danger, edge = C.DangerEdge, ink = C.Cream },
+	muted = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
+	buy = { fill = C.Confirm, edge = C.ConfirmEdge, ink = C.ConfirmInk },
+	cant = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
+	starter = { fill = C.PanelAlt, edge = nil, ink = C.Cream, outline = C.Amber },
+	locked = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
+	forged = { fill = C.PanelAlt, edge = C.AmberEdge, ink = C.Amber },
+	full = { fill = C.Panel, edge = C.AmberEdge, ink = C.Cream },
+	use = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
+	inuse = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
+	bark = { fill = C.Panel, edge = C.AmberEdge, ink = C.Cream },
+	blue = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
+	amber = { fill = C.Amber, edge = C.AmberEdge, ink = C.ConfirmInk },
+	skip = { fill = C.MutedFill, edge = C.MutedEdge, ink = C.Muted },
 } :: { [string]: Style }
 
 ---------------------------------------------------------------------------
@@ -229,7 +256,6 @@ UITheme.Sizes = {
 		Store = { size = Vector2.new(90, 36), hit = S.Tap, text = S.TextMin, tap = true },
 		Clock = { size = Vector2.new(100, 36), text = S.TextMin },
 		Pouch = { size = Vector2.new(84, 36), hit = S.Tap, text = S.TextMin, tap = true },
-		DailyButton = { size = Vector2.new(200, 36), hit = S.Tap, text = S.TextMin, tap = true },
 		-- The corner's popups
 		DailyHeading = { text = S.TextMin },
 		DailyFooter = { text = S.TextMin },
@@ -262,7 +288,6 @@ UITheme.Sizes = {
 		Store = { size = Vector2.new(90, 30), text = 14, tap = true },
 		Clock = { size = Vector2.new(100, 30), text = 13 },
 		Pouch = { size = Vector2.new(84, 26), text = 14, tap = true },
-		DailyButton = { size = Vector2.new(200, 30), text = 13, tap = true },
 		DailyHeading = { text = 13 },
 		DailyFooter = { text = 13 },
 		DailyCountdown = { text = 12 },
@@ -528,6 +553,7 @@ UITheme.Layers = {
 	Settings = 13, -- a modal: over the HUD and the cash row
 	Admin = 14, -- the owner menu (AdminUI), over Settings
 	QuickMenu = 15, -- the gamepad's quick menu (QuickMenuUI), over the owner menu
+	News = 16, -- What's new in V1 (NewsUI), over the quick menu, under the join screens
 	Store = 20,
 	Dialogue = 30,
 	PlotPicker = 80,
@@ -869,8 +895,6 @@ export type Button = {
 	SetText: (self: Button, text: string) -> (),
 }
 
-local EDGE = 3
-
 local function brighten(color: Color3, amount: number): Color3
 	local h, s, v = color:ToHSV()
 	return Color3.fromHSV(h, s, math.clamp(v * (1 + amount), 0, 1))
@@ -886,40 +910,35 @@ export type ButtonOptions = {
 	name: string?,
 }
 
+local selectionRing: () -> Frame
+
 function UITheme.Button(opts: ButtonOptions): Button
-	local radius = opts.radius or 10
+	local radius = opts.radius or UITheme.Radius
+	local drop = UITheme.ButtonDrop
 	local root = Instance.new("Frame")
 	root.Name = opts.name or opts.text
-	root.Size = UDim2.fromOffset(opts.size.X, opts.size.Y + EDGE)
+	root.Size = UDim2.fromOffset(opts.size.X, opts.size.Y + drop)
 	root.BorderSizePixel = 0
+	root.BackgroundTransparency = 1
 	UITheme.corner(root, radius)
 
 	local face = Instance.new("TextButton")
 	face.Name = "Face"
-	face.Size = UDim2.new(1, 0, 1, -EDGE)
+	face.Size = UDim2.new(1, 0, 1, -drop)
 	face.AutoButtonColor = false
 	face.BorderSizePixel = 0
-	face.Font = opts.font or UITheme.Fonts.Black
+	face.Font = opts.font or UITheme.Fonts.Button
 	face.TextSize = opts.textSize or 14
 	face.TextScaled = true
 	face.Text = opts.text
+	face.SelectionImageObject = selectionRing()
 	UITheme.corner(face, radius)
 	local fit = Instance.new("UITextSizeConstraint")
 	fit.MaxTextSize = opts.textSize or 14
 	fit.MinTextSize = if UITheme.IsPhone() then S.ButtonMinText else 8
 	fit.Parent = face
 	UITheme.padding(face, 0, 6, 0, 6)
-	-- The spec's top highlight: a touch lighter along the top edge.
-	local shine = Instance.new("UIGradient")
-	shine.Rotation = 90
-	shine.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
-		ColorSequenceKeypoint.new(0.12, Color3.new(0.9, 0.9, 0.9)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.9, 0.9, 0.9)),
-	})
-	shine.Parent = face
-	local outline = UITheme.stroke(face, C.Muted, 2)
-	outline.Enabled = false
+	local edge = UITheme.stroke(face, C.AmberEdge, UITheme.Stroke)
 	face.Parent = root
 
 	local pressed, hovered = false, false
@@ -927,8 +946,8 @@ function UITheme.Button(opts: ButtonOptions): Button
 
 	local function paint()
 		local style = UITheme.Styles[button.style] or UITheme.Styles.cant
-		-- The gradient darkens by 10%, so lift the fill to match the spec.
-		local fill = brighten(style.fill, 0.11)
+		-- Resting fill is the token. Hover and press only nudge it.
+		local fill = style.fill
 		if pressed then
 			fill = brighten(fill, -0.08)
 		elseif hovered then
@@ -936,11 +955,15 @@ function UITheme.Button(opts: ButtonOptions): Button
 		end
 		face.BackgroundColor3 = fill
 		face.TextColor3 = style.ink
-		root.BackgroundColor3 = style.edge or style.fill
-		root.BackgroundTransparency = if style.edge and not pressed then 0 else 1
-		face.Position = UDim2.fromOffset(0, if pressed then EDGE else 0)
-		outline.Enabled = style.outline ~= nil
-		outline.Color = style.outline or C.Muted
+		local rim = style.edge or style.outline
+		edge.Enabled = rim ~= nil
+		edge.Color = rim or C.AmberEdge
+		edge.Thickness = UITheme.Stroke
+		if drop > 0 then
+			root.BackgroundColor3 = style.edge or style.fill
+			root.BackgroundTransparency = if style.edge and not pressed then 0 else 1
+			face.Position = UDim2.fromOffset(0, if pressed then drop else 0)
+		end
 	end
 
 	button = {
@@ -1044,7 +1067,7 @@ export type Bar = { outer: Frame, label: TextLabel, row: Frame }
 -- A bark bar at the bottom centre, just above the control hint: a line of
 -- text and a row of buttons (build mode, placing a blueprint).
 function UITheme.Bar(parent: Instance, name: string): Bar
-	local card = UITheme.Card(C.Bark, C.Ink, 3, 12, true, "Panel")
+	local card = UITheme.Card(C.Paper, C.AmberEdge, UITheme.Stroke, UITheme.Radius, true, "Panel")
 	card.outer.Name = name
 	card.outer.AnchorPoint = Vector2.new(0.5, 1)
 	card.outer.Position = UDim2.new(0.5, 0, 1, -(UITheme.Bottom() + 30 + 8))
@@ -1196,37 +1219,20 @@ function UITheme.escape(text: string): string
 	)
 end
 
--- The gamepad selection ring, used for every selected button: a soft amber
--- glow, then 4 px ink and 4 px amber round the button (the spec's
--- SelectionImageObject, thickened so it reads from a couch).
-local function selectionRing(): Frame
+-- The gamepad selection ring: Selection (#FFF4C2), Ring px, outside the
+-- fill. One image, on the PlayerGui and on every Button, so a second
+-- stroke is not stacked on top of it.
+function selectionRing(): Frame
+	local pad = UITheme.Ring * 2
 	local ring = Instance.new("Frame")
 	ring.Name = "SelectionRing"
 	ring.BackgroundTransparency = 1
-	ring.Size = UDim2.fromScale(1, 1)
-	UITheme.corner(ring, 12)
-	UITheme.stroke(ring, C.Ink, 4)
-	local outer = Instance.new("Frame")
-	outer.Name = "Outer"
-	outer.BackgroundTransparency = 1
-	outer.AnchorPoint = Vector2.new(0.5, 0.5)
-	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.new(1, 8, 1, 8)
-	UITheme.corner(outer, 15)
-	local amber = UITheme.stroke(outer, C.Amber, 4)
-	amber.Transparency = 0
-	outer.Parent = ring
-	local glow = Instance.new("Frame")
-	glow.Name = "Glow"
-	glow.BackgroundColor3 = C.Amber
-	glow.BackgroundTransparency = 0.8
-	glow.BorderSizePixel = 0
-	glow.AnchorPoint = Vector2.new(0.5, 0.5)
-	glow.Position = UDim2.fromScale(0.5, 0.5)
-	glow.Size = UDim2.new(1, 20, 1, 20)
-	glow.ZIndex = 0
-	UITheme.corner(glow, 20)
-	glow.Parent = ring
+	ring.AnchorPoint = Vector2.new(0.5, 0.5)
+	ring.Position = UDim2.fromScale(0.5, 0.5)
+	ring.Size = UDim2.new(1, pad, 1, pad)
+	UITheme.corner(ring, UITheme.Radius + UITheme.Ring)
+	local stroke = UITheme.stroke(ring, C.Selection, UITheme.Ring)
+	stroke.Transparency = 0
 	return ring
 end
 

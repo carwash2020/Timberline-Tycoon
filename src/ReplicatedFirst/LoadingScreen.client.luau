@@ -22,6 +22,8 @@
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
+local LoadingTips = require(script.Parent.LoadingTips)
+
 local MAX_SECONDS = 30 -- the card never stays up longer than this
 local FADE_SECONDS = 0.6
 local BACKSTOP_SECONDS = MAX_SECONDS + FADE_SECONDS + 5
@@ -31,24 +33,15 @@ local PLAYERGUI_WAIT = 5 -- seconds per WaitForChild try (a timeout, so no infin
 local PLAYERGUI_TRIES = 6
 local PLAYER_WAIT = 10 -- seconds to wait for Players.LocalPlayer, should it not be set yet
 
--- UITheme's palette (UITheme isn't loaded yet).
-local INK = Color3.fromHex("#3C2814")
-local CREAM = Color3.fromHex("#F5EBD7")
-local PAPER = Color3.fromHex("#F0E1C3")
-local BARK = Color3.fromHex("#583A22")
-local AMBER = Color3.fromHex("#FFB840")
+-- UITheme's palette (UITheme isn't loaded yet). Ink is PanelAlt, Bark is
+-- Panel, Paper is Muted (the tip), Cream and Amber match the theme.
+local INK = Color3.fromHex("#1E1B18")
+local CREAM = Color3.fromHex("#F3E7C9")
+local PAPER = Color3.fromHex("#CDBFA3")
+local BARK = Color3.fromHex("#2A1F17")
+local AMBER = Color3.fromHex("#F2C14E")
 
 local TITLE = "Timberline Tycoon"
--- Inlined like the colours (ReplicatedFirst runs before Shared arrives).
--- The v2 loop's (GameConfig.CoreLoop 2): cut anywhere, drag, carry loose.
-local TIPS = {
-	"Swing low on a trunk and keep hitting the same spot. Watch the notch grow until it falls.",
-	"Put your axe away, then click and hold a log to drag it onto your truck's bed.",
-	"Back your truck onto the green pad by the sawmill: the wood sells itself, by volume.",
-	"A felled tree grows back somewhere else in its stand, smaller at first.",
-	"Odd-looking bark can hide figured wood. The sawmill pays extra for it.",
-	"Elders are giants. Anyone who chops a share of one is paid when it falls.",
-}
 
 local started = os.clock()
 local player = Players.LocalPlayer
@@ -146,7 +139,7 @@ local function build(): Card
 	list.Parent = content
 	content.Parent = inset
 
-	local title = textLabel(content, "Title", TITLE, Enum.Font.FredokaOne, 40, CREAM)
+	local title = textLabel(content, "Title", TITLE, Enum.Font.GothamBold, 40, CREAM)
 	title.LayoutOrder = 1
 	title.Size = UDim2.new(1, 0, 0, 48)
 	local titleStroke = Instance.new("UIStroke")
@@ -164,11 +157,11 @@ local function build(): Card
 	corner(divider, UDim.new(0, 2))
 	divider.Parent = content
 
-	local kicker = textLabel(content, "Kicker", "TIP", Enum.Font.GothamBlack, 14, AMBER)
+	local kicker = textLabel(content, "Kicker", "TIP", Enum.Font.GothamBold, 14, AMBER)
 	kicker.LayoutOrder = 3
 	kicker.Size = UDim2.new(1, 0, 0, 18)
 
-	local tip = textLabel(content, "Tip", "", Enum.Font.GothamMedium, 18, PAPER)
+	local tip = textLabel(content, "Tip", "", Enum.Font.Gotham, 18, PAPER)
 	tip.LayoutOrder = 4
 	-- Room for two lines whatever the tip, so the card doesn't hop as the
 	-- tips change (AutomaticSize treats Size as a minimum: a third line,
@@ -198,8 +191,8 @@ local function build(): Card
 		dots[i] = dot
 	end
 
-	-- A random first tip, so a rejoin doesn't start on the same one.
-	local firstTip = math.random(#TIPS)
+	-- Shuffled once, then again only after every line has been shown.
+	local cycle = LoadingTips.Begin(math.random)
 
 	local function draw(elapsed: number, fade: number)
 		local function mix(base: number): number
@@ -213,7 +206,7 @@ local function build(): Card
 			end
 		end
 		local slot = math.floor(elapsed / TIP_SECONDS)
-		local text = TIPS[(firstTip - 1 + slot) % #TIPS + 1]
+		local text = LoadingTips.LineAt(cycle, slot)
 		if tip.Text ~= text then
 			tip.Text = text
 		end

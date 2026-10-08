@@ -55,6 +55,7 @@ local MODULES = {
 	"LuxFX",
 	"MenuPad",
 	"NPCController",
+	"NewsUI",
 	"PlotPickerUI",
 	"PlotUI",
 	"PromptSwitch",
@@ -428,6 +429,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "QualityPickerUI", -- the join screen: Lower or Higher quality, once per account
 		get = function()
 			return require(script.Parent.QualityPickerUI)
+		end,
+	},
+	{
+		name = "NewsUI",
+		get = function()
+			return require(script.Parent.NewsUI)
 		end,
 	},
 	{

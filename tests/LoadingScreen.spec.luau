@@ -8,12 +8,21 @@ return function(t)
 	local Enum = roblox.Enum
 
 	local FRAME = 1 / 60
-	local PALETTE = { -- UITheme's, inlined in the script
-		Ink = Color3.fromHex("#3C2814"),
-		Cream = Color3.fromHex("#F5EBD7"),
-		Paper = Color3.fromHex("#F0E1C3"),
-		Bark = Color3.fromHex("#583A22"),
-		Amber = Color3.fromHex("#FFB840"),
+	-- The card copies these tokens (ReplicatedFirst cannot require UITheme).
+	local UITheme = t.loader({
+		services = {
+			GuiService = {},
+			Players = { LocalPlayer = {} },
+			TextChatService = {},
+			UserInputService = {},
+		},
+	}):load("StarterPlayer/StarterPlayerScripts/UITheme")
+	local PALETTE = {
+		Ink = UITheme.Colors.Ink,
+		Cream = UITheme.Colors.Cream,
+		Paper = UITheme.Colors.Muted,
+		Bark = UITheme.Colors.Panel,
+		Amber = UITheme.Colors.Amber,
 	}
 
 	-- A UIGradient multiplies its parent's colour (it doesn't replace it),
@@ -263,7 +272,7 @@ return function(t)
 		t.eq(snap.resetOnSpawn, false)
 		t.eq(snap.backdropTransparency, 0, "opaque from the first frame")
 		t.eq(snap.labels.Title.text, "Timberline Tycoon")
-		t.eq(snap.labels.Title.font, Enum.Font.FredokaOne)
+		t.eq(snap.labels.Title.font, UITheme.Fonts.Title)
 	end)
 
 	t.test("renders only the inlined palette: Cream title on a Bark-to-Ink backdrop", function()
@@ -325,7 +334,12 @@ return function(t)
 		t.ok(big.scale > 1.5, "a monitor gets bigger text")
 	end)
 
-	t.test("4 to 6 short tips about chopping, hauling, selling and figures, rotating", function()
+	t.test("tips rotate from LoadingTips, with no repeat inside the wait", function()
+		local Tips = t.load("ReplicatedFirst/LoadingTips")
+		local known = {}
+		for _, line in ipairs(Tips.Lines) do
+			known[line] = true
+		end
 		local s = run({}) -- never ready: the full 30 s
 		local seen, order = {}, {}
 		local changes, last = 0, nil
@@ -341,15 +355,12 @@ return function(t)
 				end
 			end
 		end
-		t.ok(#order >= 4 and #order <= 6, #order .. " different tips")
-		t.ok(changes <= 7, "a tip stays up for seconds, not frames")
-		local all = string.lower(table.concat(order, " "))
-		for _, word in ipairs({ "tree", "truck", "sell", "figured" }) do
-			t.ok(string.find(all, word, 1, true), "a tip mentions " .. word)
-		end
+		t.ok(#order >= 4, #order .. " different tips")
+		t.ok(#order < #Tips.Lines, "the wait is shorter than one full cycle")
+		t.ok(changes <= 8, "a tip stays up for seconds, not frames")
 		for _, tip in ipairs(order) do
-			-- ~60 characters a line at 18 px in 560 px: two lines at most.
-			t.ok(#tip <= 100, "short enough for two lines: " .. tip)
+			t.ok(known[tip], "shown tip is in the module: " .. tip)
+			t.ok(#tip <= Tips.MaxLength, "short enough for a phone: " .. tip)
 		end
 	end)
 
