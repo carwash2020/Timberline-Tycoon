@@ -86,7 +86,7 @@ local function wedge(
 	cf: CFrame,
 	color: Color3,
 	material: Enum.Material?
-): Part
+): WedgePart
 	return Kit.decor(Kit.wedge(parent, name, size, cf, color, material or Enum.Material.SmoothPlastic), false)
 end
 
@@ -454,9 +454,7 @@ function NatureArt.Build(kind: string, seed: number, sizeName: string?): Model
 		rock(m, s, rng, color)
 		return m
 	end
-	if kind == "Bush" then
-		bush(m, 1, rng)
-	elseif kind == "Fern" then
+	if kind == "Fern" then
 		fern(m, 1)
 	elseif kind == "Flowers" then
 		flowers(m, 1, rng)
@@ -486,6 +484,7 @@ function NatureArt.Build(kind: string, seed: number, sizeName: string?): Model
 	elseif kind == "Bat" then
 		bat(m, 1)
 	else
+		-- Bush, and any kind this builder does not know yet.
 		bush(m, 1, rng)
 	end
 	local host = m:FindFirstChildWhichIsA("BasePart")
@@ -539,7 +538,7 @@ function NatureArt.RainField(style: RainStyle, tier: string, sheltered: boolean)
 	local low = tier == "low"
 	local count = if style == "blobs" then (if low then 18 else 36) else (if low then 16 else 40)
 	local rng = Kit.rng(if style == "blobs" then 3 else 11)
-	for i = 1, count do
+	for _ = 1, count do
 		local x = rng:range(-10, 10)
 		local z = rng:range(-8, 8)
 		local y = rng:range(4, 16)
@@ -571,7 +570,7 @@ function NatureArt.RainField(style: RainStyle, tier: string, sheltered: boolean)
 	end
 	if style == "streaks" and not sheltered then
 		local splashes = if low then 4 else 8
-		for i = 1, splashes do
+		for _ = 1, splashes do
 			local splash = part(
 				field,
 				"Splash",

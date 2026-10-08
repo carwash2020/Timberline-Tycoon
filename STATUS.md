@@ -11,9 +11,9 @@ Last updated 7 October 2026 (dialogue box branch on top of main at #95), after P
 
 ## Lane G: V1 nature looks (branch `phase-2/v1-g-nature`, not merged)
 
-First renders, before the pieces are placed in the world. Connor reviews these and the tweaks land on this branch. Trees are the live section trees (`TreeArt.FromSkeleton`), the look players chop today. Rocks, plants, cave dressing, the gull, the snow fox and the sky moth are new part-built models. Rain is drawn as parts (the preview tool does not draw particles): blobs are today's puff, streaks are the remake, shorter and fewer on low, and absent under a shop roof.
+First renders are in `previews/v1-g/` so Connor can mark them up before this merges. Trees in those shots are the live section trees (`TreeArt.FromSkeleton`). Rocks, plants, cave dressing, the gull, the snow fox and the sky moth are new part-built models. Rain shots are parts, because the preview tool does not draw particles: blobs are the old puff, streaks are the remake.
 
-Not in the world yet: scatter placement, the weather controller, phone budgets, filler trees. No cash change and no tree-volume change.
+The client now places those pieces. `AmbientLife` reads zones from `NatureData` (`ScatterZones` when Lane B has merged it, otherwise `WorldPlan`, plus `UndergroundData` rooms). Cave dressing shares `MaxDecor`, stays at or under 120 parts per cave, and uses at most 6 unshadowed lights (2 on low, 4 on medium, 6 on high). Surface nature parts near the camera stay within 560 / 320 / 148. Critters also stop at 320 / 240 / 120 parts, and still at `MaxCritters`. Walkers stay off a road's edge by more than 4 studs. Filler trees come from `TreeArt.FillerTree` (same part counts as before). Rain is a thin streak (`Size` 0.05, `Squash` 9, slanted) plus ground splashes, both inside the old 560 budget: about 198 live particles on high, 139 on medium, 99 on low. A raycast plus cave, tunnel and grotto zones fades rain, the rain sound, and a small sky shift out under shelter. No cash change and no tree-volume change. Palm section trees stay at 3 coconuts.
 
 **Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.
 

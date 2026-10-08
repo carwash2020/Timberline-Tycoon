@@ -36,6 +36,17 @@ export type Spot = {
 	light: boolean,
 }
 
+-- Lane B's modules are not in the game until that branch merges. A static
+-- require would be a type error while the ModuleScript is missing, so the
+-- call goes through a function value.
+function NatureData.TryModule(inst: Instance?): any
+	if inst and inst:IsA("ModuleScript") then
+		local load: (ModuleScript) -> any = require
+		return load(inst)
+	end
+	return nil
+end
+
 NatureData.Cell = 64
 NatureData.CavePartCap = 120
 NatureData.CaveLightCap = 6
@@ -353,10 +364,7 @@ function NatureData.CellSpots(
 	local x0 = cx * NatureData.Cell
 	local z0 = cz * NatureData.Cell
 	local left = natureLeft
-	local budget: { [string]: number } = {}
-	for id, n in pairs(caveParts) do
-		budget[id] = n
-	end
+	local budget = table.clone(caveParts)
 	local slot = 0
 	for _, zone in ipairs(hitting) do
 		local menu = NatureData.Menu[zone.kind]

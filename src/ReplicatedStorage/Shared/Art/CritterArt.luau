@@ -734,11 +734,11 @@ end
 function CritterArt.SkyMoth(seed: number): Model
 	local rng = Kit.rng(seed)
 	local model = critter("SkyMoth")
-	local glow = Kit.vary(hex("#FFF4C2"), rng, 0.04)
-	local body = bead(model, "Body", 0.28, Vector3.zero, glow, Enum.Material.Neon)
+	local pale = Kit.vary(hex("#FFF4C2"), rng, 0.04)
+	local body = bead(model, "Body", 0.28, Vector3.zero, pale, Enum.Material.Neon)
 	local light = Instance.new("PointLight")
 	light.Name = "Glow"
-	light.Color = glow
+	light.Color = pale
 	light.Range = 6
 	light.Brightness = 0.6
 	light.Shadows = false

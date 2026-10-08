@@ -154,9 +154,15 @@ and Land Office from the lot, 6 from the lot, 7 and 8 top down, 9 aerial,
 
 ## V1 nature looks (8 October 2026, branch `phase-2/v1-g-nature`)
 
-Early art only. The PNGs under `previews/v1-g/` (listed in STATUS.md) are what to review. Trees are the live choppable section trees. Rain blobs are the current puff; rain streaks are the remake, including a dry shop interior. Nothing in this pass is scattered into the live world, so there is no Studio placement check yet.
+The PNGs under `previews/v1-g/` (listed in STATUS.md) are the looks to review. Trees there are the live choppable section trees. Rain blobs are the old puff; rain streaks are what the weather controller now emits.
 
-When the client wiring lands, the Studio checks will be: PC, phone emulator and Xbox; chop, fell, logs and regrowth unchanged; streaks instead of blobs, dry inside a shop, a cave, the tunnel and the grotto; no decor or critters on roads, pads or floors; low quality stays smooth.
+Studio checks (PC, the phone emulator, and Xbox). Good looks like this:
+
+1. Chop, fell, and watch a stump and a regrow. Same swing and the same logs as before.
+2. In rain, the drops are thin slanted streaks in the world, not soft blobs stuck to the screen. On Lower quality there are fewer, shorter streaks.
+3. Step into a shop, under a bridge, into a truck cab, and into the cave, the tunnel and the grotto. Rain, splashes and the rain sound fade within about a second. They come back within about a second of stepping outside. Prompts and the controller cursor still work in the rain.
+4. Rocks, plants and critters are not on roads, plot pads, shop floors or the gondola path. Ducks sit on water. A gull is on the coast. A snow fox is on the snow. A sky moth glows on the isles at night.
+5. Lower quality stays smooth. A lanternwood's pods still read in a dark cave (neon, no extra light on a phone). Cave glow lights do not cast shadows.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 

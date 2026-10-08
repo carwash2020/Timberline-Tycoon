@@ -1,13 +1,16 @@
 --!strict
 -- TreeCosmetics: a gentle seasonal tint on canopies, and on high quality
 -- one slow mote on maple and frostwood. The crown is built on the server
--- (TreeArt's crystal cuts). This never adds a part, and on low (phones,
--- Shared/QualityBudgets) it adds nothing at all.
+-- (TreeArt's crystal cuts). The tint never adds a part. A gloamwood's
+-- mushroom ring and a lanternwood's night pods are client dressing, and
+-- on low (phones, Shared/QualityBudgets) this adds nothing at all.
 
 local CollectionService = game:GetService("CollectionService")
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local NatureArt = require(ReplicatedStorage.Shared.Art.NatureArt)
 local TreeArt = require(ReplicatedStorage.Shared.Art.TreeArt)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Quality = require(script.Parent.Quality)
@@ -102,6 +105,37 @@ local function ensureAccent(tree: Model)
 	accented[tree] = true
 end
 
+local function clearNature(tree: Model)
+	local ring = tree:FindFirstChild("MushroomRing")
+	if ring then
+		ring:Destroy()
+	end
+	local pods = tree:FindFirstChild("LanternPods")
+	if pods then
+		pods:Destroy()
+	end
+end
+
+local function dressNature(tree: Model)
+	local woodId = tree:GetAttribute("WoodId")
+	if woodId == "phantomwood" and not tree:FindFirstChild("MushroomRing") then
+		local ring = NatureArt.MushroomRing(tonumber(tree:GetAttribute("Seed")) or 1)
+		ring.Name = "MushroomRing"
+		ring:PivotTo(tree:GetPivot())
+		ring.Parent = tree
+	end
+	local night = Lighting.ClockTime < 6 or Lighting.ClockTime > 18
+	local pods = tree:FindFirstChild("LanternPods")
+	if woodId == "lanternwood" and night and not pods then
+		local made = NatureArt.LanternPods(tonumber(tree:GetAttribute("Seed")) or 1)
+		made.Name = "LanternPods"
+		made:PivotTo(tree:GetPivot() * CFrame.new(0, 8, 0))
+		made.Parent = tree
+	elseif pods and (woodId ~= "lanternwood" or not night) then
+		pods:Destroy()
+	end
+end
+
 function TreeCosmetics.Start()
 	local since = math.huge
 	RunService.Heartbeat:Connect(function(dt: number)
@@ -133,6 +167,11 @@ function TreeCosmetics.Start()
 					ensureAccent(tree)
 				else
 					clearAccent(tree)
+				end
+				if look.tint > 0 then
+					dressNature(tree)
+				else
+					clearNature(tree)
 				end
 			end
 		end
