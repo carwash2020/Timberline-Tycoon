@@ -513,7 +513,7 @@ function setView(i) {
   useLights(night, camera.position);
   const hud = document.getElementById("hud");
   if (scene.hud === false) hud.style.display = "none";
-  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""} · ${scene.parts.length} parts`;
+  hud.textContent = `${scene.name} · view ${i + 1}/${views.length}${v.label ? " · " + v.label : ""}${night ? " · night" : ""}${v.own != null ? " · rock " + v.own + " parts" : ""} · full view ${scene.parts.length + scene.meshes.length} parts`;
 }
 window.setView = setView;
 window.viewCount = views.length;

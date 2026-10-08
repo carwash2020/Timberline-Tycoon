@@ -120,6 +120,15 @@ return {
 			local lookY = bottom + visH * 0.0
 			local cam = frameOne(cx, lookY, cz, visH, visW)
 			cam.label = row[4]
+			do
+				local n = 0
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") then
+						n += 1
+					end
+				end
+				cam.own = n
+			end
 			table.insert(cameras, cam)
 		end
 

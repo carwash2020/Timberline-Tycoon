@@ -130,6 +130,30 @@ return function(t)
 		end
 	end)
 
+	t.test("a part-built ore rock with an OreData id is 8 parts or fewer, with 2 or 3 flush vein wedges", function()
+		-- The previews use this path (shape plus oreId), so pin it too.
+		for _, oreId in ipairs({ "coal", "gold", "opal", "heartstone" }) do
+			for _, shape in ipairs(NatureArt.RockShapes) do
+				for _, sizeName in ipairs(NatureArt.Sizes) do
+					local model =
+						NatureArt.OreRock(shape, sizeName, Color3.fromRGB(1, 2, 3), Enum.Material.Metal, false, oreId)
+					local tag = oreId .. " " .. shape .. " " .. sizeName
+					t.eq(model:GetAttribute("OreId"), oreId, tag)
+					t.ok(#blockParts(model) <= 8, tag .. " parts " .. #blockParts(model))
+					local veins = 0
+					for _, d in ipairs(model:GetDescendants()) do
+						if d:IsA("BasePart") and d.Name == "Vein" then
+							veins += 1
+							t.eq(d.ClassName, "WedgePart", tag .. " vein is a wedge")
+						end
+						t.ok(not (d:IsA("BasePart") and d.Name == "Plaque"), tag .. " no plaque")
+					end
+					t.ok(veins == 2 or veins == 3, tag .. " veins " .. veins)
+				end
+			end
+		end
+	end)
+
 	t.test("an ore rock is at most 8 parts, with flush vein wedges and a blank OreId", function()
 		for _, shape in ipairs(NatureArt.RockShapes) do
 			for _, sizeName in ipairs(NatureArt.Sizes) do

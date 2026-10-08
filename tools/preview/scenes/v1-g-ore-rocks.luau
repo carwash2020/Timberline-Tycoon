@@ -130,11 +130,11 @@ return {
 			{ "HEARTSTONE", { "split", C3.fromRGB(255, 70, 118), Enum.Material.Neon, true, "heartstone" } },
 		}
 
-		local function makeOre(spec, seed)
+		local function makeOre(spec, seed, sizeName)
 			if not spec then
 				return NatureArt.Build("Boulder", seed, "mid", "host")
 			end
-			return NatureArt.OreRock(spec[1], "mid", spec[2], spec[3], spec[4], spec[5])
+			return NatureArt.OreRock(spec[1], sizeName or "mid", spec[2], spec[3], spec[4], spec[5])
 		end
 
 		local cameras = {}
@@ -157,6 +157,15 @@ return {
 			local lookY = bottom - visH * 0.1
 			local cam = frameOne(cx, lookY, cz, visH, visW)
 			cam.label = string.lower(ore[1])
+			do
+				local n = 0
+				for _, d in ipairs(model:GetDescendants()) do
+					if d:IsA("BasePart") then
+						n += 1
+					end
+				end
+				cam.own = n
+			end
 			table.insert(cameras, cam)
 		end
 
@@ -227,12 +236,13 @@ return {
 			put(model, CF.new(x, 0, z) * CF.Angles(0, aimYaw(model, want), 0))
 		end
 		-- Front row is the one the entrance camera sees first.
-		local caveOrder = { 2, 3, 8, 4, 5, 6, 7, 1 }
+		-- Gold is a low pebble pile, so it stands in front and large to stay readable.
+		local caveOrder = { 6, 3, 8, 4, 2, 5, 7, 1 }
 		for n, index in ipairs(caveOrder) do
 			local spec = ores[index][2]
 			local col = (n - 1) % 4
 			local row = math.floor((n - 1) / 4)
-			placeCave(makeOre(spec, 80 + n), col, row)
+			placeCave(makeOre(spec, 80 + n, if index == 6 then "large" else nil), col, row)
 		end
 
 		-- Behind the rocks and up at the ceiling. A lamp over the near
