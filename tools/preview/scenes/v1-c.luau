@@ -81,7 +81,9 @@ return {
 		-- half the frame. The label stays in the corner, off the prop.
 		place(PropArt.Scene("fishing"), 80, 360, { -15.9, 8.83, -21.7, 0, 1.1, -4 }, "scene-fishing", 29)
 		place(PropArt.Scene("campfire"), 110, 360, { -15.9, 8.53, -17.7, 0, 0.8, 0 }, "scene-campfire", 15)
-		place(PropArt.Scene("lookout"), 140, 360, { -15.9, 9.13, -17.7, 0, 1.4, 0 }, "scene-lookout", 19)
+		-- Same 25-stud three-quarter. The aim is higher so the platform
+		-- (about 9 studs up) stays in frame; the corner label still misses it.
+		place(PropArt.Scene("lookout"), 140, 360, { -15.9, 13, -17.7, 0, 5.2, 0 }, "scene-lookout", 28)
 		place(PropArt.Scene("bench"), 165, 360, { -15.5, 8.63, -17.6, 0.4, 0.9, 0.1 }, "scene-bench", 12)
 		place(MachineArt.Build("SawmillRickety", false), 210, 360, { -8, 6, -12, 0, 2, 0 }, "machine-sawmill")
 		-- The foreman stand and the widened DAILY JOBS board, from the road.

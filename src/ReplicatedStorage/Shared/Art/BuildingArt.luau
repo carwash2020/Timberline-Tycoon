@@ -3450,16 +3450,26 @@ end
 function BuildingArt.SkyForgeCourt(): Model
 	local model = Kit.model("SkyForgeCourt")
 	local floor = Kit.part(model, "Floor", V3(30, 0.8, 24), CF(0, 0.4, 0), Palette.StoneBase, MAT.Slate)
-	Kit.part(model, "Wall", V3(0.6, 8, 20), CF(-14.5, 4.8, 1), Palette.AshBasalt, MAT.Slate)
-	Kit.part(model, "Wall", V3(0.6, 8, 20), CF(14.5, 4.8, 1), Palette.AshBasalt, MAT.Slate)
-	Kit.part(model, "Wall", V3(30, 8, 0.6), CF(0, 4.8, 11.5), Palette.AshBasalt, MAT.Slate)
-	Kit.part(model, "Furnace", V3(8, 10, 6), CF(-8, 5.8, 7), Palette.IronBlack, MAT.Metal)
+	-- The street camera sees the shadowed side. Dark slate photographed as a
+	-- missing material there, so the court uses the shops' honey plank and
+	-- timber, with a stone chimney and bands thick enough to read from the hill.
+	Kit.part(model, "Wall", V3(0.6, 8, 20), CF(-14.5, 4.8, 1), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(0.6, 8, 20), CF(14.5, 4.8, 1), Palette.PlankHoney, MAT.WoodPlanks)
+	Kit.part(model, "Wall", V3(30, 8, 0.6), CF(0, 4.8, 11.5), Palette.PlankHoney, MAT.WoodPlanks)
+	dBox(model, "WallCap", V3(30.6, 0.55, 1.1), CF(0, 9.05, 11.5), Palette.TimberBrown, MAT.Wood)
+	Kit.part(model, "Furnace", V3(8, 10, 6), CF(-8, 5.8, 7), Palette.WeatheredPlank, MAT.Wood)
+	dBox(model, "FurnaceBand", V3(8.7, 1.15, 6.7), CF(-8, 2.3, 7), Palette.TimberBrown, MAT.Wood)
+	dBox(model, "FurnaceBand", V3(8.7, 0.9, 6.7), CF(-8, 9.4, 7), Palette.PlankHoney, MAT.Wood)
+	Kit.part(model, "FurnacePost", V3(0.5, 10.4, 0.5), CF(-11.8, 5.9, 4.15), Palette.TimberBrown, MAT.Wood)
+	Kit.part(model, "FurnacePost", V3(0.5, 10.4, 0.5), CF(-4.2, 5.9, 4.15), Palette.TimberBrown, MAT.Wood)
 	local mouth = Kit.part(model, "FurnaceMouth", V3(3, 3, 0.2), CF(-8, 4.2, 3.9), hex("#FF9A33"), MAT.Neon)
 	Kit.decor(mouth, false)
-	Kit.part(model, "Chimney", V3(2, 8, 2), CF(-8, 14, 8), Palette.AshBasalt, MAT.Slate)
+	Kit.part(model, "Chimney", V3(2, 8, 2), CF(-8, 14, 8), Palette.StoneBase, MAT.Slate)
+	dBox(model, "ChimneyBand", V3(2.4, 0.4, 2.4), CF(-8, 16.2, 8), Palette.TimberBrown, MAT.Wood)
+	dBox(model, "ChimneyCap", V3(2.7, 0.45, 2.7), CF(-8, 18.3, 8), Palette.TownCobble, MAT.Slate)
 	light(mouth, 20, 2, hex("#FFB070"))
 	Kit.part(model, "Stump", V3(2.2, 1.4, 2.2), CF(0, 1.5, 2), TIMBER, MAT.Wood)
-	local anvil = Kit.part(model, "Anvil", V3(3, 2.6, 1.4), CF(0, 3.5, 2), Palette.IronBlack, MAT.Metal)
+	local anvil = Kit.part(model, "Anvil", V3(3, 2.6, 1.4), CF(0, 3.5, 2), Palette.RoadGravel, MAT.Slate)
 	spot(anvil, "TemperSpot")
 	Kit.part(model, "Altar", V3(4, 3, 4), CF(8, 2.3, 6), hex("#E8E2D0"), MAT.Marble)
 	local sockets: { { name: string, color: Color3, x: number } } = {
@@ -3472,10 +3482,10 @@ function BuildingArt.SkyForgeCourt(): Model
 		local gem = dBox(model, "RelicGem", V3(0.45, 0.45, 0.45), CF(8 + socket.x, 4, 6), socket.color, MAT.Neon)
 		spot(gem, socket.name)
 	end
-	local orders = Kit.part(model, "OrderBoard", V3(6, 4, 0.3), CF(12, 5, 8), Palette.SignInk, MAT.Wood)
+	local orders = Kit.part(model, "OrderBoard", V3(6, 4, 0.3), CF(12, 5, 8), Palette.TimberBrown, MAT.Wood)
 	faceGui(orders, "OrderBoard")
 	Kit.signText(orders, "ORDERS", Palette.SignCream, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	Kit.part(model, "Trough", V3(6, 1.6, 2), CF(8, 1.6, -2), Palette.IronBlack, MAT.Metal)
+	Kit.part(model, "Trough", V3(6, 1.6, 2), CF(8, 1.6, -2), Palette.StoneBase, MAT.Slate)
 	spot(floor, "KeeperSpot", CF(0, 1, -6))
 	return model
 end

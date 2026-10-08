@@ -29,9 +29,11 @@ Part counts, whole model, Lune (shop cap 250, including the interior):
 | Plot map | — | 3 |
 | Arrival arch | — | 4 |
 | Land Office (art only) | — | 8 |
-| Sky forge court | — | 16 |
+| Sky forge court | — | 23 |
 
 Round 1 framing (8 October 2026). `town-overview.png` is one elevated three-quarter of a grouped street (the per-building fronts are unchanged). The four scene shots are three-quarter views from about 25 studs, each prop about half the frame. The DAILY JOBS board is wider, with the posts on its edges, so the words clear the posts. The Tool Shed gold table is unchanged.
+
+Round 2 (8 October 2026). The sky forge court uses the street palette: honey plank walls, a weathered-timber furnace with thick timber and honey bands, and a stone chimney. Darker slate photographed as a missing material on the shadowed street face. The four scene props are rebuilt, 10 to 30 parts each: a teepee fire with a tripod pot and log seats, a dock on water with posts, a rod, a bucket and a crate, a lookout platform about 9 studs up with a ladder and a coin telescope, and a park bench with a back and arms. `mill-foreman.png` is unchanged.
 
 Paths:
 - `previews/v1-c/sawmill-front.png`

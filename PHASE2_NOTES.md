@@ -48,7 +48,7 @@ One upgraded look for the town buildings. Shops keep the pinned footprints (Tool
 - Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
 - Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
 - Weigh House: red metal roof, a round scale on the side. No new price text.
-- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage, sky forge court (anvil, order board, four relic sockets).
+- New models are built but not placed in the live town yet: gate kiosk, Odds and Ends ("CHARGES", no dollar amount), Sparkworks (empty demo board), Sky Market, Gondola Pass turnstile, plot map, arrival arch, Land Office cottage, sky forge court (stone and timber, anvil, timber ORDERS board, four relic sockets). The fishing dock, campfire, lookout and park bench are preview props only (`PropArt.Scene`); they are not in the live town.
 
 **Phone emulator**
 

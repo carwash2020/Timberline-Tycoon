@@ -494,7 +494,7 @@ return function(t)
 		end
 	end)
 
-	t.test("scenes: fishing, campfire, lookout and bench, each with a StandSpot, under 15 parts", function()
+	t.test("scenes: fishing, campfire, lookout and bench, each with a StandSpot, 10 to 30 parts", function()
 		for _, kind in ipairs({ "fishing", "campfire", "lookout", "bench" }) do
 			local model = PropArt.Scene(kind)
 			local n = 0
@@ -506,7 +506,7 @@ return function(t)
 					stand = true
 				end
 			end
-			t.ok(n > 0 and n <= 15, kind .. " parts " .. n)
+			t.ok(n >= 10 and n <= 30, kind .. " parts " .. n)
 			t.ok(stand, kind .. " StandSpot")
 		end
 		local rod = nil
