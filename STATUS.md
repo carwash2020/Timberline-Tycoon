@@ -19,6 +19,8 @@ Rocks are six families (`Boulder`, `CrackedBoulder`, `Spire`, `Slab`, `PebbleClu
 
 **Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.
 
+Rock and ore previews are one model per frame: a 3/4 camera about 25° up, the rock about 55% of the frame height, name on a ground plaque turned 180° about Y so it reads from the camera. Boulder carries the meadow moss, cracked boulder the snow cap. Each ore vein is turned toward the camera. The cave shot is the same eight rocks, preview-lit (mean brightness about 44%) with heartstone the bright one. The meadow shot is from 12 studs up, 30° down, over a 60×60 patch with grass, flowers, small rocks, a rabbit and a deer. Nothing in those scene files changes the game.
+
 Preview paths:
 
 - `previews/v1-g/trees-lineup.png`
@@ -36,12 +38,21 @@ Preview paths:
 - `previews/v1-g/trees-emberwood-night.png`
 - `previews/v1-g/trees-gloamwood-night.png`
 - `previews/v1-g/trees-lumenwood-night.png`
-- `previews/v1-g/nature-rocks-1.png`
-- `previews/v1-g/nature-rocks-2.png`
-- `previews/v1-g/nature-boulder-close.png`
+- `previews/v1-g/rock-boulder.png`
+- `previews/v1-g/rock-crackedboulder.png`
+- `previews/v1-g/rock-spire.png`
+- `previews/v1-g/rock-slab.png`
+- `previews/v1-g/rock-pebblecluster.png`
+- `previews/v1-g/rock-outcrop.png`
 - `previews/v1-g/nature-meadow.png`
-- `previews/v1-g/ore-rocks-1.png`
-- `previews/v1-g/ore-rocks-2.png`
+- `previews/v1-g/ore-host.png`
+- `previews/v1-g/ore-coal.png`
+- `previews/v1-g/ore-copper.png`
+- `previews/v1-g/ore-iron.png`
+- `previews/v1-g/ore-silver.png`
+- `previews/v1-g/ore-gold.png`
+- `previews/v1-g/ore-opal.png`
+- `previews/v1-g/ore-heartstone.png`
 - `previews/v1-g/ore-rocks-cave.png`
 - `previews/v1-g/nature-plants.png`
 - `previews/v1-g/nature-flowers-close.png`
