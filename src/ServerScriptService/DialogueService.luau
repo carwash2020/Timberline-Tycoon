@@ -32,6 +32,8 @@ local offeredTo: { [number]: string? } = {}
 local hooked: { [Model]: boolean } = {}
 
 DialogueService.Last = nil :: any
+-- GameServer sets this: Old Hank's answer (PlotService.HankPick).
+DialogueService.HankPick = nil :: ((Player, unknown, unknown) -> ())?
 
 -- A number in [0, 1) for the keeper's greeting and line (the specs replace it).
 function DialogueService.Roll(): number
@@ -146,6 +148,13 @@ local function onDialogue(player: Player, action: unknown, a: unknown, b: unknow
 	if type(action) ~= "string" then
 		return
 	end
+	if action == "hank" then
+		local pick = DialogueService.HankPick
+		if pick then
+			pick(player, a, b)
+		end
+		return
+	end
 	if action == "open" and type(a) == "string" then
 		talking[player.UserId] = a
 		if shopClosed(a) then
@@ -255,6 +264,12 @@ function DialogueService.Init(remoteEvent: RemoteEvent?)
 			if type(a) == "string" and RateLimiter.Allow(player, "TalkEnd") then
 				NPCTalkService.End(player, a)
 			end
+			return
+		end
+		-- Old Hank's Yes / No ("hank", "yes" | "no", offerId): his own offers,
+		-- not a shop box. The Land Office checks range and what the offer is.
+		if action == "hank" then
+			onDialogue(player, action, a, b) -- the same Dialogue budget as every other intent
 			return
 		end
 		-- B15: a remote "open" must name a real shop (the keeper's prompt

@@ -240,6 +240,7 @@ function DialogueUI.Start()
 	local state: DialogueFlow.State? = nil
 	local choosing = false
 	local boxUid: string? = nil
+	local hankOffer: string? = nil -- an offer of Old Hank's (not a shop box): Yes / No go to him
 	local speakerModel: Model? = nil
 	local asleepAtOpen = false
 	local onClose: (() -> ())? = nil
@@ -329,6 +330,7 @@ function DialogueUI.Start()
 		holder.Visible = false
 		choosing = false
 		boxUid = nil
+		hankOffer = nil
 		state = nil
 		speakerModel = nil
 		if bound then
@@ -360,9 +362,12 @@ function DialogueUI.Start()
 
 	local function choose(which: string)
 		local uid = boxUid
+		local hank = hankOffer
 		local offer = choosing
 		hide()
-		if offer and uid ~= nil then
+		if offer and hank ~= nil then
+			Net.Remote("Dialogue"):FireServer("hank", which, hank)
+		elseif offer and uid ~= nil then
 			Net.Remote("Dialogue"):FireServer("pick", which, uid)
 		end
 	end
@@ -482,6 +487,7 @@ function DialogueUI.Start()
 		state = convo
 		choosing = isChoice
 		boxUid = uid
+		hankOffer = nil
 		speakerModel = model
 		asleepAtOpen = model ~= nil and model:GetAttribute("Asleep") == true
 		onClose = after
@@ -564,7 +570,9 @@ function DialogueUI.Start()
 		end
 		local cancel = if type(payload.noLabel) == "string" then payload.noLabel else "No"
 		no.Text = cancel
+		local offerId = if isChoice and type(payload.offerId) == "string" then payload.offerId else nil
 		open(convo, isChoice, uid, model, nil)
+		hankOffer = offerId -- after open(): hide() clears it, open() must not
 	end
 
 	yes.Activated:Connect(function()

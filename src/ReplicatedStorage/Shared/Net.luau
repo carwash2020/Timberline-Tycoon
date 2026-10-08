@@ -34,6 +34,9 @@ Net.RemoteNames = {
 	"PlotOffer", -- server -> client: (offer) the open homesteads and the price, for the Land Office (or a returning owner's join) picker
 	"ClaimPlot", -- client -> server: (index) buy that homestead; the server checks the Land Office range, the pad and the price, then charges
 	"PlotPass", -- client -> server: () close the picker (a returning owner is given a free pad; a buyer gets nothing)
+	"PlotShown", -- client -> server: () the join picker is really on screen; only now does its timeout start
+	"BaseAction", -- client -> server: ("open" | "pad" | "pack" | "new" | "bring", shelfIndex?) the Bases panel (PlotService.BaseAction)
+	"BaseState", -- server -> client: (state) the panel's data: the base on your pad, the crated ones, the cap and the cooldown
 	"SaveSetting", -- client -> server: (key, value) remember a Settings choice (SettingsLogic)
 	"SetQuality", -- client -> server: ("low" | "high") the Lower / Higher graphics choice, from the join screen or Settings (QualityService)
 	"ClientReady", -- client -> server: () every controller has started and its handlers are connected; the server then lets the player in and sends state again (JoinSync)

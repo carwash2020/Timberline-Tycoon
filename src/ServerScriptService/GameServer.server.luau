@@ -704,7 +704,46 @@ safely("SaveSlotService.Init", SaveSlotService.Init, remote.SlotAction, remote.S
 	rebuild = function(player: Player)
 		rebuildSlot(player)
 	end,
+	-- Saves are picked by hand: the last-played save, picked as it is, now asks
+	-- for its pad (a save with no plot just stays in the world).
+	chosen = function(player: Player)
+		local profile = ProfileService.GetProfile(player)
+		if profile then
+			PlotService.PlayerJoined(player, profile)
+		end
+	end,
+	onBase = function(player: Player): boolean
+		return PlotService.HasPad(player)
+	end,
 })
+-- Old Hank's Yes / No offers and the base hand-over (pack, bring out) reach
+-- the other services through these.
+PlotService.Ask = function(player: Player, text: string, offerId: string)
+	remote.Dialogue:FireClient(player, {
+		line = "hank",
+		text = text,
+		speaker = PlotSalesmanData.Id,
+		choice = true,
+		noLabel = "Not now",
+		offerId = offerId,
+	})
+	NPCTalkService.BeginById(player, PlotSalesmanData.Id)
+end
+DialogueService.HankPick = function(player: Player, which: unknown, offerId: unknown)
+	PlotService.HankPick(player, which, offerId)
+end
+PlotService.Hooks.commit = function(player: Player)
+	commitSlot(player)
+end
+PlotService.Hooks.despawn = function(player: Player)
+	VehicleService.DespawnTruck(player)
+end
+PlotService.Hooks.clearPads = function(plot: any)
+	VehicleService.ClearPads(plot)
+end
+PlotService.Hooks.assigned = function(player: Player, profile: any)
+	VehicleService.RestorePads(player, profile)
+end
 -- Old Hank's replies are the dialogue box like everyone's, not a toast.
 PlotService.Speak = function(player: Player, text: string)
 	remote.Dialogue:FireClient(
@@ -722,6 +761,9 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlotOffer = remote.PlotOffer,
 	ClaimPlot = remote.ClaimPlot,
 	PlotPass = remote.PlotPass,
+	PlotShown = remote.PlotShown,
+	BaseAction = remote.BaseAction,
+	BaseState = remote.BaseState,
 	VisitPlot = remote.VisitPlot,
 }, notify, { gates = LoadState.Gates })
 -- The pads, the Land Office counter and the plot picker's data exist now (or
@@ -1594,7 +1636,9 @@ local function onPlayerAdded(player: Player)
 	safely("FieldGuideService.Refresh", FieldGuideService.Refresh, player)
 	safely("NodeService.Publish", NodeService.Publish, player)
 	safely("AetherService.PlayerJoined", AetherService.PlayerJoined, player, profile)
-	safely("PlotService.PlayerJoined", PlotService.PlayerJoined, player, profile)
+	-- No picker yet: the save picker comes first (SaveSlotService.PlayerJoined
+	-- below), and only the chosen save's plot asks for a pad.
+	safely("PlotService.Prepare", PlotService.Prepare, player, profile)
 	safely("ForestService.PlayerJoined", ForestService.PlayerJoined, player, profile)
 	safely("SaveSlotService.PlayerJoined", SaveSlotService.PlayerJoined, player)
 	safely("LeaderboardService.PlayerJoined", LeaderboardService.PlayerJoined, player, profile.settings.showOnBoard)
@@ -1640,6 +1684,10 @@ LeaveCommit.Add("leftBehind", saveLeftBehind)
 -- builds the other slot the way a join does. Commit runs before the swap.
 local function commitSlotNow(player: Player)
 	dropCarriedLogs(player)
+	local leaving = ProfileService.GetProfile(player)
+	if leaving then
+		VehicleService.ClearPads(leaving.plot) -- the old save's pads must not stay standing
+	end
 	if CoreLoop.V2() then
 		TruckLoad.PlayerRemoving(player)
 	end

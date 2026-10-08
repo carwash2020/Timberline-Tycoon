@@ -31,6 +31,7 @@ local ACCOUNT: { [string]: boolean } = {
 	onboarding = true,
 	activeSlot = true,
 	slotCooldownUntil = true,
+	baseCooldownUntil = true, -- the pack / bring-out cooldown (BaseLogic): a rejoin or a slot swap must not skip it
 	accountAxes = true,
 	slots = true,
 	passes = true,
@@ -89,6 +90,10 @@ export type Summary = {
 	axeName: string,
 	lastPlayed: number,
 	active: boolean,
+	hasPlot: boolean, -- the save owns a plot (the join picker then asks for a pad)
+	pieces: number, -- pieces on the base (placed items plus vehicle pads)
+	packed: number, -- bases packed away on the shelf
+	tier: number, -- the base's size tier
 }
 
 -- Open to tuning: how long a save's name may be.
@@ -182,13 +187,30 @@ function SaveSlotLogic.AxeLabel(axes: any): (string, string)
 	return bestId, bestName
 end
 
+local function plotFacts(record: any): (boolean, number, number, number)
+	local plot = if type(record) == "table" then record.plot else nil
+	if type(plot) ~= "table" then
+		return false, 0, 0, 0
+	end
+	local pieces = (if type(plot.placed) == "table" then #plot.placed else 0)
+		+ (if type(plot.pads) == "table" then #plot.pads else 0)
+	local packed = if type(record.bases) == "table" then #record.bases else 0
+	local tier = if type(plot.tier) == "number" then plot.tier else 1
+	return plot.claimed == true, pieces, packed, tier
+end
+
 function SaveSlotLogic.Summary(data: any): { Summary }
 	local out: { Summary } = {}
 	local slots = if type(data.slots) == "table" then data.slots else {}
 	for i = 1, SaveSlotLogic.Count do
+		-- The playing save is the live profile; its parked snapshot is only as
+		-- fresh as the last swap, so read the plot and the shelf from the live one.
 		local slot = slots[i]
+		local hasPlot, pieces, packed, tier = plotFacts(if i == data.activeSlot then data else slot)
 		local fresh = type(slot) ~= "table" or slot.fresh == true
-		local cash = if type(slot) == "table" and type(slot.cash) == "number" then slot.cash else 0
+		local live = i == data.activeSlot
+		local cashFrom: any = if live then data else slot
+		local cash = if type(cashFrom) == "table" and type(cashFrom.cash) == "number" then cashFrom.cash else 0
 		local axeId, axeName = SaveSlotLogic.AxeLabel(if type(slot) == "table" then slot.axes else nil)
 		local played = if type(slot) == "table" and type(slot.lastPlayed) == "number" then slot.lastPlayed else 0
 		table.insert(out, {
@@ -200,6 +222,10 @@ function SaveSlotLogic.Summary(data: any): { Summary }
 			axeName = if fresh then "New game" else axeName,
 			lastPlayed = if fresh then 0 else played,
 			active = i == data.activeSlot,
+			hasPlot = hasPlot,
+			pieces = pieces,
+			packed = packed,
+			tier = tier,
 		})
 	end
 	return out

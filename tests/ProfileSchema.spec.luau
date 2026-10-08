@@ -1172,4 +1172,66 @@ return function(t)
 		Schema.Migrate(junk)
 		t.eq({ grants = junk.ownerGrants.LuxAxe.at, log = #junk.ownerGrantLog }, snapshot)
 	end)
+
+	t.test("bases: the shelf and its cooldown are in the template, and migrating is idempotent", function()
+		local Schema, data = fresh()
+		t.eq(Schema.Template.bases, {})
+		t.eq(Schema.Template.baseCooldownUntil, 0)
+		-- An old save has neither: Reconcile fills them, Migrate leaves them clean.
+		data.bases = nil
+		data.baseCooldownUntil = nil
+		Schema.Migrate(data)
+		t.eq(data.bases, {})
+		t.eq(data.baseCooldownUntil, 0)
+		-- A shelf with junk: non-tables go, every real base is kept and repaired, never dropped.
+		data.bases = {
+			"junk",
+			{
+				placed = { { uid = "a", blueprintId = "Bench", x = 1, z = 2, rot = 5 }, { uid = "", x = 1 } },
+				tier = 99,
+			},
+			{ placed = "nope", squares = { "1,0", 7 }, name = 5, savedAt = 0 / 0 },
+		}
+		data.baseCooldownUntil = 0 / 0
+		Schema.Migrate(data)
+		t.eq(#data.bases, 2)
+		t.eq(data.bases[1].tier, 1)
+		t.eq(data.bases[1].claimed, true)
+		t.eq(#data.bases[1].placed, 1, "a piece with no uid is dropped, as on the live plot")
+		t.eq(data.bases[1].placed[1].rot, 1, "and the rest is repaired the same way")
+		t.eq(data.bases[2].placed, {})
+		t.eq(data.bases[2].squares, { "1,0" })
+		t.eq(data.bases[2].name, nil)
+		t.eq(data.bases[2].savedAt, nil)
+		t.eq(data.baseCooldownUntil, 0)
+		local snapshot = require("@lune/serde").encode("json", data.bases)
+		Schema.Migrate(data)
+		t.eq(require("@lune/serde").encode("json", data.bases), snapshot, "twice is the same as once")
+	end)
+
+	t.test("bases: a vehicle pad on a crated base keeps its truck boxed, so no second box is minted", function()
+		local Schema, data = fresh()
+		data.ownedTrucks = { "Rustbucket" }
+		data.plot.claimed = true
+		data.plot.pads = nil
+		data.bases = { { claimed = true, tier = 1, placed = {}, pads = { { uid = "pad-1", id = "Rustbucket" } } } }
+		t.eq(Schema.WaitingTrucks(data), {}, "the pad on the shelf is its box")
+		data.bases = {}
+		t.eq(Schema.WaitingTrucks(data), { "Rustbucket" }, "without it the truck would be waiting for a box")
+	end)
+
+	t.test("bases: a stored box can never share a uid with a piece on a crated base", function()
+		local Schema, data = fresh()
+		data.bases = {
+			{ claimed = true, tier = 1, placed = { { uid = "same", blueprintId = "Bench", x = 0, z = 0, rot = 0 } } },
+		}
+		data.storage = {
+			{ uid = "same", itemId = "Bench", shop = "ToolShed" },
+			{ uid = "other", itemId = "Bench", shop = "ToolShed" },
+		}
+		Schema.Migrate(data)
+		for _, box in ipairs(data.storage) do
+			t.ok(box.uid ~= "same", "the clashing box is dropped, as for the live plot")
+		end
+	end)
 end

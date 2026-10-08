@@ -1,16 +1,27 @@
 --!strict
--- SaveSlotUI: three save slots (SaveSlotLogic). A side button opens a
--- panel: each slot's name, cash, axe and when it was last saved, a load
--- button, and Redo on the one you're playing. Load and Redo both ask you
--- to confirm, because the save you're playing is put away first. The
--- server still checks the cooldown and pulls wood out of the world before
--- it swaps, so this screen can't duplicate cash or logs. Esc and B close it.
+-- SaveSlotUI: three save slots (SaveSlotLogic). Two ways in:
+--   * THE JOIN PICK. Saves are chosen by hand: when the server says SlotPick
+--     (the save is in memory but nobody has picked it), this panel opens by
+--     itself, after the quality screen and before the plot picker
+--     (PickerSequence "slot"), and cannot be closed. The save last played is
+--     marked "Last played", not "Playing". PLAY sends play(index); a save
+--     with a plot then opens the plot picker for its pad, one without just
+--     enters the world (the Land Office sells a plot).
+--   * THE SAVES BUTTON (any time after). Each slot's name, cash, axe, what is
+--     on its plot and when it was last saved, and LOAD, which asks you to
+--     confirm because the save you're playing is put away first. Restarting
+--     a save is not here: it is RESTART SAVE in Settings.
+-- The server still checks the cooldown and pulls wood out of the world
+-- before it swaps, so this screen can't duplicate cash or logs. Esc and B
+-- close the SAVES panel (never the join pick).
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
+local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
+local PickerSequence = require(ReplicatedStorage.Shared.PickerSequence)
 local Net = require(ReplicatedStorage.Shared.Net)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
 local Util = require(ReplicatedStorage.Shared.Util)
@@ -35,6 +46,10 @@ local cooldownLabel: TextLabel? = nil
 local pending: { action: string, index: number }? = nil
 local summaries: { Summary } = {}
 local firstPick: GuiButton? = nil
+local picking = false -- the join pick is up (the server's SlotPick attribute)
+local sequence = PickerSequence.Shared()
+local setOpen: (boolean) -> ()
+local closeButton: GuiObject? = nil
 
 local function send(action: string, index: number, extra: boolean | string)
 	Net.Remote("SlotAction"):FireServer(action, index, extra)
@@ -57,9 +72,6 @@ local function showConfirm(action: string, index: number, message: string)
 	end
 	if c then
 		c.Visible = true
-	end
-	if action == "reset" then
-		send("arm", index, false)
 	end
 end
 
@@ -96,9 +108,16 @@ local function fill()
 	local label = cooldownLabel
 	if label then
 		if type(untilAt) == "number" and os.time() < untilAt then
-			label.Text = string.format("You can change saves in %ds.", math.ceil(untilAt - os.time()))
+			label.Text = if picking
+				then string.format(
+					"Other saves open in %ds. The last-played one is ready now.",
+					math.ceil(untilAt - os.time())
+				)
+				else string.format("You can change saves in %ds.", math.ceil(untilAt - os.time()))
 		else
-			label.Text = "Loading a save puts this one away. Cash, wood, plot and visitor rules stay with each save."
+			label.Text = if picking
+				then "Pick a save to play. If it has a plot, you choose where your base goes next."
+				else "Loading a save puts this one away. Cash, wood, plot and visitor rules stay with each save."
 		end
 	end
 	for _, slot in ipairs(summaries) do
@@ -144,30 +163,56 @@ local function fill()
 		detail.Size = UDim2.new(1, -16, 0, 20)
 		detail.Position = UDim2.fromOffset(8, 52)
 		local saved = SaveSlotLogic.SavedText(slot.lastPlayed, now)
+		local plotText = JoinPickLogic.PlotText(slot.hasPlot == true, slot.pieces or 0, slot.packed or 0)
 		if slot.fresh then
 			detail.Text = "Empty  ·  " .. saved
 		else
-			detail.Text = string.format("%s  ·  %s  ·  %s", Util.formatCash(slot.cash), slot.axeName, saved)
+			detail.Text =
+				string.format("%s  ·  %s  ·  %s  ·  %s", Util.formatCash(slot.cash), slot.axeName, plotText, saved)
 		end
+		detail.TextWrapped = true
+		detail.TextSize = 13
+		detail.Size = UDim2.new(1, -16, 0, 36)
 		detail.Parent = card
 
 		local buttons = Instance.new("Frame")
 		buttons.BackgroundTransparency = 1
 		buttons.Size = UDim2.new(1, -16, 0, 44)
-		buttons.Position = UDim2.fromOffset(8, 96)
+		buttons.Position = UDim2.fromOffset(8, 98)
 		UITheme.list(buttons, 8, true)
 		buttons.Parent = card
 
-		if slot.active then
-			rowButton(buttons, "REDO", "skip", 1, function()
-				showConfirm(
-					"reset",
-					slot.index,
-					"Redo this save? Cash, wood, axes you bought, and the plot on it are wiped. Robux purchases stay."
-				)
+		local playLabel = JoinPickLogic.PlayLabel(picking, slot.fresh, slot.active)
+		if slot.active and not picking then
+			local here = Instance.new("TextLabel")
+			here.BackgroundTransparency = 1
+			here.Font = UITheme.Fonts.Heading
+			here.TextSize = 16
+			here.TextColor3 = C.GreenEdge
+			here.Size = UDim2.fromOffset(160, 44)
+			here.Text = JoinPickLogic.ActiveBadge(false)
+			here.Parent = buttons
+		elseif playLabel ~= nil and picking then
+			if slot.active then
+				local badge = Instance.new("TextLabel")
+				badge.BackgroundTransparency = 1
+				badge.Font = UITheme.Fonts.Body
+				badge.TextSize = 14
+				badge.TextColor3 = C.GreenEdge
+				badge.Size = UDim2.fromOffset(110, 44)
+				badge.Text = JoinPickLogic.ActiveBadge(true)
+				badge.LayoutOrder = 0
+				badge.Parent = buttons
+			end
+			local play = rowButton(buttons, playLabel, "buy", 1, function()
+				send("play", slot.index, true)
 			end)
-		else
-			local load = rowButton(buttons, if slot.fresh then "START" else "LOAD", "buy", 1, function()
+			-- The last-played save is always playable; another one obeys the cooldown.
+			local blocked = cooling and not slot.active
+			play.face.Active = not blocked
+			play.face.AutoButtonColor = not blocked
+		elseif playLabel ~= nil then
+			local load = rowButton(buttons, playLabel, "buy", 1, function()
 				local what = if slot.fresh then "Start a new game on" else "Load"
 				showConfirm(
 					"load",
@@ -185,12 +230,19 @@ local function fill()
 	end
 end
 
-local function setOpen(on: boolean)
+setOpen = function(on: boolean)
 	local p = panel
 	if not p then
 		return
 	end
+	if not on and picking then
+		return -- the join pick stays up until a save is chosen
+	end
 	p.Visible = on
+	local x = closeButton
+	if x then
+		x.Visible = not picking
+	end
 	if not on then
 		hideConfirm()
 		ContextActionService:UnbindAction(SAVES_CLOSE)
@@ -202,6 +254,9 @@ local function setOpen(on: boolean)
 			function(_name, state)
 				if state ~= Enum.UserInputState.Begin then
 					return Enum.ContextActionResult.Pass
+				end
+				if picking then
+					return Enum.ContextActionResult.Sink -- no way out but a choice
 				end
 				if confirm and confirm.Visible then
 					hideConfirm()
@@ -268,6 +323,7 @@ function SaveSlotUI.Start()
 	close.face.Activated:Connect(function()
 		setOpen(false)
 	end)
+	closeButton = close.root
 
 	local note = Instance.new("TextLabel")
 	note.BackgroundTransparency = 1
@@ -342,6 +398,34 @@ function SaveSlotUI.Start()
 	no.face.ZIndex = 6
 	no.face.Activated:Connect(hideConfirm)
 
+	-- The server's word that nobody has picked a save yet. The screen takes its
+	-- turn after the quality screen and ahead of the plot picker.
+	local function considerPick()
+		local on = player:GetAttribute("SlotPick") == true
+		if on == picking then
+			return
+		end
+		picking = on
+		if on then
+			if sequence.Request("slot") then
+				setOpen(true)
+			end
+		else
+			sequence.Done("slot")
+			setOpen(false)
+		end
+		local p = panel
+		if p and p.Visible then
+			fill()
+		end
+	end
+	sequence.OnChange(function(active: string?)
+		if active == "slot" and picking then
+			setOpen(true)
+		end
+	end)
+	player:GetAttributeChangedSignal("SlotPick"):Connect(considerPick)
+
 	Net.Remote("SlotState").OnClientEvent:Connect(function(payload: unknown)
 		if type(payload) ~= "table" then
 			return
@@ -359,6 +443,7 @@ function SaveSlotUI.Start()
 		end
 	end)
 
+	task.defer(considerPick) -- the attribute may have arrived before this screen started
 	task.spawn(function()
 		while panel do
 			task.wait(1)

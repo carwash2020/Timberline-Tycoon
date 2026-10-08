@@ -64,6 +64,7 @@ return function(t)
 			WorldFX = true,
 			SlotState = true,
 			PlotOffer = true,
+			BaseState = true,
 			BadgeSync = true,
 			BoardData = true,
 			AdminResult = true,

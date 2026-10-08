@@ -184,7 +184,17 @@ export type Profile = {
 		squares: { string }, -- owned squares, "x,z" (empty until land expansion)
 		wires: { WireLink }, -- switch to lamp or door links (WireLogic)
 		switches: { string }, -- uids of the wall switches that are on; a switch not listed is off
+		pads: { any }?, -- vehicle pads (VehicleService); they travel with the base
+		-- Set when a base is crated (BaseLogic): its name, id and when.
+		name: string?,
+		id: string?,
+		savedAt: number?,
 	},
+	-- Bases packed away at the Land Office (BaseLogic): plot records like `plot`
+	-- (placed pieces, pads, tier, squares), moved here and back, never copied.
+	-- Per slot (they travel with the save). baseCooldownUntil is account-wide.
+	bases: { any },
+	baseCooldownUntil: number, -- unix time a pack or bring-out is allowed again
 	-- Boxes kept for you, per slot. Capped at StorageCap.
 	storage: { StoredBox },
 	-- Who may visit and build, per slot. PermissionService fills this in.
@@ -307,6 +317,8 @@ local TEMPLATE: Profile = {
 	ownedBoats = {},
 	gear = {},
 	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} },
+	bases = {},
+	baseCooldownUntil = 0,
 	storage = {},
 	permissions = {},
 	badgesAwarded = {},
@@ -445,18 +457,25 @@ local function takenIds(record: any): { [string]: boolean }
 			end
 		end
 	end
-	local plot = record.plot
-	if type(plot) == "table" and type(plot.placed) == "table" then
-		for _, item in ipairs(plot.placed) do
-			if type(item) == "table" then
-				keep(item.uid)
-			end
+	local plots: { any } = { record.plot }
+	if type(record.bases) == "table" then
+		for _, base in ipairs(record.bases) do
+			table.insert(plots, base)
 		end
 	end
-	if type(plot) == "table" and type(plot.pads) == "table" then
-		for _, pad in ipairs(plot.pads) do
-			if type(pad) == "table" then
-				keep(pad.uid)
+	for _, plot in ipairs(plots) do
+		if type(plot) == "table" and type(plot.placed) == "table" then
+			for _, item in ipairs(plot.placed) do
+				if type(item) == "table" then
+					keep(item.uid)
+				end
+			end
+		end
+		if type(plot) == "table" and type(plot.pads) == "table" then
+			for _, pad in ipairs(plot.pads) do
+				if type(pad) == "table" then
+					keep(pad.uid)
+				end
 			end
 		end
 	end
@@ -488,11 +507,19 @@ function ProfileSchema.WaitingTrucks(record: any): { string }
 			end
 		end
 	end
-	local plot = record.plot
-	if type(plot) == "table" and type(plot.pads) == "table" then
-		for _, pad in ipairs(plot.pads) do
-			if type(pad) == "table" and type(pad.id) == "string" then
-				have[pad.id] = true
+	-- A pad on a packed-away base still holds its vehicle's box: no second box.
+	local plots: { any } = { record.plot }
+	if type(record.bases) == "table" then
+		for _, base in ipairs(record.bases) do
+			table.insert(plots, base)
+		end
+	end
+	for _, plot in ipairs(plots) do
+		if type(plot) == "table" and type(plot.pads) == "table" then
+			for _, pad in ipairs(plot.pads) do
+				if type(pad) == "table" and type(pad.id) == "string" then
+					have[pad.id] = true
+				end
 			end
 		end
 	end
@@ -576,6 +603,135 @@ function ProfileSchema.MintTruckBoxes(record: any): { string }
 	return waiting
 end
 
+-- One base record (the live plot or a packed-away one): tier, squares, wires,
+-- switches and every placed piece, repaired to what the rebuild can take.
+-- Idempotent: running it twice changes nothing.
+local function cleanPlot(plot: any)
+	if plot.claimed ~= true then
+		plot.claimed = false
+	end
+	local tier = plot.tier
+	local tierOk = type(tier) == "number"
+		and tier == tier
+		and tier >= 1
+		and tier <= #PlotData.Tiers
+		and tier == math.floor(tier)
+	if not tierOk then
+		plot.tier = 1
+	end
+	plot.size = nil
+	plot.wires = WireLogic.Clean(plot.wires)
+	plot.switches = WireLogic.CleanSwitches(plot.switches)
+	if type(plot.placed) ~= "table" then
+		plot.placed = {}
+	end
+	local kept = {}
+	for _, item in ipairs(plot.placed) do
+		local x, z, rot =
+			if type(item) == "table" then item.x else nil,
+			if type(item) == "table" then item.z else nil,
+			if type(item) == "table" then item.rot else nil
+		local finite = type(x) == "number"
+			and type(z) == "number"
+			and type(rot) == "number"
+			and x == x
+			and z == z
+			and rot == rot
+			and x ~= math.huge
+			and z ~= math.huge
+			and rot ~= math.huge
+			and x ~= -math.huge
+			and z ~= -math.huge
+			and rot ~= -math.huge
+		if type(item) == "table" and type(item.uid) == "string" and item.uid ~= "" and finite then
+			item.rot = math.floor(rot :: number) % 4
+			item.open = nil
+			if type(item.y) ~= "number" or item.y ~= item.y or item.y < 0 or item.y > PlotData.MaxBuildY then
+				item.y = nil
+			end
+			if item.wood ~= nil and (type(item.wood) ~= "string" or WoodData.Get(item.wood) == nil) then
+				item.wood = nil
+			end
+			local bp = if type(item.blueprintId) == "string" then PlotData.Blueprint(item.blueprintId) else nil
+			-- Paint is a palette id on a kit piece; anything else (an old save has
+			-- none, a hand-edited one may have junk) becomes natural.
+			item.paint = if bp and bp.kit == true then KitPaint.Clean(item.paint) else nil
+			if not bp or bp.kit ~= true then
+				item.fill = nil
+				item.paid = nil
+				item.len = nil
+				item.lenX = nil
+				item.lenZ = nil
+			else
+				local along = EditLogic.CanResize(bp.id)
+				if along and bp.id ~= "Floor" and bp.id ~= "Floor4" then
+					item.len = EditLogic.CleanLen(bp.footprint.X, item.len)
+					item.lenX = nil
+					item.lenZ = nil
+				elseif bp.id == "Floor" or bp.id == "Floor4" then
+					item.len = nil
+					item.lenX = EditLogic.CleanLen(bp.footprint.X, item.lenX)
+					item.lenZ = EditLogic.CleanLen(bp.footprint.Y, item.lenZ)
+				else
+					item.len = nil
+					item.lenX = nil
+					item.lenZ = nil
+				end
+				if item.fill ~= nil then
+					local units = if type(item.fill) == "table" then item.fill.units else nil
+					local need = EditLogic.Units(bp, item)
+					if type(units) ~= "number" or units ~= units or units < 0 or units >= need then
+						item.fill = nil
+					else
+						item.fill = { units = units }
+					end
+				end
+				if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
+					item.paid = nil
+				elseif type(item.paid) == "number" then
+					local price = EditLogic.Fee(bp, item)
+					if item.paid > price then
+						item.paid = price
+					end
+				end
+			end
+			table.insert(kept, item)
+		end
+	end
+	plot.placed = kept
+end
+
+-- The shelf of packed-away bases (BaseLogic). A base is never dropped here
+-- (it may hold a player's whole build): only a non-table entry goes, and each
+-- record is repaired the same way the live plot is. Idempotent.
+local function cleanBases(value: any): { any }
+	local out: { any } = {}
+	if type(value) ~= "table" then
+		return out
+	end
+	for _, base in ipairs(value) do
+		if type(base) == "table" then
+			cleanPlot(base)
+			base.claimed = true
+			base.squares = squareList(base.squares)
+			if type(base.pads) ~= "table" then
+				base.pads = nil
+			end
+			if type(base.name) ~= "string" or base.name == "" or utf8.len(base.name) == nil or #base.name > 48 then
+				base.name = nil
+			end
+			if type(base.id) ~= "string" then
+				base.id = nil
+			end
+			if type(base.savedAt) ~= "number" or base.savedAt ~= base.savedAt then
+				base.savedAt = nil
+			end
+			table.insert(out, base)
+		end
+	end
+	return out
+end
+
 -- Per-slot fields. Missing or wrong-typed fields become the template.
 -- storage keeps at most StorageCap boxes, each with a server uid, and
 -- drops a box only when its uid is already an axe, truck, or placed-item uid.
@@ -586,6 +742,7 @@ local function applySlotFields(record: any)
 	record.plot.squares = squareList(record.plot.squares)
 	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.plot.switches = WireLogic.CleanSwitches(record.plot.switches)
+	record.bases = cleanBases(record.bases)
 	record.questAxe = copyQuest(record.questAxe)
 	-- The book, carried plans and the hammer. Adds only; safe to repeat.
 	BlueprintBook.Migrate(record)
@@ -673,98 +830,12 @@ function ProfileSchema.Migrate(data: any)
 	if type(data.plot) ~= "table" then
 		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
-	if data.plot.claimed ~= true then
-		data.plot.claimed = false
+	cleanPlot(data.plot)
+	-- Packed-away bases and their cooldown (BaseLogic). Idempotent.
+	data.bases = cleanBases(data.bases)
+	if type(data.baseCooldownUntil) ~= "number" or data.baseCooldownUntil ~= data.baseCooldownUntil then
+		data.baseCooldownUntil = 0
 	end
-	local tier = data.plot.tier
-	local tierOk = type(tier) == "number"
-		and tier == tier
-		and tier >= 1
-		and tier <= #PlotData.Tiers
-		and tier == math.floor(tier)
-	if not tierOk then
-		data.plot.tier = 1
-	end
-	data.plot.size = nil
-	data.plot.wires = WireLogic.Clean(data.plot.wires)
-	data.plot.switches = WireLogic.CleanSwitches(data.plot.switches)
-	if type(data.plot.placed) ~= "table" then
-		data.plot.placed = {}
-	end
-	local kept = {}
-	for _, item in ipairs(data.plot.placed) do
-		local x, z, rot =
-			if type(item) == "table" then item.x else nil,
-			if type(item) == "table" then item.z else nil,
-			if type(item) == "table" then item.rot else nil
-		local finite = type(x) == "number"
-			and type(z) == "number"
-			and type(rot) == "number"
-			and x == x
-			and z == z
-			and rot == rot
-			and x ~= math.huge
-			and z ~= math.huge
-			and rot ~= math.huge
-			and x ~= -math.huge
-			and z ~= -math.huge
-			and rot ~= -math.huge
-		if type(item) == "table" and type(item.uid) == "string" and item.uid ~= "" and finite then
-			item.rot = math.floor(rot :: number) % 4
-			item.open = nil
-			if type(item.y) ~= "number" or item.y ~= item.y or item.y < 0 or item.y > PlotData.MaxBuildY then
-				item.y = nil
-			end
-			if item.wood ~= nil and (type(item.wood) ~= "string" or WoodData.Get(item.wood) == nil) then
-				item.wood = nil
-			end
-			local bp = if type(item.blueprintId) == "string" then PlotData.Blueprint(item.blueprintId) else nil
-			-- Paint is a palette id on a kit piece; anything else (an old save has
-			-- none, a hand-edited one may have junk) becomes natural.
-			item.paint = if bp and bp.kit == true then KitPaint.Clean(item.paint) else nil
-			if not bp or bp.kit ~= true then
-				item.fill = nil
-				item.paid = nil
-				item.len = nil
-				item.lenX = nil
-				item.lenZ = nil
-			else
-				local along = EditLogic.CanResize(bp.id)
-				if along and bp.id ~= "Floor" and bp.id ~= "Floor4" then
-					item.len = EditLogic.CleanLen(bp.footprint.X, item.len)
-					item.lenX = nil
-					item.lenZ = nil
-				elseif bp.id == "Floor" or bp.id == "Floor4" then
-					item.len = nil
-					item.lenX = EditLogic.CleanLen(bp.footprint.X, item.lenX)
-					item.lenZ = EditLogic.CleanLen(bp.footprint.Y, item.lenZ)
-				else
-					item.len = nil
-					item.lenX = nil
-					item.lenZ = nil
-				end
-				if item.fill ~= nil then
-					local units = if type(item.fill) == "table" then item.fill.units else nil
-					local need = EditLogic.Units(bp, item)
-					if type(units) ~= "number" or units ~= units or units < 0 or units >= need then
-						item.fill = nil
-					else
-						item.fill = { units = units }
-					end
-				end
-				if item.paid ~= nil and (type(item.paid) ~= "number" or item.paid ~= item.paid or item.paid < 0) then
-					item.paid = nil
-				elseif type(item.paid) == "number" then
-					local price = EditLogic.Fee(bp, item)
-					if item.paid > price then
-						item.paid = price
-					end
-				end
-			end
-			table.insert(kept, item)
-		end
-	end
-	data.plot.placed = kept
 	-- Saves from before the Hidden Grain kept only wood ids in the Sky Bin.
 	for i, entry in ipairs(data.skyBin) do
 		if type(entry) == "string" then

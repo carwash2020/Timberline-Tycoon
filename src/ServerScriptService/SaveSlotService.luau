@@ -8,7 +8,16 @@
 --   3. swaps the slot data (Robux state stays);
 --   4. rebuilds the plot, the truck and the axe loadout from the slot;
 --   5. saves immediately, and stamps the cooldown so a rejoin can't skip it.
--- Reset asks for a confirm first (Arm), so one stray tap can't wipe a slot.
+-- Restart (the old Redo, now in Settings) asks for a confirm first (Arm), so
+-- one stray tap can't wipe a slot.
+--
+-- Saves are chosen by hand. Joining loads no save for you: the profile is in
+-- memory, but the player is "picking" (attribute SlotPick) until they send
+-- play(index). Playing the save that was last played changes nothing; any
+-- other goes through the same Perform as a swap (cooldown, commit, rebuild).
+-- Either way the chosen save then asks for a pad if it owns a plot
+-- (hooks.chosen, or the rebuild). A player already standing on a base this
+-- session (hooks.onBase) is never asked.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -27,6 +36,8 @@ local ARM_SECONDS = 20
 type Hooks = {
 	commit: (Player) -> (),
 	rebuild: (Player) -> (),
+	chosen: ((Player) -> ())?, -- the last-played save was picked as it is: ask for its pad
+	onBase: ((Player) -> boolean)?, -- they already stand on a pad this session
 }
 
 local notify: (Player, string) -> () = function(_player: Player, _message: string) end
@@ -36,6 +47,8 @@ local hooks: Hooks = {
 }
 local stateRemote: RemoteEvent? = nil
 local armedUntil: { [Player]: number } = {}
+local awaiting: { [Player]: boolean } = {} -- joined, has not picked a save yet
+local chosen: { [Player]: boolean } = {} -- picked one this visit
 
 -- Text other players can read. PublicChat is the broadcast context.
 -- A failure returns nil so the caller stores the default name instead.
@@ -73,6 +86,7 @@ local function publish(player: Player)
 	end
 	player:SetAttribute("ActiveSlot", profile.activeSlot)
 	player:SetAttribute("SlotCooldownUntil", profile.slotCooldownUntil)
+	player:SetAttribute("SlotPick", if awaiting[player] then true else nil)
 	remote:FireClient(player, SaveSlotLogic.Summary(profile))
 end
 
@@ -108,8 +122,65 @@ local function perform(player: Player, action: string, index: number): boolean
 	return true
 end
 
+-- The pick is made: the save is in play, so the picker closes, and a save
+-- with a plot asks for its pad.
+local function finishPick(player: Player, ask: boolean)
+	awaiting[player] = nil
+	chosen[player] = true
+	publish(player)
+	local after = hooks.chosen
+	if ask and after then
+		after(player)
+	end
+end
+
+-- play(index): the join screen's choice.
+local function play(player: Player, index: unknown)
+	if not awaiting[player] then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if
+		not profile
+		or type(index) ~= "number"
+		or index ~= math.floor(index)
+		or index < 1
+		or index > SaveSlotLogic.Count
+	then
+		return
+	end
+	if index == profile.activeSlot then
+		finishPick(player, true)
+		return
+	end
+	-- Another save: a normal swap. Its rebuild asks for the pad, so no second ask.
+	awaiting[player] = nil
+	if perform(player, "load", index) then
+		chosen[player] = true
+		publish(player)
+	else
+		awaiting[player] = true -- refused (cooldown): the picker stays up
+		publish(player)
+	end
+end
+
 local function onAction(player: Player, action: unknown, index: unknown, extra: unknown)
 	if not RateLimiter.Allow(player, "SlotAction") then
+		return
+	end
+	if action == "play" then
+		play(player, index)
+		return
+	end
+	if awaiting[player] and action == "load" and extra == true then
+		play(player, index) -- a Load before the first pick is the pick
+		return
+	end
+	if awaiting[player] and action == "arm" then
+		return -- nothing can be armed before a save is picked
+	end
+	if awaiting[player] and action == "reset" then
+		notify(player, "Pick a save to play first.")
 		return
 	end
 	if action == "arm" then
@@ -152,7 +223,7 @@ local function onAction(player: Player, action: unknown, index: unknown, extra: 
 		return
 	end
 	if action == "reset" and os.clock() > (armedUntil[player] or 0) then
-		notify(player, "Tap Redo, then confirm. That save's cash, wood and plot will be wiped.")
+		notify(player, "Press Restart save again to confirm. That save's cash, wood and plot will be wiped.")
 		return
 	end
 	armedUntil[player] = nil
@@ -163,12 +234,26 @@ local function onAction(player: Player, action: unknown, index: unknown, extra: 
 	perform(player, action :: string, if type(slot) == "number" then slot else 0)
 end
 
+-- Called at the join and again by JoinSync's resend: the second call only
+-- re-sends. A player who has already picked, or stands on a base, is not
+-- asked (again).
 function SaveSlotService.PlayerJoined(player: Player)
+	local onBase = hooks.onBase
+	if not chosen[player] and not awaiting[player] and not (onBase ~= nil and onBase(player)) then
+		awaiting[player] = true
+	end
 	publish(player)
+end
+
+-- For the join flow and the specs.
+function SaveSlotService.IsPicking(player: Player): boolean
+	return awaiting[player] == true
 end
 
 function SaveSlotService.PlayerRemoving(player: Player)
 	armedUntil[player] = nil
+	awaiting[player] = nil
+	chosen[player] = nil
 end
 
 function SaveSlotService.Init(action: RemoteEvent, state: RemoteEvent, notifyFn: (Player, string) -> (), world: Hooks)

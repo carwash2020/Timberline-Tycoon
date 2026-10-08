@@ -21,6 +21,7 @@ local MODULES = {
 	"AmbientLife",
 	"AmbientSound",
 	"AxeController",
+	"BasesUI",
 	"BadgeUI",
 	"BlueprintPlacer",
 	"BoxPoof",
@@ -343,6 +344,12 @@ local controllers: { { name: string, get: () -> any } } = {
 		name = "PlotUI",
 		get = function()
 			return require(script.Parent.PlotUI)
+		end,
+	},
+	{
+		name = "BasesUI",
+		get = function()
+			return require(script.Parent.BasesUI)
 		end,
 	},
 	{

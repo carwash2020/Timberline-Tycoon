@@ -119,4 +119,13 @@ return function(t)
 		t.eq(plot.event, "plotClaimed")
 		t.ok(mentions(plot.murphShort, "$" .. GameConfig.PlotPrice))
 	end)
+
+	t.test("Old Hank's bases question: one offer id, the crate count, and the no-pad wording", function()
+		t.eq(PlotSalesmanData.BasesOfferId, "bases")
+		local withPad = PlotSalesmanData.BasesLine(true, 0, 3)
+		t.ok(string.find(withPad, "Nothing in a crate is ever lost", 1, true) ~= nil)
+		t.eq(string.find(withPad, "crated with me", 1, true), nil, "no crates, no count")
+		t.ok(string.find(PlotSalesmanData.BasesLine(true, 2, 3), "2 of 3 bases crated with me", 1, true) ~= nil)
+		t.ok(string.find(PlotSalesmanData.BasesLine(false, 0, 3), "no pad", 1, true) ~= nil)
+	end)
 end

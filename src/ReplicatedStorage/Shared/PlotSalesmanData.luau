@@ -81,6 +81,20 @@ PlotSalesmanData.OwnsLine = "You've got your plot, partner. Come back when there
 PlotSalesmanData.FullLine = "Every pad's spoken for on this server today. Try another one, friend."
 PlotSalesmanData.FarLine = "Come on up to the counter, I can't hear you from there."
 
+-- The Yes / No question for a player who has a base (or crated ones): Yes
+-- opens the Bases panel (pack, bring out, start fresh, pick a pad). The
+-- offer id is what the client sends back with its answer (PlotService.HankPick).
+PlotSalesmanData.BasesOfferId = "bases"
+
+function PlotSalesmanData.BasesLine(hasPad: boolean, packed: number, cap: number): string
+	local crates = if packed > 0 then string.format(" You have %d of %d bases crated with me.", packed, cap) else ""
+	if hasPad then
+		return "Want to see what I can do with your base? I can crate it up and hold it, bring another one out, or start you a fresh one. Nothing in a crate is ever lost."
+			.. crates
+	end
+	return "You've got no pad right now. Want to look at your crated bases, or pick a pad? It's free." .. crates
+end
+
 function PlotSalesmanData.Find(id: string): Offer?
 	for _, offer in ipairs(PlotSalesmanData.Offers) do
 		if offer.id == id then

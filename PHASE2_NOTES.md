@@ -22,6 +22,8 @@ What's here, each with its own checklist below:
 11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
 12. **The new look**: every screen restyled from the Claude Design UI spec
 
+13. **Saves by hand, and crating a base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, Old Hank's crates
+
 Where the redesign changed something an older section describes (the
 world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
 section wins.
@@ -29,6 +31,111 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## Saves by hand, and crating a base (8 October 2026, branch `claude/plot-save-switch`)
+
+Connor: "with plots, they need a way to unload/save their base and switch to
+another"; "I never loaded a save ... it shouldn't automatically load a save;
+save should be manual unless it's already on a base. When picking a save, if
+that player has a plot, then they pick a spot"; "restart save should be in
+settings". Nothing here changes a price, a recipe or the economy model.
+
+**What was already there (and is reused, not rebuilt).** Three whole-game save
+slots (`SaveSlotLogic`, `SaveSlotService`, SAVES button): each holds cash, axes,
+plot, storage. Switching one swaps ALL of it. `PlotService.Reload` rebuilds the
+same pad for the other save. Every join already let a returning owner pick a
+(free) pad again, because a pad is only held while you are online. Missing: a
+way to put away just the BASE (not the whole game), more than one base per
+save, and a deliberate (not automatic) choice of save.
+
+**Join flow now.** Quality screen (first time only) -> SAVE PICKER -> (only if
+the picked save has a plot) PLOT PICKER with its camera, map and pillar ->
+world. The save picker lists each save: name, cash, best axe, "Plot, 12
+pieces, 1 packed" or "No plot yet", when it was saved. The save you left off on
+says "Last played", not "Playing". PLAY on it changes nothing; PLAY on another
+is a normal swap (commit wood, swap, rebuild; same cooldown as before). No
+close button: you choose. A player already standing on a pad (a swap from the
+SAVES button) is not asked again; that swap keeps the pad. The 60 s plot-picker
+timer now starts when the picker is on the player's screen (`PlotShown`), not
+when the save loads. Order of screens is `PickerSequence`: quality, slot, plot
+(rules in `Shared/JoinPickLogic`).
+
+**Restart save** is no longer on the SAVES list (the confusing REDO). It is
+RESTART SAVE 1 / 2 / 3 on the Settings GAME tab (the number is the save you are
+playing). Press once: it arms and says what will be wiped; press again within 5
+s: it does what REDO did (same server path, same arm window, cooldown and rate
+limit). Disabled and labelled "pick a save first" while the save picker is up,
+and while the save cooldown runs.
+
+**Crating a base (Old Hank, Land Office counter).** Talk to Old Hank while you
+own a plot (or have crated bases): Yes / No "Want to see what I can do with
+your base?". Yes opens BASES. Rows: the base on your pad with PACK UP and NEW
+BASE; each crated base with SWAP IN (or BRING OUT when you have no pad); PICK A
+PAD when you have none. Every change shows a confirm card first.
+ * PACK UP crates the base whole and gives your pad back (free for others).
+ * NEW BASE crates it and starts an empty one on the same pad.
+ * SWAP IN replaces the base on your pad with a crated one (yours is crated
+   in its place). With no pad, BRING OUT opens the free plot picker and the
+   base lands on the pad you choose. Moving a base to another pad is PACK UP,
+   then BRING OUT the same base.
+The shelf holds `GameConfig.BaseShelfCap` (3) bases per save; a change has a
+`GameConfig.BaseCooldownSec` (120 s) cooldown stored on the profile.
+
+How nothing is lost or duplicated: a pack or a swap MOVES a plot record
+(placed pieces, vehicle pads, tier, squares, wires, switches) between
+`profile.plot` and `profile.bases`; it never copies one and moves no cash
+(`BaseLogic.Swap`, spec-checked: every uid exists once before and after).
+Refused, with nothing changed: away from the counter, loose logs or planks of
+yours lying on the plot (they are not in the save), a full shelf, an empty
+base, cooldown, another change in flight. Before the data moves the world lets
+go: carried logs, the truck's load and the truck go into the save (the slot
+swap's commit), visitors standing on the yard are set down outside it, the
+base's vehicle-pad models come down (the records stay), and undo history is
+cleared. A rebuild that throws puts the exact records back (no cooldown spent).
+If the player leaves in the middle the save is whole either before or after,
+never half. A pad on a crated base still counts as its truck's box, so no
+second box is minted; uids on crated bases are protected from box clashes.
+
+Also fixed on the way: vehicle pad models were never taken down (a leave or a
+slot swap left them standing), and they were never restored after claiming a
+pad at join (they were only restored by a slot swap). `assigned` now restores
+them when a base lands on a pad.
+
+### Studio checklist
+1. Join a fresh save: quality screen (once), then SAVES list. Nothing loads by
+   itself. The first save says "Last played" (or START), not "Playing". Press
+   PLAY: you enter the world. No plot -> nothing else opens.
+2. Rejoin on a save that has a plot: quality skipped, save list, PLAY -> the plot
+   picker opens (pillar, map, camera). Leave the save list open for a minute
+   first: no pad is taken. Then PLAY and leave the plot picker alone for 60 s:
+   only now does the timer run out and a free pad is taken.
+3. Pick save 2 (another save) on the list: swap happens, no second prompt; if
+   it has a plot, the plot picker opens. Cooldown message if you just swapped.
+4. Settings (GAME tab): RESTART SAVE n is greyed while the save list is up.
+   Press once (arms, says what is wiped), again within 5 s (the save restarts).
+   The SAVES list has no REDO. Check with a gamepad (View menu, Settings, A) and
+   on a phone.
+5. Build a few pieces and place a vehicle pad on your plot. Walk to Old Hank
+   (Land Office). Talk -> Yes/No box -> Yes -> BASES opens (tap and A both work;
+   B closes the confirm card, then the panel).
+6. PACK UP -> confirm: your house vanishes, pad sign says OPEN PLOT, the
+   pad models are gone, cash and storage unchanged. Another player (second
+   Studio client) can claim that pad.
+7. BRING OUT the crate -> plot picker opens (free) -> pick a DIFFERENT pad: the
+   same layout stands there, pieces in the same relative spots, vehicle pad back,
+   pad button works.
+8. NEW BASE, build something small, SWAP IN the first one: the two swap, both
+   complete. Try again straight away: "Give it N more seconds".
+9. Drop a log on your plot, try PACK UP: refused with the loose-wood message.
+   Pick it up or sell it and retry. Stand a second player on your plot: they
+   are set down outside when you pack.
+10. Leave and rejoin right after a pack: your save has the crated base, the
+    shelf row, and the picker offers a free pad for the empty base.
+11. Slot swap mid-session still keeps your pad and rebuilds its pads (no
+    orphan pad models left on the old pad).
+
+Not seen in Studio yet; the camera/picker, the dialogue Yes/No, BASES layout
+on phone and TV, and the pad-model restore need an eye.
 
 ## Sawmills and planks (M2.2)
 

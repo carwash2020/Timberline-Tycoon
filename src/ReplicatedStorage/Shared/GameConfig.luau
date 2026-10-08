@@ -15,6 +15,11 @@ local GameConfig = {
 	-- sell the same wood twice.
 	SlotCooldownSec = 120,
 	SlotCount = 3,
+	-- Bases (Shared/BaseLogic): how many packed-up bases a save keeps on the
+	-- Land Office shelf besides the one on your pad, and the seconds between
+	-- pack / bring-out changes (stored on the profile, so a rejoin keeps it).
+	BaseShelfCap = 3,
+	BaseCooldownSec = 120,
 	-- Creator Hub max players for this place (PlaceCheck). Plot count is
 	-- this plus two spare pads, so the last person on still has a choice.
 	MaxPlayers = 12,

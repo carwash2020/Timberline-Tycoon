@@ -185,4 +185,37 @@ function SettingsLogic.ScaleMultiplier(uiScale: string): number
 	return 1
 end
 
+-- RESTART SAVE (Settings, Game tab). It wipes the save you are playing back
+-- to a brand-new game (the old REDO button on the SAVES list, moved here at
+-- Connor's request, 8 October 2026). The server does the real work through
+-- the same SlotAction remote: "arm", then "reset" within seconds, behind the
+-- save-slot cooldown and RateLimiter. This only says what the row shows.
+SettingsLogic.RestartArmSeconds = 5
+SettingsLogic.RestartConfirm =
+	"Restart this save? Cash, wood, axes you bought, bases and the plot on it are wiped. Robux purchases stay. Press again to confirm."
+
+export type RestartRow = { text: string, enabled: boolean }
+
+-- activeSlot: the ActiveSlot attribute (nil until a save is loaded);
+-- picking: the join save picker is still up (no save chosen yet);
+-- cooldownUntil: SlotCooldownUntil (unix); armed: pressed once, waiting for the second press.
+function SettingsLogic.RestartRow(
+	activeSlot: unknown,
+	picking: boolean,
+	cooldownUntil: unknown,
+	now: number,
+	armed: boolean
+): RestartRow
+	if type(activeSlot) ~= "number" or activeSlot < 1 or picking then
+		return { text = "RESTART SAVE (pick a save first)", enabled = false }
+	end
+	if type(cooldownUntil) == "number" and now < cooldownUntil then
+		return { text = string.format("RESTART SAVE (in %ds)", math.ceil(cooldownUntil - now)), enabled = false }
+	end
+	if armed then
+		return { text = "PRESS AGAIN: WIPE SAVE " .. tostring(activeSlot), enabled = true }
+	end
+	return { text = "RESTART SAVE " .. tostring(activeSlot), enabled = true }
+end
+
 return SettingsLogic
