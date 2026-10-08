@@ -88,4 +88,37 @@ return function(t)
 		local Perm = t.shared("PermissionLogic")
 		t.ok(Perm.Tap >= 44)
 	end)
+
+	t.test("Restart save lives in Settings: only with a chosen save, and not while the cooldown runs", function()
+		local row = SettingsLogic.RestartRow
+		t.eq(row(nil, false, 0, 100, false).enabled, false, "no save is active: disabled")
+		t.eq(row(nil, false, 0, 100, false).text, "RESTART SAVE (pick a save first)")
+		t.eq(row(1, true, 0, 100, false).enabled, false, "still choosing a save at the join picker")
+		t.eq(row(2, false, 150, 100, false).enabled, false, "the slot cooldown runs")
+		t.eq(row(2, false, 150, 100, false).text, "RESTART SAVE (in 50s)")
+		t.eq(row(2, false, 0, 100, false), { text = "RESTART SAVE 2", enabled = true })
+		t.eq(row(2, false, 0, 100, true), { text = "PRESS AGAIN: WIPE SAVE 2", enabled = true })
+		t.eq(row("1", false, 0, 100, false).enabled, false, "a made-up attribute is not a save")
+		t.eq(row(0, false, 0, 100, false).enabled, false)
+	end)
+
+	t.test(
+		"Restart save: two presses through the same server path as the old Redo, and the list has no wipe button",
+		function()
+			local fs = require("@lune/fs")
+			local ui = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SettingsUI.luau")
+			t.ok(
+				string.find(ui, 'Net.Remote("SlotAction"):FireServer("arm", 0, false)', 1, true),
+				"the first press arms"
+			)
+			t.ok(string.find(ui, 'Net.Remote("SlotAction"):FireServer("reset", 0, true)', 1, true), "the second wipes")
+			t.ok(string.find(ui, "SettingsLogic.RestartRow", 1, true))
+			local slots = fs.readFile("src/StarterPlayer/StarterPlayerScripts/SaveSlotUI.luau")
+			t.eq(string.find(slots, '"reset"', 1, true), nil, "the save list can no longer wipe a save")
+			local service = fs.readFile("src/ServerScriptService/SaveSlotService.luau")
+			t.ok(string.find(service, 'RateLimiter.Allow(player, "SlotAction")', 1, true), "still rate limited")
+			t.ok(string.find(service, "ARM_SECONDS", 1, true), "still two steps on the server")
+			t.ok(SettingsLogic.RestartArmSeconds <= 20, "the client's window is inside the server's")
+		end
+	)
 end

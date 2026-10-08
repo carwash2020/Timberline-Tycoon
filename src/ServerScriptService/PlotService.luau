@@ -33,6 +33,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local BaseLogic = require(ReplicatedStorage.Shared.BaseLogic)
 local BlueprintBook = require(ReplicatedStorage.Shared.BlueprintBook)
 local BlueprintModels = require(ReplicatedStorage.Shared.BlueprintModels)
 local AutomationLogic = require(ReplicatedStorage.Shared.AutomationLogic)
@@ -83,6 +84,18 @@ local UNDO_SECONDS = 60 -- selling something this soon after placing it refunds 
 PlotService.UndoSeconds = UNDO_SECONDS
 -- GameServer sets this: Old Hank's replies as the dialogue box (else a toast).
 PlotService.Speak = nil :: ((Player, string) -> ())?
+-- GameServer wires the other services in (this file does not require them):
+--   commit   pull wood, the truck's load and carried logs into the save (the
+--            slot swap's path), run before a base is unloaded;
+--   despawn  take the player's truck off the world;
+--   clearPads  take a base's vehicle-pad models down (the records stay);
+--   assigned a base now stands on the player's pad (restore its pads, shop).
+PlotService.Hooks = {
+	commit = function(_player: Player) end,
+	despawn = function(_player: Player) end,
+	clearPads = function(_plot: any) end,
+	assigned = function(_player: Player, _profile: any) end,
+}
 
 type Slot = {
 	index: number,
@@ -110,6 +123,7 @@ local undoStacks: { [Player]: { EditLogic.Entry } } = {}
 local pickingUntil: { [Player]: number } = {} -- a returning owner's join picker (a timeout takes a free pad)
 local buying: { [Player]: boolean } = {} -- the Land Office picker is open (no timeout: nothing is given away)
 local claiming: { [Player]: boolean } = {} -- a claim is being charged and assigned right now
+local switching: { [Player]: boolean } = {} -- a base is being packed or swapped right now (BaseLogic)
 local officePos: Vector3 = Vector3.zero
 local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
@@ -619,6 +633,12 @@ local function release(player: Player)
 	for _, model in ipairs(slot.items:GetChildren()) do
 		placedAt[model.Name] = nil
 	end
+	-- The vehicle pads of this base stand in the world, not in the items
+	-- folder: take them down too, or they would be orphans on the next owner's yard.
+	local leaving = ProfileService.GetProfile(player)
+	if leaving and leaving.plot then
+		pcall(PlotService.Hooks.clearPads, leaving.plot)
+	end
 	slot.owner = nil
 	slot.items:ClearAllChildren()
 	slot.model:SetAttribute("OwnerId", nil)
@@ -755,6 +775,7 @@ local function grant(player: Player, slot: Slot, profile: Profile, moveIfFar: bo
 	assign(player, slot, profile)
 	adoptSpawn(player, slot, moveIfFar)
 	rescueProfile(profile, slot.cframe * CFrame.new(0, 2, 0))
+	pcall(PlotService.Hooks.assigned, player, profile) -- its vehicle pads stand up on this pad
 	if first then
 		QuestService.Event(player, "plotClaimed")
 		MilestoneService.Mark(player, "Claimed a plot")
@@ -1950,11 +1971,21 @@ function PlotService.ParkStrays(profile: Profile)
 	rescueProfile(profile, CFrame.new(x, y, z))
 end
 
-function PlotService.PlayerJoined(player: Player, profile: Profile)
+-- At profile load: watch the spawn and mirror the plot's attributes. It opens
+-- no picker: a save is chosen by hand first (SaveSlotService), and only the
+-- chosen save's PlayerJoined asks for a pad.
+function PlotService.Prepare(player: Player, profile: Profile)
 	watchSpawn(player)
 	if profile.plot then
 		mirrorPlot(player, profile)
 	end
+end
+
+-- The chosen save is loaded: a save that owns a plot now picks a pad for it.
+-- The 60 s timer does not start here but when the picker is on the player's
+-- screen (PlotService.Shown), so a screen in front of it never eats the time.
+function PlotService.PlayerJoined(player: Player, profile: Profile)
+	PlotService.Prepare(player, profile)
 	if slotOf[player] or not PlotPickerLogic.ShouldPick(slotOf[player] ~= nil) then
 		return
 	end
@@ -1972,9 +2003,24 @@ function PlotService.PlayerJoined(player: Player, profile: Profile)
 		player:SetAttribute("Picking", nil)
 		return
 	end
-	pickingUntil[player] = os.clock() + PlotPickerLogic.TimeoutSeconds
+	pickingUntil[player] = math.huge -- armed by Shown
 	player:SetAttribute("Picking", true)
 	fireOffer(player)
+end
+
+-- The client says the join picker is really on its screen. Only then does the
+-- timeout that takes a free pad start; asking twice never restarts it.
+function PlotService.Shown(player: Player)
+	if not RateLimiter.Allow(player, "PlotShown") then
+		return
+	end
+	if pickingUntil[player] == math.huge then
+		pickingUntil[player] = os.clock() + PlotPickerLogic.TimeoutSeconds
+	end
+end
+
+function PlotService.HasPad(player: Player): boolean
+	return slotOf[player] ~= nil
 end
 
 -- Sends the picker's offer again (JoinSync, when the client says ClientReady):
@@ -2062,6 +2108,7 @@ function PlotService.PlayerRemoving(player: Player)
 	pickingUntil[player] = nil
 	buying[player] = nil
 	claiming[player] = nil
+	switching[player] = nil
 	lastOffer[player] = nil
 	watching[player] = nil
 	undoStacks[player] = nil
@@ -2328,6 +2375,16 @@ function PlotService.Init(
 			PlotService.Pass(player)
 		end)
 	end
+	if remotes.PlotShown then
+		remotes.PlotShown.OnServerEvent:Connect(function(player: Player)
+			PlotService.Shown(player)
+		end)
+	end
+	if remotes.BaseAction then
+		remotes.BaseAction.OnServerEvent:Connect(function(player: Player, action: unknown)
+			PlotService.BaseAction(player, action)
+		end)
+	end
 	local heartbeat = (RunService :: any).Heartbeat
 	if typeof(heartbeat) == "RBXScriptSignal" or (type(heartbeat) == "table" and heartbeat.Connect) then
 		heartbeat:Connect(function()
@@ -2491,6 +2548,127 @@ function PlotService.FillStep()
 				end
 			end
 		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Unload base / load base (Shared/BaseLogic)
+---------------------------------------------------------------------------
+
+-- Their logs and planks lying on their own plot (not held). Loose wood is
+-- not in the save, so a base never comes off the pad while some is out there.
+local function looseWoodOn(player: Player, slot: Slot, profile: Profile): number
+	local wood = woodModule()
+	if not wood or type(wood.All) ~= "function" then
+		return 0
+	end
+	local pieces = wood.All()
+	if type(pieces) ~= "table" then
+		return 0
+	end
+	local tier = PlotData.Tier(profile.plot.tier) or PlotData.Tiers[1]
+	local squares = if type(profile.plot.squares) == "table" then profile.plot.squares else {}
+	local extent = PlotLogic.Extent(tier.size, squares)
+	local n = 0
+	for _, piece in pairs(pieces) do
+		local root = woodRoot(piece)
+		if root and not woodHeld(piece) and piece.ownerId == player.UserId and onPlot(slot, extent, root.Position) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- Everyone but the owner who stands on or beside the yard is set down just
+-- outside it, so nobody falls out of a house that is about to come down.
+local function ejectOthers(owner: Player, slot: Slot, profile: Profile)
+	for _, other in ipairs(onlinePlayers()) do
+		if other ~= owner and actorOn(other, slot, profile) then
+			nudgeOff(other, slot, profile)
+		end
+	end
+end
+
+local FAILED = "Something went wrong and your base is still on its pad. Try again."
+
+-- The world lets go (wood, the truck, visitors, pad models), then the pad is
+-- released. The save is NOT edited: profile.plot stays exactly as it is, so
+-- nothing is moved, copied or lost. If the release throws, the base is built
+-- back on its pad. A save written before this runs, or after, is whole.
+local function unloadBase(player: Player, profile: Profile, slot: Slot): boolean
+	pcall(PlotService.Hooks.commit, player)
+	pcall(PlotService.Hooks.despawn, player)
+	-- The commit may have yielded: still the same save, still on that pad?
+	if ProfileService.GetProfile(player) ~= profile or slotOf[player] ~= slot then
+		return false
+	end
+	ejectOthers(player, slot, profile)
+	pcall(PlotService.Hooks.clearPads, profile.plot)
+	undoStacks[player] = nil
+	local ok = pcall(release, player)
+	if not ok then
+		slot.items:ClearAllChildren()
+		slot.owner = player
+		pcall(assign, player, slot, profile)
+		pcall(PlotService.Hooks.assigned, player, profile)
+		return false
+	end
+	return true
+end
+
+-- Intents from the SAVES panel: "unload" (the base comes off the pad) and
+-- "load" (the free plot picker opens for it). The server checks it all: one
+-- change at a time, cooldown, loose wood, an owned plot, a free pad.
+function PlotService.BaseAction(player: Player, action: unknown)
+	if not RateLimiter.Allow(player, "BaseAction") then
+		return
+	end
+	local profile = ProfileService.GetProfile(player)
+	if not profile or not profile.plot then
+		return
+	end
+	local slot = slotOf[player]
+	if action == "unload" then
+		local ctx: BaseLogic.Context = {
+			now = os.time(),
+			hasPad = slot ~= nil,
+			busy = switching[player] == true or claiming[player] == true or expanding[player] == true,
+			looseWood = if slot then looseWoodOn(player, slot, profile) else 0,
+		}
+		local ok, why = BaseLogic.CheckUnload(profile, ctx)
+		if not ok or not slot then
+			if why and why ~= BaseLogic.Reasons.bad then
+				notify(player, why)
+			end
+			return
+		end
+		switching[player] = true
+		local done, result = (pcall :: any)(unloadBase, player, profile, slot)
+		switching[player] = nil
+		if not done or result ~= true then
+			if not done then
+				warn("[PlotService] unload failed: " .. tostring(result))
+			end
+			notify(player, FAILED)
+			return
+		end
+		BaseLogic.Stamp(profile, os.time())
+		player:SetAttribute("BaseCooldownUntil", profile.baseCooldownUntil)
+		local save = ProfileService.Save
+		if type(save) == "function" then
+			pcall(save, player) -- the save is written with the base in it
+		end
+		notify(player, BaseLogic.UnloadedToast)
+	elseif action == "load" then
+		local ok = BaseLogic.CanLoad(profile, slot ~= nil)
+		if not ok or switching[player] or claiming[player] then
+			return
+		end
+		if pickingUntil[player] ~= nil or buying[player] then
+			PlotService.Resend(player) -- the picker is already up: show it again
+			return
+		end
+		PlotService.PlayerJoined(player, profile) -- the same free picker as a join, timer and all
 	end
 end
 

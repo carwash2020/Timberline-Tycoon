@@ -2003,6 +2003,31 @@ function VehicleService.RestorePads(player: Player, profile: any)
 	end
 end
 
+-- Takes down the world pads (and their buttons) of a base that is leaving
+-- the pad: packed away, swapped out, or its owner left. The saved pad
+-- records stay in the base, so nothing is lost; only the models go, so no
+-- orphan pad stands on a yard that is somebody else's next. Returns how many
+-- models were removed. Safe to call twice.
+function VehicleService.ClearPads(plot: any): number
+	if type(plot) ~= "table" or type(plot.pads) ~= "table" then
+		return 0
+	end
+	local removed = 0
+	for _, pad in ipairs(plot.pads) do
+		if type(pad) == "table" and type(pad.uid) == "string" then
+			local model: Model? = builtPads[pad.uid]
+			builtPads[pad.uid] = nil
+			if model ~= nil then
+				removed += 1
+				pcall(function()
+					model:Destroy()
+				end)
+			end
+		end
+	end
+	return removed
+end
+
 -- Places a pad for a paid truck or trailer box. False leaves the box.
 function VehicleService.TryPlaceFromBox(player: Player, rec: any): boolean
 	local kind = rec.itemKind

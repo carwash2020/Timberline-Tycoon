@@ -394,6 +394,7 @@ local function showCurrent()
 end
 
 local function apply(offer: Offer)
+	local wasOpen = open
 	local previous = plots[index]
 	local lost = offer.notice == "taken"
 	plots = offer.plots
@@ -423,6 +424,11 @@ local function apply(offer: Offer)
 	lock()
 	showCurrent()
 	PlotPickerUI._open(claimButton)
+	if not wasOpen then
+		-- It is on the screen now: the server's timeout that takes a free pad
+		-- starts here, not when the save loaded (PlotService.Shown).
+		Net.Remote("PlotShown"):FireServer()
+	end
 end
 
 -- An offer arrived (or arrived again: the server sends it once the save has

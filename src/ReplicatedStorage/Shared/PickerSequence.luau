@@ -7,11 +7,12 @@
 -- once. Now they take turns: each asks (Request), only the first in
 -- Order is shown, and when it is done (Done) the next one opens. Pure.
 --
--- Order: "quality" then "plot". Anything else never shows (Request refuses).
+-- Order: "quality", then "slot" (which save to play), then "plot" (which pad
+-- to put that save's base on). Anything else never shows (Request refuses).
 
 local PickerSequence = {}
 
-PickerSequence.Order = { "quality", "plot" }
+PickerSequence.Order = { "quality", "slot", "plot" }
 
 export type Sequence = {
 	Request: (id: string) -> boolean,

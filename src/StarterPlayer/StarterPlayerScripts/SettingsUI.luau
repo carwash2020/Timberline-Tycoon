@@ -123,6 +123,7 @@ function SettingsUI.Start()
 	local tap = math.max(rowSize.Y, PermissionLogic.Tap, UITheme.Size.Tap)
 	local firstFace: GuiButton? = nil
 	local resetArmed = false
+	local restartArmedUntil = 0
 	local tabName = "game"
 	local visitorTarget = PermissionLogic.Anyone
 	local gameRows: { GuiObject } = {}
@@ -331,6 +332,7 @@ function SettingsUI.Start()
 	local scaleFace: TextButton
 	local tipsFace: TextButton
 	local resetFace: TextButton
+	local restartFace: TextButton
 
 	local function save(key: string, value: any)
 		Net.Remote("SaveSetting"):FireServer(key, value)
@@ -386,6 +388,16 @@ function SettingsUI.Start()
 		sfxFace.Text = if SoundData.SfxEnabled then "SOUND FX: ON" else "SOUND FX: OFF"
 		sfxVolFace.Text = "Effects volume  " .. percent(SoundData.SfxVolume) .. "  ±"
 		resetFace.Text = if resetArmed then "TAP AGAIN TO RESET" else "RESET TUTORIAL"
+		local restart = SettingsLogic.RestartRow(
+			player:GetAttribute("ActiveSlot"),
+			player:GetAttribute("SlotPick") == true,
+			player:GetAttribute("SlotCooldownUntil"),
+			os.time(),
+			os.clock() < restartArmedUntil
+		)
+		restartFace.Text = restart.text
+		restartFace.Active = restart.enabled
+		restartFace.AutoButtonColor = restart.enabled
 		if tabName == "board" then
 			boardPanel:SetOptIn(player:GetAttribute(SettingsLogic.BoardAttribute) == true)
 		end
@@ -460,7 +472,38 @@ function SettingsUI.Start()
 		applyAll()
 	end)
 
+	-- Restart save: two presses, like the tutorial reset. The first asks the
+	-- server to arm (SlotAction "arm"), the second sends "reset"; the server
+	-- still checks the cooldown, the arm window and the rate limit.
+	restartFace = row("restart", "RESTART SAVE", function()
+		local state = SettingsLogic.RestartRow(
+			player:GetAttribute("ActiveSlot"),
+			player:GetAttribute("SlotPick") == true,
+			player:GetAttribute("SlotCooldownUntil"),
+			os.time(),
+			os.clock() < restartArmedUntil
+		)
+		if not state.enabled then
+			return
+		end
+		if os.clock() >= restartArmedUntil then
+			restartArmedUntil = os.clock() + SettingsLogic.RestartArmSeconds
+			Net.Remote("SlotAction"):FireServer("arm", 0, false)
+			HUD.Toast(SettingsLogic.RestartConfirm)
+			applyAll()
+			task.delay(SettingsLogic.RestartArmSeconds + 0.1, applyAll)
+			return
+		end
+		restartArmedUntil = 0
+		Net.Remote("SlotAction"):FireServer("reset", 0, true)
+		card.outer.Visible = false
+		applyAll()
+	end)
+
 	for _, attr in pairs(SettingsLogic.Attributes) do
+		player:GetAttributeChangedSignal(attr):Connect(applyAll)
+	end
+	for _, attr in ipairs({ "ActiveSlot", "SlotPick", "SlotCooldownUntil" }) do
 		player:GetAttributeChangedSignal(attr):Connect(applyAll)
 	end
 	player:GetAttributeChangedSignal("PlotPermissions"):Connect(function()

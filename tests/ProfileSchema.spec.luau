@@ -1172,4 +1172,41 @@ return function(t)
 		Schema.Migrate(junk)
 		t.eq({ grants = junk.ownerGrants.LuxAxe.at, log = #junk.ownerGrantLog }, snapshot)
 	end)
+
+	t.test(
+		"unload base: the cooldown is in the template, and a shelf from the earlier build is dropped idempotently",
+		function()
+			local Schema, data = fresh()
+			t.eq(Schema.Template.baseCooldownUntil, 0)
+			t.eq(Schema.Template.bases, nil, "no shelf of crated bases any more")
+			-- An old save has no cooldown: Reconcile fills it, Migrate leaves it clean.
+			data.baseCooldownUntil = nil
+			Schema.Migrate(data)
+			t.eq(data.baseCooldownUntil, 0)
+			-- A save written by the earlier (never released) build still loads: the live base is kept, the shelf goes.
+			data.plot.claimed = true
+			data.plot.placed = { { uid = "a", blueprintId = "Bench", x = 1, z = 2, rot = 0 } }
+			data.bases = { { claimed = true, tier = 1, placed = { { uid = "z" } } } }
+			data.slots[data.activeSlot].bases = { { claimed = true } }
+			data.baseCooldownUntil = 0 / 0
+			Schema.Migrate(data)
+			t.eq(data.bases, nil)
+			t.eq(data.slots[data.activeSlot].bases, nil)
+			t.eq(#data.plot.placed, 1, "the base that was on the pad is untouched")
+			t.eq(data.baseCooldownUntil, 0)
+			local json = require("@lune/serde").encode("json", data.plot)
+			Schema.Migrate(data)
+			t.eq(require("@lune/serde").encode("json", data.plot), json, "twice is the same as once")
+		end
+	)
+
+	t.test("unload base: a vehicle pad stays part of the plot record, so its truck is never boxed twice", function()
+		local Schema, data = fresh()
+		data.ownedTrucks = { "Rustbucket" }
+		data.plot.claimed = true
+		data.plot.pads = { { uid = "pad-1", id = "Rustbucket" } }
+		t.eq(Schema.WaitingTrucks(data), {}, "an unloaded base keeps its pad record, which is the box")
+		data.plot.pads = {}
+		t.eq(Schema.WaitingTrucks(data), { "Rustbucket" })
+	end)
 end

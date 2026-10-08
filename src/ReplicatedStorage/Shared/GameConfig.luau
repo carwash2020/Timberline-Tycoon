@@ -15,6 +15,9 @@ local GameConfig = {
 	-- sell the same wood twice.
 	SlotCooldownSec = 120,
 	SlotCount = 3,
+	-- Unload base (Shared/BaseLogic): seconds between two unloads (stored on
+	-- the profile, so a rejoin keeps it). Loading a base back is never cooled.
+	BaseCooldownSec = 120,
 	-- Creator Hub max players for this place (PlaceCheck). Plot count is
 	-- this plus two spare pads, so the last person on still has a choice.
 	MaxPlayers = 12,

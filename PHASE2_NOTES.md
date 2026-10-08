@@ -22,6 +22,8 @@ What's here, each with its own checklist below:
 11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
 12. **The new look**: every screen restyled from the Claude Design UI spec
 
+13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
+
 Where the redesign changed something an older section describes (the
 world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
 section wins.
@@ -29,6 +31,101 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
+
+Connor: "with plots, they need a way to unload/save their base and switch to
+another"; "it shouldn't automatically load a save ... when picking a save, if
+that player has a plot, they pick a spot"; "restart save should be in
+settings"; and, answering the first design: "I meant switching between saves,
+and unloading your base with a button which also saves it, LT2 style."
+Nothing here changes a price, a recipe or the economy model.
+
+**Switching bases is switching saves.** The three whole-game save slots already
+exist (cash, axes, plot, storage swap together); the SAVES panel is how you
+switch. Nothing new was built for that.
+
+**Join flow.** Quality screen (first time only) -> SAVE PICKER -> (only if the
+picked save has a plot) PLOT PICKER with its camera, map and pillar -> world.
+Each save row shows name, cash, best axe, "Plot, 12 pieces" or "No plot yet",
+when it was saved. The save you left off on says "Last played", never
+"Playing". PLAY on it changes nothing; PLAY on another is a normal swap
+(commit wood, swap, rebuild, the usual 120 s save cooldown). No close button:
+you choose. A player already standing on a pad (a swap from the SAVES button) is
+not asked again and keeps their pad. The 60 s plot-picker timeout starts when
+the picker is on screen (`PlotShown`), not at profile load. Order of screens:
+`PickerSequence` quality, slot, plot (`Shared/JoinPickLogic`).
+
+**Restart save** left the SAVES list (the confusing REDO). It is RESTART SAVE n
+on the Settings GAME tab (n is the save you are playing): press once (arms and
+says what is wiped), again within 5 s to do what REDO did. Greyed while the
+save picker is up and during the cooldown; same server path, arm window,
+cooldown and rate limit.
+
+**UNLOAD BASE / LOAD BASE (SAVES panel, top button).**
+ * While your base stands on a pad the button reads UNLOAD BASE. A confirm card
+   explains: saved with this save, off your pad, pad freed, nothing lost or
+   sold. Confirm -> the base's models and vehicle pads come down, anyone on the
+   yard is set down outside, the pad is free for others, and you stay in the
+   world with no pad. The base stays in that save's `profile.plot`
+   (the record is not moved, copied or edited), the save is written at once.
+ * While the save has a base but no pad, the button reads LOAD BASE: it opens
+   the same free plot picker as a join (camera, map, pillar, any pad, the 60 s
+   auto-assign once shown). The base lands there laid out exactly as before
+   (plot-local studs).
+ * Quitting while unloaded is fine: the save keeps the base, and the next join's
+   save picker leads to the free plot picker as usual.
+ * Cooldown `GameConfig.BaseCooldownSec` (120 s) between unloads, stored on the
+   profile (`baseCooldownUntil`, account-wide); loading back is never cooled.
+   Rate limit `BaseAction`. The remote carries only "unload" / "load".
+
+Safeguards: the unload commits carried logs, the truck's load and the truck
+into the save the same way a slot swap does; refuses (nothing changed, with a
+toast) when logs or planks of yours lie on the plot, while another change is in
+flight, during the cooldown, or with no pad; if the release throws, the base is
+rebuilt on its pad and no cooldown is spent; if the player leaves in the middle
+the save is whole before or after, never half. Vehicle pad models were never
+taken down on a leave or a slot swap and were never restored after a join-time
+pad claim: both fixed (`VehicleService.ClearPads`, the `assigned` hook).
+
+Old Hank is as he was (buy a plot, pad picker for returning owners). The
+earlier "crated bases shelf" design (profile.bases, Hank's Yes / No, BASES
+panel) was removed; `ProfileSchema.Migrate` drops a stray `bases` field
+idempotently and keeps `profile.plot`.
+
+### Studio checklist
+1. Join a fresh save: quality screen (once), then the SAVES list. Nothing loads
+   by itself. The first save says "Last played" (or START), not "Playing".
+   PLAY: you enter the world; no plot -> nothing else opens.
+2. Rejoin on a save with a plot: quality skipped, save list, PLAY -> the plot
+   picker opens (pillar, map, camera). Leave the save list open a minute first:
+   no pad is taken. Then PLAY and leave the plot picker alone for 60 s: only
+   now a free pad is taken.
+3. Pick save 2 (another save) on the list: swap, no second prompt; if it has a
+   plot the plot picker opens. Cooldown message if you just swapped.
+4. Settings (GAME tab): RESTART SAVE n greyed while the save list is up. Press
+   once (arms, says what is wiped), again within 5 s (the save restarts). The
+   SAVES list has no REDO. Check with a gamepad and on a phone.
+5. Build a few pieces and place a vehicle pad. Open SAVES: UNLOAD BASE is the top
+   button (tap and A both work; B closes the confirm card then the panel).
+6. UNLOAD BASE -> confirm: the house and pad models vanish, the pad sign says OPEN
+   PLOT, cash and storage unchanged, you are still standing in the world. A
+   second client can claim that pad. A second client standing on your yard is
+   set down outside.
+7. The button now says LOAD BASE (also after a slot swap away and back). Press
+   it: the free plot picker opens; pick a DIFFERENT pad: the same layout stands
+   there, pieces in the same relative spots, the vehicle pad's button works.
+8. Unload, quit, rejoin the same save: save list -> PLAY -> plot picker -> the
+   base lands on the pad you pick. Unload twice quickly: "Give it N more
+   seconds". Load back is not delayed.
+9. Drop a log on your plot, try UNLOAD BASE: refused with the loose-wood message.
+   Pick it up or sell it and retry.
+10. Slot swap mid-session keeps your pad and rebuilds its pads (no orphan pad
+    models left on the old pad). Old Hank sells a plot exactly as before.
+
+Not seen in Studio yet: the SAVES panel layout (the taller card and the new
+button) on phone and TV, the picker after LOAD BASE, visitor set-down with real
+raycasts, and the pad models after a claim.
 
 ## Sawmills and planks (M2.2)
 
