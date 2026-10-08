@@ -50,7 +50,7 @@ Caps (proposals): 80 logic pieces and 160 wires on a plot. A looping circuit sto
 
 Lane K's meshes: each piece looks for a model of its id under `MeshTemplates`, with slots Body, Indicator, Moving and LabelFace. A missing model keeps the part build and logs once. Indicator is the lamp or LED. Moving is the lever, the button cap, the hatch door or the plate top. The gate label sits on LabelFace. Lane W can call `LogicService.RegisterTarget(uid, { power, reverse })` for a belt, a sawmill or a planer. Those inputs are stored and not driven yet.
 
-The settings panel sits at the top centre, clear of the thumbstick and the jump button. Minus, plus and Done work by tap, click, and the d-pad or arrow keys. B closes it. The wire tool and the panel bind gamepad keys only while they are open.
+`V1Boot.Start` receives the remote table from GameServer and calls `LogicService.V1Init`, so `LogicSet` has a listener before anyone opens the settings panel. The settings panel sits at the top centre, clear of the thumbstick and the jump button. Minus, plus and Done work by tap, click, and the d-pad or arrow keys. B closes it. The wire tool and the panel bind gamepad keys only while they are open.
 
 ### Studio checks
 
