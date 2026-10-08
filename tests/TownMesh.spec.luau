@@ -171,6 +171,8 @@ return function(t)
 					end,
 				},
 				NodeService = { Spawn = function() end },
+				UndergroundBuilder = { Build = function() end },
+				SecretService = { V1Init = function() end },
 				WorldClock = { Start = function() end, Refresh = function() end },
 			},
 			services = {

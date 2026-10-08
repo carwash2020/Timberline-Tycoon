@@ -31,6 +31,12 @@ BIOMES = [
     ("sky", "Lumen Isles", (680, 280), 100, (170, 190, 220)),
 ]
 
+# Reserved for Lane R. Not wood biomes, so the pad checker ignores them.
+RESERVED = [
+    ("bayou", "Bayou", (-760, -700), 140, (70, 110, 80)),
+    ("redmesa", "Red Mesa", (590, -790), 115, (180, 80, 60)),
+]
+
 WATERS = [
     ("pond", "disc", (-40, -160), 16),
     ("lake", "disc", (-700, 180), 70),
@@ -66,7 +72,12 @@ ROADS = [
     ("EastLink", 28, [(140, 80), (600, 80)]),
     ("DockRoad", 28, [(600, 80), (860, 160)]),
     ("RavineRoad", 28, [(0, -520), (-90, -560), (-90, -780)]),
+    ("BayouRoad", 28, [(-424, -344), (-692, -612)]),
+    ("MesaRoad", 28, [(424, -344), (540, -470), (585, -700)]),
 ]
+
+# 32-stud junction circles where the new spurs end.
+JUNCTIONS = [(-692, -612, 32), (585, -700, 32)]
 
 TUNNEL = [(60, 700), (180, 660), (300, 600), (400, 560)]
 
@@ -402,6 +413,10 @@ def render(path: str) -> None:
 
     for _bid, _label, c, r, col in BIOMES:
         disc(img, w, h, to_px, c, r, col)
+    for _bid, _label, c, r, col in RESERVED:
+        disc(img, w, h, to_px, c, r, col)
+    for jx, jz, jr in JUNCTIONS:
+        disc(img, w, h, to_px, (jx, jz), jr, (90, 86, 78))
     for water in WATERS:
         if water[1] == "disc":
             disc(img, w, h, to_px, water[2], water[3], (70, 140, 170))
@@ -477,6 +492,8 @@ def render(path: str) -> None:
         ((10, -720), "GLOAM"),
         ((930, -50), "FERRY"),
         ((680, 280), "LUMEN"),
+        ((-760, -700), "BAYOU"),
+        ((590, -790), "MESA"),
         ((-700, 180), "LAKE"),
         ((100, -220), "POND"),
         ((220, 640), "TUNNEL"),
@@ -497,6 +514,8 @@ def render(path: str) -> None:
         "ORE FURNACE PAD",
         "DOCK AND FERRY",
         "LUMEN ISLES",
+        "BAYOU SUNK FLAT",
+        "RED MESA FLAT",
         "SKIRT PAST EDGE",
     ]
     lx = map_w + 16

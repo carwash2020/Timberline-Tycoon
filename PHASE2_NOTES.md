@@ -2,7 +2,9 @@
 
 ## V1 map remake (Lane B, 8 October 2026)
 
-The plan is `MAP_V1.md`. The labelled top-down picture is `previews/v1-b/00-overview.png`. The sell station stays at the sawmill plus (53, 1), middle (53, 111); trucks still back straight north off MainStreet. The ground is not in this commit yet. When it is, Studio checks are: zoom fully out and tilt into the ground at town, a pad, a road, the shore, the bridge, a cave and an isle (no underside); drive the Logging Rig through the tunnel both ways, day and night; walk the mine's upper tier with no rubble removed. The game keeps the default FallenPartsDestroyHeight. After the new map is published, restart every server.
+The plan is `MAP_V1.md`. The labelled top-down picture is `previews/v1-b/00-overview.png`. The sell station stays at the sawmill plus (53, 1), middle (53, 111); trucks still back straight north off MainStreet. Bayou is reserved at (−760, −700), radius 140, a flat basin sunk 7 studs, reached by BayouRoad. Red Mesa is reserved at (590, −790), radius 115, flat at the base height, reached by MesaRoad. Each road ends in a 32-radius junction and a signpost. Lane R fills both after this merges. The Lanternwood grotto was not moved: it stays at (−240, −420), about 416 studs from the Bayou edge. After the new map is published, restart every server.
+
+Studio checks: zoom fully out and tilt into the ground at town, a pad, a road, the shore, the bridge, a cave and an isle (no underside); drive the Logging Rig through the tunnel both ways, day and night; walk the mine's upper tier with no rubble removed; drive BayouRoad onto the flat basin and MesaRoad onto the flat mesa, and read both signposts. The game keeps the default FallenPartsDestroyHeight.
 
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).

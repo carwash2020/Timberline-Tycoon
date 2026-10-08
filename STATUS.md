@@ -8,6 +8,8 @@ Playable square goes from 3000×3000 to 2000×2000 (`WorldHalf` 1000). Area 9,00
 
 The picture shows the 28-wide ring, four town links, the hills cross-link, the truck tunnel, the mine mouth (MINE), three hidden mouths (H), five secrets (?), the ore furnace pad and the dock. The sell station (SELL) stays at the sawmill plus (53, 1): pad and zone middle (53, 111). Trucks back straight north off MainStreet into that lane. Lane C's furnace art uses this same zone. The ore pad at (48, −110) is Lane M's, not the sell station. Region, pad and secret coordinates are in `MAP_V1.md`.
 
+Bayou (−760, −700, radius 140) is a flat basin sunk 7 studs. Red Mesa (590, −790, radius 115) is flat at the base height. BayouRoad and MesaRoad are 28 wide and each end in a 32-radius junction with a signpost. Lane R fills both later: trees, scatter and the unique items are hooks only (`WorldPlan` anchors, including one `UniqueItemSpawn` each and the leaderboard at (−50, 0, 92) facing south). The Lanternwood grotto stays at (−240, −420); it is about 416 studs from the Bayou edge.
+
 NPC stand spots, weather zones and critter zones (for Lanes E and G; the live modules still have the old numbers until those lanes read these):
 
 | Who | Position | Yaw (degrees, 0 faces −Z) |
@@ -47,7 +49,11 @@ Weather and critter zones (same discs Lane G should read from `ScatterZones` onc
 
 Preview paths so far:
 
-- `previews/v1-b/00-overview.png`
+- `previews/v1-b/00-overview.png` (top-down, Bayou and Red Mesa labelled)
+- `previews/v1-b/bayou-top.png`
+- `previews/v1-b/bayou-three-quarter.png`
+- `previews/v1-b/mesa-top.png`
+- `previews/v1-b/mesa-three-quarter.png`
 
 Last updated 8 October 2026 (saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.

@@ -119,7 +119,7 @@ return function(t)
 
 	t.test("the Snowfields award that area badge on the first visit", function()
 		local s = setup()
-		stand(s.player, 0, 30, 1240)
+		stand(s.player, 0, 30, 720)
 		s.BadgeService.Poll(s.player)
 		t.eq(s.profile.badgesAwarded.AreaSnow, true)
 		t.eq(s.profile.areasVisited.snow, true)

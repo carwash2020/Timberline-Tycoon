@@ -38,7 +38,9 @@ PlotData.DeliveryWidth = 16 -- studs back from the road edge into the yard
 PlotData.DeliveryLength = 80 -- along that edge: a Logging Rig plus a Heavy Hauler
 PlotData.MinSpacing = 248
 PlotData.NearHaul = 500 -- the homes listed first sit inside this of the sawmill
-PlotData.GroveReach = 640
+-- Disc edge of the nearest starter, hills or grove. Ash Gate sits off the
+-- volcano so its yard stays clear of that disc; the starter edge is 935 away.
+PlotData.GroveReach = 940
 -- Everyone online, plus two spare pads.
 PlotData.Count = GameConfig.MaxPlayers + 2
 
@@ -46,28 +48,27 @@ PlotData.Count = GameConfig.MaxPlayers + 2
 -- gondola and the haul roads. Shelves stay 48 studs apart on the wider
 -- axis (MinSpacing minus Pad). Each is within GroveReach of a grove.
 -- The first four are the opening offer. After that, nearest the sawmill.
+-- Centres from MAP_V1.md. The first four are the opener. From the fifth,
+-- nearer the sawmill comes first. East Meadow stays east of the lot.
 PlotData.Homes = {
-	{ id = "birch", name = "Birch Side", region = "Starter Forest", x = 0, z = -350 },
-	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -360, z = -160 },
-	-- South of East Meadow, and far enough west that the two shelves
-	-- don't meet. About (230, -350); a little further so the gap holds.
-	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 248, z = -380 },
-	-- 65 studs north of its first spot (z 290 to 345), so the blend clears the
-	-- showroom lawn's north edge (z 166, the hall is 64 deep) by more than 10
-	-- studs: PlotLogic.spec asks 66 between a shelf's blend and a reserved box.
-	{ id = "climb", name = "The Climb", region = "the north road", x = 330, z = 345 },
-	{ id = "north", name = "North Bend", region = "the north road", x = -190, z = 530 },
-	-- East of the display lot (x 178-340). The shelf and its blend stay
-	-- south of the lot and the path from the showroom.
-	{ id = "mill", name = "East Meadow", region = "east of town", x = 450, z = -130 },
-	{ id = "meadow", name = "North Meadow", region = "the north road", x = 130, z = 680 },
-	{ id = "west", name = "West Shelf", region = "west country", x = -250, z = -420 },
-	{ id = "pine", name = "Pine Bend", region = "The Hills", x = -580, z = 380 },
-	{ id = "east", name = "East Field", region = "east country", x = 698, z = 100 },
-	{ id = "ridge", name = "Lower Ridge", region = "south country", x = 520, z = -430 },
-	{ id = "high", name = "High Meadow", region = "the north road", x = -460, z = 720 },
-	{ id = "ash", name = "Ash Gate", region = "the east road", x = 720, z = -180 },
-	{ id = "long", name = "Long Meadow", region = "south country", x = 200, z = -650 },
+	{ id = "birch", name = "Birch Side", region = "Starter Forest", x = -118, z = -120 },
+	{ id = "orchard", name = "Orchard Edge", region = "Starter Forest", x = -340.8, z = -260.8 },
+	{ id = "oak", name = "Oak Side", region = "Starter Forest", x = 118, z = -300 },
+	{ id = "climb", name = "The Climb", region = "The Hills", x = -718, z = 80 },
+	-- North Bend sits south of the snow disc: a 200-stud yard on the peak
+	-- would cover the toll gorge. Ash Gate and High Meadow sit off the
+	-- volcano disc for the same reason. Order from the fifth is still
+	-- nearer the sawmill first.
+	{ id = "north", name = "North Bend", region = "the north road", x = 118, z = 500 },
+	{ id = "high", name = "High Meadow", region = "the north road", x = 560, z = 250 },
+	{ id = "west", name = "West Shelf", region = "west country", x = -359, z = 701.8 },
+	{ id = "pine", name = "Pine Bend", region = "The Hills", x = -621.8, z = 439 },
+	{ id = "mill", name = "East Meadow", region = "east of town", x = 710, z = -10 },
+	{ id = "long", name = "Long Meadow", region = "south country", x = -621.8, z = -279 },
+	{ id = "ridge", name = "Lower Ridge", region = "south country", x = -359, z = -541.8 },
+	{ id = "meadow", name = "North Meadow", region = "the north road", x = 359, z = -541.8 },
+	{ id = "ash", name = "Ash Gate", region = "the east road", x = 676, z = 604 },
+	{ id = "east", name = "East Field", region = "east country", x = -208, z = -760 },
 } :: { Home }
 
 PlotData.Slots = {} :: { Vector2 }

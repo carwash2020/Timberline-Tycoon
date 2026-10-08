@@ -57,6 +57,8 @@ Wood counts stay as they are today (Frostwood 70, Emberwood 60, Phantomwood 22, 
 | Gloam ravine | (10, −720) | 80 | Phantomwood | 72 wide, 48 deep, one 28-wide road to the floor. Night plus the Lantern |
 | Ferry isle | (930, −50) | 55 | palms | dock (860, 160), east coast at x 780 |
 | Lumen isles | (680, 280) | 100, floor y 650 | Lumenwood | 216 studs from the dock (inside 400). Gondola from town |
+| Bayou | (−760, −700) | 140 | none yet | flat basin sunk 7 studs. Lane R fills it |
+| Red Mesa | (590, −790) | 115 | none yet | flat at the base height. Lane R fills it |
 
 Respawns stay on the pads. No pad sits in the snow disc or the volcano disc.
 
@@ -74,6 +76,8 @@ All of these are 28 wide except the plot spurs, which stay 22.
 - EastLink (140, 80) → (600, 80)
 - DockRoad (600, 80) → (860, 160)
 - RavineRoad (0, −520) → (−90, −560) → (−90, −780)
+- BayouRoad (−424, −344) → (−692, −612), from the ring vertex at −135 degrees. Ends in a 32-radius junction
+- MesaRoad (424, −344) → (540, −470) → (585, −700), from the ring vertex at −45 degrees. Ends in a 32-radius junction
 
 Town streets inside the flat zone (x −125 to 140, z −32 to 205) are dressed 22 wide with curbs and a boardwalk when that step lands. Junctions where a link meets the ring get a circle of radius 32.
 
@@ -173,6 +177,30 @@ The ravine's real reward is 2 Sky Shards once A2's grant exists. Explorer badge 
 `WorldPlan` exposes the NPC stand spots, weather zones and critter zones so Lane E and Lane G stop hardcoding coordinates. The table is also in STATUS.md.
 
 `SecretLogic.Count(profile)` is the field-guide fraction (found, 5) for Lane E.
+
+## Bayou and Red Mesa
+
+Reserved for Lane R. This lane lays the ground, the roads and the anchors. No trees, scatter or unique items.
+
+Bayou centre (−760, −700), radius 140. The basin is flat and sunk 7 studs (inside the 6–8 band) under the broad ground at its centre. BayouRoad is 28 wide, from the ring vertex (−424, −344) to (−692, −612), and ends in a junction of radius 32 with a signpost reading BAYOU.
+
+Red Mesa centre (590, −790), radius 115. The disc is flattened to the base height, not sunk. MesaRoad is 28 wide, (424, −344) → (540, −470) → (585, −700), and ends in a junction of radius 32 with a signpost reading RED MESA.
+
+Anchors on `WorldPlan` (Lane R reads these):
+
+| Anchor | Where |
+|---|---|
+| BayouCentre | (−760, −700), radius 140 |
+| MesaCentre | (590, −790), radius 115 |
+| MudZones | (−820, −640) r20, (−680, −760) r22, (−740, −640) r18, (−700, −800) r22 |
+| BaitShackSpot | (−720, −660) |
+| BayouLogLanding | (−800, −700), 40 × 30 |
+| SlabNodes | 8 points on the mesa's north rim, 8 studs in from the edge |
+| MesaTruckLot | (620, −770), 40 × 30 |
+| UniqueItemSpawn | one in the Bayou at (−780, −780), one on the mesa at (590, −860) |
+| LeaderboardBoard | CFrame (−50, 0, 92), facing south onto MainStreet, between GondolaPath x −37.5 and ToolShedFloor x −62 |
+
+Resource regions (a wood biome, or one of these two) are at least 500 studs apart centre to centre. A pair under 700 keeps 70 trees or fewer combined. Bayou and Red Mesa have 0 trees, so they pass. The Lanternwood grotto stays at (−240, −420): its nearest corner is about 416 studs from the Bayou edge, past the 100-stud gap, so it was not moved.
 
 ## Not in this plan
 

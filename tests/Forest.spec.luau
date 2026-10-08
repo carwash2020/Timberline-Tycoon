@@ -612,13 +612,13 @@ return function(t)
 	t.test("FOR-02: budgets: filler, tufts and stand-ins in view under 6,000 parts on low, 14,000 on high", function()
 		local spots = {
 			{ "the spawn", WorldPlan.SpawnEye() },
-			{ "the Starter Forest", t.roblox.Vector3.new(0, 8, -110) },
-			{ "the Hills", t.roblox.Vector3.new(-420, 40, 110) },
-			{ "the Snowfields", t.roblox.Vector3.new(0, 45, 1240) },
-			{ "the Phantom Grove", t.roblox.Vector3.new(-565, 4, -455) },
+			{ "the Starter Forest", t.roblox.Vector3.new(0, 8, -180) },
+			{ "the Hills", t.roblox.Vector3.new(-500, 40, 110) },
+			{ "the Snowfields", t.roblox.Vector3.new(80, 45, 760) },
+			{ "the Phantom Grove", t.roblox.Vector3.new(10, 4, -720) },
 			{ "deep in the south forest", t.roblox.Vector3.new(800, 8, -600) },
 			{ "on the Snow Road in the forest", t.roblox.Vector3.new(30, 8, 450) },
-			{ "on the isles", t.roblox.Vector3.new(-1050, 706, 1050) },
+			{ "on the isles", t.roblox.Vector3.new(680, 706, 280) },
 		}
 		local most = { low = 0, high = 0 }
 		for _, tier in ipairs({ "low", "high" }) do
@@ -672,7 +672,7 @@ return function(t)
 			end
 		end
 		-- From the isles the ground is all far: stand-ins only.
-		for _, mode in pairs(WorldPlan.FillerPlanAround(-1050, 706, 1050, budget.FillerNear, budget.FillerFar)) do
+		for _, mode in pairs(WorldPlan.FillerPlanAround(680, 706, 280, budget.FillerNear, budget.FillerFar)) do
 			t.eq(mode, "far")
 		end
 	end)

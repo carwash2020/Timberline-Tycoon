@@ -15,11 +15,12 @@
 -- Pure. WorldPlan, the filler and BiomeService read it.
 
 local BiomeData = require(script.Parent.BiomeData)
+local UndergroundData = require(script.Parent.World.UndergroundData)
 local WorldLayout = require(script.Parent.World.WorldLayout)
 
 local RegionLogic = {}
 
-export type Shape = "plains" | "hills" | "plateau" | "cone" | "hollow" | "beach" | "banks" | "sky"
+export type Shape = "plains" | "hills" | "plateau" | "cone" | "hollow" | "beach" | "banks" | "sky" | "underground"
 
 export type RegionDef = {
 	id: string,
@@ -208,6 +209,16 @@ local function buildRegions(): { RegionDef }
 			bleed = {},
 			exclusive = "lumenwood",
 		},
+		{
+			id = "underground",
+			displayName = "Underground",
+			blurb = "caves under the map · the mine and the grotto",
+			shape = "underground",
+			palette = "slate",
+			species = { "dead" },
+			bleed = {},
+			hidden = true,
+		},
 	}
 	return regions
 end
@@ -388,6 +399,9 @@ end
 -- The named place at (x, z), or nil out in the open country between them.
 -- `y` matters for the isles: the ground under them is not the sky.
 function RegionLogic.At(x: number, z: number, y: number?): Here?
+	if y ~= nil and UndergroundData.CaveAt(x, z, y) then
+		return hereFrom(BY_ID.underground, nil)
+	end
 	local region = discAt(x, z, y)
 	if not region and inStrand(x, z) then
 		region = BY_ID.strand

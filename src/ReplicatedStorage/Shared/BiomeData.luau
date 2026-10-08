@@ -52,9 +52,11 @@ export type Rules = {
 
 -- Ferry Island. The disc matches WorldLayout.Island; this module does not
 -- require WorldLayout (that require would cycle). A spec locks the two.
-BiomeData.FerryCenterX = 1395
-BiomeData.FerryCenterZ = -760
-BiomeData.FerryRadius = 70
+-- Centres are the V1 ring map (MAP_V1.md). haulStuds and FerryHaulStuds
+-- stay until the road lengths are measured after A1 merges.
+BiomeData.FerryCenterX = 930
+BiomeData.FerryCenterZ = -50
+BiomeData.FerryRadius = 55
 BiomeData.FerryHaulStuds = 1644 -- sawmill (0, 110) is about 1644 studs away
 BiomeData.PalmCount = 30
 BiomeData.LanternwoodCount = 6
@@ -66,7 +68,7 @@ local biomes: { BiomeDef } = {
 		displayName = "Starter Forest",
 		access = "truck",
 		haulStuds = 190,
-		area = { x = 0, z = -110, radius = 90 }, -- south of spawn
+		area = { x = 0, z = -180, radius = 100 }, -- south of spawn
 		ground = { color = "#64B838", material = "Grass" },
 		trees = { oak = 70, birch = 26 },
 	},
@@ -75,7 +77,7 @@ local biomes: { BiomeDef } = {
 		displayName = "The Hills",
 		access = "truck",
 		haulStuds = 400,
-		area = { x = -420, z = 110, radius = 170 }, -- west
+		area = { x = -500, z = 110, radius = 150 }, -- west
 		ground = { color = "#529E30", material = "LeafyGrass" },
 		trees = { pine = 80, maple = 50 },
 	},
@@ -85,7 +87,7 @@ local biomes: { BiomeDef } = {
 		access = "truck",
 		haulStuds = 1200,
 		slowdown = { amount = 0.15, removedBy = "InsulatedCoat" },
-		area = { x = 0, z = 1240, radius = 200 }, -- far north
+		area = { x = 0, z = 720, radius = 115 }, -- the peak, inside the ring
 		ground = { color = "#E8F0F5", material = "Snow" },
 		trees = { frostwood = 70 },
 	},
@@ -96,7 +98,7 @@ local biomes: { BiomeDef } = {
 		haulStuds = 1600,
 		requiresGear = "HeatBoots",
 		hazards = { "lava", "ash storms" },
-		area = { x = 1100, z = 1180, radius = 220 }, -- the far north-east corner
+		area = { x = 450, z = 500, radius = 125 }, -- north-east, past the tunnel
 		ground = { color = "#2B2522", material = "Basalt" },
 		trees = { emberwood = 60 },
 	},
@@ -125,7 +127,7 @@ local biomes: { BiomeDef } = {
 		haulStuds = 800,
 		requiresGear = "Lantern",
 		nightOnly = true,
-		area = { x = -565, z = -455, radius = 120 }, -- hidden south-west, no road
+		area = { x = 10, z = -720, radius = 80 }, -- the ravine, south of town
 		ground = { color = "#3B2E4F", material = "LeafyGrass" },
 		trees = { phantomwood = 22 },
 	},
@@ -143,7 +145,7 @@ local biomes: { BiomeDef } = {
 		-- gondola leaves from a station by the sawmill (the model counts the
 		-- Sky Bin as a short walk from it); a second station at the Skyroot's
 		-- foot is the way back up for anyone who falls.
-		area = { x = -1050, z = 1050, radius = 170, y = 650 },
+		area = { x = 680, z = 280, radius = 100, y = 650 },
 		trees = { lumenwood = 12 },
 		nodes = { SkyShard = 8 },
 	},

@@ -22,6 +22,7 @@
 
 local BiomeData = require(script.Parent.Parent.BiomeData)
 local WorldLayout = require(script.Parent.WorldLayout)
+local UndergroundData = require(script.Parent.UndergroundData)
 
 local TerrainGen = {}
 
@@ -212,8 +213,176 @@ local function rimLift(x: number, z: number): number
 	return lift
 end
 
+-- Lane R's reserved pads. The Bayou is a flat basin sunk `sink` studs
+-- (7, inside 6–8) below the broad ground on the road just outside the
+-- rim, which is the drop a truck drives. Red Mesa is the broad ground at
+-- its centre, flattened, with no sink. The rim eases back over 36 studs
+-- so the climb stays under 0.2. smoothstep's steepest slope is 1.5, so
+-- 7 studs needs more than 7/0.2 studs of run.
+local BAYOU_REGION = WorldLayout.Bayou
+local MESA_REGION = WorldLayout.RedMesa
+local RESERVE_BLEND = 80
+TerrainGen.ReserveBlend = RESERVE_BLEND
+
+local function outsideRoad(region: WorldLayout.ReservedRegion): (number, number)
+	local roadName = if region.id == "bayou" then "BayouRoad" else "MesaRoad"
+	local points: { Vector2 } = {}
+	for _, road in ipairs(WorldLayout.Roads) do
+		if road.name == roadName then
+			points = road.points
+		end
+	end
+	local a, b = points[1], points[#points]
+	local want = region.radius + RESERVE_BLEND + 8
+	local lo, hi = 0, 1
+	for _ = 1, 24 do
+		local mid = (lo + hi) / 2
+		local x = a.X + (b.X - a.X) * mid
+		local z = a.Y + (b.Y - a.Y) * mid
+		local d = sqrt((x - region.x) ^ 2 + (z - region.z) ^ 2)
+		if d > want then
+			lo = mid
+		else
+			hi = mid
+		end
+	end
+	return a.X + (b.X - a.X) * hi, a.Y + (b.Y - a.Y) * hi
+end
+
+local bayouApproachX, bayouApproachZ = outsideRoad(BAYOU_REGION)
+local bayouFloor = lowHeight(bayouApproachX, bayouApproachZ) - BAYOU_REGION.sink
+local mesaFloor = lowHeight(MESA_REGION.x, MESA_REGION.z) - MESA_REGION.sink
+
+local function applyReserve(
+	x: number,
+	z: number,
+	h: number,
+	cx: number,
+	cz: number,
+	radius: number,
+	floor: number
+): number
+	local dx, dz = x - cx, z - cz
+	local d = sqrt(dx * dx + dz * dz)
+	if d <= radius then
+		return floor
+	end
+	if d >= radius + RESERVE_BLEND then
+		return h
+	end
+	local w = smoothstep((d - radius) / RESERVE_BLEND)
+	return floor * (1 - w) + h * w
+end
+
 -- Features that override everything: the volcano cone, the grove hollow,
 -- mountains, coast, island.
+local TUNNEL_LINE = WorldLayout.FastLine(WorldLayout.TunnelPoints)
+local RAVINE_LINE: WorldLayout.FastLine = TUNNEL_LINE
+for _, road in ipairs(WorldLayout.Roads) do
+	if road.name == "RavineRoad" then
+		RAVINE_LINE = WorldLayout.FastLine(road.points)
+	end
+end
+
+-- Rock over the truck tunnel. The bore stays at least TunnelOverhead above
+-- the ceiling. Mouths (the first and last 40 studs) stay open, and both
+-- the mouth and the sides ease back over 280 studs so a road that crosses
+-- the ridge climbs under 20% instead of hitting a wall.
+local function tunnelRidge(x: number, z: number, h: number): number
+	local cap = WorldLayout.TunnelWidth / 2
+	local shoulder = 280
+	local reach = cap + shoulder
+	local d = WorldLayout.FastDistance(TUNNEL_LINE, x, z, reach)
+	if d >= reach then
+		return h
+	end
+	local pts = WorldLayout.TunnelPoints
+	local a, b = pts[1], pts[#pts]
+	local da = sqrt((x - a.X) ^ 2 + (z - a.Y) ^ 2)
+	local db = sqrt((x - b.X) ^ 2 + (z - b.Y) ^ 2)
+	-- The first and last 40 studs are open mouths. Past that the bore is
+	-- full height; only the sides ease down, so a crossing road can climb.
+	if math.min(da, db) < 40 then
+		return h
+	end
+	local roof = WorldLayout.TunnelFloorY + WorldLayout.TunnelHeight + WorldLayout.TunnelOverhead
+	local sideW = if d <= cap then 1 else 1 - smoothstep((d - cap) / shoulder)
+	if sideW <= 0 then
+		return h
+	end
+	return h * (1 - sideW) + math.max(h, roof) * sideW
+end
+
+local function ravineAlong(x: number, z: number): number
+	local pts = RAVINE_LINE.segs
+	local bestD, bestAlong, acc = 1e12, 0, 0
+	local total = 0
+	for i = 1, #pts, 4 do
+		local ax, az, bx, bz = pts[i], pts[i + 1], pts[i + 2], pts[i + 3]
+		local abx, abz = bx - ax, bz - az
+		local len = math.sqrt(abx * abx + abz * abz)
+		local len2 = len * len
+		local t = if len2 > 1e-6 then math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1) else 0
+		local dx, dz = x - (ax + abx * t), z - (az + abz * t)
+		local d2 = dx * dx + dz * dz
+		if d2 < bestD then
+			bestD = d2
+			bestAlong = acc + len * t
+		end
+		acc += len
+		total = acc
+	end
+	if total < 1 then
+		return 0
+	end
+	return math.clamp(bestAlong / total, 0, 1)
+end
+
+-- The Gloam ravine: 72 wide, 48 deep. The road down wins over the floor cut
+-- so a truck can grade into it (under 12 degrees on this length).
+local function ravineCut(x: number, z: number, h: number): number
+	local dx, dz = x - GROVE.x, z - GROVE.z
+	if dx * dx + dz * dz < 36 * 36 then
+		h = math.min(h, -48)
+	end
+	local half = 14
+	local shoulder = 28
+	local dRoad = WorldLayout.FastDistance(RAVINE_LINE, x, z, half + shoulder)
+	if dRoad < half + shoulder then
+		local along = ravineAlong(x, z)
+		local ramp = 6 + (-48 - 6) * along
+		-- The first stretch eases out of the ground the road arrives on,
+		-- so the south link doesn't fall off a step where the ravine starts.
+		local ease = smoothstep(clamp(along / 0.18, 0, 1))
+		ramp = h * (1 - ease) + ramp * ease
+		local w = if dRoad <= half then 1 else 1 - smoothstep((dRoad - half) / shoulder)
+		h = h * (1 - w) + ramp * w
+	end
+	return h
+end
+
+-- Rock over a covered cave. Mouths and the grotto skylight stay open.
+local function caveRoof(x: number, z: number, h: number): number
+	local mouth = UndergroundData.MineMouth
+	if (x - mouth.x) ^ 2 + (z - mouth.z) ^ 2 < 24 * 24 then
+		return h
+	end
+	for _, rubble in ipairs(UndergroundData.Rubble) do
+		if rubble.y > -8 and (x - rubble.x) ^ 2 + (z - rubble.z) ^ 2 < 22 * 22 then
+			return h
+		end
+	end
+	local grotto = UndergroundData.Cave("grotto")
+	for _, c in ipairs(UndergroundData.Caves) do
+		local covered = math.abs(x - c.x) <= c.sx / 2 and math.abs(z - c.z) <= c.sz / 2
+		local skylight = grotto ~= nil and c.id == grotto.id and (x - c.x) ^ 2 + (z - c.z) ^ 2 < 14 * 14
+		if covered and not skylight then
+			h = math.max(h, c.floorY + c.height + UndergroundData.CeilingRock)
+		end
+	end
+	return h
+end
+
 local function landmarks(x: number, z: number, h: number): number
 	-- Volcano cone with a crater.
 	local dx, dz = x - CONE.x, z - CONE.z
@@ -273,14 +442,27 @@ local function landmarks(x: number, z: number, h: number): number
 		end
 	end
 
-	-- The palm island offshore.
+	-- The palm island offshore. A solid disc, not a shell: the height is
+	-- the crown, and the crust under it (plus the sea bed) fills the bottom.
 	dx, dz = x - ISLAND.x, z - ISLAND.z
 	d = sqrt(dx * dx + dz * dz)
 	if d < ISLAND.radius then
 		local t = 1 - d / ISLAND.radius
 		h = math.max(h, -12 + (ISLAND.height + 12) * smoothstep(t * 1.6) + noise(x / 20, z / 20, 5.5) * 1.5 * t)
 	end
+
+	h = tunnelRidge(x, z, h)
+	h = ravineCut(x, z, h)
+	h = caveRoof(x, z, h)
+	h = applyReserve(x, z, h, BAYOU_REGION.x, BAYOU_REGION.z, BAYOU_REGION.radius, bayouFloor)
+	h = applyReserve(x, z, h, MESA_REGION.x, MESA_REGION.z, MESA_REGION.radius, mesaFloor)
 	return h
+end
+
+-- Roofs again, after a shelf or a blend has had its say. Idempotent: it
+-- only lifts, and mouths stay open.
+local function cover(x: number, z: number, h: number): number
+	return caveRoof(x, z, h)
 end
 
 -- Water channels: returns (bed height or nil, water surface or nil, how
@@ -291,6 +473,9 @@ local CHANNELS: { Channel } = {
 	{ line = WorldLayout.FastLine(OUTFLOW.points), width = OUTFLOW.width, depth = OUTFLOW.depth },
 }
 local POOLS = { LAKE, POND }
+for _, pool in ipairs(WorldLayout.Pools) do
+	table.insert(POOLS, pool)
+end
 
 local function water(x: number, z: number): (number?, number?, number)
 	local bestBed: number? = nil
@@ -480,7 +665,10 @@ local function groundHeight(x: number, z: number): (number, number?)
 	-- Building zones are perfectly flat. Town pulls to 0; a homestead
 	-- pulls to its shelf. A shelf's blend must not fill a pond or a river.
 	local flat, target = WorldLayout.FlatAt(x, z)
-	if flat > 0 and not (bed and surface) then
+	local coneDx, coneDz = x - CONE.x, z - CONE.z
+	local inCone = coneDx * coneDx + coneDz * coneDz < CONE.radius * CONE.radius
+	-- A yard's blend must not tip the lava pool or pave the cone.
+	if flat > 0 and not (bed and surface) and not inCone then
 		h = h * (1 - flat) + target * flat
 	end
 	return h, bed
@@ -702,40 +890,236 @@ local function tollChord(x: number, z: number): number?
 	return spurHeightAt(bestAlong)
 end
 
+-- Haul roads (not the homestead lanes, which spurChord already ramps) are
+-- held to a grade under 20%. Sampled from the shaped ground, then relaxed
+-- so a cliff the road crosses becomes a cut instead of a wall.
+local GRADE_CAP = 0.18
+type GradedRoad = {
+	xs: { number },
+	zs: { number },
+	hs: { number },
+	along: { number },
+	half: number,
+	minX: number,
+	maxX: number,
+	minZ: number,
+	maxZ: number,
+}
+local HAUL_GRADE: { GradedRoad } = {}
+local haulHeight: (number, number) -> number?
+
+local function buildHaulGrades()
+	for _, road in ipairs(WorldLayout.Roads) do
+		local pts = road.points
+		local xs: { number } = {}
+		local zs: { number } = {}
+		local hs: { number } = {}
+		local pinned: { [number]: boolean } = {}
+		local function push(x: number, z: number)
+			local n = #xs
+			if n > 0 and math.abs(xs[n] - x) < 1e-3 and math.abs(zs[n] - z) < 1e-3 then
+				return
+			end
+			table.insert(xs, x)
+			table.insert(zs, z)
+			-- A lane that ends on a haul road takes that road's height, and
+			-- the pin keeps the join from stepping off it.
+			local onHaul = if road.name == "PlotSpur" then haulHeight(x, z) else nil
+			local height = if onHaul then onHaul else groundHeight(x, z)
+			local bore = WorldLayout.TunnelWidth / 2
+			local td = WorldLayout.FastDistance(TUNNEL_LINE, x, z, bore + 20)
+			local pin = onHaul ~= nil
+			if td < bore + 20 then
+				local ends = WorldLayout.TunnelPoints
+				local a, b = ends[1], ends[#ends]
+				local da = sqrt((x - a.X) ^ 2 + (z - a.Y) ^ 2)
+				local db = sqrt((x - b.X) ^ 2 + (z - b.Y) ^ 2)
+				if da >= 40 and db >= 40 then
+					local roof = WorldLayout.TunnelFloorY + WorldLayout.TunnelHeight + WorldLayout.TunnelOverhead
+					if height < roof then
+						height = roof
+						pin = true
+					end
+				end
+			end
+			table.insert(hs, height)
+			if pin then
+				pinned[#hs] = true
+			end
+		end
+		for i = 1, #pts - 1 do
+			local a, b = pts[i], pts[i + 1]
+			local len = (b - a).Magnitude
+			local steps = math.max(1, math.ceil(len / 12))
+			for s = 0, steps - 1 do
+				local p = a:Lerp(b, s / steps)
+				push(p.X, p.Y)
+			end
+		end
+		push(pts[#pts].X, pts[#pts].Y)
+		local closed = (pts[1] - pts[#pts]).Magnitude < 1
+		local function segLen(i: number): number
+			local dx, dz = xs[i + 1] - xs[i], zs[i + 1] - zs[i]
+			return math.sqrt(dx * dx + dz * dz)
+		end
+		local function relax()
+			for i = 1, #hs - 1 do
+				if not pinned[i + 1] then
+					local cap = GRADE_CAP * segLen(i)
+					local delta = hs[i + 1] - hs[i]
+					if delta > cap then
+						hs[i + 1] = hs[i] + cap
+					elseif delta < -cap then
+						hs[i + 1] = hs[i] - cap
+					end
+				end
+			end
+			for i = #hs - 1, 1, -1 do
+				if not pinned[i] then
+					local cap = GRADE_CAP * segLen(i)
+					local delta = hs[i] - hs[i + 1]
+					if delta > cap then
+						hs[i] = hs[i + 1] + cap
+					elseif delta < -cap then
+						hs[i] = hs[i + 1] - cap
+					end
+				end
+			end
+		end
+		for _ = 1, 6 do
+			relax()
+			if closed and hs[1] ~= nil and hs[#hs] ~= nil then
+				local mid = (hs[1] + hs[#hs]) * 0.5
+				hs[1] = mid
+				hs[#hs] = mid
+			end
+		end
+		relax()
+		local along = { 0 }
+		local acc = 0
+		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+		for i = 1, #xs do
+			minX, maxX = math.min(minX, xs[i]), math.max(maxX, xs[i])
+			minZ, maxZ = math.min(minZ, zs[i]), math.max(maxZ, zs[i])
+			if i > 1 then
+				acc += segLen(i - 1)
+				along[i] = acc
+			end
+		end
+		table.insert(HAUL_GRADE, {
+			xs = xs,
+			zs = zs,
+			hs = hs,
+			along = along,
+			half = road.width / 2,
+			minX = minX,
+			maxX = maxX,
+			minZ = minZ,
+			maxZ = maxZ,
+		})
+	end
+end
+
+haulHeight = function(x: number, z: number): number?
+	local bestH: number? = nil
+	local bestD = math.huge
+	for _, g in ipairs(HAUL_GRADE) do
+		local half = g.half
+		if x < g.minX - half or x > g.maxX + half or z < g.minZ - half or z > g.maxZ + half then
+			continue
+		end
+		local dist = math.huge
+		local alongAt = 0
+		local xs, zs = g.xs, g.zs
+		for i = 1, #xs - 1 do
+			local ax, az, bx, bz = xs[i], zs[i], xs[i + 1], zs[i + 1]
+			local abx, abz = bx - ax, bz - az
+			local len2 = abx * abx + abz * abz
+			local len = math.sqrt(len2)
+			local t = if len2 > 1e-6 then math.clamp(((x - ax) * abx + (z - az) * abz) / len2, 0, 1) else 0
+			local dx, dz = x - (ax + abx * t), z - (az + abz * t)
+			local d2 = dx * dx + dz * dz
+			if d2 < dist then
+				dist = d2
+				alongAt = g.along[i] + len * t
+			end
+		end
+		if dist < half * half and dist < bestD then
+			bestD = dist
+			local hs, along = g.hs, g.along
+			local hAt = hs[#hs]
+			for i = 1, #along - 1 do
+				if alongAt <= along[i + 1] then
+					local span = along[i + 1] - along[i]
+					local u = if span > 1e-6 then (alongAt - along[i]) / span else 0
+					hAt = hs[i] + (hs[i + 1] - hs[i]) * u
+					break
+				end
+			end
+			bestH = hAt
+		end
+	end
+	return bestH
+end
+
+buildHaulGrades()
+
 -- Ground height at (x, z), in studs.
 function TerrainGen.HeightAt(x: number, z: number): number
 	-- Only past the square, and only inside the strip. The fingerprint
 	-- grid and every road sample stay on the old heights. The spur's
 	-- graded suffix is the one exception, and it misses those samples.
-	if z > WorldLayout.WorldHalf and WorldLayout.InNorthStrip(x, z) then
+	if WorldLayout.InNorthStrip(x, z) then
 		local shelf = stripShelf()
+		local graded = haulHeight(x, z)
+		if graded then
+			return cover(x, z, graded)
+		end
 		if WorldLayout.InGorge(x, z) then
-			return shelf - WorldLayout.GorgeDepth
+			return cover(x, z, shelf - WorldLayout.GorgeDepth)
 		end
 		local spur = tollChord(x, z)
 		if spur then
-			return spur
+			return cover(x, z, spur)
 		end
-		return shelf
+		return cover(x, z, shelf)
 	end
 	local h, bed = groundHeight(x, z) -- (its channel bed: water(x, z)'s first value)
-	if bed then
-		return h
+	local graded = haulHeight(x, z)
+	if graded then
+		h = graded
+		-- A graded road that clips the bore can land a hair under the roof.
+		-- Snap that dust back up so the 16 studs of rock stay put.
+		local bore = WorldLayout.TunnelWidth / 2
+		local td = WorldLayout.FastDistance(TUNNEL_LINE, x, z, bore)
+		if td < bore then
+			local ends = WorldLayout.TunnelPoints
+			local a, b = ends[1], ends[#ends]
+			local da = sqrt((x - a.X) ^ 2 + (z - a.Y) ^ 2)
+			local db = sqrt((x - b.X) ^ 2 + (z - b.Y) ^ 2)
+			local roof = WorldLayout.TunnelFloorY + WorldLayout.TunnelHeight + WorldLayout.TunnelOverhead
+			if da >= 40 and db >= 40 and h < roof then
+				h = roof
+			end
+		end
+	end
+	if bed and not graded then
+		return cover(x, z, h)
 	end
 	local toll = tollChord(x, z)
-	if toll then
-		return toll
+	if toll and not graded then
+		return cover(x, z, toll)
 	end
 	local chord = spurChord(x, z)
-	if chord then
-		return chord
+	if chord and not graded then
+		return cover(x, z, chord)
 	end
-	return h
+	return cover(x, z, h)
 end
 
 -- Water surface above (x, z), or nil if the column is dry.
 function TerrainGen.WaterLevelAt(x: number, z: number): number?
-	if z > WorldLayout.WorldHalf and WorldLayout.InNorthStrip(x, z) then
+	if WorldLayout.InNorthStrip(x, z) then
 		return nil
 	end
 	local h = TerrainGen.HeightAt(x, z)
@@ -883,6 +1267,15 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 	if x > lot.x0 and x < lot.x1 and z > lot.z0 and z < lot.z1 then
 		return TerrainGen.GravelMaterial
 	end
+	-- The cone stays lava and basalt where a yard's lawn reaches it.
+	local coneDx, coneDz = x - CONE.x, z - CONE.z
+	local dcone = sqrt(coneDx * coneDx + coneDz * coneDz)
+	if dcone < CONE.radius + 10 then
+		if dcone < CONE.crater then
+			return "CrackedLava"
+		end
+		return if slope > 0.6 then "Slate" else "Basalt"
+	end
 	-- The lawn round every homestead: plain Grass for PlotLawn studs past
 	-- the pad (its edge dithered), whatever the biome. Not on a cliff.
 	if slope <= 0.6 and WorldLayout.NearPlotPad(x, z, PLOT_LAWN + dither(x, z) * 6) then
@@ -900,16 +1293,6 @@ function TerrainGen.SurfaceMaterial(x: number, z: number, h: number, slope: numb
 				return if slope > 0.6 then "Slate" else "Basalt"
 			end
 		end
-	end
-
-	-- The volcano's cone: dark rock, a lava-filled crater (checked before
-	-- the mountains, so its peak never gets a snow cap).
-	local dcone = sqrt((x - CONE.x) ^ 2 + (z - CONE.z) ^ 2)
-	if dcone < CONE.radius + 10 then
-		if dcone < CONE.crater then
-			return "CrackedLava"
-		end
-		return if slope > 0.6 then "Slate" else "Basalt"
 	end
 
 	-- Mountains: rock, snow on the high north and west peaks.
@@ -1017,18 +1400,18 @@ end
 TerrainGen.MaterialColors = {
 	Grass = Color3.fromRGB(100, 184, 56),
 	LeafyGrass = Color3.fromRGB(82, 158, 48),
-	Ground = Color3.fromRGB(156, 94, 64),
-	Mud = Color3.fromRGB(64, 50, 72), -- the Gloam Hollow's violet floor
-	Sand = Color3.fromRGB(226, 205, 150),
-	Rock = Color3.fromRGB(128, 86, 64),
-	Snow = Color3.fromRGB(238, 244, 250),
-	Glacier = Color3.fromRGB(172, 214, 236),
-	Basalt = Color3.fromRGB(52, 46, 44),
-	Slate = Color3.fromRGB(74, 66, 62),
-	CrackedLava = Color3.fromRGB(255, 108, 30),
-	Cobblestone = Color3.fromRGB(170, 160, 146),
-	-- Every road, path and street (GravelMaterial): a light, neutral grey.
-	Asphalt = Color3.fromRGB(176, 176, 172),
+	Ground = Color3.fromRGB(142, 108, 74), -- #8E6C4A
+	Mud = Color3.fromRGB(90, 74, 62), -- #5A4A3E
+	Sand = Color3.fromRGB(216, 198, 154), -- #D8C69A
+	Rock = Color3.fromRGB(126, 118, 108), -- #7E766C
+	Snow = Color3.fromRGB(238, 243, 247), -- #EEF3F7
+	Glacier = Color3.fromRGB(169, 211, 230), -- #A9D3E6
+	Basalt = Color3.fromRGB(58, 52, 51), -- #3A3433
+	Slate = Color3.fromRGB(91, 86, 80), -- #5B5650
+	CrackedLava = Color3.fromRGB(255, 106, 30), -- #FF6A1E
+	Cobblestone = Color3.fromRGB(156, 149, 138), -- #9C958A
+	-- Every road, path and street (GravelMaterial).
+	Asphalt = Color3.fromRGB(168, 164, 156), -- #A8A49C
 } :: { [string]: Color3 }
 
 -- What lies under a surface material (cliff faces, the voxels below).

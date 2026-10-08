@@ -129,10 +129,10 @@ return function(t)
 	t.test("strike points: near the player, on the ground, never in town or the plots", function()
 		local WeatherService = setup()
 		local spots = {
-			Vector3.new(0, 1, -110), -- Starter Forest, right by town
+			Vector3.new(0, 1, -180), -- Starter Forest
 			Vector3.new(0, 1, 60), -- in town
-			Vector3.new(-420, 10, 110), -- the Hills
-			Vector3.new(0, 30, 1240), -- the Snowfields
+			Vector3.new(-500, 10, 200), -- the Hills, off the road
+			Vector3.new(80, 30, 760), -- the Snowfields, off the north road
 		}
 		for _, near in ipairs(spots) do
 			local found = 0

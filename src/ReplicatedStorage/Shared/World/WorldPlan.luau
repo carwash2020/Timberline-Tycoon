@@ -16,6 +16,7 @@ local Kit = require(script.Parent.Parent.Art.Kit)
 local LandmarkArt = require(script.Parent.Parent.Art.LandmarkArt)
 local RegionLogic = require(script.Parent.Parent.RegionLogic)
 local TerrainGen = require(script.Parent.TerrainGen)
+local UndergroundData = require(script.Parent.UndergroundData)
 local WoodData = require(script.Parent.Parent.WoodData)
 local WorldLayout = require(script.Parent.WorldLayout)
 
@@ -932,8 +933,6 @@ local function ferrySites(): FerrySites
 		return cached
 	end
 	local island = WorldLayout.Island
-	local fx, fz = WorldLayout.FerryFacing()
-	local face = math.atan2(fx, fz)
 	local function yOf(x: number, z: number): number
 		return TerrainGen.HeightAt(x, z) - 0.3
 	end
@@ -942,24 +941,8 @@ local function ferrySites(): FerrySites
 		cx = island.x,
 		cz = island.z,
 		radius = island.radius - WorldLayout.FerryLandingInset,
-		cap = BiomeData.PalmCount + BiomeData.LanternwoodCount,
+		cap = BiomeData.PalmCount,
 	}
-	local lantern: { TreeSpot } = {}
-	local count = BiomeData.LanternwoodCount
-	local mid = (count + 1) / 2
-	local radius = WorldLayout.LanternwoodRadius
-	local gap = WorldLayout.TreeSpacing
-	for i = 1, count do
-		local angle = face + (i - mid) * WorldLayout.LanternwoodAngleStep
-		local x = island.x + math.sin(angle) * radius
-		local z = island.z + math.cos(angle) * radius
-		table.insert(lantern, {
-			woodId = "lanternwood",
-			position = Vector3.new(x, yOf(x, z), z),
-			biome = "ferryisle",
-			zone = zone,
-		})
-	end
 	local palms: { TreeSpot } = {}
 	local step = WorldLayout.PalmGridStep
 	local limit = WorldLayout.PalmMaxRadius
@@ -971,17 +954,7 @@ local function ferrySites(): FerrySites
 			local z = island.z + iz * step
 			local dx, dz = x - island.x, z - island.z
 			if dx * dx + dz * dz <= limit * limit and not WorldLayout.OnFerryPath(x, z) then
-				local clear = true
-				for _, tree in ipairs(lantern) do
-					local qx, qz = x - tree.position.X, z - tree.position.Z
-					if qx * qx + qz * qz < gap * gap then
-						clear = false
-						break
-					end
-				end
-				if clear then
-					table.insert(candidates, { x = x, z = z })
-				end
+				table.insert(candidates, { x = x, z = z })
 			end
 		end
 	end
@@ -1002,7 +975,7 @@ local function ferrySites(): FerrySites
 			zone = zone,
 		})
 	end
-	local made = { palms = palms, lantern = lantern }
+	local made = { palms = palms, lantern = {} }
 	cachedFerry = made
 	return made
 end
@@ -1011,8 +984,41 @@ function WorldPlan.FerryPalms(): { TreeSpot }
 	return ferrySites().palms
 end
 
+-- Six Lanternwood in the grotto. The chamber is 36 tall; the tallest tree
+-- is 28. The wood's row stays ferryisle (the badge and the economy).
+local cachedLantern: { TreeSpot }? = nil
 function WorldPlan.Lanternwood(): { TreeSpot }
-	return ferrySites().lantern
+	local cached = cachedLantern
+	if cached then
+		return cached
+	end
+	local cave = UndergroundData.Cave("grotto")
+	local spots: { TreeSpot } = {}
+	if cave then
+		local zone: TreeZone = {
+			id = "grotto",
+			cx = cave.x,
+			cz = cave.z,
+			radius = math.min(cave.sx, cave.sz) / 2,
+			cap = BiomeData.LanternwoodCount,
+		}
+		local count = BiomeData.LanternwoodCount
+		local cols = 3
+		for i = 1, count do
+			local col = (i - 1) % cols
+			local row = math.floor((i - 1) / cols)
+			local x = cave.x + (col - 1) * 10
+			local z = cave.z + (row - 0.5) * 12
+			table.insert(spots, {
+				woodId = "lanternwood",
+				position = Vector3.new(x, cave.floorY + 0.5, z),
+				biome = "ferryisle",
+				zone = zone,
+			})
+		end
+	end
+	cachedLantern = spots
+	return spots
 end
 
 -- The old palm list, now the thirty ferry palms (the preview still calls this).
@@ -1157,7 +1163,8 @@ local function sightOfLamp(): (Vector3, Vector3)
 	local radius = LandmarkArt.LIGHTHOUSE_RADIUS
 	local tips: { { x: number, z: number } } = {}
 	for z = 120, 460, 4 do
-		for x = 1050, 1400 do
+		local coast = WorldLayout.Coast
+		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
 				table.insert(tips, { x = x, z = z })
 				break
@@ -1899,7 +1906,17 @@ end
 
 function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 	local out: { Sign } = {}
-	local roadFor = { HillsRoad = "hills", SnowRoad = "snow", VolcanoRoad = "volcano", SkyrootRoad = "sky" }
+	local roadFor = {
+		HillsRoad = "hills",
+		SnowRoad = "snow",
+		VolcanoRoad = "volcano",
+		SkyrootRoad = "sky",
+		BayouRoad = "bayou",
+		MesaRoad = "redmesa",
+	}
+	-- Reserved regions are not biomes yet. The post names the place; Lane R
+	-- adds the woods later.
+	local reservedSign = { bayou = "BAYOU", redmesa = "RED MESA" }
 	-- `flat` (at y = 0) set down on the lower post's ground, and whether the
 	-- ground under its posts and middle is level within a stud.
 	local function setDown(flat: CFrame): (CFrame, boolean)
@@ -1920,12 +1937,19 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 			local side = Vector2.new(-dir.Y, dir.X)
 			local toward = Vector3.new(prev.X, 0, prev.Y)
 			local spot: CFrame? = nil
-			for back = 6, math.min(66, (last - prev).Magnitude - 6), 4 do
+			for back = 6, math.max(6, (last - prev).Magnitude - 6), 4 do
 				for _, s in ipairs({ 1, -1 }) do
-					local at = last - dir * back + side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 0.5))
-					local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), toward))
-					if level then
-						spot = cf
+					for extra = 0, 18, 6 do
+						local at = last
+							- dir * back
+							+ side * (s * (road.width / 2 + SIGN_POST + SIGN_CLEAR + 0.5 + extra))
+						local cf, level = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), toward))
+						if level then
+							spot = cf
+							break
+						end
+					end
+					if spot then
 						break
 					end
 				end
@@ -1938,7 +1962,8 @@ function WorldPlan.RoadSigns(text: (biomeId: string) -> string): { Sign }
 				local roadSide = Vector3.new(at.X - side.X, 0, at.Y - side.Y) -- its face toward the road
 				spot = setDown(CFrame.lookAt(Vector3.new(at.X, 0, at.Y), roadSide))
 			end
-			table.insert(out, { text = text(biomeId), cframe = spot :: CFrame })
+			local label = reservedSign[biomeId]
+			table.insert(out, { text = if label then label else text(biomeId), cframe = spot :: CFrame })
 		end
 	end
 	return out
@@ -4071,7 +4096,8 @@ function WorldPlan.Lighthouse(): Lighthouse?
 	type Tip = { x: number, z: number }
 	local tips: { Tip } = {}
 	for z = LIGHTHOUSE_Z[1], LIGHTHOUSE_Z[2], 4 do
-		for x = 1050, 1400, 1 do
+		local coast = WorldLayout.Coast
+		for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt, 1 do
 			if TerrainGen.WaterLevelAt(x, z) ~= nil then
 				table.insert(tips, { x = x, z = z })
 				break
@@ -4708,6 +4734,10 @@ end
 -- third value is whether a species stand may replace the mix (forest and
 -- copses; the hub's lone ornament trees keep their own mix).
 local function fillerDensity(x: number, z: number, roadClearance: number): (number, Mix, boolean)
+	-- Bayou and Red Mesa stay empty until Lane R fills them.
+	if WorldLayout.InReservedRegion(x, z) then
+		return 0, ORNAMENT_MIX, false
+	end
 	local density = WorldPlan.FillerDensity
 	local c, ring = WorldLayout.ForestCover(x, z)
 	if c > 0.5 then
@@ -5083,6 +5113,96 @@ function WorldPlan.FillerPlanAround(
 				out[key] = "near"
 			elseif d <= far or (was == "far" and d <= far + hyst) then
 				out[key] = "far"
+			end
+		end
+	end
+	return out
+end
+
+---------------------------------------------------------------------------
+-- Reserved regions (Lane R fills them). Anchors only: no trees, no props.
+---------------------------------------------------------------------------
+
+export type DiscAnchor = { id: string, x: number, z: number, radius: number }
+export type BoxAnchor = { id: string, x: number, z: number, sx: number, sz: number }
+export type PointAnchor = { id: string, x: number, z: number }
+export type ResourceRegion = { id: string, x: number, z: number, trees: number }
+
+local bayou = WorldLayout.Bayou
+local mesa = WorldLayout.RedMesa
+
+WorldPlan.BayouCentre = { id = bayou.id, x = bayou.x, z = bayou.z, radius = bayou.radius } :: DiscAnchor
+WorldPlan.MesaCentre = { id = mesa.id, x = mesa.x, z = mesa.z, radius = mesa.radius } :: DiscAnchor
+
+-- Four mud patches inside the basin, off BayouRoad, each radius 18–30.
+WorldPlan.MudZones = {
+	{ id = "mud-1", x = -820, z = -640, radius = 20 },
+	{ id = "mud-2", x = -680, z = -760, radius = 22 },
+	{ id = "mud-3", x = -740, z = -640, radius = 18 },
+	{ id = "mud-4", x = -700, z = -800, radius = 22 },
+} :: { DiscAnchor }
+
+WorldPlan.BaitShackSpot = { id = "bait-shack", x = -720, z = -660 } :: PointAnchor
+-- A 40 by 30 log landing on the flat basin.
+WorldPlan.BayouLogLanding = { id = "bayou-landing", x = -800, z = -700, sx = 40, sz = 30 } :: BoxAnchor
+
+-- Eight ore slabs along the mesa's north rim, 8 studs in from the edge.
+local slabNodes: { PointAnchor } = {}
+local slabDx = { -70, -50, -30, -10, 10, 30, 50, 70 }
+for i, dx in ipairs(slabDx) do
+	local inset = math.sqrt(mesa.radius * mesa.radius - dx * dx) - 8
+	table.insert(slabNodes, { id = "slab-" .. tostring(i), x = mesa.x + dx, z = mesa.z + inset })
+end
+WorldPlan.SlabNodes = slabNodes
+
+-- A 40 by 30 truck lot on the mesa, south of the junction circle.
+WorldPlan.MesaTruckLot = { id = "mesa-lot", x = 620, z = -770, sx = 40, sz = 30 } :: BoxAnchor
+
+-- One empty spawn hook per region. Lane R puts the unique item here.
+WorldPlan.UniqueItemSpawns = {
+	{ id = "bayou", x = -780, z = -780 },
+	{ id = "redmesa", x = 590, z = -860 },
+} :: { PointAnchor }
+
+-- Faces south (-Z) onto MainStreet. Between GondolaPath (x -37.5) and
+-- ToolShedFloor (x -62).
+WorldPlan.LeaderboardBoard = CFrame.new(-50, 0, 92)
+
+-- Biome discs that grow a wood, plus the two reserved regions (0 trees
+-- until Lane R). Centre to centre must be at least 500. A pair under 700
+-- keeps 70 trees or fewer between them.
+function WorldPlan.ResourceRegions(): { ResourceRegion }
+	local out: { ResourceRegion } = {}
+	for _, biome in ipairs(BiomeData.All()) do
+		local area = biome.area
+		local trees = biome.trees
+		if area and trees then
+			local count = 0
+			for _, n in pairs(trees) do
+				count += n
+			end
+			table.insert(out, { id = biome.id, x = area.x, z = area.z, trees = count })
+		end
+	end
+	table.insert(out, { id = bayou.id, x = bayou.x, z = bayou.z, trees = 0 })
+	table.insert(out, { id = mesa.id, x = mesa.x, z = mesa.z, trees = 0 })
+	return out
+end
+
+function WorldPlan.SpacingViolations(): { string }
+	local regions = WorldPlan.ResourceRegions()
+	local out: { string } = {}
+	for i = 1, #regions do
+		for j = i + 1, #regions do
+			local a, b = regions[i], regions[j]
+			local d = math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2)
+			if d < 500 then
+				table.insert(out, string.format("%s and %s are %.0f apart", a.id, b.id, d))
+			elseif d < 700 and a.trees + b.trees > 70 then
+				table.insert(
+					out,
+					string.format("%s and %s are %.0f apart with %d trees", a.id, b.id, d, a.trees + b.trees)
+				)
 			end
 		end
 	end

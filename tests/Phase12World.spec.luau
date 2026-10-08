@@ -160,7 +160,7 @@ return function(t)
 		t.ok(string.find(blob, "GLOAM", 1, true), "a hollow gate")
 		t.eq(#WorldPlan.RoadSigns(function()
 			return ""
-		end), 4)
+		end), 6)
 	end)
 
 	t.test("brown boulders sit on the open grass, and the forest is wider but still a forest", function()

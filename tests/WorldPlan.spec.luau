@@ -22,6 +22,64 @@ return function(t)
 
 	local ROAD_MARGIN = 2 -- studs between a road's edge and anything in town that collides
 
+	t.test("resource regions stay 500 apart, and a pair under 700 keeps at most 70 trees", function()
+		-- Starter, hills, snow, volcano, grove and sky were planted before this
+		-- rule and already sit inside it. Bayou and Red Mesa must not add a
+		-- violation. The checker still reports the older pairs, so a stub
+		-- that returns nothing does not pass.
+		local legacy = {
+			starter = true,
+			hills = true,
+			snow = true,
+			volcano = true,
+			grove = true,
+			sky = true,
+		}
+		local violations = WorldPlan.SpacingViolations()
+		t.ok(#violations >= 1, "older forests that already break the rule are reported")
+		for _, violation in ipairs(violations) do
+			t.ok(not string.find(violation, "bayou", 1, true), violation)
+			t.ok(not string.find(violation, "redmesa", 1, true), violation)
+			local known = false
+			for id in pairs(legacy) do
+				if string.find(violation, id, 1, true) then
+					known = true
+				end
+			end
+			t.ok(known, violation)
+		end
+		local regions = WorldPlan.ResourceRegions()
+		local byId = {}
+		for _, region in ipairs(regions) do
+			byId[region.id] = region
+			t.ok(region.trees >= 0, region.id)
+		end
+		local bayou, redmesa = byId.bayou, byId.redmesa
+		t.ok(bayou ~= nil and redmesa ~= nil, "both reserved regions are resource regions")
+		t.eq(bayou.trees, 0)
+		t.eq(redmesa.trees, 0)
+		t.eq(bayou.x, -760)
+		t.eq(bayou.z, -700)
+		t.eq(redmesa.x, 590)
+		t.eq(redmesa.z, -790)
+		for _, region in ipairs(regions) do
+			if region.id ~= "bayou" then
+				local d = math.sqrt((region.x - bayou.x) ^ 2 + (region.z - bayou.z) ^ 2)
+				t.ok(d >= 500, string.format("bayou to %s is %.0f", region.id, d))
+				if d < 700 then
+					t.ok(region.trees + bayou.trees <= 70, region.id)
+				end
+			end
+			if region.id ~= "redmesa" then
+				local d = math.sqrt((region.x - redmesa.x) ^ 2 + (region.z - redmesa.z) ^ 2)
+				t.ok(d >= 500, string.format("redmesa to %s is %.0f", region.id, d))
+				if d < 700 then
+					t.ok(region.trees + redmesa.trees <= 70, region.id)
+				end
+			end
+		end
+	end)
+
 	local town = WorldPlan.Town()
 	local sky = WorldPlan.Sky()
 	local WorldLayout = t.load("ReplicatedStorage/Shared/World/WorldLayout")
@@ -1275,7 +1333,7 @@ return function(t)
 		local signs = WorldPlan.RoadSigns(function(id)
 			return id
 		end)
-		t.eq(#signs, 4)
+		t.eq(#signs, 6)
 		for _, sign in ipairs(signs) do
 			t.ok(sign.cframe.UpVector.Y > 0.9999, sign.text .. " stands upright")
 			local model = placed(BuildingArt.Signpost(sign.text), sign.cframe)
@@ -2941,7 +2999,8 @@ return function(t)
 			end
 			-- The headland: no water's edge further east along this stretch of coast.
 			local function edgeAt(z)
-				for x = 1050, 1400 do
+				local coast = WorldLayout.Coast
+				for x = coast.shoreX - coast.beachWidth, WorldLayout.WorldHalf + WorldLayout.TerrainSkirt do
 					if TerrainGen.WaterLevelAt(x, z) ~= nil then
 						return x
 					end
