@@ -2,8 +2,10 @@
 -- LogicPanelUI: the Set panel for a Delay, a Sustain or a Clock.
 -- Opens from that piece's Set prompt. Plus and minus step the saved
 -- number and fire LogicSet(uid, key, value) when that remote exists.
--- Mouse, touch and a gamepad all reach the same buttons. Gamepad keys
--- are bound only while the panel is open, and unbound on close. B closes.
+-- Mouse, touch and a gamepad all reach the same buttons. The stick moves
+-- between them and A presses. Left and Right on a keyboard step the value.
+-- The d-pad stays the HUD's. Keys are bound only while the panel is open,
+-- and unbound on close. B closes.
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -108,21 +110,12 @@ local function bindPad()
 		return Enum.ContextActionResult.Sink
 	end
 	local top = Enum.ContextActionPriority.High.Value + 120
-	ContextActionService:BindActionAtPriority(
-		"LogicMinus",
-		onAction,
-		false,
-		top,
-		Enum.KeyCode.DPadLeft,
-		Enum.KeyCode.Left,
-		Enum.KeyCode.Minus
-	)
+	ContextActionService:BindActionAtPriority("LogicMinus", onAction, false, top, Enum.KeyCode.Left, Enum.KeyCode.Minus)
 	ContextActionService:BindActionAtPriority(
 		"LogicPlus",
 		onAction,
 		false,
 		top,
-		Enum.KeyCode.DPadRight,
 		Enum.KeyCode.Right,
 		Enum.KeyCode.Equals
 	)
@@ -186,7 +179,7 @@ local function openFrom(prompt: ProximityPrompt)
 end
 
 function LogicPanelUI.Start()
-	local screen = UITheme.Screen("LogicPanel", 16)
+	local screen = UITheme.Screen("LogicPanel", UITheme.Layers.LogicPanel)
 	local panel = Instance.new("Frame")
 	panel.Name = "Card"
 	panel.AnchorPoint = Vector2.new(0.5, 0)

@@ -58,7 +58,7 @@ The settings panel sits at the top centre, clear of the thumbstick and the jump 
 4. **PC.** Wire three NOT gates in a ring. Each piece shows Overloaded. The server stays smooth.
 5. **PC.** Leave the server. Lamps and clocks stop. Rejoin: levers and settings match what you saved.
 6. **Phone emulator.** The wire tool: tap an output, tap an input. The settings panel: tap minus, plus and Done. Nothing sits on the thumbstick or the jump button. The first wiring session shows "Pick an output", then "Pick an input", then "Done: flip it", once.
-7. **Xbox.** Wire tool: RT picks, X cuts, B leaves. Settings panel: d-pad changes the number, B closes. After both are closed, chopping with RT still swings the axe.
+7. **Xbox.** Wire tool: RT picks, X cuts, B leaves. Settings panel: the stick moves between minus and plus, A presses, B closes. The d-pad is not used (it stays the HUD shortcuts). After both are closed, chopping with RT still swings the axe.
 8. **Demo board.** If Sparkworks has a part named DemoBoard, a lever feeds an AND, a clock feeds a lamp, and a plate feeds a hatch, with no save. If the building is not in the world, nothing errors.
 
 ## V1 economy core (8 October 2026, branch `phase-2/v1-a1-economy-core`)
