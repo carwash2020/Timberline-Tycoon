@@ -11,6 +11,9 @@
 --     on its plot and when it was last saved, and LOAD, which asks you to
 --     confirm because the save you're playing is put away first. Restarting
 --     a save is not here: it is RESTART SAVE in Settings.
+--     UNLOAD BASE sits at the top of the panel (LT2 style): it saves the base
+--     with the save, takes it off the pad and frees the pad. While the base is
+--     unloaded the same button reads LOAD BASE and opens the free plot picker.
 -- The server still checks the cooldown and pulls wood out of the world
 -- before it swaps, so this screen can't duplicate cash or logs. Esc and B
 -- close the SAVES panel (never the join pick).
@@ -19,6 +22,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BaseLogic = require(ReplicatedStorage.Shared.BaseLogic)
 local InputKit = require(ReplicatedStorage.Shared.InputKit)
 local JoinPickLogic = require(ReplicatedStorage.Shared.JoinPickLogic)
 local PickerSequence = require(ReplicatedStorage.Shared.PickerSequence)
@@ -50,6 +54,7 @@ local picking = false -- the join pick is up (the server's SlotPick attribute)
 local sequence = PickerSequence.Shared()
 local setOpen: (boolean) -> ()
 local closeButton: GuiObject? = nil
+local baseButton: UITheme.Button? = nil
 
 local function send(action: string, index: number, extra: boolean | string)
 	Net.Remote("SlotAction"):FireServer(action, index, extra)
@@ -91,7 +96,36 @@ local function rowButton(parent: Instance, text: string, style: string, order: n
 	return button
 end
 
+-- UNLOAD BASE / LOAD BASE: which one, and whether it is cooling down.
+local function refreshBase()
+	local b = baseButton
+	if not b then
+		return
+	end
+	local hasPad = player:GetAttribute("PlotSlot") ~= nil
+	local saveHasPlot = false
+	for _, slot in ipairs(summaries) do
+		if slot.active then
+			saveHasPlot = slot.hasPlot == true
+		end
+	end
+	local kind = BaseLogic.ButtonFor(hasPad, saveHasPlot, picking)
+	b.root.Visible = kind ~= nil
+	if kind == nil then
+		return
+	end
+	local untilAt = player:GetAttribute("BaseCooldownUntil")
+	local cooling = kind == "unload" and type(untilAt) == "number" and os.time() < untilAt
+	b.face.Text = if cooling
+		then string.format("UNLOAD BASE (%ds)", math.ceil((untilAt :: number) - os.time()))
+		else BaseLogic.ButtonText(kind)
+	b.face.Active = not cooling
+	b.face.AutoButtonColor = not cooling
+	b.root:SetAttribute("Kind", kind)
+end
+
 local function fill()
+	refreshBase()
 	local holder = list
 	if not holder then
 		return
@@ -163,7 +197,7 @@ local function fill()
 		detail.Size = UDim2.new(1, -16, 0, 20)
 		detail.Position = UDim2.fromOffset(8, 52)
 		local saved = SaveSlotLogic.SavedText(slot.lastPlayed, now)
-		local plotText = JoinPickLogic.PlotText(slot.hasPlot == true, slot.pieces or 0, slot.packed or 0)
+		local plotText = JoinPickLogic.PlotText(slot.hasPlot == true, slot.pieces or 0)
 		if slot.fresh then
 			detail.Text = "Empty  ·  " .. saved
 		else
@@ -297,7 +331,7 @@ function SaveSlotUI.Start()
 	outer.Name = "Saves"
 	outer.AnchorPoint = Vector2.new(0.5, 0.5)
 	outer.Position = UDim2.fromScale(0.5, 0.5)
-	outer.Size = UDim2.fromOffset(360, 300)
+	outer.Size = UDim2.fromOffset(360, 360)
 	outer.BackgroundColor3 = C.Paper
 	outer.BorderSizePixel = 0
 	outer.Visible = false
@@ -339,12 +373,38 @@ function SaveSlotUI.Start()
 	note.Parent = outer
 	cooldownLabel = note
 
+	-- The base button: UNLOAD BASE while the base is on a pad, LOAD BASE while it waits.
+	local base = UITheme.Button({
+		name = "BaseButton",
+		text = "UNLOAD BASE",
+		size = Vector2.new(336, math.max(48, UITheme.Size.Tap)),
+		style = "bark",
+		textSize = 16,
+	})
+	base.root.Position = UDim2.fromOffset(12, 90)
+	base.root.Visible = false
+	base.root.Parent = outer
+	baseButton = base
+	base.face.Activated:Connect(function()
+		local kind = base.root:GetAttribute("Kind")
+		if kind == "unload" then
+			local untilAt = player:GetAttribute("BaseCooldownUntil")
+			if type(untilAt) == "number" and os.time() < untilAt then
+				return
+			end
+			showConfirm("unload", 0, BaseLogic.UnloadConfirm)
+		elseif kind == "load" then
+			Net.Remote("BaseAction"):FireServer("load")
+			setOpen(false)
+		end
+	end)
+
 	local rows = Instance.new("ScrollingFrame")
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
 	rows.BorderSizePixel = 0
-	rows.Position = UDim2.fromOffset(12, 88)
-	rows.Size = UDim2.new(1, -24, 1, -100)
+	rows.Position = UDim2.fromOffset(12, 144)
+	rows.Size = UDim2.new(1, -24, 1, -156)
 	rows.CanvasSize = UDim2.fromOffset(0, 0)
 	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	rows.ScrollBarThickness = 6
@@ -384,7 +444,9 @@ function SaveSlotUI.Start()
 	yes.face.ZIndex = 6
 	yes.face.Activated:Connect(function()
 		local want = pending
-		if want then
+		if want and want.action == "unload" then
+			Net.Remote("BaseAction"):FireServer("unload")
+		elseif want then
 			send(want.action, want.index, true)
 		end
 		hideConfirm()
@@ -425,6 +487,9 @@ function SaveSlotUI.Start()
 		end
 	end)
 	player:GetAttributeChangedSignal("SlotPick"):Connect(considerPick)
+	for _, attr in ipairs({ "PlotSlot", "BaseCooldownUntil" }) do
+		player:GetAttributeChangedSignal(attr):Connect(refreshBase)
+	end
 
 	Net.Remote("SlotState").OnClientEvent:Connect(function(payload: unknown)
 		if type(payload) ~= "table" then

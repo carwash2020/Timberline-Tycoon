@@ -716,22 +716,7 @@ safely("SaveSlotService.Init", SaveSlotService.Init, remote.SlotAction, remote.S
 		return PlotService.HasPad(player)
 	end,
 })
--- Old Hank's Yes / No offers and the base hand-over (pack, bring out) reach
--- the other services through these.
-PlotService.Ask = function(player: Player, text: string, offerId: string)
-	remote.Dialogue:FireClient(player, {
-		line = "hank",
-		text = text,
-		speaker = PlotSalesmanData.Id,
-		choice = true,
-		noLabel = "Not now",
-		offerId = offerId,
-	})
-	NPCTalkService.BeginById(player, PlotSalesmanData.Id)
-end
-DialogueService.HankPick = function(player: Player, which: unknown, offerId: unknown)
-	PlotService.HankPick(player, which, offerId)
-end
+-- Unloading a base (PlotService.BaseAction) reaches the other services through these.
 PlotService.Hooks.commit = function(player: Player)
 	commitSlot(player)
 end
@@ -763,7 +748,6 @@ safely("PlotService.Init", PlotService.Init, mapFolder, {
 	PlotPass = remote.PlotPass,
 	PlotShown = remote.PlotShown,
 	BaseAction = remote.BaseAction,
-	BaseState = remote.BaseState,
 	VisitPlot = remote.VisitPlot,
 }, notify, { gates = LoadState.Gates })
 -- The pads, the Land Office counter and the plot picker's data exist now (or

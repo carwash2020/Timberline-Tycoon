@@ -84,12 +84,9 @@ local UNDO_SECONDS = 60 -- selling something this soon after placing it refunds 
 PlotService.UndoSeconds = UNDO_SECONDS
 -- GameServer sets this: Old Hank's replies as the dialogue box (else a toast).
 PlotService.Speak = nil :: ((Player, string) -> ())?
--- GameServer sets this: a Yes / No question from Old Hank in the dialogue box
--- (text, offer id). Without it (the specs) he only speaks.
-PlotService.Ask = nil :: ((Player, string, string) -> ())?
 -- GameServer wires the other services in (this file does not require them):
 --   commit   pull wood, the truck's load and carried logs into the save (the
---            slot swap's path), run before a base is packed or swapped;
+--            slot swap's path), run before a base is unloaded;
 --   despawn  take the player's truck off the world;
 --   clearPads  take a base's vehicle-pad models down (the records stay);
 --   assigned a base now stands on the player's pad (restore its pads, shop).
@@ -127,7 +124,6 @@ local pickingUntil: { [Player]: number } = {} -- a returning owner's join picker
 local buying: { [Player]: boolean } = {} -- the Land Office picker is open (no timeout: nothing is given away)
 local claiming: { [Player]: boolean } = {} -- a claim is being charged and assigned right now
 local switching: { [Player]: boolean } = {} -- a base is being packed or swapped right now (BaseLogic)
-local baseRemote: RemoteEvent? = nil -- BaseState: the Bases panel's data (server -> client)
 local officePos: Vector3 = Vector3.zero
 local lastOffer: { [Player]: PlotPickerLogic.Offer } = {}
 local watching: { [Player]: boolean } = {}
@@ -948,20 +944,6 @@ local function onSalesmanTalk(player: Player)
 	end
 	local profile = ProfileService.GetProfile(player)
 	if not profile or not profile.plot then
-		return
-	end
-	local ask = PlotService.Ask
-	if ask and ownedBefore(profile) and (slotOf[player] ~= nil or #BaseLogic.Shelf(profile) > 0) then
-		-- A player with a base (or crated ones): Hank offers to show them, Yes / No.
-		if not nearOffice(player) then
-			salesmanSay(player, PlotSalesmanData.FarLine)
-			return
-		end
-		ask(
-			player,
-			PlotSalesmanData.BasesLine(slotOf[player] ~= nil, #BaseLogic.Shelf(profile), BaseLogic.Cap),
-			PlotSalesmanData.BasesOfferId
-		)
 		return
 	end
 	local choice = PlotSalesmanData.Choose({
@@ -2398,10 +2380,9 @@ function PlotService.Init(
 			PlotService.Shown(player)
 		end)
 	end
-	baseRemote = remotes.BaseState
 	if remotes.BaseAction then
-		remotes.BaseAction.OnServerEvent:Connect(function(player: Player, action: unknown, index: unknown)
-			PlotService.BaseAction(player, action, index)
+		remotes.BaseAction.OnServerEvent:Connect(function(player: Player, action: unknown)
+			PlotService.BaseAction(player, action)
 		end)
 	end
 	local heartbeat = (RunService :: any).Heartbeat
@@ -2571,11 +2552,11 @@ function PlotService.FillStep()
 end
 
 ---------------------------------------------------------------------------
--- Bases: pack one away, bring one back (Shared/BaseLogic, Old Hank)
+-- Unload base / load base (Shared/BaseLogic)
 ---------------------------------------------------------------------------
 
 -- Their logs and planks lying on their own plot (not held). Loose wood is
--- not in the save, so a base never leaves while some is out there.
+-- not in the save, so a base never comes off the pad while some is out there.
 local function looseWoodOn(player: Player, slot: Slot, profile: Profile): number
 	local wood = woodModule()
 	if not wood or type(wood.All) ~= "function" then
@@ -2599,7 +2580,7 @@ local function looseWoodOn(player: Player, slot: Slot, profile: Profile): number
 end
 
 -- Everyone but the owner who stands on or beside the yard is set down just
--- outside it, so nobody falls out of a house that is about to be crated.
+-- outside it, so nobody falls out of a house that is about to come down.
 local function ejectOthers(owner: Player, slot: Slot, profile: Profile)
 	for _, other in ipairs(onlinePlayers()) do
 		if other ~= owner and actorOn(other, slot, profile) then
@@ -2608,164 +2589,87 @@ local function ejectOthers(owner: Player, slot: Slot, profile: Profile)
 	end
 end
 
-local function publishBases(player: Player, open: boolean)
-	local remote = baseRemote
-	local profile = ProfileService.GetProfile(player)
-	if not remote or not profile or not profile.plot then
-		return
-	end
-	local live = profile.plot
-	local tier = PlotData.Tier(live.tier) or PlotData.Tiers[1]
-	remote:FireClient(player, {
-		open = open,
-		hasPad = slotOf[player] ~= nil,
-		cap = BaseLogic.Cap,
-		cooldownUntil = tonumber(profile.baseCooldownUntil) or 0,
-		live = {
-			name = if type(live.name) == "string" then live.name else "Your base",
-			tier = tier.name,
-			pieces = BaseLogic.Pieces(live),
-			empty = BaseLogic.IsEmpty(live),
-		},
-		shelf = BaseLogic.Summary(profile),
-	})
-end
+local FAILED = "Something went wrong and your base is still on its pad. Try again."
 
-function PlotService.OpenBases(player: Player)
-	if nearOffice(player) then
-		publishBases(player, true)
-	end
-end
-
--- Old Hank's Yes on "show me my bases".
-function PlotService.HankPick(player: Player, which: unknown, offerId: unknown)
-	if which == "yes" and offerId == PlotSalesmanData.BasesOfferId then
-		PlotService.OpenBases(player)
-	end
-end
-
-local FAILED = "Something went wrong and nothing was changed. Try again."
-
--- The change itself. Order matters: the world lets go first (nothing yields
--- after the data moves), the data moves as one swap of references, then the
--- pad is rebuilt or released. Any failure puts the references back.
-local function changeBase(player: Player, profile: Profile, slot: Slot?, action: string, index: number?): boolean
+-- The world lets go (wood, the truck, visitors, pad models), then the pad is
+-- released. The save is NOT edited: profile.plot stays exactly as it is, so
+-- nothing is moved, copied or lost. If the release throws, the base is built
+-- back on its pad. A save written before this runs, or after, is whole.
+local function unloadBase(player: Player, profile: Profile, slot: Slot): boolean
 	pcall(PlotService.Hooks.commit, player)
 	pcall(PlotService.Hooks.despawn, player)
-	-- The commit may have yielded: still the same save, still online?
-	if ProfileService.GetProfile(player) ~= profile then
+	-- The commit may have yielded: still the same save, still on that pad?
+	if ProfileService.GetProfile(player) ~= profile or slotOf[player] ~= slot then
 		return false
 	end
-	if slot then
-		ejectOthers(player, slot, profile)
-		pcall(PlotService.Hooks.clearPads, profile.plot)
-		undoStacks[player] = nil
-	end
-	local snap = BaseLogic.Snapshot(profile)
-	local ok = pcall(function()
-		BaseLogic.Swap(profile, action, index, os.time(), Util.guid)
-		if action == "pack" then
-			release(player)
-		elseif slot then
-			if not PlotService.Reload(player, profile) then
-				error("the base would not load")
-			end
-		end
-	end)
+	ejectOthers(player, slot, profile)
+	pcall(PlotService.Hooks.clearPads, profile.plot)
+	undoStacks[player] = nil
+	local ok = pcall(release, player)
 	if not ok then
-		BaseLogic.Restore(profile, snap)
-		if slot then
-			if slotOf[player] == slot then
-				pcall(PlotService.Reload, player, profile)
-			else
-				slot.owner = player -- a failed pack had already let go of the pad
-				pcall(assign, player, slot, profile)
-			end
-			pcall(PlotService.Hooks.assigned, player, profile)
-		end
+		slot.items:ClearAllChildren()
+		slot.owner = player
+		pcall(assign, player, slot, profile)
+		pcall(PlotService.Hooks.assigned, player, profile)
 		return false
-	end
-	BaseLogic.Stamp(profile, os.time())
-	if slotOf[player] then
-		pcall(PlotService.Hooks.assigned, player, profile) -- the new base's pads stand up
 	end
 	return true
 end
 
--- One intent from the Bases panel: "open", "pad" (a base with no pad picks
--- one), "pack", "new" (crate this one, start empty here) or "bring" + the
--- shelf number. The server checks all of it: range, cooldown, shelf room,
--- loose wood, one change at a time.
-function PlotService.BaseAction(player: Player, action: unknown, index: unknown)
+-- Intents from the SAVES panel: "unload" (the base comes off the pad) and
+-- "load" (the free plot picker opens for it). The server checks it all: one
+-- change at a time, cooldown, loose wood, an owned plot, a free pad.
+function PlotService.BaseAction(player: Player, action: unknown)
 	if not RateLimiter.Allow(player, "BaseAction") then
-		return
-	end
-	if type(action) ~= "string" then
 		return
 	end
 	local profile = ProfileService.GetProfile(player)
 	if not profile or not profile.plot then
 		return
 	end
-	if action == "open" then
-		PlotService.OpenBases(player)
-		return
-	end
-	if action == "pad" then
-		if not slotOf[player] and ownedBefore(profile) then
-			onOfficeOpened(player)
-		end
-		return
-	end
 	local slot = slotOf[player]
-	local ctx: BaseLogic.Context = {
-		now = os.time(),
-		hasPad = slot ~= nil,
-		nearOffice = nearOffice(player),
-		busy = switching[player] == true or claiming[player] == true or expanding[player] == true,
-		looseWood = if slot then looseWoodOn(player, slot, profile) else 0,
-	}
-	local ok, why = BaseLogic.Check(profile, action, index, ctx)
-	if not ok then
-		if why and why ~= BaseLogic.Reasons.bad then
-			notify(player, why)
+	if action == "unload" then
+		local ctx: BaseLogic.Context = {
+			now = os.time(),
+			hasPad = slot ~= nil,
+			busy = switching[player] == true or claiming[player] == true or expanding[player] == true,
+			looseWood = if slot then looseWoodOn(player, slot, profile) else 0,
+		}
+		local ok, why = BaseLogic.CheckUnload(profile, ctx)
+		if not ok or not slot then
+			if why and why ~= BaseLogic.Reasons.bad then
+				notify(player, why)
+			end
+			return
 		end
-		return
-	end
-	switching[player] = true
-	local done, result = (pcall :: any)(
-		changeBase,
-		player,
-		profile,
-		slot,
-		action,
-		if type(index) == "number" then index else nil
-	)
-	switching[player] = nil
-	if not done or result ~= true then
-		if not done then
-			warn("[PlotService] base change failed: " .. tostring(result))
+		switching[player] = true
+		local done, result = (pcall :: any)(unloadBase, player, profile, slot)
+		switching[player] = nil
+		if not done or result ~= true then
+			if not done then
+				warn("[PlotService] unload failed: " .. tostring(result))
+			end
+			notify(player, FAILED)
+			return
 		end
-		notify(player, FAILED)
-		publishBases(player, true)
-		return
+		BaseLogic.Stamp(profile, os.time())
+		player:SetAttribute("BaseCooldownUntil", profile.baseCooldownUntil)
+		local save = ProfileService.Save
+		if type(save) == "function" then
+			pcall(save, player) -- the save is written with the base in it
+		end
+		notify(player, BaseLogic.UnloadedToast)
+	elseif action == "load" then
+		local ok = BaseLogic.CanLoad(profile, slot ~= nil)
+		if not ok or switching[player] or claiming[player] then
+			return
+		end
+		if pickingUntil[player] ~= nil or buying[player] then
+			PlotService.Resend(player) -- the picker is already up: show it again
+			return
+		end
+		PlotService.PlayerJoined(player, profile) -- the same free picker as a join, timer and all
 	end
-	-- A base with no pad yet (a pack, or a bring-out while padless) picks one.
-	if not slotOf[player] and action ~= "pack" then
-		onOfficeOpened(player)
-	end
-	local save = ProfileService.Save
-	if type(save) == "function" then
-		pcall(save, player)
-	end
-	if action == "pack" then
-		notify(player, "Your base is crated and safe with Old Hank. Your pad is free for others.")
-	elseif action == "new" then
-		notify(player, "Your old base is crated. Here is a fresh one.")
-	else
-		notify(player, "Your base is out of the crate.")
-	end
-	publishBases(player, true)
 end
 
 return PlotService

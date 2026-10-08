@@ -598,18 +598,16 @@ return function(t)
 		t.eq(SaveSlotLogic.ForgetAccountAxe(data, "LuxAxe"), 0, "twice is the same")
 	end)
 
-	t.test("the join picker's rows say whether a save has a plot, how much is on it and what is crated", function()
+	t.test("the join picker's rows say whether a save has a plot and how much is on it", function()
 		local data = fresh()
 		data.plot.claimed = true
 		data.plot.placed = { { uid = "a" }, { uid = "b" } }
 		data.plot.pads = { { uid = "p" } }
 		data.plot.tier = 3
-		data.bases = { { claimed = true, placed = {}, tier = 1 } }
 		data.cash = 777
 		local row = SaveSlotLogic.Summary(data)[1]
 		t.eq(row.hasPlot, true)
 		t.eq(row.pieces, 3)
-		t.eq(row.packed, 1)
 		t.eq(row.tier, 3)
 		t.eq(row.cash, 777, "the playing save's cash is the live wallet, not an old snapshot")
 		local other = SaveSlotLogic.Summary(data)[2]
@@ -617,21 +615,18 @@ return function(t)
 		t.eq(other.pieces, 0)
 	end)
 
-	t.test("crated bases belong to the save slot, the base cooldown to the account", function()
-		t.eq(SaveSlotLogic.IsAccountKey("bases"), false)
+	t.test("an unloaded base stays with its save through a swap; the unload cooldown is the account's", function()
 		t.eq(SaveSlotLogic.IsAccountKey("baseCooldownUntil"), true)
 		local data = fresh()
 		data.plot.claimed = true
-		data.bases =
-			{ { claimed = true, placed = { { uid = "x" } }, tier = 1, squares = {}, wires = {}, switches = {} } }
+		data.plot.placed = { { uid = "x", blueprintId = "Bench", x = 0, z = 0, rot = 0 } }
 		data.baseCooldownUntil = 4000
 		local world = worldFor(data)
 		t.eq(SaveSlotLogic.Perform(data, "load", 2, 3_000, Schema.Template, guidFactory(), world.hooks), true)
-		t.eq(#data.bases, 0, "the other save has its own (empty) shelf")
+		t.eq(data.plot.claimed, false, "the other save has its own plot")
 		t.eq(data.baseCooldownUntil, 4000, "the cooldown did not travel or reset")
-		t.eq(#data.slots[1].bases, 1, "the shelf was kept with the save that was put away")
+		t.eq(SaveSlotLogic.Summary(data)[1].hasPlot, true, "the first save still shows its base")
 		t.eq(SaveSlotLogic.Perform(data, "load", 1, 9_000, Schema.Template, guidFactory(), world.hooks), true)
-		t.eq(#data.bases, 1)
-		t.eq(data.bases[1].placed[1].uid, "x", "and it comes back with it, uid for uid")
+		t.eq(data.plot.placed[1].uid, "x", "and it comes back with it, uid for uid")
 	end)
 end

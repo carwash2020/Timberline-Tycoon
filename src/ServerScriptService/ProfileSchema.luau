@@ -185,16 +185,9 @@ export type Profile = {
 		wires: { WireLink }, -- switch to lamp or door links (WireLogic)
 		switches: { string }, -- uids of the wall switches that are on; a switch not listed is off
 		pads: { any }?, -- vehicle pads (VehicleService); they travel with the base
-		-- Set when a base is crated (BaseLogic): its name, id and when.
-		name: string?,
-		id: string?,
-		savedAt: number?,
 	},
-	-- Bases packed away at the Land Office (BaseLogic): plot records like `plot`
-	-- (placed pieces, pads, tier, squares), moved here and back, never copied.
-	-- Per slot (they travel with the save). baseCooldownUntil is account-wide.
-	bases: { any },
-	baseCooldownUntil: number, -- unix time a pack or bring-out is allowed again
+	-- Unload base (BaseLogic): account-wide, unix time the next unload is allowed.
+	baseCooldownUntil: number,
 	-- Boxes kept for you, per slot. Capped at StorageCap.
 	storage: { StoredBox },
 	-- Who may visit and build, per slot. PermissionService fills this in.
@@ -317,7 +310,6 @@ local TEMPLATE: Profile = {
 	ownedBoats = {},
 	gear = {},
 	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} },
-	bases = {},
 	baseCooldownUntil = 0,
 	storage = {},
 	permissions = {},
@@ -457,25 +449,18 @@ local function takenIds(record: any): { [string]: boolean }
 			end
 		end
 	end
-	local plots: { any } = { record.plot }
-	if type(record.bases) == "table" then
-		for _, base in ipairs(record.bases) do
-			table.insert(plots, base)
-		end
-	end
-	for _, plot in ipairs(plots) do
-		if type(plot) == "table" and type(plot.placed) == "table" then
-			for _, item in ipairs(plot.placed) do
-				if type(item) == "table" then
-					keep(item.uid)
-				end
+	local plot = record.plot
+	if type(plot) == "table" and type(plot.placed) == "table" then
+		for _, item in ipairs(plot.placed) do
+			if type(item) == "table" then
+				keep(item.uid)
 			end
 		end
-		if type(plot) == "table" and type(plot.pads) == "table" then
-			for _, pad in ipairs(plot.pads) do
-				if type(pad) == "table" then
-					keep(pad.uid)
-				end
+	end
+	if type(plot) == "table" and type(plot.pads) == "table" then
+		for _, pad in ipairs(plot.pads) do
+			if type(pad) == "table" then
+				keep(pad.uid)
 			end
 		end
 	end
@@ -507,19 +492,11 @@ function ProfileSchema.WaitingTrucks(record: any): { string }
 			end
 		end
 	end
-	-- A pad on a packed-away base still holds its vehicle's box: no second box.
-	local plots: { any } = { record.plot }
-	if type(record.bases) == "table" then
-		for _, base in ipairs(record.bases) do
-			table.insert(plots, base)
-		end
-	end
-	for _, plot in ipairs(plots) do
-		if type(plot) == "table" and type(plot.pads) == "table" then
-			for _, pad in ipairs(plot.pads) do
-				if type(pad) == "table" and type(pad.id) == "string" then
-					have[pad.id] = true
-				end
+	local plot = record.plot
+	if type(plot) == "table" and type(plot.pads) == "table" then
+		for _, pad in ipairs(plot.pads) do
+			if type(pad) == "table" and type(pad.id) == "string" then
+				have[pad.id] = true
 			end
 		end
 	end
@@ -701,37 +678,6 @@ local function cleanPlot(plot: any)
 	plot.placed = kept
 end
 
--- The shelf of packed-away bases (BaseLogic). A base is never dropped here
--- (it may hold a player's whole build): only a non-table entry goes, and each
--- record is repaired the same way the live plot is. Idempotent.
-local function cleanBases(value: any): { any }
-	local out: { any } = {}
-	if type(value) ~= "table" then
-		return out
-	end
-	for _, base in ipairs(value) do
-		if type(base) == "table" then
-			cleanPlot(base)
-			base.claimed = true
-			base.squares = squareList(base.squares)
-			if type(base.pads) ~= "table" then
-				base.pads = nil
-			end
-			if type(base.name) ~= "string" or base.name == "" or utf8.len(base.name) == nil or #base.name > 48 then
-				base.name = nil
-			end
-			if type(base.id) ~= "string" then
-				base.id = nil
-			end
-			if type(base.savedAt) ~= "number" or base.savedAt ~= base.savedAt then
-				base.savedAt = nil
-			end
-			table.insert(out, base)
-		end
-	end
-	return out
-end
-
 -- Per-slot fields. Missing or wrong-typed fields become the template.
 -- storage keeps at most StorageCap boxes, each with a server uid, and
 -- drops a box only when its uid is already an axe, truck, or placed-item uid.
@@ -742,7 +688,7 @@ local function applySlotFields(record: any)
 	record.plot.squares = squareList(record.plot.squares)
 	record.plot.wires = WireLogic.Clean(record.plot.wires)
 	record.plot.switches = WireLogic.CleanSwitches(record.plot.switches)
-	record.bases = cleanBases(record.bases)
+	record.bases = nil -- the crated-bases shelf of an earlier build is gone (idempotent)
 	record.questAxe = copyQuest(record.questAxe)
 	-- The book, carried plans and the hammer. Adds only; safe to repeat.
 	BlueprintBook.Migrate(record)
@@ -831,8 +777,10 @@ function ProfileSchema.Migrate(data: any)
 		data.plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} }
 	end
 	cleanPlot(data.plot)
-	-- Packed-away bases and their cooldown (BaseLogic). Idempotent.
-	data.bases = cleanBases(data.bases)
+	-- The unload-base cooldown (BaseLogic). A shelf of crated bases from an
+	-- earlier, never-released build is dropped; its active base was always
+	-- profile.plot, which is kept. Idempotent.
+	data.bases = nil
 	if type(data.baseCooldownUntil) ~= "number" or data.baseCooldownUntil ~= data.baseCooldownUntil then
 		data.baseCooldownUntil = 0
 	end

@@ -257,7 +257,6 @@ return function(t)
 			"WorldFX",
 			"PlotShown",
 			"BaseAction",
-			"BaseState",
 		}) do
 			remotes[name] = Instance.new("RemoteEvent")
 		end
@@ -265,10 +264,6 @@ return function(t)
 		local fx = {}
 		remotes.WorldFX.FireClient = function(_, target, kind, payload)
 			table.insert(fx, { to = target, kind = kind, payload = payload })
-		end
-		local baseStates = {}
-		remotes.BaseState.FireClient = function(_, target, payload)
-			table.insert(baseStates, { to = target, payload = payload })
 		end
 		PlotService.Init(map, remotes, function(_, message)
 			table.insert(toasts, message)
@@ -326,7 +321,6 @@ return function(t)
 			questEvents = questEvents,
 			tags = tags,
 			remotes = remotes,
-			baseStates = baseStates,
 			lastToast = function()
 				return toasts[#toasts]
 			end,
@@ -2463,8 +2457,8 @@ return function(t)
 		t.eq(#s.items(1), 0)
 	end)
 
-	-- Bases: packing one away and bringing one back (Shared/BaseLogic).
-	-- The cooldown reads os.time(), so a test that changes twice clears it.
+	-- Unload base / load base (Shared/BaseLogic). The cooldown reads os.time(),
+	-- so a test that unloads twice clears it in between.
 	local function baseWorld(opts)
 		local s = setup(opts or { cash = 100000 })
 		local calls = { commit = 0, despawn = 0, cleared = {}, assigned = 0 }
@@ -2486,109 +2480,113 @@ return function(t)
 		s.P.Place(ann, "Bench", 4, 4, 1)
 		s.P.Place(ann, "Bench", -8, 6, 0)
 		profile.plot.pads = { { uid = "pad-a", id = "Rustbucket", kind = "Truck", x = 12, z = -12 } }
-		s.atOffice(ann)
 		local Base = t.shared("BaseLogic")
-		local function cool()
-			profile.baseCooldownUntil = 0
-		end
-		return s, ann, profile, calls, Base, cool
+		return s, ann, profile, calls, Base
 	end
 
-	t.test("pack up: the base goes to the shelf whole, the pad is free, nothing is charged or lost", function()
+	t.test("unload: the pad is free and clean, the save keeps the base untouched, nothing is charged", function()
 		local s, ann, profile, calls, Base = baseWorld()
 		local before = Base.Uids(profile)
-		local cash = profile.cash
 		local record = profile.plot
+		local snapshot = require("@lune/serde").encode("json", record)
+		local cash = profile.cash
 		t.eq(#before, 3, "two benches and a pad")
-		s.P.BaseAction(ann, "pack")
-		t.eq(ann.attrs.PlotSlot, nil, "the pad is given up")
-		t.eq(s.plot(1):GetAttribute("OwnerId"), nil, "and free for the next player")
+		s.P.BaseAction(ann, "unload")
+		t.eq(ann.attrs.PlotSlot, nil, "no pad")
+		t.eq(s.plot(1):GetAttribute("OwnerId"), nil, "the pad is free for the next player")
 		t.eq(#s.items(1), 0, "no model is left standing on it")
-		t.eq(#profile.bases, 1)
-		t.ok(profile.bases[1] == record, "the very same record moved, it was not copied")
-		t.eq(Base.Uids(profile), before, "every piece and pad exists exactly once")
-		t.eq(profile.plot.claimed, true, "the plot is still owned: a pad is free to pick again")
-		t.eq(#profile.plot.placed, 0)
+		t.ok(profile.plot == record, "the same record, still the save's plot")
+		t.eq(require("@lune/serde").encode("json", record), snapshot, "not one field changed")
+		t.eq(Base.Uids(profile), before, "every piece and pad exactly once")
+		t.eq(profile.plot.claimed, true, "the plot is still owned, so a pad can be picked again for free")
 		t.eq(profile.cash, cash, "no money moves")
 		t.eq(calls.commit, 1, "carried wood and the truck's load were put in the save first")
 		t.eq(calls.despawn, 1)
-		t.ok(calls.cleared[1] == record, "the pad models of the packed base were taken down")
-		t.ok(profile.baseCooldownUntil > os.time(), "the cooldown is stamped on the profile")
-		t.eq(s.baseStates[#s.baseStates].payload.shelf[1].pieces, 3)
+		t.ok(calls.cleared[1] == record, "the pad models were taken down")
+		t.ok(profile.baseCooldownUntil > os.time(), "the cooldown is on the profile")
+		t.eq(ann.attrs.BaseCooldownUntil, profile.baseCooldownUntil)
+		t.eq(ann.attrs.Picking, nil, "and the player is left in the world, no picker forced")
+		t.eq(s.lastToast(), t.shared("BaseLogic").UnloadedToast)
 	end)
 
-	t.test("the cooldown holds a second change, and it holds across a rejoin because it is on the profile", function()
-		local s, ann, profile, _, Base, cool = baseWorld()
-		s.P.BaseAction(ann, "pack")
-		s.P.BaseAction(ann, "bring", 1)
-		t.ok(string.find(s.lastToast(), "more seconds before changing bases", 1, true) ~= nil, s.lastToast())
-		t.eq(#profile.bases, 1, "nothing moved")
-		t.eq(#Base.Uids(profile), 3)
-		cool()
-		s.P.BaseAction(ann, "bring", 1)
-		t.eq(#profile.bases, 0, "an empty base is not kept on the shelf")
-		t.eq(#profile.plot.placed, 2)
+	t.test("the cooldown holds a second unload, and survives a rejoin because it is on the profile", function()
+		local s, ann, profile = baseWorld()
+		s.P.BaseAction(ann, "unload")
+		s.P.BaseAction(ann, "load")
+		s.P.Claim(ann, 2)
+		t.eq(ann.attrs.PlotSlot, 2, "loading it back is never cooled")
+		s.P.BaseAction(ann, "unload")
+		t.ok(string.find(s.lastToast(), "more seconds before unloading again", 1, true) ~= nil, s.lastToast())
+		t.eq(ann.attrs.PlotSlot, 2, "nothing happened")
+		profile.baseCooldownUntil = 0
+		s.P.BaseAction(ann, "unload")
+		t.eq(ann.attrs.PlotSlot, nil)
+	end)
+
+	t.test("load base: the free picker opens, and the base lands laid out the same on the pad you choose", function()
+		local s, ann, profile, calls, Base = baseWorld()
+		local before = Base.Uids(profile)
+		local cash = profile.cash
+		s.P.BaseAction(ann, "unload")
+		local assignedBefore = calls.assigned
+		ann.standOn(nil) -- the SAVES panel works from anywhere
+		s.P.BaseAction(ann, "load")
+		t.eq(ann.attrs.Picking, true, "the plot picker (its camera, map and pillar) opens")
+		t.eq(s.P.OfferOf(ann).price, 0, "free: the plot was bought once")
+		t.eq(#s.items(1), 0, "nothing is built until a pad is chosen")
+		s.P.Claim(ann, 3)
+		t.eq(ann.attrs.PlotSlot, 3)
+		t.eq(#s.items(3), 2)
+		local at = {}
+		for _, model in ipairs(s.items(3)) do
+			at[model.Name] = model.placedAt
+		end
+		for _, item in ipairs(profile.plot.placed) do
+			t.eq(at[item.uid], { item.x, item.z, item.rot }, "plot-local coordinates carry over to any pad")
+		end
+		t.eq(Base.Uids(profile), before)
+		t.ok(calls.assigned > assignedBefore, "its vehicle pads stand up on the new pad")
+		t.eq(profile.cash, cash, "no second charge for the plot")
 	end)
 
 	t.test(
-		"bring out with no pad: the free picker opens and the base lands on the pad you choose, laid out the same",
+		"load base: the join picker's timer applies (starts when shown, then takes a free pad), and a second press only re-shows it",
 		function()
-			local s, ann, profile, calls, Base, cool = baseWorld()
-			local before = Base.Uids(profile)
-			local cash = profile.cash
-			s.P.BaseAction(ann, "pack")
-			cool()
-			local assignedBefore = calls.assigned
-			s.P.BaseAction(ann, "bring", 1)
-			t.eq(ann.attrs.Picking, true, "padless: the picker (its camera, map and pillar) opens")
-			t.eq(s.P.OfferOf(ann).price, 0, "free: the plot was bought once")
-			t.eq(#s.items(1), 0, "nothing is built until a pad is chosen")
-			s.P.Claim(ann, 3)
-			t.eq(ann.attrs.PlotSlot, 3)
-			t.eq(#s.items(3), 2)
-			local at = {}
-			for _, model in ipairs(s.items(3)) do
-				at[model.Name] = model.placedAt
-			end
-			for _, item in ipairs(profile.plot.placed) do
-				t.eq(at[item.uid], { item.x, item.z, item.rot }, "plot-local coordinates carry over to any pad")
-			end
-			t.eq(Base.Uids(profile), before)
-			t.ok(calls.assigned > assignedBefore, "its vehicle pads stand up on the new pad")
-			t.eq(profile.cash, cash, "no second charge for the plot")
+			local s, ann, profile = baseWorld()
+			s.P.BaseAction(ann, "unload")
+			s.P.BaseAction(ann, "load")
+			s.P.BaseAction(ann, "load")
+			local offers = 0
+			t.ok(s.P.OfferOf(ann) ~= nil)
+			s.advance(500)
+			s.P.Sweep()
+			t.eq(ann.attrs.PlotSlot, nil, "not on screen yet: no timer")
+			s.P.Shown(ann)
+			s.advance(61)
+			s.P.Sweep()
+			t.eq(ann.attrs.PlotSlot, 1, "auto-assigned after the timeout")
+			t.eq(#s.items(1), 2, "with the base on it")
+			t.eq(#profile.plot.placed, 2)
+			_ = offers
 		end
 	)
 
-	t.test("new base on the same pad, then swap back: the pad is rebuilt each time, nothing is duplicated", function()
-		local s, ann, profile, _, Base, cool = baseWorld()
-		local before = Base.Uids(profile)
-		s.P.BaseAction(ann, "new")
-		t.eq(ann.attrs.PlotSlot, 1, "same pad")
-		t.eq(#s.items(1), 0)
-		t.eq(#profile.bases, 1)
-		cool()
-		ann.standOn(1)
-		s.P.Place(ann, "Bench", 10, 10, 0)
-		local fresh = Base.Uids(profile)
-		t.eq(#fresh, 4)
-		cool()
-		s.atOffice(ann)
-		s.P.BaseAction(ann, "bring", 1)
-		t.eq(ann.attrs.PlotSlot, 1)
-		t.eq(#s.items(1), 2, "the first base is back on the pad")
-		t.eq(#profile.bases, 1, "and the newer one is crated in its place")
-		t.eq(Base.Uids(profile), fresh, "the same pieces, all of them, once each")
-		t.eq(#profile.bases[1].placed, 1)
-		for _, uid in ipairs(before) do
-			t.ok(table.find(Base.Uids(profile), uid) ~= nil)
-		end
+	t.test("load base does nothing for a save with no plot, or while the base is on a pad", function()
+		local s, ann = baseWorld()
+		s.P.BaseAction(ann, "load")
+		t.eq(ann.attrs.Picking, nil, "the base is already on a pad")
+		local bob = s.newPlayer(2, "Bob")
+		s.P.BaseAction(bob, "load")
+		s.P.BaseAction(bob, "unload")
+		t.eq(bob.attrs.Picking, nil)
+		t.eq(bob.attrs.PlotSlot, nil)
 	end)
 
 	t.test(
-		"refused with nothing changed: away from the counter, loose wood on the plot, a full shelf, an empty base",
+		"refused with nothing changed: loose wood on the plot, a base with no pad, another change in flight",
 		function()
 			local pieces = {}
-			local s, ann, profile, calls, _, cool = baseWorld({
+			local s, ann, profile, calls = baseWorld({
 				cash = 100000,
 				wood = {
 					All = function()
@@ -2603,79 +2601,61 @@ return function(t)
 					end,
 				},
 			})
-			local record = profile.plot
-			ann.standOn(1)
-			s.P.BaseAction(ann, "pack")
-			t.ok(string.find(s.lastToast(), "Land Office", 1, true) ~= nil, s.lastToast())
-			t.ok(profile.plot == record and #profile.bases == 0)
-			s.atOffice(ann)
-			-- A log of theirs lying on the plot: it could not be crated, so nothing leaves.
 			local origin = Vector3.new(s.PlotData.Slots[1].X, 0, s.PlotData.Slots[1].Y)
 			pieces.log1 = loose(origin, "log1", { kind = "log", ownerId = 1 })
-			s.atOffice(ann)
-			s.P.BaseAction(ann, "pack")
+			s.P.BaseAction(ann, "unload")
 			t.ok(string.find(s.lastToast(), "loose logs and planks", 1, true) ~= nil, s.lastToast())
-			t.ok(profile.plot == record and #profile.bases == 0)
+			t.eq(ann.attrs.PlotSlot, 1)
+			t.eq(#s.items(1), 2)
 			t.eq(calls.commit, 0, "the world was not touched either")
+			t.eq(profile.baseCooldownUntil, 0)
 			-- Held in a hand, or somebody else's, does not count.
 			pieces.log1 = loose(origin, "log1", { kind = "log", ownerId = 1, heldBy = 1 })
 			pieces.log2 = loose(origin, "log2", { kind = "plank", ownerId = 2 })
-			s.P.BaseAction(ann, "new")
-			t.eq(#profile.bases, 1)
-			-- A full shelf (the cap), an empty base, and nobody with no plot.
-			cool()
-			local Base = t.shared("BaseLogic")
-			for i = 2, Base.Cap do
-				profile.bases[i] = {
-					claimed = true,
-					tier = 1,
-					placed = { { uid = "x" .. i } },
-					squares = {},
-					wires = {},
-					switches = {},
-				}
-			end
-			ann.standOn(1)
-			s.P.Place(ann, "Bench", 14, 14, 0)
-			s.atOffice(ann)
-			s.P.BaseAction(ann, "pack")
-			t.eq(s.lastToast(), "The shelf is full. Bring one back out first.")
-			cool()
-			local bob = s.newPlayer(2, "Bob")
-			s.atOffice(bob)
-			s.P.BaseAction(bob, "pack")
-			t.eq(s.lastToast(), "You need a plot before you can pack a base.")
+			s.P.BaseAction(ann, "unload")
+			t.eq(ann.attrs.PlotSlot, nil, "then it goes")
+			profile.baseCooldownUntil = 0
+			s.P.BaseAction(ann, "unload")
+			t.eq(s.lastToast(), "Your base is not on a pad right now.")
 		end
 	)
 
-	t.test("visitors on the plot are set down outside it before it is crated", function()
-		local s, ann, _, _, _, _ = baseWorld()
+	t.test("visitors on the plot are set down outside it before it comes down", function()
+		local s, ann = baseWorld()
 		local bob = s.newPlayer(2, "Bob")
 		bob.standOn(1)
 		local start = bob.root.Position
-		s.P.BaseAction(ann, "pack")
+		s.P.BaseAction(ann, "unload")
 		t.ok(bob.root.Position ~= start, "Bob was moved off the yard")
 		t.eq(s.plot(1):GetAttribute("OwnerId"), nil)
 	end)
 
-	t.test("a rebuild that fails puts the base back: data restored, no cooldown, the player told", function()
-		local s, ann, profile, _, Base, cool = baseWorld()
-		s.P.BaseAction(ann, "new")
-		cool()
-		local record = profile.plot
-		local shelf = profile.bases[1]
-		local uids = Base.Uids(profile)
-		s.explodeOnBuild(true)
-		s.P.BaseAction(ann, "bring", 1)
-		s.explodeOnBuild(false)
-		t.ok(profile.plot == record and profile.bases[1] == shelf, "the same records are back where they were")
-		t.eq(Base.Uids(profile), uids)
-		t.eq(profile.baseCooldownUntil, 0, "a change that did not happen costs no cooldown")
-		t.eq(s.lastToast(), "Something went wrong and nothing was changed. Try again.")
-		t.eq(ann.attrs.PlotSlot, 1)
-	end)
+	t.test(
+		"a release that throws puts the base back on its pad: nothing doubled, no cooldown spent, the player told",
+		function()
+			local s, ann, profile, _, Base = baseWorld()
+			local uids = Base.Uids(profile)
+			local record = profile.plot
+			local realSet = ann.SetAttribute
+			local failures = 1
+			ann.SetAttribute = function(self, key, value)
+				if key == "PlotSlot" and value == nil and failures > 0 then
+					failures -= 1
+					error("the pad would not let go")
+				end
+				realSet(self, key, value)
+			end
+			s.P.BaseAction(ann, "unload")
+			t.ok(profile.plot == record)
+			t.eq(Base.Uids(profile), uids)
+			t.eq(profile.baseCooldownUntil, 0, "an unload that did not happen costs no cooldown")
+			t.eq(s.lastToast(), "Something went wrong and your base is still on its pad. Try again.")
+			t.eq(ann.attrs.PlotSlot, 1)
+			t.eq(#s.items(1), 2, "the pieces are standing once each, none doubled")
+		end
+	)
 
-	t.test("leaving mid-switch changes nothing: the save is whole before or whole after, never half", function()
+	t.test("leaving mid-unload changes nothing: the save is whole before or after, never half", function()
 		local s, ann, profile, calls, Base = baseWorld()
 		local before = Base.Uids(profile)
 		local record = profile.plot
@@ -2683,65 +2663,40 @@ return function(t)
 			calls.commit += 1
 			s.profiles[ann] = nil -- they disconnected while the hand-over was in the air
 		end
-		s.P.BaseAction(ann, "pack")
-		t.ok(profile.plot == record and #profile.bases == 0, "no half-move")
+		s.P.BaseAction(ann, "unload")
+		t.ok(profile.plot == record)
 		t.eq(Base.Uids(profile), before)
 		t.eq(profile.baseCooldownUntil, 0)
+		t.eq(ann.attrs.PlotSlot, 1, "the pad is not half released")
 	end)
 
-	t.test(
-		"Old Hank offers the Bases panel to a player with a base, Yes opens it, and the counter range is checked",
-		function()
-			local s = setup({ cash = 1000 })
-			local talk = withHank(s)
-			local asked = {}
-			s.P.Ask = function(who, text, id)
-				table.insert(asked, { who = who, text = text, id = id })
-			end
-			local ann = s.newPlayer(1, "Ann")
-			s.claim(ann, 1)
-			s.atOffice(ann)
-			talk.Triggered.fn(ann)
-			t.eq(#asked, 1)
-			t.eq(asked[1].id, "bases")
-			t.eq(asked[1].text, t.shared("PlotSalesmanData").BasesLine(true, 0, t.shared("BaseLogic").Cap))
-			s.P.HankPick(ann, "no", "bases")
-			t.eq(#s.baseStates, 0)
-			s.P.HankPick(ann, "yes", "other")
-			t.eq(#s.baseStates, 0, "only his own offer id opens it")
-			s.P.HankPick(ann, "yes", "bases")
-			t.eq(#s.baseStates, 1)
-			t.eq(s.baseStates[1].payload.open, true)
-			ann.standOn(nil)
-			s.P.HankPick(ann, "yes", "bases")
-			t.eq(#s.baseStates, 1, "too far away: nothing opens")
-			-- A save that never bought a plot still gets the buy offer, not this one.
-			local cara = s.newPlayer(3, "Cara")
-			s.atOffice(cara)
-			talk.Triggered.fn(cara)
-			t.eq(#asked, 1)
-			t.eq(cara.attrs.Picking, true)
-		end
-	)
-
-	t.test("the Bases panel's intents are validated: junk does nothing", function()
+	t.test("the intents are validated and rate limited: junk does nothing", function()
 		local s, ann, profile, calls, Base = baseWorld()
 		local before = Base.Uids(profile)
-		for _, junk in ipairs({ 1, true, {}, "swap", "", "PACK" }) do
-			s.P.BaseAction(ann, junk, 1)
+		for _, junk in ipairs({ 1, true, {}, "pack", "", "UNLOAD", "bring" }) do
+			s.P.BaseAction(ann, junk)
 		end
-		for _, index in ipairs({ -1, 0, 1.5, 0 / 0, math.huge, "1", {}, 99 }) do
-			s.P.BaseAction(ann, "bring", index)
-		end
-		t.eq(Base.Uids(profile), before)
 		t.eq(calls.commit, 0)
-		t.eq(#profile.bases, 0)
+		t.eq(Base.Uids(profile), before)
+		t.eq(ann.attrs.PlotSlot, 1)
+		local s2, ann2, _, calls2 = baseWorld({ cash = 100000, rate = false })
+		s2.P.BaseAction(ann2, "unload")
+		t.eq(calls2.commit, 0)
 	end)
 
-	t.test("it is rate limited like every remote", function()
-		local s, ann, profile, calls = baseWorld({ cash = 100000, rate = false })
-		s.P.BaseAction(ann, "pack")
-		t.eq(#profile.bases, 0)
-		t.eq(calls.commit, 0)
+	t.test("Old Hank is as he was: no bases offer, a plot owner just hears the owner line", function()
+		local s = setup({ cash = 1000 })
+		local talk = withHank(s)
+		t.eq(s.P.Ask, nil)
+		t.eq(s.P.HankPick, nil)
+		local said = {}
+		s.P.Speak = function(_, text)
+			table.insert(said, text)
+		end
+		local ann = s.newPlayer(1, "Ann")
+		s.claim(ann, 1)
+		s.atOffice(ann)
+		talk.Triggered.fn(ann)
+		t.eq(said[1], t.shared("PlotSalesmanData").OwnsLine)
 	end)
 end

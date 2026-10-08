@@ -86,6 +86,7 @@ local function publish(player: Player)
 	end
 	player:SetAttribute("ActiveSlot", profile.activeSlot)
 	player:SetAttribute("SlotCooldownUntil", profile.slotCooldownUntil)
+	player:SetAttribute("BaseCooldownUntil", profile.baseCooldownUntil)
 	player:SetAttribute("SlotPick", if awaiting[player] then true else nil)
 	remote:FireClient(player, SaveSlotLogic.Summary(profile))
 end

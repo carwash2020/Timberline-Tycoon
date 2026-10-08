@@ -92,7 +92,6 @@ export type Summary = {
 	active: boolean,
 	hasPlot: boolean, -- the save owns a plot (the join picker then asks for a pad)
 	pieces: number, -- pieces on the base (placed items plus vehicle pads)
-	packed: number, -- bases packed away on the shelf
 	tier: number, -- the base's size tier
 }
 
@@ -187,16 +186,15 @@ function SaveSlotLogic.AxeLabel(axes: any): (string, string)
 	return bestId, bestName
 end
 
-local function plotFacts(record: any): (boolean, number, number, number)
+local function plotFacts(record: any): (boolean, number, number)
 	local plot = if type(record) == "table" then record.plot else nil
 	if type(plot) ~= "table" then
-		return false, 0, 0, 0
+		return false, 0, 0
 	end
 	local pieces = (if type(plot.placed) == "table" then #plot.placed else 0)
 		+ (if type(plot.pads) == "table" then #plot.pads else 0)
-	local packed = if type(record.bases) == "table" then #record.bases else 0
 	local tier = if type(plot.tier) == "number" then plot.tier else 1
-	return plot.claimed == true, pieces, packed, tier
+	return plot.claimed == true, pieces, tier
 end
 
 function SaveSlotLogic.Summary(data: any): { Summary }
@@ -206,7 +204,7 @@ function SaveSlotLogic.Summary(data: any): { Summary }
 		-- The playing save is the live profile; its parked snapshot is only as
 		-- fresh as the last swap, so read the plot and the shelf from the live one.
 		local slot = slots[i]
-		local hasPlot, pieces, packed, tier = plotFacts(if i == data.activeSlot then data else slot)
+		local hasPlot, pieces, tier = plotFacts(if i == data.activeSlot then data else slot)
 		local fresh = type(slot) ~= "table" or slot.fresh == true
 		local live = i == data.activeSlot
 		local cashFrom: any = if live then data else slot
@@ -224,7 +222,6 @@ function SaveSlotLogic.Summary(data: any): { Summary }
 			active = i == data.activeSlot,
 			hasPlot = hasPlot,
 			pieces = pieces,
-			packed = packed,
 			tier = tier,
 		})
 	end

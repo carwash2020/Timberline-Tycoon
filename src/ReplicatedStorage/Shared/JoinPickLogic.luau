@@ -69,15 +69,11 @@ function JoinPickLogic.PlayLabel(picking: boolean, fresh: boolean, active: boole
 end
 
 -- One line on a save row: whether it owns a plot, and how much is on it.
-function JoinPickLogic.PlotText(hasPlot: boolean, pieces: number, packed: number): string
+function JoinPickLogic.PlotText(hasPlot: boolean, pieces: number): string
 	if not hasPlot then
 		return "No plot yet"
 	end
-	local text = if pieces == 1 then "Plot, 1 piece" else string.format("Plot, %d pieces", pieces)
-	if packed > 0 then
-		text ..= string.format(", %d packed", packed)
-	end
-	return text
+	return if pieces == 1 then "Plot, 1 piece" else string.format("Plot, %d pieces", pieces)
 end
 
 return JoinPickLogic

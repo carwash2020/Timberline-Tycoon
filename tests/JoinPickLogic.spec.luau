@@ -66,8 +66,8 @@ return function(t)
 	end)
 
 	t.test("a save row says whether it has a plot", function()
-		t.eq(Join.PlotText(false, 0, 0), "No plot yet")
-		t.eq(Join.PlotText(true, 1, 0), "Plot, 1 piece")
-		t.eq(Join.PlotText(true, 12, 2), "Plot, 12 pieces, 2 packed")
+		t.eq(Join.PlotText(false, 0), "No plot yet")
+		t.eq(Join.PlotText(true, 1), "Plot, 1 piece")
+		t.eq(Join.PlotText(true, 12), "Plot, 12 pieces")
 	end)
 end
