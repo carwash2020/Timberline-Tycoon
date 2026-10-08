@@ -28,6 +28,7 @@ return function(t)
 
 	t.test("every piece is in PlotData, once, with the fields PlotLogic needs", function()
 		local seen = {}
+		local cheap = 0
 		for _, bp in ipairs(all()) do
 			t.ok(not seen[bp.id], "duplicate " .. bp.id)
 			seen[bp.id] = true
@@ -35,13 +36,18 @@ return function(t)
 			t.eq(PlotLogic.Blueprint(bp.id), bp, bp.id)
 			t.eq(bp.category, "Decor", bp.id)
 			t.eq(bp.tier, 1, bp.id)
-			t.ok(bp.priceCash > 0 and bp.priceCash <= MAX_PRICE, bp.id .. " price")
+			if bp.gated == true then
+				t.ok(bp.priceCash > 0, bp.id .. " price")
+			else
+				t.ok(bp.priceCash > 0 and bp.priceCash <= MAX_PRICE, bp.id .. " price")
+				cheap += 1
+			end
 			t.eq(bp.kit, nil, bp.id .. " is not a plank kit")
 			t.eq(bp.woodUnits, nil, bp.id .. " takes no gathered material")
 			t.ok(#bp.boxes >= 1 and #bp.boxes <= MAX_BOXES, bp.id .. " part budget")
 			t.ok(bp.footprint.X <= 6 and bp.footprint.Y <= 6, bp.id .. " footprint")
 		end
-		t.eq(#all(), 9)
+		t.eq(cheap, 9, "the cheap shelf pieces, before the gated Sparkworks set")
 	end)
 
 	t.test("the older blueprints keep their ids and prices", function()

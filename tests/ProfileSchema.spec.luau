@@ -83,7 +83,16 @@ return function(t)
 	t.test("a new save has an unclaimed Campsite plot", function()
 		local Schema, data = fresh()
 		Schema.Migrate(data)
-		t.eq(data.plot, { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} })
+		t.eq(data.plot, {
+			claimed = false,
+			tier = 1,
+			placed = {},
+			squares = {},
+			wires = {},
+			switches = {},
+			loose = {},
+			logic = {},
+		})
 	end)
 
 	t.test("saves from before plots lose the old size and any old-format items", function()
@@ -1208,5 +1217,111 @@ return function(t)
 		t.eq(Schema.WaitingTrucks(data), {}, "an unloaded base keeps its pad record, which is the box")
 		data.plot.pads = {}
 		t.eq(Schema.WaitingTrucks(data), { "Rustbucket" })
+	end)
+
+	t.test("world version: v1 keeps the truck, v2 parks once, and v1 then v2 does not duplicate", function()
+		local loader = t.loader()
+		local Schema = loader:server("ProfileSchema")
+		local GameConfig = loader:shared("GameConfig")
+		local Util = loader:shared("Util")
+		local function save()
+			local data = Util.deepCopy(Schema.Template)
+			data.worldVersion = nil
+			data.truckAt = { x = 10, y = 2, z = 30 }
+			data.groundLoad = { { w = "oak", k = "log", t = 1.07 } }
+			data.strandedLoad = {}
+			data.secrets = { cave = true, bad = 1 }
+			data.temper = {
+				good = { prefix = "Prosperous", tier = 2 },
+				unknown = { prefix = "Swift", tier = 1 },
+				skip = { prefix = "Keen", tier = 4 },
+			}
+			data.truckLoad = { { w = "pine", k = "log", t = 1.5 } }
+			return data
+		end
+
+		GameConfig.WorldVersion = 1
+		local kept = save()
+		local truck = kept.truckAt
+		Schema.Migrate(kept)
+		t.eq(kept.truckAt, truck, "a v1 save with the constant at 1 keeps truckAt")
+		t.eq(kept.worldVersion, 1)
+		t.eq(#kept.groundLoad, 1)
+		t.eq(#kept.strandedLoad, 0)
+		t.eq(kept.secrets.cave, true)
+		t.eq(kept.secrets.bad, nil)
+		t.eq(kept.temper.good.tier, 2)
+		t.eq(kept.temper.unknown, nil)
+		t.eq(kept.temper.skip, nil)
+		t.eq(kept.truckLoad[1].t, nil, "a temper that is not a grade becomes 1, stored as absent")
+
+		GameConfig.WorldVersion = 2
+		local parked = save()
+		local piece = parked.groundLoad[1]
+		Schema.Migrate(parked)
+		t.eq(parked.truckAt, nil)
+		t.eq(parked.worldVersion, 2)
+		t.eq(#parked.groundLoad, 0)
+		t.eq(#parked.strandedLoad, 1)
+		t.eq(parked.strandedLoad[1], piece)
+		t.eq(parked.strandedLoad[1].t, 1.07)
+		Schema.Migrate(parked)
+		t.eq(#parked.strandedLoad, 1, "a second migrate does not duplicate")
+		t.eq(parked.strandedLoad[1], piece)
+
+		GameConfig.WorldVersion = 1
+		local round = save()
+		local first = round.groundLoad[1]
+		Schema.Migrate(round)
+		t.eq(round.worldVersion, 1)
+		t.eq(round.truckAt.x, 10)
+		GameConfig.WorldVersion = 2
+		Schema.Migrate(round)
+		t.eq(#round.strandedLoad, 1)
+		t.eq(round.strandedLoad[1], first)
+		t.eq(round.truckAt, nil)
+		GameConfig.WorldVersion = 1
+		round.truckAt = { x = 4, y = 1, z = 4 }
+		local second = { w = "pine", k = "log", t = 1.10 }
+		table.insert(round.groundLoad, second)
+		Schema.Migrate(round)
+		t.eq(round.worldVersion, 1, "an old-map server writes its own version, not the higher one")
+		t.eq(#round.strandedLoad, 1)
+		t.eq(round.groundLoad[1], second)
+		t.eq(round.truckAt.x, 4)
+		GameConfig.WorldVersion = 2
+		Schema.Migrate(round)
+		t.eq(round.worldVersion, 2)
+		t.eq(round.truckAt, nil)
+		t.eq(#round.groundLoad, 0)
+		t.eq(#round.strandedLoad, 2)
+		t.eq(round.strandedLoad[1], first)
+		t.eq(round.strandedLoad[2], second)
+		Schema.Migrate(round)
+		t.eq(#round.strandedLoad, 2)
+		t.eq(round.secrets.cave, true)
+	end)
+
+	t.test("daily turn-in: a finished goal is already paid, and a second migrate matches", function()
+		local Schema = t.server("ProfileSchema")
+		local Util = t.shared("Util")
+		local data = Util.deepCopy(Schema.Template)
+		data.daily = {
+			day = 12,
+			streak = 2,
+			bestStreak = 2,
+			lastCompleteDay = 12,
+			goals = {
+				{ kind = "fell", target = 4, progress = 4, reward = 15, done = true },
+				{ kind = "sell", target = 12, progress = 3, reward = 15, done = false },
+			},
+		}
+		Schema.Migrate(data)
+		t.eq(data.daily.goals[1].paid, true)
+		t.eq(data.daily.goals[2].paid, false)
+		t.eq(data.daily.bonusOwed, 0)
+		local once = Util.deepCopy(data.daily)
+		Schema.Migrate(data)
+		t.eq(data.daily, once, "a second migrate leaves it identical")
 	end)
 end

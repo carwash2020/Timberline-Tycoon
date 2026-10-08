@@ -191,6 +191,9 @@ end
 
 -- `itemSku` names what was bought for analytics (e.g. "SteelAxe").
 function EconomyService.SpendCash(player: Player, amount: number, reason: string, itemSku: string?): boolean
+	if amount ~= amount then
+		return false
+	end
 	amount = math.floor(amount)
 	if amount <= 0 then
 		return false

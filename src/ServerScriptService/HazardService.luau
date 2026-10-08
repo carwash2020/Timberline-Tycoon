@@ -12,6 +12,7 @@
 
 local RunService = game:GetService("RunService")
 
+local ClimateLogic = require(game:GetService("ReplicatedStorage").Shared.ClimateLogic)
 local GameConfig = require(game:GetService("ReplicatedStorage").Shared.GameConfig)
 local HazardLogic = require(game:GetService("ReplicatedStorage").Shared.HazardLogic)
 
@@ -27,6 +28,7 @@ local STEP_SEC = 0.5 -- how often positions are sampled; ticks accrue inside Haz
 local elapsed = 0
 local seaState: { [Player]: HazardLogic.SeaState } = {}
 local inCave: { [Player]: boolean } = {}
+local exposureOf: { [Player]: number } = {}
 
 local function notify(player: Player, text: string)
 	local send = HazardService.Notify
@@ -53,6 +55,27 @@ end
 function HazardService.Forget(player: Player)
 	seaState[player] = nil
 	inCave[player] = nil
+	exposureOf[player] = nil
+	pcall(function()
+		player:SetAttribute("Exposure", 0)
+		player:SetAttribute("ClimateKind", "")
+	end)
+end
+
+-- One climate step. BiomeService decides the hazard (gear, crater, biome)
+-- and whether a seat is sheltering the player. This owns the meter, the
+-- attributes, and the damage number. A nil hazard, or a respawn, clears it.
+function HazardService.ApplyClimate(
+	player: Player,
+	hazard: ClimateLogic.Hazard?,
+	sheltered: boolean,
+	dt: number
+): number
+	local exposure, damage = ClimateLogic.Tick(exposureOf[player] or 0, dt, hazard ~= nil, sheltered, hazard)
+	exposureOf[player] = exposure
+	player:SetAttribute("Exposure", exposure)
+	player:SetAttribute("ClimateKind", if hazard then hazard.kind else "")
+	return damage
 end
 
 -- One player's pass at (x, z) for `dt` seconds. Exposed for specs.

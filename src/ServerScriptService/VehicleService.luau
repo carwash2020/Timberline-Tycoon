@@ -1207,7 +1207,9 @@ local function respawnFee(player: Player, def: TruckDef): number
 	if free then
 		ownsTow = free(player) == true
 	end
-	return ShopLogic.RecallFee(def, CoreLoop.Active(), ownsTow)
+	local profile = ProfileService.GetProfile(player)
+	local cash = if profile and type(profile.cash) == "number" then profile.cash else nil
+	return ShopLogic.RecallFee(def, CoreLoop.Active(), ownsTow, cash)
 end
 
 -- 5% of its price to bring a truck back (the first two spawns free; Tow Service

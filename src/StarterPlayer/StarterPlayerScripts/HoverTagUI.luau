@@ -20,6 +20,7 @@
 -- stands in front: aiming never goes through a wall.
 
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -27,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local CoreLoop = require(ReplicatedStorage.Shared.CoreLoop)
 local HoverTag = require(ReplicatedStorage.Shared.HoverTag)
+local PickaxeData = require(ReplicatedStorage.Shared.Mining.PickaxeData)
 local ShopHoursLogic = require(ReplicatedStorage.Shared.ShopHoursLogic)
 local ShopLogic = require(ReplicatedStorage.Shared.ShopLogic)
 local TextAnchor = require(ReplicatedStorage.Shared.TextAnchor)
@@ -40,7 +42,8 @@ local F = UITheme.Fonts
 local player = Players.LocalPlayer
 
 local TICK = 0.1 -- seconds between aim checks (10 a second)
-local WIDTH, HEIGHT = 260, 130 -- the billboard; the card sits in its lower middle
+local WIDTH, HEIGHT = 260, 130 -- the shop billboard; an ore card is HoverTag.OreWidth
+local ORE_H = 72
 local CARD_PX = 64 -- about how tall the card is, for the ceiling check
 local PROMPT_CLEAR_PX = 52 -- a Buy / Open card is drawn over the item's middle: keep above it
 local AIM_PAD = 0.35 -- studs a bounding box is grown by for aiming
@@ -58,6 +61,7 @@ local shownKey: string? = nil
 local shownRoot: Instance? = nil
 
 local gui: BillboardGui? = nil
+local oreTag = false
 local nameLabel: TextLabel? = nil
 local lineLabel: TextLabel? = nil
 local card: Frame? = nil
@@ -360,21 +364,57 @@ local function show(key: string)
 		return
 	end
 	local g = ensureGui()
+	local levelAttr = player:GetAttribute(PickaxeData.LevelAttribute)
 	local facts: HoverTag.Facts = {
 		hour = ShopHoursLogic.Now(),
 		loop = CoreLoop.Active(),
 		owned = ownedFacts(spec),
 		inStock = vehicleInStock(spec),
+		pickLevel = if type(levelAttr) == "number" then levelAttr else 0,
 	}
-	local name, line = HoverTag.Lines(spec, facts)
+	local name, line, oreStyle = HoverTag.Lines(spec, facts)
 	local state = HoverTag.StateOf(spec, facts)
+	oreTag = oreStyle ~= nil
+	g.Size = if oreTag then UDim2.fromOffset(HoverTag.OreWidth, ORE_H) else UDim2.fromOffset(WIDTH, HEIGHT)
 	if nameLabel then
 		nameLabel.Text = name
+		nameLabel.TextColor3 = if oreStyle ~= nil and oreStyle.nameColor ~= nil then oreStyle.nameColor else C.Cream
+		if oreTag then
+			nameLabel.TextScaled = false
+			nameLabel.TextWrapped = false
+			nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+			nameLabel.Size = UDim2.new(1, 0, 0, 22)
+			nameLabel.AutomaticSize = Enum.AutomaticSize.None
+		end
 	end
 	if lineLabel then
 		lineLabel.Text = line
 		lineLabel.Visible = line ~= ""
-		lineLabel.TextColor3 = if state == "price" then C.Amber else C.Cream
+		if oreStyle ~= nil then
+			-- StopRed is UITheme.Colors.Danger. The theme has no StopRed token.
+			lineLabel.TextColor3 = if oreStyle.needs then C.Danger else C.Cream
+			lineLabel.TextScaled = false
+			lineLabel.TextWrapped = false
+			lineLabel.TextTruncate = Enum.TextTruncate.AtEnd
+			lineLabel.Size = UDim2.new(1, 0, 0, 20)
+			lineLabel.AutomaticSize = Enum.AutomaticSize.None
+		else
+			local cashAttr = player:GetAttribute("Cash")
+			local cash = if type(cashAttr) == "number" then cashAttr else 0
+			local price = if state == "price" and spec.robux == nil then HoverTag.Price(spec, facts.loop) else nil
+			local toneOf = (HoverTag :: any).PriceTone
+			if type(toneOf) == "function" then
+				local tone = toneOf(state, price, cash, spec.robux ~= nil)
+				local gold = (HoverTag :: any).CoinGold
+				local red = (HoverTag :: any).StopRed
+				lineLabel.TextColor3 = if tone == "gold" and typeof(gold) == "Color3"
+					then gold
+					elseif tone == "red" and typeof(red) == "Color3" then red
+					else C.Cream
+			else
+				lineLabel.TextColor3 = if state == "price" then C.Amber else C.Cream
+			end
+		end
 	end
 	if shownKey ~= key then
 		hidden = false
@@ -421,6 +461,19 @@ local function placeTag()
 	local cardStuds = TextAnchor.CardStuds(CARD_PX, distance, camera.ViewportSize.Y)
 	local lift = TextAnchor.Lift(0, LIFT, if up then up.Distance else nil, cardStuds)
 	local tail = base + Vector3.new(0, lift, 0)
+	if oreTag then
+		local screen = camera:WorldToViewportPoint(tail)
+		if screen.Z > 0 then
+			local inset = GuiService:GetGuiInset()
+			local vp = camera.ViewportSize
+			local x, y =
+				HoverTag.ClampScreen(screen.X, screen.Y, vp.X, vp.Y, inset.X, inset.Y, HoverTag.OreWidth, ORE_H)
+			if math.abs(x - screen.X) > 0.5 or math.abs(y - screen.Y) > 0.5 then
+				local ray = camera:ViewportPointToRay(x, y)
+				tail = ray.Origin + ray.Direction.Unit * screen.Z
+			end
+		end
+	end
 	g.StudsOffsetWorldSpace = tail - adornee.Position
 	local pixels = if hasPrompt(root) then PROMPT_CLEAR_PX else 0
 	if card then

@@ -160,7 +160,8 @@ local function price(d: Deps, model: Model): Priced?
 			boost,
 			lux,
 			attrNumber(model, "MillBonus"),
-			attrNumber(model, "BoardBonus")
+			attrNumber(model, "BoardBonus"),
+			attrNumber(model, "t")
 		),
 		figure = figure,
 	}

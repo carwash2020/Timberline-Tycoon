@@ -397,11 +397,11 @@ return function(t)
 	t.test("H-Economy: kit fees do not move the five headlines", function()
 		local text = fs.readFile("ECONOMY.md")
 		t.ok(string.find(text, "68 s", 1, true) ~= nil)
-		t.ok(string.find(text, "7.9 min", 1, true) ~= nil)
-		t.ok(string.find(text, "13.7 min", 1, true) ~= nil)
-		t.ok(string.find(text, "51.4 min", 1, true) ~= nil)
-		-- The price ladder (axes) moved the headlines to these.
-		t.ok(string.find(text, "30.5 h", 1, true) ~= nil)
+		t.ok(string.find(text, "5.4 min", 1, true) ~= nil)
+		t.ok(string.find(text, "17.9 min", 1, true) ~= nil)
+		t.ok(string.find(text, "66.3 min", 1, true) ~= nil)
+		-- Coat gate, modelled mill and planer bonuses, and the $7,600 step.
+		t.ok(string.find(text, "33.5 h", 1, true) ~= nil)
 	end)
 
 	t.test("kit meshes: fidelity is chosen per mesh, and a shared col loads once", function()

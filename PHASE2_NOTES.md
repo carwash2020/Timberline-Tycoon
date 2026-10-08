@@ -8,6 +8,10 @@ passes (formatter, linter, strict types against the Roblox API, 351 unit
 tests, ECONOMY.md current); GitHub runs it on every push.
 
 What's here, each with its own checklist below:
+
+15. **V1 economy core** (8 October 2026, branch `phase-2/v1-a1-economy-core`): climate damage, the Prosperous stamp, prices, and the save contract
+
+
 1. **The redesign (October 2026):** every model rebuilt, the world on
    terrain, a living environment, the Living Forest twist, feel and fixes
 2. **Axe shop**: the Tool Shed
@@ -22,9 +26,12 @@ What's here, each with its own checklist below:
 11. **Plots**: claim a plot, grow it, the Blueprint Store, placing, moving, selling back
 12. **The new look**: every screen restyled from the Claude Design UI spec
 
+15. **Mining and crafting** (8 October 2026, branch `phase-2/v1-m-mining`): ore rocks, picks, bombs, the smelting furnace, the craft bench
+
 14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
 
 15. **V1 buildings, shops, props and palette** (8 October 2026, branch `phase-2/v1-c-buildings`): one style for the town buildings, shops at 250 parts or fewer, new small buildings, renders in `previews/v1-c/`
+16. **Sparkworks logic sandbox** (8 October 2026, branch `phase-2/v1-s-sparkworks`): wires, gates, timers, the settings panel, the demo board
 
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
 
@@ -61,6 +68,76 @@ One upgraded look for the town buildings. Shops keep the pinned footprints (Tool
 - Same walk with the stick. Door prompts still appear in range. Talk to the keeper; the counter does not block the prompt. Aim at an axe on the rack: the hover tag still shows the name and price (nothing on the model itself).
 
 Good: one family of colours, no dollar signs on buildings, doors and counters where they were, rack still stepped. Bad: a shop over 250 parts, a price painted on a sign, the Tool Shed rack missing a sold axe, grass under the Hearth porch, or the Dealership porch lamp brighter than the showroom.
+## Sparkworks logic sandbox (8 October 2026, branch `phase-2/v1-s-sparkworks`)
+
+Connor wants Sparkworks in V1, and he wants to see the pieces before they merge. Renders (names only, no prices on the models): `previews/v1-s/pieces-1.png` through `previews/v1-s/pieces-4.png` (at most four pieces, 3/4 at 30 degrees, the group about 70% of the width, name on a ground plaque), `previews/v1-s/wired.png` (lever and button into AND into a lamp, unlit beside lit, right-angle wires), `previews/v1-s/settings-panel-phone.png` (667x375) and `previews/v1-s/settings-panel-desktop.png` (1920x1080, the selection ring on minus). Panel colors are UITheme's. `SparkworksTheme.Layer = 16` is local until Lane U adds it.
+
+What shipped: Button $320, Lever $520, Pressure Plate $640, Wall Switch $100, AND/OR/XOR $260, NOT $200, Delay $520, Sustain $520, Clock $902, Spark Lamp $150, Glow Wire $720, Hatch $830. A Door you already own can be wired. Bought once, then placed free. The Wall Switch and Spark Lamp stay on Hearth & Home until Lane F stocks Sparkworks from `SparkworksStock` (anyone who already owns one keeps it). Laser, Detector and Wood Detector are not in this pass (V1.1).
+
+Caps (proposals): 80 logic pieces and 160 wires on a plot. A looping circuit stops at 200 evaluations and the piece reads Overloaded. The graph ticks only while the owner is online and the plot is loaded. Delay, Sustain and Clock remember their setting in `plot.logic`. Clocks and in-flight delays start again on rejoin (the phase is not saved).
+
+Lane K's meshes: each piece looks for a model of its id under `MeshTemplates`, with slots Body, Indicator, Moving and LabelFace. A missing model keeps the part build and logs once. Indicator is the lamp or LED. Moving is the lever, the button cap, the hatch door or the plate top. The gate label sits on LabelFace. Lane W can call `LogicService.RegisterTarget(uid, { power, reverse })` for a belt, a sawmill or a planer. Those inputs are stored and not driven yet.
+
+`V1Boot.Start` receives the remote table from GameServer and calls `LogicService.V1Init`, so `LogicSet` has a listener before anyone opens the settings panel. The settings panel sits at the top centre, clear of the thumbstick and the jump button. Minus, plus and Done work by tap, click, and the d-pad or arrow keys. B closes it. The wire tool and the panel bind gamepad keys only while they are open.
+
+### Studio checks
+
+1. **PC.** Place a Lever and a Button, wire them into the two inputs of an AND gate, and wire the gate to a Spark Lamp. The lamp lights only when both are on. The button lets go after about a second. The lever stays. Good: the lamp goes dark when either input drops.
+2. **PC.** Wire a Clock to a Spark Lamp. Use Set, then plus and minus. The lamp blinks once per the number you set. Leave and rejoin, and swap save slots: the number is the same. The clock starts off again. Good: one number in the panel, in seconds.
+3. **PC.** Wire a Pressure Plate to a Hatch. Stand on the plate: the hatch opens. Step off: it shuts. Drop a piece of wood on the plate: it opens again.
+4. **PC.** Wire three NOT gates in a ring. Each piece shows Overloaded. The server stays smooth.
+5. **PC.** Leave the server. Lamps and clocks stop. Rejoin: levers and settings match what you saved.
+6. **Phone emulator.** The wire tool: tap an output, tap an input. The settings panel: tap minus, plus and Done. Nothing sits on the thumbstick or the jump button. The first wiring session shows "Pick an output", then "Pick an input", then "Done: flip it", once.
+7. **Xbox.** Wire tool: RT picks, X cuts, B leaves. Settings panel: the stick moves between minus and plus, A presses, B closes. The d-pad is not used (it stays the HUD shortcuts). After both are closed, chopping with RT still swings the axe.
+8. **Demo board.** If Sparkworks has a part named DemoBoard, a lever feeds an AND, a clock feeds a lamp, and a plate feeds a hatch, with no save. If the building is not in the world, nothing errors.
+9. **Gates.** AND, OR, XOR, NOT, Delay, Sustain and Clock each show a cream label on the dark top (AND, OR, XOR, NOT, DLY, HOLD, CLK) and a different coloured strip. You can tell them apart without opening the shop. Until Lane K's meshes are in the place, Output logs `[LogicItems] <id> has no MeshTemplates model; keeping the part build` once per piece and the parts stay.
+
+## V1 economy core (8 October 2026, branch `phase-2/v1-a1-economy-core`)
+
+Not seen in Studio. The model (ECONOMY.md) is 68 s / 5.4 min / 17.9 min / 66.3 min / 33.5 h. Lane B, after this merges, edits only BiomeData haul distances and possibly `GameConfig.ExpansionPriceStep`, then reruns `lune run tools/economy`.
+
+**Snow and the volcano.** Stand in the Snowfields with no coat. The player attribute `Exposure` climbs from 0 to 1 over 8 seconds and `ClimateKind` is `snow`; health does not drop until the meter is full, then about 4 per second. Sit in a vehicle seat: `Exposure` stops where it is. Step back to the forest, equip the Insulated Coat, or respawn: `Exposure` goes to 0 and the damage stops. On the volcano, outside the crater, the same meter fills over 6 seconds and then health drops about 6 per second; Heat Boots clear it. Inside the crater the old lava burn stays (5 per second) and `ClimateKind` stays empty.
+
+**Prosperous (`t`).** Fell with an axe whose temper is Prosperous I, II or III. The log's attribute `t` is 1.04, 1.07 or 1.10. Run it through a sawmill and a planer: the plank still has that `t`. Load it, unload it, leave and rejoin: `t` is still there. Sell it. A log pays its price times `t`. A plank pays its price times min(3, mill bonus × board bonus × `t`). An axe with no Prosperous temper has no `t`. Truck paint is unchanged.
+
+**Prices and the pass.** The Tool Shed shows the Steel Axe at $110 and the Cobalt Axe at $2,500. The Sky Pass is not on a shelf. With under $5, recalling a truck is free; with $5 or more it is the usual fee (5%, at least $5), and Tow Service is still free. A new plot's expansion squares use the $7,600 step.
+
+**Saves.** A brand-new profile's `worldVersion` is 1. Nothing here moves a parked truck; that waits until the map's version goes to 2. An old save keeps its cash, axes, trucks, placed pieces and the sections on its truck and on the ground. The shop prices that moved are the Steel Axe ($110, was $120), the Cobalt Axe ($2,500, was $3,000), frostwood planks (plan 120, plank scale 0.40) and the expansion step ($7,600, was $3,050). There is no trade window.
+
+## Mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
+
+Not played in Studio yet. The furnace pad is the flat 30×24 at world (48, 0, −110). The mine mouth fallback is (150, 0, −150). If lane B's tagged `MineAnchor` / `Rubble` parts are in the place, those win and the fallback anchors are not used. One chamber of nodes spawns per tier (8 / 5 / 4), even if more anchors exist.
+
+Picks are Tools, not shop axes. Swing with the tool button (mouse click, a phone tap, the gamepad's tool button). There is no extra ButtonR2 bind. The ore label is the existing hover tag (`HoverTag` / `HoverTagUI`), not a second billboard. The server writes `PickLevel` on the player (best owned pick). The rock only stores the required level (`HoverNeed`).
+
+### PC
+
+1. Walk to the pad. You should see SmeltingFurnace, a Prospector stall (the sign says PROSPECTOR, no price on the model) and a craft bench. E on the stall opens the shop. E on the bench opens Craft.
+2. The first shop visit puts a Rusty Pick in the backpack and sets `PickLevel` to 1. Equip it. The chip at the top right reads `Rusty Pick · Lv 1`. Unequip it away from the mine and the chip hides.
+3. Aim at an Iron rock within 60 studs. One tag, on that rock only. The name is Iron in the rust vein colour. The second line is `Needs Iron Pick` in red (`UITheme` Danger). Buy the Copper Pick ($450, one price). With `PickLevel` 2 the same rock reads `Iron Pick` in cream, with no Needs line. Coal (need 1) never says Needs for a Rusty Pick. No `$` and no `R$` on an ore tag.
+4. Move the mouse off the rock. The tag hides in about a third of a second. Move from a shop box to a rock: the tag waits about 0.08s before it switches. Shop and log tags still show their own prices.
+5. Click a Coal rock. One click, one swing, then a cooldown. The last hit spawns one chunk. A second click in the same moment does not spawn a second chunk. The chunk has a Pick up prompt. Carry it into the Ore Chute on the stall. Cash goes up once, by the chunk's stored value ($6), and the chunk is gone. The wood sell pad does not pay for ore.
+6. With the Rusty Pick, click an Iron rock. A toast says `Needs an Iron Pick` and the swing does not start a cooldown (a Coal rock beside it still swings at once).
+7. Buy a Bomb for $220 (the same number as dynamite). Short cash buys nothing. Equip it, stand within 8 studs of a rubble wall, click once. A spark shows for 3 seconds, then the wall's parts hide for everyone for 10 minutes. About 20 seconds before it reseals, dust appears. Crawl out (E) moves you toward the mine mouth, not deeper. If the wall reseals while you are just past its far face (within about 6 studs), Crawl out still works. Two clicks in the same moment spend one bomb.
+8. Put a Copper chunk in SmeltIntake. With coal, one coal covers four chunks; without it, each chunk costs $2, once. About 3 seconds later one ingot appears and the chunk is gone. Leaving it there does not charge again. The same chunk cannot also be paid by the chute.
+9. Craft bench: one row per recipe (icon, name, cost line, a 44×44 Craft button). Copper Lamp Post and Gold-banded Chest say Soon. B and Esc close the shop and the bench. You have to be within 12 studs of the bench, and the ingots and chunks have to be within 12 studs of it too. A stranger's log, even a closer one, is not yours.
+10. Obsidian Pick: Heartstone is too hard for a Steel Pick, so the turn-in is 5 Timber Opal ingots (Opal is hardness 4) plus $50,000, at the stall. Four ingots are refused and stay in the world. Five are consumed, then the pick can be bought. The save still calls that turn-in `HeartstoneTurnIn`. `mining` on the profile is account-wide: a slot swap does not move the picks.
+
+### Phone emulator (667×375)
+
+1. The chip, the shop and the craft list sit in the top half, at least 12px from the edges, and the panel is at most 60% of the screen height. They do not cover the bottom-left thumbstick (left 40% of the bottom half) or the jump button (bottom right).
+2. One row per item, 8px apart, in a scrolling list. The name is 16px (18px on a tall screen), not stretched. The cost is 14px under the name. Buy and Craft buttons are at least 44×44.
+3. Tap a rock, or stand within 6 studs of one in front of you. The tag shows for about 4 seconds and is readable. One tap on the equipped pick is one swing.
+4. In a cave, count PointLights: the lamp (only while equipped, range 12, shadows off) plus at most 4 glowing nodes, 6 or fewer in total, shadows off. Each ore rock is 8 parts or fewer. Live ore chunks on you stop at 40 (a toast names the one that did not fit).
+
+### Xbox
+
+1. With a pick equipped, aim the screen centre at a rock within 12 studs. The tag shows with no extra button, and it does not cover the swing or a target ring.
+2. The tool button swings once per press. ButtonR2 is not bound by mining.
+3. X on the Shop and Craft prompts opens the panel. The stick stays inside it. B closes it.
+4. Crawl out works on X while your character is inside a sealed wall. A too-weak rock shows the Needs line and does not arm a swing.
+
+Good: the five wood headline times in ECONOMY.md are unchanged (68 s, 7.9 min, 13.7 min, 51.4 min, 30.5 h). Mining ratios are in MINING.md (Hills 0.43 of Pine $17,136, Snow 0.57 of Frostwood $28,677, Gloam 0.67 of that same Frostwood). Steel or Lux at Gloam is about $10.7k/h. Obsidian is about $19.1k/h.
 
 ## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
 
