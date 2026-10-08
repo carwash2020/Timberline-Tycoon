@@ -629,17 +629,24 @@ local function turnIn(player: Player)
 	if mining == nil or not nearPrimary(player, prospector()) then
 		return
 	end
-	local found: { Model } = {}
-	for _, child in ipairs(worldFolder():GetChildren()) do
-		if
-			child:IsA("Model")
-			and child.Name == "Ingot"
-			and child:GetAttribute("OwnerId") == player.UserId
-			and child:GetAttribute("Ore") == "TimberOpal"
-		then
-			table.insert(found, child)
-		end
+	if (mining.crafted.HeartstoneTurnIn or 0) >= 1 then
+		toast(player, "Already turned in")
+		return
 	end
+	local stall = prospector()
+	local host = stall and stall.PrimaryPart
+	if host == nil then
+		return
+	end
+	-- CraftingService requires this module, so look it up by name at call
+	-- time (a static require would be a cycle the type checker rejects).
+	local craftingModule = script.Parent:FindFirstChild("CraftingService")
+	if craftingModule == nil then
+		return
+	end
+	local CraftingService = require(craftingModule :: any) :: any
+	local _, ingotModels = CraftingService.StockNear(player, host)
+	local found = ingotModels.TimberOpal or {}
 	if #found < need then
 		toast(player, "Needs 5 Timber Opal ingots")
 		return

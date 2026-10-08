@@ -94,6 +94,12 @@ return function(t)
 						return if p == player then profile else nil
 					end,
 				},
+				WoodService = {
+					FromModel = function()
+						return nil
+					end,
+					Remove = function() end,
+				},
 			},
 			services = {
 				Workspace = world,
@@ -227,6 +233,82 @@ return function(t)
 		t.eq(world.profile.mining.picks.ObsidianPick, true)
 		t.eq(world.profile.cash, 0)
 		t.eq(world.profile.mining.pick, "ObsidianPick")
+	end)
+
+	local function opalSave()
+		return { picks = { RustyPick = true, SteelPick = true }, pick = "SteelPick" }
+	end
+
+	local function countLeft(models)
+		local left = 0
+		for _, model in ipairs(models) do
+			if stillThere(model) then
+				left += 1
+			end
+		end
+		return left
+	end
+
+	t.test("a repeat turnIn takes nothing more", function()
+		local world = setup(50000, opalSave())
+		stall(world.miningFolder(), Vector3.zero)
+		world.stand(Vector3.new(0, 0, 4))
+		local owned = {}
+		for i = 1, 10 do
+			owned[i] = ingot(world.miningFolder(), world.player.UserId, Vector3.new(i * 0.5, 0, 0))
+		end
+		world.Mining.Handle(world.player, "turnIn", nil, nil)
+		t.eq(world.profile.mining.crafted.HeartstoneTurnIn, 1)
+		t.eq(countLeft(owned), 5)
+		world.Mining.Handle(world.player, "turnIn", nil, nil)
+		t.eq(world.profile.mining.crafted.HeartstoneTurnIn, 1)
+		t.eq(countLeft(owned), 5)
+	end)
+
+	t.test("ingots on the plot, outside the stall's reach, are not counted or taken", function()
+		local world = setup(50000, opalSave())
+		stall(world.miningFolder(), Vector3.zero)
+		world.stand(Vector3.new(0, 0, 4))
+		local models = {}
+		for i = 1, 4 do
+			models[#models + 1] = ingot(world.miningFolder(), world.player.UserId, Vector3.new(i, 0, 0))
+		end
+		for i = 1, 3 do
+			models[#models + 1] = ingot(world.miningFolder(), world.player.UserId, Vector3.new(200 + i, 0, 0))
+		end
+		world.Mining.Handle(world.player, "turnIn", nil, nil)
+		t.eq(countLeft(models), 7)
+		t.eq(world.profile.mining.crafted.HeartstoneTurnIn, nil)
+	end)
+
+	t.test("ingots welded in a truck bed are not counted or taken", function()
+		local world = setup(50000, opalSave())
+		local folder = world.miningFolder()
+		stall(folder, Vector3.zero)
+		world.stand(Vector3.new(0, 0, 4))
+		local bed = Instance.new("Part")
+		bed.Name = "BedFloor"
+		place(bed, Vector3.new(0, 0, 2))
+		bed.Parent = folder
+		local models = {}
+		for i = 1, 4 do
+			models[#models + 1] = ingot(folder, world.player.UserId, Vector3.new(i, 0, 0))
+		end
+		local welded = ingot(folder, world.player.UserId, Vector3.new(0, 1, 0))
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = welded.PrimaryPart
+		weld.Part1 = bed
+		weld.Parent = welded
+		models[#models + 1] = welded
+		world.Mining.Handle(world.player, "turnIn", nil, nil)
+		t.eq(countLeft(models), 5)
+		t.eq(world.profile.mining.crafted.HeartstoneTurnIn, nil)
+		-- A fifth loose ingot lets it through, and the welded one stays.
+		local loose = ingot(folder, world.player.UserId, Vector3.new(0, 2, 0))
+		world.Mining.Handle(world.player, "turnIn", nil, nil)
+		t.eq(world.profile.mining.crafted.HeartstoneTurnIn, 1)
+		t.eq(stillThere(welded), true)
+		t.eq(stillThere(loose), false)
 	end)
 
 	t.test("a coal-less chunk left 3s in SmeltIntake is charged $2 once", function()

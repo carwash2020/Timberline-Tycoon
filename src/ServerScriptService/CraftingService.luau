@@ -69,9 +69,8 @@ local function nearBench(player: Player): boolean
 	return (root.Position - host.Position).Magnitude <= MiningLogic.ShopReach
 end
 
-local function oreModels(player: Player): { Model }
+local function oreModels(player: Player, host: BasePart?): { Model }
 	local folder = Workspace:FindFirstChild("Mining")
-	local host = benchHost()
 	local list: { Model } = {}
 	if folder == nil or host == nil then
 		return list
@@ -89,11 +88,16 @@ local function oreModels(player: Player): { Model }
 	return list
 end
 
-local function stockFrom(player: Player): (CraftLogic.Stock, { [string]: { Model } }, { [string]: { Model } })
+-- The owner's ore within ShopReach of `host`, minus anything welded in a
+-- truck bed. The bench and the prospector's turn-in both count this way.
+local function stockNear(
+	player: Player,
+	host: BasePart?
+): (CraftLogic.Stock, { [string]: { Model } }, { [string]: { Model } })
 	local stock: CraftLogic.Stock = { ingots = {}, chunks = {} }
 	local ingotModels: { [string]: { Model } } = {}
 	local chunkModels: { [string]: { Model } } = {}
-	for _, model in ipairs(oreModels(player)) do
+	for _, model in ipairs(oreModels(player, host)) do
 		if not truckWelded(model) then
 			local ore = model:GetAttribute("Ore")
 			if type(ore) == "string" then
@@ -110,6 +114,17 @@ local function stockFrom(player: Player): (CraftLogic.Stock, { [string]: { Model
 		end
 	end
 	return stock, ingotModels, chunkModels
+end
+
+local function stockFrom(player: Player): (CraftLogic.Stock, { [string]: { Model } }, { [string]: { Model } })
+	return stockNear(player, benchHost())
+end
+
+function CraftingService.StockNear(
+	player: Player,
+	host: BasePart
+): (CraftLogic.Stock, { [string]: { Model } }, { [string]: { Model } })
+	return stockNear(player, host)
 end
 
 -- A loose log near the player. Owner and Volume are the server attributes.

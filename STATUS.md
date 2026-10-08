@@ -15,6 +15,8 @@ The earlier tier-3 cut (Opal $36/$70, Heartstone $80/$140, compared with Gloamwo
 - Furniture (Copper Lamp Post, Gold-banded Chest) stays "Coming soon" until lane F can grant a placed piece.
 - No texture or mesh uploads. Rocks, picks, the furnace and the gear are part-built.
 
+Turn-in fixes (PR #125 QA round 2): a second turn-in no longer eats 5 more Timber Opal ingots (toast "Already turned in"), and the turn-in only counts ingots near the Prospector stall and not welded in a truck bed, through `CraftingService.StockNear`. Specs in `tests/MiningService.spec.luau`.
+
 Studio checks: PHASE2_NOTES.md, "Mining and crafting".
 
 Last updated 8 October 2026 (choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
