@@ -2778,6 +2778,22 @@ A read-through of the join flow, boxes and store, owner hub and paid items, mill
 
 Left alone, for Connor to decide: a log hand-dropped at a sawmill or planer that is busy waits; after `AutomationLogic.HandWindow` (4 s) untouched it counts as belt-fed, so rare or figured wood hand-fed behind another job is refused ("rare") and the throughput cap applies. Picking it up and dropping it again resets the clock.
 
+
+## Vehicle meshes (branch `claude/vehicle-models`)
+
+Connor, Xbox playtest after #108: "The vehicle models are messed up as well". His picture is the dealership's back row: a red Logging Rig with a long plank deck lying at the plinth, black lumps, huge black tyres and pale poles, and a blue block.
+
+**What it was.** The showroom, plinths, boxes, `ItemBox` sizes and `PlotPlatform` are fine: the part-built vehicles render correctly in `dealership` and `trucks`. The mess is the uploaded-mesh path (Studio only, Lune cannot load meshes). `VehicleModels` holds each vehicle piece (Body, Glass, Lights, Bed, Hitch; Wheels go on the part-built wheels) as its own asset and its size. An asset has no pivot, so the piece arrives centred on its own bounds, and `VehicleMeshes.placeAtRoot` stood every piece's bottom-centre on the ground centre. That is right for the Body only. The Bed (3 to 7 studs tall) went to the road, under the kept part-built bed boards; Glass and Lights sank to the ground; the Hitch sat mid-truck; a trailer's pieces were all at its average. The part-built cab, hood and fenders are dropped when meshes are used, so nothing hid it.
+
+**Fix.** `VehicleMeshes.Place` takes each piece's centre from the part-built hull it replaces (read before the cab and bed are dropped): Body on the ground as before; Bed from the chassis bottom, over the BedFloor; Glass at the cab glass (the Scout: by its seat); Lights from the lowest lamp up, centred between the head and tail lamps and never above the cab roof; Hitch at the chassis end. Trailer pieces stand on `TrailerBed` (Body with its top at the bed top, Bed and Lights from its bottom, Hitch between the coupler and the bed front). A mesh whose pivot did survive (`MeshPivot = "authored"`) is used only if it lands within `VehicleMeshes.PivotTolerance` (2 studs) of that place. Wheels, collision, welds, part caps and handling are untouched; a mesh that fails to load still leaves the part-built vehicle. `tests/VehicleMeshPlace.spec.luau`: every truck and trailer piece stands on its hull. Preview: `bash tools/preview/shoot.sh vehiclemesh` draws each mesh as a block of its real size (body red, glass cyan, lights yellow, bed brown, hitch magenta) so the places can be compared.
+
+**Not verified.** The mesh shapes themselves (which way the nose faces, how a Lights mesh fills its box, the tyre axis) can only be seen in Studio.
+
+### Studio checks (Connor), vehicle meshes
+- [ ] Dealership, back and front row: every vehicle's bed sits on its frame behind the cab at truck height, glass in the cab, no plank deck at the plinth, no floating poles or lumps, tyres under the arches.
+- [ ] Spawn the Rustbucket, Pickup, Scout ATV, Flatbed and Logging Rig on your pad, each with and without a trailer: same checks, hitch at the back, the trailer's bed on its frame, tow and load logs as before.
+- [ ] Look at the vehicle through its box window: the little copy looks like the real one.
+- [ ] If a vehicle still looks wrong, send the vehicle and a side view: which piece (bed, glass, lights, hitch) is out tells which anchor to move.
 ## Box hold: a grabbed shop box hangs steady (branch `claude/box-hold-axes`, 8 October 2026)
 
 Connor's Xbox video: a grabbed shop box (the Millmaster 100, a shelf box) tilts and swings round the grip. Cause: the pull was sized for wood (mass x 400, capped at 4000), but a big box weighs about 6900 (35 mass x 196), so it could not be lifted, and the grip is off-centre (`ApplyAtCenterOfMass = false`) with a torque of only 2 x the pull, less than the pull's lever on a box. Fix (box only, tag `ShopBox`; wood is unchanged): `GrabLogic.HoldForce` (never less than 1.6 x the box's weight), the pull taken at the centre of mass (`PullsAtCentre`), `GrabLogic.HoldTorque` (at least force x 2 x the box's radius), the hold orientation started upright at the box's yaw (`GrabLogic.Upright`), and the box's angular velocity zeroed when the server confirms the grab.
