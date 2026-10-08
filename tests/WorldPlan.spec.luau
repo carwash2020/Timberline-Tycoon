@@ -623,6 +623,28 @@ return function(t)
 		t.ok(size.X == WorldPlan.SellPadWidth, "as wide as the pad")
 		t.ok(math.abs(zone.X - pad.X) < 1e-6, "over the pad, across")
 		t.ok(math.abs(zone.X - 53) < 1e-6 and math.abs(zone.Z - 111) < 1e-6, "its middle at (53, 111)")
+		local mill = WorldLayout.Sawmill
+		t.ok(
+			math.abs(pad.X - (mill.X + 53)) < 1e-6 and math.abs(pad.Z - (mill.Z + 1)) < 1e-6,
+			"the pad stays 53 east and 1 north of the sawmill"
+		)
+		t.ok(
+			math.abs(zone.X - (mill.X + 53)) < 1e-6 and math.abs(zone.Z - (mill.Z + 1)) < 1e-6,
+			"the zone stays on that same point"
+		)
+		-- MainStreet's north edge meets the zone. Backing in is due north
+		-- along the pad's centre line, not a bend off a new road.
+		local street = nil
+		for _, paint in ipairs(WorldLayout.TownPaint) do
+			if paint.name == "MainStreet" then
+				street = paint
+			end
+		end
+		t.ok(street ~= nil, "MainStreet")
+		t.ok(street.x0 <= pad.X and pad.X <= street.x1, "the street covers the pad's centre line")
+		local zoneSouth = zone.Z - size.Z / 2
+		t.ok(math.abs(street.z1 - zoneSouth) <= 2, "the street meets the south end of the zone")
+		t.ok(street.z1 <= zoneSouth + 1, "the street does not run through the zone")
 		t.ok(math.abs(zone.Z + size.Z / 2 - 137) < 1e-6 and math.abs(zone.Z - size.Z / 2 - 85) < 1e-6, "z 85 to 137")
 		t.ok(math.abs(zone.Z - pad.Z) < 1e-6, "its middle on the pad")
 		t.ok(zone.Z - size.Z / 2 > 61, "north of the lamps at z 60")

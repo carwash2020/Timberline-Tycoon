@@ -102,9 +102,19 @@ SECRETS = [
 
 MINE_MOUTH = (150, -150)
 HIDDEN = [(-400, 40), (90, 800), (540, 640)]
-FURNACE = (48, -110)  # 30 x 24 pad, long axis along X
+FURNACE = (48, -110)  # Lane M's ore pad, 30 x 24, not the sell station
 DOCK = (860, 160)
 TOWN = (-125, 140, -32, 205)
+# Sell station, locked to the sawmill. Pad middle is sawmill + (53, 1).
+# Zone is 28 x 52, z 85 to 137. Trucks back due north off MainStreet.
+SAWMILL_3 = (0.0, 110.0)
+SELL = (SAWMILL_3[0] + 53.0, SAWMILL_3[1] + 1.0)  # (53, 111)
+SELL_W, SELL_D = 28.0, 32.0
+SELL_ZONE_D = 52.0
+MAIN_STREET = (-128.0, 64.0, 62.0, 84.0)  # x0, x1, z0, z1
+# The backing lane: 6.3 studs either side of the pad's middle, from the
+# street's north edge up through the zone.
+SELL_LANE = (SELL[0] - 6.3, SELL[0] + 6.3, MAIN_STREET[2], SELL[1] + SELL_ZONE_D / 2)
 
 
 def dist(a, b) -> float:
@@ -173,6 +183,18 @@ def tunnel_len() -> float:
     return poly_len(TUNNEL)
 
 
+def segment_hits_rect(a, b, x0, x1, z0, z1) -> bool:
+    """True when segment ab meets the closed rect. Samples the segment."""
+    steps = max(2, int(dist(a, b) / 2))
+    for s in range(steps + 1):
+        t = s / steps
+        x = a[0] + (b[0] - a[0]) * t
+        z = a[1] + (b[1] - a[1]) * t
+        if x0 <= x <= x1 and z0 <= z <= z1:
+            return True
+    return False
+
+
 def validate() -> list[str]:
     lines = []
     bad = []
@@ -212,6 +234,17 @@ def validate() -> list[str]:
             bad.append(f"secret {name} {rd:.0f}")
     sky = next(b for b in BIOMES if b[0] == "sky")
     lines.append(f"isles to dock {dist(sky[2], DOCK):.1f}")
+    lines.append(f"sell pad {SELL[0]:.0f},{SELL[1]:.0f} (sawmill + 53, +1)")
+    if abs(SELL[0] - 53) > 1e-6 or abs(SELL[1] - 111) > 1e-6:
+        bad.append("sell pad moved")
+    sx0, sx1, sz0, sz1 = MAIN_STREET
+    if not (sx0 <= SELL[0] <= sx1 and abs(sz1 - (SELL[1] - SELL_ZONE_D / 2)) <= 2):
+        bad.append("main street does not meet the sell zone")
+    lx0, lx1, lz0, lz1 = SELL_LANE
+    for road_name, _width, pts in ROADS:
+        for i in range(len(pts) - 1):
+            if segment_hits_rect(pts[i], pts[i + 1], lx0, lx1, lz0, lz1):
+                bad.append(f"{road_name} crosses the sell lane")
     rest = PADS[4:]
     order = ", ".join(f"{a[1]} {dist((a[3], a[4]), SAWMILL):.0f}" for a in rest)
     lines.append("haul order: " + order)
@@ -411,8 +444,27 @@ def render(path: str) -> None:
         px, py = to_px(sx, sz)
         blit(img, w, h, px - 4, py - 8, "?", (20, 20, 80), 2)
 
+    # Main street and the sell station. The arrow is the straight back-in,
+    # due north along x = 53, from the street into the pad.
+    sx0, sy0 = to_px(MAIN_STREET[0], MAIN_STREET[3])
+    sx1, sy1 = to_px(MAIN_STREET[1], MAIN_STREET[2])
+    thick_line(img, w, h, sx0, sy0, sx1, sy0, (60, 60, 60), 2)
+    thick_line(img, w, h, sx1, sy0, sx1, sy1, (60, 60, 60), 2)
+    thick_line(img, w, h, sx1, sy1, sx0, sy1, (60, 60, 60), 2)
+    thick_line(img, w, h, sx0, sy1, sx0, sy0, (60, 60, 60), 2)
+    px0, py0 = to_px(SELL[0] - SELL_W / 2, SELL[1] + SELL_D / 2)
+    px1, py1 = to_px(SELL[0] + SELL_W / 2, SELL[1] - SELL_D / 2)
+    thick_line(img, w, h, px0, py0, px1, py0, (160, 60, 20), 2)
+    thick_line(img, w, h, px1, py0, px1, py1, (160, 60, 20), 2)
+    thick_line(img, w, h, px1, py1, px0, py1, (160, 60, 20), 2)
+    thick_line(img, w, h, px0, py1, px0, py0, (160, 60, 20), 2)
+    ax0, ay0 = to_px(SELL[0], MAIN_STREET[2])
+    ax1, ay1 = to_px(SELL[0], SELL[1])
+    thick_line(img, w, h, ax0, ay0, ax1, ay1, (180, 40, 20), 2)
+    blit(img, w, h, px1 + 4, (py0 + py1) / 2 - 6, "SELL", (140, 30, 10), 2)
+
     fx, fy = to_px(*FURNACE)
-    blit(img, w, h, fx, fy, "FURNACE", ink, 1)
+    blit(img, w, h, fx, fy, "ORE", ink, 1)
     dx, dy = to_px(*DOCK)
     blit(img, w, h, dx, dy, "DOCK", ink, 1)
 
@@ -441,7 +493,8 @@ def render(path: str) -> None:
         "MINE WALK-IN SOUTH",
         "H HIDDEN ENTRANCE",
         "? SECRET",
-        "FURNACE PAD",
+        "SELL PAD AT MILL",
+        "ORE FURNACE PAD",
         "DOCK AND FERRY",
         "LUMEN ISLES",
         "SKIRT PAST EDGE",

@@ -5,6 +5,16 @@ Plan for the V1 world remake. Picture: `previews/v1-b/00-overview.png`
 Town, the sawmill at (0, 110) and the spawn at (0, 0.5, 40) stay put.
 StreamingTargetRadius stays 640.
 
+The sell station stays beside the mill. `town.sellPad` is the sawmill
+plus (53, 0, 1), so its middle is (53, 111). `town.sellZone` is the same
+point at y 6, still 28 × 12 × 52 (z 85 to 137). Lane C turns the pad art
+into a furnace joined to the mill; the zone does not move. Trucks back in
+due north off MainStreet (x −128 to 64, z 62 to 84). The street's north
+edge meets the zone, and the lane down the pad's middle (x 53, about 6
+studs either side) is a straight line from that edge up to the log rack.
+No new road crosses that lane. The ore furnace pad at (48, −110) is a
+different place, for Lane M.
+
 ## Size
 
 | | Before | After |

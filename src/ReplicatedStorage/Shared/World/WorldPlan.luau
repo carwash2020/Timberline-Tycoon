@@ -1807,7 +1807,11 @@ function WorldPlan.Town(): Town
 		sawmill = CFrame.new(mill.X, 0, mill.Z + 6.5) * FACING_SOUTH,
 		-- The sell station beside the mill's east lean-to (WorldPlan.SellZoneSize:
 		-- 28 x 52, z 85 to 137, over the pad's middle). It stays west of the
-		-- Dealership's loading pad (WorldLayout, x 70 to 84).
+		-- Dealership's loading pad (WorldLayout, x 70 to 84). The offsets are
+		-- the station's place: the map remake keeps the sawmill, and these
+		-- two stay 53 east and 1 north of it. Trucks back straight north off
+		-- MainStreet into the lane. Lane C may restyle the pad as a furnace
+		-- joined to the mill; the zone stays this box.
 		sellZone = CFrame.new(mill.X + 53, 6, mill.Z + 1),
 		sellPad = CFrame.new(mill.X + 53, 0, mill.Z + 1),
 		shops = {

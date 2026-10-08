@@ -6,7 +6,7 @@ Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The la
 
 Playable square goes from 3000×3000 to 2000×2000 (`WorldHalf` 1000). Area 9,000,000 sq studs down to 4,000,000 (44%). A 200-stud skirt is generated past the edge and is not playable. Town, the sawmill (0, 110) and the spawn stay. StreamingTargetRadius stays 640.
 
-The picture shows the 28-wide ring, four town links, the hills cross-link, the truck tunnel, the mine mouth (MINE), three hidden mouths (H), five secrets (?), the furnace pad and the dock. Region, pad and secret coordinates are in `MAP_V1.md`.
+The picture shows the 28-wide ring, four town links, the hills cross-link, the truck tunnel, the mine mouth (MINE), three hidden mouths (H), five secrets (?), the ore furnace pad and the dock. The sell station (SELL) stays at the sawmill plus (53, 1): pad and zone middle (53, 111). Trucks back straight north off MainStreet into that lane. Lane C's furnace art uses this same zone. The ore pad at (48, −110) is Lane M's, not the sell station. Region, pad and secret coordinates are in `MAP_V1.md`.
 
 NPC stand spots, weather zones and critter zones (for Lanes E and G; the live modules still have the old numbers until those lanes read these):
 
