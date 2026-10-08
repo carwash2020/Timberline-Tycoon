@@ -34,9 +34,24 @@ return function(t)
 			t.ok(parts <= MiningArt.MaxNodeParts and parts <= OreRock.MaxParts, ore.id .. " " .. parts)
 			local veins = 0
 			local lights = 0
+			local rocks = 0
+			local tilted = false
+			local sunk = false
 			walk(node, function(inst)
 				if inst.Name == "Vein" and inst:IsA("WedgePart") then
 					veins += 1
+					local thin = math.min(inst.Size.X, inst.Size.Y, inst.Size.Z)
+					t.ok(thin <= 0.15, ore.id .. " vein proud " .. thin)
+				end
+				if inst.Name == "Rock" and inst:IsA("BasePart") then
+					rocks += 1
+					local look = inst.CFrame.LookVector
+					if look.X * look.X + look.Y * look.Y > 0.006 then
+						tilted = true
+					end
+					if inst.CFrame.Position.Y - inst.Size.Magnitude / 2 < 0 then
+						sunk = true
+					end
 				end
 				if inst:IsA("PointLight") then
 					lights += 1
@@ -44,6 +59,9 @@ return function(t)
 					t.ok(inst.Range <= 12)
 				end
 			end)
+			t.ok(rocks >= 3 and rocks <= 5, ore.id .. " rocks " .. rocks)
+			t.eq(tilted, true, ore.id .. " tilt")
+			t.eq(sunk, true, ore.id .. " sunk")
 			t.ok(veins == 2 or veins == 3, ore.id .. " veins " .. veins)
 			t.eq(lights, if ore.glow then 1 else 0, ore.id)
 			t.eq(node:GetAttribute("HoverKind"), "Ore")

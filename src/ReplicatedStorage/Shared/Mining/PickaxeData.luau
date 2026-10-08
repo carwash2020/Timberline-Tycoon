@@ -12,7 +12,8 @@ export type Pick = {
 	price: number, -- cash; 0 for the free rusty pick and the unpriced Lux stub
 	speed: number, -- swing speed multiplier
 	free: boolean?,
-	needsHeartstone: boolean?,
+	opalIngots: number?, -- Timber Opal ingots turned in before this pick can be bought
+	needsHeartstone: boolean?, -- retired; the save still uses crafted.HeartstoneTurnIn
 	passId: number?,
 	passKey: string?,
 	robux: boolean?,
@@ -30,7 +31,7 @@ local LIST: { Pick } = {
 		level = 5,
 		price = 50000,
 		speed = 1.5,
-		needsHeartstone = true,
+		opalIngots = 5,
 	},
 	{
 		id = "LuxPickaxe",

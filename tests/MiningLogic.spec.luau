@@ -95,13 +95,51 @@ return function(t)
 		for _, pick in ipairs(PickaxeData.All()) do
 			for tier = 1, 3 do
 				local rate = MiningLogic.Income(tier, pick.id)
-				local wood = if tier == 1
-					then MiningLogic.WoodIncome.hills
-					elseif tier == 2 then MiningLogic.WoodIncome.snow
-					else MiningLogic.WoodIncome.gloam
+				-- Gloam compares with Frostwood, the best wood already in reach.
+				local wood = if tier == 1 then MiningLogic.WoodIncome.hills else MiningLogic.WoodIncome.snow
 				t.ok(rate <= wood * MiningLogic.StageCap + 0.01, pick.id .. " t" .. tier)
 			end
 		end
+	end)
+
+	t.test("a deeper tier's best rate and ingot stay at least the tier above", function()
+		t.eq(MiningLogic.TiersClimb(), true)
+		t.eq(MiningLogic.ObsidianReachable(), true)
+		t.ok(math.abs(MiningLogic.Income(3, "SteelPick") - 10732.5) < 1)
+		t.ok(math.abs(MiningLogic.Income(3, "LuxPickaxe") - 10732.5) < 1)
+		t.ok(math.abs(MiningLogic.Income(3, "ObsidianPick") - 19110) < 1)
+		local gloam = MiningLogic.StageReport()[3]
+		t.eq(gloam.wood, MiningLogic.WoodIncome.snow)
+		t.ok(math.abs(gloam.ratio - 19110 / 28677) < 0.001)
+	end)
+
+	t.test("NaN buys no bombs", function()
+		t.eq(MiningLogic.BuyBombs(0, 100, 220, 0 / 0), 0)
+		local bought, cost = MiningLogic.BuyBombs(0, 500, 220, 0 / 0)
+		t.eq(bought, 0)
+		t.eq(cost, 0)
+	end)
+
+	t.test("crawling out of mine-mid moves toward the mouth", function()
+		local MineSites = t.load("ReplicatedStorage/Shared/Mining/MineSites")
+		local sites = MineSites.Fallback()
+		local mid = nil
+		for _, wall in ipairs(sites.rubble) do
+			if wall.id == "mine-mid" then
+				mid = wall
+			end
+		end
+		t.ok(mid.ez > 0, "exit points toward the mouth, not deeper")
+		local cf = t.roblox.CFrame.new(mid.x, mid.y, mid.z)
+		local size = t.roblox.Vector3.new(16, 12, 6)
+		local exit = t.roblox.Vector3.new(mid.ex, 0, mid.ez)
+		local spot = MiningLogic.CrawlTarget(cf, size, exit)
+		t.ok(spot.Z > -214, string.format("spot z %.2f", spot.Z))
+		local dir = t.roblox.Vector3.new(mid.ex, 0, mid.ez).Unit
+		local extent = math.abs(dir.X) * size.X / 2 + math.abs(dir.Y) * size.Y / 2 + math.abs(dir.Z) * size.Z / 2
+		local trapped = cf.Position + dir * (-extent - 2)
+		t.eq(MiningLogic.OnFarSide(trapped, cf, size, exit, MiningLogic.FarReach), true)
+		t.eq(MiningLogic.OnFarSide(cf.Position, cf, size, exit, MiningLogic.FarReach), false)
 	end)
 
 	t.test("the miner's lamp is a light and is not required to be the Lantern", function()

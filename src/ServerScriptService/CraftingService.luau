@@ -13,6 +13,7 @@ local WoodService = require(script.Parent.WoodService)
 local CraftData = require(ReplicatedStorage.Shared.Mining.CraftData)
 local CraftLogic = require(ReplicatedStorage.Shared.Mining.CraftLogic)
 local MiningSchema = require(ReplicatedStorage.Shared.Mining.MiningSchema)
+local MiningLogic = require(ReplicatedStorage.Shared.Mining.MiningLogic)
 local MiningService = require(script.Parent.MiningService)
 
 local CraftingService = {}
@@ -50,16 +51,38 @@ local function truckWelded(model: Model): boolean
 	return false
 end
 
+local function benchHost(): BasePart?
+	local folder = Workspace:FindFirstChild("Mining")
+	local bench = folder and folder:FindFirstChild("CraftBench")
+	if bench and bench:IsA("Model") and bench.PrimaryPart then
+		return bench.PrimaryPart
+	end
+	return nil
+end
+
+local function nearBench(player: Player): boolean
+	local host = benchHost()
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if host == nil or root == nil or not root:IsA("BasePart") then
+		return false
+	end
+	return (root.Position - host.Position).Magnitude <= MiningLogic.ShopReach
+end
+
 local function oreModels(player: Player): { Model }
 	local folder = Workspace:FindFirstChild("Mining")
+	local host = benchHost()
 	local list: { Model } = {}
-	if folder == nil then
+	if folder == nil or host == nil then
 		return list
 	end
 	for _, child in ipairs(folder:GetChildren()) do
 		if child:IsA("Model") and child:GetAttribute("OwnerId") == player.UserId then
 			if child.Name == "OreChunk" or child.Name == "Ingot" then
-				table.insert(list, child)
+				local dist = (child:GetPivot().Position - host.Position).Magnitude
+				if dist <= MiningLogic.ShopReach then
+					table.insert(list, child)
+				end
 			end
 		end
 	end
@@ -103,7 +126,7 @@ local function findLog(player: Player): (Model?, CraftLogic.LogFacts?)
 		if inst:IsA("Model") and not truckWelded(inst) then
 			local owner = inst:GetAttribute("Owner")
 			local volume = inst:GetAttribute("Volume")
-			if type(owner) == "number" and type(volume) == "number" then
+			if owner == player.UserId and type(volume) == "number" then
 				local dist = (inst:GetPivot().Position - root.Position).Magnitude
 				if dist < bestDist then
 					best = inst
@@ -142,7 +165,7 @@ end
 function CraftingService.Craft(player: Player, recipeId: string): boolean
 	local mining = miningOf(player)
 	local recipe = CraftData.Get(recipeId)
-	if mining == nil or recipe == nil then
+	if mining == nil or recipe == nil or not nearBench(player) then
 		return false
 	end
 	if not recipe.enabled then

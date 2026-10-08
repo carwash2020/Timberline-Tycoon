@@ -39,6 +39,7 @@ HoverTag.TouchSeconds = 4 -- how long a tapped item keeps its tag
 HoverTag.SwitchDelay = 0.08 -- a new target must hold this long before the tag moves
 HoverTag.HideDelay = 0.3 -- a tag stays this long after the aim leaves
 HoverTag.DismissCooldown = 1.5 -- a dismissed item does not come back for this long
+HoverTag.OreWidth = 220 -- px, the ore card, so two lines stay on screen
 
 export type Device = "mouse" | "gamepad" | "touch"
 
@@ -213,13 +214,12 @@ end
 function HoverTag.OreLines(spec: Spec, facts: Facts): (string, string, OreStyle)
 	local ore = OreData.Get(spec.itemId)
 	local need = if type(spec.need) == "number" then spec.need else if ore then ore.hardness else 1
-	local tier = if type(spec.tier) == "number" then spec.tier else if ore then ore.tier else 1
 	local pickName = PickaxeData.NameForLevel(need)
 	local level = if type(facts.pickLevel) == "number" then facts.pickLevel else 0
 	local weak = level < need
-	local line = if weak
-		then string.format("Tier %d · Needs %s", tier, pickName)
-		else string.format("Tier %d · %s", tier, pickName)
+	-- One second line. "Needs <Pick>" when short. The pick's name (its tier)
+	-- when the player can mine it. Never both, and never a price.
+	local line = if weak then "Needs " .. pickName else pickName
 	return spec.name, line, {
 		needs = weak,
 		nameColor = if ore then ore.color else nil,
@@ -360,6 +360,25 @@ function HoverTag.Step(mem: Memory, now: number, wanted: string?): string?
 		mem.shown, mem.since, mem.pending = wanted, now, nil
 	end
 	return mem.shown
+end
+
+-- Pulls a projected card back inside the viewport, including the core inset
+-- (GuiService:GetGuiInset, the same inset ScreenInsets.CoreUISafeInsets uses).
+function HoverTag.ClampScreen(
+	x: number,
+	y: number,
+	viewW: number,
+	viewH: number,
+	insetX: number,
+	insetY: number,
+	cardW: number,
+	cardH: number
+): (number, number)
+	local left = insetX + cardW / 2
+	local right = math.max(left, viewW - cardW / 2)
+	local top = insetY + cardH
+	local bottom = math.max(top, viewH - 8)
+	return math.clamp(x, left, right), math.clamp(y, top, bottom)
 end
 
 -- Hides the tag now and keeps that item's tag away for DismissCooldown

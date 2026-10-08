@@ -4,12 +4,13 @@
 
 ## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
 
-Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the wood supply cap at each stage (`MINING.md`). The Lux Pickaxe is not for sale.
+Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.
+
+The earlier tier-3 cut (Opal $36/$70, Heartstone $80/$140, compared with Gloamwood $7,262) is overridden. Gloam compares with Frostwood, $28,677/h, so the 0.8× cap is $22,942/h. Timber Opal is $90 / $240. Heartstone is $210 / $560. Steel or Lux at Gloam is about $10.7k/h. Obsidian is about $19.1k/h (0.67×). Hills and Snow ore values are unchanged. Hills now quotes Pine at $17,136 from ECONOMY.md (was $15,232). The Obsidian Pick costs $50,000 plus 5 Timber Opal ingots. The save key stays `crafted.HeartstoneTurnIn`.
 
 **Awaiting Connor**
 
-- Lux Pickaxe: a new pass, or a bundle with the Lux Axe pass (`StoreData` Lux Axe id 2005226878), and the price. `passId` stays 0. No StoreData row. Nothing is on sale. Do not run a purchase test until Connor says yes.
-- Tier 3 values were cut so a deep chamber stays under 0.8× Gloamwood $7,262 (tuned 0.71×, $5,160/h). Proposal was Timber Opal $150/$400 and Heartstone $400/$1,050, which came out at 4.64×. Tuned is $36/$70 and $80/$140. Confirm the cut, or name a higher comparison wood.
+- Lux Pickaxe: a new pass, or a bundle with the Lux Axe pass (`StoreData` Lux Axe id 2005226878), and the price. `passId` stays 0. Level stays 4. No StoreData row. Nothing is on sale. Do not run a purchase test until Connor says yes.
 - Whether the crafted Miner's Lamp should also count as the Lantern for Gloam. Default: no. It does light tier 3 mining.
 - Furniture (Copper Lamp Post, Gold-banded Chest) stays "Coming soon" until lane F can grant a placed piece.
 - No texture or mesh uploads. Rocks, picks, the furnace and the gear are part-built.

@@ -166,19 +166,52 @@ function MiningArt.Pickaxe(pick: PickaxeData.Pick): Model
 	local collar =
 		Kit.part(model, "Collar", Vector3.new(0.46, 0.4, 0.5), CFrame.new(0, 2.85, 0), head, Enum.Material.Metal)
 	Kit.decor(collar, false)
-	local point =
-		Kit.wedge(model, "Point", Vector3.new(0.35, 0.9, 1.15), CFrame.new(0, 3.15, -0.55), head, Enum.Material.Metal)
-	Kit.decor(point, false)
-	if pick.id == PickaxeData.LuxId then
-		local edge = Kit.part(
-			model,
-			"LuxEdge",
-			Vector3.new(0.12, 0.7, 0.9),
-			CFrame.new(0, 3.2, -0.7),
-			LuxEffect.Gold,
-			Enum.Material.Neon
+	local function bit(name: string, size: Vector3, cf: CFrame, color: Color3, material: Enum.Material): BasePart
+		local made: BasePart
+		if name == "Poll" or name == "Cheek" or name == "LuxEdge" then
+			made = Kit.part(model, name, size, cf, color, material)
+		else
+			made = Kit.wedge(model, name, size, cf, color, material)
+		end
+		Kit.decor(made, false)
+		return made
+	end
+	-- Each head is a different silhouette. None of them carries a light.
+	if pick.id == "RustyPick" then
+		bit(
+			"Point",
+			Vector3.new(0.72, 0.4, 0.58),
+			CFrame.new(0, 3.02, -0.28) * CFrame.Angles(math.rad(-12), 0, 0),
+			head,
+			Enum.Material.Metal
 		)
-		Kit.decor(edge, false)
+	elseif pick.id == "CopperPick" then
+		bit("Point", Vector3.new(1.05, 0.36, 1.05), CFrame.new(0, 3.1, -0.5), head, Enum.Material.Metal)
+	elseif pick.id == "IronPick" then
+		bit(
+			"Point",
+			Vector3.new(0.38, 0.95, 1.25),
+			CFrame.new(0, 3.25, -0.55) * CFrame.Angles(0, math.rad(16), 0),
+			head,
+			Enum.Material.Metal
+		)
+		bit("Cheek", Vector3.new(0.22, 0.55, 0.62), CFrame.new(0.32, 3.12, -0.1), head, Enum.Material.Metal)
+	elseif pick.id == "SteelPick" then
+		bit("Point", Vector3.new(0.26, 1.15, 1.4), CFrame.new(0, 3.3, -0.62), head, Enum.Material.Metal)
+	elseif pick.id == "ObsidianPick" then
+		bit("Poll", Vector3.new(0.9, 0.5, 0.55), CFrame.new(0, 3.12, 0.2), head, Enum.Material.Slate)
+		bit("Point", Vector3.new(0.48, 0.62, 0.78), CFrame.new(0, 3.18, -0.48), head, Enum.Material.Metal)
+	else
+		bit("Point", Vector3.new(0.42, 0.7, 1.0), CFrame.new(0, 3.14, -0.42), LuxEffect.Gold, Enum.Material.Metal)
+		bit(
+			"Fan",
+			Vector3.new(0.95, 0.2, 0.72),
+			CFrame.new(0, 3.4, -0.12) * CFrame.Angles(math.rad(72), 0, 0),
+			LuxEffect.Gold,
+			Enum.Material.Metal
+		)
+		local edge =
+			bit("LuxEdge", Vector3.new(0.1, 0.5, 0.8), CFrame.new(0, 3.2, -0.82), LuxEffect.Gold, Enum.Material.Neon)
 		edge:SetAttribute("Lux", true)
 	end
 	weldAll(model, handle)

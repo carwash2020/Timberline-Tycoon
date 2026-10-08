@@ -9,7 +9,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MineSites = {}
 
 export type Anchor = { tier: number, x: number, y: number, z: number }
-export type Rubble = { id: string, tier: number, x: number, y: number, z: number }
+export type Rubble = {
+	id: string,
+	tier: number,
+	x: number,
+	y: number,
+	z: number,
+	ex: number, -- unit exit toward the mine mouth, X
+	ez: number, -- unit exit toward the mine mouth, Z
+}
 export type Pad = { x: number, y: number, z: number, sx: number, sz: number }
 export type Sites = {
 	source: string,
@@ -26,7 +34,24 @@ local function pad(x: number, y: number, z: number, sx: number, sz: number): Pad
 	return { x = x, y = y, z = z, sx = sx, sz = sz }
 end
 
-function MineSites.Fallback(): Sites
+-- Horizontal unit from a wall toward the mouth. Straight +Z when the two
+-- spots are the same, so a crawl never follows LookVector down -Z.
+function MineSites.Exit(x: number, z: number, mouth: { x: number, z: number }): (number, number)
+	local dx = mouth.x - x
+	local dz = mouth.z - z
+	local len = math.sqrt(dx * dx + dz * dz)
+	if len < 1e-4 then
+		return 0, 1
+	end
+	return dx / len, dz / len
+end
+
+local function wall(id: string, tier: number, x: number, y: number, z: number, mouth: { x: number, z: number }): Rubble
+	local ex, ez = MineSites.Exit(x, z, mouth)
+	return { id = id, tier = tier, x = x, y = y, z = z, ex = ex, ez = ez }
+end
+
+local function fallbackBody(): Sites
 	-- FurnaceSite (48, -110), 30 x 24, beside the south link. The mouth
 	-- (150, -150) opens tier 1 only. Anchors sit in the chambers, off the
 	-- roads, the sell pad, the truck tunnel and the grotto.
@@ -34,6 +59,7 @@ function MineSites.Fallback(): Sites
 		source = "fallback",
 		furnace = pad(48, 0, -110, 30, 24),
 		mouth = { x = 150, z = -150 },
+		-- rubble is filled just below, once `mouth` exists
 		anchors = {
 			{ tier = 1, x = 168, y = -12, z = -168 },
 			{ tier = 1, x = 176, y = -12, z = -184 },
@@ -53,18 +79,26 @@ function MineSites.Fallback(): Sites
 			{ tier = 3, x = 212, y = -62, z = -268 },
 			{ tier = 3, x = 196, y = -70, z = -284 },
 		},
-		rubble = {
-			{ id = "mine-mid", tier = 2, x = 192, y = -28, z = -214 },
-			{ id = "mine-deep", tier = 3, x = 198, y = -58, z = -252 },
-			{ id = "hidden-hills", tier = 2, x = -460, y = 8, z = 160 },
-			{ id = "hidden-peak", tier = 3, x = -80, y = 24, z = 620 },
-			{ id = "hidden-lava", tier = 3, x = 280, y = -8, z = 420 },
-		},
+		rubble = {},
 		ledges = {
 			{ tier = 2, x = 210, y = -30, z = -236 },
 			{ tier = 3, x = 204, y = -60, z = -276 },
 		},
 	}
+end
+
+-- Fallback builds the mouth first, then the walls, so each exit points at it.
+function MineSites.Fallback(): Sites
+	local sites = fallbackBody()
+	local mouth = sites.mouth
+	sites.rubble = {
+		wall("mine-mid", 2, 192, -28, -214, mouth),
+		wall("mine-deep", 3, 198, -58, -252, mouth),
+		wall("hidden-hills", 2, -460, 8, 160, mouth),
+		wall("hidden-peak", 3, -80, 24, 620, mouth),
+		wall("hidden-lava", 3, 280, -8, 420, mouth),
+	}
+	return sites
 end
 
 local function num(v: any, fallback: number): number
@@ -86,6 +120,11 @@ function MineSites.FromUnderground(data: any): Sites?
 		pad(num(furnace.x, 48), num(furnace.y, 0), num(furnace.z, -110), num(furnace.sx, 30), num(furnace.sz, 24))
 	if type(data.Mouth) == "table" then
 		sites.mouth = { x = num(data.Mouth.x, 150), z = num(data.Mouth.z, -150) }
+		if type(data.Rubble) ~= "table" then
+			for _, row in ipairs(sites.rubble) do
+				row.ex, row.ez = MineSites.Exit(row.x, row.z, sites.mouth)
+			end
+		end
 	end
 	if type(data.MineAnchors) == "table" then
 		local anchors: { Anchor } = {}
@@ -107,12 +146,16 @@ function MineSites.FromUnderground(data: any): Sites?
 		local rubble: { Rubble } = {}
 		for _, row in ipairs(data.Rubble) do
 			if type(row) == "table" and type(row.id) == "string" then
+				local x, y, z = num(row.x, 0), num(row.y, 0), num(row.z, 0)
+				local ex, ez = MineSites.Exit(x, z, sites.mouth)
 				table.insert(rubble, {
 					id = row.id,
 					tier = math.clamp(math.floor(num(row.tier, 1)), 1, 3),
-					x = num(row.x, 0),
-					y = num(row.y, 0),
-					z = num(row.z, 0),
+					x = x,
+					y = y,
+					z = z,
+					ex = ex,
+					ez = ez,
 				})
 			end
 		end
@@ -173,7 +216,20 @@ function MineSites.MergeLive(sites: Sites, anchors: { LiveAnchor }, rubble: { Li
 	end
 	if #rubble > 0 then
 		copy.source = if #anchors > 0 then "live" else sites.source .. "+rubble"
-		copy.rubble = rubble
+		local placed: { Rubble } = {}
+		for _, row in ipairs(rubble) do
+			local ex, ez = MineSites.Exit(row.x, row.z, copy.mouth)
+			table.insert(placed, {
+				id = row.id,
+				tier = row.tier,
+				x = row.x,
+				y = row.y,
+				z = row.z,
+				ex = ex,
+				ez = ez,
+			})
+		end
+		copy.rubble = placed
 	end
 	return copy
 end

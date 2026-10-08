@@ -34,6 +34,10 @@ return function(t)
 			last = pick.price
 		end
 		t.eq(PickaxeData.Get("RustyPick").price, 0)
-		t.eq(PickaxeData.Get("ObsidianPick").needsHeartstone, true)
+		local obsidian = PickaxeData.Get("ObsidianPick")
+		t.eq(obsidian.opalIngots, 5)
+		t.eq(obsidian.needsHeartstone, nil)
+		t.eq(obsidian.level, 5)
+		t.eq(obsidian.price, 50000)
 	end)
 end

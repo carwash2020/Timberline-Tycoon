@@ -1,7 +1,8 @@
 --!strict
 -- OreData: the ores a mine node can hold. Values are the tuned set in
--- MINING.md (tier 3 is below the first proposal so deep mining stays under
--- 0.8 times Gloamwood). Vein colour and material are what the rock shows.
+-- MINING.md. Tier 3 is compared with Frostwood, the best wood a player can
+-- already reach, and stays under 0.8 times that. Vein colour and material
+-- are what the rock shows.
 
 local OreData = {}
 
@@ -102,8 +103,8 @@ local LIST: { Ore } = {
 		name = "Timber Opal",
 		tier = 3,
 		hardness = 4,
-		chunkValue = 36,
-		ingotValue = 70,
+		chunkValue = 90,
+		ingotValue = 240,
 		respawnSec = 240,
 		hp = 16,
 		color = Color3.fromRGB(46, 196, 182),
@@ -117,8 +118,8 @@ local LIST: { Ore } = {
 		name = "Heartstone",
 		tier = 3,
 		hardness = 5,
-		chunkValue = 80,
-		ingotValue = 140,
+		chunkValue = 210,
+		ingotValue = 560,
 		respawnSec = 240,
 		hp = 16,
 		color = Color3.fromRGB(168, 28, 40),

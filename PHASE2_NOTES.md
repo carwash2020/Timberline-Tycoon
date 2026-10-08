@@ -62,18 +62,19 @@ Picks are Tools, not shop axes. Swing with the tool button (mouse click, a phone
 
 1. Walk to the pad. You should see SmeltingFurnace, a Prospector stall (the sign says PROSPECTOR, no price on the model) and a craft bench. E on the stall opens the shop. E on the bench opens Craft.
 2. The first shop visit puts a Rusty Pick in the backpack and sets `PickLevel` to 1. Equip it. The chip at the top right reads `Rusty Pick · Lv 1`. Unequip it away from the mine and the chip hides.
-3. Aim at an Iron rock within 60 studs. The tag names Iron in the rust vein colour, and the line is `Tier 1 · Needs Iron Pick` in red. Buy the Copper Pick ($450, one price). With `PickLevel` 2 the same rock reads `Tier 1 · Iron Pick` in cream, not red. Coal (need 1) never says Needs for a Rusty Pick. No `$` and no `R$` on an ore tag.
+3. Aim at an Iron rock within 60 studs. One tag, on that rock only. The name is Iron in the rust vein colour. The second line is `Needs Iron Pick` in red (`UITheme` Danger). Buy the Copper Pick ($450, one price). With `PickLevel` 2 the same rock reads `Iron Pick` in cream, with no Needs line. Coal (need 1) never says Needs for a Rusty Pick. No `$` and no `R$` on an ore tag.
 4. Move the mouse off the rock. The tag hides in about a third of a second. Move from a shop box to a rock: the tag waits about 0.08s before it switches. Shop and log tags still show their own prices.
 5. Click a Coal rock. One click, one swing, then a cooldown. The last hit spawns one chunk. A second click in the same moment does not spawn a second chunk. The chunk has a Pick up prompt. Carry it into the Ore Chute on the stall. Cash goes up once, by the chunk's stored value ($6), and the chunk is gone. The wood sell pad does not pay for ore.
 6. With the Rusty Pick, click an Iron rock. A toast says `Needs an Iron Pick` and the swing does not start a cooldown (a Coal rock beside it still swings at once).
-7. Buy a Bomb for $220 (the same number as dynamite). Short cash buys nothing. Equip it, stand within 8 studs of a rubble wall, click once. A spark shows for 3 seconds, then the wall's parts hide for everyone for 10 minutes. About 20 seconds before it reseals, dust appears. Stand in the opening when it reseals: you are not sealed in; Crawl out (E) moves you to the near side if the server sees your root inside. Two clicks in the same moment spend one bomb.
-8. Put a Copper chunk in SmeltIntake. With coal, one coal covers four chunks; without it, each chunk costs $2. About 3 seconds later one ingot appears and the chunk is gone. The same chunk cannot also be paid by the chute.
-9. Craft bench: have/need counts, one Craft button. Copper Lamp Post and Gold-banded Chest say Soon. B and Esc close the shop and the bench.
+7. Buy a Bomb for $220 (the same number as dynamite). Short cash buys nothing. Equip it, stand within 8 studs of a rubble wall, click once. A spark shows for 3 seconds, then the wall's parts hide for everyone for 10 minutes. About 20 seconds before it reseals, dust appears. Crawl out (E) moves you toward the mine mouth, not deeper. If the wall reseals while you are just past its far face (within about 6 studs), Crawl out still works. Two clicks in the same moment spend one bomb.
+8. Put a Copper chunk in SmeltIntake. With coal, one coal covers four chunks; without it, each chunk costs $2, once. About 3 seconds later one ingot appears and the chunk is gone. Leaving it there does not charge again. The same chunk cannot also be paid by the chute.
+9. Craft bench: one row per recipe (icon, name, cost line, a 44×44 Craft button). Copper Lamp Post and Gold-banded Chest say Soon. B and Esc close the shop and the bench. You have to be within 12 studs of the bench, and the ingots and chunks have to be within 12 studs of it too. A stranger's log, even a closer one, is not yours.
+10. Obsidian Pick: Heartstone is too hard for a Steel Pick, so the turn-in is 5 Timber Opal ingots (Opal is hardness 4) plus $50,000, at the stall. Four ingots are refused and stay in the world. Five are consumed, then the pick can be bought. The save still calls that turn-in `HeartstoneTurnIn`. `mining` on the profile is account-wide: a slot swap does not move the picks.
 
 ### Phone emulator (667×375)
 
-1. The chip, the shop and the craft list sit in the top half, at least 12px from the edges. They do not cover the bottom-left thumbstick (left 40% of the bottom half) or the jump button (bottom right).
-2. Buy and Craft buttons are at least 44×44 and 8px apart. Body text is at least 14px.
+1. The chip, the shop and the craft list sit in the top half, at least 12px from the edges, and the panel is at most 60% of the screen height. They do not cover the bottom-left thumbstick (left 40% of the bottom half) or the jump button (bottom right).
+2. One row per item, 8px apart, in a scrolling list. The name is 16px (18px on a tall screen), not stretched. The cost is 14px under the name. Buy and Craft buttons are at least 44×44.
 3. Tap a rock, or stand within 6 studs of one in front of you. The tag shows for about 4 seconds and is readable. One tap on the equipped pick is one swing.
 4. In a cave, count PointLights: the lamp (only while equipped, range 12, shadows off) plus at most 4 glowing nodes, 6 or fewer in total, shadows off. Each ore rock is 8 parts or fewer. Live ore chunks on you stop at 40 (a toast names the one that did not fit).
 
@@ -84,7 +85,7 @@ Picks are Tools, not shop axes. Swing with the tool button (mouse click, a phone
 3. X on the Shop and Craft prompts opens the panel. The stick stays inside it. B closes it.
 4. Crawl out works on X while your character is inside a sealed wall. A too-weak rock shows the Needs line and does not arm a swing.
 
-Good: the five wood headline times in ECONOMY.md are unchanged (68 s, 7.9 min, 13.7 min, 51.4 min, 30.5 h). Mining ratios are in MINING.md (Hills 0.48, Snow 0.57, Gloam 0.71).
+Good: the five wood headline times in ECONOMY.md are unchanged (68 s, 7.9 min, 13.7 min, 51.4 min, 30.5 h). Mining ratios are in MINING.md (Hills 0.43 of Pine $17,136, Snow 0.57 of Frostwood $28,677, Gloam 0.67 of that same Frostwood). Steel or Lux at Gloam is about $10.7k/h. Obsidian is about $19.1k/h.
 
 ## Trees in the spawn area (8 October 2026, branch `claude/spawn-trees`)
 

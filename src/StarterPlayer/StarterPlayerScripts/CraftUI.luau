@@ -21,21 +21,42 @@ local panel: Frame? = nil
 local list: GuiObject? = nil
 local open = false
 local ready = true
+local view = Vector2.new(1280, 720)
+
+-- 18 px on a 720-tall screen, 16 px on a phone. Cost lines stay 14 px.
+-- TextScaled stays off so a short row cannot stretch the name.
+function CraftUI.NamePx(w: number, h: number): number
+	return if math.min(w, h) < UITheme.CompactEdge then 16 else 18
+end
 
 function CraftUI.Rects(w: number, h: number): MiningUI.Rect
 	local margin = 12
-	local top = h * 0.5
-	return {
+	local phone = math.min(w, h) < UITheme.CompactEdge
+	local cap = if phone then math.floor(h * 0.6) else math.floor(h * 0.5)
+	local box: MiningUI.Rect = {
 		x = margin,
 		y = margin,
 		w = math.min(420, w - margin * 2),
-		h = math.max(96, top - margin * 2),
+		h = math.max(120, cap - margin * 2),
 	}
+	local stick = MiningUI.Thumbstick(w, h)
+	local jump = MiningUI.Jump(w, h)
+	if box.y + box.h > stick.y and box.x < stick.x + stick.w then
+		box.h = math.max(120, stick.y - box.y - 8)
+	end
+	if box.x + box.w > jump.x and box.y + box.h > jump.y then
+		box.h = math.max(120, jump.y - box.y - 8)
+	end
+	if phone then
+		box.h = math.min(box.h, math.floor(h * 0.6))
+	end
+	return box
 end
 
 local function build(viewport: Vector2): ScreenGui
 	local gui = UITheme.Screen("CraftUI", UITheme.Layers.World)
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+	view = viewport
 	local rect = CraftUI.Rects(viewport.X, viewport.Y)
 	local shop = Instance.new("Frame")
 	shop.Name = "Bench"
@@ -141,12 +162,23 @@ function CraftUI.Fill(stock: { ingots: Have, chunks: Have }, logOk: boolean)
 			child:Destroy()
 		end
 	end
+	local namePx = CraftUI.NamePx(view.X, view.Y)
 	for _, recipe in ipairs(CraftData.All()) do
 		local block = Instance.new("Frame")
 		block.Name = recipe.id
 		block.BackgroundColor3 = C.PaperDark
-		block.Size = UDim2.new(1, -8, 0, 44)
+		block.Size = UDim2.new(1, -8, 0, 64)
 		block.Parent = rows
+		local icon = Instance.new("Frame")
+		icon.Name = "Icon"
+		icon.BackgroundColor3 = if recipe.enabled then C.Bark else C.Muted
+		icon.Size = UDim2.fromOffset(40, 40)
+		icon.Position = UDim2.fromOffset(8, 12)
+		icon.Parent = block
+		UITheme.corner(icon, 8)
+		local mark = UITheme.label(icon, string.sub(recipe.name, 1, 1), F.Bold, 16, C.Cream)
+		mark.Size = UDim2.fromScale(1, 1)
+		mark.TextXAlignment = Enum.TextXAlignment.Center
 		local bits = {}
 		for _, need in ipairs(recipe.needs) do
 			if need.kind == "log" then
@@ -157,16 +189,28 @@ function CraftUI.Fill(stock: { ingots: Have, chunks: Have }, logOk: boolean)
 				table.insert(bits, string.format("%s %d/%d", need.ore or "", have, need.n or 0))
 			end
 		end
-		local name = UITheme.label(block, recipe.name .. "  " .. table.concat(bits, "  "), F.Body, 14, C.Ink)
-		name.Size = UDim2.new(1, -96, 1, 0)
-		name.TextXAlignment = Enum.TextXAlignment.Left
+		local name = UITheme.label(block, recipe.name, F.Bold, namePx, C.Ink)
+		name.Name = "Name"
+		name.TextScaled = false
+		name.TextWrapped = false
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.Position = UDim2.fromOffset(56, 8)
+		name.Size = UDim2.new(1, -112, 0, 22)
+		local cost = UITheme.label(block, table.concat(bits, "  "), F.Body, 14, C.Bark)
+		cost.Name = "Cost"
+		cost.TextScaled = false
+		cost.TextWrapped = false
+		cost.TextTruncate = Enum.TextTruncate.AtEnd
+		cost.Position = UDim2.fromOffset(56, 32)
+		cost.Size = UDim2.new(1, -112, 0, 18)
 		local button = Instance.new("TextButton")
 		button.Name = "Craft"
 		button.Font = F.Bold
 		button.TextSize = 14
+		button.TextScaled = false
 		button.TextColor3 = C.Cream
-		button.Size = UDim2.fromOffset(88, 44)
-		button.Position = UDim2.new(1, -88, 0, 0)
+		button.Size = UDim2.fromOffset(44, 44)
+		button.Position = UDim2.new(1, -52, 0, 10)
 		button.Parent = block
 		if not ready or not recipe.enabled then
 			button.Text = "Soon"

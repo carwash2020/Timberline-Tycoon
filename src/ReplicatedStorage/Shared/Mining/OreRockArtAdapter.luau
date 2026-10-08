@@ -2,6 +2,10 @@
 -- OreRockArtAdapter: ore nodes call NatureArt.OreRock when Lane G has
 -- shipped it, and a small part-built rock until then. Same arguments
 -- either way: shape, size, vein colour, vein material, glow.
+--
+-- The fallback is a tilted pile of 3 to 5 wedges and blocks, partly sunk,
+-- with 2 or 3 vein wedges lying flat on the faces (0.1 stud proud, about
+-- a fifth of the face). Glow only when the ore says so.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -16,6 +20,15 @@ local SCALE = { small = 0.72, mid = 1, large = 1.32 }
 local ROCK = Color3.fromRGB(126, 118, 108)
 local MOSS = Color3.fromRGB(78, 110, 62)
 
+local LAYOUT = {
+	boulder = { parts = 4, veins = 3, seed = 11 },
+	split = { parts = 5, veins = 2, seed = 23 },
+	standing = { parts = 4, veins = 2, seed = 37 },
+	slab = { parts = 3, veins = 2, seed = 41 },
+	pebbles = { parts = 5, veins = 2, seed = 53 },
+	mossy = { parts = 4, veins = 3, seed = 67 },
+}
+
 local function scaleOf(size: any): number
 	if type(size) == "number" then
 		return math.clamp(size, 0.4, 2)
@@ -26,60 +39,82 @@ local function scaleOf(size: any): number
 	return 1
 end
 
-local function vein(model: Model, cf: CFrame, color: Color3, material: Enum.Material, s: number): WedgePart
-	local part = Kit.wedge(model, "Vein", Vector3.new(0.35 * s, 0.9 * s, 1.3 * s), cf, color, material)
-	Kit.decor(part, false)
-	return part
-end
-
-local function body(model: Model, name: string, size: Vector3, cf: CFrame, material: Enum.Material?): Part
-	return Kit.part(model, name, size, cf, ROCK, material or Enum.Material.Slate)
-end
-
 local function fallback(shape: string, size: any, oreColor: Color3, oreMaterial: Enum.Material, glow: boolean?): Model
 	local model = Instance.new("Model")
 	model.Name = "OreRock"
 	local s = scaleOf(size)
-	local host: BasePart
-	local veins = 3
-	if shape == "split" then
-		host = body(model, "Rock", Vector3.new(2.2 * s, 1.5 * s, 1.6 * s), CFrame.new(-0.55 * s, 0.75 * s, 0))
-		body(model, "Rock", Vector3.new(1.6 * s, 1.3 * s, 1.5 * s), CFrame.new(0.85 * s, 0.65 * s, 0.15 * s))
-		veins = 2
-	elseif shape == "standing" then
-		host = body(model, "Rock", Vector3.new(1.3 * s, 3.1 * s, 1.2 * s), CFrame.new(0, 1.55 * s, 0))
-		veins = 2
-	elseif shape == "slab" then
-		host = body(model, "Rock", Vector3.new(3.2 * s, 0.7 * s, 2.1 * s), CFrame.new(0, 0.35 * s, 0))
-		veins = 2
-	elseif shape == "pebbles" then
-		host = body(model, "Rock", Vector3.new(0.9 * s, 0.7 * s, 0.8 * s), CFrame.new(0, 0.35 * s, 0))
-		body(model, "Rock", Vector3.new(0.7 * s, 0.55 * s, 0.7 * s), CFrame.new(0.8 * s, 0.28 * s, 0.3 * s))
-		body(model, "Rock", Vector3.new(0.6 * s, 0.45 * s, 0.6 * s), CFrame.new(-0.7 * s, 0.22 * s, 0.35 * s))
-		body(model, "Rock", Vector3.new(0.5 * s, 0.4 * s, 0.5 * s), CFrame.new(0.2 * s, 0.2 * s, -0.7 * s))
-		veins = 2
-	elseif shape == "mossy" then
-		host = body(model, "Rock", Vector3.new(2.4 * s, 1.4 * s, 1.8 * s), CFrame.new(0, 0.7 * s, 0))
-		local moss = Kit.part(
-			model,
-			"Moss",
-			Vector3.new(1.6 * s, 0.18 * s, 1.2 * s),
-			CFrame.new(-0.2 * s, 1.42 * s, 0.1 * s),
-			MOSS,
-			Enum.Material.Grass
-		)
-		Kit.decor(moss, false)
-		veins = 3
-	else
-		host = body(model, "Rock", Vector3.new(2.4 * s, 1.8 * s, 2.1 * s), CFrame.new(0, 0.9 * s, 0))
-		veins = 3
+	local layout = LAYOUT[shape] or LAYOUT.boulder
+	local rng = Kit.rng(layout.seed)
+	local host: BasePart? = nil
+	local biggest = 0
+	for i = 1, layout.parts do
+		local sx = rng:range(1.15, 2.15) * s
+		local sy = rng:range(0.7, 1.45) * s
+		local sz = rng:range(1.05, 1.9) * s
+		local cf = CFrame.new(
+			rng:range(-0.4, 0.4) * s,
+			rng:range(-0.45, 0.15) * s + sy * 0.15,
+			rng:range(-0.35, 0.35) * s
+		) * CFrame.Angles(math.rad(rng:range(-26, 22)), math.rad(rng:range(-50, 50)), math.rad(rng:range(-20, 20)))
+		local moss = shape == "mossy" and i == layout.parts
+		local color = if moss then MOSS else ROCK
+		local material = if moss then Enum.Material.Grass else Enum.Material.Slate
+		local part: BasePart
+		if rng:next() < 0.6 then
+			part = Kit.wedge(model, "Rock", Vector3.new(sx, sy, sz), cf, color, material)
+		else
+			part = Kit.part(model, "Rock", Vector3.new(sx, sy, sz), cf, color, material)
+		end
+		local volume = sx * sy * sz
+		if volume > biggest then
+			biggest = volume
+			host = part
+		end
 	end
-	model.PrimaryPart = host
-	local face = host.CFrame * CFrame.new(0, host.Size.Y / 2 - 0.02 * s, host.Size.Z / 2 - 0.05 * s)
-	for i = 1, veins do
-		local slide = (i - (veins + 1) / 2) * 0.45 * s
-		local cf = face * CFrame.new(slide, 0, 0) * CFrame.Angles(0, math.rad(8 * i), math.rad(-8))
-		local part = vein(model, cf, oreColor, oreMaterial, s)
+	local body = host :: BasePart
+	model.PrimaryPart = body
+	-- Flat insets on the front, the side, and (when there is a third) the top.
+	local faces = {
+		{
+			normal = Vector3.new(0, 0, -1),
+			width = body.Size.X,
+			height = body.Size.Y,
+			along = "z",
+		},
+		{
+			normal = Vector3.new(1, 0, 0),
+			width = body.Size.Z,
+			height = body.Size.Y,
+			along = "x",
+		},
+		{
+			normal = Vector3.new(0, 1, 0),
+			width = body.Size.X,
+			height = body.Size.Z,
+			along = "y",
+		},
+	}
+	for i = 1, layout.veins do
+		local face = faces[i]
+		local cover = 0.18 + (i - 1) * 0.03
+		local span = math.sqrt(math.max(face.width * face.height * cover, 0.05))
+		local wide = math.clamp(span, face.width * 0.35, face.width * 0.7)
+		local tall = math.clamp((face.width * face.height * cover) / wide, face.height * 0.28, face.height * 0.7)
+		local proud = 0.1
+		local plate: Vector3
+		local localCf: CFrame
+		if face.along == "z" then
+			plate = Vector3.new(wide, tall, proud)
+			localCf = CFrame.new(0, 0, -body.Size.Z / 2 - proud / 2)
+		elseif face.along == "x" then
+			plate = Vector3.new(proud, tall, wide)
+			localCf = CFrame.new(body.Size.X / 2 + proud / 2, 0, 0)
+		else
+			plate = Vector3.new(wide, proud, tall)
+			localCf = CFrame.new(0, body.Size.Y / 2 + proud / 2, 0)
+		end
+		local part = Kit.wedge(model, "Vein", plate, body.CFrame * localCf, oreColor, oreMaterial)
+		Kit.decor(part, false)
 		if glow == true and i == 1 then
 			local light = Instance.new("PointLight")
 			light.Name = "VeinLight"

@@ -55,7 +55,13 @@ return function(t)
 			t.ok(rects.panel.h >= 44)
 			local bench = CraftUI.Rects(size.X, size.Y)
 			clear(bench, size.X, size.Y)
+			t.ok(bench.h <= size.Y * 0.6, "panel stays within 60 percent of the screen")
+			t.ok(rects.panel.h <= size.Y * 0.6)
 		end
+		t.eq(MiningUI.NamePx(667, 375), 16)
+		t.eq(MiningUI.NamePx(1280, 720), 18)
+		t.eq(CraftUI.NamePx(667, 375), 16)
+		t.eq(CraftUI.NamePx(1280, 720), 18)
 	end)
 
 	t.test("shop rows are 44 px and eight px apart, and B closes", function()
@@ -68,8 +74,14 @@ return function(t)
 		for _, child in ipairs(rows:GetChildren()) do
 			if child:IsA("TextButton") then
 				count += 1
-				t.eq(child.Size.Y.Offset, 44)
-				t.ok(child.TextSize >= 14)
+				t.ok(child.Size.Y.Offset >= 44, "row is a 44 px tap")
+				t.eq(child.Text, "")
+				local name = child:FindFirstChild("Name")
+				t.eq(name.TextScaled, false)
+				t.eq(name.TextSize, MiningUI.NamePx(667, 375))
+				local price = child:FindFirstChild("Price")
+				t.eq(price.TextSize, 14)
+				t.eq(price.TextScaled, false)
 				if previous then
 					t.ok(child.Position.Y.Offset == 0 or true)
 				end
@@ -95,8 +107,18 @@ return function(t)
 			if child.Name == "Craft" and child:IsA("TextButton") then
 				count += 1
 				t.eq(child.Text, "Soon")
+				t.eq(child.Size.X.Offset, 44)
 				t.eq(child.Size.Y.Offset, 44)
+				t.eq(child.TextScaled, false)
 				t.ok(child.TextSize >= 14)
+				local row = child.Parent
+				local name = row:FindFirstChild("Name")
+				t.eq(name.TextScaled, false)
+				t.eq(name.TextSize, CraftUI.NamePx(667, 375))
+				t.eq(string.find(name.Text, "/", 1, true), nil)
+				local cost = row:FindFirstChild("Cost")
+				t.eq(cost.TextSize, 14)
+				t.eq(cost.TextScaled, false)
 			end
 		end
 		t.eq(count, 6)

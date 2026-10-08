@@ -24,6 +24,8 @@ MiningLogic.ChargeCap = 99
 MiningLogic.StashCap = 80
 MiningLogic.LiveChunks = 40
 MiningLogic.CfLen = 12
+MiningLogic.ShopReach = 12 -- studs from the Prospector or the craft bench
+MiningLogic.FarReach = 6 -- studs past a closed rubble wall's far face
 MiningLogic.StageCap = 0.8
 MiningLogic.WalkSpeed = 16
 MiningLogic.HitDamage = 2
@@ -37,10 +39,13 @@ MiningLogic.Mix = {
 	[3] = { { id = "TimberOpal", n = 3 }, { id = "Heartstone", n = 1 } },
 }
 
--- Best wood $/h at the stage, from ECONOMY.md's "$/h cap a player" column.
--- Hills: Pine. Snow/volcano: Frostwood (higher than Emberwood). Gloam: Gloamwood.
+-- Best wood $/h the player can already reach, from ECONOMY.md's
+-- "$/h cap a player" column. Hills: Pine. Snow: Frostwood (higher than
+-- Emberwood). Gloam compares with Frostwood too, not Gloamwood ($7,262),
+-- because a deep miner can already sell Frostwood. `gloam` stays the
+-- Gloamwood quote so the economy tool can see it moved.
 MiningLogic.WoodIncome = {
-	hills = 15232,
+	hills = 17136,
 	snow = 28677,
 	gloam = 7262,
 }
@@ -48,7 +53,7 @@ MiningLogic.WoodIncome = {
 local STAGES = {
 	{ stage = "hills", tier = 1, wood = "hills" },
 	{ stage = "snow", tier = 2, wood = "snow" },
-	{ stage = "gloam", tier = 3, wood = "gloam" },
+	{ stage = "gloam", tier = 3, wood = "snow" },
 }
 
 export type Node = {
@@ -159,7 +164,14 @@ function MiningLogic.TryFuse(mem: FuseMem, playerKey: string, frame: number, cha
 end
 
 function MiningLogic.BuyBombs(have: number, cash: number, price: number, n: number): (number, number)
-	local ask = math.clamp(math.floor(n), 1, 10)
+	if n ~= n or have ~= have or cash ~= cash or price ~= price then
+		return 0, 0
+	end
+	local ask = math.floor(n)
+	if ask ~= ask then
+		return 0, 0
+	end
+	ask = math.clamp(ask, 1, 10)
 	local room = MiningLogic.ChargeCap - math.clamp(math.floor(have), 0, MiningLogic.ChargeCap)
 	if room <= 0 or price <= 0 or cash < price then
 		return 0, 0
@@ -296,9 +308,54 @@ function MiningLogic.InBox(pos: Vector3, cf: CFrame, size: Vector3): boolean
 	return math.abs(localPos.X) <= half.X and math.abs(localPos.Y) <= half.Y and math.abs(localPos.Z) <= half.Z
 end
 
--- The near side of the rubble: just outside the box, toward +Z of the box.
-function MiningLogic.CrawlTarget(cf: CFrame, size: Vector3): Vector3
-	return cf.Position + cf.LookVector * (size.Z / 2 + 4)
+-- Just outside the wall, along the exit (toward the mine mouth). LookVector
+-- on an unrotated part points down -Z, which is deeper into the mine.
+function MiningLogic.CrawlTarget(cf: CFrame, size: Vector3, exit: Vector3): Vector3
+	local flat = Vector3.new(exit.X, 0, exit.Z)
+	if flat.Magnitude < 1e-4 then
+		flat = Vector3.new(0, 0, 1)
+	end
+	local dir = flat.Unit
+	local extent = math.abs(dir.X) * size.X / 2 + math.abs(dir.Z) * size.Z / 2
+	return cf.Position + dir * (extent + 4)
+end
+
+-- True when `pos` is past the face that points away from `exit`, and within
+-- `reach` studs of that face. A resealed wall still lets that player out.
+function MiningLogic.OnFarSide(pos: Vector3, cf: CFrame, size: Vector3, exit: Vector3, reach: number): boolean
+	local flat = Vector3.new(exit.X, 0, exit.Z)
+	if flat.Magnitude < 1e-4 then
+		flat = Vector3.new(0, 0, 1)
+	end
+	local dir = flat.Unit
+	local delta = pos - cf.Position
+	local along = delta:Dot(dir)
+	local extent = math.abs(dir.X) * size.X / 2 + math.abs(dir.Y) * size.Y / 2 + math.abs(dir.Z) * size.Z / 2
+	local face = -extent
+	if along > face + 0.25 or along < face - reach then
+		return false
+	end
+	local lateral = (delta - dir * along).Magnitude
+	return lateral <= math.max(size.X, size.Z) / 2 + 4
+end
+
+-- Steel can mine Timber Opal, and Obsidian asks for those ingots. Heartstone
+-- stays harder than Steel, so it is not the gate.
+function MiningLogic.ObsidianReachable(): boolean
+	local steel = PickaxeData.Get("SteelPick")
+	local obsidian = PickaxeData.Get("ObsidianPick")
+	local opal = OreData.Get("TimberOpal")
+	local heart = OreData.Get("Heartstone")
+	if steel == nil or obsidian == nil or opal == nil or heart == nil then
+		return false
+	end
+	if (obsidian.opalIngots or 0) < 5 or obsidian.needsHeartstone == true then
+		return false
+	end
+	if steel.level < opal.hardness or heart.hardness <= steel.level then
+		return false
+	end
+	return obsidian.price == 50000 and steel.opalIngots == nil
 end
 
 ---------------------------------------------------------------------------
@@ -419,6 +476,32 @@ end
 function MiningLogic.StagesOk(): boolean
 	for _, row in ipairs(MiningLogic.StageReport()) do
 		if row.ratio > MiningLogic.StageCap + 1e-9 then
+			return false
+		end
+	end
+	return true
+end
+
+-- A deeper tier's best $/h and its best ingot are at least the tier above.
+function MiningLogic.TiersClimb(): boolean
+	local bestRate = { 0, 0, 0 }
+	local bestIngot = { 0, 0, 0 }
+	for tier = 1, 3 do
+		for _, pick in ipairs(PickaxeData.All()) do
+			local rate = MiningLogic.Income(tier, pick.id)
+			if rate > bestRate[tier] then
+				bestRate[tier] = rate
+			end
+		end
+		for _, ore in ipairs(OreData.All()) do
+			local ingot = ore.ingotValue
+			if ore.tier == tier and type(ingot) == "number" and ingot > bestIngot[tier] then
+				bestIngot[tier] = ingot
+			end
+		end
+	end
+	for tier = 2, 3 do
+		if bestRate[tier] + 1e-6 < bestRate[tier - 1] or bestIngot[tier] + 1e-6 < bestIngot[tier - 1] then
 			return false
 		end
 	end

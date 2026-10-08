@@ -24,6 +24,15 @@ return function(t)
 			t.ok(anchor.tier >= 1 and anchor.tier <= 3)
 		end
 		t.ok(tiers[1] >= 4 and tiers[2] >= 4 and tiers[3] >= 4)
+		local mid = nil
+		for _, wall in ipairs(sites.rubble) do
+			if wall.id == "mine-mid" then
+				mid = wall
+			end
+			t.eq(type(wall.ex), "number")
+			t.eq(type(wall.ez), "number")
+		end
+		t.ok(mid.ez > 0, "mine-mid opens toward the mouth")
 	end)
 
 	t.test("an UndergroundData table replaces the fallback", function()
@@ -40,6 +49,8 @@ return function(t)
 		t.eq(#sites.anchors, 1)
 		t.eq(sites.anchors[1].tier, 2)
 		t.eq(sites.rubble[1].id, "mine-mid")
+		t.eq(type(sites.rubble[1].ex), "number")
+		t.eq(type(sites.rubble[1].ez), "number")
 	end)
 
 	t.test("live anchors and rubble win over the table", function()
@@ -52,6 +63,8 @@ return function(t)
 		t.eq(#sites.anchors, 1)
 		t.eq(sites.anchors[1].x, 1)
 		t.eq(sites.rubble[1].id, "hidden-lava")
+		t.eq(type(sites.rubble[1].ex), "number")
+		t.eq(type(sites.rubble[1].ez), "number")
 	end)
 
 	t.test("with no module, Current is the fallback", function()

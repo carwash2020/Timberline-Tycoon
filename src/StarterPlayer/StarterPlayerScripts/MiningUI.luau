@@ -8,6 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local PickaxeData = require(ReplicatedStorage.Shared.Mining.PickaxeData)
+local Util = require(ReplicatedStorage.Shared.Util)
 local GamepadNav = require(script.Parent.GamepadNav)
 local UITheme = require(script.Parent.UITheme)
 
@@ -26,16 +27,32 @@ function MiningUI.Jump(w: number, h: number): Rect
 	return { x = w - 120, y = h - 140, w = 120, h = 140 }
 end
 
+function MiningUI.NamePx(w: number, h: number): number
+	return if math.min(w, h) < UITheme.CompactEdge then 16 else 18
+end
+
 function MiningUI.Rects(w: number, h: number): { chip: Rect, panel: Rect }
 	local margin = 12
+	local phone = math.min(w, h) < UITheme.CompactEdge
 	local chip: Rect = { x = w - margin - 248, y = margin, w = 248, h = 48 }
-	local top = h * 0.5
+	local cap = if phone then math.floor(h * 0.6) else math.floor(h * 0.5)
 	local panel: Rect = {
 		x = margin,
 		y = margin + 56,
-		w = math.min(340, w - margin * 2),
-		h = math.max(88, top - margin - 64),
+		w = math.min(360, w - margin * 2),
+		h = math.max(120, cap - margin - 64),
 	}
+	local stick = MiningUI.Thumbstick(w, h)
+	local jump = MiningUI.Jump(w, h)
+	if panel.y + panel.h > stick.y and panel.x < stick.x + stick.w then
+		panel.h = math.max(88, stick.y - panel.y - 8)
+	end
+	if panel.x + panel.w > jump.x and panel.y + panel.h > jump.y then
+		panel.h = math.max(88, jump.y - panel.y - 8)
+	end
+	if phone then
+		panel.h = math.min(panel.h, math.floor(h * 0.6))
+	end
 	return { chip = chip, panel = panel }
 end
 
@@ -47,9 +64,10 @@ local screen: ScreenGui? = nil
 local chipFrame: Frame? = nil
 local chipLabel: TextLabel? = nil
 local panel: Frame? = nil
-local list: Frame? = nil
+local list: GuiObject? = nil
 local open = false
 local ready = true
+local view = Vector2.new(1280, 720)
 
 local function priceColor(afford: boolean): Color3
 	return if afford then C.Money else C.Danger
@@ -62,6 +80,7 @@ end
 local function build(viewport: Vector2): ScreenGui
 	local gui = UITheme.Screen("MiningUI", UITheme.Layers.Shop)
 	gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+	view = viewport
 	local rects = MiningUI.Rects(viewport.X, viewport.Y)
 	local chip = Instance.new("Frame")
 	chip.Name = "Chip"
@@ -95,11 +114,15 @@ local function build(viewport: Vector2): ScreenGui
 	close.Size = UDim2.fromOffset(64, 44)
 	close.Position = UDim2.new(1, -64, 0, 0)
 	close.Parent = shop
-	local rows = Instance.new("Frame")
+	local rows = Instance.new("ScrollingFrame")
 	rows.Name = "Rows"
 	rows.BackgroundTransparency = 1
+	rows.BorderSizePixel = 0
 	rows.Position = UDim2.fromOffset(0, 48)
 	rows.Size = UDim2.new(1, 0, 1, -52)
+	rows.CanvasSize = UDim2.fromOffset(0, 0)
+	rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	rows.ScrollBarThickness = 6
 	rows.Parent = shop
 	UITheme.list(rows, 8)
 	panel = shop
@@ -115,16 +138,27 @@ function MiningUI.Ensure(viewport: Vector2): ScreenGui
 	return build(viewport)
 end
 
-local function rowButton(text: string, afford: boolean): TextButton
+local function rowButton(title: string, detail: string, afford: boolean): TextButton
 	local button = Instance.new("TextButton")
 	button.Name = "Buy"
-	button.Text = text
-	button.Font = F.Bold
-	button.TextSize = 14
-	button.TextColor3 = C.Cream
+	button.Text = ""
+	button.AutoButtonColor = true
 	button.BackgroundColor3 = priceColor(afford)
-	button.Size = UDim2.new(1, 0, 0, 44)
+	button.Size = UDim2.new(1, -8, 0, 52)
 	button.Parent = list
+	local namePx = MiningUI.NamePx(view.X, view.Y)
+	local name = UITheme.label(button, title, F.Bold, namePx, C.Cream)
+	name.Name = "Name"
+	name.TextScaled = false
+	name.TextWrapped = false
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.Position = UDim2.fromOffset(10, 4)
+	name.Size = UDim2.new(1, -20, 0, 22)
+	local price = UITheme.label(button, detail, F.Body, 14, C.Cream)
+	price.Name = "Price"
+	price.TextScaled = false
+	price.Position = UDim2.fromOffset(10, 26)
+	price.Size = UDim2.new(1, -20, 0, 18)
 	return button
 end
 
@@ -146,7 +180,7 @@ function MiningUI.FillShop(cash: number, owned: { [string]: boolean })
 	for _, pick in ipairs(PickaxeData.Shop()) do
 		if pick.price > 0 and owned[pick.id] ~= true then
 			local afford = cash >= pick.price
-			local button = rowButton(string.format("%s  $%d", pick.name, pick.price), afford)
+			local button = rowButton(pick.name, Util.formatCash(pick.price), afford)
 			button:SetAttribute("PickId", pick.id)
 			button.Activated:Connect(function()
 				MiningUI.Fire("buyPick", pick.id, nil)
@@ -154,7 +188,7 @@ function MiningUI.FillShop(cash: number, owned: { [string]: boolean })
 		end
 	end
 	local price = GameConfig.DynamitePrice
-	local bombs = rowButton(string.format("Bomb  $%d", price), cash >= price)
+	local bombs = rowButton("Bomb", Util.formatCash(price), cash >= price)
 	bombs.Activated:Connect(function()
 		MiningUI.Fire("buyBomb", nil, 1)
 	end)

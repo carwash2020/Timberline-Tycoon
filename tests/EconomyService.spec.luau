@@ -59,6 +59,8 @@ return function(t)
 		t.eq(profile.cash, 0)
 		t.ok(not Economy.SpendCash(player, -10, "test"), "negative spends would add cash")
 		t.eq(profile.cash, 0)
+		t.ok(not Economy.SpendCash(player, 0 / 0, "test"), "NaN must not move cash")
+		t.eq(profile.cash, 0)
 	end)
 
 	t.test("Refund gives spent cash back up to the cap, without counting it as earned", function()

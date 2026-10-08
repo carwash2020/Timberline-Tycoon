@@ -41,6 +41,7 @@ type RubbleRec = {
 	model: Model,
 	sealedUntil: number?,
 	warned: boolean,
+	exit: Vector3,
 }
 
 local nodes: { NodeRec } = {}
@@ -141,11 +142,37 @@ local function worldFolder(): Folder
 	if found and found.Parent then
 		return found
 	end
+	local existing = Workspace:FindFirstChild("Mining")
+	if existing and existing:IsA("Folder") then
+		folder = existing
+		return existing
+	end
 	local made = Instance.new("Folder")
 	made.Name = "Mining"
 	made.Parent = Workspace
 	folder = made
 	return made
+end
+
+-- buildWorld sets these. A test that parents SmeltIntake under Mining
+-- is picked up the same way, so a chunk can be settled without Init.
+local function bindSinks()
+	if intake ~= nil and chute ~= nil then
+		return
+	end
+	local root = worldFolder()
+	if intake == nil then
+		local part = root:FindFirstChild("SmeltIntake", true)
+		if part and part:IsA("BasePart") then
+			intake = part
+		end
+	end
+	if chute == nil then
+		local part = root:FindFirstChild("OreChute", true)
+		if part and part:IsA("BasePart") then
+			chute = part
+		end
+	end
 end
 
 local function liveChunks(player: Player): number
@@ -486,33 +513,67 @@ local function playerInside(wall: RubbleRec): boolean
 	return false
 end
 
+local function wallExit(wall: RubbleRec): Vector3
+	if wall.exit.Magnitude > 1e-4 then
+		return wall.exit
+	end
+	return Vector3.new(0, 0, 1)
+end
+
+-- Open wall: anyone inside the box. Closed wall: anyone within FarReach of
+-- the face that points away from the mine mouth, so a reseal cannot trap them.
+local function crawlOk(wall: RubbleRec, pos: Vector3): boolean
+	local cf, size = wall.model:GetBoundingBox()
+	local exit = wallExit(wall)
+	if wall.sealedUntil ~= nil and MiningLogic.InBox(pos, cf, size) then
+		return true
+	end
+	return MiningLogic.OnFarSide(pos, cf, size, exit, MiningLogic.FarReach)
+end
+
 function MiningService.Crawl(player: Player): boolean
 	local root = rootOf(player)
 	if root == nil then
 		return false
 	end
 	for _, wall in ipairs(rubble) do
-		if wall.sealedUntil ~= nil then
-			local cf, size = wall.model:GetBoundingBox()
-			if MiningLogic.InBox(root.Position, cf, size) then
-				local spot = MiningLogic.CrawlTarget(cf, size)
-				local character = player.Character
-				if character then
-					character:PivotTo(CFrame.new(spot))
-				end
-				for _, child in ipairs(worldFolder():GetChildren()) do
-					if child:IsA("Model") and child:GetAttribute("OwnerId") == player.UserId then
-						local carry = child:FindFirstChild("CarryWeld", true)
-						if carry then
-							child:PivotTo(CFrame.new(spot) * CFrame.new(1, 1, 0))
-						end
+		local cf, size = wall.model:GetBoundingBox()
+		if crawlOk(wall, root.Position) then
+			local spot = MiningLogic.CrawlTarget(cf, size, wallExit(wall))
+			local character = player.Character
+			if character then
+				character:PivotTo(CFrame.new(spot))
+			end
+			for _, child in ipairs(worldFolder():GetChildren()) do
+				if child:IsA("Model") and child:GetAttribute("OwnerId") == player.UserId then
+					local carry = child:FindFirstChild("CarryWeld", true)
+					if carry then
+						child:PivotTo(CFrame.new(spot) * CFrame.new(1, 1, 0))
 					end
 				end
-				return true
 			end
+			return true
 		end
 	end
 	return false
+end
+
+local function prospector(): Model?
+	local folderNow = Workspace:FindFirstChild("Mining")
+	local stall = folderNow and folderNow:FindFirstChild("Prospector")
+	if stall and stall:IsA("Model") then
+		return stall
+	end
+	return nil
+end
+
+local function nearPrimary(player: Player, model: Model?): boolean
+	local root = rootOf(player)
+	local host = model and model.PrimaryPart
+	if root == nil or host == nil then
+		return false
+	end
+	return (root.Position - host.Position).Magnitude <= MiningLogic.ShopReach
 end
 
 local function buyPick(player: Player, id: string)
@@ -521,12 +582,17 @@ local function buyPick(player: Player, id: string)
 	if mining == nil or pick == nil or pick.robux == true then
 		return
 	end
+	if not nearPrimary(player, prospector()) then
+		return
+	end
 	if mining.picks[id] then
 		toast(player, "You already own this")
 		return
 	end
-	if pick.needsHeartstone == true and (mining.crafted.HeartstoneTurnIn or 0) < 1 then
-		toast(player, "Needs a Heartstone turned in")
+	-- The save key stays HeartstoneTurnIn so an old turn-in still counts.
+	local need = pick.opalIngots or 0
+	if need > 0 and (mining.crafted.HeartstoneTurnIn or 0) < 1 then
+		toast(player, "Needs 5 Timber Opal ingots")
 		return
 	end
 	if pick.price > 0 and not EconomyService.SpendCash(player, pick.price, "pickaxe", pick.id) then
@@ -541,7 +607,7 @@ end
 
 local function buyBombs(player: Player, n: number)
 	local mining = miningOf(player)
-	if mining == nil then
+	if mining == nil or not nearPrimary(player, prospector()) then
 		return
 	end
 	local bought, cost = MiningLogic.BuyBombs(mining.bombs, cashOf(player), MiningLogic.BombPrice(), n)
@@ -558,22 +624,31 @@ end
 
 local function turnIn(player: Player)
 	local mining = miningOf(player)
-	if mining == nil then
+	local pick = PickaxeData.Get("ObsidianPick")
+	local need = if pick and pick.opalIngots then pick.opalIngots else 5
+	if mining == nil or not nearPrimary(player, prospector()) then
 		return
 	end
+	local found: { Model } = {}
 	for _, child in ipairs(worldFolder():GetChildren()) do
 		if
 			child:IsA("Model")
+			and child.Name == "Ingot"
 			and child:GetAttribute("OwnerId") == player.UserId
-			and child:GetAttribute("Ore") == "Heartstone"
+			and child:GetAttribute("Ore") == "TimberOpal"
 		then
-			child:Destroy()
-			mining.crafted.HeartstoneTurnIn = 1
-			toast(player, "Heartstone turned in")
-			return
+			table.insert(found, child)
 		end
 	end
-	toast(player, "Bring a Heartstone")
+	if #found < need then
+		toast(player, "Needs 5 Timber Opal ingots")
+		return
+	end
+	for i = 1, need do
+		found[i]:Destroy()
+	end
+	mining.crafted.HeartstoneTurnIn = 1
+	toast(player, "Timber Opal turned in")
 end
 
 local function equip(player: Player, id: string)
@@ -622,6 +697,9 @@ local function onMineAction(player: Player, op: unknown, id: unknown, n: unknown
 	if type(op) ~= "string" or not RateLimiter.Allow(player, "MineAction") then
 		return
 	end
+	if type(n) == "number" and n ~= n then
+		return
+	end
 	if op == "buyPick" and type(id) == "string" then
 		buyPick(player, id)
 	elseif op == "buyBomb" then
@@ -654,6 +732,7 @@ local function pieceModels(): { Model }
 end
 
 local function settle()
+	bindSinks()
 	local sinkIntake = intake
 	local sinkChute = chute
 	if sinkIntake == nil and sinkChute == nil then
@@ -677,6 +756,12 @@ local function settle()
 			inChute = inPart(sinkChute, pos)
 		end
 		if inIntake and owner then
+			if claimed[uid] ~= nil then
+				continue
+			end
+			if not MiningLogic.Claim(claimed, uid, "smelt") then
+				continue
+			end
 			local coal = 0
 			for _, other in ipairs(pieceModels()) do
 				if other:GetAttribute("Ore") == "Coal" and other:GetAttribute("OwnerId") == ownerId then
@@ -685,10 +770,8 @@ local function settle()
 			end
 			local use, pay = MiningLogic.SmeltCost(1, coal)
 			if pay > 0 and not EconomyService.SpendCash(owner, pay, "smelt", oreId) then
+				claimed[uid] = nil
 				toast(owner, "Not enough cash to smelt")
-				continue
-			end
-			if not MiningLogic.Claim(claimed, uid, "smelt") then
 				continue
 			end
 			if use > 0 then
@@ -922,12 +1005,14 @@ local function buildWorld()
 					y = inst:GetPivot().Position.Y,
 					z = inst:GetPivot().Position.Z,
 				})
+				local ex, ez = MineSites.Exit(inst:GetPivot().Position.X, inst:GetPivot().Position.Z, sites.mouth)
 				table.insert(rubble, {
 					id = id,
 					tier = if type(tier) == "number" then tier else 1,
 					model = inst,
 					sealedUntil = nil,
 					warned = false,
+					exit = Vector3.new(ex, 0, ez),
 				})
 			end
 		end
@@ -962,12 +1047,21 @@ local function buildWorld()
 				if whoRoot == nil then
 					return
 				end
-				local cf, size = model:GetBoundingBox()
-				if MiningLogic.InBox(whoRoot.Position, cf, size) then
-					MiningService.Crawl(who)
+				for _, wall in ipairs(rubble) do
+					if wall.model == model and crawlOk(wall, whoRoot.Position) then
+						MiningService.Crawl(who)
+						return
+					end
 				end
 			end)
-			table.insert(rubble, { id = spec.id, tier = spec.tier, model = model, sealedUntil = nil, warned = false })
+			table.insert(rubble, {
+				id = spec.id,
+				tier = spec.tier,
+				model = model,
+				sealedUntil = nil,
+				warned = false,
+				exit = Vector3.new(spec.ex, 0, spec.ez),
+			})
 		end
 	end
 	local padCf = CFrame.new(sites.furnace.x, sites.furnace.y, sites.furnace.z)
@@ -1102,7 +1196,15 @@ local function danger(now: number)
 			end
 			local prompt = wall.model:FindFirstChild("CrawlOut", true)
 			if prompt and prompt:IsA("ProximityPrompt") then
-				prompt.Enabled = playerInside(wall)
+				local open = false
+				for _, player in ipairs(Players:GetPlayers()) do
+					local root = rootOf(player)
+					if root and crawlOk(wall, root.Position) then
+						open = true
+						break
+					end
+				end
+				prompt.Enabled = open
 			end
 		end
 	end
@@ -1199,6 +1301,25 @@ function MiningService.Refresh(player: Player)
 	else
 		stripTools(player, "Bomb")
 	end
+end
+
+function MiningService.Handle(player: Player, op: unknown, id: unknown, n: unknown)
+	onMineAction(player, op, id, n)
+end
+
+function MiningService.SettleNow()
+	settle()
+end
+
+function MiningService.TrackRubble(id: string, model: Model, exit: Vector3, sealedUntil: number?)
+	table.insert(rubble, {
+		id = id,
+		tier = 2,
+		model = model,
+		sealedUntil = sealedUntil,
+		warned = false,
+		exit = exit,
+	})
 end
 
 function MiningService.Init()

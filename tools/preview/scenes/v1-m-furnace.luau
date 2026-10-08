@@ -1,5 +1,5 @@
 --!nocheck
--- Smelting furnace on the pad, sawmill beside it.
+-- The furnace pad: smelter, ore chute, craft bench. The sawmill stays out of frame.
 
 return {
 	build = function(ctx)
@@ -7,10 +7,9 @@ return {
 		local V3, CF, C3 = roblox.Vector3, roblox.CFrame, roblox.Color3
 		local Enum = roblox.Enum
 		local Kit = ctx.art("Kit")
-		local BuildingArt = ctx.art("BuildingArt")
 		local MiningArt = ctx.load("ReplicatedStorage/Shared/Mining/MiningArt")
 		local root = roblox.Instance.new("Model")
-		Kit.part(root, "Pad", V3.new(36, 1, 28), CF.new(0, -0.5, 0), C3.fromRGB(140, 136, 128), Enum.Material.Slate)
+		Kit.part(root, "Pad", V3.new(36, 1, 28), CF.new(1, -0.5, -1), C3.fromRGB(150, 146, 138), Enum.Material.Slate)
 		local layout = MiningArt.PadLayout()
 		local furnace = MiningArt.SmeltingFurnace()
 		furnace:PivotTo(layout.furnace)
@@ -21,19 +20,15 @@ return {
 		local bench = MiningArt.CraftBench()
 		bench:PivotTo(layout.bench)
 		bench.Parent = root
-		local mill = BuildingArt.Sawmill(1)
-		mill:PivotTo(CF.new(-40, 0, 0))
-		mill.Parent = root
-		local function cam(x, y, z, tx, ty, tz, label)
-			return { pos = { x, y, z }, target = { tx, ty, tz }, label = label }
+		local function cam(x, y, z, tx, ty, tz, label, fov)
+			return { pos = { x, y, z }, target = { tx, ty, tz }, label = label, fov = fov }
 		end
 		return {
 			root = root,
-			shadowRadius = 80,
-			fov = 40,
+			shadowRadius = 40,
+			fov = 36,
 			cameras = {
-				cam(18, 16, 36, -10, 4, 0, "furnace with the sawmill"),
-				cam(8, 8, 18, -6, 3, -2, "smelting furnace"),
+				cam(16, 9, 20, 1, 3, -1, "furnace pad", 36),
 			},
 		}
 	end,
