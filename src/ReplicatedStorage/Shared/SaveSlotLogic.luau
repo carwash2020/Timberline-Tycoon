@@ -48,6 +48,7 @@ local ACCOUNT: { [string]: boolean } = {
 	guideStamps = true,
 	tipsSeen = true,
 	dayCounter = true,
+	mining = true, -- pick ladder, bombs, lamp, hat, stash (Lane M). Account-wide, like PickLevel.
 }
 
 -- Axes a Robux pass grants. They come back after a reset, on every slot.

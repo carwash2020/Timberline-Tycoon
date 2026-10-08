@@ -2,6 +2,23 @@
 
 > **Newer than this file's merge notes: read AGENT_HANDOFF.md first.** Every branch below marked "not merged" is merged (main is at #116 as of 8 October 2026).
 
+## Lane M: mining and crafting (8 October 2026, branch `phase-2/v1-m-mining`)
+
+Not on main. V1 mining: ore rocks that show the vein, a cash pick ladder, bombs that open rubble, a smelting furnace and a craft bench on the furnace pad. Income stays at or under 0.8× the best wood the player can already reach (`MINING.md`). The Lux Pickaxe is not for sale. `profile.mining` is account-wide, like the pick level.
+
+The earlier tier-3 cut (Opal $36/$70, Heartstone $80/$140, compared with Gloamwood $7,262) is overridden. Gloam compares with Frostwood, $28,677/h, so the 0.8× cap is $22,942/h. Timber Opal is $90 / $240. Heartstone is $210 / $560. Steel or Lux at Gloam is about $10.7k/h. Obsidian is about $19.1k/h (0.67×). Hills and Snow ore values are unchanged. Hills now quotes Pine at $17,136 from ECONOMY.md (was $15,232). The Obsidian Pick costs $50,000 plus 5 Timber Opal ingots. The save key stays `crafted.HeartstoneTurnIn`.
+
+**Awaiting Connor**
+
+- Lux Pickaxe: a new pass, or a bundle with the Lux Axe pass (`StoreData` Lux Axe id 2005226878), and the price. `passId` stays 0. Level stays 4. No StoreData row. Nothing is on sale. Do not run a purchase test until Connor says yes.
+- Whether the crafted Miner's Lamp should also count as the Lantern for Gloam. Default: no. It does light tier 3 mining.
+- Furniture (Copper Lamp Post, Gold-banded Chest) stays "Coming soon" until lane F can grant a placed piece.
+- No texture or mesh uploads. Rocks, picks, the furnace and the gear are part-built.
+
+Turn-in fixes (PR #125 QA round 2): a second turn-in no longer eats 5 more Timber Opal ingots (toast "Already turned in"), and the turn-in only counts ingots near the Prospector stall and not welded in a truck bed, through `CraftingService.StockNear`. Specs in `tests/MiningService.spec.luau`.
+
+Studio checks: PHASE2_NOTES.md, "Mining and crafting".
+
 Last updated 8 October 2026 (choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
