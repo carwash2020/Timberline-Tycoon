@@ -172,6 +172,10 @@ local GameConfig = {
 	MaxPlotPieces = 150,
 	MaxPlotSections = 1100,
 	MaxLoosePieces = 150,
+	-- Pieces one plot.placed list may hold. SaveSize.spec fills every slot,
+	-- storage, and the saved-section cap and keeps the JSON under 1 MB
+	-- (a DataStore value may be 4 MB). Raised only when that spec still passes.
+	PlacedCap = 320,
 	PlotSquare = 40, -- studs
 	PlotGrid = 5,
 	BlueprintPricePerUnit = 10,

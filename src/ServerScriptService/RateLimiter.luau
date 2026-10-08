@@ -75,11 +75,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	ForgeAction = 4,
 	ForgeOpen = 2,
 	SaveNow = 1,
-	TradeRequest = 2,
-	TradeState = 4,
 	PaintAllType = 4,
 	LogicSet = 4,
-	Trade = 4,
 	MineAction = 8, -- Lane M: a mining intent, about 8 a second
 	CraftAction = 2, -- Lane M: a craft intent, about 2 a second
 }

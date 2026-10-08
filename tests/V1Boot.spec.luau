@@ -11,5 +11,6 @@ return function(t)
 			end
 		end
 		t.ok(found)
+		t.eq(table.find(V1Boot.Services, "TradeService"), nil, "trading is not in V1")
 	end)
 end

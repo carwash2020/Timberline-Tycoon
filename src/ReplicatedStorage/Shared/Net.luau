@@ -70,11 +70,8 @@ Net.RemoteNames = {
 	"ForgeAction", -- client -> server: a forge order
 	"ForgeOpen", -- client -> server: open the forge
 	"SaveNow", -- client -> server: write the save now
-	"TradeRequest", -- client -> server: ask another player to trade
-	"TradeState", -- client -> server: the trade window's intent
 	"PaintAllType", -- client -> server: paint every placed piece of one type
 	"LogicSet", -- client -> server: a logic link on the plot
-	"Trade", -- client -> server: confirm a trade
 	"MineAction", -- client -> server: (op: string, id: string?, n: number?) Lane M owns the handler
 	"CraftAction", -- client -> server: (recipeId: string) Lane M owns the handler
 }

@@ -276,8 +276,6 @@ export type Profile = {
 	temper: { [string]: TemperLogic.Record },
 	relics: { [string]: boolean },
 	forgeOrder: { any },
-	tradeLog: { any },
-	tradeLockUntil: number,
 	saveCooldownUntil: number,
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
 	instantDeliveries: number, -- Instant Delivery uses left
@@ -406,8 +404,6 @@ local TEMPLATE: Profile = {
 	temper = {},
 	relics = {},
 	forgeOrder = {},
-	tradeLog = {},
-	tradeLockUntil = 0,
 	saveCooldownUntil = 0,
 	guideStamps = {},
 	tipsSeen = {},
@@ -845,10 +841,6 @@ local function applyContract(record: any)
 	if type(record.forgeOrder) ~= "table" then
 		record.forgeOrder = {}
 	end
-	if type(record.tradeLog) ~= "table" then
-		record.tradeLog = {}
-	end
-	record.tradeLockUntil = finiteNumber(record.tradeLockUntil, 0)
 	record.saveCooldownUntil = finiteNumber(record.saveCooldownUntil, 0)
 	if type(record.plot) == "table" then
 		record.plot.loose = snapPieceList(record.plot.loose)
