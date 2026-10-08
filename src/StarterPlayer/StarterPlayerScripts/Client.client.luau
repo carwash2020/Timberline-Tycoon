@@ -102,6 +102,7 @@ end
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local JoinFlow = require(ReplicatedStorage.Shared.JoinFlow)
 local Net = require(ReplicatedStorage.Shared.Net)
 
 type Controller = { Start: () -> () }
@@ -551,9 +552,12 @@ task.spawn(function()
 			totalStarts
 		)
 	)
-	for _ = 1, 6 do
+	-- The server connects its listener only once its services have started,
+	-- which can be later than the first fire: keep asking for longer than the
+	-- server's gate wait (JoinFlow.ClientReadyTries), not for a fixed 18 s.
+	for _ = 1, JoinFlow.ClientReadyTries do
 		remote:FireServer()
-		task.wait(3)
+		task.wait(JoinFlow.ClientReadyEvery)
 		if localPlayer:GetAttribute("ProfileLoaded") == true then
 			return
 		end

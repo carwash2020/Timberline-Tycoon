@@ -41,6 +41,9 @@ return function(t)
 				if name == "Net" then
 					return fakeNet
 				end
+				if name == "JoinFlow" then
+					return { ClientReadyTries = 30, ClientReadyEvery = 3 }
+				end
 				if failingLoad[name] then
 					error(name .. " broke at load") -- its top level errors
 				end

@@ -2758,3 +2758,22 @@ No new remotes, no server change, no economy change.
 - [ ] Respawn or reset while the picker is open: the camera stays on the pad shot.
 - [ ] Claim: the screen fades to black with "Claimed <pad>!", then fades into your plot (no hard cut). "Not now" / B closes with no fade and the camera returns to your character.
 - [ ] Phone: the card does not touch the thumbstick or jump corners; Xbox: D-pad still walks Previous / Claim / Next (the card is not selectable).
+
+## Final pass over everything not yet seen in Studio (branch `claude/final-pass`, 7 October 2026)
+
+A read-through of the join flow, boxes and store, owner hub and paid items, mill tiers, planers and belts, plot platforms and the load pipeline, looking only for real bugs. Fixed:
+- **No character after one failed load** (`GameServer`): `LoadCharacterAsync` was one pcall; a failure at join left the player with no character and a dead player's respawn failure left them dead for good. Now `JoinFlow.LoadWithRetry` (3 tries, 1 s apart, stops when the player leaves) for the join, the respawn, the save-slot swap and the fallback.
+- **ClientReady could be lost** (`Client.client`, `JoinFlow`): the client fired 6 times over 18 s, the server only listens once its services have started. Now it fires every 3 s for up to 90 s (`JoinFlow.ClientReadyTries`) until the save is in; the server still releases after its own bounded wait.
+- **Plot picker lock after a close** (`PlotPickerUI`): a respawn that finished after the picker closed locked WalkSpeed and the camera with nothing to undo it. It checks `open` again after waiting for the humanoid. Its three buttons also shrink their text on a narrow phone panel instead of spilling.
+- **Quality screen** (`QualityPickerUI`): closes (controls back on) before it talks to the server.
+- **Hover tag** (`HoverTagUI`): placing the tag no longer errors on an item destroyed since the last aim check.
+
+### Studio checks (Connor), final pass
+- [ ] Join on a cold server: Output shows `client ready handshake` and `state sent again to the client`; the plot picker (returning owner) and the cash show without a rejoin.
+- [ ] Die and reset a few times, in town and on your plot: you always come back with a character.
+- [ ] Plot picker open, then claim while resetting: you can walk and the camera is yours afterwards.
+- [ ] Phone (or the phone emulator, narrow): PREVIOUS / CLAIM FOR $... / NEXT stay inside their buttons.
+- [ ] Quality screen: tap a card; movement works at once.
+- [ ] Aim at a shelf box, then buy and open it quickly: no red error in Output.
+
+Left alone, for Connor to decide: a log hand-dropped at a sawmill or planer that is busy waits; after `AutomationLogic.HandWindow` (4 s) untouched it counts as belt-fed, so rare or figured wood hand-fed behind another job is refused ("rare") and the throughput cap applies. Picking it up and dropping it again resets the clock.

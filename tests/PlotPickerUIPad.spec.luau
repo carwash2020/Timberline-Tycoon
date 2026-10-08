@@ -30,4 +30,14 @@ return function(t)
 		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/PlotUI.luau")
 		t.ok(string.find(src, "body.Selectable = false", 1, true), "the land panel does not eat the D-pad")
 	end)
+
+	-- Final pass: the respawn handler waits for the humanoid; a close in that wait must not lock afterwards.
+	t.test("a respawn that finishes after the picker closed does not lock the player", function()
+		local src = fs.readFile("src/StarterPlayer/StarterPlayerScripts/PlotPickerUI.luau")
+		local wait = string.find(src, 'char:WaitForChild("Humanoid", 5)', 1, true)
+		local recheck = string.find(src, "if not open then", wait or 1, true)
+		local lock = string.find(src, "\t\t\tlock()", wait or 1, true)
+		t.ok(wait and recheck and lock and recheck < lock, "open is checked again before lock()")
+		t.ok(string.find(src, "button.TextScaled = true", 1, true), "the narrow phone panel shrinks its labels")
+	end)
 end

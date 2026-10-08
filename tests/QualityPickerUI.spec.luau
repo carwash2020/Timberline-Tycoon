@@ -301,4 +301,14 @@ return function(t)
 		t.ok(string.find(source, 'Net.Remote("SetQuality"):FireServer(nextChoice)', 1, true))
 		t.eq(string.find(source, "SetOverride", 1, true), nil, "the old four-way override is gone from the menu")
 	end)
+
+	-- Final pass: the screen closes (controls back on) before anything that could yield or throw.
+	t.test("Choose closes the screen before it talks to the server", function()
+		local fs = require("@lune/fs")
+		local source = fs.readFile("src/StarterPlayer/StarterPlayerScripts/QualityPickerUI.luau")
+		local choose = string.find(source, "function QualityPickerUI.Choose", 1, true)
+		local closeAt = string.find(source, "\tclose()\n", choose, true)
+		local fire = string.find(source, 'Net.Remote("SetQuality"):FireServer(choice)', choose, true)
+		t.ok(choose and closeAt and fire and closeAt < fire)
+	end)
 end

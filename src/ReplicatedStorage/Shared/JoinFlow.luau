@@ -38,6 +38,13 @@ JoinFlow.SettleSeconds = 0.3 -- on the ground this long (no falling, no sliding)
 JoinFlow.ClientWaitSeconds = 12 -- the longest to wait for the client's ClientReady
 JoinFlow.StreamLift = 3 -- studs above the spawn pad the stream is asked around
 JoinFlow.MaxRespawnSeconds = 30
+JoinFlow.LoadAttempts = 3 -- LoadCharacterAsync tries (a failed one used to leave the player with no character, for good)
+JoinFlow.LoadRetrySeconds = 1
+-- The client repeats ClientReady every ClientReadyEvery seconds, ClientReadyTries times, until the save
+-- is in. The server only listens once its services have started, which on a cold server can be well
+-- after the client's first fire; the window must outlast the gate wait or every fire can be lost.
+JoinFlow.ClientReadyEvery = 3
+JoinFlow.ClientReadyTries = 30
 
 -- The first-player gates that are still shut. `isReady` answers one name.
 function JoinFlow.Missing(isReady: (string) -> boolean): { string }
@@ -111,6 +118,27 @@ function JoinFlow.Settled(): Tracker
 		return now - (since :: number) >= JoinFlow.SettleSeconds
 	end
 	return tracker
+end
+
+-- Runs `load` (LoadCharacterAsync) until it succeeds, at most LoadAttempts
+-- times, waiting LoadRetrySeconds between tries and giving up when the player
+-- has left. Returns (true, nil) or (false, the last error).
+function JoinFlow.LoadWithRetry(load: () -> (), alive: () -> boolean, wait: (seconds: number) -> ()): (boolean, any?)
+	local lastErr: any = "no attempt"
+	for attempt = 1, JoinFlow.LoadAttempts do
+		if not alive() then
+			return false, "the player left"
+		end
+		local ok, err = (pcall :: any)(load)
+		if ok then
+			return true, nil
+		end
+		lastErr = err
+		if attempt < JoinFlow.LoadAttempts then
+			wait(JoinFlow.LoadRetrySeconds)
+		end
+	end
+	return false, lastErr
 end
 
 -- Seconds before a dead character is loaded again (Players.RespawnTime
