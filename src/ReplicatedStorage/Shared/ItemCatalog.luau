@@ -100,6 +100,7 @@ export type GearDef = {
 	priceCash: number,
 	biome: string, -- the biome it's for
 	color: string, -- hex, for the shop swatch
+	quest: boolean?, -- earned, never sold at Hearth & Home
 }
 
 ItemCatalog.Axes = {
@@ -335,6 +336,16 @@ ItemCatalog.Gear = {
 		biome = "volcano",
 		color = "#B5472A",
 	},
+	-- The Sky Pass (Gondola Pass). A quest turn-in, not a shelf item.
+	GondolaPass = {
+		id = "GondolaPass",
+		displayName = "Sky Pass",
+		effect = "The gondola to the Aether Isles",
+		priceCash = 0,
+		biome = "sky",
+		color = "#9FD4FF",
+		quest = true,
+	},
 	FeatherfallCloak = {
 		id = "FeatherfallCloak",
 		displayName = "Featherfall Cloak",
@@ -484,10 +495,10 @@ local AXES_V2: { [string]: AxeV2 } = {
 	-- first step (the model buys it in about 7 min), and the Inferno Axe
 	-- ($38,000) sits under the forged Starfall Axe. The tutorial's loads step
 	-- is sized so start + a sale + Murph's reward reaches the Steel price.
-	SteelAxe = { price = 120, damage = 0.55, range = 6, cooldown = 0.73 },
+	SteelAxe = { price = 110, damage = 0.55, range = 6, cooldown = 0.73 },
 	HardenedAxe = { price = 400, damage = 0.93, range = 8, cooldown = 0.70 },
 	SilverAxe = { price = 1100, damage = 1.45, range = 8, cooldown = 0.65 },
-	CobaltAxe = { price = 3000, damage = 1.6, range = 10, cooldown = 0.48 },
+	CobaltAxe = { price = 2500, damage = 1.6, range = 10, cooldown = 0.48 },
 	GoldAxe = { price = 8500, damage = 1.68, range = 10, cooldown = 0.40 },
 	-- Was 10.2 damage: that one-cut almost every trunk and beat the forged
 	-- Starfall Axe. Damage, reach and cooldown now climb the ladder, and
@@ -669,7 +680,9 @@ end
 -- Every piece of gear, cheapest first (Hearth & Home's order).
 local gearList: { GearDef } = {}
 for _, gear in pairs(ItemCatalog.Gear) do
-	table.insert(gearList, gear)
+	if gear.quest ~= true then
+		table.insert(gearList, gear)
+	end
 end
 table.sort(gearList, function(a, b)
 	return a.priceCash < b.priceCash
@@ -843,7 +856,7 @@ ItemCatalog.Machines = {
 		boxD = 10,
 		planer = {
 			tier = 4,
-			boardBonus = 2.00,
+			boardBonus = 1.80,
 			maxLength = 18.9,
 			minX = 0.6,
 			maxX = 3.0,

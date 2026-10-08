@@ -18,6 +18,7 @@ local StarterPlayer = game:GetService("StarterPlayer")
 
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local HazardService = require(script.Parent.HazardService)
 local ItemCatalog = require(ReplicatedStorage.Shared.ItemCatalog)
 local ProfileService = require(script.Parent.ProfileService)
 local SprintLogic = require(ReplicatedStorage.Shared.SprintLogic)
@@ -84,6 +85,8 @@ local function update(player: Player)
 	local root = if char then char:FindFirstChild("HumanoidRootPart") :: BasePart? else nil
 	local humanoid = if char then char:FindFirstChildOfClass("Humanoid") else nil
 	if not root or not humanoid or humanoid.Health <= 0 then
+		-- A respawn starts clear. The new character is not standing in the hazard yet.
+		HazardService.ApplyClimate(player, nil, false, 0)
 		return
 	end
 	local pos = root.Position
@@ -127,6 +130,14 @@ local function update(player: Player)
 			burningWarned[player] = true
 			notify(player, string.format("The ground is scorching! %s keep you safe here.", gearName(rules.needs)))
 		end
+	end
+	-- Snow, and the volcano outside the crater. The coat or the boots remove
+	-- it. A seat pauses the meter. The crater keeps the lava burn above.
+	local climate = BiomeData.Exposure(biome, gear, not inHeat)
+	local sheltered = humanoid.SeatPart ~= nil
+	local climateDamage = HazardService.ApplyClimate(player, climate, sheltered, TICK)
+	if climateDamage > 0 then
+		humanoid:TakeDamage(climateDamage)
 	end
 	setLantern(root, gear.Lantern == true and WorldClock.IsNight())
 end

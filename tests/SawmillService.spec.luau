@@ -713,4 +713,21 @@ return function(t)
 			t.eq(taken({ lastInteracted = 0, ownerId = 9 }), true, "hand-fed, anyone's")
 		end
 	)
+
+	t.test("a log's temper t is stamped onto every plank the mill cuts", function()
+		local r = run("SawmillRickety", { temper = 1.07 })
+		r.tick(0)
+		r.tick(Sawmill.Settle)
+		r.finish()
+		t.ok(#r.spawned > 0)
+		for _, info in ipairs(r.spawned) do
+			t.eq(info.temper, 1.07)
+			local volume = Sell.VolumeU3(info.size.X, info.size.Y, info.size.Z)
+			local priced = Sell.PieceValue("oak", "plank", volume, nil, 1, false, info.mill, nil, 1.07)
+			local untinted = Sell.PieceValue("oak", "plank", volume, nil, 1, false, info.mill, nil, 1)
+			t.ok(math.abs(priced - untinted * 1.07) < 1e-6 or priced == untinted * Sell.BonusCap, "the sale uses t, capped with the mill")
+		end
+		r.mill:Destroy()
+		Sawmill._reset()
+	end)
 end

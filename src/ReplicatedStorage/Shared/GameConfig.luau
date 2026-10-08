@@ -89,6 +89,12 @@ local GameConfig = {
 	-- workspace attribute CoreLoop overrides it (Shared/CoreLoop); live
 	-- servers never.
 	CoreLoop = 2,
+	-- Which map a save was written on. Missing counts as 1. Migrate parks a
+	-- truck and its ground wood when the save is behind this, then writes
+	-- this number exactly (an older server can write a lower one again).
+	-- Lane B raises it when the map moves. Lane F restores strandedLoad and
+	-- does not change this.
+	WorldVersion = 1,
 	-- The uploaded town meshes (TownMeshes.Dress). KILL SWITCH: set false and
 	-- republish and the town is the part-built art again (nothing else
 	-- changes). In Studio, set the workspace attribute TownMeshes to
@@ -155,11 +161,17 @@ local GameConfig = {
 	PlotPrice = 150,
 	FirstPlotPrice = 100,
 	-- Expansion k costs ExpansionPriceStep × k (k = 1..24). With
-	-- FirstPlotPrice that is the full 5×5 plot: 3050 totals $915,100 and
-	-- the economy model takes about 30 h (acceptance E1: 28–36 h). It was
-	-- 2280 ($684,100) before the rarer woods (WoodData.RareBoost) sold for
-	-- more, which shortened the long game; the step grew to put it back.
-	ExpansionPriceStep = 3050,
+	-- FirstPlotPrice that is the full 5×5 plot: 7600 totals $2,280,100.
+	-- It was 3050 ($915,100) before mill and planer bonuses were modelled.
+	-- The economy model has to land the full plot in 28–36 h (acceptance E1).
+	ExpansionPriceStep = 7600,
+	-- Homestead tiers (PlotData.Tiers): campsite through empire. The campsite
+	-- is free; the later prices are what UpgradePlot charges to grow.
+	PlotTierPrices = { 0, 2500, 10000, 30000, 60000 },
+	-- Placeholders for the plot batch. Nothing else reads them yet.
+	MaxPlotPieces = 150,
+	MaxPlotSections = 1100,
+	MaxLoosePieces = 150,
 	PlotSquare = 40, -- studs
 	PlotGrid = 5,
 	BlueprintPricePerUnit = 10,

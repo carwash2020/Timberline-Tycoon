@@ -94,6 +94,10 @@ return function(t)
 		t.eq(ShopLogic.RespawnFee(truck("Rustbucket"), 2), 5) -- 5% of $100
 		t.eq(ShopLogic.RespawnFee(truck("Pickup"), 2), 20) -- 5% of $400
 		t.eq(ShopLogic.RespawnFee(truck("Flatbed"), 2), 250) -- 5% of $5,000
+		t.eq(ShopLogic.RecallFee(truck("Rustbucket"), 2, false, 4), 0, "under $5 the recall is free")
+		t.eq(ShopLogic.RecallFee(truck("Rustbucket"), 2, false, 5), 5)
+		t.eq(ShopLogic.RecallFee(truck("Flatbed"), 2, false, 100), 250, "a wallet over $5 still pays the fee")
+		t.eq(ShopLogic.GearStatusOf(ItemCatalog.GetGear("GondolaPass"), {}), "soon", "the Sky Pass is not sold")
 	end)
 
 	t.test("trailers: buy, hitch, hitched", function()

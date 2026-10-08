@@ -12,7 +12,8 @@
 -- bigger plank loses the shavings; a smaller one was refused at the door),
 -- it is stamped with the planer's boardBonus (never lowering an existing
 -- stamp) and let go, shoved out the front. It is the SAME piece: its owner,
--- wood, figure, boost, lux and mill bonus carry; SellLogic does the rest.
+-- wood, figure, boost, lux, mill bonus and Prosperous stamp `t` carry;
+-- SellLogic does the rest.
 --
 -- Belts: a plank nobody has touched for AutomationLogic.HandWindow seconds
 -- came by belt: it is capped by the tier's autoRate and refused for rare
@@ -27,6 +28,7 @@ local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
 local MachineArt = require(ReplicatedStorage.Shared.Art.MachineArt)
 local PlanerLogic = require(ReplicatedStorage.Shared.PlanerLogic)
 local SawmillLogic = require(ReplicatedStorage.Shared.SawmillLogic)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 local VehicleLogic = require(ReplicatedStorage.Shared.VehicleLogic)
 local GrabService = require(script.Parent.GrabService)
 local ProfileService = require(script.Parent.ProfileService)
@@ -444,6 +446,7 @@ local function liveContext(notifyFn: (Player, string) -> ()): Context
 				part.Size = Vector3.new(size.sx, size.sy, size.sz)
 			end
 			piece.board = board
+			piece.temper = SellLogic.Temper(piece.temper)
 			WoodService.Publish(piece)
 		end,
 		moved = WoodService.Moved,

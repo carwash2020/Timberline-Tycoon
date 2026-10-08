@@ -45,6 +45,9 @@ local ACCOUNT: { [string]: boolean } = {
 	secretsFound = true,
 	areasVisited = true,
 	cosmetics = true, -- event cosmetics (the Halloween Pumpkin Hat)
+	guideStamps = true,
+	tipsSeen = true,
+	dayCounter = true,
 }
 
 -- Axes a Robux pass grants. They come back after a reset, on every slot.

@@ -162,8 +162,12 @@ function ShopLogic.RespawnFee(truck: TruckDef, loop: number): number
 	)
 end
 
-function ShopLogic.RecallFee(truck: TruckDef, loop: number, ownsTow: boolean?): number
+function ShopLogic.RecallFee(truck: TruckDef, loop: number, ownsTow: boolean?, cash: number?): number
 	if ownsTow == true then
+		return 0
+	end
+	-- Under $5 the minimum can't be paid, so the recall is free.
+	if type(cash) == "number" and cash == cash and cash < GameConfig.VehicleRespawnMinFee then
 		return 0
 	end
 	return ShopLogic.RespawnFee(truck, loop)
@@ -229,6 +233,9 @@ export type GearStatus = "buy" | "owned" | "soon"
 function ShopLogic.GearStatusOf(gear: GearDef, owned: { [string]: boolean }): GearStatus
 	if owned[gear.id] then
 		return "owned"
+	end
+	if gear.quest == true then
+		return "soon"
 	end
 	if not BiomeData.IsOpen(gear.biome) then
 		return "soon"

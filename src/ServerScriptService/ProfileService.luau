@@ -55,7 +55,15 @@ function ProfileService.LoadProfile(player: Player): (Profile?, string?)
 	end
 
 	session:AddUserId(player.UserId) -- GDPR: lets Roblox erase this key on request
+	-- Reconcile would copy the template's WorldVersion onto a save that
+	-- never had one, and a later map would then skip the park. Missing
+	-- counts as 1 inside Migrate. A new profile already has the field,
+	-- copied from the template, so it starts on the current map.
+	local hadWorldVersion = session.Data.worldVersion ~= nil
 	session:Reconcile()
+	if not hadWorldVersion then
+		session.Data.worldVersion = nil
+	end
 	ProfileSchema.Migrate(session.Data)
 
 	-- The player may have left while we were waiting on the DataStore.

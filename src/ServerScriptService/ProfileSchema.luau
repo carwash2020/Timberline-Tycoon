@@ -17,6 +17,8 @@ local PaidItems = require(ReplicatedStorage.Shared.PaidItems)
 local EditLogic = require(ReplicatedStorage.Shared.EditLogic)
 local PlotData = require(ReplicatedStorage.Shared.PlotData)
 local SaveSlotLogic = require(ReplicatedStorage.Shared.SaveSlotLogic)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
+local TemperLogic = require(ReplicatedStorage.Shared.TemperLogic)
 local SkyBinLogic = require(ReplicatedStorage.Shared.SkyBinLogic)
 local SettingsLogic = require(ReplicatedStorage.Shared.SettingsLogic)
 local TutorialData = require(ReplicatedStorage.Shared.TutorialData)
@@ -112,6 +114,7 @@ export type SkyWood = {
 	l: boolean?, -- cut with the Lux Axe: +10% at sale
 	m: number?, -- a plank's mill bonus (SellLogic.Bonus); absent means 1.0
 	d: number?, -- a finished board's planer bonus; absent means 1.0
+	t: number?, -- Prosperous temper; absent means 1
 }
 
 -- One loose piece of wood saved off your truck's beds (the v2 loop,
@@ -130,6 +133,7 @@ export type TruckPiece = {
 	l: boolean?,
 	m: number?,
 	d: number?,
+	t: number?, -- Prosperous temper; absent means 1
 	bed: string,
 	at: { number },
 	s: { { number } },
@@ -185,6 +189,8 @@ export type Profile = {
 		wires: { WireLink }, -- switch to lamp or door links (WireLogic)
 		switches: { string }, -- uids of the wall switches that are on; a switch not listed is off
 		pads: { any }?, -- vehicle pads (VehicleService); they travel with the base
+		loose: { any }, -- loose wood on the plot; each piece may carry `t`
+		logic: { any }, -- placed logic links, kept with the plot
 	},
 	-- Unload base (BaseLogic): account-wide, unix time the next unload is allowed.
 	baseCooldownUntil: number,
@@ -200,6 +206,10 @@ export type Profile = {
 	areasVisited: { [string]: boolean },
 	-- Cosmetics earned (the Halloween Pumpkin Hat is "pumpkinHat"): account-wide.
 	cosmetics: { [string]: boolean },
+	-- Account-wide, like cosmetics: a tip or a guide stamp is not per slot.
+	guideStamps: { [string]: boolean },
+	tipsSeen: { [string]: boolean },
+	dayCounter: number,
 	-- The seasonal event's progress (EventData.State), per slot.
 	event: EventData.State,
 	compendium: { [string]: boolean },
@@ -255,6 +265,18 @@ export type Profile = {
 	ownerGrantLog: { PaidItems.LogEntry },
 	-- Paint Shop colors, per truck id, on this slot. Cosmetic only.
 	truckPaint: { [string]: string },
+	-- The Sky Pass (also called the Gondola Pass): a quest reward, not a shop
+	-- item. Both names are the same flag.
+	gondolaPass: boolean,
+	skyPass: boolean,
+	skyQuest: { [string]: any },
+	-- Axe tempers by axe uid: { prefix, tier }. Prosperous stamps `t` on a fell.
+	temper: { [string]: TemperLogic.Record },
+	relics: { [string]: boolean },
+	forgeOrder: { any },
+	tradeLog: { any },
+	tradeLockUntil: number,
+	saveCooldownUntil: number,
 	doubleWoodUntil: number, -- unix time the 2x Wood boost ends (0 = none)
 	instantDeliveries: number, -- Instant Delivery uses left
 	-- Funnel flags (MilestoneService). Additions only.
@@ -264,12 +286,22 @@ export type Profile = {
 	-- Where your truck was when its bed last changed or it last moved (x, y,
 	-- z; {} until known): on a rejoin the bed only comes back into the truck
 	-- if that was in town, else it waits there on the ground (VehicleService).
-	truckAt: { x: number?, y: number?, z: number? },
+	-- Nil after a map-version park: the old spot is not on the new map.
+	truckAt: { x: number?, y: number?, z: number? }?,
 	leftLoad: { LeftLog }, -- left-behind logs still on the ground when you left (put back on rejoin)
 	-- v2: loose wood a load left out of town that you hadn't fetched when
 	-- you left (TruckLoad): LeftLoad pieces with bed "Ground" and a world
 	-- spot `g`, put back where they lay on rejoin.
 	groundLoad: { any },
+	-- Wood that was on the ground when the map moved (same shape as
+	-- groundLoad). Lane F puts it on the plot and clears this. Migrate only
+	-- appends, and only while worldVersion is behind GameConfig.WorldVersion.
+	strandedLoad: { any },
+	-- The map this slot was saved on. Missing counts as 1. Migrate writes
+	-- GameConfig.WorldVersion exactly, never the higher of the two.
+	worldVersion: number,
+	-- Found secrets on this slot (not secretsFound, which is account-wide).
+	secrets: { [string]: boolean },
 	-- Sawmills bought at the Tool Shed and not placed yet (ids; duplicates
 	-- are two mills). Placing one on your plot takes it off this list.
 	sawmillStock: { string },
@@ -309,7 +341,16 @@ local TEMPLATE: Profile = {
 	equippedTrailer = "",
 	ownedBoats = {},
 	gear = {},
-	plot = { claimed = false, tier = 1, placed = {}, squares = {}, wires = {}, switches = {} },
+	plot = {
+		claimed = false,
+		tier = 1,
+		placed = {},
+		squares = {},
+		wires = {},
+		switches = {},
+		loose = {},
+		logic = {},
+	},
 	baseCooldownUntil = 0,
 	storage = {},
 	permissions = {},
@@ -346,6 +387,18 @@ local TEMPLATE: Profile = {
 	ownerGrants = {},
 	ownerGrantLog = {},
 	truckPaint = {},
+	gondolaPass = false,
+	skyPass = false,
+	skyQuest = {},
+	temper = {},
+	relics = {},
+	forgeOrder = {},
+	tradeLog = {},
+	tradeLockUntil = 0,
+	saveCooldownUntil = 0,
+	guideStamps = {},
+	tipsSeen = {},
+	dayCounter = 0,
 	doubleWoodUntil = 0,
 	instantDeliveries = 0,
 	onboarding = {},
@@ -355,6 +408,9 @@ local TEMPLATE: Profile = {
 	leftLoad = {},
 	truckLoad = {},
 	groundLoad = {},
+	strandedLoad = {},
+	worldVersion = GameConfig.WorldVersion,
+	secrets = {},
 	sawmillStock = {},
 	settings = SettingsLogic.Sanitize(nil),
 	pendingCash = 0,
@@ -678,6 +734,89 @@ local function cleanPlot(plot: any)
 	plot.placed = kept
 end
 
+local function finiteNumber(value: any, fallback: number): number
+	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+		return fallback
+	end
+	return value
+end
+
+-- A piece list (truck, ground, stranded, sky, loose). `t` is kept only when
+-- it is a Prosperous grade above 1. The same tables come back, so a second
+-- pass does not copy them.
+local function snapPieceList(list: any): { any }
+	if type(list) ~= "table" then
+		return {}
+	end
+	local out = {}
+	for _, entry in ipairs(list) do
+		if type(entry) == "table" then
+			entry.t = TemperLogic.Stored(entry.t)
+			table.insert(out, entry)
+		end
+	end
+	return out
+end
+
+-- Missing worldVersion counts as 1. A non-number counts as missing.
+local function worldVersionOf(record: any): number
+	local v = record.worldVersion
+	if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then
+		return 1
+	end
+	return v
+end
+
+-- Park this slot when it was saved on an older map than the one this server
+-- is running. Writes GameConfig.WorldVersion exactly, so a server still on
+-- an older map stores that older number and the next new-map join parks
+-- again. Appending only what is in groundLoad, then clearing it, is what
+-- keeps a second pass from duplicating pieces.
+local function parkWorld(record: any)
+	if type(record.strandedLoad) ~= "table" then
+		record.strandedLoad = {}
+	end
+	if worldVersionOf(record) < GameConfig.WorldVersion then
+		record.truckAt = nil
+		local ground = if type(record.groundLoad) == "table" then record.groundLoad else {}
+		for _, entry in ipairs(ground) do
+			table.insert(record.strandedLoad, entry)
+		end
+		record.groundLoad = {}
+	end
+	record.worldVersion = GameConfig.WorldVersion
+end
+
+local function applyContract(record: any)
+	record.secrets = booleanMap(record.secrets)
+	record.temper = TemperLogic.Clean(record.temper)
+	record.relics = booleanMap(record.relics)
+	record.gondolaPass = record.gondolaPass == true or record.skyPass == true
+	record.skyPass = record.gondolaPass
+	if type(record.skyQuest) ~= "table" then
+		record.skyQuest = {}
+	end
+	if type(record.forgeOrder) ~= "table" then
+		record.forgeOrder = {}
+	end
+	if type(record.tradeLog) ~= "table" then
+		record.tradeLog = {}
+	end
+	record.tradeLockUntil = finiteNumber(record.tradeLockUntil, 0)
+	record.saveCooldownUntil = finiteNumber(record.saveCooldownUntil, 0)
+	if type(record.plot) == "table" then
+		record.plot.loose = snapPieceList(record.plot.loose)
+		if type(record.plot.logic) ~= "table" then
+			record.plot.logic = {}
+		end
+	end
+	record.truckLoad = snapPieceList(record.truckLoad)
+	record.groundLoad = snapPieceList(record.groundLoad)
+	record.skyWood = snapPieceList(record.skyWood)
+	record.strandedLoad = snapPieceList(record.strandedLoad)
+	parkWorld(record)
+end
+
 -- Per-slot fields. Missing or wrong-typed fields become the template.
 -- storage keeps at most StorageCap boxes, each with a server uid, and
 -- drops a box only when its uid is already an axe, truck, or placed-item uid.
@@ -730,6 +869,7 @@ local function applySlotFields(record: any)
 	-- not minted. A full storage stops the mint and leaves trucksBoxed
 	-- false, so a later load can finish. Nothing already stored is removed.
 	ProfileSchema.MintTruckBoxes(record)
+	applyContract(record)
 end
 
 -- Account-wide fields live on the profile, never inside a slot snapshot.
@@ -739,6 +879,9 @@ local function applyAccountFields(data: any)
 	data.secretsFound = booleanMap(data.secretsFound)
 	data.areasVisited = booleanMap(data.areasVisited)
 	data.cosmetics = booleanMap(data.cosmetics)
+	data.guideStamps = booleanMap(data.guideStamps)
+	data.tipsSeen = booleanMap(data.tipsSeen)
+	data.dayCounter = finiteNumber(data.dayCounter, 0)
 	data.tollPaidUntil = nil
 end
 
@@ -748,6 +891,9 @@ local function stripAccountFields(slot: any)
 	slot.secretsFound = nil
 	slot.areasVisited = nil
 	slot.cosmetics = nil
+	slot.guideStamps = nil
+	slot.tipsSeen = nil
+	slot.dayCounter = nil
 	slot.tollPaidUntil = nil
 end
 
