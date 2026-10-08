@@ -4,9 +4,22 @@
 -- stay: chassis, skids, ramps, seat, bed floors, bed hull, wheels, lights
 -- and exhaust. Looks-only meshes are Massless and not queryable.
 -- Wheels are one tyre mesh each, at the axle the part-built wheel already
--- uses. Body, glass, lights, bed and hitch share the vehicle root (ground
--- centre, front -Z). A MeshPart whose import pivot survived is PivotTo'd
--- there; otherwise the bounds' bottom centre sits on that root.
+-- uses.
+--
+-- WHERE EACH PIECE GOES (fixed 8 October 2026, "the vehicle models are messed
+-- up"). Each role is its own mesh asset, and an asset carries no pivot: the
+-- piece lands at its own bounds' centre, which tells us its size but not
+-- where it sat in the assembly. The old rule put every piece's bounds' bottom
+-- centre on the ground centre, which is right only for the Body (it is drawn
+-- from the ground up). A Bed went to the ground, under the part-built bed
+-- boards; the Glass and the Lights sank to the ground; the Hitch sat in the
+-- middle of the truck. Now every role is placed from the part-built hull it
+-- replaces (Place): the Bed on the BedFloor from the chassis bottom, the
+-- Glass at the cab's glass, the Lights between the head and tail lamps, the
+-- Hitch at the rear of the chassis (a trailer: the bed, the lamps, the
+-- coupler). A piece whose import pivot DID survive (MeshPivot "authored") is
+-- used as it is only when that lands within PivotTolerance of the hull's
+-- place; otherwise the hull's place wins. Never a guess from the ground.
 
 local MeshKit = require(script.Parent.MeshKit)
 local VehicleModels = require(script.Parent.VehicleModels)
@@ -112,12 +125,155 @@ local function wheelsOf(model: Model, trailer: boolean): { BasePart }
 	return out
 end
 
+-- An authored pivot is trusted only this close (studs) to where the hull says
+-- the piece goes.
+VehicleMeshes.PivotTolerance = 2
+
 local function placeAtRoot(part: BasePart, size: Vector3, root: Vector3)
 	if part:GetAttribute("MeshPivot") == "authored" then
 		part:PivotTo(CFrame.new(root))
 	else
 		part.CFrame = CFrame.new(root + Vector3.new(0, size.Y / 2, 0))
 	end
+end
+
+-- The hull parts a mesh piece is placed from, found before the part-built
+-- cab and bed are dropped. All in the vehicle's local space.
+-- A hull part as numbers (the part itself is dropped or moved after).
+type Spot = { pos: Vector3, size: Vector3, name: string }
+type Hull = {
+	chassis: Spot?,
+	bedFloor: Spot?,
+	glass: Spot?, -- CabGlass, else Windshield
+	seat: Spot?,
+	lampLo: Vector3?, -- the truck's head and tail lamps: lowest corner
+	lampHi: Vector3?,
+	trailerBed: Spot?,
+	coupler: Spot?,
+}
+
+local function hullOf(model: Model): Hull
+	local hull: Hull = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if not d:IsA("BasePart") then
+			continue
+		end
+		local name = d.Name
+		local trailer = isTrailer(d)
+		local spot: Spot = { pos = d.CFrame.Position, size = d.Size, name = name }
+		if name == "Chassis" then
+			hull.chassis = spot
+		elseif name == "BedFloor" and not trailer then
+			hull.bedFloor = spot
+		elseif name == "CabGlass" or (name == "Windshield" and not (hull.glass and hull.glass.name == "CabGlass")) then
+			hull.glass = spot
+		elseif name == "DriverSeat" then
+			hull.seat = spot
+		elseif name == "TrailerBed" then
+			hull.trailerBed = spot
+		elseif name == "Coupler" then
+			hull.coupler = spot
+		elseif name == "Headlight" or name == "Taillight" then
+			local p, h = spot.pos, spot.size / 2
+			if not trailer then
+				local lo, hi = p - h, p + h
+				hull.lampLo = if hull.lampLo then hull.lampLo:Min(lo) else lo
+				hull.lampHi = if hull.lampHi then hull.lampHi:Max(hi) else hi
+			end
+		end
+	end
+	return hull
+end
+
+-- Where the middle of a piece's bounds goes, from the hull, or nil when the
+-- hull has nothing to place it from (the caller then uses the old root rule).
+function VehicleMeshes.Place(hull: Hull, role: string, size: Vector3, trailer: boolean): Vector3?
+	local half = size.Y / 2
+	if trailer then
+		local bed = hull.trailerBed
+		if not bed then
+			return nil
+		end
+		local bp, bs = bed.pos, bed.size
+		if role == "Body" then
+			return Vector3.new(bp.X, bp.Y + bs.Y / 2 - half, bp.Z)
+		elseif role == "Bed" then
+			return Vector3.new(bp.X, bp.Y - bs.Y / 2 + half, bp.Z)
+		elseif role == "Lights" then
+			-- The trailer's lights can stand as tall as its bed (marker lamps
+			-- up the stakes): on the bed's bottom like the Bed, not on the lamp.
+			return Vector3.new(bp.X, bp.Y - bs.Y / 2 + half, bp.Z)
+		elseif role == "Hitch" then
+			local frontZ = bp.Z - bs.Z / 2
+			local tip = if hull.coupler then hull.coupler.pos else Vector3.new(0, bp.Y - 0.6, frontZ - 2)
+			return Vector3.new(bp.X, tip.Y + 0.5, (tip.Z + frontZ) / 2)
+		end
+		return nil
+	end
+	local chassis = hull.chassis
+	if not chassis then
+		return nil
+	end
+	local cp, cs = chassis.pos, chassis.size
+	local chassisBottom = cp.Y - cs.Y / 2
+	if role == "Body" then
+		return Vector3.new(0, half, 0)
+	elseif role == "Bed" then
+		local floor = hull.bedFloor
+		if not floor then
+			return nil
+		end
+		local fp = floor.pos
+		return Vector3.new(fp.X, chassisBottom + half, fp.Z)
+	elseif role == "Glass" then
+		local glass = hull.glass
+		if glass then
+			local gp = glass.pos
+			-- A bare windshield is a thin pane at the cab's front: the glass
+			-- mesh (windows all round) stands behind it.
+			local z = if glass.name == "CabGlass" then gp.Z else gp.Z + size.Z / 2 - 0.2
+			return Vector3.new(0, gp.Y, z)
+		end
+		local seat = hull.seat
+		if seat then
+			local sp = seat.pos
+			return Vector3.new(0, sp.Y + 1.6, sp.Z - 1.2)
+		end
+		return nil
+	elseif role == "Lights" then
+		local lo, hi = hull.lampLo, hull.lampHi
+		if not lo or not hi then
+			return nil
+		end
+		-- From the lowest lamp up, but never above the cab's roof (the tall
+		-- Flatbed and Logging Rig light meshes reach the cab beacons).
+		local bottom = lo.Y
+		local glass = hull.glass
+		if glass then
+			local roof = glass.pos.Y + glass.size.Y / 2 + 0.5
+			bottom = math.max(chassisBottom, math.min(bottom, roof - size.Y))
+		end
+		return Vector3.new(0, bottom + half, (lo.Z + hi.Z) / 2)
+	elseif role == "Hitch" then
+		return Vector3.new(0, cp.Y, cp.Z + cs.Z / 2 - size.Z / 2)
+	end
+	return nil
+end
+
+-- Puts `part` where the hull says, unless its own pivot survived and agrees.
+local function placePiece(part: BasePart, role: string, size: Vector3, trailer: boolean, hull: Hull, root: Vector3)
+	local want = VehicleMeshes.Place(hull, role, size, trailer)
+	if want == nil then
+		placeAtRoot(part, size, root)
+		return
+	end
+	if part:GetAttribute("MeshPivot") == "authored" then
+		part:PivotTo(CFrame.new(root))
+		if (part.CFrame.Position - want).Magnitude <= VehicleMeshes.PivotTolerance then
+			return
+		end
+	end
+	part.CFrame = CFrame.new(want)
 end
 
 local function trailerRoot(model: Model): Vector3
@@ -252,6 +408,7 @@ function VehicleMeshes.Apply(model: Model, truckId: string, trailerId: string?):
 		end
 	end
 
+	local hull = hullOf(model)
 	local drop: { Instance } = {}
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and not KEEP[d.Name] and d:GetAttribute("VisualMesh") ~= true then
@@ -274,7 +431,7 @@ function VehicleMeshes.Apply(model: Model, truckId: string, trailerId: string?):
 			swapWheel(part, item.wheel)
 		else
 			local root = if item.trailer then trailerAt else origin
-			placeAtRoot(part, part.Size, root)
+			placePiece(part, item.role, part.Size, item.trailer, hull, root)
 			if item.trailer then
 				part:SetAttribute("TrailerBody", true)
 				part:SetAttribute("RigHalf", "trailer")
