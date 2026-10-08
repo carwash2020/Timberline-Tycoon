@@ -127,7 +127,7 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	gap.Name = "Gap"
 	gap.Visible = false
 	gap.BackgroundTransparency = 1
-	gap.Position = UDim2.new(0, 0, order * 0.01 + 0.005, 0)
+	gap.Position = UDim2.fromScale(0, order * 0.01 + 0.005)
 	gap.Size = UDim2.fromOffset(0, 0)
 	gap.Text = " "
 	gap.Parent = card
