@@ -195,17 +195,17 @@ return function(t)
 	t.test("a label read when the menu opens follows a button whose text changes", function()
 		local HudNav = fresh()
 		local b = layout()
-		local text = "Drop axe"
+		local text = "Drop plan"
 		HudNav.Add(b.hammer, {
-			id = "dropaxe",
+			id = "plans",
 			labelOf = function()
 				return string.upper(text)
 			end,
 			press = function() end,
 		})
-		eq(HudNav.Entries()[1].label, "DROP AXE")
-		text = "Drop plan"
 		eq(HudNav.Entries()[1].label, "DROP PLAN")
+		text = "Drop it"
+		eq(HudNav.Entries()[1].label, "DROP IT")
 		text = ""
 		eq(HudNav.Entries(), {}, "no text, no tile")
 	end)
@@ -244,13 +244,12 @@ return function(t)
 		has("QuestUI.luau", 'id = "tutorial"')
 		has("PlotUI.luau", 'id = "plans"')
 		has("PlotUI.luau", 'id = "land"')
-		-- SAVES, OWNER, HAMMER, truck and drop-axe are HUD.SideButton: registered there.
+		-- SAVES, OWNER, HAMMER and truck are HUD.SideButton: registered there.
 		for _, file in ipairs({
 			"SaveSlotUI.luau",
 			"AdminUI.luau",
 			"PlotUI.luau",
 			"VehicleController.luau",
-			"AxeController.luau",
 		}) do
 			has(file, "HUD.SideButton(")
 		end

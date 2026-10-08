@@ -77,8 +77,20 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 	local intro: string? = nil
 	local more: string? = nil
 	if line == "greet" and keeper then
-		intro, more =
-			DialogueFlow.KeeperExtras(keeper.greetings, keeper.lines, DialogueService.Roll(), DialogueService.Roll())
+		-- Flavour only: if it ever throws, the plain hello still goes out.
+		local ok, a, b = pcall(function(): (string?, string?)
+			return DialogueFlow.KeeperExtras(
+				keeper.greetings,
+				keeper.lines,
+				DialogueService.Roll(),
+				DialogueService.Roll()
+			)
+		end)
+		if ok then
+			intro, more = a, b
+		else
+			warn("[Talk] keeper extras failed: " .. tostring(a))
+		end
 	end
 	local payload = {
 		line = line,
@@ -106,8 +118,15 @@ function DialogueService.Say(player: Player, line: string, shop: string, rec: an
 	end
 	-- The box on their screen is a talk with the keeper (a reply after a
 	-- Yes or No included): the keeper faces them until it is closed.
+	-- (The box is already sent: facing them is only a nicety, and must never
+	-- throw into the payment or the prompt that called this.)
 	if keeper then
-		NPCTalkService.BeginById(player, keeper.id)
+		local ok, err = pcall(function()
+			NPCTalkService.BeginById(player, keeper.id)
+		end)
+		if not ok then
+			warn("[Talk] facing the keeper failed: " .. tostring(err))
+		end
 	end
 end
 
@@ -141,6 +160,7 @@ end
 
 local function onDialogue(player: Player, action: unknown, a: unknown, b: unknown)
 	if not RateLimiter.Allow(player, "Dialogue") then
+		print(string.format("[Talk] %s: %s dropped (Dialogue rate limit)", tostring(player.Name), tostring(action)))
 		return
 	end
 	if type(action) ~= "string" then
@@ -220,6 +240,7 @@ local function hook(model: Model)
 	end
 	hooked[model] = true
 	talk.Triggered:Connect(function(who: Player)
+		print(string.format("[Talk] %s pressed Talk on %s (%s)", tostring(who.Name), id, shop))
 		onDialogue(who, "open", shop)
 	end)
 end
