@@ -104,6 +104,17 @@ local demoBeams: { { part: Part, from: string } } = {}
 local demoSense = 0
 
 local slice = TimeSlice.new({ budget = 0.002 })
+-- True while a Tick is running (it may be suspended inside slice.step()), so
+-- the next Heartbeat's Tick skips instead of advancing the graphs twice.
+local ticking = false
+
+-- TEST ONLY: swap the slice's clock and wait so a spec can force a yield.
+-- nil restores the default 2 ms slice.
+function LogicService._setSlice(options: TimeSlice.Options?)
+	local clock = options and options.clock
+	local waitFn = options and options.wait
+	slice = TimeSlice.new({ budget = 0.002, clock = clock, wait = waitFn })
+end
 
 function LogicService.Bind(host: HostFn, notifyFn: Notify)
 	hostFn = host
@@ -1068,21 +1079,37 @@ function LogicService.Tick(dt: number)
 	if type(dt) ~= "number" or dt ~= dt or dt <= 0 or dt > 5 then
 		return
 	end
+	if ticking then
+		return
+	end
+	ticking = true
 	slice.reset()
 	for _, run in pairs(runs) do
 		if online(run) then
-			sense(run, dt)
-			local graph = run.graph
-			if graph then
-				LogicGraph.Tick(graph, dt)
-				applyReport(run, run.owner)
-				clearOverload(run)
+			-- One failing plot must never stop the others ticking.
+			local ok, err = pcall(function()
+				sense(run, dt)
+				local graph = run.graph
+				if graph then
+					LogicGraph.Tick(graph, dt)
+					applyReport(run, run.owner)
+					clearOverload(run)
+				end
+			end)
+			if not ok then
+				warn("[LogicService] " .. tostring(err))
 			end
 		end
 		slice.step()
 	end
-	tickDemo(dt)
+	local demoOk, demoErr = pcall(function()
+		tickDemo(dt)
+	end)
+	if not demoOk then
+		warn("[LogicService] " .. tostring(demoErr))
+	end
 	slice.step()
+	ticking = false
 end
 
 function LogicService.Stop(player: Player)

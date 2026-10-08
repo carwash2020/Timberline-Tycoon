@@ -90,6 +90,7 @@ return function(t)
 			return model, ctx
 		end
 		return {
+			loader = loader,
 			Service = LogicService,
 			WireLogic = WireLogic,
 			Doors = loader:server("PlotDoors"),
@@ -536,5 +537,119 @@ return function(t)
 		t.eq(s.Service.Target("saw"), saw)
 		s.Service.UnregisterTarget("missing")
 		t.eq(s.Service.Target("saw"), saw)
+	end)
+
+	-- Tick re-entrancy: a Tick that yields inside TimeSlice must not let the
+	-- next Heartbeat's Tick advance the same graphs again.
+	local function tickRig()
+		local s = setup()
+		local PlotData = s.loader:shared("PlotData")
+		local BlueprintModels = s.loader:shared("BlueprintModels")
+		local LogicGraph = s.loader:shared("LogicGraph")
+		local realTick = LogicGraph.Tick
+		local rig = { s = s, calls = {}, failing = {} }
+		LogicGraph.Tick = function(graph, dt)
+			rig.calls[graph] = (rig.calls[graph] or 0) + 1
+			if rig.failing[graph] then
+				error("graph blew up")
+			end
+			return realTick(graph, dt)
+		end
+		-- LogicGraph may be a module shared between Loaders: put Tick back.
+		function rig.restore()
+			LogicGraph.Tick = realTick
+		end
+		s.owner.Parent = {} -- online
+		-- One plot with a lamp on it, attached the way PlotService does.
+		function rig.plot(uid)
+			local items = Instance.new("Folder")
+			items.Parent = Instance.new("Folder")
+			local host = { cframe = CFrame.new(0, 0, 0), items = items }
+			local profile = { plot = { placed = {}, wires = {} }, permissions = {} }
+			local item = { uid = uid, blueprintId = "SparkLamp", x = 0, z = 0, rot = 0 }
+			table.insert(profile.plot.placed, item)
+			local model = BlueprintModels.Build(PlotData.Blueprint("SparkLamp"), false)
+			model.Name = uid
+			model.Parent = items
+			s.Service.Attach({
+				slot = host,
+				model = model,
+				item = item,
+				ownerOf = function()
+					return s.owner, profile
+				end,
+			})
+			s.Service.Refresh(host, profile, s.owner) -- builds the run's graph
+			return host, profile
+		end
+		-- The graphs Tick reached.
+		function rig.seen()
+			local list = {}
+			for g in pairs(rig.calls) do
+				table.insert(list, g)
+			end
+			return list
+		end
+		return rig
+	end
+
+	t.test("a nested Tick while one is running does nothing", function()
+		local rig = tickRig()
+		local Service = rig.s.Service
+		rig.plot("lampA")
+		local nestedRan = false
+		local now = 0
+		Service._setSlice({
+			clock = function()
+				now += 1 -- every step sees the budget spent
+				return now
+			end,
+			wait = function()
+				if not nestedRan then
+					nestedRan = true
+					Service.Tick(0.1)
+				end
+			end,
+		})
+		Service.Tick(0.1)
+		Service._setSlice(nil)
+		rig.restore()
+		t.ok(nestedRan, "the injected wait ran, so the outer Tick did yield")
+		local graphs = rig.seen()
+		t.eq(#graphs, 1)
+		t.eq(rig.calls[graphs[1]], 1, "the outer Tick advanced the graph once; the nested one advanced nothing")
+	end)
+
+	t.test("the Tick flag clears after a graph errors", function()
+		local rig = tickRig()
+		local Service = rig.s.Service
+		rig.plot("lampA")
+		Service.Tick(0.1)
+		local graph = rig.seen()[1]
+		t.ok(graph ~= nil, "the plot's graph ticked")
+		local before = rig.calls[graph]
+		rig.failing[graph] = true
+		Service.Tick(0.1) -- errors inside; nothing escapes
+		t.eq(rig.calls[graph], before + 1, "the failing graph was reached")
+		rig.failing[graph] = nil
+		Service.Tick(0.1)
+		rig.restore()
+		t.eq(rig.calls[graph], before + 2, "the next Tick was not skipped by a stuck flag")
+	end)
+
+	t.test("one plot's graph error does not stop another plot ticking", function()
+		local rig = tickRig()
+		local Service = rig.s.Service
+		rig.plot("lampA")
+		rig.plot("lampB")
+		Service.Tick(0.1)
+		local graphs = rig.seen()
+		t.eq(#graphs, 2, "both plots ticked")
+		rig.failing[graphs[1]] = true
+		local c1, c2 = rig.calls[graphs[1]], rig.calls[graphs[2]]
+		Service.Tick(0.1)
+		rig.restore()
+		t.eq(rig.calls[graphs[1]], c1 + 1, "the failing plot was attempted")
+		t.eq(rig.calls[graphs[2]], c2 + 1, "the healthy plot still advanced in the same Tick")
 	end)
 end
