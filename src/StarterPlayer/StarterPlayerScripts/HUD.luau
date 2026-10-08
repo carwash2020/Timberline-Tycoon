@@ -1181,6 +1181,55 @@ local function promptOn(key: Enum.KeyCode): boolean
 	return false
 end
 
+-- A small mark on the left of Saves, Hammer and the truck button. Same
+-- shapes everywhere; the colour is that button's ink so it stays readable
+-- on walnut, green and amber.
+local function sideMark(face: TextButton, name: string)
+	local kind = if name == "Saves"
+		then "saves"
+		elseif name == "Hammer" then "hammer"
+		elseif name == "CallTruck" then "truck"
+		else nil
+	if kind == nil then
+		return
+	end
+	-- paint() has already set the label colour
+	local ink = face.TextColor3
+	local mark = Instance.new("Frame")
+	mark.Name = "Mark"
+	mark.AnchorPoint = Vector2.new(0, 0.5)
+	mark.Position = UDim2.new(0, 8, 0.5, 0)
+	mark.Size = UDim2.fromOffset(18, 18)
+	mark.BackgroundTransparency = 1
+	mark.BorderSizePixel = 0
+	mark.ZIndex = face.ZIndex + 1
+	mark.Active = false
+	local function bit(w: number, h: number, x: number, y: number, rot: number?): Frame
+		local part = Instance.new("Frame")
+		part.Size = UDim2.fromOffset(w, h)
+		part.Position = UDim2.fromOffset(x, y)
+		part.Rotation = rot or 0
+		part.BackgroundColor3 = ink
+		part.BorderSizePixel = 0
+		part.ZIndex = mark.ZIndex
+		part.Parent = mark
+		UITheme.corner(part, 2)
+		return part
+	end
+	if kind == "saves" then
+		bit(14, 10, 2, 4)
+		bit(6, 3, 6, 2)
+	elseif kind == "hammer" then
+		bit(12, 3, 3, 8, -40)
+		bit(7, 5, 10, 2, -40)
+	else
+		bit(14, 6, 2, 8)
+		bit(4, 4, 3, 12)
+		bit(4, 4, 11, 12)
+	end
+	mark.Parent = face
+end
+
 -- A side button's size for the device (UITheme.Sized: on a phone 116 x 44,
 -- a fingertip tall, its label 15 and never under 12; on a gamepad wider,
 -- for the glyph).
@@ -1202,7 +1251,8 @@ local function layoutSide(side: Side, device: UITheme.Device)
 	end
 	local pad = side.button.face:FindFirstChildOfClass("UIPadding")
 	if pad then
-		pad.PaddingLeft = UDim.new(0, if console then 36 else 6)
+		local iconPad = if side.button.face:FindFirstChild("Mark") then 28 else 0
+		pad.PaddingLeft = UDim.new(0, (if console then 36 else 6) + iconPad)
 	end
 	if side.glyph then
 		side.glyph.Visible = console
@@ -1342,6 +1392,7 @@ function HUD.SideButton(opts: SideOptions): UITheme.Button
 	button.root.LayoutOrder = opts.order
 	button.root.AnchorPoint = Vector2.new(1, 1) -- placed by arrangeSide
 	button.root.Visible = false
+	sideMark(button.face, opts.name)
 	if not column then
 		warn(string.format("[HUD] no side column (HUD.Start didn't finish): skipping the %s button", opts.name))
 		return button
@@ -1810,7 +1861,7 @@ local function buildHint(row: Frame)
 	hint.AutomaticSize = Enum.AutomaticSize.X
 	hint.Size = UDim2.fromOffset(0, ROW_HEIGHT)
 	hint.BackgroundColor3 = C.Ink
-	hint.BackgroundTransparency = 0.2
+	hint.BackgroundTransparency = 0 -- solid, so cream stays 4.5:1 on grass and sky
 	hint.TextXAlignment = Enum.TextXAlignment.Center
 	hint.TextTruncate = Enum.TextTruncate.AtEnd
 	UITheme.corner(hint, ROW_HEIGHT / 2)

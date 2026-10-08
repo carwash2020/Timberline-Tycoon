@@ -7,18 +7,30 @@ local NewsLogic = {}
 
 NewsLogic.Key = "News:V1"
 
-export type Entry = { line: string, icon: string }
+export type Entry = { line: string, detail: string, icon: string }
 
--- Short lines and a frame-drawn icon name. No uploaded images. One table,
--- so a later pass can edit the headlines without hunting through the UI.
+-- Headline, a short second line, and a frame-drawn icon name. No uploaded
+-- images. One table, so a later pass can edit the copy in one place.
 NewsLogic.Entries = {
-	{ line = "A new island map, with the Bayou and Red Mesa.", icon = "map" },
-	{ line = "Mine the cave for ore.", icon = "mine" },
-	{ line = "Build from blueprints.", icon = "blueprint" },
-	{ line = "Foreman Rook's daily jobs, with streaks.", icon = "daily" },
-	{ line = "Temper your axe.", icon = "temper" },
-	{ line = "Sparkworks logic pieces.", icon = "spark" },
-	{ line = "A sky island, reached by the gondola pass.", icon = "gondola" },
+	{
+		line = "A new island map, with the Bayou and Red Mesa.",
+		detail = "Two regions past the old town.",
+		icon = "map",
+	},
+	{ line = "Mine the cave for ore.", detail = "Clear rubble, then follow the vein.", icon = "mine" },
+	{ line = "Build from blueprints.", detail = "Place a plan, then raise the walls.", icon = "blueprint" },
+	{
+		line = "Foreman Rook's daily jobs, with streaks.",
+		detail = "Three jobs a day. A streak pays more.",
+		icon = "daily",
+	},
+	{ line = "Temper your axe.", detail = "A hotter edge bites harder.", icon = "temper" },
+	{ line = "Sparkworks logic pieces.", detail = "Wire switches, gates and lamps.", icon = "spark" },
+	{
+		line = "A sky island, reached by the gondola pass.",
+		detail = "Ride the line up from the pass.",
+		icon = "gondola",
+	},
 } :: { Entry }
 
 -- True only after the tutorial is finished (TutorialStep 0) and this save

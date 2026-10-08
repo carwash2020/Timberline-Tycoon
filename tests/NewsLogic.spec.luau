@@ -10,10 +10,12 @@ return function(t)
 		local blob = ""
 		for _, entry in ipairs(News.Entries) do
 			t.ok(#entry.line > 0 and #entry.line <= 70, entry.line)
+			t.ok(#entry.detail > 0 and #entry.detail <= 70, entry.detail)
 			t.ok(#entry.icon > 0, "icon")
 			t.ok(not string.find(entry.line, "$", 1, true), entry.line)
-			t.ok(not string.find(string.lower(entry.line), "robux", 1, true), entry.line)
-			blob ..= " " .. entry.line
+			t.ok(not string.find(entry.detail, "$", 1, true), entry.detail)
+			t.ok(not string.find(string.lower(entry.line .. entry.detail), "robux", 1, true), entry.line)
+			blob ..= " " .. entry.line .. " " .. entry.detail
 		end
 		for _, word in ipairs({
 			"Bayou",

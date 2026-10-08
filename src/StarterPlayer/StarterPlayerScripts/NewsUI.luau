@@ -30,6 +30,8 @@ local function icon(parent: Instance, kind: string, size: number)
 	local box = Instance.new("Frame")
 	box.Name = kind
 	box.Size = UDim2.fromOffset(size, size)
+	box.AnchorPoint = Vector2.new(0, 0.5)
+	box.Position = UDim2.fromScale(0, 0.5)
 	box.BackgroundColor3 = C.PanelAlt
 	box.BorderSizePixel = 0
 	box.Active = false
@@ -191,67 +193,77 @@ function NewsUI.Start()
 
 	local card = UITheme.Card(C.Panel, C.AmberEdge, UITheme.Stroke, UITheme.Radius, false)
 	card.outer.Name = "WhatsNew"
-	card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
-	card.outer.Position = UDim2.fromScale(0.5, 0.5)
-	card.outer.Size = UDim2.fromOffset(480, 400)
 	card.outer.Visible = false
 	card.outer.Active = true
-	card.outer.ClipsDescendants = true
+	card.outer.AutomaticSize = Enum.AutomaticSize.Y
+	card.face.AutomaticSize = Enum.AutomaticSize.Y
+	card.face.Size = UDim2.fromScale(1, 0)
 	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(640, 480)
+	limit.MaxSize = Vector2.new(640, 2000)
 	limit.Parent = card.outer
-	UITheme.padding(card.face, 10, 12, 10, 12)
-	UITheme.list(card.face, 6)
+	UITheme.padding(card.face, 8, 10, 8, 10)
+	UITheme.list(card.face, 4)
 	card.outer.Parent = gui
 	panel = card.outer
 
-	-- On a short screen the card sits right of the thumbstick (left 40% of
-	-- the bottom half) and its bottom stays above the jump box (70px, whose
-	-- top-left is 95px from the right and 90px up). Close lives in that
-	-- card, so it cannot land on either zone. A wide screen centres it.
-	local function placeCard()
-		local cam = workspace.CurrentCamera
-		local vp = if cam then cam.ViewportSize else Vector2.zero
-		local parent = card.outer.Parent
-		local origin = if parent and parent:IsA("GuiBase2d") then parent.AbsolutePosition else Vector2.zero
-		local scale = math.max(UITheme.Scale(), 0.05)
-		local short = math.min(vp.X, vp.Y)
-		if vp.X >= 200 and vp.Y >= 200 and short < 600 then
-			local margin = 8
-			local left = vp.X * 0.4 + margin
-			local top = margin
-			local right = vp.X - margin
-			local bottom = vp.Y - 90 - margin
-			card.outer.AnchorPoint = Vector2.new(0, 0)
-			card.outer.Position = UDim2.fromOffset((left - origin.X) / scale, (top - origin.Y) / scale)
-			card.outer.Size = UDim2.fromOffset(math.max(200, right - left) / scale, math.max(180, bottom - top) / scale)
-		else
-			card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
-			card.outer.Position = UDim2.fromScale(0.5, 0.5)
-			card.outer.Size = UDim2.fromOffset(480, 400)
-		end
-	end
-	UITheme.WatchLayout(placeCard)
-
-	local title = UITheme.label(card.face, "WHAT'S NEW IN V1", F.Title, 18, C.Cream)
+	-- Sunset-into-wood strip with the wordmark. Short on a phone so the
+	-- headlines and Close still fit above the jump button; a wide screen
+	-- gets the taller thumbnail.
+	local hero = Instance.new("Frame")
+	hero.Name = "Hero"
+	hero.LayoutOrder = 1
+	hero.Size = UDim2.new(1, 0, 0, 88)
+	hero.BackgroundColor3 = Color3.new(1, 1, 1)
+	hero.BorderSizePixel = 0
+	UITheme.corner(hero, UITheme.ChipRadius)
+	local wash = Instance.new("UIGradient")
+	wash.Rotation = 90
+	wash.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromHex("#E8A15A")),
+		ColorSequenceKeypoint.new(0.45, C.Amber),
+		ColorSequenceKeypoint.new(1, C.Panel),
+	})
+	wash.Parent = hero
+	local word = UITheme.label(hero, "TIMBERLINE", F.Title, 22, C.Cream)
+	word.Name = "Logo"
+	word.Size = UDim2.new(1, -16, 0, 26)
+	word.Position = UDim2.fromOffset(10, 8)
+	word.TextXAlignment = Enum.TextXAlignment.Left
+	local wordStroke = Instance.new("UIStroke")
+	wordStroke.Color = C.PanelAlt
+	wordStroke.Thickness = 1
+	wordStroke.Parent = word
+	local title = UITheme.label(hero, "WHAT'S NEW IN V1", F.Title, 16, C.Cream)
 	title.Name = "Title"
-	title.LayoutOrder = 1
-	title.Size = UDim2.new(1, 0, 0, 22)
+	title.Size = UDim2.new(1, -16, 0, 20)
+	title.Position = UDim2.fromOffset(10, 36)
 	title.TextXAlignment = Enum.TextXAlignment.Left
+	hero.Parent = card.face
 
+	local rows: { Frame } = {}
+	local headlines: { TextLabel } = {}
+	local details: { TextLabel } = {}
 	for i, entry in ipairs(NewsLogic.Entries) do
 		local row = Instance.new("Frame")
 		row.Name = "Line" .. i
 		row.LayoutOrder = 1 + i
 		row.BackgroundTransparency = 1
-		row.Size = UDim2.new(1, 0, 0, 24)
+		row.Size = UDim2.new(1, 0, 0, 44)
 		row.Parent = card.face
-		icon(row, entry.icon, 24)
-		local line = UITheme.label(row, entry.line, F.Body, 15, C.Cream)
-		line.Position = UDim2.fromOffset(36, 0)
-		line.Size = UDim2.new(1, -36, 1, 0)
+		icon(row, entry.icon, 36)
+		local line = UITheme.label(row, entry.line, F.Body, 18, C.Cream)
+		line.Name = "Headline"
+		line.Position = UDim2.fromOffset(44, 2)
+		line.Size = UDim2.new(1, -44, 0, 20)
 		line.TextTruncate = Enum.TextTruncate.AtEnd
-		line.TextYAlignment = Enum.TextYAlignment.Center
+		local detail = UITheme.label(row, entry.detail, F.Body, 15, C.Muted)
+		detail.Name = "Detail"
+		detail.Position = UDim2.fromOffset(44, 22)
+		detail.Size = UDim2.new(1, -44, 0, 18)
+		detail.TextTruncate = Enum.TextTruncate.AtEnd
+		table.insert(rows, row)
+		table.insert(headlines, line)
+		table.insert(details, detail)
 	end
 
 	local closeRow = Instance.new("Frame")
@@ -270,6 +282,92 @@ function NewsUI.Start()
 	close.root.AnchorPoint = Vector2.new(0.5, 0)
 	close.root.Position = UDim2.fromScale(0.5, 0)
 	close.root.Parent = closeRow
+
+	-- On a short screen the card is only as tall as its rows. Its bottom
+	-- sits above the jump box (70px, top-left 95 from the right and 90 up)
+	-- and the card stays right of the thumbstick (left 40% of the bottom
+	-- half), so Close cannot land on either. A wide screen centres it.
+	local function placeCard()
+		local cam = workspace.CurrentCamera
+		local vp = if cam then cam.ViewportSize else Vector2.zero
+		local parent = card.outer.Parent
+		local origin = if parent and parent:IsA("GuiBase2d") then parent.AbsolutePosition else Vector2.zero
+		local scale = math.max(UITheme.Scale(), 0.05)
+		local short = math.min(vp.X, vp.Y)
+		local compact = vp.X >= 200 and vp.Y >= 200 and short < 600
+		-- Offsets, before the screen's UIScale. On a 375px phone the scale
+		-- is about 0.78, so these land at 28px icons, 14px headlines and a
+		-- 44px Close, and the card still ends above the jump button.
+		local pad = card.face:FindFirstChildOfClass("UIPadding")
+		local list = card.face:FindFirstChildOfClass("UIListLayout")
+		local tap = UITheme.Size.Tap
+		if compact then
+			tap = math.ceil(UITheme.Size.Tap / scale)
+			if pad then
+				pad.PaddingTop = UDim.new(0, 4)
+				pad.PaddingBottom = UDim.new(0, 4)
+				pad.PaddingLeft = UDim.new(0, 8)
+				pad.PaddingRight = UDim.new(0, 8)
+			end
+			if list then
+				list.Padding = UDim.new(0, 1)
+			end
+			hero.Size = UDim2.new(1, 0, 0, 26)
+			word.TextSize = 18
+			word.Position = UDim2.fromOffset(8, 3)
+			word.Size = UDim2.new(1, -12, 0, 20)
+			title.Visible = false
+			for i, row in ipairs(rows) do
+				row.Size = UDim2.new(1, 0, 0, 36)
+				local line = headlines[i]
+				local sub = details[i]
+				line.Position = UDim2.fromOffset(44, 0)
+				line.Size = UDim2.new(1, -48, 0, 18)
+				sub.Position = UDim2.fromOffset(44, 18)
+				sub.Size = UDim2.new(1, -48, 0, 16)
+			end
+		else
+			if pad then
+				pad.PaddingTop = UDim.new(0, 8)
+				pad.PaddingBottom = UDim.new(0, 8)
+				pad.PaddingLeft = UDim.new(0, 10)
+				pad.PaddingRight = UDim.new(0, 10)
+			end
+			if list then
+				list.Padding = UDim.new(0, 4)
+			end
+			hero.Size = UDim2.new(1, 0, 0, 88)
+			word.TextSize = 22
+			word.Position = UDim2.fromOffset(10, 8)
+			word.Size = UDim2.new(1, -16, 0, 26)
+			title.Visible = true
+			for i, row in ipairs(rows) do
+				row.Size = UDim2.new(1, 0, 0, 44)
+				local line = headlines[i]
+				local sub = details[i]
+				line.Position = UDim2.fromOffset(44, 2)
+				line.Size = UDim2.new(1, -48, 0, 20)
+				sub.Position = UDim2.fromOffset(44, 22)
+				sub.Size = UDim2.new(1, -48, 0, 18)
+			end
+		end
+		closeRow.Size = UDim2.new(1, 0, 0, tap)
+		close.root.Size = UDim2.fromOffset(140, tap)
+		if compact then
+			local margin = 8
+			local left = vp.X * 0.4 + margin
+			local right = vp.X - margin
+			local bottom = vp.Y - 90 - margin
+			card.outer.AnchorPoint = Vector2.new(0.5, 1)
+			card.outer.Position = UDim2.fromOffset(((left + right) / 2 - origin.X) / scale, (bottom - origin.Y) / scale)
+			card.outer.Size = UDim2.fromOffset(math.max(180, (right - left) / scale), 0)
+		else
+			card.outer.AnchorPoint = Vector2.new(0.5, 0.5)
+			card.outer.Position = UDim2.fromScale(0.5, 0.46)
+			card.outer.Size = UDim2.fromOffset(520, 0)
+		end
+	end
+	UITheme.WatchLayout(placeCard)
 	close.face.NextSelectionUp = close.face
 	close.face.NextSelectionDown = close.face
 	close.face.NextSelectionLeft = close.face

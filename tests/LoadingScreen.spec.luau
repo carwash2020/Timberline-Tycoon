@@ -61,6 +61,10 @@ return function(t)
 				}
 				table.insert(snap.colors, d.TextColor3)
 			elseif d:IsA("Frame") then
+				-- The landscape behind the card uses its own colours.
+				if d.Name == "Scene" or d:FindFirstAncestor("Scene") then
+					continue
+				end
 				if d.BackgroundTransparency < 1 then
 					local g = gradientOf(d)
 					if g then
@@ -80,6 +84,10 @@ return function(t)
 			end
 		end
 		local backdrop = gui:FindFirstChild("Backdrop")
+		snap.hasScene = backdrop ~= nil and backdrop:FindFirstChild("Scene") ~= nil
+		local cardBody = backdrop and backdrop:FindFirstChild("TextInset")
+		cardBody = cardBody and cardBody:FindFirstChild("Content")
+		snap.hasProgress = cardBody ~= nil and cardBody:FindFirstChild("Progress") ~= nil
 		if backdrop then
 			-- The rendered top and bottom edges (Rotation 90 runs the
 			-- gradient's first keypoint along the top).
@@ -282,6 +290,8 @@ return function(t)
 		t.eq(snap.backdropRotation, 90, "the gradient runs top to bottom")
 		t.ok(same(snap.backdropTop, PALETTE.Bark), "backdrop shows Bark along the top")
 		t.ok(same(snap.backdropBottom, PALETTE.Ink), "and Ink along the bottom")
+		t.ok(snap.hasScene, "a scene behind the card")
+		t.ok(snap.hasProgress, "a progress bar")
 		t.ok(#snap.colors >= 5)
 		for _, c in ipairs(snap.colors) do
 			local named = false

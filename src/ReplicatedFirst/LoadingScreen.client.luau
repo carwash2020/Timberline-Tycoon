@@ -4,8 +4,9 @@
 -- ReplicatedFirst runs this before anything else replicates, so it can't
 -- use UITheme or Shared (they aren't here yet): the colours and fonts are
 -- inlined, and it builds its own GUI.
---   * Puts a full-screen card in PlayerGui: the title, a tip that changes
---     every few seconds, and three pulsing dots. Only then does it remove
+--   * Puts a full-screen card in PlayerGui over a sunset scene: the title,
+--     one tip that changes every few seconds, and a progress bar. Only then
+--     does it remove
 --     Roblox's default loading screen, so there's no gap between the two.
 --   * Fades out once the LocalPlayer has a Character, the save is in (the
 --     "ProfileLoaded" attribute GameServer sets) and the game has loaded,
@@ -112,6 +113,47 @@ local function build(): Card
 	gradient.Parent = backdrop
 	backdrop.Parent = screen
 
+	-- A landscape behind the card: sunset sky, ground, a few trees. The
+	-- Bark-to-Ink gradient stays on the backdrop for the fade; the scene
+	-- covers it.
+	local scene = Instance.new("Frame")
+	scene.Name = "Scene"
+	scene.Size = UDim2.fromScale(1, 1)
+	scene.BackgroundColor3 = Color3.fromHex("#7EB6D6")
+	scene.BorderSizePixel = 0
+	local sky = Instance.new("UIGradient")
+	sky.Rotation = 90
+	sky.Color = ColorSequence.new(Color3.fromHex("#E7A15A"), Color3.fromHex("#7EB6D6"))
+	sky.Parent = scene
+	local ground = Instance.new("Frame")
+	ground.Name = "Ground"
+	ground.AnchorPoint = Vector2.new(0, 1)
+	ground.Position = UDim2.fromScale(0, 1)
+	ground.Size = UDim2.fromScale(1, 0.42)
+	ground.BackgroundColor3 = Color3.fromHex("#3E6B34")
+	ground.BorderSizePixel = 0
+	ground.Parent = scene
+	for i, x in ipairs({ 0.08, 0.18, 0.72, 0.84 }) do
+		local trunk = Instance.new("Frame")
+		trunk.Name = "Trunk"
+		trunk.AnchorPoint = Vector2.new(0.5, 1)
+		trunk.Position = UDim2.fromScale(x, 0.62)
+		trunk.Size = UDim2.fromOffset(14, 50 + (i % 2) * 16)
+		trunk.BackgroundColor3 = Color3.fromHex("#5C3B24")
+		trunk.BorderSizePixel = 0
+		trunk.Parent = scene
+		local leaf = Instance.new("Frame")
+		leaf.Name = "Leaf"
+		leaf.AnchorPoint = Vector2.new(0.5, 1)
+		leaf.Position = UDim2.new(0.5, 0, 0, 8)
+		leaf.Size = UDim2.fromOffset(46, 36)
+		leaf.BackgroundColor3 = Color3.fromHex("#2F6A32")
+		leaf.BorderSizePixel = 0
+		corner(leaf, UDim.new(0, 8))
+		leaf.Parent = trunk
+	end
+	scene.Parent = backdrop
+
 	-- The backdrop stays full-bleed. The words sit inside a 5% margin.
 	local inset = Instance.new("Frame")
 	inset.Name = "TextInset"
@@ -126,7 +168,15 @@ local function build(): Card
 	content.Position = UDim2.fromScale(0.5, 0.5)
 	content.Size = UDim2.fromScale(1, 0)
 	content.AutomaticSize = Enum.AutomaticSize.Y
-	content.BackgroundTransparency = 1
+	content.BackgroundColor3 = BARK
+	content.BackgroundTransparency = 0
+	corner(content, UDim.new(0, 12))
+	local contentPad = Instance.new("UIPadding")
+	contentPad.PaddingTop = UDim.new(0, 16)
+	contentPad.PaddingBottom = UDim.new(0, 16)
+	contentPad.PaddingLeft = UDim.new(0, 16)
+	contentPad.PaddingRight = UDim.new(0, 16)
+	contentPad.Parent = content
 	local maxSize = Instance.new("UISizeConstraint")
 	maxSize.MaxSize = Vector2.new(560, math.huge)
 	maxSize.Parent = content
@@ -171,25 +221,21 @@ local function build(): Card
 	tip.TextWrapped = true
 	tip.TextYAlignment = Enum.TextYAlignment.Top
 
-	local dotRow = Instance.new("Frame")
-	dotRow.Name = "Dots"
-	dotRow.LayoutOrder = 5
-	dotRow.Size = UDim2.fromOffset(44, 18)
-	dotRow.BackgroundTransparency = 1
-	dotRow.Parent = content
-	local dots: { Frame } = {}
-	for i = 1, 3 do
-		local dot = Instance.new("Frame")
-		dot.Name = "Dot" .. i
-		dot.AnchorPoint = Vector2.new(0, 1)
-		dot.Position = UDim2.new(0, (i - 1) * 17, 1, 0)
-		dot.Size = UDim2.fromOffset(10, 10)
-		dot.BackgroundColor3 = AMBER
-		dot.BorderSizePixel = 0
-		corner(dot, UDim.new(0.5, 0))
-		dot.Parent = dotRow
-		dots[i] = dot
-	end
+	local track = Instance.new("Frame")
+	track.Name = "Progress"
+	track.LayoutOrder = 5
+	track.Size = UDim2.new(1, 0, 0, 10)
+	track.BackgroundColor3 = INK
+	track.BorderSizePixel = 0
+	corner(track, UDim.new(0, 5))
+	track.Parent = content
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = AMBER
+	fill.BorderSizePixel = 0
+	corner(fill, UDim.new(0, 5))
+	fill.Parent = track
 
 	-- Shuffled once, then again only after every line has been shown.
 	local cycle = LoadingTips.Begin(math.random)
@@ -213,15 +259,21 @@ local function build(): Card
 		local into = elapsed - slot * TIP_SECONDS
 		local tipHidden = math.clamp(1 - math.min(into, TIP_SECONDS - into) / TIP_FADE, 0, 1)
 		backdrop.BackgroundTransparency = mix(0)
+		scene.BackgroundTransparency = mix(0)
+		for _, d in ipairs(scene:GetDescendants()) do
+			if d:IsA("Frame") then
+				d.BackgroundTransparency = mix(0)
+			end
+		end
+		content.BackgroundTransparency = mix(0)
 		title.TextTransparency = mix(0)
 		titleStroke.Transparency = mix(0)
 		divider.BackgroundTransparency = mix(0)
 		kicker.TextTransparency = mix(0)
 		tip.TextTransparency = mix(tipHidden)
-		for i, dot in ipairs(dots) do
-			local pulse = 0.5 + 0.5 * math.sin(elapsed * 5 - i * 0.9)
-			dot.BackgroundTransparency = mix(0.7 - 0.6 * pulse)
-		end
+		track.BackgroundTransparency = mix(0)
+		fill.BackgroundTransparency = mix(0)
+		fill.Size = UDim2.fromScale(math.clamp(elapsed / MAX_SECONDS, 0.04, 1), 1)
 	end
 
 	draw(0, 0)
