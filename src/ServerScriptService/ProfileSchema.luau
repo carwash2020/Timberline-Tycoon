@@ -77,6 +77,9 @@ export type DailyState = {
 	streak: number, -- days in a row with every goal done
 	bestStreak: number,
 	lastCompleteDay: number,
+	-- Cash the all-done bonus still owes. Lane E pays it at the Sawmill
+	-- Foreman. 0 until then.
+	bonusOwed: number,
 	-- The daily-return calendar (DailyData.LoginStep; absent in older saves,
 	-- read as 0): the calendar day 1..7 last paid, and the UTC day it paid.
 	loginDay: number?,
@@ -296,9 +299,11 @@ export type Profile = {
 	-- groundLoad). Lane F puts it on the plot and clears this. Migrate only
 	-- appends, and only while worldVersion is behind GameConfig.WorldVersion.
 	strandedLoad: { any },
-	-- The map this slot was saved on. Missing counts as 1. Migrate writes
-	-- GameConfig.WorldVersion exactly, never the higher of the two.
-	worldVersion: number,
+	-- The map this slot was saved on. Missing counts as 1 (nil only in the
+	-- moment before Migrate, so Reconcile cannot stamp the template's
+	-- version onto an old save). Migrate writes GameConfig.WorldVersion
+	-- exactly, never the higher of the two.
+	worldVersion: number?,
 	-- Found secrets on this slot (not secretsFound, which is account-wide).
 	secrets: { [string]: boolean },
 	-- Sawmills bought at the Tool Shed and not placed yet (ids; duplicates
@@ -380,7 +385,16 @@ local TEMPLATE: Profile = {
 	tutorialRefresher = false,
 	tutorialReplay = false,
 	seasonId = "spring",
-	daily = { day = 0, goals = {}, streak = 0, bestStreak = 0, lastCompleteDay = 0, loginDay = 0, lastLoginDay = 0 },
+	daily = {
+		day = 0,
+		goals = {},
+		streak = 0,
+		bestStreak = 0,
+		lastCompleteDay = 0,
+		loginDay = 0,
+		lastLoginDay = 0,
+		bonusOwed = 0,
+	},
 	purchaseIds = {},
 	passes = {},
 	ownerGrants = {},
@@ -786,6 +800,39 @@ local function parkWorld(record: any)
 	record.worldVersion = GameConfig.WorldVersion
 end
 
+-- Lane E pays finished goals at the Sawmill Foreman, not the moment they
+-- finish. A goal with no `paid` was already paid when it finished, so
+-- `paid` becomes `done` and it is not paid again. A boolean `paid` is left
+-- alone: a second Migrate changes nothing, and a goal waiting on the
+-- foreman stays unpaid. `bonusOwed` defaults to 0.
+local function applyDaily(record: any)
+	local daily = record.daily
+	if type(daily) ~= "table" then
+		record.daily = {
+			day = 0,
+			goals = {},
+			streak = 0,
+			bestStreak = 0,
+			lastCompleteDay = 0,
+			loginDay = 0,
+			lastLoginDay = 0,
+			bonusOwed = 0,
+		}
+		return
+	end
+	local owed = finiteNumber(daily.bonusOwed, 0)
+	daily.bonusOwed = if owed < 0 then 0 else owed
+	if type(daily.goals) ~= "table" then
+		daily.goals = {}
+		return
+	end
+	for _, goal in ipairs(daily.goals) do
+		if type(goal) == "table" and type(goal.paid) ~= "boolean" then
+			goal.paid = goal.done == true
+		end
+	end
+end
+
 local function applyContract(record: any)
 	record.secrets = booleanMap(record.secrets)
 	record.temper = TemperLogic.Clean(record.temper)
@@ -814,6 +861,7 @@ local function applyContract(record: any)
 	record.skyWood = snapPieceList(record.skyWood)
 	record.strandedLoad = snapPieceList(record.strandedLoad)
 	parkWorld(record)
+	applyDaily(record)
 end
 
 -- Per-slot fields. Missing or wrong-typed fields become the template.

@@ -226,7 +226,12 @@ function BiomeData.Exposure(biome: BiomeDef?, gear: { [string]: boolean }, outsi
 	if biome.id == "volcano" and outsideCrater == false then
 		return nil
 	end
-	return { kind = biome.id, dps = exposure.dps, graceSec = exposure.graceSec }
+	local hazard: Hazard = {
+		kind = biome.id :: string,
+		dps = exposure.dps,
+		graceSec = exposure.graceSec,
+	}
+	return hazard
 end
 
 return BiomeData

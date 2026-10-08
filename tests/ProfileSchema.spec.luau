@@ -1301,4 +1301,27 @@ return function(t)
 		t.eq(#round.strandedLoad, 2)
 		t.eq(round.secrets.cave, true)
 	end)
+
+	t.test("daily turn-in: a finished goal is already paid, and a second migrate matches", function()
+		local Schema = t.server("ProfileSchema")
+		local Util = t.shared("Util")
+		local data = Util.deepCopy(Schema.Template)
+		data.daily = {
+			day = 12,
+			streak = 2,
+			bestStreak = 2,
+			lastCompleteDay = 12,
+			goals = {
+				{ kind = "fell", target = 4, progress = 4, reward = 15, done = true },
+				{ kind = "sell", target = 12, progress = 3, reward = 15, done = false },
+			},
+		}
+		Schema.Migrate(data)
+		t.eq(data.daily.goals[1].paid, true)
+		t.eq(data.daily.goals[2].paid, false)
+		t.eq(data.daily.bonusOwed, 0)
+		local once = Util.deepCopy(data.daily)
+		Schema.Migrate(data)
+		t.eq(data.daily, once, "a second migrate leaves it identical")
+	end)
 end
