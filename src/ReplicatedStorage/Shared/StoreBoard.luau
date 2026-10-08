@@ -66,25 +66,68 @@ function StoreBoard.Overlaps(x0: number, x1: number, z0: number, z1: number): bo
 	return a0 < x1 and a1 > x0 and b0 < z1 and b1 > z0
 end
 
--- Two lines per item: the name, then the price. The numbers that exist are
--- GAME_DESIGN §7. The Lux Axe has no number in the repo, so its line is the
--- same "R$ …" the store screen shows before Creator Hub answers. Lane P
--- owns this board next; the parts, frame and place stay as they are.
-local PRICE_BY_NAME: { [string]: string } = {
-	["2x Cash"] = "R$ 399",
-	["$1,000"] = "R$ 49",
-	["$10,000"] = "R$ 399",
-}
+StoreBoard.TitleTextPx = 16
+StoreBoard.DescTextPx = 14
+StoreBoard.DescLines = 2
+-- Gotham advance as a fraction of TextSize, a little wide of the real face
+-- so a fit here still fits in Studio.
+StoreBoard.Em = 0.58
 
-function StoreBoard.PriceFor(name: string): string
-	return PRICE_BY_NAME[name] or "R$ …"
+function StoreBoard.BodyWidth(canvasW: number): number
+	local list = canvasW - 16
+	local card = list - 8
+	return card - 80
+end
+
+function StoreBoard.LineCount(text: string, widthPx: number, textPx: number): number
+	if text == "" then
+		return 1
+	end
+	if widthPx <= 0 then
+		return 99
+	end
+	local lines = 1
+	local used = 0
+	local space = textPx * StoreBoard.Em
+	for word in string.gmatch(text, "%S+") do
+		local w = #word * textPx * StoreBoard.Em
+		if used > 0 and used + space + w > widthPx then
+			lines += 1
+			used = w
+		else
+			used += (if used > 0 then space else 0) + w
+		end
+	end
+	return lines
+end
+
+-- The description, or a prefix plus an ellipsis when it would run past
+-- two lines on this board.
+function StoreBoard.FitText(text: string, widthPx: number, textPx: number, maxLines: number): string
+	if StoreBoard.LineCount(text, widthPx, textPx) <= maxLines then
+		return text
+	end
+	local best = "…"
+	local lo, hi = 1, #text
+	while lo <= hi do
+		local mid = math.floor((lo + hi) / 2)
+		local cut = string.gsub(string.sub(text, 1, mid), "%s+$", "")
+		local trial = cut .. "…"
+		if StoreBoard.LineCount(trial, widthPx, textPx) <= maxLines then
+			best = trial
+			lo = mid + 1
+		else
+			hi = mid - 1
+		end
+	end
+	return best
 end
 
 local function poster(parent: Instance, item: { name: string, description: string, image: number }, order: number)
 	local card = Instance.new("Frame")
 	card.Name = item.name
 	card.LayoutOrder = order
-	card.Size = UDim2.new(1, -8, 0, 56)
+	card.Size = UDim2.new(1, -8, 0, 72)
 	card.BackgroundColor3 = Color3.fromRGB(255, 246, 230)
 	card.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
@@ -93,8 +136,8 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	local image = Instance.new("ImageLabel")
 	image.Name = "Art"
 	image.BackgroundColor3 = Color3.fromRGB(90, 62, 36)
-	image.Size = UDim2.fromOffset(40, 40)
-	image.Position = UDim2.fromOffset(6, 6)
+	image.Size = UDim2.fromOffset(56, 56)
+	image.Position = UDim2.fromOffset(8, 8)
 	image.BorderSizePixel = 0
 	if item.image > 0 then
 		image.Image = "rbxassetid://" .. tostring(item.image)
@@ -102,35 +145,36 @@ local function poster(parent: Instance, item: { name: string, description: strin
 		image.Image = ""
 	end
 	image.Parent = card
-	local ink = Color3.fromHex("#2A2420") -- SignInk
-	local priceText = StoreBoard.PriceFor(item.name)
-	-- One label, two lines. A hair of Y scale keeps the preview's sort
-	-- (name, then a blank, then the next name) without moving the words
-	-- on the card. The card is what you see in Studio.
 	local title = Instance.new("TextLabel")
-	title.Name = "Name"
 	title.BackgroundTransparency = 1
-	title.Position = UDim2.new(0, 52, order * 0.01, 4)
-	title.Size = UDim2.new(1, -58, 0, 44)
+	title.Position = UDim2.fromOffset(72, 6)
+	title.Size = UDim2.new(1, -80, 0, 22)
 	title.Font = Enum.Font.GothamBold
-	title.TextScaled = true
-	title.TextWrapped = true
-	title.TextTruncate = Enum.TextTruncate.None
+	title.TextSize = StoreBoard.TitleTextPx
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextYAlignment = Enum.TextYAlignment.Center
-	title.TextColor3 = ink
-	title.Text = item.name .. "\n" .. priceText
+	title.TextColor3 = Color3.fromRGB(62, 42, 24)
+	title.Text = item.name
 	title.Parent = card
-	-- A blank line between items in the preview. Hidden, so the card
-	-- itself stays two lines.
-	local gap = Instance.new("TextLabel")
-	gap.Name = "Gap"
-	gap.Visible = false
-	gap.BackgroundTransparency = 1
-	gap.Position = UDim2.fromScale(0, order * 0.01 + 0.005)
-	gap.Size = UDim2.fromOffset(0, 0)
-	gap.Text = " "
-	gap.Parent = card
+	local body = Instance.new("TextLabel")
+	body.BackgroundTransparency = 1
+	body.Position = UDim2.fromOffset(72, 28)
+	body.Name = "Description"
+	body.Size = UDim2.new(1, -80, 0, StoreBoard.DescTextPx * StoreBoard.DescLines)
+	body.Font = Enum.Font.Gotham
+	body.TextSize = StoreBoard.DescTextPx
+	body.TextWrapped = true
+	body.TextTruncate = Enum.TextTruncate.AtEnd
+	body.TextXAlignment = Enum.TextXAlignment.Left
+	body.TextYAlignment = Enum.TextYAlignment.Top
+	body.TextColor3 = Color3.fromRGB(90, 64, 40)
+	local canvas = 400
+	local gui = parent.Parent
+	if gui and gui:IsA("SurfaceGui") then
+		canvas = gui.CanvasSize.X
+	end
+	body.Text =
+		StoreBoard.FitText(item.description, StoreBoard.BodyWidth(canvas), StoreBoard.DescTextPx, StoreBoard.DescLines)
+	body.Parent = card
 	card.Parent = parent
 end
 
@@ -215,9 +259,7 @@ function StoreBoard.Build(): Model
 	local model = Instance.new("Model")
 	model.Name = "StoreBoard"
 	local size = StoreBoard.BoardSize
-	local cream = Color3.fromHex("#F3E7C9") -- SignCream
-	local ink = Color3.fromHex("#2A2420") -- SignInk
-	local board = Kit.part(model, "Board", size, CFrame.new(0, 0, 0), cream, Enum.Material.SmoothPlastic)
+	local board = Kit.part(model, "Board", size, CFrame.new(0, 0, 0), Color3.fromRGB(92, 58, 32), Enum.Material.Wood)
 	model.PrimaryPart = board
 	for _, x in ipairs({ -size.X / 2 + 0.3, size.X / 2 - 0.3 }) do
 		Kit.part(
@@ -252,7 +294,7 @@ function StoreBoard.Build(): Model
 	heading.Size = UDim2.new(1, 0, 0, 44)
 	heading.Font = Enum.Font.GothamBlack
 	heading.TextSize = 34
-	heading.TextColor3 = ink
+	heading.TextColor3 = Color3.fromRGB(255, 244, 220)
 	heading.Text = "TIMBERLINE STORE"
 	heading.LayoutOrder = 0
 	heading.Parent = list
@@ -273,7 +315,7 @@ function StoreBoard.Build(): Model
 		soon.Font = Enum.Font.GothamBold
 		soon.TextSize = 20
 		soon.TextWrapped = true
-		soon.TextColor3 = ink
+		soon.TextColor3 = Color3.fromRGB(255, 236, 200)
 		soon.Text = "Coming soon"
 		soon.LayoutOrder = 1
 		soon.Parent = list
@@ -295,43 +337,6 @@ function StoreBoard.Build(): Model
 	})
 	-- The arch goes up after the meshes, so they never retire it.
 	StoreBoard.BuildArch(model)
-	-- A brass frame on the face, added after the meshes for the same reason.
-	-- Four bars keep the board at 15 parts (the cap is 16).
-	local brass = Color3.fromHex("#C9A24A") -- Brass
-	local bar = 0.12
-	local faceZ = -size.Z / 2 - 0.05
-	Kit.part(
-		model,
-		"Frame",
-		Vector3.new(size.X, bar, 0.08),
-		CFrame.new(0, size.Y / 2 - bar / 2, faceZ),
-		brass,
-		Enum.Material.Metal
-	)
-	Kit.part(
-		model,
-		"Frame",
-		Vector3.new(size.X, bar, 0.08),
-		CFrame.new(0, -size.Y / 2 + bar / 2, faceZ),
-		brass,
-		Enum.Material.Metal
-	)
-	Kit.part(
-		model,
-		"Frame",
-		Vector3.new(bar, size.Y - bar * 2, 0.08),
-		CFrame.new(-size.X / 2 + bar / 2, 0, faceZ),
-		brass,
-		Enum.Material.Metal
-	)
-	Kit.part(
-		model,
-		"Frame",
-		Vector3.new(bar, size.Y - bar * 2, 0.08),
-		CFrame.new(size.X / 2 - bar / 2, 0, faceZ),
-		brass,
-		Enum.Material.Metal
-	)
 	prompt:AddTag("StorePrompt")
 	return model
 end

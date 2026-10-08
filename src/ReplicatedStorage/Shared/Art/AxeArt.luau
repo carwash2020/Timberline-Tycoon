@@ -24,7 +24,8 @@
 --     along the arm when it's raised to hold a tool).
 --   * Glowing axes (look.glow) carry a PointLight and particles.
 --   * ApplyTemper(model, prefix, tier) dresses a built axe. A nil prefix
---     changes nothing.
+--     changes nothing. The neon edge, Keen's wind and Heavy's sheen sit
+--     on the front face of MeshHead. With no mesh, they use the part head.
 --
 -- The hand stays 0.75 studs up the haft (GripFromFoot). That is what the
 -- swing pose uses. Moving it to 25–30% of the haft would mean changing
@@ -644,6 +645,45 @@ AxeArt.GripFromFoot = GRIP_FROM_FOOT
 
 local TEMPER_NAMES = { "TemperTrim", "TemperEdge", "TemperFx" }
 
+-- The blade points -Z. Keen's streaks and Heavy's sheen use this box:
+-- MeshHead's Size and CFrame once MeshKit has placed it, otherwise the
+-- part-built head (Head, and Blade when that is the bit).
+local function headBounds(model: Model): (CFrame, Vector3)
+	local mesh = model:FindFirstChild("MeshHead")
+	if mesh ~= nil and mesh:IsA("BasePart") then
+		return mesh.CFrame, mesh.Size
+	end
+	local pieces: { BasePart } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") and (d.Name == "Head" or d.Name == "Blade") then
+			table.insert(pieces, d)
+		end
+	end
+	if #pieces == 0 then
+		local handle = model.PrimaryPart :: BasePart
+		local len = handle.Size.Y
+		return handle.CFrame * CFrame.new(0, len / 2 - 0.7, -0.72), Vector3.new(0.2, 0.55, 0.08)
+	end
+	if #pieces == 1 then
+		return pieces[1].CFrame, pieces[1].Size
+	end
+	local minv = Vector3.new(math.huge, math.huge, math.huge)
+	local maxv = Vector3.new(-math.huge, -math.huge, -math.huge)
+	for _, piece in ipairs(pieces) do
+		local half = piece.Size / 2
+		for _, x in ipairs({ -1, 1 }) do
+			for _, y in ipairs({ -1, 1 }) do
+				for _, z in ipairs({ -1, 1 }) do
+					local p = piece.CFrame * Vector3.new(half.X * x, half.Y * y, half.Z * z)
+					minv = Vector3.new(math.min(minv.X, p.X), math.min(minv.Y, p.Y), math.min(minv.Z, p.Z))
+					maxv = Vector3.new(math.max(maxv.X, p.X), math.max(maxv.Y, p.Y), math.max(maxv.Z, p.Z))
+				end
+			end
+		end
+	end
+	return CFrame.new((minv + maxv) / 2), maxv - minv
+end
+
 local function clearTemper(model: Model)
 	local drop: { Instance } = {}
 	for _, d in ipairs(model:GetDescendants()) do
@@ -691,17 +731,23 @@ function AxeArt.ApplyTemper(model: Model, prefix: string?, tier: number)
 	)
 	Kit.decor(trim, false)
 	dress(trim)
+	local edge: Part? = nil
 	if tier >= 2 and look.glow > 0 then
-		local edge = Kit.part(
+		local headCf, headSize = headBounds(model)
+		local thick = 0.04
+		local tall = math.clamp(headSize.Y * 0.55, 0.28, math.max(headSize.Y, 0.28))
+		-- Just clear of the front face, so the strip is not inside the mesh.
+		local made = Kit.part(
 			model,
 			"TemperEdge",
-			Vector3.new(0.16, 0.55, 0.04),
-			handle.CFrame * CFrame.new(0, len / 2 - 0.7, -0.72),
+			Vector3.new(0.16, tall, thick),
+			headCf * CFrame.new(0, 0, -headSize.Z / 2 - thick / 2),
 			look.trimColor,
 			Enum.Material.Neon
 		)
-		Kit.decor(edge, false)
-		dress(edge)
+		Kit.decor(made, false)
+		dress(made)
+		edge = made
 	end
 	if tier >= 3 and look.particle ~= nil then
 		local fx = Instance.new("ParticleEmitter")
@@ -717,7 +763,11 @@ function AxeArt.ApplyTemper(model: Model, prefix: string?, tier: number)
 			NumberSequenceKeypoint.new(1, 0),
 		})
 		fx:SetAttribute("Kind", look.particle)
-		fx.Parent = trim
+		local host: BasePart = trim
+		if (look.particle == "Wind" or look.particle == "Sheen") and edge ~= nil then
+			host = edge
+		end
+		fx.Parent = host
 	end
 end
 

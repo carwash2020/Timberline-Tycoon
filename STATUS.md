@@ -6,51 +6,23 @@ Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `ph
 
 ## Lane D — axes, boxes, shelves, displays (done)
 
-Branch `phase-2/v1-d-axes-displays`. Connor reviews each render before this merges. Paths below are the pictures to open.
+Branch `phase-2/v1-d-axes-displays`, rebased onto main at `f96b62c` (A1). Connor reviews each render before this merges. Paths below are the pictures to open.
 
-The lane is done on this branch. Axes, temper colours, the stepped shelf unit, window boxes, the store board and hover price colours are built. Lineups are a three-quarter view, 30 degrees off the side and 15 degrees down, in rows of at most four. Each axe name is a small plaque above and behind the head, so the axe from butt to tip is clear. The Hermit's Maul is a heavy wedge (head 0.9×2.4×1.7, at least twice a Steel blade) with a flat poll. The Lux Axe is an axe bit with a short fan behind it and a small glow, so the head still reads. The brass plate sits under the box name. Each store poster is two lines, the item name and its price: R$ 399, R$ 49 and R$ 399 are GAME_DESIGN §7; the Lux Axe line is "R$ …" because that pass has no number in the repo. The board's parts, frame, arch and place are unchanged (lane P owns the board next). The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy; the pictures of it are below. Economy numbers did not move.
+Axes, temper colours, the stepped shelf unit, window boxes and hover price colours are on this branch. The store board is not: `StoreBoard` and its spec match main, and the board scene and pictures are gone. Lane P owns a full board redesign. This branch does not type Robux prices onto the board. The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy. Economy numbers did not move in this lane.
 
-- `previews/v1-d/axes-before-lineup.png` — the 11 axes as they stood before the remake.
-- `previews/v1-d/axes-after-lineup.png` — the same 11 after the remake, three-quarter, rows of four, names behind the heads.
-- `previews/v1-d/axes-after-rusty-steel-hardened.png`
-- `previews/v1-d/axes-after-silver-cobalt-gold.png`
-- `previews/v1-d/axes-after-obsidian-inferno-starfall.png`
-- `previews/v1-d/axes-after-lux-maul.png`
-- `previews/v1-d/axe-rusty.png`
-- `previews/v1-d/axe-steel.png`
-- `previews/v1-d/axe-hardened.png`
-- `previews/v1-d/axe-silver.png`
-- `previews/v1-d/axe-cobalt.png`
-- `previews/v1-d/axe-gold.png`
-- `previews/v1-d/axe-obsidian.png`
-- `previews/v1-d/axe-inferno.png`
-- `previews/v1-d/axe-starfall.png`
-- `previews/v1-d/axe-lux.png`
-- `previews/v1-d/axe-hermits-maul.png`
-- `previews/v1-d/tempers-lineup.png` — Keen (speed, sky blue wind), Heavy (damage, white sheen) and Prosperous (coin gold), tiers 1 to 3, on a Steel Axe.
-- `previews/v1-d/tempers-tier-3.png` — the three families at tier 3, close, so the band and the edge read.
-- `previews/v1-d/temper-keen-1.png`
-- `previews/v1-d/temper-keen-2.png`
-- `previews/v1-d/temper-keen-3.png`
-- `previews/v1-d/temper-heavy-1.png`
-- `previews/v1-d/temper-heavy-2.png`
-- `previews/v1-d/temper-heavy-3.png`
-- `previews/v1-d/temper-prosperous-1.png`
-- `previews/v1-d/temper-prosperous-2.png`
-- `previews/v1-d/temper-prosperous-3.png`
+Keen is the speed temper (sky blue wind, `#6FB7E8`). Heavy is the damage temper (white edge sheen, `#FFFFFF`). Prosperous stays coin gold (`#F2C14E`). `TemperLook` covers exactly the prefixes `TemperLogic` exports. The neon edge, Keen's streaks and Heavy's sheen sit on the front face of `MeshHead` (its Size and CFrame after MeshKit places it). With no mesh, they use the part-built head. The Hermit's Maul has no uploaded mesh. It stays the part-built wedge (head 0.9×2.4×1.7, a flat poll, rope on the haft). It needs a Blender mesh. Do not invent one.
+
+Part-built axe, temper and shelf pictures are not in this PR. Connor rejected them. Reshoot after `phase-2/v1-preview-meshes` is on main. The box and hover pictures are still here:
+
 - `previews/v1-d/boxes-before-lineup.png` — five window boxes before the remake.
 - `previews/v1-d/boxes-before-axe.png`
 - `previews/v1-d/boxes-before-sawmill.png`
 - `previews/v1-d/boxes-after-lineup.png` — the same boxes after: 0.1 accent band and a brass plate, no price.
 - `previews/v1-d/boxes-after-axe.png`
 - `previews/v1-d/boxes-after-sawmill.png`
-- `previews/v1-d/board-before.png` — the store board before.
-- `previews/v1-d/board-after.png` — cream board, ink text, brass frame. Each item is its name and its price.
-- `previews/v1-d/shelf-front.png` — the stepped unit, three boards.
-- `previews/v1-d/shelf-side.png`
 - `previews/v1-d/hover-colours.png` — gold when you can pay, red when you cannot, cream when the line is not a cash price.
 
-Awaiting Connor: the hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. The Lux Axe's Robux price is not in the repo (GAME_DESIGN §7 prices the other three posted items only), so the board says "R$ …" for it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
+Awaiting Connor: the Hermit's Maul is part-built and needs a Blender mesh. The hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and cash prices are unchanged.
 
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.

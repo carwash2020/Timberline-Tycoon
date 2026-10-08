@@ -68,46 +68,38 @@ return function(t)
 		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
 	end)
 
-	t.test("each poster is the item name and its price, two lines, nothing cut off", function()
+	t.test("poster descriptions are 14 px, wrapped, and at most two lines", function()
 		local Enum = t.roblox.Enum
 		local model = StoreBoard.Build()
+		local gui = model:FindFirstChild("Posters", true)
+		local width = StoreBoard.BodyWidth(gui.CanvasSize.X)
 		local StoreData = t.shared("StoreData")
-		t.eq(StoreBoard.PriceFor("2x Cash"), "R$ 399")
-		t.eq(StoreBoard.PriceFor("$1,000"), "R$ 49")
-		t.eq(StoreBoard.PriceFor("$10,000"), "R$ 399")
-		t.eq(StoreBoard.PriceFor("Lux Axe"), "R$ …", "no Lux number is stored")
 		local function check(item)
 			local card = model:FindFirstChild(item.name, true)
-			t.eq(card:FindFirstChild("Description"), nil, item.name .. " has no description")
-			local title = card:FindFirstChild("Name")
-			local lines = string.split(title.Text, "\n")
-			t.eq(#lines, 2, item.name .. " is two lines")
-			t.eq(lines[1], item.name)
-			t.eq(lines[2], StoreBoard.PriceFor(item.name))
-			t.eq(title.TextScaled, true, item.name)
-			t.eq(title.TextWrapped, true, item.name)
-			t.eq(title.TextTruncate, Enum.TextTruncate.None, item.name)
-			t.ok(card.Size.Y.Offset <= 56, item.name .. " stays a short card")
-			local gap = card:FindFirstChild("Gap")
-			t.eq(gap.Visible, false, "the spacer is not a third line on the card")
+			local body = card:FindFirstChild("Description")
+			t.eq(body.TextSize, 14, item.name)
+			t.eq(body.TextWrapped, true, item.name)
+			t.eq(body.TextTruncate, Enum.TextTruncate.AtEnd, item.name)
+			t.eq(body.Size.Y.Offset, 28, item.name)
+			t.ok(StoreBoard.LineCount(body.Text, width, 14) <= 2, item.name)
+			if StoreBoard.LineCount(item.description, width, 14) <= 2 then
+				t.eq(body.Text, item.description, item.name .. " fits whole")
+			else
+				t.ok(string.sub(body.Text, -#"…") == "…", item.name .. " clips")
+			end
+			local title = nil
+			for _, d in ipairs(card:GetChildren()) do
+				if d:IsA("TextLabel") and d.Text == item.name then
+					title = d
+				end
+			end
+			t.eq(title.TextSize, 16, item.name .. " title")
 		end
 		for _, pass in ipairs(StoreData.ListedPasses()) do
 			check(pass)
 		end
 		for _, product in ipairs(StoreData.ListedProducts()) do
 			check(product)
-		end
-		for _, d in ipairs(model:GetDescendants()) do
-			if d:IsA("TextLabel") and d.Name ~= "Gap" then
-				t.ok(string.find(d.Text, "...", 1, true) == nil, "no cut-off line")
-				if d.Name == "Name" then
-					local price = string.split(d.Text, "\n")[2]
-					local ellipsis = string.find(d.Text, "…", 1, true)
-					t.eq(ellipsis ~= nil, price == "R$ …", "only the unknown Lux price uses an ellipsis")
-				else
-					t.ok(string.find(d.Text, "…", 1, true) == nil, "no cut-off line")
-				end
-			end
 		end
 	end)
 
@@ -167,17 +159,6 @@ return function(t)
 			end
 		end
 		t.ok(parts <= 16, "the board stays cheap: " .. parts)
-		local Color3 = t.roblox.Color3
-		t.eq(model:FindFirstChild("Board").Color, Color3.fromHex("#F3E7C9"))
-		local frames = 0
-		for _, d in ipairs(model:GetChildren()) do
-			if d.Name == "Frame" then
-				frames += 1
-				t.eq(d.Color, Color3.fromHex("#C9A24A"))
-			end
-		end
-		t.eq(frames, 4, "a brass frame")
-		t.eq(heading.TextColor3, Color3.fromHex("#2A2420"))
 		local prompt = model:FindFirstChild("StorePrompt", true)
 		t.eq(prompt.ActionText, "Browse")
 		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")

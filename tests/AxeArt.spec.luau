@@ -8,6 +8,7 @@ return function(t)
 	local roblox = t.roblox
 	local Vector3 = roblox.Vector3
 	local AxeArt = t.load("ReplicatedStorage/Shared/Art/AxeArt")
+	local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
 	local ItemCatalog = t.shared("ItemCatalog")
 
 	local MAX_PARTS = 40
@@ -321,5 +322,71 @@ return function(t)
 		-- A nil prefix does not strip a temper that is already there.
 		AxeArt.ApplyTemper(m, nil, 1)
 		t.ok(m:FindFirstChild("TemperTrim") ~= nil, "nil leaves the temper")
+	end)
+
+	local function frontOf(part)
+		local minZ = math.huge
+		local half = part.Size / 2
+		for _, x in ipairs({ -1, 1 }) do
+			for _, y in ipairs({ -1, 1 }) do
+				for _, z in ipairs({ -1, 1 }) do
+					local p = part.CFrame * Vector3.new(half.X * x, half.Y * y, half.Z * z)
+					minZ = math.min(minZ, p.Z)
+				end
+			end
+		end
+		return minZ
+	end
+
+	t.test("the temper edge sits on the head mesh, or the part head when no mesh loaded", function()
+		local maul = AxeArt.Build(ItemCatalog.GetAxe("HermitsMaul"))
+		t.eq(maul:FindFirstChild("MeshHead", true), nil, "the maul has no mesh")
+		AxeArt.ApplyTemper(maul, "Heavy", 2)
+		local partEdge = maul:FindFirstChild("TemperEdge")
+		local partFront = math.huge
+		for _, d in ipairs(maul:GetDescendants()) do
+			if d:IsA("BasePart") and d.Name == "Head" then
+				partFront = math.min(partFront, frontOf(d))
+			end
+		end
+		t.ok(partEdge and partEdge:IsA("BasePart"), "part-built edge")
+		t.ok(
+			math.abs(partEdge.CFrame.Position.Z - (partFront - partEdge.Size.Z / 2)) < 1e-3,
+			"on the part head's front face"
+		)
+
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = roblox.Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local ok, err = pcall(function()
+			local steel = AxeArt.Build(ItemCatalog.GetAxe("SteelAxe"))
+			local mesh = steel:FindFirstChild("MeshHead")
+			t.ok(mesh and mesh:IsA("BasePart"), "head mesh")
+			AxeArt.ApplyTemper(steel, "Keen", 3)
+			local edge = steel:FindFirstChild("TemperEdge")
+			local wantZ = mesh.CFrame.Position.Z - mesh.Size.Z / 2 - edge.Size.Z / 2
+			t.ok(math.abs(edge.CFrame.Position.Z - wantZ) < 1e-3, "just clear of the mesh face, not inside it")
+			t.ok(math.abs(edge.CFrame.Position.Y - mesh.CFrame.Position.Y) < 1e-3, "centred on the mesh head")
+			t.ok(edge.CFrame.Position.Z < mesh.CFrame.Position.Z - mesh.Size.Z / 2, "outside the mesh")
+			local wind = steel:FindFirstChild("TemperFx", true)
+			t.eq(wind.Parent, edge, "Keen streaks come off the edge")
+			t.eq(wind:GetAttribute("Kind"), "Wind")
+			AxeArt.ApplyTemper(steel, "Heavy", 3)
+			local sheen = steel:FindFirstChild("TemperFx", true)
+			t.eq(sheen.Parent, steel:FindFirstChild("TemperEdge"), "Heavy sheen comes off the edge")
+			t.eq(sheen:GetAttribute("Kind"), "Sheen")
+			AxeArt.ApplyTemper(steel, "Prosperous", 3)
+			local spark = steel:FindFirstChild("TemperFx", true)
+			t.eq(spark.Parent.Name, "TemperTrim", "Prosperous sparkles stay on the collar")
+		end)
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		if not ok then
+			error(err, 0)
+		end
 	end)
 end

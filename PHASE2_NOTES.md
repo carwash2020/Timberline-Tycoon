@@ -2,15 +2,15 @@
 
 ## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
 
-Done on this branch, not on main. Renders for Connor live in `previews/v1-d/` (listed in STATUS.md).
+Done on this branch, not on main. Rebased onto main at `f96b62c`. The store board is not in this PR (lane P owns the redesign). Box and hover renders live in `previews/v1-d/` (listed in STATUS.md). Axe, temper and shelf pictures were part-built and are gone until `phase-2/v1-preview-meshes` can draw the real meshes.
 
-Axes (part-built; uploaded meshes still replace them when they load):
+Axes (uploaded meshes replace the part-built axe when they load; the Hermit's Maul has no mesh and stays part-built):
 
-1. PC. Equip Rusty, then each rung, then the Lux Axe and the Hermit's Maul. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat (the maul included). Good: each axe is a different shape, matching `previews/v1-d/axe-*.png`. The Rusty head is chipped, Steel is a clean wedge, Hardened has a back spike, Silver is bearded, Cobalt has a white edge, Gold is a crescent, Obsidian is dark glass with a violet edge, Inferno glows, Starfall is a pale double head, Lux is a gold axe head with a short fan behind it (the glow stays on the head), the Hermit's Maul is a heavy wedge at least twice a Steel blade, with a flat poll and rope on the haft.
+1. PC, Play mode. In the command bar run `print(require(game.ReplicatedStorage.Shared.Art.MeshKit).Stats())`. `loaded` is greater than 0 and the axe ids are not in `failedIds`. Equip Rusty, then each rung, then the Lux Axe. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat. The Hermit's Maul is still the part-built wedge (a heavy head, a flat poll, rope on the haft). It has no custom mesh yet.
 2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
 3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
 
-Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The pictures are `previews/v1-d/temper-*.png`. Stats do not move.
+Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Keen, Heavy or Prosperous until lane A2 wires it. Keen is the speed temper (sky blue wind). Heavy is the damage temper (a white edge sheen). Prosperous stays coin gold. The neon edge, the wind streaks and the white sheen sit on the front face of the head mesh, not inside it. With no mesh they use the part-built head. Stats do not move.
 
 Boxes (the window crate; shell stays at 9 parts, a full box at 42):
 
@@ -20,21 +20,15 @@ Boxes (the window crate; shell stays at 9 parts, a full box at 42):
 
 Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's `ShopInterior.SteppedUnit` until C copies it):
 
-7. Open `previews/v1-d/shelf-front.png` and `shelf-side.png`. Three boards step up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows.
-
-Store board:
-
-8. PC. Walk to the store board in town. The board is cream, the heading is dark ink, and each poster is exactly two lines: the item name, then its price (2x Cash is R$ 399, the $1,000 pack is R$ 49, the $10,000 pack is R$ 399, from GAME_DESIGN §7). The Lux Axe's price line is "R$ …" because no Lux number is stored. No description, no cut-off line. A thin brass frame sits on the face. The banner words and where the board stands are the same as before. Good: `previews/v1-d/board-after.png`.
-9. Phone emulator. The board is still readable. Body text stays at least 14px. No new control.
-10. Xbox. The board prompt still works. B closes whatever it opened.
+7. The unit is three boards stepping up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows. No shelf picture in this PR.
 
 Hover tag (the price line only; the words do not change):
 
-11. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
-12. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
-13. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
+8. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
+9. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
+10. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
 
-Awaiting Connor, so Studio will not show these until he says otherwise: a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
+Awaiting Connor: a Blender mesh for the Hermit's Maul (it stays part-built until that exists), a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
 
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
