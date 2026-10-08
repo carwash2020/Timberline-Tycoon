@@ -80,6 +80,8 @@ local LIMITS: { [string]: number } = { -- max requests per second
 	PaintAllType = 4,
 	LogicSet = 4,
 	Trade = 4,
+	MineAction = 8, -- Lane M: a mining intent, about 8 a second
+	CraftAction = 2, -- Lane M: a craft intent, about 2 a second
 }
 local ABUSE_MULTIPLIER = 5
 -- Never strike for fewer than this many presses in a second: frantic

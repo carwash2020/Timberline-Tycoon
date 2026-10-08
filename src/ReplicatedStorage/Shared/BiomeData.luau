@@ -215,23 +215,33 @@ function BiomeData.Rules(biome: BiomeDef?, gear: { [string]: boolean }): Rules
 	return rules
 end
 
+-- Built from a plain string so the id stays `string`. Comparing `biome.id`
+-- to "volcano" refines it to a singleton union, and a table literal will
+-- not accept that union where Hazard.kind is string.
+local function climateHazard(kind: string, dps: number, graceSec: number): Hazard
+	return {
+		kind = kind,
+		dps = dps,
+		graceSec = graceSec,
+	}
+end
+
 -- The climate hazard at `biome` for a player who owns `gear`, or nil when
 -- the gear removes it or the biome has none. `outsideCrater` is false in
 -- the volcano's lava column, where the old burn applies instead.
 function BiomeData.Exposure(biome: BiomeDef?, gear: { [string]: boolean }, outsideCrater: boolean?): Hazard?
-	local exposure = if biome then biome.exposure else nil
-	if not biome or not exposure or gear[exposure.gear] then
+	if biome == nil then
 		return nil
 	end
-	if biome.id == "volcano" and outsideCrater == false then
+	local exposure = biome.exposure
+	if exposure == nil or gear[exposure.gear] then
 		return nil
 	end
-	local hazard: Hazard = {
-		kind = biome.id :: string,
-		dps = exposure.dps,
-		graceSec = exposure.graceSec,
-	}
-	return hazard
+	local kind = biome.id
+	if kind == "volcano" and outsideCrater == false then
+		return nil
+	end
+	return climateHazard(kind, exposure.dps, exposure.graceSec)
 end
 
 return BiomeData

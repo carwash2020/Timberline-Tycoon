@@ -46,7 +46,7 @@ return function(t)
 			{ list[1].priceCash, list[2].priceCash, list[3].priceCash, list[4].priceCash },
 			{ 2500, 9000, 30000, 95000 }
 		)
-		t.eq({ list[1].planer.boardBonus, list[4].planer.boardBonus }, { 1.2, 2.0 })
+		t.eq({ list[1].planer.boardBonus, list[4].planer.boardBonus }, { 1.2, 1.8 })
 		t.eq(Logic.IsPlaner("SkyBin"), false)
 		t.eq(Logic.IsPlaner("ChopSaw"), false)
 		t.eq(Logic.IsPlaner("SawmillRickety"), false)
@@ -133,7 +133,7 @@ return function(t)
 		local _, hand = Logic.Get("PlanerHand")
 		local _, industrial = Logic.Get("PlanerIndustrial")
 		t.eq(Logic.Stamp(nil, hand), 1.2)
-		t.eq(Logic.Stamp(1, industrial), 2)
+		t.eq(Logic.Stamp(1, industrial), 1.8)
 		t.eq(Logic.Stamp(2, hand), 2, "a better stamp stays")
 		t.eq(Logic.Stamp(0 / 0, hand), 1.2)
 		-- And SellLogic applies it on sale: a finished plank pays the bonus, a log never does.

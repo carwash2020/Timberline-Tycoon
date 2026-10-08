@@ -299,11 +299,11 @@ export type Profile = {
 	-- groundLoad). Lane F puts it on the plot and clears this. Migrate only
 	-- appends, and only while worldVersion is behind GameConfig.WorldVersion.
 	strandedLoad: { any },
-	-- The map this slot was saved on. Missing counts as 1 (nil only in the
-	-- moment before Migrate, so Reconcile cannot stamp the template's
-	-- version onto an old save). Migrate writes GameConfig.WorldVersion
-	-- exactly, never the higher of the two.
-	worldVersion: number?,
+	-- The map this slot was saved on. A save that never had the field is
+	-- version 1 (ProfileService writes 1 after Reconcile, before Migrate).
+	-- Migrate writes GameConfig.WorldVersion exactly, never the higher of
+	-- the two.
+	worldVersion: number,
 	-- Found secrets on this slot (not secretsFound, which is account-wide).
 	secrets: { [string]: boolean },
 	-- Sawmills bought at the Tool Shed and not placed yet (ids; duplicates

@@ -770,8 +770,8 @@ ItemCatalog.Machines = {
 		shop = "ToolShed",
 		color = "#E2B93B",
 	},
-	-- The Planer line (V2_PLAN.md §2h): a late-game sink, not on the economy
-	-- ladder (tools/economy does not buy it).
+	-- The Planer line (V2_PLAN.md §2h). tools/economy buys a planer when it
+	-- raises the rate. The chop saw is in this table and is not a rung.
 	PlanerHand = {
 		id = "PlanerHand",
 		displayName = "Hand Planer",
