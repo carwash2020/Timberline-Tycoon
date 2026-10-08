@@ -50,7 +50,6 @@ local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -62,6 +61,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Tune = require(ReplicatedStorage.Shared.Tune)
 local BlueprintPlacer = require(script.Parent.BlueprintPlacer)
 local HUD = require(script.Parent.HUD)
+local PromptSwitch = require(script.Parent.PromptSwitch)
 local UITheme = require(script.Parent.UITheme)
 
 local DragController = {}
@@ -112,7 +112,6 @@ local focusConn: RBXScriptConnection? = nil -- the window losing focus lets go o
 local stick = Vector2.zero -- the left stick, read while locked
 local tookKey: { [Enum.KeyCode]: boolean } = {} -- key presses whose Begin we used
 local lastHint = -math.huge
-local promptsWere: boolean? = nil -- ProximityPromptService.Enabled before the hold
 local balls: { [Model]: BasePart } = {}
 local watched: { [Model]: RBXScriptConnection } = {}
 local ballFolder: Folder? = nil
@@ -365,15 +364,14 @@ function DragController.SetBuildMode(on: boolean)
 	end
 end
 
+-- World prompts are off while a piece is held (PromptSwitch keeps the count:
+-- the dialogue box, the placer and the wire tool hold them off under their
+-- own names, so none of them can leave the switch off for the others).
 local function hidePrompts(hide: boolean)
 	if hide then
-		if promptsWere == nil then
-			promptsWere = ProximityPromptService.Enabled
-		end
-		ProximityPromptService.Enabled = false
-	elseif promptsWere ~= nil then
-		ProximityPromptService.Enabled = promptsWere
-		promptsWere = nil
+		PromptSwitch.Hold("drag")
+	else
+		PromptSwitch.Release("drag")
 	end
 end
 
@@ -603,10 +601,10 @@ local function drop(tell: boolean)
 	end
 	hold = nil
 	distanceAxis = 0
+	hidePrompts(false) -- first: nothing below may leave world prompts off
 	ghostBeds(false)
 	unbindHold()
 	showButtons(false)
-	hidePrompts(false)
 	if h.conn then
 		h.conn:Disconnect()
 	end
@@ -718,29 +716,39 @@ local function grab(device: Device, touch: InputObject?)
 	}
 	hold = h
 	distanceAxis = 0
-	HUD.NoteGrab()
-	ghostBeds(true)
-	Net.Remote("Grab"):FireServer(part, at)
-	h.conn = model:GetAttributeChangedSignal("HeldBy"):Connect(function()
-		if hold ~= h then
-			return
-		end
-		if model:GetAttribute("HeldBy") == player.UserId then
-			h.confirmed = true
-			if h.box then
-				-- Whatever spin the shelf release left on it is damped at once.
-				pcall(function()
-					h.part.AssemblyAngularVelocity = Vector3.zero
-				end)
+	-- Everything that can throw after the hold is recorded is guarded: a throw
+	-- here used to leave `hold` set with nothing to end it, so no piece could
+	-- be grabbed again (and the prompts' hold, below, never matched a release).
+	local started, why = pcall(function()
+		HUD.NoteGrab()
+		ghostBeds(true)
+		Net.Remote("Grab"):FireServer(part, at)
+		h.conn = model:GetAttributeChangedSignal("HeldBy"):Connect(function()
+			if hold ~= h then
+				return
 			end
-		elseif h.confirmed then
-			drop(false) -- the server let go (sold, cut, too far, put back)
-		end
+			if model:GetAttribute("HeldBy") == player.UserId then
+				h.confirmed = true
+				if h.box then
+					-- Whatever spin the shelf release left on it is damped at once.
+					pcall(function()
+						h.part.AssemblyAngularVelocity = Vector3.zero
+					end)
+				end
+			elseif h.confirmed then
+				drop(false) -- the server let go (sold, cut, too far, put back)
+			end
+		end)
+		bindHold()
+		showButtons(device == "touch")
+		hidePrompts(true)
+		refreshBall(model)
 	end)
-	bindHold()
-	showButtons(device == "touch")
-	hidePrompts(true)
-	refreshBall(model)
+	if not started then
+		warn("[Drag] could not start the hold: " .. tostring(why))
+		drop(true)
+		return
+	end
 	task.delay(GrabLogic.ConfirmSec(player:GetNetworkPing()), function()
 		if hold == h and not h.confirmed then
 			if model:GetAttribute("HeldBy") == player.UserId then

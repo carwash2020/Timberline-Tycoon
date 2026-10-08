@@ -217,7 +217,10 @@ function NPCTalkService.Track(model: Model)
 	hooked[model] = true
 	talk.Triggered:Connect(function(who: Player)
 		if RateLimiter.Allow(who, "NPCTalk") then
-			NPCTalkService.Begin(who, model)
+			local ok, began = pcall(NPCTalkService.Begin, who, model)
+			if not ok then
+				warn("[Talk] NPCTalkService.Begin failed: " .. tostring(began))
+			end
 		end
 	end)
 	pcall(function()

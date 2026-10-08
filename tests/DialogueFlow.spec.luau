@@ -219,7 +219,7 @@ return function(t)
 		t.ok(string.find(ui, "UITheme.Glyph(Enum.KeyCode.ButtonX", 1, true) ~= nil, "the pad's X glyph")
 		t.ok(string.find(ui, "DialogueFlow.Key(device)", 1, true) ~= nil)
 		-- Other prompts are off while it is up, and come back after a beat.
-		t.ok(string.find(ui, "ProximityPromptService.Enabled = false", 1, true) ~= nil)
+		t.ok(string.find(ui, 'PromptSwitch.Hold("dialogue")', 1, true) ~= nil)
 		t.ok(string.find(ui, "DialogueFlow.ReenableDelay", 1, true) ~= nil)
 		-- Toasts hold (NoticePolicy) and the gamepad's focus is given back.
 		t.ok(string.find(ui, 'player:SetAttribute("TalkOpen", true)', 1, true) ~= nil)
