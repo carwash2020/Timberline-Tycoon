@@ -1,0 +1,5213 @@
+{
+  "100056308278514": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      698.758,
+      241.375,
+      2048.0
+    ],
+    "node": "Lights"
+  },
+  "100066231658827": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.95,
+      0.8,
+      0.97
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "100192126544226": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      9.6,
+      4.55,
+      2.6
+    ],
+    "node": "Counter"
+  },
+  "100234799060798": {
+    "file": "items/Flag/Flag.glb",
+    "initialSize": [
+      0.4,
+      12.0,
+      0.4
+    ],
+    "node": "Collision"
+  },
+  "100283783007723": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      24.3,
+      5.4,
+      0.75
+    ],
+    "node": "Sign"
+  },
+  "100432331486427": {
+    "file": "trees/Birch/Section_2.glb",
+    "initialSize": [
+      1.6,
+      3.2,
+      1.6
+    ],
+    "node": "Section"
+  },
+  "100635326256018": {
+    "file": "buildings/SkyBin/SkyBin.glb",
+    "initialSize": [
+      0.33,
+      0.42,
+      0.33
+    ],
+    "node": "Glow"
+  },
+  "100903937466780": {
+    "file": "buildings/SkyBin/SkyBin.glb",
+    "initialSize": [
+      4.825,
+      10.085,
+      7.374
+    ],
+    "node": "Body"
+  },
+  "101057277743396": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      1031.0,
+      210.0,
+      1824.5
+    ],
+    "node": "Body"
+  },
+  "101219244496563": {
+    "file": "vehicles/PonyTrailer/by_truck/LoggingRig/PonyTrailer_LoggingRig.glb",
+    "initialSize": [
+      10.42,
+      2.14,
+      13.0
+    ],
+    "node": "Bed"
+  },
+  "101508101794001": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "101525114127541": {
+    "file": "trees/Palmwood/Section_1.glb",
+    "initialSize": [
+      1.8,
+      3.6,
+      1.8
+    ],
+    "node": "Section"
+  },
+  "101559062589660": {
+    "file": "trees/Pine/Section_1.glb",
+    "initialSize": [
+      2.6,
+      5.2,
+      2.6
+    ],
+    "node": "Section"
+  },
+  "101564508038045": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      1.4,
+      0.867,
+      0.308
+    ],
+    "node": "Glass"
+  },
+  "101607517869693": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.95,
+      0.8,
+      0.97
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "101615123184878": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      722.229,
+      649.54,
+      2048.0
+    ],
+    "node": "Body"
+  },
+  "101631149063987": {
+    "file": "environment/MillBell/MillBell.glb",
+    "initialSize": [
+      1.0,
+      5.39,
+      1.525
+    ],
+    "node": "Body"
+  },
+  "101660484556741": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "101738227193301": {
+    "file": "trees/Birch/Leaves_B.glb",
+    "initialSize": [
+      8.522,
+      17.567,
+      7.883
+    ],
+    "node": "Leaves"
+  },
+  "102029522927110": {
+    "file": "kit/FenceGate4/FenceGate4.glb",
+    "initialSize": [
+      4.0,
+      3.0,
+      0.6
+    ],
+    "node": "Wood"
+  },
+  "102282482919035": {
+    "file": "environment/Crate/Crate.glb",
+    "initialSize": [
+      2.409,
+      3.47,
+      2.452
+    ],
+    "node": "Body"
+  },
+  "102313140359146": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      1.52,
+      1.798,
+      1.66
+    ],
+    "node": "Head"
+  },
+  "102328618104359": {
+    "file": "axes/LuxAxe/LuxAxe.glb",
+    "initialSize": [
+      0.477,
+      1.251,
+      2.035
+    ],
+    "node": "Head"
+  },
+  "102331982236025": {
+    "file": "trees/Maple/Leaves_B.glb",
+    "initialSize": [
+      34.214,
+      12.735,
+      18.971
+    ],
+    "node": "Leaves"
+  },
+  "102449064454701": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.84,
+      0.86,
+      0.86
+    ],
+    "node": "RightLowerArm"
+  },
+  "102572518490476": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      1.113,
+      2.988,
+      2.937
+    ],
+    "node": "Wheel"
+  },
+  "102593030407778": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "RightUpperArm"
+  },
+  "102672823416739": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      1.0,
+      0.37,
+      0.37
+    ],
+    "node": "Carry"
+  },
+  "102697546003435": {
+    "file": "environment/Dock/Dock.glb",
+    "initialSize": [
+      5.271,
+      0.3,
+      19.937
+    ],
+    "node": "Deck"
+  },
+  "102728327572502": {
+    "file": "items/Flag/Flag.glb",
+    "initialSize": [
+      1.0,
+      12.4,
+      1.0
+    ],
+    "node": "Body"
+  },
+  "102747831750260": {
+    "file": "vehicles/HeavyHauler/by_truck/Rustbucket/HeavyHauler_Rustbucket.glb",
+    "initialSize": [
+      9.92,
+      2.085,
+      26.045
+    ],
+    "node": "Body"
+  },
+  "102825418230236": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      9.4,
+      2.648,
+      10.999
+    ],
+    "node": "Lights"
+  },
+  "102865278963145": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      2.18,
+      1.54,
+      1.44
+    ],
+    "node": "UpperTorso"
+  },
+  "102934582150383": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      1.98,
+      1.54,
+      1.09
+    ],
+    "node": "UpperTorso"
+  },
+  "103111550635504": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      4.125,
+      9.0,
+      0.6
+    ],
+    "node": "Door"
+  },
+  "103133226390723": {
+    "file": "environment/SellPad/SellPad.glb",
+    "initialSize": [
+      24.0,
+      0.2,
+      17.94
+    ],
+    "node": "SellPad"
+  },
+  "103427372287639": {
+    "file": "kit/Beam8/Beam8.glb",
+    "initialSize": [
+      8.0,
+      1.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "103556777932740": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      1.94,
+      0.575,
+      1.03
+    ],
+    "node": "LowerTorso"
+  },
+  "103621913097291": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "103819640831326": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      70.0,
+      106.0,
+      168.0
+    ],
+    "node": "Hitch"
+  },
+  "103840124258122": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "103975676965652": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      1.96,
+      1.54,
+      1.095
+    ],
+    "node": "UpperTorso"
+  },
+  "103978168374792": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "104141006365223": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "LeftUpperArm"
+  },
+  "104320298687581": {
+    "file": "vehicles/HeavyHauler/by_truck/Pickup/HeavyHauler_Pickup.glb",
+    "initialSize": [
+      8.9,
+      4.15,
+      26.08
+    ],
+    "node": "Bed"
+  },
+  "104416240141512": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "104437473223082": {
+    "file": "environment/Wheelbarrow/Wheelbarrow.glb",
+    "initialSize": [
+      2.09,
+      2.205,
+      5.087
+    ],
+    "node": "Body"
+  },
+  "104477072598213": {
+    "file": "vehicles/RanchTrailer/by_truck/Rustbucket/RanchTrailer_Rustbucket.glb",
+    "initialSize": [
+      8.2,
+      4.22,
+      18.295
+    ],
+    "node": "Lights"
+  },
+  "104574414484630": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      6.6,
+      11.775,
+      0.787
+    ],
+    "node": "BarnDoorL"
+  },
+  "104687332442263": {
+    "file": "trees/Oak/Leaves_A.glb",
+    "initialSize": [
+      17.031,
+      11.992,
+      22.287
+    ],
+    "node": "Leaves"
+  },
+  "104702159359138": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      14.725,
+      14.725,
+      0.9
+    ],
+    "node": "SawBlade"
+  },
+  "104766179787748": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "104857227459379": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      2.05,
+      1.705,
+      1.2
+    ],
+    "node": "UpperTorso"
+  },
+  "104869702239200": {
+    "file": "trees/Palmwood/Leaves_C.glb",
+    "initialSize": [
+      18.96,
+      6.833,
+      19.211
+    ],
+    "node": "Leaves"
+  },
+  "104952124701042": {
+    "file": "kit/Floor4/Floor4.glb",
+    "initialSize": [
+      4.0,
+      0.4,
+      4.0
+    ],
+    "node": "Wood"
+  },
+  "105009286686361": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "105284930523566": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "LeftUpperArm"
+  },
+  "105398150865760": {
+    "file": "environment/Campfire/Campfire.glb",
+    "initialSize": [
+      1.586,
+      0.284,
+      1.36
+    ],
+    "node": "Embers"
+  },
+  "105565294587502": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      888.0,
+      413.0,
+      1827.0
+    ],
+    "node": "Bed"
+  },
+  "105839768179795": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      1.98,
+      1.375,
+      1.1
+    ],
+    "node": "LowerTorso"
+  },
+  "106039931444640": {
+    "file": "axes/InfernoAxe/InfernoAxe.glb",
+    "initialSize": [
+      0.233,
+      2.824,
+      1.626
+    ],
+    "node": "Glow"
+  },
+  "106182055345622": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.455,
+      2.387,
+      0.156
+    ],
+    "node": "Carry"
+  },
+  "106201918511427": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      566.524,
+      626.68,
+      2048.0
+    ],
+    "node": "Body"
+  },
+  "106240781110764": {
+    "file": "trees/Oak/Section_1.glb",
+    "initialSize": [
+      2.0,
+      4.0,
+      2.0
+    ],
+    "node": "Section"
+  },
+  "106358396545112": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      8.6,
+      4.55,
+      2.4
+    ],
+    "node": "Counter"
+  },
+  "106500111589450": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      63.367,
+      20.52,
+      40.5
+    ],
+    "node": "Roof"
+  },
+  "106581335446864": {
+    "file": "kit/TallWall4/TallWall4.glb",
+    "initialSize": [
+      4.0,
+      10.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "106816754909256": {
+    "file": "buildings/SkyBin/SkyBin.glb",
+    "initialSize": [
+      4.336,
+      3.66,
+      4.348
+    ],
+    "node": "SkyBin"
+  },
+  "107003020182290": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      979.0,
+      203.5,
+      1304.5
+    ],
+    "node": "Body"
+  },
+  "107147198667062": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      27.9,
+      25.448,
+      24.12
+    ],
+    "node": "Glow"
+  },
+  "107185280727328": {
+    "file": "trees/Maple/Leaves_A.glb",
+    "initialSize": [
+      31.639,
+      12.206,
+      24.146
+    ],
+    "node": "Leaves"
+  },
+  "107189158999558": {
+    "file": "vehicles/HeavyHauler/by_truck/Rustbucket/HeavyHauler_Rustbucket.glb",
+    "initialSize": [
+      8.2,
+      4.22,
+      26.075
+    ],
+    "node": "Lights"
+  },
+  "107258633460004": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      11.11,
+      9.145,
+      26.136
+    ],
+    "node": "Body"
+  },
+  "107509873567959": {
+    "file": "environment/StoreBoard/StoreBoard.glb",
+    "initialSize": [
+      5.7,
+      5.562,
+      1.421
+    ],
+    "node": "Body"
+  },
+  "108009426716841": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      1.52,
+      1.568,
+      1.663
+    ],
+    "node": "Head"
+  },
+  "108200236177822": {
+    "file": "environment/ParkingBay/ParkingBay.glb",
+    "initialSize": [
+      2.6,
+      0.06,
+      0.7
+    ],
+    "node": "LanternGlow"
+  },
+  "108277826361867": {
+    "file": "vehicles/PonyTrailer/by_truck/Pickup/PonyTrailer_Pickup.glb",
+    "initialSize": [
+      8.86,
+      2.14,
+      13.0
+    ],
+    "node": "Bed"
+  },
+  "108290746826201": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "RightLowerLeg"
+  },
+  "108310065203684": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.88,
+      0.83,
+      0.93
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "108371403171450": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.84,
+      0.86,
+      0.86
+    ],
+    "node": "RightLowerArm"
+  },
+  "108374815739635": {
+    "file": "environment/Footbridge/Footbridge.glb",
+    "initialSize": [
+      5.3,
+      4.939,
+      14.4
+    ],
+    "node": "Body"
+  },
+  "108430978098778": {
+    "file": "kit/SlopedRoof8/SlopedRoof8.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      4.0
+    ],
+    "node": "Collision"
+  },
+  "108637384034532": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      1.52,
+      1.365,
+      1.39
+    ],
+    "node": "Head"
+  },
+  "108656014869417": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      821.399,
+      325.89,
+      2048.0
+    ],
+    "node": "Bed"
+  },
+  "108779264518842": {
+    "file": "vehicles/PonyTrailer/by_truck/Flatbed/PonyTrailer_Flatbed.glb",
+    "initialSize": [
+      9.5,
+      0.38,
+      12.83
+    ],
+    "node": "Lights"
+  },
+  "108948940119854": {
+    "file": "kit/HalfWall8/HalfWall8.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "109029592716076": {
+    "file": "kit/Wall4/Wall4.glb",
+    "initialSize": [
+      4.0,
+      6.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "109113608718430": {
+    "file": "trees/Gloamwood/Leaves_B.glb",
+    "initialSize": [
+      15.144,
+      14.785,
+      27.517
+    ],
+    "node": "Leaves"
+  },
+  "109459775582599": {
+    "file": "trees/Gloamwood/Leaves_C.glb",
+    "initialSize": [
+      25.654,
+      11.303,
+      26.429
+    ],
+    "node": "Leaves"
+  },
+  "109498505023571": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      111.3,
+      298.807,
+      293.704
+    ],
+    "node": "Wheel"
+  },
+  "109577497643149": {
+    "file": "trees/Maple/Section_1.glb",
+    "initialSize": [
+      2.4,
+      4.8,
+      2.4
+    ],
+    "node": "Section"
+  },
+  "109602148572490": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "110023019061457": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      9.3,
+      9.36,
+      12.891
+    ],
+    "node": "Body"
+  },
+  "110217796170520": {
+    "file": "environment/Well/Well.glb",
+    "initialSize": [
+      5.9,
+      2.571,
+      4.735
+    ],
+    "node": "Roof"
+  },
+  "110663013657387": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      1219.4,
+      444.034,
+      392.454
+    ],
+    "node": "Glass"
+  },
+  "110928270659032": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "RightLowerArm"
+  },
+  "110946981942122": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      870.575,
+      716.598,
+      2048.0
+    ],
+    "node": "Body"
+  },
+  "111101942473680": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.59,
+      1.127,
+      0.548
+    ],
+    "node": "Carry"
+  },
+  "111225616877210": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      31.68,
+      32.107,
+      27.769
+    ],
+    "node": "Body"
+  },
+  "111307059016521": {
+    "file": "environment/StoreBoard/StoreBoard.glb",
+    "initialSize": [
+      5.0,
+      5.2,
+      0.6
+    ],
+    "node": "Collision"
+  },
+  "111333312069489": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      482.882,
+      531.412,
+      2048.0
+    ],
+    "node": "Lights"
+  },
+  "111473608570682": {
+    "file": "environment/LogPile/LogPile.glb",
+    "initialSize": [
+      5.15,
+      3.612,
+      5.922
+    ],
+    "node": "Body"
+  },
+  "111557478178184": {
+    "file": "kit/Window/Window.glb",
+    "initialSize": [
+      3.8,
+      2.9,
+      0.75
+    ],
+    "node": "Wood"
+  },
+  "111559217063343": {
+    "file": "kit/Floor/Floor.glb",
+    "initialSize": [
+      8.0,
+      0.4,
+      8.0
+    ],
+    "node": "Wood"
+  },
+  "111622442505696": {
+    "file": "environment/Well/Well.glb",
+    "initialSize": [
+      5.0,
+      5.4,
+      4.527
+    ],
+    "node": "Collision"
+  },
+  "111767377324633": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      10.67,
+      7.325,
+      33.8
+    ],
+    "node": "Bed"
+  },
+  "112087968527199": {
+    "file": "trees/Lumenwood/Section_3.glb",
+    "initialSize": [
+      2.6,
+      5.2,
+      2.6
+    ],
+    "node": "Section"
+  },
+  "112203689695205": {
+    "file": "kit/Fence/Fence.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      0.6
+    ],
+    "node": "Wood"
+  },
+  "112366473449777": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "RightLowerLeg"
+  },
+  "112496106041809": {
+    "file": "vehicles/HeavyHauler/by_truck/Pickup/HeavyHauler_Pickup.glb",
+    "initialSize": [
+      6.974,
+      3.51,
+      3.067
+    ],
+    "node": "Hitch"
+  },
+  "112566568598574": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      61.65,
+      42.0,
+      40.95
+    ],
+    "node": "Collision"
+  },
+  "112911971618847": {
+    "file": "vehicles/PonyTrailer/by_truck/LoggingRig/PonyTrailer_LoggingRig.glb",
+    "initialSize": [
+      8.505,
+      3.51,
+      3.076
+    ],
+    "node": "Hitch"
+  },
+  "113252783846653": {
+    "file": "vehicles/RanchTrailer/by_truck/Rustbucket/RanchTrailer_Rustbucket.glb",
+    "initialSize": [
+      6.466,
+      3.51,
+      3.063
+    ],
+    "node": "Hitch"
+  },
+  "113357125249890": {
+    "file": "trees/Frostwood/Facet_A.glb",
+    "initialSize": [
+      6.063,
+      14.83,
+      6.063
+    ],
+    "node": "Facet"
+  },
+  "113393982074490": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      1.373,
+      3.509,
+      3.509
+    ],
+    "node": "Wheel"
+  },
+  "113682027937082": {
+    "file": "items/Mailbox/Mailbox.glb",
+    "initialSize": [
+      0.88,
+      3.875,
+      1.45
+    ],
+    "node": "Body"
+  },
+  "113789372437689": {
+    "file": "items/PlotSign/PlotSign.glb",
+    "initialSize": [
+      8.0,
+      3.5,
+      0.4
+    ],
+    "node": "Sign"
+  },
+  "113829338505467": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "114422124406733": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "114836272452866": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      7.96,
+      8.76,
+      33.76
+    ],
+    "node": "Lights"
+  },
+  "114906176954403": {
+    "file": "environment/RockBrown/RockBrown.glb",
+    "initialSize": [
+      5.966,
+      3.861,
+      4.791
+    ],
+    "node": "Body"
+  },
+  "115113425380693": {
+    "file": "kit/Foundation8/Foundation8.glb",
+    "initialSize": [
+      8.0,
+      2.0,
+      8.0
+    ],
+    "node": "Collision"
+  },
+  "115206763558887": {
+    "file": "vehicles/PonyTrailer/by_truck/LoggingRig/PonyTrailer_LoggingRig.glb",
+    "initialSize": [
+      11.87,
+      2.035,
+      13.045
+    ],
+    "node": "Body"
+  },
+  "115239214273651": {
+    "file": "axes/ObsidianAxe/ObsidianAxe.glb",
+    "initialSize": [
+      0.547,
+      1.718,
+      2.491
+    ],
+    "node": "Head"
+  },
+  "115254536239726": {
+    "file": "vehicles/HeavyHauler/by_truck/Flatbed/HeavyHauler_Flatbed.glb",
+    "initialSize": [
+      9.68,
+      4.15,
+      26.08
+    ],
+    "node": "Bed"
+  },
+  "115367571641134": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      1.96,
+      1.54,
+      1.14
+    ],
+    "node": "UpperTorso"
+  },
+  "115405926778726": {
+    "file": "environment/LookoutTower/LookoutTower.glb",
+    "initialSize": [
+      6.601,
+      15.661,
+      7.049
+    ],
+    "node": "Collision"
+  },
+  "115567970319340": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "115632734637819": {
+    "file": "environment/Cart/Cart.glb",
+    "initialSize": [
+      4.5,
+      3.584,
+      8.045
+    ],
+    "node": "Body"
+  },
+  "115635347945305": {
+    "file": "trees/Maple/Section_3.glb",
+    "initialSize": [
+      2.4,
+      4.8,
+      2.4
+    ],
+    "node": "Section"
+  },
+  "115672468528717": {
+    "file": "trees/Frostwood/Section_2.glb",
+    "initialSize": [
+      2.2,
+      4.4,
+      2.2
+    ],
+    "node": "Section"
+  },
+  "115724309287354": {
+    "file": "kit/HalfWall8/HalfWall8.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "115887287930870": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      1.98,
+      0.55,
+      1.05
+    ],
+    "node": "LowerTorso"
+  },
+  "116160073850108": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "116387430275343": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      0.7,
+      1.06,
+      1.68
+    ],
+    "node": "Hitch"
+  },
+  "116430701440570": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      51.6,
+      30.0,
+      41.106
+    ],
+    "node": "Collision"
+  },
+  "116687476427666": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.95,
+      0.8,
+      0.97
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "116870188640151": {
+    "file": "kit/TallWall8/TallWall8.glb",
+    "initialSize": [
+      8.0,
+      10.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "116977876197897": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.84,
+      0.86,
+      0.86
+    ],
+    "node": "LeftLowerArm"
+  },
+  "117109970254679": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "117150345657348": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      10.28,
+      4.22,
+      26.075
+    ],
+    "node": "Lights"
+  },
+  "117328552905839": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      940.0,
+      264.814,
+      1099.876
+    ],
+    "node": "Lights"
+  },
+  "117499271217684": {
+    "file": "vehicles/RanchTrailer/by_truck/Rustbucket/RanchTrailer_Rustbucket.glb",
+    "initialSize": [
+      9.79,
+      2.1,
+      18.245
+    ],
+    "node": "Body"
+  },
+  "118206786010410": {
+    "file": "trees/Pine/Section_3.glb",
+    "initialSize": [
+      2.6,
+      5.2,
+      2.6
+    ],
+    "node": "Section"
+  },
+  "118218058767651": {
+    "file": "trees/Lumenwood/Section_1.glb",
+    "initialSize": [
+      2.6,
+      5.2,
+      2.6
+    ],
+    "node": "Section"
+  },
+  "118563219993952": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "LeftUpperArm"
+  },
+  "118621040752731": {
+    "file": "items/Flag/Flag.glb",
+    "initialSize": [
+      0.336,
+      2.4,
+      3.4
+    ],
+    "node": "Flag"
+  },
+  "118902112646379": {
+    "file": "items/Mailbox/Mailbox.glb",
+    "initialSize": [
+      0.9,
+      3.8,
+      1.45
+    ],
+    "node": "Collision"
+  },
+  "118925999764012": {
+    "file": "environment/Bench/Bench.glb",
+    "initialSize": [
+      5.0,
+      3.412,
+      1.773
+    ],
+    "node": "Body"
+  },
+  "119092211614975": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      8.72,
+      4.22,
+      18.295
+    ],
+    "node": "Lights"
+  },
+  "119349865481682": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "119351101193720": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "119527653132088": {
+    "file": "vehicles/HeavyHauler/by_truck/Pickup/HeavyHauler_Pickup.glb",
+    "initialSize": [
+      10.44,
+      2.085,
+      26.045
+    ],
+    "node": "Body"
+  },
+  "119641824946975": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      1.52,
+      3.02,
+      1.42
+    ],
+    "node": "Head"
+  },
+  "119957434678210": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "LeftLowerArm"
+  },
+  "119961448211765": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      1.98,
+      1.54,
+      1.14
+    ],
+    "node": "UpperTorso"
+  },
+  "120538377648344": {
+    "file": "vehicles/RanchTrailer/by_truck/Flatbed/RanchTrailer_Flatbed.glb",
+    "initialSize": [
+      9.5,
+      4.22,
+      18.295
+    ],
+    "node": "Lights"
+  },
+  "120579076567292": {
+    "file": "environment/Haybale/Haybale.glb",
+    "initialSize": [
+      2.723,
+      2.85,
+      2.774
+    ],
+    "node": "Body"
+  },
+  "120660751744175": {
+    "file": "kit/Wall12/Wall12.glb",
+    "initialSize": [
+      12.0,
+      6.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "120725616537680": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      930.876,
+      769.897,
+      2048.0
+    ],
+    "node": "Body"
+  },
+  "120734733805977": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      840.0,
+      302.0,
+      1397.705
+    ],
+    "node": "Bed"
+  },
+  "120770468233431": {
+    "file": "items/AxeRack/AxeRack.glb",
+    "initialSize": [
+      6.1,
+      4.7,
+      1.75
+    ],
+    "node": "Body"
+  },
+  "120967515606051": {
+    "file": "environment/MurphsCamp/MurphsCamp.glb",
+    "initialSize": [
+      13.0,
+      4.2,
+      10.6
+    ],
+    "node": "Collision"
+  },
+  "121084898724236": {
+    "file": "axes/StarfallAxe/StarfallAxe.glb",
+    "initialSize": [
+      0.466,
+      2.26,
+      2.046
+    ],
+    "node": "Head"
+  },
+  "121130051862147": {
+    "file": "trees/Frostwood/Leaves_B.glb",
+    "initialSize": [
+      14.505,
+      35.306,
+      15.217
+    ],
+    "node": "Leaves"
+  },
+  "121133497628718": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      1.52,
+      1.798,
+      1.66
+    ],
+    "node": "Head"
+  },
+  "121165382213492": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.733,
+      0.686,
+      0.749
+    ],
+    "node": "RightUpperLeg"
+  },
+  "121204102754475": {
+    "file": "vehicles/RanchTrailer/by_truck/Flatbed/RanchTrailer_Flatbed.glb",
+    "initialSize": [
+      9.66,
+      4.13,
+      18.27
+    ],
+    "node": "Bed"
+  },
+  "121239833575865": {
+    "file": "items/Door/Door.glb",
+    "initialSize": [
+      3.8,
+      6.3,
+      0.6
+    ],
+    "node": "Body"
+  },
+  "121403425366835": {
+    "file": "environment/Well/Well.glb",
+    "initialSize": [
+      3.141,
+      0.1,
+      3.141
+    ],
+    "node": "WellWater"
+  },
+  "121441762172695": {
+    "file": "kit/Stairs/Stairs.glb",
+    "initialSize": [
+      4.0,
+      4.0,
+      8.0
+    ],
+    "node": "Collision"
+  },
+  "121507994255438": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      70.0,
+      106.0,
+      168.0
+    ],
+    "node": "Hitch"
+  },
+  "121726594323101": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      2.18,
+      0.55,
+      1.25
+    ],
+    "node": "LowerTorso"
+  },
+  "121962083793739": {
+    "file": "axes/InfernoAxe/InfernoAxe.glb",
+    "initialSize": [
+      0.295,
+      3.953,
+      0.396
+    ],
+    "node": "Handle"
+  },
+  "122013450324601": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      1.02
+    ],
+    "node": "RightUpperLeg"
+  },
+  "122079815376996": {
+    "file": "environment/Fence/Fence.glb",
+    "initialSize": [
+      8.5,
+      3.4,
+      0.7
+    ],
+    "node": "Collision"
+  },
+  "122106124846170": {
+    "file": "trees/Emberwood/Facet_Section_3.glb",
+    "initialSize": [
+      0.12,
+      2.448,
+      0.491
+    ],
+    "node": "Facet"
+  },
+  "122126725797799": {
+    "file": "axes/LuxAxe/LuxAxe.glb",
+    "initialSize": [
+      0.021,
+      1.145,
+      0.021
+    ],
+    "node": "Trail"
+  },
+  "122254759522234": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      31.213,
+      10.695,
+      24.0
+    ],
+    "node": "Roof"
+  },
+  "122360921506580": {
+    "file": "vehicles/HeavyHauler/by_truck/Flatbed/HeavyHauler_Flatbed.glb",
+    "initialSize": [
+      11.22,
+      2.085,
+      26.045
+    ],
+    "node": "Body"
+  },
+  "122727224889509": {
+    "file": "items/LampPost/LampPost.glb",
+    "initialSize": [
+      1.25,
+      8.425,
+      1.25
+    ],
+    "node": "Body"
+  },
+  "122927328430335": {
+    "file": "environment/ToolRack/ToolRack.glb",
+    "initialSize": [
+      4.8,
+      4.6,
+      0.5
+    ],
+    "node": "Collision"
+  },
+  "122929934130988": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "123109371096027": {
+    "file": "environment/PathRound/PathRound.glb",
+    "initialSize": [
+      3.091,
+      0.27,
+      3.091
+    ],
+    "node": "Body"
+  },
+  "123241877210621": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.95,
+      0.8,
+      0.97
+    ],
+    "node": "RightLowerLeg"
+  },
+  "123349059126526": {
+    "file": "trees/Gloamwood/Facet_B.glb",
+    "initialSize": [
+      5.757,
+      9.088,
+      24.496
+    ],
+    "node": "Facet"
+  },
+  "123969354159436": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "RightLowerArm"
+  },
+  "124094016599150": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "124190518401724": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      1.529,
+      1.525,
+      1.454
+    ],
+    "node": "Head"
+  },
+  "124343533685558": {
+    "file": "axes/GoldAxe/GoldAxe.glb",
+    "initialSize": [
+      0.328,
+      3.945,
+      0.413
+    ],
+    "node": "Handle"
+  },
+  "124380880700146": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      697.447,
+      350.967,
+      306.665
+    ],
+    "node": "Hitch"
+  },
+  "124435372710468": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      646.514,
+      443.834,
+      2048.0
+    ],
+    "node": "Bed"
+  },
+  "124493769904792": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      840.067,
+      79.83,
+      2048.0
+    ],
+    "node": "Lights"
+  },
+  "124499237471996": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "124570295416522": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      37.35,
+      3.45,
+      0.24
+    ],
+    "node": "PriceTags"
+  },
+  "124588773103657": {
+    "file": "environment/MurphsCamp/MurphsCamp.glb",
+    "initialSize": [
+      2.231,
+      0.8,
+      1.592
+    ],
+    "node": "Sign"
+  },
+  "124592511391743": {
+    "file": "environment/Windmill/Windmill.glb",
+    "initialSize": [
+      8.0,
+      16.425,
+      8.3
+    ],
+    "node": "Body"
+  },
+  "124832442437427": {
+    "file": "items/Warehouse/Warehouse.glb",
+    "initialSize": [
+      16.1,
+      11.2,
+      12.575
+    ],
+    "node": "Body"
+  },
+  "124886704209701": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      137.3,
+      350.903,
+      350.903
+    ],
+    "node": "Wheel"
+  },
+  "124895017446055": {
+    "file": "environment/RockGrey/RockGrey.glb",
+    "initialSize": [
+      5.634,
+      3.236,
+      3.727
+    ],
+    "node": "Body"
+  },
+  "124897971224275": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.655,
+      0.671,
+      0.671
+    ],
+    "node": "RightLowerArm"
+  },
+  "125026873129323": {
+    "file": "items/Bench/Bench.glb",
+    "initialSize": [
+      4.0,
+      2.617,
+      1.543
+    ],
+    "node": "Body"
+  },
+  "125036188202077": {
+    "file": "trees/Oak/Leaves_C.glb",
+    "initialSize": [
+      18.728,
+      8.881,
+      22.93
+    ],
+    "node": "Leaves"
+  },
+  "125093131488068": {
+    "file": "environment/Rowboat/Rowboat.glb",
+    "initialSize": [
+      2.96,
+      1.32,
+      7.153
+    ],
+    "node": "Body"
+  },
+  "125117420122950": {
+    "file": "trees/Pine/Section_2.glb",
+    "initialSize": [
+      2.6,
+      5.2,
+      2.6
+    ],
+    "node": "Section"
+  },
+  "125201382591041": {
+    "file": "vehicles/HeavyHauler/by_truck/Rustbucket/HeavyHauler_Rustbucket.glb",
+    "initialSize": [
+      6.466,
+      3.51,
+      3.063
+    ],
+    "node": "Hitch"
+  },
+  "125228989315064": {
+    "file": "axes/RustyAxe/RustyAxe.glb",
+    "initialSize": [
+      0.295,
+      3.6,
+      0.396
+    ],
+    "node": "Handle"
+  },
+  "125341270300053": {
+    "file": "vehicles/PonyTrailer/by_truck/Flatbed/PonyTrailer_Flatbed.glb",
+    "initialSize": [
+      11.09,
+      2.035,
+      13.045
+    ],
+    "node": "Body"
+  },
+  "125421785530563": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "LeftLowerArm"
+  },
+  "125835772079020": {
+    "file": "trees/Oak/Leaves_B.glb",
+    "initialSize": [
+      22.105,
+      10.455,
+      22.553
+    ],
+    "node": "Leaves"
+  },
+  "126041521825452": {
+    "file": "kit/Wall/Wall.glb",
+    "initialSize": [
+      8.0,
+      6.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "126182097546615": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "RightLowerArm"
+  },
+  "126429254955747": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      2.4,
+      0.75,
+      2.4
+    ],
+    "node": "Chimney"
+  },
+  "126436581421231": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      31.333,
+      9.35,
+      22.35
+    ],
+    "node": "Roof"
+  },
+  "126479955849945": {
+    "file": "vehicles/RanchTrailer/by_truck/Rustbucket/RanchTrailer_Rustbucket.glb",
+    "initialSize": [
+      8.36,
+      4.13,
+      18.27
+    ],
+    "node": "Bed"
+  },
+  "126615154910404": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      51.06,
+      30.525,
+      40.524
+    ],
+    "node": "Body"
+  },
+  "126675592445622": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "LeftUpperArm"
+  },
+  "126694029139645": {
+    "file": "vehicles/PonyTrailer/by_truck/LoggingRig/PonyTrailer_LoggingRig.glb",
+    "initialSize": [
+      10.28,
+      0.38,
+      12.83
+    ],
+    "node": "Lights"
+  },
+  "126741158290606": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "RightUpperArm"
+  },
+  "126744027047585": {
+    "file": "environment/WaterTower/WaterTower.glb",
+    "initialSize": [
+      6.871,
+      17.204,
+      6.239
+    ],
+    "node": "Body"
+  },
+  "126860307040734": {
+    "file": "environment/StoreBoard/StoreBoard.glb",
+    "initialSize": [
+      4.6,
+      4.6,
+      0.4
+    ],
+    "node": "Board"
+  },
+  "126907896592866": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.86,
+      0.86,
+      0.88
+    ],
+    "node": "LeftLowerArm"
+  },
+  "126941607721593": {
+    "file": "axes/CobaltAxe/CobaltAxe.glb",
+    "initialSize": [
+      0.295,
+      3.882,
+      0.396
+    ],
+    "node": "Handle"
+  },
+  "127150152790679": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      12.194,
+      4.44,
+      3.925
+    ],
+    "node": "Glass"
+  },
+  "127262169660338": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      10.64,
+      8.8,
+      23.409
+    ],
+    "node": "Body"
+  },
+  "127818655597739": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      11.2,
+      3.947,
+      3.852
+    ],
+    "node": "Glass"
+  },
+  "128014872762728": {
+    "file": "trees/Emberwood/Leaves_A.glb",
+    "initialSize": [
+      19.251,
+      9.53,
+      17.159
+    ],
+    "node": "Leaves"
+  },
+  "128179108608673": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      11.646,
+      0.567,
+      0.446
+    ],
+    "node": "Glow"
+  },
+  "128231736630899": {
+    "file": "trees/Lumenwood/Leaves_B.glb",
+    "initialSize": [
+      17.955,
+      15.534,
+      16.574
+    ],
+    "node": "Leaves"
+  },
+  "128235208564555": {
+    "file": "items/Cabin/Cabin.glb",
+    "initialSize": [
+      13.0,
+      10.4,
+      11.0
+    ],
+    "node": "Collision"
+  },
+  "128328086500877": {
+    "file": "environment/Lighthouse/Lighthouse.glb",
+    "initialSize": [
+      16.028,
+      47.5,
+      11.759
+    ],
+    "node": "Collision"
+  },
+  "128380567399095": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      850.539,
+      350.967,
+      307.55
+    ],
+    "node": "Hitch"
+  },
+  "128457368602839": {
+    "file": "kit/Wall4/Wall4.glb",
+    "initialSize": [
+      4.0,
+      6.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "128731335060332": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      27.075,
+      24.923,
+      15.57
+    ],
+    "node": "Glow"
+  },
+  "128822943813662": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "LeftUpperArm"
+  },
+  "128937745363899": {
+    "file": "axes/LuxAxe/LuxAxe.glb",
+    "initialSize": [
+      0.424,
+      1.251,
+      2.088
+    ],
+    "node": "Glow"
+  },
+  "128974784954519": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      6.6,
+      11.775,
+      0.787
+    ],
+    "node": "BarnDoorR"
+  },
+  "129236426052873": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "129282759397083": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.601,
+      0.6,
+      0.462
+    ],
+    "node": "Carry"
+  },
+  "129295857336034": {
+    "file": "vehicles/HeavyHauler/by_truck/Flatbed/HeavyHauler_Flatbed.glb",
+    "initialSize": [
+      7.739,
+      3.51,
+      3.072
+    ],
+    "node": "Hitch"
+  },
+  "129326766967750": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "129553230069326": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      6.466,
+      3.51,
+      3.063
+    ],
+    "node": "Hitch"
+  },
+  "129681198038049": {
+    "file": "vehicles/PonyTrailer/by_truck/Pickup/PonyTrailer_Pickup.glb",
+    "initialSize": [
+      8.72,
+      0.38,
+      12.83
+    ],
+    "node": "Lights"
+  },
+  "129773781524937": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      4.8,
+      3.3,
+      4.8
+    ],
+    "node": "Smokestack"
+  },
+  "129983915802950": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      1.96,
+      1.68,
+      1.145
+    ],
+    "node": "UpperTorso"
+  },
+  "130355041655175": {
+    "file": "items/Shed/Shed.glb",
+    "initialSize": [
+      10.574,
+      2.471,
+      8.3
+    ],
+    "node": "Roof"
+  },
+  "130381459815747": {
+    "file": "items/LogPile/LogPile.glb",
+    "initialSize": [
+      6.0,
+      2.2,
+      3.6
+    ],
+    "node": "Collision"
+  },
+  "130480099384678": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      47.321,
+      37.748,
+      32.209
+    ],
+    "node": "Glow"
+  },
+  "130628169716671": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "RightLowerArm"
+  },
+  "130646054040528": {
+    "file": "axes/ObsidianAxe/ObsidianAxe.glb",
+    "initialSize": [
+      0.295,
+      3.9,
+      0.383
+    ],
+    "node": "Handle"
+  },
+  "130708537761087": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.86,
+      0.86,
+      0.88
+    ],
+    "node": "LeftLowerArm"
+  },
+  "130983332723451": {
+    "file": "items/Stairs/Stairs.glb",
+    "initialSize": [
+      4.0,
+      4.0,
+      8.0
+    ],
+    "node": "Collision"
+  },
+  "131056384322053": {
+    "file": "environment/LampPost/LampPost.glb",
+    "initialSize": [
+      0.8,
+      10.6,
+      0.8
+    ],
+    "node": "Collision"
+  },
+  "131136044406175": {
+    "file": "environment/MurphsCamp/MurphsCamp.glb",
+    "initialSize": [
+      13.533,
+      5.25,
+      14.768
+    ],
+    "node": "Body"
+  },
+  "131332680191580": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      1.513,
+      0.448,
+      0.803
+    ],
+    "node": "LowerTorso"
+  },
+  "131366081636560": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "RightUpperArm"
+  },
+  "131540414701446": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.702,
+      0.764,
+      0.718
+    ],
+    "node": "RightUpperArm"
+  },
+  "131671997531071": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      111.3,
+      311.799,
+      306.474
+    ],
+    "node": "Wheel"
+  },
+  "131703911442920": {
+    "file": "trees/Emberwood/Leaves_B.glb",
+    "initialSize": [
+      15.914,
+      8.938,
+      22.046
+    ],
+    "node": "Leaves"
+  },
+  "131814545854935": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "131862798681592": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "RightLowerLeg"
+  },
+  "131883902524854": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      930.0,
+      936.0,
+      1289.057
+    ],
+    "node": "Body"
+  },
+  "131955977341353": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      143.0,
+      363.82,
+      363.82
+    ],
+    "node": "Wheel"
+  },
+  "132080866023484": {
+    "file": "kit/Foundation8/Foundation8.glb",
+    "initialSize": [
+      8.0,
+      1.7,
+      8.0
+    ],
+    "node": "Trim"
+  },
+  "132351348411495": {
+    "file": "items/Window/Window.glb",
+    "initialSize": [
+      3.2,
+      2.4,
+      0.08
+    ],
+    "node": "Glass"
+  },
+  "132533867776257": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "132628679495380": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.733,
+      0.686,
+      0.749
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "132647270125437": {
+    "file": "environment/Bush/Bush.glb",
+    "initialSize": [
+      3.959,
+      2.941,
+      3.32
+    ],
+    "node": "Body"
+  },
+  "132751076363768": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      9.79,
+      2.035,
+      13.045
+    ],
+    "node": "Body"
+  },
+  "132790652457449": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      10.0,
+      1.0,
+      10.0
+    ],
+    "node": "Platform"
+  },
+  "132814082294569": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      14.4,
+      1.65,
+      1.569
+    ],
+    "node": "RollDoor"
+  },
+  "132884007738463": {
+    "file": "axes/RustyAxe/RustyAxe.glb",
+    "initialSize": [
+      0.445,
+      0.938,
+      1.738
+    ],
+    "node": "Head"
+  },
+  "132894018963841": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      1.43,
+      3.638,
+      3.638
+    ],
+    "node": "Wheel"
+  },
+  "132987667702902": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.702,
+      0.764,
+      0.718
+    ],
+    "node": "LeftUpperArm"
+  },
+  "133080680995508": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      1.94,
+      0.575,
+      1.03
+    ],
+    "node": "LowerTorso"
+  },
+  "133263885973371": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "RightUpperArm"
+  },
+  "133341052456224": {
+    "file": "kit/RoofRidge8/RoofRidge8.glb",
+    "initialSize": [
+      8.0,
+      0.855,
+      1.4
+    ],
+    "node": "Collision"
+  },
+  "133911836509151": {
+    "file": "kit/Window/Window.glb",
+    "initialSize": [
+      3.8,
+      2.9,
+      0.5
+    ],
+    "node": "Collision"
+  },
+  "133933843716348": {
+    "file": "vehicles/RanchTrailer/by_truck/Flatbed/RanchTrailer_Flatbed.glb",
+    "initialSize": [
+      7.739,
+      3.51,
+      3.072
+    ],
+    "node": "Hitch"
+  },
+  "134460693041565": {
+    "file": "kit/RoofCorner/RoofCorner.glb",
+    "initialSize": [
+      4.0,
+      3.0,
+      4.0
+    ],
+    "node": "Wood"
+  },
+  "134482743397348": {
+    "file": "environment/Well/Well.glb",
+    "initialSize": [
+      5.25,
+      5.4,
+      4.8
+    ],
+    "node": "Body"
+  },
+  "134684216163207": {
+    "file": "items/Floor/Floor.glb",
+    "initialSize": [
+      7.95,
+      0.4,
+      7.98
+    ],
+    "node": "Body"
+  },
+  "134730710875106": {
+    "file": "environment/Dock/Dock.glb",
+    "initialSize": [
+      5.55,
+      10.6,
+      20.0
+    ],
+    "node": "Collision"
+  },
+  "134865694365483": {
+    "file": "trees/Lumenwood/Facet_Section_3.glb",
+    "initialSize": [
+      0.13,
+      2.652,
+      0.531
+    ],
+    "node": "Facet"
+  },
+  "135014855749918": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "135030458148685": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      12.91,
+      14.281,
+      46.67
+    ],
+    "node": "Body"
+  },
+  "135044303797643": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      986.316,
+      318.622,
+      369.766
+    ],
+    "node": "Glass"
+  },
+  "135045241070662": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      15.272,
+      5.165,
+      11.0
+    ],
+    "node": "Roof"
+  },
+  "135152345128364": {
+    "file": "kit/Stairs/Stairs.glb",
+    "initialSize": [
+      4.0,
+      4.0,
+      8.0
+    ],
+    "node": "Wood"
+  },
+  "135415690415895": {
+    "file": "trees/Gloamwood/Facet_C.glb",
+    "initialSize": [
+      25.781,
+      2.546,
+      24.981
+    ],
+    "node": "Facet"
+  },
+  "135756150151986": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.86,
+      0.86,
+      0.88
+    ],
+    "node": "RightLowerArm"
+  },
+  "135843814941139": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      0.7,
+      1.06,
+      1.68
+    ],
+    "node": "Hitch"
+  },
+  "135893698322865": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      1.12,
+      1.29,
+      0.9
+    ],
+    "node": "Carry"
+  },
+  "135928373740350": {
+    "file": "environment/Signpost/Signpost.glb",
+    "initialSize": [
+      12.501,
+      10.1,
+      2.1
+    ],
+    "node": "Body"
+  },
+  "135958628937217": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      1.98,
+      0.55,
+      1.05
+    ],
+    "node": "LowerTorso"
+  },
+  "136200588858564": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.84,
+      0.86,
+      0.86
+    ],
+    "node": "LeftLowerArm"
+  },
+  "136215992489717": {
+    "file": "items/Shed/Shed.glb",
+    "initialSize": [
+      10.1,
+      6.6,
+      8.1
+    ],
+    "node": "Body"
+  },
+  "136434036384438": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "136485582140109": {
+    "file": "kit/Railing8/Railing8.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      0.7
+    ],
+    "node": "Wood"
+  },
+  "136768692724386": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "LeftUpperArm"
+  },
+  "136804358591165": {
+    "file": "environment/MurphsCamp/MurphsCamp.glb",
+    "initialSize": [
+      6.217,
+      4.699,
+      7.181
+    ],
+    "node": "Tent"
+  },
+  "137106255286313": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      14.756,
+      14.115,
+      11.7
+    ],
+    "node": "Collision"
+  },
+  "137197018763785": {
+    "file": "environment/Lantern/Lantern.glb",
+    "initialSize": [
+      0.44,
+      0.56,
+      0.44
+    ],
+    "node": "Glow"
+  },
+  "137243554156858": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      1.53,
+      1.825,
+      1.79
+    ],
+    "node": "Head"
+  },
+  "137332886057378": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      1.98,
+      1.54,
+      1.055
+    ],
+    "node": "UpperTorso"
+  },
+  "137461808658419": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "137475826693991": {
+    "file": "environment/RopeBridge/RopeBridge.glb",
+    "initialSize": [
+      7.3,
+      4.45,
+      16.8
+    ],
+    "node": "Body"
+  },
+  "137659811327372": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      872.0,
+      387.0,
+      1568.5
+    ],
+    "node": "Bed"
+  },
+  "137835827026580": {
+    "file": "trees/Frostwood/Section_3.glb",
+    "initialSize": [
+      2.2,
+      4.4,
+      2.2
+    ],
+    "node": "Section"
+  },
+  "137889643879858": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      2.0,
+      2.0,
+      1.0
+    ],
+    "node": "HumanoidRootPart"
+  },
+  "137935452492787": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      8.88,
+      4.13,
+      18.27
+    ],
+    "node": "Bed"
+  },
+  "138062966733596": {
+    "file": "trees/Palmwood/Leaves_A.glb",
+    "initialSize": [
+      18.675,
+      7.166,
+      18.834
+    ],
+    "node": "Leaves"
+  },
+  "138240165712362": {
+    "file": "trees/Emberwood/Section_3.glb",
+    "initialSize": [
+      2.4,
+      4.8,
+      2.4
+    ],
+    "node": "Section"
+  },
+  "138480592524964": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      25.5,
+      5.7,
+      0.75
+    ],
+    "node": "Sign"
+  },
+  "138508996721598": {
+    "file": "trees/Birch/Section_3.glb",
+    "initialSize": [
+      1.6,
+      3.2,
+      1.6
+    ],
+    "node": "Section"
+  },
+  "138592277198174": {
+    "file": "kit/Foundation8/Foundation8.glb",
+    "initialSize": [
+      8.0,
+      0.3,
+      8.0
+    ],
+    "node": "Wood"
+  },
+  "138595966323968": {
+    "file": "trees/Gloamwood/Section_1.glb",
+    "initialSize": [
+      2.0,
+      4.0,
+      2.0
+    ],
+    "node": "Section"
+  },
+  "138609336116860": {
+    "file": "kit/FenceGate4/FenceGate4.glb",
+    "initialSize": [
+      3.13,
+      2.55,
+      0.3
+    ],
+    "node": "Door"
+  },
+  "138864737558838": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      10.098,
+      3.391,
+      3.395
+    ],
+    "node": "Glass"
+  },
+  "138884656779084": {
+    "file": "environment/FallenLog/FallenLog.glb",
+    "initialSize": [
+      6.899,
+      2.022,
+      1.992
+    ],
+    "node": "Body"
+  },
+  "139011793154543": {
+    "file": "vehicles/RanchTrailer/by_truck/LoggingRig/RanchTrailer_LoggingRig.glb",
+    "initialSize": [
+      11.87,
+      2.1,
+      18.245
+    ],
+    "node": "Body"
+  },
+  "139195335876549": {
+    "file": "environment/Stump/Stump.glb",
+    "initialSize": [
+      3.226,
+      1.757,
+      3.226
+    ],
+    "node": "Body"
+  },
+  "139213895433736": {
+    "file": "environment/Dock/Dock.glb",
+    "initialSize": [
+      5.6,
+      10.6,
+      20.35
+    ],
+    "node": "Body"
+  },
+  "139264614078279": {
+    "file": "items/Warehouse/Warehouse.glb",
+    "initialSize": [
+      0.33,
+      0.42,
+      0.33
+    ],
+    "node": "Glow"
+  },
+  "139387790017966": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      1.02
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "139390483847560": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      130.8,
+      337.156,
+      337.156
+    ],
+    "node": "Wheel"
+  },
+  "139464974716589": {
+    "file": "environment/Mailbox/Mailbox.glb",
+    "initialSize": [
+      1.175,
+      4.625,
+      1.77
+    ],
+    "node": "Body"
+  },
+  "139469055377248": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      7.6,
+      4.55,
+      2.4
+    ],
+    "node": "Counter"
+  },
+  "139471072919132": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      646.599,
+      350.967,
+      306.257
+    ],
+    "node": "Hitch"
+  },
+  "139564345155945": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "139649051325358": {
+    "file": "axes/SteelAxe/SteelAxe.glb",
+    "initialSize": [
+      0.445,
+      1.092,
+      1.919
+    ],
+    "node": "Head"
+  },
+  "139692668119426": {
+    "file": "environment/RuinedCabin/RuinedCabin.glb",
+    "initialSize": [
+      13.1,
+      7.65,
+      14.693
+    ],
+    "node": "Body"
+  },
+  "139734928087096": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      854.209,
+      654.222,
+      2048.0
+    ],
+    "node": "Bed"
+  },
+  "139892769635979": {
+    "file": "kit/FlatRoof8/FlatRoof8.glb",
+    "initialSize": [
+      8.0,
+      0.4,
+      8.0
+    ],
+    "node": "Wood"
+  },
+  "140001053768737": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      182.0,
+      324.529,
+      320.285
+    ],
+    "node": "Wheel"
+  },
+  "140048197540221": {
+    "file": "environment/MurphsCamp/MurphsCamp.glb",
+    "initialSize": [
+      0.44,
+      0.56,
+      0.44
+    ],
+    "node": "Glow"
+  },
+  "140349480773545": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      70.0,
+      106.0,
+      168.0
+    ],
+    "node": "Hitch"
+  },
+  "140486008025625": {
+    "file": "environment/LookoutTower/LookoutTower.glb",
+    "initialSize": [
+      7.1,
+      18.531,
+      7.275
+    ],
+    "node": "Body"
+  },
+  "140520576025638": {
+    "file": "kit/TallWall4/TallWall4.glb",
+    "initialSize": [
+      4.0,
+      10.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "140592453452011": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "140616724444561": {
+    "file": "items/Floor/Floor.glb",
+    "initialSize": [
+      8.0,
+      0.4,
+      8.0
+    ],
+    "node": "Collision"
+  },
+  "140687924961400": {
+    "file": "items/PlotCorner/PlotCorner.glb",
+    "initialSize": [
+      0.95,
+      3.4,
+      0.95
+    ],
+    "node": "Body"
+  },
+  "70892980568483": {
+    "file": "trees/Maple/Leaves_C.glb",
+    "initialSize": [
+      34.344,
+      11.89,
+      27.349
+    ],
+    "node": "Leaves"
+  },
+  "71406221435175": {
+    "file": "items/FlowerBed/FlowerBed.glb",
+    "initialSize": [
+      4.0,
+      1.295,
+      4.0
+    ],
+    "node": "Body"
+  },
+  "71426736590879": {
+    "file": "environment/Signpost/Signpost.glb",
+    "initialSize": [
+      10.6,
+      9.8,
+      0.8
+    ],
+    "node": "Collision"
+  },
+  "71618342241004": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "LeftUpperArm"
+  },
+  "71619965421917": {
+    "file": "items/Door/Door.glb",
+    "initialSize": [
+      3.16,
+      5.95,
+      0.48
+    ],
+    "node": "Door"
+  },
+  "71890137452649": {
+    "file": "trees/Birch/Section_1.glb",
+    "initialSize": [
+      1.6,
+      3.2,
+      1.6
+    ],
+    "node": "Section"
+  },
+  "71905033591284": {
+    "file": "trees/Emberwood/Section_1.glb",
+    "initialSize": [
+      2.4,
+      4.8,
+      2.4
+    ],
+    "node": "Section"
+  },
+  "72091687940455": {
+    "file": "vehicles/HeavyHauler/by_truck/Flatbed/HeavyHauler_Flatbed.glb",
+    "initialSize": [
+      9.5,
+      4.22,
+      26.075
+    ],
+    "node": "Lights"
+  },
+  "72172329191191": {
+    "file": "items/LampPost/LampPost.glb",
+    "initialSize": [
+      0.85,
+      1.0,
+      0.85
+    ],
+    "node": "Glow"
+  },
+  "72378122111931": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "72598895169696": {
+    "file": "kit/RoofRidge8/RoofRidge8.glb",
+    "initialSize": [
+      8.0,
+      0.855,
+      1.4
+    ],
+    "node": "Wood"
+  },
+  "72762101555519": {
+    "file": "trees/Pine/Leaves_A.glb",
+    "initialSize": [
+      18.492,
+      40.544,
+      18.492
+    ],
+    "node": "Leaves"
+  },
+  "73102814846989": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "RightUpperArm"
+  },
+  "73211772830716": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      3.225,
+      9.0,
+      0.6
+    ],
+    "node": "OfficeDoor"
+  },
+  "73427235174280": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "73629078625036": {
+    "file": "vehicles/RanchTrailer/by_truck/LoggingRig/RanchTrailer_LoggingRig.glb",
+    "initialSize": [
+      10.28,
+      4.22,
+      18.295
+    ],
+    "node": "Lights"
+  },
+  "73648959184321": {
+    "file": "axes/HardenedAxe/HardenedAxe.glb",
+    "initialSize": [
+      0.509,
+      2.111,
+      2.279
+    ],
+    "node": "Head"
+  },
+  "73677583211835": {
+    "file": "items/Window/Window.glb",
+    "initialSize": [
+      3.8,
+      2.88,
+      0.65
+    ],
+    "node": "Body"
+  },
+  "73679620163478": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.95,
+      0.8,
+      0.97
+    ],
+    "node": "RightLowerLeg"
+  },
+  "73687041929457": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.686,
+      0.624,
+      0.702
+    ],
+    "node": "RightLowerLeg"
+  },
+  "73832096671738": {
+    "file": "environment/Footbridge/Footbridge.glb",
+    "initialSize": [
+      4.6,
+      1.706,
+      14.092
+    ],
+    "node": "Deck"
+  },
+  "73996108186259": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.135,
+      1.287,
+      1.089
+    ],
+    "node": "Carry"
+  },
+  "74063491046370": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      27.0,
+      4.2,
+      0.75
+    ],
+    "node": "Sign"
+  },
+  "74892568048481": {
+    "file": "kit/Window/Window.glb",
+    "initialSize": [
+      3.3,
+      2.4,
+      0.06
+    ],
+    "node": "Glass"
+  },
+  "75065765379379": {
+    "file": "environment/Campfire/Campfire.glb",
+    "initialSize": [
+      4.177,
+      1.506,
+      4.161
+    ],
+    "node": "Body"
+  },
+  "75177652452411": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      9.76,
+      7.475,
+      23.4
+    ],
+    "node": "Bed"
+  },
+  "75201943310825": {
+    "file": "items/WoodSign/WoodSign.glb",
+    "initialSize": [
+      3.2,
+      3.9,
+      0.735
+    ],
+    "node": "Body"
+  },
+  "75274090398906": {
+    "file": "items/Warehouse/Warehouse.glb",
+    "initialSize": [
+      17.0,
+      11.2,
+      13.0
+    ],
+    "node": "Collision"
+  },
+  "75426342751786": {
+    "file": "axes/SilverAxe/SilverAxe.glb",
+    "initialSize": [
+      0.445,
+      1.426,
+      1.972
+    ],
+    "node": "Head"
+  },
+  "76073821702142": {
+    "file": "vehicles/RanchTrailer/by_truck/LoggingRig/RanchTrailer_LoggingRig.glb",
+    "initialSize": [
+      10.44,
+      4.13,
+      18.27
+    ],
+    "node": "Bed"
+  },
+  "76209421282595": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      12.8,
+      16.55,
+      12.128
+    ],
+    "node": "Body"
+  },
+  "76520784565504": {
+    "file": "trees/Frostwood/Leaves_A.glb",
+    "initialSize": [
+      14.591,
+      35.48,
+      15.212
+    ],
+    "node": "Leaves"
+  },
+  "76545053823377": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      39.6,
+      6.9,
+      0.75
+    ],
+    "node": "Sign"
+  },
+  "76572574544186": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      49.35,
+      17.798,
+      37.091
+    ],
+    "node": "Glow"
+  },
+  "76718452145232": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      1009.8,
+      339.143,
+      339.525
+    ],
+    "node": "Glass"
+  },
+  "76846404422941": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      12.14,
+      10.918,
+      34.425
+    ],
+    "node": "Body"
+  },
+  "77282072681797": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      11.865,
+      9.605,
+      45.8
+    ],
+    "node": "Lights"
+  },
+  "77320953084591": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      8.437,
+      0.802,
+      20.568
+    ],
+    "node": "Lights"
+  },
+  "77337816221861": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      1.178,
+      3.248,
+      3.192
+    ],
+    "node": "Wheel"
+  },
+  "77430231533861": {
+    "file": "environment/Lantern/Lantern.glb",
+    "initialSize": [
+      1.0,
+      5.105,
+      1.8
+    ],
+    "node": "Body"
+  },
+  "77462715122352": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      8.505,
+      3.51,
+      3.076
+    ],
+    "node": "Hitch"
+  },
+  "77490113182466": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "77491757108641": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "77508109255073": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      7.487,
+      1.2,
+      7.487
+    ],
+    "node": "Bullwheel"
+  },
+  "77525517309414": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      29.898,
+      21.75,
+      25.8
+    ],
+    "node": "Collision"
+  },
+  "77666165822042": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "77815213952449": {
+    "file": "vehicles/PonyTrailer/by_truck/Pickup/PonyTrailer_Pickup.glb",
+    "initialSize": [
+      10.31,
+      2.035,
+      13.045
+    ],
+    "node": "Body"
+  },
+  "77999129021080": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.412,
+      0.525,
+      0.413
+    ],
+    "node": "Glow"
+  },
+  "78264803126606": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.86,
+      0.86,
+      0.88
+    ],
+    "node": "RightLowerArm"
+  },
+  "78405414900273": {
+    "file": "trees/Gloamwood/Leaves_A.glb",
+    "initialSize": [
+      23.164,
+      15.642,
+      24.436
+    ],
+    "node": "Leaves"
+  },
+  "78552137472446": {
+    "file": "kit/Wall12/Wall12.glb",
+    "initialSize": [
+      12.0,
+      6.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "78585942862069": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "78601687849004": {
+    "file": "environment/Bench/Bench.glb",
+    "initialSize": [
+      5.0,
+      3.35,
+      1.75
+    ],
+    "node": "Collision"
+  },
+  "78683464149744": {
+    "file": "environment/WaterTower/WaterTower.glb",
+    "initialSize": [
+      6.0,
+      2.3,
+      5.706
+    ],
+    "node": "Roof"
+  },
+  "78730728517805": {
+    "file": "trees/Lumenwood/Section_2.glb",
+    "initialSize": [
+      2.6,
+      5.2,
+      2.6
+    ],
+    "node": "Section"
+  },
+  "78963403567540": {
+    "file": "trees/Emberwood/Facet_A.glb",
+    "initialSize": [
+      15.773,
+      5.433,
+      10.8
+    ],
+    "node": "Facet"
+  },
+  "78972491879481": {
+    "file": "environment/Signpost/Signpost.glb",
+    "initialSize": [
+      5.36,
+      0.08,
+      0.36
+    ],
+    "node": "Glow"
+  },
+  "79169836502313": {
+    "file": "trees/Frostwood/Facet_C.glb",
+    "initialSize": [
+      6.039,
+      15.152,
+      6.039
+    ],
+    "node": "Facet"
+  },
+  "79516772478629": {
+    "file": "trees/Frostwood/Leaves_C.glb",
+    "initialSize": [
+      15.179,
+      36.257,
+      14.767
+    ],
+    "node": "Leaves"
+  },
+  "79575927974739": {
+    "file": "environment/Dock/Dock.glb",
+    "initialSize": [
+      0.55,
+      0.7,
+      0.55
+    ],
+    "node": "LanternGlow"
+  },
+  "79595962219470": {
+    "file": "kit/Ramp8/Ramp8.glb",
+    "initialSize": [
+      4.0,
+      2.0,
+      8.0
+    ],
+    "node": "Wood"
+  },
+  "79778138876188": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "LeftUpperLeg"
+  },
+  "79925629935072": {
+    "file": "npcs/Millie/Millie.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "RightUpperArm"
+  },
+  "79943965234806": {
+    "file": "vehicles/PonyTrailer/by_truck/Flatbed/PonyTrailer_Flatbed.glb",
+    "initialSize": [
+      9.64,
+      2.14,
+      13.0
+    ],
+    "node": "Bed"
+  },
+  "79984537639444": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "LeftLowerArm"
+  },
+  "80141114733932": {
+    "file": "trees/Emberwood/Leaves_C.glb",
+    "initialSize": [
+      16.995,
+      8.443,
+      22.388
+    ],
+    "node": "Leaves"
+  },
+  "80269525184898": {
+    "file": "environment/Mailbox/Mailbox.glb",
+    "initialSize": [
+      1.1,
+      1.1,
+      1.75
+    ],
+    "node": "Collision"
+  },
+  "80549624362174": {
+    "file": "vehicles/HeavyHauler/by_truck/Pickup/HeavyHauler_Pickup.glb",
+    "initialSize": [
+      8.72,
+      4.22,
+      26.075
+    ],
+    "node": "Lights"
+  },
+  "80550306632305": {
+    "file": "axes/SteelAxe/SteelAxe.glb",
+    "initialSize": [
+      0.295,
+      3.75,
+      0.396
+    ],
+    "node": "Handle"
+  },
+  "80860699331818": {
+    "file": "axes/SilverAxe/SilverAxe.glb",
+    "initialSize": [
+      0.312,
+      3.832,
+      0.405
+    ],
+    "node": "Handle"
+  },
+  "80876683743330": {
+    "file": "trees/Gloamwood/Section_3.glb",
+    "initialSize": [
+      2.0,
+      4.0,
+      2.0
+    ],
+    "node": "Section"
+  },
+  "80895288519775": {
+    "file": "buildings/SkyBin/SkyBin.glb",
+    "initialSize": [
+      1.3,
+      3.575,
+      2.894
+    ],
+    "node": "FlumeWater"
+  },
+  "81005251088688": {
+    "file": "items/Stairs/Stairs.glb",
+    "initialSize": [
+      3.6,
+      4.0,
+      8.05
+    ],
+    "node": "Body"
+  },
+  "81074969756089": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      117.8,
+      324.791,
+      319.243
+    ],
+    "node": "Wheel"
+  },
+  "81083955610031": {
+    "file": "trees/Lumenwood/Leaves_A.glb",
+    "initialSize": [
+      17.874,
+      17.117,
+      16.683
+    ],
+    "node": "Leaves"
+  },
+  "81114717507868": {
+    "file": "environment/ToolRack/ToolRack.glb",
+    "initialSize": [
+      5.1,
+      4.6,
+      1.3
+    ],
+    "node": "Body"
+  },
+  "81162824661955": {
+    "file": "trees/Frostwood/Facet_B.glb",
+    "initialSize": [
+      4.84,
+      14.758,
+      4.84
+    ],
+    "node": "Facet"
+  },
+  "81216731170475": {
+    "file": "kit/WindowWall8/WindowWall8.glb",
+    "initialSize": [
+      8.0,
+      6.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "81476867108470": {
+    "file": "trees/Oak/Section_3.glb",
+    "initialSize": [
+      2.0,
+      4.0,
+      2.0
+    ],
+    "node": "Section"
+  },
+  "81542757402029": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      149.5,
+      454.775,
+      454.775
+    ],
+    "node": "Wheel"
+  },
+  "81858976831127": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      1.82,
+      3.245,
+      3.203
+    ],
+    "node": "Wheel"
+  },
+  "82098165138477": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      530.557,
+      429.498,
+      2048.0
+    ],
+    "node": "Lights"
+  },
+  "82108123525118": {
+    "file": "items/Wall/Wall.glb",
+    "initialSize": [
+      8.0,
+      6.0,
+      0.6
+    ],
+    "node": "Collision"
+  },
+  "82134973035228": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "82151058963952": {
+    "file": "environment/RopeBridge/RopeBridge.glb",
+    "initialSize": [
+      7.0,
+      2.1,
+      16.0
+    ],
+    "node": "Collision"
+  },
+  "82248576176144": {
+    "file": "items/WoodSign/WoodSign.glb",
+    "initialSize": [
+      3.0,
+      1.2,
+      0.15
+    ],
+    "node": "Sign"
+  },
+  "82273669284316": {
+    "file": "axes/HardenedAxe/HardenedAxe.glb",
+    "initialSize": [
+      0.295,
+      3.874,
+      0.396
+    ],
+    "node": "Handle"
+  },
+  "82339079226406": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      1.98,
+      0.55,
+      1.05
+    ],
+    "node": "LowerTorso"
+  },
+  "82376014838945": {
+    "file": "vehicles/PonyTrailer/by_truck/Pickup/PonyTrailer_Pickup.glb",
+    "initialSize": [
+      6.974,
+      3.51,
+      3.067
+    ],
+    "node": "Hitch"
+  },
+  "82514834771582": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      32.43,
+      30.665,
+      25.159
+    ],
+    "node": "Body"
+  },
+  "82575072978283": {
+    "file": "kit/Post/Post.glb",
+    "initialSize": [
+      1.0,
+      6.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "82719064541664": {
+    "file": "trees/Gloamwood/Section_2.glb",
+    "initialSize": [
+      2.0,
+      4.0,
+      2.0
+    ],
+    "node": "Section"
+  },
+  "82740805087300": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.88,
+      0.8,
+      0.9
+    ],
+    "node": "RightLowerLeg"
+  },
+  "82916793253147": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "LeftUpperArm"
+  },
+  "83071415666688": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "83150319950735": {
+    "file": "vehicles/RanchTrailer/by_truck/LoggingRig/RanchTrailer_LoggingRig.glb",
+    "initialSize": [
+      8.505,
+      3.51,
+      3.076
+    ],
+    "node": "Hitch"
+  },
+  "83283479724897": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "83334681998584": {
+    "file": "environment/Windmill/Windmill.glb",
+    "initialSize": [
+      8.0,
+      14.0,
+      7.608
+    ],
+    "node": "Collision"
+  },
+  "83517310351339": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "83674626488519": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "83918398499306": {
+    "file": "environment/LampPost/LampPost.glb",
+    "initialSize": [
+      1.9,
+      10.625,
+      3.662
+    ],
+    "node": "Body"
+  },
+  "84015618100992": {
+    "file": "kit/Floor4/Floor4.glb",
+    "initialSize": [
+      4.0,
+      0.4,
+      4.0
+    ],
+    "node": "Collision"
+  },
+  "84108857863628": {
+    "file": "kit/DoorWall8/DoorWall8.glb",
+    "initialSize": [
+      8.0,
+      6.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "84109447694675": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "84192872504605": {
+    "file": "items/AxeRack/AxeRack.glb",
+    "initialSize": [
+      6.0,
+      4.5,
+      1.6
+    ],
+    "node": "Collision"
+  },
+  "84294902067749": {
+    "file": "environment/Campfire/Campfire.glb",
+    "initialSize": [
+      1.546,
+      1.756,
+      1.732
+    ],
+    "node": "Flame"
+  },
+  "84579932172929": {
+    "file": "trees/Emberwood/Section_2.glb",
+    "initialSize": [
+      2.4,
+      4.8,
+      2.4
+    ],
+    "node": "Section"
+  },
+  "84592207708255": {
+    "file": "environment/Windmill/Windmill.glb",
+    "initialSize": [
+      17.046,
+      17.046,
+      4.0
+    ],
+    "node": "Sails"
+  },
+  "84833713688995": {
+    "file": "trees/Frostwood/Section_1.glb",
+    "initialSize": [
+      2.2,
+      4.4,
+      2.2
+    ],
+    "node": "Section"
+  },
+  "84894878985661": {
+    "file": "trees/Emberwood/Facet_B.glb",
+    "initialSize": [
+      10.881,
+      5.217,
+      18.843
+    ],
+    "node": "Facet"
+  },
+  "84929156961939": {
+    "file": "environment/Barrel/Barrel.glb",
+    "initialSize": [
+      1.681,
+      2.22,
+      1.7
+    ],
+    "node": "Body"
+  },
+  "85114800128167": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      1.78,
+      1.791,
+      1.858
+    ],
+    "node": "Head"
+  },
+  "85134454559323": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.92,
+      0.88,
+      0.94
+    ],
+    "node": "LeftLowerArm"
+  },
+  "85140047871902": {
+    "file": "kit/Door/Door.glb",
+    "initialSize": [
+      3.2,
+      5.7,
+      0.36
+    ],
+    "node": "Door"
+  },
+  "85178015121629": {
+    "file": "trees/Maple/Section_2.glb",
+    "initialSize": [
+      2.4,
+      4.8,
+      2.4
+    ],
+    "node": "Section"
+  },
+  "85233243499195": {
+    "file": "items/Wall/Wall.glb",
+    "initialSize": [
+      8.0,
+      6.0,
+      0.6
+    ],
+    "node": "Body"
+  },
+  "85367554456096": {
+    "file": "environment/Lighthouse/Lighthouse.glb",
+    "initialSize": [
+      3.76,
+      23.7,
+      7.47
+    ],
+    "node": "WindowGlass"
+  },
+  "85578922834247": {
+    "file": "vehicles/RanchTrailer/by_truck/Flatbed/RanchTrailer_Flatbed.glb",
+    "initialSize": [
+      11.09,
+      2.1,
+      18.245
+    ],
+    "node": "Body"
+  },
+  "85622271046056": {
+    "file": "environment/GlowMushrooms/GlowMushrooms.glb",
+    "initialSize": [
+      2.139,
+      1.24,
+      1.47
+    ],
+    "node": "Glow"
+  },
+  "85784017066458": {
+    "file": "environment/WaterTower/WaterTower.glb",
+    "initialSize": [
+      5.6,
+      16.7,
+      5.6
+    ],
+    "node": "Collision"
+  },
+  "85865214195600": {
+    "file": "items/Cabin/Cabin.glb",
+    "initialSize": [
+      12.94,
+      12.21,
+      10.795
+    ],
+    "node": "Body"
+  },
+  "85954106592221": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "85979782548399": {
+    "file": "trees/Lumenwood/Facet_B.glb",
+    "initialSize": [
+      10.871,
+      13.104,
+      9.036
+    ],
+    "node": "Facet"
+  },
+  "86009830178984": {
+    "file": "items/LampPost/LampPost.glb",
+    "initialSize": [
+      0.6,
+      7.0,
+      0.6
+    ],
+    "node": "Collision"
+  },
+  "86190154234212": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "86215100835246": {
+    "file": "buildings/Sawmill/Sawmill.glb",
+    "initialSize": [
+      63.785,
+      42.3,
+      42.938
+    ],
+    "node": "Body"
+  },
+  "86487216536816": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.749,
+      0.312,
+      0.952
+    ],
+    "node": "RightFoot"
+  },
+  "86676965928481": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      10.31,
+      2.1,
+      18.245
+    ],
+    "node": "Body"
+  },
+  "86918982188562": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      1.308,
+      3.372,
+      3.372
+    ],
+    "node": "Wheel"
+  },
+  "86986832102076": {
+    "file": "buildings/ToolShed/ToolShed.glb",
+    "initialSize": [
+      31.1,
+      22.107,
+      27.6
+    ],
+    "node": "Collision"
+  },
+  "87049330143094": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.749,
+      0.312,
+      0.952
+    ],
+    "node": "LeftFoot"
+  },
+  "87065553139625": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "RightFoot"
+  },
+  "87089532835827": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      8.72,
+      3.87,
+      15.685
+    ],
+    "node": "Bed"
+  },
+  "87250979692258": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      6.974,
+      3.51,
+      3.067
+    ],
+    "node": "Hitch"
+  },
+  "87322205534816": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.655,
+      0.671,
+      0.671
+    ],
+    "node": "LeftLowerArm"
+  },
+  "87493254949869": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      1.529,
+      1.201,
+      0.889
+    ],
+    "node": "UpperTorso"
+  },
+  "87504427783528": {
+    "file": "environment/LampPost/LampPost.glb",
+    "initialSize": [
+      0.605,
+      0.77,
+      0.605
+    ],
+    "node": "LampGlow"
+  },
+  "87523682880006": {
+    "file": "environment/Signpost/Signpost.glb",
+    "initialSize": [
+      9.0,
+      4.4,
+      0.3
+    ],
+    "node": "Board"
+  },
+  "87568900889258": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      8.2,
+      0.38,
+      12.83
+    ],
+    "node": "Lights"
+  },
+  "87654189754458": {
+    "file": "environment/SawdustPile/SawdustPile.glb",
+    "initialSize": [
+      5.147,
+      1.44,
+      5.046
+    ],
+    "node": "Body"
+  },
+  "87909791831811": {
+    "file": "kit/Ramp8/Ramp8.glb",
+    "initialSize": [
+      4.0,
+      2.0,
+      8.0
+    ],
+    "node": "Collision"
+  },
+  "87927667111212": {
+    "file": "axes/StarfallAxe/StarfallAxe.glb",
+    "initialSize": [
+      0.127,
+      2.437,
+      0.858
+    ],
+    "node": "Glow"
+  },
+  "88085019167252": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.16,
+      1.7,
+      0.6
+    ],
+    "node": "Carry"
+  },
+  "88157571885674": {
+    "file": "environment/FlowerBox/FlowerBox.glb",
+    "initialSize": [
+      3.037,
+      1.001,
+      0.6
+    ],
+    "node": "Body"
+  },
+  "88163132342304": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      820.0,
+      38.0,
+      1283.0
+    ],
+    "node": "Lights"
+  },
+  "88260552161622": {
+    "file": "items/Warehouse/Warehouse.glb",
+    "initialSize": [
+      16.98,
+      1.612,
+      13.171
+    ],
+    "node": "Roof"
+  },
+  "88262540650736": {
+    "file": "environment/Footbridge/Footbridge.glb",
+    "initialSize": [
+      5.2,
+      2.158,
+      16.457
+    ],
+    "node": "Collision"
+  },
+  "88407278927659": {
+    "file": "trees/Oak/Section_2.glb",
+    "initialSize": [
+      2.0,
+      4.0,
+      2.0
+    ],
+    "node": "Section"
+  },
+  "88481479388142": {
+    "file": "environment/GlowMushrooms/GlowMushrooms.glb",
+    "initialSize": [
+      2.247,
+      1.343,
+      1.594
+    ],
+    "node": "Body"
+  },
+  "88569217185155": {
+    "file": "environment/TownTree/TownTree.glb",
+    "initialSize": [
+      1.386,
+      10.5,
+      1.386
+    ],
+    "node": "Collision"
+  },
+  "88791806526106": {
+    "file": "environment/Planter/Planter.glb",
+    "initialSize": [
+      2.75,
+      2.324,
+      2.75
+    ],
+    "node": "Body"
+  },
+  "88798385258611": {
+    "file": "trees/Birch/Leaves_C.glb",
+    "initialSize": [
+      9.265,
+      15.423,
+      9.117
+    ],
+    "node": "Leaves"
+  },
+  "88895260081796": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.96,
+      0.4,
+      1.22
+    ],
+    "node": "LeftFoot"
+  },
+  "89045210450121": {
+    "file": "environment/SellPad/SellPad.glb",
+    "initialSize": [
+      26.1,
+      0.26,
+      20.1
+    ],
+    "node": "Body"
+  },
+  "89084974588543": {
+    "file": "trees/Lumenwood/Facet_A.glb",
+    "initialSize": [
+      9.623,
+      14.688,
+      9.885
+    ],
+    "node": "Facet"
+  },
+  "89315032900256": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      0.7,
+      1.06,
+      1.68
+    ],
+    "node": "Hitch"
+  },
+  "89343787487548": {
+    "file": "vehicles/LoggingRig/LoggingRig.glb",
+    "initialSize": [
+      1.495,
+      4.548,
+      4.548
+    ],
+    "node": "Wheel"
+  },
+  "89489461690884": {
+    "file": "items/Cabin/Cabin.glb",
+    "initialSize": [
+      11.8,
+      1.8,
+      6.15
+    ],
+    "node": "Glow"
+  },
+  "89682155893512": {
+    "file": "environment/RopeBridge/RopeBridge.glb",
+    "initialSize": [
+      6.482,
+      0.75,
+      16.039
+    ],
+    "node": "Deck"
+  },
+  "89887064461596": {
+    "file": "npcs/Tink/Tink.glb",
+    "initialSize": [
+      0.9,
+      0.98,
+      0.92
+    ],
+    "node": "RightUpperArm"
+  },
+  "90030662798643": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      807.419,
+      331.45,
+      2048.0
+    ],
+    "node": "Lights"
+  },
+  "90232166847277": {
+    "file": "environment/Lighthouse/Lighthouse.glb",
+    "initialSize": [
+      16.92,
+      56.05,
+      12.418
+    ],
+    "node": "Body"
+  },
+  "90389536788385": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      834.0,
+      214.0,
+      1300.0
+    ],
+    "node": "Bed"
+  },
+  "90389890437469": {
+    "file": "npcs/OldBram/OldBram.glb",
+    "initialSize": [
+      0.94,
+      0.88,
+      0.96
+    ],
+    "node": "RightUpperLeg"
+  },
+  "90576413321443": {
+    "file": "items/LogPile/LogPile.glb",
+    "initialSize": [
+      5.974,
+      2.185,
+      3.8
+    ],
+    "node": "Body"
+  },
+  "91247694595859": {
+    "file": "environment/RuinedCabin/RuinedCabin.glb",
+    "initialSize": [
+      13.1,
+      7.5,
+      12.3
+    ],
+    "node": "Collision"
+  },
+  "91500735557872": {
+    "file": "trees/Lumenwood/Leaves_C.glb",
+    "initialSize": [
+      16.926,
+      13.807,
+      18.239
+    ],
+    "node": "Leaves"
+  },
+  "91780638736614": {
+    "file": "vehicles/HeavyHauler/by_truck/Rustbucket/HeavyHauler_Rustbucket.glb",
+    "initialSize": [
+      8.38,
+      4.15,
+      26.08
+    ],
+    "node": "Bed"
+  },
+  "91854520961950": {
+    "file": "items/PlotSign/PlotSign.glb",
+    "initialSize": [
+      8.8,
+      8.725,
+      1.2
+    ],
+    "node": "Body"
+  },
+  "91923957383838": {
+    "file": "environment/ParkingBay/ParkingBay.glb",
+    "initialSize": [
+      11.0,
+      0.04,
+      18.0
+    ],
+    "node": "Body"
+  },
+  "91965156525733": {
+    "file": "items/Door/Door.glb",
+    "initialSize": [
+      3.2,
+      6.0,
+      0.4
+    ],
+    "node": "Collision"
+  },
+  "92140759801527": {
+    "file": "items/Fence/Fence.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      0.5
+    ],
+    "node": "Collision"
+  },
+  "92385742285426": {
+    "file": "environment/Lighthouse/Lighthouse.glb",
+    "initialSize": [
+      2.092,
+      2.092,
+      2.2
+    ],
+    "node": "LampGlow"
+  },
+  "92471087482503": {
+    "file": "environment/TownTree/TownTree.glb",
+    "initialSize": [
+      6.311,
+      11.137,
+      6.44
+    ],
+    "node": "Body"
+  },
+  "92529563640180": {
+    "file": "axes/InfernoAxe/InfernoAxe.glb",
+    "initialSize": [
+      0.445,
+      1.23,
+      1.993
+    ],
+    "node": "Head"
+  },
+  "92614532031627": {
+    "file": "kit/Door/Door.glb",
+    "initialSize": [
+      3.8,
+      6.0,
+      0.8
+    ],
+    "node": "Wood"
+  },
+  "92965386864498": {
+    "file": "axes/StarfallAxe/StarfallAxe.glb",
+    "initialSize": [
+      0.295,
+      4.042,
+      0.396
+    ],
+    "node": "Handle"
+  },
+  "93031171745389": {
+    "file": "vehicles/ScoutATV/ScoutATV.glb",
+    "initialSize": [
+      140.0,
+      86.693,
+      30.756
+    ],
+    "node": "Glass"
+  },
+  "93169923368878": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.95,
+      0.8,
+      0.97
+    ],
+    "node": "RightLowerLeg"
+  },
+  "93227720333749": {
+    "file": "trees/Palmwood/Section_3.glb",
+    "initialSize": [
+      1.8,
+      3.6,
+      1.8
+    ],
+    "node": "Section"
+  },
+  "93375706848240": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      10.46,
+      4.15,
+      26.08
+    ],
+    "node": "Bed"
+  },
+  "93478161314715": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.92,
+      0.98,
+      0.94
+    ],
+    "node": "RightUpperArm"
+  },
+  "93554668994248": {
+    "file": "items/Cabin/Cabin.glb",
+    "initialSize": [
+      12.7,
+      3.65,
+      11.529
+    ],
+    "node": "Roof"
+  },
+  "93845570251227": {
+    "file": "trees/Pine/Leaves_C.glb",
+    "initialSize": [
+      16.029,
+      41.005,
+      16.029
+    ],
+    "node": "Leaves"
+  },
+  "93977628567245": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      943.598,
+      163.95,
+      2048.0
+    ],
+    "node": "Body"
+  },
+  "94025013138140": {
+    "file": "trees/Palmwood/Section_2.glb",
+    "initialSize": [
+      1.8,
+      3.6,
+      1.8
+    ],
+    "node": "Section"
+  },
+  "94445787554352": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      9.863,
+      3.186,
+      3.698
+    ],
+    "node": "Glass"
+  },
+  "94457413408892": {
+    "file": "vehicles/PonyTrailer/PonyTrailer.glb",
+    "initialSize": [
+      8.34,
+      2.14,
+      13.0
+    ],
+    "node": "Bed"
+  },
+  "94887677148607": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      1.113,
+      3.118,
+      3.065
+    ],
+    "node": "Wheel"
+  },
+  "94933689637736": {
+    "file": "environment/TownTree/TownTree.glb",
+    "initialSize": [
+      11.915,
+      9.754,
+      11.461
+    ],
+    "node": "Crown"
+  },
+  "95152510866641": {
+    "file": "trees/Pine/Leaves_B.glb",
+    "initialSize": [
+      16.394,
+      39.823,
+      16.394
+    ],
+    "node": "Leaves"
+  },
+  "95166951515260": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.562,
+      1.318,
+      0.562
+    ],
+    "node": "Carry"
+  },
+  "95238469359825": {
+    "file": "axes/GoldAxe/GoldAxe.glb",
+    "initialSize": [
+      0.551,
+      1.081,
+      2.586
+    ],
+    "node": "Head"
+  },
+  "95271263377734": {
+    "file": "trees/Lumenwood/Facet_C.glb",
+    "initialSize": [
+      9.467,
+      11.377,
+      10.123
+    ],
+    "node": "Facet"
+  },
+  "95359618816924": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      8.4,
+      3.02,
+      13.977
+    ],
+    "node": "Bed"
+  },
+  "95420384468440": {
+    "file": "trees/Emberwood/Facet_C.glb",
+    "initialSize": [
+      13.155,
+      5.241,
+      17.51
+    ],
+    "node": "Facet"
+  },
+  "95905082010293": {
+    "file": "kit/Beam8/Beam8.glb",
+    "initialSize": [
+      8.0,
+      1.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "96006854263813": {
+    "file": "vehicles/PonyTrailer/by_truck/Flatbed/PonyTrailer_Flatbed.glb",
+    "initialSize": [
+      7.739,
+      3.51,
+      3.072
+    ],
+    "node": "Hitch"
+  },
+  "96007499157338": {
+    "file": "environment/RockMossy/RockMossy.glb",
+    "initialSize": [
+      3.961,
+      2.811,
+      3.499
+    ],
+    "node": "Body"
+  },
+  "96013384851518": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      1.52,
+      1.715,
+      1.915
+    ],
+    "node": "Head"
+  },
+  "96144513964536": {
+    "file": "axes/CobaltAxe/CobaltAxe.glb",
+    "initialSize": [
+      0.445,
+      1.264,
+      2.438
+    ],
+    "node": "Head"
+  },
+  "96159005518459": {
+    "file": "items/PaintCan/PaintCan.glb",
+    "initialSize": [
+      1.26,
+      1.565,
+      1.224
+    ],
+    "node": "Body"
+  },
+  "96169983593532": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.608,
+      0.328,
+      0.608
+    ],
+    "node": "RightHand"
+  },
+  "96198574363660": {
+    "file": "npcs/Murph/Murph.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "96607075043621": {
+    "file": "environment/MillBell/MillBell.glb",
+    "initialSize": [
+      0.6,
+      5.2,
+      0.6
+    ],
+    "node": "Collision"
+  },
+  "96795427613618": {
+    "file": "trees/Birch/Leaves_A.glb",
+    "initialSize": [
+      9.226,
+      18.309,
+      8.293
+    ],
+    "node": "Leaves"
+  },
+  "97206762661640": {
+    "file": "buildings/GondolaStation/GondolaStation.glb",
+    "initialSize": [
+      6.4,
+      1.5,
+      0.3
+    ],
+    "node": "Sign"
+  },
+  "97251985544625": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "97410892935245": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.686,
+      0.624,
+      0.702
+    ],
+    "node": "LeftLowerLeg"
+  },
+  "97427676081467": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      0.7,
+      1.06,
+      1.68
+    ],
+    "node": "Hitch"
+  },
+  "97435191207255": {
+    "file": "items/Shed/Shed.glb",
+    "initialSize": [
+      10.0,
+      6.2,
+      8.0
+    ],
+    "node": "Collision"
+  },
+  "97460440164368": {
+    "file": "environment/Lighthouse/Lighthouse.glb",
+    "initialSize": [
+      4.25,
+      3.6,
+      4.25
+    ],
+    "node": "LampRoom"
+  },
+  "97474817544364": {
+    "file": "buildings/Dealership/Dealership.glb",
+    "initialSize": [
+      7.8,
+      1.125,
+      0.3
+    ],
+    "node": "OfficeSign"
+  },
+  "97636778870157": {
+    "file": "npcs/Rosa/Rosa.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "RightHand"
+  },
+  "97652593772480": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      0.608,
+      0.328,
+      0.608
+    ],
+    "node": "LeftHand"
+  },
+  "97681876019747": {
+    "file": "npcs/Hazel/Hazel.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.78
+    ],
+    "node": "LeftHand"
+  },
+  "97694939333482": {
+    "file": "npcs/Gus/Gus.glb",
+    "initialSize": [
+      1.98,
+      0.55,
+      1.05
+    ],
+    "node": "LowerTorso"
+  },
+  "97721950217923": {
+    "file": "npcs/Dale/Dale.glb",
+    "initialSize": [
+      0.88,
+      0.83,
+      0.93
+    ],
+    "node": "RightLowerLeg"
+  },
+  "97743434575899": {
+    "file": "items/Fence/Fence.glb",
+    "initialSize": [
+      8.1,
+      3.16,
+      0.6
+    ],
+    "node": "Body"
+  },
+  "97749142571629": {
+    "file": "vehicles/RanchTrailer/RanchTrailer.glb",
+    "initialSize": [
+      872.0,
+      422.0,
+      1829.5
+    ],
+    "node": "Lights"
+  },
+  "97750771801717": {
+    "file": "items/PlotRail/PlotRail.glb",
+    "initialSize": [
+      10.0,
+      0.37,
+      0.42
+    ],
+    "node": "Body"
+  },
+  "97919227077911": {
+    "file": "environment/Cart/Cart.glb",
+    "initialSize": [
+      4.3,
+      3.2,
+      5.2
+    ],
+    "node": "Collision"
+  },
+  "97929711741619": {
+    "file": "buildings/GeneralStore/GeneralStore.glb",
+    "initialSize": [
+      51.75,
+      13.001,
+      47.0
+    ],
+    "node": "Roof"
+  },
+  "98072291486744": {
+    "file": "items/Bench/Bench.glb",
+    "initialSize": [
+      4.0,
+      2.605,
+      1.45
+    ],
+    "node": "Collision"
+  },
+  "98186309048933": {
+    "file": "kit/SlopedRoof8/SlopedRoof8.glb",
+    "initialSize": [
+      8.0,
+      3.0,
+      4.0
+    ],
+    "node": "Wood"
+  },
+  "98421774126122": {
+    "file": "vehicles/Pickup/Pickup.glb",
+    "initialSize": [
+      8.54,
+      2.95,
+      25.03
+    ],
+    "node": "Lights"
+  },
+  "98760659539151": {
+    "file": "vehicles/Flatbed/Flatbed.glb",
+    "initialSize": [
+      1120.0,
+      394.735,
+      385.22
+    ],
+    "node": "Glass"
+  },
+  "98787230378648": {
+    "file": "trees/Gloamwood/Facet_A.glb",
+    "initialSize": [
+      5.633,
+      1.925,
+      9.614
+    ],
+    "node": "Facet"
+  },
+  "98910544598150": {
+    "file": "npcs/Pip/Pip.glb",
+    "initialSize": [
+      1.56,
+      1.56,
+      0.78
+    ],
+    "node": "HumanoidRootPart"
+  },
+  "98943571728515": {
+    "file": "vehicles/HeavyHauler/HeavyHauler.glb",
+    "initialSize": [
+      12.0,
+      2.085,
+      26.045
+    ],
+    "node": "Body"
+  },
+  "99228152972776": {
+    "file": "environment/Fence/Fence.glb",
+    "initialSize": [
+      8.583,
+      3.499,
+      0.741
+    ],
+    "node": "Body"
+  },
+  "99465405713921": {
+    "file": "kit/Wall/Wall.glb",
+    "initialSize": [
+      8.0,
+      6.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "99575576195148": {
+    "file": "trees/Palmwood/Leaves_B.glb",
+    "initialSize": [
+      18.998,
+      7.063,
+      19.224
+    ],
+    "node": "Leaves"
+  },
+  "99726500181036": {
+    "file": "kit/TallWall8/TallWall8.glb",
+    "initialSize": [
+      8.0,
+      10.0,
+      1.0
+    ],
+    "node": "Wood"
+  },
+  "99836533054151": {
+    "file": "axes/LuxAxe/LuxAxe.glb",
+    "initialSize": [
+      0.328,
+      4.053,
+      0.413
+    ],
+    "node": "Handle"
+  },
+  "99945088655922": {
+    "file": "kit/Post/Post.glb",
+    "initialSize": [
+      1.0,
+      6.0,
+      1.0
+    ],
+    "node": "Collision"
+  },
+  "99956936383854": {
+    "file": "vehicles/Rustbucket/Rustbucket.glb",
+    "initialSize": [
+      70.0,
+      106.0,
+      168.0
+    ],
+    "node": "Hitch"
+  }
+}
