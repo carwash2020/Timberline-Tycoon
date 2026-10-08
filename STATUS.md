@@ -31,9 +31,9 @@ Part counts, whole model, Lune (shop cap 250, including the interior):
 | Land Office (art only) | — | 8 |
 | Sky forge court | — | 16 |
 
-Paths:
+Round 1 framing (8 October 2026). `town-overview.png` is one elevated three-quarter of a grouped street (the per-building fronts are unchanged). The four scene shots are three-quarter views from about 25 studs, each prop about half the frame. The DAILY JOBS board is wider, with the posts on its edges, so the words clear the posts. The Tool Shed gold table is unchanged.
 
-- `previews/v1-c/town-overview.png`
+Paths:
 - `previews/v1-c/sawmill-front.png`
 - `previews/v1-c/toolshed-front.png`
 - `previews/v1-c/hearth-front.png`
@@ -61,7 +61,7 @@ Paths:
 - `previews/v1-c/machine-sawmill.png`
 - `previews/v1-c/mill-foreman.png`
 
-Foreman stand for Lane E. `MillForemanSpot` is an anchored, transparent, non-colliding part on the sawmill, west of the office door, facing the road (-Z). With the mill at `WorldPlan.Town().sawmill` (`CFrame.new(0, 0, 116.5)`), the spot's world CFrame is `CFrame.new(-26.025, 0.15, 97.45)` (look -Z). In the scaled model, before that placement, it is `CFrame.new(-26.025, 0.15, -19.05)`. The DAILY JOBS board stands just west of it. The office lumber, barrel and crates moved behind the cabin so the stand has 6 studs of clear ground.
+Foreman stand for Lane E. `MillForemanSpot` is an anchored, transparent, non-colliding part on the sawmill, west of the office door, facing the road (-Z). With the mill at `WorldPlan.Town().sawmill` (`CFrame.new(0, 0, 116.5)`), the spot's world CFrame is `CFrame.new(-26.025, 0.15, 97.45)` (look -Z). In the scaled model, before that placement, it is `CFrame.new(-26.025, 0.15, -19.05)`. The DAILY JOBS board stands just west of it, wide enough that the words sit between the posts with padding on both sides. The office lumber, barrel and crates moved behind the cabin so the stand has 6 studs of clear ground.
 
 ## Who and how
 

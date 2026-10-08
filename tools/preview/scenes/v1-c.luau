@@ -15,13 +15,14 @@ return {
 		Common.ground(ctx, root, 900, C3.fromRGB(100, 150, 70), V3.new(200, -0.5, 40))
 
 		local cameras = {}
-		local function place(model, x, z, cam, label)
+		local function place(model, x, z, cam, label, fov)
 			Kit.placeAt(model, CF.new(x, 0, z))
 			model.Parent = root
 			table.insert(cameras, {
 				pos = { x + cam[1], cam[2], z + cam[3] },
 				target = { x + (cam[4] or 0), cam[5] or 4, z + (cam[6] or 0) },
 				label = label,
+				fov = fov,
 			})
 		end
 
@@ -76,23 +77,61 @@ return {
 		place(BuildingArt.Campfire(), 500, 280, { -4, 4, -6, 0, 1, 0 }, "campfire")
 		place(BuildingArt.Fence(18), 530, 280, { -4, 4, -12, 0, 2, 0 }, "fence")
 		place(BuildingArt.LampPost(), 560, 280, { -5, 6, -8, 0, 6, 0 }, "lamp-post")
-		place(PropArt.Scene("fishing"), 80, 360, { -6, 5, -8, 0, 1, -4 }, "scene-fishing")
-		place(PropArt.Scene("campfire"), 110, 360, { -5, 4, -6, 0, 1, 0 }, "scene-campfire")
-		place(PropArt.Scene("lookout"), 140, 360, { -6, 5, -8, 0, 1, 0 }, "scene-lookout")
-		place(PropArt.Scene("bench"), 165, 360, { -5, 4, -7, 0, 1, 0 }, "scene-bench")
+		-- About 25 studs out, three-quarter, tight enough that the prop is
+		-- half the frame. The label stays in the corner, off the prop.
+		place(PropArt.Scene("fishing"), 80, 360, { -15.9, 8.83, -21.7, 0, 1.1, -4 }, "scene-fishing", 29)
+		place(PropArt.Scene("campfire"), 110, 360, { -15.9, 8.53, -17.7, 0, 0.8, 0 }, "scene-campfire", 15)
+		place(PropArt.Scene("lookout"), 140, 360, { -15.9, 9.13, -17.7, 0, 1.4, 0 }, "scene-lookout", 19)
+		place(PropArt.Scene("bench"), 165, 360, { -15.5, 8.63, -17.6, 0.4, 0.9, 0.1 }, "scene-bench", 12)
 		place(MachineArt.Build("SawmillRickety", false), 210, 360, { -8, 6, -12, 0, 2, 0 }, "machine-sawmill")
-		-- The foreman stand, west of the office door, from the road.
-		place(BuildingArt.Sawmill(), 300, 400, { -36, 5.5, -32, -27, 2.2, -16 }, "mill-foreman")
+		-- The foreman stand and the widened DAILY JOBS board, from the road.
+		place(BuildingArt.Sawmill(), 300, 400, { -38, 5.6, -33, -31, 3.8, -19.6 }, "mill-foreman")
+
+		-- A street on the empty south lawn, fronts turned toward the camera,
+		-- so one elevated three-quarter shows the town as a place. The
+		-- display row above stays put for the per-building fronts.
+		local yaw = CF.Angles(0, math.pi, 0)
+		local function street(model, x, z)
+			Kit.placeAt(model, CF.new(x, 0, z) * yaw)
+			model.Parent = root
+		end
+		local road = Kit.part(
+			root,
+			"TownRoad",
+			V3.new(430, 0.2, 24),
+			CF.new(-16, 0.06, -256),
+			C3.fromRGB(122, 108, 88),
+			roblox.Enum.Material.Ground
+		)
+		road.CanCollide = false
+		street(BuildingArt.Sawmill(), -167.5, -290.8)
+		street(BuildingArt.Shop("ToolShed", "TOOL SHED", tool), -97.3, -297.8)
+		street(BuildingArt.Shop("HearthAndHome", "HEARTH & HOME", hearth), -31.9, -299.5)
+		street(BuildingArt.Shop("Dealership", "DEALERSHIP", dealer), 100.8, -306.2)
+		street(BuildingArt.ArrivalArch(), -184, -243)
+		street(BuildingArt.LampPost(), -158, -243)
+		street(BuildingArt.PlotMapBoard(), -140, -243.8)
+		street(BuildingArt.GateKiosk(tool), -118, -241)
+		street(BuildingArt.Campfire(), -96, -241.8)
+		street(BuildingArt.Fence(16), -70, -243.7)
+		street(BuildingArt.LandOffice(), -40, -236.5)
+		street(BuildingArt.OddsAndEnds(), -8, -236)
+		street(BuildingArt.Sparkworks(), 24, -236)
+		street(BuildingArt.SkyMarket(), 48, -240)
+		street(BuildingArt.SkyTurnstile(), 64, -243.5)
+		street(BuildingArt.SkyForgeCourt(), 100, -232)
+		street(BuildingArt.LampPost(), 150, -243.3)
 
 		table.insert(cameras, 1, {
-			pos = { 220, 90, -80 },
-			target = { 220, 0, 140 },
+			pos = { 260, 42, -200 },
+			target = { -30, 12, -285 },
+			fov = 48,
 			label = "town-overview",
 		})
 
 		return {
 			root = root,
-			shadowRadius = 280,
+			shadowRadius = 520,
 			cameras = cameras,
 		}
 	end,

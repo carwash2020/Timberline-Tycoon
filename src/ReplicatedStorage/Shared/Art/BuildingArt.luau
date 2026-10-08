@@ -1186,9 +1186,12 @@ function BuildingArt.Sawmill(scale: number?): Model
 	local stand = Kit.part(model, "MillForemanSpot", V3(2, 0.2, 2), CF(-17.35, 0.1, -12.7), TIMBER)
 	Kit.decor(stand, false)
 	stand.Transparency = 1
-	dBox(model, "JobPost", V3(0.3, 3.2, 0.3), CF(-19.9, 1.6, -13.1), TIMBER)
-	dBox(model, "JobPost", V3(0.3, 3.2, 0.3), CF(-19.1, 1.6, -13.1), TIMBER)
-	local jobs = dBox(model, "JobBoard", V3(1.6, 1.4, 0.2), CF(-19.5, 2.6, -13.1), Palette.SignInk, MAT.Slate)
+	-- Wide enough that "DAILY JOBS" has padding past the posts. The posts
+	-- stand on the board's edges and sit behind its face, so they frame
+	-- the words instead of covering them. Same three parts.
+	dBox(model, "JobPost", V3(0.26, 4.1, 0.16), CF(-22.77, 2.15, -13.1), TIMBER)
+	dBox(model, "JobPost", V3(0.26, 4.1, 0.16), CF(-18.55, 2.15, -13.1), TIMBER)
+	local jobs = dBox(model, "JobBoard", V3(3.96, 1.98, 0.22), CF(-20.66, 2.55, -13.1), Palette.SignInk, MAT.Slate)
 	Kit.signText(jobs, "DAILY JOBS", Palette.SignCream, { Enum.NormalId.Front })
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	fitNameSign(crest)

@@ -43,7 +43,7 @@ One upgraded look for the town buildings. Shops keep the pinned footprints (Tool
 **PC**
 
 - Walk the spawn road to the sawmill, the Tool Shed, Hearth and Home, and the Dealership. Each reads as the same timber-and-slate style: stone-coloured base, honey plank walls, a roof, a porch, a lit sign.
-- Sawmill office: the foreman stand is the invisible pad west of the office door, facing the road. The chalkboard beside it reads DAILY JOBS. Nothing solid within 6 studs of the pad. The lumber pile, barrel and crates are behind the cabin.
+- Sawmill office: the foreman stand is the invisible pad west of the office door, facing the road. The chalkboard beside it reads DAILY JOBS, with the posts at the edges of the board and the words clear of them. Nothing solid within 6 studs of the pad. The lumber pile, barrel and crates are behind the cabin.
 - Tool Shed: blue sign (#3A6FD8). Step in. The counter top is at the same height as before. The axe rack is on the back wall, blades to the left, stepped, one colour block per axe. Buy an axe; the box still comes off the shelf.
 - Hearth and Home: green sign (#2F5D3A). The porch posts stand just inside the front wall (the pad starts at the wall; posts outside it sat on grass).
 - Dealership: red sign (#D9534F). The showroom walkway is clear. The three nearest bays have a low plinth and a dim lamp. The porch lantern is no brighter than the showroom lamps.
