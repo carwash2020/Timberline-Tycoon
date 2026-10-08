@@ -1,0 +1,1706 @@
+{
+  "schema": 5,
+  "v2Credit": 0,
+  "cash": 250000,
+  "totalEarned": 1800000,
+  "rebirths": 1,
+  "axes": [
+    {
+      "uid": "00000021-4000-8000-8000-000000000021",
+      "id": "RustyAxe"
+    },
+    {
+      "uid": "00000022-4000-8000-8000-000000000022",
+      "id": "SteelAxe"
+    },
+    {
+      "uid": "00000023-4000-8000-8000-000000000023",
+      "id": "HardenedAxe"
+    },
+    {
+      "uid": "00000024-4000-8000-8000-000000000024",
+      "id": "CobaltAxe"
+    },
+    {
+      "uid": "00000025-4000-8000-8000-000000000025",
+      "id": "InfernoAxe"
+    },
+    {
+      "uid": "00000026-4000-8000-8000-000000000026",
+      "id": "StarfallAxe"
+    }
+  ],
+  "bestAxeTier": 9,
+  "equippedAxe": "00000026-4000-8000-8000-000000000026",
+  "ownedTrucks": [
+    "Rustbucket",
+    "Pickup",
+    "Flatbed",
+    "LoggingRig"
+  ],
+  "equippedTruck": "LoggingRig",
+  "starterTruckGranted": true,
+  "trucksBoxed": true,
+  "rustbucketBoxed": true,
+  "ownedTrailers": [
+    "PonyTrailer",
+    "RanchTrailer"
+  ],
+  "equippedTrailer": "RanchTrailer",
+  "ownedBoats": [],
+  "gear": [
+    "InsulatedCoat",
+    "HeatBoots",
+    "FeatherfallCloak",
+    "Lantern"
+  ],
+  "plot": {
+    "claimed": true,
+    "tier": 5,
+    "placed": [
+      {
+        "uid": "00000031-4000-8000-8000-000000000031",
+        "blueprintId": "Cabin",
+        "x": 8,
+        "z": 12,
+        "rot": 0
+      },
+      {
+        "uid": "00000032-4000-8000-8000-000000000032",
+        "blueprintId": "Flag",
+        "x": -16,
+        "z": 4,
+        "rot": 1
+      },
+      {
+        "uid": "00000033-4000-8000-8000-000000000033",
+        "blueprintId": "Warehouse",
+        "x": 24,
+        "z": -8,
+        "rot": 0
+      },
+      {
+        "uid": "00000034-4000-8000-8000-000000000034",
+        "blueprintId": "SkyBin",
+        "x": 4,
+        "z": 20,
+        "rot": 2
+      },
+      {
+        "uid": "00000035-4000-8000-8000-000000000035",
+        "blueprintId": "Flag",
+        "x": 32,
+        "z": 16,
+        "rot": 0
+      }
+    ],
+    "squares": [
+      "0,1",
+      "1,0",
+      "1,1",
+      "-1,0"
+    ],
+    "wires": [],
+    "switches": [],
+    "pads": [
+      {
+        "id": "LoggingRig",
+        "uid": "00000061-4000-8000-8000-000000000061",
+        "x": -24,
+        "z": 8,
+        "rot": 0
+      },
+      {
+        "id": "Flatbed",
+        "uid": "00000062-4000-8000-8000-000000000062",
+        "x": 0,
+        "z": 8,
+        "rot": 0
+      }
+    ]
+  },
+  "baseCooldownUntil": 0,
+  "storage": [
+    {
+      "uid": "00000800-4000-8000-8000-000000000800",
+      "itemId": "Rustbucket",
+      "shop": "Dealership"
+    },
+    {
+      "uid": "00000801-4000-8000-8000-000000000801",
+      "itemId": "Pickup",
+      "shop": "Dealership"
+    },
+    {
+      "uid": "00000802-4000-8000-8000-000000000802",
+      "itemId": "Flatbed",
+      "shop": "Dealership"
+    },
+    {
+      "uid": "00000803-4000-8000-8000-000000000803",
+      "itemId": "LoggingRig",
+      "shop": "Dealership"
+    },
+    {
+      "uid": "00000804-4000-8000-8000-000000000804",
+      "itemId": "InsulatedCoat",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000805-4000-8000-8000-000000000805",
+      "itemId": "HeatBoots",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000806-4000-8000-8000-000000000806",
+      "itemId": "FeatherfallCloak",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000807-4000-8000-8000-000000000807",
+      "itemId": "SkyBin",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000808-4000-8000-8000-000000000808",
+      "itemId": "SteelAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000809-4000-8000-8000-000000000809",
+      "itemId": "HardenedAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000810-4000-8000-8000-000000000810",
+      "itemId": "LoggingRig",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000811-4000-8000-8000-000000000811",
+      "itemId": "Flatbed",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000812-4000-8000-8000-000000000812",
+      "itemId": "Pickup",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000813-4000-8000-8000-000000000813",
+      "itemId": "Rustbucket",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000814-4000-8000-8000-000000000814",
+      "itemId": "InsulatedCoat",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000815-4000-8000-8000-000000000815",
+      "itemId": "HeatBoots",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000816-4000-8000-8000-000000000816",
+      "itemId": "FeatherfallCloak",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000817-4000-8000-8000-000000000817",
+      "itemId": "SkyBin",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000818-4000-8000-8000-000000000818",
+      "itemId": "SteelAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000819-4000-8000-8000-000000000819",
+      "itemId": "HardenedAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000820-4000-8000-8000-000000000820",
+      "itemId": "LoggingRig",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000821-4000-8000-8000-000000000821",
+      "itemId": "Flatbed",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000822-4000-8000-8000-000000000822",
+      "itemId": "Pickup",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000823-4000-8000-8000-000000000823",
+      "itemId": "Rustbucket",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000824-4000-8000-8000-000000000824",
+      "itemId": "InsulatedCoat",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000825-4000-8000-8000-000000000825",
+      "itemId": "HeatBoots",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000826-4000-8000-8000-000000000826",
+      "itemId": "FeatherfallCloak",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000827-4000-8000-8000-000000000827",
+      "itemId": "SkyBin",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000828-4000-8000-8000-000000000828",
+      "itemId": "SteelAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000829-4000-8000-8000-000000000829",
+      "itemId": "HardenedAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000830-4000-8000-8000-000000000830",
+      "itemId": "LoggingRig",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000831-4000-8000-8000-000000000831",
+      "itemId": "Flatbed",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000832-4000-8000-8000-000000000832",
+      "itemId": "Pickup",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000833-4000-8000-8000-000000000833",
+      "itemId": "Rustbucket",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000834-4000-8000-8000-000000000834",
+      "itemId": "InsulatedCoat",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000835-4000-8000-8000-000000000835",
+      "itemId": "HeatBoots",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000836-4000-8000-8000-000000000836",
+      "itemId": "FeatherfallCloak",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000837-4000-8000-8000-000000000837",
+      "itemId": "SkyBin",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000838-4000-8000-8000-000000000838",
+      "itemId": "SteelAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000839-4000-8000-8000-000000000839",
+      "itemId": "HardenedAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000840-4000-8000-8000-000000000840",
+      "itemId": "LoggingRig",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000841-4000-8000-8000-000000000841",
+      "itemId": "Flatbed",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000842-4000-8000-8000-000000000842",
+      "itemId": "Pickup",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000843-4000-8000-8000-000000000843",
+      "itemId": "Rustbucket",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000844-4000-8000-8000-000000000844",
+      "itemId": "InsulatedCoat",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000845-4000-8000-8000-000000000845",
+      "itemId": "HeatBoots",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000846-4000-8000-8000-000000000846",
+      "itemId": "FeatherfallCloak",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000847-4000-8000-8000-000000000847",
+      "itemId": "SkyBin",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000848-4000-8000-8000-000000000848",
+      "itemId": "SteelAxe",
+      "shop": "ToolShed"
+    },
+    {
+      "uid": "00000849-4000-8000-8000-000000000849",
+      "itemId": "HardenedAxe",
+      "shop": "ToolShed"
+    }
+  ],
+  "permissions": {},
+  "badgesAwarded": {
+    "AreaSky": true,
+    "AreaSnow": true
+  },
+  "badgesSent": {},
+  "questAxe": {
+    "step": 0
+  },
+  "secretsFound": {},
+  "areasVisited": {
+    "town": true,
+    "hills": true,
+    "snow": true,
+    "volcano": true,
+    "grove": true,
+    "sky": true
+  },
+  "cosmetics": {},
+  "event": {
+    "id": "",
+    "day": 0,
+    "progress": {},
+    "done": {},
+    "daysDone": 0,
+    "lastDoneDay": 0
+  },
+  "compendium": {
+    "oak": true,
+    "birch": true,
+    "pine": true,
+    "maple": true,
+    "frostwood": true,
+    "emberwood": true,
+    "lumenwood": true
+  },
+  "materials": {
+    "SkyShard": 12
+  },
+  "forgeLogs": {
+    "lumenwood": 40
+  },
+  "skyBin": [],
+  "forgeWood": {
+    "lumenwood": 60
+  },
+  "skyWood": [
+    {
+      "w": "lumenwood",
+      "v": 12.5,
+      "f": "elder"
+    }
+  ],
+  "skyBinOwned": true,
+  "furnitureBlueprints": {},
+  "blueprintBook": [
+    "Flag",
+    "Cabin"
+  ],
+  "blueprintItems": [],
+  "hammer": true,
+  "npcFriendship": {
+    "Murph": 6,
+    "Millie": 4,
+    "Tink": 3
+  },
+  "stats": {
+    "treesChopped": 4200,
+    "logsSold": 9000,
+    "playtimeMin": 2400,
+    "volumeSold": 18000,
+    "cuts": 30000
+  },
+  "tutorialDone": true,
+  "tutorialStep": 8,
+  "tutorialProgress": 0,
+  "tutorialOrder": 1,
+  "tutorialRefresher": false,
+  "tutorialReplay": false,
+  "seasonId": "spring",
+  "daily": {
+    "day": 20370,
+    "goals": [
+      {
+        "kind": "fell",
+        "target": 12,
+        "progress": 12,
+        "reward": 1300,
+        "done": true
+      },
+      {
+        "kind": "earn",
+        "target": 9000,
+        "progress": 9000,
+        "reward": 1300,
+        "done": true
+      },
+      {
+        "kind": "sellWood",
+        "target": 60,
+        "progress": 20,
+        "reward": 1300,
+        "wood": "lumenwood",
+        "done": false
+      }
+    ],
+    "streak": 14,
+    "bestStreak": 14,
+    "lastCompleteDay": 20369,
+    "loginDay": 7,
+    "lastLoginDay": 20370
+  },
+  "purchaseIds": [],
+  "passes": {},
+  "ownerGrants": {},
+  "ownerGrantLog": [],
+  "truckPaint": {},
+  "doubleWoodUntil": 0,
+  "instantDeliveries": 0,
+  "onboarding": {},
+  "forest": {
+    "figures": {},
+    "elders": 0
+  },
+  "truckBed": [],
+  "truckAt": {
+    "x": -30.0,
+    "y": 6.0,
+    "z": 40.0
+  },
+  "leftLoad": [],
+  "groundLoad": [
+    {
+      "w": "pine",
+      "k": "log",
+      "bed": "Ground",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ]
+      ],
+      "g": [
+        100.0,
+        8.0,
+        -400.0
+      ]
+    },
+    {
+      "w": "oak",
+      "k": "log",
+      "bed": "Ground",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ]
+      ],
+      "g": [
+        101.0,
+        8.0,
+        -400.0
+      ]
+    },
+    {
+      "w": "pine",
+      "k": "log",
+      "bed": "Ground",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ]
+      ],
+      "g": [
+        102.0,
+        8.0,
+        -400.0
+      ]
+    },
+    {
+      "w": "oak",
+      "k": "log",
+      "bed": "Ground",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ]
+      ],
+      "g": [
+        103.0,
+        8.0,
+        -400.0
+      ]
+    }
+  ],
+  "sawmillStock": [
+    "Sawmill"
+  ],
+  "truckLoad": [
+    {
+      "w": "pine",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ]
+      ]
+    },
+    {
+      "w": "oak",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ]
+      ]
+    },
+    {
+      "w": "pine",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ]
+      ]
+    },
+    {
+      "w": "oak",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ]
+      ]
+    },
+    {
+      "w": "pine",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ]
+      ]
+    },
+    {
+      "w": "oak",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ]
+      ]
+    },
+    {
+      "w": "pine",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ]
+      ]
+    },
+    {
+      "w": "oak",
+      "k": "log",
+      "bed": "BedFloor",
+      "at": [
+        1.5,
+        0.6,
+        -2.0,
+        0.0,
+        1.5708,
+        0.0
+      ],
+      "s": [
+        [
+          1.25,
+          2.5,
+          8.0,
+          -1.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          -0.875,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          3
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          0.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          1.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1
+        ],
+        [
+          1.25,
+          2.5,
+          8.0,
+          2.125,
+          0.4,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          2
+        ]
+      ]
+    }
+  ],
+  "settings": {
+    "music": true,
+    "sfx": true,
+    "musicVolume": 1,
+    "sfxVolume": 1,
+    "graphics": "auto",
+    "quality": "high",
+    "cameraShake": true,
+    "uiScale": "normal",
+    "showTips": true,
+    "showOnBoard": false
+  },
+  "pendingCash": 0,
+  "activeSlot": 1,
+  "slotCooldownUntil": 0,
+  "accountAxes": [],
+  "slots": [
+    {
+      "name": "Save 1",
+      "fresh": false,
+      "lastPlayed": 1750002000,
+      "cash": 0,
+      "totalEarned": 0,
+      "axes": [
+        {
+          "uid": "00000011-4000-8000-8000-000000000011",
+          "id": "RustyAxe"
+        }
+      ],
+      "bestAxeTier": 1,
+      "equippedAxe": "00000011-4000-8000-8000-000000000011",
+      "ownedTrucks": [],
+      "equippedTruck": "",
+      "starterTruckGranted": true,
+      "trucksBoxed": true,
+      "rustbucketBoxed": true,
+      "ownedTrailers": [],
+      "equippedTrailer": "",
+      "ownedBoats": [],
+      "gear": [],
+      "plot": {
+        "claimed": false,
+        "tier": 1,
+        "placed": [],
+        "squares": [],
+        "wires": [],
+        "switches": []
+      },
+      "storage": [],
+      "permissions": {},
+      "questAxe": {
+        "step": 0
+      },
+      "event": {
+        "id": "",
+        "day": 0,
+        "progress": {},
+        "done": {},
+        "daysDone": 0,
+        "lastDoneDay": 0
+      },
+      "compendium": {
+        "oak": true
+      },
+      "materials": {},
+      "forgeLogs": {},
+      "skyBin": [],
+      "forgeWood": {},
+      "skyWood": [],
+      "skyBinOwned": false,
+      "furnitureBlueprints": {},
+      "blueprintBook": [
+        "Flag",
+        "Cabin"
+      ],
+      "blueprintItems": [],
+      "hammer": true,
+      "npcFriendship": {
+        "Murph": 0,
+        "Millie": 0,
+        "Tink": 0
+      },
+      "stats": {
+        "treesChopped": 0,
+        "logsSold": 0,
+        "playtimeMin": 0,
+        "volumeSold": 0,
+        "cuts": 0
+      },
+      "tutorialDone": false,
+      "tutorialStep": 1,
+      "tutorialProgress": 0,
+      "tutorialOrder": 0,
+      "tutorialRefresher": false,
+      "tutorialReplay": false,
+      "seasonId": "spring",
+      "daily": {
+        "day": 0,
+        "goals": [],
+        "streak": 0,
+        "bestStreak": 0,
+        "lastCompleteDay": 0,
+        "loginDay": 0,
+        "lastLoginDay": 0
+      },
+      "truckPaint": {},
+      "forest": {
+        "figures": {},
+        "elders": 0
+      },
+      "truckBed": [],
+      "truckAt": {},
+      "leftLoad": [],
+      "groundLoad": [],
+      "sawmillStock": [],
+      "truckLoad": [],
+      "rebirths": 0
+    },
+    {
+      "name": "Save 2",
+      "fresh": true,
+      "lastPlayed": 0,
+      "cash": 0,
+      "totalEarned": 0,
+      "axes": [
+        {
+          "uid": "00000012-4000-8000-8000-000000000012",
+          "id": "RustyAxe"
+        }
+      ],
+      "bestAxeTier": 1,
+      "equippedAxe": "00000012-4000-8000-8000-000000000012",
+      "ownedTrucks": [],
+      "equippedTruck": "",
+      "starterTruckGranted": true,
+      "trucksBoxed": true,
+      "rustbucketBoxed": true,
+      "ownedTrailers": [],
+      "equippedTrailer": "",
+      "ownedBoats": [],
+      "gear": [],
+      "plot": {
+        "claimed": false,
+        "tier": 1,
+        "placed": [],
+        "squares": [],
+        "wires": [],
+        "switches": []
+      },
+      "storage": [],
+      "permissions": {},
+      "questAxe": {
+        "step": 0
+      },
+      "event": {
+        "id": "",
+        "day": 0,
+        "progress": {},
+        "done": {},
+        "daysDone": 0,
+        "lastDoneDay": 0
+      },
+      "compendium": {
+        "oak": true
+      },
+      "materials": {},
+      "forgeLogs": {},
+      "skyBin": [],
+      "forgeWood": {},
+      "skyWood": [],
+      "skyBinOwned": false,
+      "furnitureBlueprints": {},
+      "blueprintBook": [
+        "Flag",
+        "Cabin"
+      ],
+      "blueprintItems": [],
+      "hammer": true,
+      "npcFriendship": {
+        "Murph": 0,
+        "Millie": 0,
+        "Tink": 0
+      },
+      "stats": {
+        "treesChopped": 0,
+        "logsSold": 0,
+        "playtimeMin": 0,
+        "volumeSold": 0,
+        "cuts": 0
+      },
+      "tutorialDone": false,
+      "tutorialStep": 1,
+      "tutorialProgress": 0,
+      "tutorialOrder": 0,
+      "tutorialRefresher": false,
+      "tutorialReplay": false,
+      "seasonId": "spring",
+      "daily": {
+        "day": 0,
+        "goals": [],
+        "streak": 0,
+        "bestStreak": 0,
+        "lastCompleteDay": 0,
+        "loginDay": 0,
+        "lastLoginDay": 0
+      },
+      "truckPaint": {},
+      "forest": {
+        "figures": {},
+        "elders": 0
+      },
+      "truckBed": [],
+      "truckAt": {},
+      "leftLoad": [],
+      "groundLoad": [],
+      "sawmillStock": [],
+      "truckLoad": [],
+      "rebirths": 0
+    },
+    {
+      "name": "Save 3",
+      "fresh": true,
+      "lastPlayed": 0,
+      "cash": 0,
+      "totalEarned": 0,
+      "axes": [
+        {
+          "uid": "00000013-4000-8000-8000-000000000013",
+          "id": "RustyAxe"
+        }
+      ],
+      "bestAxeTier": 1,
+      "equippedAxe": "00000013-4000-8000-8000-000000000013",
+      "ownedTrucks": [],
+      "equippedTruck": "",
+      "starterTruckGranted": true,
+      "trucksBoxed": true,
+      "rustbucketBoxed": true,
+      "ownedTrailers": [],
+      "equippedTrailer": "",
+      "ownedBoats": [],
+      "gear": [],
+      "plot": {
+        "claimed": false,
+        "tier": 1,
+        "placed": [],
+        "squares": [],
+        "wires": [],
+        "switches": []
+      },
+      "storage": [],
+      "permissions": {},
+      "questAxe": {
+        "step": 0
+      },
+      "event": {
+        "id": "",
+        "day": 0,
+        "progress": {},
+        "done": {},
+        "daysDone": 0,
+        "lastDoneDay": 0
+      },
+      "compendium": {
+        "oak": true
+      },
+      "materials": {},
+      "forgeLogs": {},
+      "skyBin": [],
+      "forgeWood": {},
+      "skyWood": [],
+      "skyBinOwned": false,
+      "furnitureBlueprints": {},
+      "blueprintBook": [
+        "Flag",
+        "Cabin"
+      ],
+      "blueprintItems": [],
+      "hammer": true,
+      "npcFriendship": {
+        "Murph": 0,
+        "Millie": 0,
+        "Tink": 0
+      },
+      "stats": {
+        "treesChopped": 0,
+        "logsSold": 0,
+        "playtimeMin": 0,
+        "volumeSold": 0,
+        "cuts": 0
+      },
+      "tutorialDone": false,
+      "tutorialStep": 1,
+      "tutorialProgress": 0,
+      "tutorialOrder": 0,
+      "tutorialRefresher": false,
+      "tutorialReplay": false,
+      "seasonId": "spring",
+      "daily": {
+        "day": 0,
+        "goals": [],
+        "streak": 0,
+        "bestStreak": 0,
+        "lastCompleteDay": 0,
+        "loginDay": 0,
+        "lastLoginDay": 0
+      },
+      "truckPaint": {},
+      "forest": {
+        "figures": {},
+        "elders": 0
+      },
+      "truckBed": [],
+      "truckAt": {},
+      "leftLoad": [],
+      "groundLoad": [],
+      "sawmillStock": [],
+      "truckLoad": [],
+      "rebirths": 0
+    }
+  ]
+}

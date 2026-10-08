@@ -1,0 +1,436 @@
+{
+  "schema": 5,
+  "v2Credit": 0,
+  "cash": 20,
+  "totalEarned": 20,
+  "rebirths": 0,
+  "axes": [
+    {
+      "uid": "00000001-4000-8000-8000-000000000001",
+      "id": "RustyAxe"
+    }
+  ],
+  "bestAxeTier": 1,
+  "equippedAxe": "00000001-4000-8000-8000-000000000001",
+  "ownedTrucks": [],
+  "equippedTruck": "",
+  "starterTruckGranted": true,
+  "trucksBoxed": true,
+  "rustbucketBoxed": true,
+  "ownedTrailers": [],
+  "equippedTrailer": "",
+  "ownedBoats": [],
+  "gear": [],
+  "plot": {
+    "claimed": false,
+    "tier": 1,
+    "placed": [],
+    "squares": [],
+    "wires": [],
+    "switches": []
+  },
+  "baseCooldownUntil": 0,
+  "storage": [],
+  "permissions": {},
+  "badgesAwarded": {},
+  "badgesSent": {},
+  "questAxe": {
+    "step": 0
+  },
+  "secretsFound": {},
+  "areasVisited": {
+    "town": true
+  },
+  "cosmetics": {},
+  "event": {
+    "id": "",
+    "day": 0,
+    "progress": {},
+    "done": {},
+    "daysDone": 0,
+    "lastDoneDay": 0
+  },
+  "compendium": {
+    "oak": true
+  },
+  "materials": {},
+  "forgeLogs": {},
+  "skyBin": [],
+  "forgeWood": {},
+  "skyWood": [],
+  "skyBinOwned": false,
+  "furnitureBlueprints": {},
+  "blueprintBook": [
+    "Flag",
+    "Cabin"
+  ],
+  "blueprintItems": [],
+  "hammer": true,
+  "npcFriendship": {
+    "Murph": 0,
+    "Millie": 0,
+    "Tink": 0
+  },
+  "stats": {
+    "treesChopped": 0,
+    "logsSold": 0,
+    "playtimeMin": 1,
+    "volumeSold": 0,
+    "cuts": 0
+  },
+  "tutorialDone": false,
+  "tutorialStep": 1,
+  "tutorialProgress": 0,
+  "tutorialOrder": 1,
+  "tutorialRefresher": false,
+  "tutorialReplay": false,
+  "seasonId": "spring",
+  "daily": {
+    "day": 0,
+    "goals": [],
+    "streak": 0,
+    "bestStreak": 0,
+    "lastCompleteDay": 0,
+    "loginDay": 0,
+    "lastLoginDay": 0
+  },
+  "purchaseIds": [],
+  "passes": {},
+  "ownerGrants": {},
+  "ownerGrantLog": [],
+  "truckPaint": {},
+  "doubleWoodUntil": 0,
+  "instantDeliveries": 0,
+  "onboarding": {},
+  "forest": {
+    "figures": {},
+    "elders": 0
+  },
+  "truckBed": [],
+  "truckAt": {},
+  "leftLoad": [],
+  "groundLoad": [],
+  "sawmillStock": [],
+  "truckLoad": [],
+  "settings": {
+    "music": true,
+    "sfx": true,
+    "musicVolume": 1,
+    "sfxVolume": 1,
+    "graphics": "auto",
+    "quality": "high",
+    "cameraShake": true,
+    "uiScale": "normal",
+    "showTips": true,
+    "showOnBoard": false
+  },
+  "pendingCash": 0,
+  "activeSlot": 1,
+  "slotCooldownUntil": 0,
+  "accountAxes": [],
+  "slots": [
+    {
+      "name": "Save 1",
+      "fresh": false,
+      "lastPlayed": 1750000000,
+      "cash": 20,
+      "totalEarned": 0,
+      "axes": [
+        {
+          "uid": "00000011-4000-8000-8000-000000000011",
+          "id": "RustyAxe"
+        }
+      ],
+      "bestAxeTier": 1,
+      "equippedAxe": "00000011-4000-8000-8000-000000000011",
+      "ownedTrucks": [],
+      "equippedTruck": "",
+      "starterTruckGranted": true,
+      "trucksBoxed": true,
+      "rustbucketBoxed": true,
+      "ownedTrailers": [],
+      "equippedTrailer": "",
+      "ownedBoats": [],
+      "gear": [],
+      "plot": {
+        "claimed": false,
+        "tier": 1,
+        "placed": [],
+        "squares": [],
+        "wires": [],
+        "switches": []
+      },
+      "storage": [],
+      "permissions": {},
+      "questAxe": {
+        "step": 0
+      },
+      "event": {
+        "id": "",
+        "day": 0,
+        "progress": {},
+        "done": {},
+        "daysDone": 0,
+        "lastDoneDay": 0
+      },
+      "compendium": {
+        "oak": true
+      },
+      "materials": {},
+      "forgeLogs": {},
+      "skyBin": [],
+      "forgeWood": {},
+      "skyWood": [],
+      "skyBinOwned": false,
+      "furnitureBlueprints": {},
+      "blueprintBook": [
+        "Flag",
+        "Cabin"
+      ],
+      "blueprintItems": [],
+      "hammer": true,
+      "npcFriendship": {
+        "Murph": 0,
+        "Millie": 0,
+        "Tink": 0
+      },
+      "stats": {
+        "treesChopped": 0,
+        "logsSold": 0,
+        "playtimeMin": 0,
+        "volumeSold": 0,
+        "cuts": 0
+      },
+      "tutorialDone": false,
+      "tutorialStep": 1,
+      "tutorialProgress": 0,
+      "tutorialOrder": 0,
+      "tutorialRefresher": false,
+      "tutorialReplay": false,
+      "seasonId": "spring",
+      "daily": {
+        "day": 0,
+        "goals": [],
+        "streak": 0,
+        "bestStreak": 0,
+        "lastCompleteDay": 0,
+        "loginDay": 0,
+        "lastLoginDay": 0
+      },
+      "truckPaint": {},
+      "forest": {
+        "figures": {},
+        "elders": 0
+      },
+      "truckBed": [],
+      "truckAt": {},
+      "leftLoad": [],
+      "groundLoad": [],
+      "sawmillStock": [],
+      "truckLoad": [],
+      "rebirths": 0
+    },
+    {
+      "name": "Save 2",
+      "fresh": true,
+      "lastPlayed": 0,
+      "cash": 0,
+      "totalEarned": 0,
+      "axes": [
+        {
+          "uid": "00000012-4000-8000-8000-000000000012",
+          "id": "RustyAxe"
+        }
+      ],
+      "bestAxeTier": 1,
+      "equippedAxe": "00000012-4000-8000-8000-000000000012",
+      "ownedTrucks": [],
+      "equippedTruck": "",
+      "starterTruckGranted": true,
+      "trucksBoxed": true,
+      "rustbucketBoxed": true,
+      "ownedTrailers": [],
+      "equippedTrailer": "",
+      "ownedBoats": [],
+      "gear": [],
+      "plot": {
+        "claimed": false,
+        "tier": 1,
+        "placed": [],
+        "squares": [],
+        "wires": [],
+        "switches": []
+      },
+      "storage": [],
+      "permissions": {},
+      "questAxe": {
+        "step": 0
+      },
+      "event": {
+        "id": "",
+        "day": 0,
+        "progress": {},
+        "done": {},
+        "daysDone": 0,
+        "lastDoneDay": 0
+      },
+      "compendium": {
+        "oak": true
+      },
+      "materials": {},
+      "forgeLogs": {},
+      "skyBin": [],
+      "forgeWood": {},
+      "skyWood": [],
+      "skyBinOwned": false,
+      "furnitureBlueprints": {},
+      "blueprintBook": [
+        "Flag",
+        "Cabin"
+      ],
+      "blueprintItems": [],
+      "hammer": true,
+      "npcFriendship": {
+        "Murph": 0,
+        "Millie": 0,
+        "Tink": 0
+      },
+      "stats": {
+        "treesChopped": 0,
+        "logsSold": 0,
+        "playtimeMin": 0,
+        "volumeSold": 0,
+        "cuts": 0
+      },
+      "tutorialDone": false,
+      "tutorialStep": 1,
+      "tutorialProgress": 0,
+      "tutorialOrder": 0,
+      "tutorialRefresher": false,
+      "tutorialReplay": false,
+      "seasonId": "spring",
+      "daily": {
+        "day": 0,
+        "goals": [],
+        "streak": 0,
+        "bestStreak": 0,
+        "lastCompleteDay": 0,
+        "loginDay": 0,
+        "lastLoginDay": 0
+      },
+      "truckPaint": {},
+      "forest": {
+        "figures": {},
+        "elders": 0
+      },
+      "truckBed": [],
+      "truckAt": {},
+      "leftLoad": [],
+      "groundLoad": [],
+      "sawmillStock": [],
+      "truckLoad": [],
+      "rebirths": 0
+    },
+    {
+      "name": "Save 3",
+      "fresh": true,
+      "lastPlayed": 0,
+      "cash": 0,
+      "totalEarned": 0,
+      "axes": [
+        {
+          "uid": "00000013-4000-8000-8000-000000000013",
+          "id": "RustyAxe"
+        }
+      ],
+      "bestAxeTier": 1,
+      "equippedAxe": "00000013-4000-8000-8000-000000000013",
+      "ownedTrucks": [],
+      "equippedTruck": "",
+      "starterTruckGranted": true,
+      "trucksBoxed": true,
+      "rustbucketBoxed": true,
+      "ownedTrailers": [],
+      "equippedTrailer": "",
+      "ownedBoats": [],
+      "gear": [],
+      "plot": {
+        "claimed": false,
+        "tier": 1,
+        "placed": [],
+        "squares": [],
+        "wires": [],
+        "switches": []
+      },
+      "storage": [],
+      "permissions": {},
+      "questAxe": {
+        "step": 0
+      },
+      "event": {
+        "id": "",
+        "day": 0,
+        "progress": {},
+        "done": {},
+        "daysDone": 0,
+        "lastDoneDay": 0
+      },
+      "compendium": {
+        "oak": true
+      },
+      "materials": {},
+      "forgeLogs": {},
+      "skyBin": [],
+      "forgeWood": {},
+      "skyWood": [],
+      "skyBinOwned": false,
+      "furnitureBlueprints": {},
+      "blueprintBook": [
+        "Flag",
+        "Cabin"
+      ],
+      "blueprintItems": [],
+      "hammer": true,
+      "npcFriendship": {
+        "Murph": 0,
+        "Millie": 0,
+        "Tink": 0
+      },
+      "stats": {
+        "treesChopped": 0,
+        "logsSold": 0,
+        "playtimeMin": 0,
+        "volumeSold": 0,
+        "cuts": 0
+      },
+      "tutorialDone": false,
+      "tutorialStep": 1,
+      "tutorialProgress": 0,
+      "tutorialOrder": 0,
+      "tutorialRefresher": false,
+      "tutorialReplay": false,
+      "seasonId": "spring",
+      "daily": {
+        "day": 0,
+        "goals": [],
+        "streak": 0,
+        "bestStreak": 0,
+        "lastCompleteDay": 0,
+        "loginDay": 0,
+        "lastLoginDay": 0
+      },
+      "truckPaint": {},
+      "forest": {
+        "figures": {},
+        "elders": 0
+      },
+      "truckBed": [],
+      "truckAt": {},
+      "leftLoad": [],
+      "groundLoad": [],
+      "sawmillStock": [],
+      "truckLoad": [],
+      "rebirths": 0
+    }
+  ]
+}

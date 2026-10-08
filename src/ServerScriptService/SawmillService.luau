@@ -69,6 +69,7 @@ type Job = {
 	boost: number,
 	lux: boolean,
 	plankBonus: number, -- the plank bonus the planks leave with
+	temper: number, -- the log's Prosperous stamp, carried onto every plank
 	lastHolderId: number?,
 	consumed: boolean,
 	next: number,
@@ -334,6 +335,7 @@ local function startJob(c: Context, mill: Model, piece: Piece, millDef: ItemCata
 		boost = piece.boost,
 		lux = piece.lux == true,
 		plankBonus = math.max(SellLogic.Bonus(piece.mill), SellLogic.Bonus(millDef.plankBonus)),
+		temper = SellLogic.Temper(piece.temper),
 		lastHolderId = piece.lastHolderId,
 		consumed = false,
 		next = 1,
@@ -498,6 +500,7 @@ local function emitOne(c: Context, job: Job)
 		boost = job.boost,
 		lux = job.lux,
 		mill = job.plankBonus,
+		temper = job.temper,
 		lastHolderId = job.lastHolderId,
 	})
 	-- Shove it out along the outfeed. SpawnPlank leaves the plank loose.

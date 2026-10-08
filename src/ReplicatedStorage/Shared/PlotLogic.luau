@@ -691,6 +691,12 @@ function PlotLogic.Check(
 		elseif otherCount >= PlotData.MaxItems then
 			return false, string.format("Your plot holds %d things at most", PlotData.MaxItems)
 		end
+		-- Save-size total. A move passes ignoreUid and does not grow the list.
+		-- Kit and item caps above keep their own messages when they are the
+		-- ones that are full.
+		if #placed >= GameConfig.PlacedCap then
+			return false, string.format("Your plot holds %d placed pieces at most", GameConfig.PlacedCap)
+		end
 	end
 	local rect = PlotLogic.RectOf(bp, x, z, rot)
 	local onYard = if squares

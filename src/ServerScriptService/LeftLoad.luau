@@ -24,6 +24,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+local SellLogic = require(ReplicatedStorage.Shared.SellLogic)
 
 local LeftLoad = {}
 
@@ -62,6 +63,7 @@ export type Piece = {
 	l: boolean?,
 	m: number?,
 	d: number?,
+	t: number?, -- Prosperous temper; absent means 1
 	bed: string,
 	at: { number },
 	s: { { number } },
@@ -203,6 +205,7 @@ function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean, beds: { 
 	end
 	local at = r.at :: { number }
 	local boost = r.x
+	local stamp = SellLogic.Temper(if finite(r.t) then r.t else nil)
 	return {
 		w = r.w,
 		k = if r.k == "plank" then "plank" else "log",
@@ -211,6 +214,7 @@ function LeftLoad.CleanPiece(raw: unknown, isWood: (string) -> boolean, beds: { 
 		l = if r.l == true then true else nil,
 		m = if r.k == "plank" and finite(r.m) and (r.m :: number) > 1 then math.min(r.m :: number, 3) else nil,
 		d = if r.k == "plank" and finite(r.d) and (r.d :: number) > 1 then math.min(r.d :: number, 3) else nil,
+		t = if stamp > 1 then stamp else nil,
 		bed = r.bed,
 		at = { at[1], at[2], at[3], at[4], at[5], at[6] },
 		s = sections,

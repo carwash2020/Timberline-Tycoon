@@ -696,7 +696,7 @@ return function(t)
 		local fs = require("@lune/fs")
 		local report = fs.readFile("ECONOMY.md")
 		-- The price ladder (axes) moved the headlines to these.
-		for _, headline in ipairs({ "68 s", "7.9 min", "13.7 min", "51.4 min", "30.5 h" }) do
+		for _, headline in ipairs({ "68 s", "5.4 min", "17.9 min", "66.3 min", "33.5 h" }) do
 			t.ok(string.find(report, headline, 1, true) ~= nil, headline)
 		end
 		t.eq(NPCData.Get("Murph").tips[1], "I'm Murph. Chop a tree, haul the wood, sell it at the mill.")

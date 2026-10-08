@@ -118,7 +118,9 @@ end
 local function gearSlots(): { Slot }
 	local list: { ItemCatalog.GearDef } = {}
 	for _, gear in pairs(ItemCatalog.Gear) do
-		table.insert(list, gear)
+		if gear.quest ~= true then
+			table.insert(list, gear)
+		end
 	end
 	table.sort(list, function(a, b)
 		return a.id < b.id

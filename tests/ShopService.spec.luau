@@ -395,7 +395,7 @@ return function(t)
 		t.eq(s.profile.cash, steel.v2.price - 10)
 		t.eq(s.granted, {})
 		t.eq(s.toasts, { "You need $10 more for the Steel Axe." })
-		-- Each loop charges its own price: v2's Steel Axe is $120, v1's $150.
+		-- Each loop charges its own price: v2's Steel Axe is $110, v1's $150.
 		local own = setup({ cash = steel.v2.price, loop = 2 })
 		own.buy("Axe", "SteelAxe")
 		t.eq(own.granted, { "SteelAxe" })
@@ -454,7 +454,7 @@ return function(t)
 		t.eq(far.profile.cash, 99999)
 	end)
 
-	t.test("a boxed steel axe charges $120 once when pay is fired ten times", function()
+	t.test("a boxed steel axe charges $110 once when pay is fired ten times", function()
 		local s = setup({ cash = 1000, loop = 2, bestTier = 1 })
 		local box = { uid = "box-steel", kind = "Axe", itemId = "SteelAxe", limited = false }
 		local oks = 0
@@ -466,7 +466,7 @@ return function(t)
 			end
 		end
 		t.eq(oks, 1)
-		t.eq(s.profile.cash, 1000 - 120)
+		t.eq(s.profile.cash, 1000 - 110)
 		t.eq(s.granted, { "SteelAxe" })
 		t.eq(#s.equipped, 1)
 	end)
@@ -476,12 +476,12 @@ return function(t)
 		local box = { uid = "box-defer", kind = "Axe", itemId = "SteelAxe", limited = false, deferGrant = true }
 		local ok = s.ShopService.ChargeAndGrant(s.player, box)
 		t.eq(ok, true)
-		t.eq(s.profile.cash, 1000 - 120, "charged at the counter")
+		t.eq(s.profile.cash, 1000 - 110, "charged at the counter")
 		t.eq(s.granted, {}, "but nothing in the inventory yet")
 		t.eq(#s.equipped, 0)
 		local again = s.ShopService.ChargeAndGrant(s.player, box)
 		t.eq(again, false, "a second pay of the same box is refused")
-		t.eq(s.profile.cash, 1000 - 120)
+		t.eq(s.profile.cash, 1000 - 110)
 		t.eq(s.ShopService.GrantItem(s.player, box), true)
 		t.eq(s.granted, { "SteelAxe" })
 		t.eq(s.ShopService.GrantItem(s.player, box), false, "the item comes out of a box once")
