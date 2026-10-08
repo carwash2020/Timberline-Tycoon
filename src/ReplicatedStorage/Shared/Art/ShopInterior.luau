@@ -37,8 +37,6 @@ local TABLE_TOP = hex("#C69C6D")
 local TIMBER = hex("#5A3E26")
 local IRON = hex("#3B3634")
 local PAPER = hex("#F4ECD8")
-local GOLD = hex("#E3B73C")
-local GOLD_INK = hex("#6B4A12")
 local TRIM = hex("#F2E7CF")
 local RUNNER = hex("#9A3D2E")
 local RUNNER_EDGE = hex("#E3C98A")
@@ -498,43 +496,50 @@ local function axeRack(model: Model, frame: Frame)
 	end
 end
 
+-- The Tool Shed's Robux table, and nothing else. A later purchases lane
+-- replaces this one function. Same table as the cash shelves, gold top,
+-- along the back wall behind the counter. Its boxes are the gold boxes.
+local function buildRobuxTable(model: Model, floorTop: number)
+	local GOLD = hex("#E3B73C")
+	local GOLD_INK = hex("#6B4A12")
+	local entries = RobuxShelf.List()
+	if #entries == 0 then
+		return
+	end
+	local width = RobuxShelf.RowWidth()
+	local cz = RobuxShelf.TableZ
+	local depth = RobuxShelf.TableDepth
+	furniture(
+		model,
+		"GoldTable",
+		-width / 2,
+		width / 2,
+		cz - depth / 2,
+		cz + depth / 2,
+		floorTop,
+		RobuxShelf.TableTop,
+		TIMBER,
+		GOLD
+	)
+	-- The name on a board across the table's front (a hanging sign here
+	-- would hide the axes on the rack behind).
+	local board = dBox(
+		model,
+		"RobuxSign",
+		V3(math.max(8.4, width - 1), 1.1, 0.12),
+		CF(0, RobuxShelf.TableTop - 0.9, cz - depth / 2 - 0.1),
+		GOLD,
+		MAT.SmoothPlastic
+	)
+	Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
+end
+
 local function toolShed(model: Model, frame: Frame)
 	local rng = Kit.rng(2604)
 	-- The middle of each table (the lamps and the hanging signs are over it).
 	local LANE_MIDDLE = 11.05
 	ShopInterior.SteppedUnit(model, "ToolShed", frame, "DisplayTable", TABLE, TABLE_TOP)
-	-- The Robux table: the same table as the cash shelves with a gold top, along
-	-- the back wall behind the counter and its keeper. Its boxes are the gold
-	-- boxes, one label each (its name; the R$ price shows when you aim).
-	local entries = RobuxShelf.List()
-	if #entries > 0 then
-		local width = RobuxShelf.RowWidth()
-		local cz = RobuxShelf.TableZ
-		local depth = RobuxShelf.TableDepth
-		furniture(
-			model,
-			"GoldTable",
-			-width / 2,
-			width / 2,
-			cz - depth / 2,
-			cz + depth / 2,
-			frame.floorTop,
-			RobuxShelf.TableTop,
-			TIMBER,
-			GOLD
-		)
-		-- The gold shelf's name on a board across the table's front (a hanging
-		-- sign here would hide the axes on the rack behind).
-		local board = dBox(
-			model,
-			"RobuxSign",
-			V3(math.max(8.4, width - 1), 1.1, 0.12),
-			CF(0, RobuxShelf.TableTop - 0.9, cz - depth / 2 - 0.1),
-			GOLD,
-			MAT.SmoothPlastic
-		)
-		Kit.signText(board, "ROBUX SHELF", GOLD_INK, { Enum.NormalId.Front }, Enum.Font.FredokaOne, 0.2)
-	end
+	buildRobuxTable(model, frame.floorTop)
 	axeRack(model, frame)
 	counterDetail(model, frame)
 	backDoor(model, frame, frame.halfW - 0.3, 19, false, 1)
