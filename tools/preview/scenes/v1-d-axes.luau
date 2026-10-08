@@ -1,6 +1,7 @@
 --!nocheck
 -- Lane D: the axe ladder in a 3/4 view (30 degrees off the side, 15 degrees
--- down) so each head reads as a solid. Two rows, every axe inside the frame.
+-- down) so each head reads as a solid. Rows of four. Name plaques stand
+-- behind and above the head, so the axe from butt to tip stays clear.
 
 return {
 	build = function(ctx)
@@ -25,11 +26,10 @@ return {
 			table.insert(axes, maul)
 		end
 
-		local GAP = 4.2
-		local FRONT_Z = -5
-		local BACK_Z = 5
-		-- Six on the ground, five on the step behind them.
-		local frontN = 6
+		local GAP = 5.4
+		local PER = 4
+		-- Camera sits on -Z. The first row is the near one.
+		local ROW_Z = { -9, 0, 9 }
 		local turn = CF.Angles(0, math.pi / 2, 0)
 
 		local function corners(cf, size)
@@ -71,51 +71,65 @@ return {
 		end
 
 		local placed = {}
-		local function slotX(i, n)
-			return (i - (n + 1) / 2) * GAP
+		local rowCount = math.ceil(#axes / PER)
+		local rowN = {}
+		for r = 1, rowCount do
+			rowN[r] = math.min(PER, #axes - (r - 1) * PER)
 		end
 
 		for i, def in ipairs(axes) do
 			local axe = AxeArt.Build(def)
-			local onBack = i > frontN
-			local x = if onBack then slotX(i - frontN, #axes - frontN) else slotX(i, frontN)
-			local z = if onBack then BACK_Z else FRONT_Z
+			local r = math.floor((i - 1) / PER) + 1
+			local col = (i - 1) % PER + 1
+			local x = (col - (rowN[r] + 1) / 2) * GAP
+			local z = ROW_Z[r]
 			axe:PivotTo(CF.new(x, 0, z) * turn)
 			axe.Parent = root
-			placed[i] = { axe = axe, def = def, x = x, z = z, back = onBack }
+			placed[i] = { axe = axe, def = def, x = x, z = z, row = r }
 		end
 
-		local frontTop = 0
+		-- Each row stands above the one in front, signs included, so a
+		-- 15-degree camera does not hide the back row behind the front.
+		local heights = {}
+		for r = 1, rowCount do
+			heights[r] = 0
+		end
 		for _, row in ipairs(placed) do
-			if not row.back then
-				frontTop = math.max(frontTop, topY(row.axe))
+			heights[row.row] = math.max(heights[row.row], topY(row.axe))
+		end
+		local foot = { 0 }
+		for r = 2, rowCount do
+			foot[r] = foot[r - 1] + heights[r - 1] + 1.4
+		end
+		for _, row in ipairs(placed) do
+			row.foot = foot[row.row]
+			if row.foot > 0 then
+				row.axe:PivotTo(CF.new(row.x, row.foot, row.z) * turn)
 			end
 		end
-		local step = frontTop + 0.6
-		for _, row in ipairs(placed) do
-			if row.back then
-				row.axe:PivotTo(CF.new(row.x, step, row.z) * turn)
-			end
+
+		for r = 2, rowCount do
+			Kit.part(
+				root,
+				"Step",
+				V3.new((rowN[r] - 1) * GAP + 4, foot[r], 3.4),
+				CF.new(0, foot[r] / 2, ROW_Z[r]),
+				C3.fromHex("#7A5230"), -- TimberBrown
+				Enum.Material.Wood
+			)
 		end
 
-		local backWidth = (#axes - frontN - 1) * GAP + 3
-		Kit.part(
-			root,
-			"Step",
-			V3.new(backWidth, step, 3.2),
-			CF.new(0, step / 2, BACK_Z),
-			C3.fromHex("#7A5230"), -- TimberBrown
-			Enum.Material.Wood
-		)
-
+		-- A small plaque above the head and a stud behind it (further from
+		-- the camera), so it never covers the butt or the blade.
 		local labels = {}
 		for i, row in ipairs(placed) do
-			local foot = if row.back then step else 0
+			local top = topY(row.axe)
+			local h = 0.38
 			local sign = Kit.part(
 				root,
 				"Label",
-				V3.new(2.4, 0.55, 0.1),
-				CF.new(row.x, foot + 0.32, row.z - 1.7),
+				V3.new(2.1, h, 0.08),
+				CF.new(row.x, top + 0.5 + h / 2, row.z + 1.15),
 				C3.fromHex("#F3E7C9"), -- SignCream
 				Enum.Material.SmoothPlastic
 			)
@@ -191,7 +205,7 @@ return {
 				local hHalf = vHalf * ASPECT
 				dist *= math.max(maxR / hHalf, maxU / vHalf, 0.5)
 			end
-			dist *= margin or 1.28
+			dist *= margin or 1.5
 			local eye = eyeAt(dist)
 			return { pos = { eye.X, eye.Y, eye.Z }, target = { center.X, center.Y, center.Z }, label = label }
 		end
@@ -218,10 +232,10 @@ return {
 				table.insert(subjects, placed[i].axe)
 				table.insert(subjects, labels[i])
 			end
-			table.insert(cameras, frame(subjects, g[3], 1.35))
+			table.insert(cameras, frame(subjects, g[3], 1.5))
 		end
 		for i, row in ipairs(placed) do
-			table.insert(cameras, frame({ row.axe, labels[i] }, row.def.displayName, 1.4))
+			table.insert(cameras, frame({ row.axe, labels[i] }, row.def.displayName, 1.55))
 		end
 		return {
 			root = root,

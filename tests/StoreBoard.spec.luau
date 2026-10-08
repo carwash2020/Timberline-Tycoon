@@ -68,24 +68,28 @@ return function(t)
 		t.eq(model:FindFirstChild("Instant Delivery", true), nil)
 	end)
 
-	t.test("posters show the name and R$, scaled and wrapped, with no description", function()
+	t.test("each poster is the item name and its price, two lines, nothing cut off", function()
 		local Enum = t.roblox.Enum
 		local model = StoreBoard.Build()
 		local StoreData = t.shared("StoreData")
+		t.eq(StoreBoard.PriceFor("2x Cash"), "R$ 399")
+		t.eq(StoreBoard.PriceFor("$1,000"), "R$ 49")
+		t.eq(StoreBoard.PriceFor("$10,000"), "R$ 399")
+		t.eq(StoreBoard.PriceFor("Lux Axe"), "R$ …", "no Lux number is stored")
 		local function check(item)
 			local card = model:FindFirstChild(item.name, true)
 			t.eq(card:FindFirstChild("Description"), nil, item.name .. " has no description")
 			local title = card:FindFirstChild("Name")
-			local price = card:FindFirstChild("Price")
-			t.eq(title.Text, item.name)
-			t.eq(price.Text, "R$")
+			local lines = string.split(title.Text, "\n")
+			t.eq(#lines, 2, item.name .. " is two lines")
+			t.eq(lines[1], item.name)
+			t.eq(lines[2], StoreBoard.PriceFor(item.name))
 			t.eq(title.TextScaled, true, item.name)
-			t.eq(price.TextScaled, true, item.name)
 			t.eq(title.TextWrapped, true, item.name)
-			t.eq(price.TextWrapped, true, item.name)
 			t.eq(title.TextTruncate, Enum.TextTruncate.None, item.name)
-			t.eq(price.TextTruncate, Enum.TextTruncate.None, item.name)
 			t.ok(card.Size.Y.Offset <= 56, item.name .. " stays a short card")
+			local gap = card:FindFirstChild("Gap")
+			t.eq(gap.Visible, false, "the spacer is not a third line on the card")
 		end
 		for _, pass in ipairs(StoreData.ListedPasses()) do
 			check(pass)
@@ -94,9 +98,15 @@ return function(t)
 			check(product)
 		end
 		for _, d in ipairs(model:GetDescendants()) do
-			if d:IsA("TextLabel") then
-				t.ok(string.find(d.Text, "…", 1, true) == nil, "no cut-off line")
+			if d:IsA("TextLabel") and d.Name ~= "Gap" then
 				t.ok(string.find(d.Text, "...", 1, true) == nil, "no cut-off line")
+				if d.Name == "Name" then
+					local price = string.split(d.Text, "\n")[2]
+					local ellipsis = string.find(d.Text, "…", 1, true)
+					t.eq(ellipsis ~= nil, price == "R$ …", "only the unknown Lux price uses an ellipsis")
+				else
+					t.ok(string.find(d.Text, "…", 1, true) == nil, "no cut-off line")
+				end
 			end
 		end
 	end)

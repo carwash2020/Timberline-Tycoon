@@ -66,16 +66,25 @@ function StoreBoard.Overlaps(x0: number, x1: number, z0: number, z1: number): bo
 	return a0 < x1 and a1 > x0 and b0 < z1 and b1 > z0
 end
 
--- The board names what is for sale. The Robux number is not stored here
--- (Creator Hub owns it; the store screen reads it live), so the line is
--- "R$" and nothing else. Descriptions stay on the store screen.
-StoreBoard.PriceLine = "R$"
+-- Two lines per item: the name, then the price. The numbers that exist are
+-- GAME_DESIGN §7. The Lux Axe has no number in the repo, so its line is the
+-- same "R$ …" the store screen shows before Creator Hub answers. Lane P
+-- owns this board next; the parts, frame and place stay as they are.
+local PRICE_BY_NAME: { [string]: string } = {
+	["2x Cash"] = "R$ 399",
+	["$1,000"] = "R$ 49",
+	["$10,000"] = "R$ 399",
+}
+
+function StoreBoard.PriceFor(name: string): string
+	return PRICE_BY_NAME[name] or "R$ …"
+end
 
 local function poster(parent: Instance, item: { name: string, description: string, image: number }, order: number)
 	local card = Instance.new("Frame")
 	card.Name = item.name
 	card.LayoutOrder = order
-	card.Size = UDim2.new(1, -8, 0, 52)
+	card.Size = UDim2.new(1, -8, 0, 56)
 	card.BackgroundColor3 = Color3.fromRGB(255, 246, 230)
 	card.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
@@ -94,13 +103,15 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	end
 	image.Parent = card
 	local ink = Color3.fromHex("#2A2420") -- SignInk
-	-- Y scale is a hair, so a preview that sorts lines by it keeps name
-	-- then price. The card is what you see in Studio; the scale does not move it.
+	local priceText = StoreBoard.PriceFor(item.name)
+	-- One label, two lines. A hair of Y scale keeps the preview's sort
+	-- (name, then a blank, then the next name) without moving the words
+	-- on the card. The card is what you see in Studio.
 	local title = Instance.new("TextLabel")
 	title.Name = "Name"
 	title.BackgroundTransparency = 1
-	title.Position = UDim2.new(0, 52, order * 0.02, 2)
-	title.Size = UDim2.new(1, -58, 0, 26)
+	title.Position = UDim2.new(0, 52, order * 0.01, 4)
+	title.Size = UDim2.new(1, -58, 0, 44)
 	title.Font = Enum.Font.GothamBold
 	title.TextScaled = true
 	title.TextWrapped = true
@@ -108,22 +119,18 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.TextYAlignment = Enum.TextYAlignment.Center
 	title.TextColor3 = ink
-	title.Text = item.name
+	title.Text = item.name .. "\n" .. priceText
 	title.Parent = card
-	local price = Instance.new("TextLabel")
-	price.Name = "Price"
-	price.BackgroundTransparency = 1
-	price.Position = UDim2.new(0, 52, order * 0.02 + 0.01, 28)
-	price.Size = UDim2.new(1, -58, 0, 20)
-	price.Font = Enum.Font.GothamBold
-	price.TextScaled = true
-	price.TextWrapped = true
-	price.TextTruncate = Enum.TextTruncate.None
-	price.TextXAlignment = Enum.TextXAlignment.Left
-	price.TextYAlignment = Enum.TextYAlignment.Center
-	price.TextColor3 = ink
-	price.Text = StoreBoard.PriceLine
-	price.Parent = card
+	-- A blank line between items in the preview. Hidden, so the card
+	-- itself stays two lines.
+	local gap = Instance.new("TextLabel")
+	gap.Name = "Gap"
+	gap.Visible = false
+	gap.BackgroundTransparency = 1
+	gap.Position = UDim2.new(0, 0, order * 0.01 + 0.005, 0)
+	gap.Size = UDim2.fromOffset(0, 0)
+	gap.Text = " "
+	gap.Parent = card
 	card.Parent = parent
 end
 

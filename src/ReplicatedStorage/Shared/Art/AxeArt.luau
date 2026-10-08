@@ -6,8 +6,9 @@
 -- a brass pin. Cobalt is a thin double bevel with a white edge. Gold is a
 -- wide crescent and three bands. Obsidian is three glass facets in an iron
 -- frame with a violet edge. Inferno is a notched flame. Starfall is a
--- star-tipped double head. Lux is an ornate fan. The Hermit's Maul is a
--- block on a rope-wrapped haft. Pure (see Kit).
+-- star-tipped double head. Lux is an axe bit with a small fan behind it.
+-- The Hermit's Maul is a heavy wedge, wider than a Steel blade, on a
+-- rope-wrapped haft. Pure (see Kit).
 --
 -- Contract (AxeService, the preview):
 --   * Build(def) returns a Model built upright around the origin: the
@@ -129,17 +130,24 @@ local function emitter(parent: BasePart, name: string, color: Color3, rate: numb
 	e.Parent = parent
 end
 
-local function glowLight(parent: BasePart, color: Color3)
+local function glowLight(parent: BasePart, color: Color3, range: number?, brightness: number?)
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Range = 8
-	light.Brightness = 1.2
+	light.Range = range or 8
+	light.Brightness = brightness or 1.2
 	light.Shadows = false
 	light.Parent = parent
 end
 
-local function shine(host: BasePart, color: Color3, particleName: string, rate: number)
-	glowLight(host, color)
+local function shine(
+	host: BasePart,
+	color: Color3,
+	particleName: string,
+	rate: number,
+	range: number?,
+	brightness: number?
+)
+	glowLight(host, color, range, brightness)
 	emitter(host, particleName, color, rate)
 end
 
@@ -203,8 +211,9 @@ local function buildLook(model: Model, def: AxeDef, look: AxeModels.AxeLook)
 	-- the two 3.7-stud hafts do not share an outline.
 	local nudge = if shape == "crescent" then -0.2 else 0
 	local y, z, front = seat(ctx, size, nudge)
-	-- The maul's head is the block itself. A second core would sit on the haft.
-	local host: Part? = if shape == "maul" then nil else core(ctx, size, y, z, color, mat)
+	-- The maul and the Lux fan draw their own head. A core box under either
+	-- one would hide the outline (a block, or a glow with nothing to read).
+	local host: Part? = if shape == "maul" or shape == "fan" then nil else core(ctx, size, y, z, color, mat)
 
 	if shape == "chipped" then
 		bit(ctx, "Blade", size, y, z, color, mat, 0.46)
@@ -364,16 +373,37 @@ local function buildLook(model: Model, def: AxeDef, look: AxeModels.AxeLook)
 			)
 		end
 	elseif shape == "fan" then
-		for i = -2, 2 do
-			local ang = i * 0.22
-			local blade = Vector3.new(size.X, size.Y * 0.28, size.Z * 0.82)
-			wedge(ctx, "Fan", blade, CFrame.new(0, y, z) * CFrame.Angles(ang, 0, 0), color, mat)
+		-- A real bit first, so the head still reads when the light is on.
+		-- Three short ribs sit behind the bit. They are the fan, not the head.
+		bit(ctx, "Blade", size, y, z, color, mat, 0.4)
+		local edge = part(
+			ctx,
+			"Edge",
+			Vector3.new(size.X * 0.55, size.Y * 0.72, 0.04),
+			CFrame.new(0, y - size.Y * 0.02, front - 0.02),
+			color,
+			Enum.Material.Neon
+		)
+		for i = -1, 1 do
+			local rib = Vector3.new(size.X * 0.8, size.Y * 0.18, size.Z * 0.36)
+			local rz = z + size.Z * 0.24
+			local ry = y + i * size.Y * 0.18
+			wedge(ctx, "Fan", rib, CFrame.new(0, ry, rz) * CFrame.Angles(i * 0.32, 0, 0), color, mat)
 		end
-		collar(ctx, y - size.Y * 0.2, Kit.hex("#C9A24A"), Enum.Material.Metal, "Collar") -- Brass
+		collar(ctx, y - size.Y * 0.42, Kit.hex("#C9A24A"), Enum.Material.Metal, "Collar") -- Brass
+		if def.look.glow then
+			-- Short and dim next to Inferno and Starfall, so the bit stays a shape.
+			shine(edge, color, "Glint", 3, 3.2, 0.35)
+		end
 	elseif shape == "maul" then
-		local mz = -1.02 + size.Z / 2
-		part(ctx, "Head", size, CFrame.new(0, y, mz), color, mat)
-		for _, ry in ipairs({ 0.55, 0.9, 1.25 }) do
+		-- A wide wedge, at least twice a Steel blade's height, plus a flat
+		-- poll so it reads as a hammer and not a box on a stick. The head
+		-- stays thin in X: a dropped maul has to lie under 1.2 studs.
+		bit(ctx, "Head", size, y, z, color, mat, 0.55)
+		local pollDepth = 0.5
+		local poll = Vector3.new(size.X * 0.92, size.Y * 0.62, pollDepth)
+		part(ctx, "Poll", poll, CFrame.new(0, y, z + size.Z / 2 + pollDepth / 2 - 0.06), Kit.shade(color, -0.12), mat)
+		for _, ry in ipairs({ 0.42, 0.72, 1.02 }) do
 			part(
 				ctx,
 				"Rope",
@@ -388,7 +418,7 @@ local function buildLook(model: Model, def: AxeDef, look: AxeModels.AxeLook)
 	end
 
 	if def.look.glow and host ~= nil then
-		local particleName = if shape == "fan" then "Glint" elseif shape == "star" then "Spark" else "Ember"
+		local particleName = if shape == "star" then "Spark" else "Ember"
 		shine(host, color, particleName, 5)
 	end
 end

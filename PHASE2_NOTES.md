@@ -6,7 +6,7 @@ Done on this branch, not on main. Renders for Connor live in `previews/v1-d/` (l
 
 Axes (part-built; uploaded meshes still replace them when they load):
 
-1. PC. Equip Rusty, then each rung, then the Lux Axe and the Hermit's Maul. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat (the maul included). Good: each axe is a different shape, matching `previews/v1-d/axe-*.png`. The Rusty head is chipped, Steel is a clean wedge, Hardened has a back spike, Silver is bearded, Cobalt has a white edge, Gold is a crescent, Obsidian is dark glass with a violet edge, Inferno glows, Starfall is a pale double head, Lux is a gold fan with its trail, the maul is a block.
+1. PC. Equip Rusty, then each rung, then the Lux Axe and the Hermit's Maul. The hand sits near the foot of the haft and the blade points forward. A swing still chops. Q or Backspace drops it, and it lies flat (the maul included). Good: each axe is a different shape, matching `previews/v1-d/axe-*.png`. The Rusty head is chipped, Steel is a clean wedge, Hardened has a back spike, Silver is bearded, Cobalt has a white edge, Gold is a crescent, Obsidian is dark glass with a violet edge, Inferno glows, Starfall is a pale double head, Lux is a gold axe head with a short fan behind it (the glow stays on the head), the Hermit's Maul is a heavy wedge at least twice a Steel blade, with a flat poll and rope on the haft.
 2. Phone emulator. The same equip, swing and drop. Drop is a long press on the hotbar. No new button, and nothing sits on the thumbstick or the jump button.
 3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
 
@@ -24,7 +24,7 @@ Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's
 
 Store board:
 
-8. PC. Walk to the store board in town. The board is cream, the heading is dark ink, and each poster is the item's name plus R$ (the Robux number stays on the store screen). No description, no cut-off line. A thin brass frame sits on the face. The banner words and where the board stands are the same as before. Good: `previews/v1-d/board-after.png`.
+8. PC. Walk to the store board in town. The board is cream, the heading is dark ink, and each poster is exactly two lines: the item name, then its price (2x Cash is R$ 399, the $1,000 pack is R$ 49, the $10,000 pack is R$ 399, from GAME_DESIGN §7). The Lux Axe's price line is "R$ …" because no Lux number is stored. No description, no cut-off line. A thin brass frame sits on the face. The banner words and where the board stands are the same as before. Good: `previews/v1-d/board-after.png`.
 9. Phone emulator. The board is still readable. Body text stays at least 14px. No new control.
 10. Xbox. The board prompt still works. B closes whatever it opened.
 

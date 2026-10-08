@@ -18,7 +18,7 @@ return function(t)
 		InfernoAxe = { length = 4.0, head = Vector3.new(0.3, 1.6, 1.7), shape = "flame", headColor = "#FF6A1A" },
 		StarfallAxe = { length = 4.2, head = Vector3.new(0.28, 1.8, 1.8), shape = "star", headColor = "#BFD8FF" },
 		LuxAxe = { length = 4.0, head = Vector3.new(0.25, 1.6, 1.6), shape = "fan", headColor = "#F2D36B" },
-		HermitsMaul = { length = 3.6, head = Vector3.new(0.8, 0.8, 1.2), shape = "maul", headColor = "#6F7B5C" },
+		HermitsMaul = { length = 3.6, head = Vector3.new(0.9, 2.4, 1.7), shape = "maul", headColor = "#6F7B5C" },
 	}
 
 	t.test("every axe has the remake's length, head and shape", function()

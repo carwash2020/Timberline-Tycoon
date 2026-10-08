@@ -218,7 +218,7 @@ return function(t)
 		t.ok(AxeArt.Grip(def), "a grip")
 	end)
 
-	t.test("the Lux Axe: a gold haft and fan, a Glint, the 3.5 gameplay haft", function()
+	t.test("the Lux Axe: a gold haft, a readable bit, a fan behind it, the 3.5 gameplay haft", function()
 		local def = ItemCatalog.GetAxe("LuxAxe")
 		t.ok(AxeArt.Designed("LuxAxe"))
 		local m = AxeArt.Build(def)
@@ -231,24 +231,42 @@ return function(t)
 		t.ok(lo.Z < -0.5, "blade toward -Z")
 		t.ok(nearHex(m.PrimaryPart.Color, "#F2D36B"), "gold haft")
 		local fan = false
+		local bladeY = 0
 		for _, p in ipairs(parts(m)) do
 			if p.Name == "Fan" then
 				fan = true
 				t.ok(nearHex(p.Color, "#F2D36B"), "gold fan")
+			elseif p.Name == "Blade" then
+				bladeY += p.Size.Y
 			end
 		end
-		t.ok(fan, "an ornate fan")
+		t.ok(fan, "a fan behind the head")
+		t.ok(bladeY >= 1.4, "an axe head, not only a glow")
 		local glint = m:FindFirstChild("Glint", true)
 		t.ok(glint and glint:IsA("ParticleEmitter"), "named Glint")
-		t.ok(m:FindFirstChildWhichIsA("PointLight", true) ~= nil, "a glint light")
+		local light = m:FindFirstChildWhichIsA("PointLight", true)
+		t.ok(light ~= nil, "a glint light")
+		t.ok(light.Range <= 4, "the glow stays on the head")
 	end)
 
-	t.test("the Hermit's Maul is its own block, and it does not glow", function()
+	t.test("the Hermit's Maul is a heavy wedge, twice a Steel blade, and it does not glow", function()
+		local AxeModels = t.load("ReplicatedStorage/Shared/Art/AxeModels")
 		t.ok(AxeArt.Designed("HermitsMaul"))
 		local m = AxeArt.Build(ItemCatalog.GetAxe("HermitsMaul"))
-		local head = m:FindFirstChild("Head")
-		t.ok(head, "a head")
-		t.ok(near(head.Size.X, 0.8) and near(head.Size.Y, 0.8) and near(head.Size.Z, 1.2), "block maul")
+		local steel = AxeModels.Look("SteelAxe")
+		local spanY, thick, heads = 0, 0, 0
+		for _, p in ipairs(parts(m)) do
+			if p.Name == "Head" then
+				heads += 1
+				spanY += p.Size.Y
+				thick = math.max(thick, p.Size.X)
+			end
+		end
+		t.ok(heads >= 2, "a wedge, not one box")
+		local blade = math.max(steel.head.Y, steel.head.Z)
+		t.ok(spanY + 1e-3 >= blade * 2, string.format("head %.2f vs twice a Steel blade %.2f", spanY, blade * 2))
+		t.ok(thick < 1.15, "thin enough to lie flat")
+		t.ok(m:FindFirstChild("Poll") ~= nil, "a hammer poll")
 		t.ok(m:FindFirstChild("Rope") ~= nil, "rope wrap")
 		t.eq(m:FindFirstChildWhichIsA("PointLight", true), nil)
 		-- Lying down, the thick head is the height. It has to stay low.

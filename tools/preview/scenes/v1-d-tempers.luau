@@ -56,7 +56,8 @@ return {
 			tall = topOf(probe)
 			probe:Destroy()
 		end
-		local step = tall + 0.5
+		-- Clear of the plaque, which sits above the head.
+		local step = tall + 1.35
 
 		for f, family in ipairs(families) do
 			local foot = (3 - f) * step
@@ -77,11 +78,13 @@ return {
 				AxeArt.ApplyTemper(axe, family, tier)
 				axe:PivotTo(CF.new(x, foot, z) * turn)
 				axe.Parent = root
+				local top = topOf(axe)
+				local h = 0.36
 				local sign = Kit.part(
 					root,
 					"Label",
-					V3.new(2.4, 0.5, 0.1),
-					CF.new(x, foot + 0.3, z - 1.6),
+					V3.new(2.0, h, 0.08),
+					CF.new(x, top + 0.45 + h / 2, z + 1.1),
 					C3.fromHex("#F3E7C9"), -- SignCream
 					Enum.Material.SmoothPlastic
 				)
@@ -157,7 +160,7 @@ return {
 				local vHalf = math.tan(math.rad(FOV / 2))
 				dist *= math.max(maxR / (vHalf * ASPECT), maxU / vHalf, 0.5)
 			end
-			dist *= margin or 1.28
+			dist *= margin or 1.5
 			local eye = eyeAt(dist)
 			return { pos = { eye.X, eye.Y, eye.Z }, target = { center.X, center.Y, center.Z }, label = label }
 		end
