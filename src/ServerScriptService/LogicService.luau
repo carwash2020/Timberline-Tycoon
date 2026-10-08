@@ -82,6 +82,14 @@ local GLOW_ROLE: { [string]: boolean } = {
 local hostFn: HostFn? = nil
 local function silent(_player: Player, _text: string) end
 local notify: Notify = silent
+-- Lane W registers a belt, sawmill or planer. power and reverse are the
+-- two boolean inputs a wire can drive later. Registering does not run them.
+export type LogicTarget = {
+	power: (boolean) -> (),
+	reverse: (boolean) -> (),
+}
+
+local targets: { [string]: LogicTarget } = {}
 local lastFlip: { [string]: number } = {}
 local runs: { [Instance]: Run } = {}
 local hexCache: { [string]: Color3 } = {}
@@ -104,6 +112,7 @@ end
 
 function LogicService.Reset()
 	table.clear(lastFlip)
+	table.clear(targets)
 end
 
 local function mayUse(owner: Player, profile: Profile, who: Player, flag: string): boolean
@@ -186,18 +195,65 @@ end
 -- What the pieces show
 ---------------------------------------------------------------------------
 
+local function named(model: Model, slot: string): BasePart?
+	local part = model:FindFirstChild(slot)
+	if part and part:IsA("BasePart") then
+		return part
+	end
+	return nil
+end
+
+local function restOf(part: BasePart, root: BasePart): CFrame
+	local rest = part:GetAttribute("RestOffset")
+	if typeof(rest) == "CFrame" then
+		return rest
+	end
+	local made = root.CFrame:ToObjectSpace(part.CFrame)
+	part:SetAttribute("RestOffset", made)
+	return made
+end
+
 local function tip(model: Model, blueprintId: string, on: boolean)
+	local moving = named(model, "Moving")
+	local base = named(model, "Root")
+	if moving and base then
+		moving.CFrame = base.CFrame * restOf(moving, base) * CFrame.Angles(0, 0, if on then -TIP else TIP)
+		model:SetAttribute("On", on)
+		return
+	end
 	local lever = model:FindFirstChild("Part" .. LEVER_BOX)
-	local base = model:FindFirstChild("Root")
+	base = named(model, "Root")
 	local bp = PlotLogic.Blueprint(blueprintId)
 	local box = if bp then bp.boxes[LEVER_BOX] else nil
-	if lever and base and box and lever:IsA("BasePart") and base:IsA("BasePart") then
+	if lever and base and box and lever:IsA("BasePart") then
 		lever.CFrame = base.CFrame * CFrame.new(box.offset - ROOT_LIFT) * CFrame.Angles(0, 0, if on then -TIP else TIP)
 	end
 	model:SetAttribute("On", on)
 end
 
+local function poseCap(model: Model, down: boolean)
+	local moving = named(model, "Moving")
+	local base = named(model, "Root")
+	if not moving or not base then
+		return
+	end
+	moving.CFrame = base.CFrame * restOf(moving, base) * CFrame.new(0, if down then -0.08 else 0, 0)
+end
+
 local function setLamp(model: Model, blueprintId: string, lit: boolean)
+	local indicator = named(model, "Indicator")
+	if indicator then
+		local stored = indicator:GetAttribute("LitColor")
+		local color = if typeof(stored) == "Color3" then stored else indicator.Color
+		indicator.Material = if lit then Enum.Material.Neon else Enum.Material.SmoothPlastic
+		indicator.Color = if lit then color else OFF_COLOR
+		local glow = indicator:FindFirstChildOfClass("PointLight")
+		if glow then
+			glow.Enabled = lit
+		end
+		model:SetAttribute("Lit", lit)
+		return
+	end
 	local bp = PlotLogic.Blueprint(blueprintId)
 	if bp then
 		for i, box in ipairs(bp.boxes) do
@@ -218,6 +274,19 @@ local function setLamp(model: Model, blueprintId: string, lit: boolean)
 end
 
 local function poseHatch(model: Model, open: boolean)
+	local moving = named(model, "Moving")
+	local root = named(model, "Root")
+	if moving and root then
+		local shut = root.CFrame * restOf(moving, root)
+		if open then
+			local half = moving.Size.Z / 2
+			moving.CFrame = shut * CFrame.new(0, 0, half) * CFrame.Angles(HATCH_OPEN, 0, 0) * CFrame.new(0, 0, -half)
+		else
+			moving.CFrame = shut
+		end
+		model:SetAttribute("Open", open)
+		return
+	end
 	local leaf = model:FindFirstChild("Part2")
 	local base = model:FindFirstChild("Root")
 	local bp = PlotLogic.Blueprint("Hatch")
@@ -239,7 +308,7 @@ local function showOverload(model: Model, on: boolean)
 	model:SetAttribute("Overloaded", on)
 	local existing = model:FindFirstChild("OverloadGui", true)
 	if on and existing == nil then
-		local host = model:FindFirstChild("Part1")
+		local host = model:FindFirstChild("LabelFace") or model:FindFirstChild("Part1")
 		if host and host:IsA("BasePart") then
 			local gui = Instance.new("SurfaceGui")
 			gui.Name = "OverloadGui"
@@ -308,6 +377,9 @@ local function applyItem(run: Run, item: PlotLogic.Placed, who: Player?): string
 		poseHatch(model, on)
 	elseif role ~= nil and GLOW_ROLE[role] then
 		setLamp(model, id, on)
+		if role == "button" or role == "plate" then
+			poseCap(model, on)
+		end
 		if role == "button" then
 			model:SetAttribute("On", on)
 		end
@@ -780,7 +852,9 @@ function LogicService.Attach(ctx: Context)
 	end
 	if role == "switch" or role == "lever" then
 		tip(ctx.model, id, profile ~= nil and WireLogic.IsOn(profile.plot.switches, ctx.item.uid))
-		local host: Instance = ctx.model:FindFirstChild("Part" .. LEVER_BOX) or ctx.model
+		local host: Instance = ctx.model:FindFirstChild("Moving")
+			or ctx.model:FindFirstChild("Part" .. LEVER_BOX)
+			or ctx.model
 		local object = nameOf(ctx.item)
 		local flipPrompt = prompt(host, "FlipPrompt", "Flip", object, "Interact", 0)
 		onTriggered(flipPrompt, function(who: Player)
@@ -793,7 +867,7 @@ function LogicService.Attach(ctx: Context)
 			end)
 		end
 	elseif role == "button" then
-		local host: Instance = ctx.model:FindFirstChild("Part3") or ctx.model
+		local host: Instance = ctx.model:FindFirstChild("Moving") or ctx.model:FindFirstChild("Part3") or ctx.model
 		local pressPrompt = prompt(host, "PressPrompt", "Press", nameOf(ctx.item), "Interact", 0)
 		onTriggered(pressPrompt, function(who: Player)
 			LogicService.Press(ctx, who)
@@ -819,7 +893,9 @@ function LogicService.Attach(ctx: Context)
 	local key, default = WireLogic.DefaultSetting(id)
 	local spec = WireLogic.Spec(id)
 	if key and default and spec and spec.min and spec.max and spec.step then
-		local hostPart: Instance = ctx.model:FindFirstChild("Part1") or ctx.model
+		local hostPart: Instance = ctx.model:FindFirstChild("LabelFace")
+			or ctx.model:FindFirstChild("Part1")
+			or ctx.model
 		local setPrompt = prompt(hostPart, "SetPrompt", "Set", nameOf(ctx.item), "Interact", 0)
 		setPrompt:SetAttribute("Uid", ctx.item.uid)
 		setPrompt:SetAttribute("LogicKey", key)
@@ -1115,7 +1191,7 @@ function LogicService.BuildDemo(board: BasePart?)
 	beamBetween(folder, "WireAnd", tie(lever, "lever"), tie(gate, "gate"), "lever")
 	beamBetween(folder, "WireLamp", tie(clock, "clock"), tie(lamp, "lamp"), "clock")
 	beamBetween(folder, "WireHatch", tie(plate, "plate"), tie(hatch, "hatch"), "plate")
-	local flipHost: Instance = lever:FindFirstChild("Part3") or lever
+	local flipHost: Instance = lever:FindFirstChild("Moving") or lever:FindFirstChild("Part3") or lever
 	local flipPrompt = prompt(flipHost, "FlipPrompt", "Flip", "Lever", "Interact", 0)
 	onTriggered(flipPrompt, function(_who: Player)
 		local on = lever:GetAttribute("On") ~= true
@@ -1160,6 +1236,30 @@ function LogicService.Init(remoteEvent: RemoteEvent?)
 	if remoteEvent ~= nil then
 		startRuntime()
 	end
+end
+
+function LogicService.RegisterTarget(uid: string, target: LogicTarget): boolean
+	if type(uid) ~= "string" or uid == "" then
+		return false
+	end
+	if type(target) ~= "table" or type(target.power) ~= "function" or type(target.reverse) ~= "function" then
+		return false
+	end
+	targets[uid] = target
+	return true
+end
+
+function LogicService.UnregisterTarget(uid: string)
+	if type(uid) == "string" then
+		targets[uid] = nil
+	end
+end
+
+function LogicService.Target(uid: string): LogicTarget?
+	if type(uid) ~= "string" then
+		return nil
+	end
+	return targets[uid]
 end
 
 function LogicService.V1Init(ctx: { remotes: { LogicSet: RemoteEvent? }?, notify: Notify? }?)

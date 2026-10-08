@@ -57,4 +57,43 @@ return function(t)
 		end
 		t.eq(count, #KINDS, "one label each")
 	end)
+
+	t.test("a missing MeshTemplates model keeps the part build and is logged once", function()
+		LogicItems.InstallMesh(nil)
+		local model = Models.Build(PlotData.Blueprint("Lever"), false)
+		t.eq(model:FindFirstChild("Body"), nil)
+		t.eq(model:FindFirstChild("Moving"), nil)
+		local handle = model:FindFirstChild("Part3")
+		t.eq(handle.Transparency, 0)
+		t.eq(LogicItems.FellBack("Lever"), true)
+		Models.Build(PlotData.Blueprint("Lever"), false)
+		t.eq(LogicItems.FellBack("Lever"), true)
+	end)
+
+	t.test("a MeshTemplates model supplies the named slots and the gate label", function()
+		local function part(name)
+			local made = t.roblox.Instance.new("Part")
+			made.Name = name
+			made.Size = t.roblox.Vector3.new(1, 0.4, 1)
+			made.CFrame = t.roblox.CFrame.new(0, 0.5, 0)
+			made.Color = t.roblox.Color3.fromRGB(40, 40, 40)
+			return made
+		end
+		local template = t.roblox.Instance.new("Model")
+		for _, name in ipairs({ "Body", "Indicator", "Moving", "LabelFace" }) do
+			local piece = part(name)
+			piece.Parent = template
+		end
+		LogicItems.InstallMesh("GateAnd", template)
+		local model = Models.Build(PlotData.Blueprint("GateAnd"), false)
+		for _, name in ipairs(LogicItems.Slots) do
+			t.ok(model:FindFirstChild(name), name)
+		end
+		local mark = model:FindFirstChild("Mark", true)
+		t.eq(mark.Parent.Name, "LabelFace")
+		t.eq(mark:FindFirstChild("Label").Text, "AND")
+		t.eq(model:FindFirstChild("Part1").Transparency, 1, "the boxes step back")
+		t.eq(LogicItems.FellBack("GateAnd"), false)
+		LogicItems.InstallMesh("GateAnd", nil)
+	end)
 end

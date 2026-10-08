@@ -48,6 +48,8 @@ What shipped: Button $320, Lever $520, Pressure Plate $640, Wall Switch $100, AN
 
 Caps (proposals): 80 logic pieces and 160 wires on a plot. A looping circuit stops at 200 evaluations and the piece reads Overloaded. The graph ticks only while the owner is online and the plot is loaded. Delay, Sustain and Clock remember their setting in `plot.logic`. Clocks and in-flight delays start again on rejoin (the phase is not saved).
 
+Lane K's meshes: each piece looks for a model of its id under `MeshTemplates`, with slots Body, Indicator, Moving and LabelFace. A missing model keeps the part build and logs once. Indicator is the lamp or LED. Moving is the lever, the button cap, the hatch door or the plate top. The gate label sits on LabelFace. Lane W can call `LogicService.RegisterTarget(uid, { power, reverse })` for a belt, a sawmill or a planer. Those inputs are stored and not driven yet.
+
 The settings panel sits at the top centre, clear of the thumbstick and the jump button. Minus, plus and Done work by tap, click, and the d-pad or arrow keys. B closes it. The wire tool and the panel bind gamepad keys only while they are open.
 
 ### Studio checks
@@ -60,7 +62,7 @@ The settings panel sits at the top centre, clear of the thumbstick and the jump 
 6. **Phone emulator.** The wire tool: tap an output, tap an input. The settings panel: tap minus, plus and Done. Nothing sits on the thumbstick or the jump button. The first wiring session shows "Pick an output", then "Pick an input", then "Done: flip it", once.
 7. **Xbox.** Wire tool: RT picks, X cuts, B leaves. Settings panel: the stick moves between minus and plus, A presses, B closes. The d-pad is not used (it stays the HUD shortcuts). After both are closed, chopping with RT still swings the axe.
 8. **Demo board.** If Sparkworks has a part named DemoBoard, a lever feeds an AND, a clock feeds a lamp, and a plate feeds a hatch, with no save. If the building is not in the world, nothing errors.
-9. **Gates.** AND, OR, XOR, NOT, Delay, Sustain and Clock each show a cream label on the dark top (AND, OR, XOR, NOT, DLY, HOLD, CLK) and a different coloured strip. You can tell them apart without opening the shop.
+9. **Gates.** AND, OR, XOR, NOT, Delay, Sustain and Clock each show a cream label on the dark top (AND, OR, XOR, NOT, DLY, HOLD, CLK) and a different coloured strip. You can tell them apart without opening the shop. Until Lane K's meshes are in the place, Output logs `[LogicItems] <id> has no MeshTemplates model; keeping the part build` once per piece and the parts stay.
 
 ## V1 economy core (8 October 2026, branch `phase-2/v1-a1-economy-core`)
 

@@ -504,4 +504,37 @@ return function(t)
 		s.Service.BuildDemo(board)
 		t.eq(#board:GetChildren(), 1, "not built twice")
 	end)
+
+	t.test("a machine registers power and reverse and nothing drives them", function()
+		local s = setup()
+		local calls = { power = 0, reverse = 0 }
+		local target = {
+			power = function(_on)
+				calls.power += 1
+			end,
+			reverse = function(_on)
+				calls.reverse += 1
+			end,
+		}
+		t.eq(s.Service.RegisterTarget("belt", target), true)
+		t.eq(s.Service.Target("belt"), target)
+		t.eq(s.Service.RegisterTarget("", target), false)
+		t.eq(s.Service.RegisterTarget("belt", { power = function() end }), false)
+		t.eq(calls.power, 0)
+		t.eq(calls.reverse, 0)
+		s.add("lamp", "SparkLamp", 0, 0)
+		t.eq(calls.power, 0, "placing a lamp does not drive the machine")
+		t.eq(calls.reverse, 0)
+		local saw = {
+			power = function() end,
+			reverse = function() end,
+		}
+		t.eq(s.Service.RegisterTarget("saw", saw), true)
+		t.eq(s.Service.Target("saw"), saw)
+		s.Service.UnregisterTarget("belt")
+		t.eq(s.Service.Target("belt"), nil)
+		t.eq(s.Service.Target("saw"), saw)
+		s.Service.UnregisterTarget("missing")
+		t.eq(s.Service.Target("saw"), saw)
+	end)
 end

@@ -369,14 +369,152 @@ local items: { Item } = {
 	},
 }
 
+-- Lane K ships one MeshTemplates model per piece id. The named slots are
+-- the look; the boxes stay the collider when a slot is missing.
+local SLOTS = { "Body", "Indicator", "Moving", "LabelFace" }
+
+local MeshKit = require(script.Parent.Art.MeshKit)
+
+local known: { [string]: boolean } = {}
+for _, item in ipairs(items) do
+	known[item.id] = true
+end
+
+local installed: { [string]: Model } = {}
+local logged: { [string]: boolean } = {}
+
+local function logMiss(id: string)
+	if logged[id] then
+		return
+	end
+	logged[id] = true
+	warn(string.format("[LogicItems] %s has no MeshTemplates model; keeping the part build", id))
+end
+
+local function findTemplate(id: string): Model?
+	local held = installed[id]
+	if held then
+		return held
+	end
+	local ok, folder = pcall(function()
+		return game:GetService("ReplicatedStorage"):FindFirstChild("MeshTemplates")
+	end)
+	if not ok or folder == nil then
+		return nil
+	end
+	local inst = (folder :: Instance):FindFirstChild(id)
+	if inst and inst:IsA("Model") then
+		return inst
+	end
+	return nil
+end
+
+-- Clones Body, Indicator, Moving and LabelFace from the piece's
+-- MeshTemplates model. Indicator is the lamp or LED. Moving is the lever
+-- handle, button cap, hatch door or plate top. LabelFace carries the gate
+-- label. A missing model, or one with none of those slots, keeps the part
+-- build and is logged once.
+local function applyMeshes(model: Model, id: string, ghost: boolean?): boolean
+	if not known[id] then
+		return false
+	end
+	local template = findTemplate(id)
+	local root = model:FindFirstChild("Root")
+	if template == nil or root == nil or not root:IsA("BasePart") then
+		logMiss(id)
+		return false
+	end
+	local pivot = template:GetPivot()
+	local made: { BasePart } = {}
+	for _, slot in ipairs(SLOTS) do
+		local src = template:FindFirstChild(slot)
+		if src and src:IsA("BasePart") then
+			local part = src:Clone()
+			part.Name = slot
+			part:SetAttribute("LogicMesh", true)
+			if part:IsA("MeshPart") then
+				local raw = part:GetAttribute("MeshId")
+				local meshId = 0
+				if type(raw) == "string" then
+					meshId = tonumber(raw) or 0
+				elseif type(raw) == "number" then
+					meshId = raw
+				end
+				MeshKit.Visual(part, meshId)
+			else
+				part.Massless = true
+				part.CanCollide = false
+				part.CanTouch = false
+				part.CanQuery = false
+			end
+			part.Anchored = true
+			if ghost then
+				part.Transparency = 0.45
+				part.CanCollide = false
+				part.CanQuery = false
+				part.CanTouch = false
+			end
+			part.CFrame = root.CFrame * pivot:ToObjectSpace(src.CFrame)
+			part.Parent = model
+			if slot == "Moving" or slot == "Indicator" then
+				part:SetAttribute("RestOffset", root.CFrame:ToObjectSpace(part.CFrame))
+			end
+			if slot == "Indicator" then
+				part:SetAttribute("LitColor", part.Color)
+			end
+			table.insert(made, part)
+		end
+	end
+	if #made == 0 then
+		logMiss(id)
+		return false
+	end
+	local indicator = model:FindFirstChild("Indicator")
+	if indicator and indicator:IsA("BasePart") then
+		for _, child in ipairs(model:GetChildren()) do
+			if child:IsA("BasePart") and child:GetAttribute("LogicMesh") ~= true then
+				local light = child:FindFirstChildOfClass("PointLight")
+				if light and light.Parent ~= indicator then
+					light.Parent = indicator
+				end
+			end
+		end
+	end
+	for _, child in ipairs(model:GetChildren()) do
+		if child:IsA("BasePart") and child ~= root and child:GetAttribute("LogicMesh") ~= true then
+			child.Transparency = 1
+		end
+	end
+	return true
+end
+
+-- Tests hand a stand-in model. Nil id forgets every stand-in.
+local function installMesh(id: string?, model: Model?)
+	if id == nil then
+		table.clear(installed)
+		table.clear(logged)
+		return
+	end
+	installed[id] = model :: Model
+	logged[id] = nil
+end
+
+local function fellBack(id: string): boolean
+	return logged[id] == true
+end
+
 -- A readable name on the dark top of a gate, in cream GothamBold.
 -- BlueprintModels calls this for every build, ghost included.
+-- The label sits on LabelFace when the mesh supplied one.
 local function dress(model: Model, id: string)
 	local text = MARK[id]
 	if text == nil then
 		return
 	end
-	local host = model:FindFirstChild("Part1")
+	local host = model:FindFirstChild("LabelFace")
+	if host == nil or not host:IsA("BasePart") then
+		host = model:FindFirstChild("Part1")
+	end
 	if host == nil or not host:IsA("BasePart") then
 		return
 	end
@@ -400,6 +538,10 @@ end
 
 local api = items :: any
 api.Dress = dress
+api.ApplyMeshes = applyMeshes
+api.InstallMesh = installMesh
+api.FellBack = fellBack
+api.Slots = SLOTS
 api.Mark = MARK
 api.Accent = ACCENT
 

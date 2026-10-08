@@ -136,6 +136,10 @@ function BlueprintModels.Build(bp: PlotData.Blueprint, ghost: boolean): Model
 	else
 		ItemMeshes.Attach(model, root, bp.id, ghost)
 	end
+	local applyMeshes = (LogicItems :: any).ApplyMeshes
+	if type(applyMeshes) == "function" then
+		applyMeshes(model, bp.id, ghost)
+	end
 	local dress = (LogicItems :: any).Dress
 	if type(dress) == "function" then
 		dress(model, bp.id)
