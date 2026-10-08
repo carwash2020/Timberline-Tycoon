@@ -15,7 +15,9 @@ return {
 		local Models = ctx.shared("BlueprintModels")
 		local LogicItems = ctx.shared("LogicItems")
 		local root = roblox.Instance.new("Model")
-		Common.ground(ctx, root, 2400, C3.fromRGB(116, 164, 84), V3.new(400, -0.5, 200))
+		-- One grass pad big enough that every camera hits grass, not sky.
+		-- The shadow map has to cover that pad or the outer shots go flat.
+		Common.ground(ctx, root, 1600, C3.fromRGB(116, 164, 84), V3.new(0, -0.5, 120))
 
 		-- 3/4: 30 degrees off the front, 30 degrees up. Renders are 1400x900.
 		local AZ = math.rad(30)
@@ -65,67 +67,62 @@ return {
 			end
 		end
 
-		local function consider(part, minV, maxV)
-			if part.Transparency >= 1 then
-				return minV, maxV
-			end
-			local cf = part.CFrame
-			local h = part.Size * 0.5
-			for _, sx in ipairs({ -1, 1 }) do
-				for _, sy in ipairs({ -1, 1 }) do
-					for _, sz in ipairs({ -1, 1 }) do
-						local p = cf.Position
-							+ cf.RightVector * (h.X * sx)
-							+ cf.UpVector * (h.Y * sy)
-							- cf.LookVector * (h.Z * sz)
-						minV = V3.new(math.min(minV.X, p.X), math.min(minV.Y, p.Y), math.min(minV.Z, p.Z))
-						maxV = V3.new(math.max(maxV.X, p.X), math.max(maxV.Y, p.Y), math.max(maxV.Z, p.Z))
+		local function eachCorner(list, fn)
+			local function one(part)
+				if part.Transparency >= 1 then
+					return
+				end
+				local cf = part.CFrame
+				local h = part.Size * 0.5
+				for _, sx in ipairs({ -1, 1 }) do
+					for _, sy in ipairs({ -1, 1 }) do
+						for _, sz in ipairs({ -1, 1 }) do
+							fn(
+								cf.Position
+									+ cf.RightVector * (h.X * sx)
+									+ cf.UpVector * (h.Y * sy)
+									- cf.LookVector * (h.Z * sz)
+							)
+						end
 					end
 				end
 			end
-			return minV, maxV
-		end
-
-		local function boundsOf(list)
-			local minV = V3.new(math.huge, math.huge, math.huge)
-			local maxV = V3.new(-math.huge, -math.huge, -math.huge)
 			for _, inst in ipairs(list) do
 				if inst:IsA("BasePart") then
-					minV, maxV = consider(inst, minV, maxV)
+					one(inst)
 				end
 				for _, d in ipairs(inst:GetDescendants()) do
 					if d:IsA("BasePart") then
-						minV, maxV = consider(d, minV, maxV)
+						one(d)
 					end
 				end
 			end
-			return minV, maxV
 		end
 
 		-- Distance so the group is about 70% of the width, and fully in frame.
+		-- Fit the real part corners. An axis-aligned box would include empty
+		-- air (a tall lamp's height at another piece's corner) and back the
+		-- camera up.
 		local function frame(list, fill)
-			local minV, maxV = boundsOf(list)
+			local minV = V3.new(math.huge, math.huge, math.huge)
+			local maxV = V3.new(-math.huge, -math.huge, -math.huge)
+			eachCorner(list, function(p)
+				minV = V3.new(math.min(minV.X, p.X), math.min(minV.Y, p.Y), math.min(minV.Z, p.Z))
+				maxV = V3.new(math.max(maxV.X, p.X), math.max(maxV.Y, p.Y), math.max(maxV.Z, p.Z))
+			end)
 			local center = (minV + maxV) / 2
 			local back = V3.new(math.sin(AZ) * math.cos(EL), math.sin(EL), math.cos(AZ) * math.cos(EL))
 			local forward = -back
 			local right = forward:Cross(V3.new(0, 1, 0)).Unit
 			local up = right:Cross(forward).Unit
 			local halfW, halfH = 0, 0
-			local function weigh(p)
+			eachCorner(list, function(p)
 				local d = p - center
 				halfW = math.max(halfW, math.abs(d:Dot(right)))
 				halfH = math.max(halfH, math.abs(d:Dot(up)))
-			end
-			weigh(minV)
-			weigh(maxV)
-			weigh(V3.new(minV.X, minV.Y, maxV.Z))
-			weigh(V3.new(minV.X, maxV.Y, minV.Z))
-			weigh(V3.new(maxV.X, minV.Y, minV.Z))
-			weigh(V3.new(minV.X, maxV.Y, maxV.Z))
-			weigh(V3.new(maxV.X, minV.Y, maxV.Z))
-			weigh(V3.new(maxV.X, maxV.Y, minV.Z))
-			halfW *= 1.08
-			halfH *= 1.08
+			end)
+			halfW *= 1.06
+			halfH *= 1.06
 			local hfov = 2 * math.atan(math.tan(math.rad(FOV) / 2) * ASPECT)
 			local distW = halfW / math.tan(fill * hfov / 2)
 			local distH = halfH / math.tan(math.rad(FOV) * 0.42)
@@ -142,8 +139,9 @@ return {
 		local per = 4
 		local groups = math.ceil(#LogicItems / per)
 		for g = 1, groups do
-			-- Far enough apart that this camera cannot see another group.
-			local originX = (g - 1) * 800
+			-- Far enough apart that this camera cannot see another group,
+			-- and still inside the grass pad.
+			local originX = (g - 1) * 260 - 390
 			local count = math.min(per, #LogicItems - (g - 1) * per)
 			local owned = {}
 			for i = 1, count do
@@ -155,7 +153,7 @@ return {
 				local front = bp.footprint.Y / 2 + 0.9
 				table.insert(owned, plaque(bp.displayName, x, z + front, if #bp.displayName > 10 then 4.2 else 3.2))
 			end
-			local cam = frame(owned, 0.7)
+			local cam = frame(owned, 0.74)
 			cam.label = "pieces-" .. g
 			table.insert(cameras, cam)
 		end
@@ -238,19 +236,20 @@ return {
 
 		-- Behind every piece camera, so none of those shots can see it.
 		local wired = {}
-		for _, part in ipairs(circuit(0, 500, false)) do
+		for _, part in ipairs(circuit(-20, 420, false)) do
 			table.insert(wired, part)
 		end
-		for _, part in ipairs(circuit(22, 500, true)) do
+		for _, part in ipairs(circuit(8, 420, true)) do
 			table.insert(wired, part)
 		end
-		local wiredCam = frame(wired, 0.72)
+		local wiredCam = frame(wired, 0.74)
 		wiredCam.label = "wired"
 		table.insert(cameras, wiredCam)
 
 		return {
 			root = root,
 			cameras = cameras,
+			shadowRadius = 700,
 		}
 	end,
 }

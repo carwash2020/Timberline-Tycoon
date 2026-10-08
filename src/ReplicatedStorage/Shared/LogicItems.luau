@@ -14,7 +14,7 @@ local V2 = Vector2.new
 local V3 = Vector3.new
 
 -- Palette (BuildingArt): IRON, STEEL, STEEL_DARK, BRASS, GLOW, EMBER,
--- TIMBER, ANVIL, BRICK, PAPER. The Wall Switch and Spark Lamp keep the
+-- TIMBER, ANVIL, BRICK. The Wall Switch and Spark Lamp keep the
 -- colours they already shipped with.
 
 local IRON = "#3B3634"
@@ -25,7 +25,6 @@ local EMBER = "#FF7A2E"
 local TIMBER = "#5B3920"
 local ANVIL = "#3C3F48"
 local BRICK = "#A8553D"
-local PAPER = "#F4ECD8"
 
 local METAL = "#3C3C41" -- the shipped switch post
 
