@@ -16,6 +16,7 @@ return function(t)
 	local TreeFill = t.load("ReplicatedStorage/Shared/World/TreeFill")
 	local ForestLogic = t.shared("ForestLogic")
 	local PlotData = t.shared("PlotData")
+	local TownTreeData = t.shared("TownTreeData")
 
 	local PREFIX = 730 -- WorldPlan.Trees() on main, before this fill
 	local HAUL = { HillsRoad = true, SnowRoad = true, VolcanoRoad = true, SkyrootRoad = true }
@@ -298,7 +299,7 @@ return function(t)
 		t.eq(clumps, 30)
 	end)
 
-	t.test("about 500 regrow spots in each zone pass TreeFill.Ground", function()
+	t.test("about 500 regrow spots in each zone pass its ground test (TreeFill.GroundFor)", function()
 		local zones = {}
 		for _, spot in ipairs(trees) do
 			local zone = spot.zone
@@ -323,11 +324,11 @@ return function(t)
 					if dist(px, pz, base.X, base.Z) < 10 then
 						return false
 					end
-					return TreeFill.Ground(px, pz)
+					return TreeFill.GroundFor(zone, px, pz)
 				end)
 				if x and z then
 					got += 1
-					t.ok(TreeFill.Ground(x, z), zone.id)
+					t.ok(TreeFill.GroundFor(zone, x, z), zone.id)
 				end
 			end
 			local least = if zone.radius >= 30 then 200 else 20
@@ -337,7 +338,7 @@ return function(t)
 		t.ok(checked > 30, checked .. " zones")
 	end)
 
-	t.test("the phone discs grow by at most 1.7x in trees and parts", function()
+	t.test("the phone discs grow by at most 1.7x in trees and parts, 2x with the town's trees", function()
 		local partsByWood = {}
 		local function partsOf(woodId)
 			local cached = partsByWood[woodId]
@@ -379,16 +380,30 @@ return function(t)
 		for _, grove in ipairs(TutorialGrove.Trees) do
 			table.insert(before, grove)
 		end
-		local after = { table.unpack(trees) }
+		-- `trees` less the town's (TreeFill.TownRings: budgeted on their own below).
+		local fill = {}
+		for _, spot in ipairs(trees) do
+			local zone = spot.zone
+			if not (zone and string.sub(zone.id, 1, 5) == "town:") then
+				table.insert(fill, spot)
+			end
+		end
+		local extras = {}
 		for _, spot in ipairs(reach) do
-			table.insert(after, spot)
+			table.insert(extras, spot)
 		end
 		local sky = WorldPlan.Sky()
 		for _, pos in ipairs(sky.lumenwood) do
-			table.insert(after, { position = pos, woodId = "lumenwood" })
+			table.insert(extras, { position = pos, woodId = "lumenwood" })
 		end
 		for _, grove in ipairs(TutorialGrove.Trees) do
-			table.insert(after, grove)
+			table.insert(extras, grove)
+		end
+		local after = { table.unpack(fill) }
+		local withTown = { table.unpack(trees) }
+		for _, spot in ipairs(extras) do
+			table.insert(after, spot)
+			table.insert(withTown, spot)
 		end
 		for _, disc in ipairs(PHONE) do
 			local bn, bp = tally(before, disc.x, disc.z)
@@ -396,6 +411,34 @@ return function(t)
 			t.ok(bn > 0, disc.name)
 			t.ok(an / bn <= 1.7, string.format("%s trees %d -> %d", disc.name, bn, an))
 			t.ok(ap / bp <= 1.7, string.format("%s parts %d -> %d", disc.name, bp, ap))
+			-- The town's trees (Connor, 8 October 2026: "all over, it's a lumberjack
+			-- game") sit inside these discs and are budgeted on top: a phone
+			-- carries the shipped tier's list (TownTreeData.ShippedTier).
+			local tn, tp = tally(withTown, disc.x, disc.z)
+			print(
+				string.format(
+					"phone disc %s: trees %d -> %d (%.2fx), parts %d -> %d (%.2fx); with the town %d (%.2fx), %d (%.2fx)",
+					disc.name,
+					bn,
+					an,
+					an / bn,
+					bp,
+					ap,
+					ap / bp,
+					tn,
+					tn / bn,
+					tp,
+					tp / bp
+				)
+			)
+			t.ok(
+				tn / bn <= TownTreeData.PhoneDiscMax,
+				string.format("%s trees %d -> %d with the town", disc.name, bn, tn)
+			)
+			t.ok(
+				tp / bp <= TownTreeData.PhoneDiscMax,
+				string.format("%s parts %d -> %d with the town", disc.name, bp, tp)
+			)
 		end
 	end)
 

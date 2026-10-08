@@ -1383,7 +1383,7 @@ local function pickSpot(rec: TreeRecord): Vector3?
 		if dx * dx + dz * dz < TREE_GAP * TREE_GAP then
 			return false
 		end
-		if not TreeFill.Ground(px, pz) then
+		if not TreeFill.GroundFor(zone, px, pz) then
 			return false
 		end
 		return not liveBaseNear(rec, px, pz)
