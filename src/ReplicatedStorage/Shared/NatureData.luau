@@ -34,6 +34,7 @@ export type Spot = {
 	caveId: string?,
 	parts: number,
 	light: boolean,
+	look: Kind?, -- zone kind; picks the rock palette
 }
 
 -- Lane B's modules are not in the game until that branch merges. A static
@@ -55,23 +56,24 @@ NatureData.RoadMargin = 4
 -- What a zone kind is dressed with. Town is empty on purpose.
 NatureData.Menu = {
 	meadow = { "Bush", "Fern", "Flowers", "Boulder", "Mushroom" },
-	forest = { "Fern", "Mushroom", "Bush", "Slab", "Roots" },
-	shore = { "Reeds", "WedgeRock", "Bush", "Flowers" },
-	snow = { "SnowShrub", "Spire", "Stack" },
-	volcano = { "AshShrub", "Boulder", "Stack" },
-	gloam = { "GloamCap", "Mushroom", "Fern" },
+	forest = { "Fern", "Mushroom", "Bush", "Slab", "Outcrop" },
+	shore = { "Reeds", "Slab", "PebbleCluster", "Flowers" },
+	snow = { "SnowShrub", "Spire", "CrackedBoulder" },
+	volcano = { "AshShrub", "Boulder", "Outcrop" },
+	gloam = { "GloamCap", "Mushroom", "Spire", "Fern" },
 	isle = { "IsleCrystal", "Fern", "Flowers" },
 	town = {},
-	cave = { "CaveMushroom", "GlowFungus", "CrystalRock", "Roots", "Bat" },
+	cave = { "CaveMushroom", "GlowFungus", "CrystalRock", "Roots", "Bat", "Boulder" },
 } :: { [string]: { string } }
 
 -- Must match NatureArt.Parts. The spec checks both.
 NatureData.PartCost = {
-	Boulder = 5,
-	Slab = 4,
-	Spire = 4,
-	WedgeRock = 4,
-	Stack = 6,
+	Boulder = 6,
+	CrackedBoulder = 6,
+	Spire = 6,
+	Slab = 6,
+	PebbleCluster = 6,
+	Outcrop = 6,
 	Bush = 4,
 	Fern = 3,
 	Flowers = 5,
@@ -409,6 +411,7 @@ function NatureData.CellSpots(
 				caveId = caveId,
 				parts = cost,
 				light = NatureData.LightKinds[kind] == true,
+				look = zone.kind,
 			})
 		end
 	end

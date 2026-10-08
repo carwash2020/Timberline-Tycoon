@@ -312,9 +312,13 @@ local function prepareNature(model: Model, spot: NatureData.Spot): boolean
 	return true
 end
 
+local function natureKey(spot: NatureData.Spot): string
+	return "nature/" .. spot.kind .. "/" .. tostring(spot.variant) .. "/" .. (spot.look or "")
+end
+
 local function buildNature(spot: NatureData.Spot): Decor?
 	local sizeName = if spot.variant == 1 then "small" elseif spot.variant == 3 then "large" else "mid"
-	local model = NatureArt.Build(spot.kind, spot.seed, if spot.caveId then nil else sizeName)
+	local model = NatureArt.Build(spot.kind, spot.seed, if spot.caveId then nil else sizeName, spot.look)
 	local lit = prepareNature(model, spot)
 	local parts: { BasePart } = {}
 	local locals: { CFrame } = {}
@@ -333,7 +337,7 @@ local function buildNature(spot: NatureData.Spot): Decor?
 		model = model,
 		parts = parts,
 		locals = locals,
-		key = "nature/" .. spot.kind .. "/" .. tostring(spot.variant),
+		key = natureKey(spot),
 		natureParts = spot.parts,
 		caveId = spot.caveId,
 		lit = lit,
@@ -341,7 +345,7 @@ local function buildNature(spot: NatureData.Spot): Decor?
 end
 
 local function acquireNature(spot: NatureData.Spot): Decor?
-	local key = "nature/" .. spot.kind .. "/" .. tostring(spot.variant)
+	local key = natureKey(spot)
 	local pool = decorPools[key]
 	local d = if pool then table.remove(pool) else nil
 	if not d then

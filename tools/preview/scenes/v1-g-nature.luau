@@ -1,5 +1,6 @@
 --!nocheck
--- Lane G nature looks: five rock shapes at three sizes, every plant, and
+-- Lane G nature looks: six rock families at three sizes, one biome look
+-- per column (moss, snow, sand, basalt, gloam, cave), every plant, and
 -- the cave dressing (mushrooms, glow fungus, crystal rocks, roots, bats)
 -- plus a gloamwood mushroom ring and lanternwood pods. Night views light
 -- the glow pieces.
@@ -41,16 +42,29 @@ return {
 			model.Parent = root
 		end
 
-		local sizes = { "small", "mid", "large" }
-		for si, sizeName in ipairs(sizes) do
-			for ri, kind in ipairs(NatureArt.RockShapes) do
-				local x = (ri - 1) * 7
-				local z = (si - 1) * 6
-				put(NatureArt.Build(kind, ri * 3 + si, sizeName), CF.new(x, 0, z))
-			end
-			label(string.upper(sizeName), -6, (si - 1) * 6)
+		-- Six families, large, each in its biome look. Two rows so the shot can
+		-- get close enough to read the shape.
+		local lineup = {
+			{ "Boulder", "meadow", "MOSS" },
+			{ "CrackedBoulder", "snow", "SNOW" },
+			{ "Spire", "shore", "SAND" },
+			{ "Slab", "volcano", "BASALT" },
+			{ "PebbleCluster", "gloam", "GLOAM" },
+			{ "Outcrop", "cave", "CAVE" },
+		}
+		for i, row in ipairs(lineup) do
+			local col = (i - 1) % 3
+			local line = math.floor((i - 1) / 3)
+			local x = col * 11
+			local z = line * 10
+			put(NatureArt.Build(row[1], i * 19, "large", row[2]), CF.new(x, 0, z))
+			label(row[3], x, z - 4.2)
 		end
-		label("ROCKS", 14, -6)
+		-- Sizes of the moss boulder, off to the side of the hero shot.
+		for si, sizeName in ipairs({ "small", "mid", "large" }) do
+			put(NatureArt.Build("Boulder", 40 + si, sizeName, "meadow"), CF.new(36, 0, (si - 1) * 7))
+			label(string.upper(sizeName), 36, (si - 1) * 7 - 3)
+		end
 
 		local plants = NatureArt.PlantKinds
 		for i, kind in ipairs(plants) do
@@ -77,9 +91,9 @@ return {
 			shadowRadius = 80,
 			fov = 42,
 			cameras = {
-				{ pos = { 14, 18, -28 }, target = { 14, 1, 4 }, label = "rocks plants cave" },
-				{ pos = { 14, 8, -14 }, target = { 14, 1, 6 }, label = "rocks" },
-				{ pos = { 8, 3.2, -8 }, target = { 7, 1.2, 0 }, label = "boulder close" },
+				{ pos = { 16, 20, -28 }, target = { 14, 1, 6 }, label = "rocks plants cave" },
+				{ pos = { 11, 7.5, -12 }, target = { 11, 1.3, 5 }, label = "rocks", fov = 46 },
+				{ pos = { 4.2, 2.6, -6 }, target = { 0.3, 1.1, 0.4 }, label = "boulder close", fov = 32 },
 				{ pos = { 36, 10, -40 }, target = { 36, 0.6, -18 }, label = "plants" },
 				{ pos = { 18, 2.2, -24 }, target = { 18, 0.45, -18 }, label = "flowers close", fov = 32 },
 				{ pos = { 20, 8, 8 }, target = { 20, 1.2, 30 }, label = "cave", night = true },

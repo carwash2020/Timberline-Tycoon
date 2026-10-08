@@ -42,6 +42,7 @@ local RunService = game:GetService("RunService")
 
 local ClockOverride = require(ReplicatedStorage.Shared.ClockOverride)
 local EnvironmentData = require(ReplicatedStorage.Shared.EnvironmentData)
+local RainFog = require(ReplicatedStorage.Shared.RainFog)
 local QualityBudgets = require(ReplicatedStorage.Shared.QualityBudgets)
 local Util = require(ReplicatedStorage.Shared.Util)
 local WeatherSchedule = require(ReplicatedStorage.Shared.WeatherSchedule)
@@ -308,13 +309,16 @@ local function apply(owned: Owned, s: LightingState)
 	if colorMoved("Lighting.OutdoorAmbient", s.outdoorAmbient) then
 		Lighting.OutdoorAmbient = s.outdoorAmbient
 	end
-	if colorMoved("Lighting.ColorShift_Top", s.colorShiftTop) then
-		Lighting.ColorShift_Top = s.colorShiftTop
+	-- Rain wetness is part of the target, applied once. WeatherController
+	-- only publishes RainFog.SetWet; it must not write these properties.
+	local wetSky = RainFog.Target(s.atmosphereDensity, s.atmosphereHaze, s.colorShiftTop)
+	if colorMoved("Lighting.ColorShift_Top", wetSky.shift) then
+		Lighting.ColorShift_Top = wetSky.shift
 	end
 
 	local a = owned.atmosphere
-	if numberMoved("Atmosphere.Density", s.atmosphereDensity) then
-		a.Density = s.atmosphereDensity
+	if numberMoved("Atmosphere.Density", wetSky.density) then
+		a.Density = wetSky.density
 	end
 	if numberMoved("Atmosphere.Offset", s.atmosphereOffset) then
 		a.Offset = s.atmosphereOffset
@@ -328,8 +332,8 @@ local function apply(owned: Owned, s: LightingState)
 	if numberMoved("Atmosphere.Glare", s.atmosphereGlare) then
 		a.Glare = s.atmosphereGlare
 	end
-	if numberMoved("Atmosphere.Haze", s.atmosphereHaze) then
-		a.Haze = s.atmosphereHaze
+	if numberMoved("Atmosphere.Haze", wetSky.haze) then
+		a.Haze = wetSky.haze
 	end
 
 	local grade = owned.grade

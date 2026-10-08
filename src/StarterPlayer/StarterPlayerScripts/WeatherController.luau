@@ -27,6 +27,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local NatureData = require(ReplicatedStorage.Shared.NatureData)
+local RainFog = require(ReplicatedStorage.Shared.RainFog)
 local WorldPlan = require(ReplicatedStorage.Shared.World.WorldPlan)
 
 local IS_STUDIO = RunService:IsStudio()
@@ -324,17 +325,6 @@ local function updateShelter(pos: Vector3, dt: number)
 	local target = if dry then 0 else 1
 	local alpha = 1 - math.exp(-dt / 1.6)
 	rainCover += (target - rainCover) * alpha
-end
-
-local function applyRainSky()
-	local wet = rainCover
-	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-	if atmosphere then
-		atmosphere.Density += 0.08 * wet
-		atmosphere.Haze += 1.1 * wet
-	end
-	local cool = Color3.fromRGB(150, 168, 188)
-	Lighting.ColorShift_Top = Lighting.ColorShift_Top:Lerp(cool, 0.25 * wet)
 end
 
 local function updateRates(env: LightingController.Environment, dt: number)
@@ -929,8 +919,6 @@ function WeatherController.Start()
 				placeRainbow()
 			end
 		end
-		-- After LightingController's RenderStepped write, so a wet sky does not stick.
-		applyRainSky()
 	end)
 
 	local sinceCosmetic = 0
@@ -952,6 +940,9 @@ function WeatherController.Start()
 		if camera then
 			updateShelter(camera.CFrame.Position, elapsed)
 		end
+		-- LightingController folds this into its fog target. Do not write Atmosphere here.
+		local rain = (targets(env).Rain or 0) * rainCover
+		RainFog.SetWet(rain)
 		updateRates(env, elapsed)
 		updateMapEmitters()
 		updateRainSound(elapsed)

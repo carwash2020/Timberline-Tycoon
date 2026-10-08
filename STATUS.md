@@ -13,7 +13,9 @@ Last updated 7 October 2026 (dialogue box branch on top of main at #95), after P
 
 First renders are in `previews/v1-g/` so Connor can mark them up before this merges. Trees in those shots are the live section trees (`TreeArt.FromSkeleton`). Rocks, plants, cave dressing, the gull, the snow fox and the sky moth are new part-built models. Rain shots are parts, because the preview tool does not draw particles: blobs are the old puff, streaks are the remake.
 
-The client now places those pieces. `AmbientLife` reads zones from `NatureData` (`ScatterZones` when Lane B has merged it, otherwise `WorldPlan`, plus `UndergroundData` rooms). Cave dressing shares `MaxDecor`, stays at or under 120 parts per cave, and uses at most 6 unshadowed lights (2 on low, 4 on medium, 6 on high). Surface nature parts near the camera stay within 560 / 320 / 148. Critters also stop at 320 / 240 / 120 parts, and still at `MaxCritters`. Walkers stay off a road's edge by more than 4 studs. Filler trees come from `TreeArt.FillerTree` (same part counts as before). Rain is a thin streak (`Size` 0.05, `Squash` 9, slanted) plus ground splashes, both inside the old 560 budget: about 198 live particles on high, 139 on medium, 99 on low. A raycast plus cave, tunnel and grotto zones fades rain, the rain sound, and a small sky shift out under shelter. No cash change and no tree-volume change. Palm section trees stay at 3 coconuts.
+The client now places those pieces. `AmbientLife` reads zones from `NatureData` (`ScatterZones` when Lane B has merged it, otherwise `WorldPlan`, plus `UndergroundData` rooms). Cave dressing shares `MaxDecor`, stays at or under 120 parts per cave, and uses at most 6 unshadowed lights (2 on low, 4 on medium, 6 on high). Surface nature parts near the camera stay within 560 / 320 / 148. Critters also stop at 320 / 240 / 120 parts, and still at `MaxCritters`. Walkers stay off a road's edge by more than 4 studs. Filler trees come from `TreeArt.FillerTree` (same part counts as before). Rain is a thin streak (`Size` 0.05, `Squash` 9, slanted) plus ground splashes, both inside the old 560 budget: about 198 live particles on high, 139 on medium, 99 on low. A raycast plus cave, tunnel and grotto zones fades rain and the rain sound under shelter. The wet-air haze is `RainFog`: WeatherController only publishes a 0–1 wetness, and LightingController adds it once to its own fog target (`+0.08` density, `+1.1` haze at full storm). Steady rain no longer stacks fog until the sky goes white. No cash change and no tree-volume change. Palm section trees stay at 3 coconuts.
+
+Rocks are six families (`Boulder`, `CrackedBoulder`, `Spire`, `Slab`, `PebbleCluster`, `Outcrop`), three sizes, each tilted 8–20° and sunk 20–30%. No block is taller than 1.5× its width (a spire is stacked offset courses). Biome palettes: meadow moss, snow cap, shore sandstone, volcano basalt, gloam blue-grey, cave wet stone. `NatureArt.OreRock(shape, size, oreColor, oreMaterial, glow)` is the host plus 2 or 3 thin face wedges, 8 parts or fewer, tagged `OreRockArt`, with `OreId` left `""` for Lane M. Neon and a shadowless PointLight are added only when `glow` is true. Ore rocks are not scattered yet.
 
 **Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.
 
@@ -36,6 +38,8 @@ Preview paths:
 - `previews/v1-g/trees-lumenwood-night.png`
 - `previews/v1-g/nature-rocks.png`
 - `previews/v1-g/nature-boulder-close.png`
+- `previews/v1-g/ore-rocks.png`
+- `previews/v1-g/ore-rocks-cave.png`
 - `previews/v1-g/nature-plants.png`
 - `previews/v1-g/nature-flowers-close.png`
 - `previews/v1-g/nature-cave.png`
