@@ -9,6 +9,53 @@ Last updated 7 October 2026 (dialogue box branch on top of main at #95), after P
 - **No floating speech bubbles (`claude/remove-bubbles`, 8 October 2026, not merged):** Connor: with the pop-up dialogue box, remove the floating chat bubbles. Gone: the wave hello, idle chatter, Murph's first-tip bubble, and every NPC's bubble code (`NPCController`, `NPCDialogue.AutoBubbles` and the Bubble* helpers, `TextAnchor.CardPx`/`Side`). Kept: name tags (wall-safe through `TextAnchor`), the Talk prompt, the box, the wave and talking gestures (the talking gesture now plays while the box is open), the murmur sound (plays as the box opens). Murph's three onboarding tips now open in the box the first time a new player talks to him on step one (`QuestUI`). Ferry fare, toll fee and shop prices still arrive through the prompts' own text (`Board ($x)`, `Pay toll ($x)`), the keepers' box lines and the toasts. Studio checklist in PHASE2_NOTES.md.
 - **Hotfix `claude/fix-shop-talk-buy` (8 October 2026, not merged):** Talk and Buy prompts went dead after #107-#111 (the global prompt switch was saved and restored by four scripts that overlap); now `PromptGate` / `PromptSwitch` hold it by name. Open until Connor confirms on Xbox: see PHASE2_NOTES.md "Hotfix: Talk and Buy prompts". Output tags to send back: `[Talk]`, `[PromptSwitch]`, `[Drag]`.
 
+## Lane G: V1 nature looks (branch `phase-2/v1-g-nature`, not merged)
+
+First renders, before the pieces are placed in the world. Connor reviews these and the tweaks land on this branch. Trees are the live section trees (`TreeArt.FromSkeleton`), the look players chop today. Rocks, plants, cave dressing, the gull, the snow fox and the sky moth are new part-built models. Rain is drawn as parts (the preview tool does not draw particles): blobs are today's puff, streaks are the remake, shorter and fewer on low, and absent under a shop roof.
+
+Not in the world yet: scatter placement, the weather controller, phone budgets, filler trees. No cash change and no tree-volume change.
+
+**Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.
+
+Preview paths:
+
+- `previews/v1-g/trees-lineup.png`
+- `previews/v1-g/trees-oak.png`
+- `previews/v1-g/trees-birch.png`
+- `previews/v1-g/trees-pine.png`
+- `previews/v1-g/trees-maple.png`
+- `previews/v1-g/trees-palm.png`
+- `previews/v1-g/trees-frostwood.png`
+- `previews/v1-g/trees-lanternwood.png`
+- `previews/v1-g/trees-emberwood.png`
+- `previews/v1-g/trees-gloamwood.png`
+- `previews/v1-g/trees-lumenwood.png`
+- `previews/v1-g/trees-lanternwood-night.png`
+- `previews/v1-g/trees-emberwood-night.png`
+- `previews/v1-g/trees-gloamwood-night.png`
+- `previews/v1-g/trees-lumenwood-night.png`
+- `previews/v1-g/nature-rocks.png`
+- `previews/v1-g/nature-boulder-close.png`
+- `previews/v1-g/nature-plants.png`
+- `previews/v1-g/nature-flowers-close.png`
+- `previews/v1-g/nature-cave.png`
+- `previews/v1-g/nature-glow-fungus.png`
+- `previews/v1-g/nature-mushroom-ring-lantern-pods.png`
+- `previews/v1-g/critters-lineup.png`
+- `previews/v1-g/critters-birds.png`
+- `previews/v1-g/critters-rabbits.png`
+- `previews/v1-g/critters-deer.png`
+- `previews/v1-g/critters-gulls.png`
+- `previews/v1-g/critters-snow-fox.png`
+- `previews/v1-g/critters-sky-moth.png`
+- `previews/v1-g/critters-wisps.png`
+- `previews/v1-g/critters-embers.png`
+- `previews/v1-g/rain-high-before-blobs.png`
+- `previews/v1-g/rain-high-after-streaks.png`
+- `previews/v1-g/rain-low-after-streaks.png`
+- `previews/v1-g/rain-shop-inside.png`
+- `previews/v1-g/rain-shop-outside.png`
+
 ## Who and how
 
 - Owner: Connor. A beginner on Windows PowerShell (also has a Mac): give commands one per line, never chained with `&&`, and never print secrets.

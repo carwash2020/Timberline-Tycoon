@@ -25,6 +25,7 @@ What's here, each with its own checklist below:
 14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
 
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
+15. **V1 nature looks** (8 October 2026, branch `phase-2/v1-g-nature`): first renders of trees, rocks, plants, cave dressing, critters and rain. Not placed in the world yet.
 
 Where the redesign changed something an older section describes (the
 world layout, the trucks' looks, chop range, the Sky Bin), the redesign's
@@ -150,6 +151,12 @@ and Land Office from the lot, 6 from the lot, 7 and 8 top down, 9 aerial,
    send the `[Load] ready for play` and `forest planted` lines.
 8. If a tree looks wrong (on a path, on a shop floor, in a queue), send its
    position: each site is one line in `TownTreeData.Sites`.
+
+## V1 nature looks (8 October 2026, branch `phase-2/v1-g-nature`)
+
+Early art only. The PNGs under `previews/v1-g/` (listed in STATUS.md) are what to review. Trees are the live choppable section trees. Rain blobs are the current puff; rain streaks are the remake, including a dry shop interior. Nothing in this pass is scattered into the live world, so there is no Studio placement check yet.
+
+When the client wiring lands, the Studio checks will be: PC, phone emulator and Xbox; chop, fell, logs and regrowth unchanged; streaks instead of blobs, dry inside a shop, a cave, the tunnel and the grotto; no decor or critters on roads, pads or floors; low quality stays smooth.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 
