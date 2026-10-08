@@ -351,6 +351,12 @@ local function showButtons(show: boolean)
 end
 
 -- PlotUI: while build mode is open the drag row stays hidden.
+-- Whether a piece is held, or a finger rests on one about to be (the drop
+-- keys, DropControls, leave Q and B to it).
+function DragController.Holding(): boolean
+	return hold ~= nil or pending ~= nil
+end
+
 function DragController.SetBuildMode(on: boolean)
 	if on then
 		local row = buttonRow

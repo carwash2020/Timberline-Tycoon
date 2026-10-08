@@ -35,7 +35,6 @@ QuickMenuLogic.Order = {
 	"hammer",
 	"tutorial",
 	"calltruck",
-	"dropaxe",
 	"instantdelivery",
 	"owner",
 	"hud",
