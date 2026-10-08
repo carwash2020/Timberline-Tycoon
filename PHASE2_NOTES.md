@@ -2,7 +2,7 @@
 
 ## Lane D: axes, boxes, shelves, hover tags (8 October 2026, branch `phase-2/v1-d-axes-displays`)
 
-In progress. Renders for Connor live in `previews/v1-d/` (listed in STATUS.md). Boxes, shelves, the store board and hover colours are not in yet. Nothing here is on main yet.
+Done on this branch, not on main. Renders for Connor live in `previews/v1-d/` (listed in STATUS.md).
 
 Axes (part-built; uploaded meshes still replace them when they load):
 
@@ -11,6 +11,30 @@ Axes (part-built; uploaded meshes still replace them when they load):
 3. Xbox. Swing on RT. Drop is B, twice, with the toast. B still closes a menu instead of dropping. No control is bound to ButtonR2 for good.
 
 Tempers are look-only (`AxeArt.ApplyTemper`). Nothing in the game calls that yet, so Studio will not show Swift, Keen or Prosperous until lane A2 wires it. The pictures are `previews/v1-d/temper-*.png`. Stats do not move.
+
+Boxes (the window crate; shell stays at 9 parts, a full box at 42):
+
+4. PC. Buy or spawn a boxed axe and a boxed truck. The box has a wood body, a glass front, a 0.1 accent band and a small brass plate. No price, no decal, no billboard on the box. The item shows through the glass. Good: it matches `previews/v1-d/boxes-after-axe.png` and `boxes-after-sawmill.png`. A truck box still appears (the shell did not grow, so the 42-part cap still holds).
+5. Phone emulator, Lower quality. The same boxes. The copies of the item inside are gone and the glass is tinted. The shell, the band and the plate stay. Nothing new sits on the thumbstick or the jump button.
+6. Xbox. Look at a box on a shelf. The tag hangs on it. No control is bound to ButtonR2.
+
+Shelves (the unit is `ShelfLayout.Build`; the shop on screen still uses lane C's `ShopInterior.SteppedUnit` until C copies it):
+
+7. Open `previews/v1-d/shelf-front.png` and `shelf-side.png`. Three boards step up (tops 3.2, 2.98, 2.76), four timber posts, a dark kick, three cream rails. Feet on the floor, front of the unit at the front. In Studio the Tool Shed shelves will not change until lane C adopts this unit. Gaps stay 1.5 across and 2.5 between rows.
+
+Store board:
+
+8. PC. Walk to the store board in town. The board is cream, the heading and the poster text are dark ink, and a thin brass frame sits on the face. The banner words and where the board stands are the same as before. Good: `previews/v1-d/board-after.png`.
+9. Phone emulator. The board is still readable. Body text stays at least 14px. No new control.
+10. Xbox. The board prompt still works. B closes whatever it opened.
+
+Hover tag (the price line only; the words do not change):
+
+11. PC. With enough cash, look at a priced shelf item. The price line is gold (`#F2C14E`). Spend down or look at something you cannot afford: the line is red (`#D9534F`). A free item (price 0) is gold. Closed, already owned, out of stock, and a Robux line stay the old cream. One price, never two numbers.
+12. Phone emulator. The same colours. The tag does not cover the thumbstick or the jump button. Touch targets stay about 44×44 and 8px apart.
+13. Xbox. The same colours inside the existing look ranges (gamepad 12, touch 6). No new ButtonR2 bind.
+
+Awaiting Connor, so Studio will not show these until he says otherwise: a hand 25–30% up the haft (it stays at 0.75), a Lux haft of 4.0 in play (it stays 3.5), and four bevel parts on the box corners (they are not parts).
 
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).

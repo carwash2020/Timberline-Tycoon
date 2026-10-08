@@ -448,4 +448,22 @@ return function(t)
 			)
 		end
 	)
+
+	t.test("the accent band is 0.1 deep and a brass plate sits on it, with no price", function()
+		local model, body = dressed("Axe", "SteelAxe", { name = "Steel Axe" })
+		local strip = model:FindFirstChild("Strip")
+		t.ok(math.abs(strip.Size.Z - 0.1) < 1e-3, "the band is 0.1 deep")
+		t.ok(model:FindFirstChild("Base").Size.X > body.Size.X + 0.15, "the foot flange is the accent too")
+		local logo = model:FindFirstChild("Logo")
+		t.ok(logo, "a logo plate")
+		t.ok(math.abs(logo.Size.X - 0.6) < 1e-3 and math.abs(logo.Size.Y - 0.3) < 1e-3, "0.6 by 0.3")
+		t.eq(logo:FindFirstChildWhichIsA("SurfaceGui"), nil, "the plate prints nothing")
+		local shell = 0
+		for _, p in ipairs(parts(model)) do
+			if p.Name ~= "Contents" and (p.Parent == model) then
+				shell += 1
+			end
+		end
+		t.ok(shell <= BoxLogic.ShellPartCap, "shell " .. shell)
+	end)
 end

@@ -209,6 +209,31 @@ return function(t)
 		t.eq(HoverTag.Step(empty, 0.1, "a"), "a")
 	end)
 
+	t.test("the price line is gold when you can pay, red when you cannot", function()
+		local Color3 = t.roblox.Color3
+		local function hex(color)
+			return string.format(
+				"#%02X%02X%02X",
+				math.floor(color.R * 255 + 0.5),
+				math.floor(color.G * 255 + 0.5),
+				math.floor(color.B * 255 + 0.5)
+			)
+		end
+		t.eq(hex(HoverTag.CoinGold), "#F2C14E")
+		t.eq(hex(HoverTag.StopRed), "#D9534F")
+		local price = HoverTag.Price(axe, 2)
+		t.eq(HoverTag.PriceTone("price", price, price, false), "gold")
+		t.eq(HoverTag.PriceTone("price", price, price - 1, false), "red")
+		t.eq(HoverTag.PriceTone("price", 0, 0, false), "gold", "FREE is affordable")
+		t.eq(HoverTag.PriceTone("price", price, nil, false), "red", "no cash yet")
+		t.eq(HoverTag.PriceTone("closed", price, 999999, false), "plain")
+		t.eq(HoverTag.PriceTone("owned", price, 999999, false), "plain")
+		t.eq(HoverTag.PriceTone("soldOut", price, 999999, false), "plain")
+		t.eq(HoverTag.PriceTone("price", price, 999999, true), "plain", "a Robux line is not cash")
+		t.eq(HoverTag.PriceTone("price", nil, 999999, false), "plain")
+		t.eq(Color3.fromHex("#F2C14E"), HoverTag.CoinGold)
+	end)
+
 	t.test("RayBox: where a ray meets a box, nil past it, and a padded box is easier to hit", function()
 		local cf = CFrame.new(0, 5, 10)
 		local size = Vector3.new(2, 2, 2)

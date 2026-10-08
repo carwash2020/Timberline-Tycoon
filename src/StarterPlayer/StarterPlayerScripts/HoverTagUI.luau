@@ -374,7 +374,14 @@ local function show(key: string)
 	if lineLabel then
 		lineLabel.Text = line
 		lineLabel.Visible = line ~= ""
-		lineLabel.TextColor3 = if state == "price" then C.Amber else C.Cream
+		local cashAttr = player:GetAttribute("Cash")
+		local cash = if type(cashAttr) == "number" then cashAttr else 0
+		local price = if state == "price" and spec.robux == nil then HoverTag.Price(spec, facts.loop) else nil
+		local tone = HoverTag.PriceTone(state, price, cash, spec.robux ~= nil)
+		lineLabel.TextColor3 = if tone == "gold"
+			then HoverTag.CoinGold
+			elseif tone == "red" then HoverTag.StopRed
+			else C.Cream
 	end
 	if shownKey ~= key then
 		hidden = false

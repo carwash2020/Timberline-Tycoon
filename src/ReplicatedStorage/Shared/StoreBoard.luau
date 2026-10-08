@@ -152,7 +152,7 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	title.Font = Enum.Font.GothamBold
 	title.TextSize = StoreBoard.TitleTextPx
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextColor3 = Color3.fromRGB(62, 42, 24)
+	title.TextColor3 = Color3.fromHex("#2A2420") -- SignInk
 	title.Text = item.name
 	title.Parent = card
 	local body = Instance.new("TextLabel")
@@ -166,7 +166,7 @@ local function poster(parent: Instance, item: { name: string, description: strin
 	body.TextTruncate = Enum.TextTruncate.AtEnd
 	body.TextXAlignment = Enum.TextXAlignment.Left
 	body.TextYAlignment = Enum.TextYAlignment.Top
-	body.TextColor3 = Color3.fromRGB(90, 64, 40)
+	body.TextColor3 = Color3.fromHex("#2A2420") -- SignInk
 	local canvas = 400
 	local gui = parent.Parent
 	if gui and gui:IsA("SurfaceGui") then
@@ -259,7 +259,9 @@ function StoreBoard.Build(): Model
 	local model = Instance.new("Model")
 	model.Name = "StoreBoard"
 	local size = StoreBoard.BoardSize
-	local board = Kit.part(model, "Board", size, CFrame.new(0, 0, 0), Color3.fromRGB(92, 58, 32), Enum.Material.Wood)
+	local cream = Color3.fromHex("#F3E7C9") -- SignCream
+	local ink = Color3.fromHex("#2A2420") -- SignInk
+	local board = Kit.part(model, "Board", size, CFrame.new(0, 0, 0), cream, Enum.Material.SmoothPlastic)
 	model.PrimaryPart = board
 	for _, x in ipairs({ -size.X / 2 + 0.3, size.X / 2 - 0.3 }) do
 		Kit.part(
@@ -294,7 +296,7 @@ function StoreBoard.Build(): Model
 	heading.Size = UDim2.new(1, 0, 0, 44)
 	heading.Font = Enum.Font.GothamBlack
 	heading.TextSize = 34
-	heading.TextColor3 = Color3.fromRGB(255, 244, 220)
+	heading.TextColor3 = ink
 	heading.Text = "TIMBERLINE STORE"
 	heading.LayoutOrder = 0
 	heading.Parent = list
@@ -315,7 +317,7 @@ function StoreBoard.Build(): Model
 		soon.Font = Enum.Font.GothamBold
 		soon.TextSize = 20
 		soon.TextWrapped = true
-		soon.TextColor3 = Color3.fromRGB(255, 236, 200)
+		soon.TextColor3 = ink
 		soon.Text = "Coming soon"
 		soon.LayoutOrder = 1
 		soon.Parent = list
@@ -337,6 +339,43 @@ function StoreBoard.Build(): Model
 	})
 	-- The arch goes up after the meshes, so they never retire it.
 	StoreBoard.BuildArch(model)
+	-- A brass frame on the face, added after the meshes for the same reason.
+	-- Four bars keep the board at 15 parts (the cap is 16).
+	local brass = Color3.fromHex("#C9A24A") -- Brass
+	local bar = 0.12
+	local faceZ = -size.Z / 2 - 0.05
+	Kit.part(
+		model,
+		"Frame",
+		Vector3.new(size.X, bar, 0.08),
+		CFrame.new(0, size.Y / 2 - bar / 2, faceZ),
+		brass,
+		Enum.Material.Metal
+	)
+	Kit.part(
+		model,
+		"Frame",
+		Vector3.new(size.X, bar, 0.08),
+		CFrame.new(0, -size.Y / 2 + bar / 2, faceZ),
+		brass,
+		Enum.Material.Metal
+	)
+	Kit.part(
+		model,
+		"Frame",
+		Vector3.new(bar, size.Y - bar * 2, 0.08),
+		CFrame.new(-size.X / 2 + bar / 2, 0, faceZ),
+		brass,
+		Enum.Material.Metal
+	)
+	Kit.part(
+		model,
+		"Frame",
+		Vector3.new(bar, size.Y - bar * 2, 0.08),
+		CFrame.new(size.X / 2 - bar / 2, 0, faceZ),
+		brass,
+		Enum.Material.Metal
+	)
 	prompt:AddTag("StorePrompt")
 	return model
 end

@@ -159,6 +159,17 @@ return function(t)
 			end
 		end
 		t.ok(parts <= 16, "the board stays cheap: " .. parts)
+		local Color3 = t.roblox.Color3
+		t.eq(model:FindFirstChild("Board").Color, Color3.fromHex("#F3E7C9"))
+		local frames = 0
+		for _, d in ipairs(model:GetChildren()) do
+			if d.Name == "Frame" then
+				frames += 1
+				t.eq(d.Color, Color3.fromHex("#C9A24A"))
+			end
+		end
+		t.eq(frames, 4, "a brass frame")
+		t.eq(heading.TextColor3, Color3.fromHex("#2A2420"))
 		local prompt = model:FindFirstChild("StorePrompt", true)
 		t.eq(prompt.ActionText, "Browse")
 		t.eq(prompt.GamepadKeyCode.Name, "ButtonX")

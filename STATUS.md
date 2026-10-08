@@ -4,11 +4,11 @@
 
 Last updated 8 October 2026 (Lane D axe, box, shelf and hover remake, branch `phase-2/v1-d-axes-displays`; choppable trees in the spawn area, branch `claude/spawn-trees` on top of main at #114; saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
-## Lane D — axes, boxes, shelves, displays (in progress)
+## Lane D — axes, boxes, shelves, displays (done)
 
 Branch `phase-2/v1-d-axes-displays`. Connor reviews each render before this merges. Paths below are the pictures to open.
 
-Axes and temper colours are built (part-built fallback). Boxes, shelves, the store board and hover colours are not in yet.
+The lane is done on this branch. Axes, temper colours, the stepped shelf unit, window boxes, the store board and hover price colours are built. The shop's shelves on screen are still `ShopInterior.SteppedUnit` (lane C). `ShelfLayout.Build` is the unit those shelves should copy; the pictures of it are below. Economy numbers did not move.
 
 - `previews/v1-d/axes-before-lineup.png` — the 11 axes as they stood before the remake.
 - `previews/v1-d/axes-after-lineup.png` — the same 11 after the remake, side-on.
@@ -37,8 +37,20 @@ Axes and temper colours are built (part-built fallback). Boxes, shelves, the sto
 - `previews/v1-d/temper-prosperous-1.png`
 - `previews/v1-d/temper-prosperous-2.png`
 - `previews/v1-d/temper-prosperous-3.png`
+- `previews/v1-d/boxes-before-lineup.png` — five window boxes before the remake.
+- `previews/v1-d/boxes-before-axe.png`
+- `previews/v1-d/boxes-before-sawmill.png`
+- `previews/v1-d/boxes-after-lineup.png` — the same boxes after: 0.1 accent band and a brass plate, no price.
+- `previews/v1-d/boxes-after-axe.png`
+- `previews/v1-d/boxes-after-sawmill.png`
+- `previews/v1-d/board-before.png` — the store board before.
+- `previews/v1-d/board-after.png` — cream board, ink text, brass frame.
+- `previews/v1-d/shelf-front.png` — the stepped unit, three boards.
+- `previews/v1-d/shelf-side.png`
+- `previews/v1-d/hover-colours.png` — gold when you can pay, red when you cannot, cream when the line is not a cash price.
 
-Awaiting Connor: the hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Damage, range and cooldown are unchanged.
+Awaiting Connor: the hand stays 0.75 studs up the haft (`AxeArt.GripFromFoot`, shared with `SwingLogic`). The brief's 25–30% would move that swing constant. The Lux design length is 4.0 in `AxeModels.Look`, but the gameplay Handle stays 3.5 because `tests/MeshArt.spec` pins it. Four 0.1 corner bevels on a box are not parts: `BoxLogic.ShellPartCap` is 9 and a truck already fills `BoxPartCap` 42, so bevel parts need those caps raised (lane F). The accent band is 0.1 deep and the brass plate uses the spare shell slot. Damage, range, cooldown and prices are unchanged.
+
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 
