@@ -196,6 +196,16 @@ local LOOKS: { [string]: RockLook } = {
 		bandMat = LIME,
 		capMat = SLATE,
 	},
+	-- Plain stone for the ore lineup's host rock. Not a scatter look.
+	host = {
+		stone = hex("#B7B3AC"),
+		dark = hex("#8E8A84"),
+		light = hex("#D4D0C8"),
+		cap = hex("#A39E96"),
+		stoneMat = ROCK,
+		bandMat = SLATE,
+		capMat = SLATE,
+	},
 }
 
 local LOOK_ALIAS: { [string]: string } = {
