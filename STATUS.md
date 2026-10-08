@@ -1,5 +1,54 @@
 # STATUS: read this first in a new session
 
+Last updated 8 October 2026 (V1 map remake, branch `phase-2/v1-b-world`). The layout plan is `MAP_V1.md`. The labelled picture is `previews/v1-b/00-overview.png`.
+
+## Lane B: world (in progress)
+
+Playable square goes from 3000×3000 to 2000×2000 (`WorldHalf` 1000). Area 9,000,000 sq studs down to 4,000,000 (44%). A 200-stud skirt is generated past the edge and is not playable. Town, the sawmill (0, 110) and the spawn stay. StreamingTargetRadius stays 640.
+
+The picture shows the 28-wide ring, four town links, the hills cross-link, the truck tunnel, the mine mouth (MINE), three hidden mouths (H), five secrets (?), the furnace pad and the dock. Region, pad and secret coordinates are in `MAP_V1.md`.
+
+NPC stand spots, weather zones and critter zones (for Lanes E and G; the live modules still have the old numbers until those lanes read these):
+
+| Who | Position | Yaw (degrees, 0 faces −Z) |
+|---|---|---|
+| Murph | (−25, 0, 44) | toward the spawn |
+| Millie | (71, 0, 120) | toward the sell lane |
+| Tink | (−84, 0, 134) | toward the Tool Shed door |
+| Dale | (194, 0, 158) | toward the showroom aisle |
+| Hazel | (−100, 0, 205) | toward Hearth & Home's door |
+| Gus | town gondola (−40, 0, 150) | toward the isle column (680, 280) |
+| Rosa, Pip, Bram | unchanged town walks | unchanged |
+| Old Hank | Land Office counter | toward the door |
+| Hermit | secret camp mouth (−360, 4, −90) | 180, facing the cave |
+| Old Tolly | folded toll booth, east of the deck near z 940 | south, toward town |
+| Capn Moss | ferry dock (860, 4, 160) | toward the isle (930, −50) |
+| Odds & Ends keeper | snow junction (30, 4, 450) on the new north road, adjusted when the junction is placed | toward the road |
+| Sparkworks keeper | ferry isle dock side | toward the dock |
+| Fishing scene | pond (−40, 0, −160) | toward the water |
+| Campfire scene | starter edge (40, 0, −80) | toward town |
+| Lookout scene | (40, 8, 820), facing the volcano | toward (450, 500) |
+| Bench scene | town square | toward the mill |
+
+Weather and critter zones (same discs Lane G should read from `ScatterZones` once that module lands):
+
+| Zone | Kind | Centre | Radius |
+|---|---|---|---|
+| town | town | (0, 90) | 180 |
+| starter | forest | (0, −180) | 100 |
+| hills | forest | (−500, 110) | 150 |
+| meadow-east | meadow | (300, −40) | 80 |
+| snow | snow | (0, 720) | 115 |
+| volcano | volcano | (450, 500) | 125 |
+| gloam | gloam | (10, −720) | 80 |
+| shore | shore | (820, 40) | 120 |
+| isle | isle | (680, 280) | 100 |
+| cave | cave | (150, −200) | 80 |
+
+Preview paths so far:
+
+- `previews/v1-b/00-overview.png`
+
 Last updated 8 October 2026 (saves by hand and base crating, branch `claude/plot-save-switch` on top of main at #111; NPC talk lock, branch `claude/npc-talk-lock` on top of main at #108; join race fix, branch `claude/join-race-fix` on top of main at #105; spaced-out shelves and the Lower / Higher quality choice, branch `claude/quality-picker` on top of main at #102; LT2 window boxes branch `claude/lt2-boxes` on top of main at #98; modern kit branch on top of main at #98; earlier: store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (LT2 ground branch on top of main at #98; store fixes branch; mill tiers on top of #93), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.
 Last updated 7 October 2026 (dialogue box branch on top of main at #95), after PR #90 (everything through store polish is on main). Keep this file current: update it in the same PR as any change that moves a goal, a rule below, or an open question. Older plans (HANDOFF.md, MORNING_HANDOFF.md) are history; this file wins when they disagree.

@@ -1,5 +1,9 @@
 # Phase 2+ build notes
 
+## V1 map remake (Lane B, 8 October 2026)
+
+The plan is `MAP_V1.md`. The labelled top-down picture is `previews/v1-b/00-overview.png`. The ground is not in this commit yet. When it is, Studio checks are: zoom fully out and tilt into the ground at town, a pad, a road, the shore, the bridge, a cave and an isle (no underside); drive the Logging Rig through the tunnel both ways, day and night; walk the mine's upper tier with no rubble removed. The game keeps the default FallenPartsDestroyHeight. After the new map is published, restart every server.
+
 Everything after the Phase 1 vertical slice. It's all on `main` now
 (merged October 2026, with the redesign below).
 
