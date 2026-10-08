@@ -1016,7 +1016,7 @@ local function applyOreMeshes(
 		slotOf("MeshVein2", "vein 2", spec.Vein2, scale, color, veinMat),
 	}
 	if moss then
-		table.insert(slots, slotOf("MeshMoss", "moss", spec.Moss, scale, hostLook.cap, Enum.Material.Grass))
+		table.insert(slots, slotOf("MeshMoss", "moss", spec.Moss, scale, palette("meadow").cap, Enum.Material.Grass))
 	end
 	if heartstone then
 		table.insert(slots, slotOf("MeshGlow", "heartstone glow", spec.Glow, scale, color, Enum.Material.Neon))

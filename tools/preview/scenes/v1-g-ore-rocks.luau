@@ -96,7 +96,7 @@ return {
 		end
 
 		local function frameOne(cx, lookY, cz, visH, visW)
-			local fill = 0.55
+			local fill = 0.4
 			local d = (visH * math.cos(ELEV)) / (fill * 2 * math.tan(math.rad(FOV) / 2))
 			local aspect = 1280 / 800
 			local function hSpan(dist)
@@ -152,9 +152,9 @@ return {
 			local bottom = math.max(minY, 0)
 			local visH = math.max(maxY - bottom, 0.5)
 			local visW = math.max(maxX - minX, maxZ - minZ)
-			local reach = visW * 0.5 + 1.0
+			local reach = visW * 0.45 + 0.8
 			plaque(ore[1], cx - math.sin(YAW) * reach, cz - math.cos(YAW) * reach)
-			local lookY = bottom + visH * 0.05
+			local lookY = bottom - visH * 0.1
 			local cam = frameOne(cx, lookY, cz, visH, visW)
 			cam.label = string.lower(ore[1])
 			table.insert(cameras, cam)
@@ -214,7 +214,7 @@ return {
 		local caveCam = {
 			pos = { -math.sin(math.rad(34)) * 20, 6.2, caveZ - math.cos(math.rad(34)) * 20 },
 			target = { 0, 2.4, caveZ + 1 },
-			fov = 50,
+			fov = 62,
 			label = "cave",
 			night = true,
 		}

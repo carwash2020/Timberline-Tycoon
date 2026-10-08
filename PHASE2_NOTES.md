@@ -180,6 +180,10 @@ Studio checks (PC, the phone emulator, and Xbox). Good looks like this:
 4. Stand in steady rain for a minute. The air hazes a little and stays there; the sky does not fade to white. When the rain stops, or you step under a roof, the haze goes back to the clear-weather sky.
 5. Rocks read as six shapes (round boulder, cracked boulder, stacked standing stone, slab, pebble cluster, mossy outcrop), tilted and partly in the ground. Meadow rocks have moss, snow rocks a white cap, the shore is sandstone, the volcano is dark basalt, the gloam is blue-grey, caves are wet dark stone. Plants and critters are not on roads, plot pads, shop floors or the gondola path. Ducks sit on water. A gull is on the coast. A snow fox is on the snow. A sky moth glows on the isles at night.
 6. Lower quality stays smooth. A lanternwood's pods still read in a dark cave (neon, no extra light on a phone). Cave glow lights do not cast shadows.
+7. Rock meshes (the uploaded Blender rocks): on the open grass, a rock is a real faceted stone with a green moss cap, not a ball. Walk round a few in the same meadow and you see two shapes of each kind (A and B). Moss or snow sits on the top of the stone, never floating above it or sunk inside it. Rocks are 0.62x, 1x and 1.45x, and the cap scales with them.
+8. Ore rocks (once the mine uses them): coal, copper, iron, silver, gold and opal each show two seams of ore across a stone (opal's stone is mossy). Heartstone has red crystals and a red glow. The seams are visible from the front of the rock.
+9. The mine mouth (needs Lane B's placement call, see the PR's cross-lane requests): a stone arch with a timber frame, two lanterns and MINE letters; its opening faces out of the hill, the tunnel runs into it, you can walk in, and you cannot walk through the rock around it.
+10. Phone (667x375): rocks and the mine mouth look the same at Lower quality; no frame-rate drop near a rock-heavy meadow.
 
 ## Saves by hand, and Unload base (8 October 2026, branch `claude/plot-save-switch`)
 

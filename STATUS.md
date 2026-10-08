@@ -20,6 +20,8 @@ Rocks are six families (`Boulder`, `CrackedBoulder`, `Spire`, `Slab`, `PebbleClu
 
 `RockModels` holds the uploaded Blender rocks (ids pasted 2026-10-08): six kinds, each with an A and a B variant, and six slots per variant (`MeshHost`, `MeshVein1`, `MeshVein2`, `MeshMoss`, `MeshSnow`, `MeshGlow`) with Blender sizes, per-piece `offset` and a `hostCentre`. `NatureArt` puts MeshHost at `hostCentre * scale` and every other piece at `MeshHost.CFrame * CFrame.new(offset * scale)`, before `settle()` tilts and sinks the whole model, so caps and veins sit on the stone. Scatter rocks pick A or B from their seed (same seed, same variant). `RockModels.KindFor(shape)` maps Lane M's ore shapes (boulder, split, standing, slab, mossy, pebbles) to a kind and variant (`mossy` is Boulder B plus a MeshMoss cap); capitalised kind names pass through, anything else is Boulder A, logged once. `NatureArt.CaveMouth()` builds the mine mouth from the uploaded Body, Frame, Glow and Collision (Collision is the invisible collider, Body does not collide, Glow is Neon with a PointLight range 14), or a part-built frame when an id is 0 or a load fails. `RockModels.Scenery` also holds RubbleBoulders and RubbleTunnel with their uploaded ids (not built yet, Lane M). A missing id or failed load keeps the part build and logs once per shape, variant and slot. `NatureArt.BuildFlat` is Build without the tilt, for specs and previews. The preview manifest (`assets/meshes/manifest.json`, with `"tint": true`) now lists the 84 rock and scenery ids, with their GLBs under `assets/meshes/rocks/`.
 
+The preview renderer multiplies a mesh by its part colour only when the manifest entry says `"tint": true` (the rock vertex colours are greyscale shading, so without it the rocks draw white); `tools/preview/viewer.html` and `export.luau` carry that opt-in and nothing else changed there. A mossy ore rock's moss cap uses the meadow cap green, not the ore host's grey, so it reads as moss.
+
 Cave mouth placement is not wired here: B's `UndergroundData.MineMouth` does not exist on this branch (see the PR's cross-lane requests).
 
 **Awaiting Connor:** palm section trees stay at 3 coconuts, because that count is a shape field and changing it would move the economy volumes. Say if any rock, plant, critter or rain streak below should change before it is placed.
@@ -29,6 +31,7 @@ Rock and ore previews are one model per frame: a 3/4 camera about 25° up, the r
 Preview paths:
 
 - `previews/v1-g/cave-mouth.png` (real meshes)
+- `previews/v1-g/ore-host.png`, `ore-coal.png`, `ore-copper.png`, `ore-iron.png`, `ore-silver.png`, `ore-gold.png`, `ore-opal.png`, `ore-heartstone.png`, `ore-rocks-cave.png` (reshot with the real Blender rocks, Lane M's ore shapes; opal is the mossy Boulder B)
 - `previews/v1-g/rock-boulder.png`, `rock-crackedboulder.png`, `rock-spire.png`, `rock-slab.png`, `rock-pebblecluster.png`, `rock-outcrop.png` (reshot with the real Blender rocks)
 - `previews/v1-g/trees-lineup.png`
 - `previews/v1-g/trees-oak.png`
