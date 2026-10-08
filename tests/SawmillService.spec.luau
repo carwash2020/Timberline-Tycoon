@@ -725,7 +725,10 @@ return function(t)
 			local volume = Sell.VolumeU3(info.size.X, info.size.Y, info.size.Z)
 			local priced = Sell.PieceValue("oak", "plank", volume, nil, 1, false, info.mill, nil, 1.07)
 			local untinted = Sell.PieceValue("oak", "plank", volume, nil, 1, false, info.mill, nil, 1)
-			t.ok(math.abs(priced - untinted * 1.07) < 1e-6 or priced == untinted * Sell.BonusCap, "the sale uses t, capped with the mill")
+			t.ok(
+				math.abs(priced - untinted * 1.07) < 1e-6 or priced == untinted * Sell.BonusCap,
+				"the sale uses t, capped with the mill"
+			)
 		end
 		r.mill:Destroy()
 		Sawmill._reset()

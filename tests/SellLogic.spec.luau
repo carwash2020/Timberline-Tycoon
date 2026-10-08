@@ -195,9 +195,24 @@ return function(t)
 		local plain = SellLogic.PieceValue("oak", "plank", 10)
 		local log = SellLogic.PieceValue("oak", "log", 10)
 		near(SellLogic.PieceValue("oak", "log", 10, nil, 1, false, nil, nil, 1.10), log * 1.10, 1e-9, "log times t")
-		near(SellLogic.PieceValue("oak", "log", 10, nil, 1, false, 2, 1.8, 1.10), log * 1.10, 1e-9, "a log ignores mill and board")
-		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2, 1.8, 1), plain * SellLogic.BonusCap, 1e-9, "mill 2 and board 1.8 cap at 3")
-		near(SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.5, 1.8, 1.10), plain * math.min(3, 1.5 * 1.8 * 1.10), 1e-9, "under the cap")
+		near(
+			SellLogic.PieceValue("oak", "log", 10, nil, 1, false, 2, 1.8, 1.10),
+			log * 1.10,
+			1e-9,
+			"a log ignores mill and board"
+		)
+		near(
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 2, 1.8, 1),
+			plain * SellLogic.BonusCap,
+			1e-9,
+			"mill 2 and board 1.8 cap at 3"
+		)
+		near(
+			SellLogic.PieceValue("oak", "plank", 10, nil, 1, false, 1.5, 1.8, 1.10),
+			plain * math.min(3, 1.5 * 1.8 * 1.10),
+			1e-9,
+			"under the cap"
+		)
 		t.eq(SellLogic.Temper(1.04), 1.04)
 		t.eq(SellLogic.Temper(1.07), 1.07)
 		t.eq(SellLogic.Temper(1.10), 1.10)
@@ -206,6 +221,11 @@ return function(t)
 		local stamped = SellLogic.Entry("oak", "log", 10, nil, nil, nil, nil, nil, 1.07)
 		t.eq(stamped.t, 1.07)
 		t.eq(SellLogic.Entry("oak", "log", 10, nil, nil, nil, nil, nil, 1).t, nil, "1 is not written")
-		near(SellLogic.EntryValue(stamped), SellLogic.PieceValue("oak", "log", 10, nil, nil, nil, nil, nil, 1.07), 1e-9, "the bin pays t")
+		near(
+			SellLogic.EntryValue(stamped),
+			SellLogic.PieceValue("oak", "log", 10, nil, nil, nil, nil, nil, 1.07),
+			1e-9,
+			"the bin pays t"
+		)
 	end)
 end
