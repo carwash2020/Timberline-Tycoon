@@ -4,14 +4,29 @@
 return function(t)
 	local News = t.load("ReplicatedStorage/Shared/NewsLogic")
 
-	t.test("five or six short lines, each with an icon name", function()
-		t.ok(#News.Entries >= 5 and #News.Entries <= 6, "count " .. #News.Entries)
+	t.test("at most seven V1 headlines, each with an icon name", function()
+		t.ok(#News.Entries >= 1 and #News.Entries <= 7, "count " .. #News.Entries)
 		t.eq(News.Key, "News:V1")
+		local blob = ""
 		for _, entry in ipairs(News.Entries) do
 			t.ok(#entry.line > 0 and #entry.line <= 70, entry.line)
 			t.ok(#entry.icon > 0, "icon")
 			t.ok(not string.find(entry.line, "$", 1, true), entry.line)
 			t.ok(not string.find(string.lower(entry.line), "robux", 1, true), entry.line)
+			blob ..= " " .. entry.line
+		end
+		for _, word in ipairs({
+			"Bayou",
+			"Red Mesa",
+			"ore",
+			"blueprint",
+			"Rook",
+			"streak",
+			"Temper",
+			"Sparkworks",
+			"gondola",
+		}) do
+			t.ok(string.find(blob, word, 1, true) ~= nil, word)
 		end
 	end)
 

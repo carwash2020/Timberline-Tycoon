@@ -269,12 +269,9 @@ local controllers: { { name: string, get: () -> any } } = {
 			return require(script.Parent.FerryController)
 		end,
 	},
-	{
-		name = "DailyUI",
-		get = function()
-			return require(script.Parent.DailyUI)
-		end,
-	},
+	-- DailyUI stays in MODULES (the file is waited for) but is not started.
+	-- Start calls UITheme.Sized("DailyButton"), and that size is gone, so
+	-- starting it warned in Output. Lane E (Foreman) replaces this module.
 	{
 		name = "DialogueUI",
 		get = function()

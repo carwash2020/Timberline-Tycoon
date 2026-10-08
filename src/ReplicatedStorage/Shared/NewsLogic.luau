@@ -9,14 +9,16 @@ NewsLogic.Key = "News:V1"
 
 export type Entry = { line: string, icon: string }
 
--- Short lines and a frame-drawn icon name. No uploaded images.
+-- Short lines and a frame-drawn icon name. No uploaded images. One table,
+-- so a later pass can edit the headlines without hunting through the UI.
 NewsLogic.Entries = {
-	{ line = "Trees you can chop now stand around the spawn.", icon = "tree" },
-	{ line = "Unload your base from SAVES, then pick a pad.", icon = "base" },
-	{ line = "Drop the axe with B, Q, or a long press.", icon = "axe" },
-	{ line = "Shop boxes show the real item in a window.", icon = "box" },
-	{ line = "Choose Lower or Higher quality when you join.", icon = "gear" },
-	{ line = "Talk opens a box, and folks turn to face you.", icon = "talk" },
+	{ line = "A new island map, with the Bayou and Red Mesa.", icon = "map" },
+	{ line = "Mine the cave for ore.", icon = "mine" },
+	{ line = "Build from blueprints.", icon = "blueprint" },
+	{ line = "Foreman Rook's daily jobs, with streaks.", icon = "daily" },
+	{ line = "Temper your axe.", icon = "temper" },
+	{ line = "Sparkworks logic pieces.", icon = "spark" },
+	{ line = "A sky island, reached by the gondola pass.", icon = "gondola" },
 } :: { Entry }
 
 -- True only after the tutorial is finished (TutorialStep 0) and this save

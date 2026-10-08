@@ -9,11 +9,13 @@ tests, ECONOMY.md current); GitHub runs it on every push.
 
 ## V1 UI (lane U, branch `phase-2/v1-u-ui`)
 
-Mockups (phone 667x375 and PC 1920x1080): `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png`, `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png`, `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png`, `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png`.
+Mockups (phone 667x375 and PC 1920x1080): `previews/v1-u/loading-667x375.png`, `previews/v1-u/loading-1920x1080.png`, `previews/v1-u/hud-667x375.png`, `previews/v1-u/hud-1920x1080.png`, `previews/v1-u/hud-buttons-667x375.png`, `previews/v1-u/hud-buttons-1920x1080.png`, `previews/v1-u/owner-menu-667x375.png`, `previews/v1-u/owner-menu-1920x1080.png`, `previews/v1-u/theme-sheet-667x375.png`, `previews/v1-u/theme-sheet-1920x1080.png`, `previews/v1-u/news-667x375.png`, `previews/v1-u/news-1920x1080.png`.
 
-Look: walnut panels, cream text, amber prices and edges, green confirm, red danger, muted locked. GothamBold for titles and buttons, Gotham for body. Radius 8, stroke 2, selection ring #FFF4C2 at 4px. Uploaded UIArt skins (cash plaque, prompts) still cover the flat colours once those images load; until then the flat theme shows.
+Look: walnut panels, cream text, amber prices and edges, green confirm, danger fill `#B23B30` (cream on it is 4.80:1), muted locked. GothamBold for titles and buttons, Gotham for body. Radius 8, stroke 2, selection ring #FFF4C2 at 4px. Uploaded UIArt skins (cash plaque, prompts) still cover the flat colours once those images load; until then the flat theme shows. The loading card shows one tip at a time. `hud-667x375.png` and `hud-1920x1080.png` are the in-context HUD (cash, the real side buttons, one selection ring; the phone frame also draws the thumbstick and the jump box). `hud-buttons-*.png` is only the style row.
 
-What's new in V1: once per save after the tutorial, stored as `onboarding["News:V1"]` (no new save field). Settings has WHAT'S NEW. Close or B skips it.
+What's new in V1: seven headlines in `NewsLogic.Entries` (the island map with the Bayou and Red Mesa, the cave and ore, blueprints, Foreman Rook's daily jobs, axe tempering, Sparkworks logic pieces, the gondola sky island). Once per save after the tutorial, stored as `onboarding["News:V1"]` (no new save field). Settings has WHAT'S NEW. Close or B skips it. On a short screen the card sits to the right of the thumbstick and above the jump box, and Close is centred on that card.
+
+Lane E: `DailyUI` remains in the client module list, but the client does not call `DailyUI.Start`. Starting it warned, because the Daily Goals button size was removed. Foreman replaces that module. Output should not contain `[Client] DailyUI failed to start`.
 
 Controller, first selected button:
 - Owner menu: PLAYERS tab
@@ -24,8 +26,8 @@ Controller, first selected button:
 B closes those panels. None of them binds ButtonR2 (RT still chops and places, as before).
 
 Studio checks:
-- PC: loading card uses the new colours and rotates tips without repeating until the list ends. HUD buttons match the sheet. Owner menu (if you are the owner) is walnut with a cream title. Settings, WHAT'S NEW, Close. Cash still reads.
-- Phone (667x375 landscape): the same panels fit, buttons stay fingertip-tall, the jump button and the left thumbstick zone are not covered by a panel.
+- PC: the loading card uses the new colours and shows one tip, then the next, with no repeat until the list ends. The HUD matches `hud-1920x1080.png` (cash, SAVES, Send truck home when you own a truck). Owner menu (if you are the owner) is walnut with a cream title. Settings, WHAT'S NEW: seven headlines, Close centred at the bottom of the card. Cash still reads. Output has no DailyUI startup warning.
+- Phone (667x375 landscape): the same panels fit, buttons stay fingertip-tall. What's new Close is not under the jump button and not in the thumbstick zone. The side buttons sit above the jump button, as in `hud-667x375.png`.
 - Xbox: open each panel above. The cream ring is on the first button immediately. D-pad and the left stick reach every button. A activates. B closes and returns to the HUD button that opened it. RT still swings the axe and does not change owner-menu tabs.
 
 What's here, each with its own checklist below:

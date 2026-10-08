@@ -110,12 +110,12 @@ return function(t)
 		t.ok(seen[2] == column)
 	end)
 
-	t.test("the theme's danger colour is #D9534F", function()
+	t.test("the theme's danger fill is #B23B30", function()
 		local UITheme = theme({})
 		local danger = UITheme.Colors.Danger
 		t.eq(
 			{ math.floor(danger.R * 255 + 0.5), math.floor(danger.G * 255 + 0.5), math.floor(danger.B * 255 + 0.5) },
-			{ 217, 83, 79 }
+			{ 178, 59, 48 }
 		)
 	end)
 
@@ -512,7 +512,7 @@ return function(t)
 		t.ok(ratio(C.Cream, C.PanelAlt) >= 4.5, "cream on panel alt")
 		t.ok(ratio(C.Muted, C.Panel) >= 4.5, "muted on panel")
 		t.ok(ratio(C.Muted, C.MutedFill) >= 4.5, "muted on the muted button")
-		t.ok(ratio(C.Cream, C.Danger) >= 3, "cream on danger")
+		t.ok(ratio(C.Cream, C.Danger) >= 4.5, "cream on danger")
 		t.ok(ratio(C.ConfirmInk, C.Confirm) >= 3, "ink on confirm")
 		t.ok(ratio(C.ConfirmInk, C.Amber) >= 3, "ink on amber")
 		t.eq(UITheme.Radius, 8)

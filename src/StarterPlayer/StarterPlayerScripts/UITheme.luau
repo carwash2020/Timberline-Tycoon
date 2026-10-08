@@ -61,8 +61,11 @@ UITheme.Colors = {
 	Confirm = Color3.fromHex("#4CC36A"),
 	ConfirmEdge = Color3.fromHex("#2F8A48"),
 	ConfirmInk = Color3.fromHex("#14240F"),
-	Danger = Color3.fromHex("#D9534F"),
-	DangerEdge = Color3.fromHex("#A43A36"),
+	Danger = Color3.fromHex("#B23B30"), -- dark enough that cream labels clear 4.5:1
+	DangerEdge = Color3.fromHex("#7A2C26"),
+	-- A short status line on walnut. The fill above is the button colour;
+	-- this brighter red stays readable on a dark panel.
+	DangerText = Color3.fromHex("#D9534F"),
 	MutedFill = Color3.fromHex("#5A4A3E"),
 	Selection = Color3.fromHex("#FFF4C2"),
 	-- Older names, kept as light or dark so screens this pass does not

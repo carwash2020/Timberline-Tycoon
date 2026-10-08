@@ -302,7 +302,7 @@ local function paintStatus()
 	local label = statusLabel
 	if label then
 		label.Text = if statusText ~= "" then statusText else currentTab().hint
-		label.TextColor3 = if statusOk == true then C.Money elseif statusOk == false then C.Danger else C.Cream
+		label.TextColor3 = if statusOk == true then C.Money elseif statusOk == false then C.DangerText else C.Cream
 	end
 	local picked = pickedLabel
 	if picked then
@@ -542,7 +542,7 @@ local function toolBlock(toolId: string, labelOverride: string?)
 	line.LayoutOrder = 2
 	if why then
 		local reason = hintLabel(f, "Can't yet: " .. why)
-		reason.TextColor3 = C.Danger
+		reason.TextColor3 = C.DangerText
 		reason.LayoutOrder = 3
 	end
 	f.Parent = body
@@ -997,7 +997,7 @@ local function paidDetail(item: PaidItems.Item)
 		hintLabel(f, hint).LayoutOrder = 2
 		if why and not armed then
 			local reason = hintLabel(f, "Can't yet: " .. why)
-			reason.TextColor3 = C.Danger
+			reason.TextColor3 = C.DangerText
 			reason.LayoutOrder = 3
 		end
 		f.Parent = body
@@ -1826,7 +1826,7 @@ syncHub = function()
 	local title = titleLabel
 	if title then
 		title.Text = if access.role == "delegate" then (if access.tester then "TESTER" else "DELEGATE") else "OWNER"
-		title.TextColor3 = if access.tester then C.Danger else C.Cream
+		title.TextColor3 = if access.tester then C.DangerText else C.Cream
 	end
 	paintWho()
 	if not can then
