@@ -66,7 +66,7 @@ be re-bought for a collection.
 and all of them sit in your hotbar. Switch with the number keys or a tap,
 so the Inferno Axe stays useful on volcano trees even after a stronger
 general axe comes out; the game re-equips whichever you held last. Drop an
-axe (Backspace or the Drop button) and it lies on the ground with a "Pick
+axe (Q or Backspace, B on a pad, a long press on the hotbar on a phone) and it lies on the ground with a "Pick
 up" prompt, ready for plot displays later. Axes are never lost: dying
 doesn't drop them, and one left lying around is back in your inventory
 when you rejoin. Only the owner can pick up a dropped axe for now, which
@@ -772,7 +772,7 @@ export type Profile = {
 - `Client.client.luau` — bootstrap.
 - `ChopController.luau` — click/hold input, swing animation, HP bar UI.
 - `CarryController.luau`, `VehicleController.luau`, `AxeController.luau`
-  (Drop button + Backspace).
+  (B / Q / Backspace / phone long press).
 - `BlueprintPlacer.luau` — ghost preview (green/red validity), R to rotate,
   2-stud grid snap, click to place.
 - UI modules: `HUD`, `ShopUI`, `FieldGuideUI`, `QuestUI`, `DialogueUI`.

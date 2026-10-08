@@ -42,7 +42,7 @@ So nothing a player had unlocked or paid for is lost, and running it twice chang
 
 - **Stores.** The General Store's boxes with `unlock = true` (Shed, Wood Sign, Paint Can, Mailbox, the furniture). Paying at the counter now grants a physical blueprint instead of flipping a flag. The price is the old one.
 - **Owner.** `/gift <player> Blueprint <id>` gives the item (any blueprint id, not only store ones). Owner-only as before.
-- **Found / dropped.** `BlueprintService.Drop` and the pick-up prompt exist now (drop with Backspace or the Drop button, like an axe), and `BlueprintService.Spawn(position, id)` puts one in the world for later content. No world spawns are placed yet (open question).
+- **Found / dropped.** `BlueprintService.Drop` and the pick-up prompt exist now (drop with Q, Backspace or B, like an axe), and `BlueprintService.Spawn(position, id)` puts one in the world for later content. No world spawns are placed yet (open question).
 
 ## Hammer use, by device
 

@@ -119,7 +119,6 @@ InputKit.Target = {
 		{ action = "Guide", gamepad = Enum.KeyCode.DPadLeft },
 		{ action = "Settings", gamepad = Enum.KeyCode.DPadRight },
 		{ action = "Daily", gamepad = Enum.KeyCode.DPadUp },
-		{ action = "DropAxe", keyboard = Enum.KeyCode.Backspace, gamepad = Enum.KeyCode.DPadDown },
 		{ action = "Recall", gamepad = Enum.KeyCode.ButtonY },
 		-- The quick menu (QuickMenuLogic.OpenGamepad): one button to every HUD
 		-- destination, Badges included. Always available; B closes it.
@@ -136,6 +135,12 @@ InputKit.WireBinds = {
 	{ action = "Cut", keyboard = Enum.KeyCode.X, gamepad = Enum.KeyCode.ButtonX },
 	{ action = "Done", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB },
 } :: { Bind }
+
+-- Putting down the axe or plan in hand (AxeController, rules in DropControls):
+-- B on a gamepad, Q on a keyboard (Backspace too). Not in a context list: B
+-- is Cancel in menus and in the placer, so the drop only takes it when none
+-- of those is up (DropControls.Decide) and is bound below them all.
+InputKit.DropBind = { action = "Drop", keyboard = Enum.KeyCode.Q, gamepad = Enum.KeyCode.ButtonB } :: Bind
 
 function InputKit.WireSafe(binds: { Bind }): boolean
 	local seenPad: { [string]: boolean } = {}
