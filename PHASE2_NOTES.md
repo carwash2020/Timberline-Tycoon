@@ -2777,3 +2777,16 @@ A read-through of the join flow, boxes and store, owner hub and paid items, mill
 - [ ] Aim at a shelf box, then buy and open it quickly: no red error in Output.
 
 Left alone, for Connor to decide: a log hand-dropped at a sawmill or planer that is busy waits; after `AutomationLogic.HandWindow` (4 s) untouched it counts as belt-fed, so rare or figured wood hand-fed behind another job is refused ("rare") and the throughput cap applies. Picking it up and dropping it again resets the clock.
+
+## Box hold: a grabbed shop box hangs steady (branch `claude/box-hold-axes`, 8 October 2026)
+
+Connor's Xbox video: a grabbed shop box (the Millmaster 100, a shelf box) tilts and swings round the grip. Cause: the pull was sized for wood (mass x 400, capped at 4000), but a big box weighs about 6900 (35 mass x 196), so it could not be lifted, and the grip is off-centre (`ApplyAtCenterOfMass = false`) with a torque of only 2 x the pull, less than the pull's lever on a box. Fix (box only, tag `ShopBox`; wood is unchanged): `GrabLogic.HoldForce` (never less than 1.6 x the box's weight), the pull taken at the centre of mass (`PullsAtCentre`), `GrabLogic.HoldTorque` (at least force x 2 x the box's radius), the hold orientation started upright at the box's yaw (`GrabLogic.Upright`), and the box's angular velocity zeroed when the server confirms the grab.
+
+### Studio checks (Connor), box hold
+- [ ] Grab the Millmaster 100 and a shelf box (Hearth & Home): it lifts and hangs level in front of you, no swinging or tumbling, from any grip point (corner, strip, glass).
+- [ ] Q/E (or D-pad) still turn it, the left trigger + left stick still tips it; drop it and it falls normally.
+- [ ] A log still swings from the grip as before (not changed).
+- [ ] A box held while you walk and look around stays level; carry one to the till and buy it as before.
+
+### "Custom axes not working either" (looked at, not changed)
+- Buy -> box -> open -> equip (`BoxService` -> `ShopService.GrantItem` -> `AxeService.Grant` -> `EquipTool`) and owner grant -> equip (`MonetizationService.OwnerGrant` -> pass listener -> `AxeService.Ensure`) read correctly; no nil field or wrong tool name found. The rack on the Tool Shed wall builds each axe with `AxeArt.Build`, which uses the uploaded meshes only when they load (asset permissions, open item 3 in STATUS.md); if they do not, the part-built axe shows. Send the `[MapBuilder] build check:` and `[MeshKit]` Output lines to settle it.

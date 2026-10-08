@@ -224,6 +224,61 @@ function GrabLogic.Torque(force: number): number
 	return force * GrabLogic.TorqueArm
 end
 
+-- A shop box is carried, not dragged (Connor, 8 October 2026: a grabbed box
+-- "spins": it tumbled round the grip). Cause: a box's assembly weighs more
+-- than DragForceCap lifts (about 35 mass is 6900 of weight against a 4000
+-- pull) and the turn's torque (2 x force) was less than the grip's lever
+-- over a box that size, so the pull dragged one edge up and the box swung
+-- from it. A box is therefore held like a tray: the pull sized to lift the
+-- whole assembly (BoxLiftMargin x its weight, at least the wood pull), taken
+-- at the centre of mass so it has no lever, and the turn sized to the box's
+-- radius so it stays at the held orientation (upright, as it stood).
+GrabLogic.BoxLiftMargin = 1.6
+GrabLogic.BoxTorqueMargin = 2
+
+-- The pull for a piece: wood's Force; a box's is never less than
+-- BoxLiftMargin x its weight (0 for nonsense).
+function GrabLogic.HoldForce(mass: number, isBox: boolean, perMass: number?, cap: number?): number
+	local force = GrabLogic.Force(mass, perMass, cap)
+	if not isBox or not finite(mass) or mass <= 0 then
+		return force
+	end
+	return math.max(force, mass * GrabLogic.Gravity * GrabLogic.BoxLiftMargin)
+end
+
+-- The turn's most torque: wood's Torque(force); a box's is also at least
+-- force x BoxTorqueMargin x its radius (studs, centre to far corner), so no
+-- pull on its edge can tip it.
+function GrabLogic.HoldTorque(force: number, isBox: boolean, radius: number?): number
+	local torque = GrabLogic.Torque(force)
+	if not isBox or not finite(force) or force <= 0 then
+		return torque
+	end
+	local r = if radius and finite(radius) and radius > 0 then radius else 0
+	return math.max(torque, force * GrabLogic.BoxTorqueMargin * r)
+end
+
+-- Where a box's pull is taken: at the centre of mass, so the grip is no
+-- lever. Wood keeps swinging from the grip.
+function GrabLogic.PullsAtCentre(isBox: boolean): boolean
+	return isBox
+end
+
+-- `rot` kept to its turn about the world's up only (a box stands on its
+-- floor; a tilt left over from a shelf nudge or a fall is taken out).
+function GrabLogic.Upright(rot: CFrame): CFrame
+	local look = rot.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 1e-3 then
+		local right = rot.RightVector
+		flat = Vector3.new(-right.Z, 0, right.X) -- look = up x right when looking straight down
+		if flat.Magnitude < 1e-3 then
+			return CFrame.identity
+		end
+	end
+	return CFrame.lookAt(Vector3.zero, flat.Unit)
+end
+
 -- Whether the pull can lift a piece of `mass` off the ground (or only
 -- drag it along).
 function GrabLogic.CanLift(mass: number, perMass: number?, cap: number?): boolean
