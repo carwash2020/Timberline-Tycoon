@@ -19,8 +19,9 @@
 -- role for the name tag, and a Talk prompt NPCService parents to the
 -- model so it streams in with them. `react` is the situational lines
 -- (hour, weather, the first sale, the first real axe, a sawmill);
--- `tips` is the short onboarding Murph gives a new player. NPCDialogue
--- picks among them.
+-- `tips` is the short onboarding Murph gives a new player: QuestUI plays
+-- it in the dialogue box the first time they talk to him. NPCDialogue
+-- picks among the rest.
 
 local CharacterArt = require(script.Parent.Art.CharacterArt)
 local FacingLogic = require(script.Parent.FacingLogic)
@@ -79,7 +80,7 @@ export type NPC = {
 	workLoops: number?, -- chops in a row (a saw or a sweep is already a phrase)
 	promptLift: number?, -- Talk's UIOffset Y, so it sits above a shop or pad prompt
 	shop: string?, -- a counter keeper's shop id (ShopHoursLogic). Nil for everyone else.
-	tutorialQuiet: boolean?, -- no chatter while the tutorial runs (QuestUI owns Murph's lines; one tip still plays)
+	tutorialQuiet: boolean?, -- QuestUI owns Murph's Talk (his tutorial line and tips open the same dialogue box)
 	tips: { string }?, -- onboarding, the first time a new player meets them
 	greetings: { string },
 	lines: { string },
@@ -572,7 +573,7 @@ NPCData.List = {
 	{
 		-- The Secret Cave's keeper (HermitService). Stands inside the room,
 		-- facing the open mouth; HermitService sets his feet on the floor.
-		-- His quest talk is DialogueData.HermitLines; these are his bubbles.
+		-- His quest talk is DialogueData.HermitLines; these are his small talk.
 		id = "Hermit",
 		name = "The Hermit",
 		role = "Keeper of the cave",

@@ -120,8 +120,8 @@ function PlotSalesmanData.Choose(state: State): Choice
 	return { offer = nil, line = PlotSalesmanData.FullLine }
 end
 
--- Bubble greetings for NPCData. Every one names the plot price, so whichever
--- the bubble draws, the player hears the real number. Built from the live
+-- Greetings for NPCData. Every one names the plot price, so whichever
+-- the dialogue box draws, the player hears the real number. Built from the live
 -- Offers, so a price change in GameConfig shows up here.
 function PlotSalesmanData.Greetings(): { string }
 	local price = PlotSalesmanData.PriceText(PlotSalesmanData.Offers[1])

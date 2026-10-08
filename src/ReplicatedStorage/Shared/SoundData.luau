@@ -58,7 +58,7 @@ SoundData.Sounds = {
 	-- UI
 	UIClick = { id = "rbxasset://sounds/volume_slider.ogg", volume = 0.5 },
 	Equip = { id = "rbxassetid://282906960", volume = 0.4 },
-	-- Townsfolk murmur when a chat bubble opens (NPCController).
+	-- Townsfolk murmur when the dialogue box opens for them (NPCController).
 	NPCChatter = { id = "rbxasset://sounds/button.wav", volume = 0.2, speed = { 1.3, 1.6 }, rolloff = 40 },
 	-- A truck's engine loop (VehicleFX sets the pitch per truck). Silent
 	-- until an id is picked: Toolbox > Audio, Creator = Roblox, "engine".

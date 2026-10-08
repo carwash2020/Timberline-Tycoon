@@ -71,12 +71,12 @@ return function(t)
 		t.eq(keepers.ToolShed, "Tink")
 	end)
 
-	t.test("everyone has something to say, short enough for a bubble", function()
+	t.test("everyone has something to say, short enough for the box", function()
 		for _, npc in ipairs(NPCData.All()) do
 			t.ok(#npc.lines >= 4, npc.id .. " needs more lines")
 			t.ok(#npc.greetings >= 1, npc.id .. " needs a greeting")
 			for _, line in ipairs(npc.lines) do
-				t.ok(#line <= 110, string.format("%s's line is too long for a bubble: %q", npc.id, line))
+				t.ok(#line <= 110, string.format("%s's line is too long: %q", npc.id, line))
 			end
 		end
 	end)

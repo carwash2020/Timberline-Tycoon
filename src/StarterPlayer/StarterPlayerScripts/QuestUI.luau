@@ -888,6 +888,10 @@ end
 -- The prompt is built with the model (NPCService), so it streams in with
 -- him. This only connects to it: no WaitForChild, and no second prompt.
 local murphHooked = false
+-- Murph's onboarding tips (NPCData) were a bubble on his first hello. They
+-- now open in the same dialogue box the first time a new player talks to him
+-- on the first step, ahead of the step's line.
+local tipsGiven = false
 
 local function hookMurph(model: Instance): boolean
 	if murphHooked or not model:IsA("Model") or model:GetAttribute("NPCId") ~= "Murph" then
@@ -899,7 +903,7 @@ local function hookMurph(model: Instance): boolean
 	end
 	murphHooked = true
 	prompt.Triggered:Connect(function()
-		local _, step = currentStep()
+		local index, step = currentStep()
 		local line: string
 		if step then
 			local cash = player:GetAttribute("Cash")
@@ -914,9 +918,19 @@ local function hookMurph(model: Instance): boolean
 		-- Required here, not at the top: the box builds on services a tutorial
 		-- card does not need (the specs that load QuestUI stub none of them).
 		local DialogueUI = require(script.Parent.DialogueUI)
+		local lines: { string } = {}
+		if not tipsGiven and step and index == 1 and not onRefresher() then
+			tipsGiven = true
+			local NPCData = require(ReplicatedStorage.Shared.NPCData)
+			local murph = NPCData.Get("Murph")
+			for _, tip in ipairs(if murph and murph.tips then murph.tips else {}) do
+				table.insert(lines, HintLogic.Expand(tip, UITheme.Device()))
+			end
+		end
+		table.insert(lines, HintLogic.Expand(line, UITheme.Device()))
 		DialogueUI.Talk({
 			id = "Murph",
-			lines = { HintLogic.Expand(line, UITheme.Device()) },
+			lines = lines,
 			model = model,
 		})
 	end)

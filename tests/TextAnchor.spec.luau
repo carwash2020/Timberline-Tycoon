@@ -1,22 +1,22 @@
 --!nocheck
 -- TextAnchor: text over a head never sits in a wall. The height clamp under a
--- ceiling, the sideways rule, the wall hide with its hysteresis, and the
--- wiring in NPCController / PromptUI (rays at a low rate, nothing "always on
--- top" over a person).
+-- ceiling, the wall hide with its hysteresis, and the wiring in
+-- NPCController / PromptUI (rays at a low rate, nothing "always on top" over
+-- a person). NPC name tags still use it; the floating speech bubbles are gone
+-- (every talk is the dialogue box).
 return function(t)
 	local fs = require("@lune/fs")
 	local TextAnchor = t.shared("TextAnchor")
-	local NPCDialogue = t.shared("NPCDialogue")
 	local NPCData = t.shared("NPCData")
 	local CharacterArt = t.load("ReplicatedStorage/Shared/Art/CharacterArt")
 
-	t.test("under open sky the tail keeps its usual lift", function()
-		local lift, fits = TextAnchor.Lift(3, NPCDialogue.BubbleClearance, nil, 2)
+	t.test("under open sky the card keeps its usual lift", function()
+		local lift, fits = TextAnchor.Lift(3, 1.5, nil, 2)
 		t.eq(lift, 4.5)
 		t.eq(fits, true)
 	end)
 
-	t.test("a high ceiling changes nothing; a low one brings the tail down so the card fits", function()
+	t.test("a high ceiling changes nothing; a low one brings the card down so it fits", function()
 		-- Head centre to roof 12 studs, a 2 stud card: plenty.
 		local lift, fits = TextAnchor.Lift(3, 1.5, 12, 2)
 		t.eq(lift, 4.5)
@@ -29,7 +29,7 @@ return function(t)
 		t.ok(low >= 3 + TextAnchor.MinClearance, "never into the hat")
 	end)
 
-	t.test("with no room above the hat at all, it does not fit (a bubble hides, never clips)", function()
+	t.test("with no room above the hat at all, it does not fit (never clips)", function()
 		local lift, fits = TextAnchor.Lift(3, 1.5, 4.5, 2)
 		t.eq(fits, false)
 		t.eq(lift, 3 + TextAnchor.MinClearance, "a name tag still sits just above the hat")
@@ -38,7 +38,7 @@ return function(t)
 		t.ok(tight >= 3, "and the lift never goes below the hat")
 	end)
 
-	t.test("the lift is monotonic: a lower roof never raises the tail", function()
+	t.test("the lift is monotonic: a lower roof never raises the card", function()
 		local last = math.huge
 		for headroom = 14, 3, -0.5 do
 			local lift = TextAnchor.Lift(3, 1.5, headroom, 1.5)
@@ -56,27 +56,14 @@ return function(t)
 		t.ok(TextAnchor.CardStuds(100, 0, 0) > 0, "no division by nothing")
 	end)
 
-	t.test("a card's estimated height grows with its text, to four lines", function()
-		local one = TextAnchor.CardPx(10, 230, 16)
-		local many = TextAnchor.CardPx(400, 230, 16)
-		t.ok(many > one)
-		t.eq(many, TextAnchor.CardPx(4000, 230, 16), "the label stops at four lines")
-		t.ok(one >= 16 + 14 + 18)
-	end)
-
-	t.test("every NPC fits a bubble under a 14-stud roof, and none can have its hat in the card", function()
+	t.test("every NPC's name tag fits under a 14-stud roof, and none can have its hat in the card", function()
 		for _, npc in ipairs(NPCData.All()) do
 			local model = CharacterArt.Build(npc.look)
 			local top = model:GetAttribute("TopOffset")
-			local lift, fits = TextAnchor.Lift(top, NPCDialogue.BubbleClearance, 14, 2)
+			local lift, fits = TextAnchor.Lift(top, 1.5, 14, 2)
 			t.ok(fits, npc.id .. " fits under open-ish roofs")
 			t.ok(lift >= top + TextAnchor.MinClearance, npc.id .. " clears the hat")
 		end
-	end)
-
-	t.test("a wall beside the bubble puts it straight above the head", function()
-		t.eq(TextAnchor.Side(1.6, false), 1.6)
-		t.eq(TextAnchor.Side(1.6, true), 0)
 	end)
 
 	t.test("a wall hides text at once; it returns after two clear checks, not one", function()
@@ -106,8 +93,7 @@ return function(t)
 		t.ok(string.find(prompt, "TextAnchor.NextHidden(", 1, true) ~= nil, "a wall hides a head's card")
 		t.ok(string.find(prompt, "TextAnchor.Lift(0, PromptUI.HeadLift", 1, true) ~= nil, "and a low roof lowers it")
 		local npcs = fs.readFile("src/StarterPlayer/StarterPlayerScripts/NPCController.luau")
-		t.eq(string.find(npcs, "AlwaysOnTop = true", 1, true), nil, "bubbles are never on top")
-		t.ok(string.find(npcs, "gui.AlwaysOnTop = false", 1, true) ~= nil)
+		t.eq(string.find(npcs, "AlwaysOnTop = true", 1, true), nil, "name tags are never on top")
 	end)
 
 	t.test("NPCController checks walls and ceilings at a low rate and applies the clamp", function()
@@ -116,10 +102,8 @@ return function(t)
 		t.ok(string.find(npcs, "if now >= rig.textAt and", 1, true) ~= nil, "gated by the clock")
 		t.ok(string.find(npcs, "RespectCanCollide = true", 1, true) ~= nil, "leaves and awnings are not walls")
 		t.ok(string.find(npcs, "TextAnchor.NextHidden(rig.hidden, blocked, rig.clear)", 1, true) ~= nil)
-		t.ok(string.find(npcs, "TextAnchor.Lift(rig.topOffset, NPCDialogue.BubbleClearance", 1, true) ~= nil)
-		t.ok(string.find(npcs, "TextAnchor.Side(", 1, true) ~= nil)
-		t.ok(string.find(npcs, "gui.Enabled = not rig.hidden and not rig.crowded", 1, true) ~= nil)
-		t.ok(string.find(npcs, "tag.Enabled = rig.bubble == nil and not rig.hidden", 1, true) ~= nil)
+		t.ok(string.find(npcs, "TextAnchor.Lift(rig.topOffset, rig.tagBaseY - rig.topOffset", 1, true) ~= nil)
+		t.ok(string.find(npcs, "tag.Enabled = not rig.hidden", 1, true) ~= nil)
 		-- No second place turns the name tag on behind checkText's back.
 		t.eq(string.find(npcs, "rig.tag.Enabled", 1, true), nil)
 	end)

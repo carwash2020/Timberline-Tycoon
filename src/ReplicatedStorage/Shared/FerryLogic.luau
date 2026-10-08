@@ -111,7 +111,7 @@ end
 -- device can draw the boat gliding on its own frames.
 function FerryLogic.PoseAt(now: number): (number, number, number)
 	-- What Cap'n Moss says about the price and the timetable, for his Talk
-	-- bubbles (NPCData). Every number comes from GameConfig and this module.
+	-- box (NPCData). Every number comes from GameConfig and this module.
 	function FerryLogic.TalkLines(): { string }
 		local fare = Util.formatCash(GameConfig.FerryFare)
 		local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)
@@ -183,7 +183,7 @@ function FerryLogic.CanBoard(now: number, dock: Dock): boolean
 		return false
 	end
 	-- What Cap'n Moss says about the price and the timetable, for his Talk
-	-- bubbles (NPCData). Every number comes from GameConfig and this module.
+	-- box (NPCData). Every number comes from GameConfig and this module.
 	function FerryLogic.TalkLines(): { string }
 		local fare = Util.formatCash(GameConfig.FerryFare)
 		local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)
@@ -290,7 +290,7 @@ function FerryLogic.PaidText(): string
 end
 
 -- What Cap'n Moss says about the price and the timetable, for his Talk
--- bubbles (NPCData). Every number comes from GameConfig and this module.
+-- box (NPCData). Every number comes from GameConfig and this module.
 function FerryLogic.TalkLines(): { string }
 	local fare = Util.formatCash(GameConfig.FerryFare)
 	local minutes = math.floor(GameConfig.FerryIntervalSec / 60 + 0.5)

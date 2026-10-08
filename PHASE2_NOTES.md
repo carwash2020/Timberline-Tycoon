@@ -2957,3 +2957,23 @@ Connor: "why is there a drop axe button, just make it B on Xbox and a similar bu
 - [ ] Hold a rolled plan: B / Q twice drops it, server still says only you can pick it up.
 - [ ] Phone (device emulator or a phone): long-press the hotbar twice, about a second apart, with an axe equipped: it lands on the ground. A long press up in the world, or on the thumbstick or jump button, does nothing. A tap on the equipped slot still puts it away. Watch whether the first long press also unequips it (expected; the second press still drops it).
 - [ ] The one-time hint appears the first time you hold a droppable axe, with the right control for the device.
+
+## No floating speech bubbles (branch `claude/remove-bubbles`, 8 October 2026)
+
+Connor: "If we have the pop up chats you can remove the floating chat bubbles."
+
+**What changed.** The speech bubble over an NPC's head is gone everywhere: the wave hello, the idle chatter, Murph's first-tip bubble, and the bubble code in `NPCController` plus its helpers in `NPCDialogue` (`AutoBubbles`, `Bubble*`, `AmbientGap`, the bubble layout sizes) and `TextAnchor` (`CardPx`, `Side`, `SideProbe`). Kept: name tags and role labels (still wall-safe and lowered under a roof by `TextAnchor`), the Talk prompt, the dialogue box, the wave gesture (animation only), a talking gesture while the box is open for that NPC, and the `NPCChatter` murmur, now played as the box opens. `QuestUI`'s "bubble" is Murph's tutorial card on the HUD, not an NPC bubble, so it stays.
+
+**Where each bubble-only message went.**
+- Murph's first-hello tips (amber arrow, F for the Field Guide, the little oaks): the first Talk on tutorial step one opens them in the box ahead of the step line (`QuestUI`). The step card, arrow and Skip still appear on their own, so nobody is stranded without Talk.
+- Progress and weather chatter (sell your first load, a better axe, a sawmill, rain): drawn into the box on every Talk (`NPCDialogue.PoolFor`, as before).
+- Ferry fare and timetable, toll fee, plot price (Old Hank): in each NPC's greeting and lines in the box, and in the prompts (`Board ($x)`, `Pay toll ($x)`, the Land Office offer) and the paid / refused toasts.
+- Shop open / closed: the keeper lies down and the hours sign changes (server); a Talk to a sleeping keeper opens the box with their SleepLine.
+
+### Studio checks (Connor), no bubbles
+- [ ] Walk past every NPC (town, Aether Isles, ferry, toll gate, cave, plots): no speech bubble ever appears; name tags still show and hide behind walls and shop roofs.
+- [ ] Come near Murph as a new player: he waves, no text. His step card and the amber arrow appear as before.
+- [ ] Press Talk on Murph on step one: three tips, then the step line, one press each. Talk again: only the step line.
+- [ ] Press Talk on each NPC (Millie, Tink, Hazel, Dale, Gus, Rosa, Pip, Bram, Old Hank, Old Tolly, Cap'n Moss, the Hermit): the box opens, the NPC turns to you and gestures, and prompts work afterwards. Hear the murmur as it opens.
+- [ ] Ferry and toll: the Board / Pay toll prompts show the price; Cap'n Moss and Old Tolly mention it when talked to.
+- [ ] Talk to a keeper after closing time: the box opens with their sleep line.
