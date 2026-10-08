@@ -97,7 +97,7 @@ return function(t)
 		local stack = find(mill, "Smokestack")
 		t.ok(stack and stack:FindFirstChildOfClass("Smoke"), "Smokestack has a Smoke")
 		t.ok(stack.CFrame.Position.Y > 20, "the smoke leaves the top of the stack")
-		t.ok(#parts(mill) <= 400, "sawmill parts: " .. #parts(mill))
+		t.ok(#parts(mill) <= 404, "sawmill parts: " .. #parts(mill))
 		t.ok(texts(mill)["TIMBERLINE SAWMILL"], "the sign")
 		-- The blade stays non-colliding (it spins). SawGuard covers its
 		-- centre, and the rails close the way in from the deck and the east
@@ -119,6 +119,37 @@ return function(t)
 			end
 		end
 		t.eq(rails, 2, "front rail and east rail")
+	end)
+
+	t.test("the sawmill has a clear stand for the foreman beside the office door", function()
+		local mill = BuildingArt.Sawmill()
+		local spot = find(mill, "MillForemanSpot")
+		t.ok(spot and spot.Anchored and spot.Transparency == 1, "a transparent anchored stand")
+		t.ok(not spot.CanCollide and not spot.CanQuery and not spot.CanTouch, "not a hitbox")
+		t.ok(spot.CFrame.LookVector:Dot(V3.new(0, 0, -1)) > 0.99, "faces the road")
+		t.ok(texts(mill)["DAILY JOBS"], "the chalkboard")
+		local board = 0
+		for _, p in ipairs(parts(mill)) do
+			if p.Name == "JobPost" or p.Name == "JobBoard" then
+				board += 1
+			end
+		end
+		t.ok(board >= 1 and board <= 12, "the board is at most 12 parts: " .. board)
+		-- Six studs of flat ground around the stand. The floor it stands on
+		-- (top at or under 1.6) and roofs overhead (bottom above 7) are not
+		-- something to walk into.
+		local slo, shi = bounds(spot)
+		for _, p in ipairs(parts(mill)) do
+			if p ~= spot and p.CanCollide then
+				local lo, hi = bounds(p)
+				if hi.Y > 1.6 and lo.Y < 7 then
+					local dx = math.max(slo.X - hi.X, lo.X - shi.X, 0)
+					local dz = math.max(slo.Z - hi.Z, lo.Z - shi.Z, 0)
+					local gap = math.sqrt(dx * dx + dz * dz)
+					t.ok(gap >= 6 - 1e-3, string.format("%s is %.2f studs from the stand", p.Name, gap))
+				end
+			end
+		end
 	end)
 
 	t.test("the sawmill leaves the sell pad clear", function()

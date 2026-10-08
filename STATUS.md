@@ -20,7 +20,7 @@ Part counts, whole model, Lune (shop cap 250, including the interior):
 | Tool Shed | 626 | 241 |
 | Hearth and Home | 311 | 195 |
 | Dealership | 245 | 215 |
-| Sawmill | 398 | 398 |
+| Sawmill | 398 | 402 |
 | Gate kiosk | — | 7 |
 | Odds and Ends | — | 37 |
 | Sparkworks | — | 20 |
@@ -59,6 +59,9 @@ Paths:
 - `previews/v1-c/scene-lookout.png`
 - `previews/v1-c/scene-bench.png`
 - `previews/v1-c/machine-sawmill.png`
+- `previews/v1-c/mill-foreman.png`
+
+Foreman stand for Lane E. `MillForemanSpot` is an anchored, transparent, non-colliding part on the sawmill, west of the office door, facing the road (-Z). With the mill at `WorldPlan.Town().sawmill` (`CFrame.new(0, 0, 116.5)`), the spot's world CFrame is `CFrame.new(-26.025, 0.15, 97.45)` (look -Z). In the scaled model, before that placement, it is `CFrame.new(-26.025, 0.15, -19.05)`. The DAILY JOBS board stands just west of it. The office lumber, barrel and crates moved behind the cabin so the stand has 6 studs of clear ground.
 
 ## Who and how
 

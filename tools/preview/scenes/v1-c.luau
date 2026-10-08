@@ -81,6 +81,8 @@ return {
 		place(PropArt.Scene("lookout"), 140, 360, { -6, 5, -8, 0, 1, 0 }, "scene-lookout")
 		place(PropArt.Scene("bench"), 165, 360, { -5, 4, -7, 0, 1, 0 }, "scene-bench")
 		place(MachineArt.Build("SawmillRickety", false), 210, 360, { -8, 6, -12, 0, 2, 0 }, "machine-sawmill")
+		-- The foreman stand, west of the office door, from the road.
+		place(BuildingArt.Sawmill(), 300, 400, { -36, 5.5, -32, -27, 2.2, -16 }, "mill-foreman")
 
 		table.insert(cameras, 1, {
 			pos = { 220, 90, -80 },

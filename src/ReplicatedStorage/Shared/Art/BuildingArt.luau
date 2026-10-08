@@ -1174,10 +1174,22 @@ function BuildingArt.Sawmill(scale: number?): Model
 		wallLantern(model, CF(s * 11, 9.4, Z0 - 0.7), 1)
 	end
 	sawdust(model, CF(15.4, 0, -11), 2.8, rng)
-	lumberStack(model, CF(-16.4, 0, -10.5), 5.4, 2.2, 3, 2, rng)
-	barrel(model, CF(-12.6, 0, -8.6), rng, true)
-	crate(model, CF(-19, 0, -8.4) * ANG(0, 0.2, 0), 1.8, rng, true)
-	crate(model, CF(-19.1, 1.8, -8.5) * ANG(0, -0.25, 0), 1.3, rng, true)
+	-- The office yard's stack sits behind the cabin. The ground in front of
+	-- the office door stays clear for the foreman.
+	lumberStack(model, CF(-19.4, 0, 12.2) * ANG(0, PI / 2, 0), 5.4, 2.2, 3, 2, rng)
+	barrel(model, CF(-9.5, 0, 11.0), rng, true)
+	crate(model, CF(-12.2, 0, 12.2) * ANG(0, 0.2, 0), 1.8, rng, true)
+	crate(model, CF(-12.1, 1.8, 12.3) * ANG(0, -0.25, 0), 1.3, rng, true)
+	-- Foreman stand: west of the office door, facing the road (-Z), on the
+	-- flat yard. Transparent, anchored, and not a hitbox. The board is the
+	-- daily-jobs chalkboard (Lane E places the NPC on MillForemanSpot).
+	local stand = Kit.part(model, "MillForemanSpot", V3(2, 0.2, 2), CF(-17.35, 0.1, -12.7), TIMBER)
+	Kit.decor(stand, false)
+	stand.Transparency = 1
+	dBox(model, "JobPost", V3(0.3, 3.2, 0.3), CF(-19.9, 1.6, -13.1), TIMBER)
+	dBox(model, "JobPost", V3(0.3, 3.2, 0.3), CF(-19.1, 1.6, -13.1), TIMBER)
+	local jobs = dBox(model, "JobBoard", V3(1.6, 1.4, 0.2), CF(-19.5, 2.6, -13.1), Palette.SignInk, MAT.Slate)
+	Kit.signText(jobs, "DAILY JOBS", Palette.SignCream, { Enum.NormalId.Front })
 	Kit.scaleModel(model, scale or BuildingArt.Scale.Sawmill)
 	fitNameSign(crest)
 	-- Authored at 1.5 already: do not scale the meshes again.
