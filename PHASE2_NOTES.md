@@ -28,6 +28,8 @@ What's here, each with its own checklist below:
 
 14. **Trees in the spawn area** (8 October 2026, branch `claude/spawn-trees`): 54 more choppable trees in and round the town, by the pad, the dealership and the Land Office
 
+16. **Sparkworks logic sandbox** (8 October 2026, branch `phase-2/v1-s-sparkworks`): wires, gates, timers, the settings panel, the demo board
+
 13. **Saves by hand, and Unload base** (8 October 2026, branch `claude/plot-save-switch`): the save picker at join, Restart save in Settings, UNLOAD / LOAD BASE in the SAVES panel
 
 Where the redesign changed something an older section describes (the
@@ -37,6 +39,27 @@ section wins.
 Old saves carry over: new save fields are filled in on load and old ones
 migrated. Play the sections in order the first time (a fresh save gets the
 tutorial).
+
+## Sparkworks logic sandbox (8 October 2026, branch `phase-2/v1-s-sparkworks`)
+
+Connor wants Sparkworks in V1, and he wants to see the pieces before they merge. Renders (names only, no prices on the models): `previews/v1-s/pieces.png`, `previews/v1-s/wires.png`, `previews/v1-s/demo-board.png`, `previews/v1-s/settings-panel.png`.
+
+What shipped: Button $320, Lever $520, Pressure Plate $640, Wall Switch $100, AND/OR/XOR $260, NOT $200, Delay $520, Sustain $520, Clock $902, Spark Lamp $150, Glow Wire $720, Hatch $830. A Door you already own can be wired. Bought once, then placed free. The Wall Switch and Spark Lamp stay on Hearth & Home until Lane F stocks Sparkworks from `SparkworksStock` (anyone who already owns one keeps it). Laser, Detector and Wood Detector are not in this pass (V1.1).
+
+Caps (proposals): 80 logic pieces and 160 wires on a plot. A looping circuit stops at 200 evaluations and the piece reads Overloaded. The graph ticks only while the owner is online and the plot is loaded. Delay, Sustain and Clock remember their setting in `plot.logic`. Clocks and in-flight delays start again on rejoin (the phase is not saved).
+
+The settings panel sits at the top centre, clear of the thumbstick and the jump button. Minus, plus and Done work by tap, click, and the d-pad or arrow keys. B closes it. The wire tool and the panel bind gamepad keys only while they are open.
+
+### Studio checks
+
+1. **PC.** Place a Lever and a Button, wire them into the two inputs of an AND gate, and wire the gate to a Spark Lamp. The lamp lights only when both are on. The button lets go after about a second. The lever stays. Good: the lamp goes dark when either input drops.
+2. **PC.** Wire a Clock to a Spark Lamp. Use Set, then plus and minus. The lamp blinks once per the number you set. Leave and rejoin, and swap save slots: the number is the same. The clock starts off again. Good: one number in the panel, in seconds.
+3. **PC.** Wire a Pressure Plate to a Hatch. Stand on the plate: the hatch opens. Step off: it shuts. Drop a piece of wood on the plate: it opens again.
+4. **PC.** Wire three NOT gates in a ring. Each piece shows Overloaded. The server stays smooth.
+5. **PC.** Leave the server. Lamps and clocks stop. Rejoin: levers and settings match what you saved.
+6. **Phone emulator.** The wire tool: tap an output, tap an input. The settings panel: tap minus, plus and Done. Nothing sits on the thumbstick or the jump button. The first wiring session shows "Pick an output", then "Pick an input", then "Done: flip it", once.
+7. **Xbox.** Wire tool: RT picks, X cuts, B leaves. Settings panel: d-pad changes the number, B closes. After both are closed, chopping with RT still swings the axe.
+8. **Demo board.** If Sparkworks has a part named DemoBoard, a lever feeds an AND, a clock feeds a lamp, and a plate feeds a hatch, with no save. If the building is not in the world, nothing errors.
 
 ## V1 economy core (8 October 2026, branch `phase-2/v1-a1-economy-core`)
 

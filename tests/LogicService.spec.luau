@@ -32,6 +32,7 @@ return function(t)
 		local PlotData = loader:shared("PlotData")
 		local BlueprintModels = loader:shared("BlueprintModels")
 		local InputKit = loader:shared("InputKit")
+		local WireLogic = loader:shared("WireLogic")
 
 		local toasts = {}
 		local function newPlayer(userId, at)
@@ -90,6 +91,7 @@ return function(t)
 		end
 		return {
 			Service = LogicService,
+			WireLogic = WireLogic,
 			Doors = loader:server("PlotDoors"),
 			InputKit = InputKit,
 			owner = owner,
@@ -422,5 +424,84 @@ return function(t)
 		s.Service.OnWire(s.owner, "sw", 1, "lamp", 1)
 		t.eq(s.profile.plot.wires, {})
 		t.eq(s.toasts[#s.toasts].text, "Stand closer to wire that.")
+	end)
+
+	t.test("a lever and a button into an AND gate light the lamp only when both are on", function()
+		local s = setup()
+		s.add("lever", "Lever", 0, 0)
+		s.add("button", "Button", 0, 4)
+		s.add("gate", "GateAnd", 4, 2)
+		local lamp = s.add("lamp", "SparkLamp", 8, 2)
+		t.eq({ s.Service.Link(s.owner, "lever", "gate", 1, 1) }, { true, nil })
+		t.eq({ s.Service.Link(s.owner, "button", "gate", 1, 2) }, { true, nil })
+		t.eq({ s.Service.Link(s.owner, "gate", "lamp") }, { true, nil })
+		t.eq(s.profile.plot.wires[2].toPort, 2)
+		t.eq(lamp:GetAttribute("Lit"), false)
+		s.Service.Flip(s.ctx.lever, s.owner)
+		t.eq(lamp:GetAttribute("Lit"), false, "the button is still off, so the AND stays off")
+		s.Service.Press(s.ctx.button, s.owner)
+		t.eq(lamp:GetAttribute("Lit"), true)
+		t.eq(lamp:FindFirstChild("Part2").Material, t.roblox.Enum.Material.Neon)
+	end)
+
+	t.test("LogicSet saves a clamped time and refuses a value outside the range", function()
+		local s = setup()
+		local delay = s.add("delay", "Delay", 0, 0)
+		local set = delay:FindFirstChild("SetPrompt", true)
+		t.ok(set, "a Set prompt")
+		t.eq(set:GetAttribute("LogicKey"), "delay")
+		t.eq(set:GetAttribute("LogicValue"), 1)
+		s.Service.OnLogicSet(s.owner, "delay", "delay", 2)
+		t.eq(s.profile.plot.logic.delay.delay, 2)
+		t.eq(set:GetAttribute("LogicValue"), 2)
+		t.eq(s.toasts[#s.toasts].text, "Delay set to 2 s.")
+		s.Service.OnLogicSet(s.owner, "delay", "delay", 50)
+		t.eq(s.profile.plot.logic.delay.delay, 2, "out of range is ignored")
+		s.Service.OnLogicSet(s.owner, "delay", "nope", 3)
+		t.eq(s.profile.plot.logic.delay.delay, 2)
+		s.Service.OnLogicSet(s.owner, 5, "delay", 2)
+		t.eq(s.profile.plot.logic.delay.delay, 2)
+	end)
+
+	t.test("a plot over the logic cap is told once", function()
+		local s = setup()
+		s.WireLogic.MaxItems = 1
+		s.add("a", "SparkSwitch", 0, 0)
+		s.add("b", "SparkSwitch", 4, 0)
+		local hits = 0
+		for _, toast in ipairs(s.toasts) do
+			if string.find(toast.text, "logic pieces", 1, true) then
+				hits += 1
+			end
+		end
+		t.eq(hits, 1)
+		s.add("c", "SparkSwitch", 8, 0)
+		t.eq(hits, 1, "still the one warning from before the third piece")
+		local again = 0
+		for _, toast in ipairs(s.toasts) do
+			if string.find(toast.text, "logic pieces", 1, true) then
+				again += 1
+			end
+		end
+		t.eq(again, 1, "the cap is said once per plot")
+	end)
+
+	t.test("the showroom demo builds on a DemoBoard and a second call does nothing", function()
+		local s = setup()
+		local board = Instance.new("Part")
+		board.Name = "DemoBoard"
+		board.Size = Vector3.new(20, 10, 1)
+		board.CFrame = CFrame.new(0, 5, 0)
+		s.Service.BuildDemo(board)
+		local demo = board:FindFirstChild("SparkworksDemo")
+		t.ok(demo, "a demo folder")
+		t.ok(demo:FindFirstChild("lever"), "lever")
+		t.ok(demo:FindFirstChild("gate"), "AND")
+		t.ok(demo:FindFirstChild("clock"), "clock")
+		t.ok(demo:FindFirstChild("lamp"), "lamp")
+		t.ok(demo:FindFirstChild("plate"), "plate")
+		t.ok(demo:FindFirstChild("hatch"), "hatch")
+		s.Service.BuildDemo(board)
+		t.eq(#board:GetChildren(), 1, "not built twice")
 	end)
 end

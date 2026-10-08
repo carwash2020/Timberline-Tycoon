@@ -22,10 +22,46 @@ WireToolLogic.TapPx = 44 -- a tap this near a piece's centre on screen picks it 
 WireToolLogic.LineThickness = 0.14
 
 -- Where on each piece the wire is tied, studs above its base.
-WireToolLogic.Height = { switch = 3.4, lamp = 5.5, door = 4 } :: { [string]: number }
+WireToolLogic.Height = {
+	switch = 3.4,
+	lamp = 5.5,
+	door = 4,
+	button = 1.2,
+	lever = 2.4,
+	plate = 0.4,
+	gate = 1.2,
+	invert = 1.2,
+	delay = 1.2,
+	sustain = 1.2,
+	clock = 1.7,
+	glow = 0.6,
+	hatch = 0.4,
+} :: { [string]: number }
+
+-- Shown once per session, in order, while the tool is open.
+WireToolLogic.Lessons = { "Pick an output", "Pick an input", "Done: flip it" }
+
+-- `step` is 1..3 while teaching and 4 once the session has seen all three.
+function WireToolLogic.Lesson(step: number): string?
+	return WireToolLogic.Lessons[step]
+end
+
+function WireToolLogic.Advance(step: number, event: string): number
+	if step >= 4 then
+		return 4
+	end
+	if event == "source" and step <= 1 then
+		return 2
+	elseif event == "link" and step <= 2 then
+		return 3
+	elseif event == "done" and step >= 3 then
+		return 4
+	end
+	return if step < 1 then 1 else step
+end
 
 export type Piece = { uid: string, blueprintId: string, x: number, y: number?, z: number }
-export type Action = { op: "link", from: string, to: string } | { op: "cut", uid: string }
+export type Action = { op: "link", from: string, to: string, toPort: number? } | { op: "cut", uid: string }
 export type Segment =
 	{ from: string, to: string, ax: number, ay: number, az: number, bx: number, by: number, bz: number }
 
@@ -48,14 +84,14 @@ function WireToolLogic.Tap(picked: string?, tapped: string?, pieces: { Piece }):
 	if tapped == nil or role == nil then
 		return nil, nil
 	end
-	if role == "switch" then
+	if WireLogic.IsSource(role) then
 		if picked == tapped then
 			return nil, nil
 		end
 		return tapped, nil
 	end
-	-- A lamp or a door.
-	if picked ~= nil and roleOf(pieces, picked) == "switch" then
+	-- An input (a lamp, a door, a gate, a timer).
+	if picked ~= nil and WireLogic.IsSource(roleOf(pieces, picked)) then
 		return picked, { op = "link", from = picked, to = tapped }
 	end
 	return tapped, nil
@@ -72,7 +108,7 @@ end
 -- What the Wire remote is fired with for an action.
 function WireToolLogic.Args(action: Action): { any }
 	if action.op == "link" then
-		return { action.from, WireLogic.Port, action.to, WireLogic.Port }
+		return { action.from, WireLogic.Port, action.to, action.toPort or WireLogic.Port }
 	end
 	return { "cut", action.uid }
 end
@@ -82,10 +118,34 @@ function WireToolLogic.Help(picked: string?, pieces: { Piece }): string
 	local role = roleOf(pieces, picked)
 	if role == "switch" then
 		return "Tap a Spark Lamp or a Door to wire it. CUT clears this switch."
+	elseif WireLogic.IsSource(role) then
+		return "Tap an input to wire it. CUT clears this piece."
 	elseif role ~= nil then
-		return "Tap a Wall Switch to wire it here. CUT clears this piece."
+		return "Tap an output to wire it here. CUT clears this piece."
 	end
 	return "Tap a Wall Switch to start a wire."
+end
+
+-- The lowest input port on `blueprintId` that `toUid` does not already use.
+-- When every port is used, another wire ORs onto port 1.
+function WireToolLogic.NextIn(wires: { WireLogic.Wire }, toUid: string, blueprintId: string): number
+	local spec = WireLogic.Spec(blueprintId)
+	if not spec then
+		return WireLogic.Port
+	end
+	for _, port in ipairs(spec.ins) do
+		local used = false
+		for _, wire in ipairs(wires) do
+			if wire.to == toUid and (wire.toPort or 1) == port then
+				used = true
+				break
+			end
+		end
+		if not used then
+			return port
+		end
+	end
+	return spec.ins[1] or WireLogic.Port
 end
 
 -- The target uids in a switch model's "Wires" attribute.
@@ -94,8 +154,11 @@ function WireToolLogic.Parse(text: unknown): { string }
 	if type(text) ~= "string" then
 		return out
 	end
-	for uid in string.gmatch(text, "[^,]+") do
-		table.insert(out, uid)
+	for token in string.gmatch(text, "[^,]+") do
+		local uid = string.match(token, "^[^@]+")
+		if uid and uid ~= "" then
+			table.insert(out, uid)
+		end
 	end
 	return out
 end
@@ -135,7 +198,7 @@ function WireToolLogic.Segments(pieces: { Piece }, wires: { [string]: string }):
 	table.sort(uids)
 	for _, fromUid in ipairs(uids) do
 		local a = by[fromUid]
-		if a and WireLogic.Role(a.blueprintId) == "switch" then
+		if a and WireLogic.IsSource(WireLogic.Role(a.blueprintId)) then
 			for _, toUid in ipairs(WireToolLogic.Parse(wires[fromUid])) do
 				local b = by[toUid]
 				if b and WireLogic.IsTarget(WireLogic.Role(b.blueprintId)) then
