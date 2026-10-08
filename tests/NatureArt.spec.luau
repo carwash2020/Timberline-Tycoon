@@ -353,23 +353,41 @@ return function(t)
 	t.test("a missing rock mesh keeps the part build and says so once", function()
 		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
 		t.eq(RockModels.UsesMesh(0), false)
-		t.eq(#RockModels.MeshIds(), 0, "nothing is uploaded yet")
+		-- The ids are uploaded now, so zero them here to test the fallback.
+		local saved = {}
 		for _, shape in ipairs(NatureArt.RockShapes) do
-			local spec = RockModels.Get(shape)
-			t.eq(spec.Host.meshId, 0, shape)
-			t.eq(spec.Glow.meshId, 0, shape .. " glow")
+			for _, variant in ipairs({ "A", "B" }) do
+				local spec = RockModels.Get(shape, variant)
+				for _, key in ipairs(RockModels.PieceKeys) do
+					table.insert(saved, { spec[key], spec[key].meshId })
+					spec[key].meshId = 0
+				end
+			end
 		end
-		local rock = NatureArt.Build("Boulder", 4, "mid", "meadow")
-		t.ok(rock:FindFirstChild("Core"), "the part-built core stays")
-		t.eq(rock:FindFirstChild("MeshHost"), nil)
-		t.eq(rock:GetAttribute("MeshFallback"), "host")
-		t.eq(rock:GetAttribute("RockMesh"), nil)
-		local fern = NatureArt.Build("Fern", 1)
-		t.eq(fern:GetAttribute("MeshFallback"), nil, "plants are not rock meshes")
-		local ore = NatureArt.OreRock("Spire", "mid", Color3.fromRGB(255, 0, 0), Enum.Material.Metal, false)
-		t.ok(ore:FindFirstChild("Vein"))
-		t.eq(ore:GetAttribute("OreId"), "")
-		t.eq(ore:GetAttribute("MeshFallback"), "host")
+		local ok, err = pcall(function()
+			for _, shape in ipairs(NatureArt.RockShapes) do
+				local spec = RockModels.Get(shape)
+				t.eq(spec.Host.meshId, 0, shape)
+				t.eq(spec.Glow.meshId, 0, shape .. " glow")
+			end
+			local rock = NatureArt.Build("Boulder", 4, "mid", "meadow")
+			t.ok(rock:FindFirstChild("Core"), "the part-built core stays")
+			t.eq(rock:FindFirstChild("MeshHost"), nil)
+			t.eq(rock:GetAttribute("MeshFallback"), "host")
+			t.eq(rock:GetAttribute("RockMesh"), nil)
+			local fern = NatureArt.Build("Fern", 1)
+			t.eq(fern:GetAttribute("MeshFallback"), nil, "plants are not rock meshes")
+			local ore = NatureArt.OreRock("Spire", "mid", Color3.fromRGB(255, 0, 0), Enum.Material.Metal, false)
+			t.ok(ore:FindFirstChild("Vein"))
+			t.eq(ore:GetAttribute("OreId"), "")
+			t.eq(ore:GetAttribute("MeshFallback"), "host")
+		end)
+		for _, row in ipairs(saved) do
+			row[1].meshId = row[2]
+		end
+		if not ok then
+			error(err, 0)
+		end
 	end)
 
 	t.test("an ore id tints the part build from OreData", function()
@@ -523,8 +541,9 @@ return function(t)
 		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
 		local Instance = t.roblox.Instance
 		local spec = RockModels.Get("Boulder")
-		local saved = spec.Host.meshId
+		local saved, savedMoss = spec.Host.meshId, spec.Moss.meshId
 		spec.Host.meshId = 770011
+		spec.Moss.meshId = 0
 		MeshKit.Reset()
 		MeshKit.Override = function(_id, name, size)
 			local part = Instance.new("MeshPart")
@@ -541,6 +560,7 @@ return function(t)
 			t.eq(meadow:GetAttribute("MeshFallback"), "moss")
 		end)
 		spec.Host.meshId = saved
+		spec.Moss.meshId = savedMoss
 		MeshKit.Override = nil
 		MeshKit.Reset()
 		if not ok then
@@ -575,6 +595,161 @@ return function(t)
 		if not ok then
 			error(err, 0)
 		end
+	end)
+
+	local function withMeshes(fn)
+		local MeshKit = t.load("ReplicatedStorage/Shared/Art/MeshKit")
+		local Instance = t.roblox.Instance
+		MeshKit.Reset()
+		MeshKit.Override = function(_id, name, size)
+			local part = Instance.new("MeshPart")
+			part.Name = name
+			part.Size = size
+			return part
+		end
+		local ok, err = pcall(fn)
+		MeshKit.Override = nil
+		MeshKit.Reset()
+		if not ok then
+			error(err, 0)
+		end
+	end
+
+	t.test("mesh pieces sit at the host plus their offset times the scale", function()
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		local CFrame = t.roblox.CFrame
+		withMeshes(function()
+			-- Seed 4 picks variant A and its jitter is exactly 1.
+			for _, sizeName in ipairs({ "mid", "large" }) do
+				local scale = if sizeName == "large" then 1.45 else 1
+				local spec = RockModels.Get("Boulder", "A")
+				local flat = NatureArt.BuildFlat("Boulder", 4, sizeName, "meadow")
+				local host = flat:FindFirstChild("MeshHost")
+				local moss = flat:FindFirstChild("MeshMoss")
+				t.ok(host and moss, sizeName .. " has host and moss")
+				t.ok(
+					(host.CFrame.Position - spec.hostCentre * scale).Magnitude < 1e-3,
+					sizeName .. " host sits at hostCentre * scale in build space"
+				)
+				local want = host.CFrame * CFrame.new(spec.Moss.offset * scale)
+				t.ok((moss.CFrame.Position - want.Position).Magnitude < 1e-3, sizeName .. " moss position")
+				t.ok((moss.Size - spec.Moss.size * scale).Magnitude < 1e-3, sizeName .. " moss size scales")
+				t.ok((host.Size - spec.Host.size * scale).Magnitude < 1e-3, sizeName .. " host size scales")
+				-- The tilted build keeps the same relation (the whole model moves as one).
+				local tilted = NatureArt.Build("Boulder", 4, sizeName, "meadow")
+				local th, tm = tilted:FindFirstChild("MeshHost"), tilted:FindFirstChild("MeshMoss")
+				local twant = th.CFrame * CFrame.new(spec.Moss.offset * scale)
+				t.ok((tm.CFrame.Position - twant.Position).Magnitude < 1e-3, sizeName .. " moss after settle")
+			end
+			-- Ore rock: both veins and the glow.
+			local red = t.roblox.Color3.fromRGB(255, 0, 0)
+			local heart = NatureArt.OreRock("Outcrop", "large", red, t.roblox.Enum.Material.Slate, false, "heartstone")
+			local spec = RockModels.Get("Outcrop", "A")
+			local host = heart:FindFirstChild("MeshHost")
+			-- settle() jitters the whole rock's size and spacing a little.
+			local jitter = host.Size.X / (spec.Host.size.X * 1.45)
+			t.ok(jitter > 0.9 and jitter < 1.1)
+			for key, name in pairs({ Vein1 = "MeshVein1", Vein2 = "MeshVein2", Glow = "MeshGlow" }) do
+				local piece = heart:FindFirstChild(name)
+				t.ok(piece, name)
+				local want = host.CFrame * CFrame.new(spec[key].offset * 1.45 * jitter)
+				t.ok((piece.CFrame.Position - want.Position).Magnitude < 1e-3, name .. " offset on the ore rock")
+			end
+			t.eq(heart:FindFirstChild("MeshHost"):GetAttribute("MeshId"), tostring(spec.Host.meshId))
+		end)
+	end)
+
+	t.test("scatter variants follow the seed and ore shapes pick their kind", function()
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		withMeshes(function()
+			local function hostId(model)
+				return model:FindFirstChild("MeshHost"):GetAttribute("MeshId")
+			end
+			local a = RockModels.Get("Boulder", "A").Host.meshId
+			local b = RockModels.Get("Boulder", "B").Host.meshId
+			t.eq(hostId(NatureArt.Build("Boulder", 4, "mid", "shore")), tostring(a))
+			t.eq(hostId(NatureArt.Build("Boulder", 4, "mid", "shore")), tostring(a), "same seed, same variant")
+			t.eq(hostId(NatureArt.Build("Boulder", 2, "mid", "shore")), tostring(b), "another seed can pick B")
+			local red = t.roblox.Color3.fromRGB(255, 0, 0)
+			local Material = t.roblox.Enum.Material.Metal
+			local function ore(shape)
+				return NatureArt.OreRock(shape, "mid", red, Material, false, "coal")
+			end
+			t.eq(hostId(ore("split")), tostring(RockModels.Get("CrackedBoulder", "A").Host.meshId))
+			t.eq(hostId(ore("standing")), tostring(RockModels.Get("Spire", "A").Host.meshId))
+			t.eq(hostId(ore("pebbles")), tostring(RockModels.Get("PebbleCluster", "A").Host.meshId))
+			t.eq(hostId(ore("Slab")), tostring(RockModels.Get("Slab", "A").Host.meshId), "kind names pass through")
+			t.eq(hostId(ore("unknown")), tostring(a), "unknown shapes are a Boulder")
+			local mossy = ore("mossy")
+			t.eq(hostId(mossy), tostring(b))
+			t.ok(mossy:FindFirstChild("MeshMoss"), "mossy has a moss cap")
+			t.eq(mossy.MeshMoss.Material, t.roblox.Enum.Material.Grass)
+			t.eq(ore("boulder"):FindFirstChild("MeshMoss"), nil, "a plain boulder has none")
+		end)
+	end)
+
+	t.test("with no ids the part build stays and each miss is told once", function()
+		local loader = t.loader()
+		local Fresh = loader:load("ReplicatedStorage/Shared/Art/NatureArt")
+		local FreshRocks = loader:load("ReplicatedStorage/Shared/Art/RockModels")
+		for _, variant in ipairs({ "A", "B" }) do
+			local spec = FreshRocks.Get("Spire", variant)
+			for _, key in ipairs(FreshRocks.PieceKeys) do
+				spec[key].meshId = 0
+			end
+		end
+		local ok, err = pcall(function()
+			for i = 1, 6 do
+				local rock = Fresh.Build("Spire", 4, "mid", "meadow")
+				t.ok(rock:FindFirstChild("Core"))
+				t.eq(rock:FindFirstChild("MeshHost"), nil)
+			end
+			local told = 0
+			for _, line in ipairs(loader.warnings) do
+				if string.find(line, "Spire", 1, true) and string.find(line, "host", 1, true) then
+					told += 1
+				end
+			end
+			t.eq(told, 1, "six missing rocks, one log line")
+		end)
+		if not ok then
+			error(err, 0)
+		end
+	end)
+
+	t.test("the cave mouth is meshed with a hidden collider, or part-built with a light", function()
+		local RockModels = t.load("ReplicatedStorage/Shared/Art/RockModels")
+		local spec = RockModels.Scenery("CaveMouth")
+		-- No override in Lune: every load misses, so this is the part build.
+		local plain = NatureArt.CaveMouth()
+		t.ok(plain:FindFirstChild("Body"), "part-built body")
+		t.ok(plain:FindFirstChild("Frame"))
+		t.eq(plain:GetAttribute("MeshFallback"), "Body")
+		t.eq(plain:GetAttribute("RockMesh"), nil)
+		local light = plain:FindFirstChild("Glow"):FindFirstChildWhichIsA("PointLight")
+		t.ok(light, "the lantern light")
+		withMeshes(function()
+			local m = NatureArt.CaveMouth()
+			t.eq(m:GetAttribute("RockMesh"), true)
+			t.eq(m:GetAttribute("MeshFallback"), nil)
+			local body, frame, glow, collision = m.Body, m.Frame, m.Glow, m.Collision
+			t.eq(body.CanCollide, false, "the body does not collide")
+			t.eq(frame.CanCollide, false)
+			t.eq(collision.CanCollide, true, "the collider collides")
+			t.eq(collision.CanQuery, true)
+			t.eq(collision.Transparency, 1)
+			t.eq(glow.Material, t.roblox.Enum.Material.Neon)
+			local lamp = glow:FindFirstChildWhichIsA("PointLight")
+			t.ok(lamp)
+			t.eq(lamp.Range, 14)
+			t.eq(lamp.Brightness, 1)
+			t.eq(lamp.Shadows, false)
+			t.ok((body.CFrame.Position - spec.hostCentre).Magnitude < 1e-3, "body at hostCentre")
+			local want = spec.hostCentre + spec.pieces.Frame.offset
+			t.ok((frame.CFrame.Position - want).Magnitude < 1e-3, "frame offset from the body")
+			t.ok((collision.Size - spec.pieces.Collision.size).Magnitude < 1e-3)
+			t.eq(m:FindFirstChildWhichIsA("SurfaceGui", true), nil, "the MINE letters are modelled")
+		end)
 	end)
 
 	t.test("rain streaks are thin parts and a shelter skips the middle", function()

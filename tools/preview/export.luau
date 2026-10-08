@@ -334,6 +334,7 @@ local function export(name: string, def)
 						file = info.file,
 						node = info.node,
 						initialSize = info.initialSize,
+						tint = info.tint,
 					}
 					blobFor(info.file)
 				end

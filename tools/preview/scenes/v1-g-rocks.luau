@@ -56,7 +56,7 @@ return {
 			local board = Kit.part(
 				root,
 				"Plaque",
-				V3.new(6.4, 0.12, 1.85),
+				V3.new(4.0, 0.12, 1.15),
 				CF.new(x, 0.07, z) * CF.Angles(0, math.pi + YAW, 0),
 				C3.fromRGB(98, 68, 42),
 				Enum.Material.Wood
@@ -71,7 +71,7 @@ return {
 
 		-- Distance where a vertical span `visH` covers `fill` of the frame.
 		local function frameOne(cx, lookY, cz, visH, visW)
-			local fill = 0.55
+			local fill = 0.42
 			local d = (visH * math.cos(ELEV)) / (fill * 2 * math.tan(math.rad(FOV) / 2))
 			local aspect = 1280 / 800
 			local function hSpan(dist)
@@ -115,9 +115,9 @@ return {
 			local bottom = math.max(minY, 0)
 			local visH = math.max(maxY - bottom, 0.5)
 			local visW = math.max(maxX - minX, maxZ - minZ)
-			local reach = math.max(visW, maxZ - minZ, maxX - minX) * 0.62 + 1.35
+			local reach = math.max(visW, maxZ - minZ, maxX - minX) * 0.42 + 0.95
 			plaque(row[3], cx - math.sin(YAW) * reach, cz - math.cos(YAW) * reach)
-			local lookY = bottom + visH * 0.4
+			local lookY = bottom + visH * 0.0
 			local cam = frameOne(cx, lookY, cz, visH, visW)
 			cam.label = row[4]
 			table.insert(cameras, cam)

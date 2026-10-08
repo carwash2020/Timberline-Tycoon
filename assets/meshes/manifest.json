@@ -53,6 +53,16 @@
     ],
     "node": "Section"
   },
+  "100630014533328": {
+    "file": "rocks/RockCrackedBoulderB/RockCrackedBoulderB.glb",
+    "initialSize": [
+      2.92,
+      1.909,
+      2.392
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
   "100635326256018": {
     "file": "buildings/SkyBin/SkyBin.glb",
     "initialSize": [
@@ -88,6 +98,26 @@
       13.0
     ],
     "node": "Bed"
+  },
+  "101286265773616": {
+    "file": "rocks/RockCrackedBoulderA/RockCrackedBoulderA.glb",
+    "initialSize": [
+      3.606,
+      2.211,
+      2.042
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
+  "101341694885371": {
+    "file": "rocks/CaveMouth/CaveMouth.glb",
+    "initialSize": [
+      39.42,
+      20.233,
+      15.26
+    ],
+    "node": "Body",
+    "tint": true
   },
   "101508101794001": {
     "file": "npcs/Millie/Millie.glb",
@@ -224,6 +254,16 @@
     ],
     "node": "RightLowerArm"
   },
+  "102541556185071": {
+    "file": "rocks/RockCrackedBoulderB/RockCrackedBoulderB.glb",
+    "initialSize": [
+      3.631,
+      2.21,
+      2.268
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
   "102572518490476": {
     "file": "vehicles/PonyTrailer/PonyTrailer.glb",
     "initialSize": [
@@ -232,6 +272,16 @@
       2.937
     ],
     "node": "Wheel"
+  },
+  "102587715074861": {
+    "file": "rocks/RockBoulderA/RockBoulderA.glb",
+    "initialSize": [
+      1.62,
+      1.878,
+      2.082
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "102593030407778": {
     "file": "npcs/Murph/Murph.glb",
@@ -305,6 +355,16 @@
     ],
     "node": "UpperTorso"
   },
+  "102972490912638": {
+    "file": "rocks/RockSlabB/RockSlabB.glb",
+    "initialSize": [
+      0.884,
+      0.496,
+      1.671
+    ],
+    "node": "MeshVein2",
+    "tint": true
+  },
   "103111550635504": {
     "file": "buildings/Sawmill/Sawmill.glb",
     "initialSize": [
@@ -350,6 +410,16 @@
     ],
     "node": "RightHand"
   },
+  "103763403133102": {
+    "file": "rocks/RockSpireB/RockSpireB.glb",
+    "initialSize": [
+      2.059,
+      2.622,
+      1.749
+    ],
+    "node": "MeshSnow",
+    "tint": true
+  },
   "103819640831326": {
     "file": "vehicles/LoggingRig/LoggingRig.glb",
     "initialSize": [
@@ -385,6 +455,16 @@
       0.78
     ],
     "node": "RightHand"
+  },
+  "104109068749289": {
+    "file": "rocks/RockBoulderA/RockBoulderA.glb",
+    "initialSize": [
+      3.107,
+      2.634,
+      2.279
+    ],
+    "node": "MeshGlow",
+    "tint": true
   },
   "104141006365223": {
     "file": "npcs/OldBram/OldBram.glb",
@@ -512,6 +592,16 @@
     ],
     "node": "LeftUpperArm"
   },
+  "105311834374970": {
+    "file": "rocks/CaveMouth/CaveMouth.glb",
+    "initialSize": [
+      32.0,
+      20.0,
+      15.0
+    ],
+    "node": "Collision",
+    "tint": true
+  },
   "105398150865760": {
     "file": "environment/Campfire/Campfire.glb",
     "initialSize": [
@@ -620,6 +710,16 @@
     ],
     "node": "Body"
   },
+  "107045585185064": {
+    "file": "rocks/RockSlabB/RockSlabB.glb",
+    "initialSize": [
+      4.07,
+      1.082,
+      1.893
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
   "107147198667062": {
     "file": "buildings/ToolShed/ToolShed.glb",
     "initialSize": [
@@ -664,6 +764,16 @@
       1.421
     ],
     "node": "Body"
+  },
+  "107968526158919": {
+    "file": "rocks/RockPebbleClusterB/RockPebbleClusterB.glb",
+    "initialSize": [
+      0.78,
+      0.42,
+      0.757
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "108009426716841": {
     "file": "npcs/Rosa/Rosa.glb",
@@ -736,6 +846,16 @@
       4.0
     ],
     "node": "Collision"
+  },
+  "108571714472065": {
+    "file": "rocks/RockBoulderA/RockBoulderA.glb",
+    "initialSize": [
+      3.23,
+      1.616,
+      2.323
+    ],
+    "node": "MeshMoss",
+    "tint": true
   },
   "108637384034532": {
     "file": "npcs/OldBram/OldBram.glb",
@@ -935,6 +1055,16 @@
     ],
     "node": "Wood"
   },
+  "111560392695120": {
+    "file": "rocks/RockSpireB/RockSpireB.glb",
+    "initialSize": [
+      0.958,
+      0.826,
+      1.194
+    ],
+    "node": "MeshVein1",
+    "tint": true
+  },
   "111622442505696": {
     "file": "environment/Well/Well.glb",
     "initialSize": [
@@ -952,6 +1082,16 @@
       33.8
     ],
     "node": "Bed"
+  },
+  "112030824525124": {
+    "file": "rocks/RockSlabB/RockSlabB.glb",
+    "initialSize": [
+      4.317,
+      1.233,
+      2.21
+    ],
+    "node": "MeshSnow",
+    "tint": true
   },
   "112087968527199": {
     "file": "trees/Lumenwood/Section_3.glb",
@@ -1006,6 +1146,16 @@
       3.076
     ],
     "node": "Hitch"
+  },
+  "113108254107488": {
+    "file": "rocks/RubbleBoulders/RubbleBoulders.glb",
+    "initialSize": [
+      2.306,
+      2.288,
+      0.3
+    ],
+    "node": "Marks",
+    "tint": true
   },
   "113252783846653": {
     "file": "vehicles/RanchTrailer/by_truck/Rustbucket/RanchTrailer_Rustbucket.glb",
@@ -1196,6 +1346,16 @@
     ],
     "node": "LowerTorso"
   },
+  "116131616381659": {
+    "file": "rocks/RockPebbleClusterA/RockPebbleClusterA.glb",
+    "initialSize": [
+      2.062,
+      0.685,
+      1.776
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
   "116160073850108": {
     "file": "npcs/Hazel/Hazel.glb",
     "initialSize": [
@@ -1231,6 +1391,16 @@
       0.97
     ],
     "node": "LeftLowerLeg"
+  },
+  "116736395836828": {
+    "file": "rocks/RockSpireA/RockSpireA.glb",
+    "initialSize": [
+      2.12,
+      2.635,
+      1.446
+    ],
+    "node": "MeshHost",
+    "tint": true
   },
   "116870188640151": {
     "file": "kit/TallWall8/TallWall8.glb",
@@ -1268,6 +1438,16 @@
     ],
     "node": "Lights"
   },
+  "117316128539352": {
+    "file": "rocks/RockBoulderB/RockBoulderB.glb",
+    "initialSize": [
+      3.984,
+      1.892,
+      3.042
+    ],
+    "node": "MeshSnow",
+    "tint": true
+  },
   "117328552905839": {
     "file": "vehicles/ScoutATV/ScoutATV.glb",
     "initialSize": [
@@ -1285,6 +1465,36 @@
       18.245
     ],
     "node": "Body"
+  },
+  "117901466468019": {
+    "file": "rocks/RockOutcropA/RockOutcropA.glb",
+    "initialSize": [
+      2.806,
+      1.178,
+      1.868
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
+  "118121899916712": {
+    "file": "rocks/RockBoulderB/RockBoulderB.glb",
+    "initialSize": [
+      3.614,
+      1.349,
+      2.273
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
+  "118195742752744": {
+    "file": "rocks/RockPebbleClusterB/RockPebbleClusterB.glb",
+    "initialSize": [
+      0.868,
+      0.493,
+      0.88
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "118206786010410": {
     "file": "trees/Pine/Section_3.glb",
@@ -1402,6 +1612,26 @@
       1.14
     ],
     "node": "UpperTorso"
+  },
+  "120054350575997": {
+    "file": "rocks/RockSlabA/RockSlabA.glb",
+    "initialSize": [
+      3.126,
+      0.746,
+      2.052
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
+  "120441451290084": {
+    "file": "rocks/RockBoulderB/RockBoulderB.glb",
+    "initialSize": [
+      3.106,
+      2.754,
+      2.397
+    ],
+    "node": "MeshGlow",
+    "tint": true
   },
   "120538377648344": {
     "file": "vehicles/RanchTrailer/by_truck/Flatbed/RanchTrailer_Flatbed.glb",
@@ -1556,6 +1786,16 @@
     ],
     "node": "LowerTorso"
   },
+  "121885047697204": {
+    "file": "rocks/RubbleTunnel/RubbleTunnel.glb",
+    "initialSize": [
+      16.0,
+      12.0,
+      6.0
+    ],
+    "node": "Collision",
+    "tint": true
+  },
   "121962083793739": {
     "file": "axes/InfernoAxe/InfernoAxe.glb",
     "initialSize": [
@@ -1628,6 +1868,16 @@
     ],
     "node": "Body"
   },
+  "122883454923856": {
+    "file": "rocks/RubbleBoulders/RubbleBoulders.glb",
+    "initialSize": [
+      16.0,
+      12.0,
+      6.0
+    ],
+    "node": "Collision",
+    "tint": true
+  },
   "122927328430335": {
     "file": "environment/ToolRack/ToolRack.glb",
     "initialSize": [
@@ -1646,6 +1896,16 @@
     ],
     "node": "LeftLowerLeg"
   },
+  "122975660028978": {
+    "file": "rocks/RockCrackedBoulderA/RockCrackedBoulderA.glb",
+    "initialSize": [
+      3.17,
+      2.077,
+      2.615
+    ],
+    "node": "MeshSnow",
+    "tint": true
+  },
   "123109371096027": {
     "file": "environment/PathRound/PathRound.glb",
     "initialSize": [
@@ -1654,6 +1914,16 @@
       3.091
     ],
     "node": "Body"
+  },
+  "123210761799280": {
+    "file": "rocks/RubbleTunnel/RubbleTunnel.glb",
+    "initialSize": [
+      2.306,
+      2.288,
+      0.3
+    ],
+    "node": "Marks",
+    "tint": true
   },
   "123241877210621": {
     "file": "npcs/Rosa/Rosa.glb",
@@ -1672,6 +1942,16 @@
       24.496
     ],
     "node": "Facet"
+  },
+  "123515393937777": {
+    "file": "rocks/RockCrackedBoulderA/RockCrackedBoulderA.glb",
+    "initialSize": [
+      3.006,
+      1.975,
+      2.354
+    ],
+    "node": "MeshHost",
+    "tint": true
   },
   "123969354159436": {
     "file": "npcs/Dale/Dale.glb",
@@ -1771,6 +2051,16 @@
       8.3
     ],
     "node": "Body"
+  },
+  "124596463310175": {
+    "file": "rocks/RockSpireA/RockSpireA.glb",
+    "initialSize": [
+      1.135,
+      0.965,
+      1.025
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "124832442437427": {
     "file": "items/Warehouse/Warehouse.glb",
@@ -1880,6 +2170,16 @@
     ],
     "node": "LeftLowerArm"
   },
+  "125645204407135": {
+    "file": "rocks/RubbleTunnel/RubbleTunnel.glb",
+    "initialSize": [
+      18.136,
+      12.599,
+      9.758
+    ],
+    "node": "Body",
+    "tint": true
+  },
   "125835772079020": {
     "file": "trees/Oak/Leaves_B.glb",
     "initialSize": [
@@ -1906,6 +2206,16 @@
       0.94
     ],
     "node": "RightLowerArm"
+  },
+  "126355289210718": {
+    "file": "rocks/RockPebbleClusterB/RockPebbleClusterB.glb",
+    "initialSize": [
+      2.614,
+      0.745,
+      1.871
+    ],
+    "node": "MeshSnow",
+    "tint": true
   },
   "126429254955747": {
     "file": "buildings/GeneralStore/GeneralStore.glb",
@@ -1979,6 +2289,16 @@
     ],
     "node": "Body"
   },
+  "126856307775172": {
+    "file": "rocks/RubbleBoulders/RubbleBoulders.glb",
+    "initialSize": [
+      15.558,
+      9.705,
+      6.794
+    ],
+    "node": "Moss",
+    "tint": true
+  },
   "126860307040734": {
     "file": "environment/StoreBoard/StoreBoard.glb",
     "initialSize": [
@@ -2006,6 +2326,16 @@
     ],
     "node": "Handle"
   },
+  "127108880483384": {
+    "file": "rocks/RockSlabA/RockSlabA.glb",
+    "initialSize": [
+      2.641,
+      1.02,
+      2.765
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
   "127150152790679": {
     "file": "vehicles/LoggingRig/LoggingRig.glb",
     "initialSize": [
@@ -2032,6 +2362,16 @@
       3.852
     ],
     "node": "Glass"
+  },
+  "127956204159935": {
+    "file": "rocks/RockPebbleClusterA/RockPebbleClusterA.glb",
+    "initialSize": [
+      0.979,
+      0.604,
+      0.994
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "128014872762728": {
     "file": "trees/Emberwood/Leaves_A.glb",
@@ -2132,6 +2472,16 @@
     ],
     "node": "BarnDoorR"
   },
+  "129233942409876": {
+    "file": "rocks/RockPebbleClusterB/RockPebbleClusterB.glb",
+    "initialSize": [
+      1.99,
+      0.919,
+      1.341
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
   "129236426052873": {
     "file": "npcs/Hazel/Hazel.glb",
     "initialSize": [
@@ -2140,6 +2490,16 @@
       0.9
     ],
     "node": "LeftLowerLeg"
+  },
+  "129244625350818": {
+    "file": "rocks/RockOutcropB/RockOutcropB.glb",
+    "initialSize": [
+      3.091,
+      1.037,
+      1.667
+    ],
+    "node": "MeshMoss",
+    "tint": true
   },
   "129282759397083": {
     "file": "npcs/Murph/Murph.glb",
@@ -2167,6 +2527,16 @@
       0.96
     ],
     "node": "RightUpperLeg"
+  },
+  "129384016726186": {
+    "file": "rocks/RockSpireA/RockSpireA.glb",
+    "initialSize": [
+      2.424,
+      2.708,
+      1.678
+    ],
+    "node": "MeshSnow",
+    "tint": true
   },
   "129553230069326": {
     "file": "vehicles/PonyTrailer/PonyTrailer.glb",
@@ -2204,6 +2574,26 @@
     ],
     "node": "UpperTorso"
   },
+  "130142943401116": {
+    "file": "rocks/RockOutcropB/RockOutcropB.glb",
+    "initialSize": [
+      3.238,
+      1.334,
+      1.798
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
+  "130260208165473": {
+    "file": "rocks/RockPebbleClusterB/RockPebbleClusterB.glb",
+    "initialSize": [
+      1.746,
+      0.478,
+      1.128
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
   "130355041655175": {
     "file": "items/Shed/Shed.glb",
     "initialSize": [
@@ -2231,6 +2621,16 @@
     ],
     "node": "Glow"
   },
+  "130502799772380": {
+    "file": "rocks/RubbleTunnel/RubbleTunnel.glb",
+    "initialSize": [
+      14.9,
+      11.188,
+      6.955
+    ],
+    "node": "Timber",
+    "tint": true
+  },
   "130628169716671": {
     "file": "npcs/Tink/Tink.glb",
     "initialSize": [
@@ -2257,6 +2657,16 @@
       0.88
     ],
     "node": "LeftLowerArm"
+  },
+  "130743362864832": {
+    "file": "rocks/RockBoulderB/RockBoulderB.glb",
+    "initialSize": [
+      1.569,
+      1.622,
+      2.22
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "130983332723451": {
     "file": "items/Stairs/Stairs.glb",
@@ -2302,6 +2712,16 @@
       0.94
     ],
     "node": "RightUpperArm"
+  },
+  "131449379256182": {
+    "file": "rocks/RockCrackedBoulderB/RockCrackedBoulderB.glb",
+    "initialSize": [
+      1.749,
+      1.369,
+      1.981
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "131540414701446": {
     "file": "npcs/Pip/Pip.glb",
@@ -2383,6 +2803,16 @@
       0.08
     ],
     "node": "Glass"
+  },
+  "132475579395371": {
+    "file": "rocks/RockCrackedBoulderA/RockCrackedBoulderA.glb",
+    "initialSize": [
+      1.369,
+      1.25,
+      1.819
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "132533867776257": {
     "file": "npcs/Rosa/Rosa.glb",
@@ -2492,6 +2922,16 @@
     ],
     "node": "Collision"
   },
+  "133514845456052": {
+    "file": "rocks/RockSpireA/RockSpireA.glb",
+    "initialSize": [
+      2.093,
+      1.68,
+      1.802
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
   "133911836509151": {
     "file": "kit/Window/Window.glb",
     "initialSize": [
@@ -2509,6 +2949,16 @@
       3.072
     ],
     "node": "Hitch"
+  },
+  "134147863493545": {
+    "file": "rocks/RockOutcropB/RockOutcropB.glb",
+    "initialSize": [
+      2.379,
+      1.535,
+      1.975
+    ],
+    "node": "MeshGlow",
+    "tint": true
   },
   "134460693041565": {
     "file": "kit/RoofCorner/RoofCorner.glb",
@@ -2545,6 +2995,16 @@
       20.0
     ],
     "node": "Collision"
+  },
+  "134764809615746": {
+    "file": "rocks/RockCrackedBoulderA/RockCrackedBoulderA.glb",
+    "initialSize": [
+      1.608,
+      1.372,
+      1.983
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "134865694365483": {
     "file": "trees/Lumenwood/Facet_Section_3.glb",
@@ -2600,6 +3060,16 @@
     ],
     "node": "Wood"
   },
+  "135285101472759": {
+    "file": "rocks/RockBoulderA/RockBoulderA.glb",
+    "initialSize": [
+      1.688,
+      1.532,
+      2.144
+    ],
+    "node": "MeshVein1",
+    "tint": true
+  },
   "135415690415895": {
     "file": "trees/Gloamwood/Facet_C.glb",
     "initialSize": [
@@ -2644,6 +3114,16 @@
       2.1
     ],
     "node": "Body"
+  },
+  "135954677451616": {
+    "file": "rocks/RockBoulderB/RockBoulderB.glb",
+    "initialSize": [
+      3.808,
+      1.73,
+      2.814
+    ],
+    "node": "MeshHost",
+    "tint": true
   },
   "135958628937217": {
     "file": "npcs/Rosa/Rosa.glb",
@@ -2960,6 +3440,16 @@
     ],
     "node": "Hitch"
   },
+  "139498143650556": {
+    "file": "rocks/RockSpireB/RockSpireB.glb",
+    "initialSize": [
+      1.163,
+      2.844,
+      1.436
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
   "139564345155945": {
     "file": "npcs/Dale/Dale.glb",
     "initialSize": [
@@ -3014,6 +3504,16 @@
     ],
     "node": "Wheel"
   },
+  "140021699860349": {
+    "file": "rocks/RockSpireB/RockSpireB.glb",
+    "initialSize": [
+      1.699,
+      2.24,
+      1.452
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
   "140048197540221": {
     "file": "environment/MurphsCamp/MurphsCamp.glb",
     "initialSize": [
@@ -3022,6 +3522,36 @@
       0.44
     ],
     "node": "Glow"
+  },
+  "140068358947807": {
+    "file": "rocks/RockPebbleClusterB/RockPebbleClusterB.glb",
+    "initialSize": [
+      2.362,
+      0.548,
+      1.642
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
+  "140288429621552": {
+    "file": "rocks/RockPebbleClusterA/RockPebbleClusterA.glb",
+    "initialSize": [
+      0.755,
+      0.485,
+      0.797
+    ],
+    "node": "MeshVein2",
+    "tint": true
+  },
+  "140345419460828": {
+    "file": "rocks/RockSlabB/RockSlabB.glb",
+    "initialSize": [
+      2.519,
+      0.885,
+      2.748
+    ],
+    "node": "MeshGlow",
+    "tint": true
   },
   "140349480773545": {
     "file": "vehicles/Flatbed/Flatbed.glb",
@@ -3058,6 +3588,16 @@
       0.78
     ],
     "node": "LeftHand"
+  },
+  "140599043656529": {
+    "file": "rocks/RockSlabB/RockSlabB.glb",
+    "initialSize": [
+      1.232,
+      0.495,
+      1.747
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "140616724444561": {
     "file": "items/Floor/Floor.glb",
@@ -3158,6 +3698,16 @@
     ],
     "node": "Glow"
   },
+  "72316176267224": {
+    "file": "rocks/RockPebbleClusterA/RockPebbleClusterA.glb",
+    "initialSize": [
+      2.331,
+      0.864,
+      2.025
+    ],
+    "node": "MeshSnow",
+    "tint": true
+  },
   "72378122111931": {
     "file": "npcs/Tink/Tink.glb",
     "initialSize": [
@@ -3166,6 +3716,16 @@
       1.22
     ],
     "node": "LeftFoot"
+  },
+  "72506631534828": {
+    "file": "rocks/RockPebbleClusterA/RockPebbleClusterA.glb",
+    "initialSize": [
+      1.971,
+      0.999,
+      1.401
+    ],
+    "node": "MeshGlow",
+    "tint": true
   },
   "72598895169696": {
     "file": "kit/RoofRidge8/RoofRidge8.glb",
@@ -3193,6 +3753,16 @@
       0.92
     ],
     "node": "RightUpperArm"
+  },
+  "73167730011310": {
+    "file": "rocks/RockOutcropA/RockOutcropA.glb",
+    "initialSize": [
+      0.833,
+      0.377,
+      1.304
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "73211772830716": {
     "file": "buildings/Dealership/Dealership.glb",
@@ -3284,6 +3854,16 @@
     ],
     "node": "Sign"
   },
+  "74075404917586": {
+    "file": "rocks/RockSlabA/RockSlabA.glb",
+    "initialSize": [
+      0.858,
+      0.554,
+      1.84
+    ],
+    "node": "MeshVein2",
+    "tint": true
+  },
   "74892568048481": {
     "file": "kit/Window/Window.glb",
     "initialSize": [
@@ -3338,6 +3918,16 @@
     ],
     "node": "Head"
   },
+  "76053001678761": {
+    "file": "rocks/RockSlabA/RockSlabA.glb",
+    "initialSize": [
+      1.274,
+      0.554,
+      1.884
+    ],
+    "node": "MeshVein1",
+    "tint": true
+  },
   "76073821702142": {
     "file": "vehicles/RanchTrailer/by_truck/LoggingRig/RanchTrailer_LoggingRig.glb",
     "initialSize": [
@@ -3355,6 +3945,16 @@
       12.128
     ],
     "node": "Body"
+  },
+  "76321144260453": {
+    "file": "rocks/RockOutcropA/RockOutcropA.glb",
+    "initialSize": [
+      2.916,
+      1.14,
+      1.914
+    ],
+    "node": "MeshHost",
+    "tint": true
   },
   "76520784565504": {
     "file": "trees/Frostwood/Leaves_A.glb",
@@ -3509,6 +4109,16 @@
     ],
     "node": "Glow"
   },
+  "78056572803123": {
+    "file": "rocks/RockBoulderA/RockBoulderA.glb",
+    "initialSize": [
+      3.532,
+      1.981,
+      2.646
+    ],
+    "node": "MeshSnow",
+    "tint": true
+  },
   "78264803126606": {
     "file": "npcs/Murph/Murph.glb",
     "initialSize": [
@@ -3526,6 +4136,16 @@
       24.436
     ],
     "node": "Leaves"
+  },
+  "78415289115581": {
+    "file": "rocks/RockSpireA/RockSpireA.glb",
+    "initialSize": [
+      1.405,
+      0.942,
+      1.208
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "78552137472446": {
     "file": "kit/Wall12/Wall12.glb",
@@ -3598,6 +4218,16 @@
       6.039
     ],
     "node": "Facet"
+  },
+  "79400154649592": {
+    "file": "rocks/RockOutcropB/RockOutcropB.glb",
+    "initialSize": [
+      1.504,
+      0.986,
+      1.52
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "79516772478629": {
     "file": "trees/Frostwood/Leaves_C.glb",
@@ -3698,6 +4328,16 @@
     ],
     "node": "Handle"
   },
+  "80686921861072": {
+    "file": "rocks/RockBoulderA/RockBoulderA.glb",
+    "initialSize": [
+      3.422,
+      2.02,
+      2.394
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
   "80860699331818": {
     "file": "axes/SilverAxe/SilverAxe.glb",
     "initialSize": [
@@ -3779,6 +4419,16 @@
     ],
     "node": "Wood"
   },
+  "81217018152748": {
+    "file": "rocks/RockBoulderB/RockBoulderB.glb",
+    "initialSize": [
+      1.733,
+      1.381,
+      2.311
+    ],
+    "node": "MeshVein1",
+    "tint": true
+  },
   "81476867108470": {
     "file": "trees/Oak/Section_3.glb",
     "initialSize": [
@@ -3805,6 +4455,16 @@
       3.203
     ],
     "node": "Wheel"
+  },
+  "81898150064862": {
+    "file": "rocks/RockOutcropA/RockOutcropA.glb",
+    "initialSize": [
+      1.193,
+      0.417,
+      1.805
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "82098165138477": {
     "file": "vehicles/LoggingRig/LoggingRig.glb",
@@ -3877,6 +4537,16 @@
       3.067
     ],
     "node": "Hitch"
+  },
+  "82487395045845": {
+    "file": "rocks/RockCrackedBoulderA/RockCrackedBoulderA.glb",
+    "initialSize": [
+      2.843,
+      1.348,
+      1.9
+    ],
+    "node": "MeshMoss",
+    "tint": true
   },
   "82514834771582": {
     "file": "buildings/Dealership/Dealership.glb",
@@ -3977,6 +4647,16 @@
     ],
     "node": "LeftHand"
   },
+  "83797901809117": {
+    "file": "rocks/RockSlabB/RockSlabB.glb",
+    "initialSize": [
+      4.074,
+      1.172,
+      1.986
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
   "83918398499306": {
     "file": "environment/LampPost/LampPost.glb",
     "initialSize": [
@@ -4021,6 +4701,16 @@
       1.6
     ],
     "node": "Collision"
+  },
+  "84286722746349": {
+    "file": "rocks/RockSlabA/RockSlabA.glb",
+    "initialSize": [
+      3.415,
+      0.88,
+      2.442
+    ],
+    "node": "MeshSnow",
+    "tint": true
   },
   "84294902067749": {
     "file": "environment/Campfire/Campfire.glb",
@@ -4129,6 +4819,16 @@
       7.47
     ],
     "node": "WindowGlass"
+  },
+  "85402746195194": {
+    "file": "rocks/RockCrackedBoulderB/RockCrackedBoulderB.glb",
+    "initialSize": [
+      3.15,
+      1.948,
+      2.587
+    ],
+    "node": "MeshSnow",
+    "tint": true
   },
   "85578922834247": {
     "file": "vehicles/RanchTrailer/by_truck/Flatbed/RanchTrailer_Flatbed.glb",
@@ -4463,6 +5163,16 @@
     ],
     "node": "Body"
   },
+  "89071774904778": {
+    "file": "rocks/RockSlabA/RockSlabA.glb",
+    "initialSize": [
+      3.164,
+      0.82,
+      2.16
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
   "89084974588543": {
     "file": "trees/Lumenwood/Facet_A.glb",
     "initialSize": [
@@ -4489,6 +5199,16 @@
       4.548
     ],
     "node": "Wheel"
+  },
+  "89464630244395": {
+    "file": "rocks/RockSpireA/RockSpireA.glb",
+    "initialSize": [
+      1.247,
+      2.25,
+      1.207
+    ],
+    "node": "MeshMoss",
+    "tint": true
   },
   "89489461690884": {
     "file": "items/Cabin/Cabin.glb",
@@ -4661,6 +5381,36 @@
     ],
     "node": "Wood"
   },
+  "92619823907586": {
+    "file": "rocks/RubbleBoulders/RubbleBoulders.glb",
+    "initialSize": [
+      17.082,
+      12.776,
+      9.68
+    ],
+    "node": "Body",
+    "tint": true
+  },
+  "92695059497176": {
+    "file": "rocks/RockOutcropA/RockOutcropA.glb",
+    "initialSize": [
+      1.783,
+      1.808,
+      1.839
+    ],
+    "node": "MeshGlow",
+    "tint": true
+  },
+  "92851382181470": {
+    "file": "rocks/RockOutcropA/RockOutcropA.glb",
+    "initialSize": [
+      3.231,
+      1.326,
+      2.198
+    ],
+    "node": "MeshSnow",
+    "tint": true
+  },
   "92965386864498": {
     "file": "axes/StarfallAxe/StarfallAxe.glb",
     "initialSize": [
@@ -4669,6 +5419,16 @@
       0.396
     ],
     "node": "Handle"
+  },
+  "93012071548500": {
+    "file": "rocks/RockCrackedBoulderB/RockCrackedBoulderB.glb",
+    "initialSize": [
+      1.958,
+      1.203,
+      2.052
+    ],
+    "node": "MeshVein1",
+    "tint": true
   },
   "93031171745389": {
     "file": "vehicles/ScoutATV/ScoutATV.glb",
@@ -4705,6 +5465,16 @@
       26.08
     ],
     "node": "Bed"
+  },
+  "93389463678447": {
+    "file": "rocks/RockPebbleClusterA/RockPebbleClusterA.glb",
+    "initialSize": [
+      1.806,
+      0.516,
+      1.257
+    ],
+    "node": "MeshMoss",
+    "tint": true
   },
   "93478161314715": {
     "file": "npcs/Rosa/Rosa.glb",
@@ -4768,6 +5538,16 @@
       13.0
     ],
     "node": "Bed"
+  },
+  "94839303985408": {
+    "file": "rocks/RockOutcropB/RockOutcropB.glb",
+    "initialSize": [
+      3.376,
+      1.533,
+      1.991
+    ],
+    "node": "MeshSnow",
+    "tint": true
   },
   "94887677148607": {
     "file": "vehicles/RanchTrailer/RanchTrailer.glb",
@@ -4841,6 +5621,26 @@
     ],
     "node": "Facet"
   },
+  "95470563986109": {
+    "file": "rocks/RockCrackedBoulderB/RockCrackedBoulderB.glb",
+    "initialSize": [
+      2.913,
+      1.496,
+      1.946
+    ],
+    "node": "MeshMoss",
+    "tint": true
+  },
+  "95595144644129": {
+    "file": "rocks/CaveMouth/CaveMouth.glb",
+    "initialSize": [
+      17.62,
+      1.05,
+      0.52
+    ],
+    "node": "Glow",
+    "tint": true
+  },
   "95905082010293": {
     "file": "kit/Beam8/Beam8.glb",
     "initialSize": [
@@ -4913,6 +5713,16 @@
     ],
     "node": "LeftHand"
   },
+  "96322577929774": {
+    "file": "rocks/RockOutcropB/RockOutcropB.glb",
+    "initialSize": [
+      0.637,
+      0.44,
+      1.153
+    ],
+    "node": "MeshVein2",
+    "tint": true
+  },
   "96607075043621": {
     "file": "environment/MillBell/MillBell.glb",
     "initialSize": [
@@ -4948,6 +5758,16 @@
       0.78
     ],
     "node": "LeftHand"
+  },
+  "97286944998962": {
+    "file": "rocks/RockSpireB/RockSpireB.glb",
+    "initialSize": [
+      1.203,
+      0.829,
+      1.5
+    ],
+    "node": "MeshVein2",
+    "tint": true
   },
   "97410892935245": {
     "file": "npcs/Pip/Pip.glb",
@@ -5147,6 +5967,16 @@
     ],
     "node": "Body"
   },
+  "98952222683990": {
+    "file": "rocks/RockSpireB/RockSpireB.glb",
+    "initialSize": [
+      1.844,
+      2.62,
+      1.524
+    ],
+    "node": "MeshHost",
+    "tint": true
+  },
   "99228152972776": {
     "file": "environment/Fence/Fence.glb",
     "initialSize": [
@@ -5173,6 +6003,16 @@
       19.224
     ],
     "node": "Leaves"
+  },
+  "99645603164777": {
+    "file": "rocks/CaveMouth/CaveMouth.glb",
+    "initialSize": [
+      18.8,
+      15.5,
+      7.175
+    ],
+    "node": "Frame",
+    "tint": true
   },
   "99726500181036": {
     "file": "kit/TallWall8/TallWall8.glb",

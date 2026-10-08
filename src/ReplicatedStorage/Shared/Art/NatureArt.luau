@@ -864,38 +864,42 @@ local function lookName(look: string?): string
 	return "meadow"
 end
 
-local function firstPart(root: Model, name: string): BasePart?
-	for _, d in ipairs(root:GetDescendants()) do
-		if d:IsA("BasePart") and d.Name == name and d:GetAttribute("VisualMesh") ~= true then
-			return d
-		end
-	end
-	return nil
-end
-
-local function partsNamed(root: Model, name: string): { BasePart }
-	local list: { BasePart } = {}
-	for _, d in ipairs(root:GetDescendants()) do
-		if d:IsA("BasePart") and d.Name == name and d:GetAttribute("VisualMesh") ~= true then
-			table.insert(list, d)
-		end
-	end
-	return list
-end
-
+-- One uploaded piece of a rock. MeshHost is placed at the build origin plus
+-- hostCentre * scale; every other piece sits at MeshHost.CFrame * offset *
+-- scale (unrotated offsets, so the pieces follow the host's rotation).
 type MeshSlot = {
 	name: string,
 	label: string,
 	meshId: number,
 	size: Vector3,
-	at: BasePart,
+	offset: Vector3,
 	color: Color3?,
 	material: Enum.Material?,
 }
 
--- Clone every slot or leave the part build alone. A 0 id, a failed load,
--- or a slot with nowhere to sit all count as missing.
-local function applySlots(root: Model, shape: string, slots: { MeshSlot }): boolean
+local function slotOf(
+	name: string,
+	label: string,
+	piece: RockModels.Piece,
+	scale: number,
+	color: Color3?,
+	material: Enum.Material?
+): MeshSlot
+	return {
+		name = name,
+		label = label,
+		meshId = piece.meshId,
+		size = piece.size * scale,
+		offset = piece.offset * scale,
+		color = color,
+		material = material,
+	}
+end
+
+-- Clone every slot or leave the part build alone. A 0 id or a failed load
+-- counts as missing. slots[1] is MeshHost. The part-built parts are dropped
+-- only once every mesh exists.
+local function applySlots(root: Model, shape: string, slots: { MeshSlot }, hostCentre: Vector3): boolean
 	for _, slot in ipairs(slots) do
 		if not RockModels.UsesMesh(slot.meshId) then
 			logFallback(shape, slot.label, slot.meshId)
@@ -912,14 +916,20 @@ local function applySlots(root: Model, shape: string, slots: { MeshSlot }): bool
 		root:SetAttribute("MeshFallback", slot.label)
 		return false
 	end
-	for _, slot in ipairs(slots) do
-		local mesh = MeshKit.Create(slot.meshId, slot.name, slot.size)
+	local hostCf = CFrame.new(hostCentre)
+	for index, slot in ipairs(slots) do
+		local fidelity = if index == 1 then Enum.CollisionFidelity.Hull else nil
+		local mesh = MeshKit.Create(slot.meshId, slot.name, slot.size, fidelity)
 		if not mesh then
 			return abandon(slot)
 		end
 		MeshKit.Visual(mesh, slot.meshId)
 		mesh.Anchored = true
-		mesh.CFrame = slot.at.CFrame
+		if index == 1 then
+			mesh.CFrame = hostCf
+		else
+			mesh.CFrame = hostCf * CFrame.new(slot.offset)
+		end
 		Kit.decor(mesh, false)
 		if slot.color then
 			mesh.Color = slot.color
@@ -958,108 +968,60 @@ local function oreGlow(host: BasePart, color: Color3)
 	lamp.Parent = host
 end
 
-local function applyNatureMeshes(root: Model, shape: string, look: string, rockLook: RockLook, scale: number)
-	local spec = RockModels.Get(shape)
+local function applyNatureMeshes(
+	root: Model,
+	shape: string,
+	variant: RockModels.Variant,
+	look: string,
+	rockLook: RockLook,
+	scale: number
+)
+	local spec = RockModels.Get(shape, variant)
 	if not spec then
 		return
 	end
-	local core = firstPart(root, "Core")
-	if not core then
-		logFallback(shape, "host", spec.Host.meshId)
-		root:SetAttribute("MeshFallback", "host")
-		return
-	end
+	local tag = shape .. variant
 	local slots: { MeshSlot } = {
-		{
-			name = "MeshHost",
-			label = "host",
-			meshId = spec.Host.meshId,
-			size = spec.Host.size * scale,
-			at = core,
-		},
+		slotOf("MeshHost", "host", spec.Host, scale, rockLook.stone, rockLook.stoneMat),
 	}
-	if look == "meadow" or look == "snow" then
-		local capPart = firstPart(root, "Cap")
-		local piece = if look == "meadow" then spec.Moss else spec.Snow
-		local label = if look == "meadow" then "moss" else "snow"
-		if not capPart then
-			logFallback(shape, label, piece.meshId)
-			root:SetAttribute("MeshFallback", label)
-			return
-		end
-		table.insert(slots, {
-			name = if look == "meadow" then "MeshMoss" else "MeshSnow",
-			label = label,
-			meshId = piece.meshId,
-			size = piece.size * scale,
-			at = capPart,
-			color = rockLook.cap,
-			material = rockLook.capMat,
-		})
+	if look == "meadow" then
+		table.insert(slots, slotOf("MeshMoss", "moss", spec.Moss, scale, rockLook.cap, rockLook.capMat))
+	elseif look == "snow" then
+		table.insert(slots, slotOf("MeshSnow", "snow", spec.Snow, scale, rockLook.cap, rockLook.capMat))
 	end
-	applySlots(root, shape, slots)
+	applySlots(root, tag, slots, spec.hostCentre * scale)
 end
 
 local function applyOreMeshes(
 	root: Model,
 	shape: string,
+	variant: RockModels.Variant,
+	moss: boolean,
 	scale: number,
+	hostLook: RockLook,
 	color: Color3,
 	material: Enum.Material,
 	useGlow: boolean,
 	heartstone: boolean
 ): boolean
-	local spec = RockModels.Get(shape)
+	local spec = RockModels.Get(shape, variant)
 	if not spec then
 		return false
 	end
-	local core = firstPart(root, "Core")
-	if not core then
-		logFallback(shape, "host", spec.Host.meshId)
-		root:SetAttribute("MeshFallback", "host")
-		return false
-	end
-	local slots: { MeshSlot } = {
-		{
-			name = "MeshHost",
-			label = "host",
-			meshId = spec.Host.meshId,
-			size = spec.Host.size * scale,
-			at = core,
-		},
-	}
-	local veins = partsNamed(root, "Vein")
-	local veinPieces = { spec.Vein1, spec.Vein2 }
+	local tag = shape .. variant
 	local veinMat = veinMaterial(material, useGlow)
-	for index, piece in ipairs(veinPieces) do
-		local at = veins[index]
-		if not at then
-			logFallback(shape, "vein " .. tostring(index), piece.meshId)
-			root:SetAttribute("MeshFallback", "vein " .. tostring(index))
-			return false
-		end
-		table.insert(slots, {
-			name = "MeshVein" .. tostring(index),
-			label = "vein " .. tostring(index),
-			meshId = piece.meshId,
-			size = piece.size * scale,
-			at = at,
-			color = color,
-			material = veinMat,
-		})
+	local slots: { MeshSlot } = {
+		slotOf("MeshHost", "host", spec.Host, scale, hostLook.stone, hostLook.stoneMat),
+		slotOf("MeshVein1", "vein 1", spec.Vein1, scale, color, veinMat),
+		slotOf("MeshVein2", "vein 2", spec.Vein2, scale, color, veinMat),
+	}
+	if moss then
+		table.insert(slots, slotOf("MeshMoss", "moss", spec.Moss, scale, hostLook.cap, Enum.Material.Grass))
 	end
 	if heartstone then
-		table.insert(slots, {
-			name = "MeshGlow",
-			label = "heartstone glow",
-			meshId = spec.Glow.meshId,
-			size = spec.Glow.size * scale,
-			at = core,
-			color = color,
-			material = Enum.Material.Neon,
-		})
+		table.insert(slots, slotOf("MeshGlow", "heartstone glow", spec.Glow, scale, color, Enum.Material.Neon))
 	end
-	if not applySlots(root, shape, slots) then
+	if not applySlots(root, tag, slots, spec.hostCentre * scale) then
 		return false
 	end
 	if useGlow then
@@ -1071,11 +1033,16 @@ local function applyOreMeshes(
 	return true
 end
 
+-- Same seed, same variant.
+local function variantFor(seed: number): RockModels.Variant
+	return if math.floor(seed / 2) % 2 == 0 then "A" else "B"
+end
+
 -- One decoration model at the origin. `sizeName` is "small", "mid" or
 -- "large" (rocks). `look` is a biome palette (meadow, snow, shore, volcano,
 -- gloam, cave). Plants ignore both and stay hand-sized. A rock is tilted
 -- and sunk so it sits in the ground.
-function NatureArt.Build(kind: string, seed: number, sizeName: string?, look: string?): Model
+local function buildOne(kind: string, seed: number, sizeName: string?, look: string?, tilt: boolean): Model
 	local rng = Kit.rng(seed)
 	local s = scaleOf(sizeName)
 	local m = model(kind)
@@ -1091,8 +1058,10 @@ function NatureArt.Build(kind: string, seed: number, sizeName: string?, look: st
 		if accent then
 			accent(m, s, rockLook)
 		end
-		applyNatureMeshes(m, kind, lookName(look), rockLook, s)
-		settle(m, seed)
+		applyNatureMeshes(m, kind, variantFor(seed), lookName(look), rockLook, s)
+		if tilt then
+			settle(m, seed)
+		end
 		return m
 	end
 	if kind == "Fern" then
@@ -1134,6 +1103,16 @@ function NatureArt.Build(kind: string, seed: number, sizeName: string?, look: st
 		glowLight(host, if kind == "GlowFungus" then hex("#7AF2C8") else NatureArt.WispViolet, range)
 	end
 	return m
+end
+
+function NatureArt.Build(kind: string, seed: number, sizeName: string?, look: string?): Model
+	return buildOne(kind, seed, sizeName, look, true)
+end
+
+-- Build without the tilt, jitter and sink: the rock stands at its build
+-- origin. For specs and previews that check where the mesh pieces sit.
+function NatureArt.BuildFlat(kind: string, seed: number, sizeName: string?, look: string?): Model
+	return buildOne(kind, seed, sizeName, look, false)
 end
 
 local function oreSeed(shape: string, sizeName: string): number
@@ -1222,10 +1201,12 @@ function NatureArt.OreRock(
 		m:SetAttribute("OreId", "")
 	end
 	local s = scaleOf(sizeName)
-	local body = BODIES[shape] or BODIES.Boulder
-	body(m, s, oreHost(color))
-	embedVeins(m, shape, color, veinMaterial(material, useGlow))
-	local meshed = applyOreMeshes(m, shape, s, color, material, useGlow, heartstone)
+	local kind, variant, moss = RockModels.KindFor(shape)
+	local body = BODIES[kind] or BODIES.Boulder
+	local hostLook = oreHost(color)
+	body(m, s, hostLook)
+	embedVeins(m, kind, color, veinMaterial(material, useGlow))
+	local meshed = applyOreMeshes(m, kind, variant, moss, s, hostLook, color, material, useGlow, heartstone)
 	if not meshed and useGlow then
 		local host = m:FindFirstChild("Vein")
 		if host and host:IsA("BasePart") then
@@ -1233,6 +1214,150 @@ function NatureArt.OreRock(
 		end
 	end
 	settle(m, oreSeed(shape, sizeName))
+	return m
+end
+
+-- Scenery built from RockModels.Scenery pieces (Body, Frame, Glow, Collision).
+-- `at` is the pivot (ground height at the mouth), the opening faces model -Z
+-- and the throat runs to +Z. Pieces sit at the Body centre plus their offset.
+-- Body, Frame and Glow are looks only (no collision); Collision is the
+-- invisible blocker. A 0 id or a failed load keeps a plain part-built frame
+-- of the same opening, logged once.
+local MOUTH_WIDTH = 16
+local MOUTH_HEIGHT = 12
+
+local function caveMouthParts(m: Model, spec: RockModels.Scenery)
+	local base = CFrame.new(spec.hostCentre)
+	local body = spec.pieces.Body
+	local function at(piece: RockModels.SceneryPiece): CFrame
+		return base * CFrame.new(piece.offset)
+	end
+	local stone = hex("#7E766C")
+	local timber = hex("#6B4A2B")
+	local sideW = (body.size.X - MOUTH_WIDTH) * 0.5
+	local y = body.size.Y * 0.5
+	local depth = body.size.Z
+	part(
+		m,
+		"Body",
+		Vector3.new(sideW, body.size.Y, depth),
+		base * CFrame.new(-(MOUTH_WIDTH + sideW) * 0.5, 0, 0),
+		stone,
+		ROCK
+	)
+	part(
+		m,
+		"Body",
+		Vector3.new(sideW, body.size.Y, depth),
+		base * CFrame.new((MOUTH_WIDTH + sideW) * 0.5, 0, 0),
+		stone,
+		ROCK
+	)
+	local lintel = body.size.Y - MOUTH_HEIGHT
+	part(
+		m,
+		"Body",
+		Vector3.new(MOUTH_WIDTH, lintel, depth),
+		base * CFrame.new(0, -y + MOUTH_HEIGHT + lintel * 0.5, 0),
+		stone,
+		ROCK
+	)
+	part(
+		m,
+		"Frame",
+		Vector3.new(MOUTH_WIDTH + 1.6, 0.8, 0.8),
+		base * CFrame.new(0, -y + MOUTH_HEIGHT + 0.4, -depth * 0.5),
+		timber,
+		Enum.Material.Wood
+	)
+	for _, sx in ipairs({ -1, 1 }) do
+		part(
+			m,
+			"Frame",
+			Vector3.new(0.8, MOUTH_HEIGHT, 0.8),
+			base * CFrame.new(sx * (MOUTH_WIDTH + 0.8) * 0.5, -y + MOUTH_HEIGHT * 0.5, -depth * 0.5),
+			timber,
+			Enum.Material.Wood
+		)
+	end
+	local glow = spec.pieces.Glow
+	part(m, "Glow", Vector3.new(glow.size.X, 0.4, 0.3), at(glow), hex("#FFC873"), Enum.Material.Neon)
+end
+
+local function caveMouthLight(parent: BasePart)
+	local lamp = Instance.new("PointLight")
+	lamp.Name = "MouthLight"
+	lamp.Range = 14
+	lamp.Brightness = 1
+	lamp.Color = hex("#FFC873")
+	lamp.Shadows = false
+	lamp.Parent = parent
+end
+
+function NatureArt.CaveMouth(): Model
+	local m = model("CaveMouth")
+	local spec = RockModels.Scenery("CaveMouth")
+	assert(spec, "CaveMouth spec missing")
+	local base = CFrame.new(spec.hostCentre)
+	local order = { "Body", "Frame", "Glow", "Collision" }
+	local ok = true
+	for _, name in ipairs(order) do
+		if not RockModels.UsesMesh(spec.pieces[name].meshId) then
+			logFallback("CaveMouth", name, spec.pieces[name].meshId)
+			m:SetAttribute("MeshFallback", name)
+			ok = false
+			break
+		end
+	end
+	local made: { MeshPart } = {}
+	if ok then
+		for _, name in ipairs(order) do
+			local piece = spec.pieces[name]
+			local fidelity = if name == "Body" or name == "Collision" then Enum.CollisionFidelity.Hull else nil
+			local mesh = MeshKit.Create(piece.meshId, name, piece.size, fidelity)
+			if not mesh then
+				logFallback("CaveMouth", name, piece.meshId)
+				m:SetAttribute("MeshFallback", name)
+				for _, d in ipairs(made) do
+					d:Destroy()
+				end
+				ok = false
+				break
+			end
+			MeshKit.Visual(mesh, piece.meshId)
+			mesh.Anchored = true
+			mesh.CFrame = if name == "Body" then base else base * CFrame.new(piece.offset)
+			Kit.decor(mesh, false)
+			if name == "Body" then
+				mesh.Color = NatureArt.CliffRock
+				mesh.Material = ROCK
+			elseif name == "Frame" then
+				mesh.Color = Color3.new(1, 1, 1)
+			elseif name == "Glow" then
+				mesh.Material = Enum.Material.Neon
+				mesh.Color = hex("#FFC873")
+			elseif name == "Collision" then
+				mesh.Transparency = 1
+				mesh.CanCollide = true
+				mesh.CanQuery = true
+			end
+			mesh.Parent = m
+			table.insert(made, mesh)
+		end
+	end
+	if ok then
+		local glow = m:FindFirstChild("Glow")
+		if glow and glow:IsA("BasePart") then
+			caveMouthLight(glow)
+		end
+		m:SetAttribute("RockMesh", true)
+		return m
+	end
+	caveMouthParts(m, spec)
+	local lit = m:FindFirstChild("Glow")
+	if lit and lit:IsA("BasePart") then
+		caveMouthLight(lit)
+	end
 	return m
 end
 
